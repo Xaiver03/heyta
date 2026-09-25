@@ -1,0 +1,15 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "rootDir": ".",
+    "lib": ["ES2022", "DOM"],
+    "jsx": "react-jsx",
+    "moduleResolution": "bundler",
+    "module": "esnext",
+    "types": ["react", "node"],
+    "skipLibCheck": true
+  },
+  "include": ["src/**/*", "index.js", "*.js"],
+  "exclude": ["node_modules", "ios", "android"]
+}

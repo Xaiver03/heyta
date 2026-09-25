@@ -19,6 +19,12 @@ const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 /** 不扫描的目录。 */
 const SKIP_DIRS = new Set([
   'node_modules', '.git', '.pnpm-store', 'dist', 'build', 'coverage',
+  // CocoaPods 装下来的第三方源码。里面的 README 是**上游的**，
+  // 它的死链我们既不该修也修不了 —— 实测 `ios/Pods/RCT-Folly/README.md`
+  // 就有 2 个指向 folly/docs 的死链，而这个检查器会把它算成我们的问题。
+  'Pods',
+  // Android / Gradle 的原生产物目录。
+  '.gradle', '.cxx',
 ]);
 
 /** 上游克隆与第三方资料不归我们维护，检查它们的死链没有意义。 */

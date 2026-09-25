@@ -29,6 +29,7 @@ heyta 是一个**本地优先**的任务管理应用，目标是做一个功能�
 | `server/` | 同步服务端（Fastify + Prisma + PostgreSQL）。**vendored，MIT** | ✅ 已改造 |
 | `apps/` | 客户端外壳。**只允许放平台差异与 UI 绑定** | ✅ |
 | `apps/web/` | Web 壳（IndexedDB + 浏览器 fetch） | ✅ |
+| `apps/mobile/` | 移动壳（React Native 0.84.1 + op-sqlite）。**Android 实机跑通，iOS 构建通过，鸿蒙壳未建** | ✅ |
 | `apps/node-host/` | 非 Web 验证壳（真 SQLite 文件）。**接线已全部来自 `app-host`** | ✅ |
 | `docs/` | 产品文档。**分层规则见 [`docs/README.md`](docs/README.md)** | ✅ |
 | `research/` | 调研原料：上游克隆、原始报告、一次性脚本。**不是产品文档** | ⚠️ 归档性质 |
@@ -237,7 +238,7 @@ pnpm check:design     # 非零退出 = 有裸值
 pnpm install                    # 安装（工作区）
 pnpm -r build                   # 全量构建
 pnpm -r typecheck               # 全量类型检查
-pnpm -r test                    # 全量测试（当前 2137 个通过 + 11 个 Web E2E 默认跳过 + 1 个服务端跳过）
+pnpm -r test                    # 全量测试（当前 2216 个通过 + 25 个跳过：24 浏览器 E2E 默认跳过 + 1 服务端）
 
 pnpm verify:sync                # P0 验收：真实同步闭环（需要服务端在跑）
 pnpm verify:sync:dry            # 不需要服务端，只校验 op 形状
@@ -443,7 +444,7 @@ docker inspect <容器> --format '{{range .Config.Env}}{{println .}}{{end}}' | g
 |---|---|
 | P0 奠基 | ✅ 已完成（协议已跑通，Docker 实测通过） |
 | P1 单端闭环 | ✅ **已完成**（6 条零 mock E2E 全过）→ [详细计划](docs/plans/phase-1-single-client-loop.md) |
-| P2 多端补齐 | 🔄 **进行中**（存储契约 ✅ / SQLite ✅ / token 生成器 ✅ / **RN token 产物（含暗色合并 + 类型安全）** ✅ / **ArkTS 产物真编译器验证** ✅ / **RNOH 依赖链实测打通** ✅ / 非 Web 宿主 ✅ / **移动壳 ❌ 尚未创建**）→ [详细计划](docs/plans/phase-2-multi-platform.md) |
+| P2 多端补齐 | 🔄 **进行中**（存储契约 ✅ / SQLite ✅ / token 生成器 ✅ / **RN token 产物（含暗色合并 + 类型安全）** ✅ / **ArkTS 产物真编译器验证** ✅ / **RNOH 依赖链实测打通** ✅ / 非 Web 宿主 ✅ / **移动壳（Android 实机跑通）** ✅ / **iOS 壳** ✅ / 鸿蒙壳 ❌）→ [详细计划](docs/plans/phase-2-multi-platform.md) |
 | P3 平台特性 | ⏸ |
 
 总路线图：[`docs/plans/roadmap.md`](docs/plans/roadmap.md)

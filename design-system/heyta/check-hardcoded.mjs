@@ -28,11 +28,27 @@ import { join, dirname, resolve, relative, extname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
-const WEB_SRC = join(ROOT, 'apps/web/src');
 const verbose = process.argv.includes('--verbose');
 
-if (!existsSync(WEB_SRC)) {
-  console.log('⏭  apps/web/src 尚不存在，跳过设计变量检查。');
+/**
+ * 扫描范围。
+ *
+ * 🔴 这里是**全部客户端外壳**，不只是 Web。
+ * 之前只有 `apps/web/src`，于是移动端（用户实际在用的那个 App）
+ * 完全不受"组件禁止裸值"约束 —— 规则写了，但没在那个 App 上生效。
+ * 新增平台壳时必须同步加进来。
+ */
+const SCAN_ROOTS = [
+  { label: 'apps/web/src', path: join(ROOT, 'apps/web/src') },
+  { label: 'apps/mobile/src', path: join(ROOT, 'apps/mobile/src') },
+].filter((r) => {
+  if (existsSync(r.path)) return true;
+  if (verbose) console.log(`⏭  ${r.label} 尚不存在，跳过。`);
+  return false;
+});
+
+if (SCAN_ROOTS.length === 0) {
+  console.log('⏭  没有任何客户端源码目录，跳过设计变量检查。');
   process.exit(0);
 }
 
@@ -117,7 +133,7 @@ function allowed(line, match) {
   return LINE_ALLOW.some((a) => a.re.test(line));
 }
 
-const files = collect(WEB_SRC);
+const files = SCAN_ROOTS.flatMap((r) => collect(r.path));
 const problems = [];
 let checked = 0;
 
@@ -163,7 +179,7 @@ for (const file of files) {
 }
 
 console.log(
-  `\n扫描 ${checked} 个源文件（apps/web/src），检查 ${CHECKS.length} 类硬编码。`,
+  `\n扫描 ${checked} 个源文件（${SCAN_ROOTS.map((r) => r.label).join(' + ')}），检查 ${CHECKS.length} 类硬编码。`,
 );
 
 if (verbose) {

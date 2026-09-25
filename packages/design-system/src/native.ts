@@ -30,14 +30,21 @@ import {
 export { darkTokens, lightTokens, reducedMotionTokens, THEME_NAMES };
 export type { HeytaNativeTokens, ThemeName };
 
-/** RN `useColorScheme()` / `Appearance.getColorScheme()` 的返回形态。 */
-export type ColorSchemeLike = 'light' | 'dark' | null | undefined;
+/**
+ * RN `useColorScheme()` / `Appearance.getColorScheme()` 的返回形态。
+ *
+ * ⚠️ `'unspecified'` 是**真的会出现**的：Android 在某些机型/系统版本上就是这样
+ * 上报"用户没设过"的。漏掉它不会在运行时出错（`resolveThemeName` 只判 `=== 'dark'`），
+ * 但会让调用方在类型检查时被迫写一次无意义的强转 —— 而强转正是把
+ * "类型没表达真实情况"这件事盖住的东西（AGENTS.md §7 第 14 条）。
+ */
+export type ColorSchemeLike = 'light' | 'dark' | 'unspecified' | null | undefined;
 
 /**
  * 把 RN 的配色方案归一化成主题名。
  *
- * `null`/`undefined`（系统未指定）→ `'light'`。
- * 这是**有意的默认**：heyta 是蓝白亮色系，且暗色必须实测过才交付
+ * 除 `'dark'` 外一律 `'light'` —— `null`/`undefined`/`'unspecified'` 都是
+ * "系统没指定"，而 heyta 是蓝白亮色系。暗色必须实测过才交付
  * （见 `design-system/heyta/MASTER.md`），不能靠猜。
  */
 export function resolveThemeName(scheme: ColorSchemeLike): ThemeName {

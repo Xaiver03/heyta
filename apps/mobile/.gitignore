@@ -1,0 +1,44 @@
+# 移动壳的构建产物与依赖。
+#
+# 🔴 这个文件原本**不存在** —— RN 模板不生成它，而 `pod install` 会往
+# `ios/Pods/` 写 296 MB 的第三方源码。没有它，`git add apps/mobile`
+# 就会把整棵 CocoaPods 依赖树提交进仓库：不可审、不可维护，
+# 而且这 296 MB 里就有上游文档的死链（docs-link-check 实测抓到 2 个）。
+
+# ── 操作系统 ──
+.DS_Store
+
+# ── 依赖 ──
+node_modules/
+
+# ── Android ──
+android/.gradle/
+android/build/
+android/app/build/
+android/app/.cxx/
+# Gradle 的 C++ 构建缓存：react-native-svg 这类带 JNI 的库会在这里
+# 生成几万行 codegen 头文件，属于纯产物。
+android/local.properties
+*.keystore
+!debug.keystore
+.cxx/
+
+# ── iOS ──
+# CocoaPods 的依赖源码与产物。**绝不提交** —— 它由 Podfile.lock 完全决定，
+# 提交它等于把依赖以源码副本的形式塞进仓库。
+ios/Pods/
+ios/build/
+ios/DerivedData/
+**/xcuserdata/
+ios/.xcode.env.local
+*.podspec.bak
+
+# ── Metro / RN ──
+.metro-health-check*
+# JS bundle 由 Gradle 在构建时生成，不是源码。
+android/app/src/main/assets/index.android.bundle
+
+# ── 杂项 ──
+*.log
+npm-debug.log*
+yarn-error.log*

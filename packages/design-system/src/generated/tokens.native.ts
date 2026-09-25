@@ -122,6 +122,7 @@ export interface HeytaNativeTokens {
   readonly 'duration.normal': number;
   readonly 'duration.slow': number;
   readonly 'duration.exit': number;
+  readonly 'duration.press': number;
   /** cubic-bezier 是 CSS 时序函数，SwiftUI / ArkUI 没有同名类型；已导出控制点，需各端自行映射为动画曲线。 */
   readonly 'ease.standard': string;
   /** cubic-bezier 是 CSS 时序函数，SwiftUI / ArkUI 没有同名类型；已导出控制点，需各端自行映射为动画曲线。 */
@@ -153,6 +154,63 @@ export interface HeytaNativeTokens {
   readonly 'layout.quadrant-min-height': number;
   readonly 'border-width.thin': number;
   readonly 'border-width.thick': number;
+  readonly 'nav.tab-bar-height': number;
+  readonly 'nav.tab-icon-size': number;
+  readonly 'nav.tab-label-size': number;
+  readonly 'nav.tab-item-min-width': number;
+  readonly 'nav.tab-indicator-inset': number;
+  readonly 'nav.tab-indicator-width': number;
+  readonly 'nav.tab-indicator-height': number;
+  readonly 'nav.app-bar-height': number;
+  readonly 'nav.app-bar-title-size': number;
+  readonly 'nav.safe-top-min': number;
+  readonly 'nav.safe-bottom-min': number;
+  readonly 'screen.gutter': number;
+  readonly 'screen.section-gap': number;
+  readonly 'screen.bottom-inset': number;
+  readonly 'size.checkbox': number;
+  readonly 'size.row-min-height': number;
+  readonly 'size.swipe-action': number;
+  readonly 'size.avatar-sm': number;
+  readonly 'size.avatar-md': number;
+  readonly 'size.avatar-lg': number;
+  readonly 'size.fab': number;
+  readonly 'size.chip-height': number;
+  readonly 'size.chip-padding-x': number;
+  readonly 'size.divider-inset': number;
+  readonly 'size.badge-min-width': number;
+  readonly 'size.badge-height': number;
+  readonly 'size.badge-dot': number;
+  readonly 'size.badge-ring': number;
+  /** 🔴 导出的是**比例**（em），不是点数。RN 的 letterSpacing、SwiftUI 的 .tracking()、ArkTS 的 letterSpacing 都要的是点值，必须按 `比例 × 字号` 换算（见 native-values.ts 的 resolveTracking）。直接把比例当点用会让字距小到等于没有，且两端都不报错。 */
+  readonly 'tracking.display': number;
+  /** 🔴 导出的是**比例**（em），不是点数。RN 的 letterSpacing、SwiftUI 的 .tracking()、ArkTS 的 letterSpacing 都要的是点值，必须按 `比例 × 字号` 换算（见 native-values.ts 的 resolveTracking）。直接把比例当点用会让字距小到等于没有，且两端都不报错。 */
+  readonly 'tracking.title': number;
+  /** 🔴 导出的是**比例**（em），不是点数。RN 的 letterSpacing、SwiftUI 的 .tracking()、ArkTS 的 letterSpacing 都要的是点值，必须按 `比例 × 字号` 换算（见 native-values.ts 的 resolveTracking）。直接把比例当点用会让字距小到等于没有，且两端都不报错。 */
+  readonly 'tracking.body': number;
+  /** 🔴 导出的是**比例**（em），不是点数。RN 的 letterSpacing、SwiftUI 的 .tracking()、ArkTS 的 letterSpacing 都要的是点值，必须按 `比例 × 字号` 换算（见 native-values.ts 的 resolveTracking）。直接把比例当点用会让字距小到等于没有，且两端都不报错。 */
+  readonly 'tracking.caption': number;
+  readonly 'motion.spring-damping-default': number;
+  readonly 'motion.spring-damping-momentum': number;
+  readonly 'motion.spring-response-move': number;
+  readonly 'motion.spring-response-sheet': number;
+  readonly 'motion.spring-response-rotation': number;
+  readonly 'motion.press-scale': number;
+  readonly 'motion.deceleration-rate': number;
+  readonly 'motion.rubber-band-constant': number;
+  readonly 'gesture.hysteresis': number;
+  readonly 'gesture.hit-slop': number;
+  readonly 'state.pressed-opacity': number;
+  readonly 'state.hover-opacity': number;
+  readonly 'state.disabled-opacity': number;
+  readonly 'blur.chrome': number;
+  readonly 'blur.sheet': number;
+  readonly 'material.chrome-tint': string;
+  readonly 'material.chrome-tint-strong': string;
+  readonly 'material.edge-highlight': string;
+  readonly 'material.sheet-tint': string;
+  readonly 'material.scrim': string;
+  readonly 'material.scrim-strong': string;
 }
 
 export const lightTokens: HeytaNativeTokens = {
@@ -256,6 +314,7 @@ export const lightTokens: HeytaNativeTokens = {
   'duration.normal': 200,
   'duration.slow': 300,
   'duration.exit': 140,
+  'duration.press': 100,
   'ease.standard': "cubic-bezier(0.2, 0, 0.2, 1)",
   'ease.enter': "cubic-bezier(0, 0, 0.2, 1)",
   'ease.exit': "cubic-bezier(0.4, 0, 1, 1)",
@@ -282,6 +341,59 @@ export const lightTokens: HeytaNativeTokens = {
   'layout.quadrant-min-height': 192,
   'border-width.thin': 1,
   'border-width.thick': 2,
+  'nav.tab-bar-height': 64,
+  'nav.tab-icon-size': 24,
+  'nav.tab-label-size': 11,
+  'nav.tab-item-min-width': 64,
+  'nav.tab-indicator-inset': 4,
+  'nav.tab-indicator-width': 20,
+  'nav.tab-indicator-height': 3,
+  'nav.app-bar-height': 56,
+  'nav.app-bar-title-size': 16,
+  'nav.safe-top-min': 20,
+  'nav.safe-bottom-min': 8,
+  'screen.gutter': 16,
+  'screen.section-gap': 24,
+  'screen.bottom-inset': 88,
+  'size.checkbox': 22,
+  'size.row-min-height': 56,
+  'size.swipe-action': 72,
+  'size.avatar-sm': 24,
+  'size.avatar-md': 32,
+  'size.avatar-lg': 40,
+  'size.fab': 56,
+  'size.chip-height': 28,
+  'size.chip-padding-x': 10,
+  'size.divider-inset': 52,
+  'size.badge-min-width': 18,
+  'size.badge-height': 18,
+  'size.badge-dot': 8,
+  'size.badge-ring': 2,
+  'tracking.display': -0.022,
+  'tracking.title': -0.019,
+  'tracking.body': -0.011,
+  'tracking.caption': 0.006,
+  'motion.spring-damping-default': 1,
+  'motion.spring-damping-momentum': 0.8,
+  'motion.spring-response-move': 0.4,
+  'motion.spring-response-sheet': 0.3,
+  'motion.spring-response-rotation': 0.4,
+  'motion.press-scale': 0.97,
+  'motion.deceleration-rate': 0.998,
+  'motion.rubber-band-constant': 0.55,
+  'gesture.hysteresis': 10,
+  'gesture.hit-slop': 10,
+  'state.pressed-opacity': 0.08,
+  'state.hover-opacity': 0.04,
+  'state.disabled-opacity': 0.38,
+  'blur.chrome': 20,
+  'blur.sheet': 30,
+  'material.chrome-tint': "#ffffffb8",
+  'material.chrome-tint-strong': "#ffffffd9",
+  'material.edge-highlight': "#ffffff80",
+  'material.sheet-tint': "#ffffffeb",
+  'material.scrim': "#0f172a52",
+  'material.scrim-strong': "#0f172a80",
 };
 
 export const darkTokens: HeytaNativeTokens = {
@@ -385,6 +497,7 @@ export const darkTokens: HeytaNativeTokens = {
   'duration.normal': 200,
   'duration.slow': 300,
   'duration.exit': 140,
+  'duration.press': 100,
   'ease.standard': "cubic-bezier(0.2, 0, 0.2, 1)",
   'ease.enter': "cubic-bezier(0, 0, 0.2, 1)",
   'ease.exit': "cubic-bezier(0.4, 0, 1, 1)",
@@ -411,6 +524,59 @@ export const darkTokens: HeytaNativeTokens = {
   'layout.quadrant-min-height': 192,
   'border-width.thin': 1,
   'border-width.thick': 2,
+  'nav.tab-bar-height': 64,
+  'nav.tab-icon-size': 24,
+  'nav.tab-label-size': 11,
+  'nav.tab-item-min-width': 64,
+  'nav.tab-indicator-inset': 4,
+  'nav.tab-indicator-width': 20,
+  'nav.tab-indicator-height': 3,
+  'nav.app-bar-height': 56,
+  'nav.app-bar-title-size': 16,
+  'nav.safe-top-min': 20,
+  'nav.safe-bottom-min': 8,
+  'screen.gutter': 16,
+  'screen.section-gap': 24,
+  'screen.bottom-inset': 88,
+  'size.checkbox': 22,
+  'size.row-min-height': 56,
+  'size.swipe-action': 72,
+  'size.avatar-sm': 24,
+  'size.avatar-md': 32,
+  'size.avatar-lg': 40,
+  'size.fab': 56,
+  'size.chip-height': 28,
+  'size.chip-padding-x': 10,
+  'size.divider-inset': 52,
+  'size.badge-min-width': 18,
+  'size.badge-height': 18,
+  'size.badge-dot': 8,
+  'size.badge-ring': 2,
+  'tracking.display': -0.022,
+  'tracking.title': -0.019,
+  'tracking.body': -0.011,
+  'tracking.caption': 0.006,
+  'motion.spring-damping-default': 1,
+  'motion.spring-damping-momentum': 0.8,
+  'motion.spring-response-move': 0.4,
+  'motion.spring-response-sheet': 0.3,
+  'motion.spring-response-rotation': 0.4,
+  'motion.press-scale': 0.97,
+  'motion.deceleration-rate': 0.998,
+  'motion.rubber-band-constant': 0.55,
+  'gesture.hysteresis': 10,
+  'gesture.hit-slop': 10,
+  'state.pressed-opacity': 0.08,
+  'state.hover-opacity': 0.04,
+  'state.disabled-opacity': 0.38,
+  'blur.chrome': 20,
+  'blur.sheet': 30,
+  'material.chrome-tint': "#0d1526c7",
+  'material.chrome-tint-strong': "#0d1526e6",
+  'material.edge-highlight': "#ffffff1f",
+  'material.sheet-tint': "#0d1526f0",
+  'material.scrim': "#02061780",
+  'material.scrim-strong': "#020617ad",
 };
 
 /** `prefers-reduced-motion` 的覆盖层；只需覆盖真的会动的 token。 */
@@ -420,6 +586,7 @@ export const reducedMotionTokens: Partial<HeytaNativeTokens> = {
   'duration.normal': 1,
   'duration.slow': 1,
   'duration.exit': 1,
+  'duration.press': 1,
 };
 
 export const THEME_NAMES: readonly ThemeName[] = ['light', 'dark'];
