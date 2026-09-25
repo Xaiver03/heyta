@@ -128,7 +128,27 @@ export interface DbTx {
 
   getFromIndex<T>(store: string, index: string, key: DbKey | DbKey[]): Promise<T | undefined>;
   getKeyFromIndex(store: string, index: string, key: DbKey | DbKey[]): Promise<DbKey | undefined>;
+
+  /**
+   * 按索引查询，返回**全部**命中记录。
+   *
+   * 🔴 **返回顺序未定义。**
+   *
+   * 实测各实现并不一致：IndexedDB 原生的 `getAllFromIndex` 按**索引键**排序，
+   * 而内存实现与 SQLite 实现按**主键**排序。三者都能满足"返回哪些记录"，
+   * 但顺序不同。
+   *
+   * 这不是缺陷，是**必须被写下来的事实** —— 否则将来有人合理地假设
+   * 它按索引键有序（因为 IndexedDB 就是这样），在 SQLite 上会静默拿到
+   * 另一个顺序。**依赖顺序的调用方必须自己 sort。**
+   *
+   * `DbOpLogStore` 里每个需要顺序的地方（`findPendingUpload` /
+   * `findPendingApply` / `getOpsForEntity`）都已显式按 `seq` 排序，
+   * 并由 OpLogStore 契约锁住，所以上传顺序是安全的。
+   */
   getAllFromIndex<T>(store: string, index: string, query?: DbIndexQuery): Promise<T[]>;
+
+  /** 按索引计数。与 {@link getAllFromIndex} 不同，计数与顺序无关。 */
   countFromIndex(store: string, index: string, query?: DbIndexQuery): Promise<number>;
 
   iterate<T>(store: string, options: DbIterateOptions, visit: DbCursorVisitor<T>): Promise<void>;
@@ -160,7 +180,27 @@ export interface DbAdapter {
   // ── 索引操作 ─────────────────────────────────────────────
   getFromIndex<T>(store: string, index: string, key: DbKey | DbKey[]): Promise<T | undefined>;
   getKeyFromIndex(store: string, index: string, key: DbKey | DbKey[]): Promise<DbKey | undefined>;
+
+  /**
+   * 按索引查询，返回**全部**命中记录。
+   *
+   * 🔴 **返回顺序未定义。**
+   *
+   * 实测各实现并不一致：IndexedDB 原生的 `getAllFromIndex` 按**索引键**排序，
+   * 而内存实现与 SQLite 实现按**主键**排序。三者都能满足"返回哪些记录"，
+   * 但顺序不同。
+   *
+   * 这不是缺陷，是**必须被写下来的事实** —— 否则将来有人合理地假设
+   * 它按索引键有序（因为 IndexedDB 就是这样），在 SQLite 上会静默拿到
+   * 另一个顺序。**依赖顺序的调用方必须自己 sort。**
+   *
+   * `DbOpLogStore` 里每个需要顺序的地方（`findPendingUpload` /
+   * `findPendingApply` / `getOpsForEntity`）都已显式按 `seq` 排序，
+   * 并由 OpLogStore 契约锁住，所以上传顺序是安全的。
+   */
   getAllFromIndex<T>(store: string, index: string, query?: DbIndexQuery): Promise<T[]>;
+
+  /** 按索引计数。与 {@link getAllFromIndex} 不同，计数与顺序无关。 */
   countFromIndex(store: string, index: string, query?: DbIndexQuery): Promise<number>;
 
   // ── 游标 ────────────────────────────────────────────────

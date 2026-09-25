@@ -27,7 +27,7 @@ import {
   createRetryScheduler,
   type ConflictInfo,
   type SyncStatus,
-} from './client.js';
+} from '@heyta/sync-client';
 
 interface SyncStoreState {
   status: SyncStatus;

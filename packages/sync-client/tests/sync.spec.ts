@@ -14,7 +14,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { OpType, decrypt, encrypt } from '@heyta/sync-core';
 import type { Operation } from '@heyta/sync-core';
 
-import { SyncClient, createRetryScheduler, type SyncStatus } from '../src/features/sync/client.js';
+import { SyncClient, createRetryScheduler, type SyncStatus } from '../src/client.js';
 
 const PASSWORD = 'correct horse battery staple';
 const BASE = 'http://127.0.0.1:3000';

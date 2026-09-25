@@ -15,7 +15,7 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { INDEXEDDB_SCHEMA } from '../src/indexeddb/indexeddb-adapter.js';
 import { NodeSqliteDriver } from '../src/sqlite/node-sqlite-driver.js';
@@ -177,5 +177,54 @@ describe('SqliteAdapter 持久化（临时文件，不是 :memory:）', () => {
     } finally {
       db.close();
     }
+  });
+});
+
+/**
+ * 记录一个**已知的实现间差异**，而不是假装它不存在。
+ *
+ * `DbAdapter.getAllFromIndex` 的返回顺序**未定义**（见 `db.types.ts` 上的说明）：
+ * IndexedDB 按索引键排，内存与 SQLite 按主键排。
+ *
+ * 这个用例不是在断言"SQLite 是对的"，而是把这个差异**钉下来**：
+ * 如果有人后来改了行为，这里会红，从而逼他确认是不是有意为之。
+ * 真正的保证在 OpLogStore 契约里 —— 那里每个需要顺序的地方都显式排了序。
+ */
+describe('已知差异：索引查询顺序', () => {
+  let db: SqliteAdapter;
+
+  beforeEach(async () => {
+    db = new SqliteAdapter({
+      schema: INDEXEDDB_SCHEMA,
+      driverFactory: () => new NodeSqliteDriver(':memory:'),
+    });
+    await db.init();
+  });
+
+  afterEach(() => {
+    db.close();
+  });
+
+  it('SQLite 按**主键**返回 getAllFromIndex 结果（IndexedDB 按索引键）', async () => {
+    // 故意让插入顺序与索引键顺序相反，这样两种排序会给出不同结果
+    await db.add(STORES.OPS, {
+      op: { id: 'op-c', entityType: 'TASK', entityId: 't', vectorClock: {} },
+      uploadStatus: 'pending',
+    });
+    await db.add(STORES.OPS, {
+      op: { id: 'op-a', entityType: 'TASK', entityId: 't', vectorClock: {} },
+      uploadStatus: 'pending',
+    });
+    await db.add(STORES.OPS, {
+      op: { id: 'op-b', entityType: 'TASK', entityId: 't', vectorClock: {} },
+      uploadStatus: 'pending',
+    });
+
+    const rows = await db.getAllFromIndex<{ seq: number }>(STORES.OPS, OP_INDEXES.PENDING_UPLOAD, 'pending');
+    // 按主键（seq）升序 = 插入顺序，**不是**按 op.id 字母序
+    expect(rows.map((r) => r.seq)).toEqual([1, 2, 3]);
+
+    // 顺序无关的查询结果一致
+    expect(await db.countFromIndex(STORES.OPS, OP_INDEXES.PENDING_UPLOAD, 'pending')).toBe(3);
   });
 });

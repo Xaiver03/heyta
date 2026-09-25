@@ -1,0 +1,28 @@
+{
+  "name": "@heyta/sync-client",
+  "version": "0.0.0",
+  "private": true,
+  "description": "heyta 同步客户端：上传 / 下载 / 冲突上报与解决。**宿主无关** —— Web、Node、iOS、鸿蒙共用同一份",
+  "license": "MIT",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": { "types": "./dist/index.d.ts", "default": "./dist/index.js" }
+  },
+  "scripts": {
+    "build": "tsup",
+    "typecheck": "tsc --noEmit -p tsconfig.spec.json",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "@heyta/shared-schema": "workspace:*",
+    "@heyta/sync-core": "workspace:*"
+  },
+  "devDependencies": {
+    "tsup": "^8.5.1",
+    "typescript": "^5.9.3",
+    "vitest": "^5.0.1"
+  }
+}

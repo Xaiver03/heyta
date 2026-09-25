@@ -26,7 +26,11 @@ import { AlertTriangle, Check, Monitor, Smartphone, X } from 'lucide-react';
 import { cssVar, type TokenName } from '@heyta/design-system';
 
 import { useSyncStore } from './store.js';
-import { describeConflictPayload, type ConflictInfo, type ConflictSide } from './client.js';
+import {
+  describeConflictPayload,
+  type ConflictInfo,
+  type ConflictSide,
+} from '@heyta/sync-client';
 
 /** 时间戳 → 可读时间。冲突界面里"谁更新"是判断依据，必须看得懂。 */
 function formatTime(ms: number): string {
