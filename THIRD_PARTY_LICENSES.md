@@ -29,6 +29,31 @@ MIT 许可证的合规义务：**保留版权声明与许可声明**。本仓库
 
 ---
 
+### `packages/shared-schema/` — 实体清单 / 版本策略 / HTTP 契约
+
+| 项 | 值 |
+|---|---|
+| 来源 | [Super Productivity](https://github.com/super-productivity/super-productivity) |
+| 原路径 | `packages/shared-schema/` |
+| 原包名 | `@sp/shared-schema`（本仓库中已更名为 `@heyta/shared-schema`） |
+| **commit** | `aa9690ca28aa6751971dd0e47d9b39c5b72922cb` |
+| **License** | **MIT** |
+| **版权** | Copyright (c) 2018 Johannes Millan |
+| 许可全文 | [`packages/shared-schema/LICENSE`](packages/shared-schema/LICENSE) |
+| 改动说明 | [`packages/shared-schema/PROVENANCE.md`](packages/shared-schema/PROVENANCE.md) |
+
+**部分复用，部分是 heyta 原创：**
+
+| 文件 | 状态 |
+|---|---|
+| `src/supersync-http-contract.ts`（384 行 zod 线协议） | ✅ 上游原样 |
+| `src/migrate.ts` + `src/migration.types.ts`（迁移框架） | ✅ 上游原样 |
+| `src/entity-types.ts` | 🔧 heyta 重写（上游是 SP 专属 21 项） |
+| `src/schema-version.ts` | 🔧 heyta 重写（版本重置为 v1，**政策继承上游**） |
+| `src/migrations/*`（3 个 SP 迁移） | ❌ 已删除 |
+
+---
+
 ## 2. 通过包管理器引入的依赖
 
 所有第三方依赖的许可证必须**逐项登记**在 [`research/licenses.md`](research/licenses.md)，
