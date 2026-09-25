@@ -85,17 +85,28 @@ heyta/
 
 对照 `@sp/shared-schema` 的 `ENTITY_TYPES` 做映射（详见 `research/deep-dive-schema-providers.md` §1.1）：
 
-| heyta 实体 | 来源 | 备注 |
-|---|---|---|
-| `TASK` `PROJECT` `TAG` `NOTE` | 沿用 | |
-| `TASK_REPEAT_CFG` `REMINDER` | 沿用 | |
-| `HABIT` `HABIT_LOG` | **新增** | 上游只有 `SIMPLE_COUNTER`，语义不够 |
-| `FOCUS_SESSION` | **新增** | 上游借用 `METRIC` |
-| `GLOBAL_CONFIG` `MIGRATION` `RECOVERY` `ALL` | 沿用 | 系统实体 |
-| ~~`WORK_CONTEXT`~~ `TIME_TRACKING` `ISSUE_PROVIDER` `PLUGIN_*` `MENU_TREE` | **删除** | 不需要 |
+| heyta 实体 | 来源 | 已物化 | 备注 |
+|---|---|---|---|
+| `TASK` `PROJECT` `TAG` | 沿用 | ✅ | |
+| `HABIT` `HABIT_LOG` | **新增** | ✅ | 上游只有 `SIMPLE_COUNTER`，语义不够 |
+| `FOCUS_SESSION` | **新增** | ✅ | 上游借用 `METRIC` |
+| `GLOBAL_CONFIG` `MIGRATION` `RECOVERY` `ALL` | 沿用 | — | 系统实体，有意不物化 |
+| 🔴 `NOTE` | 沿用 | ❌ | **领域类型未定义，reducer 不物化** |
+| 🔴 `TASK_REPEAT_CFG` | 沿用 | ❌ | **同上；重复展开语义未定** |
+| 🔴 `REMINDER` | 沿用 | ❌ | **同上；通知调度未定** |
+| ~~`WORK_CONTEXT`~~ `TIME_TRACKING` `ISSUE_PROVIDER` `PLUGIN_*` `MENU_TREE` | **删除** | — | 不需要 |
 
 ⚠️ **改一处要同步改两处**：`shared-schema` 与服务端 `validation.service.ts` 都依赖这份清单，
 服务端**会拒绝未知实体类型**。
+
+🔴 **上表里三个 ❌ 是实测确认的静默丢数据**，不是"还没做"那么轻描淡写：
+它们是**合法实体**（`isEntityType()` 为 true），`dispatch` **不报错**，op 照常入队、
+上传、同步到所有设备 —— 但**没有任何设备会物化它们**。用户建一条重复任务，
+它同步得到处都是，哪儿也不显示，且任何一层都不报错。
+
+门禁已就位：`packages/op-log/tests/entity-coverage.spec.ts` 要求每个 `ENTITY_TYPES`
+成员要么物化、要么在 `UNMODELED_ENTITY_TYPES` 里显式登记原因。**实现后必须把登记移掉**，
+否则测试会红 —— 清单不会腐烂。
 
 ### 2.4 存储适配层
 
