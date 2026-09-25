@@ -1,5 +1,0 @@
-repo	stars	forks	license	archived	branch	last_commit	latest_release	top_lang	desc	topics
-bndkt/react-native-widget-extension	564	45	NA	false	main	2026-05-25T19:44:48Z	v0.3.0 @ 2026-05-25T19:45:32Z	typescript: 60.8%	Add widgets and live activities to a React Native app	
-fasky-software/flutter_widgetkit	263	25	MIT (MIT License)	false	main	2021-03-22T09:10:06Z	NO-RELEASES @ NA	swift: 43.4%	Flutter library for iOS Widgets Extensions. Integrate a Widget into your App 🍏📱	flutter,ios-widget,ios14,ios14-widget,widget-extension
-expo/expo-modules-core									FETCH_ERROR:HTTP Error 404: Not Found	
-google/accompanist	7836	685	Apache-2.0 (Apache License 2.0)	false	main	2025-08-18T20:49:30Z	v0.37.3 🌈 @ 2025-04-28T06:28:14Z	kotlin: 97.7%	A collection of extension libraries for Jetpack Compose	android-library,jetpack-compose

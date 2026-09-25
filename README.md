@@ -21,12 +21,45 @@
 
 ## 文档索引
 
+### 决策文档（`docs/`）
+
 | 文档 | 内容 |
 |------|------|
-| [`docs/00-feature-matrix.md`](docs/00-feature-matrix.md) | 滴答清单功能对照矩阵 —— 需求基准线 |
-| `docs/01-oss-landscape.md` | 开源项目调研与复用评估（编写中） |
-| `docs/02-architecture.md` | 技术选型与架构决策（待定） |
-| `docs/03-roadmap.md` | 里程碑与 MVP 范围（待定） |
+| [`docs/00-feature-matrix.md`](docs/00-feature-matrix.md) | 滴答清单功能对照矩阵 —— 需求基准线（P0/P1/P2 分级） |
+| [`docs/01-oss-landscape.md`](docs/01-oss-landscape.md) | 开源项目盘点（16 个项目的许可证、成熟度、可复用性） |
+| [`docs/02-licensing-and-compliance.md`](docs/02-licensing-and-compliance.md) | 许可证与合规边界（AGPL §13、商标、上架成本、定价数据） |
+| [`docs/03-architecture.md`](docs/03-architecture.md) | 技术选型与架构（⚠️ 顶部有推翻声明，同步引擎部分仍有效） |
+| [`docs/04-license-decision.md`](docs/04-license-decision.md) | **ADR-0001** heyta 自己的许可证选择（待确认） |
+| [`docs/05-codebase-assessment.md`](docs/05-codebase-assessment.md) | 上游代码体检：依赖许可证扫描 + 代码量实测 |
+| [`docs/06-reuse-plan.md`](docs/06-reuse-plan.md) | ⭐ **复用方案核心**：精确分层账本 + 复用矩阵 + 待决策点 |
+| [`docs/07-reusable-components.md`](docs/07-reusable-components.md) | 外部组件决策表：每个模块"用现成的还是自研" |
+
+### 深度调研（`research/`）
+
+| 文档 | 内容 |
+|------|------|
+| [`research/deep-dive-sync-core.md`](research/deep-dive-sync-core.md) | `packages/sync-core` 逐文件拆解 + 跨语言先例 |
+| [`research/deep-dive-supersync-server.md`](research/deep-dive-supersync-server.md) | 同步服务端：完整 API、数据模型、鉴权、部署 |
+| [`research/deep-dive-schema-providers.md`](research/deep-dive-schema-providers.md) | `shared-schema` + `sync-providers` + **独立构建验证** |
+| [`research/deep-dive-cross-language.md`](research/deep-dive-cross-language.md) | 跨语言集成路径评估（含 Flutter/Dart） |
+| [`research/licenses.md`](research/licenses.md) | ⭐ **依赖许可证登记表**（强制登记规则） |
+| [`research/oss-task-manager-deep-dive.md`](research/oss-task-manager-deep-dive.md) | 16 个开源任务管理项目深度对比 |
+| [`research/module3-eisenhower.md`](research/module3-eisenhower.md) | 四象限模块专项调研 |
+| [`research/module5-nlp-dates.md`](research/module5-nlp-dates.md) | 自然语言日期解析专项调研 |
+| [`research/module7-sync-engines.md`](research/module7-sync-engines.md) | 同步引擎市场调研 |
+
+### 工具（`research/tools/`）
+
+| 工具 | 用途 |
+|------|------|
+| `licscan.py` | 扫描 `package-lock.json`，按许可证分类汇总依赖树 |
+| `crypto-interop/` | **跨语言加解密互操作测试**（验证加密契约可移植） |
+| `ghinfo.py` | 绕过 api.github.com DNS 问题抓取仓库事实（stars/许可证/分支） |
+| `wfetch.py` | 经系统代理抓取网页并输出可读文本 |
+| `bsearch.py` | 经代理做 Bing 搜索并输出结构化结果 |
+
+> 上述三个脚本是为绕开本机 `api.github.com` 解析到 `198.18.0.x` 伪 IP 的问题而写的，
+> 后续调研同样适用。
 
 ## 目录结构（规划）
 

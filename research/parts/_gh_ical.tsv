@@ -1,3 +1,0 @@
-repo	stars	forks	license	archived	branch	last_commit	latest_release	top_lang	desc	topics
-niccokunzmann/python-recurring-ical-events	121	31	LGPL-3.0 (GNU Lesser General Public License v3.0)	false	main	2026-09-23T08:41:44Z	v3.9.0 @ 2026-05-16T05:08:34Z	html: 65.4%	Python library to calculate recurrence times of events, todos, alarms and journals based on icalendar RFC5545	hacktoberfest,icalendar,recurrence,rfc5545
-collective/icalendar	1174	436	NOASSERTION (Other)	false	main	2026-09-23T16:58:50Z	v7.3.0 @ 2026-08-20T05:46:53Z	python: 99.2%	icalendar parser library for Python	alarm,event,generator,hacktoberfest,icalendar,ics,journal,parser,rfc5545,todo

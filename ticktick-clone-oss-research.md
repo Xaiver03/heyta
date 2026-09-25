@@ -18,8 +18,8 @@
 | 4 | 日历 + CalDAV | 服务端 **Radicale**（GPL-3.0，独立部署无冲突）/ **sabre/dav**（BSD-3-Clause ✅可嵌入）；客户端库 **dav4jvm**（MPL-2.0 ✅，Android/JVM）、**tsdav**（MIT ✅，JS/RN）、**python-caldav**（Apache-2.0 ✅） | Baikal、Xandikos、Nextcloud Tasks、Tasks.org、jtx Board、DAVx⁵ | 用 CalDAV 当同步层是**最省事的互操作方案**；注意 GPL 客户端 App 只能做参考实现，不能链接进闭源产品 |
 | 5 | 自然语言日期解析 | **wanasit/chrono**（MIT ✅，JS/TS，**自带中文 locale**）+ 中文长尾 **JioNLP**（Apache-2.0 ✅） | dateparser（BSD-3 ✅，Python）、duckling（BSD-3 ✅，多语种服务）、olebedev/when（Apache-2.0，Go） | 高频中文表达现成库够用；长尾必须自研规则 + LLM 兜底 |
 | 6 | 重复任务 RRULE | **jkbrzt/rrule（rrule.js）**（BSD-3-Clause ✅）+ **python-dateutil**（Apache-2.0 或 BSD-3 双许可 ✅） | lib-recur（Apache-2.0，Java/Android）、rrule-go（MIT）、rust-rrule（Apache-2.0）、Dart rrule（Apache-2.0） | 每个语言都有成熟实现，**直接用，不要自研** |
-| 7 | 本地优先同步引擎 | 见 §7（完全开源可商用 / copyleft / 商业授权三档差异极大） | Yjs、Automerge、Loro（MIT）、ElectricSQL（Apache-2.0）、RxDB（Apache-2.0）、WatermelonDB（MIT） | **同步引擎是选型风险最高的一块**，必须逐个读 license 原文 |
-| 8 | 小组件 / 跨端 | 见 §8（Flutter + `home_widget`；Android 原生 Glance；RN + `react-native-android-widget`；Tauri 只能做桌面） | Tasks.org（Compose Multiplatform，Android+macOS）、mhabit（Flutter，全平台） | 小组件是**唯一无法完全跨端复用**的部分，必须每端写原生代码 |
+| 7 | 本地优先同步引擎 | 见 **§8**：**Yjs / Loro + 自建 Hocuspocus**（全链路 MIT ✅）为首选；次选 Electric / Zero（Apache-2.0） | RxDB（核心 Apache-2.0 + 付费插件）、PouchDB+CouchDB（Apache-2.0）、WatermelonDB（MIT，不含同步） | **选型风险最高**：PowerSync Service（FSL）、Couchbase 4.x（BSL）、sqlite-sync（Elastic 改版）、Ditto（专有）都有明确限制 |
+| 8 | 小组件 / 跨端 | 见 **§9**：Flutter + `home_widget`（BSD-3-Clause ✅）；Android 原生 Glance（Apache-2.0）；RN + `react-native-android-widget`（MIT） | Tauri（Apache-2.0 OR MIT）、Capacitor（MIT）、Compose Multiplatform（Tasks.org 路线） | 小组件**必须每端写原生代码**，是跨端方案的固定成本 |
 
 ---
 
@@ -139,6 +139,7 @@
 | 项目 | 仓库 | Star | License | 技术栈 | 活跃度 | 说明 |
 |---|---|---|---|---|---|---|
 | Tasks.org | https://github.com/tasks/tasks | **5601** | **GPL-3.0** ⚠️ | Kotlin 96.0%（Compose Multiplatform，Android + macOS） | 极活跃：2026-09-24，15.12（2026-09-15） | 开源待办 App 事实标准；官方文档实测列出第三方同步：Google Tasks / Microsoft To Do / **DAVx⁵ / CalDAV** / EteSync / DecSync CC【文档：tasks.org/docs/sync】 |
+| Planify | https://github.com/alainm23/planify | **5704** | **GPL-3.0** ⚠️ | Vala 98.1%（GNOME/libadwaita） | 极活跃：2026-09-21，Planify 4.20.0（2026-09-10） | GNOME 桌面任务管理器，**同时支持 Todoist API + Nextcloud + CalDAV**（多后端抽象的好样本） |
 | DAVx⁵ | https://github.com/bitfireAT/davx5-ose | 2897 | **GPL-3.0** ⚠️ | Kotlin 97.9% | 极活跃：2026-09-24，v4.5.20-beta.2-ose | Android 的 CalDAV/CardDAV/WebDAV 同步适配器（生态枢纽） |
 | jtx Board | https://github.com/TechbeeAT/jtxBoard | 687 | **GPL-3.0** ⚠️ | Kotlin 100%（Jetpack Compose + **Glance 小组件**） | 活跃：2026-09-11，v2.17.03-beta01 | VTODO/VJOURNAL/VNOTE + DAVx⁵ 集成；**Android 小组件实现范本** |
 | Fossify Calendar | https://github.com/FossifyOrg/Calendar | 2176 | **GPL-3.0** ⚠️ | Kotlin 98.7% | 极活跃：2026-09-24，1.11.0 | 带可定制小组件的 Android 日历 |
