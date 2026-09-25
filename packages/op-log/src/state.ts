@@ -68,6 +68,58 @@ function isModeled(entityType: string): entityType is ModeledEntity {
   return entityType in BUCKET_BY_ENTITY;
 }
 
+/** reducer 会物化的实体类型（供门禁与宿主自省）。 */
+export const MODELED_ENTITY_TYPES: readonly string[] = Object.keys(BUCKET_BY_ENTITY);
+
+/**
+ * 🔴 **合法但尚未物化**的实体 —— 必须逐个登记，并写明为什么。
+ *
+ * 为什么需要这份清单：`isModeled` 原本把两件完全不同的事混为一谈 ——
+ *
+ *   1. **未知的未来实体**：老客户端不认识它，应当优雅跳过，别让同步卡死（合理）。
+ *   2. **已知且合法的实体，只是还没实现**：跳过它 = **静默丢用户数据**。
+ *
+ * 实测过第 2 种：`NOTE` / `TASK_REPEAT_CFG` / `REMINDER` 都是合法实体
+ * （`isEntityType()` 返回 true），`dispatch` **不报错**，op **正常入队并同步到所有设备**，
+ * 但**没有任何设备会物化它们**。用户建一条重复任务，它同步得到处都是，哪儿也不显示。
+ *
+ * 静默是这里最糟的部分。所以这份清单 + `entity-coverage` 测试把"跳过"变成
+ * **必须显式登记的决定**：往 `ENTITY_TYPES` 里加一个新实体却忘了实现，
+ * 门禁会红，而不是等到用户数据丢了才发现。
+ *
+ * 从这份清单里移除一项 = 那个实体的物化已经实现。
+ */
+export const UNMODELED_ENTITY_TYPES: readonly { entityType: string; reason: string }[] = [
+  {
+    entityType: 'NOTE',
+    reason: '领域类型尚未定义；笔记功能未开始',
+  },
+  {
+    entityType: 'TASK_REPEAT_CFG',
+    reason: '重复任务规则；需要重复展开语义与产品决策，尚未开始',
+  },
+  {
+    entityType: 'REMINDER',
+    reason: '提醒；需要通知调度与产品决策，尚未开始',
+  },
+  {
+    entityType: 'GLOBAL_CONFIG',
+    reason: '全局配置，有意落在物化状态之外（不是用户数据）',
+  },
+  {
+    entityType: 'MIGRATION',
+    reason: '迁移标记，有意落在物化状态之外（不是用户数据）',
+  },
+  {
+    entityType: 'RECOVERY',
+    reason: '恢复标记，有意落在物化状态之外（不是用户数据）',
+  },
+  {
+    entityType: 'ALL',
+    reason: '通配类型，不是真实实体，不物化',
+  },
+];
+
 /**
  * 把一条 op 应用到状态。
  *
