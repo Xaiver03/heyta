@@ -2,7 +2,7 @@
 
 > **核实日期**：2026-09-25（CST）
 > **核实方式**：本机 `api.github.com` 不可用、`web_fetch` 抓 `github.com` 会被拒（域名解析到非公网 IP），因此全部改用 `curl` 直取 `github.com` 仓库页 HTML + `commits/<branch>.atom` / `releases.atom` 提要 + `raw.githubusercontent.com` 的 LICENSE 原文 + `img.shields.io`（语言占比，镜像 linguist 数据）+ `pub.dev` / `registry.npmjs.org` 的包元数据。
-> 自建脚本：`research/ghinfo.py`（用法 `python3 research/ghinfo.py owner/repo [...]`，输出 TSV：stars / forks / license / archived / default branch / last commit / latest release / top language / description / topics）。
+> 自建脚本：`research/tools/ghinfo.py`（用法 `python3 research/tools/ghinfo.py owner/repo [...]`，输出 TSV：stars / forks / license / archived / default branch / last commit / latest release / top language / description / topics）。
 > **数据口径**：本报告中所有 Star 数、License、最后提交时间、最新 Release 均为 **2026-09-25 实测值**；凡 GitHub 标签为 `NOASSERTION` / `Other` / `NA` 的，均另行读取 LICENSE 原文确认后才写入 SPDX；无法核实的字段一律写「未核实」，不做推测。
 > **证据分级**：`【实测】`= 本次 curl 一手核实；`【文档】`= 只读到官方文档/官网/README（未读源码）；`【未核实】`= 仅搜索线索，未经核实。
 
@@ -12,7 +12,7 @@
 
 | # | 功能模块 | 首选（许可 / 可商用？） | 备选 | 一句话结论 |
 |---|---|---|---|---|
-| 1 | 习惯打卡 | **FriesI23/mhabit**（Apache-2.0 ✅可商用，Flutter 跨端 + WebDAV 同步） | beaverhabits（BSD-3-Clause）、Loop Habit Tracker（GPL-3.0）、Habitica（GPL-3.0 + 素材 CC-BY-NC-SA ⚠️） | 开源生态**很成熟**；Apache-2.0 的 mhabit 是唯一能直接当商业产品骨架的 |
+| 1 | 习惯打卡 | **FriesI23/mhabit**（Apache-2.0 ✅可商用，Flutter 跨端 + WebDAV 同步） | beaverhabits（BSD-3-Clause，自托管 Web）、Loop Habit Tracker（GPL-3.0）、Habitica（GPL-3.0 + 素材 CC-BY-NC-SA ⚠️） | 开源生态**很成熟**；mhabit（Apache-2.0）是唯一能直接当**移动端商业产品骨架**的 |
 | 2 | 番茄钟 / 专注 | **johannesjo/super-productivity**（MIT ✅，任务+番茄+Flowmodoro+时间追踪一体，最佳参考实现） | Pomotroid / Pomatez / TomatoBar（均 MIT）、Goodtime / Tomato（GPL-3.0）、ActivityWatch（MPL-2.0，自动时间追踪） | 计时器本身不难，**难点是「番茄钟 ↔ 任务」的数据绑定**，Super Productivity 是唯一把这条打通的 |
 | 3 | 四象限 / 艾森豪威尔 | 见 **§4**：**没有可复用的开源组件库，必须自研**（拖拽用 dnd-kit 17,667★ MIT） | gsd-task-manager（26★ MIT，样板）、todoist-matrix（2★ MIT，架构范式）、Einsen（919★ Apache-2.0，停更） | 开源生态**最薄弱**：前 20 名全是个人练手项目，55% 已归档或 2 年无提交 |
 | 4 | 日历 + CalDAV | 服务端 **Radicale**（GPL-3.0，独立部署无冲突）/ **sabre/dav**（BSD-3-Clause ✅可嵌入）；客户端库 **dav4jvm**（MPL-2.0 ✅，Android/JVM）、**tsdav**（MIT ✅，JS/RN）、**python-caldav**（Apache-2.0 ✅） | Baikal、Xandikos、Nextcloud Tasks、Tasks.org、jtx Board、DAVx⁵ | 用 CalDAV 当同步层是**最省事的互操作方案**；注意 GPL 客户端 App 只能做参考实现，不能链接进闭源产品 |
@@ -31,8 +31,8 @@
    - 因此 GitHub 侧数据全部来自**网页 HTML + atom feed**：star/fork 取仓库页内嵌 JSON 的 `stargazerCount` / `forksCount`；license 取 `"license":{"spdxId":...}`；最后提交时间取 `commits.atom` 的 `<updated>`；最新 release 取 `releases.atom`。
 2. **许可核实规则**：凡 GitHub 识别不出标准许可证（显示 `NOASSERTION (Other)` 或 `NA`）的，一律 `curl` 读 `raw.githubusercontent.com/.../LICENSE|LICENCE|LICENSE.md|COPYING` 原文；本报告中这类项目包括 Habitica、dateutil、rrule.js、libical、php-rrule、vdirsyncer、joplin、focalboard、planka 等，均已在正文注明原文结论。
 3. **语言占比**来自 `img.shields.io/github/languages/top/<repo>`（镜像 GitHub linguist 结果），仓库页内的 Languages 区块是 JS 骨架加载的，服务端 HTML 拿不到。
-4. **本报告的三档证据标注**：`【实测】` / `【文档】` / `【未核实】`。
-5. 并行调研产出（同目录）：`research/module5-nlp-dates.md`（自然语言解析完整明细）、`research/module3-eisenhower.md`、`research/module7-sync-engines.md`、`research/module8-crossplatform-legal.md`。
+4. **本报告的证据标注**：正文在关键判断处使用 `【实测】`（本次 curl 一手核实）/ `【文档】`（只读到官方文档/官网/README）/ `【未核实】`（仅搜索线索）三档；表格中的 Star 与 License 默认均为实测值，例外处单独标注。
+5. 并行调研产出（同目录）：`research/module5-nlp-dates.md`（自然语言解析完整明细）、`research/module3-eisenhower.md`（四象限完整明细）、`research/module7-sync-engines.md`（同步引擎授权判定明细）。
 
 ---
 
@@ -455,13 +455,19 @@
 | SmartDateParser（Android 第三方 NL 解析） | **未核实** | 未核到可靠仓库 |
 | `chronotope/chrono`（Rust 基础库）star | **未核实** | 与「NL 解析」不是同一层，未纳入 |
 | Pomello、Focus To-Do 的开源状态 | **未核实** | 搜索到 `Pomelloapp/pomello` 路径 404；Focus To-Do 按官网信息为闭源商业产品 |
+| `EvanBacon/expo-apple-targets`（`@bacons/apple-targets`）的 License | **未核实** | 仓库根目录 `LICENSE` / `LICENSE.md` / `LICENSE.txt` 均 404；GitHub 探测为 NA。采用前须向作者确认 |
+| `ABausG/home_widget` 的 License 在 GitHub 显示 NA | **已解决** | 实际文件位于 `packages/home_widget/LICENSE`，原文为 **BSD-3-Clause**（三条款），可商用 |
 | HabitTrove 在 GitHub Topics 页显示的 286★ 版本 | **未核实** | Topics 页描述与 `dohsimpson/HabitTrove`（683★）不一致，未定位到该 286★ 仓库的准确 slug |
 | 各类 ToS 中「自动化访问/爬取」条款 | **部分核实** | 只逐字核实了 TickTick 通用 ToS；其他产品未逐条核实 |
 | 本报告中所有 `【未核实】` 标注项 | — | 均不应作为决策依据，需二次核实 |
 
 ---
 
-### 附：本报告使用的自建工具
+### 附：本报告使用的自建工具与并行调研明细
 
-- `research/ghinfo.py` — GitHub 事实抓取脚本（stars / forks / license / archived / last commit / latest release / top language / description / topics），用法：`python3 research/ghinfo.py owner/repo [owner/repo ...]`。
-- 并行调研明细：`research/module5-nlp-dates.md`、`research/module3-eisenhower.md`、`research/module7-sync-engines.md`、`research/module8-crossplatform-legal.md`。
+- `research/tools/ghinfo.py` — GitHub 事实抓取脚本（stars / forks / license / archived / last commit / latest release / top language / description / topics），用法：`python3 research/tools/ghinfo.py owner/repo [owner/repo ...]`。不依赖 `api.github.com`。
+- 并行调研明细（同一目录，含逐条原始证据与 `ghinfo.py` 实测行）：
+  - `research/module3-eisenhower.md`（四象限 + 其他可视化视图，241 行）
+  - `research/module5-nlp-dates.md`（自然语言日期解析，207 行）
+  - `research/module7-sync-engines.md`（同步引擎授权判定，218 行，逐条 license 原文摘录）
+- 本报告 §9（跨端/小组件）与 §11–§12（非开源参考 + 法律合规）由主调研直接核实编写（含 TickTick ToS 原文抓取、RFC 编号核对、各仓库 LICENSE 原文读取）。

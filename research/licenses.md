@@ -98,20 +98,52 @@
 
 > 用途：如果 heyta 走 Flutter/Dart 或其他非 JS 技术栈，这是**已通过 CI 互操作验证**的移植蓝本。
 
-### 1.6 计划引入的第三方组件（决策见 `docs/07-reusable-components.md`）
+### 1.6 计划引入的第三方组件
 
-| 组件 | 版本 | License | 验证方式 | 用途 |
+> **准入规则（强制）**：必须**同时**满足两条才可引入 ——
+> 1. **许可**：允许闭源商用（MIT / Apache-2.0 / BSD / ISC / MPL-2.0 等）
+> 2. **可维护性**：**2021 年之后仍在持续更新**（否则排除，无论许可多宽松）
+>
+> 核实手段：`python3 research/tools/ghinfo.py owner/repo`（拉最后提交/发版时间）
+> 或 npm registry `time[latest]`。**数据为 2026-09-25 实测。**
+
+#### ✅ 通过双门槛
+
+| 组件 | 版本 | License | 最后更新 | 用途 |
 |---|---|---|---|---|
-| **`chrono-node`** | 2.10.1 | **MIT** ✅ | 【本机实测】npm registry + `raw.githubusercontent.com/wanasit/chrono/master/LICENSE.txt` 原文 | 自然语言日期解析（**含中文 hans/hant**，已实测 parser 文件存在） |
-| **`@dnd-kit/core`** | 6.3.1 | **MIT** ✅ | 【本机实测】npm registry | 四象限 2×2 拖拽交互 |
-| `fullcalendar` | — | MIT 【子任务核实】 | 待本机复验后登记 | 日历视图 |
-| `schedule-x` | — | MIT 【子任务核实】 | 待本机复验后登记 | 日历视图（备选） |
-| `frappe/gantt` | — | MIT 【子任务核实】 | 待本机复验后登记 | 甘特视图 |
-| `vis-timeline` | — | Apache-2.0 OR MIT 【子任务核实】 | 待本机复验后登记 | 时间线视图 |
-| `rrule` (rrule.js) | — | 【未核实】 | **引入前必须核实并登记** | 重复任务规则引擎 |
-| Radicale / Baikal（服务端） | — | 【未核实】 | **引入前必须核实并登记** | CalDAV 服务端 |
-| ntfy / Gotify / UnifiedPush | — | 【未核实】 | **引入前必须核实并登记** | 自建推送 |
-| Drift / sqflite（Dart） | — | 【未核实】 | **引入前必须核实并登记** | 本地 SQLite |
+| **`chrono-node`** | 2.10.1 | **MIT** ✅ | **2026-09-22** | 自然语言日期解析（**含中文 hans/hant**，已实测 parser 文件存在） |
+| **`@dnd-kit/core`** | 6.3.1 | **MIT** ✅ | **2026-09-12** | 四象限 2×2 拖拽 |
+| `fullcalendar` | 7.1.0 | MIT ✅ | 2026-09-05 | 日历视图 |
+| **`ical.js`** | 2.2.1 | **MPL-2.0** ✅ | **2026-09-17** | **RRULE 引擎** + iCalendar + CalDAV |
+| **`tsdav`** | 2.3.4 | **MIT** ✅ | **2026-09-19** | CalDAV 客户端（真实仓库 `natelindev/tsdav`） |
+| `react-activity-calendar` | — | MIT ✅ | **2026-09-24** | 习惯热力图 |
+| `frappe/Gantt` | 1.0.3 | MIT ✅ | 2026-03-05 | 甘特图（注意仓库名是 `frappe/Gantt`） |
+| `@noble/ciphers` | 2.4.0 | MIT ✅ | 2026-08-27 | sync-core 依赖 |
+| `hash-wasm` | 4.12.0 | MIT ✅ | 2024-11-19 | sync-core 依赖（Argon2id） |
+| `zod` | 4.6.5 | MIT ✅ | 2026-09-13 | 线协议校验 |
+| `fastify` | 5.12.5 | MIT ✅ | 2026-09-16 | 服务端 |
+| `@prisma/client` | 7.10.0 | Apache-2.0 ✅ | 2026-08-25 | ORM |
+| `react` | 19.3.0 | MIT ✅ | 2026-09-09 | UI |
+| `zustand` | 5.0.15 | MIT ✅ | 2026-08-13 | 状态管理 |
+
+#### ⚠️ 触线待权衡
+
+| 组件 | 问题 | 处置 |
+|---|---|---|
+| **`rrule` (rrule.js)** | 许可 ✅ **BSD-3-Clause**（GitHub 标 NOASSERTION 是**误报**，已读 `LICENCE` 原文与 npm `license` 字段）；但**最后发版 2023-11-10**，近 3 年无更新 | **改用 `ical.js`** —— 活跃（2026-09-17）且自带完整 `Recur` / `RecurIterator`；做 CalDAV 反正是必须依赖它，**一个依赖解决两件事** |
+| `cal-heatmap` | 许可 ✅ MIT，但最后提交 **2024-03-03**（2.5 年） | **排除**，改用 `react-activity-calendar` |
+| `prisma` CLI | latest 为 `8.0.0-rc.17`（RC） | 用稳定线 7.10.0。⚠️ 上游 `super-sync-server` 锁 Prisma **5.22.0**，有版本跨度 |
+
+#### ⏸ 待评估（尚未核实到活跃度）
+
+| 组件 | 用途 | 备注 |
+|---|---|---|
+| Radicale / Baikal / sabre/dav | CalDAV 服务端 | 自建可选组件，非 P0 |
+| ntfy / Gotify / UnifiedPush | 自建推送 | P3 才需要，**引入前必须核实** |
+| `schedule-x` / `vis-timeline` | 日历/时间线备选 | 已被 fullcalendar 覆盖，暂不需要 |
+
+> **技术栈已定：JS/TypeScript 生态**（2026-09-25），因此 Dart/Flutter 相关候选
+> （Drift / sqflite / Dart argon2 / libsodium 绑定）**全部作废**，不再登记。
 
 ---
 

@@ -18,6 +18,8 @@
 3. **本地优先**：数据默认存用户设备，云端只是同步通道。
 4. **导出自由**：任何时刻都能一键带走全部数据。
 5. **许可证干净**：所有引入的代码必须允许我们的分发/商业模式，逐项登记。
+6. **可维护优先**：引入的第三方组件**必须 2021 年之后仍在持续更新**。许可证再宽松，
+   一个停更三年的库也是负债。核实手段：`python3 research/tools/ghinfo.py owner/repo`。
 
 ## 文档索引
 
@@ -33,6 +35,7 @@
 | [`docs/05-codebase-assessment.md`](docs/05-codebase-assessment.md) | 上游代码体检：依赖许可证扫描 + 代码量实测 |
 | [`docs/06-reuse-plan.md`](docs/06-reuse-plan.md) | ⭐ **复用方案核心**：精确分层账本 + 复用矩阵 + 待决策点 |
 | [`docs/07-reusable-components.md`](docs/07-reusable-components.md) | 外部组件决策表：每个模块"用现成的还是自研" |
+| [`docs/08-implementation-plan.md`](docs/08-implementation-plan.md) | ⭐ **实施计划**：阶段划分、P0 任务分解、组件判定、风险 |
 
 ### 深度调研（`research/`）
 
@@ -44,6 +47,7 @@
 | [`research/deep-dive-cross-language.md`](research/deep-dive-cross-language.md) | 跨语言集成路径评估（含 Flutter/Dart） |
 | [`research/licenses.md`](research/licenses.md) | ⭐ **依赖许可证登记表**（强制登记规则） |
 | [`research/oss-task-manager-deep-dive.md`](research/oss-task-manager-deep-dive.md) | 16 个开源任务管理项目深度对比 |
+| [`research/ticktick-clone-oss-research.md`](research/ticktick-clone-oss-research.md) | 按功能模块（习惯/番茄/四象限/日历/NLP/RRULE/同步/小组件）的开源方案盘点 |
 | [`research/module3-eisenhower.md`](research/module3-eisenhower.md) | 四象限模块专项调研 |
 | [`research/module5-nlp-dates.md`](research/module5-nlp-dates.md) | 自然语言日期解析专项调研 |
 | [`research/module7-sync-engines.md`](research/module7-sync-engines.md) | 同步引擎市场调研 |
