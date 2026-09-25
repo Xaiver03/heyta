@@ -70,6 +70,16 @@ export type DbCursorAction = 'continue' | 'stop' | 'delete' | 'delete-stop';
 
 export type DbCursorVisitor<T> = (value: T, key: DbKey) => DbCursorAction;
 
+/**
+ * `addToleratingDuplicate` 的结果。
+ *
+ * 判别联合而不是 `{ ok: boolean; key?: number }`：后者让调用方必须对
+ * `key` 做非空断言，而"成功却没有 key"实际上是**不可能**的状态。
+ */
+export type DbTolerantAddResult =
+  | { ok: true; key: number }
+  | { ok: false; reason: 'duplicate' };
+
 export interface DbIterateOptions {
   direction?: DbCursorDirection;
   /** 从该键开始（含）。 */
@@ -90,6 +100,25 @@ export interface DbIterateOptions {
  */
 export interface DbTx {
   add(store: string, value: unknown): Promise<number>;
+
+  /**
+   * 插入；若触发**唯一索引冲突**则报告"已存在"而**不使事务失败**。
+   *
+   * 🔴 这个方法必须在接口里，因为它承载了 op-log 的一条关键语义：
+   * 同一个 opId 被重复投递是**正常路径**（同步会重放、客户端会重试），
+   * 不是异常。
+   *
+   * 它曾经**只存在于 `IndexedDbAdapter` 上而不在接口里** ——
+   * `DbOpLogStore` 于是只能靠 `as DbTx & {...}` 强转去调用它。
+   * 强转本身就是信号：接口没有表达使用者的真实需求。后果是任何新适配器
+   * （比如 SQLite、内存实现）只要按接口老实实现，就会在运行时报
+   * "addToleratingDuplicate is not a function"。共享契约一跑就抓到了。
+   *
+   * 🔴 实现要点：冲突必须被**适配器内部**吸收（IndexedDB 里是
+   * `preventDefault()`），否则错误冒泡会中止整个事务，把整批写入回滚掉 ——
+   * 那会让"跳过重复项、继续写其余的"变成"整批都不写"。
+   */
+  addToleratingDuplicate(store: string, value: unknown): Promise<DbTolerantAddResult>;
   put(store: string, value: unknown, key?: DbKey): Promise<void>;
   get<T>(store: string, key: DbKey): Promise<T | undefined>;
   getAll<T>(store: string, range?: DbKeyRange): Promise<T[]>;

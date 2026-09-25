@@ -18,9 +18,10 @@
     "check:migrations": "node scripts/check-migrations.mjs",
     "check:licenses": "node research/tools/license-inventory.mjs",
     "check:docs": "node research/tools/docs-link-check.mjs",
-    "check": "pnpm build && pnpm typecheck && pnpm check:migrations && pnpm check:licenses && pnpm check:docs && pnpm check:design",
+    "check": "pnpm build && pnpm typecheck && pnpm check:migrations && pnpm check:licenses && pnpm check:docs && pnpm check:design && pnpm check:tokens",
     "check:design": "node design-system/heyta/check-hardcoded.mjs",
-    "verify:p1": "node scripts/verify-p1-sync.mjs"
+    "verify:p1": "node scripts/verify-p1-sync.mjs",
+    "check:tokens": "pnpm --filter @heyta/design-system run generate:check"
   },
   "devDependencies": {
     "@heyta/shared-schema": "workspace:*",

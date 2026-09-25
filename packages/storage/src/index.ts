@@ -12,5 +12,12 @@ export * from './db.types';
 export * from './stores';
 export * from './op-log-store';
 export * from './indexeddb/index';
+export * from './sqlite/index';
 
 export { MemoryDbAdapter } from './memory/memory-adapter.js';
+
+// 只导出类：`db-op-log-store.ts` 会再导出 `op-log-store.ts` 的类型，
+// 用 `export *` 会与上面第 13 行产生重复导出冲突。
+export { DbOpLogStore } from './db-op-log-store.js';
+// 旧名（兼容别名）：见 db-op-log-store.ts 里为什么用 `export {}` 而非 `const`
+export { IndexedDbOpLogStore } from './db-op-log-store.js';

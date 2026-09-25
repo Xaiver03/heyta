@@ -1,0 +1,302 @@
+/**
+ * `OpLogStore` 共享契约
+ * =====================
+ *
+ * `DbAdapter` 是可替换的存储引擎；`OpLogStore` 是它上面的**同步语义**。
+ * 两层必须分别被契约锁住 —— 引擎对了不代表同步语义对了。
+ *
+ * 🔴 **这份契约最重要的作用是证明一件事：op-log 层不绑定 IndexedDB。**
+ *
+ * 它原本叫 `IndexedDbOpLogStore` 并放在 `indexeddb/` 下，但实测一行
+ * IndexedDB API 都没用 —— 只依赖 `DbAdapter`。名字在撒谎，而代价是实质的：
+ * 看代码的人会以为换到 SQLite 要**再写一个 op-log store**，
+ * 于是真的去写第二份同步逻辑，而两份实现不可能保持一致 ——
+ * 那等于数据损坏（ADR-0003 §3.3）。
+ *
+ * 同一份契约跑在 Memory 与 IndexedDB 两个适配器上，就是"换引擎、零改动"的证据。
+ */
+
+import { describe, expect, it } from 'vitest';
+
+import type { Operation } from '@heyta/sync-core';
+
+import type { DbAdapter } from '../../src/db.types.js';
+import type { OpLogStore, StoredOperation } from '../../src/op-log-store.js';
+import { OP_FIELDS } from '../../src/stores.js';
+
+export interface OpLogStoreContractOptions {
+  name: string;
+  /** 造一个**全新且已 init** 的适配器。 */
+  createDb: () => Promise<DbAdapter>;
+  /** 给定一个适配器，造出对应的 op-log store。 */
+  create: (db: DbAdapter) => OpLogStore<Operation<string>>;
+}
+
+let opCounter = 0;
+
+export function makeOp(over: Partial<Operation<string>> = {}): Operation<string> {
+  opCounter++;
+  return {
+    id: `op-${opCounter}`,
+    entityType: 'TASK',
+    entityId: 'task-1',
+    opType: 'CRT',
+    payload: { title: `任务 ${opCounter}` },
+    clientId: 'client-a',
+    timestamp: 1_000 + opCounter,
+    vectorClock: { 'client-a': opCounter },
+    schemaVersion: 1,
+    ...over,
+  } as Operation<string>;
+}
+
+const ids = (rows: StoredOperation<Operation<string>>[]): string[] =>
+  rows.map((r) => r.op[OP_FIELDS.OP_ID] as unknown as string);
+
+export function runOpLogStoreContract({ name, createDb, create }: OpLogStoreContractOptions): void {
+  describe(`OpLogStore 契约 —— ${name}`, () => {
+    const withStore = async (
+      fn: (store: OpLogStore<Operation<string>>) => Promise<void>,
+    ): Promise<void> => {
+      const db = await createDb();
+      const store = create(db);
+      try {
+        await fn(store);
+      } finally {
+        db.close();
+      }
+    };
+
+    // ── 写入：seq 无空洞 ────────────────────────────────────
+
+    it('🔴 appendLocal 返回单调递增、**无空洞**的 seq', async () => {
+      await withStore(async (store) => {
+        const a = await store.appendLocal([makeOp()]);
+        const b = await store.appendLocal([makeOp(), makeOp()]);
+        const c = await store.appendLocal([makeOp()]);
+
+        // seq 是同步游标的基础。有空洞 → 增量同步永久漏掉中间的操作 → 静默丢数据。
+        expect([...a, ...b, ...c]).toEqual([1, 2, 3, 4]);
+      });
+    });
+
+    it('getLastLocalSeq 与写入一致', async () => {
+      await withStore(async (store) => {
+        expect(await store.getLastLocalSeq()).toBe(0);
+        await store.appendLocal([makeOp(), makeOp()]);
+        expect(await store.getLastLocalSeq()).toBe(2);
+      });
+    });
+
+    it('空批次是安全的空操作', async () => {
+      await withStore(async (store) => {
+        expect(await store.appendLocal([])).toEqual([]);
+        expect(await store.getLastLocalSeq()).toBe(0);
+      });
+    });
+
+    it('🔴 同一 opId 写两次只留一条（幂等，靠唯一索引而不是先查后写）', async () => {
+      await withStore(async (store) => {
+        const op = makeOp();
+        await store.appendLocal([op]);
+        await store.appendLocal([op]);
+        expect(await store.getAllOps()).toHaveLength(1);
+      });
+    });
+
+    it('🔴 同一批里重复的 opId 也只写一条', async () => {
+      await withStore(async (store) => {
+        const op = makeOp();
+        await store.appendLocal([op, op, op]);
+        expect(await store.getAllOps()).toHaveLength(1);
+        // 且不能因为跳过而留下空洞
+        expect(await store.getLastLocalSeq()).toBe(1);
+      });
+    });
+
+    it('并发写入同一 opId 仍只留一条', async () => {
+      await withStore(async (store) => {
+        const op = makeOp();
+        await Promise.all([
+          store.appendLocal([op]),
+          store.appendLocal([op]),
+          store.appendLocal([op]),
+        ]);
+        expect(await store.getAllOps()).toHaveLength(1);
+      });
+    });
+
+    // ── 读取 ───────────────────────────────────────────────
+
+    it('getOpsSince 是**开区间**（不含 sinceSeq 本身）', async () => {
+      await withStore(async (store) => {
+        const ops = [makeOp(), makeOp(), makeOp()];
+        await store.appendLocal(ops);
+        const [a, b, c] = ops.map((o) => o.id);
+
+        expect(ids(await store.getOpsSince(0))).toEqual([a, b, c]);
+        expect(ids(await store.getOpsSince(1))).toEqual([b, c]);
+        expect(ids(await store.getOpsSince(3))).toEqual([]);
+      });
+    });
+
+    it('getOpsSince 可以排除自己的客户端（避免回放自己写的东西）', async () => {
+      await withStore(async (store) => {
+        const other = makeOp({ clientId: 'other' });
+        await store.appendLocal([makeOp({ clientId: 'me' }), other]);
+        expect(ids(await store.getOpsSince(0, undefined, 'me'))).toEqual([other.id]);
+      });
+    });
+
+    it('getOpsSince 尊重 limit', async () => {
+      await withStore(async (store) => {
+        const ops = [makeOp(), makeOp(), makeOp()];
+        await store.appendLocal(ops);
+        expect(ids(await store.getOpsSince(0, 2))).toEqual([ops[0]!.id, ops[1]!.id]);
+      });
+    });
+
+    it('getOpsForEntity 只返回该实体、且按 seq 升序', async () => {
+      await withStore(async (store) => {
+        const first = makeOp({ entityId: 'a' });
+        const third = makeOp({ entityId: 'a' });
+        await store.appendLocal([first, makeOp({ entityId: 'b' }), third]);
+
+        const rows = await store.getOpsForEntity('TASK' as never, 'a');
+        expect(ids(rows)).toEqual([first.id, third.id]);
+      });
+    });
+
+    it('getAllOps 按 seq 升序返回', async () => {
+      await withStore(async (store) => {
+        const ops = [makeOp(), makeOp(), makeOp()];
+        await store.appendLocal(ops);
+        expect(ids(await store.getAllOps())).toEqual(ops.map((o) => o.id));
+      });
+    });
+
+    // ── 崩溃恢复 ───────────────────────────────────────────
+
+    it('本地 op 写入即已应用，不进待应用队列', async () => {
+      await withStore(async (store) => {
+        await store.appendLocal([makeOp()]);
+        expect(await store.findPendingApply()).toHaveLength(0);
+      });
+    });
+
+    it('🔴 远程 op 进入待应用队列，markApplied 后移出（崩溃恢复闭环）', async () => {
+      await withStore(async (store) => {
+        const ops = [makeOp(), makeOp()];
+        await store.appendBatchSkipDuplicates(ops, 'remote', { pendingApply: true });
+
+        const pending = await store.findPendingApply();
+        expect(pending).toHaveLength(2);
+        // 用真实 seq，不假设从 1 开始（每个用例是独立的库，但不要依赖这一点）
+        const seqs = pending.map((r) => r[OP_FIELDS.SEQ] as number);
+
+        await store.markApplied([seqs[0]!]);
+        expect(ids(await store.findPendingApply())).toEqual([ops[1]!.id]);
+
+        await store.markApplied([seqs[1]!]);
+        expect(await store.findPendingApply()).toHaveLength(0);
+      });
+    });
+
+    it('🔴 待应用与待上传是**两个独立队列**', async () => {
+      await withStore(async (store) => {
+        // 本地 op：待上传，不待应用
+        const local = makeOp();
+        await store.appendLocal([local]);
+        // 远程 op：待应用，不待上传（我们本来就收到了）
+        const remote = makeOp();
+        await store.appendBatchSkipDuplicates([remote], 'remote', { pendingApply: true });
+
+        expect(ids(await store.findPendingUpload())).toEqual([local.id]);
+        expect(ids(await store.findPendingApply())).toEqual([remote.id]);
+      });
+    });
+
+    // ── 上传队列 ───────────────────────────────────────────
+
+    it('🔴 待上传队列按本地 seq 升序（上传顺序必须与产出顺序一致）', async () => {
+      await withStore(async (store) => {
+        const ops = [makeOp(), makeOp(), makeOp()];
+        for (const op of ops) await store.appendLocal([op]);
+
+        const queue = await store.findPendingUpload();
+        expect(ids(queue)).toEqual(ops.map((o) => o.id));
+        // 上传顺序必须与产出顺序一致
+        const seqs = queue.map((r) => r[OP_FIELDS.SEQ] as number);
+        expect(seqs).toEqual([...seqs].sort((a, b) => a - b));
+      });
+    });
+
+    it('markUploaded 把 op 移出待上传队列，并回写服务端 seq', async () => {
+      await withStore(async (store) => {
+        const ops = [makeOp(), makeOp()];
+        await store.appendLocal(ops);
+
+        const updated = await store.markUploaded(new Map([[ops[0]!.id, 900]]));
+        expect(updated).toBe(1);
+
+        expect(ids(await store.findPendingUpload())).toEqual([ops[1]!.id]);
+        const row = (await store.getAllOps()).find((r) => r.op.id === ops[0]!.id);
+        expect(row?.serverSeq).toBe(900);
+      });
+    });
+
+    it('markUploaded 对不存在的 opId 是安全空操作', async () => {
+      await withStore(async (store) => {
+        await store.appendLocal([makeOp()]);
+        expect(await store.markUploaded(new Map([['nope', 1]]))).toBe(0);
+        expect(await store.findPendingUpload()).toHaveLength(1);
+      });
+    });
+
+    it('🔴 discardPendingUpload 只移出队列，**不删除 op**（事实来源不能被清理）', async () => {
+      await withStore(async (store) => {
+        const ops = [makeOp(), makeOp()];
+        await store.appendLocal(ops);
+
+        const n = await store.discardPendingUpload([ops[0]!.id]);
+        expect(n).toBe(1);
+
+        // 队列里没了
+        expect(ids(await store.findPendingUpload())).toEqual([ops[1]!.id]);
+        // 但日志里**还在** —— 这是 op-log 与"删除"的根本区别
+        expect(ids(await store.getAllOps())).toEqual(ops.map((o) => o.id));
+      });
+    });
+
+    it('discardPendingUpload 对不存在的 opId 是安全空操作', async () => {
+      await withStore(async (store) => {
+        expect(await store.discardPendingUpload(['nope'])).toBe(0);
+      });
+    });
+
+    // ── 归档 ───────────────────────────────────────────────
+
+    it('archiveUpTo 把老 op 移入归档，但日志仍可读', async () => {
+      await withStore(async (store) => {
+        for (let i = 0; i < 5; i++) await store.appendLocal([makeOp()]);
+
+        const archived = await store.archiveUpTo(3);
+        expect(archived).toBeGreaterThanOrEqual(0);
+        // 无论归档策略如何，**不能丢数据**
+        expect(await store.getAllOps()).toHaveLength(5);
+      });
+    });
+
+    // ── 游标 ───────────────────────────────────────────────
+
+    it('同步游标读写', async () => {
+      await withStore(async (store) => {
+        expect(await store.getLastServerSeq()).toBe(0);
+        await store.setLastServerSeq(42);
+        expect(await store.getLastServerSeq()).toBe(42);
+        await store.setLastServerSeq(7);
+        expect(await store.getLastServerSeq()).toBe(7);
+      });
+    });
+  });
+}
