@@ -335,7 +335,16 @@ describe('prefers-reduced-motion 被显式导出并说明原生替代方式', ()
  * "每个 token 都在、值也对得上"，但**证明不了这文件语法合法**。
  * 一个拼错的关键字、少了的引号，正则照样能匹配出值，而 ArkTS 编译器会拒绝整个文件。
  *
- * 本机没有 ArkTS 编译器，所以这里用 TypeScript 的**真实解析器**兜底：
+ * ⚠️ 这条注释原本写的是「本机没有 ArkTS 编译器」—— **那是错的**。
+ * DevEco Studio 装在本机（`/Applications/DevEco-Studio.app`），真正的 ArkTS 编译器
+ * `es2abc` 也就在里面，只是不在 PATH 上，所以当时没找到就下了结论。
+ * 现在**真正的编译器验证**由 `pnpm check:arkts` 负责（见 check-arkts-compile.mjs）。
+ *
+ * 这里保留 TypeScript 解析器兜底仍有独立价值：它在 `pnpm test` 里就能跑，
+ * 不依赖 DevEco，因此开发机上不必等 `pnpm check` 就能发现产物被写坏。
+ * 但**它证明的是"TS 能解析"，不是"ArkTS 能编译"** —— 方言终究是方言。
+ *
+ * 用 TypeScript 的**真实解析器**兜底：
  * ArkTS 是 TypeScript 的方言，纯常量声明部分的语法是同一套。
  *
  * ⚠️ **这不是 ArkTS 编译通过**。它只覆盖"语法"这一层，而且只对得起
