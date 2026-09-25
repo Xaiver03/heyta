@@ -12,12 +12,22 @@
 
 | 项目 | Stars | License | 四象限 | 番茄钟 | 习惯 | NLP 日期 | 全平台 App | 日历同步 |
 |---|---|---|---|---|---|---|---|---|
-| **Super Productivity** | **22.2k** | **MIT** | ✅ | ✅ | ✅ | ✅ | ✅ 含 iOS/Android | ✅ CalDAV + Google/Outlook |
+| **Super Productivity** | **22.2k** | **MIT** | ✅ | ✅ | ⚠️ **简版** | ✅ | ✅ 含 iOS/Android | ✅ CalDAV + Google/Outlook |
 | **Tududi** | 3.4k | **MIT** | ✅ | ✅ | ✅ | ❌ | ❌ 仅 PWA | ✅ CalDAV 双向 |
 | Vikunja | 5.5k | AGPL-3.0 | ❌ | ❌ | ❌ | ✅ | ⚠️ Android alpha | ⚠️ CalDAV alpha |
 | 其余 13 个 | — | — | ❌ | ❌ | ❌ | ❌ | — | — |
 
 **关键结论：功能最全的两个项目，恰好都是 MIT。** 这意味着——**你不需要在"闭源"和"复用"之间取舍了。**
+
+> ⚠️ **2026-09-25 二次更正**：我此前把 Super Productivity 的习惯打卡记为 ✅，**这仍然偏乐观**。
+> 实测结论：它的"习惯"不是一个 Habit 实体，而是 **`SimpleCounter`（简单计数器）+ streak 选项**：
+> - 数据模型 `SimpleCounterCfgFields`：`type`（StopWatch / ClickCounter / RepeatedCountdownReminder）、
+>   `countOnDay: {日期: 次数}`、`isTrackStreaks` / `streakMinValue` / `streakMode`（`specific-days` | `weekly-frequency`）
+> - `habit-page.component.ts` **只有 36 行**，只是渲染 `HabitTrackerComponent`（327 行 TS + 201 行 HTML）
+> - **没有 goal / target / unit 概念**（grep 零命中）、**没有热力图 / 月历统计**
+> - ✅ 但它**确实参与同步**（`SIMPLE_COUNTER` 在 `ENTITY_TYPES` 里）
+>
+> 换句话说：**"打卡 + 连续天数"能用，"滴答清单级别的习惯模块"要自己补**（目标值/单位、备注日记、热力图、统计）。详见 `research/deep-dive-sync-core.md` §2.4 与 `research/deep-dive-habit-and-entities.md`。
 
 ---
 
@@ -36,7 +46,7 @@
 - 任务 / 项目 / 标签 / 子任务 / 优先级 / 重复任务 / 提醒
 - **四象限**（内置 `EISENHOWER_MATRIX` 板）
 - **番茄钟 + 专注模式**（`features/focus-mode`）
-- **习惯打卡**（`pages/habit-page` 实测存在 ← 我上一版文档写"完全没有"是错的）
+- **习惯打卡**（⚠️ 见上方更正：实为 `SimpleCounter` + streak，非滴答清单级别的习惯模块）
 - 看板（`features/boards`）、Schedule + Planner 时间盒视图
 - **自然语言日期**（Chrono：`@4pm`、`@every 2 weeks`）
 - **CalDAV VTODO 可配置 pull / push / both**；Google Calendar / Outlook 365 集成
