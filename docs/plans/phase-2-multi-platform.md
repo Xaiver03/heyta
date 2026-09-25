@@ -63,7 +63,7 @@ iOS 与鸿蒙**必须**用 SQLite（ADR-0003 §2.2：WebView 的 IndexedDB 会�
 复合主键拆成 `pk0..pkN` 列按列排序；所有键列**不声明 SQL 类型**（BLOB 亲和性），
 否则 INTEGER/TEXT 亲和性会把 meta 的键 `'123'` 静默变成整数 `123` 而与别的键合并。
 
-### 2.3 非 Web 宿主验证（🔄 进行中）
+### 2.3 非 Web 宿主验证（✅ 已完成）
 
 要求里说"至少一个非 Web 端壳，有真实读写 + 同步验证"。
 
@@ -75,6 +75,41 @@ op-log 引擎 + SQLite 适配器 + 同步客户端，对着真实服务端做读
 它验证的是 ADR-0003 最核心的那条主张 —— "业务逻辑全在 `packages/`，换宿主只是换壳" ——
 而**完全不需要先决定 UI 技术栈**。如果 Node 宿主能跑通，说明分层是真的；
 如果跑不通，说明还有逻辑漏在 `apps/web` 里，那正是现在就该发现的事。
+
+**完成情况**：`apps/node-host/`（`@heyta/node-host`）把
+`NodeSqliteDriver → SqliteAdapter → DbOpLogStore → OpLogEngine → SyncClient`
+接起来，只注入平台差异（**真实 SQLite 文件**、`fetch`、令牌、口令）。
+CLI 提供 `add` / `list` / `rename` / `complete` / `reopen` / `sync` / `pending`；
+**所有写入都过 `OpLogEngine.dispatch()`**，CLI 里没有一处直接改状态。
+设备 id 与同步游标存在与 Web 端**同一个 `META_KEYS`** 下，所以两端的本地库
+结构完全一致 —— 这是"换存储实现上层一行不用改"的直接结果。
+
+零 mock 验收：`pnpm verify:p2`（`scripts/verify-p2-node-host.mjs`）自带真实
+Fastify + PostgreSQL，两台独立宿主各用一个 SQLite 文件，**每条命令都是新进程**：
+
+1. A `add` → **另一个进程** `list` 仍能读到（重启不丢 = 真落盘）
+2. 绕过适配器，用 `node:sqlite` 直接读 `ops` 表原始行（数据真的在表里，
+   且同步前 `uploadStatus === 'pending'`）
+3. A `sync` → 待上传队列清空 → B `sync` 看到 A 的任务（两端 `clientId` 不同）
+4. B 改名并 `sync` → A `sync` 后看到 B 的编辑（双向）
+5. 服务端只存密文（`isPayloadEncrypted: true`，明文标题不出现）
+
+**关键发现（好消息）**：宿主**没有改动 `packages/` 或 `apps/web` 一行**。
+分层是真的 —— 换宿主确实只是换存储实现与网络注入。
+
+**但有一处诚实的接缝**：`SyncClientOptions` 的那十来个回调
+（`getLocalOps` / `markUploaded` / `applyRemote` / `redispatch` …）在
+`apps/web` 与 `apps/node-host` 里各接了一遍。它们不是业务逻辑（业务逻辑在
+`packages/sync-client` 里完整存在），只是"把引擎的方法接到选项上"的管道，
+所以不影响"换壳"的结论；但它确实是**每个宿主都要抄一遍的样板**。
+若将来第三个宿主出现，值得把这段接线提到 `packages/` 里做成
+`createSyncClient(engine, ...)` —— 现在只有两处，且两端行为分别由
+`verify:p1` 与 `verify:p2` 两条零 mock 验收同时钉住，暂不重构。
+
+**验收确实能失败**：把 Host B 指向死掉的端口（`http://127.0.0.1:9`）后，
+`pnpm verify:p2` 退出码 1，输出
+`❌ P2 验收失败：宿主命令失败（B sync：sync），exit=1`，
+并打印宿主返回的 `{"kind":"offline"}` 与保留的现场目录；恢复后重新通过。
 
 ### 2.4 设计变量生成器（✅ 已完成）
 

@@ -351,7 +351,7 @@ docker inspect <容器> --format '{{range .Config.Env}}{{println .}}{{end}}' | g
 |---|---|
 | P0 奠基 | ✅ 已完成（协议已跑通，Docker 实测通过） |
 | P1 单端闭环 | ✅ **已完成**（6 条零 mock E2E 全过）→ [详细计划](docs/plans/phase-1-single-client-loop.md) |
-| P2 多端补齐 | 🔄 **进行中**（存储契约 ✅ / SQLite ✅ / token 生成器 ✅ / 非 Web 宿主 🔄）→ [详细计划](docs/plans/phase-2-multi-platform.md) |
+| P2 多端补齐 | 🔄 **进行中**（存储契约 ✅ / SQLite ✅ / token 生成器 ✅ / 非 Web 宿主 ✅）→ [详细计划](docs/plans/phase-2-multi-platform.md) |
 | P3 平台特性 | ⏸ |
 
 总路线图：[`docs/plans/roadmap.md`](docs/plans/roadmap.md)
