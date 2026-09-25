@@ -36,6 +36,7 @@
 | [`docs/06-reuse-plan.md`](docs/06-reuse-plan.md) | ⭐ **复用方案核心**：精确分层账本 + 复用矩阵 + 待决策点 |
 | [`docs/07-reusable-components.md`](docs/07-reusable-components.md) | 外部组件决策表：每个模块"用现成的还是自研" |
 | [`docs/08-implementation-plan.md`](docs/08-implementation-plan.md) | ⭐ **实施计划**：阶段划分、P0 任务分解、组件判定、风险 |
+| [`docs/09-local-server-verification.md`](docs/09-local-server-verification.md) | ⭐ **本地跑通服务端**：不依赖 Docker 的验证配方 + 三条实测发现 |
 
 ### 深度调研（`research/`）
 

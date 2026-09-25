@@ -5,35 +5,44 @@ WORKDIR /repo
 
 RUN apk add --no-cache openssl libc6-compat
 
-# Root package + lock (for workspace install)
-COPY package.json package-lock.json ./
+# 🔧 heyta 改动：上游这里用 `npm ci`。
+# heyta 的工作区定义在 pnpm-workspace.yaml（不在 package.json 的 `workspaces` 字段），
+# npm 根本看不到它是一个 monorepo，所以必须改用 pnpm。
+# 版本与根 package.json 的 `packageManager` 保持一致。
+RUN corepack enable && corepack prepare pnpm@11.8.0 --activate
+
+# 根工作区文件 + 各包的 package.json（先只拷清单，让依赖层可缓存）
+COPY pnpm-workspace.yaml package.json pnpm-lock.yaml ./
 COPY packages/sync-core/package.json ./packages/sync-core/
 COPY packages/shared-schema/package.json ./packages/shared-schema/
-COPY packages/super-sync-server/package.json ./packages/super-sync-server/
+COPY server/package.json ./server/
 
-# Install ALL dependencies for the monorepo
-# Use npm ci for reproducible builds; requires compatible lockfile
-RUN npm ci --ignore-scripts
+# 安装整个工作区的依赖。
+# --frozen-lockfile：锁文件与清单不一致时**直接失败**，而不是悄悄换版本。
+RUN pnpm install --frozen-lockfile --ignore-scripts
 
-# Copy source code
+# 拷贝源码
 COPY packages/sync-core/ ./packages/sync-core/
 COPY packages/shared-schema/ ./packages/shared-schema/
-COPY packages/super-sync-server/ ./packages/super-sync-server/
+COPY server/ ./server/
 
-# Build sync-core, then shared-schema
+# 先构建 sync-core，再构建 shared-schema —— 顺序不能反，后者依赖前者
 WORKDIR /repo/packages/sync-core
-RUN npm run build
-RUN npm pack
+RUN pnpm run build
+
+# 🔧 heyta 改动：tarball 名字随包名变化。
+# 包名是 @heyta/sync-core，`pnpm pack` 产出 heyta-sync-core-<version>.tgz（去掉 scope）。
+RUN pnpm pack
 
 WORKDIR /repo/packages/shared-schema
-RUN npm run build
+RUN pnpm run build
 # Pack shared-schema to tgz for installation in production
-RUN npm pack
+RUN pnpm pack
 
-# Build super-sync-server
-WORKDIR /repo/packages/super-sync-server
-RUN npx prisma generate
-RUN rm -rf dist && npm run build
+# 构建服务端
+WORKDIR /repo/server
+RUN pnpm exec prisma generate
+RUN rm -rf dist && pnpm run build
 
 # ---- Runtime stage ----
 FROM node:24-alpine AS production
@@ -50,22 +59,28 @@ RUN apk add --no-cache openssl libc6-compat wget && \
 WORKDIR /app
 
 # Copy built artifacts from builder (note: tsconfig rootDir is "." so structure is dist/src/ and dist/scripts/)
-COPY --from=builder --chown=supersync:nodejs /repo/packages/super-sync-server/dist ./dist
-COPY --from=builder --chown=supersync:nodejs /repo/packages/super-sync-server/public ./public
+# 🔧 heyta 改动：源路径 packages/super-sync-server/ → server/
+COPY --from=builder --chown=supersync:nodejs /repo/server/dist ./dist
+COPY --from=builder --chown=supersync:nodejs /repo/server/public ./public
 # Templates live OUTSIDE public/ on purpose: @fastify/static serves that whole directory,
 # so a template left there is downloadable at /privacy.template.html — which would republish
 # the very statements the generator suppresses when an operator has not configured them.
-COPY --from=builder --chown=supersync:nodejs /repo/packages/super-sync-server/templates ./templates
-COPY --from=builder --chown=supersync:nodejs /repo/packages/super-sync-server/prisma ./prisma
-COPY --from=builder --chown=supersync:nodejs /repo/packages/super-sync-server/scripts ./scripts
-COPY --from=builder --chown=supersync:nodejs /repo/packages/super-sync-server/src ./src
-COPY --from=builder --chown=supersync:nodejs /repo/packages/super-sync-server/package.json ./package.json
-COPY --from=builder --chown=supersync:nodejs /repo/packages/sync-core/sp-sync-core-*.tgz ./sync-core.tgz
-COPY --from=builder --chown=supersync:nodejs /repo/packages/shared-schema/sp-shared-schema-*.tgz ./shared-schema.tgz
+COPY --from=builder --chown=supersync:nodejs /repo/server/templates ./templates
+COPY --from=builder --chown=supersync:nodejs /repo/server/prisma ./prisma
+COPY --from=builder --chown=supersync:nodejs /repo/server/scripts ./scripts
+COPY --from=builder --chown=supersync:nodejs /repo/server/src ./src
+COPY --from=builder --chown=supersync:nodejs /repo/server/package.json ./package.json
+# 🔧 heyta 改动：tarball 名字 sp-* → heyta-*
+COPY --from=builder --chown=supersync:nodejs /repo/packages/sync-core/heyta-sync-core-*.tgz ./sync-core.tgz
+COPY --from=builder --chown=supersync:nodejs /repo/packages/shared-schema/heyta-shared-schema-*.tgz ./shared-schema.tgz
 
 # Install dependencies and generate Prisma client in single layer
 # Note: prisma CLI installed explicitly for runtime migrate deploy
 # IMPORTANT: prisma version must match @prisma/client in package.json
+#
+# 这里仍然是 npm（不是 pnpm），**刻意的**：
+# 服务端 package.json 里两个工作区依赖写成 `"*"`，npm 能用上面两个 tarball 满足它们；
+# 写成 `workspace:*` 的话 npm 会直接报错。这一点很容易踩，别改。
 RUN npm install ./sync-core.tgz ./shared-schema.tgz --ignore-scripts --omit=dev && \
     npm install --ignore-scripts --omit=dev && \
     npm install prisma@5.22.0 --ignore-scripts --omit=dev && \

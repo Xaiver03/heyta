@@ -1,0 +1,58 @@
+# Docker 构建上下文排除规则。
+#
+# 来源：以 Super Productivity 的根 .dockerignore 为基础改编（MIT，见 THIRD_PARTY_LICENSES.md）。
+# 构建上下文是**仓库根目录**（compose 里 context: .，deploy.sh 里 $REPO_ROOT），
+# 所以这是 Docker 唯一会读的 .dockerignore —— 放在 server/ 下的同名文件会被忽略。
+#
+# .gitignore 对构建上下文**没有任何作用**，所以下面这些不是冗余：
+# 没有它们，builder 阶段会把开发者磁盘上的一切都扫进去。
+
+# ── 通用 ──────────────────────────────────────────────
+node_modules
+**/node_modules
+.git
+.gitignore
+dist
+**/dist
+coverage
+**/coverage
+*.log
+**/*.log
+.idea
+.vscode
+tmp
+.DS_Store
+**/.DS_Store
+
+# ── 密钥与本地配置（任何层级）──────────────────────────
+# `**/.env` 匹配不到 `.env.local` / `.env.production`，所以两条都要写。
+**/.env
+**/.env.*
+!**/.env.example
+**/secrets/
+
+# ── heyta 特有 ────────────────────────────────────────
+
+# 调研资料：含一份完整的上游 Super Productivity 克隆，
+# 是仓库里最大的目录，对镜像**毫无用处**。
+research/
+
+# pnpm 的 store 与 pack 中间产物
+.pnpm-store/
+*.tgz
+
+# 本地服务端状态（运行时数据，绝不能进镜像）
+server/data/
+server/backups/
+server/initdb.d/
+server/.health-alert/
+
+# 运行时才从模板渲染出来的页面。
+# 带上过期副本会把某个运营者的法务身份烤进所有其他运营者拉取的镜像里。
+server/public/privacy.html
+server/public/index.html
+server/public/terms.html
+
+# 上游托管实例自己的服务条款（写明德国法律、莱比锡管辖地）。
+# 运营者应通过 <DATA_DIR>/legal/terms.html 提供自己的版本。
+server/legal/

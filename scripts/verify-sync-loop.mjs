@@ -115,6 +115,16 @@ for (const [label, op] of [
   }
 }
 
+// ⚠️ 实测发现（第二个不对称）：线协议 schema **接受** `isPayloadEncrypted: false` 的明文 op，
+// 但服务端**无条件拒绝**它（E2EE_REQUIRED，且没有开关）。
+// 也就是说，客户端无法从契约中得知"必须加密"这件事 —— 又是一个要靠文档/运行时才发现的要求。
+// 把它固化成断言，避免有人误以为 schema 已经保证了 E2EE。
+if (SuperSyncUploadOpsRequestSchema.safeParse({ ops: [opPlain], clientId: CLIENT_A }).success) {
+  ok('已确认：线协议 schema 允许明文载荷（E2EE 门禁在服务端）');
+} else {
+  ok('线协议 schema 已内置 E2EE 强制');
+}
+
 // ⚠️ 实测发现（重要）：线协议 schema **只校验形状，不校验实体是否在清单里**。
 // 传一个不存在的 entityType，SuperSyncOperationSchema 会**接受**它 ——
 // 实体成员校验只存在于服务端的 validation.service.ts（`ALLOWED_ENTITY_TYPES.has(...)`）。
@@ -230,51 +240,96 @@ const download = (sinceSeq, excludeClient) =>
 
 console.log('\n=== 阶段 3：A 写入 → B 可见 ===\n');
 
-const upA = await upload([opPlain], CLIENT_A, 0);
-if (upA.status === 200 && upA.body?.results?.[0]?.accepted) {
-  ok(`A 上传成功（serverSeq=${upA.body.results[0].serverSeq}）`);
+// ⚠️ 关键事实（实测发现）：服务端**强制要求 E2EE**，没有开关。
+// `violatesE2eeGate` 要求 isPayloadEncrypted **显式等于 true**
+// 且 payload 是规范 base64 密文（见 server/src/sync/sync.routes.payload.ts:47）。
+// 明文上传一律 400 E2EE_REQUIRED。
+//
+// 这条门禁在指纹/去重/配额/落库**之前**执行，所以被拒的上传在服务端不留痕迹。
+
+// 先做负面测试：明文必须被拒（否则门禁形同虚设）
+const upPlain = await upload([opPlain], CLIENT_A, 0);
+if (upPlain.body?.errorCode === 'E2EE_REQUIRED') {
+  ok('服务端正确拒绝了明文上传（E2EE_REQUIRED）');
 } else {
-  bad('A 上传失败', JSON.stringify(upA.body).slice(0, 300));
+  bad(
+    '明文上传没有被拒绝 —— E2EE 门禁可能失效',
+    JSON.stringify(upPlain.body).slice(0, 200),
+  );
+}
+
+// 正式验证：加密上传
+const upA = await upload([opEncrypted], CLIENT_A, 0);
+if (upA.status === 200 && upA.body?.results?.[0]?.accepted) {
+  ok(`A 加密上传成功（serverSeq=${upA.body.results[0].serverSeq}）`);
+} else {
+  bad('A 加密上传失败', JSON.stringify(upA.body).slice(0, 300));
 }
 
 const downB = await download(0, CLIENT_B);
 const bSees = downB.body?.ops?.some((o) => o.op?.entityId === ENTITY_ID);
 if (bSees) {
   ok('B 下载后看到了 A 的操作');
+  // 服务端拿到的必须是密文
+  const got = downB.body.ops.find((o) => o.op?.entityId === ENTITY_ID);
+  if (typeof got.op.payload === 'string' && !got.op.payload.includes('买牛奶')) {
+    ok('B 收到的载荷仍是密文（服务端未曾解密）');
+  } else {
+    bad('B 收到的载荷疑似明文 —— 端到端加密被破坏');
+  }
 } else {
   bad('B 没有看到 A 的操作', JSON.stringify(downB.body).slice(0, 300));
 }
 
 console.log('\n=== 阶段 4：并发冲突应被拒绝 ===\n');
 
-// 两端基于同一个 vector clock 并发修改同一实体
+// 两端基于同一个 vector clock 并发修改同一实体，都在 A 的版本之上。
+// ⚠️ 必须**分两次请求**：服务端要求 op 的 clientId 与请求级 clientId 一致，
+// 把两个不同 clientId 的 op 塞进一个请求会得到 INVALID_CLIENT_ID ——
+// 那样测试会"通过"但完全没测到冲突检测（踩过这个坑，记在这里）。
 const baseClock = { [CLIENT_A]: 1 };
+
+// 两个设备各自从服务端拉到同一基线，然后并发改同一实体
 const concurrentA = await makeOp({
   clientId: CLIENT_A,
   entityId: ENTITY_ID,
   title: 'A 的改法',
   clock: { ...baseClock, [CLIENT_A]: 2 },
-  encryptPayload: false,
+  encryptPayload: true,
 });
 const concurrentB = await makeOp({
   clientId: CLIENT_B,
   entityId: ENTITY_ID,
   title: 'B 的改法',
   clock: { ...baseClock, [CLIENT_B]: 2 },
-  encryptPayload: false,
+  encryptPayload: true,
 });
 
-const upConcurrent = await upload([concurrentA, concurrentB], CLIENT_A, 0);
-const rejected = upConcurrent.body?.results?.filter((r) => !r.accepted) ?? [];
-if (rejected.length > 0) {
-  ok(
-    `服务端拒绝了并发冲突（errorCode=${rejected[0].errorCode ?? '未提供'}）`,
-  );
-} else {
+const upA2 = await upload([concurrentA], CLIENT_A, 0);
+const upB2 = await upload([concurrentB], CLIENT_B, 0);
+
+const resA = upA2.body?.results?.[0];
+const resB = upB2.body?.results?.[0];
+const CONFLICT_CODES = ['CONFLICT_CONCURRENT', 'CONFLICT_SUPERSEDED'];
+
+if (resA?.accepted && resB?.accepted) {
   bad(
     '服务端同时接受了两个并发写 —— 冲突检测可能失效',
-    JSON.stringify(upConcurrent.body).slice(0, 300),
+    `A=${JSON.stringify(resA)} B=${JSON.stringify(resB)}`,
   );
+} else {
+  const loser = !resA?.accepted ? resA : resB;
+  const winner = !resA?.accepted ? resB : resA;
+  if (CONFLICT_CODES.includes(loser?.errorCode)) {
+    ok(`服务端识别出并发冲突并拒绝了败者（errorCode=${loser.errorCode}）`);
+    ok(`胜者被正常接受（serverSeq=${winner?.serverSeq}）`);
+  } else {
+    // 被拒了，但**不是因为冲突** —— 这是"以错误理由通过"，必须暴露出来。
+    bad(
+      `并发写被拒绝，但错误码不是冲突类（errorCode=${loser?.errorCode}）—— 冲突检测并未真正被验证`,
+      JSON.stringify(loser).slice(0, 200),
+    );
+  }
 }
 
 console.log(

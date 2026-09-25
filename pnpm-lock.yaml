@@ -87,10 +87,10 @@ importers:
         specifier: ^11.2.0
         version: 11.3.1
       '@heyta/shared-schema':
-        specifier: workspace:*
+        specifier: '*'
         version: link:../packages/shared-schema
       '@heyta/sync-core':
-        specifier: workspace:*
+        specifier: '*'
         version: link:../packages/sync-core
       '@prisma/client':
         specifier: 5.22.0

@@ -109,12 +109,12 @@ supersync_image_source_revision() {
     local revision
 
     revision="$(git log -1 --format=%H -- \
-        ../../.dockerignore \
-        ../../.github/workflows/supersync-docker.yml \
-        ../../package.json \
-        ../../package-lock.json \
-        ../shared-schema \
-        ../sync-core \
+        ../.dockerignore \
+        ../.github/workflows/supersync-docker.yml \
+        ../package.json \
+        ../pnpm-lock.yaml \
+        ../packages/shared-schema \
+        ../packages/sync-core \
         . 2>/dev/null || true)"
     if [ -n "$revision" ]; then
         printf '%s\n' "$revision"
@@ -128,20 +128,20 @@ assert_clean_supersync_image_inputs() {
     local untracked_files
 
     if ! git diff --quiet -- \
-        ../../.dockerignore \
-        ../../.github/workflows/supersync-docker.yml \
-        ../../package.json \
-        ../../package-lock.json \
-        ../shared-schema \
-        ../sync-core \
+        ../.dockerignore \
+        ../.github/workflows/supersync-docker.yml \
+        ../package.json \
+        ../pnpm-lock.yaml \
+        ../packages/shared-schema \
+        ../packages/sync-core \
         . ||
         ! git diff --cached --quiet -- \
-            ../../.dockerignore \
-            ../../.github/workflows/supersync-docker.yml \
-            ../../package.json \
-            ../../package-lock.json \
-            ../shared-schema \
-            ../sync-core \
+            ../.dockerignore \
+            ../.github/workflows/supersync-docker.yml \
+            ../package.json \
+            ../pnpm-lock.yaml \
+            ../packages/shared-schema \
+            ../packages/sync-core \
             .; then
         echo ""
         echo "ERROR: Refusing to build a labeled supersync image from dirty tracked input files."
@@ -152,12 +152,12 @@ assert_clean_supersync_image_inputs() {
     fi
 
     untracked_files="$(git ls-files --others --exclude-standard -- \
-        ../../.dockerignore \
-        ../../.github/workflows/supersync-docker.yml \
-        ../../package.json \
-        ../../package-lock.json \
-        ../shared-schema \
-        ../sync-core \
+        ../.dockerignore \
+        ../.github/workflows/supersync-docker.yml \
+        ../package.json \
+        ../pnpm-lock.yaml \
+        ../packages/shared-schema \
+        ../packages/sync-core \
         . 2>/dev/null || true)"
     if [ -n "$untracked_files" ]; then
         echo ""

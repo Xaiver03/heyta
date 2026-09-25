@@ -14,3 +14,6 @@ research/upstream/
 research/standalone/
 research/parts/
 .pnpm-store/
+
+# pnpm pack 产物（Docker 构建中间物）
+*.tgz
