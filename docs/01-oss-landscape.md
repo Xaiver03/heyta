@@ -27,7 +27,7 @@
 > - **没有 goal / target / unit 概念**（grep 零命中）、**没有热力图 / 月历统计**
 > - ✅ 但它**确实参与同步**（`SIMPLE_COUNTER` 在 `ENTITY_TYPES` 里）
 >
-> 换句话说：**"打卡 + 连续天数"能用，"滴答清单级别的习惯模块"要自己补**（目标值/单位、备注日记、热力图、统计）。详见 `research/deep-dive-sync-core.md` §2.4 与 `research/deep-dive-habit-and-entities.md`。
+> 换句话说：**"打卡 + 连续天数"能用，"滴答清单级别的习惯模块"要自己补**（目标值/单位、备注日记、热力图、统计）。详见 `research/deep-dive-sync-core.md` §2.4。
 
 ---
 

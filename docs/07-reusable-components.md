@@ -143,7 +143,7 @@ CalDAV **服务端**候选（自建/兼容生态）：Radicale、Baikal、SabreD
 
 ## 6. 本地数据库 / 跨端框架
 
-⚠️ 这部分**依赖"跨语言策略"的最终决定**（见 `research/deep-dive-cross-language-and-components.md`）。
+⚠️ 这部分**依赖"跨语言策略"的最终决定**（见 `research/deep-dive-cross-language.md`）。
 
 | 路线 | 本地库候选 |
 |---|---|

@@ -3,7 +3,7 @@
 > 这是本阶段的核心决策文档。
 > 所有数字来自本机实测（`research/upstream/` 下的真实代码）。
 > 配套深度报告：`research/deep-dive-sync-core.md`、`research/deep-dive-supersync-server.md`、
-> `research/deep-dive-schema-providers.md`、`research/deep-dive-cross-language-and-components.md`
+> `research/deep-dive-schema-providers.md`、`research/deep-dive-cross-language.md`
 
 ---
 
@@ -175,7 +175,7 @@ heyta 需要自己的清单。对照 SP：
 
 ### 4.3 跨语言策略必须先定
 
-见 `research/deep-dive-cross-language-and-components.md`。已知的关键事实：
+见 `research/deep-dive-cross-language.md`。已知的关键事实：
 
 - ✅ **加密层有跨语言先例**：上游用 Kotlin 重写了 Argon2id + AES-GCM（**633 行**），且有 `LiveJsEncryptRoundTripTest` + `tools/generate-android-crypto-fixtures.mjs`，**CI 每次用真实 TS 加密结果验证 Kotlin 解密**。
 - ❌ **同步算法没有跨语言先例**：`grep vectorClock android/app/src/main/java/` → 零命中。Kotlin 侧只做"后台读提醒"，不实现向量时钟与冲突解决。
