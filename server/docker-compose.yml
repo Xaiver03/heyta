@@ -24,9 +24,16 @@ x-logging-app: &app-logging
 
 services:
   supersync:
-    # Only `latest` and `master-<sha>` are published, both built from master — there
-    # are no release tags. Pin SUPERSYNC_IMAGE to a master-<sha> for a fixed version.
-    image: ${SUPERSYNC_IMAGE:-ghcr.io/super-productivity/supersync:latest}
+    # 🔧 heyta 改动：上游这里默认拉 `ghcr.io/super-productivity/supersync:latest`。
+    # 对 heyta **这是错的** —— 我们的服务端已经改造过（实体清单、迁移、E2EE 强制），
+    # 拉上游镜像跑的是**别人的代码**，而且看起来一切正常。
+    #
+    # heyta 没有发布任何镜像（上游也只有 latest / master-<sha>，没有 release tag），
+    # 所以默认指向本地构建产物（由 docker-compose.build.yml 产出）。
+    # 要托管到别处就显式设 SUPERSYNC_IMAGE 指向你自己的仓库。
+    #
+    # 先构建：./scripts/deploy.sh --build
+    image: ${SUPERSYNC_IMAGE:-supersync:local}
     container_name: supersync-server
     restart: unless-stopped
     environment:

@@ -318,8 +318,8 @@ docker inspect <容器> --format '{{range .Config.Env}}{{println .}}{{end}}' | g
 | 阶段 | 状态 |
 |---|---|
 | P0 奠基 | ✅ 已完成（协议已跑通，Docker 实测通过） |
-| P1 单端闭环 | 🔄 **进行中** → [详细计划](docs/plans/phase-1-single-client-loop.md) |
-| P2 多端补齐 | ⏸ |
+| P1 单端闭环 | ✅ **已完成**（6 条零 mock E2E 全过）→ [详细计划](docs/plans/phase-1-single-client-loop.md) |
+| P2 多端补齐 | 🔄 **下一步** → [ADR-0003](docs/adr/0003-multi-platform-strategy.md) |
 | P3 平台特性 | ⏸ |
 
 总路线图：[`docs/plans/roadmap.md`](docs/plans/roadmap.md)
