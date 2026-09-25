@@ -207,7 +207,7 @@ pnpm check:design     # 非零退出 = 有裸值
 pnpm install                    # 安装（工作区）
 pnpm -r build                   # 全量构建
 pnpm -r typecheck               # 全量类型检查
-pnpm -r test                    # 全量测试（当前 2034 个通过 + 11 个 E2E 默认跳过 + 1 个服务端跳过）
+pnpm -r test                    # 全量测试（当前 2041 个通过 + 11 个 E2E 默认跳过 + 1 个服务端跳过）
 
 pnpm verify:sync                # P0 验收：真实同步闭环（需要服务端在跑）
 pnpm verify:sync:dry            # 不需要服务端，只校验 op 形状
@@ -312,6 +312,15 @@ docker inspect <容器> --format '{{range .Config.Env}}{{println .}}{{end}}' | g
     现在先比向量时钟（`GREATER_THAN` 接受 / `LESS_THAN` 拒绝），只有
     `EQUAL`/`CONCURRENT` 才回退到时间戳 + `op.id`。
     这是 #7 的同一种形状：**拿墙上时钟去表达因果事实**。
+20. 🔴 **合法实体被静默丢弃。** `isModeled` 把两件事混为一谈：**未知的未来实体**
+    （老客户端该优雅跳过，合理）与**已知且合法但还没实现的实体**（跳过 = 静默丢用户数据）。
+    实测：`NOTE` / `TASK_REPEAT_CFG` / `REMINDER` 都是合法实体（`isEntityType()` 为 true），
+    `dispatch` 不报错、op 照常入队上传同步，但**没有任何设备物化它们**。
+    用户建一条重复任务 → 同步得到处都是、哪儿也不显示、任何一层都不报错。
+    「优雅跳过未知实体」这个正确行为**替它掩盖了**。
+    现在 `packages/op-log/src/state.ts` 导出 `MODELED_ENTITY_TYPES` /
+    `UNMODELED_ENTITY_TYPES`，`entity-coverage` 测试要求每个 `ENTITY_TYPES` 成员
+    要么物化、要么**显式登记并写明原因**。实现后不移除登记会红 —— 清单不会腐烂。
 
 > 第 4、7 条的根因相同：**两套并行定义**（词表 / 时钟语义）。
 > 这类 bug 单元测试抓不到 —— mock 是按实现者对协议的理解写的，理解错了 mock 跟着错。
