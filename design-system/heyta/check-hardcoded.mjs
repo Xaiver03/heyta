@@ -127,7 +127,18 @@ for (const file of files) {
   if (rel.includes('tokens.css') || rel.includes('tokens.generated')) continue;
 
   checked++;
-  const lines = readFileSync(file, 'utf8').split('\n');
+  const raw = readFileSync(file, 'utf8');
+
+  // 🔴 先剥掉跨行的 /* ... */ 块注释，**保留行数**（用换行填充）。
+  //
+  // 为什么必须做：只跳"行首注释"时，块注释的**中间行**（以空格+文字开头）
+  // 不会被识别，里面的 `1ms` 会被当成裸值报出来。
+  // 我实际踩到了这个误报。误报的危害不是烦人 —— 是它会训练人去放宽
+  // ALLOW 列表，而放宽之后真正的违规就再也拦不住了。
+  //
+  // 用等量换行替换，保证后面报出的行号仍然准确。
+  const source = raw.replace(/\/\*[\s\S]*?\*\//g, (m) => m.replace(/[^\n]/g, ' '));
+  const lines = source.split('\n');
 
   lines.forEach((line, i) => {
     // 整行注释跳过（但行尾注释仍检查，因为代码部分可能违规）

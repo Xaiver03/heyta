@@ -28,6 +28,11 @@ import {
   useTaskStore,
   type TaskFilter,
 } from './features/tasks/store.js';
+import { useProjectStore } from './features/projects/store.js';
+import { ProjectsPanel } from './features/projects/ProjectsPanel.js';
+import { QuadrantBoard } from './features/quadrant/QuadrantBoard.js';
+import { HabitsView } from './features/habits/HabitsView.js';
+import { FocusTimer } from './features/focus/FocusTimer.js';
 import { applyTheme, resolveInitialTheme, type Theme } from './lib/theme.js';
 
 import './styles/app.css';
@@ -72,12 +77,24 @@ const PRIMARY_NAV: NavEntry[] = [
   { filter: { kind: 'today' }, label: '今天', icon: Sun },
 ];
 
+/**
+ * 顶层视图。
+ *
+ * 为什么不用路由库：P1 只有四个平级视图、没有深链接需求、
+ * 没有嵌套布局。引入 router 的收益（URL 可分享）在本地优先的单端
+ * 场景下几乎不存在，而成本是又一个需要维护的依赖。
+ * 到 P2 需要深链接时再引入 —— 那时才知道真实的约束是什么。
+ */
+type ViewKey = 'tasks' | 'quadrant' | 'habits' | 'focus';
+
 export function App(): React.JSX.Element {
   const [theme, setTheme] = useState<Theme>(resolveInitialTheme);
   const store = useTaskStore();
+  const projects = useProjectStore();
   const visible = useTaskStore(selectVisibleTasks);
   const counts = useTaskStore(selectQuadrantCounts);
   const [draft, setDraft] = useState('');
+  const [view, setView] = useState<ViewKey>('tasks');
 
   // 主题应用到 <html data-theme>，tokens.css 的暗色覆盖挂在那里
   useEffect(() => {
@@ -97,8 +114,19 @@ export function App(): React.JSX.Element {
     if (f.kind === 'all') return '收集箱';
     if (f.kind === 'today') return '今天';
     if (f.kind === 'completed') return '已完成';
-    return QUADRANT_NAV.find((n) => n.filter.kind === 'quadrant' &&
-      n.filter.quadrant === f.quadrant)?.label ?? '任务';
+    // filter 是判别联合（含 all/today/completed/quadrant/project），
+    // **必须显式判 kind** 才能访问各自特有字段 —— 直接取 f.quadrant 编译不过。
+    if (f.kind === 'quadrant') {
+      return (
+        QUADRANT_NAV.find(
+          (n) => n.filter.kind === 'quadrant' && n.filter.quadrant === f.quadrant,
+        )?.label ?? '四象限'
+      );
+    }
+    if (f.kind === 'project') {
+      return projects.projects.find((p) => p.id === f.projectId)?.name ?? '清单';
+    }
+    return '任务';
   }, [store.filter]);
 
   function submit(): void {
@@ -141,11 +169,35 @@ export function App(): React.JSX.Element {
             />
           ))}
         </div>
+        <ProjectsPanel />
       </nav>
 
       <main className="ht-main">
         <header className="ht-header">
           <h1 className="ht-header__title">{title}</h1>
+          {/* 视图切换。用 role=tablist 让屏幕阅读器理解这是一组互斥选项 */}
+          <div role="tablist" aria-label="视图" className="ht-viewtabs">
+            {(
+              [
+                { key: 'tasks', label: '任务', Icon: Inbox },
+                { key: 'quadrant', label: '四象限', Icon: CircleDot },
+                { key: 'habits', label: '习惯', Icon: Check },
+                { key: 'focus', label: '番茄钟', Icon: Sun },
+              ] as const
+            ).map((v) => (
+              <button
+                key={v.key}
+                type="button"
+                role="tab"
+                aria-selected={view === v.key}
+                className={`ht-viewtab${view === v.key ? ' ht-viewtab--active' : ''}`}
+                onClick={() => setView(v.key)}
+              >
+                <v.Icon size={14} aria-hidden="true" />
+                {v.label}
+              </button>
+            ))}
+          </div>
           <div className="ht-header__actions">
             <button
               type="button"
@@ -181,7 +233,8 @@ export function App(): React.JSX.Element {
             </button>
           </div>
 
-          {visible.length === 0 ? (
+          {view === 'tasks' &&
+            (visible.length === 0 ? (
             <EmptyState filter={store.filter} />
           ) : (
             <div className="ht-tasklist">
@@ -223,7 +276,11 @@ export function App(): React.JSX.Element {
                 );
               })}
             </div>
-          )}
+            ))}
+
+          {view === 'quadrant' && <QuadrantBoard />}
+          {view === 'habits' && <HabitsView />}
+          {view === 'focus' && <FocusTimer />}
         </div>
       </main>
     </div>
