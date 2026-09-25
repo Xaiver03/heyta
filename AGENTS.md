@@ -207,7 +207,7 @@ pnpm check:design     # 非零退出 = 有裸值
 pnpm install                    # 安装（工作区）
 pnpm -r build                   # 全量构建
 pnpm -r typecheck               # 全量类型检查
-pnpm -r test                    # 全量测试（当前 1649 个通过 + 3 个 E2E 默认跳过）
+pnpm -r test                    # 全量测试（当前 1681 个通过 + 6 个 E2E 默认跳过 + 1 个服务端跳过）
 
 pnpm verify:sync                # P0 验收：真实同步闭环（需要服务端在跑）
 pnpm verify:sync:dry            # 不需要服务端，只校验 op 形状
@@ -260,6 +260,16 @@ docker inspect <容器> --format '{{range .Config.Env}}{{println .}}{{end}}' | g
 7. **向量时钟必须包含本次写入自己的递增。** 写成"写入前的时钟"会让每台设备的
    **第一条 op 时钟为空**，对端 `compareVectorClocks` 判 `EQUAL`（"已见过"）→
    **静默丢弃**：本地正常、服务端收到、对端永远看不到，且不报错。
+8. **服务端会拒绝并发修改（`CONFLICT_CONCURRENT`），并附 `existingClock`。**
+   客户端必须**先下载、再解决、再重传** —— 判定谁更新要用到远端那条 op 的时间戳，
+   而下载之前手上根本没有它。把冲突当普通错误重试会**永远解不开**。
+   🔴 **冲突策略不要自己发明**：用 `sync-core` 的 `suggestConflictResolution`。
+   它对"同实体 UPDATE、时间戳相近、无删除/创建不对称"返回 **`manual`** ——
+   **故意拒绝自动选边**。这是对的：自动择一 = 静默丢掉另一个人的编辑。
+   计划里的"冲突可判定"指的是**能识别并上报**，不是"自动收敛"。
+9. **`recover()` 必须从整个日志重建，不能只看 `pendingApply`。**
+   本地 op 在 dispatch 时就标成 `applied`，因此一条都不会进 `pendingApply`。
+   只重放它 → **刷新页面后内存状态为空**：磁盘一条没少，界面一条没有。
 
 > 第 4、7 条的根因相同：**两套并行定义**（词表 / 时钟语义）。
 > 这类 bug 单元测试抓不到 —— mock 是按实现者对协议的理解写的，理解错了 mock 跟着错。

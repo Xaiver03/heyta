@@ -20,12 +20,30 @@
  */
 
 import { isEntityType } from '@heyta/shared-schema';
-import { decrypt, encrypt, isEncryptedPayloadTransportShape } from '@heyta/sync-core';
+import {
+  decrypt,
+  encrypt,
+  isEncryptedPayloadTransportShape,
+  suggestConflictResolution,
+} from '@heyta/sync-core';
 import type { Operation } from '@heyta/sync-core';
 
 /** 服务端单次上传/下载的上限（契约里的常量，声明在此以便分页）。 */
 const MAX_OPS_PER_UPLOAD = 500;
 const DOWNLOAD_PAGE_SIZE = 200;
+
+/**
+ * 一次上传里被服务端以"冲突"拒绝的 op。
+ *
+ * 服务端在 CONCURRENT / 相等时钟异客户端 / 被取代 时拒绝，并给出
+ * `existingClock` —— 那是它用来判定冲突的**既有版本时钟**。
+ */
+interface ConflictReport {
+  op: Operation<string>;
+  reason: string;
+  errorCode: string;
+  existingClock?: Record<string, number>;
+}
 
 export type SyncStatus =
   | { kind: 'idle' }
@@ -48,6 +66,8 @@ interface UploadResult {
   serverSeq?: number;
   error?: string;
   errorCode?: string;
+  /** 服务端判定冲突时给出的**既有版本**时钟，用于解决后重试。 */
+  existingClock?: Record<string, number>;
 }
 
 interface UploadResponse {
@@ -117,6 +137,21 @@ export interface SyncClientOptions {
 
   /** 把解密后的远程 op 交给 op-log 引擎。 */
   applyRemote: (ops: Operation<string>[]) => Promise<void>;
+
+  /**
+   * 冲突判定为"本地胜出"时，把这条改动**重新派发**成一条新 op。
+   *
+   * 为什么要重新派发而不是改旧 op 的时钟：op 是**不可变**的。
+   * 而且下载阶段已经把远程时钟并进了本地时钟，所以新 op 的时钟
+   * 天然压过服务端既有版本，重传即被接受。
+   */
+  redispatch: (op: Operation<string>) => Promise<void>;
+
+  /** 冲突判定为"远端胜出"时，把本地这条移出上传队列（不删除）。 */
+  discardLocal: (opIds: string[]) => Promise<void>;
+
+  /** 取某实体的全部本地 op（冲突解决要比对时间戳）。 */
+  getOpsForEntity: (entityType: string, entityId: string) => Promise<Operation<string>[]>;
 
   /** 网络实现，便于测试注入。默认用 globalThis.fetch。 */
   fetchImpl?: typeof fetch;
@@ -212,11 +247,30 @@ export class SyncClient {
     }
 
     try {
-      report({ kind: 'syncing', phase: 'upload' });
-      await this.upload(token, password);
+      const conflicts: ConflictReport[] = [];
 
+      report({ kind: 'syncing', phase: 'upload' });
+      await this.upload(token, password, conflicts);
+
+      // 🔴 顺序：上传 → 下载 → 解决冲突 → 再上传。
+      //
+      // 冲突解决必须在**下载之后**：判定"谁更新"要用到远端那条 op 的
+      // 时间戳，而下载之前我们手上根本没有它。
+      // 我第一版没有这一步，于是 CONCURRENT 会被当成硬错误 ——
+      // 离线改一次就永远同步不上去。
       report({ kind: 'syncing', phase: 'download' });
       await this.download(token, password);
+
+      if (conflicts.length > 0) {
+        const unresolved = await this.resolveConflicts(conflicts, token, password);
+        if (unresolved.length > 0) {
+          return report({
+            kind: 'error',
+            message: `${String(unresolved.length)} 处冲突需要你手动选择保留哪一边`,
+            retryable: false,
+          });
+        }
+      }
 
       return report({ kind: 'synced', at: this.now() });
     } catch (error: unknown) {
@@ -231,7 +285,11 @@ export class SyncClient {
   }
 
   /** 上传本地 op。分批，避免超过服务端单次上限。 */
-  private async upload(token: string, password: string): Promise<void> {
+  private async upload(
+    token: string,
+    password: string,
+    conflicts: ConflictReport[],
+  ): Promise<void> {
     const pending = await this.options.getLocalOps();
     if (pending.length === 0) return;
 
@@ -300,13 +358,40 @@ export class SyncClient {
       // HTTP 200 **不代表** op 被接受 —— 服务端会对单条 op 返回
       // `accepted: false` + errorCode，而响应整体仍是 200。
       // 只看 res.ok 的话，客户端会报"已同步"而数据一条都没上云。
-      const rejected = (body.results ?? []).filter((r) => r.accepted !== true);
-      if (rejected.length > 0) {
-        const detail = rejected
+      const localOpById = new Map(batch.map((op) => [op.id, op]));
+      const rejected: UploadResult[] = [];
+
+      for (const result of body.results ?? []) {
+        if (result.accepted === true) continue;
+        rejected.push(result);
+
+        // 冲突**不是**普通失败：它是需要解决的分歧，不是要重试的错误。
+        // 混在一起的话，"冲突"会被无限重试，永远解不开。
+        if (result.errorCode?.startsWith('CONFLICT') === true || result.errorCode === 'CONFLICT') {
+          const op = localOpById.get(result.opId);
+          if (op !== undefined) {
+            conflicts.push({
+              op,
+              reason: result.error ?? '未知冲突',
+              errorCode: result.errorCode ?? 'CONFLICT',
+              ...(result.existingClock !== undefined
+                ? { existingClock: result.existingClock }
+                : {}),
+            });
+          }
+        }
+      }
+
+      // 非冲突的拒绝才是硬错误
+      const hardRejects = rejected.filter(
+        (r) => r.errorCode?.startsWith('CONFLICT') !== true,
+      );
+      if (hardRejects.length > 0) {
+        const detail = hardRejects
           .map((r) => `${r.opId}(${r.errorCode ?? '?'}: ${r.error ?? '未知原因'})`)
           .join(', ');
         throw new Error(
-          `服务端拒绝了 ${String(rejected.length)}/${String(ops.length)} 条 op：${detail}`,
+          `服务端拒绝了 ${String(hardRejects.length)}/${String(ops.length)} 条 op：${detail}`,
         );
       }
 
@@ -314,7 +399,7 @@ export class SyncClient {
       // 反过来的话，游标前进了却不知道哪些 op 传过 —— 下次会重传整批。
       const seqsByOpId = new Map<string, number>();
       for (const result of body.results ?? []) {
-        if (typeof result.serverSeq === 'number') {
+        if (result.accepted === true && typeof result.serverSeq === 'number') {
           seqsByOpId.set(result.opId, result.serverSeq);
         }
       }
@@ -335,6 +420,69 @@ export class SyncClient {
         await this.options.applyRemote(decoded);
       }
     }
+  }
+
+  /**
+   * 解决上传时被判定的冲突。
+   *
+   * 策略**不是自己发明**，而是复用 sync-core 的 `suggestConflictResolution`：
+   * 它已经编码了 LWW（一小时窗口内比时间戳）、删除优先、
+   * 创建与更新不对称等规则，以及判不出来时的 `manual` 兜底。
+   * 自己再写一套迟早与它对不上，而两套冲突策略不一致是最难查的一类 bug。
+   *
+   * 返回**未能自动解决**的冲突（需要用户手动选择）。
+   */
+  private async resolveConflicts(
+    conflicts: ConflictReport[],
+    token: string,
+    password: string,
+  ): Promise<ConflictReport[]> {
+    const unresolved: ConflictReport[] = [];
+    const toRedispatch: Operation<string>[] = [];
+    const toDiscard: string[] = [];
+
+    for (const conflict of conflicts) {
+      const { op } = conflict;
+      if (op.entityId === undefined) {
+        // 没有 entityId 就没法比对实体级历史 —— 交给人判断
+        unresolved.push(conflict);
+        continue;
+      }
+
+      // 下载之后，本地日志里已经有了远端那条
+      const history = await this.options.getOpsForEntity(op.entityType, op.entityId);
+      const mine = history.filter((o) => o.clientId === this.options.clientId);
+      const theirs = history.filter((o) => o.clientId !== this.options.clientId);
+
+      const suggestion = suggestConflictResolution(mine, theirs);
+
+      switch (suggestion) {
+        case 'local':
+          toRedispatch.push(op);
+          break;
+        case 'remote':
+          toDiscard.push(op.id);
+          break;
+        default:
+          unresolved.push(conflict);
+          break;
+      }
+    }
+
+    if (toDiscard.length > 0) await this.options.discardLocal(toDiscard);
+
+    if (toRedispatch.length > 0) {
+      for (const op of toRedispatch) {
+        await this.options.redispatch(op);
+      }
+      // 重新派发产生了新 op（时钟已压过服务端），再传一次
+      const retryConflicts: ConflictReport[] = [];
+      await this.upload(token, password, retryConflicts);
+      // 重传仍冲突 → 交给用户，不再循环（否则可能无限重试）
+      unresolved.push(...retryConflicts);
+    }
+
+    return unresolved;
   }
 
   /** 增量下载。按 serverSeq 游标分页，直到 hasMore 为 false。 */

@@ -117,6 +117,15 @@ export interface OpLogStore<
   /** 标记 op 已上传，并回写服务端分配的 seq。返回更新条数。 */
   markUploaded(serverSeqsByOpId: ReadonlyMap<string, number>): Promise<number>;
 
+  /**
+   * 丢弃待上传的本地 op（把它移出上传队列，但**不删除**）。
+   *
+   * 用于冲突解决判定为"远端胜出"时：本地这条不该再上传，
+   * 但 op-log 是事实来源，**不能物理删除** —— 删了就无法解释
+   * "为什么本地曾经是这个值"，重放也会与其它设备不一致。
+   */
+  discardPendingUpload(opIds: string[]): Promise<number>;
+
   // ── 压缩 / 归档 ──────────────────────────────────────────
 
   /**

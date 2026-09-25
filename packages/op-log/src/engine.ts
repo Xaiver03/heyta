@@ -140,6 +140,48 @@ export class OpLogEngine {
     await this.options.store.markUploaded(serverSeqsByOpId);
   }
 
+  /**
+   * 把一条已有 op **重新派发**成一条新 op（冲突判定为本地胜出时用）。
+   *
+   * 为什么必须新建而不是改旧 op：
+   *   1. op 是**不可变**的 —— 它是事实日志，改一条已落盘的 op 会让
+   *      所有已重放它的设备与我们对不上。
+   *   2. 新 op 会被打上**当前**时钟。而下载阶段已经把远程时钟并进来了，
+   *      所以新 op 天然压过服务端的既有版本，重传即被接受。
+   *
+   * 只有实体级意图（entityType/entityId/opType/payload）被保留，
+   * 这是"一个用户意图 = 一个 op"的体现：重新表达同一个意图。
+   */
+  async redispatch(op: Operation<string>): Promise<DispatchResult> {
+    if (op.entityId === undefined) {
+      throw new Error(
+        `无法重新派发缺少 entityId 的 op（${op.id}）—— 多实体 op 需要显式意图`,
+      );
+    }
+
+    return this.dispatch({
+      entityType: op.entityType as EntityType,
+      entityId: op.entityId,
+      opType: op.opType as OpType,
+      payload: op.payload,
+      ...(op.entityIds !== undefined ? { entityIds: op.entityIds } : {}),
+    });
+  }
+
+  /** 丢弃待上传的本地 op（冲突判定为远端胜出时用）。 */
+  async discardPendingUpload(opIds: string[]): Promise<void> {
+    await this.options.store.discardPendingUpload(opIds);
+  }
+
+  /** 取某实体的全部本地 op（冲突解决要用它比对时间戳）。 */
+  async getOpsForEntity(
+    entityType: EntityType,
+    entityId: string,
+  ): Promise<Operation<string>[]> {
+    const rows = await this.options.store.getOpsForEntity(entityType, entityId);
+    return rows.map((r) => r.op);
+  }
+
   /** 当前向量时钟快照。 */
   getClock(): VectorClock {
     return { ...this.clock };
@@ -341,18 +383,40 @@ export class OpLogEngine {
    * 否则那些 op 占着 seq 却永不生效，等于静默丢数据。
    */
   async recover(): Promise<{ replayed: number }> {
-    const pending = await this.options.store.findPendingApply();
-    if (pending.length === 0) return { replayed: 0 };
+    // 🔴 启动时必须从**整个日志**重建内存状态，不能只看 pendingApply。
+    //
+    // 我第一版只重放了 `pendingApply`（"写了但没应用"的远程 op）。
+    // 本地 op 是在 dispatch 时就标成 `applied` 的，所以它们**一条都不会被重放**。
+    // 后果：刷新页面后内存状态是空的 —— 磁盘上数据一条没少，界面上一条没有。
+    // 这正是"op-log 是事实来源"必须能兑现的地方，而我把它走成了摆设。
+    //
+    // `rebuildFromLog()` 本来就写好了，只是没有被 recover 用上。
+    const all = await this.options.store.getAllOps();
 
-    // 按 seq 升序重放 —— 顺序错了 LWW 结果会不同
-    const sorted = [...pending].sort((a, b) => a.seq - b.seq);
+    // 按 seq 升序 —— 顺序错了 LWW 的结果就会不同
+    const sorted = [...all].sort((a, b) => a.seq - b.seq);
 
+    this.state = replayOperations(
+      emptyState(),
+      sorted.map((r) => r.op),
+    );
+
+    // 重建幂等闸门与向量时钟。两者都必须从日志恢复：
+    //   - appliedOpIds 不恢复 → 重复投递的 op 会被再应用一次
+    //   - clock 不恢复 → 后续本地写入无法在因果上压过已见过的一切，
+    //     并发判定会把"我们早就知道的事"当成并发
     for (const record of sorted) {
-      this.applyOne(record.op);
+      this.appliedOpIds.add(record.op.id);
       this.clock = this.trimClock(mergeVectorClocks(this.clock, record.op.vectorClock ?? {}));
     }
 
-    await this.options.store.markApplied(sorted.map((r) => r.seq));
+    // 崩溃时"写了但没应用"的远程 op：虽然上面已经从日志重放过了，
+    // 但仍要把它们从 pendingApply 队列里清掉 —— 否则每次启动都重复处理。
+    const pending = await this.options.store.findPendingApply();
+    if (pending.length > 0) {
+      await this.options.store.markApplied(pending.map((r) => r.seq));
+    }
+
     return { replayed: sorted.length };
   }
 
