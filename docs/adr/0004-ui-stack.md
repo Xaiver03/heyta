@@ -161,8 +161,45 @@ ADR-0003 §2.4 把"具体跨平台 UI 技术栈"留成了开放项。产品负�
 2. **未验证** `@react-native-oh-tpl` 是否覆盖 heyta 需要的全部三方库
    （如拖拽、日历、图表）。若缺关键库，移动端功能范围要相应调整。
 
-3. **未验证** RN 侧消费 `tokens.json` 的实际形态（token 名到 RN `StyleSheet` 的映射方式、
-   暗色主题切换机制）。`tokens.json` 已产出不代表已试过消费。
+3. ✅ **已解决**：RN 侧消费形态已落地为 `generated/tokens.native.ts`
+   （带类型、暗色已合并）+ `src/native.ts`（`useColorScheme` 的 null 归一化、
+   减少动效合并）。详见下方"消费层"一节。
+   ⚠️ 仍未验证的是**在真机/模拟器上渲染出来的样子** —— 类型与值是对的，
+   但**没有人眼看过**它。
 
 4. **未验证** Android 是否在目标范围内 —— 产品负责人早前提及"安卓暂不考虑备案"，
    但 RN 天然覆盖 Android。这一点需要在排期时确认，不影响本 ADR 的技术结论。
+
+---
+
+## 6. RN 消费层（本轮新增，回应上面第 3 条）
+
+Web 端用 `cssVar()` 拿 CSS 变量；**RN 没有 `var()`，也没有层叠**，因此不能复用那条路径。
+新增了两个东西：
+
+1. **`generated/tokens.native.ts`** —— 自动生成，与 Swift/ArkTS 同源（同一个 `NativeToken[]`）。
+   它比 `tokens.json` 多了两件关键的事：
+
+   | | `tokens.json` | `tokens.native.ts` |
+   |---|---|---|
+   | 暗色段 | **稀疏**（只含 59 个被覆盖的） | **完整 126 个**（已与亮色合并） |
+   | 类型 | `Record<string, string \| number>` | 每个 token 精确类型（颜色 `string`、尺寸 `number`） |
+   | 拼错名字 | 运行期 `undefined` | **编译期报错** |
+
+   🔴 第一行是**修掉一个真陷阱**，不是格式偏好：RN 拿到 `undefined` 颜色**不报错，
+   只是不渲染**。直接消费 `tokens.json` 的 dark 段，任何未被覆盖的 token 都会静默消失。
+
+2. **`src/native.ts`** —— 补上 RN 特有、而 CSS 帮我们做掉的两件事：
+   - `resolveThemeName()`：`useColorScheme()` 的类型是 `'light' | 'dark' | null | undefined`，
+     `null` 表示"系统未指定"。直接当索引会得到 `undefined`。已归一化为亮色。
+   - `resolveNativeTokens()`：减少动效是**覆盖层**，必须与主题表合并后使用。
+
+验证（`tests/native.spec.ts`，56 条，已用**三重注入**确认能失败）：
+
+| 注入的缺陷 | 结果 |
+|---|---|
+| 把 dark 砍回稀疏（126 → 42 条） | **21 条测试红** |
+| 把一个数值 token 写成字符串 | **4 条红** |
+| 生成器把暗色的合并写错 | **2 条红** |
+
+对比度也**用 RN 拿到的值重算**（亮/暗各一遍），与 Swift/ArkTS 同一套阈值。

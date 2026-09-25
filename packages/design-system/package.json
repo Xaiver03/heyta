@@ -12,7 +12,12 @@
       "default": "./dist/index.js"
     },
     "./tokens.css": "./src/tokens.css",
-    "./reset.css": "./src/reset.css"
+    "./reset.css": "./src/reset.css",
+    "./native": {
+      "types": "./dist/native.d.ts",
+      "import": "./dist/native.js",
+      "require": "./dist/native.cjs"
+    }
   },
   "files": [
     "dist",
@@ -22,8 +27,8 @@
   ],
   "scripts": {
     "build": "tsup",
-    "generate": "tsup && node dist/generate-cli.js",
-    "generate:check": "tsup && node dist/generate-cli.js --check",
+    "generate": "tsup --config tsup.generate.config.ts && node dist/generate-cli.js",
+    "generate:check": "tsup --config tsup.generate.config.ts && node dist/generate-cli.js --check",
     "typecheck": "tsc --noEmit -p tsconfig.spec.json",
     "test": "vitest run",
     "test:watch": "vitest"

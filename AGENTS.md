@@ -207,7 +207,7 @@ pnpm check:design     # 非零退出 = 有裸值
 pnpm install                    # 安装（工作区）
 pnpm -r build                   # 全量构建
 pnpm -r typecheck               # 全量类型检查
-pnpm -r test                    # 全量测试（当前 2048 个通过 + 11 个 Web E2E 默认跳过 + 1 个服务端跳过）
+pnpm -r test                    # 全量测试（当前 2104 个通过 + 11 个 Web E2E 默认跳过 + 1 个服务端跳过）
 
 pnpm verify:sync                # P0 验收：真实同步闭环（需要服务端在跑）
 pnpm verify:sync:dry            # 不需要服务端，只校验 op 形状
@@ -216,7 +216,7 @@ pnpm verify:p2                  # P2 验收：**自带真实服务端**，非 We
 
 pnpm check                      # 全部门禁：类型 + 迁移 + 许可证 + 文档 + 设计变量
 pnpm check:design               # 只跑设计变量硬编码检查
-pnpm check:tokens               # 原生 token 产物是否与 tokens.css 同步
+pnpm check:tokens               # 原生 token 产物（Swift/ArkTS/JSON/RN）是否与 tokens.css 同步
 pnpm check:arkts                # 用**真 ArkTS 编译器**编译生成的 .ets 产物
 ```
 
@@ -341,6 +341,21 @@ docker inspect <容器> --format '{{range .Config.Env}}{{println .}}{{end}}' | g
     另：官方《环境搭建》文档写"仅支持 RN **0.72.5**"，**该文档已过时** ——
     实测两侧都已在 `0.84.x`，`peerDependencies` 要 `react-native@0.84.1`。
     **官方文档里的版本号必须上网核对，不能照抄。**
+23. 🔴 **生成器不能依赖它自己要产出的东西。** `@heyta/design-system` 的
+    `generate` 原本是 `tsup && node dist/generate-cli.js` —— 而 `tsup` 会构建
+    `src/native.ts`，后者 import 的正是这次生成要写的 `src/generated/tokens.native.ts`。
+    于是**产物一旦缺失，生成器就跑不起来** —— 而那恰恰是最需要它的时候。
+    现在 `generate` 只构建生成器自身（`tsup src/generate-cli.ts`），完整构建是另一条
+    `build`。**已实测：先 `rm -rf src/generated`，`pnpm generate` 仍能产出全部 4 个文件。**
+    一般规律：**修复工具不能依赖被修复的东西。**
+24. 🔴 **二级构建配置不能带 `clean: true`。** 修 #23 时我把 `generate` 改成
+    `tsup src/generate-cli.ts` —— 但 tsup 的 `clean` 来自**主配置**且默认为 `true`，
+    于是跑一次生成器就把 `dist/` 清空、只留 `generate-cli.js`，
+    `@heyta/design-system` 的 `"."` 入口消失，**所有 `cssVar` 导入全部解析失败**。
+    更糟的是生成器**看起来是成功的**（产物确实写了），错误要到别处构建才炸 ——
+    实测 `apps/web` 因此从 48 掉到 38 且静默变成 2 个 suite 无法加载。
+    现在生成器用独立的 `tsup.generate.config.ts`，`clean: false`：
+    **生成器只允许新增文件，绝不删别人的。**
 
 > 第 4、7 条的根因相同：**两套并行定义**（词表 / 时钟语义）。
 > 这类 bug 单元测试抓不到 —— mock 是按实现者对协议的理解写的，理解错了 mock 跟着错。
@@ -390,7 +405,7 @@ docker inspect <容器> --format '{{range .Config.Env}}{{println .}}{{end}}' | g
 |---|---|
 | P0 奠基 | ✅ 已完成（协议已跑通，Docker 实测通过） |
 | P1 单端闭环 | ✅ **已完成**（6 条零 mock E2E 全过）→ [详细计划](docs/plans/phase-1-single-client-loop.md) |
-| P2 多端补齐 | 🔄 **进行中**（存储契约 ✅ / SQLite ✅ / token 生成器 ✅ / **ArkTS 产物真编译器验证** ✅ / **RNOH 依赖链实测打通** ✅ / 非 Web 宿主 ✅）→ [详细计划](docs/plans/phase-2-multi-platform.md) |
+| P2 多端补齐 | 🔄 **进行中**（存储契约 ✅ / SQLite ✅ / token 生成器 ✅ / **RN token 产物（含暗色合并 + 类型安全）** ✅ / **ArkTS 产物真编译器验证** ✅ / **RNOH 依赖链实测打通** ✅ / 非 Web 宿主 ✅ / **移动壳 ❌ 尚未创建**）→ [详细计划](docs/plans/phase-2-multi-platform.md) |
 | P3 平台特性 | ⏸ |
 
 总路线图：[`docs/plans/roadmap.md`](docs/plans/roadmap.md)
