@@ -1,8 +1,8 @@
 {
-  "name": "@heyta/node-host",
+  "name": "@heyta/app-host",
   "version": "0.0.0",
   "private": true,
-  "description": "heyta 非 Web 宿主：真 SQLite 文件 + op-log 引擎 + 宿主无关同步客户端。接线与动作都在 @heyta/app-host，本包只剩\"用哪个驱动\"这一个平台差异",
+  "description": "宿主无关的应用接线：把 SQLite 驱动接到 op-log 引擎与同步客户端，并承载所有平台共用的写入动作（ADR-0003 §2.1）",
   "license": "MIT",
   "type": "module",
   "main": "dist/index.js",
@@ -17,8 +17,7 @@
     "build": "tsup",
     "typecheck": "tsc --noEmit -p tsconfig.spec.json",
     "test": "vitest run",
-    "test:watch": "vitest",
-    "host": "node dist/cli.js"
+    "test:watch": "vitest"
   },
   "dependencies": {
     "@heyta/domain": "workspace:*",
@@ -26,12 +25,12 @@
     "@heyta/shared-schema": "workspace:*",
     "@heyta/storage": "workspace:*",
     "@heyta/sync-client": "workspace:*",
-    "@heyta/sync-core": "workspace:*",
-    "@heyta/app-host": "workspace:*"
+    "@heyta/sync-core": "workspace:*"
   },
   "devDependencies": {
     "tsup": "^8.5.1",
     "typescript": "^5.9.3",
-    "vitest": "^5.0.1"
+    "vitest": "^5.0.1",
+    "fake-indexeddb": "^6.2.5"
   }
 }
