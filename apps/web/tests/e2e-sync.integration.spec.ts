@@ -24,7 +24,7 @@ import { OpLogEngine } from '@heyta/op-log';
 import { OpType } from '@heyta/sync-core';
 import type { Operation } from '@heyta/sync-core';
 
-import { SyncClient } from '../src/features/sync/client.js';
+import { SyncClient } from '@heyta/sync-client';
 
 const URL_BASE = process.env['HEYTA_E2E_URL'];
 const PASSWORD = 'e2e-correct-horse-battery-staple';

@@ -16,7 +16,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { ConflictDialog } from '../src/features/sync/ConflictDialog.js';
 import { useSyncStore } from '../src/features/sync/store.js';
-import { describeConflictPayload, type ConflictInfo } from '../src/features/sync/client.js';
+import { describeConflictPayload, type ConflictInfo } from '@heyta/sync-client';
 
 function makeConflict(): ConflictInfo {
   return {
