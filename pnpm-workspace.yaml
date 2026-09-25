@@ -22,3 +22,20 @@ allowBuilds:
   '@prisma/client': true
   '@prisma/engines': true
   prisma: true
+
+# ⚠️ 必须显式声明，不能依赖默认值 —— 否则构建结果取决于**跑的是哪个 pnpm**。
+#
+# 实测踩到的坑：本机（DSH 内置 pnpm）该值为 0，而 Docker 里 corepack 装的原生
+# pnpm 11 默认是 **24 小时**。同一份 lockfile，本地 `pnpm install` 成功，
+# 容器里 `pnpm install --frozen-lockfile` 却报：
+#   "The lockfile contains entries that the active policies reject"
+# 并列出刚发布不久的 @rollup/rollup-* 与 @rolldown/binding-*。
+# 这类"本地绿、CI 红"的差异最难排查，所以在这里钉死。
+#
+# 为什么 0 是可接受的：安全性由**提交进仓库的 lockfile + --frozen-lockfile** 保证 ——
+# 精确版本与完整性哈希都已固定，不存在"解析时被换成新发布的恶意版本"的窗口。
+# minimumReleaseAge 防的是**解析阶段**拿到太新的包，而我们的解析结果早已冻结。
+#
+# 若将来想启用该策略（例如允许定期升级依赖），把它改成正整数即可，
+# 但要注意：改完必须重新解析并提交 lockfile，否则容器构建会再次失败。
+minimumReleaseAge: 0

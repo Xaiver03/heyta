@@ -1,0 +1,29 @@
+# 测试用覆盖文件：在 Docker 里跑 P0 验收脚本。
+#
+# 用法：
+#   docker compose -f docker-compose.yml -f docker-compose.build.yml \
+#                  -f docker-compose.test.yml up -d postgres supersync
+#   pnpm verify:sync --base-url http://127.0.0.1:1900
+#   docker compose -f docker-compose.yml -f docker-compose.build.yml \
+#                  -f docker-compose.test.yml down -v
+#
+# 为什么单独一个文件：生产 compose 里 NODE_ENV=production，而服务端**禁止**
+# 在 production 下启用 TEST_MODE（见 src/config.ts）。所以验收所需的
+# TEST_MODE 必须通过覆盖文件注入，绝不能写进生产 compose。
+#
+# ⚠️ TEST_MODE 会暴露 /api/test/*（免邮件验证造账号）。**仅用于本地/CI 验收。**
+# 同时它把 NODE_ENV 降级为 development，这会关掉一批生产环境的启动校验 ——
+# 所以这个文件**不能**用于任何真实部署。
+
+services:
+  supersync:
+    environment:
+      - NODE_ENV=development
+      - TEST_MODE=true
+      - TEST_MODE_CONFIRM=yes-i-understand-the-risks
+      # 首启时自动跑迁移。走的是项目自己的 migrate-deploy.sh，
+      # 它会把 CONCURRENTLY 迁移拆到事务外执行（见 PROVENANCE.md）。
+      - RUN_MIGRATIONS_ON_STARTUP=true
+      - PUBLIC_URL=http://localhost:1900
+      - WEBAUTHN_RP_ID=localhost
+      - WEBAUTHN_ORIGIN=http://localhost:1900

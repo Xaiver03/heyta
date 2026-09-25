@@ -1,13 +1,21 @@
-# Local build override for development
+# 本地构建覆盖文件（开发用）
 #
-# Usage:
+# 用法：
 #   ./scripts/deploy.sh --build
+#   或直接：docker compose -f docker-compose.yml -f docker-compose.build.yml build supersync
+#
+# 🔧 heyta 改动：上游这里两条路径都按它自己的 monorepo 布局写死。
+# compose 的 context 是相对**该 compose 文件所在目录**解析的：
+#   context:    ../..                          上游 compose 在 packages/super-sync-server/（两层到仓库根）
+#               ..                             heyta 在 server/（一层到仓库根）
+#   dockerfile: packages/super-sync-server/Dockerfile
+#               server/Dockerfile              heyta 的布局
 
 services:
   supersync:
     build:
-      context: ../..
-      dockerfile: packages/super-sync-server/Dockerfile
+      context: ..
+      dockerfile: server/Dockerfile
       args:
         VCS_REF: ${SUPERSYNC_BUILD_SHA:-local}
     image: supersync:local

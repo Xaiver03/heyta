@@ -135,19 +135,83 @@ dropdb -h 127.0.0.1 -p 5432 -U "$(whoami)" heyta_sync_smoke
 
 ---
 
-## Docker 部署（尚未实际运行）
+## Docker 部署（已实测跑通 ✅）
 
-Dockerfile 与 `deploy.sh` 已按 heyta 的布局改造（见 `server/PROVENANCE.md`），
-但**本机没有 Docker，因此未实际构建过镜像**。改造点：
+**镜像已成功构建并跑通完整验收**（OrbStack / Docker 29.6.1，arm64）。完整流程：
+
+```bash
+cd server
+cp env.example .env          # 至少填 DOMAIN / JWT_SECRET / POSTGRES_PASSWORD
+
+# 1. 构建镜像
+docker compose -f docker-compose.yml -f docker-compose.build.yml build supersync
+
+# 2. 起服务（caddy 需要真实域名做 TLS，本地验收用不到）
+docker compose -f docker-compose.yml -f docker-compose.build.yml \
+               -f docker-compose.test.yml up -d postgres supersync
+
+# 3. 跑验收
+pnpm verify:sync --base-url http://127.0.0.1:1900
+
+# 4. 清理
+docker compose -f docker-compose.yml -f docker-compose.build.yml \
+               -f docker-compose.test.yml down -v
+```
+
+### 改造点（原样沿用上游布局的话，第一次部署必然失败）
 
 | 问题 | 原因 | 处理 |
 |---|---|---|
 | builder 用 `npm ci` | heyta 的工作区定义在 `pnpm-workspace.yaml`，npm 不认；且 npm 不支持 `workspace:*` | 改用 pnpm（corepack 锁定 11.8.0） |
 | 路径 `packages/super-sync-server/` | heyta 在 `server/` | 全部改为 `server/` |
-| tarball `sp-*.tgz` | 包名改为 `@heyta/*` 后产出 `heyta-*.tgz` | 已**实测**确认命名 |
+| tarball `sp-*.tgz` | 包名改为 `@heyta/*` 后产出 `heyta-*.tgz` | 已实测确认命名 |
 | `deploy.sh` 里 `../../` 路径 | 从 `server/` 看多跳了一级 | 修正 48 行 |
 | 缺 `.dockerignore` | vendoring 时未带过来 | 已创建（含 `research/`，否则构建上下文会拖进整个上游克隆） |
+| `docker-compose.build.yml` 的 `context: ../..` 与 `dockerfile: packages/...` | 同样按上游布局写死 | 改为 `..` 与 `server/Dockerfile` |
 
-**未处理**：`docker-compose.yml` 的镜像仍指向上游的
-`ghcr.io/super-productivity/supersync:latest`。heyta 需要换成自己的仓库，
-或用 `deploy.sh --build` 本地构建。
+### 🔴 构建期踩到的两个坑（都已修，且都会在别人机器上复现）
+
+**1. `minimumReleaseAge` 没显式声明 → 本地绿、容器红。**
+
+本机 pnpm 该值为 0，容器里 corepack 装的原生 pnpm 11 默认 **24 小时**。
+同一份 lockfile，本地 `pnpm install` 通过，容器里 `pnpm install --frozen-lockfile` 报
+`The lockfile contains entries that the active policies reject`（点名刚发布的
+`@rollup/rollup-*`、`@rolldown/binding-*`）。已在 `pnpm-workspace.yaml` 显式写死。详见该文件注释。
+
+**2. 宿主机的 `DATABASE_URL` 会污染 compose —— 这个最阴。**
+
+`docker-compose.yml` 用 `${DATABASE_URL:-默认值}` 允许指向外部数据库（上游的有意设计），
+但 **docker compose 的变量插值优先读宿主机环境变量，其次才是 `.env` 文件**。
+如果当前 shell 里有 `DATABASE_URL`（任何来源），容器就会拿到它，
+而不是 compose 里那个带 `connection_limit`/`pool_timeout` 的默认值，
+于是启动时报：
+
+```
+ERROR: DATABASE_URL must include exactly one positive connection_limit and pool_timeout value each.
+```
+
+**排查方法**：`docker inspect <容器> --format '{{range .Config.Env}}{{println .}}{{end}}' | grep DATABASE_URL`
+—— 直接看容器**实际收到**的值，不要猜。
+
+**规避**：`env -u DATABASE_URL docker compose ... up`，或在 `.env` 里显式覆盖
+（注意 shell 环境仍然优先，所以 `env -u` 更可靠）。
+
+### 容器内迁移同样是"两段式"
+
+首启日志会看到迁移**故意失败再恢复**：
+
+```
+Error: P3018 ... DROP INDEX CONCURRENTLY cannot run inside a transaction block
+==> Recovering 20260514000000_add_encrypted_ops_partial_index outside Prisma migrate...
+    Serializing recovery under the dedicated recovery advisory lock (72707370)...
+```
+
+这不是故障 —— 是 `migrate-deploy.sh` 在按设计逐个把 CONCURRENTLY 迁移拆到事务外执行。
+**31 个迁移全部应用成功**，容器随后进入 healthy。
+
+### 仍未处理
+
+`docker-compose.yml` 的镜像仍指向上游的
+`ghcr.io/super-productivity/supersync:latest`。用 `deploy.sh --build` 或
+`docker-compose.build.yml`（产出 `supersync:local`）不受影响，
+但**直接 `docker compose up` 会拉上游镜像**。上线前需换成 heyta 自己的仓库名。
