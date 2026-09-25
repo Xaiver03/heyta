@@ -2,8 +2,8 @@ import { WebCryptoNotAvailableError } from '../web-crypto-error';
 import {
   ALGORITHM,
   IV_LENGTH,
-  TEXT_DECODER,
-  TEXT_ENCODER,
+  getTextDecoder,
+  getTextEncoder,
   decodeBase64,
   getRequiredSubtle,
   hashPasswordForCache,
@@ -51,7 +51,7 @@ const getOrDeriveLegacyKey = async (password: string): Promise<CryptoKey> => {
   }
 
   const subtle = getRequiredSubtle();
-  const passwordBuffer = TEXT_ENCODER.encode(password);
+  const passwordBuffer = getTextEncoder().encode(password);
   const keyMaterial = await subtle.importKey(
     'raw',
     passwordBuffer,
@@ -63,7 +63,7 @@ const getOrDeriveLegacyKey = async (password: string): Promise<CryptoKey> => {
     {
       name: 'PBKDF2',
       // Using password as salt is insecure but kept for backward compatibility.
-      salt: TEXT_ENCODER.encode(password),
+      salt: getTextEncoder().encode(password),
       iterations: 1000,
       hash: 'SHA-256',
     },
@@ -102,5 +102,5 @@ export const decryptLegacy = async (data: string, password: string): Promise<str
   );
 
   _legacyKdfWarningHandler?.();
-  return TEXT_DECODER.decode(decryptedContent);
+  return getTextDecoder().decode(decryptedContent);
 };

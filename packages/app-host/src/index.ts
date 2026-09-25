@@ -27,4 +27,13 @@ export {
   type NewTaskFields,
 } from './actions.js';
 
+/**
+ * 同步接线。**所有宿主共用这一份** —— 见 `sync-wiring.ts` 文件头：
+ * 它此前在 `packages/app-host` 与 `apps/web` 里各有一份，连注释都是复制的。
+ *
+ * 🔴 `apps/*` 里**不得出现 `new SyncClient(`**。宿主能决定的只有
+ * 地址、令牌、口令、网络实现，以及"应用远端后要不要通知 UI"。
+ */
+export { createSyncClient, type SyncWiringOptions } from './sync-wiring.js';
+
 export { newTaskId, randomId, usingRandomIdFallback } from './ids.js';

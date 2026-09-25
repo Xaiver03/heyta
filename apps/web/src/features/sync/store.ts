@@ -17,17 +17,17 @@ import {
   applyRemoteOps,
   currentState,
   requireEngine,
+  requireStore,
 } from '../../lib/oplog.js';
-import { META_KEYS, STORES, IndexedDbAdapter } from '@heyta/storage';
-import type { EntityType } from '@heyta/shared-schema';
-import type { Operation, OpType } from '@heyta/sync-core';
 
 import {
-  SyncClient,
   createRetryScheduler,
   type ConflictInfo,
+  type SyncClient,
   type SyncStatus,
 } from '@heyta/sync-client';
+// 🔴 接线只有一份。见下方 `buildClient` 的说明。
+import { createSyncClient } from '@heyta/app-host';
 
 interface SyncStoreState {
   status: SyncStatus;
@@ -64,83 +64,47 @@ interface SyncStoreState {
 }
 
 let retry: { start: () => void; stop: () => void } | undefined;
-/** 游标存在 meta store，跨刷新保留 —— 断点续传的前提。 */
-const LAST_SERVER_SEQ_KEY = 'lastServerSeq';
 
-async function withMeta<T>(
-  fn: (db: IndexedDbAdapter) => Promise<T>,
-): Promise<T> {
-  // 复用 op-log 已经打开的库名，避免开第二个数据库
-  const db = new IndexedDbAdapter('heyta');
-  await db.init();
-  try {
-    return await fn(db);
-  } finally {
-    db.close();
-  }
-}
-
-async function readCursor(): Promise<number> {
-  const rec = await withMeta((db) =>
-    db.get<{ key: string; value: number }>(STORES.META, LAST_SERVER_SEQ_KEY),
-  );
-  return rec?.value ?? 0;
-}
-
-async function writeCursor(seq: number): Promise<void> {
-  await withMeta((db) =>
-    db.put(STORES.META, { key: LAST_SERVER_SEQ_KEY, value: seq }),
-  );
-}
+/**
+ * 游标读写**已删除**。
+ *
+ * 这里原先自己开第二个 `IndexedDbAdapter('heyta')` 去读 `meta` store ——
+ * 既重复了 `OpLogStore` 已经提供的 `getLastServerSeq`/`setLastServerSeq`，
+ * 又把「游标存在哪个键」这个知识复制了第二份。
+ * 现在游标由 `requireStore()` 提供，键名只在 `packages/storage` 里定义一次。
+ */
 
 /**
  * 构造一个同步客户端。
  *
+ * 🔴 **接线只有一份**，在 `@heyta/app-host` 的 `createSyncClient`。
+ * 这里此前手写了全部 12 个回调 —— 与 `packages/app-host/src/host.ts`
+ * 里那份**逐字相同，连注释都是复制的**。两套接线一定会漂移，
+ * 而 `ids.ts` 已经记过一次同形状的事故。
+ *
+ * 现在宿主能决定的只剩真正的平台差异：
+ * 地址、令牌、口令，以及「应用远端之后要不要通知 UI」。
+ *
  * ⚠️ **每次重建，不缓存。** 缓存的话 configure() 改了地址/令牌后旧客户端
  * 还在用旧值 —— 而"令牌过期后同步一直失败"是最难排查的一类问题。
- *
- * 抽成工厂是因为"手动解决冲突"也需要一个客户端，
- * 而它不能自己再写一遍全部接线 —— 两套接线一定会漂移。
  */
 function buildClient(
   get: () => SyncStoreState,
-  set: (partial: Partial<SyncStoreState>) => void,
+  _set: (partial: Partial<SyncStoreState>) => void,
 ): SyncClient | undefined {
   const { baseUrl, token } = get();
   if (baseUrl === '' || token === undefined) return undefined;
 
-  const engine = requireEngine();
-
-  return new SyncClient({
+  return createSyncClient({
+    engine: requireEngine(),
+    store: requireStore(),
     baseUrl,
-    clientId: engine.getClientId(),
     getToken: async () => get().token,
     getPassword: async () => get().password,
-    getLastServerSeq: readCursor,
-    setLastServerSeq: writeCursor,
-    // 待上传队列直接来自存储的上传状态索引，不是内存列表 ——
-    // 内存列表崩溃后就丢了，而"哪些还没上传"正是崩溃后最需要的信息
-    getLocalOps: () => engine.getPendingUpload(),
-    markUploaded: (seqs) => engine.markUploaded(seqs),
+    // 🔴 Web 宿主特有的那一步：应用完远端 op 必须通知订阅者。
+    // 不通知的话数据到了、界面不动 —— 而原生宿主没有这层订阅，
+    // 所以它是**注入项**而不是接线内部的固定行为。
     applyRemote: applyRemoteOps,
-    // 冲突判定为本地胜出 → 重新派发（新 op，时钟已压过远端）
-    redispatch: async (op) => {
-      await engine.redispatch(op);
-    },
-    discardLocal: (ids) => engine.discardPendingUpload(ids),
-    getOpsForEntity: (entityType, entityId) =>
-      engine.getOpsForEntity(entityType as EntityType, entityId),
-    getOpById: (opId) => engine.getOpById(opId),
-    redispatchPayload: async (intent) => {
-      // 用户选择"保留远端"：把远端载荷表达成本地的一条新 op。
-      // 直接改状态是不行的 —— 那正是 D4 禁止的绕开 op-log 的写入。
-      await engine.dispatch({
-        entityType: intent.entityType as EntityType,
-        entityId: intent.entityId,
-        opType: intent.opType as OpType,
-        payload: intent.payload,
-      });
-    },
   });
 }
 
