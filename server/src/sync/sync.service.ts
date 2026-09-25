@@ -1,5 +1,6 @@
 import { prisma } from '../db';
 import {
+  MS_PER_MINUTE,
   Operation,
   ServerOperation,
   UploadResult,
@@ -12,6 +13,7 @@ import {
 } from './sync.types';
 import { CheckpointGateFleetSummary } from './checkpoint-gate';
 import { Logger } from '../logger';
+import { loadConfigFromEnv } from '../config';
 import { Prisma } from '@prisma/client';
 import {
   ValidationService,
@@ -112,7 +114,19 @@ export class SyncService {
   private prevalidatedOps = new WeakMap<Operation, ValidationResult>();
 
   constructor(config: Partial<SyncConfig> = {}) {
-    this.config = { ...DEFAULT_SYNC_CONFIG, ...config };
+    // 🔴 TEST_MODE 下把**按用户**的上传限额也抬到不可达。
+    //
+    // 这是与路由级限流同类的问题：验收套件合法地会打很多次上传，
+    // 而限流只会表现为随机几个用例报 HTTP 429 —— 看起来像协议/业务错误。
+    // 只关一层是不够的，两层都会咬人。
+    const isTestMode = loadConfigFromEnv().testMode !== undefined;
+    this.config = {
+      ...DEFAULT_SYNC_CONFIG,
+      ...(isTestMode
+        ? { uploadRateLimit: { max: 1_000_000, windowMs: MS_PER_MINUTE } }
+        : {}),
+      ...config,
+    };
     this.validationService = new ValidationService(this.config);
     this.rateLimitService = new RateLimitService(this.config);
     this.requestDeduplicationService = new RequestDeduplicationService();

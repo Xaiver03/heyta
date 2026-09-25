@@ -1,6 +1,7 @@
 import { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { SuperSyncDownloadOpsQuerySchema } from '@heyta/shared-schema';
 import { authenticate, getAuthUser } from '../middleware';
+import { loadConfigFromEnv } from '../config';
 import { getSyncService } from './sync.service';
 import { parseAppVersion } from './checkpoint-gate';
 import { Logger } from '../logger';
@@ -24,6 +25,29 @@ import {
   MAX_RAW_BODY_SIZE_SNAPSHOT,
 } from './sync.routes.payload';
 import { uploadOpsHandler } from './sync.routes.ops-handler';
+
+/**
+ * 路由级限流配置。
+ *
+ * 🔴 **TEST_MODE 下必须关掉。**
+ *
+ * 限流是按 IP 计的，而验收套件里的全部设备都来自 127.0.0.1 ——
+ * 于是"用例越多越容易撞额度"，表现为随机几个用例报 HTTP 429。
+ * 更糟的是它**伪装成业务失败**：我这次看到的现象是"冲突没有被识别"，
+ * 排查方向直接偏到同步协议上去了，而真正的原因在限流。
+ * 一个会让自己的验收套件随机变红的服务端，没法用来验收。
+ *
+ * 只在 TEST_MODE（且要求显式 `TEST_MODE_CONFIRM`）下关闭，
+ * 生产配置一个字没改。判定复用 `loadConfigFromEnv()`，
+ * **不直接读 `process.env.TEST_MODE`** —— 那会变成第二份定义，
+ * 而"两套并行定义"正是这个仓库里反复出现的 bug 形状。
+ */
+const RATE_LIMIT_DISABLED = loadConfigFromEnv().testMode !== undefined;
+
+function routeRateLimit(max: number, timeWindow: string): false | { max: number; timeWindow: string } {
+  if (RATE_LIMIT_DISABLED) return false;
+  return { max, timeWindow };
+}
 import { uploadSnapshotHandler } from './sync.routes.snapshot-handler';
 
 export const syncRoutes = async (fastify: FastifyInstance): Promise<void> => {
@@ -86,10 +110,7 @@ export const syncRoutes = async (fastify: FastifyInstance): Promise<void> => {
         MAX_RAW_BODY_SIZE_OPS,
       ),
       config: {
-        rateLimit: {
-          max: 100,
-          timeWindow: '1 minute',
-        },
+        rateLimit: routeRateLimit(100, '1 minute'),
       },
     },
     uploadOpsHandler,
@@ -102,10 +123,7 @@ export const syncRoutes = async (fastify: FastifyInstance): Promise<void> => {
     '/ops',
     {
       config: {
-        rateLimit: {
-          max: 200,
-          timeWindow: '1 minute',
-        },
+        rateLimit: routeRateLimit(200, '1 minute'),
       },
     },
     async (
@@ -206,10 +224,7 @@ export const syncRoutes = async (fastify: FastifyInstance): Promise<void> => {
       config: {
         // B8: snapshot uploads are heavy (full state replay + cache write).
         // Match the backup/repair-import budget.
-        rateLimit: {
-          max: 10,
-          timeWindow: '15 minutes',
-        },
+        rateLimit: routeRateLimit(10, '15 minutes'),
       },
     },
     uploadSnapshotHandler,
@@ -220,10 +235,7 @@ export const syncRoutes = async (fastify: FastifyInstance): Promise<void> => {
     '/status',
     {
       config: {
-        rateLimit: {
-          max: 60,
-          timeWindow: '1 minute',
-        },
+        rateLimit: routeRateLimit(60, '1 minute'),
       },
     },
     async (req: FastifyRequest, reply: FastifyReply) => {
@@ -266,10 +278,7 @@ export const syncRoutes = async (fastify: FastifyInstance): Promise<void> => {
     '/devices',
     {
       config: {
-        rateLimit: {
-          max: 30,
-          timeWindow: '1 minute',
-        },
+        rateLimit: routeRateLimit(30, '1 minute'),
       },
     },
     async (req: FastifyRequest, reply: FastifyReply) => {
@@ -296,10 +305,7 @@ export const syncRoutes = async (fastify: FastifyInstance): Promise<void> => {
     '/data',
     {
       config: {
-        rateLimit: {
-          max: 3,
-          timeWindow: '15 minutes',
-        },
+        rateLimit: routeRateLimit(3, '15 minutes'),
       },
     },
     async (req: FastifyRequest, reply: FastifyReply) => {
@@ -331,10 +337,7 @@ export const syncRoutes = async (fastify: FastifyInstance): Promise<void> => {
     '/restore-points',
     {
       config: {
-        rateLimit: {
-          max: 30,
-          timeWindow: '1 minute',
-        },
+        rateLimit: routeRateLimit(30, '1 minute'),
       },
     },
     async (req, reply) => {
@@ -371,10 +374,7 @@ export const syncRoutes = async (fastify: FastifyInstance): Promise<void> => {
     '/restore/:serverSeq',
     {
       config: {
-        rateLimit: {
-          max: 10,
-          timeWindow: '5 minutes',
-        },
+        rateLimit: routeRateLimit(10, '5 minutes'),
       },
     },
     async (req, reply) => {

@@ -173,6 +173,12 @@ export class OpLogEngine {
     await this.options.store.discardPendingUpload(opIds);
   }
 
+  /** 按 op id 取回本地 op（用户手动解决冲突时用它重新派发）。 */
+  async getOpById(opId: string): Promise<Operation<string> | undefined> {
+    const all = await this.options.store.getAllOps();
+    return all.find((r) => r.op.id === opId)?.op;
+  }
+
   /** 取某实体的全部本地 op（冲突解决要用它比对时间戳）。 */
   async getOpsForEntity(
     entityType: EntityType,

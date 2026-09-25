@@ -21,8 +21,9 @@
  *   node scripts/verify-p1-sync.mjs --port 3200
  */
 
-import { execFileSync, spawn } from 'node:child_process';
+import { execFileSync, spawn, spawnSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
+import os from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { setTimeout as sleep } from 'node:timers/promises';
 
@@ -76,9 +77,28 @@ const BASE = `http://127.0.0.1:${PORT}`;
 
 // ⚠️ 宿主机上残留的 DATABASE_URL 会覆盖 .env（见 AGENTS.md §7）。
 // 这里是本地验收用的库，与 P0 的一致。
+//
+// 🔴 默认 URL **不能写死本机用户名**。
+// 我第一版写的是 `postgresql://rocalight@...` —— 那是我这台机器的账号，
+// 换一台机器立刻 `role "rocalight" does not exist`。
+// 这里从当前用户推导，并允许完全覆盖。
+const DEFAULT_DB_NAME = 'heyta_sync_smoke';
+const DB_NAME = process.env.HEYTA_VERIFY_DB_NAME ?? DEFAULT_DB_NAME;
+
+function defaultDbUser() {
+  // 显式给出优先；否则用 shell 的 $USER / $LOGNAME，再退到 os 用户名
+  return (
+    process.env.HEYTA_VERIFY_DB_USER ??
+    process.env.PGUSER ??
+    process.env.USER ??
+    process.env.LOGNAME ??
+    os.userInfo().username
+  );
+}
+
 const DB_URL =
   process.env.HEYTA_VERIFY_DATABASE_URL ??
-  'postgresql://rocalight@127.0.0.1:5432/heyta_sync_smoke?schema=public&connection_limit=5&pool_timeout=10';
+  `postgresql://${defaultDbUser()}@127.0.0.1:5432/${DB_NAME}?schema=public&connection_limit=5&pool_timeout=10`;
 
 let server;
 
@@ -98,6 +118,91 @@ if (process.env.DATABASE_URL) {
 }
 
 console.log(`· node: ${NODE}`);
+console.log(`· 数据库: ${DB_NAME}`);
+
+/**
+ * 确保验收库存在并已迁移。
+ *
+ * 🔴 这一步是**必须**的，不是便利设施。
+ * 之前脚本假定库已经手工建好 —— 于是"自带真实服务端"只在
+ * 恰好建过库的那台机器上成立。我把库删掉之后验收立刻失败，
+ * 暴露出这条路根本不是自足的：一个验收脚本要么自己准备好环境，
+ * 要么就不是验收脚本。
+ */
+function run(cmd, args, options = {}) {
+  const r = spawnSync(cmd, args, { encoding: 'utf8', ...options });
+  return { ok: r.status === 0, out: `${r.stdout ?? ''}${r.stderr ?? ''}` };
+}
+
+function psqlAvailable() {
+  return run('psql', ['--version']).ok;
+}
+
+/**
+ * 把 Prisma 的 URL 转成 libpq 能懂的 URL。
+ *
+ * 🔴 psql **不认** Prisma 特有的查询参数：`?schema=public` 会让它直接报
+ * `invalid URI query parameter: "schema"` —— 一个看起来像 DSN 写错了、
+ * 实际是"工具不同"的错误。`connection_limit` / `pool_timeout` 同理。
+ * 这几个参数只对 Prisma 有意义，给 psql 之前必须剥掉。
+ */
+function toLibpqUrl(url) {
+  const u = new URL(url);
+  for (const key of ['schema', 'connection_limit', 'pool_timeout']) {
+    u.searchParams.delete(key);
+  }
+  const qs = u.searchParams.toString();
+  u.search = qs;
+  return u.toString();
+}
+
+function ensureDatabase() {
+  if (!psqlAvailable()) {
+    console.log('⚠️  找不到 psql，跳过建库 —— 若库不存在，验收会在服务端启动阶段失败');
+    return;
+  }
+
+  // 连到 postgres 维护库去建目标库
+  const adminUrl = toLibpqUrl(DB_URL.replace(/\/[^/?]+\?/, '/postgres?'));
+  const exists = run('psql', [adminUrl, '-tAc', `SELECT 1 FROM pg_database WHERE datname='${DB_NAME}'`]);
+  if (exists.out.trim() === '1') {
+    console.log('· 验收库已存在');
+  } else {
+    console.log('· 验收库不存在，创建中…');
+    // 用 psql 发 CREATE DATABASE —— `createdb <URL>` 是不行的：
+    // createdb 的第一个位置参数是**库名**，把 URL 塞进去它会当成标识符，
+    // 报 `identifier "postgresql://..." will be truncated`，看起来像权限问题。
+    const created = run('psql', [adminUrl, '-c', `CREATE DATABASE "${DB_NAME}"`]);
+    if (!created.ok) {
+      // 并发或权限问题时再查一次，别直接判失败
+      const recheck = run('psql', [adminUrl, '-tAc', `SELECT 1 FROM pg_database WHERE datname='${DB_NAME}'`]);
+      if (recheck.out.trim() !== '1') {
+        console.error(`❌ 建库失败：${created.out.trim().slice(0, 300)}`);
+        process.exit(1);
+      }
+    }
+  }
+
+  console.log('· 应用迁移…');
+  // 必须用项目脚本，不能用 prisma migrate deploy（见 AGENTS.md §4）
+  const shim = `${ROOT}research/tools/macos-sed-shim`;
+  const migrated = run('sh', ['scripts/migrate-deploy.sh'], {
+    cwd: `${ROOT}server`,
+    env: {
+      ...process.env,
+      DATABASE_URL: DB_URL,
+      PATH: `${shim}:${process.env.PATH ?? ''}`,
+    },
+  });
+  if (!migrated.ok) {
+    console.error(`❌ 迁移失败：\n${migrated.out.trim().slice(-800)}`);
+    process.exit(1);
+  }
+  console.log('· 迁移完成');
+}
+
+ensureDatabase();
+
 console.log(`· 启动服务端（端口 ${PORT}，TEST_MODE）…`);
 // 用 process.execPath，不要写死 'node' ——
 // PATH 里没有 node 时 spawn 会以 ENOENT 失败，而错误信息毫无指向性。

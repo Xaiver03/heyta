@@ -29,6 +29,7 @@ import {
   type TaskFilter,
 } from './features/tasks/store.js';
 import { useProjectStore } from './features/projects/store.js';
+import { ConflictDialog } from './features/sync/ConflictDialog.js';
 import { SyncBar } from './features/sync/SyncBar.js';
 import { ProjectsPanel } from './features/projects/ProjectsPanel.js';
 import { QuadrantBoard } from './features/quadrant/QuadrantBoard.js';
@@ -201,6 +202,7 @@ export function App(): React.JSX.Element {
           </div>
           <div className="ht-header__actions">
             <SyncBar />
+        <ConflictDialog />
             <button
               type="button"
               className="ht-btn ht-btn--ghost"

@@ -20,9 +20,14 @@ import {
 } from '../../lib/oplog.js';
 import { META_KEYS, STORES, IndexedDbAdapter } from '@heyta/storage';
 import type { EntityType } from '@heyta/shared-schema';
-import type { Operation } from '@heyta/sync-core';
+import type { Operation, OpType } from '@heyta/sync-core';
 
-import { SyncClient, createRetryScheduler, type SyncStatus } from './client.js';
+import {
+  SyncClient,
+  createRetryScheduler,
+  type ConflictInfo,
+  type SyncStatus,
+} from './client.js';
 
 interface SyncStoreState {
   status: SyncStatus;
@@ -34,10 +39,26 @@ interface SyncStoreState {
   password?: string;
   /** 上次同步时间。 */
   lastSyncedAt?: number;
+  /**
+   * 冲突对话框是否打开。
+   *
+   * 🔴 **与 `status` 分开**，因为"有没有冲突"和"正在不正在看冲突"是两件事。
+   * 我第一版让关闭对话框把 `status` 改回 `idle`，于是用户一按 Esc，
+   * 冲突提示就整个消失了 —— 数据还卡在待上传队列里，
+   * 但他再也找不到处理的入口，问题从"没法解决"变成"看不见了"，更糟。
+   */
+  conflictDialogOpen: boolean;
 
   configure: (baseUrl: string, token: string, password: string) => void;
   clearCredentials: () => void;
   syncNow: () => Promise<SyncStatus>;
+  /** 用户手动解决一处冲突。两个方向都走 op-log（重新派发），不直接改状态。 */
+  resolveConflict: (
+    conflict: ConflictInfo,
+    choice: 'keep-local' | 'keep-remote',
+  ) => Promise<SyncStatus>;
+  openConflictDialog: () => void;
+  closeConflictDialog: () => void;
   startAutoRetry: () => void;
   stopAutoRetry: () => void;
 }
@@ -72,9 +93,70 @@ async function writeCursor(seq: number): Promise<void> {
   );
 }
 
+/**
+ * 构造一个同步客户端。
+ *
+ * ⚠️ **每次重建，不缓存。** 缓存的话 configure() 改了地址/令牌后旧客户端
+ * 还在用旧值 —— 而"令牌过期后同步一直失败"是最难排查的一类问题。
+ *
+ * 抽成工厂是因为"手动解决冲突"也需要一个客户端，
+ * 而它不能自己再写一遍全部接线 —— 两套接线一定会漂移。
+ */
+function buildClient(
+  get: () => SyncStoreState,
+  set: (partial: Partial<SyncStoreState>) => void,
+): SyncClient | undefined {
+  const { baseUrl, token } = get();
+  if (baseUrl === '' || token === undefined) return undefined;
+
+  const engine = requireEngine();
+
+  return new SyncClient({
+    baseUrl,
+    clientId: engine.getClientId(),
+    getToken: async () => get().token,
+    getPassword: async () => get().password,
+    getLastServerSeq: readCursor,
+    setLastServerSeq: writeCursor,
+    // 待上传队列直接来自存储的上传状态索引，不是内存列表 ——
+    // 内存列表崩溃后就丢了，而"哪些还没上传"正是崩溃后最需要的信息
+    getLocalOps: () => engine.getPendingUpload(),
+    markUploaded: (seqs) => engine.markUploaded(seqs),
+    applyRemote: applyRemoteOps,
+    // 冲突判定为本地胜出 → 重新派发（新 op，时钟已压过远端）
+    redispatch: async (op) => {
+      await engine.redispatch(op);
+    },
+    discardLocal: (ids) => engine.discardPendingUpload(ids),
+    getOpsForEntity: (entityType, entityId) =>
+      engine.getOpsForEntity(entityType as EntityType, entityId),
+    getOpById: (opId) => engine.getOpById(opId),
+    redispatchPayload: async (intent) => {
+      // 用户选择"保留远端"：把远端载荷表达成本地的一条新 op。
+      // 直接改状态是不行的 —— 那正是 D4 禁止的绕开 op-log 的写入。
+      await engine.dispatch({
+        entityType: intent.entityType as EntityType,
+        entityId: intent.entityId,
+        opType: intent.opType as OpType,
+        payload: intent.payload,
+      });
+    },
+  });
+}
+
 export const useSyncStore = create<SyncStoreState>((set, get) => ({
   status: { kind: 'idle' },
   baseUrl: '',
+  conflictDialogOpen: false,
+
+  openConflictDialog: () => {
+    set({ conflictDialogOpen: true });
+  },
+
+  closeConflictDialog: () => {
+    // 只关窗口，**不动 status** —— 冲突还在，SyncBar 仍会提示，还能再打开
+    set({ conflictDialogOpen: false });
+  },
 
   configure: (baseUrl, token, password) => {
     set({ baseUrl, token, password, status: { kind: 'idle' } });
@@ -87,44 +169,37 @@ export const useSyncStore = create<SyncStoreState>((set, get) => ({
   },
 
   syncNow: async () => {
-    const { baseUrl, token } = get();
-
-    if (baseUrl === '' || token === undefined) {
+    const c = buildClient(get, set);
+    if (c === undefined) {
       const s: SyncStatus = { kind: 'error', message: '未配置同步服务', retryable: false };
       set({ status: s });
       return s;
     }
 
-    const engine = requireEngine();
-
-    // ⚠️ 客户端每次重建，不缓存。
-    // 缓存的话 configure() 改了地址/令牌后旧客户端还在用旧值 ——
-    // 而"令牌过期后同步一直失败"是最难排查的一类问题。
-    const c = new SyncClient({
-      baseUrl,
-      clientId: engine.getClientId(),
-      getToken: async () => get().token,
-      getPassword: async () => get().password,
-      getLastServerSeq: readCursor,
-      setLastServerSeq: writeCursor,
-      // 待上传队列直接来自存储的上传状态索引，不是内存列表 ——
-      // 内存列表崩溃后就丢了，而"哪些还没上传"正是崩溃后最需要的信息
-      getLocalOps: () => engine.getPendingUpload(),
-      markUploaded: (seqs) => engine.markUploaded(seqs),
-      applyRemote: applyRemoteOps,
-      // 冲突判定为本地胜出 → 重新派发（新 op，时钟已压过远端）
-      redispatch: async (op) => {
-        await engine.redispatch(op);
-      },
-      discardLocal: (ids) => engine.discardPendingUpload(ids),
-      getOpsForEntity: (entityType, entityId) =>
-        engine.getOpsForEntity(entityType as EntityType, entityId),
-    });
-
     const status = await c.sync((s) => {
       set({ status: s });
     });
 
+    // 出现冲突就自动打开一次 —— 否则用户只会看到状态栏变了字，
+    // 不知道需要自己去点一下
+    if (status.kind === 'conflict') set({ conflictDialogOpen: true });
+    if (status.kind === 'synced') set({ lastSyncedAt: status.at });
+    return status;
+  },
+
+  resolveConflict: async (conflict, choice) => {
+    const c = buildClient(get, set);
+    if (c === undefined) {
+      const s: SyncStatus = { kind: 'error', message: '未配置同步服务', retryable: false };
+      set({ status: s });
+      return s;
+    }
+
+    set({ status: { kind: 'syncing', phase: 'upload' } });
+    const status = await c.resolveConflict(conflict, choice);
+
+    // 解决完后把剩下的冲突（可能还有别的）一并反映到状态里
+    set({ status });
     if (status.kind === 'synced') set({ lastSyncedAt: status.at });
     return status;
   },
@@ -150,6 +225,8 @@ export function describeStatus(status: SyncStatus): string {
       return '已同步';
     case 'offline':
       return '离线 · 改动已排队，联网后自动重试';
+    case 'conflict':
+      return `${String(status.conflicts.length)} 处改动需要你确认`;
     case 'error':
       return status.retryable ? `同步出错：${status.message}` : status.message;
   }
@@ -163,6 +240,8 @@ export function statusColorToken(status: SyncStatus): string {
     case 'syncing':
       return 'color.info';
     case 'offline':
+      return 'color.warning';
+    case 'conflict':
       return 'color.warning';
     case 'error':
       return 'color.danger';

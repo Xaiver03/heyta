@@ -32,6 +32,9 @@ function statusIcon(kind: string): React.JSX.Element {
     case 'offline':
       return <CloudOff size={14} aria-hidden="true" />;
     case 'error':
+    case 'conflict':
+      // 冲突不是故障，但确实需要用户注意 —— 和 error 共用警示图标，
+      // 具体措辞由 describeStatus 区分
       return <AlertTriangle size={14} aria-hidden="true" />;
     default:
       return <CloudOff size={14} aria-hidden="true" />;
@@ -70,6 +73,18 @@ export function SyncBar() {
           {statusIcon(sync.status.kind)}
           {describeStatus(sync.status)}
         </span>
+
+        {/* 冲突需要一个**看得见的入口**：关掉对话框之后，
+            用户还得能再打开它，否则问题就从"没法解决"变成"看不见了" */}
+        {sync.status.kind === 'conflict' ? (
+          <button
+            type="button"
+            className="ht-btn ht-btn--primary"
+            onClick={sync.openConflictDialog}
+          >
+            处理冲突
+          </button>
+        ) : null}
 
         <button
           type="button"

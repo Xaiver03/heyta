@@ -21,6 +21,7 @@
 
 import { isEntityType } from '@heyta/shared-schema';
 import {
+  compareVectorClocks,
   decrypt,
   encrypt,
   isEncryptedPayloadTransportShape,
@@ -45,11 +46,81 @@ interface ConflictReport {
   existingClock?: Record<string, number>;
 }
 
+/** 冲突的一方（本地或远端）。只暴露 UI 需要的部分，不外泄整个 op。 */
+export interface ConflictSide {
+  opId: string;
+  clientId: string;
+  timestamp: number;
+  opType: string;
+  payload: unknown;
+}
+
+/**
+ * 一处**需要用户决定**的冲突。
+ *
+ * 🔴 为什么要把双方都带出来，而不是只报"有冲突"：
+ * 用户没法对着一句"需要手动选择保留哪一边"做选择 —— 他得**看见两边分别是什么**。
+ * 我第一版只上报了一个数量，等于把一个必然需要人判断的问题变成了死路：
+ * 数据两边都没丢，但谁也没法往下走。
+ *
+ * `remote` 可能是 `undefined` —— 例如 op 缺少 entityId、或下载后仍找不到对端那条。
+ * 这种情况下 UI 必须**明确显示"取不到对端版本"**，而不是显示成空白让人以为对端是空的。
+ */
+export interface ConflictInfo {
+  /** 稳定标识，UI 用它做 key 与"已处理过"判定。 */
+  id: string;
+  entityType: string;
+  entityId: string;
+  reason: string;
+  local: ConflictSide;
+  remote: ConflictSide | undefined;
+  /** 服务端判定冲突时给出的既有版本时钟（诊断用）。 */
+  existingClock?: Record<string, number>;
+}
+
+/** 一个 op 里最能代表"用户改了什么"的字段，用于在界面上给出简短标题。 */
+export function describeConflictPayload(payload: unknown): string {
+  if (payload === null || payload === undefined) return '（空）';
+  if (typeof payload !== 'object') return String(payload);
+
+  const record = payload as Record<string, unknown>;
+  for (const key of ['title', 'name', 'text', 'content', 'note']) {
+    const value = record[key];
+    if (typeof value === 'string' && value.trim() !== '') return value;
+  }
+
+  // 没有可读标题就把字段列出来，总比显示"对象"强
+  const keys = Object.keys(record);
+  if (keys.length === 0) return '（空）';
+  return keys
+    .slice(0, 4)
+    .map((k) => `${k}: ${JSON.stringify(record[k])}`)
+    .join('、');
+}
+
+function toConflictSide(op: Operation<string>): ConflictSide {
+  return {
+    opId: op.id,
+    clientId: op.clientId,
+    timestamp: op.timestamp,
+    opType: String(op.opType),
+    payload: op.payload,
+  };
+}
+
 export type SyncStatus =
   | { kind: 'idle' }
   | { kind: 'syncing'; phase: 'upload' | 'download' }
   | { kind: 'synced'; at: number }
   | { kind: 'offline'; since: number }
+  /**
+   * 有冲突**需要用户决定**。
+   *
+   * 单独一种状态，而不是塞进 `error`：冲突不是故障，是两边的改动都合法。
+   * 混进 error 的话，UI 只能显示一句报错，用户既不知道冲突的是什么、
+   * 也没有地方去选，问题就永久卡住了。
+   */
+  | { kind: 'conflict'; conflicts: ConflictInfo[] }
   | { kind: 'error'; message: string; retryable: boolean };
 
 /**
@@ -149,6 +220,23 @@ export interface SyncClientOptions {
 
   /** 冲突判定为"远端胜出"时，把本地这条移出上传队列（不删除）。 */
   discardLocal: (opIds: string[]) => Promise<void>;
+
+  /** 按 op id 取回本地 op（用户手动解决冲突时要用它重新派发）。 */
+  getOpById: (opId: string) => Promise<Operation<string> | undefined>;
+
+  /**
+   * 用给定载荷派发一条新的本地 op。
+   *
+   * 用户选择"保留远端"时用它：把**远端的载荷**重新表达成本地的一条新 op。
+   * 这样本地状态才会真的变成用户选的那个值 —— 只丢弃本地待上传项是不够的，
+   * 因为本地那条 op 的 seq 更大，重放时仍然压过远端值。
+   */
+  redispatchPayload: (intent: {
+    entityType: string;
+    entityId: string;
+    opType: string;
+    payload: unknown;
+  }) => Promise<void>;
 
   /** 取某实体的全部本地 op（冲突解决要比对时间戳）。 */
   getOpsForEntity: (entityType: string, entityId: string) => Promise<Operation<string>[]>;
@@ -264,11 +352,8 @@ export class SyncClient {
       if (conflicts.length > 0) {
         const unresolved = await this.resolveConflicts(conflicts, token, password);
         if (unresolved.length > 0) {
-          return report({
-            kind: 'error',
-            message: `${String(unresolved.length)} 处冲突需要你手动选择保留哪一边`,
-            retryable: false,
-          });
+          // 结构化上报，不是一句文案 —— 用户得看见两边分别是什么才能选
+          return report({ kind: 'conflict', conflicts: unresolved });
         }
       }
 
@@ -436,37 +521,92 @@ export class SyncClient {
     conflicts: ConflictReport[],
     token: string,
     password: string,
-  ): Promise<ConflictReport[]> {
-    const unresolved: ConflictReport[] = [];
+  ): Promise<ConflictInfo[]> {
+    const unresolved: ConflictInfo[] = [];
     const toRedispatch: Operation<string>[] = [];
     const toDiscard: string[] = [];
 
     for (const conflict of conflicts) {
       const { op } = conflict;
+
+      // 没有 entityId 就没法比对实体级历史 —— 只能交给人判断
       if (op.entityId === undefined) {
-        // 没有 entityId 就没法比对实体级历史 —— 交给人判断
-        unresolved.push(conflict);
+        unresolved.push({
+          id: op.id,
+          entityType: String(op.entityType),
+          entityId: '(未知)',
+          reason: conflict.reason,
+          local: toConflictSide(op),
+          remote: undefined,
+          ...(conflict.existingClock !== undefined
+            ? { existingClock: conflict.existingClock }
+            : {}),
+        });
         continue;
       }
 
       // 下载之后，本地日志里已经有了远端那条
       const history = await this.options.getOpsForEntity(op.entityType, op.entityId);
-      const mine = history.filter((o) => o.clientId === this.options.clientId);
       const theirs = history.filter((o) => o.clientId !== this.options.clientId);
 
-      const suggestion = suggestConflictResolution(mine, theirs);
+      /**
+       * 🔴 传给 `suggestConflictResolution` 的必须是**真正并发的那几条**，
+       * 不是实体的全部历史。
+       *
+       * `EntityConflict.localOps/remoteOps` 的语义是"这个冲突涉及的两组 op"。
+       * 我第一版传了整个实体历史，于是 A 当初创建该任务的那条 Create 也在里面，
+       * 而 B 那边没有 Create —— 直接命中"本地有 Create 就本地赢"的规则。
+       * 结果：**创建者的编辑永远自动胜出，另一台的编辑被静默丢掉**，
+       * 而且看起来像"同步成功"。这正是整个冲突机制要避免的结果。
+       *
+       * 并发判定用 `compareVectorClocks`：只有 CONCURRENT 才是"两边各自改了"
+       * 的那种真冲突，GREATER_THAN/LESS_THAN 是版本先后关系，不是冲突。
+       */
+      const concurrentTheirs = theirs.filter(
+        (o) => compareVectorClocks(op.vectorClock ?? {}, o.vectorClock ?? {}) === 'CONCURRENT',
+      );
 
-      switch (suggestion) {
-        case 'local':
-          toRedispatch.push(op);
-          break;
-        case 'remote':
-          toDiscard.push(op.id);
-          break;
-        default:
-          unresolved.push(conflict);
-          break;
+      // 找不到并发的对端（例如服务端判定的是同客户端重复提交）时，
+      // 退回到"最新的一条远端 op"而不是空数组 —— 空数组会被判成"本地赢"，
+      // 那等于在信息不足时武断地丢掉对端。
+      const counterpart = concurrentTheirs.length > 0 ? concurrentTheirs : theirs;
+
+      const suggestion = suggestConflictResolution([op], counterpart);
+
+      if (suggestion === 'local') {
+        toRedispatch.push(op);
+        // 🔴 原来的那条必须**丢弃**（移出上传队列，但不删 op）。
+        //
+        // 我第一版只重新派发、没丢弃，于是那条被服务端拒过的 op 永远留在
+        // 待上传队列里，每次同步都再撞一次冲突 —— 同步被**永久卡死**，
+        // 而且看起来像"服务端老是无缘无故拒绝我"。
+        // 它已经被重新表达成一条新 op 了，旧的那条没有任何理由再上传。
+        toDiscard.push(op.id);
+        continue;
       }
+      if (suggestion === 'remote') {
+        toDiscard.push(op.id);
+        continue;
+      }
+
+      // manual（或策略判不出来）：把**双方**都交给用户，而不是只报一个数量。
+      // 取时间戳最大的那条作为"远端版本" —— 那正是用户要对比的那个值。
+      const latestRemote =
+        counterpart.length === 0
+          ? undefined
+          : counterpart.reduce((a, b) => (b.timestamp > a.timestamp ? b : a));
+
+      unresolved.push({
+        id: op.id,
+        entityType: String(op.entityType),
+        entityId: op.entityId,
+        reason: conflict.reason,
+        local: toConflictSide(op),
+        remote: latestRemote === undefined ? undefined : toConflictSide(latestRemote),
+        ...(conflict.existingClock !== undefined
+          ? { existingClock: conflict.existingClock }
+          : {}),
+      });
     }
 
     if (toDiscard.length > 0) await this.options.discardLocal(toDiscard);
@@ -475,14 +615,104 @@ export class SyncClient {
       for (const op of toRedispatch) {
         await this.options.redispatch(op);
       }
-      // 重新派发产生了新 op（时钟已压过服务端），再传一次
+      // 重新派发产生了新 op（时钟已压过服务端），再传一次。
+      //
+      // 🔴 **不要再递归调用 resolveConflicts。**
+      // 我改结构化上报时顺手把这里写成了递归，于是"重传仍冲突"会一层层
+      // 套下去 —— 配合上面"旧 op 没被丢弃"的问题，就是无限循环。
+      // 重传仍然冲突说明自动判定不成立，那正是**该交给用户**的情况，
+      // 而不是我们自己再猜一轮。
       const retryConflicts: ConflictReport[] = [];
       await this.upload(token, password, retryConflicts);
-      // 重传仍冲突 → 交给用户，不再循环（否则可能无限重试）
-      unresolved.push(...retryConflicts);
+      if (retryConflicts.length > 0) {
+        const history = await this.options.getOpsForEntity(
+          retryConflicts[0]!.op.entityType,
+          retryConflicts[0]!.op.entityId ?? '(未知)',
+        );
+        for (const c of retryConflicts) {
+          const theirs = history.filter((o) => o.clientId !== this.options.clientId);
+          const latestRemote =
+            theirs.length === 0
+              ? undefined
+              : theirs.reduce((a, b) => (b.timestamp > a.timestamp ? b : a));
+          unresolved.push({
+            id: c.op.id,
+            entityType: String(c.op.entityType),
+            entityId: c.op.entityId ?? '(未知)',
+            reason: c.reason,
+            local: toConflictSide(c.op),
+            remote: latestRemote === undefined ? undefined : toConflictSide(latestRemote),
+            ...(c.existingClock !== undefined ? { existingClock: c.existingClock } : {}),
+          });
+        }
+      }
     }
 
     return unresolved;
+  }
+
+  /**
+   * 用户手动解决一处冲突。
+   *
+   * 两条路径**都通过重新派发**，因为 op 是不可变的、op-log 是唯一写入口。
+   *
+   * `keep-remote` 为什么也要重新派发本地一条：
+   * 远端那条虽然已经下载并应用了，但本地这条待上传 op 的 `seq` 更大，
+   * 重放时仍然是本地值胜出 —— 界面会显示用户**已经放弃**的那个值。
+   * 把远端载荷重新表达成一条新的本地 op（时钟压过双方），
+   * 本地状态才会真的变成用户选的那个值，而且这是一次真实的用户意图。
+   */
+  async resolveConflict(
+    conflict: ConflictInfo,
+    choice: 'keep-local' | 'keep-remote',
+  ): Promise<SyncStatus> {
+    const token = await this.options.getToken();
+    const password = await this.options.getPassword();
+    if (token === undefined || password === undefined || password === '') {
+      return { kind: 'error', message: '未登录或缺少加密口令', retryable: false };
+    }
+
+    try {
+      if (choice === 'keep-local') {
+        // 本地这条重新派发（时钟已含下载阶段并入的远端时钟）
+        const op = await this.options.getOpById(conflict.local.opId);
+        if (op === undefined) {
+          return {
+            kind: 'error',
+            message: '本地那条改动已经不在队列里了，请重新同步',
+            retryable: true,
+          };
+        }
+        await this.options.redispatch(op);
+      } else {
+        if (conflict.remote === undefined) {
+          // 拿不到对端版本就没法"保留对端" —— 明确失败，不要猜
+          return {
+            kind: 'error',
+            message: '取不到对端版本，无法保留远端；请选择保留本地',
+            retryable: false,
+          };
+        }
+        // 把**远端载荷**表达成本地的一条新 op
+        await this.options.redispatchPayload({
+          entityType: conflict.entityType,
+          entityId: conflict.entityId,
+          opType: conflict.remote.opType,
+          payload: conflict.remote.payload,
+        });
+      }
+
+      // 原始的待上传 op 不该再传了 —— 用户已经做出了选择
+      await this.options.discardLocal([conflict.local.opId]);
+
+      return await this.sync();
+    } catch (error: unknown) {
+      return {
+        kind: 'error',
+        message: error instanceof Error ? error.message : String(error),
+        retryable: true,
+      };
+    }
   }
 
   /** 增量下载。按 serverSeq 游标分页，直到 hasMore 为 false。 */
