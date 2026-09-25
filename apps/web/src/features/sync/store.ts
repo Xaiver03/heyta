@@ -19,6 +19,7 @@ import {
   requireEngine,
 } from '../../lib/oplog.js';
 import { META_KEYS, STORES, IndexedDbAdapter } from '@heyta/storage';
+import type { EntityType } from '@heyta/shared-schema';
 import type { Operation } from '@heyta/sync-core';
 
 import { SyncClient, createRetryScheduler, type SyncStatus } from './client.js';
@@ -111,6 +112,13 @@ export const useSyncStore = create<SyncStoreState>((set, get) => ({
       getLocalOps: () => engine.getPendingUpload(),
       markUploaded: (seqs) => engine.markUploaded(seqs),
       applyRemote: applyRemoteOps,
+      // 冲突判定为本地胜出 → 重新派发（新 op，时钟已压过远端）
+      redispatch: async (op) => {
+        await engine.redispatch(op);
+      },
+      discardLocal: (ids) => engine.discardPendingUpload(ids),
+      getOpsForEntity: (entityType, entityId) =>
+        engine.getOpsForEntity(entityType as EntityType, entityId),
     });
 
     const status = await c.sync((s) => {

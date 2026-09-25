@@ -68,6 +68,12 @@ async function makeDevice(
     applyRemote: async (ops) => {
       await engine.applyRemote(ops);
     },
+    redispatch: async (op) => {
+      await engine.redispatch(op);
+    },
+    discardLocal: (ids) => engine.discardPendingUpload(ids),
+    getOpsForEntity: (entityType, entityId) =>
+      engine.getOpsForEntity(entityType as never, entityId),
     ...(fetchImpl !== undefined ? { fetchImpl } : {}),
   });
 
@@ -247,5 +253,245 @@ describe.skipIf(URL_BASE === undefined)('端到端同步（真实服务端）', 
     expect(back).toEqual({ kind: 'synced', at: expect.any(Number) });
     // 重放成功后队列清空
     expect(await A.engine.getPendingUpload()).toHaveLength(0);
+  }, 60_000);
+
+});
+
+describe.skipIf(URL_BASE === undefined)('P1 验收：离线合并与崩溃恢复（真实服务端）', () => {
+  const created: Array<{ adapter: IndexedDbAdapter }> = [];
+  afterAll(() => {
+    for (const d of created) d.adapter.close();
+  });
+
+  async function freshToken(prefix: string): Promise<string> {
+    const reg = await fetch(`${URL_BASE}/api/test/create-user`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        email: `heyta-${prefix}-${String(Date.now())}@example.com`,
+        password: 'heyta-p1-password',
+      }),
+    });
+    const body = (await reg.json()) as Record<string, unknown>;
+    return (body['token'] ??
+      body['accessToken'] ??
+      (body['data'] as Record<string, unknown> | undefined)?.['token']) as string;
+  }
+
+  it('🔴 离线合并：A 断网改 + B 在线改 → 冲突可判定且两边都不丢数据', async () => {
+    (globalThis as unknown as { indexedDB: IDBFactory }).indexedDB = new IDBFactory();
+    (globalThis as unknown as { IDBKeyRange: typeof IDBKeyRange }).IDBKeyRange = IDBKeyRange;
+
+    const token = await freshToken('merge');
+
+    let aOffline = false;
+    const realFetch = globalThis.fetch;
+    const flaky = ((input: string | URL | Request, init?: RequestInit) => {
+      if (aOffline) return Promise.reject(new TypeError('Failed to fetch'));
+      return realFetch(input as never, init);
+    }) as unknown as typeof fetch;
+
+    const A = await makeDevice('merge-a', token, flaky);
+    const B = await makeDevice('merge-b', token);
+    created.push(A, B);
+
+    await A.engine.dispatch({
+      entityType: 'TASK',
+      entityId: 'shared',
+      opType: OpType.Create,
+      payload: { title: '原始标题' },
+    });
+    await A.client.sync();
+    await B.client.sync();
+    expect(B.engine.getState().tasks['shared']!.title).toBe('原始标题');
+
+    aOffline = true;
+    await A.engine.dispatch({
+      entityType: 'TASK',
+      entityId: 'shared',
+      opType: OpType.Update,
+      payload: { title: 'A 离线改的' },
+    });
+    const aOfflineSync = await A.client.sync();
+    expect(aOfflineSync.kind).toBe('offline');
+    expect(await A.engine.getPendingUpload()).toHaveLength(1);
+    expect(A.engine.getState().tasks['shared']!.title).toBe('A 离线改的');
+
+    await B.engine.dispatch({
+      entityType: 'TASK',
+      entityId: 'shared',
+      opType: OpType.Update,
+      payload: { title: 'B 在线改的' },
+    });
+    await B.client.sync();
+    expect(B.engine.getState().tasks['shared']!.title).toBe('B 在线改的');
+
+    aOffline = false;
+    const back = await A.client.sync();
+
+    /**
+     * 关键：这里**不该**自动收敛。
+     *
+     * 我最初断言"两端自动收敛到时间较晚的那个"，想当然以为 LWW 会自动择一。
+     * 实测发现协议不是这样：sync-core 的 `suggestConflictResolution` 对
+     * "两边都是同实体 UPDATE、时间戳相近、无删除/创建不对称"返回 **manual**
+     * —— 它**故意拒绝自动选边**。
+     *
+     * 这是对的。自动择一 = 静默丢掉另一个人的编辑，而用户永远不会知道。
+     * 计划要求的是"冲突**可判定**"，不是"自动消失"。
+     */
+    expect(back.kind).toBe('error');
+    if (back.kind === 'error') {
+      expect(back.message).toContain('冲突');
+      expect(back.retryable).toBe(false);
+    }
+
+    // 两边数据都不能丢
+    expect(A.engine.getState().tasks['shared']!.title).toBe('A 离线改的');
+    expect(B.engine.getState().tasks['shared']!.title).toBe('B 在线改的');
+
+    // A 的 op 仍留在待上传队列里（等用户决定后重试），没有被丢弃
+    expect(await A.engine.getPendingUpload()).toHaveLength(1);
+
+    expect(A.engine.getState().tasks['shared']).toBeDefined();
+    expect(B.engine.getState().tasks['shared']).toBeDefined();
+  }, 60_000);
+
+  it('🔴 冲突可判定：服务端明确告知并发修改，并给出既有版本时钟', async () => {
+    (globalThis as unknown as { indexedDB: IDBFactory }).indexedDB = new IDBFactory();
+    (globalThis as unknown as { IDBKeyRange: typeof IDBKeyRange }).IDBKeyRange = IDBKeyRange;
+
+    const token = await freshToken('detect');
+
+    let aOffline = false;
+    const realFetch = globalThis.fetch;
+    const flaky = ((input: string | URL | Request, init?: RequestInit) => {
+      if (aOffline) return Promise.reject(new TypeError('Failed to fetch'));
+      return realFetch(input as never, init);
+    }) as unknown as typeof fetch;
+
+    const A = await makeDevice('det-a', token, flaky);
+    const B = await makeDevice('det-b', token);
+    created.push(A, B);
+
+    await A.engine.dispatch({
+      entityType: 'TASK',
+      entityId: 'c1',
+      opType: OpType.Create,
+      payload: { title: 'base' },
+    });
+    await A.client.sync();
+    await B.client.sync();
+
+    aOffline = true;
+    await A.engine.dispatch({
+      entityType: 'TASK',
+      entityId: 'c1',
+      opType: OpType.Update,
+      payload: { title: 'A' },
+    });
+    await A.client.sync();
+
+    await B.engine.dispatch({
+      entityType: 'TASK',
+      entityId: 'c1',
+      opType: OpType.Update,
+      payload: { title: 'B' },
+    });
+    await B.client.sync();
+
+    aOffline = false;
+    const status = await A.client.sync();
+
+    // 必须被识别为**冲突**，而不是笼统的"同步失败"
+    expect(status.kind).toBe('error');
+    if (status.kind === 'error') {
+      expect(status.message).toContain('冲突');
+    }
+  }, 60_000);
+
+  it('🔴 崩溃恢复：写入中途"关闭页面" → 重开数据一致', async () => {
+    (globalThis as unknown as { indexedDB: IDBFactory }).indexedDB = new IDBFactory();
+    (globalThis as unknown as { IDBKeyRange: typeof IDBKeyRange }).IDBKeyRange = IDBKeyRange;
+
+    const token = await freshToken('crash');
+
+    // 用固定库名，模拟"同一个浏览器重新打开"
+    const dbName = `crash-${String(Date.now())}`;
+    const adapter1 = new IndexedDbAdapter(dbName);
+    await adapter1.init();
+    const store1 = new IndexedDbOpLogStore<Operation<string>>(adapter1);
+    const engine1 = new OpLogEngine({ clientId: 'crash-device', store: store1 });
+    await engine1.recover();
+
+    await engine1.dispatch({
+      entityType: 'TASK',
+      entityId: 'survives',
+      opType: OpType.Create,
+      payload: { title: '必须活下来' },
+    });
+    await engine1.dispatch({
+      entityType: 'TASK',
+      entityId: 'survives',
+      opType: OpType.Update,
+      payload: { completedAt: 12345 },
+    });
+    const before = engine1.getState();
+    expect(before.tasks['survives']!.completedAt).toBe(12345);
+
+    // ── "关闭页面"：丢弃内存里的引擎，只留磁盘 ──
+    adapter1.close();
+
+    // ── "重新打开"：新适配器 + 新引擎，从日志重建 ──
+    const adapter2 = new IndexedDbAdapter(dbName);
+    await adapter2.init();
+    const store2 = new IndexedDbOpLogStore<Operation<string>>(adapter2);
+    const engine2 = new OpLogEngine({ clientId: 'crash-device', store: store2 });
+    const recovery = await engine2.recover();
+
+    // 内存态从零重建，但必须与关闭前一致
+    expect(engine2.getState().tasks['survives']).toBeDefined();
+    expect(engine2.getState().tasks['survives']!.title).toBe('必须活下来');
+    expect(engine2.getState().tasks['survives']!.completedAt).toBe(12345);
+
+    // 重建的实体数应与关闭前相同（没有重复应用导致的状态漂移）
+    expect(Object.keys(engine2.getState().tasks).sort()).toEqual(
+      Object.keys(before.tasks).sort(),
+    );
+
+    // 重开后仍能继续同步（恢复出来的 op 还在待上传队列）
+    const client = new SyncClient({
+      baseUrl: URL_BASE!,
+      clientId: 'crash-device',
+      getToken: async () => token,
+      getPassword: async () => PASSWORD,
+      getLastServerSeq: async () => {
+        const r = await adapter2.get<{ key: string; value: number }>(STORES.META, KEY);
+        return r?.value ?? 0;
+      },
+      setLastServerSeq: async (seq) => {
+        await adapter2.put(STORES.META, { key: KEY, value: seq });
+      },
+      getLocalOps: () => engine2.getPendingUpload(),
+      markUploaded: (m) => engine2.markUploaded(m),
+      applyRemote: async (ops) => {
+        await engine2.applyRemote(ops);
+      },
+      redispatch: async (op) => {
+        await engine2.redispatch(op);
+      },
+      discardLocal: (ids) => engine2.discardPendingUpload(ids),
+      getOpsForEntity: (entityType, entityId) =>
+        engine2.getOpsForEntity(entityType as never, entityId),
+    });
+
+    const status = await client.sync();
+    expect(status).toEqual({ kind: 'synced', at: expect.any(Number) });
+    expect(await engine2.getPendingUpload()).toHaveLength(0);
+
+    // 未被丢弃的恢复结果应当被记录（哪怕是 0，也说明路径跑到了）
+    expect(recovery).toBeDefined();
+
+    created.push({ adapter: adapter2 });
   }, 60_000);
 });

@@ -398,6 +398,23 @@ export class IndexedDbOpLogStore<TOperation extends Operation<string> = Operatio
     );
   }
 
+  async discardPendingUpload(opIds: string[]): Promise<number> {
+    if (opIds.length === 0) return 0;
+
+    return this.db.transaction([STORES.OPS], 'readwrite', async (tx) => {
+      let updated = 0;
+      for (const opId of opIds) {
+        const key = await tx.getKeyFromIndex(STORES.OPS, OP_INDEXES.OP_ID, opId);
+        if (key === undefined) continue;
+        const record = await tx.get<StoredOperation<TOperation>>(STORES.OPS, key);
+        if (record === undefined) continue;
+        await tx.put(STORES.OPS, { ...record, uploadStatus: 'uploaded' });
+        updated += 1;
+      }
+      return updated;
+    });
+  }
+
   async getLastServerSeq(): Promise<number> {
     return readMetaNumber(this.db, META_KEYS.LAST_SERVER_SEQ);
   }
