@@ -28,6 +28,7 @@ import type {
   Tag,
   Task,
 } from '@heyta/domain';
+import { OpType } from '@heyta/sync-core';
 import type { Operation } from '@heyta/sync-core';
 
 /** 物化状态。所有实体按 id 索引。 */
@@ -89,7 +90,7 @@ export function applyOperation(
 
   // DELETE op：写入墓碑，**不物理删除**。
   // 物理删除会让同步端永远看不到这次删除，另一端会把数据又同步回来。
-  if (op.opType === 'DELETE') {
+  if (op.opType === OpType.Delete) {
     const existing = (state[bucket] as Record<string, { deletedAt?: number }>)[entityId];
     if (existing === undefined) return state;
     return {

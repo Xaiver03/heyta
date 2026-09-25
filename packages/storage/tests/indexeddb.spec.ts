@@ -16,7 +16,7 @@ import type { Operation } from '@heyta/sync-core';
 
 import { IndexedDbAdapter } from '../src/indexeddb/indexeddb-adapter.js';
 import { IndexedDbOpLogStore } from '../src/indexeddb/indexeddb-op-log-store.js';
-import { META_KEYS, OP_INDEXES, STORES } from '../src/stores.js';
+import { META_KEYS, OP_FIELDS, OP_INDEXES, STORES } from '../src/stores.js';
 
 // 每个测试用全新的 IndexedDB 全局，避免互相污染
 function freshAdapter(name: string): IndexedDbAdapter {
@@ -325,5 +325,160 @@ describe('IndexedDbOpLogStore', () => {
     // 保留 500 条，只有 1 条 → 没有可归档的
     expect(await store.archiveUpTo(1)).toBe(0);
     expect(await db.count(STORES.OPS)).toBe(1);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────
+// 上传队列（离线同步用）
+// ─────────────────────────────────────────────────────────────
+
+describe('IndexedDbOpLogStore — 上传队列', () => {
+  let db: IndexedDbAdapter;
+  let store: IndexedDbOpLogStore<Operation<string>>;
+
+  beforeEach(async () => {
+    const g = globalThis as unknown as {
+      indexedDB: IDBFactory;
+      IDBKeyRange: typeof IDBKeyRange;
+    };
+    g.indexedDB = new IDBFactory();
+    g.IDBKeyRange = IDBKeyRange;
+    db = new IndexedDbAdapter(`upload-${Math.random().toString(36).slice(2)}`);
+    await db.init();
+    store = new IndexedDbOpLogStore<Operation<string>>(db);
+  });
+
+  function op(id: string): Operation<string> {
+    return {
+      id,
+      clientId: 'device-a',
+      actionType: 'CREATE_TASK',
+      opType: 'CREATE',
+      entityType: 'TASK',
+      entityId: `e-${id}`,
+      payload: { title: id },
+      vectorClock: {},
+      timestamp: 1,
+      schemaVersion: 1,
+    } as Operation<string>;
+  }
+
+  it('本地 op 进入待上传队列；远程 op 不进（我们本来就收到了）', async () => {
+    await store.appendLocal([op('local-1')]);
+    await store.appendBatchSkipDuplicates([op('remote-1')], 'remote', {
+      pendingApply: true,
+    });
+
+    const pending = await store.findPendingUpload();
+    expect(pending.map((r) => r.op.id)).toEqual(['local-1']);
+  });
+
+  it('🔴 待上传队列按本地 seq 升序（上传顺序必须与产出顺序一致）', async () => {
+    // 故意乱序插入
+    await store.appendLocal([op('a')]);
+    await store.appendLocal([op('b')]);
+    await store.appendLocal([op('c')]);
+
+    const pending = await store.findPendingUpload();
+    const seqs = pending.map((r) => r.seq);
+    expect(seqs).toEqual([...seqs].sort((x, y) => x - y));
+    expect(pending.map((r) => r.op.id)).toEqual(['a', 'b', 'c']);
+  });
+
+  it('markUploaded 把 op 移出待上传队列，并写回服务端 seq', async () => {
+    await store.appendLocal([op('a')]);
+    expect(await store.findPendingUpload()).toHaveLength(1);
+
+    const updated = await store.markUploaded(new Map([['a', 99]]));
+    expect(updated).toBe(1);
+
+    // 已上传 → 不在队列里（否则每次同步都重传）
+    expect(await store.findPendingUpload()).toHaveLength(0);
+
+    // 服务端序号写进存储元数据，**不能**污染 op
+    const rows = await store.getAllOps();
+    expect(rows[0]!.serverSeq).toBe(99);
+    expect(rows[0]!.op).not.toHaveProperty('seq');
+  });
+
+  it('markUploaded 对不存在的 opId 是安全空操作', async () => {
+    const updated = await store.markUploaded(new Map([['nope', 1]]));
+    expect(updated).toBe(0);
+  });
+
+  it('markUploaded 保留 applyStatus（不能顺手重置它）', async () => {
+    await store.appendLocal([op('a')]);
+    await store.markUploaded(new Map([['a', 5]]));
+
+    const rows = await store.getAllOps();
+    // 本地 op 本来就是 applied；上传不该改变这个
+    expect(rows[0]!.applyStatus).toBe('applied');
+    expect(rows[0]!.uploadStatus).toBe('uploaded');
+  });
+
+  it('待应用与待上传是**两个独立队列**（远程 op 待应用但不上传）', async () => {
+    await store.appendBatchSkipDuplicates([op('r1')], 'remote', { pendingApply: true });
+    await store.appendLocal([op('l1')]);
+
+    const toApply = await store.findPendingApply();
+    const toUpload = await store.findPendingUpload();
+
+    expect(toApply.map((r) => r.op.id)).toEqual(['r1']);
+    expect(toUpload.map((r) => r.op.id)).toEqual(['l1']);
+  });
+});
+
+describe('IndexedDB schema 升级', () => {
+  it('🔴 从 v1 库升级到当前版本时，新索引会被补上（否则上传队列恒为空）', async () => {
+    const g = globalThis as unknown as {
+      indexedDB: IDBFactory;
+      IDBKeyRange: typeof IDBKeyRange;
+    };
+    g.indexedDB = new IDBFactory();
+    g.IDBKeyRange = IDBKeyRange;
+
+    const name = `upgrade-${Math.random().toString(36).slice(2)}`;
+
+    // 手工造一个 v1 库：只有 by_opId，**没有** by_uploadStatus
+    await new Promise<void>((resolve, reject) => {
+      const req = indexedDB.open(name, 1);
+      req.onupgradeneeded = () => {
+        const s = req.result.createObjectStore(STORES.OPS, {
+          keyPath: OP_FIELDS.SEQ,
+          autoIncrement: true,
+        });
+        s.createIndex(OP_INDEXES.OP_ID, `op.${OP_FIELDS.OP_ID}`, { unique: true });
+      };
+      req.onsuccess = () => {
+        req.result.close();
+        resolve();
+      };
+      req.onerror = () => reject(req.error);
+    });
+
+    // 现在用当前版本打开 → 应触发 onupgradeneeded 补建索引
+    const db = new IndexedDbAdapter(name);
+    await db.init();
+    const store = new IndexedDbOpLogStore<Operation<string>>(db);
+
+    const o: Operation<string> = {
+      id: 'x',
+      clientId: 'c',
+      actionType: 'A',
+      opType: 'CREATE',
+      entityType: 'TASK',
+      entityId: 'e',
+      payload: {},
+      vectorClock: {},
+      timestamp: 1,
+      schemaVersion: 1,
+    } as Operation<string>;
+
+    await store.appendLocal([o]);
+
+    // 如果新索引没建出来，这里会静默返回空数组 —— 这就是本测试的意义
+    const pending = await store.findPendingUpload();
+    expect(pending).toHaveLength(1);
+    expect(pending[0]!.op.id).toBe('x');
   });
 });

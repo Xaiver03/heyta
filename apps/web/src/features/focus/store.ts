@@ -1,3 +1,4 @@
+import { OpType } from '@heyta/sync-core';
 /**
  * 番茄钟 store
  * ==============
@@ -60,7 +61,7 @@ async function persist(session: FocusSession, id: string): Promise<void> {
   await dispatchIntent({
     entityType: 'FOCUS_SESSION',
     entityId: id,
-    opType: 'CREATE',
+    opType: OpType.Create,
     payload: {
       kind: session.kind,
       plannedMs: session.plannedMs,

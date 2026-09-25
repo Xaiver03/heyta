@@ -13,6 +13,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { toLocalDate } from '@heyta/domain';
 import { IndexedDbAdapter, IndexedDbOpLogStore } from '@heyta/storage';
+import { OpType } from '@heyta/sync-core';
 import type { Operation } from '@heyta/sync-core';
 
 import { __resetFocusForTests, useFocusStore } from '../src/features/focus/store.js';
@@ -133,7 +134,7 @@ describe('习惯 store', () => {
     expect(useHabitStore.getState().logs).toHaveLength(0);
     // 但日志里有 DELETE op —— 这才是远端能收到删除的原因
     const ops = await allOps();
-    expect(ops.some((o) => o.entityType === 'HABIT_LOG' && o.opType === 'DELETE')).toBe(
+    expect(ops.some((o) => o.entityType === 'HABIT_LOG' && o.opType === OpType.Delete)).toBe(
       true,
     );
   });
@@ -143,7 +144,7 @@ describe('习惯 store', () => {
     const id = useHabitStore.getState().habits[0]!.id;
     await useHabitStore.getState().undoCheckIn(id, '2026-01-01');
     const ops = await allOps();
-    expect(ops.filter((o) => o.opType === 'DELETE')).toHaveLength(0);
+    expect(ops.filter((o) => o.opType === OpType.Delete)).toHaveLength(0);
   });
 
   it('连续多天打卡，streak.current 递增', async () => {

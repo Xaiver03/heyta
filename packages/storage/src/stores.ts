@@ -72,6 +72,13 @@ export const OP_FIELDS = {
   CLIENT_TIMESTAMP: 'timestamp',
   SCHEMA_VERSION: 'schemaVersion',
   /**
+   * 上传状态，**字符串不是布尔**。
+   *
+   * 同一个理由再踩一次就太蠢了：IndexedDB 不能索引布尔值 ——
+   * `true` 不是合法的 IDB key，索引里不会产生条目，查询恒返回空**且不报错**。
+   */
+  UPLOAD_STATUS: 'uploadStatus',
+  /**
    * 🔴 应用状态。**必须用字符串，不能用布尔。**
    *
    * 为什么：**IndexedDB 不允许布尔值作为键** —— `true` 不是合法的 IDB key，
@@ -92,6 +99,20 @@ export const OP_FIELDS = {
  *   failed   —— 应用失败，已隔离
  */
 export type ApplyStatus = 'pending' | 'applied' | 'failed';
+
+/**
+ * 上传状态。
+ *
+ * `pending`   —— 尚未成功上传给服务端（离线队列就是它）
+ * `uploaded`  —— 服务端已接受
+ *
+ * 为什么不用 `op.seq === 0` 表示"没上传"：那样无法**建索引**，
+ * 每次同步都要全表扫描。而且服务端理论上可能分配 seq 0。
+ * 显式状态比特判可靠。
+ */
+export type UploadStatus = 'pending' | 'uploaded';
+
+export const UPLOAD_STATUSES: readonly UploadStatus[] = ['pending', 'uploaded'];
 
 /**
  * 把上面那些「指向 Operation 内部字段」的常量在类型层面钉死。
@@ -124,6 +145,8 @@ export const OP_INDEXES = {
   ENTITY_IDS: 'by_entityIds',
   /** 崩溃恢复扫描：找出所有 applyStatus='pending' 的记录。 */
   PENDING_APPLY: 'by_applyStatus',
+  /** 按上传状态查待同步的 op（离线队列）。 */
+  PENDING_UPLOAD: 'by_uploadStatus',
 } as const;
 
 /** `state` store 的字段名。 */

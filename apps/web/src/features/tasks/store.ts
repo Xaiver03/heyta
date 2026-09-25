@@ -1,3 +1,4 @@
+import { OpType } from '@heyta/sync-core';
 import { create } from 'zustand';
 
 import { Priority, Quadrant, bucketByQuadrant, type Task } from '@heyta/domain';
@@ -91,7 +92,7 @@ export const useTaskStore = create<TaskState>((set, get) => ({
     await dispatchIntent({
       entityType: 'TASK',
       entityId: id,
-      opType: 'CREATE',
+      opType: OpType.Create,
       payload: { title: trimmed, priority: Priority.None, ...over },
     });
   },
@@ -107,7 +108,7 @@ export const useTaskStore = create<TaskState>((set, get) => ({
     await dispatchIntent({
       entityType: 'TASK',
       entityId: id,
-      opType: 'UPDATE',
+      opType: OpType.Update,
       // null 表示"显式清除该字段"。undefined 会被 JSON 丢掉，
       // 于是"取消完成"在另一端静默失效。reducer 负责把 null 变成删除。
       payload: { completedAt },
@@ -120,7 +121,7 @@ export const useTaskStore = create<TaskState>((set, get) => ({
     await dispatchIntent({
       entityType: 'TASK',
       entityId: id,
-      opType: 'DELETE',
+      opType: OpType.Delete,
       payload: {},
     });
   },
@@ -129,7 +130,7 @@ export const useTaskStore = create<TaskState>((set, get) => ({
     await dispatchIntent({
       entityType: 'TASK',
       entityId: id,
-      opType: 'UPDATE',
+      opType: OpType.Update,
       payload: { priority },
     });
   },
@@ -139,7 +140,7 @@ export const useTaskStore = create<TaskState>((set, get) => ({
     await dispatchIntent({
       entityType: 'TASK',
       entityId: id,
-      opType: 'UPDATE',
+      opType: OpType.Update,
       payload: { important },
     });
   },
@@ -148,7 +149,7 @@ export const useTaskStore = create<TaskState>((set, get) => ({
     await dispatchIntent({
       entityType: 'TASK',
       entityId: id,
-      opType: 'UPDATE',
+      opType: OpType.Update,
       // undefined → null：null 表示"清除截止时间"，能穿过 JSON
       payload: { dueDate: dueDate ?? null },
     });
@@ -158,7 +159,7 @@ export const useTaskStore = create<TaskState>((set, get) => ({
     await dispatchIntent({
       entityType: 'TASK',
       entityId: id,
-      opType: 'UPDATE',
+      opType: OpType.Update,
       payload: { projectId: projectId ?? null },
     });
   },
