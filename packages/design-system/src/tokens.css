@@ -242,6 +242,9 @@
   --ht-layout-sidebar-width: 15rem;   /* 240px */
   --ht-layout-header-height: 3.5rem;  /* 56px */
   --ht-layout-content-max: 75rem;     /* 1200px */
+  /* 正文最大宽度。用 ch 而不是 rem：它随字号缩放，
+     让"一行多少字"在不同字号下保持稳定 —— 这才是可读性的变量。 */
+  --ht-layout-prose-max: 65ch;
 }
 
 /* ────────────────────────────────────────────────────────────

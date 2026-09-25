@@ -10,7 +10,7 @@
   },
   "scripts": {
     "build": "pnpm -r build",
-    "test": "pnpm -r test",
+    "test": "pnpm -r build && pnpm -r test",
     "typecheck": "pnpm -r typecheck",
     "clean": "pnpm -r exec rm -rf dist node_modules",
     "verify:sync": "node scripts/verify-sync-loop.mjs",
@@ -18,7 +18,7 @@
     "check:migrations": "node scripts/check-migrations.mjs",
     "check:licenses": "node research/tools/license-inventory.mjs",
     "check:docs": "node research/tools/docs-link-check.mjs",
-    "check": "pnpm typecheck && pnpm check:migrations && pnpm check:licenses && pnpm check:docs && pnpm check:design",
+    "check": "pnpm build && pnpm typecheck && pnpm check:migrations && pnpm check:licenses && pnpm check:docs && pnpm check:design",
     "check:design": "node design-system/heyta/check-hardcoded.mjs"
   },
   "devDependencies": {

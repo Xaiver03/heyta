@@ -12,6 +12,8 @@ import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 
 import { App } from './App.js';
+import { ErrorScreen } from './features/shell/ErrorScreen.js';
+import { initOpLog } from './features/tasks/store.js';
 
 const container = document.getElementById('root');
 if (container === null) {
@@ -19,8 +21,34 @@ if (container === null) {
   throw new Error('找不到 #root 挂载点');
 }
 
-createRoot(container).render(
-  <StrictMode>
-    <App />
-  </StrictMode>,
-);
+const root = createRoot(container);
+
+/**
+ * 🔴 必须先完成 op-log 初始化（含**崩溃恢复**）再渲染。
+ *
+ * 顺序不能换：如果先渲染，用户可能在恢复完成前就发起写入，
+ * 而那些待重放的 op 会与新的写入竞争同一个 seq 区间。
+ * 且 recover() 必须早于任何同步，否则"已落盘未应用"的 op 永不生效。
+ */
+initOpLog()
+  .then(() => {
+    root.render(
+      <StrictMode>
+        <App />
+      </StrictMode>,
+    );
+  })
+  .catch((error: unknown) => {
+    // 存储不可用时**不能白屏** —— 必须明确告诉用户数据层没起来。
+    // 用 ErrorScreen 而不是裸 inline 样式：错误屏同样要受设计系统管。
+    const message = error instanceof Error ? error.message : String(error);
+    root.render(
+      <StrictMode>
+        <ErrorScreen
+          title="无法初始化本地存储"
+          message={message}
+          hint="您的浏览器可能禁用了 IndexedDB（隐私模式常见）。"
+        />
+      </StrictMode>,
+    );
+  });

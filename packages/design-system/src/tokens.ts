@@ -94,7 +94,7 @@ export const TOKEN_GROUPS = {
   /** 焦点环宽度。 */
   'focus-ring': ['width'],
   /** 布局尺寸。组件布局应消费它们，而不是写死宽度。 */
-  layout: ['sidebar-width', 'header-height', 'content-max'],
+  layout: ['sidebar-width', 'header-height', 'content-max', 'prose-max'],
 } as const;
 
 export type TokenGroup = keyof typeof TOKEN_GROUPS;
