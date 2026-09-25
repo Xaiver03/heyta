@@ -1,0 +1,206 @@
+# heyta 设计系统规范
+
+> **唯一事实源是 [`packages/design-system/src/tokens.css`](../../packages/design-system/src/tokens.css)。**
+> 本文档**故意不复制取值表** —— 复制就会漂移，而漂移的设计系统比没有更糟
+> （组件会照着一份过期文档写，且没人知道哪份是对的）。
+> 本文档负责**规则、理由与约定**；值请直接看 tokens.css。
+
+**色系：蓝白。** 主蓝 `#2563EB`，近白底 `#F8FAFC`，冷调石板灰中性色。
+
+---
+
+## 0. 给我（AI agent）的检索说明
+
+构建某个页面时：
+1. 先读本文档
+2. 再检查 `design-system/heyta/pages/<page>.md` 是否存在。存在则其规则**覆盖**本文档
+3. 不在 page 文件里定义新 token —— token 只能加在 tokens.css
+
+---
+
+## 1. 三条硬规则
+
+### 🔴 规则 1：组件禁止裸值
+
+组件里**不得**出现裸 hex、裸 px、裸 ms、裸 z-index 数字、裸 rgb()。
+
+```tsx
+// ❌ 全部会被 check-hardcoded.mjs 拦下
+<div style={{ color: '#0F172A', padding: '16px', zIndex: 999 }} />
+
+// ✅
+import { cssVar } from '@heyta/design-system';
+<div style={{ color: cssVar('color.foreground'), padding: cssVar('space.4') }} />
+```
+
+**为什么是硬规则**：设计变量散落在组件里之后，"统一改主色"会变成全仓库搜索替换，
+而且必然漏。这条规则让设计系统成为**真正的**单一控制点。
+
+### 🔴 规则 2：语义名，不用外观名
+
+```
+✅ --ht-color-danger      ❌ --ht-red
+✅ --ht-color-primary     ❌ --ht-blue-600（组件不该直接用原始色阶）
+✅ --ht-space-4           ❌ --ht-gap-16px
+```
+
+**为什么**：换色系时语义名不用改，外观名会全部作废。
+组件**只消费语义层**（`--ht-color-*`），原始色阶（`--ht-blue-600`）留给设计系统内部。
+
+### 🔴 规则 3：要新变量，先加 token
+
+组件里发现自己"需要一个新颜色/新间距"时，**不是**在组件里写死，
+而是先加进 tokens.css 与 `TOKEN_GROUPS`，再消费。
+
+**加 token 的成本是刻意的** —— 它逼你想清楚"这个值是不是一次性的"。
+大概率你能在现有阶梯里找到合适的。
+
+**执行**：
+
+```bash
+node design-system/heyta/check-hardcoded.mjs   # 非零退出 = 有裸值
+```
+
+> 该检查器已用注入违规文件的方式**验证过能失败**（4 类硬编码全部抓到），
+> 也验证过合规写法能通过。**不能失败的检查没有价值。**
+
+---
+
+## 2. 设计语言：扁平 + 克制
+
+**风格**：Flat Design / Touch-First。**不用**玻璃拟态、重投影、渐变装饰。
+
+**层次怎么表达**（这是扁平风格的核心问题）：
+
+| 层次 | 手段 |
+|---|---|
+| 区块分隔 | **边框**（`--ht-color-border`）而不是阴影 |
+| 可点击的卡片 | hover 时换背景色（`--ht-color-hover`），**不是** `translateY` 位移 |
+| 真正的浮层（弹窗/下拉） | 才用阴影（`--ht-shadow-lg/xl`） |
+
+**为什么禁止 hover 位移**：`translateY` 会让元素看起来在动，但布局没变，
+在列表里连续 hover 会产生视觉抖动；而且它与"扁平、无阴影"的语言自相矛盾。
+**上一版自动生成的规范里同时写了"零阴影"和四级阴影 + hover 位移，我没照抄。**
+
+---
+
+## 3. 可访问性（CRITICAL —— 不可妥协）
+
+| 项 | 要求 | 怎么保证 |
+|---|---|---|
+| 正文对比度 | ≥ 4.5:1 | **测试自动计算**，见下 |
+| 大字/图形 | ≥ 3:1 | 同上 |
+| 触控目标 | ≥ 44×44px | `--ht-touch-target-min` 有测试守着 |
+| 焦点可见 | 必须 | 用 `:focus-visible`，**禁止 `outline: none`** |
+| 减少动效 | 必须尊重 | `@media (prefers-reduced-motion)` 已把时长压到 1ms |
+| 不靠颜色单独表意 | 必须 | 状态色要**配图标或文字**（色盲用户） |
+
+**对比度不是写在文档里就算数的**：`tests/tokens.spec.ts` 会解析 tokens.css、
+递归展开 `var()`、按 WCAG 公式**真实计算**每一对前景/背景，低于门槛则测试失败。
+
+> 这个测试**已经抓到过真问题**：`--ht-color-quadrant-3` 原用 amber-600（`#D97706`），
+> 在白底上只有 **3.19:1**，不达正文标准。已改为 amber-700（**5.02:1**）。
+> 如果只在文档里写"要 4.5:1"，这个问题会一直留到用户抱怨看不清。
+
+---
+
+## 4. 排版
+
+- **字体**：Plus Jakarta Sans（标题与正文同一族，用的不同字重）。CJK 回退已在
+  `--ht-font-sans` 里显式给出（PingFang SC / 微软雅黑 / Noto Sans SC）——
+  **不给 CJK 回退的话中文会落到系统默认值，与英文排版割裂**。
+- **基准 16px**，`--ht-font-size-base`。正文最小 14px（`--ht-font-size-sm`）；
+  12px 仅用于辅助标签，11px 是极限下限。
+- **行高**：正文 1.5（`--ht-line-height-normal`），长文 1.75，标题 1.25。
+- **字重表达层次**：标题 600，正文 400，标签 500。
+- **数字用等宽**：任务计数、番茄钟计时、统计数字必须加 `.tabular-nums`，
+  否则数值变化时宽度跳动。
+
+---
+
+## 5. 间距与布局
+
+- **4px 基准**，8 步阶梯（`--ht-space-1` 到 `--ht-space-16`）。
+  **有测试断言全部是 4 的倍数**。
+- 用 `gap` 而不是 `margin` 做同级间隔 —— margin 会叠加，gap 不会。
+- 断点：375 / 768 / 1024 / 1440。移动优先。
+- 内容最大宽度 `--ht-layout-content-max`（1200px），长文本限 65–75 字符。
+
+---
+
+## 6. 动效
+
+- 微交互 **150–300ms**，复杂过渡 ≤400ms。有测试断言这个区间。
+- 缓动：进入 `--ht-ease-enter`（ease-out），退出 `--ht-ease-exit`（ease-in）。
+- **退出比进入快**（`--ht-duration-exit` = 140ms）—— 否则界面显得拖沓。
+- **只动 `transform` 和 `opacity`**，不动 `width`/`height`/`top`/`left`（会触发重排）。
+- 每次只动 1–2 个元素，动效要表达因果关系，不做纯装饰。
+
+---
+
+## 7. 组件约定
+
+### 图标
+
+- **禁止用 emoji 当图标** —— 跨平台渲染不一致，且无法被 token 控制。
+- 统一用 **Lucide**（stroke 风格一致，MIT，持续维护）。
+- 尺寸只用 `--ht-icon-xs/sm/md/lg/xl`，不混用随手值。
+- 图标按钮**必须**有 `aria-label` 或配 `.sr-only` 文本。
+
+### 按钮
+
+| 类型 | 用色 | 场景 |
+|---|---|---|
+| Primary | `--ht-color-primary` + `--ht-color-on-primary` | 每屏**只有 1 个** |
+| Secondary | 透明底 + `--ht-color-border-strong` 边框 | 次要操作 |
+| Ghost | 无边框，hover 显示 `--ht-color-hover` | 工具栏、列表内 |
+| Danger | `--ht-color-danger` | 破坏性操作，**要视觉上分离** |
+
+状态：hover / active / disabled / focus-visible 四态**都要有**，
+且**不改变布局尺寸**（用颜色与透明度，不用缩放位移）。
+
+### 表单
+
+- **可见 label**，不用 placeholder 当 label。
+- 报错信息在**对应字段下方**，不能只堆在顶部。
+- 校验时机：**失焦时**，不是每次按键时。
+- 错误信息必须写清**原因 + 怎么修**。
+
+### 空状态
+
+任何列表都要有空状态：说明 + 一个明确的行动入口。**不能留白屏**。
+
+---
+
+## 8. 提交前检查
+
+```bash
+node design-system/heyta/check-hardcoded.mjs      # 无裸值
+cd packages/design-system && pnpm test            # 对比度/token 同步/暗色完整性
+```
+
+清单：
+
+- [ ] 无裸 hex / px / ms / z-index（检查器保证）
+- [ ] 无 emoji 作图标
+- [ ] 所有可点元素有 hover 与 focus-visible 反馈，且不引起布局位移
+- [ ] 图标按钮有 aria-label
+- [ ] 暗色主题下**实际切换查看过**（不能从亮色推断）
+- [ ] 空状态与加载状态都有
+- [ ] 开 `prefers-reduced-motion` 验证过
+- [ ] 375px 与 1440px 下都看过，无横向滚动
+
+---
+
+## 9. 与自动生成版本的差异（记录了就不必再争论）
+
+本文件由 UIX Pro 的 `--design-system` 输出为起点，但**没有照抄**。改了这些：
+
+| 项 | 生成版本 | 本版本 | 理由 |
+|---|---|---|---|
+| 页面模式 | App Store 落地页 | 移除 | 我们是应用，不是营销站；该模式讲的是截图轮播与下载 CTA |
+| 层次语言 | 声称"零阴影"却给四级阴影 + hover 位移 | 边框优先，阴影只给浮层 | 生成版本自相矛盾 |
+| 主按钮色 | 绿色 `#059669` | **蓝色** `--ht-color-primary` | 用户指定蓝白色系 |
+| Q3/优先级中 | amber-600 | amber-700 | 600 只有 3.19:1，不达可访问性 |
+| 组件示例 | 硬编码 hex | 全部 `var(--ht-*)` | 生成版本示例违反本项目第一硬规则 |
+| 边框 token | 两处不一致（`#E4ECFC` vs `#E2E8F0`） | 统一 `--ht-color-border` | — |

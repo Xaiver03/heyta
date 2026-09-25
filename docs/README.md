@@ -84,7 +84,7 @@ docs/research/<kebab-case>.md     例：reuse-plan.md
 
 | 编号 | 决策 | 状态 |
 |---|---|---|
-| [0001](adr/0001-license-decision.md) | heyta 自身的许可证选择 | 🟡 **待确认** |
+| [0001](adr/0001-license-decision.md) | heyta 自身的许可证选择 = **MIT** | ✅ **已接受** |
 | [0002](adr/0002-migration-tooling.md) | 数据库迁移方案：继续用 Prisma，不引入 Flyway | ✅ **已接受** |
 
 ### 计划

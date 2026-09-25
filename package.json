@@ -3,7 +3,7 @@
   "version": "0.0.0",
   "private": true,
   "description": "功能等价于滴答清单的任务 / 习惯 / 专注管理应用 —— 本地优先，全平台",
-  "comment:license": "heyta 自身的许可证尚未确定，见 docs/adr/0001-license-decision.md（ADR-0001）。第三方代码的归属见 THIRD_PARTY_LICENSES.md。",
+  "comment:license": "heyta 采用 MIT（见 docs/adr/0001-license-decision.md）。第三方代码归属见 THIRD_PARTY_LICENSES.md。注意：我们是 MIT 不代表可以用 AGPL 依赖 —— 分发物一旦含 AGPL 代码，义务会附着于整体。",
   "packageManager": "pnpm@11.8.0",
   "engines": {
     "node": ">=22"
@@ -18,10 +18,12 @@
     "check:migrations": "node scripts/check-migrations.mjs",
     "check:licenses": "node research/tools/license-inventory.mjs",
     "check:docs": "node research/tools/docs-link-check.mjs",
-    "check": "pnpm typecheck && pnpm check:migrations && pnpm check:licenses && pnpm check:docs"
+    "check": "pnpm typecheck && pnpm check:migrations && pnpm check:licenses && pnpm check:docs && pnpm check:design",
+    "check:design": "node design-system/heyta/check-hardcoded.mjs"
   },
   "devDependencies": {
     "@heyta/shared-schema": "workspace:*",
     "@heyta/sync-core": "workspace:*"
-  }
+  },
+  "license": "MIT"
 }

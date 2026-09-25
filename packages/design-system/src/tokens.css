@@ -1,0 +1,348 @@
+/**
+ * heyta 设计系统 —— 唯一事实源（Single Source of Truth）
+ * =====================================================
+ *
+ * 规则（AGENTS.md §9）：
+ *   1. 组件**不得**出现裸 hex、裸 px、裸 ms。一律 var(--ht-*)。
+ *   2. 新增视觉变量**先加到这里**，再在组件里用。不允许组件自己发明。
+ *   3. 命名一律语义化（--ht-color-danger），不用外观名（--ht-red）。
+ *      理由：换色系时语义名不用改，外观名会全部作废。
+ *
+ * 主题策略：亮色为基准（蓝白），暗色覆盖同名变量。
+ * 组件**只消费语义变量**，因此换主题时组件代码零改动。
+ */
+
+/* ────────────────────────────────────────────────────────────
+   1. 原始色阶（Primitive）
+   只给设计系统内部用。组件**不要**直接引用这一层 —— 它们会锁死色系。
+   ──────────────────────────────────────────────────────────── */
+:root {
+  /* 主蓝：heyta 的品牌色 */
+  --ht-blue-50: #eff6ff;
+  --ht-blue-100: #dbeafe;
+  --ht-blue-200: #bfdbfe;
+  --ht-blue-300: #93c5fd;
+  --ht-blue-400: #60a5fa;
+  --ht-blue-500: #3b82f6;
+  --ht-blue-600: #2563eb;
+  --ht-blue-700: #1d4ed8;
+  --ht-blue-800: #1e40af;
+  --ht-blue-900: #1e3a8a;
+
+  /* 中性：偏冷的石板灰，与蓝白基调协调（纯灰会显脏） */
+  --ht-slate-50: #f8fafc;
+  --ht-slate-100: #f1f5f9;
+  --ht-slate-200: #e2e8f0;
+  --ht-slate-300: #cbd5e1;
+  --ht-slate-400: #94a3b8;
+  --ht-slate-500: #64748b;
+  --ht-slate-600: #475569;
+  --ht-slate-700: #334155;
+  --ht-slate-800: #1e293b;
+  --ht-slate-900: #0f172a;
+  --ht-slate-950: #020617;
+
+  /* 语义色阶 */
+  --ht-red-50: #fef2f2;
+  --ht-red-600: #dc2626;
+  --ht-red-700: #b91c1c;
+  --ht-amber-50: #fffbeb;
+  --ht-amber-600: #d97706;
+  --ht-amber-700: #b45309;
+  --ht-emerald-50: #ecfdf5;
+  --ht-emerald-600: #059669;
+  --ht-emerald-700: #047857;
+  --ht-sky-50: #f0f9ff;
+  --ht-sky-600: #0284c7;
+  --ht-sky-700: #0369a1;
+
+  --ht-white: #ffffff;
+}
+
+/* ────────────────────────────────────────────────────────────
+   2. 语义变量（Semantic）—— 亮色主题（蓝白）
+   组件只消费这一层。
+   ──────────────────────────────────────────────────────────── */
+:root {
+  /* 品牌 */
+  --ht-color-primary: var(--ht-blue-600);
+  --ht-color-primary-hover: var(--ht-blue-700);
+  --ht-color-primary-active: var(--ht-blue-800);
+  --ht-color-primary-subtle: var(--ht-blue-50);
+  --ht-color-primary-subtle-hover: var(--ht-blue-100);
+  --ht-color-on-primary: var(--ht-white);
+
+  /* 表面与背景：白底为主，蓝作强调 */
+  --ht-color-background: var(--ht-slate-50);
+  --ht-color-surface: var(--ht-white);
+  --ht-color-surface-raised: var(--ht-white);
+  --ht-color-surface-sunken: var(--ht-slate-100);
+  --ht-color-overlay: rgb(15 23 42 / 0.5);
+
+  /* 文字 */
+  --ht-color-foreground: var(--ht-slate-900);
+  --ht-color-foreground-muted: var(--ht-slate-500);
+  --ht-color-foreground-subtle: var(--ht-slate-400);
+  --ht-color-foreground-inverse: var(--ht-white);
+
+  /* 边框与分隔 */
+  --ht-color-border: var(--ht-slate-200);
+  --ht-color-border-strong: var(--ht-slate-300);
+  --ht-color-border-subtle: var(--ht-slate-100);
+
+  /* 交互 */
+  --ht-color-ring: var(--ht-blue-600);
+  --ht-color-hover: var(--ht-slate-100);
+  --ht-color-active: var(--ht-slate-200);
+  --ht-color-disabled-bg: var(--ht-slate-100);
+  --ht-color-disabled-fg: var(--ht-slate-400);
+
+  /* 状态 */
+  --ht-color-success: var(--ht-emerald-600);
+  --ht-color-success-strong: var(--ht-emerald-700);
+  --ht-color-success-subtle: var(--ht-emerald-50);
+  --ht-color-warning: var(--ht-amber-600);
+  --ht-color-warning-strong: var(--ht-amber-700);
+  --ht-color-warning-subtle: var(--ht-amber-50);
+  --ht-color-danger: var(--ht-red-600);
+  --ht-color-danger-strong: var(--ht-red-700);
+  --ht-color-danger-subtle: var(--ht-red-50);
+  --ht-color-info: var(--ht-sky-600);
+  --ht-color-info-strong: var(--ht-sky-700);
+  --ht-color-info-subtle: var(--ht-sky-50);
+
+  /* ── 四象限（heyta 核心功能，必须是一等 token，不能散落在组件里）──
+     象限语义固定，颜色可换：Q1 红 / Q2 蓝 / Q3 琥珀 / Q4 石板 */
+  --ht-color-quadrant-1: var(--ht-red-600);      /* 重要且紧急 */
+  --ht-color-quadrant-1-subtle: var(--ht-red-50);
+  --ht-color-quadrant-2: var(--ht-blue-600);     /* 重要不紧急 */
+  --ht-color-quadrant-2-subtle: var(--ht-blue-50);
+  --ht-color-quadrant-3: var(--ht-amber-700);    /* 紧急不重要（amber-600 仅 3.19:1，不达正文 AA，故用 700） */
+  --ht-color-quadrant-3-subtle: var(--ht-amber-50);
+  --ht-color-quadrant-4: var(--ht-slate-500);    /* 不重要不紧急 */
+  --ht-color-quadrant-4-subtle: var(--ht-slate-100);
+
+  /* 优先级 */
+  --ht-color-priority-high: var(--ht-red-600);
+  --ht-color-priority-medium: var(--ht-amber-700); /* 同上：文字用途需 ≥4.5:1 */
+  --ht-color-priority-low: var(--ht-sky-600);
+  --ht-color-priority-none: var(--ht-slate-400);
+
+  /* 习惯热力图：蓝色单色阶（深浅即数值，不靠色相区分） */
+  --ht-color-heat-0: var(--ht-slate-100);
+  --ht-color-heat-1: var(--ht-blue-200);
+  --ht-color-heat-2: var(--ht-blue-300);
+  --ht-color-heat-3: var(--ht-blue-500);
+  --ht-color-heat-4: var(--ht-blue-700);
+
+  /* 番茄钟 */
+  --ht-color-focus-work: var(--ht-blue-600);
+  --ht-color-focus-break: var(--ht-emerald-600);
+}
+
+/* ────────────────────────────────────────────────────────────
+   3. 非颜色 token（与主题无关）
+   ──────────────────────────────────────────────────────────── */
+:root {
+  /* 字体栈。CJK 回退必须显式给，否则中文会用系统默认衬线，与英文割裂。 */
+  --ht-font-sans:
+    'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI',
+    'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', 'Noto Sans SC',
+    sans-serif;
+  --ht-font-mono:
+    'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+
+  /* 字号：1.200 比例（小调），基准 16px */
+  --ht-font-size-2xs: 0.6875rem; /* 11px — 仅极致紧凑标签 */
+  --ht-font-size-xs: 0.75rem;    /* 12px — 辅助文字下限 */
+  --ht-font-size-sm: 0.875rem;   /* 14px — 密集列表 */
+  --ht-font-size-base: 1rem;     /* 16px — 正文基准 */
+  --ht-font-size-lg: 1.125rem;   /* 18px */
+  --ht-font-size-xl: 1.25rem;    /* 20px */
+  --ht-font-size-2xl: 1.5rem;    /* 24px */
+  --ht-font-size-3xl: 1.875rem;  /* 30px */
+  --ht-font-size-4xl: 2.25rem;   /* 36px */
+
+  --ht-font-weight-regular: 400;
+  --ht-font-weight-medium: 500;
+  --ht-font-weight-semibold: 600;
+  --ht-font-weight-bold: 700;
+
+  --ht-line-height-tight: 1.25;
+  --ht-line-height-normal: 1.5;
+  --ht-line-height-relaxed: 1.75;
+
+  /* 间距：4px 基准的 8 步阶梯。全部是 4 的倍数。 */
+  --ht-space-0: 0;
+  --ht-space-1: 0.25rem;  /* 4px  */
+  --ht-space-2: 0.5rem;   /* 8px  */
+  --ht-space-3: 0.75rem;  /* 12px */
+  --ht-space-4: 1rem;     /* 16px */
+  --ht-space-5: 1.25rem;  /* 20px */
+  --ht-space-6: 1.5rem;   /* 24px */
+  --ht-space-8: 2rem;     /* 32px */
+  --ht-space-10: 2.5rem;  /* 40px */
+  --ht-space-12: 3rem;    /* 48px */
+  --ht-space-16: 4rem;    /* 64px */
+
+  /* 圆角 */
+  --ht-radius-none: 0;
+  --ht-radius-sm: 0.25rem;  /* 4px  — 标签 */
+  --ht-radius-md: 0.5rem;   /* 8px  — 按钮、输入框 */
+  --ht-radius-lg: 0.75rem;  /* 12px — 卡片 */
+  --ht-radius-xl: 1rem;     /* 16px — 弹窗 */
+  --ht-radius-full: 9999px; /* 胶囊、头像 */
+
+  /* 阴影：克制。扁平风格优先用边框表达层次，阴影只用于浮层。 */
+  --ht-shadow-none: none;
+  --ht-shadow-sm: 0 1px 2px rgb(15 23 42 / 0.05);
+  --ht-shadow-md: 0 2px 8px rgb(15 23 42 / 0.08);
+  --ht-shadow-lg: 0 8px 24px rgb(15 23 42 / 0.12);
+  --ht-shadow-xl: 0 16px 48px rgb(15 23 42 / 0.16);
+  /* 主色焦点光晕，与 --ht-color-ring 配套 */
+  --ht-shadow-focus: 0 0 0 3px rgb(37 99 235 / 0.25);
+
+  /* 动效：150–300ms。退出比进入快（60–70%）才不拖沓。 */
+  --ht-duration-instant: 80ms;
+  --ht-duration-fast: 150ms;
+  --ht-duration-normal: 200ms;
+  --ht-duration-slow: 300ms;
+  --ht-duration-exit: 140ms;
+
+  --ht-ease-standard: cubic-bezier(0.2, 0, 0.2, 1);
+  --ht-ease-enter: cubic-bezier(0, 0, 0.2, 1);     /* ease-out：进入 */
+  --ht-ease-exit: cubic-bezier(0.4, 0, 1, 1);      /* ease-in：退出 */
+  --ht-ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+
+  /* z 轴阶梯。禁止在组件里写裸 z-index 数字。 */
+  --ht-z-base: 0;
+  --ht-z-sticky: 100;
+  --ht-z-dropdown: 200;
+  --ht-z-overlay: 300;
+  --ht-z-modal: 400;
+  --ht-z-popover: 500;
+  --ht-z-toast: 600;
+  --ht-z-tooltip: 700;
+
+  /* 图标尺寸。禁止混用 20/24/28 这类随手值。 */
+  --ht-icon-xs: 0.875rem; /* 14px */
+  --ht-icon-sm: 1rem;     /* 16px */
+  --ht-icon-md: 1.25rem;  /* 20px */
+  --ht-icon-lg: 1.5rem;   /* 24px — 基准 */
+  --ht-icon-xl: 2rem;     /* 32px */
+
+  /* 触控目标：44px 是可访问性硬下限，不许调小。 */
+  --ht-touch-target-min: 2.75rem; /* 44px */
+
+  /* 焦点环宽度。2px 是"看得见但不喧宾夺主"的经验值；
+     可访问性只要求**可见**，不要求粗。 */
+  --ht-focus-ring-width: 2px;
+
+  /* 布局 */
+  --ht-layout-sidebar-width: 15rem;   /* 240px */
+  --ht-layout-header-height: 3.5rem;  /* 56px */
+  --ht-layout-content-max: 75rem;     /* 1200px */
+}
+
+/* ────────────────────────────────────────────────────────────
+   4. 暗色主题 —— 覆盖同名语义变量
+   遵循规范：暗色不是亮色反相，而是降饱和 + 提亮前景。
+   组件因为只消费语义变量，这里不需要任何组件改动。
+   ──────────────────────────────────────────────────────────── */
+[data-theme='dark'] {
+  --ht-color-primary: var(--ht-blue-400);
+  --ht-color-primary-hover: var(--ht-blue-300);
+  --ht-color-primary-active: var(--ht-blue-200);
+  --ht-color-primary-subtle: rgb(37 99 235 / 0.16);
+  --ht-color-primary-subtle-hover: rgb(37 99 235 / 0.24);
+  --ht-color-on-primary: var(--ht-slate-950);
+
+  --ht-color-background: var(--ht-slate-950);
+  --ht-color-surface: #0d1526;
+  --ht-color-surface-raised: #131e33;
+  --ht-color-surface-sunken: #080e1a;
+  --ht-color-overlay: rgb(2 6 23 / 0.7);
+
+  --ht-color-foreground: var(--ht-slate-100);
+  --ht-color-foreground-muted: var(--ht-slate-400);
+  --ht-color-foreground-subtle: var(--ht-slate-500);
+  --ht-color-foreground-inverse: var(--ht-slate-950);
+
+  --ht-color-border: #1e2b45;
+  --ht-color-border-strong: #2b3b5c;
+  --ht-color-border-subtle: #16203a;
+
+  --ht-color-ring: var(--ht-blue-400);
+  --ht-color-hover: rgb(148 163 184 / 0.12);
+  --ht-color-active: rgb(148 163 184 / 0.2);
+  --ht-color-disabled-bg: #16203a;
+  --ht-color-disabled-fg: var(--ht-slate-600);
+
+  --ht-color-success: #34d399;
+  --ht-color-success-strong: #6ee7b7;
+  --ht-color-success-subtle: rgb(5 150 105 / 0.16);
+  --ht-color-warning: #fbbf24;
+  --ht-color-warning-strong: #fcd34d;
+  --ht-color-warning-subtle: rgb(217 119 6 / 0.16);
+  --ht-color-danger: #f87171;
+  --ht-color-danger-strong: #fca5a5;
+  --ht-color-danger-subtle: rgb(220 38 38 / 0.16);
+  --ht-color-info: #38bdf8;
+  --ht-color-info-strong: #7dd3fc;
+  --ht-color-info-subtle: rgb(2 132 199 / 0.16);
+
+  --ht-color-quadrant-1: #f87171;
+  --ht-color-quadrant-1-subtle: rgb(220 38 38 / 0.16);
+  --ht-color-quadrant-2: var(--ht-blue-400);
+  --ht-color-quadrant-2-subtle: rgb(37 99 235 / 0.16);
+  --ht-color-quadrant-3: #fbbf24;
+  --ht-color-quadrant-3-subtle: rgb(217 119 6 / 0.16);
+  --ht-color-quadrant-4: var(--ht-slate-400);
+  --ht-color-quadrant-4-subtle: rgb(148 163 184 / 0.14);
+
+  --ht-color-priority-high: #f87171;
+  --ht-color-priority-medium: #fbbf24;
+  --ht-color-priority-low: #38bdf8;
+  --ht-color-priority-none: var(--ht-slate-500);
+
+  --ht-color-heat-0: #16203a;
+  --ht-color-heat-1: #1e3a8a;
+  --ht-color-heat-2: #1d4ed8;
+  --ht-color-heat-3: var(--ht-blue-500);
+  --ht-color-heat-4: var(--ht-blue-300);
+
+  --ht-color-focus-work: var(--ht-blue-400);
+  --ht-color-focus-break: #34d399;
+
+  --ht-shadow-sm: 0 1px 2px rgb(0 0 0 / 0.4);
+  --ht-shadow-md: 0 2px 8px rgb(0 0 0 / 0.5);
+  --ht-shadow-lg: 0 8px 24px rgb(0 0 0 / 0.6);
+  --ht-shadow-xl: 0 16px 48px rgb(0 0 0 / 0.7);
+  --ht-shadow-focus: 0 0 0 3px rgb(96 165 250 / 0.35);
+}
+
+/* ────────────────────────────────────────────────────────────
+   5. 全局基线
+   ──────────────────────────────────────────────────────────── */
+:root {
+  color-scheme: light;
+}
+
+[data-theme='dark'] {
+  color-scheme: dark;
+}
+
+/**
+ * 尊重系统"减少动效"设置。
+ * 做法：把时长压到接近 0，而不是删掉 transition —— 删掉会让依赖
+ * transitionend 的逻辑永远不触发。
+ */
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --ht-duration-instant: 1ms;
+    --ht-duration-fast: 1ms;
+    --ht-duration-normal: 1ms;
+    --ht-duration-slow: 1ms;
+    --ht-duration-exit: 1ms;
+  }
+}

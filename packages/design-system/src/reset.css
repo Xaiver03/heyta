@@ -1,0 +1,164 @@
+/**
+ * heyta 基线样式（Reset + Base）
+ * ==============================
+ *
+ * 由 `@heyta/design-system` 提供，应用入口引入一次。
+ * **全部取值来自 token** —— 这里同样不允许裸值，`check-hardcoded.mjs` 会检查它。
+ *
+ * 与常见 reset 的差异（都是有意的）：
+ *   1. **不重置 border-style: none**。很多 reset 会把它去掉，导致
+ *      `border: 1px solid` 失效（因为 style 为 none）。保留它能少一类诡异 bug。
+ *   2. **保留系统默认的 :focus-visible 行为**，只做增强而不用 `outline: none`
+ *      抹掉它 —— 抹掉焦点环是最常见的可访问性回归。
+ *   3. **字号基准放在 html，而不是 body**，这样 rem 的计算基准稳定，
+ *      用户改浏览器默认字号时所有 rem 会等比缩放（尊重用户的阅读偏好）。
+ */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  /* 16px 基准。不用固定 px 覆盖，让用户的浏览器字号设置生效。 */
+  font-size: 100%;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
+body {
+  margin: 0;
+  min-height: 100dvh;
+  background: var(--ht-color-background);
+  color: var(--ht-color-foreground);
+  font-family: var(--ht-font-sans);
+  font-size: var(--ht-font-size-base);
+  font-weight: var(--ht-font-weight-regular);
+  line-height: var(--ht-line-height-normal);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* 标题：只重置尺寸，重量与行高由 token 决定，避免各浏览器差异 */
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  margin: 0;
+  font-weight: var(--ht-font-weight-semibold);
+  line-height: var(--ht-line-height-tight);
+}
+
+p {
+  margin: 0;
+}
+
+/* 列表：默认去掉样式。任务应用里大量用 ul 做列表容器。 */
+ul,
+ol {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* 表单：**继承字体**。这是最容易遗漏的一项 ——
+   不设置的话 input/button 会用浏览器默认的 13.33px Arial，与设计系统割裂。 */
+button,
+input,
+select,
+textarea {
+  font: inherit;
+  color: inherit;
+}
+
+button {
+  cursor: pointer;
+  border: none;
+  background: none;
+  padding: 0;
+}
+
+button:disabled {
+  cursor: not-allowed;
+}
+
+/* 输入框的默认外观清除，但**保留焦点环** */
+input,
+textarea {
+  border: none;
+  background: none;
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: var(--ht-color-foreground-subtle);
+  opacity: 1; /* Firefox 会默认降透明度 */
+}
+
+a {
+  color: var(--ht-color-primary);
+  text-decoration: none;
+}
+
+a:hover {
+  color: var(--ht-color-primary-hover);
+  text-decoration: underline;
+}
+
+img,
+svg,
+video {
+  display: block;
+  max-width: 100%;
+}
+
+/* 焦点可见性：只对键盘导航显示焦点环（鼠标点击不显示） */
+:focus-visible {
+  outline: var(--ht-focus-ring-width) solid var(--ht-color-ring);
+  outline-offset: 2px;
+}
+
+/* 数字列、计时器用等宽数字，避免数值变化时宽度跳动 */
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
+}
+
+/* 屏幕阅读器专用文本（SVG 图标按钮必须配它，否则图标无标签） */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border-width: 0;
+}
+
+/* 滚动条：与蓝白基调一致，不用系统默认的灰 */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--ht-color-border-strong) transparent;
+}
+
+*::-webkit-scrollbar {
+  width: var(--ht-space-2);
+  height: var(--ht-space-2);
+}
+
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+*::-webkit-scrollbar-thumb {
+  background: var(--ht-color-border-strong);
+  border-radius: var(--ht-radius-full);
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background: var(--ht-color-foreground-subtle);
+}

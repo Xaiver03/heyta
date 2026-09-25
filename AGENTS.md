@@ -160,7 +160,48 @@ Linux/Docker 里不需要。
 
 ---
 
-## 5. 常用命令
+## 5. 设计系统（UI 代码必读）
+
+**唯一事实源：[`packages/design-system/src/tokens.css`](packages/design-system/src/tokens.css)。**
+规则与理由见 [`design-system/heyta/MASTER.md`](design-system/heyta/MASTER.md)（**不复制取值表**）。
+
+**色系：蓝白。** 主蓝 `#2563EB`，近白底 `#F8FAFC`，冷调石板灰中性色。
+
+### 🔴 三条硬规则
+
+1. **组件禁止裸值** —— 不得出现裸 hex / px / ms / z-index / rgb()。
+   用 `cssVar('color.foreground')`（类型安全，拼错编译期报错）。
+2. **语义名，不用外观名** —— `--ht-color-danger` 而不是 `--ht-red`。
+   组件只消费语义层，原始色阶（`--ht-blue-600`）留给设计系统内部。
+3. **要新变量，先加 token** —— 先改 tokens.css 与 `TOKEN_GROUPS`，再消费。
+   **加 token 的成本是刻意的**，它逼你想清楚这个值是不是一次性的。
+
+```bash
+pnpm check:design     # 非零退出 = 有裸值
+```
+
+> 该检查器已用**注入违规文件**验证过能失败（4 类硬编码全部抓到），
+> 也验证过合规写法能通过。**不能失败的检查没有价值。**
+
+### 🔴 对比度是测试保证的，不是文档保证的
+
+`pnpm --filter @heyta/design-system test` 会解析 tokens.css、递归展开 `var()`、
+按 WCAG 公式**真实计算**每一对前景/背景对比度，不达标就失败。
+
+> **这个测试已经抓到过真问题**：`quadrant-3` 原用 amber-600（`3.19:1`）不达正文标准，
+> 已改为 amber-700（`5.02:1`）。写在文档里的"4.5:1"是拦不住的。
+
+### 容易犯的几个错
+
+- ❌ **用 emoji 当图标** —— 跨平台渲染不一致且不受 token 控制。统一用 **Lucide**。
+- ❌ **`outline: none`** —— 抹掉焦点环是最常见的可访问性回归。用 `:focus-visible`。
+- ❌ **hover 用 `translateY` 位移** —— 扁平风格用**边框**表达层次，阴影只给真正的浮层。
+- ❌ **不测暗色主题就交付** —— 暗色不是亮色的反相，必须**实际切换查看**。
+- ❌ **数字不加 `.tabular-nums`** —— 番茄钟计时与统计数字的宽度会跳动。
+
+---
+
+## 6. 常用命令
 
 ```bash
 pnpm install                    # 安装（工作区）
@@ -171,15 +212,15 @@ pnpm -r test                    # 全量测试（当前 1444 个通过）
 pnpm verify:sync                # P0 验收：真实同步闭环（需要服务端在跑）
 pnpm verify:sync:dry            # 不需要服务端，只校验 op 形状
 
-node research/tools/license-inventory.mjs   # 许可证门禁
-node research/tools/docs-link-check.mjs     # 文档死链门禁
+pnpm check                      # 全部门禁：类型 + 迁移 + 许可证 + 文档 + 设计变量
+pnpm check:design               # 只跑设计变量硬编码检查
 ```
 
 **提交前至少跑**：`pnpm -r typecheck && pnpm -r test`。
 
 ---
 
-## 6. 环境陷阱（实测踩过，会复现）
+## 7. 环境陷阱（实测踩过，会复现）
 
 ### 🔴 `DATABASE_URL` 会污染 docker compose
 
@@ -219,7 +260,7 @@ docker inspect <容器> --format '{{range .Config.Env}}{{println .}}{{end}}' | g
 
 ---
 
-## 7. 工作流
+## 8. 工作流
 
 1. **改代码前先读相关的 ADR 与计划**：决策不可逆层（`packages/shared-schema`、线协议、迁移）时尤其。
 2. **可维护性与许可证先查**，不要先写完再补登记。
@@ -238,18 +279,20 @@ docker inspect <容器> --format '{{range .Config.Env}}{{println .}}{{end}}' | g
 
 ---
 
-## 8. 当前进度
+## 9. 当前进度
 
 | 阶段 | 状态 |
 |---|---|
 | P0 奠基 | ✅ 已完成（协议已跑通，Docker 实测通过） |
-| P1 单端闭环 | 🔄 规划中 → [详细计划](docs/plans/phase-1-single-client-loop.md) |
+| P1 单端闭环 | 🔄 **进行中** → [详细计划](docs/plans/phase-1-single-client-loop.md) |
 | P2 多端补齐 | ⏸ |
 | P3 平台特性 | ⏸ |
 
 总路线图：[`docs/plans/roadmap.md`](docs/plans/roadmap.md)
 
-### 还挡在前面的决策
+### 已定的关键决策
 
-- **ADR-0001 许可证选择仍标"待确认"**（[文档](docs/adr/0001-license-decision.md)）。
-  在它确定之前，"能不能用某个库"的判断缺依据。**建议优先拍板。**
+- **ADR-0001 许可证 = MIT** ✅（[文档](docs/adr/0001-license-decision.md)）。与 vendored 的 MIT 底座天然兼容。
+- **ADR-0002 迁移工具 = 继续用 Prisma** ✅（[文档](docs/adr/0002-migration-tooling.md)）。
+
+**当前没有阻塞性决策**，P1 可以持续推进。
