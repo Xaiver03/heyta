@@ -5,6 +5,8 @@
  * 改动前请读 `packages/shared-schema/src/schema-version.ts` 的版本政策。
  */
 
+import type { Operation } from '@heyta/sync-core';
+
 /** store 名称。 */
 export const STORES = {
   /**
@@ -35,12 +37,31 @@ export const ALL_STORES: StoreName[] = [
   STORES.ARCHIVE,
 ];
 
-/** `ops` store 的字段名。 */
+/**
+ * `ops` store 的字段名。
+ *
+ * 🔴 **这些常量必须和 `@heyta/sync-core` 的 `Operation` 契约字段名严格一致。**
+ *
+ * 我第一版把它们写成普通字符串（`OP_ID: 'opId'`），而 `Operation` 的字段其实叫
+ * `id`。结果是唯一索引的 keyPath 指向一个不存在的字段 ——
+ * **IndexedDB 对 undefined 不建索引条目，不报错**，于是去重完全失效：
+ * 同一个 op 可以被无限写入，而所有测试之外的地方都看不出来。
+ *
+ * 修法不是改对字符串就完事，而是**让它们在类型层面被约束**：
+ * 下面用 `satisfies` 把每个字段名绑定到 `Operation` 的 key，
+ * 写错字段名会**编译失败**，而不是等到运行时静默失效。
+ */
 export const OP_FIELDS = {
-  /** 本地自增序号，主键。 */
+  /**
+   * ⚠️ **本地**自增序号。
+   *
+   * 注意与 `Operation.seq`（**服务端**序号）区分：两者名字一样但含义不同。
+   * 本常量指顶层 `StoredOperation.seq`（存储记录的主键），
+   * 不是嵌套的 `op.seq`。索引 keyPath 因此写顶层 `'seq'`。
+   */
   SEQ: 'seq',
-  /** 操作业务 id（客户端生成的 UUID v7），**唯一索引**——用于去重。 */
-  OP_ID: 'opId',
+  /** 操作业务 id（客户端生成的 UUID v7），**唯一索引** —— 用于去重。 */
+  OP_ID: 'id',
   ENTITY_TYPE: 'entityType',
   ENTITY_ID: 'entityId',
   /** 多实体批次操作涉及的全部实体 id，**multiEntry 索引**。 */
@@ -48,20 +69,50 @@ export const OP_FIELDS = {
   PAYLOAD: 'payload',
   VECTOR_CLOCK: 'vectorClock',
   CLIENT_ID: 'clientId',
-  CLIENT_TIMESTAMP: 'clientTimestamp',
+  CLIENT_TIMESTAMP: 'timestamp',
   SCHEMA_VERSION: 'schemaVersion',
   /**
-   * 崩溃恢复标记。远程 op 先写入但标记为待应用，
-   * 只有当 reducer 提交被持久化后才清除。
+   * 🔴 应用状态。**必须用字符串，不能用布尔。**
    *
-   * 这是"应用过程中崩溃"不会导致数据不一致的关键。
+   * 为什么：**IndexedDB 不允许布尔值作为键** —— `true` 不是合法的 IDB key，
+   * 所以对布尔字段建索引时，索引条目会被**静默跳过**（不报错，只是查不到）。
+   * 我第一版就是用 `pendingApply: true` 建索引，结果 `findPendingApply()`
+   * 永远返回空数组 —— 崩溃恢复完全失效，而且没有任何错误提示。
+   *
+   * 取值见 {@link ApplyStatus}。
    */
-  PENDING_APPLY: 'pendingApply',
-  /** 是否已应用到本地状态。 */
-  APPLIED: 'applied',
-  /** 应用失败标记（配合 quarantine）。 */
-  FAILED: 'failed',
+  APPLY_STATUS: 'applyStatus',
 } as const;
+
+/**
+ * 应用状态机。
+ *
+ *   pending  —— 已落盘，等待 reducer 提交（崩溃恢复要扫这个）
+ *   applied  —— 已应用，安全
+ *   failed   —— 应用失败，已隔离
+ */
+export type ApplyStatus = 'pending' | 'applied' | 'failed';
+
+/**
+ * 把上面那些「指向 Operation 内部字段」的常量在类型层面钉死。
+ *
+ * 这一句的价值：任何字段名拼错、或上游改了 `Operation` 的形状，
+ * 都会在 `pnpm -r typecheck` 阶段报错，而不是变成
+ * 「索引静默失效 → 去重失效 → 数据重复」这类线上事故。
+ */
+type OpFieldName = keyof Operation;
+const _opFieldShape = {
+  OP_ID: OP_FIELDS.OP_ID,
+  ENTITY_TYPE: OP_FIELDS.ENTITY_TYPE,
+  ENTITY_ID: OP_FIELDS.ENTITY_ID,
+  ENTITY_IDS: OP_FIELDS.ENTITY_IDS,
+  PAYLOAD: OP_FIELDS.PAYLOAD,
+  VECTOR_CLOCK: OP_FIELDS.VECTOR_CLOCK,
+  CLIENT_ID: OP_FIELDS.CLIENT_ID,
+  CLIENT_TIMESTAMP: OP_FIELDS.CLIENT_TIMESTAMP,
+  SCHEMA_VERSION: OP_FIELDS.SCHEMA_VERSION,
+} satisfies Record<string, OpFieldName>;
+void _opFieldShape;
 
 /** 索引名称。 */
 export const OP_INDEXES = {
@@ -71,8 +122,8 @@ export const OP_INDEXES = {
   ENTITY: 'by_entity',
   /** 多实体批次：multiEntry，用于 GIN 式查询的对等物。 */
   ENTITY_IDS: 'by_entityIds',
-  /** 崩溃恢复扫描：找出所有 pendingApply 的记录。 */
-  PENDING_APPLY: 'by_pendingApply',
+  /** 崩溃恢复扫描：找出所有 applyStatus='pending' 的记录。 */
+  PENDING_APPLY: 'by_applyStatus',
 } as const;
 
 /** `state` store 的字段名。 */
