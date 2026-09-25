@@ -1,8 +1,19 @@
 /**
- * IndexedDB 操作日志存储
- * ========================
+ * 操作日志存储（**适配器无关**）
+ * ==============================
  *
  * 实现 {@link OpLogStore}。这是同步系统的本地事实来源。
+ *
+ * 🔴 **它不属于 IndexedDB。**
+ *
+ * 它原本叫 `IndexedDbOpLogStore` 并放在 `indexeddb/` 下 —— 但实测它
+ * **一行 IndexedDB API 都没用**，只依赖 `DbAdapter` / `DbTx` / `DbKeyRange`。
+ * 名字和目录在撒谎，而代价是实质的：任何看代码的人都会以为换到 SQLite
+ * 需要**再写一个 op-log store**，于是真的去写第二个实现 ——
+ * 而两份同步逻辑实现不可能保持一致，那等于数据损坏（ADR-0003 §3.3）。
+ *
+ * 现在它按真实能力命名与位置放置：**换任何 `DbAdapter` 实现，op-log 层零改动。**
+ * 这是 ADR-0003「同一套接口、同一套测试」最直接的体现。
  *
  * ─────────────────────────────────────────────────────────────────────────
  * 两个不能妥协的正确性要求：
@@ -26,21 +37,21 @@ import type {
 } from '@heyta/sync-core';
 import type { EntityType } from '@heyta/shared-schema';
 
-import type { DbAdapter, DbKeyRange, DbTx } from '../db.types.js';
+import type { DbAdapter, DbKeyRange, DbTx } from './db.types.js';
 import {
   OpLogStoreError,
   OpLogStoreErrorCode,
   type OpLogStore,
   type OperationSource,
   type StoredOperation,
-} from '../op-log-store.js';
+} from './op-log-store.js';
 import {
   META_FIELDS,
   META_KEYS,
   OP_FIELDS,
   OP_INDEXES,
   STORES,
-} from '../stores.js';
+} from './stores.js';
 
 /**
  * `appendBatchSkipDuplicates` 的结果类型。
@@ -63,7 +74,7 @@ export interface AppendBatchResult<TOperation extends Operation<string>> {
   seqs: number[];
 }
 
-export class IndexedDbOpLogStore<TOperation extends Operation<string> = Operation>
+export class DbOpLogStore<TOperation extends Operation<string> = Operation>
   implements OpLogStore<TOperation>
 {
   constructor(
@@ -139,14 +150,10 @@ export class IndexedDbOpLogStore<TOperation extends Operation<string> = Operatio
           // 用 addToleratingDuplicate 而不是 try/catch add：
           // 唯一索引冲突必须在**适配器内部** preventDefault，
           // 否则错误冒泡会中止整个事务，把整批写入都回滚掉。
-          const outcome = await (
-            tx as DbTx & {
-              addToleratingDuplicate: (
-                s: string,
-                v: unknown,
-              ) => Promise<{ ok: boolean; key?: number }>;
-            }
-          ).addToleratingDuplicate(STORES.OPS, record);
+          // 现在这是接口上的正式能力 —— 不再需要 `as` 强转。
+          // 那个强转曾经掩盖了"接口没有表达使用者真实需求"这个事实：
+          // 新适配器按接口实现，就会在运行时报 "not a function"。
+          const outcome = await tx.addToleratingDuplicate(STORES.OPS, record);
 
           if (!outcome.ok) {
             // 唯一索引冲突 = 这个 opId 已经存在。这是**正常路径**（同步会重复投递）
@@ -154,7 +161,7 @@ export class IndexedDbOpLogStore<TOperation extends Operation<string> = Operatio
             continue;
           }
           appended.push(op);
-          seqs.push(outcome.key!);
+          seqs.push(outcome.key);
         }
 
         // 与写 ops 同一事务更新 lastLocalSeq —— 保证 seq 与游标不会脱节
@@ -462,3 +469,16 @@ async function writeMeta(tx: DbTx, key: string, value: unknown): Promise<void> {
 
 export { OpLogStoreError, OpLogStoreErrorCode };
 export type { StoredOperation, OperationSource };
+
+/**
+ * @deprecated 用 {@link DbOpLogStore}。
+ *
+ * 保留别名只为不改动既有调用点；它的名字会让人以为这与 IndexedDB 绑定，
+ * 而事实并非如此。新代码请用 `DbOpLogStore`。
+ */
+// ⚠️ 必须用 `export { X as Y }` 而不是 `export const Y = X`：
+// 类既是值也是**类型**，而 `const` 声明只提供值 ——
+// 用 `const` 会让 `let store: IndexedDbOpLogStore<T>` 直接编译失败。
+// 我在第一次改名时就是这么写的，`packages/op-log` 的 typecheck 立刻报
+// "'IndexedDbOpLogStore' refers to a value, but is being used as a type here"。
+export { DbOpLogStore as IndexedDbOpLogStore };

@@ -71,6 +71,20 @@ function compareKeys(a: DbKey | DbKey[], b: DbKey | DbKey[]): number {
   return String(a) < String(b) ? -1 : String(a) > String(b) ? 1 : 0;
 }
 
+/**
+ * 唯一约束冲突的内部信号。
+ *
+ * 只在适配器内部使用：`add` 把它当作真错误抛出，`addToleratingDuplicate`
+ * 把它转成 `{ ok: false, reason: 'duplicate' }`。
+ * 不导出到公共类型 —— 上层不该靠 instanceof 判断重复。
+ */
+class DuplicateKeyError extends Error {
+  constructor(what: string) {
+    super(`唯一键冲突：${what}`);
+    this.name = 'DuplicateKeyError';
+  }
+}
+
 /** 稳定的 Map 键。数组要保序，所以不能只 String()。 */
 function serializeKey(key: DbKey | DbKey[]): string {
   return JSON.stringify(key);
@@ -372,52 +386,81 @@ export class MemoryDbAdapter implements DbAdapter {
     const sortedRecords = (store: PhysicalStore): PhysicalRecord[] =>
       [...store.records.values()].sort((a, b) => compareKeys(a.key, b.key));
 
-    return {
-      add: async (storeName, value) => {
-        const store = assert(storeName);
-        const record = value as Record<string, unknown>;
-        const keyPath = store.schema.keyPath;
-        let key = keyPath === undefined ? undefined : keyFromPath(record, keyPath);
+    /**
+     * 插入一条记录。唯一冲突时抛 `DuplicateKeyError`（内部型别），
+     * 由 `add` 直接抛出、由 `addToleratingDuplicate` 转成结果对象。
+     *
+     * 抽出来是为了让两个入口**共用同一套唯一性判定** ——
+     * 各写一份必然漂移，而"容忍重复"与"不容忍重复"对唯一性的理解
+     * 一旦不一致，去重就会变成碰运气。
+     */
+    const insert = (storeName: string, value: unknown): { key: number } => {
+      const store = assert(storeName);
+      const record = value as Record<string, unknown>;
+      const keyPath = store.schema.keyPath;
+      let key = keyPath === undefined ? undefined : keyFromPath(record, keyPath);
 
-        if (key === undefined) {
-          if (keyPath !== undefined && store.schema.autoIncrement !== true) {
-            throw new Error(`store「${storeName}」的记录缺少主键字段「${String(keyPath)}」`);
-          }
-          key = ++store.autoIncrement;
-          // 自增时把键写回记录，与 IndexedDB 的行为一致（in-line keys）
-          if (keyPath !== undefined) {
-            const path = typeof keyPath === 'string' ? keyPath : keyPath[0];
-            if (path !== undefined) record[path] = key;
-          }
-        } else if (typeof key === 'number' && key > store.autoIncrement) {
-          store.autoIncrement = key;
+      if (key === undefined) {
+        if (keyPath !== undefined && store.schema.autoIncrement !== true) {
+          throw new Error(`store「${storeName}」的记录缺少主键字段「${String(keyPath)}」`);
         }
+        key = ++store.autoIncrement;
+        // 自增时把键写回记录，与 IndexedDB 的 in-line key 行为一致
+        if (keyPath !== undefined) {
+          const path = typeof keyPath === 'string' ? keyPath : keyPath[0];
+          if (path !== undefined) record[path] = key;
+        }
+      } else if (typeof key === 'number' && key > store.autoIncrement) {
+        store.autoIncrement = key;
+      }
 
-        // 🔴 唯一索引冲突要**阻止整条记录入库**，不是"跳过索引但留下记录"。
-        // `addToleratingDuplicate` 依赖这个行为做去重。
-        for (const idx of store.schema.indexes ?? []) {
-          if (idx.unique !== true) continue;
-          for (const entry of indexEntries(store, idx, record)) {
-            for (const existing of store.records.values()) {
-              if (existing.key === key) continue;
-              for (const otherEntry of indexEntries(store, idx, existing.value)) {
-                if (compareKeys(entry, otherEntry) === 0) {
-                  throw new Error(
-                    `唯一索引「${idx.name}」冲突：键 ${JSON.stringify(entry)} 已存在`,
-                  );
-                }
+      // 🔴 唯一索引冲突要**阻止整条记录入库**，不是"跳过索引但留下记录"。
+      // `addToleratingDuplicate` 依赖这个行为做幂等去重。
+      for (const idx of store.schema.indexes ?? []) {
+        if (idx.unique !== true) continue;
+        for (const entry of indexEntries(store, idx, record)) {
+          for (const existing of store.records.values()) {
+            if (existing.key === key) continue;
+            for (const otherEntry of indexEntries(store, idx, existing.value)) {
+              if (compareKeys(entry, otherEntry) === 0) {
+                throw new DuplicateKeyError(idx.name);
               }
             }
           }
         }
+      }
 
-        if (store.records.has(serializeKey(key))) {
-          throw new Error(`主键已存在：${JSON.stringify(key)}`);
-        }
-        store.records.set(serializeKey(key), { key, value: record });
-        return typeof key === 'number' ? key : 0;
+      if (store.records.has(serializeKey(key))) {
+        throw new DuplicateKeyError(String(keyPath ?? '主键'));
+      }
+      store.records.set(serializeKey(key), { key, value: record });
+      return { key: typeof key === 'number' ? key : 0 };
+    };
+
+    return {
+      add: async (storeName, value) => {
+        const { key } = insert(storeName, value);
+        return key;
       },
 
+      /**
+       * 容忍唯一冲突的插入。
+       *
+       * 语义与 IndexedDB 实现一致：冲突时**不抛错**，而是报告 `duplicate`，
+       * 且**记录不入库**、事务继续。op-log 的幂等去重完全靠这个行为 ——
+       * 同一个 opId 被重复投递是正常路径（同步会重放），不是异常。
+       */
+      addToleratingDuplicate: async (storeName, value) => {
+        try {
+          const { key } = insert(storeName, value);
+          return { ok: true as const, key };
+        } catch (error) {
+          if (error instanceof DuplicateKeyError) {
+            return { ok: false as const, reason: 'duplicate' as const };
+          }
+          throw error;
+        }
+      },
       put: async (storeName, value, explicitKey) => {
         const store = assert(storeName);
         const record = value as Record<string, unknown>;

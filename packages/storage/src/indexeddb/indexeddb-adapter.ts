@@ -33,6 +33,7 @@ import type {
   DbKeyRange,
   DbTx,
   DbTxMode,
+  DbTolerantAddResult,
   StoreSchema,
 } from '../db.types.js';
 import { assertIterateLimit } from '../db.types.js';
@@ -182,9 +183,15 @@ function req<T>(request: IDBRequest<T>, suppressError = false): Promise<T> {
 }
 
 /** 尝试 add 的结果。冲突不是错误，是"已存在"。 */
-export type AddOutcome =
-  | { ok: true; key: IDBValidKey }
-  | { ok: false; reason: 'duplicate' };
+/**
+ * @deprecated 用 `db.types.ts` 的 {@link DbTolerantAddResult}。
+ *
+ * 这里曾经有一份**自己的**定义。共享契约一跑就暴露了：
+ * 接口上声明的是 `DbTolerantAddResult`（key 是 number），
+ * 而这里是 `IDBValidKey` —— 两套定义，一个概念。
+ * 已合并，别名只为不改动既有引用。
+ */
+export type AddOutcome = DbTolerantAddResult;
 
 export class IndexedDbAdapter implements DbAdapter {
   private db: IDBDatabase | undefined;
@@ -345,7 +352,7 @@ export class IndexedDbAdapter implements DbAdapter {
     };
 
     const api: DbTx & {
-      addToleratingDuplicate: (storeName: string, value: unknown) => Promise<AddOutcome>;
+      addToleratingDuplicate: (storeName: string, value: unknown) => Promise<DbTolerantAddResult>;
     } = {
       add: (s, value) => req(store(s).add(value)) as Promise<number>,
 
@@ -358,7 +365,10 @@ export class IndexedDbAdapter implements DbAdapter {
       addToleratingDuplicate: async (storeName, value) => {
         try {
           const key = await req(store(storeName).add(value), true);
-          return { ok: true, key };
+          // 本项目所有主键都是 string | number，且自增键一定是 number。
+          // 在边界处收窄，而不是把 `DbTolerantAddResult.key` 放宽到 IDBValidKey
+          // —— 那会让上层也被迫处理 Date / ArrayBuffer。
+          return { ok: true, key: typeof key === 'number' ? key : Number(key) };
         } catch (error) {
           if (
             typeof error === 'object' &&

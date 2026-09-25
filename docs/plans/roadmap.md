@@ -1,8 +1,9 @@
 # heyta 实施计划（总路线图）
 
-> 状态：**进行中** —— P0、P1 已完成，P2 规划中
+> 状态：**进行中** —— P0、P1 已完成，P2 进行中
 > 前置决策见 `docs/reference/architecture.md` §0；复用依据见 `docs/research/reuse-plan.md`。
 > P1 的详细计划见 `docs/plans/phase-1-single-client-loop.md`。
+> P2 的详细计划见 `docs/plans/phase-2-multi-platform.md`。
 
 ---
 
@@ -23,7 +24,7 @@
 |---|---|---|---|
 | **P0 奠基** | 工程骨架 + 实体模型 + 服务端跑通 | 能在 Docker 上完成一次真实的「A 端写入 → B 端同步可见」 | ✅ **已完成**（2026-09-25） |
 | **P1 单端闭环** | 1 个端（Web）跑通核心功能 | 任务/清单/四象限/习惯/番茄钟可用，能同步 | ✅ **已完成**（6 条零 mock E2E）→ [详细计划](phase-1-single-client-loop.md) |
-| **P2 多端补齐** | 桌面 + 移动 | Tauri/Electron + Capacitor 套壳，共享同一套核心 | ⏸ |
+| **P2 多端补齐** | 桌面 + 移动 | 存储可替换（同一套契约跑遍所有实现）+ 原生端 SQLite，共享同一套核心 | 🔄 **进行中** → [详细计划](phase-2-multi-platform.md) |
 | **P3 平台特有能力** | 小组件、通知、CalDAV 双向同步 | 依赖前两阶段 | ⏸ |
 
 ### P0 完成证据（2026-09-25）

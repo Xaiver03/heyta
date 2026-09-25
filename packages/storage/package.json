@@ -10,6 +10,10 @@
     ".": {
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
+    },
+    "./sqlite/node": {
+      "types": "./dist/sqlite/node-sqlite-driver.d.ts",
+      "default": "./dist/sqlite/node-sqlite-driver.js"
     }
   },
   "scripts": {

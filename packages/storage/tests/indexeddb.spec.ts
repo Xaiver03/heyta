@@ -15,7 +15,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import type { Operation } from '@heyta/sync-core';
 
 import { IndexedDbAdapter } from '../src/indexeddb/indexeddb-adapter.js';
-import { IndexedDbOpLogStore } from '../src/indexeddb/indexeddb-op-log-store.js';
+import { DbOpLogStore } from '../src/db-op-log-store.js';
 import { META_KEYS, OP_FIELDS, OP_INDEXES, STORES } from '../src/stores.js';
 
 // 每个测试用全新的 IndexedDB 全局，避免互相污染
@@ -163,17 +163,17 @@ describe('IndexedDbAdapter', () => {
   });
 });
 
-describe('IndexedDbOpLogStore', () => {
+describe('DbOpLogStore', () => {
   // ⚠️ 泛型参数必须显式给 `Operation<string>`：默认的 `Operation` 用的是
   // sync-core 内部的 `OpType` 联合，而测试里造的是宽松的 string op。
   // 不写会让 Operation<string> 无法赋给 Operation<OpType>。
   let db: IndexedDbAdapter;
-  let store: IndexedDbOpLogStore<Operation<string>>;
+  let store: DbOpLogStore<Operation<string>>;
 
   beforeEach(async () => {
     db = freshAdapter(`test-oplog-${Math.random().toString(36).slice(2)}`);
     await db.init();
-    store = new IndexedDbOpLogStore<Operation<string>>(db);
+    store = new DbOpLogStore<Operation<string>>(db);
   });
 
   it('appendLocal 返回单调递增的 seq', async () => {
@@ -309,7 +309,7 @@ describe('IndexedDbOpLogStore', () => {
     const seqs = await store.appendLocal(Array.from({ length: 20 }, () => makeOp()));
     const lastSeq = seqs[seqs.length - 1]!;
 
-    const store5 = new IndexedDbOpLogStore<Operation<string>>(db, 5);
+    const store5 = new DbOpLogStore<Operation<string>>(db, 5);
     const archived = await store5.archiveUpTo(lastSeq);
 
     // cutoff = lastSeq - 5，所以归档的是 seq <= cutoff 的那批
@@ -332,9 +332,9 @@ describe('IndexedDbOpLogStore', () => {
 // 上传队列（离线同步用）
 // ─────────────────────────────────────────────────────────────
 
-describe('IndexedDbOpLogStore — 上传队列', () => {
+describe('DbOpLogStore — 上传队列', () => {
   let db: IndexedDbAdapter;
-  let store: IndexedDbOpLogStore<Operation<string>>;
+  let store: DbOpLogStore<Operation<string>>;
 
   beforeEach(async () => {
     const g = globalThis as unknown as {
@@ -345,7 +345,7 @@ describe('IndexedDbOpLogStore — 上传队列', () => {
     g.IDBKeyRange = IDBKeyRange;
     db = new IndexedDbAdapter(`upload-${Math.random().toString(36).slice(2)}`);
     await db.init();
-    store = new IndexedDbOpLogStore<Operation<string>>(db);
+    store = new DbOpLogStore<Operation<string>>(db);
   });
 
   function op(id: string): Operation<string> {
@@ -459,7 +459,7 @@ describe('IndexedDB schema 升级', () => {
     // 现在用当前版本打开 → 应触发 onupgradeneeded 补建索引
     const db = new IndexedDbAdapter(name);
     await db.init();
-    const store = new IndexedDbOpLogStore<Operation<string>>(db);
+    const store = new DbOpLogStore<Operation<string>>(db);
 
     const o: Operation<string> = {
       id: 'x',

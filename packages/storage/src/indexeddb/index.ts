@@ -1,2 +1,2 @@
 export * from './indexeddb-adapter.js';
-export * from './indexeddb-op-log-store.js';
+// `DbOpLogStore` 不在这里 —— 它与 IndexedDB 无关，见 `../db-op-log-store.js`。
