@@ -204,3 +204,8 @@ cd packages/design-system && pnpm test            # 对比度/token 同步/暗�
 | Q3/优先级中 | amber-600 | amber-700 | 600 只有 3.19:1，不达可访问性 |
 | 组件示例 | 硬编码 hex | 全部 `var(--ht-*)` | 生成版本示例违反本项目第一硬规则 |
 | 边框 token | 两处不一致（`#E4ECFC` vs `#E2E8F0`） | 统一 `--ht-color-border` | — |
+| 新增 `layout.prose-max` | 无 | 加入 | 正文可读行长上限，长文不横跨整屏 |
+| 新增 `layout.quadrant-min-height` | 无 | 加入 | 四象限格子最小高度，保证可点区域 |
+| 新增 `border-width.thin/thick` | 硬编码 1px/2px | 加入 token | 边框是主要层次手段，宽度必须统一 |
+
+**这些 token 的取值以 [`packages/design-system/src/tokens.css`](../../packages/design-system/src/tokens.css) 为准，本文件不复制。**
