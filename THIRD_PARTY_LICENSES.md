@@ -2,7 +2,7 @@
 
 本仓库包含**非 heyta 原创**的第三方代码。按各自许可证的要求，此处登记归属。
 
-> heyta 自身的许可证尚未确定，见 `docs/04-license-decision.md`（ADR-0001）。
+> heyta 自身的许可证尚未确定，见 `docs/adr/0001-license-decision.md`（ADR-0001）。
 > 本文件只处理**第三方代码的合规义务**。
 
 ---
@@ -135,7 +135,7 @@ python3 research/tools/ghinfo.py owner/repo   # 最后提交/发版时间（可�
 | `remvze/moodist` | MIT | 白噪音功能设计 |
 
 > ⚠️ 即使许可证允许，heyta 也**不使用**滴答清单（TickTick）的商标、图标、文案与界面素材。
-> 见 `docs/02-licensing-and-compliance.md`。
+> 见 `docs/research/licensing-and-compliance.md`。
 
 ---
 

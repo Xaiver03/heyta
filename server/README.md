@@ -7,7 +7,7 @@ A custom, high-performance synchronization server for Super Productivity.
 > **Related Documentation:**
 >
 > - [Authentication Architecture](./docs/authentication.md) - Auth design decisions and security features
-> - [Sync Architecture Field Guide](../../docs/sync-and-op-log/sync-architecture.html) - Whole-system maintainer overview
+> - [Sync Architecture Field Guide](https://github.com/super-productivity/super-productivity/blob/aa9690ca28aa6751971dd0e47d9b39c5b72922cb/docs/sync-and-op-log/sync-architecture.html) - Whole-system maintainer overview
 > - [Server Architecture](./docs/architecture.md) - Server-only contracts and trust boundaries
 > - [Backup & Disaster Recovery](./docs/backup-and-recovery.md) - Backup setup and recovery procedures
 > - [Production Capacity](./docs/production-capacity.md) - Measured I/O limits of the hosted deployment and what they mean when you write a query
@@ -396,7 +396,7 @@ npm run clear-data -- --all
 The stable endpoint purposes and server invariants are documented in
 [Server Architecture](./docs/architecture.md). Request and response shapes are
 owned by the executable routes: sync wire shapes live in
-[`packages/shared-schema/src/supersync-http-contract.ts`](../shared-schema/src/supersync-http-contract.ts),
+[`packages/shared-schema/src/supersync-http-contract.ts`](../packages/shared-schema/src/supersync-http-contract.ts),
 while authentication schemas live beside the routes in
 [`src/api.ts`](./src/api.ts).
 

@@ -43,7 +43,7 @@ export const ENTITY_TYPES = [
 | `TASK` `PROJECT` `TAG` `NOTE` | 任务 / 清单 / 标签 / 笔记 | ✅ 直接对应 |
 | `TASK_REPEAT_CFG` `REMINDER` | 重复规则 / 提醒 | ✅ 对应 |
 | `BOARD` `SECTION` `PLANNER` | 四象限 / 看板 / 日历 | ⚠️ 语义需重新设计 |
-| `SIMPLE_COUNTER` | **SP 的"习惯"** | ⚠️ **换成 `HABIT` + `HABIT_LOG`**（语义不同，见 `docs/01-oss-landscape.md` 更正） |
+| `SIMPLE_COUNTER` | **SP 的"习惯"** | ⚠️ **换成 `HABIT` + `HABIT_LOG`**（语义不同，见 `docs/research/oss-landscape.md` 更正） |
 | `METRIC` | SP 用它记专注会话（`METRIC_LOG_FOCUS_SESSION`） | ⚠️ 换成 `FOCUS_SESSION` |
 | `GLOBAL_CONFIG` `MIGRATION` `RECOVERY` `ALL` | 系统实体 | ✅ 保留 |
 | `WORK_CONTEXT` `TIME_TRACKING` `ISSUE_PROVIDER` `PLUGIN_*` `MENU_TREE` | — | ❌ 不需要 |
@@ -281,4 +281,4 @@ Test Files  13 passed (13)     Tests  271 passed (271)
 
 ---
 
-*相关：`research/deep-dive-sync-core.md`、`research/deep-dive-supersync-server.md`、`docs/06-reuse-plan.md`*
+*相关：`research/deep-dive-sync-core.md`、`research/deep-dive-supersync-server.md`、`docs/research/reuse-plan.md`*

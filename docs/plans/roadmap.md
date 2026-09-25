@@ -1,7 +1,8 @@
-# heyta 实施计划
+# heyta 实施计划（总路线图）
 
-> 状态：**第一阶段进行中**
-> 前置决策见 `docs/03-architecture.md` §0；复用依据见 `docs/06-reuse-plan.md`。
+> 状态：**进行中** —— P0 已完成，P1 规划中
+> 前置决策见 `docs/reference/architecture.md` §0；复用依据见 `docs/research/reuse-plan.md`。
+> P1 的详细计划见 `docs/plans/phase-1-single-client-loop.md`。
 
 ---
 
@@ -10,7 +11,7 @@
 | 约束 | 内容 |
 |---|---|
 | **可维护性门槛** | 引入的任何第三方组件，**必须 2021 年之后仍在持续更新**，否则排除。每次引入前用 `python3 research/tools/ghinfo.py owner/repo` 或 npm registry 核实最后提交/发版时间 |
-| **许可证** | 逐项登记到 `research/licenses.md`，未登记不得引入 |
+| **许可证** | 逐项登记到 `research/licenses-inventory.generated.md`，未登记不得引入。门禁：`node research/tools/license-inventory.mjs`（非零退出即不合格） |
 | **本地优先** | 数据先落本地；云端是同步通道而非事实源 |
 | **不可逆层优先干净** | 同步协议、数据 schema、服务端要一次做对；UI/外壳/集成可以先将就 |
 
@@ -20,12 +21,25 @@
 
 | 阶段 | 目标 | 交付判据 | 状态 |
 |---|---|---|---|
-| **P0 奠基** | 工程骨架 + 实体模型 + 服务端跑通 | 能在 Docker 上完成一次真实的「A 端写入 → B 端同步可见」 | 🔄 **当前阶段** |
-| **P1 单端闭环** | 1 个端（Web）跑通核心功能 | 任务/清单/四象限/习惯/番茄钟可用，能同步 | ⏸ |
+| **P0 奠基** | 工程骨架 + 实体模型 + 服务端跑通 | 能在 Docker 上完成一次真实的「A 端写入 → B 端同步可见」 | ✅ **已完成**（2026-09-25） |
+| **P1 单端闭环** | 1 个端（Web）跑通核心功能 | 任务/清单/四象限/习惯/番茄钟可用，能同步 | 🔄 **当前阶段** → [详细计划](phase-1-single-client-loop.md) |
 | **P2 多端补齐** | 桌面 + 移动 | Tauri/Electron + Capacitor 套壳，共享同一套核心 | ⏸ |
 | **P3 平台特有能力** | 小组件、通知、CalDAV 双向同步 | 依赖前两阶段 | ⏸ |
 
-> **为什么 P0 不碰 UI**：`docs/03` 的分层原则——核心不对，后面全是重构。
+### P0 完成证据（2026-09-25）
+
+| 交付判据 | 证据 |
+|---|---|
+| 工程骨架 | pnpm monorepo：`packages/sync-core`、`packages/shared-schema`、`packages/storage`、`server` |
+| 实体模型 | 13 个实体，含 heyta 特有的 `HABIT` / `HABIT_LOG` / `FOCUS_SESSION` |
+| Docker 跑通 | 镜像 `supersync:local` 构建成功；31 个迁移在容器内应用；容器 healthy |
+| 真实同步闭环 | `pnpm verify:sync` 退出码 0：A 加密上传 → B 可见 → 载荷仍为密文 → 并发判 `CONFLICT_CONCURRENT` |
+| 回归 | `pnpm -r build/typecheck/test` 全绿，1444 个测试通过 |
+| 许可证 | 315 个依赖全部宽松许可，逐项登记；门禁工具经"注入假 AGPL 包"验证过**能失败** |
+
+复现步骤见 [`docs/runbooks/local-server-verification.md`](../runbooks/local-server-verification.md)。
+
+> **为什么 P0 不碰 UI**：`docs/reference/architecture.md` 的分层原则——核心不对，后面全是重构。
 > P0 的成功标志是**协议通了**，不是界面好看。
 
 ---
@@ -189,7 +203,7 @@ Time_NLP 系列（**仓库无 LICENSE**）。
 
 ## 5. 下一步动作（按顺序）
 
-1. **确认许可证 ADR-0001**（`docs/04-license-decision.md` 仍标"待确认"）——这是唯一还挡在前面的决策
+1. **确认许可证 ADR-0001**（`docs/adr/0001-license-decision.md` 仍标"待确认"）——这是唯一还挡在前面的决策
 2. 在服务器上 `docker compose up` 跑通 `super-sync-server`，确认 `/api/sync/status` 可达
 3. 建 monorepo 骨架，引入 `sync-core`（原版不改）
 4. 写 heyta 实体清单 + 7 个 host Port 适配

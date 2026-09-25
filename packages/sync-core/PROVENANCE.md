@@ -37,7 +37,7 @@ MIT 许可证允许"use, copy, modify, merge, publish, distribute, sublicense"�
 条件是**保留版权声明与许可声明**。我们保留了原始 `LICENSE` 文件，
 并在仓库根的 `THIRD_PARTY_LICENSES.md` 中登记了归属。
 
-**MIT 允许闭源商用**，不受 heyta 自身许可证选择（见 `docs/04-license-decision.md`）的影响。
+**MIT 允许闭源商用**，不受 heyta 自身许可证选择（见 `docs/adr/0001-license-decision.md`）的影响。
 
 ## 更新上游代码的方法
 

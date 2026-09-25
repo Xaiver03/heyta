@@ -21,7 +21,7 @@ Current status, security boundaries, and criteria for considering a replacement
 are documented in:
 
 - [`../../docs/encryption-at-rest.md`](../../docs/encryption-at-rest.md)
-- [`../../../../docs/supersync-encryption-at-rest-decision.md`](../../../../docs/supersync-encryption-at-rest-decision.md)
+- [`../../../../docs/supersync-encryption-at-rest-decision.md`](https://github.com/super-productivity/super-productivity/blob/aa9690ca28aa6751971dd0e47d9b39c5b72922cb/docs/supersync-encryption-at-rest-decision.md)
 
 Any future storage-encryption project needs a fresh design and an exercised
 migration, rollback, boot, key-rotation, backup, and restore procedure on the

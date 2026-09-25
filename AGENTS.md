@@ -1,0 +1,218 @@
+# AGENTS.md
+
+给在本仓库工作的 AI agent 的规则。**这些是约束，不是建议。**
+
+面向人的贡献流程见 [`CONTRIBUTING.md`](CONTRIBUTING.md)；文档该放哪见 [`docs/README.md`](docs/README.md)。
+
+---
+
+## 1. 这个项目是什么
+
+heyta 是一个**本地优先**的任务管理应用，目标是做一个功能上对标滴答清单、但可以自建/自托管的替代品。
+
+- **本地优先**：数据先落本地，云端只是同步通道，**不是事实源**。
+- **端到端加密**：服务端从设计上就看不到用户明文。
+- **同步模型**：op-log（事件溯源），**不是 CRDT**。向量时钟判并发，LWW 加 `clientId` 确定性打破平局。
+
+## 2. 仓库地图
+
+| 路径 | 内容 | 能不能改 |
+|---|---|---|
+| `packages/sync-core/` | 同步内核（加密、向量时钟、冲突判定）。**vendored 自 Super Productivity，MIT** | ⚠️ 尽量不改，改了要更新 `PROVENANCE.md` |
+| `packages/shared-schema/` | 实体清单、schema 版本、HTTP 线协议契约（zod） | ✅ heyta 已改造，是**不可逆层** |
+| `packages/storage/` | 存储适配层接口 + 内存实现（`DbAdapter` / `OpLogStore`） | ✅ |
+| `server/` | 同步服务端（Fastify + Prisma + PostgreSQL）。**vendored，MIT** | ✅ 已改造 |
+| `apps/` | 客户端应用（P1 开始建，当前为空） | ✅ |
+| `docs/` | 产品文档。**分层规则见 [`docs/README.md`](docs/README.md)** | ✅ |
+| `research/` | 调研原料：上游克隆、原始报告、一次性脚本。**不是产品文档** | ⚠️ 归档性质 |
+| `scripts/` | 仓库级脚本（如 P0 验收） | ✅ |
+
+---
+
+## 3. 硬性约束（违反即打回）
+
+### 3.1 可维护性门槛
+
+引入任何第三方组件前，**必须确认它在 2021 年之后仍在持续更新**。否则排除，无论许可证多宽松。
+
+```bash
+python3 research/tools/ghinfo.py owner/repo    # 查最后提交/发版时间
+```
+
+已因此被排除的例子：`rrule.js`（停在 2023）、`cal-heatmap`（停在 2024）。
+**不要因为它们"看起来成熟"就放行** —— 这个门槛是有意的。
+
+### 3.2 许可证
+
+- ✅ **允许**：MIT / Apache-2.0 / BSD / ISC / MPL-2.0 / 0BSD / Unlicense / CC0
+- 🔴 **禁止**进入产品代码：**AGPL / GPL / LGPL / BUSL / FSL / Elastic License / SSPL / CC-BY-NC**
+- **无 LICENSE 文件 = 无授权 = 一行都不能用**
+
+每个依赖必须**逐项登记**。门禁：
+
+```bash
+node research/tools/license-inventory.mjs      # 非零退出 = 有不合格依赖
+```
+
+它扫描的是**实际安装的依赖树**，并已通过"注入假 AGPL 包"验证过**能失败**。
+
+> 已知雷区：`@nextcloud/cdav-library` 是 **AGPL-3.0-or-later**，已被上游生产代码引用。
+> heyta 的 CalDAV 要么自研，要么换 `tsdav`（MIT）。**不要引入任何 Nextcloud 服务端组件。**
+
+### 3.3 schema 与持久化字段
+
+- **默认不 bump `CURRENT_SCHEMA_VERSION`**。bump 保护不了已发布的客户端、近乎不可逆、且即使安全也不免费。
+- 新增语义必须能**在旧客户端上优雅降级**（payload marker / 惰性标记模式）。
+- 🔴 **给持久化模型新增"必填"字段会破坏每一个已有安装**：磁盘上的旧数据没有这个字段，会在 hydration 时校验失败。
+  **新字段一律写成可选（`?`）并给运行时默认值。** TypeScript 只保护新数据，构建会绿，而每个老安装会静默炸掉。
+
+### 3.4 op-log 纪律（P1 起）
+
+- **一个用户意图 = 一个 op。**
+- **被回放/来自远端的 op 不得再次触发副作用。** 否则会出现"同步回来又写一遍"的双向灾难。
+- **op-log 是唯一写入口**：UI 不得绕开它直接改状态。详见 [P1 计划](docs/plans/phase-1-single-client-loop.md) 的 D4。
+- 多实体变更要**在一次操作里完成**，不要 fan-out 成多个 op。
+
+> 依据：上游 `src/app/op-log/` 那 5 万行是**用真实故障换来的规格书**。改动同步逻辑前先读它，
+> 但**移植语义，不要拷贝代码**（它绑定 Angular + NgRx）。
+
+---
+
+## 4. 数据库迁移纪律
+
+**迁移是不可逆层。** 完整规范见 [`docs/adr/0002-migration-tooling.md`](docs/adr/0002-migration-tooling.md)。
+
+### 🔴 不要用 `prisma migrate deploy` 直接部署
+
+有关键约束（实测确认）：PostgreSQL **禁止在事务块内**执行 `CREATE/DROP INDEX CONCURRENTLY`。
+Prisma 5 把迁移包在事务里，因此会在含 CONCURRENTLY 的迁移上以 `P3018 / SQLSTATE 25001` 失败。
+
+**必须用项目脚本**，它会把这类迁移拆到事务外执行、标记已应用、再重试：
+
+```bash
+cd server && sh scripts/migrate-deploy.sh
+```
+
+### 🔴 迁移文件里的 CONCURRENTLY：单语句才行
+
+实测确认的机制：PostgreSQL 的**简单查询协议**中，**多条语句合在一个查询字符串会形成隐式事务**，单条不会。
+Prisma 把整个迁移文件当一个查询字符串发送，所以：
+
+| 形状 | 结果 |
+|---|---|
+| 单条 `CREATE INDEX CONCURRENTLY`（文件里只有这一句） | ✅ 能过 |
+| 多条语句（含任何 CONCURRENTLY） | ❌ 隐式事务，报 25001 |
+
+**因此**：写 CONCURRENTLY 迁移时，优先**一个文件只放一条语句**。
+如果必须多条，就要用可恢复形状（`DROP INDEX CONCURRENTLY IF EXISTS` + `CREATE INDEX CONCURRENTLY`），
+并依赖 `migrate-deploy.sh` 的事务外恢复 —— 该脚本会**把文件拆成单条逐个执行**。
+
+> **裸 `CREATE INDEX CONCURRENTLY`（没有配套 DROP）是故意不可恢复的**：
+> 中断的并发建索引会留下 INVALID 索引，脚本宁可让部署大声失败，也不把它标记成已应用。
+
+### macOS 上跑部署脚本
+
+`migrate-deploy.sh` 有一处 GNU-only 的 `sed -i`，macOS 的 BSD sed 会报 `invalid command code`。
+用仓库里的垫片：
+
+```bash
+export PATH="$PWD/research/tools/macos-sed-shim:$PATH"
+```
+
+Linux/Docker 里不需要。
+
+---
+
+## 5. 常用命令
+
+```bash
+pnpm install                    # 安装（工作区）
+pnpm -r build                   # 全量构建
+pnpm -r typecheck               # 全量类型检查
+pnpm -r test                    # 全量测试（当前 1444 个通过）
+
+pnpm verify:sync                # P0 验收：真实同步闭环（需要服务端在跑）
+pnpm verify:sync:dry            # 不需要服务端，只校验 op 形状
+
+node research/tools/license-inventory.mjs   # 许可证门禁
+node research/tools/docs-link-check.mjs     # 文档死链门禁
+```
+
+**提交前至少跑**：`pnpm -r typecheck && pnpm -r test`。
+
+---
+
+## 6. 环境陷阱（实测踩过，会复现）
+
+### 🔴 `DATABASE_URL` 会污染 docker compose
+
+compose 的变量插值**优先读宿主机环境变量，其次才是 `.env`**。当前 shell 里只要有任何 `DATABASE_URL`，
+容器拿到的就是它，而不是 compose 里那个带 `connection_limit`/`pool_timeout` 的默认值，启动即崩：
+
+```
+ERROR: DATABASE_URL must include exactly one positive connection_limit and pool_timeout value each.
+```
+
+排查**看容器实际收到的值**，不要猜：
+
+```bash
+docker inspect <容器> --format '{{range .Config.Env}}{{println .}}{{end}}' | grep DATABASE_URL
+```
+
+规避：`env -u DATABASE_URL docker compose ... up`
+
+### 🔴 `minimumReleaseAge` 必须显式声明
+
+否则构建结果**取决于跑的是哪个 pnpm**：本机可能是 0，容器里原生 pnpm 11 默认 24 小时，
+同一份 lockfile 本地过、容器报 `lockfile contains entries that the active policies reject`。
+已在 `pnpm-workspace.yaml` 钉死，**不要删那行**。
+
+### 线协议与运行时不对称
+
+1. 服务端**强制 E2EE 且没有开关**：`isPayloadEncrypted` 必须显式 `true`，明文一律 400 `E2EE_REQUIRED`。
+2. 线协议 schema **不校验实体成员**，拼错实体名要到上传后才发现 —— 客户端必须先用 `isEntityType()` 自查。
+3. 线协议 schema **接受明文载荷**，但服务端无条件拒绝。**客户端无法从契约推出"必须加密"。**
+
+### vendored 代码的边界
+
+`packages/sync-core/`、`packages/shared-schema/`、`server/` 都源自 Super Productivity（MIT）。
+改动它们时：更新对应的 `PROVENANCE.md`，并在 `THIRD_PARTY_LICENSES.md` 里保持登记。
+它们的**包级 `package.json` 没有 `license` 字段**（上游也没有），整体靠仓库级 MIT 覆盖 ——
+若要独立抽取子包分发，需先补包级声明。
+
+---
+
+## 7. 工作流
+
+1. **改代码前先读相关的 ADR 与计划**：决策不可逆层（`packages/shared-schema`、线协议、迁移）时尤其。
+2. **可维护性与许可证先查**，不要先写完再补登记。
+3. **测试要能失败**：新增门禁/校验时，先确认它在违规输入下真的会红。**不能失败的检查没有价值。**
+4. **不要为了让测试变绿而改测试**。如果是数据/模型的问题，改模型。
+5. **提交信息说清"为什么"**，尤其是反直觉的地方（比如为什么用 `"*"` 而不是 `workspace:*`）。
+6. 文档按 [`docs/README.md`](docs/README.md) 的分层规则放置，提交前跑死链检查。
+
+### 不要擅自做的事
+
+- 不引入新的第三方依赖，除非先过了可维护性 + 许可证两道门并完成登记
+- 不 bump `CURRENT_SCHEMA_VERSION`
+- 不改已接受的 ADR 的结论（要变更就新写一份）
+- 不修改 `AGENTS.md` / `CONTRIBUTING.md` 的**规则**部分，除非用户在当前任务里明确要求
+- 不在 `CURRENT_SCHEMA_VERSION` / 线协议 / 迁移上做"顺手改一下"
+
+---
+
+## 8. 当前进度
+
+| 阶段 | 状态 |
+|---|---|
+| P0 奠基 | ✅ 已完成（协议已跑通，Docker 实测通过） |
+| P1 单端闭环 | 🔄 规划中 → [详细计划](docs/plans/phase-1-single-client-loop.md) |
+| P2 多端补齐 | ⏸ |
+| P3 平台特性 | ⏸ |
+
+总路线图：[`docs/plans/roadmap.md`](docs/plans/roadmap.md)
+
+### 还挡在前面的决策
+
+- **ADR-0001 许可证选择仍标"待确认"**（[文档](docs/adr/0001-license-decision.md)）。
+  在它确定之前，"能不能用某个库"的判断缺依据。**建议优先拍板。**

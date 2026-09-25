@@ -279,4 +279,4 @@ templates/                  # 邮件模板
 
 ---
 
-*相关文档：`docs/06-reuse-plan.md`（复用方案）、`research/deep-dive-sync-core.md`（客户端同步内核）、`research/licenses.md`（许可证登记）。*
+*相关文档：`docs/research/reuse-plan.md`（复用方案）、`research/deep-dive-sync-core.md`（客户端同步内核）、`research/licenses.md`（许可证登记）。*

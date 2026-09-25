@@ -195,7 +195,7 @@
 
 ## 4. heyta 自己的许可证选择
 
-见 `docs/04-license-decision.md`（ADR-0001，待确认）。
+见 `docs/adr/0001-license-decision.md`（ADR-0001，待确认）。
 
 **当前倾向**：fork MIT 底座 + 自己新增部分以 **AGPL-3.0** 发布 + 运营层（计费/多租户/运维）保持闭源。
 法律依据：MIT 允许再许可（sublicense），可把"MIT 底座 + 自研新增"整体以 AGPL 分发，只需保留原 MIT 声明。

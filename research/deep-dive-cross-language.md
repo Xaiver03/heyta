@@ -192,4 +192,4 @@ Flutter 的优势是**六端一套 UI**，这对"一个人做全平台"是真实
 
 ---
 
-*相关：`research/deep-dive-sync-core.md`（同步内核）、`docs/06-reuse-plan.md`（复用方案）。*
+*相关：`research/deep-dive-sync-core.md`（同步内核）、`docs/research/reuse-plan.md`（复用方案）。*

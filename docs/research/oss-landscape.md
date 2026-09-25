@@ -2,7 +2,7 @@
 
 > 数据核实时间：**2026-09-25**，全部为当日实测（`raw.githubusercontent.com` 的 LICENSE 原文 + 仓库页 + 提交流），非记忆。
 > 图例：✅ 具备 / ❌ 缺失 / ⚠️ 有条件
-> 完整原始报告见 [`research/oss-task-manager-deep-dive.md`](../research/oss-task-manager-deep-dive.md)（16 个项目逐一深挖）
+> 完整原始报告见 [`research/oss-task-manager-deep-dive.md`](../../research/oss-task-manager-deep-dive.md)（16 个项目逐一深挖）
 
 ---
 

@@ -312,7 +312,7 @@
 
 ---
 
-## 16. 需要回填到 `docs/01-oss-landscape.md` 的勘误
+## 16. 需要回填到 `docs/research/oss-landscape.md` 的勘误
 
 现有草稿里以下数据有误，建议按本文更正：
 
@@ -330,9 +330,9 @@
 
 同目录下另有三份由并行调研产出的原始报告，可作为交叉印证：
 
-- `research-open-source-task-managers.md` —— Vikunja / Super Productivity / Tududi 深度报告（含源码行数估算）
+- `oss-task-managers-comparison.md` —— Vikunja / Super Productivity / Tududi 深度报告（含源码行数估算）
 - `oss-pm-comparison-2026-09-25.md` —— Plane / Huly / Focalboard / Leantime / OpenProject / WeKan
-- `research-task-managers-2026-09-25.md` —— Tracks / AppFlowy / Nextcloud Tasks+Deck / Lunatask / Docmost / AFFiNE
+- `task-managers-comparison-2026-09-25.md` —— Tracks / AppFlowy / Nextcloud Tasks+Deck / Lunatask / Docmost / AFFiNE
 
 **局限与已标记的「未核实」项**：
 - GitHub 未认证 REST API 有 60 次/小时限额，且本机 `api.github.com` 不可达，故全部走网页 HTML、`.atom` 提交源与 `raw.githubusercontent.com` 原始文件。

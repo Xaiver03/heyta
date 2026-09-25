@@ -13,7 +13,7 @@
 | 4 | **同步内核** | ✅ **直接复用 `@sp/sync-core`（MIT）** | 已实测：独立构建 + 271/271 测试通过 |
 | 5 | 同步服务端 | ✅ **以 `super-sync-server` 为基座改造** | 已拆解：9 同步 + 13 鉴权端点，零 copyleft |
 | 6 | 部署环境 | ✅ **自有服务器，可跑 Docker** | 你的确认（2026-09-25） |
-| 7 | 许可证 | 🟡 **待最终确认**（ADR-0001） | `docs/04-license-decision.md` |
+| 7 | 许可证 | 🟡 **待最终确认**（ADR-0001） | `docs/adr/0001-license-decision.md` |
 
 ---
 
@@ -160,7 +160,7 @@ Reminder     — id, taskId, triggerAt, offset, fired
 
 ## 7. 剩余待决项
 
-- [ ] **许可证最终确认**（ADR-0001，`docs/04-license-decision.md`）——
+- [ ] **许可证最终确认**（ADR-0001，`docs/adr/0001-license-decision.md`）——
       当前倾向：fork MIT 底座 + 自有增量以 AGPL-3.0 发布 + 运营层（计费/多租户）闭源
 - [ ] **JS 生态内的具体框架**（React vs Vue vs Angular）—— 待定，见实施计划
 - [ ] **MVP 范围**——P0 功能里先做哪些，待定

@@ -14,7 +14,7 @@ for historical context. The executable Compose override, scripts, and runbooks
 were removed; Git history retains them for forensic reference.
 
 The durable rationale and revisit criteria are recorded in
-[the repository decision](../../../docs/supersync-encryption-at-rest-decision.md).
+[the repository decision](https://github.com/super-productivity/super-productivity/blob/aa9690ca28aa6751971dd0e47d9b39c5b72922cb/docs/supersync-encryption-at-rest-decision.md).
 
 ## What is and is not encrypted
 

@@ -8,14 +8,14 @@ application-state semantics, encryption keys and decryption, and resolution of
 rejected conflicts.
 
 For the client and whole-system context, start with the
-[Sync Architecture Field Guide](../../../docs/sync-and-op-log/sync-architecture.html).
+[Sync Architecture Field Guide](https://github.com/super-productivity/super-productivity/blob/aa9690ca28aa6751971dd0e47d9b39c5b72922cb/docs/sync-and-op-log/sync-architecture.html).
 
 ## Ownership and Trust Boundary
 
 - The server is authoritative for each user's retained operation order and
   accepted upload result, not for the semantic meaning of application state.
-- [`@sp/shared-schema`](../../shared-schema/src/supersync-http-contract.ts) owns
-  the HTTP wire contracts. [`@sp/sync-core`](../../sync-core/src/) owns the
+- [`@sp/shared-schema`](../../packages/shared-schema/src/supersync-http-contract.ts) owns
+  the HTTP wire contracts. [`@sp/sync-core`](../../packages/sync-core/src) owns the
   vector-clock algorithms shared by client and server.
 - The server validates identifiers, operation types, sizes, timestamps, clocks,
   schema versions, quotas, and conflict metadata before persistence.
@@ -48,7 +48,7 @@ bundled Helm chart remains single-replica.
 ## Stable API Surface
 
 Request and response fields belong to the
-[shared wire contract](../../shared-schema/src/supersync-http-contract.ts); do
+[shared wire contract](../../packages/shared-schema/src/supersync-http-contract.ts); do
 not duplicate them here.
 
 | Method and path                    | Stable purpose                                                                                             |
@@ -92,7 +92,7 @@ reports `latestSeq: 0` to clients so their existing empty-server recovery runs;
 the next upload allocates above the preserved counter.
 
 This serialization mechanism is a load-bearing decision; see
-[ADR #4](../../../ARCHITECTURE-DECISIONS.md#4-upload-conflict-safety-via-the-lastseq-row-lock-under-repeatableread),
+[ADR #4](https://github.com/super-productivity/super-productivity/blob/aa9690ca28aa6751971dd0e47d9b39c5b72922cb/ARCHITECTURE-DECISIONS.md#4-upload-conflict-safety-via-the-lastseq-row-lock-under-repeatableread),
 [`sync.service.ts`](../src/sync/sync.service.ts), and
 [`operation-upload.service.ts`](../src/sync/services/operation-upload.service.ts).
 
@@ -164,14 +164,14 @@ ordering, and conflict detection.
 The payload's AES-GCM tag does not authenticate the plaintext metadata. E2EE
 therefore provides payload confidentiality and integrity, not metadata
 confidentiality or end-to-end authenticity of the complete operation. See the
-[encryption architecture](../../../docs/sync-and-op-log/supersync-encryption-architecture.md).
+[encryption architecture](https://github.com/super-productivity/super-productivity/blob/aa9690ca28aa6751971dd0e47d9b39c5b72922cb/docs/sync-and-op-log/supersync-encryption-architecture.md).
 
 ## Executable Owners and Tests
 
 | Concern                      | Owner                                                                                                                               |
 | ---------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
 | Authentication               | [`api.ts`](../src/api.ts), [`auth.ts`](../src/auth.ts), [`passkey.ts`](../src/passkey.ts), [`auth-cache.ts`](../src/auth-cache.ts)  |
-| Wire protocol                | [`supersync-http-contract.ts`](../../shared-schema/src/supersync-http-contract.ts)                                                  |
+| Wire protocol                | [`supersync-http-contract.ts`](../../packages/shared-schema/src/supersync-http-contract.ts)                                                  |
 | HTTP and WebSocket routes    | [`sync.routes.ts`](../src/sync/sync.routes.ts), [`websocket.routes.ts`](../src/sync/websocket.routes.ts)                            |
 | Upload transaction and order | [`sync.service.ts`](../src/sync/sync.service.ts), [`operation-upload.service.ts`](../src/sync/services/operation-upload.service.ts) |
 | Conflict lookup              | [`conflict.ts`](../src/sync/conflict.ts)                                                                                            |

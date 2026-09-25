@@ -43,7 +43,7 @@ trust the submitted credential. It stores that credential as a
 that token is consumed, the server atomically verifies the user, deletes any
 other pending or active credentials for that account, and promotes only the
 credential bound to that link. This is the active architecture recorded in
-[ADR #6](../../../ARCHITECTURE-DECISIONS.md#6-passkeys-stay-pending-until-email-verification).
+[ADR #6](https://github.com/super-productivity/super-productivity/blob/aa9690ca28aa6751971dd0e47d9b39c5b72922cb/ARCHITECTURE-DECISIONS.md#6-passkeys-stay-pending-until-email-verification).
 
 ### Magic-Link Registration and Login
 
