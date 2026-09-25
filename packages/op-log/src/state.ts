@@ -24,6 +24,7 @@ import type {
   FocusSession,
   Habit,
   HabitLog,
+  Note,
   Project,
   Tag,
   Task,
@@ -36,6 +37,7 @@ export interface MaterializedState {
   tasks: Record<string, Task>;
   projects: Record<string, Project>;
   tags: Record<string, Tag>;
+  notes: Record<string, Note>;
   habits: Record<string, Habit>;
   habitLogs: Record<string, HabitLog>;
   focusSessions: Record<string, FocusSession>;
@@ -46,6 +48,7 @@ export function emptyState(): MaterializedState {
     tasks: {},
     projects: {},
     tags: {},
+    notes: {},
     habits: {},
     habitLogs: {},
     focusSessions: {},
@@ -57,6 +60,7 @@ const BUCKET_BY_ENTITY = {
   TASK: 'tasks',
   PROJECT: 'projects',
   TAG: 'tags',
+  NOTE: 'notes',
   HABIT: 'habits',
   HABIT_LOG: 'habitLogs',
   FOCUS_SESSION: 'focusSessions',
@@ -66,6 +70,28 @@ type ModeledEntity = keyof typeof BUCKET_BY_ENTITY;
 
 function isModeled(entityType: string): entityType is ModeledEntity {
   return entityType in BUCKET_BY_ENTITY;
+}
+
+/**
+ * 取某实体在物化状态里的桶。
+ *
+ * 🔴 这是**唯一**的实体类型 → 桶 的运行时映射。
+ *
+ * 曾经 `engine.ts` 的 `snapshot()` 自己又抄了一份同样的 6 行映射。
+ * 于是「哪些实体被建模、各自在哪个桶」在仓库里有**四份**定义：
+ * `EntityModelMap`、`hasModel`、`BUCKET_BY_ENTITY`、`snapshot()` 里的内联表。
+ * 加一个新实体要改四处，漏掉 `snapshot` 的那处**不会报错** ——
+ * 只会让该实体的 `overwritten` 判定恒为 false，即冲突覆盖**静默不生效**。
+ */
+/** 实体在物化状态里的形状：任意字段 + 写入闸门要读的 `updatedAt`。 */
+export type MaterializedBucket = Record<string, Record<string, unknown> & { updatedAt?: number }>;
+
+export function bucketFor(
+  state: MaterializedState,
+  entityType: string,
+): MaterializedBucket | undefined {
+  if (!isModeled(entityType)) return undefined;
+  return state[BUCKET_BY_ENTITY[entityType]] as unknown as MaterializedBucket;
 }
 
 /** reducer 会物化的实体类型（供门禁与宿主自省）。 */
@@ -90,10 +116,6 @@ export const MODELED_ENTITY_TYPES: readonly string[] = Object.keys(BUCKET_BY_ENT
  * 从这份清单里移除一项 = 那个实体的物化已经实现。
  */
 export const UNMODELED_ENTITY_TYPES: readonly { entityType: string; reason: string }[] = [
-  {
-    entityType: 'NOTE',
-    reason: '领域类型尚未定义；笔记功能未开始',
-  },
   {
     entityType: 'TASK_REPEAT_CFG',
     reason: '重复任务规则；需要重复展开语义与产品决策，尚未开始',

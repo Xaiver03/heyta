@@ -15,6 +15,7 @@
 
 import { describe, expect, it } from 'vitest';
 
+import { MODELED_ENTITY_TYPES as DOMAIN_MODELED } from '@heyta/domain';
 import { ENTITY_TYPES } from '@heyta/shared-schema';
 
 import { MODELED_ENTITY_TYPES, UNMODELED_ENTITY_TYPES } from '../src/state.js';
@@ -69,5 +70,19 @@ describe('实体覆盖：合法实体不许被静默丢弃', () => {
       const total = Object.values(state).reduce((n, bucket) => n + Object.keys(bucket).length, 0);
       expect(total, `${entityType} 声称已物化，但 dispatch 之后状态里没有它`).toBeGreaterThan(0);
     }
+  });
+});
+
+describe('🔴「已建模」只能有一份定义', () => {
+  it('domain 与 op-log 的已建模清单必须完全一致', () => {
+    // 这两份清单描述的是同一个事实：「哪些实体有领域模型、会被物化」。
+    // 它们曾经是各自手写的（domain: EntityModelMap + hasModel，op-log: BUCKET_BY_ENTITY），
+    // 加上 hasModel 里手抄的第三遍 —— 三份互不校验的定义。
+    // 只加一处、忘了另一处，那个实体就会被静默丢弃（见 AGENTS.md #20）。
+    expect(
+      [...MODELED_ENTITY_TYPES].sort(),
+      'domain 的 MODELED_ENTITY_TYPES 与 op-log 的 MODELED_ENTITY_TYPES 不一致。' +
+        '同一个事实不能有两份定义：改一处必须同步改另一处。',
+    ).toEqual([...DOMAIN_MODELED].sort());
   });
 });

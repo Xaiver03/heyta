@@ -586,3 +586,39 @@ describe('🔴 删除也要记下自己的时钟', () => {
     expect(s.tasks['e1']!.title).toBe('删除之后的编辑');
   });
 });
+
+describe('便签（NOTE）：曾是被静默丢弃的实体之一', () => {
+  const noteOp = (over: Record<string, unknown>) =>
+    makeOp({
+      entityType: 'NOTE',
+      actionType: 'CREATE_NOTE',
+      entityId: 'note-1',
+      ...over,
+    } as never);
+
+  it('物化到 notes 桶，而不是被静默丢掉', () => {
+    const s = applyOperation(
+      emptyState(),
+      noteOp({ payload: { content: '买菜', projectId: null, isPinnedToToday: true } }),
+    );
+    expect(s.notes['note-1']).toBeDefined();
+    expect(s.notes['note-1']!.content).toBe('买菜');
+    expect(s.notes['note-1']!.isPinnedToToday).toBe(true);
+  });
+
+  it('重放后仍在（说明它真的进了 op 日志，而不是只活在内存里）', () => {
+    const ops = [noteOp({ id: 'n1', payload: { content: '便签内容' } })];
+    const replayed = replayOperations(emptyState(), ops);
+    expect(replayed.notes['note-1']!.content).toBe('便签内容');
+  });
+
+  it('删除留墓碑而不是物理删除（否则另一端会把它同步回来）', () => {
+    let s = applyOperation(emptyState(), noteOp({ id: 'n1', payload: { content: '便签' } }));
+    s = applyOperation(
+      s,
+      noteOp({ id: 'n2', opType: OpType.Delete, payload: {}, timestamp: 5000, vectorClock: { 'client-a': 2 } }),
+    );
+    expect(s.notes['note-1']).toBeDefined();
+    expect(s.notes['note-1']!.deletedAt).toBe(5000);
+  });
+});

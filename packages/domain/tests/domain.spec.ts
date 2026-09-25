@@ -1,3 +1,4 @@
+import { MODELED_ENTITY_TYPES, hasModel } from '../src/index.js';
 /**
  * 领域层测试
  * ===========
@@ -477,5 +478,33 @@ describe('番茄钟状态机', () => {
     expect(formatDuration(1000)).toBe('00:01');
     expect(formatDuration(0)).toBe('00:00');
     expect(formatDuration(-5000)).toBe('00:00'); // 不变负
+  });
+});
+
+// ─────────────────────────────────────────────────────────────
+// 实体模型清单：只能有一份
+// ─────────────────────────────────────────────────────────────
+
+describe('🔴「已建模实体」清单只有一份定义', () => {
+  it('hasModel 对清单里的每个类型都返回 true', () => {
+    for (const t of MODELED_ENTITY_TYPES) {
+      expect(hasModel(t), `${t} 在清单里，hasModel 却说它没有模型`).toBe(true);
+    }
+  });
+
+  it('hasModel 对系统实体返回 false（它们有意不物化）', () => {
+    for (const t of ['GLOBAL_CONFIG', 'MIGRATION', 'RECOVERY', 'ALL'] as const) {
+      expect(hasModel(t), `${t} 是系统实体，不应有领域模型`).toBe(false);
+    }
+  });
+
+  it('清单与 hasModel 不会各说各话（曾经的形状：两处手写、互不校验）', () => {
+    // hasModel 曾经是一串手写的 `type === 'TASK' || ...`，与 EntityModelMap 的键
+    // 各写一遍。加了一个键而忘了另一处，hasModel 就会对着一个真的有模型的实体
+    // 返回 false —— 于是它被静默跳过。
+    // 现在 hasModel 由 MODELED_ENTITY_TYPES 派生，这条断言钉住这个事实。
+    const byList = MODELED_ENTITY_TYPES.filter((t) => hasModel(t));
+    expect(byList.length).toBe(MODELED_ENTITY_TYPES.length);
+    expect(new Set(MODELED_ENTITY_TYPES).size, '清单里有重复项').toBe(MODELED_ENTITY_TYPES.length);
   });
 });

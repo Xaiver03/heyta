@@ -12,6 +12,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 
 import { Priority, Quadrant } from '@heyta/domain';
 import { IndexedDbAdapter, IndexedDbOpLogStore } from '@heyta/storage';
+import { emptyState } from '@heyta/op-log';
 import type { Operation } from '@heyta/sync-core';
 
 import {
@@ -45,14 +46,7 @@ describe('任务 store（D4：写入必须经过 op-log）', () => {
     dbName = `web-test-${Math.random().toString(36).slice(2)}`;
     __resetOpLogForTests();
     useTaskStore.setState({
-      entities: {
-        tasks: {},
-        projects: {},
-        tags: {},
-        habits: {},
-        habitLogs: {},
-        focusSessions: {},
-      },
+      entities: emptyState(),
       filter: { kind: 'all' },
       now: Date.now(),
       ready: false,
@@ -179,14 +173,7 @@ describe('任务 store（D4：写入必须经过 op-log）', () => {
     // 模拟重启：重置模块状态，用同一个 dbName 重新初始化
     __resetOpLogForTests();
     useTaskStore.setState({
-      entities: {
-        tasks: {},
-        projects: {},
-        tags: {},
-        habits: {},
-        habitLogs: {},
-        focusSessions: {},
-      },
+      entities: emptyState(),
       ready: false,
     });
     await initOpLog(dbName);
