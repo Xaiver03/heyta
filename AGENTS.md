@@ -379,5 +379,9 @@ docker inspect <容器> --format '{{range .Config.Env}}{{println .}}{{end}}' | g
 
 - **ADR-0001 许可证 = MIT** ✅（[文档](docs/adr/0001-license-decision.md)）。与 vendored 的 MIT 底座天然兼容。
 - **ADR-0002 迁移工具 = 继续用 Prisma** ✅（[文档](docs/adr/0002-migration-tooling.md)）。
+- **ADR-0004 UI 栈 = React Native** ✅（[文档](docs/adr/0004-ui-stack.md)）。
+  跨平台，且是"排除 WebView 套壳后仍覆盖 iOS + 鸿蒙、还在 JS 生态里"的唯一选项。
+  🔴 **未核实**：本机无鸿蒙工具链，**没有真机/真编译验证过**。
+  投入 UI 开发前**第一步必须是让最小 RN 壳在鸿蒙上真跑起来**。
 
 **当前没有阻塞性决策**，P1 可以持续推进。
