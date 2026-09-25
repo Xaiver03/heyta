@@ -16,6 +16,30 @@
  * 目标：**换存储实现时，上层一行都不用改。**
  */
 
+/**
+ * store / 索引的**声明形状**。所有实现共用同一份 —— 不是各实现各写一份。
+ *
+ * 🔴 抽出它的理由：如果 IndexedDB 与 SQLite 各自定义自己的 schema 类型，
+ * "同一套契约测试跑遍所有实现"就无从谈起 —— 连"有哪些 store、哪些索引"
+ * 都会漂移，而那正是持久化结构的一部分。
+ */
+export interface StoreIndexSchema {
+  name: string;
+  /** 支持点分路径（`op.id`）；数组表示复合索引。 */
+  keyPath: string | string[];
+  unique?: boolean;
+  /** 数组字段展开成多个索引条目（线上 `entityIds` 就是）。 */
+  multiEntry?: boolean;
+}
+
+export interface StoreSchema {
+  name: string;
+  /** 数组表示复合主键。 */
+  keyPath: string | string[];
+  autoIncrement?: boolean;
+  indexes?: StoreIndexSchema[];
+}
+
 /** 主键类型。IndexedDB 允许 string | number，SQLite 亦然。 */
 export type DbKey = string | number;
 

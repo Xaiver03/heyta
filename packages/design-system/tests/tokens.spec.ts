@@ -14,6 +14,10 @@
  *   3. 主题完整性 —— 暗色主题必须覆盖**全部语义颜色**。
  *      漏掉一个的后果是该元素在暗色下保持亮色值（刺眼白块），
  *      这类 bug 只在手动切换主题时才能发现。
+ *
+ * ⚠️ 解析器与对比度公式已抽到 `src/css-tokens.ts`，由这里与生成器
+ * （`src/generate.ts`）共用。**不要在本文件里重新定义它们** ——
+ * 两套解析实现迟早会对同一份 tokens.css 给出不同结果。
  */
 
 import { readFileSync } from 'node:fs';
@@ -21,6 +25,12 @@ import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
+import {
+  contrast,
+  colorOf,
+  extractVars,
+  resolveVar,
+} from '../src/css-tokens.js';
 import {
   AA_PAIRS,
   GRAPHIC_PAIRS,
@@ -32,164 +42,6 @@ import {
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const CSS = readFileSync(resolve(HERE, '../src/tokens.css'), 'utf8');
-
-// ─────────────────────────────────────────────────────────────
-// 解析 tokens.css
-// ─────────────────────────────────────────────────────────────
-
-/**
- * 按**花括号深度**切出顶层块，返回 [选择器, 块体] 列表。
- *
- * 为什么必须按深度：文件末尾有
- *     @media (prefers-reduced-motion: reduce) { :root { --ht-duration-fast: 1ms; } }
- * 这是**合法的、故意的**覆盖（尊重用户的减少动效设置）。
- * 但它里面的 `:root` 在深度 1，不是基准 token 块。
- * 第一版提取器没有深度概念，于是把时长全读成 1ms，测试报"超出 150-300ms" ——
- * 那是**测试错了，不是 CSS 错了**。
- */
-function topLevelBlocks(css: string): Array<[string, string]> {
-  const clean = css.replace(/\/\*[\s\S]*?\*\//g, '');
-  const out: Array<[string, string]> = [];
-  let depth = 0;
-  let buf = '';
-  let selectorStart = 0;
-
-  for (let i = 0; i < clean.length; i++) {
-    const ch = clean[i]!;
-    if (ch === '{') {
-      if (depth === 0) {
-        const selector = clean.slice(selectorStart, i).trim();
-        // 找到配对的闭合括号
-        let d = 1;
-        let j = i + 1;
-        for (; j < clean.length && d > 0; j++) {
-          if (clean[j] === '{') d++;
-          else if (clean[j] === '}') d--;
-        }
-        out.push([selector, clean.slice(i + 1, j - 1)]);
-        i = j - 1;
-        selectorStart = j;
-        continue;
-      }
-      depth++;
-    } else if (ch === '}') {
-      depth = Math.max(0, depth - 1);
-      if (depth === 0) selectorStart = i + 1;
-    }
-    buf += ch;
-  }
-  return out;
-}
-
-/**
- * 抽取变量。
- *
- * ⚠️ 主题必须**基于基准合并**，不能独立抽取。
- * 原因：暗色块只覆盖语义变量，它引用的原始色阶（--ht-blue-400 等）仍然定义在
- * 亮色的 :root 里。只读暗色块的话，resolveVar 会一路走到 --ht-blue-400 就找不到，
- * 报「引用了未定义的 token」—— 这是**测试的实现问题，不是 CSS 的问题**。
- */
-function extractVars(css: string, theme?: string): Map<string, string> {
-  const out = new Map<string, string>();
-
-  // 第一遍：基准 :root
-  for (const [selector, body] of topLevelBlocks(css)) {
-    if (selector !== ':root') continue;
-    for (const [, name, value] of body.matchAll(/(--ht-[\w-]+)\s*:\s*([^;]+);/g)) {
-      if (name && value) out.set(name, value.trim());
-    }
-  }
-
-  // 第二遍：主题覆盖（叠在基准之上）
-  if (theme !== undefined) {
-    for (const [selector, body] of topLevelBlocks(css)) {
-      if (selector !== `[data-theme='${theme}']`) continue;
-      for (const [, name, value] of body.matchAll(/(--ht-[\w-]+)\s*:\s*([^;]+);/g)) {
-        if (name && value) out.set(name, value.trim());
-      }
-    }
-  }
-
-  return out;
-}
-
-/**
- * 把值里的 var(--x) 递归展开成原始值。
- *
- * 必须递归：语义层引用原始色阶（--ht-color-primary → var(--ht-blue-600) → #2563eb），
- * 只展开一层的话拿到的是 `var(--ht-blue-600)`，没法算对比度。
- */
-function resolveVar(
-  value: string,
-  vars: Map<string, string>,
-  depth = 0,
-): string {
-  if (depth > 10) throw new Error(`var() 展开过深，可能存在循环引用：${value}`);
-  const m = value.match(/^var\((--ht-[\w-]+)\)$/);
-  if (!m) return value;
-
-  const next = vars.get(m[1]!);
-  if (next === undefined) {
-    throw new Error(`引用了未定义的 token：${m[1]}`);
-  }
-  return resolveVar(next, vars, depth + 1);
-}
-
-/** 把颜色字面量转成 [r,g,b]（0-255）。支持 hex 与 rgb()/rgb( / ) 两种写法。 */
-function parseColor(input: string): [number, number, number] {
-  const v = input.trim();
-
-  const hex = v.match(/^#([0-9a-fA-F]{3,8})$/);
-  if (hex) {
-    let h = hex[1]!;
-    if (h.length === 3) h = h.split('').map((c) => c + c).join('');
-    if (h.length === 8) h = h.slice(0, 6); // 丢弃 alpha
-    if (h.length !== 6) throw new Error(`无法解析颜色：${input}`);
-    return [
-      Number.parseInt(h.slice(0, 2), 16),
-      Number.parseInt(h.slice(2, 4), 16),
-      Number.parseInt(h.slice(4, 6), 16),
-    ];
-  }
-
-  // rgb(15 23 42 / 0.5) 或 rgb(15, 23, 42)
-  const rgb = v.match(/^rgba?\(\s*([\d.]+)[\s,]+([\d.]+)[\s,]+([\d.]+)/);
-  if (rgb) {
-    return [
-      Math.round(Number(rgb[1])),
-      Math.round(Number(rgb[2])),
-      Math.round(Number(rgb[3])),
-    ];
-  }
-
-  throw new Error(`无法解析颜色：${input}`);
-}
-
-/**
- * WCAG 相对亮度与对比度。
- * 公式取自 WCAG 2.2 §1.4.3 定义（sRGB 通道先线性化）。
- */
-function relativeLuminance([r, g, b]: [number, number, number]): number {
-  const lin = [r, g, b].map((c) => {
-    const s = c / 255;
-    return s <= 0.03928 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4;
-  }) as [number, number, number];
-  return 0.2126 * lin[0] + 0.7152 * lin[1] + 0.0722 * lin[2];
-}
-
-function contrast(a: [number, number, number], b: [number, number, number]): number {
-  const la = relativeLuminance(a);
-  const lb = relativeLuminance(b);
-  const [hi, lo] = la > lb ? [la, lb] : [lb, la];
-  return (hi + 0.05) / (lo + 0.05);
-}
-
-function colorOf(token: string, vars: Map<string, string>): [number, number, number] {
-  const name = cssVarName(token as never);
-  const raw = vars.get(name);
-  if (raw === undefined) throw new Error(`tokens.css 缺少 ${name}`);
-  return parseColor(resolveVar(raw, vars));
-}
 
 // ─────────────────────────────────────────────────────────────
 // 测试
