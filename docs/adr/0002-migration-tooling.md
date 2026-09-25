@@ -110,6 +110,9 @@ Flyway 确实能解决 C4（事务外执行），这一点成立。但代价清�
 
 ## 5. 证据与缺口
 
+> 📄 **完整证据、原始引用与未核实清单**： [`docs/research/migration-tooling.md`](../research/migration-tooling.md)
+> （含官方文档原文、Tier 列截图级引用、issue 状态与 API 限流说明）
+
 ### 5.1 已核实（本 ADR 直接依赖）
 
 §1 的约束全部可复现（读文件、跑脚本、跑 Docker）。迁移调研返回后，以下四项**已从"未核实"转为"已核实"**：
