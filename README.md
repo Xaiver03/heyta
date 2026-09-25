@@ -1,83 +1,83 @@
 # heyta
 
-一款**功能等价于滴答清单（TickTick）**的任务 / 习惯 / 专注管理应用，目标是让用户不再为高昂订阅费买单。
+一款**功能对标滴答清单（TickTick）**的任务 / 习惯 / 专注管理应用 —— 目标是不再为高昂的订阅费买单，并且**可以自建自托管**。
 
-> 当前状态：**立项调研阶段**。代码尚未开始，先把"需求基准 + 技术选型 + 开源复用清单"钉死。
+> **当前状态：P0 奠基已完成（2026-09-25）。** 同步协议已跑通并在真实 Docker + PostgreSQL 上验证：
+> A 端加密写入 → B 端可见 → 载荷在服务端保持密文 → 并发写入被判 `CONFLICT_CONCURRENT`。
+> 下一步：**P1 单端闭环**（Web 端跑通核心功能）→ [详细计划](docs/plans/phase-1-single-client-loop.md)
 
 ---
 
 ## 为什么做这个
 
 滴答清单这类产品把「清单 + 日历 + 四象限 + 习惯打卡 + 番茄钟」打包成订阅制，年费不低。
-而其中每一块能力，开源社区都已经有成熟实现。我们要做的是**把它们整合成一套体验统一的产品**，而不是从零发明轮子。
+而其中每一块能力，开源社区都已经有成熟实现。我们要做的是**把它们整合成一套体验统一的产品**，
+而不是从零发明轮子。
 
 ## 项目原则
 
 1. **功能等价，不抄皮**：对标功能与交互逻辑，不使用对方商标、图标、文案与界面素材。
 2. **复用优先**：能 fork 的 fork，能引库的引库，只自研真正差异化的部分。
-3. **本地优先**：数据默认存用户设备，云端只是同步通道。
-4. **导出自由**：任何时刻都能一键带走全部数据。
-5. **许可证干净**：所有引入的代码必须允许我们的分发/商业模式，逐项登记。
-6. **可维护优先**：引入的第三方组件**必须 2021 年之后仍在持续更新**。许可证再宽松，
-   一个停更三年的库也是负债。核实手段：`python3 research/tools/ghinfo.py owner/repo`。
+3. **本地优先**：数据默认存用户设备，云端只是同步通道，**不是事实源**。
+4. **隐私优先**：端到端加密，服务端从设计上就看不到用户明文。
+5. **导出自由**：任何时刻都能一键带走全部数据。
+6. **许可证干净**：所有引入的代码必须允许我们的分发/商业模式，逐项登记。
+7. **可维护优先**：引入的第三方组件**必须 2021 年之后仍在持续更新**。许可证再宽松，
+   一个停更三年的库也是负债。
 
-## 文档索引
+## 快速开始
 
-### 决策文档（`docs/`）
+```bash
+pnpm install
+pnpm -r build
+pnpm -r test          # 当前 1444 个测试通过
 
-| 文档 | 内容 |
-|------|------|
-| [`docs/00-feature-matrix.md`](docs/00-feature-matrix.md) | 滴答清单功能对照矩阵 —— 需求基准线（P0/P1/P2 分级） |
-| [`docs/01-oss-landscape.md`](docs/01-oss-landscape.md) | 开源项目盘点（16 个项目的许可证、成熟度、可复用性） |
-| [`docs/02-licensing-and-compliance.md`](docs/02-licensing-and-compliance.md) | 许可证与合规边界（AGPL §13、商标、上架成本、定价数据） |
-| [`docs/03-architecture.md`](docs/03-architecture.md) | 技术选型与架构（⚠️ 顶部有推翻声明，同步引擎部分仍有效） |
-| [`docs/04-license-decision.md`](docs/04-license-decision.md) | **ADR-0001** heyta 自己的许可证选择（待确认） |
-| [`docs/05-codebase-assessment.md`](docs/05-codebase-assessment.md) | 上游代码体检：依赖许可证扫描 + 代码量实测 |
-| [`docs/06-reuse-plan.md`](docs/06-reuse-plan.md) | ⭐ **复用方案核心**：精确分层账本 + 复用矩阵 + 待决策点 |
-| [`docs/07-reusable-components.md`](docs/07-reusable-components.md) | 外部组件决策表：每个模块"用现成的还是自研" |
-| [`docs/08-implementation-plan.md`](docs/08-implementation-plan.md) | ⭐ **实施计划**：阶段划分、P0 任务分解、组件判定、风险 |
-| [`docs/09-local-server-verification.md`](docs/09-local-server-verification.md) | ⭐ **本地跑通服务端**：不依赖 Docker 的验证配方 + 三条实测发现 |
+pnpm verify:sync:dry  # 校验同步 op 形状（不需要服务端）
+pnpm check            # 类型 + 迁移规范 + 许可证 + 文档死链
+```
 
-### 深度调研（`research/`）
+跑通服务端（本地或 Docker）、数据库迁移、完整验收流程：
+👉 [`docs/runbooks/local-server-verification.md`](docs/runbooks/local-server-verification.md)
 
-| 文档 | 内容 |
-|------|------|
-| [`research/deep-dive-sync-core.md`](research/deep-dive-sync-core.md) | `packages/sync-core` 逐文件拆解 + 跨语言先例 |
-| [`research/deep-dive-supersync-server.md`](research/deep-dive-supersync-server.md) | 同步服务端：完整 API、数据模型、鉴权、部署 |
-| [`research/deep-dive-schema-providers.md`](research/deep-dive-schema-providers.md) | `shared-schema` + `sync-providers` + **独立构建验证** |
-| [`research/deep-dive-cross-language.md`](research/deep-dive-cross-language.md) | 跨语言集成路径评估（含 Flutter/Dart） |
-| [`research/licenses.md`](research/licenses.md) | ⭐ **依赖许可证登记表**（强制登记规则） |
-| [`research/oss-task-manager-deep-dive.md`](research/oss-task-manager-deep-dive.md) | 16 个开源任务管理项目深度对比 |
-| [`research/ticktick-clone-oss-research.md`](research/ticktick-clone-oss-research.md) | 按功能模块（习惯/番茄/四象限/日历/NLP/RRULE/同步/小组件）的开源方案盘点 |
-| [`research/module3-eisenhower.md`](research/module3-eisenhower.md) | 四象限模块专项调研 |
-| [`research/module5-nlp-dates.md`](research/module5-nlp-dates.md) | 自然语言日期解析专项调研 |
-| [`research/module7-sync-engines.md`](research/module7-sync-engines.md) | 同步引擎市场调研 |
-
-### 工具（`research/tools/`）
-
-| 工具 | 用途 |
-|------|------|
-| `licscan.py` | 扫描 `package-lock.json`，按许可证分类汇总依赖树 |
-| `crypto-interop/` | **跨语言加解密互操作测试**（验证加密契约可移植） |
-| `ghinfo.py` | 绕过 api.github.com DNS 问题抓取仓库事实（stars/许可证/分支） |
-| `wfetch.py` | 经系统代理抓取网页并输出可读文本 |
-| `bsearch.py` | 经代理做 Bing 搜索并输出结构化结果 |
-
-> 上述三个脚本是为绕开本机 `api.github.com` 解析到 `198.18.0.x` 伪 IP 的问题而写的，
-> 后续调研同样适用。
-
-## 目录结构（规划）
+## 目录结构
 
 ```
 heyta/
-├── docs/          # 决策文档，先文档后代码
-├── research/      # 调研原始材料、竞品截图、许可证登记
-└── (待定)         # 应用代码，技术栈确定后生成
+├── packages/
+│   ├── sync-core/        # 同步内核：加密、向量时钟、冲突判定（vendored, MIT）
+│   ├── shared-schema/    # 实体清单、schema 版本、HTTP 线协议契约（zod）
+│   └── storage/          # 存储适配层接口 + 内存实现
+├── server/               # 同步服务端：Fastify + Prisma + PostgreSQL（vendored, MIT）
+├── apps/                 # 客户端应用（P1 开始建）
+├── docs/                 # 产品文档（分层规则见 docs/README.md）
+├── research/             # 调研原料：上游克隆、原始报告、工具脚本（非产品文档）
+└── scripts/              # 仓库级脚本（P0 验收、迁移校验）
 ```
+
+## 📚 文档
+
+**完整索引见 [`docs/README.md`](docs/README.md)** —— 这里不复制一份，避免两处漂移。
+
+按你的身份选入口：
+
+| 你是 | 先读 |
+|---|---|
+| **想了解这个项目** | [`docs/plans/roadmap.md`](docs/plans/roadmap.md) —— 总路线图与当前进度 |
+| **要开始写代码** | [`AGENTS.md`](AGENTS.md)（AI agent 规则）或 [`CONTRIBUTING.md`](CONTRIBUTING.md)（人的流程） |
+| **要跑起来 / 部署** | [`docs/runbooks/local-server-verification.md`](docs/runbooks/local-server-verification.md) |
+| **关心合规与许可证** | [`THIRD_PARTY_LICENSES.md`](THIRD_PARTY_LICENSES.md) + [`ADR-0001`](docs/adr/0001-license-decision.md) |
+| **想理解架构怎么定的** | [`docs/adr/`](docs/adr/)（决策记录）+ [`docs/reference/architecture.md`](docs/reference/architecture.md) |
 
 ## 决策记录
 
-见 `docs/` 下的文档。重大选型会以 ADR 形式追加，不接受"口头决定"。
+重大选型一律以 **ADR** 形式落档，不接受"口头决定"。见 [`docs/adr/`](docs/adr/)。
+
+| 编号 | 决策 | 状态 |
+|---|---|---|
+| [0001](docs/adr/0001-license-decision.md) | heyta 自身的许可证选择 | 🟡 **待确认** |
+| [0002](docs/adr/0002-migration-tooling.md) | 数据库迁移方案：继续用 Prisma | ✅ 已接受 |
+
+**ADR-0001 是唯一还挡在前面的决策** —— 它决定"能不能用某个库"的判断依据，**建议优先拍板**。
 
 ---
 
