@@ -13,3 +13,4 @@ target/
 research/upstream/
 research/standalone/
 research/parts/
+.pnpm-store/
