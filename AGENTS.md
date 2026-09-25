@@ -332,6 +332,15 @@ docker inspect <容器> --format '{{range .Config.Env}}{{println .}}{{end}}' | g
     会让后续所有推理建立在一个假前提上。现在 `pnpm check:arkts` 用真编译器验证 ArkTS 产物。
     ⚠️ 但**不要反向过度声明**：它验证的是**语法/编译**，不是 ArkTS 语义合规 ——
     当前产物只声明常量，没有 `@ohos` 导入或 `Color` 资源类型。
+22. 🔴 **RNOH 的 JS 侧和鸿蒙侧是两个包名、两套 registry —— 查错一边会得到 404。**
+    - JS 侧走 **npm**：`@react-native-oh/react-native-harmony`（`0.84.4`）
+    - 鸿蒙侧走 **ohpm**：`@rnoh/react-native-openharmony`（`0.84.3`）
+    我先拿 `@react-native-oh/...` 去问 ohpm，得到 404，差点据此判定"包不存在"。
+    两侧实测均为 **MIT**；`ohpm install` 实测 28.9 秒成功（309 MB / 11975 文件，
+    含 2509 个 `.h`、2216 个 `.cpp`）。
+    另：官方《环境搭建》文档写"仅支持 RN **0.72.5**"，**该文档已过时** ——
+    实测两侧都已在 `0.84.x`，`peerDependencies` 要 `react-native@0.84.1`。
+    **官方文档里的版本号必须上网核对，不能照抄。**
 
 > 第 4、7 条的根因相同：**两套并行定义**（词表 / 时钟语义）。
 > 这类 bug 单元测试抓不到 —— mock 是按实现者对协议的理解写的，理解错了 mock 跟着错。
@@ -381,7 +390,7 @@ docker inspect <容器> --format '{{range .Config.Env}}{{println .}}{{end}}' | g
 |---|---|
 | P0 奠基 | ✅ 已完成（协议已跑通，Docker 实测通过） |
 | P1 单端闭环 | ✅ **已完成**（6 条零 mock E2E 全过）→ [详细计划](docs/plans/phase-1-single-client-loop.md) |
-| P2 多端补齐 | 🔄 **进行中**（存储契约 ✅ / SQLite ✅ / token 生成器 ✅ / **ArkTS 产物真编译器验证** ✅ / 非 Web 宿主 ✅）→ [详细计划](docs/plans/phase-2-multi-platform.md) |
+| P2 多端补齐 | 🔄 **进行中**（存储契约 ✅ / SQLite ✅ / token 生成器 ✅ / **ArkTS 产物真编译器验证** ✅ / **RNOH 依赖链实测打通** ✅ / 非 Web 宿主 ✅）→ [详细计划](docs/plans/phase-2-multi-platform.md) |
 | P3 平台特性 | ⏸ |
 
 总路线图：[`docs/plans/roadmap.md`](docs/plans/roadmap.md)
@@ -392,8 +401,8 @@ docker inspect <容器> --format '{{range .Config.Env}}{{println .}}{{end}}' | g
 - **ADR-0002 迁移工具 = 继续用 Prisma** ✅（[文档](docs/adr/0002-migration-tooling.md)）。
 - **ADR-0004 UI 栈 = React Native** ✅（[文档](docs/adr/0004-ui-stack.md)）。
   跨平台，且是"排除 WebView 套壳后仍覆盖 iOS + 鸿蒙、还在 JS 生态里"的唯一选项。
-  🔴 **仍未核实**：`ohos_react_native` **没有真机/真编译验证过**（见陷阱 #21：
-  DevEco 其实装了，但 RNOH 本身仍未构建过）。
-  投入 UI 开发前**第一步必须是让最小 RN 壳在鸿蒙上真跑起来**。
+  🟡 **依赖链已实测打通**（npm + ohpm 两侧包均为 **MIT**、可下载、`ohpm install`
+  实测成功），但**尚未构建出 HAP、未跑起来、未编译过 C++**。
+  投入 UI 开发前**第一步仍必须是让最小 RN 壳在鸿蒙上真跑起来**。
 
 **当前没有阻塞性决策**，P1 可以持续推进。

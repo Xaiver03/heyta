@@ -49,14 +49,25 @@ ADR-0003 §2.4 把"具体跨平台 UI 技术栈"留成了开放项。产品负�
 
 ### 证据
 
-1. **鸿蒙支持真实存在且在持续维护**，不是传闻。
-   - 核心框架：`openharmony-sig/ohos_react_native`（Gitee / GitCode），**Gitee 页面标注 License: MIT**。
-   - 三方库适配：`react-native-oh-library` 组织，npm 公仓坐标 **`@react-native-oh-tpl`**。
-   - 活跃度实测（GitHub API，`pushed_at`）：
-     `react-native-harmony-gesture-handler` 2026-08-03、
-     `react-native-harmony-reanimated` 2026-01-14、
-     `react-native-harmony-screens` 2026-07-06；该组织在 **2026-09-24**（查询当天）仍有推送。
+1. **鸿蒙支持真实存在且在持续维护**，不是传闻。已从"仓库元数据"升级为**本机实测**。
+   - 核心框架：`openharmony-sig/ohos_react_native`（Gitee / GitCode）。
+   - **⚠️ 两侧是两个不同的包名，此前我把它们混为一谈过**（见下方"踩过的坑"）：
+     - JS 侧走 **npm**：`@react-native-oh/react-native-harmony`（最新 `0.84.4`）
+     - 鸿蒙侧走 **ohpm**：`@rnoh/react-native-openharmony`（最新 `0.84.3`）
+     - 用 ohpm 查 `@react-native-oh/...` 会 404，反之亦然。**两套 registry，两个名字。**
+   - 许可证实测：**两侧都是 MIT**（npm 侧 `package/LICENSE` 实读为
+     `Copyright (c) 2024 Huawei Technologies Co., Ltd.`）。
+   - 活跃度实测：npm 侧 **2026-09-24 发布**（查询当天）；ohpm 侧 52 个版本。
    - 官方文档明确说明已适配 **Codegen 与新架构（C-API）**。
+   - 三方库适配：`react-native-oh-library` 组织，npm 公仓坐标 **`@react-native-oh-tpl`**；
+     活跃度（GitHub API，`pushed_at`）：`react-native-harmony-gesture-handler` 2026-08-03、
+     `react-native-harmony-reanimated` 2026-01-14、`react-native-harmony-screens` 2026-07-06。
+
+   > **踩过的坑（值得记，因为很容易重犯）**：官方《环境搭建》文档写的是
+   > "目前 React Native for OpenHarmony 仅支持 **0.72.5** 版本"，并给出
+   > `npm i @react-native-oh/react-native-harmony@x.x.x`。**照这份文档做会选到三年前的分支** ——
+   > 实测两侧都已在 `0.84.x`，`peerDependencies` 要求 `react-native@0.84.1`。
+   > **文档里的版本号一律要上网核对，不能照抄。**
 
 2. 🔴 **设计系统侧已经不用再做任何事** —— 这一条改变了 P2 的工作量估算。
    `packages/design-system/src/generate.ts` 的注释里已写明
@@ -103,11 +114,40 @@ ADR-0003 §2.4 把"具体跨平台 UI 技术栈"留成了开放项。产品负�
 
 **必须写明，因为这决定了后续第一步该做什么。**
 
-1. 🔴 **`ohos_react_native` 能否真的构建并运行，仍未验证。**
-   上面全部结论来自仓库元数据（许可证、最后推送时间）与官方文档，**不是**一次成功的构建。
-   → 因此**在投入 UI 开发之前，第一步必须是"让一个最小 RN 壳在鸿蒙上真跑起来"**。
+1. 🟡 **`ohos_react_native` 的依赖链已被实测打通，但"构建出 HAP 并运行"仍未验证。**
+   → 因此**在投入 UI 开发之前，第一步仍然是"让一个最小 RN 壳在鸿蒙上真跑起来"**。
    如果这一步失败，"跨平台"的结论需要重新评估（可能要退到"RN 覆盖 iOS/Android +
    鸿蒙单独用 ArkUI"，那会改变本 ADR 的结论）。
+
+   **下面这些已经不是"文档说"，而是在本机实际跑出来的（2026-09-25）：**
+
+   | 实测项 | 结果 |
+   |---|---|
+   | npm 侧包存在 | ✅ `@react-native-oh/react-native-harmony` |
+   | npm 侧许可证 | ✅ **MIT**（`Copyright (c) 2024 Huawei Technologies Co., Ltd.`） |
+   | npm 侧活跃度 | ✅ **2026-09-24 发布**（查询当天） |
+   | tarball 实际下载 | ✅ **103 MB / 1391 文件**，取出 3 个真实 `.har` |
+   | ohpm 侧包存在 | ✅ `@rnoh/react-native-openharmony@0.84.3` |
+   | ohpm 侧许可证 | ✅ **MIT**，52 个版本 |
+   | **`ohpm install` 实际执行** | ✅ **成功，28.9 秒**，连依赖 `@ppd/ffrt@1.1.10` 一并拉下 |
+   | 落盘体积 / 文件数 | 309 MB / **11975 个文件** |
+   | 含真原生代码 | ✅ **2509 个 `.h`、2216 个 `.cpp`、40 个 `.ets`、4 个 `.so`** |
+   | 本机原生工具链 | ✅ SDK `native/`（`llvm`、`build-tools`）、`hvigorw`、`ohpm`、`es2abc` |
+
+   ⚠️ **两处必须说清的更正，因为它们都推翻了先前的说法：**
+
+   - 本条初稿曾写"本机没有 HarmonyOS 工具链，也没有 ArkTS 编译器"。**那是错的** ——
+     DevEco Studio 6.1.1.300 就装在本机，SDK 为 API 24。当时的探测只查了 PATH，
+     就把"没找到"当成了"不存在"（陷阱 #21）。"本机没有工具链"这条**已作废**。
+   - 官方《环境搭建》文档写"仅支持 React Native **0.72.5**"，**该文档已过时**：
+     实测 npm 侧最新为 `0.84.4`、ohpm 侧 `0.84.3`，`peerDependencies` 要求
+     `react-native@0.84.1`。**照文档选版本会选到一个三年前的分支。**
+
+   ⚠️ **还没验证的是什么**：没有跑过 `hvigorw assembleHap`，
+   **没有编译过一行 C++，没有生成过 HAP，没有在设备/模拟器上跑起来**。
+   已确认的是"零件齐全且取得到"；未确认的是"这些零件能拼成能跑的东西"。
+   原生侧需要本地编译（`CMakeLists.txt` 存在，且 `.so` 仅 4 个而非各 ABI 齐全），
+   这是下一步最可能出问题的地方。
 
    > **更正（同日）**：本条初稿写的是"本机没有 HarmonyOS 工具链，也没有 ArkTS 编译器"。
    > **那是错的。** DevEco Studio 6.1.1.300 就装在本机
