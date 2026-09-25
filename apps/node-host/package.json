@@ -2,13 +2,16 @@
   "name": "@heyta/node-host",
   "version": "0.0.0",
   "private": true,
-  "description": "heyta 非 Web 宿主：真 SQLite 文件 + op-log 引擎 + 宿主无关同步客户端。用来证明业务逻辑不在浏览器里",
+  "description": "heyta 非 Web 宿主：真 SQLite 文件 + op-log 引擎 + 宿主无关同步客户端。接线与动作都在 @heyta/app-host，本包只剩\"用哪个驱动\"这一个平台差异",
   "license": "MIT",
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "exports": {
-    ".": { "types": "./dist/index.d.ts", "default": "./dist/index.js" }
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
   },
   "scripts": {
     "build": "tsup",
@@ -23,7 +26,8 @@
     "@heyta/shared-schema": "workspace:*",
     "@heyta/storage": "workspace:*",
     "@heyta/sync-client": "workspace:*",
-    "@heyta/sync-core": "workspace:*"
+    "@heyta/sync-core": "workspace:*",
+    "@heyta/app-host": "workspace:*"
   },
   "devDependencies": {
     "tsup": "^8.5.1",

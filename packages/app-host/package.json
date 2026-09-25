@@ -1,0 +1,36 @@
+{
+  "name": "@heyta/app-host",
+  "version": "0.0.0",
+  "private": true,
+  "description": "宿主无关的应用接线：把 SQLite 驱动接到 op-log 引擎与同步客户端，并承载所有平台共用的写入动作（ADR-0003 §2.1）",
+  "license": "MIT",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsup",
+    "typecheck": "tsc --noEmit -p tsconfig.spec.json",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "@heyta/domain": "workspace:*",
+    "@heyta/op-log": "workspace:*",
+    "@heyta/shared-schema": "workspace:*",
+    "@heyta/storage": "workspace:*",
+    "@heyta/sync-client": "workspace:*",
+    "@heyta/sync-core": "workspace:*"
+  },
+  "devDependencies": {
+    "tsup": "^8.5.1",
+    "typescript": "^5.9.3",
+    "vitest": "^5.0.1",
+    "fake-indexeddb": "^6.2.5"
+  }
+}

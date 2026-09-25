@@ -20,9 +20,16 @@ heyta 是一个**本地优先**的任务管理应用，目标是做一个功能�
 |---|---|---|
 | `packages/sync-core/` | 同步内核（加密、向量时钟、冲突判定）。**vendored 自 Super Productivity，MIT** | ⚠️ 尽量不改，改了要更新 `PROVENANCE.md` |
 | `packages/shared-schema/` | 实体清单、schema 版本、HTTP 线协议契约（zod） | ✅ heyta 已改造，是**不可逆层** |
-| `packages/storage/` | 存储适配层接口 + 内存实现（`DbAdapter` / `OpLogStore`） | ✅ |
+| `packages/storage/` | 存储适配层接口 + 索引↔SQLite 两套实现（`DbAdapter` / `OpLogStore`） | ✅ |
+| `packages/op-log/` | op-log 引擎与 reducer（物化状态、向量时钟闸门、墓碑） | ✅ |
+| `packages/domain/` | 领域实体与 `EntityModelMap`（哪些实体真的被物化） | ✅ |
+| `packages/sync-client/` | 宿主无关的同步编排（上传/下载/冲突上报） | ✅ |
+| `packages/design-system/` | 设计变量唯一事实源 + 三端生成器（Swift / ArkTS / RN） | ✅ |
+| `packages/app-host/` | **宿主无关的应用接线与写入动作**（见下文 §3.5） | ✅ |
 | `server/` | 同步服务端（Fastify + Prisma + PostgreSQL）。**vendored，MIT** | ✅ 已改造 |
-| `apps/` | 客户端应用（P1 开始建，当前为空） | ✅ |
+| `apps/` | 客户端外壳。**只允许放平台差异与 UI 绑定** | ✅ |
+| `apps/web/` | Web 壳（IndexedDB + 浏览器 fetch） | ✅ |
+| `apps/node-host/` | 非 Web 验证壳（真 SQLite 文件）。**接线已全部来自 `app-host`** | ✅ |
 | `docs/` | 产品文档。**分层规则见 [`docs/README.md`](docs/README.md)** | ✅ |
 | `research/` | 调研原料：上游克隆、原始报告、一次性脚本。**不是产品文档** | ⚠️ 归档性质 |
 | `scripts/` | 仓库级脚本（如 P0 验收） | ✅ |
@@ -75,6 +82,29 @@ node research/tools/license-inventory.mjs      # 非零退出 = 有不合格依�
 
 > 依据：上游 `src/app/op-log/` 那 5 万行是**用真实故障换来的规格书**。改动同步逻辑前先读它，
 > 但**移植语义，不要拷贝代码**（它绑定 Angular + NgRx）。
+
+### 3.5 宿主外壳的边界（`packages/app-host`）
+
+ADR-0003 §2.1 的分界线原来有个说不清的地方：把零件接起来算"业务逻辑"还是"平台外壳"。
+结论是**两者都不是** —— 它是每个宿主都要做、且**一模一样**的管道。
+
+所以：**`apps/*` 只允许有一处平台差异** —— 注入哪个 SQLite 驱动。
+
+| 允许出现在 `apps/*` | 必须出现在 `packages/app-host` |
+|---|---|
+| `driverFactory: () => new NodeSqliteDriver(path)` | `SqliteAdapter` 的 schema 与初始化顺序 |
+| 库文件路径 / 库名 | `clientId` 的读取与持久化 |
+| UI 组件与平台 API | 同步游标读写、`SyncClientOptions` 的十几个回调 |
+| | **任务 op 的构造**（`createTaskActions`） |
+
+判断方法很直接：**这段代码里有没有任何一行在决定"业务上该怎么做"？**
+有就是提取得不够。`addTask` 该写哪些字段、软删除发 `DEL` 还是改标志位、
+清除字段该写 `null` 还是 `undefined` —— 全是产品语义，**一律不许出现在 `apps/`**。
+
+> 实测代价：抽出来之前，`apps/web` 与 `apps/node-host` 各有一份任务 op 构造，
+> 而且**已经漂移了**：`node-host` 用 `crypto.randomUUID()` 生成 entityId 且没有回退，
+> 而 `apps/web` 用的是 `Date.now()+counter` 且有回退。移动端（Hermes）没有
+> `randomUUID` 时会**在用户点"新建任务"的那一刻抛异常**。
 
 ---
 
@@ -207,7 +237,7 @@ pnpm check:design     # 非零退出 = 有裸值
 pnpm install                    # 安装（工作区）
 pnpm -r build                   # 全量构建
 pnpm -r typecheck               # 全量类型检查
-pnpm -r test                    # 全量测试（当前 2104 个通过 + 11 个 Web E2E 默认跳过 + 1 个服务端跳过）
+pnpm -r test                    # 全量测试（当前 2137 个通过 + 11 个 Web E2E 默认跳过 + 1 个服务端跳过）
 
 pnpm verify:sync                # P0 验收：真实同步闭环（需要服务端在跑）
 pnpm verify:sync:dry            # 不需要服务端，只校验 op 形状
@@ -356,6 +386,14 @@ docker inspect <容器> --format '{{range .Config.Env}}{{println .}}{{end}}' | g
     实测 `apps/web` 因此从 48 掉到 38 且静默变成 2 个 suite 无法加载。
     现在生成器用独立的 `tsup.generate.config.ts`，`clean: false`：
     **生成器只允许新增文件，绝不删别人的。**
+25. 🔴 **随机 id 会让"顺序"断言随机变红 —— flaky 测试比没有测试更糟。**
+    写"列表按 (createdAt, id) 排序"的测试时，我先用真实 `Date.now()` + 随机 UUID。
+    后果：三条随机 UUID 恰好已是升序的概率是 **1/6**，于是"排序真的生效了吗"
+    这条断言**随机变红**（实测 8 次红 4 次）。为了"防止巧合"我又加了
+    `expect(listed).not.toEqual(insertionOrder)` —— **那本身才是 flaky 的源头**。
+    根治办法不是放宽断言，而是**让 id 与时钟都可注入**（`now` / `newTaskId` 选项），
+    然后造一个"按 id 排"与"按创建先后排"必然不同的确定场景。
+    **一条会随机失败的测试会教人忽略红色**，那比缺测试危险得多。
 
 > 第 4、7 条的根因相同：**两套并行定义**（词表 / 时钟语义）。
 > 这类 bug 单元测试抓不到 —— mock 是按实现者对协议的理解写的，理解错了 mock 跟着错。

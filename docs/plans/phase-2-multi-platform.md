@@ -97,14 +97,23 @@ Fastify + PostgreSQL，两台独立宿主各用一个 SQLite 文件，**每条�
 **关键发现（好消息）**：宿主**没有改动 `packages/` 或 `apps/web` 一行**。
 分层是真的 —— 换宿主确实只是换存储实现与网络注入。
 
-**但有一处诚实的接缝**：`SyncClientOptions` 的那十来个回调
+**但曾有一处诚实的接缝**：`SyncClientOptions` 的那十来个回调
 （`getLocalOps` / `markUploaded` / `applyRemote` / `redispatch` …）在
-`apps/web` 与 `apps/node-host` 里各接了一遍。它们不是业务逻辑（业务逻辑在
-`packages/sync-client` 里完整存在），只是"把引擎的方法接到选项上"的管道，
-所以不影响"换壳"的结论；但它确实是**每个宿主都要抄一遍的样板**。
-若将来第三个宿主出现，值得把这段接线提到 `packages/` 里做成
-`createSyncClient(engine, ...)` —— 现在只有两处，且两端行为分别由
-`verify:p1` 与 `verify:p2` 两条零 mock 验收同时钉住，暂不重构。
+`apps/web` 与 `apps/node-host` 里各接了一遍。
+
+**✅ 已解决（移动端落地时触发）。** 计划里原本写着"若将来第三个宿主出现，
+值得把这段接线提到 `packages/` 里" —— 移动端就是第三个宿主，条件已满足。
+新增 `packages/app-host`，`apps/node-host` 从 **270 行降到 129 行**，
+只剩一处平台差异（`driverFactory`）。
+
+抽取时发现了比"样板重复"更严重的事：**两份任务 op 构造已经漂移了**。
+`apps/node-host` 用 `crypto.randomUUID()` 生成 entityId **且没有回退**，
+而 `apps/web` 用 `Date.now()+counter` 且有回退。移动端（Hermes 没有
+`randomUUID`）会在**用户点"新建任务"的那一刻**抛异常。
+现在 id 生成与 op 构造都只有一份（`packages/app-host/src/ids.ts` / `actions.ts`）。
+
+**重构没有改变行为**：`pnpm verify:p2` 仍然 8/8 全过（真实 SQLite 文件、
+两个独立宿主经真实服务端双向同步、服务端只存密文，全程零 mock）。
 
 **验收确实能失败**：把 Host B 指向死掉的端口（`http://127.0.0.1:9`）后，
 `pnpm verify:p2` 退出码 1，输出
