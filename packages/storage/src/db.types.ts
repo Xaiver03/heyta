@@ -27,8 +27,15 @@ export interface DbKeyRange {
   upperOpen?: boolean;
 }
 
-/** 索引查询：既可以是区间，也可以是精确键列表。 */
-export type DbIndexQuery = DbKeyRange | DbKey[];
+/**
+ * 索引查询：区间、标量键、或复合索引的键数组。
+ *
+ * ⚠️ **标量必须包含在内。** 我第一版写成 `DbKeyRange | DbKey[]`，
+ * 于是 `getAllFromIndex(store, idx, 'pending')` 这类单键查询**通不过类型检查**，
+ * 而它恰恰是最常用的形式（查某个状态、某个外键）。
+ * 少了它，实现里只能靠 `as any` 绕过 —— 那就把类型安全丢了。
+ */
+export type DbIndexQuery = DbKeyRange | DbKey | DbKey[];
 
 export type DbTxMode = 'readonly' | 'readwrite';
 

@@ -23,6 +23,7 @@
 import type { Operation, RemoteOperationApplyStorePort } from '@heyta/sync-core';
 import type { EntityType } from '@heyta/shared-schema';
 import type { DbKeyRange } from './db.types';
+import type { ApplyStatus } from './stores';
 
 /** 操作的来源。 */
 export type OperationSource = 'local' | 'remote' | 'import';
@@ -33,12 +34,11 @@ export interface StoredOperation<TOperation extends Operation<string> = Operatio
   seq: number;
   op: TOperation;
   source: OperationSource;
-  /** 远程 op：是否等待应用（崩溃恢复标记）。 */
-  pendingApply?: boolean;
-  /** 是否已应用。 */
-  applied?: boolean;
-  /** 应用失败标记。 */
-  failed?: boolean;
+  /**
+   * 应用状态。**是字符串不是布尔** —— IndexedDB 不能索引布尔值，
+   * 见 `stores.ts` 的 {@link ApplyStatus} 注释（这是踩过的坑）。
+   */
+  applyStatus: ApplyStatus;
 }
 
 /**
