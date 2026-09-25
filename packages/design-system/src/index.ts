@@ -31,3 +31,17 @@ export {
 } from './tokens.js';
 
 export type { TokenGroup, TokenName } from './tokens.js';
+
+// ── React Native ──────────────────────────────────────────────
+// RN 没有 var()/层叠，因此不能复用 cssVar()：它需要的是**展开后的字面值**
+// 加一套显式的主题解析。数据来自同一份 tokens.css，与 Web/Swift/ArkTS 同源。
+export {
+  THEME_NAMES,
+  lightTokens,
+  darkTokens,
+  reducedMotionTokens,
+  resolveThemeName,
+  tokensForTheme,
+  resolveNativeTokens,
+} from './native.js';
+export type { HeytaNativeTokens, ThemeName, ColorSchemeLike } from './native.js';

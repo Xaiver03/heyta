@@ -66,6 +66,8 @@ export interface GeneratedBundle {
   swift: string;
   arkts: string;
   json: string;
+  /** React Native 用的带类型模块（完整主题表，暗色已合并）。 */
+  native: string;
   tokens: NativeToken[];
 }
 
@@ -482,6 +484,85 @@ export function toJson(tokens: readonly NativeToken[]): string {
   return `${JSON.stringify({ light, dark, reducedMotion }, null, 2)}\n`;
 }
 
+/**
+ * 生成 React Native 用的**带类型** token 模块。
+ *
+ * 🔴 为什么不能只给 RN 一个 `tokens.json`
+ *
+ * `toJson` 产出的是**裸值转储**：`dark` 段**只含被显式覆盖的 token**（稀疏）。
+ * 这在数据层面是对的（未覆盖就该回退 Light），但它把"回退"这件事
+ * **推给了每一个消费点**：RN 端写 `dark['color.background']` 而该 token
+ * 恰好没被覆盖，拿到的是 `undefined` —— 而 RN **不报错**，只是渲染成空。
+ * 这正是本项目反复抓到的同一类静默失败（对比 `cssVar()` 那段注释：
+ * "写错名字不会报错，只会在浏览器里静默失效"）。
+ *
+ * 所以这里产出的是：
+ *   1. **完整**的 `lightTokens` / `darkTokens` —— 暗色已经合并完，没有洞。
+ *   2. **精确类型** —— 数值 token 是 `number`，颜色是 `string`，
+ *      拼错名字是**编译期错误**，不是运行期 `undefined`。
+ *   3. `reducedMotionTokens` 明确是 `Partial`，因为它本来就只是覆盖层。
+ *
+ * 这里**不重新解析 CSS**，只消费 buildNativeTokens 的结果 —— 与 Swift/ArkTS
+ * 产物同源，因此三端不可能漂移出不同的值。
+ */
+export function toNativeTS(tokens: readonly NativeToken[]): string {
+  assertUniqueNames(tokens);
+
+  const tsType = (t: NativeToken): string => (t.kind === 'number' ? 'number' : 'string');
+  const literal = (v: string | number): string =>
+    typeof v === 'number' ? String(v) : JSON.stringify(v);
+
+  const lines: string[] = [
+    '/**',
+    ' * heyta 设计变量的 React Native 产物 —— **自动生成，请勿手改**。',
+    ' *',
+    ' * 唯一事实源：`packages/design-system/src/tokens.css`',
+    ' * 重新生成：`pnpm --filter @heyta/design-system run generate`',
+    ' *',
+    ' * 与 `tokens.json` 的区别（重要）：',
+    ' *   - 这里是**完整**的主题表。暗色已与亮色合并，**没有 undefined 空洞**。',
+    ' *   - 数值 token 是 `number`，颜色是 `string`；拼错名字是编译期错误。',
+    ' *   - `tokens.json` 的 dark 段是稀疏覆盖，只适合数据流水线，不适合直接消费。',
+    ' */',
+    '',
+    "export type ThemeName = 'light' | 'dark';",
+    '',
+    '/** 全部 token 在某一主题下的完整取值。 */',
+    'export interface HeytaNativeTokens {',
+  ];
+
+  for (const t of tokens) {
+    if (t.note) lines.push(`  /** ${t.note} */`);
+    lines.push(`  readonly '${t.token}': ${tsType(t)};`);
+  }
+  lines.push('}');
+  lines.push('');
+
+  const emitMap = (name: string, valueOf: (t: NativeToken) => string | number): void => {
+    lines.push(`export const ${name}: HeytaNativeTokens = {`);
+    for (const t of tokens) lines.push(`  '${t.token}': ${literal(valueOf(t))},`);
+    lines.push('};');
+    lines.push('');
+  };
+
+  emitMap('lightTokens', (t) => t.light);
+  // 暗色：**合并**，未覆盖的显式回退到亮色值。
+  emitMap('darkTokens', (t) => t.dark ?? t.light);
+
+  lines.push('/** `prefers-reduced-motion` 的覆盖层；只需覆盖真的会动的 token。 */');
+  lines.push('export const reducedMotionTokens: Partial<HeytaNativeTokens> = {');
+  for (const t of tokens) {
+    if (t.reducedMotion !== null) lines.push(`  '${t.token}': ${literal(t.reducedMotion)},`);
+  }
+  lines.push('};');
+  lines.push('');
+
+  lines.push(`export const THEME_NAMES: readonly ThemeName[] = ['light', 'dark'];`);
+  lines.push('');
+
+  return lines.join('\n');
+}
+
 // ─────────────────────────────────────────────────────────────
 // 入口
 // ─────────────────────────────────────────────────────────────
@@ -492,6 +573,7 @@ export function generateAll(css: string): GeneratedBundle {
     swift: toSwift(tokens),
     arkts: toArkTS(tokens),
     json: toJson(tokens),
+    native: toNativeTS(tokens),
     tokens,
   };
 }
