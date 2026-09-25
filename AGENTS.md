@@ -207,7 +207,7 @@ pnpm check:design     # 非零退出 = 有裸值
 pnpm install                    # 安装（工作区）
 pnpm -r build                   # 全量构建
 pnpm -r typecheck               # 全量类型检查
-pnpm -r test                    # 全量测试（当前 2041 个通过 + 11 个 E2E 默认跳过 + 1 个服务端跳过）
+pnpm -r test                    # 全量测试（当前 2048 个通过 + 11 个 Web E2E 默认跳过 + 1 个服务端跳过）
 
 pnpm verify:sync                # P0 验收：真实同步闭环（需要服务端在跑）
 pnpm verify:sync:dry            # 不需要服务端，只校验 op 形状
@@ -217,6 +217,7 @@ pnpm verify:p2                  # P2 验收：**自带真实服务端**，非 We
 pnpm check                      # 全部门禁：类型 + 迁移 + 许可证 + 文档 + 设计变量
 pnpm check:design               # 只跑设计变量硬编码检查
 pnpm check:tokens               # 原生 token 产物是否与 tokens.css 同步
+pnpm check:arkts                # 用**真 ArkTS 编译器**编译生成的 .ets 产物
 ```
 
 **提交前至少跑**：`pnpm -r typecheck && pnpm -r test`。
@@ -321,6 +322,16 @@ docker inspect <容器> --format '{{range .Config.Env}}{{println .}}{{end}}' | g
     现在 `packages/op-log/src/state.ts` 导出 `MODELED_ENTITY_TYPES` /
     `UNMODELED_ENTITY_TYPES`，`entity-coverage` 测试要求每个 `ENTITY_TYPES` 成员
     要么物化、要么**显式登记并写明原因**。实现后不移除登记会红 —— 清单不会腐烂。
+21. 🔴 **"不在 PATH 上"不等于"没装"。** 我探测鸿蒙工具链时只查了 `command -v`，
+    没查到就写下"本机没有 HarmonyOS 工具链，也没有 ArkTS 编译器"——
+    **这是错的**。DevEco Studio 6.1.1.300 就装在 `/Applications/DevEco-Studio.app`，
+    SDK 为 API 24，`hdc` / `ohpm` / `hvigorw` / **ArkTS 编译器 `es2abc`** 全在里面：
+    `.../ets/build-tools/ets-loader/bin/ark/build-mac/bin/es2abc`
+    （Apple Silicon 用 `build-mac`；SDK 根在 `Contents/sdk/default/openharmony`）。
+    结论：**探测工具链要查已知安装位置，不能只查 PATH**；随口断言"本机没有 X"
+    会让后续所有推理建立在一个假前提上。现在 `pnpm check:arkts` 用真编译器验证 ArkTS 产物。
+    ⚠️ 但**不要反向过度声明**：它验证的是**语法/编译**，不是 ArkTS 语义合规 ——
+    当前产物只声明常量，没有 `@ohos` 导入或 `Color` 资源类型。
 
 > 第 4、7 条的根因相同：**两套并行定义**（词表 / 时钟语义）。
 > 这类 bug 单元测试抓不到 —— mock 是按实现者对协议的理解写的，理解错了 mock 跟着错。
@@ -370,7 +381,7 @@ docker inspect <容器> --format '{{range .Config.Env}}{{println .}}{{end}}' | g
 |---|---|
 | P0 奠基 | ✅ 已完成（协议已跑通，Docker 实测通过） |
 | P1 单端闭环 | ✅ **已完成**（6 条零 mock E2E 全过）→ [详细计划](docs/plans/phase-1-single-client-loop.md) |
-| P2 多端补齐 | 🔄 **进行中**（存储契约 ✅ / SQLite ✅ / token 生成器 ✅ / 非 Web 宿主 ✅）→ [详细计划](docs/plans/phase-2-multi-platform.md) |
+| P2 多端补齐 | 🔄 **进行中**（存储契约 ✅ / SQLite ✅ / token 生成器 ✅ / **ArkTS 产物真编译器验证** ✅ / 非 Web 宿主 ✅）→ [详细计划](docs/plans/phase-2-multi-platform.md) |
 | P3 平台特性 | ⏸ |
 
 总路线图：[`docs/plans/roadmap.md`](docs/plans/roadmap.md)
@@ -381,7 +392,8 @@ docker inspect <容器> --format '{{range .Config.Env}}{{println .}}{{end}}' | g
 - **ADR-0002 迁移工具 = 继续用 Prisma** ✅（[文档](docs/adr/0002-migration-tooling.md)）。
 - **ADR-0004 UI 栈 = React Native** ✅（[文档](docs/adr/0004-ui-stack.md)）。
   跨平台，且是"排除 WebView 套壳后仍覆盖 iOS + 鸿蒙、还在 JS 生态里"的唯一选项。
-  🔴 **未核实**：本机无鸿蒙工具链，**没有真机/真编译验证过**。
+  🔴 **仍未核实**：`ohos_react_native` **没有真机/真编译验证过**（见陷阱 #21：
+  DevEco 其实装了，但 RNOH 本身仍未构建过）。
   投入 UI 开发前**第一步必须是让最小 RN 壳在鸿蒙上真跑起来**。
 
 **当前没有阻塞性决策**，P1 可以持续推进。
