@@ -54,6 +54,27 @@ MIT 许可证的合规义务：**保留版权声明与许可声明**。本仓库
 
 ---
 
+### `server/` — 同步服务端
+
+| 项 | 值 |
+|---|---|
+| 来源 | [Super Productivity](https://github.com/super-productivity/super-productivity) |
+| 原路径 | `packages/super-sync-server/` |
+| 原包名 | `@super-productivity/super-sync-server`（本仓库中更名为 `@heyta/sync-server`） |
+| **commit** | `aa9690ca28aa6751971dd0e47d9b39c5b72922cb` |
+| **License** | **MIT** |
+| **版权** | Copyright (c) 2018 Johannes Millan |
+| 许可全文 | [`server/LICENSE`](server/LICENSE) |
+| 改动说明 | [`server/PROVENANCE.md`](server/PROVENANCE.md) |
+
+**改动极小**：仅包名与 22 处依赖名（`@sp/*` → `@heyta/*`），**业务代码未改**。
+
+服务端之所以能自动适配 heyta，是因为它的实体校验是
+`new Set(ENTITY_TYPES)`（`server/src/sync/services/validation.service.ts:25`）——
+**直接从共享包派生**。这正是把实体清单放在共享包里的价值。
+
+---
+
 ## 2. 通过包管理器引入的依赖
 
 所有第三方依赖的许可证必须**逐项登记**在 [`research/licenses.md`](research/licenses.md)，

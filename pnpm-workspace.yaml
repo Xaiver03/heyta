@@ -3,7 +3,12 @@ packages:
   - "apps/*"
   - "server"
 
-# esbuild 需要执行 postinstall 来放置平台二进制，否则 tsup / vitest 无法运行。
-# 这是 pnpm 的供应链安全默认值，这里只显式放行确实需要的包。
+# 供应链安全：pnpm 默认不允许依赖执行 postinstall 脚本。
+# 这里只显式放行**确实需要**执行脚本的包，其余保持默认拒绝。
 allowBuilds:
+  # esbuild 需要 postinstall 放置平台二进制，否则 tsup / vitest 无法运行
   esbuild: true
+  # Prisma 需要 postinstall 下载查询引擎并生成客户端
+  '@prisma/client': true
+  '@prisma/engines': true
+  prisma: true
