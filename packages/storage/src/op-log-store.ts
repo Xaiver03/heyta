@@ -23,7 +23,7 @@
 import type { Operation, RemoteOperationApplyStorePort } from '@heyta/sync-core';
 import type { EntityType } from '@heyta/shared-schema';
 import type { DbKeyRange } from './db.types';
-import type { ApplyStatus } from './stores';
+import type { ApplyStatus, UploadStatus } from './stores';
 
 /** 操作的来源。 */
 export type OperationSource = 'local' | 'remote' | 'import';
@@ -39,6 +39,18 @@ export interface StoredOperation<TOperation extends Operation<string> = Operatio
    * 见 `stores.ts` 的 {@link ApplyStatus} 注释（这是踩过的坑）。
    */
   applyStatus: ApplyStatus;
+  /** 上传状态。见 `stores.ts` 的 {@link UploadStatus}。 */
+  uploadStatus: UploadStatus;
+  /**
+   * 服务端分配的序号（同步游标位置），上传成功后才有。
+   *
+   * ⚠️ **不能塞进 `op` 里**。`Operation` 是线协议类型，它的字段会被原样
+   * 发给服务端；`op.seq` 不在契约里，写进去等于凭空造了个幽灵字段。
+   * 服务端序号是**本地存储的元数据**，和 op 内容是两回事。
+   *
+   * 可选，因为老数据没有它 —— 见 AGENTS.md §3.3。
+   */
+  serverSeq?: number;
 }
 
 /**
@@ -90,6 +102,20 @@ export interface OpLogStore<
    * 必须先把这些 op 重放完，**再**接受新的同步。
    */
   findPendingApply(): Promise<StoredOperation<TOperation>[]>;
+
+  /**
+   * 待上传的本地 op（离线队列），按本地 seq 升序。
+   *
+   * ⚠️ 与 {@link findPendingApply} 是**两个不同的队列**，不要混用：
+   *   - pendingApply：远程来的、已落盘但还没应用 → 崩溃恢复消费
+   *   - pendingUpload：本地产生的、还没上传给服务端 → 同步客户端消费
+   * 一条 op 可能同时是"待应用"和"不需要上传"（远程 op），
+   * 也可能是"已应用"但"待上传"（本地 op）。这就是为什么它们是两个字段。
+   */
+  findPendingUpload(): Promise<StoredOperation<TOperation>[]>;
+
+  /** 标记 op 已上传，并回写服务端分配的 seq。返回更新条数。 */
+  markUploaded(serverSeqsByOpId: ReadonlyMap<string, number>): Promise<number>;
 
   // ── 压缩 / 归档 ──────────────────────────────────────────
 

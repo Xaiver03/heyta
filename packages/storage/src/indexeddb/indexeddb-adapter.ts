@@ -56,7 +56,17 @@ interface StoreSchema {
   }>;
 }
 
-export const DB_SCHEMA_VERSION = 1;
+export /**
+ * IndexedDB schema 版本。
+ *
+ * ⚠️ **加索引/加 store 必须 bump 这个值。**
+ * 已有数据库不会因为代码变了就重建 —— `onupgradeneeded` 只在
+ * 请求的版本**高于**磁盘上的版本时触发。不 bump 的话新索引永远不会
+ * 被创建，而基于它的查询会**静默返回空**（同 applyStatus 那类坑）。
+ *
+ * v2：新增 `by_uploadStatus` 索引（离线上传队列）。
+ */
+const DB_SCHEMA_VERSION = 2;
 
 export const INDEXEDDB_SCHEMA: StoreSchema[] = [
   {
@@ -68,6 +78,7 @@ export const INDEXEDDB_SCHEMA: StoreSchema[] = [
       // op 的业务字段是**嵌套**的。我第一版把 keyPath 写成顶层 `entityType`，
       // 于是索引全部命中不到任何记录 —— 不报错，只是查询恒返回空。
       { name: OP_INDEXES.OP_ID, keyPath: `op.${OP_FIELDS.OP_ID}`, unique: true },
+      { name: OP_INDEXES.PENDING_UPLOAD, keyPath: OP_FIELDS.UPLOAD_STATUS },
       {
         name: OP_INDEXES.ENTITY,
         keyPath: [`op.${OP_FIELDS.ENTITY_TYPE}`, `op.${OP_FIELDS.ENTITY_ID}`],

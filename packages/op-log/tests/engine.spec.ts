@@ -9,6 +9,7 @@
 import { IDBFactory, IDBKeyRange } from 'fake-indexeddb';
 import { beforeEach, describe, expect, it } from 'vitest';
 
+import { OpType } from '@heyta/sync-core';
 import type { Operation, VectorClock } from '@heyta/sync-core';
 import { IndexedDbAdapter, IndexedDbOpLogStore } from '@heyta/storage';
 
@@ -17,7 +18,7 @@ import { applyOperation, emptyState, replayOperations } from '../src/state.js';
 
 function makeOp(over: Partial<Operation<string>> & { id: string }): Operation<string> {
   return {
-    opType: 'CREATE',
+    opType: OpType.Create,
     actionType: 'CREATE_TASK',
     entityType: 'TASK',
     entityId: 'task-1',
@@ -56,7 +57,7 @@ describe('reducer（必须是纯函数）', () => {
   it('只覆盖 payload 里出现的字段（部分更新不抹掉其它字段）', () => {
     let s = emptyState();
     s = applyOperation(s, makeOp({ id: 'a', timestamp: 1000, payload: { title: 'A', dueDate: 999 } }));
-    s = applyOperation(s, makeOp({ id: 'b', timestamp: 2000, opType: 'UPDATE', payload: { title: 'A2' } }));
+    s = applyOperation(s, makeOp({ id: 'b', timestamp: 2000, opType: OpType.Update, payload: { title: 'A2' } }));
 
     expect(s.tasks['task-1']!.title).toBe('A2');
     // 关键：dueDate 必须还在 —— 否则"改标题"会把截止时间抹掉
@@ -66,7 +67,7 @@ describe('reducer（必须是纯函数）', () => {
   it('🔴 DELETE 写墓碑而不是物理删除（否则另一端会把数据同步回来）', () => {
     let s = emptyState();
     s = applyOperation(s, makeOp({ id: 'a', timestamp: 1000 }));
-    s = applyOperation(s, makeOp({ id: 'b', timestamp: 2000, opType: 'DELETE', payload: {} }));
+    s = applyOperation(s, makeOp({ id: 'b', timestamp: 2000, opType: OpType.Delete, payload: {} }));
 
     expect(s.tasks['task-1']).toBeDefined();
     expect(s.tasks['task-1']!.deletedAt).toBe(2000);
@@ -103,7 +104,7 @@ describe('reducer（必须是纯函数）', () => {
     // 取消完成：传 null
     s = applyOperation(
       s,
-      makeOp({ id: 'b', timestamp: 2000, opType: 'UPDATE', payload: { completedAt: null } }),
+      makeOp({ id: 'b', timestamp: 2000, opType: OpType.Update, payload: { completedAt: null } }),
     );
 
     // 字段必须**消失**，而不是变成 null —— 否则 `=== undefined` 的完成态判断会失效
@@ -122,7 +123,7 @@ describe('reducer（必须是纯函数）', () => {
     const update = makeOp({
       id: 'b',
       timestamp: 2000,
-      opType: 'UPDATE',
+      opType: OpType.Update,
       payload: { completedAt: null },
     });
 
@@ -145,8 +146,8 @@ describe('reducer（必须是纯函数）', () => {
   it('确定性：DELETE 之后再收到更旧的 UPDATE 不会复活实体', () => {
     let s = emptyState();
     s = applyOperation(s, makeOp({ id: 'a', timestamp: 1000 }));
-    s = applyOperation(s, makeOp({ id: 'b', timestamp: 3000, opType: 'DELETE', payload: {} }));
-    s = applyOperation(s, makeOp({ id: 'c', timestamp: 2000, opType: 'UPDATE', payload: { title: '复活?' } }));
+    s = applyOperation(s, makeOp({ id: 'b', timestamp: 3000, opType: OpType.Delete, payload: {} }));
+    s = applyOperation(s, makeOp({ id: 'c', timestamp: 2000, opType: OpType.Update, payload: { title: '复活?' } }));
 
     expect(s.tasks['task-1']!.deletedAt).toBe(3000);
   });
@@ -190,7 +191,7 @@ describe('OpLogEngine', () => {
     await engine.dispatch({
       entityType: 'TASK',
       entityId: 't1',
-      opType: 'CREATE',
+      opType: OpType.Create,
       payload: { title: '写文档' },
     });
 
@@ -202,18 +203,51 @@ describe('OpLogEngine', () => {
 
   it('每次 dispatch 推进本地向量时钟', async () => {
     const engine = makeEngine();
-    await engine.dispatch({ entityType: 'TASK', entityId: 't1', opType: 'CREATE', payload: {} });
+    await engine.dispatch({ entityType: 'TASK', entityId: 't1', opType: OpType.Create, payload: {} });
     expect(engine.getClock()['device-1']).toBe(1);
-    await engine.dispatch({ entityType: 'TASK', entityId: 't2', opType: 'CREATE', payload: {} });
+    await engine.dispatch({ entityType: 'TASK', entityId: 't2', opType: OpType.Create, payload: {} });
     expect(engine.getClock()['device-1']).toBe(2);
   });
 
-  it('op 自带的时钟是"写入前"的（不含本次递增）', async () => {
+  it('🔴 op 的时钟**包含**本次递增（否则第一条 op 会被对端静默丢弃）', async () => {
     const engine = makeEngine();
-    await engine.dispatch({ entityType: 'TASK', entityId: 't1', opType: 'CREATE', payload: {} });
+    await engine.dispatch({ entityType: 'TASK', entityId: 't1', opType: OpType.Create, payload: {} });
     const rows = await store.getAllOps();
-    // 第一条 op 的时钟应为空 —— 它不包含自己
-    expect(rows[0]!.op.vectorClock).toEqual({});
+
+    // 这条断言曾经写的是 `toEqual({})`，注释还理直气壮地写着
+    // "第一条 op 的时钟应为空 —— 它不包含自己"。
+    //
+    // 那是在**把 bug 断言成正确行为**。后果：新对端时钟是 `{}`，
+    // 收到时钟为 `{}` 的 op → compareVectorClocks 判 EQUAL →
+    // 当作"已见过"静默丢弃。于是本设备第一次同步之后的每一个改动
+    // 都到不了任何其它设备，本地正常、服务端也收到、对端永远看不到。
+    //
+    // 真实故障由 tests/e2e-sync.integration.spec.ts 对真实服务端暴露。
+    expect(rows[0]!.op.vectorClock).toEqual({ 'device-1': 1 });
+  });
+
+  it('🔴 跨设备可见性：新对端必须能应用我们的第一条 op', async () => {
+    const a = makeEngine();
+    await a.dispatch({ entityType: 'TASK', entityId: 't1', opType: OpType.Create, payload: { title: 'x' } });
+
+    const pending = await a.getPendingUpload();
+    expect(pending).toHaveLength(1);
+
+    // ⚠️ 对端必须用**独立的存储**。
+    // 两台设备各有各的数据库；共用一个 store 的话，op 已经在那里了，
+    // appendBatchSkipDuplicates 会当重复跳过，于是 applied 为空 ——
+    // 我第一版就是这么写的，测出来的"失败"其实是测试的错，不是代码的错。
+    const otherDb = new IndexedDbAdapter(`other-${Math.random().toString(36).slice(2)}`);
+    await otherDb.init();
+    const otherStore = new IndexedDbOpLogStore<Operation<string>>(otherDb);
+
+    const b = new OpLogEngine({ store: otherStore, clientId: 'other-client' });
+    const result = await b.applyRemote(pending);
+
+    // 必须应用 —— 时钟为 `{}` 的那些 op 会让这里 applied=0
+    expect(result.applied).toHaveLength(1);
+    expect(b.getState().tasks['t1']).toBeDefined();
+    expect(b.getState().tasks['t1']!.title).toBe('x');
   });
 
   it('🔴 applyRemote 是幂等的：重复投递同一批 op 不会重复应用', async () => {
@@ -237,7 +271,7 @@ describe('OpLogEngine', () => {
     expect(engine.getClock()['other']).toBe(7);
 
     // 之后本地写入应包含 other 的分量
-    await engine.dispatch({ entityType: 'TASK', entityId: 'x', opType: 'CREATE', payload: {} });
+    await engine.dispatch({ entityType: 'TASK', entityId: 'x', opType: OpType.Create, payload: {} });
     const rows = await store.getAllOps();
     const localOp = rows.find((r) => r.op.clientId === 'device-1')!;
     expect(localOp.op.vectorClock['other']).toBe(7);
@@ -270,9 +304,9 @@ describe('OpLogEngine', () => {
 
   it('🔴 从 op-log 全量重建状态（证明 op-log 才是事实来源）', async () => {
     const engine = makeEngine();
-    await engine.dispatch({ entityType: 'TASK', entityId: 't1', opType: 'CREATE', payload: { title: 'A' } });
-    await engine.dispatch({ entityType: 'TASK', entityId: 't2', opType: 'CREATE', payload: { title: 'B' } });
-    await engine.dispatch({ entityType: 'TASK', entityId: 't1', opType: 'UPDATE', payload: { title: 'A2' } });
+    await engine.dispatch({ entityType: 'TASK', entityId: 't1', opType: OpType.Create, payload: { title: 'A' } });
+    await engine.dispatch({ entityType: 'TASK', entityId: 't2', opType: OpType.Create, payload: { title: 'B' } });
+    await engine.dispatch({ entityType: 'TASK', entityId: 't1', opType: OpType.Update, payload: { title: 'A2' } });
 
     // 全新引擎，不带任何内存状态
     const rebuilt = makeEngine();
@@ -285,8 +319,8 @@ describe('OpLogEngine', () => {
 
   it('删除走墓碑，重建后墓碑仍在', async () => {
     const engine = makeEngine();
-    await engine.dispatch({ entityType: 'TASK', entityId: 't1', opType: 'CREATE', payload: { title: 'A' } });
-    await engine.dispatch({ entityType: 'TASK', entityId: 't1', opType: 'DELETE', payload: {} });
+    await engine.dispatch({ entityType: 'TASK', entityId: 't1', opType: OpType.Create, payload: { title: 'A' } });
+    await engine.dispatch({ entityType: 'TASK', entityId: 't1', opType: OpType.Delete, payload: {} });
 
     const rebuilt = makeEngine();
     await rebuilt.rebuildFromLog();
@@ -323,7 +357,7 @@ describe('OpLogEngine', () => {
       entityType: 'TASK',
       entityId: 't1',
       entityIds: ['t1', 't2', 't3'],
-      opType: 'UPDATE',
+      opType: OpType.Update,
       payload: { projectId: 'p1' },
     });
 

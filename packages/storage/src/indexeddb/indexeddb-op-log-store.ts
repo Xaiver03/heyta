@@ -132,6 +132,8 @@ export class IndexedDbOpLogStore<TOperation extends Operation<string> = Operatio
             source,
             // 字符串而不是布尔 —— IndexedDB 不能索引布尔（见 stores.ts）
             applyStatus: flags.pendingApply === true ? 'pending' : 'applied',
+            // 本地 op 等待上传；远程 op 我们本来就收到了，无需上传
+            uploadStatus: source === 'local' ? 'pending' : 'uploaded',
           };
 
           // 用 addToleratingDuplicate 而不是 try/catch add：
@@ -343,6 +345,58 @@ export class IndexedDbOpLogStore<TOperation extends Operation<string> = Operatio
   }
 
   // ── 簿记 ────────────────────────────────────────────────
+
+  /**
+   * 待上传的本地 op（离线队列）。
+   *
+   * 按 seq 升序 —— 上传顺序必须与本地产出顺序一致，
+   * 否则服务端的因果校验会看到"后发生的先到"。
+   */
+  async findPendingUpload(): Promise<StoredOperation<TOperation>[]> {
+    const rows = await this.db.getAllFromIndex<StoredOperation<TOperation>>(
+      STORES.OPS,
+      OP_INDEXES.PENDING_UPLOAD,
+      'pending',
+    );
+    return rows.sort((a, b) => a.seq - b.seq);
+  }
+
+  /**
+   * 标记 op 已上传，并记录服务端分配的 seq。
+   *
+   * ⚠️ 必须同时把 `op.seq` 写成服务端序号：下次上传时
+   * `lastKnownServerSeq` 与冲突判定都依赖它。
+   */
+  async markUploaded(
+    serverSeqsByOpId: ReadonlyMap<string, number>,
+  ): Promise<number> {
+    if (serverSeqsByOpId.size === 0) return 0;
+
+    return this.db.transaction(
+      [STORES.OPS],
+      'readwrite',
+      async (tx) => {
+        let updated = 0;
+        for (const [opId, serverSeq] of serverSeqsByOpId) {
+          // 用已有的 getKeyFromIndex（DbAdapter 没有 getAllKeysFromIndex）
+          const key = await tx.getKeyFromIndex(STORES.OPS, OP_INDEXES.OP_ID, opId);
+          if (key === undefined) continue;
+
+          const record = await tx.get<StoredOperation<TOperation>>(STORES.OPS, key);
+          if (record === undefined) continue;
+
+          // 只改本地元数据，**不碰 op** —— op 是要发给服务端的东西
+          await tx.put(STORES.OPS, {
+            ...record,
+            uploadStatus: 'uploaded',
+            serverSeq,
+          });
+          updated += 1;
+        }
+        return updated;
+      },
+    );
+  }
 
   async getLastServerSeq(): Promise<number> {
     return readMetaNumber(this.db, META_KEYS.LAST_SERVER_SEQ);

@@ -1,3 +1,4 @@
+import { OpType } from '@heyta/sync-core';
 /**
  * 习惯 store —— 打卡 / 撤销 / 连续天数
  * ======================================
@@ -80,7 +81,7 @@ export const useHabitStore = create<HabitState>((set, get) => ({
     await dispatchIntent({
       entityType: 'HABIT',
       entityId: nextHabitId(),
-      opType: 'CREATE',
+      opType: OpType.Create,
       payload: { name: trimmed, target: 1, ...over },
     });
     refresh(set);
@@ -103,7 +104,7 @@ export const useHabitStore = create<HabitState>((set, get) => ({
     await dispatchIntent({
       entityType: 'HABIT_LOG',
       entityId: logId(habitId, d),
-      opType: 'CREATE',
+      opType: OpType.Create,
       payload: {
         habitId,
         date: d,
@@ -124,7 +125,7 @@ export const useHabitStore = create<HabitState>((set, get) => ({
     await dispatchIntent({
       entityType: 'HABIT_LOG',
       entityId: logId(habitId, d),
-      opType: 'DELETE',
+      opType: OpType.Delete,
       payload: {},
     });
     refresh(set);
@@ -134,7 +135,7 @@ export const useHabitStore = create<HabitState>((set, get) => ({
     await dispatchIntent({
       entityType: 'HABIT',
       entityId: habitId,
-      opType: 'DELETE',
+      opType: OpType.Delete,
       payload: {},
     });
     refresh(set);

@@ -1,3 +1,4 @@
+import { OpType } from '@heyta/sync-core';
 /**
  * 清单与标签 store
  * ==================
@@ -41,7 +42,7 @@ export const useProjectStore = create<ProjectState>(() => ({
     await dispatchIntent({
       entityType: 'PROJECT',
       entityId: `project-${String(Date.now())}-${String(projectCounter)}`,
-      opType: 'CREATE',
+      opType: OpType.Create,
       // parentId 为 undefined 时不要放进 payload ——
       // 展开运算会带上它，而 null 在我们的语义里表示"清除该字段"
       payload: parentId === undefined ? { name: trimmed } : { name: trimmed, parentId },
@@ -54,7 +55,7 @@ export const useProjectStore = create<ProjectState>(() => ({
     await dispatchIntent({
       entityType: 'PROJECT',
       entityId: id,
-      opType: 'UPDATE',
+      opType: OpType.Update,
       payload: { name: trimmed },
     });
   },
@@ -63,7 +64,7 @@ export const useProjectStore = create<ProjectState>(() => ({
     await dispatchIntent({
       entityType: 'PROJECT',
       entityId: id,
-      opType: 'UPDATE',
+      opType: OpType.Update,
       payload: { archived: true },
     });
   },
@@ -74,7 +75,7 @@ export const useProjectStore = create<ProjectState>(() => ({
     await dispatchIntent({
       entityType: 'PROJECT',
       entityId: id,
-      opType: 'DELETE',
+      opType: OpType.Delete,
       payload: {},
     });
   },
@@ -86,7 +87,7 @@ export const useProjectStore = create<ProjectState>(() => ({
     await dispatchIntent({
       entityType: 'TAG',
       entityId: `tag-${String(Date.now())}-${String(tagCounter)}`,
-      opType: 'CREATE',
+      opType: OpType.Create,
       payload: { name: trimmed },
     });
   },
@@ -95,7 +96,7 @@ export const useProjectStore = create<ProjectState>(() => ({
     await dispatchIntent({
       entityType: 'TAG',
       entityId: id,
-      opType: 'DELETE',
+      opType: OpType.Delete,
       payload: {},
     });
   },

@@ -207,10 +207,11 @@ pnpm check:design     # 非零退出 = 有裸值
 pnpm install                    # 安装（工作区）
 pnpm -r build                   # 全量构建
 pnpm -r typecheck               # 全量类型检查
-pnpm -r test                    # 全量测试（当前 1444 个通过）
+pnpm -r test                    # 全量测试（当前 1649 个通过 + 3 个 E2E 默认跳过）
 
 pnpm verify:sync                # P0 验收：真实同步闭环（需要服务端在跑）
 pnpm verify:sync:dry            # 不需要服务端，只校验 op 形状
+pnpm verify:p1                  # P1 验收：**自带真实服务端**，跑零 mock 的端到端同步
 
 pnpm check                      # 全部门禁：类型 + 迁移 + 许可证 + 文档 + 设计变量
 pnpm check:design               # 只跑设计变量硬编码检查
@@ -250,6 +251,29 @@ docker inspect <容器> --format '{{range .Config.Env}}{{println .}}{{end}}' | g
 1. 服务端**强制 E2EE 且没有开关**：`isPayloadEncrypted` 必须显式 `true`，明文一律 400 `E2EE_REQUIRED`。
 2. 线协议 schema **不校验实体成员**，拼错实体名要到上传后才发现 —— 客户端必须先用 `isEntityType()` 自查。
 3. 线协议 schema **接受明文载荷**，但服务端无条件拒绝。**客户端无法从契约推出"必须加密"。**
+4. **`opType` 词表是 `CRT`/`UPD`/`DEL`**（`sync-core` 的 `OpType`）。**不要自造
+   `CREATE`/`UPDATE`/`DELETE`** —— 服务端会逐条 `INVALID_OP_TYPE` 拒绝每一个 op，
+   而本地一切正常。词表只有一份，就该只有一份定义。
+5. **HTTP 200 也可能是拒绝。** 上传响应里 `results[].accepted` 才是真相，
+   字段名是 `opId`（不是 `id`）。只看 `res.ok` 会报"已同步"而数据一条都没上云。
+6. **下载的 op 是嵌套的** `{serverSeq, op, receivedAt}`，不是扁平结构。
+7. **向量时钟必须包含本次写入自己的递增。** 写成"写入前的时钟"会让每台设备的
+   **第一条 op 时钟为空**，对端 `compareVectorClocks` 判 `EQUAL`（"已见过"）→
+   **静默丢弃**：本地正常、服务端收到、对端永远看不到，且不报错。
+
+> 第 4、7 条的根因相同：**两套并行定义**（词表 / 时钟语义）。
+> 这类 bug 单元测试抓不到 —— mock 是按实现者对协议的理解写的，理解错了 mock 跟着错。
+> **所以 `pnpm verify:p1` 是不可省的**：真引擎 → 真 IndexedDB → 真 HTTP → 真服务端。
+
+### 🔴 `spawn` 的 ENOENT 可能不是可执行文件的问题
+
+`new URL('..', import.meta.url).pathname` 会把路径里的**空格转义成 `%20`**。
+用它当 `cwd` 时目录不存在，而 `spawn` 抛的是
+`ENOENT ... spawn /path/to/node` —— 报错指向一个**明明存在**的二进制，完全误导排查方向。
+用 `fileURLToPath()`。
+
+同理，`process.execPath` 在某些封装运行时里指向**不能独立 spawn 的垫片**，
+而封装的垫片也在 PATH 最前面。脚本要按候选列表解析真 node，别写死 `'node'`。
 
 ### vendored 代码的边界
 

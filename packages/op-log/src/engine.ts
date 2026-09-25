@@ -20,6 +20,7 @@
 import type { EntityType } from '@heyta/shared-schema';
 import type { Operation, VectorClock } from '@heyta/sync-core';
 import {
+  OpType,
   VectorClockComparison,
   compareVectorClocks,
   limitVectorClockSize,
@@ -38,7 +39,15 @@ import {
 export interface OpIntent {
   entityType: EntityType;
   entityId: string;
-  opType: 'CREATE' | 'UPDATE' | 'DELETE';
+  /**
+   * ⚠️ 用 sync-core 的 `OpType`，**不要**自造 'CREATE'/'UPDATE'/'DELETE'。
+   *
+   * 我第一版就是这么写的，而且单测全绿 —— 因为我按自己的理解写了 mock。
+   * 真实服务端的词表是 `CRT`/`UPD`/`DEL`（见 SUPER_SYNC_OP_TYPES），
+   * 它逐条以 `INVALID_OP_TYPE` 拒绝了**每一个** op。
+   * 两套并行词表迟早会漂移；线协议词表只有一份，就该只有一份定义。
+   */
+  opType: OpType;
   payload?: unknown;
   /** 一次意图涉及多个实体时列出全部（单次操作，不 fan-out）。 */
   entityIds?: string[];
@@ -104,6 +113,33 @@ export class OpLogEngine {
     return this.state;
   }
 
+  /** 本设备的 clientId。同步客户端需要它（协议要求每个请求带上）。 */
+  getClientId(): string {
+    return this.options.clientId;
+  }
+
+  /**
+   * 待上传的本地 op（离线队列）。
+   *
+   * 直接读存储的上传状态索引，**不是**在内存里维护一份列表 ——
+   * 内存列表在崩溃后会丢，而"哪些 op 还没上传"恰恰是崩溃后最重要的信息。
+   */
+  async getPendingUpload(): Promise<Operation<string>[]> {
+    const rows = await this.options.store.findPendingUpload();
+    return rows.filter((r) => r.source === 'local').map((r) => r.op);
+  }
+
+  /**
+   * 标记 op 已上传，并记录服务端分配的序号。
+   *
+   * 由同步客户端在上传成功后调用。**上传成功与本地记录必须一致**：
+   * 上传了但没标记，下次会重复上传（服务端会去重，但浪费配额）；
+   * 标记了但没上传，数据永远不上云 —— 后者严重得多。
+   */
+  async markUploaded(serverSeqsByOpId: ReadonlyMap<string, number>): Promise<void> {
+    await this.options.store.markUploaded(serverSeqsByOpId);
+  }
+
   /** 当前向量时钟快照。 */
   getClock(): VectorClock {
     return { ...this.clock };
@@ -119,7 +155,12 @@ export class OpLogEngine {
    * 刷新后消失，而且 op-log 里没有痕迹（无法恢复）。
    */
   async dispatch(intent: OpIntent): Promise<DispatchResult> {
-    const op = this.buildOp(intent);
+    // 先算出**本次写入之后**的时钟；op 与本地时钟用同一个值。
+    const clock = this.trimClock({
+      ...this.clock,
+      [this.options.clientId]: (this.clock[this.options.clientId] ?? 0) + 1,
+    });
+    const op = this.buildOp(intent, clock);
 
     // 1. 落盘（原子、单调 seq）
     const seqs = await this.options.store.appendLocal([op]);
@@ -131,10 +172,7 @@ export class OpLogEngine {
     }
 
     // 2. 推进本地时钟
-    this.clock = this.trimClock({
-      ...this.clock,
-      [this.options.clientId]: (this.clock[this.options.clientId] ?? 0) + 1,
-    });
+    this.clock = clock;
 
     // 3. 应用（纯函数）
     this.state = applyOperation(this.state, op);
@@ -144,17 +182,24 @@ export class OpLogEngine {
   }
 
   /** 构造 op。向量时钟在这里 snapshot —— 之后不再变。 */
-  private buildOp(intent: OpIntent): Operation<string> {
+  private buildOp(intent: OpIntent, vectorClock: VectorClock): Operation<string> {
     this.opCounter += 1;
     const timestamp = (this.options.now ?? Date.now)();
     const id = this.options.nextOpId
       ? this.options.nextOpId()
       : `${this.options.clientId}-${String(timestamp)}-${String(this.opCounter)}`;
 
-    // op 自带的时钟 = **写入前**的时钟（不含本次递增）。
-    // 含本次会让 compareVectorClocks 把自己的新 op 判成"大于自己"，
-    // 在自回环场景下产生虚假的因果边。
-    const vectorClock: VectorClock = { ...this.clock };
+    // 🔴 op 的时钟包含本次写入自己的递增 —— 由 dispatch 算好后传进来。
+    //
+    // 我第一版在这里写成 "{ ...this.clock }"（写入**前**的时钟），理由
+    // 是"避免自回环产生虚假因果边"。推理听着合理，后果是灾难性的：
+    // 每台设备的**第一条 op 时钟是 `{}`**，而新对端的时钟也是 `{}`，
+    // compareVectorClocks 判 EQUAL → 当作"已见过"**静默丢弃**。
+    //
+    // 即：本设备第一次同步之后的每一个改动都到不了任何其它设备。
+    // 本地正常、服务端也收到，只有对端永远看不到，且不报错。
+    //
+    // 自回环另有兜底：appliedOpIds 挡重复应用，上传/下载用 excludeClient。
 
     return {
       id,
@@ -168,8 +213,9 @@ export class OpLogEngine {
       vectorClock,
       timestamp,
       schemaVersion: 1,
-      seq: 0, // 服务端序号，上传后由服务端分配
-    } as Operation<string>;
+      // 注意：**不写 seq**。`Operation` 是线协议类型，没有这个字段；
+      // 服务端序号由存储层的 `serverSeq` 单独保存（见 StoredOperation）。
+    };
   }
 
   // ── 远程 op ─────────────────────────────────────────────
