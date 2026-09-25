@@ -12,6 +12,12 @@
     "build": "pnpm -r build",
     "test": "pnpm -r test",
     "typecheck": "pnpm -r typecheck",
-    "clean": "pnpm -r exec rm -rf dist node_modules"
+    "clean": "pnpm -r exec rm -rf dist node_modules",
+    "verify:sync": "node scripts/verify-sync-loop.mjs",
+    "verify:sync:dry": "node scripts/verify-sync-loop.mjs --dry-run"
+  },
+  "devDependencies": {
+    "@heyta/shared-schema": "workspace:*",
+    "@heyta/sync-core": "workspace:*"
   }
 }
