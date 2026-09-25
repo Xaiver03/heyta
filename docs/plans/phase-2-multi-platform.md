@@ -42,7 +42,7 @@ store 要报错……）都不会有人发现 —— 直到移植到 SQLite 时�
 > 这一层的价值已经兑现：契约第一次跑就在参考实现里抓出两个真 bug
 > （multiEntry 索引恒不命中；并发事务被误判为嵌套）。见提交 `dc203df`。
 
-### 2.2 SQLite 适配器（🔄 进行中）
+### 2.2 SQLite 适配器（✅ 已完成）
 
 iOS 与鸿蒙**必须**用 SQLite（ADR-0003 §2.2：WebView 的 IndexedDB 会被系统清理，
 本地优先应用丢本地数据不可接受）。
@@ -57,7 +57,13 @@ iOS 与鸿蒙**必须**用 SQLite（ADR-0003 §2.2：WebView 的 IndexedDB 会�
 - 事务必须真回滚，包括对**已有记录**的修改。
 - 新测试：数据能跨 `close()` / 重开持久化。
 
-### 2.3 非 Web 宿主验证（⏳ 待做）
+**完成情况**：与 IndexedDB、内存实现跑**同一份** 24 条 `DbAdapter` 契约 + 21 条
+`OpLogStore` 契约（三个引擎共 135 条）。加它只需要在 `contract.spec.ts` 加一行。
+
+复合主键拆成 `pk0..pkN` 列按列排序；所有键列**不声明 SQL 类型**（BLOB 亲和性），
+否则 INTEGER/TEXT 亲和性会把 meta 的键 `'123'` 静默变成整数 `123` 而与别的键合并。
+
+### 2.3 非 Web 宿主验证（🔄 进行中）
 
 要求里说"至少一个非 Web 端壳，有真实读写 + 同步验证"。
 
@@ -70,12 +76,24 @@ op-log 引擎 + SQLite 适配器 + 同步客户端，对着真实服务端做读
 而**完全不需要先决定 UI 技术栈**。如果 Node 宿主能跑通，说明分层是真的；
 如果跑不通，说明还有逻辑漏在 `apps/web` 里，那正是现在就该发现的事。
 
-### 2.4 设计变量生成器（🔄 进行中）
+### 2.4 设计变量生成器（✅ 已完成）
 
 `packages/design-system` 是 CSS 变量，SwiftUI / ArkUI 不能直接用。
 
 要求：值只在 `tokens.css` 定义一次，其余平台由它**生成**。
 **不许各端各写一份色值** —— 那就是漂移的开始。
+
+**完成情况**：生成 Swift / ArkTS / JSON 三份产物（126 个 token + 59 个暗色 + 5 个
+reduced-motion），237 个测试覆盖（含对生成结果重算 WCAG 对比度）。
+
+已独立验证过它是**解析**而不是**复制**：改 `tokens.css` 里的 `blue-600`，
+生成物真的跟着变；不重新生成时 `generate:check` 退出码非 0；
+`swiftc` 编译产物并运行，明暗与 reduced-motion 取值都正确。
+漂移检查已接进根 `pnpm check`（`check:tokens`）。
+
+⚠️ 以下 token **没有**干净的原生对应物，按字符串原样导出并在产物头部列出：
+`font.sans/mono`、`ease.*`、`shadow.*`、`layout.prose-max`（`65ch` 依赖字号）。
+没有 token 被静默丢弃或硬凑成数字。
 
 ---
 

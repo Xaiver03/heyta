@@ -207,7 +207,7 @@ pnpm check:design     # 非零退出 = 有裸值
 pnpm install                    # 安装（工作区）
 pnpm -r build                   # 全量构建
 pnpm -r typecheck               # 全量类型检查
-pnpm -r test                    # 全量测试（当前 1691 个通过 + 9 个 E2E 默认跳过 + 1 个服务端跳过）
+pnpm -r test                    # 全量测试（当前 2024 个通过 + 9 个 E2E 默认跳过 + 1 个服务端跳过）
 
 pnpm verify:sync                # P0 验收：真实同步闭环（需要服务端在跑）
 pnpm verify:sync:dry            # 不需要服务端，只校验 op 形状
@@ -286,6 +286,22 @@ docker inspect <容器> --format '{{range .Config.Env}}{{println .}}{{end}}' | g
     把限流去掉之后，同一批用例变成**超时**，才暴露出真正的无限循环。
     所以：**测试服务端不应限流自己的验收套件**（按 IP 计额，全部设备都来自 127.0.0.1）。
     已在 TEST_MODE 下关闭路由级与按用户两层限流。
+14. 🔴 **接口漏声明方法，只有强转能救 —— 而强转会让 TS 彻底静音。**
+    `DbOpLogStore` 曾用 `as DbTx & {...}` 才能调用 `addToleratingDuplicate`，
+    因为它**只存在于 `IndexedDbAdapter` 上，不在 `DbTx` 接口里**。
+    任何新适配器按接口老实实现，就会在运行时炸（内存实现第一次跑契约就炸了）。
+    **看到 `as SomeInterface & {...}` 就是接口没表达真实需求的信号**，去补接口。
+15. **`export const Alias = SomeClass` 不能当类型用。** 类既是值也是类型，
+    而 `const` 只提供值。别名必须写 `export { A as B }`。
+16. 🔴 **跨实现的行为分歧必须写下来，不能假装一致。**
+    `getAllFromIndex` 的返回顺序：IndexedDB 按**索引键**，内存与 SQLite 按**主键**。
+    接口上已注明"顺序未定义"，并有测试钉住实际行为。
+    **依赖顺序的调用方必须自己 sort** —— 上传顺序靠这个。
+17. **测试台架也会撞自己的限流。** 见第 13 条：按 IP 计额，验收套件全部设备都来自
+    127.0.0.1，共用额度，用例越多越容易随机变红。TEST_MODE 下已关闭两层限流。
+18. **tsup 默认 `removeNodeProtocol: true` 会把 `node:sqlite` 改写成 `sqlite`**，
+    而 `sqlite` 不是可解析的内建模块 → `ERR_MODULE_NOT_FOUND`。
+    需要 `removeNodeProtocol: false`。（类型检查与源码运行都不会暴露它，只有构建产物会。）
 
 > 第 4、7 条的根因相同：**两套并行定义**（词表 / 时钟语义）。
 > 这类 bug 单元测试抓不到 —— mock 是按实现者对协议的理解写的，理解错了 mock 跟着错。
@@ -335,7 +351,7 @@ docker inspect <容器> --format '{{range .Config.Env}}{{println .}}{{end}}' | g
 |---|---|
 | P0 奠基 | ✅ 已完成（协议已跑通，Docker 实测通过） |
 | P1 单端闭环 | ✅ **已完成**（6 条零 mock E2E 全过）→ [详细计划](docs/plans/phase-1-single-client-loop.md) |
-| P2 多端补齐 | 🔄 **下一步** → [ADR-0003](docs/adr/0003-multi-platform-strategy.md) |
+| P2 多端补齐 | 🔄 **进行中**（存储契约 ✅ / SQLite ✅ / token 生成器 ✅ / 非 Web 宿主 🔄）→ [详细计划](docs/plans/phase-2-multi-platform.md) |
 | P3 平台特性 | ⏸ |
 
 总路线图：[`docs/plans/roadmap.md`](docs/plans/roadmap.md)
