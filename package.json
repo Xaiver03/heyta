@@ -21,6 +21,7 @@
     "check": "pnpm build && pnpm typecheck && pnpm check:migrations && pnpm check:licenses && pnpm check:docs && pnpm check:design && pnpm check:tokens",
     "check:design": "node design-system/heyta/check-hardcoded.mjs",
     "verify:p1": "node scripts/verify-p1-sync.mjs",
+    "verify:p2": "node scripts/verify-p2-node-host.mjs",
     "check:tokens": "pnpm --filter @heyta/design-system run generate:check"
   },
   "devDependencies": {
