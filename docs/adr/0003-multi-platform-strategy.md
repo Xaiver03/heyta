@@ -85,8 +85,10 @@ apps/harmony           待定                      ← 平台壳
 **但"唯一事实源"不变**：值只在 `tokens.css` 定义一次，其余平台由它**生成**。
 不许各端各写一份色值 —— 那就是漂移的开始。
 
-> **尚未决定**：具体跨平台 UI 技术栈（React Native / 各端原生 / Capacitor）。
-> 这决定 2.4 的生成器形态，也决定 UI 能否复用。**保持开放，不预先写死。**
+> **已由 [ADR-0004](0004-ui-stack.md) 落实**（2026-09-25）：技术栈定为 **React Native**。
+> 本表里"React Native 需要一层 tokens.css → JS 对象的导出"**已经完成** ——
+> 生成器一直在产出 `generated/tokens.json`，其用途本就写着"React Native 等 JS 运行时"。
+> 本节其余内容（"唯一事实源不变"）仍然有效。
 
 ---
 
