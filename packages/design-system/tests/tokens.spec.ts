@@ -170,8 +170,13 @@ describe('非颜色 token 的尺度合理性', () => {
   });
 
   it('动效时长都在 150–300ms 区间内（或明确标注的极短/退出值）', () => {
-    // instant 是刻意极短的按压反馈；exit 是刻意的快速退出
-    const exempt = new Set(['instant', 'exit']);
+    // 豁免项不是"为了变绿"，而是这些时长**不受 150–300ms 规律约束**：
+    //   instant —— 刻意极短的按压反馈
+    //   exit    —— 刻意更快的退出（退出慢会读起来像卡住）
+    //   press   —— 按下反馈。UIX Pro Max 的 150–300ms 管的是**过渡动画**；
+    //              按压反馈按 Apple《Designing Fluid Interfaces》必须即刻出现，
+    //              超过 ~100ms 就开始"发木"。它属于另一条规律，不是更快的过渡。
+    const exempt = new Set(['instant', 'exit', 'press']);
     for (const name of TOKEN_GROUPS.duration) {
       if (exempt.has(name)) continue;
       const raw = resolveVar(vars.get(`--ht-duration-${name}`)!, vars);

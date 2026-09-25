@@ -45,3 +45,25 @@ export {
   resolveNativeTokens,
 } from './native.js';
 export type { HeytaNativeTokens, ThemeName, ColorSchemeLike } from './native.js';
+
+// CSS → RN 的值归一化。
+// tokens.css 是唯一事实源，但**有一部分值只在 CSS 里合法**（字体栈 /
+// box-shadow / cubic-bezier），原样塞给 RN 会"不报错但画错"。这里是转换层，
+// 纯函数、不依赖 RN，所以能单测、也能同时服务 iOS/Android/鸿蒙。
+export {
+  resolveFontFamily,
+  parseCssColor,
+  parseCssShadow,
+  parseCubicBezier,
+  assertDurationMs,
+  resolveLineHeight,
+  resolveTracking,
+} from './native-values.js';
+export type { RnShadow, CubicBezier } from './native-values.js';
+
+// 语义文字样式（Apple semantic typography）。
+// 把"字号 + 字重 + 行高 + 字距"作为一个整体命名，组件只说"这是 row-title"，
+// 不说四个数字 —— 否则同一段文字在不同界面必然漂移，且没有任何一处会报错。
+// 它只**组合**已有 token，不引入新取值，因此不构成第二个事实源。
+export { TEXT_STYLES, resolveTextStyle, resolveAllTextStyles } from './typography.js';
+export type { TextStyleName, TextStyleSpec, RnTextStyle } from './typography.js';

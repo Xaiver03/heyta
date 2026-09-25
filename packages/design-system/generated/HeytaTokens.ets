@@ -33,6 +33,10 @@
 //   - ease.exit: cubic-bezier 是 CSS 时序函数，SwiftUI / ArkUI 没有同名类型；已导出控制点，需各端自行映射为动画曲线。
 //   - ease.spring: cubic-bezier 是 CSS 时序函数，SwiftUI / ArkUI 没有同名类型；已导出控制点，需各端自行映射为动画曲线。
 //   - layout.prose-max: 相对单位依赖当前字号，无法换算为原生数值常量；已原样导出为字符串。
+//   - tracking.display: 🔴 导出的是**比例**（em），不是点数。RN 的 letterSpacing、SwiftUI 的 .tracking()、ArkTS 的 letterSpacing 都要的是点值，必须按 `比例 × 字号` 换算（见 native-values.ts 的 resolveTracking）。直接把比例当点用会让字距小到等于没有，且两端都不报错。
+//   - tracking.title: 🔴 导出的是**比例**（em），不是点数。RN 的 letterSpacing、SwiftUI 的 .tracking()、ArkTS 的 letterSpacing 都要的是点值，必须按 `比例 × 字号` 换算（见 native-values.ts 的 resolveTracking）。直接把比例当点用会让字距小到等于没有，且两端都不报错。
+//   - tracking.body: 🔴 导出的是**比例**（em），不是点数。RN 的 letterSpacing、SwiftUI 的 .tracking()、ArkTS 的 letterSpacing 都要的是点值，必须按 `比例 × 字号` 换算（见 native-values.ts 的 resolveTracking）。直接把比例当点用会让字距小到等于没有，且两端都不报错。
+//   - tracking.caption: 🔴 导出的是**比例**（em），不是点数。RN 的 letterSpacing、SwiftUI 的 .tracking()、ArkTS 的 letterSpacing 都要的是点值，必须按 `比例 × 字号` 换算（见 native-values.ts 的 resolveTracking）。直接把比例当点用会让字距小到等于没有，且两端都不报错。
 // ────────────────────────────────────────────────────────────
 
 // SECTION: Light
@@ -136,6 +140,7 @@ export const HEYTA_DURATION_FAST: number = 150;  // ms
 export const HEYTA_DURATION_NORMAL: number = 200;  // ms
 export const HEYTA_DURATION_SLOW: number = 300;  // ms
 export const HEYTA_DURATION_EXIT: number = 140;  // ms
+export const HEYTA_DURATION_PRESS: number = 100;  // ms
 export const HEYTA_EASE_STANDARD: string = 'cubic-bezier(0.2, 0, 0.2, 1)';
 export const HEYTA_EASE_ENTER: string = 'cubic-bezier(0, 0, 0.2, 1)';
 export const HEYTA_EASE_EXIT: string = 'cubic-bezier(0.4, 0, 1, 1)';
@@ -162,6 +167,59 @@ export const HEYTA_LAYOUT_PROSE_MAX: string = '65ch';
 export const HEYTA_LAYOUT_QUADRANT_MIN_HEIGHT: number = 192;  // px
 export const HEYTA_BORDER_WIDTH_THIN: number = 1;  // px
 export const HEYTA_BORDER_WIDTH_THICK: number = 2;  // px
+export const HEYTA_NAV_TAB_BAR_HEIGHT: number = 64;  // px
+export const HEYTA_NAV_TAB_ICON_SIZE: number = 24;  // px
+export const HEYTA_NAV_TAB_LABEL_SIZE: number = 11;  // px
+export const HEYTA_NAV_TAB_ITEM_MIN_WIDTH: number = 64;  // px
+export const HEYTA_NAV_TAB_INDICATOR_INSET: number = 4;  // px
+export const HEYTA_NAV_TAB_INDICATOR_WIDTH: number = 20;  // px
+export const HEYTA_NAV_TAB_INDICATOR_HEIGHT: number = 3;  // px
+export const HEYTA_NAV_APP_BAR_HEIGHT: number = 56;  // px
+export const HEYTA_NAV_APP_BAR_TITLE_SIZE: number = 16;  // px
+export const HEYTA_NAV_SAFE_TOP_MIN: number = 20;  // px
+export const HEYTA_NAV_SAFE_BOTTOM_MIN: number = 8;  // px
+export const HEYTA_SCREEN_GUTTER: number = 16;  // px
+export const HEYTA_SCREEN_SECTION_GAP: number = 24;  // px
+export const HEYTA_SCREEN_BOTTOM_INSET: number = 88;  // px
+export const HEYTA_SIZE_CHECKBOX: number = 22;  // px
+export const HEYTA_SIZE_ROW_MIN_HEIGHT: number = 56;  // px
+export const HEYTA_SIZE_SWIPE_ACTION: number = 72;  // px
+export const HEYTA_SIZE_AVATAR_SM: number = 24;  // px
+export const HEYTA_SIZE_AVATAR_MD: number = 32;  // px
+export const HEYTA_SIZE_AVATAR_LG: number = 40;  // px
+export const HEYTA_SIZE_FAB: number = 56;  // px
+export const HEYTA_SIZE_CHIP_HEIGHT: number = 28;  // px
+export const HEYTA_SIZE_CHIP_PADDING_X: number = 10;  // px
+export const HEYTA_SIZE_DIVIDER_INSET: number = 52;  // px
+export const HEYTA_SIZE_BADGE_MIN_WIDTH: number = 18;  // px
+export const HEYTA_SIZE_BADGE_HEIGHT: number = 18;  // px
+export const HEYTA_SIZE_BADGE_DOT: number = 8;  // px
+export const HEYTA_SIZE_BADGE_RING: number = 2;  // px
+export const HEYTA_TRACKING_DISPLAY: number = -0.022;  // em-ratio
+export const HEYTA_TRACKING_TITLE: number = -0.019;  // em-ratio
+export const HEYTA_TRACKING_BODY: number = -0.011;  // em-ratio
+export const HEYTA_TRACKING_CAPTION: number = 0.006;  // em-ratio
+export const HEYTA_MOTION_SPRING_DAMPING_DEFAULT: number = 1;
+export const HEYTA_MOTION_SPRING_DAMPING_MOMENTUM: number = 0.8;
+export const HEYTA_MOTION_SPRING_RESPONSE_MOVE: number = 0.4;
+export const HEYTA_MOTION_SPRING_RESPONSE_SHEET: number = 0.3;
+export const HEYTA_MOTION_SPRING_RESPONSE_ROTATION: number = 0.4;
+export const HEYTA_MOTION_PRESS_SCALE: number = 0.97;
+export const HEYTA_MOTION_DECELERATION_RATE: number = 0.998;
+export const HEYTA_MOTION_RUBBER_BAND_CONSTANT: number = 0.55;
+export const HEYTA_GESTURE_HYSTERESIS: number = 10;  // px
+export const HEYTA_GESTURE_HIT_SLOP: number = 10;  // px
+export const HEYTA_STATE_PRESSED_OPACITY: number = 0.08;
+export const HEYTA_STATE_HOVER_OPACITY: number = 0.04;
+export const HEYTA_STATE_DISABLED_OPACITY: number = 0.38;
+export const HEYTA_BLUR_CHROME: number = 20;  // px
+export const HEYTA_BLUR_SHEET: number = 30;  // px
+export const HEYTA_MATERIAL_CHROME_TINT: string = '#ffffffb8';
+export const HEYTA_MATERIAL_CHROME_TINT_STRONG: string = '#ffffffd9';
+export const HEYTA_MATERIAL_EDGE_HIGHLIGHT: string = '#ffffff80';
+export const HEYTA_MATERIAL_SHEET_TINT: string = '#ffffffeb';
+export const HEYTA_MATERIAL_SCRIM: string = '#0f172a52';
+export const HEYTA_MATERIAL_SCRIM_STRONG: string = '#0f172a80';
 
 // SECTION: Dark
 export const HEYTA_DARK_COLOR_PRIMARY: string = '#60a5fa';
@@ -223,6 +281,12 @@ export const HEYTA_DARK_SHADOW_MD: string = '0 2px 8px rgb(0 0 0 / 0.5)';
 export const HEYTA_DARK_SHADOW_LG: string = '0 8px 24px rgb(0 0 0 / 0.6)';
 export const HEYTA_DARK_SHADOW_XL: string = '0 16px 48px rgb(0 0 0 / 0.7)';
 export const HEYTA_DARK_SHADOW_FOCUS: string = '0 0 0 3px rgb(96 165 250 / 0.35)';
+export const HEYTA_DARK_MATERIAL_CHROME_TINT: string = '#0d1526c7';
+export const HEYTA_DARK_MATERIAL_CHROME_TINT_STRONG: string = '#0d1526e6';
+export const HEYTA_DARK_MATERIAL_EDGE_HIGHLIGHT: string = '#ffffff1f';
+export const HEYTA_DARK_MATERIAL_SHEET_TINT: string = '#0d1526f0';
+export const HEYTA_DARK_MATERIAL_SCRIM: string = '#02061780';
+export const HEYTA_DARK_MATERIAL_SCRIM_STRONG: string = '#020617ad';
 
 // SECTION: ReducedMotion
 // 需在系统开启「减少动效」时覆盖 Light 的 duration 常量。
@@ -231,3 +295,4 @@ export const HEYTA_REDUCED_MOTION_DURATION_FAST: number = 1;  // ms
 export const HEYTA_REDUCED_MOTION_DURATION_NORMAL: number = 1;  // ms
 export const HEYTA_REDUCED_MOTION_DURATION_SLOW: number = 1;  // ms
 export const HEYTA_REDUCED_MOTION_DURATION_EXIT: number = 1;  // ms
+export const HEYTA_REDUCED_MOTION_DURATION_PRESS: number = 1;  // ms

@@ -85,7 +85,7 @@ export const TOKEN_GROUPS = {
   font: ['sans', 'mono'],
   radius: ['none', 'sm', 'md', 'lg', 'xl', 'full'],
   shadow: ['none', 'sm', 'md', 'lg', 'xl', 'focus'],
-  duration: ['instant', 'fast', 'normal', 'slow', 'exit'],
+  duration: ['instant', 'fast', 'normal', 'slow', 'exit', 'press'],
   ease: ['standard', 'enter', 'exit', 'spring'],
   z: ['base', 'sticky', 'dropdown', 'overlay', 'modal', 'popover', 'toast', 'tooltip'],
   icon: ['xs', 'sm', 'md', 'lg', 'xl'],
@@ -102,6 +102,80 @@ export const TOKEN_GROUPS = {
     'quadrant-min-height',
   ],
   'border-width': ['thin', 'thick'],
+
+  /**
+   * 导航与外壳。4 个 tab 页共享同一套尺寸 —— 外壳是产品结构，
+   * 不是某个屏幕的局部实现。
+   */
+  nav: [
+    'tab-bar-height',
+    'tab-icon-size',
+    'tab-label-size',
+    'tab-item-min-width',
+    'tab-indicator-inset',
+    'tab-indicator-width',
+    'tab-indicator-height',
+    'app-bar-height',
+    'app-bar-title-size',
+    'safe-top-min',
+    'safe-bottom-min',
+  ],
+  /** 屏幕级布局留白。 */
+  screen: ['gutter', 'section-gap', 'bottom-inset'],
+  /** 组件尺寸（"这个控件多大"），不是间距。 */
+  size: [
+    'checkbox',
+    'row-min-height',
+    'swipe-action',
+    'avatar-sm',
+    'avatar-md',
+    'avatar-lg',
+    'fab',
+    'chip-height',
+    'chip-padding-x',
+    'divider-inset',
+    'badge-min-width',
+    'badge-height',
+    'badge-dot',
+    'badge-ring',
+  ],
+  /**
+   * 字距。Apple 规则：字距随字号变，一个固定值必然在某处是错的。
+   * 单位 em，因此**不是长度**，不参与 rem→px 换算。
+   */
+  tracking: ['display', 'title', 'body', 'caption'],
+  /**
+   * 动效物理。🔴 故意不是时长：Apple 用「阻尼比 + 响应」描述弹簧，
+   * 因为弹簧没有固定时长，且必须可被打断。
+   */
+  motion: [
+    'spring-damping-default',
+    'spring-damping-momentum',
+    'spring-response-move',
+    'spring-response-sheet',
+    'spring-response-rotation',
+    'press-scale',
+    'deceleration-rate',
+    'rubber-band-constant',
+  ],
+  /** 手势阈值与容错命中区。 */
+  gesture: ['hysteresis', 'hit-slop'],
+  /**
+   * 状态层不透明度。用叠加层表达 pressed/hover，
+   * 避免为每个组件各写一套变暗色（会随组件数量爆炸）。
+   */
+  state: ['pressed-opacity', 'hover-opacity', 'disabled-opacity'],
+  /** 模糊半径。与 material 分开：一组只能有一种原生类型。 */
+  blur: ['chrome', 'sheet'],
+  /** 材质色（半透明层）。 */
+  material: [
+    'chrome-tint',
+    'chrome-tint-strong',
+    'edge-highlight',
+    'sheet-tint',
+    'scrim',
+    'scrim-strong',
+  ],
 } as const;
 
 export type TokenGroup = keyof typeof TOKEN_GROUPS;

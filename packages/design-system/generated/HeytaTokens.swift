@@ -34,6 +34,10 @@
 //   - ease.exit: cubic-bezier 是 CSS 时序函数，SwiftUI / ArkUI 没有同名类型；已导出控制点，需各端自行映射为动画曲线。
 //   - ease.spring: cubic-bezier 是 CSS 时序函数，SwiftUI / ArkUI 没有同名类型；已导出控制点，需各端自行映射为动画曲线。
 //   - layout.prose-max: 相对单位依赖当前字号，无法换算为原生数值常量；已原样导出为字符串。
+//   - tracking.display: 🔴 导出的是**比例**（em），不是点数。RN 的 letterSpacing、SwiftUI 的 .tracking()、ArkTS 的 letterSpacing 都要的是点值，必须按 `比例 × 字号` 换算（见 native-values.ts 的 resolveTracking）。直接把比例当点用会让字距小到等于没有，且两端都不报错。
+//   - tracking.title: 🔴 导出的是**比例**（em），不是点数。RN 的 letterSpacing、SwiftUI 的 .tracking()、ArkTS 的 letterSpacing 都要的是点值，必须按 `比例 × 字号` 换算（见 native-values.ts 的 resolveTracking）。直接把比例当点用会让字距小到等于没有，且两端都不报错。
+//   - tracking.body: 🔴 导出的是**比例**（em），不是点数。RN 的 letterSpacing、SwiftUI 的 .tracking()、ArkTS 的 letterSpacing 都要的是点值，必须按 `比例 × 字号` 换算（见 native-values.ts 的 resolveTracking）。直接把比例当点用会让字距小到等于没有，且两端都不报错。
+//   - tracking.caption: 🔴 导出的是**比例**（em），不是点数。RN 的 letterSpacing、SwiftUI 的 .tracking()、ArkTS 的 letterSpacing 都要的是点值，必须按 `比例 × 字号` 换算（见 native-values.ts 的 resolveTracking）。直接把比例当点用会让字距小到等于没有，且两端都不报错。
 // ────────────────────────────────────────────────────────────
 
 enum HeytaTokens {
@@ -139,6 +143,7 @@ enum HeytaTokens {
     static let durationNormal: Double = 200  // ms
     static let durationSlow: Double = 300  // ms
     static let durationExit: Double = 140  // ms
+    static let durationPress: Double = 100  // ms
     static let easeStandard: String = "cubic-bezier(0.2, 0, 0.2, 1)"
     static let easeEnter: String = "cubic-bezier(0, 0, 0.2, 1)"
     static let easeExit: String = "cubic-bezier(0.4, 0, 1, 1)"
@@ -165,6 +170,59 @@ enum HeytaTokens {
     static let layoutQuadrantMinHeight: Double = 192  // px
     static let borderWidthThin: Double = 1  // px
     static let borderWidthThick: Double = 2  // px
+    static let navTabBarHeight: Double = 64  // px
+    static let navTabIconSize: Double = 24  // px
+    static let navTabLabelSize: Double = 11  // px
+    static let navTabItemMinWidth: Double = 64  // px
+    static let navTabIndicatorInset: Double = 4  // px
+    static let navTabIndicatorWidth: Double = 20  // px
+    static let navTabIndicatorHeight: Double = 3  // px
+    static let navAppBarHeight: Double = 56  // px
+    static let navAppBarTitleSize: Double = 16  // px
+    static let navSafeTopMin: Double = 20  // px
+    static let navSafeBottomMin: Double = 8  // px
+    static let screenGutter: Double = 16  // px
+    static let screenSectionGap: Double = 24  // px
+    static let screenBottomInset: Double = 88  // px
+    static let sizeCheckbox: Double = 22  // px
+    static let sizeRowMinHeight: Double = 56  // px
+    static let sizeSwipeAction: Double = 72  // px
+    static let sizeAvatarSm: Double = 24  // px
+    static let sizeAvatarMd: Double = 32  // px
+    static let sizeAvatarLg: Double = 40  // px
+    static let sizeFab: Double = 56  // px
+    static let sizeChipHeight: Double = 28  // px
+    static let sizeChipPaddingX: Double = 10  // px
+    static let sizeDividerInset: Double = 52  // px
+    static let sizeBadgeMinWidth: Double = 18  // px
+    static let sizeBadgeHeight: Double = 18  // px
+    static let sizeBadgeDot: Double = 8  // px
+    static let sizeBadgeRing: Double = 2  // px
+    static let trackingDisplay: Double = -0.022  // em-ratio
+    static let trackingTitle: Double = -0.019  // em-ratio
+    static let trackingBody: Double = -0.011  // em-ratio
+    static let trackingCaption: Double = 0.006  // em-ratio
+    static let motionSpringDampingDefault: Double = 1
+    static let motionSpringDampingMomentum: Double = 0.8
+    static let motionSpringResponseMove: Double = 0.4
+    static let motionSpringResponseSheet: Double = 0.3
+    static let motionSpringResponseRotation: Double = 0.4
+    static let motionPressScale: Double = 0.97
+    static let motionDecelerationRate: Double = 0.998
+    static let motionRubberBandConstant: Double = 0.55
+    static let gestureHysteresis: Double = 10  // px
+    static let gestureHitSlop: Double = 10  // px
+    static let statePressedOpacity: Double = 0.08
+    static let stateHoverOpacity: Double = 0.04
+    static let stateDisabledOpacity: Double = 0.38
+    static let blurChrome: Double = 20  // px
+    static let blurSheet: Double = 30  // px
+    static let materialChromeTint: String = "#ffffffb8"
+    static let materialChromeTintStrong: String = "#ffffffd9"
+    static let materialEdgeHighlight: String = "#ffffff80"
+    static let materialSheetTint: String = "#ffffffeb"
+    static let materialScrim: String = "#0f172a52"
+    static let materialScrimStrong: String = "#0f172a80"
   }
 
   // SECTION: Dark
@@ -228,6 +286,12 @@ enum HeytaTokens {
     static let shadowLg: String = "0 8px 24px rgb(0 0 0 / 0.6)"
     static let shadowXl: String = "0 16px 48px rgb(0 0 0 / 0.7)"
     static let shadowFocus: String = "0 0 0 3px rgb(96 165 250 / 0.35)"
+    static let materialChromeTint: String = "#0d1526c7"
+    static let materialChromeTintStrong: String = "#0d1526e6"
+    static let materialEdgeHighlight: String = "#ffffff1f"
+    static let materialSheetTint: String = "#0d1526f0"
+    static let materialScrim: String = "#02061780"
+    static let materialScrimStrong: String = "#020617ad"
   }
 
   // SECTION: ReducedMotion
@@ -237,5 +301,6 @@ enum HeytaTokens {
     static let durationNormal: Double = 1  // ms
     static let durationSlow: Double = 1  // ms
     static let durationExit: Double = 1  // ms
+    static let durationPress: Double = 1  // ms
   }
 }

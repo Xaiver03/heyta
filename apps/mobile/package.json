@@ -1,0 +1,52 @@
+{
+  "name": "@heyta/mobile",
+  "version": "0.0.0",
+  "private": true,
+  "description": "heyta 移动端外壳（iOS / HarmonyOS）。业务逻辑全在 packages/，这里只放平台差异与 UI 绑定",
+  "license": "MIT",
+  "scripts": {
+    "start": "react-native start",
+    "ios": "react-native run-ios",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "vitest run",
+    "pods": "cd ios && bundle exec pod install"
+  },
+  "dependencies": {
+    "@heyta/app-host": "workspace:*",
+    "@heyta/design-system": "workspace:*",
+    "@heyta/domain": "workspace:*",
+    "@heyta/op-log": "workspace:*",
+    "@heyta/storage": "workspace:*",
+    "@heyta/sync-client": "workspace:*",
+    "@heyta/sync-core": "workspace:*",
+    "@op-engineering/op-sqlite": "^18.2.5",
+    "fast-text-encoding": "^1.0.6",
+    "lucide-react-native": "1.48.0",
+    "react": "19.2.3",
+    "react-native": "0.84.1",
+    "react-native-get-random-values": "^2.0.0",
+    "react-native-safe-area-context": "^5.5.2",
+    "react-native-svg": "15.15.5"
+  },
+  "devDependencies": {
+    "@babel/core": "^7.25.2",
+    "@babel/plugin-transform-export-namespace-from": "^8.0.1",
+    "@babel/preset-env": "^7.25.3",
+    "@babel/runtime": "^7.25.0",
+    "@react-native-community/cli": "20.1.0",
+    "@react-native-community/cli-platform-android": "20.1.0",
+    "@react-native-community/cli-platform-ios": "20.1.0",
+    "@react-native/babel-preset": "0.84.1",
+    "@react-native/codegen": "0.84.1",
+    "@react-native/gradle-plugin": "0.84.1",
+    "@react-native/metro-config": "0.84.1",
+    "@react-native/typescript-config": "0.84.1",
+    "@types/react": "^19.2.0",
+    "hermes-compiler": "250829098.0.9",
+    "typescript": "^5.9.3",
+    "vitest": "^5.0.1"
+  },
+  "engines": {
+    "node": ">= 22.11.0"
+  }
+}

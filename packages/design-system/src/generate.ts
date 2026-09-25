@@ -41,6 +41,15 @@ import type { TokenName } from './tokens.js';
 
 export type NativeKind = 'color' | 'number' | 'string';
 
+/**
+ * 数值 token 的单位，仅用于生成注释与自检。
+ *
+ * 🔴 刻意提成具名类型：它原本在 `NativeToken` 与 `Converted` 里**各写了一遍**，
+ * 我新增 `em-ratio` 时只改了一处，另一处由 `tsc` 抓出来 —— 类型检查救了这次，
+ * 但让它只有一处定义才是根治。同一个联合类型写两遍就是两个权威。
+ */
+export type NativeUnit = 'px' | 'ms' | 'em-ratio';
+
 /** 一个 token 在原生侧的完整形态。 */
 export interface NativeToken {
   /** registry 名，形如 `color.primary`（也是 JSON 的 key）。 */
@@ -51,7 +60,7 @@ export interface NativeToken {
   group: string;
   kind: NativeKind;
   /** 数值 token 的单位，仅用于生成注释。 */
-  unit?: 'px' | 'ms';
+  unit?: NativeUnit;
   /** 亮色主题下的值（颜色为 hex 字符串，数值为 number）。 */
   light: string | number;
   /** 暗色主题下被显式覆盖的值；未覆盖为 null（消费方回退 Light）。 */
@@ -104,6 +113,18 @@ const GROUP_KIND: Readonly<Record<string, NativeKind>> = {
   ease: 'string',
   shadow: 'string',
   font: 'string',
+  // 移动外壳与设计变量（2026-09-25 新增）
+  nav: 'number',
+  screen: 'number',
+  size: 'number',
+  // 字距是 em、动效物理是无量纲/秒、状态层是不透明度 —— 都不是长度，
+  // 因此**不**进 LENGTH_GROUPS，否则会被错误地按 rem 换算。
+  tracking: 'number',
+  motion: 'number',
+  state: 'number',
+  gesture: 'number',
+  blur: 'number',
+  material: 'color',
 };
 
 /** 以 px 为单位的长度的分组（rem 会按 16px 基准换算）。 */
@@ -116,18 +137,39 @@ const LENGTH_GROUPS = new Set([
   'focus-ring',
   'border-width',
   'layout',
+  'nav',
+  'screen',
+  'size',
+  'gesture',
+  'blur',
 ]);
 
 const NOTES: Readonly<Record<string, string>> = {
   font: 'CSS 字体栈不是原生端的字体选择方式；原样导出仅作参考，请配置等价系统字体（iOS: SF Pro / PingFang SC，HarmonyOS: HarmonyOS Sans）。',
   ease: 'cubic-bezier 是 CSS 时序函数，SwiftUI / ArkUI 没有同名类型；已导出控制点，需各端自行映射为动画曲线。',
   shadow: 'box-shadow 是 CSS 复合语法，与 SwiftUI / ArkUI 的阴影模型不同；已原样导出，需各端自行构造（偏移 / 模糊 / 颜色）。',
+  tracking:
+    '🔴 导出的是**比例**（em），不是点数。RN 的 letterSpacing、SwiftUI 的 .tracking()、ArkTS 的 letterSpacing 都要的是点值，' +
+    '必须按 `比例 × 字号` 换算（见 native-values.ts 的 resolveTracking）。直接把比例当点用会让字距小到等于没有，且两端都不报错。',
 };
+
+/**
+ * 以「比例」表达的分组。
+ *
+ * 这些 token 在 CSS 里必须带 `em`（`letter-spacing` 只接受长度，裸数字非法），
+ * 但原生端的等价物是**无量纲比例**：RN/SwiftUI/ArkTS 的 letterSpacing 都是点值，
+ * 都要乘字号。
+ *
+ * 🔴 刻意**不**在这里悄悄剥掉 `em` 当 px 导出 —— 那会让 `-0.022em` 变成
+ * 「-0.022 点」：字距小到肉眼不可见，而生成器、类型检查、测试全部通过。
+ * 导出比例本身并附注，让消费方必须显式做那次乘法。
+ */
+const RATIO_GROUPS = new Set(['tracking']);
 
 interface Converted {
   kind: NativeKind;
   value: string | number;
-  unit?: 'px' | 'ms';
+  unit?: NativeUnit;
   note?: string;
 }
 
@@ -139,6 +181,23 @@ function convertValue(group: string, resolved: string): Converted {
 
   if (kind === 'color') {
     return { kind, value: normalizeColor(resolved) };
+  }
+
+  if (RATIO_GROUPS.has(group)) {
+    const em = resolved.match(/^(-?[\d.]+)em$/);
+    if (em) {
+      return {
+        kind: 'number',
+        value: Number(em[1]),
+        unit: 'em-ratio',
+        note: NOTES[group],
+      };
+    }
+    const n = Number(resolved);
+    if (Number.isFinite(n)) {
+      return { kind: 'number', value: n, unit: 'em-ratio', note: NOTES[group] };
+    }
+    throw new Error(`${group} token 期望 em 比例（如 -0.022em），实际：${resolved}`);
   }
 
   if (group === 'duration') {
@@ -153,6 +212,17 @@ function convertValue(group: string, resolved: string): Converted {
     if (px) return { kind: 'number', value: Number(px[1]), unit: 'px' };
     const rem = resolved.match(/^([\d.]+)rem$/);
     if (rem) return { kind: 'number', value: Number((Number(rem[1]) * 16).toFixed(4)), unit: 'px' };
+    // 🔴 裸数字：长度 token 却写了无单位值。这不是「相对单位」，是**漏了单位**。
+    // 必须在这里响亮地失败 —— 曾经它静默降级成字符串常量，于是
+    // `nav.tab-label-weight: 500` 一路生成成 `'500'`，直到人工看产物才发现。
+    // 更根本的教训：把非长度（字重）放进长度组，错误是**分组**而非解析，
+    // 所以这里报错只是兜底，真正该做的是把它放对组。
+    if (/^-?[\d.]+$/.test(resolved)) {
+      throw new Error(
+        `${group} token 期望长度（px/rem），实际是无单位数字：${resolved}。` +
+          `若它本来就不是长度（如字重、比例），请把它移到正确的分组。`,
+      );
+    }
     // ch / em 这类相对单位依赖当前字号，没有忠实的原生数值等价物
     return {
       kind: 'string',

@@ -208,6 +208,10 @@
   --ht-duration-normal: 200ms;
   --ht-duration-slow: 300ms;
   --ht-duration-exit: 140ms;
+  /* 按下反馈专用：比 instant 还短。
+     依据 Apple《Designing Fluid Interfaces》—— 反馈必须在**按下那一刻**
+     就出现，等待超过 ~100ms 就开始"发木"。 */
+  --ht-duration-press: 100ms;
 
   --ht-ease-standard: cubic-bezier(0.2, 0, 0.2, 1);
   --ht-ease-enter: cubic-bezier(0, 0, 0.2, 1);     /* ease-out：进入 */
@@ -254,6 +258,166 @@
      所以边框宽度是被反复使用的设计变量，必须 token 化。 */
   --ht-border-width-thin: 1px;
   --ht-border-width-thick: 2px;
+}
+
+/* ────────────────────────────────────────────────────────────
+   3b. 移动外壳：导航与外壳尺寸
+   ------------------------------------------------------------
+   为什么单独成组：在这一组之前，应用**有页面但没有外壳** ——
+   每个屏幕各自摆元素，没有导航框架，于是"没有那种导航的样式"。
+   外壳是产品结构，不是某个屏幕的局部实现，因此必须 token 化，
+   让 4 个 tab 页共享同一套尺寸，换一处即全局一致。
+
+   依据：Apple HIG（标签栏内容高 49pt + 安全区、导航栏 44pt）
+   与 Material（56dp 栏高）取可共存的收敛值。
+   ──────────────────────────────────────────────────────────── */
+:root {
+  /* 底部标签栏。
+     🔴 高度**不含**安全区，安全区由外层 View 追加。
+     把它算进 height 会让内容在"扣掉底部之后"的区域里居中 ——
+     图标被顶到最上面，看着像没有留白（实测：52 − 8 = 44，而内容恰好 42，
+     上下各剩 1px）。
+     64px = 图标 24 + 图标与字标签间距 4 + 字标签行高 14 + 上下各 11 的留白。 */
+  --ht-nav-tab-bar-height: 4rem;      /* 64px */
+  --ht-nav-tab-icon-size: 1.5rem;     /* 24px —— 与 icon-lg 同值，但语义不同：
+                                         图标基准会变，标签栏图标不该跟着变 */
+  --ht-nav-tab-label-size: 0.6875rem; /* 11px —— Apple caption2，小字号下限 */
+  /* 标签栏字重**故意不设 token**：它就是 font-weight.medium。
+     另设一个 --ht-nav-tab-label-weight: 500 会制造第二个权威 —— 哪天
+     想把字重调细，得改两处，而漏掉一处不会有任何报错。语义文字样式
+     直接引用 font-weight.medium 即可（见 typography.ts）。 */
+  --ht-nav-tab-item-min-width: 4rem;  /* 64px —— 4 个 tab 在 320px 窄屏仍够宽 */
+  /* 选中态指示条。扁平风格不用背景块，用一条短横线。
+     🔴 insets 是必须的：指示条贴到 top:0 会与标签栏的**上边框线重叠**，
+     视觉上两者糊成一条，像渲染错位（实测反馈：「跟顶部挨在一块了」）。
+     让出 4px 之后，指示条才有"浮在栏内"而不是"骑在边框上"的观感。 */
+  --ht-nav-tab-indicator-inset: 0.25rem;  /* 4px —— 距标签栏顶边的间距 */
+  --ht-nav-tab-indicator-width: 1.25rem;
+  --ht-nav-tab-indicator-height: 0.1875rem; /* 3px */
+
+  /* 顶部应用栏 */
+  --ht-nav-app-bar-height: 3.5rem;    /* 56px */
+  --ht-nav-app-bar-title-size: 1rem;  /* 16px —— Material title 与 iOS headline 的交集 */
+
+  /* 安全区兜底值：设备没有 inset 时用它，避免顶/底贴边。
+     命名带 min 是刻意的 —— 这是下限，不是固定值。 */
+  --ht-nav-safe-top-min: 1.25rem;     /* 20px */
+  --ht-nav-safe-bottom-min: 0.5rem;   /* 8px */
+
+  /* 屏幕级布局 */
+  --ht-screen-gutter: 1rem;           /* 16px —— 页面左右留白 */
+  --ht-screen-section-gap: 1.5rem;    /* 24px —— 区块之间的呼吸 */
+  --ht-screen-bottom-inset: 5.5rem;   /* 88px —— 滚动内容底部预留，
+                                         否则最后一条会被标签栏永久遮住 */
+
+  /* 组件尺寸。这些不是间距，是"这个控件多大"，所以不放进 space。 */
+  --ht-size-checkbox: 1.375rem;        /* 22px —— 勾选框视觉尺寸 */
+  --ht-size-row-min-height: 3.5rem;    /* 56px —— 任务行最小高，配合 44px 触控下限 */
+  --ht-size-swipe-action: 4.5rem;      /* 72px —— 侧滑动作按钮宽 */
+  --ht-size-avatar-sm: 1.5rem;         /* 24px */
+  --ht-size-avatar-md: 2rem;           /* 32px */
+  --ht-size-avatar-lg: 2.5rem;         /* 40px */
+  --ht-size-fab: 3.5rem;               /* 56px —— 浮动主操作 */
+  --ht-size-chip-height: 1.75rem;      /* 28px —— 标签胶囊 */
+  --ht-size-chip-padding-x: 0.625rem;  /* 10px */
+  /* 列表分隔线左缩进：与主文字左边缘对齐，视觉上"线从文字开始"。 */
+  --ht-size-divider-inset: 3.25rem;    /* 52px */
+  /* 角标（徽章）。
+     🔴 为什么默认隐藏 0：一个写着「0」的角标不传达任何需要行动的信息，
+     它只是把"这里没问题"也变成一个要读的字。业界做对的产品都是 0 即隐藏。 */
+  --ht-size-badge-min-width: 1.125rem;  /* 18px —— 容得下两位数的圆形下限 */
+  --ht-size-badge-height: 1.125rem;     /* 18px */
+  --ht-size-badge-dot: 0.5rem;          /* 8px —— 只表示"有"、不表示"多少" */
+  /* 角标压在图标右上角，必须有一圈与**底色同色**的描边把两者切开，
+     否则数字会与图标笔画糊在一起（图标是线性描边，尤其明显）。 */
+  --ht-size-badge-ring: 0.125rem;       /* 2px */
+
+  /* 字距（tracking）。
+     🔴 Apple 规则：字距**随字号变**，一个固定值必然在某处是错的 ——
+     大字号视觉上字距偏大要收紧，小字号要放宽才清楚。
+     因此这里按层级给，不按像素给。单位 em，跟着字号缩放。 */
+  --ht-tracking-display: -0.022em;   /* 大标题：收 */
+  --ht-tracking-title: -0.019em;
+  --ht-tracking-body: -0.011em;      /* 正文：略收（拉丁字体在大尺寸下发虚） */
+  --ht-tracking-caption: 0.006em;    /* 小字：放 */
+
+  /* 手势常量。10px 是"意图已明确"的经验阈值：
+     小于它，一次轻微抖动就会被判成滑动手势。 */
+  --ht-gesture-hysteresis: 0.625rem; /* 10px —— 方向判定阈值 */
+  --ht-gesture-hit-slop: 0.625rem;   /* 10px —— 视觉外的额外命中区 */
+
+  /* 状态层不透明度。用叠加层表达 pressed/hover，
+     而不是为每个组件各写一套变暗色 —— 后者会随组件数量爆炸。 */
+  --ht-state-pressed-opacity: 0.08;
+  --ht-state-hover-opacity: 0.04;
+  --ht-state-disabled-opacity: 0.38; /* Apple 惯例值 */
+}
+
+/* ────────────────────────────────────────────────────────────
+   3c. 动效物理：Apple 的「阻尼比 + 响应」
+   ------------------------------------------------------------
+   🔴 这一组**故意不是时长**。Apple 在 WWDC 2018 *Designing Fluid
+   Interfaces* 明确用两个参数取代物理三件套：
+
+     阻尼比 (damping ratio) —— 控制过冲。1.0 = 临界阻尼，不过冲；
+                               <1.0 会振荡，越小越弹。
+     响应 (response)        —— 多快到达目标，单位秒。**不是 duration**：
+                              弹簧没有固定时长，收敛时间由参数涌现。
+
+   为什么必须这样：固定时长的动画**无法被中途接住**。用户抓住正在
+   飞行的元素反向拖时，CSS transition 只能等它跑完，界面于是"有延迟"。
+   弹簧可以从当前值重新起步，因此可打断。
+
+   规则：默认阻尼比 1.0（不过冲）。**只有手势本身带了速度**（甩、扔、
+   拖拽释放）才用 0.8 —— 菜单淡入却过冲是错的，甩出去的卡片回弹才对。
+   ──────────────────────────────────────────────────────────── */
+:root {
+  --ht-motion-spring-damping-default: 1;    /* 临界阻尼，大部分 UI 的默认 */
+  --ht-motion-spring-damping-momentum: 0.8; /* 仅用于动量驱动的交互 */
+
+  --ht-motion-spring-response-move: 0.4;     /* 移动 / 重定位 */
+  --ht-motion-spring-response-sheet: 0.3;    /* 抽屉 / 底部面板 */
+  --ht-motion-spring-response-rotation: 0.4; /* 旋转 */
+
+  /* 按下反馈：这是**视觉时长**不是弹簧 —— 在 pointer-down 上立即触发，
+     必须够快才不"发木"。100ms 是"看得见但感觉不到等待"。
+     归 duration 组而不是 motion 组：它是时长，不是弹簧参数。 */
+  --ht-motion-press-scale: 0.97;
+
+  /* 动量投影：算出"手势要把元素扔到哪"，再吸附到离该点最近的档位。
+     用 Apple 的指数衰减式，**不是**物理课本的 v²/(2·decel) ——
+     后者与系统滚动行为不一致。0.998 是常规手感，0.99 更干脆。 */
+  --ht-motion-deceleration-rate: 0.998;
+  /* 边界软阻力系数：越界越难拖，而不是硬停（硬停读起来像"卡住"）。 */
+  --ht-motion-rubber-band-constant: 0.55;
+}
+
+/* ────────────────────────────────────────────────────────────
+   3d. 材质：半透明层级
+   ------------------------------------------------------------
+   依据 Apple《Materials》：导航/工具条/面板是**悬浮的功能层**，
+   内容从下方滚过 —— 而不是一条实心色带切走一块屏幕。
+
+   🔴 两条硬规则：
+     1. 材料重量表达层级：越"厚"的材料分隔结构区，越"亮"的吸引交互。
+     2. **禁止把亮色半透明面叠在另一个半透明面上** —— 可读性会塌。
+        因此 tint 系列只允许直接叠在滚动内容上。
+
+   ⚠️ 模糊半径是 px 长度；tint/scrim 是颜色，因此分成 blur 与 material
+      两组 —— 一个 token 组只能有一种原生类型，混装会让生成器无法映射。
+   ──────────────────────────────────────────────────────────── */
+:root {
+  --ht-blur-chrome: 20px;  /* 导航条 / 标签栏 */
+  --ht-blur-sheet: 30px;   /* 底部面板：更大的面要更厚 */
+
+  --ht-material-chrome-tint: rgb(255 255 255 / 0.72);
+  --ht-material-chrome-tint-strong: rgb(255 255 255 / 0.85);
+  /* 亮色顶边 = 光打在材料上。没有它，半透明面会显得像"没画完"。 */
+  --ht-material-edge-highlight: rgb(255 255 255 / 0.5);
+  --ht-material-sheet-tint: rgb(255 255 255 / 0.92);
+  /* 遮罩：模态要"变暗以聚焦"，并行面板则不加遮罩以保持流不被打断。 */
+  --ht-material-scrim: rgb(15 23 42 / 0.32);
+  --ht-material-scrim-strong: rgb(15 23 42 / 0.5);
 }
 
 /* ────────────────────────────────────────────────────────────
@@ -331,6 +495,17 @@
   --ht-shadow-lg: 0 8px 24px rgb(0 0 0 / 0.6);
   --ht-shadow-xl: 0 16px 48px rgb(0 0 0 / 0.7);
   --ht-shadow-focus: 0 0 0 3px rgb(96 165 250 / 0.35);
+
+  /* 材质：暗色的半透明**不是亮色的反相**。
+     亮色用"白色提升"，暗色要用"深蓝提升" —— 用纯黑会让浮层与背景糊成一片，
+     用白色会过曝。这里沿用 surface 那套 #0d1526 家族，保持同一色相。
+     顶边高光在暗色下要更弱：亮色下它是"光"，暗色下只是"边缘"。 */
+  --ht-material-chrome-tint: rgb(13 21 38 / 0.78);
+  --ht-material-chrome-tint-strong: rgb(13 21 38 / 0.9);
+  --ht-material-edge-highlight: rgb(255 255 255 / 0.12);
+  --ht-material-sheet-tint: rgb(13 21 38 / 0.94);
+  --ht-material-scrim: rgb(2 6 23 / 0.5);
+  --ht-material-scrim-strong: rgb(2 6 23 / 0.68);
 }
 
 /* ────────────────────────────────────────────────────────────
@@ -356,5 +531,8 @@
     --ht-duration-normal: 1ms;
     --ht-duration-slow: 1ms;
     --ht-duration-exit: 1ms;
+    /* 压到 1ms 而不是删掉 duration —— 删掉会让依赖 transitionend 的逻辑
+       永远不触发。按下反馈同理：仍要有"瞬间发生"，只是不再可见。 */
+    --ht-duration-press: 1ms;
   }
 }

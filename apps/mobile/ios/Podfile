@@ -1,0 +1,82 @@
+# Resolve react_native_pods.rb with node to allow for hoisting
+require Pod::Executable.execute_command('node', ['-p',
+  'require.resolve(
+    "react-native/scripts/react_native_pods.rb",
+    {paths: [process.argv[1]]},
+  )', __dir__]).strip
+
+platform :ios, min_ios_version_supported
+prepare_react_native_project!
+
+linkage = ENV['USE_FRAMEWORKS']
+if linkage != nil
+  Pod::UI.puts "Configuring Pod with #{linkage}ally linked Frameworks".green
+  use_frameworks! :linkage => linkage.to_sym
+end
+
+target 'HeytaMobile' do
+  config = use_native_modules!
+
+  use_react_native!(
+    :path => config[:reactNativePath],
+    # An absolute path to your application root.
+    :app_path => "#{Pod::Config.instance.installation_root}/.."
+  )
+
+  post_install do |installer|
+    react_native_post_install(
+      installer,
+      config[:reactNativePath],
+      :mac_catalyst_enabled => false,
+      # :ccache_enabled => true
+    )
+
+    # ─────────────────────────────────────────────────────────────────────
+    # fmt 11.0.2 × Apple clang 21 的编译失败（实测，两个 Xcode 都中）
+    # ─────────────────────────────────────────────────────────────────────
+    #
+    # RN 0.84.1 把 fmt 钉在 11.0.2（third-party-podspecs/fmt.podspec，git tag 11.0.2）。
+    # 用 Xcode 26.5 与 27.1 构建都会在 `fmt/format-inl.h` 报：
+    #
+    #   error: call to consteval function
+    #     'fmt::basic_format_string<...>::basic_format_string<FMT_COMPILE_STRING, 0>'
+    #     is not a constant expression
+    #
+    # ❌ **换 Xcode 没用**：实测两个 Xcode 的 clang 都是 Apple clang 21.0.0
+    #    （26.5 是 21.0.1.1.101，27.1 Beta 是 21.0.3.34.2）。这是编译器版本的
+    #    问题，不是 Xcode 版本的问题 —— 这点不实测就会误判成"用正式版 Xcode 就能好"。
+    #
+    # ❌ **`-DFMT_USE_CONSTEVAL=0` 没用**：fmt/base.h 的条件链最后一条
+    #    `#elif defined(__cpp_consteval)` 会**无条件重新定义**它，命令行传的值被覆盖。
+    #    （clang 21 定义了 `__cpp_consteval`，所以走的就是这一条。）
+    #
+    # ✅ 所以直接改头文件里那一行。`FMT_USE_CONSTEVAL` 为 0 时 `FMT_CONSTEVAL`
+    #    展开为空，`basic_format_string` 退化成普通构造函数 —— 我们**只是失去
+    #    编译期的格式串检查**，运行期行为不变。对 RN 的用法没有任何影响。
+    #
+    # 这是**临时绕行**，不是修复：正确做法是等 RN 把 fmt 升到 ≥ 11.1.x。
+    # 一旦升级，下面的 gsub 匹配不到，脚本会打印一行提示而不是静默失效。
+    # ⚠️ 是 `sandbox.root`，不是 `sandbox.pods_root` —— 后者在 CocoaPods 1.16
+    # 上不存在，报 `undefined method 'pods_root' for Pod::Sandbox`，
+    # 而**整段 post_install 会因此中断**（补丁静默不生效，构建照旧失败）。
+    fmt_base = File.join(installer.sandbox.root, 'fmt/include/fmt/base.h')
+    if File.exist?(fmt_base)
+      # 🔴 fmt 的文件是 `-r--r--r--`（444）。CocoaPods 从 git checkout 出来的
+      # 头文件**没有写位**，直接 IO.write 会报
+      # `Permission denied @ rb_sysopen` —— 而这个异常同样会中断整段
+      # post_install，表现为"补丁没生效、构建照旧失败"，很容易误判成补丁写错了。
+      File.chmod(0o644, fmt_base)
+      original = File.read(fmt_base)
+      patched = original.sub(
+        "#elif defined(__cpp_consteval)\n#  define FMT_USE_CONSTEVAL 1",
+        "#elif defined(__cpp_consteval)\n#  define FMT_USE_CONSTEVAL 0",
+      )
+      if patched == original
+        Pod::UI.puts '[heyta] fmt 补丁未命中 —— fmt 可能已升级，请复查是否还需要它'.yellow
+      else
+        File.write(fmt_base, patched)
+        Pod::UI.puts '[heyta] 已对 fmt 关闭 consteval（Apple clang 21 兼容）'.green
+      end
+    end
+  end
+end
