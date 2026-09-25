@@ -6,8 +6,81 @@ export const SALT_LENGTH = 16;
 export const IV_LENGTH = 12;
 export const KEY_LENGTH = 32;
 
-export const TEXT_ENCODER = new TextEncoder();
-export const TEXT_DECODER = new TextDecoder();
+/**
+ * `TextEncoder` / `TextDecoder` 的**惰性**获取。
+ *
+ * 🔴 原来这里是模块顶层的 eager 求值：
+ *
+ *     export const TEXT_ENCODER = new TextEncoder();
+ *     export const TEXT_DECODER = new TextDecoder();
+ *
+ * 后果是**只要 import 这个模块就崩**，哪怕当前流程根本不需要编解码。
+ * 真机实测（小米 Android 16 / Hermes，点"添加任务"时）：
+ *
+ *     ReferenceError: Property 'TextDecoder' doesn't exist
+ *     FATAL EXCEPTION: mqt_v_native
+ *     崩溃位置: loadModuleImplementation ← 模块加载期，不是调用期
+ *
+ * Hermes 实测的全局量分布很不对称：
+ *
+ *     TextEncoder      function     ✅ 有
+ *     TextDecoder      undefined    ❌ 没有
+ *     crypto           undefined    ❌ 完全没有（getRandomValues / subtle / randomUUID 全无）
+ *     atob / btoa      function     ✅ 有
+ *
+ * 所以 `new TextEncoder()` 能过、`new TextDecoder()` 立刻炸 —— 报错只提到后者。
+ * 依赖运行时的全局量时，**"有没有"必须查过再说**，不能假定成对出现。
+ *
+ * 改成惰性有两个好处：
+ * 1. 模块能被安全 import（`compression.ts` 早就是这个写法，这里只是对齐）；
+ * 2. 真缺的时候报的是**清楚的错误**，而不是一个指向 import 语句的 ReferenceError。
+ *
+ * ⚠️ 惰性只是让失败可诊断，**不解决问题本身**。RN 宿主仍然必须装
+ * `fast-text-encoding` 与 `react-native-get-random-values` 两个 polyfill
+ * （见 `apps/mobile/index.js` 顶部）。
+ */
+/**
+ * ⚠️ 返回类型用 **DOM 的 `TextEncoder` / `TextDecoder`**，不要自己写窄接口。
+ * 我一开始写成 `{ decode(input: Uint8Array): string }`，结果调用方传的是
+ * `ArrayBuffer`，`tsc` 立刻报了一串"缺少 24 个属性" —— 真实的 DOM 签名是
+ * `decode(input?: BufferSource): string`，比手写的宽。
+ * 手写窄接口 = 用自己的猜测替换标准定义，只会制造假错误。
+ */
+const getRequiredGlobal = <T>(name: string, value: T | undefined): T => {
+  if (value === undefined) {
+    throw new WebCryptoNotAvailableError(
+      `${name} is not available in this runtime. ` +
+        `React Native (Hermes) lacks it — install the platform polyfill in the host shell.`,
+    );
+  }
+  return value;
+};
+
+/**
+ * 惰性构造并**记住**实例。
+ *
+ * 返回实例（不是构造函数），所以调用点是 `getTextEncoder().encode(x)` ——
+ * 与原先 `TEXT_ENCODER.encode(x)` 逐字相近。记忆化保证"惰性"不会退化成
+ * "每次调用都新建一个"。
+ */
+let textEncoder: TextEncoder | undefined;
+let textDecoder: TextDecoder | undefined;
+
+export const getTextEncoder = (): TextEncoder => {
+  textEncoder ??= new (getRequiredGlobal(
+    'TextEncoder',
+    (globalThis as { TextEncoder?: typeof TextEncoder }).TextEncoder,
+  ))();
+  return textEncoder;
+};
+
+export const getTextDecoder = (): TextDecoder => {
+  textDecoder ??= new (getRequiredGlobal(
+    'TextDecoder',
+    (globalThis as { TextDecoder?: typeof TextDecoder }).TextDecoder,
+  ))();
+  return textDecoder;
+};
 
 // Minimum sizes for format detection
 // Argon2: [SALT (16)][IV (12)][CIPHERTEXT + AUTH_TAG (min 16)] = 44 bytes

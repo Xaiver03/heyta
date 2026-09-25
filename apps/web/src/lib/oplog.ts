@@ -13,15 +13,26 @@
  */
 
 import { OpLogEngine, type MaterializedState, type OpIntent } from '@heyta/op-log';
-import { IndexedDbAdapter, IndexedDbOpLogStore, STORES } from '@heyta/storage';
+import { IndexedDbAdapter, IndexedDbOpLogStore } from '@heyta/storage';
 import type { Operation } from '@heyta/sync-core';
+// 🔴 **clientId 的生成只有一份实现**，在 `@heyta/app-host`。
+// 这里原本自己写了一份：回退用 `Math.random()`、格式也不同，
+// 而 `ids.ts` 的文件头那张"漂移对照表"里**已经列过它**。
+// 两份实现的差距不是风格问题 —— clientId 是 LWW 冲突的决胜依据。
+import { resolveClientId } from '@heyta/app-host';
 
 let engine: OpLogEngine | undefined;
 let db: IndexedDbAdapter | undefined;
+/**
+ * op-log 存储实例。
+ *
+ * 保留引用是因为「构造同步客户端」需要它来读写**同步游标** ——
+ * `getLastServerSeq`/`setLastServerSeq` 是 `OpLogStore` 接口的正式成员。
+ * 此前同步 store 绕过它、自己再开一个 adapter 去读 `meta`，
+ * 等于把游标键名知识复制了第二份。
+ */
+let opLogStore: IndexedDbOpLogStore<Operation<string>> | undefined;
 let initPromise: Promise<void> | undefined;
-
-/** 设备身份在 meta store 里的键名。 */
-const CLIENT_ID_KEY = 'clientId';
 
 /** 事件监听器：状态变化后通知各 store 刷新。 */
 type Listener = () => void;
@@ -37,23 +48,6 @@ function notify(): void {
   for (const l of listeners) l();
 }
 
-/** 读取或生成稳定的设备 clientId。**一经生成不可更改**（LWW 决胜依据）。 */
-async function resolveClientId(
-  adapter: IndexedDbAdapter,
-  key: string,
-): Promise<string> {
-  const existing = await adapter.get<{ key: string; value: string }>(STORES.META, key);
-  if (existing !== undefined && typeof existing.value === 'string') {
-    return existing.value;
-  }
-  const fresh =
-    typeof crypto !== 'undefined' && 'randomUUID' in crypto
-      ? crypto.randomUUID()
-      : `client-${String(Date.now())}-${Math.random().toString(36).slice(2)}`;
-  await adapter.put(STORES.META, { key, value: fresh });
-  return fresh;
-}
-
 /**
  * 初始化引擎。幂等，可并发调用。
  *
@@ -67,10 +61,12 @@ export function initOpLog(dbName = 'heyta'): Promise<void> {
     db = new IndexedDbAdapter(dbName);
     await db.init();
 
-    const store = new IndexedDbOpLogStore<Operation<string>>(db);
-    const clientId = await resolveClientId(db, CLIENT_ID_KEY);
+    opLogStore = new IndexedDbOpLogStore<Operation<string>>(db);
+    // 与原生宿主同一个键（`META_KEYS.CLIENT_ID` = 'clientId'），
+    // 所以这次切换**不需要任何数据迁移** —— 已有值会被原样读回。
+    const clientId = await resolveClientId(db);
 
-    engine = new OpLogEngine({ store, clientId });
+    engine = new OpLogEngine({ store: opLogStore, clientId });
     await engine.recover();
     notify();
   })();
@@ -85,6 +81,16 @@ export function requireEngine(): OpLogEngine {
     );
   }
   return engine;
+}
+
+/** op-log 存储。同步接线用它读写游标 —— 不要绕过它直接碰 adapter。 */
+export function requireStore(): IndexedDbOpLogStore<Operation<string>> {
+  if (opLogStore === undefined) {
+    throw new Error(
+      'op-log 存储尚未初始化。请先 await initOpLog()（应用入口应已完成）。',
+    );
+  }
+  return opLogStore;
 }
 
 export function currentState(): MaterializedState {
@@ -112,6 +118,7 @@ export async function applyRemoteOps(ops: Operation<string>[]): Promise<void> {
 export function __resetOpLogForTests(): void {
   engine = undefined;
   db = undefined;
+  opLogStore = undefined;
   initPromise = undefined;
   // ⚠️ **不要清空 listeners。**
   // 订阅是模块级注册的（各 store 在模块加载时订阅一次），

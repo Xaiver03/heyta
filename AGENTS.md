@@ -107,6 +107,18 @@ ADR-0003 §2.1 的分界线原来有个说不清的地方：把零件接起来�
 > 而 `apps/web` 用的是 `Date.now()+counter` 且有回退。移动端（Hermes）没有
 > `randomUUID` 时会**在用户点"新建任务"的那一刻抛异常**。
 
+**同形状的第二次，发生在同步接线上。** `SyncClientOptions` 有 12 个回调，
+`packages/app-host` 与 `apps/web` 里**各写了一份，逐字相同、连注释都是复制的**；
+clientId 的回退逻辑还真的漂移了（`randomId()` vs 自己写的 `Math.random()`）。
+clientId 是 LWW 的决胜依据 —— 两份实现 = 两套裁决标准。
+现已抽成 `packages/app-host` 的 `createSyncClient()`，并由
+`pnpm check:layering` 钉住（4 条规则，已用注入违规验证能失败）。
+
+> 教训：**"抽出了一个共享实现"不等于"重复被消除了"。** `ids.ts` 抽出来了、
+> 文件头还专门列了一张漂移对照表 —— 但 `apps/web` 那份**从没被删掉**，
+> 表里列着它，它却一直活在代码里。抽取的收尾动作是**删掉旧的那份并加门禁**，
+> 不是写一个更好的新版本。
+
 ---
 
 ## 4. 数据库迁移纪律
@@ -245,8 +257,9 @@ pnpm verify:sync:dry            # 不需要服务端，只校验 op 形状
 pnpm verify:p1                  # P1 验收：**自带真实服务端**，跑零 mock 的端到端同步（11 条）
 pnpm verify:p2                  # P2 验收：**自带真实服务端**，非 Web 壳（Node+SQLite）真实读写+同步
 
-pnpm check                      # 全部门禁：类型 + 迁移 + 许可证 + 文档 + 设计变量
+pnpm check                      # 全部门禁：类型 + 迁移 + 分层 + 许可证 + 文档 + 设计变量
 pnpm check:design               # 只跑设计变量硬编码检查
+pnpm check:layering             # 只跑分层边界检查（apps/* 不得重新长出业务/接线）
 pnpm check:tokens               # 原生 token 产物（Swift/ArkTS/JSON/RN）是否与 tokens.css 同步
 pnpm check:arkts                # 用**真 ArkTS 编译器**编译生成的 .ets 产物
 ```
@@ -443,7 +456,7 @@ docker inspect <容器> --format '{{range .Config.Env}}{{println .}}{{end}}' | g
 | 阶段 | 状态 |
 |---|---|
 | P0 奠基 | ✅ 已完成（协议已跑通，Docker 实测通过） |
-| P1 单端闭环 | ✅ **已完成**（6 条零 mock E2E 全过）→ [详细计划](docs/plans/phase-1-single-client-loop.md) |
+| P1 单端闭环 | ✅ **已完成**。**冲突解决闭环已实测跑通**：`pnpm verify:p1` 自带真实服务端跑 11 条零 mock E2E，含"真实点击 `ConflictDialog` → 双端收敛"两条（`keep-local` / `keep-remote` 各一）→ [详细计划](docs/plans/phase-1-single-client-loop.md) |
 | P2 多端补齐 | 🔄 **进行中**（存储契约 ✅ / SQLite ✅ / token 生成器 ✅ / **RN token 产物（含暗色合并 + 类型安全）** ✅ / **ArkTS 产物真编译器验证** ✅ / **RNOH 依赖链实测打通** ✅ / 非 Web 宿主 ✅ / **移动壳（Android 实机跑通）** ✅ / **iOS 壳** ✅ / 鸿蒙壳 ❌）→ [详细计划](docs/plans/phase-2-multi-platform.md) |
 | P3 平台特性 | ⏸ |
 

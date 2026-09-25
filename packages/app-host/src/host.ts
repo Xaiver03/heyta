@@ -32,7 +32,6 @@
  */
 
 import { OpLogEngine, type MaterializedState, type OpIntent } from '@heyta/op-log';
-import type { EntityType } from '@heyta/shared-schema';
 import {
   DbOpLogStore,
   INDEXEDDB_SCHEMA,
@@ -42,8 +41,10 @@ import {
   type DbAdapter,
   type SqliteDriver,
 } from '@heyta/storage';
-import { SyncClient, type SyncStatus } from '@heyta/sync-client';
-import { OpType, type Operation } from '@heyta/sync-core';
+import type { SyncStatus } from '@heyta/sync-client';
+import type { Operation } from '@heyta/sync-core';
+import { randomId } from './ids.js';
+import { createSyncClient } from './sync-wiring.js';
 
 export interface AppHostOptions {
   /**
@@ -122,6 +123,24 @@ export interface AppHost {
  * **一经生成不可更改** —— 它是 LWW 冲突的确定性决胜依据。
  * 存在 `meta` store（与 Web 宿主同一个键），所以同一条 SQLite 文件
  * 每次打开都拿到同一个 id。
+ *
+ * 🔴 **必须走 `randomId()`，不能直接 `globalThis.crypto.randomUUID()`。**
+ *
+ * 这里原来是后者，而且**在真机上炸了**（小米 Android 16，Hermes）：
+ *
+ *     打开本地数据库失败
+ *     Cannot read property 'randomUUID' of undefined
+ *
+ * Hermes 里连 `globalThis.crypto` 都不存在，所以是读 `undefined` 的属性，
+ * 不是"函数不存在"。`ids.ts` 就是为这件事写的、还专门写了文档解释 ——
+ * 但 host.ts 是后来才抽出来的，**自己又写了一份绕过守卫的实现**。
+ *
+ * 这正是 AGENTS.md §3.5 记的那个形状：**同一个决定有两个实现，然后漂移**。
+ * 而且它比 §3.5 原文预言的还早一步 —— 原文说会在"用户点新建任务"时炸，
+ * 实际在启动解析 clientId 时就炸，应用直接停在错误页。
+ *
+ * ⚠️ 回退路径**不是密码学随机**（见 `ids.ts` 文件头的取舍说明）。
+ * 对 clientId 这是有代价的，但"起不来"是确定发生的坏结果，两害相权取此。
  */
 export async function resolveClientId(adapter: DbAdapter): Promise<string> {
   const existing = await adapter.get<{ key: string; value: string }>(
@@ -132,7 +151,7 @@ export async function resolveClientId(adapter: DbAdapter): Promise<string> {
     return existing.value;
   }
 
-  const fresh = globalThis.crypto.randomUUID();
+  const fresh = randomId();
   await adapter.put(STORES.META, { key: META_KEYS.CLIENT_ID, value: fresh });
   return fresh;
 }
@@ -159,52 +178,23 @@ export async function openAppHost(options: AppHostOptions): Promise<AppHost> {
   });
   await engine.recover();
 
-  // ── 同步游标：所有宿主共用同一个 meta store / 同一个键 ──
-  const readCursor = async (): Promise<number> => {
-    const rec = await adapter.get<{ key: string; value: number }>(
-      STORES.META,
-      META_KEYS.LAST_SERVER_SEQ,
-    );
-    return rec?.value ?? 0;
-  };
-  const writeCursor = async (seq: number): Promise<void> => {
-    await adapter.put(STORES.META, { key: META_KEYS.LAST_SERVER_SEQ, value: seq });
-  };
-
   /**
    * 同步客户端是**宿主无关**的业务逻辑（`packages/sync-client`）。
-   * 这里只注入平台差异：网络、令牌、口令。
+   *
+   * 🔴 接线本身也已抽到 `sync-wiring.ts`：它此前在 `apps/web` 里**另有一份**，
+   * 连注释都是复制的。这里只注入真正的平台差异 —— 网络、令牌、口令，
+   * 以及"应用远端之后要不要通知 UI"。
    */
-  const client = new SyncClient({
+  const client = createSyncClient({
+    engine,
+    store,
     baseUrl: options.serverUrl ?? '',
-    clientId,
     getToken: async () => options.token,
     getPassword: async () => options.password,
-    getLastServerSeq: readCursor,
-    setLastServerSeq: writeCursor,
-    // 待上传队列直接来自存储的上传状态索引，不是内存列表 ——
-    // 内存列表崩溃后就丢了，而「哪些还没上传」正是崩溃后最需要的信息。
-    getLocalOps: () => engine.getPendingUpload(),
-    markUploaded: (seqs) => engine.markUploaded(seqs),
+    // 原生宿主没有订阅层：状态由调用方主动 `getState()` 拉取，
+    // 因此应用远端之后**不需要**通知任何人。
     applyRemote: async (ops) => {
       await engine.applyRemote(ops);
-    },
-    redispatch: async (op) => {
-      await engine.redispatch(op);
-    },
-    discardLocal: (ids) => engine.discardPendingUpload(ids),
-    getOpsForEntity: (entityType, entityId) =>
-      engine.getOpsForEntity(entityType as EntityType, entityId),
-    getOpById: (opId) => engine.getOpById(opId),
-    redispatchPayload: async (intent) => {
-      // 冲突判定为「保留远端」时，把远端载荷表达成本地的一条新 op。
-      // 直接改状态是 D4 禁止的绕开 op-log 的写入。
-      await engine.dispatch({
-        entityType: intent.entityType as EntityType,
-        entityId: intent.entityId,
-        opType: intent.opType as OpType,
-        payload: intent.payload,
-      });
     },
     ...(options.fetchImpl !== undefined ? { fetchImpl: options.fetchImpl } : {}),
   });

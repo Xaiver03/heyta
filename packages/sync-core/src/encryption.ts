@@ -50,8 +50,8 @@
 import {
   IV_LENGTH,
   SALT_LENGTH,
-  TEXT_ENCODER,
-  TEXT_DECODER,
+  getTextEncoder,
+  getTextDecoder,
   aesDecrypt,
   aesEncrypt,
   decodeBase64,
@@ -95,7 +95,7 @@ export { setLegacyKdfWarningHandler } from './encryption/legacy';
  *          (format: `[SALT (16)][IV (12)][AES-GCM ciphertext + auth tag]`)
  */
 const encryptWithDerivedKey = async (data: string, key: DerivedKey): Promise<string> => {
-  const dataBuffer = TEXT_ENCODER.encode(data);
+  const dataBuffer = getTextEncoder().encode(data);
   const iv = getRandomBytes(IV_LENGTH);
   const encryptedContent = await aesEncrypt(key.keyBytes, iv, dataBuffer);
 
@@ -124,7 +124,7 @@ const decryptWithDerivedKey = async (
   const encryptedData = new Uint8Array(dataBuffer, SALT_LENGTH + IV_LENGTH);
 
   const decryptedContent = await aesDecrypt(key.keyBytes, iv, encryptedData);
-  return TEXT_DECODER.decode(decryptedContent);
+  return getTextDecoder().decode(decryptedContent);
 };
 
 export const encrypt = async (data: string, password: string): Promise<string> => {

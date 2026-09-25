@@ -21,10 +21,30 @@
 1. **`package.json` 的 `name`**：`@sp/sync-core` → `@heyta/sync-core`
    （已验证：`src/` 与 `tests/` 中**没有**对该包名的自引用，改名不影响任何代码）
 2. 在 `package.json` 增加 `typecheck` script（与 `test:typecheck` 等价，便于工作区统一调用）
+3. 🔴 **`src/encryption/web-crypto.ts`：把 `TextEncoder`/`TextDecoder` 从模块顶层 eager 求值
+   改成惰性获取**（`TEXT_ENCODER` / `TEXT_DECODER` 两个常量 →
+   `getTextEncoder()` / `getTextDecoder()` 两个函数），并同步更新
+   `src/encryption.ts` 与 `src/encryption/legacy.ts` 里的 5 处调用。
 
-**除此之外，`src/` 与 `tests/` 的代码与上游逐字一致、未作任何修改。**
+   原因：原写法在模块**加载期**就执行 `new TextDecoder()`，而 React Native 的
+   Hermes 引擎没有 `TextDecoder`（实测：`TextEncoder` 有、`TextDecoder` 没有、
+   `crypto` 完全没有）。后果不是降级而是**崩溃**，且崩在 import 语句上：
 
-> 保持零改动是刻意的：这样将来上游修 bug 时，我们可以直接 diff 并同步。
+   ```
+   ReferenceError: Property 'TextDecoder' doesn't exist
+   FATAL EXCEPTION: mqt_v_native  ← 位置是 loadModuleImplementation
+   ```
+
+   改成惰性后模块可被安全 import，真缺失时报的是清楚的错误。
+   上游若将来修了这个问题，可以直接替换本文件。
+
+   ⚠️ 这只是让失败可诊断，**不解决问题本身**：RN 宿主仍必须装
+   `fast-text-encoding` 与 `react-native-get-random-values`
+   （见 `apps/mobile/index.js` 顶部，那里记了许可证核查结论）。
+
+**除此之外，`src/` 与 `tests/` 的代码与上游逐字一致。**
+
+> 保持改动最小是刻意的：这样将来上游修 bug 时，我们可以直接 diff 并同步。
 
 ## 为什么 vendor 而不是依赖 npm
 

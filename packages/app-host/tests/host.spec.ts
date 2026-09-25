@@ -118,6 +118,48 @@ describe('openAppHost：真实 SQLite 文件', () => {
     expect(host.clientId).toBe(a);
   });
 
+  it('🔴 `globalThis.crypto` 完全不存在时也能开起来（Hermes 的真实形状）', async () => {
+    // 真机实测的失败：
+    //     打开本地数据库失败
+    //     Cannot read property 'randomUUID' of undefined
+    //
+    // 起因是 `resolveClientId` 直接调了 `globalThis.crypto.randomUUID()`，
+    // 而 Hermes 里连 `globalThis.crypto` 都没有 —— 所以是读 undefined 的属性。
+    // `ids.ts` 早就有带守卫的 `randomId()`，但 host.ts 抽出来时**自己又写了一份**。
+    //
+    // 这条用例把 crypto 整个摘掉，正是当时的运行时形状。
+    const real = Object.getOwnPropertyDescriptor(globalThis, 'crypto');
+    Object.defineProperty(globalThis, 'crypto', {
+      value: undefined,
+      configurable: true,
+      writable: true,
+    });
+    try {
+      host = await openAppHost({ dbPath, driverFactory: driverFor(dbPath) });
+      expect(typeof host.clientId).toBe('string');
+      expect(host.clientId.length).toBeGreaterThan(0);
+    } finally {
+      if (real) Object.defineProperty(globalThis, 'crypto', real);
+    }
+  });
+
+  it('🔴 `crypto` 在但没有 `randomUUID` 时也不抛（更老的 Hermes）', async () => {
+    // 与上一条是**不同**的形状：crypto 存在、有 getRandomValues，但没有 randomUUID。
+    // 两种情况必须都不炸 —— 守卫要同时挡住。
+    const real = Object.getOwnPropertyDescriptor(globalThis, 'crypto');
+    Object.defineProperty(globalThis, 'crypto', {
+      value: { getRandomValues: (a: Uint8Array) => a.fill(1) },
+      configurable: true,
+      writable: true,
+    });
+    try {
+      host = await openAppHost({ dbPath, driverFactory: driverFor(dbPath) });
+      expect(typeof host.clientId).toBe('string');
+    } finally {
+      if (real) Object.defineProperty(globalThis, 'crypto', real);
+    }
+  });
+
   it('游标走 META store 的同一个键（换存储实现上层不用改）', async () => {
     host = await openAppHost({ dbPath, driverFactory: driverFor(dbPath) });
     host.close();
