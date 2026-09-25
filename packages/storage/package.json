@@ -1,0 +1,30 @@
+{
+  "name": "@heyta/storage",
+  "version": "0.0.0",
+  "private": true,
+  "description": "heyta 的存储适配层：底层 DB 抽象 + 操作日志存储契约（IndexedDB / SQLite 可替换）",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsup",
+    "typecheck": "tsc --noEmit -p tsconfig.spec.json",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "@heyta/shared-schema": "workspace:*",
+    "@heyta/sync-core": "workspace:*"
+  },
+  "devDependencies": {
+    "tsup": "^8.5.1",
+    "typescript": "^5.9.3",
+    "vitest": "^5.0.1"
+  }
+}
