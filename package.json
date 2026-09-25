@@ -3,7 +3,7 @@
   "version": "0.0.0",
   "private": true,
   "description": "功能等价于滴答清单的任务 / 习惯 / 专注管理应用 —— 本地优先，全平台",
-  "comment:license": "heyta 自身的许可证尚未确定，见 docs/04-license-decision.md（ADR-0001）。第三方代码的归属见 THIRD_PARTY_LICENSES.md。",
+  "comment:license": "heyta 自身的许可证尚未确定，见 docs/adr/0001-license-decision.md（ADR-0001）。第三方代码的归属见 THIRD_PARTY_LICENSES.md。",
   "packageManager": "pnpm@11.8.0",
   "engines": {
     "node": ">=22"
@@ -14,7 +14,11 @@
     "typecheck": "pnpm -r typecheck",
     "clean": "pnpm -r exec rm -rf dist node_modules",
     "verify:sync": "node scripts/verify-sync-loop.mjs",
-    "verify:sync:dry": "node scripts/verify-sync-loop.mjs --dry-run"
+    "verify:sync:dry": "node scripts/verify-sync-loop.mjs --dry-run",
+    "check:migrations": "node scripts/check-migrations.mjs",
+    "check:licenses": "node research/tools/license-inventory.mjs",
+    "check:docs": "node research/tools/docs-link-check.mjs",
+    "check": "pnpm typecheck && pnpm check:migrations && pnpm check:licenses && pnpm check:docs"
   },
   "devDependencies": {
     "@heyta/shared-schema": "workspace:*",
