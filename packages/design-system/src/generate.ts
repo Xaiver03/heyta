@@ -325,14 +325,9 @@ function arktsStringLiteral(value: string): string {
 // ─────────────────────────────────────────────────────────────
 
 function unmappableNotes(tokens: readonly NativeToken[]): Array<[string, string]> {
-  const out: Array<[string, string]> = [];
-  const seen = new Set<string>();
-  for (const t of tokens) {
-    if (!t.note || seen.has(t.note)) continue;
-    seen.add(t.note);
-    out.push([t.token, t.note]);
-  }
-  return out;
+  // 按 token 逐条列出，**不按说明文字去重** —— 去重会漏掉同组的第二、三个
+  // token（font.sans 与 font.mono 说明相同，只列 sans 会让人以为 mono 已映射）。
+  return tokens.filter((t) => t.note).map((t) => [t.token, t.note!]);
 }
 
 function commonHeader(prefix: string, tokens: readonly NativeToken[]): string[] {
@@ -346,7 +341,7 @@ function commonHeader(prefix: string, tokens: readonly NativeToken[]): string[] 
     L('   唯一事实源：packages/design-system/src/tokens.css'),
     L('   重新生成：pnpm --filter @heyta/design-system run generate'),
     L(''),
-    L('从 tokens.css 解析并**展开**所有 var() 引用：产物里没有 var()，'),
+    L('从 tokens.css 解析并**展开**所有 CSS 变量引用：产物里没有悬空引用，'),
     L('全部是可直接使用的具体值。手改本文件会在下次生成时被覆盖，'),
     L('而且会绕过 tokens.css 的对比度测试（AGENTS.md §5）。'),
     L(''),
