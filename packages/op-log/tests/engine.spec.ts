@@ -492,3 +492,97 @@ describe('🔴 写入闸门：因果优先，不被同毫秒的墙上时钟击�
     expect(backward.tasks['e1']!.title).toBe('B');
   });
 });
+
+describe('🔴 删除也要记下自己的时钟', () => {
+  it('删除之后，因果上更旧的写入必须被拒绝（而不是因为时钟过期被放进来）', () => {
+    // 场景：A 编辑过这条任务，B 随后把它删了，然后一条 B **更早**的写入迟到。
+    // 那条迟到的写入因果上先于删除，必须被拒绝。
+    let s = emptyState();
+
+    // A 的编辑：{A:2}
+    s = applyOperation(
+      s,
+      makeOp({
+        id: 'a-edit',
+        entityId: 'e1',
+        opType: OpType.Update,
+        payload: { title: 'A 改过' },
+        timestamp: 1000,
+        vectorClock: { A: 2 },
+      }),
+    );
+
+    // B 的删除：{B:5} —— 比下面那条迟到的写入更"新"
+    s = applyOperation(
+      s,
+      makeOp({
+        id: 'b-del',
+        entityId: 'e1',
+        opType: OpType.Delete,
+        payload: {},
+        timestamp: 2000,
+        vectorClock: { B: 5 },
+      }),
+    );
+    expect(s.tasks['e1']!.deletedAt).toBeTypeOf('number');
+
+    // 迟到的旧写入：{B:3}，因果上**先于**删除；但它的墙上时钟最大。
+    // 修复前：删除没记自己的时钟，实体上的 _lastClock 还是 {A:2}，
+    //         于是 {B:3} 被判为并发，靠时间戳 9999 赢下 —— 墓碑被越过。
+    // 修复后：{B:3} vs {B:5} = LESS_THAN → 直接拒绝。
+    s = applyOperation(
+      s,
+      makeOp({
+        id: 'b-late',
+        entityId: 'e1',
+        opType: OpType.Update,
+        payload: { title: '迟到的旧写入' },
+        timestamp: 9999,
+        vectorClock: { B: 3 },
+      }),
+    );
+
+    expect(s.tasks['e1']!.title).toBe('A 改过');
+  });
+
+  it('删除之后，因果上更新的写入仍必须被接受', () => {
+    let s = emptyState();
+    s = applyOperation(
+      s,
+      makeOp({
+        id: 'a-edit',
+        entityId: 'e1',
+        opType: OpType.Update,
+        payload: { title: 'A 改过' },
+        timestamp: 1000,
+        vectorClock: { A: 2 },
+      }),
+    );
+    s = applyOperation(
+      s,
+      makeOp({
+        id: 'b-del',
+        entityId: 'e1',
+        opType: OpType.Delete,
+        payload: {},
+        timestamp: 2000,
+        vectorClock: { B: 5 },
+      }),
+    );
+
+    // B 在删除之后又写了一次：{B:6} —— 因果上更新，必须生效
+    s = applyOperation(
+      s,
+      makeOp({
+        id: 'b-after',
+        entityId: 'e1',
+        opType: OpType.Update,
+        payload: { title: '删除之后的编辑' },
+        timestamp: 3000,
+        vectorClock: { B: 6 },
+      }),
+    );
+
+    expect(s.tasks['e1']!.title).toBe('删除之后的编辑');
+  });
+});

@@ -88,16 +88,34 @@ export function applyOperation(
 
   const payload = op.payload;
 
+  const existing = (state[bucket] as Record<string, unknown>)[entityId] as
+    | (Record<string, unknown> & { updatedAt?: number; deletedAt?: number })
+    | undefined;
+
   // DELETE op：写入墓碑，**不物理删除**。
   // 物理删除会让同步端永远看不到这次删除，另一端会把数据又同步回来。
   if (op.opType === OpType.Delete) {
-    const existing = (state[bucket] as Record<string, { deletedAt?: number }>)[entityId];
     if (existing === undefined) return state;
+
+    // 🔴 删除也必须过同一道写入闸门，并且必须**记下自己的时钟**。
+    //
+    // 曾经这两件事都没做：DELETE 无条件写墓碑，也不更新 `_lastClock` /
+    // `_lastOpId`。后果是删除之后实体上留着的时钟是**删除之前那次写入的** ——
+    // 于是后面每条 op 都在和一个过期的时钟比较，因果判定随之失真
+    // （陈旧时钟比真实值旧，闸门会变得过于宽松，本该拒绝的写入被放进来了）。
+    if (!shouldAcceptWrite(op, existing)) return state;
+
     return {
       ...state,
       [bucket]: {
         ...state[bucket],
-        [entityId]: { ...existing, deletedAt: op.timestamp, updatedAt: op.timestamp },
+        [entityId]: {
+          ...existing,
+          deletedAt: op.timestamp,
+          updatedAt: op.timestamp,
+          _lastOpId: op.id,
+          _lastClock: op.vectorClock,
+        },
       },
     } as MaterializedState;
   }
@@ -105,9 +123,6 @@ export function applyOperation(
   if (payload === null || typeof payload !== 'object') return state;
 
   const incoming = payload as Record<string, unknown>;
-  const existing = (state[bucket] as Record<string, unknown>)[entityId] as
-    | (Record<string, unknown> & { updatedAt?: number })
-    | undefined;
 
   /**
    * LWW（最后写入者胜）的**实体级**闸门。
