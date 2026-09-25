@@ -77,17 +77,36 @@ MIT 许可证的合规义务：**保留版权声明与许可声明**。本仓库
 
 ## 2. 通过包管理器引入的依赖
 
-所有第三方依赖的许可证必须**逐项登记**在 [`research/licenses.md`](research/licenses.md)，
-准入规则有两条硬门槛：
+所有第三方依赖的许可证必须**逐项登记**，准入规则有两条硬门槛：
 
 1. **许可**：允许闭源商用（MIT / Apache-2.0 / BSD / ISC / MPL-2.0 等）
 2. **可维护性**：**2021 年之后仍在持续更新**（否则排除，无论许可多宽松）
 
-核实手段：
+### 逐项清单
+
+📋 **[`research/licenses-inventory.generated.md`](research/licenses-inventory.generated.md)**
+—— 由工具生成，**当前 315 个包，全部宽松许可，0 受限 / 0 无许可证**。
+
+该清单的数据来源是**实际安装的依赖树**（pnpm store 里的每个 `package.json`），
+不是 lockfile 的声明范围 —— 后者只说明"想装什么"，前者才是"实际装了什么"。
+去重口径为 `包名@版本`，同名多版本分别登记。
+
 ```bash
-python3 research/tools/ghinfo.py owner/repo        # 最后提交/发版时间
-python3 research/tools/licscan.py path/package-lock.json   # 依赖树许可证汇总
+# 重新生成
+node research/tools/license-inventory.mjs            # 人读汇总
+node research/tools/license-inventory.mjs --json     # 机器可读
+node research/tools/license-inventory.mjs --flagged  # 只看需人判断的
 ```
+
+**非零退出码 = 存在受限或无许可证的包**，可直接接进 CI 当门禁。
+
+### 其他核实手段
+
+```bash
+python3 research/tools/ghinfo.py owner/repo   # 最后提交/发版时间（可维护性门槛）
+```
+
+决策记录与逐项调研见 [`research/licenses.md`](research/licenses.md)。
 
 ### 🔴 明确的禁令
 
