@@ -836,26 +836,28 @@ describe('Sync Operations', () => {
       expect(snapshot.state).toHaveProperty('PROJECT');
     });
 
-    it('should accept time tracking operations', async () => {
+    // 🔧 heyta 改动：上游用 TIME_TRACKING 实体，heyta 已用 FOCUS_SESSION 取代它。
+    // 断言意图不变 —— 确认服务端接受「非任务本体」的业务实体操作。
+    it('should accept focus session operations', async () => {
       const service = getSyncService();
 
-      const timeTrackingOp: Operation = {
+      const focusSessionOp: Operation = {
         id: uuidv7(),
         clientId,
-        actionType: 'ADD_TIME',
+        actionType: 'ADD_FOCUS_SESSION',
         opType: 'UPD',
-        entityType: 'TIME_TRACKING',
-        entityId: 'tt-1',
-        payload: { timeSpent: 120000, taskId: 'task-1' },
+        entityType: 'FOCUS_SESSION',
+        entityId: 'fs-1',
+        payload: { durationMs: 120000, taskId: 'task-1' },
         vectorClock: { [clientId]: 1 },
         timestamp: Date.now(),
         schemaVersion: 1,
       };
 
-      const results = await service.uploadOps(userId, clientId, [timeTrackingOp]);
+      const results = await service.uploadOps(userId, clientId, [focusSessionOp]);
 
       expect(results[0]).toMatchObject({
-        opId: timeTrackingOp.id,
+        opId: focusSessionOp.id,
         accepted: true,
       });
     });

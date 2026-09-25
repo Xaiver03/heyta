@@ -268,24 +268,20 @@ describe('ValidationService', () => {
     });
 
     it('should reject missing entityId for all regular entity types', () => {
+      // 🔧 heyta 改动：上游这里硬编码了 SP 的实体清单。
+      // 这里是「需要 entityId 的常规实体」—— 不含 MIGRATION / RECOVERY / ALL，
+      // 那三个是系统级实体，本来就没有 entityId。
       const regularEntityTypes = [
         'TASK',
         'PROJECT',
         'TAG',
         'NOTE',
         'GLOBAL_CONFIG',
-        'TIME_TRACKING',
-        'SIMPLE_COUNTER',
-        'WORK_CONTEXT',
         'TASK_REPEAT_CFG',
-        'ISSUE_PROVIDER',
-        'PLANNER',
-        'MENU_TREE',
-        'METRIC',
-        'BOARD',
         'REMINDER',
-        'PLUGIN_USER_DATA',
-        'PLUGIN_METADATA',
+        'HABIT',
+        'HABIT_LOG',
+        'FOCUS_SESSION',
       ];
 
       for (const entityType of regularEntityTypes) {
@@ -603,38 +599,58 @@ describe('ValidationService', () => {
   });
 
   describe('ALLOWED_ENTITY_TYPES', () => {
-    it('should include all expected entity types', () => {
-      const expectedTypes = [
-        'TASK',
-        'PROJECT',
-        'TAG',
-        'NOTE',
-        'GLOBAL_CONFIG',
+    // 🔧 heyta 改动：上游这里断言的是 Super Productivity 的 21 个实体。
+    // heyta 的实体清单见 packages/shared-schema/src/entity-types.ts。
+    // 服务端的 ALLOWED_ENTITY_TYPES 是 `new Set(ENTITY_TYPES)`，所以这份清单
+    // 必须与共享包保持一致 —— 不一致就说明两处脱节了。
+    const HEYTA_ENTITY_TYPES = [
+      'TASK',
+      'PROJECT',
+      'TAG',
+      'NOTE',
+      'TASK_REPEAT_CFG',
+      'REMINDER',
+      'HABIT',
+      'HABIT_LOG',
+      'FOCUS_SESSION',
+      'GLOBAL_CONFIG',
+      'MIGRATION',
+      'RECOVERY',
+      'ALL',
+    ];
+
+    it('should include all heyta entity types', () => {
+      for (const type of HEYTA_ENTITY_TYPES) {
+        expect(ALLOWED_ENTITY_TYPES.has(type)).toBe(true);
+      }
+    });
+
+    it('should have exactly the expected number of entity types', () => {
+      expect(ALLOWED_ENTITY_TYPES.size).toBe(HEYTA_ENTITY_TYPES.length);
+    });
+
+    it('should NOT accept Super Productivity-only entity types', () => {
+      // heyta 已移除上游的产品专属实体。如果它们又被接受，
+      // 说明实体清单被上游代码覆盖回去了。
+      const spOnly = [
         'TIME_TRACKING',
         'SIMPLE_COUNTER',
         'WORK_CONTEXT',
-        'TASK_REPEAT_CFG',
         'ISSUE_PROVIDER',
         'PLANNER',
         'MENU_TREE',
         'METRIC',
         'BOARD',
         'SECTION',
-        'REMINDER',
-        'MIGRATION',
-        'RECOVERY',
-        'ALL',
         'PLUGIN_USER_DATA',
         'PLUGIN_METADATA',
       ];
-
-      for (const type of expectedTypes) {
-        expect(ALLOWED_ENTITY_TYPES.has(type)).toBe(true);
+      for (const type of spOnly) {
+        expect(
+          ALLOWED_ENTITY_TYPES.has(type),
+          `${type} 是 SP 专属实体，heyta 不应接受`,
+        ).toBe(false);
       }
-    });
-
-    it('should have exactly the expected number of entity types', () => {
-      expect(ALLOWED_ENTITY_TYPES.size).toBe(21);
     });
   });
 });
