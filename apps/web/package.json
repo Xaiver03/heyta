@@ -1,0 +1,36 @@
+{
+  "name": "@heyta/web",
+  "version": "0.0.0",
+  "private": true,
+  "description": "heyta Web 客户端（本地优先，React 19 + Vite）",
+  "license": "MIT",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit -p tsconfig.spec.json",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@heyta/design-system": "workspace:*",
+    "@heyta/shared-schema": "workspace:*",
+    "@heyta/storage": "workspace:*",
+    "@heyta/sync-core": "workspace:*",
+    "date-fns": "^4.1.0",
+    "lucide-react": "^0.545.0",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
+    "zustand": "^5.0.8",
+    "@heyta/domain": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/react": "^19.2.2",
+    "@types/react-dom": "^19.2.1",
+    "@vitejs/plugin-react": "^5.0.4",
+    "jsdom": "^27.0.0",
+    "typescript": "^5.9.3",
+    "vite": "^7.1.9",
+    "vitest": "^5.0.1"
+  }
+}

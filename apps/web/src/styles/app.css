@@ -1,0 +1,369 @@
+/**
+ * 应用布局样式
+ * ==============
+ *
+ * ⚠️ **全部取值来自 token**，这里一个裸 hex/px/ms 都没有。
+ * `pnpm check:design` 只扫 `apps/web/src`（含 .css），所以这个文件同样受检。
+ *
+ * 布局策略：CSS Grid 两栏（侧栏 + 主区），移动端塌缩成单栏 + 底部导航。
+ */
+
+.ht-app {
+  display: grid;
+  grid-template-columns: var(--ht-layout-sidebar-width) 1fr;
+  min-height: 100dvh;
+  background: var(--ht-color-background);
+}
+
+/* ── 侧栏 ───────────────────────────────────────────── */
+
+.ht-sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ht-space-2);
+  padding: var(--ht-space-4);
+  background: var(--ht-color-surface);
+  /* 扁平风格用边框表达层次，不用阴影 */
+  border-right: 1px solid var(--ht-color-border);
+}
+
+.ht-brand {
+  display: flex;
+  align-items: center;
+  gap: var(--ht-space-2);
+  padding: var(--ht-space-2);
+  margin-bottom: var(--ht-space-4);
+  font-size: var(--ht-font-size-lg);
+  font-weight: var(--ht-font-weight-bold);
+  color: var(--ht-color-foreground);
+}
+
+.ht-brand__dot {
+  inline-size: var(--ht-icon-sm);
+  block-size: var(--ht-icon-sm);
+  border-radius: var(--ht-radius-full);
+  background: var(--ht-color-primary);
+}
+
+.ht-nav {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ht-space-1);
+}
+
+.ht-nav__section {
+  padding: var(--ht-space-3) var(--ht-space-2) var(--ht-space-1);
+  font-size: var(--ht-font-size-2xs);
+  font-weight: var(--ht-font-weight-semibold);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ht-color-foreground-subtle);
+}
+
+.ht-nav__item {
+  display: flex;
+  align-items: center;
+  gap: var(--ht-space-3);
+  /* 44px 触控下限 —— 用 token 而不是写死，测试守着这个值 */
+  min-block-size: var(--ht-touch-target-min);
+  padding: 0 var(--ht-space-3);
+  border-radius: var(--ht-radius-md);
+  font-size: var(--ht-font-size-sm);
+  font-weight: var(--ht-font-weight-medium);
+  color: var(--ht-color-foreground-muted);
+  text-align: left;
+  transition: background-color var(--ht-duration-fast) var(--ht-ease-standard),
+    color var(--ht-duration-fast) var(--ht-ease-standard);
+}
+
+/* hover 只换色，**不做 translateY** —— 位移会让列表项视觉抖动 */
+.ht-nav__item:hover {
+  background: var(--ht-color-hover);
+  color: var(--ht-color-foreground);
+}
+
+.ht-nav__item[aria-current='true'] {
+  background: var(--ht-color-primary-subtle);
+  color: var(--ht-color-primary);
+}
+
+/* 象限前的小色块 */
+.ht-swatch {
+  inline-size: var(--ht-space-2);
+  block-size: var(--ht-space-2);
+  border-radius: var(--ht-radius-full);
+  flex: none;
+}
+
+.ht-swatch--q1 {
+  background: var(--ht-color-quadrant-1);
+}
+.ht-swatch--q2 {
+  background: var(--ht-color-quadrant-2);
+}
+.ht-swatch--q3 {
+  background: var(--ht-color-quadrant-3);
+}
+.ht-swatch--q4 {
+  background: var(--ht-color-quadrant-4);
+}
+
+/* 计数徽标：数字必须等宽，否则增减时宽度跳动 */
+.ht-nav__count {
+  margin-inline-start: auto;
+  font-size: var(--ht-font-size-xs);
+  font-variant-numeric: tabular-nums;
+  color: var(--ht-color-foreground-subtle);
+}
+
+/* ── 主区 ───────────────────────────────────────────── */
+
+.ht-main {
+  display: flex;
+  flex-direction: column;
+  min-inline-size: 0; /* 防止 grid 子项被内容撑破 */
+}
+
+.ht-header {
+  display: flex;
+  align-items: center;
+  gap: var(--ht-space-3);
+  block-size: var(--ht-layout-header-height);
+  padding: 0 var(--ht-space-6);
+  border-bottom: 1px solid var(--ht-color-border);
+  background: var(--ht-color-surface);
+}
+
+.ht-header__title {
+  font-size: var(--ht-font-size-xl);
+  font-weight: var(--ht-font-weight-semibold);
+}
+
+.ht-header__actions {
+  margin-inline-start: auto;
+  display: flex;
+  gap: var(--ht-space-2);
+}
+
+.ht-content {
+  flex: 1;
+  padding: var(--ht-space-6);
+  max-inline-size: var(--ht-layout-content-max);
+  inline-size: 100%;
+  margin-inline: auto;
+}
+
+/* ── 按钮 ───────────────────────────────────────────── */
+
+.ht-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--ht-space-2);
+  min-block-size: var(--ht-touch-target-min);
+  padding: 0 var(--ht-space-4);
+  border-radius: var(--ht-radius-md);
+  font-size: var(--ht-font-size-sm);
+  font-weight: var(--ht-font-weight-medium);
+  transition: background-color var(--ht-duration-fast) var(--ht-ease-standard),
+    color var(--ht-duration-fast) var(--ht-ease-standard),
+    border-color var(--ht-duration-fast) var(--ht-ease-standard);
+}
+
+.ht-btn--primary {
+  background: var(--ht-color-primary);
+  color: var(--ht-color-on-primary);
+}
+
+.ht-btn--primary:hover {
+  background: var(--ht-color-primary-hover);
+}
+
+.ht-btn--primary:active {
+  background: var(--ht-color-primary-active);
+}
+
+.ht-btn--ghost {
+  background: transparent;
+  color: var(--ht-color-foreground-muted);
+}
+
+.ht-btn--ghost:hover {
+  background: var(--ht-color-hover);
+  color: var(--ht-color-foreground);
+}
+
+.ht-btn:disabled {
+  opacity: 0.5;
+}
+
+/* ── 任务列表 ───────────────────────────────────────── */
+
+.ht-tasklist {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ht-space-2);
+}
+
+.ht-task {
+  display: flex;
+  align-items: center;
+  gap: var(--ht-space-3);
+  padding: var(--ht-space-3) var(--ht-space-4);
+  background: var(--ht-color-surface);
+  border: 1px solid var(--ht-color-border);
+  border-radius: var(--ht-radius-lg);
+  text-align: left;
+  inline-size: 100%;
+  transition: border-color var(--ht-duration-fast) var(--ht-ease-standard),
+    background-color var(--ht-duration-fast) var(--ht-ease-standard);
+}
+
+.ht-task:hover {
+  border-color: var(--ht-color-border-strong);
+}
+
+.ht-task__check {
+  inline-size: var(--ht-icon-md);
+  block-size: var(--ht-icon-md);
+  flex: none;
+  border: 1.5px solid var(--ht-color-border-strong);
+  border-radius: var(--ht-radius-full);
+  display: grid;
+  place-items: center;
+  color: transparent;
+  transition: background-color var(--ht-duration-fast) var(--ht-ease-standard),
+    border-color var(--ht-duration-fast) var(--ht-ease-standard);
+}
+
+.ht-task__check:hover {
+  border-color: var(--ht-color-primary);
+}
+
+.ht-task--done .ht-task__check {
+  background: var(--ht-color-primary);
+  border-color: var(--ht-color-primary);
+  color: var(--ht-color-on-primary);
+}
+
+.ht-task__title {
+  flex: 1;
+  font-size: var(--ht-font-size-sm);
+  min-inline-size: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ht-task--done .ht-task__title {
+  /* 用删除线 + 弱化色双重表达完成态，不只靠颜色（色盲可辨） */
+  text-decoration: line-through;
+  color: var(--ht-color-foreground-subtle);
+}
+
+.ht-task__meta {
+  display: flex;
+  align-items: center;
+  gap: var(--ht-space-2);
+  font-size: var(--ht-font-size-xs);
+  color: var(--ht-color-foreground-subtle);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── 输入行 ─────────────────────────────────────────── */
+
+.ht-compose {
+  display: flex;
+  gap: var(--ht-space-2);
+  margin-bottom: var(--ht-space-4);
+}
+
+.ht-input {
+  flex: 1;
+  min-block-size: var(--ht-touch-target-min);
+  padding: 0 var(--ht-space-4);
+  background: var(--ht-color-surface);
+  border: 1px solid var(--ht-color-border);
+  border-radius: var(--ht-radius-md);
+  font-size: var(--ht-font-size-sm);
+  transition: border-color var(--ht-duration-fast) var(--ht-ease-standard);
+}
+
+.ht-input:hover {
+  border-color: var(--ht-color-border-strong);
+}
+
+/* 焦点用主色边框 + 焦点环。
+   注意**没有** outline:none —— 那是可访问性回归。 */
+.ht-input:focus-visible {
+  border-color: var(--ht-color-primary);
+}
+
+/* ── 空状态 ─────────────────────────────────────────── */
+
+.ht-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--ht-space-3);
+  padding: var(--ht-space-16) var(--ht-space-6);
+  text-align: center;
+  color: var(--ht-color-foreground-subtle);
+}
+
+.ht-empty__icon {
+  color: var(--ht-color-border-strong);
+}
+
+.ht-empty__title {
+  font-size: var(--ht-font-size-base);
+  font-weight: var(--ht-font-weight-medium);
+  color: var(--ht-color-foreground-muted);
+}
+
+.ht-empty__hint {
+  font-size: var(--ht-font-size-sm);
+}
+
+/* ── 响应式：移动端塌缩成单栏 ───────────────────────── */
+
+@media (max-width: 768px) {
+  .ht-app {
+    grid-template-columns: 1fr;
+    grid-template-rows: 1fr auto;
+  }
+
+  /* 侧栏变成底部导航 */
+  .ht-sidebar {
+    order: 2;
+    flex-direction: row;
+    justify-content: space-around;
+    border-right: none;
+    border-top: 1px solid var(--ht-color-border);
+    /* 刘海屏安全区 */
+    padding-block-end: max(var(--ht-space-2), env(safe-area-inset-bottom));
+  }
+
+  .ht-brand,
+  .ht-nav__section,
+  .ht-nav__count {
+    display: none;
+  }
+
+  .ht-nav {
+    flex-direction: row;
+    inline-size: 100%;
+    justify-content: space-around;
+  }
+
+  .ht-nav__item {
+    flex-direction: column;
+    gap: var(--ht-space-1);
+    font-size: var(--ht-font-size-2xs);
+    padding: 0 var(--ht-space-2);
+  }
+
+  .ht-content {
+    padding: var(--ht-space-4);
+  }
+}
