@@ -2,6 +2,7 @@
 
 > 状态：**已接受**
 > 日期：2026-09-25
+> 修订：**2026-09-25** —— 外部调研返回后改正了 §2/§3 的论证（见 §2「证据更新说明」），结论不变
 > 取代：无
 
 ## 1. 背景与约束
@@ -19,6 +20,7 @@
 | C5 | 已存在一份 1111 行的迁移恢复脚本，处理过真实事故 | `server/scripts/migrate-deploy.sh` |
 | C6 | 已存在一份 204 行的迁移规范，记录真实故障与取舍 | `server/prisma/migrations/README.md` |
 | C7 | 可维护性门槛：组件必须 2021 年后仍在更新 | `AGENTS.md` §3.1 |
+| C8 | **`server/` 是 super-sync-server 的 fork**，上游持续维护这些迁移与恢复脚本 | `PROVENANCE.md`；与上游逐字节相同的 README |
 
 > **C5/C6 的分量最重，且是我在调研前没意识到的。** `migrate-deploy.sh` 不是"一个绕过 Prisma 限制的临时脚本"，
 > 它包含：专用 advisory lock（key `72707370`，区别于 Prisma 自己的 `72707369`）、
@@ -29,33 +31,62 @@
 
 | 选项 | 优点 | 缺点 | 关键证据 |
 |---|---|---|---|
-| **A. 继续用 Prisma**（保留恢复脚本） | 零迁移成本；C5/C6 的事故知识全部保留；单一事实源（`schema.prisma`）；镜像不加 JVM | 需要自己的恢复脚本处理 CONCURRENTLY；Prisma 5 无原生非事务迁移 | 本 ADR §1 |
-| **B. 换成 Flyway** | 原生支持逐脚本非事务执行，可删掉 1111 行恢复逻辑；SQL 迁移更"标准" | 要 baseline 29 个已有迁移；**产生双事实源**（`schema.prisma` vs SQL），有漂移风险；Node 镜像加 JVM；**丢弃 C6 记录的故障知识** | 见 §5 未核实项 |
+| **A. 继续用 Prisma**（保留恢复脚本） | 零迁移成本；C5/C6 的事故知识全部保留；单一事实源（`schema.prisma`）；镜像不加 JVM；**与 fork 上游保持同构**（C8） | 需要自己的恢复脚本处理 CONCURRENTLY；Prisma 至今无原生非事务迁移 | §1、§5 |
+| **B. 换成 Flyway** | **已核实**：Apache-2.0（过 C7 许可门槛）；**`executeInTransaction` 属 Community 免费**；官方称会**自动检测**非事务语句，CONCURRENTLY 可能开箱即用；SQL 迁移更"标准" | 要 baseline 29 个已有迁移；**产生双事实源**（`schema.prisma` vs SQL），使 Prisma 自带漂移检测失效；Node 镜像加 JVM；**与 fork 上游分道**（C8），每个上游迁移都要手工转换；`undo` 付费（与 A 同为无回滚） | §5（已核实项） |
 | **C. 换轻量迁移器**（`node-pg-migrate` / `dbmate` / `golang-migrate` / Atlas） | 无 JVM；原生非事务 | 同样要 baseline + 双事实源；且每个都要单独过 C7 门槛 | 未逐一核实（见 §5） |
 
-### 关于选项 B 的一个关键反问
+### 证据更新说明（2026-09-25 调研返回后）
 
-Flyway 能解决的**唯一实质问题**是 C4（事务外执行）。但请看清代价对比：
+本节初稿把 B 的优点写成"未核实"，并据此弱化了它。**调研回来后，两项关键事实被证实、且都有利于 B**：
+Flyway Community 是 Apache-2.0，且 `executeInTransaction` 按官方 Script Configuration 页的 Tier 列标注属于 Community（付费的是 `shouldExecute`、`undo`）。
 
-- Flyway 省掉的：`migrate-deploy.sh` 的恢复逻辑
-- Flyway 带来的：baseline 29 个迁移、双事实源、JVM、以及**必须重新发现那些已经用事故换来、并写在 C6 里的坑**
+**所以"B 做不到"是错的，必须把论证改正。** 结论仍为 A，但理由已从"B 不行"改为 §3 —— 那是**代价与同构性**的问题，不是能力问题。
 
-**C6 里那些规则不会因为换了工具就消失** —— 比如"`lock_timeout='0'` 在 PostgreSQL 里表示永久等待"、
-"等锁的 ACCESS EXCLUSIVE 会把整张表的新查询排到后面"。换工具只是把它们从 Prisma 的文档
-搬到一个新工具的文档里，并且要在生产上重新踩一遍。
+### 选项 B 的真实代价（修正后）
+
+Flyway 确实能解决 C4（事务外执行），这一点成立。但代价清单里有**两项不会因为"Flyway 能做到"而消失**：
+
+1. **双事实源。** 只要还用 Prisma Client，`schema.prisma` 就必须存在。迁移改由 Flyway 管后，
+   两者之间出现漂移时，**Prisma 自带的漂移检测不再覆盖** —— `migrate dev` 的 shadow DB 只对 Prisma 自己的迁移历史有效。
+2. **与上游分道（C8）。** 这是初稿**低估了的最重一项**。heyta 的 `server/` 是 fork，
+   上游在持续新增迁移并改进 `migrate-deploy.sh`。改用 Flyway 后：每个上游迁移都要人工转成 `V<version>__<desc>.sql`，
+   且上游对恢复逻辑的任何修复**都无法直接受益**。
+
+**C6 里那些规则不会因为换了工具就消失** —— "`lock_timeout='0'` 在 PostgreSQL 里表示永久等待"、
+"等锁的 ACCESS EXCLUSIVE 会把整张表的新查询排到后面"，这些是 **PostgreSQL 层面的**，
+换工具只是换个文档重新踩一遍。而且 `migrate-deploy.sh` 里的**孤儿 CONCURRENTLY 后端终止**
+与 **lock-bounded 重试**，Flyway **并不提供** —— 脚本只会缩小，不会消失。
 
 ## 3. 结论
 
 **选 A：继续用 Prisma，并把现有规范变成可执行的检查。**
 
+⚠️ **本结论不是"Flyway 做不到"。** 调研已证实 Flyway Community 免费支持逐脚本非事务执行，
+能力上它确实能覆盖 C4。选 A 的理由是**代价与同构性**：
+
 理由按权重：
 
-1. **Flyway 解决的是我们已经在解决的问题。** C4 不是"未解决的障碍"，而是"已被 1111 行脚本 + 204 行规范解决并记录在案的问题"。换工具是在重做已完成的工作。
-2. **双事实源是真实且长期的成本。** 只要还用 Prisma Client（C2），`schema.prisma` 就必须存在。迁移一旦由 Flyway 管理，`schema.prisma` 与 SQL 迁移之间就存在漂移可能，而 Prisma 自带的漂移检测（`migrate dev` 的 shadow DB）会失效 —— 它只对**自己的**迁移历史有效。
-3. **镜像成本。** C3 是 Node Alpine。为一个已经解决的问题引入 JVM 运行时不划算。
-4. **事故知识不该被丢弃。** C6 的内容不是通用最佳实践，是针对这个 schema 的真实故障记录。
+1. **与 fork 上游分道是持续成本，而非一次性成本（C8）。** 这是最重的一条。
+   上游在持续新增迁移、改进恢复脚本。换工具后，**每个上游迁移都要人工转换一次**，
+   且上游对恢复逻辑的修复无法直接受益。一次性迁移成本可以忍，**每季度重复的成本不能忍**。
+2. **双事实源是真实且长期的成本。** 只要还用 Prisma Client（C2），`schema.prisma` 就必须存在。
+   迁移改由 Flyway 管后，两者的漂移**不再被 Prisma 自带的检测覆盖**（shadow DB 只认自己的迁移历史）。
+3. **`migrate-deploy.sh` 不会消失，只会缩小。** Flyway 覆盖的是 CONCURRENTLY 的**事务外执行**；
+   它**不提供**孤儿 CONCURRENTLY 后端终止，也**不提供** lock-bounded 重试。
+   代价清单里"可删掉 1111 行恢复逻辑"是不成立的 —— 真正能删的只是其中一部分。
+4. **镜像成本。** C3 是 Node Alpine。为一个已解决的问题引入 JVM 运行时不划算。
+   （Flyway CLI 是 Java 工具；**未在本机实测其镜像体积**，见 §5。）
+5. **事故知识不该被丢弃。** C6 是针对这个 schema 的真实故障记录，不是通用最佳实践。
 
 **投入方向改为**：把规范从"文档"变成"门禁" —— 见 §4。
+
+### 触发重新评估的条件
+
+如果发生以下任一情况，**重开一份 ADR**（不要改本份）：
+
+- 上游 `super-sync-server` 停止维护，或 heyta 明确决定不再跟进上游迁移
+- `migrate-deploy.sh` 的维护成本开始超过一次性迁移成本
+- Prisma 明确拒绝支持非事务迁移**且**其替代品（如 ORM 8 的阻塞式 `createIndex`）被证明不适用于我们的数据量
 
 ## 4. 后果
 
@@ -77,23 +108,55 @@ Flyway 能解决的**唯一实质问题**是 C4（事务外执行）。但请看
 - Prisma 官方明确拒绝支持非事务迁移，且
 - `migrate-deploy.sh` 的维护成本开始超过一次性迁移成本
 
-## 5. 未核实项
+## 5. 证据与缺口
 
-**本 ADR 的结论建立在 §1 那些我亲自核实过的约束上（全部可复现：读文件、跑脚本、跑 Docker）。**
-以下事实我**没有**验证，它们也不影响结论，但如果有相反证据应当重新评估：
+### 5.1 已核实（本 ADR 直接依赖）
 
-| 未核实项 | 状态 |
+§1 的约束全部可复现（读文件、跑脚本、跑 Docker）。迁移调研返回后，以下四项**已从"未核实"转为"已核实"**：
+
+| 事实 | 结论 | 对结论的影响 |
+|---|---|---|
+| Flyway Community 许可证 | **Apache-2.0** —— 过 C7 许可门槛 | **有利于 B**（初稿曾据此弱化 B，已改正） |
+| `executeInTransaction` 是否免费 | **属 Community 免费**（官方 Script Configuration 页 Tier 列；付费的是 `shouldExecute` 与 `undo`） | **有利于 B**：B 的能力主张成立 |
+| Flyway 能否自动处理非事务语句 | 官方称会**自动检测**并标记 —— CONCURRENTLY 可能开箱即用 | **有利于 B** |
+| Flyway 状态表与命名 | `flyway_schema_history`；`V<version>__<description>.sql`；非事务用同名 `.conf` | 中性 |
+
+**因此 §3 的结论不建立在"B 做不到"上**，而建立在 C8（fork 同构）、双事实源、JVM 与不可消除的维护成本上。
+
+### 5.2 已核实的 Prisma 侧事实
+
+| 事实 | 结论 |
 |---|---|
-| Flyway Community Edition 的确切许可证 | **未核实**。若为 Apache-2.0 则过 C7 的许可门槛 |
-| Flyway 的逐脚本非事务执行（`executeInTransaction=false`）是否在**免费** Community 版可用 | **未核实**。这是选项 B 的核心卖点 |
-| 最新 Prisma（6.x/7.x）是否已原生支持非事务迁移 | **未核实**。若已支持，`migrate-deploy.sh` 的价值会下降（但不会归零 —— 它还有孤儿清理与 advisory lock） |
-| Flyway 的迁移状态表名与文件命名规范 | **未核实** |
-| 选项 C 各轻量迁移器的许可证与活跃度 | **未核实**，未逐一过 C7 门槛 |
+| Prisma 最新稳定版本 | `@prisma/client` **7.10.0**（2026-08-25）；CLI `latest` 指向 **8.0.0-rc.17**（RC，非稳定）。项目在用 **5.22.0** |
+| ORM 8 是否支持非事务迁移 | **不支持**。ORM 8 文档明确：一次 `npx prisma db migrate` 在 PostgreSQL 上是**一个事务**，`rawSql` **不能**跑 `CREATE INDEX CONCURRENTLY`；官方给的替代是 `this.createIndex`，即**阻塞写入**的普通 `CREATE INDEX` |
+| 相关 issue 状态 | `#14456` 标 closed/completed (2026-02-12)，但 **`#22922` / `#15295` / `#8080` 仍 open** |
 
-> 已委托一次外部调研核实上述前四项；在其结论回来之前，本 ADR 按"证据不足时选**维持现状**"处理 ——
-> 因为选 A 的代价可逆（随时可以换），选 B 的代价不可逆（baseline 之后回不去）。
+> ⚠️ **一处未能解释的矛盾**：`#14456` 被标为 completed，而**官方文档仍明说不支持**。
+> 其**关闭理由未能核实**（issue 页 HTML 只渲染前 8 条评论，均为 2022 年内容；GitHub core API 当时有限流）。
+> **本 ADR 按文档判定为"不支持"** —— 文档是最新事实源，且方向与 issue 标题相反。
+> 若要彻底钉死，可拉 `/repos/prisma/orm/issues/14456/comments`。
 
-## 6. 一点更正
+> ⚠️ **一个必须说明的适用性限制**：上述 ORM 8 原文讲的是它**新的迁移编写 API**
+> （`prisma db migrate` / `rawSql` / `this.createIndex`），**与我们当前 `prisma migrate deploy` 跑 `.sql` 文件的路径不是同一个接口**。
+> 所以"升级 Prisma 8 一定无解"这一推论，严格说是**未在本机实测**的。
+> 但实际结论依然成立：官方文档**明确以阻塞式建索引作为索引场景的答案**，说明它不打算提供非事务建索引。
+> **`migrate-deploy.sh` 在可预见版本内仍是必需的。**
+
+### 5.3 仍未核实
+
+| 未核实项 | 影响 |
+|---|---|
+| `#14456` 的关闭理由 | 若它确实实现了 per-migration 事务开关，则 ORM 8 的结论需修正 |
+| Flyway 是否强依赖 JVM、其 Docker 镜像体积 | 影响 §3 理由 4 的权重（Flyway CLI 是 Java 工具，但**未在本机实测**） |
+| Flyway `group` / `mixed` 配置的 Tier | 本 ADR 未依赖 |
+| `golang-migrate` 的真实 SPDX | 选项 C 未选，不影响结论 |
+| 选项 C 各轻量迁移的活跃度 | 未逐一过 C7，但 C8 对它们同样适用 |
+
+> 本 ADR 的取舍原则：**证据不足时选可逆的一侧。** 选 A 可逆（随时能换），选 B 不可逆（baseline 之后回不去）。
+
+## 6. 两处事实更正
+
+### 6.1 上游 README 开头那句是简化
 
 `server/prisma/migrations/README.md` 开头写的是 "Prisma 5.x wraps every migration in a transaction"。
 这句话**不准确**，而且它自己的后文就给出了更准确的版本：真正形成事务的是 **PostgreSQL 的简单查询协议** ——
@@ -104,3 +167,19 @@ Flyway 能解决的**唯一实质问题**是 C4（事务外执行）。但请看
 
 之所以记在这里而不是改掉 README：那份文件是 vendored 的（与上游逐字节相同），
 擅自修改会让未来的 upstream 合并产生冲突。改动应回馈上游。
+
+### 6.2 CONCURRENTLY 迁移的数字（三个口径都对，别混用）
+
+不同数法会得出不同结果，容易误判，这里一次说清：
+
+| 口径 | 数量 | 说明 |
+|---|---|---|
+| 目录条目总数 | 32 | 含 `README.md`、`migration_lock.toml`、`migrate-passkey-credentials.ts` 三个**非迁移目录项** |
+| **真实迁移目录** | **29** | 这才是迁移数 |
+| `migration.sql` 原文含 `CONCURRENTLY` | 10 | 包含**仅在注释里提及**的那一个 |
+| **实际需要事务外执行的** | **9** | 剥掉注释后的真实数量 —— `scripts/check-migrations.mjs` 报的就是这个 |
+| 其中 drop+create 可恢复形状 | 5 | `20260512000000`、`20260514000000`、`20260514000002`、`20260828000001`、`20260829000000`（与脚本注释里 "5 recoverable" 一致） |
+
+> 我本人在这上面**数错过一次**：最初 grep 原始文本得到 10，并把 `20260613000001` 误判为"两条 CREATE CONCURRENTLY" ——
+> 实际它只有**一条**，第二条是**它自己注释里**解释该机制的那句话。
+> 校验器现在会**先剥注释再检测**，正是为了避免这个坑。
