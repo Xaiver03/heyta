@@ -114,7 +114,7 @@
 | **`chrono-node`** | 2.10.1 | **MIT** ✅ | **2026-09-22** | 自然语言日期解析（**含中文 hans/hant**，已实测 parser 文件存在） |
 | **`@dnd-kit/core`** | 6.3.1 | **MIT** ✅ | **2026-09-12** | 四象限 2×2 拖拽 |
 | `fullcalendar` | 7.1.0 | MIT ✅ | 2026-09-05 | 日历视图 |
-| **`ical.js`** | 2.2.1 | **MPL-2.0** ✅ | **2026-09-17** | **RRULE 引擎** + iCalendar + CalDAV |
+| **`ical.js`** ✅ **已引入**（P1 3.0，`packages/domain`） | 2.2.1 | **MPL-2.0** ✅ | **2026-09-17** | **RRULE 引擎** + iCalendar + CalDAV |
 | **`tsdav`** | 2.3.4 | **MIT** ✅ | **2026-09-19** | CalDAV 客户端（真实仓库 `natelindev/tsdav`） |
 | `react-activity-calendar` | — | MIT ✅ | **2026-09-24** | 习惯热力图 |
 | `frappe/Gantt` | 1.0.3 | MIT ✅ | 2026-03-05 | 甘特图（注意仓库名是 `frappe/Gantt`） |
@@ -158,7 +158,7 @@
 
 | 包 | License | 状态 |
 |---|---|---|
-| `ical.js` @2.2.1 | MPL-2.0 🟡 | devDependency。MPL 是文件级 copyleft，**只要不修改该库源文件就无义务**。Tududi 也用它 |
+| `ical.js` @2.2.1 | MPL-2.0 🟡 | **运行时**依赖（`packages/domain` 的 `dependencies`），会进打包产物。MPL 是**文件级** copyleft：只要不修改该库源文件就无义务，与 MIT 项目组合分发是允许的。**不得**把它 vendored 进仓库并改源码 —— 那会触发同文件回馈义务 |
 | `@nextcloud/cdav-library` | AGPL-3.0-or-later 🔴 | 见上 |
 
 ---

@@ -14,3 +14,4 @@ export * from './date.js';
 export * from './quadrant.js';
 export * from './habit-streak.js';
 export * from './focus.js';
+export * from './recurrence.js';

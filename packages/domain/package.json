@@ -8,7 +8,10 @@
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "exports": {
-    ".": { "types": "./dist/index.d.ts", "default": "./dist/index.js" }
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
   },
   "scripts": {
     "build": "tsup",
@@ -17,7 +20,8 @@
     "test:watch": "vitest"
   },
   "dependencies": {
-    "@heyta/shared-schema": "workspace:*"
+    "@heyta/shared-schema": "workspace:*",
+    "ical.js": "^2.2.1"
   },
   "devDependencies": {
     "tsup": "^8.5.1",
