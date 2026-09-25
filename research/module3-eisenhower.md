@@ -201,7 +201,7 @@
 | react-kanban / gantt-task-react / gantt-elastic / tegon | asseinfo / MaTeMaTuK / neuronetio / tegonhq | 已归档 | 均 `archived=true` |
 
 **AGPL-3.0 清单（闭源 SaaS 一票否决）**：AppFlowy、Plane、Logseq、Vikunja（主仓）、Leantime、Taiga Front、Tegon。
-**GPL-3.0 清单（闭源产品不可链入）**：Einsen 无关、Focus、Zen.、vitodo、OpenProject、Kanri、Obsidian Kanban、todo.txt-cli、topydo。
+**GPL-3.0 清单（闭源产品不可链入）**：Focus、Zen.、vitodo、OpenProject、Kanri、Obsidian Kanban、todo.txt-cli、topydo。（注：Einsen 是 Apache-2.0，不在 GPL 之列，可自由商用。）
 **弱 copyleft / 可商用**：EPL-2.0（Huly）、OSL-3.0（Restyaboard，仍属 copyleft，慎用）、Apache-2.0 / MIT / BSD-3-Clause 系列可自由商用。
 
 ---

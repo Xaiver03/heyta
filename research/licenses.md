@@ -98,6 +98,21 @@
 
 > 用途：如果 heyta 走 Flutter/Dart 或其他非 JS 技术栈，这是**已通过 CI 互操作验证**的移植蓝本。
 
+### 1.6 计划引入的第三方组件（决策见 `docs/07-reusable-components.md`）
+
+| 组件 | 版本 | License | 验证方式 | 用途 |
+|---|---|---|---|---|
+| **`chrono-node`** | 2.10.1 | **MIT** ✅ | 【本机实测】npm registry + `raw.githubusercontent.com/wanasit/chrono/master/LICENSE.txt` 原文 | 自然语言日期解析（**含中文 hans/hant**，已实测 parser 文件存在） |
+| **`@dnd-kit/core`** | 6.3.1 | **MIT** ✅ | 【本机实测】npm registry | 四象限 2×2 拖拽交互 |
+| `fullcalendar` | — | MIT 【子任务核实】 | 待本机复验后登记 | 日历视图 |
+| `schedule-x` | — | MIT 【子任务核实】 | 待本机复验后登记 | 日历视图（备选） |
+| `frappe/gantt` | — | MIT 【子任务核实】 | 待本机复验后登记 | 甘特视图 |
+| `vis-timeline` | — | Apache-2.0 OR MIT 【子任务核实】 | 待本机复验后登记 | 时间线视图 |
+| `rrule` (rrule.js) | — | 【未核实】 | **引入前必须核实并登记** | 重复任务规则引擎 |
+| Radicale / Baikal（服务端） | — | 【未核实】 | **引入前必须核实并登记** | CalDAV 服务端 |
+| ntfy / Gotify / UnifiedPush | — | 【未核实】 | **引入前必须核实并登记** | 自建推送 |
+| Drift / sqflite（Dart） | — | 【未核实】 | **引入前必须核实并登记** | 本地 SQLite |
+
 ---
 
 ## 2. 🔴 禁止引入清单
