@@ -83,6 +83,8 @@ function makeHarness(
     redispatch: async () => undefined,
     discardLocal: async () => undefined,
     getOpsForEntity: async () => [],
+    getOpById: async () => undefined,
+    redispatchPayload: async () => undefined,
     fetchImpl,
   });
 
@@ -360,6 +362,8 @@ describe('同步客户端 — 离线与错误区分', () => {
       redispatch: async () => undefined,
       discardLocal: async () => undefined,
       getOpsForEntity: async () => [],
+      getOpById: async () => undefined,
+      redispatchPayload: async () => undefined,
       fetchImpl: (async (input: string | URL | Request) => {
         uploads.push(String(input));
         return okJson({});

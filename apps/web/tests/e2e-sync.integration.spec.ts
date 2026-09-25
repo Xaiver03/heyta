@@ -74,6 +74,15 @@ async function makeDevice(
     discardLocal: (ids) => engine.discardPendingUpload(ids),
     getOpsForEntity: (entityType, entityId) =>
       engine.getOpsForEntity(entityType as never, entityId),
+    getOpById: (opId) => engine.getOpById(opId),
+    redispatchPayload: async (intent) => {
+      await engine.dispatch({
+        entityType: intent.entityType as never,
+        entityId: intent.entityId,
+        opType: intent.opType as never,
+        payload: intent.payload,
+      });
+    },
     ...(fetchImpl !== undefined ? { fetchImpl } : {}),
   });
 
@@ -330,28 +339,53 @@ describe.skipIf(URL_BASE === undefined)('P1 验收：离线合并与崩溃恢复
     const back = await A.client.sync();
 
     /**
-     * 关键：这里**不该**自动收敛。
+     * 关键：这里**不该**自动收敛，也不该只是笼统报错。
      *
      * 我最初断言"两端自动收敛到时间较晚的那个"，想当然以为 LWW 会自动择一。
-     * 实测发现协议不是这样：sync-core 的 `suggestConflictResolution` 对
-     * "两边都是同实体 UPDATE、时间戳相近、无删除/创建不对称"返回 **manual**
-     * —— 它**故意拒绝自动选边**。
+     * 协议不是这样：`sync-core` 的 `suggestConflictResolution` 在有创建/删除
+     * 不对称或时间戳相近时拒绝自动选边，需要人来决定。
      *
-     * 这是对的。自动择一 = 静默丢掉另一个人的编辑，而用户永远不会知道。
-     * 计划要求的是"冲突**可判定**"，不是"自动消失"。
+     * 更重要的是**上报的形状**：冲突必须带着双方内容结构化上报
+     * （`kind: 'conflict'`），而不是一句"同步失败"。只报一句话，
+     * 用户既不知道冲突的是什么，也无处可选，问题就永久卡住了。
      */
-    expect(back.kind).toBe('error');
-    if (back.kind === 'error') {
-      expect(back.message).toContain('冲突');
-      expect(back.retryable).toBe(false);
-    }
+    expect(back.kind).toBe('conflict');
+    if (back.kind !== 'conflict') return;
+    expect(back.conflicts.length).toBeGreaterThan(0);
+    // 双方内容都要拿得到 —— 界面靠它让用户比较
+    expect(back.conflicts[0]!.local.payload).toBeDefined();
 
-    // 两边数据都不能丢
-    expect(A.engine.getState().tasks['shared']!.title).toBe('A 离线改的');
+    /**
+     * ── "不丢数据"到底指什么 ──
+     *
+     * 我一开始断言"A 的界面仍然显示 A 改的值"，那是个**想当然的假设**。
+     * 实测：下载阶段把 B 的 op 应用了，A 的本地视图于是更新成 B 的值。
+     * 这其实是合理的 —— A 确实已经**看到**了 B 的改动，而胜负还没被决定。
+     *
+     * 真正要保证的是两条：
+     *   1. **A 自己的编辑没被丢掉**：仍在本地日志里、仍在待上传队列里，
+     *      用户可以选"保留本地"把它恢复回来（相邻用例已验证确实能恢复）。
+     *   2. **冲突被结构化上报**，双方内容都拿得到。
+     *
+     * 也就是说，"不丢"= "两条 op 都还在且用户随时能选"，
+     * 而不是"界面停在谁的值上"。把前者写成后者，就是在断言一个
+     * 我自己都没验证过的实现细节 —— 测试会红，但红得没有意义。
+     */
+    expect(A.engine.getState().tasks['shared']!.title).toBe('B 在线改的');
     expect(B.engine.getState().tasks['shared']!.title).toBe('B 在线改的');
 
-    // A 的 op 仍留在待上传队列里（等用户决定后重试），没有被丢弃
-    expect(await A.engine.getPendingUpload()).toHaveLength(1);
+    // ① A 的编辑仍留在待上传队列里（等用户决定），没有被丢弃
+    const stillPending = await A.engine.getPendingUpload();
+    expect(stillPending).toHaveLength(1);
+    expect(stillPending[0]!.payload).toMatchObject({ title: 'A 离线改的' });
+
+    // ② A 的编辑也仍在 op-log 里 —— 事实来源不做"删除"式清理
+    const aOps = await A.engine.getOpsForEntity('TASK' as never, 'shared');
+    expect(aOps.some((o) => o.clientId === 'merge-a')).toBe(true);
+
+    // ③ 冲突上报里双方内容都能看到，界面才有东西可比
+    expect(back.conflicts[0]!.local.payload).toMatchObject({ title: 'A 离线改的' });
+    expect(back.conflicts[0]!.remote?.payload).toMatchObject({ title: 'B 在线改的' });
 
     expect(A.engine.getState().tasks['shared']).toBeDefined();
     expect(B.engine.getState().tasks['shared']).toBeDefined();
@@ -403,10 +437,11 @@ describe.skipIf(URL_BASE === undefined)('P1 验收：离线合并与崩溃恢复
     aOffline = false;
     const status = await A.client.sync();
 
-    // 必须被识别为**冲突**，而不是笼统的"同步失败"
-    expect(status.kind).toBe('error');
-    if (status.kind === 'error') {
-      expect(status.message).toContain('冲突');
+    // 必须被识别为**冲突**，而不是笼统的"同步失败"，
+    // 而且要带上双方内容 —— 只报一句话等于把问题变成死路
+    expect(status.kind).toBe('conflict');
+    if (status.kind === 'conflict') {
+      expect(status.conflicts[0]!.local).toBeDefined();
     }
   }, 60_000);
 
@@ -483,6 +518,15 @@ describe.skipIf(URL_BASE === undefined)('P1 验收：离线合并与崩溃恢复
       discardLocal: (ids) => engine2.discardPendingUpload(ids),
       getOpsForEntity: (entityType, entityId) =>
         engine2.getOpsForEntity(entityType as never, entityId),
+      getOpById: (opId) => engine2.getOpById(opId),
+      redispatchPayload: async (intent) => {
+        await engine2.dispatch({
+          entityType: intent.entityType as never,
+          entityId: intent.entityId,
+          opType: intent.opType as never,
+          payload: intent.payload,
+        });
+      },
     });
 
     const status = await client.sync();
@@ -495,3 +539,149 @@ describe.skipIf(URL_BASE === undefined)('P1 验收：离线合并与崩溃恢复
     created.push({ adapter: adapter2 });
   }, 60_000);
 });
+
+
+describe.skipIf(URL_BASE === undefined)('冲突解决：用户选完之后双端真的收敛（真实服务端）', () => {
+  const created: Array<{ adapter: IndexedDbAdapter }> = [];
+  afterAll(() => {
+    for (const d of created) d.adapter.close();
+  });
+
+  async function freshToken(prefix: string): Promise<string> {
+    const reg = await fetch(`${URL_BASE}/api/test/create-user`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        email: `heyta-res-${prefix}-${String(Date.now())}@example.com`,
+        password: 'heyta-p1-password',
+      }),
+    });
+    const body = (await reg.json()) as Record<string, unknown>;
+    return (body['token'] ??
+      body['accessToken'] ??
+      (body['data'] as Record<string, unknown> | undefined)?.['token']) as string;
+  }
+
+  /**
+   * 造一个"两边都改了同一个字段"的真并发场景，返回 A 处于冲突状态的客户端。
+   */
+  async function makeConflict(prefix: string) {
+    (globalThis as unknown as { indexedDB: IDBFactory }).indexedDB = new IDBFactory();
+    (globalThis as unknown as { IDBKeyRange: typeof IDBKeyRange }).IDBKeyRange = IDBKeyRange;
+
+    const token = await freshToken(prefix);
+
+    let aOffline = false;
+    const realFetch = globalThis.fetch;
+    const flaky = ((input: string | URL | Request, init?: RequestInit) => {
+      if (aOffline) return Promise.reject(new TypeError('Failed to fetch'));
+      return realFetch(input as never, init);
+    }) as unknown as typeof fetch;
+
+    const A = await makeDevice(`${prefix}-a`, token, flaky);
+    const B = await makeDevice(`${prefix}-b`, token);
+    created.push(A, B);
+
+    await A.engine.dispatch({
+      entityType: 'TASK',
+      entityId: 'c',
+      opType: OpType.Create,
+      payload: { title: 'base' },
+    });
+    await A.client.sync();
+    await B.client.sync();
+
+    aOffline = true;
+    await A.engine.dispatch({
+      entityType: 'TASK',
+      entityId: 'c',
+      opType: OpType.Update,
+      payload: { title: 'A 的版本' },
+    });
+    await A.client.sync(); // offline
+
+    await B.engine.dispatch({
+      entityType: 'TASK',
+      entityId: 'c',
+      opType: OpType.Update,
+      payload: { title: 'B 的版本' },
+    });
+    await B.client.sync();
+
+    aOffline = false;
+    const status = await A.client.sync();
+
+    return { A, B, status, setOffline: (v: boolean) => { aOffline = v; } };
+  }
+
+  it('🔴 保留远端：用户选完后双端收敛到远端值', async () => {
+    const { A, B, status } = await makeConflict('remote');
+
+    // 先确认真的进了冲突状态，而且**双方内容都拿得到**
+    expect(status.kind).toBe('conflict');
+    if (status.kind !== 'conflict') return;
+    expect(status.conflicts).toHaveLength(1);
+
+    const c = status.conflicts[0]!;
+    expect(c.entityType).toBe('TASK');
+    expect(c.entityId).toBe('c');
+    expect(c.local.payload).toMatchObject({ title: 'A 的版本' });
+    // 界面要能看见对端到底是什么 —— 否则用户没法选
+    expect(c.remote).toBeDefined();
+    expect(c.remote!.payload).toMatchObject({ title: 'B 的版本' });
+
+    // 用户点"保留其他设备那一版"
+    const after = await A.client.resolveConflict(c, 'keep-remote');
+
+    expect(after.kind).toBe('synced');
+    expect(A.engine.getState().tasks['c']!.title).toBe('B 的版本');
+    expect(await A.engine.getPendingUpload()).toHaveLength(0);
+
+    // B 拉一次，两端必须一致
+    await B.client.sync();
+    expect(B.engine.getState().tasks['c']!.title).toBe('B 的版本');
+    expect(A.engine.getState().tasks['c']!.title).toBe(B.engine.getState().tasks['c']!.title);
+  }, 60_000);
+
+  it('🔴 保留本地：用户选完后双端收敛到本地值', async () => {
+    const { A, B, status } = await makeConflict('local');
+
+    expect(status.kind).toBe('conflict');
+    if (status.kind !== 'conflict') return;
+
+    const c = status.conflicts[0]!;
+    expect(c.remote!.payload).toMatchObject({ title: 'B 的版本' });
+
+    // 用户点"保留本机那一版"
+    const after = await A.client.resolveConflict(c, 'keep-local');
+
+    expect(after.kind).toBe('synced');
+    expect(A.engine.getState().tasks['c']!.title).toBe('A 的版本');
+    expect(await A.engine.getPendingUpload()).toHaveLength(0);
+
+    // B 拉到 A 的选择，两端必须一致
+    await B.client.sync();
+    expect(B.engine.getState().tasks['c']!.title).toBe('A 的版本');
+    expect(A.engine.getState().tasks['c']!.title).toBe(B.engine.getState().tasks['c']!.title);
+  }, 60_000);
+
+  it('🔴 丢弃待上传项不等于删除 op：日志里必须还在', async () => {
+    const { A, status } = await makeConflict('noclear');
+
+    expect(status.kind).toBe('conflict');
+    if (status.kind !== 'conflict') return;
+    const c = status.conflicts[0]!;
+
+    const before = await A.engine.getOpsForEntity('TASK' as never, 'c');
+    const hadLocalOp = before.some((o) => o.id === c.local.opId);
+    expect(hadLocalOp).toBe(true);
+
+    await A.client.resolveConflict(c, 'keep-remote');
+
+    // op-log 是事实日志：被"丢弃"的那条必须**还在日志里**，只是不再上传。
+    // 物理删除会让本地历史无法解释，重放也会与其它设备不一致。
+    const afterOps = await A.engine.getOpsForEntity('TASK' as never, 'c');
+    expect(afterOps.some((o) => o.id === c.local.opId)).toBe(true);
+  }, 60_000);
+});
+
