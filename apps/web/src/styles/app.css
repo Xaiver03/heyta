@@ -367,3 +367,55 @@
     padding: var(--ht-space-4);
   }
 }
+
+/* ── 视图切换条 ─────────────────────────────────────────────
+   扁平风格：用边框与背景表达选中态，不用阴影或位移。 */
+.ht-viewtabs {
+  display: flex;
+  gap: var(--ht-space-1);
+  padding: var(--ht-space-1);
+  border-radius: var(--ht-radius-md);
+  background: var(--ht-color-surface-sunken);
+  margin-right: auto;
+}
+
+.ht-viewtab {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--ht-space-1);
+  /* 44px 最小点击目标（UIX Pro 硬规则 2） */
+  min-height: var(--ht-touch-target-min);
+  padding: 0 var(--ht-space-3);
+  cursor: pointer;
+  border: var(--ht-border-width-thin) solid transparent;
+  border-radius: var(--ht-radius-sm);
+  background: transparent;
+  color: var(--ht-color-foreground-muted);
+  font-family: var(--ht-font-sans);
+  font-size: var(--ht-font-size-xs);
+  font-weight: var(--ht-font-weight-medium);
+  transition:
+    background var(--ht-duration-fast) var(--ht-ease-standard),
+    color var(--ht-duration-fast) var(--ht-ease-standard);
+}
+
+.ht-viewtab:hover {
+  color: var(--ht-color-foreground);
+}
+
+.ht-viewtab--active {
+  background: var(--ht-color-surface);
+  color: var(--ht-color-primary);
+  border-color: var(--ht-color-border);
+}
+
+/* 焦点环必须可见 —— 抹掉它是最常见的可访问性回归 */
+.ht-viewtab:focus-visible {
+  outline: var(--ht-focus-ring-width) solid var(--ht-color-ring);
+  outline-offset: var(--ht-space-1);
+}
+
+/* ⚠️ 这里**不要**再写 prefers-reduced-motion 覆盖。
+   设计系统已在 tokens.css 的媒体查询里把所有 --ht-duration-* 压成 1ms，
+   组件只要用 token 就自动获得降低动效行为。
+   我第一版又写了一遍，既是冗余，也引入了裸值 1ms。 */
