@@ -33,6 +33,7 @@ import type {
   DbKeyRange,
   DbTx,
   DbTxMode,
+  StoreSchema,
 } from '../db.types.js';
 import { assertIterateLimit } from '../db.types.js';
 import {
@@ -44,17 +45,10 @@ import {
 } from '../stores.js';
 
 /** 建库所需的 store 与索引定义。持久化结构，改动要谨慎（见 stores.ts）。 */
-interface StoreSchema {
-  name: string;
-  keyPath: string | string[];
-  autoIncrement?: boolean;
-  indexes?: Array<{
-    name: string;
-    keyPath: string | string[];
-    unique?: boolean;
-    multiEntry?: boolean;
-  }>;
-}
+// `StoreSchema` 已提到 `db.types.ts` —— 它必须在实现之间共享。
+// 这里重新导出，保持既有 import 路径可用。
+
+export type { StoreSchema };
 
 export /**
  * IndexedDB schema 版本。

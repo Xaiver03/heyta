@@ -12,3 +12,5 @@ export * from './db.types';
 export * from './stores';
 export * from './op-log-store';
 export * from './indexeddb/index';
+
+export { MemoryDbAdapter } from './memory/memory-adapter.js';

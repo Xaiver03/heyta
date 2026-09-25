@@ -16,11 +16,14 @@
   },
   "files": [
     "dist",
+    "generated",
     "src/tokens.css",
     "src/reset.css"
   ],
   "scripts": {
     "build": "tsup",
+    "generate": "tsup && node dist/generate-cli.js",
+    "generate:check": "tsup && node dist/generate-cli.js --check",
     "typecheck": "tsc --noEmit -p tsconfig.spec.json",
     "test": "vitest run",
     "test:watch": "vitest"
