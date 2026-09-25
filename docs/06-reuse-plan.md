@@ -205,12 +205,56 @@ heyta 需要自己的清单。对照 SP：
 
 ---
 
-## 6. 未完成
+## 6. ✅ 已实测验证（决定性证据）
 
-- [ ] `super-sync-server` 端点清单、鉴权、DB schema、部署（子任务进行中）
-- [ ] `shared-schema` 实体字段级细节 + 迁移策略（子任务进行中）
-- [ ] 跨语言方案评级 + 外部组件许可证盘点（子任务进行中）
-- [ ] `research/licenses.md` 依赖登记表
+**"`sync-core` 能不能拿出来用"这个问题，已经有定论了。**
+
+我把 `packages/sync-core` 从 monorepo 拷到独立目录，脱离工作区安装、构建、跑测试：
+
+| 步骤 | 结果 |
+|---|---|
+| 独立 `npm install`（无工作区） | ✅ 成功 |
+| `npm run build`（tsup） | ✅ 成功，**18ms** |
+| 产物 | ESM 61KB + CJS 65KB + 类型声明 58KB（含 sourcemap） |
+| **`vitest run`** | ✅ **13 个文件 / 271 个测试全部通过（451ms）** |
+
+它有自己的 `package.json`（**无任何工作区内部依赖**）、`tsup.config.ts`、`tsconfig.json`，
+产出标准 ESM + CJS + `.d.ts`。**可以直接当 npm 依赖引入。**
+
+> 环境备注：本机 npm 10.9.8 在默认缓存下报 `Cannot read properties of null (reading 'edgesOut')`，
+> 需 `--no-package-lock --legacy-peer-deps` + 全新缓存目录。**是本机环境问题，不是代码问题。**
+
+---
+
+## 7. 服务端与协议已拆清
+
+**`super-sync-server` 的完整 API（实测提取，前缀 `/api`）**：
+
+| 方法 | 路径 | 用途 |
+|---|---|---|
+| POST | `/api/sync/ops` | 上传操作批次（≤100 条/次） |
+| GET | `/api/sync/ops` | 下载增量（limit ≤1000） |
+| POST | `/api/sync/snapshot` | 上传全量快照 |
+| GET | `/api/sync/status` | 同步状态 |
+| GET | `/api/sync/devices` | 设备列表 |
+| DELETE | `/api/sync/data` | 删除全部数据 |
+| GET | `/api/sync/restore-points` | 恢复点 |
+| GET | `/api/sync/restore/:serverSeq` | 恢复到指定序号 |
+| GET | `/api/sync/ws` | WebSocket 实时推送 |
+
+外加 13 个账号/鉴权端点（Passkey / Magic Link / JWT 三种登录方式）。
+技术栈 **Fastify 5 + Prisma 5 + PostgreSQL**，6 张表，鉴权用 **JWT Bearer（365 天）+ token version 撤销**。
+
+详见 `research/deep-dive-supersync-server.md`。
+
+---
+
+## 8. 还剩下的工作
+
+- [ ] **跨语言方案评级**（决定 UI 用 Flutter 还是 JS 栈）—— 子任务进行中
+- [ ] 实测 `super-sync-server` 能否 Docker 跑起来（**本机没装 Docker，需换环境**）
+- [ ] `shared-schema` / `sync-providers` 的独立构建验证（`sync-core` 已通过）
+- [ ] 把实体清单映射落成 heyta 的具体设计
 
 ---
 

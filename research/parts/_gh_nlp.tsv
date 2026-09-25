@@ -1,0 +1,8 @@
+repo	stars	forks	license	archived	branch	last_commit	latest_release	top_lang	desc	topics
+wanasit/chrono	5287	388	MIT (MIT License)	false	master	2026-09-22T23:42:14Z	v2.10.1 @ 2026-07-20T00:29:36Z	typescript: 100.0%	A natural language date parser in Javascript	
+scrapinghub/dateparser	2862	522	BSD-3-Clause (BSD 3-Clause \)	false	master	2026-09-23T18:07:00Z	1.4.3 @ 2026-09-03T10:07:00Z	python: 100.0%	python parser for human readable dates	hacktoberfest
+bear/parsedatetime	711	114	Apache-2.0 (Apache License 2.0)	false	master	2024-08-08T01:37:43Z	2.6 @ 2020-05-31T23:52:03Z	python: 99.6%	Parse human-readable date/time strings	
+stevedonovan/chrono-english	60	12	MIT (MIT License)	false	master	2026-08-26T16:08:25Z	v0.2.1 @ 2026-08-26T16:10:30Z	rust: 100.0%	Converting informal English dates (like `date` command) to chrono DateTime in Rust	
+bschwind/dtparse									FETCH_ERROR:HTTP Error 404: Not Found	
+olebedev/when	1461	94	Apache-2.0 (Apache License 2.0)	false	master	2026-08-10T01:28:37Z	Extend RU rules  @ 2024-11-12T03:05:22Z	go: 100.0%	A natural language date/time parser with pluggable rules	date,datetime,golang,natural-language,parser,time
+araddon/dateparse	2142	174	MIT (MIT License)	false	master	2021-04-29T16:20:01Z	NO-RELEASES @ NA	go: 100.0%	GoLang Parse many date strings without knowing format in advance.	date,dates,datetime,golang,time

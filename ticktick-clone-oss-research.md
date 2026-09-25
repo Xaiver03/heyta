@@ -89,7 +89,34 @@
 
 ## 4. 模块 3：四象限 / 艾森豪威尔矩阵视图
 
-<!-- PLACEHOLDER_MODULE3 -->
+> 完整明细（22 个专用应用 + 其他视图库 + 许可雷区清单）见 `research/module3-eisenhower.md`；本节为结论浓缩版。
+
+### 4.1 核心结论：四象限必须自研
+
+- **「拿来即用的四象限组件库」在开源世界里基本不存在**：GitHub topic `eisenhower-matrix` 全量扫描后，star 最高的是 **919★ 的 Android 原生 App**（`Spikeysanju/Einsen`，Apache-2.0，但 2022 年后停更），第 2 名是 **243★ 的 Flutter App**（`Appaxaap/Focus`，GPL-3.0）；前 20 名**没有一个是可复用的 Web 组件库**。npm 搜 `eisenhower` / `priority-matrix` / `quadrant` 也没有可用组件包。
+- **整机任务系统里没有「原生四象限」**：Vikunja / Planka / Focalboard / Kanboard / WeKan / Plane / Huly 只有看板 + 甘特 + 列表。`Super Productivity` 官网原话是 *"supports the Eisenhower Matrix through its customizable boards feature"*，即**通用看板配 4 列**，不是原生象限视图（此点已在 `research/module3-eisenhower.md` 中纠正了搜索摘要的说法）。
+- **建议**：只自研「布局 + 象限归属规则 + 持久化」三层，拖拽交互直接用成熟库。
+
+### 4.2 可复用清单（全部 2026-09-25 实测）
+
+| 项目 | 仓库 | Star | License | 技术栈 | 活跃度 | 用途 |
+|---|---|---|---|---|---|---|
+| **dnd-kit** | https://github.com/clauderic/dnd-kit | **17667** | MIT ✅ | TS，React/Vue/Svelte | 活跃：2026-09-12 | **四象限拖拽底座首选**，配 CSS Grid 约 200–400 行跑通 |
+| SortableJS | https://github.com/SortableJS/Sortable | 31183 | MIT ✅ | 原生 JS | 活跃 | 轻量拖拽替代方案 |
+| **gsd-task-manager** | https://github.com/vscarpenter/gsd-task-manager | 26 | MIT ✅ | Next.js + TypeScript（含 MCP server） | **当天有提交**（2026-09-25） | 唯一「Web 栈 + MIT + 活跃 + 四象限原生」样板，可抄交互与数据模型 |
+| todoist-matrix | https://github.com/harin/todoist-matrix | 2 | MIT ✅ | JavaScript | 停更（2018） | **架构范式最贴合**：给已有任务系统加「矩阵视图层」，不改数据层 |
+| Einsen | https://github.com/Spikeysanju/Einsen | 919 | **Apache-2.0** ✅ | Kotlin / Jetpack Compose | 停更（2022-01） | Android 象限 UI 信息架构参考 |
+| Focus | https://github.com/Appaxaap/Focus | 243 | **GPL-3.0** ⚠️ | Flutter / Dart | 活跃：2026-08-23，v2.2.8 | 离线优先四象限（GPL：只可读不可抄） |
+| Zen. | https://github.com/jesusantguerrero/zen | 40 | GPL-3.0 ⚠️ | Vue 3 + Firebase | 2026-04-18 | 四象限 + 番茄钟 + GTD 整合的产品形态参考 |
+| jarvis-ai-calendar | https://github.com/jilmiy/jarvis-ai-calendar | 19 | **未核实（根目录无 LICENSE 文件）** | Electron/JS | 2026-07-05 | 中文桌面日历 + 待办 + 四象限 + 倒计时 + AI 周报，**产品形态最接近滴答**（代码不可用） |
+| FullCalendar | https://github.com/fullcalendar/fullcalendar | 20653 | MIT ✅ | JS | 活跃 | 日历视图（可复用） |
+| schedule-x | https://github.com/schedule-x/schedule-x | 2585 | MIT ✅ | JS/TS | 活跃 | 现代日历视图替代 |
+| frappe-gantt | https://github.com/frappe/gantt | 6127 | MIT ✅ | SVG/JS | 活跃 | 甘特图首选 |
+| xpyjs/gantt | https://github.com/xpyjs/gantt | 351 | MIT ✅ | Canvas | 活跃 | 大数据量甘特 |
+| Kaneo | https://github.com/kaneo-app/kaneo | 9186 | MIT ✅ | React + Hono | 活跃 | 现代技术栈看板（可参考多视图架构） |
+| vis-timeline | https://github.com/visjs/vis-timeline | 2559 | **Apache-2.0 OR MIT 双许可**（原文核实）✅ | JS | 活跃 | 时间轴/时间盒视图 |
+
+**许可雷区（务必回避）**：Planka（自定义 PLANKA Community License，禁止对第三方商业托管）、Focalboard（README 明写 "currently not maintained"，且源码 AGPL-3.0 / 商业许可双轨）、TaskView（Source-Available，禁止 SaaS 与竞品）、以及 6 个**根目录完全没有 LICENSE 文件**的四象限小项目（`jarvis-ai-calendar`、`erictherobot/eisenhower-matrix`、`DGSConsulting/priority-matrix-builder`、`kubarium/eisenhower-box`、`padey/Prioritize-Like-Ike`、`qshaiya/time-matrix-app`）——无授权＝默认保留全部权利，**一行都不能抄**。
 
 ---
 
@@ -197,7 +224,67 @@
 
 ## 8. 模块 7：跨端框架与本地优先同步引擎
 
-<!-- PLACEHOLDER_MODULE7 -->
+> 完整明细（40+ 项目、逐条 license 原文摘录、证据分级）见 `research/module7-sync-engines.md`；本节为结论浓缩版。所有 Star 为 2026-09-25 实测，License 均读 LICENSE 原文确认。
+
+### 8.1 三类归因（决策视图）
+
+#### A 类：完全开源可商用，可直接嵌入闭源商业产品
+
+| 项目 | 仓库 | Star | License | 定位 | 关键事实 |
+|---|---|---|---|---|---|
+| **Yjs** | https://github.com/yjs/yjs | 22842 | **MIT**（原文；GitHub 显示 NOASSERTION 属解析误报）✅ | CRDT 引擎（最成熟生态） | 2026-09-23 v13.6.33，极活跃 |
+| **Loro** | https://github.com/loro-dev/loro | 6167 | **MIT** ✅ | 高性能 CRDT（Rust 核心 + WASM/Swift/Kotlin 绑定） | 2026-09-21，活跃 |
+| **Automerge** | https://github.com/automerge/automerge | 6615 | **MIT** ✅ | JSON-like CRDT（历史/分支模型强） | 2026-09-24，活跃 |
+| **Hocuspocus** | https://github.com/ueberdosis/hocuspocus | 2600 | **MIT** ✅ | 生产级 Yjs WebSocket 后端（持久化/Redis/Webhook/S3） | 2026-09-22 v4.7.0；**自托管免费商用**，只有 Tiptap 协作云才收费 |
+| y-websocket / y-indexeddb / y-protocols / y-prosemirror | https://github.com/yjs/y-websocket 等 | 714 / 281 / 163 / 467 | **MIT** ✅ | Yjs 配套连接器与持久化 | 均活跃（y-leveldb 已归档） |
+| **Electric** | https://github.com/electric-sql/electric | 10370 | **Apache-2.0** ✅ | Postgres **只读下行**同步（Shapes + HTTP API） | ⚠️ **不是双向 CRDT**，写路径需自研；「license 随版本变化」的说法**未获证实**（新旧仓库均为 Apache-2.0 全文） |
+| **Zero / Replicache（rocicorp/mono）** | https://github.com/rocicorp/mono | 3392 | **Apache-2.0** ✅ | 双向同步引擎 + zero-cache 服务端 | Zero 仍为 canary（v1.11.0-canary.13）；Replicache 已并入同仓、官方宣布**不再收费 + 维护模式** |
+| **Evolu** | https://github.com/evoluhq/evolu | 1899 | **MIT** ✅ | E2EE + SQLite + CRDT | 活跃 |
+| **cr-sqlite** | https://github.com/vlcn-io/cr-sqlite | 3800 | **MIT** ✅ | 收敛型复制 SQLite 扩展 | 提交活跃但 release 停在 2024-01 |
+| **SQLSync** | https://github.com/orbitinghail/sqlsync | 2915 | **Apache-2.0** ✅ | SQLite 协作/离线封装（Rust+WASM） | ⚠️ 最后提交 2025-11-19，需观察 |
+| **LiveStore** | https://github.com/livestorejs/livestore | 3715 | **Apache-2.0** ✅ | 响应式 SQLite + 内置同步 | ⚠️ 版本仍 0.5.0-dev |
+| **TinyBase** | https://github.com/tinyplex/tinybase | 5177 | **MIT** ✅ | 响应式 store + 可接 Yjs/Automerge | 无自家付费云 |
+| **InstantDB** | https://github.com/instantdb/instant | 10522 | **Apache-2.0** ✅ | 全栈后端 + 实时同步（可自托管） | 官方云为付费托管 |
+| **Jazz** | https://github.com/garden-co/jazz | 196 | **MIT** ✅（仅官网字体例外） | local-first 关系库 | 2.0 alpha |
+| **WatermelonDB** | https://github.com/Nozbe/WatermelonDB | 11786 | **MIT** ✅ | RN 高性能本地库 | ⚠️ **本身不含同步**，需自建协议 |
+| **RxDB** | https://github.com/pubkey/rxdb | 23391 | **Apache-2.0（核心）+ Premium 插件商业许可** ⚠️ | local-first DB + 复制协议 | 核心免费；性能/加密/存储插件在付费墙后，**授权到期不得继续用** |
+| **PouchDB + Apache CouchDB** | https://github.com/pouchdb/pouchdb / https://github.com/apache/couchdb | 17615 / 6963 | **Apache-2.0** ✅ | 经典主从复制组合 | 成熟稳定 |
+| **Kinto** | https://github.com/Kinto/kinto | 4418 | **Apache-2.0** ✅ | 通用 JSON 文档存储 + 客户端同步（Mozilla） | 活跃 |
+| Realm Core / realm-swift | https://github.com/realm/realm-core / realm-swift | 1052 / 16612 | **Apache-2.0** ✅ | 端侧数据库 | ⚠️ **Atlas Device Sync 已于 2025-09-30 EOL**，只剩本地存储 |
+| PowerSync **客户端 SDK**（JS/Swift/.NET） | https://github.com/powersync-ja/powersync-js 等 | 724 / 62 / 51 | **Apache-2.0** ✅ | 客户端库 | ⚠️ 仅客户端；服务端另有条款；**Kotlin SDK 无 LICENSE 文件**（见下） |
+| TanStack DB | https://github.com/tanstack/db | 3917 | MIT ✅ | 响应式客户端 store | 存储层，非同步引擎 |
+
+#### B 类：copyleft / 需隔离
+
+| 项目 | License | 风险点 |
+|---|---|---|
+| Triplit | **AGPL-3.0-only** ⚠️ | 嵌入闭源 SaaS 触发网络条款源码披露义务；且最后提交 2025-09-11（疑似停滞） |
+| Nextcloud Server / Radicale | AGPL-3.0 / GPL-3.0 ⚠️ | 自托管自用可以；**修改后对外提供网络服务须开源修改** |
+| Liveblocks 服务端组件 | **AGPL-3.0-or-later**（客户端 Apache-2.0）⚠️ | 服务端必须隔离或不用 |
+| ObjectBox | 绑定 Apache-2.0，**native 引擎是 ObjectBox Binary Licence**，Gradle 插件 GPL-3.0 ⚠️ | 真正跑数据的引擎是二进制专有许可 |
+| AFFiNE | 前端 MIT，`packages/backend` 为 **EE License**（生产须订阅）⚠️ | 自建其后端绕过订阅有法律风险 |
+| Couchbase Lite iOS 3.x | Apache-2.0（但 **4.x core 是 BSL 1.1**）⚠️ | 必须锁版本核对依赖树 |
+
+#### C 类：商业授权 / source-available（不适合作为闭源商业产品核心依赖）
+
+| 项目 | License | 关键限制（原文摘录要点） |
+|---|---|---|
+| **PowerSync Service** | **FSL-1.1-ALv2** ❌ | 禁止 **"Competing Use"**（提供替代或实质相似功能的产品/服务）；发布满 **2 年**后才自动转 Apache-2.0 |
+| **Couchbase Lite Core 4.x** | **BSL 1.1** ❌ | 禁止商用衍生物与 "as-a-service" 托管；**Change Date 2029-05-01** 才转 Apache-2.0 |
+| **sqlite-sync（SQLite Cloud）** | **Elastic License 2.0 修改版** ❌ | **禁止修改/替换/自实现 Network Layer**，禁止向第三方提供 managed service；非开源项目商用需商业授权 |
+| **Ditto** | **Ditto Binary License**（专有）❌ | 纯专有二进制，禁止反向工程，**无开源核心** |
+| **ObjectBox Sync** | 商业订阅 ❌ | 自托管也需付费授权 |
+| PowerSync **Kotlin SDK** | **无 LICENSE 文件** ❓ | 无授权声明＝默认保留全部权利；同厂商 Swift/.NET 均为 Apache-2.0（疑遗漏），但**法律上必须书面确认** |
+| MongoDB Atlas Device Sync | 已 EOL ❌ | 2025-09-30 停止服务 |
+
+### 8.2 给本项目的选型建议
+
+1. **最干净的路线（推荐）**：**Yjs 或 Loro + 自建 Hocuspocus/y-websocket**。全链路 MIT，可闭源商用、可自建、可托管给用户；冲突合并由 CRDT 天然解决。代价：自研任务实体的 CRDT schema、服务端鉴权/配额/快照压缩。
+2. **次选**：**Electric（Apache-2.0，只读下行）+ 自研写路径**，或 **Zero（Apache-2.0，双向）**——后者 API 仍是 canary，需 4–8 周 PoC 验证离线重放与冲突收敛。
+3. **另一条务实路线**：**CalDAV 作为同步层**（见 §5），把「多端同步」问题转化为「标准协议 + 服务端」问题，规避自研 CRDT 的复杂度（代价是冲突语义弱于 CRDT）。
+4. **明确规避**：`sqlite-sync`、`Couchbase Lite 4.x`、`Triplit`（AGPL）作为闭源 SaaS 核心；`Ditto`/`ObjectBox Sync`/`PowerSync 商业版`（持续付费且条款随厂商变动）。
+5. **注意**：`PowerSync` 若使用，客户端 SDK（Apache-2.0）可放心，但**服务端 FSL 的 "Competing Use" 定义可能正好覆盖「给用户提供一个滴答清单 SaaS」这件事本身**——需法务判定。
+6. **反直觉但重要**：CRDT 不是唯一答案。滴答清单这类「单人为主 + 少量共享清单」的场景，**服务端权威 + LWW（最后写入胜出）+ 操作日志**往往比 CRDT 更简单可靠；CRDT 的价值在「离线长周期编辑 + 复杂协作」。
 
 ---
 
