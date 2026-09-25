@@ -370,3 +370,125 @@ describe('OpLogEngine', () => {
     expect(await engine.applyRemote([])).toEqual({ applied: [], skipped: 0, overwritten: [] });
   });
 });
+
+// ─────────────────────────────────────────────────────────────
+// 写入闸门：因果优先
+// ─────────────────────────────────────────────────────────────
+
+describe('🔴 写入闸门：因果优先，不被同毫秒的墙上时钟击败', () => {
+  const C = 'device-1';
+  /** 刻意选一个两条 op **完全相同**的时间戳 —— 这正是真实故障的形状。 */
+  const SAME_MS = 1_790_000_000_000;
+
+  it('同一设备连续两次编辑落在同一毫秒时，后一条必须胜出', () => {
+    let s = emptyState();
+    s = applyOperation(
+      s,
+      makeOp({
+        id: 'op-1',
+        entityId: 'e1',
+        opType: OpType.Update,
+        payload: { completedAt: SAME_MS },
+        timestamp: SAME_MS,
+        vectorClock: { [C]: 3 },
+      }),
+    );
+    s = applyOperation(
+      s,
+      makeOp({
+        id: 'op-2',
+        entityId: 'e1',
+        opType: OpType.Update,
+        payload: { completedAt: null },
+        timestamp: SAME_MS,
+        vectorClock: { [C]: 4 },
+      }),
+    );
+
+    // 修复前：约一半概率这里仍是 SAME_MS（「取消完成」静默失效）
+    expect(s.tasks['e1']!.completedAt).toBeUndefined();
+  });
+
+  it('即使后一条的 op.id 字典序更小，因果更新的写入仍必须胜出', () => {
+    // 修复前失败的关键：随机 UUID 的字典序决定了因果顺序。
+    // 「完成」的 id 是 zzz、「取消完成」的 id 是 aaa，旧逻辑因为 aaa <= zzz 直接丢弃后者。
+    let s = emptyState();
+    s = applyOperation(
+      s,
+      makeOp({
+        id: 'zzz',
+        entityId: 'e1',
+        opType: OpType.Update,
+        payload: { completedAt: SAME_MS },
+        timestamp: SAME_MS,
+        vectorClock: { [C]: 3 },
+      }),
+    );
+    s = applyOperation(
+      s,
+      makeOp({
+        id: 'aaa',
+        entityId: 'e1',
+        opType: OpType.Update,
+        payload: { completedAt: null },
+        timestamp: SAME_MS,
+        vectorClock: { [C]: 4 },
+      }),
+    );
+
+    expect(s.tasks['e1']!.completedAt).toBeUndefined();
+  });
+
+  it('因果上更旧的写入必须被拒绝，哪怕它的时间戳更大（时钟回拨）', () => {
+    let s = emptyState();
+    s = applyOperation(
+      s,
+      makeOp({
+        id: 'new',
+        entityId: 'e1',
+        opType: OpType.Update,
+        payload: { title: '新' },
+        timestamp: 1000,
+        vectorClock: { [C]: 5 },
+      }),
+    );
+    s = applyOperation(
+      s,
+      makeOp({
+        id: 'old',
+        entityId: 'e1',
+        opType: OpType.Update,
+        payload: { title: '旧' },
+        timestamp: 999_999,
+        vectorClock: { [C]: 2 },
+      }),
+    );
+
+    expect(s.tasks['e1']!.title).toBe('新');
+  });
+
+  it('真正并发的写入仍由时间戳裁决，且与重放顺序无关（两端算得一样）', () => {
+    const other = makeOp({
+      id: 'x',
+      entityId: 'e1',
+      opType: OpType.Update,
+      payload: { title: 'A' },
+      timestamp: 1000,
+      vectorClock: { a: 1 },
+    });
+    const newer = makeOp({
+      id: 'y',
+      entityId: 'e1',
+      opType: OpType.Update,
+      payload: { title: 'B' },
+      timestamp: 2000,
+      vectorClock: { b: 1 },
+    });
+
+    const forward = applyOperation(applyOperation(emptyState(), other), newer);
+    const backward = applyOperation(applyOperation(emptyState(), newer), other);
+
+    expect(forward.tasks['e1']!.title).toBe('B');
+    expect(backward.tasks['e1']!.title).toBe('B');
+  });
+});

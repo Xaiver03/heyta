@@ -28,8 +28,8 @@ import type {
   Tag,
   Task,
 } from '@heyta/domain';
-import { OpType } from '@heyta/sync-core';
-import type { Operation } from '@heyta/sync-core';
+import { OpType, compareVectorClocks } from '@heyta/sync-core';
+import type { Operation, VectorClock } from '@heyta/sync-core';
 
 /** 物化状态。所有实体按 id 索引。 */
 export interface MaterializedState {
@@ -119,15 +119,7 @@ export function applyOperation(
    *
    * 平局用 op.id 打破：不能留"谁先到谁赢"，那在两端会不一致。
    */
-  if (existing !== undefined) {
-    const existingUpdated = existing['updatedAt'] ?? 0;
-    if (op.timestamp < existingUpdated) return state;
-    if (op.timestamp === existingUpdated) {
-      // 同毫秒：用 op.id 字典序做确定性决胜，保证两端一致
-      const existingOpId = (existing['_lastOpId'] as string | undefined) ?? '';
-      if (op.id <= existingOpId) return state;
-    }
-  }
+  if (!shouldAcceptWrite(op, existing)) return state;
 
   // CREATE / UPDATE 合并语义：只覆盖 payload 里出现的字段。
   // 这样"只改标题"的 op 不会把 dueDate 抹掉。
@@ -137,6 +129,7 @@ export function applyOperation(
     id: entityId,
     updatedAt: op.timestamp,
     _lastOpId: op.id,
+    _lastClock: op.vectorClock,
   };
 
   /**
@@ -168,7 +161,55 @@ export function applyOperation(
 }
 
 /**
- * 按序重放一批 op。
+ * 写入闸门：**因果优先，墙上时钟只作兜底**。
+ *
+ * 🔴 为什么不能只比 `op.timestamp`（这是本仓库真实踩过的坑）：
+ *
+ * 同一台设备连续两次编辑同一实体会落在**同一毫秒**里，于是时间戳相等，
+ * 判定就落到 `op.id` 的字典序上 —— 而 `op.id` 是随机 UUID。
+ * 结果：**因果上更新的那条有一半概率被丢掉**，且完全静默。
+ *
+ * 实测症状：`setCompleted(true)` 紧接 `setCompleted(false)`，重开后
+ * 「取消完成」约 2/3 的情况不生效（`completedAt` 仍是时间戳）。
+ * op 日志里两条 op 的向量时钟清清楚楚是 `3` → `4`，同设备、顺序明确 ——
+ * **它们根本不并发，不该由墙上时钟裁决。**
+ *
+ * 所以先用向量时钟：因果上明确更新/更旧，直接接受/拒绝，不看时间戳。
+ * 只有真正**并发**（或时钟相等，即同一条 op 重放）时，才回退到
+ * 时间戳 + `op.id` 字典序 —— 后者是为了保证**两端算出同一个结果**。
+ *
+ * 注：`_lastClock` / `_lastOpId` 都是**内存派生字段**，随 op 重放重建，
+ * 不进任何持久化 schema（物化状态从不落盘）。
+ */
+function shouldAcceptWrite(
+  op: Operation<string>,
+  existing: (Record<string, unknown> & { updatedAt?: number }) | undefined,
+): boolean {
+  if (existing === undefined) return true;
+
+  const existingClock = existing['_lastClock'] as VectorClock | undefined;
+  const incomingClock = op.vectorClock;
+  if (existingClock !== undefined && incomingClock !== undefined) {
+    const cmp = compareVectorClocks(incomingClock, existingClock);
+    // 因果上更新 → 无条件胜出（同一设备连续编辑就是这种情况）
+    if (cmp === 'GREATER_THAN') return true;
+    // 因果上更旧 → 无条件拒绝，哪怕时间戳更大（时钟回拨也挡得住）
+    if (cmp === 'LESS_THAN') return false;
+    // EQUAL（同一条 op 重放）与 CONCURRENT 才需要下面兜底
+  }
+
+  const existingUpdated = existing['updatedAt'] ?? 0;
+  if (op.timestamp < existingUpdated) return false;
+  if (op.timestamp === existingUpdated) {
+    // 同毫秒且并发：用 op.id 字典序做确定性决胜，保证两端一致
+    const existingOpId = (existing['_lastOpId'] as string | undefined) ?? '';
+    if (op.id <= existingOpId) return false;
+  }
+  return true;
+}
+
+/**
+按序重放一批 op。
  *
  * ⚠️ 顺序敏感：同实体的 op 必须按发生顺序应用。
  * 调用方负责保证传入顺序（本地 op 按 seq，远程 op 按服务端序）。
