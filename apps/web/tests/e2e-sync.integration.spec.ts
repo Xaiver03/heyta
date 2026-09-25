@@ -17,7 +17,9 @@
  */
 
 import { IDBFactory, IDBKeyRange } from 'fake-indexeddb';
-import { afterAll, describe, expect, it } from 'vitest';
+import { act, createElement } from 'react';
+import { createRoot, type Root } from 'react-dom/client';
+import { afterAll, afterEach, describe, expect, it } from 'vitest';
 
 import { IndexedDbAdapter, IndexedDbOpLogStore, STORES } from '@heyta/storage';
 import { OpLogEngine } from '@heyta/op-log';
@@ -25,6 +27,14 @@ import { OpType } from '@heyta/sync-core';
 import type { Operation } from '@heyta/sync-core';
 
 import { SyncClient } from '@heyta/sync-client';
+
+import { ConflictDialog } from '../src/features/sync/ConflictDialog.js';
+import { useSyncStore } from '../src/features/sync/store.js';
+import {
+  __resetOpLogForTests,
+  initOpLog,
+  requireEngine,
+} from '../src/lib/oplog.js';
 
 const URL_BASE = process.env['HEYTA_E2E_URL'];
 const PASSWORD = 'e2e-correct-horse-battery-staple';
@@ -684,4 +694,249 @@ describe.skipIf(URL_BASE === undefined)('冲突解决：用户选完之后双端
     expect(afterOps.some((o) => o.id === c.local.opId)).toBe(true);
   }, 60_000);
 });
+
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * UI → store → SyncClient → 服务端
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * 上面的 `冲突解决：用户选完之后双端真的收敛` 调的是 `SyncClient.resolveConflict`
+ * 这个 API，绕过了 store；`conflict-dialog.spec.tsx` 测的是界面，却把
+ * store action mock 掉了。两份测试各自都是绿的，中间那段接线**没有测试**：
+ *
+ *     ConflictDialog ──► useSyncStore.resolveConflict ──► buildClient ──► SyncClient
+ *
+ * 只要 store 的 action 把 `choice` 传错、找错冲突、或漏掉 redispatchPayload，
+ * 上面两份测试都照样通过（一份绕过 store，一份 mock 掉 store）。
+ *
+ * 这条用例把整条链一次跑完，**零 mock**：
+ *   点真实 <ConflictDialog /> 的按钮
+ *     → 真的 useSyncStore action
+ *       → 真的 buildClient → 真的 SyncClient
+ *         → 真引擎（模块单例）→ 真 IndexedDB → 真 HTTP → 真 Fastify 服务端
+ * 然后断言：**双端最终落在同一个值上，且正是用户选的那一版**。
+ *
+ * 设备 A 是被测应用本身 —— 它必须用 `initOpLog()` 的模块单例引擎，
+ * 因为 store 的 `requireEngine()` 拿的就是这个实例。设备 B 复用既有
+ * `makeDevice` 造的独立设备（只有 A 的界面在被测）。
+ */
+describe.skipIf(URL_BASE === undefined)(
+  '🔴 冲突解决：从真实对话框点击到双端收敛（真实服务端，零 mock）',
+  () => {
+    const created: Array<{ adapter: IndexedDbAdapter }> = [];
+    let root: Root | undefined;
+    let container: HTMLDivElement | undefined;
+
+    afterEach(() => {
+      act(() => {
+        root?.unmount();
+      });
+      container?.remove();
+      root = undefined;
+      container = undefined;
+      // store 是模块单例，用例之间必须清干净，否则冲突状态会互相污染
+      useSyncStore.setState({
+        status: { kind: 'idle' },
+        conflictDialogOpen: false,
+        baseUrl: '',
+        token: undefined,
+        password: undefined,
+      });
+      __resetOpLogForTests();
+    });
+
+    afterAll(() => {
+      for (const d of created) d.adapter.close();
+    });
+
+    async function freshToken(prefix: string): Promise<string> {
+      const reg = await fetch(`${URL_BASE}/api/test/create-user`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          email: `heyta-ui-${prefix}-${String(Date.now())}@example.com`,
+          password: 'heyta-p1-password',
+        }),
+      });
+      expect(reg.ok).toBe(true);
+      const body = (await reg.json()) as Record<string, unknown>;
+      return (body['token'] ??
+        body['accessToken'] ??
+        (body['data'] as Record<string, unknown> | undefined)?.['token']) as string;
+    }
+
+    /**
+     * 造一个真并发冲突，其中**设备 A 的同步客户端完全来自真实 store**。
+     *
+     * ⚠️ 不能照搬上面 `makeConflict` 的"注入 flaky fetch 模拟离线"：
+     * store 的 `buildClient` 不接受 `fetchImpl`，而为了测试去给它开一个口子
+     * 就是改被测代码的形状 —— 那正是这条用例要避免的。
+     *
+     * 改用协议本身保证的并发，不依赖断网：
+     *   1. A 创建 base 并上传，B 下载；
+     *   2. A 本地改一版（**先不传**）；
+     *   3. B 抢先改并上传；
+     *   4. A 经真实 store 同步 → 服务端以 CONFLICT_CONCURRENT 拒绝 A 的 op。
+     * 到达的仍是同一个 `status.kind === 'conflict'`，且双方内容都拿得到。
+     */
+    async function makeUiConflict(prefix: string) {
+      const g = globalThis as unknown as {
+        indexedDB: IDBFactory;
+        IDBKeyRange: typeof IDBKeyRange;
+      };
+      g.indexedDB = new IDBFactory();
+      g.IDBKeyRange = IDBKeyRange;
+
+      const token = await freshToken(prefix);
+
+      // 设备 A = 被测应用：模块单例引擎，store 的 requireEngine() 用的就是它
+      __resetOpLogForTests();
+      await initOpLog('heyta');
+      const A = requireEngine();
+
+      // 设备 B = 另一台真实设备，复用既有 makeDevice
+      const B = await makeDevice(`${prefix}-b`, token);
+      created.push(B);
+
+      // 把 store 指向真实服务端 / 真实令牌 / 真实 E2EE 口令
+      useSyncStore.getState().configure(URL_BASE!, token, PASSWORD);
+
+      await A.dispatch({
+        entityType: 'TASK',
+        entityId: 'c',
+        opType: OpType.Create,
+        payload: { title: 'base' },
+      });
+      const first = await useSyncStore.getState().syncNow();
+      expect(first.kind).toBe('synced');
+
+      await B.client.sync();
+      expect(B.engine.getState().tasks['c']!.title).toBe('base');
+
+      // A 本地改，但先不同步
+      await A.dispatch({
+        entityType: 'TASK',
+        entityId: 'c',
+        opType: OpType.Update,
+        payload: { title: 'A 的版本' },
+      });
+
+      // B 抢先上传自己的版本，服务端"当前版本"变成 B 的
+      await B.engine.dispatch({
+        entityType: 'TASK',
+        entityId: 'c',
+        opType: OpType.Update,
+        payload: { title: 'B 的版本' },
+      });
+      const bStatus = await B.client.sync();
+      expect(bStatus.kind).toBe('synced');
+
+      // A 现在经**真实 store action** 同步 —— 服务端判定并发冲突
+      const status = await useSyncStore.getState().syncNow();
+      return { A, B, status };
+    }
+
+    /** 渲染**真实** `<ConflictDialog />`（文件是 .ts，故用 createElement）。 */
+    function renderDialog(): HTMLDivElement {
+      container = document.createElement('div');
+      document.body.appendChild(container);
+      root = createRoot(container);
+      act(() => {
+        root!.render(createElement(ConflictDialog));
+      });
+      return container;
+    }
+
+    /** 点击后 `void resolveConflict(...)` 不返回 promise，只能轮询真实状态。 */
+    async function waitForSynced(readValue: () => unknown): Promise<void> {
+      const deadline = Date.now() + 30_000;
+      for (;;) {
+        const status = useSyncStore.getState().status;
+        if (status.kind === 'synced') return;
+        if (Date.now() > deadline) {
+          throw new Error(
+            `等待冲突解决超时：status=${JSON.stringify(status)}，` +
+              `设备 A 当前值=${JSON.stringify(readValue())}`,
+          );
+        }
+        await new Promise((r) => setTimeout(r, 25));
+      }
+    }
+
+    function keepButtons(el: HTMLElement): HTMLButtonElement[] {
+      return [...el.querySelectorAll('button')].filter((b) =>
+        b.textContent?.includes('保留这一版'),
+      ) as HTMLButtonElement[];
+    }
+
+    it('🔴 点"本机"按钮 → 双端收敛到本地值', async () => {
+      const { A, B, status } = await makeUiConflict('ui-local');
+
+      // 前提：真的进了冲突，且双方内容都在
+      expect(status.kind).toBe('conflict');
+      if (status.kind !== 'conflict') return;
+      expect(status.conflicts).toHaveLength(1);
+      const c = status.conflicts[0]!;
+      expect(c.entityType).toBe('TASK');
+      expect(c.entityId).toBe('c');
+      expect(c.local.payload).toMatchObject({ title: 'A 的版本' });
+      expect(c.remote?.payload).toMatchObject({ title: 'B 的版本' });
+
+      // 真实对话框：用户能看见两边分别是什么
+      const el = renderDialog();
+      expect(el.textContent).toContain('A 的版本');
+      expect(el.textContent).toContain('B 的版本');
+      const buttons = keepButtons(el);
+      expect(buttons).toHaveLength(2);
+
+      // 第 0 个按钮 = "本机"
+      act(() => {
+        buttons[0]!.click();
+      });
+      await waitForSynced(() => A.getState().tasks['c']);
+
+      // ── 收敛断言：双端同值，且是用户选的"本地"那一版 ──
+      expect(useSyncStore.getState().status.kind).toBe('synced');
+      expect(A.getState().tasks['c']!.title).toBe('A 的版本');
+      expect(await A.getPendingUpload()).toHaveLength(0);
+
+      await B.client.sync();
+      expect(B.engine.getState().tasks['c']!.title).toBe('A 的版本');
+      // 双端必须是**同一个值**
+      expect(A.getState().tasks['c']!.title).toBe(B.engine.getState().tasks['c']!.title);
+    }, 60_000);
+
+    it('🔴 点"其他设备"按钮 → 双端收敛到远端值', async () => {
+      const { A, B, status } = await makeUiConflict('ui-remote');
+
+      expect(status.kind).toBe('conflict');
+      if (status.kind !== 'conflict') return;
+      expect(status.conflicts).toHaveLength(1);
+      const c = status.conflicts[0]!;
+      expect(c.local.payload).toMatchObject({ title: 'A 的版本' });
+      expect(c.remote?.payload).toMatchObject({ title: 'B 的版本' });
+
+      const el = renderDialog();
+      expect(el.textContent).toContain('A 的版本');
+      expect(el.textContent).toContain('B 的版本');
+      const buttons = keepButtons(el);
+      expect(buttons).toHaveLength(2);
+
+      // 第 1 个按钮 = "其他设备"
+      act(() => {
+        buttons[1]!.click();
+      });
+      await waitForSynced(() => A.getState().tasks['c']);
+
+      // ── 收敛断言：双端同值，且是用户选的"远端"那一版 ──
+      expect(useSyncStore.getState().status.kind).toBe('synced');
+      expect(A.getState().tasks['c']!.title).toBe('B 的版本');
+      expect(await A.getPendingUpload()).toHaveLength(0);
+
+      await B.client.sync();
+      expect(B.engine.getState().tasks['c']!.title).toBe('B 的版本');
+      expect(A.getState().tasks['c']!.title).toBe(B.engine.getState().tasks['c']!.title);
+    }, 60_000);
+  },
+);
 
