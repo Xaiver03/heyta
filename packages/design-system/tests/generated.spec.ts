@@ -19,6 +19,7 @@
 import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import ts from 'typescript';
 import { describe, expect, it } from 'vitest';
 
 import {
@@ -324,5 +325,48 @@ describe('prefers-reduced-motion 被显式导出并说明原生替代方式', ()
     expect(swiftText).toContain('accessibilityReduceMotion');
     expect(swiftText).toContain('isReduceMotionEnabled');
     expect(arktsText).toContain('accessibilityReduceMotion');
+  });
+});
+
+/**
+ * ArkTS 产物的**语法**门禁。
+ *
+ * 为什么需要单独一组：本文件其它断言都是**正则**解析 `.ets` —— 它们能证明
+ * "每个 token 都在、值也对得上"，但**证明不了这文件语法合法**。
+ * 一个拼错的关键字、少了的引号，正则照样能匹配出值，而 ArkTS 编译器会拒绝整个文件。
+ *
+ * 本机没有 ArkTS 编译器，所以这里用 TypeScript 的**真实解析器**兜底：
+ * ArkTS 是 TypeScript 的方言，纯常量声明部分的语法是同一套。
+ *
+ * ⚠️ **这不是 ArkTS 编译通过**。它只覆盖"语法"这一层，而且只对得起
+ * "本文件只声明常量"这个前提。真正的 ArkTS 集成（`@ohos` 导入、`Color` 类型、
+ * 资源引用）没有被验证过 —— 等鸿蒙端落地时必须补上。
+ */
+describe('ArkTS 产物语法（TypeScript 解析器兜底）', () => {
+  it('HeytaTokens.ets 没有任何语法错误', () => {
+    // .ets 当 .ts 解析：ScriptKind.TS
+    const sf = ts.createSourceFile('HeytaTokens.ts', arktsText, ts.ScriptTarget.Latest, true);
+
+    // `parseDiagnostics` 是 TypeScript 的内部字段，公开 `.d.ts` 里没有它，
+    // 所以这里显式收窄类型。用它是**故意的**：我们要的正是"解析器自己是否报错"，
+    // 而不是 `ts.transpileModule` 那种把语法错误吞掉的宽松路径。
+    const diagnostics = (sf as unknown as { parseDiagnostics?: ts.Diagnostic[] }).parseDiagnostics ?? [];
+    const messages = diagnostics.map((d) => ts.flattenDiagnosticMessageText(d.messageText, ' '));
+    expect(messages, `ArkTS 产物有语法错误：\n${messages.join('\n')}`).toEqual([]);
+  });
+
+  it('确实解析出了预期数量的变量声明（防止"零错误"是因为压根没解析）', () => {
+    const sf = ts.createSourceFile('HeytaTokens.ts', arktsText, ts.ScriptTarget.Latest, true);
+
+    let decls = 0;
+    const walk = (node: ts.Node): void => {
+      if (ts.isVariableStatement(node)) decls += node.declarationList.declarations.length;
+      ts.forEachChild(node, walk);
+    };
+    walk(sf);
+
+    // 亮色 + 暗色 + 减少动效，三者之和。写死下限而不是精确值：
+    // 精确值会在**故意**加 token 时无谓地报红，而下限仍能抓住"解析不出东西"。
+    expect(decls).toBeGreaterThan(150);
   });
 });
