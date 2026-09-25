@@ -207,14 +207,16 @@ pnpm check:design     # 非零退出 = 有裸值
 pnpm install                    # 安装（工作区）
 pnpm -r build                   # 全量构建
 pnpm -r typecheck               # 全量类型检查
-pnpm -r test                    # 全量测试（当前 2024 个通过 + 9 个 E2E 默认跳过 + 1 个服务端跳过）
+pnpm -r test                    # 全量测试（当前 2034 个通过 + 11 个 E2E 默认跳过 + 1 个服务端跳过）
 
 pnpm verify:sync                # P0 验收：真实同步闭环（需要服务端在跑）
 pnpm verify:sync:dry            # 不需要服务端，只校验 op 形状
-pnpm verify:p1                  # P1 验收：**自带真实服务端**，跑零 mock 的端到端同步
+pnpm verify:p1                  # P1 验收：**自带真实服务端**，跑零 mock 的端到端同步（11 条）
+pnpm verify:p2                  # P2 验收：**自带真实服务端**，非 Web 壳（Node+SQLite）真实读写+同步
 
 pnpm check                      # 全部门禁：类型 + 迁移 + 许可证 + 文档 + 设计变量
 pnpm check:design               # 只跑设计变量硬编码检查
+pnpm check:tokens               # 原生 token 产物是否与 tokens.css 同步
 ```
 
 **提交前至少跑**：`pnpm -r typecheck && pnpm -r test`。
@@ -302,6 +304,14 @@ docker inspect <容器> --format '{{range .Config.Env}}{{println .}}{{end}}' | g
 18. **tsup 默认 `removeNodeProtocol: true` 会把 `node:sqlite` 改写成 `sqlite`**，
     而 `sqlite` 不是可解析的内建模块 → `ERR_MODULE_NOT_FOUND`。
     需要 `removeNodeProtocol: false`。（类型检查与源码运行都不会暴露它，只有构建产物会。）
+19. 🔴 **墙上时钟不能裁决因果顺序。** reducer 的 LWW 闸门曾**只**比 `op.timestamp`，
+    同毫秒时用 `op.id`（随机 UUID）字典序打破平局。但同一台设备连续两次编辑
+    经常落在**同一毫秒**里 —— 于是因果上更新的那条有一半概率被静默丢弃。
+    实测症状：完成 → 立刻取消完成 → 重开，「取消完成」约 2/3 失效，而 op 日志里
+    两条 op 的向量时钟清清楚楚是 `3` → `4`。**它们根本不并发。**
+    现在先比向量时钟（`GREATER_THAN` 接受 / `LESS_THAN` 拒绝），只有
+    `EQUAL`/`CONCURRENT` 才回退到时间戳 + `op.id`。
+    这是 #7 的同一种形状：**拿墙上时钟去表达因果事实**。
 
 > 第 4、7 条的根因相同：**两套并行定义**（词表 / 时钟语义）。
 > 这类 bug 单元测试抓不到 —— mock 是按实现者对协议的理解写的，理解错了 mock 跟着错。
