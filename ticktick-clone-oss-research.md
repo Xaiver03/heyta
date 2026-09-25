@@ -14,7 +14,7 @@
 |---|---|---|---|---|
 | 1 | 习惯打卡 | **FriesI23/mhabit**（Apache-2.0 ✅可商用，Flutter 跨端 + WebDAV 同步） | beaverhabits（BSD-3-Clause）、Loop Habit Tracker（GPL-3.0）、Habitica（GPL-3.0 + 素材 CC-BY-NC-SA ⚠️） | 开源生态**很成熟**；Apache-2.0 的 mhabit 是唯一能直接当商业产品骨架的 |
 | 2 | 番茄钟 / 专注 | **johannesjo/super-productivity**（MIT ✅，任务+番茄+Flowmodoro+时间追踪一体，最佳参考实现） | Pomotroid / Pomatez / TomatoBar（均 MIT）、Goodtime / Tomato（GPL-3.0）、ActivityWatch（MPL-2.0，自动时间追踪） | 计时器本身不难，**难点是「番茄钟 ↔ 任务」的数据绑定**，Super Productivity 是唯一把这条打通的 |
-| 3 | 四象限 / 艾森豪威尔 | 见 §3（开源生态最薄弱的一环，多数是小玩具或已归档项目） | Vikunja / Focalboard 等看板 + 自研 2×2 视图 | **建议自研视图层**，只在后端复用任务系统 |
+| 3 | 四象限 / 艾森豪威尔 | 见 **§4**：**没有可复用的开源组件库，必须自研**（拖拽用 dnd-kit 17,667★ MIT） | gsd-task-manager（26★ MIT，样板）、todoist-matrix（2★ MIT，架构范式）、Einsen（919★ Apache-2.0，停更） | 开源生态**最薄弱**：前 20 名全是个人练手项目，55% 已归档或 2 年无提交 |
 | 4 | 日历 + CalDAV | 服务端 **Radicale**（GPL-3.0，独立部署无冲突）/ **sabre/dav**（BSD-3-Clause ✅可嵌入）；客户端库 **dav4jvm**（MPL-2.0 ✅，Android/JVM）、**tsdav**（MIT ✅，JS/RN）、**python-caldav**（Apache-2.0 ✅） | Baikal、Xandikos、Nextcloud Tasks、Tasks.org、jtx Board、DAVx⁵ | 用 CalDAV 当同步层是**最省事的互操作方案**；注意 GPL 客户端 App 只能做参考实现，不能链接进闭源产品 |
 | 5 | 自然语言日期解析 | **wanasit/chrono**（MIT ✅，JS/TS，**自带中文 locale**）+ 中文长尾 **JioNLP**（Apache-2.0 ✅） | dateparser（BSD-3 ✅，Python）、duckling（BSD-3 ✅，多语种服务）、olebedev/when（Apache-2.0，Go） | 高频中文表达现成库够用；长尾必须自研规则 + LLM 兜底 |
 | 6 | 重复任务 RRULE | **jkbrzt/rrule（rrule.js）**（BSD-3-Clause ✅）+ **python-dateutil**（Apache-2.0 或 BSD-3 双许可 ✅） | lib-recur（Apache-2.0，Java/Android）、rrule-go（MIT）、rust-rrule（Apache-2.0）、Dart rrule（Apache-2.0） | 每个语言都有成熟实现，**直接用，不要自研** |
@@ -290,7 +290,51 @@
 
 ## 9. 模块 8：小组件 / 原生移动端 / 跨端框架
 
-<!-- PLACEHOLDER_MODULE8 -->
+### 9.1 跨端框架本体（2026-09-25 实测）
+
+| 框架 | 仓库 | Star | License（精确） | 技术栈 | 说明 |
+|---|---|---|---|---|---|
+| Flutter | https://github.com/flutter/flutter | **179081** | **BSD-3-Clause** ✅ | Dart 74.9% | 一套代码 → Android/iOS/Windows/macOS/Linux/Web；**小组件需插件 + 原生代码** |
+| React Native | https://github.com/facebook/react-native | **126724** | **MIT** ✅ | C++/JS | JS/TS → 原生控件；生态最大；**小组件需原生扩展** |
+| Tauri | https://github.com/tauri-apps/tauri | **111382** | **Apache-2.0 OR MIT 双许可**（`Cargo.toml` 原文 `license = "Apache-2.0 OR MIT"`，LICENSE-MIT + LICENSE-APACHE-2.0 均存在）✅ | Rust 81.4% | 桌面体积小；2.0 起支持移动端 |
+| Capacitor | https://github.com/ionic-team/capacitor | 16724 | **MIT** ✅ | TypeScript | Web 应用包装为原生 App（Super Productivity 移动端走这条路） |
+| Jetpack Compose / androidx | https://github.com/androidx/androidx | 6100 | **Apache-2.0** ✅ | Kotlin 69.6% | Android 原生（**Glance 小组件**所在仓库） |
+
+### 9.2 小组件能力（跨端框架无法覆盖的「税收」）
+
+| 平台 | 方案 | 仓库 / 类型 | Star | License | 说明 |
+|---|---|---|---|---|---|
+| Android | **Glance（Jetpack）** | https://github.com/androidx/androidx（`glance` 模块） | 6100（整仓） | **Apache-2.0** ✅ | 用 Compose 风格写 AppWidget，官方推荐 |
+| Android | **react-native-android-widget** | https://github.com/sAleksovski/react-native-android-widget | 897 | **MIT** ✅ | 用 React Native 写 Android 小组件 |
+| Flutter | **home_widget** | https://github.com/ABausG/home_widget | 975 | **BSD-3-Clause** ✅（LICENSE 位于 `packages/home_widget/LICENSE`，原文核实：三条款 BSD） | Flutter ↔ 原生小组件桥（Android/iOS） |
+| iOS / Expo | expo-apple-targets（`@bacons/apple-targets`） | https://github.com/EvanBacon/expo-apple-targets | 1389 | **未核实：仓库根目录无 LICENSE 文件**（`LICENSE`/`.md`/`.txt` 均 404） | Config Plugin 生成 Apple target（Widget/Live Activity/Watch/Safari 扩展） |
+| iOS / macOS | **WidgetKit + SwiftUI** | 系统能力（Apple SDK） | — | 随 SDK | 小组件必须写 Swift，无跨端替代 |
+| 桌面 | 托盘/菜单栏（Tauri / Electron 原生 API） | 案例：Pomotroid（Tauri）、Tomatez（Electron）、TomatoBar（Swift） | — | — | 桌面「小组件」等价物是菜单栏/托盘 |
+
+### 9.3 待办 / 习惯类真实案例（技术选型证据）
+
+| 项目 | 仓库 | Star | License | 技术栈 | 覆盖平台 | 借鉴点 |
+|---|---|---|---|---|---|---|
+| **Tasks.org** | https://github.com/tasks/tasks | 5601 | GPL-3.0 ⚠️ | Kotlin + **Compose Multiplatform** | Android + macOS | **同一套 Compose 代码出 Android + 桌面**；CalDAV 同步 |
+| **mhabit** | https://github.com/FriesI23/mhabit | 1596 | **Apache-2.0** ✅ | Flutter / Dart | Android/iOS/Windows/macOS/Linux | **全平台 + WebDAV 同步 + 小组件**，许可最宽松 |
+| jtx Board | https://github.com/TechbeeAT/jtxBoard | 687 | GPL-3.0 ⚠️ | Kotlin/Compose + **Glance** | Android | Glance 小组件 + CalDAV VTODO 实战 |
+| Tomato | https://github.com/nsh07/Tomato | 1467 | GPL-3.0 ⚠️ | **Kotlin Multiplatform** | Android + Desktop | KMP + Material 3 + 小组件 + 专注统计 |
+| AppFlowy | https://github.com/AppFlowy-IO/AppFlowy | 76916 | AGPL-3.0 ⚠️ | Flutter + Rust | 全平台 | Flutter 实现看板/日历/网格多视图 |
+| Notesnook | https://github.com/streetwriters/notesnook | 14636 | GPL-3.0 ⚠️ | React Native + Electron | 全平台 | RN 移动 + Electron 桌面同构 + E2EE |
+| Joplin | https://github.com/laurent22/joplin | 56479 | AGPL-3.0（server 专有）⚠️ | React Native + Electron | 全平台 | 多后端同步（WebDAV/S3/Nextcloud）实践 |
+| **Super Productivity** | https://github.com/johannesjo/super-productivity | 22240 | **MIT** ✅ | Angular + Electron + **Capacitor** | 桌面 + 移动 | 一套 Web 代码 + Capacitor 上移动端 |
+| Pomotroid | https://github.com/Splode/pomotroid | 5517 | MIT ✅ | Rust + **Tauri** | 桌面 | Tauri 桌面样板 |
+| Pomatez | https://github.com/roldanjr/pomatez | 4901 | MIT ✅ | Electron | 桌面 | Electron 样板 |
+| Habitica Android | https://github.com/HabitRPG/habitica-android | 1821 | GPL-3.0 ⚠️ | Kotlin | Android + **Wear OS**（topics 含 `wearos`） | 手表端实践（开源侧少见） |
+
+### 9.4 选型结论
+
+1. **小组件是跨端框架的「税收」**：无论选 Flutter 还是 RN，Android 小组件要用 Glance 或 `react-native-android-widget`，iOS 小组件必须写 SwiftUI/WidgetKit。**预算里必须单列原生工作量**（通常 1–3 人周/端）。
+2. **若要「一份代码覆盖最多平台 + 小组件」**：`Flutter + home_widget（BSD-3-Clause）` 是现实解，`mhabit`（Apache-2.0）已证明可行。
+3. **若团队是 Web 栈**：`React Native`（MIT）+ `react-native-android-widget`（MIT）+ SwiftUI 小组件；桌面复用 `Electron` 或 `Tauri`。
+4. **若追求 Android 原生体验与系统集成**：`Kotlin + Compose + Glance`（Tasks.org 路线），代价是 iOS 需另写一套。
+5. **桌面优先**：`Tauri`（Apache-2.0 OR MIT，体积小）或 `Electron`（生态成熟）；参考 Pomotroid / Pomatez。
+6. **许可提示**：`Tasks.org`、`jtx Board`、`Tomato`、`AppFlowy`、`Notesnook`、`Joplin` 均为 GPL/AGPL，**只能作为参考实现或独立服务**，不可把代码链接进闭源 App；可直接进闭源产品的只有 `mhabit`（Apache-2.0）、`Super Productivity`（MIT）、`home_widget`（BSD-3）、`react-native-android-widget`（MIT）。
 
 ---
 
