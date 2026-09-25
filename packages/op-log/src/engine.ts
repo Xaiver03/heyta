@@ -30,6 +30,7 @@ import type { OpLogStore, StoredOperation } from '@heyta/storage';
 
 import {
   applyOperation,
+  bucketFor,
   emptyState,
   replayOperations,
   type MaterializedState,
@@ -366,16 +367,8 @@ export class OpLogEngine {
   }
 
   private snapshot(op: Operation<string>): string | undefined {
-    const bucket = (
-      {
-        TASK: this.state.tasks,
-        PROJECT: this.state.projects,
-        TAG: this.state.tags,
-        HABIT: this.state.habits,
-        HABIT_LOG: this.state.habitLogs,
-        FOCUS_SESSION: this.state.focusSessions,
-      } as Record<string, Record<string, { updatedAt?: number }>>
-    )[op.entityType];
+    // 不在这里维护实体→桶的映射：那是 `bucketFor` 的职责，映射只有一份。
+    const bucket = bucketFor(this.state, op.entityType);
     if (bucket === undefined || op.entityId === undefined) return undefined;
     return String(bucket[op.entityId]?.['updatedAt'] ?? '');
   }

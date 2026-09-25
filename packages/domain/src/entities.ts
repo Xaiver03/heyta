@@ -105,6 +105,40 @@ export interface Tag extends EntityBase {
 }
 
 // ─────────────────────────────────────────────────────────────
+// 便签
+// ─────────────────────────────────────────────────────────────
+
+/**
+ * 独立便签（**不是**任务的备注字段）。
+ *
+ * 语义移植自上游 `features/note/note.model.ts`（MIT）：便签可挂在项目下、
+ * 也可不挂（`projectId: null`），并可钉到「今天」。
+ *
+ * 与上游的两处**有意不同**：
+ *
+ * 1. 上游有 `created` / `modified`，本地由 `EntityBase` 的
+ *    `createdAt` / `updatedAt` 统一提供，不另立一套时间字段
+ *    （op-log 要对时间戳做确定性比较，只能有一处）。
+ * 2. **没有 `backgroundColor`。** 上游允许存任意 hex 作为便签底色，
+ *    但那会绕开设计系统（AGENTS.md §5：组件禁止裸值，取值只能来自 token）。
+ *    要支持便签配色，正确的做法是先在 `tokens.css` 里加语义 token
+ *    （并通过对比度测试），而不是让用户数据里出现自由 hex。
+ *    在 token 就位之前，此字段**刻意缺席** —— 缺席比开一个后门好。
+ */
+export interface Note extends EntityBase {
+  /** 所属项目；`null` = 不归属任何项目。 */
+  projectId: string | null;
+  /** 是否钉到「今天」。 */
+  isPinnedToToday: boolean;
+  /** 正文。 */
+  content: string;
+  /** 配图地址。 */
+  imgUrl?: string;
+  /** 是否锁定（禁止编辑）。 */
+  isLock?: boolean;
+}
+
+// ─────────────────────────────────────────────────────────────
 // 习惯
 // ─────────────────────────────────────────────────────────────
 
@@ -178,6 +212,7 @@ export interface EntityModelMap {
   TASK: Task;
   PROJECT: Project;
   TAG: Tag;
+  NOTE: Note;
   HABIT: Habit;
   HABIT_LOG: HabitLog;
   FOCUS_SESSION: FocusSession;
@@ -185,14 +220,35 @@ export interface EntityModelMap {
 
 export type ModeledEntityType = keyof EntityModelMap;
 
+/**
+ * 有领域模型的实体类型的**运行时**清单。
+ *
+ * 🔴 `EntityModelMap` 的键与这份清单必须完全一致，且这是唯一一处运行时可读的定义。
+ *
+ * 这里曾经把同样 6 个名字**手写了第三遍**（`hasModel` 里一串 `type === 'TASK' || ...`）。
+ * 于是「哪些实体被建模」这件事在仓库里有**三份**互不校验的定义：
+ * `EntityModelMap`、`hasModel`、以及 `@heyta/op-log` 的 `BUCKET_BY_ENTITY`。
+ * 两套并行定义必然漂移 —— 这正是 AGENTS.md #4/#7 的形状。
+ *
+ * 下面的编译期断言保证：往 `EntityModelMap` 加了键却忘了加进这里，`typecheck` 就红。
+ */
+export const MODELED_ENTITY_TYPES = [
+  'TASK',
+  'PROJECT',
+  'TAG',
+  'NOTE',
+  'HABIT',
+  'HABIT_LOG',
+  'FOCUS_SESSION',
+] as const satisfies readonly ModeledEntityType[];
+
+/** 编译期兜底：清单漏掉 `EntityModelMap` 的任何一个键都会让这里类型错误。 */
+type AllModeledAreListed =
+  Exclude<ModeledEntityType, (typeof MODELED_ENTITY_TYPES)[number]> extends never ? true : never;
+const allModeledAreListed: AllModeledAreListed = true;
+void allModeledAreListed;
+
 /** 运行时守卫：该实体类型是否有领域模型（系统实体没有）。 */
 export function hasModel(type: EntityType): type is ModeledEntityType {
-  return (
-    type === 'TASK' ||
-    type === 'PROJECT' ||
-    type === 'TAG' ||
-    type === 'HABIT' ||
-    type === 'HABIT_LOG' ||
-    type === 'FOCUS_SESSION'
-  );
+  return (MODELED_ENTITY_TYPES as readonly string[]).includes(type);
 }

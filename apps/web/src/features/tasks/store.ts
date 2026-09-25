@@ -2,7 +2,7 @@ import { OpType } from '@heyta/sync-core';
 import { create } from 'zustand';
 
 import { Priority, Quadrant, bucketByQuadrant, type Task } from '@heyta/domain';
-import type { MaterializedState } from '@heyta/op-log';
+import { emptyState, type MaterializedState } from '@heyta/op-log';
 
 import {
   __resetOpLogForTests as resetEngine,
@@ -71,14 +71,7 @@ function nextTaskId(): string {
 let taskCounter = 0;
 
 export const useTaskStore = create<TaskState>((set, get) => ({
-  entities: {
-    tasks: {},
-    projects: {},
-    tags: {},
-    habits: {},
-    habitLogs: {},
-    focusSessions: {},
-  },
+  entities: emptyState(),
   filter: { kind: 'all' },
   now: Date.now(),
   ready: false,

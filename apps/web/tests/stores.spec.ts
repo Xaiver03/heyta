@@ -14,6 +14,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { toLocalDate } from '@heyta/domain';
 import { IndexedDbAdapter, IndexedDbOpLogStore } from '@heyta/storage';
 import { OpType } from '@heyta/sync-core';
+import { emptyState } from '@heyta/op-log';
 import type { Operation } from '@heyta/sync-core';
 
 import { __resetFocusForTests, useFocusStore } from '../src/features/focus/store.js';
@@ -59,14 +60,7 @@ beforeEach(async () => {
   __resetOpLogForTests();
   __resetFocusForTests();
   useTaskStore.setState({
-    entities: {
-      tasks: {},
-      projects: {},
-      tags: {},
-      habits: {},
-      habitLogs: {},
-      focusSessions: {},
-    },
+    entities: emptyState(),
     filter: { kind: 'all' },
     now: NOW,
     ready: false,
