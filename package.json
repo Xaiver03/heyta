@@ -41,7 +41,8 @@
   },
   "devDependencies": {
     "@heyta/shared-schema": "workspace:*",
-    "@heyta/sync-core": "workspace:*"
+    "@heyta/sync-core": "workspace:*",
+    "@types/node": "^20.0.0"
   },
   "license": "MIT"
 }
