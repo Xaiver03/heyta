@@ -194,7 +194,7 @@ if open_sheet "打开任务：$TITLE"; then
   XY=$(xy_edit "任务标题")
   if [ -z "$XY" ]; then bad "详情面板里找不到标题输入框"; screen_txt; else
     $ADB shell input tap $XY; sleep 1.2
-    clear_and_type "$RENAMED"
+    clear_and_type "$RENAMED" "任务标题"
     dump
     # 关闭时会提交标题（见 TaskDetailSheet 的 close()）
     close_sheet

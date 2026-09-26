@@ -31,7 +31,7 @@ import { fileURLToPath } from 'node:url';
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 
 /** 扫哪些目录。`apps/*` 是外壳，也就是所有界面文案所在的地方。 */
-const ROOTS = ['apps/web/src', 'apps/mobile/src'];
+const ROOTS = ['apps/web/src', 'apps/mobile/src', 'apps/landing/src'];
 
 const SKIP_DIRS = new Set(['node_modules', 'dist', 'build', 'Pods', '.gradle', '.cxx']);
 

@@ -47,6 +47,7 @@ import { useText, useTokens } from '../theme';
 import { Button, Card, Chip, Screen, SectionHeader, Text } from '../ui/kit';
 import { Icon } from '../ui/icons';
 import { openTaskHost } from '../db/open-host';
+import { useMobileSync } from '../sync/store';
 import {
   FOCUS_CONFIG,
   abortFocus,
@@ -231,6 +232,8 @@ export function FocusScreen(): React.JSX.Element {
   /** 未完成任务 —— 只用它填选择列表。 */
   const [pendingTasks, setPendingTasks] = useState<Task[]>([]);
   const [loadError, setLoadError] = useState<string | null>(null);
+  // 同步完成 → `dataRevision` 变 → 下面的 effect 重读物化状态。
+  const { dataRevision } = useMobileSync();
 
   useEffect(() => {
     let alive = true;
@@ -259,7 +262,9 @@ export function FocusScreen(): React.JSX.Element {
     refresh();
     // 🔴 依赖里必须有 `timer.savedAt`：落盘是异步的，没有它的话
     // "今天专注了几段"会停在旧值上，看起来像记录没保存。
-  }, [refresh, timer.savedAt]);
+    // `dataRevision`：同步完成后也要重读 —— 别的设备上的专注记录同步下来时，
+    // 本屏同样需要看见（与任务屏/日历屏同一种毛病，见 `sync/store.ts`）。
+  }, [refresh, timer.savedAt, dataRevision]);
 
   const stats = useMemo(
     () => focusStatsForDay(sessions, timer.now),

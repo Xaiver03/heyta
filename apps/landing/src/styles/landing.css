@@ -1,0 +1,1141 @@
+/**
+ * 落地页样式
+ * ============
+ *
+ * 规则（与 `apps/web` 一致，`pnpm check:design` 同样扫这里）：
+ *   1. 取值一律 `var(--ht-*)`，不写裸 hex / px / ms / z-index / rgb()。
+ *      尺寸用 rem / em / % / vw / vh —— 它们随字号与视口缩放，不是设计尺度。
+ *   2. 语义名优先（`--ht-color-primary`），不直接用原始色阶（`--ht-blue-600`）。
+ *   3. 需要新变量时**先加 token**，不在组件里发明。
+ *
+ * ⚠️ 与 MASTER.md §2 的一处冲突（刻意说明，不静默绕过）：
+ *   §2 写「**不用**玻璃拟态、重投影、渐变装饰」，但 tokens.css §3d 后来又
+ *   加入了完整的 Apple 材质层（`--ht-material-chrome-tint` / `--ht-blur-chrome` /
+ *   `--ht-material-edge-highlight` / `--ht-material-scrim`）。
+ *   也就是说**设计系统已经长过了那条规则，而 MASTER.md 没有跟着更新**。
+ *
+ *   本文件的取舍：**只使用 tokens.css 里已登记的材质 token**，不自己发明模糊值
+ *   或半透明色。凡是用了材质的地方都注明它来自哪一组 token。
+ *   产品界面（apps/web）仍然是扁平的 —— 材质只用在落地页的**悬浮导航**这一处，
+ *   因为那是 Apple《Materials》里唯一明确该用材质的场景（悬浮功能层，内容从下方滚过）。
+ */
+
+/* ── 页面基线 ───────────────────────────────────────────── */
+
+.lp {
+  position: relative;
+  min-block-size: 100dvh;
+  background: var(--ht-color-background);
+  color: var(--ht-color-foreground);
+  font-family: var(--ht-font-sans);
+  /* 3D 场景与倾斜卡片会溢出容器，横滚必须挡住 */
+  overflow-x: clip;
+}
+
+/* 跳到主内容：键盘用户第一个 Tab 就能跳过导航 */
+.lp-skip {
+  position: absolute;
+  inset-block-start: var(--ht-space-2);
+  inset-inline-start: var(--ht-space-2);
+  z-index: var(--ht-z-tooltip);
+  padding: var(--ht-space-2) var(--ht-space-4);
+  border-radius: var(--ht-radius-md);
+  background: var(--ht-color-primary);
+  color: var(--ht-color-on-primary);
+  font-size: var(--ht-font-size-sm);
+  transform: translateY(-200%);
+}
+
+.lp-skip:focus-visible {
+  transform: translateY(0);
+}
+
+/* 统一的内容栏。用**产品自己的**内容上限（1200px）而不是另开一个 ——
+   落地页与产品同宽，是刻意的：它让"这是同一个产品"这件事在版面上就成立。 */
+.lp-wrap {
+  inline-size: 100%;
+  max-inline-size: var(--ht-layout-content-max);
+  margin-inline: auto;
+  padding-inline: var(--ht-space-6);
+}
+
+/* ── 悬浮导航（材质层）────────────────────────────────────
+   依据 Apple《Materials》：导航是**悬浮的功能层**，内容从下方滚过，
+   而不是一条实心色带切走一块屏幕。
+   材质取值全部来自 tokens.css §3d，不在这里发明模糊值。 */
+
+.lp-nav {
+  position: fixed;
+  inset-block-start: var(--ht-space-4);
+  inset-inline: 0;
+  z-index: var(--ht-z-sticky);
+  display: flex;
+  justify-content: center;
+  padding-inline: var(--ht-space-4);
+}
+
+.lp-nav__bar {
+  display: flex;
+  align-items: center;
+  gap: var(--ht-space-6);
+  inline-size: 100%;
+  max-inline-size: var(--ht-layout-content-max);
+  /* 导航高度上限 80px 以内 */
+  block-size: var(--ht-layout-header-height);
+  padding-inline: var(--ht-space-4);
+  border-radius: var(--ht-radius-full);
+  border: var(--ht-border-width-thin) solid var(--ht-color-border);
+  background: var(--ht-material-chrome-tint);
+  backdrop-filter: blur(var(--ht-blur-chrome)) saturate(180%);
+  -webkit-backdrop-filter: blur(var(--ht-blur-chrome)) saturate(180%);
+  box-shadow: var(--ht-shadow-md);
+}
+
+/* 亮色顶边 = 光打在材料上。没有它，半透明面会显得像"没画完"。
+   暗色下这个 token 会自动变弱（tokens.css 里覆盖过）。 */
+.lp-nav__bar::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  border-block-start: var(--ht-border-width-thin) solid var(--ht-material-edge-highlight);
+  pointer-events: none;
+}
+
+.lp-brand {
+  display: flex;
+  align-items: center;
+  gap: var(--ht-space-2);
+  font-size: var(--ht-font-size-lg);
+  font-weight: var(--ht-font-weight-bold);
+  letter-spacing: var(--ht-tracking-title);
+  color: var(--ht-color-foreground);
+}
+
+.lp-brand:hover {
+  text-decoration: none;
+  color: var(--ht-color-foreground);
+}
+
+.lp-brand__dot {
+  inline-size: var(--ht-icon-sm);
+  block-size: var(--ht-icon-sm);
+  border-radius: var(--ht-radius-full);
+  background: var(--ht-color-primary);
+}
+
+.lp-nav__links {
+  display: flex;
+  align-items: center;
+  gap: var(--ht-space-1);
+  margin-inline-end: auto;
+}
+
+.lp-nav__link {
+  padding: var(--ht-space-2) var(--ht-space-3);
+  border-radius: var(--ht-radius-full);
+  font-size: var(--ht-font-size-sm);
+  font-weight: var(--ht-font-weight-medium);
+  color: var(--ht-color-foreground-muted);
+  transition: background-color var(--ht-duration-fast) var(--ht-ease-standard),
+    color var(--ht-duration-fast) var(--ht-ease-standard);
+}
+
+.lp-nav__link:hover {
+  background: var(--ht-color-hover);
+  color: var(--ht-color-foreground);
+  text-decoration: none;
+}
+
+.lp-nav__actions {
+  display: flex;
+  align-items: center;
+  gap: var(--ht-space-2);
+}
+
+/* ── 按钮 ───────────────────────────────────────────────── */
+
+.lp-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--ht-space-2);
+  min-block-size: var(--ht-touch-target-min);
+  padding-inline: var(--ht-space-5);
+  border-radius: var(--ht-radius-full);
+  font-size: var(--ht-font-size-sm);
+  font-weight: var(--ht-font-weight-medium);
+  /* 按下反馈在 pointer-down 上出现，100ms 是"看得见但感觉不到等待"
+     （Apple《Designing Fluid Interfaces》） */
+  transition: background-color var(--ht-duration-fast) var(--ht-ease-standard),
+    color var(--ht-duration-fast) var(--ht-ease-standard),
+    border-color var(--ht-duration-fast) var(--ht-ease-standard),
+    transform var(--ht-duration-press) var(--ht-ease-standard);
+  /* CTA 文案在桌面端必须一行放得下 */
+  white-space: nowrap;
+}
+
+.lp-btn:active {
+  transform: scale(var(--ht-motion-press-scale));
+}
+
+.lp-btn--primary {
+  background: var(--ht-color-primary);
+  color: var(--ht-color-on-primary);
+}
+
+.lp-btn--primary:hover {
+  background: var(--ht-color-primary-hover);
+  color: var(--ht-color-on-primary);
+  text-decoration: none;
+}
+
+.lp-btn--secondary {
+  background: transparent;
+  color: var(--ht-color-foreground);
+  border: var(--ht-border-width-thin) solid var(--ht-color-border-strong);
+}
+
+.lp-btn--secondary:hover {
+  background: var(--ht-color-hover);
+  color: var(--ht-color-foreground);
+  text-decoration: none;
+}
+
+.lp-btn--lg {
+  min-block-size: var(--ht-space-12);
+  padding-inline: var(--ht-space-8);
+  font-size: var(--ht-font-size-base);
+}
+
+.lp-iconbtn {
+  display: grid;
+  place-items: center;
+  inline-size: var(--ht-touch-target-min);
+  block-size: var(--ht-touch-target-min);
+  border-radius: var(--ht-radius-full);
+  color: var(--ht-color-foreground-muted);
+  transition: background-color var(--ht-duration-fast) var(--ht-ease-standard),
+    color var(--ht-duration-fast) var(--ht-ease-standard);
+}
+
+.lp-iconbtn:hover {
+  background: var(--ht-color-hover);
+  color: var(--ht-color-foreground);
+}
+
+/* ── 英雄区：非对称分栏 ───────────────────────────────────
+   taste skill：DESIGN_VARIANCE > 4 时避免居中英雄区。
+   左文右景的 5/7 分栏，右侧留给 3D 场景。 */
+
+.lp-hero {
+  display: grid;
+  grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
+  align-items: center;
+  gap: var(--ht-space-12);
+  inline-size: 100%;
+  max-inline-size: var(--ht-layout-content-max);
+  margin-inline: auto;
+  padding-inline: var(--ht-space-6);
+  /* 顶部：让开固定导航，但**不超过 pt-24 的精神**（内容不漂到视口中间） */
+  padding-block: calc(var(--ht-layout-header-height) + var(--ht-space-8)) var(--ht-space-12);
+  min-block-size: 100dvh;
+}
+
+.lp-hero__copy {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--ht-space-5);
+}
+
+/* 眉标（全页只出现 2 次，远低于 sectionCount/3 的上限） */
+.lp-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--ht-space-2);
+  padding: var(--ht-space-1) var(--ht-space-3);
+  border: var(--ht-border-width-thin) solid var(--ht-color-border);
+  border-radius: var(--ht-radius-full);
+  background: var(--ht-color-surface);
+  font-size: var(--ht-font-size-xs);
+  font-weight: var(--ht-font-weight-medium);
+  letter-spacing: var(--ht-tracking-caption);
+  color: var(--ht-color-foreground-muted);
+}
+
+.lp-h1 {
+  font-size: clamp(2rem, 4.4vw, 3.25rem);
+  font-weight: var(--ht-font-weight-bold);
+  line-height: 1.08;
+  /* 大字号收紧字距（Apple 规则：字距随字号变） */
+  letter-spacing: var(--ht-tracking-display);
+  text-wrap: balance;
+}
+
+.lp-h1 em {
+  font-style: italic;
+  color: var(--ht-color-primary);
+  /* 🔴 斜体带降部字母（y g j p q）时 leading-none 会切掉降部。
+     中文没有降部问题，但「你的」这类字在斜体下仍需要一点余量。 */
+  line-height: 1.1;
+  padding-block-end: 0.08em;
+}
+
+.lp-lede {
+  max-inline-size: 34ch;
+  font-size: var(--ht-font-size-lg);
+  line-height: var(--ht-line-height-relaxed);
+  color: var(--ht-color-foreground-muted);
+}
+
+.lp-hero__ctas {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--ht-space-3);
+}
+
+/* ── 英雄区的 3D 舞台 ───────────────────────────────────── */
+
+.lp-hero__stage {
+  position: relative;
+  /* 透视放在**父级**，子级才有 3D 纵深；放在自身只影响自己的旋转 */
+  perspective: 90rem;
+  perspective-origin: 60% 40%;
+}
+
+.lp-hero__glow {
+  position: absolute;
+  inset: -12% -8%;
+  z-index: var(--ht-z-base);
+  background: radial-gradient(
+    ellipse at 60% 35%,
+    color-mix(in oklab, var(--ht-color-primary) 22%, transparent),
+    transparent 62%
+  );
+  filter: blur(var(--ht-blur-sheet));
+  pointer-events: none;
+}
+
+.lp-hero__card {
+  position: relative;
+  z-index: var(--ht-z-base);
+  transform-style: preserve-3d;
+  will-change: transform;
+}
+
+/* 浮在应用窗口之上的一层"状态浮片" —— 3D 纵深靠它读出来 */
+.lp-float {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  gap: var(--ht-space-2);
+  padding: var(--ht-space-2) var(--ht-space-3);
+  border-radius: var(--ht-radius-lg);
+  border: var(--ht-border-width-thin) solid var(--ht-color-border);
+  background: var(--ht-color-surface-raised);
+  box-shadow: var(--ht-shadow-lg);
+  font-size: var(--ht-font-size-xs);
+  font-weight: var(--ht-font-weight-medium);
+  color: var(--ht-color-foreground);
+  white-space: nowrap;
+  /* 每片给一个自己的 Z 值，形成真正的纵深分层 */
+  transform: translateZ(var(--lp-float-z, 0));
+}
+
+.lp-float--sync {
+  inset-block-start: -8%;
+  inset-inline-end: -6%;
+}
+
+.lp-float--offline {
+  inset-block-end: 6%;
+  inset-inline-start: -10%;
+}
+
+.lp-float__icon--ok {
+  color: var(--ht-color-success-strong);
+}
+
+.lp-float__icon--info {
+  color: var(--ht-color-primary);
+}
+
+/* ── 事实条（"信任"区块，但用可核实的事实而不是假 logo）──────
+   taste skill 禁止在英雄区里塞信任条 —— 所以它是英雄区**下方**的独立区块。 */
+
+.lp-facts {
+  border-block: var(--ht-border-width-thin) solid var(--ht-color-border);
+  background: var(--ht-color-surface);
+}
+
+.lp-facts__grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--ht-space-6);
+  padding-block: var(--ht-space-8);
+}
+
+.lp-fact {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ht-space-2);
+}
+
+.lp-fact__value {
+  font-size: var(--ht-font-size-2xl);
+  font-weight: var(--ht-font-weight-bold);
+  letter-spacing: var(--ht-tracking-title);
+  font-variant-numeric: tabular-nums;
+}
+
+.lp-fact__label {
+  font-size: var(--ht-font-size-sm);
+  color: var(--ht-color-foreground-muted);
+  line-height: var(--ht-line-height-normal);
+}
+
+/* ── 响应式 ─────────────────────────────────────────────── */
+
+@media (max-width: 1024px) {
+  .lp-hero {
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--ht-space-10);
+    padding-block-start: calc(var(--ht-layout-header-height) + var(--ht-space-6));
+    min-block-size: auto;
+  }
+
+  .lp-nav__links {
+    display: none;
+  }
+
+  .lp-facts__grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 640px) {
+  .lp-wrap,
+  .lp-hero {
+    padding-inline: var(--ht-space-4);
+  }
+
+  .lp-lede {
+    font-size: var(--ht-font-size-base);
+  }
+}
+
+/* 减少透明度偏好：材质要变"霜"甚至实心，否则可读性会塌。
+   Apple《Materials》：这也是可访问性要求，不只是审美。 */
+@media (prefers-reduced-transparency: reduce) {
+  .lp-nav__bar {
+    background: var(--ht-color-surface);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+}
+
+/* ════════════════════════════════════════════════════════════
+   区块节奏与通用件
+   ════════════════════════════════════════════════════════════
+   竖向留白用 `calc(token * 倍数)` 而不是新加一个间距 token ——
+   落地页需要比产品界面更松的呼吸，但那是**同一个尺度的放大**，
+   不是一个新的设计尺度。加 token 的成本应该留给真正的语义。 */
+
+.lp-section {
+  padding-block: calc(var(--ht-space-16) * 1.75);
+}
+
+.lp-section__head {
+  max-inline-size: var(--ht-layout-prose-max);
+  margin-block-end: calc(var(--ht-space-12) * 1.15);
+}
+
+.lp-section__lede {
+  margin-block-start: var(--ht-space-4);
+  font-size: var(--ht-font-size-lg);
+  line-height: var(--ht-line-height-relaxed);
+  color: var(--ht-color-foreground-muted);
+}
+
+.lp-h2 {
+  font-size: clamp(var(--ht-font-size-2xl), 2.6vw, var(--ht-font-size-4xl));
+  font-weight: var(--ht-font-weight-bold);
+  line-height: var(--ht-line-height-tight);
+  letter-spacing: var(--ht-tracking-title);
+  text-wrap: balance;
+}
+
+.lp-link {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--ht-space-2);
+  font-size: var(--ht-font-size-sm);
+  font-weight: var(--ht-font-weight-medium);
+}
+
+.lp-note {
+  display: flex;
+  gap: var(--ht-space-3);
+  padding: var(--ht-space-4);
+  border: var(--ht-border-width-thin) solid var(--ht-color-border);
+  border-radius: var(--ht-radius-lg);
+  background: var(--ht-color-surface);
+  font-size: var(--ht-font-size-sm);
+  line-height: var(--ht-line-height-normal);
+  color: var(--ht-color-foreground-muted);
+}
+
+.lp-note code {
+  font-family: var(--ht-font-mono);
+  font-size: var(--ht-font-size-xs);
+  color: var(--ht-color-foreground);
+}
+
+/* 警告语气**不能只靠颜色**：图标 + 文案本身已经把严重性说清楚了 */
+.lp-note--warn {
+  border-color: var(--ht-color-warning);
+  color: var(--ht-color-warning-strong);
+}
+
+/* ════════════════════════════════════════════════════════════
+   能力：bento 网格
+   ════════════════════════════════════════════════════════════ */
+
+.lp-bento {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--ht-space-4);
+}
+
+.lp-bento__cell {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: var(--ht-space-6);
+  min-block-size: 10rem;
+  padding: var(--ht-space-6);
+  border: var(--ht-border-width-thin) solid var(--ht-color-border);
+  border-radius: var(--ht-radius-xl);
+  background: var(--ht-color-surface);
+}
+
+/* 底色要有差异，否则六格读起来是一块白板。
+   三格换底：四象限（主色浅底）、智能拆解与离线（下沉底）。 */
+.lp-bento__cell:nth-child(1) {
+  background: var(--ht-color-primary-subtle);
+  border-color: var(--ht-color-primary-subtle-hover);
+}
+
+.lp-bento__cell:nth-child(4),
+.lp-bento__cell:nth-child(6) {
+  background: var(--ht-color-surface-sunken);
+}
+
+.lp-bento__cell--tall {
+  grid-column: span 2;
+  grid-row: span 2;
+}
+
+.lp-bento__cell--wide,
+.lp-bento__cell--half {
+  grid-column: span 2;
+}
+
+.lp-bento__body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ht-space-2);
+}
+
+.lp-bento__title {
+  display: flex;
+  align-items: center;
+  gap: var(--ht-space-2);
+  font-size: var(--ht-font-size-lg);
+  font-weight: var(--ht-font-weight-semibold);
+}
+
+.lp-bento__icon {
+  display: grid;
+  place-items: center;
+  color: var(--ht-color-primary);
+}
+
+.lp-bento__text {
+  font-size: var(--ht-font-size-sm);
+  line-height: var(--ht-line-height-normal);
+  color: var(--ht-color-foreground-muted);
+}
+
+.lp-bento__visual {
+  display: flex;
+  align-items: center;
+}
+
+/* 迷你四象限 */
+.lp-mini-quad {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--ht-space-2);
+  inline-size: 100%;
+}
+
+.lp-mini-quad__cell {
+  display: flex;
+  align-items: center;
+  gap: var(--ht-space-2);
+  padding: var(--ht-space-2) var(--ht-space-3);
+  border: var(--ht-border-width-thin) solid var(--ht-color-border);
+  border-radius: var(--ht-radius-md);
+  background: var(--ht-color-surface);
+  font-size: var(--ht-font-size-xs);
+  font-weight: var(--ht-font-weight-medium);
+}
+
+/* 迷你热力图条 */
+.lp-mini-heat {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--ht-space-1);
+}
+
+/* 迷你进度环 */
+.lp-mini-ring {
+  flex: none;
+}
+
+/* ════════════════════════════════════════════════════════════
+   展厅：滚动固定 + 3D 换位
+   ════════════════════════════════════════════════════════════ */
+
+.lp-showcase {
+  position: relative;
+  /* 300vh 的滚动跨度换来三次换位 —— 平均每次一屏，
+     低于这个值会换得太快，像被"甩"过去而不是"移"过去。 */
+  min-block-size: 300vh;
+}
+
+.lp-showcase__inner {
+  position: sticky;
+  inset-block-start: 0;
+  display: grid;
+  align-items: center;
+  min-block-size: 100dvh;
+  padding-block: var(--ht-layout-header-height);
+}
+
+.lp-showcase__grid {
+  display: grid;
+  grid-template-columns: minmax(0, 4fr) minmax(0, 8fr);
+  gap: var(--ht-space-10);
+  align-items: center;
+}
+
+.lp-showcase__aside {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ht-space-4);
+}
+
+.lp-showcase__list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ht-space-2);
+  margin-block-start: var(--ht-space-4);
+}
+
+.lp-showcase__item {
+  display: flex;
+  gap: var(--ht-space-3);
+  padding: var(--ht-space-4);
+  border: var(--ht-border-width-thin) solid transparent;
+  border-radius: var(--ht-radius-lg);
+  opacity: 0.45;
+  transition: opacity var(--ht-duration-normal) var(--ht-ease-standard),
+    background-color var(--ht-duration-normal) var(--ht-ease-standard),
+    border-color var(--ht-duration-normal) var(--ht-ease-standard);
+}
+
+.lp-showcase__item--active {
+  opacity: 1;
+  background: var(--ht-color-surface);
+  border-color: var(--ht-color-border);
+}
+
+.lp-showcase__index {
+  display: grid;
+  place-items: center;
+  inline-size: var(--ht-icon-lg);
+  block-size: var(--ht-icon-lg);
+  flex: none;
+  border-radius: var(--ht-radius-full);
+  background: var(--ht-color-surface-sunken);
+  font-size: var(--ht-font-size-2xs);
+  font-weight: var(--ht-font-weight-semibold);
+  font-variant-numeric: tabular-nums;
+  color: var(--ht-color-foreground-muted);
+}
+
+.lp-showcase__item--active .lp-showcase__index {
+  background: var(--ht-color-primary);
+  color: var(--ht-color-on-primary);
+}
+
+.lp-showcase__item-label {
+  display: block;
+  font-size: var(--ht-font-size-base);
+  font-weight: var(--ht-font-weight-semibold);
+}
+
+.lp-showcase__item-body {
+  display: block;
+  margin-block-start: var(--ht-space-1);
+  font-size: var(--ht-font-size-sm);
+  line-height: var(--ht-line-height-normal);
+  color: var(--ht-color-foreground-muted);
+}
+
+.lp-showcase__hint {
+  font-size: var(--ht-font-size-xs);
+  color: var(--ht-color-foreground-subtle);
+}
+
+.lp-showcase__stage {
+  position: relative;
+  aspect-ratio: 16 / 10;
+  perspective: 90rem;
+  transform-style: preserve-3d;
+}
+
+.lp-showcase__win {
+  position: absolute;
+  inset: 0;
+  will-change: transform, opacity;
+}
+
+/* ════════════════════════════════════════════════════════════
+   同步：全宽 WebGL 场景
+   ════════════════════════════════════════════════════════════ */
+
+.lp-sync {
+  padding-block-start: calc(var(--ht-space-16) * 1.75);
+}
+
+.lp-sync__head {
+  max-inline-size: var(--ht-layout-prose-max);
+  margin-block-end: var(--ht-space-12);
+}
+
+.lp-sync__holder {
+  position: relative;
+  inline-size: 100%;
+  /* 用 vh 而不是固定高度：3D 场景的观感与视口高度强相关，
+     固定高度在矮屏上会把场景压扁。 */
+  block-size: 68vh;
+  min-block-size: 24rem;
+  max-block-size: 44rem;
+}
+
+.lp-sync__canvas {
+  inline-size: 100%;
+  block-size: 100%;
+  display: block;
+}
+
+.lp-sync__legend {
+  position: absolute;
+  inset-block-end: var(--ht-space-6);
+  inset-inline-start: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: var(--ht-space-5);
+  padding: var(--ht-space-2) var(--ht-space-4);
+  border-radius: var(--ht-radius-full);
+  border: var(--ht-border-width-thin) solid var(--ht-color-border);
+  background: var(--ht-material-chrome-tint);
+  backdrop-filter: blur(var(--ht-blur-chrome));
+  -webkit-backdrop-filter: blur(var(--ht-blur-chrome));
+  font-size: var(--ht-font-size-xs);
+  color: var(--ht-color-foreground-muted);
+  white-space: nowrap;
+}
+
+.lp-sync__legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--ht-space-2);
+}
+
+.lp-sync__dot {
+  inline-size: var(--ht-space-2);
+  block-size: var(--ht-space-2);
+  border-radius: var(--ht-radius-full);
+  background: var(--ht-color-primary);
+}
+
+.lp-sync__dot--plain {
+  background: var(--ht-color-foreground);
+}
+
+/* ════════════════════════════════════════════════════════════
+   隐私：逐字加密
+   ════════════════════════════════════════════════════════════ */
+
+.lp-privacy__panels {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--ht-space-4);
+}
+
+.lp-privacy__panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ht-space-4);
+  padding: var(--ht-space-8) var(--ht-space-6);
+  border: var(--ht-border-width-thin) solid var(--ht-color-border);
+  border-radius: var(--ht-radius-xl);
+  background: var(--ht-color-surface);
+}
+
+.lp-privacy__panel--server {
+  background: var(--ht-color-surface-sunken);
+}
+
+.lp-privacy__panel-head {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--ht-space-2);
+  font-size: var(--ht-font-size-xs);
+  font-weight: var(--ht-font-weight-semibold);
+  letter-spacing: var(--ht-tracking-caption);
+  text-transform: uppercase;
+  color: var(--ht-color-foreground-subtle);
+}
+
+.lp-privacy__text {
+  font-size: var(--ht-font-size-2xl);
+  font-weight: var(--ht-font-weight-semibold);
+  letter-spacing: var(--ht-tracking-title);
+  line-height: var(--ht-line-height-tight);
+  /* 等宽：逐字替换时每个字符宽度不变，整行不会横向抖动 */
+  font-variant-numeric: tabular-nums;
+}
+
+.lp-privacy__char {
+  transition: color var(--ht-duration-normal) var(--ht-ease-standard);
+}
+
+/* 已加密的字：换成等宽 + 主色，与明文形成"这是另一种东西"的对比 */
+.lp-privacy__char--locked {
+  font-family: var(--ht-font-mono);
+  color: var(--ht-color-primary);
+}
+
+.lp-privacy__note {
+  margin-block-start: auto;
+  font-size: var(--ht-font-size-xs);
+  font-variant-numeric: tabular-nums;
+  color: var(--ht-color-foreground-subtle);
+}
+
+/* ════════════════════════════════════════════════════════════
+   自建：终端 + 步骤
+   ════════════════════════════════════════════════════════════ */
+
+.lp-selfhost__grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: var(--ht-space-10);
+  align-items: start;
+}
+
+.lp-term {
+  border: var(--ht-border-width-thin) solid var(--ht-color-border);
+  border-radius: var(--ht-radius-xl);
+  overflow: hidden;
+  background: var(--ht-color-surface-sunken);
+}
+
+.lp-term__bar {
+  display: flex;
+  align-items: center;
+  gap: var(--ht-space-2);
+  padding: var(--ht-space-3) var(--ht-space-4);
+  border-block-end: var(--ht-border-width-thin) solid var(--ht-color-border);
+  background: var(--ht-color-surface);
+}
+
+.lp-term__dot {
+  inline-size: var(--ht-space-2);
+  block-size: var(--ht-space-2);
+  border-radius: var(--ht-radius-full);
+  background: var(--ht-color-border-strong);
+}
+
+.lp-term__title {
+  margin-inline-start: var(--ht-space-2);
+  font-size: var(--ht-font-size-xs);
+  color: var(--ht-color-foreground-subtle);
+}
+
+.lp-term__body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ht-space-3);
+  padding: var(--ht-space-5);
+  font-family: var(--ht-font-mono);
+  font-size: var(--ht-font-size-xs);
+  line-height: var(--ht-line-height-normal);
+}
+
+.lp-term__line {
+  display: flex;
+  gap: var(--ht-space-2);
+  /* 终端是 LTR 内容，即使用户界面是中文 */
+  direction: ltr;
+  text-align: left;
+}
+
+.lp-term__line code {
+  font-family: var(--ht-font-mono);
+  word-break: break-all;
+}
+
+.lp-term__prompt {
+  color: var(--ht-color-primary);
+  flex: none;
+}
+
+.lp-term__caret {
+  inline-size: var(--ht-space-2);
+  block-size: var(--ht-font-size-sm);
+  background: var(--ht-color-primary);
+}
+
+.lp-selfhost__steps {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ht-space-4);
+}
+
+.lp-steps {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ht-space-4);
+}
+
+.lp-step {
+  display: grid;
+  grid-template-columns: auto auto 1fr;
+  gap: var(--ht-space-3);
+  align-items: start;
+  padding-block-end: var(--ht-space-4);
+  border-block-end: var(--ht-border-width-thin) solid var(--ht-color-border-subtle);
+}
+
+.lp-step__icon {
+  display: grid;
+  place-items: center;
+  inline-size: var(--ht-icon-xl);
+  block-size: var(--ht-icon-xl);
+  border-radius: var(--ht-radius-md);
+  background: var(--ht-color-primary-subtle);
+  color: var(--ht-color-primary);
+}
+
+.lp-step__index {
+  font-family: var(--ht-font-mono);
+  font-size: var(--ht-font-size-xs);
+  font-variant-numeric: tabular-nums;
+  color: var(--ht-color-foreground-subtle);
+}
+
+.lp-step__title {
+  font-size: var(--ht-font-size-base);
+  font-weight: var(--ht-font-weight-semibold);
+}
+
+.lp-step__body {
+  margin-block-start: var(--ht-space-1);
+  font-size: var(--ht-font-size-sm);
+  line-height: var(--ht-line-height-normal);
+  color: var(--ht-color-foreground-muted);
+}
+
+/* ════════════════════════════════════════════════════════════
+   收尾 CTA
+   ════════════════════════════════════════════════════════════ */
+
+.lp-cta {
+  border-block-start: var(--ht-border-width-thin) solid var(--ht-color-border);
+  background: var(--ht-color-surface);
+}
+
+.lp-cta__inner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--ht-space-5);
+  text-align: center;
+}
+
+.lp-cta__title {
+  max-inline-size: 24ch;
+}
+
+.lp-cta__lede {
+  max-inline-size: var(--ht-layout-prose-max);
+  font-size: var(--ht-font-size-lg);
+  line-height: var(--ht-line-height-relaxed);
+  color: var(--ht-color-foreground-muted);
+}
+
+.lp-cta__actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--ht-space-3);
+  margin-block-start: var(--ht-space-2);
+}
+
+/* ════════════════════════════════════════════════════════════
+   页脚
+   ════════════════════════════════════════════════════════════ */
+
+.lp-footer {
+  padding-block: calc(var(--ht-space-16) * 1.2) var(--ht-space-8);
+  border-block-start: var(--ht-border-width-thin) solid var(--ht-color-border);
+  background: var(--ht-color-background);
+}
+
+.lp-footer__grid {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) repeat(3, minmax(0, 1fr));
+  gap: var(--ht-space-10);
+}
+
+.lp-footer__brand {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--ht-space-4);
+}
+
+.lp-footer__tagline {
+  max-inline-size: 30ch;
+  font-size: var(--ht-font-size-sm);
+  line-height: var(--ht-line-height-normal);
+  color: var(--ht-color-foreground-muted);
+}
+
+.lp-footer__group-title {
+  margin-block-end: var(--ht-space-3);
+  font-size: var(--ht-font-size-xs);
+  font-weight: var(--ht-font-weight-semibold);
+  letter-spacing: var(--ht-tracking-caption);
+  text-transform: uppercase;
+  color: var(--ht-color-foreground-subtle);
+}
+
+.lp-footer__links {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ht-space-2);
+}
+
+.lp-footer__link {
+  font-size: var(--ht-font-size-sm);
+  color: var(--ht-color-foreground-muted);
+}
+
+.lp-footer__link:hover {
+  color: var(--ht-color-foreground);
+}
+
+.lp-footer__bottom {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: var(--ht-space-3);
+  margin-block-start: calc(var(--ht-space-12) * 1.2);
+  padding-block-start: var(--ht-space-6);
+  border-block-start: var(--ht-border-width-thin) solid var(--ht-color-border-subtle);
+  font-size: var(--ht-font-size-xs);
+  color: var(--ht-color-foreground-subtle);
+}
+
+/* ════════════════════════════════════════════════════════════
+   响应式
+   ════════════════════════════════════════════════════════════ */
+
+@media (max-width: 1024px) {
+  .lp-bento {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .lp-bento__cell--tall {
+    grid-column: span 2;
+    grid-row: span 1;
+  }
+
+  .lp-showcase {
+    min-block-size: auto;
+  }
+
+  .lp-showcase__inner {
+    position: static;
+    min-block-size: auto;
+    padding-block: calc(var(--ht-space-16) * 1.75);
+  }
+
+  .lp-showcase__grid,
+  .lp-selfhost__grid,
+  .lp-footer__grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .lp-showcase__stage {
+    aspect-ratio: 16 / 10;
+  }
+
+  .lp-privacy__panels {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 640px) {
+  .lp-section,
+  .lp-sync,
+  .lp-footer {
+    padding-block-start: calc(var(--ht-space-16) * 1.1);
+  }
+
+  .lp-bento {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .lp-bento__cell--tall,
+  .lp-bento__cell--wide,
+  .lp-bento__cell--half {
+    grid-column: span 1;
+  }
+
+  .lp-sync__holder {
+    block-size: 50vh;
+  }
+}
+
+/* 减少动效：展厅的 3D 换位在窄屏/减动效下退化成"一次显示一块"。
+   这里只处理 CSS 侧；Motion 驱动的部分由 useMotionPreset 负责。 */
+@media (prefers-reduced-motion: reduce) {
+  .lp-showcase {
+    min-block-size: auto;
+  }
+
+  .lp-showcase__inner {
+    position: static;
+    min-block-size: auto;
+    padding-block: calc(var(--ht-space-16) * 1.75);
+  }
+}

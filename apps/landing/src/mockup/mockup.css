@@ -1,0 +1,639 @@
+/**
+ * 真实界面的复现样式（Reproduction）
+ * ====================================
+ *
+ * ⚠️ **这是一个复现，不是应用本身。**
+ *
+ * 真实组件在 `apps/web/src/`（`App.tsx` + `features/*` + `styles/app.css`）。
+ * 落地页不能直接 import 它们：那是另一个 app 的内部文件，没有 `exports`，
+ * 而且一 import 就会把整套 store / IndexedDB / 同步客户端拖进落地页的产物里。
+ *
+ * 所以这里的做法是：**照抄布局结构与取值，但不照抄文件** ——
+ *   - 取值全部走同一套 `--ht-*` token（所以换主题时两边一起变，不会漂移）
+ *   - 类名统一加 `mk-` 前缀（`mk-` = mockup），与应用自己的 `ht-` 区分开，
+ *     避免"看起来是同一套样式"的错觉
+ *   - 文案取自应用的真实字符串（`收集箱` / `马上做` / `拖任务到这里` …）
+ *
+ * 🔴 **已知的漂移风险**：应用改了布局而这里没改，落地页就会展示一个
+ * 已经不存在的界面。没有门禁能自动发现这件事 —— 它需要一个"渲染真实应用
+ * 并与复现对比"的视觉回归测试，目前**没做**。不要假装它是自动同步的。
+ *
+ * 尺寸策略：stage 固定为 80rem × 50rem（= 应用在 1280×800 下的真实布局），
+ * 再由 `AppWindow` 用 ResizeObserver 算出一个 `--mk-scale` 等比缩放塞进外框。
+ * 这样做而不是"重新做一套响应式"，是为了让**比例与应用逐像素一致**。
+ */
+
+/* ── 外框：等比缩放的容器 ───────────────────────────────── */
+
+.mk-frame {
+  position: relative;
+  overflow: hidden;
+  border-radius: var(--ht-radius-xl);
+  border: var(--ht-border-width-thin) solid var(--ht-color-border);
+  background: var(--ht-color-surface);
+  aspect-ratio: 16 / 10;
+  /* 复现出来的界面**不可交互**：它是展示品，不是可用的应用。
+     用 pointer-events: none 免得用户以为能点，点不动又以为坏了。 */
+  pointer-events: none;
+  user-select: none;
+}
+
+.mk-stage {
+  position: absolute;
+  inset-block-start: 0;
+  inset-inline-start: 0;
+  inline-size: 80rem;
+  block-size: 50rem;
+  transform: scale(var(--mk-scale, 1));
+  transform-origin: top left;
+}
+
+/* ── 应用外壳（复现 `apps/web/src/styles/app.css` 的 .ht-app）── */
+
+.mk-app {
+  display: grid;
+  grid-template-columns: var(--ht-layout-sidebar-width) 1fr;
+  block-size: 100%;
+  background: var(--ht-color-background);
+  color: var(--ht-color-foreground);
+  font-family: var(--ht-font-sans);
+  font-size: var(--ht-font-size-base);
+  line-height: var(--ht-line-height-normal);
+}
+
+/* ── 侧栏 ───────────────────────────────────────────────── */
+
+.mk-sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ht-space-2);
+  padding: var(--ht-space-4);
+  background: var(--ht-color-surface);
+  /* 扁平风格用边框表达层次，不用阴影 */
+  border-inline-end: var(--ht-border-width-thin) solid var(--ht-color-border);
+}
+
+.mk-brand {
+  display: flex;
+  align-items: center;
+  gap: var(--ht-space-2);
+  padding: var(--ht-space-2);
+  margin-block-end: var(--ht-space-4);
+  font-size: var(--ht-font-size-lg);
+  font-weight: var(--ht-font-weight-bold);
+}
+
+.mk-brand__dot {
+  inline-size: var(--ht-icon-sm);
+  block-size: var(--ht-icon-sm);
+  border-radius: var(--ht-radius-full);
+  background: var(--ht-color-primary);
+}
+
+.mk-nav {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ht-space-1);
+}
+
+.mk-nav__section {
+  padding: var(--ht-space-3) var(--ht-space-2) var(--ht-space-1);
+  font-size: var(--ht-font-size-2xs);
+  font-weight: var(--ht-font-weight-semibold);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ht-color-foreground-subtle);
+}
+
+.mk-nav__item {
+  display: flex;
+  align-items: center;
+  gap: var(--ht-space-3);
+  min-block-size: var(--ht-touch-target-min);
+  padding: 0 var(--ht-space-3);
+  border-radius: var(--ht-radius-md);
+  font-size: var(--ht-font-size-sm);
+  font-weight: var(--ht-font-weight-medium);
+  color: var(--ht-color-foreground-muted);
+  text-align: start;
+}
+
+.mk-nav__item--active {
+  background: var(--ht-color-primary-subtle);
+  color: var(--ht-color-primary);
+}
+
+.mk-swatch {
+  inline-size: var(--ht-space-2);
+  block-size: var(--ht-space-2);
+  border-radius: var(--ht-radius-full);
+  flex: none;
+}
+
+.mk-swatch--q1 {
+  background: var(--ht-color-quadrant-1);
+}
+.mk-swatch--q2 {
+  background: var(--ht-color-quadrant-2);
+}
+.mk-swatch--q3 {
+  background: var(--ht-color-quadrant-3);
+}
+.mk-swatch--q4 {
+  background: var(--ht-color-quadrant-4);
+}
+
+.mk-nav__count {
+  margin-inline-start: auto;
+  font-size: var(--ht-font-size-xs);
+  font-variant-numeric: tabular-nums;
+  color: var(--ht-color-foreground-subtle);
+}
+
+/* ── 主区 ───────────────────────────────────────────────── */
+
+.mk-main {
+  display: flex;
+  flex-direction: column;
+  min-inline-size: 0;
+}
+
+.mk-header {
+  display: flex;
+  align-items: center;
+  gap: var(--ht-space-3);
+  block-size: var(--ht-layout-header-height);
+  padding: 0 var(--ht-space-6);
+  border-block-end: var(--ht-border-width-thin) solid var(--ht-color-border);
+  background: var(--ht-color-surface);
+}
+
+.mk-header__title {
+  font-size: var(--ht-font-size-xl);
+  font-weight: var(--ht-font-weight-semibold);
+  letter-spacing: var(--ht-tracking-title);
+}
+
+.mk-viewtabs {
+  display: flex;
+  gap: var(--ht-space-1);
+  padding: var(--ht-space-1);
+  border-radius: var(--ht-radius-md);
+  background: var(--ht-color-surface-sunken);
+  margin-inline-end: auto;
+}
+
+.mk-viewtab {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--ht-space-1);
+  min-block-size: var(--ht-touch-target-min);
+  padding: 0 var(--ht-space-3);
+  border: var(--ht-border-width-thin) solid transparent;
+  border-radius: var(--ht-radius-sm);
+  color: var(--ht-color-foreground-muted);
+  font-size: var(--ht-font-size-xs);
+  font-weight: var(--ht-font-weight-medium);
+}
+
+.mk-viewtab--active {
+  background: var(--ht-color-surface);
+  color: var(--ht-color-primary);
+  border-color: var(--ht-color-border);
+}
+
+.mk-header__actions {
+  margin-inline-start: auto;
+  display: flex;
+  align-items: center;
+  gap: var(--ht-space-2);
+}
+
+/* 同步状态。复现 SyncBar：状态用**图标 + 文字**，不只靠颜色。 */
+.mk-sync {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--ht-space-1);
+  padding: 0 var(--ht-space-2);
+  min-block-size: var(--ht-size-chip-height);
+  border: var(--ht-border-width-thin) solid var(--ht-color-border);
+  border-radius: var(--ht-radius-full);
+  font-size: var(--ht-font-size-2xs);
+  font-variant-numeric: tabular-nums;
+  color: var(--ht-color-foreground-muted);
+}
+
+.mk-sync--ok {
+  color: var(--ht-color-success-strong);
+  border-color: var(--ht-color-success);
+}
+
+.mk-iconbtn {
+  display: grid;
+  place-items: center;
+  inline-size: var(--ht-touch-target-min);
+  block-size: var(--ht-touch-target-min);
+  border-radius: var(--ht-radius-md);
+  color: var(--ht-color-foreground-muted);
+}
+
+.mk-content {
+  flex: 1;
+  padding: var(--ht-space-6);
+  max-inline-size: var(--ht-layout-content-max);
+  inline-size: 100%;
+  margin-inline: auto;
+  min-block-size: 0;
+  overflow: hidden;
+}
+
+/* ── 输入行 ─────────────────────────────────────────────── */
+
+.mk-compose {
+  display: flex;
+  gap: var(--ht-space-2);
+  margin-block-end: var(--ht-space-4);
+}
+
+.mk-input {
+  flex: 1;
+  min-block-size: var(--ht-touch-target-min);
+  padding: 0 var(--ht-space-4);
+  background: var(--ht-color-surface);
+  border: var(--ht-border-width-thin) solid var(--ht-color-border);
+  border-radius: var(--ht-radius-md);
+  font-size: var(--ht-font-size-sm);
+  color: var(--ht-color-foreground-subtle);
+  display: flex;
+  align-items: center;
+}
+
+.mk-btn-primary {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--ht-space-2);
+  min-block-size: var(--ht-touch-target-min);
+  padding: 0 var(--ht-space-4);
+  border-radius: var(--ht-radius-md);
+  background: var(--ht-color-primary);
+  color: var(--ht-color-on-primary);
+  font-size: var(--ht-font-size-sm);
+  font-weight: var(--ht-font-weight-medium);
+}
+
+/* ── 任务列表 ───────────────────────────────────────────── */
+
+.mk-tasklist {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ht-space-2);
+}
+
+.mk-task {
+  display: flex;
+  align-items: center;
+  gap: var(--ht-space-3);
+  padding: var(--ht-space-3) var(--ht-space-4);
+  background: var(--ht-color-surface);
+  border: var(--ht-border-width-thin) solid var(--ht-color-border);
+  border-radius: var(--ht-radius-lg);
+}
+
+.mk-task__check {
+  inline-size: var(--ht-icon-md);
+  block-size: var(--ht-icon-md);
+  flex: none;
+  border: var(--ht-border-width-thick) solid var(--ht-color-border-strong);
+  border-radius: var(--ht-radius-full);
+  display: grid;
+  place-items: center;
+  color: transparent;
+}
+
+.mk-task--done .mk-task__check {
+  background: var(--ht-color-primary);
+  border-color: var(--ht-color-primary);
+  color: var(--ht-color-on-primary);
+}
+
+.mk-task__title {
+  flex: 1;
+  font-size: var(--ht-font-size-sm);
+  min-inline-size: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 完成态用**删除线 + 弱化色**双重表达，不只靠颜色（色盲可辨） */
+.mk-task--done .mk-task__title {
+  text-decoration: line-through;
+  color: var(--ht-color-foreground-subtle);
+}
+
+.mk-task__meta {
+  display: flex;
+  align-items: center;
+  gap: var(--ht-space-2);
+  font-size: var(--ht-font-size-xs);
+  color: var(--ht-color-foreground-subtle);
+  font-variant-numeric: tabular-nums;
+}
+
+.mk-due {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--ht-space-1);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* 紧迫度**不能只用颜色表达**：语义由文字承载，颜色只是冗余通道。 */
+.mk-due--overdue {
+  color: var(--ht-color-danger);
+  font-weight: var(--ht-font-weight-medium);
+}
+
+.mk-due--today {
+  color: var(--ht-color-warning-strong);
+  font-weight: var(--ht-font-weight-medium);
+}
+
+.mk-prio {
+  padding: 0 var(--ht-space-1);
+  border: var(--ht-border-width-thin) solid var(--ht-color-border);
+  border-radius: var(--ht-radius-sm);
+  font-size: var(--ht-font-size-2xs);
+}
+
+/* ── 四象限 ─────────────────────────────────────────────── */
+
+.mk-quadrant {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--ht-space-3);
+}
+
+.mk-quad {
+  display: flex;
+  flex-direction: column;
+  min-block-size: var(--ht-layout-quadrant-min-height);
+  padding: var(--ht-space-3);
+  border-radius: var(--ht-radius-lg);
+  background: var(--ht-color-surface);
+  border: var(--ht-border-width-thick) solid var(--ht-color-border);
+}
+
+.mk-quad__head {
+  display: flex;
+  align-items: center;
+  gap: var(--ht-space-2);
+  font-weight: var(--ht-font-weight-semibold);
+  font-size: var(--ht-font-size-sm);
+}
+
+.mk-quad__hint {
+  margin-block-start: var(--ht-space-1);
+  font-size: var(--ht-font-size-2xs);
+  color: var(--ht-color-foreground-muted);
+}
+
+.mk-quad__list {
+  margin-block-start: var(--ht-space-2);
+  display: flex;
+  flex-direction: column;
+  gap: var(--ht-space-2);
+}
+
+.mk-quad__card {
+  padding: var(--ht-space-2);
+  background: var(--ht-color-surface);
+  border: var(--ht-border-width-thin) solid var(--ht-color-border);
+  border-radius: var(--ht-radius-md);
+  font-size: var(--ht-font-size-sm);
+}
+
+.mk-quad__empty {
+  display: flex;
+  align-items: center;
+  gap: var(--ht-space-2);
+  font-size: var(--ht-font-size-2xs);
+  color: var(--ht-color-foreground-muted);
+}
+
+/* ── 习惯热力图 ─────────────────────────────────────────── */
+
+.mk-habits {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ht-space-4);
+}
+
+.mk-habit {
+  padding: var(--ht-space-4);
+  background: var(--ht-color-surface);
+  border: var(--ht-border-width-thin) solid var(--ht-color-border);
+  border-radius: var(--ht-radius-lg);
+}
+
+.mk-habit__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--ht-space-2);
+  margin-block-end: var(--ht-space-3);
+}
+
+.mk-habit__name {
+  font-size: var(--ht-font-size-sm);
+  font-weight: var(--ht-font-weight-semibold);
+}
+
+.mk-habit__streak {
+  font-size: var(--ht-font-size-xs);
+  color: var(--ht-color-foreground-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+/* 热力图：深浅即数值，**不靠色相区分** —— 蓝色单色阶 */
+.mk-heat {
+  display: grid;
+  grid-auto-flow: column;
+  grid-template-rows: repeat(7, 1fr);
+  gap: var(--ht-space-1);
+}
+
+.mk-heat__cell {
+  inline-size: var(--ht-space-3);
+  block-size: var(--ht-space-3);
+  border-radius: var(--ht-radius-sm);
+  background: var(--ht-color-heat-0);
+}
+
+.mk-heat__cell--1 {
+  background: var(--ht-color-heat-1);
+}
+.mk-heat__cell--2 {
+  background: var(--ht-color-heat-2);
+}
+.mk-heat__cell--3 {
+  background: var(--ht-color-heat-3);
+}
+.mk-heat__cell--4 {
+  background: var(--ht-color-heat-4);
+}
+
+.mk-heat__legend {
+  display: flex;
+  align-items: center;
+  gap: var(--ht-space-2);
+  margin-block-start: var(--ht-space-2);
+  font-size: var(--ht-font-size-2xs);
+  color: var(--ht-color-foreground-subtle);
+}
+
+/* ── 番茄钟 ─────────────────────────────────────────────── */
+
+.mk-focus {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--ht-space-4);
+  padding-block-start: var(--ht-space-6);
+}
+
+.mk-focus__ring {
+  position: relative;
+  display: grid;
+  place-items: center;
+}
+
+.mk-focus__readout {
+  position: absolute;
+  text-align: center;
+}
+
+.mk-focus__time {
+  font-size: var(--ht-font-size-3xl);
+  font-weight: var(--ht-font-weight-bold);
+  /* tabular-nums：否则秒数跳动时整个计时器左右晃 */
+  font-variant-numeric: tabular-nums;
+  line-height: var(--ht-line-height-tight);
+  letter-spacing: var(--ht-tracking-display);
+}
+
+.mk-focus__phase {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--ht-space-1);
+  font-size: var(--ht-font-size-2xs);
+  color: var(--ht-color-foreground-muted);
+}
+
+.mk-focus__actions {
+  display: flex;
+  gap: var(--ht-space-2);
+}
+
+.mk-focus__stat {
+  font-size: var(--ht-font-size-2xs);
+  color: var(--ht-color-foreground-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── 清单面板 ───────────────────────────────────────────── */
+
+.mk-projects {
+  margin-block-start: var(--ht-space-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--ht-space-1);
+}
+
+.mk-project {
+  display: flex;
+  align-items: center;
+  gap: var(--ht-space-3);
+  min-block-size: var(--ht-touch-target-min);
+  padding: 0 var(--ht-space-3);
+  border-radius: var(--ht-radius-md);
+  font-size: var(--ht-font-size-sm);
+  color: var(--ht-color-foreground-muted);
+}
+
+/* ── 移动端复现（窄屏时用）───────────────────────────────── */
+
+.mk-mobile {
+  display: flex;
+  flex-direction: column;
+  block-size: 100%;
+  background: var(--ht-color-background);
+  color: var(--ht-color-foreground);
+  font-family: var(--ht-font-sans);
+}
+
+.mk-mobile__bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  block-size: var(--ht-nav-app-bar-height);
+  padding: 0 var(--ht-screen-gutter);
+  border-block-end: var(--ht-border-width-thin) solid var(--ht-color-border);
+  background: var(--ht-material-chrome-tint);
+  backdrop-filter: blur(var(--ht-blur-chrome));
+  font-size: var(--ht-nav-app-bar-title-size);
+  font-weight: var(--ht-font-weight-semibold);
+}
+
+.mk-mobile__body {
+  flex: 1;
+  padding: var(--ht-screen-gutter);
+  display: flex;
+  flex-direction: column;
+  gap: var(--ht-screen-section-gap);
+  min-block-size: 0;
+  overflow: hidden;
+}
+
+.mk-mobile__tabs {
+  display: flex;
+  justify-content: space-around;
+  align-items: center;
+  block-size: var(--ht-nav-tab-bar-height);
+  border-block-start: var(--ht-border-width-thin) solid var(--ht-color-border);
+  background: var(--ht-material-chrome-tint);
+  backdrop-filter: blur(var(--ht-blur-chrome));
+}
+
+.mk-mobile__tab {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--ht-space-1);
+  min-inline-size: var(--ht-nav-tab-item-min-width);
+  font-size: var(--ht-nav-tab-label-size);
+  font-weight: var(--ht-font-weight-medium);
+  color: var(--ht-color-foreground-subtle);
+}
+
+.mk-mobile__tab--active {
+  color: var(--ht-color-primary);
+}
+
+.mk-mobile__fab {
+  position: absolute;
+  inset-inline-end: var(--ht-screen-gutter);
+  inset-block-end: var(--ht-screen-bottom-inset);
+  display: grid;
+  place-items: center;
+  inline-size: var(--ht-size-fab);
+  block-size: var(--ht-size-fab);
+  border-radius: var(--ht-radius-full);
+  background: var(--ht-color-primary);
+  color: var(--ht-color-on-primary);
+}
+
+.mk-mobile__stage {
+  position: relative;
+  block-size: 100%;
+}

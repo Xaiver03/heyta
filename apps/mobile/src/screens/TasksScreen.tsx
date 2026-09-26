@@ -48,6 +48,7 @@ import {
 } from '../ui/kit';
 import { Icon, type IconName } from '../ui/icons';
 import { openTaskHost } from '../db/open-host';
+import { useMobileSync } from '../sync/store';
 
 import { dueTone, toDueDisplay, type DueDisplayMode } from '../lib/due-display';
 import { priorityBadgeLabel, priorityColorToken } from '../lib/priority';
@@ -333,6 +334,8 @@ export function TasksScreen({
   // 应用挂后台一夜、或就一直开着到第二天，界面上的"今天"还是昨天，
   // 于是昨晚到期的任务仍然显示"今天到期"。详见 `lib/use-today.ts` 的文件头。
   const { now } = useToday();
+  // 同步完成 → `dataRevision` 变 → 下面的 effect 重读物化状态。
+  const { dataRevision } = useMobileSync();
 
   useEffect(() => {
     let alive = true;
@@ -364,7 +367,14 @@ export function TasksScreen({
     // 🔴 必须等 `recover()` 走完再读 —— openTaskHost 已经保证了这一点，
     // 这里拿到 host 就意味着日志已重放完毕（AGENTS.md §7 第 9 条）。
     refresh();
-  }, [host, refresh]);
+    // 🔴 `dataRevision` 是**同步完成**的信号（见 `sync/store.ts` 的字段说明）。
+    //
+    // 少了它，这个 effect 的依赖 `[host, refresh]` 在整个应用生命周期里都不会变 ——
+    // 屏幕一直挂着，于是**同步完成后它不会重读**。实测到的现象：
+    // 冷启动落在本屏（空的）→ 去「我的」同步 → 切回本屏 → 仍显示"还没有任务"，
+    // 而数据库里那条远端任务**已经应用了**（重启 App 就能看见）。
+    // 用户据此会认为"多端同步没成功"，而真相是数据到了、界面没去看。
+  }, [host, refresh, dataRevision]);
 
   const groups = useMemo(() => {
     const today = startOfDay(now);
