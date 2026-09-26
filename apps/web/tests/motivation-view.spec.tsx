@@ -25,6 +25,12 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 (globalThis as unknown as { IDBKeyRange: typeof IDBKeyRange }).IDBKeyRange = IDBKeyRange;
 
 const { App } = await import('../src/App.js');
+// 🔴 必须用**线上同一个** `LocaleHost`（`main.tsx` 也用它）包住 `<App />`，
+// 而不是直接挂 `<App />`：外壳里的语言切换器要求 `LocalePreferenceProvider` 在它之上，
+// 缺了会**当场抛错**（`useLocalePreference 必须在 <LocalePreferenceProvider> 内使用`），
+// 于是这个文件里每一条用例都会红 —— 而报错指向的是 provider，不是被测的东西。
+// 这与 `app-mount.spec.tsx` 是同一份接线：两处各拼一遍就会漂移。
+const { LocaleHost } = await import('../src/lib/locale-host.js');
 const { __resetOpLogForTests, initOpLog } = await import('../src/lib/oplog.js');
 const { useHabitStore, selectHabitProgress } = await import('../src/features/habits/store.js');
 const { useTaskStore } = await import('../src/features/tasks/store.js');
@@ -87,7 +93,11 @@ beforeEach(async () => {
 
   act(() => {
     root = createRoot(container!);
-    root.render(<App />);
+    root.render(
+      <LocaleHost>
+        <App />
+      </LocaleHost>,
+    );
   });
   await flush();
 });
