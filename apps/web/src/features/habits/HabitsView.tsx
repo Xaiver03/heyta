@@ -179,6 +179,7 @@ export function HabitsView() {
 
               <button
                 type="button"
+                className="ht-habit__checkin"
                 onClick={() => {
                   if (p.doneToday) {
                     void store.undoCheckIn(p.habit.id);
@@ -205,7 +206,9 @@ export function HabitsView() {
                   background: p.doneToday ? cssVar('color.primary') : 'transparent',
                   color: p.doneToday ? cssVar('color.on-primary') : cssVar('color.foreground'),
                   fontSize: cssVar('font-size.2xs'),
-                  transition: `background ${cssVar('duration.fast')} ${cssVar('ease.standard')}`,
+                  // 按下反馈：缩放本身由 `.ht-habit__checkin:active` 给（行内写不出伪类），
+                  // 这里只把 transform 加进过渡，否则缩放是瞬时跳变。
+                  transition: `background ${cssVar('duration.fast')} ${cssVar('ease.standard')}, transform ${cssVar('duration.press')} ${cssVar('ease.standard')}`,
                 }}
               >
                 {p.doneToday ? (

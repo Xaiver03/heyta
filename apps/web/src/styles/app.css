@@ -165,9 +165,11 @@
   border-radius: var(--ht-radius-md);
   font-size: var(--ht-font-size-sm);
   font-weight: var(--ht-font-weight-medium);
-  transition: background-color var(--ht-duration-fast) var(--ht-ease-standard),
+  transition:
+    background-color var(--ht-duration-fast) var(--ht-ease-standard),
     color var(--ht-duration-fast) var(--ht-ease-standard),
-    border-color var(--ht-duration-fast) var(--ht-ease-standard);
+    border-color var(--ht-duration-fast) var(--ht-ease-standard),
+    transform var(--ht-duration-press) var(--ht-ease-standard);
 }
 
 .ht-btn--primary {
@@ -195,6 +197,26 @@
 
 .ht-btn:disabled {
   opacity: 0.5;
+}
+
+/**
+ * 按下即反馈 —— Apple 的规矩是「回应发生在按下时，不是松手时」。
+ *
+ * 🔴 `--ht-motion-press-scale` 这个 token **移动端一直在用**
+ * （`apps/mobile/src/ui/kit.tsx` 里有 `pressed` 状态 + reduced-motion 判断），
+ * 而 Web 以前只有背景色变化：按下与松手之间**没有任何即时回应**，
+ * 一次点击的第一帧是"什么都没发生"。
+ *
+ * 🔴 只动 `transform`：它由合成器处理，不触发布局 ——
+ * 而按下是**每一次点击**都要付的成本，这里省下的时间最值。
+ * 时长用 `--ht-duration-press`（它存在的意义就是这个）。
+ *
+ * 🔴 `prefers-reduced-motion` 在这里一个字都不写：`tokens.css` 已把
+ * 全部 `--ht-duration-*` 压到 1ms，缩放会立刻完成、不产生动效。
+ * 在这里再写一遍 media query 就是第二套降级策略。
+ */
+.ht-btn:active:not(:disabled) {
+  transform: scale(var(--ht-motion-press-scale));
 }
 
 /* ── 任务列表 ───────────────────────────────────────── */
@@ -1111,6 +1133,12 @@
   align-items: center;
   gap: var(--ht-space-1);
   white-space: nowrap;
+}
+
+/* 打卡是这套体系里**最高频**的动作，所以它也要有按下反馈。
+   这个按钮的样式是行内的（既有写法），因此规则挂在一个类上。 */
+.ht-habit__checkin:active:not(:disabled) {
+  transform: scale(var(--ht-motion-press-scale));
 }
 
 /* ── L3 成长视图 ───────────────────────────────────────────────────── */
