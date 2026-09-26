@@ -271,7 +271,10 @@ pnpm check:design     # 非零退出 = 有裸值
 pnpm install                    # 安装（工作区）
 pnpm -r build                   # 全量构建
 pnpm -r typecheck               # 全量类型检查
-pnpm -r test                    # 全量测试（当前 2562 个通过 + 12 个跳过：11 浏览器 E2E 默认跳过 + 1 服务端）
+pnpm -r test                    # 全量测试（当前 2590 个通过 + 12 个跳过：11 浏览器 E2E 默认跳过 + 1 服务端）
+                                # ⚠️ 沙箱里跑不了 `@heyta/sync-server`（`prisma generate` EPERM），
+                                #    用 `pnpm -r --filter '!@heyta/sync-server' test` 复现这 2590；
+                                #    该包本身只贡献 1 个跳过、0 个通过，所以两者可比
 
 pnpm verify:sync                # P0 验收：真实同步闭环（需要服务端在跑）
 pnpm verify:sync:dry            # 不需要服务端，只校验 op 形状
@@ -1002,6 +1005,13 @@ docker inspect <容器> --format '{{range .Config.Env}}{{println .}}{{end}}' | g
   `memoryEnabled` **必填且默认关闭（fail-closed）**；推断结果**不持久化**
   （纯函数，每次从 op-log 重算），只有用户**纠正**进 op-log 跨设备同步；
   两个新实体是**纯可加性**的 —— **不需 bump `CURRENT_SCHEMA_VERSION`**。
+- **ADR-0015 习惯韧性的「冻结余额」= 纯派生且不上界面** ✅（[文档](docs/adr/0015-resilience-state-stays-derived.md)）。
+  它是**库存**不是事实（等于说"你还有 N 次可以不来的机会"）、用户对它**不可操作**、
+  且是整套体系里**唯一的货币** —— 唯一一处会让 heyta 读起来像资源管理游戏的地方。
+  关键推论：**界面上不出现的东西不需要稳定的持久化结构**，
+  于是「派生还是加字段」这个二选一被**消解**（承接 ADR-0014 的"派生不持久化"）。
+  🔴 配套纪律：**冻结参数只能放宽、不能收紧** —— 收紧会让重放把历史连续天数
+  **变小**，违反"只增不减"；真要收紧走**代码常量切分点**，**仍然不加字段**。
 - **AI 的完整架构**见 [`docs/reference/ai-architecture.md`](docs/reference/ai-architecture.md)
   （模块地图 / 封闭词表 / 全部具名常量 / 20 条不变量清单）。
   **AI 的入口文档是 [`docs/plans/ai-strategy.md`](docs/plans/ai-strategy.md)**，先读那份。

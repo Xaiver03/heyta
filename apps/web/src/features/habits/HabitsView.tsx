@@ -166,7 +166,7 @@ export function HabitsView() {
                  *      这是唯一一处会让 heyta 读起来像资源管理游戏的地方 —— 调性不统一。
                  *   4. 少了它，"余额"就彻底是**实现细节**：界面上不出现的东西不需要
                  *      稳定的持久化结构。**产品决策把"要不要给它加字段"这个问题消解掉了**
-                 *      （完整论证见 `docs/plans/motivation-and-progression.md` §10.1）。
+                 *      （完整决策记录见 `docs/adr/0015-resilience-state-stays-derived.md`）。
                  *
                  * 规则本身仍然要可解释，但解释的位置是**首次真正用到的那一刻**——
                  * 也就是下面这一行本身，而不是一个常驻的计数器。
