@@ -35,21 +35,30 @@ concurrency:
 jobs:
   verify:
     name: 门禁 + 全量测试（干净检出）
-    runs-on: ubuntu-latest
+    # 自托管 runner（在 finlaw 上，容器化 + 硬限流 2 核 / 3G）。
+    #
+    # 为什么不用 ubuntu-latest：私有仓库的 GitHub 托管 runner 有月度分钟额度，
+    # 而**自托管 runner 是免费无限量的**（GitHub 官方计费文档明说）。
+    #
+    # 🔴🔴 **如果哪天这个仓库要转公开，必须先把这行改回 ubuntu-latest。**
+    # 自托管 runner + 公开仓库是最危险的组合：任何人都能提 PR，
+    # 而 PR 的工作流会在你自己的服务器上执行任意代码。
+    # 两者只能选一个 —— 想公开就回到托管 runner（公开仓库同样免费）。
+    runs-on: [self-hosted, linux, x64, heyta-ci]
     timeout-minutes: 40
 
     steps:
       - name: 检出
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       # 🔴 顺序不能反：pnpm 必须在 setup-node **之前**装好，
       # 否则 setup-node 的 `cache: pnpm` 找不到 pnpm，缓存直接失效。
       # 版本不在这里写死 —— pnpm/action-setup 会读 package.json 的 packageManager。
       - name: 装 pnpm
-        uses: pnpm/action-setup@v4
+        uses: pnpm/action-setup@v6
 
       - name: 装 Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           # 必须是 24，不能降到 22 —— 尽管根 package.json 的 engines 写的是 ">=22"。
           # 原因：packages/storage 与 apps/node-host 用 `node:sqlite`，
