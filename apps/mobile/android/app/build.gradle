@@ -84,6 +84,25 @@ android {
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 1
         versionName "1.0"
+
+        // 🔴 放开明文 HTTP。这不是图省事，是自建场景的可用性刚需。
+        //
+        // React Native 的 Gradle 插件把 **非 debuggable** 变体的
+        // `usesCleartextTraffic` 设成 `false`。后果：release 包里把服务器地址填成
+        // `http://192.168.1.10:3000`（自托管最常见的样子：NAS / 家里的小主机 /
+        // 容器直接起在局域网）**必然连不上**，而且失败发生在网络层 ——
+        // OkHttp 抛出的 TypeError 里往往没有原因字符串，界面只能显示「当前离线」。
+        // 实测就是这样：服务端用 curl 一切正常，应用却坚称离线。
+        //
+        // 为什么敢放开：heyta 的载荷**始终是端到端加密**的（AES-256-GCM，
+        // 密钥由口令在本地派生），服务端从头到尾看不到明文。明文信道真正暴露的是
+        // **访问令牌**与元数据（op 数量、时间、体积），不是任务内容本身。
+        //
+        // 风险由应用层承担而不是忽略：填 `http://` 时界面会明确警告，
+        // 用户是知情选择，不是被默默降级。决策记录见 `docs/adr/0007-*`。
+        //
+        // ⚠️ 真正生效的设置在文件末尾的 `androidComponents.finalizeDsl` ——
+        // 写在这里的 manifestPlaceholders **会被插件覆盖**，见那里的说明。
     }
     signingConfigs {
         debug {
@@ -104,6 +123,73 @@ android {
             minifyEnabled enableProguardInReleaseBuilds
             proguardFiles getDefaultProguardFile("proguard-android.txt"), "proguard-rules.pro"
         }
+    }
+}
+
+/**
+ * 🔴 明文 HTTP 的开关必须在**这里**，不能写在 `android { }` 里。
+ *
+ * `@react-native/gradle-plugin` 的实现（`AgpConfiguratorUtils.kt`）是：
+ *
+ *     .finalizeDsl { ext ->
+ *       ext.buildTypes {
+ *         getByName("release").apply { manifestPlaceholders["usesCleartextTraffic"] = "false" }
+ *       }
+ *     }
+ *
+ * `finalizeDsl` 在 build script 求值**之后**才跑，所以写在 `android { }` 里的
+ * `manifestPlaceholders` 一定会被它覆盖 —— 实测就是这样：构建退出码 0、
+ * 日志一切正常，而 aapt2 从产物里读出来仍然是 `=false`。
+ * **构建成功不等于配置生效，必须验证产物。**
+ *
+ * 这里再注册一个 finalizeDsl。AGP 按**注册顺序**回调，而插件是在
+ * `apply plugin: "com.facebook.react"`（本文件第 3 行）时注册的，比这里早，
+ * 所以本回调后跑，最后一次写入才是我要的值。
+ *
+ * 改完务必用 aapt2 验证产物，别只看脚本：
+ *   aapt2 dump xmltree --file AndroidManifest.xml app-release.apk | grep usesCleartextTraffic
+ *   期望 =true
+ */
+androidComponents {
+    finalizeDsl { ext ->
+        ext.buildTypes.getByName("release").manifestPlaceholders["usesCleartextTraffic"] = "true"
+    }
+}
+
+// 🔴 让 JS 打包任务**真的**依赖 workspace 包（`packages`）的构建产物。
+//
+// 背景：`@heyta/mobile` 通过 `@heyta/app-host` 等 workspace 包消费仓库里的 `packages`，
+// 而它们的入口是 `dist/index.js`（`main` / `exports` 都指过去，Metro 没有别名）。
+//
+// 但 React Native 的 Gradle 插件给 `createBundle<变体>JsAndAssets` 声明的输入
+// 只覆盖本工程自己的 JS 源与配置，**不包括 monorepo 里 `packages` 的 `dist`**。
+// 后果：只改 `packages`（不碰 `apps/mobile/src`）时，Gradle 认为打包任务 UP-TO-DATE、
+// **根本不调用 Metro**，打出来的 APK 里是**上一次的旧 bundle**。
+//
+// 实测（这就是它的危险之处）：
+//   - 往 `packages/app-host/src/actions.ts` 注入一个真 bug，`pnpm -r build` 之后
+//     `./gradlew assembleRelease` 报 BUILD SUCCESSFUL（12 秒，打包任务被跳过）；
+//   - 装到模拟器上跑验收，**40/0 全绿** —— 界面、同步、跨设备全对，
+//     因为设备上跑的是**没有 bug 的旧代码**；
+//   - 加 `--rerun-tasks` 强制重打后，同一个注入立刻让验收红了 2 项。
+//
+// 也就是说这个漏配会让"重建 → 安装 → 验收"整套**对着旧产物报成功** ——
+// 它污染的不是某个功能，而是**所有移动端验收的结论**。
+//
+// 修法：把 `packages` 显式声明成打包任务的输入。声明整个 `packages` 而不是只声明
+// `dist`，是因为 `inputs.dir` 会递归做内容哈希，而 `packages` 下没有 `node_modules`
+// （pnpm 提升到根），成本很低；覆盖面反而更全。
+//
+// ⚠️ 实测：声明之后，即使 `packages` 没有任何改动，打包任务也常常会重跑
+//（增量缓存似乎就此失效）。方向是**安全**的 —— 宁可重打一次，也不能打旧包 ——
+// 代价是 APK 构建从 ~12 秒变成 ~30 秒。**不要**为了省这 20 秒把这条声明删掉。
+//
+// ⚠️ 本注释刻意全部用 `//`，不用块注释：Groovy 的块注释**不能嵌套**，
+// 而注释里必然会出现 `packages/*/dist` 这种写法 —— 其中的 `*/` 会提前闭合注释，
+// 剩下的中文就变成了代码，构建报 "Unexpected character" 而且行号指向注释中间。
+tasks.configureEach { task ->
+    if (task.name.startsWith("createBundle") && task.name.endsWith("JsAndAssets")) {
+        task.inputs.dir(new File(rootProject.projectDir, "../../../packages"))
     }
 }
 

@@ -1,0 +1,78 @@
+/**
+ * 移动端的**运行时同步凭据**
+ * ============================
+ *
+ * 🔴 这个文件存在的唯一理由，是 `openAppHost()` 在**应用启动时**就跑完了，
+ * 而服务器地址 / 访问令牌 / E2EE 口令只能由用户在启动**之后**输入。
+ *
+ * 实测的功能缺口：`apps/mobile` 此前把 `serverUrl` 硬编码传给 `openAppHost`，
+ * 却**从不调用 `sync()`** —— 因为即使调了也永远缺令牌。
+ * 表现是"能建任务、能勾选、能删除，但一条都同步不出去"，
+ * 而界面上看不出任何异常。
+ *
+ * ---
+ *
+ * 🔴 **凭据只放内存，刻意不落盘。**
+ *
+ * E2EE 口令落盘就等于把"服务端看不到明文"这个承诺作废 ——
+ * 攻击者不再需要攻破服务端，只要拿到设备上的那个文件。
+ * 所以口令重启后必须重新输入。
+ *
+ * 代价是真实的：每次冷启动都要重填。这是**有意的取舍**，
+ * 想改善它应该去接系统钥匙串（iOS Keychain / Android Keystore），
+ * 而不是把口令写进我们自己的 SQLite —— 两者在安全性上不是一回事。
+ *
+ * ⚠️ 服务器地址不是秘密，将来可以持久化；本轮**一律不落盘**，
+ * 因为"哪些字段算秘密"是个产品判断，不该由这里顺手决定。
+ */
+
+import type { SyncConfig } from '@heyta/app-host';
+
+/**
+ * 当前的活凭据。`undefined` = 尚未配置。
+ *
+ * 模块级可变状态，因为 `openAppHost` 只接受一个**取值函数**
+ * （`getSyncConfig`）而不是一份快照 —— 它必须在每次同步时重新读。
+ */
+let current: SyncConfig | undefined;
+
+/** 供 `openAppHost` 的 `getSyncConfig` 使用。**每次同步都会被调用。** */
+export function readSyncConfig(): SyncConfig | undefined {
+  return current;
+}
+
+/**
+ * 写入凭据。
+ *
+ * 空字符串会被规整成 `undefined` —— 表单里"用户把令牌清空了"和
+ * "用户从没填过"在行为上必须一致，否则会留下一个空令牌的配置，
+ * 表现为请求带着 `Authorization: Bearer ` 出去，服务端回 401，
+ * 而界面显示"已配置"。**清空字段要写 `null`，不能写 `undefined`** 的同一条纪律。
+ */
+export function writeSyncConfig(input: {
+  serverUrl: string;
+  token: string;
+  password: string;
+}): void {
+  const token = input.token.trim();
+  const password = input.password;
+  current = {
+    serverUrl: input.serverUrl.trim(),
+    ...(token === '' ? {} : { token }),
+    ...(password === '' ? {} : { password }),
+  };
+}
+
+export function clearSyncConfig(): void {
+  current = undefined;
+}
+
+/**
+ * Android 模拟器上的默认服务端地址。
+ *
+ * 🔴 **`127.0.0.1` 在模拟器里指的是模拟器自己**，不是运行服务端的这台 Mac。
+ * 模拟器把宿主机的回环地址映射到 `10.0.2.2`。
+ * 这是"地址填对了、服务也在跑、就是连不上"最常见的原因。
+ * 真机调试要换成局域网 IP。
+ */
+export const DEFAULT_SERVER_URL = 'http://10.0.2.2:3000';

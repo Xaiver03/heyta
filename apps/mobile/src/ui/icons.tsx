@@ -22,15 +22,28 @@ import {
   Bell,
   CalendarDays,
   CalendarClock,
+  ChartColumn,
   Check,
+  ChevronLeft,
+  ChevronRight,
   CircleCheckBig,
+  Coffee,
   Flag,
+  Flame,
   Inbox,
+  Link2,
   ListTodo,
+  Monitor,
+  Pause,
+  Play,
   Plus,
   RefreshCw,
   Repeat,
+  RotateCcw,
   Settings,
+  Smartphone,
+  Square,
+  Target,
   Timer,
   TriangleAlert,
   Trash2,
@@ -56,7 +69,9 @@ const ICONS = {
   'task.done': Check,
   'task.delete': Trash2,
   'task.due': CalendarClock,
+  'task.overdue': TriangleAlert,
   'task.repeat': Repeat,
+  'task.reopen': RotateCcw,
   'task.reminder': Bell,
   'task.priority': Flag,
 
@@ -66,7 +81,30 @@ const ICONS = {
   'group.overdue': TriangleAlert,
   'group.completed': CircleCheckBig,
 
+  // 冲突解决
+  // 🔴 语义名而不是图标名：`conflict.warning` 而不是 `triangle-alert`。
+  // 与 Web 端 `ConflictDialog` 用的是同一组语义（AlertTriangle / Monitor / Smartphone），
+  // 于是两端在同一个情境下画的是同一个字形。
+  'conflict.warning': TriangleAlert,
+  'device.local': Smartphone,
+  'device.remote': Monitor,
+  'action.keep': Check,
+
+  // 专注
+  // 与任务图标同样的理由：语义名（`focus.pause`）而不是图标名（`Pause`）——
+  // 换图标库时语义名不用改，而且"暂停"在两处必须是同一个字形。
+  'focus.work': Target,
+  'focus.break': Coffee,
+  'focus.play': Play,
+  'focus.pause': Pause,
+  'focus.abort': Square,
+  'focus.stats': ChartColumn,
+  'focus.streak': Flame,
+  'focus.link': Link2,
+
   // 通用
+  'action.prev-month': ChevronLeft,
+  'action.next-month': ChevronRight,
   'action.close': X,
   'action.settings': Settings,
   'action.sync': RefreshCw,

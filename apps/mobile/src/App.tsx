@@ -29,7 +29,11 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { ThemeProvider, useTheme, useTokens } from './theme';
 import { TabBar, type TabKey } from './nav/TabBar';
 import { TasksScreen } from './screens/TasksScreen';
-import { CalendarScreen, FocusScreen, ProfileScreen } from './screens/NotYetImplemented';
+// 🔴 四个 tab 现在**全部是真实屏幕**了 —— `screens/NotYetImplemented.tsx`
+// 已按它自己文件头写好的方式删除（"实现一个就移走一个，最后删掉它"）。
+import { CalendarScreen } from './screens/CalendarScreen';
+import { FocusScreen } from './screens/FocusScreen';
+import { ProfileScreen } from './screens/ProfileScreen';
 
 function Shell(): React.JSX.Element {
   const t = useTokens();

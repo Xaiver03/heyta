@@ -28,8 +28,12 @@ import {
   View,
 } from 'react-native';
 import type { Task } from '@heyta/domain';
-import { Priority } from '@heyta/domain';
+// `formatDayTitle` 来自领域层：**"某一天的标题"只有那一个实现**
+// （这里原来用的是本地的 `formatToday`；日历需要同一件事时会写出第二份，
+//  一份收时间戳用"星期五"、一份收 LocalDate 用"周五"）。
+import { Priority, describeRecurrence, formatDayTitle, startOfDay, toLocalDate } from '@heyta/domain';
 import { createTaskActions, type AppHost, type TaskActions } from '@heyta/app-host';
+import { useToday } from '../lib/use-today';
 import { useText, useTheme, useTokens } from '../theme';
 import {
   Button,
@@ -37,13 +41,17 @@ import {
   EmptyState,
   Fab,
   IconButton,
+  Chip,
   Screen,
   SectionHeader,
   Text,
 } from '../ui/kit';
 import { Icon, type IconName } from '../ui/icons';
 import { openTaskHost } from '../db/open-host';
-import { formatDue, formatToday, isOverdue, startOfDay } from '../lib/date';
+
+import { dueTone, toDueDisplay, type DueDisplayMode } from '../lib/due-display';
+import { priorityBadgeLabel, priorityColorToken } from '../lib/priority';
+import { TaskDetailSheet } from './TaskDetailSheet';
 
 // ─────────────────────────────────────────────────────────────
 // 任务行
@@ -54,11 +62,15 @@ function TaskRow({
   actions,
   onChanged,
   now,
+  dueMode,
+  onOpen,
 }: {
   task: Task;
   actions: TaskActions;
   onChanged: () => void;
   now: number;
+  dueMode: DueDisplayMode;
+  onOpen: () => void;
 }): React.JSX.Element {
   const t = useTokens();
   const [busy, setBusy] = useState(false);
@@ -66,7 +78,17 @@ function TaskRow({
   // `Task` 上**没有** `completed` 布尔字段 —— 设计上就用"有没有完成时间"
   // 表达完成（entities.ts:76：「不另设 completed 布尔，避免两者不一致」）。
   const done = task.completedAt !== undefined;
-  const overdue = !done && task.dueDate !== undefined && isOverdue(task.dueDate, now);
+
+  // 🔴 截止显示与档位全部来自 `@heyta/domain` 的共享实现
+  // （`lib/due-display.ts` 只是把它包成"给 UI 的形状"）。
+  // 这里曾经用的是本地的 `formatDue` —— 它与共享实现已经说了两种话
+  // （`已过期` vs `已逾期`、`9月26日` vs `还剩 8 天`）。
+  const due = toDueDisplay(task, dueMode, now);
+  const priorityBadge = priorityBadgeLabel(task.priority);
+  // 重复规则是**同步读**物化状态（`repeatOf` 不发 op），放在渲染里没有问题。
+  // 它同时决定了要不要多画一个标记、以及读屏时怎么念这条任务。
+  const repeat = actions.repeatOf(task.id);
+  const priorityColor = t[priorityColorToken(task.priority ?? Priority.None)];
 
   const run = useCallback(
     (p: Promise<unknown>) => {
@@ -90,13 +112,34 @@ function TaskRow({
         marginLeft: -(t['touch-target.min'] - t['size.checkbox']) / 2,
       }}
     >
-      <Checkbox checked={done} busy={busy} onToggle={() => run(actions.toggleCompleted(task.id))} />
+      <Checkbox
+        checked={done}
+        busy={busy}
+        // ⚠️ 两种状态各写一整句，不要写成 `${done ? '取消完成' : '完成'}：…`。
+        // 后者被 `check:ui-language` 判成"没有汉字的文案"（它取到的片段是
+        // `${done ?`，里面有 4 个连续拉丁字母）。门禁是对的：
+        // 用户可见的字符串**本身**就该是中文，而不是靠表达式拼出来。
+        label={done ? `取消完成：${task.title}` : `完成：${task.title}`}
+        onToggle={() => run(actions.toggleCompleted(task.id))}
+      />
 
+      {/* 🔴 点行 = **打开详情**，不再切换完成。
+          行上的主操作应该是"打开它"；切换完成有专门的勾选框，
+          而且那样更可达：勾选框有自己的无障碍名，读屏用户能直接说
+          "完成：买牛奶"，不必先打开详情再找按钮。 */}
       <Pressable
-        onPress={() => run(actions.toggleCompleted(task.id))}
+        onPress={onOpen}
         style={{ flex: 1, paddingVertical: t['space.2'], gap: t['space.1'] }}
         accessibilityRole="button"
-        accessibilityLabel={`任务：${task.title}`}
+        // 重复状态要进无障碍名：读屏用户看不到那个小图标，
+        // 而"这条任务会不会每周回来"直接影响他决定要不要现在做。
+        // ⚠️ 两种状态各写一整句（不是 `${...}` 拼一个后缀）——
+        // 见上面勾选框那段注释：门禁会把"取到的片段没有汉字"判成违规。
+        accessibilityLabel={
+          repeat === undefined
+            ? `打开任务：${task.title}`
+            : `打开任务：${task.title}，重复：${describeRecurrence(repeat.rule)}`
+        }
       >
         <Text
           variant="row-title"
@@ -107,29 +150,41 @@ function TaskRow({
           {task.title}
         </Text>
 
-        {task.dueDate !== undefined || task.priority !== undefined ? (
+        {due !== null || priorityBadge !== null || repeat !== undefined ? (
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: t['space.2'] }}>
-            {task.dueDate !== undefined ? (
+            {due !== null ? (
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: t['space.1'] }}>
                 <Icon
-                  name="task.due"
+                  name={due.overdue ? 'task.overdue' : 'task.due'}
                   size="xs"
-                  color={overdue ? t['color.danger'] : t['color.foreground-subtle']}
+                  color={due.overdue ? t['color.danger'] : t['color.foreground-subtle']}
                 />
-                <Text variant="row-meta" tone={overdue ? 'danger' : 'subtle'}>
-                  {formatDue(task.dueDate, now)}
+                <Text variant="row-meta" tone={dueTone(due.urgency)}>
+                  {due.text}
                 </Text>
               </View>
             ) : null}
             {/* 🔴 `Priority` 是**数值枚举**（High = 3），不是字符串。
                 我一开始写成 `task.priority === 'high'` —— TS 报了
                 "两个类型没有重叠"，否则这个条件**永远为假**：
-                高优先级任务不会显示标记，而且不报任何错。 */}
-            {task.priority === Priority.High ? (
+                高优先级任务不会显示标记，而且不报任何错。
+                现在映射只在 `lib/priority.ts` 一处，并有可失败的测试。 */}
+            {priorityBadge !== null ? (
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: t['space.1'] }}>
-                <Icon name="task.priority" size="xs" color={t['color.priority-high']} />
-                <Text variant="row-meta" style={{ color: t['color.priority-high'] }}>
-                  高优先级
+                <Icon name="task.priority" size="xs" color={priorityColor} />
+                <Text variant="row-meta" style={{ color: priorityColor }}>
+                  {priorityBadge}
+                </Text>
+              </View>
+            ) : null}
+            {/* 重复标记。文字用 `describeRecurrence`（中文），
+                不要自己拼"每 N 天" —— 那会在界面上长出第二份规则描述，
+                而它和 domain 那份迟早对"每两周的周三"说两种话。 */}
+            {repeat !== undefined ? (
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: t['space.1'] }}>
+                <Icon name="task.repeat" size="xs" color={t['color.foreground-subtle']} />
+                <Text variant="row-meta" tone="muted">
+                  {describeRecurrence(repeat.rule)}
                 </Text>
               </View>
             ) : null}
@@ -267,9 +322,17 @@ export function TasksScreen({
   const [tasks, setTasks] = useState<Task[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [composerOpen, setComposerOpen] = useState(false);
-  // 冻结"现在"：每次渲染重新取 Date.now() 会让"今天/过期"在跨零点时
-  // 与渲染不同步，也会让 useMemo 每次都失效。
-  const now = useMemo(() => Date.now(), []);
+  /** 打开详情的任务 id。用 id 而不是 Task 对象：列表刷新后对象会换新引用，
+      存对象会让面板在每次同步后拿到过期快照。 */
+  const [detailTaskId, setDetailTaskId] = useState<string | null>(null);
+  /** 截止时间的呈现方式。与 Web 端 `DueBadge` 的开关一致，默认 `date`。 */
+  const [dueMode, setDueMode] = useState<DueDisplayMode>('date');
+  // 🔴 "现在"由 `useToday` 提供：**回到前台**与**跨过本地零点**时会刷新。
+  //
+  // 原来是 `useMemo(() => Date.now(), [])` —— 它把"跨零点"这件真事一起冻住了：
+  // 应用挂后台一夜、或就一直开着到第二天，界面上的"今天"还是昨天，
+  // 于是昨晚到期的任务仍然显示"今天到期"。详见 `lib/use-today.ts` 的文件头。
+  const { now } = useToday();
 
   useEffect(() => {
     let alive = true;
@@ -324,7 +387,21 @@ export function TasksScreen({
         inbox.push(task);
       }
     }
-    return { overdue, dueToday, inbox, completed };
+    // 🔴 分组内**倒序展示**（新的在上）。
+    //
+    // `listTasks()` 给的是 `createdAt` **升序**，那是**跨端一致的规范顺序**
+    // （见 `packages/app-host/src/actions.ts`："顺序必须在所有端一致 ——
+    // 否则同一份数据在两台设备上显示不同顺序"）。**规范顺序不动。**
+    //
+    // 但这一层是**视图**，视图有义务把"我刚加的那条"放在看得见的地方。
+    // 实测代价：升序展示时，新建的任务落到 10 条列表的**最底部、屏幕外**，
+    // 用户唯一的反馈是角标从 9 变成 10 —— 会怀疑"我到底加上了吗"。
+    return {
+      overdue: overdue.reverse(),
+      dueToday: dueToday.reverse(),
+      inbox: inbox.reverse(),
+      completed: completed.reverse(),
+    };
   }, [tasks, now]);
 
   /**
@@ -332,6 +409,13 @@ export function TasksScreen({
    * 都从这一个值来，不允许各自再算一遍。
    */
   const pending = groups.overdue.length + groups.dueToday.length + groups.inbox.length;
+
+  // 🔴 由 id 反查任务，而不是存一份对象：列表刷新后 `Task` 是新引用，
+  // 存下来的那份会变成过期快照（改了日期却显示旧值）。
+  const detailTask = useMemo(
+    () => tasks.find((x) => x.id === detailTaskId),
+    [tasks, detailTaskId],
+  );
 
   useEffect(() => {
     onPendingCountChange?.(pending);
@@ -344,7 +428,10 @@ export function TasksScreen({
           icon="group.overdue"
           title="打开本地数据库失败"
           hint="数据在本地，不会丢。重开应用通常能恢复。"
-          detail={error}
+          // 🔴 原始错误原样附上（并允许长按复制）：它多半是英文的系统信息，
+          // 但**不能翻译** —— 翻译之后就没法拿去搜索、也没法对照日志。
+          // 分工是：中文说明在 `hint`，技术原文在 `detail`，前缀用中文标明它是什么。
+          detail={`技术细节：${error}`}
         />
       </Screen>
     );
@@ -353,7 +440,7 @@ export function TasksScreen({
   if (host === null || actions === null) {
     return (
       <Screen title="任务">
-        <EmptyState icon="action.sync" title="正在打开本地数据" hint="首次启动会重放本地 op 日志。" />
+        <EmptyState icon="action.sync" title="正在打开本地数据" hint="正在恢复到上次关闭前的状态，稍等片刻。" />
       </Screen>
     );
   }
@@ -396,12 +483,34 @@ export function TasksScreen({
       <Screen title="任务" actions={[{ icon: 'action.sync', label: '同步', onPress: refresh }]}>
         {/* 大标题 + 日期。大标题属于**内容区**（会随内容滚动），不属于顶栏。 */}
         <View style={{ paddingTop: t['space.2'], gap: t['space.1'] }}>
-          <Text variant="screen-title">{formatToday(now)}</Text>
+          <Text variant="screen-title">{formatDayTitle(toLocalDate(now))}</Text>
           <Text variant="row-meta" tone="muted">
             {nothing
               ? '还没有任务'
               : `${pending} 项待办，${groups.completed.length} 项已完成`}
           </Text>
+        </View>
+
+        {/* 截止时间两种呈现的开关。
+            竞品调研里这是**唯一有规模证据**的时间可视化形态
+            （滴答清单的 Task time ↔ Countdown Time），见
+            `docs/research/ai-competitive-and-architecture.md` §5.2。
+            两种呈现读的是同一个 `dueDate`，所以开关只是换说法、不动数据。 */}
+        <View style={{ flexDirection: 'row', gap: t['space.2'], paddingTop: t['space.2'] }}>
+          <Chip
+            label="日期"
+            selected={dueMode === 'date'}
+            onPress={() => {
+              setDueMode('date');
+            }}
+          />
+          <Chip
+            label="倒计时"
+            selected={dueMode === 'countdown'}
+            onPress={() => {
+              setDueMode('countdown');
+            }}
+          />
         </View>
 
         {nothing ? (
@@ -424,13 +533,35 @@ export function TasksScreen({
                   tone={item.tone}
                 />
               ) : (
-                <TaskRow task={item.task} actions={actions} onChanged={refresh} now={now} />
+                <TaskRow
+                  task={item.task}
+                  actions={actions}
+                  onChanged={refresh}
+                  now={now}
+                  dueMode={dueMode}
+                  onOpen={() => {
+                    setDetailTaskId(item.task.id);
+                  }}
+                />
               )
             }
             contentContainerStyle={{ gap: t['space.1'] }}
           />
         )}
       </Screen>
+
+      {actions !== null ? (
+        <TaskDetailSheet
+          task={detailTask}
+          visible={detailTaskId !== null}
+          onClose={() => {
+            setDetailTaskId(null);
+          }}
+          actions={actions}
+          onChanged={refresh}
+          now={now}
+        />
+      ) : null}
 
       <Fab icon="task.add" label="新建任务" onPress={() => setComposerOpen(true)} />
       <Composer

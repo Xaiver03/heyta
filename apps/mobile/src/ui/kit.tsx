@@ -30,6 +30,7 @@ import {
   Pressable,
   ScrollView,
   Text as RNText,
+  TextInput,
   View,
   type StyleProp,
   type TextStyle,
@@ -52,7 +53,8 @@ export type TextTone =
   | 'primary'
   | 'danger'
   | 'success'
-  | 'on-primary';
+  | 'on-primary'
+  | 'warning';
 
 const TONE_TOKENS = {
   default: 'color.foreground',
@@ -62,6 +64,10 @@ const TONE_TOKENS = {
   danger: 'color.danger',
   success: 'color.success',
   'on-primary': 'color.on-primary',
+  // 🔴 用 `warning-strong`（amber-700，5.02:1）而不是 `warning`（amber-600，3.19:1）。
+  // 设计系统的对比度测试已经证明 amber-600 不达标（quadrant-3 就是因此改的），
+  // 而这里是要用户**读**的警告文案，正是最不能糊的那类文字。
+  warning: 'color.warning-strong',
 } as const satisfies Record<TextTone, string>;
 
 export interface TextProps {
@@ -314,10 +320,19 @@ export function Checkbox({
   checked,
   onToggle,
   busy,
+  label,
 }: {
   checked: boolean;
   onToggle: () => void;
   busy?: boolean;
+  /**
+   * 无障碍名。默认是「标记完成 / 取消完成」。
+   *
+   * 🔴 任务行必须传**带标题**的版本：一屏上有十几行时，
+   * 读屏用户听到的会是一串完全一样的"标记完成"，
+   * 根本不知道勾的是哪一条。
+   */
+  label?: string;
 }): React.JSX.Element {
   const t = useTokens();
   const { reducedMotion } = useTheme();
@@ -329,7 +344,7 @@ export function Checkbox({
       disabled={busy}
       accessibilityRole="checkbox"
       accessibilityState={{ checked, disabled: busy === true }}
-      accessibilityLabel={checked ? '取消完成' : '标记完成'}
+      accessibilityLabel={label ?? (checked ? '取消完成' : '标记完成')}
       hitSlop={t['gesture.hit-slop']}
       style={({ pressed }) => ({
         width: t['touch-target.min'],
@@ -654,5 +669,175 @@ export function EmptyState({
         </Text>
       ) : null}
     </View>
+  );
+}
+export interface TextFieldProps {
+  label: string;
+  value: string;
+  onChangeText: (next: string) => void;
+  /** 提示语。**不要**拿它当 label —— 输入之后提示就消失了。 */
+  placeholder?: string;
+  /** 口令类字段：掩码显示，并关掉自动纠错与首字母大写。 */
+  secure?: boolean;
+  /**
+   * 键盘类型。
+   *
+   * 🔴 地址字段必须能输入 `://` 与 `.` —— 默认键盘没有这些键，
+   * 用户会看到"明明填了地址却少了几个字符"。`url` 键盘才带 `/` 和 `.`。
+   */
+  keyboard?: 'default' | 'url';
+  autoCapitalize?: 'none' | 'sentences';
+  editable?: boolean;
+  /** 字段下方的说明或错误。传了就会占位，所以只在真有时才传。 */
+  hint?: string;
+  hintTone?: 'subtle' | 'danger';
+}
+
+/**
+ * 文本输入字段。
+ *
+ * 🔴 **label 与 placeholder 是两件事，不能只做后者。**
+ * 只有 placeholder 的话，用户一开始输入它就没了 —— 于是回到这个界面时
+ * 已经看不出这一格是"访问令牌"还是"口令"。这两者填错的表现都是 401，
+ * 而用户没有任何线索。
+ *
+ * 高度取 `size.field-height`（44px，等于触控下限）：
+ * 输入框本身**就是**触控目标，不是它的容器 —— 做成 40px 再留 4px 间隙，
+ * 手指点下去会落在间隙里。
+ */
+export function TextField({
+  label,
+  value,
+  onChangeText,
+  placeholder,
+  secure = false,
+  keyboard = 'default',
+  autoCapitalize = 'none',
+  editable = true,
+  hint,
+  hintTone = 'subtle',
+}: TextFieldProps): React.JSX.Element {
+  const t = useTokens();
+  const text = useText();
+  const [focused, setFocused] = React.useState(false);
+
+  return (
+    <View style={{ gap: t['space.1'] }}>
+      <Text variant="row-meta" tone="muted">
+        {label}
+      </Text>
+      <TextInput
+        value={value}
+        onChangeText={onChangeText}
+        placeholder={placeholder}
+        placeholderTextColor={t['color.foreground-subtle']}
+        secureTextEntry={secure}
+        keyboardType={keyboard}
+        autoCapitalize={autoCapitalize}
+        autoCorrect={false}
+        editable={editable}
+        accessibilityLabel={label}
+        // cursorColor 是 TextInput 的 **prop**，不是 style —— 放进 style 会被静默忽略。
+        cursorColor={t['color.primary']}
+        onFocus={() => {
+          setFocused(true);
+        }}
+        onBlur={() => {
+          setFocused(false);
+        }}
+        style={[
+          // ⚠️ 样式名必须**真实存在**于 `TEXT_STYLES`。我第一版写了 `'body'` ——
+          // 表里没有这个名字（最接近的是 `row-title`），取到 `undefined`，
+          // 输入框里的字会**完全看不见**，而且不报任何错。
+          // `useText()` 返回的是**对象**，所以是属性取值 `text['row-title']`，
+          // 不是函数调用。
+          text['row-title'],
+          {
+            minHeight: t['size.field-height'],
+            paddingHorizontal: t['size.field-padding-x'],
+            borderRadius: t['radius.md'],
+            backgroundColor: t['color.surface'],
+            color: t['color.foreground'],
+            // 🔴 焦点态用**边框加粗**表达，不用阴影位移 ——
+            // 扁平风格靠边框分层，且位移会让布局跳动。
+            borderWidth: focused ? t['border-width.thick'] : t['border-width.thin'],
+            borderColor: focused ? t['color.primary'] : t['color.border'],
+            opacity: editable ? 1 : t['state.disabled-opacity'],
+          },
+        ]}
+      />
+      {hint !== undefined ? (
+        <Text variant="caption" tone={hintTone === 'danger' ? 'danger' : 'subtle'}>
+          {hint}
+        </Text>
+      ) : null}
+    </View>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────
+// 可选中的胶囊（快捷日期、优先级）
+// ─────────────────────────────────────────────────────────────
+
+/**
+ * 一个小而可选的按钮。
+ *
+ * 🔴 **按压反馈不用不透明度，用底色。** 兄弟组件 `Button` 里写的是
+ * `opacity: 0.85` 这种裸数字（那是 `check:design` 目前**抓不到**的已知缺口，
+ * 见 AGENTS.md §5 —— 裸的无单位数字不在检查范围内）。这里不复制那个做法：
+ * 改用 `color.surface-sunken` 这个**已有的** token。
+ * 需要新变量时先加 token 再消费，而不是先写个数字。
+ *
+ * 🔴 选中态同时改**边框粗细**与**底色**，不只改颜色：
+ * 只改颜色的话，色觉障碍用户看不出哪一个是选中的
+ * （UIX Pro 第 1 条是可达性，排在风格前面）。
+ */
+export function Chip({
+  label,
+  selected = false,
+  onPress,
+  icon,
+  color,
+}: {
+  label: string;
+  selected?: boolean;
+  onPress: () => void;
+  icon?: IconName;
+  color?: string;
+}): React.JSX.Element {
+  const t = useTokens();
+
+  const fg = selected ? t['color.on-primary'] : t['color.foreground'];
+
+  return (
+    <Pressable
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityState={{ selected }}
+      accessibilityLabel={label}
+      style={({ pressed }) => ({
+        // 触控目标不小于 44×44（UIX Pro 第 2 条）
+        minHeight: t['touch-target.min'],
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: t['space.1'],
+        paddingHorizontal: t['space.3'],
+        borderRadius: t['radius.full'],
+        borderWidth: selected ? t['border-width.thick'] : t['border-width.thin'],
+        borderColor: selected ? t['color.primary'] : t['color.border'],
+        backgroundColor: selected
+          ? t['color.primary']
+          : pressed
+            ? t['color.surface-sunken']
+            : t['color.surface'],
+      })}
+    >
+      {icon !== undefined ? (
+        <Icon name={icon} size="xs" color={color ?? fg} />
+      ) : null}
+      <Text variant="row-meta" style={{ color: fg }}>
+        {label}
+      </Text>
+    </Pressable>
   );
 }
