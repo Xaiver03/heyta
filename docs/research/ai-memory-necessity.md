@@ -190,6 +190,39 @@ heyta 当前 iOS/Android **既没有 FTS5 也没有 sqlite-vec**：
 
 ⚠️ 浏览器端用不了：web 是 IndexedDB，**没有 SQL**。
 
+### ⑧ 一个被推翻的常见前提：heyta 的「三端」是**三种不同的存储引擎**
+
+| 端 | 存储 | 有 SQL 吗 |
+|---|---|---|
+| 浏览器（`apps/web`） | **IndexedDB**（`apps/web/src/lib/oplog.ts:61` → `IndexedDbAdapter`） | ❌ **完全没有** |
+| React Native | `@op-engineering/op-sqlite@18.2.5`（JSI 原生） | ✅ |
+| Node（桌面 / CLI） | `node:sqlite` | ✅ |
+
+**后果**：任何「基于 SQL 的检索 / 向量」方案天然只有 **2/3 端可复用**，
+浏览器端**必须另写**。
+
+这条比"哪个库更好"重要得多 —— 它决定了**任何依赖 SQL 的检索都不是跨端方案**。
+如果记忆层要三端一致，它就只能建立在**纯函数 + op-log**之上
+（本仓库的 `packages/domain` 正是这个位置）。
+
+### ⑨ 一条会浪费半天的工程陷阱：许可证门禁按**字符串**判定
+
+调研实测发现，`pnpm check:licenses` 会拦下两个**底层许可其实没问题**的包：
+
+| 包 | 它声明的 | 为什么被拦 |
+|---|---|---|
+| `usearch` | `"Apache 2.0"`（**无连字符**） | 脚本用 `up.includes('APACHE-2.0')` → 匹配失败 → 落入 `other` → 未登记 → 退出 1 |
+| `pgvector` | `PostgreSQL` | 不在 `PERMISSIVE` 枚举里 |
+| `sqlite-vec` | `"MIT OR Apache"` | 含 `MIT` 子串 → **反而通过** |
+
+⚠️ 修法是走 `REVIEWED_OTHER` 登记，**不要**为了让门禁变绿去改 `PERMISSIVE` 白名单 ——
+那会同时放行所有同类许可的包，把门禁变成摆设。
+
+### ⑩ 另一个容易混的名字
+
+`packages/storage/src/stores.ts` 的 `OP_FIELDS` 里有 **`VECTOR_CLOCK`** ——
+那是**因果向量时钟**（同步用），**不是向量检索**。两者毫无关系，别被名字带偏。
+
 ## 4. 那"记忆"到底怎么建
 
 **不需要新建数据库。heyta 已经有最好的记忆载体。**
