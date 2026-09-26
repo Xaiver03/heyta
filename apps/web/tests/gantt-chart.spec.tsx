@@ -15,24 +15,39 @@
  * 一旦需要它们，就说明 AI 又漏进可视化层了（`ai-architecture.md` §14 第 20 条）。
  */
 
+import { IDBFactory } from 'fake-indexeddb';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
+import { App } from '../src/App.js';
+import { __resetOpLogForTests, initOpLog } from '../src/lib/oplog.js';
 import { buildTimeline, type TimelineEntry } from '../src/features/timeline/buildTimeline.js';
 import { GanttChart } from '../src/features/timeline/GanttChart.js';
+import { TimelineView } from '../src/features/timeline/TimelineView.js';
 
 let root: Root | undefined;
 let container: HTMLDivElement | undefined;
 
-function render(props: Parameters<typeof GanttChart>[0]): HTMLDivElement {
+/** 渲染任意节点到一块新的容器里；同一测试里多次调用是安全的。 */
+function renderElement(node: React.ReactNode): HTMLDivElement {
+  if (root !== undefined) {
+    act(() => {
+      root?.unmount();
+    });
+    container?.remove();
+  }
   container = document.createElement('div');
   document.body.appendChild(container);
   root = createRoot(container);
   act(() => {
-    root?.render(<GanttChart {...props} />);
+    root?.render(node);
   });
   return container;
+}
+
+function render(props: Parameters<typeof GanttChart>[0]): HTMLDivElement {
+  return renderElement(<GanttChart {...props} />);
 }
 
 afterEach(() => {
@@ -81,8 +96,8 @@ describe('渲染条目', () => {
 
   it('时间条的横向位置反映偏移与工期', () => {
     const entries: TimelineEntry[] = [
-      { title: 'A', startOffsetMinutes: 0, durationMinutes: 60, durationSource: 'provided' },
-      { title: 'B', startOffsetMinutes: 60, durationMinutes: 60, durationSource: 'provided' },
+      { title: 'A', startOffsetMinutes: 0, durationMinutes: 60, durationSource: 'manual' },
+      { title: 'B', startOffsetMinutes: 60, durationMinutes: 60, durationSource: 'manual' },
     ];
     const el = render({ entries });
 
@@ -102,8 +117,8 @@ describe('渲染条目', () => {
 describe('🔴🔴 90 分钟的条必须比 30 分钟的明显宽', () => {
   /** 30 分钟与 90 分钟并行起步 → 总跨度 90 分钟。 */
   const entries: TimelineEntry[] = [
-    { title: '短的', startOffsetMinutes: 0, durationMinutes: 30, durationSource: 'provided' },
-    { title: '长的', startOffsetMinutes: 0, durationMinutes: 90, durationSource: 'provided' },
+    { title: '短的', startOffsetMinutes: 0, durationMinutes: 30, durationSource: 'manual' },
+    { title: '长的', startOffsetMinutes: 0, durationMinutes: 90, durationSource: 'manual' },
   ];
 
   it('🔴 宽度比是 3:1（30 分钟 : 90 分钟）', () => {
@@ -233,13 +248,13 @@ describe('🔴🔴 信息不能只靠颜色', () => {
 
   it('依赖被违反时给出文字警告（不只是一条错位的色块）', () => {
     const entries: TimelineEntry[] = [
-      { title: '前置', startOffsetMinutes: 0, durationMinutes: 180, durationSource: 'provided' },
+      { title: '前置', startOffsetMinutes: 0, durationMinutes: 180, durationSource: 'manual' },
       {
         title: '后继',
         startOffsetMinutes: 60,
         durationMinutes: 60,
         dependsOn: '前置',
-        durationSource: 'provided',
+        durationSource: 'manual',
       },
     ];
     const el = render({ entries });
@@ -264,8 +279,8 @@ describe('🔴🔴 信息不能只靠颜色', () => {
 describe('🔴 轴自适应', () => {
   it('🔴 跨度在一天内 → 按钟点画刻度（9:30 / 10:30 …）', () => {
     const entries: TimelineEntry[] = [
-      { title: 'A', startOffsetMinutes: 0, durationMinutes: 120, durationSource: 'provided' },
-      { title: 'B', startOffsetMinutes: 120, durationMinutes: 120, durationSource: 'provided' },
+      { title: 'A', startOffsetMinutes: 0, durationMinutes: 120, durationSource: 'manual' },
+      { title: 'B', startOffsetMinutes: 120, durationMinutes: 120, durationSource: 'manual' },
     ];
     const el = render({
       entries,
@@ -274,17 +289,18 @@ describe('🔴 轴自适应', () => {
       now: Date.parse('2026-09-26'),
     });
 
-    // 跨度 240 分钟 → 每 60 分钟一格
-    expect(el.querySelector('[data-testid="gantt-tick-570"]')?.textContent).toBe('9:30');
-    expect(el.querySelector('[data-testid="gantt-tick-630"]')?.textContent).toBe('10:30');
-    expect(el.querySelector('[data-testid="gantt-tick-810"]')?.textContent).toBe('13:30');
+    // 跨度 240 分钟 → 每 60 分钟一格。
+    // ⚠️ testid 用的是**偏移**（0 / 60 / …），钟点只是**标签**。
+    expect(el.querySelector('[data-testid="gantt-tick-0"]')?.textContent).toBe('9:30');
+    expect(el.querySelector('[data-testid="gantt-tick-60"]')?.textContent).toBe('10:30');
+    expect(el.querySelector('[data-testid="gantt-tick-240"]')?.textContent).toBe('13:30');
     // 一天内不该出现"第 N 天"的分隔带
     expect(el.querySelector('[data-testid="gantt-day-1"]')).toBeNull();
   });
 
   it('🔴 没有起始日时，刻度退化成相对偏移（不硬编一个钟点）', () => {
     const entries: TimelineEntry[] = [
-      { title: 'A', startOffsetMinutes: 0, durationMinutes: 240, durationSource: 'provided' },
+      { title: 'A', startOffsetMinutes: 0, durationMinutes: 240, durationSource: 'manual' },
     ];
     const el = render({ entries });
     expect(el.querySelector('[data-testid="gantt-tick-0"]')?.textContent).toBe('0 分钟');
@@ -311,7 +327,7 @@ describe('🔴 轴自适应', () => {
   it('🔴 计划从 9:30 开始时，"第 1 天"只到当天午夜（不按 24 小时硬切）', () => {
     // 从 9:30 起，跨天阈值 12 小时 → 需要 > 720 分钟。取 900 分钟（15 小时）。
     const entries: TimelineEntry[] = [
-      { title: 'A', startOffsetMinutes: 0, durationMinutes: 900, durationSource: 'provided' },
+      { title: 'A', startOffsetMinutes: 0, durationMinutes: 900, durationSource: 'manual' },
     ];
     const el = render({
       entries,
@@ -334,8 +350,8 @@ describe('🔴 轴自适应', () => {
 
 describe('日期显示', () => {
   const entries: TimelineEntry[] = [
-    { title: 'A', startOffsetMinutes: 0, durationMinutes: 60, durationSource: 'provided' },
-    { title: 'B', startOffsetMinutes: 60, durationMinutes: 60, durationSource: 'provided' },
+    { title: 'A', startOffsetMinutes: 0, durationMinutes: 60, durationSource: 'manual' },
+    { title: 'B', startOffsetMinutes: 60, durationMinutes: 60, durationSource: 'manual' },
   ];
 
   it('给了起始日就显示真实日期与钟点', () => {
@@ -369,7 +385,7 @@ describe('日期显示', () => {
           title: 'A',
           startOffsetMinutes: 5 * 1440,
           durationMinutes: 3 * 1440,
-          durationSource: 'provided',
+          durationSource: 'manual',
         },
       ],
       startDate: '2026-01-30',
@@ -403,8 +419,8 @@ describe('日期显示', () => {
 
 describe('今天标线', () => {
   const entries: TimelineEntry[] = [
-    { title: 'A', startOffsetMinutes: 0, durationMinutes: 1440, durationSource: 'provided' },
-    { title: 'B', startOffsetMinutes: 1440, durationMinutes: 1440, durationSource: 'provided' },
+    { title: 'A', startOffsetMinutes: 0, durationMinutes: 1440, durationSource: 'manual' },
+    { title: 'B', startOffsetMinutes: 1440, durationMinutes: 1440, durationSource: 'manual' },
   ];
 
   it('今天在计划内 → 有文字标注与标线', () => {
@@ -437,7 +453,7 @@ describe('今天标线', () => {
   it('🔴 计划从今天 9:30 开始 → 今天照样算在计划内（区间相交，不是起点包含）', () => {
     const el = render({
       entries: [
-        { title: 'A', startOffsetMinutes: 0, durationMinutes: 120, durationSource: 'provided' },
+        { title: 'A', startOffsetMinutes: 0, durationMinutes: 120, durationSource: 'manual' },
       ],
       startDate: '2026-09-26',
       startTimeMinutes: 570,
@@ -446,5 +462,197 @@ describe('今天标线', () => {
     });
     expect(el.querySelector('[data-testid="gantt-today"]')?.textContent).toContain('第 1 天');
     expect(el.querySelector('[data-testid="gantt-today-line"]')).toBeTruthy();
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────
+// 🔴 多图共用一把尺子（否则每张图各自占满整行，比不出长短）
+// ─────────────────────────────────────────────────────────────────────────
+
+describe('🔴 spanMinutes：多张图对齐到同一个尺度', () => {
+  const entries: TimelineEntry[] = [
+    { title: '短的', startOffsetMinutes: 0, durationMinutes: 30, durationSource: 'manual' },
+    { title: '长的', startOffsetMinutes: 0, durationMinutes: 90, durationSource: 'manual' },
+  ];
+
+  it('不给 spanMinutes → 按本图跨度归一化（长条占满）', () => {
+    const el = render({ entries });
+    expect(barWidthPercent(el, 0)).toBeCloseTo(100 / 3, 3);
+    expect(barWidthPercent(el, 1)).toBeCloseTo(100, 5);
+  });
+
+  it('🔴 给了更大的 spanMinutes → 两条一起按同一尺度缩小，比例仍是 3:1', () => {
+    const el = render({ entries, spanMinutes: 180 });
+    const short = barWidthPercent(el, 0);
+    const long = barWidthPercent(el, 1);
+    expect(short).toBeCloseTo((30 / 180) * 100, 3);
+    expect(long).toBeCloseTo((90 / 180) * 100, 3);
+    expect(long / short).toBeCloseTo(3, 5);
+  });
+
+  it('🔴 给的 spanMinutes 比本图还小 → 只放宽不截断（条不会溢出容器）', () => {
+    const el = render({ entries, spanMinutes: 10 });
+    // 本图跨度 90 更大，所以仍然按 90 归一化
+    expect(barWidthPercent(el, 1)).toBeCloseTo(100, 5);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────
+// 🔴🔴 TimelineView：把 AI 估时接到条上（"AI 自动生成甘特图"真正成立的那一段）
+// ─────────────────────────────────────────────────────────────────────────
+
+describe('🔴🔴 TimelineView', () => {
+  it('没有任务 → 一句人话的空态', () => {
+    const el = renderElement(<TimelineView tasks={[]} />);
+    const empty = el.querySelector('[data-testid="timeline-view-empty"]');
+    expect(empty).toBeTruthy();
+    expect((empty?.textContent ?? '').length).toBeGreaterThan(10);
+  });
+
+  it('🔴 每个任务一块（不是全塞进一张图）', () => {
+    const el = renderElement(
+      <TimelineView
+        tasks={[
+          { id: 't1', title: '写文案', note: '- [ ] 初稿\n- [ ] 定稿' },
+          { id: 't2', title: '做设计' },
+        ]}
+      />,
+    );
+    expect(el.querySelectorAll('[data-testid^="timeline-block-"]')).toHaveLength(2);
+    expect(el.querySelector('[data-testid="timeline-task-title-t1"]')?.textContent).toBe('写文案');
+    expect(el.querySelector('[data-testid="timeline-task-title-t2"]')?.textContent).toBe('做设计');
+    // 两块各有一张图
+    expect(
+      el.querySelector('[data-testid="timeline-block-t1"]')?.querySelectorAll(
+        '[data-testid="gantt-chart"]',
+      ),
+    ).toHaveLength(1);
+  });
+
+  it('🔴 没有可排期清单的任务**不静默跳过**，并显式说明', () => {
+    const el = renderElement(<TimelineView tasks={[{ id: 't1', title: '还没拆的任务' }]} />);
+    const hint = el.querySelector('[data-testid="timeline-no-checklist-t1"]');
+    expect(hint).toBeTruthy();
+    expect(hint?.textContent).toContain('还没有可排期的清单');
+    // 而且它照样有一条（整条任务），不是空块
+    expect(el.querySelector('[data-testid="gantt-row-0"]')).toBeTruthy();
+  });
+
+  it('🔴🔴 验收点：估了 90 分钟的任务，条比估了 30 分钟的**明显宽**', () => {
+    // 备注里的那一行就是 `AiDuration` 写进去的格式（`duration-note.ts`）。
+    const el = renderElement(
+      <TimelineView
+        tasks={[
+          { id: 'short', title: '写文案', note: '预计耗时：30 分钟' },
+          { id: 'long', title: '做设计', note: '预计耗时：90 分钟' },
+        ]}
+      />,
+    );
+
+    const shortBar = el.querySelector(
+      '[data-testid="timeline-block-short"] [data-testid="gantt-bar-0"]',
+    ) as HTMLElement;
+    const longBar = el.querySelector(
+      '[data-testid="timeline-block-long"] [data-testid="gantt-bar-0"]',
+    ) as HTMLElement;
+
+    const shortWidth = Number.parseFloat(shortBar.style.width);
+    const longWidth = Number.parseFloat(longBar.style.width);
+
+    // 3:1 —— 不是"差不多"，是肉眼一眼能分辨
+    expect(longWidth / shortWidth).toBeCloseTo(3, 5);
+    expect(longWidth - shortWidth).toBeGreaterThan(50);
+    // 而且这个差别来自 AI 估时，不是默认值
+    expect(el.querySelector('[data-testid="timeline-ai-long"]')?.textContent).toContain(
+      'AI 估时：1 小时 30 分',
+    );
+    expect(
+      el.querySelector('[data-testid="timeline-block-long"] [data-testid="gantt-duration-0"]')
+        ?.textContent,
+    ).toContain('AI 估时');
+  });
+
+  it('🔴 清单只有 1 条时，整条任务的估时直接落在那一条上', () => {
+    const el = renderElement(
+      <TimelineView tasks={[{ id: 't1', title: '上线', note: '- [ ] 全量发布\n预计耗时：90 分钟' }]} />,
+    );
+    expect(el.querySelector('[data-testid="gantt-duration-0"]')?.textContent).toContain(
+      '约 1 小时 30 分 · AI 估时',
+    );
+    expect(el.querySelector('[data-testid="gantt-unestimated-summary"]')).toBeNull();
+  });
+
+  it('🔴 清单有 N>1 条时，整条任务的估时**不分摊**，并明说摊不了', () => {
+    const note = ['- [ ] 甲', '- [ ] 乙', '- [ ] 丙', '预计耗时：90 分钟'].join('\n');
+    const el = renderElement(<TimelineView tasks={[{ id: 't1', title: '多步任务', note }]} />);
+
+    const warning = el.querySelector('[data-testid="timeline-unattributable-t1"]');
+    expect(warning).toBeTruthy();
+    expect(warning?.textContent).toContain('3 个子条目');
+
+    // 三条都是默认时长（没有偷偷把 90 分钟摊成 30 分钟）
+    for (const index of [0, 1, 2]) {
+      const text = el.querySelector(`[data-testid="gantt-duration-${String(index)}"]`)?.textContent;
+      expect(text).toContain('未估时');
+      expect(text).not.toContain('AI 估时');
+    }
+    // 备注里那行估时**不是**一个清单条目
+    expect(el.querySelector('[data-testid="gantt-row-3"]')).toBeNull();
+  });
+
+  it('🔴 没估过时（undefined）说「未估时」，与"估了 0 分钟"分得开', () => {
+    const never = renderElement(<TimelineView tasks={[{ id: 'a', title: '没估过' }]} />);
+    expect(never.querySelector('[data-testid="gantt-duration-0"]')?.textContent).toContain(
+      '未估时',
+    );
+    expect(never.querySelector('[data-testid="timeline-ai-a"]')).toBeNull();
+
+    // 0 分钟：夹到下限 5 分钟，但仍然算"估过"
+    const zero = renderElement(
+      <TimelineView tasks={[{ id: 'b', title: '估了零', note: '预计耗时：0 分钟' }]} />,
+    );
+    expect(zero.querySelector('[data-testid="timeline-ai-b"]')?.textContent).toContain('0 分钟');
+    expect(zero.querySelector('[data-testid="gantt-duration-0"]')?.textContent).toContain(
+      'AI 估时',
+    );
+  });
+
+  it('🔴 空标题 / 空备注也不炸', () => {
+    const el = renderElement(<TimelineView tasks={[{ id: 'x', title: '', note: '' }]} />);
+    expect(el.querySelector('[data-testid="timeline-block-x"]')).toBeTruthy();
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────
+// 🔴🔴 真实可达性：挂真 App，点真导航
+// ─────────────────────────────────────────────────────────────────────────
+
+/**
+ * 这一组补的是本仓库最高发的失效形状：**能力实现了、单测全绿、生产里零调用点。**
+ *
+ * 上面所有测试都能在"没人挂载"的情况下全绿 —— 它们只证明组件本身对。
+ * 所以这里挂**真的 `App`**（不是单独挂 `TimelineView`），点真的导航按钮。
+ * 一旦有人把 `App.tsx` 里的 `'timeline'` 分支或导航项删掉，这一组立刻红。
+ */
+describe('🔴🔴 时间线真的能点到（不是"写好了没人挂载"）', () => {
+  beforeEach(async () => {
+    (globalThis as unknown as { indexedDB: IDBFactory }).indexedDB = new IDBFactory();
+    localStorage.clear();
+    __resetOpLogForTests();
+    await initOpLog();
+  });
+
+  it('🔴 App 的视图切换里有「时间线」，点了能看到时间线视图', () => {
+    const el = renderElement(<App />);
+
+    const tabs = Array.from(el.querySelectorAll('[role="tab"]'));
+    const timelineTab = tabs.find((tab) => (tab.textContent ?? '').includes('时间线'));
+    expect(timelineTab).toBeTruthy();
+
+    act(() => {
+      (timelineTab as HTMLElement).click();
+    });
+
+    expect(el.querySelector('[data-testid="timeline-view"]')).toBeTruthy();
   });
 });
