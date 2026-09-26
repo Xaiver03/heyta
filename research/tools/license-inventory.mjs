@@ -5,7 +5,10 @@
  * 为什么不能只读 lockfile：lockfile 记录的是声明范围与解析结果，
  * 而许可证字段在包的 package.json 里。要"逐项登记"就必须以**真实装了什么**为准。
  *
- * 扫描 pnpm 的虚拟 store（node_modules/.pnpm），去重后产出清单。
+ * 扫描**仓库里所有 pnpm 工作区**的虚拟 store（`node_modules/.pnpm`），去重后产出清单。
+ * 目前有两个：根工作区、以及 `e2e/`（独立工作区，见那里的 `pnpm-workspace.yaml`）。
+ * **加新工作区时必须在下面的 `STORES` 里登记** —— 否则那个工作区的依赖
+ * 会悄悄不被清点，而汇总数字看起来完好无损。
  *
  * 用法：
  *   node research/tools/license-inventory.mjs            # 汇总
@@ -18,7 +21,6 @@ import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '../..');
-const STORE = join(ROOT, 'node_modules/.pnpm');
 
 /** 宽松许可：允许闭源商用。 */
 const PERMISSIVE = [
@@ -82,44 +84,72 @@ const classify = (lic) => {
   return 'other';
 };
 
-if (!existsSync(STORE)) {
-  console.error(`找不到 pnpm store：${STORE}\n请先运行 pnpm install。`);
+/**
+ * 要扫的 pnpm store 列表。
+ *
+ * 🔴 **为什么不止一个。**
+ *
+ * `e2e/` 是一个**独立的 pnpm 工作区**（它有自己的 `pnpm-workspace.yaml`，
+ * 原因见那个文件：根 lockfile 当时被一个并发开发中的新应用占着，不能动）。
+ * 独立工作区就有自己的一份 store —— 只扫根 store 的话，
+ * Playwright 及其依赖会**完全不可见**：`check:licenses` 绿着，
+ * 而它根本没看过那个包。
+ *
+ * 这正是本仓库反复吃亏的那类失效：**门禁绿 ≠ 登记全**。
+ * 之前 `licenses-inventory.generated.md` 漏掉整棵 React Native 子树
+ * （315 → 908）也是同一个形状。所以这里把"要扫哪些 store"写成一份**显式清单**，
+ * 将来再加工作区时，忘了登记会表现为"数字没变"，而不是"悄悄漏了"。
+ */
+const STORES = [
+  { label: '根工作区', path: join(ROOT, 'node_modules/.pnpm') },
+  { label: 'e2e（独立工作区）', path: join(ROOT, 'e2e/node_modules/.pnpm') },
+];
+
+const presentStores = STORES.filter((s) => existsSync(s.path));
+if (presentStores.length === 0) {
+  console.error(
+  `找不到任何 pnpm store。已找过：\n${STORES.map((s) => `  ${s.label}: ${s.path}`).join('\n')}\n` +
+      '请先运行 pnpm install（根目录；e2e 需要单独装）。',
+  );
   process.exit(1);
 }
 
 /** key = `${name}@${version}`，天然对同名多版本去重。 */
 const found = new Map();
 
-for (const entry of readdirSync(STORE)) {
-  // pnpm 目录名形如 `zod@4.6.5` 或 `@prisma+client@5.22.0_prisma@5.22.0`
-  // 直接扫内部 node_modules 更可靠
-  const inner = join(STORE, entry, 'node_modules');
-  if (!existsSync(inner)) continue;
-  for (const name of readdirSync(inner)) {
-    const pkgs = name.startsWith('@')
-      ? readdirSync(join(inner, name)).map((s) => `${name}/${s}`)
-      : [name];
-    for (const pkgName of pkgs) {
-      const pj = join(inner, pkgName, 'package.json');
-      if (!existsSync(pj)) continue;
-      try {
-        const j = JSON.parse(readFileSync(pj, 'utf8'));
-        const lic = normalize(j.license ?? j.licenses);
-        const key = `${j.name}@${j.version}`;
-        if (!found.has(key)) {
-          found.set(key, {
-            name: j.name,
-            version: j.version,
-            license: lic,
-            kind: classify(lic),
-            repo:
-              typeof j.repository === 'string'
-                ? j.repository
-                : j.repository?.url ?? '',
-          });
+for (const store of presentStores) {
+  for (const entry of readdirSync(store.path)) {
+    // pnpm 目录名形如 `zod@4.6.5` 或 `@prisma+client@5.22.0_prisma@5.22.0`
+    // 直接扫内部 node_modules 更可靠
+    const inner = join(store.path, entry, 'node_modules');
+    if (!existsSync(inner)) continue;
+    for (const name of readdirSync(inner)) {
+      const pkgs = name.startsWith('@')
+        ? readdirSync(join(inner, name)).map((s) => `${name}/${s}`)
+        : [name];
+      for (const pkgName of pkgs) {
+        const pj = join(inner, pkgName, 'package.json');
+        if (!existsSync(pj)) continue;
+        try {
+          const j = JSON.parse(readFileSync(pj, 'utf8'));
+          const lic = normalize(j.license ?? j.licenses);
+          const key = `${j.name}@${j.version}`;
+          if (!found.has(key)) {
+            found.set(key, {
+              name: j.name,
+              version: j.version,
+              license: lic,
+              kind: classify(lic),
+              store: store.label,
+              repo:
+                typeof j.repository === 'string'
+                  ? j.repository
+                  : j.repository?.url ?? '',
+            });
+          }
+        } catch {
+          /* 坏 package.json 跳过 */
         }
-      } catch {
-        /* 坏 package.json 跳过 */
       }
     }
   }

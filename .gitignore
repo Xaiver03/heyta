@@ -3,6 +3,13 @@ dist/
 dist-types/
 *.tsbuildinfo
 
+# 构建产物：任何层级叫 build/ 的目录都是产物，不是源码。
+# 各 app 的 .gitignore 里有更细的规则（apps/mobile 覆盖 Gradle / CocoaPods /
+# NDK 的产物路径），这里是兜底 —— 免得又出现「某个 app 忘了写自己的规则，
+# 结果 `git add -A` 把产物带进仓库」那种事（.pnpm-store 就是这么进来的）。
+# 真要提交某个 build/ 目录时，先确认它确实是源码而不是构建脚本。
+build/
+
 # 环境变量：可能含密钥，绝不入库
 .env
 .env.local
@@ -22,17 +29,37 @@ research/vendor/
 coverage/
 *.log
 
-# 内容寻址包缓存 —— 不是源码，按 lockfile 可完整重建。
+# pnpm 内容寻址缓存。
 #
-# 🔴 这三个目录曾经被误提交（`git add -A` 带进去的），合计 444.9 MB / 8456 个文件，
-# 占了整个 tip 树的 98%。它们就是 CI 克隆慢的真正原因：
-#     .pnpm-store/                               188.4 MiB   7671 个文件
-#     research/standalone/.npm-cache/            130.2 MiB    290 个文件
-#     research/standalone/sync-core/.npmcache2/  126.4 MiB    495 个文件
-# 内容寻址、每次 install 都会新增大量 blob、换台机器或换个 pnpm 版本就漂移 ——
+# 🔴 这个目录**曾经被误提交**（b59dfb6，一次普通的 feat 提交里被 `git add -A` 带进去的），
+# 当时入库了 7671 个文件、目录体积 **949 MB**。它不是源码，是缓存：
+#   - 内容寻址，可按 lockfile 完整重建
+#   - 每次 install 都会新增大量 blob（本次新增 38202 个文件）
+#   - 换一台机器、换一个 pnpm 版本就会漂移
 # 提交它只会让每次安装都产生一份没人看得懂的巨型 diff。
-# 文件仍留在本地磁盘上，只是不再入库。
+# 已用 `git rm -r --cached .pnpm-store` 取消跟踪，文件仍留在本地磁盘上。
 .pnpm-store/
+
+# npm 的 `_cacache` 内容寻址缓存 —— 和上面的 .pnpm-store 同一类东西：
+# 缓存不是源码，按 lockfile 可以完整重建，提交它只会让每次 install 产生巨型 diff。
+# research/standalone/ 下的两个独立 PoC 各自带了一份，入库了 785 个文件 / 256 MB。
 .npm-cache/
 .npmcache*/
 _cacache/
+
+# Playwright（`e2e/`）跑完留下的产物。
+#
+# 它们是**失败现场的取证材料**（trace / 截图 / 录屏，见 `playwright.config.ts`
+# 的 `trace: 'retain-on-failure'`），不是源码：每次跑都不一样，
+# 而且实测一次失败就能产出 8 MB。入库的后果是"每次跑测试都产生一份没人看得懂的
+# 二进制 diff"，与上面 `.pnpm-store/` 是同一类错误。
+#
+# 🔴 但**不要**因为忽略它们就把 `retain-on-failure` 关掉 ——
+# 门禁红了的时候，那份 trace 是唯一能告诉你"浏览器里当时发生了什么"的东西。
+# 正确做法是在 CI 里把它当 **artifact 上传**，而不是提交进仓库。
+e2e/test-results/
+e2e/playwright-report/
+e2e/blob-report/
+e2e/.playwright/
+e2e/.cache/
+

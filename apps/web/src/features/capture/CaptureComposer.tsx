@@ -31,11 +31,43 @@ import {
   Priority,
   dueDateToEpoch,
   formatRemainingUntil,
+  localDateTimeToEpoch,
   parseCapture,
+  type AiFeedbackOutcome,
   type CaptureExclusion,
+  type PreferenceSet,
 } from '@heyta/domain';
+import type {
+  AiHealthSnapshot,
+  AiRoutingConfig,
+  EgressConsent,
+  HealthMap,
+  SecretStore,
+} from '@heyta/ai';
 
+import { AiCapture } from '../ai/AiCapture.js';
+import { WEB_EMPTY_SECRET_STORE } from '../settings/aiStore.js';
 import { useTaskStore } from '../tasks/store.js';
+
+/**
+ * 接线所需的 AI 配置 —— 全部由 `App.tsx` 透传，本组件**不做任何判断**。
+ *
+ * 它们是可选的：不传就退化成纯确定性捕获（本组件的单测就是这么用的）。
+ * 这样"AI 没配置"和"AI 关了"走的都是同一条路，不需要两套渲染。
+ */
+export interface CaptureComposerProps {
+  routing?: AiRoutingConfig | undefined;
+  consents?: readonly EgressConsent[] | undefined;
+  secrets?: SecretStore | undefined;
+  healthSnapshot?: AiHealthSnapshot | undefined;
+  preferenceSet?: PreferenceSet | undefined;
+  onHealth?: ((health: HealthMap) => void) | undefined;
+  onFeedback?: ((feedback: {
+    outcome: AiFeedbackOutcome;
+    proposedCount: number;
+    appliedCount: number;
+  }) => void) | undefined;
+}
 
 /** 优先级 → 可读文案。与 `capture.ts` 的 display 保持一致口径。 */
 const PRIORITY_LABEL: Record<number, string> = {
@@ -45,7 +77,7 @@ const PRIORITY_LABEL: Record<number, string> = {
   [Priority.None]: '无优先级',
 };
 
-export function CaptureComposer(): React.JSX.Element {
+export function CaptureComposer(props: CaptureComposerProps): React.JSX.Element {
   const addTask = useTaskStore((s) => s.addTask);
   const [draft, setDraft] = useState('');
   /**
@@ -87,6 +119,36 @@ export function CaptureComposer(): React.JSX.Element {
   function onDraftChange(value: string): void {
     setDraft(value);
     if (ignored.length > 0) setIgnored([]);
+  }
+
+  /**
+   * AI 解析出的字段落库。
+   *
+   * 🔴 走的是**和回车完全相同的那条路**（`addTask` → op-log），
+   * 所以它同样可同步、可撤销、可被别的设备看到 —— AI 没有旁路。
+   *
+   * ⚠️ `dueDate` 在这里从「本地日期时间串」换算成 epoch 毫秒。
+   * 这一步**必须**在界面侧做，因为 `ai-capture` 只给本地串
+   * （它不替 domain 决定时区语义，见那个文件头）。
+   * 换算失败（模型给了不存在的日期）就**当作没给** —— 宁可少一个截止时间，
+   * 也不要一个静默错位的日期。
+   */
+  async function applyCapture(fields: {
+    title: string;
+    dueDate?: string | undefined;
+    priority?: Priority | undefined;
+  }): Promise<void> {
+    const due =
+      fields.dueDate === undefined ? undefined : localDateTimeToEpoch(fields.dueDate);
+    await addTask(fields.title, {
+      ...(due !== undefined ? { dueDate: due } : {}),
+      ...(fields.priority !== undefined ? { priority: fields.priority } : {}),
+    });
+    // 建完清空输入框：AI 应用与回车应当是**同一种结果**，
+    // 否则用户会面对两套行为（一个清、一个不清），而且残留的文字
+    // 会让下一次回车悄悄建出重复任务。
+    setDraft('');
+    setIgnored([]);
   }
 
   return (
@@ -170,6 +232,32 @@ export function CaptureComposer(): React.JSX.Element {
         <p className="ht-capture__preview">
           实际标题：<strong>{parsed.title === '' ? '（空）' : parsed.title}</strong>
         </p>
+      )}
+
+      {/* AI 一句话捕获（功能 ①）。
+          🔴 它与上面的规则解析**并存**，不是替换 —— 规则那条路对「明天」
+          「下周三」「!1」是**算准的**，而 `packages/ai/src/index.ts` 记着一次实测：
+          同一个句子里模型算出来的日期错了约 4.5 个月。所以凡规则能算准的，
+          继续走规则；AI 补的是规则覆盖不到的（"下下个季度前"、含歧义的表达）。
+
+          ⚠️ 只在**有内容**时出现：空输入框上挂一个"AI 解析"按钮，
+          点下去必然失败，那是在制造一次注定报错的交互。
+
+          ⚠️ 没配置 AI 时也**照样出现**（`routing` 缺省时组件自己会说该去开什么）——
+          "找不到入口"和"入口说为什么不可用"是两件事。但这一条只在
+          `App.tsx` 传了 AI 配置时才成立；纯确定性场景（单测）不渲染它。 */}
+      {props.routing !== undefined && draft.trim() !== '' && (
+        <AiCapture
+          text={draft}
+          routing={props.routing}
+          consents={props.consents ?? []}
+          secrets={props.secrets ?? WEB_EMPTY_SECRET_STORE}
+          healthSnapshot={props.healthSnapshot}
+          preferenceSet={props.preferenceSet}
+          onApply={applyCapture}
+          {...(props.onFeedback !== undefined ? { onFeedback: props.onFeedback } : {})}
+          {...(props.onHealth !== undefined ? { onHealth: props.onHealth } : {})}
+        />
       )}
     </div>
   );

@@ -71,8 +71,33 @@ jobs:
       - name: 按 lockfile 严格安装
         run: pnpm install --frozen-lockfile
 
-      # 12 道门禁（build + 全量 typecheck + 迁移/layering/文案/许可证/文档/
-      # 设计/token/ArkTS/原生依赖/物化读），全部真实执行，不跳过。
+      # 🔴 `e2e/` 是**独立工作区**，根 `pnpm install` 不会装它。
+      # 它有自己的一份 lockfile（见 `e2e/pnpm-workspace.yaml` 里的说明：
+      # 根 lockfile 曾被一个并发开发中的应用污染，独立出去才不会互相拖累）。
+      # 忘了这一步的表现是 `pnpm check` 在 `check:ai-e2e` 处报
+      # "playwright: command not found" —— 看起来像门禁坏了，其实是没装。
+      - name: 装 E2E 工作区（独立 lockfile）
+        run: pnpm --dir e2e install --frozen-lockfile
+
+      # 浏览器不进 lockfile，要单独下载。缓存键跟着 lockfile 走：
+      # Playwright 升级时缓存自动失效，不会出现"缓存里是旧版浏览器"的错配。
+      - name: 缓存 Chromium
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('e2e/pnpm-lock.yaml') }}
+
+      - name: 装 Chromium
+        run: pnpm --dir e2e run install-browser
+
+      # 14 道门禁（build + 全量 typecheck + 迁移/layering/文案/许可证/文档/
+      # 设计/token/ArkTS/原生依赖/物化读 + **AI 可达性** + **AI 真实浏览器 E2E**），
+      # 全部真实执行，不跳过。
+      #
+      # 🔴 最后两道是本仓库对"AI 功能做完了"的定义，不是可选加分项：
+      # `check:ai-coverage` 保证四个 AiFeature 从实现到界面没有断链
+      # （它专门查"引用了 ≠ 用户能用"，见 docs/runbooks/ai-acceptance.md），
+      # `check:ai-e2e` 保证用户旅程在真 Chromium 里真的走得通。
       - name: 门禁
         run: pnpm check
 
