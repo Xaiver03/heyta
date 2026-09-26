@@ -28,18 +28,26 @@
 import React, { useMemo } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import type { MessageKey } from '@heyta/i18n';
+import { useI18n } from '@heyta/i18n';
 import { useText, useTheme, useTokens } from '../theme';
 import { Badge, Text } from '../ui/kit';
 import { Icon } from '../ui/icons';
 import type { IconName } from '../ui/icons';
 
-/** 四个 tab。顺序即显示顺序，也是产品结构。 */
+/**
+ * 四个 tab。顺序即显示顺序，也是产品结构。
+ *
+ * ⚠️ 这里存的是**词条 key 不是文案**：模块级拿不到 `t`，而把中文写在这里
+ * 就是硬编码 —— 迁移模式下门禁会直接判红（这正是"数据数组里的文案"那个盲区，
+ * 本仓库明确不许利用它）。
+ */
 export const TABS = [
-  { key: 'tasks', label: '任务', icon: 'tab.tasks' },
-  { key: 'calendar', label: '日历', icon: 'tab.calendar' },
-  { key: 'focus', label: '专注', icon: 'tab.focus' },
-  { key: 'profile', label: '我的', icon: 'tab.profile' },
-] as const satisfies ReadonlyArray<{ key: string; label: string; icon: IconName }>;
+  { key: 'tasks', labelKey: 'mobile.tab.tasks', icon: 'tab.tasks' },
+  { key: 'calendar', labelKey: 'mobile.tab.calendar', icon: 'tab.calendar' },
+  { key: 'focus', labelKey: 'mobile.tab.focus', icon: 'tab.focus' },
+  { key: 'profile', labelKey: 'mobile.tab.profile', icon: 'tab.profile' },
+] as const satisfies ReadonlyArray<{ key: string; labelKey: MessageKey; icon: IconName }>;
 
 export type TabKey = (typeof TABS)[number]['key'];
 
@@ -57,9 +65,10 @@ export interface TabBarProps {
 }
 
 export function TabBar({ active, onChange, badges }: TabBarProps): React.JSX.Element {
-  const t = useTokens();
+  const tokens = useTokens();
   const text = useText();
   const { reducedMotion } = useTheme();
+  const { t } = useI18n();
   const insets = useSafeAreaInsets();
 
   const styles = useMemo(
@@ -70,51 +79,51 @@ export function TabBar({ active, onChange, badges }: TabBarProps): React.JSX.Ele
           // 放进去的后果是内容在"扣掉底部之后"的区域里垂直居中，
           // 图标被顶到最上面 —— 实测 52 − 8 = 44 的内容区装 42 的内容，
           // 上下各剩 1px，看着像完全没有留白。
-          paddingBottom: Math.max(insets.bottom, t['nav.safe-bottom-min']),
-          backgroundColor: t['color.surface'],
-          borderTopWidth: t['border-width.thin'],
-          borderTopColor: t['color.border'],
+          paddingBottom: Math.max(insets.bottom, tokens['nav.safe-bottom-min']),
+          backgroundColor: tokens['color.surface'],
+          borderTopWidth: tokens['border-width.thin'],
+          borderTopColor: tokens['color.border'],
         },
         barRow: {
           flexDirection: 'row',
           // 这一层才是"标签栏高度"，内容在其中居中。
-          height: t['nav.tab-bar-height'],
+          height: tokens['nav.tab-bar-height'],
         },
         item: {
           flex: 1,
-          minWidth: t['nav.tab-item-min-width'],
+          minWidth: tokens['nav.tab-item-min-width'],
           // 🔴 触控下限 44：标签栏是最高频的交互面，
           // 这一条不是"最好满足"，是不可妥协（WCAG 2.5.5）。
-          minHeight: t['touch-target.min'],
+          minHeight: tokens['touch-target.min'],
           alignItems: 'center',
           justifyContent: 'center',
-          gap: t['space.1'],
+          gap: tokens['space.1'],
         },
         indicator: {
           position: 'absolute',
           // 🔴 不能让出 0：贴到顶边会与标签栏的**上边框线重叠**，
           // 两者糊成一条，看起来像渲染错位。
-          top: t['nav.tab-indicator-inset'],
-          width: t['nav.tab-indicator-width'],
-          height: t['nav.tab-indicator-height'],
-          borderBottomLeftRadius: t['radius.full'],
-          borderBottomRightRadius: t['radius.full'],
-          backgroundColor: t['color.primary'],
+          top: tokens['nav.tab-indicator-inset'],
+          width: tokens['nav.tab-indicator-width'],
+          height: tokens['nav.tab-indicator-height'],
+          borderBottomLeftRadius: tokens['radius.full'],
+          borderBottomRightRadius: tokens['radius.full'],
+          backgroundColor: tokens['color.primary'],
         },
         // 指示条只在选中时占位，未选中时用同尺寸的透明占位 ——
         // 否则选中切换时整个标签会上下跳动（布局位移）。
         indicatorSpacer: {
           position: 'absolute',
-          top: t['nav.tab-indicator-inset'],
-          width: t['nav.tab-indicator-width'],
-          height: t['nav.tab-indicator-height'],
+          top: tokens['nav.tab-indicator-inset'],
+          width: tokens['nav.tab-indicator-width'],
+          height: tokens['nav.tab-indicator-height'],
           backgroundColor: 'transparent',
         },
         // 图标容器：角标靠它定位。RN 里 position 默认就是 relative，
         // 但这个 View 是角标能压在图标右上角的**唯一**锚点。
         iconWrap: {
-          width: t['nav.tab-icon-size'],
-          height: t['nav.tab-icon-size'],
+          width: tokens['nav.tab-icon-size'],
+          height: tokens['nav.tab-icon-size'],
           alignItems: 'center',
           justifyContent: 'center',
         },
@@ -122,11 +131,11 @@ export function TabBar({ active, onChange, badges }: TabBarProps): React.JSX.Ele
           position: 'absolute',
           // 角标中心压在图标右上角的**顶点**上（Apple HIG 的角标位置），
           // 而不是完全在图标外面 —— 后者会让标签栏显得拥挤。
-          top: -t['space.1'],
-          right: -t['space.2'],
+          top: -tokens['space.1'],
+          right: -tokens['space.2'],
         },
       }),
-    [t, insets.bottom],
+    [tokens, insets.bottom],
   );
 
   return (
@@ -140,13 +149,13 @@ export function TabBar({ active, onChange, badges }: TabBarProps): React.JSX.Ele
               onPress={() => onChange(tab.key)}
               accessibilityRole="tab"
               accessibilityState={{ selected }}
-              accessibilityLabel={tab.label}
+              accessibilityLabel={t(tab.labelKey)}
               style={({ pressed }) => [
                 styles.item,
                 // 按下反馈：整块变暗，用叠加色而不是改每个 children 的颜色 ——
                 // 后者要动图标和文字两处，迟早只改一处。
                 pressed && !reducedMotion
-                  ? { backgroundColor: t['color.hover'] }
+                  ? { backgroundColor: tokens['color.hover'] }
                   : null,
               ]}
             >
@@ -155,7 +164,7 @@ export function TabBar({ active, onChange, badges }: TabBarProps): React.JSX.Ele
                 <Icon
                   name={tab.icon}
                   size="tab"
-                  color={selected ? t['color.primary'] : t['color.foreground-muted']}
+                  color={selected ? tokens['color.primary'] : tokens['color.foreground-muted']}
                 />
                 {badges?.[tab.key] !== undefined ? (
                   <View style={styles.badge}>
@@ -166,10 +175,10 @@ export function TabBar({ active, onChange, badges }: TabBarProps): React.JSX.Ele
               <Text
                 style={[
                   text['tab-label'],
-                  { color: selected ? t['color.primary'] : t['color.foreground-muted'] },
+                  { color: selected ? tokens['color.primary'] : tokens['color.foreground-muted'] },
                 ]}
               >
-                {tab.label}
+                {t(tab.labelKey)}
               </Text>
             </Pressable>
           );

@@ -16,6 +16,9 @@
  */
 
 import { addDays, isoWeekday, type LocalDate } from '@heyta/domain';
+import type { MessageKey } from '@heyta/i18n';
+
+import type { Translate } from '../i18n/translate';
 
 export interface QuickDatePick {
   /** 稳定 key，UI 用它做 `key` 与"当前选中"判定。 */
@@ -32,13 +35,20 @@ export interface QuickDatePick {
  * 会让用户在周日当天点"本周末"却跳到 7 天后。
  *
  * 「下周一」= 从今天算起的下一个周一。今天是周日时就是明天。
+ *
+ * ⚠️ `t` 由调用方传入：本函数是纯函数（有单测），**不能**从 context 取。
  */
-export function quickDatePicks(now: LocalDate): QuickDatePick[] {
+export function quickDatePicks(now: LocalDate, t: Translate): QuickDatePick[] {
   const weekday = isoWeekday(now); // 1=周一 … 7=周日
+  const pick = (key: string, labelKey: MessageKey, date: LocalDate): QuickDatePick => ({
+    key,
+    label: t(labelKey),
+    date,
+  });
   return [
-    { key: 'today', label: '今天', date: now },
-    { key: 'tomorrow', label: '明天', date: addDays(now, 1) },
-    { key: 'weekend', label: '本周末', date: addDays(now, 7 - weekday) },
-    { key: 'next-week', label: '下周一', date: addDays(now, 8 - weekday) },
+    pick('today', 'mobile.common.today', now),
+    pick('tomorrow', 'mobile.quickDate.tomorrow', addDays(now, 1)),
+    pick('weekend', 'mobile.quickDate.weekend', addDays(now, 7 - weekday)),
+    pick('next-week', 'mobile.quickDate.nextWeek', addDays(now, 8 - weekday)),
   ];
 }

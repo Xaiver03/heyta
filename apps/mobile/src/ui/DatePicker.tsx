@@ -23,18 +23,16 @@ import { Pressable, View } from 'react-native';
 
 import {
   addMonths,
-  formatMonthTitle,
   monthGrid,
   startOfMonth,
   type LocalDate,
 } from '@heyta/domain';
+import { useI18n } from '@heyta/i18n';
 
+import { WEEKDAY_MESSAGE_KEYS, formatMonthTitleText } from '../lib/date';
 import { quickDatePicks } from '../lib/quick-dates';
 import { useTokens } from '../theme';
 import { Chip, IconButton, Text } from './kit';
-
-/** 周一开头，与 `monthGrid` 的约定一致。 */
-const WEEKDAY_LABELS = ['一', '二', '三', '四', '五', '六', '日'] as const;
 
 export function DatePicker({
   value,
@@ -46,7 +44,8 @@ export function DatePicker({
   onChange: (date: LocalDate | undefined) => void;
   today: LocalDate;
 }): React.JSX.Element {
-  const t = useTokens();
+  const tokens = useTokens();
+  const { t } = useI18n();
 
   // 可见月份。初始跟到已选日期，没选就停在"今天"那一月。
   const [month, setMonth] = useState<LocalDate>(() => startOfMonth(value ?? today));
@@ -57,12 +56,12 @@ export function DatePicker({
     if (value !== undefined) setMonth(startOfMonth(value));
   }, [value]);
 
-  const picks = quickDatePicks(today);
+  const picks = quickDatePicks(today, t);
   const weeks = monthGrid(month);
 
   return (
-    <View style={{ gap: t['space.3'] }}>
-      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: t['space.2'] }}>
+    <View style={{ gap: tokens['space.3'] }}>
+      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: tokens['space.2'] }}>
         {picks.map((pick) => (
           <Chip
             key={pick.key}
@@ -76,7 +75,7 @@ export function DatePicker({
         {/* 「清除」只在真的有日期时出现 —— 没日期时给一个"清除"是假的选择 */}
         {value !== undefined ? (
           <Chip
-            label="清除"
+            label={t('mobile.datePicker.clear')}
             onPress={() => {
               onChange(undefined);
             }}
@@ -93,17 +92,17 @@ export function DatePicker({
       >
         <IconButton
           icon="action.prev-month"
-          label="上个月"
-          color={t['color.foreground-muted']}
+          label={t('mobile.common.prevMonth')}
+          color={tokens['color.foreground-muted']}
           onPress={() => {
             setMonth(addMonths(month, -1));
           }}
         />
-        <Text variant="row-title">{formatMonthTitle(month)}</Text>
+        <Text variant="row-title">{formatMonthTitleText(month, t)}</Text>
         <IconButton
           icon="action.next-month"
-          label="下个月"
-          color={t['color.foreground-muted']}
+          label={t('mobile.common.nextMonth')}
+          color={tokens['color.foreground-muted']}
           onPress={() => {
             setMonth(addMonths(month, 1));
           }}
@@ -111,10 +110,10 @@ export function DatePicker({
       </View>
 
       <View style={{ flexDirection: 'row' }}>
-        {WEEKDAY_LABELS.map((label) => (
-          <View key={label} style={{ flex: 1, alignItems: 'center' }}>
+        {WEEKDAY_MESSAGE_KEYS.map((key) => (
+          <View key={key} style={{ flex: 1, alignItems: 'center' }}>
             <Text variant="row-meta" tone="subtle">
-              {label}
+              {t(key)}
             </Text>
           </View>
         ))}
@@ -127,7 +126,7 @@ export function DatePicker({
             const isToday = cell.date === today;
             const day = Number(cell.date.slice(8, 10));
             const monthOfCell = Number(cell.date.slice(5, 7));
-            const label = `${String(monthOfCell)}月${String(day)}日`;
+            const label = t('mobile.datePicker.dayLabel', { month: monthOfCell, day });
 
             return (
               <Pressable
@@ -145,7 +144,7 @@ export function DatePicker({
                   flex: 1,
                   // ⚠️ 这里只给 height，不给 paddingBottom —— 两个一起给
                   // 会让内层在压缩后的盒子居中，表现为整体偏上。
-                  height: t['touch-target.min'],
+                  height: tokens['touch-target.min'],
                   alignItems: 'center',
                   justifyContent: 'center',
                 }}
@@ -153,20 +152,20 @@ export function DatePicker({
                 {/* 定尺寸内层：圆是圆的，与列宽无关 */}
                 <View
                   style={{
-                    width: t['touch-target.min'],
-                    height: t['touch-target.min'],
-                    borderRadius: t['radius.full'],
+                    width: tokens['touch-target.min'],
+                    height: tokens['touch-target.min'],
+                    borderRadius: tokens['radius.full'],
                     alignItems: 'center',
                     justifyContent: 'center',
-                    backgroundColor: selected ? t['color.primary'] : 'transparent',
-                    borderWidth: isToday && !selected ? t['border-width.thin'] : 0,
-                    borderColor: t['color.primary'],
+                    backgroundColor: selected ? tokens['color.primary'] : 'transparent',
+                    borderWidth: isToday && !selected ? tokens['border-width.thin'] : 0,
+                    borderColor: tokens['color.primary'],
                   }}
                 >
                   <Text
                     variant="row-meta"
                     tone={selected ? 'default' : cell.inMonth ? 'default' : 'subtle'}
-                    style={selected ? { color: t['color.on-primary'] } : undefined}
+                    style={selected ? { color: tokens['color.on-primary'] } : undefined}
                   >
                     {String(day)}
                   </Text>
