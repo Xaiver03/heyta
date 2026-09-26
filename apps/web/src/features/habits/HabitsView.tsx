@@ -13,13 +13,45 @@
 import { useState } from 'react';
 import { ActivityCalendar } from 'react-activity-calendar';
 import { cssVar, cssVarName } from '@heyta/design-system';
+import { useI18n, type I18nValue } from '@heyta/i18n';
 import { Check, Flame, Plus, Undo2 } from 'lucide-react';
 
 import { selectHabitProgress, selectHeatmap, useHabitStore } from './store.js';
 
 const NOW_STATE_KEY = 'now';
 
+/**
+ * 连续天数 → 一句话。
+ *
+ * 🔴 词条表没有 ICU：连续 1 天时英文必须走单数兄弟词条
+ * （"Streak 1 days" 是一眼可见的坏句子）。两个数字各自分支，
+ * 因为它们完全可能一个是 1、另一个不是。
+ *
+ * 放在组件外、显式收 `t`：这样它既在 JSX 之外拼好句子
+ * （门禁只认"字面量紧跟 `t(`"的形状），又不依赖 hook。
+ */
+function streakText(current: number, longest: number, t: I18nValue['t']): string {
+  const currentText = t(
+    current === 1 ? 'web.habits.streak.currentOne' : 'web.habits.streak.current',
+    { count: current },
+  );
+  const longestText = t(
+    longest === 1 ? 'web.habits.streak.longestOne' : 'web.habits.streak.longest',
+    { count: longest },
+  );
+  // 分隔符是纯标点，不属于任何一种语言。
+  return `${currentText} · ${longestText}`;
+}
+
+/** 打卡按钮的无障碍名："撤销今日打卡" / "为它打卡" 是两句话，各自成词条。 */
+function checkInLabel(name: string, doneToday: boolean, t: I18nValue['t']): string {
+  return doneToday
+    ? t('web.habits.a11y.undo', { name })
+    : t('web.habits.a11y.checkIn', { name });
+}
+
 export function HabitsView() {
+  const { t } = useI18n();
   const store = useHabitStore();
   const [draft, setDraft] = useState('');
   // 固定"现在"，避免同一次渲染里跨午夜导致不一致
@@ -48,8 +80,8 @@ export function HabitsView() {
         <input
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
-          placeholder="新习惯，例如「喝水」"
-          aria-label="新习惯名称"
+          placeholder={t('web.habits.addPlaceholder')}
+          aria-label={t('web.habits.addLabel')}
           style={{
             flex: 1,
             minHeight: cssVar('touch-target.min'),
@@ -65,7 +97,7 @@ export function HabitsView() {
         />
         <button
           type="submit"
-          aria-label="添加习惯"
+          aria-label={t('web.habits.add')}
           style={{
             minWidth: cssVar('touch-target.min'),
             minHeight: cssVar('touch-target.min'),
@@ -84,7 +116,7 @@ export function HabitsView() {
 
       {progress.length === 0 && (
         <p style={{ color: cssVar('color.foreground-muted'), fontSize: cssVar('font-size.sm') }}>
-          还没有习惯。添加一个开始打卡。
+          {t('web.habits.empty')}
         </p>
       )}
 
@@ -128,16 +160,7 @@ export function HabitsView() {
                   }}
                 >
                   <Flame size={12} aria-hidden="true" />
-                  连续
-                  {/* tabular-nums：数字变化时宽度不跳 */}
-                  <span className="ht-tabular" style={{ fontVariantNumeric: 'tabular-nums' }}>
-                    {p.streak.current}
-                  </span>
-                  天 · 最长
-                  <span style={{ fontVariantNumeric: 'tabular-nums' }}>
-                    {p.streak.longest}
-                  </span>
-                  天
+                  {streakText(p.streak.current, p.streak.longest, t)}
                 </div>
               </div>
 
@@ -150,7 +173,7 @@ export function HabitsView() {
                     void store.checkIn(p.habit.id);
                   }
                 }}
-                aria-label={p.doneToday ? `撤销「${p.habit.name}」今日打卡` : `为「${p.habit.name}」打卡`}
+                aria-label={checkInLabel(p.habit.name, p.doneToday, t)}
                 aria-pressed={p.doneToday}
                 style={{
                   minWidth: cssVar('touch-target.min'),
@@ -175,12 +198,12 @@ export function HabitsView() {
                 {p.doneToday ? (
                   <>
                     <Check size={16} aria-hidden="true" />
-                    已打卡
+                    {t('web.habits.checkedIn')}
                   </>
                 ) : (
                   <>
                     <Undo2 size={16} aria-hidden="true" />
-                    打卡
+                    {t('web.habits.checkIn')}
                   </>
                 )}
               </button>

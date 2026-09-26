@@ -26,15 +26,37 @@
  */
 import { useEffect } from 'react';
 import { cssVar } from '@heyta/design-system';
-import { useLocale } from '@heyta/i18n';
+import { useI18n, type MessageKey } from '@heyta/i18n';
 import { CloudOff, Server } from 'lucide-react';
 
-import { subscriptionMessage, type SubscriptionNoticeVariant } from './copy.js';
+/**
+ * 提示的措辞变体。
+ *
+ * `expired` 与 `refused` 分开，是因为"到期了"和"服务端因其它原因拒绝"
+ * 对用户来说是不同的信息 —— 把它们合并成一句会让其中一种说假话。
+ */
+export type SubscriptionNoticeVariant = 'expired' | 'refused';
+
+/**
+ * 变体 → 词条。用 `Record` 而不是 `t(\`...${variant}...\`)`：
+ * **动态拼 key 在门禁上是违规的**（拼错了就没有类型检查兜底），
+ * 而且 `Record` 让"新加一个变体却忘了加词条"变成编译错误。
+ */
+const VARIANT_KEYS: Record<SubscriptionNoticeVariant, { title: MessageKey; body: MessageKey }> = {
+  expired: {
+    title: 'web.subscription.notice.expired.title',
+    body: 'web.subscription.notice.expired.body',
+  },
+  refused: {
+    title: 'web.subscription.notice.refused.title',
+    body: 'web.subscription.notice.refused.body',
+  },
+};
 import { useSubscriptionStore } from './store.js';
 import { useSyncStore } from '../sync/store.js';
 
 export function SubscriptionNotice(): React.JSX.Element | null {
-  const locale = useLocale();
+  const { t } = useI18n();
   const access = useSubscriptionStore((s) => s.access);
   const refresh = useSubscriptionStore((s) => s.refresh);
   // 地址 / 令牌一变就重新问一次：用户刚把地址换成自己的服务器时，
@@ -52,12 +74,12 @@ export function SubscriptionNotice(): React.JSX.Element | null {
   if (access.kind !== 'restricted') return null;
 
   const variant: SubscriptionNoticeVariant = access.expired ? 'expired' : 'refused';
-  const messageKey = `subscription.notice.${variant}` as const;
-  const label = subscriptionMessage(locale, 'subscription.notice.a11y');
-  const title = subscriptionMessage(locale, `${messageKey}.title`);
-  const body = subscriptionMessage(locale, `${messageKey}.body`);
-  const localData = subscriptionMessage(locale, 'subscription.notice.localData');
-  const selfHost = subscriptionMessage(locale, 'subscription.notice.selfHost');
+  const { title: titleKey, body: bodyKey } = VARIANT_KEYS[variant];
+  const label = t('web.subscription.notice.a11y');
+  const title = t(titleKey);
+  const body = t(bodyKey);
+  const localData = t('web.subscription.notice.localData');
+  const selfHost = t('web.subscription.notice.selfHost');
 
   return (
     <div

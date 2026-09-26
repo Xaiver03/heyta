@@ -16,7 +16,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { ConflictDialog } from '../src/features/sync/ConflictDialog.js';
 import { useSyncStore } from '../src/features/sync/store.js';
-import { describeConflictPayload, type ConflictInfo } from '@heyta/sync-client';
+import { summarizeConflictPayload, type ConflictInfo } from '@heyta/sync-client';
 
 function makeConflict(): ConflictInfo {
   return {
@@ -65,19 +65,22 @@ afterEach(() => {
   useSyncStore.setState({ status: { kind: 'idle' }, conflictDialogOpen: false });
 });
 
-describe('describeConflictPayload', () => {
-  it('优先取可读标题字段', () => {
-    expect(describeConflictPayload({ title: '写周报' })).toBe('写周报');
-    expect(describeConflictPayload({ name: '项目 A' })).toBe('项目 A');
+describe('冲突载荷摘要：判断在 sync-client，措辞在界面', () => {
+  it('优先取可读标题字段（用户自己的字，不翻译）', () => {
+    expect(summarizeConflictPayload({ title: '写周报' })).toEqual({ kind: 'text', text: '写周报' });
+    expect(summarizeConflictPayload({ name: '项目 A' })).toEqual({ kind: 'text', text: '项目 A' });
   });
 
-  it('没有标题时列出字段，而不是显示"对象"', () => {
-    expect(describeConflictPayload({ completedAt: 123 })).toContain('completedAt');
+  it('🔴 没有标题时只报"有多少个字段"，字段名本身不进界面', () => {
+    const summary = summarizeConflictPayload({ completedAt: 123, dueDate: '2026-03-02' });
+    expect(summary.kind).toBe('fields');
+    if (summary.kind === 'fields') expect(summary.fields).toHaveLength(2);
+    // 界面只显示数量 —— 下面那条渲染断言钉住字段名绝不出现。
   });
 
-  it('空载荷有明确文案', () => {
-    expect(describeConflictPayload(null)).toBe('（空）');
-    expect(describeConflictPayload({})).toBe('（空）');
+  it('空载荷是 `empty`，不是「一个空对象」', () => {
+    expect(summarizeConflictPayload(null)).toEqual({ kind: 'empty' });
+    expect(summarizeConflictPayload({})).toEqual({ kind: 'empty' });
   });
 });
 
@@ -189,5 +192,31 @@ describe('ConflictDialog', () => {
     // 对话框关了，但冲突本身还在 —— SyncBar 仍能提示并再次打开
     expect(useSyncStore.getState().conflictDialogOpen).toBe(false);
     expect(useSyncStore.getState().status.kind).toBe('conflict');
+  });
+
+  it('🔴 结构化载荷只显示字段数量，绝不泄漏内部字段名', () => {
+    const base = makeConflict();
+    const remoteSide = base.remote;
+    if (remoteSide === undefined) throw new Error('fixture 必须带 remote');
+    useSyncStore.setState({
+      status: {
+        kind: 'conflict',
+        conflicts: [
+          {
+            ...base,
+            local: { ...base.local, payload: { completedAt: 123, dueDate: '2026-03-02' } },
+            remote: { ...remoteSide, payload: { completedAt: 999 } },
+          },
+        ],
+      },
+      conflictDialogOpen: true,
+    });
+    const el = render();
+
+    expect(el.textContent).toContain('2 个字段有改动');
+    expect(el.textContent).toContain('1 个字段有改动');
+    // `completedAt` / `dueDate` 是内部标识符，出现在用户可见文案里正是要修的泄漏。
+    expect(el.textContent).not.toContain('completedAt');
+    expect(el.textContent).not.toContain('dueDate');
   });
 });

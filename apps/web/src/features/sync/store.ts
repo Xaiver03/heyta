@@ -48,6 +48,15 @@ interface SyncStoreState {
    * 但他再也找不到处理的入口，问题从"没法解决"变成"看不见了"，更糟。
    */
   conflictDialogOpen: boolean;
+  /**
+   * 同步设置对话框是否打开。
+   *
+   * 🔴 从 `SyncBar` 的局部 state **提到这里**，是因为现在有两个入口要打开它：
+   * 同步条自己的齿轮，以及订阅提示的「改用你自己的服务器」。
+   * 让两处各持一份 `open` state 就必然漂移（一处打开、另一处不知道），
+   * 而这一条正是 `AGENTS.md §3.5` 反复记过的形状。
+   */
+  settingsOpen: boolean;
 
   configure: (baseUrl: string, token: string, password: string) => void;
   clearCredentials: () => void;
@@ -59,11 +68,25 @@ interface SyncStoreState {
   ) => Promise<SyncStatus>;
   openConflictDialog: () => void;
   closeConflictDialog: () => void;
+  openSettings: () => void;
+  closeSettings: () => void;
   startAutoRetry: () => void;
   stopAutoRetry: () => void;
 }
 
 let retry: { start: () => void; stop: () => void } | undefined;
+
+/**
+ * 「没配置同步服务」的**错误码**。
+ *
+ * 🔴 这是个**数据值**，不是文案。这一条错误是我们自己产生的、而且用户能自己修好，
+ * 所以它值得一条专门的词条（告诉用户"去填地址和令牌"），但句子属于壳 ——
+ * 见 `SyncBar` 的 `describeSyncStatus`。store 里塞中文句子的话，
+ * 英文界面会永远漏出一句中文（这正是本轮要修的缺陷）。
+ */
+// 🔴 原来这里有一个 `SYNC_NOT_CONFIGURED` 哨兵字符串塞在 `message` 里 ——
+// 那是"类型里没有结构化原因"的绕路。`SyncStatus` 现在有 `reason` 了，
+// 哨兵整个删掉：`message` 是字符串字段，拿它当码用没有任何类型保护。
 
 /**
  * 游标读写**已删除**。
@@ -112,6 +135,7 @@ export const useSyncStore = create<SyncStoreState>((set, get) => ({
   status: { kind: 'idle' },
   baseUrl: '',
   conflictDialogOpen: false,
+  settingsOpen: false,
 
   openConflictDialog: () => {
     set({ conflictDialogOpen: true });
@@ -120,6 +144,14 @@ export const useSyncStore = create<SyncStoreState>((set, get) => ({
   closeConflictDialog: () => {
     // 只关窗口，**不动 status** —— 冲突还在，SyncBar 仍会提示，还能再打开
     set({ conflictDialogOpen: false });
+  },
+
+  openSettings: () => {
+    set({ settingsOpen: true });
+  },
+
+  closeSettings: () => {
+    set({ settingsOpen: false });
   },
 
   configure: (baseUrl, token, password) => {
@@ -135,7 +167,11 @@ export const useSyncStore = create<SyncStoreState>((set, get) => ({
   syncNow: async () => {
     const c = buildClient(get, set);
     if (c === undefined) {
-      const s: SyncStatus = { kind: 'error', message: '未配置同步服务', retryable: false };
+      const s: SyncStatus = {
+        kind: 'error',
+        reason: 'not-configured',
+        retryable: false,
+      };
       set({ status: s });
       return s;
     }
@@ -154,7 +190,11 @@ export const useSyncStore = create<SyncStoreState>((set, get) => ({
   resolveConflict: async (conflict, choice) => {
     const c = buildClient(get, set);
     if (c === undefined) {
-      const s: SyncStatus = { kind: 'error', message: '未配置同步服务', retryable: false };
+      const s: SyncStatus = {
+        kind: 'error',
+        reason: 'not-configured',
+        retryable: false,
+      };
       set({ status: s });
       return s;
     }
@@ -177,24 +217,6 @@ export const useSyncStore = create<SyncStoreState>((set, get) => ({
     retry?.stop();
   },
 }));
-
-/** 人类可读的状态文案。 */
-export function describeStatus(status: SyncStatus): string {
-  switch (status.kind) {
-    case 'idle':
-      return '未同步';
-    case 'syncing':
-      return status.phase === 'upload' ? '正在上传…' : '正在下载…';
-    case 'synced':
-      return '已同步';
-    case 'offline':
-      return '离线 · 改动已排队，联网后自动重试';
-    case 'conflict':
-      return `${String(status.conflicts.length)} 处改动需要你确认`;
-    case 'error':
-      return status.retryable ? `同步出错：${status.message}` : status.message;
-  }
-}
 
 /** 状态对应的语义色 token 名。 */
 export function statusColorToken(status: SyncStatus): string {
