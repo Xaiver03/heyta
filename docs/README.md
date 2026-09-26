@@ -115,6 +115,7 @@ docs/research/<kebab-case>.md     例：reuse-plan.md
 | [ai-capability-branches.md](plans/ai-capability-branches.md) | **AI 能力分支与开发分支策略**（含对 5 条功能设想的逐条裁决）—— 大而全，深挖用 |
 | [ai-open-decisions.md](plans/ai-open-decisions.md) | **AI 功能需要拍板的决策清单**（不是需求表单，是「代码解决不了的事」） |
 | [motivation-and-progression.md](plans/motivation-and-progression.md) | ⭐ **激励与成长体系设计**：三层架构（即时反馈/连续性/叙事）× 四个循环，含「不改 schema」的落地映射、反需求 2.0、E2EE 下的指标方案 |
+| [activity-categories-and-colors.md](plans/activity-categories-and-colors.md) | **活动分类与分类着色**（增量，设计已拍板未开工）：颜色由**用户自赋义**、App 不判健康度；真正的工程量在时间归因（零新增字段可跑通第一版）；分类泳道图 + 周堆叠条 |
 
 ### 工程参考
 
