@@ -60,6 +60,7 @@
  *   非零退出 = 有违规。
  */
 
+import { execFileSync } from 'node:child_process';
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -486,6 +487,40 @@ let migratedStrings = 0;
 // ── 先查词条表本身（规则 2/3/4）────────────────────────────────
 const catalogResult = checkCatalogs();
 violations.push(...catalogResult.violations);
+
+/**
+ * ── 价格一致性：词条里的价格必须与**代码价目表**和**法务文本**一致 ──────
+ *
+ * 为什么挂在这里：它属于同一个契约（「文案说的是真话」），而价格是**唯一一个
+ * 除了词条表之外还有可执行事实源**的文案 —— `server/src/billing/wechat.adapter.ts`
+ * 的价目表才是真正收的钱，词条表里的价格只是「对外怎么说」。两者不一致
+ * 就是虚假宣传；反过来价目表改了而页面没改，用户看到的价格也不是他要付的价格。
+ *
+ * 🔴 判据与理由见 [ADR-0017](../docs/adr/0017-single-paid-tier-and-payment-channel.md) §3.2。
+ * 单独成一个脚本（`scripts/check-pricing-consistency.mjs`）而不是内联在这里，
+ * 是因为它自己也有一套**能失败的注入用例**（`scripts/verify-i18n-failures.mjs` 的 `pricing` 组）。
+ *
+ * ⚠️ 必须**调用**而不是**复制**那条规则进来 —— 复制出来的两份规则会各自漂移，
+ * 而中间那一份才是对的。
+ */
+try {
+  const pricingOut = execFileSync(
+    process.execPath,
+    [join(ROOT, 'scripts/check-pricing-consistency.mjs')],
+    { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] },
+  );
+  if (pricingOut.trim() !== '') console.log(pricingOut.trimEnd());
+} catch (e) {
+  // 把子脚本自己的诊断原样透出来 —— 它已经写清了是哪两处对不上。
+  const detail = `${String(e.stdout ?? '')}${String(e.stderr ?? '')}`.trimEnd();
+  if (detail !== '') console.error(detail);
+  violations.push({
+    where: '价格（server 价目表 ↔ 中英词条表 ↔ 法务文本）',
+    text: '三个地方说的不是同一个数',
+    why: '价格是唯一一个有可执行事实源的文案；不一致意味着用户看到的价格不是他要付的价格',
+    fix: '按 docs/reference/pricing-and-entitlements.md 的 pricing-ssot 代码块统一三处（改价必须同一次改完）。',
+  });
+}
 
 // ── 再查组件源码（规则 1 或旧的中文规则）─────────────────────
 for (const { dir: relRoot, migrated, migratedFiles } of ROOTS) {

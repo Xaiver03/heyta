@@ -15,7 +15,7 @@
 
 import { useMemo, useState } from 'react';
 import { motion, useMotionValueEvent, useScroll } from 'motion/react';
-import { Github, Moon, Sun } from 'lucide-react';
+import { Moon, Sun } from 'lucide-react';
 
 import { useI18n, useLocale } from '@heyta/i18n';
 
@@ -24,8 +24,29 @@ import { useMotionPreset } from '../lib/motion.js';
 import type { Theme } from '../lib/theme.js';
 import { BrandMark } from './BrandMark.js';
 
-export const GITHUB_URL = 'https://github.com/Xaiver03/heyta';
-
+/**
+ * 🔴 这里**曾经**导出 `GITHUB_URL`，导航、首屏、收尾 CTA、页脚全都指向它。
+ * 仓库目前是**私有**的，那个链接对任何访客都是 404 —— 所以整条链路摘掉了。
+ *
+ * ⚠️ 「摘掉」的范围比链接大：自建区的终端里原本有一行可复制的
+ * `git clone https://github.com/Xaiver03/heyta.git`，它同样会把访客送到 404。
+ * 现在那里是 `git clone <repo-url>` 占位符。所以**判据是整页文本里不该出现
+ * `github.com`**，而不是「不该有指向它的链接」—— `tests/render.spec.tsx`
+ * 正是照这个判据断言整页文本的。
+ *
+ * 公开仓库时要一起做的事（别只把图标放回来）：
+ *   1. 这个常量 + 导航的 GitHub 图标 + 首屏 `REPO_URL` + 收尾 CTA 的「先看看代码」
+ *      + 页脚的 `viewOnGithub` 与那几组文档链接；
+ *   2. `SelfHost.tsx` 的 `git clone <repo-url>` 换成真地址，
+ *      并去掉 `landing.selfhost.sourcePending` 那句诚实说明
+ *      （源码真的公开了，那句话就不成立了）；
+ *   3. 中文词条 `landing.cta.lede` 恢复成「代码是开放的」的说法；
+ *   4. `tests/render.spec.tsx` 那条「整页不出现私有仓库地址」换回
+ *      「外链必须带 `rel=noopener`」—— 它拦的是原来那个风险，不是这个。
+ *
+ * ⚠️ 公开仓库还有一条**硬约束**：`.github/workflows/ci.yml` 的 `runs-on`
+ * 必须先从自托管 runner 改回 `ubuntu-latest`（见该文件里的说明）。
+ */
 export function Nav({
   theme,
   onToggleTheme,
@@ -48,6 +69,7 @@ export function Nav({
       { href: '#capabilities', label: t('landing.nav.capabilities') },
       { href: '#showcase', label: t('landing.nav.showcase') },
       { href: '#sync', label: t('landing.nav.sync') },
+      { href: '#pricing', label: t('landing.nav.pricing') },
       { href: '#selfhost', label: t('landing.nav.selfhost') },
     ],
     [t],
@@ -141,16 +163,6 @@ export function Nav({
               {theme === 'light' ? <Moon size={18} /> : <Sun size={18} />}
             </motion.span>
           </button>
-
-          <a
-            className="lp-iconbtn"
-            href={GITHUB_URL}
-            target="_blank"
-            rel="noreferrer noopener"
-            aria-label={t('landing.nav.viewSource')}
-          >
-            <Github size={18} aria-hidden="true" />
-          </a>
         </div>
       </motion.div>
     </header>

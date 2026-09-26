@@ -21,13 +21,12 @@
 
 import { useMemo, useRef } from 'react';
 import { motion, useMotionValue, useSpring, useTransform } from 'motion/react';
-import { Check, Github, WifiOff } from 'lucide-react';
+import { Check, WifiOff } from 'lucide-react';
 
 import { useI18n } from '@heyta/i18n';
 
 import { AppWindow } from '../mockup/AppWindow.js';
 import { HERO_ENTRANCE_DELAY, revealVariants, staggerContainer, useMotionPreset, VIEWPORT } from '../lib/motion.js';
-import { GITHUB_URL } from './Nav.js';
 
 /** 倾斜幅度（度）。刻意小 —— 大角度会让界面文字变形到读不清。 */
 const TILT_Y = 11;
@@ -172,9 +171,6 @@ export function Hero(): React.JSX.Element {
     </section>
   );
 }
-
-/** 供 CTA 区块复用，避免两处各写一遍仓库地址。 */
-export const REPO_URL = GITHUB_URL;
 
 /**
  * 事实条。**刻意不是 logo 墙。**

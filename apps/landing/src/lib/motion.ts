@@ -207,6 +207,51 @@ export function staggerContainer(reduced: boolean, stagger = STAGGER): Variants 
 }
 
 /**
+ * 展厅窗口的不透明度曲线
+ * ========================
+ *
+ * 两个纯函数（不依赖 Motion），因为这条曲线有一个**能证伪的不变量**要钉住，
+ * 而它只能在测试里钉：`apps/landing/tests/showcase-opacity.spec.ts`。
+ *
+ * ## 为什么不是 `1 - |o| * 1.05` 这个简单的对称淡出
+ *
+ * 三块窗口是 `inset: 0` 的整屏元素、在 `perspective` + `preserve-3d` 的舞台里
+ * 靠 `translateZ` 分前后。对称淡出在**换位的中点上**让前后两块同时半透明：
+ * `|o| = 0.5` 时两块都是 47.6%。前面那块一旦不是不透明的，后面那块就会从它
+ * 里面透出来 —— 中间那一片看起来像**双重曝光**（叠影/ghosting）。
+ *
+ * 根因不是"淡出太多"，而是**前面那块不该淡**：3D 排序本来就会让靠前的窗口
+ * 遮住靠后的，不需要再用透明度表达遮挡。所以 3D 路径改成"平台 + 快速收尾"：
+ *
+ *   |o| ≤ 0.6 → 1（完全不透明，靠 3D 前后关系遮挡）
+ *   |o| ≥ 1.0 → 0
+ *   中间线性落到 0
+ *
+ * ⚠️ 这个曲线有个必须成立的性质：**任何滚动进度下都至少有一块窗口是完全不透明的**
+ * （也就是"离自己那一格最近"的那块）。否则叠影会回来。测试逐点扫 p ∈ [0,1] 断言它。
+ */
+
+/** 3D 路径里窗口开始淡出的位置（`|offset|`）：之前保持完全不透明。 */
+export const SHOWCASE_OPAQUE_PLATEAU = 0.6;
+
+export function showcaseWindowOpacity(offset: number): number {
+  const abs = Math.abs(offset);
+  return Math.max(0, Math.min(1, (1 - abs) / (1 - SHOWCASE_OPAQUE_PLATEAU)));
+}
+
+/**
+ * 减动效路径的不透明度：**纯交叉淡入**。
+ *
+ * 减动效下位移与旋转都被去掉，三块窗口全部 `inset: 0` 直叠 ——
+ * 这时候"前后关系"不存在了，遮挡只能由透明度表达，所以必须保留平滑淡出。
+ * 把 3D 那条平台曲线用在这里会让换位变成一次**硬切**（两块都是 1，
+ * 靠 DOM 顺序决定谁在上面）。
+ */
+export function showcaseWindowOpacityReduced(offset: number): number {
+  return Math.max(0, 1 - Math.abs(offset) * 1.05);
+}
+
+/**
  * 视口触发的统一参数。
  *
  * `once: true` 是刻意的：反复进出视口就重放会让页面显得神经质，

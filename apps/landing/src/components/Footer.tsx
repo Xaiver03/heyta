@@ -5,14 +5,21 @@
  * 🔴 必须有的那句免责声明：README 里写着
  * 「本仓库为个人项目，与滴答清单/TickTick 及其关联公司无任何关系」。
  * 落地页是**最容易被截图传播**的界面，漏掉这句会让人误以为这是官方产品。
+ *
+ * ⚠️ 这里原本有三组指向 GitHub 的链接（源码 / 贡献指南 / 路线图 / ADR /
+ * 第三方许可证 / 文档索引）。仓库当前是**私有的**，那些链接对任何访客
+ * 一律 404 —— 一个「看起来能点、点了是 404」的链接比没有链接更坏，
+ * 所以整组摘掉了。加回来的完整清单（别只把图标放回来）见 `Nav.tsx` 顶部。
+ *
+ * 现在剩下的链接**全部是页内锚点**，所以不再需要
+ * `target="_blank"` / `rel="noreferrer"` 那一套。
  */
 
 import { useMemo } from 'react';
-import { Github } from 'lucide-react';
 
 import { useI18n } from '@heyta/i18n';
 
-import { GITHUB_URL } from './Nav.js';
+import { BrandMark } from './BrandMark.js';
 
 export function Footer(): React.JSX.Element {
   const { t } = useI18n();
@@ -32,25 +39,8 @@ export function Footer(): React.JSX.Element {
       {
         title: t('landing.footer.group.gettingStarted'),
         links: [
+          { label: t('landing.footer.pricing'), href: '#pricing' },
           { label: t('landing.footer.selfHostServer'), href: '#selfhost' },
-          {
-            label: t('landing.footer.deployGuide'),
-            href: `${GITHUB_URL}/blob/main/docs/runbooks/local-server-verification.md`,
-          },
-          { label: t('landing.footer.contributing'), href: `${GITHUB_URL}/blob/main/CONTRIBUTING.md` },
-          { label: t('landing.footer.source'), href: GITHUB_URL },
-        ],
-      },
-      {
-        title: t('landing.footer.group.docs'),
-        links: [
-          { label: t('landing.footer.roadmap'), href: `${GITHUB_URL}/blob/main/docs/plans/roadmap.md` },
-          { label: t('landing.footer.adr'), href: `${GITHUB_URL}/tree/main/docs/adr` },
-          {
-            label: t('landing.footer.licenses'),
-            href: `${GITHUB_URL}/blob/main/THIRD_PARTY_LICENSES.md`,
-          },
-          { label: t('landing.footer.docsIndex'), href: `${GITHUB_URL}/blob/main/docs/README.md` },
         ],
       },
     ],
@@ -62,17 +52,16 @@ export function Footer(): React.JSX.Element {
       <div className="lp-wrap">
         <div className="lp-footer__grid">
           <div className="lp-footer__brand">
-            <a className="lp-brand" href="#top">
-              <span className="lp-brand__dot" aria-hidden="true" />
-              {t('common.brand')}
+            {/*
+              字标与导航用的是**同一个组件**，不是"蓝点 + 文字"的另一种画法。
+              之前两处品牌表达不一致（导航是字标、页脚是圆点+文字），
+              同一个品牌在一页里出现两种画法是没道理的区别。
+              它标了 aria-hidden，所以链接的可访问名由 aria-label 提供。
+            */}
+            <a className="lp-brand" href="#top" aria-label={t('common.brand')}>
+              <BrandMark />
             </a>
-            <p className="lp-footer__tagline">
-              {t('landing.footer.tagline')}
-            </p>
-            <a className="lp-link" href={GITHUB_URL} target="_blank" rel="noreferrer noopener">
-              <Github size={16} aria-hidden="true" />
-              {t('landing.footer.viewOnGithub')}
-            </a>
+            <p className="lp-footer__tagline">{t('landing.footer.tagline')}</p>
           </div>
 
           {groups.map((group) => (
@@ -81,11 +70,7 @@ export function Footer(): React.JSX.Element {
               <ul className="lp-footer__links">
                 {group.links.map((link) => (
                   <li key={link.label}>
-                    <a
-                      className="lp-footer__link"
-                      href={link.href}
-                      {...(link.href.startsWith('#') ? {} : { target: '_blank', rel: 'noreferrer noopener' })}
-                    >
+                    <a className="lp-footer__link" href={link.href}>
                       {link.label}
                     </a>
                   </li>
@@ -96,9 +81,7 @@ export function Footer(): React.JSX.Element {
         </div>
 
         <div className="lp-footer__bottom">
-          <p>
-            {t('landing.footer.disclaimer')}
-          </p>
+          <p>{t('landing.footer.disclaimer')}</p>
           <p>{t('landing.footer.licenseNote')}</p>
         </div>
       </div>

@@ -145,7 +145,7 @@ export const en = {
   'landing.selfhost.warnCode': 'migration script scripts/migrate-deploy.sh.',
   // The repository is private today, so the `git clone` command above does not
   // work for visitors. This is an honest disclosure, not marketing copy.
-  'landing.selfhost.sourcePending': 'The source is not public yet, so the command above will not run today. Once the repository is public you can clone and self-host directly.',
+  'landing.selfhost.sourcePending': 'The source is not public yet, so the first line leaves the repository address as a placeholder. Once it is public that line runs as-is, and the two lines after it take you to a running self-host.',
 
   // ── Landing · pricing ─────────────────────────────────────
   // 🔴 These two prices must match the server price list and the legal text --

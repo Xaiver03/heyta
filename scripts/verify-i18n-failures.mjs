@@ -67,6 +67,11 @@ const IDB_ADAPTER = path.join(STORAGE, 'src/indexeddb/indexeddb-adapter.ts');
 const ERROR_HINT = path.join(ROOT, 'apps/web/src/features/shell/error-hint.ts');
 const ERROR_SCREEN = path.join(ROOT, 'apps/web/src/features/shell/ErrorScreen.tsx');
 const HEALTH_COPY = path.join(ROOT, 'apps/web/src/features/settings/health-copy.ts');
+// 价格一致性（ADR-0017）：实际收多少 / 对外怎么说 / 对外怎么承诺 —— 三处必须同一个数。
+const PRICING_CHECK = path.join(ROOT, 'scripts/check-pricing-consistency.mjs');
+const PRICING_DOC = path.join(ROOT, 'docs/reference/pricing-and-entitlements.md');
+const PRICING_ADAPTER = path.join(ROOT, 'server/src/billing/wechat.adapter.ts');
+const PRICING_LEGAL = path.join(ROOT, 'server/legal/terms-of-service.heyta.md');
 
 /** 跑一条命令，返回退出码与合并输出。**不抛错** —— 非零退出就是被测的结果。 */
 function run(bin, args, cwd = ROOT) {
@@ -828,6 +833,65 @@ function groupAiFailure() {
   );
 }
 
+/**
+ * 价格一致性（`scripts/check-pricing-consistency.mjs`）
+ * ===================================================
+ *
+ * 价格是**唯一一个除了词条表之外还有可执行事实源**的文案：
+ * `server/src/billing/wechat.adapter.ts` 的价目表才是真正收的钱，
+ * 词条表里的价格只是「对外怎么说」。两者不一致就是虚假宣传。
+ *
+ * 这一组证明那道门禁**真的会红**，而且证明的是它最难的那种情形 ——
+ * 「文档里已经有一个正确的价格，另一处被改成了别的数字」：
+ * 只检查"某条词条含不含 ¥99"是拦不住的（实测：把法务文本 §4 改成 ¥139 时
+ * 那种写法照绿，因为 §2 那张表里还留着一个 ¥99），所以门禁扫的是**全量金额**。
+ *
+ * 🔴 最后一条钉的是门禁自己的**锚点失效**：词条被改名之后，
+ * 「找不到就跳过」的实现会让这道门禁**永远通过**，而那正是最需要它红的时候。
+ */
+function groupPricing() {
+  const pricingRun = () => run(NODE_BIN, [PRICING_CHECK]);
+
+  expectGreen('pricing', '基线：三处价格一致时必须绿', pricingRun);
+
+  // ① 实际收多少被改（服务端价目表）—— 页面写的价格不再是要付的价格。
+  expectRed('pricing', '服务端价目表改了而页面没改（用户看到的价格≠实收）', () =>
+    withMutation(PRICING_ADAPTER, '  annual: { totalFen: 9_900,', '  annual: { totalFen: 13_900,', pricingRun),
+  );
+
+  // ② 对外怎么说被改（中文词条）。
+  expectRed('pricing', '中文词条的价格被改而价目表没改', () =>
+    withMutation(ZH, "'landing.pricing.hosted.priceCny': '¥99 / 年',", "'landing.pricing.hosted.priceCny': '¥139 / 年',", pricingRun),
+  );
+
+  // ③ 🔴 这条是"扫全量金额"的理由：法务文本里**已经有一个 ¥99**，
+  //    只改另一处。按"文档里出现过 ¥99 就算过"的写法，这一条必绿。
+  expectRed('pricing', '法务文本另一处的价格被改（文档里仍留着一个 ¥99）', () =>
+    withMutation(PRICING_LEGAL, '| 价格 | 大陆人民币 **¥99 / 年**；', '| 价格 | 大陆人民币 **¥139 / 年**；', pricingRun),
+  );
+
+  // ④ 价格表自己（pricing-ssot 块）被改 —— 门禁必须抓到"唯一事实源"本身被动过。
+  expectRed('pricing', 'pricing-ssot 块自己被动过', () =>
+    withMutation(PRICING_DOC, '"totalFen": 9900,', '"totalFen": 13900,', pricingRun),
+  );
+
+  // ⑤ 🔴 偷偷加第二个 SKU：ADR-0017 只批准了一个档，而且回调的金额校验
+  //    在"多个不同金额"时不成立。门禁必须拦住这个，不只是拦住价格写错。
+  expectRed('pricing', '价目表里偷偷加第二个不同金额的 SKU', () =>
+    withMutation(
+      PRICING_ADAPTER,
+      "  annual: { totalFen: 9_900, description: 'heyta 托管同步服务（年）' },",
+      "  annual: { totalFen: 9_900, description: 'heyta 托管同步服务（年）' },\n  monthly: { totalFen: 1_900, description: '月付' },",
+      pricingRun,
+    ),
+  );
+
+  // ⑥ 门禁的锚点失效（词条被改名）：必须**报错**，不许静默跳过。
+  expectRed('pricing', '门禁锚点失效（词条改名）时不许静默通过', () =>
+    withMutation(ZH, "'landing.pricing.hosted.priceCny':", "'landing.pricing.hosted.priceCNY':", pricingRun),
+  );
+}
+
 function groupStorage() {
   const oneRun = () =>
     run(path.join(STORAGE, 'node_modules/.bin/vitest'), ['run', 'tests/storage-error.spec.ts'], STORAGE);
@@ -900,6 +964,7 @@ const GROUPS = {
   preference: groupPreference,
   preset: groupPreset,
   aifailure: groupAiFailure,
+  pricing: groupPricing,
 };
 const only = process.argv[2];
 const names = only === undefined ? Object.keys(GROUPS) : [only];

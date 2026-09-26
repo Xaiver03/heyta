@@ -196,7 +196,7 @@ aria-label={label}
 
 | 外壳 | 状态 | 门禁模式 | 备注 |
 |---|---|---|---|
-| `apps/landing` | ✅ 已完成 | `migrated: true` | 含 `/en/` 双入口 + hreflang + 导航里的语言切换器；已发布并在线上逐条验过 |
+| `apps/landing` | ✅ 已完成 | `migrated: true` | 含 `/en/` 双入口 + hreflang + 导航里的语言切换器；已发布并在线上逐条验过。第 17 轮加了价格区（新增 `landing.pricing.*`），并把三组指向**私有仓库**的外链（源码/文档/贡献）整组摘掉 —— 理由与「加回来时要做什么」的清单见 `apps/landing/src/components/Nav.tsx` 顶部 |
 | `apps/mobile` | ✅ 已完成 | `migrated: true` | 语言来源见 §3；域层文案的处置见 §7.1；英文单复数见 §7.4 |
 | `apps/web` | ✅ 已完成 | `migrated: true` | 第 16 轮收尾：逐文件清单**退休**（§7.12）。订阅提示的本地词条表收编进全局表；语言切换器见 §7.8 |
 
@@ -206,6 +206,43 @@ aria-label={label}
 **移动端最后一块中文（重复规则）也已处理**：域层的 `describeRecurrence` 返回中文句子，
 现在拆成 `recurrenceParts`（域层，给结构化结果）+ `describeRecurrenceText`（壳层，给措辞）。
 细节与两处刻意的措辞偏离见 §7.1。
+
+---
+
+### 7.13 价格是唯一一个「词条表之外还有事实源」的文案（第 17 轮）
+
+价格区把一个**别的文案都没有的问题**带进来了：词条表里的价格只是「对外怎么说」，
+而真正收多少钱在 `server/src/billing/wechat.adapter.ts` 的价目表里，
+法务文本又是一份对用户的承诺。**三处不一致就是虚假宣传**，
+而类型系统看不见字符串里的数字，测试也各测各的模块。
+
+所以第 17 轮加了一道专门的**跨层一致性门禁**：
+
+```bash
+node scripts/check-pricing-consistency.mjs
+```
+
+它由 `scripts/check-ui-language.mjs` 调用（挂在「文案说的是真话」这个契约下），
+读四处的金额并逐个比对：
+
+| 层 | 文件 | 谁读它 |
+|---|---|---|
+| 实际收多少 | `server/src/billing/wechat.adapter.ts` | 服务端下单 + 回调金额校验 |
+| 对外怎么说 | `packages/i18n/locales/{zh-CN,en}.ts` 的 `landing.pricing.*` | 落地页 |
+| 对外怎么承诺 | `server/legal/terms-of-service.heyta.md` | 用户与服务方 |
+| 一句话的价格表 | `docs/reference/pricing-and-entitlements.md` 的 `pricing-ssot` 块 | 人 + 门禁 |
+
+🔴 两条设计选择值得单独记下来，因为它们都是**被真实失败教出来的**：
+
+1. **扫全量金额，而不是「检查某条词条含不含 ¥99」。** 后者只要求那个数字
+   **在文档里出现过** —— 把法务文本 §4 的 ¥99 改成 ¥139 时它照绿，
+   因为 §2 那张表里还留着一个 ¥99。而「同一份对外文本里出现两个不同的价格」
+   恰恰是最坏的那种事故。
+2. **匹配不到锚点时直接报错，不许跳过。** 词条被改名之后，「找不到就跳过」的实现
+   会让这道门禁**永远通过**，而那正是最需要它红的时候。
+
+判据与理由见 [ADR-0017](../adr/0017-single-paid-tier-and-payment-channel.md) §3.2；
+上面两条各自的注入用例在 `scripts/verify-i18n-failures.mjs` 的 `pricing` 组（7 个用例）。
 
 ---
 
@@ -702,7 +739,7 @@ pnpm --filter @heyta/i18n build
 （同一件事还有第二个后果：`/tmp` 里那批 headless Chrome 脚本也一起没了，
 所以"线上验过 WebGL 降级"这件事同样只剩结论、没有脚本。）
 
-**已经固化的是十二组（66 个用例）**：
+**已经固化的是十三组（73 个用例）**：
 
 ```bash
 node scripts/verify-i18n-failures.mjs             # 全部 12 组
@@ -717,6 +754,7 @@ node scripts/verify-i18n-failures.mjs sync        # 同步失败原因的结构�
 node scripts/verify-i18n-failures.mjs preference  # 偏好的「事实 → 句子」（领域投影 / 词条表 / 壳的判据）
 node scripts/verify-i18n-failures.mjs preset      # 出场预设的 label / prerequisite（按 id 映射 + 回退分支）
 node scripts/verify-i18n-failures.mjs aifailure   # 四个 AI 面板失败态（原因码 → 词条，message 降级为详情）
+node scripts/verify-i18n-failures.mjs pricing    # 价格三处一致（价目表 / 词条表 / 法务文本），见 ADR-0017 §3.2
 ```
 
 它自己会保证两件事：注入前**断言锚点存在**（否则空转的注入会伪装成"验证过了"），
@@ -739,6 +777,7 @@ node scripts/verify-i18n-failures.mjs aifailure   # 四个 AI 面板失败态（
 | `aifailure` | 2 | 原因码指错词条 → 用户要做的动作（「去逐功能授权」）从界面消失 |
 | `landing` | 6 | 英文入口的 `lang`/`canonical` 写回中文、hreflang 少一件、英文页顶着中文标题 |
 | `scene` | 5 | 错误边界不再进入失败态（**白屏复发**）、降级时把整节丢掉、渲染器构造失败后不降级 |
+| `pricing` | 7 | 🔴 价目表与页面不一致（用户看到的价格≠实收）、法务文本**另一处**被改（文档里仍留着一个正确数字 —— 这条正是「扫全量金额」的理由）、`pricing-ssot` 块自己被动过、**偷偷加第二个 SKU**、以及锚点失效时必须报错而不是静默通过 |
 
 ⚠️ 其中三组（`conflict` / `landing` / `scene`）是**第 9–10 轮才补的**，此前它们只有描述。
 三组都遵守同一条纪律：**基线必须是确定性的** —— `conflict` 故意不跑壳的测试
@@ -762,7 +801,25 @@ node scripts/verify-i18n-failures.mjs aifailure   # 四个 AI 面板失败态（
 
 ---
 
-落地页发布后还要验**线上**（本地 DNS 会返回代理假 IP，所以必须 `--resolve` + `--noproxy`）：
+### 发布方式（第 17 轮起，写下来是因为此前只存在于 shell history 里）
+
+仓库里**没有**落地页的部署脚本：产物是**手工 rsync** 上去的，
+`.github/workflows/ci.yml` 只验证不部署。所以把命令写在这里，否则下一个人只能猜。
+
+```bash
+pnpm --filter @heyta/landing build
+rsync -az --delete --itemize-changes apps/landing/dist/ ubuntu-jcli:/var/www/heyta-landing/
+```
+
+⚠️ `--delete` 是**必要**的，不是顺手加的：`assets/` 里是带 hash 的文件名，
+不删旧的就会一直堆着（而 `index.html` 只指向新的那一份）。
+第 17 轮它同时清掉了服务器上残留的 `hey.svg` ——
+那份文件与 `BrandMark.tsx` 是同一套几何的第二份拷贝，已经从仓库删除。
+⚠️ 同步前先 `--dry-run` 看一眼要删什么，`--delete` 对目标目录是无差别生效的。
+
+### 线上验收
+
+本地 DNS 会返回代理假 IP，所以必须 `--resolve` + `--noproxy`：
 
 ```bash
 curl -s --noproxy '*' --resolve heyta.finlaw.cloud:443:124.223.13.226 https://heyta.finlaw.cloud/en/ \
@@ -770,6 +827,26 @@ curl -s --noproxy '*' --resolve heyta.finlaw.cloud:443:124.223.13.226 https://he
 ```
 
 期望 `<html lang="en"` 与英文标题；`/en`（无斜尾）应当是 `301` 到 `/en/`。
+
+🔴 **第 17 轮加的判据：门禁绿 ≠ 线上对。** 词条表和门禁都在仓库里，
+而访客看到的是**产物**。`--delete` 有没有生效、hash 有没有换、
+地址有没有真的从 bundle 里消失 —— 这些只能在线上查。所以发布后除了 head，还要查产物内容：
+
+```bash
+curl -s https://heyta.finlaw.cloud/ | grep -oE 'assets/main-[A-Za-z0-9_-]+\.js'
+curl -s https://heyta.finlaw.cloud/assets/main-<上面那个 hash>.js -o live.js
+grep -c 'github\.com' live.js        # 🔴 必须是 0：仓库私有，任何源码入口都是 404
+grep -c '只收一台服务器的钱' live.js    # 1 = 新文案真的上线了
+```
+
+⚠️ 这一步抓出过一次**门禁看不见的真实泄漏**：自建区的终端里有一行
+可复制粘贴的 `git clone https://github.com/Xaiver03/heyta.git`。
+`tests/render.spec.tsx` 原本只断言「没有指向它的 `<a href>`」——
+而它不是链接，是**代码块里的文本**。所以那条断言后来改成查**整页文本**，
+线上也改成直接 grep 产物里的 `github.com`。
+
+第 17 轮的实测结果：`/` 与 `/en/` 都是 `200`、hreflang 三元组一致、
+线上 bundle 里 `github.com` 出现 **0** 次、两个价格与中英两套新文案都在产物里。
 
 ---
 
@@ -945,7 +1022,8 @@ case 'ollama': return t('common.ai.preset.ollama.label');
    它们的处置方式一样（结构化返回 + 各壳措辞）。
    ⚠️ **注意 `app-host/src/ai-*.ts` 的 107 处里绝大多数是模型提示词**，不是界面文案 ——
    判据只有一条：**这条字符串会不会被渲染**。别把提示词翻成英文（那会改变模型行为，不是本地化）。
-4. **落地页用新词条表重新发布**（§8 尾部的线上验收）。
+4. ✅ **落地页用新词条表重新发布**（第 17 轮做完）——
+   发布方式与线上验收的判据见 §8 尾部的「发布方式」/「线上验收」。
    ⚠️ 发布前先跑一次**完整**的八组注入验证（`node scripts/verify-i18n-failures.mjs`）——
    第 10 轮只逐组跑过 `conflict` / `landing` / `scene`（词条表与门禁当时被子代理持有，
    跑 `catalog` / `gate` 两组会互相干扰）。**这个总数 42 还没有一次性跑过。**

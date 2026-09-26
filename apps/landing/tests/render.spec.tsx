@@ -88,11 +88,28 @@ describe('落地页整页渲染', () => {
     expect(view.textContent?.length ?? 0).toBeGreaterThan(500);
   });
 
-  it('九个区块的锚点都在 —— 导航与页脚的链接不会指向空处', () => {
+  it('页内锚点全部有落点 —— 导航与页脚的链接不会指向空处', () => {
     const view = renderLanding();
-    for (const id of ['main', 'showcase', 'privacy', 'selfhost']) {
-      expect(view.querySelector(`#${id}`), `缺少 #${id}`).not.toBeNull();
+    // 把锚点**从 DOM 里读出来**再逐个查落点，而不是硬编码一份 id 清单：
+    // 硬编码的清单会在加了一个区块之后仍然全绿（"以为管住了，其实没管"），
+    // 而写错/删掉一个区块 id 的后果就是"点了没反应"。
+    const hrefs = [...view.querySelectorAll<HTMLAnchorElement>('a[href^="#"]')].map(
+      (a) => a.getAttribute('href') ?? '',
+    );
+    expect(hrefs.length).toBeGreaterThan(0);
+    // `#sync` 那一节由 `<Deferred>` 包着、在 jsdom 里**不会挂载**（见本文件最后
+    // 一条测试），所以它是唯一允许缺席的落点。允许清单写死在这里，
+    // 别的锚点一个都不许缺 —— 也不许"多一个缺席的"。
+    const NOT_MOUNTED_IN_JSDOM = new Set(['#sync']);
+    const missing = hrefs.filter(
+      (href) => !NOT_MOUNTED_IN_JSDOM.has(href) && view.querySelector(href) === null,
+    );
+    expect(missing).toEqual([]);
+    for (const href of NOT_MOUNTED_IN_JSDOM) {
+      expect(view.querySelector(href), `${href} 本该在 jsdom 里缺席`).toBeNull();
     }
+    // 价格那一节必须有锚点：导航、页脚、以及它自己都指向它。
+    expect(view.querySelector('#pricing')).not.toBeNull();
   });
 
   it('一级标题存在且不为空', () => {
@@ -104,7 +121,7 @@ describe('落地页整页渲染', () => {
 
   it('每个区块都有二级标题 —— 页面结构对读屏软件是可导航的', () => {
     const view = renderLanding();
-    expect(view.querySelectorAll('h2').length).toBeGreaterThanOrEqual(5);
+    expect(view.querySelectorAll('h2').length).toBeGreaterThanOrEqual(6);
   });
 
   it('真实界面的复现件挂上了（任务列表、四象限、热力图、进度环）', () => {
@@ -120,13 +137,64 @@ describe('落地页整页渲染', () => {
     expect(view.textContent).toContain('无任何关系');
   });
 
-  it('GitHub 链接是外链且带 rel=noopener —— 避免 target=_blank 的劫持面', () => {
+  /**
+   * 🔴 仓库当前是**私有的**，所以任何 `github.com/Xaiver03/heyta` 链接
+   * 对访客都是 404 —— 一个"看起来能点、点了是 404"的链接比没有链接更坏。
+   *
+   * 这条测试钉的就是"整条链路已经摘干净"。它比原来那条
+   * 「GitHub 链接是外链且带 rel=noopener」更强：
+   * 原来那条只要求"如果有外链，就得带 noopener"，一个外链都没有时它**恒假**
+   * （而它当时确实红了，正好证明它测的是"存在性"而不是"安全性"）。
+   *
+   * 仓库公开之后要做的不是删这条测试，而是把它换回"外链必须带 noopener" ——
+   * 清单见 `Nav.tsx` 顶部。
+   */
+  it('整页不出现私有仓库地址，也没有 target=_blank', () => {
     const view = renderLanding();
-    const external = [...view.querySelectorAll('a[target="_blank"]')];
-    expect(external.length).toBeGreaterThan(0);
-    for (const anchor of external) {
-      expect(anchor.getAttribute('rel')).toContain('noopener');
+    const hrefs = [...view.querySelectorAll<HTMLAnchorElement>('a[href]')].map(
+      (a) => a.getAttribute('href') ?? '',
+    );
+    expect(hrefs.filter((href) => href.includes('github.com'))).toEqual([]);
+
+    // 🔴 只看 `<a href>` 是不够的：自建那一节的**终端里有可以复制粘贴的命令**，
+    // 一条印着真地址的 `git clone` 和一条链接一样会把访客送到 404。
+    // 所以这里查的是整页文本（含 <code>），而不是链接集合。
+    expect(view.textContent ?? '').not.toContain('github.com');
+
+    // 唯一的非锚点链接是语言切换（它指向另一语言的地址，且带 hrefLang）。
+    for (const anchor of view.querySelectorAll<HTMLAnchorElement>('a[href]')) {
+      const href = anchor.getAttribute('href') ?? '';
+      if (href.startsWith('#')) continue;
+      expect(anchor.getAttribute('hrefLang'), `非锚点链接却不是语言切换：${href}`).not.toBeNull();
     }
+
+    expect([...view.querySelectorAll('a[target="_blank"]')]).toEqual([]);
+  });
+
+  /**
+   * 🔴 价格区的**前端侧**契约。
+   *
+   * 价格本身在三处必须一致（`scripts/check-pricing-consistency.mjs` 管），
+   * 这里管的是另外两件只有渲染出来才看得见的事：
+   *   1. 页面上真的出现了那两个数字（门禁读的是词条表，读不到"有没有渲染"）；
+   *   2. **没有一个点了没反应的购买按钮** —— 托管档现在买不到
+   *      （大陆通道没接线、海外 KYC 没过），放一个"立即购买"比不放更坏。
+   */
+  it('价格区：两个数字都在，且没有假的购买按钮', () => {
+    const view = renderLanding();
+    const pricing = view.querySelector('#pricing');
+    expect(pricing).not.toBeNull();
+    const text = pricing?.textContent ?? '';
+
+    expect(text).toContain('¥99');
+    expect(text).toContain('$49');
+    // 两档功能一致这条论断必须真的在页面上（否则"只有一个付费档"会被读成阉割版）
+    expect(text).toContain('功能完全一样');
+
+    // 唯一的可点元素是免费档的 CTA，指向自建那一节；托管档没有任何按钮/链接。
+    expect(pricing?.querySelectorAll('button').length).toBe(0);
+    const anchors = [...(pricing?.querySelectorAll('a[href]') ?? [])];
+    expect(anchors.map((a) => a.getAttribute('href'))).toEqual(['#selfhost']);
   });
 
   it('WebGL 那一节在 jsdom 下**没有**被挂载（Deferred 的桩永不触发）', () => {
