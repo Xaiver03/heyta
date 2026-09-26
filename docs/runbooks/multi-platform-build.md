@@ -373,10 +373,28 @@ src/sync/sync.types.ts(32,29): error TS2694: Namespace '".../.prisma/client/defa
                                has no exported member 'OperationWhereInput'
 ```
 
-这是 **Prisma Client 没生成**，不是代码错。`server/package.json` 里
-`prisma generate` 只挂在 `pretest` 上，**没挂 `build`**；开发机上是很久以前手动生成过一次，
-所以一直没事。一台全新机器跑 `pnpm -r build` 必然倒在这一步。
-修法：`server` 的 `build` 改成 `prisma generate && tsc`。
+这是 **Prisma Client 没生成**，不是代码错。开发机上很久以前手动生成过一次，所以一直没事；
+一台全新机器跑 `pnpm -r build` 就必然倒在这一步。
+
+> ⚠️ **这条的因果一开始记错了，值得专门记一笔。**
+> 当时写的是"`prisma generate` 只挂在 `pretest` 上，没挂 `build`"，
+> 但仓库里其实一直有 `"prebuild": "prisma generate"`，**而且 pnpm 会执行它** ——
+> 在 HEAD 上实测 `pnpm run build`，输出里能看到 `$ prisma generate` 带着 `prebuild` 的标签跑起来。
+> 真正出问题的是当时发到 Windows 的那棵树：它的 `build` 是裸 `tsc`，且没有 `prebuild`。
+> 证据在构建日志里 —— `server build$ tsc`，全程**没有** `prebuild` 行。
+>
+> 教训：报"某个脚本没挂上"之前，先去看**当时跑的那棵树**里那个文件长什么样，
+> 别拿"现在仓库里是什么样"去回推当时的因果。
+
+修法是把 `prisma generate` 直接写进 `build`：
+
+```json
+"build": "prisma generate && tsc"
+```
+
+这样构建不再依赖 pnpm 的 `pre`/`post` 脚本是否执行。这一条对本仓库尤其值得做：
+`pnpm-workspace.yaml` 里已经记着"构建结果取决于跑的是哪个 pnpm"的教训，
+而 pre/post 脚本开关正是随 pnpm 版本与配置变的那种东西。
 
 **第三个实例，同一台机器再往后一步**：`pnpm -r build` 全绿之后，
 `pnpm build:android:debug` 立刻失败：
