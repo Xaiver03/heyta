@@ -1,7 +1,9 @@
 # 激励与成长体系（设计）
 
 > 状态：**L1 / L2 / L3 三层已实现**（分支 `feat/motivation-system`，见 §8.1 的落地对照）。
-> **未做**：Prompt 层（提示时机）、§3.4 新习惯"启动期"、§10 里需要你拍板的那几项。
+> **未做**：Prompt 层（提示时机）、§3.4 新习惯"启动期"。
+> 🔴 **尚未合并到 `main`**：等 3 条前置门打开，程序见 **§12（可机械重放）**。
+> §10 的 5 项开放问题**已附建议**，等拍板。
 > 心理学证据：[`../research/motivation-psychology.md`](../research/motivation-psychology.md)
 > 竞品机制事实：[`../research/competitor-incentive-teardown.md`](../research/competitor-incentive-teardown.md)
 > 硬约束来源：[ADR-0005](../adr/0005-ai-data-path.md)、[ADR-0006](../adr/0006-supply-modes.md)、
@@ -403,10 +405,25 @@ heyta 的里程碑采用**累计制**（不要求连续）：
 
 1. ~~冻结余额走**纯派生**还是新增 schema 字段？~~ → **已拍板：派生，且余额不上界面**，见 [ADR-0015](../adr/0015-resilience-state-stays-derived.md) 与 §11
 2. 是否保留 `prefers-reduced-motion` 之外的"极简模式"（关闭所有动效与庆祝）？
+   **建议：不加。** `prefers-reduced-motion` 已覆盖唯一有医学依据的场景（前庭功能障碍 / 晕动症），
+   而且它是**系统级、零配置、被中央 token 处理**（`tokens.css` 把所有 `--ht-duration-*` 压到 1ms）。
+   再加一个应用内开关 = 第二个真相来源，两者一定会漂移。
 3. 本地埋点做不做？做的话开关粒度如何（沿用 ADR-0010 的逐功能授权）？
+   **建议：只本地、不上报。** 上报要单独 ADR + 逐项授权，且与「本地优先 + E2EE」的定位冲突很大。
+   本地埋点（"我这周开了几次成长页"）能回答产品问题，不上报也能自己看。
 4. 分享卡是否要加签名 / 来源标记？加了就承认"可自证来源、不可证真"的定位。
+   **建议：静态来源标记，不做加密签名。** 本地优先下签名只能证明"某客户端生成"，
+   证不了"这个人真的做到了" —— 那是一次**过度承诺**：一旦上线，它会诱使别人把它当证据。
+   标一句来源即可，诚实且不欠债。
 5. "启动期 7 天"的阈值是否与 `HabitFrequency` 联动（每周一次的习惯 7 天可能只排 1 次）？
+   **建议：要耦合，统一到「计划日」口径。** 每周一次的习惯在 7 个日历日里只排 1 次，
+   日历日阈值对它是错的。
+   ⚠️ 这条现在有**硬证据**支撑：§11 第 4 项那个错误就是"同一个概念两套单位"的现成样本 ——
+   领域层已经有稳定的「计划日」口径（`isScheduledOn`），**复用它，不要再引入一套日历日阈值**。
 6. 里程碑阈值是否需要用户可改（Apple 允许改 Move 目标）？
+   **建议：不改。** 1/10/100 次是**刻度**，不是目标 —— 可改的刻度就不是刻度，
+   跨用户也就失去了可比性（而"只与自己比"依赖刻度稳定）。
+   真要个性化，走"**自定义里程碑**"（用户可以自己加一个刻度），而不是改我们定的刻度。
 
 ## 11. 已收口的决策
 
@@ -431,3 +448,114 @@ heyta 的里程碑采用**累计制**（不要求连续）：
    ⚠️ 这也**直接回答了 §10 第 5 项的一半**：领域层已经有稳定的「计划日」口径
    （`isScheduledOn`），要做"启动期"就该复用它，**不要再引入一套日历日阈值** ——
    上面这个错误就是"同一个概念两套单位"的现成样本。
+
+---
+
+## 12. 落地程序（可机械重放）
+
+> 记录时间：2026-09-26。**不是凭记忆写的** —— 对当时的 main（`f41c435`）
+> 真跑了一次合并、解掉冲突、跑 typecheck，然后 `git merge --abort` 收回。
+
+### 12.1 前置门（**三条，缺一条都不要合**）
+
+| 门 | 判据（可直接跑） | 当时现状 |
+|---|---|---|
+| ① `packages/i18n` 进了 git | `git ls-files packages/i18n \| wc -l` > 0 | ❌ 磁盘上有 5 个源文件，git 里是 `??`（未跟踪） |
+| ② main 的 sync store 有 `openSettings` / `settingsOpen` | `git show main:apps/web/src/features/sync/store.ts \| grep -c openSettings` | ❌ 0 处 |
+| ③ 主检出工作树干净 | 主检出 `git status --porcelain \| wc -l` = 0 | ❌ 206 项 |
+
+**为什么必须等**：main 目前**自己既 build 不了也 typecheck 不了** ——
+它已经提交了引用 `@heyta/i18n`（未跟踪）与 `openSettings`（未实现）的代码。
+合并只会把这个红尖端搬进本分支。
+
+实测证据（并集解完唯一冲突后，`apps/web` 的 typecheck 剩 **9 条错，全部**落在门①②）：
+
+```
+copy.ts(32,29)                        TS2307 Cannot find module '@heyta/i18n'
+copy.ts(101,19)                       TS7053 'Locale' can't be used to index ...
+SubscriptionNotice.tsx(29,27)         TS2307 Cannot find module '@heyta/i18n'
+SubscriptionNotice.tsx(44,46)         TS2339 Property 'openSettings' does not exist on 'SyncStoreState'
+subscription-downgrade.spec.ts(93,58) TS2353 'settingsOpen' does not exist in 'SyncStoreState'
+subscription-notice.spec.tsx(17,52)   TS2307 Cannot find module '@heyta/i18n'
+subscription-notice.spec.tsx(67,5)    TS2353 'settingsOpen' ...
+subscription-notice.spec.tsx(127,36)  TS2339 Property 'settingsOpen' does not exist on 'SyncStoreState'
+subscription-notice.spec.tsx(190,87)  TS2345 ...
+```
+
+🔴 **误判警告（这一条最容易骗人）**：同一轮里还出现过 **4 条假错误** ——
+`@heyta/domain` 没有 `decideHostedSyncAccess` / `HostedEntitlementReading` / `HostedSyncAccess`，
+以及 `@heyta/app-host` 没有 `fetchHostedEntitlementReading`。
+它们是**陈旧 `dist`** 造出来的：`@heyta/domain/package.json` 写着 `"types": "dist/index.d.ts"`，
+**跨包类型走的是构建产物**，而 main 新增的 `packages/domain/src/subscription.ts`
+还没被 build 进 `dist`。`pnpm -r build` 之后这 4 条**全部消失**（13 条 → 9 条）。
+
+→ **合并后必须先构建再检查**，否则会看到一批根本不存在的错误，
+然后去 main 的源码里找一个其实已经在那儿的导出。
+（三条都确认在 main 源码里：`packages/domain/src/subscription.ts` 有定义、且被
+`src/index.ts:31` 的 `export * from './subscription.js'` 导出；
+`packages/app-host/src/index.ts:85` 有 re-export。）
+
+### 12.2 步骤
+
+1. 确认 12.1 三条门全开。
+2. 在 worktree 里合并 main：
+   ```bash
+   cd .worktrees/motivation && git merge --no-edit main
+   ```
+3. **唯一真冲突点：`apps/web/src/App.tsx`。**
+   main 在 `<div className="ht-content">` 内插入了 `<SubscriptionNotice />`，
+   本分支在**同一处**插入了
+   `{view !== 'settings' && view !== 'growth' && <TodayProgressCard />}`。
+   **解法 = 并集：两段都保留**（顺序：先 `TodayProgressCard` 判断式，再 `SubscriptionNotice`），
+   删掉 `<<<<<<<` / `=======` / `>>>>>>>` 三行，**留下 0 个冲突标记**。
+   **两侧的注释块都要留** —— 它们分别解释了"为什么它常驻四个视图"和"降级的是什么"，
+   删掉任何一段都是把理由丢了。
+   已验证：冲突集**在 main 推进到 `f41c435` 之后仍然只有这一个文件**
+   （`git merge-tree --write-tree --name-only main HEAD`，退出码 1、只列 `App.tsx`）。
+4. `packages/domain/src/index.ts`、`docs/README.md` 是**可加性**改动（各自都是新增行）→
+   自动合并，**不要手动改**。
+5. 🔴 **先构建，再检查**（见 12.1 的误判警告）：
+   ```bash
+   pnpm -r --filter '!@heyta/sync-server' build
+   ```
+6. 全套验证（每一层都要能真的失败）：
+
+   | 层 | 命令 | 期望 |
+   |---|---|---|
+   | 类型 | `pnpm -r typecheck` | 0 error |
+   | 构建 | `pnpm -r --filter '!@heyta/sync-server' build` | 退出码 0 |
+   | 全仓测试 | `pnpm -r --filter '!@heyta/sync-server' test` | 2592 通过 / 12 跳过 |
+   | 域 | `pnpm --filter @heyta/domain test` | 393 通过 |
+   | 激励（渲染层） | `pnpm --filter @heyta/web exec vitest run tests/motivation.spec.ts tests/motivation-view.spec.tsx` | 23 通过（12 + 11） |
+   | 门禁 | docs-link-check / check-ui-language / check-hardcoded / check-layering | 全绿 |
+   | 真浏览器 | 静态服务指向 `apps/web/dist`，7 个标签页可切换、标题正确、控制台无 error | 全绿 |
+
+   ⚠️ 本分支的测试数会**随 main 一起涨**（main 的订阅测试也在里面），
+   所以上表的 2592 是**本分支自己的基线**；合并后应当 ≥ 它，**不是等于它**。
+7. 落地到 main：**必须等门③**（主检出干净）之后，在**主检出**里
+   ```bash
+   git merge --no-edit feat/motivation-system
+   ```
+   因为步骤 2 之后本分支已包含 main，这一步通常是**快进**。
+   ⚠️ **不要在主检出脏的时候去更新 `main` ref**（`git push . …:main` 这类）：
+   主检出手上有 200+ 个未提交文件，ref 一动，工作树与 HEAD 的关系就说不清了 ——
+   而那时**没有任何工具能告诉你哪些改动静默丢了**。
+8. 收尾：`git worktree remove .worktrees/motivation`（分支已合并，worktree 不再需要）。
+
+### 12.3 回退
+
+- 步骤 2–6 期间任意一步失败：`git merge --abort`（尚未提交时），
+  或 `git reset --hard 808e851`。**落地前的尖端是 `808e851`。**
+- 步骤 7 之后要回退：在主检出 `git reset --hard <合并前的 main>` ——
+  因为那一步是快进，合并前的 main 尖端就是它。
+  ⚠️ **别的会话有未提交改动时不要做这件事。**
+
+### 12.4 既有红灯的交代
+
+`apps/web/tests/gantt-chart.spec.tsx` 曾有 3 条红灯，**不是本分支引入的**，也不需要在本分支处理：
+
+- 它是 **main 自己的 `e624ac0`**（"让时间线真的能被走到，并把排程单位对齐到分钟"）修掉的 ——
+  测试改成断言**子串** `'未估时'`。
+- **当场重测（2026-09-26，本轮）：`44 passed (44)`，全绿。**
+- 按仓库纪律「断言红了先证明谁错再决定删谁」：这里已经证明**两边都属于 main 的既有状态、
+  且已被 main 自己修正**，所以本分支**一个字都不动它**。
