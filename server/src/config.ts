@@ -156,6 +156,49 @@ const DEFAULT_CONFIG: ServerConfig = {
  * Load configuration from environment variables.
  * Environment variables take precedence over defaults.
  */
+/**
+ * `PUBLIC_URL` 的 host 是不是**私网/回环**地址。
+ *
+ * 用途见 ADR-0012 §4.2：生产模式对明文 HTTP 的禁令**只该对准公网**。
+ * 局域网自建（`http://192.168.1.5:3000` 这类）是自托管里最常见的形态，
+ * 而 iOS 侧本来就放行它（ATS 的判据是"本地网络 vs 公网"，见 ADR-0007 §6.1）。
+ * 两端口径因此一致。
+ *
+ * 🔴 **必须是"整个 host 就是一个私网 IP 字面量"，不能是"包含私网前缀"。**
+ *    `192.168.1.5.evil.com` 前缀完全一样，但它是**公网域名**，必须返回 `false`。
+ *    所以这里先把 host 整体匹配成 IPv4/IPv6 字面量，是字面量才看网段；
+ *    任何域名（含上面那个）一律 `false`。
+ *
+ *    用 `startsWith('192.168.')` 写会把这个域名判成私网并**静默放行**，
+ *    而且**不会有任何测试失败** —— 这正是 `config-public-url.spec.ts` 里
+ *    专门留了一条负例的原因。
+ */
+export const isPrivateNetworkHost = (hostname: string): boolean => {
+  const host = hostname.trim().toLowerCase().replace(/^\[/, '').replace(/\]$/, '');
+
+  // `localhost` 是回环的**名字**，不是字面量，但语义上无疑属于本地。
+  if (host === 'localhost') return true;
+
+  // IPv4 字面量：整串必须是 4 段数字，否则当域名处理。
+  if (/^\d{1,3}(\.\d{1,3}){3}$/.test(host)) {
+    const [a, b] = host.split('.').map(Number);
+    if (a === 127) return true; // 回环 127/8
+    if (a === 10) return true; // 私有 10/8
+    if (a === 192 && b === 168) return true; // 私有 192.168/16
+    if (a === 172 && b >= 16 && b <= 31) return true; // 私有 172.16/12
+    if (a === 169 && b === 254) return true; // 链路本地 169.254/16
+    return false;
+  }
+
+  // IPv6 字面量（含 `:`）：只看回环与唯一本地地址 fc00::/7。
+  if (host.includes(':')) {
+    return host === '::1' || /^f[cd][0-9a-f]{0,2}:/.test(host);
+  }
+
+  // 其余一律是域名 —— **包括 `192.168.1.5.evil.com`**。
+  return false;
+};
+
 export const loadConfigFromEnv = (
   overrides: Partial<ServerConfig> = {},
 ): ServerConfig => {
@@ -216,9 +259,22 @@ export const loadConfigFromEnv = (
     config.publicUrl = `http://localhost:${config.port}`;
   }
 
-  // Enforce HTTPS for PUBLIC_URL in production
+  // Enforce HTTPS for PUBLIC_URL in production — **但只对公网**。
+  //
+  // 这条禁令要防的是"公网上的明文"；局域网自建的明文不出网线，而 iOS 侧本来
+  // 就放行它（ADR-0007 §6.1）。一律禁止会把自托管里最常见的那种形态也否掉，
+  // 逼用户去跑未文档化的非生产模式。收窄的理由与负例见 ADR-0012 §4.2。
   if (process.env.NODE_ENV === 'production' && !config.publicUrl.startsWith('https://')) {
-    throw new Error('PUBLIC_URL must use HTTPS in production');
+    let publicHost = '';
+    try {
+      publicHost = new URL(config.publicUrl).hostname;
+    } catch {
+      // 解析不出 host 就不放行 —— 放行是静默的，失败必须是响的。
+      publicHost = '';
+    }
+    if (!isPrivateNetworkHost(publicHost)) {
+      throw new Error('PUBLIC_URL must use HTTPS in production');
+    }
   }
 
   // CORS configuration

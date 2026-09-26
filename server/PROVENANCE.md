@@ -25,7 +25,34 @@
 | 工作区依赖 | `"*"` → `"workspace:*"` |
 | `package.json` description | 改为 heyta 描述 |
 
-**业务代码未作修改。** 服务端通过 `@heyta/shared-schema` 的实体清单与服务端校验间接适配 heyta ——
+### 🔴 唯一一处**语义**改动：精确重复回幂等成功（ADR-0009）
+
+`src/sync/services/operation-upload.service.ts` 的两处"磁盘上已有同 id op"分支
+（可预测的 `existingOp` 分支、竞态失败后的 `duplicateOp` 分支），在
+`isSameDuplicateOperation(...)` 判定为**同一条 op**时，从
+
+```ts
+return reject(... 'Duplicate operation ID' ... DUPLICATE_OPERATION)
+```
+
+改成
+
+```ts
+return { result: { opId: op.id, accepted: true, serverSeq: existingOp.serverSeq },
+         storageBytes: 0, fallback: false };
+```
+
+理由、边界与验收证据见 [`docs/adr/0009-duplicate-op-idempotent-success.md`](../docs/adr/0009-duplicate-op-idempotent-success.md)。
+这不是"顺手改"：旧行为会让一台设备**永久同步不了**（硬拒绝 → 不落"已上传" → 重传整批 → 又硬拒绝）。
+
+🔴 **`INVALID_OP_ID` 那几条硬拒绝分支一个字都没动** —— 内容 / 向量时钟 / 持久化元数据不同、
+跨用户 id 碰撞、竞态里的 id 碰撞，仍然全部拒绝。"幂等重试"与"id 冲突"的分界线就在这里。
+
+🔴 这不是新发明：上游**自己的** snapshot 路径早就是这么做的 ——
+`src/sync/sync.routes.snapshot-handler.ts:454-478`，注释原文
+"Surface the original serverSeq as success instead of a confusing DUPLICATE_OPERATION rejection"。
+
+**其余业务代码未作修改。** 服务端通过 `@heyta/shared-schema` 的实体清单与服务端校验间接适配 heyta ——
 因为我们已经把那个包的 `ENTITY_TYPES` 换成了 heyta 的 13 项，服务端会自动接受 heyta 实体、
 拒绝 SP 专属实体。这正是把实体清单放在共享包里的价值。
 

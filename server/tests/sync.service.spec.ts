@@ -835,6 +835,7 @@ import { Operation, DEFAULT_SYNC_CONFIG, SYNC_ERROR_CODES } from '../src/sync/sy
 import { prisma } from '../src/db';
 import { Logger } from '../src/logger';
 import { CURRENT_SCHEMA_VERSION } from '@heyta/shared-schema';
+import { MAX_VECTOR_CLOCK_SIZE } from '@heyta/sync-core';
 
 describe('SyncService', () => {
   const userId = 1;
@@ -1243,7 +1244,10 @@ describe('SyncService', () => {
           [fullStateAuthor]: 1,
           [uploadClient]: 2,
           ...Object.fromEntries(
-            Array.from({ length: 25 }, (_, index) => [
+            // 🔴 条数从上限推导：写死 25 时上限一提到 100 就不再超限，
+            // 裁剪不再发生，toHaveLength(MAX) 随即失败 —— 若当初写成
+            // toHaveLength(25) 就会静默空转。
+            Array.from({ length: MAX_VECTOR_CLOCK_SIZE + 5 }, (_, index) => [
               `old-client-${index}`,
               100 + index,
             ]),
@@ -1259,24 +1263,27 @@ describe('SyncService', () => {
       expect(
         (await service.uploadOps(userId, fullStateAuthor, [fullStateOp]))[0].accepted,
       ).toBe(true);
-      expect(
-        (await service.uploadOps(userId, uploadClient, [oversizedDelta]))[0].accepted,
-      ).toBe(true);
+      const oversizedResult = (
+        await service.uploadOps(userId, uploadClient, [oversizedDelta])
+      )[0];
+      expect(oversizedResult.accepted).toBe(true);
 
       const storedClock = testState.operations.get(oversizedDelta.id)?.vectorClock as
         | Record<string, number>
         | undefined;
       expect(storedClock).toBeDefined();
-      expect(Object.keys(storedClock ?? {})).toHaveLength(20);
+      expect(Object.keys(storedClock ?? {})).toHaveLength(MAX_VECTOR_CLOCK_SIZE);
       expect(storedClock?.[fullStateAuthor]).toBe(1);
       expect(storedClock?.[uploadClient]).toBe(2);
 
-      expect((await service.uploadOps(userId, uploadClient, [retryDelta]))[0]).toEqual(
-        expect.objectContaining({
-          accepted: false,
-          errorCode: SYNC_ERROR_CODES.DUPLICATE_OPERATION,
-        }),
-      );
+      // 重传（内容逐字段相同）按幂等成功处理；上面那三条"裁剪保留了
+      // fullStateAuthor"的断言才是这个用例的重点，它们不受这次语义变更影响。
+      const retryResult = (await service.uploadOps(userId, uploadClient, [retryDelta]))[0];
+      expect(retryResult.accepted).toBe(true);
+      // 真的比较：回的必须是**首次上传那条**的序号（不是新分配的，也不是 undefined）
+      expect(oversizedResult.serverSeq).toBeTypeOf('number');
+      expect(retryResult.serverSeq).toBe(oversizedResult.serverSeq);
+      expect(retryResult.errorCode).toBeUndefined();
     });
 
     it('classifies an exact intra-batch retry of an oversized-clock op as DUPLICATE_OPERATION', async () => {
@@ -1302,7 +1309,10 @@ describe('SyncService', () => {
           [fullStateAuthor]: 1,
           [uploadClient]: 2,
           ...Object.fromEntries(
-            Array.from({ length: 25 }, (_, index) => [
+            // 🔴 条数从上限推导：写死 25 时上限一提到 100 就不再超限，
+            // 裁剪不再发生，toHaveLength(MAX) 随即失败 —— 若当初写成
+            // toHaveLength(25) 就会静默空转。
+            Array.from({ length: MAX_VECTOR_CLOCK_SIZE + 5 }, (_, index) => [
               `old-client-${index}`,
               100 + index,
             ]),
@@ -1360,7 +1370,8 @@ describe('SyncService', () => {
             [fullStateAuthor]: 1,
             [uploadClient]: 2 + index,
             ...Object.fromEntries(
-              Array.from({ length: 25 }, (_, old) => [`old-client-${old}`, 100 + old]),
+              // 同上：跟着上限走
+              Array.from({ length: MAX_VECTOR_CLOCK_SIZE + 5 }, (_, old) => [`old-client-${old}`, 100 + old]),
             ),
           },
           timestamp: fullStateOp.timestamp + 1 + index,
@@ -1378,7 +1389,7 @@ describe('SyncService', () => {
         const storedClock = testState.operations.get(delta.id)?.vectorClock as
           | Record<string, number>
           | undefined;
-        expect(Object.keys(storedClock ?? {})).toHaveLength(20);
+        expect(Object.keys(storedClock ?? {})).toHaveLength(MAX_VECTOR_CLOCK_SIZE);
         expect(storedClock?.[fullStateAuthor]).toBe(1);
       }
     });
@@ -1904,7 +1915,7 @@ describe('SyncService', () => {
       );
     });
 
-    it('should reject duplicate operation IDs (idempotency)', async () => {
+    it('should answer a duplicate operation ID idempotently (retry == success)', async () => {
       const service = getSyncService();
       const opId = uuidv7();
       const op: Operation = {
@@ -1924,10 +1935,13 @@ describe('SyncService', () => {
       const firstResults = await service.uploadOps(userId, clientId, [op]);
       expect(firstResults[0].accepted).toBe(true);
 
-      // Second upload with same ID should be rejected
+      // 🔴 第二次上传**按幂等成功**处理，不是拒绝。
+      // 原来回 DUPLICATE_OPERATION 会让客户端不去标记"已上传"
+      // → 队列永不清空 → 每次同步重传整批 → 永久卡死（见 duplicate-operation-precheck.spec.ts 文件头）。
       const secondResults = await service.uploadOps(userId, clientId, [op]);
-      expect(secondResults[0].accepted).toBe(false);
-      expect(secondResults[0].error).toBe('Duplicate operation ID');
+      expect(secondResults[0].accepted).toBe(true);
+      // 回的是**原来那条**的序号，不是新分配的
+      expect(secondResults[0].serverSeq).toBe(firstResults[0].serverSeq);
     });
 
     it('should update device last seen timestamp', async () => {

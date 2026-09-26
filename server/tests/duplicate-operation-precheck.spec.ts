@@ -30,6 +30,25 @@ const createTestOp = (overrides: Record<string, any> = {}) => ({
   ...overrides,
 });
 
+/**
+ * 🔴 语义变更（本轮）：**精确重复 = 幂等成功**，不再是硬拒绝。
+ *
+ * 原行为：磁盘上已有同一个 op（`isSameDuplicateOperation` 判定内容逐字段一致）
+ * 时回 `accepted: false` + `DUPLICATE_OPERATION`。
+ *
+ * 为什么改：`DUPLICATE_OPERATION` 的字面意思是"服务端已经有了"，而那
+ * **正是上传想要的结果**。把它当失败，客户端就不会去标记"已上传"，
+ * 于是队列永不清空 → 下次重传整批 → 又全是重复 → **这台设备的同步永久卡死**
+ * （数据没丢，但用户看到"同步一直失败 + 待上传数永远不减"）。
+ *
+ * 现在回 `accepted: true` + **原来那个 serverSeq**，与
+ * `sync.routes.snapshot-handler.ts` 里 BACKUP_IMPORT / REPAIR 的幂等分支同形。
+ *
+ * ⚠️ **边界没有放松**：id 撞上"另一条不同的 op"仍然硬拒绝 `INVALID_OP_ID`
+ * —— 下面 "different payload / vector clock / persisted metadata"、
+ * "another user operation"、"insert-race ID collisions" 这几条**故意保持不变**，
+ * 它们正是"幂等重试"与"id 冲突"的分界线。
+ */
 describe('Duplicate Operation Pre-check', () => {
   let syncService: SyncService;
 
@@ -38,7 +57,7 @@ describe('Duplicate Operation Pre-check', () => {
   });
 
   describe('uploadOps with duplicate operation', () => {
-    it('should return DUPLICATE_OPERATION error without aborting batch', async () => {
+    it('should treat an exact retry as idempotent success without aborting the batch', async () => {
       const existingOp = createTestOp({
         id: 'dup-op-1',
         entityId: 'task-1',
@@ -67,11 +86,12 @@ describe('Duplicate Operation Pre-check', () => {
       const results = await syncService.uploadOps(1, 'client-1', ops);
 
       expect(results).toHaveLength(3);
+      // 幂等成功：回的是**原来那条**的序号，而且没有占用新的序号
       expect(results[0]).toMatchObject({
-        accepted: false,
-        errorCode: SYNC_ERROR_CODES.DUPLICATE_OPERATION,
+        accepted: true,
+        serverSeq: 1,
       });
-      expect(results[0].serverSeq).toBeUndefined();
+      expect(results[0].errorCode).toBeUndefined();
       expect(results[1]).toMatchObject({
         accepted: true,
         serverSeq: 2,
@@ -82,7 +102,7 @@ describe('Duplicate Operation Pre-check', () => {
       });
     });
 
-    it('should detect duplicate operation via pre-check and return proper error code', async () => {
+    it('should return the original serverSeq when the pre-check hits an exact retry', async () => {
       // First, upload an operation
       const originalOp = createTestOp({ id: 'original-op-id', entityId: 'task-1' });
       const firstResult = await syncService.uploadOps(1, 'client-1', [originalOp]);
@@ -92,13 +112,14 @@ describe('Duplicate Operation Pre-check', () => {
       const duplicateOp = createTestOp({ id: 'original-op-id', entityId: 'task-1' });
       const duplicateResult = await syncService.uploadOps(1, 'client-1', [duplicateOp]);
 
-      // Should get DUPLICATE_OPERATION error
-      expect(duplicateResult[0].accepted).toBe(false);
-      expect(duplicateResult[0].errorCode).toBe(SYNC_ERROR_CODES.DUPLICATE_OPERATION);
-      expect(duplicateResult[0].error).toContain('Duplicate');
+      // 幂等成功，且序号就是原来那个（不是新分配的）
+      expect(duplicateResult[0].accepted).toBe(true);
+      expect(duplicateResult[0].serverSeq).toBe(firstResult[0].serverSeq);
+      expect(duplicateResult[0].error).toBeUndefined();
+      expect(duplicateResult[0].errorCode).toBeUndefined();
     });
 
-    it('should preserve duplicate retries when JSON field order differs', async () => {
+    it('should treat an exact retry as idempotent success when JSON field order differs', async () => {
       const originalOp = createTestOp({
         id: 'json-order-op',
         payload: {
@@ -120,8 +141,8 @@ describe('Duplicate Operation Pre-check', () => {
       const duplicateResult = await syncService.uploadOps(1, 'client-1', [duplicateOp]);
 
       expect(duplicateResult[0]).toMatchObject({
-        accepted: false,
-        errorCode: SYNC_ERROR_CODES.DUPLICATE_OPERATION,
+        accepted: true,
+        serverSeq: 1,
       });
     });
 
@@ -222,7 +243,7 @@ describe('Duplicate Operation Pre-check', () => {
       }
     });
 
-    it('should preserve duplicate retries when future timestamps are clamped', async () => {
+    it('should treat an exact retry as idempotent success when future timestamps are clamped', async () => {
       const baseTimestamp = 1_700_000_000_000;
       const farFuture = baseTimestamp + DEFAULT_SYNC_CONFIG.maxClockDriftMs + 10_000;
 
@@ -245,15 +266,15 @@ describe('Duplicate Operation Pre-check', () => {
         ]);
 
         expect(duplicateResult[0]).toMatchObject({
-          accepted: false,
-          errorCode: SYNC_ERROR_CODES.DUPLICATE_OPERATION,
+          accepted: true,
+          serverSeq: 1,
         });
       } finally {
         vi.useRealTimers();
       }
     });
 
-    it('should preserve clamped duplicate retries when the retry timestamp is no longer clamped', async () => {
+    it('should treat an exact retry as idempotent success when the retry is no longer clamped', async () => {
       const baseTimestamp = 1_700_000_000_000;
       const retryTimestamp = baseTimestamp + 10_000;
       const farFuture = baseTimestamp + DEFAULT_SYNC_CONFIG.maxClockDriftMs + 10_000;
@@ -277,15 +298,15 @@ describe('Duplicate Operation Pre-check', () => {
         ]);
 
         expect(duplicateResult[0]).toMatchObject({
-          accepted: false,
-          errorCode: SYNC_ERROR_CODES.DUPLICATE_OPERATION,
+          accepted: true,
+          serverSeq: 1,
         });
       } finally {
         vi.useRealTimers();
       }
     });
 
-    it('should not advance server sequence for duplicate retries', async () => {
+    it('should not consume a new server sequence for an idempotent retry', async () => {
       const originalOp = createTestOp({
         id: 'seq-original',
         entityId: 'task-seq-original',
@@ -300,10 +321,11 @@ describe('Duplicate Operation Pre-check', () => {
 
       const duplicateResult = await syncService.uploadOps(1, 'client-1', [originalOp]);
       expect(duplicateResult[0]).toMatchObject({
-        accepted: false,
-        errorCode: SYNC_ERROR_CODES.DUPLICATE_OPERATION,
+        accepted: true,
+        serverSeq: 1,
       });
-      expect(duplicateResult[0].serverSeq).toBeUndefined();
+      // 关键性质：幂等重试回原来的序号，**不**消耗新序号
+      expect(duplicateResult[0].serverSeq).toBe(1);
 
       const nextResult = await syncService.uploadOps(1, 'client-1', [
         createTestOp({
@@ -319,7 +341,7 @@ describe('Duplicate Operation Pre-check', () => {
       });
     });
 
-    it('should not abort transaction when duplicate is in the middle of batch', async () => {
+    it('should not abort the transaction when an exact retry is in the middle of the batch', async () => {
       // Upload first op to make it a "duplicate" for later
       const existingOp = createTestOp({ id: 'existing-op', entityId: 'task-existing' });
       await syncService.uploadOps(1, 'client-1', [existingOp]);
@@ -351,17 +373,17 @@ describe('Duplicate Operation Pre-check', () => {
         serverSeq: 2,
       });
       expect(results[1]).toMatchObject({
-        accepted: false,
-        errorCode: SYNC_ERROR_CODES.DUPLICATE_OPERATION,
+        accepted: true,
+        serverSeq: 1,
       });
-      expect(results[1].serverSeq).toBeUndefined();
+      expect(results[1].errorCode).toBeUndefined();
       expect(results[2]).toMatchObject({
         accepted: true,
         serverSeq: 3,
       });
     });
 
-    it('should prefer duplicate rejection over conflicts for older duplicate retries', async () => {
+    it('should answer an older exact retry with idempotent success instead of a conflict', async () => {
       const olderOp = createTestOp({
         id: 'older-op',
         entityId: 'task-same',
@@ -377,11 +399,12 @@ describe('Duplicate Operation Pre-check', () => {
 
       const results = await syncService.uploadOps(1, 'client-1', [olderOp]);
 
+      // 旧 op 正好命中幂等分支：既不算冲突，也不该让客户端永远重传
       expect(results[0]).toMatchObject({
-        accepted: false,
-        errorCode: SYNC_ERROR_CODES.DUPLICATE_OPERATION,
+        accepted: true,
+        serverSeq: 1,
       });
-      expect(results[0].serverSeq).toBeUndefined();
+      expect(results[0].errorCode).toBeUndefined();
     });
 
     it('should not treat another user operation with the same ID as duplicate success', async () => {
@@ -425,7 +448,7 @@ describe('Duplicate Operation Pre-check', () => {
       });
     });
 
-    it('should handle duplicate insert races without aborting the transaction', async () => {
+    it('should answer a lost insert race with the concurrent row as idempotent success', async () => {
       const raceTimestamp = Date.now() - 1000;
       const tx = {
         operation: {
@@ -436,6 +459,8 @@ describe('Duplicate Operation Pre-check', () => {
             .mockResolvedValueOnce({
               id: 'race-op',
               userId: 1,
+              // 幂等分支要回"并发插入那条"的序号，所以 mock 必须带上它
+              serverSeq: 1,
               clientId: 'client-1',
               actionType: '[Test] Action',
               opType: 'UPD',
@@ -488,10 +513,10 @@ describe('Duplicate Operation Pre-check', () => {
 
       expect(results).toHaveLength(1);
       expect(results[0]).toMatchObject({
-        accepted: false,
-        errorCode: SYNC_ERROR_CODES.DUPLICATE_OPERATION,
+        accepted: true,
+        serverSeq: 1,
       });
-      expect(results[0].serverSeq).toBeUndefined();
+      expect(results[0].errorCode).toBeUndefined();
       expect(tx.operation.createMany).toHaveBeenCalledWith(
         expect.objectContaining({ skipDuplicates: true }),
       );
@@ -645,7 +670,7 @@ describe('Duplicate Operation Pre-check', () => {
   });
 
   describe('error codes', () => {
-    it('should use DUPLICATE_OPERATION error code, not INTERNAL_ERROR', async () => {
+    it('should answer an exact retry idempotently, not with INTERNAL_ERROR', async () => {
       // The key regression: Before the fix, duplicates caused INTERNAL_ERROR
       // because the P2002 exception aborted the transaction and subsequent
       // queries failed with 25P02, which was caught as INTERNAL_ERROR.
@@ -658,8 +683,9 @@ describe('Duplicate Operation Pre-check', () => {
       // Upload again (duplicate)
       const result = await syncService.uploadOps(1, 'client-1', [op]);
 
-      // Must be DUPLICATE_OPERATION, NOT INTERNAL_ERROR
-      expect(result[0].errorCode).toBe(SYNC_ERROR_CODES.DUPLICATE_OPERATION);
+      // 幂等成功，绝不是 INTERNAL_ERROR
+      expect(result[0].accepted).toBe(true);
+      expect(result[0].serverSeq).toBe(1);
       expect(result[0].errorCode).not.toBe(SYNC_ERROR_CODES.INTERNAL_ERROR);
     });
   });
