@@ -21,3 +21,18 @@ research/vendor/
 # 测试与构建产物
 coverage/
 *.log
+
+# 内容寻址包缓存 —— 不是源码，按 lockfile 可完整重建。
+#
+# 🔴 这三个目录曾经被误提交（`git add -A` 带进去的），合计 444.9 MB / 8456 个文件，
+# 占了整个 tip 树的 98%。它们就是 CI 克隆慢的真正原因：
+#     .pnpm-store/                               188.4 MiB   7671 个文件
+#     research/standalone/.npm-cache/            130.2 MiB    290 个文件
+#     research/standalone/sync-core/.npmcache2/  126.4 MiB    495 个文件
+# 内容寻址、每次 install 都会新增大量 blob、换台机器或换个 pnpm 版本就漂移 ——
+# 提交它只会让每次安装都产生一份没人看得懂的巨型 diff。
+# 文件仍留在本地磁盘上，只是不再入库。
+.pnpm-store/
+.npm-cache/
+.npmcache*/
+_cacache/
