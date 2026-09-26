@@ -1,0 +1,286 @@
+=== Q1: goal gradient effect replication failure criticism motivation ===
+## Search Results (8 results, 2015ms)
+
+### 1. The Goal-Gradient Hypothesis Resurrected
+- **URL**: https://home.uchicago.edu/ourminsky/Goal-Gradient_Illusionary_Goal_Progress.pdf
+- by RAN KIVETZ · 2006 · Cited by 1208 — According to the goal-gradient hypothesis (H1), card- holding customers accelerate their purchases because they experience enhanced motivation as they get ...
+
+### 2. Goal-Gradient Hypothesis: Why We Speed Up at the End
+- **URL**: https://yukaichou.com/behavioral-analysis/goal-gradient-hypothesis-hull-kivetz-motivation-acceleration/
+- The goal-gradient hypothesis says motivation and effort increase as you approach a goal. It responds to perceived distance, not real distance. date: Jun 22, 2026
+
+### 3. Goal-Gradient Effect
+- **URL**: https://lawsofux.com/goal-gradient-effect/
+- Goal-Gradient Effect. The tendency to approach a goal increases with proximity to the goal.
+
+### 4. Moving the Finish Line: The Goal Gradient Hypothesis
+- **URL**: https://fs.blog/goal-gradient-hypothesis/
+- The Goal Gradient Hypothesis explains why we increase our effort as we get close to the finish line. Here's what you need to know to put this idea to work.
+
+### 5. Goal Gradient Effect: How rewards can improve your ...
+- **URL**: https://medium.com/choice-hacking/goal-gradient-effect-how-rewards-can-improve-your-customer-experience-25dfcab5e3b8
+- Goal Gradient Effect states that as people get closer to a reward, they speed up their behavior to get to their goal faster. In other words, ...
+
+### 6. Using the goal gradient hypothesis to help people cross ...
+- **URL**: https://nesslabs.com/goal-gradient-hypothesis
+- The goal gradient hypothesis posits that our efforts increase as we get closer to achieving a goal: when the reward is in sight, we feel incentivised to reach ...
+
+### 7. Designing for motivation with the goal-gradient effect
+- **URL**: https://uxdesign.cc/designing-for-motivation-with-the-goal-gradient-effect-c873cdf58beb
+- The goal-gradient effect describes how our efforts intensify as we approach a goal. We become more motivated to complete the task when the ... date: May 17, 2020
+
+### 8. Reports Goal gradient in helping behavior
+- **URL**: https://www.sciencedirect.com/science/article/abs/pii/S0022103113001364
+- by CE Cryder · 2013 · Cited by 253 — People are more likely to pitch in as charitable campaigns approach their goals. · Three studies showed evidence of this goal-gradient helping behavior.
+
+
+=== Q2: illusion of progress bar false sense of accomplishment criticism ===
+## Search Results (8 results, 2198ms)
+
+### 1. How to Take Action and Break Free From the Illusion
+- **URL**: https://hackernoon.com/when-progress-is-not-progress-how-to-take-action-and-break-free-from-the-illusion
+- The problem with giving ourselves a fake sense of accomplishment is pretty obvious: we don't have powerful algorithms and codes running in the ... date: Apr 19, 2023
+
+### 2. The illusion of achievement: chasing a non-existent finish line
+- **URL**: https://www.facebook.com/groups/910798219668535/posts/2617171869031153/
+- The Illusion of Completion is the false feeling that you have already arrived, when in reality you have only made progress. The bar moves. You ...
+
+### 3. The False Sense of Achievement - by Nuno Padovani
+- **URL**: https://medium.com/@nunopadovani/the-false-sense-of-achievement-344bd36b1e6e
+- Many times, people, including myself, tend to create in their minds a false sense of progress, an objective that, even though it's imaginary, ... date: 3 years ago
+
+### 4. The Illusion of Progress: Balancing Life's Demands with ...
+- **URL**: https://www.linkedin.com/pulse/illusion-progress-balancing-lifes-demands-purposeful-frankie-bzioe
+- This illusion of progress can be deceptive because it creates a temporary sense of accomplishment without actual forward movement. date: 1 year ago
+
+### 5. The progress bar paradox: why completion often kills ...
+- **URL**: https://www.reddit.com/r/UXDesign/comments/1oowd3d/the_progress_bar_paradox_why_completion_often/
+- From a behavioral perspective, progress bars don't measure progress, they measure closure. Once the bar hits 100%, motivation collapses. The ... date: 10 months ago
+
+### 6. Truth, Lies and Progress Bars
+- **URL**: https://cloudfour.com/thinks/truth-lies-and-progress-bars/
+- It was decided that a fictional progress bar was a necessary evil. By demonstrating some amount of forward momentum, users felt more confident ... date: Mar 4, 2025
+
+### 7. Status and the Illusion of Progress
+- **URL**: https://moretothat.com/status-and-the-illusion-of-progress/
+- Almost any quantifiable indicator of progress has this type of tradeoff embedded in it, which is why real progress cannot be defined by something external.
+
+### 8. The Illusion of Progress: Are You Really Moving Forward?
+- **URL**: https://www.empoweredspeaker.com/blog/illusionofprogress
+- Have you ever felt like you're constantly busy, always in motion, yet somehow making little to no real progress? It's easy to mistake activity for achievement..
+
+
+=== Q3: life calendar app reddit stopped using novelty died ===
+## Search Results (8 results, 2565ms)
+
+### 1. life-calendar.el – Your entire life as a grid of weeks : r/emacs
+- **URL**: https://www.reddit.com/r/emacs/comments/1q5qiye/lifecalendarel_your_entire_life_as_a_grid_of_weeks/
+- It displays your entire life as a grid, with each square representing one week and each row representing one year. Past weeks are filled, the ... date: 8 months ago
+
+### 2. I made a life calendar and now I'm scared : r/Rainmeter
+- **URL**: https://www.reddit.com/r/Rainmeter/comments/lm2ypg/i_made_a_life_calendar_and_now_im_scared/
+- I was making a "Yearly week counter" that lights up a circle for every week in the year that passes, Kind of like a year progress bar made ... date: 5 years ago
+
+### 3. Entertainment & Promotions Event Calendar
+- **URL**: https://www.everythingtulalip.com/entertainment/calendar/
+- View the event calendar for Quil Ceda Creek Casino, Tulalip Bingo & Slots and Tulalip Resort Casino events and entertainment. date: 2 hours ago
+
+### 4. Just finished building “Your Life Calendar” web-app
+- **URL**: https://www.reddit.com/r/vibecoding/comments/1lulku6/just_finished_building_your_life_calendar_webapp/
+- I just finished vibe coding a one-page Life-Calendar idea with a real-time countdown clock—where you can enter any target date of death—and ... date: 1 year ago
+
+### 5. The Notion Life Calendar - now with colors
+- **URL**: https://www.reddit.com/r/Notion/comments/nuqhqs/the_notion_life_calendar_now_with_colors/
+- Hey notioners! I created this small life calendar to be embeddable in my digital life, so to think about time a bit more often. date: 5 years ago
+
+### 6. this might sound morbid but its actually been weirdly freeing
+- **URL**: https://www.reddit.com/r/Life/comments/1qbxgk6/this_might_sound_morbid_but_its_actually_been/
+- a few months ago i came across this concept called a life calendar. basically you take the average lifespan (around 80 years), break it into weeks (about ... date: 8 months ago
+
+### 7. I saw those viral "Life Calendar" wallpapers on Reels, but ...
+- **URL**: https://www.reddit.com/r/androiddev/comments/1qj1sxt/i_saw_those_viral_life_calendar_wallpapers_on/
+- It's a minimal Android widget that shows your year as a grid of 365 dots. Past days turn grey. Today pulses with an orange glow. Future days are ... date: 8 months ago
+
+### 8. What are your favorite calendar, todo, or general life ...
+- **URL**: https://www.reddit.com/r/ipad/comments/ctxyyd/what_are_your_favorite_calendar_todo_or_general/
+- I've recently taken on a lot more responsibility at work and at home, while starting classes back up. I've found that keeping a calendar and to do list ... date: 7 years ago
+
+
+=== Q4: memento mori app anxiety harmful criticism death clock ===
+## Search Results (8 results, 2404ms)
+
+### 1. Memento: Stoic Death Clock - App Store - Apple
+- **URL**: https://apps.apple.com/us/app/memento-stoic-death-clock/id6758631638
+- Death clock & memento mori in one app. Visualize your life in weeks, burn anxiety with Stoic clarity. Try it free. Stop managing your anxiety. date: Mar 12, 2026
+
+### 2. Memento Mori - Life Clock - Apps on Google Play
+- **URL**: https://play.google.com/store/apps/details?id=com.mementomori.lifeclock&hl=en_US
+- Memento Mori - Life Timer is not just a countdown to death; it is a tool for radical life affirmation. By visualizing your remaining time ... date: Feb 24, 2026
+
+### 3. There is a new app called The Death Clock. It came across ...
+- **URL**: https://www.facebook.com/pam.houston.792/posts/there-is-a-new-app-called-the-death-clock-it-came-across-my-feed-i-burst-out-lau/10167284081164498/
+- It tells you the day you die after you enter the answers to all their questions and mix it with the average person with your type of lifestyle. date: 6 months ago
+
+### 4. Memento Mori - A Negative Or Positive Reminder?
+- **URL**: https://selfhelpnirvana.com/sharper-brain/memento-mori-a-negative-or-positive-reminder/
+- The phrase “memento mori” is a Latin term that essentially means, “remember you will die”. This saying is often associated with one of people can die in a ...
+
+### 5. Memento Mori and Mental Health: Why Remembering ...
+- **URL**: https://aimwellbeing.com/memento-mori-and-mental-health-why-remembering-death-can-help-us-live/
+- Memento Mori is the practice of remembering that life is finite. Rather than being morbid, it helps reduce anxiety by sharpening perspective ... date: Dec 8, 2025
+
+### 6. Question about Memento Mori from someone with anxiety
+- **URL**: https://www.reddit.com/r/Stoicism/comments/pyasvl/question_about_memento_mori_from_someone_with/
+- Memento Mori is about accepting the reality of death, one reality of which is "you cannot control when it arrives - it may arrive before you've ... date: 4 years ago
+
+### 7. When people hear the phrase memento mori, they often flinch. ...
+- **URL**: https://www.instagram.com/reel/DblWVyEjxA5/
+- When people hear the phrase memento mori, they often flinch. The idea of remembering that we're going to die can sound harsh or even morbid. date: 1 month ago
+
+### 8. Memento Mori - The Death Clock of Life - Chrome Web Store
+- **URL**: https://chromewebstore.google.com/detail/memento-mori-the-death-cl/mpfnfgmigbobkcdlibhpiaoiocpmdieh?hl=en
+- A daily gratitude journal and a reminder of your mortality. Memento Mori - a new Chrome extension designed to help you live a more mindful ... date: Jan 15, 2025
+
+
+=== Q5: Griply app goals deadline tasks habits ===
+## Search Results (8 results, 1707ms)
+
+### 1. Daily Planner & Goals: Griply - App Store - Apple
+- **URL**: https://apps.apple.com/us/app/daily-planner-goals-griply/id1556692747
+- Griply connects your daily tasks and habits to your bigger goals and the why behind them, Habits and tasks all tie back to goals/subgoals and their completion ...
+
+### 2. Griply Features | Goals, Habits, Tasks & Progress Tracking
+- **URL**: https://griply.app/help/features
+- Griply is an all-in-one productivity app designed for people who want to set meaningful goals, build consistent habits, and manage tasks, all in one place.
+
+### 3. We just added Time Blocking, a Goal Roadmap & Calendar to ...
+- **URL**: https://www.reddit.com/r/ProductivityApps/comments/1lkzuil/we_just_added_time_blocking_a_goal_roadmap/
+- Griply connects your goals, habits, and tasks in one system. Break down big goals into subgoals, habits, and actionable tasks date: 1 year ago
+
+### 4. Griply - Goal Planner (@griply.app)
+- **URL**: https://www.threads.com/@griply.app
+- From now on, you can type your tasks in plain language and Griply will recognize dates, times, priorities, goals, tags, reminders, repeat schedules, and more...
+
+### 5. Griply | Goal Planner, Habit Tracker & Task Manager
+- **URL**: https://griply.app/
+- Griply connects your goals, habits, tasks, and calendar, so you can plan your vision, stay focused, and make real progress every day.
+
+### 6. Why choose Griply over TickTick for combined goal, habit, and task ...
+- **URL**: https://www.reddit.com/r/GriplyApp/comments/1r3qxav/why_choose_griply_over_ticktick_for_combined_goal/
+
+### 7. How to align daily tasks with long-term goals
+- **URL**: https://griply.app/faq/align-daily-tasks-with-long-term-goals
+- Griply is now on Android in public beta. Set goals with a target and a deadline, then plan the tasks and habits that move them forward.
+
+### 8. Time-limited habits?
+- **URL**: https://www.reddit.com/r/GriplyApp/comments/1o38tty/timelimited_habits/
+
+
+=== Q6: Deadliner app Mac App Store task countdown ===
+## Search Results (8 results, 2474ms)
+
+### 1. Deadline App - App Store - Apple
+- **URL**: https://apps.apple.com/us/app/deadline-app/id1557048705
+- This app is perfect for getting stuff done! Simple list that sorts based on what needs done next with a timer when that deadline is.
+
+### 2. Looking for a menubar or widget based apps for tracking ...
+- **URL**: https://www.reddit.com/r/macapps/comments/1rgjk63/looking_for_a_menubar_or_widget_based_apps_for/
+- Sit at desktop corner and have this detailed time tracker to submit a project/deadline. Stays on menubar so that it has that colour icon or time ... date: 7 months ago
+
+### 3. Top 5 Time and Deadline Tracking Apps in 2023 for iOS ...
+- **URL**: https://zetegy.com/articles/top-deadline-tracking-apps-ios-mac
+- Deadliner is built around tracking tasks visually. Each task displays a countdown, as well as a circular progress bar that shows you how much ... date: Dec 22, 2022
+
+### 4. Best Time Management Apps for Mac in 2026
+- **URL**: https://timingapp.com/blog/best-apps-for-time-management-mac/
+- Compare the best time management apps for Mac in 2026, with tools to plan your day, capture tasks, protect focus, and track time. date: Jun 1, 2026
+
+### 5. Due: The Superfast Reminder App for iPhone & iPad
+- **URL**: https://www.dueapp.com/
+- With 12 fully customizable buttons, you can instantly set your reminder to the next 12 noon or the next 10 PM with just a single tap. You can even add or ...
+
+### 6. My 4 top countdown timer apps for Mac that beat procrastinat
+- **URL**: https://www.linkedin.com/pulse/top-countdown-timer-apps-mac-help-me-meet-every-less-stress-polina-9w3if
+- Finishing tasks at midnight with a coffee overdose? These countdown timer apps transform your chaotic work pattern into focused productivity ... date: 1 year ago
+
+### 7. Reel by Tvaro (@gettvaro) · September 24, 2026
+- **URL**: https://www.instagram.com/reel/DdrZF4gguyl/
+- Buy a pack of credits in most apps and some quietly disappear at month's end. That turns a top-up into a countdown, penalizing you for not using the app often ...
+
+### 8. Deadliner – Time Management - App Store - Apple
+- **URL**: https://apps.apple.com/bz/app/deadliner-time-management/id1539999660?platform=mac
+- Deadliner is a visual task tracker designed to increase your productivity and eliminate procrastination. managing deadlines, projects, events, and meetings. ...
+
+
+=== Q7: Time Until app 5 million downloads Handcrafted Apps Games revenue ===
+## Search Results (8 results, 1212ms)
+
+### 1. Without revealing what the game is, how much money does your 1 ...
+- **URL**: https://www.reddit.com/r/gamedev/comments/1h0i6a7/without_revealing_what_the_game_is_how_much_money/
+- 80% revenue came from ads & 20% from IAP. The game is appealing more to very young audience, so its suffers IAP revenues. Also at least 70% ...How much does an app with a million downloads make? : r/androiddevMobile Application Developers, how much money do you earn with your ...More results from www.reddit.com
+
+### 2. How Much My Indie Game Made with 1 Million Android Downloads
+- **URL**: https://www.youtube.com/watch?v=Eir4LD-iWuk
+- //apps.apple.com/us/app/endurance-mighty-soul-doom/id1504643083 In this video, I break down the real revenue ... 5 years later. Good enough ...
+
+### 3. Top Mobile Games by Revenue and Downloads in August 2026
+- **URL**: https://gamedevreports.substack.com/p/appmagic-top-mobile-games-by-revenue-980
+- Honor of Kings stays in first place with $152.7 million in revenue - almost level with July (-3% MoM). Summer school holidays are still running ...
+
+### 4. This Week in Apps - They Did It Again! - Appfigures
+- **URL**: https://appfigures.com/resources/this-week-in-apps/20260213
+- In the acquisition month, the mobile app was pulling about $830K per month in estimated net revenue. By January 2026, it hit $4.6M. Revenue was ...
+
+### 5. How long does it take to earn $5 a day from your Android apps? - Quora
+- **URL**: https://www.quora.com/How-long-does-it-take-to-earn-5-a-day-from-your-Android-apps
+- Regarding the earning, the revenue from android apps could be from $0 to $1Million+ per day depends on your app user base. Flappy bird game ...
+
+### 6. US App Store revenue from non-game apps just topped games ...
+- **URL**: https://techcrunch.com/2022/07/14/u-s-app-store-revenue-from-non-game-apps-just-topped-games-for-the-first-time/
+- This drove the total revenue generated by non-game apps higher for the quarter, reaching about $3.4 billion on the U.S. App Store, compared with ...
+
+### 7. Top Grossing Apps (2026) - Business of Apps
+- **URL**: https://www.businessofapps.com/data/top-grossing-apps/
+- Top Grossing iOS Apps and Games 2025. YouTube was the top grossing app on iOS in 2025, with $2.1 billion in-app revenue. App ...
+
+### 8. List of highest-grossing mobile games | Video Game Sales Wiki | Fandom
+- **URL**: https://vgsales.fandom.com/wiki/List_of_highest-grossing_mobile_games
+- This is a list of the highest-grossing mobile games. It is a list of mobile games that have generated at least $100 million in gross revenue.
+
+
+=== Q8: Beeminder bright red line visualization graph procrastination ===
+## Search Results (8 results, 835ms)
+
+### 1. Goodbye Yellow Brick Road, Hello Bright Red Line - Beeminder Blog
+- **URL**: https://blog.beeminder.com/brl/
+- Beeminder is goal-tracking with teeth. We plot your progress on a graph with a Bright Red Line (formerly Yellow Brick Road). It encompasses ...
+
+### 2. How do I interpret the graph? - Beeminder Help
+- **URL**: https://help.beeminder.com/article/118-how-do-i-interpret-the-graph
+- The bright red line is the line Beeminder draws to your final goal date / value (which might be very far in the future, if you don't have a ...
+
+### 3. Beeminding a task for Mon/Wed/Fri only
+- **URL**: https://forum.beeminder.com/t/beeminding-a-task-for-mon-wed-fri-only/10593
+- I set the goal up on a Sunday with a start value of 0, so the next day Beeminder said I was in the red - the line was at 0.6, my score was at 0, ...
+
+### 4. beeminder
+- **URL**: https://www.beeminder.com/
+- Answer with your number when Beeminder asks — or connect a device/app below to auto-report — and we'll show your progress and a Bright Red Line to follow to ...
+
+### 5. Catch-up Unmustered; or, Easier is Harder - Beeminder Blog
+- **URL**: https://blog.beeminder.com/catchup/
+- We plot your progress on a graph with a Bright Red Line (formerly Yellow Brick Road). If your datapoints cross that line, we take your money.
+
+### 6. The Bright Red Staircase | Beeminder Blog
+- **URL**: https://blog.beeminder.com/staircase/
+- We plot your progress on a graph with a Bright Red Line (formerly Yellow Brick Road). If your datapoints cross that line, we take your money.
+
+### 7. Why Beeminder Uses Cumulative Graphs
+- **URL**: https://blog.beeminder.com/grayson/
+- We plot your progress on a graph with a Bright Red Line (formerly Yellow Brick Road). If your datapoints cross that line, we take your money.
+
+### 8. It's Chunky Time! - Beeminder Blog
+- **URL**: https://blog.beeminder.com/chunky/
+- We plot your progress on a graph with a Bright Red Line (formerly Yellow Brick Road). If your datapoints cross that line, we take your money.
+
+

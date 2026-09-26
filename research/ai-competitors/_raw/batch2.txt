@@ -1,0 +1,247 @@
+=== QUERY 1: Beeminder commitment device money progress goal ===
+## Search Results (7 results, 3351ms)
+
+### 1. Beeminder
+- **URL**: https://www.beeminder.com/
+- Your goals can be anything quantifiable — weight, pushups, minutes spent on Facebook, points on Duolingo. Answer with your number when Beeminder asks — or connect a device/app below to auto-report — and we'll show your progress and a Bright Red Line to follow to stay on track. If you cross the line, we charge your payment method! sitelinks: Sign up: https://www.beeminder.com/users/sign_up Log in: https://www.beeminder.com/users/sign_in Premium: https://www.beeminder.com/premium Featured: https://www.beeminder.com/featured Blog: https://blog.beeminder.com/
+
+### 2. Beeminder Tracks Your Goals & Motivates You by Charging—How ...
+- **URL**: https://lifetips.alibaba.com/tech-efficiency/beeminder-tracks-your-goals-motivates-you-by-charging
+- Yes—Beeminder tracks your goals and motivates you by charging you money when you fall off track. This is not a metaphor or gamified nudge: it is a real, enforced financial consequence tied directly to objective, quantifiable progress data. date: Jan 16, 2026
+
+### 3. Beeminder review: miss your goal, pay real money
+- **URL**: https://howtostopprocrastinating.org/tools/beeminder/
+- Beeminder is a commitment-device service: you set a quantified goal, the app plots a required path on a graph, and if your data falls off that path you derail and are charged real money from a card on file. Pledges start small and escalate with each failure, so staying on track gets progressively more expensive to abandon. date: Sep 12, 2026
+
+### 4. Tag: commitment devices | Beeminder Blog
+- **URL**: https://blog.beeminder.com/tags/commitment%20devices
+- Beeminder is goal-tracking with teeth. We plot your progress on a graph with a Bright Red Line (formerly Yellow Brick Road). If your datapoints cross that line, we take your money. The Beeminder blog is a hodgepodge of productivity nerdery and behavioral economics written by the founders and various friends. 100% human-written always.
+
+### 5. Review: Forfeit is the yoda of commitment device apps
+- **URL**: https://forum.beeminder.com/t/review-forfeit-is-the-yoda-of-commitment-device-apps/11021
+- Whenever a commitment device fails to motivate, even if it is nominally the user’s fault for not setting a commitment device to be aggressive enough to motivate. For example, if I were to have 7 beeminder goals that were blue, (would have financial consequences in two days) but not green… (Financial consequences in three days.) date: Jun 28, 2023
+
+### 6. Commitment Devices That Help You Stick to Goals
+- **URL**: https://goalsandprogress.com/commitment-devices-that-help-you-stick-to-goals/
+- A commitment device is a choice you make now that restricts your future options, so abandoning a goal becomes costly or difficult rather than easy. It works by binding your present, motivated self before your future, tempted self can talk its way out. Used well, commitment devices improve follow-through on goals you would otherwise drop.
+
+### 7. about – beeminder
+- **URL**: https://www.beeminder.com/overview
+- It's reminders with a sting! Or, goal-tracking with teeth.Mind anything you can graph— weight, pushups, to-do tasks completed —by replying with data when Beeminder prompts you.Or connect with one of the dozens of services (like Fitbit or RescueTime) that we integrate with to report automatically.We plot your progress with a Bright Red Line to your ...
+
+
+=== QUERY 2: Structured app visual timeline day schedule tasks ===
+## Search Results (8 results, 2377ms)
+
+### 1. Structured — Daily Planner
+- **URL**: https://structured.app/
+- Structured combines all your tasks, calendar events, and focus sessions in one beautifully designed timeline. Structured WebStart planning for free!
+
+### 2. turning your habits into structured timeline task
+- **URL**: https://www.reddit.com/r/ProductivityApps/comments/1mo2jw2/turning_your_habits_into_structured_timeline_task/
+
+### 3. Structured: Daily Planner Todo - App Store
+- **URL**: https://apps.apple.com/bg/app/structured-daily-planner-todo/id1499198946
+- A visual daily planner to organize tasks, routines, and habits. Stay focused, reduce overwhelm, and plan your day in one clear timeline.
+
+### 4. Structured - Daily Planner - Apps on Google Play
+- **URL**: https://play.google.com/store/apps/details?id=io.unorderly.structured&hl=en_US
+- Structured is built for visual planning. Seeing your tasks in a clear timeline reduces decision fatigue and makes it easier to focus. You ... date: 4 days ago rating: 4.6 rating_count: 31445
+
+### 5. Welcome to Structured , your ultimate day planner app that ...
+- **URL**: https://www.instagram.com/reel/CyngodzoTFR/?hl=en
+- Welcome to Structured 👋, your ultimate day planner app that seamlessly integrates your personal to-dos 📋 , work calendar 📆 , and all other ... date: 2 years ago
+
+### 6. Best Daily Planner App in 2026? (Honest Review)
+- **URL**: https://www.youtube.com/watch?v=K278tuMDyf4
+- We'll dive into its visual timeline that merges your calendar, to-dos, routines, and habits into a single color-coded view, plus page through ... date: 5 months ago
+
+### 7. Tiimo vs Structured: Which Visual Planner for ADHD? (2026)
+- **URL**: https://elevenapril.com/blog/tiimo-vs-structured
+- Structured is a day planner first. drag tasks onto a timeline, block your time, see the whole day in order. date: 22 hours ago
+
+### 8. Todo List App for ADHD & Visual Task Lists
+- **URL**: https://thruday.com/product/todo-list
+- Thruday supports daily executive function with visual timelines, reminders, task structure, and tools that make it easier to start tasks, move between ... date: 9 hours ago rating: 4.6 rating_count: 5
+
+
+=== QUERY 3: Due app persistent reminders iOS review ===
+## Search Results (8 results, 1277ms)
+
+### 1. Due - Reminders & Timers : r/iosapps
+- **URL**: https://www.reddit.com/r/iosapps/comments/1glcm25/due_reminders_timers/
+- Yes its really good value considering you'll use it every day and it will save your butt by avoiding missing something really important. date: 1 year ago
+
+### 2. Due: The Superfast Reminder App for iPhone & iPad
+- **URL**: https://www.dueapp.com/
+- Due remembers everything you need so you don't have to. It's lightning-fast to set reminders, and it's so persistent you can't forget anything.
+
+### 3. Due: An Excellent Reminder App for Students - Peer Reviewed
+- **URL**: https://www.peerreviewed.io/blog/2019/8/2/due-an-excellent-reminder-app-for-students
+- This feature has significantly reduced the number of reminders I get a notification for but then immediately forget about on my lock screen. date: Aug 2, 2019
+
+### 4. ‎Due — Reminders & Timers - Ratings & Reviews - App Store
+- **URL**: https://apps.apple.com/us/app/due-reminders-timers/id524373870?mt=12&see-all=reviews
+- I'm a new user of Due, and I've given it four stars because: a) the simplicity of adding tasks means that I'm likely to record them, and b) the reminder ...
+
+### 5. Just Due It: Persistent Notifications for Tasks - TidBITS Talk
+- **URL**: https://talk.tidbits.com/t/just-due-it-persistent-notifications-for-tasks/28231
+- I took up using Due many years ago after getting sick of Reminders 1. not syncing consistently between ios and mac (the same as every other ... date: Jul 6, 2024
+
+### 6. The BEST Persistent Reminders App for Mac, iPhone & Apple ...
+- **URL**: https://www.youtube.com/watch?v=ph5dIB8gCDg
+- Works on iPhone, Mac, Apple Watch, iPad 2. Keeps reminding you over and over again until you stop it 3. Is super easy to use I don't know of ... date: 2 years ago
+
+### 7. iPad Pro Anyone Used Due APP
+- **URL**: https://forums.macrumors.com/threads/anyone-used-due-app.2224539/
+- Due is fantastic. It's like basically every other app in that you can set your preferences so that you can get banner notifications. Its ability ... date: Feb 24, 2020
+
+### 8. Best Persistent Reminder Apps for Busy Professionals
+- **URL**: https://www.yougot.ai/blog/reminders/general-reminders/persistent-reminder-app
+- Due is the gold standard for push-based persistence. It auto-repeats notifications every minute. It's simple, fast, and relentless. date: Apr 3, 2026
+
+
+=== QUERY 4: TickTick countdown widget days left task ===
+## Search Results (8 results, 1867ms)
+
+### 1. Countdown feature is super useful for paying bills & ...
+- **URL**: https://www.reddit.com/r/ticktick/comments/1p37jjy/countdown_feature_is_super_useful_for_paying/
+- You change the view options from Task time to Countdown Time and Ticktick shows how many days left until the task is due. date: 10 months ago
+
+### 2. Add Countdowns
+- **URL**: https://help.ticktick.com/articles/7322524237753745408
+- Go to Settings > Tab Bar, find Countdown, and tap the + icon to turn it on. to add a new countdown. Add a Countdown like "Payday" and input the upcoming ...
+
+### 3. Never Miss a Big Day Again! TickTick Countdown Tutorial
+- **URL**: https://www.youtube.com/watch?v=3G3jjXtppMQ
+- Want an easy way to keep track of important days. Enable the Countdown Feature 00:44 Add Countdowns 02:40 Customize Your Countdowns 03:42 ... date: 1 year ago
+
+### 4. Why 'countdown mode' is the task manager feature I can't ...
+- **URL**: https://www.zdnet.com/article/ticktick-task-manager-feature-countdown-mode/
+- In the TickTick app, click your profile picture in the top-left and then click “Settings” and “Date and Time.” You can toggle on countdown near ... date: Jun 30, 2026
+
+### 5. TickTick: A To-Do List and Calendar to keep you organized
+- **URL**: https://ticktick.com/?language=en_us
+- TickTick: Your all-in-one productivity app. Manage tasks, calendars, habits, and more. Sync across all devices. Start for free!
+
+### 6. Countdown Widget・Countdown app - Apps on Google Play
+- **URL**: https://play.google.com/store/apps/details?id=me.gira.widget.countdown&hl=en_US
+- ⏳ Create as many countdown timer events as you want; ⏳ Configurable countdown timer to calculate for days left, but also for years, months, or weeks left; rating: 4.1 rating_count: 135391
+
+### 7. #christmas #daysuntilchristmas #christmascountdown # ...
+- **URL**: https://www.tiktok.com/@snowflakesonchristmas89/video/7689371691373301022
+- Use a phone or smart-screen countdown app to show days, hours, and minutes. reveal a small activity or family task each day.
+
+### 8. Google Tasks vs Google Calendar: Which Should Hold…
+- **URL**: https://tasksboard.com/blog/google-tasks-vs-google-calendar
+- Google Calendar has a "Tasks" toggle in the left sidebar that displays any task with a due date as an all-day item on the matching day. date: 24 hours ago
+
+
+=== QUERY 5: 人生进度条 app 时间 可视化 倒计时 ===
+## Search Results (8 results, 2887ms)
+
+### 1. 人生进度条 - 量化你的人生画卷 - iKnowABit
+- **URL**: https://iknowabit.com/zh/life-progress
+- 这是一个温暖的时间可视化工具。 输入出生日期，生成你的人生画卷。 看见时间的流向，珍惜当下的每一刻，规划属于你的精彩人生。 您的设置会自动保存在本地。 建议收藏本页，常回来看看。
+
+### 2. 人生进度条 (Life Progress) - 4000周可视化 | XYanLab
+- **URL**: https://tools.xyanlab.com/tools/life-progress.html
+- 这个数字听起来比"80年"要少得多，这就是**时间的具象化**带来的冲击力。 XYanLab 的人生进度条（Life Progress Bar）灵感来源于 Oliver Burkeman 的著作《四千周》，旨在通过可视化的格子，帮助你直观地感受生命的流逝。
+
+### 3. 人生倒计时 - 珍惜时间、把握当下 | 免费时间管理工具
+- **URL**: https://www.iicn.net/tools/life-countdown.html
+- 时间是最公平的资源，每个人每天都只有24小时。 重要的不是我们还有多少时间，而是我们如何利用这些时间。 date: Jun 1, 2024
+
+### 4. 人生倒时计 - 免费人生倒计时，时间流逝可视化 | pudone!
+- **URL**: https://pudone.com/zh/life-countdown
+- 将你的剩余人生可视化为具体的日常事件——餐食、日落、心跳等等。 📊人生进度条 — 大型彩色进度条直观显示你的人生已过去多少、还剩多少。 🍚13 个具体人生事件 — 将抽象的年数转换为可感知的数量：餐食、睡眠、心跳、春节、夏天等。
+
+### 5. 人生进度条 - 直观感受时间的流逝
+- **URL**: https://www.gwlin.com/generated/life-progress/
+- 一个基于年龄的人生进度条工具，直观显示人生时间的流逝，帮助珍惜每一天。输入生日即可看到你的人生进度。
+
+### 6. ‎Treasure Life 人生倒计时组件 App - App ... - App Store
+- **URL**: https://apps.apple.com/cn/app/treasure-life-%E4%BA%BA%E7%94%9F%E5%80%92%E8%AE%A1%E6%97%B6%E7%BB%84%E4%BB%B6/id6741671694
+- Treasure Life 不用制造压力，而是用漂亮、安静的可视化提醒你认真使用今天。 你可以调整颜色、形状、表情标记和显示方式，让时间视图更像自己的节奏。 Premium 可解锁更多视图、更深度自定义、小组件样式和无广告体验。
+
+### 7. https://v.douyin.com/JhH5kNY
+- **URL**: https://v.douyin.com/JhH5kNY
+- No information is available for this page. sitelinks: Learn why: https://support.google.com/webmasters/answer/7489871?hl=en
+
+### 8. 夜明珠网【美女三肖】2025最新版解析：精准预测技巧与使用 ...
+- **URL**: http://www.fjc001.com/?blog/20250707-6843065.html
+- 有个小进度条, 其实它就是个“历史遗漏时间”的百分比可视化。比如某生肖已经遗漏了15期,进度条显示80%,那意味着再等3-5期 date: 17 hours ago
+
+
+=== QUERY 6: Amazing Marvin time budget countdown strategy ===
+## Search Results (8 results, 2133ms)
+
+### 1. Mastering Time Targets in Amazing Marvin
+- **URL**: https://www.youtube.com/watch?v=Z7lyjrRFnpE
+- Learn how to use Time Targets in Amazing Marvin to balance your workload. This guide shows you how to set weekly goals for different ... date: 2 months ago
+
+### 2. Amazing Marvin - The Customizable Task Manager for ADHD
+- **URL**: https://amazingmarvin.com/
+- Time Tracking. Track exactly how long you spend on each task. Perfect for billing, reporting, or understanding your productivity patterns.
+
+### 3. Duration Estimates
+- **URL**: http://help.amazingmarvin.com/en/articles/1950205-duration-estimates
+- Use the shortcut ~ or ca. followed by the time estimate (e.g. 5m, 20m, 1h etc.) either during tasks creation or afterwards while editing the ... date: Jan 21, 2026
+
+### 4. Set time to a task : r/amazingmarvin
+- **URL**: https://www.reddit.com/r/amazingmarvin/comments/k89xtv/set_time_to_a_task/
+- You can do this by adding time to the task's title and then using the duration estimate shortcut "~" to make it 20 minutes long. So something ... date: 5 years ago
+
+### 5. My Four-Step Amazing Marvin Planning Process
+- **URL**: https://macautomationtips.com/my-four-step-amazing-marvin-planning-process/
+- These tasks include checking emails, updating project statuses, reviewing my financial budget, and preparing for weekly or monthly meetings. date: Jul 22, 2024
+
+### 6. Amazing Marvin Review 2026: Is the Customization Worth ...
+- **URL**: https://www.saner.ai/blogs/amazing-marvin-review
+- Marvin's cheapest option is a 14-day countdown. Faster time to value. Less setup, no strategy library to sort through solo before you feel ... date: Aug 10, 2026
+
+### 7. What Ohio State plays Illinois: things to know about Big Ten ...
+- **URL**: https://www.nbc4i.com/sports/buckeyes/what-ohio-state-plays-illinois-things-to-know-about-big-ten-opener/
+- No. 7 Ohio State shifts its focus to the Big Ten, opening conference play Saturday at Ohio Stadium against Illinois. Kickoff is set for noon. date: 3 hours ago
+
+### 8. Bielema gives final thoughts ahead of Ohio State matchup
+- **URL**: https://www.wcia.com/sports/your-illini-nation/bielema-gives-final-thoughts-ahead-of-ohio-state-matchup/
+- The seventh-ranked Buckeyes are nearly four-touchdown favorites for the 11 am central time kickoff. Bielema said he expects linebacker Daniel Brown to play. date: 16 hours ago
+
+
+=== QUERY 7: Habitica habit tracker RPG revenue users ===
+## Search Results (8 results, 1962ms)
+
+### 1. 20 Amazing Habitica Stats and Facts
+- **URL**: https://www.helloleads.io/blog/stats-facts/20-amazing-habitica-stats-and-facts/
+- Habitica Revenue: $5.2 milliion; Habitica Revenue per employee: $187,642; Number of Habitica employees: 28 employees; How many people use Habitica: 4 million+ ...
+
+### 2. How many people use Habitica/HabitRPG?
+- **URL**: https://www.reddit.com/r/habitrpg/comments/73mapn/how_many_people_use_habiticahabitrpg/
+- The Android app has been downloaded between 500k and 1M times, it mentions "over 2.5 million Habiticans". The kickstarter campaign had 2817 ... date: 8 years ago
+
+### 3. Habitica: Gamified Taskmanager - App Store - Apple
+- **URL**: https://apps.apple.com/us/app/habitica-gamified-taskmanager/id994882113
+- Habitica is a free habit-building and productivity app that uses retro RPG elements to gamify your tasks and goals. Use Habitica to help with ADHD, self care,
+
+### 4. Habitica: Gamify Your Tasks - Apps on Google Play
+- **URL**: https://play.google.com/store/apps/details?id=com.habitrpg.android.habitica&hl=en_US
+- Habitica is a free habit-building and productivity app that uses retro RPG elements to gamify your tasks and goals. Use Habitica to help ... date: Aug 26, 2026 rating: 4.7 rating_count: 75554
+
+### 5. Do gamified habit apps like Habitica actually work ...
+- **URL**: https://www.quora.com/Do-gamified-habit-apps-like-Habitica-actually-work-compared-to-stricter-apps-like-Abstenence
+- Gamified apps like Habitica turn daily chores into digital quests. When a user ticks off a task, their avatar gains experience points, gold, ... date: 6 months ago
+
+### 6. Habitica - Crunchbase Company Profile & Funding
+- **URL**: https://www.crunchbase.com/organization/habitrpg
+- A gamified habit improvement app that helps users build and maintain real-life habits through task management and role-playing game elements. Explore Insight ...
+
+### 7. Is anyone using Habitica as a habit tracker?
+- **URL**: https://www.facebook.com/groups/reincarnatedlowres/posts/1601578387276720/
+- Habitica is a habit-tracking app that turns your to-do list into a game. It helps your daily habits and tasks and you can earn rewards, level up ... date: 2 years ago
+
+### 8. Gamify Your Life with Habitica, A To-Do List RPG To Get Things ...
+- **URL**: https://www.youtube.com/watch?v=230NecNTaSA
+- Habitica is a free habit-building and productivity app that helps you treat parts of your life like a game aka to gamify your life. date: 4 years ago
+
+

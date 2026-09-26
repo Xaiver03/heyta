@@ -1,0 +1,252 @@
+=== QUERY A: temporal discounting present bias procrastination research paper ===
+## Search Results (8 results, 1362ms)
+
+### 1. Temporal discounting predicts procrastination in the real ...
+- **URL**: https://www.nature.com/articles/s41598-024-65110-4
+- by PY Zhang · 2024 · Cited by 29 — One long-standing hypothesis is that temporal discounting drives procrastination: in a task with a distant future reward, the discounted future ...
+
+### 2. Present-Bias, Procrastination and Deadlines in a Field ...
+- **URL**: https://www.nber.org/system/files/working_papers/w19874/w19874.pdf
+- by A Bisin · 2014 · Cited by 210 — While in this paper we focus on present-bias and quasi-hyperbolic discounting as a possible cause for procrastination, it is the case that other types of ...
+
+### 3. Section 9.7: Present Bias and Procrastination
+- **URL**: https://sites.google.com/view/personnel-economics-resources/home/part-2-evidence-on-employee-motivation/section-9-7-present-bias-and-procrastination
+- While procrastination is typically modeled as resulting from present bias, we consider an alternative explanation: excessively optimistic beliefs about future ...
+
+### 4. Why You Might Be Procrastinating and How to Get to Work
+- **URL**: https://www.psychologyinaction.org/2021-5-27-why-you-might-be-procrastinating-and-how-to-get-to-work/
+- One hypothesis attributes such decisions in intertemporal choice scenarios to a phenomenon called temporal discounting or delay discounting. date: by PG Series
+
+### 5. Present-bias, procrastination and deadlines in a field ...
+- **URL**: https://www.sciencedirect.com/science/article/abs/pii/S0899825619301757
+- by A Bisin · 2020 · Cited by 210 — We study procrastination in the context of a field experiment involving students who must exert costly effort to complete certain tasks by a fixed deadline.
+
+### 6. Guide to The Temporal Discounting & Hyperbolic Discounting ...
+- **URL**: https://www.leadalchemists.com/marketing-psychology/cognitive-biases-marketing/temporal-discounting-and-hyperbolic-discounting/
+- Essentially, temporal discounting is the cognitive mechanism, present bias is the psychological tendency, and procrastination is one of the behavioural outcomes ...
+
+### 7. The Science of Temporal Discounting
+- **URL**: https://www.investopedia.com/temporal-discounting-7972594
+- Temporal discounting refers to the preference for immediate rewards over future benefits, impacting financial and personal decisions.
+
+### 8. Temporal discounting predicts procrastination in the real ...
+- **URL**: https://www.semanticscholar.org/paper/Temporal-discounting-predicts-procrastination-in-Zhang-Ma/8d05c9ca0b22e16762e2b56a39a130351e93021e
+- People procrastinate, but why? One long-standing hypothesis is that temporal discounting drives procrastination: in a task with a distant future reward, ...
+
+
+=== QUERY B: goal gradient effect Kivetz Urminsky Zheng 2006 paper ===
+## Search Results (8 results, 1056ms)
+
+### 1. [PDF] The Goal-Gradient Hypothesis Resurrected - Knowledge Base
+- **URL**: https://home.uchicago.edu/ourminsky/Goal-Gradient_Illusionary_Goal_Progress.pdf
+- *Consistent with the notion that a steeper goal gradient indicates a stronger motivation to earn rewards, people's tendency to accelerate toward their first reward produces a greater probability of retention and faster reengagement in the program. Consistent with the goal-graded hypothesis, rats that were stopped closer to the food pulled more strongly than those pushed farther away (see also Anderson 1933).
+
+### 2. The goal-gradient hypothesis resurrected: Purchase acceleration ...
+- **URL**: https://psycnet.apa.org/record/2006-02304-007
+- The goal-gradient hypothesis denotes the classic finding from behaviorism that animals expend more effort as they approach a reward.
+
+### 3. The Goal-Gradient Hypothesis Resurrected: Purchase ...
+- **URL**: https://journals.sagepub.com/doi/abs/10.1509/jmkr.43.1.39
+- The goal-gradient hypothesis denotes the classic finding from behaviorism that animals expend more effort as they approach a reward.
+
+### 4. Goal Gradient Effect - Coglode
+- **URL**: https://www.coglode.com/research/goal-gradient-effect
+- # Goal Gradient Effect ### Our efforts increase as we move closer to a goal Kivetz, Urminsky & Zheng (2006) The Goal-Gradient Hypothesis Resurrected **Rats run faster as they approach a food reward** (Hull, 1934), and **humans increase effort as they approach rewards such as gift certiﬁcates** (Kivetz, Urminsky, & Zheng, 2006) or **goals such as visual ﬁnish lines** (Cheema & Bagchi, 2011). Instead, they ﬁnd satisfaction from having personal inﬂuence in solving a social problem.
+
+### 5. The Goal-Gradient Hypothesis Resurrected - IDEAS/RePEc
+- **URL**: https://ideas.repec.org/p/feb/natura/00658.html
+- # The Goal-Gradient Hypothesis Resurrected: Purchase Acceleration, Illusionary Goal Progress, and Customer Retention ## Suggested Citation Ran Kivetz & Oleg Urminsky & Yuhuang Zheng, 2006.
+
+### 6. Purchase Acceleration, Illusionary Goal Progress, and Customer ...
+- **URL**: https://business.columbia.edu/insights/chazen-global-insights/goal-gradient-hypothesis-resurrected-purchase-acceleration
+- ## The Research **Ran Kivetz,** Oleg Urminsky and Yuhuang Zheng tested the goal-gradient hypothesis in the context of consumer reward programs.
+
+### 7. The Goal-Gradient Hypothesis Resurrected - ResearchGate
+- **URL**: https://www.researchgate.net/publication/239776073_The_Goal-Gradient_Hypothesis_Resurrected_Purchase_Acceleration_Illusionary_Goal_Progress_and_Customer_Retention
+- # The Goal-Gradient Hypothesis Resurrected: Purchase Acceleration, Illusionary Goal Progress, and Customer Retention ## No full-text available Prior research suggests that motivation is shaped not only by their actual progress but also by perceived closeness to a focal goal (Kivetz et al., 2006;Cheema and Bagchi, 2011). ... Even when the actual effort required to attain a goal remains unchanged, artificially endowed or illusory progress can strengthen persistence and accelerate goal pursuit (Kivetz et al., 2006;Nunes and Dr� eze, 2006). According to the goal-gradient hypothesis, goal-pursuit motivation intensifies as individuals perceive themselves as approaching goal attainment (Hull, 1932;Kivetz et al., 2006).
+
+### 8. Goal-Gradient Effect | Laws of UX
+- **URL**: https://lawsofux.com/goal-gradient-effect/
+- The tendency to approach a goal increases with proximity to the goal. Kivetz, Oleg Urminsky, Yuhuang Zheng
+
+
+=== QUERY C: Nunes Dreze 2006 endowed progress effect car wash loyalty ===
+## Search Results (8 results, 2169ms)
+
+### 1. (PDF) The Endowed Progress Effect: How Artificial ...
+- **URL**: https://www.researchgate.net/publication/23547282_The_Endowed_Progress_Effect_How_Artificial_Advancement_Increases_Effort
+- Those provided the endowed progress were more likely to buy the required eight car washes (hypothesis 1), and bought them sooner than their ... date: Aug 7, 2026
+
+### 2. ON THE BIAS: Endowed Progress Effect
+- **URL**: https://www.brooketully.com/endowed-progress/
+- Nunes and Xavier Drèze, tested which loyalty cards for car washes would produce higher car wash purchases. Both cards required 8 car wash ... date: Jul 24, 2024
+
+### 3. In a 2006 study by Joseph Nunes and Xavier Dreze ...
+- **URL**: https://www.instagram.com/reel/DHn1PFkCx8x/
+- **Findings:** - Customers with the endowed progress card (2/10) were significantly more likely to complete the program and earn a free car wash ... date: 1 year ago
+
+### 4. Endowed Progress: Jumpstart user motivation - Learning Loop
+- **URL**: https://learningloop.io/plays/psychology/endowed-progress-effect
+- But research by Nunes & Dreze (2006) suggests a simple trick to boost your motivation. Consider a car wash that offers loyalty programs with punch cards.
+
+### 5. Loyalty Psychology Series: Endowed Progress Effect
+- **URL**: https://loyaltyrewardco.com/loyalty-psychology-series-endowed-progress-effect/
+- The Endowed Progress Effect creates the illusion that less effort is required to reach a goal, thereby increasing an individual's motivation.
+
+### 6. The Endowed Progress Effect: How Artificial Advancement ...
+- **URL**: https://www.jstor.org/stable/10.1086/500480
+- by JC Nunes · 2006 · Cited by 467 — Those provided the endowed progress were more likely to buy the required eight car washes (hypothesis 1) and bought them sooner than their counterparts ( ...
+
+### 7. Fake Progress Is Real Motivation
+- **URL**: https://productdesignpsychology.com/19-fake-progress-is-real-motivation/
+- 2006, researchers Joseph Nunes and Xavier Drèze ran a field experiment at a car wash. They gave 300 customers loyalty cards. Nunes and Drèze called this the ...
+
+### 8. Endowed Progress Effect - Renascence
+- **URL**: https://www.renascence.io/behavioral-biases/endowed-progress-effect
+- Nunes & Drèze (2006) gave car-wash customers either an 8-stamp card needing 8 more stamps or a 10-stamp card with 2 pre-filled. Both required 8 additional ...
+
+
+=== QUERY D: progress bar motivation research small victories goal completion ===
+## Search Results (8 results, 5554ms)
+
+### 1. Goal-Gradient Effect and the Psychology of Progress Bars
+- **URL**: https://medium.com/design-bootcamp/goal-gradient-effect-and-the-psychology-of-progress-bars-df6fd889fd8e
+- The goal-gradient effect accelerates behavior near completion through progress bars and visualized progress. A critical analysis of motivation and ethical product design. date: Jan 5, 2026
+
+### 2. The Goal-Gradient Effect - Learnnovators
+- **URL**: https://learnnovators.com/blog/the-goal-gradient-effect-why-visible-progress-sustains-motivation/
+- The Goal-Gradient Effect explains why visible progress keeps people motivated. When learners see movement toward a goal, even through small signals like progress bars or milestones, effort increases and persistence improves. This article explores the science behind the goal-gradient effect and how learning designers can use visible progress to sustain engagement and strengthen completion in ... date: Mar 13, 2026
+
+### 3. Using Progress Bars and Levels to Show Achievement
+- **URL**: https://improveworkspace.com/using-progress-bars-and-levels-to-show-achievement/
+- Achieve your goals more effectively by leveraging progress bars and levels—discover how these tools can transform your motivation and commitment. date: May 18, 2025
+
+### 4. Understanding the Progress Principle: Small Wins for Big ...
+- **URL**: https://psychologyfanatic.com/the-progress-principle/
+- Understanding the Progress Principle The Progress Principle, as described by Teresa Amabile and Steven Kramer in their book The Progress Principle: Using Small Wins to Ignite Joy, Engagement, and Creativity at Work, emphasizes the positive impact that small, meaningful progress has on our motivation and overall well-being. date: Dec 15, 2023
+
+### 5. The Science of Micro-Wins: How Small Victories Boost ...
+- **URL**: https://momentumpath.net/the-science-of-micro-wins-how-small-victories-boost-productivity-and-motivation/
+- Learn how small wins create momentum, improve motivation, and increase productivity. Discover how micro-wins drive long-term success and habit-building. date: Feb 17, 2025
+
+### 6. The Progress Principle: Why Small Wins Fuel Motivation More ...
+- **URL**: https://www.questmodelife.com/blog/progress-principle-small-wins-guide
+- Research on thousands of workday diary entries found one factor mattered more for motivation and mood than recognition, incentives, or pressure: the feeling of making progress, even in small increments.
+
+### 7. The Power of Small Wins: How Celebrating Minor Victories ...
+- **URL**: https://nyweekly.com/health/the-power-of-small-wins-how-celebrating-minor-victories-builds-lasting-momentum/
+- By systematically noticing and celebrating small victories, individuals and teams cultivate the persistence required to achieve exceptional results. The daily discipline of recognizing progress, no matter how modest, builds the psychological resilience and positive reinforcement loops that turn aspirations into realities. date: Apr 18, 2025
+
+### 8. SHORT TERM GOAL SETTING WORKSHEET
+- **URL**: https://ftp.richmondbizsense.com/document/mL9FF0604702/Short_Term_Goal_Setting_Worksheet
+- Set clear, achievable objectives, track your progress, celebrate small wins, and remind yourself of the bigger picture to stay motivated. date: 23 hours ago
+
+
+=== QUERY E: Zeigarnik effect UX design incomplete tasks memory ===
+## Search Results (8 results, 2429ms)
+
+### 1. Psychology in design: the Zeigarnik effect | by Lauren Dukes
+- **URL**: https://uxdesign.cc/psychology-in-design-the-zeigarnik-effect-a59317503f8f
+- Essentially, the Zeigarnik Effect posits that unfinished or uninterrupted tasks are more easily recalled than completed tasks. Uninterrupted ... date: Oct 8, 2020
+
+### 2. How to Use the Zeigarnik Effect in UX (Video)
+- **URL**: https://www.nngroup.com/videos/zeigarnik-effect/
+- The Zeigarnik effect suggests that unfinished tasks are more memorable than completed ones. In UX design, we can leverage this effect to ... date: Mar 27, 2024
+
+### 3. Zeigarnik Effect
+- **URL**: https://lawsofux.com/zeigarnik-effect/
+- She had found that incomplete tasks are easier to remember than successful ones. This is now known as the Zeigarnik effect. She later began working at the ...
+
+### 4. Psychological Principles Behind Effective UX Design
+- **URL**: https://uxplanet.org/psychological-principles-behind-effective-ux-design-bd7d9b547123
+- The Zeigarnik effect reminds us of the importance of unfinished tasks in our memory, cognitive load highlights the weight of information on ... date: Mar 21, 2024
+
+### 5. Understanding and applying the Zeigarnik effect
+- **URL**: https://blog.logrocket.com/ux-design/zeigarnik-effect/
+- The Zeigarnik effect explains why people tend to remember incomplete tasks first and complete work that's already started. date: Sep 19, 2024
+
+### 6. Zeigarnik Effect: Does It Boost Memory? 2025 Meta-Analysis
+- **URL**: https://yukaichou.com/behavioral-analysis/zeigarnik-effect-incomplete-tasks-memory-tension/
+- The Zeigarnik effect is the tendency for tasks we have started but not finished to occupy the mind more than tasks we have completed. date: Jun 14, 2026
+
+### 7. Zeigarnik Effect in UX Design
+- **URL**: https://www.linkedin.com/pulse/zeigarnik-effect-ux-design-mide-sowunmi-foe0c
+- The Zeigarnik effect is the psychological tendency to easily remember incomplete or interrupted tasks. Completed tasks tend to be easily ... date: 1 year ago
+
+### 8. Zeigarnik Effect UX: How It Keeps Users Engaged
+- **URL**: https://pageflows.com/resources/zeigarnik-effect-ux/
+- Incomplete tasks build tension and take up more space in our minds. On the most basic level, we're more aware of them due to their urgency ... date: Jul 11, 2024
+
+
+=== QUERY F: deadline salience procrastination concreteness experiment ===
+## Search Results (8 results, 6128ms)
+
+### 1. Present-bias, procrastination and deadlines in a field experiment
+- **URL**: https://www.sciencedirect.com/science/article/pii/S0899825619301757
+- We study procrastination in the context of a field experiment involving students who must exert costly effort to complete certain tasks by a fixed deadline. We document a robust demand for commitment, in the form of self-imposed deadlines. On the other hand, deadlines do not increase completion rates in our experiment. Furthermore, while we find that present-bias is widespread in the sample ... date: Jan 1, 2020
+
+### 2. Present-bias, procrastination and deadlines in a field ...
+- **URL**: https://psycnet.apa.org/record/2019-79537-001
+- We study procrastination in the context of a field experiment involving students who must exert costly effort to complete certain tasks by a fixed deadline. We document a robust demand for commitment, in the form of self-imposed deadlines. On the other hand, deadlines do not increase completion rates in our experiment. Furthermore, while we find that present-bias is widespread in the sample ...
+
+### 3. PRESENT-BIAS, PROCRASTINATION AND DEADLINES IN A FIELD ...
+- **URL**: https://www.nber.org/system/files/working_papers/w19874/revisions/w19874.rev0.pdf
+- ABSTRACT We study procrastination in the context of a field experiment involving students who must exert costly effort to complete certain tasks by a fixed deadline. Students display a strong demand for commitment in the form of self-imposed deadlines. However, deadlines appear not to increase task completion rates. Students who report themselves as being more disorganized delay task ...
+
+### 4. Present-bias, procrastination and deadlines in a field experiment
+- **URL**: https://bpb-us-e1.wpmucdn.com/wp.nyu.edu/dist/c/16384/files/2019/12/1-s2.0-S0899825619301757-main-1.pdf
+- Abstract We study procrastination in the context of a field experiment involving students who must exert costly effort to complete certain tasks by a fixed deadline. We document a robust demand for commitment, in the form of self-imposed deadlines. On the other hand, deadlines do not increase completion rates in our experiment.
+
+### 5. Present-bias, procrastination and deadlines in a field experiment
+- **URL**: https://www.researchgate.net/publication/337863365_Present-bias_procrastination_and_deadlines_in_a_field_experiment
+- Abstract We study procrastination in the context of a field experiment involving students who must exert costly effort to complete certain tasks by a fixed deadline. date: Dec 1, 2019
+
+### 6. Memory Lane
+- **URL**: https://medical-neurosciences.charite.de/fileadmin/user_upload/microsites/studiengaenge/neurosciences/cns/2026/cns-2026-1902.pdf
+- Seen in that light, the all-nighter looks less like a carefully chosen study method than a last-minute response to procrastination, pressure, and lack of time. date: 10 hours ago
+
+### 7. BE YOUR FUTURE SELF NOW
+- **URL**: https://cr.ltuceo.ltu.edu.tw/ebook/mL6234603006/BeYourFutureSelfNow
+- Procrastination and Impulsivity. - Break tasks into smaller steps. - Use timers or alarms to create structure. - Practice mindfulness to increase awareness ... date: 6 hours ago
+
+### 8. Present-Bias, Procrastination and Deadlines in a Field ...
+- **URL**: https://www.nber.org/papers/w19874
+- We study procrastination in the context of a field experiment involving students who must exert costly effort to complete certain tasks by a fixed deadline. Descriptively, we document a strong demand for commitment, in the form of self-imposed deadlines, which appear to be associated with students ...
+
+
+=== QUERY G: time affluence research Whillans scarcity of time ===
+## Search Results (8 results, 2241ms)
+
+### 1. What if feeling "time-rich" matters more for happiness than ...
+- **URL**: https://www.facebook.com/DrLaurieSantos/posts/what-if-feeling-time-rich-matters-more-for-happiness-than-being-money-rich-resea/1276977564608579/
+- Research suggests that "time affluence" — the feeling of having enough time for meaningful activities — is a stronger predictor of well- being ... date: 5 months ago
+
+### 2. Time affluence and health: a scoping review of conceptual ...
+- **URL**: https://www.frontiersin.org/journals/public-health/articles/10.3389/fpubh.2026.1824268/full
+- Time affluence thus serves as an important counter-concept to time scarcity and provides a useful framework for the understanding of how subjective temporal ... date: by SY Yoon · 2026
+
+### 3. The value of time: Understanding and maximizing ...
+- **URL**: https://www.bbh.com/us/en/insights/capital-partners-insights/the-value-of-time--understanding-and-maximizing-time-affluence.html
+- He addresses wealth's impact on time affluence, how to cultivate it, and how to avoid “time poverty,” which can lead to a lack of mindfulness ... date: Apr 27, 2023
+
+### 4. Time Scarcity vs. Time Affluence
+- **URL**: https://birchstreetadvisors.com/blog/time-scarcity-vs-time-affluence
+- Studies have shown that people who frequently feel they “don't have enough time” (time scarcity) are less happy and more prone to anxiety and ... date: Mar 10, 2025
+
+### 5. Harvard Business School Professor Discusses 'Time ...
+- **URL**: https://www.thecrimson.com/article/2020/10/7/whillans-book-talk/
+- Whillans suggested four strategies to alleviate the feeling of being “time poor,” including prioritizing time over money, blocking off leisure ... date: Oct 6, 2020
+
+### 6. Buying time promotes happiness
+- **URL**: https://www.pnas.org/doi/10.1073/pnas.1706541114
+- by AV Whillans · 2017 · Cited by 331 — We provide evidence that using money to buy time can provide a buffer against this time famine, thereby promoting happiness.
+
+### 7. Why time poverty matters for individuals, organisations and ...
+- **URL**: https://www.hks.harvard.edu/centers/mrcbg/programs/growthpolicy/why-time-poverty-matters-individuals-organisations-and-nations
+- Ashley Whillans. Abstract. 2020, Paper, "Over the last two decades, global wealth has risen. Yet material affluence has not translated into time affluence.
+
+### 8. Time Affluence: The Path to a Meaningful Life - Thomas Oppong
+- **URL**: https://thomas-oppong.medium.com/time-affluence-as-a-path-to-a-meaningful-life-799de78421cd
+- “Nothing less than our health and happiness depends on reversing the innate notion that time is money,” says Ashley Whillans, professor at ... date: 3 years ago
+
+

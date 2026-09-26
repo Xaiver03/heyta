@@ -1,0 +1,284 @@
+=== Q1: small-area hypothesis Bonezzi Brendl De Angelis stuck in the middle goal pursuit ===
+## Search Results (7 results, 3205ms)
+
+### 1. Stuck in the Middle: The Psychophysics of Goal Pursuit
+- **URL**: https://www.researchgate.net/publication/261740023_Stuck_in_the_Middle_The_Psychophysics_of_Goal_Pursuit
+- Despite the importance of perceived goal progress on consumer motivation (Bonezzi, Brendl, and De Angelis 2011; Carver and Scheier 1998;Harkin et al. 2016;Kivetz et al. 2006;Koo and Fishbach 2012 ... date: Jan 1, 2011
+
+### 2. Stuck in the Middle - Andrea Bonezzi, C. Miguel Brendl ...
+- **URL**: https://journals.sagepub.com/doi/10.1177/0956797611404899
+- Stuck in the Middle: The Psychophysics of Goal Pursuit Andrea Bonezzi a-bonezzi@kellogg.northwestern.edu, C. Miguel Brendl, and Matteo De Angelis View all authors and affiliations date: Apr 7, 2011
+
+### 3. Stuck in the middle: The psychophysics of goal pursuit.
+- **URL**: https://psycnet.apa.org/record/2011-09890-008
+- The classic goal-gradient hypothesis posits that motivation to reach a goal increases monotonically with proximity to the desired end state. However, we argue that this is not always the case. In this article, we show that motivation to engage in goal-consistent behavior can be higher when people are either far from or close to the end state and lower when they are about halfway to the end ...
+
+### 4. Stuck in the Middle: The Psychophysics of Goal Pursuit - JSTOR
+- **URL**: https://www.jstor.org/stable/25835424
+- In particular, we hypothesize that motivation can decrease about halfway to the end state. We propose a psychophysical model of goal pursuit that accounts not only for this tendency to get “stuck in the middle,” but also for the classic goal gradient.
+
+### 5. Psychological Science http://pss.sagepub.com/content/early ...
+- **URL**: https://web-docs.stern.nyu.edu/pa/Stuck_in_the_Middle.pdf
+- Stuck in the Middle : The Psychophysics of Goal Pursuit Andrea Bonezzi, C. Miguel Brendl and Matteo De Angelis Psychological Science published online 7 April 2011 DOI: 10.1177/0956797611404899 date: Apr 7, 2011
+
+### 6. Stuck in the Middle - ResearchGate
+- **URL**: https://www.researchgate.net/profile/Andrea-Bonezzi/publication/261740023_Stuck_in_the_Middle_The_Psychophysics_of_Goal_Pursuit/links/5cb9e3cd4585156cd7a46b8b/Stuck-in-the-Middle-The-Psychophysics-of-Goal-Pursuit.pdf
+- Overall, Experiment 3 provides evidence that the stuck-in-the-middle U pattern is due to an attentional shift from the starting point to the end point during goal pursuit.
+
+### 7. Stuck in the Middle: The Psychophysics of Goal Pursuit ...
+- **URL**: https://journals.sagepub.com/doi/abs/10.1177/0956797611404899?journalCode=pssa
+- We propose a psychophysical explanation for this tendency to get “stuck in the middle.” Building on the assumption that motivation is influenced by the perceived marginal value of progress toward the goal, we show that the shape of the goal gradient varies depending on whether an individual monitors progress in terms of distance from the ... date: Apr 7, 2011
+
+
+=== Q2: Koo Fishbach 2008 dynamics of self-control goal progress remaining ===
+## Search Results (8 results, 2814ms)
+
+### 1. How (un)accomplished goal actions affect motivation
+- **URL**: https://pubmed.ncbi.nlm.nih.gov/18211171/
+- by M Koo · 2008 · Cited by 520 — Two factors increase the motivation to adhere to a goal: goal commitment and lack of goal progress. Authors Minjung Koo 1 , Ayelet Fishbach Affiliation. Two ...
+
+### 2. Dynamics of self-regulation: How (un)accomplished goal ...
+- **URL**: https://psycnet.apa.org/fulltext/2008-00466-001.html?sr=1
+- by M Koo · 2008 · Cited by 520 — bach, A. (2008). Two factors increase the motivation to adhere to a goal: goal commitment and lack of goal progress.
+
+### 3. How (Un)accomplished Goal Actions Affect Motivation
+- **URL**: https://www.researchgate.net/publication/5640927_Dynamics_of_Self-Regulation_How_Unaccomplished_Goal_Actions_Affect_Motivation
+- This article investigates how monitoring one's current goal in terms of remaining actions versus completed actions influences the desire to move up the goal ...
+
+### 4. 11.6: Motives and Goals
+- **URL**: https://socialsci.libretexts.org/Bookshelves/Psychology/Introductory_Psychology/Introduction_to_Psychology_(Jorden_A._Cummings_and_Lee_Sanders)/11%3A_Emotions_and_Motivations/11.06%3A_Motives_and_Goals
+- Your decisions and behaviors are often the result of a goal or motive you possess. This module provides an overview of the main theories and ... date: Oct 5, 2021
+
+### 5. Research | The University of Chicago Booth School of Business
+- **URL**: https://faculty.chicagobooth.edu/ayelet-fishbach/research
+- Self-control is often an intentional process of committing to long-term goals and eliminating tempting alternatives. Improves Everyday Goal Progress. The ...
+
+### 6. [PDF] Climbing the Goal Ladder: How Upcoming Actions ...
+- **URL**: https://www.semanticscholar.org/paper/Climbing-the-Goal-Ladder%3A-How-Upcoming-Actions-of-Koo-Fishbach/2770e726cca1f670162cc63bfde055bb021f7bd1
+- This article investigates how monitoring one's current goal in terms of remaining actions versus completed actions influences the desire to move up the goal ...
+
+### 7. The Dynamics of Self-Regulation 1
+- **URL**: https://sydneysymposium.unsw.edu.au/2008/Chapters/FishbachSSSP08.pdf
+- by A Fishbach · Cited by 341 — Koo and Fishbach (2008) provide some new insights into this classic problem by proposing that in a commitment representation of goals, people adhere to their ...
+
+### 8. Koo, M., & Fishbach, A. (2008). Dynamics of Self ...
+- **URL**: https://www.scirp.org/reference/referencespapers?referenceid=2472119
+- This study explores the impact of time landmarks on consumer preference type's preferences through two experiments, and studies the mediating role of self- ...
+
+
+=== Q3: time blindness ADHD visual timer research evidence Time Timer ===
+## Search Results (8 results, 1476ms)
+
+### 1. Effectiveness of time-related interventions in children with ...
+- **URL**: https://pmc.ncbi.nlm.nih.gov/articles/PMC5852175/
+- by B Wennberg · 2017 · Cited by 59 — An example of a product compensating for deficits in time perception was a visual timer. ... Evidence for a pure time perception deficit in children with ADHD.
+
+### 2. Visual Timer for ADHD Kids and Adults
+- **URL**: https://www.timetimer.com/pages/adhd?srsltid=AU7gw4UFxdVzwR9kZgwKH7TP7l_fvQQvyQ7acphKlF7gBQzqffcLWiCK
+- Research shows that Time Timer products are extremely effective aids in teaching time awareness for children and adults diagnosed with ADD/ADHD, autism,
+
+### 3. ADHD Timers and Time Management | Baptist Health
+- **URL**: https://www.baptisthealth.com/blog/behavioral-health/adhd-timer-what-is-it-and-how-does-it-work
+- Blindness Evidence suggests one of the factors in time blindness is insufficient dopamine, a chemical messenger in the brain. date: Jan 8, 2025
+
+### 4. ADHD Time Blindness: How to Detect It & Regain Control ...
+- **URL**: https://add.org/adhd-time-blindness/
+- Have a visual timer on your computer or mobile phone that shows how much time has elapsed since starting your task. date: by A Join · 2025
+
+### 5. Russell Barkley Time Blindness: What ADHD Does to Your ...
+- **URL**: https://www.reachlink.com/advice/adhd/russell-barkley-time-blindness/
+- Russell Barkley time blindness research explains how ADHD affects brain time ... Visual timers that show time shrinking as a colored disk or bar. date: Mar 16, 2026
+
+### 6. ADHD Time Blindness: Why Timers Fail and What Works
+- **URL**: https://super-productivity.com/blog/adhd-time-blindness-strategies/
+- For some ADHD brains, a ticking timer triggers time anxiety rather than time awareness. The countdown becomes a source of stress that impairs ... date: Feb 9, 2026
+
+### 7. Time Blindness - An ADHD or Executive Dysfunction Trait
+- **URL**: https://www.youtube.com/watch?v=wk_iX7pXGwk
+- Real quick, time blindness is a symptom really common in people with ADHD, or other forms of neurodiversity, it includes: Trouble estimating ... date: 2 years ago
+
+### 8. Managing Time Blindness | Center for Teaching and Learning
+- **URL**: https://ctl.stanford.edu/managing-time-blindness
+- Visual Timers: Look for visual timers, analog timers, or digital timer apps that represent time passing/running out as a shrinking wedge.
+
+
+=== Q4: deadline reminder notifications stress anxiety backfire research ===
+## Search Results (8 results, 2084ms)
+
+### 1. Effects of task interruptions caused by notifications from ... - PMC
+- **URL**: https://pmc.ncbi.nlm.nih.gov/articles/PMC10244611/
+- by S Ohly · 2023 · Cited by 63 — Interruptions were found to cause more annoyance and anxiety, increase stress and frustration, and lead to errors in the primary task, less ...
+
+### 2. Digital Burnout In 2026: How Constant Notifications Are ...
+- **URL**: https://doralhw.org/digital-burnout-in-2026-how-constant-notifications-are-affecting-mental-wellness-and-stress-levels/
+- Clinicians call it technostress, which is linked to how endless notifications can trigger anxiety, fatigue, and trouble sleeping.
+
+### 3. Ways Your Task Reminders Backfire, Part 6
+- **URL**: https://www.linkedin.com/posts/deviseconquer_ways-your-task-reminders-backfire-part-6-activity-7284932342777815040-hPMr
+- too many overall notifications can lead to overwhelm, alarm fatigue, chronic stress, poor sleep, and completely shutting down. date: 1 year ago
+
+### 4. Do deadlines make your anxiety worse, even when you ...
+- **URL**: https://www.facebook.com/groups/2752414714979406/posts/4491610851059775/
+- Learning some different stress- management techniques you might use when you have a deadline can help improve your mood, focus and productivity.
+
+### 5. When mental health apps become worry engines
+- **URL**: https://theconversation.com/when-mental-health-apps-become-worry-engines-how-digital-care-can-hijack-our-anxieties-263930
+- Research shows that smartphone notifications from various types of apps can contribute to stress, anxiety and depression, with users receiving ... date: Sep 26, 2025
+
+### 6. Ways Your Task Reminders can Backfire
+- **URL**: https://m.youtube.com/watch?v=0L6UqbxRnZ4
+- A reminder to do a task can backfire when they hit at the wrong time, turning a helpful nudge into a major roadblock. date: 1 year ago
+
+### 7. Can Constant Notifications Affect Mental Health? Here Is ...
+- **URL**: https://www.bwhealthcareworld.com/article/can-constant-notifications-affect-mental-health-here-is-what-experts-say-618034
+- Constant notifications may seem harmless, but over time they can contribute to stress, anxiety, reduced concentration, poor sleep and digital ... date: Aug 5, 2026
+
+### 8. You've Got Mail: Email Push Notifications After Work Raise ...
+- **URL**: https://www.medicaldaily.com/youve-got-mail-email-push-notifications-after-work-raise-anxiety-stress-levels-368156
+- Email notifications are useful, but it also compromises our health by raising our anxiety and stress levels, according to a recent study. The ... date: Jan 6, 2016
+
+
+=== Q5: progress bar paradox reddit UXDesign completion kills motivation ===
+## Search Results (8 results, 958ms)
+
+### 1. The progress bar paradox: why completion often kills ...
+- **URL**: https://www.reddit.com/r/UXDesign/comments/1oowd3d/the_progress_bar_paradox_why_completion_often/
+- Once the bar hits 100%, motivation collapses. The experience signals “done,” not “continue.” The problem isn't visual; it's motivational ... date: 10 months ago
+
+### 2. Knowledge Cuts Both Ways: When Progress Bars Backfire
+- **URL**: https://irrationallabs.com/blog/knowledge-cuts-both-ways-when-progress-bars-backfire/
+- We've found that poorly designed progress bars can backfire, delaying or decreasing completion rates. Below, we share four common design fails date: Jul 29, 2022
+
+### 3. From RPGs to UX: How progress indicators affect user ...
+- **URL**: https://uxdesign.cc/from-rpgs-to-ux-how-progress-indicators-affect-user-engagement-8748f02d766a
+- Surprisingly, this indicated that showing progress can actually have a negative effect on user completion rates and can be discouraging. If ... date: Aug 19, 2024
+
+### 4. Progress Bars Don't Always Motivate. Sometimes They ...
+- **URL**: https://medium.com/@ghcpgs/progress-bars-dont-always-motivate-sometimes-they-shame-977c2f754cd6
+- Progress Bars Don't Always Motivate. Sometimes They Shame. As designers, we visualize progress to help users move forward.
+
+### 5. Numeric Citizen Blog
+- **URL**: https://blog.numericcitizen.me/
+- I'm a compulsive creator and contributor, a digital nomad, a light painter. Aspiring peace supremacist and democracy propagandist. date: 14 hours ago sitelinks: other tips: https://support.google.com/websearch/answer/134479?hl=en&sa=X&ved=2ahUKEwiqur62hoqXAxWwpJUCHYE0Gg8QjfsDegQIEBAB
+
+### 6. What is the best UX practice for dynamic progress-bars in ...
+- **URL**: https://www.reddit.com/r/userexperience/comments/192dlx7/what_is_the_best_ux_practice_for_dynamic/
+- What if your form flow can change from 4 steps to 6 steps depending on the answers you fill in?As a user it feels bad when you go from step 2/4 to 3/6. ... date: 2 years ago
+
+### 7. Why do progress bars sometimes jump from 90% to 100% ...
+- **URL**: https://www.reddit.com/r/answers/comments/1smsrjg/why_do_progress_bars_sometimes_jump_from_90_to/
+- Because it's actually quite hard to make a progress bar they are all kind of faking it with a good guess but when it's done it's done. date: 5 months ago
+
+### 8. Creating a stacked progress bar - Help please : r/webdev
+- **URL**: https://www.reddit.com/r/webdev/comments/1sp5x0e/creating_a_stacked_progress_bar_help_please/
+- usually means the sizing/positioning is fighting you, not the idea itself. The progress bar paradox: why completion often kills motivation date: 5 months ago
+
+
+=== Q6: life in weeks app store retention novelty downloads decline ===
+## Search Results (8 results, 1556ms)
+
+### 1. Weeks - Life Tracker Calendar - App Store - Apple
+- **URL**: https://apps.apple.com/us/app/weeks-life-tracker-calendar/id6758022552
+- See your entire life in weeks. Track how many you've lived and how many remain. Add milestones, journal memories, and gain perspective on what truly matters ...
+
+### 2. What causes a total fall-off of app downloads like this? I just ...
+- **URL**: https://www.reddit.com/r/iOSProgramming/comments/1dyld8t/what_causes_a_total_falloff_of_app_downloads_like/
+- You will likely get a bit of exposure in the first week or so because your app is new. After that, it's going to fall behind in search ... date: 2 years ago
+
+### 3. Life Calendar: Life in Weeks - Apps on Google Play
+- **URL**: https://play.google.com/store/apps/details?id=com.astraledgestudios.my_life_calendar&hl=en_US
+- Life Calendar helps you visualize your entire life in weeks, so you can focus on what truly matters. This powerful "life in weeks" app ... date: Aug 6, 2026
+
+### 4. Improve your subscriber retention with App Store features
+- **URL**: https://developer.apple.com/videos/play/tech-talks/111386/
+- Learn how to minimize churn and win back subscribers on the App Store. Explore App Store data, review different types of subscriber churn, discover tools ...
+
+### 5. Quantifying App Store Dynamics: Longitudinal Tracking of ...
+- **URL**: https://pmc.ncbi.nlm.nih.gov/articles/PMC4995352/
+- by ME Larsen · 2016 · Cited by 220 — Approximately 75% of Android and 90% of iOS apps were still available to download at the end of the study. We identified only 35.3% (347/982) ...
+
+### 6. US App Store downloads are dropping, new data indicates
+- **URL**: https://techcrunch.com/2023/09/05/u-s-app-store-downloads-are-dropping-new-data-indicates/
+- As of August 31, 2023, the Index had dropped to 83.59 — that's a drop of 8.28 points, or 9% lower than where it started, indicating a worsening ... date: Sep 5, 2023
+
+### 7. The Value of a Life Calendar - Cody McLain
+- **URL**: https://neocody.medium.com/the-value-of-a-life-calendar-91527e153d39
+- The key to decreasing the bad weeks and increasing the good weeks is by reflecting on what made them so. Having a Life Calendar isn't going to ...
+
+### 8. Life in Weeks | Create a map of your life with each week as a ...
+- **URL**: https://lifeweeks.app/
+- You can use it to track key periods and events in your life, see the progress you've made over time, and easily share your life story with friends and loved ...
+
+
+=== Q7: 中国 时间管理 app 进度条 目标 可视化 人生 ===
+## Search Results (8 results, 1801ms)
+
+### 1. Rich Life - 人生格子目标可视化丨进度条打卡热力图 - App Store
+- **URL**: https://apps.apple.com/tw/app/rich-life-%E4%BA%BA%E7%94%9F%E6%A0%BC%E5%AD%90%E7%9B%AE%E6%A0%87%E5%8F%AF%E8%A7%86%E5%8C%96%E4%B8%A8%E8%BF%9B%E5%BA%A6%E6%9D%A1%E6%89%93%E5%8D%A1%E7%83%AD%E5%8A%9B%E5%9B%BE/id6753065273
+- 用时间轴重新定义你的人生规划方式。 Rich Life 将你的人生可视化为一格一格的时间，一格一年的方式让你清晰看到：我还有多少时间？我想成为什么样的人？
+
+### 2. 人生总结– 生命时间线
+- **URL**: https://play.google.com/store/apps/details?id=com.tooltoolnam.ttm_life_summary&hl=zh
+- 人生总结通过将你的整个人生— 过去、现在与未来— 可视化，帮你重拾这种视角：设定目标、管理时间、自信记录每一个重要时刻。 ... - 同时看到今日、今年、整个人生的进度。
+
+### 3. 推荐一款令人深思的App：Life Progress —— 生命进度条
+- **URL**: https://blog.csdn.net/gitblog_00082/article/details/139229236
+- Life Progress 将你的生命周期转化为可视化的方格，每个方格代表一周的时间。从出生的第一周开始，随着时间的流逝，方格逐渐被填色。这样的设计让我们清晰 ... date: May 27, 2024
+
+### 4. 三个时间统计工具| 今年进度■■■■□□□□□□ 45.9%
+- **URL**: https://zhuanlan.zhihu.com/p/148658585
+- 可视化呈现个人的人生进度, 人生进度条人生进度条,这是工具箱软件uTools 中的一个插件。 它可以统计你已经走过的时间、吃过多少顿饭、(可能)度过的愉快周 ... date: Jun 16, 2020
+
+### 5. 人生进度条Life
+- **URL**: https://baike.baidu.com/item/%E4%BA%BA%E7%94%9F%E8%BF%9B%E5%BA%A6%E6%9D%A1Life/56267898
+- 人生进度条Life是一款非常有意思的小程序，可以查看自己剩余的人生时间、人生进度，对自己剩余的人生进行规划。做这款小程序的目的是希望大家都能更加珍惜每一天的生活！
+
+### 6. 如何制定人生目标？推荐曼陀罗计划表！
+- **URL**: https://www.processon.com/knowledge/schedule
+- 曼陀罗计划表——OW64计划表，也称九宫格计划表，是一种用于描绘整体目标和行动方案的实用工具。 它以大目标为核心，分为9个区域，围绕在大目标旁边的是拆解 ... date: Sep 6, 2024
+
+### 7. 10款最佳时间管理应用：跟踪、规划并完成更多任务
+- **URL**: https://www.larksuite.com/zh_cn/blog/time-management-apps
+- 随着工作、学习和个人日程日益繁忙，高效管理时间已变得至关重要。 · 1. Lark：团队与日常规划的最佳时间管理应用 · 2. Todoist：用于组织工作与生活的任务 ... date: Nov 24, 2025
+
+### 8. Create Your Life Dashboard — Become Unbelievably Powerful ...
+- **URL**: https://www.youtube.com/watch?v=z8YVVhfbErs
+- 你是否正处于人生的转折期？在迷茫、拖延和焦虑中，日复一日，迟迟无法开启人生的主线。 在这个视频中，我将手把手教你如何打造属于你自己的“人生仪表 ... date: 1 year ago
+
+
+=== Q8: Habitify habit tracker pricing users ===
+## Search Results (8 results, 2605ms)
+
+### 1. Habitify Pricing - Start Free, Grow with Premium | Habit ...
+- **URL**: https://habitify.me/pricing
+- Choose the perfect Habitify plan. Start free and upgrade for premium features. Flexible pricing with monthly, annual, and lifetime options.
+
+### 2. Habitify: Habit Tracker - App Store - Apple
+- **URL**: https://apps.apple.com/us/app/habitify-habit-tracker/id1111447047
+- Free users can now create an unlimited number of habits. While habits ... Pricing system: Habitify Free Your essential toolkit for building consistency.
+
+### 3. Are habit tracking apps really worth their price?
+- **URL**: https://www.reddit.com/r/getdisciplined/comments/1q56hay/are_habit_tracking_apps_really_worth_their_price/
+- Hello, I ask myself a real question after testing a lot of habit tracking apps (stop smoking, sleep better, light sports, diet, coffee, etc.). Honestly, ... date: 8 months ago
+
+### 4. Habitify for iOS | 2019 Review - Features, Opinions & Pricing
+- **URL**: https://www.youtube.com/watch?v=dMcEUvF19aU
+- $6.99 for iOS, $9.99 for MacOS (this may appear differently in other countries) · With an Android edition, coming soon. · Sign-up to Android beta ... date: 7 years ago
+
+### 5. Habitify App Review 2026: Can It Help You Build Better Habits?
+- **URL**: https://makeheadway.com/blog/habitify/
+- As of August 2026, it runs about $39.99/year (roughly $3.33/month) or a one-time Habitify lifetime purchase of about $95.99. Both unlock the ... date: Aug 21, 2026
+
+### 6. We Tested 6 Habit Tracker Apps: Here's Our Ranking (2026)
+- **URL**: https://habi.app/insights/best-habit-tracker-apps/
+- Pricing: Free (all core features). Subscription at $4.99/month or $47.99/year for cosmetic perks. Platforms: iOS, Android, Web. Bottom line: ... date: Feb 14, 2026
+
+### 7. Best Habit Tracking Apps in 2026
+- **URL**: https://toolfinder.com/best/habit-trackers
+- One-time purchase of around $4.99 (price varies by region). No subscription, no in-app purchases, no premium tiers. You buy it once and own it forever. Some ...
+
+### 8. Daily Stress Tracker Elevate Your Habits
+- **URL**: https://pandorassteakhouse.com/product/category/17649246001350
+- Daily Stress Tracker No.1 229 USD(tax included) Buy, Best Price in UAE, Dubai, Abu Dhabi, Sharjah date: 23 hours ago rating: 4.8 rating_count: 277
+
+

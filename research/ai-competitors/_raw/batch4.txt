@@ -1,0 +1,288 @@
+=== Q1: countdown widget app gimmick anxiety stress criticism ===
+## Search Results (8 results, 2493ms)
+
+### 1. Would this be yet another dark pattern
+- **URL**: https://www.linkedin.com/posts/robertcmeza_would-this-be-yet-another-dark-pattern-activity-7110675422853390336-JkHH
+- The timer, although anxiety inducing, is there to allow you to not have to double confirm. By placing order and allowing this confirm to time ... date: 3 years ago
+
+### 2. Health screen affects hats countdown timer
+- **URL**: https://www.facebook.com/groups/781993746824949/posts/1449004536790530/
+- My trick to get my preferred elderly HATS Cooldown period: 9 minutes HATS: 30 seconds left I drained my health under 30, and waited at potion used menu, ... date: 8 months ago
+
+### 3. Top 8 Time Tracking Apps to Swear By | by Alexandra Martin
+- **URL**: https://medium.com/paymo/top-8-time-tracking-apps-to-swear-by-36409abf211b
+- Top 8 Time Tracking Apps to Swear By This excerpt is part of an extensive review of time tracking apps. You can read the full article on ... date: 4 years ago
+
+### 4. panGEMic on Steam
+- **URL**: https://store.steampowered.com/app/547540/panGEMic/
+- Collect all the gems while avoiding enemies and hazards, do it in the time limit or face the 'Red Skull'. panGEMic is a retro inspired platform game ...
+
+### 5. Is It Free? My Experience with Neuroscience & Happiness
+- **URL**: https://www.lemon8-app.com/@racheldicesare761/7420123101477913093?region=us
+- The app's meditation features help me find calmness during stressful days. It provides practical insights into managing anxiety and stress ...
+
+### 6. Do you know the 'Hidden Horrors” that lurk in Halloween ...
+- **URL**: https://www.instagram.com/p/DBzaI0-Tt1C/
+- Do you know the 'Hidden Horrors” that lurk in Halloween Candy? Do you want to know how to detox your kids from Halloween Hangover?
+
+### 7. Brite Daily Planner Review: The All-in-One App to Skyrocket ...
+- **URL**: https://the1percentbetterclub.substack.com/p/brite-daily-planner-review-the-all
+- Brite allows me to see the to-do list, while also seeing the Pomodoro timer. #6 – Calendar connectivity with support for Apple, Google, and ... date: 2 years ago
+
+### 8. I want to get rid of Instagram, but there is one reason ...
+- **URL**: https://www.reddit.com/r/Anticonsumption/comments/1wpfiv4/i_want_to_get_rid_of_instagram_but_there_is_one/
+- I've been feeling for a while now that the addictive nature of Instagram is harming my mental health and stealing my time. I've been thinking this for some ... date: 17 hours ago
+
+
+=== Q2: life calendar app novelty retention churn memento mori criticism ===
+## Search Results (8 results, 2638ms)
+
+### 1. Memento Mori: Daily Reminder - App Store - Apple
+- **URL**: https://apps.apple.com/in/app/memento-mori-daily-reminder/id6670531480
+- Memento Mori is more than just an app—it's a philosophy, a reminder that life is fleeting, and every moment counts. Drawing from Stoic principles, this app ...
+
+### 2. this might sound morbid but its actually been weirdly freeing
+- **URL**: https://www.reddit.com/r/Life/comments/1qbxgk6/this_might_sound_morbid_but_its_actually_been/
+- a few months ago i came across this concept called a life calendar. basically you take the average lifespan (around 80 years), break it into weeks (about ... date: 8 months ago
+
+### 3. How a Memento Mori Life Calendar Can Change Your Life
+- **URL**: https://beingpax.medium.com/how-a-memento-mori-life-calendar-can-change-your-life-be06b1f5d9e1
+- Memento Mori is a Latin phrase for “Remember, you must die”. This sounds to be simple, yet it is profoundly powerful. date: 4 years ago
+
+### 4. Memento Mori: Stoic Calendar - Apps on Google Play
+- **URL**: https://play.google.com/store/apps/details?id=com.goldenraccoon.mementomoricalendar&hl=en_US
+- Your life, one square per week. Memento Mori Calendar shows your whole life as a calendar of weeks — the ones you have lived, ... date: Aug 14, 2026
+
+### 5. How to create a Memento Mori Calendar (Life ...
+- **URL**: https://www.youtube.com/watch?v=V2F8lFFDiRE
+- Learn how to create a Memento Mori Calendar in Notion, a powerful tool to track your life and stay motivated. Watch this video for a ... date: 2 years ago
+
+### 6. The Memento Mori Life Calendar _ Visualize your life, destroy ...
+- **URL**: https://www.instagram.com/p/CGxU8lQH1QO/
+- It's an unbelievably powerful tool that will help improve your focus, destroy procrastination, develop a heightened perspective on life, and ... date: 5 years ago
+
+### 7. The Memento Mori Calendar - A Mindset Shift Tool
+- **URL**: https://maritimesupplyco.com/blogs/msco-journal/the-memento-mori-calendar-a-mindset-shift-tool?srsltid=AU7gw4V0NOsv7lI4iMSchlh1TBe2BnUZqaDOCXN5Xx8JekkoyKKCyc-c
+- Five-year plans can be very helpful, but an entire life calendar really puts things into perspective. Some may see the calendar as a highly ... date: Apr 4, 2023
+
+### 8. Memento mori and the science of death awareness
+- **URL**: https://www.scientistandthepsychic.com/blog-nav/2021/4/24/memento-mori-and-the-science-of-death-awareness
+- Memento mori translates to "remember you have to die." How do we handle death awareness? How can we live each day to the fullest? date: Apr 25, 2021
+
+
+=== Q3: progress bar dark pattern anxiety pressure criticism UX ===
+## Search Results (8 results, 2103ms)
+
+### 1. Progress Bar UI/UX in SaaS: Stop Losing Users to Bad Waits
+- **URL**: https://userpilot.com/blog/progress-bar-ui-ux-saas/
+- For waits above three seconds, a progress bar becomes worth implementing. As a rule of thumb, the longer the wait, the greater the anxiety a ... date: Aug 19, 2026
+
+### 2. The Beautiful Lie of the Progress Bar: Why We Trust Fake ...
+- **URL**: https://medium.com/@Jason-Han/the-beautiful-lie-of-the-progress-bar-why-we-trust-fake-progress-over-honest-waiting-6f44873a8efa
+- A perfectly accurate loading screen causes more anxiety than a fake one. The fake progress bar was literally lowering their blood pressure. ... date: 2 months ago
+
+### 3. Three common progress indicator patterns in UX design
+- **URL**: https://www.facebook.com/groups/uxdesignercommunity/posts/25673398059009694/
+- Design detail that many people overlook: progress indicators. When a system is processing something, how you communicate progress matters more than most ... date: 6 months ago
+
+### 4. 22 Dark Patterns Examples You Should Avoid
+- **URL**: https://arounda.agency/blog/dark-patterns-examples
+- This dark ux pattern implements emotional pressure to affect user behavior. Instead of neutral messages, the interface delivers guilt-tripping ... date: Oct 29, 2025
+
+### 5. Building Trust Instead of Frustration with UX design
+- **URL**: https://www.youtube.com/watch?v=4YVpZL98wBY
+- Dark patterns can drive clicks and conversions in the short term, In this session, you'll learn how to identify, avoid, and replace dark ... date: 1 year ago
+
+### 6. buttons switching, loading delays, and guilt-tripping
+- **URL**: https://uxdesign.cc/little-ux-crimes-buttons-switching-loading-delays-and-guilt-tripping-370ed06c171c
+- Dark UX is a deceptive strategy that manipulates users into doing things they did not intend to do. This Dark Pattern exploits users' shame, ... date: Jun 17, 2020
+
+### 7. Progress Indicators Make a Slow System Less Insufferable
+- **URL**: https://www.nngroup.com/articles/progress-indicators/
+- the graphical progress indicators mitigate the negative effects of waiting, and prolong the user's attention on your website. date: Oct 26, 2014
+
+### 8. Dark patterns in UX design: How can I protect my users?
+- **URL**: https://peschke.at/blog/dark-patterns-in-ux-design/?lang=en
+- Dark patterns in UX design are design decisions that deliberately manipulate users – e.g. for the purpose of data collection or higher sales figures.
+
+
+=== Q4: TickTick countdown mode ZDNET task manager feature ===
+## Search Results (8 results, 1453ms)
+
+### 1. Why 'countdown mode' is the task manager feature I can't ...
+- **URL**: https://www.zdnet.com/article/ticktick-task-manager-feature-countdown-mode/
+- There are two countdown options in TickTick — one for everyday tasks and a dedicated countdown feature for milestone events like birthdays and ... date: Jun 30, 2026
+
+### 2. Why in Ticktick's app in PC doesn't have countdown mode ...
+- **URL**: https://www.reddit.com/r/ticktick/comments/1tbrkrw/why_in_tickticks_app_in_pc_doesnt_have_countdown/
+- On ticktick view click 3 dots on right top. The is an option to select countdown or task time in another dialogue box. date: 4 months ago
+
+### 3. Add Countdowns
+- **URL**: https://help.ticktick.com/articles/7322524237753745408
+- Go to Settings > Tab Bar, find Countdown, and tap the + icon to turn it on. Once turned on, the Countdown tab will appear in your bottom navigation bar. ll see ...
+
+### 4. TickTick: A To-Do List and Calendar to keep you organized
+- **URL**: https://ticktick.com/?language=en_us
+- Manage tasks, calendars, habits, and more. Countdown Capture every important moment Easily record important dates like birthdays, anniversaries, exams, and ...
+
+### 5. TickTick Full Tutorial and Overview - The Ultimate Task Manager
+- **URL**: https://www.youtube.com/watch?v=zqGeCiSgFOk
+- In this full TickTick tutorial, I'll walk you through everything you need to know to master one of the most powerful task managers available ... date: 1 year ago
+
+### 6. TickTick:To Do List & Calendar - Apps on Google Play
+- **URL**: https://play.google.com/store/apps/details?id=com.ticktick.task&hl=en_US
+- This multi-dimensional task manager brings together all your to-dos, schedules, and reminders in one intuitive space, letting you manage time and tasks ... rating: 4.6 rating_count: 164748
+
+### 7. Operating Systems
+- **URL**: https://www.zdnet.com/topic/operating-systems/6/
+- Why 'countdown mode' is the task manager feature I can't live without. This setting meshes perfectly with how my brain works, and I don't miss deadlines anymore ...
+
+### 8. Never Miss a Big Day Again! TickTick Countdown Tutorial
+- **URL**: https://www.youtube.com/watch?v=3G3jjXtppMQ
+- 00:00 Intro ; 00:22 Enable the Countdown Feature ; 00:44 Add Countdowns ; 02:40 Customize Your Countdowns ; 03:42 Manage Your Countdowns 05:2 Outro ... date: 1 year ago
+
+
+=== Q5: Deadline Bar Time Progress app iOS ===
+## Search Results (8 results, 1972ms)
+
+### 1. Deadline Bar: Time Progress - App Store - Apple
+- **URL**: https://apps.apple.com/cz/app/deadline-bar-time-progress/id6764828980?platform=vision
+- Deadline Bar makes time visible. Track today, this year, your next project, exam, vacation, goal, or personal deadline with beautiful visual progress bars.
+
+### 2. Pretty Progress - Countdown widgets on your iPhone
+- **URL**: https://prettyprogress.app/
+- Your life goals, The Matrix release, deadlines... Create beautiful progress bars, timers and countdowns that are always visible on all your everyday devices.
+
+### 3. Top 5 Time and Deadline Tracking Apps in 2023 for iOS ...
+- **URL**: https://zetegy.com/articles/top-deadline-tracking-apps-ios-mac
+- Deadliner is built around tracking tasks visually. Each task displays a countdown, as well as a circular progress bar that shows you how much ... date: Dec 22, 2022
+
+### 4. Deadline Bar: Time Progress - Productivity App
+- **URL**: https://mwm.ai/apps/deadline-bar-time-progress/6764828980
+- The app provides visual progress bars for various timeframes, allowing users to quickly grasp time passed and remaining for goals, projects, and ... date: Aug 7, 2026
+
+### 5. 3 Apps That'll Quietly Upgrade Your Life  1. Deadline ⏳ ...
+- **URL**: https://www.instagram.com/reel/DL5CTjEvJs_/
+- ✓ Create your deadline ✓ Set start & end date ✓ Add a note if you like The progress bars show how much time has passed Best part ... date: 1 year ago
+
+### 6. Looking for a menubar or widget based apps for tracking ...
+- **URL**: https://www.reddit.com/r/macapps/comments/1rgjk63/looking_for_a_menubar_or_widget_based_apps_for/
+- The Chunk App does this really well. Lives in the menubar, shows a countdown bar or number for every deadline you dump in. Drag your ... date: 7 months ago
+
+### 7. Due: The Superfast Reminder App for iPhone & iPad
+- **URL**: https://www.dueapp.com/
+- With 12 fully customizable buttons, you can instantly set your reminder to the next 12 noon or the next 10 PM with just a single tap. You can even add or ...
+
+### 8. 10 Apps I Didn't Know Were Possible (Until Now)
+- **URL**: https://www.youtube.com/watch?v=UGgijyl7dug&xstg=CAMSBhUD_LL2Hw%3D%3D
+- https://yt.link/hei0DPv ---- These incredible apps turn your iPhone into a mini Stream Deck, remotely monitor a portion of your Mac screen, ... date: 3 months ago
+
+
+=== Q6: Things 3 deadlines feature Cultured Code ===
+## Search Results (8 results, 1500ms)
+
+### 1. Cultured Code
+- **URL**: https://www.culturedcode.com/
+- Things is the award-winning personal task manager that helps you plan your day, manage your projects, and make real progress toward your goals.
+
+### 2. What's New in the all-new Things. Your to-do list for Mac ...
+- **URL**: https://culturedcode.com/things/features/
+- Rebuilt from the ground up with timeless design, calendar integration, headings, checklists, and more.
+
+### 3. At what point does Cultured Code need to start listening ...
+- **URL**: https://www.reddit.com/r/thingsapp/comments/1vp0na7/at_what_point_does_cultured_code_need_to_start/
+- I love Things. I think it remains one of the most beautifully designed and pleasurable apps I’ve ever used. I don’t want it filled with AI features, ... date: 1 month ago
+
+### 4. What's going on with the Things app?
+- **URL**: https://www.youtube.com/watch?v=RDVUFRUfYxs&vl=en
+- Feature requests for Things 05:26 The developers' comments on ... How to Organize Your To-Dos with Things 3 (2026 Tutorial). Peter ... date: 4 months ago
+
+### 5. massCode vs Things 3
+- **URL**: https://masscode.io/compare/things.html
+- Things 3 by Cultured Code is a premium, Apple-only task manager with a ... Yes, plus deadlines. Reminders, No, Yes. Recurring tasks, No, Yes. Subtasks ...
+
+### 6. Things 3 - Review 2025
+- **URL**: https://me.pcmag.com/en/productivity/29784/things-3
+- Less conveniently, Things separates its menu for due dates and reminders from deadlines, requiring a few extra clicks. (Credit: Cultured Code/ ... date: May 12, 2025
+
+### 7. Code of Virginia Code - Article 3. Discipline
+- **URL**: https://law.lis.virginia.gov/vacodefull/title22.1/chapter14/article3/
+- Such schedule shall be designed to ensure that any initial petition for readmission will be reviewed by the school board or a committee thereof, or the division ... date: 3 hours ago
+
+### 8. an update on the love live local festival date changed to ...
+- **URL**: https://www.facebook.com/365CapeCod/posts/an-update-on-the-love-live-local-festival-date-changed-to-october-4th/1626203122633512/
+- an update on the love live local festival date changed to October 4th.
+
+
+=== Q7: 倒计时小组件 焦虑 智商税 没用 ===
+## Search Results (8 results, 2194ms)
+
+### 1. 执行功能障碍让我感到完全无能为力: r/ADHD
+- **URL**: https://www.reddit.com/r/ADHD/comments/lkn6qy/executive_dysfunction_makes_me_feel_completely/?tl=zh-hans
+- 我必须说，整个倒计时的事情对我来说从来没用。我觉得它对我不起作用的原因是，如果我不起来，就没有什么“立刻”会发生的负面后果。 我希望我能以某种 ... date: 5 years ago
+
+### 2. LLian Talk
+- **URL**: https://open.spotify.com/show/0TooPpqx7mLDMhGL1kWrBp
+- 冬天一定是低迷、EMO、需要被“熬过去”的季节吗？为什么有些人一到冬天就情绪低落，而有些人却在冬天变得清醒、专注，甚至幸福？从生理节律、光照变化、动物冬眠的基因 ...
+
+### 3. 2020年09月25日
+- **URL**: http://mrdx.cn/h5/mrdx/content/20200925/Page03QY.htm
+- 新华社北京9月24日电中共中央总书记、国家主席、中央军委主席习近平近日对供销合作社工作作出重要指示指出，供销合作社是党领导下的为农服务的综合性 ... date: Sep 25, 2020
+
+### 4. 2026年4月Android更新了哪些内容？涉及手机、电视
+- **URL**: https://www.163.com/dy/article/KRJ949DA051191D6.html
+- 【CNMO科技消息】近日，谷歌发布2026年4月月度系统更新公告，详细介绍了Play服务、Play商店、Play系统更新等多个谷歌系统组件的新内容，覆盖手机、平板、Wear ...
+
+### 5. HSK考试大纲
+- **URL**: https://studycli.org/wp-content/uploads/2026/04/xinban-hsk-kaoshi-dagang-1219.pdf
+- Syllabus for the Chinese Proficiency Test ・ 16 对方表达客气的有一定复杂度的言语,或在升学、升职・ 把握讲座要点和整体结构,准确记录关键内容, 并提 ... date: Apr 3, 2026
+
+### 6. 家电
+- **URL**: http://www.news.cn/jiadian/
+- 新华家电为您提供国内外家电厂家新闻，以及家电行业发展动态和及时资讯。家电产品更新，家电行业揭秘，行业黑幕曝光，家电产品价格及型号信息查询。新华家电是中国最 ...
+
+### 7. 人间四月天｜四月频道
+- **URL**: https://www.xiaoyuzhoufm.com/podcast/6850383bc16597cff03fcfe1
+- 四月对话米拉, 聊聊30+单身女性面对的职场焦虑与人生选择, 从大厂裸辞到西班牙留学的真实体验. 有对内卷文化的反思, 也有对“成功”和“幸福”的重新定义. 米拉是一个小镇女孩, ...
+
+### 8. 这25块的线油，真能救我缝纫机的命？ - 淘宝数码网- Taobao
+- **URL**: https://shuma.taobao.com/topic/fengrenjipeijian_14/354f7e88c27a57281ee5a2d6d381b3cd
+- 不是智商税,是老手才知道的隐藏神器! 线变黄、针头结垢、电机发热,缝纫机当场给你表演“退休倒计时”。 PP date: Dec 4, 2025
+
+
+=== Q8: 滴答清单 倒计时 功能 任务 截止 ===
+## Search Results (8 results, 1259ms)
+
+### 1. 你推荐如何在滴答清单上处理截止日期？ : r/ticktick
+- **URL**: https://www.reddit.com/r/ticktick/comments/1q7w81n/how_do_you_recommend_working_with_deadlines_on/?tl=zh-hans
+- 我有一个小项目/任务，包含几个小任务，必须在月底前完成。但可以在现在到那时之间的任何时间完成。 使用“持续时 ... date: 8 months ago
+
+### 2. 滴答清单: 任务打卡日历番茄钟和时间管理提醒事项 - App Store
+- **URL**: https://apps.apple.com/cn/app/%E6%BB%B4%E7%AD%94%E6%B8%85%E5%8D%95-%E4%BB%BB%E5%8A%A1%E6%89%93%E5%8D%A1%E6%97%A5%E5%8E%86%E7%95%AA%E8%8C%84%E9%92%9F%E5%92%8C%E6%97%B6%E9%97%B4%E7%AE%A1%E7%90%86%E6%8F%90%E9%86%92%E4%BA%8B%E9%A1%B9/id626144601
+- 滴答清单，一款轻便的待办事项(Todo)、日程管理(GTD)应用，全球逾千万用户的共同选择。它可以帮你制定项目计划、设置会议提醒、 安排行程规划、保持工作专注，还能用于 ...
+
+### 3. 添加任务
+- **URL**: https://help.dida365.com/articles/6950658877373284352
+- 滴答清单支持识别任务里的日期和时间，你只需要在输入内容里加上日期、时间，我们将会为你自动设置好提醒时间，极大简化了操作步骤。 如：输入“1月10号下午两点补油漆”. 当 ...
+
+### 4. 滴答清单- Download and install on Windows
+- **URL**: https://apps.microsoft.com/detail/xpdkjhs77vh8t7?hl=en-US&gl=CN
+- 滴答清单是一款记录待办事项、管理日程提醒的效率类应用。 我们支持多平台同步，帮助你随时随地制定工作计划、安排行程规划、设置会议提醒、管理学习任务。
+
+### 5. 简单好用的功能任务助你效率倍增
+- **URL**: https://ticktick.com/features?language=zh_cn
+- 智能识别时间在添加任务时,滴答清单会根据你输入的文本内容,智能识别时间信息,并设置提醒。 轻松整理任务管理工作和生活中的大小事项清单使用清单管理任务,合理分类
+
+### 6. 滴答清单- Todo & 任务提醒- Chrome 应用商店
+- **URL**: https://chromewebstore.google.com/detail/ticktick-todo-task-list/diankknpkndanachmlckaikddgcehkod?hl=zh
+- 简洁, 易用的待办和任务管理工具, 帮助您高效完成所有的事情, 合理规划时间, 让生活更轻松！ 滴答清单是Todo管理神器TickTick的中文版，能帮您随时 ... date: May 26, 2026
+
+### 7. 任务详情
+- **URL**: https://help.dida365.com/articles/6950661731483910144
+- 如果需要为任务添加具体的时间段，可以在日期选择框中切换到「时间段」，然后选择「开始时间」和「结束时间」，你可以：. 设置单日时间段：例如9:00–12:00。 设置跨天时间 ...
+
+### 8. 🚀 更新动态
+- **URL**: https://help.dida365.com/articles/6950689674532749312
+- 新增按创建时间分组，以及按创建时间、修改时间排序，你还可以自由选择排序从新到旧还是从旧到新，方便快速找到最近添加或更新的任务，整理清单中的任务 ...
+
+
