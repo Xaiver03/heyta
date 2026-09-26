@@ -37,6 +37,7 @@ model User {
   devices                     SyncDevice[]
   passkeys                    Passkey[]
   pendingPasskeyRegistrations PendingPasskeyRegistration[]
+  subscriptions               Subscription[]
 
   @@index([verificationToken])
   @@index([resetPasswordToken])
@@ -144,6 +145,44 @@ model UserSyncState {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("user_sync_state")
+}
+
+/// 会员订阅（**服务端表，不是 op**）。
+///
+/// 它回答的是"这个账号有没有资格使用官方托管服务"，与客户端 op-log 无关 ——
+/// 订阅关系**绝不允许**走 op-log（`AGENTS.md §3.4`）：它不是用户意图，
+/// 也不可能让用户离线自增。字段形状照现有模型：`@@map` 表名、snake_case 列名、
+/// `userId Int` + `onDelete: Cascade`，时间戳用 `BigInt`（与 `User.termsAcceptedAt` 一致）。
+///
+/// 🔴 每一列都可选或带默认值（`AGENTS.md §3.3`）：老 `users` 行没有这些列，
+/// 而且这里刻意不设任何"必填且无默认"的字段。
+/// 🔴 本表**不参与** `CURRENT_SCHEMA_VERSION` —— 那管的是客户端 op-log / 快照的线协议。
+model Subscription {
+  id Int @id @default(autoincrement())
+
+  /// 权益来源（支付商 / 渠道名，例如 `stripe`、`paddle`、`manual`）。
+  provider String?
+
+  /// 外部订阅 id，由支付商侧唯一标识一条订阅；webhook 幂等依赖它。
+  /// 可空：手动授予 / 尚未绑定外部 id 的行没有它，PostgreSQL 的
+  /// `UNIQUE` 允许多个 `NULL`，所以可空唯一约束不会互相冲突。
+  externalSubscriptionId String? @unique @map("external_subscription_id")
+
+  /// `active` / `past_due` / `canceled` / `expired` 之类。可空，未知即视为无权益。
+  status String?
+
+  /// 当前周期结束时间（epoch 毫秒）。可空：无法确定周期时按"无权益"处理。
+  currentPeriodEnd BigInt? @map("current_period_end")
+
+  /// 创建 / 更新时间（epoch 毫秒）。带默认值，避免任何"必填无默认"的列。
+  createdAt BigInt @default(0) @map("created_at")
+  updatedAt BigInt @default(0) @map("updated_at")
+
+  userId Int  @map("user_id")
+  user   User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("subscriptions")
 }
 
 model SyncDevice {
