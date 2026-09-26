@@ -142,20 +142,42 @@
 
 ---
 
-## 5. 本 ADR **没有**做的事
+## 5. 落实情况（2026-09-26 更新）
 
-- ❌ 没有实现 `PREFERENCE_CORRECTION` 实体类型（本 ADR 只定方向）
-- ❌ 没有实现主开关的界面（M6）
-- ❌ 没有实现反馈层（M4：记录 AI 建议的接受/修改/拒绝）
-- ❌ 没有改动 `CURRENT_SCHEMA_VERSION`
+本 ADR 定方向时列的"还没做"，现已全部落地：
 
-落实顺序见 [`ai-memory-system.md`](../plans/ai-memory-system.md) §9。
+| 项 | 状态 | 位置 |
+|---|---|---|
+| `PREFERENCE_CORRECTION` 实体类型 | ✅ 已实现 | `packages/domain/src/entities.ts` |
+| 主开关界面 | ✅ 已实现 | `apps/web/src/features/settings/AiSettings.tsx` |
+| 主开关**闸门** | ✅ 已实现 | `packages/domain/src/preferences.ts` + `ai-feedback.ts` |
+| 反馈层（M4：记录建议的接受/修改/拒绝） | ✅ 已实现 | `packages/domain/src/ai-feedback.ts` |
+| 偏好可见 / 可忘掉 / 可恢复 | ✅ 已实现 | `apps/web/src/features/settings/MemoryPanel.tsx` |
+| `CURRENT_SCHEMA_VERSION` | ✅ **未改动**（保持原值） | —— |
+
+两处实现在落地时**推翻或细化了本 ADR 的预判**，都记在这里：
+
+**① §3.2 的"不需 bump schema"被证实是对的，而且更省事。**
+两个新实体（`AI_FEEDBACK` / `PREFERENCE_CORRECTION`）都是纯可加性的，
+`CURRENT_SCHEMA_VERSION` 一个字没动。
+
+**② §3.1 "纠正要落盘"是对的，但当时没意识到它还需要一个「抑制 vs 还没算出来」的区分。**
+现在两者分开：`withheld` 是"数据还不够"，`suppressed` 是"你让我忘掉"。
+合并的话，用户会看到「我还需要 5 次专注」出现在一条他**刚刚亲手删掉**的偏好上 ——
+那看起来就像系统没听见他说话。见 `preference-corrections.ts` 的文件头。
 
 ---
 
-## 6. 未决
+## 6. 已决（原「未决」）
 
-1. `PREFERENCE_CORRECTION` 的 payload 形状（`preferenceId` + 覆盖值 + 时间）
-   —— 等实现时定，需要同时考虑"删除"与"覆盖"两种纠正是同一条 op 还是两条
-2. 纠正与推断冲突时的展示：是静默采用纠正，还是标出"这是你改过的"
-   （我倾向**标出**，与本仓库"披露三要素"的一贯立场一致）
+1. **`PREFERENCE_CORRECTION` 的 payload 形状** ——
+   定为 `{ preferenceId, kind: 'suppress' }`。
+   `kind` 做成联合类型而不是布尔，是为了将来能加"改成某个值"而不必再动实体形状。
+   **删除与覆盖不做成同一条 op**：它们是不同的事实，混在一起会让
+   reducer 需要读 payload 才知道语义（本仓库的 reducer 刻意不做这件事）。
+2. **纠正与推断冲突时的展示** —— 采纳当时的倾向：**标出**。
+   「你已忘记」是界面上独立的一区，可恢复。静默采用会让用户
+   无法发现自己误删过什么。
+3. **新增（当时没预料到）**：`AI_FEEDBACK` 只记**计数与枚举**，不记内容。
+   内容已经在任务备注里，再存一份就是第二份会漂移的副本，
+   而且会让这条本机行为记录变成新的内容泄露面。

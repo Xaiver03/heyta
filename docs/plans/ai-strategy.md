@@ -195,6 +195,11 @@ heyta 手里有一份**别人拿不到的数据**：`MaterializedState` 里的 `
 | **检索基线 + 决策实验** | 词法相似度基线；用重复检测实验决定要不要向量库 | `packages/domain/src/recall.ts`、`tests/recall-experiment.spec.ts` | 5 测试 |
 | **偏好推断层** | P1–P5 五条偏好（估算偏差 / 深度时段 / 提前量 / 粒度 / 表达习惯），纯函数 + `sampleSize`/`confidence`/`evidence`；**主开关 fail-closed** | `packages/domain/src/preferences.ts` | 27 测试 |
 | **偏好有效性实验** | 留出法（train80/test20）：五条**全部**优于基线，纯噪声上**零误报** | `packages/domain/tests/preferences-experiment.spec.ts` | 8 测试 |
+| **偏好接入 prompt** | 按用途过滤（只发当前决定需要的）；`preferences` 进出境披露；开关关时零偏好出境 | `packages/domain/src/preference-hints.ts` | 17 测试 |
+| **AI 反馈层** | 记录建议的接受/修改/拒绝（`AI_FEEDBACK`，走 op-log）；子项**逐条可取舍** | `packages/domain/src/ai-feedback.ts`、`apps/web/src/features/ai/AiBreakdown.tsx` | 20 + 12 测试 |
+| **反馈偏好 P6/P7** | 从处置推断粒度与保留率；P6 **MAE 0.167 vs 基线 1.000**；噪声上零误报 | `packages/domain/tests/ai-feedback.spec.ts` | 见上 |
+| **偏好可见可纠正** | `MemoryPanel`：依据原文、单条忘掉、**可恢复**的「你已忘记」 | `apps/web/src/features/settings/MemoryPanel.tsx` | 14 测试 |
+| **偏好纠正持久化** | `PREFERENCE_CORRECTION`（走 op-log，跨设备同步） | `packages/domain/src/preference-corrections.ts` | 17 测试 |
 
 ### 7.2 未落地
 
