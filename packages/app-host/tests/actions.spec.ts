@@ -253,6 +253,50 @@ describe('listTasks 的顺序', () => {
   });
 });
 
+describe('listPendingTasks（未完成）', () => {
+  it('只给未完成的，且 listTasks 仍然给全部（两件事不能混）', async () => {
+    const a = await actions.create('A');
+    clock += 1000;
+    const b = await actions.create('B');
+    clock += 1000;
+    const c = await actions.create('C');
+
+    await actions.setCompleted(b, true);
+
+    expect(actions.listPendingTasks().map((x) => x.id)).toEqual([a, c]);
+    expect(actions.listTasks().map((x) => x.id)).toEqual([a, b, c]);
+  });
+
+  it('顺序与 listTasks 用同一条规则（createdAt 升序、同刻按 id）', async () => {
+    idPrefix = 'task-z';
+    const a = await actions.create('A');
+    idPrefix = 'task-a';
+    const b = await actions.create('B');
+    // createdAt 相同 → 按 id 升序，与创建先后无关
+    expect(actions.listPendingTasks().map((x) => x.id)).toEqual([b, a]);
+  });
+
+  it('全部完成时是空数组，不是 undefined', async () => {
+    const a = await actions.create('A');
+    await actions.setCompleted(a, true);
+    expect(actions.listPendingTasks()).toEqual([]);
+  });
+
+  it('已删除的不算待办', async () => {
+    const a = await actions.create('A');
+    await actions.remove(a);
+    expect(actions.listPendingTasks()).toEqual([]);
+  });
+
+  it('🔴 取消完成后会重新出现（不是单向过滤）', async () => {
+    const a = await actions.create('A');
+    await actions.setCompleted(a, true);
+    expect(actions.listPendingTasks()).toHaveLength(0);
+    await actions.setCompleted(a, false);
+    expect(actions.listPendingTasks().map((x) => x.id)).toEqual([a]);
+  });
+});
+
 describe('其余字段', () => {
   it('rename / setPriority / setImportant 各产出一条 UPD op', async () => {
     const id = await actions.create('A');
@@ -271,5 +315,62 @@ describe('其余字段', () => {
     const task = actions.findTask(id)!;
     expect(task.title).toBe('B');
     expect(task.priority).toBe(Priority.Medium);
+  });
+});
+
+/**
+ * `setNote` —— 备注的写入路径
+ *
+ * 🔴 **为什么单开一节。** 在它存在之前，`note` 只能通过 `create` 写一次，
+ * 于是所有"事后生成内容"的功能（AI 拆解出的清单、模板、导入的笔记）
+ * **都没有落点**。这是一个"缺一个动作"的洞，不是"少一个字段"。
+ *
+ * ⚠️ 字段名必须是 `note`（单数）。历史上写成 `notes` 时，
+ * 数据同步到了每一台设备，而**没有任何视图读得到它** ——
+ * 载荷键与实体字段对不上，静默失效。所以下面的断言**读的是 `Task.note`**，
+ * 而不是"载荷里有 note 这个键"。
+ */
+describe('setNote', () => {
+  it('🔴 备注真的落到 `Task.note`（不是载荷里有个 note 键就算数）', async () => {
+    const id = await actions.create('写文档');
+    await actions.setNote(id, '第一行\n第二行');
+
+    const task = actions.findTask(id);
+    expect(task?.note).toBe('第一行\n第二行');
+    // 反向确认没有写出一个叫 notes 的幽灵字段
+    expect((task as Record<string, unknown> | undefined)?.['notes']).toBeUndefined();
+  });
+
+  it('🔴 传 undefined 表示清除，且清除要能穿过 JSON', async () => {
+    const id = await actions.create('写文档', { note: '原来的' });
+    expect(actions.findTask(id)?.note).toBe('原来的');
+
+    await actions.setNote(id, undefined);
+    // 关键：清除之后读回来必须是 undefined，而不是 "null" 或空串
+    expect(actions.findTask(id)?.note).toBeUndefined();
+
+    // 载荷里写的是 null（undefined 会被 JSON 丢掉，见文件头第 2 条）
+    const ops = await opsOf(id);
+    const last = ops[ops.length - 1];
+    expect(payloadOf(last!)['note']).toBeNull();
+  });
+
+  it('空字符串是一个合法的备注（区别于"清除"）', async () => {
+    const id = await actions.create('x', { note: '有内容' });
+    await actions.setNote(id, '');
+    expect(actions.findTask(id)?.note).toBe('');
+  });
+
+  it('产出一条 UPD op，不是 CRT', async () => {
+    const id = await actions.create('x');
+    await actions.setNote(id, 'y');
+    const ops = await opsOf(id);
+    expect(ops.filter((o) => o.opType === OpType.Update)).toHaveLength(1);
+  });
+
+  it('🔴 覆盖已有备注时是替换，不是追加（合并逻辑在调用方，不在这里）', async () => {
+    const id = await actions.create('x', { note: '旧的' });
+    await actions.setNote(id, '新的');
+    expect(actions.findTask(id)?.note).toBe('新的');
   });
 });

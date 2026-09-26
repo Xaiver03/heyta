@@ -4,8 +4,11 @@
  *
  * 宿主无关的应用接线与写入动作。ADR-0003 §2.1 的**唯一实现处**：
  *
- *   - `openAppHost()`     —— 把平台 SQLite 驱动接到 op-log 引擎与同步客户端
- *   - `createTaskActions()` —— 所有平台共用的 op 构造
+ *   - `openAppHost()`       —— 把平台 SQLite 驱动接到 op-log 引擎与同步客户端
+ *   - `createTaskActions()`     —— 任务 op 的构造
+ *   - `createProjectActions()`  —— 清单 / 标签 op 的构造
+ *   - `createHabitActions()`    —— 习惯 / 打卡 op 的构造
+ *   - `createFocusActions()`    —— 专注记录 op 的构造
  *   - `randomId()` / `newTaskId()` —— 带 RN 安全回退的标识符生成
  *
  * 宿主（`apps/*`）应当**只**提供三样东西：驱动工厂、库路径、同步参数。
@@ -18,6 +21,7 @@ export {
   materializedState,
   type AppHost,
   type AppHostOptions,
+  type SyncConfig,
 } from './host.js';
 
 export {
@@ -26,6 +30,39 @@ export {
   type TaskActions,
   type NewTaskFields,
 } from './actions.js';
+
+/**
+ * 专注动作。与任务动作同一个理由：**op 的构造只有一份**（AGENTS.md §3.5）。
+ *
+ * 🔴 `apps/*` 里**不得出现 `entityType: 'FOCUS_SESSION'` 的字面量** ——
+ * 出现就说明宿主在自己拼 op。
+ */
+export {
+  createFocusActions,
+  type FocusActions,
+  type FocusActionsOptions,
+} from './focus-actions.js';
+
+/**
+ * 清单 / 标签 / 习惯动作。同一理由：**op 的构造只有一份**（AGENTS.md §3.5）。
+ *
+ * 🔴 `apps/*` 里**不得出现 `entityType: 'PROJECT' | 'TAG' | 'HABIT' | 'HABIT_LOG'`
+ * 的字面量** —— 出现就说明宿主在自己拼 op。这条由 `pnpm check:layering` 的
+ * `no-op-construction-in-apps` 规则钉住（它上线时一次抓出了 17 处真实违规）。
+ */
+export {
+  createProjectActions,
+  type ProjectActions,
+  type ProjectActionsOptions,
+} from './project-actions.js';
+
+export {
+  createHabitActions,
+  habitLogId,
+  type HabitActions,
+  type HabitActionsOptions,
+  type NewHabitFields,
+} from './habit-actions.js';
 
 /**
  * 同步接线。**所有宿主共用这一份** —— 见 `sync-wiring.ts` 文件头：
@@ -37,3 +74,38 @@ export {
 export { createSyncClient, type SyncWiringOptions } from './sync-wiring.js';
 
 export { newTaskId, randomId, usingRandomIdFallback } from './ids.js';
+
+/**
+ * 重复规则的预设。**"每周"到底是哪一天是产品语义**，所以在这里而不在界面里
+ * （判据见 §3.5："这段代码里有没有一行在决定业务上该怎么做？"）。
+ * 界面只负责选 id 与显示文字。
+ */
+export {
+  REPEAT_PRESET_IDS,
+  repeatPresetRule,
+  type RepeatPresetId,
+} from './repeat-presets.js';
+
+export {
+  createLocalApiHost,
+  fromLocalDateString,
+  taskToItem,
+  toLocalDateString,
+  type LocalApiHostOptions,
+} from './local-api-host.js';
+
+export {
+  MAX_BREAKDOWN_ITEMS,
+  MAX_ITEM_LENGTH,
+  buildBreakdownInvocation,
+  manualChecklistSkeleton,
+  mergeChecklistIntoNote,
+  parseBreakdownItems,
+  renderChecklist,
+  requestBreakdown,
+  type BreakdownFailureReason,
+  type BreakdownOutcome,
+  type BreakdownProposal,
+  type BreakdownSource,
+  type RequestBreakdownDeps,
+} from './ai-breakdown.js';
