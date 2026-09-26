@@ -32,7 +32,16 @@
  * ─────────────────────────────────────────────────────────────────────────
  */
 
-import { Priority, type Task } from '@heyta/domain';
+import {
+  Priority,
+  isValidRecurrenceRule,
+  nextOccurrence,
+  parseLocalDate,
+  startOfDay,
+  toLocalDate,
+  today,
+  type Task,
+} from '@heyta/domain';
 import type { MaterializedState, OpIntent } from '@heyta/op-log';
 import type { EntityType } from '@heyta/shared-schema';
 import { OpType } from '@heyta/sync-core';
@@ -57,7 +66,22 @@ export interface NewTaskFields {
   dueDate?: number;
   projectId?: string;
   important?: boolean;
-  notes?: string;
+  /**
+   * 备注（Markdown）。
+   *
+   * 🔴 **字段名是 `note`（单数），必须与 `Task.note` 一致。**
+   * 这里曾经叫 `notes` —— 而 `payload: { title, priority, ...over }` 会把它
+   * **原样**写成载荷里的 `notes` 字段。实测确认：`create(t, { notes: 'x' })` 之后
+   * `task.note === undefined`、`task.notes === 'x'`。
+   * 也就是说这条备注**会同步到每一台设备，而没有任何视图读得到它**
+   * （视图读的是 `Task.note`）—— 数据没丢，但那和丢了没区别。
+   *
+   * 这正是 AGENTS.md #20 的形状：字段名差一个字母，静默失效，不报错。
+   * ⚠️ **拦住改名的不是测试，是 `typecheck`**（接口字段名，`TS2561`）；
+   * `repeat-actions.spec.ts` 里那条测试守的是**运行时落点**（载荷键 → `Task` 字段）。
+   * 别把功劳记错 —— 我最初就写成了"测试会红"，实测它是绿的。
+   */
+  note?: string;
 }
 
 export interface TaskActionsOptions {
@@ -102,11 +126,56 @@ export interface TaskActions {
   setImportant(entityId: string, important: boolean): Promise<void>;
   /** 传 `undefined` 表示清除截止时间（会写成 `null`，见文件头第 2 条）。 */
   setDueDate(entityId: string, dueDate: number | undefined): Promise<void>;
+  /**
+   * 改备注（Markdown）。传 `undefined` 表示清除（同样写成 `null`）。
+   *
+   * 🔴 **为什么必须有这个动作**：`create` 能带 `note`，但改不了 ——
+   * 于是"把 AI 拆解出的清单写进备注"这类能力**没有任何落点**。
+   * 一个只能创建时写一次的字段，会让所有"事后生成内容"的功能无处可去。
+   *
+   * ⚠️ 字段名是 `note`（单数），与 `Task.note` 一致 ——
+   * 理由见 `NewTaskFields.note` 上那段（曾经写成 `notes`，
+   * 数据同步到了每台设备却没有任何视图读得到）。
+   */
+  setNote(entityId: string, note: string | undefined): Promise<void>;
   /** 传 `undefined` 表示移出项目（会写成 `null`）。 */
   moveToProject(entityId: string, projectId: string | undefined): Promise<void>;
 
+  /**
+   * 设置重复规则（RFC 5545 RRULE 串）。传 `undefined` 表示取消重复。
+   *
+   * 🔴 **规则串由调用方从 `Recurrence.*` 构造，不要手拼** ——
+   * `setRepeat(id, 'FREQ=WEEKLY;BYDAY=MO')` 这种字面串在调用点看不出对错，
+   * 而拼错一个分号只会静默变成另一条规则。
+   *
+   * 产品语义（都在这里，不在界面里）：
+   *   - **锚点钉一次**：`repeatDtstart` 取"设规则那一刻的截止日"，之后不再变。
+   *     不这么做的话，"每两周的周三"会随着 `dueDate` 每次推进而整体漂移。
+   *   - **重复需要一个起点**：任务原本没有截止日时，顺手把它设成**今天**。
+   *     否则会出现"有规则、没日子"的任务 —— 它在任何一个日期视图里都不出现。
+   */
+  setRepeat(entityId: string, rule: string | undefined): Promise<void>;
+
+  /**
+   * 取某个任务的重复规则；没有规则（或规则串已损坏）时返回 `undefined`。
+   *
+   * 视图层要靠它决定"要不要画那个重复图标"，也要靠它显示 `describeRecurrence`。
+   * 规则串损坏时返回 `undefined` 而不是把坏串透出去：`occurrencesInRange`
+   * 遇到非法规则会**抛错**，而 "这一条任务的规则坏了" 不该让整个日期视图白屏。
+   */
+  repeatOf(entityId: string): { rule: string; dtstart: string } | undefined;
+
   /** 未删除的任务，按创建时间排序（同刻按 id 字典序，保证跨端顺序一致）。 */
   listTasks(): Task[];
+  /**
+   * 未删除**且未完成**的任务，顺序同 `listTasks()`。
+   *
+   * 🔴 存在的理由是"未完成"是**产品语义**：它此前在两处各写了一遍
+   * （`apps/web` 的 `selectVisibleTasks` 与 `apps/mobile` 的 `TasksScreen` 分组），
+   * 而专注页要选任务时会变成第三遍。`completedAt === undefined` 看起来只有一行，
+   * 但"什么算完成"一旦改动（比如将来允许"部分完成"），三处就会分叉。
+   */
+  listPendingTasks(): Task[];
   /** 取单个未删除任务；不存在或已删除返回 `undefined`。 */
   findTask(entityId: string): Task | undefined;
 }
@@ -133,6 +202,57 @@ export function createTaskActions(
     });
   };
 
+  /**
+   * 读任务的重复规则。规则缺失**或规则串已损坏**都返回 `undefined`。
+   *
+   * 为什么不把坏串透出去：`occurrencesInRange` / `nextOccurrence` 对非法规则会**抛错**，
+   * 而"某一条任务的规则坏了"不该让整个日期视图白屏。坏规则在读取侧退化成"不重复"，
+   * 数据仍在 op-log 里，用户可以把规则重设一遍。
+   */
+  const repeatOf = (task: Task | undefined): { rule: string; dtstart: string } | undefined => {
+    if (task === undefined) return undefined;
+    const { repeatRule, repeatDtstart } = task;
+    if (repeatRule === undefined || repeatDtstart === undefined) return undefined;
+    if (!isValidRecurrenceRule(repeatRule)) return undefined;
+    return { rule: repeatRule, dtstart: repeatDtstart };
+  };
+
+  /**
+   * 勾选/取消勾选一个任务 —— 重复任务走的是**另一条语义**。
+   *
+   * 🔴 **完成一个重复任务 = 把到期日推进到下一次，而不是写 `completedAt`。**
+   *
+   * 写 `completedAt` 会让它掉进「已完成」分组并且**再也不出来** —— 而"每周一"的任务
+   * 恰恰是下周还要做的。上游 `nextAfterCompletion` 的注释把这层说得很清楚：
+   * 重复的是一条**实例**，不是那条任务本身。
+   *
+   * ⚠️ **推进的基准是"当前到期日"，不是"完成时刻"。**
+   * 用完成时刻的话：一条 9/14(周一) 的任务在 9/13(周日) 被提前勾掉，
+   * "下一个 9/14 之后的周一"仍然是 9/14 —— 到期日纹丝不动，用户会以为勾选没生效。
+   * 所以固定排期一律从当前到期日往后推，"每周一"永远落在周一。
+   *
+   * 规则已经走到尽头（`UNTIL`/`COUNT` 用尽 → `nextOccurrence` 返回 `undefined`）时
+   * **退回普通完成**：这一次是最后一件，之后就没有了。
+   */
+  const completeTask = async (entityId: string, task: Task): Promise<void> => {
+    const repeat = repeatOf(task);
+    if (repeat === undefined) {
+      await update(entityId, { completedAt: now() });
+      return;
+    }
+
+    const from = task.dueDate !== undefined ? toLocalDate(task.dueDate) : repeat.dtstart;
+    const next = nextOccurrence(repeat.rule, repeat.dtstart, from);
+    if (next === undefined) {
+      await update(entityId, { completedAt: now() });
+      return;
+    }
+
+    // 只动到期日：`completedAt` 保持不存在，任务仍然是"待办"。
+    // 要把它标成完成必须显式清掉规则，否则两种状态会互相打架。
+    await update(entityId, { dueDate: parseLocalDate(next).getTime() });
+  };
+
   return {
     async create(title, over = {}) {
       const trimmed = title.trim();
@@ -156,17 +276,24 @@ export function createTaskActions(
     },
 
     async setCompleted(entityId, completed) {
-      if (taskOf(entityId) === undefined) throw new Error(`找不到任务「${entityId}」`);
+      const task = taskOf(entityId);
+      if (task === undefined) throw new Error(`找不到任务「${entityId}」`);
+      if (completed) {
+        await completeTask(entityId, task);
+        return;
+      }
       // null 而不是 undefined —— 见文件头第 2 条。
-      await update(entityId, { completedAt: completed ? now() : null });
+      await update(entityId, { completedAt: null });
     },
 
     async toggleCompleted(entityId) {
       const task = taskOf(entityId);
       if (task === undefined) throw new Error(`找不到任务「${entityId}」`);
-      await update(entityId, {
-        completedAt: task.completedAt === undefined ? now() : null,
-      });
+      if (task.completedAt === undefined) {
+        await completeTask(entityId, task);
+        return;
+      }
+      await update(entityId, { completedAt: null });
     },
 
     async remove(entityId) {
@@ -192,20 +319,70 @@ export function createTaskActions(
       return update(entityId, { dueDate: dueDate ?? null });
     },
 
+    setNote(entityId, note) {
+      // undefined → null：与 setDueDate 同一个理由，null 能穿过 JSON 表达"清除"。
+      return update(entityId, { note: note ?? null });
+    },
+
     moveToProject(entityId, projectId) {
       return update(entityId, { projectId: projectId ?? null });
     },
 
+    async setRepeat(entityId, rule) {
+      const task = taskOf(entityId);
+      if (task === undefined) throw new Error(`找不到任务「${entityId}」`);
+
+      if (rule === undefined) {
+        // 两个字段一起清：只清一个会留下"有锚点、没规则"的半截状态。
+        await update(entityId, { repeatRule: null, repeatDtstart: null });
+        return;
+      }
+
+      if (!isValidRecurrenceRule(rule)) throw new Error(`无效的重复规则：${rule}`);
+
+      // 锚点钉一次：已有截止日就用它，否则用今天 —— 并顺手把截止日补上。
+      // 不补的话会出现"有规则、没日子"的任务，它在任何日期视图里都不出现。
+      const anchor = task.dueDate !== undefined ? toLocalDate(task.dueDate) : today(now());
+      await update(entityId, {
+        repeatRule: rule,
+        repeatDtstart: anchor,
+        ...(task.dueDate === undefined ? { dueDate: startOfDay(now()) } : {}),
+      });
+    },
+
+    repeatOf(entityId) {
+      return repeatOf(taskOf(entityId));
+    },
+
     listTasks(): Task[] {
-      return Object.values(ctx.getState().tasks)
-        .filter((task) => task.deletedAt === undefined)
-        .sort((a, b) => {
-          if (a.createdAt !== b.createdAt) return a.createdAt - b.createdAt;
-          // 顺序必须在所有端一致 —— 否则同一份数据在两台设备上显示不同顺序。
-          return a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
-        });
+      return listAlive(ctx.getState().tasks).sort(byCanonicalOrder);
+    },
+
+    listPendingTasks(): Task[] {
+      // 与 listTasks 同一份顺序、同一个"未删除"判据 —— 只有"未完成"是新增的。
+      return listAlive(ctx.getState().tasks)
+        .filter((task) => task.completedAt === undefined)
+        .sort(byCanonicalOrder);
     },
 
     findTask: taskOf,
   };
+}
+
+/** 未软删除的任务（顺序未定义，调用方自己 sort）。 */
+function listAlive(tasks: Record<string, Task>): Task[] {
+  return Object.values(tasks).filter((task) => task.deletedAt === undefined);
+}
+
+/**
+ * 跨端一致的规范顺序：创建时间升序，同刻按 id 字典序。
+ *
+ * 🔴 **不要去掉那个 id 决胜**：`createdAt` 来自毫秒时钟，同一台设备连续建两条
+ * 经常落在同一毫秒里，此时排序结果取决于 `Object.values` 的枚举顺序 ——
+ * 那是**各端不同**的（IndexedDB 按索引键、SQLite 按主键，见 AGENTS.md §7 第 16 条）。
+ * 表现是同一份数据在两台设备上顺序不同，而没有任何一处报错。
+ */
+function byCanonicalOrder(a: Task, b: Task): number {
+  if (a.createdAt !== b.createdAt) return a.createdAt - b.createdAt;
+  return a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
 }

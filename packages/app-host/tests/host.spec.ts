@@ -252,3 +252,137 @@ describe('openAppHost 与手写接线的等价性', () => {
     expect(viaHost.listTasks().map((t) => t.title)).toEqual(['任务甲', '任务乙']);
   });
 });
+
+/**
+ * 运行时可变凭据（`getSyncConfig`）
+ * ==================================
+ *
+ * 🔴 **这组测试存在的理由是一个真实的功能缺口。**
+ *
+ * 移动壳把 `serverUrl` 传给了 `openAppHost`，但**从不调用 `sync()`、也从没有
+ * token / 口令** —— 因为那些只能由用户在应用启动**之后**输入，而
+ * `openAppHost()` 在启动时就跑完并闭包捕获了静态字段。
+ * 于是移动端"能建任务、能勾选、能删除"，但一条都同步不出去。
+ *
+ * 静态字段那条路（上面的用例）永远测不出这个问题：测试可以在
+ * `openAppHost` 之前把凭据准备好，而真实用户不能。
+ */
+describe('运行时可变同步凭据', () => {
+  /** 记录每次请求的 URL，并回一个**成功但无数据**的同步响应。 */
+  function recordingFetch(): { fetchImpl: typeof fetch; urls: string[] } {
+    const urls: string[] = [];
+    const fetchImpl = (async (input: string | URL | Request) => {
+      urls.push(String(input));
+      return new Response(
+        JSON.stringify({ ops: [], hasMore: false, latestSeq: 0, results: [] }),
+        { status: 200, headers: { 'content-type': 'application/json' } },
+      );
+    }) as unknown as typeof fetch;
+    return { fetchImpl, urls };
+  }
+
+  it('没给凭据时同步**明确说"未配置"**，不假装成功', async () => {
+    host = await openAppHost({
+      dbPath,
+      driverFactory: driverFor(dbPath),
+      // 活配置存在但还没填 —— 正是应用刚启动、用户还没进「我的」时的状态。
+      getSyncConfig: () => undefined,
+    });
+
+    const status = await host.sync();
+
+    // 关键不是"失败了"，而是**说清了是哪一种失败**：
+    // `synced` 会把"没配置"伪装成"同步成功且没有新数据"，那是最坏的一类静默失败。
+    expect(status.kind).toBe('error');
+    if (status.kind !== 'error') throw new Error('unreachable');
+    expect(status.retryable, '用户没配置不是可重试的错误，重试一万次也一样').toBe(false);
+    expect(status.message).toContain('未配置');
+  });
+
+  it('只有地址没有令牌时也算未配置（不能只查地址）', async () => {
+    host = await openAppHost({
+      dbPath,
+      driverFactory: driverFor(dbPath),
+      getSyncConfig: () => ({ serverUrl: 'http://127.0.0.1:3210' }),
+    });
+
+    const status = await host.sync();
+    expect(status.kind).toBe('error');
+  });
+
+  it('活配置**覆盖**静态字段（静态那份是坏的，活的那份才会被用）', async () => {
+    const { fetchImpl, urls } = recordingFetch();
+    host = await openAppHost({
+      dbPath,
+      driverFactory: driverFor(dbPath),
+      // 静态字段刻意填一个不可达端口：如果活配置没生效，请求会打到它上面。
+      serverUrl: 'http://127.0.0.1:9',
+      token: 'static-token',
+      getSyncConfig: () => ({
+        serverUrl: 'http://127.0.0.1:3210',
+        token: 'live-token',
+        password: 'pw',
+      }),
+      fetchImpl,
+    });
+
+    await host.sync();
+
+    expect(urls.length, '应该真的发出了请求').toBeGreaterThan(0);
+    for (const url of urls) {
+      expect(url, '用了静态字段说明活配置没生效').toContain('127.0.0.1:3210');
+      expect(url).not.toContain('127.0.0.1:9');
+    }
+  });
+
+  it('🔴 改了配置之后，**下一次同步必须用新值**（客户端不得被缓存）', async () => {
+    const { fetchImpl, urls } = recordingFetch();
+    // 模拟用户在「我的」里改服务器地址：这是**同一台设备、同一个 host 实例**内发生的。
+    let live = { serverUrl: 'http://127.0.0.1:3210', token: 't1', password: 'pw' };
+
+    host = await openAppHost({
+      dbPath,
+      driverFactory: driverFor(dbPath),
+      getSyncConfig: () => live,
+      fetchImpl,
+    });
+
+    await host.sync();
+    const firstBatch = [...urls];
+    expect(firstBatch.some((u) => u.includes(':3210'))).toBe(true);
+
+    // 用户改地址
+    live = { serverUrl: 'http://127.0.0.1:4321', token: 't2', password: 'pw' };
+    urls.length = 0;
+    await host.sync();
+
+    // 缓存客户端的话，这里还会打 :3210 —— 而现象是"改了设置但同步还是连旧服务器"，
+    // 最难排查的一类问题（设置界面看起来完全正常）。
+    expect(urls.length, '第二次也必须真的发请求').toBeGreaterThan(0);
+    for (const url of urls) {
+      expect(url, '缓存了旧客户端 → 还在打旧地址').toContain('127.0.0.1:4321');
+    }
+  });
+
+  it('未配置时 resolveConflict 也返回"未配置"，而不是抛异常', async () => {
+    host = await openAppHost({
+      dbPath,
+      driverFactory: driverFor(dbPath),
+      getSyncConfig: () => undefined,
+    });
+
+    const status = await host.resolveConflict(
+      {
+        entityType: 'TASK',
+        entityId: 'x',
+        reason: 'concurrent-update',
+        local: { payload: {}, clock: {} },
+        remote: { payload: {}, clock: {} },
+      } as never,
+      'keep-local',
+    );
+
+    // UI 在这种情况下已经在渲染冲突对话框了 —— 抛异常会把整个界面打白。
+    expect(status.kind).toBe('error');
+  });
+});

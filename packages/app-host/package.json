@@ -20,7 +20,9 @@
     "test:watch": "vitest"
   },
   "dependencies": {
+    "@heyta/ai": "workspace:*",
     "@heyta/domain": "workspace:*",
+    "@heyta/local-api": "workspace:*",
     "@heyta/op-log": "workspace:*",
     "@heyta/shared-schema": "workspace:*",
     "@heyta/storage": "workspace:*",

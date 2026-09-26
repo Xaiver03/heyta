@@ -41,10 +41,36 @@ import {
   type DbAdapter,
   type SqliteDriver,
 } from '@heyta/storage';
-import type { SyncStatus } from '@heyta/sync-client';
+import {
+  type ConflictInfo,
+  type SyncClient,
+  type SyncStatus,
+} from '@heyta/sync-client';
 import type { Operation } from '@heyta/sync-core';
 import { randomId } from './ids.js';
 import { createSyncClient } from './sync-wiring.js';
+
+/**
+ * 一次同步所需的全部凭据。
+ *
+ * 🔴 **为什么它是可变的、而不是 `openAppHost` 的静态字段：**
+ *
+ * 服务器地址、访问令牌、E2EE 口令都只能由**用户在应用启动之后**输入 ——
+ * 启动时没有任何办法拿到它们。而 `openAppHost()` 在启动时就跑完了。
+ *
+ * 实测后果（移动壳）：`serverUrl` 传进去了，但 `token` / `password` 永远是
+ * `undefined`，于是 `sync()` 永远以"未登录"失败 —— 而 `openHost` 里唯一的
+ * 现象是"从不调用 sync()"，看起来像 UI 漏了按钮，实际是**接线拿不到凭据**。
+ *
+ * Web 宿主早就有这个问题，它的解法是在 store 里每次重建客户端并注入
+ * `getToken: async () => get().token` 这样的**活取值器**。这里把同一个解法
+ * 提到宿主层，好让原生宿主也能用同一条路。
+ */
+export interface SyncConfig {
+  serverUrl: string;
+  token?: string;
+  password?: string;
+}
 
 export interface AppHostOptions {
   /**
@@ -67,6 +93,13 @@ export interface AppHostOptions {
   token?: string;
   /** E2EE 口令。缺失时同步会明确失败，**不会降级成明文**。 */
   password?: string;
+  /**
+   * **运行时可变**的同步凭据。给了它就**取代**上面的 `serverUrl` / `token` / `password`。
+   *
+   * 移动端必须用这个：用户是在应用起来之后才在「我的」里填服务器和口令的。
+   * 不传则退回静态字段（Node 验收壳与测试用的就是静态路径）。
+   */
+  getSyncConfig?: () => SyncConfig | undefined;
   /**
    * 覆盖设备 id。
    *
@@ -108,8 +141,25 @@ export interface AppHost {
    */
   dispatch(intent: OpIntent): Promise<void>;
 
-  /** 与真实服务端完整同步一次。 */
+  /**
+   * 与真实服务端完整同步一次。
+   *
+   * 未配置同步服务时返回 `{ kind: 'error', message: '未配置同步服务' }` ——
+   * **不会**返回"已同步"，因为那会把"没配置"伪装成"同步成功且没有新数据"。
+   */
   sync(): Promise<SyncStatus>;
+
+  /**
+   * 用户手动解决一处冲突。
+   *
+   * 两个方向都走 op-log 重新派发（`sync-client` 的 `resolveConflict`），
+   * 宿主不得直接改状态 —— 那正是 D4 禁止的绕开 op-log 的写入。
+   */
+  resolveConflict(
+    conflict: ConflictInfo,
+    choice: 'keep-local' | 'keep-remote',
+  ): Promise<SyncStatus>;
+
   /** 待上传队列长度（离线队列是否清空，同步后应该为 0）。 */
   pendingUploadCount(): Promise<number>;
 
@@ -179,24 +229,57 @@ export async function openAppHost(options: AppHostOptions): Promise<AppHost> {
   await engine.recover();
 
   /**
-   * 同步客户端是**宿主无关**的业务逻辑（`packages/sync-client`）。
+   * 读取当前生效的同步凭据。
    *
-   * 🔴 接线本身也已抽到 `sync-wiring.ts`：它此前在 `apps/web` 里**另有一份**，
-   * 连注释都是复制的。这里只注入真正的平台差异 —— 网络、令牌、口令，
-   * 以及"应用远端之后要不要通知 UI"。
+   * `getSyncConfig` 给了就用它（运行时可变，移动端走这条）；
+   * 否则退回静态字段（Node 验收壳与测试走这条）。
    */
-  const client = createSyncClient({
-    engine,
-    store,
-    baseUrl: options.serverUrl ?? '',
-    getToken: async () => options.token,
-    getPassword: async () => options.password,
-    // 原生宿主没有订阅层：状态由调用方主动 `getState()` 拉取，
-    // 因此应用远端之后**不需要**通知任何人。
-    applyRemote: async (ops) => {
-      await engine.applyRemote(ops);
-    },
-    ...(options.fetchImpl !== undefined ? { fetchImpl: options.fetchImpl } : {}),
+  const readSyncConfig = (): SyncConfig => {
+    const live = options.getSyncConfig?.();
+    if (live !== undefined) return live;
+    return {
+      serverUrl: options.serverUrl ?? '',
+      ...(options.token !== undefined ? { token: options.token } : {}),
+      ...(options.password !== undefined ? { password: options.password } : {}),
+    };
+  };
+
+  /**
+   * 构造一个**当前配置下**的同步客户端。
+   *
+   * 🔴 **每次同步重建，不缓存。** 缓存会让用户在「我的」里改完服务器地址或口令后，
+   * 旧客户端继续用旧值 —— 而"改了设置但同步还是失败"是最难排查的一类问题。
+   * `SyncClient` 自身没有连接状态，重建是廉价的（`apps/web` 早就是这个做法）。
+   *
+   * 未配置时返回 `undefined`，**不返回一个"什么也不做"的客户端** ——
+   * 后者会把"没配置"伪装成"同步成功且没有新数据"，那是最坏的一类静默失败。
+   */
+  const buildSyncClient = (): SyncClient | undefined => {
+    const config = readSyncConfig();
+    // 口令可以不填（那样同步会在 E2EE 那一步明确失败，且不会降级成明文），
+    // 但地址与令牌缺一不可 —— 没有它们连请求都发不出去。
+    if (config.serverUrl === '' || config.token === undefined) return undefined;
+
+    return createSyncClient({
+      engine,
+      store,
+      baseUrl: config.serverUrl,
+      getToken: async () => config.token,
+      getPassword: async () => config.password,
+      // 原生宿主没有订阅层：状态由调用方主动 `getState()` 拉取，
+      // 因此应用远端之后**不需要**通知任何人。
+      applyRemote: async (ops) => {
+        await engine.applyRemote(ops);
+      },
+      ...(options.fetchImpl !== undefined ? { fetchImpl: options.fetchImpl } : {}),
+    });
+  };
+
+  /** 未配置同步时的统一答复。**明确说"未配置"，不说"已同步"。** */
+  const notConfigured = (): SyncStatus => ({
+    kind: 'error',
+    message: '未配置同步服务',
+    retryable: false,
   });
 
   return {
@@ -210,7 +293,20 @@ export async function openAppHost(options: AppHostOptions): Promise<AppHost> {
 
     getState: () => engine.getState(),
 
-    sync: () => client.sync(),
+    async sync(): Promise<SyncStatus> {
+      const client = buildSyncClient();
+      if (client === undefined) return notConfigured();
+      return client.sync();
+    },
+
+    async resolveConflict(
+      conflict: ConflictInfo,
+      choice: 'keep-local' | 'keep-remote',
+    ): Promise<SyncStatus> {
+      const client = buildSyncClient();
+      if (client === undefined) return notConfigured();
+      return client.resolveConflict(conflict, choice);
+    },
 
     async pendingUploadCount(): Promise<number> {
       return (await engine.getPendingUpload()).length;
