@@ -6,21 +6,63 @@
 > 调研日期基准 **2026-09-26**。全部结论来自官方页面 / 官方 `.md` / npm registry API /
 > GitHub API / **官方 LICENSE 原文**直抓（本机 `web_search` 不可用，返回 HTTP 432）。
 
-## 1. 结论
+## 0. 🔴 推荐在调研最后一轮翻转了：**Paddle 同时赢下两个分叉**
+
+我最初把 **Creem** 定为「无执照分支首选」。**这个结论被推翻了**，
+依据是两条复核过的官方原文：
+
+**① Creem 的买家侧还不能用支付宝/微信**（这条最致命）：
+
+> "Cards (Visa, Mastercard, Amex), PayPal, Apple Pay, Google Pay, and local
+> payment methods based on customer location. **WeChat Pay and Alipay support
+> coming soon.**"
+> — https://docs.creem.io/getting-started/introduction.md
+
+Creem 的**商家侧**能收支付宝（结算给你）是真的，但它解决的是
+**"你怎么拿到钱"，不是"中国用户怎么付钱"** —— 而后者才是这个产品的问题本身。
+收银台里没有支付宝/微信，¥139 的中国用户就付不出来。
+
+**② Paddle 的卖家侧是打开的**（逐字读到官方原文）：
+
+| 事实 | 原文 |
+|---|---|
+| 中国大陆**不在**不支持名单 | "works with software businesses **anywhere in the world** with the exception of…" 后 28 国**不含 China** |
+| **个人/个体户免公司资质** | "this step is **not required for individuals or sole traders**" |
+| 结算**支持人民币** | payout 币种含 **Chinese Yuan (CNY)**；wire/Payoneer；**min $100**；1 日结余、15 日前发出 |
+| 买家侧支付宝**支持订阅** | `Countries=CN`、`Currencies=CNY`、**`Subscriptions: Supported`**，续费 ≤1600 CNY |
+
+## 1. 结论（修正版）
 
 | 分叉 | 🥇 首选 | 🥈 备选 |
 |---|---|---|
-| **无中国大陆营业执照** | **Creem** | 只做海外用户（Paddle / Stripe） |
-| **有中国大陆营业执照**（个体户即可） | **Paddle**（🔴 先确认是否接受大陆卖家） | 支付宝「电脑网站支付」 |
+| **有中国大陆营业执照**（个体户即可） | **Paddle** | 支付宝「电脑网站支付」（0.6%，成本最低，但**必须放弃自动续费** → 改「一次性年付 + 到期提醒」） |
+| **无中国大陆营业执照** | **Paddle**（官方明确接受 individuals / sole traders） | **Creem** |
 
-### 🔴 但真正的决策变量不是"有没有执照"
+### 🔴 唯一的单点风险：**Paddle 是"文本已核实、实操未核实"**
 
-因为 **Creem 两个分叉都能用**（个人 KYC 入驻即可）。
+政策文本允许 ≠ KYC 实操放行。
 
-真正的变量是：**能不能接受 Creem 的规模与不确定性** ——
-体量小（官方 TS SDK 仓库 33 stars）、资金先冻结 7–12 天、提现最低 50 USD/EUR、
-支付宝收款**每年 30–60 万 CNY 上限**（¥139/年 → 约 2100–4300 单/年，早期足够，
-规模化会撞墙）、以及 **是否支持 CNY 计价未核实**（可能得用 USD 定价）。
+> **建议在写任何 adapter 之前，先用中国身份真实注册一次 Paddle 卖家账号，
+> 走到 Account Verification 那一步。**
+> 一封验证的成本，远低于按 Paddle 写完抽象层才发现开不了户。
+
+若被拒，则诚实的结论是：**「无海外实体 + 无中国大陆执照」要同时做到
+「中国用户用支付宝付 + 自动续费」，目前没有完全干净的方案** ——
+最接近的是 Creem（个人 KYC 可开户，但**买家侧无支付宝/微信**，转化会差），
+或办一张个体工商户执照。
+
+### 另外两家出局（复核过原文）
+
+- **Lemon Squeezy 三重出局**：① 卖家支持国家列表**无 China**（有 Taiwan/HK/Macao）；
+  ② 官方原文 "**For subscription products we only support cards, Apple Pay,
+  Google Pay and PayPal at this time.**" → **订阅用不了支付宝/微信**；
+  ③ Node SDK 停在 2024-11，§3.1 不过。
+- **PayPal 打款成本吃光利润**：中国大陆电汇提款 **35.00 USD/笔**，
+  而收款费率 **4.40% + 固定费**。对 ¥139 × 早期单量，$35/笔几乎吃光利润。
+
+> 长尾（Gumroad / Buy Me a Coffee / Payhip / Ko-fi）**无一家优于 Paddle**：
+> 打款国清单收录港澳台却**独缺中国大陆**，且 BMAC 官方明说自己
+> "does not handle the collection and remittance of sales tax or VAT" —— **不是 MoR**。
 
 ## 2. 🔴 三条走不通的路（先钉住，省得浪费工程时间）
 
