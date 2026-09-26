@@ -39,6 +39,11 @@
 import { useState } from 'react';
 import { AlertTriangle, Clock, Cloud, HardDrive, X } from 'lucide-react';
 
+import { useI18n, type I18nValue } from '@heyta/i18n';
+
+import { LIST_SEPARATOR } from './locale-punctuation.js';
+import { retentionMessageKey } from './disclosure-copy.js';
+
 import {
   renderPreferenceHints,
   type PreferenceSet,
@@ -69,6 +74,7 @@ import {
   type DurationHistoryRow,
   type DurationProposal,
 } from '@heyta/app-host';
+import { durationFailureCopy, type AiFailureCopy } from './ai-failure-copy.js';
 import type { Task } from '@heyta/domain';
 
 /**
@@ -114,13 +120,13 @@ export function resolveDurationTarget(
 }
 
 /** 分钟数 → 人话（90 → 「1 小时 30 分钟」）。 */
-function humanizeMinutes(minutes: number): string {
-  if (minutes < 60) return `${String(minutes)} 分钟`;
+function humanizeMinutes(minutes: number, t: I18nValue['t']): string {
+  if (minutes < 60) return t('web.ai.duration.minutes', { minutes });
   const hours = Math.floor(minutes / 60);
   const rest = minutes % 60;
   return rest === 0
-    ? `${String(hours)} 小时`
-    : `${String(hours)} 小时 ${String(rest)} 分钟`;
+    ? t('web.ai.duration.hours', { hours })
+    : t('web.ai.duration.hoursMinutes', { hours, minutes: rest });
 }
 
 type Phase = 'idle' | 'disclosing' | 'loading' | 'proposal' | 'failed';
@@ -170,10 +176,11 @@ export interface AiDurationProps {
 
 export function AiDuration(props: AiDurationProps): React.JSX.Element {
   const { task, history, routing, consents, secrets, onApply, onHealth, preferenceSet } = props;
+  const { t, locale } = useI18n();
 
   const [phase, setPhase] = useState<Phase>('idle');
   const [proposal, setProposal] = useState<DurationProposal | undefined>(undefined);
-  const [failure, setFailure] = useState<string>('');
+  const [failure, setFailure] = useState<AiFailureCopy | null>(null);
   const [applied, setApplied] = useState(false);
   /** 手动兜底输入（AI 不可用时的退路，见失败态）。 */
   const [manualText, setManualText] = useState('');
@@ -235,7 +242,7 @@ export function AiDuration(props: AiDurationProps): React.JSX.Element {
       setPhase('proposal');
       return;
     }
-    setFailure(outcome.message);
+    setFailure(durationFailureCopy(outcome.reason, outcome.message, outcome.cause));
     setPhase('failed');
   }
 
@@ -264,7 +271,7 @@ export function AiDuration(props: AiDurationProps): React.JSX.Element {
   function reset(): void {
     setPhase('idle');
     setProposal(undefined);
-    setFailure('');
+    setFailure(null);
     setManualText('');
   }
 
@@ -279,7 +286,7 @@ export function AiDuration(props: AiDurationProps): React.JSX.Element {
     if (!hasHistory && !hasHints) {
       return (
         <p className="ht-ai__note" data-testid="duration-basis-none">
-          这次没有可用的历史数据，只有模型自己的通用判断 —— 它可能不准。
+          {t('web.ai.duration.basis.none')}
         </p>
       );
     }
@@ -287,10 +294,14 @@ export function AiDuration(props: AiDurationProps): React.JSX.Element {
       <div className="ht-ai__note" data-testid="duration-basis">
         {hasHistory && (
           <p className="ht-ai__row" data-testid="duration-basis-history">
-            基于你过去 <strong>{usableHistory.length}</strong> 次的实际/计划比值
+            {t('web.ai.duration.basis.historyLead')} <strong>{usableHistory.length}</strong>{' '}
+            {t('web.ai.duration.basis.historyMid')}
             {totalHistory > usableHistory.length && (
               <>
-                （你共有 {totalHistory} 次记录，为控制出境只发送最近 {MAX_HISTORY_ROWS} 次）
+                {t('web.ai.duration.basis.historyOverflow', {
+                  total: totalHistory,
+                  max: MAX_HISTORY_ROWS,
+                })}
               </>
             )}
           </p>
@@ -316,18 +327,18 @@ export function AiDuration(props: AiDurationProps): React.JSX.Element {
           type="button"
           className="ht-btn ht-btn--ghost"
           data-testid={`duration-run-${task.id}`}
-          aria-label={`用 AI 估计耗时：${task.title}`}
+          aria-label={t('web.ai.duration.runAria', { title: task.title })}
           onClick={() => {
             setApplied(false);
             setPhase('disclosing');
           }}
         >
           <Clock size={12} aria-hidden="true" />
-          AI 估时
+          {t('web.ai.duration.button')}
         </button>
         {applied && (
           <span className="ht-ai__done" data-testid={`duration-applied-${task.id}`}>
-            已写入耗时
+            {t('web.ai.duration.applied')}
           </span>
         )}
       </span>
@@ -340,12 +351,12 @@ export function AiDuration(props: AiDurationProps): React.JSX.Element {
       <div
         className="ht-ai__panel"
         role="dialog"
-        aria-label="AI 估时 —— 发送前确认"
+        aria-label={t('web.ai.duration.disclosureAria')}
         data-testid="duration-disclosure"
       >
         <div className="ht-ai__head">
-          <span>发送前确认</span>
-          <button type="button" className="ht-btn ht-btn--ghost" aria-label="取消" onClick={reset}>
+          <span>{t('web.ai.disclosure.heading')}</span>
+          <button type="button" className="ht-btn ht-btn--ghost" aria-label={t('web.ai.action.cancel')} onClick={reset}>
             <X size={12} aria-hidden="true" />
           </button>
         </div>
@@ -353,7 +364,7 @@ export function AiDuration(props: AiDurationProps): React.JSX.Element {
         {target === undefined ? (
           <p className="ht-ai__warn" data-testid="duration-no-target">
             <AlertTriangle size={12} aria-hidden="true" />
-            还没有给「耗时估计」配置端点。去「设置」里添加端点并指定路由。
+            {t('web.ai.noTarget.duration')}
           </p>
         ) : (
           <>
@@ -363,11 +374,11 @@ export function AiDuration(props: AiDurationProps): React.JSX.Element {
               ) : (
                 <Cloud size={12} aria-hidden="true" />
               )}
-              将发往：<strong>{target.label}</strong>
+              {t('web.ai.disclosure.destinationLead')}<strong>{target.label}</strong>
               <code>{target.endpoint}</code>
-              <span>模型 {target.model}</span>
+              <span>{t('web.ai.disclosure.model', { model: target.model })}</span>
               <span className="ht-ai__tag" data-testid="duration-destination-kind">
-                {target.isLocal ? '数据不出设备' : '数据会离开设备'}
+                {target.isLocal ? t('web.ai.disclosure.local') : t('web.ai.disclosure.remote')}
               </span>
             </p>
 
@@ -375,23 +386,23 @@ export function AiDuration(props: AiDurationProps): React.JSX.Element {
             {target.fallbacks.length > 0 && (
               <p className="ht-ai__row ht-ai__row--warn" data-testid="duration-fallbacks">
                 <AlertTriangle size={12} aria-hidden="true" />
-                如果它失败，会接着依次尝试：
-                <strong data-testid="duration-fallback-list">{target.fallbacks.join('、')}</strong>
+                {t('web.ai.disclosure.fallbackLead')}
+                <strong data-testid="duration-fallback-list">{target.fallbacks.join(LIST_SEPARATOR[locale])}</strong>
               </p>
             )}
 
             {/* 🔴 「留多久」是披露的三维之一（发给谁 / 发什么 / 留多久）。 */}
             {disclosure !== undefined && (
               <p className="ht-ai__row" data-testid="duration-retention">
-                保留：<strong data-testid="duration-retention-text">
-                  {disclosure.retentionText ?? '未定案 —— 在 heyta 说明清楚之前，这个端点不允许启用。'}
+                {t('web.ai.disclosure.retentionLead')}<strong data-testid="duration-retention-text">
+                  {t(retentionMessageKey(disclosure.retentionDisclosure.kind))}
                 </strong>
               </p>
             )}
 
             <p className="ht-ai__row" data-testid="duration-fields">
-              将发送这些字段：
-              <strong data-testid="duration-field-list">{invocation.fields.join('、')}</strong>
+              {t('web.ai.disclosure.fieldsLead')}
+              <strong data-testid="duration-field-list">{invocation.fields.join(LIST_SEPARATOR[locale])}</strong>
             </p>
 
             {/* 🔴 依据必须在**发送前**就能看到：用户据此决定要不要发。 */}
@@ -400,7 +411,7 @@ export function AiDuration(props: AiDurationProps): React.JSX.Element {
             {!target.isLocal && (
               <p className="ht-ai__warn" data-testid="duration-e2ee-warning">
                 <AlertTriangle size={12} aria-hidden="true" />
-                这台设备上的任务内容是端到端加密的，而发出去的这一份<strong>不受端到端加密保护</strong>。
+                {t('web.ai.disclosure.e2eeLead')}<strong>{t('web.ai.disclosure.e2eeStrong')}</strong>
               </p>
             )}
 
@@ -411,10 +422,10 @@ export function AiDuration(props: AiDurationProps): React.JSX.Element {
                 data-testid="duration-send"
                 onClick={() => void send()}
               >
-                发送
+                {t('web.ai.action.send')}
               </button>
               <button type="button" className="ht-btn ht-btn--ghost" onClick={reset}>
-                取消
+                {t('web.ai.action.cancel')}
               </button>
             </div>
           </>
@@ -426,7 +437,7 @@ export function AiDuration(props: AiDurationProps): React.JSX.Element {
   if (phase === 'loading') {
     return (
       <div className="ht-ai__panel" data-testid="duration-loading">
-        <span>正在等待端点返回…</span>
+        <span>{t('web.ai.loading.waiting')}</span>
       </div>
     );
   }
@@ -437,16 +448,16 @@ export function AiDuration(props: AiDurationProps): React.JSX.Element {
       <div
         className="ht-ai__panel"
         role="dialog"
-        aria-label="AI 估时结果"
+        aria-label={t('web.ai.duration.proposalAria')}
         data-testid="duration-proposal"
       >
         <div className="ht-ai__head">
           <span>
-            估计需要 <strong data-testid="duration-proposal-minutes">{proposal.minutes}</strong> 分钟
-            （{humanizeMinutes(proposal.minutes)}）
+            {t('web.ai.duration.proposalLead')} <strong data-testid="duration-proposal-minutes">{proposal.minutes}</strong>{' '}
+            {t('web.ai.duration.proposalRest', { humanized: humanizeMinutes(proposal.minutes, t) })}
           </span>
           <span className="ht-ai__tag" data-testid="duration-proposal-source">
-            {proposal.destination === 'none' ? '来自本机' : '来自云端'}
+            {proposal.destination === 'none' ? t('web.ai.source.local') : t('web.ai.source.remote')}
           </span>
         </div>
 
@@ -454,15 +465,18 @@ export function AiDuration(props: AiDurationProps): React.JSX.Element {
         {proposal.clamped && (
           <p className="ht-ai__warn" data-testid="duration-clamped">
             <AlertTriangle size={12} aria-hidden="true" />
-            模型给的数超出了 {MIN_DURATION_MINUTES}–{MAX_DURATION_MINUTES} 分钟的范围，已经夹到
-            {proposal.minutes} 分钟。
+            {t('web.ai.duration.clamped', {
+              min: MIN_DURATION_MINUTES,
+              max: MAX_DURATION_MINUTES,
+              minutes: proposal.minutes,
+            })}
           </p>
         )}
 
         <div data-testid="duration-proposal-basis">{renderBasis()}</div>
 
         <p className="ht-ai__note">
-          确认后会把这个分钟数写进这条任务的耗时。已写入的耗时可以随时改。
+          {t('web.ai.duration.note')}
         </p>
 
         <div className="ht-ai__actions">
@@ -472,7 +486,7 @@ export function AiDuration(props: AiDurationProps): React.JSX.Element {
             data-testid="duration-apply"
             onClick={() => void apply()}
           >
-            用这个数
+            {t('web.ai.duration.apply')}
           </button>
           <button
             type="button"
@@ -480,7 +494,7 @@ export function AiDuration(props: AiDurationProps): React.JSX.Element {
             data-testid="duration-reject"
             onClick={reset}
           >
-            不要了
+            {t('web.ai.action.discard')}
           </button>
         </div>
       </div>
@@ -489,18 +503,28 @@ export function AiDuration(props: AiDurationProps): React.JSX.Element {
 
   // ── 失败：给出**具体原因**，并提供不依赖 AI 的退路 ─────────────────────
   return (
-    <div className="ht-ai__panel" role="dialog" aria-label="AI 估时失败" data-testid="duration-failed">
+    <div className="ht-ai__panel" role="dialog" aria-label={t('web.ai.duration.failedAria')} data-testid="duration-failed">
       <div className="ht-ai__head">
-        <span>没能估时</span>
-        <button type="button" className="ht-btn ht-btn--ghost" aria-label="关闭" onClick={reset}>
+        <span>{t('web.ai.duration.failedHead')}</span>
+        <button type="button" className="ht-btn ht-btn--ghost" aria-label={t('web.ai.action.close')} onClick={reset}>
           <X size={12} aria-hidden="true" />
         </button>
       </div>
-      <p data-testid="duration-failure-message">{failure}</p>
+      <p data-testid="duration-failure-message">
+        {failure === null ? '' : t(failure.key)}
+      </p>
+      {/* 技术详情：包 / 端点返回的原文。分类与 ErrorScreen 的 <details> 相同 ——
+          那是诊断**数据**，不是文案（见 ai-failure-copy.ts 的 `showDetail`）。 */}
+      {failure !== null && failure.showDetail && failure.detail !== '' && (
+        <details data-testid="duration-failure-message-detail">
+          <summary>{t('web.ai.failure.details')}</summary>
+          <p>{failure.detail}</p>
+        </details>
+      )}
 
       {/* 🔴 手动兜底 —— **不是 AI 生成物**，用户自己填、自己按。 */}
       <p className="ht-ai__row" data-testid="duration-manual">
-        自己填一个：
+        {t('web.ai.duration.manualLead')}
         <input
           type="number"
           min={MIN_DURATION_MINUTES}
@@ -509,10 +533,10 @@ export function AiDuration(props: AiDurationProps): React.JSX.Element {
           onChange={(e) => {
             setManualText(e.target.value);
           }}
-          aria-label="手动输入耗时（分钟）"
+          aria-label={t('web.ai.duration.manualAria')}
           data-testid="duration-manual-input"
         />
-        分钟
+        {t('web.ai.duration.manualUnit')}
         <button
           type="button"
           className="ht-btn"
@@ -520,7 +544,7 @@ export function AiDuration(props: AiDurationProps): React.JSX.Element {
           disabled={!manualOk}
           onClick={() => void applyManual()}
         >
-          用这个数
+          {t('web.ai.duration.apply')}
         </button>
       </p>
 
@@ -531,7 +555,7 @@ export function AiDuration(props: AiDurationProps): React.JSX.Element {
           data-testid="duration-retry"
           onClick={() => setPhase('disclosing')}
         >
-          再试一次
+          {t('web.ai.duration.retry')}
         </button>
         <button
           type="button"
@@ -539,7 +563,7 @@ export function AiDuration(props: AiDurationProps): React.JSX.Element {
           data-testid="duration-close"
           onClick={reset}
         >
-          关闭
+          {t('web.ai.action.close')}
         </button>
       </div>
     </div>
