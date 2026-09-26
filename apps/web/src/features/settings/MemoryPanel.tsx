@@ -36,15 +36,23 @@ import { EyeOff, RotateCcw, Sparkles, X } from 'lucide-react';
 import {
   describeSuppressed,
   preferenceLabel,
+  suppressedPreferenceIds,
   type FeedbackPreferenceSet,
   type Preference,
   type PreferenceSet,
 } from '@heyta/domain';
 
-/** 一条纠正记录（界面需要 id 才能撤销）。 */
+/**
+ * 一条纠正记录（界面需要 id 才能撤销）。
+ *
+ * ⚠️ `deletedAt` 必须带上 —— 见下面 `suppressedPreferenceIds` 的用法。
+ */
 export interface CorrectionEntry {
   readonly id: string;
   readonly preferenceId: string;
+  readonly kind: 'suppress';
+  /** 墓碑：撤销过的纠正。**存在即表示这条纠正已经不算数了。** */
+  readonly deletedAt?: number;
 }
 
 export interface MemoryPanelProps {
@@ -125,10 +133,27 @@ export function MemoryPanel(props: MemoryPanelProps): React.JSX.Element {
   push('feedback-keep-ratio', feedbackSet.keepRatio);
 
   const withheld = [...preferenceSet.withheld, ...feedbackSet.withheld];
-  const suppressedSet = new Set(corrections.map((c) => c.preferenceId));
+
+  /**
+   * 🔴 抑制集合**必须用领域层那个函数算**，不要在这里自己 `map`。
+   *
+   * 我第一版就是自己写的 `new Set(corrections.map(c => c.preferenceId))` ——
+   * 那会把**墓碑记录**也算成"正在抑制"。而 `applyPreferenceCorrections`
+   * （App 里真正把偏好置空的那一步）用的是 `suppressedPreferenceIds()`，
+   * 它会跳过墓碑。
+   *
+   * 两套规则 ⇒ 两套结论，后果很具体：**点了「恢复」之后，偏好回到了
+   * 「我了解到的你」，却同时还挂在「你已忘记」里** —— 界面上自相矛盾，
+   * 而且用户再也删不掉它（他以为已经恢复，实际两边都在）。
+   *
+   * 真实用户旅程测试抓到了它。单测抓不到，因为单测喂进来的 `corrections`
+   * 本来就是干净的、不含墓碑。
+   */
+  const suppressedSet = suppressedPreferenceIds(corrections);
   const forgotten = describeSuppressed(rawPresentIds, suppressedSet);
+  /** 只在**未墓碑**的纠正里找 —— 撤销过的不能再被撤销第二次。 */
   const correctionIdOf = (preferenceId: string): string | undefined =>
-    corrections.find((c) => c.preferenceId === preferenceId)?.id;
+    corrections.find((c) => c.preferenceId === preferenceId && c.deletedAt === undefined)?.id;
 
   return (
     <div className="ht-settings__section" data-testid="memory-panel">
