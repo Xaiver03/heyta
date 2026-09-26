@@ -9,6 +9,7 @@
  */
 
 import { useEffect, useMemo, useState } from 'react';
+import { useShallow } from 'zustand/react/shallow';
 import { CalendarDays, Check, CircleDot, Inbox, Moon, Sun, Timer, Trash2, type LucideIcon, Settings } from 'lucide-react';
 
 import {
@@ -104,8 +105,22 @@ export function App(): React.JSX.Element {
   const [theme, setTheme] = useState<Theme>(resolveInitialTheme);
   const store = useTaskStore();
   const projects = useProjectStore();
-  const visible = useTaskStore(selectVisibleTasks);
-  const counts = useTaskStore(selectQuadrantCounts);
+  /**
+   * 🔴 `useShallow` 不是优化，**是必需的**。
+   *
+   * zustand v5 底层是 `useSyncExternalStore`，它要求 selector 的结果
+   * **引用稳定**：同一个 state 连续调两次必须返回同一个值。
+   * 而 `selectVisibleTasks` 返回 `alive.filter(...)`（新数组）、
+   * `selectQuadrantCounts` 返回新对象 —— 每次都是新引用。
+   *
+   * 后果不是"多渲染几次"，而是 **React 判定快照一直在变、无限重渲染**，
+   * 直接抛 `Maximum update depth exceeded`：**整个 `<App />` 挂不起来。**
+   *
+   * 这个 bug 藏了很久，因为**从来没有任何测试挂载过整个 App** ——
+   * 直到真实用户旅程测试第一次去挂它。典型的"每一段都绿、接起来断"。
+   */
+  const visible = useTaskStore(useShallow(selectVisibleTasks));
+  const counts = useTaskStore(useShallow(selectQuadrantCounts));
   const [view, setView] = useState<ViewKey>('tasks');
   const [aiSettings, setAiSettings] = useState(loadAiSettings);
   // 🔴 密钥只在内存里，只活在这个标签页（Web 没有系统钥匙串）
