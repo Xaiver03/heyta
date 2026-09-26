@@ -36,6 +36,12 @@
 import { useState } from 'react';
 import { AlertTriangle, Cloud, HardDrive, Sparkles, X } from 'lucide-react';
 
+import { breakdownFailureCopy, type AiFailureCopy } from './ai-failure-copy.js';
+import { useI18n } from '@heyta/i18n';
+
+import { LIST_SEPARATOR } from './locale-punctuation.js';
+import { retentionMessageKey } from './disclosure-copy.js';
+
 import {
   renderPreferenceHints,
   type AiFeedbackOutcome,
@@ -194,6 +200,7 @@ export interface AiBreakdownProps {
 export function AiBreakdown(props: AiBreakdownProps): React.JSX.Element {
   const { task, routing, consents, secrets, onApplyNote, onHealth, preferenceSet, onFeedback } =
     props;
+  const { t, locale } = useI18n();
 
   const [phase, setPhase] = useState<Phase>('idle');
   const [proposal, setProposal] = useState<BreakdownProposal | undefined>(undefined);
@@ -205,7 +212,7 @@ export function AiBreakdown(props: AiBreakdownProps): React.JSX.Element {
    * P7「保留率」恒为 1 —— 那条偏好会变成一句废话。
    */
   const [selected, setSelected] = useState<readonly boolean[]>([]);
-  const [failure, setFailure] = useState<string>('');
+  const [failure, setFailure] = useState<AiFailureCopy | null>(null);
   const [applied, setApplied] = useState(false);
 
   const target = resolvePreferredTarget(routing);
@@ -270,7 +277,7 @@ export function AiBreakdown(props: AiBreakdownProps): React.JSX.Element {
       setPhase('proposal');
       return;
     }
-    setFailure(outcome.message);
+    setFailure(breakdownFailureCopy(outcome.reason, outcome.message, outcome.cause));
     setPhase('failed');
   }
 
@@ -320,7 +327,7 @@ export function AiBreakdown(props: AiBreakdownProps): React.JSX.Element {
     setPhase('idle');
     setProposal(undefined);
     setSelected([]);
-    setFailure('');
+    setFailure(null);
     setApplied(false);
   }
 
@@ -332,18 +339,18 @@ export function AiBreakdown(props: AiBreakdownProps): React.JSX.Element {
           type="button"
           className="ht-btn ht-btn--ghost"
           data-testid={`ai-breakdown-${task.id}`}
-          aria-label={`用 AI 拆解：${task.title}`}
+          aria-label={t('web.ai.breakdown.runAria', { title: task.title })}
           onClick={() => {
             setApplied(false);
             setPhase('disclosing');
           }}
         >
           <Sparkles size={12} aria-hidden="true" />
-          AI 拆解
+          {t('web.ai.breakdown.button')}
         </button>
         {applied && (
           <span className="ht-ai__done" data-testid={`ai-applied-${task.id}`}>
-            已写入备注
+            {t('web.ai.breakdown.applied')}
           </span>
         )}
       </span>
@@ -353,10 +360,10 @@ export function AiBreakdown(props: AiBreakdownProps): React.JSX.Element {
   // ── 🔴 披露：只算，不发 ───────────────────────────────────────────────
   if (phase === 'disclosing') {
     return (
-      <div className="ht-ai__panel" role="dialog" aria-label="AI 拆解 —— 发送前确认" data-testid="ai-disclosure">
+      <div className="ht-ai__panel" role="dialog" aria-label={t('web.ai.breakdown.disclosureAria')} data-testid="ai-disclosure">
         <div className="ht-ai__head">
-          <span>发送前确认</span>
-          <button type="button" className="ht-btn ht-btn--ghost" aria-label="取消" onClick={reset}>
+          <span>{t('web.ai.disclosure.heading')}</span>
+          <button type="button" className="ht-btn ht-btn--ghost" aria-label={t('web.ai.action.cancel')} onClick={reset}>
             <X size={12} aria-hidden="true" />
           </button>
         </div>
@@ -364,7 +371,7 @@ export function AiBreakdown(props: AiBreakdownProps): React.JSX.Element {
         {target === undefined ? (
           <p className="ht-ai__warn" data-testid="ai-no-target">
             <AlertTriangle size={12} aria-hidden="true" />
-            还没有给「拆解任务」配置端点。去「设置」里添加端点并指定路由。
+            {t('web.ai.noTarget.breakdown')}
           </p>
         ) : (
           <>
@@ -374,11 +381,11 @@ export function AiBreakdown(props: AiBreakdownProps): React.JSX.Element {
               ) : (
                 <Cloud size={12} aria-hidden="true" />
               )}
-              将发往：<strong>{target.label}</strong>
+              {t('web.ai.disclosure.destinationLead')}<strong>{target.label}</strong>
               <code>{target.endpoint}</code>
-              <span>模型 {target.model}</span>
+              <span>{t('web.ai.disclosure.model', { model: target.model })}</span>
               <span className="ht-ai__tag" data-testid="ai-destination-kind">
-                {target.isLocal ? '数据不出设备' : '数据会离开设备'}
+                {target.isLocal ? t('web.ai.disclosure.local') : t('web.ai.disclosure.remote')}
               </span>
             </p>
 
@@ -388,8 +395,8 @@ export function AiBreakdown(props: AiBreakdownProps): React.JSX.Element {
             {target.fallbacks.length > 0 && (
               <p className="ht-ai__row ht-ai__row--warn" data-testid="ai-fallbacks">
                 <AlertTriangle size={12} aria-hidden="true" />
-                如果它失败，会接着依次尝试：
-                <strong data-testid="ai-fallback-list">{target.fallbacks.join('、')}</strong>
+                {t('web.ai.disclosure.fallbackLead')}
+                <strong data-testid="ai-fallback-list">{target.fallbacks.join(LIST_SEPARATOR[locale])}</strong>
               </p>
             )}
 
@@ -398,30 +405,30 @@ export function AiBreakdown(props: AiBreakdownProps): React.JSX.Element {
                 而 UI 用的是自己手写的那一套。 */}
             {disclosure !== undefined && (
               <p className="ht-ai__row" data-testid="ai-retention">
-                保留：<strong data-testid="ai-retention-text">
-                  {disclosure.retentionText ?? '未定案 —— 在 heyta 说明清楚之前，这个端点不允许启用。'}
+                {t('web.ai.disclosure.retentionLead')}<strong data-testid="ai-retention-text">
+                  {t(retentionMessageKey(disclosure.retentionDisclosure.kind))}
                 </strong>
               </p>
             )}
 
             <p className="ht-ai__row" data-testid="ai-fields">
-              将发送这些字段：
-              <strong data-testid="ai-field-list">{invocation.fields.join('、')}</strong>
+              {t('web.ai.disclosure.fieldsLead')}
+              <strong data-testid="ai-field-list">{invocation.fields.join(LIST_SEPARATOR[locale])}</strong>
             </p>
 
             {!target.isLocal && (
               <p className="ht-ai__warn" data-testid="ai-e2ee-warning">
                 <AlertTriangle size={12} aria-hidden="true" />
-                这台设备上的任务内容是端到端加密的，而发出去的这一份<strong>不受端到端加密保护</strong>。
+                {t('web.ai.disclosure.e2eeLead')}<strong>{t('web.ai.disclosure.e2eeStrong')}</strong>
               </p>
             )}
 
             <div className="ht-ai__actions">
               <button type="button" className="ht-btn" data-testid="ai-send" onClick={() => void send()}>
-                发送
+                {t('web.ai.action.send')}
               </button>
               <button type="button" className="ht-btn ht-btn--ghost" onClick={reset}>
-                取消
+                {t('web.ai.action.cancel')}
               </button>
             </div>
           </>
@@ -433,7 +440,7 @@ export function AiBreakdown(props: AiBreakdownProps): React.JSX.Element {
   if (phase === 'loading') {
     return (
       <div className="ht-ai__panel" data-testid="ai-loading">
-        <span>正在等待端点返回…</span>
+        <span>{t('web.ai.loading.waiting')}</span>
       </div>
     );
   }
@@ -441,18 +448,18 @@ export function AiBreakdown(props: AiBreakdownProps): React.JSX.Element {
   // ── 🔴 提议：AI 的输出不会自己写进去 ──────────────────────────────────
   if (phase === 'proposal' && proposal !== undefined) {
     return (
-      <div className="ht-ai__panel" role="dialog" aria-label="AI 拆解结果" data-testid="ai-proposal">
+      <div className="ht-ai__panel" role="dialog" aria-label={t('web.ai.breakdown.proposalAria')} data-testid="ai-proposal">
         <div className="ht-ai__head">
-          <span>拆解结果（{proposal.items.length} 项）</span>
+          <span>{t('web.ai.breakdown.proposalHead', { count: proposal.items.length })}</span>
           <span className="ht-ai__tag" data-testid="ai-proposal-source">
-            {proposal.destination === 'none' ? '来自本机' : '来自云端'}
+            {proposal.destination === 'none' ? t('web.ai.source.local') : t('web.ai.source.remote')}
           </span>
         </div>
 
         {proposal.truncated && (
           <p className="ht-ai__warn" data-testid="ai-truncated">
             <AlertTriangle size={12} aria-hidden="true" />
-            结果太多，只保留了前 {proposal.items.length} 项。
+            {t('web.ai.breakdown.truncated', { count: proposal.items.length })}
           </p>
         )}
 
@@ -480,8 +487,9 @@ export function AiBreakdown(props: AiBreakdownProps): React.JSX.Element {
         </ul>
 
         <p className="ht-ai__note">
-          确认后会作为 <strong>Markdown 清单追加</strong>到这条任务的备注里，原来的备注不会被动。
-          已选 <strong data-testid="ai-kept-count">{keptItems().length}</strong> / {proposal.items.length} 项。
+          {t('web.ai.breakdown.noteLead')} <strong>{t('web.ai.breakdown.noteStrong')}</strong>
+          {t('web.ai.breakdown.noteMid')} <strong data-testid="ai-kept-count">{keptItems().length}</strong>{' '}
+          {t('web.ai.breakdown.noteCount', { count: proposal.items.length })}
         </p>
 
         <div className="ht-ai__actions">
@@ -492,10 +500,10 @@ export function AiBreakdown(props: AiBreakdownProps): React.JSX.Element {
             disabled={keptItems().length === 0}
             onClick={() => void apply()}
           >
-            写入备注
+            {t('web.ai.breakdown.apply')}
           </button>
           <button type="button" className="ht-btn ht-btn--ghost" onClick={reject}>
-            不要了
+            {t('web.ai.action.discard')}
           </button>
         </div>
       </div>
@@ -504,14 +512,24 @@ export function AiBreakdown(props: AiBreakdownProps): React.JSX.Element {
 
   // ── 失败：给出**具体原因**，并提供不依赖 AI 的退路 ─────────────────────
   return (
-    <div className="ht-ai__panel" role="dialog" aria-label="AI 拆解失败" data-testid="ai-failed">
+    <div className="ht-ai__panel" role="dialog" aria-label={t('web.ai.breakdown.failedAria')} data-testid="ai-failed">
       <div className="ht-ai__head">
-        <span>没能拆解</span>
-        <button type="button" className="ht-btn ht-btn--ghost" aria-label="关闭" onClick={reset}>
+        <span>{t('web.ai.breakdown.failedHead')}</span>
+        <button type="button" className="ht-btn ht-btn--ghost" aria-label={t('web.ai.action.close')} onClick={reset}>
           <X size={12} aria-hidden="true" />
         </button>
       </div>
-      <p data-testid="ai-failure-message">{failure}</p>
+      <p data-testid="ai-failure-message">
+        {failure === null ? '' : t(failure.key)}
+      </p>
+      {/* 技术详情：包 / 端点返回的原文。分类与 ErrorScreen 的 <details> 相同 ——
+          那是诊断**数据**，不是文案（见 ai-failure-copy.ts 的 `showDetail`）。 */}
+      {failure !== null && failure.showDetail && failure.detail !== '' && (
+        <details data-testid="ai-failure-message-detail">
+          <summary>{t('web.ai.failure.details')}</summary>
+          <p>{failure.detail}</p>
+        </details>
+      )}
       <div className="ht-ai__actions">
         <button
           type="button"
@@ -522,10 +540,10 @@ export function AiBreakdown(props: AiBreakdownProps): React.JSX.Element {
             reset();
           }}
         >
-          手动写一份空清单
+          {t('web.ai.breakdown.manual')}
         </button>
         <button type="button" className="ht-btn ht-btn--ghost" onClick={reset}>
-          关闭
+          {t('web.ai.action.close')}
         </button>
       </div>
     </div>

@@ -31,8 +31,12 @@ import type { CSSProperties } from 'react';
  * 把语义文字样式展开成 `CSSProperties`。
  *
  * ```tsx
- * <h2 style={{ ...text('section-title'), color: cssVar('color.foreground') }}>里程碑</h2>
+ * <h2 style={{ ...text('section-title'), color: cssVar('color.foreground') }} />
  * ```
+ *
+ * ⚠️ 上面写成自闭合标签是**故意的**：文案门禁会把 `>…<` 之间的东西当成
+ * JSX 文本节点（它按源码扫描，看不出这是注释）—— 在示例里塞一句中文，
+ * 门禁就会报一处不存在的硬编码文案。
  *
  * `line-height` 与 `letter-spacing` 直接吃 token 值：
  * tokens.css 里前者是**无单位倍数**（`1.5`），后者是 **em 比例**（`-0.022em`）——

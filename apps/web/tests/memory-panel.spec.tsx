@@ -18,25 +18,40 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-import type { FeedbackPreferenceSet, Preference, PreferenceSet } from '@heyta/domain';
+import {
+  preferenceEvidenceText,
+  type FeedbackPreferenceSet,
+  type Preference,
+  type PreferenceEvidence,
+  type PreferenceSet,
+} from '@heyta/domain';
 
 const { MemoryPanel } = await import('../src/features/settings/MemoryPanel.js');
 
-const pref = <T,>(id: Preference<T>['id'], value: T, evidence: string): Preference<T> => ({
+/**
+ * 造一条偏好。
+ *
+ * ⚠️ 第 14 轮起 `Preference` 多了一个**必需**的 `evidenceFacts`（结构化事实）——
+ * 壳按它取自己的词条，不再渲染 `evidence`（那是领域层拼好的中文）。
+ * 这里刻意**由事实投影出 `evidence`**，而不是手写一句：fixture 也就跟着
+ * 变成真的了（手写的那句"依据"其实和真实句子的形状不一样）。
+ */
+const pref = <T,>(id: Preference<T>['id'], value: T, facts: PreferenceEvidence): Preference<T> => ({
   id,
   value,
   sampleSize: 20,
   confidence: 0.9,
-  evidence,
+  evidenceFacts: facts,
+  evidence: preferenceEvidenceText(facts),
 });
 
 function prefs(over: Partial<PreferenceSet> = {}): PreferenceSet {
   return {
     memoryEnabled: true,
-    estimateBias: pref('estimate-bias', 1.8, '基于 30 次专注，你倾向低估任务耗时'),
+    estimateBias: pref('estimate-bias', 1.8, { kind: 'estimate-bias', multiplier: 1.8, samples: 30 }),
     deepWorkWindow: null,
     leadTime: null,
-    granularity: pref('granularity', 6, '你的 12 条带清单任务，中位数是 6 项'),
+    granularity: pref('granularity', 6, { kind: 'granularity', items: 6, samples: 12 }),
     titleStyle: null,
     withheld: [],
     ...over,
@@ -119,7 +134,13 @@ describe('记忆面板：能看见', () => {
 
   it('反馈层的偏好也能显示', () => {
     const el = render({
-      feedbackSet: feedback({ keepRatio: pref('feedback-keep-ratio', 0.4, '你通常留下约 40%') }),
+      feedbackSet: feedback({
+        keepRatio: pref('feedback-keep-ratio', 0.4, {
+          kind: 'feedback-keep-ratio',
+          ratio: 0.4,
+          adopted: 5,
+        }),
+      }),
       rawPresentIds: ['feedback-keep-ratio'],
     });
     expect(el.querySelector('[data-testid="memory-pref-feedback-keep-ratio"]')).not.toBeNull();
@@ -148,7 +169,7 @@ describe('记忆面板：还不了解要如实说', () => {
       preferenceSet: prefs({
         deepWorkWindow: null,
         withheld: [
-          { id: 'deep-work-window', reason: 'not-enough-samples', detail: '还需要 5 次专注' },
+          { id: 'deep-work-window', reason: 'not-enough-samples', remaining: 5 },
         ],
       }),
     });
@@ -196,7 +217,9 @@ describe('🔴 记忆面板：墓碑记录不算「已忘记」', () => {
 
   it('已撤销的纠正 → 不再出现在「你已忘记」', () => {
     const el = render({
-      preferenceSet: prefs({ granularity: pref('granularity', 6, '依据') }),
+      preferenceSet: prefs({
+        granularity: pref('granularity', 6, { kind: 'granularity', items: 6, samples: 12 }),
+      }),
       rawPresentIds: ['granularity'],
       corrections: tombstoned,
     });
@@ -208,7 +231,9 @@ describe('🔴 记忆面板：墓碑记录不算「已忘记」', () => {
 
   it('🔴 已撤销的纠正 → 偏好回到「我了解到的你」（不是两边都在）', () => {
     const el = render({
-      preferenceSet: prefs({ granularity: pref('granularity', 6, '依据') }),
+      preferenceSet: prefs({
+        granularity: pref('granularity', 6, { kind: 'granularity', items: 6, samples: 12 }),
+      }),
       rawPresentIds: ['granularity'],
       corrections: tombstoned,
     });

@@ -7,7 +7,7 @@
 
 生成时间：2026-09-26
 
-**总计 896 个包** —— 宽松许可 895，受限 0，无许可证 0，白名单外已登记 1。
+**总计 908 个包** —— 宽松许可 907，受限 0，无许可证 0，白名单外已登记 1。
 
 准入门槛（见 THIRD_PARTY_LICENSES.md）：许可允许闭源商用；且 2021 年后仍在更新。
 
@@ -15,20 +15,6 @@
 
 这些包的许可证**不在白名单里**，也没有被判定为受限 —— 已经人工确认过它们在产品中的角色，
 并在 `research/tools/license-inventory.mjs` 的 `REVIEWED_OTHER` 里登记了**可以接受的理由**：
-
-| 包 | 版本 | 许可证 |
-|---|---|---|
-| `caniuse-lite` | 1.0.30001812 | CC-BY-4.0 |
-
-> `caniuse-lite` 的数据是 **CC-BY-4.0**（署名，非 CC0）。它是 `browserslist` 的
-> 构建期数据包，**不进入运行时产物**。CC-BY-4.0 不在 §3.2 白名单内，
-> 所以它走的是"逐项登记"这条路，而不是并进"全部宽松许可"。
->
-> 🔴 **这一档现在会失败。** 以前脚本对"白名单外"**只打印、不判定**，退出码里完全不含它 ——
-> 也就是**任何不在白名单里的许可都会被静默放行**，而那恰好是白名单想拦的东西。
-> 现在没登记的会直接让门禁红，只有登记过理由的才放行。
-
----
 
 | 包 | 版本 | 许可证 |
 |---|---|---|
@@ -163,6 +149,7 @@
 | `@csstools/css-parser-algorithms` | 4.0.0 | MIT |
 | `@csstools/css-syntax-patches-for-csstree` | 1.1.14 | MIT-0 |
 | `@csstools/css-tokenizer` | 4.0.1 | MIT |
+| `@dimforge/rapier3d-compat` | 0.12.0 | Apache-2.0 |
 | `@dnd-kit/accessibility` | 3.1.1 | MIT |
 | `@dnd-kit/core` | 6.3.1 | MIT |
 | `@dnd-kit/sortable` | 10.0.0 | MIT |
@@ -282,6 +269,7 @@
 | `@tsconfig/node12` | 1.0.11 | MIT |
 | `@tsconfig/node14` | 1.0.3 | MIT |
 | `@tsconfig/node16` | 1.0.4 | MIT |
+| `@tweenjs/tween.js` | 23.1.3 | MIT |
 | `@types/babel__core` | 7.20.5 | MIT |
 | `@types/babel__generator` | 7.27.0 | MIT |
 | `@types/babel__template` | 7.4.4 | MIT |
@@ -303,8 +291,11 @@
 | `@types/react` | 19.3.0 | MIT |
 | `@types/react-dom` | 19.3.0 | MIT |
 | `@types/stack-utils` | 2.0.3 | MIT |
+| `@types/stats.js` | 0.17.4 | MIT |
 | `@types/superagent` | 8.1.11 | MIT |
 | `@types/supertest` | 7.2.1 | MIT |
+| `@types/three` | 0.186.0 | MIT |
+| `@types/webxr` | 0.5.24 | MIT |
 | `@types/ws` | 8.18.1 | MIT |
 | `@types/yargs` | 17.0.35 | MIT |
 | `@types/yargs-parser` | 21.0.3 | MIT |
@@ -510,6 +501,7 @@
 | `fb-dotslash` | 0.5.8 | (MIT OR Apache-2.0) |
 | `fb-watchman` | 2.0.2 | Apache-2.0 |
 | `fdir` | 6.5.0 | MIT |
+| `fflate` | 0.8.3 | MIT |
 | `fill-range` | 7.1.1 | MIT |
 | `finalhandler` | 1.1.2 | MIT |
 | `find-my-way` | 9.9.0 | MIT |
@@ -519,6 +511,7 @@
 | `flow-enums-runtime` | 0.0.6 | MIT |
 | `form-data` | 4.0.6 | MIT |
 | `formidable` | 3.5.4 | MIT |
+| `framer-motion` | 13.4.4 | MIT |
 | `fresh` | 0.5.2 | MIT |
 | `fs-extra` | 8.1.0 | MIT |
 | `fs.realpath` | 1.0.0 | ISC |
@@ -645,6 +638,7 @@
 | `memoize-one` | 5.2.1 | MIT |
 | `merge-stream` | 2.0.0 | MIT |
 | `merge2` | 1.4.1 | MIT |
+| `meshoptimizer` | 1.1.1 | MIT |
 | `methods` | 1.1.2 | MIT |
 | `metro` | 0.83.8 | MIT |
 | `metro-babel-transformer` | 0.83.8 | MIT |
@@ -674,6 +668,9 @@
 | `minipass` | 7.1.3 | BlueOak-1.0.0 |
 | `mkdirp` | 1.0.4 | MIT |
 | `mlly` | 1.8.2 | MIT |
+| `motion` | 13.4.4 | MIT |
+| `motion-dom` | 13.4.4 | MIT |
+| `motion-utils` | 13.3.0 | MIT |
 | `ms` | 2.0.0 | MIT |
 | `ms` | 2.1.3 | MIT |
 | `mz` | 2.7.0 | MIT |
@@ -828,8 +825,8 @@
 | `statuses` | 2.0.2 | MIT |
 | `std-env` | 4.2.0 | MIT |
 | `stream-shift` | 1.0.3 | MIT |
-| `string-width` | 4.2.3 | MIT |
 | `string_decoder` | 1.3.0 | MIT |
+| `string-width` | 4.2.3 | MIT |
 | `strip-ansi` | 5.2.0 | MIT |
 | `strip-ansi` | 6.0.1 | MIT |
 | `strip-final-newline` | 2.0.0 | MIT |
@@ -848,6 +845,7 @@
 | `thenify` | 3.3.1 | MIT |
 | `thenify-all` | 1.6.0 | MIT |
 | `thread-stream` | 4.2.0 | MIT |
+| `three` | 0.186.1 | MIT |
 | `throat` | 5.0.0 | MIT |
 | `tinybench` | 2.9.0 | MIT |
 | `tinybench` | 6.1.4 | MIT |

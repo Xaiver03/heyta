@@ -100,7 +100,7 @@ GitHub 数据均为 🟢 实测（2026-09-26 真实 API 返回）。
 
 | 候选 | 许可证（SPDX） | star | 最后提交 | archived | **依赖 WASM？** | 浏览器 | **RN / Hermes** | 运行时体积 | 常驻服务 |
 |---|---|---|---|---|---|---|---|---|---|
-| **sqlite-vec** | Apache-2.0（GitHub）/ npm 声明 `MIT OR Apache` | 8,137 | 2026-05-18 | 否 | **本身否**；但浏览器端唯一路径是 WASM | ✅（WASM） | ✅ **可原生**（靠 op-sqlite 内置，见 §4.2） | npm 包 4 KB / 5 文件 + 平台 `.dylib`/`.so` | 嵌入式 |
+| **sqlite-vec** | Apache-2.0（GitHub）/ npm 声明 `MIT OR Apache` | 8,137 | 2026-05-18 | 否 | **本身否**（是纯 C 扩展）；但**浏览器端必须自建静态编译的 WASM** | ⚠️ 需自建 WASM（官方 demo 包自述「may change at any time」） | ✅ **可原生**（靠 op-sqlite 内置，见 §4.2） | npm 包 4 KB / 5 文件 + 平台 `.dylib`/`.so` | 嵌入式 |
 | **LanceDB** | Apache-2.0 | 11,533 | 2026-09-26 | 否 | 否（Node 原生） | ❌（npm 包内无浏览器构建） | ❌ 无 RN 路径 | `@lancedb/lancedb` 1.44 MB / 62 文件；`engines.node >= 22` | 嵌入式（但仅 Node） |
 | **ChromaDB** | Apache-2.0 | 29,381 | 2026-09-25 | 否 | 否（Rust 原生绑定 + REST） | ❌ | ❌ | `chromadb` 1.72 MB；原生绑定 `chromadb-js-bindings-*` 仅 darwin/linux/win32 | **客户端 → 需服务**；1.0+ 原生绑定仅桌面 |
 | **Qdrant** | Apache-2.0 | 34,830 | 2026-09-25 | 否 | 否 | 客户端可以 | ❌ 服务端 | `@qdrant/js-client-rest` 947 KB（`engines.node >= 22`） | **必须独立服务** |
@@ -120,6 +120,7 @@ GitHub 数据均为 🟢 实测（2026-09-26 真实 API 返回）。
 - **Qdrant 的「嵌入式」模式是 Python/Rust 专属**（🔵 官方文档）：Qdrant Edge 被描述为「a lightweight, embedded vector search engine for in-process retrieval … with no background services」，但官方明确「use the **Python Bindings** for Qdrant Edge package or the `qdrant-edge` **Rust crate**」；快速上手页也写「Qdrant Edge … supports **Python and Rust**」[来源: https://qdrant.tech/documentation/edge/]。🟡 分析：**JS 没有嵌入式 Qdrant**，`@qdrant/js-client-rest` 是纯 REST 客户端（deps 只有 `@qdrant/openapi-typescript-fetch` + `undici`）→ 必须连服务。另：npm `qdrant-local` 的 `postinstall` 会**下载并 spawn 一个原生 Qdrant 服务端二进制**，不是嵌入式。
 - **PGlite 是 WASM Postgres**（🔵 官方 README 原文）：「PGlite - the **WASM build of Postgres** from Electric.」「Unlike previous "Postgres in the browser" projects, PGlite does not use a Linux virtual machine - it is simply **Postgres in WASM**.」[来源: https://raw.githubusercontent.com/electric-sql/pglite/main/README.md]。🟡 分析：它让「浏览器里跑 Postgres + pgvector」在技术上成立，但**在 Hermes 上直接出局**（WASM），且体积 25.4 MB——对 heyta 是三重不合适（Hermes 出局 / 体积 / 与 IndexedDB 存储重复）。
 - **pgvector 必须有服务**（🔵 官方 README）：「Enable the extension (do this once in each database where you want to use it) — `CREATE EXTENSION vector;`」[来源: https://raw.githubusercontent.com/pgvector/pgvector/master/README.md]。🟡 分析：与「本地优先」直接冲突。
+- **DuckDB**：🔵 `@duckdb/duckdb-wasm` 自述「DuckDB-Wasm brings DuckDB to every browser thanks to **WebAssembly**」[来源: https://github.com/duckdb/duckdb-wasm]。🟡 **分析（决定性的一条）**：既然是 WASM，**Hermes 上直接出局**；而 Node 侧 `duckdb` / `@duckdb/node-api` 是原生插件（`duckdb@1.4.4` deps 含 `node-gyp`，`unpackedSize` 61.2 MB），**不是 RN 可用的绑定**。⚪ **未验证**：我**没有**确认 VSS 扩展在 `duckdb-wasm` 构建里是否可加载（官方 WASM 总览页只在导航侧栏提到 VSS，正文未确认；我没有跑过 `INSTALL vss` 的浏览器实验）。因为 Hermes 已出局，这条不影响结论，但不要把它当作「VSS 在浏览器可用」的依据。
 
 ### 4.2 🔴 本次最有价值的单点发现：op-sqlite 已内置 FTS5 与 sqlite-vec（原生，非 WASM）
 
@@ -260,7 +261,7 @@ require("zod")
 |---|---|---|---|---|
 | **SQLite FTS5** | ❌ 无 SQL（唯一办法是 WASM：`@sqlite.org/sqlite-wasm`，**`sql.js`/`wa-sqlite` 都没有 FTS5**） | ✅ 原生（需开 op-sqlite `fts5` 开关 + 重新构建） | ✅ **实测可用**（含 bm25 / snippet / highlight / fts5vocab / trigram / porter） | ❌（浏览器要另写） |
 | `@sqlite.org/sqlite-wasm`（浏览器 FTS5 的唯一选项） | ✅ WASM（2.9 MB） | 🔴 WASM → 出局 | ✅ 原生可用（但没必要） | ❌ |
-| **sqlite-vec** | ✅ WASM（需引 WASM SQLite） | ✅ **原生**（op-sqlite 内置 `sqlitevec.xcframework` / `libsqlite_vec.so`，需开开关）⚠️ 未真机验证 | ✅ **实测跑通 KNN** | ❌（浏览器要另写） |
+| **sqlite-vec** | ⚠️ 无现成路径（WASM 下**不能动态加载扩展**，需自建静态编译 WASM） | ✅ **原生**（op-sqlite 内置 `sqlitevec.xcframework` / `libsqlite_vec.so`，需开开关）⚠️ 未真机验证 | ✅ **实测跑通 KNN** | ❌（浏览器要另写） |
 | **纯 JS 暴力余弦扫描** | ✅ 原生 | ✅ 原生 | ✅ 原生 | ✅ **唯一真正三端一致** |
 | LanceDB | ❌ | ❌ | ✅ 原生（Node ≥ 22） | ❌ |
 | ChromaDB | ❌ | ❌ | 客户端（需服务）/ 桌面原生绑定 | ❌ |

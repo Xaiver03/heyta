@@ -22,6 +22,7 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { App } from '../src/App.js';
+import { LocaleHost } from '../src/lib/locale-host.js';
 import { __resetOpLogForTests, initOpLog } from '../src/lib/oplog.js';
 import { buildTimeline, type TimelineEntry } from '../src/features/timeline/buildTimeline.js';
 import { GanttChart } from '../src/features/timeline/GanttChart.js';
@@ -684,7 +685,14 @@ describe('🔴🔴 时间线真的能点到（不是"写好了没人挂载"）',
   });
 
   it('🔴 App 的视图切换里有「时间线」，点了能看到时间线视图', () => {
-    const el = renderElement(<App />);
+    // 🔴 必须包 `LocaleHost`：外壳里现在挂了语言切换器，而
+    // `useLocalePreference()` 在 Provider 之外**刻意抛错**（"点了没反应"更难查）。
+    // 包法与线上 `main.tsx` 完全一致 —— 这正是把 LocaleHost 抽出来的原因。
+    const el = renderElement(
+      <LocaleHost>
+        <App />
+      </LocaleHost>,
+    );
 
     const tabs = Array.from(el.querySelectorAll('[role="tab"]'));
     const timelineTab = tabs.find((tab) => (tab.textContent ?? '').includes('时间线'));

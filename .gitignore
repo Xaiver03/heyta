@@ -47,7 +47,12 @@ coverage/
 .npmcache*/
 _cacache/
 
-# Playwright（`e2e/`）跑完留下的产物。
+# Playwright 跑完留下的产物。
+#
+# 🔴 **不按目录限定**：Playwright 把 `test-results/` 写在**当前工作目录**下，
+# 所以在哪个包目录里跑过它，那里就会长出一个 —— 实测 `packages/app-host/`
+# 下就有一个（`test-results/.last-run.json`），而且它**曾经差点被当成源码提交**。
+# 原来只写 `e2e/test-results/`，挡不住这件事。
 #
 # 它们是**失败现场的取证材料**（trace / 截图 / 录屏，见 `playwright.config.ts`
 # 的 `trace: 'retain-on-failure'`），不是源码：每次跑都不一样，
@@ -57,9 +62,9 @@ _cacache/
 # 🔴 但**不要**因为忽略它们就把 `retain-on-failure` 关掉 ——
 # 门禁红了的时候，那份 trace 是唯一能告诉你"浏览器里当时发生了什么"的东西。
 # 正确做法是在 CI 里把它当 **artifact 上传**，而不是提交进仓库。
-e2e/test-results/
-e2e/playwright-report/
-e2e/blob-report/
+test-results/
+playwright-report/
+blob-report/
 e2e/.playwright/
 e2e/.cache/
 

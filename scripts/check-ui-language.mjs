@@ -1,37 +1,160 @@
 #!/usr/bin/env node
 /**
- * 界面语言门禁：用户看得见的文案必须是中文。
- * ==========================================
+ * 界面语言门禁：文案必须走词条表，两种语言都必须真的翻了。
+ * ======================================================
  *
- * 需求是明确的：**整个应用都是中文的**。
+ * ## 契约变更（2026-09）
  *
- * 但"检查文案语言"这件事看起来没法自动化 —— 直到把它拆成两条**具体形状**，
- * 而这两条都来自真实出现过的问题：
+ * 本门禁**原来**的契约是一句话：**用户看得见的文案必须是中文。**
+ * 它在单语时代是够用的，而且文件里逐条记着它踩过的坑（比较运算符造成的假红、
+ * 三元里的假绿、模板字面量的已知边界）。
  *
- *   1. **整句英文的文案。** 只要一段用户可见文本里一个汉字都没有、
- *      却有两个以上连续的拉丁字母，那它就不是中文文案。
- *      （纯 URL、版本号这类例外由白名单放行。）
+ * 现在产品要中英双语，于是契约换成四条**更严**的：
  *
- *   2. **技术标识符漏进界面。** 我实际写出过 `numeric-display 样式`
- *      和 `重放本地 op 日志` —— 它们**夹在中文里**，第一条规则抓不到，
- *      但用户看到的是我们内部的变量名和缩写。这属于把实现细节泄漏给用户。
+ *   1. **不许硬编码文案。** 已迁移的应用里，用户可见的字符串字面量一律违规，
+ *      必须写成 `t('key')`。key 由 `@heyta/i18n` 的类型系统校验，
+ *      拼错是编译错误，不是运行时的兜底降级。
+ *   2. **zh 词条必须含中文** —— 防止用英文占位中文。
+ *   3. **en 词条不许含中文** —— 防止把中文复制过去当英文交差。
+ *      这条只能靠机器：人眼扫过两栏相同的文字，很容易以为"还没翻"而不是"翻错了"。
+ *   4. **两份词条的 key 集合必须一致** —— 漏翻译必须在门禁上红。
  *
- * 为什么必须做成门禁而不是"注意一下"：文案是**最容易在后续提交里回退**的东西。
- * 加一个新屏幕时顺手写一句英文，没有任何测试会红；等到发现时，
- * 已经散落在几十个文件里，而且没人知道哪些是有意为之。
+ * 这不是"放宽"，是"换了个更值钱的契约"：原来只保证"是中文"，
+ * 现在保证"没有硬编码"且"两种语言都真翻了"。
+ *
+ * ## 为什么是分阶段迁移而不是一次性翻转
+ *
+ * 三个应用共 205 处文案（门禁口径）。一次性把规则翻过来，仓库会立刻全红，
+ * 而**长期全红的门禁等于没有门禁**（AGENTS.md #25：一条会误报的门禁会教人忽略红色）。
+ * 所以用 `MIGRATED_ROOTS` 逐个应用迁移：迁完一个加一个，
+ * 未迁移的应用继续按旧规则（必须是中文）把关。全程 `pnpm check` 保持绿。
+ *
+ * ### 再进一步：逐**文件**迁移（`migratedFiles`）
+ *
+ * `apps/web` 是最后一个、也是最大的一壳（29 个源文件），而且**它同时被另一条
+ * 工作流在改**。整个应用一次翻转意味着门禁要红很长一段时间，而这段时间里
+ * 另一条工作流的每一次 `pnpm check` 都会看到与自己无关的红 —— 那正是
+ * 上面说的"长期全红的门禁等于没有门禁"。
+ *
+ * 所以 `migrated` 从"整个根"细化到"根 + 一份已迁移文件清单"：
+ * 列进 `migratedFiles` 的文件按规则 1（不许硬编码）管，其余仍按旧契约。
+ * **规则一条都没松**，只是把开关的粒度调小了 —— 每个文件仍然只可能处在
+ * 两种契约中的一种，不存在"两边都不管"的文件。
+ *
+ * 迁完之后把该根的 `migratedFiles` 清空、`migrated` 置 true（把清单收回一个布尔）。
+ * 🔴 清单里的路径会**逐条校验存在性**：写错一个路径不会静默退回旧契约，
+ * 而是直接让门禁非零退出 —— 否则"以为管住了，其实没管"是最坏的结果。
+ *
+ * ## 顺带修掉的一个盲区
+ *
+ * 旧门禁只从 **JSX 属性**（`title=` / `label=` / `placeholder=` …）和
+ * **JSX 裸文本节点**（`>文案<`）里取候选。于是
+ * `const SCREENS = [{ label: '四象限' }]` 这种**数据数组里的文案它完全看不到** ——
+ * 而落地页的展厅、能力矩阵、自建步骤全是用这种形状写的，是真实用户可见的大头。
+ *
+ * 迁移模式下这不再有影响：凡是渲染出的字面量都要走 `t()`，
+ * 数据数组里也一样（`label: t('landing.showcase.quadrant')`）。
+ * 未迁移的应用仍按旧口径检查 —— 与改动前的行为**逐字相同**，不引入新的红。
  *
  * 用法：node scripts/check-ui-language.mjs
  *   非零退出 = 有违规。
  */
 
+import { execFileSync } from 'node:child_process';
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 
-/** 扫哪些目录。`apps/*` 是外壳，也就是所有界面文案所在的地方。 */
-const ROOTS = ['apps/web/src', 'apps/mobile/src'];
+/**
+ * 扫哪些目录，以及它是否**已经迁移**到词条表。
+ *
+ * - `migrated: true`  → 规则 1（不许硬编码文案）；
+ * - `migrated: false` → 旧规则（用户可见文案必须是中文）。
+ *
+ * 迁移一个应用就把它的 `migrated` 改成 true。**两边都不能松**：
+ * 未迁移不等于"没人管"，只是还在用旧契约。
+ *
+ * `migratedFiles` 是**逐文件**迁移的清单（仓库相对路径），用途见文件头：
+ * 大应用在被另一条工作流同时修改时，一个文件一个文件地翻，门禁全程不红。
+ * 单个文件仍然只属于一种契约：在清单里就走规则 1，不在就走旧契约。
+ */
+const ROOTS = [
+  { dir: 'apps/landing/src', migrated: true },
+  {
+    // 🔴 第 16 轮：**整个 web 壳**都迁移完了，逐文件清单退休。
+    //
+    // 清单（`migratedFiles`）是给"某个大应用正被另一条工作流同时改"用的
+    // 过渡装置 —— 让门禁不必长期全红。迁完就该收回一个布尔，
+    // 否则它会变成一份**只会越长越长的白名单**：每加一个文件都要人来登记，
+    // 而漏登记的后果是"这个文件其实没人管"。
+    //
+    // 收尾前逐文件核实过：`apps/web/src` 里已没有任何用户可见的字面量。
+    // 剩下的非 ASCII 只有三类，都**不是文案**：
+    //   1. 开发者诊断（`throw new Error('…')`）—— 候选只来自 JSX 属性 /
+    //      JSX 文本节点，这些不在视野里，本来也不该翻；
+    //   2. 解析中文标记的正则（`buildTimeline.ts` 的 `（依赖：X）`）——
+    //      它匹配的是**用户笔记里的既有格式**，翻了反而解析不出来；
+    //   3. 注释。
+    dir: 'apps/web/src',
+    migrated: true,
+  },
+  { dir: 'apps/mobile/src', migrated: true },
+];
+
+/**
+ * 清单里的路径必须真实存在 —— 写错一个字母不能让那个文件**静默退回旧契约**。
+ *
+ * 这是"门禁自己也不能有盲区"的具体做法：路径写错的症状不是报错，
+ * 而是"我明明迁了它却没人管"，那比红更难发现。所以在这里硬失败。
+ */
+{
+  const bad = [];
+  for (const root of ROOTS) {
+    for (const rel of root.migratedFiles ?? []) {
+      if (!rel.startsWith(`${root.dir}/`)) {
+        bad.push(`${rel}（不在 ${root.dir} 下，写错了根）`);
+        continue;
+      }
+      try {
+        if (!statSync(join(ROOT, rel)).isFile()) bad.push(`${rel}（不是文件）`);
+      } catch {
+        bad.push(`${rel}（不存在）`);
+      }
+    }
+  }
+  if (bad.length > 0) {
+    console.error('🔴 ROOTS.migratedFiles 里有无效路径，门禁拒绝运行：\n');
+    for (const item of bad) console.error(`   ${item}`);
+    console.error('\n   改法：修正路径，或删掉那一项。\n');
+    process.exit(1);
+  }
+}
+
+/** 词条表。规则 2/3/4 直接读这两份源文件 —— 不依赖构建产物。 */
+const CATALOG_DIR = 'packages/i18n/src/locales';
+const CATALOG_ZH = join(ROOT, CATALOG_DIR, 'zh-CN.ts');
+const CATALOG_EN = join(ROOT, CATALOG_DIR, 'en.ts');
+
+/**
+ * zh 表里允许不含汉字的 key。
+ *
+ * 品牌名与语言自称这类纯拉丁词是**真实例外**，显式列出，而不是给整条规则开口子 ——
+ * 开口子之后，"用英文占位中文"也能溜过去。
+ */
+const ZH_LATIN_OK = new Set(['common.brand', 'common.lang.en']);
+
+/**
+ * en 表里允许出现汉字的 key —— 只有**语言自称**（endonym）。
+ *
+ * 英文页面上的语言切换器必须显示「中文」：那正是给"看不懂英文"的用户准备的入口，
+ * 写成 "Chinese" 对他就没有用了。所以 `common.lang.zh` 在中英两表里**刻意相同**。
+ *
+ * 🔴 这是"把中文复制过去当英文交差"的**唯一**正当例外，因此按 key 放行，
+ * 而不是放宽规则 3 —— 放宽会让真正的偷懒也一起溜过去。
+ */
+const EN_ENDONYM_OK = new Set(['common.lang.zh']);
 
 const SKIP_DIRS = new Set(['node_modules', 'dist', 'build', 'Pods', '.gradle', '.cxx']);
 
@@ -186,6 +309,8 @@ const FORBIDDEN_TERMS = [
 
 const CJK = /[\u3400-\u4DBF\u4E00-\u9FFF\uF900-\uFAFF\u3000-\u303F\uFF00-\uFFEF]/;
 const LATIN_RUN = /[A-Za-z]{2,}/;
+/** 有任何字母（含汉字）才算"文案"。纯符号/纯数字（`·`、`→`、`3`）不是文案。 */
+const ANY_LETTER = /[A-Za-z\u3400-\u9FFF]/;
 
 /**
  * 去掉模板字面量里的 `${...}` 表达式，只留下**写死在源码里的那段字**。
@@ -258,16 +383,155 @@ function* walk(dir) {
   }
 }
 
+/**
+ * 词条表的解析。
+ *
+ * ⚠️ 这是**按行**解析，不是 TS 解析器。它依赖词条表保持一个简单形状：
+ * 一行一条、key 与 value 都用单引号、内部引号要转义。
+ * 这个约束写在 `packages/i18n/src/locales/*.ts` 的文件头里。
+ *
+ * 🔴 关键设计：**解析到的条数必须等于"看起来像词条的行数"**，
+ * 不等就报错退出。一个静默漏掉几行的解析器会给出**假绿** ——
+ * 那正是这个文件开头警告过的那种门禁。
+ */
+const ENTRY = /^\s*'([^']+)':\s*'((?:[^'\\]|\\.)*)',?\s*$/;
+const ENTRY_LIKE = /^\s*'[^']+':/;
+
+function parseCatalog(file) {
+  const src = readFileSync(file, 'utf8');
+  const entries = new Map();
+  let entryLikeLines = 0;
+  for (const line of src.split('\n')) {
+    if (ENTRY_LIKE.test(line)) {
+      entryLikeLines += 1;
+      const m = ENTRY.exec(line);
+      if (m !== null) entries.set(m[1], m[2]);
+    }
+  }
+  if (entries.size !== entryLikeLines) {
+    console.error(
+      `🔴 无法解析词条表：${relative(ROOT, file)}\n` +
+        `   看起来像词条的行有 ${String(entryLikeLines)} 行，只解析出 ${String(entries.size)} 条。\n` +
+        `   词条表必须保持"一行一条、key 与 value 都用单引号、内部引号转义"的形状。\n` +
+        `   一个静默漏行的解析器会给出假绿，所以这里直接失败而不是继续。`,
+    );
+    process.exit(1);
+  }
+  return entries;
+}
+
+/** 规则 2/3/4：两份词条表互相约束。 */
+function checkCatalogs() {
+  const violations = [];
+  const zh = parseCatalog(CATALOG_ZH);
+  const en = parseCatalog(CATALOG_EN);
+  const relZh = relative(ROOT, CATALOG_ZH);
+  const relEn = relative(ROOT, CATALOG_EN);
+
+  // 规则 4：key 集合必须一致（双向报，才能看出是漏了还是多了）。
+  for (const key of zh.keys()) {
+    if (!en.has(key)) {
+      violations.push({
+        where: `${relEn}`,
+        text: key,
+        why: '中文词条表里有这条，英文表里没有 —— 漏翻译',
+        fix: `在 en.ts 补上 '${key}'。`,
+      });
+    }
+  }
+  for (const key of en.keys()) {
+    if (!zh.has(key)) {
+      violations.push({
+        where: `${relZh}`,
+        text: key,
+        why: '英文词条表里有这条，中文表里没有 —— 多出来的 key',
+        fix: `删掉它，或先在 zh-CN.ts 里加上 '${key}' 作为事实源。`,
+      });
+    }
+  }
+
+  // 规则 2：zh 必须含中文。
+  for (const [key, value] of zh) {
+    if (ZH_LATIN_OK.has(key)) continue;
+    if (!CJK.test(value)) {
+      violations.push({
+        where: `${relZh}`,
+        text: `${key} = ${value}`,
+        why: '中文词条里一个汉字都没有',
+        fix: '写成中文。确实是纯拉丁词的（如品牌名），加进 ZH_LATIN_OK 并说明理由。',
+      });
+    }
+  }
+
+  // 规则 3：en 不许含中文（语言自称除外，见 EN_ENDONYM_OK）。
+  for (const [key, value] of en) {
+    if (EN_ENDONYM_OK.has(key)) continue;
+    if (CJK.test(value)) {
+      violations.push({
+        where: `${relEn}`,
+        text: `${key} = ${value}`,
+        why: '英文词条里出现了汉字 —— 很可能是把中文复制过来当英文',
+        fix: '翻译成英文。',
+      });
+    }
+  }
+
+  return { violations, zhCount: zh.size, enCount: en.size };
+}
+
 const violations = [];
 let scanned = 0;
 let strings = 0;
+let migratedStrings = 0;
 
-for (const relRoot of ROOTS) {
+// ── 先查词条表本身（规则 2/3/4）────────────────────────────────
+const catalogResult = checkCatalogs();
+violations.push(...catalogResult.violations);
+
+/**
+ * ── 价格一致性：词条里的价格必须与**代码价目表**和**法务文本**一致 ──────
+ *
+ * 为什么挂在这里：它属于同一个契约（「文案说的是真话」），而价格是**唯一一个
+ * 除了词条表之外还有可执行事实源**的文案 —— `server/src/billing/wechat.adapter.ts`
+ * 的价目表才是真正收的钱，词条表里的价格只是「对外怎么说」。两者不一致
+ * 就是虚假宣传；反过来价目表改了而页面没改，用户看到的价格也不是他要付的价格。
+ *
+ * 🔴 判据与理由见 [ADR-0017](../docs/adr/0017-single-paid-tier-and-payment-channel.md) §3.2。
+ * 单独成一个脚本（`scripts/check-pricing-consistency.mjs`）而不是内联在这里，
+ * 是因为它自己也有一套**能失败的注入用例**（`scripts/verify-i18n-failures.mjs` 的 `pricing` 组）。
+ *
+ * ⚠️ 必须**调用**而不是**复制**那条规则进来 —— 复制出来的两份规则会各自漂移，
+ * 而中间那一份才是对的。
+ */
+try {
+  const pricingOut = execFileSync(
+    process.execPath,
+    [join(ROOT, 'scripts/check-pricing-consistency.mjs')],
+    { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] },
+  );
+  if (pricingOut.trim() !== '') console.log(pricingOut.trimEnd());
+} catch (e) {
+  // 把子脚本自己的诊断原样透出来 —— 它已经写清了是哪两处对不上。
+  const detail = `${String(e.stdout ?? '')}${String(e.stderr ?? '')}`.trimEnd();
+  if (detail !== '') console.error(detail);
+  violations.push({
+    where: '价格（server 价目表 ↔ 中英词条表 ↔ 法务文本）',
+    text: '三个地方说的不是同一个数',
+    why: '价格是唯一一个有可执行事实源的文案；不一致意味着用户看到的价格不是他要付的价格',
+    fix: '按 docs/reference/pricing-and-entitlements.md 的 pricing-ssot 代码块统一三处（改价必须同一次改完）。',
+  });
+}
+
+// ── 再查组件源码（规则 1 或旧的中文规则）─────────────────────
+for (const { dir: relRoot, migrated, migratedFiles } of ROOTS) {
+  const staged = new Set((migratedFiles ?? []).map((p) => resolve(ROOT, p)));
   for (const file of walk(join(ROOT, relRoot))) {
     scanned += 1;
     const rel = relative(ROOT, file);
     const src = readFileSync(file, 'utf8');
     const lines = src.split('\n');
+    /** 这个文件按哪种契约检查：整根已迁移，或它自己在逐文件清单里。 */
+    const fileMigrated = migrated || staged.has(file);
 
     /** 每个候选文案带上它在原文里的偏移，好算出行号。 */
     const candidates = [];
@@ -293,24 +557,43 @@ for (const relRoot of ROOTS) {
       // `stripTemplateExpressions` 的注释里那个真实例子）。
       const text = stripTemplateExpressions(value).trim();
       if (text === '') continue;
-      strings += 1;
 
+      // 纯符号/纯数字不是文案：`>·<`、`>→<`、`>3<` 都不需要翻译。
+      // 不加这条会让迁移后的应用被一堆装饰性字符刷红。
+      if (!ANY_LETTER.test(text)) continue;
+
+      strings += 1;
       const line = src.slice(0, index).split('\n').length;
       const where = `${rel}:${String(line)}`;
 
-      // 规则 2：内部标识符泄漏（夹在中文里也算）。
+      // 规则（两种模式都适用）：内部标识符泄漏。
       const term = FORBIDDEN_TERMS.find((t) => text.includes(t));
       if (term !== undefined) {
         violations.push({
           where,
           text,
           why: `文案里出现了内部标识符「${term}」`,
-          fix: '用用户能理解的中文说法替换。原始技术信息要保留的话，放进「技术细节：」这类明确标注的字段。',
+          fix: '用用户能理解的说法替换。原始技术信息要保留的话，放进「技术细节：」这类明确标注的字段。',
         });
         continue;
       }
 
-      // 规则 1：整句拉丁文，没有任何汉字。
+      if (fileMigrated) {
+        // 🔴 迁移模式：一切用户可见的字面量都必须走 t()。
+        // 判据是"这个字面量是不是 t() 的第一个实参" —— 看它前面是不是 `t(`。
+        const before = src.slice(0, index);
+        if (/\bt\(\s*$/.test(before)) continue; // 是 t('key')，合规
+        migratedStrings += 1;
+        violations.push({
+          where,
+          text,
+          why: '硬编码文案 —— 已迁移的应用里，用户可见的字面量必须走 t()',
+          fix: "改成 {t('some.key')}，并在 packages/i18n/src/locales/zh-CN.ts 与 en.ts 各加一条词条。",
+        });
+        continue;
+      }
+
+      // ── 旧模式：用户可见文案必须是中文 ──────────────────────
       if (CJK.test(text)) continue;
       if (!LATIN_RUN.test(text)) continue;
       if (ALLOWED.some((re) => re.test(text))) continue;
@@ -323,24 +606,35 @@ for (const relRoot of ROOTS) {
         where,
         text,
         why: '用户可见文案里一个汉字都没有',
-        fix: '改成中文。确实需要保留原文的（如原始错误信息），加中文前缀说明它是什么。',
+        fix: '改成中文；或把它迁移到 packages/i18n 的词条表（整个应用迁完就把该根加进 MIGRATED；大应用在被别的分支同时改时，可以先把这一个文件加进该根的 migratedFiles）。',
       });
     }
   }
 }
 
+const migratedApps = ROOTS.filter((r) => r.migrated).map((r) => r.dir);
+const stagedFiles = ROOTS.flatMap((r) => (r.migrated ? [] : (r.migratedFiles ?? [])));
+
 if (violations.length === 0) {
+  const parts = [];
+  if (migratedApps.length > 0) parts.push(`已迁移：${migratedApps.join('、')}`);
+  if (stagedFiles.length > 0) parts.push(`逐文件迁移 ${String(stagedFiles.length)} 个（apps/web/src）`);
+  const mode = parts.length === 0 ? '全部按旧契约（中文）检查' : `${parts.join('；')}；其余按旧契约（中文）`;
   console.log(
-    `✅ 界面文案全为中文（扫描 ${String(scanned)} 个文件、${String(strings)} 处文案）。`,
+    `✅ 文案合规（扫描 ${String(scanned)} 个文件、${String(strings)} 处文案；` +
+      `词条表 zh ${String(catalogResult.zhCount)} 条 / en ${String(catalogResult.enCount)} 条；${mode}）。`,
   );
   process.exit(0);
 }
 
-console.error(`🔴 有 ${String(violations.length)} 处文案不符合中文要求：\n`);
+console.error(`🔴 有 ${String(violations.length)} 处不合规：\n`);
 for (const v of violations) {
   console.error(`   ${v.where}`);
   console.error(`      文案：${v.text}`);
   console.error(`      问题：${v.why}`);
   console.error(`      改法：${v.fix}\n`);
+}
+if (migratedStrings > 0) {
+  console.error(`   其中 ${String(migratedStrings)} 处属于"已迁移应用里的硬编码文案"。\n`);
 }
 process.exit(1);

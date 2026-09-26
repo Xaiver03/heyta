@@ -11,9 +11,13 @@ import '@heyta/design-system/reset.css';
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 
+import { StorageError } from '@heyta/storage';
+
 import { App } from './App.js';
 import { ErrorScreen } from './features/shell/ErrorScreen.js';
+import { storageHintKey } from './features/shell/error-hint.js';
 import { initOpLog } from './features/tasks/store.js';
+import { LocaleHost } from './lib/locale-host.js';
 
 const container = document.getElementById('root');
 if (container === null) {
@@ -34,23 +38,37 @@ initOpLog()
   .then(() => {
     root.render(
       <StrictMode>
-        <App />
+        <LocaleHost>
+          <App />
+        </LocaleHost>
       </StrictMode>,
     );
   })
   .catch((error: unknown) => {
     // 存储不可用时**不能白屏** —— 必须明确告诉用户数据层没起来。
     // 用 ErrorScreen 而不是裸 inline 样式：错误屏同样要受设计系统管。
+    //
+    // 🔴 这条路径也包在 LocaleHost 里，所以它能拿到用户偏好的语言；
+    // 同时它**不依赖**这个 Provider —— `ErrorScreen` 只用 `useI18n()`，
+    // 而 i18n 的 context 默认值是 DEFAULT_LOCALE（它是崩溃屏，
+    // 不能因为缺 Provider 而二次崩溃；见 ErrorScreen.tsx 的注释）。
     const message = error instanceof Error ? error.message : String(error);
+    // 🔴 建议按**失败原因**给，而不是一句通用的"存储不可用"：
+    // 「被其它标签页挡住」和「浏览器禁用了本地数据库」的用户动作完全不同。
+    // 结构化原因在 `StorageError.failure.kind` 里（`packages/storage/src/errors.ts`）。
+    //
+    // ⚠️ `instanceof` 在"模块被加载了两份"时会静默为假，那时 `failure` 是 undefined
+    // → 退回通用那句。这是刻意的：**错误屏自己不能再出错**。
+    const failure = error instanceof StorageError ? error.failure : undefined;
     root.render(
       <StrictMode>
-        <ErrorScreen
-          title="无法初始化本地存储"
-          message={message}
-          // 「IndexedDB」是浏览器内部的接口名，对用户没有行动价值 ——
-          // 换成用户能理解的「浏览器的本地数据库」，并直接给出下一步。
-          hint="浏览器可能禁用了本地数据库（无痕模式常见）。关掉无痕模式或换一个浏览器再试。"
-        />
+        <LocaleHost>
+          <ErrorScreen
+            titleKey="web.error.storage.title"
+            message={message}
+            hintKey={storageHintKey(failure)}
+          />
+        </LocaleHost>
       </StrictMode>,
     );
   });

@@ -17,6 +17,7 @@
 
 import { beforeEach, describe, expect, it } from 'vitest';
 
+import { translate } from '@heyta/i18n';
 import type { FocusSession, Habit, HabitLog, Task } from '@heyta/domain';
 
 import { selectHabitProgress, useHabitStore } from '../src/features/habits/store.js';
@@ -232,7 +233,9 @@ describe('buildShareSummary', () => {
     );
     const totals = selectTotals(input({ habitLogs: byId([log('h1', '2026-09-23')]) }));
 
-    const out = buildShareSummary(review, totals);
+    // 🔴 摘要**跟着语言走**（它会进剪贴板、离开界面），所以显式传 zh 的 `t` ——
+    // 这也是它在组件里收 `t` 参数而不是自己读 hook 的原因。
+    const out = buildShareSummary(review, totals, (key, vars) => translate('zh-CN', key, vars));
 
     expect(out).toContain('本周小结（2026-09-21 至 2026-09-27）');
     expect(out).toContain('打卡 1 次');

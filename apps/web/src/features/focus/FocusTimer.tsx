@@ -11,6 +11,7 @@
 
 import { useEffect, useState } from 'react';
 import { cssVar } from '@heyta/design-system';
+import { useI18n } from '@heyta/i18n';
 import { formatDuration } from '@heyta/domain';
 import { Coffee, Pause, Play, Square, Zap } from 'lucide-react';
 
@@ -21,6 +22,7 @@ const RING_SIZE = 180;
 const RING_STROKE = 10;
 
 function Ring({ progress, work }: { progress: number; work: boolean }) {
+  const { t } = useI18n();
   const radius = (RING_SIZE - RING_STROKE) / 2;
   const circumference = 2 * Math.PI * radius;
   // 进度从 0 开始逐渐填满；负的 dashoffset 表示已走过部分
@@ -32,7 +34,7 @@ function Ring({ progress, work }: { progress: number; work: boolean }) {
       height={RING_SIZE}
       viewBox={`0 0 ${String(RING_SIZE)} ${String(RING_SIZE)}`}
       role="img"
-      aria-label={`进度 ${Math.round(progress * 100)}%`}
+      aria-label={t('web.focus.a11y.progress', { percent: Math.round(progress * 100) })}
       style={{ transform: 'rotate(-90deg)' }}
     >
       <circle
@@ -63,6 +65,7 @@ function Ring({ progress, work }: { progress: number; work: boolean }) {
 }
 
 export function FocusTimer() {
+  const { t } = useI18n();
   const focus = useFocusStore();
   const tasks = useTaskStore();
   const [now, setNow] = useState(() => Date.now());
@@ -84,8 +87,15 @@ export function FocusTimer() {
   const running = focus.state.phase === 'running';
 
   const aliveTasks = Object.values(tasks.entities.tasks).filter(
-    (t) => t.deletedAt === undefined && t.completedAt === undefined,
+    (task) => task.deletedAt === undefined && task.completedAt === undefined,
   );
+
+  const phaseText = work ? t('web.focus.phase.work') : t('web.focus.phase.break');
+  // 🔴 词条表没有 ICU：1 个专注时英文必须走单数兄弟词条（"1 focus sessions" 是坏句子）。
+  const completedText =
+    focus.completedToday === 1
+      ? t('web.focus.completedTodayOne', { count: focus.completedToday })
+      : t('web.focus.completedToday', { count: focus.completedToday });
 
   return (
     <div
@@ -127,7 +137,7 @@ export function FocusTimer() {
             }}
           >
             {work ? <Zap size={12} aria-hidden="true" /> : <Coffee size={12} aria-hidden="true" />}
-            {work ? '专注' : '休息'}
+            {phaseText}
           </div>
         </div>
       </div>
@@ -140,16 +150,21 @@ export function FocusTimer() {
               focus.start(focus.state.taskId);
               setNow(Date.now());
             }}
-            aria-label="开始专注"
+            aria-label={t('web.focus.a11y.start')}
             style={buttonStyle('primary')}
           >
             <Play size={18} aria-hidden="true" />
-            开始
+            {t('web.focus.start')}
           </button>
         ) : (
-          <button type="button" onClick={focus.pause} aria-label="暂停专注" style={buttonStyle('ghost')}>
+          <button
+            type="button"
+            onClick={focus.pause}
+            aria-label={t('web.focus.a11y.pause')}
+            style={buttonStyle('ghost')}
+          >
             <Pause size={18} aria-hidden="true" />
-            暂停
+            {t('web.focus.pause')}
           </button>
         )}
 
@@ -159,11 +174,11 @@ export function FocusTimer() {
             onClick={() => {
               void focus.abort();
             }}
-            aria-label="中止专注"
+            aria-label={t('web.focus.a11y.stop')}
             style={buttonStyle('ghost')}
           >
             <Square size={18} aria-hidden="true" />
-            中止
+            {t('web.focus.stop')}
           </button>
         )}
       </div>
@@ -179,7 +194,7 @@ export function FocusTimer() {
           minWidth: cssVar('layout.sidebar-width'),
         }}
       >
-        关联任务（可选）
+        {t('web.focus.task.label')}
         <select
           value={focus.state.taskId ?? ''}
           onChange={(e) => {
@@ -197,10 +212,10 @@ export function FocusTimer() {
             fontFamily: cssVar('font.sans'),
           }}
         >
-          <option value="">不关联</option>
-          {aliveTasks.map((t) => (
-            <option key={t.id} value={t.id}>
-              {t.title}
+          <option value="">{t('web.focus.task.none')}</option>
+          {aliveTasks.map((task) => (
+            <option key={task.id} value={task.id}>
+              {task.title}
             </option>
           ))}
         </select>
@@ -210,18 +225,16 @@ export function FocusTimer() {
         style={{
           fontSize: cssVar('font-size.2xs'),
           color: cssVar('color.foreground-muted'),
+          // 数字跳动时宽度不跳；顺带覆盖到整句，无副作用。
+          fontVariantNumeric: 'tabular-nums',
         }}
       >
-        今日已完成
-        <span style={{ fontVariantNumeric: 'tabular-nums', marginLeft: cssVar('space.1') }}>
-          {focus.completedToday}
-        </span>
-        个专注
+        {completedText}
       </div>
 
       {focus.error !== undefined && (
         <p role="alert" style={{ color: cssVar('color.danger'), fontSize: cssVar('font-size.sm') }}>
-          {focus.error}
+          {t('web.focus.error.saveFailed', { reason: focus.error.reason })}
         </p>
       )}
     </div>

@@ -25,8 +25,12 @@
 import {
   describeDestination,
   describeRetention,
+  destinationDisclosure,
   requiresEgressConsent,
+  retentionDisclosure,
+  type DestinationDisclosure,
   type EgressDestination,
+  type RetentionDisclosure,
 } from './supply.js';
 
 /**
@@ -65,9 +69,25 @@ export interface EgressRequest {
 export interface EgressDisclosure {
   destination: EgressDestination;
   fields: readonly string[];
-  /** "发给谁"。 */
+  /**
+   * "发给谁"的**结构化**结论 —— 界面要中英双语，所以措辞必须归壳。
+   *
+   * 🔴 与下面 `destinationText` 的关系：两者**同源**（都来自 `destinationDisclosure()`），
+   * 所以不可能一个说"本地"另一个说"到了我们服务器"。壳应该用这个字段 + 词条表渲染；
+   * `destinationText` 是过渡期的兼容字段，等所有壳切过来就删。
+   */
+  destinationDisclosure: DestinationDisclosure;
+  /** "留多久"的**结构化**结论。`kind: 'undecided'` = 策略未定案，**不许编数字**。 */
+  retentionDisclosure: RetentionDisclosure;
+  /**
+   * "发给谁"。⚠️ **过渡期的兼容字段**（中文句子），新代码不要用。
+   * @deprecated 用 `destinationDisclosure` + 词条表。
+   */
   destinationText: string;
-  /** "留多久"。`undefined` = 策略未定案（见 `describeRetention`）。 */
+  /**
+   * "留多久"。`undefined` = 策略未定案（见 `describeRetention`）。
+   * @deprecated 用 `retentionDisclosure` + 词条表。
+   */
   retentionText: string | undefined;
   /** 是否需要用户授权才能进行。 */
   requiresConsent: boolean;
@@ -87,6 +107,10 @@ export function buildDisclosure(request: EgressRequest): EgressDisclosure {
   return {
     destination: request.destination,
     fields: request.fields,
+    // 结构化结论是**唯一**的判断来源，下面两句兼容文本由它投影出来 ——
+    // 两条路径不可能对同一次出境给出不同结论。
+    destinationDisclosure: destinationDisclosure(request.destination),
+    retentionDisclosure: retentionDisclosure(request.destination),
     destinationText: describeDestination(request.destination),
     retentionText: describeRetention(request.destination),
     requiresConsent: requiresEgressConsent(request.destination),

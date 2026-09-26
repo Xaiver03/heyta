@@ -110,6 +110,19 @@ export interface NormalizedPaymentEvent {
   readonly currentPeriodEnd: number | null;
   /** 我方用户 id（从 checkout metadata 取）；`null` = 事件未携带。 */
   readonly userId: number | null;
+  /**
+   * 一次性支付的授予信息。**只有"没有订阅对象"的 provider（支付宝 / 微信）才带它。**
+   *
+   * 🔴 为什么必须由 adapter 显式给出、而不是让 `applyPaymentEvent` 从"没有订阅 id"
+   * 推断："没有订阅引用"也可能是**一条我们根本没打算授予权益的事件**
+   * （退款、对账通知…）。把推断写进通用层，等于让任何没有订阅引用的事件都变成
+   * "发一年权益" —— 受益的是攻击者。所以授予必须是**事件上的显式声明**。
+   *
+   * 语义见 `docs/plans/subscription-boundary.md` §6.2：一次支付把
+   * `(userId, provider)` 那一行的到期日按
+   * `max(now, 已有到期日 ?? now) + periodDays` 叠加。
+   */
+  readonly oneTimeGrant?: { readonly periodDays: number } | null;
 }
 
 /**

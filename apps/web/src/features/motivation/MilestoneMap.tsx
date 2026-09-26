@@ -25,6 +25,7 @@
 
 import { cssVar } from '@heyta/design-system';
 import type { MilestoneProgress } from '@heyta/domain';
+import { useI18n } from '@heyta/i18n';
 import { Check } from 'lucide-react';
 
 import { text } from '../../lib/text.js';
@@ -36,6 +37,8 @@ export interface MilestoneMapProps {
 }
 
 export function MilestoneMap({ milestones }: MilestoneMapProps) {
+  const { t } = useI18n();
+
   /**
    * 按维度分组。
    *
@@ -57,6 +60,8 @@ export function MilestoneMap({ milestones }: MilestoneMapProps) {
     <div className="ht-milestones">
       {groups.map((group) => {
         const copy = KIND_COPY[group.kind];
+        const name = t(copy.nameKey);
+        const unit = t(copy.unitKey);
         const reached = group.items.filter((m) => m.reached);
         const next = group.items.find((m) => !m.reached);
         // 全部达成：进度条指向满格，而不是消失 —— "已经到顶"也是信息。
@@ -65,10 +70,10 @@ export function MilestoneMap({ milestones }: MilestoneMapProps) {
         return (
           <section key={group.kind} className="ht-milestones__group">
             <div className="ht-milestones__head">
-              <h3 style={text('row-title')}>{copy.name}</h3>
+              <h3 style={text('row-title')}>{name}</h3>
               <span className="ht-milestones__value" style={text('numeric-body')}>
                 {current?.value ?? next?.value ?? 0}
-                {copy.unit}
+                {unit}
               </span>
             </div>
 
@@ -77,10 +82,17 @@ export function MilestoneMap({ milestones }: MilestoneMapProps) {
               tone={next === undefined ? 'success' : 'primary'}
               label={
                 next === undefined
-                  ? `${copy.name}的里程碑已全部达成`
+                  ? t('web.growth.milestone.allReached', { name })
                   : // 可访问名里必须同时有**目标**和**差距** ——
-                    // 只说"距离下一档"读屏用户不知道下一档是多少。
-                    `${copy.name}：下一个里程碑是 ${String(next.threshold)} ${copy.unit}，还差 ${String(next.threshold - next.value)} ${copy.unit}`
+                    // 只说「距离下一档」读屏用户不知道下一档是多少。
+                    // （这里用直角引号而不是英文引号：门禁按源码扫描，
+                    //   会把注释里成对的 `"` 当成一个字符串字面量。）
+                    t('web.growth.milestone.nextLabel', {
+                      name,
+                      threshold: next.threshold,
+                      unit,
+                      gap: next.threshold - next.value,
+                    })
               }
             />
 
@@ -99,19 +111,20 @@ export function MilestoneMap({ milestones }: MilestoneMapProps) {
 
             {next !== undefined && (
               <p className="ht-milestones__next" style={text('caption')}>
-                下一个里程碑是
-                <span style={{ fontVariantNumeric: 'tabular-nums' }}>{next.threshold}</span>
-                {copy.unit}，还差
-                <span style={{ fontVariantNumeric: 'tabular-nums' }}>
-                  {next.threshold - next.value}
-                </span>
-                {copy.unit}
+                {t('web.growth.milestone.next', {
+                  threshold: next.threshold,
+                  unit,
+                  gap: next.threshold - next.value,
+                })}
               </p>
             )}
 
             {next === undefined && current !== undefined && (
-              <p className="ht-milestones__next" style={{ ...text('caption'), color: cssVar('color.success') }}>
-                这个维度已经全部达成
+              <p
+                className="ht-milestones__next"
+                style={{ ...text('caption'), color: cssVar('color.success') }}
+              >
+                {t('web.growth.milestone.dimensionDone')}
               </p>
             )}
           </section>

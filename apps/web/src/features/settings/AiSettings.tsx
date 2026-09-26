@@ -29,12 +29,13 @@ import {
   classifyDestination,
   validateEndpointUrl,
   requiredCapabilities,
-  describeEndpointHealth,
+  endpointHealthDisclosure,
   fromHealthSnapshot,
   isAvailable,
   type AiRoutingConfig,
   type AiCapability,
   type AiEndpointConfig,
+  type AiEndpointPreset,
   type AiFeature,
   type EgressConsent,
 } from '@heyta/ai';
@@ -61,39 +62,44 @@ const CAPABILITY_ORDER: readonly AiCapability[] = [
   'tool_calling',
 ];
 
-const CAPABILITY_LABEL: Readonly<Record<AiCapability, string>> = {
-  structured_output: '结构化输出',
-  long_context: '长上下文',
-  vision: '图片理解',
-  tool_calling: '工具调用',
-};
+/** 能力的中文名。**不直接用 `AiCapability` 字面量**，那对用户没有意义。 */
+function capabilityLabels(t: I18nValue['t']): Readonly<Record<AiCapability, string>> {
+  return {
+    structured_output: t('web.ai.capability.structuredOutput'),
+    long_context: t('web.ai.capability.longContext'),
+    vision: t('web.ai.capability.vision'),
+    tool_calling: t('web.ai.capability.toolCalling'),
+  };
+}
 
 /** 哪些功能需要这个能力 —— 让用户知道勾了有什么用。 */
-function featuresNeeding(capability: AiCapability): string {
+function featuresNeeding(capability: AiCapability, t: I18nValue['t'], locale: Locale): string {
   const names: Partial<Record<AiFeature, string>> = {
-    capture: '快速捕获',
-    breakdown: '拆解任务',
-    prioritize: '排序建议',
-    'duration-estimate': '耗时估计',
+    capture: t('web.ai.needs.capture'),
+    breakdown: t('web.ai.needs.breakdown'),
+    prioritize: t('web.ai.needs.prioritize'),
+    'duration-estimate': t('web.ai.needs.duration'),
   };
   const hit: string[] = [];
   for (const [feature, label] of Object.entries(names)) {
     if (requiredCapabilities(feature as AiFeature).includes(capability)) hit.push(label ?? feature);
   }
-  return hit.join('、');
+  return hit.join(LIST_SEPARATOR[locale]);
 }
 import { LOCAL_API_TOOLS, validateLocalApiConfig } from '@heyta/local-api';
 import { AlertTriangle, Check, Lock, Plus, ShieldCheck, Trash2 } from 'lucide-react';
 
+import { useI18n, type I18nValue, type Locale } from '@heyta/i18n';
+
+import { LIST_SEPARATOR, PAIRED_PARENS } from '../ai/locale-punctuation.js';
+import { endpointHealthCopy } from './health-copy.js';
 import {
-  WEB_KEY_STORAGE_NOTICE,
   defaultAiSettings,
   saveAiSettings,
   type PersistedAiSettings,
   type SessionSecretStore,
 } from './aiStore.js';
 
-/** 功能的中文名。**不直接用 `AiFeature` 字面量**，那对用户没有意义。 */
 /**
  * 某个功能在**当前路由里**缺哪些能力。
  *
@@ -129,12 +135,15 @@ export function capabilityGaps(
     .filter((x): x is { endpointId: string; missing: AiCapability[] } => x !== undefined);
 }
 
-const FEATURE_LABELS: Readonly<Record<AiFeature, string>> = {
-  capture: '一句话捕获',
-  breakdown: '拆解任务',
-  prioritize: '优先级建议',
-  'duration-estimate': '预估耗时',
-};
+/** 功能的中文名。**不直接用 `AiFeature` 字面量**，那对用户没有意义。 */
+function featureLabels(t: I18nValue['t']): Readonly<Record<AiFeature, string>> {
+  return {
+    capture: t('web.ai.feature.capture'),
+    breakdown: t('web.ai.feature.breakdown'),
+    prioritize: t('web.ai.feature.prioritize'),
+    'duration-estimate': t('web.ai.feature.duration'),
+  };
+}
 
 const FEATURE_ORDER: readonly AiFeature[] = [
   'capture',
@@ -142,6 +151,105 @@ const FEATURE_ORDER: readonly AiFeature[] = [
   'prioritize',
   'duration-estimate',
 ];
+
+/**
+ * `validateEndpointUrl()` 拒绝时的 `reason` 码。
+ *
+ * ⚠️ 镜像 `@heyta/ai` 里的那个联合类型，**不是**新造一套判断：
+ * 我们只是把跨包的中文 `message` 换成按 `reason` 取词条。
+ * 跨包的 `message` 仍然存在（CLI / 测试在用），只是界面不再渲染它 ——
+ * 门禁看不见 `{r.message}`，但用户看得见，所以这条已经出境到用户眼前的
+ * 中文只能在这里收口。
+ */
+type EndpointRejectionReason =
+  | 'unparseable'
+  | 'bad-scheme'
+  | 'credentials-in-url'
+  | 'plaintext-remote';
+
+/** 取 URL 的协议部分。只在 `bad-scheme` 这条路上用（那时 URL 已经解析成功）。 */
+function protocolOf(raw: string): string {
+  try {
+    return new URL(raw).protocol;
+  } catch {
+    return '';
+  }
+}
+
+/** 端点被拒 → 用户能读懂的句子。**按 `reason` 取词条，绝不渲染跨包的中文。** */
+function endpointRejectionText(
+  reason: EndpointRejectionReason,
+  endpoint: string,
+  t: I18nValue['t'],
+): string {
+  switch (reason) {
+    case 'unparseable':
+      return t('web.ai.settings.endpointError.unparseable', { url: endpoint });
+    case 'bad-scheme':
+      return t('web.ai.settings.endpointError.badScheme', { protocol: protocolOf(endpoint) });
+    case 'credentials-in-url':
+      return t('web.ai.settings.endpointError.credentialsInUrl');
+    case 'plaintext-remote':
+      return t('web.ai.settings.endpointError.plaintextRemote');
+  }
+}
+
+/** 本机 API 配置被拒 → 用户能读懂的句子。同上，按 `reason` 取词条。 */function localApiErrorText(
+  reason: 'not-loopback' | 'token-required' | 'bad-port',
+  config: { readonly port: number; readonly bindAddress: string },
+  t: I18nValue['t'],
+): string {
+  switch (reason) {
+    case 'bad-port':
+      return t('web.ai.settings.localApi.error.badPort', { port: config.port });
+    case 'token-required':
+      return t('web.ai.settings.localApi.error.tokenRequired');
+    case 'not-loopback':
+      return t('web.ai.settings.localApi.error.notLoopback', { address: config.bindAddress });
+  }
+}
+
+/**
+ * 预设的展示文案（名字 + 前置条件）。
+ *
+ * 🔴 原值在 `@heyta/ai` 的 `AI_ENDPOINT_PRESETS` 里 —— 跨包、且是中文。
+ * 门禁看不见它们（渲染的是变量 `preset.label` / `preset.prerequisite`），
+ * 但英文界面上用户看得见，所以在界面侧按 `id` 收口。
+ *
+ * ⚠️ 未知 `id` 回退到 **id 本身**（不是跨包中文）。理由见函数末尾那条注释。
+ */
+function presetText(
+  preset: AiEndpointPreset,
+  t: I18nValue['t'],
+): { readonly label: string; readonly prerequisite: string | undefined } {
+  switch (preset.id) {
+    case 'ollama':
+      return {
+        label: t('web.ai.settings.preset.ollama.label'),
+        prerequisite: t('web.ai.settings.preset.ollama.prerequisite'),
+      };
+    case 'lm-studio':
+      return {
+        label: t('web.ai.settings.preset.lmStudio.label'),
+        prerequisite: t('web.ai.settings.preset.lmStudio.prerequisite'),
+      };
+    default:
+      // 🔴 宁可显示 **id**，也不整句渲染跨包中文。
+      //
+      // 这条分支现在是**潜伏**的（出厂只有 ollama / lm-studio 两个预设，都走上面），
+      // 但它是真的会漏：`packages/ai` 新增一个预设而这里忘了加词条，
+      // 界面就会在英文模式下露出中文，而门禁**看不见** ——
+      // 它渲染的是变量 `preset.label`，不是字面量。
+      //
+      // 与 `preferenceLabelText` 同一约定：未知 id 原样返回。
+      // 理由也一样：**空白或误导性文案比"难看的 id"更糟** ——
+      // 前者用户以为是 bug 而放弃，后者至少能拿去搜索/报错。
+      //
+      // 这条约定由 `ai-settings.spec.tsx` 里"枚举全部出厂预设"的测试兜住：
+      // 新增预设而没加词条 → 那条测试当场变红。
+      return { label: preset.id, prerequisite: undefined };
+  }
+}
 
 export interface AiSettingsProps {
   initial: PersistedAiSettings;
@@ -162,7 +270,13 @@ export function AiSettings({ initial, secrets, onChange, memorySlot }: AiSetting
   const [settings, setSettings] = useState<PersistedAiSettings>(initial);
   const [keyDraft, setKeyDraft] = useState<Record<string, string>>({});
   /** 被拒绝的端点地址及其原因 —— 必须显示，不能静默丢弃。 */
-  const [rejected, setRejected] = useState<readonly { endpoint: string; message: string }[]>([]);
+  const [rejected, setRejected] = useState<
+    readonly { endpoint: string; reason: EndpointRejectionReason }[]
+  >([]);
+
+  const { t, locale } = useI18n();
+  const capabilityLabel = capabilityLabels(t);
+  const featureLabel = featureLabels(t);
 
   function update(next: PersistedAiSettings): void {
     setSettings(next);
@@ -177,7 +291,7 @@ export function AiSettings({ initial, secrets, onChange, memorySlot }: AiSetting
   function addEndpoint(config: AiEndpointConfig): void {
     const verdict = validateEndpointUrl(config.endpoint);
     if (!verdict.ok) {
-      setRejected((r) => [...r, { endpoint: config.endpoint, message: verdict.message }]);
+      setRejected((r) => [...r, { endpoint: config.endpoint, reason: verdict.reason }]);
       return;
     }
     setRejected((r) => r.filter((x) => x.endpoint !== config.endpoint));
@@ -229,7 +343,7 @@ export function AiSettings({ initial, secrets, onChange, memorySlot }: AiSetting
           ...routing.endpoints,
           {
             id: `custom-${String(n)}`,
-            label: `自定义端点 ${String(n)}`,
+            label: t('web.ai.settings.customLabel', { n }),
             endpoint: '',
             model: '',
             /**
@@ -333,13 +447,13 @@ export function AiSettings({ initial, secrets, onChange, memorySlot }: AiSetting
 
   return (
     <div className="ht-settings" data-testid="ai-settings">
-      <h2 className="ht-settings__title">AI</h2>
+      <h2 className="ht-settings__title">{t('web.ai.settings.title')}</h2>
 
       {/* ── 闸 1：总开关 ─────────────────────────────────────────── */}
       <Toggle
         id="ai-enabled"
-        label="启用 AI 功能"
-        note="关着的时候 heyta 不会向任何地方发送数据。"
+        label={t('web.ai.settings.enabled.label')}
+        note={t('web.ai.settings.enabled.note')}
         checked={routing.enabled}
         onChange={(v) => update({ ...settings, routing: { ...routing, enabled: v } })}
       />
@@ -352,8 +466,8 @@ export function AiSettings({ initial, secrets, onChange, memorySlot }: AiSetting
           这个是"用 AI 但要不要让它认识你"。 */}
       <Toggle
         id="ai-memory-enabled"
-        label="让 AI 记住我的偏好"
-        note="从你自己的历史里推断（任务拆解粒度、表达习惯、估时偏差等）。推断只在本机进行、不上传；关掉后 AI 照常工作，只是它不认识你。"
+        label={t('web.ai.settings.memory.label')}
+        note={t('web.ai.settings.memory.note')}
         checked={settings.memoryEnabled}
         onChange={(v) => update({ ...settings, memoryEnabled: v })}
       />
@@ -366,8 +480,8 @@ export function AiSettings({ initial, secrets, onChange, memorySlot }: AiSetting
           {/* ── 闸 2：允许远程 ───────────────────────────────────── */}
           <Toggle
             id="ai-allow-remote"
-            label="允许远程端点"
-            note="关着时只会使用本机端点（数据不离开这台设备）。"
+            label={t('web.ai.settings.allowRemote.label')}
+            note={t('web.ai.settings.allowRemote.note')}
             checked={routing.allowRemote}
             onChange={(v) => update({ ...settings, routing: { ...routing, allowRemote: v } })}
           />
@@ -376,15 +490,14 @@ export function AiSettings({ initial, secrets, onChange, memorySlot }: AiSetting
             <p className="ht-settings__danger" role="note" data-testid="remote-warning">
               <AlertTriangle size={14} aria-hidden="true" />
               <span>
-                远端端点能看到你的任务内容明文。这条路径<strong>不受端到端加密保护</strong>，
-                与任务同步是不同的通道。每个功能需要单独授权。
+                {t('web.ai.settings.remote.lead')}<strong>{t('web.ai.settings.remote.strong')}</strong>{t('web.ai.settings.remote.tail')}
               </span>
             </p>
           )}
 
           {/* ── 端点列表 ─────────────────────────────────────────── */}
           <section className="ht-settings__section">
-            <h3 className="ht-settings__h3">端点</h3>
+            <h3 className="ht-settings__h3">{t('web.ai.settings.endpoints.title')}</h3>
 
             {/* 🔴🔴 **这一段曾经写的是"我们没有提供托管 AI"，那是错的。**
                 产品负责人已明确：heyta **会**提供统一云端 AI 服务并按此收费，
@@ -396,27 +509,32 @@ export function AiSettings({ initial, secrets, onChange, memorySlot }: AiSetting
                 现在改成"即将提供"，并把**性质**说清楚：
                 用托管 AI 时内容会明文到 heyta 服务器，所以它**不是**端到端加密。 */}
             <p className="ht-settings__hint" data-testid="managed-ai-note">
-              heyta <strong>即将提供</strong>云端 AI 服务（仍在开发中，暂时无法启用）。
-              在那之前，需要你自己接一个端点（本机或远端）。
-              托管模式的性质不一样：用它的请求，你的任务内容会
-              <strong>以明文到达 heyta 的服务器</strong>，
-              所以它<strong>不是</strong>端到端加密 —— 我们会把它当例外单独标注。
+              {t('common.brand')} <strong>{t('web.ai.settings.managed.offer')}</strong>{t('web.ai.settings.managed.rest')}
+              <strong>{t('web.ai.settings.managed.strongPlain')}</strong>{t('web.ai.settings.managed.mid')}
+              <strong>{t('web.ai.settings.managed.strongNot')}</strong>{t('web.ai.settings.managed.tail')}
             </p>
 
             {routing.endpoints.length === 0 && (
               <p className="ht-settings__hint">
-                还没有端点。可以加一个本机端点 —— 它不需要授权，数据也不出设备。
+                {t('web.ai.settings.endpoints.empty')}
               </p>
             )}
 
             {/* 🔴🔴 端点健康必须显示出来 —— 否则用户看到的和实际发生的事不一致。
                 熔断的端点在界面上与正常端点**长得一模一样**，
                 用户只会看到"AI 暂时不可用"，不知道是哪个端点、也不知道多久恢复。
-                （`describeEndpointHealth` 早就写好了，一直没人调。） */}
+                ⚠️ 文案走词条表（`health-copy.ts`），**不要**再调包里的
+                `describeEndpointHealth()` —— 那返回的是中文硬编码，
+                英文界面会直接露出来。 */}
             <ul className="ht-settings__list">
               {routing.endpoints.map((endpoint) => {
                 const health = healthMap[endpoint.id];
                 const healthy = isAvailable(health, now);
+                // 结构化状态 → 词条 key + 插值参数（`health === undefined` 时没有可说的）
+                const healthCopy =
+                  health === undefined
+                    ? undefined
+                    : endpointHealthCopy(endpointHealthDisclosure(health, now));
                 const urlVerdict = validateEndpointUrl(endpoint.endpoint);
                 const destination = urlVerdict.ok
                   ? urlVerdict.destination
@@ -424,10 +542,10 @@ export function AiSettings({ initial, secrets, onChange, memorySlot }: AiSetting
                 const isLocal = destination === 'none';
                 return (
                   <li key={endpoint.id} className="ht-settings__item" data-testid={`endpoint-${endpoint.id}`}>
-                    {health !== undefined && !healthy && (
+                    {healthCopy !== undefined && !healthy && (
                       <p className="ht-settings__warn" data-testid={`endpoint-unhealthy-${endpoint.id}`}>
                         <AlertTriangle size={12} aria-hidden="true" />
-                        {describeEndpointHealth(health, now)}
+                        {t(healthCopy.key, healthCopy.params)}
                       </p>
                     )}
                     <div className="ht-settings__item-main">
@@ -435,28 +553,28 @@ export function AiSettings({ initial, secrets, onChange, memorySlot }: AiSetting
                           没有编辑能力的话"添加自定义端点"会加进一个 `https://`
                           然后**用户没有任何办法把它改对** —— 那是死路。 */}
                       <label className="ht-settings__inline">
-                        <span className="ht-settings__inline-label">名称</span>
+                        <span className="ht-settings__inline-label">{t('web.ai.settings.field.name')}</span>
                         <input
                           type="text"
-                          aria-label={`${endpoint.label} 的名称`}
+                          aria-label={t('web.ai.settings.nameAria', { name: endpoint.label })}
                           value={endpoint.label}
                           onChange={(e) => editEndpoint(endpoint.id, { label: e.target.value })}
                         />
                       </label>
                       <label className="ht-settings__inline">
-                        <span className="ht-settings__inline-label">地址</span>
+                        <span className="ht-settings__inline-label">{t('web.ai.settings.field.url')}</span>
                         <input
                           type="text"
-                          aria-label={`${endpoint.label} 的地址`}
+                          aria-label={t('web.ai.settings.urlAria', { name: endpoint.label })}
                           value={endpoint.endpoint}
                           onChange={(e) => editEndpoint(endpoint.id, { endpoint: e.target.value })}
                         />
                       </label>
                       <label className="ht-settings__inline">
-                        <span className="ht-settings__inline-label">模型</span>
+                        <span className="ht-settings__inline-label">{t('web.ai.settings.field.model')}</span>
                         <input
                           type="text"
-                          aria-label={`${endpoint.label} 的模型`}
+                          aria-label={t('web.ai.settings.modelAria', { name: endpoint.label })}
                           value={endpoint.model}
                           onChange={(e) => editEndpoint(endpoint.id, { model: e.target.value })}
                         />
@@ -464,15 +582,18 @@ export function AiSettings({ initial, secrets, onChange, memorySlot }: AiSetting
 
                       {/* 🔴 能力声明 —— 不勾就没有。见文件上方 CAPABILITY_ORDER 的说明。 */}
                       <fieldset className="ht-settings__caps">
-                        <legend className="ht-settings__inline-label">能力</legend>
+                        <legend className="ht-settings__inline-label">{t('web.ai.settings.field.capability')}</legend>
                         {CAPABILITY_ORDER.map((capability) => {
                           const declared = endpoint.capabilities?.includes(capability) ?? false;
-                          const neededBy = featuresNeeding(capability);
+                          const neededBy = featuresNeeding(capability, t, locale);
                           return (
                             <label key={capability} className="ht-settings__cap">
                               <input
                                 type="checkbox"
-                                aria-label={`${endpoint.label} 的能力 ${capability}`}
+                                aria-label={t('web.ai.settings.capabilityAria', {
+                                  capability,
+                                  name: endpoint.label,
+                                })}
                                 checked={declared}
                                 onChange={(e) => {
                                   const current = endpoint.capabilities ?? [];
@@ -482,9 +603,9 @@ export function AiSettings({ initial, secrets, onChange, memorySlot }: AiSetting
                                   editEndpoint(endpoint.id, { capabilities: next });
                                 }}
                               />
-                              <span>{CAPABILITY_LABEL[capability]}</span>
+                              <span>{capabilityLabel[capability]}</span>
                               {neededBy !== '' && (
-                                <span className="ht-settings__cap-hint">（{neededBy}）</span>
+                                <span className="ht-settings__cap-hint">{`${PAIRED_PARENS[locale][0]}${neededBy}${PAIRED_PARENS[locale][1]}`}</span>
                               )}
                             </label>
                           );
@@ -493,7 +614,7 @@ export function AiSettings({ initial, secrets, onChange, memorySlot }: AiSetting
                       {urlVerdict !== undefined && !urlVerdict.ok && (
                         <span className="ht-settings__tag--remote" data-testid={`endpoint-invalid-${endpoint.id}`}>
                           <AlertTriangle size={12} aria-hidden="true" />
-                          {urlVerdict.message}
+                          {endpointRejectionText(urlVerdict.reason, endpoint.endpoint, t)}
                         </span>
                       )}
                       <span
@@ -501,11 +622,11 @@ export function AiSettings({ initial, secrets, onChange, memorySlot }: AiSetting
                       >
                         {isLocal ? (
                           <>
-                            <ShieldCheck size={12} aria-hidden="true" /> 本机，数据不出设备
+                            <ShieldCheck size={12} aria-hidden="true" /> {t('web.ai.settings.tag.local')}
                           </>
                         ) : (
                           <>
-                            <AlertTriangle size={12} aria-hidden="true" /> 远端，数据会离开设备
+                            <AlertTriangle size={12} aria-hidden="true" /> {t('web.ai.settings.tag.remote')}
                           </>
                         )}
                       </span>
@@ -515,8 +636,8 @@ export function AiSettings({ initial, secrets, onChange, memorySlot }: AiSetting
                           <Lock size={12} aria-hidden="true" />
                           <input
                             type="password"
-                            aria-label={`${endpoint.label} 的密钥`}
-                            placeholder={secrets.knownRefs().includes(endpoint.keyRef) ? '已在本次会话中' : '输入密钥'}
+                            aria-label={t('web.ai.settings.keyAria', { name: endpoint.label })}
+                            placeholder={secrets.knownRefs().includes(endpoint.keyRef) ? t('web.ai.settings.keyKnown') : t('web.ai.settings.keyPlaceholder')}
                             value={keyDraft[endpoint.keyRef] ?? ''}
                             onChange={(e) => {
                               setKeyDraft((d) => ({ ...d, [endpoint.keyRef as string]: e.target.value }));
@@ -533,7 +654,7 @@ export function AiSettings({ initial, secrets, onChange, memorySlot }: AiSetting
                               update({ ...settings });
                             }}
                           >
-                            记住（本次会话）
+                            {t('web.ai.settings.keyRemember')}
                           </button>
                         </span>
                       )}
@@ -541,7 +662,7 @@ export function AiSettings({ initial, secrets, onChange, memorySlot }: AiSetting
                     <button
                       type="button"
                       className="ht-btn ht-btn--ghost"
-                      aria-label={`删除端点 ${endpoint.label}`}
+                      aria-label={t('web.ai.settings.deleteAria', { name: endpoint.label })}
                       onClick={() => removeEndpoint(endpoint.id)}
                     >
                       <Trash2 size={14} aria-hidden="true" />
@@ -554,6 +675,7 @@ export function AiSettings({ initial, secrets, onChange, memorySlot }: AiSetting
             <div className="ht-settings__actions">
               {AI_ENDPOINT_PRESETS.map((preset) => {
                 const added = routing.endpoints.some((e) => e.id === preset.id);
+                const copy = presetText(preset, t);
                 return (
                   <button
                     key={preset.id}
@@ -561,11 +683,13 @@ export function AiSettings({ initial, secrets, onChange, memorySlot }: AiSetting
                     className="ht-btn ht-btn--ghost"
                     disabled={added}
                     data-testid={`add-preset-${preset.id}`}
-                    title={preset.prerequisite}
-                    onClick={() => addEndpoint(preset.config)}
+                    title={copy.prerequisite}
+                    onClick={() => addEndpoint({ ...preset.config, label: copy.label })}
                   >
                     <Plus size={14} aria-hidden="true" />
-                    {added ? `已添加 ${preset.label}` : `添加 ${preset.label}`}
+                    {added
+                      ? t('web.ai.settings.presetAdded', { name: copy.label })
+                      : t('web.ai.settings.presetAdd', { name: copy.label })}
                   </button>
                 );
               })}
@@ -576,7 +700,7 @@ export function AiSettings({ initial, secrets, onChange, memorySlot }: AiSetting
                 onClick={addCustomEndpoint}
               >
                 <Plus size={14} aria-hidden="true" />
-                添加自定义端点
+                {t('web.ai.settings.addCustom')}
               </button>
             </div>
 
@@ -585,7 +709,7 @@ export function AiSettings({ initial, secrets, onChange, memorySlot }: AiSetting
                 {rejected.map((r) => (
                   <li key={r.endpoint}>
                     <AlertTriangle size={12} aria-hidden="true" />
-                    {r.message}
+                    {endpointRejectionText(r.reason, r.endpoint, t)}
                   </li>
                 ))}
               </ul>
@@ -594,9 +718,9 @@ export function AiSettings({ initial, secrets, onChange, memorySlot }: AiSetting
 
           {/* ── 功能路由 + 逐功能授权 ────────────────────────────── */}
           <section className="ht-settings__section">
-            <h3 className="ht-settings__h3">功能</h3>
+            <h3 className="ht-settings__h3">{t('web.ai.settings.features.title')}</h3>
             <p className="ht-settings__hint">
-              勾选哪个端点给哪个功能用。<strong>列表顺序就是尝试顺序</strong>（靠前的先试）。
+              {t('web.ai.settings.features.hintLead')}<strong>{t('web.ai.settings.features.hintStrong')}</strong>{t('web.ai.settings.features.hintTail')}
             </p>
 
             {FEATURE_ORDER.map((feature) => {
@@ -604,7 +728,7 @@ export function AiSettings({ initial, secrets, onChange, memorySlot }: AiSetting
               const needsConsent = enabled && routeTouchesRemote(feature) && !hasConsent(feature);
               return (
                 <div key={feature} className="ht-settings__feature" data-testid={`feature-${feature}`}>
-                  <span className="ht-settings__feature-name">{FEATURE_LABELS[feature]}</span>
+                  <span className="ht-settings__feature-name">{featureLabel[feature]}</span>
                   <div className="ht-settings__chips">
                     {routing.endpoints.map((endpoint) => {
                       const on = (routing.routes[feature] ?? []).some(
@@ -624,15 +748,15 @@ export function AiSettings({ initial, secrets, onChange, memorySlot }: AiSetting
                       );
                     })}
                     {routing.endpoints.length === 0 && (
-                      <span className="ht-settings__hint">先添加端点</span>
+                      <span className="ht-settings__hint">{t('web.ai.settings.features.empty')}</span>
                     )}
                   </div>
 
                   {needsConsent && (
                     <div className="ht-settings__consent" data-testid={`consent-${feature}`}>
-                      <span>「{FEATURE_LABELS[feature]}」有远端端点，需要你授权数据出境。</span>
+                      <span>{t('web.ai.settings.consentLead', { feature: featureLabel[feature] })}</span>
                       <button type="button" className="ht-btn ht-btn--primary" onClick={() => grant(feature)}>
-                        授权
+                        {t('web.ai.settings.grant')}
                       </button>
                     </div>
                   )}
@@ -648,9 +772,9 @@ export function AiSettings({ initial, secrets, onChange, memorySlot }: AiSetting
                     return (
                       <div className="ht-settings__warn" data-testid={`cap-gap-${feature}`}>
                         <span>
-                          ⚠️ 「{FEATURE_LABELS[feature]}」需要
-                          {first.missing.map((c) => CAPABILITY_LABEL[c]).join('、')}
-                          ，但<strong>{endpoint.label}</strong>没有声明它 —— 这个功能会一直不工作。
+                          {t('web.ai.settings.gapLead', { feature: featureLabel[feature] })}
+                          {first.missing.map((c) => capabilityLabel[c]).join(LIST_SEPARATOR[locale])}
+                          {t('web.ai.settings.gapMid')}<strong>{endpoint.label}</strong>{t('web.ai.settings.gapTail')}
                         </span>
                         <button
                           type="button"
@@ -663,7 +787,7 @@ export function AiSettings({ initial, secrets, onChange, memorySlot }: AiSetting
                             editEndpoint(endpoint.id, { capabilities: merged });
                           }}
                         >
-                          给「{endpoint.label}」补上
+                          {t('web.ai.settings.gapFix', { name: endpoint.label })}
                         </button>
                       </div>
                     );
@@ -672,10 +796,10 @@ export function AiSettings({ initial, secrets, onChange, memorySlot }: AiSetting
                   {enabled && hasConsent(feature) && (
                     <div className="ht-settings__consent" data-testid={`granted-${feature}`}>
                       <span>
-                        <ShieldCheck size={12} aria-hidden="true" /> 已授权数据出境
+                        <ShieldCheck size={12} aria-hidden="true" /> {t('web.ai.settings.granted')}
                       </span>
                       <button type="button" className="ht-btn ht-btn--ghost" onClick={() => revoke(feature)}>
-                        撤销
+                        {t('web.ai.settings.revoke')}
                       </button>
                     </div>
                   )}
@@ -688,10 +812,9 @@ export function AiSettings({ initial, secrets, onChange, memorySlot }: AiSetting
 
       {/* ── 闸 3（入站）：本机 API ───────────────────────────────── */}
       <section className="ht-settings__section">
-        <h3 className="ht-settings__h3">本机 API</h3>
+        <h3 className="ht-settings__h3">{t('web.ai.settings.localApi.title')}</h3>
         <p className="ht-settings__hint">
-          让本机的其他程序（编辑器、脚本、AI 助手）读写你的任务。
-          <strong>默认关闭，且每个工具要单独打开。</strong>
+          {t('web.ai.settings.localApi.hintLead')}<strong>{t('web.ai.settings.localApi.hintStrong')}</strong>
         </p>
 
         {/* 🔴🔴 **这一段是诚实的必要部分，不是说明文字。**
@@ -701,16 +824,16 @@ export function AiSettings({ initial, secrets, onChange, memorySlot }: AiSetting
             而实际上什么都不会发生，也不会有任何报错。 */}
         <p className="ht-settings__warn" data-testid="local-api-source-note">
           <AlertTriangle size={12} aria-hidden="true" />
-          下面这些只存在**浏览器**里。真正让 MCP 服务生效的是配置文件
-          <code>文件 ~/.heyta/local-api.json</code>，要用命令行生成：
-          <code>命令 heyta-ai local-api init</code>
-          （它会生成 token 并打印客户端配置片段）。两边目前**不会自动同步**。
+          {t('web.ai.settings.localApi.source.part1')}
+          <code>{t('web.ai.settings.localApi.source.file')}</code>{t('web.ai.settings.localApi.source.part2')}
+          <code>{t('web.ai.settings.localApi.source.command')}</code>
+          {t('web.ai.settings.localApi.source.part3')}
         </p>
 
         <Toggle
           id="local-api-enabled"
-          label="启用本机 API"
-          note={`只监听 ${localApi.bindAddress}，不会暴露到局域网。`}
+          label={t('web.ai.settings.localApi.enabled.label')}
+          note={t('web.ai.settings.localApi.enabled.note', { address: localApi.bindAddress })}
           checked={localApi.enabled}
           onChange={(v) => update({ ...settings, localApi: { ...localApi, enabled: v } })}
         />
@@ -718,23 +841,22 @@ export function AiSettings({ initial, secrets, onChange, memorySlot }: AiSetting
         {localApi.enabled && (
           <>
             <label className="ht-settings__field">
-              <span>访问 token</span>
+              <span>{t('web.ai.settings.localApi.token.label')}</span>
               <input
                 type="text"
-                aria-label="本机 API 访问 token"
+                aria-label={t('web.ai.settings.localApi.token.aria')}
                 value={localApi.token ?? ''}
                 onChange={(e) => update({ ...settings, localApi: { ...localApi, token: e.target.value } })}
               />
             </label>
             <p className="ht-settings__hint">
-              token 防的是这台机器上的其他程序，不是网络攻击 —— 没有它，
-              任何程序都能读走你的全部任务。
+              {t('web.ai.settings.localApi.token.hint')}
             </p>
 
             {!localApiVerdict.ok && (
               <p className="ht-settings__danger" role="alert" data-testid="local-api-error">
                 <AlertTriangle size={14} aria-hidden="true" />
-                <span>{localApiVerdict.message}</span>
+                <span>{localApiErrorText(localApiVerdict.reason, localApi, t)}</span>
               </p>
             )}
 
@@ -760,7 +882,9 @@ export function AiSettings({ initial, secrets, onChange, memorySlot }: AiSetting
                     <span>
                       {tool.name}
                       <em className="ht-settings__tool-kind">
-                        {tool.kind === 'write' ? '会改数据' : '只读'}
+                        {tool.kind === 'write'
+                          ? t('web.ai.settings.localApi.kind.write')
+                          : t('web.ai.settings.localApi.kind.read')}
                       </em>
                     </span>
                   </label>
@@ -773,7 +897,7 @@ export function AiSettings({ initial, secrets, onChange, memorySlot }: AiSetting
 
       <p className="ht-settings__notice" data-testid="key-notice">
         <Lock size={12} aria-hidden="true" />
-        {WEB_KEY_STORAGE_NOTICE}
+        {t('web.ai.settings.keyNotice')}
       </p>
 
       <button
@@ -786,7 +910,7 @@ export function AiSettings({ initial, secrets, onChange, memorySlot }: AiSetting
           update(defaultAiSettings());
         }}
       >
-        恢复默认（全部关闭）
+        {t('web.ai.settings.reset')}
       </button>
     </div>
   );

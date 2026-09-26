@@ -701,6 +701,7 @@ const PREF_SET = (memoryEnabled: boolean): PreferenceSet => ({
     value: 6,
     sampleSize: 12,
     confidence: 0.9,
+    evidenceFacts: { kind: 'granularity', items: 6, samples: 12 },
     evidence: '你的 12 条带清单任务，中位数是 6 项',
   },
   titleStyle: null,

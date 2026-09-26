@@ -81,3 +81,63 @@
 | `git commit -- <path>` 不带未跟踪文件 | 新建文件必须先 `git add` |
 | 把"商家能收款"当成"买家能付款" | Creem 的结论就是这么错的 —— **两个方向是不同的能力，要分开检查** |
 | 本地绿、CI 红 | 干净检出 + UTC 才是真相 |
+
+---
+
+## 9. 两件"需要协调才能做"的收尾（不是技术问题，是共享工作区问题）
+
+### 9.1 给 server 加 `@heyta/domain` 依赖（正解，但被挡住）
+
+`server/src/billing/extend-period.ts` 是 `packages/domain/src/subscription.ts`
+里 `extendSubscriptionPeriod` 的**镜像**，因为服务端**无法 import 它**：
+`server/package.json` 的 dependencies 里没有 `@heyta/domain`，而相对路径 import
+会撞 `rootDir`（TS6059）+ ESM/CJS 不匹配。
+
+**镜像目前是安全的**：`billing-extend-period.spec.ts` 是漂移守卫，
+它直接 import domain 那份源文件，把两份实现放在同一张用例表上比对。
+**风险是被检测的，不是被假设的。**
+
+正解：给 `server/package.json` 加 `"@heyta/domain": "workspace:*"`，
+删掉 `extend-period.ts` 与漂移守卫，改为直接 import。
+
+🔴 **为什么当时没做**：`server/package.json` 与 `pnpm-lock.yaml` 此刻**都有
+另一个 agent 的未提交改动**（`server/package.json` 上是删掉 `prebuild` 那行；
+lockfile 上还有 landing 页 agent 的改动）。改它们、尤其跑 `pnpm install`
+去重写 lockfile，会把别人的在途状态一起搅进来。
+**等这两个文件干净后再做，或者由正在改它们的那个会话做。**
+
+### 9.2 让 AI / i18n 那批未提交改动进版本库
+
+工作区里有一大批**功能上已完成且全绿**但未提交的改动：
+
+- `packages/i18n/**`（**全新包**，17 个文件；`dist/` 与 `*.tsbuildinfo` 已被 gitignore）
+- `packages/ai/src/{egress,health-store,index,provider,supply}.ts` + `tests/health-store.spec.ts`
+- `apps/web/src/features/ai/{AiBreakdown,AiCapture,AiDuration,AiPrioritize}.tsx`
+  + 三个新文件 `ai-failure-copy.ts` / `disclosure-copy.ts` / `locale-punctuation.ts`
+- `packages/ai/tests/disclosure-shape.spec.ts`（新）
+- `apps/{web,mobile,landing}/package.json` 与根 `package.json`
+
+**实测全绿**：`check-ai-coverage` ✅ 4 个功能端到端可达、`check:ai-e2e` ✅ 11 passed、
+`packages/ai` 144 passed、`apps/web` **465 passed | 12 skipped**（我前几轮报的 44 条红已清零）。
+
+🔴 **为什么没有替它提交**：这不是一个能"按显式路径切出来"的提交 ——
+AI 文件 import `@heyta/i18n`，所以 **`packages/i18n` 必须同一个提交**；
+而那个包又需要 `apps/*/package.json` + 根 `package.json` + **`pnpm-lock.yaml`** 的
+依赖声明。问题在于：
+
+1. `server/package.json` 与 `pnpm-lock.yaml` 上**混着别人的在途改动**；
+2. `apps/landing/package.json` 处于 **`AM`** 状态（既已 staged 又有未 staged 改动），
+   它属于 landing 页那个 agent；
+3. lockfile 是生成物，**没法像源码那样做"只挑我这几行"的切片** ——
+   要么整个文件一起提交（带上别人的改动），要么不提交。
+
+所以**提交它要么漏掉 lockfile 导致 CI 装不上，要么连别人的半成品一起署名**。
+这两条都是这个仓库里已经犯过的错。**应该由正在改 i18n 的那个 agent 自己提交。**
+
+### 9.3 已经做完的收尾（供对照）
+
+- ✅ **金额校验**（`fb14eba`）：微信回调必须金额落在价目表上，否则**不授予**。
+  详见 `docs/plans/subscription-boundary.md` §6 与代码注释里的强度上限说明。
+- ✅ **本地凭证**：`server/.env`（0600、gitignore、git 看不见）已写入借用的
+  `WX_*` 六个变量。⚠️ 是**别家公司的**，新凭证到位后替换并**停用旧的**。
+

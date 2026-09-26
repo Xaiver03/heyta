@@ -43,6 +43,7 @@
  */
 
 import { cssVar } from '@heyta/design-system';
+import type { I18nValue, MessageKey } from '@heyta/i18n';
 
 export function heatmapTheme(): { light: string[]; dark: string[] } {
   const levels = [
@@ -70,17 +71,39 @@ export function heatmapTheme(): { light: string[]; dark: string[] } {
  * 截图里出现过 `Oct Nov Dec …`、`1 activities in 2025`、`Less / More`。
  * 界面文案门禁只看我们自己的源码，看不见库生成的字符串 ——
  * 所以这一条只能靠**真的看一眼**才发现。
+ *
+ * ⚠️ 月份与图例**也必须走词条表**：它们同样是画在界面上的字，
+ * 而应用现在有英文界面 —— 英文界面上写着「1月」与「少 / 多」是漏翻，
+ * 不是"这个库只能这样"。库只要求我们**传**字符串，不要求我们写死中文。
  */
-export function activityLabels(totalCount: string): {
+const MONTH_KEYS = [
+  'web.heatmap.month.1',
+  'web.heatmap.month.2',
+  'web.heatmap.month.3',
+  'web.heatmap.month.4',
+  'web.heatmap.month.5',
+  'web.heatmap.month.6',
+  'web.heatmap.month.7',
+  'web.heatmap.month.8',
+  'web.heatmap.month.9',
+  'web.heatmap.month.10',
+  'web.heatmap.month.11',
+  'web.heatmap.month.12',
+] as const satisfies readonly MessageKey[];
+
+export function activityLabels(
+  totalCount: string,
+  t: I18nValue['t'],
+): {
   months: string[];
   totalCount: string;
   legend: { less: string; more: string };
 } {
   return {
-    months: ['1月', '2月', '3月', '4月', '5月', '6月', '7月', '8月', '9月', '10月', '11月', '12月'],
+    months: MONTH_KEYS.map((key) => t(key)),
     // 调用方自己写这句 —— 习惯页是 90 天、成长页是滚动一年，
     // 用同一句"最近一年"会在其中一个页面上说谎。
     totalCount,
-    legend: { less: '少', more: '多' },
+    legend: { less: t('web.heatmap.less'), more: t('web.heatmap.more') },
   };
 }

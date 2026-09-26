@@ -307,6 +307,107 @@ const WEEKDAY_NAMES: Record<string, string> = {
   SU: '日',
 };
 
+/** 解析失败一律返回 `null`，调用方自己决定怎么显示原始串。 */
+function parseRecur(rule: string): ICAL.Recur | null {
+  try {
+    return ICAL.Recur.fromString(rule);
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * 规则的**结构化**描述：只说"是什么"，不说"怎么说"。
+ *
+ * ## 为什么要有它
+ *
+ * `describeRecurrence` 把语义和措辞焊在了一起 —— 它返回的是**中文句子**
+ * （「每周一、三」）。这对单语时代没问题，但它意味着：任何要按别的语言渲染的壳
+ * 都只能**再写一个 RRULE 解析器**，而 RFC 5545 的 `BYDAY`/`BYMONTHDAY` 组合语义
+ * 极为刁钻（本文件开头那段警告），两份解析器迟早会在某个边缘上分叉，
+ * 而且是"看起来对、偶尔错一次"那种。
+ *
+ * 所以把解析结果抽出来：`packages/domain` 仍然是**唯一**的解析者，
+ * 措辞交给壳（`apps/mobile/src/lib/recurrence-display.ts` 是第一个消费者）。
+ * 与 `formatRemaining` → `remainingText` 是同一个套路：语义留域层，措辞搬壳里。
+ *
+ * ## 返回 `null` 的含义
+ *
+ * `null` = **这条规则描述不了**，调用方应当直接显示原始串。三种情况：
+ * 解析失败、`FREQ` 不是我们认识的那四种、或者数据形状超出预期
+ * （例如认不出的星期码 —— 这种输入在 RFC 里不合法，但规则串是外部来源，
+ * 不能假设它合法）。
+ *
+ * 🔴 这里**刻意比 `describeRecurrence` 严格**：后者认不出星期码时会原样回显
+ * （`周+1MO`），而回显一个内部码更像是 bug 而不是解释。两条路径对**合法**输入
+ * 逐字一致，这一点由 `apps/mobile/tests/recurrence-display.spec.ts` 里的
+ * 等价性用例钉住（拿 `describeRecurrence` 当独立参照）。
+ */
+export type RecurrenceParts =
+  | { kind: 'daily'; interval: number }
+  | { kind: 'weekly'; interval: number; weekdays: string[] }
+  | { kind: 'monthlyByMonthDay'; interval: number; monthDays: number[] }
+  | { kind: 'monthlyByWeekday'; interval: number; byDays: string[] }
+  | { kind: 'monthly'; interval: number }
+  | { kind: 'yearly'; interval: number; months: number[]; monthDays: number[] };
+
+export function recurrenceParts(rule: string): RecurrenceParts | null {
+  const recur = parseRecur(rule);
+  if (recur === null) return null;
+
+  const interval = (recur.interval ?? 1) as number;
+
+  switch (recur.freq) {
+    case 'DAILY':
+      return { kind: 'daily', interval };
+
+    case 'WEEKLY': {
+      const days = recur.parts.BYDAY ?? [];
+      if (days.length === 0) return { kind: 'weekly', interval, weekdays: [] };
+      const weekdays: string[] = [];
+      for (const day of days) {
+        // WEEKLY 的 BYDAY 按 RFC 不带序数，但仍然剥一次：串是外部来源，
+        // 写成 `+1MO` 时不该把它当成一个"星期码"。
+        const code = day.replace(/^[+-]?\d*/, '');
+        if (WEEKDAY_NAMES[code] === undefined) return null;
+        weekdays.push(code);
+      }
+      return { kind: 'weekly', interval, weekdays };
+    }
+
+    case 'MONTHLY': {
+      const rawMonthDays = recur.parts.BYMONTHDAY ?? [];
+      if (rawMonthDays.length > 0) {
+        const monthDays = rawMonthDays.map(toNumber);
+        // 认不出数字就**不猜**：宁可显示原始串，也不要显示一个编出来的日子。
+        if (monthDays.some((n) => !Number.isFinite(n))) return null;
+        return { kind: 'monthlyByMonthDay', interval, monthDays };
+      }
+      const days = recur.parts.BYDAY ?? [];
+      if (days.length > 0) {
+        // `+2WE` / `-1FR` 的序数**必须保留**：「每月第 2 个周三」和「每个周三」是两回事。
+        return { kind: 'monthlyByWeekday', interval, byDays: [...days] };
+      }
+      return { kind: 'monthly', interval };
+    }
+
+    case 'YEARLY': {
+      const months = (recur.parts.BYMONTH ?? []).map(toNumber);
+      const monthDays = (recur.parts.BYMONTHDAY ?? []).map(toNumber);
+      if (months.some((n) => !Number.isFinite(n))) return null;
+      if (monthDays.some((n) => !Number.isFinite(n))) return null;
+      return { kind: 'yearly', interval, months, monthDays };
+    }
+
+    default:
+      return null;
+  }
+}
+
+function toNumber(raw: number | string): number {
+  return typeof raw === 'number' ? raw : Number(raw);
+}
+
 /**
  * 规则的人类可读描述（中文）。取不到就用原始串。
  *
@@ -334,12 +435,8 @@ const WEEKDAY_NAMES: Record<string, string> = {
  * 而不是只给一个「每月」——用户无法从「每月」知道是哪一天。
  */
 export function describeRecurrence(rule: string): string {
-  let recur: ICAL.Recur;
-  try {
-    recur = ICAL.Recur.fromString(rule);
-  } catch {
-    return rule;
-  }
+  const recur = parseRecur(rule);
+  if (recur === null) return rule;
 
   const interval = (recur.interval ?? 1) as number;
   // 「每」是频率词的一部分，**不能**只在 interval > 1 时才出现。

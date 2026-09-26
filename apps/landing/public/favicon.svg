@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="heyta">
+  <!--
+    品牌标记的出处：落地页导航里的 .lp-brand__dot 就是一个主色满圆点，
+    后面跟 "heyta" 字标。这里把那个圆点放大成图标底板，再压上字标首字母，
+    因为纯圆点在 16px 的标签页里和一堆其他站点分不出来。
+
+    "h" 用 path 描边而不是 <text>：favicon 里用 <text> 会依赖系统字体，
+    不同平台/容器渲染出的字形与宽度都不一样，而 path 是确定的。
+
+    色值 #2563eb 就是亮色下的主色（设计令牌 ht-blue-600，见 tokens.css:27）。
+    这里没法用 var()：favicon 是独立文档，拿不到落地页的 CSS 变量。
+
+    ⚠️ 上面把令牌名写成不带前导连字符的样子，不是笔误 ——
+    XML 注释里不允许出现连续两个连字符（U+002D）。写全了整份 SVG 就是
+    非法 XML，浏览器不会显示图标，而是渲染一个 XML 错误页，而 HTTP 层
+    依然是 200 + image/svg+xml，光看响应码根本发现不了。
+    所以不要把这个令牌名的前导连字符补回来。
+  -->
+  <circle cx="32" cy="32" r="32" fill="#2563eb" />
+  <path
+    d="M24 16 V50 M24 34 a8 8 0 0 1 16 0 V50"
+    fill="none"
+    stroke="#ffffff"
+    stroke-width="7"
+    stroke-linecap="round"
+  />
+</svg>

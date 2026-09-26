@@ -30,10 +30,13 @@ import React, { useEffect, useState } from 'react';
 import { View } from 'react-native';
 import type { SyncStatus } from '@heyta/sync-client';
 import { classifyTransportSecurity } from '@heyta/sync-client';
+import { LOCALES, useI18n } from '@heyta/i18n';
 import { isArgon2SlowBackend } from '@heyta/sync-core';
 
-import { Button, Card, Divider, Screen, SectionHeader, Text, TextField } from '../ui/kit';
+import { Button, Card, Chip, Divider, Screen, SectionHeader, Text, TextField } from '../ui/kit';
 import { ConflictSheet } from './ConflictSheet';
+import { ListsSection } from './ListsSection';
+import { useLocalePreference } from '../i18n/locale-preference';
 import { formatStamp } from '../lib/date';
 import { describeSyncStatus, statusTone } from '../sync/status-text';
 import { useMobileSync, refreshPendingUpload, syncNow } from '../sync/store';
@@ -46,6 +49,21 @@ import {
 
 export function ProfileScreen(): React.JSX.Element {
   const { status, lastSyncedAt, pendingUpload, busy } = useMobileSync();
+  const { t } = useI18n();
+  /**
+   * 🔴 语言偏好**只放内存**，与凭据同一个取舍（见文件头与 `sync/config.ts`）。
+   *
+   * 代价是真实存在的：重开应用会回到设备语言，用户在这里选的英文"消失"。
+   * 之所以仍然不落盘：
+   *   1. 落盘要引入一个持久化键，而**偏好存储是 `packages/domain` /
+   *      同步 schema 的事** —— 自己塞一个 `AsyncStorage` 键会造出
+   *      一个谁也同步不到、也不受迁移管理的影子状态。
+   *   2. 现在只有两种语言、且默认就跟随设备，收益（少点一次）远小于
+   *      多一处"看起来生效了、其实另一台设备上没有"的状态。
+   * 界面上因此明说"重开会回到设备语言"（`mobile.profile.language.hint`），
+   * 而不是让用户自己发现。
+   */
+  const { locale, setLocale } = useLocalePreference();
 
   // 🔴 初值从**活配置**里读，而不是各写一份空字符串 ——
   // 否则切走再切回来（本组件会卸载重建）会把用户刚填的内容抹掉，
@@ -117,47 +135,69 @@ export function ProfileScreen(): React.JSX.Element {
     void syncNow();
   };
 
+  /**
+   * 「待上传」的三态文案**在 JSX 外面算好**。
+   *
+   * 🔴 两个理由，都会真的踩到：
+   *   1. 三态：`undefined` 是"还没读到"，`0` 是"全部上传完"，两者都不能显示成数字。
+   *   2. 门禁只认"字面量紧跟在 `t(` 之后"这一种形状；在属性里写
+   *      `t(count === 1 ? 'a' : 'b')` 会被判成硬编码文案
+   *      （落地页 `Nav.tsx` 记着同一条教训）。
+   *
+   * 顺带把英文单复数也放进这一层（词条表没有 ICU）：`1` 走单数兄弟词条，
+   * 否则英文会渲染成 `1 items`。
+   */
+  const pendingValue =
+    pendingUpload === undefined
+      ? t('mobile.profile.pending.loading')
+      : pendingUpload === 0
+        ? t('mobile.profile.pending.allUploaded')
+        : t(
+            pendingUpload === 1 ? 'mobile.profile.pending.countOne' : 'mobile.profile.pending.count',
+            { count: pendingUpload },
+          );
+
   return (
-    <Screen title="我的">
-      <SectionHeader icon="action.sync" title="同步" />
+    <Screen title={t('mobile.profile.title')}>
+      <SectionHeader icon="action.sync" title={t('mobile.profile.section.sync')} />
       <Card>
         <View style={{ gap: 16 }}>
           <TextField
-            label="服务器地址"
+            label={t('mobile.profile.serverUrl.label')}
             value={serverUrl}
             onChangeText={setServerUrl}
             placeholder={DEFAULT_SERVER_URL}
             keyboard="url"
-            hint="模拟器填 10.0.2.2（指向这台电脑）；真机填局域网地址。"
+            hint={t('mobile.profile.serverUrl.hint')}
           />
           {transport === 'plaintext' ? (
             <Text variant="caption" tone="warning">
-              {'明文连接，且目标不像是本机网段。访问令牌会以明文经过网络、可能被截获。任务内容仍是端到端加密的，但公网请务必改用 https://。'}
+              {t('mobile.profile.transport.plaintext')}
             </Text>
           ) : null}
           {transport === 'plaintext-local' ? (
             <Text variant="caption" tone="warning">
-              {'明文连接（本机/局域网）。任务内容是端到端加密的，但访问令牌会以明文经过网络，只建议在可信网络里这样用。'}
+              {t('mobile.profile.transport.plaintextLocal')}
             </Text>
           ) : null}
           <TextField
-            label="访问令牌"
+            label={t('mobile.profile.token.label')}
             value={token}
             onChangeText={setToken}
-            placeholder="登录服务端后获得"
+            placeholder={t('mobile.profile.token.placeholder')}
           />
           <TextField
-            label="端到端加密口令"
+            label={t('mobile.profile.password.label')}
             value={password}
             onChangeText={setPassword}
             secure
-            hint="只存在内存里，应用重启后需要重新输入。服务端看不到明文。"
+            hint={t('mobile.profile.password.hint')}
           />
         </View>
       </Card>
 
       <Button
-        label={busy ? '正在同步…' : '立即同步'}
+        label={busy ? t('mobile.profile.sync.busy') : t('mobile.profile.sync.now')}
         onPress={onSync}
         tone="primary"
         icon="action.sync"
@@ -166,16 +206,16 @@ export function ProfileScreen(): React.JSX.Element {
       />
       {!configured ? (
         <Text variant="caption" tone="subtle" style={{ textAlign: 'center' }}>
-          填好服务器地址与访问令牌后才能同步。
+          {t('mobile.profile.sync.notConfigured')}
         </Text>
       ) : null}
       {configured && slowKdf && status.kind !== 'synced' ? (
         <Text variant="caption" tone="muted" style={{ textAlign: 'center' }}>
-          {'这台设备没有 WebAssembly，密钥派生要用纯 JS 计算：首次同步需等待约 30–40 秒，同一会话内之后就会很快。任务内容不受影响，照常可离线使用。'}
+          {t('mobile.profile.sync.slowKdf')}
         </Text>
       ) : null}
 
-      <SectionHeader icon="action.settings" title="状态" />
+      <SectionHeader icon="action.settings" title={t('mobile.profile.section.status')} />
       <Card>
         <View style={{ gap: 12 }}>
           <StatusRow
@@ -187,29 +227,25 @@ export function ProfileScreen(): React.JSX.Element {
           />
           <Divider />
           <Row
-            label="待上传"
-            // 🔴 三态，不是两态。`0` 也要显示成"已全部上传" —— 留空会让用户
-            // 分不清"没有待上传"和"还没读到"。但**还没读到就绝不能显示 0**：
-            // 实测过本地躺着一条从未同步的任务时，界面写的是"已全部上传"。
-            value={
-              pendingUpload === undefined
-                ? '读取中…'
-                : pendingUpload === 0
-                  ? '已全部上传'
-                  : `${String(pendingUpload)} 项`
-            }
+            label={t('mobile.profile.pending.label')}
+            // 三态 + 英文单复数的分支都在 `pendingValue` 里（见上面的注释）。
+            value={pendingValue}
             tone={pendingUpload === undefined || pendingUpload === 0 ? 'muted' : 'default'}
           />
           <Row
-            label="上次成功同步"
-            value={lastSyncedAt === undefined ? '从未' : formatStamp(lastSyncedAt)}
+            label={t('mobile.profile.lastSync.label')}
+            value={
+              lastSyncedAt === undefined
+                ? t('mobile.profile.lastSync.never')
+                : formatStamp(lastSyncedAt)
+            }
             tone={lastSyncedAt === undefined ? 'subtle' : 'muted'}
           />
         </View>
       </Card>
 
       <Button
-        label="清除本机保存的凭据"
+        label={t('mobile.profile.clearCredentials')}
         onPress={() => {
           clearSyncConfig();
           setToken('');
@@ -220,8 +256,37 @@ export function ProfileScreen(): React.JSX.Element {
       />
 
       <Text variant="caption" tone="subtle">
-        凭据只保留在内存中，应用完全退出后需要重新输入。
-        日历、专注、清单与标签管理尚未实现。
+        {t('mobile.profile.footnote')}
+      </Text>
+
+      {/* 🔴 语言切换放在「我的」而不是顶部：它不是高频操作，
+          放进顶栏会让每一次切屏都多一个不该点的目标。
+          切换**只改内存里的状态**（`LocalePreferenceProvider`），
+          理由与代价见上面 `useLocalePreference()` 那段注释。 */}
+      <SectionHeader icon="action.settings" title={t('mobile.profile.section.language')} />
+      <Card>
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12 }}>
+          {LOCALES.map((code) => {
+            // 语言名永远用**它自己的语言**写（中文 / English），
+            // 不跟着当前语言翻译 —— 否则用户在英文界面里找"中文"
+            // 时会看到 "Chinese"，而他要找的正是"中文"两个字。
+            // 顺带：先算成变量再绑，字面量就不会落在 label 的花括号表达式里。
+            const label = code === 'zh-CN' ? t('common.lang.zh') : t('common.lang.en');
+            return (
+              <Chip
+                key={code}
+                label={label}
+                selected={locale === code}
+                onPress={() => {
+                  setLocale(code);
+                }}
+              />
+            );
+          })}
+        </View>
+      </Card>
+      <Text variant="caption" tone="subtle">
+        {t('mobile.profile.language.hint')}
       </Text>
 
       <ConflictSheet
@@ -230,6 +295,11 @@ export function ProfileScreen(): React.JSX.Element {
           setConflictsOpen(false);
         }}
       />
+
+      {/* 清单管理。放在最后：它读的是**本地已物化状态**，
+          而上半屏（同步 / 状态）读的是同步状态机 —— 两者的刷新时机不同，
+          混在一起会让人以为"清单没更新是因为同步坏了"。 */}
+      <ListsSection />
     </Screen>
   );
 }
@@ -244,10 +314,11 @@ function StatusRow({
   busy: boolean;
   onOpenConflicts: () => void;
 }): React.JSX.Element {
+  const { t } = useI18n();
   return (
     <View style={{ gap: 4 }}>
       <Text variant="row-title" tone={busy ? 'muted' : statusTone(status)}>
-        {describeSyncStatus(status)}
+        {describeSyncStatus(status, t)}
       </Text>
       {status.kind === 'error' ? (
         <Text variant="caption" tone="danger" selectable>
@@ -257,9 +328,13 @@ function StatusRow({
       {status.kind === 'conflict' ? (
         <View style={{ gap: 8 }}>
           <Text variant="caption" tone="danger">
-            这几处两边都改过，heyta 不会替你挑——自动挑一个会悄悄丢掉另一边的改动。数据没有丢，但选完之前它们不会上传。
+            {t('mobile.profile.conflict.body')}
           </Text>
-          <Button label="逐条处理" icon="conflict.warning" onPress={onOpenConflicts} />
+          <Button
+            label={t('mobile.profile.conflict.open')}
+            icon="conflict.warning"
+            onPress={onOpenConflicts}
+          />
         </View>
       ) : null}
     </View>

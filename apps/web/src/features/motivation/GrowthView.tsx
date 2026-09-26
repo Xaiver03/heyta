@@ -21,16 +21,24 @@
  * 2. 🔴 **不显示"比上周少"。** 周复盘里带差值，但**差值只用中性表述**，
  *    不给下降配红色、不给上升配庆祝 —— 一个正常的一周不需要被判分。
  *    这是损失厌恶的反用：我们不用"你在退步"来驱动用户回来。
+ *
+ * ## 文案
+ *
+ * 全部走 `@heyta/i18n`（`apps/web/src` 已整体迁移，门禁要求字面量一律 `t()`）。
+ * 句子里带数字的（主标题、最专注的一天、复制出去的小结）整句成条 ——
+ * 英文的语序与量词都在句子里，拼不出来。
  */
 
 import { useState } from 'react';
 import { ActivityCalendar } from 'react-activity-calendar';
 import { Copy } from 'lucide-react';
 
+import { useI18n, type MessageKey } from '@heyta/i18n';
+
 import { text } from '../../lib/text.js';
 import { activityLabels, heatmapTheme } from '../../lib/heatmap-theme.js';
 import { useTaskStore } from '../tasks/store.js';
-import { buildShareSummary, HEADLINE_COPY, headlineValue } from './copy.js';
+import { buildShareSummary, HEADLINE_COPY, headlineCount } from './copy.js';
 import { IdentityTagList } from './IdentityTagList.js';
 import { MilestoneMap } from './MilestoneMap.js';
 import {
@@ -42,6 +50,7 @@ import {
 } from './selectors.js';
 
 export function GrowthView() {
+  const { t } = useI18n();
   const entities = useTaskStore((s) => s.entities);
   const now = useTaskStore((s) => s.now);
 
@@ -56,59 +65,59 @@ export function GrowthView() {
       <section className="ht-growth__section">
         {/* ⚠️ 这里用 section-title 而不是 screen-title：页面的大标题在
             顶栏（导航项标题）上，一屏两个大标题等于没有大标题。 */}
-        <h2 style={text('section-title')}>本周</h2>
+        <h2 style={text('section-title')}>{t('web.growth.week.title')}</h2>
 
         <div className="ht-growth__week" style={text('row-meta')}>
           <span className="ht-growth__range">
-            {review.weekStart} 至 {review.weekEnd}
+            {t('web.growth.week.range', { start: review.weekStart, end: review.weekEnd })}
           </span>
         </div>
 
         {review.headline === 'none' ? (
           <p className="ht-growth__empty" style={text('row-meta')}>
-            这一周还没有记录。从今天的一件小事开始就好。
+            {t('web.growth.week.empty')}
           </p>
         ) : (
           <p className="ht-growth__headline" style={text('section-title')}>
-            {HEADLINE_COPY[review.headline]}：
-            <span style={{ fontVariantNumeric: 'tabular-nums' }}>
-              {headlineValue(review).value}
-            </span>
-            {headlineValue(review).unit}
+            {t(HEADLINE_COPY[review.headline], { count: headlineCount(review) })}
           </p>
         )}
 
         <dl className="ht-growth__stats">
-          <Stat label="打卡" value={review.checkIns} unit="次" previous={review.previous.checkIns} />
           <Stat
-            label="完成任务"
+            labelKey="web.growth.stat.checkIns"
+            unitKey="web.growth.stat.checkIns.unit"
+            value={review.checkIns}
+            previous={review.previous.checkIns}
+          />
+          <Stat
+            labelKey="web.growth.stat.tasks"
+            unitKey="web.growth.stat.tasks.unit"
             value={review.tasksCompleted}
-            unit="件"
             previous={review.previous.tasksCompleted}
           />
           <Stat
-            label="专注"
+            labelKey="web.growth.stat.focus"
+            unitKey="web.growth.stat.focus.unit"
             value={review.focusMinutes}
-            unit="分钟"
             previous={review.previous.focusMinutes}
           />
         </dl>
 
         {review.bestFocusDay !== undefined && (
           <p className="ht-growth__note" style={text('caption')}>
-            最专注的一天是 {review.bestFocusDay.date}，专注了
-            <span style={{ fontVariantNumeric: 'tabular-nums' }}>
-              {review.bestFocusDay.minutes}
-            </span>
-            分钟。
+            {t('web.growth.week.bestDay', {
+              date: review.bestFocusDay.date,
+              minutes: review.bestFocusDay.minutes,
+            })}
           </p>
         )}
       </section>
 
       <section className="ht-growth__section">
-        <h2 style={text('section-title')}>这一年</h2>
+        <h2 style={text('section-title')}>{t('web.growth.year.title')}</h2>
         <p className="ht-growth__note" style={text('caption')}>
-          一格是一天。有记录的日子才会亮起来 —— 打卡、完成任务、跑完一轮专注都算。
+          {t('web.growth.year.note')}
         </p>
         <ActivityCalendar
           data={year}
@@ -122,51 +131,53 @@ export function GrowthView() {
           theme={heatmapTheme()}
           // ⚠️ 这里**不能**用 `{{year}}`：这是滚动 365 天（2025-09 → 2026-09），
           // 而库填进去的是首个格子的年份 —— 会写成「2025 年」而其实跨到了 2026。
-          labels={activityLabels('最近一年共 {{count}} 次记录')}
+          // `{{count}}` 是**库自己的**占位符，`t()` 的 `{name}` 形状不会动它。
+          labels={activityLabels(t('web.growth.year.heatmap'), t)}
         />
       </section>
 
       <section className="ht-growth__section">
-        <h2 style={text('section-title')}>里程碑</h2>
+        <h2 style={text('section-title')}>{t('web.growth.milestones.title')}</h2>
         <p className="ht-growth__note" style={text('caption')}>
-          只增不减。中断不会让这些数字变小。
+          {t('web.growth.milestones.note')}
         </p>
         <MilestoneMap milestones={milestones} />
       </section>
 
       <section className="ht-growth__section">
-        <h2 style={text('section-title')}>你的标签</h2>
+        <h2 style={text('section-title')}>{t('web.growth.tags.title')}</h2>
         <IdentityTagList tags={tags} />
       </section>
 
-      <ShareSection summary={buildShareSummary(review, totals)} />
+      <ShareSection summary={buildShareSummary(review, totals, t)} />
     </div>
   );
 }
 
 /** 一块统计数字。`previous` 是上周同类数字，**中性呈现**（见文件头第 2 条）。 */
 function Stat({
-  label,
+  labelKey,
+  unitKey,
   value,
-  unit,
   previous,
 }: {
-  label: string;
+  labelKey: MessageKey;
+  unitKey: MessageKey;
   value: number;
-  unit: string;
   previous: number;
 }) {
+  const { t } = useI18n();
   return (
     <div className="ht-growth__stat">
-      <dt style={text('caption')}>{label}</dt>
+      <dt style={text('caption')}>{t(labelKey)}</dt>
       <dd className="ht-growth__stat-value" style={text('numeric-display')}>
         <span>{value}</span>
         <span className="ht-growth__unit" style={text('caption')}>
-          {unit}
+          {t(unitKey)}
         </span>
       </dd>
       <dd className="ht-growth__stat-prev" style={text('caption')}>
-        上周 {previous}
+        {t('web.growth.stat.previous', { count: previous })}
       </dd>
     </div>
   );
@@ -180,6 +191,7 @@ function Stat({
  * 局域网地址）里是 `undefined`，而"点了没反应"会被读成"按钮坏了"。
  */
 function ShareSection({ summary }: { summary: string }) {
+  const { t } = useI18n();
   const [state, setState] = useState<'idle' | 'copied' | 'failed'>('idle');
 
   async function copy(): Promise<void> {
@@ -198,25 +210,25 @@ function ShareSection({ summary }: { summary: string }) {
 
   return (
     <section className="ht-growth__section ht-growth__section--share">
-      <h2 style={text('section-title')}>带走这一周</h2>
+      <h2 style={text('section-title')}>{t('web.growth.share.title')}</h2>
       <p className="ht-growth__note" style={text('caption')}>
-        复制成一段纯文字，粘到哪都行。它不含你的账号、设备或任何标识。
+        {t('web.growth.share.note')}
       </p>
       <button
         type="button"
         className="ht-btn ht-btn--primary ht-growth__copy"
         onClick={() => void copy()}
-        aria-label="复制本周小结"
+        aria-label={t('web.growth.share.copy')}
       >
         <Copy size={16} aria-hidden="true" />
-        复制本周小结
+        {t('web.growth.share.copy')}
       </button>
 
       {/* `aria-live`：复制是"点下去之后什么都没发生"的典型操作，
           必须有一句能被读屏读到的结果。 */}
       <p className="ht-growth__copy-state" aria-live="polite" style={text('caption')}>
-        {state === 'copied' && '已复制'}
-        {state === 'failed' && '当前环境不允许复制，可以手动选中上面的数字。'}
+        {state === 'copied' && t('web.growth.share.copied')}
+        {state === 'failed' && t('web.growth.share.failed')}
       </p>
     </section>
   );

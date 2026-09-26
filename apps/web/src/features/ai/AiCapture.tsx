@@ -39,6 +39,11 @@
 import { useState } from 'react';
 import { AlertTriangle, Cloud, HardDrive, Sparkles, X } from 'lucide-react';
 
+import { useI18n, type I18nValue, type Locale } from '@heyta/i18n';
+
+import { LIST_SEPARATOR } from './locale-punctuation.js';
+import { retentionMessageKey } from './disclosure-copy.js';
+
 import {
   Priority,
   renderPreferenceHints,
@@ -65,6 +70,7 @@ import {
   requestCapture,
   type CaptureProposal,
 } from '@heyta/app-host';
+import { captureFailureCopy, type AiFailureCopy } from './ai-failure-copy.js';
 
 /** 路由解析结果里"这个功能会走到哪个端点"。 */
 export interface ResolvedCaptureTarget {
@@ -159,14 +165,18 @@ function effectivePriority(value: Priority | undefined): Priority | undefined {
 }
 
 /** 模型给了但没法用的字段 → 中文名。 */
-function droppedLabel(fields: readonly ('title' | 'dueDate' | 'priority')[]): string {
+function droppedLabelText(
+  fields: readonly ('title' | 'dueDate' | 'priority')[],
+  t: I18nValue['t'],
+  locale: Locale,
+): string {
   return fields
     .map((field) => {
-      if (field === 'dueDate') return '截止时间';
-      if (field === 'priority') return '优先级';
-      return '标题';
+      if (field === 'dueDate') return t('web.ai.capture.field.dueTime');
+      if (field === 'priority') return t('web.ai.capture.field.priority');
+      return t('web.ai.capture.field.title');
     })
-    .join('、');
+    .join(LIST_SEPARATOR[locale]);
 }
 
 /** 提议里有几个字段。用于反馈层的 `proposedCount`。 */
@@ -246,6 +256,7 @@ export interface AiCaptureProps {
 
 export function AiCapture(props: AiCaptureProps): React.JSX.Element {
   const { text, routing, consents, secrets, onApply, onHealth, preferenceSet, onFeedback } = props;
+  const { t, locale } = useI18n();
 
   const [phase, setPhase] = useState<Phase>('idle');
   /**
@@ -265,7 +276,7 @@ export function AiCapture(props: AiCaptureProps): React.JSX.Element {
   const [draftDate, setDraftDate] = useState('');
   const [draftTime, setDraftTime] = useState('');
   const [draftPriority, setDraftPriority] = useState<PriorityChoice>('');
-  const [failure, setFailure] = useState('');
+  const [failure, setFailure] = useState<AiFailureCopy | null>(null);
   const [applied, setApplied] = useState(false);
 
   const target = resolveCaptureTarget(routing);
@@ -335,7 +346,7 @@ export function AiCapture(props: AiCaptureProps): React.JSX.Element {
       setPhase('proposal');
       return;
     }
-    setFailure(outcome.message);
+    setFailure(captureFailureCopy(outcome.reason, outcome.message, outcome.cause));
     setPhase('failed');
   }
 
@@ -390,7 +401,7 @@ export function AiCapture(props: AiCaptureProps): React.JSX.Element {
     setDraftDate('');
     setDraftTime('');
     setDraftPriority('');
-    setFailure('');
+    setFailure(null);
     setApplied(false);
   }
 
@@ -402,16 +413,16 @@ export function AiCapture(props: AiCaptureProps): React.JSX.Element {
           type="button"
           className="ht-btn ht-btn--ghost"
           data-testid="capture-ai"
-          aria-label="用 AI 解析这句话"
+          aria-label={t('web.ai.capture.runAria')}
           disabled={text.trim() === ''}
           onClick={start}
         >
           <Sparkles size={12} aria-hidden="true" />
-          AI 捕获
+          {t('web.ai.capture.button')}
         </button>
         {applied && (
           <span className="ht-ai__done" data-testid="capture-applied">
-            已填入候选字段
+            {t('web.ai.capture.applied')}
           </span>
         )}
       </span>
@@ -424,15 +435,15 @@ export function AiCapture(props: AiCaptureProps): React.JSX.Element {
       <div
         className="ht-ai__panel"
         role="dialog"
-        aria-label="AI 捕获 —— 发送前确认"
+        aria-label={t('web.ai.capture.disclosureAria')}
         data-testid="capture-disclosure"
       >
         <div className="ht-ai__head">
-          <span>发送前确认</span>
+          <span>{t('web.ai.disclosure.heading')}</span>
           <button
             type="button"
             className="ht-btn ht-btn--ghost"
-            aria-label="取消"
+            aria-label={t('web.ai.action.cancel')}
             data-testid="capture-dismiss"
             onClick={reset}
           >
@@ -443,13 +454,13 @@ export function AiCapture(props: AiCaptureProps): React.JSX.Element {
         {/* 🔴 把"将要发送的那一句"原样显示出来 —— 用户改过输入之后
             仍能确认自己批的是哪一句。 */}
         <p className="ht-ai__row" data-testid="capture-text-preview">
-          将解析：<strong>{frozenText}</strong>
+          {t('web.ai.capture.textPreviewLead')}<strong>{frozenText}</strong>
         </p>
 
         {target === undefined ? (
           <p className="ht-ai__warn" data-testid="capture-no-target">
             <AlertTriangle size={12} aria-hidden="true" />
-            还没有给「一句话捕获」配置端点。去「设置」里添加端点并指定路由。
+            {t('web.ai.noTarget.capture')}
           </p>
         ) : (
           <>
@@ -459,11 +470,11 @@ export function AiCapture(props: AiCaptureProps): React.JSX.Element {
               ) : (
                 <Cloud size={12} aria-hidden="true" />
               )}
-              将发往：<strong>{target.label}</strong>
+              {t('web.ai.disclosure.destinationLead')}<strong>{target.label}</strong>
               <code>{target.endpoint}</code>
-              <span>模型 {target.model}</span>
+              <span>{t('web.ai.disclosure.model', { model: target.model })}</span>
               <span className="ht-ai__tag" data-testid="capture-destination-kind">
-                {target.isLocal ? '数据不出设备' : '数据会离开设备'}
+                {target.isLocal ? t('web.ai.disclosure.local') : t('web.ai.disclosure.remote')}
               </span>
             </p>
 
@@ -472,32 +483,31 @@ export function AiCapture(props: AiCaptureProps): React.JSX.Element {
             {target.fallbacks.length > 0 && (
               <p className="ht-ai__row ht-ai__row--warn" data-testid="capture-fallbacks">
                 <AlertTriangle size={12} aria-hidden="true" />
-                如果它失败，会接着依次尝试：
-                <strong data-testid="capture-fallback-list">{target.fallbacks.join('、')}</strong>
+                {t('web.ai.disclosure.fallbackLead')}
+                <strong data-testid="capture-fallback-list">{target.fallbacks.join(LIST_SEPARATOR[locale])}</strong>
               </p>
             )}
 
             {/* 🔴 「留多久」是披露的三维之一（发给谁 / 发什么 / 留多久）。 */}
             {disclosure !== undefined && (
               <p className="ht-ai__row" data-testid="capture-retention">
-                保留：
+                {t('web.ai.disclosure.retentionLead')}
                 <strong data-testid="capture-retention-text">
-                  {disclosure.retentionText ??
-                    '未定案 —— 在 heyta 说明清楚之前，这个端点不允许启用。'}
+                  {t(retentionMessageKey(disclosure.retentionDisclosure.kind))}
                 </strong>
               </p>
             )}
 
             <p className="ht-ai__row" data-testid="capture-fields">
-              将发送这些字段：
-              <strong data-testid="capture-field-list">{invocation.fields.join('、')}</strong>
+              {t('web.ai.disclosure.fieldsLead')}
+              <strong data-testid="capture-field-list">{invocation.fields.join(LIST_SEPARATOR[locale])}</strong>
             </p>
 
             {!target.isLocal && (
               <p className="ht-ai__warn" data-testid="capture-e2ee-warning">
                 <AlertTriangle size={12} aria-hidden="true" />
-                这台设备上的任务内容是端到端加密的，而发出去的这一份
-                <strong>不受端到端加密保护</strong>。
+                {t('web.ai.disclosure.e2eeLead')}
+                <strong>{t('web.ai.disclosure.e2eeStrong')}</strong>
               </p>
             )}
 
@@ -508,7 +518,7 @@ export function AiCapture(props: AiCaptureProps): React.JSX.Element {
                 data-testid="capture-send"
                 onClick={() => void send()}
               >
-                发送
+                {t('web.ai.action.send')}
               </button>
               <button
                 type="button"
@@ -516,7 +526,7 @@ export function AiCapture(props: AiCaptureProps): React.JSX.Element {
                 data-testid="capture-cancel"
                 onClick={reset}
               >
-                取消
+                {t('web.ai.action.cancel')}
               </button>
             </div>
           </>
@@ -528,7 +538,7 @@ export function AiCapture(props: AiCaptureProps): React.JSX.Element {
   if (phase === 'loading') {
     return (
       <div className="ht-ai__panel" data-testid="capture-loading">
-        <span>正在等待端点返回…</span>
+        <span>{t('web.ai.loading.waiting')}</span>
       </div>
     );
   }
@@ -539,30 +549,30 @@ export function AiCapture(props: AiCaptureProps): React.JSX.Element {
       <div
         className="ht-ai__panel"
         role="dialog"
-        aria-label="AI 捕获结果"
+        aria-label={t('web.ai.capture.proposalAria')}
         data-testid="capture-proposal"
       >
         <div className="ht-ai__head">
-          <span>捕获结果（可以改）</span>
+          <span>{t('web.ai.capture.proposalHead')}</span>
           <span className="ht-ai__tag" data-testid="capture-proposal-source">
-            {proposal.destination === 'none' ? '来自本机' : '来自云端'}
+            {proposal.destination === 'none' ? t('web.ai.source.local') : t('web.ai.source.remote')}
           </span>
         </div>
 
         {proposal.dropped.length > 0 && (
           <p className="ht-ai__warn" data-testid="capture-dropped">
             <AlertTriangle size={12} aria-hidden="true" />
-            模型给的{droppedLabel(proposal.dropped)}没法用，已经留空 —— 需要的话自己填。
+            {t('web.ai.capture.droppedLead')}{droppedLabelText(proposal.dropped, t, locale)}{t('web.ai.capture.droppedTail')}
           </p>
         )}
 
         <label className="ht-ai__row">
-          <span>标题</span>
+          <span>{t('web.ai.capture.field.title')}</span>
           <input
             className="ht-input"
             type="text"
             data-testid="capture-title"
-            aria-label="任务标题"
+            aria-label={t('web.ai.capture.field.titleAria')}
             maxLength={MAX_CAPTURE_TITLE_LENGTH}
             value={draftTitle}
             onChange={(e) => {
@@ -575,12 +585,12 @@ export function AiCapture(props: AiCaptureProps): React.JSX.Element {
             理由是"不许猜"：模型只给了日期时，替它补一个 00:00 是把
             "那一天" 悄悄变成 "那一天零点"。分开之后，没给时间就是没给。 */}
         <label className="ht-ai__row">
-          <span>截止日期</span>
+          <span>{t('web.ai.capture.field.dueDate')}</span>
           <input
             className="ht-input"
             type="date"
             data-testid="capture-due-date"
-            aria-label="截止日期"
+            aria-label={t('web.ai.capture.field.dueDate')}
             value={draftDate}
             onChange={(e) => {
               setDraftDate(e.target.value);
@@ -590,7 +600,7 @@ export function AiCapture(props: AiCaptureProps): React.JSX.Element {
             className="ht-input"
             type="time"
             data-testid="capture-due-time"
-            aria-label="截止时间"
+            aria-label={t('web.ai.capture.field.dueTime')}
             value={draftTime}
             onChange={(e) => {
               setDraftTime(e.target.value);
@@ -599,11 +609,11 @@ export function AiCapture(props: AiCaptureProps): React.JSX.Element {
         </label>
 
         <label className="ht-ai__row">
-          <span>优先级</span>
+          <span>{t('web.ai.capture.field.priority')}</span>
           <select
             className="ht-input"
             data-testid="capture-priority"
-            aria-label="优先级"
+            aria-label={t('web.ai.capture.field.priority')}
             value={draftPriority}
             onChange={(e) => {
               const value = e.target.value;
@@ -612,15 +622,15 @@ export function AiCapture(props: AiCaptureProps): React.JSX.Element {
               );
             }}
           >
-            <option value="">不设置</option>
-            <option value="low">低</option>
-            <option value="medium">中</option>
-            <option value="high">高</option>
+            <option value="">{t('web.ai.capture.priority.none')}</option>
+            <option value="low">{t('web.ai.capture.priority.low')}</option>
+            <option value="medium">{t('web.ai.capture.priority.medium')}</option>
+            <option value="high">{t('web.ai.capture.priority.high')}</option>
           </select>
         </label>
 
         <p className="ht-ai__note">
-          确认后会按上面的字段写入。截止时间是<strong>模型的推算</strong>，请核对后再填。
+          {t('web.ai.capture.noteLead')}<strong>{t('web.ai.capture.noteStrong')}</strong>{t('web.ai.capture.noteTail')}
         </p>
 
         <div className="ht-ai__actions">
@@ -631,7 +641,7 @@ export function AiCapture(props: AiCaptureProps): React.JSX.Element {
             disabled={draftTitle.trim() === ''}
             onClick={() => void apply()}
           >
-            填入任务
+            {t('web.ai.capture.apply')}
           </button>
           <button
             type="button"
@@ -639,7 +649,7 @@ export function AiCapture(props: AiCaptureProps): React.JSX.Element {
             data-testid="capture-discard"
             onClick={discard}
           >
-            不要了
+            {t('web.ai.action.discard')}
           </button>
         </div>
       </div>
@@ -651,22 +661,32 @@ export function AiCapture(props: AiCaptureProps): React.JSX.Element {
     <div
       className="ht-ai__panel"
       role="dialog"
-      aria-label="AI 捕获失败"
+      aria-label={t('web.ai.capture.failedAria')}
       data-testid="capture-failed"
     >
       <div className="ht-ai__head">
-        <span>没能捕获</span>
+        <span>{t('web.ai.capture.failedHead')}</span>
         <button
           type="button"
           className="ht-btn ht-btn--ghost"
-          aria-label="关闭"
+          aria-label={t('web.ai.action.close')}
           data-testid="capture-close"
           onClick={reset}
         >
           <X size={12} aria-hidden="true" />
         </button>
       </div>
-      <p data-testid="capture-failure-message">{failure}</p>
+      <p data-testid="capture-failure-message">
+        {failure === null ? '' : t(failure.key)}
+      </p>
+      {/* 技术详情：包 / 端点返回的原文。分类与 ErrorScreen 的 <details> 相同 ——
+          那是诊断**数据**，不是文案（见 ai-failure-copy.ts 的 `showDetail`）。 */}
+      {failure !== null && failure.showDetail && failure.detail !== '' && (
+        <details data-testid="capture-failure-message-detail">
+          <summary>{t('web.ai.failure.details')}</summary>
+          <p>{failure.detail}</p>
+        </details>
+      )}
       <div className="ht-ai__actions">
         <button
           type="button"
@@ -674,7 +694,7 @@ export function AiCapture(props: AiCaptureProps): React.JSX.Element {
           data-testid="capture-retry"
           onClick={() => void send()}
         >
-          重试
+          {t('web.ai.action.retry')}
         </button>
         <button
           type="button"
@@ -682,7 +702,7 @@ export function AiCapture(props: AiCaptureProps): React.JSX.Element {
           data-testid="capture-cancel-failed"
           onClick={reset}
         >
-          关闭
+          {t('web.ai.action.close')}
         </button>
       </div>
     </div>

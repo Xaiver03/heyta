@@ -5,12 +5,14 @@
 
 import { useState } from 'react';
 import { cssVar } from '@heyta/design-system';
+import { useI18n } from '@heyta/i18n';
 import { Folder, Plus, Tag as TagIcon, Trash2 } from 'lucide-react';
 
 import { useTaskStore } from '../tasks/store.js';
 import { selectChildProjects, selectTopLevelProjects, useProjectStore } from './store.js';
 
 export function ProjectsPanel() {
+  const { t } = useI18n();
   const projects = useProjectStore();
   const tasks = useTaskStore();
   const [draft, setDraft] = useState('');
@@ -20,13 +22,16 @@ export function ProjectsPanel() {
 
   function countIn(projectId: string): number {
     return Object.values(tasks.entities.tasks).filter(
-      (t) => t.deletedAt === undefined && t.completedAt === undefined && t.projectId === projectId,
+      (task) =>
+        task.deletedAt === undefined &&
+        task.completedAt === undefined &&
+        task.projectId === projectId,
     ).length;
   }
 
   return (
     <aside
-      aria-label="清单与标签"
+      aria-label={t('web.projects.ariaLabel')}
       style={{
         padding: cssVar('space.3'),
         borderRight: `${cssVar('border-width.thin')} solid ${cssVar('color.border')}`,
@@ -37,7 +42,7 @@ export function ProjectsPanel() {
       }}
     >
       <section>
-        <h2 style={headingStyle}>清单</h2>
+        <h2 style={headingStyle}>{t('web.projects.heading')}</h2>
         <form
           onSubmit={(e) => {
             e.preventDefault();
@@ -49,11 +54,11 @@ export function ProjectsPanel() {
           <input
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
-            placeholder="新清单"
-            aria-label="新清单名称"
+            placeholder={t('web.projects.newPlaceholder')}
+            aria-label={t('web.projects.newLabel')}
             style={inputStyle}
           />
-          <button type="submit" aria-label="添加清单" style={iconButtonStyle}>
+          <button type="submit" aria-label={t('web.projects.add')} style={iconButtonStyle}>
             <Plus size={16} aria-hidden="true" />
           </button>
         </form>
@@ -74,7 +79,7 @@ export function ProjectsPanel() {
                 <button
                   type="button"
                   onClick={() => void projects.deleteProject(p.id)}
-                  aria-label={`删除清单「${p.name}」`}
+                  aria-label={t('web.projects.delete', { name: p.name })}
                   style={iconButtonStyle}
                 >
                   <Trash2 size={14} aria-hidden="true" />
@@ -101,7 +106,7 @@ export function ProjectsPanel() {
       </section>
 
       <section>
-        <h2 style={headingStyle}>标签</h2>
+        <h2 style={headingStyle}>{t('web.tags.heading')}</h2>
         <form
           onSubmit={(e) => {
             e.preventDefault();
@@ -113,25 +118,25 @@ export function ProjectsPanel() {
           <input
             value={tagDraft}
             onChange={(e) => setTagDraft(e.target.value)}
-            placeholder="新标签"
-            aria-label="新标签名称"
+            placeholder={t('web.tags.newPlaceholder')}
+            aria-label={t('web.tags.newLabel')}
             style={inputStyle}
           />
-          <button type="submit" aria-label="添加标签" style={iconButtonStyle}>
+          <button type="submit" aria-label={t('web.tags.add')} style={iconButtonStyle}>
             <Plus size={16} aria-hidden="true" />
           </button>
         </form>
         <ul style={listStyle}>
-          {projects.tags.map((t) => (
-            <li key={t.id} style={{ display: 'flex', alignItems: 'center' }}>
+          {projects.tags.map((tag) => (
+            <li key={tag.id} style={{ display: 'flex', alignItems: 'center' }}>
               <span style={{ ...rowButtonStyle, cursor: 'default', flex: 1 }}>
                 <TagIcon size={14} aria-hidden="true" />
-                {t.name}
+                {tag.name}
               </span>
               <button
                 type="button"
-                onClick={() => void projects.deleteTag(t.id)}
-                aria-label={`删除标签「${t.name}」`}
+                onClick={() => void projects.deleteTag(tag.id)}
+                aria-label={t('web.tags.delete', { name: tag.name })}
                 style={iconButtonStyle}
               >
                 <Trash2 size={14} aria-hidden="true" />

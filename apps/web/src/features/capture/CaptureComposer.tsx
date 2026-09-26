@@ -27,6 +27,10 @@
 import { useMemo, useState } from 'react';
 import { Plus, RotateCcw, X } from 'lucide-react';
 
+import { useI18n } from '@heyta/i18n';
+
+import { dateWithRemaining } from '../ai/locale-punctuation.js';
+
 import {
   Priority,
   dueDateToEpoch,
@@ -69,16 +73,21 @@ export interface CaptureComposerProps {
   }) => void) | undefined;
 }
 
-/** 优先级 → 可读文案。与 `capture.ts` 的 display 保持一致口径。 */
-const PRIORITY_LABEL: Record<number, string> = {
-  [Priority.High]: '高优先级',
-  [Priority.Medium]: '中优先级',
-  [Priority.Low]: '低优先级',
-  [Priority.None]: '无优先级',
-};
-
+/**
+ * 优先级 → 可读文案。与 `capture.ts` 的 display 保持一致口径。
+ *
+ * ⚠️ 与 `AiPrioritize` 里的那份是**同一件事的第二个副本**（本轮不允许改
+ * `packages/domain` 造成的）；只放显示文案，不参与任何判断。
+ */
 export function CaptureComposer(props: CaptureComposerProps): React.JSX.Element {
   const addTask = useTaskStore((s) => s.addTask);
+  const { t, locale } = useI18n();
+  const priorityLabel: Record<number, string> = {
+    [Priority.High]: t('web.capture.priority.high'),
+    [Priority.Medium]: t('web.capture.priority.medium'),
+    [Priority.Low]: t('web.capture.priority.low'),
+    [Priority.None]: t('web.capture.priority.none'),
+  };
   const [draft, setDraft] = useState('');
   /**
    * 用户显式忽略的识别。
@@ -157,8 +166,8 @@ export function CaptureComposer(props: CaptureComposerProps): React.JSX.Element 
         <input
           className="ht-input"
           value={draft}
-          placeholder="添加任务，回车确认（可写「明天」「下周三」「!1」）"
-          aria-label="新任务标题"
+          placeholder={t('web.capture.placeholder')}
+          aria-label={t('web.capture.addLabel')}
           onChange={(e) => onDraftChange(e.target.value)}
           onKeyDown={(e) => {
             if (e.key === 'Enter') submit();
@@ -171,19 +180,22 @@ export function CaptureComposer(props: CaptureComposerProps): React.JSX.Element 
           disabled={!canSubmit}
         >
           <Plus size={18} aria-hidden="true" />
-          添加
+          {t('web.capture.add')}
         </button>
       </div>
 
       {parsed.matches.length > 0 && (
-        <ul className="ht-capture" aria-label="识别出的字段">
+        <ul className="ht-capture" aria-label={t('web.capture.matches.aria')}>
           {parsed.matches.map((m) => {
             // dueDate 的 display 是 YYYY-MM-DD。同时给出人话剩余时间，
             // 因为"2026-09-26"不直观而"明天"直观 —— 用户要确认的是后者。
+            // ⚠️ `formatRemainingUntil()` 仍返回中文（`packages/domain` 跨包，
+            // 本轮不迁）。外壳的文字（不加汉字）只是正字法，所以走代码常量
+            // 而不是词条表 —— 与 `LIST_SEPARATOR` 同一个先例。
             const valueLabel =
               m.field === 'dueDate' && m.dueDate !== undefined
-                ? `${m.dueDate}（${formatRemainingUntil(m.dueDate)}）`
-                : (PRIORITY_LABEL[m.priority ?? Priority.None] ?? m.display);
+                ? dateWithRemaining(m.dueDate, formatRemainingUntil(m.dueDate), locale)
+                : (priorityLabel[m.priority ?? Priority.None] ?? m.display);
 
             return (
               <li
@@ -195,14 +207,14 @@ export function CaptureComposer(props: CaptureComposerProps): React.JSX.Element 
                   →
                 </span>
                 <span className="ht-capture__value">
-                  {m.rejected ? '已忽略（当作标题文字）' : valueLabel}
+                  {m.rejected ? t('web.capture.rejected') : valueLabel}
                 </span>
                 {m.rejected ? (
                   // 恢复：把它重新纳入解析
                   <button
                     type="button"
                     className="ht-capture__x"
-                    aria-label={`恢复识别：${m.raw}`}
+                    aria-label={t('web.capture.restoreAria', { raw: m.raw })}
                     onClick={() => toggleIgnore(m)}
                   >
                     <RotateCcw size={12} aria-hidden="true" />
@@ -211,7 +223,7 @@ export function CaptureComposer(props: CaptureComposerProps): React.JSX.Element 
                   <button
                     type="button"
                     className="ht-capture__x"
-                    aria-label={`忽略识别：${m.raw}`}
+                    aria-label={t('web.capture.ignoreAria', { raw: m.raw })}
                     onClick={() => toggleIgnore(m)}
                   >
                     <X size={12} aria-hidden="true" />
@@ -220,7 +232,7 @@ export function CaptureComposer(props: CaptureComposerProps): React.JSX.Element 
                   // 未被采纳（同字段已有更早的匹配）= 它**还在标题里**。
                   // 必须说出来，否则用户会以为识别失败了，
                   // 而不知道那段字其实原样保留着。
-                  <span className="ht-capture__hint">未采用，仍在标题中</span>
+                  <span className="ht-capture__hint">{t('web.capture.unused')}</span>
                 )}
               </li>
             );
@@ -230,7 +242,8 @@ export function CaptureComposer(props: CaptureComposerProps): React.JSX.Element 
 
       {parsed.matches.length > 0 && (
         <p className="ht-capture__preview">
-          实际标题：<strong>{parsed.title === '' ? '（空）' : parsed.title}</strong>
+          {t('web.capture.previewLead')}{' '}
+          <strong>{parsed.title === '' ? t('web.capture.previewEmpty') : parsed.title}</strong>
         </p>
       )}
 

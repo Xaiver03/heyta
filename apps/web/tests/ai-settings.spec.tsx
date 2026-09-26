@@ -17,9 +17,15 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
+import { AI_ENDPOINT_PRESETS } from '@heyta/ai';
+import { I18nProvider } from '@heyta/i18n';
+
 import { AI_SETTINGS_STORAGE_KEY, defaultAiSettings, loadAiSettings, saveAiSettings, createSessionSecretStore } from '../src/features/settings/aiStore.js';
 
 const { AiSettings, capabilityGaps } = await import('../src/features/settings/AiSettings.js');
+
+/** 有没有汉字。用于「英文界面里不许露中文」这一类断言。 */
+const CJK = /[\u3400-\u4DBF\u4E00-\u9FFF]/;
 
 let root: Root | undefined;
 let container: HTMLDivElement | undefined;
@@ -30,6 +36,27 @@ function render(props: Parameters<typeof AiSettings>[0]): HTMLDivElement {
   root = createRoot(container);
   act(() => {
     root?.render(<AiSettings {...props} />);
+  });
+  return container;
+}
+
+/**
+ * 指定语言渲染。
+ *
+ * ⚠️ 默认那份 `render()` **刻意不套 Provider** —— 它走的是 i18n context 的默认语言，
+ * 而"没有 Provider 也能渲染"是崩溃屏的契约（见 `error-screen.spec.tsx`）。
+ * 要验英文界面就用这个，别去改那份。
+ */
+function renderEn(props: Parameters<typeof AiSettings>[0]): HTMLDivElement {
+  container = document.createElement('div');
+  document.body.appendChild(container);
+  root = createRoot(container);
+  act(() => {
+    root?.render(
+      <I18nProvider locale="en">
+        <AiSettings {...props} />
+      </I18nProvider>,
+    );
   });
   return container;
 }
@@ -266,6 +293,35 @@ describe('AI 设置界面', () => {
     const warning = el.querySelector('[data-testid="remote-warning"]');
     expect(warning).toBeTruthy();
     expect(warning?.textContent).toContain('不受端到端加密保护');
+  });
+
+  /**
+   * 🔴 出厂预设必须**逐个**有词条。
+   *
+   * 为什么需要这条：预设的名字与前置条件来自 `packages/ai`（跨包中文），
+   * 壳里按 `id` 取词条、未知 id 回退 —— 而门禁看不见这条路径
+   * （渲染的是变量 `preset.label`，不是字面量）。所以"跨包新增一个预设、
+   * 壳里忘了加词条"这件事只会在界面上悄悄露出中文，没有任何检查会红。
+   *
+   * 修法是让这条路径**可失败**：枚举 `AI_ENDPOINT_PRESETS`，逐个查英文界面。
+   * 任何人往 `packages/ai` 加第三个预设，这条测试当场变红。
+   */
+  it('🔴 每一个出厂预设在英文界面下都没有中文（跨包新增预设会当场变红）', () => {
+    const el = renderEn({ initial: defaultAiSettings(), secrets: createSessionSecretStore() });
+    toggle(el.querySelector('#ai-enabled'));
+    for (const preset of AI_ENDPOINT_PRESETS) {
+      const button = el.querySelector(`[data-testid="add-preset-${preset.id}"]`);
+      expect(button, `预设 ${preset.id} 没有渲染出来`).toBeTruthy();
+      // 按钮文字
+      const text = button?.textContent ?? '';
+      expect(text.length).toBeGreaterThan(0);
+      expect(CJK.test(text), `预设 ${preset.id} 的英文按钮里出现中文：${text}`).toBe(false);
+      // 前置条件只作为 title 出现
+      const title = button?.getAttribute('title') ?? '';
+      expect(CJK.test(title), `预设 ${preset.id} 的前置条件里出现中文：${title}`).toBe(false);
+      // 回退分支会把裸 id 显示出来 —— 那也是"没翻译"，所以一并拦掉。
+      expect(text, `预设 ${preset.id} 退回了 id（说明缺词条）`).not.toContain(preset.id);
+    }
   });
 
   it('添加本机预设后，端点被标为"数据不出设备"且不需要授权', () => {
@@ -759,6 +815,24 @@ describe('🔴🔴 熔断的端点必须在设置里看得出来', () => {
     });
     // 面板仍然渲染出来
     expect(el.querySelector('[data-testid="ai-settings"]')).toBeTruthy();
+  });
+
+  it('🔴🔴 英文界面下健康状态也是英文（原来是包里的中文硬编码）', () => {
+    // 这条钉的是"门禁扫不到的那类通道"：设置页原来直接渲染
+    // `describeEndpointHealth()` 的返回值 —— 那是 packages/ai 里的中文，
+    // 门禁看不见（它查字面量，这里渲染的是函数返回值）。
+    const until = Date.now() + 60_000;
+    const el = renderEn({
+      initial: withHealth(until),
+      secrets: createSessionSecretStore(),
+    });
+    const text = el.querySelector('[data-testid="endpoint-unhealthy-e1"]')?.textContent ?? '';
+    expect(text).toContain('Temporarily stopped');
+    expect(text).toContain('retrying in');
+    // 一个汉字都不许有
+    expect(text).not.toMatch(/[\u3400-\u4DBF\u4E00-\u9FFF]/);
+    // 原始时间戳同样不该出现（那对用户没有意义）
+    expect(text).not.toContain(String(until));
   });
 
   it('🔴 文案里不出现原始时间戳（那对用户没有意义）', () => {

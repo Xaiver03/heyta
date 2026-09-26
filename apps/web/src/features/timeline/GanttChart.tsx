@@ -57,16 +57,13 @@
 
 import { addDays, diffDays, formatCompactDate, parseLocalDate, type LocalDate } from '@heyta/domain';
 import { cssVar } from '@heyta/design-system';
+import { useI18n, type I18nValue } from '@heyta/i18n';
 
 import {
   DEFAULT_DURATION_MINUTES,
   MIN_DURATION_MINUTES,
   type TimelineEntry,
 } from './buildTimeline.js';
-
-/** 空态文案。**一句人话**，并告诉用户下一步去哪做。 */
-const DEFAULT_EMPTY_HINT =
-  '这份计划还是空的 —— 清单里还没有可排的条目。先在备注里写几条待办，再回来看时间线。';
 
 /** 一天有多少分钟。轴的分日计算用它。 */
 const MINUTES_PER_DAY = 1440;
@@ -160,14 +157,19 @@ function normalizeClock(value: number | undefined): number {
  * ⚠️ 导出给 `TimelineView` 用（它要在块头里写「AI 估时：90 分钟」）。
  * 宁可从这里导出，也**不要**在那边再写一份格式化 —— 同一份业务语义
  * 只能有一个实现（`ai-architecture.md` §14 第 19 条）。
+ *
+ * 🔴 现在多带一个 `t`：单位词（分钟 / 小时 / 分）是**文案**，必须在壳里取。
+ * 这个函数原先直接返回中文字符串，于是英文界面上会出现「90 分钟」。
+ * 单位用缩写（`min` / `h`）而不是 `minutes`/`hours`：
+ * 缩写不随数量变化，一个词条就够，不需要单复数兄弟。
  */
-export function formatMinutes(minutes: number): string {
-  if (minutes < MINUTES_PER_HOUR) return `${String(minutes)} 分钟`;
+export function formatMinutes(minutes: number, t: I18nValue['t']): string {
+  if (minutes < MINUTES_PER_HOUR) return t('web.gantt.minutes', { count: minutes });
   const hours = Math.floor(minutes / MINUTES_PER_HOUR);
   const rest = minutes % MINUTES_PER_HOUR;
   return rest === 0
-    ? `${String(hours)} 小时`
-    : `${String(hours)} 小时 ${String(rest)} 分`;
+    ? t('web.gantt.hours', { count: hours })
+    : t('web.gantt.hoursMinutes', { hours, minutes: rest });
 }
 
 /** 当天第几分钟 → `9:30`。超过一天就绕回来（轴上的绝对钟点）。 */
@@ -206,9 +208,14 @@ function formatRange(
 }
 
 /** 相对偏移的区间：「0 分钟 → 1 小时 30 分」。没有起始日时用它。 */
-function formatRelativeRange(startOffsetMinutes: number, durationMinutes: number): string {
-  return `${formatMinutes(startOffsetMinutes)} → ${formatMinutes(
+function formatRelativeRange(
+  startOffsetMinutes: number,
+  durationMinutes: number,
+  t: I18nValue['t'],
+): string {
+  return `${formatMinutes(startOffsetMinutes, t)} → ${formatMinutes(
     startOffsetMinutes + durationMinutes,
+    t,
   )}`;
 }
 
@@ -247,14 +254,19 @@ function dayBands(
 }
 
 /** 单日内的刻度：按跨度选 30 / 60 / 120 分钟一格。 */
-function axisTicks(span: number, startClock: number, hasStart: boolean): { offset: number; label: string }[] {
+function axisTicks(
+  span: number,
+  startClock: number,
+  hasStart: boolean,
+  t: I18nValue['t'],
+): { offset: number; label: string }[] {
   const step = span <= 2 * MINUTES_PER_HOUR ? 30 : span <= 6 * MINUTES_PER_HOUR ? 60 : 120;
   const ticks: { offset: number; label: string }[] = [];
 
   for (let offset = 0; offset <= span && ticks.length < MAX_AXIS_MARKS; offset += step) {
     ticks.push({
       offset,
-      label: hasStart ? formatClock(startClock + offset) : formatMinutes(offset),
+      label: hasStart ? formatClock(startClock + offset) : formatMinutes(offset, t),
     });
   }
 
@@ -270,6 +282,7 @@ function TimelineAxis(props: {
   now: number;
 }): React.JSX.Element {
   const { span, startClock, startDate, multiDay, now } = props;
+  const { t } = useI18n();
 
   if (multiDay) {
     return (
@@ -301,7 +314,7 @@ function TimelineAxis(props: {
               overflow: 'hidden',
             }}
           >
-            第 {band.dayIndex} 天
+            {t('web.gantt.dayBand', { day: band.dayIndex })}
             {startDate === undefined
               ? ''
               : ` · ${formatCompactDate(
@@ -314,7 +327,7 @@ function TimelineAxis(props: {
     );
   }
 
-  const ticks = axisTicks(span, startClock, startDate !== undefined);
+  const ticks = axisTicks(span, startClock, startDate !== undefined, t);
   return (
     <div
       data-testid="gantt-axis"
@@ -353,6 +366,7 @@ function TimelineAxis(props: {
 
 export function GanttChart(props: GanttChartProps): React.JSX.Element {
   const { entries, startDate, startTimeMinutes, today, spanMinutes, now, emptyHint } = props;
+  const { t } = useI18n();
   const clock = now ?? Date.now();
 
   // 坏日期 → 当作没给，而不是抛出去（见 safeLocalDate）。
@@ -363,7 +377,12 @@ export function GanttChart(props: GanttChartProps): React.JSX.Element {
   // ── 空态：一句人话 ──────────────────────────────────────────────────
   if (entries.length === 0) {
     return (
-      <div className="ht-gantt" data-testid="gantt-chart" role="group" aria-label="时间线">
+      <div
+        className="ht-gantt"
+        data-testid="gantt-chart"
+        role="group"
+        aria-label={t('web.gantt.title')}
+      >
         <p
           data-testid="gantt-empty"
           style={{
@@ -372,7 +391,7 @@ export function GanttChart(props: GanttChartProps): React.JSX.Element {
             fontSize: cssVar('font-size.xs'),
           }}
         >
-          {emptyHint ?? DEFAULT_EMPTY_HINT}
+          {emptyHint ?? t('web.gantt.empty')}
         </p>
       </div>
     );
@@ -392,6 +411,7 @@ export function GanttChart(props: GanttChartProps): React.JSX.Element {
   const unestimatedCount = entries.filter((e) => e.durationSource === 'default').length;
   const aiCount = entries.filter((e) => e.durationSource === 'ai').length;
   const multiDay = span > MULTI_DAY_THRESHOLD_MINUTES;
+  const totalText = formatMinutes(span, t);
 
   // 今天那一整天在计划里的区间（分钟）。计划起点是 startDate 的 startClock 分。
   const todayDayStart =
@@ -413,7 +433,13 @@ export function GanttChart(props: GanttChartProps): React.JSX.Element {
       className="ht-gantt"
       data-testid="gantt-chart"
       role="group"
-      aria-label={`时间线：共 ${String(entries.length)} 条，总时长 ${formatMinutes(span)}`}
+      // 1 条要分支到单数词条：词条表没有 ICU（见 `web.gantt.spanOne`）。
+      // ⚠️ 三元写在 `t(...)` 外面 —— 门禁只认"字面量紧跟 t("。
+      aria-label={
+        entries.length === 1
+          ? t('web.gantt.aria.groupOne', { count: entries.length, total: totalText })
+          : t('web.gantt.aria.group', { count: entries.length, total: totalText })
+      }
       style={{ display: 'grid', gap: cssVar('space.2') }}
     >
       {/* ── 表头：文字承载全部关键信息 ─────────────────────────────── */}
@@ -426,21 +452,26 @@ export function GanttChart(props: GanttChartProps): React.JSX.Element {
         }}
       >
         <strong style={{ fontSize: cssVar('font-size.sm'), color: cssVar('color.foreground') }}>
-          时间线
+          {t('web.gantt.title')}
         </strong>
         <span
           data-testid="gantt-span"
           style={{ fontSize: cssVar('font-size.xs'), color: cssVar('color.foreground-muted') }}
         >
-          共 {entries.length} 条 · 总时长 {formatMinutes(span)}
+          {entries.length === 1
+            ? t('web.gantt.spanOne', { count: entries.length, total: totalText })
+            : t('web.gantt.span', { count: entries.length, total: totalText })}
         </span>
         {safeStart !== undefined && (
           <span
             data-testid="gantt-range"
             style={{ fontSize: cssVar('font-size.xs'), color: cssVar('color.foreground-muted') }}
           >
-            {formatCompactDate(parseLocalDate(safeStart).getTime(), clock)}
-            {startClock > 0 ? ` ${formatClock(startClock)}` : ''} 起
+            {t('web.gantt.rangeFrom', {
+              when: `${formatCompactDate(parseLocalDate(safeStart).getTime(), clock)}${
+                startClock > 0 ? ` ${formatClock(startClock)}` : ''
+              }`,
+            })}
           </span>
         )}
         {todayVisible && todayDayStart !== undefined && (
@@ -448,7 +479,7 @@ export function GanttChart(props: GanttChartProps): React.JSX.Element {
             data-testid="gantt-today"
             style={{ fontSize: cssVar('font-size.xs'), color: cssVar('color.warning') }}
           >
-            今天 · 第 {todayDayIndex} 天
+            {t('web.gantt.today', { day: todayDayIndex })}
           </span>
         )}
         {unestimatedCount > 0 && (
@@ -456,7 +487,15 @@ export function GanttChart(props: GanttChartProps): React.JSX.Element {
             data-testid="gantt-unestimated-summary"
             style={{ fontSize: cssVar('font-size.xs'), color: cssVar('color.foreground-muted') }}
           >
-            其中 {unestimatedCount} 条未估时，按 {formatMinutes(DEFAULT_DURATION_MINUTES)}排
+            {unestimatedCount === 1
+              ? t('web.gantt.unestimatedSummaryOne', {
+                  count: unestimatedCount,
+                  duration: formatMinutes(DEFAULT_DURATION_MINUTES, t),
+                })
+              : t('web.gantt.unestimatedSummary', {
+                  count: unestimatedCount,
+                  duration: formatMinutes(DEFAULT_DURATION_MINUTES, t),
+                })}
           </span>
         )}
         {aiCount > 0 && (
@@ -464,7 +503,9 @@ export function GanttChart(props: GanttChartProps): React.JSX.Element {
             data-testid="gantt-ai-summary"
             style={{ fontSize: cssVar('font-size.xs'), color: cssVar('color.foreground-muted') }}
           >
-            其中 {aiCount} 条按 AI 估时排
+            {aiCount === 1
+              ? t('web.gantt.aiSummaryOne', { count: aiCount })
+              : t('web.gantt.aiSummary', { count: aiCount })}
           </span>
         )}
       </div>
@@ -531,11 +572,18 @@ export function GanttChart(props: GanttChartProps): React.JSX.Element {
                     color: cssVar('color.foreground-muted'),
                   }}
                 >
+                  {/* 工期：估过的说时长，没估的**必须**说"未估时"。 */}
                   {entry.durationSource === 'default'
-                    ? `未估时（按 ${formatMinutes(entry.durationMinutes)}排）`
+                    ? t('web.gantt.durationDefault', {
+                        duration: formatMinutes(entry.durationMinutes, t),
+                      })
                     : entry.durationSource === 'ai'
-                      ? `约 ${formatMinutes(entry.durationMinutes)} · AI 估时`
-                      : `约 ${formatMinutes(entry.durationMinutes)}`}
+                      ? t('web.gantt.durationAi', {
+                          duration: formatMinutes(entry.durationMinutes, t),
+                        })
+                      : t('web.gantt.durationManual', {
+                          duration: formatMinutes(entry.durationMinutes, t),
+                        })}
                 </span>
 
                 <span
@@ -546,7 +594,11 @@ export function GanttChart(props: GanttChartProps): React.JSX.Element {
                   }}
                 >
                   {safeStart === undefined
-                    ? formatRelativeRange(entry.startOffsetMinutes, entry.durationMinutes)
+                    ? formatRelativeRange(
+                        entry.startOffsetMinutes,
+                        entry.durationMinutes,
+                        t,
+                      )
                     : formatRange(
                         safeStart,
                         startClock,
@@ -565,7 +617,7 @@ export function GanttChart(props: GanttChartProps): React.JSX.Element {
                       color: cssVar('color.foreground-muted'),
                     }}
                   >
-                    依赖：{entry.dependsOn}
+                    {t('web.gantt.dependsOn', { title: entry.dependsOn })}
                   </span>
                 )}
 
@@ -574,7 +626,7 @@ export function GanttChart(props: GanttChartProps): React.JSX.Element {
                     data-testid={`gantt-overlap-${String(index)}`}
                     style={{ fontSize: cssVar('font-size.xs'), color: cssVar('color.warning') }}
                   >
-                    与前置重叠
+                    {t('web.gantt.overlap')}
                   </span>
                 )}
               </div>

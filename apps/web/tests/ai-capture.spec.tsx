@@ -675,6 +675,7 @@ const PREF_SET = (memoryEnabled: boolean): PreferenceSet => ({
     value: { cjkShare: 1, medianTitleLength: 12, emojiShare: 0 },
     sampleSize: 40,
     confidence: 0.9,
+    evidenceFacts: { kind: 'title-style', cjkShare: 1, medianTitleLength: 12, emojiShare: 0, samples: 40 },
     evidence: '基于 40 条任务，你的标题以中文为主，平均 12 个字',
   },
   withheld: [],
