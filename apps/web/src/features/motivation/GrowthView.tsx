@@ -25,10 +25,10 @@
 
 import { useState } from 'react';
 import { ActivityCalendar } from 'react-activity-calendar';
-import { cssVar, cssVarName } from '@heyta/design-system';
 import { Copy } from 'lucide-react';
 
 import { text } from '../../lib/text.js';
+import { activityLabels, heatmapTheme } from '../../lib/heatmap-theme.js';
 import { useTaskStore } from '../tasks/store.js';
 import { buildShareSummary, HEADLINE_COPY, headlineValue } from './copy.js';
 import { IdentityTagList } from './IdentityTagList.js';
@@ -117,24 +117,12 @@ export function GrowthView() {
           blockRadius={2}
           showMonthLabels
           showWeekdayLabels={false}
-          // ⚠️ 库通过 props 收值，不吃 CSS 变量 —— 所以从 token 取名传进去，
-          // 保证取值仍然只有 tokens.css 一个来源。
-          theme={{
-            light: [
-              cssVarName('color.surface-sunken'),
-              cssVarName('color.heat-1'),
-              cssVarName('color.heat-2'),
-              cssVarName('color.heat-3'),
-              cssVarName('color.heat-4'),
-            ],
-            dark: [
-              cssVarName('color.surface'),
-              cssVarName('color.heat-1'),
-              cssVarName('color.heat-2'),
-              cssVarName('color.heat-3'),
-              cssVarName('color.heat-4'),
-            ],
-          }}
+          // 主题色走共享实现（习惯页的热力图用同一份）——
+          // 那里记着为什么**必须**是 `var(--ht-…)` 而不能是裸 token 名。
+          theme={heatmapTheme()}
+          // ⚠️ 这里**不能**用 `{{year}}`：这是滚动 365 天（2025-09 → 2026-09），
+          // 而库填进去的是首个格子的年份 —— 会写成「2025 年」而其实跨到了 2026。
+          labels={activityLabels('最近一年共 {{count}} 次记录')}
         />
       </section>
 

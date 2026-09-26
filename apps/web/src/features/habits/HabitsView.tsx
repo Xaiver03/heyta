@@ -12,11 +12,12 @@
 
 import { useState } from 'react';
 import { ActivityCalendar } from 'react-activity-calendar';
-import { cssVar, cssVarName } from '@heyta/design-system';
+import { cssVar } from '@heyta/design-system';
 import { Check, Flame, Plus, Undo2 } from 'lucide-react';
 
 import { selectHabitProgress, selectHeatmap, useHabitStore } from './store.js';
 import { text } from '../../lib/text.js';
+import { activityLabels, heatmapTheme } from '../../lib/heatmap-theme.js';
 
 const NOW_STATE_KEY = 'now';
 
@@ -214,7 +215,15 @@ export function HabitsView() {
                   </>
                 ) : (
                   <>
-                    <Undo2 size={16} aria-hidden="true" />
+                    {/**
+                     * 🔴 这里是 `Plus`，不是 `Undo2`。
+                     *
+                     * 原来用的是 `Undo2`（一个回退箭头）—— 那是"撤销"的意思，
+                     * 却挂在"去打卡"这个按钮上，语义正好反了。
+                     * 改成 `Plus`（"加上一次"）之后，两个状态的差别也不只靠颜色：
+                     * 「✓ 已打卡」相对「＋ 打卡」，字形本身就不同。
+                     */}
+                    <Plus size={16} aria-hidden="true" />
                     打卡
                   </>
                 )}
@@ -288,28 +297,12 @@ export function HabitsView() {
               blockRadius={2}
               showMonthLabels
               showWeekdayLabels={false}
-              // ⚠️ 库通过 props 收值，不吃 CSS 变量 ——
-              // 所以在这里从 token 取值传入，保证值仍然只有一个来源
-              theme={{
-                // ⚠️ 必须用 token 名。我第一版在 dark 里写了裸 '#1e293b' ——
-                // 那正是设计门禁要拦的东西：裸值不会随主题切换而更新，
-                // 而且绕过了对比度测试。
-                // 空档用 muted（亮）/ surface（暗），两者都是主题感知的语义 token。
-                light: [
-                  cssVarName('color.surface-sunken'),
-                  cssVarName('color.primary'),
-                  cssVarName('color.primary'),
-                  cssVarName('color.primary'),
-                  cssVarName('color.primary'),
-                ],
-                dark: [
-                  cssVarName('color.surface'),
-                  cssVarName('color.primary'),
-                  cssVarName('color.primary'),
-                  cssVarName('color.primary'),
-                  cssVarName('color.primary'),
-                ],
-              }}
+              // 主题色走共享实现（成长页的年度视图用同一份）——
+              // 那里记着为什么**必须**是 `var(--ht-…)` 而不能是裸 token 名，
+              // 以及为什么空档要用 `heat-0` 而不是 `surface-sunken`。
+              theme={heatmapTheme()}
+              // 文案也要覆盖 —— 库的默认值是英文（`Less / More`、`Oct`、`N activities in YYYY`）
+              labels={activityLabels('最近 90 天共 {{count}} 次打卡')}
             />
           </li>
           );

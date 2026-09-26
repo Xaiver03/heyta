@@ -78,7 +78,9 @@ export function MilestoneMap({ milestones }: MilestoneMapProps) {
               label={
                 next === undefined
                   ? `${copy.name}的里程碑已全部达成`
-                  : `${copy.name}距离下一档还差 ${String(next.threshold - next.value)} ${copy.unit}`
+                  : // 可访问名里必须同时有**目标**和**差距** ——
+                    // 只说"距离下一档"读屏用户不知道下一档是多少。
+                    `${copy.name}：下一个里程碑是 ${String(next.threshold)} ${copy.unit}，还差 ${String(next.threshold - next.value)} ${copy.unit}`
               }
             />
 
@@ -97,12 +99,12 @@ export function MilestoneMap({ milestones }: MilestoneMapProps) {
 
             {next !== undefined && (
               <p className="ht-milestones__next" style={text('caption')}>
-                还差
+                下一个里程碑是
+                <span style={{ fontVariantNumeric: 'tabular-nums' }}>{next.threshold}</span>
+                {copy.unit}，还差
                 <span style={{ fontVariantNumeric: 'tabular-nums' }}>
                   {next.threshold - next.value}
                 </span>
-                {copy.unit}到
-                <span style={{ fontVariantNumeric: 'tabular-nums' }}>{next.threshold}</span>
                 {copy.unit}
               </p>
             )}
