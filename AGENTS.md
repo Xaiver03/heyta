@@ -32,6 +32,8 @@ heyta 是一个**本地优先**的任务管理应用，目标是做一个功能�
 | `packages/sync-client/` | 宿主无关的同步编排（上传/下载/冲突上报） | ✅ |
 | `packages/design-system/` | 设计变量唯一事实源 + 三端生成器（Swift / ArkTS / RN） | ✅ |
 | `packages/app-host/` | **宿主无关的应用接线与写入动作**（见下文 §3.5） | ✅ |
+| `packages/ai/` | **出站 AI**：供给模式 / **出境闸门** / provider 端口 / 配置路由 / 健康熔断。🔴 **只产出建议，类型上产生不了 op**；零厂商 SDK | ✅ 零运行时依赖 |
+| `packages/local-api/` | **入站 AI 接口**：本机 API / MCP 的工具契约 + 授权判定 + JSON-RPC 处理器。默认关、只监听回环、逐工具授权；🔴 **不构造 op** | ✅ 零运行时依赖 |
 | `server/` | 同步服务端（Fastify + Prisma + PostgreSQL）。**vendored，MIT** | ✅ 已改造 |
 | `apps/` | 客户端外壳。**只允许放平台差异与 UI 绑定** | ✅ |
 | `apps/web/` | Web 壳（IndexedDB + 浏览器 fetch） | ✅ |
@@ -964,5 +966,27 @@ docker inspect <容器> --format '{{range .Config.Env}}{{println .}}{{end}}' | g
   原先回 `DUPLICATE_OPERATION` 会让一台设备**永久同步不了**（硬拒绝 → 不落"已上传" → 重传整批 → 又硬拒绝）。
   现在回 `accepted: true` + **原 serverSeq**；**`INVALID_OP_ID` 那几条硬拒绝一条没放松**。
   这不是新发明：上游 snapshot 路径早就是这么做的（`sync.routes.snapshot-handler.ts:454-478`）。
+- **ADR-0005 / 0006 AI 的数据路径与供给模式** ✅（[0005](docs/adr/0005-ai-data-path.md) / [0006](docs/adr/0006-supply-modes.md)）。
+  AI 是**输入法**不是业务规则：只产出建议、**类型上产生不了 op**，写入必须过 `dispatch()` + 用户确认。
+  🔴 **托管 AI 与 E2EE 在定义上不能共存** —— 可以提供，但必须是一个明确、可撤销、
+  按功能开启的**例外**，**绝不得被描述成端到端加密**。
+- **ADR-0010 AI 配置路由** ✅（[文档](docs/adr/0010-ai-config-routing.md)）。
+  三道闸（总开关 / 允许远程 / 逐功能出境授权）；🔴 **回退不得跨越隐私边界** ——
+  本机端点挂了**不许**悄悄发给云端，用 `fallback-needs-consent` 钉住，且**一次请求都不发**。
+  能力**显式声明、不做推断**；URL 校验在保存与发送**两个点**执行。
+- **ADR-0011 本机 API / MCP** ✅（[文档](docs/adr/0011-local-api-mcp.md)）。
+  默认关（**每个工具单独默认关**）、只监听回环、显式 token、逐工具授权；
+  🔴 **加密条目可列举、不可读**；写入只能经 `dispatch()` 形状的端口。
+- **ADR-0013 云端 AI 与 MaaS** ✅（[文档](docs/adr/0013-cloud-ai-and-maas.md)）。
+  **方向已定**（会提供统一云端 AI 并按此收费，后续 MaaS），但**开放条件未满足**：
+  `assertEnableable()` 继续抛 `retention-undecided` 挡住 `managed`。
+  ⚠️ 这**不是没写完的占位符，是有意的失败** —— 不许"先把计费做了，保留策略以后再说"。
+- **ADR-0014 记忆偏好层的两个闸门** ✅（[文档](docs/adr/0014-memory-switch-and-corrections.md)）。
+  `memoryEnabled` **必填且默认关闭（fail-closed）**；推断结果**不持久化**
+  （纯函数，每次从 op-log 重算），只有用户**纠正**进 op-log 跨设备同步；
+  两个新实体是**纯可加性**的 —— **不需 bump `CURRENT_SCHEMA_VERSION`**。
+- **AI 的完整架构**见 [`docs/reference/ai-architecture.md`](docs/reference/ai-architecture.md)
+  （模块地图 / 封闭词表 / 全部具名常量 / 20 条不变量清单）。
+  **AI 的入口文档是 [`docs/plans/ai-strategy.md`](docs/plans/ai-strategy.md)**，先读那份。
 
 **当前没有阻塞性决策**，P1 可以持续推进。
