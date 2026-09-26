@@ -292,6 +292,50 @@ describe('习惯连续天数', () => {
     expect(computeStreak(h, logs, '2026-09-25').current).toBe(2);
   });
 
+  /**
+   * 🔴 「宽限期」是一个**时间**概念，不是一个**次数**概念。
+   *
+   * 旧实现里 `isStillAlive` 拿同一个 `grace` 当两种单位用：
+   * 先用它比**日历日**（`gap <= grace`），再用它比**漏掉的计划日个数**
+   * （`missed >= grace`）。每日习惯两者相等（grace=1），所以这个混用
+   * 在每日习惯上完全看不出来；一旦频率是「每 7 天一次」，第二个比较
+   * 就变成了「可以漏 **7 次**」—— 而注释写的意图是「允许**一个**完整周期」。
+   *
+   * 实测（每 7 天一次，计划日 9-10 / 9-17 / 9-24 / 10-01）：
+   * 漏 1 个 → current 仍是 1；漏 2 个 → 仍是 1；**漏到第 7 个才归零**。
+   * 对照每日习惯漏 1 天立刻归零。
+   *
+   * 这个数不是只躺在领域层：`selectors.ts` 的 `bestCurrentStreak` 直接喂
+   * `streakDays` 身份标签（阈值 30），所以"六周没打卡还算连上"会变成
+   * 一枚**不该发的身份标签**。
+   */
+  it('🔴 每 7 天一次：漏掉 1 个计划日就该断，宽限期不是"可以漏 7 次"', () => {
+    const h = makeHabit({ frequency: { type: 'interval', everyNDays: 7 } });
+
+    // 前提断言：下面那两个日子**确实**是计划日。否则这条用例测的
+    // 就不是"漏了一个计划日"，而会静默变成另一个场景。
+    expect(isScheduledOn(h.frequency, '2026-09-10')).toBe(true);
+    expect(isScheduledOn(h.frequency, '2026-09-17')).toBe(true);
+    expect(isScheduledOn(h.frequency, '2026-09-19')).toBe(false);
+
+    const logs = [log('h1', '2026-09-10')];
+
+    // 9-17 这个计划日漏了，今天 9-18（下一个计划日 9-24 还没到）
+    expect(computeStreak(h, logs, '2026-09-18').current).toBe(0);
+    // 再漏一个也一样
+    expect(computeStreak(h, logs, '2026-09-25').current).toBe(0);
+  });
+
+  it('对照组：每 7 天一次，下一个计划日还没到 → 不能归零', () => {
+    const h = makeHabit({ frequency: { type: 'interval', everyNDays: 7 } });
+    expect(isScheduledOn(h.frequency, '2026-09-10')).toBe(true);
+    const logs = [log('h1', '2026-09-10')];
+    // 今天 9-11，计划日 9-17 还没到 —— 上午打开界面不该看到 0
+    expect(computeStreak(h, logs, '2026-09-11').current).toBe(1);
+    // 恰好压在计划日当天、还没打卡 —— 今天没过完，同样不算漏
+    expect(computeStreak(h, logs, '2026-09-17').current).toBe(1);
+  });
+
   it('isScheduledOn 对 daily / weekly / interval 都正确', () => {
     expect(isScheduledOn({ type: 'daily' }, '2026-09-25')).toBe(true);
     expect(isScheduledOn({ type: 'weekly', daysOfWeek: [5] }, '2026-09-25')).toBe(true);

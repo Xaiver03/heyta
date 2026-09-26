@@ -156,12 +156,22 @@ export function computeStreak(
 }
 
 /**
- * 连续是否还"活着"：从今天往回看，在一个允许的宽限期内
- * 是否存在应打卡却未打卡的日子。
+ * 连续是否还"活着"：从最后打卡日到今天之间，
+ * 有没有"该打卡却空着"的日子。
  *
- * 宽限规则：
- *   - 每日习惯：允许昨天未打（今天还有机会）
- *   - 其他频率：允许一个完整周期（按最长的周频率算 7 天）
+ * 规则只有一条，且对**所有频率**都一样：
+ *   - 只看**计划日**（按 `isScheduledOn`），不看自然日
+ *   - **今天不算漏**（还没过完，晚上还有机会）
+ *   - 漏掉哪怕一个计划日就断
+ *
+ * 所以"每日习惯允许昨天没打"与"每周一次允许一个完整周期"不是两条规则，
+ * 而是同一条规则在不同频率下的样子 —— 每日习惯的"下一个计划日"就是今天，
+ * 每周一次的"下一个计划日"在 7 天后，扫描自然会把这段时间放行。
+ *
+ * ⚠️ 曾经这里写着"其他频率允许一个完整周期（7 天）"，并为此引入了一个
+ * `grace` 阈值。**那个阈值是错的**，因为它同时被当作日历日和"漏了几次"
+ * 使用，导致每 7 天一次的习惯可以漏 7 次。见下面 🔴 注释与
+ * `tests/domain.spec.ts` 里的守卫。
  */
 function isStillAlive(
   habit: Habit,
@@ -170,19 +180,32 @@ function isStillAlive(
   achieved: Set<LocalDate>,
 ): boolean {
   const gap = diffDays(lastDate, today);
-  const grace = habit.frequency?.type === 'daily' || habit.frequency === undefined ? 1 : 7;
-  if (gap <= grace) return true;
+  if (gap <= 0) return true;
 
-  // 超过宽限期：检查宽限期内是否有"应打卡但没打"的日子
+  /**
+   * 判据只有一条：从最后打卡日到今天之间，有没有**该打卡却空着**的日子。
+   * 有就断。**不含今天** —— 今天还没过完，晚上还有机会（`current` 也是
+   * 从最后打卡日往回数，两边口径必须一致，见上面的注释）。
+   *
+   * 🔴 这里**不要**再引入"宽限几天"的第二个阈值。
+   *
+   * 旧实现拿同一个 `grace` 当两种单位用：先用它比**日历日**
+   * （`gap <= grace`），再用它比**漏掉的计划日个数**（`missed >= grace`）。
+   * 每日习惯两者恰好相等（grace = 1），所以这个混用完全看不出来；
+   * 但频率是"每 7 天一次"时，第二个比较就变成了「可以漏 **7 次**」——
+   * 而注释写的意图是「允许**一个**完整周期」。
+   * 实测后果：每 7 天一次的习惯漏掉 1~6 个计划日，界面仍然显示连续。
+   *
+   * "允许一个完整周期"这句话本来就由**逐日扫描**表达：扫描走完没有
+   * 漏掉的计划日，就等于"下一个计划日还没到"。不需要额外的时间阈值。
+   */
   let c = lastDate;
-  let missed = 0;
   for (let i = 0; i < gap; i++) {
     c = addDays(c, 1);
-    if (diffDays(c, today) < 0) break;
-    if (isScheduledOn(habit.frequency, c) && !achieved.has(c)) missed++;
-    if (missed >= grace) return false;
+    if (diffDays(c, today) === 0) break; // 今天不算漏
+    if (isScheduledOn(habit.frequency, c) && !achieved.has(c)) return false;
   }
-  return missed < grace;
+  return true;
 }
 
 /**
