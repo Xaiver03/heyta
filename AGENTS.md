@@ -301,6 +301,23 @@ pnpm check:arkts                # 用**真 ArkTS 编译器**编译生成的 .ets
 pnpm check:native-deps          # iOS 原生依赖对账（package.json ↔ Podfile.lock，见 §7 第 32 条）
 ```
 
+### 6.1 多端构建
+
+```bash
+pnpm -r build                   # 🔴 打包前**必须**先跑：APK/.app 里打的是 packages/*/dist
+pnpm build:android              # Android Release APK（Mac 或 Windows 打包机）
+pnpm build:android:debug        # Android Debug APK
+pnpm build:ios                  # iOS Release（仅 macOS）
+pnpm --filter @heyta/mobile run build:android:bundle   # 上架用 AAB
+```
+
+- **事实源（环境 / 版本 / 产物 / 状态）**：[`docs/reference/build-matrix.md`](docs/reference/build-matrix.md)
+- **操作步骤（怎么打、怎么验、坑）**：[`docs/runbooks/multi-platform-build.md`](docs/runbooks/multi-platform-build.md)
+- 🔴 **门禁绿 ≠ 能打包。** `pnpm check` 不做平台打包；本仓库已三次踩到"测试全绿但打不出包"
+  （§7 第 27、28、31 条）。构建要单独跑、产物要单独验。
+- Windows 打包机装机脚本：`scripts/windows/setup-build-host.ps1`（幂等；`-Step verify` 只体检）。
+  🔴 该脚本**必须保持纯 ASCII** —— PS 5.1 把无 BOM UTF-8 当 ANSI 读，中文会破坏解析。
+
 **提交前至少跑**：`pnpm -r typecheck && pnpm -r test`。
 
 ---
