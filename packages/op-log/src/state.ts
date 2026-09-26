@@ -118,7 +118,11 @@ export const MODELED_ENTITY_TYPES: readonly string[] = Object.keys(BUCKET_BY_ENT
 export const UNMODELED_ENTITY_TYPES: readonly { entityType: string; reason: string }[] = [
   {
     entityType: 'TASK_REPEAT_CFG',
-    reason: '重复任务规则；需要重复展开语义与产品决策，尚未开始',
+    reason:
+      'vendored 线协议里的独立重复规则实体。**heyta 有意不使用它**：' +
+      '重复规则放在 Task.repeatRule / Task.repeatDtstart 上（见 packages/domain/src/entities.ts），' +
+      '因为一个用户意图必须是一个 op，而本引擎的 reducer 不处理跨实体类型的 op。' +
+      '本条不是"还没做"，是"决定不用"。',
   },
   {
     entityType: 'REMINDER',
