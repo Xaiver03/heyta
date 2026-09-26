@@ -26,7 +26,10 @@
 import React, { useState } from 'react';
 import { StatusBar, View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { I18nProvider, type Locale } from '@heyta/i18n';
 import { ThemeProvider, useTheme, useTokens } from './theme';
+import { LocalePreferenceProvider } from './i18n/locale-preference';
+import { resolveDeviceLocale } from './i18n/locale';
 import { TabBar, type TabKey } from './nav/TabBar';
 import { TasksScreen } from './screens/TasksScreen';
 // 🔴 四个 tab 现在**全部是真实屏幕**了 —— `screens/NotYetImplemented.tsx`
@@ -80,12 +83,30 @@ export default function App(): React.JSX.Element {
   return <Shell />;
 }
 
-/** 入口：SafeAreaProvider + ThemeProvider。 */
+/**
+ * 语言宿主：**只在内存里**持有 locale（重启回到设备语言）。
+ *
+ * 🔴 `I18nProvider` 必须在**所有**调 `useI18n()` 的组件之上 ——
+ * 也就是在这里，而不是更靠下的某个屏幕。`useState(resolveDeviceLocale)`
+ * 传的是**初始化函数**：设备语言的读取只在挂载时发生一次，不是每帧。
+ */
+function LocaleHost(): React.JSX.Element {
+  const [locale, setLocale] = useState<Locale>(resolveDeviceLocale);
+  return (
+    <I18nProvider locale={locale}>
+      <LocalePreferenceProvider locale={locale} setLocale={setLocale}>
+        <App />
+      </LocalePreferenceProvider>
+    </I18nProvider>
+  );
+}
+
+/** 入口：SafeAreaProvider + ThemeProvider + 语言宿主。 */
 export function Root(): React.JSX.Element {
   return (
     <SafeAreaProvider>
       <ThemeProvider>
-        <App />
+        <LocaleHost />
       </ThemeProvider>
     </SafeAreaProvider>
   );

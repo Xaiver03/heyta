@@ -13,46 +13,89 @@
  * 所以按 AGENTS.md §3.5 的收尾方式处理：**上移、删掉旧的那份、改调用方**，
  * 而不是在本文件里转发一层（转发会让下一个人以为这里还是定义处）。
  *
+ * ⚠️ 本轮同理删掉了 `formatDue` / `isOverdue`：它们已经是**死代码**
+ * （移动端唯一的使用者早已改走 `lib/due-display.ts`），却各自带着一份
+ * 与领域层不同口径的中文文案（`已过期` vs `已逾期`、`N 天后` vs `还剩 N 天`）。
+ * 留着它就是留着"第二份会漂移的实现"，而这次迁移正好要让
+ * "剩余天数怎么说"只有一处定义。用例搬去了 `tests/date.spec.ts` 的
+ * `remainingText`（边界改为与领域层同一套阈值）。
+ *
  * 本文件**不用 `Intl.DateTimeFormat`**：
  * Hermes 上 Intl 是**可选编译进去的**，拿不到时 `new Intl.DateTimeFormat()`
  * 会在渲染中途抛异常 —— 表现为整屏白掉，且错误信息不会指向 Intl 缺失。
  * 这里用 `Date` 的基础 getter 手写，行为完全确定、无环境依赖。
  */
 
-import { addDays, daysBetween, parseLocalDate, startOfDay, toLocalDate } from '@heyta/domain';
+import { addDays, isoWeekday, parseLocalDate, toLocalDate, type LocalDate } from '@heyta/domain';
+import type { MessageKey } from '@heyta/i18n';
 
-/**
- * 相对"今天"的自然语言日期。用于任务行的次要信息。
- *
- * 🔴 过期用**负天数**表述（"已过期 3 天"）而不是日期 ——
- * 过期任务最关键的信息是"拖了多久"，不是"哪天到期"。
- */
-export function formatDue(ms: number, now: number): string {
-  const days = daysBetween(ms, now);
-  if (days === 0) return '今天';
-  if (days === 1) return '明天';
-  if (days === -1) return '昨天';
-  if (days < -1) return `已过期 ${-days} 天`;
-  if (days <= 7) return `${days} 天后`;
-  const d = new Date(ms);
-  return `${d.getMonth() + 1}月${d.getDate()}日`;
-}
-
-/** 某个时间戳是否已经过期（严格早于今天 0 点）。 */
-export function isOverdue(ms: number, now: number): boolean {
-  return startOfDay(ms) < startOfDay(now);
-}
+import type { Translate } from '../i18n/translate';
 
 /**
  * 绝对时刻，如 `9-26 00:31`。
  *
  * 用于"某某事发生在什么时候"这类**必须精确**的地方（上次同步、冲突双方的改动时间）。
- * 与 `formatDue` 的分工：那个回答"还有几天"，这个回答"具体哪一刻"。
+ * 纯数字，不含语言，所以不走词条表。
  */
 export function formatStamp(ms: number): string {
   const d = new Date(ms);
   const pad = (n: number): string => String(n).padStart(2, '0');
   return `${String(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+/**
+ * 周几 → 词条 key。
+ *
+ * 🔴 用 `switch` 而不是数组下标：`isoWeekday` 的返回类型是 `number`，
+ * 而在 `noUncheckedIndexedAccess` 下数组下标访问永远是 `T | undefined` ——
+ * 那会逼出一句"兜底到周一"的死代码（实际永远走不到）。
+ * `switch` 的 `default` 覆盖的是 7（周日），不是"意外值"。
+ */
+function weekdayKey(weekday: number): MessageKey {
+  switch (weekday) {
+    case 1:
+      return 'mobile.weekday.mon';
+    case 2:
+      return 'mobile.weekday.tue';
+    case 3:
+      return 'mobile.weekday.wed';
+    case 4:
+      return 'mobile.weekday.thu';
+    case 5:
+      return 'mobile.weekday.fri';
+    case 6:
+      return 'mobile.weekday.sat';
+    default:
+      return 'mobile.weekday.sun';
+  }
+}
+
+/**
+ * 一周列头（周一…周日）的词条 key，下标 0 = 周一。
+ *
+ * 与领域层的 `WEEKDAY_LABELS` **同序**：`monthGrid` 是周一开头，
+ * 只要这里写成周日开头，整个日历会整体错位一格 —— 而错位后的界面
+ * 看上去仍然像个正常日历。所以顺序由 `isoWeekday` 的 1..7 生成，
+ * 不手写数组。
+ */
+export const WEEKDAY_MESSAGE_KEYS: readonly MessageKey[] = [1, 2, 3, 4, 5, 6, 7].map(
+  weekdayKey,
+);
+
+/** 「2026年9月」——年份与月份由领域层的 `LocalDate` 解出，措辞走词条。 */
+export function formatMonthTitleText(date: LocalDate, t: Translate): string {
+  const d = parseLocalDate(date);
+  return t('mobile.calendar.monthTitle', { year: d.getFullYear(), month: d.getMonth() + 1 });
+}
+
+/** 「9月26日 星期五」——某一天的标题只有这一个实现（与领域层同一份日期语义）。 */
+export function formatDayTitleText(date: LocalDate, t: Translate): string {
+  const d = parseLocalDate(date);
+  return t('mobile.calendar.dayTitle', {
+    month: d.getMonth() + 1,
+    day: d.getDate(),
+    weekday: t(weekdayKey(isoWeekday(date))),
+  });
 }
 
 /** 定时器下限（毫秒）。设备时钟被回拨时下一个零点可能算到 `now` 之前。 */

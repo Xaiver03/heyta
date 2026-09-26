@@ -30,6 +30,7 @@ import {
   Coffee,
   Flag,
   Flame,
+  Folder,
   Inbox,
   Link2,
   ListTodo,
@@ -74,6 +75,14 @@ const ICONS = {
   'task.reopen': RotateCcw,
   'task.reminder': Bell,
   'task.priority': Flag,
+  /**
+   * 清单（PROJECT）。
+   *
+   * 🔴 用 `Folder` 而不是 `ListTodo` —— 后者已经是「任务」这个 tab 的字形，
+   * 两者同时出现在详情页上下两处（tab 栏 + 清单选择器）会让人以为
+   * 点清单就是回任务列表。**语义名相同就复用，不同就必须换字形。**
+   */
+  'task.project': Folder,
 
   // 分组
   'group.today': ListTodo,

@@ -35,12 +35,12 @@ import {
   focusProgress,
   focusStatsForDay,
   formatDuration,
-  formatFocusDuration,
   type FocusSession,
   type FocusSessionKind,
   type FocusState,
   type Task,
 } from '@heyta/domain';
+import { useI18n } from '@heyta/i18n';
 import { createFocusActions, createTaskActions, type AppHost } from '@heyta/app-host';
 
 import { useText, useTokens } from '../theme';
@@ -59,8 +59,9 @@ import {
   useFocusTimer,
 } from '../lib/focus-timer';
 import {
-  KIND_LABELS,
+  formatFocusDurationText,
   kindDurationLabel,
+  kindLabel,
   phaseColorToken,
   phaseLabel,
   primaryActionIcon,
@@ -83,8 +84,9 @@ const MAX_PICKER_TASKS = 5;
 // ─────────────────────────────────────────────────────────────
 
 function TimerCard({ now, state }: { now: number; state: FocusState }): React.JSX.Element {
-  const t = useTokens();
-  const color = t[phaseColorToken(state)];
+  const tokens = useTokens();
+  const { t } = useI18n();
+  const color = tokens[phaseColorToken(state)];
   // 空闲时显示的是**这一轮的长度**（25:00），不是 00:00 —— 见 `focusDisplayMs`。
   const shown = focusDisplayMs(state, now);
   const progress = focusProgress(state, now);
@@ -101,9 +103,9 @@ function TimerCard({ now, state }: { now: number; state: FocusState }): React.JS
 
   return (
     <Card>
-      <View style={{ alignItems: 'center', gap: t['space.3'] }}>
+      <View style={{ alignItems: 'center', gap: tokens['space.3'] }}>
         <Text variant="row-meta" style={{ color }}>
-          {phaseLabel(state)}
+          {phaseLabel(state, t)}
         </Text>
 
         {/* 大号倒计时。`numeric-display` 带 `tabular-nums` ——
@@ -116,9 +118,9 @@ function TimerCard({ now, state }: { now: number; state: FocusState }): React.JS
         <View
           style={{
             width: '100%',
-            height: t['size.progress-height'],
-            borderRadius: t['radius.full'],
-            backgroundColor: t['color.surface-sunken'],
+            height: tokens['size.progress-height'],
+            borderRadius: tokens['radius.full'],
+            backgroundColor: tokens['color.surface-sunken'],
             overflow: 'hidden',
           }}
         >
@@ -132,7 +134,9 @@ function TimerCard({ now, state }: { now: number; state: FocusState }): React.JS
         </View>
 
         <Text variant="caption" tone="subtle">
-          {`本轮 ${kindDurationLabel(state.kind, FOCUS_CONFIG)}`}
+          {t('mobile.focus.roundLength', {
+            duration: kindDurationLabel(state.kind, FOCUS_CONFIG, t),
+          })}
         </Text>
       </View>
     </Card>
@@ -152,36 +156,37 @@ function TaskChoice({
   selected: boolean;
   onPress: () => void;
 }): React.JSX.Element {
-  const t = useTokens();
+  const tokens = useTokens();
+  const { t } = useI18n();
 
   return (
     <Pressable
       onPress={onPress}
       accessibilityRole="button"
       accessibilityState={{ selected }}
-      accessibilityLabel={`关联任务：${task.title}`}
+      accessibilityLabel={t('mobile.focus.a11y.linkTask', { title: task.title })}
       style={({ pressed }) => ({
-        minHeight: t['size.row-min-height'],
+        minHeight: tokens['size.row-min-height'],
         flexDirection: 'row',
         alignItems: 'center',
-        gap: t['space.2'],
-        paddingHorizontal: t['space.3'],
-        borderRadius: t['radius.md'],
+        gap: tokens['space.2'],
+        paddingHorizontal: tokens['space.3'],
+        borderRadius: tokens['radius.md'],
         // 选中态同时改**边框**与底色，不只改颜色 ——
         // 只改颜色的话色觉障碍用户看不出选中了哪一个（UIX Pro 第 1 条）。
-        borderWidth: selected ? t['border-width.thick'] : t['border-width.thin'],
-        borderColor: selected ? t['color.primary'] : t['color.border'],
+        borderWidth: selected ? tokens['border-width.thick'] : tokens['border-width.thin'],
+        borderColor: selected ? tokens['color.primary'] : tokens['color.border'],
         backgroundColor: selected
-          ? t['color.primary-subtle']
+          ? tokens['color.primary-subtle']
           : pressed
-            ? t['color.surface-sunken']
-            : t['color.surface'],
+            ? tokens['color.surface-sunken']
+            : tokens['color.surface'],
       })}
     >
       <Icon
         name="task.done"
         size="sm"
-        color={selected ? t['color.primary'] : t['color.border-strong']}
+        color={selected ? tokens['color.primary'] : tokens['color.border-strong']}
       />
       <Text variant="row-title" style={{ flex: 1 }} numberOfLines={1}>
         {task.title}
@@ -195,7 +200,7 @@ function TaskChoice({
 // ─────────────────────────────────────────────────────────────
 
 function StatRow({ label, value }: { label: string; value: string }): React.JSX.Element {
-  const t = useTokens();
+  const tokens = useTokens();
   const text = useText();
 
   return (
@@ -204,7 +209,7 @@ function StatRow({ label, value }: { label: string; value: string }): React.JSX.
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
-        gap: t['space.3'],
+        gap: tokens['space.3'],
       }}
     >
       <Text variant="row-meta" tone="muted">
@@ -221,7 +226,8 @@ function StatRow({ label, value }: { label: string; value: string }): React.JSX.
 // ─────────────────────────────────────────────────────────────
 
 export function FocusScreen(): React.JSX.Element {
-  const t = useTokens();
+  const tokens = useTokens();
+  const { t } = useI18n();
   const timer = useFocusTimer();
   const { state } = timer;
 
@@ -297,15 +303,27 @@ export function FocusScreen(): React.JSX.Element {
     void abortFocus();
   }, []);
 
-  const error = timer.error ?? loadError;
+  /**
+   * 错误**句子**在壳里拼，不在 store 里。
+   *
+   * `lib/focus-timer.ts` 是纯 store，拿不到 `t`，它只带**原因**（底层实现的
+   * 原始文本，是数据）；句子来自词条表。反过来做的话英文界面会漏出中文。
+   * 两条失败路径（落盘、打开本地库）各有自己的句子，别合并成一句含糊的。
+   */
+  const errorText =
+    timer.error !== undefined
+      ? t('mobile.focus.error.saveFailed', { reason: timer.error.reason })
+      : loadError !== null
+        ? t('mobile.focus.error.openFailed', { reason: loadError })
+        : undefined;
 
   return (
-    <Screen title="专注">
+    <Screen title={t('mobile.focus.title')}>
       <TimerCard now={timer.now} state={state} />
 
-      <View style={{ flexDirection: 'row', gap: t['space.2'] }}>
+      <View style={{ flexDirection: 'row', gap: tokens['space.2'] }}>
         <Button
-          label={primaryActionLabel(state)}
+          label={primaryActionLabel(state, t)}
           icon={primaryActionIcon(state)}
           tone="primary"
           onPress={onPrimary}
@@ -313,26 +331,31 @@ export function FocusScreen(): React.JSX.Element {
         />
         {/* 只有真的在计时才给"放弃" —— 空闲时它没有可放弃的东西。 */}
         {state.phase !== 'idle' ? (
-          <Button label="放弃这一轮" icon="focus.abort" tone="ghost" onPress={onAbort} />
+          <Button
+            label={t('mobile.focus.abort')}
+            icon="focus.abort"
+            tone="ghost"
+            onPress={onAbort}
+          />
         ) : null}
       </View>
 
       {/* 落盘失败必须看得见。静默的话用户会以为记录存下了。 */}
-      {error !== undefined && error !== null ? (
+      {errorText !== undefined ? (
         <Card>
           <Text variant="row-meta" tone="danger">
-            {error}
+            {errorText}
           </Text>
         </Card>
       ) : null}
 
       {/* 类型选择只在空闲时出现 —— 见文件头第 3 条。 */}
       {state.phase === 'idle' ? (
-        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: t['space.2'] }}>
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: tokens['space.2'] }}>
           {KIND_ORDER.map((kind) => (
             <Chip
               key={kind}
-              label={KIND_LABELS[kind]}
+              label={kindLabel(kind, t)}
               selected={state.kind === kind}
               onPress={() => {
                 selectFocusKind(kind);
@@ -342,10 +365,10 @@ export function FocusScreen(): React.JSX.Element {
         </View>
       ) : null}
 
-      <SectionHeader icon="focus.link" title="关联任务" />
+      <SectionHeader icon="focus.link" title={t('mobile.focus.linkedTask')} />
       <Card>
         {linkedTask !== undefined ? (
-          <View style={{ gap: t['space.2'] }}>
+          <View style={{ gap: tokens['space.2'] }}>
             <Text variant="row-title" numberOfLines={2}>
               {linkedTask.title}
             </Text>
@@ -353,7 +376,7 @@ export function FocusScreen(): React.JSX.Element {
                 中途改会让落盘时读到的 taskId 与用户看到的界面不一致。 */}
             {state.phase === 'idle' ? (
               <Button
-                label="换一个任务"
+                label={t('mobile.focus.changeTask')}
                 tone="ghost"
                 icon="action.close"
                 onPress={clearFocusTask}
@@ -362,10 +385,10 @@ export function FocusScreen(): React.JSX.Element {
           </View>
         ) : pendingTasks.length === 0 ? (
           <Text variant="row-meta" tone="subtle">
-            还没有待办任务。去「任务」页建一个，就能把它和专注关联起来。
+            {t('mobile.focus.noPending')}
           </Text>
         ) : (
-          <View style={{ gap: t['space.1'] }}>
+          <View style={{ gap: tokens['space.1'] }}>
             {pendingTasks.slice(0, MAX_PICKER_TASKS).map((task) => (
               <TaskChoice
                 key={task.id}
@@ -381,13 +404,22 @@ export function FocusScreen(): React.JSX.Element {
         )}
       </Card>
 
-      <SectionHeader icon="focus.stats" title="今天" />
+      <SectionHeader icon="focus.stats" title={t('mobile.common.today')} />
       <Card>
-        <StatRow label="完成专注" value={`${String(stats.completedWorkCount)} 个`} />
-        <StatRow label="专注时长" value={formatFocusDuration(stats.focusMs)} />
+        <StatRow
+          label={t('mobile.focus.stats.completed')}
+          value={t('mobile.focus.stats.completedValue', { count: stats.completedWorkCount })}
+        />
+        <StatRow
+          label={t('mobile.focus.stats.focusDuration')}
+          value={formatFocusDurationText(stats.focusMs, t)}
+        />
         {/* 放弃次数只在真的发生过时才显示 —— 一行常年的「0 次」不传达任何信息。 */}
         {stats.abortedWorkCount > 0 ? (
-          <StatRow label="中途放弃" value={`${String(stats.abortedWorkCount)} 次`} />
+          <StatRow
+            label={t('mobile.focus.stats.aborted')}
+            value={t('mobile.focus.stats.abortedValue', { count: stats.abortedWorkCount })}
+          />
         ) : null}
       </Card>
     </Screen>

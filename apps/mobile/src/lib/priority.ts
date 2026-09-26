@@ -15,13 +15,21 @@
  */
 
 import { Priority } from '@heyta/domain';
+import type { MessageKey } from '@heyta/i18n';
 
-/** 档位 → 中文名。 */
-export const PRIORITY_LABELS: Record<Priority, string> = {
-  [Priority.None]: '无',
-  [Priority.Low]: '低',
-  [Priority.Medium]: '中',
-  [Priority.High]: '高',
+import type { Translate } from '../i18n/translate';
+
+/**
+ * 档位 → 词条 key。
+ *
+ * ⚠️ 这里存的是 **key 不是文案**：模块级拿不到 `t`，而把中文写在这里
+ * 就是硬编码 —— 门禁在迁移模式下会直接判红。
+ */
+const PRIORITY_LABEL_KEYS: Record<Priority, MessageKey> = {
+  [Priority.None]: 'mobile.priority.none',
+  [Priority.Low]: 'mobile.priority.low',
+  [Priority.Medium]: 'mobile.priority.medium',
+  [Priority.High]: 'mobile.priority.high',
 };
 
 /**
@@ -60,6 +68,11 @@ export function priorityColorToken(priority: Priority): PriorityColorToken {
   }
 }
 
+/** 档位 → 当前语言的名称。 */
+export function priorityLabel(priority: Priority, t: Translate): string {
+  return t(PRIORITY_LABEL_KEYS[priority]);
+}
+
 /**
  * 任务行上的优先级徽标文案。
  *
@@ -67,7 +80,7 @@ export function priorityColorToken(priority: Priority): PriorityColorToken {
  * 给它一个"无优先级"的徽标只会让每一行都多一个装饰，
  * 真正的高优先级反而淹没在里面。
  */
-export function priorityBadgeLabel(priority: Priority | undefined): string | null {
+export function priorityBadgeLabel(priority: Priority | undefined, t: Translate): string | null {
   if (priority === undefined || priority === Priority.None) return null;
-  return `${PRIORITY_LABELS[priority]}优先级`;
+  return t('mobile.priority.badge', { level: priorityLabel(priority, t) });
 }

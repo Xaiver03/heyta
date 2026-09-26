@@ -115,7 +115,7 @@ export async function syncNow(): Promise<SyncStatus> {
     // 宿主自己会把可预期的失败表达成 `SyncStatus`；能走到这里的都是意外，
     // 所以必须**如实报出来**，不能吞掉变成一句"同步失败"。
     const message = error instanceof Error ? error.message : String(error);
-    const status: SyncStatus = { kind: 'error', message, retryable: true };
+    const status: SyncStatus = { kind: 'error', reason: 'unexpected', message, retryable: true };
     set({ status });
     return status;
   } finally {
@@ -172,7 +172,7 @@ export async function resolveConflictNow(
     return status;
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    const status: SyncStatus = { kind: 'error', message, retryable: true };
+    const status: SyncStatus = { kind: 'error', reason: 'unexpected', message, retryable: true };
     set({ status });
     return status;
   } finally {

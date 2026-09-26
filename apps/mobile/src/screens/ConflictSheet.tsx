@@ -37,6 +37,7 @@ import React, { useState } from 'react';
 import { Modal, ScrollView, View } from 'react-native';
 
 import type { ConflictInfo } from '@heyta/sync-client';
+import { useI18n } from '@heyta/i18n';
 
 import { useTheme, useTokens } from '../theme';
 import { useMobileSync, resolveConflictNow } from '../sync/store';
@@ -67,8 +68,9 @@ function Side({
   busy: boolean;
   onPick: (choice: ConflictChoice) => void;
 }): React.JSX.Element {
-  const t = useTokens();
-  const blocked = choiceBlockedReason(view, choice);
+  const tokens = useTokens();
+  const { t } = useI18n();
+  const blocked = choiceBlockedReason(view, choice, t);
   const icon = choice === 'keep-local' ? 'device.local' : 'device.remote';
 
   return (
@@ -76,31 +78,31 @@ function Side({
       style={{
         flex: 1,
         minWidth: 0,
-        gap: t['space.3'],
-        padding: t['space.3'],
-        borderRadius: t['radius.md'],
-        borderWidth: t['border-width.thin'],
+        gap: tokens['space.3'],
+        padding: tokens['space.3'],
+        borderRadius: tokens['radius.md'],
+        borderWidth: tokens['border-width.thin'],
         // 较新的一侧用主色描边做视觉强调 —— 这只是帮用户建立直觉，
         // **不是裁决依据**（判定见 sync-client 的 compareConflictFreshness）。
-        borderColor: side.isNewer ? t['color.primary'] : t['color.border'],
-        backgroundColor: t['color.surface'],
+        borderColor: side.isNewer ? tokens['color.primary'] : tokens['color.border'],
+        backgroundColor: tokens['color.surface'],
       }}
     >
       <View
         style={{
           flexDirection: 'row',
           alignItems: 'center',
-          gap: t['space.1'],
+          gap: tokens['space.1'],
         }}
       >
-        <Icon name={icon} size="xs" color={t['color.foreground-muted']} />
+        <Icon name={icon} size="xs" color={tokens['color.foreground-muted']} />
         <Text variant="caption" tone="muted">
           {side.label}
         </Text>
         {side.isNewer ? (
           <View style={{ marginLeft: 'auto' }}>
             <Text variant="badge" tone="primary">
-              较新
+              {t('mobile.conflict.newer')}
             </Text>
           </View>
         ) : null}
@@ -113,7 +115,7 @@ function Side({
       ) : (
         // 🔴 取不到就明说。显示成空白会让人以为对端什么都没写。
         <Text variant="caption" tone="muted" style={{ fontStyle: 'italic' }}>
-          取不到这一侧的版本
+          {t('mobile.conflict.remoteUnavailable')}
         </Text>
       )}
 
@@ -124,7 +126,7 @@ function Side({
       )}
 
       <Button
-        label="保留这一版"
+        label={t('mobile.conflict.keepThis')}
         icon="action.keep"
         tone={side.isNewer ? 'primary' : 'secondary'}
         disabled={blocked !== undefined}
@@ -151,7 +153,8 @@ export function ConflictSheet({
   visible: boolean;
   onClose: () => void;
 }): React.JSX.Element | null {
-  const t = useTokens();
+  const tokens = useTokens();
+  const { t } = useI18n();
   // 🔴 `shadow.lg` 在 token 里是 **CSS 字符串**（`0 8px 24px rgb(...)`），
   // RN 不认，展开它也不是对象。必须经 `native.shadow()` 归一化成 RN 的
   // shadowColor/shadowOffset/... 一组属性 —— 与 kit 里 `Fab` 的用法一致。
@@ -196,45 +199,56 @@ export function ConflictSheet({
         style={{
           flex: 1,
           justifyContent: 'center',
-          padding: t['screen.gutter'],
-          backgroundColor: t['color.overlay'],
+          padding: tokens['screen.gutter'],
+          backgroundColor: tokens['color.overlay'],
         }}
       >
         <View
           style={[
             {
               maxHeight: '90%',
-              gap: t['space.4'],
-              padding: t['space.5'],
-              borderRadius: t['radius.lg'],
-              backgroundColor: t['color.surface-raised'],
+              gap: tokens['space.4'],
+              padding: tokens['space.5'],
+              borderRadius: tokens['radius.lg'],
+              backgroundColor: tokens['color.surface-raised'],
             },
             // 阴影只给真正的浮层（AGENTS.md §5），而对话框就是浮层。
             shadow ?? undefined,
           ]}
         >
-          <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: t['space.2'] }}>
-            <Icon name="conflict.warning" size="md" color={t['color.warning-strong']} />
-            <View style={{ flex: 1, minWidth: 0, gap: t['space.1'] }}>
+          <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: tokens['space.2'] }}>
+            <Icon name="conflict.warning" size="md" color={tokens['color.warning-strong']} />
+            <View style={{ flex: 1, minWidth: 0, gap: tokens['space.1'] }}>
               <Text variant="section-title">
-                {`这 ${String(conflicts.length)} 处改动两边都改过`}
+                {/* 英文单复数：只有 1 处时走单数兄弟词条（词条表没有 ICU）。
+                    只在 JSX 子节点里分支，不放进属性 —— 属性里门禁只认
+                    "字面量紧跟 `t(`"这一种形状。 */}
+                {conflicts.length === 1
+                  ? t('mobile.conflict.titleOne')
+                  : t('mobile.conflict.title', { count: conflicts.length })}
               </Text>
               <Text variant="caption" tone="muted">
-                heyta 不会替你决定保留哪一版——自动挑一个会悄悄丢掉另一边的改动。每一处都请你看一眼再选；没选的那些会一直留在本地，不会丢。
+                {t('mobile.conflict.body')}
               </Text>
             </View>
-            <IconButton icon="action.close" label="稍后再处理" onPress={onClose} />
+            <IconButton
+              icon="action.close"
+              label={t('mobile.conflict.close')}
+              onPress={onClose}
+            />
           </View>
 
-          <ScrollView contentContainerStyle={{ gap: t['space.5'] }}>
+          <ScrollView contentContainerStyle={{ gap: tokens['space.5'] }}>
             {conflicts.map((conflict, index) => {
-              const view = toConflictView(conflict);
+              const view = toConflictView(conflict, t);
               return (
-                <View key={view.id} style={{ gap: t['space.2'] }}>
+                <View key={view.id} style={{ gap: tokens['space.2'] }}>
                   <Text variant="caption" tone="muted">
-                    {`${positionLabel(index, conflicts.length)} · ${view.entityLabel} · ${view.reasonLabel}`}
+                    {[positionLabel(index, conflicts.length, t), view.entityLabel, view.reasonLabel].join(
+                      ' · ',
+                    )}
                   </Text>
-                  <View style={{ flexDirection: 'row', gap: t['space.3'], alignItems: 'stretch' }}>
+                  <View style={{ flexDirection: 'row', gap: tokens['space.3'], alignItems: 'stretch' }}>
                     <Side
                       side={view.local}
                       view={view}
