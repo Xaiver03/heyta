@@ -4,6 +4,12 @@
 > 配套：[`subscription-boundary.md`](subscription-boundary.md)（产品边界，PM 定稿）。
 > 本文件回答**"代码该改哪里"**，不改任何 ADR 的结论。
 
+> ⚠️ **本文件的行号会漂移。** 共享文件随时可能被其他改动推移几行 ——
+> 上面这批行号在 2026-09-26 核对过一次（`check-migrations.mjs` 34、
+> `sync.routes.ts` 46、`server.ts` 488/494/501）。
+> **引用行号时请用 `grep -n` 现场核一遍**，不要把这里的数字当权威：
+> 结论是稳的，行号不是。
+
 ## 0. 🔴 先看清一件事：`server/` 是 vendored 上游
 
 [`README.md`](../../README.md) 第 50 行写的是实话：
@@ -30,9 +36,9 @@
 路由用 `fastify.get/post/delete` 写在各插件里，再由 `server.ts` 按前缀挂载。
 
 ```
-server/src/server.ts:487  await fastifyServer.register(apiRoutes,  { prefix: '/api' })
-server/src/server.ts:493  await fastifyServer.register(syncRoutes, { prefix: '/api/sync' })
-server/src/server.ts:496  await fastifyServer.register(wsRoutes,   { prefix: '/api/sync' })
+server/src/server.ts:488  await fastifyServer.register(apiRoutes,  { prefix: '/api' })
+server/src/server.ts:494  await fastifyServer.register(syncRoutes, { prefix: '/api/sync' })
+server/src/server.ts:501  await fastifyServer.register(wsRoutes,   { prefix: '/api/sync' })
 ```
 （`server/package.json`：`"fastify": "^5.12.1"`）
 
@@ -105,7 +111,7 @@ grep 全仓：**没有** `SELF_HOSTED` / `IS_OFFICIAL` / `INSTANCE_MODE`。
 而"自托管免费"是本项目的立身之本（见 [`subscription-boundary.md`](subscription-boundary.md) §1）。
 
 开关放 `config.ts loadConfigFromEnv`，**不要散落读 `process.env`**
-（`sync.routes.ts:40-44` 已经因为这件事踩过一次）。
+（`sync.routes.ts:46` 已经因为这件事踩过一次）。
 
 ## 6. 测试：样板是哪一个（有个坑）
 
@@ -129,7 +135,7 @@ server/src/logger.ts:73   Logger.audit(entry)
 ## 8. webhook 端点
 
 新插件 `server/src/billing/webhook.routes.ts`，与 `apiRoutes` 并列注册
-（`server.ts:487` 附近，`{ prefix: '/api/billing' }`）。
+（`server.ts:488` 附近，`{ prefix: '/api/billing' }`）。
 
 🔴 **不能套 `authenticate`** —— 调用方是支付商的机器，没有 JWT，改**验签**。
 验签要**原始 body**，可照 `sync/sync.routes.ts:56 addContentTypeParser` 的
