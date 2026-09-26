@@ -33,6 +33,7 @@ import { Logger } from '../logger';
 import { ENTITLEMENT_AUDIT_EVENTS } from '../entitlement';
 import { applyPaymentEvent } from './apply-event';
 import type { ExistingSubscription } from './apply-event';
+import { extendSubscriptionPeriod } from './extend-period';
 import {
   createBillingAdapterRegistry,
   DEFAULT_BILLING_ADAPTERS,
@@ -175,9 +176,18 @@ export const webhookRoutes = async (
               tx.subscription.findFirst({
                 where: { externalSubscriptionId },
               }) as Promise<ExistingSubscription | null>,
+            // 🔴 一次性支付（支付宝 / 微信）没有订阅 id，只能按 (userId, provider)
+            // 定位那**一行长期复用**的订阅（`subscription-boundary.md` §6.2）。
+            findSubscriptionByUser: (userId, provider) =>
+              tx.subscription.findFirst({
+                where: { userId, provider },
+              }) as Promise<ExistingSubscription | null>,
             createSubscription: (data) => tx.subscription.create({ data }),
             updateSubscription: (id, data) =>
               tx.subscription.update({ where: { id }, data }),
+            // 周期叠加的**唯一服务端实现**（本体在 packages/domain，跨包 import
+            // 被硬约束挡住 —— 见 extend-period.ts 文件头与交付报告的顶回）。
+            extendPeriod: extendSubscriptionPeriod,
             now,
           });
 

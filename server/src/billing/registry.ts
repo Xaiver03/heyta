@@ -11,6 +11,8 @@
  */
 import { createNoopBillingAdapter } from './noop.adapter';
 import type { BillingAdapter } from './types';
+import { createWechatBillingAdapter, WECHAT_PROVIDER } from './wechat.adapter';
+import type { ServerConfig } from '../config';
 
 export interface BillingAdapterRegistry {
   /** 找不到时返回 `undefined`（调用方 fail-closed）。 */
@@ -46,3 +48,40 @@ export const createBillingAdapterRegistry = (
 export const DEFAULT_BILLING_ADAPTERS: readonly BillingAdapter[] = [
   createNoopBillingAdapter(),
 ];
+
+/**
+ * 按**运营者配置**构造 adapter 列表。这是生产路径唯一该用的构造函数。
+ *
+ * - 空 provider **永远在**：它证明接口可被实现，也是"没有配支付商"时的落点；
+ * - 微信**仅当 `config.wechatPay` 存在时**注册（即 `WECHAT_PAY_ENABLED=true`
+ *   且六个凭证齐全，见 `config.ts`）。少一个变量是启动期硬错误，
+ *   不会走到这里 —— 所以"注册得上但用不了"这种中间态不存在；
+ * - 没配置时**只有 noop**：自托管 `POST /api/billing/webhooks/wechat` 回 404
+ *   （fail-closed），自托管行为与加这个功能之前逐字相同。
+ */
+export const createBillingAdaptersFromConfig = (
+  config: ServerConfig,
+): readonly BillingAdapter[] => {
+  const adapters: BillingAdapter[] = [createNoopBillingAdapter()];
+  if (config.wechatPay !== undefined) {
+    adapters.push(
+      createWechatBillingAdapter({
+        appId: config.wechatPay.appId,
+        mchId: config.wechatPay.mchId,
+        serialNo: config.wechatPay.serialNo,
+        apiV3Key: config.wechatPay.apiV3Key,
+        privateKey: config.wechatPay.privateKey,
+        publicKey: config.wechatPay.publicKey,
+        notifyUrl: config.wechatPay.notifyUrl,
+      }),
+    );
+  }
+  return adapters;
+};
+
+/** 已注册的 provider 名里有没有微信。给日志 / 自检用，判据与注册表一致。 */
+export const isWechatBillingRegistered = (config: ServerConfig): boolean =>
+  config.wechatPay !== undefined &&
+  createBillingAdaptersFromConfig(config).some(
+    (adapter) => adapter.provider === WECHAT_PROVIDER,
+  );
