@@ -107,6 +107,19 @@ export interface GanttChartProps {
   startTimeMinutes?: number;
   /** 今天的本地日历日。只有同时给了 `startDate` 时才画"今天"。 */
   today?: LocalDate;
+  /**
+   * 强制使用的总跨度（分钟）。**多张图要对齐时用它。**
+   *
+   * 🔴 为什么必须有这个口子：条宽是**相对本图跨度**的百分比。
+   * `TimelineView` 给每个任务画一张自己的图，如果每张图各自归一化，
+   * 一条 90 分钟的任务和一条 30 分钟的任务**都会占满整行**（各自 100%），
+   * 用户反而看不出谁更长 —— 恰好毁掉时间线要表达的东西。
+   * 传入所有任务里最大的跨度，各图的条就落在同一个尺度上，可以互相比。
+   *
+   * 给了就取 `max(本图实际跨度, spanMinutes)`：**只会变宽，不会截断** ——
+   * 万一调用方算错了，条也不会溢出容器。
+   */
+  spanMinutes?: number;
   /** 用于 `formatCompactDate` 判断"今年"的时间戳。默认 `Date.now()`。 */
   now?: number;
   /** 覆盖空态文案。 */
@@ -143,8 +156,12 @@ function normalizeClock(value: number | undefined): number {
  *
  * 同一个函数既用于工期，也用于轴上的**相对**偏移 —— 两种语境下
  * "90 分钟"和"1 小时 30 分"都是对的读法，所以不写两套。
+ *
+ * ⚠️ 导出给 `TimelineView` 用（它要在块头里写「AI 估时：90 分钟」）。
+ * 宁可从这里导出，也**不要**在那边再写一份格式化 —— 同一份业务语义
+ * 只能有一个实现（`ai-architecture.md` §14 第 19 条）。
  */
-function formatMinutes(minutes: number): string {
+export function formatMinutes(minutes: number): string {
   if (minutes < MINUTES_PER_HOUR) return `${String(minutes)} 分钟`;
   const hours = Math.floor(minutes / MINUTES_PER_HOUR);
   const rest = minutes % MINUTES_PER_HOUR;
@@ -335,7 +352,7 @@ function TimelineAxis(props: {
 }
 
 export function GanttChart(props: GanttChartProps): React.JSX.Element {
-  const { entries, startDate, startTimeMinutes, today, now, emptyHint } = props;
+  const { entries, startDate, startTimeMinutes, today, spanMinutes, now, emptyHint } = props;
   const clock = now ?? Date.now();
 
   // 坏日期 → 当作没给，而不是抛出去（见 safeLocalDate）。
@@ -366,9 +383,14 @@ export function GanttChart(props: GanttChartProps): React.JSX.Element {
   for (const entry of entries) {
     span = Math.max(span, entry.startOffsetMinutes + entry.durationMinutes);
   }
+  // 多图对齐：只放宽，不截断（见 spanMinutes 的说明）。
+  if (typeof spanMinutes === 'number' && Number.isFinite(spanMinutes) && spanMinutes > 0) {
+    span = Math.max(span, spanMinutes);
+  }
 
   const byTitle = indexByTitle(entries);
   const unestimatedCount = entries.filter((e) => e.durationSource === 'default').length;
+  const aiCount = entries.filter((e) => e.durationSource === 'ai').length;
   const multiDay = span > MULTI_DAY_THRESHOLD_MINUTES;
 
   // 今天那一整天在计划里的区间（分钟）。计划起点是 startDate 的 startClock 分。
@@ -381,6 +403,10 @@ export function GanttChart(props: GanttChartProps): React.JSX.Element {
   const todayVisible =
     todayDayStart !== undefined && todayDayStart < span && todayDayStart + MINUTES_PER_DAY > 0;
   const todayMarkerOffset = todayDayStart === undefined ? 0 : Math.max(0, todayDayStart);
+  // 🔴 「第 N 天」按**日期差**算，不要按 `todayDayStart / 1440` 取整：
+  // 计划从 9:30 起时 todayDayStart 是 -570，floor(-570/1440) = -1，会算出"第 0 天"。
+  const todayDayIndex =
+    safeStart !== undefined && safeToday !== undefined ? diffDays(safeStart, safeToday) + 1 : 1;
 
   return (
     <div
@@ -422,7 +448,7 @@ export function GanttChart(props: GanttChartProps): React.JSX.Element {
             data-testid="gantt-today"
             style={{ fontSize: cssVar('font-size.xs'), color: cssVar('color.warning') }}
           >
-            今天 · 第 {Math.floor(todayDayStart / MINUTES_PER_DAY) + 1} 天
+            今天 · 第 {todayDayIndex} 天
           </span>
         )}
         {unestimatedCount > 0 && (
@@ -430,7 +456,15 @@ export function GanttChart(props: GanttChartProps): React.JSX.Element {
             data-testid="gantt-unestimated-summary"
             style={{ fontSize: cssVar('font-size.xs'), color: cssVar('color.foreground-muted') }}
           >
-            其中 {unestimatedCount} 条未估时，按 {formatMinutes(DEFAULT_DURATION_MINUTES)} 排
+            其中 {unestimatedCount} 条未估时，按 {formatMinutes(DEFAULT_DURATION_MINUTES)}排
+          </span>
+        )}
+        {aiCount > 0 && (
+          <span
+            data-testid="gantt-ai-summary"
+            style={{ fontSize: cssVar('font-size.xs'), color: cssVar('color.foreground-muted') }}
+          >
+            其中 {aiCount} 条按 AI 估时排
           </span>
         )}
       </div>
@@ -498,8 +532,10 @@ export function GanttChart(props: GanttChartProps): React.JSX.Element {
                   }}
                 >
                   {entry.durationSource === 'default'
-                    ? `未估时（按 ${formatMinutes(entry.durationMinutes)} 排）`
-                    : `约 ${formatMinutes(entry.durationMinutes)}`}
+                    ? `未估时（按 ${formatMinutes(entry.durationMinutes)}排）`
+                    : entry.durationSource === 'ai'
+                      ? `约 ${formatMinutes(entry.durationMinutes)} · AI 估时`
+                      : `约 ${formatMinutes(entry.durationMinutes)}`}
                 </span>
 
                 <span
