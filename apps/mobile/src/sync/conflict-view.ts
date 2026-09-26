@@ -90,6 +90,11 @@ export const ENTITY_LABELS: Record<string, string> = {
   HABIT: '习惯',
   HABIT_LOG: '打卡记录',
   FOCUS_SESSION: '专注记录',
+  // 🔴 AI 记忆实体。**冲突面板需要它们的中文名** ——
+  // 这两种实体也会同步、也会冲突，用户看到 `AI_FEEDBACK`
+  // 不可能知道是什么东西，也就没法在冲突里做选择。
+  AI_FEEDBACK: 'AI 使用记录',
+  PREFERENCE_CORRECTION: '偏好纠正',
   GLOBAL_CONFIG: '全局设置',
   MIGRATION: '数据迁移',
   RECOVERY: '灾难恢复',

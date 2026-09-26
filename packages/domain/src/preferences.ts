@@ -101,7 +101,11 @@ export type PreferenceId =
   | 'deep-work-window'
   | 'lead-time'
   | 'granularity'
-  | 'title-style';
+  | 'title-style'
+  // ── 反馈层（M4，见 `ai-feedback.ts`）─────────────────────────
+  // 它们**只能**从"用户怎么处置 AI 建议"推断，从用户自己的数据推不出来。
+  | 'feedback-granularity'
+  | 'feedback-keep-ratio';
 
 /**
  * 一条**推断出来**的偏好。

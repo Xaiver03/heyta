@@ -32,7 +32,14 @@ import { create } from 'zustand';
 
 import { Priority, Quadrant, bucketByQuadrant, type Task } from '@heyta/domain';
 import { emptyState, type MaterializedState } from '@heyta/op-log';
-import { createTaskActions, type ActionContext, type NewTaskFields } from '@heyta/app-host';
+import {
+  createAiFeedbackActions,
+  createPreferenceCorrectionActions,
+  createTaskActions,
+  type ActionContext,
+  type AiFeedbackInput,
+  type NewTaskFields,
+} from '@heyta/app-host';
 
 import {
   __resetOpLogForTests as resetEngine,
@@ -67,6 +74,22 @@ interface TaskState {
   /** 写备注。AI 拆解出的清单就是经这里落到 `Task.note` 的。 */
   setNote: (id: string, note: string | undefined) => Promise<void>;
   moveToProject: (id: string, projectId: string | undefined) => Promise<void>;
+  /**
+   * 记录用户对一次 AI 建议的处置（采用 / 改后采用 / 拒绝）。
+   *
+   * 🔴 走 op-log，因此**跨设备同步** —— 换台设备 AI 不必重新学一遍。
+   * 只记计数与枚举，不记内容（见 `AiFeedback`）。
+   */
+  recordAiFeedback: (input: AiFeedbackInput) => Promise<void>;
+  /**
+   * 忘掉一条偏好（用户纠正）。写 op-log，因此跨设备同步。
+   *
+   * 🔴 必须持久化：不持久化的话每次打开设置都要再删一遍，
+   * 而"删了又回来"会让整个记忆层失去可信度。
+   */
+  suppressPreference: (preferenceId: string) => Promise<void>;
+  /** 撤销一次「忘掉」。 */
+  restorePreference: (correctionId: string) => Promise<void>;
   setFilter: (filter: TaskFilter) => void;
   refreshNow: () => void;
 }
@@ -103,6 +126,12 @@ const actionContext: ActionContext = {
 };
 
 const taskActions = createTaskActions(actionContext);
+/**
+ * 反馈动作。**与任务动作分开**：它写的不是用户内容，而是"用户怎么用 AI"。
+ * 混在一起会让"任务写入"这个语义变得不清晰。
+ */
+const aiFeedbackActions = createAiFeedbackActions(actionContext);
+const correctionActions = createPreferenceCorrectionActions(actionContext);
 
 /** 引擎状态变化 → 同步进 store。 */
 onEngineChange(() => {
@@ -152,6 +181,15 @@ export const useTaskStore = create<TaskState>((set) => ({
     await taskActions.setDueDate(id, dueDate);
   },
 
+  recordAiFeedback: async (input) => {
+    await aiFeedbackActions.record(input);
+  },
+  suppressPreference: async (preferenceId) => {
+    await correctionActions.suppress(preferenceId);
+  },
+  restorePreference: async (correctionId) => {
+    await correctionActions.restore(correctionId);
+  },
   setNote: async (id, note) => {
     await taskActions.setNote(id, note);
   },

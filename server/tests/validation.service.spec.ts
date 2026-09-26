@@ -613,6 +613,11 @@ describe('ValidationService', () => {
       'HABIT',
       'HABIT_LOG',
       'FOCUS_SESSION',
+      // 🔴 heyta 新增的 AI 记忆实体。`ALLOWED_ENTITY_TYPES` 直接由
+      // `ENTITY_TYPES` 派生，所以这里漏一个，"精确数量"那条断言就会红 ——
+      // 这正是它存在的意义：加实体必须是有意识的决定，不能被顺手带过去。
+      'AI_FEEDBACK',
+      'PREFERENCE_CORRECTION',
       'GLOBAL_CONFIG',
       'MIGRATION',
       'RECOVERY',

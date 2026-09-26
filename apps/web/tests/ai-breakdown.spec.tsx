@@ -747,3 +747,100 @@ describe('🔴 记忆偏好从界面走到请求体', () => {
     expect(calls[0]?.body ?? '').not.toContain('关于这位用户的历史习惯');
   });
 });
+
+// ── 🔴 反馈层：界面上的取舍真的被记下来了吗 ─────────────────────────
+//
+// 这一层此前**完全不存在**：建议被采用还是被丢掉，代码里没有痕迹。
+// 于是 P6/P7 偏好永远学不到东西 —— 而"没记录"是**没有任何症状**的，
+// 只能靠测试钉住。
+
+describe('🔴 反馈层：处置必须被记录', () => {
+  /** 跑到"拿到建议"这一步。 */
+  async function toProposal(
+    onFeedback?: (fb: { outcome: string; proposedCount: number; appliedCount: number }) => void,
+  ): Promise<HTMLDivElement> {
+    const { impl } = fakeFetch('- 甲\n- 乙\n- 丙\n- 丁');
+    const el = render({
+      fetchImpl: impl,
+      ...(onFeedback === undefined ? {} : { onFeedback }),
+    });
+    click(el.querySelector('[data-testid="ai-breakdown-t1"]'));
+    await clickAsync(el.querySelector('[data-testid="ai-send"]'));
+    return el;
+  }
+
+  it('全选后写入 → accepted，且提议数 = 采用数', async () => {
+    const seen: { outcome: string; proposedCount: number; appliedCount: number }[] = [];
+    const el = await toProposal((fb) => seen.push(fb));
+
+    await clickAsync(el.querySelector('[data-testid="ai-apply"]'));
+
+    expect(seen).toHaveLength(1);
+    expect(seen[0]?.outcome).toBe('accepted');
+    expect(seen[0]?.proposedCount).toBe(4);
+    expect(seen[0]?.appliedCount).toBe(4);
+  });
+
+  it('🔴 取消勾选两条 → modified，采用数如实是 2', async () => {
+    const seen: { outcome: string; proposedCount: number; appliedCount: number }[] = [];
+    const el = await toProposal((fb) => seen.push(fb));
+
+    // 默认全选
+    expect(el.querySelector('[data-testid="ai-kept-count"]')?.textContent).toBe('4');
+    click(el.querySelector('[data-testid="ai-item-1"]'));
+    click(el.querySelector('[data-testid="ai-item-3"]'));
+    expect(el.querySelector('[data-testid="ai-kept-count"]')?.textContent).toBe('2');
+
+    await clickAsync(el.querySelector('[data-testid="ai-apply"]'));
+
+    expect(seen[0]?.outcome).toBe('modified');
+    expect(seen[0]?.appliedCount).toBe(2);
+  });
+
+  it('🔴 写入的是**勾选后**的条目，不是全部（取舍真的生效）', async () => {
+    const applied: string[] = [];
+    const { impl } = fakeFetch('- 甲\n- 乙\n- 丙');
+    const el = render({
+      fetchImpl: impl,
+      onApplyNote: (note) => {
+        applied.push(note);
+        return Promise.resolve();
+      },
+    });
+    click(el.querySelector('[data-testid="ai-breakdown-t1"]'));
+    await clickAsync(el.querySelector('[data-testid="ai-send"]'));
+
+    click(el.querySelector('[data-testid="ai-item-0"]')); // 去掉「甲」
+    await clickAsync(el.querySelector('[data-testid="ai-apply"]'));
+
+    const note = applied[0] ?? '';
+    expect(note).not.toContain('甲');
+    expect(note).toContain('乙');
+    expect(note).toContain('丙');
+  });
+
+  it('🔴 点「不要了」→ rejected，采用数 0', async () => {
+    const seen: { outcome: string; proposedCount: number; appliedCount: number }[] = [];
+    const el = await toProposal((fb) => seen.push(fb));
+
+    click([...el.querySelectorAll('button')].find((b) => b.textContent?.includes('不要了')));
+
+    expect(seen).toHaveLength(1);
+    expect(seen[0]?.outcome).toBe('rejected');
+    expect(seen[0]?.appliedCount).toBe(0);
+  });
+
+  it('🔴 一条都不勾时写入按钮禁用（不能产生 rejected+apply 的矛盾记录）', async () => {
+    const el = await toProposal();
+    for (const i of [0, 1, 2, 3]) click(el.querySelector(`[data-testid="ai-item-${String(i)}"]`));
+    const btn = el.querySelector('[data-testid="ai-apply"]') as HTMLButtonElement;
+    expect(btn.disabled).toBe(true);
+  });
+
+  it('不传 onFeedback（旧调用点）→ 不报错，也不记录', async () => {
+    const el = await toProposal();
+    await clickAsync(el.querySelector('[data-testid="ai-apply"]'));
+    // 走到这里没抛就是通过
+    expect(el.querySelector('[data-testid="ai-proposal"]')).toBeNull();
+  });
+});

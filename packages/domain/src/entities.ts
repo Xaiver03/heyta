@@ -233,6 +233,57 @@ export interface FocusSession extends EntityBase {
   endedAt?: number;
 }
 
+// ─────────────────────────────────────────────────────────────
+// AI 反馈
+// ─────────────────────────────────────────────────────────────
+
+/**
+ * 用户对一次 AI 建议的最终处置。
+ *
+ * 三态而不是布尔，因为「**改完才用**」和「**直接用**」对偏好的含义完全不同：
+ * 前者说明 AI 的默认输出有系统性偏差，后者说明没有。
+ */
+export type AiFeedbackOutcome = 'accepted' | 'modified' | 'rejected';
+
+/**
+ * 一次 AI 建议的处置记录。
+ *
+ * 🔴 **只记事实，不记内容。**
+ * 不存 AI 提议的原文、也不存用户的最终文本 —— 那些已经在任务备注里了，
+ * 再存一份就是第二份会漂移的副本（而且会让这条本机行为记录变成内容泄露面）。
+ * 这里只有数字与枚举。
+ *
+ * ⚠️ 持久化字段一律可选（AGENTS.md §3.3）。
+ */
+export interface AiFeedback extends EntityBase {
+  /**
+   * 哪个功能产生的建议。
+   *
+   * 用 `string` 而不是 `AiFeature` 联合：domain **不依赖 `packages/ai`**。
+   * 取值由调用方保证（目前是 `'breakdown'`）。
+   */
+  feature: string;
+  outcome: AiFeedbackOutcome;
+  /** AI 提议了几项。 */
+  proposedCount: number;
+  /** 用户最终采用了几项（`rejected` 时为 0）。 */
+  appliedCount: number;
+}
+
+/**
+ * 用户对一条偏好的纠正。
+ *
+ * 目前只有「抑制」（忘掉它）。留成联合类型而不是布尔，
+ * 是为了将来能加"改成某个值"而不必再动一次实体形状。
+ */
+export type PreferenceCorrectionKind = 'suppress';
+
+export interface PreferenceCorrection extends EntityBase {
+  /** 哪条偏好。取值空间由推断层定义（见 `PreferenceId`）。 */
+  preferenceId: string;
+  kind: PreferenceCorrectionKind;
+}
+
 /**
  * 实体类型 → 领域模型 的映射。
  * 用于 op-log 的 apply 阶段做类型收窄。
@@ -245,6 +296,8 @@ export interface EntityModelMap {
   HABIT: Habit;
   HABIT_LOG: HabitLog;
   FOCUS_SESSION: FocusSession;
+  AI_FEEDBACK: AiFeedback;
+  PREFERENCE_CORRECTION: PreferenceCorrection;
 }
 
 export type ModeledEntityType = keyof EntityModelMap;
@@ -269,6 +322,8 @@ export const MODELED_ENTITY_TYPES = [
   'HABIT',
   'HABIT_LOG',
   'FOCUS_SESSION',
+  'AI_FEEDBACK',
+  'PREFERENCE_CORRECTION',
 ] as const satisfies readonly ModeledEntityType[];
 
 /** 编译期兜底：清单漏掉 `EntityModelMap` 的任何一个键都会让这里类型错误。 */

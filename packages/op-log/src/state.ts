@@ -21,7 +21,9 @@
  */
 
 import type {
+  AiFeedback,
   FocusSession,
+  PreferenceCorrection,
   Habit,
   HabitLog,
   Note,
@@ -41,6 +43,15 @@ export interface MaterializedState {
   habits: Record<string, Habit>;
   habitLogs: Record<string, HabitLog>;
   focusSessions: Record<string, FocusSession>;
+  /**
+   * AI 反馈（用户对 AI 建议的处置）。
+   *
+   * ⚠️ 它物化进来是**有意的**：偏好推断（P6/P7）要读它。
+   * 但它**不是用户内容** —— 只有数字与枚举，没有文本（见 `AiFeedback`）。
+   */
+  aiFeedback: Record<string, AiFeedback>;
+  /** 用户对推断偏好的纠正。见 `PreferenceCorrection`。 */
+  preferenceCorrections: Record<string, PreferenceCorrection>;
 }
 
 export function emptyState(): MaterializedState {
@@ -52,6 +63,8 @@ export function emptyState(): MaterializedState {
     habits: {},
     habitLogs: {},
     focusSessions: {},
+    aiFeedback: {},
+    preferenceCorrections: {},
   };
 }
 
@@ -64,6 +77,8 @@ const BUCKET_BY_ENTITY = {
   HABIT: 'habits',
   HABIT_LOG: 'habitLogs',
   FOCUS_SESSION: 'focusSessions',
+  AI_FEEDBACK: 'aiFeedback',
+  PREFERENCE_CORRECTION: 'preferenceCorrections',
 } as const;
 
 type ModeledEntity = keyof typeof BUCKET_BY_ENTITY;
