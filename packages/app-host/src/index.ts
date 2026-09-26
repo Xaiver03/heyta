@@ -109,3 +109,10 @@ export {
   type BreakdownSource,
   type RequestBreakdownDeps,
 } from './ai-breakdown.js';
+export {
+  createAiFeedbackActions,
+  createPreferenceCorrectionActions,
+  type AiFeedbackActions,
+  type AiFeedbackInput,
+  type PreferenceCorrectionActions,
+} from './ai-feedback-actions.js';

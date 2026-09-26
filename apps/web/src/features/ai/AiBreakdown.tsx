@@ -36,7 +36,11 @@
 import { useState } from 'react';
 import { AlertTriangle, Cloud, HardDrive, Sparkles, X } from 'lucide-react';
 
-import { renderPreferenceHints, type PreferenceSet } from '@heyta/domain';
+import {
+  renderPreferenceHints,
+  type AiFeedbackOutcome,
+  type PreferenceSet,
+} from '@heyta/domain';
 import {
   buildDisclosure,
   fromHealthSnapshot,
@@ -169,13 +173,38 @@ export interface AiBreakdownProps {
    * 两条路径都不会漏出去（见 ADR-0014）。
    */
   preferenceSet?: PreferenceSet | undefined;
+  /**
+   * 记录用户对这次建议的处置（采用 / 改后采用 / 拒绝）。
+   *
+   * 🔴 这是**反馈层**的入口，也是 P6/P7 偏好的唯一数据来源。
+   * 在它存在之前，建议被采用还是被丢掉在代码里不留任何痕迹 ——
+   * 于是"AI 该给你几项"这件事永远学不到。
+   *
+   * ⚠️ 可选，默认**不记录**（fail closed）：忘了传的后果是少一条反馈，
+   * 不是多发数据。注意这里**刻意不传原文** —— 只传计数与枚举，
+   * 内容已经在任务备注里了（见 `AiFeedback` 的说明）。
+   */
+  onFeedback?: (feedback: {
+    outcome: AiFeedbackOutcome;
+    proposedCount: number;
+    appliedCount: number;
+  }) => void;
 }
 
 export function AiBreakdown(props: AiBreakdownProps): React.JSX.Element {
-  const { task, routing, consents, secrets, onApplyNote, onHealth, preferenceSet } = props;
+  const { task, routing, consents, secrets, onApplyNote, onHealth, preferenceSet, onFeedback } =
+    props;
 
   const [phase, setPhase] = useState<Phase>('idle');
   const [proposal, setProposal] = useState<BreakdownProposal | undefined>(undefined);
+  /**
+   * 哪些子项要写入。**默认全选**。
+   *
+   * 🔴 这个状态是反馈层能成立的前提：没有逐条取舍，
+   * `appliedCount` 就永远等于 `proposedCount`，
+   * P7「保留率」恒为 1 —— 那条偏好会变成一句废话。
+   */
+  const [selected, setSelected] = useState<readonly boolean[]>([]);
   const [failure, setFailure] = useState<string>('');
   const [applied, setApplied] = useState(false);
 
@@ -237,6 +266,7 @@ export function AiBreakdown(props: AiBreakdownProps): React.JSX.Element {
 
     if (outcome.ok) {
       setProposal(outcome.proposal);
+      setSelected(outcome.proposal.items.map(() => true));
       setPhase('proposal');
       return;
     }
@@ -244,16 +274,52 @@ export function AiBreakdown(props: AiBreakdownProps): React.JSX.Element {
     setPhase('failed');
   }
 
+  /** 被勾选的子项。 */
+  function keptItems(): string[] {
+    if (proposal === undefined) return [];
+    return proposal.items.filter((_, i) => selected[i] === true);
+  }
+
   async function apply(): Promise<void> {
     if (proposal === undefined) return;
-    await onApplyNote(mergeChecklistIntoNote(task.note, proposal.items));
+    const kept = keptItems();
+    if (kept.length === 0) return;
+
+    await onApplyNote(mergeChecklistIntoNote(task.note, kept));
+    // 🔴 三态由**实际留下的条数**决定，不能写死。
+    // 这里曾经硬编码成 'accepted' —— 于是"去掉两条再写入"会被记成"全部采用"，
+    // 而 P7「保留率」就会恒为 1、永远学不到东西。界面层测试抓到了它。
+    report(kept.length === proposal.items.length ? 'accepted' : 'modified', kept.length);
     setApplied(true);
     setPhase('idle');
+  }
+
+  /** 明确放弃这次建议。 */
+  function reject(): void {
+    report('rejected', 0);
+    reset();
+  }
+
+  /**
+   * 交回这次处置。
+   *
+   * 三态由**事实**决定，不由调用点各自宣称：
+   * 全留 = 采用，留了一部分 = 改后采用，一条不留 = 拒绝。
+   * 这样调用点不可能"声称采用 8 项、实际写入 3 项"。
+   */
+  function report(outcome: AiFeedbackOutcome, appliedCount: number): void {
+    if (proposal === undefined) return;
+    onFeedback?.({
+      outcome,
+      proposedCount: proposal.items.length,
+      appliedCount,
+    });
   }
 
   function reset(): void {
     setPhase('idle');
     setProposal(undefined);
+    setSelected([]);
     setFailure('');
     setApplied(false);
   }
@@ -392,19 +458,43 @@ export function AiBreakdown(props: AiBreakdownProps): React.JSX.Element {
 
         <ul className="ht-ai__items" data-testid="ai-items">
           {proposal.items.map((item, index) => (
-            <li key={`${String(index)}-${item}`}>{item}</li>
+            <li key={`${String(index)}-${item}`}>
+              {/* 🔴 逐条可取消。默认全选，所以"直接用"仍然是零操作；
+                  想少留几条时才需要动手。 */}
+              <label className="ht-ai__item">
+                <input
+                  type="checkbox"
+                  checked={selected[index] === true}
+                  onChange={(e) => {
+                    const next = proposal.items.map((_, i) =>
+                      i === index ? e.target.checked : selected[i] === true,
+                    );
+                    setSelected(next);
+                  }}
+                  data-testid={`ai-item-${String(index)}`}
+                />
+                <span>{item}</span>
+              </label>
+            </li>
           ))}
         </ul>
 
         <p className="ht-ai__note">
           确认后会作为 <strong>Markdown 清单追加</strong>到这条任务的备注里，原来的备注不会被动。
+          已选 <strong data-testid="ai-kept-count">{keptItems().length}</strong> / {proposal.items.length} 项。
         </p>
 
         <div className="ht-ai__actions">
-          <button type="button" className="ht-btn" data-testid="ai-apply" onClick={() => void apply()}>
+          <button
+            type="button"
+            className="ht-btn"
+            data-testid="ai-apply"
+            disabled={keptItems().length === 0}
+            onClick={() => void apply()}
+          >
             写入备注
           </button>
-          <button type="button" className="ht-btn ht-btn--ghost" onClick={reset}>
+          <button type="button" className="ht-btn ht-btn--ghost" onClick={reject}>
             不要了
           </button>
         </div>
