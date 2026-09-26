@@ -110,16 +110,22 @@ importers:
         version: 5.9.3
       vitest:
         specifier: ^5.0.1
-        version: 5.0.1(jsdom@27.4.0(@noble/hashes@1.8.0))(vite@8.3.1(esbuild@0.27.7)(terser@5.51.2)(yaml@2.9.1))
+        version: 5.0.1(jsdom@27.4.0(@noble/hashes@2.4.0))(vite@8.3.1(esbuild@0.27.7)(terser@5.51.2)(yaml@2.9.1))
 
   apps/node-host:
     dependencies:
+      '@heyta/ai':
+        specifier: workspace:*
+        version: link:../../packages/ai
       '@heyta/app-host':
         specifier: workspace:*
         version: link:../../packages/app-host
       '@heyta/domain':
         specifier: workspace:*
         version: link:../../packages/domain
+      '@heyta/local-api':
+        specifier: workspace:*
+        version: link:../../packages/local-api
       '@heyta/op-log':
         specifier: workspace:*
         version: link:../../packages/op-log
@@ -144,7 +150,7 @@ importers:
         version: 5.9.3
       vitest:
         specifier: ^5.0.1
-        version: 5.0.1(jsdom@27.4.0(@noble/hashes@1.8.0))(vite@8.3.1(esbuild@0.27.7)(terser@5.51.2)(yaml@2.9.1))
+        version: 5.0.1(jsdom@27.4.0(@noble/hashes@2.4.0))(vite@8.3.1(esbuild@0.27.7)(terser@5.51.2)(yaml@2.9.1))
 
   apps/web:
     dependencies:
@@ -157,6 +163,9 @@ importers:
       '@dnd-kit/utilities':
         specifier: ^3.2.2
         version: 3.2.2(react@19.3.0)
+      '@heyta/ai':
+        specifier: workspace:*
+        version: link:../../packages/ai
       '@heyta/app-host':
         specifier: workspace:*
         version: link:../../packages/app-host
@@ -166,6 +175,9 @@ importers:
       '@heyta/domain':
         specifier: workspace:*
         version: link:../../packages/domain
+      '@heyta/local-api':
+        specifier: workspace:*
+        version: link:../../packages/local-api
       '@heyta/op-log':
         specifier: workspace:*
         version: link:../../packages/op-log
@@ -214,7 +226,7 @@ importers:
         version: 6.2.5
       jsdom:
         specifier: ^27.0.0
-        version: 27.4.0(@noble/hashes@1.8.0)
+        version: 27.4.0(@noble/hashes@2.4.0)
       typescript:
         specifier: ^5.9.3
         version: 5.9.3
@@ -223,13 +235,31 @@ importers:
         version: 7.3.6(lightningcss@1.33.0)(terser@5.51.2)(yaml@2.9.1)
       vitest:
         specifier: ^5.0.1
-        version: 5.0.1(jsdom@27.4.0(@noble/hashes@1.8.0))(vite@7.3.6(lightningcss@1.33.0)(terser@5.51.2)(yaml@2.9.1))
+        version: 5.0.1(jsdom@27.4.0(@noble/hashes@2.4.0))(vite@7.3.6(lightningcss@1.33.0)(terser@5.51.2)(yaml@2.9.1))
+
+  packages/ai:
+    devDependencies:
+      tsup:
+        specifier: ^8.5.1
+        version: 8.5.1(postcss@8.5.28)(supports-color@5.5.0)(typescript@5.9.3)(yaml@2.9.1)
+      typescript:
+        specifier: ^5.9.3
+        version: 5.9.3
+      vitest:
+        specifier: ^5.0.1
+        version: 5.0.1(jsdom@27.4.0(@noble/hashes@2.4.0))(vite@8.3.1(esbuild@0.27.7)(terser@5.51.2)(yaml@2.9.1))
 
   packages/app-host:
     dependencies:
+      '@heyta/ai':
+        specifier: workspace:*
+        version: link:../ai
       '@heyta/domain':
         specifier: workspace:*
         version: link:../domain
+      '@heyta/local-api':
+        specifier: workspace:*
+        version: link:../local-api
       '@heyta/op-log':
         specifier: workspace:*
         version: link:../op-log
@@ -257,7 +287,7 @@ importers:
         version: 5.9.3
       vitest:
         specifier: ^5.0.1
-        version: 5.0.1(jsdom@27.4.0(@noble/hashes@1.8.0))(vite@8.3.1(esbuild@0.27.7)(terser@5.51.2)(yaml@2.9.1))
+        version: 5.0.1(jsdom@27.4.0(@noble/hashes@2.4.0))(vite@8.3.1(esbuild@0.27.7)(terser@5.51.2)(yaml@2.9.1))
 
   packages/design-system:
     devDependencies:
@@ -269,7 +299,7 @@ importers:
         version: 5.9.3
       vitest:
         specifier: ^5.0.1
-        version: 5.0.1(jsdom@27.4.0(@noble/hashes@1.8.0))(vite@8.3.1(esbuild@0.27.7)(terser@5.51.2)(yaml@2.9.1))
+        version: 5.0.1(jsdom@27.4.0(@noble/hashes@2.4.0))(vite@8.3.1(esbuild@0.27.7)(terser@5.51.2)(yaml@2.9.1))
 
   packages/domain:
     dependencies:
@@ -288,7 +318,19 @@ importers:
         version: 5.9.3
       vitest:
         specifier: ^5.0.1
-        version: 5.0.1(jsdom@27.4.0(@noble/hashes@1.8.0))(vite@8.3.1(esbuild@0.27.7)(terser@5.51.2)(yaml@2.9.1))
+        version: 5.0.1(jsdom@27.4.0(@noble/hashes@2.4.0))(vite@8.3.1(esbuild@0.27.7)(terser@5.51.2)(yaml@2.9.1))
+
+  packages/local-api:
+    devDependencies:
+      tsup:
+        specifier: ^8.5.1
+        version: 8.5.1(postcss@8.5.28)(supports-color@5.5.0)(typescript@5.9.3)(yaml@2.9.1)
+      typescript:
+        specifier: ^5.9.3
+        version: 5.9.3
+      vitest:
+        specifier: ^5.0.1
+        version: 5.0.1(jsdom@27.4.0(@noble/hashes@2.4.0))(vite@8.3.1(esbuild@0.27.7)(terser@5.51.2)(yaml@2.9.1))
 
   packages/op-log:
     dependencies:
@@ -316,7 +358,7 @@ importers:
         version: 5.9.3
       vitest:
         specifier: ^5.0.1
-        version: 5.0.1(jsdom@27.4.0(@noble/hashes@1.8.0))(vite@8.3.1(esbuild@0.27.7)(terser@5.51.2)(yaml@2.9.1))
+        version: 5.0.1(jsdom@27.4.0(@noble/hashes@2.4.0))(vite@8.3.1(esbuild@0.27.7)(terser@5.51.2)(yaml@2.9.1))
 
   packages/shared-schema:
     dependencies:
@@ -332,7 +374,7 @@ importers:
         version: 5.9.3
       vitest:
         specifier: ^4.1.6
-        version: 4.1.11(@types/node@20.19.43)(jsdom@27.4.0(@noble/hashes@1.8.0))(vite@8.3.1(@types/node@20.19.43)(esbuild@0.27.7)(terser@5.51.2)(yaml@2.9.1))
+        version: 4.1.11(@types/node@20.19.43)(jsdom@27.4.0(@noble/hashes@2.4.0))(vite@8.3.1(@types/node@20.19.43)(esbuild@0.27.7)(terser@5.51.2)(yaml@2.9.1))
 
   packages/storage:
     dependencies:
@@ -354,7 +396,7 @@ importers:
         version: 5.9.3
       vitest:
         specifier: ^5.0.1
-        version: 5.0.1(jsdom@27.4.0(@noble/hashes@1.8.0))(vite@8.3.1(esbuild@0.27.7)(terser@5.51.2)(yaml@2.9.1))
+        version: 5.0.1(jsdom@27.4.0(@noble/hashes@2.4.0))(vite@8.3.1(esbuild@0.27.7)(terser@5.51.2)(yaml@2.9.1))
 
   packages/sync-client:
     dependencies:
@@ -373,12 +415,15 @@ importers:
         version: 5.9.3
       vitest:
         specifier: ^5.0.1
-        version: 5.0.1(jsdom@27.4.0(@noble/hashes@1.8.0))(vite@8.3.1(esbuild@0.27.7)(terser@5.51.2)(yaml@2.9.1))
+        version: 5.0.1(jsdom@27.4.0(@noble/hashes@2.4.0))(vite@8.3.1(esbuild@0.27.7)(terser@5.51.2)(yaml@2.9.1))
 
   packages/sync-core:
     dependencies:
       '@noble/ciphers':
         specifier: ^2.2.0
+        version: 2.4.0
+      '@noble/hashes':
+        specifier: ^2.4.0
         version: 2.4.0
       hash-wasm:
         specifier: ^4.12.0
@@ -392,7 +437,7 @@ importers:
         version: 5.9.3
       vitest:
         specifier: ^4.1.6
-        version: 4.1.11(@types/node@20.19.43)(jsdom@27.4.0(@noble/hashes@1.8.0))(vite@8.3.1(@types/node@20.19.43)(esbuild@0.27.7)(terser@5.51.2)(yaml@2.9.1))
+        version: 4.1.11(@types/node@20.19.43)(jsdom@27.4.0(@noble/hashes@2.4.0))(vite@8.3.1(@types/node@20.19.43)(esbuild@0.27.7)(terser@5.51.2)(yaml@2.9.1))
 
   server:
     dependencies:
@@ -486,7 +531,7 @@ importers:
         version: 5.9.3
       vitest:
         specifier: ^4.1.6
-        version: 4.1.11(@types/node@20.19.43)(jsdom@27.4.0(@noble/hashes@1.8.0))(vite@8.3.1(@types/node@20.19.43)(esbuild@0.27.7)(terser@5.51.2)(yaml@2.9.1))
+        version: 4.1.11(@types/node@20.19.43)(jsdom@27.4.0(@noble/hashes@2.4.0))(vite@8.3.1(@types/node@20.19.43)(esbuild@0.27.7)(terser@5.51.2)(yaml@2.9.1))
 
 packages:
 
@@ -1543,6 +1588,10 @@ packages:
   '@noble/hashes@1.8.0':
     resolution: {integrity: sha512-jCs9ldd7NwzpgXDIf6P3+NrHh9/sD6CQdxHyjQI+h/6rDNo88ypBxxz45UDuZHz9r3tNz7N/VInSVoVdtXEI4A==}
     engines: {node: ^14.21.3 || >=16}
+
+  '@noble/hashes@2.4.0':
+    resolution: {integrity: sha512-X5XaVWZIBCT7HHZGm5I7ZQXDwLG+bGXuSrMQAW+7Zvl87h1kmc1ZB1VSRJcpUfoUrGQp4Fkoxm5kZ+Ms+aW+eA==}
+    engines: {node: '>= 20.19.0'}
 
   '@nodelib/fs.scandir@2.1.5':
     resolution: {integrity: sha512-vq24Bq3ym5HEQm2NKCr3yXDwjc7vTsEThRDnkp2DK9p1uqLR+DHurm/NOTo0KG7HYHU7eppKZj3MyqYuMBf62g==}
@@ -5768,9 +5817,9 @@ snapshots:
   '@esbuild/win32-x64@0.27.7':
     optional: true
 
-  '@exodus/bytes@1.16.0(@noble/hashes@1.8.0)':
+  '@exodus/bytes@1.16.0(@noble/hashes@2.4.0)':
     optionalDependencies:
-      '@noble/hashes': 1.8.0
+      '@noble/hashes': 2.4.0
 
   '@fastify/accept-negotiator@2.1.0': {}
 
@@ -5977,6 +6026,8 @@ snapshots:
   '@noble/ciphers@2.4.0': {}
 
   '@noble/hashes@1.8.0': {}
+
+  '@noble/hashes@2.4.0': {}
 
   '@nodelib/fs.scandir@2.1.5':
     dependencies:
@@ -7654,9 +7705,9 @@ snapshots:
     dependencies:
       hermes-estree: 0.35.0
 
-  html-encoding-sniffer@6.0.0(@noble/hashes@1.8.0):
+  html-encoding-sniffer@6.0.0(@noble/hashes@2.4.0):
     dependencies:
-      '@exodus/bytes': 1.16.0(@noble/hashes@1.8.0)
+      '@exodus/bytes': 1.16.0(@noble/hashes@2.4.0)
     transitivePeerDependencies:
       - '@noble/hashes'
 
@@ -7861,15 +7912,15 @@ snapshots:
 
   jsc-safe-url@0.2.4: {}
 
-  jsdom@27.4.0(@noble/hashes@1.8.0):
+  jsdom@27.4.0(@noble/hashes@2.4.0):
     dependencies:
       '@acemir/cssom': 0.9.31
       '@asamuzakjp/dom-selector': 6.8.1
-      '@exodus/bytes': 1.16.0(@noble/hashes@1.8.0)
+      '@exodus/bytes': 1.16.0(@noble/hashes@2.4.0)
       cssstyle: 5.3.7
       data-urls: 6.0.1
       decimal.js: 10.6.0
-      html-encoding-sniffer: 6.0.0(@noble/hashes@1.8.0)
+      html-encoding-sniffer: 6.0.0(@noble/hashes@2.4.0)
       http-proxy-agent: 7.0.2
       https-proxy-agent: 7.0.6
       is-potential-custom-element-name: 1.0.1
@@ -9224,7 +9275,7 @@ snapshots:
       terser: 5.51.2
       yaml: 2.9.1
 
-  vitest@4.1.11(@types/node@20.19.43)(jsdom@27.4.0(@noble/hashes@1.8.0))(vite@8.3.1(@types/node@20.19.43)(esbuild@0.27.7)(terser@5.51.2)(yaml@2.9.1)):
+  vitest@4.1.11(@types/node@20.19.43)(jsdom@27.4.0(@noble/hashes@2.4.0))(vite@8.3.1(@types/node@20.19.43)(esbuild@0.27.7)(terser@5.51.2)(yaml@2.9.1)):
     dependencies:
       '@vitest/expect': 4.1.11
       '@vitest/mocker': 4.1.11(vite@8.3.1(@types/node@20.19.43)(esbuild@0.27.7)(terser@5.51.2)(yaml@2.9.1))
@@ -9248,11 +9299,11 @@ snapshots:
       why-is-node-running: 2.3.0
     optionalDependencies:
       '@types/node': 20.19.43
-      jsdom: 27.4.0(@noble/hashes@1.8.0)
+      jsdom: 27.4.0(@noble/hashes@2.4.0)
     transitivePeerDependencies:
       - msw
 
-  vitest@5.0.1(jsdom@27.4.0(@noble/hashes@1.8.0))(vite@7.3.6(lightningcss@1.33.0)(terser@5.51.2)(yaml@2.9.1)):
+  vitest@5.0.1(jsdom@27.4.0(@noble/hashes@2.4.0))(vite@7.3.6(lightningcss@1.33.0)(terser@5.51.2)(yaml@2.9.1)):
     dependencies:
       '@types/chai': 5.2.3
       '@vitest/mocker': 5.0.1(vite@7.3.6(lightningcss@1.33.0)(terser@5.51.2)(yaml@2.9.1))
@@ -9269,11 +9320,11 @@ snapshots:
       vite: 7.3.6(lightningcss@1.33.0)(terser@5.51.2)(yaml@2.9.1)
       why-is-node-running: 2.3.0
     optionalDependencies:
-      jsdom: 27.4.0(@noble/hashes@1.8.0)
+      jsdom: 27.4.0(@noble/hashes@2.4.0)
     transitivePeerDependencies:
       - msw
 
-  vitest@5.0.1(jsdom@27.4.0(@noble/hashes@1.8.0))(vite@8.3.1(esbuild@0.27.7)(terser@5.51.2)(yaml@2.9.1)):
+  vitest@5.0.1(jsdom@27.4.0(@noble/hashes@2.4.0))(vite@8.3.1(esbuild@0.27.7)(terser@5.51.2)(yaml@2.9.1)):
     dependencies:
       '@types/chai': 5.2.3
       '@vitest/mocker': 5.0.1(vite@8.3.1(esbuild@0.27.7)(terser@5.51.2)(yaml@2.9.1))
@@ -9290,7 +9341,7 @@ snapshots:
       vite: 8.3.1(@types/node@20.19.43)(esbuild@0.27.7)(terser@5.51.2)(yaml@2.9.1)
       why-is-node-running: 2.3.0
     optionalDependencies:
-      jsdom: 27.4.0(@noble/hashes@1.8.0)
+      jsdom: 27.4.0(@noble/hashes@2.4.0)
     transitivePeerDependencies:
       - msw
 
