@@ -14,13 +14,24 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { I18nProvider, LOCALES, type Locale } from '@heyta/i18n';
+import { I18nProvider, LOCALES, translate, type Locale, type MessageKey } from '@heyta/i18n';
 
 import { SubscriptionNotice } from '../src/features/subscription/SubscriptionNotice.js';
-import {
-  SUBSCRIPTION_MESSAGE_KEYS,
-  subscriptionMessage,
-} from '../src/features/subscription/copy.js';
+/**
+ * 这 7 条第 16 轮已收编进 `packages/i18n`（原来在 `subscription/copy.ts` 里）。
+ * 这里保留一份 key 清单，是为了下面那条"每种语言都真的翻了"的断言 ——
+ * 全局词条表整体由 `pnpm check:ui-language` 的规则 2/3/4 兜底，
+ * 这条则钉住**用户真会看到的那 7 条**。
+ */
+const SUBSCRIPTION_MESSAGE_KEYS = [
+  'web.subscription.notice.expired.title',
+  'web.subscription.notice.expired.body',
+  'web.subscription.notice.refused.title',
+  'web.subscription.notice.refused.body',
+  'web.subscription.notice.localData',
+  'web.subscription.notice.selfHost',
+  'web.subscription.notice.a11y',
+] as const satisfies readonly MessageKey[];
 import { __resetSubscriptionForTests } from '../src/features/subscription/store.js';
 import { useSyncStore } from '../src/features/sync/store.js';
 
@@ -87,7 +98,7 @@ describe('托管同步到期', () => {
     const el = await renderNotice('zh-CN');
     const text = el.textContent ?? '';
 
-    expect(text).toContain(subscriptionMessage('zh-CN', 'subscription.notice.expired.title'));
+    expect(text).toContain(translate('zh-CN', 'web.subscription.notice.expired.title'));
     // 限制的只有"托管同步"这一件事 —— 所有设备，不只是新设备。
     expect(text).toContain('托管同步');
     // 🔴 「免费额度」已废弃（边界文档 §1：需要同步的人恰恰是有 >=2 台设备的人，
@@ -98,8 +109,8 @@ describe('托管同步到期', () => {
     // 已接入的设备也会停止同步（边界文档 §2「只减不增」）。
     expect(text).not.toContain('只影响');
     // 明确说本地数据还在、还能用。
-    expect(text).toContain(subscriptionMessage('zh-CN', 'subscription.notice.localData'));
-    expect(text).toContain(subscriptionMessage('zh-CN', 'subscription.notice.selfHost'));
+    expect(text).toContain(translate('zh-CN', 'web.subscription.notice.localData'));
+    expect(text).toContain(translate('zh-CN', 'web.subscription.notice.selfHost'));
 
     // 🔴 恐吓式文案的机械防线：这些词一个都不许出现。
     for (const forbidden of ['丢失', '删除', '清空', '将被停用', '永久']) {
@@ -131,7 +142,7 @@ describe('托管同步到期', () => {
     stubProbe(402, { errorCode: 'SUBSCRIPTION_REQUIRED', reason: 'STATUS_NOT_ENTITLED' });
     const el = await renderNotice();
     const text = el.textContent ?? '';
-    expect(text).toContain(subscriptionMessage('zh-CN', 'subscription.notice.refused.title'));
+    expect(text).toContain(translate('zh-CN', 'web.subscription.notice.refused.title'));
     expect(text).not.toContain('已到期');
   });
 });
@@ -170,7 +181,7 @@ describe('两种语言都真的翻了', () => {
     stubProbe(402, { errorCode: 'SUBSCRIPTION_REQUIRED', reason: 'PERIOD_ENDED' });
     const el = await renderNotice('en');
     const text = el.textContent ?? '';
-    expect(text).toContain(subscriptionMessage('en', 'subscription.notice.expired.title'));
+    expect(text).toContain(translate('en', 'web.subscription.notice.expired.title'));
     expect(CJK.test(text)).toBe(false);
   });
 
@@ -189,7 +200,7 @@ describe('两种语言都真的翻了', () => {
    */
   it.each(LOCALES)('every local message is non-empty and in the right language (%s)', (locale) => {
     for (const key of SUBSCRIPTION_MESSAGE_KEYS) {
-      const text = subscriptionMessage(locale, key);
+      const text = translate(locale, key);
       expect(text.length).toBeGreaterThan(0);
       if (locale === 'zh-CN') {
         expect(CJK.test(text)).toBe(true);

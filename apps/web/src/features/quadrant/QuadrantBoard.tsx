@@ -24,7 +24,8 @@ import {
   type DragEndEvent,
 } from '@dnd-kit/core';
 import { cssVar, type TokenName } from '@heyta/design-system';
-import { Quadrant, bucketByQuadrant } from '@heyta/domain';
+import { useI18n } from '@heyta/i18n';
+import { Quadrant, bucketByQuadrant, planQuadrantDrop } from '@heyta/domain';
 import { AlertCircle, CalendarClock, CheckCircle2, Trash2 } from 'lucide-react';
 
 import { useTaskStore } from '../tasks/store.js';
@@ -36,31 +37,19 @@ const QUADRANT_ORDER: Quadrant[] = [
   Quadrant.Neither,
 ];
 
-const QUADRANT_META: Record<
-  Quadrant,
-  { title: string; hint: string; token: TokenName }
-> = {
-  [Quadrant.UrgentImportant]: {
-    title: '马上做',
-    hint: '重要且紧急',
-    token: 'color.quadrant-1',
-  },
-  [Quadrant.ImportantNotUrgent]: {
-    title: '计划做',
-    hint: '重要不紧急',
-    token: 'color.quadrant-2',
-  },
-  [Quadrant.UrgentNotImportant]: {
-    title: '交给别人',
-    hint: '紧急不重要',
-    token: 'color.quadrant-3',
-  },
-  [Quadrant.Neither]: {
-    title: '先不做',
-    hint: '不重要不紧急',
-    token: 'color.quadrant-4',
-  },
-};
+/**
+ * 每个象限的呈现信息。
+ *
+ * 🔴 `title` / `hint` 是**在组件里用 `t()` 现构造**的（见 `QuadrantBoard` 的
+ * `useMemo`），不是"把 key 存进数据、渲染处再翻译" —— 数据数组里的文案
+ * 门禁**看不见**，所以这里靠纪律：`apps/landing/src/Landing.tsx` 文件头
+ * 解释了为什么选前者。
+ */
+interface QuadrantMeta {
+  title: string;
+  hint: string;
+  token: TokenName;
+}
 
 /**
  * 类型守卫：穷举比较，**不做数组强转**。
@@ -113,14 +102,22 @@ function DraggableTask({ id, title }: { id: string; title: string }) {
   );
 }
 
-function QuadrantCell({ quadrant, children }: { quadrant: Quadrant; children: React.ReactNode }) {
+function QuadrantCell({
+  quadrant,
+  meta,
+  children,
+}: {
+  quadrant: Quadrant;
+  meta: QuadrantMeta;
+  children: React.ReactNode;
+}) {
+  const { t } = useI18n();
   const { setNodeRef, isOver } = useDroppable({ id: quadrant });
-  const meta = QUADRANT_META[quadrant];
 
   return (
     <section
       ref={setNodeRef}
-      aria-label={`${meta.title}（${meta.hint}）`}
+      aria-label={t('web.quadrant.a11y.cell', { title: meta.title, hint: meta.hint })}
       style={{
         display: 'flex',
         flexDirection: 'column',
@@ -175,12 +172,46 @@ function QuadrantCell({ quadrant, children }: { quadrant: Quadrant; children: Re
 }
 
 export function QuadrantBoard() {
+  const { t } = useI18n();
   const store = useTaskStore();
   const [activeId, setActiveId] = useState<string | undefined>();
 
   const buckets = useMemo(
     () => bucketByQuadrant(Object.values(store.entities.tasks), { now: store.now }),
     [store.entities.tasks, store.now],
+  );
+
+  /**
+   * 四个象限的标题与说明。
+   *
+   * 🔴 文案**在这里用 `t()` 现构造**，而不是把 key 存进模块级数据再在渲染处翻译
+   * （见 `QuadrantMeta` 上面的注释）。`t` 在同一语言下引用稳定，所以 `[t]`
+   * 是正确且稳定的依赖。
+   */
+  const quadrantMeta = useMemo<Record<Quadrant, QuadrantMeta>>(
+    () => ({
+      [Quadrant.UrgentImportant]: {
+        title: t('web.quadrant.do'),
+        hint: t('web.quadrant.q1'),
+        token: 'color.quadrant-1',
+      },
+      [Quadrant.ImportantNotUrgent]: {
+        title: t('web.quadrant.plan'),
+        hint: t('web.quadrant.q2'),
+        token: 'color.quadrant-2',
+      },
+      [Quadrant.UrgentNotImportant]: {
+        title: t('web.quadrant.delegate'),
+        hint: t('web.quadrant.q3'),
+        token: 'color.quadrant-3',
+      },
+      [Quadrant.Neither]: {
+        title: t('web.quadrant.drop'),
+        hint: t('web.quadrant.q4'),
+        token: 'color.quadrant-4',
+      },
+    }),
+    [t],
   );
 
   // 键盘也能拖 —— 只用 PointerSensor 会把键盘用户排除在外
@@ -203,20 +234,23 @@ export function QuadrantBoard() {
     const task = store.entities.tasks[taskId];
     if (task === undefined) return;
 
-    // 拖进"重要"象限 = important: true；拖进"不重要"= false。
-    // 紧急维度由截止时间决定，拖拽不直接控制它 ——
-    // 但为了拖拽有确定结果，切到 Q1/Q3（紧急侧）时把截止时间提前到窗口内。
-    const important =
-      target === Quadrant.UrgentImportant || target === Quadrant.ImportantNotUrgent;
-    const urgent = target === Quadrant.UrgentImportant || target === Quadrant.UrgentNotImportant;
+    // 🔴 **投放计划来自领域层的纯函数，不要在这里重算。**
+    //
+    // 这里原先是一段手写逻辑，带着两个缺陷（2026-09-26 读代码核实）：
+    //   1. `if (urgent && task.dueDate === undefined)` 只处理"完全没有截止时间"，
+    //      于是把"10 天后到期"的任务拖进 Q1 时，只设了 important，
+    //      它**仍然不紧急** → 任务**弹回 Q2**。用户拖了等于没拖，且没有解释。
+    //   2. 注释写着「一次操作 = 一条 op（AGENTS.md §3.4）：两个字段一次写完」，
+    //      代码却是**两次 `await`** —— 注释描述的是意图，代码做的是另一件事。
+    //
+    // 根因是**逻辑放错了层**：放在组件事件处理里就没有测试，
+    // 而这块看板至今**一个测试都没有**。`planQuadrantDrop` 现在穷举验证
+    // "4 象限 × 3 种截止时间状态都必须真的落在目标格"。
+    const plan = planQuadrantDrop(task, target, { now: store.now });
 
-    // 一次操作 = 一条 op（AGENTS.md §3.4）：两个字段一次写完
-    await store.setImportant(taskId, important);
-    if (urgent && task.dueDate === undefined) {
-      await store.setDueDate(taskId, Date.now() + 60 * 60 * 1000);
-    } else if (!urgent && task.dueDate !== undefined) {
-      await store.setDueDate(taskId, undefined);
-    }
+    // 一次拖放 = 一条 op。`plan.dueDateChange`（'pushed' / 'cleared'）
+    // 留给需要提示"已改/已清除截止时间"的界面用。
+    await store.setQuadrantDrop(taskId, plan);
   }
 
   return (
@@ -236,7 +270,7 @@ export function QuadrantBoard() {
         }}
       >
         {QUADRANT_ORDER.map((q) => (
-          <QuadrantCell key={q} quadrant={q}>
+          <QuadrantCell key={q} quadrant={q} meta={quadrantMeta[q]}>
             {buckets[q].map((task) => (
               <DraggableTask key={task.id} id={task.id} title={task.title} />
             ))}
@@ -253,7 +287,7 @@ export function QuadrantBoard() {
               >
                 {/* 空态给图标而不是 emoji —— emoji 跨平台渲染不一致且不受 token 控制 */}
                 <CheckCircle2 size={16} aria-hidden="true" />
-                拖任务到这里
+                {t('web.quadrant.dropHere')}
               </li>
             )}
           </QuadrantCell>
@@ -261,7 +295,7 @@ export function QuadrantBoard() {
       </div>
       {/* 让拖拽有明确的进行中提示，屏幕阅读器也能感知 */}
       <p aria-live="polite" style={{ position: 'absolute', left: -9999 }}>
-        {activeId !== undefined ? '正在拖拽任务' : ''}
+        {activeId !== undefined ? t('web.quadrant.dragging') : ''}
       </p>
       <p
         style={{
@@ -274,7 +308,7 @@ export function QuadrantBoard() {
         }}
       >
         <AlertCircle size={14} aria-hidden="true" />
-        紧急程度由截止时间决定；拖拽只改「重要」并把截止时间推入/移出 2 天窗口
+        {t('web.quadrant.footnote')}
         <CalendarClock size={14} aria-hidden="true" />
         <Trash2 size={14} aria-hidden="true" />
       </p>

@@ -33,6 +33,7 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { __resetOpLogForTests, initOpLog } from '../src/lib/oplog.js';
+import { LocaleHost } from '../src/lib/locale-host.js';
 
 (globalThis as unknown as { indexedDB: IDBFactory }).indexedDB = new IDBFactory();
 (globalThis as unknown as { IDBKeyRange: typeof IDBKeyRange }).IDBKeyRange = IDBKeyRange;
@@ -64,8 +65,16 @@ describe('根组件', () => {
     root = createRoot(container);
 
     // 不吞异常：挂载失败必须让测试红，而不是打条日志就过去。
+    //
+    // 🔴 用**线上同一个** `LocaleHost`（`main.tsx` 也用它），而不是在测试里
+    // 自己拼一遍 Provider —— 自己拼就是第二份接线，谁改了一处另一处就漂移。
+    // 顺便：外壳里的语言切换器要求它在 Provider 之内，缺了会当场抛错。
     await act(async () => {
-      root?.render(<App />);
+      root?.render(
+        <LocaleHost>
+          <App />
+        </LocaleHost>,
+      );
     });
 
     expect(container.textContent ?? '').not.toBe('');
@@ -76,7 +85,11 @@ describe('根组件', () => {
     document.body.appendChild(container);
     root = createRoot(container);
     await act(async () => {
-      root?.render(<App />);
+      root?.render(
+        <LocaleHost>
+          <App />
+        </LocaleHost>,
+      );
     });
 
     const tabs = [...container.querySelectorAll('button[role="tab"]')].map((e) =>

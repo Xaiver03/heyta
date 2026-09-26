@@ -257,10 +257,14 @@ export function createSessionSecretStore(): SessionSecretStore {
  *
  * 🔴 这句话**必须显示在密钥输入框旁边**。
  * 不说明的话，"下次打开要重输"会被当成 bug —— 而它其实是设计。
+ *
+ * ⚠️ 文案本身已经搬进词条表（`web.ai.settings.keyNotice`），由
+ * `AiSettings.tsx` 渲染。**这里刻意不留一份字符串副本**：
+ * 留副本就会漂移，而两份说明里只要有一份过期，用户看到的就是错的那份。
+ * 本文件仍然登记在 `scripts/check-ui-language.mjs` 的 `migratedFiles` 里 ——
+ * 登记不是为了这句话（门禁看不见跨行拼接），而是为了让**将来**在这个
+ * 存储层文件里新写的硬编码文案立刻被拦下。
  */
-export const WEB_KEY_STORAGE_NOTICE =
-  '浏览器里没有系统钥匙串，密钥只保存在这个标签页的内存中。' +
-  '关掉或刷新页面后需要重新输入。桌面端会把密钥存进系统钥匙串。';
 
 /** Web 上没有钥匙串断言用的空 store（未配置任何密钥时）。 */
 export const WEB_EMPTY_SECRET_STORE = EMPTY_SECRET_STORE;

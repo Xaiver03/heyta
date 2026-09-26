@@ -12,6 +12,8 @@ import { useEffect, useMemo, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { CalendarDays, ChartGantt, Check, CircleDot, Inbox, Moon, Sun, Timer, Trash2, type LucideIcon, Settings } from 'lucide-react';
 
+import { useI18n, type MessageKey } from '@heyta/i18n';
+
 import {
   applyFeedbackCorrections,
   applyPreferenceCorrections,
@@ -43,6 +45,7 @@ import { CaptureComposer } from './features/capture/CaptureComposer.js';
 import { useProjectStore } from './features/projects/store.js';
 import { ConflictDialog } from './features/sync/ConflictDialog.js';
 import { SyncBar } from './features/sync/SyncBar.js';
+import { SubscriptionNotice } from './features/subscription/SubscriptionNotice.js';
 import { ProjectsPanel } from './features/projects/ProjectsPanel.js';
 import { QuadrantBoard } from './features/quadrant/QuadrantBoard.js';
 import { HabitsView } from './features/habits/HabitsView.js';
@@ -50,7 +53,6 @@ import { TimelineView } from './features/timeline/TimelineView.js';
 import { AiBreakdown } from './features/ai/AiBreakdown.js';
 import { AiPrioritize } from './features/ai/AiPrioritize.js';
 import { AiDuration } from './features/ai/AiDuration.js';
-import { SubscriptionNotice } from './features/subscription/SubscriptionNotice.js';
 import { AiSettings } from './features/settings/AiSettings.js';
 import { MemoryPanel } from './features/settings/MemoryPanel.js';
 import {
@@ -60,13 +62,21 @@ import {
   toHealthSnapshot,
 } from './features/settings/aiStore.js';
 import { FocusTimer } from './features/focus/FocusTimer.js';
+import { LanguageSwitcher } from './features/shell/LanguageSwitcher.js';
 import { applyTheme, resolveInitialTheme, type Theme } from './lib/theme.js';
 
 import './styles/app.css';
 
 interface NavEntry {
   filter: TaskFilter;
-  label: string;
+  /**
+   * 文案**键**，不是文案本身。
+   *
+   * 🔴 模块级常量里不能有句子：`t` 是渲染期的（跟随语言变化）。
+   * 所以这里存 key，渲染时才 `t(entry.labelKey)` —— 语言一换，
+   * 这些标签自动跟着换，不需要重建数组。
+   */
+  labelKey: MessageKey;
   icon: LucideIcon;
   /** 象限色块的 CSS 类；非象限项为 undefined。 */
   swatch?: string;
@@ -75,33 +85,33 @@ interface NavEntry {
 const QUADRANT_NAV: NavEntry[] = [
   {
     filter: { kind: 'quadrant', quadrant: Quadrant.UrgentImportant },
-    label: '重要且紧急',
+    labelKey: 'web.shell.nav.q1',
     icon: CircleDot,
     swatch: 'ht-swatch--q1',
   },
   {
     filter: { kind: 'quadrant', quadrant: Quadrant.ImportantNotUrgent },
-    label: '重要不紧急',
+    labelKey: 'web.shell.nav.q2',
     icon: CircleDot,
     swatch: 'ht-swatch--q2',
   },
   {
     filter: { kind: 'quadrant', quadrant: Quadrant.UrgentNotImportant },
-    label: '紧急不重要',
+    labelKey: 'web.shell.nav.q3',
     icon: CircleDot,
     swatch: 'ht-swatch--q3',
   },
   {
     filter: { kind: 'quadrant', quadrant: Quadrant.Neither },
-    label: '不重要不紧急',
+    labelKey: 'web.shell.nav.q4',
     icon: CircleDot,
     swatch: 'ht-swatch--q4',
   },
 ];
 
 const PRIMARY_NAV: NavEntry[] = [
-  { filter: { kind: 'all' }, label: '收集箱', icon: Inbox },
-  { filter: { kind: 'today' }, label: '今天', icon: Sun },
+  { filter: { kind: 'all' }, labelKey: 'web.shell.nav.inbox', icon: Inbox },
+  { filter: { kind: 'today' }, labelKey: 'web.shell.nav.today', icon: Sun },
 ];
 
 /**
@@ -115,6 +125,7 @@ const PRIMARY_NAV: NavEntry[] = [
 type ViewKey = 'tasks' | 'quadrant' | 'habits' | 'focus' | 'timeline' | 'settings';
 
 export function App(): React.JSX.Element {
+  const { t } = useI18n();
   const [theme, setTheme] = useState<Theme>(resolveInitialTheme);
   const store = useTaskStore();
   const projects = useProjectStore();
@@ -206,27 +217,29 @@ export function App(): React.JSX.Element {
 
   const title = useMemo(() => {
     const f = store.filter;
-    if (f.kind === 'all') return '收集箱';
-    if (f.kind === 'today') return '今天';
-    if (f.kind === 'completed') return '已完成';
+    if (f.kind === 'all') return t('web.shell.nav.inbox');
+    if (f.kind === 'today') return t('web.shell.nav.today');
+    if (f.kind === 'completed') return t('web.shell.nav.completed');
     // filter 是判别联合（含 all/today/completed/quadrant/project），
     // **必须显式判 kind** 才能访问各自特有字段 —— 直接取 f.quadrant 编译不过。
     if (f.kind === 'quadrant') {
-      return (
-        QUADRANT_NAV.find(
-          (n) => n.filter.kind === 'quadrant' && n.filter.quadrant === f.quadrant,
-        )?.label ?? '四象限'
+      const entry = QUADRANT_NAV.find(
+        (n) => n.filter.kind === 'quadrant' && n.filter.quadrant === f.quadrant,
       );
+      return entry === undefined ? t('web.shell.nav.quadrant') : t(entry.labelKey);
     }
     if (f.kind === 'project') {
-      return projects.projects.find((p) => p.id === f.projectId)?.name ?? '清单';
+      // 清单名是**用户自己的字**，原样显示、不翻译。
+      return projects.projects.find((p) => p.id === f.projectId)?.name ?? t('web.shell.nav.project');
     }
-    return '任务';
-  }, [store.filter]);
+    return t('web.shell.nav.tasks');
+    // `t` 进依赖：语言变了标题必须跟着变。`projects.projects` 同理 ——
+    // 清单改名后标题不该还是旧名字。
+  }, [store.filter, projects.projects, t]);
 
   return (
     <div className="ht-app">
-      <nav className="ht-sidebar" aria-label="主导航">
+      <nav className="ht-sidebar" aria-label={t('web.shell.nav.aria')}>
         <div className="ht-brand">
           <span className="ht-brand__dot" aria-hidden="true" />
           heyta
@@ -235,7 +248,7 @@ export function App(): React.JSX.Element {
         <div className="ht-nav">
           {PRIMARY_NAV.map((entry) => (
             <NavButton
-              key={entry.label}
+              key={entry.labelKey}
               entry={entry}
               active={isActive(store.filter, entry.filter)}
               onClick={() => store.setFilter(entry.filter)}
@@ -243,11 +256,11 @@ export function App(): React.JSX.Element {
           ))}
         </div>
 
-        <div className="ht-nav__section">四象限</div>
+        <div className="ht-nav__section">{t('web.shell.nav.quadrantSection')}</div>
         <div className="ht-nav">
           {QUADRANT_NAV.map((entry) => (
             <NavButton
-              key={entry.label}
+              key={entry.labelKey}
               entry={entry}
               count={
                 entry.filter.kind === 'quadrant'
@@ -266,16 +279,16 @@ export function App(): React.JSX.Element {
         <header className="ht-header">
           <h1 className="ht-header__title">{title}</h1>
           {/* 视图切换。用 role=tablist 让屏幕阅读器理解这是一组互斥选项 */}
-          <div role="tablist" aria-label="视图" className="ht-viewtabs">
+          <div role="tablist" aria-label={t('web.shell.views.aria')} className="ht-viewtabs">
             {(
               [
-                { key: 'tasks', label: '任务', Icon: Inbox },
-                { key: 'quadrant', label: '四象限', Icon: CircleDot },
-                { key: 'habits', label: '习惯', Icon: Check },
-                { key: 'focus', label: '番茄钟', Icon: Sun },
-                { key: 'timeline', label: '时间线', Icon: ChartGantt },
-                { key: 'settings', label: '设置', Icon: Settings },
-              ] as const
+                { key: 'tasks', labelKey: 'web.shell.nav.tasks', Icon: Inbox },
+                { key: 'quadrant', labelKey: 'web.shell.nav.quadrant', Icon: CircleDot },
+                { key: 'habits', labelKey: 'web.shell.views.habits', Icon: Check },
+                { key: 'focus', labelKey: 'web.shell.views.focus', Icon: Sun },
+                { key: 'timeline', labelKey: 'web.shell.views.timeline', Icon: ChartGantt },
+                { key: 'settings', labelKey: 'web.shell.views.settings', Icon: Settings },
+              ] as const satisfies readonly { key: ViewKey; labelKey: MessageKey; Icon: LucideIcon }[]
             ).map((v) => (
               <button
                 key={v.key}
@@ -286,7 +299,7 @@ export function App(): React.JSX.Element {
                 onClick={() => setView(v.key)}
               >
                 <v.Icon size={14} aria-hidden="true" />
-                {v.label}
+                {t(v.labelKey)}
               </button>
             ))}
           </div>
@@ -296,12 +309,12 @@ export function App(): React.JSX.Element {
                 🔴 它是**开关**而不是固定行为：倒计时是待验证的 UI 假设，
                 有开关才有对照组，也才能一键回退（见 DueBadge.tsx 文件头）。 */}
             {view === 'tasks' && (
-              <div role="group" aria-label="截止时间显示方式" className="ht-viewtabs">
+              <div role="group" aria-label={t('web.shell.dueMode.aria')} className="ht-viewtabs">
                 {(
                   [
-                    { key: 'date', label: '日期', Icon: CalendarDays },
-                    { key: 'countdown', label: '倒计时', Icon: Timer },
-                  ] as const
+                    { key: 'date', labelKey: 'web.shell.dueMode.date', Icon: CalendarDays },
+                    { key: 'countdown', labelKey: 'web.shell.dueMode.countdown', Icon: Timer },
+                  ] as const satisfies readonly { key: DueDisplayMode; labelKey: MessageKey; Icon: LucideIcon }[]
                 ).map((d) => (
                   <button
                     key={d.key}
@@ -311,17 +324,25 @@ export function App(): React.JSX.Element {
                     onClick={() => setDueDisplay(d.key)}
                   >
                     <d.Icon size={14} aria-hidden="true" />
-                    {d.label}
+                    {t(d.labelKey)}
                   </button>
                 ))}
               </div>
             )}
             <SyncBar />
-        <ConflictDialog />
+            <ConflictDialog />
+            {/* 语言切换。外壳顶栏的全局控件区，与主题切换并列 ——
+                这是**真实用户唯一能把界面切到英文的入口**（见该文件的注释）。 */}
+            <LanguageSwitcher />
             <button
               type="button"
               className="ht-btn ht-btn--ghost"
-              aria-label={theme === 'light' ? '切换到暗色主题' : '切换到亮色主题'}
+              // 主题按钮是纯图标，所以必须自带可访问名（AGENTS.md §5）。
+              aria-label={
+                theme === 'light'
+                  ? t('common.a11y.toDarkTheme')
+                  : t('common.a11y.toLightTheme')
+              }
               onClick={() => setTheme(theme === 'light' ? 'dark' : 'light')}
             >
               {theme === 'light' ? <Moon size={18} /> : <Sun size={18} />}
@@ -330,10 +351,10 @@ export function App(): React.JSX.Element {
         </header>
 
         <div className="ht-content">
-          {/* 🔴 唯一被降级的东西是"通过官方托管服务的同步"（所有设备，
-              不只是新设备）。到期后本地任务照常查看 / 编辑 / 导出 ——
-              免费额度已废弃，见 subscription-boundary.md §1。
-              未配置 / 自托管 / 断网 / 探测失败时它不渲染任何东西。 */}
+          {/* 🔴 托管同步到期/被拒时的提示。它**只解释**"哪一件事被限制了"
+              （通过官方托管服务的同步；含超出免费额度的新设备），不挡任何功能 ——
+              本地任务照常查看 / 编辑 / 导出（subscription-boundary.md §2）。
+              未配置 / 自托管 / 断网时不渲染任何东西。 */}
           <SubscriptionNotice />
           {/* AI 捕获的接线**留在这个组件内部** —— 输入框的草稿是它的状态，
               而草稿就是 AI 要解析的那句话。把草稿镜像到这里再传回去
@@ -425,7 +446,13 @@ export function App(): React.JSX.Element {
                     <button
                       type="button"
                       className="ht-task__check"
-                      aria-label={done ? `取消完成：${task.title}` : `完成：${task.title}`}
+                      // ⚠️ 三元写在 `t(...)` **外面** —— 门禁只认"字面量紧跟 t("，
+                      // `t(done ? 'a' : 'b')` 两种形状都认不出来。
+                      aria-label={
+                        done
+                          ? t('web.shell.tasks.uncomplete', { title: task.title })
+                          : t('web.shell.tasks.complete', { title: task.title })
+                      }
                       aria-pressed={done}
                       onClick={() => store.toggleComplete(task.id)}
                     >
@@ -508,7 +535,7 @@ export function App(): React.JSX.Element {
                     <button
                       type="button"
                       className="ht-btn ht-btn--ghost"
-                      aria-label={`删除：${task.title}`}
+                      aria-label={t('web.shell.tasks.delete', { title: task.title })}
                       onClick={() => store.deleteTask(task.id)}
                     >
                       <Trash2 size={16} aria-hidden="true" />
@@ -581,6 +608,7 @@ function NavButton({
   active: boolean;
   onClick: () => void;
 }): React.JSX.Element {
+  const { t } = useI18n();
   const Icon = entry.icon;
   return (
     <button
@@ -594,7 +622,7 @@ function NavButton({
       ) : (
         <Icon size={16} aria-hidden="true" />
       )}
-      {entry.label}
+      {t(entry.labelKey)}
       {count !== undefined && count > 0 && (
         <span className="ht-nav__count">{count}</span>
       )}
@@ -609,19 +637,39 @@ function NavButton({
  * 留白屏会让用户以为应用坏了。
  */
 function EmptyState({ filter }: { filter: TaskFilter }): React.JSX.Element {
-  const messages: Record<string, { title: string; hint: string }> = {
-    all: { title: '收集箱是空的', hint: '在上面输入框添加第一个任务' },
-    today: { title: '今天没有到期任务', hint: '给任务设个截止时间，它会出现在这里' },
-    completed: { title: '还没有完成的任务', hint: '完成一个任务试试' },
-    quadrant: { title: '这个象限是空的', hint: '给任务标记重要程度与截止时间' },
+  const { t } = useI18n();
+  /**
+   * 空态文案。
+   *
+   * ⚠️ 存的是**键对**（标题 + 下一步动作），不是句子 —— 句子在词条表里，
+   * 渲染时才 `t(...)`。`all` 同时是兜底：出现新的 `filter.kind` 时
+   * 不能留一片空白（"任何列表都必须有空状态"，见文件尾注释）。
+   */
+  const messages: Record<string, { titleKey: MessageKey; hintKey: MessageKey }> = {
+    all: {
+      titleKey: 'web.shell.empty.all.title',
+      hintKey: 'web.shell.empty.all.hint',
+    },
+    today: {
+      titleKey: 'web.shell.empty.today.title',
+      hintKey: 'web.shell.empty.today.hint',
+    },
+    completed: {
+      titleKey: 'web.shell.empty.completed.title',
+      hintKey: 'web.shell.empty.completed.hint',
+    },
+    quadrant: {
+      titleKey: 'web.shell.empty.quadrant.title',
+      hintKey: 'web.shell.empty.quadrant.hint',
+    },
   };
   const msg = messages[filter.kind] ?? messages['all']!;
 
   return (
     <div className="ht-empty">
       <Inbox className="ht-empty__icon" size={40} aria-hidden="true" />
-      <p className="ht-empty__title">{msg.title}</p>
-      <p className="ht-empty__hint">{msg.hint}</p>
+      <p className="ht-empty__title">{t(msg.titleKey)}</p>
+      <p className="ht-empty__hint">{t(msg.hintKey)}</p>
     </div>
   );
 }

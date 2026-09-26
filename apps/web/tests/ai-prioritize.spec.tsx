@@ -415,6 +415,7 @@ const PREF_SET = (memoryEnabled: boolean): PreferenceSet => ({
     value: { startHour: 8, endHour: 11, concentration: 0.8 },
     sampleSize: 40,
     confidence: 0.9,
+    evidenceFacts: { kind: 'deep-work-window', startHour: 8, endHour: 11, concentration: 0.8, samples: 40 },
     evidence: '基于 40 次专注，80% 集中在 08:00–11:00',
   },
   leadTime: {
@@ -422,6 +423,7 @@ const PREF_SET = (memoryEnabled: boolean): PreferenceSet => ({
     value: 2,
     sampleSize: 20,
     confidence: 0.9,
+    evidenceFacts: { kind: 'lead-time', days: 2, samples: 20 },
     evidence: '基于 20 条带截止日期的任务，你习惯提前 2 天完成',
   },
   granularity: null,
