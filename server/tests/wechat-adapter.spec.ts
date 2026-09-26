@@ -605,3 +605,102 @@ describe('wechat adapter — 接口语义', () => {
     expect(createAdapter().provider).toBe('wechat');
   });
 });
+
+describe('wechat adapter — 🔴 金额校验（付的钱必须落在价目表上）', () => {
+  const NOW = Date.parse('2026-09-26T12:00:00+08:00');
+  const adapter = createAdapter({ now: () => NOW });
+
+  const fixtureWithAmount = (amountFen: number | undefined, opts: Record<string, unknown> = {}) =>
+    buildWechatPaymentWebhook({
+      privateKey,
+      timestampSeconds: Math.floor(NOW / 1000),
+      outTradeNo: buildWechatOutTradeNo(42, 1_700_000_000_000, 'deadbeef'),
+      ...(amountFen === undefined ? {} : { amountFen }),
+      ...opts,
+    });
+
+  it('付对金额（13_900 = ¥139）→ 授予 365 天', async () => {
+    const f = fixtureWithAmount(13_900);
+    const r = await adapter.verifyWebhook(f.body, f.headers);
+
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.event.eventType).toBe('payment_succeeded');
+    expect(r.event.oneTimeGrant).toEqual({ periodDays: 365 });
+  });
+
+  it('🔴 只付 ¥1 → **不授予任何权益**，并落成金额不符事件', async () => {
+    const f = fixtureWithAmount(1);
+    const r = await adapter.verifyWebhook(f.body, f.headers);
+
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    // 这是这个校验存在的全部理由：一笔错价的订单不许换来整整一年。
+    expect(r.event.oneTimeGrant).toBeNull();
+    // 但要留下可查的痕迹，而不是悄悄当成正常支付。
+    expect(r.event.eventType).toBe('payment_amount_mismatch');
+  });
+
+  it('金额字段缺失 → 同样不授予（不因为"没写"就放行）', async () => {
+    const f = fixtureWithAmount(undefined, { omitAmount: true });
+    const r = await adapter.verifyWebhook(f.body, f.headers);
+
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.event.oneTimeGrant).toBeNull();
+    expect(r.event.eventType).toBe('payment_amount_mismatch');
+  });
+
+  it('金额为 0 → 不授予', async () => {
+    const f = fixtureWithAmount(0);
+    const r = await adapter.verifyWebhook(f.body, f.headers);
+
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.event.oneTimeGrant).toBeNull();
+  });
+
+  it('篡改金额过不了验签（密文受签名保护）', async () => {
+    const f = fixtureWithAmount(13_900);
+    const tampered = Buffer.from(f.body.toString('utf8').replace('ciphertext', 'ciphertexT'));
+    await expect(adapter.verifyWebhook(tampered, f.headers)).resolves.toEqual({
+      ok: false,
+      reason: 'invalid-signature',
+    });
+  });
+
+  it('运营者自定义价目表时，按自定义金额校验', async () => {
+    const custom = createAdapter({
+      now: () => NOW,
+      prices: { annual: { totalFen: 9_900, description: '促销' } },
+    });
+
+    const ok = fixtureWithAmount(9_900);
+    const r1 = await custom.verifyWebhook(ok.body, ok.headers);
+    expect(r1.ok).toBe(true);
+    if (r1.ok) expect(r1.event.oneTimeGrant).toEqual({ periodDays: 365 });
+
+    // 默认的 13_900 在自定义价目表下**不再**被接受 —— 证明校验读的是
+    // 实际生效的价目表，而不是写死的 13900。
+    const stale = fixtureWithAmount(13_900);
+    const r2 = await custom.verifyWebhook(stale.body, stale.headers);
+    expect(r2.ok).toBe(true);
+    if (r2.ok) expect(r2.event.oneTimeGrant).toBeNull();
+  });
+
+  it('金额不符的事件仍然通过验签与幂等（是"拒绝授予"，不是"拒绝事件"）', async () => {
+    const f = fixtureWithAmount(1);
+    const r = await adapter.verifyWebhook(f.body, f.headers);
+
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    // 事件本身照常落库（幂等键还是 out_trade_no）—— 我们要能**查到**这笔异常，
+    // 但是不授予权益。把它整个丢掉会让"有人付错价"变成一个看不见的事件。
+    expect(r.event.providerEventId).toBe(
+      `payment_succeeded:${buildWechatOutTradeNo(42, 1_700_000_000_000, 'deadbeef')}`,
+    );
+    expect(r.event.userId).toBe(42);
+    expect(r.event.provider).toBe('wechat');
+  });
+});
+

@@ -573,6 +573,7 @@ export const createWechatBillingAdapter = (
         trade_state?: unknown;
         success_time?: unknown;
         attach?: unknown;
+        amount?: { total?: unknown } | undefined;
       };
       try {
         payload = JSON.parse(plaintext.toString('utf8')) as typeof payload;
@@ -596,6 +597,25 @@ export const createWechatBillingAdapter = (
         parseUserIdFromAttach(payload.attach) ??
         parseUserIdFromOutTradeNo(payload.out_trade_no);
 
+      // 🔴 金额校验 —— 付的钱必须落在价目表上，否则**不授予**。
+      //
+      // 没有这一道的话：一笔 ¥1 的订单（或任何未来新增的低价 SKU、测试单）
+      // 会按 `WECHAT_ONE_TIME_PERIOD_DAYS` 授予**整整一年**。
+      // 这是会实际损失钱的那类洞，不是理论问题。
+      //
+      // ⚠️ **这一版的强度有已知上限**：它校验的是"金额是价目表里的某一个"，
+      // 而不是"金额对应的是这一单买的那一项"。价目表现在只有一项
+      // （`annual: 13_900`），所以这两种说法**等价**，洞是关着的。
+      // 一旦价目表出现**多个不同金额**的 SKU，就必须改成按价目表项校验 ——
+      // 做法是把 priceId 编进 `out_trade_no`（我们自己生成、回调必定携带），
+      // 再按下单记录比对。**在那之前不要加第二个 SKU。**
+      const paidFen =
+        typeof payload.amount?.total === 'number' ? payload.amount.total : null;
+      const knownAmounts = new Set(
+        Object.values(options.prices ?? WECHAT_DEFAULT_PRICES).map((x) => x.totalFen),
+      );
+      const amountMatchesPrice = paidFen !== null && knownAmounts.has(paidFen);
+
       return {
         ok: true,
         event: {
@@ -604,7 +624,9 @@ export const createWechatBillingAdapter = (
           // 这样同一订单的**不同事件**（未来的退款）不会和支付事件互相顶掉。
           // 复投的同一通知 → 同一个 out_trade_no → 同一个键 → 唯一约束挡住。
           providerEventId: `payment_succeeded:${payload.out_trade_no}`,
-          eventType: 'payment_succeeded',
+          // 金额对不上时用**不同的事件类型**落审计 —— 能查到"有人付了不对的钱",
+          // 而不是悄悄当成一次正常支付。
+          eventType: amountMatchesPrice ? 'payment_succeeded' : 'payment_amount_mismatch',
           occurredAt,
           externalSubscriptionId: null,
           // 微信没有订阅状态机 → 明确 null，不编。
@@ -612,7 +634,10 @@ export const createWechatBillingAdapter = (
           currentPeriodEnd: null,
           userId,
           // 🔴 授予语义的入口：apply-event 据此走一次性支付路径。
-          oneTimeGrant: { periodDays: WECHAT_ONE_TIME_PERIOD_DAYS },
+          // 金额对不上 → `null` → **不授予任何权益**（fail-closed）。
+          oneTimeGrant: amountMatchesPrice
+            ? { periodDays: WECHAT_ONE_TIME_PERIOD_DAYS }
+            : null,
         } satisfies NormalizedPaymentEvent,
       };
     },
