@@ -37,6 +37,31 @@ const RESTRICTED = [
   'CC-BY-NC', 'CC-BY-SA', 'EUPL', 'OSL', 'CPAL', 'Commons Clause',
 ];
 
+/**
+ * 白名单**之外**、但已逐个复核并接受的许可证。
+ * ==============================================
+ *
+ * 🔴 存在的理由：这个脚本以前把"需归类"（`other`）**只打印、不判定** ——
+ * 退出码里完全不含 `other`，于是它打印完 `❔ 其他（需归类）: 1`
+ * 之后接着报 `结论：全部依赖均为宽松许可 ✅` 并退出 **0**。
+ *
+ * 那等于**这一档永远不会失败**：白名单是显式枚举的，所以任何不在表里的许可
+ * 都会落进 `other` 并被静默放行 —— 正好是白名单想拦的那一类。
+ * `THIRD_PARTY_LICENSES.md` 早就把这个弱点写在纸上了，
+ * 但**写在纸上的弱点拦不住任何一次引入**。
+ *
+ * 现在的语义：`other` **默认失败**，只有在这里逐项登记（并写明为什么可以接受）
+ * 才放行。加一条的成本是刻意的 —— 它逼人为这个许可做一次真正的判断，
+ * 而不是让它悄悄混进"全部宽松"里。
+ *
+ * 键是许可证标识，值是**接受它的理由**（会被打印出来，所以必须说清楚）。
+ */
+const REVIEWED_OTHER = {
+  'CC-BY-4.0':
+    'caniuse-lite@1.0.30001812：browserslist 的**构建期数据包**，不进入运行时产物；' +
+    'CC-BY 是署名许可（不是禁用的 CC-BY-NC），归属已在 THIRD_PARTY_LICENSES.md §2 登记。',
+};
+
 const normalize = (raw) => {
   if (raw == null) return 'UNKNOWN';
   if (typeof raw === 'string') return raw;
@@ -104,12 +129,31 @@ const all = [...found.values()].sort((a, b) => a.name.localeCompare(b.name));
 const byKind = { permissive: [], restricted: [], other: [], unknown: [] };
 for (const p of all) byKind[p.kind].push(p);
 
+// `other` 再分两档：已登记的（放行）与未登记的（失败）。
+// 分档依据是**许可证标识本身** —— 同一个许可只需人判断一次。
+const reviewedOther = byKind.other.filter((p) => Object.hasOwn(REVIEWED_OTHER, p.license));
+const unreviewedOther = byKind.other.filter((p) => !Object.hasOwn(REVIEWED_OTHER, p.license));
+
+/**
+ * 🔴 唯一的失败判据。**三处出口（--json / --flagged / 汇总）都用它。**
+ *
+ * 以前这个条件被**抄了三遍**，而且三遍里**都没有 `other`** ——
+ * 漂移就是从"同一个判断写三次"开始的。现在只有一个地方能决定失败与否。
+ */
+const failing = byKind.restricted.length + byKind.unknown.length + unreviewedOther.length;
+
 const jsonOut = process.argv.includes('--json');
 const flaggedOnly = process.argv.includes('--flagged');
 
 if (jsonOut) {
-  console.log(JSON.stringify({ total: all.length, byKind, all }, null, 2));
-  process.exit(byKind.restricted.length || byKind.unknown.length ? 1 : 0);
+  console.log(
+    JSON.stringify(
+      { total: all.length, byKind, reviewedOther, unreviewedOther, failing, all },
+      null,
+      2,
+    ),
+  );
+  process.exit(failing ? 1 : 0);
 }
 
 console.log(`\n依赖树许可证清点（去重后 ${all.length} 个包）\n`);
@@ -136,20 +180,31 @@ if (byKind.unknown.length) {
   }
 }
 
-if (byKind.other.length) {
-  console.log(`\n  ❔ 其他（需归类）: ${byKind.other.length}`);
-  for (const p of byKind.other) {
+if (unreviewedOther.length) {
+  console.log(`\n  ❔ 白名单外、且未登记 : ${unreviewedOther.length}`);
+  for (const p of unreviewedOther) {
     console.log(`     ${p.name}@${p.version}  →  ${p.license}`);
+  }
+  console.log(
+    '     ↳ 这一档**会失败**。要么换成白名单内的许可，要么在\n' +
+      '       research/tools/license-inventory.mjs 的 REVIEWED_OTHER 里逐项登记理由。',
+  );
+}
+
+if (reviewedOther.length) {
+  console.log(`\n  ☑️  白名单外、已逐项登记 : ${reviewedOther.length}`);
+  for (const p of reviewedOther) {
+    console.log(`     ${p.name}@${p.version}  →  ${p.license}`);
+    console.log(`       理由：${REVIEWED_OTHER[p.license]}`);
   }
 }
 
-if (flaggedOnly) process.exit(0);
+if (flaggedOnly) {
+  console.log('\n（--flagged：只列需人判断的项；退出码仍反映是否存在不合格依赖）');
+  process.exit(failing ? 1 : 0);
+}
 
 console.log(
-  `\n结论：${
-    byKind.restricted.length || byKind.unknown.length
-      ? '存在需要处理的项 —— 见上'
-      : '全部依赖均为宽松许可 ✅'
-  }\n`,
+  `\n结论：${failing ? '存在需要处理的项 —— 见上 ❌' : '全部依赖均为宽松许可（含已登记的例外）✅'}\n`,
 );
-process.exit(byKind.restricted.length || byKind.unknown.length ? 1 : 0);
+process.exit(failing ? 1 : 0);
