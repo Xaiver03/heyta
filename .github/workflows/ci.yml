@@ -1,0 +1,110 @@
+name: CI
+
+# 为什么这个文件存在
+# ==================
+# 在此之前，仓库**没有任何 CI**，`pnpm check` 只由人手动跑。
+# 结果是：`pnpm check` 在干净检出上从来就没通过过，而这个事实可以一直没人知道。
+#
+# 具体地，这些缺陷都是靠"换一台机器/换一个目录再来一遍"才暴露的：
+#   - 14 个包的 tsconfig 都声明 `types: ["vitest", "node"]`，但没人声明 `@types/node`
+#   - `server` 的 build 需要已生成的 Prisma Client，却只有 `pretest` 里有 `prisma generate`
+#   - `server` 声明了 `@types/ws`（类型）却没有 `ws`（运行时本体）
+# 这三类都属于同一个模式：**声明了能力，本体从没被真正装上**。
+# 它们在开发机上被 `~/node_modules` 兜住了，只有干净环境才现形。
+#
+# 所以这个 workflow 的核心不是"跑一下测试"，而是**每次都在干净环境里重新回答
+# 一次「一个新克隆能不能自己立起来」**。这也是为什么下面坚持用
+# `--frozen-lockfile`：package.json 与 lockfile 一旦漂移，这里会立刻红，
+# 而不是等到某个人在新机器上克隆时才炸。
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+# 只读即可 —— 这个 workflow 不写回任何东西
+permissions:
+  contents: read
+
+# 同一个分支连续 push 时，取消上一次还没跑完的 —— 省额度
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: 门禁 + 全量测试（干净检出）
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+
+    steps:
+      - name: 检出
+        uses: actions/checkout@v4
+
+      # 🔴 顺序不能反：pnpm 必须在 setup-node **之前**装好，
+      # 否则 setup-node 的 `cache: pnpm` 找不到 pnpm，缓存直接失效。
+      # 版本不在这里写死 —— pnpm/action-setup 会读 package.json 的 packageManager。
+      - name: 装 pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: 装 Node
+        uses: actions/setup-node@v4
+        with:
+          # 必须是 24，不能降到 22 —— 尽管根 package.json 的 engines 写的是 ">=22"。
+          # 原因：packages/storage 与 apps/node-host 用 `node:sqlite`，
+          # 而 `node:sqlite` 在 Node 22.5–23.3 需要 `--experimental-sqlite` 标志，
+          # 到 23.4 才免标志。测试脚本是裸的 `vitest run`，没有那个标志。
+          # 也就是说 engines 的 ">=22" 是**没被验证过**的声明（待办，不是这里能改的）。
+          node-version: '24'
+          cache: pnpm
+
+      - name: 按 lockfile 严格安装
+        run: pnpm install --frozen-lockfile
+
+      # 12 道门禁（build + 全量 typecheck + 迁移/layering/文案/许可证/文档/
+      # 设计/token/ArkTS/原生依赖/物化读），全部真实执行，不跳过。
+      - name: 门禁
+        run: pnpm check
+
+      - name: 全量测试
+        run: pnpm test
+
+      # 诚实交代一道 CI 里跑不了的门禁。
+      # `check:arkts` 拿真 ArkTS 编译器（es2abc，随 DevEco Studio 分发）编译产物；
+      # 找不到编译器时它**故意** exit 0 并打印"跳过"。在 ubuntu runner 上永远是后者。
+      # 与其让它安静地空跑，不如在每次运行里明说这件事。
+      - name: 交代 ArkTS 门禁的真实状态
+        if: always()
+        run: |
+          set +e
+          OUT=$(node design-system/heyta/check-arkts-compile.mjs 2>&1)
+          if printf '%s' "$OUT" | grep -q "跳过 ArkTS"; then
+            {
+              echo "### ⚠️ ArkTS 编译门禁在本 runner 上是空跑"
+              echo ""
+              echo "runner 上没有 \`es2abc\`（ArkTS 编译器，随 DevEco Studio 分发），"
+              echo "该脚本按设计 exit 0 并跳过。**这道门禁在 CI 里没有被真正执行。**"
+              echo ""
+              echo "它只在本机装有 DevEco Studio 时才是真门禁（已在 macOS 上实测通过）。"
+            } >> "$GITHUB_STEP_SUMMARY"
+            echo "::warning::ArkTS 编译门禁被跳过（runner 无 es2abc）—— 这一道没有被真正验证"
+          else
+            echo "✅ ArkTS 产物通过真实编译器。" >> "$GITHUB_STEP_SUMMARY"
+          fi
+          exit 0
+
+      # 同样如实交代：web 的端到端用户旅程测试需要真实模型端点
+      # （配置在 /tmp/heyta-ai-live/provider.json，CI 里不存在），
+      # 它会 skipIf 跳过而不是假装通过。
+      - name: 说明哪些测试在 CI 里是跳过的
+        if: always()
+        run: |
+          {
+            echo "### 测试覆盖说明"
+            echo ""
+            echo "- \`apps/web\` 的真实用户旅程测试（真界面 + 真 op-log + 真模型端点）"
+            echo "  在 CI 里会**跳过** —— 它需要一份本地的 \`provider.json\`。"
+            echo "  想让它真跑，用 \`pnpm verify:ai-live\` 系列脚本在本地执行。"
+            echo "- 测试汇总里的 skipped 数量即来自此处。"
+          } >> "$GITHUB_STEP_SUMMARY"
