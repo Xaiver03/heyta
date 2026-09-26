@@ -306,7 +306,13 @@ describe.skipIf(CONFIG === undefined)('真实用户旅程：AI 记忆从头到�
       expect(composer, '找不到捕获输入框').not.toBeNull();
       type(composer, '把新版本发到生产环境');
       pressEnter(composer);
-      await flush();
+
+      // 🔴 不能只 flush() 一次就断言：任务落库要过 op-log 引擎，是异步的。
+      // 一次微任务冲刷在负载下不够 —— 症状是「单独跑必过、成套并行跑偶发失败」，
+      // 这种形态最容易被误判成"环境问题"而放过去。
+      await waitFor('回车后任务落进 op-log', () =>
+        Object.values(currentState().tasks).some((t) => t.title === '把新版本发到生产环境'),
+      );
 
       const task = Object.values(currentState().tasks).find(
         (t) => t.title === '把新版本发到生产环境',
@@ -334,7 +340,10 @@ describe.skipIf(CONFIG === undefined)('真实用户旅程：AI 记忆从头到�
 
       // ══ 5. 逐条取舍：去掉第一项 ═════════════════════════════════════
       click(byTestId('ai-item-0'));
-      await flush();
+      await waitFor(
+        '取舍后保留数更新',
+        () => byTestId('ai-kept-count')?.textContent === String(itemCount - 1),
+      );
       expect(byTestId('ai-kept-count')?.textContent).toBe(String(itemCount - 1));
 
       // ══ 6. 写入备注 ═════════════════════════════════════════════════
@@ -359,7 +368,8 @@ describe.skipIf(CONFIG === undefined)('真实用户旅程：AI 记忆从头到�
 
       // ══ 8. 偏好必须可见（M6 的验收判据）═════════════════════════════
       switchView('设置');
-      await flush();
+      await waitFor('记忆面板出现', () => byTestId('memory-panel') !== null);
+      await waitFor('推断出偏好', () => byTestId('memory-known') !== null);
       expect(byTestId('memory-panel'), '记忆面板应该出现').not.toBeNull();
       expect(byTestId('memory-known'), '有历史数据就应该推断出偏好').not.toBeNull();
 
