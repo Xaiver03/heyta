@@ -50,6 +50,7 @@ import { TimelineView } from './features/timeline/TimelineView.js';
 import { AiBreakdown } from './features/ai/AiBreakdown.js';
 import { AiPrioritize } from './features/ai/AiPrioritize.js';
 import { AiDuration } from './features/ai/AiDuration.js';
+import { SubscriptionNotice } from './features/subscription/SubscriptionNotice.js';
 import { AiSettings } from './features/settings/AiSettings.js';
 import { MemoryPanel } from './features/settings/MemoryPanel.js';
 import {
@@ -329,6 +330,11 @@ export function App(): React.JSX.Element {
         </header>
 
         <div className="ht-content">
+          {/* 🔴 唯一被降级的东西是"通过官方托管服务的同步"（所有设备，
+              不只是新设备）。到期后本地任务照常查看 / 编辑 / 导出 ——
+              免费额度已废弃，见 subscription-boundary.md §1。
+              未配置 / 自托管 / 断网 / 探测失败时它不渲染任何东西。 */}
+          <SubscriptionNotice />
           {/* AI 捕获的接线**留在这个组件内部** —— 输入框的草稿是它的状态，
               而草稿就是 AI 要解析的那句话。把草稿镜像到这里再传回去
               会造出两份状态，且"应用后清空输入框"没法做（清不动上游的 state）。
