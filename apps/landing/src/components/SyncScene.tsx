@@ -25,11 +25,14 @@
  *   滚动进度是**只读**地从父级传进来的一个 ref，不产生额外订阅。
  */
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useMotionValueEvent, useScroll } from 'motion/react';
 import * as THREE from 'three';
 
+import { useI18n } from '@heyta/i18n';
+
 import { useMotionPreset } from '../lib/motion.js';
+import { SyncFallback } from './SyncFallback.js';
 
 /** 用探针元素把 token 解析成 `rgb(...)` 字符串。 */
 function resolveToken(name: string): string {
@@ -86,6 +89,17 @@ export function SyncScene(): React.JSX.Element {
   const holderRef = useRef<HTMLDivElement>(null);
   const sectionRef = useRef<HTMLElement>(null);
   const preset = useMotionPreset();
+  const { t } = useI18n();
+
+  /**
+   * 拿不到 WebGL 上下文 → 换成静态图。
+   *
+   * 🔴 这不是"锦上添花的兜底"，而是**必需**：不接住这个错误，
+   * React 会把整棵组件树卸载掉，整页白屏（`SyncFallback.tsx` 文件头有实测数字）。
+   * 现实里拿不到上下文的场合不少：关了硬件加速、企业策略禁用 WebGL、
+   * 防指纹浏览器、GPU 驱动黑名单、老旧设备、iOS 锁定模式。
+   */
+  const [webglFailed, setWebglFailed] = useState(false);
 
   // 滚动进度只读进 ref —— 渲染循环每帧读它，但不订阅、不触发 React 重渲染。
   const progressRef = useRef(0);
@@ -98,12 +112,28 @@ export function SyncScene(): React.JSX.Element {
   });
 
   useEffect(() => {
+    // 已经判定拿不到上下文就不再重试：重试只会再抛一次同样的错。
+    if (webglFailed) return;
+
     const canvas = canvasRef.current;
     const holder = holderRef.current;
     if (canvas === null || holder === null) return;
 
     // ── 基础三件套 ────────────────────────────────────────
-    const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
+    //
+    // 🔴 构造渲染器是**唯一**已知会抛的一行，所以它单独包 try/catch。
+    // 不把整个 effect 包进去：那样写会让 220 行初始化整体退一格缩进，
+    // 差异巨大且掩盖"到底哪一步会失败"这个信息；而真正的兜底
+    // （three 在别处抛）由外层的 `SceneBoundary` 负责。
+    let renderer: THREE.WebGLRenderer;
+    try {
+      renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
+    } catch {
+      // 不在这里 console.error：three 自己已经打过一条更详细的。
+      // 这里只做"降级"这一个决定。
+      setWebglFailed(true);
+      return;
+    }
     // 上限 2 是刻意的：3x 屏幕上像素量翻倍，而这个场景本身已经够贵。
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 
@@ -333,7 +363,7 @@ export function SyncScene(): React.JSX.Element {
       for (const item of disposables) item.dispose();
       renderer.dispose();
     };
-  }, [preset.reduced]);
+  }, [preset.reduced, webglFailed]);
 
   return (
     <section className="lp-sync" id="sync" ref={sectionRef}>
@@ -347,30 +377,34 @@ export function SyncScene(): React.JSX.Element {
       */}
       <div className="lp-wrap">
         <header className="lp-sync__head">
-          <h2 className="lp-h2">每台设备各写各的，碰上了也不会打架</h2>
+          <h2 className="lp-h2">{t('landing.sync.title')}</h2>
           <p className="lp-section__lede">
-            每次改动都是一条独立记录，带着"我见过哪些改动"的版本信息。
-            两端同时改同一条任务时，服务端会判成并发冲突并<strong>交给你决定</strong>，
-            而不是悄悄用后写的覆盖先写的。
+            {t('landing.sync.ledeLead')}
+            <strong>{t('landing.sync.ledeStrong')}</strong>
+            {t('landing.sync.ledeTail')}
           </p>
         </header>
       </div>
 
       <div className="lp-sync__holder" ref={holderRef}>
-        <canvas
-          ref={canvasRef}
-          className="lp-sync__canvas"
-          role="img"
-          aria-label="三台设备之间流动着加密的变更记录，其中一条被判为并发冲突"
-        />
+        {webglFailed ? (
+          <SyncFallback />
+        ) : (
+          <canvas
+            ref={canvasRef}
+            className="lp-sync__canvas"
+            role="img"
+            aria-label={t('landing.sync.canvasLabel')}
+          />
+        )}
         <div className="lp-sync__legend" aria-hidden="true">
           <span className="lp-sync__legend-item">
             <span className="lp-sync__dot" />
-            一次改动
+            {t('landing.sync.legendChange')}
           </span>
           <span className="lp-sync__legend-item">
             <span className="lp-sync__dot lp-sync__dot--plain" />
-            一台设备
+            {t('landing.sync.legendDevice')}
           </span>
         </div>
       </div>

@@ -18,8 +18,10 @@
  *   - `prefers-reduced-motion` 下退化成纯透明度交叉淡入（去掉位移与旋转）。
  */
 
-import { useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { motion, useMotionValueEvent, useScroll, useTransform, type MotionValue } from 'motion/react';
+
+import { useI18n } from '@heyta/i18n';
 
 import { AppWindow, type MockView } from '../mockup/AppWindow.js';
 import { useMotionPreset } from '../lib/motion.js';
@@ -30,32 +32,6 @@ interface Screen {
   title: string;
   body: string;
 }
-
-/**
- * 声明成**非空元组**而不是 `Screen[]`：这样 `SCREENS[0]` 的类型是 `Screen`
- * 而不是 `Screen | undefined`（`noUncheckedIndexedAccess` 下普通数组索引
- * 一律带上 `undefined`）。下面取当前项时就能安全地兜底到第 0 项。
- */
-const SCREENS: readonly [Screen, ...Screen[]] = [
-  {
-    view: 'quadrant',
-    label: '四象限',
-    title: '不用自己想「先做哪个」',
-    body: '重要与紧急是两个独立的轴。紧急程度由截止时间推导，你只回答"这件事重要吗"，剩下的交给矩阵。',
-  },
-  {
-    view: 'habits',
-    label: '习惯',
-    title: '连续天数比打卡次数更值得看',
-    body: '热力图用同一色阶的深浅表示强度，不靠颜色区分档位，色觉差异下一样读得出来。',
-  },
-  {
-    view: 'focus',
-    label: '番茄钟',
-    title: '专注记录和任务长在一起',
-    body: '每段专注都关联到具体任务并落进本地日志，所以"这周时间花在哪"是查得出来的。',
-  },
-];
 
 /** 单块窗口。抽成子组件是为了让每个窗口有自己的 hook —— 循环里不能调 hook。 */
 function ShowcaseWindow({
@@ -75,10 +51,24 @@ function ShowcaseWindow({
   const offset = useTransform(progress, (p) => index - p * (total - 1));
 
   const opacity = useTransform(offset, (o) => Math.max(0, 1 - Math.abs(o) * 1.05));
-  const rotateY = useTransform(offset, (o) => o * -34);
-  const x = useTransform(offset, (o) => `${String(o * 46)}%`);
-  const z = useTransform(offset, (o) => o * -220);
-  const scale = useTransform(offset, (o) => 1 - Math.min(0.18, Math.abs(o) * 0.1));
+
+  /**
+   * 🔴 合成**一条** transform 字符串，而不是 x / z / rotateY / scale 四个简写。
+   *
+   * AUDIT §5：简写会各写一次 style，目标是合成单条完整 transform ——
+   * 每帧只写一次，旋转顺序也显式可控（translate → rotate）。
+   * 几何取值与原来逐个一致，观感不变。
+   *
+   * 这是页面**签名级**的滚动交互（300vh sticky + 三块整屏窗口联动），
+   * 所以每帧少写三次 style 在这里最值得。
+   */
+  const transform = useTransform(offset, (o) => {
+    const tx = o * 46; // %
+    const tz = o * -220; // px
+    const ry = o * -34; // deg
+    const s = 1 - Math.min(0.18, Math.abs(o) * 0.1); // 无单位
+    return `translateX(${tx}%) translateZ(${tz}px) rotateY(${ry}deg) scale(${s})`;
+  });
 
   return (
     <motion.div
@@ -86,7 +76,7 @@ function ShowcaseWindow({
       style={
         reduced
           ? { opacity }
-          : { opacity, rotateY, x, z, scale, transformStyle: 'preserve-3d' }
+          : { opacity, transform, transformStyle: 'preserve-3d' }
       }
       aria-hidden={false}
     >
@@ -97,8 +87,68 @@ function ShowcaseWindow({
 
 export function Showcase(): React.JSX.Element {
   const preset = useMotionPreset();
+  const { t } = useI18n();
   const sectionRef = useRef<HTMLElement>(null);
   const [active, setActive] = useState(0);
+  const [active3d, setActive3d] = useState(false);
+
+  /**
+   * 声明成**非空元组**而不是 `Screen[]`：这样 `screens[0]` 的类型是 `Screen`
+   * 而不是 `Screen | undefined`（`noUncheckedIndexedAccess` 下普通数组索引
+   * 一律带上 `undefined`）。下面取当前项时就能安全地兜底到第 0 项。
+   *
+   * 数据挪进组件内是文案迁移的硬要求（模块级拿不到 `t`）。取舍见 `Landing.tsx` 文件头。
+   */
+  const screens = useMemo<readonly [Screen, ...Screen[]]>(
+    () => [
+      {
+        view: 'quadrant',
+        label: t('landing.feature.quadrant'),
+        title: t('landing.showcase.quadrant.title'),
+        body: t('landing.showcase.quadrant.body'),
+      },
+      {
+        view: 'habits',
+        label: t('landing.feature.habits'),
+        title: t('landing.showcase.habits.title'),
+        body: t('landing.showcase.habits.body'),
+      },
+      {
+        view: 'focus',
+        label: t('landing.feature.focus'),
+        title: t('landing.showcase.focus.title'),
+        body: t('landing.showcase.focus.body'),
+      },
+    ],
+    [t],
+  );
+
+  /**
+   * `will-change` 只在展厅**进入视口**时才加（AUDIT §5：它必须窄而临时）。
+   * 三块窗口是 `inset: 0` 的整屏元素、内部各有 `backdrop-filter` 材质，
+   * 永久提升三层大图层 = 页面整个生命周期都在吃 GPU 内存，
+   * 而这套变换只在滚过这一节时才发生。
+   *
+   * 没有 IntersectionObserver 时按「可见」处理：宁可多提升一层，
+   * 也不要让动画在旧浏览器上退化成非合成。范式同 `Deferred.tsx`。
+   */
+  useEffect(() => {
+    const el = sectionRef.current;
+    if (el === null || typeof IntersectionObserver === 'undefined') {
+      setActive3d(true);
+      return;
+    }
+    const observer = new IntersectionObserver(
+      (entries) => {
+        setActive3d(entries[0]?.isIntersecting === true);
+      },
+      { rootMargin: '25% 0% 25% 0%' },
+    );
+    observer.observe(el);
+    return () => {
+      observer.disconnect();
+    };
+  }, []);
 
   // 进度取自**这一节自身的滚动跨度**：从"节的顶部碰到视口顶部"到"节的底部离开"。
   const { scrollYProgress } = useScroll({
@@ -107,51 +157,102 @@ export function Showcase(): React.JSX.Element {
   });
 
   useMotionValueEvent(scrollYProgress, 'change', (value) => {
-    const index = Math.round(value * (SCREENS.length - 1));
-    setActive(Math.max(0, Math.min(SCREENS.length - 1, index)));
+    const index = Math.round(value * (screens.length - 1));
+    setActive(Math.max(0, Math.min(screens.length - 1, index)));
   });
 
-  const current = SCREENS[active] ?? SCREENS[0];
+  const current = screens[active] ?? screens[0];
+
+  /**
+   * 点击左侧条目 = **把页面滚到那一屏的进度点**，而不是另起一个"当前项"状态。
+   *
+   * 为什么不直接 `setActive(index)`：那会造出**两个真相源** —— 滚动一个、点击一个。
+   * 点完第 3 项再往回滚，高亮会卡在第 3 项不动；而三块窗口的 3D 位置仍由滚动进度决定，
+   * 于是"高亮的条目"和"实际显示的界面"会分家。这个不同步在本节**真的出现过**
+   * （`lp-showcase__hint` 那个 `aria-live` 就是为它加的），不该再引入第二条路径。
+   *
+   * 滚过去则由同一个 `scrollYProgress` 驱动：换位连贯，标签永远与画面一致，
+   * 而且点击不需要任何新状态。
+   */
+  const scrollToIndex = (index: number): void => {
+    const el = sectionRef.current;
+    if (el === null) return;
+    const rect = el.getBoundingClientRect();
+    const sectionTop = rect.top + window.scrollY;
+    // 🔴 必须与 useScroll 的 offset ['start start', 'end end'] 用同一个公式：
+    // 进度 p 对应的滚动位置是 sectionTop + p × (节高 − 视口高)。
+    // 公式对不上，点击的落点与动画进度就会差一截。
+    const span = rect.height - window.innerHeight;
+    if (span <= 0) return;
+    const top = sectionTop + (index / (screens.length - 1)) * span;
+    // 减少动态偏好下用 'auto'：平滑滚动本身就是一种动效。
+    window.scrollTo({ top, behavior: preset.reduced ? 'auto' : 'smooth' });
+  };
 
   return (
-    <section className="lp-showcase" id="showcase" ref={sectionRef}>
+    <section
+      className="lp-showcase"
+      id="showcase"
+      ref={sectionRef}
+      data-active={active3d ? 'true' : undefined}
+    >
       <div className="lp-showcase__inner">
         <div className="lp-wrap lp-showcase__grid">
           <div className="lp-showcase__aside">
-            <h2 className="lp-h2">这就是它现在的样子</h2>
+            <h2 className="lp-h2">{t('landing.showcase.title')}</h2>
             <p className="lp-section__lede">
-              下面这三块不是效果图，是用真实界面的结构与取值复现出来的。
+              {t('landing.showcase.lede')}
             </p>
 
             <ol className="lp-showcase__list">
-              {SCREENS.map((screen, index) => (
-                <li
-                  key={screen.view}
-                  className={`lp-showcase__item${
-                    index === active ? ' lp-showcase__item--active' : ''
-                  }`}
-                >
-                  <span className="lp-showcase__index">{index + 1}</span>
-                  <span>
-                    <span className="lp-showcase__item-label">{screen.label}</span>
-                    <span className="lp-showcase__item-body">{screen.body}</span>
-                  </span>
-                </li>
-              ))}
+              {screens.map((screen, index) => {
+                const isActive = index === active;
+                return (
+                  <li
+                    key={screen.view}
+                    className={`lp-showcase__item${
+                      isActive ? ' lp-showcase__item--active' : ''
+                    }`}
+                  >
+                    {/*
+                      整行做成 button，而不是只让 1/2/3 那个圆点可点：
+                      圆点只有 24px，触屏上很难按准；整行可点也更符合
+                      "这是一条导航"的心智。
+
+                      `aria-current` 是给读屏用户的 —— 视觉上的高亮与
+                      不透明度变化对他们完全不可见。
+                    */}
+                    <button
+                      type="button"
+                      className="lp-showcase__item-btn"
+                      onClick={() => {
+                        scrollToIndex(index);
+                      }}
+                      aria-current={isActive ? 'true' : undefined}
+                    >
+                      <span className="lp-showcase__index">{index + 1}</span>
+                      <span>
+                        <span className="lp-showcase__item-label">{screen.label}</span>
+                        <span className="lp-showcase__item-body">{screen.body}</span>
+                      </span>
+                    </button>
+                  </li>
+                );
+              })}
             </ol>
 
             <p className="lp-showcase__hint" aria-live="polite">
-              当前显示：{current.label}
+              {t('landing.showcase.hint', { label: current.label })}
             </p>
           </div>
 
           <div className="lp-showcase__stage">
-            {SCREENS.map((screen, index) => (
+            {screens.map((screen, index) => (
               <ShowcaseWindow
                 key={screen.view}
                 progress={scrollYProgress}
                 index={index}
-                total={SCREENS.length}
+                total={screens.length}
                 screen={screen}
                 reduced={preset.reduced}
               />

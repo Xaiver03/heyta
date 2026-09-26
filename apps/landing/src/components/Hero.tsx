@@ -19,12 +19,14 @@
  * 不是"什么都不动"—— 所以入场淡入仍然保留）。
  */
 
-import { useRef } from 'react';
+import { useMemo, useRef } from 'react';
 import { motion, useMotionValue, useSpring, useTransform } from 'motion/react';
 import { Check, Github, WifiOff } from 'lucide-react';
 
+import { useI18n } from '@heyta/i18n';
+
 import { AppWindow } from '../mockup/AppWindow.js';
-import { revealVariants, staggerContainer, useMotionPreset, VIEWPORT } from '../lib/motion.js';
+import { HERO_ENTRANCE_DELAY, revealVariants, staggerContainer, useMotionPreset, VIEWPORT } from '../lib/motion.js';
 import { GITHUB_URL } from './Nav.js';
 
 /** 倾斜幅度（度）。刻意小 —— 大角度会让界面文字变形到读不清。 */
@@ -33,6 +35,7 @@ const TILT_X = 8;
 
 export function Hero(): React.JSX.Element {
   const preset = useMotionPreset();
+  const { t } = useI18n();
   const stageRef = useRef<HTMLDivElement>(null);
 
   // 0..1 的归一化指针位置，初始在正中
@@ -52,6 +55,20 @@ export function Hero(): React.JSX.Element {
   const shiftX = useSpring(useTransform(pointerX, [0, 1], [-12, 12]), preset.uiSpring);
   const shiftY = useSpring(useTransform(pointerY, [0, 1], [-8, 8]), preset.uiSpring);
 
+  /**
+   * 四个弹簧合成**一条** transform 字符串。
+   *
+   * AUDIT §5：`x`/`y`/`rotateX`/`rotateY` 这类简写会各写一次 style，
+   * 目标是合成单条完整 transform —— 每帧只写一次，旋转顺序也显式可控。
+   * 顺序必须是 translate → rotate：先平移再旋转，卡片才是"在原地转"；
+   * 反过来平移会被旋转一起带偏。
+   */
+  const tilt = useTransform(
+    [rotateX, rotateY, shiftX, shiftY],
+    ([rx = 0, ry = 0, sx = 0, sy = 0]) =>
+      `translate3d(${sx}px, ${sy}px, 0) rotateX(${rx}deg) rotateY(${ry}deg)`,
+  );
+
   function handlePointerMove(event: React.PointerEvent<HTMLDivElement>): void {
     if (preset.reduced) return;
     const stage = stageRef.current;
@@ -69,34 +86,35 @@ export function Hero(): React.JSX.Element {
     pointerY.set(0.5);
   }
 
-  const copy = revealVariants(preset.reduced, '1rem');
+  const copy = revealVariants(preset.reduced, preset.ui, '1rem');
 
   return (
     <section className="lp-hero" id="top">
       <motion.div
         className="lp-hero__copy"
-        variants={staggerContainer(preset.reduced, 0.08)}
+        variants={staggerContainer(preset.reduced)}
         initial="hidden"
         animate="visible"
       >
         <motion.span className="lp-eyebrow" variants={copy}>
-          本地优先 · 端到端加密 · 可自建
+          {t('landing.hero.eyebrow')}
         </motion.span>
 
         <motion.h1 className="lp-h1" variants={copy}>
-          任务管理，<em>数据归你</em>
+          {t('landing.hero.titleLead')}
+          <em>{t('landing.hero.titleEmphasis')}</em>
         </motion.h1>
 
         <motion.p className="lp-lede" variants={copy}>
-          数据先落本地，服务端看不到明文；也可以完全跑在你自己的服务器上。
+          {t('landing.hero.lede')}
         </motion.p>
 
         <motion.div className="lp-hero__ctas" variants={copy}>
           <a className="lp-btn lp-btn--primary lp-btn--lg" href="#selfhost">
-            开始自建
+            {t('landing.cta.selfHost')}
           </a>
           <a className="lp-btn lp-btn--secondary lp-btn--lg" href="#showcase">
-            看看真实界面
+            {t('landing.hero.ctaShowcase')}
           </a>
         </motion.div>
       </motion.div>
@@ -109,38 +127,46 @@ export function Hero(): React.JSX.Element {
       >
         <div className="lp-hero__glow" aria-hidden="true" />
 
+        {/*
+          🔴 入场与指针倾斜**必须分在两个元素上**。
+          原来两者都绑在 `.lp-hero__card` 上：`style` 里给了 `y: shiftY`，
+          而 `animate` 也想驱动 `y`。Motion 中 `style` 绑定的 MotionValue
+          是该 key 的权威来源，于是入场的 `y: '2rem' → 0` **从未执行过** ——
+          英雄卡本该"从下方升起"，实际只有淡入和放大，而且没有任何报错。
+          拆开之后：外层只管入场，内层只管倾斜。
+        */}
         <motion.div
-          className="lp-hero__card"
-          style={
-            preset.reduced
-              ? undefined
-              : { rotateX, rotateY, x: shiftX, y: shiftY }
-          }
+          className="lp-hero__enter"
           initial={preset.reduced ? { opacity: 0 } : { opacity: 0, y: '2rem', scale: 0.96 }}
           animate={{ opacity: 1, y: 0, scale: 1 }}
-          transition={{ ...preset.sheet, delay: preset.reduced ? 0 : 0.12 }}
+          transition={{ ...preset.sheet, delay: preset.reduced ? 0 : HERO_ENTRANCE_DELAY }}
         >
-          {/* 真实界面的复现。见 mockup/ 的文件头：这是复现，不是应用本身。 */}
-          <AppWindow view="tasks" />
+          <motion.div
+            className="lp-hero__card"
+            style={preset.reduced ? undefined : { transform: tilt }}
+          >
+            {/* 真实界面的复现。见 mockup/ 的文件头：这是复现，不是应用本身。 */}
+            <AppWindow view="tasks" />
 
-          {/*
-            两片浮层。它们给 3D 纵深提供**参照物** ——
-            一张平卡旋转时读不出深度，有了不同 Z 值的浮片，纵深立刻可见。
-          */}
-          <div
-            className="lp-float lp-float--sync"
-            style={{ '--lp-float-z': '4rem' } as React.CSSProperties}
-          >
-            <Check className="lp-float__icon--ok" size={14} aria-hidden="true" />
-            已同步到 3 台设备
-          </div>
-          <div
-            className="lp-float lp-float--offline"
-            style={{ '--lp-float-z': '7rem' } as React.CSSProperties}
-          >
-            <WifiOff className="lp-float__icon--info" size={14} aria-hidden="true" />
-            离线照常可用
-          </div>
+            {/*
+              两片浮层。它们给 3D 纵深提供**参照物** ——
+              一张平卡旋转时读不出深度，有了不同 Z 值的浮片，纵深立刻可见。
+            */}
+            <div
+              className="lp-float lp-float--sync"
+              style={{ '--lp-float-z': '4rem' } as React.CSSProperties}
+            >
+              <Check className="lp-float__icon--ok" size={14} aria-hidden="true" />
+              {t('landing.hero.floatSynced')}
+            </div>
+            <div
+              className="lp-float lp-float--offline"
+              style={{ '--lp-float-z': '7rem' } as React.CSSProperties}
+            >
+              <WifiOff className="lp-float__icon--info" size={14} aria-hidden="true" />
+              {t('landing.hero.floatOffline')}
+            </div>
+          </motion.div>
         </motion.div>
       </div>
     </section>
@@ -156,41 +182,47 @@ export const REPO_URL = GITHUB_URL;
  * taste skill 要求信任区用真实素材而不是文字伪装 —— 但这个项目还没有
  * 任何客户或合作方，编一排 logo 就是造假。所以这里放的是**可核实的事实**，
  * 每一条都能在仓库里查到出处。
+ *
+ * 数据挪进组件内是文案迁移的硬要求（模块级拿不到 `t`）。取舍见 `Landing.tsx` 文件头。
  */
-const FACTS = [
-  {
-    value: '本地',
-    label: '数据先写本机，云端只是同步通道，不是事实源',
-  },
-  {
-    value: '密文',
-    label: '加密在客户端完成，服务端强制校验且没有开关可关',
-  },
-  {
-    value: 'MIT',
-    label: '许可证宽松，全部第三方依赖逐项登记、可审计',
-  },
-  {
-    value: '自建',
-    label: '一条命令起自己的服务端，不用把数据交给别人',
-  },
-];
-
 export function Facts(): React.JSX.Element {
   const preset = useMotionPreset();
+  const { t } = useI18n();
+
+  const facts = useMemo(
+    () => [
+      {
+        value: t('landing.facts.local.value'),
+        label: t('landing.facts.local.label'),
+      },
+      {
+        value: t('landing.facts.cipher.value'),
+        label: t('landing.facts.cipher.label'),
+      },
+      {
+        value: t('landing.facts.mit.value'),
+        label: t('landing.facts.mit.label'),
+      },
+      {
+        value: t('landing.facts.selfhost.value'),
+        label: t('landing.facts.selfhost.label'),
+      },
+    ],
+    [t],
+  );
 
   return (
-    <section className="lp-facts" aria-label="产品事实">
+    <section className="lp-facts" aria-label={t('landing.facts.ariaLabel')}>
       <div className="lp-wrap">
         <motion.div
           className="lp-facts__grid"
-          variants={staggerContainer(preset.reduced, 0.07)}
+          variants={staggerContainer(preset.reduced)}
           initial="hidden"
           whileInView="visible"
           viewport={VIEWPORT}
         >
-          {FACTS.map((fact) => (
-            <motion.div key={fact.value} className="lp-fact" variants={revealVariants(preset.reduced)}>
+          {facts.map((fact) => (
+            <motion.div key={fact.value} className="lp-fact" variants={revealVariants(preset.reduced, preset.ui)}>
               <span className="lp-fact__value">{fact.value}</span>
               <span className="lp-fact__label">{fact.label}</span>
             </motion.div>

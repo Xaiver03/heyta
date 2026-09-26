@@ -15,15 +15,37 @@
  *
  * 主题：**亮色为主，可切暗色**。切换只改 `<html data-theme>`，
  * 组件零改动 —— 这是设计系统"组件只消费语义变量"的直接收益。
+ *
+ * 文案迁移的统一取舍（全落地页一致，各文件的数组都照此办理）
+ * ------------------------------------------------------------
+ * 数据表里的文案**在组件内用 `useMemo(() => [...], [t])` 现构造**，
+ * 而不是把词条 key 存进数据、在渲染处再 `t(key)`。
+ *
+ * 为什么选前者：
+ *   1. **渲染处零改动。** 原来写 `{item.title}` 的地方还是 `{item.title}` ——
+ *      改成 `t(item.titleKey)` 会把"取值"这件小事扩散到每一个 map 里，
+ *      而 map 里混进翻译调用之后，就很难一眼看出数据形状有没有变。
+ *   2. **React 的 `key` 不必改。** 原来用 `key={item.title}`（本身就是文案）；
+ *      存 key 的话得另加一个与语言无关的 id 字段，那是为翻译付的结构税。
+ *   3. `t` 的引用随 `locale` 稳定（`useI18n` 内部 useMemo 只依赖 locale），
+ *      所以数组只在**真正切语言**时重建一次，不是每次渲染。
+ *
+ * 反过来说，`const` 数组从模块级挪进组件是**必要**的：模块级拿不到 hook，
+ * 而在模块级读一个全局"当前语言"会让模块单例绑定到第一次执行时的语言 ——
+ * 那种 bug 在切语言后才出现，且看起来像"某些文案没更新"。
  */
 
 import { lazy, Suspense } from 'react';
+
+import { useI18n } from '@heyta/i18n';
 
 import { Nav } from './components/Nav.js';
 import { Hero, Facts } from './components/Hero.js';
 import { Capabilities } from './components/Capabilities.js';
 import { Showcase } from './components/Showcase.js';
 import { Deferred } from './components/Deferred.js';
+import { SceneBoundary } from './components/SceneBoundary.js';
+import { SyncFallback } from './components/SyncFallback.js';
 import { Privacy } from './components/Privacy.js';
 import { SelfHost } from './components/SelfHost.js';
 import { FinalCta } from './components/FinalCta.js';
@@ -47,11 +69,12 @@ const SyncScene = lazy(async () => {
 
 export function Landing(): React.JSX.Element {
   const { theme, toggleTheme } = useTheme();
+  const { t } = useI18n();
 
   return (
     <div className="lp">
       <a className="lp-skip" href="#main">
-        跳到主要内容
+        {t('landing.skipLink')}
       </a>
 
       <Nav theme={theme} onToggleTheme={toggleTheme} />
@@ -63,9 +86,21 @@ export function Landing(): React.JSX.Element {
         <Showcase />
         {/* 快滚到这一节才去取 three.js 那个 chunk，并创建 WebGL 上下文 */}
         <Deferred>
-          <Suspense fallback={null}>
-            <SyncScene />
-          </Suspense>
+          {/*
+            🔴 `SceneBoundary` 必须在 `Deferred` **里面**、包住 `Suspense`。
+            两层失败要分开看：
+              - `Deferred` 自己不会抛，把它留在外面，3D 那一节炸了之后
+                外面的占位块还在，页面高度不会塌；
+              - `Suspense` 的 children 抛错、以及 **lazy chunk 加载失败**
+                （131 kB 的 three 分片在弱网下 404/超时是真会发生的）
+                都会冒泡到最近的 boundary。没有它，这两种情况都会
+                卸载整棵树 —— 整页白屏，不是"少一节"。
+          */}
+          <SceneBoundary fallback={<SyncFallback />}>
+            <Suspense fallback={null}>
+              <SyncScene />
+            </Suspense>
+          </SceneBoundary>
         </Deferred>
         <Privacy />
         <SelfHost />

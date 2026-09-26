@@ -12,6 +12,10 @@
  * 用五种颜色表示五档强度对色盲用户是不可读的；单色阶的深浅才是。
  */
 
+import { useMemo } from 'react';
+
+import { useI18n } from '@heyta/i18n';
+
 export interface Habit {
   name: string;
   streak: string;
@@ -20,12 +24,6 @@ export interface Habit {
   /** 基础完成密度，0..1。 */
   density: number;
 }
-
-const HABITS: Habit[] = [
-  { name: '早起', streak: '连续 12 天', seed: 1, density: 0.82 },
-  { name: '阅读 30 分钟', streak: '连续 5 天', seed: 2, density: 0.61 },
-  { name: '跑步', streak: '连续 3 天', seed: 3, density: 0.38 },
-];
 
 const WEEKS = 26;
 
@@ -88,9 +86,36 @@ function Heatmap({ habit }: { habit: Habit }): React.JSX.Element {
 }
 
 export function HabitHeatmap(): React.JSX.Element {
+  const { t } = useI18n();
+
+  // 数据挪进组件内是文案迁移的硬要求（模块级拿不到 `t`）。取舍见 `Landing.tsx` 文件头。
+  const habits = useMemo<Habit[]>(
+    () => [
+      {
+        name: t('landing.mock.habit.earlyRise'),
+        streak: t('landing.mock.habit.earlyRise.streak'),
+        seed: 1,
+        density: 0.82,
+      },
+      {
+        name: t('landing.mock.habit.reading'),
+        streak: t('landing.mock.habit.reading.streak'),
+        seed: 2,
+        density: 0.61,
+      },
+      {
+        name: t('landing.mock.habit.running'),
+        streak: t('landing.mock.habit.running.streak'),
+        seed: 3,
+        density: 0.38,
+      },
+    ],
+    [t],
+  );
+
   return (
     <div className="mk-habits">
-      {HABITS.map((habit) => (
+      {habits.map((habit) => (
         <section key={habit.name} className="mk-habit">
           <div className="mk-habit__head">
             <span className="mk-habit__name">{habit.name}</span>
@@ -98,13 +123,13 @@ export function HabitHeatmap(): React.JSX.Element {
           </div>
           <Heatmap habit={habit} />
           <div className="mk-heat__legend">
-            <span>少</span>
+            <span>{t('landing.mock.heat.less')}</span>
             <span className="mk-heat__cell" />
             <span className="mk-heat__cell mk-heat__cell--1" />
             <span className="mk-heat__cell mk-heat__cell--2" />
             <span className="mk-heat__cell mk-heat__cell--3" />
             <span className="mk-heat__cell mk-heat__cell--4" />
-            <span>多</span>
+            <span>{t('landing.mock.heat.more')}</span>
           </div>
         </section>
       ))}

@@ -13,7 +13,7 @@
  * 而不是"重新做一套看着差不多的响应式布局"。
  */
 
-import { useEffect, useRef, useState, type ReactNode, type RefObject } from 'react';
+import { useEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from 'react';
 import {
   CalendarDays,
   Check,
@@ -25,6 +25,8 @@ import {
   Timer,
   Zap,
 } from 'lucide-react';
+
+import { useI18n } from '@heyta/i18n';
 
 import './mockup.css';
 
@@ -38,20 +40,6 @@ export type MockView = 'tasks' | 'quadrant' | 'habits' | 'focus';
 
 /** stage 的设计尺寸，单位 rem。与 `mockup.css` 的 `.mk-stage` 必须一致。 */
 const STAGE_WIDTH_REM = 80;
-
-const VIEW_TABS: { key: MockView; label: string; Icon: typeof Inbox }[] = [
-  { key: 'tasks', label: '任务', Icon: Inbox },
-  { key: 'quadrant', label: '四象限', Icon: CircleDot },
-  { key: 'habits', label: '习惯', Icon: Check },
-  { key: 'focus', label: '番茄钟', Icon: Sun },
-];
-
-const TITLES: Record<MockView, string> = {
-  tasks: '收集箱',
-  quadrant: '四象限',
-  habits: '习惯',
-  focus: '番茄钟',
-};
 
 /**
  * 等比缩放。
@@ -125,6 +113,28 @@ export function AppWindow({
 }): React.JSX.Element {
   const frameRef = useRef<HTMLDivElement>(null);
   const scale = useStageScale(frameRef);
+  const { t } = useI18n();
+
+  // 数据挪进组件内是文案迁移的硬要求（模块级拿不到 `t`）。取舍见 `Landing.tsx` 文件头。
+  const viewTabs = useMemo<{ key: MockView; label: string; Icon: typeof Inbox }[]>(
+    () => [
+      { key: 'tasks', label: t('landing.feature.tasks'), Icon: Inbox },
+      { key: 'quadrant', label: t('landing.feature.quadrant'), Icon: CircleDot },
+      { key: 'habits', label: t('landing.feature.habits'), Icon: Check },
+      { key: 'focus', label: t('landing.feature.focus'), Icon: Sun },
+    ],
+    [t],
+  );
+
+  const titles = useMemo<Record<MockView, string>>(
+    () => ({
+      tasks: t('landing.mock.inbox'),
+      quadrant: t('landing.feature.quadrant'),
+      habits: t('landing.feature.habits'),
+      focus: t('landing.feature.focus'),
+    }),
+    [t],
+  );
 
   return (
     <div ref={frameRef} className={`mk-frame${className !== undefined ? ` ${className}` : ''}`}>
@@ -133,36 +143,36 @@ export function AppWindow({
           <nav className="mk-sidebar">
             <div className="mk-brand">
               <span className="mk-brand__dot" />
-              heyta
+              {t('common.brand')}
             </div>
 
             <div className="mk-nav">
-              <NavItem icon={<Inbox size={16} />} label="收集箱" active={view === 'tasks'} />
-              <NavItem icon={<Sun size={16} />} label="今天" />
+              <NavItem icon={<Inbox size={16} />} label={t('landing.mock.inbox')} active={view === 'tasks'} />
+              <NavItem icon={<Sun size={16} />} label={t('landing.mock.today')} />
             </div>
 
-            <div className="mk-nav__section">四象限</div>
+            <div className="mk-nav__section">{t('landing.feature.quadrant')}</div>
             <div className="mk-nav">
-              <NavItem swatch="mk-swatch--q1" label="重要且紧急" count={3} />
-              <NavItem swatch="mk-swatch--q2" label="重要不紧急" count={5} />
-              <NavItem swatch="mk-swatch--q3" label="紧急不重要" count={2} />
-              <NavItem swatch="mk-swatch--q4" label="不重要不紧急" count={1} />
+              <NavItem swatch="mk-swatch--q1" label={t('landing.quadrant.q1')} count={3} />
+              <NavItem swatch="mk-swatch--q2" label={t('landing.quadrant.q2')} count={5} />
+              <NavItem swatch="mk-swatch--q3" label={t('landing.quadrant.q3')} count={2} />
+              <NavItem swatch="mk-swatch--q4" label={t('landing.quadrant.q4')} count={1} />
             </div>
 
             <div className="mk-projects">
-              <div className="mk-nav__section">清单</div>
-              <div className="mk-project">工作</div>
-              <div className="mk-project">个人</div>
-              <div className="mk-project">读书</div>
+              <div className="mk-nav__section">{t('landing.mock.projectsSection')}</div>
+              <div className="mk-project">{t('landing.mock.project.work')}</div>
+              <div className="mk-project">{t('landing.mock.project.personal')}</div>
+              <div className="mk-project">{t('landing.mock.project.reading')}</div>
             </div>
           </nav>
 
           <main className="mk-main">
             <header className="mk-header">
-              <h1 className="mk-header__title">{TITLES[view]}</h1>
+              <h1 className="mk-header__title">{titles[view]}</h1>
 
               <div className="mk-viewtabs">
-                {VIEW_TABS.map((tab) => (
+                {viewTabs.map((tab) => (
                   <div
                     key={tab.key}
                     className={`mk-viewtab${
@@ -179,16 +189,16 @@ export function AppWindow({
                 <div className="mk-viewtabs">
                   <div className="mk-viewtab mk-viewtab--active">
                     <CalendarDays size={14} />
-                    日期
+                    {t('landing.mock.date')}
                   </div>
                   <div className="mk-viewtab">
                     <Timer size={14} />
-                    倒计时
+                    {t('landing.mock.countdown')}
                   </div>
                 </div>
                 <div className="mk-sync mk-sync--ok">
                   <Zap size={12} />
-                  已同步
+                  {t('landing.mock.synced')}
                 </div>
                 <div className="mk-iconbtn">
                   <Moon size={18} />
@@ -201,11 +211,11 @@ export function AppWindow({
                 <>
                   <div className="mk-compose">
                     <div className="mk-input">
-                      添加任务，回车确认（可写「明天」「下周三」「!1」）
+                      {t('landing.mock.composeHint')}
                     </div>
                     <div className="mk-btn-primary">
                       <Plus size={16} />
-                      添加
+                      {t('landing.mock.add')}
                     </div>
                   </div>
                   <TaskList />

@@ -83,6 +83,15 @@ export interface MotionPreset {
   ui: Transition;
   /** 抽屉 / 面板：响应更快。 */
   sheet: Transition;
+  /**
+   * 旋转（如主题图标翻转）。
+   *
+   * 🔴 单独一条，读的是 `--ht-motion-spring-response-rotation`。
+   * 取值今天恰好与 `ui` 相同（都是 0.4），所以换过去**没有任何视觉变化** ——
+   * 但如果不读它，设计系统哪天调了旋转响应，落地页会静默地留在旧手感上，
+   * 而且没有任何一处会报错。这正是本文件开头警告的那种漂移。
+   */
+  rotation: Transition;
   /** **只有手势本身带了速度**才用（甩、扔、拖拽释放）。 */
   momentum: Transition;
   /** 与 `ui` 同物理，供 `useSpring` 用（跟踪指针等连续值）。 */
@@ -101,6 +110,7 @@ export function useMotionPreset(): MotionPreset {
     const dampingMomentum = readNumberToken('--ht-motion-spring-damping-momentum', 0.8);
     const responseMove = readNumberToken('--ht-motion-spring-response-move', 0.4);
     const responseSheet = readNumberToken('--ht-motion-spring-response-sheet', 0.3);
+    const responseRotation = readNumberToken('--ht-motion-spring-response-rotation', 0.4);
 
     return {
       ui: {
@@ -112,6 +122,11 @@ export function useMotionPreset(): MotionPreset {
         type: 'spring',
         bounce: 1 - dampingDefault,
         duration: responseSheet,
+      },
+      rotation: {
+        type: 'spring',
+        bounce: 1 - dampingDefault,
+        duration: responseRotation,
       },
       momentum: {
         type: 'spring',
@@ -131,8 +146,25 @@ export function useMotionPreset(): MotionPreset {
  * 🔴 `reduced` 时**只保留 opacity**：位移是前庭不适的主要来源，
  * 而 Apple《Materials》那条"减少动效不是没有反馈"要求保留可读的过渡。
  * 不是 `animation: none` —— 那会让"这里发生了状态变化"这条信息一起消失。
+ *
+ * 🔴 `transition` 是**必填**参数，这不是形式主义。
+ *
+ * `y` 属于 Motion 的 transform 键：只要不传 `transition`，Motion 就会回落到
+ * 库内置的 `underDampedSpring`（`motion-dom` 的
+ * `animation/utils/default-transitions.mjs`：stiffness 500 / damping 25）——
+ * 换算成 Apple 的阻尼比是 ζ≈0.56，也就是 **bounce≈0.44**，明显过冲，
+ * 而且完全绕开了 `tokens.css`。
+ *
+ * 这个函数是全页用得最多的入场动效（能力区、英雄区事实条、自建、末尾 CTA 都走它），
+ * 所以「忘了传 transition」的代价是**整页的入场人格都跑在库默认值上**，
+ * 而设计系统改任何弹簧参数都不会生效 —— 且没有任何一处会报错。
+ * 做成必填，就从类型上堵死了这条路。
  */
-export function revealVariants(reduced: boolean, distance = '1.5rem'): Variants {
+export function revealVariants(
+  reduced: boolean,
+  transition: Transition,
+  distance = '1.5rem',
+): Variants {
   if (reduced) {
     return {
       hidden: { opacity: 0 },
@@ -141,18 +173,34 @@ export function revealVariants(reduced: boolean, distance = '1.5rem'): Variants 
   }
   return {
     hidden: { opacity: 0, y: distance },
-    visible: { opacity: 1, y: 0 },
+    visible: { opacity: 1, y: 0, transition },
   };
 }
 
+/**
+ * 全页统一的错峰步长（秒）。
+ *
+ * AUDIT §7：组入场用 **30–80ms** 的错峰。更重要的是这个值必须是**唯一**的 ——
+ * 它原先作为字面量散落在六个文件里（0.06 / 0.07 / 0.08 / 0.16），
+ * 于是自建区的终端成了全页最慢、最散的一次浮现（160ms，上限的两倍），
+ * 而它本该是最紧凑的一块。和弹簧一样：散落的近似值就是漂移。
+ */
+export const STAGGER = 0.07;
+
+/** 组内首个元素的额外延迟，让「一组」和「上一组」分得开。 */
+export const STAGGER_DELAY_CHILDREN = 0.05;
+
+/** 首屏英雄区入场的整体延迟 —— 一次性的，不属于错峰体系。 */
+export const HERO_ENTRANCE_DELAY = 0.12;
+
 /** 错峰容器：子元素依次浮现。 */
-export function staggerContainer(reduced: boolean, stagger = 0.06): Variants {
+export function staggerContainer(reduced: boolean, stagger = STAGGER): Variants {
   return {
     hidden: {},
     visible: {
       transition: {
         staggerChildren: reduced ? 0 : stagger,
-        delayChildren: reduced ? 0 : 0.05,
+        delayChildren: reduced ? 0 : STAGGER_DELAY_CHILDREN,
       },
     },
   };
