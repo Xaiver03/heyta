@@ -33,9 +33,12 @@
 
 import { EyeOff, RotateCcw, Sparkles, X } from 'lucide-react';
 
+import { useI18n } from '@heyta/i18n';
+
+import { preferenceEvidenceCopy, preferenceLabelText, withheldCopy } from './preference-copy.js';
+
 import {
   describeSuppressed,
-  preferenceLabel,
   suppressedPreferenceIds,
   type FeedbackPreferenceSet,
   type Preference,
@@ -83,25 +86,29 @@ function PreferenceRow({
   preference: Preference<unknown>;
   onSuppress: (id: string) => void;
 }): React.JSX.Element {
+  const { t } = useI18n();
+  // 🔴 依据**从结构化事实现拼**，不渲染 `preference.evidence` ——
+  // 那是领域层拼好的中文，英文界面会露中文（第 14 轮修的就是这条）。
+  const evidence = preferenceEvidenceCopy(preference.evidenceFacts, t);
   return (
     <li className="ht-settings__item" data-testid={`memory-pref-${id}`}>
       <span className="ht-settings__toggle-body">
-        <span className="ht-settings__toggle-label">{preferenceLabel(id)}</span>
+        <span className="ht-settings__toggle-label">{preferenceLabelText(id, t)}</span>
         {/* 🔴 显示**依据原文**（含样本量），不是只给结论。
             用户要能判断"这说得对不对"，才谈得上纠正。 */}
         <span className="ht-settings__hint" data-testid={`memory-evidence-${id}`}>
-          {preference.evidence}
+          {t(evidence.key, evidence.params)}
         </span>
       </span>
       <button
         type="button"
         className="ht-btn ht-btn--ghost"
         data-testid={`memory-forget-${id}`}
-        aria-label={`忘掉「${preferenceLabel(id)}」`}
+        aria-label={t('web.memory.forgetAria', { name: preferenceLabelText(id, t) })}
         onClick={() => onSuppress(id)}
       >
         <EyeOff size={12} aria-hidden="true" />
-        忘掉
+        {t('web.memory.forget')}
       </button>
     </li>
   );
@@ -110,12 +117,12 @@ function PreferenceRow({
 export function MemoryPanel(props: MemoryPanelProps): React.JSX.Element {
   const { memoryEnabled, preferenceSet, feedbackSet, rawPresentIds, corrections, onSuppress, onRestore } =
     props;
+  const { t } = useI18n();
 
   if (!memoryEnabled) {
     return (
       <p className="ht-settings__hint" data-testid="memory-off-note">
-        记忆已关闭 —— heyta 不会推断你的偏好，AI 也收不到任何与「你是谁」有关的信息。
-        AI 功能本身照常可用。
+        {t('web.memory.off')}
       </p>
     );
   }
@@ -159,12 +166,12 @@ export function MemoryPanel(props: MemoryPanelProps): React.JSX.Element {
     <div className="ht-settings__section" data-testid="memory-panel">
       {/* ── 我了解到的你 ─────────────────────────────────────── */}
       <h3 className="ht-settings__subtitle">
-        <Sparkles size={12} aria-hidden="true" /> 我了解到的你
+        <Sparkles size={12} aria-hidden="true" /> {t('web.memory.known.title')}
       </h3>
 
       {known.length === 0 ? (
         <p className="ht-settings__hint" data-testid="memory-nothing-known">
-          我还不太了解你。用一段时间之后，这里会出现我从你自己数据里总结出的习惯。
+          {t('web.memory.known.empty')}
         </p>
       ) : (
         <ul className="ht-settings__list" data-testid="memory-known">
@@ -177,17 +184,24 @@ export function MemoryPanel(props: MemoryPanelProps): React.JSX.Element {
       {/* ── 还不了解 ─────────────────────────────────────────── */}
       {withheld.length > 0 && (
         <>
-          <h3 className="ht-settings__subtitle">还不了解</h3>
+          <h3 className="ht-settings__subtitle">{t('web.memory.withheld.title')}</h3>
           <ul className="ht-settings__list" data-testid="memory-withheld">
-            {withheld.map((w) => (
-              <li className="ht-settings__item" key={w.id}>
-                <span className="ht-settings__toggle-body">
-                  <span className="ht-settings__toggle-label">{preferenceLabel(w.id)}</span>
-                  {/* 如实说明还缺什么，而不是编一个"平均用户"顶上 */}
-                  <span className="ht-settings__hint">{w.detail}</span>
-                </span>
-              </li>
-            ))}
+            {withheld.map((w) => {
+              // 🔴 原因**从结构化字段现拼**（`reason` + `id` + `remaining`）——
+              // 领域层那句中文在第 15 轮搬进了词条表。
+              const copy = withheldCopy(w);
+              return (
+                <li className="ht-settings__item" key={w.id}>
+                  <span className="ht-settings__toggle-body">
+                    <span className="ht-settings__toggle-label">
+                      {preferenceLabelText(w.id, t)}
+                    </span>
+                    {/* 如实说明还缺什么，而不是编一个"平均用户"顶上 */}
+                    <span className="ht-settings__hint">{t(copy.key, copy.params)}</span>
+                  </span>
+                </li>
+              );
+            })}
           </ul>
         </>
       )}
@@ -195,13 +209,16 @@ export function MemoryPanel(props: MemoryPanelProps): React.JSX.Element {
       {/* ── 你已忘记（必须能恢复）───────────────────────────── */}
       {forgotten.length > 0 && (
         <>
-          <h3 className="ht-settings__subtitle">你已忘记</h3>
+          <h3 className="ht-settings__subtitle">{t('web.memory.forgotten.title')}</h3>
           <ul className="ht-settings__list" data-testid="memory-forgotten">
             {forgotten.map((f) => (
               <li className="ht-settings__item" key={f.id}>
                 <span className="ht-settings__toggle-body">
-                  <span className="ht-settings__toggle-label">{f.label}</span>
-                  <span className="ht-settings__hint">我不会再用这一条。</span>
+                  {/* `f.label` 是领域层拼好的中文；按 id 取词条。 */}
+                  <span className="ht-settings__toggle-label">
+                    {preferenceLabelText(f.id, t)}
+                  </span>
+                  <span className="ht-settings__hint">{t('web.memory.forgotten.note')}</span>
                 </span>
                 <button
                   type="button"
@@ -213,7 +230,7 @@ export function MemoryPanel(props: MemoryPanelProps): React.JSX.Element {
                   }}
                 >
                   <RotateCcw size={12} aria-hidden="true" />
-                  恢复
+                  {t('web.memory.restore')}
                 </button>
               </li>
             ))}
@@ -222,8 +239,7 @@ export function MemoryPanel(props: MemoryPanelProps): React.JSX.Element {
       )}
 
       <p className="ht-settings__hint">
-        <X size={12} aria-hidden="true" /> 这些推断只在本机进行，不上传。
-        发给 AI 的只是当前那次决定需要的那一条摘要，并且会在发送前告诉你。
+        <X size={12} aria-hidden="true" /> {t('web.memory.footer')}
       </p>
     </div>
   );

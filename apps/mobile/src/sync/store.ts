@@ -33,12 +33,31 @@ export interface MobileSyncState {
   pendingUpload: number | undefined;
   /** 正在同步（用于禁用按钮，避免连点打出并发请求）。 */
   busy: boolean;
+  /**
+   * **本地物化数据的版本号。每完成一次同步就 +1**（成功或失败都加）。
+   *
+   * 🔴 为什么必须有它：任务屏、日历屏读的是**内存里的物化状态**
+   * （`host.engine.getState()`），而它们只在挂载时读一次。
+   * 实测的后果：冷启动落在「任务」页（此时是空的）→ 去「我的」同步 →
+   * 切回「任务」——**屏幕一直挂着，`useEffect` 依赖没变，不会重读**，
+   * 于是界面显示"还没有任务"，而**数据库里那条任务明明已经应用了**
+   * （重启 App 就能看见）。
+   *
+   * 这不是显示瑕疵：用户会据此认为"同步没成功/多端没同步"，
+   * 而真相是**数据已经到了，只是没人告诉界面去看一眼**。
+   *
+   * 为什么"失败也加"：同步是**先下载后上传**的两段。下载段可能已经
+   * 应用并物化了远端 op，之后上传段才失败 —— 那种情况下数据是**新的**，
+   * 界面必须重读。按"只在成功时加"写，就会漏掉这一类。
+   */
+  dataRevision: number;
 }
 
 let state: MobileSyncState = {
   status: { kind: 'idle' },
   pendingUpload: undefined,
   busy: false,
+  dataRevision: 0,
 };
 
 const listeners = new Set<() => void>();
@@ -96,17 +115,20 @@ export async function syncNow(): Promise<SyncStatus> {
     // 宿主自己会把可预期的失败表达成 `SyncStatus`；能走到这里的都是意外，
     // 所以必须**如实报出来**，不能吞掉变成一句"同步失败"。
     const message = error instanceof Error ? error.message : String(error);
-    const status: SyncStatus = { kind: 'error', message, retryable: true };
+    const status: SyncStatus = { kind: 'error', reason: 'unexpected', message, retryable: true };
     set({ status });
     return status;
   } finally {
-    set({ busy: false });
+    // 🔴 `dataRevision` 在 `finally` 里加，**不在成功路径上加** ——
+    // 同步是"先下载后上传"两段，下载段可能已经应用了远端 op，
+    // 之后上传段才失败。只在成功时加会漏掉这类"数据其实变了"的情况。
+    set({ busy: false, dataRevision: state.dataRevision + 1 });
   }
 }
 
 /** 仅供测试。 */
 export function __resetSyncStateForTests(): void {
-  state = { status: { kind: 'idle' }, pendingUpload: undefined, busy: false };
+  state = { status: { kind: 'idle' }, pendingUpload: undefined, busy: false, dataRevision: 0 };
   listeners.clear();
 }
 
@@ -150,12 +172,13 @@ export async function resolveConflictNow(
     return status;
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    const status: SyncStatus = { kind: 'error', message, retryable: true };
+    const status: SyncStatus = { kind: 'error', reason: 'unexpected', message, retryable: true };
     set({ status });
     return status;
   } finally {
     // 与 `syncNow` 同样的纪律：复位必须在 `finally` 里。
     // 只写在成功路径上，一次异常就会让界面**永久无法再解决冲突**。
-    set({ busy: false });
+    // `dataRevision` 同理在 `finally` 里加 —— 解决冲突本身会重新派发 op 并同步。
+    set({ busy: false, dataRevision: state.dataRevision + 1 });
   }
 }

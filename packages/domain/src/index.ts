@@ -28,3 +28,4 @@ export * from './preference-hints.js';
 export * from './ai-feedback.js';
 export * from './preference-corrections.js';
 export * from './recall.js';
+export * from './subscription.js';

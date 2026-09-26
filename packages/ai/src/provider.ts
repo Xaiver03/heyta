@@ -38,7 +38,13 @@ import {
   type AiSupplyMode,
   type EgressDestination,
 } from './supply.js';
-import { authorizeEgress, buildDisclosure, type AiFeature, type EgressConsent } from './egress.js';
+import {
+  authorizeEgress,
+  buildDisclosure,
+  type AiFeature,
+  type EgressConsent,
+  type EgressDisclosure,
+} from './egress.js';
 
 /** 一次调用的输入。 */
 export interface AiInvocation {
@@ -293,9 +299,18 @@ export const EGRESS_ORDER_NOTE =
 export function previewDisclosure(
   config: AiProviderConfig,
   request: { feature: AiFeature; fields: readonly string[] },
-) {
+): EgressDisclosure {
   if (config.mode === 'off') {
-    return { destination: 'none' as const, requiresConsent: false, fields: request.fields, destinationText: '', retentionText: undefined };
+    // 关闭态 = 没有出境，所以披露就是"本地 / 不适用"。
+    //
+    // 🔴 这里以前返回 `destinationText: ''` —— 一个**空的披露文本**。
+    // 它有两个毛病：界面拿到只会渲染空白；而且它和结构化结论**不可能同时成立**
+    // （空字符串没法自证是哪一种目的地）。现在两条路径都走 `buildDisclosure`，
+    // 同一个目的地永远得到同一份披露。
+    //
+    // ⚠️ 返回类型以前是**推断**出来的（两个分支形状不同），所以少一个字段
+    // 编译器不会报错 —— 现在显式标注 `EgressDisclosure`，由类型兜住。
+    return buildDisclosure({ feature: request.feature, destination: 'none', fields: request.fields });
   }
   assertEnableable(config);
   const destination = classifyDestination(config);

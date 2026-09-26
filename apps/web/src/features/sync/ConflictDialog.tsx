@@ -24,23 +24,56 @@ import { useEffect, useRef } from 'react';
 import { AlertTriangle, Check, Monitor, Smartphone, X } from 'lucide-react';
 
 import { cssVar, type TokenName } from '@heyta/design-system';
+import { useI18n, type I18nValue, type Locale } from '@heyta/i18n';
 
 import { useSyncStore } from './store.js';
 import {
   compareConflictFreshness,
-  describeConflictPayload,
+  summarizeConflictPayload,
   type ConflictInfo,
   type ConflictSide,
 } from '@heyta/sync-client';
 
-/** 时间戳 → 可读时间。冲突界面里"谁更新"是判断依据，必须看得懂。 */
-function formatTime(ms: number): string {
-  return new Date(ms).toLocaleString('zh-CN', {
+/**
+ * 时间戳 → 可读时间。冲突界面里"谁更新"是判断依据，必须看得懂。
+ *
+ * ⚠️ 这里原先把 `'zh-CN'` 写死 —— 英文界面会用中文习惯排日期。
+ * 现在用当前语言（`useI18n().locale`），这是最容易被漏掉的一类"看不见的文案"。
+ */
+function formatTime(ms: number, locale: Locale): string {
+  return new Date(ms).toLocaleString(locale, {
     month: 'numeric',
     day: 'numeric',
     hour: '2-digit',
     minute: '2-digit',
   });
+}
+
+/**
+ * 冲突载荷 → 一句用户能读的摘要。
+ *
+ * 🔴 **判断不在这里**：这段载荷里哪个字段能当标题，由 `@heyta/sync-client`
+ * 的 `summarizeConflictPayload` 决定 —— 那是唯一知道载荷形状的地方，
+ * 两端（web / mobile）消费同一份判断，不会漂移。这里只负责措辞：
+ *
+ *   - `text`：**用户自己的字**（标题、项目名…），直接显示、不翻译；
+ *   - `fields`：**只报数量**，绝不列字段名 —— `completedAt` 那种内部标识符
+ *     出现在用户可见文案里正是门禁要拦的东西（跨包返回值曾经绕过它）；
+ *   - `empty`：单独一条词条。空载荷与"取不到这一侧"是两回事，不能混。
+ */
+function payloadSummaryText(payload: unknown, t: I18nValue['t']): string {
+  const summary = summarizeConflictPayload(payload);
+  switch (summary.kind) {
+    case 'text':
+      return summary.text;
+    case 'empty':
+      return t('web.conflict.payload.empty');
+    case 'fields': {
+      const count = summary.fields.length;
+      if (count === 1) return t('web.conflict.payload.fieldsOne', { count });
+      return t('web.conflict.payload.fields', { count });
+    }
+  }
 }
 
 function Side({
@@ -58,6 +91,8 @@ function Side({
   disabled: boolean;
   onPick: () => void;
 }): React.JSX.Element {
+  const { t, locale } = useI18n();
+
   return (
     <div
       style={{
@@ -95,7 +130,7 @@ function Side({
               color: cssVar('color.primary'),
             }}
           >
-            较新
+            {t('web.conflict.newer')}
           </span>
         ) : null}
       </div>
@@ -111,7 +146,7 @@ function Side({
             fontStyle: 'italic',
           }}
         >
-          取不到这一侧的版本
+          {t('web.conflict.remoteUnavailable')}
         </p>
       ) : (
         <>
@@ -124,7 +159,7 @@ function Side({
               wordBreak: 'break-word',
             }}
           >
-            {describeConflictPayload(side.payload)}
+            {payloadSummaryText(side.payload, t)}
           </p>
           <span
             style={{
@@ -133,7 +168,7 @@ function Side({
               fontVariantNumeric: 'tabular-nums',
             }}
           >
-            {formatTime(side.timestamp)}
+            {formatTime(side.timestamp, locale)}
           </span>
         </>
       )}
@@ -146,13 +181,14 @@ function Side({
         style={{ marginTop: 'auto' }}
       >
         <Check size={15} aria-hidden="true" />
-        保留这一版
+        {t('web.conflict.keepThis')}
       </button>
     </div>
   );
 }
 
 export function ConflictDialog(): React.JSX.Element | null {
+  const { t } = useI18n();
   const status = useSyncStore((s) => s.status);
   const resolveConflict = useSyncStore((s) => s.resolveConflict);
   const dialogOpen = useSyncStore((s) => s.conflictDialogOpen);
@@ -184,6 +220,15 @@ export function ConflictDialog(): React.JSX.Element | null {
   }, [open, closeConflictDialog]);
 
   if (!open) return null;
+
+  /**
+   * 🔴 词条表没有 ICU：1 处冲突时英文必须走单数兄弟词条
+   * （"these 1 places" 是一眼可见的坏句子）。
+   */
+  const title =
+    conflicts.length === 1
+      ? t('web.conflict.titleOne', { count: conflicts.length })
+      : t('web.conflict.title', { count: conflicts.length });
 
   return (
     <div
@@ -241,7 +286,7 @@ export function ConflictDialog(): React.JSX.Element | null {
               id="ht-conflict-title"
               style={{ margin: 0, fontSize: cssVar('font-size.lg') }}
             >
-              这 {conflicts.length} 处改动两边都改过
+              {title}
             </h2>
             <p
               style={{
@@ -251,14 +296,14 @@ export function ConflictDialog(): React.JSX.Element | null {
                 lineHeight: cssVar('line-height.normal'),
               }}
             >
-              heyta 不会替你决定保留哪一版 —— 自动挑一个会
-              <strong>悄悄丢掉</strong>
-              另一边的改动。每一处都请你看一眼再选。没选的那些会一直留在本地，不会丢。
+              {t('web.conflict.bodyLead')}
+              <strong>{t('web.conflict.bodyStrong')}</strong>
+              {t('web.conflict.bodyTail')}
             </p>
           </div>
           <button
             type="button"
-            aria-label="稍后再处理"
+            aria-label={t('web.conflict.close')}
             className="ht-btn ht-btn--ghost"
             onClick={closeConflictDialog}
           >
@@ -316,7 +361,7 @@ export function ConflictDialog(): React.JSX.Element | null {
               >
                 <Side
                   side={conflict.local}
-                  label="本机"
+                  label={t('web.conflict.side.local')}
                   icon={<Monitor size={14} aria-hidden="true" />}
                   isNewer={localNewer}
                   disabled={busy}
@@ -326,7 +371,7 @@ export function ConflictDialog(): React.JSX.Element | null {
                 />
                 <Side
                   side={conflict.remote}
-                  label="其他设备"
+                  label={t('web.conflict.side.remote')}
                   icon={<Smartphone size={14} aria-hidden="true" />}
                   isNewer={remoteNewer}
                   disabled={busy}

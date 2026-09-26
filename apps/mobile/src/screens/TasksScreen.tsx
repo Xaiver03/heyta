@@ -27,13 +27,28 @@ import {
   TextInput,
   View,
 } from 'react-native';
-import type { Task } from '@heyta/domain';
-// `formatDayTitle` 来自领域层：**"某一天的标题"只有那一个实现**
-// （这里原来用的是本地的 `formatToday`；日历需要同一件事时会写出第二份，
-//  一份收时间戳用"星期五"、一份收 LocalDate 用"周五"）。
-import { Priority, describeRecurrence, formatDayTitle, startOfDay, toLocalDate } from '@heyta/domain';
-import { createTaskActions, type AppHost, type TaskActions } from '@heyta/app-host';
+import type { Project, Task } from '@heyta/domain';
+// `formatDayTitleText` 在壳里把领域层给的 `LocalDate` 说成当前语言：
+// **"某一天的标题"的日期语义（`isoWeekday`、`parseLocalDate`）仍只有领域层一份**，
+// 壳里只负责措辞（见 `apps/mobile/src/lib/date.ts` 文件头）。
+import {
+  Priority,
+  Quadrant,
+  bucketByQuadrant,
+  startOfDay,
+  toLocalDate,
+} from '@heyta/domain';
+import { useI18n, type MessageKey } from '@heyta/i18n';
+import {
+  createProjectActions,
+  createTaskActions,
+  type AppHost,
+  type ProjectActions,
+  type TaskActions,
+} from '@heyta/app-host';
 import { useToday } from '../lib/use-today';
+import { formatDayTitleText } from '../lib/date';
+import { describeRecurrenceText } from '../lib/recurrence-display';
 import { useText, useTheme, useTokens } from '../theme';
 import {
   Button,
@@ -48,6 +63,7 @@ import {
 } from '../ui/kit';
 import { Icon, type IconName } from '../ui/icons';
 import { openTaskHost } from '../db/open-host';
+import { useMobileSync } from '../sync/store';
 
 import { dueTone, toDueDisplay, type DueDisplayMode } from '../lib/due-display';
 import { priorityBadgeLabel, priorityColorToken } from '../lib/priority';
@@ -72,7 +88,8 @@ function TaskRow({
   dueMode: DueDisplayMode;
   onOpen: () => void;
 }): React.JSX.Element {
-  const t = useTokens();
+  const tokens = useTokens();
+  const { t, locale } = useI18n();
   const [busy, setBusy] = useState(false);
   // 🔴 完成态读的是 `completedAt`，不是 `completed`。
   // `Task` 上**没有** `completed` 布尔字段 —— 设计上就用"有没有完成时间"
@@ -83,12 +100,12 @@ function TaskRow({
   // （`lib/due-display.ts` 只是把它包成"给 UI 的形状"）。
   // 这里曾经用的是本地的 `formatDue` —— 它与共享实现已经说了两种话
   // （`已过期` vs `已逾期`、`9月26日` vs `还剩 8 天`）。
-  const due = toDueDisplay(task, dueMode, now);
-  const priorityBadge = priorityBadgeLabel(task.priority);
+  const due = toDueDisplay(task, dueMode, now, t);
+  const priorityBadge = priorityBadgeLabel(task.priority, t);
   // 重复规则是**同步读**物化状态（`repeatOf` 不发 op），放在渲染里没有问题。
   // 它同时决定了要不要多画一个标记、以及读屏时怎么念这条任务。
   const repeat = actions.repeatOf(task.id);
-  const priorityColor = t[priorityColorToken(task.priority ?? Priority.None)];
+  const priorityColor = tokens[priorityColorToken(task.priority ?? Priority.None)];
 
   const run = useCallback(
     (p: Promise<unknown>) => {
@@ -105,21 +122,24 @@ function TaskRow({
       style={{
         flexDirection: 'row',
         alignItems: 'center',
-        gap: t['space.1'],
-        minHeight: t['size.row-min-height'],
+        gap: tokens['space.1'],
+        minHeight: tokens['size.row-min-height'],
         // 负外边距把勾选框的 44 触控区拉回与屏幕留白对齐 ——
         // 视觉上勾选框距屏边 16，但它的可点区域从 16-11=5 开始（仍在屏内）。
-        marginLeft: -(t['touch-target.min'] - t['size.checkbox']) / 2,
+        marginLeft: -(tokens['touch-target.min'] - tokens['size.checkbox']) / 2,
       }}
     >
       <Checkbox
         checked={done}
         busy={busy}
-        // ⚠️ 两种状态各写一整句，不要写成 `${done ? '取消完成' : '完成'}：…`。
-        // 后者被 `check:ui-language` 判成"没有汉字的文案"（它取到的片段是
-        // `${done ?`，里面有 4 个连续拉丁字母）。门禁是对的：
-        // 用户可见的字符串**本身**就该是中文，而不是靠表达式拼出来。
-        label={done ? `取消完成：${task.title}` : `完成：${task.title}`}
+        // 两种状态各写一条**完整的**词条（`complete：{title}` / `uncomplete：{title}`），
+        // 不写成"前缀 + 标题"拼出来的句子 —— 拼接的结果没法整体翻译，
+        // 不同语言的语序（"完成：买牛奶" vs "Complete: Buy milk"）也对不上。
+        label={
+          done
+            ? t('mobile.tasks.a11y.uncomplete', { title: task.title })
+            : t('mobile.tasks.a11y.complete', { title: task.title })
+        }
         onToggle={() => run(actions.toggleCompleted(task.id))}
       />
 
@@ -129,16 +149,18 @@ function TaskRow({
           "完成：买牛奶"，不必先打开详情再找按钮。 */}
       <Pressable
         onPress={onOpen}
-        style={{ flex: 1, paddingVertical: t['space.2'], gap: t['space.1'] }}
+        style={{ flex: 1, paddingVertical: tokens['space.2'], gap: tokens['space.1'] }}
         accessibilityRole="button"
         // 重复状态要进无障碍名：读屏用户看不到那个小图标，
         // 而"这条任务会不会每周回来"直接影响他决定要不要现在做。
-        // ⚠️ 两种状态各写一整句（不是 `${...}` 拼一个后缀）——
-        // 见上面勾选框那段注释：门禁会把"取到的片段没有汉字"判成违规。
+        // 两条完整词条（不带重复 / 带重复），理由同勾选框。
         accessibilityLabel={
           repeat === undefined
-            ? `打开任务：${task.title}`
-            : `打开任务：${task.title}，重复：${describeRecurrence(repeat.rule)}`
+            ? t('mobile.tasks.a11y.open', { title: task.title })
+            : t('mobile.tasks.a11y.openRepeat', {
+                title: task.title,
+                repeat: describeRecurrenceText(repeat.rule, t, locale),
+              })
         }
       >
         <Text
@@ -151,13 +173,13 @@ function TaskRow({
         </Text>
 
         {due !== null || priorityBadge !== null || repeat !== undefined ? (
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: t['space.2'] }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: tokens['space.2'] }}>
             {due !== null ? (
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: t['space.1'] }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: tokens['space.1'] }}>
                 <Icon
                   name={due.overdue ? 'task.overdue' : 'task.due'}
                   size="xs"
-                  color={due.overdue ? t['color.danger'] : t['color.foreground-subtle']}
+                  color={due.overdue ? tokens['color.danger'] : tokens['color.foreground-subtle']}
                 />
                 <Text variant="row-meta" tone={dueTone(due.urgency)}>
                   {due.text}
@@ -170,21 +192,22 @@ function TaskRow({
                 高优先级任务不会显示标记，而且不报任何错。
                 现在映射只在 `lib/priority.ts` 一处，并有可失败的测试。 */}
             {priorityBadge !== null ? (
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: t['space.1'] }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: tokens['space.1'] }}>
                 <Icon name="task.priority" size="xs" color={priorityColor} />
                 <Text variant="row-meta" style={{ color: priorityColor }}>
                   {priorityBadge}
                 </Text>
               </View>
             ) : null}
-            {/* 重复标记。文字用 `describeRecurrence`（中文），
-                不要自己拼"每 N 天" —— 那会在界面上长出第二份规则描述，
-                而它和 domain 那份迟早对"每两周的周三"说两种话。 */}
+            {/* 重复标记。规则串 → 句子在 `lib/recurrence-display.ts`；
+                **解析**仍然只有 `packages/domain` 一份（`recurrenceParts`）。
+                这里此前直接渲染 `describeRecurrence` 的返回值 —— 那是一句中文，
+                英文界面上会漏出「每周一、三」，而它是跨包的返回值、门禁扫不到。 */}
             {repeat !== undefined ? (
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: t['space.1'] }}>
-                <Icon name="task.repeat" size="xs" color={t['color.foreground-subtle']} />
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: tokens['space.1'] }}>
+                <Icon name="task.repeat" size="xs" color={tokens['color.foreground-subtle']} />
                 <Text variant="row-meta" tone="muted">
-                  {describeRecurrence(repeat.rule)}
+                  {describeRecurrenceText(repeat.rule, t, locale)}
                 </Text>
               </View>
             ) : null}
@@ -194,8 +217,8 @@ function TaskRow({
 
       <IconButton
         icon="task.delete"
-        label={`删除任务：${task.title}`}
-        color={t['color.foreground-subtle']}
+        label={t('mobile.tasks.a11y.delete', { title: task.title })}
+        color={tokens['color.foreground-subtle']}
         onPress={() => run(actions.remove(task.id))}
       />
     </View>
@@ -215,9 +238,10 @@ function Composer({
   onClose: () => void;
   onSubmit: (title: string) => Promise<void>;
 }): React.JSX.Element {
-  const t = useTokens();
+  const tokens = useTokens();
   const text = useText();
   const { native } = useTheme();
+  const { t } = useI18n();
   const [value, setValue] = useState('');
   const [busy, setBusy] = useState(false);
 
@@ -243,50 +267,55 @@ function Composer({
       statusBarTranslucent
     >
       <Pressable
-        style={{ flex: 1, backgroundColor: t['material.scrim'] }}
+        style={{ flex: 1, backgroundColor: tokens['material.scrim'] }}
         onPress={onClose}
-        accessibilityLabel="关闭新建面板"
+        accessibilityLabel={t('mobile.tasks.composer.close')}
       />
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <View
           style={{
-            backgroundColor: t['color.surface'],
-            borderTopLeftRadius: t['radius.xl'],
-            borderTopRightRadius: t['radius.xl'],
-            padding: t['screen.gutter'],
-            gap: t['space.3'],
-            paddingBottom: t['space.8'],
+            backgroundColor: tokens['color.surface'],
+            borderTopLeftRadius: tokens['radius.xl'],
+            borderTopRightRadius: tokens['radius.xl'],
+            padding: tokens['screen.gutter'],
+            gap: tokens['space.3'],
+            paddingBottom: tokens['space.8'],
           }}
         >
-          <Text variant="section-title">新建任务</Text>
+          <Text variant="section-title">{t('mobile.tasks.new')}</Text>
           <TextInput
             value={value}
             onChangeText={setValue}
-            placeholder="要做什么？"
-            placeholderTextColor={t['color.foreground-muted']}
+            placeholder={t('mobile.tasks.composer.placeholder')}
+            placeholderTextColor={tokens['color.foreground-muted']}
             autoFocus
             returnKeyType="done"
             onSubmitEditing={submit}
             style={[
               text['row-title'],
               {
-                minHeight: t['touch-target.min'],
-                paddingHorizontal: t['space.3'],
-                borderRadius: t['radius.md'],
-                borderWidth: t['border-width.thin'],
-                borderColor: t['color.border'],
-                backgroundColor: t['color.surface-sunken'],
-                color: t['color.foreground'],
-                // ⚠️ 走归一化访问器。直接传 `t['font.sans']` 会把整条 CSS 字体栈
+                minHeight: tokens['touch-target.min'],
+                paddingHorizontal: tokens['space.3'],
+                borderRadius: tokens['radius.md'],
+                borderWidth: tokens['border-width.thin'],
+                borderColor: tokens['color.border'],
+                backgroundColor: tokens['color.surface-sunken'],
+                color: tokens['color.foreground'],
+                // ⚠️ 走归一化访问器。直接传 `tokens['font.sans']` 会把整条 CSS 字体栈
                 // 交给 RN，字体解析失败且**不报错**，屏幕上是条纹乱码（已实测）。
                 fontFamily: native.fontSans,
               },
             ]}
           />
-          <View style={{ flexDirection: 'row', gap: t['space.2'] }}>
-            <Button label="取消" tone="ghost" onPress={onClose} style={{ flex: 1 }} />
+          <View style={{ flexDirection: 'row', gap: tokens['space.2'] }}>
             <Button
-              label="添加"
+              label={t('mobile.common.cancel')}
+              tone="ghost"
+              onPress={onClose}
+              style={{ flex: 1 }}
+            />
+            <Button
+              label={t('mobile.common.add')}
               tone="primary"
               icon="task.add"
               loading={busy}
@@ -317,7 +346,8 @@ export function TasksScreen({
    */
   onPendingCountChange?: (pending: number) => void;
 } = {}): React.JSX.Element {
-  const t = useTokens();
+  const tokens = useTokens();
+  const { t } = useI18n();
   const [host, setHost] = useState<AppHost | null>(null);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -327,12 +357,23 @@ export function TasksScreen({
   const [detailTaskId, setDetailTaskId] = useState<string | null>(null);
   /** 截止时间的呈现方式。与 Web 端 `DueBadge` 的开关一致，默认 `date`。 */
   const [dueMode, setDueMode] = useState<DueDisplayMode>('date');
+  /**
+   * 「任务」页的两种视图：按今天的**列表**，与按艾森豪威尔矩阵的**四象限**。
+   *
+   * 🔴 **两种视图读的是同一份数据、同一批任务**，只是分组方式不同 ——
+   * 所以它是同一页上的视图切换，**不是第 5 个 tab**
+   * （理由见 `docs/adr/0015-four-quadrant-as-derived-view.md` §4：
+   *  给象限一个 tab 会暗示"这里有一批新数据"，而其实一条都没有）。
+   */
+  const [view, setView] = useState<'list' | 'quadrant'>('list');
   // 🔴 "现在"由 `useToday` 提供：**回到前台**与**跨过本地零点**时会刷新。
   //
   // 原来是 `useMemo(() => Date.now(), [])` —— 它把"跨零点"这件真事一起冻住了：
   // 应用挂后台一夜、或就一直开着到第二天，界面上的"今天"还是昨天，
   // 于是昨晚到期的任务仍然显示"今天到期"。详见 `lib/use-today.ts` 的文件头。
   const { now } = useToday();
+  // 同步完成 → `dataRevision` 变 → 下面的 effect 重读物化状态。
+  const { dataRevision } = useMobileSync();
 
   useEffect(() => {
     let alive = true;
@@ -350,6 +391,23 @@ export function TasksScreen({
   }, []);
 
   const actions = useMemo<TaskActions | null>(() => (host ? createTaskActions(host) : null), [host]);
+  /**
+   * 清单动作集。与 `actions` 同一条纪律：从宿主派生，不在界面里新造。
+   *
+   * 详情页的「清单」选择器要靠它**新建**清单（建完立刻选中、不用先回「我的」页）。
+   */
+  const projectActions = useMemo<ProjectActions | null>(
+    () => (host ? createProjectActions(host) : null),
+    [host],
+  );
+  /**
+   * 可选的清单。**与「我的」页读的是同一份物化状态**，所以两处永远一致。
+   *
+   * 🔴 这里**不含「收集箱」**：「收集箱」不是一条清单，而是
+   * `Task.projectId === undefined`。把假的选项混进真列表，
+   * 早晚有人给它加上"删除"或"改名"。
+   */
+  const [projects, setProjects] = useState<Project[]>([]);
 
   const refresh = useCallback(() => {
     if (!actions) return;
@@ -357,14 +415,22 @@ export function TasksScreen({
     // 我一度写成 `.then(...)` —— 运行时那里直接抛 "then is not a function"，
     // 而界面只是停在"正在打开本地数据"，看起来像数据库慢。
     setTasks(actions.listTasks());
-  }, [actions]);
+    if (projectActions) setProjects(projectActions.listProjects());
+  }, [actions, projectActions]);
 
   useEffect(() => {
     if (!host) return;
     // 🔴 必须等 `recover()` 走完再读 —— openTaskHost 已经保证了这一点，
     // 这里拿到 host 就意味着日志已重放完毕（AGENTS.md §7 第 9 条）。
     refresh();
-  }, [host, refresh]);
+    // 🔴 `dataRevision` 是**同步完成**的信号（见 `sync/store.ts` 的字段说明）。
+    //
+    // 少了它，这个 effect 的依赖 `[host, refresh]` 在整个应用生命周期里都不会变 ——
+    // 屏幕一直挂着，于是**同步完成后它不会重读**。实测到的现象：
+    // 冷启动落在本屏（空的）→ 去「我的」同步 → 切回本屏 → 仍显示"还没有任务"，
+    // 而数据库里那条远端任务**已经应用了**（重启 App 就能看见）。
+    // 用户据此会认为"多端同步没成功"，而真相是数据到了、界面没去看。
+  }, [host, refresh, dataRevision]);
 
   const groups = useMemo(() => {
     const today = startOfDay(now);
@@ -410,6 +476,44 @@ export function TasksScreen({
    */
   const pending = groups.overdue.length + groups.dueToday.length + groups.inbox.length;
 
+  /**
+   * 四象限分桶。**派生，不存储** —— 见 ADR-0015 §2：
+   * 一旦象限归属被存成独立数据，它就会和 `important` / `dueDate` 漂移，
+   * 而这类 bug 不报错，只让人不再信任界面。
+   *
+   * ⚠️ `bucketByQuadrant` 会**排除已完成与已删除**的任务（那是它写明的语义：
+   * 象限是"待办决策工具"）。所以切到四象限时"已完成"分组会消失 ——
+   * 那是设计，不是漏了。
+   */
+  const quadrants = useMemo(() => bucketByQuadrant(tasks, { now }), [tasks, now]);
+
+  /**
+   * 展示顺序：Q1 → Q2 → Q3 → Q4。
+   *
+   * 🔴 刻意**不用** `Object.values(quadrants)` —— 那依赖对象键的插入顺序，
+   * 换个地方构造桶就会悄悄改变展示顺序。象限的排序就是它的语义，写死。
+   */
+  const QUADRANT_ORDER: Quadrant[] = [
+    Quadrant.UrgentImportant,
+    Quadrant.ImportantNotUrgent,
+    Quadrant.UrgentNotImportant,
+    Quadrant.Neither,
+  ];
+
+  /**
+   * 象限名走 `t()`，**不用 `QUADRANT_META[q].label`**。
+   *
+   * `QUADRANT_META` 里的 `label` / `hint` 是写死的中文，它是**领域层的元数据**，
+   * 不是 UI 文案。`check-ui-language.mjs` 只扫 `apps/`，所以直接用不会报错 ——
+   * 那正是危险之处：它会**静默**让英文界面显示中文，而门禁看不见。
+   */
+  const QUADRANT_LABEL_KEY: Record<Quadrant, MessageKey> = {
+    [Quadrant.UrgentImportant]: 'mobile.quadrant.q1',
+    [Quadrant.ImportantNotUrgent]: 'mobile.quadrant.q2',
+    [Quadrant.UrgentNotImportant]: 'mobile.quadrant.q3',
+    [Quadrant.Neither]: 'mobile.quadrant.q4',
+  };
+
   // 🔴 由 id 反查任务，而不是存一份对象：列表刷新后 `Task` 是新引用，
   // 存下来的那份会变成过期快照（改了日期却显示旧值）。
   const detailTask = useMemo(
@@ -423,15 +527,15 @@ export function TasksScreen({
 
   if (error !== null) {
     return (
-      <Screen title="任务">
+      <Screen title={t('mobile.tasks.title')}>
         <EmptyState
           icon="group.overdue"
-          title="打开本地数据库失败"
-          hint="数据在本地，不会丢。重开应用通常能恢复。"
+          title={t('mobile.tasks.loadError.title')}
+          hint={t('mobile.tasks.loadError.hint')}
           // 🔴 原始错误原样附上（并允许长按复制）：它多半是英文的系统信息，
           // 但**不能翻译** —— 翻译之后就没法拿去搜索、也没法对照日志。
-          // 分工是：中文说明在 `hint`，技术原文在 `detail`，前缀用中文标明它是什么。
-          detail={`技术细节：${error}`}
+          // 分工是：说明走 `hint` 词条，技术原文走 `detail` 变量。
+          detail={t('mobile.tasks.loadError.detail', { detail: error })}
         />
       </Screen>
     );
@@ -439,8 +543,12 @@ export function TasksScreen({
 
   if (host === null || actions === null) {
     return (
-      <Screen title="任务">
-        <EmptyState icon="action.sync" title="正在打开本地数据" hint="正在恢复到上次关闭前的状态，稍等片刻。" />
+      <Screen title={t('mobile.tasks.title')}>
+        <EmptyState
+          icon="action.sync"
+          title={t('mobile.tasks.loading.title')}
+          hint={t('mobile.tasks.loading.hint')}
+        />
       </Screen>
     );
   }
@@ -473,22 +581,47 @@ export function TasksScreen({
     rows.push({ kind: 'header', key: `h-${key}`, title, icon, count: list.length, tone });
     for (const task of list) rows.push({ kind: 'task', key: task.id, task });
   };
-  pushGroup('overdue', '已过期', 'group.overdue', groups.overdue, 'danger');
-  pushGroup('today', '今天', 'group.today', groups.dueToday, 'primary');
-  pushGroup('inbox', '收集箱', 'group.inbox', groups.inbox);
-  pushGroup('done', '已完成', 'group.completed', groups.completed);
+  pushGroup('overdue', t('mobile.tasks.group.overdue'), 'group.overdue', groups.overdue, 'danger');
+  pushGroup('today', t('mobile.common.today'), 'group.today', groups.dueToday, 'primary');
+  pushGroup('inbox', t('mobile.tasks.group.inbox'), 'group.inbox', groups.inbox);
+  pushGroup('done', t('mobile.tasks.group.completed'), 'group.completed', groups.completed);
 
   return (
     <View style={{ flex: 1 }}>
-      <Screen title="任务" actions={[{ icon: 'action.sync', label: '同步', onPress: refresh }]}>
+      <Screen
+        title={t('mobile.tasks.title')}
+        actions={[{ icon: 'action.sync', label: t('mobile.common.sync'), onPress: refresh }]}
+      >
         {/* 大标题 + 日期。大标题属于**内容区**（会随内容滚动），不属于顶栏。 */}
-        <View style={{ paddingTop: t['space.2'], gap: t['space.1'] }}>
-          <Text variant="screen-title">{formatDayTitle(toLocalDate(now))}</Text>
+        <View style={{ paddingTop: tokens['space.2'], gap: tokens['space.1'] }}>
+          <Text variant="screen-title">{formatDayTitleText(toLocalDate(now), t)}</Text>
           <Text variant="row-meta" tone="muted">
             {nothing
-              ? '还没有任务'
-              : `${pending} 项待办，${groups.completed.length} 项已完成`}
+              ? t('mobile.tasks.summary.empty')
+              : t('mobile.tasks.summary.counts', {
+                  pending,
+                  completed: groups.completed.length,
+                })}
           </Text>
+        </View>
+
+        {/* 视图切换：**列表**（按今天分组）↔ **四象限**（艾森豪威尔矩阵）。
+            两种视图读的是**同一批任务**，只是分组方式不同 —— 见 ADR-0015 §4。 */}
+        <View style={{ flexDirection: 'row', gap: tokens['space.2'], paddingTop: tokens['space.2'] }}>
+          <Chip
+            label={t('mobile.tasks.view.list')}
+            selected={view === 'list'}
+            onPress={() => {
+              setView('list');
+            }}
+          />
+          <Chip
+            label={t('mobile.tasks.view.quadrant')}
+            selected={view === 'quadrant'}
+            onPress={() => {
+              setView('quadrant');
+            }}
+          />
         </View>
 
         {/* 截止时间两种呈现的开关。
@@ -496,16 +629,16 @@ export function TasksScreen({
             （滴答清单的 Task time ↔ Countdown Time），见
             `docs/research/ai-competitive-and-architecture.md` §5.2。
             两种呈现读的是同一个 `dueDate`，所以开关只是换说法、不动数据。 */}
-        <View style={{ flexDirection: 'row', gap: t['space.2'], paddingTop: t['space.2'] }}>
+        <View style={{ flexDirection: 'row', gap: tokens['space.2'], paddingTop: tokens['space.2'] }}>
           <Chip
-            label="日期"
+            label={t('mobile.tasks.mode.date')}
             selected={dueMode === 'date'}
             onPress={() => {
               setDueMode('date');
             }}
           />
           <Chip
-            label="倒计时"
+            label={t('mobile.tasks.mode.countdown')}
             selected={dueMode === 'countdown'}
             onPress={() => {
               setDueMode('countdown');
@@ -513,11 +646,54 @@ export function TasksScreen({
           />
         </View>
 
-        {nothing ? (
+        {view === 'quadrant' ? (
+          /* ⚠️ 这里**不是** 2×2 网格。手机宽 402px，四格每格只剩 ~190px，
+             勾选框 + 标题 + 日期塞不下，会挤成三行。**"矩阵"图形是桌面端的
+             形态**；手机上的等效表达是**按象限分组的四段** ——
+             信息一模一样，且沿用本页已有的 SectionHeader + 行。
+             落地页卖的是"不用自己想先做哪个"，那个价值在分组里完整保留。 */
+          <View style={{ gap: tokens['space.3'], paddingTop: tokens['space.2'] }}>
+            {QUADRANT_ORDER.map((q) => {
+              const list = quadrants[q];
+              return (
+                <View key={q} style={{ gap: tokens['space.1'] }}>
+                  <SectionHeader
+                    // 🔴 四个象限共用同一个图标。**刻意不给每格配一个语义图标**：
+                    // 现有图标集里没有"重要/紧急"这一对，硬套
+                    // （比如把 Q3 配成 `conflict.warning`）会给出**错的信号** ——
+                    // 那比没有图标更糟。要区分度就得先有字形，那是设计系统的活。
+                    icon="task.priority"
+                    title={t(QUADRANT_LABEL_KEY[q])}
+                    count={list.length}
+                  />
+                  {list.length === 0 ? (
+                    <Text variant="row-meta" tone="muted">
+                      {t('mobile.tasks.quadrant.empty')}
+                    </Text>
+                  ) : (
+                    list.map((task) => (
+                      <TaskRow
+                        key={task.id}
+                        task={task}
+                        actions={actions}
+                        onChanged={refresh}
+                        now={now}
+                        dueMode={dueMode}
+                        onOpen={() => {
+                          setDetailTaskId(task.id);
+                        }}
+                      />
+                    ))
+                  )}
+                </View>
+              );
+            })}
+          </View>
+        ) : nothing ? (
           <EmptyState
             icon="group.inbox"
-            title="今天还没有安排"
-            hint="点右下角的加号，写下第一件事。"
+            title={t('mobile.tasks.empty.title')}
+            hint={t('mobile.tasks.empty.hint')}
           />
         ) : (
           <FlatList
@@ -545,7 +721,7 @@ export function TasksScreen({
                 />
               )
             }
-            contentContainerStyle={{ gap: t['space.1'] }}
+            contentContainerStyle={{ gap: tokens['space.1'] }}
           />
         )}
       </Screen>
@@ -558,12 +734,14 @@ export function TasksScreen({
             setDetailTaskId(null);
           }}
           actions={actions}
+          projects={projects}
+          projectActions={projectActions}
           onChanged={refresh}
           now={now}
         />
       ) : null}
 
-      <Fab icon="task.add" label="新建任务" onPress={() => setComposerOpen(true)} />
+      <Fab icon="task.add" label={t('mobile.tasks.new')} onPress={() => setComposerOpen(true)} />
       <Composer
         visible={composerOpen}
         onClose={() => setComposerOpen(false)}

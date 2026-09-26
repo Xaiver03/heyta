@@ -65,8 +65,14 @@ export interface FocusTimerSnapshot {
   state: FocusState;
   /** 最近一次唤醒的时刻。值本身无意义，只用于让组件重算剩余时间。 */
   now: number;
-  /** 落盘失败时的错误。**必须显式暴露**，不能静默吞掉。 */
-  error?: string;
+  /**
+   * 落盘失败时的错误。**必须显式暴露**，不能静默吞掉。
+   *
+   * ⚠️ 这里只带**原因**（底层实现的原始文本，是数据），不带整句文案：
+   * 这是个纯 store，拿不到 `t`，句子由 `FocusScreen` 用词条表拼出来。
+   * 存成拼好的中文句子会让英文界面漏出一句中文。
+   */
+  error?: { reason: string };
   /**
    * 最近一次**成功落盘**的时刻。
    *
@@ -151,7 +157,7 @@ async function persist(session: FocusSession): Promise<void> {
     // 🔴 必须捕获。这段代码在**定时器回调**里跑，未捕获的拒绝在 RN 上
     // 会变成 unhandledRejection —— 存储故障不该让应用崩掉，但也不能静默。
     publish({
-      error: `专注记录保存失败：${error instanceof Error ? error.message : String(error)}`,
+      error: { reason: error instanceof Error ? error.message : String(error) },
     });
   } finally {
     persisting = false;

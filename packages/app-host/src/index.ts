@@ -76,6 +76,17 @@ export { createSyncClient, type SyncWiringOptions } from './sync-wiring.js';
 export { newTaskId, randomId, usingRandomIdFallback } from './ids.js';
 
 /**
+ * 权益探测。**所有宿主共用这一份** —— 见 `entitlement.ts` 文件头：
+ * 它是一次**不携带任何任务内容**的 GET（E2EE 硬约束：计费只碰账户与权益状态）。
+ * 判定本身是 `@heyta/domain` 的纯函数，这里只负责发请求。
+ */
+export {
+  HOSTED_ENTITLEMENT_PATH,
+  fetchHostedEntitlementReading,
+  type HostedEntitlementProbeOptions,
+} from './entitlement.js';
+
+/**
  * 重复规则的预设。**"每周"到底是哪一天是产品语义**，所以在这里而不在界面里
  * （判据见 §3.5："这段代码里有没有一行在决定业务上该怎么做？"）。
  * 界面只负责选 id 与显示文字。

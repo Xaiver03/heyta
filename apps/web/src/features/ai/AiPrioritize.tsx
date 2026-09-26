@@ -32,6 +32,11 @@
 import { useState } from 'react';
 import { AlertTriangle, Cloud, HardDrive, Sparkles, X } from 'lucide-react';
 
+import { useI18n } from '@heyta/i18n';
+
+import { LIST_SEPARATOR } from './locale-punctuation.js';
+import { retentionMessageKey } from './disclosure-copy.js';
+
 import {
   Priority,
   renderPreferenceHints,
@@ -60,6 +65,7 @@ import {
   type PrioritizeProposal,
   type PrioritizeTaskInput,
 } from '@heyta/app-host';
+import { prioritizeFailureCopy, type AiFailureCopy } from './ai-failure-copy.js';
 
 /** 路由解析结果里"这个功能会走到哪个端点"。 */
 export interface PrioritizeTarget {
@@ -113,21 +119,6 @@ export function resolvePrioritizeTarget(
 
 type Phase = 'idle' | 'disclosing' | 'loading' | 'proposal' | 'failed';
 
-/**
- * 优先级的中文标签。
- *
- * ⚠️ 与 `CaptureComposer` 里的那份是**同一件事的第二个副本** ——
- * 这是本轮不允许改 `packages/domain` / 那个组件造成的。
- * 只放显示文案（`高` / `中` / `低` / `无`），不参与任何判断，
- * 所以它漂移的后果仅限"文字不一致"，不会影响写库的值。
- */
-const PRIORITY_LABEL: Record<Priority, string> = {
-  [Priority.High]: '高',
-  [Priority.Medium]: '中',
-  [Priority.Low]: '低',
-  [Priority.None]: '无',
-};
-
 export interface AiPrioritizeProps {
   /** 要排序的一批任务。**只有 id/title/dueDate/priority 会被发出去**（见 app-host）。 */
   tasks: readonly Task[];
@@ -167,12 +158,27 @@ export interface AiPrioritizeProps {
 
 export function AiPrioritize(props: AiPrioritizeProps): React.JSX.Element {
   const { tasks, routing, consents, secrets, onApply, onHealth, preferenceSet } = props;
+  const { t, locale } = useI18n();
+
+  /**
+   * 优先级 → 展示文案。
+   *
+   * ⚠️ 与 `CaptureComposer` 里的那份是**同一件事的第二个副本** ——
+   * 这是本轮不允许改 `packages/domain` / 那个组件造成的。
+   * 只放显示文案，不参与任何判断，所以它漂移的后果仅限"文字不一致"。
+   */
+  const priorityLabel: Record<Priority, string> = {
+    [Priority.High]: t('web.ai.prioritize.priority.high'),
+    [Priority.Medium]: t('web.ai.prioritize.priority.medium'),
+    [Priority.Low]: t('web.ai.prioritize.priority.low'),
+    [Priority.None]: t('web.ai.prioritize.priority.none'),
+  };
 
   const [phase, setPhase] = useState<Phase>('idle');
   const [proposal, setProposal] = useState<PrioritizeProposal | undefined>(undefined);
   /** 哪些建议要写入。**默认全选**。 */
   const [selected, setSelected] = useState<readonly boolean[]>([]);
-  const [failure, setFailure] = useState<string>('');
+  const [failure, setFailure] = useState<AiFailureCopy | null>(null);
   const [applied, setApplied] = useState(false);
 
   const target = resolvePrioritizeTarget(routing);
@@ -238,7 +244,7 @@ export function AiPrioritize(props: AiPrioritizeProps): React.JSX.Element {
       setPhase('proposal');
       return;
     }
-    setFailure(outcome.message);
+    setFailure(prioritizeFailureCopy(outcome.reason, outcome.message, outcome.cause));
     setPhase('failed');
   }
 
@@ -267,7 +273,7 @@ export function AiPrioritize(props: AiPrioritizeProps): React.JSX.Element {
     setPhase('idle');
     setProposal(undefined);
     setSelected([]);
-    setFailure('');
+    setFailure(null);
     setApplied(false);
   }
 
@@ -279,7 +285,7 @@ export function AiPrioritize(props: AiPrioritizeProps): React.JSX.Element {
           type="button"
           className="ht-btn ht-btn--ghost"
           data-testid="prioritize-open"
-          aria-label="用 AI 给这些任务排优先级"
+          aria-label={t('web.ai.prioritize.runAria')}
           disabled={tasks.length === 0}
           onClick={() => {
             setApplied(false);
@@ -287,11 +293,11 @@ export function AiPrioritize(props: AiPrioritizeProps): React.JSX.Element {
           }}
         >
           <Sparkles size={12} aria-hidden="true" />
-          AI 排优先级
+          {t('web.ai.prioritize.button')}
         </button>
         {applied && (
           <span className="ht-ai__done" data-testid="prioritize-applied">
-            已应用
+            {t('web.ai.prioritize.applied')}
           </span>
         )}
       </span>
@@ -304,15 +310,15 @@ export function AiPrioritize(props: AiPrioritizeProps): React.JSX.Element {
       <div
         className="ht-ai__panel"
         role="dialog"
-        aria-label="AI 排优先级 —— 发送前确认"
+        aria-label={t('web.ai.prioritize.disclosureAria')}
         data-testid="prioritize-disclosure"
       >
         <div className="ht-ai__head">
-          <span>发送前确认</span>
+          <span>{t('web.ai.disclosure.heading')}</span>
           <button
             type="button"
             className="ht-btn ht-btn--ghost"
-            aria-label="取消"
+            aria-label={t('web.ai.action.cancel')}
             data-testid="prioritize-disclosure-close"
             onClick={reset}
           >
@@ -323,7 +329,7 @@ export function AiPrioritize(props: AiPrioritizeProps): React.JSX.Element {
         {target === undefined ? (
           <p className="ht-ai__warn" data-testid="prioritize-no-target">
             <AlertTriangle size={12} aria-hidden="true" />
-            还没有给「优先级排序」配置端点。去「设置」里添加端点并指定路由。
+            {t('web.ai.noTarget.prioritize')}
           </p>
         ) : (
           <>
@@ -333,11 +339,11 @@ export function AiPrioritize(props: AiPrioritizeProps): React.JSX.Element {
               ) : (
                 <Cloud size={12} aria-hidden="true" />
               )}
-              将发往：<strong>{target.label}</strong>
+              {t('web.ai.disclosure.destinationLead')}<strong>{target.label}</strong>
               <code>{target.endpoint}</code>
-              <span>模型 {target.model}</span>
+              <span>{t('web.ai.disclosure.model', { model: target.model })}</span>
               <span className="ht-ai__tag" data-testid="prioritize-destination-kind">
-                {target.isLocal ? '数据不出设备' : '数据会离开设备'}
+                {target.isLocal ? t('web.ai.disclosure.local') : t('web.ai.disclosure.remote')}
               </span>
             </p>
 
@@ -346,33 +352,33 @@ export function AiPrioritize(props: AiPrioritizeProps): React.JSX.Element {
             {target.fallbacks.length > 0 && (
               <p className="ht-ai__row ht-ai__row--warn" data-testid="prioritize-fallbacks">
                 <AlertTriangle size={12} aria-hidden="true" />
-                如果它失败，会接着依次尝试：
-                <strong data-testid="prioritize-fallback-list">{target.fallbacks.join('、')}</strong>
+                {t('web.ai.disclosure.fallbackLead')}
+                <strong data-testid="prioritize-fallback-list">{target.fallbacks.join(LIST_SEPARATOR[locale])}</strong>
               </p>
             )}
 
             {/* 🔴 「留多久」是披露的三维之一（发给谁 / 发什么 / 留多久）。 */}
             {disclosure !== undefined && (
               <p className="ht-ai__row" data-testid="prioritize-retention">
-                保留：<strong data-testid="prioritize-retention-text">
-                  {disclosure.retentionText ?? '未定案 —— 在 heyta 说明清楚之前，这个端点不允许启用。'}
+                {t('web.ai.disclosure.retentionLead')}<strong data-testid="prioritize-retention-text">
+                  {t(retentionMessageKey(disclosure.retentionDisclosure.kind))}
                 </strong>
               </p>
             )}
 
             <p className="ht-ai__row" data-testid="prioritize-fields">
-              将发送这些字段：
-              <strong data-testid="prioritize-field-list">{invocation.fields.join('、')}</strong>
+              {t('web.ai.disclosure.fieldsLead')}
+              <strong data-testid="prioritize-field-list">{invocation.fields.join(LIST_SEPARATOR[locale])}</strong>
             </p>
 
             <p className="ht-ai__note" data-testid="prioritize-count">
-              这次会送出 <strong>{source.tasks.length}</strong> 条任务（不含备注、标签、清单）。
+              {t('web.ai.prioritize.countLead')} <strong>{source.tasks.length}</strong> {t('web.ai.prioritize.countTail')}
             </p>
 
             {!target.isLocal && (
               <p className="ht-ai__warn" data-testid="prioritize-e2ee-warning">
                 <AlertTriangle size={12} aria-hidden="true" />
-                这台设备上的任务内容是端到端加密的，而发出去的这一份<strong>不受端到端加密保护</strong>。
+                {t('web.ai.disclosure.e2eeLead')}<strong>{t('web.ai.disclosure.e2eeStrong')}</strong>
               </p>
             )}
 
@@ -383,7 +389,7 @@ export function AiPrioritize(props: AiPrioritizeProps): React.JSX.Element {
                 data-testid="prioritize-send"
                 onClick={() => void send()}
               >
-                发送
+                {t('web.ai.action.send')}
               </button>
               <button
                 type="button"
@@ -391,7 +397,7 @@ export function AiPrioritize(props: AiPrioritizeProps): React.JSX.Element {
                 data-testid="prioritize-cancel"
                 onClick={reset}
               >
-                取消
+                {t('web.ai.action.cancel')}
               </button>
             </div>
           </>
@@ -403,7 +409,7 @@ export function AiPrioritize(props: AiPrioritizeProps): React.JSX.Element {
   if (phase === 'loading') {
     return (
       <div className="ht-ai__panel" data-testid="prioritize-loading">
-        <span>正在等待端点返回…</span>
+        <span>{t('web.ai.loading.waiting')}</span>
       </div>
     );
   }
@@ -414,20 +420,20 @@ export function AiPrioritize(props: AiPrioritizeProps): React.JSX.Element {
       <div
         className="ht-ai__panel"
         role="dialog"
-        aria-label="AI 优先级建议"
+        aria-label={t('web.ai.prioritize.proposalAria')}
         data-testid="prioritize-proposal"
       >
         <div className="ht-ai__head">
-          <span>优先级建议（{proposal.suggestions.length} 条）</span>
+          <span>{t('web.ai.prioritize.proposalHead', { count: proposal.suggestions.length })}</span>
           <span className="ht-ai__tag" data-testid="prioritize-proposal-source">
-            {proposal.destination === 'none' ? '来自本机' : '来自云端'}
+            {proposal.destination === 'none' ? t('web.ai.source.local') : t('web.ai.source.remote')}
           </span>
         </div>
 
         {proposal.truncated && (
           <p className="ht-ai__warn" data-testid="prioritize-truncated">
             <AlertTriangle size={12} aria-hidden="true" />
-            任务太多，只送出了前 {MAX_PRIORITIZE_TASKS} 条，其余这次没有参与排序。
+            {t('web.ai.prioritize.truncated', { max: MAX_PRIORITIZE_TASKS })}
           </p>
         )}
 
@@ -451,7 +457,7 @@ export function AiPrioritize(props: AiPrioritizeProps): React.JSX.Element {
                   {titleOf(suggestion.id)}
                 </span>
                 <span className="ht-ai__tag" data-testid={`prioritize-priority-${String(index)}`}>
-                  {PRIORITY_LABEL[suggestion.priority]}
+                  {priorityLabel[suggestion.priority]}
                 </span>
                 {/* 🔴 理由必须显示 —— 没有理由的优先级建议等于让用户盲签。 */}
                 <span className="ht-ai__note" data-testid={`prioritize-reason-${String(index)}`}>
@@ -463,9 +469,9 @@ export function AiPrioritize(props: AiPrioritizeProps): React.JSX.Element {
         </ul>
 
         <p className="ht-ai__note">
-          确认后会写入这些任务的<strong>优先级字段</strong>，备注、标签、清单都不会被动。
-          已选 <strong data-testid="prioritize-kept-count">{keptSuggestions().length}</strong> /{' '}
-          {proposal.suggestions.length} 条。
+          {t('web.ai.prioritize.noteLead')}<strong>{t('web.ai.prioritize.noteStrong')}</strong>{t('web.ai.prioritize.noteMid')}{' '}
+          <strong data-testid="prioritize-kept-count">{keptSuggestions().length}</strong>{' '}
+          {t('web.ai.prioritize.noteCount', { count: proposal.suggestions.length })}
         </p>
 
         <div className="ht-ai__actions">
@@ -476,10 +482,10 @@ export function AiPrioritize(props: AiPrioritizeProps): React.JSX.Element {
             disabled={keptSuggestions().length === 0}
             onClick={() => void apply()}
           >
-            应用优先级
+            {t('web.ai.prioritize.apply')}
           </button>
           <button type="button" className="ht-btn ht-btn--ghost" data-testid="prioritize-reject" onClick={reset}>
-            不要了
+            {t('web.ai.action.discard')}
           </button>
         </div>
       </div>
@@ -491,22 +497,32 @@ export function AiPrioritize(props: AiPrioritizeProps): React.JSX.Element {
     <div
       className="ht-ai__panel"
       role="dialog"
-      aria-label="AI 排优先级失败"
+      aria-label={t('web.ai.prioritize.failedAria')}
       data-testid="prioritize-failed"
     >
       <div className="ht-ai__head">
-        <span>没能排序</span>
+        <span>{t('web.ai.prioritize.failedHead')}</span>
         <button
           type="button"
           className="ht-btn ht-btn--ghost"
-          aria-label="关闭"
+          aria-label={t('web.ai.action.close')}
           data-testid="prioritize-failed-close"
           onClick={reset}
         >
           <X size={12} aria-hidden="true" />
         </button>
       </div>
-      <p data-testid="prioritize-failure-message">{failure}</p>
+      <p data-testid="prioritize-failure-message">
+        {failure === null ? '' : t(failure.key)}
+      </p>
+      {/* 技术详情：包 / 端点返回的原文。分类与 ErrorScreen 的 <details> 相同 ——
+          那是诊断**数据**，不是文案（见 ai-failure-copy.ts 的 `showDetail`）。 */}
+      {failure !== null && failure.showDetail && failure.detail !== '' && (
+        <details data-testid="prioritize-failure-message-detail">
+          <summary>{t('web.ai.failure.details')}</summary>
+          <p>{failure.detail}</p>
+        </details>
+      )}
       <div className="ht-ai__actions">
         <button
           type="button"
@@ -514,7 +530,7 @@ export function AiPrioritize(props: AiPrioritizeProps): React.JSX.Element {
           data-testid="prioritize-close"
           onClick={reset}
         >
-          关闭
+          {t('web.ai.action.close')}
         </button>
       </div>
     </div>

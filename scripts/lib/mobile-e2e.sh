@@ -96,7 +96,31 @@ dump() {
     $ADB shell rm -f /sdcard/ui.xml >/dev/null 2>&1
     $ADB shell uiautomator dump /sdcard/ui.xml >/dev/null 2>&1
     $ADB shell cat /sdcard/ui.xml > /tmp/ui.xml 2>/dev/null
-    grep -q '<hierarchy' /tmp/ui.xml 2>/dev/null && return 0
+    if grep -q '<hierarchy' /tmp/ui.xml 2>/dev/null; then
+      # 🔴 **系统 ANR 弹窗要当场关掉，否则整轮验收都在看弹窗。**
+      #
+      # 实测（2026-09-26，宿主机 load average 66~233）：模拟器的 System UI
+      # 会 ANR，弹出一个 "System UI isn't responding / Close app / Wait" 的
+      # **系统对话框**盖住应用。此时 dump 是成功的、`<hierarchy` 也在 ——
+      # 但里面**一个输入框都没有**，于是脚本报"找不到输入框：服务器地址"，
+      # 方向被引去怀疑界面改版，而真正的原因跟应用毫无关系。
+      #
+      # 这类"探针成功、内容是被别的东西盖住的"最费时间，所以在这里统一处理：
+      # 认出 ANR 弹窗 → 点「Wait」→ 重新抓一次，让调用方拿到真正的界面。
+      if grep -q "isn't responding\|is not responding\|无响应" /tmp/ui.xml 2>/dev/null; then
+        local anr_xy
+        anr_xy=$(python3 /tmp/_xy.py text "Wait" 0 2>/dev/null)
+        [ -z "$anr_xy" ] && anr_xy=$(python3 /tmp/_xy.py text "等待" 0 2>/dev/null)
+        [ -z "$anr_xy" ] && anr_xy=$(python3 /tmp/_xy.py text "Close app" 0 2>/dev/null)
+        if [ -n "$anr_xy" ]; then
+          echo "   ⚠️ 检测到系统 ANR 弹窗（宿主机过载），点掉它再重抓界面" >&2
+          $ADB shell input tap $anr_xy >/dev/null 2>&1
+          sleep 3
+          continue
+        fi
+      fi
+      return 0
+    fi
     sleep 1
   done
   echo "   ⚠️ uiautomator dump 连续 5 次都没抓到界面（一直不空闲？）—— 后续断言读的是空快照" >&2
@@ -113,6 +137,16 @@ xy_edit() {
 }
 xy_edit_any() {
   python3 /tmp/_xy.py editany "" 0
+}
+# 读某个输入框**当前实际内容**。
+#
+# 🔴 为什么必须有这个：`input text` 在宿主机高负载时会**静默丢字符**。
+#    实测（2026-09-26，load average 66~233 / 16 核）：225 字符的令牌只落地
+#    28~33 个字符，而 `input text` 的**退出码仍然是 0**。
+#    于是脚本报"没填进去"，方向被引去怀疑应用 —— 而应用没问题，是输入没送到。
+#    有了读回，才能"发现少了什么、把缺的补上"，而不是赌它一次成功。
+edit_value() {  # <标签>
+  python3 /tmp/_xy.py editval "$1" 0
 }
 # 按可见文本定位（第 2 个参数是"第几个"，用于两个同名按钮）
 xy_text() {
@@ -264,10 +298,57 @@ for v in seen: print('      •',v)
 PY
 }
 
-clear_and_type() {  # 先全选删除再输入，绝不循环 DEL（会 ANR）
+clear_and_type() {  # <值> [标签] —— 先全选删除再输入，绝不循环 DEL（会 ANR）
+  local want=$1 label=${2:-} i=0 cur
   $ADB shell input keycombination 113 29; sleep 0.6
   $ADB shell input keyevent 67; sleep 0.8
-  $ADB shell input text "$1"; sleep 1.5
+
+  # 🔴 **分块发送，不要一次甩一整个长字符串。**
+  #
+  # 实测（2026-09-26，load average 66~233 / 16 核）：一次发 225 字符的令牌，
+  # 只有 28~33 个字符落地 —— 而 `input text` **退出码是 0**，没有任何报错。
+  # 分块 + 每块之间让系统喘一口，丢字符的概率显著下降。
+  # 分块**不能保证**不丢，所以下面还有读回补齐；两层都要有。
+  local n=${#want} chunk=40 off=0 piece
+  while [ "$off" -lt "$n" ]; do
+    piece=$(python3 -c "import sys;print(sys.argv[1][int(sys.argv[2]):int(sys.argv[2])+40])" "$want" "$off")
+    $ADB shell input text "$piece"
+    off=$((off + chunk))
+    sleep 0.7
+  done
+  sleep 1
+
+  # 🔴 **读回补齐：缺什么补什么。**
+  #
+  # 没有标签就没法读回（调用方没给），此时只能返回 0 —— 但**必须让调用方知道**
+  # 它没拿到校验，而不是假装成功了。调用方用 `has_text` 再断言一次。
+  [ -z "$label" ] && return 0
+
+  while [ "$i" -lt 6 ]; do
+    dump
+    cur=$(edit_value "$label" 2>/dev/null)
+    # 已经正确
+    [ "$cur" = "$want" ] && return 0
+    # 是目标值的**前缀**（丢的是尾巴）→ 把剩下的补上
+    case "$want" in
+      "$cur"*)
+        # 用 python 算后缀，**不能用 `${want:${#cur}}`** ——
+        # `${#中文}` 在非 UTF-8 locale 下数的是**字节**（8 个汉字报 24），
+        # 于是偏移量错位、补上去的是乱码，而且看不出原因。
+        piece=$(python3 -c "import sys;print(sys.argv[1][len(sys.argv[2]):])" "$want" "$cur")
+        $ADB shell input text "$piece" >/dev/null 2>&1
+        ;;
+      *)
+        # 不是前缀（中间丢了、或残留了旧值）→ 全选重来，别在脏状态上叠加
+        $ADB shell input keycombination 113 29; sleep 0.6
+        $ADB shell input keyevent 67; sleep 0.8
+        $ADB shell input text "$want" >/dev/null 2>&1
+        ;;
+    esac
+    sleep 1.5
+    i=$((i + 1))
+  done
+  return 1
 }
 
 # 🔴 笔记本设备的一条命令。**返回 JSON**，成败由调用方从 `ok` 字段读 ——
@@ -585,7 +666,8 @@ configure_sync_credentials() {
     XY=$(xy_edit "$desc")
     if [ -z "$XY" ]; then bad "找不到输入框：$desc"; continue; fi
     $ADB shell input tap $XY; sleep 1.2
-    clear_and_type "$val"
+    # 传标签进去 → `clear_and_type` 会读回、把丢掉的字符补上（高负载下会丢）。
+    clear_and_type "$val" "$desc"
     dump
     if [ "$desc" = "端到端加密口令" ]; then
       # 🔴 口令是 `secureTextEntry`，**内容永远不会出现在 dump 里**

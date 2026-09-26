@@ -13,6 +13,7 @@
 import { useState } from 'react';
 import { ActivityCalendar } from 'react-activity-calendar';
 import { cssVar } from '@heyta/design-system';
+import { useI18n, type I18nValue } from '@heyta/i18n';
 import { Check, Flame, Plus, Undo2 } from 'lucide-react';
 
 import { selectHabitProgress, selectHeatmap, useHabitStore } from './store.js';
@@ -21,7 +22,43 @@ import { activityLabels, heatmapTheme } from '../../lib/heatmap-theme.js';
 
 const NOW_STATE_KEY = 'now';
 
+/**
+ * 三个指标各自的一句话。
+ *
+ * 🔴 词条表没有 ICU：连续 1 天时英文必须走单数兄弟词条
+ * （"Streak 1 days" 是一眼可见的坏句子）。三个数字各自分支，
+ * 因为它们完全可能一个是 1、另一个不是。
+ *
+ * 放在组件外、显式收 `t`：这样它既在 JSX 之外拼好句子
+ * （门禁只认"字面量紧跟 `t(`"的形状），又不依赖 hook。
+ */
+function currentStreakText(count: number, t: I18nValue['t']): string {
+  return count === 1
+    ? t('web.habits.streak.currentOne', { count })
+    : t('web.habits.streak.current', { count });
+}
+
+function longestStreakText(count: number, t: I18nValue['t']): string {
+  return count === 1
+    ? t('web.habits.streak.longestOne', { count })
+    : t('web.habits.streak.longest', { count });
+}
+
+function totalCheckInText(count: number, t: I18nValue['t']): string {
+  return count === 1
+    ? t('web.habits.streak.totalOne', { count })
+    : t('web.habits.streak.total', { count });
+}
+
+/** 打卡按钮的无障碍名："撤销今日打卡" / "为它打卡" 是两句话，各自成词条。 */
+function checkInLabel(name: string, doneToday: boolean, t: I18nValue['t']): string {
+  return doneToday
+    ? t('web.habits.a11y.undo', { name })
+    : t('web.habits.a11y.checkIn', { name });
+}
+
 export function HabitsView() {
+  const { t } = useI18n();
   const store = useHabitStore();
   const [draft, setDraft] = useState('');
   // 固定"现在"，避免同一次渲染里跨午夜导致不一致
@@ -50,8 +87,8 @@ export function HabitsView() {
         <input
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
-          placeholder="新习惯，例如「喝水」"
-          aria-label="新习惯名称"
+          placeholder={t('web.habits.addPlaceholder')}
+          aria-label={t('web.habits.addLabel')}
           style={{
             flex: 1,
             minHeight: cssVar('touch-target.min'),
@@ -67,7 +104,7 @@ export function HabitsView() {
         />
         <button
           type="submit"
-          aria-label="添加习惯"
+          aria-label={t('web.habits.add')}
           style={{
             minWidth: cssVar('touch-target.min'),
             minHeight: cssVar('touch-target.min'),
@@ -86,7 +123,7 @@ export function HabitsView() {
 
       {progress.length === 0 && (
         <p style={{ color: cssVar('color.foreground-muted'), fontSize: cssVar('font-size.sm') }}>
-          还没有习惯。添加一个开始打卡。
+          {t('web.habits.empty')}
         </p>
       )}
 
@@ -119,31 +156,29 @@ export function HabitsView() {
                 <div className="ht-habit__name" style={text('row-title')}>
                   {p.habit.name}
                 </div>
-
                 {/**
                  * 三指标**并存**（计划 §4）：当前连续 / 历史最长 / 累计。
                  *
                  * 🔴 其中「累计」是唯一只增不减、且不被任何中断影响的数字 ——
                  * 它是断链那天用户最需要看见的东西，所以它必须**常驻**，
                  * 不能只在"断链之后"才出现：那样它就成了一句安慰，而不是一个事实。
+                 *
+                 * ⚠️ 前两个走的是**韧性口径**（`r`：冻结算数），不是日历口径的
+                 * `p.streak`。两个"连续"数字**永远不能相减**（ADR-0015）——
+                 * 界面上只出现一个，出现的是那个能解释"中断过却还连着"的。
                  */}
-                <div className="ht-habit__metrics" style={text('caption')}>
+                <div
+                  className="ht-habit__metrics"
+                  // 🔴 数字现在在**句子里**（英文语序要求如此），
+                  // 所以等宽数字给在整行上，而不是给某一个 span。
+                  style={{ ...text('caption'), fontVariantNumeric: 'tabular-nums' }}
+                >
                   <span className="ht-habit__metric ht-habit__metric--current">
                     <Flame size={12} aria-hidden="true" />
-                    连续
-                    <span style={{ fontVariantNumeric: 'tabular-nums' }}>{r.current}</span>
-                    天
+                    {currentStreakText(r.current, t)}
                   </span>
-                  <span className="ht-habit__metric">
-                    最长
-                    <span style={{ fontVariantNumeric: 'tabular-nums' }}>{r.longest}</span>
-                    天
-                  </span>
-                  <span className="ht-habit__metric">
-                    累计
-                    <span style={{ fontVariantNumeric: 'tabular-nums' }}>{r.total}</span>
-                    次
-                  </span>
+                  <span className="ht-habit__metric">{longestStreakText(r.longest, t)}</span>
+                  <span className="ht-habit__metric">{totalCheckInText(r.total, t)}</span>
                 </div>
 
                 {/**
@@ -172,12 +207,11 @@ export function HabitsView() {
                  * 也就是下面这一行本身，而不是一个常驻的计数器。
                  */}
                 {r.frozenInCurrentRun > 0 && (
-                  <p className="ht-habit__freeze" style={text('caption')}>
-                    这段连续里有
-                    <span style={{ fontVariantNumeric: 'tabular-nums' }}>
-                      {r.frozenInCurrentRun}
-                    </span>
-                    天是冻结保住的
+                  <p
+                    className="ht-habit__freeze"
+                    style={{ ...text('caption'), fontVariantNumeric: 'tabular-nums' }}
+                  >
+                    {t('web.habits.freeze', { count: r.frozenInCurrentRun })}
                   </p>
                 )}
               </div>
@@ -192,7 +226,7 @@ export function HabitsView() {
                     void store.checkIn(p.habit.id);
                   }
                 }}
-                aria-label={p.doneToday ? `撤销「${p.habit.name}」今日打卡` : `为「${p.habit.name}」打卡`}
+                aria-label={checkInLabel(p.habit.name, p.doneToday, t)}
                 aria-pressed={p.doneToday}
                 style={{
                   minWidth: cssVar('touch-target.min'),
@@ -219,7 +253,7 @@ export function HabitsView() {
                 {p.doneToday ? (
                   <>
                     <Check size={16} aria-hidden="true" />
-                    已打卡
+                    {t('web.habits.checkedIn')}
                   </>
                 ) : (
                   <>
@@ -232,7 +266,7 @@ export function HabitsView() {
                      * 「✓ 已打卡」相对「＋ 打卡」，字形本身就不同。
                      */}
                     <Plus size={16} aria-hidden="true" />
-                    打卡
+                    {t('web.habits.checkIn')}
                   </>
                 )}
               </button>
@@ -251,21 +285,26 @@ export function HabitsView() {
              */}
             {repair !== undefined && (
               <div className="ht-habit__action">
-                <p className="ht-habit__action-text" style={text('caption')}>
-                  {repair.date} 那天漏了。现在补上，就是连续
-                  <span style={{ fontVariantNumeric: 'tabular-nums' }}>
-                    {repair.streakIfRepaired}
-                  </span>
-                  天。
+                <p
+                  className="ht-habit__action-text"
+                  style={{ ...text('caption'), fontVariantNumeric: 'tabular-nums' }}
+                >
+                  {t('web.habits.repair', {
+                    date: repair.date,
+                    count: repair.streakIfRepaired,
+                  })}
                 </p>
                 <button
                   type="button"
                   className="ht-btn ht-btn--ghost ht-habit__action-btn"
                   onClick={() => void store.checkIn(p.habit.id, repair.date)}
-                  aria-label={`把 ${repair.date} 的「${p.habit.name}」补上`}
+                  aria-label={t('web.habits.a11y.repair', {
+                    date: repair.date,
+                    name: p.habit.name,
+                  })}
                 >
                   <Undo2 size={14} aria-hidden="true" />
-                  补上
+                  {t('web.habits.repairAction')}
                 </button>
               </div>
             )}
@@ -280,20 +319,23 @@ export function HabitsView() {
              */}
             {freshStart !== undefined && (
               <div className="ht-habit__action">
-                <p className="ht-habit__action-text" style={text('caption')}>
-                  已经 {freshStart.daysSinceLast} 天没打卡了。最长
-                  <span style={{ fontVariantNumeric: 'tabular-nums' }}>{freshStart.longest}</span>
-                  天、累计
-                  <span style={{ fontVariantNumeric: 'tabular-nums' }}>{freshStart.total}</span>
-                  次都还在，重新开始不会清掉它们。
+                <p
+                  className="ht-habit__action-text"
+                  style={{ ...text('caption'), fontVariantNumeric: 'tabular-nums' }}
+                >
+                  {t('web.habits.freshStart', {
+                    days: freshStart.daysSinceLast,
+                    longest: freshStart.longest,
+                    total: freshStart.total,
+                  })}
                 </p>
                 <button
                   type="button"
                   className="ht-btn ht-btn--ghost ht-habit__action-btn"
                   onClick={() => void store.checkIn(p.habit.id)}
-                  aria-label={`今天为「${p.habit.name}」重新打卡`}
+                  aria-label={t('web.habits.a11y.freshStart', { name: p.habit.name })}
                 >
-                  今天重新开始
+                  {t('web.habits.freshStartAction')}
                 </button>
               </div>
             )}
@@ -310,7 +352,7 @@ export function HabitsView() {
               // 以及为什么空档要用 `heat-0` 而不是 `surface-sunken`。
               theme={heatmapTheme()}
               // 文案也要覆盖 —— 库的默认值是英文（`Less / More`、`Oct`、`N activities in YYYY`）
-              labels={activityLabels('最近 90 天共 {{count}} 次打卡')}
+              labels={activityLabels(t('web.habits.heatmap'), t)}
             />
           </li>
           );

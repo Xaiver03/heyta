@@ -31,6 +31,7 @@
 
 import { cssVar } from '@heyta/design-system';
 import type { IdentityTagProgress } from '@heyta/domain';
+import { useI18n } from '@heyta/i18n';
 import { Award } from 'lucide-react';
 
 import { text } from '../../lib/text.js';
@@ -44,9 +45,22 @@ export interface IdentityTagListProps {
 const NEAR_MISS_COUNT = 2;
 
 export function IdentityTagList({ tags }: IdentityTagListProps) {
-  const reached = tags.filter((t) => t.reached);
+  const { t } = useI18n();
+
+  /**
+   * 标签 id → 文案。
+   *
+   * ⚠️ 表里没有的 id **原样显示 id**，不编一个中文名 ——
+   * 后者会让"漏翻"看起来像"已经翻了"（与门禁对词条表的要求同一取向）。
+   */
+  function tagLabel(id: string): string {
+    const key = IDENTITY_TAG_COPY[id];
+    return key === undefined ? id : t(key);
+  }
+
+  const reached = tags.filter((tag) => tag.reached);
   const nearMisses = tags
-    .filter((t) => !t.reached)
+    .filter((tag) => !tag.reached)
     // 按"还差多少（比例）"排序。用 ratio 而不是绝对值：
     // "还差 2 小时"和"还差 500 件"在绝对值上不可比，比例才可比。
     .sort((a, b) => b.ratio - a.ratio)
@@ -55,7 +69,7 @@ export function IdentityTagList({ tags }: IdentityTagListProps) {
   if (reached.length === 0 && nearMisses.length === 0) {
     return (
       <p className="ht-tags__empty" style={text('row-meta')}>
-        还没有标签。继续记录，这里会自己长出来。
+        {t('web.growth.tags.empty')}
       </p>
     );
   }
@@ -63,26 +77,29 @@ export function IdentityTagList({ tags }: IdentityTagListProps) {
   return (
     <div className="ht-tags">
       <ul className="ht-tags__list">
-        {reached.map((t) => (
-          <li key={t.id} className="ht-tags__item ht-tags__item--reached">
+        {reached.map((tag) => (
+          <li key={tag.id} className="ht-tags__item ht-tags__item--reached">
             <Award size={16} aria-hidden="true" />
-            <span style={text('row-title')}>{IDENTITY_TAG_COPY[t.id] ?? t.id}</span>
+            <span style={text('row-title')}>{tagLabel(tag.id)}</span>
           </li>
         ))}
       </ul>
 
       {nearMisses.length > 0 && (
         <div className="ht-tags__near">
-          {nearMisses.map((t) => {
-            const kind = t.kind === 'streakDays' ? 'activeDays' : t.kind;
-            const copy = KIND_COPY[kind];
+          {nearMisses.map((tag) => {
+            const kind = tag.kind === 'streakDays' ? 'activeDays' : tag.kind;
+            const unit =
+              tag.kind === 'streakDays'
+                ? t('web.growth.unit.streakDays')
+                : t(KIND_COPY[kind].unitKey);
             return (
-              <p key={t.id} className="ht-tags__near-item" style={text('caption')}>
-                距离「{IDENTITY_TAG_COPY[t.id] ?? t.id}」还差
-                <span style={{ fontVariantNumeric: 'tabular-nums' }}>
-                  {Math.max(0, t.threshold - t.value)}
-                </span>
-                {t.kind === 'streakDays' ? '天连续' : copy.unit}
+              <p key={tag.id} className="ht-tags__near-item" style={text('caption')}>
+                {t('web.growth.tags.near', {
+                  name: tagLabel(tag.id),
+                  gap: Math.max(0, tag.threshold - tag.value),
+                  unit,
+                })}
               </p>
             );
           })}
@@ -90,8 +107,11 @@ export function IdentityTagList({ tags }: IdentityTagListProps) {
       )}
 
       {reached.length === 0 && (
-        <p className="ht-tags__empty" style={{ ...text('caption'), color: cssVar('color.foreground-subtle') }}>
-          上面这些是离你最近的两个。到了就会出现在这里。
+        <p
+          className="ht-tags__empty"
+          style={{ ...text('caption'), color: cssVar('color.foreground-subtle') }}
+        >
+          {t('web.growth.tags.nearNote')}
         </p>
       )}
     </div>

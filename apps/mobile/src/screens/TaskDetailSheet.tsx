@@ -42,42 +42,52 @@ import {
   View,
 } from 'react-native';
 
-import { Priority, describeRecurrence, dueDateToEpoch, toLocalDate, type Task } from '@heyta/domain';
+import {
+  Priority,
+  dueDateToEpoch,
+  isImportant,
+  toLocalDate,
+  type Project,
+  type Task,
+} from '@heyta/domain';
+import type { MessageKey } from '@heyta/i18n';
+import { useI18n } from '@heyta/i18n';
 import {
   REPEAT_PRESET_IDS,
   repeatPresetRule,
+  type ProjectActions,
   type RepeatPresetId,
   type TaskActions,
 } from '@heyta/app-host';
 
-import { PRIORITY_LABELS, PRIORITY_ORDER, priorityColorToken } from '../lib/priority';
+import { PRIORITY_ORDER, priorityColorToken, priorityLabel } from '../lib/priority';
+import { describeRecurrenceText } from '../lib/recurrence-display';
 import { useText, useTheme, useTokens } from '../theme';
 import { DatePicker } from '../ui/DatePicker';
 import { Button, Chip, IconButton, SectionHeader, Text } from '../ui/kit';
 
 /**
- * 重复预设的**显示文字**。
+ * 重复预设 → 词条 key。
  *
- * ⚠️ 这里只有文字。"每周到底是哪一天"、"工作日是哪几天"是产品语义，
+ * ⚠️ 这里只有 key。"每周到底是哪一天"、"工作日是哪几天"是产品语义，
  * 在 `@heyta/app-host` 的 `repeat-presets.ts` 里（§3.5 的判据）。
  * 把语义放在界面里的后果是 Web 端落地时出现第二份，两份对"工作日"的理解
  * 只要差一天，同一个用户在两台设备上就会看到不同的重复日期，且都不报错。
  */
-const REPEAT_LABELS: Record<RepeatPresetId, string> = {
-  daily: '每天',
-  weekly: '每周',
-  weekdays: '工作日',
-  monthly: '每月',
+const REPEAT_LABEL_KEYS: Record<RepeatPresetId, MessageKey> = {
+  daily: 'mobile.detail.repeat.daily',
+  weekly: 'mobile.detail.repeat.weekly',
+  weekdays: 'mobile.detail.repeat.weekdays',
+  monthly: 'mobile.detail.repeat.monthly',
 };
-
-/** 不重复。它不是一条规则，所以不属于预设清单。 */
-const NO_REPEAT_LABEL = '不重复';
 
 export function TaskDetailSheet({
   task,
   visible,
   onClose,
   actions,
+  projects,
+  projectActions,
   onChanged,
   now,
 }: {
@@ -86,15 +96,25 @@ export function TaskDetailSheet({
   visible: boolean;
   onClose: () => void;
   actions: TaskActions;
+  /**
+   * 可选的清单（**不含「收集箱」** —— 那个选项不是实体，见下面的渲染）。
+   */
+  projects: Project[];
+  /** 要新建清单时需要它。为 `null` 时「新建清单」不出现（宿主还没打开）。 */
+  projectActions: ProjectActions | null;
   onChanged: () => void;
   now: number;
 }): React.JSX.Element | null {
-  const t = useTokens();
+  const tokens = useTokens();
   const text = useText();
   const { native } = useTheme();
+  const { t, locale } = useI18n();
 
   const [title, setTitle] = useState('');
   const [busy, setBusy] = useState(false);
+  /** 行内「新建清单」的输入态与草稿名。 */
+  const [newListOpen, setNewListOpen] = useState(false);
+  const [newListName, setNewListName] = useState('');
 
   const taskId = task?.id;
 
@@ -105,6 +125,17 @@ export function TaskDetailSheet({
   // 因为"保住用户正在打的字"比"显示别处的最新值"重要。
   useEffect(() => {
     setTitle(task?.title ?? '');
+  }, [taskId, visible]);
+
+  /**
+   * 每次面板打开时收起「新建清单」那一行。
+   *
+   * 不收的话：上次敲了一半的名字会留在下一次打开的面板里，
+   * 而用户已经换了一条任务 —— 看起来像"新建清单的输入框有自己的记忆"。
+   */
+  useEffect(() => {
+    setNewListOpen(false);
+    setNewListName('');
   }, [taskId, visible]);
 
   const run = useCallback(
@@ -140,6 +171,16 @@ export function TaskDetailSheet({
   const dueLocal = task.dueDate === undefined ? undefined : toLocalDate(task.dueDate);
   const todayLocal = toLocalDate(now);
   const done = task.completedAt !== undefined;
+  /**
+   * 当前是否"重要"。
+   *
+   * 🔴 用 `isImportant()` 而不是裸的 `task.important`：后者是后加字段，
+   * 老数据没有它，直接读会得到 `undefined`（开关显示"关"），
+   * 而 `isImportant` 会回退到优先级推导（HIGH 视为重要）。
+   * 用裸字段会让**详情页与象限视图各说一套**：详情说"不重要"，
+   * 任务却在 Q1 —— 用户只会认为象限坏了。
+   */
+  const important = isImportant(task);
 
   /**
    * 重复规则的锚点。
@@ -172,7 +213,7 @@ export function TaskDetailSheet({
              （验收脚本实测：连点 5 步都没关掉，后面每一步都在面板还开着的
              状态下找列表行）。 */}
       <Pressable
-        style={{ flex: 1, backgroundColor: t['material.scrim'] }}
+        style={{ flex: 1, backgroundColor: tokens['material.scrim'] }}
         onPress={close}
         accessible={false}
         importantForAccessibility="no"
@@ -181,14 +222,14 @@ export function TaskDetailSheet({
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <View
           style={{
-            backgroundColor: t['color.surface'],
-            borderTopLeftRadius: t['radius.xl'],
-            borderTopRightRadius: t['radius.xl'],
+            backgroundColor: tokens['color.surface'],
+            borderTopLeftRadius: tokens['radius.xl'],
+            borderTopRightRadius: tokens['radius.xl'],
             // ⚠️ 只给纵向内边距，不给固定 height ——
             // 同一节点上同时给 height 与 padding 会让内容在被压缩的盒子里居中。
-            paddingTop: t['space.4'],
-            paddingBottom: t['space.8'],
-            gap: t['space.3'],
+            paddingTop: tokens['space.4'],
+            paddingBottom: tokens['space.8'],
+            gap: tokens['space.3'],
             maxHeight: '90%',
           }}
         >
@@ -197,27 +238,27 @@ export function TaskDetailSheet({
               flexDirection: 'row',
               alignItems: 'center',
               justifyContent: 'space-between',
-              paddingHorizontal: t['screen.gutter'],
+              paddingHorizontal: tokens['screen.gutter'],
             }}
           >
-            <Text variant="section-title">任务详情</Text>
+            <Text variant="section-title">{t('mobile.detail.title')}</Text>
             <IconButton
               icon="action.close"
-              label="关闭任务详情"
-              color={t['color.foreground-muted']}
+              label={t('mobile.detail.close')}
+              color={tokens['color.foreground-muted']}
               onPress={close}
             />
           </View>
 
           <ScrollView
-            style={{ paddingHorizontal: t['screen.gutter'] }}
-            contentContainerStyle={{ gap: t['space.4'], paddingBottom: t['space.2'] }}
+            style={{ paddingHorizontal: tokens['screen.gutter'] }}
+            contentContainerStyle={{ gap: tokens['space.4'], paddingBottom: tokens['space.2'] }}
             // 键盘弹起时，点快捷项/日期格应当直接生效而不是先收键盘
             keyboardShouldPersistTaps="handled"
           >
-            <View style={{ gap: t['space.1'] }}>
+            <View style={{ gap: tokens['space.1'] }}>
               <Text variant="row-meta" tone="muted">
-                标题
+                {t('mobile.detail.field.title')}
               </Text>
               <TextInput
                 value={title}
@@ -225,20 +266,20 @@ export function TaskDetailSheet({
                 onBlur={commitTitle}
                 onSubmitEditing={commitTitle}
                 returnKeyType="done"
-                accessibilityLabel="任务标题"
-                placeholder="要做什么？"
-                placeholderTextColor={t['color.foreground-subtle']}
+                accessibilityLabel={t('mobile.detail.field.title')}
+                placeholder={t('mobile.tasks.composer.placeholder')}
+                placeholderTextColor={tokens['color.foreground-subtle']}
                 style={[
                   text['row-title'],
                   {
-                    minHeight: t['touch-target.min'],
-                    paddingHorizontal: t['space.3'],
-                    borderRadius: t['radius.md'],
-                    borderWidth: t['border-width.thin'],
-                    borderColor: t['color.border'],
-                    backgroundColor: t['color.surface-sunken'],
-                    color: t['color.foreground'],
-                    // ⚠️ 走归一化访问器。直接传 `t['font.sans']` 会把整条
+                    minHeight: tokens['touch-target.min'],
+                    paddingHorizontal: tokens['space.3'],
+                    borderRadius: tokens['radius.md'],
+                    borderWidth: tokens['border-width.thin'],
+                    borderColor: tokens['color.border'],
+                    backgroundColor: tokens['color.surface-sunken'],
+                    color: tokens['color.foreground'],
+                    // ⚠️ 走归一化访问器。直接传 `tokens['font.sans']` 会把整条
                     // CSS 字体栈交给 RN，字体解析失败且**不报错**（已实测）。
                     fontFamily: native.fontSans,
                   },
@@ -246,8 +287,94 @@ export function TaskDetailSheet({
               />
             </View>
 
-            <View style={{ gap: t['space.2'] }}>
-              <SectionHeader icon="task.due" title="截止日期" />
+            <View style={{ gap: tokens['space.2'] }}>
+              <SectionHeader icon="task.project" title={t('mobile.detail.field.project')} />
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: tokens['space.2'] }}>
+                {/* 🔴 「收集箱」是**未归类**的显示名，不是一条真清单：
+                    它对应 `projectId === undefined`，任何 PROJECT 实体里都没有它。
+                    所以它是一个**选项**，但永远不参与增删改。 */}
+                <Chip
+                  label={t('mobile.detail.project.inbox')}
+                  selected={task.projectId === undefined}
+                  onPress={() => {
+                    // 清除传 `undefined`，由 app-host 写成 `null`
+                    // （见 `TaskActions.moveToProject`）。
+                    run(actions.moveToProject(task.id, undefined));
+                  }}
+                />
+                {projects.map((project) => (
+                  <Chip
+                    key={project.id}
+                    label={project.name}
+                    selected={task.projectId === project.id}
+                    onPress={() => {
+                      run(actions.moveToProject(task.id, project.id));
+                    }}
+                  />
+                ))}
+                {projectActions !== null && !newListOpen && (
+                  <Chip
+                    label={t('mobile.detail.project.create')}
+                    selected={false}
+                    icon="task.add"
+                    onPress={() => {
+                      setNewListOpen(true);
+                    }}
+                  />
+                )}
+              </View>
+
+              {/* 行内新建：**建完立刻把这任务放进去**。
+                  分两步（先去「我的」页建、再回来选）会让"边整理边建清单"
+                  这个最常见的动作变成一次跨页往返。 */}
+              {newListOpen && projectActions !== null && (
+                <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: tokens['space.2'] }}>
+                  <View style={{ flex: 1 }}>
+                    <TextInput
+                      value={newListName}
+                      onChangeText={setNewListName}
+                      accessibilityLabel={t('mobile.detail.field.project')}
+                      placeholder={t('mobile.detail.project.newPlaceholder')}
+                      placeholderTextColor={tokens['color.foreground-subtle']}
+                      autoFocus
+                      style={[
+                        text['row-title'],
+                        {
+                          minHeight: tokens['touch-target.min'],
+                          paddingHorizontal: tokens['space.3'],
+                          borderRadius: tokens['radius.md'],
+                          borderWidth: tokens['border-width.thin'],
+                          borderColor: tokens['color.border'],
+                          backgroundColor: tokens['color.surface-sunken'],
+                          color: tokens['color.foreground'],
+                          fontFamily: native.fontSans,
+                        },
+                      ]}
+                    />
+                  </View>
+                  <Button
+                    label={t('mobile.detail.project.create')}
+                    tone="secondary"
+                    disabled={newListName.trim() === ''}
+                    onPress={() => {
+                      const trimmed = newListName.trim();
+                      if (trimmed === '') return;
+                      // 两步走的是**两个用户意图 = 两个 op**（建清单、把任务放进去），
+                      // 不是一条混合实体 op —— reducer 不支持后者，会静默不生效
+                      // （见 `packages/domain/src/entities.ts` 里 repeatRule 那段）。
+                      run(
+                        projectActions.createProject(trimmed).then((id) => actions.moveToProject(task.id, id)),
+                      );
+                      setNewListOpen(false);
+                      setNewListName('');
+                    }}
+                  />
+                </View>
+              )}
+            </View>
+
+            <View style={{ gap: tokens['space.2'] }}>
+              <SectionHeader icon="task.due" title={t('mobile.detail.field.dueDate')} />
               <DatePicker
                 value={dueLocal}
                 today={todayLocal}
@@ -259,11 +386,11 @@ export function TaskDetailSheet({
               />
             </View>
 
-            <View style={{ gap: t['space.2'] }}>
-              <SectionHeader icon="task.repeat" title="重复" />
-              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: t['space.2'] }}>
+            <View style={{ gap: tokens['space.2'] }}>
+              <SectionHeader icon="task.repeat" title={t('mobile.detail.field.repeat')} />
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: tokens['space.2'] }}>
                 <Chip
-                  label={NO_REPEAT_LABEL}
+                  label={t('mobile.detail.repeat.none')}
                   selected={repeat === undefined}
                   onPress={() => {
                     run(actions.setRepeat(task.id, undefined));
@@ -272,7 +399,7 @@ export function TaskDetailSheet({
                 {REPEAT_PRESET_IDS.map((id) => (
                   <Chip
                     key={id}
-                    label={REPEAT_LABELS[id]}
+                    label={t(REPEAT_LABEL_KEYS[id])}
                     selected={activePreset === id}
                     onPress={() => {
                       const rule = repeatPresetRule(id, repeatAnchor);
@@ -290,7 +417,7 @@ export function TaskDetailSheet({
                     而用户一点「每天」就把那条规则悄悄换掉了。 */}
                 {customRule !== undefined && (
                   <Chip
-                    label={describeRecurrence(customRule)}
+                    label={describeRecurrenceText(customRule, t, locale)}
                     selected
                     icon="task.repeat"
                     onPress={() => {
@@ -301,20 +428,22 @@ export function TaskDetailSheet({
               </View>
               {repeat !== undefined && (
                 <Text variant="row-meta" tone="muted">
-                  {`当前：${describeRecurrence(repeat.rule)}`}
+                  {t('mobile.detail.repeat.current', {
+                    rule: describeRecurrenceText(repeat.rule, t, locale),
+                  })}
                 </Text>
               )}
             </View>
 
-            <View style={{ gap: t['space.2'] }}>
-              <SectionHeader icon="task.priority" title="优先级" />
-              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: t['space.2'] }}>
+            <View style={{ gap: tokens['space.2'] }}>
+              <SectionHeader icon="task.priority" title={t('mobile.detail.field.priority')} />
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: tokens['space.2'] }}>
                 {PRIORITY_ORDER.map((p) => (
                   <Chip
                     key={String(p)}
-                    label={PRIORITY_LABELS[p]}
+                    label={priorityLabel(p, t)}
                     selected={(task.priority ?? Priority.None) === p}
-                    color={t[priorityColorToken(p)]}
+                    color={tokens[priorityColorToken(p)]}
                     onPress={() => {
                       run(actions.setPriority(task.id, p));
                     }}
@@ -323,9 +452,39 @@ export function TaskDetailSheet({
               </View>
             </View>
 
-            <View style={{ flexDirection: 'row', gap: t['space.2'] }}>
+            {/* 四象限的第一个轴。
+                🔴 **为什么这里只有一个开关、没有第二个**：紧急由 `dueDate` 推导，
+                   让人再填一遍就是重复劳动，而且两个字段一定会不一致
+                   （ADR-0015 §3）。所以用户只回答"这件事重要吗"。
+
+                🔴 **为什么读的是 `isImportant(task)` 而不是 `task.important`**：
+                   `important` 是后加字段，老数据没有它。直接读会得到 `undefined`
+                   → 开关显示为"关"，而 `isImportant` 会回退到优先级推导
+                   （HIGH 视为重要）。用裸字段会造成**界面与象限视图不一致**：
+                   详情页说"不重要"，象限里它在 Q1。 */}
+            <View style={{ gap: tokens['space.2'] }}>
+              <SectionHeader icon="task.priority" title={t('mobile.detail.field.important')} />
+              <Chip
+                label={
+                  important
+                    ? t('mobile.detail.important.off')
+                    : t('mobile.detail.important.on')
+                }
+                selected={important}
+                onPress={() => {
+                  run(actions.setImportant(task.id, !important));
+                }}
+              />
+              <Text variant="row-meta" tone="muted">
+                {t('mobile.detail.important.hint')}
+              </Text>
+            </View>
+
+            <View style={{ flexDirection: 'row', gap: tokens['space.2'] }}>
               <Button
-                label={done ? '标记为未完成' : '标记为完成'}
+                label={
+                  done ? t('mobile.detail.markIncomplete') : t('mobile.detail.markComplete')
+                }
                 tone="secondary"
                 icon={done ? 'task.reopen' : 'task.done'}
                 loading={busy}
@@ -335,7 +494,7 @@ export function TaskDetailSheet({
                 style={{ flex: 1 }}
               />
               <Button
-                label="删除"
+                label={t('mobile.detail.delete')}
                 tone="danger"
                 icon="task.delete"
                 loading={busy}

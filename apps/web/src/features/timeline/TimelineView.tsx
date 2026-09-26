@@ -54,6 +54,7 @@
 import { readDurationFromNote } from '@heyta/app-host';
 import { cssVar } from '@heyta/design-system';
 import type { LocalDate } from '@heyta/domain';
+import { useI18n } from '@heyta/i18n';
 
 import {
   MIN_DURATION_MINUTES,
@@ -63,10 +64,6 @@ import {
   type TimelinePlan,
 } from './buildTimeline.js';
 import { GanttChart, formatMinutes } from './GanttChart.js';
-
-/** 空态文案。**一句人话**，并告诉用户下一步去哪做。 */
-const DEFAULT_EMPTY_HINT =
-  '还没有任务可以排 —— 先在收集箱建一个任务，再给它写几条清单（或让 AI 拆解一次），时间线就有东西可排了。';
 
 /**
  * 时间线需要的最小任务形状。
@@ -146,11 +143,12 @@ function planTask(task: TimelineTask): TaskBlock {
 
 export function TimelineView(props: TimelineViewProps): React.JSX.Element {
   const { tasks, startDate, today, now, emptyHint } = props;
+  const { t } = useI18n();
   const clock = now ?? Date.now();
 
   if (tasks.length === 0) {
     return (
-      <div data-testid="timeline-view" role="group" aria-label="时间线">
+      <div data-testid="timeline-view" role="group" aria-label={t('web.timeline.aria.empty')}>
         <p
           data-testid="timeline-view-empty"
           style={{
@@ -159,7 +157,7 @@ export function TimelineView(props: TimelineViewProps): React.JSX.Element {
             fontSize: cssVar('font-size.xs'),
           }}
         >
-          {emptyHint ?? DEFAULT_EMPTY_HINT}
+          {emptyHint ?? t('web.timeline.empty')}
         </p>
       </div>
     );
@@ -176,7 +174,11 @@ export function TimelineView(props: TimelineViewProps): React.JSX.Element {
     <div
       data-testid="timeline-view"
       role="group"
-      aria-label={`时间线：共 ${String(tasks.length)} 条任务`}
+      aria-label={
+        tasks.length === 1
+          ? t('web.timeline.aria.groupOne', { count: tasks.length })
+          : t('web.timeline.aria.group', { count: tasks.length })
+      }
       style={{ display: 'grid', gap: cssVar('space.5') }}
     >
       {blocks.map((block) => (
@@ -211,7 +213,9 @@ export function TimelineView(props: TimelineViewProps): React.JSX.Element {
                   color: cssVar('color.foreground-muted'),
                 }}
               >
-                AI 估时：{formatMinutes(block.aiMinutes)}（整条任务）
+                {t('web.timeline.aiEstimate', {
+                  duration: formatMinutes(block.aiMinutes, t),
+                })}
               </span>
             )}
           </div>
@@ -226,8 +230,7 @@ export function TimelineView(props: TimelineViewProps): React.JSX.Element {
                 color: cssVar('color.foreground-muted'),
               }}
             >
-              这条任务还没有可排期的清单 —— 先在备注里写几条待办，或让 AI 拆解一次；
-              下面先按整条任务排一条。
+              {t('web.timeline.noChecklist')}
             </p>
           )}
 
@@ -241,8 +244,10 @@ export function TimelineView(props: TimelineViewProps): React.JSX.Element {
                 color: cssVar('color.warning'),
               }}
             >
-              AI 估的 {formatMinutes(block.aiMinutes ?? 0)} 是整条任务的估计，摊不到{' '}
-              {block.unitCount} 个子条目上 —— 子条目按默认时长排，不替你猜每一步占多少。
+              {t('web.timeline.unattributable', {
+                duration: formatMinutes(block.aiMinutes ?? 0, t),
+                count: block.unitCount,
+              })}
             </p>
           )}
 

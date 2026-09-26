@@ -30,7 +30,7 @@
 
 import { create } from 'zustand';
 
-import { Priority, Quadrant, bucketByQuadrant, type Task } from '@heyta/domain';
+import { Priority, Quadrant, bucketByQuadrant, type QuadrantDropPlan, type Task } from '@heyta/domain';
 import { emptyState, type MaterializedState } from '@heyta/op-log';
 import {
   createAiFeedbackActions,
@@ -70,6 +70,11 @@ interface TaskState {
   deleteTask: (id: string) => Promise<void>;
   setPriority: (id: string, priority: Priority) => Promise<void>;
   setImportant: (id: string, important: boolean) => Promise<void>;
+  /**
+   * 一次拖放 = 一条 op。计划来自领域层的 `planQuadrantDrop`。
+   * 不要拆成 `setImportant` + `setDueDate` 两次 —— 那会写出两条 op。
+   */
+  setQuadrantDrop: (id: string, plan: QuadrantDropPlan) => Promise<void>;
   setDueDate: (id: string, dueDate: number | undefined) => Promise<void>;
   /** 写备注。AI 拆解出的清单就是经这里落到 `Task.note` 的。 */
   setNote: (id: string, note: string | undefined) => Promise<void>;
@@ -172,6 +177,14 @@ export const useTaskStore = create<TaskState>((set) => ({
   setImportant: async (id, important) => {
     // 四象限的"重要"维度。四象限矩阵的拖拽会改这个 + dueDate。
     await taskActions.setImportant(id, important);
+  },
+
+  setQuadrantDrop: async (id, plan) => {
+    // 一次拖放 = 一条 op。投放计划由领域层的 `planQuadrantDrop` 算出来
+    // （4 象限 × 3 种截止时间状态的穷举测试在 packages/domain）。
+    // 这里**只写一次**，不拆成 setImportant + setDueDate 两次 ——
+    // 那会产生两条 op，且中间态"重要已改、期限还没改"是可见的。
+    await taskActions.setQuadrantDrop(id, plan);
   },
 
   setDueDate: async (id, dueDate) => {

@@ -34,6 +34,7 @@
 
 import { cssVar } from '@heyta/design-system';
 import { type TodayProgress } from '@heyta/domain';
+import { useI18n, type I18nValue } from '@heyta/i18n';
 import { Check, Sparkles, Timer } from 'lucide-react';
 
 import { text } from '../../lib/text.js';
@@ -56,14 +57,14 @@ import { selectTodayProgress } from './selectors.js';
  * 改成显式分支之后，负数在**结构上**不可能出现 —— 不依赖调用方记得 clamp，
  * 也不用一个 `Math.max` 把"其实计划外也做完了"糊成"还有 0 件"。
  */
-function hintText(progress: TodayProgress): string {
+function hintText(progress: TodayProgress, t: I18nValue['t']): string {
   if (progress.total === 0) {
     return progress.done > 0
-      ? `计划外完成 ${String(progress.done)} 件`
-      : '今天还没有安排';
+      ? t('web.progress.hint.unplanned', { count: progress.done })
+      : t('web.progress.hint.idle');
   }
-  if (progress.done >= progress.total) return '计划内都做完了';
-  return `还有 ${String(progress.total - progress.done)} 件没做`;
+  if (progress.done >= progress.total) return t('web.progress.hint.allDone');
+  return t('web.progress.hint.remaining', { count: progress.total - progress.done });
 }
 
 /**
@@ -72,17 +73,22 @@ function hintText(progress: TodayProgress): string {
  * 有计划外完成时**必须说清分母是什么** —— `done > total` 时只念
  * "完成 2 件，共 1 件" 会让读屏用户以为进度坏了。
  */
-function progressLabel(progress: TodayProgress): string {
+function progressLabel(progress: TodayProgress, t: I18nValue['t']): string {
   if (progress.total === 0) {
-    return `今日完成 ${String(progress.done)} 件，没有计划内事项`;
+    return t('web.progress.label.noPlan', { count: progress.done });
   }
   if (progress.bonus > 0) {
-    return `今日完成 ${String(progress.done)} 件，计划内 ${String(progress.total)} 件，另有 ${String(progress.bonus)} 件计划外`;
+    return t('web.progress.label.bonus', {
+      done: progress.done,
+      total: progress.total,
+      bonus: progress.bonus,
+    });
   }
-  return `今日完成 ${String(progress.done)} 件，共 ${String(progress.total)} 件`;
+  return t('web.progress.label.plain', { done: progress.done, total: progress.total });
 }
 
 export function TodayProgressCard() {
+  const { t } = useI18n();
   const entities = useTaskStore((s) => s.entities);
   const now = useTaskStore((s) => s.now);
 
@@ -97,18 +103,18 @@ export function TodayProgressCard() {
   const unplannedOnly = progress.total === 0 && progress.done > 0;
 
   return (
-    <section className="ht-today" aria-label="今日进度">
+    <section className="ht-today" aria-label={t('web.progress.aria')}>
       <div className="ht-today__head">
         <div>
           <div className="ht-today__label" style={text('caption')}>
-            今天
+            {t('web.progress.today')}
           </div>
           <div className="ht-today__count" style={text('numeric-display')}>
             <span>{progress.done}</span>
             <span className="ht-today__count-total">/ {progress.total}</span>
           </div>
           <div className="ht-today__hint" style={text('row-meta')}>
-            {hintText(progress)}
+            {hintText(progress, t)}
           </div>
         </div>
 
@@ -119,11 +125,11 @@ export function TodayProgressCard() {
           {progress.focusMinutes > 0 && (
             <span className="ht-today__fact" style={text('caption')}>
               <Timer size={14} aria-hidden="true" />
-              专注
+              {t('web.progress.focus')}
               <span style={{ fontVariantNumeric: 'tabular-nums' }}>
                 {progress.focusMinutes}
               </span>
-              分钟
+              {t('web.progress.focusUnit')}
             </span>
           )}
 
@@ -134,7 +140,7 @@ export function TodayProgressCard() {
               ) : (
                 <Check size={14} aria-hidden="true" />
               )}
-              今天的都做完了
+              {t('web.progress.closed')}
             </span>
           )}
         </div>
@@ -143,7 +149,7 @@ export function TodayProgressCard() {
       <ProgressBar
         ratio={progress.ratio}
         tone={progress.closed ? 'success' : 'primary'}
-        label={progressLabel(progress)}
+        label={progressLabel(progress, t)}
       />
 
       {/* 四项明细只在"有计划"时展开。没有计划的时候铺一行 0 / 0 / 0 / 0
@@ -151,20 +157,20 @@ export function TodayProgressCard() {
       {progress.total > 0 && (
         <ul className="ht-today__breakdown" style={text('caption')}>
           <li>
-            习惯
+            {t('web.progress.breakdown.habits')}
             <span style={{ fontVariantNumeric: 'tabular-nums' }}>
               {progress.habitsDone}/{progress.habitsPlanned}
             </span>
           </li>
           <li>
-            任务
+            {t('web.progress.breakdown.tasks')}
             <span style={{ fontVariantNumeric: 'tabular-nums' }}>
               {progress.tasksDone}/{progress.tasksPlanned}
             </span>
           </li>
           {progress.bonus > 0 && (
             <li className="ht-today__bonus">
-              计划外
+              {t('web.progress.breakdown.bonus')}
               <span style={{ fontVariantNumeric: 'tabular-nums' }}>{progress.bonus}</span>
             </li>
           )}

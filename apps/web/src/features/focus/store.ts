@@ -72,8 +72,15 @@ interface FocusStoreState {
   completedToday: number;
   /** 重绘节拍。值本身无意义，只用于让组件重新计算 remainingMs。 */
   tick: number;
-  /** 落盘失败时的错误。**必须显式暴露**，不能静默。 */
-  error?: string;
+  /**
+   * 落盘失败时的错误。**必须显式暴露**，不能静默。
+   *
+   * ⚠️ 只带**原因**（底层实现的原始文本，是数据），不带整句文案 ——
+   * 这个 store 拿不到 `t`，句子由 `FocusTimer` 用词条表拼出来。
+   * 存成拼好的中文句子会让英文界面漏出一句中文
+   * （与移动端 `apps/mobile/src/lib/focus-timer.ts` 同形）。
+   */
+  error?: { reason: string };
 
   start: (taskId?: string) => void;
   pause: () => void;
@@ -196,7 +203,7 @@ async function runPersist(
   } catch (error: unknown) {
     stopTicking();
     set({
-      error: `专注记录保存失败：${error instanceof Error ? error.message : String(error)}`,
+      error: { reason: error instanceof Error ? error.message : String(error) },
     });
   }
 }

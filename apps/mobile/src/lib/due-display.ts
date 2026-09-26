@@ -27,10 +27,11 @@
 import {
   computeCountdown,
   formatCompactDate,
-  formatRemaining,
   type CountdownUrgency,
   type Task,
 } from '@heyta/domain';
+
+import type { Translate } from '../i18n/translate';
 
 /** 两种呈现读的是**同一个** `dueDate` 字段，只是换了说法。 */
 export type DueDisplayMode = 'date' | 'countdown';
@@ -40,6 +41,32 @@ export interface DueDisplay {
   /** 档位，供 UI 选语义色。**不要把 `overdue` 当成唯一判断依据。** */
   urgency: CountdownUrgency;
   overdue: boolean;
+}
+
+/**
+ * 剩余天数 → 当前语言的句子。
+ *
+ * 🔴 阈值语义**照搬** `@heyta/domain` 的 `formatRemaining`（今天 / 明天 /
+ * 后天 / 还剩 N 天），因为那是**产品语义**，不是措辞：
+ * 自己发明一套"几天算后天"会让同一个任务在两个端上显示成两句话。
+ * 搬过来的只有**怎么把已经算好的天数说出来**这一层，算天数的
+ * `computeCountdown` 仍然只有领域层一份。
+ */
+export function remainingText(remainingDays: number | null, t: Translate): string {
+  if (remainingDays === null) return '';
+  if (remainingDays < 0) {
+    /**
+     * 🔴 英文有单复数，中文没有 —— 词条表刻意不支持 ICU（见 `types.ts`），
+     * 所以按数量在**调用方**分支到单数兄弟词条。`remainingDays === -1`
+     * 是可达的（昨天到期），没有这条分支英文会渲染成 `1 days overdue`。
+     */
+    const days = Math.abs(remainingDays);
+    return t(days === 1 ? 'mobile.due.overdueOne' : 'mobile.due.overdue', { days });
+  }
+  if (remainingDays === 0) return t('mobile.common.today');
+  if (remainingDays === 1) return t('mobile.due.tomorrow');
+  if (remainingDays === 2) return t('mobile.due.dayAfterTomorrow');
+  return t('mobile.due.remaining', { days: remainingDays });
 }
 
 /**
@@ -53,6 +80,7 @@ export function toDueDisplay(
   task: Task,
   mode: DueDisplayMode,
   now: number,
+  t: Translate,
 ): DueDisplay | null {
   if (task.dueDate === undefined) return null;
 
@@ -61,7 +89,7 @@ export function toDueDisplay(
   const text =
     mode === 'countdown'
       ? // `remainingDays` 在 dueDate 存在时必为数字，这里只是不让类型裸露
-        (formatRemaining(countdown.remainingDays) ?? '')
+        remainingText(countdown.remainingDays, t)
       : formatCompactDate(task.dueDate, now);
 
   return { text, urgency: countdown.urgency, overdue: countdown.overdue };

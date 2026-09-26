@@ -29,8 +29,49 @@ export {
 export {
   DEFAULT_BILLING_ADAPTERS,
   createBillingAdapterRegistry,
+  createBillingAdaptersFromConfig,
+  isWechatBillingRegistered,
 } from './registry';
 export type { BillingAdapterRegistry } from './registry';
+
+// 微信支付（Native 扫码）。🔴 零依赖：全部用 `node:crypto` 手写。
+export {
+  WECHAT_API_BASE_URL,
+  WECHAT_DEFAULT_PRICES,
+  WECHAT_NATIVE_PATH,
+  WECHAT_NOTIFY_PATH,
+  WECHAT_ONE_TIME_PERIOD_DAYS,
+  WECHAT_PROVIDER,
+  WECHAT_SIGNATURE_MAX_AGE_MS,
+  WechatApiError,
+  WechatUnknownPriceError,
+  buildRequestSignatureMessage,
+  buildWechatAuthorizationHeader,
+  buildWechatOutTradeNo,
+  buildWebhookSignatureMessage,
+  createWechatBillingAdapter,
+  decryptWechatResource,
+  isWechatTimestampFresh,
+  normalizePemKey,
+  parseUserIdFromAttach,
+  parseUserIdFromOutTradeNo,
+  parseWechatTime,
+  signWechatRequest,
+  verifyWechatSignature,
+} from './wechat.adapter';
+export type {
+  WechatPayAdapterOptions,
+  WechatPrice,
+  WechatRequestSignatureInput,
+  WechatResourceCiphertext,
+} from './wechat.adapter';
+
+// 一次性支付的周期叠加（服务端侧镜像 + 漂移守卫，见对应文件头）。
+export {
+  SUBSCRIPTION_PERIOD_DAYS,
+  extendSubscriptionPeriod,
+} from '@heyta/domain';
+export type { ExtendSubscriptionPeriodInput } from '@heyta/domain';
 
 export { applyPaymentEvent } from './apply-event';
 export type {

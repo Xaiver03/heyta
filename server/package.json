@@ -37,6 +37,7 @@
     "dry-run-old-ops-sweep:dev": "tsx scripts/dry-run-old-ops-sweep.ts"
   },
   "dependencies": {
+    "@heyta/domain": "workspace:*",
     "@fastify/cors": "^11.1.0",
     "@fastify/helmet": "^13.0.2",
     "@fastify/rate-limit": "^10.3.0",

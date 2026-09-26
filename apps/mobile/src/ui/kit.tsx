@@ -38,6 +38,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { TextStyleName } from '@heyta/design-system';
+import { useI18n } from '@heyta/i18n';
 import { useText, useTheme, useTokens } from '../theme';
 import { Icon, type IconName } from './icons';
 
@@ -336,7 +337,13 @@ export function Checkbox({
 }): React.JSX.Element {
   const t = useTokens();
   const { reducedMotion } = useTheme();
+  const { t: translate } = useI18n();
   const size = t['size.checkbox'];
+  // 🔴 兜底名**在 JSX 外面算好**再绑定。把两条字面量直接写进无障碍名的
+  // 花括号表达式里，`check-ui-language` 的配平扫描会把它当成硬编码文案
+  // （迁移后就是红）—— 而先算成变量既过门禁，也让"这里其实是两条文案"更明显。
+  const defaultLabel =
+    checked ? translate('mobile.common.uncomplete') : translate('mobile.common.complete');
 
   return (
     <Pressable
@@ -344,7 +351,7 @@ export function Checkbox({
       disabled={busy}
       accessibilityRole="checkbox"
       accessibilityState={{ checked, disabled: busy === true }}
-      accessibilityLabel={label ?? (checked ? '取消完成' : '标记完成')}
+      accessibilityLabel={label ?? defaultLabel}
       hitSlop={t['gesture.hit-slop']}
       style={({ pressed }) => ({
         width: t['touch-target.min'],
@@ -408,16 +415,25 @@ export function Badge({ count, max = 99, dot, tone = 'danger' }: BadgeProps): Re
   const t = useTokens();
   const text = useText();
   const { native } = useTheme();
+  const { t: translate } = useI18n();
 
   if (dot !== true && (count === undefined || count <= 0)) return null;
 
   const bg = tone === 'primary' ? t['color.primary'] : t['color.danger'];
   const label = count !== undefined && count > max ? `${max}+` : String(count ?? '');
+  // 同上：无障碍名在外面算好，别把字面量留在无障碍名的花括号表达式里。
+  // 英文单复数也在这一层分支（词条表没有 ICU）：`1` 走单数兄弟词条。
+  const accessibility =
+    dot === true
+      ? translate('mobile.common.badge.new')
+      : translate(count === 1 ? 'mobile.common.badge.countOne' : 'mobile.common.badge.count', {
+          count: label,
+        });
 
   return (
     <View
       accessibilityRole="text"
-      accessibilityLabel={dot === true ? '有新内容' : `${label} 项`}
+      accessibilityLabel={accessibility}
       style={{
         minWidth: dot === true ? t['size.badge-dot'] : t['size.badge-min-width'],
         height: dot === true ? t['size.badge-dot'] : t['size.badge-height'],

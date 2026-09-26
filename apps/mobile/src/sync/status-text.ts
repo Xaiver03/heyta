@@ -17,20 +17,55 @@
 
 import type { SyncStatus } from '@heyta/sync-client';
 
-export function describeSyncStatus(status: SyncStatus): string {
+import type { MessageKey } from '@heyta/i18n';
+import type { SyncFailureReason } from '@heyta/sync-client';
+
+import type { Translate } from '../i18n/translate';
+
+/**
+ * 同步失败原因 → 词条。
+ *
+ * ⚠️ 和 `apps/web/src/features/sync/sync-failure-copy.ts` 是同一份路由，
+ * **刻意各写一份**：`packages/i18n` 是领域无关的，不能让它 import
+ * `@heyta/sync-client`。key 是共享的（`common.sync.error.*`），句子不会漂移。
+ * 漏一个成员会**编译报错**（`Record` 穷尽）。
+ */
+const SYNC_FAILURE_KEY: Record<Exclude<SyncFailureReason, 'unexpected'>, MessageKey> = {
+  'not-configured': 'common.sync.error.notConfigured',
+  'not-signed-in': 'common.sync.error.notSignedIn',
+  'no-encryption-password': 'common.sync.error.noPassword',
+  'local-op-missing': 'common.sync.error.localOpMissing',
+  'remote-version-unavailable': 'common.sync.error.remoteVersionUnavailable',
+  'undecryptable-ops': 'common.sync.error.undecryptableOps',
+};
+
+export function describeSyncStatus(status: SyncStatus, t: Translate): string {
   switch (status.kind) {
     case 'idle':
-      return '尚未同步';
+      return t('mobile.sync.idle');
     case 'syncing':
-      return status.phase === 'download' ? '正在下载…' : '正在上传…';
+      return status.phase === 'download'
+        ? t('mobile.sync.downloading')
+        : t('mobile.sync.uploading');
     case 'synced':
-      return '已是最新';
+      return t('mobile.sync.synced');
     case 'offline':
-      return '当前离线';
-    case 'conflict':
-      return `有 ${String(status.conflicts.length)} 处冲突待你选择`;
+      return t('mobile.sync.offline');
+    case 'conflict': {
+      /**
+       * 🔴 英文单复数：词条表没有 ICU，只能调用方分支到单数兄弟词条。
+       * 一处冲突是最常见的情形，少了这条英文会写 "1 conflicts"。
+       */
+      const count = status.conflicts.length;
+      return t(count === 1 ? 'mobile.sync.conflictOne' : 'mobile.sync.conflict', { count });
+    }
     case 'error':
-      return '同步失败';
+      // 🔴 已知原因整句走词条（和 web 共用 `common.sync.error.*` 那五条）。
+      // 意外异常这里只给一句笼统的：这是一行状态文字，塞不下诊断细节 ——
+      // 细节仍在 `status.message` 里，需要时可以在别处显示（**刻意取舍**，不是丢信息）。
+      return status.reason === 'unexpected'
+        ? t('mobile.sync.error')
+        : t(SYNC_FAILURE_KEY[status.reason]);
     default: {
       // 穷尽性检查：`SyncStatus` 新增成员时这里会**编译报错**，
       // 而不是安静地显示一句空话。

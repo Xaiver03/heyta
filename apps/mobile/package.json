@@ -20,6 +20,7 @@
     "@heyta/app-host": "workspace:*",
     "@heyta/design-system": "workspace:*",
     "@heyta/domain": "workspace:*",
+    "@heyta/i18n": "workspace:*",
     "@heyta/op-log": "workspace:*",
     "@heyta/storage": "workspace:*",
     "@heyta/sync-client": "workspace:*",
