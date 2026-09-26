@@ -18,6 +18,7 @@
 //     randomUUID        undefined    ❌
 //     atob / btoa       function     ✅ 有
 //     Buffer            undefined    ❌
+//     WebAssembly       undefined    ❌ 没有（见下方 🔴）
 //
 // 而 `@heyta/sync-core` 的加密路径要用 `getRandomValues`（生成 IV / salt）
 // 和 `TextDecoder`（把明文解出来）。缺了不会降级 —— 是**点「添加任务」时直接崩**：
@@ -27,6 +28,18 @@
 //
 // ⚠️ 这两个 polyfill 是**平台差异**，放在 `apps/*` 是对的；
 // 它们没有决定任何"业务上该怎么做"。
+//
+// 🔴 **`WebAssembly` 这一项不是"装个 polyfill"能补上的。**
+// Hermes 没有 WASM，而 Argon2id 的来源 `hash-wasm` 就是 WASM 实现。
+// 真机实测：填好服务器地址与令牌后点「立即同步」，得到的是
+//
+//     WebAssembly is not supported in this environment!
+//
+// 上面那张清单原来**漏了这一项**，于是"两个 polyfill 都装齐了"看起来像
+// "加密路径就绪了" —— 而 Argon2id 在 Hermes 上根本走不通。
+// 教训：盘点运行时能力时**漏一项就等于得出一个假结论**，
+// 而缺的那一项恰好是决定性的时候，排查方向会被带偏到同步协议上去。
+// 它不是平台差异、也不该由 polyfill 掩盖：见 `AGENTS.md` §7。
 //
 // 许可证（AGENTS.md §3.2 两道门已逐项核过）：
 //   - react-native-get-random-values  v2.0.0  MIT        LinusU/... 最后提交 2025-10-22

@@ -32,6 +32,37 @@ target 'HeytaMobile' do
     )
 
     # ─────────────────────────────────────────────────────────────────────
+    # 第三方 pod 的部署目标低于本机 Xcode 支持的下限
+    # ─────────────────────────────────────────────────────────────────────
+    #
+    # 实测：装上 `react-native-svg`（Lucide 图标的底层）之后，它的子 pod
+    # `RNSVG-RNSVGFilters` 声明的是 **12.4**，而 Xcode 27.1 支持范围是 **15.0–27.1.x**。
+    # 报错发生在编译开始之前，形状是 target 校验：
+    #
+    #   error: The iOS Simulator deployment target 'IPHONEOS_DEPLOYMENT_TARGET'
+    #   is set to 12.4, but the range of supported deployment target versions
+    #   is 15.0 to 27.1.x. (in target 'RNSVG-RNSVGFilters' from project 'Pods')
+    #
+    # ⚠️ **这个错误是"装上原生图标库"才出现的**，而图标在 Android 上完全正常 ——
+    #    所以"Android 跑通了"推不出"iOS 也能构建"。
+    #
+    # 两条刻意的约束：
+    #  1. **只抬高，不降低**（`<` 才改）。RN 自己的 pod 都已是 `min_ios_version_supported`，
+    #     无条件覆盖会把它们降下去。
+    #  2. **不写死版本号**，用 RN 自己的 `min_ios_version_supported` ——
+    #     写死一个 `'15.1'` 会在 RN 升级最低版本后静默漂移。
+    min_ios = min_ios_version_supported
+    installer.pods_project.targets.each do |target|
+      target.build_configurations.each do |build_config|
+        current = build_config.build_settings['IPHONEOS_DEPLOYMENT_TARGET']
+        next if current.nil?
+        if current.to_f < min_ios.to_f
+          build_config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = min_ios
+        end
+      end
+    end
+
+    # ─────────────────────────────────────────────────────────────────────
     # fmt 11.0.2 × Apple clang 21 的编译失败（实测，两个 Xcode 都中）
     # ─────────────────────────────────────────────────────────────────────
     #

@@ -15,10 +15,8 @@
  */
 
 import { openAppHost, type AppHost } from '@heyta/app-host';
+import { readSyncConfig } from '../sync/config';
 import { opSqliteDriverFactory } from './op-sqlite-driver';
-
-/** 同步服务端地址。真机调试时改成局域网 IP。 */
-export const SERVER_URL = 'http://127.0.0.1:3000';
 
 const DB_NAME = 'heyta.sqlite';
 
@@ -41,7 +39,17 @@ export function openTaskHost(): Promise<AppHost> {
       // 🔴 驱动是工厂不是实例：`SqliteAdapter` 会在 close 后靠它重开。
       driverFactory: opSqliteDriverFactory({ name: DB_NAME }),
       dbPath: DB_NAME,
-      serverUrl: SERVER_URL,
+      /**
+       * 🔴 **凭据必须是活的取值器，不能是快照。**
+       *
+       * 这里原来传的是 `serverUrl: SERVER_URL`（一个硬编码常量），
+       * 而且**根本不传 token / 口令** —— 于是移动端一条都同步不出去：
+       * 那些值只能由用户在应用起来之后输入，而 `openAppHost` 在启动时就跑完了。
+       *
+       * `getSyncConfig` 每次同步都会被调用，所以用户在「我的」里改完
+       * 立刻生效，不需要重启应用。
+       */
+      getSyncConfig: readSyncConfig,
     });
   }
   return pending;
