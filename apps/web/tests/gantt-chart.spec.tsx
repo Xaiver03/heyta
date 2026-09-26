@@ -15,6 +15,7 @@
  * 一旦需要它们，就说明 AI 又漏进可视化层了（`ai-architecture.md` §14 第 20 条）。
  */
 
+import { parseLocalDate, type LocalDate } from '@heyta/domain';
 import { IDBFactory } from 'fake-indexeddb';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
@@ -66,6 +67,24 @@ function threeEntries(): TimelineEntry[] {
       durationsInMinutes: { 灰度: 120, 全量: 180 },
     }).entries,
   ];
+}
+
+/**
+ * 本地日历日 → 时间戳。**必须走领域层的 `parseLocalDate`。**
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * 🔴 不要写 `Date.parse('2026-09-26')` —— 那是 **UTC 午夜**，
+ * 而 `formatCompactDate` 用的是**本地** getter（`getMonth` / `getDate` /
+ * `getFullYear`）。在 UTC-5 下 UTC 午夜会被读成**前一天 19:00**，
+ * 于是 "09-26" 变成 "09-25"。
+ *
+ * 本机（UTC+8）永远看不出来 —— 这正是"本地绿、CI 红"的典型成因。
+ * `parseLocalDate` 给的是**本地**午夜，与领域层、与 `formatCompactDate`
+ * 同一套约定，所以在任何时区都落在同一个日历日上。
+ * ─────────────────────────────────────────────────────────────────────────
+ */
+function localStartOfDay(date: LocalDate): number {
+  return parseLocalDate(date).getTime();
 }
 
 /** 读一条 bar 的宽度百分比（`style.width` 形如 `"33.33%"`）。 */
@@ -286,7 +305,7 @@ describe('🔴 轴自适应', () => {
       entries,
       startDate: '2026-09-26',
       startTimeMinutes: 570, // 9:30
-      now: Date.parse('2026-09-26'),
+      now: localStartOfDay('2026-09-26'),
     });
 
     // 跨度 240 分钟 → 每 60 分钟一格。
@@ -314,7 +333,7 @@ describe('🔴 轴自适应', () => {
         durationsInMinutes: { 甲: 480, 乙: 480, 丙: 480, 丁: 480 },
       }).entries,
     ];
-    const el = render({ entries, startDate: '2026-09-26', now: Date.parse('2026-09-26') });
+    const el = render({ entries, startDate: '2026-09-26', now: localStartOfDay('2026-09-26') });
 
     expect(el.querySelector('[data-testid="gantt-day-1"]')?.textContent).toContain('第 1 天');
     expect(el.querySelector('[data-testid="gantt-day-1"]')?.textContent).toContain('09-26');
@@ -333,7 +352,7 @@ describe('🔴 轴自适应', () => {
       entries,
       startDate: '2026-09-26',
       startTimeMinutes: 570,
-      now: Date.parse('2026-09-26'),
+      now: localStartOfDay('2026-09-26'),
     });
 
     // 9:30 → 次日 0:30，所以第 1 天只有 870 分钟（14.5 小时），第 2 天 30 分钟。
@@ -341,6 +360,28 @@ describe('🔴 轴自适应', () => {
     const second = el.querySelector('[data-testid="gantt-day-2"]') as HTMLElement;
     expect(Number.parseFloat(first.style.width)).toBeCloseTo((870 / 900) * 100, 3);
     expect(Number.parseFloat(second.style.width)).toBeCloseTo((30 / 900) * 100, 3);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────
+// 🔴 测试自己不许假设本机时区
+// ─────────────────────────────────────────────────────────────────────────
+
+describe('🔴 测试夹具不假设本机时区', () => {
+  it('🔴 localStartOfDay 落在**本地**日历日上（不是 UTC 午夜）', () => {
+    // 这条是护栏：谁要是把夹具换回 `Date.parse('2026-09-26')`，
+    // 在 UTC-5 之类的时区下这三行会立刻红 —— 而不是等到 CI 上才红。
+    const d = new Date(localStartOfDay('2026-09-26'));
+    expect(d.getFullYear()).toBe(2026);
+    expect(d.getMonth()).toBe(8); // 0-based：9 月
+    expect(d.getDate()).toBe(26);
+    expect(d.getHours()).toBe(0);
+  });
+
+  it('🔴 与领域层同一套约定：toLocalDate(parseLocalDate(x)) === x', () => {
+    for (const date of ['2026-01-30', '2026-09-26', '2026-12-31'] as const) {
+      expect(new Date(localStartOfDay(date)).getDate()).toBe(Number(date.slice(8, 10)));
+    }
   });
 });
 
@@ -359,7 +400,7 @@ describe('日期显示', () => {
       entries,
       startDate: '2026-09-26',
       startTimeMinutes: 570,
-      now: Date.parse('2026-09-26'),
+      now: localStartOfDay('2026-09-26'),
     });
     // 9:30 → 10:30
     const text = el.querySelector('[data-testid="gantt-dates-0"]')?.textContent ?? '';
@@ -389,7 +430,7 @@ describe('日期显示', () => {
         },
       ],
       startDate: '2026-01-30',
-      now: Date.parse('2026-01-30'),
+      now: localStartOfDay('2026-01-30'),
     });
     // 01-30 + 5 天 = 02-04；结束 = 起点 + 3 天 = 02-07
     const text = el.querySelector('[data-testid="gantt-dates-0"]')?.textContent ?? '';
@@ -410,7 +451,7 @@ describe('日期显示', () => {
       entries,
       startDate: '2026-09-26',
       startTimeMinutes: Number.NaN,
-      now: Date.parse('2026-09-26'),
+      now: localStartOfDay('2026-09-26'),
     });
     expect(el.querySelector('[data-testid="gantt-chart"]')).toBeTruthy();
     expect(el.querySelector('[data-testid="gantt-dates-0"]')?.textContent).toContain('09-26');
@@ -428,7 +469,7 @@ describe('今天标线', () => {
       entries,
       startDate: '2026-09-26',
       today: '2026-09-27',
-      now: Date.parse('2026-09-26'),
+      now: localStartOfDay('2026-09-26'),
     });
     expect(el.querySelector('[data-testid="gantt-today"]')?.textContent).toContain('第 2 天');
     expect(el.querySelector('[data-testid="gantt-today-line"]')).toBeTruthy();
@@ -439,7 +480,7 @@ describe('今天标线', () => {
       entries,
       startDate: '2026-09-26',
       today: '2026-12-31',
-      now: Date.parse('2026-09-26'),
+      now: localStartOfDay('2026-09-26'),
     });
     expect(el.querySelector('[data-testid="gantt-today"]')).toBeNull();
     expect(el.querySelector('[data-testid="gantt-today-line"]')).toBeNull();
@@ -458,7 +499,7 @@ describe('今天标线', () => {
       startDate: '2026-09-26',
       startTimeMinutes: 570,
       today: '2026-09-26',
-      now: Date.parse('2026-09-26'),
+      now: localStartOfDay('2026-09-26'),
     });
     expect(el.querySelector('[data-testid="gantt-today"]')?.textContent).toContain('第 1 天');
     expect(el.querySelector('[data-testid="gantt-today-line"]')).toBeTruthy();
