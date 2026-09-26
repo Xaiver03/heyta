@@ -35,7 +35,8 @@
     "check:native-deps": "node scripts/check-native-deps.mjs",
     "verify:ios-lan-http": "bash scripts/verify-ios-lan-http.sh",
     "verify:ai-live": "node scripts/verify-ai-live.mjs",
-    "verify:ai-breakdown-live": "node scripts/verify-ai-breakdown-live.mjs"
+    "verify:ai-breakdown-live": "node scripts/verify-ai-breakdown-live.mjs",
+    "verify:mcp-real": "node scripts/verify-mcp-real-client.mjs"
   },
   "devDependencies": {
     "@heyta/shared-schema": "workspace:*",
