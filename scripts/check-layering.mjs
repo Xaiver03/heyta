@@ -20,8 +20,22 @@
  *   4. `OpLogStore` 的游标键名（`lastServerSeq` 字面量）—— 键名只该定义在
  *      `packages/storage` 的 `META_KEYS` 里。外壳自己拼字面量，
  *      换键名时就会有一端悄悄读到 0（= 每次全量重下，或者更糟）。
+ *   5. **模型端点字面量 / 厂商 AI SDK** —— 见下方 RULES 里的 `no-model-endpoint-in-apps`
+ *      与 `no-vendor-ai-sdk-in-apps`。这一条与上面四条不同：前四条是**防漂移**，
+ *      这两条是**防数据出境失控**（ADR-0005 / ADR-0006）。
+ *      > ⚠️ 它们的**前提是 `packages/ai` 存在**。在该包落地之前，
+ *      > 这两条规则是"提前立的规矩"，而不是在保护一份已存在的实现。
+ *   6. **外壳里自己拼 op**（`no-op-construction-in-apps`）。
+ *      🔴 这一条是**补上的收尾动作**。AGENTS.md §3.5 末尾那条教训写得很清楚：
+ *      **"抽出了一个共享实现"不等于"重复被消除了"** —— `createTaskActions`
+ *      抽出来之后，`apps/web` 那份**从没被删掉**，而且**漂移了**。
+ *      文档里记着它，它却一直活在代码里，因为**当时没有门禁钉住它**。
+ *      加这条规则时它一次抓出了 **17 处**（实测 `apps/web`：7 TASK / 4 PROJECT /
+ *      2 TAG / 2 HABIT / 2 HABIT_LOG）—— 那是**真实存在的违规**，
+ *      比注入一个假违规更有说服力。
  *
- * 前两条是本文件写出来时**刚刚修掉的**；后两条是仓库里已经记录过的同形状事故。
+ * 前两条是本文件写出来时**刚刚修掉的**；后四条是仓库里已经记录过的同形状事故
+ * 与已定案的 ADR 约束。
  * 把它们一起钉住，是因为修复一个具体 bug 的正确收尾方式是
  * **让它再也回不来**，而不是相信下次不会有人再写一遍。
  *
@@ -82,6 +96,87 @@ const RULES = [
     what: '外壳里硬写游标键名',
     why: '键名只该定义在 packages/storage 的 META_KEYS 里。外壳自己拼字面量，改键名时会有一端静默读到 0。',
     fix: '用 `OpLogStore` 的 `getLastServerSeq()` / `setLastServerSeq()`，或 `META_KEYS.LAST_SERVER_SEQ`。',
+  },
+  {
+    id: 'no-model-endpoint-in-apps',
+    // 只匹配**模型服务端点**的字面量，不匹配普通 fetch —— 外壳当然要能发请求。
+    // 覆盖：OpenAI 兼容的 /chat/completions、各家官方主机名、Google 的 generateContent。
+    pattern:
+      /chat\/completions|api\.openai\.com|api\.anthropic\.com|generativelanguage\.googleapis\.com|api\.mistral\.ai|openrouter\.ai\/api|:11434\/v1/,
+    what: '外壳里直接写模型端点',
+    why:
+      '两个理由，每个都足以打回：① 违反 ADR-0003/AGENTS.md §3.5 —— 走哪个端点、带什么字段、' +
+      '怎么处理失败，全是产品语义，属于 packages/；② **违反 ADR-0005/0006 的数据出境约束** —— ' +
+      '出境必须经过统一的披露与授权层，散落在外壳里的 fetch 无法被审计，用户也无从撤销。',
+    fix:
+      '用 `packages/ai` 的 provider 端口（`createProvider(config)`）。它同时承载"用户自备端点"与' +
+      '"heyta 托管"两种供给模式，并在发请求前走出境披露层。',
+  },
+  {
+    id: 'no-vendor-ai-sdk-in-apps',
+    // 厂商 SDK 一律不引入：它们各自一套认证、重试、流式协议，
+    // 且会把 provider 选择硬编码进外壳。OpenAI 兼容的 /v1 已是事实标准。
+    pattern: /from\s+['"](?:openai|@anthropic-ai\/sdk|@google\/generative-ai|cohere-ai|@mistralai\/[^'"]+)['"]/,
+    what: '外壳里直接 import 厂商 AI SDK',
+    why:
+      '厂商 SDK 会把 provider 选择、凭据位置、重试策略硬编码进外壳，' +
+      '而这三样都必须能由用户在"自备 / 托管"之间切换（ADR-0006）。' +
+      'SDK 也是新的第三方依赖，要过 AGENTS.md §3.1–3.2 两道门并逐项登记。',
+    fix: '只依赖 `packages/ai` 的端口，实现统一走 OpenAI 兼容的 HTTP 契约，不引厂商 SDK。',
+  },
+  {
+    id: 'no-op-construction-in-apps',
+    // 匹配 `entityType: 'TASK'` 这种**字面量**，不匹配 `entityType: someVariable`。
+    // 这一条抓的就是"外壳在自己拼 op" —— 拼 op 必然要写出实体名。
+    pattern: /\bentityType:\s*['"][A-Z][A-Z_]*['"]/,
+    what: '外壳里自己拼 op（写死了 entityType 字面量）',
+    why:
+      'op 的构造是**产品语义**：写哪些字段、清除字段用 `null` 还是省略、软删除发 `DEL` 还是改标志位、' +
+      'id 怎么生成 —— 全都要在所有宿主上**一模一样**。而这一类漂移**不会报错**，' +
+      '症状是两台设备看到不同的数据。实测代价：`createTaskActions` 早就存在、移动端一直在用，' +
+      '`apps/web` 却另外留着一份自己的实现，且**已经漂移**（本地计数器生成 id、' +
+      '空标题静默忽略、`Partial<Task>` 直接摊进 payload）。' +
+      '同一个形状在专注上也有：Web 那份未关联时**不放 `taskId` 键**，移动端写 `null`。' +
+      '**这条规则上线时一次抓出 17 处真实违规**（TASK 7 / PROJECT 4 / TAG 2 / ' +
+      'HABIT 2 / HABIT_LOG 2），全部已收编进 app-host 的动作层。' +
+      '注意这不是"顺手整理"：那 7 处 TASK 是在 `createTaskActions` **已经存在、' +
+      '移动端已经在用**的情况下继续活着的 —— 抽取的收尾动作是删掉旧的那份**并加门禁**，' +
+      '不是写一个更好的新版本。',
+    fix:
+      '用 `@heyta/app-host` 的动作层：`createTaskActions` / `createProjectActions`' +
+      '（含 TAG）/ `createHabitActions`（含 HABIT_LOG）/ `createFocusActions`。' +
+      '**所有已物化的实体都已有对应动作层，不要再在外壳里就地拼。**' +
+      '将来新增实体时，先在 app-host 里加动作层，再让外壳调它。' +
+      '注意测试文件不在此规则范围内（见 `walk()`）：测试**可以**直接造 op，' +
+      '那是在模拟另一台设备，不是在重新定义产品语义。',
+  },
+  {
+    id: 'no-loopback-classification-in-apps',
+    // 🔴 只抓**判断**，不抓**绑定**。
+    //
+    //   ❌ `hostname === '127.0.0.1'`      ← 在判断"这个端点在不在本机"
+    //   ❌ `/^https?:\/\/(localhost|127...)\.test(url)` ← 同上，手写正则
+    //   ✅ `server.listen(port, '127.0.0.1')` ← 这是我们**自己**在监听，是反过来的事
+    //
+    // 所以：正则字面量里出现回环主机名 → 抓；拿回环主机名做相等比较 → 抓。
+    // 单纯把 `'127.0.0.1'` 当参数传出去（listen / host:）→ 不抓。
+    pattern:
+      /\/(?:[^/\\]|\\.)*(?:localhost|127\\?\.0\\?\.0|::1)(?:[^/\\]|\\.)*\/[gimsuy]*|(?:===|!==|==|!=)\s*['"](?:localhost|127\.0\.0\.\d+|::1)['"]/,
+    what: '外壳里自己判断"这个端点是不是本机"',
+    why:
+      '"端点算不算本机"决定**要不要给用户看 E2EE 警告** —— 这是产品语义，' +
+      '而且错了只会往一个方向错：把远端判成本机 → **警告被跳过**，' +
+      '用户以为数据没出设备。实测就是这次：`apps/web` 里一个手写正则把 ' +
+      '`http://127.0.0.1:80@evil.com/v1` 判成了本机（`127.0.0.1` 是 userinfo，' +
+      '真实主机是 `evil.com`），于是**不显示警告而数据发给了 evil.com**。' +
+      '同一正则还把 `http://LOCALHOST:11434/v1` 和 `http://127.0.0.2:11434/v1` ' +
+      '判成远端（真实判据是"大小写不敏感"+"127/8 整段回环"），造成虚假警告。' +
+      '注释当时还写着"与 classifyDestination 同一条判据" —— **它不是**。' +
+      '这和 ADR-0010 §3.10.1 记的是同一个形状：同一件事有两个实现就一定会漂移。',
+    fix:
+      '调 `packages/ai` 的 `isLoopbackEndpoint()`。要判断"数据去哪"用 ' +
+      '`classifyDestination()`。⚠️ 注意区分：`listen(port, \'127.0.0.1\')` 是' +
+      '**我们自己**在监听，属于外壳职责，不受本规则限制。',
   },
 ];
 
