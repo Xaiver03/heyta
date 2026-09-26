@@ -9,6 +9,7 @@
  * 本文件不碰任何任务数据 —— 权益判定接受不了任务字段（见 `subscription.ts` 文件头）。
  */
 import { readFileSync } from 'node:fs';
+import { extendSubscriptionPeriod } from '../src/subscription.js';
 import { describe, expect, it } from 'vitest';
 
 import {
@@ -220,3 +221,71 @@ describe('contract with server/src/entitlement.ts', () => {
     expect(serverSource).toMatch(/now >= periodEnd/);
   });
 });
+
+describe('extendSubscriptionPeriod —— 一次支付如何变成一段时长', () => {
+  const DAY = 24 * 60 * 60 * 1000;
+  const NOW = 1_800_000_000_000; // 固定时刻，避免用到真实时钟
+
+  it('首次购买：从当前时刻起算 365 天', () => {
+    expect(extendSubscriptionPeriod({ now: NOW, currentPeriodEnd: null })).toBe(
+      NOW + 365 * DAY,
+    );
+  });
+
+  it('🔴 提前续费必须叠加 —— 不许丢掉已经付过钱的剩余时间', () => {
+    // 还剩 100 天时又买了一年：应该是 100 + 365 = 465 天，
+    // 而不是被重置成 365 天。
+    const existing = NOW + 100 * DAY;
+    const next = extendSubscriptionPeriod({ now: NOW, currentPeriodEnd: existing });
+
+    expect(next).toBe(NOW + 465 * DAY);
+    // 钉住"没有被重置"这个性质本身，而不只是钉住那个数字。
+    expect(next).toBeGreaterThan(existing + 364 * DAY);
+  });
+
+  it('已过期后续费：从当前时刻起算，不从过期的端点起算', () => {
+    // 到期日已经过去 10 天。若拿它去叠加，新买的时长会有 10 天埋在过去。
+    const lapsed = NOW - 10 * DAY;
+    expect(extendSubscriptionPeriod({ now: NOW, currentPeriodEnd: lapsed })).toBe(
+      NOW + 365 * DAY,
+    );
+  });
+
+  it('到期日正好是当前时刻：按"已到期"处理，从 now 起算', () => {
+    expect(extendSubscriptionPeriod({ now: NOW, currentPeriodEnd: NOW })).toBe(
+      NOW + 365 * DAY,
+    );
+  });
+
+  it('连续两次提前续费：时长单调递增，永不倒退', () => {
+    const first = extendSubscriptionPeriod({ now: NOW, currentPeriodEnd: null });
+    const second = extendSubscriptionPeriod({ now: NOW, currentPeriodEnd: first });
+    const third = extendSubscriptionPeriod({ now: NOW, currentPeriodEnd: second });
+
+    expect(second).toBeGreaterThan(first);
+    expect(third).toBeGreaterThan(second);
+    expect(third).toBe(NOW + 3 * 365 * DAY);
+  });
+
+  it('可以指定别的时长（默认 365 天不是硬编码）', () => {
+    expect(
+      extendSubscriptionPeriod({ now: NOW, currentPeriodEnd: null, days: 30 }),
+    ).toBe(NOW + 30 * DAY);
+  });
+
+  it('🔴 非有限输入必须抛异常 —— 这是收钱路径，算不出来就要响', () => {
+    expect(() =>
+      extendSubscriptionPeriod({ now: Number.NaN, currentPeriodEnd: null }),
+    ).toThrow();
+    expect(() =>
+      extendSubscriptionPeriod({ now: NOW, currentPeriodEnd: Number.NaN }),
+    ).toThrow();
+    expect(() =>
+      extendSubscriptionPeriod({ now: NOW, currentPeriodEnd: null, days: 0 }),
+    ).toThrow();
+    expect(() =>
+      extendSubscriptionPeriod({ now: NOW, currentPeriodEnd: null, days: -1 }),
+    ).toThrow();
+  });
+});
+

@@ -244,3 +244,66 @@ export const decideHostedSyncAccess = (
     }
   }
 };
+
+/**
+ * 一次购买的默认时长：365 天。
+ *
+ * 🔴 这是**产品决定**，不是常量噪音。阶段一是"一次性年付 ¥139 +
+ * 到期提醒手动续费"，所以时长记账由我们自己负责 —— 微信支付**没有订阅对象**，
+ * 它的回调不会告诉我们"订阅到哪一天"。见 `subscription-boundary.md` §6。
+ */
+export const SUBSCRIPTION_PERIOD_DAYS = 365;
+
+const MS_PER_DAY = 24 * 60 * 60 * 1000;
+
+export type ExtendSubscriptionPeriodInput = {
+  /** 当前时刻（epoch ms）。 */
+  now: number;
+  /** 已记录的到期时刻（epoch ms）；从未购买过传 null。 */
+  currentPeriodEnd: number | null;
+  /** 本次购买的时长，默认 365 天。 */
+  days?: number;
+};
+
+/**
+ * 计算一次支付之后新的到期时刻。
+ *
+ *     newEnd = max(now, currentPeriodEnd ?? now) + days
+ *
+ * 🔴 **`max` 是这套语义的全部要点。**
+ *
+ * 写成 `now + days` 的后果：在到期前 3 个月续费的用户，
+ * **白白损失已经付过钱的那 3 个月**。这种错误在开发期完全看不出来 ——
+ * 只有真实用户提前续费时才暴露，而那时已经收了一批人的钱。
+ *
+ * 反过来，如果 `currentPeriodEnd` **已经过去**，就从 `now` 起算：
+ * 拿一个过期的端点去叠加，会把新买的时长**部分埋进过去**，
+ * 用户付了钱却立刻少一截。
+ *
+ * **非有限输入一律抛异常，不返回 NaN、不静默当作 0。**
+ * 这是收钱路径 —— 算不出来的时候必须响，不能默默写一个错的值进数据库。
+ */
+export const extendSubscriptionPeriod = (
+  input: ExtendSubscriptionPeriodInput,
+): number => {
+  const { now, currentPeriodEnd, days = SUBSCRIPTION_PERIOD_DAYS } = input;
+
+  if (!Number.isFinite(now)) {
+    throw new Error(`extendSubscriptionPeriod: now 不是有限数（${String(now)}）`);
+  }
+  if (currentPeriodEnd !== null && !Number.isFinite(currentPeriodEnd)) {
+    throw new Error(
+      `extendSubscriptionPeriod: currentPeriodEnd 不是有限数（${String(currentPeriodEnd)}）`,
+    );
+  }
+  if (!Number.isFinite(days) || days <= 0) {
+    throw new Error(`extendSubscriptionPeriod: days 必须是正有限数（${String(days)}）`);
+  }
+
+  // max(now, currentPeriodEnd)，且把 null 当作"没有已付时长"。
+  const base =
+    currentPeriodEnd !== null && currentPeriodEnd > now ? currentPeriodEnd : now;
+
+  return base + days * MS_PER_DAY;
+};
+
