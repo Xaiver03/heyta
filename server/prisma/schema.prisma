@@ -38,6 +38,8 @@ model User {
   passkeys                    Passkey[]
   pendingPasskeyRegistrations PendingPasskeyRegistration[]
   subscriptions               Subscription[]
+  checkoutOrders              CheckoutOrder[]
+  couponRedemptions           CouponRedemption[]
 
   @@index([verificationToken])
   @@index([resetPasswordToken])
@@ -268,4 +270,300 @@ model SyncDevice {
 
   @@id([userId, clientId])
   @@map("sync_devices")
+}
+
+// ---------------------------------------------------------------------------
+// 可调价 + 优惠券（见 docs/adr/0018-adjustable-pricing-and-coupons.md）
+// ---------------------------------------------------------------------------
+//
+// 这五张表一起回答两个问题：
+//   1. **这一刻收多少钱** —— `price_versions`（版本化价目表）+ `pricing_audit_log`；
+//   2. **这一单收了多少、为什么是这个数** —— `coupons` + `checkout_orders` +
+//      `coupon_redemptions`。
+//
+// 🔴 与 `CURRENT_SCHEMA_VERSION` **无关**：那个常量管的是客户端 op-log / 快照的
+// 线协议版本（`packages/shared-schema/src/schema-version.ts`）。这五张表纯服务端，
+// 不进线协议，客户端看不见它们。
+
+/// 价目表的**一个版本**。改价 = 追加一版，**不是**就地改一行。
+///
+/// 为什么不用「一个可变的当前价 + 一张历史表」：那样"当前价"与"历史价"是两种
+/// 形状的数据，每个读价格的地方都要判"读哪张表"，漏判的那处会静默地用当前价去
+/// 解释一笔历史订单 —— 那是错账。统一成"区间"之后，当前价只是"区间包含 now 的
+/// 那一版"，而历史订单能用**同一个函数**按它自己的时间点解析。
+///
+/// 区间是**左闭右开**（`effective_from` 含、`effective_until` 不含）：边界相接的
+/// 两版不会同时生效，也不会留下空隙。两端都闭会让正常的改价操作触发"重叠"错误。
+model PriceVersion {
+  id Int @id @default(autoincrement())
+
+  /// 价格标识（SKU）。与 `createCheckout` 的 `priceId` 同值，例如 `annual`。
+  priceId String @map("price_id")
+
+  /// `CNY` / `USD`。🔴 券与价格都按币种隔离，不做汇率换算。
+  currency String
+
+  /// 金额，**最小单位整数**（分 / 美分）。
+  ///
+  /// ⚠️ 用 `Int` 而不是 `BigInt`：`Int` 的上限是 ¥21,474,836.47，远超任何真实
+  /// 定价，而它换来的好处是**这一列在 TS 里就是 `number`** —— 金额算术全程在
+  /// `number` 上做（`money.ts` 只用整数运算），不需要在每次读价格时 `Number(bigint)`
+  /// 转一次。那种转换正是"少转一次就静默算错"的位置。
+  amountMinor Int @map("amount_minor")
+
+  /// 生效起点（epoch 毫秒，**含**）。
+  effectiveFrom BigInt @map("effective_from")
+
+  /// 生效终点（epoch 毫秒，**不含**）。`NULL` = 一直有效（开区间）。
+  effectiveUntil BigInt? @map("effective_until")
+
+  /// 人类可读备注（进审计与运维输出）。例如「上线推广价」。
+  note String?
+
+  /// 写入时间与操作者。`createdBy` 是**字符串**而不是外键：改价可能由脚本、
+  /// 运维或（将来）管理界面触发，把这些都强行绑到 `users` 上会让"系统自动调价"
+  /// 这类来源无法表达。
+  createdAt BigInt  @default(0) @map("created_at")
+  createdBy String? @map("created_by")
+
+  /// 按 (SKU, 币种) + 时间翻版本 —— 解析"这一刻哪一版生效"就走这个索引。
+  @@index([priceId, currency, effectiveFrom])
+  @@map("price_versions")
+}
+
+/// 定价域的**审计流水**：每一次改价、建券、停券都在这里留一行。
+///
+/// 为什么必须有：价格是**钱的账**。"某个用户在某个价格下买了东西"必须可回溯 ——
+/// 只靠 `price_versions` 的区间能回答"当时的价格是多少"，但回答不了
+/// 「**谁**在**什么时候**把它改成了这个价、改之前是什么」。这两件事都要有人能查。
+///
+/// 🔴 只追加，不更新、不删除。
+model PricingAuditLog {
+  id Int @id @default(autoincrement())
+
+  /// 动作名（有界词表，见 `server/src/billing/pricing-store.ts` 的常量）。
+  action String
+
+  /// 作用对象，例如 `annual/CNY` 或券 id。
+  target String
+
+  /// 变更前后的快照（JSON 字符串）。改价时至少要有 `amountMinor`。
+  beforeJson String? @map("before_json")
+  afterJson  String? @map("after_json")
+
+  /// 操作者（账号 / 脚本名 / `system`）。
+  actor String?
+  note  String?
+
+  createdAt BigInt @default(0) @map("created_at")
+
+  @@index([target, createdAt])
+  @@index([action, createdAt])
+  @@map("pricing_audit_log")
+}
+
+/// 一张**优惠券**：折扣的内容 + 适用范围 + 限额。
+///
+/// 券与优惠码在这里是**同一张表**（`code` 可空）：`code` 非空 = 用户可输入；
+/// `NULL` = 只能由活动自动应用。Stripe 把两者拆成两张表（Coupon /
+/// PromotionCode），那在"同一折扣要发给多个渠道、各自限额"时是必需的，
+/// 而 heyta 现在只有一个渠道、一个 SKU —— 拆表带来的额外 join 与第二处限额校验
+/// 大于它的收益。**触发拆表的条件**（出现任一即应拆）：
+///   ① 同一折扣需要给 ≥2 个渠道各自独立的用量上限；
+///   ② 需要"码级有效期 ≠ 活动级有效期"。
+/// 见 `docs/adr/0018-adjustable-pricing-and-coupons.md` §3.3。
+model Coupon {
+  /// 稳定的券 id，**由运营指定**（例如 `launch-2026`），不是自增。
+  /// 理由：它会写进订单与审计，一个会变的数字标识会让"这张订单用了哪张券"
+  /// 在人工排查时无法与运营的口径对上。
+  id String @id
+
+  /// 用户可输入的码。🔴 **必须已归一化**（大写、无首尾空白），
+  /// 归一化只在 `normalizeCouponCode()` 一个地方做。
+  code String? @unique
+
+  name String
+
+  /// `percent` | `fixed`。与下面两个金额列构成判别联合，
+  /// **由 `coupons_benefit_shape` 这个 CHECK 约束在数据库层强制**。
+  kind String
+
+  /// `kind = 'percent'` 时必填：基点（1bp = 0.01%）。`5000` = 5 折。
+  percentOffBp Int? @map("percent_off_bp")
+
+  /// `kind = 'fixed'` 时必填：减免金额（最小单位）。
+  amountOffMinor Int? @map("amount_off_minor")
+
+  /// 币种。🔴 `fixed` 券**必须**与订单同币种 —— 一张 ¥20 的券抵扣 $49 的订单
+  /// 是资损，而且两种钱之间没有我们定义的汇率。
+  currency String
+
+  /// 适用的价格标识。
+  ///
+  /// ⚠️ Prisma **不支持可选的标量列表**（`String[]` 落库是 `NOT NULL DEFAULT '{}'`），
+  /// 所以"全部适用"用**显式布尔列**表达，而不是拿空数组当哨兵 ——
+  /// 后者会在 `[]` 究竟是"全部"还是"一个都不"上产生第二种约定。
+  appliesToAllPrices Boolean  @default(true) @map("applies_to_all_prices")
+  priceIds            String[] @map("price_ids")
+
+  appliesToAllRegions Boolean  @default(true) @map("applies_to_all_regions")
+  regions             String[] @map("regions")
+
+  /// 生效窗口（epoch 毫秒）。`validUntil` 为 `NULL` = 永不过期。
+  validFrom  BigInt  @map("valid_from")
+  validUntil BigInt? @map("valid_until")
+
+  /// 总核销上限。🔴 口径：**含"已预留未完成"**（见 `coupon_redemptions.state`）。
+  /// 选这个口径是因为"占位"是主动攻击面（刷预留把名额占满），而"超发"是概率问题 ——
+  /// 防前者优先。代价是 sweep 必须真的在跑，见 `pricing-store.ts`。
+  maxRedemptions Int? @map("max_redemptions")
+
+  /// 每个用户最多用几次。
+  maxRedemptionsPerUser Int? @map("max_redemptions_per_user")
+
+  /// 起用门槛：订单**原价**低于它就不能用。
+  minimumOrderMinor Int? @map("minimum_order_minor")
+
+  /// 拉新券：只有从未有过已支付订单的用户可用。
+  firstPurchaseOnly Boolean @default(false) @map("first_purchase_only")
+
+  /// 停用开关。🔴 停用是运营动作，**删除不是** —— 删券会让历史订单查不到它。
+  enabled Boolean @default(true)
+
+  createdAt BigInt @default(0) @map("created_at")
+  updatedAt BigInt @default(0) @map("updated_at")
+
+  redemptions    CouponRedemption[]
+  checkoutOrders CheckoutOrder[]
+
+  @@index([enabled, validFrom])
+  @@map("coupons")
+}
+
+/// 一笔**下单记录**：报价的快照 + 它后来的命运。
+///
+/// ## 🔴 这张表同时修掉了一个已知的洞
+///
+/// `docs/reference/pricing-and-entitlements.md` §4 记着：回调的金额校验原先只验
+/// 「付的金额是价目表里的**某一个**」，那在只有一个 SKU 时恰好等价于"付对了"，
+/// 一旦有第二个 SKU 或一张券就立刻失效。当时的计划是"把 priceId 编进订单号"。
+///
+/// 这里是**更强**的做法：整份报价（原价 / 折扣 / 实付）冻在这一行里，
+/// 回调**只跟这一行比**，不再重算。于是它不仅挡得住多 SKU，也挡得住折扣 ——
+/// 而"用券之后应该收多少"是编不进订单号里的。
+model CheckoutOrder {
+  id Int @id @default(autoincrement())
+
+  /// 我们生成的商户订单号（微信回调用它回来）。全局唯一 = 幂等的锚点之一。
+  outTradeNo String @unique @map("out_trade_no")
+
+  userId Int  @map("user_id")
+  user   User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  /// 支付通道名（`wechat` / `paddle` / …）。
+  provider String
+
+  priceId  String @map("price_id")
+  currency String
+  /// 销售区域（`CN` / `INTL`）。与币种**分开**：币种说"收什么钱"，
+  /// 区域说"这笔交易在哪个法域"，它们现在几乎一一对应但不是同一件事。
+  region   String
+
+  /// 🔴 报价三元组，**不可变**。只存实付的话，开票、对账、算净收入、
+  /// 回答"双十一让了多少利"这四件事都做不到。
+  originalAmountMinor Int @map("original_amount_minor")
+  discountMinor       Int @map("discount_minor")
+  finalAmountMinor    Int @map("final_amount_minor")
+
+  couponId String? @map("coupon_id")
+  coupon   Coupon? @relation(fields: [couponId], references: [id], onDelete: Restrict)
+
+  /// `pending` | `paid` | `failed` | `expired` | `refunded`（见 `ORDER_STATUSES`）。
+  status String
+
+  /// 报价时间与失效时间（epoch 毫秒）。到点未付 → 释放券的预留。
+  quotedAt  BigInt @map("quoted_at")
+  expiresAt BigInt @map("expires_at")
+
+  paidAt    BigInt? @map("paid_at")
+  settledAt BigInt? @map("settled_at")
+
+  /// 把订单推进到终态的那条支付事件（`payment_events.(provider, provider_event_id)`）。
+  /// 用于"这笔订单是被哪个事件确认的"的排查。**不是**幂等键 —— 幂等在 `payment_events`。
+  providerEventId String? @map("provider_event_id")
+
+  /// 报价时被拒的候选券（JSON 数组），用于回答"我那个码为什么不能用"。
+  /// 冗余存一份是刻意的：券的定义以后会变（过期、停用、用满），
+  /// 而"用户当时为什么被拒"必须按**当时**的定义回答。
+  rejectedCouponsJson String? @map("rejected_coupons_json")
+
+  createdAt BigInt @default(0) @map("created_at")
+  updatedAt BigInt @default(0) @map("updated_at")
+
+  /// 这一单的券核销行（如果有）。`orderId` 上的唯一约束在 `CouponRedemption` 那边，
+  /// 它同时强制了"一单只能用一张券"这条产品策略。
+  redemption CouponRedemption?
+
+  @@index([userId, status])
+  @@index([status, expiresAt])
+  @@map("checkout_orders")
+}
+
+/// 一次**券核销**：状态机 + 金额快照。
+///
+/// ## 状态机
+///
+/// ```
+/// reserved ──(支付成功)──▶ applied
+///    │                        │
+///    │(订单过期/失败)          │(退款)
+///    ▼                        ▼
+/// expired                  reversed
+/// ```
+///
+/// 🔴 三条不可动摇的规则：
+/// 1. **`expired` 与 `reversed` 都不归还名额。** 退款不"回血"：总量限额是
+///    "预算已投放"的语义，归还意味着同一份预算可以被买→退→再买反复薅。
+///    （行业默认也是不自动归还：微信商家券要商户**主动**调退券接口才回卡包。）
+/// 2. **`reserved` 也占名额。** 否则刷预留就能把限量券占满。
+/// 3. **`order_id` 唯一 + `(coupon_id, order_id)` 唯一** 是"同一单不会被核销两次"
+///    的数据库层保证 —— 幂等不靠应用层记得判。
+model CouponRedemption {
+  id Int @id @default(autoincrement())
+
+  couponId String @map("coupon_id")
+  coupon   Coupon @relation(fields: [couponId], references: [id], onDelete: Restrict)
+
+  userId Int  @map("user_id")
+  user   User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  /// 🔴 **一单一券**：这个唯一约束就是"同一订单不会被核销两次"的保证，
+  /// 也是"一单只能用一张券"这条产品策略的落点。
+  orderId Int          @unique @map("order_id")
+  order   CheckoutOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  /// `reserved` | `applied` | `expired` | `reversed`（见 `REDEMPTION_STATES`）。
+  state String
+
+  /// 核销时冻结的金额。与订单上的三元组同值，冗余存一份是为了让这张表的
+  /// 一行**自己就能说清**减了多少 —— 对账时不必 join。
+  originalAmountMinor Int    @map("original_amount_minor")
+  discountMinor       Int    @map("discount_minor")
+  finalAmountMinor    Int    @map("final_amount_minor")
+  currency            String
+
+  /// 预留到期（epoch 毫秒）。到点仍未 `applied` → sweep 置为 `expired`。
+  reservedUntil BigInt @map("reserved_until")
+
+  createdAt BigInt  @default(0) @map("created_at")
+  appliedAt BigInt? @map("applied_at")
+  /// 离开 `reserved` 的时刻（无论去了 applied / expired / reversed）。
+  settledAt BigInt? @map("settled_at")
+
+  /// 统计"这张券用了多少"、"这个用户用了多少"都走这两个索引。
+  @@index([couponId, state])
+  @@index([couponId, userId, state])
+  /// sweep 的扫描面：`state = 'reserved' AND reserved_until < now`。
+  @@index([state, reservedUntil])
+  @@map("coupon_redemptions")
 }

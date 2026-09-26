@@ -71,6 +71,10 @@ const HEALTH_COPY = path.join(ROOT, 'apps/web/src/features/settings/health-copy.
 const PRICING_CHECK = path.join(ROOT, 'scripts/check-pricing-consistency.mjs');
 const PRICING_DOC = path.join(ROOT, 'docs/reference/pricing-and-entitlements.md');
 const PRICING_ADAPTER = path.join(ROOT, 'server/src/billing/wechat.adapter.ts');
+const PRICING_PRICE_BOOK = path.join(ROOT, 'server/src/billing/price-book.ts');
+const COUPON_MONEY = path.join(ROOT, 'server/src/billing/money.ts');
+const COUPON_RULES = path.join(ROOT, 'server/src/billing/coupon.ts');
+const COUPON_STORE = path.join(ROOT, 'server/src/billing/pricing-store.ts');
 const PRICING_LEGAL = path.join(ROOT, 'server/legal/terms-of-service.heyta.md');
 
 /** 跑一条命令，返回退出码与合并输出。**不抛错** —— 非零退出就是被测的结果。 */
@@ -854,9 +858,37 @@ function groupPricing() {
 
   expectGreen('pricing', '基线：三处价格一致时必须绿', pricingRun);
 
-  // ① 实际收多少被改（服务端价目表）—— 页面写的价格不再是要付的价格。
-  expectRed('pricing', '服务端价目表改了而页面没改（用户看到的价格≠实收）', () =>
-    withMutation(PRICING_ADAPTER, '  annual: { totalFen: 9_900,', '  annual: { totalFen: 13_900,', pricingRun),
+  // ① 实际收多少被改（代码基线价目表）—— 页面写的价格不再是要付的价格。
+  expectRed('pricing', '代码基线价目表改了而页面没改（用户看到的价格≠实收）', () =>
+    withMutation(PRICING_PRICE_BOOK, 'amountMinor: 9_900,', 'amountMinor: 13_900,', pricingRun),
+  );
+
+  // ①b 海外价被改 —— 这一条在 ADR-0018 之前**抓不到**：门禁当时只比对大陆价，
+  //     而 $49 只存在于词条表与法务文本里，服务端没有任何地方声明过它。
+  expectRed('pricing', '海外基线价被改而词条没改', () =>
+    withMutation(PRICING_PRICE_BOOK, 'amountMinor: 4_900,', 'amountMinor: 5_900,', pricingRun),
+  );
+
+  // ①c 🔴 把数字**抄回** adapter —— 抄回去的那份不会跟着改价动。
+  //    这是 ADR-0018 新增的那条"负向"检查：价格收敛到一处还不够，
+  //    还得拦住后来的人顺手再抄一份。
+  expectRed('pricing', '把 totalFen 字面量抄回 adapter（同一个数字写两次）', () =>
+    withMutation(
+      PRICING_ADAPTER,
+      'export const WECHAT_DEFAULT_PRICES',
+      "const SNEAKY = { annual: { totalFen: 9_900, description: '抄一份' } };\nexport const WECHAT_DEFAULT_PRICES",
+      pricingRun,
+    ),
+  );
+
+  // ①d 把 CNY 基线价整条删掉 —— 门禁必须**报错**（锚点/完整性），不许当成"没有价格所以通过"。
+  expectRed('pricing', 'CNY 基线价被删掉时不许静默通过', () =>
+    withMutation(
+      PRICING_PRICE_BOOK,
+      "    priceId: 'annual',\n    currency: 'CNY',\n    amountMinor: 9_900,",
+      "    priceId: 'annual',\n    currency: 'CNY',",
+      pricingRun,
+    ),
   );
 
   // ② 对外怎么说被改（中文词条）。
@@ -875,13 +907,13 @@ function groupPricing() {
     withMutation(PRICING_DOC, '"totalFen": 9900,', '"totalFen": 13900,', pricingRun),
   );
 
-  // ⑤ 🔴 偷偷加第二个 SKU：ADR-0017 只批准了一个档，而且回调的金额校验
-  //    在"多个不同金额"时不成立。门禁必须拦住这个，不只是拦住价格写错。
-  expectRed('pricing', '价目表里偷偷加第二个不同金额的 SKU', () =>
+  // ⑤ 🔴 偷偷加第二个档：ADR-0017/0018 只批准了一个档。门禁必须拦住这个，
+  //    不只是拦住价格写错 —— "多一个档"会同时打破产品决策与回调的按单校验。
+  expectRed('pricing', '基线价目表里偷偷加第二个档', () =>
     withMutation(
-      PRICING_ADAPTER,
-      "  annual: { totalFen: 9_900, description: 'heyta 托管同步服务（年）' },",
-      "  annual: { totalFen: 9_900, description: 'heyta 托管同步服务（年）' },\n  monthly: { totalFen: 1_900, description: '月付' },",
+      PRICING_PRICE_BOOK,
+      "  {\n    priceId: 'annual',\n    currency: 'USD',",
+      "  {\n    priceId: 'monthly',\n    currency: 'CNY',\n    amountMinor: 1_900,\n    effectiveFrom: 0,\n    effectiveUntil: null,\n  },\n  {\n    priceId: 'annual',\n    currency: 'USD',",
       pricingRun,
     ),
   );
@@ -889,6 +921,71 @@ function groupPricing() {
   // ⑥ 门禁的锚点失效（词条被改名）：必须**报错**，不许静默跳过。
   expectRed('pricing', '门禁锚点失效（词条改名）时不许静默通过', () =>
     withMutation(ZH, "'landing.pricing.hosted.priceCny':", "'landing.pricing.hosted.priceCNY':", pricingRun),
+  );
+}
+
+/**
+ * 组：优惠券的金额与名额规则。
+ *
+ * 🔴 这一组的存在理由是：**券的算术与名额判定最容易被"看起来等价"的改动弄错。**
+ * 取整方向、门槛的开闭、限额的开闭 —— 四个 `>=` 与 `>` 的差别，每一个都
+ * 只在边界上显形，而边界恰恰是同行评审最容易滑过去的地方。
+ *
+ * 每一发都打在 `server/tests/` 里一条**已经存在**的断言上；探针只负责证明
+ * "那条断言真的会因为这一处坏掉而变红"，而不断言本身。
+ */
+function groupCoupon() {
+  const serverDir = path.join(ROOT, 'server');
+  const billingRun = () =>
+    run(
+      path.join(serverDir, 'node_modules/.bin/vitest'),
+      ['run', 'tests/billing-money.spec.ts', 'tests/billing-coupon.spec.ts', 'tests/billing-pricing-store.pglite.spec.ts'],
+      serverDir,
+    );
+
+  expectGreen('coupon', '基线：券的算术 / 判定 / 持久化三套测试原样必须绿', billingRun);
+
+  // ① 🔴 取整方向：偏向用户 → 偏向我们自己。33.33% off 的 9900 会从 6600 变 6601。
+  //    这一改**不会**报任何错，只会每一笔都多收一分钱 —— 正是最该被拦住的那类。
+  expectRed('coupon', '把折扣取整从 ceil 改成 floor（每一单多收用户的钱）', () =>
+    withMutation(COUPON_MONEY, 'return Math.ceil((amountMinor * bp) / PERCENT_SCALE);', 'return Math.floor((amountMinor * bp) / PERCENT_SCALE);', billingRun),
+  );
+
+  // ② 干掉"折后不可支付"这道闸：0 元单会被放进收银台，然后在支付通道那边失败。
+  expectRed('coupon', '去掉"折后为 0 元不可支付"的判定', () =>
+    withMutation(COUPON_RULES, "    return reject('not_chargeable_after_discount');", '    return { ok: true, couponId: coupon.id, discountMinor: discountMinor, finalAmountMinor: 0 };', billingRun),
+  );
+
+  // ③ 门槛从闭区间改成开区间：刚好够门槛的那一单会被拒，用户莫名其妙用不了券。
+  expectRed('coupon', '最低消费门槛 >= 被改成 >（刚好够门槛的单被拒）', () =>
+    withMutation(COUPON_RULES, 'ctx.originalAmountMinor < coupon.minimumOrderMinor', 'ctx.originalAmountMinor <= coupon.minimumOrderMinor', billingRun),
+  );
+
+  // ④ 🔴 预留时的名额判定放宽一格 —— 限量 1 张的券会被发出去 2 张。
+  //    这是"报价时算一次、落库时再判一次"里落库那一次的全部价值所在。
+  expectRed('coupon', '预留名额时把 >= 改成 >（限量券超发一张）', () =>
+    withMutation(COUPON_STORE, 'if (Number(total[0]?.n ?? 0) >= maxTotal) {', 'if (Number(total[0]?.n ?? 0) > maxTotal) {', billingRun),
+  );
+
+  // ⑤ 让 `expired` 也占用名额 —— sweep 就白跑了，限量券会被"点了支付没付款"占满。
+  expectRed('coupon', '把 expired 也算进名额（占位刷满限量券）', () =>
+    withMutation(COUPON_STORE, "export const COUNTED_REDEMPTION_STATES: readonly RedemptionState[] = [\n  'reserved',\n  'applied',\n  'reversed',\n];", "export const COUNTED_REDEMPTION_STATES: readonly RedemptionState[] = [\n  'reserved',\n  'applied',\n  'reversed',\n  'expired',\n];", billingRun),
+  );
+
+  // ⑥ 让退款归还名额 —— "买 → 退 → 再买"可以无限薅同一份预算。
+  expectRed('coupon', '把 reversed 移出名额计数（退款归还名额，可反复薅）', () =>
+    withMutation(COUPON_STORE, "export const COUNTED_REDEMPTION_STATES: readonly RedemptionState[] = [\n  'reserved',\n  'applied',\n  'reversed',\n];", "export const COUNTED_REDEMPTION_STATES: readonly RedemptionState[] = [\n  'reserved',\n  'applied',\n];", billingRun),
+  );
+
+  // ⑦ 结算时不再比对订单上冻结的金额 —— ADR-0018 修掉的那个洞会重新打开：
+  //    付了原价的人也能白拿券的折扣。
+  expectRed('coupon', '结算时不再比对冻结金额（付原价也能白拿折扣）', () =>
+    withMutation(COUPON_STORE, 'if (!isMinorAmount(input.paidAmountMinor) || input.paidAmountMinor !== expectedMinor) {', 'if (false) {', billingRun),
+  );
+
+  // ⑧ 让它不再幂等：重复投递的支付事件会被当成第二次授予。
+  expectRed('coupon', '去掉结算的幂等闸（重复投递重复授予）', () =>
+    withMutation(COUPON_STORE, "if (status === 'paid') {\n      return { outcome: 'already-paid', orderId, userId };\n    }", 'if (false) {\n      return { outcome: \'already-paid\', orderId, userId };\n    }', billingRun),
   );
 }
 
@@ -965,6 +1062,7 @@ const GROUPS = {
   preset: groupPreset,
   aifailure: groupAiFailure,
   pricing: groupPricing,
+  coupon: groupCoupon,
 };
 const only = process.argv[2];
 const names = only === undefined ? Object.keys(GROUPS) : [only];

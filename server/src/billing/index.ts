@@ -73,6 +73,112 @@ export {
 } from '@heyta/domain';
 export type { ExtendSubscriptionPeriodInput } from '@heyta/domain';
 
+// 可调价 + 优惠券（见 docs/adr/0018-adjustable-pricing-and-coupons.md）。
+// 纯函数层：金额算术 / 版本化价目表 / 券判定 / 计价。
+export {
+  CURRENCIES,
+  MIN_CHARGEABLE_AMOUNT_MINOR,
+  MINOR_UNITS_PER_MAJOR,
+  PERCENT_OFF_BP_MAX,
+  PERCENT_SCALE,
+  breakdownAmount,
+  clampDiscountMinor,
+  computeDiscountMinor,
+  formatMinor,
+  isCurrency,
+  isMinorAmount,
+  isPercentOffBp,
+} from './money';
+export type { AmountBreakdown, Currency, DiscountBenefit } from './money';
+
+export {
+  DEFAULT_PRICE_BOOK,
+  InvalidPriceBookError,
+  PriceBookOverlapError,
+  PriceNotEffectiveError,
+  UnknownPriceError,
+  assertValidPriceBook,
+  isEntryEffectiveAt,
+  projectPrices,
+  resolveEffectivePrice,
+  resolvePriceEntry,
+  validatePriceBook,
+} from './price-book';
+export type { PriceBookEntry } from './price-book';
+
+export {
+  COUPON_REJECTION_EXPLANATION,
+  COUPON_REJECTION_REASONS,
+  EMPTY_COUPON_USAGE,
+  InvalidCouponDefinitionError,
+  REGIONS,
+  evaluateCoupon,
+  isRegion,
+  normalizeCouponCode,
+  validateCouponDefinition,
+} from './coupon';
+export type {
+  CouponAccepted,
+  CouponBenefit,
+  CouponContext,
+  CouponDefinition,
+  CouponEvaluateRejection,
+  CouponEvaluation,
+  CouponRejected,
+  CouponRejectionReason,
+  CouponUsage,
+  Region,
+} from './coupon';
+
+export {
+  DEFAULT_PAYMENT_WINDOW_MS,
+  MAX_COUPONS_PER_ORDER,
+  QuotePricingError,
+  isSellableCurrency,
+  quoteOrder,
+} from './quote';
+export type { OrderQuote, QuoteRequest, RejectedCoupon } from './quote';
+
+// 持久化层：SQL 走 `SqlExecutor` 端口，于是同一份 SQL 能在 PGlite（真的 PostgreSQL）
+// 上被跑一遍。见 docs/reference/pricing-and-coupons.md §7。
+export {
+  AUDIT_ACTIONS,
+  COUNTED_REDEMPTION_STATES,
+  CouponDefinitionRejectedError,
+  CouponQuotaExceededError,
+  ORDER_STATUSES,
+  PriceVersionConflictError,
+  REDEMPTION_STATES,
+  appendAudit,
+  createOrderWithReservation,
+  createPrismaSqlExecutor,
+  expireStaleOrders,
+  failOrder,
+  loadCouponUsage,
+  loadCoupons,
+  loadPriceOverrides,
+  publishPriceVersion,
+  reverseOrderOnRefund,
+  serializeRejections,
+  settleOrderPaid,
+  toCouponDefinition,
+  toMillis,
+  upsertCoupon,
+} from './pricing-store';
+export type {
+  AuditAction,
+  CouponWrite,
+  CreateOrderInput,
+  InvalidCouponRow,
+  OrderStatus,
+  PrismaLikeClient,
+  PublishPriceInput,
+  RedemptionState,
+  SettleOrderOutcome,
+  SettleOrderPaidInput,
+  SqlExecutor,
+} from './pricing-store';
+
 export { applyPaymentEvent } from './apply-event';
 export type {
   ApplyPaymentEventDeps,
