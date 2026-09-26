@@ -105,3 +105,75 @@
 | [`docs/plans/ai-strategy.md`](ai-strategy.md) §7.2.1 | 那里记的是**托管 AI** 的成本约束（按用量），与本文件的**订阅**（按设备）是两件事 |
 | [`docs/adr/0013-cloud-ai-and-maas.md`](../adr/0013-cloud-ai-and-maas.md) | 托管 AI 的 5 个前置项之一就是「计费与计量」。**本文件只解决订阅那一半**，"按用量计量"那一半仍被保留策略挡住 |
 | [`docs/reference/architecture.md`](../reference/architecture.md) | 那里第 10 行记的「开源核心 + 自建/托管收费」就是本文件展开的那句话 |
+
+---
+
+## 6. 一次性支付的授予语义（微信支付逼出来的决定）
+
+### 6.1 问题
+
+微信支付**没有"订阅对象"**。它的回调只说"一笔订单付成功了 + 金额"，
+**没有订阅 id**。而阶段一恰恰是**一次性年付 ¥139**。
+
+已有的支付抽象层里留着这个缺口（`server/src/billing/apply-event.ts` 的
+`NO_SUBSCRIPTION_REFERENCE` 分支有一个明确注释）。**按原实现，用户付了钱
+却不会得到权益** —— 而这不是一个边界情况，在阶段一它是**主路径**。
+
+这个缺口不是技术问题，是**语义缺失**：没有任何人规定过"一笔一次性付款
+应该如何变成一段时长"。下面是这个规定。
+
+### 6.2 决定
+
+| 规则 | 内容 |
+|---|---|
+| **一行一用户** | `(userId, provider='wechat')` 对应**一行** `Subscription`，长期复用。`externalSubscriptionId` 为 `null`（微信没有订阅对象）。**不要每笔支付插一行** |
+| **一次支付 = +365 天** | `currentPeriodEnd = max(now, 已有的 currentPeriodEnd ?? now) + 365 天` |
+| 🔴 **必须叠加** | 用户**提前续费不能丢失剩余时间** |
+| **`status` = `active`** | 到期后**不做任何删除**（§2 硬约束） |
+| **幂等键 = `out_trade_no`** | 商户订单号。同一笔订单重复回调**只能授予一次** |
+
+🔴 **`max(now, 已有到期日)` 里的 `max` 是这套语义的核心。**
+
+如果写成 `now + 365 天`：一个在到期前 3 个月续费的用户，
+会**白白损失已经付过钱的那 3 个月**。这种错误在开发期**完全看不出来** ——
+只有真实用户提前续费时才暴露，而那时已经收了一批人的钱。
+
+反向也必须成立：**不同 `out_trade_no` 的两笔真实购买 = 两次授予**。
+如果幂等键取错（比如取"用户 + 金额"），正常复购会被吃成重复。
+**这两个方向的测试缺一不可。**
+
+### 6.3 微信支付的技术事实（已核实）
+
+- **Native 扫码支付**：`POST /v3/pay/transactions/native`，返回 `code_url`
+  （是二维码内容，**不是跳转 URL** —— 抽象层的 `CheckoutResult` 用 `qrCode` 这一支）。
+- **请求签名**：`WECHATPAY2-SHA256-RSA2048`，签名串 `method\nurl\ntimestamp\nnonce\nbody\n`。
+- **回调验签**：验签串 `timestamp\nnonce\nbody\n`，**必须同时校验时间戳时效**（防重放）。
+- **回调报文**：`resource` 是 **AES-256-GCM** 加密的，密钥为 APIv3 密钥。
+- 🔴 **验签失败必须 fail-closed**：拒绝且**不落 `PaymentEvent`**。
+
+### 6.4 🔴 不引入依赖
+
+微信官方**没有 Node 服务端 SDK**（只有 Java / PHP / Go）。社区方案
+（`wechatpay-axios-plugin` 等）是**第三方**的，要过 `AGENTS.md` §3.1 可维护性
+与 §3.2 许可证两道门并登记进 `THIRD_PARTY_LICENSES.md`。
+
+**本阶段不引入。** RSA-SHA256 签名/验签、AES-256-GCM 解密、随机 nonce
+**全部用 `node:crypto` 手写**，HTTP 用内置 `fetch`。这是标准库能覆盖的范围，
+为省几十行而引入一个第三方依赖不划算。
+
+### 6.5 凭证（变量名，🔴 值绝不入库）
+
+`WX_APP_ID` / `WX_MCH_ID` / `WX_SERIAL_NO` / `WX_API_V3_KEY` /
+`WX_PRIVATE_KEY` / `WX_PUBLIC_KEY`
+
+- 真实值只进**本地 `.env`**（已确认 `.env` 与 `server/.env` 都在 `.gitignore` 里）。
+- `server/env.example` **只写变量名 + 占位符**。
+- 🔴 提交前必须确认没有 `.env`、没有 `*.pem`、没有任何 base64 私钥被跟踪。
+
+### 6.6 阶段一为什么用微信直连、不用聚合支付
+
+用户有**公司营业执照**，微信支付可走**普通商户**。聚合支付（虎皮椒 / XorPay /
+蓝兔 / 面包多 / 爱发电）虽然接入更快，但**有二清风险**，且对账多一层黑箱。
+既然主体齐全，**直连更干净**。
+
+支付宝排在微信之后（用户指定顺序）。
