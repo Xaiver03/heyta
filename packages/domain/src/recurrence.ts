@@ -296,7 +296,43 @@ export const Recurrence = {
     `FREQ=YEARLY;BYMONTH=${String(month)};BYMONTHDAY=${String(day)}`,
 } as const;
 
-/** 规则的人类可读描述（中文）。取不到就用原始串。 */
+/** BYDAY 的星期部分 → 中文。`+2WE` / `-1FR` 里的序数要先剥掉。 */
+const WEEKDAY_NAMES: Record<string, string> = {
+  MO: '一',
+  TU: '二',
+  WE: '三',
+  TH: '四',
+  FR: '五',
+  SA: '六',
+  SU: '日',
+};
+
+/**
+ * 规则的人类可读描述（中文）。取不到就用原始串。
+ *
+ * 🔴 **这里曾经把「每」吞掉。** 原来是
+ * `const every = interval === 1 ? '' : \`每 ${interval} \``，
+ * 而各分支拼的是 `` `${every}天` `` / `` `${every}周…` `` ——
+ * 于是在**最常见**的 interval === 1 下，用户看到的是：
+ *
+ * | 规则 | 旧输出（错） | 现在 |
+ * |---|---|---|
+ * | `FREQ=DAILY` | 天 | 每天 |
+ * | `FREQ=WEEKLY;BYDAY=SA` | 周六 | 每周六 |
+ * | `FREQ=WEEKLY;BYDAY=MO,WE` | 周一、三 | 每周一、三 |
+ *
+ * 而 interval === 2 反而是对的（「每 2 天」）—— 因为那条路径的 `every`
+ * 自己带了「每」。**只有默认分支是坏的**，所以它躲过了所有间隔>1 的用例。
+ *
+ * ⚠️ 更要紧的是：`tests/recurrence.spec.ts` 当时**把错的那两个字符串钉住了**
+ * （`toBe('天')` / `toBe('周一、三')`）。也就是说测试是绿的、实现是错的，
+ * 而绿的原因是**断言写成了实现的复述**，不是意图。
+ * 见 AGENTS.md §8.3/§8.4：断言要能回答"用户看到的是不是他想看到的"。
+ *
+ * 另外补上原实现丢掉的**时间信息**：`MONTHLY` 会说清是几号
+ * （`FREQ=MONTHLY;BYMONTHDAY=14` → 「每月 14 日」），
+ * 而不是只给一个「每月」——用户无法从「每月」知道是哪一天。
+ */
 export function describeRecurrence(rule: string): string {
   let recur: ICAL.Recur;
   try {
@@ -306,27 +342,75 @@ export function describeRecurrence(rule: string): string {
   }
 
   const interval = (recur.interval ?? 1) as number;
-  const every = interval === 1 ? '' : `每 ${String(interval)} `;
+  // 「每」是频率词的一部分，**不能**只在 interval > 1 时才出现。
+  const every = interval === 1 ? '每' : `每 ${String(interval)} `;
 
   switch (recur.freq) {
     case 'DAILY':
       return `${every}天`;
+
     case 'WEEKLY': {
       const days = recur.parts.BYDAY ?? [];
-      const names: Record<string, string> = {
-        MO: '一', TU: '二', WE: '三', TH: '四', FR: '五', SA: '六', SU: '日',
-      };
-      return days.length === 0
-        ? `${every}周`
-        : `${every}周${days.map((d) => names[d.replace(/^[+-]?\d*/, '')] ?? d).join('、')}`;
+      if (days.length === 0) return `${every}周`;
+      // WEEKLY 的 BYDAY 不带序数（RFC 5545 只允许 MONTHLY/YEARLY），
+      // 仍然剥一次：串是外部来源，写成 `+1MO` 也不该显示成「周+1MO」。
+      return `${every}周${days
+        .map((d) => WEEKDAY_NAMES[d.replace(/^[+-]?\d*/, '')] ?? d)
+        .join('、')}`;
     }
-    case 'MONTHLY':
+
+    case 'MONTHLY': {
+      const monthDays = recur.parts.BYMONTHDAY ?? [];
+      if (monthDays.length > 0) {
+        const dayText = monthDays.map(describeMonthDay).join('、');
+        // 数字日写「每月 14 日」，特殊日写「每月最后一天」——
+        // 直接套 `${n} 日` 会得到「每月 最后一天 日」。混合时按首项决定空格。
+        const sep = /^\d/.test(dayText) ? ' ' : '';
+        return `${every}月${sep}${dayText}`;
+      }
+      const days = recur.parts.BYDAY ?? [];
+      if (days.length > 0) {
+        // `+2WE` = 「第 2 个周三」，`-1FR` = 「最后一个周五」。
+        // 旧实现把序数剥掉后显示成「周三」—— 那是**错的**，不是不精确：
+        // 「每月第 2 个周三」和「每个周三」是完全两回事。
+        return `${every}月${days.map(describeMonthlyByDay).join('、')}`;
+      }
       return `${every}月`;
-    case 'YEARLY':
+    }
+
+    case 'YEARLY': {
+      const months = recur.parts.BYMONTH ?? [];
+      const monthDays = recur.parts.BYMONTHDAY ?? [];
+      if (months.length > 0 && monthDays.length > 0) {
+        return `${every}年 ${months.join('、')} 月 ${monthDays.join('、')} 日`;
+      }
+      if (months.length > 0) return `${every}年 ${months.join('、')} 月`;
       return `${every}年`;
+    }
+
     default:
       return rule;
   }
+}
+
+/** `14` → `14 日`；`-1` → `最后一天`；`-2` → `倒数第 2 天`。 */
+function describeMonthDay(raw: number | string): string {
+  const n = typeof raw === 'number' ? raw : Number(raw);
+  if (n === -1) return '最后一天';
+  if (n < 0) return `倒数第 ${String(-n)} 天`;
+  return `${String(n)} 日`;
+}
+
+/** `+2WE` → `第 2 个周三`；`-1FR` → `最后一个周五`；`WE` → `周三`。 */
+function describeMonthlyByDay(raw: string): string {
+  const m = /^([+-]?\d+)?([A-Z]{2})$/.exec(raw);
+  const weekday = WEEKDAY_NAMES[m?.[2] ?? raw] ?? raw;
+  const nth = m?.[1];
+  if (nth === undefined) return `周${weekday}`;
+  const n = Number(nth);
+  if (n === -1) return `最后一个周${weekday}`;
+  if (n < 0) return `倒数第 ${String(-n)} 个周${weekday}`;
+  return `第 ${String(n)} 个周${weekday}`;
 }
 
 export { addDays, parseLocalDate, toLocalDate };

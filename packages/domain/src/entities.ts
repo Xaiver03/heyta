@@ -75,8 +75,37 @@ export interface Task extends EntityBase {
   dueDate?: number;
   /** 完成时间。存在即表示已完成（不另设 completed 布尔，避免两者不一致）。 */
   completedAt?: number;
-  /** 重复规则 ID，指向 TASK_REPEAT_CFG。 */
-  repeatCfgId?: string;
+  /**
+   * 重复规则（RFC 5545 RRULE 串）。不存在即不重复。
+   *
+   * 🔴 **规则为什么在 `Task` 上，而不是一个 `TASK_REPEAT_CFG` 实体。**
+   * 上游 Super Productivity 的形状是"任务持有 `repeatCfgId`，规则放另一个实体"，
+   * heyta 的 schema 里也一直留着 `TASK_REPEAT_CFG` 实体名。但**本引擎做不到**：
+   * `sync-core` 的线类型里有 `MultiEntityPayload.entityChanges`（带 `entityType`，
+   * 看着就是为跨实体准备的），而 `packages/op-log` 的 reducer **完全没有处理它** ——
+   * 没有一处 `isMultiEntityPayload`。也就是说一条混合实体类型的 op 会在 reducer 里
+   * 被当成普通字段合并，**静默不生效**（同 AGENTS.md #20 的形状）。
+   * `OpIntent` 也只接受单一 `entityType`。
+   *
+   * 于是"设一次重复"若要走两实体，就得发**两个 op**，而第二个之前的状态是
+   * "任务指着一条不存在的规则"。§3.4 的"一个用户意图 = 一个 op"正是为了拦这个。
+   * 两个可选字段让整件事回到**一个 op、原子生效**，且不需要动 reducer。
+   *
+   * ⚠️ `TASK_REPEAT_CFG` 仍留在 `ENTITY_TYPES` 里（vendored 线协议词表，不能删），
+   * 因此它继续登记在 `UNMODELED_ENTITY_TYPES` 并写明了原因 —— 不代表"还没做"。
+   *
+   * 🔴 **不要手拼这个字符串**，用 `Recurrence.daily/weekly/...`：
+   * 拼错一个分号不会报错，只会静默变成另一条规则。
+   */
+  repeatRule?: string;
+  /**
+   * 规则的**锚点**（`YYYY-MM-DD` 本地日期），设规则那一刻的截止日。
+   *
+   * 不是装饰：`BYDAY` / `BYMONTHDAY` / `INTERVAL=2` 的选择基准都由它决定，
+   * 而 `dueDate` 会随着每次完成往后推 —— 拿它当锚点会让"每两周的周三"
+   * 在第二次完成之后整体漂移。所以锚点必须**钉一次、之后不动**。
+   */
+  repeatDtstart?: string;
   /** 排序键（在清单内的位置）。 */
   order?: number;
 }
