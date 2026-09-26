@@ -114,7 +114,7 @@ export async function openApp(page: Page): Promise<void> {
 /** 切换顶部视图 tab。 */
 export async function switchView(
   page: Page,
-  label: '任务' | '四象限' | '习惯' | '番茄钟' | '设置',
+  label: '任务' | '四象限' | '习惯' | '番茄钟' | '时间线' | '成长' | '设置',
 ): Promise<void> {
   await page.getByRole('tab', { name: label }).click();
 }

@@ -528,7 +528,28 @@ subscription-notice.spec.tsx(190,87)  TS2345 ...
    | 域 | `pnpm --filter @heyta/domain test` | 393 通过 |
    | 激励（渲染层） | `pnpm --filter @heyta/web exec vitest run tests/motivation.spec.ts tests/motivation-view.spec.tsx` | 23 通过（12 + 11） |
    | 门禁 | docs-link-check / check-ui-language / check-hardcoded / check-layering | 全绿 |
-   | 真浏览器 | 静态服务指向 `apps/web/dist`，7 个标签页可切换、标题正确、控制台无 error | 全绿 |
+   | 真浏览器 | `cd e2e && pnpm exec playwright test tests/motivation.spec.ts` | 6 通过 |
+   | 真浏览器（全量） | `pnpm check:ai-e2e` | 全绿 |
+
+   ⚠️ **真浏览器用的是仓库既有的 Playwright 验收**（`e2e/`，`@playwright/test 1.63.0`，
+   **刻意留在根 pnpm 工作区之外**，理由见 `e2e/pnpm-workspace.yaml` 的头注释）。
+   🔴 **不要为这件事另写一套 `scripts/verify-*.mjs`** —— 我一开始正是那么做的，
+   而下场就是"两套并行定义"（本仓库已经把这种形状的代价写过好几遍）。
+   依赖没装时先 `cd e2e && pnpm install`（它自己一份 lockfile，与本分支无关）。
+
+   本分支新增的 `e2e/tests/motivation.spec.ts` 验 **6 条设计契约**：
+   7 个标签逐字一致 / 5 个视图标题 === 标签 / **进度卡常驻做事视图且不在设置页与成长页** /
+   成长页渲染「本周」「这一年」+ 差值中性（「还差」）+ 剥离 ISO 日期后无负数 /
+   每视图非白屏 / 走完全部视图无意外控制台 error。
+   ✅ **已用注入验证它能因产品原因失败**：把 `App.tsx` 里 `view !== 'growth'` 那个条件拿掉，
+   第 3 条立刻红（`成长 不该显示今日进度卡`，`toHaveCount(0)` 失败），
+   并自动留下 `test-results/.../test-failed-1.png`；还原后 6/6 绿。
+
+   ⚠️ **一条已登记的已知缺失**：`/favicon.ico` 会 404 —— 仓库**从来没有** favicon
+   （源 `apps/web/index.html` 无引用、无 `public/`、git 里一个 `.ico` 都没有、main 同样如此）。
+   它是**缺口**不是坏引用，也不是本分支引入的。
+   🔴 **登记之时不许用 `includes('404')` 过滤** —— 那会把将来真正坏掉的资源一起藏掉；
+   要按**具体路径**断言。（这条踩过：自检脚本 v1 就是这么写的，已改。）
 
    ⚠️ 本分支的测试数会**随 main 一起涨**（main 的订阅测试也在里面），
    所以上表的 2592 是**本分支自己的基线**；合并后应当 ≥ 它，**不是等于它**。

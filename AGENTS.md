@@ -281,6 +281,12 @@ pnpm verify:sync:dry            # 不需要服务端，只校验 op 形状
 pnpm verify:p1                  # P1 验收：**自带真实服务端**，跑零 mock 的端到端同步（11 条）
 pnpm verify:p2                  # P2 验收：**自带真实服务端**，非 Web 壳（Node+SQLite）真实读写+同步
 
+# 真浏览器验收（Playwright）。⚠️ 它在 `e2e/` 里，**刻意不在根 pnpm 工作区内**
+#   （理由见 `e2e/pnpm-workspace.yaml`，别把它的依赖并回根 lockfile）。
+#   依赖要单独装：`cd e2e && pnpm install`（它自己一份 lockfile）
+pnpm check:ai-e2e               # 跑整个 e2e 套件（起 vite dev + 假端点，零 mock）
+                                #   激励体系的设计契约：e2e/tests/motivation.spec.ts（6 条）
+
 # 移动端验收：真模拟器（emulator-5554）+ 真服务端 + 真笔记本设备（node-host），全部零 mock
 pnpm verify:mobile-edit         # 任务可编辑（截止时间/优先级/重命名/删除）
 pnpm verify:mobile-conflict     # 冲突解决闭环（真的造出并发冲突，再在界面上解决）
@@ -1018,6 +1024,24 @@ docker inspect <容器> --format '{{range .Config.Env}}{{println .}}{{end}}' | g
 | P3 平台特性 | ⏸ |
 
 总路线图：[`docs/plans/roadmap.md`](docs/plans/roadmap.md)
+
+### 并行轨道：激励与成长体系（**已实现，尚未落地**）
+
+分支 `feat/motivation-system`（worktree `.worktrees/motivation`）。L1 即时反馈 / L2 连续性 /
+L3 叙事三层**已实现并通过验证**（§6 那个 2592 含其中 23 条激励渲染层测试，
+外加 `e2e/tests/motivation.spec.ts` 的 6 条真浏览器契约）。
+
+🔴 **但它还没进 `main`** —— 而且**不是**因为本分支有问题：`main` 目前**自己既 build 不了
+也 typecheck 不了**，因为它已经提交了引用**未跟踪**的 `packages/i18n` 与**未实现**的
+`createSyncClient().openSettings` 的代码（9 条 TS 错 + build 失败，全部落在这两处）。
+三条前置门与一份**可机械重放**的落地程序（含唯一冲突点 `App.tsx` 的并集解法、
+先构建再检查的理由、以及回退点）在
+[激励与成长体系设计](docs/plans/motivation-and-progression.md) **§12**。
+
+设计红线：**不发行任何货币**（没有金币/积分/商店，也不卖"后悔"）、
+**只与自己的过去比**（排行榜/联赛/自习室/组队打 Boss 在 E2EE 下结构上不可能）、
+**从不制造愧疚**。关键裁决见下面 ADR-0015 与
+[`docs/plans/roadmap.md`](docs/plans/roadmap.md) §1.2。
 
 ### 已定的关键决策
 
