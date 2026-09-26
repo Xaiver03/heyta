@@ -1,0 +1,354 @@
+# 多端构建矩阵
+
+> 本文件是**各平台构建条件的唯一事实源**：谁来构建、在哪台机器上、工具链是什么、
+> 产物落在哪、当前状态如何。
+>
+> 配套操作步骤见 [`../runbooks/multi-platform-build.md`](../runbooks/multi-platform-build.md)。
+> 为什么多端只写"壳"见 [ADR-0003](../adr/0003-multi-platform-strategy.md)。
+
+## 0. 状态图例
+
+| 标记 | 含义 |
+|---|---|
+| ✅ | **实测通过**，有可复现的命令与证据 |
+| ⚠️ | 有条件可用 / 部分完成 |
+| ❌ | 未实现 |
+| 🔲 | 已规划，未验证 |
+
+"实测"指**真的跑过并拿到产物**，不是"应该可以"。本仓库已多次踩到
+"测试通过 ≠ 能打包"（`AGENTS.md` §7 第 27、28 条），所以这里只认产物。
+
+---
+
+## 1. 构建环境总表
+
+| 环境 | SSH 别名 | 地址 | 用户 | 密钥 | 能力 |
+|---|---|---|---|---|---|
+| **本地 Mac**（当前开发机） | — | 本机 | `rocalight` | — | iOS 构建、Android 构建、鸿蒙依赖验证 |
+| **Windows 打包机** | `windows-pc` | `10.111.127.237`（ZeroTier）<br>`192.168.1.3`（局域网） | `41478` | `~/.ssh/id_ed25519` | Android ✅（debug）、Windows 桌面构建 |
+| 另一台开发 Mac | `chatgpt-other-mac` | `10.111.127.23`（ZeroTier） | `rocalight` | `~/.ssh/id_ed25519` | 备用 |
+
+### 1.1 Windows 打包机身份（固化）
+
+这台机器此前**只存在于个人 `~/.ssh/config` 的注释里**，不在版本控制内、不随仓库走、
+agent 读不到。这里把它固化进仓库。
+
+| 项 | 值 |
+|---|---|
+| SSH 别名 | `windows-pc` |
+| 主机名 | `邓湘雷-win` |
+| 系统 | Windows 11 build `10.0.26200.9457`（实测 `ver`） |
+| 架构 | `AMD64` |
+| ZeroTier 虚拟 IP | `10.111.127.237`（节点 `7578ffc5b6`） |
+| 局域网 IP | `192.168.1.3` |
+| SSH 用户 | `41478` |
+| SSH 密钥 | `~/.ssh/id_ed25519`（Ed25519，公钥认证） |
+| 仓库路径 | `C:\src\heyta` |
+| ZeroTier 网络 ID | `166359304e354777` |
+
+**换网络 / 换地点后不需要改任何配置**，只要：① 机器上 ZeroTier One 在跑；
+② 本机 Mac 上 ZeroTier One 在跑；③ 在
+<https://my.zerotier.com/network/166359304e354777> 保持该节点已授权。
+
+> ⚠️ 历史值已失效，**不要再用**：旧 IP `10.111.127.156`、旧节点 `ed4d554295`。
+> 2026-09 系统重装后换成上表的新身份。
+
+> ⚠️ **这台机器会休眠。** 休眠时 SSH 直接报 `No route to host`，ZeroTier ping 100% 丢包。
+> 实测不是掉线：上一次唤醒等了约 105 秒就恢复了。所以脚本里遇到这个错误，
+> **先重试，不要急着改 IP 或重新授权节点**。
+
+### 1.2 网络前提：GitHub 在 Windows 上需要代理
+
+中国大陆直连 `github.com` 会被 reset（实测 `Recv failure: Connection was reset`），
+而 `registry.npmjs.org` **直连可达**。因此：
+
+- **只给 git 配代理**，npm/pnpm 保持直连；
+- 代理地址是 Mac 上的 `http://10.111.127.246:7890`，经 ZeroTier 可从 Windows 访问
+  （实测 TCP 可达）；
+- 该配置由 `scripts/windows/setup-build-host.ps1 -Proxy` 写入，**不进仓库**（机器本地状态）。
+
+### 1.3 两个脚本
+
+| 脚本 | 作用 |
+|---|---|
+| `scripts/windows/setup-build-host.ps1` | 装工具链（git / node / pnpm / JDK 21 / Android SDK / 可选 VS C++），幂等 |
+| `scripts/windows/bootstrap-repo.ps1` | 把 Mac 工作树的源码快照铺到 `C:\src\heyta` 并初始化本地 git 仓库 |
+
+```powershell
+# 在 Windows 上（管理员 PowerShell）
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts\windows\setup-build-host.ps1
+```
+
+`setup-build-host.ps1` 分步：`-Step base | android-studio | vs-buildtools | verify`。
+`-Step verify` 是纯体检，输出一张 ✅/❌ 表。
+
+**为什么不用 `git clone`**：`github.com` 在这台机器上必须走代理，而且私有仓库的
+`clone` 还需要凭据（PAT / deploy key）——**目前没配**，实测失败在
+`could not read Username for 'https://github.com'`。
+所以走"源码快照"路径：Mac 导出工作树 → `scp` → `bootstrap-repo.ps1` 落地并 `git init`。
+拿到凭据后 `git fetch origin && git reset --hard origin/main` 即可回到上游。
+具体命令见 [`../runbooks/multi-platform-build.md`](../runbooks/multi-platform-build.md) §1.2。
+
+> 🔴 **两个脚本都必须保持纯 ASCII。** Windows PowerShell 5.1 把无 BOM 的 UTF-8 当 ANSI 读，
+> 中文字符会破坏解析（实测报 `UnexpectedToken` 且行号指向注释中间）。
+> 中文说明放在本文件与 runbook 里，不放进 `.ps1`。
+
+---
+
+## 2. Android
+
+| 项 | 值 |
+|---|---|
+| 构建环境 | 本地 Mac ✅ / Windows 打包机 ✅（debug + release 均实测，见 §2.5） |
+| 产物 | `apps/mobile/android/app/build/outputs/apk/release/app-release.apk` |
+| AAB 产物 | `apps/mobile/android/app/build/outputs/bundle/release/app-release.aab` |
+| 状态 | ✅ **实机跑通**（`AGENTS.md` §1） |
+
+### 2.1 工具链要求
+
+版本必须与 `apps/mobile/android/build.gradle` 的 `ext` 块一致：
+
+| 组件 | 版本 | 来源 |
+|---|---|---|
+| `compileSdkVersion` | **36** | `build.gradle` |
+| `buildToolsVersion` | **36.0.0** | `build.gradle` |
+| `minSdkVersion` | 24 | `build.gradle` |
+| `targetSdkVersion` | 36 | `build.gradle` |
+| `ndkVersion` | **27.1.12297006** | `build.gradle`（newArch + op-sqlite 需要） |
+| CMake | 3.22.1 | NDK 构建需要 |
+| Gradle | **9.0.0** | `android/gradle/wrapper/gradle-wrapper.properties` |
+| JDK（跑 Gradle） | **21** | Microsoft OpenJDK 21 |
+| JDK（工具链） | **17** | RN 的 gradle-plugin 要 `jvmToolchain(17)` |
+| Node | **≥ 22.11.0** | `apps/mobile/package.json` 的 `engines` |
+
+🔴 **两个 JDK 都要装，而且不是同一件事。**
+
+- **跑 Gradle 的那个 JDK 必须是 21。** 不要用 Android Studio 自带的 JBR ——
+  这台机器上它是 **25.0.3**，而 JDK 24+ 把 native 库加载从"警告"变成了错误，
+  `op-sqlite` 的 CMake 配置任务会直接失败：
+
+  ```
+  Execution failed for task ':op-engineering_op-sqlite:configureCMakeDebug[arm64-v8a]'
+  > WARNING: A restricted method in java.lang.System has been called
+  ```
+
+- **另外必须有 JDK 17。** RN 0.84 自带的 `@react-native/gradle-plugin` 在
+  `settings.gradle.kts` 里应用了 `foojay-resolver-convention:0.5.0`，而它自己的
+  模块写着 `kotlin { jvmToolchain(17) }`。本机找不到 17 时 Gradle 会去问这个下载
+  解析器，而 0.5.0 依赖的 `JvmVendorSpec.IBM_SEMERU` 在 Gradle 8.10 就被删了：
+
+  ```
+  Class org.gradle.jvm.toolchain.JvmVendorSpec does not have member field
+  'org.gradle.jvm.toolchain.JvmVendorSpec IBM_SEMERU'
+  ```
+
+  光把 JDK 17 装上还不够：实测 Gradle 的自动探测没认出它，要显式登记，而且
+  `gradle.properties` 是 Java properties 文件，**反斜杠会被吃掉**，必须写正斜杠：
+
+  ```properties
+  org.gradle.java.installations.paths=C:/Program Files/Eclipse Adoptium/jdk-17.0.20.1+1
+  ```
+
+  `setup-build-host.ps1` 的 `Ensure-Jdk17` 负责这两件事，`-Step verify` 里有对应体检行。
+
+> macOS 本机的 Android SDK 装在 `/opt/homebrew/share/android-commandlinetools`
+> （见 `apps/mobile/android/local.properties`）。
+> macOS 上 JDK 17 来自 Homebrew 的 `/opt/homebrew/opt/openjdk@17`，
+> 这就是同一份代码在 Mac 上没撞上 foojay 的原因。
+
+### 2.2 构建命令
+
+```bash
+pnpm -r build                      # 🔴 必须先构建 workspace 包：APK 里打的是 packages/*/dist
+pnpm build:android                 # Release APK
+pnpm build:android:debug           # Debug APK
+pnpm --filter @heyta/mobile run build:android:bundle   # Release AAB（上架用）
+```
+
+### 2.3 两个必须知道的坑
+
+1. **只改 `packages/` 时，Gradle 可能打进旧 bundle。**
+   已修：`app/build.gradle` 把 `packages` 声明成打包任务输入（`inputs.dir`）。
+   修后普通构建会自动重打，代价是 APK 构建从 ~12 秒变 ~30 秒。
+   **不要为省时间删掉那条声明** —— 它污染的是所有移动端验收的结论。
+
+2. **Release 包的明文 HTTP 开关在 `finalizeDsl` 里，不在 `android { }` 里。**
+   RN 的 Gradle 插件会在 `finalizeDsl` 覆盖 `manifestPlaceholders`，
+   写在 `android { }` 里的值**一定是假的**（构建退出码 0，aapt2 读出来仍是 `false`）。
+   改完务必验证产物：
+   ```bash
+   aapt2 dump xmltree --file AndroidManifest.xml app-release.apk | grep usesCleartextTraffic
+   # 期望 =true
+   ```
+   决策记录见 [ADR-0007](../adr/0007-transport-security.md)。
+
+### 2.4 签名（🔴 当前不是发布配置）
+
+`app/build.gradle` 的 **release 变体仍然用 debug keystore 签名**。
+这是模板默认值，**不能上架**。真要发布 Android 时：
+
+1. 生成正式 keystore；
+2. 用环境变量或 `~/.gradle/gradle.properties` 注入口令（**绝不入库**）；
+3. 把 `signingConfigs.release` 接到 release 变体；
+4. 验证：`apksigner verify --print-certs app-release.apk`。
+
+> 当前状态：✅ 可用于内部安装测试 / ❌ 不可用于应用商店。
+
+### 2.5 Windows 打包机实测（2026-09）
+
+**debug 与 release 两个变体都已跑通，产物已逐项验过。**
+
+| 步骤 | 命令 | 结果 |
+|---|---|---|
+| 装依赖 | `corepack pnpm install` | ✅ 909 包，2 分 41 秒 |
+| 构建 workspace 包 | `corepack pnpm -r build` | ✅ 16 个工作区项目全过 |
+| 打 debug | `corepack pnpm build:android:debug` | ✅ `BUILD SUCCESSFUL in 4m 14s`，200 个任务（93 执行） |
+| 打 release | `corepack pnpm build:android` | ✅ `BUILD SUCCESSFUL in 9m 13s`，255 个任务（229 执行） |
+
+产物：
+
+| 变体 | 大小 | sha256 | 时间 |
+|---|---|---|---|
+| `app-debug.apk` | 129,754,425 B | `5AED620A823637AF2B294FD2AE7A324B3E6F4367FBA2A015476EB0AE2DC951C1` | 2026-09-26 15:56:38 |
+| `app-release.apk` | 64,919,787 B | `A461D1942F9EFAC0C0298364DD6EA9D38D679E38AD2803217FA5D8030B539AF5` | 2026-09-26 16:12:20 |
+
+结构校验（`scripts/windows/verify-apk.ps1`，不靠眼看）：
+
+| 检查项 | debug | release |
+|---|---|---|
+| `AndroidManifest.xml` | ✅ | ✅ |
+| `classes.dex` | ✅ 11,592,408 B | ✅ 9,460,240 B |
+| `resources.arsc` | ✅ 364,572 B | ✅ 349,276 B |
+| `assets/index.android.bundle` | ➖ 按设计不存在 | ✅ **4,013,724 B** |
+| `lib/` 四个 ABI | ✅ 各 13 个 `.so` | ✅ 各 13 个 `.so` |
+| `usesCleartextTraffic=true` | — | ✅ **实测生效** |
+
+> **debug 包里没有 JS bundle 是对的。** RN 的 Gradle 配置默认
+> `debuggableVariants = ["debug", "debugOptimized"]`，这两个变体**跳过 bundle**，
+> JS 由 Metro 在运行时提供。只有 release 才打 bundle（本次 4.0 MB）。
+> 拿 debug 包去验"bundle 在不在"只会得到假警报 —— 脚本按路径里有没有 `\release\` 区分。
+
+> **release 的 `createBundleReleaseJsAndAssets` 确认执行**（不是 UP-TO-DATE 跳过），
+> 所以 4.0 MB 的 bundle 确实是这次构建产出的，不是缓存里的旧货。
+> 明文 HTTP 开关也**在打包后的清单里**核实为 `true`（aapt2 dump，不是看源代码）——
+> 这一条正是 §2.3 坑 2 要求验的东西。
+
+**这台机器上真正让它跑起来的三件事**（细节见
+[`../runbooks/multi-platform-build.md`](../runbooks/multi-platform-build.md) §5.1）：
+
+1. Gradle 守护进程必须跑 **JDK 21**，不能用 Android Studio 的 JBR 25；
+2. 机器上必须有 **JDK 17**，否则 RN 的 foojay 解析器在 Gradle 9 上崩；
+3. Gradle 下载走代理，实测 `services.gradle.org` 直连 61 KB/s、经代理 7.8 MB/s。
+
+**仍未做**：Windows 上的 AAB（`bundleRelease`）没跑；签名仍是 debug keystore（见 §2.4）。
+
+### 2.5 Android 备案
+
+明确指示：**暂不处理**。不阻塞构建。
+
+---
+
+## 3. iOS
+
+| 项 | 值 |
+|---|---|
+| 构建环境 | **仅本地 Mac**（iOS 构建必须 macOS + Xcode） |
+| 产物 | `apps/mobile/ios/build/Build/Products/Release-iphonesimulator/HeytaMobile.app` |
+| 状态 | ✅ 模拟器构建到交互级 |
+
+### 3.1 工具链要求
+
+| 组件 | 值 |
+|---|---|
+| Xcode | 27.1（`IPHONEOS_DEPLOYMENT_TARGET` 支持范围 15.0–27.1.x） |
+| 部署目标 | 由 `Podfile` 的 `post_install` 统一抬高到 `min_ios_version_supported`（≥15.1） |
+| CocoaPods | 经 `bundle exec pod install` |
+| Node | ≥ 22.11.0 |
+
+### 3.2 构建命令
+
+```bash
+pnpm -r build                      # 同样先构建 workspace 包
+pnpm --filter @heyta/mobile run pods   # 原生依赖变了才需要
+pnpm build:ios                     # Release, iphonesimulator
+```
+
+### 3.3 三个必须知道的坑
+
+1. **仓库路径含空格会让 `pod install` 崩。**
+   本机路径是 `…/All in one Data/…`，而 RN 的 CocoaPods helper 用
+   `URI::File.build`，遇到空格直接抛异常。
+   绕法：强制 RN core 与 dependencies **从源码构建**（见 `AGENTS.md` §7 第 29 条），
+   代价是首次 iOS 构建慢很多。
+2. **图标库的部署目标会拦住 iOS 构建，而 Android 完全不受影响。**
+   已在 `Podfile` 的 `post_install` 里对**所有** pod target 统一抬高，
+   规则是"只抬高、不降低"、且用 RN 的 `min_ios_version_supported` 常量而不是写死版本。
+3. **`.js` 扩展名的相对导入：单测全绿，Release 打包失败。**
+   移动端本地模块一律不带扩展名（`AGENTS.md` §7 第 28 条）。
+
+### 3.4 真机 / 上架
+
+- 当前只验证到**模拟器**。真机需要 Apple Developer 账号签名 + provisioning profile。
+- 已有 Apple Developer 账号 ✅（[ADR-0003 §1](../adr/0003-multi-platform-strategy.md)）。
+- 🔴 **iOS ATS 覆盖范围未实测**（[ADR-0007](../adr/0007-transport-security.md) 标注）。
+
+---
+
+## 4. Windows 桌面
+
+| 项 | 值 |
+|---|---|
+| 构建环境 | Windows 打包机 |
+| 状态 | 🔲 **方向未定** |
+
+**尚未决定**：桌面端由 **Web（PWA / Tauri）** 还是 **react-native-windows** 覆盖。
+见 [`../plans/phase-2-multi-platform.md`](../plans/phase-2-multi-platform.md) §3.2。
+
+- 工具链已备（`scripts/windows/setup-build-host.ps1 -Step vs-buildtools` 装
+  VS 2022 Build Tools + C++ 工作负载），但**技术选型没定之前不投入开发**。
+- 若走 Web / Tauri：Windows 打包机只需要 Node，**不需要 VS C++ 工具链**。
+
+---
+
+## 5. macOS 桌面 / Linux 桌面
+
+| 平台 | 状态 |
+|---|---|
+| macOS 桌面 | 🔲 未规划（可复用 Web / Tauri） |
+| Linux 桌面 | 🔲 未规划（可复用 Web / Tauri） |
+
+---
+
+## 6. HarmonyOS
+
+| 项 | 值 |
+|---|---|
+| 构建环境 | 本地 Mac（DevEco Studio 6.1.1.300，SDK API 24） |
+| 产物 | `.hap` |
+| 状态 | 🔲 **从未构建出 HAP** |
+
+已实测打通的是**依赖链**（npm + ohpm 双侧都是 MIT，`ohpm install` 28.9 秒成功），
+**未验证**的是 `hvigorw assembleHap` —— 没编译过一行 C++、没生成过 HAP、
+没在设备或模拟器上跑起来。
+
+🔴 官方《环境搭建》文档写"仅支持 RN 0.72.5"**已过时**，实测两侧都已在 `0.84.x`。
+照文档选版本会选到三年前的分支。
+
+详细计划见 [`../plans/phase-2-multi-platform.md`](../plans/phase-2-multi-platform.md) §3.1。
+
+---
+
+## 7. 一页速查
+
+| 平台 | 环境 | 命令 | 产物 | 状态 |
+|---|---|---|---|---|
+| Android (Mac) | Mac | `pnpm build:android` | `app-release.apk` | ✅ 实机 |
+| Android (Windows) | Windows 打包机 | `pnpm build:android[:debug]` | `app-release.apk` / `app-debug.apk` | ✅ 两个变体实测 |
+| iOS | 仅 Mac | `pnpm build:ios` | `HeytaMobile.app` | ✅ 模拟器 |
+| Windows 桌面 | Windows | — | — | 🔲 选型未定 |
+| macOS 桌面 | Mac | — | — | 🔲 未规划 |
+| Linux 桌面 | Linux | — | — | 🔲 未规划 |
+| HarmonyOS | Mac | — | `.hap` | 🔲 无 HAP |
+
+**签名现状**：Android release 用 debug keystore（可测试、不可上架）；
+iOS 仅模拟器；其余平台无签名需求。
