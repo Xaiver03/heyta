@@ -64,8 +64,8 @@ export const zhCN = {
   'landing.nav.capabilities': '能力',
   'landing.nav.showcase': '界面',
   'landing.nav.sync': '同步',
+  'landing.nav.pricing': '定价',
   'landing.nav.selfhost': '自建',
-  'landing.nav.viewSource': '在 GitHub 上查看源代码',
   'landing.nav.switchLanguage': '切换到{language}',
 
   // ── 落地页 · 功能名（导航 / 能力卡 / 展厅 / 复现件共用）───
@@ -159,31 +159,52 @@ export const zhCN = {
   // catalog.spec.ts 的"中文词条必须含汉字"判定为违规（它是对的 ——
   // 一条只有标点的词条没有办法自查语言）。
   'landing.selfhost.warnCode': '迁移脚本 scripts/migrate-deploy.sh。',
-  'landing.selfhost.guide': '完整的部署与验收步骤',
+  // 仓库当前是私有的，上面那条 `git clone` 对访客无效。这一条是**诚实说明**，
+  // 不是营销文案 —— 仓库公开后连同它一起删掉，并把链接恢复（见 ADR-0017 的收尾）。
+  'landing.selfhost.sourcePending': '源码尚未公开，上面这条命令现在还不能执行。仓库公开后即可直接克隆自建。',
+
+  // ── 落地页 · 价格 ─────────────────────────────────────────
+  // 🔴 这里的两个价格必须与 server 的价目表、法务文本一致 ——
+  // `scripts/check-pricing-consistency.mjs` 会读这些词条并断言三方一致。
+  // 改价时先读 docs/reference/pricing-and-entitlements.md（三层唯一事实源）。
+  'landing.pricing.ariaLabel': '价格与权益',
+  'landing.pricing.title': '只收一台服务器的钱',
+  'landing.pricing.lede': '应用本体的全部功能免费，自建永久免费、不校验。只有「我们替你运维那台中继」这一件事收费，而且只有一个档。',
+  'landing.pricing.noFeatureGate': '两边的功能完全一样 —— 你付的是我们替你运维服务器，不是解锁功能。',
+  'landing.pricing.free.name': '自建',
+  'landing.pricing.free.price': '免费',
+  'landing.pricing.free.period': '永久',
+  'landing.pricing.free.body': '跑在你自己的服务器上。不需要注册账号，也没人校验你用了多久。',
+  'landing.pricing.free.feature1': '全部功能，一个不少',
+  'landing.pricing.free.feature2': '设备数不限',
+  'landing.pricing.free.feature3': '数据与密钥都留在你手里',
+  'landing.pricing.free.cta': '开始自建',
+  'landing.pricing.hosted.name': '官方托管同步',
+  'landing.pricing.hosted.priceCny': '¥99 / 年',
+  'landing.pricing.hosted.priceUsd': '$49 / 年',
+  'landing.pricing.hosted.regionCny': '大陆',
+  'landing.pricing.hosted.regionUsd': '海外',
+  'landing.pricing.hosted.body': '我们替你运维那台中继。数据照旧是密文，我们仍然打不开。',
+  'landing.pricing.hosted.feature1': '全部功能，与自建完全一致',
+  'landing.pricing.hosted.feature2': '设备数不限',
+  'landing.pricing.hosted.feature3': '服务端记录完整保留，到期也不删',
+  'landing.pricing.hosted.cta': '即将开放',
+  'landing.pricing.statusNote': '收银台还没接完线：大陆与海外的支付通道都在等支付商资质，现在还不能下单。',
 
   // ── 落地页 · 收尾 CTA ─────────────────────────────────────
   'landing.cta.title': '你的清单，不该是别人的资产',
-  'landing.cta.lede': '代码是开放的，服务端可以自己起。今天就可以把数据搬回自己的机器上。',
+  'landing.cta.lede': '自建永久免费：源码公开后，一条命令就能起自己的服务端，把数据搬回自己的机器。',
   // 与英雄区同一个意图，共用一条词条 —— 换标签会让人以为它们是两件事。
   'landing.cta.selfHost': '开始自建',
-  'landing.cta.viewCode': '先看看代码',
 
   // ── 落地页 · 页脚 ─────────────────────────────────────────
   'landing.footer.tagline': '本地优先的任务管理。数据先落本地，云端只是同步通道。',
-  'landing.footer.viewOnGithub': '在 GitHub 上查看',
   'landing.footer.group.product': '产品',
   'landing.footer.group.gettingStarted': '上手',
-  'landing.footer.group.docs': '文档',
+  'landing.footer.pricing': '价格',
   'landing.footer.syncHow': '同步怎么工作',
   'landing.footer.privacy': '隐私',
   'landing.footer.selfHostServer': '自建服务端',
-  'landing.footer.deployGuide': '部署与验收步骤',
-  'landing.footer.contributing': '参与贡献',
-  'landing.footer.source': '源代码',
-  'landing.footer.roadmap': '总路线图',
-  'landing.footer.adr': '架构决策记录',
-  'landing.footer.licenses': '第三方许可证',
-  'landing.footer.docsIndex': '文档索引',
   'landing.footer.disclaimer': '个人项目，与滴答清单 / TickTick 及其关联公司无任何关系。',
   'landing.footer.licenseNote': 'heyta 采用 MIT 许可证；第三方代码归属逐项登记在 THIRD_PARTY_LICENSES.md。',
 

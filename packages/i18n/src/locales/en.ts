@@ -52,8 +52,8 @@ export const en = {
   'landing.nav.capabilities': 'Capabilities',
   'landing.nav.showcase': 'Screens',
   'landing.nav.sync': 'Sync',
+  'landing.nav.pricing': 'Pricing',
   'landing.nav.selfhost': 'Self-host',
-  'landing.nav.viewSource': 'View source on GitHub',
   'landing.nav.switchLanguage': 'Switch to {language}',
 
   // ── Landing · feature names (nav / cards / showcase / mockup) ──
@@ -143,30 +143,52 @@ export const en = {
   'landing.selfhost.warnStrong': 'Do not run Prisma migrations directly.',
   'landing.selfhost.warnBody': 'The project has 5 migrations that build indexes concurrently. Prisma wraps migrations in a transaction, and PostgreSQL does not allow concurrent index creation inside one, so the sixth migration fails. Use the repository ',
   'landing.selfhost.warnCode': 'migration script scripts/migrate-deploy.sh.',
-  'landing.selfhost.guide': 'Full deployment and verification steps',
+  // The repository is private today, so the `git clone` command above does not
+  // work for visitors. This is an honest disclosure, not marketing copy.
+  'landing.selfhost.sourcePending': 'The source is not public yet, so the command above will not run today. Once the repository is public you can clone and self-host directly.',
+
+  // ── Landing · pricing ─────────────────────────────────────
+  // 🔴 These two prices must match the server price list and the legal text --
+  // `scripts/check-pricing-consistency.mjs` reads these entries and asserts all
+  // three agree. Read docs/reference/pricing-and-entitlements.md before changing.
+  // ASCII punctuation only in this table (see the file header).
+  'landing.pricing.ariaLabel': 'Pricing and entitlements',
+  'landing.pricing.title': 'You pay for one server, nothing else',
+  'landing.pricing.lede': 'Every feature of the app itself is free, and self-hosting is free forever with no validation. Only one thing is paid: the relay we run for you. And there is exactly one tier.',
+  'landing.pricing.noFeatureGate': 'Both sides do exactly the same things -- you pay for us running the server, not to unlock features.',
+  'landing.pricing.free.name': 'Self-host',
+  'landing.pricing.free.price': 'Free',
+  'landing.pricing.free.period': 'forever',
+  'landing.pricing.free.body': 'Runs on your own server. No account to create, and nobody checks how long you have been using it.',
+  'landing.pricing.free.feature1': 'Every feature, none held back',
+  'landing.pricing.free.feature2': 'Unlimited devices',
+  'landing.pricing.free.feature3': 'Your data and your keys stay with you',
+  'landing.pricing.free.cta': 'Self-host now',
+  'landing.pricing.hosted.name': 'Hosted sync',
+  'landing.pricing.hosted.priceCny': 'CNY 99 / year',
+  'landing.pricing.hosted.priceUsd': '$49 / year',
+  'landing.pricing.hosted.regionCny': 'Mainland China',
+  'landing.pricing.hosted.regionUsd': 'International',
+  'landing.pricing.hosted.body': 'We run the relay for you. The data is still ciphertext, and we still cannot open it.',
+  'landing.pricing.hosted.feature1': 'Every feature, identical to self-hosting',
+  'landing.pricing.hosted.feature2': 'Unlimited devices',
+  'landing.pricing.hosted.feature3': 'Server records are kept in full, not deleted when a period ends',
+  'landing.pricing.hosted.cta': 'Opening soon',
+  'landing.pricing.statusNote': 'Checkout is not wired up yet: the payment channels for both mainland China and international are still waiting on merchant approval, so orders cannot be placed today.',
 
   // ── Landing · final CTA ───────────────────────────────────
   'landing.cta.title': 'Your task list should never become an asset someone else owns',
-  'landing.cta.lede': 'The code is open and the server can be yours. Move your data back to your own machine today.',
+  'landing.cta.lede': 'Self-hosting is free forever: once the source is public, one command brings up your own server and moves your data back to your machine.',
   'landing.cta.selfHost': 'Self-host now',
-  'landing.cta.viewCode': 'Browse the code first',
 
   // ── Landing · footer ──────────────────────────────────────
   'landing.footer.tagline': 'Local-first task management. Data lands on your device first; the cloud is only a sync channel.',
-  'landing.footer.viewOnGithub': 'View on GitHub',
   'landing.footer.group.product': 'Product',
   'landing.footer.group.gettingStarted': 'Getting started',
-  'landing.footer.group.docs': 'Docs',
+  'landing.footer.pricing': 'Pricing',
   'landing.footer.syncHow': 'How sync works',
   'landing.footer.privacy': 'Privacy',
   'landing.footer.selfHostServer': 'Self-host the server',
-  'landing.footer.deployGuide': 'Deployment and verification',
-  'landing.footer.contributing': 'Contributing',
-  'landing.footer.source': 'Source code',
-  'landing.footer.roadmap': 'Roadmap',
-  'landing.footer.adr': 'Architecture decisions',
-  'landing.footer.licenses': 'Third-party licenses',
-  'landing.footer.docsIndex': 'Docs index',
   'landing.footer.disclaimer': 'A personal project, not affiliated with TickTick or its affiliates.',
   'landing.footer.licenseNote': 'heyta is MIT licensed; third-party attribution is itemised in THIRD_PARTY_LICENSES.md.',
 
