@@ -18,16 +18,21 @@
     "typecheck": "tsc --noEmit -p tsconfig.spec.json",
     "test": "vitest run",
     "test:watch": "vitest",
-    "host": "node dist/cli.js"
+    "host": "node dist/cli.js",
+    "mcp": "node dist/cli-mcp.js",
+    "ai": "node dist/cli-ai.js",
+    "local-api": "node dist/cli-local-api.js"
   },
   "dependencies": {
+    "@heyta/ai": "workspace:*",
+    "@heyta/app-host": "workspace:*",
     "@heyta/domain": "workspace:*",
+    "@heyta/local-api": "workspace:*",
     "@heyta/op-log": "workspace:*",
     "@heyta/shared-schema": "workspace:*",
     "@heyta/storage": "workspace:*",
     "@heyta/sync-client": "workspace:*",
-    "@heyta/sync-core": "workspace:*",
-    "@heyta/app-host": "workspace:*"
+    "@heyta/sync-core": "workspace:*"
   },
   "devDependencies": {
     "tsup": "^8.5.1",
