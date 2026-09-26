@@ -70,8 +70,8 @@ export type {
 export {
   SUBSCRIPTION_PERIOD_DAYS,
   extendSubscriptionPeriod,
-} from './extend-period';
-export type { ExtendSubscriptionPeriodInput } from './extend-period';
+} from '@heyta/domain';
+export type { ExtendSubscriptionPeriodInput } from '@heyta/domain';
 
 export { applyPaymentEvent } from './apply-event';
 export type {

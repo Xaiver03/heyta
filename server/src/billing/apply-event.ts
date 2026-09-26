@@ -18,7 +18,7 @@
  * `(provider, providerEventId)` 唯一约束里。调用本函数时事件已经通过那两道闸。
  */
 import type { NormalizedPaymentEvent, SubscriptionStatus } from './types';
-import type { ExtendSubscriptionPeriodInput } from './extend-period';
+import type { ExtendSubscriptionPeriodInput } from '@heyta/domain';
 
 /** 应用结果。审计日志按它区分"真改了"与"看过但没动"。 */
 export type PaymentEventApplyOutcome =
@@ -82,7 +82,7 @@ export interface ApplyPaymentEventDeps {
    *
    * 为什么注入而不是 import：`server` 包没有 `@heyta/domain` 依赖，
    * 而硬约束不许改 `server/package.json` / lockfile。把算法做成端口，
-   * 至少保证**本文件里没有第二份公式** —— 见 `extend-period.ts` 文件头的完整说明。
+   * 至少保证**本文件里没有第二份公式** —— 见 `@heyta/domain` 的 `extendSubscriptionPeriod`。
    */
   extendPeriod(input: ExtendSubscriptionPeriodInput): number;
   /** 可注入时钟，仅用于 `updatedAt`，不参与新旧判定。 */
