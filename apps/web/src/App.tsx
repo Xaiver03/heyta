@@ -166,7 +166,14 @@ export function App(): React.JSX.Element {
       feedbackSet: applyFeedbackCorrections(rawFeedback, suppressed),
       // 🔴 故意用 raw 算：被抑制的偏好不在 corrected 里
       rawPresentIds: presentPreferenceIds(raw, rawFeedback),
-      corrections: corrections.map((c) => ({ id: c.id, preferenceId: c.preferenceId })),
+      // ⚠️ `deletedAt` 必须传下去：面板要据此排除**已撤销**的纠正，
+      // 否则"恢复"之后那条偏好会同时出现在「我了解到的你」和「你已忘记」里。
+      corrections: corrections.map((c) => ({
+        id: c.id,
+        preferenceId: c.preferenceId,
+        kind: 'suppress' as const,
+        ...(c.deletedAt === undefined ? {} : { deletedAt: c.deletedAt }),
+      })),
     };
   }, [aiSettings.memoryEnabled, store.entities]);
 

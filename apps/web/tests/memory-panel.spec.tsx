@@ -180,12 +180,63 @@ describe('🔴 记忆面板：可以改', () => {
   });
 });
 
+/**
+ * 🔴 墓碑（撤销过的纠正）不能让偏好继续被抑制。
+ *
+ * 这一组钉的是真实用户旅程测试抓到的 bug：面板曾经自己
+ * `map(c => c.preferenceId)` 建抑制集合，**把墓碑也算进去**，
+ * 而 App 里真正置空偏好用的是 `suppressedPreferenceIds()`（跳过墓碑）。
+ * 两套规则 ⇒ 点了「恢复」之后，那条偏好会**同时出现在两个区里**，
+ * 而且用户再也删不掉。
+ */
+describe('🔴 记忆面板：墓碑记录不算「已忘记」', () => {
+  const tombstoned = [
+    { id: 'c1', preferenceId: 'granularity', kind: 'suppress' as const, deletedAt: 1 },
+  ];
+
+  it('已撤销的纠正 → 不再出现在「你已忘记」', () => {
+    const el = render({
+      preferenceSet: prefs({ granularity: pref('granularity', 6, '依据') }),
+      rawPresentIds: ['granularity'],
+      corrections: tombstoned,
+    });
+    expect(
+      el.querySelector('[data-testid="memory-forgotten"]'),
+      '撤销之后不该还挂在「你已忘记」',
+    ).toBeNull();
+  });
+
+  it('🔴 已撤销的纠正 → 偏好回到「我了解到的你」（不是两边都在）', () => {
+    const el = render({
+      preferenceSet: prefs({ granularity: pref('granularity', 6, '依据') }),
+      rawPresentIds: ['granularity'],
+      corrections: tombstoned,
+    });
+    expect(el.querySelector('[data-testid="memory-pref-granularity"]')).not.toBeNull();
+    expect(el.querySelector('[data-testid="memory-restore-granularity"]')).toBeNull();
+  });
+
+  it('墓碑与生效的纠正混在一起时，只有生效的那个被抑制', () => {
+    const el = render({
+      preferenceSet: prefs({ granularity: null }),
+      rawPresentIds: ['granularity', 'estimate-bias'],
+      corrections: [
+        ...tombstoned,
+        { id: 'c2', preferenceId: 'estimate-bias', kind: 'suppress' as const },
+      ],
+    });
+    const forgotten = el.querySelector('[data-testid="memory-forgotten"]')?.textContent ?? '';
+    expect(forgotten).toContain('估时偏差');
+    expect(forgotten).not.toContain('任务拆解粒度');
+  });
+});
+
 describe('🔴 记忆面板：忘掉的必须能恢复', () => {
   it('「你已忘记」列出被抑制的偏好，并给出恢复按钮', () => {
     const el = render({
       preferenceSet: prefs({ granularity: null }),
       rawPresentIds: ['granularity', 'estimate-bias'],
-      corrections: [{ id: 'c1', preferenceId: 'granularity' }],
+      corrections: [{ id: 'c1', preferenceId: 'granularity', kind: 'suppress' }],
     });
     expect(el.querySelector('[data-testid="memory-forgotten"]')?.textContent).toContain('任务拆解粒度');
     expect(el.querySelector('[data-testid="memory-restore-granularity"]')).not.toBeNull();
@@ -196,7 +247,7 @@ describe('🔴 记忆面板：忘掉的必须能恢复', () => {
     const el = render({
       preferenceSet: prefs({ granularity: null }),
       rawPresentIds: ['granularity'],
-      corrections: [{ id: 'corr-xyz', preferenceId: 'granularity' }],
+      corrections: [{ id: 'corr-xyz', preferenceId: 'granularity', kind: 'suppress' }],
       onRestore: (id) => restored.push(id),
     });
     click(el.querySelector('[data-testid="memory-restore-granularity"]'));
@@ -212,7 +263,7 @@ describe('🔴 记忆面板：忘掉的必须能恢复', () => {
     const el = render({
       preferenceSet: prefs({ granularity: null }),
       rawPresentIds: ['granularity'],
-      corrections: [{ id: 'c1', preferenceId: 'granularity' }],
+      corrections: [{ id: 'c1', preferenceId: 'granularity', kind: 'suppress' }],
     });
     expect(el.querySelector('[data-testid="memory-pref-granularity"]')).toBeNull();
     expect(el.querySelector('[data-testid="memory-forgotten"]')).not.toBeNull();
