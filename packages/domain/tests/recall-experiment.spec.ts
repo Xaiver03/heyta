@@ -188,6 +188,60 @@ const falsePositiveRate = (rows: readonly Outcome[]): number =>
 
 const pct = (n: number): string => `${(n * 100).toFixed(0)}%`;
 
+// ─────────────────────────────────────────────────────────────
+// 检索模式的指标：precision@k / recall@k / MRR
+// ─────────────────────────────────────────────────────────────
+
+/**
+ * 🔴 为什么必须**另外**测一组 @k 指标，而不是只看上面的"过阈值判定"
+ *
+ * 上面那组测的是「**词法自己能不能做决定**」。
+ * 但它只覆盖了一种架构。还有第二种架构：
+ *
+ *   **词法负责召回候选 → 模型负责判断**（见结论文档 §3.①）
+ *
+ * 第二种架构下，词法的**判定阈值不重要**，重要的是
+ * **真正那条有没有被捞进候选集** —— 因为模型只会看到候选。
+ *
+ * 所以：
+ * - 若 @k 召回高 → 词法可以当**候选生成器**，让模型来判 → 不需要索引
+ * - 若 @k 召回也接近 0 → 词法**连候选都给不出来**，模型根本没机会看
+ *   → 这时要么把**整个列表**给模型（小语料可行），要么真的需要语义检索
+ *
+ * ⚠️ 每条查询只有 1 个正确答案（它配对的那条），所以
+ * `precision@k` 的分母是"实际返回条数"。
+ */
+interface RankOutcome {
+  pair: Pair;
+  /** 正确答案在结果里的名次（1 起）；未出现为 null。 */
+  rank: number | null;
+}
+
+function rankOf(pairs: readonly Pair[], k: number): RankOutcome[] {
+  return pairs.map((pair) => {
+    const targetId = idOf(pair.existing);
+    const hits = findSimilar(pair.incoming, pool, { k, minScore: 0 });
+    const idx = hits.findIndex((h) => h.id === targetId);
+    return { pair, rank: idx === -1 ? null : idx + 1 };
+  });
+}
+
+/** precision@1：第一名就是正确答案的比例。 */
+const precisionAt1 = (rows: readonly RankOutcome[]): number =>
+  rows.filter((r) => r.rank === 1).length / rows.length;
+
+/** recall@k：正确答案出现在前 k 名里的比例。 */
+const recallAtK = (rows: readonly RankOutcome[]): number =>
+  rows.filter((r) => r.rank !== null).length / rows.length;
+
+/** MRR：正确答案名次倒数的均值。 */
+const mrr = (rows: readonly RankOutcome[]): number =>
+  rows.reduce((sum, r) => sum + (r.rank === null ? 0 : 1 / r.rank), 0) / rows.length;
+
+const K = 5;
+const easyRank = rankOf(DUPLICATE_EASY, K);
+const hardRank = rankOf(DUPLICATE_HARD, K);
+
 /** 汇总报告 —— **始终打印**，不受断言影响。 */
 function report(): string {
   const lines: string[] = [];
@@ -216,6 +270,18 @@ function report(): string {
   for (const r of nonDup) {
     lines.push(
       `   ${r.detected ? '🔴误报' : '✅正确放过'} ${r.selfScore.toFixed(3)}  ${r.pair.existing}  ↔  ${r.pair.incoming}`,
+    );
+  }
+  lines.push('');
+  lines.push(`  ══ 检索模式指标（k=${K}，对应"词法召回候选 → 模型判断"这条架构）══`);
+  lines.push(`  precision@1  易档 ${pct(precisionAt1(easyRank))}   难档 ${pct(precisionAt1(hardRank))}`);
+  lines.push(`  recall@${K}     易档 ${pct(recallAtK(easyRank))}   难档 ${pct(recallAtK(hardRank))}`);
+  lines.push(`  MRR          易档 ${mrr(easyRank).toFixed(3)}   难档 ${mrr(hardRank).toFixed(3)}`);
+  lines.push('');
+  lines.push('  ── 🔴 难档 retrieval 逐条（模型会不会有机会看到正确答案）──');
+  for (const r of hardRank) {
+    lines.push(
+      `   ${r.rank === null ? '❌ 没进候选' : `第 ${r.rank} 名`}  ${r.pair.existing}  ↔  ${r.pair.incoming}`,
     );
   }
   lines.push('════════════════════════════════════════════════════');
@@ -288,6 +354,30 @@ describe('🔴 实验：词法基线够不够用（决定要不要向量库）',
    *
    * ⚠️ 本组 n=8，**只能定性**。它是"第一刀"，不是最终结论。
    */
+  /**
+   * 🔴 **检索模式：这才是"让模型来判"这条架构能不能成立的关键。**
+   *
+   * 判定模式说"词法自己判不出来"；但如果我们打算让**模型**来判，
+   * 那么词法只需要**把候选捞出来**。所以这里测的是 @k。
+   *
+   * 实测：难档 recall@5 = **13%（8 条里只有 1 条）** ——
+   * 一条几乎不重叠的改写（「把旧手机数据清掉」↔「手机要出二手，先处理干净」，
+   * 相似度 0.125）擦边进了候选，其余 7 条**连候选都进不去**。
+   * 模型再强也没机会看到它。
+   */
+  it('检索模式：易档 recall@k 高（词法能当候选生成器）', () => {
+    expect(recallAtK(easyRank)).toBeGreaterThanOrEqual(0.75);
+  });
+
+  it('🔴 检索模式：难档 recall@k 仅 13%（词法基本给不出候选，模型没机会看）', () => {
+    // 这个数字决定了架构选择：既然词法无法为"换说法"提供候选，
+    // 那就**不能**依赖"词法缩小候选 → 模型判断"这条路。
+    // 小语料下唯一可行的是**把整份列表给模型**（见结论文档 §3.②）。
+    // 实测 0.125（1/8）。钉住它是因为这个量级直接决定架构：
+    // 87.5% 的换说法任务，词法**连候选都捞不出来**。
+    expect(recallAtK(hardRank)).toBeCloseTo(0.125, 5);
+  });
+
   it('实验结论：难档的失败不指向向量库，而指向"用模型判、不用索引查"', () => {
     // 把结论本身编码成一条可保护的断言：
     // 若有一天有人让难档的召回变高（真上了语义匹配），
