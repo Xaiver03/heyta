@@ -1,6 +1,7 @@
 import { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { SuperSyncDownloadOpsQuerySchema } from '@heyta/shared-schema';
 import { authenticate, getAuthUser } from '../middleware';
+import { createEntitlementGuard } from '../entitlement';
 import { loadConfigFromEnv } from '../config';
 import { getSyncService } from './sync.service';
 import { parseAppVersion } from './checkpoint-gate';
@@ -94,6 +95,12 @@ export const syncRoutes = async (fastify: FastifyInstance): Promise<void> => {
 
   // All sync routes require authentication
   fastify.addHook('preHandler', authenticate);
+
+  // 🔴 权益守卫**必须**排在 `authenticate` 之后：Fastify 的 preHandler 按注册
+  // 顺序执行，排在前面时 `req.user` 还是空的，`getAuthUser` 会直接抛异常。
+  // 守卫自身读 `ENTITLEMENT_GATE_ENABLED`（默认关）：关着的时候它立刻返回，
+  // 一次数据库都不查，自托管默认全放行（docs/plans/subscription-boundary.md §1）。
+  fastify.addHook('preHandler', createEntitlementGuard());
 
   // POST /api/sync/ops - Upload operations
   // Route-level limiting is a pre-auth per-IP backstop for upload floods before
