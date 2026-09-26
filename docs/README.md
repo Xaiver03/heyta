@@ -110,6 +110,7 @@ docs/research/<kebab-case>.md     例：reuse-plan.md
 | [ai-strategy.md](plans/ai-strategy.md) | ⭐⭐ **AI 入口文档**：读这一份就够（定位 / 三档结构 / 护城河 / 现状 / 下一步） |
 | [ai-capability-branches.md](plans/ai-capability-branches.md) | **AI 能力分支与开发分支策略**（含对 5 条功能设想的逐条裁决）—— 大而全，深挖用 |
 | [ai-open-decisions.md](plans/ai-open-decisions.md) | **AI 功能需要拍板的决策清单**（不是需求表单，是「代码解决不了的事」） |
+| [motivation-and-progression.md](plans/motivation-and-progression.md) | ⭐ **激励与成长体系设计**：三层架构（即时反馈/连续性/叙事）× 四个循环，含「不改 schema」的落地映射、反需求 2.0、E2EE 下的指标方案 |
 
 ### 工程参考
 
@@ -144,6 +145,8 @@ docs/research/<kebab-case>.md     例：reuse-plan.md
 | [ai-feature-landscape.md](research/ai-feature-landscape.md) | ⭐ **AI 格局层**：13 个竞品逐产品详述 + 374 条内联来源 + 25 处「未找到公开信息」。⚠️ 与上一条的分工见下方注 |
 | [e2ee-apps-ai.md](research/e2ee-apps-ai.md) | ⭐ **E2EE 产品怎么做 AI**（192 处 ✅ 官方全文）：Bear / Joplin / Anytype / Standard Notes / Obsidian / Proton Lumo。🔴 核心结论：**"厂商托管 AI + 维持 E2EE" 在所有样本中一个都不存在**。支撑 [ADR-0006](adr/0006-supply-modes.md) |
 | [ai-competitive-teardown.html](research/ai-competitive-teardown.html) | 上两条的**可视化渲染**（战情室风格功能矩阵，单文件、离线可看）。⚠️ **`.md` 是唯一事实源**，本文件只是呈现 |
+| [motivation-psychology.md](research/motivation-psychology.md) | ⭐ **习惯养成与激励的心理学证据**：B=MAP / Hook / 实施意图 / 损失厌恶 / 断签放弃效应 / 目标梯度 / 禀赋进度 / 新鲜开始 / SDT / 过度理由效应 / 小胜原则 / 排行榜证据。每条带来源与证据强度标记 |
+| [competitor-incentive-teardown.md](research/competitor-incentive-teardown.md) | ⭐ **竞品激励机制拆解**：Forest / Duolingo / Habitica / Streaks / 番茄Todo / 滴答清单 / 小日常 / Apple 健身记录，逐机制规则与数值 + 心理原理 + 对 heyta 的可迁移性 |
 
 > ⚠️ **两份 AI 调研文档的分工（不要当成重复，也不要让它们漂移）**：
 > - `ai-competitive-and-architecture.md` = **结论层**。只放**影响 ADR-0005 / AI 计划决策**的结论，

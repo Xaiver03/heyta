@@ -28,9 +28,11 @@ import {
   addDays,
   computeStreak,
   completionRatio,
+  describeHabitResilience,
   toLocalDate,
   type Habit,
   type HabitLog,
+  type HabitResilienceView,
   type LocalDate,
   type StreakResult,
 } from '@heyta/domain';
@@ -48,6 +50,19 @@ export interface HabitWithProgress {
   streak: StreakResult;
   /** 今日打卡记录（可能不存在）。 */
   todayLog?: HabitLog;
+  /**
+   * 韧性与修复机会（冻结 / 续接 / 重新开始）。
+   *
+   * 🔴 它与 `streak` **并存**，两者在界面上各有各的位置：
+   * `streak.current` 是**日历口径**（"昨天漏了"就归零），
+   * `resilience.current` 是**算上冻结之后**的连续 —— 界面上显示的是后者，
+   * 因为"冻结保住了它"正是这个机制存在的意义。
+   *
+   * ⚠️ 但**不要**用 `resilience.current - streak.current` 去算"冻结保住了几天"：
+   * 两个数来自不同口径，差值不是事实（实测会把 1 天算成 7 天）。
+   * 那个数在 `resilience.frozenInCurrentRun` 里，是扫描过程中直接数出来的。
+   */
+  resilience: HabitResilienceView;
 }
 
 interface HabitState {
@@ -151,6 +166,9 @@ export function selectHabitProgress(
       // ⚠️ 传 HabitLog[] 而不是日期字符串数组 —— 领域层需要看 value 与
       // deletedAt 才能判定"是否达成"，只给日期会丢掉目标值信息
       streak: computeStreak(habit, habitLogs, today),
+      // 韧性与 streak 共用同一份日志、同一个 today，所以两个数字
+      // **不可能对不上账** —— 分开算两次才是漂移的开始。
+      resilience: describeHabitResilience(habit, habitLogs, today),
     };
   });
 }
