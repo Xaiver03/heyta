@@ -174,6 +174,16 @@ model Subscription {
   /// 当前周期结束时间（epoch 毫秒）。可空：无法确定周期时按"无权益"处理。
   currentPeriodEnd BigInt? @map("current_period_end")
 
+  /// 🔴 **已应用事件中最大的 `occurredAt`**（epoch 毫秒），可空 = 还没有可比较的基线。
+  ///
+  /// 为什么必须单独存它：支付商的投递**不保证顺序**（见
+  /// `docs/plans/subscription-provider-selection.md` §5），所以"取消"事件完全可能
+  /// 晚于"续费"事件到达，而它的事件时间更早。判定新旧只能用**事件内的时间戳**，
+  /// 不能用到达顺序，也不能用 `updatedAt`（那记录的是我们写入的时刻，
+  /// 恰好正是被乱序颠倒的那个东西）。可空且无默认值是刻意的：老行没有它，
+  /// 等同"没有基线"，一律允许应用（`AGENTS.md §3.3`）。
+  lastEventAt BigInt? @map("last_event_at")
+
   /// 创建 / 更新时间（epoch 毫秒）。带默认值，避免任何"必填无默认"的列。
   createdAt BigInt @default(0) @map("created_at")
   updatedAt BigInt @default(0) @map("updated_at")
@@ -181,8 +191,64 @@ model Subscription {
   userId Int  @map("user_id")
   user   User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
+  /// 反向关系：这条订阅上收到过的支付事件。只为满足 Prisma 的关系双端存在，
+  /// 不参与任何"到期 / 退款 → 删除订阅"的级联（见 `PaymentEvent` 的 `onDelete: SetNull`）。
+  paymentEvents PaymentEvent[]
+
   @@index([userId])
   @@map("subscriptions")
+}
+
+/// 支付事件 = **webhook 幂等闸门**。
+///
+/// 🔴 幂等唯一可靠的落点就是这里的 `@@unique([provider, providerEventId])`：
+/// 七家支付商有四种互不相同的机制（Stripe `Idempotency-Key`、PayPal
+/// `PayPal-Request-Id`、支付宝/微信只有 `out_trade_no`、Paddle **官方明确不支持**
+/// 客户端幂等键），没有一种能把去重推给支付商。所以闸门必须建在我们自己的库上。
+///
+/// 🔴 **绝不存原始 webhook payload。** 里面可能含买家的邮箱 / 姓名 / 地址等 PII，
+/// 而我们对它的全部需求只是"审计 + 去重" —— 存 `payloadDigest`（SHA-256 十六进制）
+/// 就够了。这条是有意的，不要为了"方便排查"把原文加回来。
+model PaymentEvent {
+  id Int @id @default(autoincrement())
+
+  /// 支付商标识（例如 `paddle` / `creem` / `noop`）。复合唯一键的一半。
+  provider String
+
+  /// 支付商侧的事件 id。复合唯一键的另一半。
+  ///
+  /// 🔴 唯一键是 **`(provider, providerEventId)` 复合**，不是单列：
+  /// 不同 provider 用同一个 eventId 是两件事，不能互相判成重复。
+  providerEventId String @map("provider_event_id")
+
+  /// 归一化后的事件类型（adapter 的私有词表映射到这里的值）。可空。
+  eventType String? @map("event_type")
+
+  /// 🔴 原始 payload 的**哈希**（SHA-256 十六进制），不是原文。见上方 model 注释。
+  payloadDigest String? @map("payload_digest")
+
+  /// 事件发生时间（epoch 毫秒），取自 payload 内部，**不是到达时间**。
+  /// 可空：某些事件确实没有时间戳。乱序判定以它为准（订阅行上的 `lastEventAt`）。
+  occurredAt BigInt? @map("occurred_at")
+
+  /// 收到时间（epoch 毫秒）。带默认值，避免"必填无默认"的列。
+  receivedAt BigInt @default(0) @map("received_at")
+
+  /// 处理完成时间（epoch 毫秒）。`null` = 已插入但尚未处理完。
+  /// 处理失败时路由会**撤销该行**（见 `webhook.routes.ts` 的失败路径），
+  /// 否则支付商重投会被判成重复而永远不再处理 —— 那会静默丢事件。
+  processedAt BigInt? @map("processed_at")
+
+  /// 关联的订阅行。可空：事件可能早于订阅创建，或该 provider 根本没有订阅状态机
+  /// （支付宝 / 微信只有单次支付）。`onDelete: SetNull` —— 删订阅**不删事件审计**。
+  subscriptionId Int?         @map("subscription_id")
+  subscription   Subscription? @relation(fields: [subscriptionId], references: [id], onDelete: SetNull)
+
+  /// 🔴 幂等的唯一可靠落点。
+  @@unique([provider, providerEventId])
+  /// 按 provider + 时间翻事件（运维排查用），不参与幂等判定。
+  @@index([provider, receivedAt])
+  @@map("payment_events")
 }
 
 model SyncDevice {
