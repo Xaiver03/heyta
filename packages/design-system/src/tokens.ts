@@ -138,6 +138,9 @@ export const TOKEN_GROUPS = {
     'badge-height',
     'badge-dot',
     'badge-ring',
+    'field-height',
+    'field-padding-x',
+    'progress-height',
   ],
   /**
    * 字距。Apple 规则：字距随字号变，一个固定值必然在某处是错的。

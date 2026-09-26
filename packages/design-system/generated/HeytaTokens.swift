@@ -198,6 +198,9 @@ enum HeytaTokens {
     static let sizeBadgeHeight: Double = 18  // px
     static let sizeBadgeDot: Double = 8  // px
     static let sizeBadgeRing: Double = 2  // px
+    static let sizeFieldHeight: Double = 44  // px
+    static let sizeFieldPaddingX: Double = 12  // px
+    static let sizeProgressHeight: Double = 6  // px
     static let trackingDisplay: Double = -0.022  // em-ratio
     static let trackingTitle: Double = -0.019  // em-ratio
     static let trackingBody: Double = -0.011  // em-ratio
