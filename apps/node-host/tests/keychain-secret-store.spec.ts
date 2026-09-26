@@ -283,8 +283,14 @@ describe('🔴 不可用/失败时降级', () => {
   });
 
   it('🔴 钥匙串锁住/用户拒绝 → `get` 退化成 undefined，不抛错', async () => {
+    // 🔴 必须显式注入 platform:'darwin'。
+    // 这三条要测的是 **runner 失败处理**，不是平台闸门。不注入的话，
+    // 在 Linux 上 `process.platform` 会让平台检查提前短路 —— 于是"读失败"
+    // 这两条**因为错误的原因通过**（runner 分支根本没被执行），
+    // 而"写失败"那条直接挂。注入之后，三个平台跑的是同一条代码路径。
     const store = createKeychainSecretStore({
       service: TEST_SERVICE,
+      platform: 'darwin',
       keychainPath,
       runner: () => Promise.resolve({ code: 1, stdout: '', stderr: 'User interaction is not allowed.' }),
     });
@@ -295,6 +301,7 @@ describe('🔴 不可用/失败时降级', () => {
   it('🔴 "找不到"与"读失败"走不同的分支（都返回 undefined，但一个是正常一个是异常）', async () => {
     const notFound = createKeychainSecretStore({
       service: TEST_SERVICE,
+      platform: 'darwin',
       keychainPath,
       runner: () =>
         Promise.resolve({ code: 44, stdout: '', stderr: 'security: could not be found in the keychain.' }),
@@ -305,6 +312,7 @@ describe('🔴 不可用/失败时降级', () => {
   it('写入失败会抛错（否则用户以为存好了）', async () => {
     const store = createKeychainSecretStore({
       service: TEST_SERVICE,
+      platform: 'darwin',
       keychainPath,
       runner: () => Promise.resolve({ code: 1, stdout: '', stderr: 'keychain is locked' }),
     });
@@ -339,7 +347,10 @@ describe('🔴🔴 测试护栏本身有效', () => {
     expect(() => guard(['-i'], brokenStdin)).toThrow(/没有指定临时钥匙串/);
   });
 
-  it('✅ 带了临时钥匙串的调用正常放行（护栏不是把功能挡死）', async () => {
+  // 🔴 这一条会**真的执行 `/usr/bin/security`**（同套件另外三条只验证护栏抛错，
+  // 不需要那个二进制），所以只能在 macOS 上跑。Linux runner 上没有它，
+  // `stderr` 是空串，断言必然失败 —— CI 首次运行抓到的正是这一条。
+  it.runIf(onMac)('✅ 带了临时钥匙串的调用正常放行（护栏不是把功能挡死）', async () => {
     const guard = guardedRunner();
     const result = await guard(['find-generic-password', '-s', TEST_SERVICE, '-a', 'never', '-w', keychainPath]);
     // 找不到是非零，但调用**执行了**
