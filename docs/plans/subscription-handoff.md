@@ -137,7 +137,7 @@ AI 文件 import `@heyta/i18n`，所以 **`packages/i18n` 必须同一个提交*
 ### 9.3 已经做完的收尾（供对照）
 
 - ✅ **金额校验**（`fb14eba`）：微信回调必须金额落在价目表上，否则**不授予**。
-  详见 `docps/plans/subscription-boundary.md` §6 与代码注释里的强度上限说明。
+  详见 `docs/plans/subscription-boundary.md` §6 与代码注释里的强度上限说明。
 - ✅ **本地凭证**：`server/.env`（0600、gitignore、git 看不见）已写入借用的
   `WX_*` 六个变量。⚠️ 是**别家公司的**，新凭证到位后替换并**停用旧的**。
 
