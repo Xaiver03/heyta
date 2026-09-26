@@ -193,6 +193,8 @@ heyta 手里有一份**别人拿不到的数据**：`MaterializedState` 里的 `
 | **AI-5 真实握手** | 用**官方 MCP SDK**（第三方参考实现）验证协议，排除"自洽的误解" | `scripts/verify-mcp-real-client.mjs` | 11/11，`pnpm verify:mcp-real` |
 | **记忆 / 特征层** | 推迟次数（**只能从事件流算**）/ 逾期 / 专注分钟 / 从未开始 / **专注落差** / 把事实写成话（**不调用模型**） | `packages/domain/src/memory.ts` | 20 测试 |
 | **检索基线 + 决策实验** | 词法相似度基线；用重复检测实验决定要不要向量库 | `packages/domain/src/recall.ts`、`tests/recall-experiment.spec.ts` | 5 测试 |
+| **偏好推断层** | P1–P5 五条偏好（估算偏差 / 深度时段 / 提前量 / 粒度 / 表达习惯），纯函数 + `sampleSize`/`confidence`/`evidence`；**主开关 fail-closed** | `packages/domain/src/preferences.ts` | 27 测试 |
+| **偏好有效性实验** | 留出法（train80/test20）：五条**全部**优于基线，纯噪声上**零误报** | `packages/domain/tests/preferences-experiment.spec.ts` | 8 测试 |
 
 ### 7.2 未落地
 
