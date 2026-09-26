@@ -321,3 +321,47 @@ describe('DEFAULT_CORS_ORIGINS', () => {
     ).toBe(false);
   });
 });
+
+describe('loadConfigFromEnv - entitlement gate', () => {
+  beforeEach(() => {
+    resetEnv();
+  });
+
+  afterEach(() => {
+    resetEnv();
+  });
+
+  it('defaults to disabled so self-hosting is free by default', async () => {
+    delete process.env.ENTITLEMENT_GATE_ENABLED;
+
+    const { loadConfigFromEnv } = await importConfig();
+
+    expect(loadConfigFromEnv().entitlements.enabled).toBe(false);
+  });
+
+  it('enables only on an explicit true', async () => {
+    process.env.ENTITLEMENT_GATE_ENABLED = 'true';
+
+    const { loadConfigFromEnv } = await importConfig();
+
+    expect(loadConfigFromEnv().entitlements.enabled).toBe(true);
+  });
+
+  it('accepts an explicit false as disabled', async () => {
+    process.env.ENTITLEMENT_GATE_ENABLED = 'false';
+
+    const { loadConfigFromEnv } = await importConfig();
+
+    expect(loadConfigFromEnv().entitlements.enabled).toBe(false);
+  });
+
+  // A typo must not silently leave the gate off (or on). It is a paid gate, so
+  // an ambiguous value is a startup error, not a default.
+  it('rejects an ambiguous value instead of silently deciding', async () => {
+    process.env.ENTITLEMENT_GATE_ENABLED = '1';
+
+    const { loadConfigFromEnv } = await importConfig();
+
+    expect(() => loadConfigFromEnv()).toThrow('Invalid ENTITLEMENT_GATE_ENABLED');
+  });
+});
