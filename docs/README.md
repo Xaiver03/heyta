@@ -98,6 +98,7 @@ docs/research/<kebab-case>.md     例：reuse-plan.md
 | [0014](adr/0014-memory-switch-and-corrections.md) | 🔴 记忆偏好层的两个闸门：**主开关默认关闭且 fail-closed**（必填参数，不是可选）；用户**纠正进 op-log** 跨设备同步，且因 `applyOperation` 静默忽略未建模实体类型 —— **不需 bump schema** | ✅ **已接受** |
 | [0013](adr/0013-cloud-ai-and-maas.md) | 🔴 云端 AI 与 MaaS：**方向已定**（会提供统一云端 AI 并按此收费，后续 MaaS），但**开放条件未满足**；托管模式**不是端到端加密**（承接 ADR-0006） | ✅ **已接受** |
 | [0017](adr/0017-single-paid-tier-and-payment-channel.md) | 💰 **唯一付费档的价格与支付通道**：大陆 **¥99/年**、海外 **$49/年**、自建**永久免费**（承接 [subscription-boundary.md](plans/subscription-boundary.md) §0，并**关闭**它 §3 一直留着的「价格未定」）；改价必须三处同时改，由 `scripts/check-pricing-consistency.mjs` 拦 | ✅ **已接受** |
+| [0018](adr/0018-adjustable-pricing-and-coupons.md) | 💰 **价格可运行期调整 + 自建优惠券域模型**：代码基线 + 数据库版本（带生效区间，**有缝绝不回落**）；券一单一券、13 个拒绝原因、名额口径 `reserved/applied/reversed` 计数而 `expired` 不计数；顺带**修掉** ADR-0017 §4「回调只校验金额是价目表里的某一个」那个洞（改成跟订单冻结金额比） | ✅ **已接受** |
 
 ### 计划
 
@@ -121,6 +122,7 @@ docs/research/<kebab-case>.md     例：reuse-plan.md
 | [architecture.md](reference/architecture.md) | 技术选型与架构（⚠️ 顶部有推翻声明，同步引擎部分仍有效） |
 | [build-matrix.md](reference/build-matrix.md) | ⭐ **多端构建矩阵**：各平台构建环境 / 工具链版本 / 产物路径 / 状态，含 **Windows 打包机身份固化** |
 | ⭐ [pricing-and-entitlements.md](reference/pricing-and-entitlements.md) | 💰 **价格与权益的工程参考**（不是营销文案）：一张表说清唯一付费档、权益对照、到期行为、价格的**三个事实源**在哪、以及**现在还买不到**的诚实状态。含被 `scripts/check-pricing-consistency.mjs` 读取的机器可读价格块 |
+| ⭐ [pricing-and-coupons.md](reference/pricing-and-coupons.md) | 💰 **价格可调与优惠券的工程参考**：价格的事实源住哪（代码基线 ↔ 数据库版本 ↔ 覆盖的裁决规则）、模块地图、**全部具名常量与数值**、13 个拒绝原因与其顺序为什么是规格、五张表与 CHECK、订单状态机、名额口径表、并发核销的锁形状、🔴 **sweep 必须真的在跑**、以及 §7 的未验证项清单 |
 | [ai-architecture.md](reference/ai-architecture.md) | ⭐ **AI 架构参考**：出站（`packages/ai` 四层收窄）/ 入站（`packages/local-api`）的模块地图、封闭词表、全部具名常量与数值、**20 条不变量清单**、数据流。⚠️ 它描述"代码现在长什么样"，与 ADR 冲突时以 ADR 为准 |
 
 ### 操作手册

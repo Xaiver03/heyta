@@ -6,8 +6,9 @@
  * 为什么需要这一道 —— 价格在这套代码里天然住在三个不同的层，
  * 而它们之间**没有任何类型关系**：
  *
- *   1. **实际收多少** —— `server/src/billing/wechat.adapter.ts` 的 `WECHAT_DEFAULT_PRICES`
- *      （服务端下单用它，回调的金额校验也用它）
+ *   1. **实际收多少** —— `server/src/billing/price-book.ts` 的 `DEFAULT_PRICE_BOOK`
+ *      （服务端下单用它；adapter 的 `WECHAT_DEFAULT_PRICES` 是它的**投影**，
+ *      自 ADR-0018 起已不再持有自己的字面量）
  *   2. **对外怎么说** —— `packages/i18n` 的 `landing.pricing.hosted.price*`（落地页渲染它）
  *   3. **对外怎么承诺** —— `server/legal/terms-of-service.heyta.md`（用户与服务方之间的文本）
  *
@@ -33,6 +34,9 @@ import { fileURLToPath } from 'node:url';
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
 const PRICING_DOC = 'docs/reference/pricing-and-entitlements.md';
+/** 🔴 **实际收多少**的唯一事实源（代码侧）。自 ADR-0018 起，这是唯一写着这个数字的 TS 文件。 */
+const PRICE_BOOK = 'server/src/billing/price-book.ts';
+/** 只是"不许把数字抄回来"这条检查的扫描对象，**不再**是价格的来源。 */
 const ADAPTER = 'server/src/billing/wechat.adapter.ts';
 const CATALOG_ZH = 'packages/i18n/src/locales/zh-CN.ts';
 const CATALOG_EN = 'packages/i18n/src/locales/en.ts';
@@ -78,16 +82,43 @@ try {
 }
 
 // ── 2. 实际收多少：服务端价目表 ──────────────────────────────────────────
-const adapterText = read(ADAPTER);
-const adapterFenRaw = must(
-  adapterText,
-  new RegExp(`\\b${ssot.cny.priceId}:\\s*\\{\\s*totalFen:\\s*([0-9_]+)`),
-  `${ADAPTER} 的 WECHAT_DEFAULT_PRICES.${ssot.cny.priceId}`,
+const priceBookText = read(PRICE_BOOK);
+
+/**
+ * 把 `DEFAULT_PRICE_BOOK` 的数组体切成一个个 `{...}` 对象再逐个取字段。
+ *
+ * 🔴 刻意**不**用一条大正则匹配固定字段顺序：字段换序不该让门禁失效，
+ * 但**字段改名**必须让门禁失效。所以这里逐字段 `must` —— 取不到就抛。
+ */
+const bookBody = must(
+  priceBookText,
+  /DEFAULT_PRICE_BOOK[^=]*=\s*\[([\s\S]*?)\n\];/,
+  `${PRICE_BOOK} 的 \`DEFAULT_PRICE_BOOK\` 数组`,
 );
-const adapterFen = Number(adapterFenRaw.replaceAll('_', ''));
-if (!Number.isSafeInteger(adapterFen)) {
-  throw new Error(`${ADAPTER} 里的 totalFen 不是一个整数：${adapterFenRaw}`);
+const bookEntries = [...bookBody.matchAll(/\{[^{}]*\}/g)].map((m) => {
+  const body = m[0];
+  const priceId = must(body, /priceId:\s*'([^']+)'/, `${PRICE_BOOK} 某个基线价格项的 priceId`);
+  const currency = must(body, /currency:\s*'([^']+)'/, `${PRICE_BOOK} 某个基线价格项的 currency`);
+  const rawAmount = must(body, /amountMinor:\s*([0-9_]+)/, `${PRICE_BOOK} 某个基线价格项的 amountMinor`);
+  const amountMinor = Number(rawAmount.replaceAll('_', ''));
+  if (!Number.isSafeInteger(amountMinor)) {
+    throw new Error(`${PRICE_BOOK} 的 amountMinor 不是一个整数：${rawAmount}`);
+  }
+  return { priceId, currency, amountMinor };
+});
+if (bookEntries.length === 0) {
+  throw new Error(`${PRICE_BOOK} 的 DEFAULT_PRICE_BOOK 一项都解析不出来 —— 锚点失效，不是"没有价格"。`);
 }
+
+const cnyEntry = bookEntries.find((e) => e.currency === 'CNY');
+const usdEntry = bookEntries.find((e) => e.currency === 'USD');
+if (cnyEntry === undefined) {
+  throw new Error(`${PRICE_BOOK} 的 DEFAULT_PRICE_BOOK 里没有 CNY 的基线价格项。`);
+}
+if (usdEntry === undefined) {
+  throw new Error(`${PRICE_BOOK} 的 DEFAULT_PRICE_BOOK 里没有 USD 的基线价格项。`);
+}
+const adapterFen = cnyEntry.amountMinor;
 
 // ── 3. 对外怎么说：中英词条表 ────────────────────────────────────────────
 const priceKeys = {
@@ -114,26 +145,58 @@ const problems = [];
 if (adapterFen !== ssot.cny.totalFen) {
   problems.push(
     `实际收多少 ≠ 价格表：\n` +
-      `     ${ADAPTER} 是 ${adapterFen} 分（¥${adapterFen / 100}）\n` +
+      `     ${PRICE_BOOK} 是 ${adapterFen} 分（¥${adapterFen / 100}）\n` +
       `     ${PRICING_DOC} 是 ${ssot.cny.totalFen} 分（¥${yuan}）`,
+  );
+}
+if (usdEntry.amountMinor !== ssot.usd.totalCents) {
+  problems.push(
+    `海外的实际收多少 ≠ 价格表：\n` +
+      `     ${PRICE_BOOK} 是 ${usdEntry.amountMinor} 分（$${usdEntry.amountMinor / 100}）\n` +
+      `     ${PRICING_DOC} 是 ${ssot.usd.totalCents} 分（$${dollars}）`,
   );
 }
 
 /**
- * 唯一付费档：价目表里**只允许有一个**价格项。
+ * 唯一付费档：代码基线里**只允许有一个** priceId。
  *
- * ADR-0017 §3.1 只批准了一个档。而且 §3.2 写明：回调的金额校验是
- * 「金额是价目表里的某一个」，**出现第二个不同金额的 SKU 之前**必须先改成
- * 按 priceId 校验 —— 所以"多了一项"本身就是要拦的事，不只是价格对不对。
+ * ADR-0017 §3.1 只批准了一个档，ADR-0018 保留了这一条（"一档到底"是产品决策，
+ * 不是还没做）。所以"多了一项"本身就是要拦的事，不只是价格对不对。
+ *
+ * ⚠️ 注意这里数的是 **priceId 的种类**，不是条目数：`annual` 在 CNY 与 USD
+ * 各有一条基线，那是同一个档的两种货币。
  */
-const adapterPriceIds = [...adapterText.matchAll(/^\s{2}([A-Za-z_][\w-]*):\s*\{\s*totalFen:/gm)].map(
-  (m) => m[1],
-);
-if (adapterPriceIds.length !== 1 || adapterPriceIds[0] !== ssot.cny.priceId) {
+const bookPriceIds = [...new Set(bookEntries.map((e) => e.priceId))];
+if (bookPriceIds.length !== 1 || bookPriceIds[0] !== ssot.cny.priceId) {
   problems.push(
-    `付费档数量 ≠ 一个：${ADAPTER} 的价目表里有 [${adapterPriceIds.join(', ')}]，` +
+    `付费档数量 ≠ 一个：${PRICE_BOOK} 的基线里有 [${bookPriceIds.join(', ')}]，` +
       `而价格表只批准了 ${ssot.cny.priceId}。\n` +
-      `     加第二个不同金额的 SKU 之前，必须先改回调校验（见 ${PRICING_DOC} §4）。`,
+      `     加第二个档会同时打破「一档到底」与回调的按单校验（见 ${PRICING_DOC} §4）。`,
+  );
+}
+
+/**
+ * 🔴 **数字不许抄第二次。**
+ *
+ * 这一条是 ADR-0018 加的，也是"价格可调"这个需求的**负向**那一半：
+ * 光把数字收敛到一处还不够，还得拦住后来的人"顺手"把它抄回去。
+ * 抄回去之后，`pricing-store.publishPriceVersion` 改的是基线之外的覆盖版本，
+ * 而 adapter 会继续按抄来的字面量下单 —— 那时两边的差额**没有任何东西会发现**。
+ */
+const adapterText = read(ADAPTER);
+/**
+ * 扫描前先去掉注释：注释里出现 `totalFen: 9_900` 是在**解释**这件事，
+ * 不是在复制价格；而注释不参与执行。
+ * （同一条教训见 `server/tests/` 里 pglite 规格对"注释里的 CONCURRENTLY"的处理。）
+ */
+const stripComments = (text) =>
+  text.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|\s)\/\/[^\n]*/g, '$1');
+if (/totalFen:\s*[0-9_]/.test(stripComments(adapterText))) {
+  problems.push(
+    `${ADAPTER} 里又出现了 \`totalFen: <数字>\` 字面量。\n` +
+      `     价目表必须只写一次（${PRICE_BOOK} 的 DEFAULT_PRICE_BOOK），` +
+      'adapter 只能通过 projectPrices 投影它。\n' +
+      '     抄回来的那份不会跟着改价动 —— 那正是最坏的一类不一致。',
   );
 }
 
@@ -212,7 +275,7 @@ if (problems.length > 0) {
   for (const p of problems) console.error(`   ❌ ${p}`);
   console.error('');
   console.error(`   唯一事实源：${PRICING_DOC} 的 \`\`\`json pricing-ssot 块。`);
-  console.error(`   改价必须同一次改：${ADAPTER} / 中英词条 / ${LEGAL} / ${PRICING_DOC}`);
+  console.error(`   改价必须同一次改：${PRICE_BOOK} / 中英词条 / ${LEGAL} / ${PRICING_DOC}`);
   console.error('   决策与理由见 docs/adr/0017-single-paid-tier-and-payment-channel.md §3.2。');
   console.error('');
   process.exit(1);

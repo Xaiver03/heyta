@@ -50,17 +50,38 @@
 
 | 层 | 文件 | 谁读它 |
 |---|---|---|
-| **实际收多少** | `server/src/billing/wechat.adapter.ts` → `WECHAT_DEFAULT_PRICES` | 服务端下单 + 回调金额校验 |
+| **实际收多少（代码基线）** | `server/src/billing/price-book.ts` → `DEFAULT_PRICE_BOOK` | 服务端下单；新装实例、测试、CI |
+| **实际收多少（运行期版本）** | `price_versions` 表（append-only，带生效区间） | 官方托管实例的生产报价 |
 | **对外怎么说** | `packages/i18n/locales/{zh-CN,en}.ts` → `landing.pricing.*` | 落地页 |
 | **对外怎么承诺（法务）** | `server/legal/terms-of-service.heyta.md` | 用户与服务方 |
 | **一句话的价格表** | 本文件 §1 与 §6 | 人 + 门禁 |
 
-### 🔴 加第二个不同金额的 SKU 之前
+自 [ADR-0018](../adr/0018-adjustable-pricing-and-coupons.md) 起，
+`server/src/billing/wechat.adapter.ts` 的 `WECHAT_DEFAULT_PRICES` **不再是事实源**
+—— 它是 `projectPrices(DEFAULT_PRICE_BOOK, 'CNY', 0)` 的投影。门禁里多了一条
+"adapter 里不许出现 `totalFen: <数字>`"，防止这个数字被抄回来：抄回来的那份
+不会跟着改价动，而没有任何东西会发现。
 
-回调的金额校验目前是「付的金额是价目表里的**某一个**」，这在**只有一个金额**时
-等价于「付对了」。一旦出现第二个不同金额的档位，必须改成**按 `out_trade_no` 里
-编入的 priceId** 校验，否则「另一个档位的金额」也会被当成付对。
-代码注释已写明这个洞的边界：`server/src/billing/wechat.adapter.ts` §6.1。
+### 4.1 价格可调，但"改价"是 append 一版，不是就地改
+
+改价走 `publishPriceVersion`（`server/src/billing/pricing-store.ts`）：在一个事务里
+把旧的开区间版本收口、插入新版、写审计行。旧行**永不删除** ——
+历史订单的金额永远能按当时生效的那一版解释。语义、裁决规则（"覆盖版本里有缝时
+**绝不**回落到基线"）与运维要求见
+[pricing-and-coupons.md](pricing-and-coupons.md) §1.2 / §5。
+
+### 🔴 加第二个档位之前（原 §4 的这一条已被修掉）
+
+原话是「回调的金额校验目前是『付的金额是价目表里的**某一个**』」——
+这个洞已经关闭，而且**在关闭它之前优惠券就先把它戳破了**：券让"这一单该付多少"
+不再等于任何价目表项（¥99 用 ¥20 券 → 实付 ¥79，不在价目表上）。
+
+现在回调的校验是：**跟订单上冻结的 `checkout_orders.final_amount_minor` 比。**
+报价一旦落库就被冻结，此后价目表与券怎么变都不影响这一单。这一条同时覆盖
+SKU 与折扣，实现在 `settleOrderPaid`。
+
+⚠️ 但"一档到底"这条产品决策**没有变**：价目表里仍然只批准
+`annual` 一个 priceId（CNY 与 USD 各一条基线），门禁会拦住第二个。
 
 ## 5. 现在还不能买 —— 诚实状态
 
@@ -92,6 +113,11 @@ Paddle 支持中国大陆卖家**只有政策文本**，**实操放行未验证*
 ```
 
 ## 7. 未核实项
+
+> 价格可调与优惠券的完整缺口清单在
+> [pricing-and-coupons.md](pricing-and-coupons.md) §7（行锁阻塞行为未实测、
+> Prisma 参数绑定层未覆盖、`check:pricing` 未接进 `pnpm check`、
+> 有券订单的发票金额口径未与会计确认、支付通道未接线）。下面只列价格本身的。
 
 1. **Paddle 对中国大陆卖家的 KYC 放行** —— 只有用户本人能验证（ADR-0017 §5.1）。
 2. **$49 / 年 的经济性** —— MoR 费率（PayPal 中国大陆电汇 **$35/笔**）在早期单量下

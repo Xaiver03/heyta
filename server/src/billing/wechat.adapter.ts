@@ -36,6 +36,7 @@ import {
   createVerify,
   randomBytes,
 } from 'node:crypto';
+import { DEFAULT_PRICE_BOOK, projectPrices } from './price-book';
 import type {
   BillingAdapter,
   CheckoutResult,
@@ -336,18 +337,30 @@ export interface WechatPrice {
 }
 
 /**
- * 阶段一的默认价目表。
+ * 默认价目表 —— **由代码基线价目表投影出来，不是又一个字面量**。
  *
- * ✅ **已定价**（一次性年付 ¥99 = 9900 分）。价格结论见 ADR-0017，
- * 价格表见 `docs/reference/pricing-and-entitlements.md`；
- * 🔴 改这个数字必须同时改词条表与法务文本，`scripts/check-pricing-consistency.mjs`
- * 会红，否则落地页说的价格与这里收的价格就会不一致。
- * 运营者仍可以直接给 adapter 传 `prices` 覆盖 —— 改价不改代码是刻意的。
+ * ✅ **已定价**（一次性年付 ¥99 = 9900 分）。价格结论见 ADR-0017 / ADR-0018，
+ * 价格表见 `docs/reference/pricing-and-entitlements.md`。
+ *
+ * 🔴 **这里刻意没有 `totalFen: 9_900` 这样的字面量。** 在有这一版之前，
+ * 同一个数字住在三个地方（这个文件、词条表、法务文本），靠
+ * `scripts/check-pricing-consistency.mjs` 事后比对来维持一致；而门禁的比对
+ * 本身也可能失效。现在**同一个数字只写一次**（`price-book.ts` 的
+ * `DEFAULT_PRICE_BOOK`），这个文件只是它的投影，"改了这里忘了改那里"
+ * 这个失效模式就从"靠门禁抓"变成了**不可能发生**。
+ *
+ * ⚠️ 门禁仍然保留，而且现在多了一条：`wechat.adapter.ts` 里**不许再出现
+ * `totalFen: <数字>`** —— 防止有人"顺手"把数字抄回来。
+ *
+ * 运营者仍可以直接给 adapter 传 `prices` 覆盖 —— 改价不改代码是刻意的
+ * （运行期改价走 `publishPriceVersion`，见 `pricing-store.ts`）。
  * （本轮**不做** env 价目表解析：把一个 JSON 表塞进环境变量比它的价值更容易出错。）
  */
-export const WECHAT_DEFAULT_PRICES: Readonly<Record<string, WechatPrice>> = {
-  annual: { totalFen: 9_900, description: 'heyta 托管同步服务（年）' },
-};
+export const WECHAT_DEFAULT_PRICES: Readonly<Record<string, WechatPrice>> = projectPrices(
+  DEFAULT_PRICE_BOOK,
+  'CNY',
+  0,
+);
 
 export interface WechatPayAdapterOptions {
   readonly appId: string;
@@ -606,12 +619,19 @@ export const createWechatBillingAdapter = (
       // 会按 `WECHAT_ONE_TIME_PERIOD_DAYS` 授予**整整一年**。
       // 这是会实际损失钱的那类洞，不是理论问题。
       //
-      // ⚠️ **这一版的强度有已知上限**：它校验的是"金额是价目表里的某一个"，
-      // 而不是"金额对应的是这一单买的那一项"。价目表现在只有一项
-      // （`annual: 9_900`），所以这两种说法**等价**，洞是关着的。
-      // 一旦价目表出现**多个不同金额**的 SKU，就必须改成按价目表项校验 ——
-      // 做法是把 priceId 编进 `out_trade_no`（我们自己生成、回调必定携带），
-      // 再按下单记录比对。**在那之前不要加第二个 SKU。**
+      // ⚠️ **这一道是粗筛，权威判定在下游。** 它校验的是"金额是价目表里的某一个"，
+      // 而不是"金额对应的是这一单买的那一项"。有券之后两者**不再等价**
+      // （¥99 用 ¥20 券 → 实付 ¥79，而 ¥79 不在价目表上），所以：
+      //
+      //   🔴 权威判定在 `pricing-store.ts` 的 `settleOrderPaid`：
+      //      它比的是**订单上冻结的 `final_amount_minor`**，同时覆盖 SKU 与折扣。
+      //      ADR-0017 §4 记的那个洞就是这样关掉的（见 ADR-0018 §1.3）。
+      //
+      // 这里保留粗筛的理由是它的**失效方向是安全的**：异常金额在这层就被拦下
+      // （`oneTimeGrant: null` → 不授予），不会漏到下游。它的**假阴性**
+      // （付了 ¥79 但 ¥79 不在价目表上）由下游接住 —— 上游说"金额可疑"，
+      // 下游仍会按订单判定，所以**不会**因为这一层而拒绝一笔正确的支付。
+      // ⚠️ 反过来说：这一层**不能**用来替代下游校验，它俩护的是不同的东西。
       const paidFen =
         typeof payload.amount?.total === 'number' ? payload.amount.total : null;
       const knownAmounts = new Set(
