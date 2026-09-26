@@ -148,9 +148,17 @@ export interface AiSettingsProps {
   secrets: SessionSecretStore;
   /** 配置变化时回调（外部持久化）。默认直接存 localStorage。 */
   onChange?: (next: PersistedAiSettings) => void;
+  /**
+   * 记忆面板（偏好可见 / 可忘掉 / 可恢复）。
+   *
+   * 用 **ReactNode 插槽**而不是把偏好数据一路传进来：
+   * 本组件只负责"AI 配置"，不该知道偏好推断长什么样。
+   * 谁持有 `preferenceSet` 谁负责组装，这里只留位置。
+   */
+  memorySlot?: React.ReactNode;
 }
 
-export function AiSettings({ initial, secrets, onChange }: AiSettingsProps) {
+export function AiSettings({ initial, secrets, onChange, memorySlot }: AiSettingsProps) {
   const [settings, setSettings] = useState<PersistedAiSettings>(initial);
   const [keyDraft, setKeyDraft] = useState<Record<string, string>>({});
   /** 被拒绝的端点地址及其原因 —— 必须显示，不能静默丢弃。 */
@@ -322,6 +330,9 @@ export function AiSettings({ initial, secrets, onChange }: AiSettingsProps) {
         checked={settings.memoryEnabled}
         onChange={(v) => update({ ...settings, memoryEnabled: v })}
       />
+
+      {/* 记忆面板紧跟在开关下面 —— 开关说"要不要"，面板说"记住了什么"。 */}
+      {memorySlot}
 
       {routing.enabled && (
         <>
