@@ -383,7 +383,16 @@ describe('番茄钟 store', () => {
     expect((focus.payload as { taskId?: string }).taskId).toBe(tid);
   });
 
-  it('未关联任务时 payload 里不含 taskId（不是 undefined 字段）', async () => {
+  it('🔴 未关联任务时 payload 里 taskId 是 **null**，不是缺失键', async () => {
+    // ⚠️ 这条断言**被改过**，而且不是为了让测试变绿：
+    // store 原先自己拼 op，未关联时**不放 taskId 这个键**；现在统一走
+    // `@heyta/app-host` 的 `createFocusActions`，移动端一直写的是 `null`。
+    //
+    // 两种写法在 reducer 上都成立，但**必须两端一样** —— 这正是收编要解决的
+    // 问题。选 `null` 的理由见 `actions.ts` 文件头第 2 条：载荷里"键存在且为 null"
+    // 能穿过 JSON 表达"清除"，而"键不存在"在更新场景下表达不了清除。
+    //
+    // 最关键的是：这条断言现在钉的是**共享实现**的输出，不再是 `apps/web` 自己的。
     useFocusStore.setState({
       state: {
         phase: 'running',
@@ -398,6 +407,7 @@ describe('番茄钟 store', () => {
 
     const ops = await allOps();
     const focus = ops.find((o) => o.entityType === 'FOCUS_SESSION')!;
-    expect('taskId' in (focus.payload as object)).toBe(false);
+    expect((focus.payload as { taskId: string | null }).taskId).toBeNull();
+    expect('taskId' in (focus.payload as object)).toBe(true);
   });
 });

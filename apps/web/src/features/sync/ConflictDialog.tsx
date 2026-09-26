@@ -27,6 +27,7 @@ import { cssVar, type TokenName } from '@heyta/design-system';
 
 import { useSyncStore } from './store.js';
 import {
+  compareConflictFreshness,
   describeConflictPayload,
   type ConflictInfo,
   type ConflictSide,
@@ -266,8 +267,19 @@ export function ConflictDialog(): React.JSX.Element | null {
         </div>
 
         {conflicts.map((conflict) => {
-          const localNewer =
-            conflict.remote === undefined || conflict.local.timestamp > conflict.remote.timestamp;
+          /**
+           * 🔴 「较新」的判定**不在这里**，而是调 `@heyta/sync-client` 的
+           * `compareConflictFreshness`。这条规则原本只在本文件里，
+           * 移动端做冲突界面时若再写一遍就是两份实现 —— 而漂移的后果是
+           * **同一个冲突在两个平台上"较新"标在不同的一侧**。
+           * 一处实现、两端消费；规则本身的可失败检查在 `sync-client` 的测试里。
+           *
+           * ⚠️ 它只影响哪个按钮被高亮，**不影响任何一个字节的数据**。
+           */
+          const { localNewer, remoteNewer } = compareConflictFreshness(
+            conflict.local,
+            conflict.remote,
+          );
           const busy = status.kind === 'syncing';
 
           return (
@@ -316,7 +328,7 @@ export function ConflictDialog(): React.JSX.Element | null {
                   side={conflict.remote}
                   label="其他设备"
                   icon={<Smartphone size={14} aria-hidden="true" />}
-                  isNewer={!localNewer}
+                  isNewer={remoteNewer}
                   disabled={busy}
                   onPick={() => {
                     void resolveConflict(conflict, 'keep-remote');

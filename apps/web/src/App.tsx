@@ -9,16 +9,7 @@
  */
 
 import { useEffect, useMemo, useState } from 'react';
-import {
-  Check,
-  CircleDot,
-  Inbox,
-  Moon,
-  Plus,
-  Sun,
-  Trash2,
-  type LucideIcon,
-} from 'lucide-react';
+import { CalendarDays, Check, CircleDot, Inbox, Moon, Sun, Timer, Trash2, type LucideIcon, Settings } from 'lucide-react';
 
 import { Priority, Quadrant } from '@heyta/domain';
 
@@ -28,12 +19,22 @@ import {
   useTaskStore,
   type TaskFilter,
 } from './features/tasks/store.js';
+import { DueBadge, type DueDisplayMode } from './features/tasks/DueBadge.js';
+import { CaptureComposer } from './features/capture/CaptureComposer.js';
 import { useProjectStore } from './features/projects/store.js';
 import { ConflictDialog } from './features/sync/ConflictDialog.js';
 import { SyncBar } from './features/sync/SyncBar.js';
 import { ProjectsPanel } from './features/projects/ProjectsPanel.js';
 import { QuadrantBoard } from './features/quadrant/QuadrantBoard.js';
 import { HabitsView } from './features/habits/HabitsView.js';
+import { AiBreakdown } from './features/ai/AiBreakdown.js';
+import { AiSettings } from './features/settings/AiSettings.js';
+import {
+  createSessionSecretStore,
+  loadAiSettings,
+  saveAiSettings,
+  toHealthSnapshot,
+} from './features/settings/aiStore.js';
 import { FocusTimer } from './features/focus/FocusTimer.js';
 import { applyTheme, resolveInitialTheme, type Theme } from './lib/theme.js';
 
@@ -87,7 +88,7 @@ const PRIMARY_NAV: NavEntry[] = [
  * 场景下几乎不存在，而成本是又一个需要维护的依赖。
  * 到 P2 需要深链接时再引入 —— 那时才知道真实的约束是什么。
  */
-type ViewKey = 'tasks' | 'quadrant' | 'habits' | 'focus';
+type ViewKey = 'tasks' | 'quadrant' | 'habits' | 'focus' | 'settings';
 
 export function App(): React.JSX.Element {
   const [theme, setTheme] = useState<Theme>(resolveInitialTheme);
@@ -95,8 +96,18 @@ export function App(): React.JSX.Element {
   const projects = useProjectStore();
   const visible = useTaskStore(selectVisibleTasks);
   const counts = useTaskStore(selectQuadrantCounts);
-  const [draft, setDraft] = useState('');
   const [view, setView] = useState<ViewKey>('tasks');
+  const [aiSettings, setAiSettings] = useState(loadAiSettings);
+  // 🔴 密钥只在内存里，只活在这个标签页（Web 没有系统钥匙串）
+  const [aiSecrets] = useState(createSessionSecretStore);
+  /**
+   * 截止时间的呈现方式。
+   *
+   * ⚠️ 它是**视图开关**，读的是同一个 `dueDate` 字段，可随时切回 ——
+   * 这是刻意的（见 `DueBadge.tsx` 文件头）：倒计时是**待验证的 UI 假设**，
+   * 做成开关才有对照组，也才能一键回退。
+   */
+  const [dueDisplay, setDueDisplay] = useState<DueDisplayMode>('date');
 
   // 主题应用到 <html data-theme>，tokens.css 的暗色覆盖挂在那里
   useEffect(() => {
@@ -130,11 +141,6 @@ export function App(): React.JSX.Element {
     }
     return '任务';
   }, [store.filter]);
-
-  function submit(): void {
-    store.addTask(draft);
-    setDraft('');
-  }
 
   return (
     <div className="ht-app">
@@ -185,6 +191,7 @@ export function App(): React.JSX.Element {
                 { key: 'quadrant', label: '四象限', Icon: CircleDot },
                 { key: 'habits', label: '习惯', Icon: Check },
                 { key: 'focus', label: '番茄钟', Icon: Sun },
+                { key: 'settings', label: '设置', Icon: Settings },
               ] as const
             ).map((v) => (
               <button
@@ -201,6 +208,31 @@ export function App(): React.JSX.Element {
             ))}
           </div>
           <div className="ht-header__actions">
+            {/* 截止时间呈现方式开关。
+                只在任务视图里有意义 —— 其他视图不显示截止时间。
+                🔴 它是**开关**而不是固定行为：倒计时是待验证的 UI 假设，
+                有开关才有对照组，也才能一键回退（见 DueBadge.tsx 文件头）。 */}
+            {view === 'tasks' && (
+              <div role="group" aria-label="截止时间显示方式" className="ht-viewtabs">
+                {(
+                  [
+                    { key: 'date', label: '日期', Icon: CalendarDays },
+                    { key: 'countdown', label: '倒计时', Icon: Timer },
+                  ] as const
+                ).map((d) => (
+                  <button
+                    key={d.key}
+                    type="button"
+                    aria-pressed={dueDisplay === d.key}
+                    className={`ht-viewtab${dueDisplay === d.key ? ' ht-viewtab--active' : ''}`}
+                    onClick={() => setDueDisplay(d.key)}
+                  >
+                    <d.Icon size={14} aria-hidden="true" />
+                    {d.label}
+                  </button>
+                ))}
+              </div>
+            )}
             <SyncBar />
         <ConflictDialog />
             <button
@@ -215,27 +247,7 @@ export function App(): React.JSX.Element {
         </header>
 
         <div className="ht-content">
-          <div className="ht-compose">
-            <input
-              className="ht-input"
-              value={draft}
-              placeholder="添加任务，回车确认"
-              aria-label="新任务标题"
-              onChange={(e) => setDraft(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') submit();
-              }}
-            />
-            <button
-              type="button"
-              className="ht-btn ht-btn--primary"
-              onClick={submit}
-              disabled={draft.trim() === ''}
-            >
-              <Plus size={18} aria-hidden="true" />
-              添加
-            </button>
-          </div>
+          <CaptureComposer />
 
           {view === 'tasks' &&
             (visible.length === 0 ? (
@@ -262,11 +274,36 @@ export function App(): React.JSX.Element {
                     <span className="ht-task__title">{task.title}</span>
 
                     <span className="ht-task__meta">
+                      <DueBadge task={task} mode={dueDisplay} now={store.now} />
                       {task.priority !== undefined &&
                         task.priority > Priority.None && (
                           <span>P{task.priority}</span>
                         )}
                     </span>
+
+                    {/* AI 拆解。配置关着时它仍然在 —— 点了会说明该去开什么，
+                        而不是消失（"找不到入口"和"入口说为什么不可用"是两件事）。 */}
+                    <AiBreakdown
+                      task={task}
+                      routing={aiSettings.routing}
+                      consents={aiSettings.consents}
+                      secrets={aiSecrets}
+                      // 🔴 把上次落盘的熔断状态传回去 —— 否则落盘没有意义。
+                      healthSnapshot={aiSettings.health}
+                      onApplyNote={(note) => store.setNote(task.id, note)}
+                      onHealth={(health) => {
+                        // 🔴 熔断状态落盘。**不进 op-log** —— 它是本机状态，
+                        // 换台设备该重新探一次端点，而不是继承另一台的失败历史。
+                        setAiSettings((previous) => {
+                          const next = {
+                            ...previous,
+                            health: toHealthSnapshot(health, Date.now()),
+                          };
+                          saveAiSettings(next);
+                          return next;
+                        });
+                      }}
+                    />
 
                     <button
                       type="button"
@@ -285,6 +322,7 @@ export function App(): React.JSX.Element {
           {view === 'quadrant' && <QuadrantBoard />}
           {view === 'habits' && <HabitsView />}
           {view === 'focus' && <FocusTimer />}
+          {view === 'settings' && <AiSettings initial={aiSettings} secrets={aiSecrets} />}
         </div>
       </main>
     </div>

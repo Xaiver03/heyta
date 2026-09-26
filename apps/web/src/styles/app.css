@@ -270,6 +270,130 @@
   font-variant-numeric: tabular-nums;
 }
 
+/* ── 截止时间徽标 ───────────────────────────────────── */
+
+/* 🔴 tabular-nums 是必须的：「还剩 3 天」→「还剩 12 天」会让整行文字宽度跳动，
+   而它就在任务标题旁边，跳动会把标题挤得晃一下。
+   用 font-variant-numeric 而不是等宽字体，是为了不引入第二套字形。 */
+.ht-due {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--ht-space-1);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* ⚠️ 紧迫度**不能只用颜色表达**（色盲用户 + 暗色主题都得能读）。
+   这里的规则是：颜色只是**冗余通道**，语义信息由文字本身承载
+   （"已逾期 3 天" 这几个字已经说清了一切）。所以下面只给颜色，不加图标差异。 */
+.ht-due--overdue {
+  color: var(--ht-color-danger);
+  font-weight: var(--ht-font-weight-medium);
+}
+
+.ht-due--today {
+  color: var(--ht-color-warning-strong);
+  font-weight: var(--ht-font-weight-medium);
+}
+
+.ht-due--soon {
+  color: var(--ht-color-foreground-muted);
+}
+
+/* ── 捕获预览 ───────────────────────────────────────── */
+
+.ht-compose-wrap {
+  margin-bottom: var(--ht-space-4);
+}
+
+/* 输入行与预览是一组，所以底部的间距挪到 wrapper 上 */
+.ht-compose-wrap .ht-compose {
+  margin-bottom: 0;
+}
+
+.ht-capture {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--ht-space-2);
+  margin: var(--ht-space-2) 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.ht-capture__chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--ht-space-1);
+  padding: var(--ht-space-1) var(--ht-space-2);
+  background: var(--ht-color-primary-subtle);
+  border: 1px solid var(--ht-color-border-subtle);
+  border-radius: var(--ht-radius-full);
+  font-size: var(--ht-font-size-xs);
+  font-variant-numeric: tabular-nums;
+  color: var(--ht-color-foreground);
+}
+
+/* 未被采纳的匹配：**它还在标题里**。用虚线边框 + 弱化色，
+   既与已采纳的区分开，又不至于消失（消失会让用户以为它生效了）。 */
+.ht-capture__chip--off {
+  background: transparent;
+  border-style: dashed;
+  color: var(--ht-color-foreground-subtle);
+}
+
+.ht-capture__raw {
+  font-weight: var(--ht-font-weight-medium);
+}
+
+.ht-capture__arrow {
+  color: var(--ht-color-foreground-subtle);
+}
+
+.ht-capture__value {
+  color: var(--ht-color-primary);
+}
+
+.ht-capture__chip--off .ht-capture__value {
+  color: inherit;
+}
+
+.ht-capture__hint {
+  color: var(--ht-color-foreground-subtle);
+  font-size: var(--ht-font-size-2xs);
+}
+
+.ht-capture__x {
+  display: grid;
+  place-items: center;
+  inline-size: var(--ht-icon-sm);
+  block-size: var(--ht-icon-sm);
+  border-radius: var(--ht-radius-full);
+  color: var(--ht-color-foreground-subtle);
+  transition: color var(--ht-duration-fast) var(--ht-ease-standard),
+    background-color var(--ht-duration-fast) var(--ht-ease-standard);
+}
+
+.ht-capture__x:hover {
+  color: var(--ht-color-danger);
+  background: var(--ht-color-hover);
+}
+
+.ht-capture__x:focus-visible {
+  outline: var(--ht-border-width-thick) solid var(--ht-color-ring);
+  outline-offset: var(--ht-space-1);
+}
+
+.ht-capture__preview {
+  margin: var(--ht-space-2) 0 0;
+  font-size: var(--ht-font-size-xs);
+  color: var(--ht-color-foreground-subtle);
+}
+
+.ht-capture__preview strong {
+  color: var(--ht-color-foreground);
+  font-weight: var(--ht-font-weight-medium);
+}
+
 /* ── 输入行 ─────────────────────────────────────────── */
 
 .ht-compose {
@@ -419,3 +543,344 @@
    设计系统已在 tokens.css 的媒体查询里把所有 --ht-duration-* 压成 1ms，
    组件只要用 token 就自动获得降低动效行为。
    我第一版又写了一遍，既是冗余，也引入了裸值 1ms。 */
+
+/* ── AI 设置面板 ────────────────────────────────────── */
+
+.ht-settings {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ht-space-4);
+  max-width: var(--ht-layout-content-max);
+  padding: var(--ht-space-4);
+  color: var(--ht-color-foreground);
+  font-family: var(--ht-font-sans);
+  font-size: var(--ht-font-size-sm);
+}
+
+.ht-settings__title {
+  margin: 0;
+  font-size: var(--ht-font-size-xl);
+  font-weight: var(--ht-font-weight-bold);
+}
+
+.ht-settings__section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ht-space-3);
+  padding: var(--ht-space-3);
+  border: var(--ht-border-width-thin) solid var(--ht-color-border-subtle);
+  border-radius: var(--ht-radius-md);
+  background: var(--ht-color-surface);
+}
+
+.ht-settings__h3 {
+  margin: 0;
+  font-size: var(--ht-font-size-base);
+  font-weight: var(--ht-font-weight-semibold);
+}
+
+.ht-settings__hint {
+  margin: 0;
+  color: var(--ht-color-foreground-muted);
+  font-size: var(--ht-font-size-xs);
+  line-height: 1.5;
+}
+
+.ht-settings__danger,
+.ht-settings__notice,
+.ht-settings__errors li {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--ht-space-2);
+  margin: 0;
+}
+
+.ht-settings__danger {
+  padding: var(--ht-space-2);
+  border-left: var(--ht-border-width-thick) solid var(--ht-color-danger);
+  color: var(--ht-color-foreground);
+  font-size: var(--ht-font-size-xs);
+  background: var(--ht-color-surface-sunken);
+}
+
+.ht-settings__notice {
+  color: var(--ht-color-foreground-muted);
+  font-size: var(--ht-font-size-2xs);
+}
+
+.ht-settings__toggle {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--ht-space-3);
+  cursor: pointer;
+}
+
+.ht-settings__toggle-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ht-space-1);
+}
+
+.ht-settings__toggle-label {
+  font-weight: var(--ht-font-weight-medium);
+}
+
+.ht-settings__list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ht-space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.ht-settings__item {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--ht-space-2);
+  padding: var(--ht-space-2);
+  border: var(--ht-border-width-thin) solid var(--ht-color-border-subtle);
+  border-radius: var(--ht-radius-sm);
+}
+
+.ht-settings__item-main {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ht-space-1);
+}
+
+.ht-settings__item-label {
+  font-weight: var(--ht-font-weight-medium);
+}
+
+.ht-settings__item-sub {
+  color: var(--ht-color-foreground-subtle);
+  font-size: var(--ht-font-size-2xs);
+}
+
+.ht-settings__tag {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--ht-space-1);
+  color: var(--ht-color-foreground-muted);
+  font-size: var(--ht-font-size-2xs);
+}
+
+/* 远端标签用警示色 + 图标 —— 不只靠颜色区分 */
+.ht-settings__tag--remote {
+  color: var(--ht-color-warning-strong);
+  font-weight: var(--ht-font-weight-medium);
+}
+
+.ht-settings__key {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--ht-space-1);
+}
+
+.ht-settings__actions,
+.ht-settings__chips,
+.ht-settings__tools {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--ht-space-2);
+}
+
+.ht-settings__feature {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ht-space-2);
+}
+
+.ht-settings__feature-name {
+  font-weight: var(--ht-font-weight-medium);
+}
+
+.ht-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--ht-space-1);
+  padding: var(--ht-space-1) var(--ht-space-2);
+  border: var(--ht-border-width-thin) solid var(--ht-color-border);
+  border-radius: var(--ht-radius-sm);
+  background: var(--ht-color-background);
+  color: var(--ht-color-foreground-muted);
+  font-size: var(--ht-font-size-2xs);
+  cursor: pointer;
+  transition: background var(--ht-duration-fast) var(--ht-ease-standard);
+}
+
+.ht-chip--on {
+  border-color: var(--ht-color-primary);
+  background: var(--ht-color-primary-subtle);
+  color: var(--ht-color-foreground);
+}
+
+.ht-settings__consent {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--ht-space-2);
+  padding: var(--ht-space-2);
+  border-radius: var(--ht-radius-sm);
+  background: var(--ht-color-surface-sunken);
+  font-size: var(--ht-font-size-xs);
+}
+
+.ht-settings__field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ht-space-1);
+}
+
+.ht-settings__tool {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--ht-space-2);
+  font-size: var(--ht-font-size-xs);
+}
+
+.ht-settings__tool-kind {
+  margin-left: var(--ht-space-1);
+  color: var(--ht-color-foreground-subtle);
+  font-size: var(--ht-font-size-2xs);
+  font-style: normal;
+}
+
+.ht-settings__errors {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ht-space-1);
+  margin: 0;
+  padding: 0;
+  color: var(--ht-color-danger);
+  font-size: var(--ht-font-size-xs);
+  list-style: none;
+}
+
+.ht-settings__inline {
+  display: grid;
+  grid-template-columns: 3em 1fr;
+  align-items: center;
+  gap: var(--ht-space-2);
+  font-size: var(--ht-font-size-xs);
+}
+
+.ht-settings__inline-label {
+  color: var(--ht-color-foreground-subtle);
+  font-size: var(--ht-font-size-2xs);
+}
+
+.ht-settings__caps {
+  border: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--ht-space-3);
+  align-items: center;
+}
+
+.ht-settings__cap {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--ht-space-1);
+  font-size: var(--ht-font-size-xs);
+}
+
+.ht-settings__cap-hint {
+  color: var(--ht-color-foreground-subtle);
+  font-size: var(--ht-font-size-2xs);
+}
+
+/* ── AI 拆解 ───────────────────────────────────────────────── */
+
+.ht-ai {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--ht-space-2);
+}
+
+.ht-ai__done {
+  color: var(--ht-color-foreground-subtle);
+  font-size: var(--ht-font-size-2xs);
+}
+
+.ht-ai__panel {
+  display: grid;
+  gap: var(--ht-space-2);
+  padding: var(--ht-space-3);
+  border: 1px solid var(--ht-color-border);
+  border-radius: var(--ht-radius-md);
+  background: var(--ht-color-surface);
+  font-size: var(--ht-font-size-xs);
+}
+
+.ht-ai__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--ht-space-2);
+  font-weight: 600;
+}
+
+.ht-ai__row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--ht-space-2);
+  margin: 0;
+}
+
+.ht-ai__warn {
+  display: flex;
+  align-items: center;
+  gap: var(--ht-space-1);
+  margin: 0;
+  color: var(--ht-color-danger);
+  font-size: var(--ht-font-size-xs);
+}
+
+.ht-ai__tag {
+  padding: 0 var(--ht-space-2);
+  border: 1px solid var(--ht-color-border);
+  border-radius: var(--ht-radius-sm);
+  color: var(--ht-color-foreground-subtle);
+  font-size: var(--ht-font-size-2xs);
+}
+
+.ht-ai__items {
+  margin: 0;
+  padding-left: var(--ht-space-4);
+}
+
+.ht-ai__note {
+  margin: 0;
+  color: var(--ht-color-foreground-subtle);
+  font-size: var(--ht-font-size-2xs);
+}
+
+.ht-ai__actions {
+  display: flex;
+  gap: var(--ht-space-2);
+}
+
+/* 能力缺口提示 —— 能配但跑不起来时必须说出来 */
+.ht-settings__warn {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--ht-space-2);
+  margin-top: var(--ht-space-2);
+  padding: var(--ht-space-2);
+  border: 1px solid var(--ht-color-border);
+  border-radius: var(--ht-radius-sm);
+  color: var(--ht-color-danger);
+  font-size: var(--ht-font-size-2xs);
+}
+
+/* 回退链披露 —— 与普通信息行区分开，它是有隐私含义的 */
+.ht-ai__row--warn {
+  color: var(--ht-color-danger);
+}

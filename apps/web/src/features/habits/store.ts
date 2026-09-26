@@ -1,7 +1,7 @@
 import { OpType } from '@heyta/sync-core';
 /**
- * 习惯 store —— 打卡 / 撤销 / 连续天数
- * ======================================
+ * 习惯 store —— 打卡 / 撤销 / 连续天数（Web 壳）
+ * ==============================================
  *
  * 为什么**不能**直接用 Super Productivity 的 SimpleCounter：
  * SP 的计数器只有"加一/减一"，没有目标值、单位、计划频率、补打卡窗口。
@@ -9,7 +9,17 @@ import { OpType } from '@heyta/sync-core';
  * 周一、周三、周五打卡就是连续，中间的周二不该算断。
  * 没有 frequency 的计数器算不出这个，所以这部分是自研（见计划 3.4）。
  *
- * 写入仍然全部经 `dispatchIntent`（D4）。
+ * ─────────────────────────────────────────────────────────────────────────
+ * 🔴 本文件被**改造过**：它原先自己拼 `HABIT` / `HABIT_LOG` 的 op（4 处）。
+ * 这些全是产品语义，现在全部委托给 `@heyta/app-host` 的 `createHabitActions`：
+ *
+ *   - 打卡记录的 id = `${habitId}:${date}`（幂等性的来源）
+ *   - "今天已经打过卡了"的判定
+ *   - 打卡值缺省落在 `habit.target` 上
+ *
+ * 上面任何一条在这里重写一遍，都会让移动端和网页端**对同一次打卡
+ * 生成不同的 op** —— 而这正是同步系统里最难查的一类问题。
+ * ─────────────────────────────────────────────────────────────────────────
  */
 
 import { create } from 'zustand';
@@ -24,6 +34,7 @@ import {
   type LocalDate,
   type StreakResult,
 } from '@heyta/domain';
+import { createHabitActions, type ActionContext, type NewHabitFields } from '@heyta/app-host';
 
 import { currentState, dispatchIntent, onEngineChange } from '../../lib/oplog.js';
 
@@ -42,11 +53,17 @@ export interface HabitWithProgress {
 interface HabitState {
   habits: Habit[];
   logs: HabitLog[];
-  /** 打卡操作会发生"同一天二次打卡"冲突，用它串行化。 */
+  /**
+   * ⚠️ 这个字段目前**没有任何消费者**，也没有任何地方把它设成 true。
+   * 保留是因为它曾经打算用来串行化"同一天双击打卡"——
+   * 而真正解决那个问题的机制是**打卡记录的复合 id**（见 `createHabitActions`）：
+   * 两次打卡落到同一个实体上，LWW 收敛成一条，不需要外部串行化。
+   * 留着它是为了不悄悄改掉一个导出接口；下次清理时可以直接删。
+   */
   busy: boolean;
   error?: string;
 
-  addHabit: (name: string, over?: Partial<Habit>) => Promise<void>;
+  addHabit: (name: string, over?: NewHabitFields) => Promise<void>;
   /** 打卡。已打卡时是幂等空操作（不产生重复 log）。 */
   checkIn: (habitId: string, date?: LocalDate, value?: number) => Promise<void>;
   /** 撤销打卡。 */
@@ -54,110 +71,55 @@ interface HabitState {
   deleteHabit: (habitId: string) => Promise<void>;
 }
 
-/** 打卡记录的主键：习惯 + 日期。
- *
- * ⚠️ 用 `${habitId}:${date}` 而不是随机 id —— 这样"同一天重复打卡"
- * 天然落到同一条记录上（幂等），而不是产生第二条 log 让计数翻倍。
- */
-function logId(habitId: string, date: LocalDate): string {
-  return `${habitId}:${date}`;
-}
+/** 与任务 / 专注 / 清单 store 同一个形状。只含两个函数引用，不含任何判断。 */
+const actionContext: ActionContext = {
+  dispatch: dispatchIntent,
+  getState: currentState,
+};
 
-let habitCounter = 0;
-function nextHabitId(): string {
-  habitCounter += 1;
-  return `habit-${String(Date.now())}-${String(habitCounter)}`;
-}
+const habitActions = createHabitActions(actionContext);
 
-export const useHabitStore = create<HabitState>((set, get) => ({
+export const useHabitStore = create<HabitState>(() => ({
   habits: [],
   logs: [],
   busy: false,
 
-  addHabit: async (name, over = {}) => {
-    const trimmed = name.trim();
-    if (trimmed === '') return;
+  addHabit: async (name, over) => {
+    // 交互决策：空名字什么都不做（动作层对空名字抛错）。
+    if (name.trim() === '') return;
 
-    await dispatchIntent({
-      entityType: 'HABIT',
-      entityId: nextHabitId(),
-      opType: OpType.Create,
-      payload: { name: trimmed, target: 1, ...over },
-    });
-    refresh(set);
+    await habitActions.createHabit(name, over);
+    refresh();
   },
 
   checkIn: async (habitId, date, value) => {
-    const d = date ?? toLocalDate(Date.now());
-    const state = get();
-    const habit = state.habits.find((h) => h.id === habitId);
-    if (habit === undefined) return;
-
-    // 幂等：今天已经打过卡就什么都不做。
-    // 不靠 reducer 去重，因为"第二次打卡"和"改数值"在数据上无法区分 ——
-    // 必须在**意图层**就判定。
-    const existing = state.logs.find(
-      (l) => l.habitId === habitId && l.date === d && l.deletedAt === undefined,
-    );
-    if (existing !== undefined) return;
-
-    await dispatchIntent({
-      entityType: 'HABIT_LOG',
-      entityId: logId(habitId, d),
-      opType: OpType.Create,
-      payload: {
-        habitId,
-        date: d,
-        value: value ?? habit.target ?? 1,
-      },
-    });
-    refresh(set);
+    // 幂等判定在动作层 —— 这里不查"今天打过卡没有"（那是产品语义）。
+    await habitActions.checkIn(habitId, date, value);
+    refresh();
   },
 
   undoCheckIn: async (habitId, date) => {
-    const d = date ?? toLocalDate(Date.now());
-    const existing = get().logs.find(
-      (l) => l.habitId === habitId && l.date === d && l.deletedAt === undefined,
-    );
-    if (existing === undefined) return;
-
-    // 软删除（墓碑）—— 物理删除会让另一端把打卡同步回来
-    await dispatchIntent({
-      entityType: 'HABIT_LOG',
-      entityId: logId(habitId, d),
-      opType: OpType.Delete,
-      payload: {},
-    });
-    refresh(set);
+    await habitActions.undoCheckIn(habitId, date);
+    refresh();
   },
 
   deleteHabit: async (habitId) => {
-    await dispatchIntent({
-      entityType: 'HABIT',
-      entityId: habitId,
-      opType: OpType.Delete,
-      payload: {},
-    });
-    refresh(set);
+    // 软删除。打卡记录**不**级联删除 —— 撤销删除后历史还在。
+    await habitActions.removeHabit(habitId);
+    refresh();
   },
 }));
 
-function refresh(set: (partial: Partial<HabitState>) => void): void {
-  const state = currentState();
-  set({
-    habits: Object.values(state.habits).filter((h) => h.deletedAt === undefined),
-    logs: Object.values(state.habitLogs).filter((l) => l.deletedAt === undefined),
+/** 从动作层重新读列表 —— "哪些算未删除"是产品语义，不在这里过滤。 */
+function refresh(): void {
+  useHabitStore.setState({
+    habits: habitActions.listHabits(),
+    logs: habitActions.listLogs(),
   });
 }
 
 // 引擎状态变化时自动刷新（含远程 op 应用后）
-onEngineChange(() => {
-  const state = currentState();
-  useHabitStore.setState({
-    habits: Object.values(state.habits).filter((h) => h.deletedAt === undefined),
-    logs: Object.values(state.habitLogs).filter((l) => l.deletedAt === undefined),
-  });
-});
+onEngineChange(refresh);
 
 // ─────────────────────────────────────────────────────────────
 // 选择器（纯计算，不改状态）

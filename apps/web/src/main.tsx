@@ -47,7 +47,9 @@ initOpLog()
         <ErrorScreen
           title="无法初始化本地存储"
           message={message}
-          hint="您的浏览器可能禁用了 IndexedDB（隐私模式常见）。"
+          // 「IndexedDB」是浏览器内部的接口名，对用户没有行动价值 ——
+          // 换成用户能理解的「浏览器的本地数据库」，并直接给出下一步。
+          hint="浏览器可能禁用了本地数据库（无痕模式常见）。关掉无痕模式或换一个浏览器再试。"
         />
       </StrictMode>,
     );
