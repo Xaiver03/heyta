@@ -251,4 +251,4 @@ heyta 手里有一份**别人拿不到的数据**：`MaterializedState` 里的 `
 | 可视化竞品拆解报告 | [ai-competitive-teardown.html](../research/ai-competitive-teardown.html) |
 | **决策（不可变）** | ADR [0005](../adr/0005-ai-data-path.md) / [0006](../adr/0006-supply-modes.md) / [0010](../adr/0010-ai-config-routing.md) / [0011](../adr/0011-local-api-mcp.md) / [0013](../adr/0013-cloud-ai-and-maas.md) |
 | **记忆要不要向量库（实验结论）** | [ai-memory-necessity.md](../research/ai-memory-necessity.md) |
-| 记忆 / AI 数据库调研原料 | `research/ai-memory-db-2026-09.md`（调研中） |
+| 记忆 / AI 数据库调研原料（许可证 / 三端矩阵 / 实测数字） | [ai-memory-db-2026-09.md](../../research/ai-memory-db-2026-09.md) |
