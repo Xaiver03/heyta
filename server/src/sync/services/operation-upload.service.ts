@@ -363,7 +363,9 @@ export class OperationUploadService {
     // from advancing lastSeq.
     const existingOp = await tx.operation.findUnique({
       where: { id: op.id },
-      select: DUPLICATE_OP_SELECT,
+      // `serverSeq` 不在 DUPLICATE_OP_SELECT 里，但幂等重试要把**原来那个序号**
+      // 回给客户端，所以这里显式补上 —— 与 snapshot-handler 同一写法。
+      select: { ...DUPLICATE_OP_SELECT, serverSeq: true },
     });
 
     if (existingOp) {
@@ -387,15 +389,23 @@ export class OperationUploadService {
         );
       }
 
-      return reject(
-        this.rejectedUploadResult(
-          userId,
-          clientId,
-          op,
-          'Duplicate operation ID',
-          SYNC_ERROR_CODES.DUPLICATE_OPERATION,
-        ),
-      );
+      // 🔴 幂等重试：`isSameDuplicateOperation` 已经确认磁盘上那条就是**同一个 op**
+      // （内容不同会走上面的 INVALID_OP_ID，那仍然是硬拒绝）。也就是说客户端上一次
+      // 其实传成功了，只是没收到响应。
+      //
+      // 这时回 `DUPLICATE_OPERATION` 是错的 —— 它的字面意思是"服务端已经有了"，
+      // 而那**正是上传想要的结果**。把它当失败，客户端就不会去标记"已上传"，
+      // 于是队列永不清空 → 下次重传整批 → 又全是重复 → **永久卡死**：
+      // 用户看到"同步一直失败 + 待上传数永远不减"，而数据其实一条都没丢。
+      //
+      // 按幂等语义回 accepted + 原来那个 serverSeq。
+      // 存储计量必须是 0：本次没有写入任何东西（调用方只在 accepted 时读 storageBytes）。
+      // 与 sync.routes.snapshot-handler.ts 里 BACKUP_IMPORT / REPAIR 的幂等分支同形。
+      return {
+        result: { opId: op.id, accepted: true, serverSeq: existingOp.serverSeq },
+        storageBytes: 0,
+        fallback: false,
+      };
     }
 
     if (wasOccupiedAtRequestStart) {
@@ -512,7 +522,8 @@ export class OperationUploadService {
     if (createResult.count === 0) {
       const duplicateOp = await tx.operation.findUnique({
         where: { id: op.id },
-        select: DUPLICATE_OP_SELECT,
+        // 同上：竞态分支也要把并发插入那条的 serverSeq 回给客户端。
+        select: { ...DUPLICATE_OP_SELECT, serverSeq: true },
       });
 
       if (!duplicateOp) {
@@ -546,15 +557,23 @@ export class OperationUploadService {
         );
       }
 
-      return reject(
-        this.rejectedUploadResult(
-          userId,
-          clientId,
-          op,
-          'Duplicate operation ID',
-          SYNC_ERROR_CODES.DUPLICATE_OPERATION,
-        ),
-      );
+      // 🔴 幂等重试：`isSameDuplicateOperation` 已经确认磁盘上那条就是**同一个 op**
+      // （内容不同会走上面的 INVALID_OP_ID，那仍然是硬拒绝）。也就是说客户端上一次
+      // 其实传成功了，只是没收到响应。
+      //
+      // 这时回 `DUPLICATE_OPERATION` 是错的 —— 它的字面意思是"服务端已经有了"，
+      // 而那**正是上传想要的结果**。把它当失败，客户端就不会去标记"已上传"，
+      // 于是队列永不清空 → 下次重传整批 → 又全是重复 → **永久卡死**：
+      // 用户看到"同步一直失败 + 待上传数永远不减"，而数据其实一条都没丢。
+      //
+      // 按幂等语义回 accepted + 原来那个 serverSeq。
+      // 存储计量必须是 0：本次没有写入任何东西（调用方只在 accepted 时读 storageBytes）。
+      // 与 sync.routes.snapshot-handler.ts 里 BACKUP_IMPORT / REPAIR 的幂等分支同形。
+      return {
+        result: { opId: op.id, accepted: true, serverSeq: duplicateOp.serverSeq },
+        storageBytes: 0,
+        fallback: false,
+      };
     }
 
     if (fullStateVectorClock) {

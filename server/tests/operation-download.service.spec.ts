@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
 import type { Prisma } from '@prisma/client';
+import { MAX_VECTOR_CLOCK_SIZE } from '@heyta/sync-core';
 import { OperationDownloadService } from '../src/sync/services/operation-download.service';
 
 // Mock prisma
@@ -972,10 +973,12 @@ describe('OperationDownloadService', () => {
     });
 
     it('should apply limitVectorClockSize to aggregate result exceeding MAX', async () => {
-      // Create 25 entries — exceeds MAX_VECTOR_CLOCK_SIZE (20)
-      const clockRows = Array.from({ length: 25 }, (_, i) => ({
+      // 🔴 条数从上限推导，不写死 —— 写死 25 时上限一提到 100 就不再超限，
+      // 裁剪不再发生，而断言仍然"通过"（一条静默失效的边界测试）。
+      const clockRows = Array.from({ length: MAX_VECTOR_CLOCK_SIZE + 5 }, (_, i) => ({
         client_id: `client-${String(i).padStart(3, '0')}`,
-        max_counter: BigInt(100 - i), // Descending counters
+        // 计数器保持为正：负数在向量时钟里没有意义
+        max_counter: BigInt(1000 - i), // Descending counters
       }));
 
       vi.mocked(prisma.$transaction).mockImplementation(async (fn: any) => {
@@ -995,18 +998,22 @@ describe('OperationDownloadService', () => {
 
       const result = await service.getOpsSinceWithSeq(1, 10);
 
-      // Should be pruned to MAX_VECTOR_CLOCK_SIZE (20) entries
-      expect(Object.keys(result.snapshotVectorClock!).length).toBeLessThanOrEqual(20);
+      // Should be pruned to MAX_VECTOR_CLOCK_SIZE entries
+      expect(Object.keys(result.snapshotVectorClock!).length).toBeLessThanOrEqual(
+        MAX_VECTOR_CLOCK_SIZE,
+      );
+      // 前提校验：输入确实超限
+      expect(Object.keys(clockRows).length).toBeGreaterThan(MAX_VECTOR_CLOCK_SIZE);
       // Highest-counter entries should be preserved
-      expect(result.snapshotVectorClock!['client-000']).toBe(100);
-      expect(result.snapshotVectorClock!['client-001']).toBe(99);
+      expect(result.snapshotVectorClock!['client-000']).toBe(1000);
+      expect(result.snapshotVectorClock!['client-001']).toBe(999);
     });
 
     it('should preserve excludeClient and snapshot author in pruned clock', async () => {
-      // Create 25 entries exceeding MAX; put excludeClient and author at the bottom
-      const clockRows = Array.from({ length: 25 }, (_, i) => ({
+      // Create MAX+5 entries exceeding MAX; put excludeClient and author at the bottom
+      const clockRows = Array.from({ length: MAX_VECTOR_CLOCK_SIZE + 5 }, (_, i) => ({
         client_id: `client-${String(i).padStart(3, '0')}`,
-        max_counter: BigInt(100 - i),
+        max_counter: BigInt(1000 - i),
       }));
       // Add low-counter entries for the clients that should be preserved
       clockRows.push({ client_id: 'requesting-client', max_counter: 1n });
@@ -1037,7 +1044,9 @@ describe('OperationDownloadService', () => {
       // Both low-counter clients should be preserved despite pruning
       expect(result.snapshotVectorClock!['requesting-client']).toBe(1);
       expect(result.snapshotVectorClock!['snapshot-author']).toBe(1);
-      expect(Object.keys(result.snapshotVectorClock!).length).toBeLessThanOrEqual(20);
+      expect(Object.keys(result.snapshotVectorClock!).length).toBeLessThanOrEqual(
+        MAX_VECTOR_CLOCK_SIZE,
+      );
     });
 
     it('should NOT use $queryRaw when client is past snapshot', async () => {

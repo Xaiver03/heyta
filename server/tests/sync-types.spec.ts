@@ -248,10 +248,16 @@ describe('sanitizeVectorClock', () => {
       // Critical invariant: sanitizeVectorClock REJECTS oversized clocks entirely.
       // It does NOT silently prune them down, which would violate the
       // "prune after comparison" invariant.
+      //
+      // 🔴 条数必须**从上限推导**，不能写死 100：上限从 20 提到 100 之后，
+      // 2.5x = 250，写死的 100 条**不再超限**，于是 "expect(valid).toBe(false)"
+      // 变成一条永远不成立的断言 —— 而它本来是这条不变量唯一的守卫。
+      const maxSanitize = Math.ceil(MAX_VECTOR_CLOCK_SIZE * 2.5);
       const clock: VectorClock = {};
-      for (let i = 0; i < 100; i++) {
+      for (let i = 0; i < maxSanitize + 1; i++) {
         clock[`client_${i}`] = i;
       }
+      expect(Object.keys(clock).length).toBeGreaterThan(maxSanitize);
       const result = sanitizeVectorClock(clock);
       expect(result.valid).toBe(false);
     });
