@@ -1,0 +1,552 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>竞品拆解 · 滴答清单的 AI 做法与 heyta 的机会窗口</title>
+<!--
+  单文件、离线可看：不引 CDN、不引 Google Fonts。
+  理由：本仓库是本地优先项目，一份"要联网才能看"的调研报告与它的取向相矛盾。
+  ⚠️ 唯一事实源是 docs/research/ai-competitive-and-architecture.md，本文件只是呈现。
+-->
+<style>
+  :root{
+    --ink:#162033; --ink-soft:#3d4a5f; --muted:#667085;
+    --paper:#f7f4ec; --card:rgba(255,255,255,.62); --line:#ded7ca;
+    --blue:#1d4ed8; --blue-wash:#e8eefc;
+    --amber:#a8631a; --amber-wash:#fdf3e3;
+    --green:#1f6152; --green-wash:#e9f5f0;
+    --red:#a3372c; --red-wash:#fbeceb;
+    --sans:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Hiragino Sans GB","Microsoft YaHei",system-ui,sans-serif;
+    --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  }
+  *{box-sizing:border-box}
+  html{-webkit-text-size-adjust:100%}
+  body{margin:0;background:var(--paper);color:var(--ink);font-family:var(--sans);line-height:1.6}
+  .page{max-width:1180px;margin:0 auto;padding:40px 24px 64px}
+  .hair{border:1px solid var(--line);background:var(--card)}
+  .r6{border-radius:6px}
+  .grid-bg{background-image:linear-gradient(var(--line) 1px,transparent 1px),linear-gradient(90deg,var(--line) 1px,transparent 1px);background-size:32px 32px}
+  .pill{display:inline-block;border:1px solid var(--line);border-radius:999px;padding:5px 10px;font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);background:rgba(255,255,255,.5)}
+  .lbl{font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+  h1{font-size:clamp(30px,5.2vw,58px);line-height:1.02;letter-spacing:-.02em;margin:.35em 0 0;font-weight:800}
+  h2{font-size:20px;margin:0;font-weight:800;letter-spacing:-.01em}
+  h3{font-size:15px;margin:0 0 6px;font-weight:800}
+  p{margin:0 0 10px}
+  .lead{font-size:15px;color:var(--ink-soft)}
+  .mut{color:var(--muted)}
+  .small{font-size:12.5px}
+  .num{font-variant-numeric:tabular-nums}
+  .stack>*+*{margin-top:20px}
+  .grid{display:grid;gap:16px}
+  @media(min-width:820px){
+    .g-hero{grid-template-columns:1.3fr .7fr;align-items:end}
+    .g-2{grid-template-columns:1fr 1fr}
+    .g-3{grid-template-columns:repeat(3,1fr)}
+    .g-map{grid-template-columns:.95fr 1.05fr}
+  }
+  @media(max-width:819px){ .g-hero,.g-2,.g-3,.g-map{grid-template-columns:1fr} }
+  .pad{padding:22px}
+  .pad-s{padding:16px}
+  /* takeaways */
+  ol.take{margin:0;padding-left:0;list-style:none;counter-reset:t}
+  ol.take li{counter-increment:t;position:relative;padding-left:26px;margin-bottom:12px;font-size:13.5px;line-height:1.55}
+  ol.take li:last-child{margin-bottom:0}
+  ol.take li::before{content:counter(t);position:absolute;left:0;top:1px;width:17px;height:17px;border-radius:50%;background:var(--ink);color:#fff;font-size:10.5px;font-weight:800;display:flex;align-items:center;justify-content:center}
+  .sowhat{display:block;margin-top:4px;font-size:12.5px;color:var(--blue);font-weight:600}
+  /* positioning map */
+  .map{position:relative;height:400px;border:1px solid var(--line);background:#fff}
+  .map .vline{position:absolute;left:50%;top:0;bottom:0;border-left:1px dashed var(--line)}
+  .map .hline{position:absolute;top:50%;left:0;right:0;border-top:1px dashed var(--line)}
+  .map .ax{position:absolute;font-size:11px;font-weight:700;letter-spacing:.06em;color:var(--muted);text-transform:uppercase}
+  .node{position:absolute;border-radius:999px;padding:8px 14px;font-size:13px;font-weight:800;white-space:nowrap;border:1px solid transparent}
+  .n-tick{background:var(--amber-wash);color:var(--amber);border-color:#e6cfa8;left:12%;top:20%}
+  .n-heyta{background:var(--blue-wash);color:var(--blue);border-color:#bcccf5;right:10%;bottom:22%}
+  .n-iface{background:var(--green-wash);color:var(--green);border-color:#b6d8cb;right:24%;top:26%}
+  .n-local{background:#f0eef7;color:#4b3f78;border-color:#cfc7e6;left:20%;bottom:30%}
+  /* cards */
+  .card{border:1px solid var(--line);background:rgba(255,255,255,.72);border-radius:6px;padding:18px}
+  .card .who{font-size:11px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-bottom:4px}
+  .card h3{font-size:19px;margin:0 0 8px}
+  dl.kv{margin:0;font-size:13px}
+  dl.kv div{display:flex;gap:10px;padding:6px 0;border-top:1px solid var(--line)}
+  dl.kv div:first-child{border-top:0}
+  dl.kv dt{flex:0 0 96px;color:var(--muted);font-weight:700;font-size:11.5px;letter-spacing:.04em;text-transform:uppercase;padding-top:1px}
+  dl.kv dd{margin:0;flex:1}
+  /* matrix */
+  .scroll{overflow-x:auto;-webkit-overflow-scrolling:touch}
+  table.matrix{width:100%;border-collapse:collapse;min-width:720px;background:rgba(255,255,255,.72)}
+  table.matrix th,table.matrix td{border-bottom:1px solid var(--line);padding:12px 14px;text-align:left;vertical-align:top;font-size:13px}
+  table.matrix thead th{font-size:11px;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);background:rgba(255,255,255,.85);position:sticky;top:0}
+  table.matrix tbody tr:last-child td{border-bottom:0}
+  table.matrix td.cap{font-weight:700;width:19%}
+  .m{font-weight:800;font-size:12px;letter-spacing:.03em}
+  .yes{color:var(--green)} .no{color:var(--red)} .part{color:var(--amber)} .unk{color:var(--muted)}
+  .note{display:block;font-weight:400;color:var(--muted);font-size:12px;margin-top:3px;line-height:1.45}
+  /* opportunity windows */
+  .win{border:1px solid var(--line);border-left:3px solid var(--blue);background:rgba(255,255,255,.72);border-radius:0 6px 6px 0;padding:16px 18px}
+  .win.w2{border-left-color:var(--amber)} .win.w3{border-left-color:var(--green)}
+  .win .tag{font-size:10.5px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+  .win ul{margin:8px 0 0;padding-left:16px;font-size:13px}
+  .win li{margin-bottom:4px}
+  .win li b{font-weight:800}
+  /* moves */
+  .mv{border:1px solid var(--line);background:rgba(255,255,255,.72);border-radius:6px;padding:16px}
+  .mv .when{font-size:11px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--blue)}
+  .mv p{font-size:13px;margin:8px 0 0;color:var(--ink-soft)}
+  /* callout */
+  .flag{border:1px solid #e6cfa8;background:var(--amber-wash);border-radius:6px;padding:14px 16px;font-size:13px}
+  .flag.red{border-color:#e7bdb8;background:var(--red-wash)}
+  .flag.blue{border-color:#bcccf5;background:var(--blue-wash)}
+  .flag b{font-weight:800}
+  code{font-family:var(--mono);font-size:12px;background:rgba(22,32,51,.06);padding:1px 5px;border-radius:3px}
+  .src{font-size:11.5px;color:var(--muted);word-break:break-all}
+  footer{margin-top:36px;padding-top:18px;border-top:1px solid var(--line);font-size:11.5px;color:var(--muted)}
+  @media print{
+    body{background:#fff}
+    .page{max-width:none;padding:0}
+    .hair,.card,.mv,.win,table.matrix{background:#fff}
+    table.matrix{min-width:0}
+  }
+</style>
+</head>
+<body>
+<main class="page stack">
+
+  <!-- ══════════ 1. HEADER ══════════ -->
+  <section class="hair r6 grid-bg pad">
+    <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:22px">
+      <span class="pill">竞品拆解</span>
+      <span class="pill">任务管理 · AI</span>
+      <span class="pill">滴答清单深挖 + 16 竞品横向</span>
+      <span class="pill">2026-09-25</span>
+    </div>
+    <div class="grid g-hero">
+      <div>
+        <div class="lbl" style="color:var(--blue)">结论</div>
+        <h1>滴答清单的 AI 能做，<br>是因为它不必保护你的数据。</h1>
+        <p class="lead" style="margin-top:14px;max-width:62ch">
+          heyta 应该学它的<strong>功能形态</strong>（建议→确认、MCP 先行、时间线而非甘特），
+          <strong>不能学它的数据路径</strong>（任务内容交给第三方模型）。学数据路径 = 放弃端到端加密。
+        </p>
+      </div>
+      <div class="hair r6 pad-s" style="background:#fffaf0">
+        <div class="lbl" style="margin-bottom:10px">Executive takeaway</div>
+        <ol class="take">
+          <li>滴答清单的 AI <b>全在 2026 年</b>，2025 年一个都没有；且先做 MCP/CLI，后做内置助手。
+            <span class="sowhat">→ so what：heyta 的"接口优先"不是边角料，是同行验证过的第一步。</span></li>
+          <li>它的 AI 会读你的<b>存量任务、清单、习惯</b>，并交给<b>第三方 AI 服务商</b>。
+            <span class="sowhat">→ so what：heyta 的 E2EE 让这条路径在技术上不可行，只能客户端内推理。</span></li>
+          <li>它<b>没有甘特图</b>，官网明说时间线"比甘特图更轻"，且时间线依赖 <code>duration</code>。
+            <span class="sowhat">→ so what：用户要的"甘特图"瓶颈是数据模型，不是 AI。</span></li>
+        </ol>
+      </div>
+    </div>
+  </section>
+
+  <!-- ══════════ 2. POSITIONING MAP ══════════ -->
+  <section class="grid g-map">
+    <div class="hair r6 pad" style="background:#fbfaf6">
+      <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:14px">
+        <span class="lbl">Positioning map</span>
+        <span class="lbl" style="text-transform:none;letter-spacing:0">坐标轴取自本报告的证据</span>
+      </div>
+      <div class="map">
+        <div class="vline"></div><div class="hline"></div>
+        <div class="ax" style="left:10px;top:10px">服务端看不到明文</div>
+        <div class="ax" style="right:10px;top:10px">服务端看得到明文</div>
+        <div class="ax" style="left:10px;bottom:10px">需用户自配置</div>
+        <div class="ax" style="right:10px;bottom:10px">开箱即用</div>
+        <div class="node n-tick">滴答清单 / TickTick</div>
+        <div class="node n-iface">heyta AI-5（MCP / 本地 API）</div>
+        <div class="node n-local">heyta AI-0～AI-2（BYOK / 自托管）</div>
+        <div class="node n-heyta">heyta 今天（无 AI）</div>
+      </div>
+      <p class="small mut" style="margin-top:12px">
+        横轴 = 服务端可见性（滴答清单 Security 页原文 <em>"stored and encrypted at rest"</em> = 服务端加密，非 E2EE）。
+        纵轴 = AI 的开箱即用程度。heyta 的四个位置全部落在左半边，这是架构决定的，不是选择。
+      </p>
+    </div>
+
+    <!-- ══════════ 3. COMPETITOR CARDS ══════════ -->
+    <div class="stack">
+      <article class="card">
+        <div class="who">竞品</div>
+        <h3>滴答清单 / TickTick</h3>
+        <dl class="kv">
+          <div><dt>目标用户</dt><dd>个人 + 轻协作；中国市场为主，国际版独立运营</dd></div>
+          <div><dt>核心承诺</dt><dd>功能最全的个人任务管理，跨平台同步可靠</dd></div>
+          <div><dt>价格信号</dt><dd class="num">US$49.99/年 · ￥139/年；<b>AI 是付费专属</b>（Free ✗ / Premium ✓），走共享月度配额</dd></div>
+          <div><dt>主要优势</dt><dd>NLP 时间识别 + 语音输入<b>免费</b>；MCP/CLI 生态铺得早；iOS 27 Siri AI 集成</dd></div>
+          <div><dt>可见弱点</dt><dd>AI 需数据上云（第三方服务商）；模型未披露；Reddit 差评集中于隐私与"慢、建议平庸"</dd></div>
+        </dl>
+      </article>
+      <article class="card" style="border-color:#bcccf5;background:var(--blue-wash)">
+        <div class="who" style="color:var(--blue)">Us / Opportunity</div>
+        <h3>heyta</h3>
+        <dl class="kv">
+          <div><dt>目标用户</dt><dd>要自建/自托管、不接受"数据换便利"的用户</dd></div>
+          <div><dt>核心承诺</dt><dd>本地优先 + 端到端加密；<b>服务端从设计上看不到明文</b></dd></div>
+          <div><dt>价格信号</dt><dd>开源核心 + 自建/托管收费；<b>AI 算力由用户自己提供</b>（无配额系统）</dd></div>
+          <div><dt>主要优势</dt><dd>唯一能正面回应"未知第三方读我全部数据"这条差评的架构</dd></div>
+          <div><dt>可见弱点</dt><dd><b>AI 默认是灰的</b>（用户不配 Key/端点就没有 AI）；这正是最大的产品代价</dd></div>
+        </dl>
+      </article>
+    </div>
+  </section>
+
+  <!-- ══════════ 4. FEATURE MATRIX ══════════ -->
+  <section class="hair r6" style="overflow:hidden">
+    <div class="pad-s" style="border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:8px">
+      <span class="lbl">Feature matrix · 能力覆盖度</span>
+      <span class="lbl" style="text-transform:none;letter-spacing:0">✓ 有 &nbsp; △ 部分 / 有条件 &nbsp; — 没有 &nbsp; ? 未找到公开信息</span>
+    </div>
+    <div class="scroll">
+      <table class="matrix">
+        <thead>
+          <tr><th>能力</th><th>滴答清单</th><th>heyta 今天</th><th>heyta 机会</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="cap">自然语言时间识别</td>
+            <td><span class="m yes">✓</span> 官网叫 NLP（中文版「智能识别」），<b>免费</b>
+              <span class="note">传统 NLU 规则，不是大模型</span></td>
+            <td><span class="m part">△</span> <code>chrono-node</code> 已登记（MIT，含中文）
+              <span class="note">未接进产品</span></td>
+            <td><b>追平即可</b> —— 这条不需要 AI，规则库就是同行的实际水平</td>
+          </tr>
+          <tr>
+            <td class="cap">语音输入建任务</td>
+            <td><span class="m yes">✓</span> Voice Input（ASR）
+              <span class="note">中文版隐私政策点名科大讯飞 SDK</span></td>
+            <td><span class="m no">—</span></td>
+            <td>用<b>系统 ASR</b> 即可，不必自研（feature-matrix §8.2 已如此判断）</td>
+          </tr>
+          <tr>
+            <td class="cap">AI 语音建任务（抽取+拆条）</td>
+            <td><span class="m yes">✓</span> AI Voice Add：一句话含多件事<b>自动拆成多条任务</b></td>
+            <td><span class="m no">—</span></td>
+            <td>heyta <b>AI-1 捕获</b>。落成普通 op，AI 痕迹不进数据</td>
+          </tr>
+          <tr>
+            <td class="cap">对话式 AI 助手</td>
+            <td><span class="m yes">✓</span> AI Assistant（2026-09 上线）
+              <span class="note">会读存量任务/清单/习惯；macOS+Web 可用，<b>Windows 不支持</b></span></td>
+            <td><span class="m no">—</span></td>
+            <td><span class="m no">✗ 不做</span> —— feature-matrix §11 的反需求；且与 E2EE 冲突</td>
+          </tr>
+          <tr>
+            <td class="cap">MCP server / CLI</td>
+            <td><span class="m yes">✓</span> <code>mcp.ticktick.com</code> + <code>@ticktick/ticktick-cli</code>
+              <span class="note">批量写操作每次最多 20 条</span></td>
+            <td><span class="m no">—</span></td>
+            <td><b>heyta AI-5</b>，<b>与 AI 基座解耦、可第一天并行</b>。唯一与 E2EE 零冲突的 AI 路径</td>
+          </tr>
+          <tr>
+            <td class="cap">录音转写 + 摘要</td>
+            <td><span class="m yes">✓</span> 30+ 语言自动识别</td>
+            <td><span class="m no">—</span></td>
+            <td><span class="m unk">?</span> 端侧 ASR 质量未验证，暂不排期</td>
+          </tr>
+          <tr>
+            <td class="cap">任务级时间可视化 / 倒计时</td>
+            <td><span class="m part">△</span> 有 <b>Countdown</b>，两种形态
+              <span class="note">① 倒数纪念日（独立实体，Free 5 / Premium 299）<br>
+              ② 🔴 <b>任务列表 countdown mode</b>：<code>Task time</code> ↔ <code>Countdown Time</code>，
+              把 "Due Wednesday" 变成 "还剩 2 天"（Google Play <b>4.6★/164,748</b>）</span></td>
+            <td><span class="m no">—</span></td>
+            <td>⚠️ <b>原判"不是追平"已更正：任务级倒计时不是空白。</b>
+              差异只在形态（递减进度条 vs 剩余时间）—— 而那正是有反面证据的形态</td>
+          </tr>
+          <tr>
+            <td class="cap">时间线视图</td>
+            <td><span class="m yes">✓</span> Timeline View（Premium）
+              <span class="note">官网原文：比甘特图更轻；依赖任务 duration</span></td>
+            <td><span class="m no">—</span>
+              <span class="note">Task 无 <code>startDate</code>、无 duration</span></td>
+            <td>需要先加<b>可选</b>字段（不可逆层）→ 属产品决策，不属 AI</td>
+          </tr>
+          <tr>
+            <td class="cap">甘特图 / 任务依赖</td>
+            <td><span class="m no">—</span> <b>滴答清单没有甘特图</b>
+              <span class="note">官网主动选择"更轻的时间线"</span></td>
+            <td><span class="m no">—</span></td>
+            <td><span class="m no">✗ 不做</span> —— feature-matrix §11 已列为另一条赛道</td>
+          </tr>
+          <tr>
+            <td class="cap">AI 优先级排序 / 自动排程</td>
+            <td><span class="m part">△</span> 2026-01「推荐任务」是<b>规则式</b>，非大模型
+              <span class="note">官方描述基于创建时间、改期历史、临近截止日</span></td>
+            <td><span class="m no">—</span></td>
+            <td>只做<b>逐条建议</b>（AI-2），<b>不做自动重排</b>。<br>
+              <span class="note">AI-3 证据已补齐：全自动排程不许当卖点；先做 Lock/预览</span></td>
+          </tr>
+          <tr>
+            <td class="cap">全量导出</td>
+            <td><span class="m yes">✓</span> Web「数据备份-导出备份」
+              <span class="note">官方注明仅支持导出清单、任务中的数据</span></td>
+            <td><span class="m part">△</span> feature-matrix 列为 P0</td>
+            <td>反锁定 + 信任来源；也是"回传云数据"需求的<b>正确解法</b></td>
+          </tr>
+          <tr>
+            <td class="cap">端到端加密</td>
+            <td><span class="m no">—</span> <b>从不声称</b>；Security 页只写 "encrypted at rest"
+              <span class="note">= 服务端加密，服务端持密钥可读明文</span></td>
+            <td><span class="m yes">✓</span> 强制且无开关
+              <span class="note"><code>violatesE2eeGate</code>，明文上传 400</span></td>
+            <td><b>这是 heyta 的立身之本，也是 AI 路线被限定的原因</b></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- ══════════ 5. PRICING READ ══════════ -->
+  <section class="grid g-2">
+    <div class="hair r6 pad">
+      <div class="lbl" style="margin-bottom:12px">Pricing / packaging read</div>
+      <dl class="kv">
+        <div><dt>免费版</dt><dd class="num">US$0 / ￥0 &nbsp;·&nbsp; 9 清单、99 任务每清单、<b>含 NLP</b></dd></div>
+        <div><dt>付费版</dt><dd class="num"><b>US$49.99/年</b>（国际）&nbsp;·&nbsp; <b>￥139/年</b>（中国）</dd></div>
+        <div><dt>AI 的切分</dt><dd><b>AI Features = Free ✗ / Premium ✓</b>（原始 HTML 解析，中英两站一致）</dd></div>
+        <div><dt>AI 计费方式</dt><dd>不单独收费，走<b>共享月度配额</b>；<code>Settings → AI Features</code> 查看用量，用尽后暂时不可用</dd></div>
+        <div><dt>配额数字</dt><dd class="unk">未找到公开信息</dd></div>
+        <div><dt>企业销售动作</dt><dd class="unk">未找到公开信息</dd></div>
+      </dl>
+      <div class="flag" style="margin-top:14px">
+        <b>读数：</b>它必须用"付费墙 + 配额"控制 AI 成本，因为<b>推理账单是它自己出的</b>。
+        heyta 走 BYOK / 自托管时账单是用户的 —— <b>不需要配额系统，但代价是用户要自己配置</b>。
+        这不是可以两全的取舍。
+      </div>
+    </div>
+
+    <!-- ══════════ 6. UX / MESSAGING NOTES ══════════ -->
+    <div class="hair r6 pad">
+      <div class="lbl" style="margin-bottom:12px">UX / messaging notes（可观察细节）</div>
+      <ul style="margin:0;padding-left:18px;font-size:13px">
+        <li style="margin-bottom:9px"><b>确认流程写进了 prompt。</b>官方范例全部以
+          <em>"Wait for my confirmation before making any changes"</em> 结尾；「整理清单」那条还专门警告
+          "Deleted content cannot be recovered."<br>
+          <span class="mut small">→ heyta AI-2 的"建议→确认→才落 op"不是保守，是行业做法。</span></li>
+        <li style="margin-bottom:9px"><b>入口藏在设置里。</b>移动端要先到 <code>Settings → Tab Bar</code> 手动打开 AI，
+          才会出现在底部导航栏 —— 默认不开。</li>
+        <li style="margin-bottom:9px"><b>平台限制写得很具体。</b>macOS 与 Web 可用，<b>Windows 暂不支持</b>；
+          不支持 iOS 15 / Android 8 / macOS 13.3 或更早。是"部分平台先上"而不是全平台齐发。</li>
+        <li style="margin-bottom:9px"><b>会话是一等对象。</b>可保存、重命名、删除；回复可 Retry；
+          已发送消息可 Edit 后重发。对话历史用户可查看和删除。</li>
+        <li style="margin-bottom:9px"><b>把"AI 放外面"做成了完整生态。</b>MCP 已适配 Claude、ChatGPT(Codex)、
+          Gemini、Grok、Perplexity、Cursor、VS Code、Codex CLI、TRAE、Antigravity；中国版另适配豆包、千问办公。
+          CLI 文档直接写"也可供 AI Agent 调用"。</li>
+        <li><b>数据最小化的一个实例。</b>中文隐私政策：搜索关键字"仅会记录在客户端本地，不会被同步到云端"。
+          <span class="mut small">→ "按用途限定数据面"已被采用，heyta 只是推得更彻底。</span></li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- ══════════ 7. OPPORTUNITY WINDOWS ══════════ -->
+  <section>
+    <div class="lbl" style="margin-bottom:12px">Opportunity windows</div>
+    <div class="stack">
+      <div class="win">
+        <div class="tag">窗口 1 · 最高确定性</div>
+        <h3>"你的 AI，你的数据，看得见去哪了"</h3>
+        <ul>
+          <li><b>why now：</b>滴答清单 AI 助手的最大差评是"未知第三方在读我全部数据"，且官方只写
+            "third-party AI service providers"、<b>模型从未披露</b>。这是架构问题，不会随时间改善。</li>
+          <li><b>target segment：</b>已在使用滴答清单、但对其 AI 隐私条款不安的付费用户。</li>
+          <li><b>first move：</b>AI-0 基座 + AI-1 捕获，并且把"发送前显示发给谁、发什么"做成产品语言。</li>
+          <li><b>risk：</b>体验门槛 —— 用户不配 Key 就没有 AI。必须让<b>无 AI 时的核心功能完全不退化</b>。</li>
+        </ul>
+      </div>
+      <div class="win w2">
+        <div class="tag">窗口 2 · 最低成本</div>
+        <h3>接口先行：MCP / 本地 API 作为"AI 功能"</h3>
+        <ul>
+          <li><b>why now：</b>滴答清单自己就是 2026-04 先做 MCP+CLI、2026-09 才做内置助手。
+            这条路被验证过，而且<b>不需要我们承担推理成本或隐私责任</b>。</li>
+          <li><b>target segment：</b>已在用 Claude/ChatGPT/Cursor 的技术型用户 —— 与自托管目标用户高度重合。</li>
+          <li><b>first move：</b>AI-5，<b>与 AI 基座解耦，可第一天开工</b>；写入全部走 <code>dispatch()</code>。</li>
+          <li><b>risk：</b>需要鉴权、权限范围、默认关闭；文档与支持成本真实存在。</li>
+        </ul>
+      </div>
+      <div class="win w3">
+        <div class="tag">窗口 3 · ⚠️ 已降级为待验证假设</div>
+        <h3>任务级时间可视化（拖延症友好）</h3>
+        <ul>
+          <li><b>why（仍成立）：</b>纯视图，零模型、零依赖、零隐私面；
+            <code>createdAt → dueDate</code> 两字段今天就有 → <b>成本低、可回退、可 A/B</b>。</li>
+          <li>🔴 <b>但原判"不是追平，是差异化"已更正。</b> 滴答清单<b>有任务列表 countdown mode</b>
+            （<code>Task time</code> ↔ <code>Countdown Time</code>，Google Play <b>4.6★/164,748 条</b>）——
+            <b>任务级倒计时不是空白</b>，且那是整个品类唯一有规模证据的成功案例。</li>
+          <li>🔴 <b>反面证据很硬：</b><b>32 个实验的元分析</b>发现前期投入感高时进度条
+            <b>反向降低完成率</b> —— 而"从 createdAt 线性匀速递减"<b>正是这个形状</b>；
+            Bisin &amp; Hyndman 发现人们想要 self-imposed deadline <b>但 deadline 并未提高完成率</b>；
+            Bonezzi 发现动机呈 U 型、<b>中点最低</b>。
+            <b>且不存在任何检验本场景的 RCT。</b></li>
+          <li>独立产品重注此形态<b>全部没做起来</b>：<code>Time Left</code>（2014 钟面式）已死 2 条评分；
+            Deadliner 存活 6 年但 <b>2 条评分</b>；Deadline App 63 / Griply 197 / Deadline Bar <b>0</b>。</li>
+          <li><b>修正后裁决：</b>做成<b>可开关视图 + 先定 A/B 指标</b>；
+            🔴 <b>不得宣称能治拖延</b>，不做成核心机制。</li>
+        </ul>
+      </div>
+      <div class="win" style="border-left-color:#4b3f78">
+        <div class="tag">窗口 4 · 无人占据的位置</div>
+        <h3>把"数据最小化"做成产品语言</h3>
+        <ul>
+          <li><b>why now：</b>逐个查过之后发现 —— <b>没有任何产品把"只给当前这一条"命名为策略并系统宣传</b>
+            （未找到公开信息）。只有散落的具体做法：Google Magic Compose 只发 1 条草稿／前 20 条消息；
+            Home Assistant 让用户选暴露哪些实体、建议 &lt;25 个；滴答清单搜索关键字仅本地。</li>
+          <li><b>target segment：</b>想要 AI 但不愿交出全部数据的用户 —— 这个群体目前<b>没有对应的产品语言</b>。</li>
+          <li><b>first move：</b>事前"发什么给谁" + 事后<b>可导出的出境日志</b>。
+            范式直接照抄 Apple 的「Apple Intelligence &amp; PCC Report」
+            （设置 → 隐私 → 导出所有离开设备的请求），这是目前最完整的公开设计。</li>
+          <li><b>risk：</b>披露 UI 本身是成本，且"说清楚"会让部分用户第一次意识到数据在流动。
+            <b>但对 heyta 这是立场，不是功能。</b></li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- ══════════ 8. RECOMMENDED MOVES ══════════ -->
+  <section>
+    <div class="lbl" style="margin-bottom:12px">Recommended moves</div>
+    <div class="grid g-3">
+      <div class="mv">
+        <div class="when">30 天</div>
+        <h3>约束已明，直接开两条线</h3>
+        <p>两个 spike <b>已在本次调研中答完</b>（CORS 与端侧运行时），结论已成硬约束，不必再验。
+          于是可以直接并行：<b>AI-0 基座</b>（含出境披露 UI 与新的分层门禁）
+          + <b>AI-5 接口</b>（与基座零依赖）。视图侧同期交付任务级倒计时。</p>
+      </div>
+      <div class="mv">
+        <div class="when">90 天</div>
+        <h3>第一条能力 + 规则打底</h3>
+        <p>AI-1 捕获：<code>chrono-node</code> 规则优先，<b>AI 只在未命中或低置信度时被调用</b>。
+          必须按"LLM 做得最少"落地 —— 校验失败走确定性回退，不靠"让模型再试一次"。
+          验收的核心判据是<b>"拔掉 AI 后功能不退化"</b>。</p>
+      </div>
+      <div class="mv">
+        <div class="when">180 天</div>
+        <h3>结构化；排程只做"锁"与"预览"</h3>
+        <p>AI-2：拆解任务（先落 <code>note</code> checklist）+ 逐条象限建议，走"建议→确认→落 op"。
+          <b>AI-3 的证据已补齐</b>，结论是：<b>不许把全自动排程当卖点</b>；
+          若要做，先做 <b>Lock / Pin</b> 与<b>预览</b>（53+ 票的未被满足需求，成本远低于排程算法），
+          并逐条对照那 12 个已验证的设计模式。</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ══════════ 9. EVIDENCE GAPS ══════════ -->
+  <section class="hair r6 pad">
+    <div class="lbl" style="margin-bottom:12px">Evidence gaps（必须写明）</div>
+    <div class="grid g-2">
+      <div>
+        <div class="lbl" style="color:var(--green);margin-bottom:8px">✅ 本次已核实（曾列为未知）</div>
+        <ul style="margin:0;padding-left:18px;font-size:13px">
+          <li style="margin-bottom:7px"><b>浏览器直连 LLM API 的 CORS 现实。</b>
+            原生端可直连；<b>Web 端架构上站不住</b>（Key 是 bearer 凭据，WebCrypto 防不住 XSS）。
+            → 已落成硬约束。</li>
+          <li style="margin-bottom:7px"><b>端侧小模型的质量。</b>
+            格式 &gt;84% 合规，但<b>取值 ≤80.4%</b>；"格式对"和"值对"是两件事。</li>
+          <li style="margin-bottom:7px"><b>RN 上端侧推理是否可用。</b>
+            🔴 <b>Hermes 缺 WebAssembly</b>（本仓库真机实测，无 polyfill）
+            → WASM 基座方案在移动壳上全部出局。</li>
+          <li><b>Apple Foundation Models 边界。</b> iOS 26+、4096 token 硬上限、
+            <code>@Generable</code> 是捷径但 <b>Swift-only</b> → RN 用不上。</li>
+          <li><b>竞品 AI 横向格局已补齐</b>（13 个产品 / 374 条来源）→ 见下方"AI 排程的成败账"。</li>
+          <li>📌 <b>一条有利结论：端侧 AI 在这个品类是空的</b> —— 13 个产品<b>无一家有端侧推理证据</b>
+            （唯一例外是 Apple / Google 在系统层做）。可检验的原因：<b>服务端才能按 credit 计费，端侧无法计费</b>。</li>
+        </ul>
+      </div>
+      <div>
+        <div class="lbl" style="color:var(--red);margin-bottom:8px">🔴 最大缺口（必须标注）</div>
+        <ul style="margin:0;padding-left:18px;font-size:13px">
+          <li style="margin-bottom:7px">🔴 <b>E2EE 产品自己怎么处理 AI —— Standard Notes / Obsidian / Bear / Anytype
+            四家零材料。</b>即"和我们约束相同的公司怎么做"<b>基本未答</b>。
+            <b>而 heyta 就是 E2EE 产品</b> —— 这是所有缺口里最要命的一条，须另行定向重跑。</li>
+          <li style="margin-bottom:7px">🔴 <b>BYOK 在任务管理品类里零先例</b> —— 13 个产品中<b>没有任何一家</b>支持
+            用户自带 LLM API Key 驱动内置 AI；模式<b>全部是厂商代管</b>。
+            对 heyta 是机会也是风险（UX 未被验证 + 教育成本）。</li>
+          <li style="margin-bottom:7px"><b>自托管产品的 AI 责任归属</b>（Nextcloud / Immich / HA / Vaultwarden）未取证。</li>
+          <li style="margin-bottom:7px"><b>"E2EE + 客户端本地明文 API"的完整公开威胁模型文档未找到</b> —— heyta 得自己写。</li>
+          <li><b>滴答清单用哪家模型 / AI 配额数字</b>：官方从未披露。</li>
+        </ul>
+        <p class="small mut" style="margin-top:10px">⚠️ 全部用户口碑类结论<b>仅来自搜索索引片段</b>
+          （Reddit / Trustpilot / G2 反爬），且横向调研<b>无任何留存数据</b>。</p>
+      </div>
+    </div>
+    <div class="flag red" style="margin-top:14px">
+      <b>取证限制（两层）：</b>① 本报告主体是<b>滴答清单深挖</b>；
+      ② 横向部分因检索通道受限（<code>web_search</code> 全程 432、anysearch 额度耗尽、社区站反爬），
+      <b>只有搜索索引片段可用</b>。<b>缺失项一律标注，未以推测填充。</b>
+      所有价格与功能均来自官方页面原文，未使用第三方站的二手数字。
+      <p style="margin:8px 0 0"><b>一处自我更正已记录：</b>初稿称滴答清单倒计时"不是任务级进度条、
+      是差异化机会"——经补证，它<b>有任务列表 countdown mode</b>，该说法<b>不完整，已更正</b>
+      （见功能矩阵与窗口 3）。</p>
+    </div>
+  </section>
+
+  <!-- ══════════ 9b. AUTOSCHED VERDICT ══════════ -->
+  <section class="hair r6" style="overflow:hidden">
+    <div class="pad-s" style="border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:8px">
+      <span class="lbl">AI 排程的成败账 · 16 个产品</span>
+      <span class="lbl" style="text-transform:none;letter-spacing:0">⚠️ 无留存数据，结论来自公告 / 聚合评分 / 用户自述</span>
+    </div>
+    <div class="pad">
+      <div class="grid g-2" style="gap:20px">
+        <div>
+          <h3>三个产品的实际结局</h3>
+          <p class="small mut" style="margin-bottom:10px">🔴 <b>没有任何一个自动排程产品是"因用户嫌弃因此下线该功能"的。</b>
+            真实退出形态是另外三种：</p>
+          <dl class="kv">
+            <div><dt>acquihire</dt><dd><b>Clockwise</b> —— 整体关停、团队被吸收（唯一有硬数字的死亡案例）</dd></div>
+            <div><dt>被收购</dt><dd><b>Reclaim.ai</b> → Dropbox（2024-08，金额未披露），用户预期崩了</dd></div>
+            <div><dt>主动拒绝</dt><dd><b>Sunsama</b> —— 做了"单任务排入"，<b>公开拒绝</b>"全量自动"按钮</dd></div>
+          </dl>
+          <div class="flag" style="margin-top:14px">
+            <b>最强的一条负面证据来自竞品创始人。</b> Sunsama 联创 Travis Meyer：
+            <em>"we consistently heard feedback from folks who had tried Motion that Motion felt too
+            opinionated and proactive… and they ended up <b>spending more time correcting automated
+            scheduling decisions</b> as a result."</em>
+            <p style="margin:8px 0 0"><b>它不是用户骂街，是同行创始人复述自己听到的反馈</b> ——
+            把失败模式说成了一句可检验的话：<b>纠正成本 &gt; 规划成本</b>。</p>
+          </div>
+        </div>
+        <div>
+          <h3>⚠️ 反证同样真实</h3>
+          <p class="small mut" style="margin-bottom:10px">正面证据集中在<b>两类人</b>，
+            这条人群分界可能比算法精度更重要：</p>
+          <ul style="margin:0 0 14px;padding-left:18px;font-size:13px">
+            <li style="margin-bottom:6px"><b>ADHD / 时间盲：</b><em>"the only way for me to stick to timeblocking"</em></li>
+            <li><b>管理者 / 团队场景：</b>排的是别人的会，不是自己的深度工作</li>
+          </ul>
+          <p class="small" style="margin-bottom:14px">负面证据集中在<b>个人贡献者的深度工作</b>场景。</p>
+          <div class="lbl" style="color:var(--green);margin-bottom:8px">🟢 三处没有先例的空白</div>
+          <ul style="margin:0;padding-left:18px;font-size:13px">
+            <li style="margin-bottom:6px"><b>Undo 撤销自动重排</b> —— 无任何产品实现</li>
+            <li style="margin-bottom:6px"><b>排程解释 UI</b> —— 无任何产品实现</li>
+            <li><b>"任务留在 App 内，只有时间块进日历"</b> —— 用户诉求明确，<b>无产品实现</b>，
+              且对本地优先的 heyta 天然契合</li>
+          </ul>
+          <p class="small mut" style="margin-top:12px"><b>另有一条已证实、未被满足的需求：</b>
+            Sunsama 的 <b>Lock / Pin</b> 请求有 <b>53+ 投票者</b>并合并了 <b>4 条</b>重复请求 ——
+            实现成本远低于排程算法。</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    <p style="margin-bottom:6px"><b>唯一事实源：</b><code>docs/research/ai-competitive-and-architecture.md</code>
+      —— 本文件只是它的可视化呈现；两者不一致时以 <code>.md</code> 为准。</p>
+    <p style="margin-bottom:6px"><b>配套决策与计划：</b><code>docs/adr/0005-ai-data-path.md</code>（待确认）·
+      <code>docs/plans/ai-capability-branches.md</code></p>
+    <p style="margin-bottom:6px"><b>主要来源：</b>ticktick.com/features · dida365.com/features · ticktick.com/upgrade ·
+      ticktick.com/privacy（2026-07-09 修订）· dida365.com/privacy · ticktick.com/security ·
+      官方 changelog（中/英）· help.ticktick.com AI Features 栏目（6 篇）· iTunes Lookup API（v8.2.12 @ 2026-09-19）</p>
+    <p>报告日期 2026-09-25 · 单文件离线可看（不引 CDN / 外部字体）· 证据分级见调研文档元信息</p>
+  </footer>
+
+</main>
+</body>
+</html>
