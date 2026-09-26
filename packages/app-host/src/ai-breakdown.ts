@@ -34,6 +34,10 @@
  */
 
 import {
+  renderHintBlock,
+  type PreferenceHint,
+} from '@heyta/domain';
+import {
   invokeRouted,
   type AiFeature,
   type AiRoutingConfig,
@@ -65,7 +69,20 @@ export interface BreakdownSource {
  * 所以这里的规则是：**`user` 里出现的每一个数据字段，`fields` 里必须有同名项**。
  * 有测试逐字段核对这件事。
  */
-export function buildBreakdownInvocation(source: BreakdownSource): {
+export function buildBreakdownInvocation(
+  source: BreakdownSource,
+  /**
+   * 记忆层推断出的偏好提示（见 `@heyta/domain` 的 `renderPreferenceHints`）。
+   *
+   * ⚠️ **这里是可选参数，而且是刻意的** —— 本项目吃过"可选参数导致
+   * fail open"的亏（`isReadable` 曾默认 `() => true`）。区别在于**默认值的方向**：
+   * 忘了传 `hints` 的后果是**少发**偏好，属于 fail **closed**；
+   * 而 `isReadable` 忘了传的后果是**多读**数据，属于 fail **open**。
+   *
+   * 判据：**可选参数的默认值必须指向更保守的一侧。**
+   */
+  hints: readonly PreferenceHint[] = [],
+): {
   feature: AiFeature;
   system: string;
   user: string;
@@ -78,10 +95,20 @@ export function buildBreakdownInvocation(source: BreakdownSource): {
     lines.push(`已有备注：\n${source.note}`);
   }
 
+  // 🔴 偏好看成**一个字段**（`preferences`），不是每项一个。
+  // 理由：出境授权与披露是按字段名绑定的（见文件头的说明），
+  // 而用户要能看懂"这一项是什么"。五条拆成五个字段名只会让披露更难读。
+  const hintBlock = renderHintBlock(hints);
+  if (hintBlock !== '') {
+    fields.push('preferences');
+    lines.push(hintBlock);
+  }
+
   return {
     feature: 'breakdown',
     system: [
       '你是一个任务拆解助手。把用户给出的任务拆成 3 到 8 个具体的、可执行的子项。',
+      '如果给出了用户的历史习惯，请据此调整子项数量与措辞，但不要复述这些习惯。',
       '每个子项一行，用「- 」开头。',
       '不要输出任何解释、前言或结语，只输出这份清单。',
     ].join('\n'),
@@ -234,6 +261,17 @@ export interface RequestBreakdownDeps {
   consents: readonly EgressConsent[];
   policy?: AiRoutingPolicy;
   routed?: RoutedDeps;
+  /**
+   * 记忆层推断出的偏好提示（见 `@heyta/domain` 的 `renderPreferenceHints`）。
+   *
+   * 🔴 **类型上没有 `undefined` 的歧义，也没有默认值** ——
+   * 但它是可选的，因为"忘了传"的后果是**少发偏好**（fail closed），
+   * 而不是多发数据。判据见 `buildBreakdownInvocation` 的说明。
+   *
+   * 关闭记忆时调用方传空数组即可（`renderPreferenceHints` 在开关关闭时
+   * 本身就返回 `[]`，所以两条路径都不可能漏出去）。
+   */
+  preferences?: readonly PreferenceHint[];
 }
 
 /**
@@ -251,7 +289,7 @@ export async function requestBreakdown(
     return { ok: false, reason: 'empty-title', message: '任务没有标题，没什么可拆的。', health: {} };
   }
 
-  const invocation = buildBreakdownInvocation(source);
+  const invocation = buildBreakdownInvocation(source, deps.preferences ?? []);
 
   const outcome = await invokeRouted(
     deps.routing,

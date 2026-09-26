@@ -15,6 +15,8 @@
 
 import { describe, expect, it, vi } from 'vitest';
 
+import { renderPreferenceHints, type PreferenceSet } from '@heyta/domain';
+
 import {
   DEFAULT_ROUTING_POLICY,
   type AiRoutingConfig,
@@ -99,6 +101,41 @@ const LOCAL_CONSENT: EgressConsent = {
   grantedAt: 1,
 };
 
+/** 造一个"有全部偏好"的开关打开状态。 */
+const withPrefs = (): PreferenceSet => ({
+  memoryEnabled: true,
+  estimateBias: {
+    id: 'estimate-bias',
+    value: 1.8,
+    sampleSize: 30,
+    confidence: 0.9,
+    evidence: '基于 30 次专注，你倾向低估任务耗时 —— 实际用时约为计划的 1.80 倍',
+  },
+  deepWorkWindow: {
+    id: 'deep-work-window',
+    value: { startHour: 8, endHour: 11, concentration: 0.8 },
+    sampleSize: 40,
+    confidence: 0.9,
+    evidence: '基于 40 次专注，80% 集中在 08:00–11:00',
+  },
+  leadTime: null,
+  granularity: {
+    id: 'granularity',
+    value: 6,
+    sampleSize: 12,
+    confidence: 0.9,
+    evidence: '你的 12 条带清单任务，中位数是 6 项',
+  },
+  titleStyle: {
+    id: 'title-style',
+    value: { cjkShare: 1, medianTitleLength: 12, emojiShare: 0 },
+    sampleSize: 40,
+    confidence: 0.9,
+    evidence: '基于 40 条任务，你的标题以中文为主，平均 12 个字',
+  },
+  withheld: [],
+});
+
 // ─────────────────────────────────────────────────────────────────────────
 // 构造调用
 // ─────────────────────────────────────────────────────────────────────────
@@ -122,6 +159,66 @@ describe('buildBreakdownInvocation', () => {
 
   it('空备注不算一个字段（避免披露里出现没送的东西）', () => {
     expect(buildBreakdownInvocation({ title: 'x', note: '   ' }).fields).toEqual(['title']);
+  });
+
+  // ── 记忆层：偏好注入 prompt 与披露 ─────────────────────────────
+
+
+  it('没有偏好时：不出现 preferences 字段，也不出现任何提示段落', () => {
+    const inv = buildBreakdownInvocation({ title: '做发布' });
+    expect(inv.fields).toEqual(['title']);
+    expect(inv.user).not.toContain('历史习惯');
+  });
+
+  it('🔴 传了偏好：`preferences` 必须进 `fields`（否则就是偷偷多发数据）', () => {
+    const hints = renderPreferenceHints(withPrefs(), 'breakdown');
+    const inv = buildBreakdownInvocation({ title: '做发布' }, hints);
+    expect(inv.fields).toContain('preferences');
+    // 字段声明了，正文里就必须真有 —— 两边的规则是对称的
+    expect(inv.user).toContain('历史习惯');
+  });
+
+  it('偏好提示真的进了 prompt，且是给模型的措辞（不复述样本量）', () => {
+    const hints = renderPreferenceHints(withPrefs(), 'breakdown');
+    const inv = buildBreakdownInvocation({ title: '做发布' }, hints);
+    expect(inv.user).toContain('拆成 6 项左右');
+    expect(inv.user).toContain('中文');
+    expect(inv.user).toContain('1.80 倍');
+    // 模型不需要知道"基于 N 次"，那是给用户看的（在 evidence 里）
+    expect(inv.user).not.toContain('基于 30 次');
+  });
+
+  it('🔴 只发该功能需要的偏好（最小化出境面）：拆解不带提前量与时段', () => {
+    const hints = renderPreferenceHints(withPrefs(), 'breakdown');
+    const inv = buildBreakdownInvocation({ title: '做发布' }, hints);
+    expect(inv.user).not.toContain('高效时段');
+    expect(inv.user).toContain('拆成 6 项左右');
+  });
+
+  it('🔴 主开关关闭：一个偏好都不进 prompt，`preferences` 字段也不出现', () => {
+    const off: PreferenceSet = { ...withPrefs(), memoryEnabled: false };
+    const hints = renderPreferenceHints(off, 'breakdown');
+    expect(hints).toEqual([]);
+
+    const inv = buildBreakdownInvocation({ title: '做发布' }, hints);
+    expect(inv.fields).toEqual(['title']);
+    expect(inv.user).not.toContain('历史习惯');
+    expect(inv.user).not.toContain('6 项');
+  });
+
+  it('🔴 关闭时即使把原始偏好集硬塞进去，也不该有输出（生成器是唯一入口）', () => {
+    // 防的是"某天有人图省事，直接自己拼字符串绕过 renderPreferenceHints"
+    const off: PreferenceSet = { ...withPrefs(), memoryEnabled: false };
+    expect(renderPreferenceHints(off, 'breakdown')).toEqual([]);
+    expect(renderPreferenceHints(off, 'prioritize')).toEqual([]);
+    expect(renderPreferenceHints(off, 'capture')).toEqual([]);
+    expect(renderPreferenceHints(off, 'duration-estimate')).toEqual([]);
+  });
+
+  it('提示顺序固定（同样的输入必须产生同样的 prompt 字节）', () => {
+    const a = buildBreakdownInvocation({ title: 'x' }, renderPreferenceHints(withPrefs(), 'breakdown'));
+    const b = buildBreakdownInvocation({ title: 'x' }, renderPreferenceHints(withPrefs(), 'breakdown'));
+    expect(a.user).toBe(b.user);
   });
 
   it('系统提示要求纯清单输出', () => {
@@ -323,6 +420,71 @@ describe('🔴🔴 requestBreakdown —— 出境闸门', () => {
     expect(outcome.ok).toBe(true);
     if (outcome.ok) expect(outcome.proposal.destination).toBe('user-endpoint');
     expect(calls).toHaveLength(1);
+  });
+
+  // ── 🔴 端到端：偏好真的到达了网络请求体 ──────────────────────
+  //
+  // 这一条是本仓库最该存在的测试类型：本项目反复出现「能力实现了、
+  // 被测了、但没人调用」。单测 `buildBreakdownInvocation` 证明不了
+  // `requestBreakdown` 把 hints 传下去了 —— 只有打到 wire 上才算数。
+
+  it('🔴 偏好真的进了 HTTP 请求体（不是只在单测里成立）', async () => {
+    const { impl, calls } = fetchReturning('- 甲\n- 乙');
+    const hints = renderPreferenceHints(withPrefs(), 'breakdown');
+    expect(hints.length).toBeGreaterThan(0);
+
+    await requestBreakdown(
+      { title: '做发布' },
+      {
+        routing: routing([LOCAL_ENDPOINT], { breakdown: ['local'] }),
+        consents: [],
+        preferences: hints,
+        routed: { fetchImpl: impl },
+      },
+    );
+
+    expect(calls).toHaveLength(1);
+    const body = calls[0]?.body ?? '';
+    // ⚠️ 断言**偏好块的完整表头**与**偏好内容**，不能只断言「历史习惯」——
+    // 系统提示里本身就有这四个字（"如果给出了用户的历史习惯…"），
+    // 用它做断言会永远为真。我第一次就这么写，测试直接把这个错暴露了。
+    expect(body).toContain('关于这位用户的历史习惯');
+    expect(body).toContain('6 项左右');
+  });
+
+  it('🔴 不传 preferences 时，请求体里一个偏好字节都没有', async () => {
+    const { impl, calls } = fetchReturning('- 甲');
+    await requestBreakdown(
+      { title: '做发布' },
+      {
+        routing: routing([LOCAL_ENDPOINT], { breakdown: ['local'] }),
+        consents: [],
+        routed: { fetchImpl: impl },
+      },
+    );
+    const body = calls[0]?.body ?? '';
+    expect(body).not.toContain('关于这位用户的历史习惯');
+    expect(body).not.toContain('6 项左右');
+  });
+
+  it('🔴 主开关关闭 → 端到端请求体里没有偏好（开关真的管住了出境）', async () => {
+    const off: PreferenceSet = { ...withPrefs(), memoryEnabled: false };
+    const hints = renderPreferenceHints(off, 'breakdown');
+    const { impl, calls } = fetchReturning('- 甲');
+
+    await requestBreakdown(
+      { title: '做发布' },
+      {
+        routing: routing([LOCAL_ENDPOINT], { breakdown: ['local'] }),
+        consents: [],
+        preferences: hints,
+        routed: { fetchImpl: impl },
+      },
+    );
+
+    const body = calls[0]?.body ?? '';
+    expect(body).not.toContain('关于这位用户的历史习惯');
+    expect(body).not.toContain('6 项左右');
   });
 
   it('🔴 送出的请求体里含标题，但不含没在 `fields` 里声明的东西', async () => {

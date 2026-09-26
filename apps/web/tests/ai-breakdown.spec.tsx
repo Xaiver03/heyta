@@ -15,7 +15,7 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { AiRoutingConfig, EgressConsent, SecretStore } from '@heyta/ai';
-import type { Task } from '@heyta/domain';
+import type { PreferenceSet, Task } from '@heyta/domain';
 
 const { AiBreakdown, resolvePreferredTarget } = await import('../src/features/ai/AiBreakdown.js');
 
@@ -681,5 +681,69 @@ describe('🔴🔴 披露必须是**三维**：发给谁 / 发什么 / 留多久
     expect(el.querySelector('[data-testid="ai-retention-text"]')?.textContent).toBe(
       expected.retentionText,
     );
+  });
+});
+
+// ── 🔴 记忆偏好：从界面到网络请求 ─────────────────────────────────────
+//
+// 这一组防的是本仓库最高发的 bug 类：**能力实现了、被测了、但没人接**。
+// `packages/domain` 与 `packages/app-host` 各自的测试都能过，
+// 而界面忘了传 `preferenceSet` —— 那样偏好永远送不出去，且**没有任何症状**。
+// 所以这里从「点按钮」一路断言到「HTTP 请求体」。
+
+const PREF_SET = (memoryEnabled: boolean): PreferenceSet => ({
+  memoryEnabled,
+  estimateBias: null,
+  deepWorkWindow: null,
+  leadTime: null,
+  granularity: {
+    id: 'granularity',
+    value: 6,
+    sampleSize: 12,
+    confidence: 0.9,
+    evidence: '你的 12 条带清单任务，中位数是 6 项',
+  },
+  titleStyle: null,
+  withheld: [],
+});
+
+describe('🔴 记忆偏好从界面走到请求体', () => {
+  it('关了记忆 → 请求体里没有偏好，披露里也没有 preferences 字段', async () => {
+    const { impl, calls } = fakeFetch('- 甲');
+    const el = render({ fetchImpl: impl, preferenceSet: PREF_SET(false) });
+
+    click(el.querySelector('[data-testid="ai-breakdown-t1"]'));
+    expect(el.querySelector('[data-testid="ai-field-list"]')?.textContent).not.toContain('preferences');
+
+    await clickAsync(el.querySelector('[data-testid="ai-send"]'));
+    const body = calls[0]?.body ?? '';
+    expect(body).not.toContain('关于这位用户的历史习惯');
+    expect(body).not.toContain('6 项左右');
+  });
+
+  it('🔴 开了记忆 → 披露**先**列出 preferences 字段，然后请求体里真的有偏好', async () => {
+    const { impl, calls } = fakeFetch('- 甲');
+    const el = render({ fetchImpl: impl, preferenceSet: PREF_SET(true) });
+
+    click(el.querySelector('[data-testid="ai-breakdown-t1"]'));
+
+    // ① 披露必须**在发送前**就说明会发偏好
+    expect(el.querySelector('[data-testid="ai-field-list"]')?.textContent).toContain('preferences');
+    // 此刻还没有任何请求出去
+    expect(calls).toHaveLength(0);
+
+    // ② 确认后才真的带上
+    await clickAsync(el.querySelector('[data-testid="ai-send"]'));
+    expect(calls).toHaveLength(1);
+    expect(calls[0]?.body ?? '').toContain('关于这位用户的历史习惯');
+    expect(calls[0]?.body ?? '').toContain('6 项左右');
+  });
+
+  it('不传 preferenceSet（旧的调用点）→ 一个偏好都不发，也不报错', async () => {
+    const { impl, calls } = fakeFetch('- 甲');
+    const el = render({ fetchImpl: impl });
+    click(el.querySelector('[data-testid="ai-breakdown-t1"]'));
+    await clickAsync(el.querySelector('[data-testid="ai-send"]'));
+    expect(calls[0]?.body ?? '').not.toContain('关于这位用户的历史习惯');
   });
 });

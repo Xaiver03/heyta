@@ -19,4 +19,5 @@ export * from './capture.js';
 export * from './countdown.js';
 export * from './memory.js';
 export * from './preferences.js';
+export * from './preference-hints.js';
 export * from './recall.js';
