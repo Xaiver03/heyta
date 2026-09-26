@@ -36,6 +36,7 @@
 import { useState } from 'react';
 import { AlertTriangle, Cloud, HardDrive, Sparkles, X } from 'lucide-react';
 
+import { renderPreferenceHints, type PreferenceSet } from '@heyta/domain';
 import {
   buildDisclosure,
   fromHealthSnapshot,
@@ -159,10 +160,19 @@ export interface AiBreakdownProps {
   onHealth?: (health: HealthMap) => void;
   /** 仅在测试里注入。生产用 `globalThis.fetch`。 */
   fetchImpl?: typeof fetch;
+  /**
+   * 记忆层推断出的偏好集（见 `@heyta/domain` 的 `inferPreferences`）。
+   *
+   * ⚠️ **可选的，默认「没有记忆」** —— 即 fail closed：
+   * 忘了传的后果是"这次拆解不带偏好"，而不是"偷偷多发数据"。
+   * 主开关关闭时 `inferPreferences` 返回的本身就是空集，
+   * 两条路径都不会漏出去（见 ADR-0014）。
+   */
+  preferenceSet?: PreferenceSet | undefined;
 }
 
 export function AiBreakdown(props: AiBreakdownProps): React.JSX.Element {
-  const { task, routing, consents, secrets, onApplyNote, onHealth } = props;
+  const { task, routing, consents, secrets, onApplyNote, onHealth, preferenceSet } = props;
 
   const [phase, setPhase] = useState<Phase>('idle');
   const [proposal, setProposal] = useState<BreakdownProposal | undefined>(undefined);
@@ -170,10 +180,21 @@ export function AiBreakdown(props: AiBreakdownProps): React.JSX.Element {
   const [applied, setApplied] = useState(false);
 
   const target = resolvePreferredTarget(routing);
-  const invocation = buildBreakdownInvocation({
-    title: task.title,
-    ...(task.note === undefined ? {} : { note: task.note }),
-  });
+
+  /**
+   * 🔴 偏好 → 提示。**这里也是出境面的一个决定点**：
+   * `renderPreferenceHints` 按用途过滤（拆解只要粒度/风格/估时），
+   * 并且主开关关闭时返回空数组 —— 所以下面两个用途不可能漏。
+   */
+  const hints = preferenceSet === undefined ? [] : renderPreferenceHints(preferenceSet, 'breakdown');
+
+  const invocation = buildBreakdownInvocation(
+    {
+      title: task.title,
+      ...(task.note === undefined ? {} : { note: task.note }),
+    },
+    hints,
+  );
 
   /**
    * 🔴 披露内容由 `packages/ai` 的 `buildDisclosure()` 组装 ——
@@ -196,6 +217,10 @@ export function AiBreakdown(props: AiBreakdownProps): React.JSX.Element {
       {
         routing,
         consents,
+        // 🔴 同一个 `hints` 既进 invocation（决定披露与请求体），
+        // 也进这里（决定真正发出去的内容）—— **只算一次**，
+        // 否则两处可能算出不同的东西，披露就会和实际发送不一致。
+        preferences: hints,
         routed: {
           secretStore: secrets,
           // 🔴 **发送那一刻**才解析快照 —— 冷却期是对着"现在"算的。

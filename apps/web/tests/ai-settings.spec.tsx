@@ -85,6 +85,80 @@ describe('默认值 —— 三道闸全关', () => {
   });
 });
 
+// ── 记忆总开关（ADR-0014）──────────────────────────────────────────────
+//
+// 🔴 这一组守的是**第四道闸**。它和前三道的区别是：
+// 前三道管"数据能不能出去"，这道管"AI 认不认识你"。
+// 关掉它 AI 照常工作 —— 所以"关了但没生效"是**没有症状**的，
+// 只能靠测试钉住。
+
+describe('记忆总开关', () => {
+  it('🔴 出厂默认关闭（第四道闸也是关的）', () => {
+    expect(defaultAiSettings().memoryEnabled).toBe(false);
+  });
+
+  it('🔴 存成字符串 "true" 不算开 —— 只认真布尔', () => {
+    localStorage.setItem(
+      AI_SETTINGS_STORAGE_KEY,
+      JSON.stringify({ ...defaultAiSettings(), memoryEnabled: 'true' }),
+    );
+    expect(loadAiSettings().memoryEnabled).toBe(false);
+  });
+
+  it('🔴 字段缺失（旧版本存的配置）→ 关闭，而不是 undefined 漏出去', () => {
+    const legacy = { ...defaultAiSettings() } as Record<string, unknown>;
+    delete legacy.memoryEnabled;
+    localStorage.setItem(AI_SETTINGS_STORAGE_KEY, JSON.stringify(legacy));
+    expect(loadAiSettings().memoryEnabled).toBe(false);
+  });
+
+  it('数字 1 / null / 对象 都不算开', () => {
+    for (const bogus of [1, null, {}, [], 'yes']) {
+      localStorage.setItem(
+        AI_SETTINGS_STORAGE_KEY,
+        JSON.stringify({ ...defaultAiSettings(), memoryEnabled: bogus }),
+      );
+      expect(loadAiSettings().memoryEnabled).toBe(false);
+    }
+  });
+
+  it('真的存了 true 才开', () => {
+    localStorage.setItem(
+      AI_SETTINGS_STORAGE_KEY,
+      JSON.stringify({ ...defaultAiSettings(), memoryEnabled: true }),
+    );
+    expect(loadAiSettings().memoryEnabled).toBe(true);
+  });
+
+  it('🔴 界面上的开关存在，且**不依赖 AI 总开关**就能看到', () => {
+    const c = render({ initial: defaultAiSettings(), secrets: createSessionSecretStore() });
+    const box = c.querySelector('#ai-memory-enabled');
+    expect(box).not.toBeNull();
+  });
+
+  it('🔴 打开记忆开关会回传 memoryEnabled=true（否则改了不生效）', () => {
+    const seen: boolean[] = [];
+    const c = render({
+      initial: defaultAiSettings(),
+      secrets: createSessionSecretStore(),
+      onChange: (next) => seen.push(next.memoryEnabled),
+    });
+    toggle(c.querySelector('#ai-memory-enabled'));
+    expect(seen.at(-1)).toBe(true);
+  });
+
+  it('🔴 关闭记忆开关会回传 false', () => {
+    const seen: boolean[] = [];
+    const c = render({
+      initial: { ...defaultAiSettings(), memoryEnabled: true },
+      secrets: createSessionSecretStore(),
+      onChange: (next) => seen.push(next.memoryEnabled),
+    });
+    toggle(c.querySelector('#ai-memory-enabled'));
+    expect(seen.at(-1)).toBe(false);
+  });
+});
+
 describe('loadAiSettings —— 坏配置必须降级到"全关"，不是抛错', () => {
   it('没存过 → 默认值', () => {
     expect(loadAiSettings().routing.enabled).toBe(false);

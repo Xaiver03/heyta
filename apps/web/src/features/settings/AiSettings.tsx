@@ -309,6 +309,20 @@ export function AiSettings({ initial, secrets, onChange }: AiSettingsProps) {
         onChange={(v) => update({ ...settings, routing: { ...routing, enabled: v } })}
       />
 
+      {/* ── 闸：记忆（ADR-0014）─────────────────────────────────
+          ⚠️ 刻意**始终可见**，不受 `routing.enabled` 管辖：
+          用户在"AI 到底记不记得我"这件事上应该能直接找到开关，
+          而不是先打开 AI 才看见它。
+          但它与总开关是**两件事** —— 总开关是"要不要用 AI"，
+          这个是"用 AI 但要不要让它认识你"。 */}
+      <Toggle
+        id="ai-memory-enabled"
+        label="让 AI 记住我的偏好"
+        note="从你自己的历史里推断（任务拆解粒度、表达习惯、估时偏差等）。推断只在本机进行、不上传；关掉后 AI 照常工作，只是它不认识你。"
+        checked={settings.memoryEnabled}
+        onChange={(v) => update({ ...settings, memoryEnabled: v })}
+      />
+
       {routing.enabled && (
         <>
           {/* ── 闸 2：允许远程 ───────────────────────────────────── */}

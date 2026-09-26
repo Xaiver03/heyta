@@ -11,7 +11,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { CalendarDays, Check, CircleDot, Inbox, Moon, Sun, Timer, Trash2, type LucideIcon, Settings } from 'lucide-react';
 
-import { Priority, Quadrant } from '@heyta/domain';
+import { inferPreferences, Priority, Quadrant } from '@heyta/domain';
 
 import {
   selectQuadrantCounts,
@@ -108,6 +108,32 @@ export function App(): React.JSX.Element {
    * 做成开关才有对照组，也才能一键回退。
    */
   const [dueDisplay, setDueDisplay] = useState<DueDisplayMode>('date');
+
+  /**
+   * 🔴 记忆层：**每次从 op-log 派生，不落盘**（ADR-0014 §3.3）。
+   *
+   * 为什么在这里算而不是存起来：存了就会漂移，而漂移的"用户画像"比没有更糟。
+   * `inferPreferences` 是纯函数，重算的代价是 O(任务数) —— 可以忽略。
+   *
+   * ⚠️ `memoryEnabled` 为 false 时它**立刻返回空集**，
+   * 所以下面传给界面的东西里一个偏好都不会有。
+   */
+  const preferenceSet = useMemo(
+    () =>
+      inferPreferences({
+        memoryEnabled: aiSettings.memoryEnabled,
+        tasks: Object.values(store.entities.tasks),
+        focusSessions: Object.values(store.entities.focusSessions),
+        now: Date.now(),
+        // `getTimezoneOffset()` 是「本地比 UTC 晚多少分钟」（东八区为 -480），
+        // 取负号得到常规的「UTC 偏移」。**必须显式传**，
+        // 否则偏好层会去读运行环境的时区，也就无法从 op-log 确定重建。
+        utcOffsetMinutes: -new Date().getTimezoneOffset(),
+      }),
+    // `store.entities` 变了就重算；`now` 刻意不进依赖 ——
+    // 时间是给"当场算一次"用的，分钟级漂移不影响这批偏好的结论。
+    [aiSettings.memoryEnabled, store.entities],
+  );
 
   // 主题应用到 <html data-theme>，tokens.css 的暗色覆盖挂在那里
   useEffect(() => {
@@ -290,6 +316,8 @@ export function App(): React.JSX.Element {
                       secrets={aiSecrets}
                       // 🔴 把上次落盘的熔断状态传回去 —— 否则落盘没有意义。
                       healthSnapshot={aiSettings.health}
+                      // 🔴 记忆偏好。开关关着时这里是空集 —— 界面拿不到任何偏好。
+                      preferenceSet={preferenceSet}
                       onApplyNote={(note) => store.setNote(task.id, note)}
                       onHealth={(health) => {
                         // 🔴 熔断状态落盘。**不进 op-log** —— 它是本机状态，
@@ -322,7 +350,22 @@ export function App(): React.JSX.Element {
           {view === 'quadrant' && <QuadrantBoard />}
           {view === 'habits' && <HabitsView />}
           {view === 'focus' && <FocusTimer />}
-          {view === 'settings' && <AiSettings initial={aiSettings} secrets={aiSecrets} />}
+          {view === 'settings' && (
+            <AiSettings
+              initial={aiSettings}
+              secrets={aiSecrets}
+              /**
+               * 🔴 回传并落盘。不传的话 `AiSettings` 会退回自己存 localStorage，
+               * 于是 `aiSettings` 这个 state **不会更新** ——
+               * 用户关掉记忆开关后，界面上的偏好要刷新才消失。
+               * 隐私开关"关不掉当下的行为"是不可接受的。
+               */
+              onChange={(next) => {
+                setAiSettings(next);
+                saveAiSettings(next);
+              }}
+            />
+          )}
         </div>
       </main>
     </div>

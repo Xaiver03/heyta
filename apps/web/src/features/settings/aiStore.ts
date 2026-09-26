@@ -63,6 +63,16 @@ export interface PersistedAiSettings {
    * 版本号，否则将来改结构时没法安全迁移（见 `packages/ai/src/health-store.ts`）。
    */
   health: AiHealthSnapshot;
+  /**
+   * 🔴 **记忆总开关**（见 ADR-0014）。
+   *
+   * 默认 **false**。关闭时偏好层**零推断、零偏好进 prompt**。
+   *
+   * ⚠️ 与 `routing`/`localApi` 不同，它**不是**"AI 能不能用"的开关 ——
+   * AI 可以照常工作，只是不记得你。两个概念分开，用户才想得清楚：
+   * 「不用 AI」和「用 AI 但别记我」是两件事。
+   */
+  memoryEnabled: boolean;
 }
 
 /**
@@ -84,6 +94,8 @@ export function defaultAiSettings(): PersistedAiSettings {
     localApi: { ...DEFAULT_LOCAL_API_CONFIG },
     consents: [],
     health: { version: HEALTH_SNAPSHOT_VERSION, entries: [] },
+    // 🔴 第四道闸，同样默认关。与 ADR-0014 的 fail-closed 要求一致。
+    memoryEnabled: false,
   };
 }
 
@@ -107,6 +119,11 @@ export function loadAiSettings(): PersistedAiSettings {
       routing: sanitizeRouting(candidate.routing, fallback.routing),
       localApi: sanitizeLocalApi(candidate.localApi, fallback.localApi),
       consents: Array.isArray(candidate.consents) ? candidate.consents : [],
+      // 🔴 只在**真的是布尔 true** 时才打开。
+      // 存成字符串 "true"、数字 1、或字段缺失 —— 一律按关闭处理。
+      // 隐私闸门不接受"看起来像真"的值（与 `sanitizeRouting` 对
+      // `enabled` 的处理同一条规则）。
+      memoryEnabled: candidate.memoryEnabled === true,
       health: {
         version: HEALTH_SNAPSHOT_VERSION,
         entries: toHealthSnapshot(
