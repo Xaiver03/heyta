@@ -512,6 +512,8 @@ subscription-notice.spec.tsx(190,87)  TS2345 ...
    删掉任何一段都是把理由丢了。
    已验证：冲突集**在 main 推进到 `f41c435` 之后仍然只有这一个文件**
    （`git merge-tree --write-tree --name-only main HEAD`，退出码 1、只列 `App.tsx`）。
+   ✅ **又对 `3090eb7` 重探过一次，结论不变**（main 两次前进都没有碰这个交叉点）——
+   也就是说下面这套程序不是"写了一次的文档"，而是**可复现的**。
 4. `packages/domain/src/index.ts`、`docs/README.md` 是**可加性**改动（各自都是新增行）→
    自动合并，**不要手动改**。
 5. 🔴 **先构建，再检查**（见 12.1 的误判警告）：
