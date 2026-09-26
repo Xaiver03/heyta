@@ -10,7 +10,20 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
-import { CalendarDays, Check, CircleDot, Inbox, Moon, Sun, Timer, TrendingUp, Trash2, type LucideIcon, Settings } from 'lucide-react';
+import {
+  CalendarDays,
+  ChartGantt,
+  Check,
+  CircleDot,
+  Inbox,
+  Moon,
+  Sun,
+  Timer,
+  TrendingUp,
+  Trash2,
+  type LucideIcon,
+  Settings,
+} from 'lucide-react';
 
 import {
   applyFeedbackCorrections,
@@ -21,6 +34,7 @@ import {
   Priority,
   Quadrant,
   suppressedPreferenceIds,
+  toLocalDate,
 } from '@heyta/domain';
 
 /**
@@ -47,6 +61,7 @@ import { QuadrantBoard } from './features/quadrant/QuadrantBoard.js';
 import { HabitsView } from './features/habits/HabitsView.js';
 import { GrowthView } from './features/motivation/GrowthView.js';
 import { TodayProgressCard } from './features/motivation/TodayProgressCard.js';
+import { TimelineView } from './features/timeline/TimelineView.js';
 import { AiBreakdown } from './features/ai/AiBreakdown.js';
 import { AiPrioritize } from './features/ai/AiPrioritize.js';
 import { AiDuration } from './features/ai/AiDuration.js';
@@ -111,7 +126,7 @@ const PRIMARY_NAV: NavEntry[] = [
  * 场景下几乎不存在，而成本是又一个需要维护的依赖。
  * 到 P2 需要深链接时再引入 —— 那时才知道真实的约束是什么。
  */
-type ViewKey = 'tasks' | 'quadrant' | 'habits' | 'focus' | 'growth' | 'settings';
+type ViewKey = 'tasks' | 'quadrant' | 'habits' | 'focus' | 'timeline' | 'growth' | 'settings';
 
 /**
  * 视图切换列表。
@@ -127,12 +142,19 @@ const VIEW_TABS: readonly { key: ViewKey; label: string; Icon: LucideIcon }[] = 
   { key: 'quadrant', label: '四象限', Icon: CircleDot },
   { key: 'habits', label: '习惯', Icon: Check },
   { key: 'focus', label: '番茄钟', Icon: Sun },
+  { key: 'timeline', label: '时间线', Icon: ChartGantt },
   { key: 'growth', label: '成长', Icon: TrendingUp },
   { key: 'settings', label: '设置', Icon: Settings },
 ];
 
 /** 标题直接跟着视图走的那些视图（任务 / 四象限的标题有更具体的信息，不在此列）。 */
-const VIEW_TITLED_BY_TAB: readonly ViewKey[] = ['habits', 'focus', 'growth', 'settings'];
+const VIEW_TITLED_BY_TAB: readonly ViewKey[] = [
+  'habits',
+  'focus',
+  'timeline',
+  'growth',
+  'settings',
+];
 
 export function App(): React.JSX.Element {
   const [theme, setTheme] = useState<Theme>(resolveInitialTheme);
@@ -553,6 +575,21 @@ export function App(): React.JSX.Element {
           {view === 'quadrant' && <QuadrantBoard />}
           {view === 'habits' && <HabitsView />}
           {view === 'focus' && <FocusTimer />}
+          {/**
+           * 时间线。排的是**当前视图里的任务**，每个任务一块。
+           *
+           * 🔴 起始日取"今天"（`store.now`）—— 时间线总得从某一天起算，
+           * 而从今天起排是唯一不需要问用户、也不会说谎的默认值。
+           * 它只是**展示参数**，不落任何持久化字段。
+           */}
+          {view === 'timeline' && (
+            <TimelineView
+              tasks={visible}
+              startDate={toLocalDate(store.now)}
+              today={toLocalDate(store.now)}
+              now={store.now}
+            />
+          )}
           {view === 'growth' && <GrowthView />}
           {view === 'settings' && (
             <AiSettings

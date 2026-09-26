@@ -148,7 +148,7 @@ describe('🔴 单位是「分钟」', () => {
     const plan = buildTimeline([{ title: '甲' }], { durationsInMinutes: { 甲: 90 } });
     expect(plan.entries[0]?.durationMinutes).toBe(90);
     expect(plan.totalMinutes).toBe(90);
-    expect(plan.entries[0]?.durationSource).toBe('provided');
+    expect(plan.entries[0]?.durationSource).toBe('manual');
   });
 
   it('🔴 90 分钟与 30 分钟的比例是 3:1（甘特图宽度的根据）', () => {
@@ -201,11 +201,11 @@ describe('buildTimeline —— 无显式依赖时退回清单顺序', () => {
     expect(plan.entries.map((e) => e.startOffsetMinutes)).toEqual([0, 60, 120]);
   });
 
-  it('🔴 非法工期（NaN / 0 / 负数）一律退回默认值，而不是传播 NaN', () => {
+  it('🔴 非法工期（NaN / Infinity / 负数）一律退回默认值，而不是传播 NaN', () => {
     const plan = buildTimeline(items, {
       durationsInMinutes: new Map([
         ['甲', Number.NaN],
-        ['乙', 0],
+        ['乙', Number.POSITIVE_INFINITY],
         ['丙', -3],
       ]),
     });
@@ -217,16 +217,36 @@ describe('buildTimeline —— 无显式依赖时退回清单顺序', () => {
     expect(plan.unestimatedCount).toBe(3);
   });
 
+  it('🔴 0 分钟是"估过"，不是"没估过"：夹到下限，但**不说成未估时**', () => {
+    // `readDurationFromNote` 刻意区分 `undefined` 与 `0`（见 duration-note.ts）。
+    // 0 分钟的条在图上没有宽度 → 夹到下限 5 分钟；但它仍然是"估过的"。
+    const plan = buildTimeline([{ title: '甲' }], { durationsInMinutes: { 甲: 0 } });
+    expect(plan.entries[0]?.durationSource).toBe('manual');
+    expect(plan.entries[0]?.durationMinutes).toBe(MIN_DURATION_MINUTES);
+    expect(plan.unestimatedCount).toBe(0);
+  });
+
+  it('🔴 `durationOrigin` 决定来源标签：ai 与 manual 分得开', () => {
+    const asAi = buildTimeline([{ title: '甲' }], {
+      durationsInMinutes: { 甲: 90 },
+      durationOrigin: 'ai',
+    });
+    expect(asAi.entries[0]?.durationSource).toBe('ai');
+    // 默认是更保守的一侧：来源不明的数字**不**说成"AI 估的"
+    const asManual = buildTimeline([{ title: '甲' }], { durationsInMinutes: { 甲: 90 } });
+    expect(asManual.entries[0]?.durationSource).toBe('manual');
+  });
+
   it('🔴 超大工期被夹到上限（不是原样传播）', () => {
     const plan = buildTimeline([{ title: '甲' }], { durationsInMinutes: { 甲: 99_999 } });
     expect(plan.entries[0]?.durationMinutes).toBe(MAX_DURATION_MINUTES);
-    expect(plan.entries[0]?.durationSource).toBe('provided');
+    expect(plan.entries[0]?.durationSource).toBe('manual');
   });
 
   it('🔴 过小工期被抬到下限（2 分钟 → 5 分钟）', () => {
     const plan = buildTimeline([{ title: '甲' }], { durationsInMinutes: { 甲: 2 } });
     expect(plan.entries[0]?.durationMinutes).toBe(MIN_DURATION_MINUTES);
-    expect(plan.entries[0]?.durationSource).toBe('provided');
+    expect(plan.entries[0]?.durationSource).toBe('manual');
   });
 
   it('普通对象与 Map 两种映射都支持', () => {

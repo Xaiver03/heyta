@@ -118,11 +118,15 @@ export interface TimelineEntry {
   /** 真正被采纳的前置条目（不存在的/自引用的/成环的**已被丢弃**）。 */
   dependsOn?: string;
   /**
-   * 这个工期是**给的**还是**退回默认值**的。
+   * 这个工期是**哪来的**。
    *
-   * 🔴 界面必须据此显示「未估时」—— 否则用户会把默认值当成真实估计。
+   * 🔴 界面必须据此区分三种情况 —— 否则用户会把默认值当成真实估计：
+   *
+   *   - `'ai'`      → 来自 AI 估时（`readDurationFromNote` 读回的那一行），界面说「AI 估时」
+   *   - `'manual'`  → 调用方直接给的（用户手填 / 测试桩），界面说「约 N 分钟」
+   *   - `'default'` → 谁都没给，按默认值排，界面**必须**说「未估时（按 1 小时排）」
    */
-  durationSource: 'provided' | 'default';
+  durationSource: 'ai' | 'manual' | 'default';
 }
 
 /** 一份排好的计划。 */
@@ -157,6 +161,16 @@ export interface BuildTimelineOptions {
    * 所以从 AI 估时接线时**直接传即可，不要乘 1440 也不要除 480**。
    */
   durationsInMinutes?: TimelineDurations;
+  /**
+   * 这份映射是**谁给的**，会原样落到每条 `TimelineEntry.durationSource`。
+   *
+   * - `'ai'`（时间线视图走的就是这条）→ 界面能说出「AI 估时」
+   * - `'manual'`（默认）→ 调用方自己给的数，界面不说成 AI
+   *
+   * 🔴 默认 `'manual'` 而不是 `'ai'`：**参数默认值指向更保守的一侧** ——
+   * 把来源不明的数字说成"AI 估的"是一种虚构，反过来只是少说一句话。
+   */
+  durationOrigin?: 'ai' | 'manual';
   /** 覆盖默认工期（**分钟**）。非法值忽略（退回 `DEFAULT_DURATION_MINUTES`）。 */
   defaultDurationMinutes?: number;
 }
@@ -287,15 +301,25 @@ function clampDuration(minutes: number): number {
   return Math.min(MAX_DURATION_MINUTES, Math.max(MIN_DURATION_MINUTES, Math.round(minutes)));
 }
 
-/** 解析一条条目的工期：能用就用，不能用就退回默认值并**标记来源**。 */
+/**
+ * 解析一条条目的工期：能用就用，不能用就退回默认值并**标记来源**。
+ *
+ * 🔴 判据是 `raw >= 0`，**不是 `raw > 0`** —— `0` 是"估了 0 分钟"，
+ * 与"没估过"（`undefined`）是两件事（见 `duration-note.ts` 的同名注释）。
+ * 0 会被 `clampDuration` 夹到下限（0 分钟的条在图上没有宽度），
+ * 但它**仍然是"估过"的**，界面不会把它说成「未估时」。
+ *
+ * 负数是模型/上游搞错了语义 → 一律当"没有"（fail closed），不夹住。
+ */
 function resolveDuration(
   title: string,
   durationsInMinutes: TimelineDurations | undefined,
   defaultMinutes: number,
-): { minutes: number; source: 'provided' | 'default' } {
+  origin: 'ai' | 'manual',
+): { minutes: number; source: 'ai' | 'manual' | 'default' } {
   const raw = lookupDuration(durationsInMinutes, title);
-  if (typeof raw === 'number' && Number.isFinite(raw) && raw > 0) {
-    return { minutes: clampDuration(raw), source: 'provided' };
+  if (typeof raw === 'number' && Number.isFinite(raw) && raw >= 0) {
+    return { minutes: clampDuration(raw), source: origin };
   }
   return { minutes: defaultMinutes, source: 'default' };
 }
@@ -464,7 +488,7 @@ export function buildTimeline(
 
   const start = new Array<number>(kept.length).fill(0);
   const duration = new Array<number>(kept.length).fill(defaultDuration);
-  const source = new Array<'provided' | 'default'>(kept.length).fill('default');
+  const source = new Array<'ai' | 'manual' | 'default'>(kept.length).fill('default');
   let unestimatedCount = 0;
 
   for (const i of order) {
@@ -472,6 +496,7 @@ export function buildTimeline(
       kept[i]?.title ?? '',
       options.durationsInMinutes,
       defaultDuration,
+      options.durationOrigin ?? 'manual',
     );
     duration[i] = resolved.minutes;
     source[i] = resolved.source;

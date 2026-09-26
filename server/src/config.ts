@@ -118,6 +118,24 @@ export interface ServerConfig {
    */
   dataRegion?: string;
   /**
+   * 付费权益闸门（**默认关**）。
+   *
+   * 🔴 这是本仓库**唯一**允许推断"这是官方托管实例"的地方，而它不推断 ——
+   * 它要求运营者用 `ENTITLEMENT_GATE_ENABLED=true` **显式**开启。
+   *
+   * 为什么必须显式：代码里没有任何"官方实例 vs 自托管"的程序化标志，
+   * 而 heyta 的立身之本就是**自托管免费**（`docs/plans/subscription-boundary.md` §1）。
+   * 任何靠现成信号（域名、CORS 默认值、是否有法律文本）去猜"官方实例"的写法，
+   * 都会在自托管者身上误伤。默认关 = 自托管默认**全放行**，一次数据库都不查。
+   *
+   * 上游自己也承认这件事：`sync/services/storage-quota.service.ts` 的注释写着
+   * "A self-hoster running this on their own disk has no reason to inherit our
+   * hosted service's 100 MB budget."
+   */
+  entitlements: {
+    enabled: boolean;
+  };
+  /**
    * Test mode configuration. When enabled, provides endpoints for E2E testing.
    * NEVER enable in production!
    */
@@ -149,6 +167,10 @@ const DEFAULT_CONFIG: ServerConfig = {
   cors: {
     enabled: true,
     allowedOrigins: DEFAULT_CORS_ORIGINS,
+  },
+  // 🔴 默认关：自托管默认全放行。只有官方托管实例才该用 env 打开它。
+  entitlements: {
+    enabled: false,
   },
 };
 
@@ -375,6 +397,25 @@ export const loadConfigFromEnv = (
   }
 
   config.dataRegion = process.env.PRIVACY_DATA_REGION?.trim() || undefined;
+
+  // 付费权益闸门（默认关）。
+  //
+  // 🔴 这个开关只有**官方托管实例**才该打开：它是 heyta 收"托管同步服务"费用的
+  // 唯一入口（见 docs/plans/subscription-boundary.md）。自托管**不要开** ——
+  // 开了会让自己的用户因为"没有订阅"而被拒，而自托管免费是本项目的承诺。
+  //
+  // 取值严格：只接受 'true' / 'false'。写错（例如 '1' / 'yes'）在这里**报错**，
+  // 而不是静默落到"关" —— 一个静默失效的收费闸门比没有闸门更危险。
+  if (process.env.ENTITLEMENT_GATE_ENABLED !== undefined) {
+    const rawEntitlementGate = process.env.ENTITLEMENT_GATE_ENABLED.trim().toLowerCase();
+    if (rawEntitlementGate !== 'true' && rawEntitlementGate !== 'false') {
+      throw new Error(
+        `Invalid ENTITLEMENT_GATE_ENABLED: ${process.env.ENTITLEMENT_GATE_ENABLED}. ` +
+          `Use 'true' or 'false'.`,
+      );
+    }
+    config.entitlements = { enabled: rawEntitlementGate === 'true' };
+  }
 
   // Test mode configuration
   // Requires both TEST_MODE=true AND TEST_MODE_CONFIRM=yes-i-understand-the-risks
