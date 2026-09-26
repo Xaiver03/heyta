@@ -61,7 +61,7 @@ ADR-0006 不是"如果做的话要小心"，而是"做的时候必须这样标�
 | 1 | **服务本体** | 工程量 | 还没有任何云端 AI 服务可指 |
 | 2 | 🔴 **数据保留策略** | **产品/法务** | ADR-0006 §5：未定案就不开放。`describeRetention('heyta-cloud')` 现在返回 `undefined`，披露里会显示"未定案" |
 | 3 | **计费与计量** | 产品 + 工程 | "按此收费"要求服务端能计量；这又要求记录用量，而**用量记录本身就是一种数据保留** —— 与第 2 条是同一件事的两面 |
-| 4 | **Harness 集成的边界** | 架构 | 见 §6（我需要先确认"Harness"具体指什么） |
+| 4 | **Harness 集成的边界** | 架构 | ⚠️ 部分澄清（§6）；三个硬约束见 §6.4，其中"Pi 只跑 Node"直接决定 Web/移动端方案 |
 | 5 | **"哪些任务允许上云"的粒度** | 产品 | 全库上云 vs 逐条选择，对 E2EE 产品的用户是完全不同的承诺 |
 
 ### 4.1 为什么第 2 条和第 3 条是同一件事
@@ -83,17 +83,102 @@ ADR-0006 不是"如果做的话要小心"，而是"做的时候必须这样标�
 改成：**"即将提供"**，并明说它的性质（内容会到 heyta 服务器、不是端到端加密），
 而不是说"我们不做"。
 
-## 6. 未决：需要产品负责人澄清的一点
+## 6. 「Harness」与 Pi：已澄清，并定下集成方向
 
-「在软件当中集成一下 **Harness**」里的 Harness，我需要确认指的是哪一个：
+我最初把 Harness 猜成了 **Harness.io**（一家 DevOps/SDLC 平台）——**猜错了**。
+产品负责人要我直接去搜。搜完的结论：
 
-- **A. DeepSeek Harness（本机这个 agent 运行时）** —— 那么它的运行位置决定了
-  数据路径：跑在用户设备上 vs 跑在 heyta 云端，是两套完全不同的隐私承诺。
-- **B. 某个自研的 agent/编排框架** —— 那么它是一个新的依赖，要过两道门
-  （可维护性 + 许可证，见 `AGENTS.md` §3.1–3.2），并登记。
+### 6.1 Harness 是什么
 
-⚠️ 我**不猜**这一点：选错会让整个托管 AI 的数据路径设计跑偏，
-而这正是本 ADR 最核心的那条线（§3）。
+**Harness = 把大模型变成智能体的那一层"身体"。**
+
+行业里现在的说法是「**一个工程化智能体 = 大模型 + Harness**」：
+
+> 大模型提供推理的"大脑"，Harness 提供**执行、记忆与安全保障**的"身体"。
+
+另一种常见比喻是「**模型是 CPU，Harness 是操作系统** —— CPU 再强，OS 拉胯也白搭」。
+它被称作继 Prompt Engineering、Context Engineering 之后的**第三次重心迁移**。
+（`zhuanlan.zhihu.com/p/2014014859164026634`、`yeasy.gitbook.io/harness_engineering_guide`）
+
+所以 Harness 不是一个产品名，是一个**层次概念**。
+
+### 6.2 Pi 是它的一个具体实现
+
+[`earendil-works/pi`](https://github.com/earendil-works/pi) —— **Pi Agent Harness**，
+自称 "a minimal agent harness"，且**有专门的 SDK 用于把 Pi 嵌入别的应用**
+（"可用于将 Pi 嵌入其他应用、构建自定义界面，或集成到自动化工作流中"）。
+
+三个和 heyta 直接相关的包：
+
+| 包 | 作用 |
+|---|---|
+| `@earendil-works/pi-ai` | **统一的多供应商 LLM API**（OpenAI / Anthropic / Google…） |
+| `@earendil-works/pi-agent-core` | **带工具调用与状态管理的 agent 运行时** |
+| `@earendil-works/pi-coding-agent` | 交互式编码 agent CLI |
+
+**依赖门证据**（`AGENTS.md` §3.1–3.2）：
+
+| 门 | 证据 | 结论 |
+|---|---|---|
+| 许可证 | MIT（仓库与三个 npm 包一致） | ✅ 白名单内 |
+| 可维护性 | 109,401 stars；最近推送 **2026-09-25**（前一天）；2025-08 创建；未归档 | ✅ 活跃 |
+| ⚠️ 版本 | **0.87.1** —— 未到 1.0 | ⚠️ API 可能变动 |
+| ⚠️ 治理 | README 明写"新贡献者的 issue/PR **默认自动关闭**" | ⚠️ 上游响应可能慢 |
+
+### 6.3 🔴 决策：内嵌 Pi，云端供 API
+
+产品负责人的原话是「直接内嵌一个 pi agent 我觉得差不多」。
+所以定了：
+
+- **云端**：heyta 提供统一 AI API（MaaS）+ 订阅计费
+- **客户端**：内嵌 Pi 作为 harness，用户**无需自己配置**就有 AI 功能
+- 用户自备端点（`own`）仍然保留 —— 这正是 `packages/ai` 已经支持的双供给模式
+
+### 6.4 🔴 三个必须先解决的问题（不是顾虑，是硬约束）
+
+#### (1) **Pi 只能跑在 Node 上 —— 覆盖不了 Web 和移动端**
+
+三个包的 `engines` 都是 **`node >=22.19.0`**。而 heyta 的客户端是：
+
+| 壳 | 运行时 | 能内嵌 Pi 吗 |
+|---|---|---|
+| `apps/node-host` | Node | ✅ 可以 |
+| `apps/web` | 浏览器 | ❌ 没有 Node |
+| `apps/mobile` | Hermes | ❌ 没有 Node，且 **Hermes 无 WebAssembly**（已是硬约束） |
+
+> **"内嵌 Pi" 目前只对桌面壳成立。**
+> Web 与移动端要么走"远端 harness"，要么另找方案 —— 这必须现在就想清楚，
+> 否则会做成"桌面上有 AI，手机上什么都没有"。
+
+#### (2) 🔴 **Pi 没有内建权限系统** —— 对 heyta 是最高风险项
+
+Pi 的 README 原文：
+
+> Pi does not include a built-in permission system for restricting
+> filesystem, process, network, or credential access. By default, it runs
+> with the permissions of the user and process that launched it.
+
+heyta 是一个**以隐私为立身之本**的产品，把"以用户全权限运行、没有权限边界"
+的东西嵌进来，与产品的核心承诺是**直接冲突**的。
+
+> **权限边界必须由 heyta 提供**，不能指望上游。
+> 这与 ADR-0011 里本机 API 的设计是同一条线：
+> 默认关、显式授权、写入只能经既定路径。
+
+#### (3) ⚠️ `pi-ai` 与 heyta 的 `packages/ai` 有重叠
+
+`pi-ai` 是"统一的多供应商 LLM API"；heyta 的 `packages/ai` 也是多供应商路由。
+两者**层次不同但会撞车**：
+
+- `packages/ai` 管的是**策略**：能不能发、发给谁、要不要授权、熔断了没有、密钥在哪
+- `pi-ai` 管的是**传输**：把一次请求按各家格式发出去
+
+我的判断是**保留 `packages/ai` 做策略层，让 Pi 只做 agent 循环**，
+把 heyta 的端点和授权结果**注入**给 Pi，而不是让 Pi 自己去读配置。
+否则两条路由并行，就又回到我前几轮反复修的那个 bug 类
+（**同一份业务语义有两处实现，必然漂移**）。
+
+⚠️ 这条是**我的建议，尚未验证**。真正的接缝要等做 PoC 才能定。
 
 ## 7. 后果
 
