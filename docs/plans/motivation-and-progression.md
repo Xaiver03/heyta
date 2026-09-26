@@ -2,7 +2,10 @@
 
 > 状态：**L1 / L2 / L3 三层已实现**（分支 `feat/motivation-system`，见 §8.1 的落地对照）。
 > **未做**：Prompt 层（提示时机）、§3.4 新习惯"启动期"。
-> 🔴 **尚未合并到 `main`**：等 3 条前置门打开，程序见 **§12（可机械重放）**。
+> ✅ **本分支已合并 main**（merge commit `0560e82`，3 处冲突全部手工取并集，见 §12.2）；
+> 界面文案**已全部迁进词条表**（`apps/web/src` 现在是"已迁移"，门禁要求）。
+> 🔴 **尚未落到 `main`**：主检出工作树仍有 200+ 未提交文件（前置门③未开），
+> 且 `main` 自己现在是红的 —— **不是本分支引入的**，证据与归属见 §12.4。
 > §10 的 5 项开放问题**已附建议**，等拍板。
 > 心理学证据：[`../research/motivation-psychology.md`](../research/motivation-psychology.md)
 > 竞品机制事实：[`../research/competitor-incentive-teardown.md`](../research/competitor-incentive-teardown.md)
@@ -486,6 +489,11 @@ heyta 的里程碑采用**累计制**（不要求连续）：
 它已经提交了引用 `@heyta/i18n`（未跟踪）与 `openSettings`（未实现）的代码。
 合并只会把这个红尖端搬进本分支。
 
+**本轮实测（合并日）**：① 已开（`f57f248` 把 `packages/i18n` 提交进了 git）；
+② 已开（main 的 sync store 有 `openSettings` / `settingsOpen`）；③ **仍未开**。
+🔴 **但 ①② 打开并没有让 main 变绿** —— 它换了一条断裂继续红（消费者已提交、生产者还在
+工作树里），见 §12.4。**"前置门打开"与"main 是绿的"是两件事，不要混为一谈。**
+
 实测证据（并集解完唯一冲突后，`apps/web` 的 typecheck 剩 **9 条错，全部**落在门①②）：
 
 ```
@@ -520,42 +528,108 @@ subscription-notice.spec.tsx(190,87)  TS2345 ...
    ```bash
    cd .worktrees/motivation && git merge --no-edit main
    ```
-3. **唯一真冲突点：`apps/web/src/App.tsx`。**
-   main 在 `<div className="ht-content">` 内插入了 `<SubscriptionNotice />`，
-   本分支在**同一处**插入了
-   `{view !== 'settings' && view !== 'growth' && <TodayProgressCard />}`。
-   **解法 = 并集：两段都保留**（顺序：先 `TodayProgressCard` 判断式，再 `SubscriptionNotice`），
-   删掉 `<<<<<<<` / `=======` / `>>>>>>>` 三行，**留下 0 个冲突标记**。
-   **两侧的注释块都要留** —— 它们分别解释了"为什么它常驻四个视图"和"降级的是什么"，
+3. **冲突点：3 个文件**（**不是**最初探测到的 1 个 —— main 在这期间推进了 5 个提交，
+   其中 `f57f248` 把整个 web 壳迁到了词条表，正好压在 `App.tsx` 与 `HabitsView.tsx` 上）：
+
+   ```
+   apps/web/src/App.tsx
+   apps/web/src/features/habits/HabitsView.tsx
+   docs/README.md
+   ```
+
+   复现（对落地前的尖端 `ee20ddd` 与当时的 main 都成立，**退出码 0 但列出这 3 个文件**）：
+
+   ```bash
+   git merge-tree --write-tree --name-only main ee20ddd
+   ```
+
+   - **`App.tsx`**：main 把导航标签改成 `labelKey` + `t()`（`VIEW_TABS` 从内联数组
+     变成带 `labelKey` 的常量），本分支在**同一段**插入了 `growth` 项。
+     **解法 = 并集**：`VIEW_TABS` 保留 `labelKey` 形状（`growth` 也走词条，
+     新增 `web.shell.views.growth`）；tablist 用 `VIEW_TABS.map(...)`；
+     `title` 的 `useMemo` 保留 main 的 `t(tab.labelKey)`；
+     进度卡与 `<SubscriptionNotice />` 共存（进度卡在前）。
+   - **`HabitsView.tsx`**：本分支换了热力图写法（`heatmapTheme()`），
+     main 把指标区文案 i18n 化。**解法 = 并集**：保留新写法并**删掉**随 main 进来的
+     `cssVarName` 导入（否则是未使用导入）；指标区保住三指标 DOM，文案走 `t()`。
+   - **`docs/README.md`**：0014 / 0015 与 main 的 0017 并集。
+
+   ⚠️ **两侧的注释块都要留** —— 它们分别解释了"为什么它常驻四个视图"和"降级的是什么"，
    删掉任何一段都是把理由丢了。
-   已验证：冲突集**在 main 推进到 `f41c435` 之后仍然只有这一个文件**
-   （`git merge-tree --write-tree --name-only main HEAD`，退出码 1、只列 `App.tsx`）。
-   ✅ **又对 `3090eb7` 重探过一次，结论不变**（main 两次前进都没有碰这个交叉点）——
-   也就是说下面这套程序不是"写了一次的文档"，而是**可复现的**。
-4. `packages/domain/src/index.ts`、`docs/README.md` 是**可加性**改动（各自都是新增行）→
-   自动合并，**不要手动改**。
+
+   🔴 **合并期间 `git commit` 提交的是**索引**，不是工作树。**
+   git 自动合并过的文件**在合并开始时就已被暂存**（内容是合并结果）；
+   之后再编辑它们**必须重新 `git add`**，否则那些改动**不在提交里，也不会报错** ——
+   本次就发生过一次（词条迁移整批漏提交，`git status` 里安静地躺着 10 个 ` M`，
+   而合并提交看起来"成功"）。收尾前先看 `git status --porcelain` 是不是空的。
+
+   🔴 **词条表改了也必须重新 build `@heyta/i18n`。** `apps/web` 从**构建产物**解析词条，
+   vitest 不会读 `src`。忘了这一步的症状与"词条真的没加"**逐字相同**：
+   `Error: [@heyta/i18n] 词条不存在：zh-CN / web.shell.views.growth`，
+   而 `src` 里那条明明在。**先 `pnpm --filter @heyta/i18n build` 再判定红绿。**
+   （§12.1 的"陈旧 `dist` 造出假 TS 错误"是同一件事的类型版本。）
+4. `packages/domain/src/index.ts` 是**可加性**改动（新增行）→ 自动合并，**不要手动改**。
+   ⚠️ `docs/README.md` **会冲突**（两边都往文档索引里加行）—— 按并集处理，
+   沿 HEAD 的既有顺序追加，**不要重排**（顺序本来就不是单调的，重排等于制造无意义 diff）。
 5. 🔴 **先构建，再检查**（见 12.1 的误判警告）：
    ```bash
    pnpm -r --filter '!@heyta/sync-server' build
    ```
-6. 全套验证（每一层都要能真的失败）：
+6. 全套验证（每一层都要能真的失败）。
+   **下表右边是 2026-09-28 合并这一轮实测到的结果**（不是"应该是什么"）：
 
-   | 层 | 命令 | 期望 |
-   |---|---|---|
-   | 类型 | `pnpm -r typecheck` | 0 error |
-   | 构建 | `pnpm -r --filter '!@heyta/sync-server' build` | 退出码 0 |
-   | 全仓测试 | `pnpm -r --filter '!@heyta/sync-server' test` | 2592 通过 / 12 跳过 |
-   | 域 | `pnpm --filter @heyta/domain test` | 393 通过 |
-   | 激励（渲染层） | `pnpm --filter @heyta/web exec vitest run tests/motivation.spec.ts tests/motivation-view.spec.tsx` | 23 通过（12 + 11） |
-   | 门禁 | docs-link-check / check-ui-language / check-hardcoded / check-layering | 全绿 |
-   | 真浏览器 | `cd e2e && pnpm exec playwright test tests/motivation.spec.ts` | 6 通过 |
-   | 真浏览器（全量） | `pnpm check:ai-e2e` | 全绿 |
+   | 层 | 命令 | 期望 | 本轮实测 |
+   |---|---|---|---|
+   | 类型 | `pnpm -r typecheck` | 0 error | ⚠️ **红**，全部落在 §12.5 的 3 个包；**本分支改动的文件 0 条** |
+   | 构建 | `pnpm -r --filter '!@heyta/sync-server' build` | 退出码 0 | ⚠️ 同上（`apps/web` 红、`apps/mobile` 红） |
+   | 全仓测试 | `pnpm -r --filter '!@heyta/sync-server' test` | 全绿 | ⚠️ 只剩 `apps/mobile/tests/conflict-view.spec.ts` 15 条红（§12.5） |
+   | 域 | `pnpm --filter @heyta/domain test` | 全绿 | ✅ **438 通过** |
+   | 激励（渲染层） | `pnpm --filter @heyta/web exec vitest run tests/motivation-view.spec.tsx tests/motivation.spec.ts tests/plural-keys.spec.tsx` | 23 通过 | ✅ **35 通过（11 + 12 + 12）** |
+   | `apps/web` 全量 | `pnpm --filter @heyta/web test` | 全绿 | ⚠️ 32 红 / 469 通过 —— **32 条全在 main 的文件里**（§12.5） |
+   | 门禁（10 道） | `migrations` / `layering` / `ui-language` / `licenses` / `docs` / `design` / `tokens` / `arkts` / `native-deps` / `ai-coverage` | 全绿 | ✅ **10/10 全绿**（文案：zh 970 / en 970） |
+   | 真浏览器 | `cd e2e && pnpm exec playwright test tests/motivation.spec.ts` | 6 通过 | 🔴 **6 条全红 —— 但红在 §12.5 的同一条断裂上，不是本分支的界面问题**（见下） |
+   | 真浏览器（全量） | `pnpm check:ai-e2e` | 全绿 | ⛔ 同上，被同一条断裂挡住，**本轮未跑** |
 
    ⚠️ **真浏览器用的是仓库既有的 Playwright 验收**（`e2e/`，`@playwright/test 1.63.0`，
    **刻意留在根 pnpm 工作区之外**，理由见 `e2e/pnpm-workspace.yaml` 的头注释）。
    🔴 **不要为这件事另写一套 `scripts/verify-*.mjs`** —— 我一开始正是那么做的，
    而下场就是"两套并行定义"（本仓库已经把这种形状的代价写过好几遍）。
    依赖没装时先 `cd e2e && pnpm install`（它自己一份 lockfile，与本分支无关）。
+
+   🔴 **那 6 条为什么红：白屏，而白屏有确切的现场证据。** 6 条全部倒在
+   `helpers.ts` 的 `openApp`（等 `input[placeholder^="添加任务"]` 出现）——
+   截出来是**一张纯白图**（`test-results/.../test-failed-1.png`）。
+   起一个 dev server 用真 Chromium 打开，第一条 pageerror 就是：
+
+   ```
+   PAGEERROR: The requested module '…/packages/sync-client/dist/index.js'
+              does not provide an export named 'summarizeConflictPayload'
+   ```
+
+   复现（**复核这条不要靠猜**）：
+
+   ```bash
+   pnpm --filter @heyta/web exec vite --host 127.0.0.1 --port 4399 --strictPort   # 另开一个终端
+   # 然后用 playwright-core 打开 http://127.0.0.1:4399/ ，收集 pageerror
+   ```
+
+   ⚠️ **必须 `--host 127.0.0.1`**：vite 默认绑 `localhost`，macOS 上常先解析到 `::1`，
+   于是"服务起来了"但 `127.0.0.1` 是 `ERR_CONNECTION_REFUSED` —— 与
+   `e2e/playwright.config.ts` 里那条注释同因（那边也钉了 `--host 127.0.0.1`）。
+   ⚠️ `apps/web` 的 import 图从 `main.tsx` 走到 `ConflictDialog.tsx`，
+   所以 `@heyta/sync-client` 少一个导出就足以让**整个应用挂不上** ——
+   这正是 §12.5 那张表第一行与第二行的连带后果。
+
+   🔴 **不要为了让它变绿去补一个假的 `summarizeConflictPayload` / `StorageError`**：
+   那两件东西是别人**正在写的功能**（`StorageError.failure.kind` 决定错误屏措辞、
+   冲突摘要决定对话框里显示什么），补一个空壳得到的绿**测的是空壳**。
+   这条断裂的正确处置方是它的作者（§12.5），本分支**只记录、不代写**。
+
+   ✅ **今天能验的那一层已经验了**：`motivation-view.spec.tsx` 的 11 条
+   在 jsdom 里覆盖了同一批契约（进度卡、成长页四区块、热力图格子、
+   日历中文文案、主题色可解析、剪贴板成功与失败、三个指标、不出现冻结余额），
+   11/11 绿；真浏览器这一层补的是"真 `CSS.supports` / 真剪贴板"，
+   **等 §12.5 收口后重跑即可**，本分支没有欠账。
 
    本分支新增的 `e2e/tests/motivation.spec.ts` 验 **6 条设计契约**：
    7 个标签逐字一致 / 5 个视图标题 === 标签 / **进度卡常驻做事视图且不在设置页与成长页** /
@@ -571,22 +645,36 @@ subscription-notice.spec.tsx(190,87)  TS2345 ...
    🔴 **登记之时不许用 `includes('404')` 过滤** —— 那会把将来真正坏掉的资源一起藏掉；
    要按**具体路径**断言。（这条踩过：自检脚本 v1 就是这么写的，已改。）
 
-   ⚠️ 本分支的测试数会**随 main 一起涨**（main 的订阅测试也在里面），
-   所以上表的 2592 是**本分支自己的基线**；合并后应当 ≥ 它，**不是等于它**。
-7. 落地到 main：**必须等门③**（主检出干净）之后，在**主检出**里
+   ⚠️ 测试数会**随 main 一起涨**（main 的订阅 / AI 记忆测试也在里面），
+   所以上表的数字是**这一轮实测的快照**，不是长期契约 —— 判据是"本分支的文件 0 红"。
+7. 落地到 main：**必须等门③**（主检出干净）**且 §12.5 那条断裂已由它的作者收口**之后，
+   在**主检出**里
    ```bash
    git merge --no-edit feat/motivation-system
    ```
    因为步骤 2 之后本分支已包含 main，这一步通常是**快进**。
+   ⚠️ **主检出脏的时候连快进都做不了**：本次实测 —— `AGENTS.md`、`docs/README.md`、
+   `packages/domain/src/index.ts` 三处**同时**被主检出的未提交改动与本次合并改动覆盖，
+   git 会拒绝（"local changes would be overwritten"）。这正是门③存在的**可运行**理由，
+   不是一句谨慎的废话。
    ⚠️ **不要在主检出脏的时候去更新 `main` ref**（`git push . …:main` 这类）：
    主检出手上有 200+ 个未提交文件，ref 一动，工作树与 HEAD 的关系就说不清了 ——
    而那时**没有任何工具能告诉你哪些改动静默丢了**。
+   ⚠️ **main 会继续前进**（本次合并期间它又推进了 1 个提交，到 `2d2d4dd`，只碰
+   `docs/README.md` / `server/**` / 若干脚本）。落地前重探一次冲突集即可：
+   ```bash
+   git merge-tree --write-tree --name-only main HEAD   # 只打树哈希 = 无冲突
+   ```
+   实测对 `2d2d4dd` 是**干净的**（`docs/README.md` 自动合并）。
+   需要再合一次时，重复步骤 2。
 8. 收尾：`git worktree remove .worktrees/motivation`（分支已合并，worktree 不再需要）。
 
 ### 12.3 回退
 
 - 步骤 2–6 期间任意一步失败：`git merge --abort`（尚未提交时），
-  或 `git reset --hard 808e851`。**落地前的尖端是 `808e851`。**
+  或 `git reset --hard 808e851`（**合并前**的尖端）。
+- **合并已提交之后的尖端是 `0560e82`**（merge commit，父提交 `ee20ddd` + `58e6b9d`）。
+  要回到"只剩本分支、没有 main"的状态：`git reset --hard ee20ddd`。
 - 步骤 7 之后要回退：在主检出 `git reset --hard <合并前的 main>` ——
   因为那一步是快进，合并前的 main 尖端就是它。
   ⚠️ **别的会话有未提交改动时不要做这件事。**
@@ -600,3 +688,38 @@ subscription-notice.spec.tsx(190,87)  TS2345 ...
 - **当场重测（2026-09-26，本轮）：`44 passed (44)`，全绿。**
 - 按仓库纪律「断言红了先证明谁错再决定删谁」：这里已经证明**两边都属于 main 的既有状态、
   且已被 main 自己修正**，所以本分支**一个字都不动它**。
+
+### 12.5 合并带进来的既有红灯：**消费者已提交、生产者还在工作树里**
+
+合并后 `apps/web` 与 `apps/mobile` 的 `build` / `typecheck` 是红的，`apps/web` 的测试也红一批。
+**这不是本分支引入的，本分支一个字都不修**（那是另一条轨道的在制品）。
+全部红灯落在**同一条断裂**上：main 已提交**消费者**，而**生产者至今未提交**。
+
+| 消费者（**已提交在 main**） | 缺的生产者（**main HEAD 里不存在**） | 提交 |
+|---|---|---|
+| `apps/web/src/features/shell/error-hint.ts`、`src/main.tsx`（`StorageError` / `StorageFailure`） | `packages/storage/src/errors.ts` | `f57f248` |
+| `apps/web/src/features/sync/{ConflictDialog,SyncBar,store,sync-failure-copy}.ts*`（`summarizeConflictPayload` / `SyncFailureReason` / `status.reason`） | `packages/sync-client/src/client.ts` 的改动 | `f57f248` |
+| `apps/web/src/features/tasks/store.ts`（`QuadrantDropPlan` / `setQuadrantDrop`） | `packages/domain/src/quadrant.ts`、`packages/app-host/src/actions.ts` | `f57f248` |
+| `apps/mobile/src/sync/*`、`screens/ProfileScreen.tsx`（同一个 `summarizeConflictPayload`，外加 `./ListsSection`） | 同上 + `apps/mobile/src/screens/ListsSection.tsx` | `27764c9` |
+
+**复现（证明它属于 main、不属于本分支）：**
+
+```bash
+git cat-file -e main:packages/storage/src/errors.ts                  # 退出码 128（不存在）
+git show main:packages/storage/src/index.ts        | grep -c StorageError       # 0
+git show main:packages/sync-client/src/client.ts   | grep -c SyncFailureReason  # 0
+git show main:packages/domain/src/index.ts         | grep -c QuadrantDropPlan    # 0
+git log --oneline -1 main -- apps/web/src/features/sync/store.ts     # f57f248
+```
+
+🔴 **本分支改动的文件一个都不在报错清单里。** 这是"归属"的判据，
+不是"看起来不像我"的直觉 —— 报错清单与 `git diff --name-only main...HEAD` 的交集是**空集**。
+
+**处置：不修。** 理由是仓库纪律「一个用户意图 = 一个 op」在提交侧的对应物：
+把别人的半成品拆开提交，正是**上面那条断裂的成因**（消费者先落地、生产者留在工作树），
+再动一次只会造出第二条。**落地前必须由那条轨道自己收口**（把生产者提交掉），
+否则 `main` 会从"能构建但红"变成"红得更复杂"。
+
+> ⚠️ 顺带一条更普遍的教训：**"前置门全开"不等于"main 是绿的"。**
+> §12.1 的三条门只覆盖了当时那一条断裂；断裂换一条形状（这次是"消费者 vs 生产者"），
+> 门还是全开。**判据要盯着"能不能构建/测试"，而不是盯着那几条具体的门。**

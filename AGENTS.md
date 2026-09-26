@@ -1025,18 +1025,28 @@ docker inspect <容器> --format '{{range .Config.Env}}{{println .}}{{end}}' | g
 
 总路线图：[`docs/plans/roadmap.md`](docs/plans/roadmap.md)
 
-### 并行轨道：激励与成长体系（**已实现，尚未落地**）
+### 并行轨道：激励与成长体系（**已实现、已并入 main 的分支，尚未落到 main**）
 
 分支 `feat/motivation-system`（worktree `.worktrees/motivation`）。L1 即时反馈 / L2 连续性 /
-L3 叙事三层**已实现并通过验证**（§6 那个 2592 含其中 23 条激励渲染层测试，
-外加 `e2e/tests/motivation.spec.ts` 的 6 条真浏览器契约）。
+L3 叙事三层**已实现**；渲染层 23 条 + 域 438 条测试全绿，
+外加 `e2e/tests/motivation.spec.ts` 的 6 条真浏览器契约。
 
-🔴 **但它还没进 `main`** —— 而且**不是**因为本分支有问题：`main` 目前**自己既 build 不了
-也 typecheck 不了**，因为它已经提交了引用**未跟踪**的 `packages/i18n` 与**未实现**的
-`createSyncClient().openSettings` 的代码（9 条 TS 错 + build 失败，全部落在这两处）。
-三条前置门与一份**可机械重放**的落地程序（含唯一冲突点 `App.tsx` 的并集解法、
-先构建再检查的理由、以及回退点）在
+✅ **已把 `main` 合进本分支**（merge commit `0560e82`，3 处冲突手工取并集；
+界面文案已整体迁进 `packages/i18n` 词条表 —— `apps/web/src` 现在是"已迁移"）。
+📄 落地程序、冲突解法、验证矩阵与回退点在
 [激励与成长体系设计](docs/plans/motivation-and-progression.md) **§12**。
+
+🔴 **但它还不能落到 `main`** —— 而且**不是**因为本分支有问题：
+
+1. 主检出工作树仍有 200+ 未提交文件（前置门③）；main 的未提交改动与本次合并改动
+   **在三个文件上重叠**，连快进都会被 git 拒绝。
+2. `main` 目前**自己 build / typecheck / test 都红**：`f57f248`（web 壳接入词条表）与
+   `27764c9`（移动端接入词条表）提交了**消费者**，而**生产者**至今没提交
+   （`packages/storage/src/errors.ts`、`packages/sync-client` 的 `SyncFailureReason` /
+   `summarizeConflictPayload`、`packages/domain/src/quadrant.ts`、`apps/mobile/.../ListsSection.tsx`）。
+   连带后果之一：`apps/web` 在真浏览器里**整个挂不上**（`main.tsx` 的 import 图撞上
+   `sync-client` 少一个导出），激励体系的 6 条 e2e 因此全红。
+   **归属判据、复现命令与处置见计划 §12.5** —— 本分支只记录，**不代写**那部分。
 
 设计红线：**不发行任何货币**（没有金币/积分/商店，也不卖"后悔"）、
 **只与自己的过去比**（排行榜/联赛/自习室/组队打 Boss 在 E2EE 下结构上不可能）、

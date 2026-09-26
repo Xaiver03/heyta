@@ -270,6 +270,7 @@ export const en = {
   'web.shell.views.habits': 'Habits',
   'web.shell.views.focus': 'Focus timer',
   'web.shell.views.timeline': 'Timeline',
+  'web.shell.views.growth': 'Growth',
   'web.shell.views.settings': 'Settings',
   'web.shell.dueMode.aria': 'Due date display',
   'web.shell.dueMode.date': 'Date',

@@ -291,6 +291,10 @@ export const zhCN = {
   'web.shell.views.habits': '习惯',
   'web.shell.views.focus': '番茄钟',
   'web.shell.views.timeline': '时间线',
+  // 成长页（激励体系 L3）。⚠️ 它必须在词条表里**真实存在**：
+  // `App.tsx` 的 `VIEW_TABS` 用 `labelKey` 渲染标签，而 `t()` 查不到词条是**抛错**，
+  // 不是回退 —— 少一条就是整个外壳白屏（真浏览器验收抓到过）。
+  'web.shell.views.growth': '成长',
   'web.shell.views.settings': '设置',
   'web.shell.dueMode.aria': '截止时间显示方式',
   'web.shell.dueMode.date': '日期',
