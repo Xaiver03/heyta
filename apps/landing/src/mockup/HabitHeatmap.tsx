@@ -1,0 +1,113 @@
+/**
+ * 真实界面复现：习惯热力图
+ * ==========================
+ *
+ * 复现对象：`apps/web/src/features/habits/HabitsView.tsx`（用 `react-activity-calendar` 画）。
+ *
+ * 🔴 这里**不引入那个库**，而是用纯 CSS Grid 画格子 ——
+ * 落地页只需要一个静态复现，为它装一个日历库是把依赖成本花在展示品上。
+ * 代价是：**真实视图的交互（点格子改记录）这里没有**，这是刻意的。
+ *
+ * 🔴 配色规则必须复现：**深浅即数值，不靠色相区分**（`color.heat-0..4`）。
+ * 用五种颜色表示五档强度对色盲用户是不可读的；单色阶的深浅才是。
+ */
+
+export interface Habit {
+  name: string;
+  streak: string;
+  /** 用来生成稳定图案的种子 —— 见 `levelFor`。 */
+  seed: number;
+  /** 基础完成密度，0..1。 */
+  density: number;
+}
+
+const HABITS: Habit[] = [
+  { name: '早起', streak: '连续 12 天', seed: 1, density: 0.82 },
+  { name: '阅读 30 分钟', streak: '连续 5 天', seed: 2, density: 0.61 },
+  { name: '跑步', streak: '连续 3 天', seed: 3, density: 0.38 },
+];
+
+const WEEKS = 26;
+
+/**
+ * 确定性的"假数据"。
+ *
+ * 🔴 **不能用 `Math.random()`**：热力图每次重渲染都会换一副图案，
+ * 而 React 严格模式会渲染两遍 —— 用户会看到它在闪。
+ * 而且同一张页面每次刷新都不一样，看起来像数据在乱跳。
+ *
+ * 用一个 sin 散列得到稳定的 0..1，再按密度的阈值映射到 0..4 档。
+ * 周末刻意压低，最近几周刻意抬高 —— 让它看起来像真的习惯曲线，
+ * 而不是均匀噪声。
+ *
+ * 导出是为了让测试能验证"确定性"这条不变量（见 `tests/determinism.spec.ts`）。
+ */
+export function levelFor(habit: Habit, week: number, day: number): 0 | 1 | 2 | 3 | 4 {
+  const noise = Math.sin(habit.seed * 7.13 + week * 12.9898 + day * 78.233) * 43758.5453;
+  const unit = noise - Math.floor(noise); // 0..1，稳定
+
+  const weekend = day === 5 || day === 6 ? 0.55 : 1;
+  const recency = 0.75 + (week / WEEKS) * 0.45; // 越近越密
+  const score = unit * weekend * recency;
+
+  // 🔴 阈值必须随密度**下降**，不能上升。
+  // 这里原本写的是 `threshold = habit.density`，于是密度 0.95 的习惯几乎全落
+  // 0 档、密度 0.1 的反而全落 4 档 —— 热力图整个是**反的**，
+  // 而且肉眼看不出是 bug（图案本身仍然"像"热力图）。
+  // 是 `tests/determinism.spec.ts` 里"密度高的习惯整体档位更高"这条抓出来的。
+  //
+  // 语义上密度 = 完成频率，所以密度越高、门槛越低。用 `1 − density` 当门槛，
+  // 并夹一个下限，避免 density = 1 时门槛归零让所有格子都满档。
+  const cutoff = Math.max(0.05, 1 - habit.density);
+  if (score > cutoff * 1.6) return 4;
+  if (score > cutoff * 1.2) return 3;
+  if (score > cutoff * 0.8) return 2;
+  if (score > cutoff * 0.4) return 1;
+  return 0;
+}
+
+function Heatmap({ habit }: { habit: Habit }): React.JSX.Element {
+  const weeks = Array.from({ length: WEEKS }, (_, w) => w);
+  const days = Array.from({ length: 7 }, (_, d) => d);
+
+  return (
+    <div className="mk-heat">
+      {weeks.map((week) =>
+        days.map((day) => {
+          const level = levelFor(habit, week, day);
+          return (
+            <span
+              key={`${String(week)}-${String(day)}`}
+              className={`mk-heat__cell${level > 0 ? ` mk-heat__cell--${String(level)}` : ''}`}
+            />
+          );
+        }),
+      )}
+    </div>
+  );
+}
+
+export function HabitHeatmap(): React.JSX.Element {
+  return (
+    <div className="mk-habits">
+      {HABITS.map((habit) => (
+        <section key={habit.name} className="mk-habit">
+          <div className="mk-habit__head">
+            <span className="mk-habit__name">{habit.name}</span>
+            <span className="mk-habit__streak">{habit.streak}</span>
+          </div>
+          <Heatmap habit={habit} />
+          <div className="mk-heat__legend">
+            <span>少</span>
+            <span className="mk-heat__cell" />
+            <span className="mk-heat__cell mk-heat__cell--1" />
+            <span className="mk-heat__cell mk-heat__cell--2" />
+            <span className="mk-heat__cell mk-heat__cell--3" />
+            <span className="mk-heat__cell mk-heat__cell--4" />
+            <span>多</span>
+          </div>
+        </section>
+      ))}
+    </div>
+  );
+}

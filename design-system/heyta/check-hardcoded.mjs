@@ -41,6 +41,9 @@ const verbose = process.argv.includes('--verbose');
 const SCAN_ROOTS = [
   { label: 'apps/web/src', path: join(ROOT, 'apps/web/src') },
   { label: 'apps/mobile/src', path: join(ROOT, 'apps/mobile/src') },
+  // 落地页是**面向公众的界面**，裸色值/裸间距在这里的代价比在产品内部更高：
+  // 它不受设计系统重构的保护，改一次 token 就会悄悄与产品界面脱节。
+  { label: 'apps/landing/src', path: join(ROOT, 'apps/landing/src') },
 ].filter((r) => {
   if (existsSync(r.path)) return true;
   if (verbose) console.log(`⏭  ${r.label} 尚不存在，跳过。`);

@@ -42,6 +42,7 @@ import { createTaskActions, type AppHost, type TaskActions } from '@heyta/app-ho
 import { useToday } from '../lib/use-today';
 
 import { openTaskHost } from '../db/open-host';
+import { useMobileSync } from '../sync/store';
 import { useTokens } from '../theme';
 import {
   Button,
@@ -175,6 +176,8 @@ export function CalendarScreen(): React.JSX.Element {
   // 🔴 "现在"由 `useToday` 提供：回到前台与跨过本地零点时会刷新。
   // 原来的 `useMemo(() => Date.now(), [])` 会让"今天"永远停在打开应用的那一天。
   const { now, today } = useToday();
+  // 同步完成 → `dataRevision` 变 → 上面的 effect 重读物化状态。
+  const { dataRevision } = useMobileSync();
 
   /** 正在显示的月份（用该月里任意一天表示）。 */
   const [cursor, setCursor] = useState<LocalDate>(() => startOfMonth(toLocalDate(Date.now())));
@@ -230,7 +233,9 @@ export function CalendarScreen(): React.JSX.Element {
     // 🔴 必须等 `recover()` 走完再读 —— openTaskHost 已经保证了这一点
     // （AGENTS.md §7 第 9 条）。
     refresh();
-  }, [host, refresh]);
+    // 🔴 `dataRevision`：同步完成后重读。少了它，日历屏会一直显示同步前的快照
+    // （本屏与任务屏是同一种毛病，见 `sync/store.ts` 的字段说明）。
+  }, [host, refresh, dataRevision]);
 
   /**
    * 按**本地日期**把任务分到各天。

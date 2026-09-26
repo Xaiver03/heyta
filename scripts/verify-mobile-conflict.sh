@@ -270,6 +270,106 @@ laptop_ok sync || bad "笔记本 sync 失败"
 LT=$(laptop_title_of "$LAPTOP_ID")
 if [ "$LT" = "$LAPTOP_TITLE" ]; then ok "笔记本侧值一致：$LT"; else bad "笔记本侧值不一致：'$LT'"; fi
 
+step "7b. 再造一次冲突，这次选「保留本机」—— 验证**另一个**解决动作"
+
+# 🔴 为什么必须补这一段：
+#    上面只验了「保留远端」。两个动作走的是**完全不同的代码路径**：
+#      · 保留远端 = 丢弃本地待上传项（但**不删 op**）
+#      · 保留本机 = **重新派发一个新 op**
+#    只验一个就说"冲突解决闭环通了"，等于把另一半留成未测代码 ——
+#    而它恰好是"重新派发"这种更容易写错的一侧（opId 要不要换？基线要不要更新？）。
+#
+# 造冲突的方式与第 2~5 步同构，但这次换一个字段（勾选状态），
+# 这样即使标题那条已经收敛，也能再造一次真并发。
+
+# 数服务端 op 数 —— 走 API 而不是 psql，免得依赖宿主机上 psql 在哪。
+# 用 `--noproxy '*'`：本机 shell 设了 HTTP_PROXY，走代理会连不上本机服务端。
+server_op_count() {
+  curl -s --noproxy '*' -m 15 -H "Authorization: Bearer $TOKEN" \
+    "$HOST_SERVER/api/sync/ops?sinceSeq=0&limit=500" \
+    | python3 -c "import json,sys; print(len(json.load(sys.stdin).get('ops') or []))" 2>/dev/null
+}
+
+# 1) 手机先同步到最新，作为干净起点
+$ADB shell input tap 945 2253; sleep 3
+dump; XY=$(xy_text "立即同步"); $ADB shell input tap $XY; sleep 10
+for i in $(seq 1 12); do sleep 4; dump; [ "$(has_sub "处冲突待你选择")" = "0" ] && break; done
+ok "手机已同步到最新（起点干净）"
+
+# 2) 笔记本再改一次标题并同步
+SECOND_TITLE="laptop-second-$TITLE"
+laptop_ok rename "$LAPTOP_ID" "$SECOND_TITLE" && ok "笔记本第二次改名" || bad "笔记本第二次 rename 失败"
+laptop_ok sync && ok "笔记本第二次 sync" || bad "笔记本第二次 sync 失败"
+
+# 3) 手机**在没下载到那条的前提下**再改一次（勾选状态）
+$ADB shell input tap 135 2253; sleep 3
+dump
+XY=$(scroll_to_desc "完成：$SECOND_TITLE")
+[ -z "$XY" ] && XY=$(scroll_to_desc "取消完成：$SECOND_TITLE")
+if [ -z "$XY" ]; then bad "找不到勾选框（第二次造并发）"; screen_txt; else
+  $ADB shell input tap $XY; sleep 3
+  ok "手机第二次本地改动（勾选状态，尚未同步）"
+fi
+
+# 4) 同步 → 应再次出现冲突
+$ADB shell input tap 945 2253; sleep 3
+dump; XY=$(xy_text "立即同步"); $ADB shell input tap $XY; sleep 8
+for i in $(seq 1 12); do sleep 4; dump; [ "$(has_sub "处冲突待你选择")" = "1" ] && break; done
+dump
+[ "$(has_sub "处冲突待你选择")" = "1" ] && ok "第二次检测到真冲突" || { bad "第二次没报冲突"; screen_txt; }
+
+# 5) 记下解决**之前**的服务端 op 数
+OPS_BEFORE=$(server_op_count)
+echo "     解决前服务端 op 数 = $OPS_BEFORE"
+
+# 6) 打开冲突界面，点**左边**那个（本机）
+XY=$(scroll_to_text "逐条处理")
+if [ -z "$XY" ]; then bad "点不到「逐条处理」（第二次）"; else
+  $ADB shell input tap $XY; sleep 4
+  dump
+  XY=$(xy_text "保留这一版" 0)   # 按 x 排序：第 0 个 = 本机
+  if [ -z "$XY" ]; then bad "取不到第一个「保留这一版」（本机侧）"; else
+    echo "     点击 (本机侧) $XY"
+    $ADB shell input tap $XY; sleep 12
+    ok "已点「保留这一版」（**本机**侧）"
+  fi
+fi
+
+step "8b. 断言：冲突消失，且**派发了新 op**（保留本机 = 重新派发）"
+for i in $(seq 1 15); do sleep 4; dump; [ "$(has_sub "处冲突待你选择")" = "0" ] && break; done
+dump
+[ "$(has_sub "处冲突待你选择")" = "0" ] && ok "第二次冲突已解决" || { bad "第二次冲突仍在"; screen_txt; }
+
+# 🔴 这是这一段**最核心**的断言。
+#    「保留本机」的语义是**重新派发一个新 op**，所以服务端 op 数必须**增加**。
+#    如果实现成了"只清掉冲突标记、不重发"，界面看起来完全正常（冲突没了），
+#    但另一台设备**永远收不到**这一版 —— 那正是这个断言要拦住的。
+OPS_AFTER=$(server_op_count)
+echo "     解决后服务端 op 数 = $OPS_AFTER"
+if [ -n "$OPS_BEFORE" ] && [ -n "$OPS_AFTER" ] && [ "$OPS_AFTER" -gt "$OPS_BEFORE" ]; then
+  ok "服务端 op 数增加（$OPS_BEFORE → $OPS_AFTER）—— 确实**重新派发**了新 op"
+else
+  bad "服务端 op 数没有增加（$OPS_BEFORE → $OPS_AFTER）——「保留本机」没有重新派发"
+fi
+
+step "9b. 断言：笔记本同步后收敛到手机那一版（另一侧也走通）"
+laptop_ok sync || bad "笔记本第三次 sync 失败"
+# 笔记本上这条任务的**勾选状态**应当跟手机一致。
+LT_STATE=$(laptop list --all | python3 -c "
+import json,sys
+try: d=json.load(sys.stdin)
+except Exception: print(''); raise SystemExit
+t=next((t for t in d.get('tasks',[]) if t['id']=='$LAPTOP_ID'), None)
+print('completed' if (t or {}).get('completedAt') else 'open')
+")
+echo "     笔记本侧勾选状态 = $LT_STATE"
+# 手机在第 3 步把它勾成了完成，且选了「保留本机」→ 笔记本应看到 completed。
+if [ "$LT_STATE" = "completed" ]; then
+  ok "笔记本收敛到手机那一版（completed）"
+else
+  bad "笔记本没收敛到手机那一版（读到 '$LT_STATE'）"
+fi
+
 step "10. 直接查 Postgres"
 psql -h 127.0.0.1 -p 5432 -U rocalight -d heyta_mobile_smoke -tAc \
   "SELECT (SELECT count(*) FROM operations) AS ops, (SELECT count(*) FROM sync_devices) AS devices" 2>/dev/null \
