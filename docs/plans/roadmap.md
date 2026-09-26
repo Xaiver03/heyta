@@ -4,6 +4,8 @@
 > 前置决策见 `docs/reference/architecture.md` §0；复用依据见 `docs/research/reuse-plan.md`。
 > P1 的详细计划见 `docs/plans/phase-1-single-client-loop.md`。
 > P2 的详细计划见 `docs/plans/phase-2-multi-platform.md`。
+> **AI 能力线与开发分支策略见 `docs/plans/ai-capability-branches.md`**（与 P2/P3 **并行**，不是下一个阶段）。
+> AI 的数据路径决策见 [ADR-0005](../adr/0005-ai-data-path.md)（**待确认**）。
 
 ---
 
@@ -26,6 +28,23 @@
 | **P1 单端闭环** | 1 个端（Web）跑通核心功能 | 任务/清单/四象限/习惯/番茄钟可用，能同步 | ✅ **已完成**（6 条零 mock E2E）→ [详细计划](phase-1-single-client-loop.md) |
 | **P2 多端补齐** | 桌面 + 移动 | 存储可替换（同一套契约跑遍所有实现）+ 原生端 SQLite，共享同一套核心 | 🔄 **进行中** → [详细计划](phase-2-multi-platform.md) |
 | **P3 平台特有能力** | 小组件、通知、CalDAV 双向同步 | 依赖前两阶段 | ⏸ |
+
+### 1.1 并行轨道：AI 能力线
+
+AI **不是 P4**，而是一条与 P2/P3 并行的轨道 —— 理由与排序原则见
+[AI 能力分支与开发分支策略](ai-capability-branches.md)。
+
+| 分支 | 内容 | 前置 | 状态 |
+|---|---|---|---|
+| **AI-0 基座** | `packages/ai` 的 provider 端口 + BYOK/自托管后端 + 隐私提示 + 分层门禁 | 两个 spike（浏览器 CORS、RN 端侧运行时） | 📋 规划中 |
+| **AI-1 捕获** | 一句话 → 结构化任务字段（`chrono-node` 打底，AI 只兜长尾） | AI-0 | 📋 规划中 |
+| **AI-2 结构化** | 拆解任务（先落 `note` checklist）、逐条象限/优先级建议 | AI-0 | 📋 规划中 |
+| **AI-3 规划** | 今日计划、时间块、AI 排程 | AI-1/AI-2 的真实使用数据 | ⏸ 推迟 |
+| **AI-4 复盘** | 周报、习惯趋势叙述 | AI-0 + 端侧推理（受限分支） | ⏸ 受限 |
+| **AI-5 接口 / 数据主权** | 全量导出、本地 API、MCP server | **无**（与 AI-0 解耦，可并行） | 📋 规划中 |
+
+⚠️ 同一份计划里还有 **3 条不是 AI 的功能设想**（甘特图→时间线视图、Time Left 式倒计时、
+API 数据出口），已刻意放在**非 AI 分支** —— 理由见该计划 §1 与 §5。
 
 ### P0 完成证据（2026-09-25）
 
