@@ -1,8 +1,38 @@
-import { OpType } from '@heyta/sync-core';
+/**
+ * 任务 store（Web 壳）
+ * ======================
+ *
+ * 这里只做两件事：
+ *   1. 把 op-log 引擎的物化状态同步进 zustand（`onEngineChange`）
+ *   2. 把界面意图转交给 `@heyta/app-host` 的 `createTaskActions`
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * 🔴 本文件被**改造过**，改的是一处真实的架构违规（AGENTS.md §3.5）：
+ *
+ * 它原先自己拼 `TASK` 的 op，7 处 `entityType: 'TASK'` 字面量就写在这里。
+ * 而 `createTaskActions` **早就存在**、移动端一直在用 ——
+ * 也就是说"重复"在文件头被记了一笔之后**还活了很久**，因为当时没有门禁钉住它
+ * （现在有了：`pnpm check:layering` 的 `no-op-construction-in-apps`）。
+ *
+ * 收编时对齐了这些**已经漂移**的地方：
+ *
+ * | 行为 | 旧（自己拼） | 新（app-host 单一实现） |
+ * |---|---|---|
+ * | 新任务 id | `task-${Date.now()}-${counter}`（**每刷新页面计数器归零**）| `newTaskId()`（带 Hermes 回退）|
+ * | 空标题 | 静默 return | 动作层**抛错**；"按键时空回车什么都不做"由界面判断 |
+ * | 任务不存在时 `toggleComplete` | 静默 return | **抛错**（见下）|
+ *
+ * 关于最后一条：静默 return 会掩盖"界面上摆着一个已经被删掉的任务"这类真问题，
+ * 让它在用户点下去之后**什么都不发生、也不报错**。方向判断（完成 → 取消完成）
+ * 现在由动作层负责，这一层连读都不用读，也就没有理由再吞掉错误。
+ * ─────────────────────────────────────────────────────────────────────────
+ */
+
 import { create } from 'zustand';
 
 import { Priority, Quadrant, bucketByQuadrant, type Task } from '@heyta/domain';
 import { emptyState, type MaterializedState } from '@heyta/op-log';
+import { createTaskActions, type ActionContext, type NewTaskFields } from '@heyta/app-host';
 
 import {
   __resetOpLogForTests as resetEngine,
@@ -28,12 +58,14 @@ interface TaskState {
   ready: boolean;
   error?: string;
 
-  addTask: (title: string, over?: Partial<Task>) => Promise<void>;
+  addTask: (title: string, over?: NewTaskFields) => Promise<void>;
   toggleComplete: (id: string) => Promise<void>;
   deleteTask: (id: string) => Promise<void>;
-  setPriority: (id: string, priority: number) => Promise<void>;
+  setPriority: (id: string, priority: Priority) => Promise<void>;
   setImportant: (id: string, important: boolean) => Promise<void>;
   setDueDate: (id: string, dueDate: number | undefined) => Promise<void>;
+  /** 写备注。AI 拆解出的清单就是经这里落到 `Task.note` 的。 */
+  setNote: (id: string, note: string | undefined) => Promise<void>;
   moveToProject: (id: string, projectId: string | undefined) => Promise<void>;
   setFilter: (filter: TaskFilter) => void;
   refreshNow: () => void;
@@ -58,103 +90,74 @@ export function __resetOpLogForTests(): void {
   resetEngine();
 }
 
+/**
+ * 动作层的宿主上下文。
+ *
+ * 与专注 store 用的是同一个形状 —— 两个 store 各写一份 `{dispatch, getState}`
+ * 是可以接受的，因为它只是**两个函数引用**，不含任何判断；
+ * 一旦它开始包含判断（比如"离线时排队"），就该抽走。
+ */
+const actionContext: ActionContext = {
+  dispatch: dispatchIntent,
+  getState: currentState,
+};
+
+const taskActions = createTaskActions(actionContext);
+
 /** 引擎状态变化 → 同步进 store。 */
 onEngineChange(() => {
   useTaskStore.setState({ entities: currentState() });
 });
 
-function nextTaskId(): string {
-  taskCounter += 1;
-  return `task-${String(Date.now())}-${String(taskCounter)}`;
-}
-
-let taskCounter = 0;
-
-export const useTaskStore = create<TaskState>((set, get) => ({
+export const useTaskStore = create<TaskState>((set) => ({
   entities: emptyState(),
   filter: { kind: 'all' },
   now: Date.now(),
   ready: false,
 
-  addTask: async (title, over = {}) => {
-    const trimmed = title.trim();
-    if (trimmed === '') return; // 空标题不建任务，静默忽略（用户只是按了回车）
+  addTask: async (title, over) => {
+    // ⚠️ 这条判断是**交互**决策（用户按了空回车），不是数据决策 ——
+    // 所以它留在这里，而动作层对空标题抛错（见 `TaskActions.create` 的注释）。
+    if (title.trim() === '') return;
 
-    const id = nextTaskId();
-    // ⚠️ 唯一写入口（D4）。没有 set({ entities: ... }) 这种捷径。
-    await dispatchIntent({
-      entityType: 'TASK',
-      entityId: id,
-      opType: OpType.Create,
-      payload: { title: trimmed, priority: Priority.None, ...over },
-    });
+    // ⚠️ 唯一写入口（D4）。没有 `set({ entities: ... })` 这种捷径 ——
+    // 现在连"自己拼 op"这条捷径也没有了。
+    await taskActions.create(title, over);
   },
 
   toggleComplete: async (id) => {
-    const task = get().entities.tasks[id];
-    if (task === undefined) return;
-
-    // 用 completedAt 的**有无**表示完成态，不另设 completed 布尔 ——
-    // 两个字段必然会不一致。
-    const completedAt = task.completedAt === undefined ? Date.now() : null;
-
-    await dispatchIntent({
-      entityType: 'TASK',
-      entityId: id,
-      opType: OpType.Update,
-      // null 表示"显式清除该字段"。undefined 会被 JSON 丢掉，
-      // 于是"取消完成"在另一端静默失效。reducer 负责把 null 变成删除。
-      payload: { completedAt },
-    });
+    // 方向（完成 ↔ 取消完成）由动作层决定，这一层不读状态、也不吞错。
+    await taskActions.toggleCompleted(id);
   },
 
   deleteTask: async (id) => {
-    // 软删除（墓碑）。DELETE op 由 reducer 转成 deletedAt。
+    // 软删除（墓碑）。`DEL` op 由 reducer 转成 `deletedAt` ——
     // 物理删除会让同步端永远看不到这次删除。
-    await dispatchIntent({
-      entityType: 'TASK',
-      entityId: id,
-      opType: OpType.Delete,
-      payload: {},
-    });
+    await taskActions.remove(id);
   },
 
   setPriority: async (id, priority) => {
-    await dispatchIntent({
-      entityType: 'TASK',
-      entityId: id,
-      opType: OpType.Update,
-      payload: { priority },
-    });
+    await taskActions.setPriority(id, priority);
   },
 
   setImportant: async (id, important) => {
     // 四象限的"重要"维度。四象限矩阵的拖拽会改这个 + dueDate。
-    await dispatchIntent({
-      entityType: 'TASK',
-      entityId: id,
-      opType: OpType.Update,
-      payload: { important },
-    });
+    await taskActions.setImportant(id, important);
   },
 
   setDueDate: async (id, dueDate) => {
-    await dispatchIntent({
-      entityType: 'TASK',
-      entityId: id,
-      opType: OpType.Update,
-      // undefined → null：null 表示"清除截止时间"，能穿过 JSON
-      payload: { dueDate: dueDate ?? null },
-    });
+    // `undefined` → 动作层写成 `null`。null 表示"清除截止时间"，
+    // 能穿过 JSON；undefined 会在 `JSON.stringify` 时被丢掉，
+    // 于是"清除"在另一端静默失效。
+    await taskActions.setDueDate(id, dueDate);
+  },
+
+  setNote: async (id, note) => {
+    await taskActions.setNote(id, note);
   },
 
   moveToProject: async (id, projectId) => {
-    await dispatchIntent({
-      entityType: 'TASK',
-      entityId: id,
-      opType: OpType.Update,
-      payload: { projectId: projectId ?? null },
-    });
+    await taskActions.moveToProject(id, projectId);
   },
 
   setFilter: (filter) => set({ filter }),
