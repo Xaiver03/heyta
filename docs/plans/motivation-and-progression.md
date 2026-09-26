@@ -653,9 +653,33 @@ subscription-notice.spec.tsx(190,87)  TS2345 ...
    git merge --no-edit feat/motivation-system
    ```
    因为步骤 2 之后本分支已包含 main，这一步通常是**快进**。
-   ⚠️ **主检出脏的时候连快进都做不了**：本次实测 —— `AGENTS.md`、`docs/README.md`、
-   `packages/domain/src/index.ts` 三处**同时**被主检出的未提交改动与本次合并改动覆盖，
-   git 会拒绝（"local changes would be overwritten"）。这正是门③存在的**可运行**理由，
+   ⚠️ **主检出脏的时候连快进都做不了**：本次实测 —— 主检出的未提交改动与本分支改动的
+   **交集是 7 个文件**，git 会拒绝（"local changes would be overwritten"）：
+
+   ```
+   AGENTS.md
+   apps/web/src/App.tsx
+   docs/README.md
+   packages/domain/src/index.ts
+   packages/domain/tests/domain.spec.ts
+   packages/i18n/src/locales/en.ts
+   packages/i18n/src/locales/zh-CN.ts
+   ```
+
+   复现（落地前先跑，**输出非空就说明还不能落地**）：
+
+   ```bash
+   # 在主检出
+   git status --porcelain | awk '{print $2}' | sort > /tmp/main-dirty.txt
+   # 在 worktree
+   git diff --name-only main...HEAD | sort > /tmp/branch-files.txt
+   comm -12 /tmp/main-dirty.txt /tmp/branch-files.txt
+   ```
+
+   🔴 注意其中**有两份词条表**：主检出那边的会话也在改 `packages/i18n/src/locales/*.ts`，
+   而本分支这一轮往同一对文件里加了一百多条 —— 这是**最危险的一格**：
+   它既是"会被 git 拒绝"的，也是"如果强行覆盖就悄悄丢掉别人翻译"的。
+   处置只有一条：**等对方先提交**，再做合并。这正是门③存在的**可运行**理由，
    不是一句谨慎的废话。
    ⚠️ **不要在主检出脏的时候去更新 `main` ref**（`git push . …:main` 这类）：
    主检出手上有 200+ 个未提交文件，ref 一动，工作树与 HEAD 的关系就说不清了 ——
