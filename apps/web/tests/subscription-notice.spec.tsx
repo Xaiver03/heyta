@@ -88,9 +88,12 @@ describe('托管同步到期', () => {
     const text = el.textContent ?? '';
 
     expect(text).toContain(subscriptionMessage('zh-CN', 'subscription.notice.expired.title'));
-    // 限制的只有"托管同步"这一件事，且必须点明包含超出免费额度的设备。
+    // 限制的只有"托管同步"这一件事 —— 所有设备，不只是新设备。
     expect(text).toContain('托管同步');
-    expect(text).toContain('免费额度');
+    // 🔴 「免费额度」已废弃（边界文档 §1：需要同步的人恰恰是有 >=2 台设备的人，
+    // 免费给 2 台等于把核心需求白送）。所以文案里**不许**再出现这个词 ——
+    // 那会承诺一个服务端不提供、且我们已决定不给的东西。
+    expect(text).not.toContain('免费额度');
     // 🔴 不许把范围说小：服务端的闸门拒绝的是整条托管同步，
     // 已接入的设备也会停止同步（边界文档 §2「只减不增」）。
     expect(text).not.toContain('只影响');

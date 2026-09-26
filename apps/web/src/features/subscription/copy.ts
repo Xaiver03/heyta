@@ -21,9 +21,11 @@
  * - **不许恐吓**。任何"数据将丢失 / 数据将被删除"都是**假的**：
  *   本地数据一个字都不动，服务端已有的数据也不删（边界文档 §2）。
  * - **说清楚限制的**唯一**一件事**：通过官方托管服务的同步
- *   （含"超出免费额度的新设备不能接入"）。**不要**把它说成"只影响新设备"——
- *   服务端的闸门拒绝的是整条托管同步，已接入的设备也会停止同步
- *   （边界文档 §2：「已接入的设备……只减不增，且必须给明确提示，不许静默断连」）。
+ *   —— **就是"通过官方托管服务的同步"这一件事，所有设备，不只是新设备**。
+ *   ⚠️ 本文早先写过"超出免费额度的设备无法接入"，**那个免费额度已经废弃**
+ *   （边界文档 §1：需要同步的人恰恰是有 ≥2 台设备的人，白送 2 台等于白送核心需求）。
+ *   所以**不要**再提"免费额度"，也**不要**说成"只影响新设备"——
+ *   闸门拒绝的是整条托管同步。
  * - 不给内部标识符（协议名、加密缩写等）。
  */
 
@@ -59,7 +61,7 @@ export const SUBSCRIPTION_MESSAGE_KEYS = [
 const ZH_CN: Record<SubscriptionMessageKey, string> = {
   'subscription.notice.expired.title': '官方托管同步已到期',
   'subscription.notice.expired.body':
-    '这台设备不再通过 heyta 官方托管服务同步，同一账号下超出免费额度的设备也无法接入。你的任务、清单和设置都还在，没有被改动。',
+    '这台设备不再通过 heyta 官方托管服务同步。你的任务、清单和设置都还在，没有被改动 —— 你随时可以改用你自己的服务器，同步会立刻恢复。',
   'subscription.notice.refused.title': '官方托管同步暂不可用',
   'subscription.notice.refused.body':
     '服务端没有放行这台设备的托管同步。你的任务、清单和设置都还在，没有被改动。',
@@ -72,7 +74,7 @@ const ZH_CN: Record<SubscriptionMessageKey, string> = {
 const EN: Record<SubscriptionMessageKey, string> = {
   'subscription.notice.expired.title': 'Hosted sync has expired',
   'subscription.notice.expired.body':
-    'This device no longer syncs through heyta\u2019s hosted service, and devices beyond the free allowance can no longer join this account. Your tasks, lists and settings are all still here and were not changed.',
+    'This device no longer syncs through heyta\u2019s hosted service. Your tasks, lists and settings are all still here and were not changed \u2014 you can point the app at your own server at any time and syncing resumes immediately.',
   'subscription.notice.refused.title': 'Hosted sync is unavailable',
   'subscription.notice.refused.body':
     'The server did not allow hosted sync for this device. Your tasks, lists and settings are all still here and were not changed.',
