@@ -60,11 +60,21 @@ export {
   clearSessionKeyCache,
   getSessionKeyCacheStats,
   getArgon2Params,
+  getArgon2Backend,
+  isArgon2SlowBackend,
+  setArgon2Provider,
+  getArgon2Provider,
   isCryptoSubtleAvailable,
   setArgon2ParamsForTesting,
   setLegacyKdfWarningHandler,
 } from './encryption';
-export type { DerivedKey, DecryptSettledItem } from './encryption';
+export type {
+  DerivedKey,
+  DecryptSettledItem,
+  Argon2Backend,
+  Argon2Input,
+  Argon2Provider,
+} from './encryption';
 
 // Structural ciphertext-transport classifier — used by the SuperSync server's
 // encrypted-only ingress gate (E2EE_REQUIRED). Shape check only, never proof.

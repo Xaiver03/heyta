@@ -74,8 +74,12 @@ export {
   setArgon2ParamsForTesting,
   getArgon2Params,
   deriveKeyFromPassword,
+  getArgon2Backend,
+  isArgon2SlowBackend,
+  setArgon2Provider,
+  getArgon2Provider,
 } from './encryption/argon2';
-export type { DerivedKey } from './encryption/argon2';
+export type { DerivedKey, Argon2Backend, Argon2Input, Argon2Provider } from './encryption/argon2';
 export {
   clearSessionKeyCache,
   getSessionKeyCacheStats,

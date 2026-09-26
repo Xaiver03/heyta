@@ -205,16 +205,20 @@ describe('limitVectorClockSize', () => {
   });
 
   it('should cap at MAX_VECTOR_CLOCK_SIZE even when preserveClientIds exceeds MAX', () => {
-    // Build a clock with many entries including 35 "preserved" clients
+    // 🔴 条目数必须**跟着常量走**，不能写死数字。
+    // 这里原来写死 35 个 preserve + 20 个 high：上限从 20 提到 100 之后，
+    // 这两个数字都不再超过上限，裁剪根本不会发生 —— 测试照样"通过"但**再也测不到东西**。
+    // 写死数字的边界测试会在常量变动时**静默失效**，这正是 AGENTS.md §7 反复出现的形状。
+    const preserveCount = MAX_VECTOR_CLOCK_SIZE + 15;
     const clock: Record<string, number> = {};
     const preserveIds: string[] = [];
-    for (let i = 0; i < 35; i++) {
+    for (let i = 0; i < preserveCount; i++) {
       const id = `preserved_${i}`;
       clock[id] = i + 1;
       preserveIds.push(id);
     }
     // Add more clients with higher counters
-    for (let i = 0; i < 20; i++) {
+    for (let i = 0; i < MAX_VECTOR_CLOCK_SIZE; i++) {
       clock[`high_${i}`] = 200 + i;
     }
 
@@ -230,6 +234,8 @@ describe('limitVectorClockSize', () => {
       }
     }
     expect(preservedCount).toBeLessThanOrEqual(MAX_VECTOR_CLOCK_SIZE);
+    // 前提校验：输入**确实**超限，否则上面两条断言都是空转
+    expect(Object.keys(clock).length).toBeGreaterThan(MAX_VECTOR_CLOCK_SIZE);
   });
 
   it('should break ties deterministically by client ID (lexicographic order)', () => {
@@ -476,9 +482,12 @@ describe('snapshot vector clock aggregation scenario', () => {
     // 1. Multiple ops from different clients are aggregated (max per key)
     // 2. Result is pruned with requesting client + snapshot author preserved
 
-    // Simulate 25 operations from different clients
+    // 🔴 条数必须跟着常量走。原来写死 25：上限从 20 提到 100 之后它不再超限，
+    // 裁剪根本不发生，而断言仍然"通过" —— 一条**静默失效**的边界测试
+    // 比没有测试更糟（AGENTS.md §7 反复出现的形状）。
+    const opCount = MAX_VECTOR_CLOCK_SIZE + 5;
     const opClocks: Record<string, number>[] = [];
-    for (let i = 0; i < 25; i++) {
+    for (let i = 0; i < opCount; i++) {
       opClocks.push({ [`client_${i}`]: i + 1, shared_client: i + 10 });
     }
 
@@ -490,20 +499,21 @@ describe('snapshot vector clock aggregation scenario', () => {
       }
     }
 
-    // Should have 26 entries: client_0..client_24 + shared_client
-    expect(Object.keys(aggregated).length).toBe(26);
-    expect(aggregated['shared_client']).toBe(34); // 24 + 10
+    // Should have opCount+1 entries: client_0..client_{opCount-1} + shared_client
+    expect(Object.keys(aggregated).length).toBe(opCount + 1);
+    expect(aggregated['shared_client']).toBe(opCount - 1 + 10);
 
     // Prune with two preserved IDs (requesting client + snapshot author)
-    const pruned = limitVectorClockSize(aggregated, ['client_0', 'client_24']);
+    const lastClient = `client_${opCount - 1}`;
+    const pruned = limitVectorClockSize(aggregated, ['client_0', lastClient]);
     expect(Object.keys(pruned).length).toBe(MAX_VECTOR_CLOCK_SIZE);
 
     // Both preserved IDs must survive
     expect(pruned['client_0']).toBe(1); // Lowest counter, preserved
-    expect(pruned['client_24']).toBe(25); // High counter, preserved
+    expect(pruned[lastClient]).toBe(opCount); // High counter, preserved
 
-    // shared_client has value 34 (highest), should be kept
-    expect(pruned['shared_client']).toBe(34);
+    // shared_client has the highest counter, should be kept
+    expect(pruned['shared_client']).toBe(opCount - 1 + 10);
   });
 
   it('pruned snapshot clock still produces correct comparison with post-snapshot ops', () => {
@@ -552,53 +562,63 @@ describe('limitVectorClockSize comparison-flip scenarios (pruned-out keys presen
   // behaviour so a future "smarter" prune doesn't accidentally invent a
   // pruning-aware comparison without protocol changes.
   it('unpruned A vs B with pruned-out keys high in B: GREATER_THAN unpruned, CONCURRENT after pruning', () => {
-    // A starts with 25 entries c1..c25. c1..c20 are high (dominant over B),
-    // c21..c25 are low (counter=1) — these are the ones pruning will drop.
-    // B has c1..c5 (lower than A) AND c21..c25 at high counters.
+    // A starts with MAX+5 entries c1..c{MAX+5}. c1..c{MAX} are high (dominant
+    // over B), the tail is low (counter=1) — these are the ones pruning drops.
+    // B has c1..c5 (lower than A) AND the tail at high counters.
+    //
+    // 🔴 所有条数都跟着 MAX_VECTOR_CLOCK_SIZE 走，不写死 —— 理由同上。
+    const HIGH = MAX_VECTOR_CLOCK_SIZE;
+    const LOW_FROM = MAX_VECTOR_CLOCK_SIZE + 1;
+    const LOW_TO = MAX_VECTOR_CLOCK_SIZE + 5;
+
     const a: Record<string, number> = {};
-    for (let i = 1; i <= 20; i++) a[`c${i}`] = 100;
-    for (let i = 21; i <= 25; i++) a[`c${i}`] = 1;
-    expect(Object.keys(a).length).toBe(25);
+    for (let i = 1; i <= HIGH; i++) a[`c${i}`] = 100;
+    for (let i = LOW_FROM; i <= LOW_TO; i++) a[`c${i}`] = 1;
+    expect(Object.keys(a).length).toBe(LOW_TO);
 
     const b: Record<string, number> = {};
     for (let i = 1; i <= 5; i++) b[`c${i}`] = 50; // A dominates here (100 > 50)
-    for (let i = 21; i <= 25; i++) b[`c${i}`] = 99; // B dominates here (99 > 1)
+    for (let i = LOW_FROM; i <= LOW_TO; i++) b[`c${i}`] = 99; // B dominates here (99 > 1)
 
-    // Unpruned comparison: A wins on c1..c5 (100 > 50), B wins on c21..c25 (99 > 1)
-    // → CONCURRENT even before pruning (A's c21..c25=1 is still < B's 99).
+    // Unpruned comparison: A wins on c1..c5 (100 > 50), B wins on the tail
+    // (99 > 1) → CONCURRENT even before pruning.
     expect(compareVectorClocks(a, b)).toBe('CONCURRENT');
 
-    // After pruning A to MAX=20, the c21..c25 entries (lowest counters) are
-    // dropped. Missing keys are treated as 0, so for c21..c25: pruned=0 < B=99.
+    // After pruning A to MAX, the tail (lowest counters) is dropped.
+    // Missing keys are treated as 0, so for the tail: pruned=0 < B=99.
     const pruned = limitVectorClockSize(a);
     expect(Object.keys(pruned).length).toBe(MAX_VECTOR_CLOCK_SIZE);
-    for (let i = 21; i <= 25; i++) expect(pruned[`c${i}`]).toBeUndefined();
-    // Result is still CONCURRENT (A wins on c1..c5, B wins on c21..c25).
+    for (let i = LOW_FROM; i <= LOW_TO; i++) expect(pruned[`c${i}`]).toBeUndefined();
+    // Result is still CONCURRENT (A wins on c1..c5, B wins on the tail).
     expect(compareVectorClocks(pruned, b)).toBe('CONCURRENT');
   });
 
   it('GREATER_THAN flips to CONCURRENT when pruning drops keys that B holds at high values', () => {
-    // A: 25 entries — c1..c20 dominate B; c21..c25 also dominate B but at
-    // tiny counters (so they get pruned).
-    const a: Record<string, number> = {};
-    for (let i = 1; i <= 20; i++) a[`c${i}`] = 100;
-    for (let i = 21; i <= 25; i++) a[`c${i}`] = 2;
+    const HIGH = MAX_VECTOR_CLOCK_SIZE;
+    const LOW_FROM = MAX_VECTOR_CLOCK_SIZE + 1;
+    const LOW_TO = MAX_VECTOR_CLOCK_SIZE + 5;
 
-    // B has c1..c20 below A AND c21..c25 at high values that A only narrowly
-    // beats (2 > 1).
+    // A: MAX+5 entries — c1..c{MAX} dominate B; the tail also dominates B but
+    // at tiny counters (so it gets pruned).
+    const a: Record<string, number> = {};
+    for (let i = 1; i <= HIGH; i++) a[`c${i}`] = 100;
+    for (let i = LOW_FROM; i <= LOW_TO; i++) a[`c${i}`] = 2;
+
+    // B has c1..c{MAX} below A AND the tail at high values that A only
+    // narrowly beats (2 > 1).
     const b: Record<string, number> = {};
-    for (let i = 1; i <= 20; i++) b[`c${i}`] = 50;
-    for (let i = 21; i <= 25; i++) b[`c${i}`] = 1;
+    for (let i = 1; i <= HIGH; i++) b[`c${i}`] = 50;
+    for (let i = LOW_FROM; i <= LOW_TO; i++) b[`c${i}`] = 1;
 
     // Unpruned: A strictly dominates B on every key → GREATER_THAN.
     expect(compareVectorClocks(a, b)).toBe('GREATER_THAN');
 
-    // Pruning drops c21..c25 (counter=2 vs c1..c20 at 100).
+    // Pruning drops the tail (counter=2 vs c1..c{MAX} at 100).
     const pruned = limitVectorClockSize(a);
     expect(Object.keys(pruned).length).toBe(MAX_VECTOR_CLOCK_SIZE);
-    for (let i = 21; i <= 25; i++) expect(pruned[`c${i}`]).toBeUndefined();
+    for (let i = LOW_FROM; i <= LOW_TO; i++) expect(pruned[`c${i}`]).toBeUndefined();
 
-    // After pruning: pruned wins on c1..c20 (100 > 50) but loses on c21..c25
+    // After pruning: pruned wins on c1..c{MAX} (100 > 50) but loses on the tail
     // (missing = 0 < 1). This flips GREATER_THAN → CONCURRENT, which is the
     // documented behaviour — the protocol (server prunes AFTER compare; client
     // never prunes before send) prevents this from being observed in practice.
@@ -606,41 +626,46 @@ describe('limitVectorClockSize comparison-flip scenarios (pruned-out keys presen
   });
 
   it('GREATER_THAN flips to LESS_THAN when pruning drops keys B holds at high values and A does not dominate elsewhere', () => {
-    // A: 25 entries — c1..c20 at equal value to B; c21..c25 narrowly beat B.
+    const HIGH = MAX_VECTOR_CLOCK_SIZE;
+    const LOW_FROM = MAX_VECTOR_CLOCK_SIZE + 1;
+    const LOW_TO = MAX_VECTOR_CLOCK_SIZE + 5;
+
+    // A: MAX+5 entries — c1..c{MAX} equal to B; the tail narrowly beats B.
     const a: Record<string, number> = {};
-    for (let i = 1; i <= 20; i++) a[`c${i}`] = 50;
-    for (let i = 21; i <= 25; i++) a[`c${i}`] = 2;
+    for (let i = 1; i <= HIGH; i++) a[`c${i}`] = 50;
+    for (let i = LOW_FROM; i <= LOW_TO; i++) a[`c${i}`] = 2;
 
-    // B: identical on c1..c20; lower than A on c21..c25.
+    // B: identical on c1..c{MAX}; lower than A on the tail.
     const b: Record<string, number> = {};
-    for (let i = 1; i <= 20; i++) b[`c${i}`] = 50;
-    for (let i = 21; i <= 25; i++) b[`c${i}`] = 1;
+    for (let i = 1; i <= HIGH; i++) b[`c${i}`] = 50;
+    for (let i = LOW_FROM; i <= LOW_TO; i++) b[`c${i}`] = 1;
 
-    // Unpruned: equal on c1..c20, A wins on c21..c25 → GREATER_THAN.
+    // Unpruned: equal on c1..c{MAX}, A wins on the tail → GREATER_THAN.
     expect(compareVectorClocks(a, b)).toBe('GREATER_THAN');
 
-    // Pruning drops c21..c25.
+    // Pruning drops the tail.
     const pruned = limitVectorClockSize(a);
     expect(Object.keys(pruned).length).toBe(MAX_VECTOR_CLOCK_SIZE);
-    for (let i = 21; i <= 25; i++) expect(pruned[`c${i}`]).toBeUndefined();
+    for (let i = LOW_FROM; i <= LOW_TO; i++) expect(pruned[`c${i}`]).toBeUndefined();
 
-    // After pruning: equal on c1..c20, but for c21..c25 pruned=0 < B=1.
+    // After pruning: equal on c1..c{MAX}, but for the tail pruned=0 < B=1.
     // No key where pruned beats B → LESS_THAN.
     expect(compareVectorClocks(pruned, b)).toBe('LESS_THAN');
   });
 
   it('preserveClientIds keeps the uploading client even when its counter is low (server-side flow)', () => {
-    // Server flow: client sends 25-entry clock, server compares (sees
+    // Server flow: client sends an over-MAX clock, server compares (sees
     // GREATER_THAN), then prunes preserving the uploading client.
-    // Use 19 high-counter "other_" entries so that with the preserved
-    // uploader (1 slot) + 19 highest counters, we fill all 20 slots without
+    // Use MAX-1 high-counter "other_" entries so that the preserved uploader
+    // (1 slot) + (MAX-1) highest counters fill all MAX slots with no
     // tie-breaking ambiguity.
+    const HIGH = MAX_VECTOR_CLOCK_SIZE - 1;
     const a: Record<string, number> = {};
-    for (let i = 1; i <= 19; i++) a[`other_${i}`] = 100;
+    for (let i = 1; i <= HIGH; i++) a[`other_${i}`] = 100;
     a['uploader'] = 1; // Brand-new client with counter=1
     // 5 more low-counter entries that should all be pruned out.
     for (let i = 1; i <= 5; i++) a[`stale_${i}`] = 2;
-    expect(Object.keys(a).length).toBe(25);
+    expect(Object.keys(a).length).toBe(MAX_VECTOR_CLOCK_SIZE + 5);
 
     const pruned = limitVectorClockSize(a, ['uploader']);
     expect(Object.keys(pruned).length).toBe(MAX_VECTOR_CLOCK_SIZE);
@@ -648,8 +673,8 @@ describe('limitVectorClockSize comparison-flip scenarios (pruned-out keys presen
     expect(pruned['uploader']).toBe(1);
     // All 5 stale_* entries (counter=2) are the lowest non-preserved → pruned.
     for (let i = 1; i <= 5; i++) expect(pruned[`stale_${i}`]).toBeUndefined();
-    // All 19 other_* entries (counter=100) survive.
-    for (let i = 1; i <= 19; i++) expect(pruned[`other_${i}`]).toBe(100);
+    // All HIGH other_* entries (counter=100) survive.
+    for (let i = 1; i <= HIGH; i++) expect(pruned[`other_${i}`]).toBe(100);
   });
 });
 
