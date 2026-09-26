@@ -14,7 +14,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { OpType, decrypt, encrypt } from '@heyta/sync-core';
 import type { Operation } from '@heyta/sync-core';
 
-import { SyncClient, createRetryScheduler, type SyncStatus } from '../src/client.js';
+import { SyncClient, createRetryScheduler, isNetworkError, type SyncStatus } from '../src/client.js';
 
 const PASSWORD = 'correct horse battery staple';
 const BASE = 'http://127.0.0.1:3000';
@@ -167,6 +167,66 @@ describe('同步客户端 — 上传与游标', () => {
     expect(status.kind).toBe('synced');
     expect(h.marked).toHaveLength(1);
     expect(h.marked[0]!.get('op-1')).toBe(42);
+  });
+
+  it('🔴 一批里有硬拒绝时，同批**已被接受**的 op 仍必须落盘（否则永久重传）', async () => {
+    // 现场：一台设备的队列里混进了一条 clientId 不属于本机的 op。
+    // 服务端逐条判定，接受 op-1、拒绝 op-2 —— 而响应整体是 HTTP 200。
+    //
+    // 修之前，上面那个 `throw` 发生在 `markUploaded` **之前**，于是：
+    //   op-1 已被服务端收下，却在本地永远留在"待上传"
+    //   → 下次同步重传 op-1 → 服务端回"已存在" → 又一次硬拒绝
+    //   → **这台设备的同步永久卡死**，用户看到"同步一直失败 + 待上传数不减"。
+    const h = makeHarness(
+      () =>
+        okJson({
+          results: [
+            { opId: 'op-1', accepted: true, serverSeq: 42 },
+            {
+              opId: 'op-2',
+              accepted: false,
+              errorCode: 'INVALID_CLIENT_ID',
+              error: 'Operation clientId does not match request clientId',
+            },
+          ],
+          latestSeq: 42,
+        }),
+      { ops: [makeOp({ id: 'op-1' }), makeOp({ id: 'op-2' })] },
+    );
+    const status = await h.client.sync();
+
+    // 被拒的那条仍必须让用户知道 —— 不要为了"看起来成功"把错误吞掉
+    expect(status.kind).toBe('error');
+
+    // 但已被接受的那条**绝不能**留在待上传队列里
+    expect(h.marked).toHaveLength(1);
+    expect(h.marked[0]!.get('op-1')).toBe(42);
+    // 被拒的那条**不许**被误标成已上传
+    expect(h.marked[0]!.has('op-2')).toBe(false);
+
+    // 🔴 游标不能推进：这条路径下面还有 piggyback 的 newOps 没被应用，
+    // 先推进会跳过它们（那是真的丢数据，比"多下几次"严重得多）
+    expect(h.cursor.value).toBe(0);
+  });
+
+  it('🔴 硬拒绝的错误文案要点明"同批有几条已被接受"（否则会误判成全军覆没）', async () => {
+    const h = makeHarness(
+      () =>
+        okJson({
+          results: [
+            { opId: 'op-1', accepted: true, serverSeq: 7 },
+            { opId: 'op-2', accepted: false, errorCode: 'INVALID_CLIENT_ID', error: 'x' },
+          ],
+          latestSeq: 7,
+        }),
+      { ops: [makeOp({ id: 'op-1' }), makeOp({ id: 'op-2' })] },
+    );
+    const status = await h.client.sync();
+    expect(status.kind).toBe('error');
+    if (status.kind === 'error') {
+      expect(status.message).toContain('1/2');
+      expect(status.message).toContain('1 条已被接受');
+    }
   });
 
   it('🔴 游标用 latestSeq 推进，而不是最后一条 op 的 serverSeq', async () => {
@@ -345,6 +405,58 @@ describe('同步客户端 — 离线与错误区分', () => {
     expect(status.kind).toBe('error');
     // 错误信息必须带上服务端给的原因，否则没法排查
     if (status.kind === 'error') expect(status.message).toContain('400');
+  });
+
+  // ────────────────────────────────────────────────────────────────────────
+  // 🔴 平台策略拦截 ≠ 离线。
+  //
+  // 原来的判据是 /failed to fetch|network|offline|ECONNREFUSED/i，
+  // 里面的裸 `network` 会命中 Android 的
+  //   "CLEARTEXT communication to 10.0.2.2 not permitted by network security policy"
+  // 于是"系统不允许明文 HTTP"被报成「当前离线」。实测就是这个现象：
+  // 服务端 curl 正常、应用坚称离线，排查方向被带偏。
+  // ────────────────────────────────────────────────────────────────────────
+  it('Android 明文策略拦截 → error，不是 offline', async () => {
+    const h = makeHarness(() => {
+      throw new TypeError(
+        'CLEARTEXT communication to 10.0.2.2 not permitted by network security policy',
+      );
+    });
+    const status = await h.client.sync();
+
+    expect(status.kind).toBe('error');
+    // 原因必须原样透出，否则用户无法从「当前离线」看出真实问题
+    if (status.kind === 'error') expect(status.message).toMatch(/cleartext/i);
+  });
+
+  it('iOS ATS 拦截 → error，不是 offline', () => {
+    expect(
+      isNetworkError(
+        new TypeError(
+          'The resource could not be loaded because the App Transport Security policy requires the use of a secure connection.',
+        ),
+      ),
+    ).toBe(false);
+  });
+
+  it('分类器：策略拦截优先于 TypeError 分支（顺序不能换）', () => {
+    // 两者都是 TypeError；差别只在消息。先判 TypeError 就会把它归成离线。
+    expect(isNetworkError(new TypeError('Network request failed'))).toBe(true);
+    expect(isNetworkError(new TypeError('CLEARTEXT communication to x not permitted'))).toBe(false);
+  });
+
+  it('分类器：真离线仍然判离线', () => {
+    expect(isNetworkError(new TypeError('Failed to fetch'))).toBe(true);
+    expect(isNetworkError(new TypeError('Network request failed'))).toBe(true);
+    expect(isNetworkError(new Error('ECONNREFUSED 127.0.0.1:3000'))).toBe(true);
+    expect(isNetworkError(new Error('device is offline'))).toBe(true);
+  });
+
+  it('分类器：不含网络语义的服务端错误不算离线', () => {
+    // 裸 `network` 的另一个坑：服务端错误文案里出现这个词就会被误判成离线而白白重试
+    expect(isNetworkError(new Error('同步请求失败：HTTP 500 — network overloaded'))).toBe(false);
+    expect(isNetworkError(new Error('同步请求失败：HTTP 401 — token expired'))).toBe(false);
+    expect(isNetworkError(new Error('payload is not encrypted'))).toBe(false);
   });
 
   it('未登录时不发请求', async () => {

@@ -71,7 +71,23 @@ export interface ConflictInfo {
   id: string;
   entityType: string;
   entityId: string;
+  /**
+   * 服务端那句**人类可读**的诊断（英文），如
+   * `Concurrent modification detected for TASK:task-...`。
+   *
+   * 🔴 **不要把它显示给用户。** 它只用于日志与排查；界面文案要用 `errorCode`。
+   * 移动端真机验收实测：直接显示 `reason` 会把一整句英文漏进一个全中文的界面里。
+   */
   reason: string;
+  /**
+   * 服务端给的**机器可读**错误码：`CONFLICT_CONCURRENT` / `CONFLICT_SUPERSEDED`。
+   *
+   * 来自 `sync-core` LWW 自动判定的冲突**没有**这个字段 —— 那种情况下
+   * `reason` 本身就是 `LwwConflictResolutionReason`（如 `remote-archive`），
+   * 也是一个可查表的编码。所以界面取文案的顺序是
+   * `errorCode ?? reason`，两者共用同一张表。
+   */
+  errorCode?: string;
   local: ConflictSide;
   remote: ConflictSide | undefined;
   /** 服务端判定冲突时给出的既有版本时钟（诊断用）。 */
@@ -96,6 +112,44 @@ export function describeConflictPayload(payload: unknown): string {
     .slice(0, 4)
     .map((k) => `${k}: ${JSON.stringify(record[k])}`)
     .join('、');
+}
+
+/**
+ * 冲突双方的「谁较新」标记。
+ *
+ * ═════════════════════════════════════════════════════════════════════════
+ * 🔴 为什么这**必须**是共享函数，而不是两端各写一个三元式
+ *
+ * 这条规则原本只存在于 Web 端 `ConflictDialog`：
+ * `conflict.remote === undefined || local.timestamp > remote.timestamp`。
+ * 做移动端冲突界面时如果照着再写一遍，就是本项目已经吃过两次亏的那个形状
+ * （AGENTS.md §3.5：两份实现 + 一处真实漂移），
+ * 而这次漂移的后果是**同一个冲突在两个平台上"较新"标在不同的一侧** ——
+ * 用户会以为是两件事，且没有任何测试会发现。
+ *
+ * 🔴 **规则本身也修过一次。** 原来的三元式在**时间戳相等**时为 false，
+ * 于是"较新"被标到**对端**头上 —— 而 AGENTS.md #19 明确记着
+ * "同一台设备连续两次编辑经常落在同一毫秒里"。也就是说，
+ * 在一个专门帮用户判断的界面上，一个高频且毫无依据的标记。现在：
+ *
+ *   - 严格更晚才标较新
+ *   - 时间戳相等 → 两边都不标（分不出先后就如实说分不出）
+ *   - 拿不到对端 → 两边都不标（没有可比对象）
+ *
+ * ⚠️ **这个标记永远不是裁决依据。** 真正的裁决在 `sync-core` 的 LWW；
+ * "分不出来"的那些正是被刻意交到人手上的（`suggestConflictResolution` 返回 `manual`）。
+ * 它只影响哪个按钮被高亮，**不影响任何一个字节的数据**。
+ * ═════════════════════════════════════════════════════════════════════════
+ */
+export function compareConflictFreshness(
+  local: Pick<ConflictSide, 'timestamp'>,
+  remote: Pick<ConflictSide, 'timestamp'> | undefined,
+): { localNewer: boolean; remoteNewer: boolean } {
+  if (remote === undefined) return { localNewer: false, remoteNewer: false };
+  return {
+    localNewer: local.timestamp > remote.timestamp,
+    remoteNewer: remote.timestamp > local.timestamp,
+  };
 }
 
 function toConflictSide(op: Operation<string>): ConflictSide {
@@ -467,21 +521,18 @@ export class SyncClient {
         }
       }
 
-      // 非冲突的拒绝才是硬错误
-      const hardRejects = rejected.filter(
-        (r) => r.errorCode?.startsWith('CONFLICT') !== true,
-      );
-      if (hardRejects.length > 0) {
-        const detail = hardRejects
-          .map((r) => `${r.opId}(${r.errorCode ?? '?'}: ${r.error ?? '未知原因'})`)
-          .join(', ');
-        throw new Error(
-          `服务端拒绝了 ${String(hardRejects.length)}/${String(ops.length)} 条 op：${detail}`,
-        );
-      }
-
-      // 🔴 先把"已上传"落盘，再推进游标。
-      // 反过来的话，游标前进了却不知道哪些 op 传过 —— 下次会重传整批。
+      // 🔴 先把"已上传"落盘，**再**决定要不要抛硬拒绝。
+      //
+      // 顺序反过来会造成一台设备**永久同步不了**，而且症状极难归因：
+      // 一批里只要有一条被硬拒，整个 throw 就会把**已被服务端接受的那些**
+      // 也一起挡在落盘之前。它们于是永远留在待上传队列里
+      // → 下次同步重传整批 → 服务端回"已存在" → 又一次硬拒 → 永远循环。
+      // 用户看到的是"同步一直失败 + 待上传数永远不减"，而数据其实一条没丢。
+      //
+      // 先落盘则队列会收敛到"只剩那条真被拒的 op"，下次只重传它。
+      //
+      // 🔴 但游标**不在这里推进**（见下面那段）：游标记的是"下载到哪里了"，
+      // 而这条路径下面可能还有 piggyback 的 newOps 没应用；先推进会跳过它们。
       const seqsByOpId = new Map<string, number>();
       for (const result of body.results ?? []) {
         if (result.accepted === true && typeof result.serverSeq === 'number') {
@@ -491,6 +542,25 @@ export class SyncClient {
       if (seqsByOpId.size > 0) {
         await this.options.markUploaded(seqsByOpId);
       }
+
+      // 非冲突的拒绝才是硬错误
+      const hardRejects = rejected.filter(
+        (r) => r.errorCode?.startsWith('CONFLICT') !== true,
+      );
+      if (hardRejects.length > 0) {
+        const detail = hardRejects
+          .map((r) => `${r.opId}(${r.errorCode ?? '?'}: ${r.error ?? '未知原因'})`)
+          .join(', ');
+        throw new Error(
+          `服务端拒绝了 ${String(hardRejects.length)}/${String(ops.length)} 条 op：${detail}` +
+            (seqsByOpId.size > 0
+              ? `（同批另有 ${String(seqsByOpId.size)} 条已被接受，已标记为已上传，不会再重传）`
+              : ''),
+        );
+      }
+
+      // 🔴 上传成功才推进游标。
+      // 反过来的话，游标前进了却不知道哪些 op 传过 —— 下次会重传整批。
 
       // 上传成功才推进游标。失败就保持原位，下次重试同一批。
       if (typeof body.latestSeq === 'number') {
@@ -536,6 +606,7 @@ export class SyncClient {
           entityType: String(op.entityType),
           entityId: '(未知)',
           reason: conflict.reason,
+          ...( conflict.errorCode !== undefined ? { errorCode: conflict.errorCode } : {}),
           local: toConflictSide(op),
           remote: undefined,
           ...(conflict.existingClock !== undefined
@@ -601,6 +672,7 @@ export class SyncClient {
         entityType: String(op.entityType),
         entityId: op.entityId,
         reason: conflict.reason,
+        ...( conflict.errorCode !== undefined ? { errorCode: conflict.errorCode } : {}),
         local: toConflictSide(op),
         remote: latestRemote === undefined ? undefined : toConflictSide(latestRemote),
         ...(conflict.existingClock !== undefined
@@ -640,6 +712,7 @@ export class SyncClient {
             entityType: String(c.op.entityType),
             entityId: c.op.entityId ?? '(未知)',
             reason: c.reason,
+            ...( c.errorCode !== undefined ? { errorCode: c.errorCode } : {}),
             local: toConflictSide(c.op),
             remote: latestRemote === undefined ? undefined : toConflictSide(latestRemote),
             ...(c.existingClock !== undefined ? { existingClock: c.existingClock } : {}),
@@ -773,11 +846,35 @@ async function toHttpError(res: Response): Promise<Error> {
   );
 }
 
-/** 判断是否网络层错误（→ 离线），区别于服务端拒绝（→ 错误）。 */
-function isNetworkError(error: unknown): boolean {
+/**
+ * 平台/传输**策略**拦截，而不是"没网"。
+ *
+ * 实测来源：Android 在 `usesCleartextTraffic=false` 时，对 `http://` 请求抛
+ *
+ *     CLEARTEXT communication to 10.0.2.2 not permitted by network security policy
+ *
+ * iOS 的 ATS 同形状：App Transport Security policy requires the use of a secure connection。
+ */
+const TRANSPORT_POLICY_ERROR = /cleartext|app transport security|network security policy/i;
+
+/**
+ * 判断是否网络层错误（→ 离线），区别于服务端拒绝（→ 错误）。
+ *
+ * 🔴 注意顺序：**必须先排除策略拦截**。原来的写法是
+ * `/failed to fetch|network|offline|ECONNREFUSED/i`，其中的 `network` 会命中
+ * "network **security policy**" —— 于是"平台不允许明文 HTTP"被报成「当前离线」。
+ * 用户看到的是"我没网吗？"，而真相是"这个地址的协议被系统拦了"。
+ * 一个正则里的裸子串就把两类完全不同的问题合并成了一个，且合并错了方向。
+ */
+export function isNetworkError(error: unknown): boolean {
+  const message =
+    error instanceof Error ? error.message : typeof error === 'string' ? error : '';
+  // 策略拦截：网络是通的，重试也不会好。必须先判，顺序不能换。
+  if (TRANSPORT_POLICY_ERROR.test(message)) return false;
   if (error instanceof TypeError) return true; // fetch 在断网时抛 TypeError
-  const message = error instanceof Error ? error.message : '';
-  return /failed to fetch|network|offline|ECONNREFUSED/i.test(message);
+  return /failed to fetch|network request failed|\boffline\b|ECONNREFUSED|ECONNRESET|ETIMEDOUT|ENOTFOUND|EHOSTUNREACH|ENETUNREACH/i.test(
+    message,
+  );
 }
 
 /**
