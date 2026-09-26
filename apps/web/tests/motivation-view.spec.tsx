@@ -26,8 +26,9 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 const { App } = await import('../src/App.js');
 const { __resetOpLogForTests, initOpLog } = await import('../src/lib/oplog.js');
-const { useHabitStore } = await import('../src/features/habits/store.js');
+const { useHabitStore, selectHabitProgress } = await import('../src/features/habits/store.js');
 const { useTaskStore } = await import('../src/features/tasks/store.js');
+const { addDays, toLocalDate } = await import('@heyta/domain');
 
 let root: Root | undefined;
 let container: HTMLDivElement | undefined;
@@ -113,6 +114,13 @@ describe('今日进度卡（L1）真的渲染出来了', () => {
     await waitFor('闭环文案出现', () =>
       (container?.textContent ?? '').includes('今天的都做完了'),
     );
+
+    // 🔴 这一条抓到过一个真 bug：`beforeEach` 造的场景里，习惯是**今天计划内**的、
+    // 而任务没有截止日期（= 计划外），于是 `done(2) > total(1)`，
+    // 卡片左边打出了「还有 -1 件没做」，右边同时写着「今天的都做完了」。
+    const flat = (container?.textContent ?? '').replace(/\s+/gu, '');
+    expect(flat, '进度卡的文案里绝不能出现负数').not.toMatch(/-\d/u);
+    expect(flat).toContain('计划内都做完了');
   });
 
   it('进度条的可访问名说出了分子与分母（不能只有一根无名的横条）', () => {
@@ -246,5 +254,45 @@ describe('习惯卡片（L2）真的显示出三个数', () => {
     // 🔴 「累计」是那个只增不减的数字 —— 它必须常驻，
     // 否则断签那天用户看不到任何"我没有归零"的证据。
     expect(text).toContain('累计');
+  });
+
+  it('🔴 界面上不出现「冻结余额」—— 它是库存，不是事实', async () => {
+    // 与 `HabitsView` 取"今天"用的是**同一个表达式**，否则我算的日期和界面算的
+    // 差一天，前提断言就会莫名其妙地红。
+    click(byText('习惯'));
+    await flush();
+    await waitFor('习惯卡片出现', () => (container?.textContent ?? '').includes('喝水'));
+
+    const now = Number(sessionStorage.getItem('now') ?? Date.now());
+    const today = toLocalDate(now);
+    const store = useHabitStore.getState();
+    const habitId = store.habits[0]?.id ?? '';
+
+    // 往前补 7 个连续计划日：满 7 天会**真的**攒到一个冻结。
+    for (let i = 1; i <= 7; i += 1) {
+      await act(async () => {
+        await store.checkIn(habitId, addDays(today, -i));
+      });
+    }
+    await flush();
+
+    const progress = selectHabitProgress(useHabitStore.getState(), now);
+    // ⚠️ 这里要解**一层**：`HabitResilienceView` 是个包装
+    // （`{ resilience: HabitResilience, repair?, freshStart? }`），
+    // 三个数字在内层。界面里也是这么取的（`const r = p.resilience.resilience`）。
+    const numbers = progress[0]?.resilience.resilience;
+
+    // 🔴 前提断言，两条都不能省：
+    //   1. 手里真的有 1 个冻结 —— 否则下面那条否定断言是**空转**的
+    //      （旧代码在没有冻结时也不会渲染余额，测试会假装通过）。
+    //   2. 界面确实按新日志重绘过 —— 用一个**肯定**的断言钉住。
+    //      没有它的话，"界面里没有余额"也可能只是"界面还没刷新"。
+    expect(numbers?.freezesHeld).toBe(1);
+    const flat = (container?.textContent ?? '').replace(/\s+/gu, '');
+    expect(flat).toContain(`累计${String(numbers?.total)}次`);
+
+    // 才是要守的那条：余额不上界面。
+    expect(flat).not.toContain('个冻结');
+    expect(flat).not.toContain('还剩');
   });
 });

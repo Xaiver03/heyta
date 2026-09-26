@@ -153,26 +153,31 @@ export function HabitsView() {
                  * 他会以为自己从没断过，而这恰好是下一次中断时"我明明一直连着"
                  * 那种困惑与不信任的来源。所以这里写的不是"你还剩几个道具"，
                  * 而是**它刚刚替你保住了什么**。
+                 *
+                 * 🔴 这一版才**真的**把余额删掉了。上一版这句话写在注释里，
+                 * 而紧跟着的代码渲染的正是「还剩 N 个冻结」—— **注释是对的，代码没照做**。
+                 * 删它的理由不是审美：
+                 *   1. 它是**库存**。它等于在告诉用户"你还有 2 次可以不来的机会"，
+                 *      而冻结是给**意外**的宽容，不是**计划内**的额度 —— 这个数字
+                 *      把后者摆到了台面上，等于鼓励按额度缺勤。
+                 *   2. 它**不可操作**。用户不能主动花掉它、不能多挣、不能选时机。
+                 *      一个做什么都用不上的数字就是纯噪声（Apple 的"克制"指的是这个）。
+                 *   3. 它把冻结变成了**货币**，而整套体系里没有第二种货币。
+                 *      这是唯一一处会让 heyta 读起来像资源管理游戏的地方 —— 调性不统一。
+                 *   4. 少了它，"余额"就彻底是**实现细节**：界面上不出现的东西不需要
+                 *      稳定的持久化结构。**产品决策把"要不要给它加字段"这个问题消解掉了**
+                 *      （完整论证见 `docs/plans/motivation-and-progression.md` §10.1）。
+                 *
+                 * 规则本身仍然要可解释，但解释的位置是**首次真正用到的那一刻**——
+                 * 也就是下面这一行本身，而不是一个常驻的计数器。
                  */}
-                {(r.frozenInCurrentRun > 0 || r.freezesHeld > 0) && (
+                {r.frozenInCurrentRun > 0 && (
                   <p className="ht-habit__freeze" style={text('caption')}>
-                    {r.frozenInCurrentRun > 0 && (
-                      <>
-                        这段连续里有
-                        <span style={{ fontVariantNumeric: 'tabular-nums' }}>
-                          {r.frozenInCurrentRun}
-                        </span>
-                        天是冻结保住的
-                      </>
-                    )}
-                    {r.frozenInCurrentRun > 0 && r.freezesHeld > 0 && ' · '}
-                    {r.freezesHeld > 0 && (
-                      <>
-                        还剩
-                        <span style={{ fontVariantNumeric: 'tabular-nums' }}>{r.freezesHeld}</span>
-                        个冻结
-                      </>
-                    )}
+                    这段连续里有
+                    <span style={{ fontVariantNumeric: 'tabular-nums' }}>
+                      {r.frozenInCurrentRun}
+                    </span>
+                    天是冻结保住的
                   </p>
                 )}
               </div>

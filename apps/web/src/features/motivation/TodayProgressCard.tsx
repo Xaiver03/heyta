@@ -33,12 +33,54 @@
  */
 
 import { cssVar } from '@heyta/design-system';
+import { type TodayProgress } from '@heyta/domain';
 import { Check, Sparkles, Timer } from 'lucide-react';
 
 import { text } from '../../lib/text.js';
 import { useTaskStore } from '../tasks/store.js';
 import { ProgressBar } from './ProgressBar.js';
 import { selectTodayProgress } from './selectors.js';
+
+/**
+ * 卡片左边那句"还剩多少"。
+ *
+ * 🔴 **`done` 可以大于 `total`，这里必须先处理那种情况。**
+ * `total` 只数**计划内**的（今天该做的习惯 + 今天到期或逾期的任务），
+ * 而 `done` 还包含**计划外**完成的任务 —— 也就是"今天没有截止日期，
+ * 但我顺手把它做了"。那是最常见的操作之一。
+ *
+ * 原写法直接算 `total − done`，于是界面上出现过：
+ *
+ *     今天 2/1　还有 -1 件没做　今天的都做完了      ← 实测原文，同一张卡上自相矛盾
+ *
+ * 改成显式分支之后，负数在**结构上**不可能出现 —— 不依赖调用方记得 clamp，
+ * 也不用一个 `Math.max` 把"其实计划外也做完了"糊成"还有 0 件"。
+ */
+function hintText(progress: TodayProgress): string {
+  if (progress.total === 0) {
+    return progress.done > 0
+      ? `计划外完成 ${String(progress.done)} 件`
+      : '今天还没有安排';
+  }
+  if (progress.done >= progress.total) return '计划内都做完了';
+  return `还有 ${String(progress.total - progress.done)} 件没做`;
+}
+
+/**
+ * 进度条的可访问名。
+ *
+ * 有计划外完成时**必须说清分母是什么** —— `done > total` 时只念
+ * "完成 2 件，共 1 件" 会让读屏用户以为进度坏了。
+ */
+function progressLabel(progress: TodayProgress): string {
+  if (progress.total === 0) {
+    return `今日完成 ${String(progress.done)} 件，没有计划内事项`;
+  }
+  if (progress.bonus > 0) {
+    return `今日完成 ${String(progress.done)} 件，计划内 ${String(progress.total)} 件，另有 ${String(progress.bonus)} 件计划外`;
+  }
+  return `今日完成 ${String(progress.done)} 件，共 ${String(progress.total)} 件`;
+}
 
 export function TodayProgressCard() {
   const entities = useTaskStore((s) => s.entities);
@@ -66,11 +108,7 @@ export function TodayProgressCard() {
             <span className="ht-today__count-total">/ {progress.total}</span>
           </div>
           <div className="ht-today__hint" style={text('row-meta')}>
-            {unplannedOnly
-              ? `计划外完成 ${String(progress.done)} 件`
-              : progress.total === 0
-                ? '今天还没有安排'
-                : `还有 ${String(progress.total - progress.done)} 件没做`}
+            {hintText(progress)}
           </div>
         </div>
 
@@ -105,11 +143,7 @@ export function TodayProgressCard() {
       <ProgressBar
         ratio={progress.ratio}
         tone={progress.closed ? 'success' : 'primary'}
-        label={
-          progress.total === 0
-            ? `今日完成 ${String(progress.done)} 件，没有计划内事项`
-            : `今日完成 ${String(progress.done)} 件，共 ${String(progress.total)} 件`
-        }
+        label={progressLabel(progress)}
       />
 
       {/* 四项明细只在"有计划"时展开。没有计划的时候铺一行 0 / 0 / 0 / 0
