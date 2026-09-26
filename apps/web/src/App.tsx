@@ -10,7 +10,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
-import { CalendarDays, Check, CircleDot, Inbox, Moon, Sun, Timer, Trash2, type LucideIcon, Settings } from 'lucide-react';
+import { CalendarDays, Check, CircleDot, Inbox, Moon, Sun, Timer, TrendingUp, Trash2, type LucideIcon, Settings } from 'lucide-react';
 
 import {
   applyFeedbackCorrections,
@@ -45,6 +45,8 @@ import { SyncBar } from './features/sync/SyncBar.js';
 import { ProjectsPanel } from './features/projects/ProjectsPanel.js';
 import { QuadrantBoard } from './features/quadrant/QuadrantBoard.js';
 import { HabitsView } from './features/habits/HabitsView.js';
+import { GrowthView } from './features/motivation/GrowthView.js';
+import { TodayProgressCard } from './features/motivation/TodayProgressCard.js';
 import { AiBreakdown } from './features/ai/AiBreakdown.js';
 import { AiPrioritize } from './features/ai/AiPrioritize.js';
 import { AiDuration } from './features/ai/AiDuration.js';
@@ -109,7 +111,7 @@ const PRIMARY_NAV: NavEntry[] = [
  * 场景下几乎不存在，而成本是又一个需要维护的依赖。
  * 到 P2 需要深链接时再引入 —— 那时才知道真实的约束是什么。
  */
-type ViewKey = 'tasks' | 'quadrant' | 'habits' | 'focus' | 'settings';
+type ViewKey = 'tasks' | 'quadrant' | 'habits' | 'focus' | 'growth' | 'settings';
 
 export function App(): React.JSX.Element {
   const [theme, setTheme] = useState<Theme>(resolveInitialTheme);
@@ -270,6 +272,7 @@ export function App(): React.JSX.Element {
                 { key: 'quadrant', label: '四象限', Icon: CircleDot },
                 { key: 'habits', label: '习惯', Icon: Check },
                 { key: 'focus', label: '番茄钟', Icon: Sun },
+                { key: 'growth', label: '成长', Icon: TrendingUp },
                 { key: 'settings', label: '设置', Icon: Settings },
               ] as const
             ).map((v) => (
@@ -326,6 +329,19 @@ export function App(): React.JSX.Element {
         </header>
 
         <div className="ht-content">
+          {/**
+           * 今日进度（激励体系 L1）。
+           *
+           * 🔴 **它常驻在三个"做事"的视图上**（任务 / 四象限 / 习惯 / 番茄钟），
+           * 而不常驻设置页与成长页：设置页不产生完成，成长页本身就是在讲
+           * 更长的尺度 —— 在那里再顶一条"今天 3/5"，会把"历史"重新压回"今天"，
+           * 恰好抵消掉那个页面存在的意义。
+           *
+           * 放在这里而不是放进各视图内部：它是**跨视图的同一件事**，
+           * 放进四个视图就会长出四份，而它们必然漂移。
+           */}
+          {view !== 'settings' && view !== 'growth' && <TodayProgressCard />}
+
           {/* AI 捕获的接线**留在这个组件内部** —— 输入框的草稿是它的状态，
               而草稿就是 AI 要解析的那句话。把草稿镜像到这里再传回去
               会造出两份状态，且"应用后清空输入框"没法做（清不动上游的 state）。
@@ -513,6 +529,7 @@ export function App(): React.JSX.Element {
           {view === 'quadrant' && <QuadrantBoard />}
           {view === 'habits' && <HabitsView />}
           {view === 'focus' && <FocusTimer />}
+          {view === 'growth' && <GrowthView />}
           {view === 'settings' && (
             <AiSettings
               initial={aiSettings}

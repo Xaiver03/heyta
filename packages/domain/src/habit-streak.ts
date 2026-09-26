@@ -49,8 +49,14 @@ export function isScheduledOn(frequency: HabitFrequency | undefined, date: Local
   }
 }
 
-/** 打卡是否算"达成"。 */
-function isAchieved(habit: Habit, log: HabitLog): boolean {
+/**
+ * 打卡是否算"达成"。
+ *
+ * ⚠️ **导出**是刻意的：`habit-resilience.ts` 必须用同一套判据。
+ * 两个模块各写一遍 `goalType` 的 switch，症状是"连续天数说达成、
+ * 成就徽章说没达成"，且两边都不报错。
+ */
+export function isAchieved(habit: Habit, log: HabitLog): boolean {
   const target = habit.target ?? 1;
   const value = log.value ?? target;
   switch (habit.goalType ?? 'atLeast') {
