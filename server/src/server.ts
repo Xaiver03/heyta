@@ -16,7 +16,7 @@ import { prisma, disconnectDb } from './db';
 import websocket from '@fastify/websocket';
 import { apiRoutes } from './api';
 import { pageRoutes } from './pages';
-import { webhookRoutes } from './billing';
+import { createBillingAdaptersFromConfig, webhookRoutes } from './billing';
 import {
   syncRoutes,
   startCleanupJobs,
@@ -493,9 +493,14 @@ export const createServer = (
       // Sync Routes (operation-based sync)
       await fastifyServer.register(syncRoutes, { prefix: '/api/sync' });
 
-      // 支付商 webhook（provider 无关；默认只有空 provider）。🔴 不套 authenticate ——
+      // 支付商 webhook（provider 无关）。🔴 不套 authenticate ——
       // 调用方是支付商的机器，身份靠 adapter 验签。幂等靠 payment_events 唯一约束。
-      await fastifyServer.register(webhookRoutes, { prefix: '/api/billing' });
+      // 🔴 adapter 列表来自**运营者配置**：没配支付商时只有 noop，自托管行为不变
+      //    （`/api/billing/webhooks/wechat` 回 404，fail-closed）。
+      await fastifyServer.register(webhookRoutes, {
+        prefix: '/api/billing',
+        adapters: createBillingAdaptersFromConfig(fullConfig),
+      });
 
       // WebSocket routes for real-time sync notifications
       await fastifyServer.register(wsRoutes, { prefix: '/api/sync' });

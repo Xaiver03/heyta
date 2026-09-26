@@ -81,6 +81,32 @@ export interface PrivacyConfig {
  */
 export const isConsentRequired = (config: ServerConfig): boolean => !!config.privacy;
 
+/**
+ * 微信支付（Native 扫码）运营者配置。
+ *
+ * 🔴 **默认不存在**：只有运营者显式设 `WECHAT_PAY_ENABLED=true` 且**六个凭证
+ * 全部齐全**时，`loadConfigFromEnv` 才会填出这个对象。少一个变量是**启动期
+ * 硬错误**，不是静默降级 —— 一个"看起来配了但注册不上"的支付通道
+ * 会表现为"用户扫码付了钱但没权益"，而那是最晚才会被发现的失败。
+ *
+ * 自托管实例**不要开**：heyta 是 MIT、自托管免费
+ * （`docs/plans/subscription-boundary.md` §1）。
+ */
+export interface WechatPayConfig {
+  readonly appId: string;
+  readonly mchId: string;
+  /** 商户证书序列号。 */
+  readonly serialNo: string;
+  /** APIv3 密钥（32 个 ASCII 字节）。 */
+  readonly apiV3Key: string;
+  /** 商户私钥（PEM / 转义 PEM / PEM 的 base64）。 */
+  readonly privateKey: string;
+  /** 微信支付平台公钥（同上三种写法）。 */
+  readonly publicKey: string;
+  /** 回调地址，绝对 URL。默认 `PUBLIC_URL + /api/billing/webhooks/wechat`。 */
+  readonly notifyUrl: string;
+}
+
 export interface ServerConfig {
   port: number;
   host: string;
@@ -135,6 +161,11 @@ export interface ServerConfig {
   entitlements: {
     enabled: boolean;
   };
+  /**
+   * 微信支付配置。**默认 undefined**（= 不注册微信 adapter，自托管不受影响）。
+   * 见 `WechatPayConfig` 与 `docs/plans/subscription-boundary.md` §6。
+   */
+  wechatPay?: WechatPayConfig;
   /**
    * Test mode configuration. When enabled, provides endpoints for E2E testing.
    * NEVER enable in production!
@@ -415,6 +446,70 @@ export const loadConfigFromEnv = (
       );
     }
     config.entitlements = { enabled: rawEntitlementGate === 'true' };
+  }
+
+  // 微信支付（Native 扫码）—— **运营者显式开关 + 六个凭证全齐**才注册。
+  //
+  // 🔴 默认关：自托管实例不接任何支付商，`registry.ts` 只注册 noop。
+  // 🔴 取值严格：写错在这里**报错**，不静默落到"关"。
+  // 🔴 凭证不全也是**报错**：错拼一个变量名会让 adapter 悄悄不注册，
+  //    而症状是"用户付了钱没权益" —— 那是收钱路径上最坏的一种静默。
+  if (process.env.WECHAT_PAY_ENABLED !== undefined) {
+    const raw = process.env.WECHAT_PAY_ENABLED.trim().toLowerCase();
+    if (raw !== 'true' && raw !== 'false') {
+      throw new Error(
+        `Invalid WECHAT_PAY_ENABLED: ${process.env.WECHAT_PAY_ENABLED}. Use 'true' or 'false'.`,
+      );
+    }
+
+    if (raw === 'true') {
+      const credentials = {
+        appId: process.env.WX_APP_ID,
+        mchId: process.env.WX_MCH_ID,
+        serialNo: process.env.WX_SERIAL_NO,
+        apiV3Key: process.env.WX_API_V3_KEY,
+        privateKey: process.env.WX_PRIVATE_KEY,
+        publicKey: process.env.WX_PUBLIC_KEY,
+      };
+      const credentialKeys = Object.keys(credentials) as (keyof typeof credentials)[];
+      const missing = credentialKeys.filter((key) => !credentials[key]?.trim());
+      if (missing.length > 0) {
+        throw new Error(
+          'WECHAT_PAY_ENABLED=true but wechat pay credentials are incomplete. Missing: ' +
+            `${missing.map((key) => `WX_${key.replace(/[A-Z]/g, (c) => `_${c}`).toUpperCase()}`).join(', ')}. ` +
+            'Set all of them, or turn WECHAT_PAY_ENABLED off.',
+        );
+      }
+
+      // APIv3 密钥必须是 32 个字节：在启动期挡掉，而不是等第一条真实回调验签失败。
+      const apiV3Key = credentials.apiV3Key as string;
+      if (Buffer.byteLength(apiV3Key, 'utf8') !== 32) {
+        throw new Error(
+          `Invalid WX_API_V3_KEY: must be exactly 32 bytes, got ${String(Buffer.byteLength(apiV3Key, 'utf8'))}.`,
+        );
+      }
+
+      // 回调地址默认由 PUBLIC_URL 推导 —— 它必须是**微信能访问到**的公网地址。
+      const notifyUrl =
+        process.env.WX_NOTIFY_URL?.trim() ||
+        `${config.publicUrl}/api/billing/webhooks/wechat`;
+      if (!/^https:\/\//i.test(notifyUrl)) {
+        throw new Error(
+          `WX_NOTIFY_URL must be an absolute https:// URL (got ${notifyUrl}). ` +
+            'WeChat Pay refuses non-HTTPS notify URLs.',
+        );
+      }
+
+      config.wechatPay = {
+        appId: credentials.appId as string,
+        mchId: credentials.mchId as string,
+        serialNo: credentials.serialNo as string,
+        apiV3Key,
+        privateKey: credentials.privateKey as string,
+        publicKey: credentials.publicKey as string,
+        notifyUrl,
+      };
+    }
   }
 
   // Test mode configuration

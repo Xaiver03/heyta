@@ -18,6 +18,7 @@
  * `(provider, providerEventId)` 唯一约束里。调用本函数时事件已经通过那两道闸。
  */
 import type { NormalizedPaymentEvent, SubscriptionStatus } from './types';
+import type { ExtendSubscriptionPeriodInput } from './extend-period';
 
 /** 应用结果。审计日志按它区分"真改了"与"看过但没动"。 */
 export type PaymentEventApplyOutcome =
@@ -43,7 +44,12 @@ export interface ExistingSubscription {
 /** 写入用的字段（**没有任何删除字段**）。 */
 export interface SubscriptionWrite {
   readonly provider: string;
-  readonly externalSubscriptionId: string;
+  /**
+   * 外部订阅 id。**可为 `null`**：一次性支付的 provider（支付宝 / 微信）
+   * 没有订阅对象，`(userId, provider)` 那一行的这个字段长期是 `null`
+   * （PostgreSQL 的 `UNIQUE` 允许多个 `NULL`，所以不会互相冲突）。
+   */
+  readonly externalSubscriptionId: string | null;
   readonly status: SubscriptionStatus;
   readonly currentPeriodEnd: number | null;
   readonly lastEventAt: number;
@@ -56,10 +62,29 @@ export interface SubscriptionWrite {
  */
 export interface ApplyPaymentEventDeps {
   findSubscription(externalSubscriptionId: string): Promise<ExistingSubscription | null>;
+  /**
+   * 按 `(userId, provider)` 找那**一行长期复用**的订阅。
+   *
+   * 🔴 一次性支付的 provider 没有 `externalSubscriptionId` 可查，
+   * 唯一稳定的定位方式就是"这个用户的这个 provider 那一行"
+   * （`subscription-boundary.md` §6.2「一行一用户」）。**不要每笔支付插一行。**
+   */
+  findSubscriptionByUser(
+    userId: number,
+    provider: string,
+  ): Promise<ExistingSubscription | null>;
   createSubscription(
     data: SubscriptionWrite & { userId: number; createdAt: number },
   ): Promise<{ id: number }>;
   updateSubscription(id: number, data: SubscriptionWrite): Promise<unknown>;
+  /**
+   * 周期叠加纯函数，**以端口注入**。
+   *
+   * 为什么注入而不是 import：`server` 包没有 `@heyta/domain` 依赖，
+   * 而硬约束不许改 `server/package.json` / lockfile。把算法做成端口，
+   * 至少保证**本文件里没有第二份公式** —— 见 `extend-period.ts` 文件头的完整说明。
+   */
+  extendPeriod(input: ExtendSubscriptionPeriodInput): number;
   /** 可注入时钟，仅用于 `updatedAt`，不参与新旧判定。 */
   now(): number;
 }
@@ -79,22 +104,89 @@ const toEpochMillis = (value: unknown): number | undefined => {
   return undefined;
 };
 
+/**
+ * 🔴 一次性支付的授予路径（阶段一的**主路径**，不是边界情况）。
+ *
+ * `subscription-boundary.md` §6.2 的规则，逐条落在这里：
+ *
+ * - **一行一用户**：`(userId, provider)` 复用一行，`externalSubscriptionId = null`；
+ * - **一次支付 = +365 天**：`max(now, 已有的 currentPeriodEnd ?? now) + 365天`
+ *   （算术在注入的 `extendPeriod` 里，本文件不含公式）；
+ * - **绝不删除**：只写 `status` / `currentPeriodEnd`，这里没有任何删除调用；
+ * - **永不 `now + 365天`**：那会让提前续费的用户丢掉已付过钱的剩余时间。
+ *
+ * 幂等**不在这里**：同一 `out_trade_no` 的重复回调在路由层被
+ * `(provider, providerEventId)` 唯一约束挡住（`webhook.routes.ts`）。本函数
+ * 只按 `lastEventAt` 做乱序防护，与订阅路径同一套语义。
+ */
+const applyOneTimeGrant = async (
+  event: NormalizedPaymentEvent,
+  deps: ApplyPaymentEventDeps,
+  periodDays: number,
+): Promise<PaymentEventApplyOutcome> => {
+  const occurredAt = toEpochMillis(event.occurredAt);
+  if (occurredAt === undefined) {
+    return { status: 'ignored', reason: 'INVALID_OCCURRED_AT' };
+  }
+  if (event.userId === null) {
+    // 没有用户归属就没法建行 / 找不到行；不猜、不按 email 模糊匹配。
+    return { status: 'ignored', reason: 'NO_USER_REFERENCE' };
+  }
+
+  const existing = await deps.findSubscriptionByUser(event.userId, event.provider);
+  const now = deps.now();
+
+  // 🔴 乱序闸门，与订阅路径逐字同形：只有**事件时间更早**才算过期。
+  // 相等按"可应用"处理 —— 精确重复已被唯一约束挡在前面。
+  const baseline = existing === null ? undefined : toEpochMillis(existing.lastEventAt);
+  if (existing !== null && baseline !== undefined && occurredAt < baseline) {
+    return { status: 'stale', subscriptionId: existing.id };
+  }
+
+  // 已有的到期日：非法值按"没有已付时长"处理（`extendPeriod` 会从 now 起算），
+  // 而不是把一个垃圾值喂进收钱路径让它抛。
+  const currentPeriodEnd =
+    existing === null ? null : (toEpochMillis(existing.currentPeriodEnd) ?? null);
+
+  const nextPeriodEnd = deps.extendPeriod({ now, currentPeriodEnd, days: periodDays });
+
+  const write: SubscriptionWrite = {
+    provider: event.provider,
+    // 🔴 微信没有订阅对象，这一列长期是 null（一行一用户，不是一笔支付一行）。
+    externalSubscriptionId: null,
+    status: 'active',
+    currentPeriodEnd: nextPeriodEnd,
+    lastEventAt: occurredAt,
+    updatedAt: now,
+  };
+
+  if (existing === null) {
+    const created = await deps.createSubscription({
+      ...write,
+      userId: event.userId,
+      createdAt: now,
+    });
+    return { status: 'applied', subscriptionId: created.id };
+  }
+
+  await deps.updateSubscription(existing.id, write);
+  return { status: 'applied', subscriptionId: existing.id };
+};
+
 export const applyPaymentEvent = async (
   event: NormalizedPaymentEvent,
   deps: ApplyPaymentEventDeps,
 ): Promise<PaymentEventApplyOutcome> => {
   if (event.externalSubscriptionId === null) {
-    // 支付宝 / 微信这类"没有订阅对象"的 provider 会走到这里：合法，不是错误。
+    // 支付宝 / 微信这类"没有订阅对象"的 provider 会走到这里。
     //
-    // ⚠️ **已知缺口，选型定稿前必须解决**：阶段一（国内）的结论是
-    // **一次性年付 + 到期提醒手动续费**（`subscription-provider-selection.md`
-    // 「阶段一（国内）的唯一现实路径」），也就是**没有自动续费的 provider**。
-    // 那种 provider 的 webhook 只有"一笔订单付成功了 + 这次买到哪一天"，
-    // 没有订阅 id —— 按当前实现它会被记进 `payment_events` 审计，
-    // 但**不会**创建 / 延长 `Subscription`。要接它，adapter 必须先决定
-    // "一笔一次性支付如何映射成稳定的订阅行 + 如何叠加周期"，
-    // 那是 provider 相关的语义（§4「抽象不掉的」），不能在这里猜。
-    // 本轮不选型、不接 SDK，所以刻意保留这个 ignore 分支并把它写下来。
+    // 🔴 授予必须是**事件上的显式声明**（`event.oneTimeGrant`），不能从
+    // "没有订阅引用"推断：退款 / 对账通知同样没有订阅引用，而它们**不该发权益**。
+    // 把推断写进通用层等于让任何这类事件都变成"发一年"。
+    if (event.oneTimeGrant != null) {
+      return applyOneTimeGrant(event, deps, event.oneTimeGrant.periodDays);
+    }
+    // 没有声明授予语义的事件：记进 `payment_events` 审计，但不动权益。
     return { status: 'ignored', reason: 'NO_SUBSCRIPTION_REFERENCE' };
   }
   if (event.status === null) {
