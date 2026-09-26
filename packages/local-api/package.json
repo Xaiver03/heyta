@@ -1,0 +1,27 @@
+{
+  "name": "@heyta/local-api",
+  "version": "0.0.0",
+  "private": true,
+  "description": "heyta 本地 API / MCP 端口层：默认关、只监听回环、显式 token、逐工具授权、写入只能经 dispatch()。与 @heyta/ai（出站）方向相反。",
+  "license": "MIT",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsup",
+    "typecheck": "tsc --noEmit -p tsconfig.spec.json",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "devDependencies": {
+    "tsup": "^8.5.1",
+    "typescript": "^5.9.3",
+    "vitest": "^5.0.1"
+  }
+}
