@@ -90,8 +90,8 @@ export const buildWechatPaymentWebhook = (
       ? {}
       : {
           amount: {
-            total: options.amountFen ?? 13_900,
-            payer_total: options.amountFen ?? 13_900,
+            total: options.amountFen ?? 9_900,
+            payer_total: options.amountFen ?? 9_900,
             currency: 'CNY',
           },
         }),

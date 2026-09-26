@@ -107,9 +107,10 @@
   pointer-events: none;
 }
 
-/* ⚠️ 这个类被**导航**和**页脚**共用，但两处的品牌表达不同：
-   导航是字标（.lp-brand__mark），页脚仍是「蓝点 + heyta 文字」（.lp-brand__dot）。
-   所以这里的文字排版规则必须留着 —— 删掉的话页脚的字号/字重会一起塌掉。 */
+/* 导航与页脚**共用**同一个类，而且两边都用 BrandMark（.lp-brand__mark）——
+   同一个品牌在一页里出现两种画法（字标 / 蓝点+文字）是没道理的区别，已经统一。
+   这里的文字排版规则留着不比配任何文字元素了，但**不要删**：
+   `aria-label` 之外的兜底文字、以及将来加回文字字标时都还要它。 */
 .lp-brand {
   display: flex;
   align-items: center;
@@ -123,13 +124,6 @@
 .lp-brand:hover {
   text-decoration: none;
   color: var(--ht-color-foreground);
-}
-
-.lp-brand__dot {
-  inline-size: var(--ht-icon-sm);
-  block-size: var(--ht-icon-sm);
-  border-radius: var(--ht-radius-full);
-  background: var(--ht-color-primary);
 }
 
 /* 字标的尺寸只由这里决定：给高度，宽度靠 viewBox 的固有比例推出来（不写死 width，
@@ -1121,6 +1115,168 @@
 }
 
 /* ════════════════════════════════════════════════════════════
+   价格：两栏对等对比
+   ════════════════════════════════════════════════════════════ */
+
+/* 两栏**等宽**，不是「免费窄、付费宽」——
+   两个档是同一个产品的两种用法，版面本身就该说"它们对等"。
+   `stretch`（默认）而不是 `start`：两张卡等高，底部的 CTA / 状态说明才会
+   落在同一条水平线上；否则内容少的那张会矮一截，两个按钮一高一低。 */
+.lp-pricing__grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--ht-space-4);
+}
+
+.lp-pricing__card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ht-space-4);
+  padding: var(--ht-space-6);
+  border: var(--ht-border-width-thin) solid var(--ht-color-border);
+  border-radius: var(--ht-radius-xl);
+  background: var(--ht-color-surface);
+}
+
+/* 免费那条路用主色描边。
+   ⚠️ 这里**刻意没有「推荐」/「最受欢迎」角标**：我们只有一个付费档，
+   角标是拿来在多档之间引导选择的，而这里没有可选项 —— 免费的本来就是完整的
+   （见 Pricing.tsx 文件头）。描边表达的是"这条路过得通"，不是"买这个"。 */
+.lp-pricing__card--featured {
+  border-color: var(--ht-color-primary);
+}
+
+.lp-pricing__name {
+  display: flex;
+  align-items: center;
+  gap: var(--ht-space-2);
+  font-size: var(--ht-font-size-base);
+  font-weight: var(--ht-font-weight-semibold);
+}
+
+.lp-pricing__icon {
+  display: grid;
+  place-items: center;
+  inline-size: var(--ht-icon-md);
+  block-size: var(--ht-icon-md);
+  border-radius: var(--ht-radius-md);
+  background: var(--ht-color-primary-subtle);
+  color: var(--ht-color-primary);
+}
+
+.lp-pricing__price {
+  display: flex;
+  align-items: baseline;
+  gap: var(--ht-space-2);
+}
+
+.lp-pricing__amount {
+  font-size: var(--ht-font-size-3xl);
+  font-weight: var(--ht-font-weight-bold);
+  letter-spacing: var(--ht-tracking-display);
+}
+
+.lp-pricing__period {
+  font-size: var(--ht-font-size-sm);
+  color: var(--ht-color-foreground-muted);
+}
+
+/* 两个地区是**同一个档的两种定价**，不是两档 —— 所以是"标签 + 数字"的
+   定义列表，而不是两个并列的大数字（那样会被读成"二选一"）。 */
+.lp-pricing__regions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ht-space-2);
+  padding-block: var(--ht-space-3);
+  border-block: var(--ht-border-width-thin) solid var(--ht-color-border-subtle);
+}
+
+.lp-pricing__region {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--ht-space-3);
+}
+
+.lp-pricing__region dt {
+  font-size: var(--ht-font-size-sm);
+  color: var(--ht-color-foreground-muted);
+}
+
+.lp-pricing__region dd {
+  font-size: var(--ht-font-size-xl);
+  font-weight: var(--ht-font-weight-semibold);
+  letter-spacing: var(--ht-tracking-title);
+}
+
+.lp-pricing__body {
+  font-size: var(--ht-font-size-sm);
+  line-height: var(--ht-line-height-normal);
+  color: var(--ht-color-foreground-muted);
+}
+
+.lp-pricing__features {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ht-space-2);
+  font-size: var(--ht-font-size-sm);
+  line-height: var(--ht-line-height-normal);
+}
+
+.lp-pricing__feature {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--ht-space-2);
+}
+
+.lp-pricing__feature > svg {
+  flex: none;
+  /* 让勾与**第一行**文字对齐，而不是整段居中 —— 长文案折行时后者会跑偏。 */
+  margin-block-start: var(--ht-space-1);
+  color: var(--ht-color-success);
+}
+
+/* CTA 推到卡片底部，两张卡的按钮/状态说明才会落在同一条水平线上。 */
+.lp-pricing__cta {
+  margin-block-start: auto;
+}
+
+.lp-pricing__pending {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--ht-space-2);
+  min-block-size: var(--ht-touch-target-min);
+  padding-inline: var(--ht-space-5);
+  margin-block-start: auto;
+  border: var(--ht-border-width-thin) dashed var(--ht-color-border-strong);
+  border-radius: var(--ht-radius-full);
+  font-size: var(--ht-font-size-sm);
+  color: var(--ht-color-foreground-muted);
+}
+
+.lp-pricing__notes {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ht-space-2);
+  max-inline-size: var(--ht-layout-prose-max);
+  margin-block-start: var(--ht-space-6);
+  margin-inline: auto;
+  text-align: center;
+}
+
+.lp-pricing__note-strong {
+  font-size: var(--ht-font-size-base);
+  font-weight: var(--ht-font-weight-semibold);
+}
+
+.lp-pricing__note {
+  font-size: var(--ht-font-size-sm);
+  line-height: var(--ht-line-height-normal);
+  color: var(--ht-color-foreground-muted);
+}
+
+/* ════════════════════════════════════════════════════════════
    收尾 CTA
    ════════════════════════════════════════════════════════════ */
 
@@ -1247,6 +1403,7 @@
   }
 
   .lp-showcase__grid,
+  .lp-pricing__grid,
   .lp-selfhost__grid,
   .lp-footer__grid {
     grid-template-columns: minmax(0, 1fr);

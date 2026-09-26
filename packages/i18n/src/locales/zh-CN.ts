@@ -161,7 +161,7 @@ export const zhCN = {
   'landing.selfhost.warnCode': '迁移脚本 scripts/migrate-deploy.sh。',
   // 仓库当前是私有的，上面那条 `git clone` 对访客无效。这一条是**诚实说明**，
   // 不是营销文案 —— 仓库公开后连同它一起删掉，并把链接恢复（见 ADR-0017 的收尾）。
-  'landing.selfhost.sourcePending': '源码尚未公开，上面这条命令现在还不能执行。仓库公开后即可直接克隆自建。',
+  'landing.selfhost.sourcePending': '源码尚未公开，所以第一行的仓库地址先留成占位符。公开之后那一行原样就能执行，照后两条走完即可自建。',
 
   // ── 落地页 · 价格 ─────────────────────────────────────────
   // 🔴 这里的两个价格必须与 server 的价目表、法务文本一致 ——

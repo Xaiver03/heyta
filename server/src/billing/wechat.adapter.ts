@@ -338,12 +338,15 @@ export interface WechatPrice {
 /**
  * 阶段一的默认价目表。
  *
- * ⚠️ **暂定值**（一次性年付 ¥139 = 13900 分，见 `subscription-boundary.md` §0）。
- * 运营者可以直接给 adapter 传 `prices` 覆盖 —— 改价不改代码是刻意的。
+ * ✅ **已定价**（一次性年付 ¥99 = 9900 分）。价格结论见 ADR-0017，
+ * 价格表见 `docs/reference/pricing-and-entitlements.md`；
+ * 🔴 改这个数字必须同时改词条表与法务文本，`scripts/check-pricing-consistency.mjs`
+ * 会红，否则落地页说的价格与这里收的价格就会不一致。
+ * 运营者仍可以直接给 adapter 传 `prices` 覆盖 —— 改价不改代码是刻意的。
  * （本轮**不做** env 价目表解析：把一个 JSON 表塞进环境变量比它的价值更容易出错。）
  */
 export const WECHAT_DEFAULT_PRICES: Readonly<Record<string, WechatPrice>> = {
-  annual: { totalFen: 13_900, description: 'heyta 托管同步服务（年）' },
+  annual: { totalFen: 9_900, description: 'heyta 托管同步服务（年）' },
 };
 
 export interface WechatPayAdapterOptions {
@@ -605,7 +608,7 @@ export const createWechatBillingAdapter = (
       //
       // ⚠️ **这一版的强度有已知上限**：它校验的是"金额是价目表里的某一个"，
       // 而不是"金额对应的是这一单买的那一项"。价目表现在只有一项
-      // （`annual: 13_900`），所以这两种说法**等价**，洞是关着的。
+      // （`annual: 9_900`），所以这两种说法**等价**，洞是关着的。
       // 一旦价目表出现**多个不同金额**的 SKU，就必须改成按价目表项校验 ——
       // 做法是把 priceId 编进 `out_trade_no`（我们自己生成、回调必定携带），
       // 再按下单记录比对。**在那之前不要加第二个 SKU。**

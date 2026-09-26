@@ -6,18 +6,20 @@
  * （taste skill：宣言式排版可以居中；居中英雄区不行）。
  *
  * 🔴 全页只有**一个** CTA 标签对应**一个**意图：
- *   英雄区与这里都用「开始自建」，都指向 `#selfhost`。
+ *   英雄区、定价区的免费档、这里，都用「开始自建」，都指向 `#selfhost`。
  *   同一意图换标签（"开始使用" / "免费试用" / "立即部署"）会让用户以为
  *   它们是不同的事，而实际上只是文案没统一。
+ *
+ * ⚠️ 这里原来还有第二个按钮「先看看代码」指向 GitHub —— 摘掉的原因见
+ *   `Nav.tsx` 顶部那段（仓库私有，链接对访客是 404）。
  */
 
 import { motion } from 'motion/react';
-import { ArrowRight, Github } from 'lucide-react';
+import { ArrowRight } from 'lucide-react';
 
 import { useI18n } from '@heyta/i18n';
 
 import { revealVariants, staggerContainer, useMotionPreset, VIEWPORT } from '../lib/motion.js';
-import { GITHUB_URL } from './Nav.js';
 
 export function FinalCta(): React.JSX.Element {
   const preset = useMotionPreset();
@@ -45,15 +47,6 @@ export function FinalCta(): React.JSX.Element {
             <a className="lp-btn lp-btn--primary lp-btn--lg" href="#selfhost">
               {t('landing.cta.selfHost')}
               <ArrowRight size={18} aria-hidden="true" />
-            </a>
-            <a
-              className="lp-btn lp-btn--secondary lp-btn--lg"
-              href={GITHUB_URL}
-              target="_blank"
-              rel="noreferrer noopener"
-            >
-              <Github size={18} aria-hidden="true" />
-              {t('landing.cta.viewCode')}
             </a>
           </motion.div>
         </motion.div>

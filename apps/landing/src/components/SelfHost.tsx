@@ -21,7 +21,6 @@ import { AlertTriangle, BookOpen, Container, Database, Terminal } from 'lucide-r
 import { useI18n } from '@heyta/i18n';
 
 import { revealVariants, staggerContainer, useMotionPreset, VIEWPORT } from '../lib/motion.js';
-import { GITHUB_URL } from './Nav.js';
 
 /**
  * 终端里逐行浮现的命令。最后一行是光标行。
@@ -29,9 +28,18 @@ import { GITHUB_URL } from './Nav.js';
  * ⚠️ 这三行**故意不进词条表**：它们是可复制粘贴执行的 shell 命令（含仓库 URL
  * 与 pnpm 子命令），不是给人读的句子。把命令"翻译"一遍会让用户复制到一条跑不通的
  * 命令 —— 那不是本地化，是造假。真正的文案（标题、步骤、警告）都已走 `t()`。
+ *
+ * 🔴 第一行是**占位符**，不是仓库地址。
+ *
+ * 仓库当前是私有的，在页面上印一个真的 `git clone <真地址>` 等于教访客去撞一个
+ * “repository not found” —— 那比不给出地址更坏，因为它看起来是能用的。
+ * 所以 `<repo-url>` 是**故意留着不填**的，并紧跟着用
+ * `landing.selfhost.sourcePending` 说明为什么 —— 页面下方那条说明不是装饰，
+ * 是这段代码诚实的前提。真地址在 `Nav.tsx` 顶部那份「公开后要加回来的清单」里，
+ * 公开后替换这一行即可。
  */
 const COMMANDS = [
-  'git clone https://github.com/Xaiver03/heyta.git',
+  'git clone <repo-url>',
   'cd heyta && pnpm install && pnpm -r build',
   'cd server && docker compose up -d',
 ];
@@ -165,10 +173,21 @@ export function SelfHost(): React.JSX.Element {
               </div>
             </motion.div>
 
-            <a className="lp-link" href={`${GITHUB_URL}/blob/main/docs/runbooks/local-server-verification.md`} target="_blank" rel="noreferrer noopener">
+            {/*
+              这条替换掉了原来指向 `docs/runbooks/local-server-verification.md` 的
+              外链（仓库私有 → 对访客是 404）。**不能只删不补**：上面那三行命令
+              现在跑不通，页面上必须有人把这件事说出来。
+            */}
+            <motion.div
+              className="lp-note"
+              variants={revealVariants(preset.reduced, preset.ui)}
+              initial="hidden"
+              whileInView="visible"
+              viewport={VIEWPORT}
+            >
               <BookOpen size={16} aria-hidden="true" />
-              {t('landing.selfhost.guide')}
-            </a>
+              <div>{t('landing.selfhost.sourcePending')}</div>
+            </motion.div>
           </div>
         </div>
       </div>

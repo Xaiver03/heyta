@@ -325,7 +325,7 @@ describe('wechat adapter — createCheckout（stub fetch，🔴 没有真网络�
     const body = JSON.parse(String(captured!.init.body)) as Record<string, unknown>;
     expect(body.appid).toBe(APP_ID);
     expect(body.mchid).toBe(MCH_ID);
-    expect(body.amount).toEqual({ total: 13_900, currency: 'CNY' });
+    expect(body.amount).toEqual({ total: 9_900, currency: 'CNY' });
     expect(body.attach).toBe('42');
     expect(body.notify_url).toBe(NOTIFY_URL);
     expect(parseUserIdFromOutTradeNo(String(body.out_trade_no))).toBe(42);
@@ -619,8 +619,8 @@ describe('wechat adapter — 🔴 金额校验（付的钱必须落在价目表�
       ...opts,
     });
 
-  it('付对金额（13_900 = ¥139）→ 授予 365 天', async () => {
-    const f = fixtureWithAmount(13_900);
+  it('付对金额（9_900 = ¥99）→ 授予 365 天', async () => {
+    const f = fixtureWithAmount(9_900);
     const r = await adapter.verifyWebhook(f.body, f.headers);
 
     expect(r.ok).toBe(true);
@@ -661,7 +661,7 @@ describe('wechat adapter — 🔴 金额校验（付的钱必须落在价目表�
   });
 
   it('篡改金额过不了验签（密文受签名保护）', async () => {
-    const f = fixtureWithAmount(13_900);
+    const f = fixtureWithAmount(9_900);
     const tampered = Buffer.from(f.body.toString('utf8').replace('ciphertext', 'ciphertexT'));
     await expect(adapter.verifyWebhook(tampered, f.headers)).resolves.toEqual({
       ok: false,
@@ -672,17 +672,17 @@ describe('wechat adapter — 🔴 金额校验（付的钱必须落在价目表�
   it('运营者自定义价目表时，按自定义金额校验', async () => {
     const custom = createAdapter({
       now: () => NOW,
-      prices: { annual: { totalFen: 9_900, description: '促销' } },
+      prices: { annual: { totalFen: 19_900, description: '促销' } },
     });
 
-    const ok = fixtureWithAmount(9_900);
+    const ok = fixtureWithAmount(19_900);
     const r1 = await custom.verifyWebhook(ok.body, ok.headers);
     expect(r1.ok).toBe(true);
     if (r1.ok) expect(r1.event.oneTimeGrant).toEqual({ periodDays: 365 });
 
-    // 默认的 13_900 在自定义价目表下**不再**被接受 —— 证明校验读的是
-    // 实际生效的价目表，而不是写死的 13900。
-    const stale = fixtureWithAmount(13_900);
+    // 默认的 9_900 在自定义价目表下**不再**被接受 —— 证明校验读的是
+    // 实际生效的价目表，而不是写死的 9900。
+    const stale = fixtureWithAmount(9_900);
     const r2 = await custom.verifyWebhook(stale.body, stale.headers);
     expect(r2.ok).toBe(true);
     if (r2.ok) expect(r2.event.oneTimeGrant).toBeNull();

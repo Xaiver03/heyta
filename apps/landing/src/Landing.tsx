@@ -9,9 +9,14 @@
  *   4. 真实界面展厅   滚动固定的横向切换
  *   5. 同步          全宽 3D 画布（WebGL）
  *   6. 隐私          滚动驱动的逐字加密
- *   7. 自建          分栏（终端 + 步骤）
- *   8. 收尾 CTA      居中宣言
- *   9. 页脚
+ *   7. 价格          两栏对等对比（免费的自建 / 收费的托管）
+ *   8. 自建          分栏（终端 + 步骤）
+ *   9. 收尾 CTA      居中宣言
+ *  10. 页脚
+ *
+ * ⚠️ 价格排在自建**之前**：叙述是「只有一件事收费 → 而免费的那条路就在下面」。
+ *    反过来放的话，读者先在自建那节读完一整段终端流程，才看到原来还有收费档，
+ *    而那时他已经不知道自己在选什么了。导航里的顺序与此一致。
  *
  * 主题：**亮色为主，可切暗色**。切换只改 `<html data-theme>`，
  * 组件零改动 —— 这是设计系统"组件只消费语义变量"的直接收益。
@@ -47,6 +52,7 @@ import { Deferred } from './components/Deferred.js';
 import { SceneBoundary } from './components/SceneBoundary.js';
 import { SyncFallback } from './components/SyncFallback.js';
 import { Privacy } from './components/Privacy.js';
+import { Pricing } from './components/Pricing.js';
 import { SelfHost } from './components/SelfHost.js';
 import { FinalCta } from './components/FinalCta.js';
 import { Footer } from './components/Footer.js';
@@ -103,6 +109,7 @@ export function Landing(): React.JSX.Element {
           </SceneBoundary>
         </Deferred>
         <Privacy />
+        <Pricing />
         <SelfHost />
         <FinalCta />
       </main>

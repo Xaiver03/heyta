@@ -24,7 +24,7 @@ import { motion, useMotionValueEvent, useScroll, useTransform, type MotionValue 
 import { useI18n } from '@heyta/i18n';
 
 import { AppWindow, type MockView } from '../mockup/AppWindow.js';
-import { useMotionPreset } from '../lib/motion.js';
+import { showcaseWindowOpacity, showcaseWindowOpacityReduced, useMotionPreset } from '../lib/motion.js';
 
 interface Screen {
   view: MockView;
@@ -50,7 +50,23 @@ function ShowcaseWindow({
   // 该窗口在"自己那一格"时 offset = 0；滚过去变负，还没到变正。
   const offset = useTransform(progress, (p) => index - p * (total - 1));
 
-  const opacity = useTransform(offset, (o) => Math.max(0, 1 - Math.abs(o) * 1.05));
+  /**
+   * 🔴 两条曲线，因为"谁遮挡谁"在两条路径上不是同一回事。
+   *
+   * 3D 路径下靠 `translateZ` 分出前后，**靠前的那块必须完全不透明**，
+   * 否则后面那块会从它里面透出来 —— 换位中点上前后两块同时 47.6%，
+   * 看起来就是双重曝光。所以 3D 走"平台 + 快速收尾"。
+   *
+   * 减动效路径下位移与旋转都被去掉、三块 `inset: 0` 直叠，
+   * "前后关系"不存在了，只能靠透明度表达遮挡 —— 那一路径必须保留平滑淡出。
+   *
+   * ⚠️ 曲线做成 `lib/motion.ts` 里的纯函数，是因为它有一个**能证伪的不变量**
+   * （任何进度下都至少有一块完全不透明），只能靠测试钉：
+   * `tests/showcase-opacity.spec.ts`。
+   */
+  const opacity = useTransform(offset, (o) =>
+    reduced ? showcaseWindowOpacityReduced(o) : showcaseWindowOpacity(o),
+  );
 
   /**
    * 🔴 合成**一条** transform 字符串，而不是 x / z / rotateY / scale 四个简写。
