@@ -43,6 +43,7 @@ import {
   materializedState,
   openAppHost,
   type AppHost,
+  type NewTaskFields,
 } from '@heyta/app-host';
 import type { Task } from '@heyta/domain';
 import type { OpIntent } from '@heyta/op-log';
@@ -70,8 +71,13 @@ export interface NodeHost {
   readonly clientId: string;
   readonly engine: AppHost['engine'];
 
-  /** 创建任务。返回新任务的实体 id。 */
-  addTask(title: string): Promise<string>;
+  /**
+   * 创建任务。返回新任务的实体 id。
+   *
+   * `over` 直接透传给 `createTaskActions().create` —— 本壳**不解释**任何字段，
+   * 特别是 `dueDate`：它是领域层的时间戳语义，壳只管把参数递进去。
+   */
+  addTask(title: string, over?: NewTaskFields): Promise<string>;
   /** 改标题（UPD op）。 */
   renameTask(entityId: string, title: string): Promise<void>;
   /** 完成 / 取消完成（UPD op）。 */
@@ -110,7 +116,7 @@ export async function openNodeHost(options: NodeHostOptions): Promise<NodeHost> 
     clientId: app.clientId,
     engine: app.engine,
 
-    addTask: (title) => actions.create(title),
+    addTask: (title, over) => actions.create(title, over),
     renameTask: (entityId, title) => actions.rename(entityId, title),
     setCompleted: (entityId, completed) => actions.setCompleted(entityId, completed),
     listTasks: () => actions.listTasks(),

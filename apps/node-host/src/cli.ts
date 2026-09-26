@@ -22,10 +22,12 @@
 
 import { writeSync } from 'node:fs';
 
+import { parseLocalDate } from '@heyta/domain';
+import type { NewTaskFields } from '@heyta/app-host';
 import { openNodeHost } from './host.js';
 import type { SyncStatus } from '@heyta/sync-client';
 
-const VALUE_FLAGS = new Set(['db', 'server', 'token', 'password', 'client-id']);
+const VALUE_FLAGS = new Set(['db', 'server', 'token', 'password', 'client-id', 'due']);
 const BOOL_FLAGS = new Set(['json', 'all', 'help']);
 
 interface ParsedArgs {
@@ -110,7 +112,7 @@ const USAGE = `heyta node-host —— 非 Web 宿主（真实 SQLite + 真实同
   --json               机器可读输出
 
 命令：
-  add <标题>                创建一个任务
+  add <标题> [--due 2026-10-05]  创建一个任务（--due 是**本地日期**）
   list [--all]              列出任务（默认只列未完成）
   rename <id> <标题>        改标题
   complete <id>             标记完成
@@ -162,9 +164,18 @@ async function main(): Promise<number> {
       case 'add': {
         const title = positionals[0];
         if (title === undefined) throw new Error('add 需要 <标题>');
-        const id = await host.addTask(title);
-        if (json) out(JSON.stringify({ ok: true, command: 'add', id }));
-        else out(`已创建任务 ${id}：${title}`);
+        // `--due` 收的是**本地日期**（`2026-10-05`），不是时间戳。
+        // 理由与 `NewTaskFields.dueDate` 的语义词一致：截止时间在领域层是
+        // "哪一天"，交给 `parseLocalDate` 落地成本地午夜。
+        // 🔴 不自己切分字符串：`parseLocalDate` 会校验格式并抛错，
+        // 而手写的 `split('-')` 遇到 `2026-1-5` 或手滑的 `2026-13-40`
+        // 会安静地算出别的日子（`Date` 会自动进位），脚本却以为自己传对了。
+        const due = stringFlag(flags, 'due');
+        const over: NewTaskFields = {};
+        if (due !== undefined) over.dueDate = parseLocalDate(due).getTime();
+        const id = await host.addTask(title, Object.keys(over).length > 0 ? over : undefined);
+        if (json) out(JSON.stringify({ ok: true, command: 'add', id, due: due ?? null }));
+        else out(`已创建任务 ${id}：${title}${due !== undefined ? `（截止 ${due}）` : ''}`);
         return 0;
       }
 
@@ -182,6 +193,16 @@ async function main(): Promise<number> {
                 id: task.id,
                 title: task.title,
                 completedAt: task.completedAt ?? null,
+                // 验收要能断言"截止日期/优先级真的同步到了另一台设备"。
+                // 在此之前 list 只吐 title/completedAt，于是跨设备只能证明标题同步 ——
+                // 而这两项恰恰是"能日常用"的核心字段。
+                dueDate: task.dueDate ?? null,
+                priority: task.priority ?? null,
+                // 重复规则也要能看到：验收要证明"在手机上设的重复，笔记本上读到了"。
+                // 没有这两项时，跨设备只能证到截止时间，重复规则同步没同步**无法断言** ——
+                // 而"没法断言的字段"正是最可能在半路上丢掉的。
+                repeatRule: task.repeatRule ?? null,
+                repeatDtstart: task.repeatDtstart ?? null,
                 createdAt: task.createdAt,
                 updatedAt: task.updatedAt,
               })),
