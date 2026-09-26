@@ -18,4 +18,5 @@ export * from './recurrence.js';
 export * from './capture.js';
 export * from './countdown.js';
 export * from './memory.js';
+export * from './preferences.js';
 export * from './recall.js';
