@@ -18,6 +18,8 @@
 
 import { Coffee, Pause, Play, Square, Zap } from 'lucide-react';
 
+import { useI18n } from '@heyta/i18n';
+
 /** SVG 用户单位，**不是 px** —— 实际尺寸由 width/height 的 rem 值决定。 */
 const VIEWBOX = 180;
 const STROKE = 10;
@@ -69,6 +71,7 @@ function Ring({ progress }: { progress: number }): React.JSX.Element {
 
 export function FocusRing(): React.JSX.Element {
   const progress = ELAPSED_SECONDS / TOTAL_SECONDS;
+  const { t } = useI18n();
 
   return (
     <div className="mk-focus">
@@ -78,7 +81,7 @@ export function FocusRing(): React.JSX.Element {
           <div className="mk-focus__time">{formatClock(REMAINING_SECONDS)}</div>
           <div className="mk-focus__phase">
             <Zap size={12} />
-            专注
+            {t('landing.mock.focus.phase')}
           </div>
         </div>
       </div>
@@ -86,29 +89,29 @@ export function FocusRing(): React.JSX.Element {
       <div className="mk-focus__actions">
         <div className="mk-btn-primary">
           <Pause size={18} />
-          暂停
+          {t('landing.mock.focus.pause')}
         </div>
         <div className="mk-viewtab">
           <Square size={18} />
-          中止
+          {t('landing.mock.focus.stop')}
         </div>
       </div>
 
       {/* 关联任务：只列未完成的，避免选到一个已经做完的任务 */}
       <div className="mk-input" style={{ inlineSize: 'var(--ht-layout-sidebar-width)' }}>
-        关联任务：整理本周周报，发给团队
+        {t('landing.mock.focus.linkedTask', { task: t('landing.mock.task.weeklyReport') })}
       </div>
 
       <div className="mk-focus__stat">
-        今日已完成 3 个专注
+        {t('landing.mock.focus.completedToday')}
         <span style={{ marginInlineStart: 'var(--ht-space-2)' }}>
-          <Coffee size={12} style={{ display: 'inline' }} /> 休息 5 分钟
+          <Coffee size={12} style={{ display: 'inline' }} /> {t('landing.mock.focus.break5')}
         </span>
       </div>
 
       <div className="mk-viewtab">
         <Play size={14} />
-        开始下一段
+        {t('landing.mock.focus.startNext')}
       </div>
     </div>
   );

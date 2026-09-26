@@ -1,5 +1,13 @@
 <!doctype html>
-<html lang="zh-CN">
+<!--
+  英文版入口。与根目录的 index.html **共用同一个 JS bundle**，
+  只有 <html lang>、标题、描述与 hreflang 不同。
+
+  为什么不做成"一个 HTML + 客户端切语言"：
+  那样英文版没有独立地址，搜索引擎收录不到，而**自然流量正是这个页面存在的理由**。
+  两个静态入口是 SEO 正确的做法，代价只是多一个 1.7KB 的 HTML。
+-->
+<html lang="en">
   <head>
     <meta charset="UTF-8" />
     <meta
@@ -7,27 +15,30 @@
       content="width=device-width, initial-scale=1, viewport-fit=cover"
     />
     <meta name="color-scheme" content="light dark" />
-    <!-- favicon 来源见 public/favicon.svg 的文件头：由品牌自己的蓝点 + 字标首字母构成 -->
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <title>heyta：本地优先的任务管理，可自建自托管</title>
+    <title>heyta: local-first task management you can self-host</title>
     <meta
       name="description"
-      content="heyta 是一个本地优先的任务管理应用：数据先落本地，云端只是同步通道，服务端看不到明文。功能对标滴答清单，可以完全用自己的服务器。"
+      content="heyta is a local-first task manager: your data lands on your device first, the cloud is only a sync channel, and the server never sees plaintext. TickTick-class features, and you can run it entirely on your own server."
     />
 
     <!--
-      hreflang 三件套：告诉搜索引擎 `/` 与 `/en/` 是**同一页面的两个语言版本**，
+      hreflang 三件套：告诉搜索引擎这两个地址是**同一页面的两个语言版本**，
       而不是两份互相重复的内容。少了它，两版会互相抢排名。
       x-default 指向中文版（主站），用于语言未匹配时的兜底。
     -->
-    <link rel="canonical" href="https://heyta.finlaw.cloud/" />
+    <link rel="canonical" href="https://heyta.finlaw.cloud/en/" />
     <link rel="alternate" hreflang="zh-CN" href="https://heyta.finlaw.cloud/" />
     <link rel="alternate" hreflang="en" href="https://heyta.finlaw.cloud/en/" />
     <link rel="alternate" hreflang="x-default" href="https://heyta.finlaw.cloud/" />
+
     <!--
       主题引导：在样式表之前同步执行，避免暗色用户看到一帧亮色（FOUC）。
       与 `src/lib/theme.ts` 共用同一个 storage key —— 两处不一致会让
       刷新后主题闪一下，而那种闪烁很容易被当成"渲染 bug"去查错方向。
+
+      ⚠️ 语言**不在这里**引导，与主题刻意不同：主题是纯偏好（无 URL 语义），
+      语言有 URL 语义（/ 与 /en/），由路径决定，见 src/lib/locale.ts。
     -->
     <script>
       (function () {

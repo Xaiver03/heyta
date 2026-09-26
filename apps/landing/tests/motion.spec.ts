@@ -9,9 +9,13 @@
  *   2. `prefers-reduced-motion` 下**位移必须消失**，但**透明度必须保留** ——
  *      去掉位移是可达性要求，去掉淡入是功能倒退。
  *   3. 错峰在降级时必须是 0（否则"减少动效"下元素仍然一个个慢慢出现）。
+ *   4. 正常模式的入场**必须带 transition** —— 少了它 Motion 会静默回落到
+ *      库内置的过冲弹簧（`underDampedSpring`，bounce≈0.44），
+ *      整页的入场人格就都跑在 `tokens.css` 之外了。
  */
 
 import { describe, expect, it } from 'vitest';
+import type { Transition } from 'motion/react';
 
 import {
   revealVariants,
@@ -19,6 +23,9 @@ import {
   toSpringOptions,
   VIEWPORT,
 } from '../src/lib/motion.js';
+
+/** 测试用的显式弹簧：与 `preset.ui` 同类（临界阻尼、不过冲）。 */
+const TEST_TRANSITION: Transition = { type: 'spring', bounce: 0, duration: 0.4 };
 
 describe('toSpringOptions：Apple 参数 → 二阶系统', () => {
   it('ω₀ = 2π / response，且 stiffness = ω₀²、damping = 2ζω₀', () => {
@@ -57,21 +64,33 @@ describe('toSpringOptions：Apple 参数 → 二阶系统', () => {
 
 describe('revealVariants：减少动效时的降级', () => {
   it('正常模式带位移（y）', () => {
-    const variants = revealVariants(false);
+    const variants = revealVariants(false, TEST_TRANSITION);
     expect(variants.hidden).toHaveProperty('y');
     expect(variants.visible).toHaveProperty('y');
   });
 
   it('减少动效时**没有** y —— 位移是前庭不适的主要来源', () => {
-    const variants = revealVariants(true);
+    const variants = revealVariants(true, TEST_TRANSITION);
     expect(variants.hidden).not.toHaveProperty('y');
     expect(variants.visible).not.toHaveProperty('y');
   });
 
   it('减少动效时**保留** opacity —— 去掉淡入会让"状态变了"这条信息一起消失', () => {
-    const variants = revealVariants(true);
+    const variants = revealVariants(true, TEST_TRANSITION);
     expect(variants.hidden).toHaveProperty('opacity', 0);
     expect(variants.visible).toHaveProperty('opacity', 1);
+  });
+
+  /**
+   * 🔴 这条钉的是一个**具体回归**：`revealVariants` 曾经不接收 transition，
+   * 于是 `y` 走 Motion 的库默认值 `underDampedSpring`（stiffness 500/damping 25
+   * → ζ≈0.56、bounce≈0.44），全页入场都变成过冲的，而且绕开了 tokens.css。
+   * 现在 transition 是必填参数，这条断言保证它真的被挂到了 `visible` 上。
+   */
+  it('正常模式**必须**把调用方给的 transition 挂到 visible 上', () => {
+    const variants = revealVariants(false, TEST_TRANSITION);
+    const visible = variants['visible'] as { transition?: Transition } | undefined;
+    expect(visible?.transition).toBe(TEST_TRANSITION);
   });
 });
 

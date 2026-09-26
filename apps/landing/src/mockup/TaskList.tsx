@@ -13,7 +13,10 @@
  *      （「已逾期 2 天」这几个字已经说清了一切）。
  */
 
+import { useMemo } from 'react';
 import { Check, Sparkles, Trash2 } from 'lucide-react';
+
+import { useI18n } from '@heyta/i18n';
 
 type DueTone = 'overdue' | 'today' | 'soon' | 'none';
 
@@ -25,60 +28,67 @@ interface MockTask {
   ai?: boolean;
 }
 
-/**
- * 展示用的任务数据。
- *
- * ⚠️ 这是**手工编排的示例数据**，不是从某个真实账号导出的。
- * 挑的都是任务管理里典型的一天：一件逾期的、一件今天的、两件本周的、
- * 一件委派出去的、一件先不做的，外加一件已完成的 —— 这样列表里
- * 四种紧迫度和三种优先级都能被看到，而不是清一色的「今天」。
- */
-const TASKS: MockTask[] = [
-  {
-    title: '回复客户关于报价的邮件',
-    due: { text: '已逾期 2 天', tone: 'overdue' },
-    priority: 1,
-  },
-  {
-    title: '整理本周周报，发给团队',
-    due: { text: '今天 18:00', tone: 'today' },
-    priority: 1,
-    ai: true,
-  },
-  {
-    title: '写 Q4 目标拆解初稿',
-    due: { text: '还剩 3 天', tone: 'soon' },
-    priority: 2,
-  },
-  {
-    title: '读完《高效能人士的七个习惯》第 3 章',
-    due: { text: '还剩 5 天', tone: 'soon' },
-    priority: 3,
-  },
-  {
-    title: '预约牙医，确认下周三上午',
-    due: { text: '明天', tone: 'soon' },
-    priority: 2,
-  },
-  {
-    title: '整理上个月的照片备份',
-  },
-  {
-    title: '提交 9 月报销单',
-    done: true,
-    due: { text: '已完成', tone: 'none' },
-  },
-];
-
 function DueBadge({ due }: { due: { text: string; tone: DueTone } }): React.JSX.Element {
   const toneClass = due.tone === 'none' ? '' : ` mk-due--${due.tone}`;
   return <span className={`mk-due${toneClass}`}>{due.text}</span>;
 }
 
 export function TaskList(): React.JSX.Element {
+  const { t } = useI18n();
+
+  /**
+   * 展示用的任务数据。
+   *
+   * ⚠️ 这是**手工编排的示例数据**，不是从某个真实账号导出的。
+   * 挑的都是任务管理里典型的一天：一件逾期的、一件今天的、两件本周的、
+   * 一件委派出去的、一件先不做的，外加一件已完成的 —— 这样列表里
+   * 四种紧迫度和三种优先级都能被看到，而不是清一色的「今天」。
+   *
+   * 数据挪进组件内是文案迁移的硬要求（模块级拿不到 `t`）。取舍见 `Landing.tsx` 文件头。
+   */
+  const tasks = useMemo<MockTask[]>(
+    () => [
+      {
+        title: t('landing.mock.task.quote'),
+        due: { text: t('landing.mock.due.overdue2'), tone: 'overdue' },
+        priority: 1,
+      },
+      {
+        title: t('landing.mock.task.weeklyReport'),
+        due: { text: t('landing.mock.due.today1800'), tone: 'today' },
+        priority: 1,
+        ai: true,
+      },
+      {
+        title: t('landing.mock.task.q4Draft'),
+        due: { text: t('landing.mock.due.in3Days'), tone: 'soon' },
+        priority: 2,
+      },
+      {
+        title: t('landing.mock.task.bookChapter'),
+        due: { text: t('landing.mock.due.in5Days'), tone: 'soon' },
+        priority: 3,
+      },
+      {
+        title: t('landing.mock.task.dentist'),
+        due: { text: t('landing.mock.due.tomorrow'), tone: 'soon' },
+        priority: 2,
+      },
+      {
+        title: t('landing.mock.task.photoBackup'),
+      },
+      {
+        title: t('landing.mock.task.expense'),
+        done: true,
+        due: { text: t('landing.mock.due.done'), tone: 'none' },
+      },
+    ],
+    [t],
+  );
+
   return (
     <div className="mk-tasklist">
-      {TASKS.map((task) => (
+      {tasks.map((task) => (
         <div
           key={task.title}
           className={`mk-task${task.done === true ? ' mk-task--done' : ''}`}

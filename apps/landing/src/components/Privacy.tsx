@@ -20,8 +20,7 @@ import { useRef, useState } from 'react';
 import { useMotionValueEvent, useScroll } from 'motion/react';
 import { Server, Smartphone } from 'lucide-react';
 
-/** 演示用的明文。挑一句"一看就知道不该给别人看"的话。 */
-const PLAINTEXT = '给妈妈买生日礼物';
+import { useI18n } from '@heyta/i18n';
 
 const CIPHER_ALPHABET = '0123456789ABCDEF';
 
@@ -43,13 +42,17 @@ export function cipherCharAt(index: number): string {
 export function Privacy(): React.JSX.Element {
   const sectionRef = useRef<HTMLElement>(null);
   const [encrypted, setEncrypted] = useState(0);
+  const { t } = useI18n();
 
   const { scrollYProgress } = useScroll({
     target: sectionRef,
     offset: ['start 0.85', 'end 0.45'],
   });
 
-  const chars = [...PLAINTEXT];
+  // 演示用的明文：挑一句"一看就知道不该给别人看"的话。它同时是密文的字符来源，
+  // 所以英文版长短不同没关系 —— 加密进度是按这段文字的实际长度算出来的。
+  const plaintext = t('landing.privacy.plaintext');
+  const chars = [...plaintext];
 
   useMotionValueEvent(scrollYProgress, 'change', (value) => {
     // 进度 0 → 0 个字已加密；进度 1 → 全部加密
@@ -61,10 +64,11 @@ export function Privacy(): React.JSX.Element {
     <section className="lp-section lp-privacy" id="privacy" ref={sectionRef}>
       <div className="lp-wrap">
         <header className="lp-section__head">
-          <h2 className="lp-h2">服务端从头到尾没见过你的明文</h2>
+          <h2 className="lp-h2">{t('landing.privacy.title')}</h2>
           <p className="lp-section__lede">
-            加密在你的设备上完成，密钥不出设备。服务端拿到的是一段它打不开的东西，
-            而且<strong>没有任何开关能让它看到明文</strong> —— 不是"我们承诺不看"，是"看不到"。
+            {t('landing.privacy.ledeLead')}
+            <strong>{t('landing.privacy.ledeStrong')}</strong>
+            {t('landing.privacy.ledeTail')}
           </p>
         </header>
 
@@ -72,16 +76,16 @@ export function Privacy(): React.JSX.Element {
           <div className="lp-privacy__panel">
             <div className="lp-privacy__panel-head">
               <Smartphone size={16} aria-hidden="true" />
-              你的设备
+              {t('landing.privacy.yourDevice')}
             </div>
-            <p className="lp-privacy__text">{PLAINTEXT}</p>
-            <p className="lp-privacy__note">密钥在这里，也留在这里</p>
+            <p className="lp-privacy__text">{plaintext}</p>
+            <p className="lp-privacy__note">{t('landing.privacy.keyNote')}</p>
           </div>
 
           <div className="lp-privacy__panel lp-privacy__panel--server">
             <div className="lp-privacy__panel-head">
               <Server size={16} aria-hidden="true" />
-              服务端
+              {t('landing.privacy.server')}
             </div>
             <p className="lp-privacy__text lp-privacy__text--cipher">
               {chars.map((char, index) => (
@@ -99,8 +103,11 @@ export function Privacy(): React.JSX.Element {
             </p>
             <p className="lp-privacy__note">
               {encrypted === 0
-                ? '往下滚，看看它到底收到了什么'
-                : `已加密 ${String(encrypted)} / ${String(chars.length)} 个字`}
+                ? t('landing.privacy.noteIdle')
+                : t('landing.privacy.noteProgress', {
+                    done: encrypted,
+                    total: chars.length,
+                  })}
             </p>
           </div>
         </div>

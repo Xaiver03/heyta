@@ -14,48 +14,61 @@
  *   把这条"为什么"留在页面上，比只给一行命令有用。
  */
 
+import { useMemo } from 'react';
 import { motion } from 'motion/react';
 import { AlertTriangle, BookOpen, Container, Database, Terminal } from 'lucide-react';
+
+import { useI18n } from '@heyta/i18n';
 
 import { revealVariants, staggerContainer, useMotionPreset, VIEWPORT } from '../lib/motion.js';
 import { GITHUB_URL } from './Nav.js';
 
-/** 终端里逐行浮现的命令。最后一行是光标行。 */
+/**
+ * 终端里逐行浮现的命令。最后一行是光标行。
+ *
+ * ⚠️ 这三行**故意不进词条表**：它们是可复制粘贴执行的 shell 命令（含仓库 URL
+ * 与 pnpm 子命令），不是给人读的句子。把命令"翻译"一遍会让用户复制到一条跑不通的
+ * 命令 —— 那不是本地化，是造假。真正的文案（标题、步骤、警告）都已走 `t()`。
+ */
 const COMMANDS = [
   'git clone https://github.com/Xaiver03/heyta.git',
   'cd heyta && pnpm install && pnpm -r build',
   'cd server && docker compose up -d',
 ];
 
-const STEPS = [
-  {
-    icon: <Terminal size={18} />,
-    title: '拉代码并构建',
-    body: '需要 Node 22 以上、pnpm 11.8.0。装完依赖跑一次全量构建。',
-  },
-  {
-    icon: <Container size={18} />,
-    title: '起服务端',
-    body: '一条命令拉起同步服务与数据库。服务端只存密文，它没有解密的钥匙。',
-  },
-  {
-    icon: <Database size={18} />,
-    title: '在客户端填地址',
-    body: '首次启动时二选一：填自己的服务器地址，或者用托管。选了随时能换。',
-  },
-];
-
 export function SelfHost(): React.JSX.Element {
   const preset = useMotionPreset();
+  const { t } = useI18n();
+
+  // 数据挪进组件内是文案迁移的硬要求（模块级拿不到 `t`）。取舍见 `Landing.tsx` 文件头。
+  const steps = useMemo(
+    () => [
+      {
+        icon: <Terminal size={18} />,
+        title: t('landing.selfhost.step1.title'),
+        body: t('landing.selfhost.step1.body'),
+      },
+      {
+        icon: <Container size={18} />,
+        title: t('landing.selfhost.step2.title'),
+        body: t('landing.selfhost.step2.body'),
+      },
+      {
+        icon: <Database size={18} />,
+        title: t('landing.selfhost.step3.title'),
+        body: t('landing.selfhost.step3.body'),
+      },
+    ],
+    [t],
+  );
 
   return (
     <section className="lp-section lp-selfhost" id="selfhost">
       <div className="lp-wrap">
         <header className="lp-section__head">
-          <h2 className="lp-h2">自己的服务器，一条命令的事</h2>
+          <h2 className="lp-h2">{t('landing.selfhost.title')}</h2>
           <p className="lp-section__lede">
-            不需要注册账号，不需要订阅。服务端只负责转发密文与判并发，
-            换掉它、关掉它、搬到别的机器上，你的数据都不受影响。
+            {t('landing.selfhost.lede')}
           </p>
         </header>
 
@@ -65,13 +78,13 @@ export function SelfHost(): React.JSX.Element {
             initial="hidden"
             whileInView="visible"
             viewport={VIEWPORT}
-            variants={staggerContainer(preset.reduced, 0.16)}
+            variants={staggerContainer(preset.reduced)}
           >
             <div className="lp-term__bar">
               <span className="lp-term__dot" />
               <span className="lp-term__dot" />
               <span className="lp-term__dot" />
-              <span className="lp-term__title">终端</span>
+              <span className="lp-term__title">{t('landing.selfhost.terminal')}</span>
             </div>
 
             <div className="lp-term__body">
@@ -79,7 +92,7 @@ export function SelfHost(): React.JSX.Element {
                 <motion.div
                   key={command}
                   className="lp-term__line"
-                  variants={revealVariants(preset.reduced, '0.4rem')}
+                  variants={revealVariants(preset.reduced, preset.ui, '0.4rem')}
                 >
                   <span className="lp-term__prompt" aria-hidden="true">
                     $
@@ -88,7 +101,7 @@ export function SelfHost(): React.JSX.Element {
                 </motion.div>
               ))}
 
-              <motion.div className="lp-term__line" variants={revealVariants(preset.reduced, '0.4rem')}>
+              <motion.div className="lp-term__line" variants={revealVariants(preset.reduced, preset.ui, '0.4rem')}>
                 <span className="lp-term__prompt" aria-hidden="true">
                   $
                 </span>
@@ -117,13 +130,13 @@ export function SelfHost(): React.JSX.Element {
           <div className="lp-selfhost__steps">
             <motion.ol
               className="lp-steps"
-              variants={staggerContainer(preset.reduced, 0.07)}
+              variants={staggerContainer(preset.reduced)}
               initial="hidden"
               whileInView="visible"
               viewport={VIEWPORT}
             >
-              {STEPS.map((step, index) => (
-                <motion.li key={step.title} className="lp-step" variants={revealVariants(preset.reduced)}>
+              {steps.map((step, index) => (
+                <motion.li key={step.title} className="lp-step" variants={revealVariants(preset.reduced, preset.ui)}>
                   <span className="lp-step__icon">{step.icon}</span>
                   <span className="lp-step__index">{String(index + 1).padStart(2, '0')}</span>
                   <div>
@@ -137,25 +150,24 @@ export function SelfHost(): React.JSX.Element {
             {/* 这条警告是从真实踩坑记录里拿来的，所以值得占一块版面 */}
             <motion.div
               className="lp-note lp-note--warn"
-              variants={revealVariants(preset.reduced)}
+              variants={revealVariants(preset.reduced, preset.ui)}
               initial="hidden"
               whileInView="visible"
               viewport={VIEWPORT}
             >
               <AlertTriangle size={16} aria-hidden="true" />
               <div>
-                <strong>数据库迁移不要直接调 Prisma。</strong>
-                项目里有 5 个并发建索引的迁移，Prisma 会把迁移包进事务，而 PostgreSQL
-                不允许在事务里建并发索引，跑到第 6 个就会失败。请用仓库里的
+                <strong>{t('landing.selfhost.warnStrong')}</strong>
+                {t('landing.selfhost.warnBody')}
                 {/* 与 apps/web 的 AiSettings 同一写法：代码元素里带中文前缀。
                     这不是凑格式 —— 路径本身对用户没有意义，得先说明它是什么。 */}
-                <code>迁移脚本 scripts/migrate-deploy.sh</code>。
+                <code>{t('landing.selfhost.warnCode')}</code>
               </div>
             </motion.div>
 
             <a className="lp-link" href={`${GITHUB_URL}/blob/main/docs/runbooks/local-server-verification.md`} target="_blank" rel="noreferrer noopener">
               <BookOpen size={16} aria-hidden="true" />
-              完整的部署与验收步骤
+              {t('landing.selfhost.guide')}
             </a>
           </div>
         </div>

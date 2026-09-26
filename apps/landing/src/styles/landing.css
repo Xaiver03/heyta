@@ -89,6 +89,11 @@
   backdrop-filter: blur(var(--ht-blur-chrome)) saturate(180%);
   -webkit-backdrop-filter: blur(var(--ht-blur-chrome)) saturate(180%);
   box-shadow: var(--ht-shadow-md);
+  /* 浮起时阴影从 sm 换到 lg（Nav.tsx 按滚动位置切 style）。
+     没有这条过渡，材质变化是**瞬变**的 —— 而 Nav.tsx 开头说这层阴影
+     是 Apple 的 scroll edge effect，用材料表达"内容从下面过去了"。
+     瞬变读不出这个意思。 */
+  transition: box-shadow var(--ht-duration-normal) var(--ht-ease-standard);
 }
 
 /* 亮色顶边 = 光打在材料上。没有它，半透明面会显得像"没画完"。
@@ -102,6 +107,9 @@
   pointer-events: none;
 }
 
+/* ⚠️ 这个类被**导航**和**页脚**共用，但两处的品牌表达不同：
+   导航是字标（.lp-brand__mark），页脚仍是「蓝点 + heyta 文字」（.lp-brand__dot）。
+   所以这里的文字排版规则必须留着 —— 删掉的话页脚的字号/字重会一起塌掉。 */
 .lp-brand {
   display: flex;
   align-items: center;
@@ -122,6 +130,21 @@
   block-size: var(--ht-icon-sm);
   border-radius: var(--ht-radius-full);
   background: var(--ht-color-primary);
+}
+
+/* 字标的尺寸只由这里决定：给高度，宽度靠 viewBox 的固有比例推出来（不写死 width，
+   否则样式表和 SVG 两处会打架）。颜色走 currentColor —— 亮色 blue-600、暗色 blue-400，
+   随主题自动切换，所以静态 SVG 里那套烘死的渐变不能用在导航上。 */
+.lp-brand__mark {
+  display: block;
+  block-size: var(--ht-icon-lg);
+  inline-size: auto;
+  color: var(--ht-color-primary);
+  transition: color var(--ht-duration-normal) var(--ht-ease-standard);
+}
+
+.lp-brand:hover .lp-brand__mark {
+  color: var(--ht-color-primary-hover);
 }
 
 .lp-nav__links {
@@ -166,17 +189,24 @@
   font-size: var(--ht-font-size-sm);
   font-weight: var(--ht-font-weight-medium);
   /* 按下反馈在 pointer-down 上出现，100ms 是"看得见但感觉不到等待"
-     （Apple《Designing Fluid Interfaces》） */
+     （Apple《Designing Fluid Interfaces》）。
+     基态（抬起）用 instant：松手要**脆**，按下才是刻意的 —— AUDIT §4
+     明确把「按下与抬起共用同一套时序」列为一条问题。 */
   transition: background-color var(--ht-duration-fast) var(--ht-ease-standard),
     color var(--ht-duration-fast) var(--ht-ease-standard),
     border-color var(--ht-duration-fast) var(--ht-ease-standard),
-    transform var(--ht-duration-press) var(--ht-ease-standard);
+    transform var(--ht-duration-instant) var(--ht-ease-standard);
   /* CTA 文案在桌面端必须一行放得下 */
   white-space: nowrap;
 }
 
 .lp-btn:active {
   transform: scale(var(--ht-motion-press-scale));
+  /* 按下稍慢（100ms），抬起走基态的 80ms —— 两个方向故意不同速 */
+  transition: background-color var(--ht-duration-fast) var(--ht-ease-standard),
+    color var(--ht-duration-fast) var(--ht-ease-standard),
+    border-color var(--ht-duration-fast) var(--ht-ease-standard),
+    transform var(--ht-duration-press) var(--ht-ease-standard);
 }
 
 .lp-btn--primary {
@@ -215,13 +245,55 @@
   block-size: var(--ht-touch-target-min);
   border-radius: var(--ht-radius-full);
   color: var(--ht-color-foreground-muted);
+  /* 按下反馈与 hover 同源（AUDIT §3：可按元素必须有按下反馈）。
+     基态 instant = 松手脆，:active 用 press = 按下刻意。 */
   transition: background-color var(--ht-duration-fast) var(--ht-ease-standard),
-    color var(--ht-duration-fast) var(--ht-ease-standard);
+    color var(--ht-duration-fast) var(--ht-ease-standard),
+    transform var(--ht-duration-instant) var(--ht-ease-standard);
 }
 
 .lp-iconbtn:hover {
   background: var(--ht-color-hover);
   color: var(--ht-color-foreground);
+}
+
+.lp-iconbtn:active {
+  transform: scale(var(--ht-motion-press-scale));
+}
+
+/* ── 语言切换器 ────────────────────────────────────────────
+   显示的是**目标语言自己的文字**（中文 / English），而不是把"英文"
+   翻译成当前语言。看不懂当前语言的用户，恰恰是最需要找到这个入口的人 ——
+   把 "English" 写成「英文」，对他没有任何帮助。
+
+   它是个**链接**而不是按钮：切换会整页跳到另一个地址（理由见 src/lib/locale.ts），
+   所以刷新、复制链接、前进后退都符合浏览器预期。 */
+.lp-lang {
+  display: grid;
+  place-items: center;
+  min-inline-size: var(--ht-touch-target-min);
+  block-size: var(--ht-touch-target-min);
+  padding-inline: var(--ht-space-2);
+  border-radius: var(--ht-radius-full);
+  font-size: var(--ht-font-size-sm);
+  font-weight: var(--ht-font-weight-medium);
+  color: var(--ht-color-foreground-muted);
+  /* reset.css 给 a:hover 加了全局下划线，那对胶囊按钮不合适，压掉。 */
+  text-decoration: none;
+  /* 与 .lp-iconbtn 同一套反馈时序：基态 instant（松手脆），按下 press（刻意）。 */
+  transition: background-color var(--ht-duration-fast) var(--ht-ease-standard),
+    color var(--ht-duration-fast) var(--ht-ease-standard),
+    transform var(--ht-duration-instant) var(--ht-ease-standard);
+}
+
+.lp-lang:hover {
+  background: var(--ht-color-hover);
+  color: var(--ht-color-foreground);
+  text-decoration: none;
+}
+
+.lp-lang:active {
+  transform: scale(var(--ht-motion-press-scale));
 }
 
 /* ── 英雄区：非对称分栏 ───────────────────────────────────
@@ -317,11 +389,26 @@
   pointer-events: none;
 }
 
+/* 入场通道（位移 + 缩放）。
+   必须保留 3D 上下文：perspective 在 .lp-hero__stage 上，而卡现在是它的**孙级**，
+   没有 preserve-3d 的话卡的旋转就拿不到那层透视，纵深会整体塌掉。 */
+.lp-hero__enter {
+  transform-style: preserve-3d;
+}
+
 .lp-hero__card {
   position: relative;
   z-index: var(--ht-z-base);
   transform-style: preserve-3d;
-  will-change: transform;
+}
+
+/* will-change 只给**能触发倾斜**的设备（AUDIT §5：无差别/永久的 will-change
+   会常驻提升图层、吃掉 GPU 内存，而触摸设备根本不会倾斜 —— 倾斜只由
+   pointermove 驱动，只在 hover + 精确指针下才可能发生）。 */
+@media (hover: hover) and (pointer: fine) {
+  .lp-hero__card {
+    will-change: transform;
+  }
 }
 
 /* 浮在应用窗口之上的一层"状态浮片" —— 3D 纵深靠它读出来 */
@@ -645,22 +732,48 @@
   margin-block-start: var(--ht-space-4);
 }
 
+/* li 只做布局容器，真正的盒子是里面的 button —— 这样**整行**都是可点区域。
+   只让 1/2/3 那个 24px 的圆点可点的话，命中区域太小，触屏上很难按准。 */
 .lp-showcase__item {
   display: flex;
+}
+
+.lp-showcase__item-btn {
+  display: flex;
   gap: var(--ht-space-3);
+  inline-size: 100%;
   padding: var(--ht-space-4);
+  text-align: start;
   border: var(--ht-border-width-thin) solid transparent;
   border-radius: var(--ht-radius-lg);
+  background: none;
+  color: inherit;
+  /* button 不继承字体，必须显式要回来，否则这一行的排版会退回浏览器默认值。 */
+  font: inherit;
+  cursor: pointer;
   opacity: 0.45;
   transition: opacity var(--ht-duration-normal) var(--ht-ease-standard),
     background-color var(--ht-duration-normal) var(--ht-ease-standard),
     border-color var(--ht-duration-normal) var(--ht-ease-standard);
 }
 
-.lp-showcase__item--active {
+/* 悬停要有"可点"的预反馈：非当前项平时是 0.45 不透明度，
+   不提示的话用户未必看得出它可以点。
+   `:focus-visible` 不用自己写 —— reset.css 有全局规则。 */
+.lp-showcase__item-btn:hover {
+  opacity: 0.78;
+  background: var(--ht-color-surface-sunken);
+}
+
+.lp-showcase__item--active .lp-showcase__item-btn {
   opacity: 1;
   background: var(--ht-color-surface);
   border-color: var(--ht-color-border);
+}
+
+/* 当前项悬停时保持已选中的底色，否则鼠标移上去会"掉回"未选中态。 */
+.lp-showcase__item--active .lp-showcase__item-btn:hover {
+  background: var(--ht-color-surface);
 }
 
 .lp-showcase__index {
@@ -675,6 +788,10 @@
   font-weight: var(--ht-font-weight-semibold);
   font-variant-numeric: tabular-nums;
   color: var(--ht-color-foreground-muted);
+  /* 与所在行同时序（.lp-showcase__item 用 --ht-duration-normal + ease-standard）。
+     没有它，当前屏切换时徽章底色会**跳变**，而行是渐变的。 */
+  transition: background-color var(--ht-duration-normal) var(--ht-ease-standard),
+    color var(--ht-duration-normal) var(--ht-ease-standard);
 }
 
 .lp-showcase__item--active .lp-showcase__index {
@@ -711,6 +828,13 @@
 .lp-showcase__win {
   position: absolute;
   inset: 0;
+}
+
+/* will-change 只在展厅**进入视口**时才加（AUDIT §5：它必须窄而临时）。
+   三块窗口是 inset:0 的整屏元素、内部各有 backdrop-filter 材质，
+   永久提升三层大图层会常驻吃掉 GPU 内存，而这套变换只在滚过这一节时发生。
+   data-active 由 Showcase.tsx 里的 IntersectionObserver 维护。 */
+.lp-showcase[data-active='true'] .lp-showcase__win {
   will-change: transform, opacity;
 }
 
@@ -776,6 +900,39 @@
 
 .lp-sync__dot--plain {
   background: var(--ht-color-foreground);
+}
+
+/* ── WebGL 拿不到上下文时的静态替代 ──────────────────────────
+   与 canvas 同一套呈现语言（节点 + 连线 + 数据包），只是不画 3D。
+   位置与 canvas 一致（填满 holder），所以降级不会改变页面高度。 */
+.lp-sync__fallback {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+}
+
+.lp-sync__graph {
+  inline-size: min(100%, 42rem);
+  block-size: auto;
+  /* 让 SVG 里的 `currentColor` 跟着主题走 */
+  color: var(--ht-color-primary);
+}
+
+.lp-sync__graph-edges line {
+  stroke: var(--ht-color-border);
+  stroke-width: var(--ht-border-width-thin);
+}
+
+.lp-sync__graph-nodes circle {
+  fill: var(--ht-material-chrome-tint);
+  stroke: currentColor;
+  stroke-width: var(--ht-border-width-thin);
+}
+
+/* 数据包用实心，和空心的设备节点区分开 —— 这也是图例里两个点色差的由来。 */
+.lp-sync__graph-packets circle {
+  fill: currentColor;
 }
 
 /* ════════════════════════════════════════════════════════════

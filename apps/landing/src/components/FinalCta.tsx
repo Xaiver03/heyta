@@ -14,33 +14,36 @@
 import { motion } from 'motion/react';
 import { ArrowRight, Github } from 'lucide-react';
 
+import { useI18n } from '@heyta/i18n';
+
 import { revealVariants, staggerContainer, useMotionPreset, VIEWPORT } from '../lib/motion.js';
 import { GITHUB_URL } from './Nav.js';
 
 export function FinalCta(): React.JSX.Element {
   const preset = useMotionPreset();
+  const { t } = useI18n();
 
   return (
     <section className="lp-section lp-cta">
       <div className="lp-wrap">
         <motion.div
           className="lp-cta__inner"
-          variants={staggerContainer(preset.reduced, 0.08)}
+          variants={staggerContainer(preset.reduced)}
           initial="hidden"
           whileInView="visible"
           viewport={VIEWPORT}
         >
-          <motion.h2 className="lp-h2 lp-cta__title" variants={revealVariants(preset.reduced)}>
-            你的清单，不该是别人的资产
+          <motion.h2 className="lp-h2 lp-cta__title" variants={revealVariants(preset.reduced, preset.ui)}>
+            {t('landing.cta.title')}
           </motion.h2>
 
-          <motion.p className="lp-cta__lede" variants={revealVariants(preset.reduced)}>
-            代码是开放的，服务端可以自己起。今天就可以把数据搬回自己的机器上。
+          <motion.p className="lp-cta__lede" variants={revealVariants(preset.reduced, preset.ui)}>
+            {t('landing.cta.lede')}
           </motion.p>
 
-          <motion.div className="lp-cta__actions" variants={revealVariants(preset.reduced)}>
+          <motion.div className="lp-cta__actions" variants={revealVariants(preset.reduced, preset.ui)}>
             <a className="lp-btn lp-btn--primary lp-btn--lg" href="#selfhost">
-              开始自建
+              {t('landing.cta.selfHost')}
               <ArrowRight size={18} aria-hidden="true" />
             </a>
             <a
@@ -50,7 +53,7 @@ export function FinalCta(): React.JSX.Element {
               rel="noreferrer noopener"
             >
               <Github size={18} aria-hidden="true" />
-              先看看代码
+              {t('landing.cta.viewCode')}
             </a>
           </motion.div>
         </motion.div>

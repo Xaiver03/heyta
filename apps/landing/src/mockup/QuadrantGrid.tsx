@@ -13,7 +13,10 @@
  * 换色系时象限语义不变，组件不用改（MASTER.md 规则 2）。
  */
 
+import { useMemo } from 'react';
 import { CheckCircle2 } from 'lucide-react';
+
+import { useI18n } from '@heyta/i18n';
 
 interface Quadrant {
   title: string;
@@ -22,37 +25,47 @@ interface Quadrant {
   cards: string[];
 }
 
-const QUADRANTS: Quadrant[] = [
-  {
-    title: '马上做',
-    hint: '重要且紧急',
-    swatch: 'mk-swatch--q1',
-    cards: ['回复客户关于报价的邮件', '整理本周周报，发给团队'],
-  },
-  {
-    title: '计划做',
-    hint: '重要不紧急',
-    swatch: 'mk-swatch--q2',
-    cards: ['写 Q4 目标拆解初稿', '读完《高效能人士的七个习惯》第 3 章', '准备季度复盘的材料'],
-  },
-  {
-    title: '交给别人',
-    hint: '紧急不重要',
-    swatch: 'mk-swatch--q3',
-    cards: ['预约牙医，确认下周三上午'],
-  },
-  {
-    title: '先不做',
-    hint: '不重要不紧急',
-    swatch: 'mk-swatch--q4',
-    cards: [],
-  },
-];
-
 export function QuadrantGrid(): React.JSX.Element {
+  const { t } = useI18n();
+
+  // 数据挪进组件内是文案迁移的硬要求（模块级拿不到 `t`）。取舍见 `Landing.tsx` 文件头。
+  const quadrants = useMemo<Quadrant[]>(
+    () => [
+      {
+        title: t('landing.quadrant.do'),
+        hint: t('landing.quadrant.q1'),
+        swatch: 'mk-swatch--q1',
+        cards: [t('landing.mock.task.quote'), t('landing.mock.task.weeklyReport')],
+      },
+      {
+        title: t('landing.quadrant.plan'),
+        hint: t('landing.quadrant.q2'),
+        swatch: 'mk-swatch--q2',
+        cards: [
+          t('landing.mock.task.q4Draft'),
+          t('landing.mock.task.bookChapter'),
+          t('landing.mock.task.quarterlyReview'),
+        ],
+      },
+      {
+        title: t('landing.quadrant.delegate'),
+        hint: t('landing.quadrant.q3'),
+        swatch: 'mk-swatch--q3',
+        cards: [t('landing.mock.task.dentist')],
+      },
+      {
+        title: t('landing.quadrant.drop'),
+        hint: t('landing.quadrant.q4'),
+        swatch: 'mk-swatch--q4',
+        cards: [],
+      },
+    ],
+    [t],
+  );
+
   return (
     <div className="mk-quadrant">
-      {QUADRANTS.map((q) => (
+      {quadrants.map((q) => (
         <section key={q.title} className="mk-quad">
           <div className="mk-quad__head">
             <span className={`mk-swatch ${q.swatch}`} />
@@ -69,7 +82,7 @@ export function QuadrantGrid(): React.JSX.Element {
             {q.cards.length === 0 && (
               <div className="mk-quad__empty">
                 <CheckCircle2 size={16} />
-                拖任务到这里
+                {t('landing.quadrant.dropHere')}
               </div>
             )}
           </div>

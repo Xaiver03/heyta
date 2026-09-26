@@ -6,7 +6,12 @@
     "declarationMap": false,
     "noEmit": true,
     "rootDir": ".",
-    "types": ["vitest/globals", "node"]
+    // 🔴 `types` **会整体覆盖**父级 tsconfig.json 里的 `["vite/client"]`，不会合并。
+    //    少了它，任何 `import.meta.env.X` 都会报 TS2339
+    //    （实测：`src/lib/locale.ts(23,26): Property 'env' does not exist on type 'ImportMeta'`）。
+    //    而 `pnpm check` 的 typecheck 走的正是这份 spec 配置 ——
+    //    于是「构建能过、typecheck 不过」：vite build 不需要这些类型，tsc 需要。
+    "types": ["vitest/globals", "node", "vite/client"]
   },
   "include": ["src/**/*", "tests/**/*"],
   "exclude": ["node_modules", "dist", "dist-types"]
