@@ -277,6 +277,46 @@ describe('AI 设置界面', () => {
     expect(item?.textContent).toContain('数据不出设备');
   });
 
+  /**
+   * 🔴 这条钉的是一个"能力有单测、但零生产调用点"的洞。
+   *
+   * 密钥输入框的渲染条件是 `endpoint.keyRef !== undefined`，路由层取值
+   * 也由它开关。而 `addCustomEndpoint` 曾经**不设 `keyRef`** ——
+   * 于是界面上永远不出现密钥输入框，请求永远不带 `authorization` 头，
+   * 「自己接入 AI」对有鉴权的服务商完全走不通。
+   *
+   * 它为什么一直没被发现：本文件其它用例**自己造了带 `keyRef` 的配置**，
+   * 于是密钥 UI 一直是绿的。只有"点真界面加一个端点、看有没有输入框"
+   * 才能发现 —— 这正是真实用户旅程测试抓出来的。
+   */
+  it('🔴 新加的自定义端点**必须能输密钥**（否则它无法鉴权）', () => {
+    const el = render({ initial: defaultAiSettings(), secrets: createSessionSecretStore() });
+    toggle(el.querySelector('#ai-enabled'));
+    click(el.querySelector('[data-testid="add-custom-endpoint"]'));
+    const item = el.querySelector('[data-testid="endpoint-custom-1"]');
+    expect(item, '端点行应该出现').toBeTruthy();
+    expect(
+      item?.querySelector('[aria-label$="的密钥"]'),
+      '没有密钥输入框 → 这个端点根本没法鉴权',
+    ).toBeTruthy();
+    expect(
+      [...(item?.querySelectorAll('button') ?? [])].some((b) =>
+        b.textContent?.includes('记住'),
+      ),
+      '应该有"记住（本次会话）"按钮',
+    ).toBe(true);
+  });
+
+  it('🔴 keyRef 进 localStorage、密钥本身不进（引用与值分离）', () => {
+    const el = render({ initial: defaultAiSettings(), secrets: createSessionSecretStore() });
+    toggle(el.querySelector('#ai-enabled'));
+    click(el.querySelector('[data-testid="add-custom-endpoint"]'));
+
+    const raw = localStorage.getItem(AI_SETTINGS_STORAGE_KEY) ?? '';
+    expect(raw, 'keyRef 要落盘（否则刷新后密钥对不上端点）').toContain('keyRef');
+    expect(raw, '端点配置里不能出现密钥字面量').not.toContain('sk-');
+  });
+
   it('🔴 加进来的自定义端点**能改**（否则加进来就是死路）', () => {
     const el = render({ initial: defaultAiSettings(), secrets: createSessionSecretStore() });
     toggle(el.querySelector('#ai-enabled'));

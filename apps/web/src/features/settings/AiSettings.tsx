@@ -227,7 +227,34 @@ export function AiSettings({ initial, secrets, onChange, memorySlot }: AiSetting
         ...routing,
         endpoints: [
           ...routing.endpoints,
-          { id: `custom-${String(n)}`, label: `自定义端点 ${String(n)}`, endpoint: '', model: '' },
+          {
+            id: `custom-${String(n)}`,
+            label: `自定义端点 ${String(n)}`,
+            endpoint: '',
+            model: '',
+            /**
+             * 🔴 **必须给 `keyRef`，否则这个端点根本无法鉴权。**
+             *
+             * 密钥输入框的渲染条件是 `endpoint.keyRef !== undefined`，
+             * 而路由层取值也是 `keyRef === undefined ? undefined : await store.get(keyRef)`
+             * —— 两处都由它开关。不设的后果是：
+             *
+             *   1. 界面上**永远不出现**密钥输入框（用户没地方输）
+             *   2. 请求**永远不带** `authorization` 头
+             *
+             * 也就是「自己接入 AI」这条路对有鉴权的服务商**完全走不通**，
+             * 只有两个本机预设能用。
+             *
+             * 这个洞藏了很久，因为密钥 UI 的单测**自己造了带 `keyRef` 的配置**
+             * （见 `ai-settings.spec.tsx`），于是它一直是绿的 ——
+             * 典型的"能力实现了、有单测、但零生产调用点"。
+             * 直到真实用户旅程测试去点真界面才暴露。
+             *
+             * ⚠️ 空密钥是安全的：`routing.ts` 里 `apiKey !== ''` 才加头。
+             * 所以不需要"要不要密钥"的开关，无条件给上即可。
+             */
+            keyRef: `custom-${String(n)}`,
+          },
         ],
       },
     });
