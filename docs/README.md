@@ -108,6 +108,8 @@ docs/research/<kebab-case>.md     例：reuse-plan.md
 | [ai-memory-necessity.md](research/ai-memory-necessity.md) | ⭐ **要不要向量数据库**：用重复检测做可证伪实验得出的结论（难档召回 0%） |
 | 🔴 [ai-memory-system.md](plans/ai-memory-system.md) | **AI 记忆系统实施计划**：该记住什么偏好、怎么验证、分几阶段做 |
 | [ai-strategy.md](plans/ai-strategy.md) | ⭐⭐ **AI 入口文档**：读这一份就够（定位 / 三档结构 / 护城河 / 现状 / 下一步） |
+| 🔴 [subscription-boundary.md](plans/subscription-boundary.md) | **会员订阅的免费/付费边界**：收费的是「服务器」不是「功能」；为什么按设备数卡而不按存储量；「到期不许变成数据 hostage」这条硬约束 |
+| 🔴 [subscription-integration.md](plans/subscription-integration.md) | **会员订阅的服务端接入点**：Fastify/JWT/配额守卫/迁移纪律的落点，以及 🔴「代码里没有官方实例标志，付费闸门必须默认关」 |
 | [ai-capability-branches.md](plans/ai-capability-branches.md) | **AI 能力分支与开发分支策略**（含对 5 条功能设想的逐条裁决）—— 大而全，深挖用 |
 | [ai-open-decisions.md](plans/ai-open-decisions.md) | **AI 功能需要拍板的决策清单**（不是需求表单，是「代码解决不了的事」） |
 
