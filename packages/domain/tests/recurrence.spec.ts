@@ -236,10 +236,58 @@ describe('规则构造助手', () => {
 });
 
 describe('人类可读描述', () => {
+  /**
+   * 🔴 **这两条断言改过，改的理由不是"实现变了"。**
+   *
+   * 它们原来是 `toBe('天')` 和 `toBe('周一、三')` —— 也就是把实现的输出**复述**了一遍。
+   * 实现里 `interval === 1 ? '' : ...` 把「每」吞了，于是最常见的那条路径拼出
+   * 「天」「周六」，测试**照样是绿的**。它是绿的，因为它断言的是"代码输出了什么"，
+   * 而不是"用户该看到什么"。
+   *
+   * 这是 AGENTS.md §8.4 的反面用法：那条规则说"不要为了让测试变绿而改测试"，
+   * 而这里**必须**改测试 —— 因为坏的是测试（它把一个 bug 固定成了契约）。
+   * 判据是：新断言能不能在实现退回旧行为时变红。能（`每天` ≠ `天`），
+   * 所以它现在是一道真的门。
+   *
+   * 下面每条都同时覆盖 **interval=1（坏过的那个分支）** 与 **interval>1**，
+   * 因为只测后者正是它当初活下来的原因。
+   */
   it('常见规则', () => {
-    expect(describeRecurrence('FREQ=DAILY')).toBe('天');
+    expect(describeRecurrence('FREQ=DAILY')).toBe('每天');
     expect(describeRecurrence('FREQ=DAILY;INTERVAL=2')).toBe('每 2 天');
-    expect(describeRecurrence('FREQ=WEEKLY;BYDAY=MO,WE')).toBe('周一、三');
+    expect(describeRecurrence('FREQ=WEEKLY')).toBe('每周');
+    expect(describeRecurrence('FREQ=WEEKLY;BYDAY=MO,WE')).toBe('每周一、三');
+    expect(describeRecurrence('FREQ=WEEKLY;INTERVAL=1;BYDAY=MO,TU,WE,TH,FR')).toBe(
+      '每周一、二、三、四、五',
+    );
+  });
+
+  it('🔴 默认间隔（interval=1）也必须带「每」—— 它曾经只有「天」「周六」', () => {
+    // 这条单独写出来，是因为 bug 恰好只在这个分支：
+    // interval>1 时 `every` 自带「每」，所以「每 2 天」一直是对的。
+    for (const rule of ['FREQ=DAILY', 'FREQ=WEEKLY;BYDAY=SA', 'FREQ=MONTHLY', 'FREQ=YEARLY']) {
+      expect(describeRecurrence(rule), rule).toContain('每');
+    }
+  });
+
+  it('每月要说出**是哪一天**，只说「每月」用户无法判断', () => {
+    expect(describeRecurrence('FREQ=MONTHLY;BYMONTHDAY=14')).toBe('每月 14 日');
+    expect(describeRecurrence('FREQ=MONTHLY;BYMONTHDAY=-1')).toBe('每月最后一天');
+    expect(describeRecurrence('FREQ=MONTHLY;BYMONTHDAY=14,-1')).toBe('每月 14 日、最后一天');
+    expect(describeRecurrence('FREQ=MONTHLY;INTERVAL=2;BYMONTHDAY=1')).toBe('每 2 月 1 日');
+  });
+
+  it('每月的"第 N 个周几"不能退化成"每个周几"', () => {
+    // 旧实现把序数剥掉，于是「每月第 2 个周三」显示成「周三」——
+    // 那不是不精确，是**另一条规则**。
+    expect(describeRecurrence('FREQ=MONTHLY;BYDAY=+2WE')).toBe('每月第 2 个周三');
+    expect(describeRecurrence('FREQ=MONTHLY;BYDAY=-1FR')).toBe('每月最后一个周五');
+  });
+
+  it('每年带上月和日', () => {
+    expect(describeRecurrence('FREQ=YEARLY;BYMONTH=9;BYMONTHDAY=26')).toBe('每年 9 月 26 日');
+    expect(describeRecurrence('FREQ=YEARLY;BYMONTH=9')).toBe('每年 9 月');
+    expect(describeRecurrence('FREQ=YEARLY')).toBe('每年');
   });
 
   it('无法解析时回退到原始串（不抛错）', () => {

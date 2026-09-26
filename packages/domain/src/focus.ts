@@ -14,6 +14,7 @@
  */
 
 import type { FocusSession, FocusSessionKind } from './entities.js';
+import { dayRange } from './date.js';
 
 /** 番茄钟配置。 */
 export interface FocusConfig {
@@ -87,6 +88,36 @@ export function start(
   };
 }
 
+/**
+ * 选择下一轮的类型（专注 / 短休息 / 长休息）。
+ *
+ * ⚠️ **只在 idle 时生效**：计时中途改类型会让 `plannedMs` 与已经过去的进度对不上，
+ * 于是倒计时要么瞬间跳到 0、要么凭空多出一段。运行中要换就先中止。
+ *
+ * 为什么要暴露这个：`durationFor()` 是私有的，而"短休息是 5 分钟"这个映射
+ * 是配置语义 —— 让界面自己查时长就是第二次定义（改配置时只改一处）。
+ */
+export function selectKind(
+  state: FocusState,
+  kind: FocusSessionKind,
+  config: FocusConfig = DEFAULT_FOCUS_CONFIG,
+): FocusState {
+  if (state.phase !== 'idle') return state;
+  return { ...state, kind, plannedMs: durationFor(kind, config) };
+}
+
+/**
+ * 清除关联任务。
+ *
+ * ⚠️ 与 `selectKind` 同样是 **idle 限定**：已经开始的这一轮，它的归属已经定了。
+ * 中途解除关联会让"这一段专注记在谁头上"在落盘时刻变得不确定 ——
+ * 而落盘时读的是 state，用户看到的却是解除之后的界面。
+ */
+export function clearTask(state: FocusState): FocusState {
+  if (state.phase !== 'idle') return state;
+  return { ...state, taskId: undefined };
+}
+
 /** 暂停。把剩余量记下来，然后清掉 endsAt。 */
 export function pause(state: FocusState, now: number): FocusState {
   if (state.phase !== 'running') return state;
@@ -129,6 +160,44 @@ export function remainingMs(state: FocusState, now: number): number {
 /** 是否已到时。 */
 export function isFinished(state: FocusState, now: number): boolean {
   return state.phase === 'running' && remainingMs(state, now) === 0;
+}
+
+/**
+ * 进度 0–1，供进度条 / 进度环使用。
+ *
+ * 🔴 与 `remainingMs` 一样**每次重算**，不累加。idle 时返回 0（而不是 1）：
+ * "还没开始"和"已经走完"在界面上必须是两种不同的样子。
+ *
+ * 放在领域层而不是各自的选择器里：Web 端的专注 store 里已经有一份
+ * `selectProgress`，移动端要用就会变成第二份 —— 两端口径不同的症状是
+ * "网页的环走完了、手机的还差一点"，且没有任何一处报错。
+ */
+export function focusProgress(state: FocusState, now: number): number {
+  if (state.phase === 'idle') return 0;
+  const total = state.plannedMs;
+  // 除零守卫：plannedMs 为 0 时（非法配置/坏数据）返回 0 而不是 NaN。
+  // NaN 传进布局会让进度条整条消失，而错误信息不会指向这里。
+  if (!Number.isFinite(total) || total <= 0) return 0;
+  return Math.min(1, Math.max(0, 1 - remainingMs(state, now) / total));
+}
+
+/**
+ * 计时器**显示**的毫秒数。
+ *
+ * 运行/暂停时就是剩余时间；**空闲时是这一轮的计划时长**，不是 0。
+ *
+ * 🔴 为什么空闲不显示 `00:00`：一个静止不动的 `00:00` 在用户眼里等于
+ * "坏了 / 卡住了"，而它的真实含义是"还没开始"。真机验收时我自己看到它
+ * 第一反应就是"是不是没跑起来"。番茄钟类的界面都显示 `25:00` ——
+ * 空闲时该显示的是"按下开始之后会走多长"。
+ *
+ * 与 `focusProgress` 放在一起，是为了让两端**用同一个定义**：
+ * Web 端若自己写成 `phase === 'idle' ? 0 : remaining`，就会出现
+ * "网页显示 00:00、手机显示 25:00"这种没人会报的差异。
+ */
+export function focusDisplayMs(state: FocusState, now: number): number {
+  if (state.phase === 'idle') return state.plannedMs;
+  return remainingMs(state, now);
 }
 
 /**
@@ -222,6 +291,20 @@ function durationFor(kind: FocusSessionKind, config: FocusConfig): number {
 }
 
 /**
+ * 某一轮的计划时长（ms）。`durationFor` 的公开版本。
+ *
+ * 🔴 界面**不要**自己写 `kind === 'work' ? config.workMs : ...` ——
+ * 那就是把同一张映射表写了第二遍，而两处不同的症状是
+ * "界面写着 25 分钟、计时器却跑 5 分钟"，且没有任何一处报错。
+ */
+export function focusDurationMs(
+  kind: FocusSessionKind,
+  config: FocusConfig = DEFAULT_FOCUS_CONFIG,
+): number {
+  return durationFor(kind, config);
+}
+
+/**
  * 格式化为 `MM:SS`。
  *
  * ⚠️ 用 `ceil` 而不是 `floor`：剩 59.4 秒时应显示 01:00 而不是 00:59。
@@ -232,4 +315,103 @@ export function formatDuration(ms: number): string {
   const m = Math.floor(totalSeconds / 60);
   const s = totalSeconds % 60;
   return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+}
+
+// ─────────────────────────────────────────────────────────────
+// 统计
+// ─────────────────────────────────────────────────────────────
+//
+// 放在领域层而不是界面里：**"哪些算今天""什么算一次完成的专注"是产品语义**，
+// 不是展示细节。写在屏幕组件里，换个端就要重写一遍，
+// 而两端口径不同的症状是"手机说今天 4 个番茄、网页说 3 个"（AGENTS.md §3.5）。
+
+/**
+ * 一条 session 算在**哪一天**。
+ *
+ * 🔴 判据是 `endedAt`（没有就退到 `createdAt`），**不是 `startedAt`**。
+ *
+ * 理由：跨零点的那一轮（23:50 开始、00:15 结束）如果按开始日算，
+ * 用户看到的是"昨晚那个番茄今天不在统计里"；按开始日切分又会把一轮
+ * 拆成两天、两边都不完整。**记在结束的那一天**是唯一不重不漏的口径，
+ * 也与"今天我完成了几个番茄"这个问法一致。
+ */
+export function focusSessionDay(session: FocusSession): number {
+  return session.endedAt ?? session.createdAt;
+}
+
+/**
+ * 这一段是否值得**落盘**。
+ *
+ * 🔴 这是产品语义，不是平台细节：**只有工作段落盘，休息不落盘。**
+ * 理由：休息不是用户的专注成果。存下来会让"今天专注了几段"里一半是休息，
+ * 统计看起来翻倍；而如果只有休息没有工作，这一天仍然是"没专注"。
+ *
+ * 它原先只写在 `apps/web` 的专注 store 里（`if (finished.kind !== 'work') return;`）。
+ * 移动端要写同一段逻辑时就是第二次 —— 而两端口径不同的症状是
+ * "手机记了 5 段、网页记了 3 段"，且没有任何一处报错。所以提到这里，
+ * 两个壳都调用它（见 AGENTS.md §3.5）。
+ */
+export function shouldPersistSession(session: FocusSession): boolean {
+  return session.kind === 'work';
+}
+
+/** 某一天的专注汇总。 */
+export interface FocusDayStats {
+  /** 自然完成的**专注**轮数（不含休息）。 */
+  completedWorkCount: number;
+  /** 中途放弃的专注轮数。单独记，因为"完成了 3 个"和"试了 5 次"是两回事。 */
+  abortedWorkCount: number;
+  /** 实际专注时长合计（ms）。**含中途放弃的那部分** —— 那是真实坐下来的时间。 */
+  focusMs: number;
+  /** 休息时长合计（ms）。 */
+  breakMs: number;
+}
+
+/** 空的汇总。所有字段都是 0，方便直接当累加初值。 */
+export function emptyFocusDayStats(): FocusDayStats {
+  return { completedWorkCount: 0, abortedWorkCount: 0, focusMs: 0, breakMs: 0 };
+}
+
+/**
+ * 汇总**某一天**的专注。
+ *
+ * `now` 决定"今天"是哪一天（本地日历日），跨零点的归属见 `focusSessionDay`。
+ * 纯函数：同样的输入永远同样的输出，不读系统时间。
+ */
+export function focusStatsForDay(
+  sessions: readonly FocusSession[],
+  now: number,
+): FocusDayStats {
+  const { start, end } = dayRange(now);
+  const stats = emptyFocusDayStats();
+
+  for (const session of sessions) {
+    const at = focusSessionDay(session);
+    if (at < start || at >= end) continue;
+
+    // ⚠️ `actualMs` 缺省时**不能当 0**：老数据或未来写入方可能只填了 plannedMs，
+    // 当成 0 会让"今天专注 25 分钟"显示成 0 分钟。缺失时退回 plannedMs 更接近真相。
+    const actual = session.actualMs ?? session.plannedMs;
+
+    if (session.kind === 'work') {
+      if (session.completed === true) stats.completedWorkCount += 1;
+      else stats.abortedWorkCount += 1;
+      stats.focusMs += actual;
+    } else {
+      stats.breakMs += actual;
+    }
+  }
+
+  return stats;
+}
+
+/** `focusMs` 的人类可读形式：不足 1 小时给「25 分钟」，否则「1 小时 20 分钟」。 */
+export function formatFocusDuration(ms: number): string {
+  const totalMinutes = Math.round(Math.max(0, ms) / 60000);
+  if (totalMinutes < 60) return `${String(totalMinutes)} 分钟`;
+  const h = Math.floor(totalMinutes / 60);
+  const m = totalMinutes % 60;
+  return m === 0
+    ? `${String(h)} 小时`
+    : `${String(h)} 小时 ${String(m)} 分钟`;
 }
