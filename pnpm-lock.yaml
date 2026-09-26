@@ -14,6 +14,9 @@ importers:
       '@heyta/sync-core':
         specifier: workspace:*
         version: link:packages/sync-core
+      '@types/node':
+        specifier: ^20.0.0
+        version: 20.19.43
 
   apps/mobile:
     dependencies:

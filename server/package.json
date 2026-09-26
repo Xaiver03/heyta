@@ -4,6 +4,7 @@
   "description": "heyta 同步服务端（以 Super Productivity 的 super-sync-server 为基座改造）",
   "main": "dist/src/index.js",
   "scripts": {
+    "prebuild": "prisma generate",
     "build": "tsc",
     "start": "node dist/src/index.js",
     "dev": "nodemon --watch src --ext ts --exec ts-node src/index.ts",
