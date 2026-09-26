@@ -334,23 +334,21 @@ export function AiSettings({ initial, secrets, onChange }: AiSettingsProps) {
           <section className="ht-settings__section">
             <h3 className="ht-settings__h3">端点</h3>
 
-            {/* 🔴🔴 **为什么这里要明说"没有托管 AI"。**
-                产品上只有两种供给方式：用户自备端点（own），或 heyta 托管（managed）。
-                我们**只提供了前者**，而界面上**完全不提**后者 ——
-                用户会以为"heyta 就是不自带 AI"，而不知道这是一个**有意的决定**，
-                更不知道**在什么条件下它会变**。
+            {/* 🔴🔴 **这一段曾经写的是"我们没有提供托管 AI"，那是错的。**
+                产品负责人已明确：heyta **会**提供统一云端 AI 服务并按此收费，
+                后续还有 MaaS（见 ADR-0013）。
 
-                `managed` 在代码里是完整实现的（分类、保留策略、闸门都在），
-                只是被 `assertEnableable` 挡着不许启用 —— 因为
-                **还没有那个服务，保留策略也就无从定案**。
-                没定案就不装作能开，这是 ADR-0006 §5 的结论。
+                把"我暂时无法决定"写成"我们不做"、并把它放进用户可见文案，
+                是最贵的一种错 —— 它会变成产品对用户的承诺。
 
-                一个"不说自己缺了什么"的界面，和一个"说了但做不到"的界面一样不诚实。 */}
+                现在改成"即将提供"，并把**性质**说清楚：
+                用托管 AI 时内容会明文到 heyta 服务器，所以它**不是**端到端加密。 */}
             <p className="ht-settings__hint" data-testid="managed-ai-note">
-              heyta <strong>不自带</strong> AI 服务 —— 需要你自己接一个端点（本机或远端）。
-              我们<strong>没有</strong>提供「heyta 托管的 AI」。这不是还没做，
-              而是<strong>在没有真正跑起来的服务之前，托管模式的数据保留策略无从定案</strong>；
-              没有定案就不开放。等有了服务，这条会在同一位置说明。
+              heyta <strong>即将提供</strong>云端 AI 服务（仍在开发中，暂时无法启用）。
+              在那之前，需要你自己接一个端点（本机或远端）。
+              托管模式的性质不一样：用它的请求，你的任务内容会
+              <strong>以明文到达 heyta 的服务器</strong>，
+              所以它<strong>不是</strong>端到端加密 —— 我们会把它当例外单独标注。
             </p>
 
             {routing.endpoints.length === 0 && (

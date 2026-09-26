@@ -699,23 +699,26 @@ describe('🔴🔴 必须说清"我们只提供两种供给方式中的哪一种
     return { ...base, routing: { ...base.routing, enabled: true } };
   }
 
-  it('🔴🔴 明说 heyta 不自带 AI 服务（否则用户以为是能力缺失）', () => {
+  it('🔴🔴 说清托管 AI **会来**（曾经这里写的是"我们不做"）', () => {
     const el = render({ initial: enabled(), secrets: createSessionSecretStore() });
     const note = el.querySelector('[data-testid="managed-ai-note"]');
     expect(note).toBeTruthy();
-    expect(note?.textContent).toContain('不自带');
+    expect(note?.textContent).toContain('即将提供');
   });
 
-  it('🔴 说清这是**有意的决定**，不是"还没做"', () => {
+  it('🔴🔴 明说托管模式**不是端到端加密**（ADR-0006 的核心结论）', () => {
     const el = render({ initial: enabled(), secrets: createSessionSecretStore() });
     const text = el.querySelector('[data-testid="managed-ai-note"]')?.textContent ?? '';
-    expect(text).toContain('不是还没做');
+    // 这句不能省：托管 AI 是这个 E2EE 产品里唯一"必须解开才能用"的口子
+    expect(text).toContain('明文到达');
+    expect(text).toContain('不是');
+    expect(text).toContain('端到端加密');
   });
 
-  it('🔴 说清**在什么条件下它会变**（保留策略定案）', () => {
+  it('🔴 不能再说"我们没有提供托管 AI"（那会变成对用户的错误承诺）', () => {
     const el = render({ initial: enabled(), secrets: createSessionSecretStore() });
     const text = el.querySelector('[data-testid="managed-ai-note"]')?.textContent ?? '';
-    expect(text).toContain('保留策略');
+    expect(text).not.toContain('没有');
   });
 
   it('🔴🔴 不能出现字面量星号（JSX 里 ** 不会变粗体）', () => {
