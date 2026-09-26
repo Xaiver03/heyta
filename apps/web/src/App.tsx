@@ -11,7 +11,16 @@
 import { useEffect, useMemo, useState } from 'react';
 import { CalendarDays, Check, CircleDot, Inbox, Moon, Sun, Timer, Trash2, type LucideIcon, Settings } from 'lucide-react';
 
-import { inferPreferences, Priority, Quadrant } from '@heyta/domain';
+import {
+  applyFeedbackCorrections,
+  applyPreferenceCorrections,
+  inferFeedbackPreferences,
+  inferPreferences,
+  presentPreferenceIds,
+  Priority,
+  Quadrant,
+  suppressedPreferenceIds,
+} from '@heyta/domain';
 
 import {
   selectQuadrantCounts,
@@ -29,6 +38,7 @@ import { QuadrantBoard } from './features/quadrant/QuadrantBoard.js';
 import { HabitsView } from './features/habits/HabitsView.js';
 import { AiBreakdown } from './features/ai/AiBreakdown.js';
 import { AiSettings } from './features/settings/AiSettings.js';
+import { MemoryPanel } from './features/settings/MemoryPanel.js';
 import {
   createSessionSecretStore,
   loadAiSettings,
@@ -115,25 +125,36 @@ export function App(): React.JSX.Element {
    * 为什么在这里算而不是存起来：存了就会漂移，而漂移的"用户画像"比没有更糟。
    * `inferPreferences` 是纯函数，重算的代价是 O(任务数) —— 可以忽略。
    *
-   * ⚠️ `memoryEnabled` 为 false 时它**立刻返回空集**，
-   * 所以下面传给界面的东西里一个偏好都不会有。
+   * ⚠️ 顺序很重要：先算**原始**推断，再应用用户的纠正。
+   * "你已忘记"那一区必须拿**纠正之前**的 id 列表去算 ——
+   * 被抑制的偏好已经不在纠正后的集合里了。
    */
-  const preferenceSet = useMemo(
-    () =>
-      inferPreferences({
-        memoryEnabled: aiSettings.memoryEnabled,
-        tasks: Object.values(store.entities.tasks),
-        focusSessions: Object.values(store.entities.focusSessions),
-        now: Date.now(),
-        // `getTimezoneOffset()` 是「本地比 UTC 晚多少分钟」（东八区为 -480），
-        // 取负号得到常规的「UTC 偏移」。**必须显式传**，
-        // 否则偏好层会去读运行环境的时区，也就无法从 op-log 确定重建。
-        utcOffsetMinutes: -new Date().getTimezoneOffset(),
-      }),
-    // `store.entities` 变了就重算；`now` 刻意不进依赖 ——
-    // 时间是给"当场算一次"用的，分钟级漂移不影响这批偏好的结论。
-    [aiSettings.memoryEnabled, store.entities],
-  );
+  const memory = useMemo(() => {
+    const offsets = { now: Date.now(), utcOffsetMinutes: -new Date().getTimezoneOffset() };
+
+    const raw = inferPreferences({
+      memoryEnabled: aiSettings.memoryEnabled,
+      tasks: Object.values(store.entities.tasks),
+      focusSessions: Object.values(store.entities.focusSessions),
+      ...offsets,
+    });
+    const rawFeedback = inferFeedbackPreferences({
+      memoryEnabled: aiSettings.memoryEnabled,
+      feedback: Object.values(store.entities.aiFeedback),
+    });
+
+    const corrections = Object.values(store.entities.preferenceCorrections);
+    const suppressed = suppressedPreferenceIds(corrections);
+
+    return {
+      preferenceSet: applyPreferenceCorrections(raw, suppressed),
+      feedbackSet: applyFeedbackCorrections(rawFeedback, suppressed),
+      // 🔴 故意用 raw 算：被抑制的偏好不在 corrected 里
+      rawPresentIds: presentPreferenceIds(raw, rawFeedback),
+      corrections: corrections.map((c) => ({ id: c.id, preferenceId: c.preferenceId })),
+    };
+  }, [aiSettings.memoryEnabled, store.entities]);
+
 
   // 主题应用到 <html data-theme>，tokens.css 的暗色覆盖挂在那里
   useEffect(() => {
@@ -317,8 +338,16 @@ export function App(): React.JSX.Element {
                       // 🔴 把上次落盘的熔断状态传回去 —— 否则落盘没有意义。
                       healthSnapshot={aiSettings.health}
                       // 🔴 记忆偏好。开关关着时这里是空集 —— 界面拿不到任何偏好。
-                      preferenceSet={preferenceSet}
+                      preferenceSet={memory.preferenceSet}
                       onApplyNote={(note) => store.setNote(task.id, note)}
+                      /**
+                       * 🔴 反馈落到 op-log（跨设备同步）。
+                       * 不接这个回调，AI 就永远学不到"该给你几项"——
+                       * 界面上的逐条取舍会变成白点，没有任何记录。
+                       */
+                      onFeedback={(fb) => {
+                        void store.recordAiFeedback({ feature: 'breakdown', ...fb });
+                      }}
                       onHealth={(health) => {
                         // 🔴 熔断状态落盘。**不进 op-log** —— 它是本机状态，
                         // 换台设备该重新探一次端点，而不是继承另一台的失败历史。
@@ -354,6 +383,17 @@ export function App(): React.JSX.Element {
             <AiSettings
               initial={aiSettings}
               secrets={aiSecrets}
+              memorySlot={
+                <MemoryPanel
+                  memoryEnabled={aiSettings.memoryEnabled}
+                  preferenceSet={memory.preferenceSet}
+                  feedbackSet={memory.feedbackSet}
+                  rawPresentIds={memory.rawPresentIds}
+                  corrections={memory.corrections}
+                  onSuppress={(id) => void store.suppressPreference(id)}
+                  onRestore={(id) => void store.restorePreference(id)}
+                />
+              }
               /**
                * 🔴 回传并落盘。不传的话 `AiSettings` 会退回自己存 localStorage，
                * 于是 `aiSettings` 这个 state **不会更新** ——

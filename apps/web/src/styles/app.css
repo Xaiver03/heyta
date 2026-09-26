@@ -579,6 +579,16 @@
   font-weight: var(--ht-font-weight-semibold);
 }
 
+.ht-settings__subtitle {
+  display: flex;
+  align-items: center;
+  gap: var(--ht-space-1);
+  margin: 0;
+  color: var(--ht-color-foreground-muted);
+  font-size: var(--ht-font-size-sm);
+  font-weight: var(--ht-font-weight-medium);
+}
+
 .ht-settings__hint {
   margin: 0;
   color: var(--ht-color-foreground-muted);
