@@ -544,6 +544,9 @@ importers:
       '@fastify/websocket':
         specifier: ^11.2.0
         version: 11.3.1
+      '@heyta/domain':
+        specifier: workspace:*
+        version: link:../packages/domain
       '@heyta/shared-schema':
         specifier: '*'
         version: link:../packages/shared-schema

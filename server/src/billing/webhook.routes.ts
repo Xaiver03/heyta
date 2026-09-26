@@ -33,7 +33,7 @@ import { Logger } from '../logger';
 import { ENTITLEMENT_AUDIT_EVENTS } from '../entitlement';
 import { applyPaymentEvent } from './apply-event';
 import type { ExistingSubscription } from './apply-event';
-import { extendSubscriptionPeriod } from './extend-period';
+import { extendSubscriptionPeriod } from '@heyta/domain';
 import {
   createBillingAdapterRegistry,
   DEFAULT_BILLING_ADAPTERS,
@@ -186,7 +186,7 @@ export const webhookRoutes = async (
             updateSubscription: (id, data) =>
               tx.subscription.update({ where: { id }, data }),
             // 周期叠加的**唯一服务端实现**（本体在 packages/domain，跨包 import
-            // 被硬约束挡住 —— 见 extend-period.ts 文件头与交付报告的顶回）。
+            // 被硬约束挡住，故曾以镜像形式存在；现直接使用 @heyta/domain。
             extendPeriod: extendSubscriptionPeriod,
             now,
           });
