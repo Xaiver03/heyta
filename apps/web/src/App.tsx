@@ -113,6 +113,27 @@ const PRIMARY_NAV: NavEntry[] = [
  */
 type ViewKey = 'tasks' | 'quadrant' | 'habits' | 'focus' | 'growth' | 'settings';
 
+/**
+ * 视图切换列表。
+ *
+ * 🔴 提出来当**唯一一份**定义：它既是顶栏的按钮，也是页面标题的来源。
+ * 原来这张表内联在 JSX 里，而标题另有一条只从 `store.filter`（任务是域的概念）
+ * 推导的逻辑 —— 于是在习惯 / 番茄钟 / 成长 / 设置 这些页面上，顶部标题写着
+ * 「收集箱」：那是**上一个视图的残留**，会让人以为没切过去。
+ * 同一件事写两遍，漂移是注定的。
+ */
+const VIEW_TABS: readonly { key: ViewKey; label: string; Icon: LucideIcon }[] = [
+  { key: 'tasks', label: '任务', Icon: Inbox },
+  { key: 'quadrant', label: '四象限', Icon: CircleDot },
+  { key: 'habits', label: '习惯', Icon: Check },
+  { key: 'focus', label: '番茄钟', Icon: Sun },
+  { key: 'growth', label: '成长', Icon: TrendingUp },
+  { key: 'settings', label: '设置', Icon: Settings },
+];
+
+/** 标题直接跟着视图走的那些视图（任务 / 四象限的标题有更具体的信息，不在此列）。 */
+const VIEW_TITLED_BY_TAB: readonly ViewKey[] = ['habits', 'focus', 'growth', 'settings'];
+
 export function App(): React.JSX.Element {
   const [theme, setTheme] = useState<Theme>(resolveInitialTheme);
   const store = useTaskStore();
@@ -205,6 +226,18 @@ export function App(): React.JSX.Element {
 
   const title = useMemo(() => {
     const f = store.filter;
+    // 习惯 / 番茄钟 / 成长 / 设置：标题跟**视图**走。
+    // 这些视图里没有"任务筛选"这回事，标题必须由视图自己决定，
+    // 否则显示的是上一个视图残留的清单名。
+    if (VIEW_TITLED_BY_TAB.includes(view)) {
+      return VIEW_TABS.find((t) => t.key === view)?.label ?? '任务';
+    }
+    /**
+     * 四象限页要看筛选**是否真的落在某个象限上**：
+     * 落上了就用更具体的象限名（「重要且紧急」比「四象限」有用），
+     * 没落上（用户只是点了顶部标签）就不能显示上一个视图的清单名。
+     */
+    if (view === 'quadrant' && f.kind !== 'quadrant') return '四象限';
     if (f.kind === 'all') return '收集箱';
     if (f.kind === 'today') return '今天';
     if (f.kind === 'completed') return '已完成';
@@ -221,7 +254,7 @@ export function App(): React.JSX.Element {
       return projects.projects.find((p) => p.id === f.projectId)?.name ?? '清单';
     }
     return '任务';
-  }, [store.filter]);
+  }, [store.filter, view]);
 
   return (
     <div className="ht-app">
@@ -266,16 +299,7 @@ export function App(): React.JSX.Element {
           <h1 className="ht-header__title">{title}</h1>
           {/* 视图切换。用 role=tablist 让屏幕阅读器理解这是一组互斥选项 */}
           <div role="tablist" aria-label="视图" className="ht-viewtabs">
-            {(
-              [
-                { key: 'tasks', label: '任务', Icon: Inbox },
-                { key: 'quadrant', label: '四象限', Icon: CircleDot },
-                { key: 'habits', label: '习惯', Icon: Check },
-                { key: 'focus', label: '番茄钟', Icon: Sun },
-                { key: 'growth', label: '成长', Icon: TrendingUp },
-                { key: 'settings', label: '设置', Icon: Settings },
-              ] as const
-            ).map((v) => (
+            {VIEW_TABS.map((v) => (
               <button
                 key={v.key}
                 type="button"
