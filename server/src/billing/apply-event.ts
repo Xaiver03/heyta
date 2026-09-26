@@ -85,6 +85,16 @@ export const applyPaymentEvent = async (
 ): Promise<PaymentEventApplyOutcome> => {
   if (event.externalSubscriptionId === null) {
     // 支付宝 / 微信这类"没有订阅对象"的 provider 会走到这里：合法，不是错误。
+    //
+    // ⚠️ **已知缺口，选型定稿前必须解决**：阶段一（国内）的结论是
+    // **一次性年付 + 到期提醒手动续费**（`subscription-provider-selection.md`
+    // 「阶段一（国内）的唯一现实路径」），也就是**没有自动续费的 provider**。
+    // 那种 provider 的 webhook 只有"一笔订单付成功了 + 这次买到哪一天"，
+    // 没有订阅 id —— 按当前实现它会被记进 `payment_events` 审计，
+    // 但**不会**创建 / 延长 `Subscription`。要接它，adapter 必须先决定
+    // "一笔一次性支付如何映射成稳定的订阅行 + 如何叠加周期"，
+    // 那是 provider 相关的语义（§4「抽象不掉的」），不能在这里猜。
+    // 本轮不选型、不接 SDK，所以刻意保留这个 ignore 分支并把它写下来。
     return { status: 'ignored', reason: 'NO_SUBSCRIPTION_REFERENCE' };
   }
   if (event.status === null) {
