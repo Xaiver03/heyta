@@ -1,0 +1,21 @@
+# 🔴 这个文件的存在**本身就是设计的一部分**，不要删。
+#
+# 为什么会有一个"仓库里的第二个 pnpm 工作区"：
+#
+# 根 `pnpm-workspace.yaml` 的 glob 是 `packages/*` / `apps/*` / `server`，
+# 本来就不包含 `e2e/`。但 pnpm 会**向上查找**最近的 `pnpm-workspace.yaml` ——
+# 没有这个文件的话，在 `e2e/` 里跑 `pnpm install` 会认到根工作区，
+# 于是 Playwright 被算进**根 lockfile**。
+#
+# 而根 lockfile 当前不能动：`apps/landing` 是一个**并发开发中**的新应用，
+# 它的依赖（three / motion …）已经落在工作区的 lockfile 里，但它的
+# `package.json` 还没提交。此刻往根 lockfile 里加任何东西，都会把它一起提交出去，
+# 于是 CI 的 `--frozen-lockfile` 会因为"lockfile 里有未提交的 importer"而红。
+#
+# 所以 E2E 的依赖单独一份 lockfile —— 与根工作区**完全解耦**：
+#   * 根 lockfile 保持干净（不因为引入 Playwright 而带上 landing 的依赖）
+#   * `e2e/pnpm-lock.yaml` 只描述 Playwright，随时可独立提交、独立复现
+#
+# `packages: ["."]` 让 `e2e/` 自己成为工作区根，pnpm 不再向上找。
+packages:
+  - "."

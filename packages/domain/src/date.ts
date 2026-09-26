@@ -72,6 +72,61 @@ export function parseLocalDate(date: LocalDate): Date {
 }
 
 /**
+ * 把「本地日期时间串」换算成 epoch 毫秒。
+ *
+ * 输入形态：`YYYY-MM-DD`、`YYYY-MM-DDTHH:mm`、`YYYY-MM-DDTHH:mm:ss`。
+ * 这正是 `ai-capture` 的 `dueDate` 会给的两种形态（见那边的系统提示：
+ * 只有日期就给日期，带时间就带时间）。
+ *
+ * 🔴 **为什么放在这里，而不是放在调用它的界面里。**
+ *
+ * "本地时间 → 绝对时刻"只能有**一份**实现。这个仓库已经因为
+ * "同一个判断抄了三遍"栽过跟头（见 `license-inventory.mjs` 里那段注释），
+ * 而这里更危险：三个地方各答一次"只给日期时算哪一刻"，
+ * 就会出现"有的地方算当天 00:00、有的地方算次日"，而且都不报错。
+ *
+ * 🔴 **用 `new Date(y, m-1, d, hh, mm, ss)` 构造，而不是"午夜 + 毫秒数"。**
+ * 后者在夏令时切换那天会算错一小时 —— 因为那一天不是 24 小时。
+ * 加毫秒数的写法读起来完全合理，只在一年里的两天出错，最难查。
+ *
+ * 解析不了（格式不对 / 日期不存在 / 时刻越界）→ 返回 `undefined`：
+ * 不抛错（调用方是界面，它要的是"这个日期不可用"，不是一个异常），
+ * 也**绝不静默修正**成附近的一天。判据沿用 `parseLocalDate` 的回读校验。
+ */
+export function localDateTimeToEpoch(value: string): number | undefined {
+  const m = /^(\d{4})-(\d{2})-(\d{2})(?:T(\d{2}):(\d{2})(?::(\d{2}))?)?$/.exec(value);
+  if (m === null) return undefined;
+
+  const year = m[1];
+  const month = m[2];
+  const day = m[3];
+  if (year === undefined || month === undefined || day === undefined) return undefined;
+
+  const hasTime = m[4] !== undefined;
+  const hours = hasTime ? Number(m[4]) : 0;
+  const minutes = hasTime ? Number(m[5]) : 0;
+  const seconds = m[6] === undefined ? 0 : Number(m[6]);
+  if (hours > 23 || minutes > 59 || seconds > 59) return undefined;
+
+  let base: Date;
+  try {
+    // 存在性判定交给唯一的那个实现（`2026-02-30` 会在那里被挡住）。
+    base = parseLocalDate(`${year}-${month}-${day}`);
+  } catch {
+    return undefined;
+  }
+
+  return new Date(
+    base.getFullYear(),
+    base.getMonth(),
+    base.getDate(),
+    hours,
+    minutes,
+    seconds,
+  ).getTime();
+}
+
+/**
  * 本地日历日加减天数。
  *
  * 用 Date 的溢出行为做加减，所以跨月、跨年、闰年都由原生逻辑处理。

@@ -23,6 +23,14 @@ import {
   suppressedPreferenceIds,
 } from '@heyta/domain';
 
+/**
+ * 🔴 估时**写进备注**，不新增持久化字段。
+ *
+ * 格式与写入规则都在 `@heyta/app-host` 里（`duration-note.ts`），
+ * 这里只负责把结果交给 `store.setNote`。壳不做业务判断 —— 见 AGENTS.md §3.5。
+ */
+import { writeDurationIntoNote } from '@heyta/app-host';
+
 import {
   selectQuadrantCounts,
   selectVisibleTasks,
@@ -38,6 +46,8 @@ import { ProjectsPanel } from './features/projects/ProjectsPanel.js';
 import { QuadrantBoard } from './features/quadrant/QuadrantBoard.js';
 import { HabitsView } from './features/habits/HabitsView.js';
 import { AiBreakdown } from './features/ai/AiBreakdown.js';
+import { AiPrioritize } from './features/ai/AiPrioritize.js';
+import { AiDuration } from './features/ai/AiDuration.js';
 import { AiSettings } from './features/settings/AiSettings.js';
 import { MemoryPanel } from './features/settings/MemoryPanel.js';
 import {
@@ -316,7 +326,80 @@ export function App(): React.JSX.Element {
         </header>
 
         <div className="ht-content">
-          <CaptureComposer />
+          {/* AI 捕获的接线**留在这个组件内部** —— 输入框的草稿是它的状态，
+              而草稿就是 AI 要解析的那句话。把草稿镜像到这里再传回去
+              会造出两份状态，且"应用后清空输入框"没法做（清不动上游的 state）。
+
+              与 `AiBreakdown` 一样：配置关着时它**仍然在**，点了会说明该去开什么，
+              而不是消失。 */}
+          <CaptureComposer
+            routing={aiSettings.routing}
+            consents={aiSettings.consents}
+            secrets={aiSecrets}
+            // 🔴 把上次落盘的熔断状态传回去 —— 否则落盘没有意义。
+            healthSnapshot={aiSettings.health}
+            // 🔴 记忆偏好。开关关着时这里是空集 —— 界面拿不到任何偏好。
+            preferenceSet={memory.preferenceSet}
+            onFeedback={(fb) => {
+              void store.recordAiFeedback({ feature: 'capture', ...fb });
+            }}
+            onHealth={(health) => {
+              // 🔴 熔断状态落盘。**不进 op-log** —— 它是本机状态，
+              // 换台设备该重新探一次端点，而不是继承另一台的失败历史。
+              setAiSettings((previous) => {
+                const next = {
+                  ...previous,
+                  health: toHealthSnapshot(health, Date.now()),
+                };
+                saveAiSettings(next);
+                return next;
+              });
+            }}
+          />
+
+          {/* AI 优先级建议（功能 ②）。
+              🔴 它是**批量**的，而且只能出现在列表上方 —— "哪件事更重要"只有在
+              互相比较时才成立；逐条问模型"这一条重要吗"既贵又没有意义。
+
+              与 `AiBreakdown` 一样：配置关着时它**仍然在**，点了会说明该去开什么，
+              而不是消失（"找不到入口"和"入口说为什么不可用"是两件事）。 */}
+          {view === 'tasks' && visible.length > 0 && (
+            <AiPrioritize
+              tasks={visible}
+              routing={aiSettings.routing}
+              consents={aiSettings.consents}
+              secrets={aiSecrets}
+              // 🔴 把上次落盘的熔断状态传回去 —— 否则落盘没有意义。
+              healthSnapshot={aiSettings.health}
+              // 🔴 记忆偏好。开关关着时这里是空集 —— 界面拿不到任何偏好。
+              preferenceSet={memory.preferenceSet}
+              /**
+               * 🔴 逐条写回，但**只写用户勾选保留的那些**（`decisions` 已经是
+               * 取舍后的结果）。走 `store.setPriority` —— 那条路走 op-log，
+               * 所以它能同步到别的设备，也能被撤销。
+               *
+               * 一条一个 intent：这里刻意不合并成一个批量 op，
+               * 因为用户可能只采纳其中三条（见 AGENTS.md §3.4）。
+               */
+              onApply={async (decisions) => {
+                for (const d of decisions) {
+                  await store.setPriority(d.id, d.priority);
+                }
+              }}
+              onHealth={(health) => {
+                // 🔴 熔断状态落盘。**不进 op-log** —— 它是本机状态，
+                // 换台设备该重新探一次端点，而不是继承另一台的失败历史。
+                setAiSettings((previous) => {
+                  const next = {
+                    ...previous,
+                    health: toHealthSnapshot(health, Date.now()),
+                  };
+                  saveAiSettings(next);
+                  return next;
+                });
+              }}
+            />
+          )}
 
           {view === 'tasks' &&
             (visible.length === 0 ? (
@@ -373,6 +456,35 @@ export function App(): React.JSX.Element {
                       onHealth={(health) => {
                         // 🔴 熔断状态落盘。**不进 op-log** —— 它是本机状态，
                         // 换台设备该重新探一次端点，而不是继承另一台的失败历史。
+                        setAiSettings((previous) => {
+                          const next = {
+                            ...previous,
+                            health: toHealthSnapshot(health, Date.now()),
+                          };
+                          saveAiSettings(next);
+                          return next;
+                        });
+                      }}
+                    />
+
+                    {/* AI 估时。
+                        🔴 结果**写进备注**，不新增持久化字段 —— 加字段要产品先拍板
+                        （见 `packages/app-host/src/duration-note.ts` 文件头与
+                        `ai-capability-branches.md` §5.1）。
+                        ⚠️ 刻意**不传 `history`**：web 壳目前没有暴露专注历史，
+                        而不传的语义是"这次估时没有历史可用"，是 fail closed 的一侧。
+                        等专注历史接出来再传，不要在这里编一份假的。 */}
+                    <AiDuration
+                      task={task}
+                      routing={aiSettings.routing}
+                      consents={aiSettings.consents}
+                      secrets={aiSecrets}
+                      healthSnapshot={aiSettings.health}
+                      preferenceSet={memory.preferenceSet}
+                      onApply={async (minutes) => {
+                        await store.setNote(task.id, writeDurationIntoNote(task.note, minutes));
+                      }}
+                      onHealth={(health) => {
                         setAiSettings((previous) => {
                           const next = {
                             ...previous,

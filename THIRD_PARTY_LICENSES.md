@@ -85,7 +85,42 @@ MIT 许可证的合规义务：**保留版权声明与许可声明**。本仓库
 ### 逐项清单
 
 📋 **[`research/licenses-inventory.generated.md`](research/licenses-inventory.generated.md)**
-—— 由工具生成，**当前 896 个包：宽松许可 895，受限 0，无许可证 0，白名单外已登记 1**。
+—— 由工具生成，**当前 910 个包：宽松许可 909，受限 0，无许可证 0，白名单外已登记 1**。
+
+> 📌 **2026-09-26 因真实浏览器验收（`e2e/`）新增 3 个包**：
+> `@playwright/test@1.63.0` + `playwright@1.63.0` + `playwright-core@1.63.0`，
+> **全部 Apache-2.0**（§3.2 白名单内，无需逐项例外登记）。
+>
+> 两道门都过：
+> * **可维护性**：`microsoft/playwright` 最后提交 **2026-09-26**、最新发版
+>   **v1.63.0（2026-09-04）**，96.7k★，未归档。远超"2021 年之后仍活跃"的门槛。
+> * **许可**：发布包 `package.json` 的 `license` 字段为 `Apache-2.0`（已核）。
+>
+> ⚠️ **`e2e/` 是一个独立的 pnpm 工作区**（`e2e/pnpm-workspace.yaml`），
+> 因此它有**自己的一份 store**。上面那个 910 之所以是对的，是因为
+> `research/tools/license-inventory.mjs` 已经改成扫描**所有工作区的 store**
+> （见那里的 `STORES` 清单）—— 在那之前它只扫根 store，于是 Playwright
+> **完全不可见**，而汇总数字看起来毫无异常。
+>
+> **这正是本仓库吃过两次亏的同一个形状**：315 → 908 那次漏掉整棵 React Native
+> 子树，这次差点漏掉整个 e2e 工作区。判据因此写死：
+> **门禁绿 ≠ 登记全；新增工作区必须在 `STORES` 里登记，
+> 忘了的表现是"数字没变"，不是"报错"。**
+
+> 📌 **2026-09-26 因落地页（`apps/landing`）新增 12 个包**：
+> `three@0.186.1`（MIT，**零运行时依赖**）、`motion@13.4.4`（MIT，依赖树只有
+> `framer-motion` / `motion-dom` / `motion-utils`），以及 `@types/three` 带进来的
+> 6 个**仅类型**依赖（`@dimforge/rapier3d-compat` 是 Apache-2.0，其余 MIT）。
+> `lucide-react` 本来就在树里（`apps/web` 在用），未新增。
+> 两道门都过：许可全在白名单内；维护性上 `three`（116k★，2026-09-25）与
+> `motion`（34k★，2026-09-25）都在活跃维护。
+>
+> ⚠️ **落地页刻意没有引入 GSAP。** 它不是 OSI 许可：发布包里**没有 LICENSE 文件**，
+> `package.json` 的 license 字段是散文（`Standard 'no charge' license`），
+> 归属 Webflow 且保留随时修改或终止的权利。按 §3.2 白名单它落进"白名单外"，
+> 而这一档**默认失败**。同一判断也排除了 `@splinetool/*`（无 LICENSE 且仓库非公开）
+> 与 `@theatre/studio`（AGPL-3.0）。滚动驱动因此改用 Motion 的 `useScroll` + CSS sticky，
+> 3D 改用 `three` 手写渲染循环。
 
 > ⚠️ **这个数字曾经是 315，而且是错的。** 该文件在 React Native 的依赖树装进来
 > **之前**生成，之后一直没重新生成 —— 里面 `react-native*` 条目为 **0 行**，
