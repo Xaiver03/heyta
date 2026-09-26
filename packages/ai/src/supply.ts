@@ -106,6 +106,67 @@ export function requiresEgressConsent(destination: EgressDestination): boolean {
 }
 
 /**
+ * 出境的**结构化**披露 —— "这条路径的性质是什么"，**不含任何措辞**。
+ *
+ * 🔴 为什么要有它：`describeDestination()` 返回的是一句**中文**，而它会被三个壳渲染
+ * （web / mobile / 将来的桌面）。界面要中英双语之后，"怎么说"必须归壳 ——
+ * 否则英文界面上这句话仍然是中文，而它恰恰是整个产品里**最不能出错的一句**
+ * （ADR-0006 的基石）。
+ *
+ * 判断只有一份：`describeDestination` 现在**建立在它之上**，
+ * 所以"结构化结论"与"中文句子"对同一个目的地永远一致，不会各自漂移。
+ *
+ * ⚠️ `heyta-cloud-managed` 这个 kind 本身就在陈述"明文到了我们手里"，
+ * 它是 ADR-0006 §3.2 第 5 条要保护的那个事实。**不要给它起一个听起来更温和的名字。**
+ */
+export type DestinationDisclosure =
+  /** 明文没离开这台设备。 */
+  | { kind: 'local' }
+  /** 明文去了用户自己选的第三方端点 —— 我们无权代表它做任何承诺。 */
+  | { kind: 'third-party-endpoint' }
+  /** 明文去了 heyta 自己的服务器。**不受端到端加密保护。** */
+  | { kind: 'heyta-cloud-managed' };
+
+/** 结构化披露：目的地 → 性质。与 {@link describeDestination} 同源。 */
+export function destinationDisclosure(destination: EgressDestination): DestinationDisclosure {
+  switch (destination) {
+    case 'none':
+      return { kind: 'local' };
+    case 'user-endpoint':
+      return { kind: 'third-party-endpoint' };
+    case 'heyta-cloud':
+      return { kind: 'heyta-cloud-managed' };
+  }
+}
+
+/**
+ * 保留策略的**结构化**披露。
+ *
+ * `undecided` 是刻意的一个 kind、不是缺省值：ADR-0006 §5 未决项 4/6 还没定案，
+ * 而"没定案"与"不需要保留"是两件完全不同的事。壳拿到 `undecided` 时
+ * **不许自己编一个数字**，只许照实说"还没定"。
+ */
+export type RetentionDisclosure =
+  /** 没出境，不存在服务端保留问题。 */
+  | { kind: 'not-applicable' }
+  /** 保留策略由用户自己的端点决定，我们无从知晓。 */
+  | { kind: 'third-party-decides' }
+  /** 🔴 产品尚未定案 —— 照实说，不许编。 */
+  | { kind: 'undecided' };
+
+/** 结构化披露：目的地 → 保留策略。与 {@link describeRetention} 同源。 */
+export function retentionDisclosure(destination: EgressDestination): RetentionDisclosure {
+  switch (destination) {
+    case 'none':
+      return { kind: 'not-applicable' };
+    case 'user-endpoint':
+      return { kind: 'third-party-decides' };
+    case 'heyta-cloud':
+      return { kind: 'undecided' };
+  }
+}
+
+/**
  * 隐私文案。
  *
  * 🔴🔴 **`heyta-cloud` 这一条是本文件存在的主要理由之一。**
@@ -140,12 +201,15 @@ export function requiresEgressConsent(destination: EgressDestination): boolean {
  * ⚠️ 想说"同步不受影响"时，用**不含这个词**的说法（见下面的返回值）。
  */
 export function describeDestination(destination: EgressDestination): string {
-  switch (destination) {
-    case 'none':
+  // ⚠️ **兼容路径**：返回中文句子，结论与 `destinationDisclosure()` 同源
+  // （这里 switch 的就是它的 kind，所以两者不可能各说一套）。
+  // 三个壳切到结构化版本 + 词条表之后，它会只剩测试在用 —— 那时再删。
+  switch (destinationDisclosure(destination).kind) {
+    case 'local':
       return '数据不离开这台设备（端点在本地）。';
-    case 'user-endpoint':
+    case 'third-party-endpoint':
       return '数据会发送到你自己配置的 AI 端点。该端点由你提供，heyta 不参与，也无法审计它的日志与保留策略。';
-    case 'heyta-cloud':
+    case 'heyta-cloud-managed':
       return '数据会发送到 heyta 的云 AI 服务，由 heyta 处理后返回结果。⚠️ 这条路径上 heyta 能看到明文，该功能不受端到端加密保护。任务同步走的是另一条通道，不受此影响。';
   }
 }
@@ -163,12 +227,14 @@ export function describeDestination(destination: EgressDestination): string {
  *     由调用方决定是否阻止启用。见 `describeRetention`。
  */
 export function describeRetention(destination: EgressDestination): string | undefined {
-  switch (destination) {
-    case 'none':
+  // ⚠️ 同上：兼容路径，结论与 `retentionDisclosure()` 同源。
+  // `undecided` → `undefined` 这个映射**必须保持** —— 它是 ADR-0006 §5 未决项的载体。
+  switch (retentionDisclosure(destination).kind) {
+    case 'not-applicable':
       return '未离开设备，不涉及服务端保留。';
-    case 'user-endpoint':
+    case 'third-party-decides':
       return '保留策略由你自己的端点决定，heyta 无从知晓。';
-    case 'heyta-cloud':
+    case 'undecided':
       // 🔴 故意留空：产品尚未确定托管 AI 的数据保留策略（ADR-0006 §5）。
       // 在它定案之前，`managed` 模式**不允许被启用** —— 见 assertEnableable。
       return undefined;
@@ -201,7 +267,9 @@ export function assertEnableable(config: { mode: AiSupplyMode; endpoint?: string
   if (config.mode === 'off') return;
 
   if (config.mode === 'managed') {
-    if (describeRetention('heyta-cloud') === undefined) {
+    // 🔴 问的是**结构化的 kind**，不是"字符串是不是 undefined" ——
+    // 前者是产品事实（未定案），后者只是它在旧接口上的投影。
+    if (retentionDisclosure('heyta-cloud').kind === 'undecided') {
       throw new AiConfigError(
         '托管 AI 的数据保留策略尚未定案（ADR-0006 §5 未决项），因此当前不允许启用。' +
           '这不影响"自备端点"模式。',

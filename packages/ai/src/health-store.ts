@@ -198,17 +198,61 @@ export function fromHealthSnapshot(raw: unknown, now: number): HealthMap {
 }
 
 /**
+ * 熔断状态的**结构化**形态 —— "这个端点现在什么情况"，**不含任何措辞**。
+ *
+ * 🔴 与 `supply.ts` 的披露同一个理由：这段文字会渲染给用户，而界面要中英双语，
+ * 所以"怎么说"必须归壳。三个 kind 也刻意**不做温和化**：
+ * 跳闸就是跳闸（`circuit-open`），不叫"暂时休息"。
+ */
+export type EndpointHealthDisclosure =
+  /** 一切正常。 */
+  | { kind: 'ok' }
+  /** 最近失败过，但还没跳闸。 */
+  | { kind: 'failing'; failures: number }
+  /** 已跳闸，`retryInSeconds` 秒后自动恢复。 */
+  | { kind: 'circuit-open'; failures: number; retryInSeconds: number };
+
+/**
+ * 结构化：一条健康记录 → 它现在是什么情况。
+ *
+ * ⚠️ 判定的**优先级**是这条函数的一部分，不是实现细节：
+ * 先看跳闸（且**未过期**）→ 再看失败次数 → 否则正常。
+ * 把"已过期的跳闸"仍当成跳闸，会让一个其实已经恢复的端点永远显示成不可用。
+ */
+export function endpointHealthDisclosure(
+  entry: EndpointHealth,
+  now: number,
+): EndpointHealthDisclosure {
+  if (entry.circuitOpenUntil !== undefined && entry.circuitOpenUntil > now) {
+    return {
+      kind: 'circuit-open',
+      failures: entry.consecutiveFailures,
+      retryInSeconds: Math.ceil((entry.circuitOpenUntil - now) / 1000),
+    };
+  }
+  if (entry.consecutiveFailures > 0) {
+    return { kind: 'failing', failures: entry.consecutiveFailures };
+  }
+  return { kind: 'ok' };
+}
+
+/**
  * 描述一条熔断状态，给界面用。
  *
  * ⚠️ 这是"给用户看的"，所以要说人话 —— 不要出现 `consecutiveFailures` 这种词。
+ *
+ * ⚠️ **兼容路径**：中文句子，结论与 `endpointHealthDisclosure()` 同源
+ * （这里 switch 的就是它的 kind）。壳切到结构化版本 + 词条表之后，
+ * 它会只剩测试在用 —— 那时再删。
  */
 export function describeEndpointHealth(entry: EndpointHealth, now: number): string {
-  if (entry.circuitOpenUntil !== undefined && entry.circuitOpenUntil > now) {
-    const seconds = Math.ceil((entry.circuitOpenUntil - now) / 1000);
-    return `暂时停止使用（连续失败 ${String(entry.consecutiveFailures)} 次，${String(seconds)} 秒后重试）`;
+  const d = endpointHealthDisclosure(entry, now);
+  switch (d.kind) {
+    case 'circuit-open':
+      return `暂时停止使用（连续失败 ${String(d.failures)} 次，${String(d.retryInSeconds)} 秒后重试）`;
+    case 'failing':
+      return `最近失败过 ${String(d.failures)} 次`;
+    case 'ok':
+      return '正常';
   }
-  if (entry.consecutiveFailures > 0) {
-    return `最近失败过 ${String(entry.consecutiveFailures)} 次`;
-  }
-  return '正常';
 }

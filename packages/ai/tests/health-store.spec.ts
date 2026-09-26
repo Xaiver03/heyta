@@ -17,6 +17,7 @@ import {
   MAX_CIRCUIT_MS,
   MAX_LAST_ERROR_LENGTH,
   describeEndpointHealth,
+  endpointHealthDisclosure,
   fromHealthSnapshot,
   toHealthSnapshot,
 } from '../src/health-store.js';
@@ -227,5 +228,56 @@ describe('describeEndpointHealth', () => {
 
   it('跳闸时间已过 → 不再说"停止使用"', () => {
     expect(describeEndpointHealth(tripped('a', NOW - 1), NOW)).not.toContain('暂时停止使用');
+  });
+});
+
+/**
+ * 结构化形态 —— 界面双语的地基。
+ *
+ * 这里钉的是**判断**，不是措辞：哪个 kind、带什么数。
+ * 中文句子那一层由上面的 `describeEndpointHealth` 测试负责。
+ */
+describe('endpointHealthDisclosure', () => {
+  it('跳闸中：带失败次数与剩余秒数（向上取整）', () => {
+    expect(endpointHealthDisclosure(tripped('a', NOW + 30_000), NOW)).toEqual({
+      kind: 'circuit-open',
+      failures: 3,
+      retryInSeconds: 30,
+    });
+    // 29.5 秒 → 30：宁可多说一秒，也不要说"0 秒后重试"。
+    expect(endpointHealthDisclosure(tripped('a', NOW + 29_500), NOW)).toEqual({
+      kind: 'circuit-open',
+      failures: 3,
+      retryInSeconds: 30,
+    });
+  });
+
+  it('失败过但没跳闸 → failing，带次数', () => {
+    expect(endpointHealthDisclosure({ endpointId: 'a', consecutiveFailures: 2 }, NOW)).toEqual({
+      kind: 'failing',
+      failures: 2,
+    });
+  });
+
+  it('正常 → ok', () => {
+    expect(endpointHealthDisclosure(healthy('a'), NOW)).toEqual({ kind: 'ok' });
+  });
+
+  it('🔴 优先级：已过期的跳闸**不再算跳闸**', () => {
+    // 这一条是"端点永远显示不可用"这类 bug 的守卫。
+    // `tripped` 会带上 consecutiveFailures，所以过期后应落到 `failing` 而不是 `ok`。
+    const d = endpointHealthDisclosure(tripped('a', NOW - 1), NOW);
+    expect(d.kind).not.toBe('circuit-open');
+    expect(d.kind).toBe('failing');
+  });
+
+  it('两条路径同源：结构化结论与中文句子说的是同一件事', () => {
+    // 三种情况都过一遍，防止有人只改一边。
+    for (const entry of [tripped('a', NOW + 30_000), { endpointId: 'a', consecutiveFailures: 2 }, healthy('a')]) {
+      const d = endpointHealthDisclosure(entry, NOW);
+      const text = describeEndpointHealth(entry, NOW);
+      if (d.kind === 'ok') expect(text).toBe('正常');
+      else expect(text).toContain(String(d.failures));
+    }
   });
 });

@@ -39,10 +39,14 @@ export {
   classifyDestination,
   describeDestination,
   describeRetention,
+  destinationDisclosure,
   isLoopbackEndpoint,
   requiresEgressConsent,
+  retentionDisclosure,
   type AiSupplyMode,
+  type DestinationDisclosure,
   type EgressDestination,
+  type RetentionDisclosure,
 } from './supply.js';
 
 export {
@@ -117,8 +121,10 @@ export {
   MAX_CIRCUIT_MS,
   MAX_LAST_ERROR_LENGTH,
   describeEndpointHealth,
+  endpointHealthDisclosure,
   fromHealthSnapshot,
   toHealthSnapshot,
   type AiHealthSnapshot,
+  type EndpointHealthDisclosure,
   type PersistedEndpointHealth,
 } from './health-store.js';
