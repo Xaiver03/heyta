@@ -53,6 +53,8 @@ export interface WechatWebhookFixture {
 }
 
 export interface WechatWebhookFixtureOptions {
+  /** 回调里完全不带 `amount` 字段。 */
+  readonly omitAmount?: boolean;
   readonly privateKey: string;
   readonly timestampSeconds: number;
   readonly outTradeNo: string;
@@ -82,11 +84,17 @@ export const buildWechatPaymentWebhook = (
     trade_state: options.tradeState ?? 'SUCCESS',
     ...(options.omitSuccessTime ? {} : { success_time: successTime }),
     ...(options.attach === null ? {} : { attach: options.attach ?? String(options.userId ?? 42) }),
-    amount: {
-      total: options.amountFen ?? 13_900,
-      payer_total: options.amountFen ?? 13_900,
-      currency: 'CNY',
-    },
+    // `omitAmount` 让我们能构造"回调里根本没有金额字段"这个真实可能的输入，
+    // 而不是只能构造"金额不对"。
+    ...(options.omitAmount
+      ? {}
+      : {
+          amount: {
+            total: options.amountFen ?? 13_900,
+            payer_total: options.amountFen ?? 13_900,
+            currency: 'CNY',
+          },
+        }),
   });
   const envelope = JSON.stringify({
     id: 'notif_fixture_1',
