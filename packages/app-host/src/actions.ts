@@ -122,6 +122,55 @@ export interface TaskActions {
   toggleCompleted(entityId: string): Promise<void>;
   /** 软删除（发 `DEL` op，由 reducer 转成墓碑 `deletedAt`）。 */
   remove(entityId: string): Promise<void>;
+  /**
+   * 从回收站恢复。
+   *
+   * ═════════════════════════════════════════════════════════════════════
+   * 🔴 **为什么是"写一条新 op 覆盖"，而不是"清墓碑"或"只改本地状态"。**
+   *
+   * 1. **必须发 op。** 只把本地的 `deletedAt` 抹掉，另一台设备回放不到任何东西，
+   *    它那边条目仍是删除状态 —— 而且下次同步会把墓碑再推回来。
+   *    这就是"本地生效了但没同步"的那半个 bug（op-log 纪律，§3.4）。
+   *
+   * 2. **发的是一条普通 `UPD`，payload 是 `{ deletedAt: null }`。**
+   *    reducer 早有约定：**载荷里某个键为 `null` = 显式清除该字段**
+   *    （见 `op-log/src/state.ts` 的 `toDelete`）。于是 `deletedAt` 真的消失、
+   *    条目回到存活状态。**不需要新的 op 类型、不需要改 reducer、不需要
+   *    bump schema** —— 老客户端回放同一条 `UPD` 会得到**逐字相同**的结果
+   *    （`null` → 删字段是既有语义），这就是可加性/向前兼容。
+   *
+   *    反过来，"清墓碑"（真去删 op-log 里那条 DEL / 删实体记录）做不到同步：
+   *    op-log 是只追加的事实日志，删掉一条本地事实不会让别的设备也删；
+   *    而"写一个 `deleted: false` 之类的布尔"会引入**第二个删除真相来源**，
+   *    两个字段迟早不一致 —— 与 `completedAt` 不设 `completed` 布尔同一条理由。
+   *
+   * 3. **原字段全都在。** DELETE 分支只往墓碑上盖 `deletedAt` / `updatedAt` /
+   *    时钟（`{ ...existing, deletedAt }`），标题、备注、清单、标签、日期、
+   *    重复规则**一个都没丢**。所以恢复能把它们全部还原 —— 见
+   *    `trash-actions.spec.ts` 里逐字段的断言。
+   * ═════════════════════════════════════════════════════════════════════
+   *
+   * 已经彻底删除（`purgedAt` 存在）的条目**拒绝恢复**：那是不可逆的。
+   * 本来就没被删除时**不发 op**（没有用户意图要落库，发空 op 只是噪声）。
+   */
+  restore(entityId: string): Promise<void>;
+  /**
+   * 彻底删除（purge）—— 回收站里的**不可逆**动作。
+   *
+   * 发一条 `UPD`，写入可加性标记 `purgedAt`（见 `EntityBase.purgedAt`）：
+   *   - 回收站按 `purgedAt` 过滤，所以它从这里消失；
+   *   - `deletedAt` **保留** —— 墓碑不能被清掉，否则离线端会把它当成
+   *     "从未删除"又同步回来；
+   *   - `restore()` 从此拒绝它，因此对用户而言是真的不可恢复。
+   *
+   * 🔴 **对依赖诚实**：这**不**抹掉 op-log 里的历史载荷（只追加的日志），
+   * 也不是加密擦除。它关闭的是"恢复"这条路，以及"回收站里继续看得到"。
+   * 真要物理擦除需要协议级支持，不在本轮范围。
+   *
+   * 只能对**已软删除**的条目用：对一条活着的任务发 purge 会让它在
+   * 没有任何墓碑的情况下从视图里消失，而离线端完全不知道发生过什么。
+   */
+  purge(entityId: string): Promise<void>;
   setPriority(entityId: string, priority: Priority): Promise<void>;
   /** 四象限的"重要"维度。 */
   setImportant(entityId: string, important: boolean): Promise<void>;
@@ -205,6 +254,13 @@ export interface TaskActions {
 
   /** 未删除的任务，按创建时间排序（同刻按 id 字典序，保证跨端顺序一致）。 */
   listTasks(): Task[];
+  /**
+   * 回收站：**已软删除且未彻底删除**的任务，最近删除的排在最前面。
+   *
+   * 排序必须跨端一致（同刻按 id 字典序），否则同一份数据在两台设备上
+   * 顺序不同而没有任何一处报错 —— 与 `listTasks()` 的同一条理由。
+   */
+  listTrashed(): Task[];
   /**
    * 未删除**且未完成**的任务，顺序同 `listTasks()`。
    *
@@ -344,6 +400,39 @@ export function createTaskActions(
       });
     },
 
+    async restore(entityId) {
+      // 直接读桶，**不用 `taskOf`**：那个辅助函数把墓碑过滤掉了，
+      // 而这里恰恰要处理墓碑。
+      const task = ctx.getState().tasks[entityId];
+      if (task === undefined) throw new Error(`找不到任务「${entityId}」`);
+      if (task.purgedAt !== undefined) {
+        // 不可逆是 purge 的核心语义，必须在动作层真的拦住，
+        // 而不是只靠界面不画那个按钮。
+        throw new Error(`任务「${entityId}」已被彻底删除，无法恢复`);
+      }
+      // 本来就没删除：不产生 op。见 `TaskActions.restore` 的注释。
+      if (task.deletedAt === undefined) return;
+
+      // 🔴 `null` = 显式清除 `deletedAt`（reducer 的既有约定）。
+      // 不要写 `deletedAt: undefined` —— 那会被 JSON 丢掉，
+      // 对端既不清除也不报错，"恢复"在另一台设备上静默失效。
+      // 原字段（标题/备注/清单/标签/日期/重复规则）本来就在墓碑里，无需重写。
+      await update(entityId, { deletedAt: null });
+    },
+
+    async purge(entityId) {
+      const task = ctx.getState().tasks[entityId];
+      if (task === undefined) throw new Error(`找不到任务「${entityId}」`);
+      if (task.deletedAt === undefined) {
+        throw new Error(`任务「${entityId}」不在回收站里，不能彻底删除`);
+      }
+      // 已彻底删除：幂等，不重复发 op。
+      if (task.purgedAt !== undefined) return;
+
+      // 只加标记，**不清 `deletedAt`** —— 墓碑留着，离线端才不会复活它。
+      await update(entityId, { purgedAt: now() });
+    },
+
     setPriority(entityId, priority) {
       return update(entityId, { priority });
     },
@@ -447,6 +536,14 @@ export function createTaskActions(
         .sort(byCanonicalOrder);
     },
 
+    listTrashed(): Task[] {
+      // 回收站 = 有墓碑、且没有被彻底删除。
+      // `purgedAt` 之后 `deletedAt` 仍然在（墓碑必须留着），所以两个条件都要。
+      return Object.values(ctx.getState().tasks)
+        .filter((task) => task.deletedAt !== undefined && task.purgedAt === undefined)
+        .sort(byDeletedOrder);
+    },
+
     findTask: taskOf,
   };
 }
@@ -454,6 +551,20 @@ export function createTaskActions(
 /** 未软删除的任务（顺序未定义，调用方自己 sort）。 */
 function listAlive(tasks: Record<string, Task>): Task[] {
   return Object.values(tasks).filter((task) => task.deletedAt === undefined);
+}
+
+/**
+ * 回收站顺序：**最近删除的在前**，同刻按 id 字典序。
+ *
+ * 决胜项与 `byCanonicalOrder` 同一个理由：`deletedAt` 来自毫秒时钟，
+ * 同一台设备连续删两条经常落在同一毫秒里，此时顺序会退化成
+ * `Object.values` 的枚举顺序 —— 那是**各端不同**的。
+ */
+function byDeletedOrder(a: Task, b: Task): number {
+  const ad = a.deletedAt ?? 0;
+  const bd = b.deletedAt ?? 0;
+  if (ad !== bd) return bd - ad;
+  return a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
 }
 
 /**
