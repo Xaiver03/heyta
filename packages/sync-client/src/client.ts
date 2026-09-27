@@ -34,6 +34,46 @@ const MAX_OPS_PER_UPLOAD = 500;
 const DOWNLOAD_PAGE_SIZE = 200;
 
 /**
+ * 服务端**永久拒绝**的错误码 —— 这条 op 重试多少次都不会被接受。
+ *
+ * 🔴 为什么必须区分"永久拒绝"和"暂时被挡"，而不是一律 throw：
+ *
+ * 抛错发生在 `sync()` 的**下载阶段之前**。于是一条永远传不上去的 op 会让
+ * 这台设备**每一次同步都在上传段抛错**，`download()` 永远不执行 ——
+ * 它再也拉不到任何远端数据，而界面上只是一句"同步失败"。
+ * 实测复现：本地队列里混进一条 `clientId` 属于别的设备的 op 之后，
+ * 连续两次同步都是 `error`、待上传数永远是 1、设备再没下载过东西。
+ *
+ * 所以永久拒绝要**移出队列**（`markRejected`），并且**不阻断下载**。
+ *
+ * ⚠️ 名单只收"重试无意义"的码。**拿不准的一律留在暂时那一类** ——
+ * 判成永久会**丢掉一条本来能上去的改动**，那比多试几次严重得多。
+ * 而"多试几次"也不再会卡死设备了：下载已经不再依赖上传是否干净。
+ */
+const PERMANENT_REJECTION_CODES: readonly string[] = [
+  // 这条 op 本身就有问题，重传同一份内容结果不会变。
+  'VALIDATION_FAILED',
+  'INVALID_OP_ID',
+  'INVALID_OP_TYPE',
+  'INVALID_ENTITY_TYPE',
+  'INVALID_ENTITY_ID',
+  'INVALID_PAYLOAD',
+  'PAYLOAD_TOO_LARGE',
+  'INVALID_VECTOR_CLOCK',
+  'INVALID_TIMESTAMP',
+  'MISSING_ENTITY_ID',
+  'INVALID_SCHEMA_VERSION',
+  // op 的 clientId 与本次请求的 clientId 不一致 —— 它压根不属于本机。
+  'INVALID_CLIENT_ID',
+  // 服务端已经有这个 opId 了（幂等重试走 accepted 分支，走到这里说明
+  // 同批里重复出现，或内容不一致 —— 两者都不该无限重传）。
+  'DUPLICATE_OPERATION',
+  // 加密配置层面的不匹配：客户端与服务端口径不一致，重传同一份内容无用。
+  'ENCRYPTED_OPS_NOT_SUPPORTED',
+  'E2EE_REQUIRED',
+];
+
+/**
  * 一次上传里被服务端以"冲突"拒绝的 op。
  *
  * 服务端在 CONCURRENT / 相等时钟异客户端 / 被取代 时拒绝，并给出
@@ -94,24 +134,89 @@ export interface ConflictInfo {
   existingClock?: Record<string, number>;
 }
 
-/** 一个 op 里最能代表"用户改了什么"的字段，用于在界面上给出简短标题。 */
-export function describeConflictPayload(payload: unknown): string {
-  if (payload === null || payload === undefined) return '（空）';
-  if (typeof payload !== 'object') return String(payload);
+/**
+ * 冲突载荷的**结构化**摘要：只说"这是什么"，不说"怎么说"。
+ *
+ * ## 为什么要有它
+ *
+ * `describeConflictPayload` 返回的是一句**中文**，而且其中一支会把载荷的**字段名**
+ * 直接拼进去（`completedAt: 123`）。这对单语时代能用，但它有两个问题：
+ *
+ *   1. 它没法按别的语言渲染 —— 任何要显示英文的壳只能自己再判断一遍载荷形状；
+ *   2. `completedAt` 是**内部标识符**。界面语言门禁明确禁止用户可见文案里出现
+ *      内部标识符（原始技术信息要放进"技术细节"这类标注字段），
+ *      而这段文字是**绕过门禁**直接进界面的 —— 门禁扫不到跨包的返回值。
+ *
+ * 所以把"判断"和"措辞"拆开：这里的 `kind` 由 `packages/sync-client` 决定
+ * （它是唯一知道载荷形状的地方），措辞交给壳。
+ * 与 `recurrenceParts`（`packages/domain`）是同一个套路。
+ *
+ * ## 三种 kind 的取舍
+ *
+ * - `text`：载荷里能当标题用的**用户自己的字**（任务标题、项目名…）。**不翻译** ——
+ *   那不是我们的文案，是用户的数据。
+ * - `fields`：载荷是结构化的、但没有可读标题。这里**只报数量**，不列字段名 ——
+ *   列出来的就是 `completedAt` 那种内部标识符。用户在这个界面上要判断的是
+ *   "哪一条冲突、要不要保留"，"有 3 个字段被改过"足够支撑这个判断。
+ * - `empty`：`null` / `undefined` / `{}`。空就是空，绝不拼一个空字符串冒充。
+ *
+ * ⚠️ 与 `describeConflictPayload` 的关系：后者现在**建立在它之上**（先要 kind，
+ * 再拼中文），所以两条路径对同一种载荷永远给同一个判断 ——
+ * 既有的 web 断言因此原样通过，而新壳不必复制那段判断逻辑。
+ */
+export type ConflictPayloadSummary =
+  | { kind: 'text'; text: string }
+  | { kind: 'fields'; fields: readonly { name: string; value: string }[] }
+  | { kind: 'empty' };
+
+/** 载荷里按优先级找"能当标题"的字段。顺序即优先级。 */
+const CONFLICT_TITLE_KEYS = ['title', 'name', 'text', 'content', 'note'] as const;
+
+/** 一个 op 的载荷 → 结构化摘要。判断规则见 {@link ConflictPayloadSummary}。 */
+export function summarizeConflictPayload(payload: unknown): ConflictPayloadSummary {
+  if (payload === null || payload === undefined) return { kind: 'empty' };
+  if (typeof payload !== 'object') return { kind: 'text', text: String(payload) };
 
   const record = payload as Record<string, unknown>;
-  for (const key of ['title', 'name', 'text', 'content', 'note']) {
+  for (const key of CONFLICT_TITLE_KEYS) {
     const value = record[key];
-    if (typeof value === 'string' && value.trim() !== '') return value;
+    if (typeof value === 'string' && value.trim() !== '') return { kind: 'text', text: value };
   }
 
-  // 没有可读标题就把字段列出来，总比显示"对象"强
-  const keys = Object.keys(record);
-  if (keys.length === 0) return '（空）';
-  return keys
-    .slice(0, 4)
-    .map((k) => `${k}: ${JSON.stringify(record[k])}`)
-    .join('、');
+  const fields = Object.keys(record).map((name) => ({
+    name,
+    // `JSON.stringify` 对函数/符号返回 `undefined`；显式补成 `'undefined'` 是为了
+    // 让类型是 `string` —— 拼出来的字符串与原来 `${...}` 的隐式转换**逐字相同**。
+    value: JSON.stringify(record[name]) ?? 'undefined',
+  }));
+  if (fields.length === 0) return { kind: 'empty' };
+  return { kind: 'fields', fields };
+}
+
+/**
+ * 一个 op 里最能代表"用户改了什么"的字段，用于在界面上给出简短标题（**中文**）。
+ *
+ * ⚠️ 新的壳请用 {@link summarizeConflictPayload} + 自己的词条，不要用这个：
+ * 它是给门禁改造之前就存在的调用方留的（`apps/web` 的 `ConflictDialog` 与
+ * `apps/mobile` 的 `conflict-view` 正在分头迁）。两条路径的判断是同一份
+ * （都走 `summarizeConflictPayload`），所以不会漂移。
+ */
+export function describeConflictPayload(payload: unknown): string {
+  const summary = summarizeConflictPayload(payload);
+  switch (summary.kind) {
+    case 'text':
+      return summary.text;
+    case 'empty':
+      return '（空）';
+    case 'fields':
+      // 没有可读标题就把字段列出来，总比显示"对象"强。
+      // 上限 4 个：再多会把冲突面板的标题栏撑成一堵墙，而用户真正要看的
+      // 是"哪一条冲突"，不是整份载荷。
+      return summary.fields
+        .slice(0, 4)
+        .map((f) => `${f.name}: ${f.value}`)
+        .join('、');
+  }
 }
 
 /**
@@ -175,7 +280,65 @@ export type SyncStatus =
    * 也没有地方去选，问题就永久卡住了。
    */
   | { kind: 'conflict'; conflicts: ConflictInfo[] }
-  | { kind: 'error'; message: string; retryable: boolean };
+  | ({ kind: 'error'; retryable: boolean } & SyncFailure);
+
+/**
+ * 同步失败的**结构化原因**。
+ *
+ * 🔴 为什么必须有它，而不是只有 `message`：壳里原来只能把 `message` 原样插进
+ * 一句本地化好的框里（`'同步出错：{message}'` / `'Sync error: {message}'`），
+ * 而 `message` 曾经是**这个包里的中文**。于是英文界面的用户读到的是
+ * `Sync error: 未设置端到端加密口令，已停止同步（不会以明文上传）` —— 中英混排。
+ * 门禁永远扫不到：壳渲染的是**变量**，不是字面量。
+ *
+ * ⚠️ 加一个新原因，两个壳都要跟着改 —— 而且是**编译器盯着你改**：
+ * 两边都用 `switch (status.reason)` 穷尽，漏一个就编译不过。
+ */
+export type SyncFailureReason =
+  /** 还没配同步服务。由宿主/壳判断，不是这个包。 */
+  | 'not-configured'
+  /** 没有访问令牌。 */
+  | 'not-signed-in'
+  /** 有令牌但没有端到端加密口令 —— 宁可停下，也**绝不明文上传**。 */
+  | 'no-encryption-password'
+  /** 解决冲突时，本地那条 op 已经不在待上传队列里了。 */
+  | 'local-op-missing'
+  /** 解决冲突时拿不到对端版本，没法"保留远端"。 */
+  | 'remote-version-unavailable'
+  /**
+   * 服务端上有一批 op 用**当前口令解不开**，它们被跳过了。
+   *
+   * 详见 `download()` 里那段注释：这些 op 大概率是在**另一个口令**下写入的
+   * （换过口令、或某台设备用旧口令传过东西）。重试永远不会让它们变得可读，
+   * 所以它**不可重试** —— 但也不能因此让设备永远同步不了。
+   */
+  | 'undecryptable-ops'
+  /**
+   * 服务端**拒绝了本机上传的 op**，这些改动不在云上。
+   *
+   * 🔴 单独一种原因，因为它和"网络不好"是**完全相反**的处置：
+   * 网络问题该重试，而永久拒绝重试一万次也还是拒绝。
+   * 混进 `'unexpected'` 的话，用户只会看到一句"同步出错"，既不知道
+   * **有改动没上去**，也没有任何地方能看是哪些改动。
+   *
+   * 其中 `retryable` 由调用方按"有没有永久拒绝"决定：
+   *   - 全是永久拒绝（`INVALID_CLIENT_ID` 这类）→ `false`，重试无意义；
+   *   - 只是暂时被挡（限流、配额）→ `true`，队列还留着，下次会重传。
+   */
+  | 'upload-rejected'
+  /** 意外异常：只有 `message` 有意义，它里面是技术细节。 */
+  | 'unexpected';
+
+/**
+ * 失败信息。**已知原因不需要 `message`。**
+ *
+ * 这样"已知原因"那几个分支里根本不存在可以被误当成文案渲染的中文；
+ * `message` 只留给真正意外的那一类 —— 那里它是**诊断数据**，
+ * 本来也不该翻译（用户看到的是本地化的框 + 这段细节）。
+ */
+export type SyncFailure =
+  | { reason: 'unexpected'; message: string }
+  | { reason: Exclude<SyncFailureReason, 'unexpected'>; message?: string };
 
 /**
  * 上传结果。字段名以**真实服务端**为准（SuperSyncUploadResultSchema）：
@@ -199,6 +362,18 @@ interface UploadResponse {
   results?: UploadResult[];
   latestSeq?: number;
   newOps?: ServerOperation[];
+}
+
+/**
+ * 一条**用当前口令解不开**的服务端 op。
+ *
+ * 带上 `opId` 与 `serverSeq` 是为了让上报的信息**可定位** ——
+ * 只说"有 2 条解不开"无从下手；带上序号才查得到是哪两条。
+ */
+interface UnreadableOp {
+  serverSeq: number;
+  opId: string;
+  errorName: string;
 }
 
 /** 线协议里的 op 本体（不含 serverSeq，那个在外面）。 */
@@ -274,6 +449,15 @@ export interface SyncClientOptions {
 
   /** 冲突判定为"远端胜出"时，把本地这条移出上传队列（不删除）。 */
   discardLocal: (opIds: string[]) => Promise<void>;
+
+  /**
+   * 服务端**永久拒绝**时，把这些 op 移出上传队列（不删除、**不标成已上传**）。
+   *
+   * 与 {@link discardLocal} 分开，因为语义不同：那个是"我们决定不上传了"，
+   * 这个是"服务端永远不会接受"。后者必须可观测，否则界面会一直显示
+   * "已同步"而那条改动其实没上去。
+   */
+  markRejected: (opIds: string[]) => Promise<void>;
 
   /** 按 op id 取回本地 op（用户手动解决冲突时要用它重新派发）。 */
   getOpById: (opId: string) => Promise<Operation<string> | undefined>;
@@ -355,6 +539,31 @@ export class SyncClient {
   private readonly fetchImpl: typeof fetch;
   private readonly now: () => number;
 
+  /**
+   * 本次同步里**解不开**的 op（详见 `download()`）。
+   *
+   * ⚠️ 是**每次 `sync()` 开头清空**的实例字段，不是跨次累积的历史 ——
+   * 否则一次口令手滑之后，界面会永远挂着"有数据解不开"。
+   */
+  private unreadableOps: UnreadableOp[] = [];
+
+  /**
+   * 本次同步里被服务端**永久拒绝**的 op（已随之移出待上传队列）。
+   *
+   * 与 `unreadableOps` 同样是**每次 `sync()` 开头清空**的实例字段：
+   * 这些 op 已经被移出队列，不该在后续每一次同步里继续被报出来。
+   */
+  private rejectedOps: { opId: string; errorCode: string; error: string }[] = [];
+
+  /**
+   * 本次同步里**暂时**被挡的 op（限流、配额……）。它们**留在队列里**，下次重传。
+   *
+   * 和永久拒绝分开记，是因为两者的 `retryable` 相反 ——
+   * 合成一类的话，界面要么劝用户"重试"（永久拒绝重试没用），
+   * 要么劝用户"别试了"（限流其实等一会儿就好）。
+   */
+  private transientRejects: { opId: string; errorCode: string; error: string }[] = [];
+
   constructor(private readonly options: SyncClientOptions) {
     this.fetchImpl = options.fetchImpl ?? globalThis.fetch.bind(globalThis);
     this.now = options.now ?? Date.now;
@@ -374,7 +583,7 @@ export class SyncClient {
 
     const token = await this.options.getToken();
     if (token === undefined) {
-      return report({ kind: 'error', message: '未登录', retryable: false });
+      return report({ kind: 'error', reason: 'not-signed-in', retryable: false });
     }
 
     const password = await this.options.getPassword();
@@ -383,15 +592,27 @@ export class SyncClient {
       // 宁可明确失败，也不让用户以为数据安全地上云了。
       return report({
         kind: 'error',
-        message: '未设置端到端加密口令，已停止同步（不会以明文上传）',
+        reason: 'no-encryption-password',
         retryable: false,
       });
     }
 
     try {
+      this.unreadableOps = [];
+      this.rejectedOps = [];
+      this.transientRejects = [];
       const conflicts: ConflictReport[] = [];
 
       report({ kind: 'syncing', phase: 'upload' });
+      // ⚠️ 这里**不会再因为"服务端拒绝了某条 op"而抛错** —— 拒绝被记进
+      // `rejectedOps` / `transientRejects`，下面照常下载。
+      //
+      // 🔴 这一条是"设备再也不会拉不到数据"的保证。原来它抛错，而抛出点在
+      // 下载之前，于是**一条永远传不上去的 op 就能让这台设备永久失去下载能力**：
+      // 每次同步都在上传段失败，`download()` 一次都不执行，界面只显示"同步失败"。
+      // 实测：队列里混进一条 `INVALID_CLIENT_ID` 的 op 后，连续两次同步都是
+      // error、待上传数恒为 1、设备再没拉到过任何远端数据。
+      // 上传的问题只该影响"能不能上传"，不该影响"能不能下载"。
       await this.upload(token, password, conflicts);
 
       // 🔴 顺序：上传 → 下载 → 解决冲突 → 再上传。
@@ -411,6 +632,64 @@ export class SyncClient {
         }
       }
 
+      /**
+       * 🔴 **被拒的改动要排在"解不开的 op"之前报。**
+       *
+       * 两者都是"你的数据没全在这台设备上"，但**被拒是一次性信息**：
+       * 永久拒绝的 op 已经被移出队列，下一次同步就不会再提它了 ——
+       * 如果这次被 `undecryptable-ops` 挡住，用户**再也没有机会知道**有改动没上去。
+       * 而解不开的 op 是持久状态，下次同步照样会报，晚一轮不损失信息。
+       *
+       * 判据优先级 = "错过就再也看不到的" 优先。
+       */
+      if (this.rejectedOps.length > 0 || this.transientRejects.length > 0) {
+        const parts: string[] = [];
+        if (this.rejectedOps.length > 0) {
+          parts.push(
+            `永久拒绝 ${String(this.rejectedOps.length)} 条（已移出待上传队列，不会重传）：` +
+              this.rejectedOps
+                .map((r) => `${r.opId}(${r.errorCode}: ${r.error})`)
+                .join(', '),
+          );
+        }
+        if (this.transientRejects.length > 0) {
+          parts.push(
+            `暂时被挡 ${String(this.transientRejects.length)} 条（仍在队列里，下次会重传）：` +
+              this.transientRejects
+                .map((r) => `${r.opId}(${r.errorCode}: ${r.error})`)
+                .join(', '),
+          );
+        }
+
+        return report({
+          kind: 'error',
+          reason: 'upload-rejected',
+          // 只要还有"下次会重传"的，就值得重试；全是永久拒绝则重试无意义。
+          retryable: this.transientRejects.length > 0,
+          message: parts.join('；'),
+        });
+      }
+
+      /**
+       * 🔴 有 op 解不开时**不能报 `synced`**。
+       *
+       * 数据确实同步了一部分，但只要有 op 被跳过，用户的完整数据就不在这台设备上。
+       * 报"已是最新"会让他以为全都同步了 —— 那是无声的数据丢失。
+       *
+       * 顺序上放在冲突之后：冲突是"需要用户做决定"，优先级更高、更可行动；
+       * 解不开的 op 用户**当下做不了任何事**（重试也不会变好），所以 `retryable: false`。
+       */
+      if (this.unreadableOps.length > 0) {
+        return report({
+          kind: 'error',
+          reason: 'undecryptable-ops',
+          retryable: false,
+          message: this.unreadableOps
+            .map((u) => `${String(u.serverSeq)}:${u.opId}(${u.errorName})`)
+            .join(', '),
+        });
+      }
+
       return report({ kind: 'synced', at: this.now() });
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : String(error);
@@ -418,7 +697,7 @@ export class SyncClient {
       return report(
         offline
           ? { kind: 'offline', since: this.now() }
-          : { kind: 'error', message, retryable: true },
+          : { kind: 'error', reason: 'unexpected', message, retryable: true },
       );
     }
   }
@@ -543,36 +822,107 @@ export class SyncClient {
         await this.options.markUploaded(seqsByOpId);
       }
 
-      // 非冲突的拒绝才是硬错误
+      // 🔴 非冲突的拒绝分两类，**都不在这里抛错**（抛错会连下载一起挡掉）：
+      //
+      //   永久拒绝（INVALID_CLIENT_ID / INVALID_OP_ID / 校验类……）
+      //     → 这条 op 重试多少次都不会被接受，**移出待上传队列**并如实上报。
+      //       不移出的话，它会每次同步都被重传、每次都被拒，设备永远卡在
+      //       "同步失败 + 待上传数不减"，而且**再也拉不到任何远端数据**。
+      //
+      //   暂时被挡（限流 / 配额 / 服务端内部错）
+      //     → **留在队列里**，下次同步重传。绝不能把它们也移出队列：
+      //       那等于把一条本来会成功的改动丢掉。
+      //
+      // 判据名单见 `PERMANENT_REJECTION_CODES`。拿不准的一律算"暂时"。
       const hardRejects = rejected.filter(
         (r) => r.errorCode?.startsWith('CONFLICT') !== true,
       );
-      if (hardRejects.length > 0) {
-        const detail = hardRejects
-          .map((r) => `${r.opId}(${r.errorCode ?? '?'}: ${r.error ?? '未知原因'})`)
-          .join(', ');
-        throw new Error(
-          `服务端拒绝了 ${String(hardRejects.length)}/${String(ops.length)} 条 op：${detail}` +
-            (seqsByOpId.size > 0
-              ? `（同批另有 ${String(seqsByOpId.size)} 条已被接受，已标记为已上传，不会再重传）`
-              : ''),
-        );
+
+      for (const r of hardRejects) {
+        const entry = {
+          opId: r.opId,
+          errorCode: r.errorCode ?? '(未给出错误码)',
+          error: r.error ?? '未知原因',
+        };
+        if (PERMANENT_REJECTION_CODES.includes(entry.errorCode)) {
+          this.rejectedOps.push(entry);
+        } else {
+          this.transientRejects.push(entry);
+        }
       }
 
-      // 🔴 上传成功才推进游标。
-      // 反过来的话，游标前进了却不知道哪些 op 传过 —— 下次会重传整批。
-
-      // 上传成功才推进游标。失败就保持原位，下次重试同一批。
-      if (typeof body.latestSeq === 'number') {
-        await this.options.setLastServerSeq(body.latestSeq);
+      if (this.rejectedOps.length > 0) {
+        // 先移出队列再上报 —— 顺序反了的话，上报之后进程若中断，
+        // 这些 op 下次还会被重传并被拒（不会丢数据，但会白白多跑一轮）。
+        await this.options.markRejected(this.rejectedOps.map((r) => r.opId));
       }
 
-      // 服务端可能搭车返回新 op（piggyback），必须应用，否则会丢数据
+      /**
+       * 🔴 搭车返回的 op 也必须**逐条解密，一条解不开不能拖垮整次同步**。
+       *
+       * 这里原来是无保护的 `await Promise.all(body.newOps.map(decodeServerOp))`。
+       * 它和 `download()` 里被 ADR-0016 修掉的那处是**同一个形状**，但更隐蔽：
+       *
+       *   1. `upload()` 在 `pending.length === 0` 时**直接 return**（见本方法开头），
+       *      所以"没有待上传 op"的设备永远走不到这一行。用干净数据库复现，
+       *      会得出"解密路径没问题"的结论 —— **必须有待上传的 op 才会踩到**。
+       *   2. 抛错发生在 `sync()` 的 upload 阶段，于是 `download()` **根本不会执行**。
+       *      设备其实一条远端数据都没拉下来，却只显示"同步失败"，而且被
+       *      `sync()` 归类成 `unexpected` + `retryable: true` —— 用户重试多少次都一样。
+       *      实测：手机上传成功（服务端确实收到了），本地库里远端 op 数为 **0**。
+       *
+       * 修法与 ADR-0016 一致：跳过读不了的，应用能读的，如实上报。
+       */
+      let piggybackAllUndecodable = false;
       if (body.newOps !== undefined && body.newOps.length > 0) {
-        const decoded = await Promise.all(
-          body.newOps.map((o) => decodeServerOp(o, password)),
+        const attempts = await Promise.all(
+          body.newOps.map(async (o) => {
+            try {
+              return { ok: true as const, op: await decodeServerOp(o, password) };
+            } catch (error: unknown) {
+              return {
+                ok: false as const,
+                serverSeq: o.serverSeq,
+                opId: o.op?.id ?? '(未知)',
+                errorName: error instanceof Error ? error.name : 'Error',
+              };
+            }
+          }),
         );
-        await this.options.applyRemote(decoded);
+
+        const decoded = attempts.filter((a) => a.ok).map((a) => a.op);
+        const failed = attempts.filter((a) => !a.ok);
+
+        if (decoded.length > 0) await this.options.applyRemote(decoded);
+
+        if (failed.length === 0) {
+          // 全部解开 —— 正常情况
+        } else if (decoded.length === 0) {
+          /**
+           * 整批都解不开 —— 与 `download()` 一样，这多半是"口令不对"的信号。
+           * **不在这里抛**，也不推进游标：交给紧接着的 `download()` 去判。
+           * 理由是这个判断只该有一份策略（ADR-0016），在这里再写一套迟早会漂移；
+           * 而不推进游标能让 `download()` 从旧位点重新看到这批 op，
+           * 从而给出"口令不对"还是"历史里混着别的口令"的正确区分。
+           */
+          piggybackAllUndecodable = true;
+        } else {
+          // 有的解开、有的解不开 = 口令是对的，只是历史里混着别的口令写的数据。
+          for (const f of failed) this.unreadableOps.push(f);
+        }
+      }
+
+      /**
+       * 🔴 上传成功、且搭车 op 没有整批解不开时才推进游标。
+       *
+       * 反过来的话，游标前进了却不知道哪些 op 传过 —— 下次会重传整批。
+       * 而"整批解不开"时推进游标，等于把这段历史静默跳过（ADR-0016 明确禁止）。
+       */
+      if (
+        !piggybackAllUndecodable &&
+        typeof body.latestSeq === 'number'
+      ) {
+        await this.options.setLastServerSeq(body.latestSeq);
       }
     }
   }
@@ -742,7 +1092,12 @@ export class SyncClient {
     const token = await this.options.getToken();
     const password = await this.options.getPassword();
     if (token === undefined || password === undefined || password === '') {
-      return { kind: 'error', message: '未登录或缺少加密口令', retryable: false };
+      // 分成两条精确原因，而不是原来那句"未登录或缺少加密口令" ——
+      // 用户能做的事完全不同（去登录 vs 去填口令），混着说等于没说。
+      if (token === undefined) {
+        return { kind: 'error', reason: 'not-signed-in', retryable: false };
+      }
+      return { kind: 'error', reason: 'no-encryption-password', retryable: false };
     }
 
     try {
@@ -752,7 +1107,7 @@ export class SyncClient {
         if (op === undefined) {
           return {
             kind: 'error',
-            message: '本地那条改动已经不在队列里了，请重新同步',
+            reason: 'local-op-missing',
             retryable: true,
           };
         }
@@ -762,7 +1117,7 @@ export class SyncClient {
           // 拿不到对端版本就没法"保留对端" —— 明确失败，不要猜
           return {
             kind: 'error',
-            message: '取不到对端版本，无法保留远端；请选择保留本地',
+            reason: 'remote-version-unavailable',
             retryable: false,
           };
         }
@@ -782,6 +1137,7 @@ export class SyncClient {
     } catch (error: unknown) {
       return {
         kind: 'error',
+        reason: 'unexpected',
         message: error instanceof Error ? error.message : String(error),
         retryable: true,
       };
@@ -808,8 +1164,62 @@ export class SyncClient {
       const ops = body.ops ?? [];
 
       if (ops.length > 0) {
-        const decoded = await Promise.all(ops.map((o) => decodeServerOp(o, password)));
-        await this.options.applyRemote(decoded);
+        /**
+         * 🔴 逐条解密，**一条解不开不能拖垮整页**。
+         *
+         * 实测（iPhone 17 Pro 模拟器 + 真实服务端）：服务端上有两条 op 是用
+         * **另一个口令**写入的（换口令之前传上去的）。`decodeServerOp` 对它们抛
+         * `OperationError`（AES-GCM 认证失败），而这里是
+         * `await Promise.all(ops.map(decodeServerOp))` —— 于是：
+         *
+         *   1. 整页**一条都应用不上**（后面那 7 条明明是好的）；
+         *   2. `setLastServerSeq` 在抛错**之后**，游标**永远不推进**；
+         *   3. 下一次同步从同一个位点开始，**撞上同样两条，再抛**。
+         *
+         * 结果：这台设备**永久**无法同步，而界面只显示"同步失败"。
+         * 换过口令的用户会以为同步坏了，其实只是历史里有两条解不开的。
+         *
+         * 这与第 34 条（上传侧：一条被硬拒的 op 让设备永久卡死）是**同一个形状**，
+         * 只是发生在读侧。修法也必须一致：**跳过读不了的，应用能读的，并如实上报。**
+         *
+         * ⚠️ 但不能无脑跳过。**整页一条都解不开**时，最常见的原因是
+         * **用户把口令打错了** —— 那时候推进游标等于把整段历史静默跳过，
+         * 比卡死更糟。所以只在"有的解开、有的解不开"时才跳过。
+         */
+        const attempts = await Promise.all(
+          ops.map(async (o) => {
+            try {
+              return { ok: true as const, op: await decodeServerOp(o, password) };
+            } catch (error: unknown) {
+              return {
+                ok: false as const,
+                serverSeq: o.serverSeq,
+                opId: o.op?.id ?? '(未知)',
+                errorName: error instanceof Error ? error.name : 'Error',
+              };
+            }
+          }),
+        );
+
+        const decoded = attempts.filter((a) => a.ok).map((a) => a.op);
+        const failed = attempts.filter((a) => !a.ok);
+
+        if (decoded.length > 0) await this.options.applyRemote(decoded);
+
+        if (failed.length > 0) {
+          if (decoded.length === 0) {
+            const first = failed[0];
+            throw new Error(
+              `这一页 ${String(ops.length)} 条 op **一条都解不开**` +
+                `（第一条 ${first?.serverSeq ?? '?'}:${first?.opId ?? '?'}，` +
+                `${first?.errorName ?? '?'}）。这几乎总是"端到端加密口令不对"，` +
+                `所以**不推进游标** —— 否则一次手滑就会静默跳过整段历史。`,
+            );
+          }
+          // 有的解开、有的解不开 = 口令确实是对的，只是历史里混着别的口令写的数据。
+          // 跳过它们（重试也不会变好），但要**如实上报**，不能装作没这回事。
+          for (const f of failed) this.unreadableOps.push(f);
+        }
       }
 
       /**

@@ -1,4 +1,9 @@
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+// 🔴 这一条**刻意**直接 import `@noble/*`：它是一条"两种后端算出的字节必须相同"
+// 的参照计算，参照物不能是被测对象自己。参数（1000 轮 / SHA-256 / dkLen 32）
+// 与生产代码里的常量逐字相同，任何一处漂移都会让下面的期望值对不上。
+import { pbkdf2 } from '@noble/hashes/pbkdf2.js';
+import { sha256 } from '@noble/hashes/sha2.js';
 // Spec imports only from the barrel so the public-API contract is the
 // single tested surface.
 import {
@@ -485,7 +490,18 @@ describe('encryption', () => {
       await expect(decrypt(invalid, PASSWORD)).rejects.toBeDefined();
     });
 
-    it('throws WebCryptoNotAvailableError on legacy decrypt in fallback mode', async () => {
+    /**
+     * 🔴 这条用例**原来断言的是抛错**，而且是断言对的 ——
+     * 那时 legacy 路径确实只有 `crypto.subtle` 一条实现，Hermes 上必然失败。
+     *
+     * 但那个"预期行为"的代价是真实的、并且在真机上被测到了：
+     * iPhone 17 Pro 模拟器里，服务端上**只要有一条历史 op 是 legacy 格式**，
+     * 整次下载就抛在这里 —— 手机永远停在「同步失败」，而它自己的数据传得上去。
+     * 用户看到的症状是"多端同步不工作"，排查方向会被整体带偏。
+     *
+     * 所以这条现在断言**能解开**。这正是"把一个被记录的缺口真的补上"。
+     */
+    it('decrypts legacy ciphertext with the pure-JS fallback (no WebCrypto)', async () => {
       // Re-enable WebCrypto to produce legacy ciphertext, then disable it.
       Object.defineProperty(globalThis.crypto, 'subtle', {
         value: originalSubtle,
@@ -498,10 +514,73 @@ describe('encryption', () => {
         writable: true,
         configurable: true,
       });
+      clearSessionKeyCache();
 
-      await expect(decrypt(legacy, PASSWORD)).rejects.toBeInstanceOf(
-        WebCryptoNotAvailableError,
+      await expect(decrypt(legacy, PASSWORD)).resolves.toBe(DATA);
+    });
+
+    /**
+     * 已知答案向量：password `'pw'`、password-as-salt、1000 轮、SHA-256、
+     * IV `00 01 … 0b`、明文 `'hello legacy'`，由 WebCrypto 产出后**固定在这里**。
+     *
+     * 与上面那条"自己产、自己解"不同，这条是**钉死的历史密文**：
+     * 参数映射（轮数、salt、hash、dkLen）任何一处漂移，GCM 认证就会失败。
+     * 自己产自己解的那条**恰好**钉不住这一点。
+     */
+    it('decrypts a fixed legacy known-answer vector with no WebCrypto', async () => {
+      const FIXED_LEGACY =
+        'AAECAwQFBgcICQoLiY/pbFUkqqKbCqHjFb1DIb4LK+UCuzvOYqp1Lw==';
+      Object.defineProperty(globalThis.crypto, 'subtle', {
+        value: undefined,
+        writable: true,
+        configurable: true,
+      });
+      clearSessionKeyCache();
+
+      await expect(decrypt(FIXED_LEGACY, 'pw')).resolves.toBe('hello legacy');
+    });
+
+    it('legacy KDF: pure-JS backend produces the same key bytes as WebCrypto', async () => {
+      // 生产参数：password-as-salt、1000 轮、SHA-256、dkLen 32。
+      // 这条向量是**两种后端共用的契约** —— 换实现不得改变它。
+      const EXPECTED =
+        '761616d73b9cbd8c8a2ec56c73ea613fe59661d0a6d11dca4018eb917a72c553';
+      const passwordBytes = new TextEncoder().encode('pw');
+
+      Object.defineProperty(globalThis.crypto, 'subtle', {
+        value: originalSubtle,
+        writable: true,
+        configurable: true,
+      });
+      const keyMaterial = await globalThis.crypto.subtle.importKey(
+        'raw',
+        passwordBytes,
+        { name: 'PBKDF2' },
+        false,
+        ['deriveBits'],
       );
+      const webcryptoBits = new Uint8Array(
+        await globalThis.crypto.subtle.deriveBits(
+          {
+            name: 'PBKDF2',
+            salt: passwordBytes,
+            iterations: 1000,
+            hash: 'SHA-256',
+          },
+          keyMaterial,
+          256,
+        ),
+      );
+      const pureJsBits = pbkdf2(sha256, passwordBytes, passwordBytes, {
+        c: 1000,
+        dkLen: 32,
+      });
+
+      const hex = (bytes: Uint8Array): string =>
+        Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('');
+
+      expect(hex(webcryptoBits)).toBe(EXPECTED);
+      expect(hex(pureJsBits)).toBe(EXPECTED);
     });
   });
 
