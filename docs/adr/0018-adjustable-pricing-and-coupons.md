@@ -80,13 +80,29 @@ C 让价格只有一份机器可读的写入口（`publishPriceVersion`），并
 |---|---|---|
 | Stripe | coupon（折扣本身）与 promotion code（用户输入的码）**是两个对象**；promotion code 可以有 `max_redemptions`、`first_time_transaction`、`expires_at`、`restrictions`（按 product 限） | 我们的 `CouponDefinition` 一个对象里同时含"折扣"与"码"——因为**只有一个档**，不需要 coupon/promotion code 的多对多。这是可维护性门槛下的**有意缩小**，不是没看懂对方模型 |
 | Stripe | 明确允许**零金额订单**（发票/订阅都可以是 0） | 我们**反过来**：`MIN_CHARGEABLE_AMOUNT_MINOR = 1`，0 元单在**建单之前**就被拒。理由见 §3.3 |
-| Paddle | 折扣有 `flat` / `percentage` 两种，外加 `discount_group`（同组互斥）、`usage_limit` 是**全局** | `discount_group` 承认了"叠加会有组合爆炸"；我们的答案更简单：一单一张 |
+| Paddle | 折扣有 `flat` / `flat_per_seat` / `percentage` **三种**，外加 `discount_group`（同组互斥）、`usage_limit` 是**全局** | `discount_group` 承认了"叠加会有组合爆炸"；我们的答案更简单：一单一张。`flat_per_seat` 对我们是**无关**的（只有一个档、按账户不按席位），所以没进 §2.2 的选项表 |
 | Lemon Squeezy | `usage_limit` 也是全局一个数 | 我们额外支持 `maxRedemptionsPerUser`，因为大陆运营口径里"每人一次"比"总量"更常用 |
 | 微信支付 | 代金券分**预充值**与**非预充值**；商家券仍在灰度；商品券按商品核销 | 支付通道侧的券本轮不接；`checkout_orders` 保留 `provider` / `out_trade_no` / `provider_event_id`，将来接的时候不用改表 |
 | 微信支付 | 账单字段 `应结订单金额 = 订单金额 − 免充值券金额` → **有券的单，结算金额 ≠ 订单金额** | 订单表把 `original_amount_minor` / `discount_minor` / `final_amount_minor` **三列都存**，并且有 CHECK 保证 `final = original − discount`。对账时三个数都在，不用反推 |
 | 微信支付 | 退款**不会**自动退券，要商户**主动**调 `/v3/marketing/busifavor/coupons/return` | 所以"退款归还名额"**不能**被假设为默认行为 → §3.4 的"退款不归还名额"与我方语义一致 |
 | 有赞 | 券类型有满减 / 折扣 / 随机金额 | 随机金额（如"立减 1~5 元"）**本轮不做**：它让"用户看到的价格"不确定，而我们的落地页要写死一个价 |
 | Stripe / Paddle 通用 | 并发核销必须用**部分唯一索引 + `INSERT … ON CONFLICT DO NOTHING`** 或 `SELECT … FOR UPDATE`，**绝不能**"先 count 再 insert" | 我们选 `SELECT … FOR UPDATE`（锁券行）+ 事务内重新计数；并且 `coupon_redemptions.order_id` 是 UNIQUE，那是第二道闸 |
+
+**本次复核**（`web_search` 在本会话不可用 —— Tavily HTTP 432 —— 故用 `web_fetch` 取一手文档）：
+
+- **Stripe 的两条：逐条对上。** `docs.stripe.com/billing/subscriptions/coupons.md`：
+  coupon 与 promotion code 确为两个对象；"限指定客户""限首购""最低消费"是 promotion code
+  独有、coupon 不支持；`max_redemptions` 是**全局**额度（全体客户共享，不限每人）；
+  `expires_at` 不能晚于 coupon 的 `redeem_by`；coupon 只能删除，promotion code 可以
+  `active:false` 归档。原文里的权衡也被我们采纳了 —— coupon 删除**不影响**已有订阅/发票上的折扣，
+  与本文 §3.1"旧价行永不删除"是同一种纪律。
+- **Paddle 的一条：对上，并已修正一处不精确。** `developer.paddle.com/api-reference/discounts/list-discounts.md`：
+  `type` 实际是 `flat` / `flat_per_seat` / `percentage` **三种**（本文原先写成两种，已改）；
+  `usage_limit` 原文 "an overall limit for this discount, rather than a per-customer limit" —— 
+  与"全局"一致；`discount_group_id` 存在。
+- **未复核：Lemon Squeezy、微信支付、有赞三条。** 它们驱动的是"本轮不做"的否决
+  （§2.2 的 B/C/D 与随机金额券），细节有出入也不改变结论。但**接支付通道侧的券之前必须重核**，
+  尤其是微信那条 `应结订单金额 = 订单金额 − 免充值券金额` —— 它是订单表存三个金额列的直接理由。
 
 ---
 
@@ -227,9 +243,10 @@ unknown_coupon → stacking_not_allowed → disabled → not_started → expired
    （b）机制形状 —— 一条记录语句顺序的测试断言"锁券行 → 数名额 → 插入"
    在**同一个事务里按这个顺序**发生，删掉 `FOR UPDATE` 或把计数挪出事务就变红。
    PostgreSQL 的行锁会阻塞并发写者是其文档保证的行为，但**没有在本仓库验证过**。
-3. **`check:pricing` 还没接进 `pnpm check`。** 门禁与注入探针都是可运行的，
-   但 `package.json` 的 `check` 链路里没有它们（`package.json` 正被另一条工作流修改，
-   本轮没有动它）。见 [pricing-and-coupons.md](../reference/pricing-and-coupons.md) §7。
+3. ~~`check:pricing` 还没接进 `pnpm check`。~~ **已接入**（提交 `e63b100`，
+   见 [pricing-and-coupons.md](../reference/pricing-and-coupons.md) §7）。
+   剩下真正未接的是 `verify:i18n-failures` 进 CI 的独立作业 —— 它耗时较长，
+   有意不放进 `pnpm check`。
 4. **发票金额口径未与会计确认**（承接 ADR-0017 的同类未决项）。有券的单，
    "开票金额"是 `original` 还是 `final`，我们按常识取 `final`（实付），
    但**未经会计确认**。
