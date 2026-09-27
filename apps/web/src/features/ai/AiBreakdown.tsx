@@ -202,6 +202,16 @@ export function AiBreakdown(props: AiBreakdownProps): React.JSX.Element {
    * 路由全貌：**有路**时给 `target`（披露与发送都用它），
    * **没路**时给 `explanation`（为什么 + 下一步）。两者恰好一个非空。
    */
+  /**
+   * 🔴 熔断冷却到点后的"再试一次"。
+   *
+   * 解析**每次渲染都重跑**（`resolveFeatureRoute` 在渲染体里，`now` 取当前时刻），
+   * 所以重试只需要强制一次重渲染 —— 不必把 tick 传进任何地方。
+   * 这样"重试"与"重新打开面板"走的是**同一条路径**，不会出现第二种解析口径。
+   */
+  const [, retryResolution] = useState(0);
+  const retry = (): void => retryResolution((n) => n + 1);
+
   const health = fromHealthSnapshot(props.healthSnapshot ?? {}, Date.now());
   const { target, explanation } = resolveFeatureRoute(routing, 'breakdown', { health });
 
@@ -361,6 +371,7 @@ export function AiBreakdown(props: AiBreakdownProps): React.JSX.Element {
             explanation={explanation}
             onOpenSettings={onOpenSettings}
             testId="ai-no-target"
+            onRetry={retry}
           />
         ) : (
           <>

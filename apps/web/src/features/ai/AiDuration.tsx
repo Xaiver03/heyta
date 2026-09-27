@@ -24,7 +24,10 @@
  *
  * 依据有三档，且**必须如实区分**：
  *   - 有历史 → 「基于你过去 N 次的实际/计划比值」（N 是**真正发出去的**条数）
- *   - 有偏好 → 逐条列出 `PreferenceHint.summary`（来自 `@heyta/domain` 的原话）
+ *   - 有偏好 → 用**结构化事实** `PreferenceHint.facts` 取**当前语言**的词条
+ *     （🔴 **不是** `hint.summary` —— 那是领域层拼好的**中文投影**，
+ *     整句渲染它会让英文界面露中文；映射函数只有一份，在
+ *     `features/settings/preference-copy.ts`）
  *   - 都没有 → 「只有模型自己的通用判断，它可能不准」（**不许假装懂**）
  *
  * ## 🔴 结果不会自己写进数据
@@ -188,6 +191,16 @@ export function AiDuration(props: AiDurationProps): React.JSX.Element {
   const [manualText, setManualText] = useState('');
 
   /** 路由全貌：有路给 `target`，没路给 `explanation`（恰好一个非空）。 */
+  /**
+   * 🔴 熔断冷却到点后的"再试一次"。
+   *
+   * 解析**每次渲染都重跑**（`resolveFeatureRoute` 在渲染体里，`now` 取当前时刻），
+   * 所以重试只需要强制一次重渲染 —— 不必把 tick 传进任何地方。
+   * 这样"重试"与"重新打开面板"走的是**同一条路径**，不会出现第二种解析口径。
+   */
+  const [, retryResolution] = useState(0);
+  const retry = (): void => retryResolution((n) => n + 1);
+
   const health = fromHealthSnapshot(props.healthSnapshot ?? {}, Date.now());
   const { target, explanation } = resolveFeatureRoute(routing, 'duration-estimate', { health });
 
@@ -385,6 +398,7 @@ export function AiDuration(props: AiDurationProps): React.JSX.Element {
             explanation={explanation}
             onOpenSettings={onOpenSettings}
             testId="duration-no-target"
+            onRetry={retry}
           />
         ) : (
           <>
