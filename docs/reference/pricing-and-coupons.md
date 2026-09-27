@@ -249,18 +249,21 @@ expireStaleOrders(sql, { now })
    `billing-pricing-store.pglite.spec.ts` 的同名用例（把那套 executor 换成 Prisma 版）。
    ⚠️ 这个缺口是**有意的取舍**：把 Prisma 的 `$queryRawUnsafe` 包成一个可注入的
    端口，换来的是"全部 SQL 在真 PostgreSQL 上被跑过"。
-3. **`check:pricing` 还没接进 `pnpm check`。** 门禁与注入探针都可运行，但
-   `package.json` 的 `check` 链路里没有它们（`package.json` 正被另一条工作流修改，
-   本轮没动它）。要接的话是两行：
+3. ~~`check:pricing` 还没接进 `pnpm check`。~~ **已接入（提交 `e63b100`）。**
+   `package.json` 现在有 `check:pricing`，`check` 链路在 `check:docs` 之后调它。
+   提交时 `package.json` 是用 `git show HEAD:package.json` 做基底、**只**叠加这一处的 ——
+   工作树里当时还带着另外两条工作流未提交的改动（`check:mobile-bundle`、
+   `check:materialized-reads`、harmony 系列 `verify:*`），不为别人提交他们没验证过的东西。
 
-   ```
-   "check:pricing": "node scripts/check-pricing-consistency.mjs",
-   // 并把 && pnpm check:pricing 追加进 "check"
-   ```
+   实测：`pnpm check:pricing` → exit 0；`pnpm check` 全链路 → exit 0。
+   **注入探针**：把 `server/src/billing/price-book.ts` 的 `amountMinor: 9_900`
+   手改成 `9_800` → 门禁 exit 1，并指名两个不一致的文件与两个数字；改回后 exit 0。
+   门禁不是空转的。
 
    `verify-i18n-failures.mjs` 的 `pricing` / `coupon` 两组是它的**故障注入**验证，
-   同样需要一条 `verify:i18n-failures` 脚本（耗时较长，适合放在 CI 的独立作业里，
-   不适合放进 `pnpm check`）。
+   已注册成 `pnpm verify:i18n-failures`（实测 85 例全部符合预期，其中 `pricing` 10 例、
+   `coupon` 9 例：每个 mutant 都让对应检查变红）。它耗时较长，**有意不**放进
+   `pnpm check`，留给 CI 的独立作业。
 4. **发票金额口径未与会计确认。** 有券的单，"开票金额"取 `final`（实付）
    是我们的常识判断，**未经会计确认**。
 5. **支付通道未接线。** 下单 / 回调 / 退款的实际接线仍是 ADR-0017 §5 的状态。
