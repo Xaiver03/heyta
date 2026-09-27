@@ -18,6 +18,10 @@ services:
       dockerfile: server/Dockerfile
       args:
         VCS_REF: ${SUPERSYNC_BUILD_SHA:-local}
+        # Alpine 仓库源。默认官方 CDN（与不带这个参数的行为一致）；
+        # 在连不上 dl-cdn.alpinelinux.org 的主机上用 APK_MIRROR 覆盖，
+        # 否则 `apk add` 会**无声挂住**（Dockerfile 里有说明）。
+        APK_MIRROR: ${APK_MIRROR:-dl-cdn.alpinelinux.org}
     image: supersync:local
     environment:
       - MIGRATE_RECOVERY_BUILD_LOCAL=true

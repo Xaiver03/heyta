@@ -1,9 +1,24 @@
 # ---- Builder stage ----
 FROM node:24-alpine AS builder
 
+# 🔧 heyta 改动：Alpine 仓库源可覆盖。
+#
+# 默认仍是官方 CDN，所以在能直连 Alpine 的机器上行为完全不变。
+# 但在国内主机上 `dl-cdn.alpinelinux.org` 会**连不上**，而 `apk add` 不设超时，
+# 表现为 `docker compose build` **永久卡在这一步且没有任何输出**
+# （实测：官方 CDN 超时无响应，mirrors.aliyun.com 0.26s 返回 200）。
+#
+# 部署时用 `APK_MIRROR=mirrors.aliyun.com`（见 docker-compose.build.yml）
+# 覆盖，而不是往仓库里写死一个地域性的镜像 —— 那会让别处的自建者拿到慢源。
+ARG APK_MIRROR=dl-cdn.alpinelinux.org
+
 WORKDIR /repo
 
-RUN apk add --no-cache openssl libc6-compat
+RUN set -eux; \
+    if [ "$APK_MIRROR" != "dl-cdn.alpinelinux.org" ]; then \
+      sed -i "s|dl-cdn.alpinelinux.org|${APK_MIRROR}|g" /etc/apk/repositories; \
+    fi; \
+    apk add --no-cache openssl libc6-compat
 
 # 🔧 heyta 改动：上游这里用 `npm ci`。
 # heyta 的工作区定义在 pnpm-workspace.yaml（不在 package.json 的 `workspaces` 字段），
@@ -47,11 +62,17 @@ RUN rm -rf dist && pnpm run build
 # ---- Runtime stage ----
 FROM node:24-alpine AS production
 ARG VCS_REF=unknown
+# 与 builder 阶段同源；见那里的注释。两个阶段各自声明，因为 ARG 不跨阶段继承。
+ARG APK_MIRROR=dl-cdn.alpinelinux.org
 
 LABEL org.opencontainers.image.revision=$VCS_REF
 
 # System deps for Prisma & healthcheck + create user BEFORE copying files
-RUN apk add --no-cache openssl libc6-compat wget && \
+RUN set -eux; \
+    if [ "$APK_MIRROR" != "dl-cdn.alpinelinux.org" ]; then \
+      sed -i "s|dl-cdn.alpinelinux.org|${APK_MIRROR}|g" /etc/apk/repositories; \
+    fi; \
+    apk add --no-cache openssl libc6-compat wget && \
     addgroup -g 1001 -S nodejs && \
     adduser -S supersync -u 1001 -G nodejs && \
     mkdir -p /app/data && chown supersync:nodejs /app /app/data
