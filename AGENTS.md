@@ -1930,6 +1930,50 @@ docker inspect <容器> --format '{{range .Config.Env}}{{println .}}{{end}}' | g
     📌 推论：**守卫的输入清单必须和 Dockerfile 的 `COPY` 清单同源**，
     否则它会稳定地守错方向。改 Dockerfile 时请同时改 `deploy.sh` 里那四份清单。
 
+ 77. 🔴 **`instanceof ArrayBuffer` 在 jsdom 测试里是假阴性 —— 8 条测试一起红，报错却在说"字段缺失"。**
+
+     写二进制转换代码（`packages/app-host` 的导出/还原、`apps/web` 的通行密钥）时，
+     自然会写 `if (value instanceof ArrayBuffer)`。真浏览器里没问题，**vitest 的 jsdom 环境里必错**：
+
+     - `new TextEncoder().encode('x').buffer` 是 **Node realm** 的 `ArrayBuffer`；
+     - `instanceof` 右边是 **jsdom realm** 的 `ArrayBuffer` 构造函数；
+     - 两者不是同一个对象 ⇒ **假阴性** ⇒ 代码判定"这个字段不是二进制" ⇒ 报
+       `registration credential missing rawId/clientDataJSON/attestationObject`。
+
+     🔴 **最危险的是错误信息指错了方向**：它说"字段缺失"，而字段明明在。
+     你会先去改测试数据，而不是改判定方式 —— 实测就是这样绕了一圈（改数据没用，数据是对的）。
+
+     正确写法（都基于**内部槽**，与 realm 无关）：
+
+     ```ts
+     function isArrayBuffer(v: unknown): v is ArrayBuffer {
+       return Object.prototype.toString.call(v) === '[object ArrayBuffer]';
+     }
+     if (ArrayBuffer.isView(v)) { /* TypedArray / DataView，跨 realm 也安全 */ }
+     ```
+
+     📌 推论：凡是"跨 realm 可能成立"的类型判定，`instanceof` 一律不可信 ——
+     包括 **iframe、WebView、worker**（真实产品里同样会踩，不只是测试环境）。
+
+ 78. ⚠️ **WebAuthn 的 `challenge` 传成字符串，有些实现不报错、只是验证永远失败。**
+
+     服务端（SimpleWebAuthn 形状）下发的 `challenge` / `user.id` / `excludeCredentials[].id`
+     都是 **base64url 字符串**，而 `navigator.credentials.create()` 要 **`ArrayBuffer`**；
+     产出的凭据方向上，`clientDataJSON` / `attestationObject` / `signature` / `userHandle`
+     又要**反过来**序列化成 base64url 字符串。
+
+     - 在 **Chromium** 上原样传字符串会立刻
+       `TypeError: Failed to execute 'create' on 'CredentialsContainer': Failed to read the 'publicKey' prope…`，算走运；
+     - 但这个错误**不会在编译期出现**（options 在 app-host 里被刻意声明成 `Record<string, unknown>`，
+       以便不引入 `@simplewebauthn`），所以只能靠**运行时**抓。
+
+     📌 可复现的验收方式（本仓库已实测 13/13）：Playwright 开 CDP
+     `WebAuthn.enable` + `WebAuthn.addVirtualAuthenticator`，然后在页面里
+     `await import('/src/features/auth/passkey-browser.ts')`（Vite dev server 把 TS 编成 ESM；
+     该模块只有 `import type`，运行时零依赖）。
+     **关键断言不是"调用成功"，而是把产出的 `clientDataJSON` 解出来、`challenge` 必须原样回显** ——
+     长度对但内容错也会被它抓住。
+
 ---
 
 ## 8. 工作流
@@ -1994,7 +2038,16 @@ L3 叙事三层**已实现**，**并已落到 `main`**（merge commit `84cc7f5`�
    未配置时**整条入口不渲染**；仓库默认构建就是未配置，那是**故意的**。
 2. **Web 注册 / 登录入口**：协议语义收进 `packages/app-host/src/hosted-auth.ts`，
    面板开在**同步设置内部**（认证要用的服务端地址就是那里的地址，分开会出现"对着 A 登录、令牌存到 B"）。
-   🔴 **通行密钥在浏览器端那一步没有接线**，只有登录链接这条路打通。
+   通行密钥的**浏览器端那一步**在 `apps/web/src/features/auth/passkey-browser.ts` ——
+   `navigator.credentials` 的平台调用**按设计不在 app-host 里**（否则要引入 `@simplewebauthn`，
+   过不了 §3.1–3.2 两道门）。注册与登录两条路都通了。
+   验收是两层的：单测 45 条（转换层逐字段钉字节 + store 接线 + **失败不许被当成成功**），
+   外加**真浏览器 + 虚拟认证器 13/13**。其中最有价值的两条：
+   ① **反证**：把服务端下发的 JSON 原样丢给 `navigator.credentials.create()`，Chromium 会以
+   `TypeError: Failed to read the 'publicKey' prope…` 拒掉 —— 证明"JSON ↔ ArrayBuffer"转换层不是多余的；
+   ② 把产出的 `clientDataJSON` 解出来，`challenge` 必须**原样回显**（长度对但内容错也会被它抓住）。
+   ⚠️ **找回通行密钥仍然没有界面**（`/api/passkey/recover/*` 三个端点在 app-host 里有函数、没有入口），
+   用户自助**增删凭据**也没有 UI 与端点。
 3. **导出**：`packages/app-host/src/export-dump.ts`。含**墓碑**与完整 op-log，
    另有可核对的 `counts`（丢掉墓碑的"备份"回放时已删数据会复活）。
    入口在 Web 设置页与 node-host CLI，**移动端没有**。**只能导出，不能导回。**
