@@ -26,8 +26,31 @@
  * "852 KB 的 wasm 必须单独作为资源被正确打包与 MIME 分发，
  * 这是 web 构建要新增的一类失败模式" —— 当时是预判，现在是一手证据。
  */
+
+import { fileURLToPath } from 'node:url';
+
 export default {
   optimizeDeps: {
     exclude: ['@sqlite.org/sqlite-wasm'],
+  },
+  resolve: {
+    alias: {
+      /**
+       * 🔴 `@heyta/app-host` 只为探针而解析到这里。
+       *
+       * `packages/storage` **不允许**依赖 `app-host` —— 那是分层规则
+       * （ADR-0003 §2.1：业务逻辑在框架无关的 `packages/*`，依赖方向单向）。
+       * 真正用 `resolveClientId` 的是 **app**（`apps/web/src/worker/storage.worker.ts`），
+       * 那里它本来就是合法依赖。
+       *
+       * 而探针要验的是"**真实 schema + 真实桥接**在真浏览器里成不成立"，
+       * 所以它必须能拿到同一个 `resolveClientId`，否则验的就不是真实接线。
+       * 用 alias 指向**源码**，既不改依赖声明、也不引入构建产物，
+       * 分层规则仍然成立 —— 这是探针的特权，不是生产代码的写法。
+       */
+      '@heyta/app-host': fileURLToPath(
+        new URL('../../app-host/src/index.ts', import.meta.url),
+      ),
+    },
   },
 };

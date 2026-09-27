@@ -113,6 +113,19 @@ async function readProbe(page) {
   return page.evaluate(() => window.__heytaSqliteProbe);
 }
 
+/**
+ * 读**桥接探针**（`__heytaOpLogProbe`）的结果。
+ *
+ * ⚠️ 它与裸驱动探针是**两个独立的 async 流程**，谁先完成不确定 ——
+ * 所以各自等各自的，不要把两者的完成顺序写进假设。
+ */
+async function readOpLogProbe(page) {
+  await page.waitForFunction(() => window.__heytaOpLogProbe !== undefined, undefined, {
+    timeout: 60_000,
+  });
+  return page.evaluate(() => window.__heytaOpLogProbe);
+}
+
 const failures = [];
 function check(label, condition, detail) {
   const mark = condition ? '✅' : '🔴';
@@ -145,9 +158,6 @@ async function main() {
     console.log('② 首轮探针结果：');
     for (const s of first.steps ?? []) console.log(`     ${s.name}${s.detail === undefined ? '' : ` → ${JSON.stringify(s.detail)}`}`);
 
-    await page.screenshot({ path: SHOT });
-    console.log(`📷 截图：${SHOT}`);
-
     check('探针没有报错', first.status === 'ok', first.error);
     check('OPFS 里写进了一行', first.rowCount >= 1, `rowCount=${first.rowCount}`);
 
@@ -164,6 +174,64 @@ async function main() {
 
     /** 记录事实但**不断言**：FTS5 是能力协商项，不是所有运行时的前提（ADR-0027 §5）。 */
     console.log(`  ℹ️  本浏览器 FTS5：${second.fts5 === true ? '支持' : '不支持'}`);
+
+    /**
+     * 🔴 **M4-3 的端到端判据**：主线程经真 `postMessage` 操作 Worker 里的 SQLite。
+     *
+     * 与上面裸驱动探针的分工：那边验的是"OPFS 在真浏览器可用"，
+     * 这边验的是"**web 最终要用的那套接线**（真实 schema + 桥接 + 主线程代理）成立"。
+     * 之前所有验证都跑在 Worker 内部，而真正要迁过去的是**主线程的调用方式** ——
+     * 这一块从来没被验过。
+     */
+    console.log('④ 桥接探针（主线程 → Worker 里的真实 schema）首轮：');
+    const oplogFirst = await readOpLogProbe(page);
+    for (const s of oplogFirst.steps ?? []) {
+      console.log(`     ${s.name}${s.detail === undefined ? '' : ` → ${JSON.stringify(s.detail)}`}`);
+    }
+    check('桥接探针没有报错', oplogFirst.status === 'ok', oplogFirst.error);
+    check(
+      'clientId 由 Worker 里的库给出（不是主线程自己算的）',
+      typeof oplogFirst.clientId === 'string' && oplogFirst.clientId.length > 0,
+      `len=${oplogFirst.clientId?.length}`,
+    );
+    check('经桥接写入的 op 被读回', (oplogFirst.opCount ?? 0) >= 1, `opCount=${oplogFirst.opCount}`);
+    check(
+      'payload 跨线程往返逐字节未变（能被结构化克隆）',
+      (oplogFirst.steps ?? []).some((s) => s.detail?.payloadRoundTripped === true),
+    );
+    check(
+      '重复 opId 被唯一索引吸收（不报错、不多一条）',
+      (oplogFirst.steps ?? []).some(
+        (s) => s.detail?.appendedByDuplicate === 0 && s.detail?.totalAfterDuplicate === oplogFirst.opCount,
+      ),
+    );
+    check(
+      '同步游标经桥接往返（最容易漏转发的方法）',
+      oplogFirst.serverSeq === 7,
+      `serverSeq=${oplogFirst.serverSeq}`,
+    );
+
+    /** 桥接这条路也必须跨刷新持久 —— 它用的是**另一个库文件**。 */
+    await page.reload();
+    const oplogSecond = await readOpLogProbe(page);
+    console.log('⑤ 桥接探针刷新后：');
+    for (const s of oplogSecond.steps ?? []) {
+      console.log(`     ${s.name}${s.detail === undefined ? '' : ` → ${JSON.stringify(s.detail)}`}`);
+    }
+    check('刷新后 op 仍在（桥接这条路也真的落盘）', (oplogSecond.opCount ?? 0) >= 1, `opCount=${oplogSecond.opCount}`);
+    check(
+      '刷新后 op 数没有翻倍（说明读到的是既有数据，不是又写了一遍）',
+      (oplogSecond.opCount ?? -1) === (oplogFirst.opCount ?? -2),
+    );
+
+    /**
+     * 🔴 截图放在**两个探针都报完之后**。
+     *
+     * 早一点拍会拍到"⏳ 进行中…"，那张图**证明不了任何事** ——
+     * 而这条规定存在的原因正是"图要能说明问题"（AGENTS.md §6.2）。
+     */
+    await page.screenshot({ path: SHOT, fullPage: true });
+    console.log(`📷 截图（两个探针都完成后）：${SHOT}`);
 
     if (failures.length > 0) {
       console.error(`\n──── 页面控制台 ────\n${console_.join('\n') || '（无输出）'}`);
