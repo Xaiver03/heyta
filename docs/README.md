@@ -97,8 +97,14 @@ docs/research/<kebab-case>.md     例：reuse-plan.md
 | [0011](adr/0011-local-api-mcp.md) | 本机 API / MCP：默认关、只监听回环、显式 token、逐工具授权；🔴 **加密条目可列举不可读**；写入只能经 `dispatch()` 形状的端口 | ✅ **已接受** |
 | [0014](adr/0014-memory-switch-and-corrections.md) | 🔴 记忆偏好层的两个闸门：**主开关默认关闭且 fail-closed**（必填参数，不是可选）；用户**纠正进 op-log** 跨设备同步，且因 `applyOperation` 静默忽略未建模实体类型 —— **不需 bump schema** | ✅ **已接受** |
 | [0013](adr/0013-cloud-ai-and-maas.md) | 🔴 云端 AI 与 MaaS：**方向已定**（会提供统一云端 AI 并按此收费，后续 MaaS），但**开放条件未满足**；托管模式**不是端到端加密**（承接 ADR-0006） | ✅ **已接受** |
-| [0017](adr/0017-single-paid-tier-and-payment-channel.md) | 💰 **唯一付费档的价格与支付通道**：大陆 **¥99/年**、海外 **$49/年**、自建**永久免费**（承接 [subscription-boundary.md](plans/subscription-boundary.md) §0，并**关闭**它 §3 一直留着的「价格未定」）；改价必须三处同时改，由 `scripts/check-pricing-consistency.mjs` 拦 | ✅ **已接受** |
+| [0012](adr/0012-self-host-transport-policy.md) | 自托管传输策略：生产环境**只**拒绝**公网**明文 `PUBLIC_URL`（私网/回环放行）—— 与 iOS ATS 的"私网放行、公网明文拦截"对齐 | ✅ **已接受** |
+| [0015](adr/0015-four-quadrant-as-derived-view.md) | 四象限是**派生视图**，不是第四套存储｜`important` 与 `urgent` 从既有字段推导，不加持久化字段 | ✅ **已接受** |
+| [0016](adr/0016-undecryptable-ops-do-not-block-sync.md) | 🔴 读侧解不开的 op **跳过 + 推进游标 + 结构化上报**（否则一条坏 op 让**别的**设备永久卡死）；但**整页都解不开时抛错且不推进游标**（口令打错≠历史混口令）。是 [ADR-0009](adr/0009-duplicate-op-idempotent-success.md) 的读侧对偶 | ✅ **已接受** |
+| [0017](adr/0017-single-paid-tier-and-payment-channel.md) | 💰 **唯一付费档的价格与支付通道**：大陆 **¥99/年**、海外 **$49/年**、自建**永久免费**（承接 [subscription-boundary.md](plans/subscription-boundary.md) §0，并**关闭**它 §3 一直留着的「价格未定」）；改价必须三处同时改，由 `scripts/check-pricing-consistency.mjs` 拦 —— ⚠️ **价格与周期结论（¥99/年、$49/年、年付）已被 [ADR-0020](adr/0020-ai-subscription-two-tiers.md) 取代**；「自建永久免费」与「不自动续费」两条**保留** | ⚠️ **已取代**（仅价格与周期结论） |
 | [0018](adr/0018-adjustable-pricing-and-coupons.md) | 💰 **价格可运行期调整 + 自建优惠券域模型**：代码基线 + 数据库版本（带生效区间，**有缝绝不回落**）；券一单一券、13 个拒绝原因、名额口径 `reserved/applied/reversed` 计数而 `expired` 不计数；顺带**修掉** ADR-0017 §4「回调只校验金额是价目表里的某一个」那个洞（改成跟订单冻结金额比） | ✅ **已接受** |
+| [0019](adr/0019-upload-rejection-does-not-block-download.md) | 🔴 **上传被拒不得阻断下载**：被服务端**永久拒绝**的 op **移出重传队列**并结构化上报（新 `UploadStatus` 取值 `rejected`、新上报原因 `upload-rejected`）—— 否则一条坏 op 让一台设备**永远失去下载能力**，队列也永不收敛；但**只对永久拒绝**这么做：可恢复失败（网络抖动 / 限流）照旧退避重传，否则会静默丢数据。被拒的 op **不删除**，仍留在 op-log 里 | ✅ **已接受** |
+| [0020](adr/0020-ai-subscription-two-tiers.md) | 💰 **托管与 AI 都按月卖**：收费的是**我们替你运维服务器**与**我们的云端 AI**（不是功能、不是同步）；非 AI 能力永久免费；**两档 —— ¥5/$5（全部功能 + 官方托管同步）与 ¥12/$12（再加我们的云端 AI 300 次/月）**，两档功能完全相同，差的只是含不含我们的 AI；自带端点的 AI **永久免费且不计量**；计量只记**动作次数**（不记 token —— token 数暴露内容长度） | ✅ **已接受** |
+| [0021](adr/0021-managed-ai-model-deepseek-flash.md) | 🤖 **托管 AI 用 DeepSeek V4.1 Flash**：关闭 [0020](adr/0020-ai-subscription-two-tiers.md) §5 第 1 条。选它的理由是**单位经济**而不是「它够用」—— 300 次/月 的 token 成本 ≈¥2.01（占 ¥7 增量 **29%**），换 pro 级 ≈¥7.71 **超过 ¥7 增量本身**；所以「换模型 = 换价」，两者不能分开定 | ✅ **已接受** |
 
 ### 计划
 
@@ -114,6 +120,7 @@ docs/research/<kebab-case>.md     例：reuse-plan.md
 | 🔴 [subscription-integration.md](plans/subscription-integration.md) | **会员订阅的服务端接入点**：Fastify/JWT/配额守卫/迁移纪律的落点，以及 🔴「代码里没有官方实例标志，付费闸门必须默认关」 |
 | [ai-capability-branches.md](plans/ai-capability-branches.md) | **AI 能力分支与开发分支策略**（含对 5 条功能设想的逐条裁决）—— 大而全，深挖用 |
 | [ai-open-decisions.md](plans/ai-open-decisions.md) | **AI 功能需要拍板的决策清单**（不是需求表单，是「代码解决不了的事」） |
+| [i18n-multilingual.md](plans/i18n-multilingual.md) | 🌐 **中英双语实施计划**：为什么自研零依赖词条表、落地页用 URL 而应用用偏好、`check:ui-language` 契约的**变更与两处按 key 的例外**、分阶段迁移进度、以及**还没解决的域层文案** |
 
 ### 工程参考
 
@@ -130,8 +137,10 @@ docs/research/<kebab-case>.md     例：reuse-plan.md
 | 文档 | 内容 |
 |---|---|
 | [local-server-verification.md](runbooks/local-server-verification.md) | ⭐ 不依赖 Docker 跑通服务端 + Docker 部署 + 实测发现 |
+| [deployment.md](runbooks/deployment.md) | ⭐ **运维与部署现状**：哪台服务器跑什么、heyta 公网部署拓扑、反向代理与证书、代理链路、DNS、本机开发环境、🔴 待清理风险（含"实测 / 引用 / 未核实"标记） |
 | [multi-platform-build.md](runbooks/multi-platform-build.md) | ⭐ **多端构建操作手册**：Android / iOS / Windows / 鸿蒙怎么打包、怎么验产物、高频坑 |
 | [ci-and-runner.md](runbooks/ci-and-runner.md) | ⭐ **CI 与自托管 runner 操作手册**：push 之后发生什么、runner 为什么在 finlaw、日常操作命令、7 条已踩过的坑、安全边界、🔴 **转公开必须改回托管 runner**的硬约束 |
+| [finlaw-cleanup-candidates.md](runbooks/finlaw-cleanup-candidates.md) | **ubuntu-jcli（finlaw）回收候选清单**：只读盘点「该回收什么」——🟢 可安全回收 / 🟡 需确认 / 🔴 绝不能动，每档带判据与总可回收量估算 |
 | [ai-acceptance.md](runbooks/ai-acceptance.md) | ⭐ **AI 验收门禁**：什么叫「AI 功能做完了」——静态可达性门禁查什么（含"引用了 ≠ 用户能用"那条）、真实浏览器 E2E 为什么不接真模型、红了怎么归因、加新功能要补哪几步、以及这道门禁**没覆盖**什么 |
 
 ### 调研

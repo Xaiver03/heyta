@@ -281,6 +281,9 @@ pnpm verify:p2                  # P2 验收：**自带真实服务端**，非 We
 # 移动端验收：真模拟器（emulator-5554）+ 真服务端 + 真笔记本设备（node-host），全部零 mock
 pnpm verify:mobile-edit         # 任务可编辑（截止时间/优先级/重命名/删除）
 pnpm verify:mobile-conflict     # 冲突解决闭环（真的造出并发冲突，再在界面上解决）
+pnpm verify:mobile-autosync     # 🔴 自动同步：**全程不点任何同步按钮**，建一条任务
+                                #   也必须自己出去（判据 a：服务端日志出现请求；
+                                #   判据 b：另一台设备读到那条任务）。见 §7 第 66 条
 pnpm verify:mobile-focus        # 专注（番茄钟）闭环
 pnpm verify:mobile-calendar     # 日历（判断的期望值来自宿主机的 Python，不是本仓库的日历代码）
 pnpm verify:mobile-repeat       # 重复任务（设规则 → 同步 → 勾选顺延 → 反向再从笔记本完成）
@@ -288,9 +291,22 @@ pnpm verify:mobile-repeat       # 重复任务（设规则 → 同步 → 勾选
 # iOS 验收：真 iPhone 17 Pro 模拟器 + 真服务端 + 真笔记本设备。
 # 走 AX 树点击（不依赖窗口 z-order / 焦点，见 §7 第 34 条）
 pnpm verify:mobile-ios          # iOS 输入侧全链路：点 FAB → 输入 → 提交 → op 落库 → 同步到另一台设备
+                                # **并含「零点击自动同步」**（第 6 步：凭据配好后再写一条，一下都不点）
+                                #   §1.0 会先验"无障碍树有没有内容"；为空则**自动重启模拟器**自愈
+                                #   （见 §7 第 63 条）。变异复现（验证那条自愈真的会触发）：
+                                #   cd scripts && HEYTA_IOS_FORCE_AX_EMPTY=1 bash verify-mobile-ios.sh
 pnpm verify:ios-lan-http        # iOS 连**私有 IP 字面量**（自建服务器）的明文 HTTP 可用性
                                 #   三个地址单变量对照：错端口 / 错 IP 都失败，真 LAN 地址成功
                                 #   ⚠️ 需要 Simulator 窗口在**当前 Space**（见 §7 第 37 条）
+
+# 鸿蒙验收：用 DevEco **自带**的工具链（cmake/ninja/ohpm/hvigorw 都不在 PATH 上）
+pnpm verify:harmony-toolchain   # 工具链 → 最小 ArkTS 工程 → 真 HAP（17 项）
+pnpm verify:harmony-rnoh        # RNOH 原生侧 → 37MB HAP（含 librnoh_core/app/reactnative.so，17 项）
+                                #   ⚠️ 只到"原生编得出包"，JS 侧用桩（见下一条）
+pnpm verify:harmony-rnoh-js     # 鸿蒙 JS 侧全链路（零桩）：真 codegen + 真 autolinking
+                                #   + Metro/Hermes bundle（验魔数）+ 20MB release HAP（含 hbc）
+                                #   ⚠️ 只到"编得出包"：不验运行（缺模拟器镜像+签名）
+                                #   需要 Node ≥ 20.12（DevEco 自带的 18 会报 styleText，见 §7 第 59 条）
 
 pnpm check                      # 全部门禁：类型 + 迁移 + 分层 + 界面文案 + 许可证 + 文档 + 设计变量 + iOS 原生依赖
 pnpm check:design               # 只跑设计变量硬编码检查
@@ -728,6 +744,35 @@ docker inspect <容器> --format '{{range .Config.Env}}{{println .}}{{end}}' | g
     🔴 反差要记住：修复前同一状态是「**拒绝了 5/5 条**」且队列**永不减少**；
     修复后是「**拒绝了 1/10 条**」且**队列排空**。
 
+    ---
+
+    **残余缺陷（同一条链的最后一环）：上面那次修完，队列仍会**停在 1** ——
+    那条 `INVALID_CLIENT_ID` 的毒数据删掉才归零。2026-09-27 单独一轮把它也修了
+    （**ADR-0019**）：那条 op 根本不属于本机，重传一万次也不会被接受。
+
+    🔴 但真正的要害不是"毒数据"。把 `upload()` 的 `throw` 去掉之前，
+    它挡住的是**下载**：
+
+      ```
+      sync() → upload() → ❌ throw
+                      ↘ download()   ← 永远走不到
+      ```
+
+    也就是说"上传里有一条过不去的 op"这个**局部问题**，
+    升级成了"**这台设备永久失去下载能力**"这个**全局故障**。
+    实测复现（真服务端 + 真 SQLite，队列里注入一条 `clientId` 属于别机的 op）：
+    连续两次同步都是 `error`、待上传数恒为 1、**设备再没下载过任何东西**。
+
+    修法（ADR-0019）：① 上传的失败**永不**阻断下载；② 永久拒绝（显式白名单）
+    `markRejected` **移出队列**并如实上报，暂时被挡（限流/配额）留在队列里重传；
+    ③ 新增第三种上传状态 `rejected` —— **不并进** `uploaded`
+    （并进去等于说"这条在云上"，而服务端刚拒绝了它）；
+    ④ 新原因 `upload-rejected`（`retryable` 按有无永久拒绝决定）。
+
+    验收：`pnpm verify:sync-recovery`（零 mock，15/15）+ 存储契约 + 客户端单元。
+    变异测试：把 `upload()` 改回"硬拒绝直接抛错" → 脚本在
+    **「没拉到对端那条 —— 这台设备变聋了」** 上变红。
+
     **方法侧（更值得记住）**：这条缺陷是**测试写错反而救了产品**。
     我原来断言"上传后 `uploadStatus` 应从 pending 变成 uploaded"，它红了，
     而我第一反应是"断言写错了" —— **去查真因才发现断言没错、产品错了**。
@@ -934,6 +979,717 @@ docker inspect <容器> --format '{{range .Config.Env}}{{println .}}{{end}}' | g
 它们的**包级 `package.json` 没有 `license` 字段**（上游也没有），整体靠仓库级 MIT 覆盖 ——
 若要独立抽取子包分发，需先补包级声明。
 
+38. 🔴 **软键盘会把 tap 吞掉，而点工具报的是 `success` —— 于是"点不到"看起来像"点了没反应"，
+    最后被写成"客户端根本不会推送"这种根本性误判。**
+
+    实测（iPhone 17 Pro 模拟器 / iOS 26.5，idb 驱动）：
+    `verify-mobile-ios.sh` 在「我的」页填完三个输入框后按「立即同步」。
+    那时软键盘**立着**，而按钮中心 (201,589) 落在键盘窗口里
+    （AutoFill「Passwords」条 y=539..583，按键行从 y=590 起）。
+    那一下点在了键盘上，**同步一次都没跑**。
+
+    而 shim 当时报的是 `result=success` —— 因为 **tap 这个系统调用确实成功了**。
+    服务端 `operations` 表按标题查 0 命中、日志里 0 行 Upload 属于该用户，
+    于是"证据"齐全地推出结论：**"客户端从来没发起过 Upload"**，
+    并花掉整整一轮去 `packages/app-host` / `packages/sync-core` 里找
+    "决定要不要 push 的那个恒为假的条件"（那个条件**不存在**）。
+
+    → **"没有观测到 X" ≠ "X 没有发生"。** 这里缺的观测是"客户端到底有没有尝试上传"，
+      而这个空白被一个**看起来很顺的因果链**填掉了。**漂亮的解释会主动劝你停止调查。**
+
+    正确做法（已落地在 `scripts/tools/ios-ax-shim.py`）：
+    **点击之前显式判断目标是否被键盘盖住**，盖住就报 `tap-blocked-by-keyboard`，
+    让调用方先收键盘 —— 绝不假装点到了。判据必须是**结构性的**：
+
+    - 键盘按键节点带 `KeyboardKey` trait（实测 `q`/`shift`/`return` 都有）。
+      不要靠 `AXLabel`（随语言/输入法变），也不要靠 `role`。
+    - ⚠️ **候选/自动填充条带不带 `KeyboardKey` 是不稳定的**，实测两种都有：
+      英文键盘上的「Passwords」条**没有**（键盘真实上沿比 `min(KeyboardKey)` 高约 51px），
+      中文拼音候选栏**有**（`min(KeyboardKey)` 就是真实上沿）。
+      所以**不能**一律减一个固定余量 —— 那会在第二种情形下多减一次，
+      把明明够得着的按钮判成"被挡住"（我自己先踩了一次：
+      `添加` 中心 y=484，减 60 得 478，于是第 4 步整段红掉）。
+      正确做法：取 `min(KeyboardKey)`，**只在真的存在**一条紧贴其上、且接近全宽的
+      横条时才抬高上沿。
+    - 调用方**必须看 `result`**。同一个脚本里两处 `ax ... --press >/dev/null 2>&1`
+      后面跟一句无条件的 `ok "已按下"` —— 那就是这轮假红的入口，两处都改了。
+
+    同族已记过的形状：`AXRaise` 返回成功但遮挡不变（第 34 条）、
+    `mac type` 返回 `typed N chars` 却一个字没进去、`idb ui text` 抛异常却不报。
+    **回执 ≠ 现象**；这里再加一条：**回执 ≠ 点到了那个元素**。
+
+    ⚠️ **同一件事还害过一次，而且那次是被写进文档当"产品缺陷"的。**
+    计划文档里"「我的」页上**底部 tab 根本点不动**，疑似内容层盖住 tab bar，
+    **这是产品的真实缺陷**"—— 也是**同一次误诊**：键盘占 `y=539..874`，
+    tab 中心 `y=808`，点在了键盘上。A/B 实测（同一台设备、同一个 tab）：
+    键盘立着 → `tap-blocked-by-keyboard`，停在「我的」；键盘收起 → `success`，切到任务页。
+
+    它为什么会被写成产品缺陷？因为上一轮**写对了**：「怀疑与键盘遮挡有关 ——
+    **但本轮没验**」；下一轮把"**但本轮没验**"删掉，换成一句确定的断言。
+    **一个词的删除，就把一个待验证的怀疑变成了"已知的产品缺陷"**，
+    此后每一轮都照着它绕路（还付出了"重启 App + 再付 50 秒 Argon2id 派生"的代价）。
+
+    → 纪律：**没验过的怀疑不许升格成结论**，文档里"本轮没验/未核实"这几个字
+    **不许顺手删**。要删，就得先拿出 A/B 证据。这与第 36、37 条"先怀疑探针"是同一件事：
+    **探针坏了和产品坏了，在输出上长得一模一样。**
+
+39. 🔴 **Hermes 上没有 `crypto.subtle`，而 legacy 密文只有 WebCrypto 一条解码路 ——
+    服务端上只要有一条历史 op 是 legacy 格式，手机整次下载就全废。**
+
+    `packages/sync-core` 的 Argon2id 路径早就有纯 JS 兜底（第 26 条），
+    但 **legacy PBKDF2 路径没有**：`decryptLegacy` 一旦发现没有 `crypto.subtle`
+    就直接抛 `WebCryptoNotAvailableError`，提示"请先在桌面浏览器上同步一次"。
+
+    实测（同一台模拟器）症状是：**上传是好的**（2 条 op 被服务端接受），
+    紧接着下载抛错，状态区显示
+    `同步失败 · Cannot decrypt legacy data on this device…`。
+    失败形状很坏：**不是那一条解不开，而是整次下载中断、后面的 op 一条都应用不上。**
+    用户看到的是"多端同步不工作"，方向会被带到同步协议上去。
+
+    **修法**：这条路径完全可以纯 JS 实现 —— PBKDF2-HMAC-SHA256 与 AES-GCM
+    `@noble/hashes` / `@noble/ciphers` 都提供了，而且**已经是本包的依赖**
+    （`argon2.ts`、`web-crypto.ts` 早在用）。少的不是能力，是那条兜底腿。
+    生产参数（password-as-salt、1000 轮、SHA-256、dkLen 32）下两种实现
+    **逐字节相同**，由 `tests/encryption.spec.ts` 的已知答案向量钉住。
+
+    ⚠️ 同时注意：那条用例**原先断言的是"抛错"**，而且断言是对的。
+    **把一个被记录的缺口补上时，必须同时改掉那条把缺口固化成"预期行为"的断言** ——
+    否则测试会替你把缺陷焊死。改完要**做一次变异**验证它真的会红
+    （把 `dkLen` 改成 16，两条用例失败，改回来全绿）。
+
+40. 🔴 **`$VAR` 后面紧跟一个非 ASCII 字符时，bash 3.2 在 UTF-8 locale 下会把那个字符
+    当成变量名的一部分 —— 报 `unbound variable`，而变量明明存在。**
+
+    实测：`ok "idb companion 已连上（$IDB_COMPANION）"`。
+    没有 UTF-8 locale 时一切正常（脚本一直这么跑，所以从来没人发现）；
+    一旦 `export LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8`（中文项目里再自然不过），
+    bash 3.2 就把 `）` 的高位字节并进标识符，于是第 0 步直接
+    `IDB_COMPANION<乱码>: unbound variable` 退出。
+
+    `scripts/` 下这种写法有 22 处，**已全部改成 `${VAR}`**。
+    判据：`\$[A-Za-z_][A-Za-z0-9_]*[^\x00-\x7F]`（BSD grep 没有 `-P`，
+    用 ripgrep 或 python 正则）。
+    这与"`${#中文}` 按字节算"是同一条根：**bash 3.2 没有真正的多字节意识。**
+
+41. 🔴 **下载时一条解不开的 op 会让**别的**设备**永久**同步不了；而出问题的那台设备
+    看起来最健康。**
+
+    这是第 34 条（上传侧：一条被硬拒的 op 让设备永久卡死）在**读侧的对偶**，
+    形状完全一样，只是更难发现。
+
+    实测：服务端上 `user:37` 的 9 条 op 里，**第 6、7 条**是同一台手机更早一次会话
+    用**另一个口令**传的（口令只存内存，重启要重填）。逐条解密后边界干净得可疑：
+    1–5 OK、**6/7 `OperationError`**（AES-GCM 认证失败）、8/9 OK。
+
+    而原实现是 `await Promise.all(ops.map(decodeServerOp))`：
+
+    1. **整页作废** —— 同页那 7 条明明是好的；
+    2. 抛错在 `setLastServerSeq` **之前** → **游标永不推进** → 下次撞同两条，再抛；
+    3. 界面只有一句"同步失败"，用户以为同步坏了。
+
+    🔴 **最阴的一点**：下载会带 `excludeClient=<自己>`，所以**写坏数据的那台设备
+    永远看不到自己那两条**，界面显示「已是最新」——
+    **出问题的机器看起来最健康，坏掉的是所有别的设备。**
+    实测就是这样：手机一路绿灯，笔记本 300 秒里一条都读不到。
+
+    **判据**：`reason: 'unexpected'` + `message: "The operation failed for an
+    operation-specific reason"` —— 那句是 WebCrypto 的 `OperationError`，
+    **它就是 AES-GCM 认证失败**（口令不对/数据损坏），不是网络问题、不是协议问题。
+    看到它不要去查同步协议，直接**逐条解密服务端 op 定位是哪几条**。
+
+    **修法**（**ADR-0016**）：逐条解密、能读的 `applyRemote`、读不了的**跳过**、
+    游标**推进**，并且只要跳过了任何一条就**不报 `synced`**，改报
+    `{reason:'undecryptable-ops', retryable:false, message:'<serverSeq:opId(errorName)>'}`。
+    🔴 但**整页一条都解不开时必须抛错且不推进游标** —— 那是"口令打错了"，
+    一次手滑推进游标 = **静默跳过用户整段历史**，比卡死更糟。
+
+    加 `SyncFailureReason` 成员时两个壳会被**编译器**逼着改
+    （`Record<Exclude<…,'unexpected'>, MessageKey>` 穷尽）—— 这是设计好的，别绕过。
+
+    配套的探针也要一起改：`undecryptable-ops` 是**一次真的执行了的同步**
+    （数据搬了、游标走了），不许再被当成"探针自己坏了"。
+
+42. 🔴 **想验证"某句中文文案有没有进产物"，直接 `grep` 中文会得到**假的**答案 ——
+    因为 Metro 的 bundle 里**字符串值被转义成 `\uXXXX`，而注释保留原始 UTF-8**。**
+
+    实测：改掉 `mobile.profile.footnote` 之后，在 bundle 里
+    `grep "清单与标签管理尚未实现"` **命中了 1 次** —— 差点据此判断"产物是旧的"。
+    打开上下文才发现命中的是**我自己写在词条上方的那条注释**，
+    而真正的值在 bundle 里长这样：
+
+    ```
+    "mobile.profile.footnote": "\u51ED\u636E\u53EA\u4FDD\u7559..."
+    ```
+
+    所以对比新旧文案时，`grep 旧句` 和 `grep 新句` **都会命中**（新句是旧句的子串），
+    而命中的那条又是注释 —— **两个方向都会骗你**。
+
+    **而且换一种产物，正确的编码还会变。** 实测（2026-09-27，iOS Release）：
+
+    | 产物 | 非 ASCII 存在形式 | 用 `grep` 搜中文 |
+    |---|---|---|
+    | Metro 的 JS bundle / `packages/i18n/dist` | `\uXXXX` 转义 | 只命中**注释** |
+    | **Hermes 的 `main.jsbundle`（bytecode）** | **UTF-16LE** | **一次都命中不了**（假红） |
+
+    同一条 `mobile.profile.footnote` 新文案在 iOS 产物里的实测计数：
+    ```
+    utf-8     : 0 次      ← 只看这一种，会得出"没进产物"这个**完全相反**的结论
+    utf-16-le : 1 次      ← 真相
+    utf-16-be : 0 次
+    ```
+
+    所以正确做法是**逐种编码都数一遍，取最大值**，并且**新值和旧值都要数**
+    （新 1 / 旧 0 才算真的换了）。已经脚本化了，别再手搓：
+
+    ```
+    python3 scripts/tools/check-bundle-string.py --expect 1 <产物> '<新文案>'
+    python3 scripts/tools/check-bundle-string.py --expect 0 <产物> '<旧文案>'
+    ```
+
+    → 与第 27 条（Android 打进旧 JS bundle）、第 39 条
+    （Hermes 是字节码、不可 grep）同族：**"grep 不到"既不等于"没有"，也不等于"有"** ——
+    它甚至可能把你推向**假红**，而假红会掩盖真问题。
+
+43. 🔴 **`adb shell input text` 发不了非 ASCII，而且它不是"发成乱码"，是直接抛异常。**
+
+    实测（Android 模拟器，`emulator-5554`）传中文清单名：
+    ```
+    Exception occurred while executing 'text':
+    java.lang.NullPointerException: Attempt to get length of null array
+        at com.android.server.input.InputShellCommand.sendText(...)
+    ```
+    `input text` 走 `KeyCharacterMap`，表里没有的字符就炸。
+    所以 **Android 侧的验收脚本用 ASCII 名**（`proj-e2e-<时间戳>`），
+    中文输入的验证走 iOS（`idb ui set-value` 能写中文，且那条路径上有
+    「添加」enabled 的 L3 断言证明应用真的收到了文字）。
+
+    → 与本条同族的还有第 40 条：**平台工具的输入能力是有边界的，
+    而"能输入中文"这件事必须在**具体那条路径上**验过，不能从别处推断。
+
+44. 🔴 **iOS 模拟器上目前没有可用的滚动办法 —— 于是 iOS 验收只能覆盖首屏。**
+
+    三条路都实测过，全部不可用：
+
+    | 调用 | 结果 |
+    |---|---|
+    | `idb ui swipe X1 Y1 X2 Y2 --duration 800` | **会滚，但 60 秒不返回（rc=124），内容只挪 30px**（行程 600px）。不传 `--duration` 能返回，但一点都不滚。 |
+    | `idb ui scroll down`（不带目标） | 先做坐标探针，报 `the point is empty` / `found no element`，然后**什么都不做**；退出码还可能是 1。 |
+    | `idb ui scroll down <坐标\|标记>` | 落在空白 View 上报 `the point is empty`；落在 `TextInput` 上报 `element had moved by the time the write reached it`。都不滚。 |
+
+    另外 **`idb ui set-value` 对滚出屏幕的元素不生效，而且不报错**：
+    元素在 y=1357（屏高 874）时 `--set` 返回 `{"detail":"<placeholder>"}` ——
+    回读是占位符，即写入没发生。**回读是唯一能发现这件事的判据。**
+
+    需要滚动才能到达的元素，去 Android 侧验，或者把它挪进首屏。
+
+    ⚠️ 我**一度"测出" `idb ui scroll` 有效**（「清单名称」的 y 862 → 542），
+    并据此写了一段"它是走 AXScrollAction、方向与手势相反"的解释。
+    后来复测发现：**不带目标时它纹丝不动**，那次位移的真正来源是
+    之前被 `timeout` 杀掉的 `ui swipe` 在 companion 侧继续跑完了。
+    → 先有机制猜想、再去找证据，就会把巧合读成因果（第 38 条同族）。
+    **怀疑和解释都要能重复：换个初态再测一次，它就不成立了。**
+
+45. 🔴 **`cmd | tail -n; echo $?` 里 `$?` 是 `tail` 的 —— 我因此把
+    "退出码是 1" 读成了 "退出码是 0"。**
+
+    实测：`idb ... ui scroll down | tail -3; echo "rc=$?"` → 打印 `rc=0`，
+    而 `idb ... ui scroll down; echo rc=$?` → `rc=1`。
+    这条**恰好和"看到 rc=1 就以为命令失败"的错误合谋**：我先因为管道拿到 rc=0
+    而认为命令没报错，又因为回执里那句 `found no element` 以为它只是没找到元素。
+
+    已知受害点：第 12 条（"绝不把门禁管道接 `tail`/`sed`"）讲的是**门禁**，
+    这一条补充的是：**任何"我要读这个退出码"的场合都不能接管道**
+    （`| sed`、`| tail`、`| head` 都是）。
+    要么不接，要么用 `${PIPESTATUS[0]}`（bash 3.2 支持）。
+
+46. 🔴 **"在干净环境里复现不出来" ≠ "不存在" —— 先问这个代码路径的前置条件。**
+    `SyncClient.upload()` 开头是 `if (pending.length === 0) return;`。
+    所以那个"上传响应里搭车的 op 解不开就拖垮整次同步"的缺陷，
+    **只有设备手上真的有东西要传时才会被走到**。
+
+    我因此连着得出过两个**假绿**的结论：
+
+    - 用干净数据库起一个 `node-host` 探针 → 没有待上传的 op → 路径根本没执行
+      → "解密路径没问题"；
+    - 在 Node 里模拟 Hermes（摘掉 `WebAssembly` + `crypto.subtle`）→ **依然是绿的**，
+      因为它根本不是密码学问题，是**控制流**问题。
+
+    真机的证据（手机上传成功、服务端确实收到 op、而本地库里**远端 op 数 = 0**）
+    才把方向掰回来。
+
+    配套的动作是**换判据**：`scripts/verify-mobile-lists.sh` 第 7 步原来只判
+    「界面说同步完成了」，于是"上传成了、下载整批作废"被判成通过；
+    现在必须**真的数出本地库里的远端 op 条数 ≥ 1**。
+    **一个只在半瘫状态下才为真的判据，才是这类缺陷的判据。**
+
+    同族提醒（第 38 条）：**"没有观测到 X" ≠ "X 没有发生"**；
+    这一条补的是它的近亲 —— **"没复现出来" ≠ "路径没被执行"。**
+
+47. 🔴 **查"拼接出来的状态行"必须用 `has_sub`，不能用 `has_text`。**
+    `scripts/lib/mobile-e2e.sh` 里：
+
+    - `has_text` 是**整节点精确匹配**（`grep -q "text=\"$1\""`）；
+    - `has_sub` 是子串匹配（`grep -q "text=\"[^\"]*$1"`）。
+
+    界面上的状态行往往是**一句拼接出来的整句**，例如
+
+    > 有部分历史数据用当前口令解不开（…），已跳过 —— 其余数据已同步
+
+    我写 `wait_synced` 时把判据写成 `has_text "其余数据已同步"` ——
+    **永远为假**。后果不是"报个错"，而是**空转**：手机其实已经同步成功
+    （界面上就写着那句话），`wait_synced` 却老老实实跑满 180 轮 × 5 秒，
+    日志一个字都不长。看起来像"同步卡死"，实际上是**探针的判据坏了**。
+
+    ⚠️ 更值得记的是：`has_sub` 上面**早就写着这条注释**（讲冲突状态行
+    「有 1 处冲突待你选择」踩过同一个坑）。**规则在同文件里，我还是踩了。**
+
+    验证判据的廉价办法：拿一份**真实 dump** 直接跑一遍 `grep`，
+    确认新判据为真、旧判据为假 —— 不要靠"读起来应该能匹配"。
+
+48. 🔴 **`pnpm <名字>` 找不到脚本时，会去跑 PATH 上同名的二进制。**
+    本仓库**没有 `lint` 脚本**。我随手在一个门禁循环里加了 `lint`，
+    于是 `pnpm lint` 跑起了 **Android SDK 的 `/opt/homebrew/bin/lint`**，
+    吐出一堆 gradle 参数说明和 `1 Lint errors detected`。
+
+    它差一点被当成"仓库门禁红了"。**这是自己造出来的假红**：
+
+    - 真正的聚合门禁是 **`pnpm check`**（build + typecheck + 全部 `check:*` 门禁 + 浏览器套件）。
+      这里**刻意不写门禁条数** —— 它已经因为"加了门却忘了改这句话"漂过一次
+      （`check:mobile-bundle` 加进链里时，本句还写着 13）。要数就直接看 `package.json`
+      的 `check` 脚本，那是唯一权威；
+    - 加门禁名之前先 `python3 -c "import json;print(json.load(open('package.json'))['scripts'])"`
+      看一眼**它到底存不存在**；
+    - **自己造出来的红不是产品缺陷**，报之前先问"这个命令是本仓库的吗"。
+
+49. 🔴 **Playwright 的 `check()` / `uncheck()` 断言的是"控件当帧的 DOM 状态"，
+    不是"这次操作生效了"。** 受控组件 + 异步派发时它是**假红**。
+
+    `apps/web` 的 op-log 写入是异步的（`lib/oplog.ts`：`await engine.dispatch(intent)`
+    之后才 `notify()`）。于是点一下复选框：DOM 原生勾上 → React 手里还是旧的
+    `tagIds` → 重渲染把勾按回去 → Playwright 当场报
+    `Clicking the checkbox did not change its state`。
+
+    **op 其实已经派出去了。** 换成 `click()` + 断言**结果**（那一行上真的出现了
+    标签 chip），`expect` 自带重试，而且断言的是产品契约。
+
+    ⚠️ 前提是那条结果断言**真的会失败** —— 见第 50 条，它当时差点就不会。
+
+50. 🔴 **"操作之后状态是对的"这条断言，在"操作从来没生效过"时也可能是绿的。**
+    **先证明它曾经生效过，再断言它被撤销。**
+
+    我写的"取消标签"用例：打上标签 → 断言 chip 在 → 摘掉 → 刷新 → 断言 chip 不在。
+    变异测试（把指派改成**只写本地 React 状态**、不派发 op）暴露出：
+    第一条用例在「刷新后标签丢了」红了，**而这条用例全绿** ——
+    因为"从来没存过"同样满足"刷新后没有"。
+
+    改成 **打上 → 刷新（还在）→ 摘掉 → 刷新（没了）** 之后，同一个变异让它也红了。
+
+    这是本仓库第 N 次遇到同一形状：**一条断言是否"能失败"，只能靠变异测试回答，
+    不能靠读它**。顺序本身也是判据的一部分。
+
+51. 🔴 **"变异测试红了"也要看它红在哪儿 —— 红在别的原因上等于没做变异。**
+
+    我给三端验收做变异（强制两台设备共用 `clientId`）时，把变异脚本拷到 `/tmp` 跑。
+    脚本里到处是 `$(dirname "$0")/lib/...`，于是它去找 `/tmp/lib/mobile-e2e-fresh-account.sh`
+    —— **第 53 行就死了**，`exit 1`。而 `exit 1` 看起来正是"变异成功让验收红了"。
+
+    实际上它那一次**一条断言都没跑到**：既没证明判据有鉴别力，也没证明别的。
+    挪到 `scripts/` 旁边之后才真正红在断言处：
+
+      ❌ client 数没有多出新的（1 → 1）—— 无法证明那条是**另一台设备**写的
+
+    判据：变异之后要**读到那条期望的失败**，而不只是"退出码非 0"。
+    （同源的坑还有第 45 条：`cmd | tail` 的 `$?` 是 `tail` 的。）
+
+52. 🔴 **服务端读不了 op 的内容 —— 它是密文。别写按内容的服务端断言。**
+
+    `operations.payload` 是 E2EE 之后的载荷（同表有 `is_payload_encrypted`）。
+    我写的服务端判据是 `payload->>'title' = '...'`，于是它报
+    「服务端没收到」，而**同一轮的最后一步却从服务端把另一台设备建的任务拉了回来**。
+    两个判据互相矛盾 —— 这时**探针是首要嫌疑**。
+
+    尊重 E2EE 的服务端判据只有两类：
+
+    1. 某类 op 的**条数增量**（收到没收到）；
+    2. **distinct `client_id` 数**（是不是真有两台设备在写）。
+
+    "收到的是不是我想的那一条"**只能**由另一台设备解密后读出来回答。
+    顺带一条：`clientId` 不只是 LWW 决胜依据，它还是**设备身份** ——
+    变异测试实测，两台设备共用它会**同时**破坏对方的读与写。
+
+53. 🔴 **自建栈上"Web 端同步变离线"，先查 CORS，别查网络。**
+
+    `apps/web` 跑在 vite 自己的端口上，调 API 就是**跨域**。服务端默认只放行
+    `DEFAULT_CORS_ORIGINS = ['https://app.super-productivity.com']`
+    —— 那是随上游 `super-sync-server` 继承来的域名。预检不通过时：
+
+    - 浏览器**根本不会发出**那个 POST；
+    - 界面状态条显示「**离线** · 改动已排队，联网后自动重试」；
+    - 服务端日志里**一条请求都没有**。
+
+    看起来完全像网络问题。验收栈（`scripts/mobile-e2e-up.sh`）已显式带上
+    `CORS_ORIGINS`；`verify-multi-end-sync.sh` 第 0 步也会**单独验一次预检**，
+    不通过就 `exit 3`（环境失败，不是产品失败）。生产上的正解是**同源部署**
+    （服务端自己 `@fastify/static` 托管 Web 产物）。
+
+54. 🔴 **生产机的 `server/.env` 里有 `TEST_MODE=true` —— 当前无害，但别给它接上管道。**
+
+    2026-09-26 实测（`ubuntu-jcli` / `124.223.13.226`）：
+
+    ```
+    ~/heyta/server/.env:11  TEST_MODE=true
+    ~/heyta/server/.env:12  TEST_MODE_CONFIRM=yes-i-understand-the-risks
+    ```
+
+    而 `config.ts` 在 `NODE_ENV=production` + `TEST_MODE=true` 时是**抛错拒绝启动**的。
+    看起来像一颗定时炸弹，但**实测容器 env 里根本没有 `TEST_MODE`**：
+
+    ```
+    docker inspect supersync-server → NODE_ENV=production, PUBLIC_URL=...,
+                                      CORS_ORIGINS=...  （没有 TEST_MODE）
+    RestartCount=0, Up 18 hours (healthy)
+    ```
+
+    原因是 compose 的 `environment:` 是**白名单**，那个文件根本没被读进容器。
+    所以：**现在不会炸**；但谁哪天加上 `env_file:` 或 `docker compose --env-file server/.env`，
+    容器就会立刻进入 crash-loop。要接之前先把那两行删掉。
+
+    同一台机器上还有两件**容易被误判**的事：
+
+    - **3000 端口不是我们的。** `curl 127.0.0.1:3000/health` 返回的是
+      `{"service":"sumei-print",...}` —— 另一个项目的服务。
+      我们的容器发布的是 `1900`（`1900/tcp -> 127.0.0.1:1900`），
+      公网入口是反代到 `https://heyta-tmp.litopia.space`。
+      **在这台机器上按 3000 判"服务端活没活"会得到错误结论。**
+    - `CORS_ORIGINS` 生产上设成了自己的 `PUBLIC_URL`（同源），
+      所以第 53 条那个上游默认域名在生产上**不生效**。
+
+55. 🔴 **一段流程里 `throw` 了，要问的不是"报了什么错"，而是"**它跳过了哪几步**"。**
+
+    同步是"先上传、再下载"两段。`upload()` 里一个 throw，界面报的是"同步出错"，
+    而**真正发生的事是下载一次都没执行** —— 这台设备从此**只写不读**。
+    只盯报错文案会得出"错误显示得不好看"，而缺陷是"设备单向聋了"。
+
+    查法：看抛错点**后面**还有什么没跑。凡是"多阶段流程中途抛错"的地方
+    （迁移、导入、批量写、上传→下载），都要问一句"跳过的那段是不是比报错重要得多"。
+    修法通常是**让各阶段互相独立**：一个阶段的失败只该影响它自己。
+
+56. 🔴 **一次性信息必须排在持久状态之前上报。**
+
+    "有改动被服务端永久拒绝"是**一次性**的：那些 op 已被移出队列，
+    **下一次同步不会再提**。而"有历史数据解不开"是**持久**状态，下次照样会报。
+
+    两者同时出现时，如果先报后者，用户**再也没有机会知道**有改动没上去。
+    判据优先级 = **"错过就再也看不到的"优先**，而不是"谁更严重"。
+
+57. 🔴 **`pnpm check` 全绿 ≠ 单元测试通过 —— 它根本不跑单元测试。**
+
+    `package.json`：
+
+    ```
+    "test":  "pnpm -r build && pnpm -r test"
+    "check": "pnpm build && pnpm typecheck && check:migrations && … && check:ai-e2e"
+    ```
+
+    `check` 里**没有任何一步是 vitest**。实测：跑完 `pnpm check`（rc=0）之后
+    `grep -c vitest <日志>` 等于 **0**。
+
+    本仓库已经因为"测试全绿 ≠ 能打包"吃过一次亏；这是它的镜像：
+    **门禁全绿 ≠ 测试全绿**。两者都要跑，顺序无所谓，但不能拿其中一个当另一个。
+
+    改完逻辑之后至少要：`pnpm -r test`（全仓单元）**和** `pnpm check`（构建 + 门禁 + 浏览器）。
+
+58. 🔴 **变异"没复现"时，先确认变异**真的**生效了 —— 否则你会把"变异没写对"读成"判据挡住了"。**
+
+    给 `verify-harmony-rnoh.sh` 写了一个"把 RNOH 从构建里摘掉"的变异，跑完 **rc=0、17/17 全绿**。
+    差一点就得出一条**完全错误**的结论（"判据对 RNOH 不敏感"）。
+
+    实际上那次的变异**一行都没改到** —— heredoc 里的正则被转义搞坏了，
+    `re.sub` 什么也没匹配上，脚本照旧用了原始的 CMakeLists。
+
+    做法：**变异后先 diff 输入，再解释结果。**
+    本次直接改探针工程（不用正则）并 `print(s.count(a))` 确认命中，重跑才得到真结论：
+    **rc=255、`ninja: build stopped`、没有 HAP 产出** —— 判据有鉴别力。
+
+    与陷阱 46 是一对：那条是"没复现 ≠ 路径没执行"，这条是
+    "**没复现 ≠ 变异生效了**"。两者都会把一次无效实验读成一个技术结论。
+
+59. 🔴 **鸿蒙：RN 0.84 的 CLI 要 Node ≥ 20.12，而 DevEco 自带 Node 18.20.1 —— 报错信息完全指错方向。**
+
+    `react-native codegen-harmony` 会死在 `TypeError: styleText is not a function`
+    （`util.styleText` 是 Node 20.12+ 才有的）。**从这句话看不出跟 Node 版本有关。**
+
+    更绕的是**误导链**：第一次失败先弹
+    「`react-native` depends on `@react-native-community/cli`」（RN 0.84 不再捆绑它），
+    装上那个包**才**露出真正的 `styleText` 错误。
+
+    修法：把 hvigor 的 **`NODE_HOME` 指到 Node ≥ 20.12**（hvigor 会用 PATH 上的 node
+    跑 `node_modules/.bin/react-native`，所以子进程也跟着换）。
+    `scripts/verify-harmony-rnoh-js.sh` 把「Node 版本」做成了**会红的硬判据** ——
+    写成警告的话，脚本只会以 `styleText` 崩掉，而没人知道为什么。
+
+60. 🔴 **`bundle-harmony` 找不到 `hermesc`：它在 `hermes-compiler` 包里，不在 `react-native/sdks/`。**
+
+    默认它会去 `node_modules/react-native/sdks/hermesc/osx-bin/hermesc` 找
+    （RN 0.84 里不存在）→ `Couldn't find hermesc`。真身在
+    `node_modules/hermes-compiler/hermesc/osx-bin/hermesc`，要显式
+    `--hermesc-dir node_modules/hermes-compiler/hermesc`。
+
+    且：**验 Hermes 字节码要验魔数 `0x1F1903C103BC1FC6`，不能验扩展名** ——
+    把 JS 改名成 `.hbc` 能骗过所有只看文件名的检查。
+
+61. 🔴 **官方模板是半成品 —— 模板里被 CLI 在 init 阶段填掉的字段，就留在模板里当坑。**
+
+    用 RNOH 官方 CLI 自带的 `templates/harmony` 也不行，以下三处必须按实际环境改写，
+    **而它们的失败信息都不指向真正原因**：
+
+    - `entry/src/main/ets/pages/Index.ets` **根本不在模板里**（`pages/` 是空的），
+      真货由 CLI 的 `EntryIndexTemplate` 生成 → 不补就报 `Page '...' does not exist`。
+      **解法是从官方模板渲染，而不是手抄一份**（手抄必然漂移）。
+    - `AppScope/app.json5` 的 `bundleName` 是 `"com.example"`（**两段**），
+      过不了 hvigor 的 schema（要求三段以上）。
+    - `compatibleSdkVersion` 还是旧的（模板里写着 `5.0.0(12)`）→ **要读 `sdk-pkg.json`，别写死。**
+
+    推论：**装了 DevEco ≠ 能出包**；"官方模板"也不等于"能直接跑"。
+
+62. 🔴 **鸿蒙工程别放在 macOS 的 `$TMPDIR` 下 —— hvigor 会用绝对路径当 pnpm store 文件名，撞 255 字节上限。**
+
+    把 `rnoh-hvigor-plugin-0.84.4.tgz` 接进 `hvigor-config.json5` 后，hvigor 内部的 pnpm 会
+    **拿 tarball 的绝对路径**去拼 store 索引名。路径一旦够长：
+
+    ```
+    ERR_PNPM_ENAMETOOLONG  name too long, open
+    '/Users/.../.hvigor/caches/v10/index/b2/38e7...-file+..+..+..+..+..+..+private+var+folders+
+     5n+zvn6...T+heyta-harmony-rnjs+proj+node_modules+...'
+    ```
+
+    **而 hvigor 只往外抛一句 `00308002 Operation Error`**，真因埋在它启动的 pnpm 输出里。
+
+    macOS 的 `$TMPDIR` 是 `/var/folders/5n/xxxx/T/`（还常被解析成 `/private/var/...`），
+    一个"默认用 `$TMPDIR` 很规范"的脚本就会随机踩中。**工程放 `/tmp/xxx`。**
+
+    这也是"**退出码/错误码不携带原因**"的又一例：`00308002` 什么都说明不了，
+    必须去日志里捞 `ENAMETOOLONG`。三个 `verify:harmony-*` 脚本现在都
+    （a）默认用 `/tmp` 短路径，（b）失败时**把这一条真因单独打出来**。
+
+63. 🔴 **模拟器跑久了，App 的无障碍注册会卡死 —— "AX 桥不通"会把你整条指向 App，而真因在模拟器。**
+
+    现象：`verify:mobile-ios` 第 1 步红，报"找不到「新建任务」按钮 —— AX 桥不通，
+    或 App 不在任务页"。**而 `idb screenshot` 里 App 明明好好停在任务页、FAB 就在那儿。**
+
+    实测把能排的全排掉了（**都不是**原因）：
+
+    | 候选 | 证据 |
+    |---|---|
+    | companion 没起来 | describe-all 返回合法 JSON，连得上 |
+    | companion 馊了 | 换新的也一样；且**主屏能读出 11 个 label** |
+    | App 崩了 | 无崩溃报告，`launchctl` 里在，界面对点击有响应 |
+    | 整树被无障碍隐藏 | 源码里没有 `accessibilityElementsHidden` 那类写法 |
+
+    真因：**模拟器连续跑了 13 小时后，App 对 AX 只暴露一个零尺寸的 `Application` 节点**
+    （`AXFrame: "{{0, 0}, {0, 0}}"`、label 数 0）——**重启模拟器立刻恢复**：
+    同一台设备、同一个 App、同一个 companion，label 数 **0 → 42**。
+
+    两条方法论：
+
+    - **判据必须是"App 起来之后树里有没有内容"，不是"companion 连不连得上"。**
+      旧的 `companion_ok` 只要求"是合法 JSON 数组"，于是那个
+      `[{"role":"AXApplication","frame":{0,0,0,0}}]` **判成了健康** ——
+      一条不会失败的检查。
+    - **"主屏有 label"不能当对照。** 卡死期间主屏一直读得出 11 个 label，
+      拿它做对照会得出"树是好的"的假结论。我第一版就是这么误判的，还先错怪了 companion。
+
+    现在 `verify-mobile-ios.sh` §1.0 会：App 起来后先查 label 数 → 为 0 就
+    **重启模拟器 + 重拉 companion + 重启 App**（自动自愈，代价是再付一次 ~50 秒
+    Argon2id 派生），恢复不了才报错，且报错文案明确写"**先怀疑工具链，别先怀疑产品**"。
+
+    **推论：`idb` 不会自己拉 companion。** 它只连 `/tmp/idb/<UDID>_companion.sock`，
+    没人起就 `[Errno 2] No such file`。脚本现在用官方参数
+    （`--grpc-domain-sock <sock> --only simulator`）自己拉。
+
+64. 🔴 **"探针坏了"和"对端没有"之间的分界线，会被一个仓库根相对路径悄悄挪掉。**
+
+    `scripts/lib/mobile-e2e.sh` 里 `CLI="apps/node-host/dist/cli.js"` 是**仓库根相对**的。
+    一旦不是从仓库根调用脚本（例如 `cd scripts && bash verify-mobile-ios.sh`，
+    这正是"跑变异脚本要 `cd scripts`"那条老习惯）：
+
+    ```
+    node:internal/modules/cjs/loader:1433   ← 在 scripts/apps/... 里找不到
+    ...
+    Node.js v22.22.3                        ← 探针只回报了这最后一行
+    ```
+
+    于是笔记本探针**每次都失败**，报告写的是"笔记本探针自己坏了（不是产品问题）"。
+    同一份脚本、同一台设备，**从仓库根跑全绿，从 `scripts/` 跑就红**。
+
+    这次没被误导，靠的是探针**早就分开的 rc=2**（探针坏了 ≠ 对端没有）——
+    那条分类挡在了同步协议之外。但**根因是路径**：`APK` / `CLI` 现在都用
+    `HEYTA_REPO_ROOT`（由 lib 自身位置推出）拼成绝对路径，脚本在哪都能跑。
+
+    教训：**"探针坏了"是个告警，不是结论** —— 它说"这一段没测到"，
+    不代表"被测的东西坏了"，也**不代表探针真的坏了**。
+
+65. 🔴 **Android release 构建要 JDK 17 —— 而 `java_home -v 17` 在这台机器上找不到它。**
+
+    现象：`pnpm --filter @heyta/mobile build:android` **十秒**就失败，报
+
+    ```
+    Class org.gradle.jvm.toolchain.JvmVendorSpec does not have member field
+    'org.gradle.jvm.toolchain.JvmVendorSpec IBM_SEMERU'
+    ```
+
+    🔴 这个错误**长得像 Gradle 插件版本不兼容**（一个 class 少了个成员字段），
+    于是很容易去查 plugin / AGP / wrapper 版本 —— 而**真因是 JDK**：
+
+    `/usr/libexec/java_home -V` 只登记了 temurin-**24**，所以
+    `java_home -v 17` **返回空**，构建命令里那句 `|| echo "$JAVA_HOME"` 就兜底到 24，
+    而 Gradle 9 + JDK 24 起不来。**唯一可用的 17 在 Homebrew 里**，
+    不在 `/Library/Java/JavaVirtualMachines`：
+
+    ```bash
+    export JAVA_HOME=/opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home
+    ```
+
+    换上去之后同一条命令 `rc=0`，产出 ~65 MB 的 release APK，APK 的 mtime 也随之前进。
+    **验证"真的重编了"要看 mtime，不要看 rc** —— 失败时 rc 是 1，但
+    **旧的 APK 还在原地**，`ls` 一样能看到文件。
+
+    教训：报错文本里的**类名/字段名**很容易把人钉死在"依赖版本"上，
+    而它只是"运行时被换了一个"的副作用。**报错信的是现象，不是原因。**
+
+66. 🔴 **既有验收都"点了那个按钮"，于是"按钮还能用"被当成了"链路是通的"。**
+
+    在自动同步之前，全应用**只有** `ProfileScreen` 那个「立即同步」按钮会调
+    `syncNow()`。于是：**用户建完一条任务，它不会自己出去。**
+    不报错、界面看不出异常、单测也证明不了 —— `sync/store.ts` 的逻辑是对的，
+    缺的是**没人调它**，而"没人调"是**接线**，正是单测照不到的那一层。
+
+    🔴 **为什么两年没被发现：每一条既有移动端验收都点了那个按钮。**
+    `verify-mobile-conflict.sh` 建完任务立刻 `xy_text "立即同步"` + tap。
+    于是"同步链路是通的"这条结论**永远为真**，而
+    "**用户不点它，还通不通**"这件事从来没有人问过。
+    **验收点的是按钮，结论下的却是整条链路。**
+
+    所以新判据 `pnpm verify:mobile-autosync` 里**不存在**任何对同步按钮的点击 ——
+    加了那一下，整个验收就退化成"按钮还能用"。
+
+    ⚠️ 而且**故意不做**"凭据一填齐就自动同步"这个触发点：那会让
+    `verify-mobile-conflict.sh` 的"首次同步"断言**恒真**（测试去点按钮时，
+    状态早就结算完了），等于亲手造一条**不能再失败**的检查。见 plan §3.27(b)。
+
+    变异验证（这是这条判据的价值所在）：把 `dispatch` 之后那声
+    `emitLocalWrite()` 拿掉 → 重新出 APK → 同一条验收
+    **3 红**：判据 (a)「120 秒内服务端一条请求都没有」、
+    判据 (b)「另一台设备没读到」、以及
+    `❌ 待上传没有归零（text="1 项"）` —— 最后那条正是用户会看到的
+    "**数据卡在本地，而界面一切正常**"。
+
+67. 🔴 **"查不到"不是"不存在" —— 按钮在 `loading` 时，它的文字节点根本不存在。**
+
+    自动同步上线后跑回归，`verify-mobile-conflict.sh` 冒出 3 次
+
+    ```
+    java.lang.IllegalArgumentException: Argument expected after "tap"
+    ```
+
+    **而最终结论照样是 `通过 35 项，失败 0 项`。**
+
+    那脚本里有 4 处手写的 `XY=$(xy_text "立即同步"); $ADB shell input tap $XY`。
+    自动同步抢跑之后同步**正在跑**，而 `Button` 在 `loading` 时渲染的是
+
+    ```tsx
+    {loading ? <ActivityIndicator/> : <><Icon/><RNText>{label}</RNText></>}
+    ```
+
+    —— **只有菊花，没有文字节点**。所以 `text="立即同步"` 查不到；
+    而 busy 文案（`正在同步…`）**只挂在 `accessibilityLabel` → `content-desc` 上，
+    `text` 里根本没有**。于是 `XY` 为空 → `input tap` 拿空参数执行 → adb 抛异常
+    → 而**脚本从不检查 `XY` 是否为空**，一行都不报。
+
+    > **"点了一下同步"和"什么都没点"在报告里长得一模一样。**
+    > 冲突断言照样绿 —— 因为冲突是**自动同步**造成的。
+    > 结论没错，但它不再是被测的那件事产生的了。
+
+    🔴 **同一个坑有三种变体，一次全修**（不只修被撞到的那一处）：
+    静默空操作两种（`input tap $XY`、`[ -n "$XY" ] && tap`），
+    以及**假红**一种（`[ -z "$XY" ] → bad`：同步正在正常跑，却报"找不到按钮"）。
+
+    🔴 **而我第一版修错了，错法本身又是这条陷阱**：改用 `has_text "正在同步"`
+    判断 → 又误报 3 条 `bad`，而同步正在正常进行。真因就是上面那条：
+    busy 文案只在 `content-desc`。本库 `has_desc` 上面那句注释**早就写明了这条规矩**
+    （"按钮这类节点的可辨识名在 `content-desc` 上，用 `has_text` 查它们**永远是 0**"），
+    我写那个函数时没看它。
+
+    修法：共享库 `ensure_phone_sync()`（三态：真点 / 已在跑就等并**打印说明** /
+    真没有才 `bad`）+ `has_desc_sub()`。
+
+    **和 §7 第 63 条、第 64 条是同一个形状**：先排除"我查错了地方"，
+    再下"它不存在"的结论。
+
+68. 🔴 **delta 基线取晚了，会把"更快"读成"没发生"。**
+
+    `verify-mobile-focus.sh` 原来这样断言"专注记录到服务端了"：
+    在**快要断言之前**取 `SRV_BEFORE`，点同步，再取 `SRV_AFTER`，查增量。
+
+    这在"op 只有点按钮才出去"的年代是对的。**自动同步上线后前提就没了** ——
+    业务动作一派发 op，两三秒内就传上去了；等取基线时，基线里**已经含了本次那条**。
+
+    A/B 实测（同一条脚本、同一个 APK，只切自动同步）：
+
+    | 自动同步 | 输出 | 结果 |
+    |---|---|---|
+    | 关 | `✅ 服务端收到了专注记录（3 → 4）` | **26/26** |
+    | 开 | `❌ 服务端没收到专注记录（3 → 3）` | 25/26 |
+
+    而**同一次运行的下一行**打印的是
+    `✅ 笔记本（真 SQLite）同步后有了 1 条 FOCUS_SESSION op` ——
+    服务端没收到的话笔记本不可能拉到。**这是假红。**
+
+    修法：基线前移到**任何本地写入之前**，断言"相对运行前有增长"。
+    它对"谁在什么时候上传"不敏感，但"本次运行确实新增了"仍然为真。
+
+    🔴 **一般化**：任何"前 / 后取两次样、查差值"的判据，
+    都要先问一句 **"这两次取样之间，还有谁会写？"** ——
+    引入一个后台进程（同步、定时任务、缓存刷新）就会让这类判据失真，
+    而且失真的方向**恰好是报假红**。
+
+    🔴 **配套纪律**：改动引入回归时，**先建基线再定罪**。
+    这一轮 `verify:mobile-edit` 报了一串失败，看着像"自动同步把编辑面板搞坏了"；
+    把自动同步关掉重建 APK 一跑，**失败点一模一样** ——
+    真因是 i18n 迁移（`ccf3e50`）留下的陈旧定位符：
+    脚本找 `任务标题`，界面上的词条是 **「标题」**。
+    **不建基线，我就会去改一段本来正确的同步代码。**
+
+69. 🔴 **`$VAR` 后面紧跟全角字符时必须写成 `${VAR}` —— 否则一旦有 UTF-8 locale 就会炸。**
+
+    本机是 **GNU bash 3.2.57**（macOS 自带）。实测：
+
+    ```bash
+    TITLE2=abc
+    echo "第二条任务：$TITLE2（基线）"     # 没有 LANG 时正常
+    ```
+
+    | 环境 | 结果 |
+    |---|---|
+    | 默认（无 `LANG`） | ✅ 正常 |
+    | `LANG=en_US.UTF-8` | ❌ `TITLE2\xef: unbound variable` |
+    | `LC_ALL=en_US.UTF-8` | ❌ 同上 |
+    | 写成 `${TITLE2}（` | ✅ 两种环境都正常 |
+
+    **bash 3.2 会把 `（`（U+FF08，字节 `EF BC 88`）的首字节 `EF` 并进变量名**，
+    于是报一个**名字里带乱码字节**的 `unbound variable`。
+
+    🔴 **为什么这条很危险**：本仓库 `scripts/` 里这种写法有 **178 处**，
+    它们**平时全部正常**（脚本都不设 `LANG`）—— 所以这是一个**潜伏**的坑：
+    任何一次"顺手 export LANG"（这次是 iOS 构建需要 `LANG=en_US.UTF-8`，
+    而我把 export 留在了同一个 shell 里）都会让 `pnpm verify:mobile-ios`
+    在**一条与同步毫无关系的 echo 行**上崩掉（`line 763: TITLE2?: unbound variable`），
+    而现场看起来像"新加的那一步有 bug"。
+
+    **纪律**：① 脚本里 `$VAR` 后面跟中文标点，一律加花括号；
+    ② 构建用的 `export LANG=…` **只作用于那一条命令**（`env LANG=… cmd`），
+    不要留在跑验收的 shell 里。
+
 ---
 
 ## 8. 工作流
@@ -961,7 +1717,7 @@ docker inspect <容器> --format '{{range .Config.Env}}{{println .}}{{end}}' | g
 |---|---|
 | P0 奠基 | ✅ 已完成（协议已跑通，Docker 实测通过） |
 | P1 单端闭环 | ✅ **已完成**。**冲突解决闭环已实测跑通**：`pnpm verify:p1` 自带真实服务端跑 11 条零 mock E2E，含"真实点击 `ConflictDialog` → 双端收敛"两条（`keep-local` / `keep-remote` 各一）→ [详细计划](docs/plans/phase-1-single-client-loop.md) |
-| P2 多端补齐 | 🔄 **进行中**（存储契约 ✅ / SQLite ✅ / token 生成器 ✅ / **RN token 产物（含暗色合并 + 类型安全）** ✅ / **ArkTS 产物真编译器验证** ✅ / **RNOH 依赖链实测打通** ✅ / 非 Web 宿主 ✅ / **移动壳（Android 实机跑通）** ✅ / **移动端任务可编辑 + 冲突解决闭环 + 专注闭环 + 日历 + 重复任务（真模拟器零 mock E2E：`pnpm verify:mobile-edit`、`pnpm verify:mobile-conflict`、`pnpm verify:mobile-focus`、`pnpm verify:mobile-calendar`、`pnpm verify:mobile-repeat`）** ✅ / **移动端四个标签全部为真实屏幕**（占位文件已删除）✅ / **iOS 壳已跑通到交互级**（Release 模拟器构建 → 安装 → 启动 → 真图标 + 真中文 + 真 SQLite 建库；`pnpm verify:mobile-ios` 31 项零 mock，含"点 FAB → 输中文 → 提交 → op 落库 → 同步到另一台设备"全链路）✅ / ✅ **P0 已修：一条硬被拒的 op 会让设备同步永久卡死**（§7 第 34 条，**ADR-0009**；线级 + 反证 + 真机界面四层验收）/ 鸿蒙壳 ❌）→ [详细计划](docs/plans/phase-2-multi-platform.md) |
+| P2 多端补齐 | 🔄 **进行中**（存储契约 ✅ / SQLite ✅ / token 生成器 ✅ / **RN token 产物（含暗色合并 + 类型安全）** ✅ / **ArkTS 产物真编译器验证** ✅ / **RNOH 依赖链实测打通** ✅ / 非 Web 宿主 ✅ / **移动壳（Android 实机跑通）** ✅ / **移动端任务可编辑 + 冲突解决闭环 + 专注闭环 + 日历 + 重复任务（真模拟器零 mock E2E：`pnpm verify:mobile-edit`、`pnpm verify:mobile-conflict`、`pnpm verify:mobile-focus`、`pnpm verify:mobile-calendar`、`pnpm verify:mobile-repeat`、**`pnpm verify:mobile-autosync`（全程不点任何同步按钮，写入也必须自己出去；变异：拿掉写入信号 ⇒ 3 红）**）** ✅ / ✅ **自动同步（前台 + 本地写入去抖）**：此前同步**只能靠手点** —— 建完任务数据一直躺在本地，而界面全绿。核心/平台两层拆分（纯决策逻辑 16 条单测 + 变异验证），三个并发陷阱逐个处理（代际计数防丢写、失败退避防热循环、`ready()` 必须地址与令牌同时具备）；**§7 第 66/67/68 条**，计划 §3.27 ✅ / ✅ **顺手修掉两条陈旧判据**（是自动同步**当场**把它们照出来的）：① `verify-mobile-focus` 的 **delta 基线取晚了**，把"传得更快"读成"没传" —— A/B：关自动同步 26/26、开 25/26，而**同一次运行**又打印笔记本读到了那条记录（**假红**）；② `verify-mobile-edit` **自 i18n 迁移起就是红的**（脚本找「任务标题」，界面词条是「标题」）＋「优先级」区块在首屏之外被当成"没渲染"。修完 **28/28** ✅ / **移动端四个标签全部为真实屏幕**（占位文件已删除）✅ / **iOS 壳已跑通到交互级**（Release 模拟器构建 → 安装 → 启动 → 真图标 + 真中文 + 真 SQLite 建库；`pnpm verify:mobile-ios` **36 项零 mock**，含"点 FAB → 输中文 → 提交 → op 落库 → 同步到另一台设备"全链路，**并含「零点击自动同步」这一条**（第 6 步；变异：关掉 `startAutoSync()` ⇒ **恰好 2 红**，而同一轮里「点按钮」那条仍然绿）；**从"我的页 + 键盘立着"这个曾经判红的初始状态跑起也能全绿**）✅/ ✅ **P0 已修：一条硬被拒的 op 会让设备同步永久卡死**（§7 第 34 条，**ADR-0009**；线级 + 反证 + 真机界面四层验收）/ ✅ **P0 已修：读侧解不开的 op 会让**别的**设备同步永久卡死**（§7 第 41 条，**ADR-0016**；变异验证 + 真服务端复验；配套修掉 legacy 密文在 Hermes 上无纯 JS 兜底）✅ / **清单（PROJECT）跨设备闭环**（`pnpm verify:mobile-lists` 零 mock：手机建清单 → 任务归入 → 笔记本读到**同一条清单、同一个 `projectId`**；业务逻辑复用 `packages/app-host`，未 bump schema）✅ / ✅ **P0 已修：手机"只能推、不能拉"** —— 上传响应搭车回来的 op 里有一条解不开，整次同步就死在 **upload 阶段**，`download()` **从不执行**（界面只显示"同步失败"，本地库远端 op 数 = 0）。（**ADR-0016 §6**，§7 第 46/47 条；变异验证 + 真机复验 + 判据补强：必须**数出**远端 op ≥ 1）✅ / **标签（TAG）跨设备闭环** —— 在此之前 `tagIds` **全仓库没有一处读写**（零件都在、产品里没有这个功能）。`TaskActions.setTags`（整组覆盖、写入侧校验悬空 id）、清单/标签共用 `OrganizerSection`、`pnpm verify:mobile-tags` 零 mock 四层判据（标签实体 + 任务引用 × 手机 + 笔记本）（399 单测 +2 处变异验证）✅ / **Web 端也接上「清单 + 标签」** —— 同一个空洞的另一半：`moveToProject` 在 `apps/web` **零调用点**，于是侧栏里建出来的清单和标签一个都用不上。新增 `TaskOrganizer`（原生控件、chip 常驻 + `<details>` 编辑），浏览器套件 13/13，判据是**刷新后仍在**（变异可复现：只写本地态 ⇒ 2 红）✅ / **三端同步验收 `pnpm verify:multi-end`**（Web ↔ 服务端 ↔ 笔记本，真浏览器 + 真服务端 + 真 SQLite）—— 补上此前**没人覆盖**的那条接缝（手机脚本没有浏览器、浏览器套件刻意离线）。第 3 相开在**全新 context = 空 IndexedDB**（= 一台刚装好的新设备），18/18。顺带查出三个真问题：**自建栈 CORS 默认只放行上游域名**（症状是「离线」而服务端零请求）、**服务端只存密文所以不能按内容断言**、**两设备共用 clientId 会让双方都同步不了**✅ / **鸿蒙：从 JS 源码到自包含 release HAP 的整条构建链已实测打通**（`verify:harmony-toolchain` 17/17、`verify:harmony-rnoh` 17/17、`verify:harmony-rnoh-js` 13/13：真 codegen + 真 autolinking + `hermes_bundle.hbc`（魔数已验）→ **20 MB release HAP**，含全部原生库，双 ABI。**但没跑起来**：缺模拟器系统镜像 + 签名（产物 unsigned）→ §3.24 / §3.25）→ [详细计划](docs/plans/phase-2-multi-platform.md) |
 | P3 平台特性 | ⏸ |
 
 总路线图：[`docs/plans/roadmap.md`](docs/plans/roadmap.md)
@@ -972,9 +1728,13 @@ docker inspect <容器> --format '{{range .Config.Env}}{{println .}}{{end}}' | g
 - **ADR-0002 迁移工具 = 继续用 Prisma** ✅（[文档](docs/adr/0002-migration-tooling.md)）。
 - **ADR-0004 UI 栈 = React Native** ✅（[文档](docs/adr/0004-ui-stack.md)）。
   跨平台，且是"排除 WebView 套壳后仍覆盖 iOS + 鸿蒙、还在 JS 生态里"的唯一选项。
-  🟡 **依赖链已实测打通**（npm + ohpm 两侧包均为 **MIT**、可下载、`ohpm install`
-  实测成功），但**尚未构建出 HAP、未跑起来、未编译过 C++**。
-  投入 UI 开发前**第一步仍必须是让最小 RN 壳在鸿蒙上真跑起来**。
+  🟢 **原生侧已实测编译出 HAP**（`pnpm verify:harmony-rnoh`，2026-09-27）：
+  NDK 自带的 cmake + ninja 现编了 RNOH 的 C++（`BuildNativeWithNinja` 1 分 2 秒），
+  产出 37 MB HAP，含 `librnoh_core.so` / `librnoh_app.so` / `libreactnative.so`（双 ABI）。
+  "最可能出问题的地方"（原生侧要本地编译 `.so`）**通了**。
+  🟡 **但仍未跑起来** —— 缺模拟器系统镜像 + 签名（产物是 unsigned，装不进设备），
+  且 JS 侧 codegen/autolinking 本轮用**桩**顶替。ADR-0004 的结论**暂不需要重估**，
+  但最后那一环（真跑起来）仍是它唯一的硬证据。见 §3.24。
 - **ADR-0008 向量时钟上限 = 100** ✅（[文档](docs/adr/0008-vector-clock-limit.md)）。
   原值 20 会让设备写入被**永久拒绝**（服务端 head 与客户端各自裁剪、规则不同）。
   ⚠️ **这是把墙挪远、不是拆掉**：因果安全的压缩**未做**，
