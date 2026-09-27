@@ -4,6 +4,10 @@
 > 适用对象：**一个 AI 执行者**（本文即提示词，可直接整篇粘贴给该 AI）
 > 上游审计：[`ai-gap-audit-and-remediation.md`](ai-gap-audit-and-remediation.md)
 > 并行模块：模块 1（引擎层）、模块 3（记忆护城河）——**不要碰它们的文件**
+> 🟢 **可以独立跑完，不需要等另外两个模块。** 开工命令、租约门禁（可执行的白名单）、
+> 以及"缺一个跨模块符号怎么办"的三条路，见
+> [`ai-remediation-parallel-runbook.md`](ai-remediation-parallel-runbook.md)。
+> 你的 worktree：`.worktrees/ai-m2`，分支 `feat/ai-module-2-journey`，分叉点 tag `ai-remediation-fork`。
 
 ---
 

@@ -4,6 +4,10 @@
 > 适用对象：**一个 AI 执行者**（本文即提示词，可直接整篇粘贴给该 AI）
 > 上游审计：[`ai-gap-audit-and-remediation.md`](ai-gap-audit-and-remediation.md)
 > 并行模块：模块 1（引擎层）、模块 2（Web 旅程）——**不要碰它们的文件**
+> 🟢 **可以独立跑完，不需要等另外两个模块。** 开工命令、租约门禁（可执行的白名单）、
+> 以及"缺一个跨模块符号怎么办"的三条路，见
+> [`ai-remediation-parallel-runbook.md`](ai-remediation-parallel-runbook.md)。
+> 你的 worktree：`.worktrees/ai-m3`，分支 `feat/ai-module-3-memory-moat`，分叉点 tag `ai-remediation-fork`。
 
 ---
 
@@ -66,14 +70,23 @@
    面板**只能**显示"记忆已关闭"的说明，**零条推断**。
    判断必须是 `=== true` 这种严格方向（缺字段 = 关），不要写成 `!== false`。
 
-### 1.4 `App.tsx` 的共享协议（重要）
+### 1.4 `App.tsx`：**你不改它**（它不再和模块 2 并行共享）
 
-`App.tsx` **同时**被模块 2 和模块 3 需要，两个模块**不许并行改同一分支**：
+`App.tsx` 的**唯一 owner 是模块 2**，你的租约里已经不含它（见 runbook §1 R3）。
+此前这里写的是"两个模块不许并行改同一分支，合并顺序 1 → 2 → 3" ——
+那条规则就是"必须等前一个做完才能开工"的来源，已删除。
 
-- 模块 2 主 owner，合并顺序是 **模块 1 → 模块 2 → 模块 3**。
-- 你在自己的分支上改 `App.tsx`，合并时以模块 2 的版本为基。
-- 你的改动应当**很小**（把 `focusGaps` 加进已有的 `memory` memo 并传给 `MemoryPanel`）。
-  如果你发现需要大改 `App.tsx`，先停下来，在报告里说明。
+你要的 `focusGaps` 只有三条路，**都要靠接口先行，不靠等**：
+
+1. **在 `MemoryPanel` 里自己订阅**（首选）。它本来就是 Web 组件，
+   读 store / op-log 是它自己的事 —— 这样 `App.tsx` 一个字节都不用动。
+2. **用已经存在的 prop 接进去**：`App.tsx` 已经给 `MemoryPanel` 传了
+   `memoryEnabled` 等既有 prop，先看能不能复用。
+3. **需要新 prop 时**：在报告里写清"需要模块 2 在 `App.tsx` 预埋一个 `focusGaps`"，
+   **然后继续做别的**。预埋由模块 2 owner 一次提交在分叉点之前，它就不再是冲突。
+
+🔴 三条路都不通、又非改 `App.tsx` 不可时：**停下来**，在报告里说明，
+不要自己动手，也不要停在半路等另一个模块。
 
 ### 1.5 禁止的手段
 
