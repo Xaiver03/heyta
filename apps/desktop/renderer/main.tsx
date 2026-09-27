@@ -24,6 +24,17 @@ import { createRoot } from 'react-dom/client';
 import type { Task } from '@heyta/domain';
 import { HeytaUiProvider, TaskList } from '@heyta/ui';
 
+/**
+ * 🔴 设计 token。**不引这一行，上面那些 `var(--ht-*)` 全都解析不出来** ——
+ * 而失败的样子是"样式静默消失"（字号/间距/颜色全变浏览器默认），
+ * **不会报任何错**，`check:design` 也照样是绿的（它检查的是"有没有用 token"，
+ * 不是"token 定没定义"）。
+ *
+ * 与 `apps/web/src/main.tsx` 引的是**同一份** `tokens.css` —— 这正是
+ * "三端共享设计系统"的落点。
+ */
+import '@heyta/design-system/tokens.css';
+
 import type { DesktopRequest } from '../src/ipc-contract';
 
 /**
@@ -122,10 +133,29 @@ function App(): React.JSX.Element {
   }, [reload]);
 
   return (
-    <main data-testid="desktop-root" style={{ font: '14px/1.6 system-ui, sans-serif', padding: 24 }}>
-      <header style={{ marginBottom: 16 }}>
-        <h1 style={{ fontSize: 18, margin: 0 }}>{L.heading}</h1>
-        <p style={{ margin: '4px 0 0', opacity: 0.6 }}>{L.subheading}</p>
+    /**
+     * 🔴 这里所有尺寸/颜色都走 **token**（`var(--ht-*)`），不写裸值。
+     *
+     * 这不是洁癖：`check:design` 的 `SCAN_ROOTS` 现在**包含**
+     * `apps/desktop/renderer`（本轮补上，之前漏了 —— 见 `check-hardcoded.mjs` 的注释），
+     * 而补上的第一件事就是在这段代码里抓出 6 处裸值。
+     * 裸值在这里的代价是"改一次主题要满地找"，而 token 是唯一能让
+     * 桌面端跟着 `tokens.css` 一起变的方式。
+     */
+    <main
+      data-testid="desktop-root"
+      style={{
+        fontFamily: 'system-ui, sans-serif',
+        fontSize: 'var(--ht-font-size-sm)',
+        lineHeight: 1.6,
+        padding: 'var(--ht-space-6)',
+      }}
+    >
+      <header style={{ marginBottom: 'var(--ht-space-4)' }}>
+        <h1 style={{ fontSize: 'var(--ht-font-size-lg)', margin: 0 }}>{L.heading}</h1>
+        <p style={{ margin: 'var(--ht-space-1) 0 0', color: 'var(--ht-color-foreground-muted)' }}>
+          {L.subheading}
+        </p>
       </header>
 
       <button type="button" data-testid="desktop-add" onClick={onAdd}>
@@ -133,7 +163,7 @@ function App(): React.JSX.Element {
       </button>
 
       {error !== null ? (
-        <p data-testid="desktop-error" style={{ color: '#b91c1c' }}>
+        <p data-testid="desktop-error" style={{ color: 'var(--ht-color-danger-strong)' }}>
           🔴 宿主不可用：{error}
         </p>
       ) : null}

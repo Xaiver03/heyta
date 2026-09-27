@@ -40,7 +40,7 @@
  */
 
 import { createRequire } from 'node:module';
-import { mkdirSync, mkdtempSync, rmSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -50,9 +50,18 @@ import { _electron as electron, expect, test, type Page } from '@playwright/test
 /** `e2e/tests/` → 仓库根。 */
 const ROOT = fileURLToPath(new URL('../../', import.meta.url));
 const DESKTOP_DIR = join(ROOT, 'apps', 'desktop');
+const RELEASE_DIR = join(ROOT, 'release');
 
-/** 截图固定落点 —— 见文件头第 3 条。 */
-const SHOT = join(ROOT, 'e2e', 'test-results', 'desktop-window.png');
+/**
+ * 截图落点 —— 见文件头第 3 条。
+ *
+ * ⚠️ 两种形态**分开命名**：合成一张的话，后跑的会覆盖先跑的，
+ * 而"打包产物白屏、开发构建正常"恰恰是最需要同时看到两张图的那种事故。
+ */
+function shotPath(target: { readonly label: string }): string {
+  const suffix = target.label === '开发构建' ? 'dev' : 'packaged';
+  return join(ROOT, 'e2e', 'test-results', `desktop-window-${suffix}.png`);
+}
 
 /**
  * Electron 的可执行文件路径。
@@ -86,17 +95,15 @@ const electronBinary = desktopRequire('electron') as unknown as string;
  * 改成在 `app.on('window')` 上挂监听 —— 那个事件在**窗口刚创建、还没开始加载**
  * 时就触发，天然覆盖整次加载，不需要重载。
  */
-async function captureWindow(window: Page, label: string): Promise<readonly string[]> {
+async function captureWindow(window: Page, label: string, shot: string): Promise<void> {
   mkdirSync(join(ROOT, 'e2e', 'test-results'), { recursive: true });
 
-  console.log(`   · 当前 URL：${window.url()}`);
+  console.log(`   · [${label}] URL：${window.url()}`);
 
   // 给页面一点时间把首帧和错误都吐出来 —— 太早截图会拍到中间态。
   await window.waitForTimeout(1500);
-  await window.screenshot({ path: SHOT });
-  console.log(`📷 ${label} 截图：${SHOT}`);
-
-  return logs;
+  await window.screenshot({ path: shot });
+  console.log(`📷 [${label}] 截图：${shot}`);
 }
 
 /**
@@ -116,13 +123,49 @@ function attachLogs(page: Page): void {
   });
 }
 
-test('桌面端：真窗口打开，且共享 UI 真的画出来了', async () => {
-  test.setTimeout(120_000);
+/**
+ * 被验证的"桌面端入口"。
+ *
+ * 🔴 **同一套断言要同时覆盖两种形态**：
+ * - `dev`：`electron dist/main.cjs` —— 平时开发跑的东西。
+ * - `packaged`：`release/heyta-<平台>/…` —— 真正发给用户的东西。
+ *
+ * 为什么非要都覆盖：这两条路径的**路径解析结果不同**。
+ * 开发时 `__dirname` 是 `apps/desktop/dist`，打包后是 `app.asar/dist`；
+ * 一旦有人把 `__dirname` 换回 `app.getAppPath()`，**开发形态照样是绿的**，
+ * 只有打包后才白屏。所以"开发端冒烟过了"**不能**推出"打包产物是对的"。
+ */
+interface DesktopTarget {
+  readonly label: string;
+  readonly executablePath: string;
+  readonly entry: readonly string[];
+}
 
+const DEV_TARGET: DesktopTarget = {
+  label: '开发构建',
+  executablePath: electronBinary,
+  entry: [join(DESKTOP_DIR, 'dist', 'main.cjs')],
+};
+
+/**
+ * 打包产物的入口（macOS）。
+ *
+ * ⚠️ 路径写死在 `.app` 里，而不是用 `open -a`：`open` 会另起一个不受
+ * Playwright 控制的进程，拿不到窗口对象，也就截不了图。
+ */
+function packagedTarget(): DesktopTarget {
+  return {
+    label: '打包产物',
+    executablePath: join(RELEASE_DIR, 'heyta-darwin-arm64', 'heyta.app', 'Contents', 'MacOS', 'heyta'),
+    entry: [],
+  };
+}
+
+async function verifyWindow(target: DesktopTarget): Promise<void> {
   const userDataDir = mkdtempSync(join(tmpdir(), 'heyta-desktop-gui-'));
   const app = await electron.launch({
-    executablePath: electronBinary,
-    args: [join(DESKTOP_DIR, 'dist', 'main.cjs'), `--user-data-dir=${userDataDir}`],
+    executablePath: target.executablePath,
+    args: [...target.entry, `--user-data-dir=${userDataDir}`],
     cwd: DESKTOP_DIR,
     /**
      * 🔴 让窗口**不要抢前台**（见 `apps/desktop/src/main.ts` 的 `NO_FOCUS`）。
@@ -135,21 +178,17 @@ test('桌面端：真窗口打开，且共享 UI 真的画出来了', async () =
 
   // 🔴 在等窗口**之前**就挂监听：`window` 事件在窗口刚创建、页面还没开始加载时触发。
   app.on('window', attachLogs);
-  console.log('① Electron 已启动');
 
   try {
     const window = await app.firstWindow();
     attachLogs(window); // 双保险：万一 window 事件早于本行执行
-    console.log('② 拿到窗口');
 
     // 🔴 先截图 —— 顺序不能反。失败时也要有图。
-    await captureWindow(window, '首帧');
-    console.log('③ 首帧截图完成');
+    await captureWindow(window, target.label, shotPath(target));
 
     try {
       // 1. 页面本体起来了（不是白窗口）。
       await expect(window.getByTestId('desktop-root')).toBeVisible();
-      console.log('④ 页面根节点可见');
 
       // 2. 共享组件渲染完成 —— `desktop-loading` 消失是"IPC 回来了"的信号。
       //
@@ -157,21 +196,18 @@ test('桌面端：真窗口打开，且共享 UI 真的画出来了', async () =
       // 断言一个正常为空的列表，把一次真实的读取失败当成通过。
       await expect(window.getByTestId('desktop-loading')).toHaveCount(0);
       await expect(window.getByTestId('desktop-error')).toHaveCount(0);
-      console.log('⑤ 宿主数据已回来');
 
       const rowsBefore = await window.locator('[data-testid^="task-row-"]').count();
 
       // 3. 点一下"添加"，然后**等新行真的出现**。
       await window.getByTestId('desktop-add').click();
       await expect(window.locator('[data-testid^="task-row-"]')).toHaveCount(rowsBefore + 1);
-      console.log(`⑥ 新增一行成功（${rowsBefore} → ${rowsBefore + 1}）`);
 
       // 4. 行的文案来自共享组件 + 库里的真数据。
       await expect(window.locator('[data-testid^="task-row-"]').last()).toContainText('示例任务');
 
-      // 5. 点击后的第二张截图（此时列表里应该有新行）。
-      await window.screenshot({ path: SHOT });
-      console.log('⑦ 全部断言通过');
+      // 5. 点击后的截图（此时列表里应该有新行）。
+      await window.screenshot({ path: shotPath(target) });
     } catch (failure) {
       /**
        * ⚠️ 断言失败时**必须**把控制台吐出来。
@@ -179,13 +215,34 @@ test('桌面端：真窗口打开，且共享 UI 真的画出来了', async () =
        * 白窗口在自动化里的表现是"某个元素一直不出现"，而**为什么**不出现
        * 只在控制台里。不打印的话，下一个人只能重新跑一遍去复现。
        */
-      console.error('\n──── 窗口控制台 / 页面错误 ────');
+      console.error(`\n──── ${target.label} 窗口控制台 / 页面错误 ────`);
       console.error(logs.length === 0 ? '（无输出 —— 那更可疑：脚本可能压根没执行）' : logs.join('\n'));
-      console.error(`──── 截图见 ${SHOT} ────\n`);
+      console.error(`──── 截图见 ${shotPath(target)} ────\n`);
       throw failure;
     }
   } finally {
     await app.close();
     rmSync(userDataDir, { recursive: true, force: true });
   }
+}
+
+test('桌面端（开发构建）：真窗口打开，且共享 UI 真的画出来了', async () => {
+  test.setTimeout(120_000);
+  await verifyWindow(DEV_TARGET);
+});
+
+/**
+ * 打包产物冒烟。
+ *
+ * ⚠️ 产物不存在时**显式 skip 并说明怎么产出**，不静默跳过 ——
+ * 静默跳过会让"打包坏了"看起来像"没事"。
+ */
+test('桌面端（打包产物）：release 里的 .app 同样画得出共享 UI', async () => {
+  test.setTimeout(120_000);
+  const target = packagedTarget();
+  test.skip(
+    !existsSync(target.executablePath),
+    `打包产物不存在，先跑：pnpm --filter @heyta/desktop run package:mac`,
+  );
+  await verifyWindow(target);
 });

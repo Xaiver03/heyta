@@ -57,8 +57,11 @@ function createWindow(): BrowserWindow {
        * `undefined`，界面上表现为一句
        * `TypeError: Cannot read properties of undefined (reading 'request')`。
        * 这个错误看起来像"宿主坏了"，实际只是路径多了一层。
+       *
+       * ⚠️ 同样用 `__dirname`（理由见下面 `loadFile` 那段）：asar 之后
+       * `app.getAppPath()` 是 `app.asar`，不是 `dist/`。
        */
-      preload: join(app.getAppPath(), 'preload.cjs'),
+      preload: join(__dirname, 'preload.cjs'),
       /**
        * 🔴 这三项是桌面端**唯一**的安全边界，不要为了图方便放开任何一个：
        * - `contextIsolation` 让 preload 与页面在**不同的 JS 世界**
@@ -108,10 +111,17 @@ function createWindow(): BrowserWindow {
    * `electron.launch()` 直接超时（连窗口对象都拿不到）。
    * 换句话说：**这个 bug 从占位页时期就存在**，桌面端从来没显示过东西。
    *
-   * 所以路径要从 `dist/` **往上走一级**。写成 `'..'` 而不是依赖 cwd，
-   * 是因为 cwd 取决于谁启动的（`pnpm start`、Playwright、双击 .app 各不相同）。
+   * 所以路径要从 `dist/` **往上走一级**。
+   *
+   * ⚠️ 用 `__dirname` 而**不是** `app.getAppPath()`：
+   * `__dirname` 就是 `main.cjs` 所在目录，开发时是 `apps/desktop/dist`、
+   * 打包后（asar）是 `…/Resources/app.asar/dist` —— 两种形态下
+   * `'..'` 都恰好落在该在的地方。
+   * 而 `getAppPath()` 打包后返回的是 **`app.asar` 本身**，`'..'` 会跑到
+   * `Resources/` 去，于是又变回"白窗口、无报错"。
+   * 这个差异只在打包后才出现，开发时怎么试都是好的 —— 所以现在就用对的写法。
    */
-  void window.loadFile(join(app.getAppPath(), '..', 'renderer-dist', 'index.html'));
+  void window.loadFile(join(__dirname, '..', 'renderer-dist', 'index.html'));
 
   return window;
 }
