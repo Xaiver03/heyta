@@ -30,7 +30,21 @@ const CHALLENGE_EXPIRY_MS = 5 * 60 * 1000; // 5 minutes
 const RECOVERY_TOKEN_EXPIRY_MS = 60 * 60 * 1000; // 1 hour
 const REGISTRATION_SUCCESS_MESSAGE =
   'Registration successful. Please check your email to verify your account.';
-type ChallengeCeremony = 'registration' | 'authentication' | 'recovery';
+type ChallengeCeremony =
+  | 'registration'
+  | 'authentication'
+  | 'recovery'
+  /**
+   * 已认证地为**当前账号**再添一条凭据（见 `generateUserPasskeyOptions`）。
+   *
+   * 🔴 刻意与 `'registration'` 分开：两者都叫"注册"，但一个是**公开**入口
+   * （email 决定归属，必须防枚举），另一个是**已认证**入口（userId 来自 JWT）。
+   * challenge 存进同一张 Map 时按 `${ceremony}:${subject}` 分命名空间，
+   * 分开之后拿到的 challenge 无法跨入口消费 —— 公开的
+   * `POST /register/passkey/verify` 不能消费已认证流程签发的 challenge，
+   * 反之亦然。
+   */
+  | 'user-registration';
 
 /**
  * 通行密钥错误的稳定机器码。
@@ -54,7 +68,16 @@ export type PasskeyErrorCode =
   /** 要删的凭据不属于当前用户，或者根本不存在 —— 两者故意同一个码。 */
   | 'passkey_not_found_for_user'
   /** 删掉它会让账号一条凭据都不剩，而账号可能只靠通行密钥登录。 */
-  | 'last_passkey_required';
+  | 'last_passkey_required'
+  /**
+   * 这条 credential ID 在服务端**已经登记过**（`Passkey.credentialId` 唯一）。
+   *
+   * 已认证的"再加一条"流程里，正常的同设备重复注册会被下发的
+   * `excludeCredentials` 在设备侧挡掉（客户端抛 `InvalidStateError`，
+   * app-host 翻成 `passkey-already-registered`）。这里是**服务端**的最后
+   * 一道守卫：绕过前端的调用方不会把同一条凭据写成两行。
+   */
+  | 'passkey_already_registered';
 
 /**
  * 带稳定 `code` 的通行密钥错误。
@@ -317,6 +340,161 @@ export const verifyRegistration = async (
     }
     throw err;
   }
+};
+
+// ── 已认证地给当前账号「再加一条」凭据 ──────────────────────────
+//
+// 🔴 为什么必须有这条路，而不是让已登录用户复用
+// `POST /register/passkey/options` + `/register/passkey/verify`：
+//
+// `verifyRegistration` 对**已验证账号**的 email **故意**提前返回成功
+// （见上面 :242 那段，防账号枚举）—— 它一条凭据都不写。于是对一个已登录
+// 用户来说，那条公开注册路径是一个**静默空操作**：界面显示"注册成功"，
+// 新凭据根本不存在。而设置页在拒绝"删最后一条"时让用户"先添加一条新的"，
+// 用户照做之后删掉旧的那条，就**再也登不进去**。
+//
+// 已认证上下文的语义与公开注册**逐条不同**，所以是两条路，不是同一条的开关：
+//   1. 归属来自 `userId`（JWT），**不**来自任何请求字段；
+//   2. `excludeCredentials` **要**填当前用户已有的 credential id ——
+//      这里不存在"泄露某个 email 是否存在"的问题（调用方已经证明了自己是谁），
+//      而排除已有凭据能防止同一条凭据在同一账号上重复注册；
+//   3. 完成时**必须真的写入** `Passkey` 行。成功 ⟺ 写入发生。
+//
+// 两条路由都 `preHandler: authenticate`（见 `server/src/api.ts`）：
+// 未认证在进函数之前就是 401，函数体一个 DB 写都不会执行。
+
+/**
+ * 已认证地为当前账号取注册 options。
+ *
+ * challenge 存进 `user-registration` 命名空间（见 `ChallengeCeremony` 的注释），
+ * 因此公开注册流程与它互不消费。
+ */
+export const generateUserPasskeyOptions = async (
+  userId: number,
+): Promise<PublicKeyCredentialCreationOptionsJSON> => {
+  const { rpName, rpID } = getWebAuthnConfig();
+
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { id: true, email: true },
+  });
+  if (user === null) {
+    // 令牌有效，但用户已经不在了（比如另一个会话刚删号）。
+    // 这不是"重试一次"能解决的，所以给一个可判别的码而不是笼统的 500。
+    throw new PasskeyError('passkey_not_found_for_user', 'Account not found');
+  }
+
+  const existing = await prisma.passkey.findMany({
+    where: { userId },
+    // 只读 credentialId：这是这里唯一要用的东西，公钥/计数器不读。
+    select: { credentialId: true },
+  });
+
+  const options = await webAuthnGenerateRegistration({
+    rpName,
+    rpID,
+    userName: user.email,
+    userDisplayName: user.email,
+    // 🔴 与公开注册的 `excludeCredentials: []` 相反。理由见本节文件头：
+    // 已认证上下文没有枚举顾虑，而排除已有凭据让 authenticator 直接拒绝
+    // "同一条凭据重复登记"（WebAuthn 的 `InvalidStateError`）。
+    excludeCredentials: existing.map((row) => ({
+      id: row.credentialId.toString('base64url'),
+    })),
+    authenticatorSelection: {
+      residentKey: 'required', // 与公开注册一致：登录侧只接受可发现凭据
+      userVerification: 'preferred',
+    },
+    attestationType: 'none',
+  });
+
+  storeChallenge('user-registration', String(userId), options.challenge);
+
+  Logger.info(
+    `User passkey options generated (userId: ${userId}, existing: ${existing.length})`,
+  );
+  return options;
+};
+
+/**
+ * 已认证地把宿主产出的 credential 回验并**真的写入**当前账号。
+ *
+ * 🔴 这里**不调用** `verifyRegistration`：后者的"已验证账号提前返回成功"
+ * 分支正是本通路要绕开的缺陷（见本节文件头）。本函数只做三件事：
+ * 验 challenge、验 credential、`passkey.create` 挂到 `userId` 上。
+ *
+ * **成功 ⟺ 写入发生**：`prisma.passkey.create` 抛错时不返回成功，
+ * 所以不存在"返回 200 但库里没有"的形状。
+ */
+export const completeUserPasskeyRegistration = async (
+  userId: number,
+  credential: RegistrationResponseJSON,
+): Promise<{ id: string; message: string }> => {
+  const { rpID, origin } = getWebAuthnConfig();
+
+  const expectedChallenge = getAndClearChallenge('user-registration', String(userId));
+  if (!expectedChallenge) {
+    throw new Error('Challenge expired or not found. Please try again.');
+  }
+
+  let verification;
+  try {
+    verification = await verifyRegistrationResponse({
+      response: credential,
+      expectedChallenge,
+      expectedOrigin: origin,
+      expectedRPID: rpID,
+      requireUserVerification: false, // We use 'preferred', not 'required'
+    });
+  } catch (err) {
+    Logger.warn(
+      `User passkey registration verification failed (userId: ${userId}): ${err}`,
+    );
+    throw new PasskeyError('passkey_verification_failed', 'Passkey verification failed');
+  }
+
+  if (!verification.verified || !verification.registrationInfo) {
+    throw new PasskeyError('passkey_verification_failed', 'Passkey verification failed');
+  }
+
+  const { credential: credentialInfo } = verification.registrationInfo;
+
+  // 与公开注册同一套编解码：`credentialInfo.id` 是"base64url 字符串的 UTF-8
+  // 字节"，数据库列的原始字节要再从 base64url 解一次。
+  const credentialIdBase64url = Buffer.from(credentialInfo.id).toString('utf-8');
+  const credentialIdRawBytes = Buffer.from(credentialIdBase64url, 'base64url');
+
+  let created: { id: string };
+  try {
+    created = await prisma.passkey.create({
+      data: {
+        credentialId: credentialIdRawBytes,
+        publicKey: Buffer.from(credentialInfo.publicKey),
+        counter: BigInt(credentialInfo.counter),
+        transports: credential.response.transports
+          ? JSON.stringify(credential.response.transports)
+          : null,
+        // 🔴 归属在这里，且只能在这里：`userId` 是函数的参数（来自 JWT），
+        // 请求体里没有任何字段能影响它。
+        userId,
+      },
+      select: { id: true },
+    });
+  } catch (err) {
+    if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
+      // 同一台设备上这条凭据已经登记过（前端正常情况下会被
+      // excludeCredentials 先挡住）。**绝不当成功**。
+      throw new PasskeyError(
+        'passkey_already_registered',
+        'This passkey is already registered on this account',
+      );
+    }
+    throw err;
+  }
+
+  Logger.audit({ event: 'PASSKEY_ADDED', userId, entityId: created.id });
+
+  return { id: created.id, message: 'Passkey added successfully.' };
 };
 
 /**

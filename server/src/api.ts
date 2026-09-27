@@ -21,6 +21,8 @@ import {
   completePasskeyRecovery,
   listUserPasskeys,
   deleteUserPasskey,
+  generateUserPasskeyOptions,
+  completeUserPasskeyRegistration,
   PasskeyError,
 } from './passkey';
 import { authenticate, getAuthUser } from './middleware';
@@ -98,6 +100,19 @@ const PasskeyIdParamSchema = z.object({
   id: z.string().min(1).max(64),
 });
 
+/**
+ * 已认证地"再加一条凭据"的完成体。
+ *
+ * 🔴 只有 `credential` 一个字段，**没有任何"这是谁的凭据"的字段** ——
+ * 归属来自令牌（`authenticate` → `getAuthUser`），不来自输入。zod 默认丢弃
+ * 未声明键，所以请求体里就算塞了 `userId` / `email` 也**到不了**服务端逻辑。
+ * 这一点由 `tests/passkey-enrollment.spec.ts` 的反向 B 用"塞了 userId: 2 之后
+ * `passkey.create` 收到的仍然是 1"直接钉住。
+ */
+const PasskeyEnrollmentCompleteSchema = z.object({
+  credential: z.object({}).passthrough(), // WebAuthn credential response
+});
+
 // Magic Link Schemas
 const MagicLinkRequestSchema = z.object({
   email: z.string().email('Invalid email format'),
@@ -120,6 +135,7 @@ type MagicLinkRegisterBody = RegisterBody;
 type MagicLinkRequestBody = z.infer<typeof MagicLinkRequestSchema>;
 type MagicLinkVerifyBody = z.infer<typeof MagicLinkVerifySchema>;
 type PasskeyIdParams = z.infer<typeof PasskeyIdParamSchema>;
+type PasskeyEnrollmentCompleteBody = z.infer<typeof PasskeyEnrollmentCompleteSchema>;
 
 /**
  * 客户端可见的通行密钥文案。
@@ -134,6 +150,8 @@ const PASSKEY_VERIFICATION_FAILED_MESSAGE = 'Passkey verification failed';
 const PASSKEY_NOT_FOUND_FOR_USER_MESSAGE = 'Passkey not found';
 const LAST_PASSKEY_MESSAGE =
   'This is your only passkey, so it cannot be removed. Add another passkey first.';
+const PASSKEY_ALREADY_REGISTERED_MESSAGE =
+  'This passkey is already registered on this account.';
 
 // Known safe error messages that can be shown to clients
 const SAFE_ERROR_MESSAGES = new Set([
@@ -696,6 +714,104 @@ export const apiRoutes = async (
           });
         }
         return reply.status(500).send({ error: 'Failed to delete passkey.' });
+      }
+    },
+  );
+
+  // ── 已认证地给当前账号「再加一条」凭据 ──────────────────────
+  //
+  // 为什么不是让已登录用户复用 `/register/passkey/*`：`verifyRegistration`
+  // 对"email 已属于一个已验证账号"**故意**提前返回成功（防枚举）而**不写
+  // 任何凭据**，所以那条路对已登录用户是静默空操作 —— 界面说成功、新凭据
+  // 不存在。设置页让"删最后一条"被拒的用户"先添加一条新的"，用户照做后
+  // 删掉旧的，就再也登不进去。这两条路由就是那条真正会写库的通路。
+  //
+  // 🔴 两条都 `preHandler: authenticate`，作用域是**令牌的主人**；
+  // 请求体里没有任何字段能指定归属（见 PasskeyEnrollmentCompleteSchema）。
+
+  // Step 1: registration options for the signed-in account
+  fastify.post(
+    '/passkeys/registration/options',
+    {
+      preHandler: authenticate,
+      config: {
+        rateLimit: {
+          max: 50,
+          timeWindow: '15 minutes',
+        },
+      },
+    },
+    async (req, reply) => {
+      try {
+        const { userId } = getAuthUser(req);
+        const options = await generateUserPasskeyOptions(userId);
+        return reply.send(options);
+      } catch (err) {
+        const errMsg = err instanceof Error ? err.message : 'Unknown error';
+        Logger.error(`User passkey options error: ${errMsg}`);
+        // 令牌有效但账号已不在：401 + 可判别码，客户端据此提示重新登录。
+        if (err instanceof PasskeyError && err.code === 'passkey_not_found_for_user') {
+          return reply.status(401).send({
+            error: 'Account not found',
+            code: 'passkey_not_found_for_user',
+          });
+        }
+        return reply.status(400).send({
+          error: getSafeErrorMessage(err, 'Failed to generate registration options.'),
+        });
+      }
+    },
+  );
+
+  // Step 2: verify the credential and WRITE the passkey onto the signed-in user
+  fastify.post<{ Body: PasskeyEnrollmentCompleteBody }>(
+    '/passkeys/registration/complete',
+    {
+      preHandler: authenticate,
+      config: {
+        rateLimit: {
+          max: 50,
+          timeWindow: '15 minutes',
+        },
+      },
+    },
+    async (req, reply) => {
+      const parseResult = PasskeyEnrollmentCompleteSchema.safeParse(req.body);
+      if (!parseResult.success) {
+        return reply.status(400).send({
+          error: 'Validation failed',
+          details: parseResult.error.issues,
+        });
+      }
+
+      try {
+        const { userId } = getAuthUser(req);
+        const result = await completeUserPasskeyRegistration(
+          userId,
+          parseResult.data.credential as never,
+        );
+        // 200 而不是 201：客户端只关心"这条凭据现在在账号上了"，
+        // 而"成功 ⟺ 真的写入"由 completeUserPasskeyRegistration 保证。
+        return reply.send(result);
+      } catch (err) {
+        const errMsg = err instanceof Error ? err.message : 'Unknown error';
+        Logger.error(`User passkey registration error: ${errMsg}`);
+
+        if (err instanceof PasskeyError && err.code === 'passkey_already_registered') {
+          return reply.status(409).send({
+            error: PASSKEY_ALREADY_REGISTERED_MESSAGE,
+            code: 'passkey_already_registered',
+          });
+        }
+        if (err instanceof PasskeyError && err.code === 'passkey_verification_failed') {
+          return reply.status(400).send({
+            error: PASSKEY_VERIFICATION_FAILED_MESSAGE,
+            code: 'passkey_verification_failed',
+          });
+        }
+        return reply.status(400).send({
+          error: getSafeErrorMessage(err, 'Passkey registration failed. Please try again.'),
+        });
       }
     },
   );

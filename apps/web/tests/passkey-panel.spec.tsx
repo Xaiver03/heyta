@@ -90,6 +90,69 @@ const PASSKEY_ROW = {
   lastUsedAt: '2026-02-03T04:05:06.000Z',
 };
 
+const PASSKEY_ROW_2 = {
+  id: 'pk_row_2',
+  createdAt: '2026-03-04T05:06:07.000Z',
+  lastUsedAt: null,
+};
+
+/**
+ * 服务端下发的注册 options。`challenge` 与 `user.id` 必须是 base64url 字符串
+ * ——`passkey-browser.ts` 的 `toCreationOptions` 在缺失时会判 `malformed-response`。
+ */
+const ENROLLMENT_OPTIONS = {
+  challenge: 'Y2hhbGxlbmdl',
+  rp: { id: 'localhost', name: 'Test' },
+  user: { id: 'dXNlci1pZA', name: 'owner@example.com', displayName: 'owner@example.com' },
+  pubKeyCredParams: [],
+  excludeCredentials: [],
+  authenticatorSelection: { residentKey: 'required', userVerification: 'preferred' },
+  attestation: 'none',
+};
+
+/** 让系统弹窗那一步返回一个形状正确的假 credential（真实 `PublicKeyCredential` 的替身）。 */
+function fakeCreatedCredential(): unknown {
+  return {
+    rawId: new Uint8Array([1, 2, 3]).buffer,
+    type: 'public-key',
+    response: {
+      clientDataJSON: new Uint8Array([4]).buffer,
+      attestationObject: new Uint8Array([5]).buffer,
+      getTransports: () => ['internal'],
+    },
+    getClientExtensionResults: () => ({}),
+  };
+}
+
+/**
+ * 注入"这台设备支持通行密钥"。
+ *
+ * 🔴 走的是**真实**的 `detectPasskeyBrowser`（它读 `navigator.credentials` 与
+ * `PublicKeyCredential`），不是给 store 开后门 —— 所以"不支持"那条用例
+ * 只要不调用它即可。
+ */
+function stubPasskeyDevice(create: (publicKey: unknown) => Promise<unknown>): void {
+  Object.defineProperty(window.navigator, 'credentials', {
+    configurable: true,
+    value: { create, get: vi.fn() },
+  });
+  vi.stubGlobal('PublicKeyCredential', function PublicKeyCredential() {});
+}
+
+function clearPasskeyDevice(): void {
+  Object.defineProperty(window.navigator, 'credentials', {
+    configurable: true,
+    value: undefined,
+  });
+}
+
+/** 让若干层微任务（fetch → platform → fetch → reload）落定。 */
+async function settle(): Promise<void> {
+  await act(async () => {
+    for (let i = 0; i < 12; i += 1) await Promise.resolve();
+  });
+}
+
 beforeEach(() => {
   __resetPasskeysForTests();
   useSyncStore.setState({ baseUrl: BASE_URL, token: TOKEN });
@@ -104,6 +167,7 @@ afterEach(() => {
   container = undefined;
   __resetPasskeysForTests();
   useSyncStore.setState({ baseUrl: '', token: undefined });
+  clearPasskeyDevice();
   vi.unstubAllGlobals();
 });
 
@@ -287,5 +351,87 @@ describe('PasskeyPanel — 删除', () => {
     expect(byId('passkeys-deleted')).toBeNull();
     expect(byId('passkey-row-pk_row_1')).not.toBeNull();
     expect(byId('passkeys-delete-failed')).not.toBeNull();
+  });
+});
+
+/**
+ * "添加一条新的" —— 面板上那个出口。
+ *
+ * 🔴 这三条正是"删最后一条被拒 → 先添加一条新的"那句话**能不能兑现**的判据：
+ *   1. 成功后**列表真的刷新**并出现新行（不是本地乐观新增，是重拉服务端）；
+ *   2. 用户在系统弹窗取消 → **绝不说成成功**；
+ *   3. 设备不支持 → **一个请求都不发**。
+ *
+ * `fetch` 注入，零联网；平台那一步由 `stubPasskeyDevice` 注入。
+ */
+describe('PasskeyPanel — 添加一条', () => {
+  it('成功 → 打两步已认证端点，然后刷新列表并出现新行', async () => {
+    stubPasskeyDevice(() => Promise.resolve(fakeCreatedCredential()));
+    stubFetch([
+      { status: 200, body: { passkeys: [PASSKEY_ROW] } }, // 挂载时的列表
+      { status: 200, body: ENROLLMENT_OPTIONS }, // ① 取 options
+      { status: 200, body: { message: 'Passkey added successfully.' } }, // ③ 交回
+      { status: 200, body: { passkeys: [PASSKEY_ROW_2, PASSKEY_ROW] } }, // 刷新
+    ]);
+
+    await renderPanel();
+    click('passkeys-add');
+    await settle();
+
+    const posts = calls.filter((c) => c.method === 'POST');
+    expect(posts).toHaveLength(2);
+    expect(posts[0]!.url).toBe(`${BASE_URL}/api/passkeys/registration/options`);
+    expect(posts[1]!.url).toBe(`${BASE_URL}/api/passkeys/registration/complete`);
+    // 完成后**以服务端为准**重拉了一次列表（GET 从 1 次变 2 次）。
+    expect(calls.filter((c) => c.method === 'GET')).toHaveLength(2);
+    // 新行真的出现了 —— 这是"凭据确实写进去了"在界面上的呈现。
+    expect(byId('passkey-row-pk_row_2')).not.toBeNull();
+    expect(byId('passkeys-added')).not.toBeNull();
+    expect(byId('passkeys-add-failed')).toBeNull();
+  });
+
+  it('🔴 用户在系统弹窗取消 → 绝不说成成功，也不再发第二步请求', async () => {
+    stubPasskeyDevice(() =>
+      Promise.reject(new DOMException('cancelled', 'NotAllowedError')),
+    );
+    stubFetch([
+      { status: 200, body: { passkeys: [PASSKEY_ROW] } },
+      { status: 200, body: ENROLLMENT_OPTIONS },
+    ]);
+
+    await renderPanel();
+    click('passkeys-add');
+    await settle();
+
+    // 只有"取 options"这一步发出去了，凭据没有被交回服务端。
+    const posts = calls.filter((c) => c.method === 'POST');
+    expect(posts).toHaveLength(1);
+    expect(posts[0]!.url).toBe(`${BASE_URL}/api/passkeys/registration/options`);
+    // 界面说的是"取消"，不是"成功"。
+    expect(byId('passkeys-added')).toBeNull();
+    const failure = byId('passkeys-add-failed');
+    expect(failure).not.toBeNull();
+    expect(failure!.textContent).toContain('cancelled');
+    // 列表没变。
+    expect(byId('passkey-row-pk_row_1')).not.toBeNull();
+  });
+
+  it('🔴 这台设备不支持 → 一个请求都不发（挂载那次列表加载除外）', async () => {
+    // 刻意**不**调用 stubPasskeyDevice：`detectPasskeyBrowser` 应判不支持。
+    stubFetch([{ status: 200, body: { passkeys: [PASSKEY_ROW] } }]);
+
+    await renderPanel();
+    const before = calls.length;
+
+    click('passkeys-add');
+    await settle();
+
+    // 点击添加之后没有任何新请求 —— 不支持的设备连 options 都不问。
+    expect(calls).toHaveLength(before);
+    expect(calls.filter((c) => c.method === 'POST')).toHaveLength(0);
+    expect(byId('passkeys-added')).toBeNull();
+    const failure = byId('passkeys-add-failed');
+    expect(failure).not.toBeNull();
+    expect(failure!.textContent).toContain('does not support passkeys');
   });
 });

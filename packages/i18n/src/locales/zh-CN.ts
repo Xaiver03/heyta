@@ -444,6 +444,10 @@ export const zhCN = {
   // 服务端此前只有注册 / 登录 / 恢复，用户没有任何"看我自己的凭据 / 删一条"的入口。
   'web.passkeys.title': '通行密钥',
   'web.passkeys.lead': '这里列出你这个账号在服务端注册的通行密钥。删除一条不会影响其它设备上的凭据。',
+  'web.passkeys.add': '添加一条通行密钥',
+  'web.passkeys.adding': '正在添加…',
+  'web.passkeys.waitingForPrompt': '请在弹出的系统窗口中完成通行密钥的创建。',
+  'web.passkeys.added': '已添加这条通行密钥。',
   'web.passkeys.refresh': '刷新列表',
   'web.passkeys.loading': '正在加载…',
   'web.passkeys.needsSignIn': '先登录，才能管理这个账号的通行密钥。',
@@ -461,6 +465,10 @@ export const zhCN = {
   'web.passkeys.error.lastPasskey': '这是账号上最后一条通行密钥，不能删除。先添加一条新的。',
   'web.passkeys.error.unauthorized': '登录状态已失效，请重新登录。',
   'web.passkeys.error.network': '连不上服务端，请稍后重试。',
+  'web.passkeys.error.add': '没能添加这条通行密钥，请重试。',
+  'web.passkeys.error.passkeyUnsupported': '这台设备或浏览器不支持通行密钥。',
+  'web.passkeys.error.passkeyCancelled': '通行密钥的创建被取消或超时了，可以再试一次。',
+  'web.passkeys.error.passkeyAlreadyRegistered': '这台设备上已经有这个账号的通行密钥了。',
   'web.passkeys.error.other': '操作没有完成，请重试。',
   // ── Web · 冲突解决界面 ────────────────────────────────────
   // 载荷摘要：`text` 是用户自己的字（不翻译），`fields` 只报数量 ——

@@ -17,6 +17,8 @@ import { describe, expect, it } from 'vitest';
 
 import {
   HOSTED_AUTH_PATHS,
+  beginPasskeyEnrollment,
+  completePasskeyEnrollment,
   completePasskeyLogin,
   deletePasskey,
   listPasskeys,
@@ -327,5 +329,121 @@ describe('缺口 B：登录失败的两种 401 在客户端就分开了', () => 
       // 码仍然原样带给调用方（可观测性），只是不用它选动作。
       expect(outcome.code).toBe('something_only_the_server_knows');
     }
+  });
+});
+
+describe('已认证"再加一条"凭据的客户端契约', () => {
+  const credential = { id: 'NEWCRED', response: { transports: ['internal'] } };
+
+  it('begin：POST 已认证端点，带 bearer，**不带请求体**', async () => {
+    const { impl, calls } = recordingFetch(() => ({
+      status: 200,
+      body: { challenge: 'Y2hhbGxlbmdl', rp: { id: 'localhost' } },
+    }));
+
+    const outcome = await beginPasskeyEnrollment(opts({ fetchImpl: impl }), ' jwt-1 ');
+
+    expect(outcome.ok).toBe(true);
+    if (!outcome.ok) return;
+    expect(outcome.options.challenge).toBe('Y2hhbGxlbmdl');
+    expect(calls).toHaveLength(1);
+    expect(calls[0]!.url).toBe(
+      `https://sync.example.com${HOSTED_AUTH_PATHS.passkeyEnrollOptions}`,
+    );
+    expect(calls[0]!.init?.method).toBe('POST');
+    expect(headerOf(calls[0]!.init)['authorization']).toBe('Bearer jwt-1');
+    // options 的生成完全由令牌决定，客户端没有输入要带。
+    expect(calls[0]!.init?.body).toBeUndefined();
+  });
+
+  it('begin：空令牌 → unauthorized，且一个请求都不发', async () => {
+    const { impl, calls } = recordingFetch(() => ({ status: 200, body: {} }));
+
+    const outcome = await beginPasskeyEnrollment(opts({ fetchImpl: impl }), '   ');
+
+    expect(outcome).toEqual({ ok: false, reason: 'unauthorized' });
+    expect(calls).toHaveLength(0);
+  });
+
+  it('begin：2xx 但不是 JSON 对象 → malformed-response，绝不当成功', async () => {
+    const { impl } = recordingFetch(() => ({ status: 200, body: [1, 2, 3] }));
+
+    const outcome = await beginPasskeyEnrollment(opts({ fetchImpl: impl }), 'tok');
+
+    expect(outcome.ok).toBe(false);
+    if (!outcome.ok) expect(outcome.reason).toBe('malformed-response');
+  });
+
+  it('complete：POST 已认证端点，带 bearer，请求体**只有 credential**', async () => {
+    const { impl, calls } = recordingFetch(() => ({
+      status: 200,
+      body: { message: 'Passkey added successfully.' },
+    }));
+
+    const outcome = await completePasskeyEnrollment(opts({ fetchImpl: impl }), {
+      token: 'tok',
+      credential,
+    });
+
+    expect(outcome).toEqual({ ok: true, message: 'Passkey added successfully.' });
+    expect(calls).toHaveLength(1);
+    expect(calls[0]!.url).toBe(
+      `https://sync.example.com${HOSTED_AUTH_PATHS.passkeyEnrollComplete}`,
+    );
+    expect(calls[0]!.init?.method).toBe('POST');
+    expect(headerOf(calls[0]!.init)['authorization']).toBe('Bearer tok');
+    // 🔴 归属字段一个都不发：服务端从 JWT 取 userId。
+    expect(calls[0]!.body).toEqual({ credential });
+    expect(JSON.stringify(calls[0]!.body)).not.toContain('userId');
+    expect(JSON.stringify(calls[0]!.body)).not.toContain('email');
+  });
+
+  it('complete：空令牌 → unauthorized，且一个请求都不发', async () => {
+    const { impl, calls } = recordingFetch(() => ({ status: 200, body: {} }));
+
+    const outcome = await completePasskeyEnrollment(opts({ fetchImpl: impl }), {
+      token: ' ',
+      credential,
+    });
+
+    expect(outcome).toEqual({ ok: false, reason: 'unauthorized' });
+    expect(calls).toHaveLength(0);
+  });
+
+  it('🔴 409 + passkey_already_registered → passkey-already-registered（不是笼统失败）', async () => {
+    const { impl } = recordingFetch(() => ({
+      status: 409,
+      body: {
+        error: 'This passkey is already registered on this account.',
+        code: 'passkey_already_registered',
+      },
+    }));
+
+    const outcome = await completePasskeyEnrollment(opts({ fetchImpl: impl }), {
+      token: 'tok',
+      credential,
+    });
+
+    expect(outcome.ok).toBe(false);
+    if (!outcome.ok) {
+      expect(outcome.reason).toBe('passkey-already-registered');
+      expect(outcome.status).toBe(409);
+      expect(outcome.code).toBe('passkey_already_registered');
+    }
+  });
+
+  it('complete：401 → unauthorized（而不是当成凭据已写入）', async () => {
+    const { impl } = recordingFetch(() => ({
+      status: 401,
+      body: { error: 'Missing or invalid Authorization header' },
+    }));
+
+    const outcome = await completePasskeyEnrollment(opts({ fetchImpl: impl }), {
+      token: 'tok',
+      credential,
+    });
+
+    expect(outcome.ok).toBe(false);
+    if (!outcome.ok) expect(outcome.reason).toBe('unauthorized');
   });
 });

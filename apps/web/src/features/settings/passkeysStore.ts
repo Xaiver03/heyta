@@ -24,11 +24,19 @@
 import { create } from 'zustand';
 
 import {
+  beginPasskeyEnrollment,
+  completePasskeyEnrollment,
   deletePasskey,
   listPasskeys,
   type HostedAuthFailureReason,
   type HostedPasskeySummary,
 } from '@heyta/app-host';
+
+import {
+  createPasskeyCredential,
+  detectPasskeyBrowser,
+  type PasskeyBrowser,
+} from '../auth/passkey-browser.js';
 
 /**
  * 列表状态。
@@ -51,9 +59,30 @@ export interface PasskeysStoreState {
   deleteFailure?: HostedAuthFailureReason;
   /** 刚删掉一条 —— 给一句确认，而不是静默。 */
   justDeleted: boolean;
+  /** 正在"添加一条新的"（含系统弹窗那一段）。 */
+  adding: boolean;
+  /** 添加失败的结构化原因。与删除失败分开：`passkey-unsupported` 只可能来自添加。 */
+  addFailure?: HostedAuthFailureReason;
+  /** 刚添加成功。注意：它只在服务端**真的写入**之后才会置位。 */
+  justAdded: boolean;
 
   load: (baseUrl: string, token: string | undefined) => Promise<void>;
   remove: (baseUrl: string, token: string | undefined, id: string) => Promise<void>;
+  /**
+   * 给当前账号再添一条通行密钥。
+   *
+   * 🔴 三步：(1) 向已认证端点要 options；(2) **平台调用**（系统弹窗，
+   * 只能发生在浏览器里，见 `../auth/passkey-browser.js`）；(3) 交回服务端
+   * 写入。任何一步失败都**绝不**置 `justAdded`。
+   *
+   * `browser` 可注入（jsdom 没有 `navigator.credentials`）；不传时自动探测。
+   * 不支持的设备在**发任何请求之前**就返回 —— 与认证 store 里同一形状。
+   */
+  add: (
+    baseUrl: string,
+    token: string | undefined,
+    browser?: PasskeyBrowser,
+  ) => Promise<void>;
   dismissNotice: () => void;
   reset: () => void;
 }
@@ -61,6 +90,8 @@ export interface PasskeysStoreState {
 export const usePasskeysStore = create<PasskeysStoreState>((set, get) => ({
   status: { kind: 'idle' },
   justDeleted: false,
+  adding: false,
+  justAdded: false,
 
   load: async (baseUrl, token) => {
     set({ status: { kind: 'loading' } });
@@ -91,8 +122,50 @@ export const usePasskeysStore = create<PasskeysStoreState>((set, get) => ({
     await get().load(baseUrl, token);
   },
 
+  add: async (baseUrl, token, browser) => {
+    // 🔴 能力探测必须在**发任何请求之前**。不支持的设备上先要 options
+    // 是白问，而且会把"这台设备不支持"伪装成一次失败的网络请求。
+    const resolved = browser ?? detectPasskeyBrowser();
+    if (resolved === undefined || !resolved.supported) {
+      set({ addFailure: 'passkey-unsupported', justAdded: false });
+      return;
+    }
+
+    // 清掉上一条通知，并进入进行中；此时**还没有**任何成功可言。
+    set({ adding: true, addFailure: undefined, justAdded: false });
+
+    // ① 向已认证端点要 options（协议在 app-host）
+    const begun = await beginPasskeyEnrollment({ baseUrl }, token ?? '');
+    if (!begun.ok) {
+      set({ adding: false, addFailure: begun.reason });
+      return;
+    }
+
+    // ② 平台那一步：用户在系统弹窗上操作，可能停住很久。
+    const created = await createPasskeyCredential(begun.options, resolved);
+    if (!created.ok) {
+      // 用户在弹窗里取消 / 超时 —— 这里**绝不**说成功。
+      set({ adding: false, addFailure: created.reason });
+      return;
+    }
+
+    // ③ 交回服务端写入。服务端 2xx ⟺ 真的写进了 Passkey 行。
+    const completed = await completePasskeyEnrollment(
+      { baseUrl },
+      { token: token ?? '', credential: created.credential },
+    );
+    if (!completed.ok) {
+      set({ adding: false, addFailure: completed.reason });
+      return;
+    }
+
+    set({ adding: false, justAdded: true });
+    // 与删除同一条纪律：列表以**服务端**为准重拉，不做本地乐观新增。
+    await get().load(baseUrl, token);
+  },
+
   dismissNotice: () => {
-    set({ justDeleted: false, deleteFailure: undefined });
+    set({ justDeleted: false, deleteFailure: undefined, addFailure: undefined, justAdded: false });
   },
 
   reset: () => {
@@ -101,6 +174,9 @@ export const usePasskeysStore = create<PasskeysStoreState>((set, get) => ({
       deletingId: undefined,
       deleteFailure: undefined,
       justDeleted: false,
+      adding: false,
+      addFailure: undefined,
+      justAdded: false,
     });
   },
 }));
@@ -117,5 +193,8 @@ export function __resetPasskeysForTests(): void {
     deletingId: undefined,
     deleteFailure: undefined,
     justDeleted: false,
+    adding: false,
+    addFailure: undefined,
+    justAdded: false,
   });
 }

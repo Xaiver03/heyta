@@ -73,6 +73,16 @@ export const HOSTED_AUTH_PATHS = {
   passkeyRecoverRequest: '/api/recover/passkey',
   passkeyRecoverOptions: '/api/recover/passkey/options',
   passkeyRecoverComplete: '/api/recover/passkey/complete',
+  /**
+   * 已认证地给**当前账号**再添一条凭据。
+   *
+   * 🔴 与上面的 `passkeyRegister*`（公开注册新账号）是**两条不同的协议**：
+   * 公开注册的完成端点在"email 已属于一个已验证账号"时**故意**提前返回成功
+   * 而**不写任何凭据**（防账号枚举）。已登录用户走那条路只会得到一次
+   * 静默空操作。这两条路径带 Bearer 令牌，归属由令牌决定。
+   */
+  passkeyEnrollOptions: '/api/passkeys/registration/options',
+  passkeyEnrollComplete: '/api/passkeys/registration/complete',
   /** 自助管理：列出 / 删除当前账号自己的通行密钥。 */
   passkeys: '/api/passkeys',
 } as const;
@@ -256,6 +266,10 @@ const FAILURE_REASON_BY_SERVER_CODE: Readonly<Record<string, HostedAuthFailureRe
   passkey_not_found_for_user: 'passkey-not-found',
   // 删除最后一条被拒绝。
   last_passkey_required: 'last-passkey',
+  // 已认证"再加一条"时，这条凭据已经在服务端登记过（P2002）。
+  // 前端正常会被 excludeCredentials 先挡在设备侧（InvalidStateError，
+  // 同样映射到这个原因），这是绕过前端时的服务端守卫给出的码。
+  passkey_already_registered: 'passkey-already-registered',
 };
 
 /** 由服务端 `code` 与 HTTP 状态共同决定原因；只有白名单里的码会覆盖状态分类。 */
@@ -739,4 +753,74 @@ export async function deletePasskey(
   if (!result.ok) return result;
 
   return { ok: true, deleted: true };
+}
+
+// ── 已认证地给当前账号「再加一条」凭据（协议一半）──────────────
+//
+// 🔴 为什么不是复用 `beginPasskeyRegistration`：服务端的公开注册完成端点对
+// "email 已属于一个已验证账号"**故意**提前返回成功而**不写凭据**
+// （防账号枚举）。已登录用户走那条路 = 界面说成功、凭据不存在。
+// 而设置页在拒绝"删最后一条"时让用户"先添加一条新的" ——
+// 用户照做后删掉旧的，就再也登不进去。
+//
+// 归属由**令牌**决定：这两个函数都不发送任何"这是谁的"字段
+// （服务端从 JWT 取 userId）。这与 `deletePasskey` 是同一条纪律。
+//
+// 命名刻意不叫 `*Registration`：`beginPasskeyRegistration` 已经占了
+// "注册一个新账号"的语义，同名会让调用方以为可以互相顶替。
+
+/**
+ * 取"给当前账号再加一条"的注册 options。
+ *
+ * 空令牌**不发请求**（判 `unauthorized`）—— 未登录却去要一次 401
+ * 是没有意义的往返，与 `listPasskeys` 同一条 fail-safe。
+ */
+export async function beginPasskeyEnrollment(
+  options: HostedAuthOptions,
+  token: string,
+): Promise<HostedAuthOutcome<{ options: HostedPasskeyOptions }>> {
+  const trimmed = token.trim();
+  if (trimmed === '') return failure('unauthorized');
+
+  // 无请求体：options 的生成完全由令牌决定，客户端没有任何输入要带。
+  const result = await sendJson(
+    options,
+    'POST',
+    HOSTED_AUTH_PATHS.passkeyEnrollOptions,
+    undefined,
+    trimmed,
+  );
+  if (!result.ok) return result;
+
+  const passkeyOptions = parsePasskeyObject(result.body);
+  if (passkeyOptions === undefined) return failure('malformed-response');
+  return { ok: true, options: passkeyOptions };
+}
+
+/**
+ * 交回宿主产出的 credential，让服务端把它挂到当前账号上。
+ *
+ * 🔴 成功（`ok: true`）**就是**"凭据已经写进去了"：服务端只有在
+ * `passkey.create` 真的成功之后才返回 2xx。调用方据此刷新列表，
+ * 不要自造一个"看起来成功了"的乐观更新。
+ */
+export async function completePasskeyEnrollment(
+  options: HostedAuthOptions,
+  input: { token: string; credential: HostedPasskeyCredential },
+): Promise<HostedAuthOutcome<{ message: string }>> {
+  const trimmedToken = input.token.trim();
+  if (trimmedToken === '') return failure('unauthorized');
+
+  // 🔴 只发 `credential`。请求体里**没有** userId / email 这类归属字段：
+  // 归属只由 Authorization 头上的令牌决定。服务端就算收到多余的键也会丢弃，
+  // 但契约上我们连发都不发。
+  const result = await sendJson(
+    options,
+    'POST',
+    HOSTED_AUTH_PATHS.passkeyEnrollComplete,
+    { credential: input.credential },
+    trimmedToken,
+  );
+  if (!result.ok) return result;
+  return { ok: true, message: readServerMessage(result.body) ?? '' };
 }
