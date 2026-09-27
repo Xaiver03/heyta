@@ -373,6 +373,22 @@ Web 那份重复（`durationParts` 的措辞仍分两端：领域层不认识 i1
 不做那个堆叠柱状图（手机上 12 根柱子和 12 格泳道抢宽度，宁可只留主视图）；
 不做习惯打卡（移动端没有习惯界面 —— 同步过来的习惯照样显示，但记时长要靠 Web）。
 
+**一条补做的检查：真打包器能不能解析这一屏。**
+移动端最容易踩的不是逻辑错，而是**导入写法**（AGENTS.md §7 第 28 条：
+vitest 会把 `../lib/x.js` 映射回 `.ts`，Metro 不会）—— 而这条只有真打包器能证。
+本轮临时写了一个只 import 这一屏的入口，跑了一次真 Metro 打包：
+
+```
+$ npx react-native bundle --entry-file <探针>.js --platform android --dev false …
+LOG:Writing bundle output to: /tmp/cat-probe.bundle
+LOG:Done writing bundle output                     ← 整条导入链可解析
+$ # 探针是不是真的能红？给一个相对导入加上 `.js`：
+error Unable to resolve module ../lib/category-display.js from …/CategoriesScreen.tsx
+```
+
+两条都验过，探针用完已删（没有留在包里，也没有变成新门禁 ——
+`verify:mobile-*` 那条路径本来就是干这个的，多一个入口只会多一处要维护的东西）。
+
 ⚠️ **移动端没有组件渲染测试台**（`apps/mobile` 的 devDependencies 里没有
 `@testing-library/react-native`，既有 8 个测试文件全是纯逻辑）。
 所以这一屏**由类型与门禁保证"接线正确"，不保证"渲染出来是什么样"** ——
