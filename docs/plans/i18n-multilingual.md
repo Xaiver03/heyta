@@ -120,12 +120,12 @@ title/description 两边不同、中文入口含汉字而**英文入口不含**�
 
 ### 为什么分阶段迁移，而不是一次性翻转
 
-一次性翻规则会让仓库立刻全红，而**长期全红的门禁等于没有门禁**（`AGENTS.md` §8.3）。
+一次性翻规则会让仓库立刻全红，而**长期全红的门禁等于没有门禁**（`AGENTS.md` 的 §8 工作流第 3 条）。
 所以 `ROOTS` 逐个应用迁移：`migrated: true` 走新规则，`migrated: false` 继续走旧规则（必须是中文）。
 两边都不松 —— 未迁移不等于"没人管"，只是还在用旧契约。
 
 `apps/landing` 与 `apps/mobile` 都是**整包一次翻转**的（迁移期间门禁短暂变红，翻完转绿）。
-但 `apps/web` 不行：它最大（29 个源文件），而且**同一时间有另一条工作流在改它**
+但 `apps/web` 不行：它最大（当时 29 个源文件，2026-09-27 实测 `apps/web/src` 已有 59 个 `.ts`/`.tsx`），而且**同一时间有另一条工作流在改它**
 （`App.tsx`、`features/timeline/**`、`features/ai/*` 等）。整包翻转意味着门禁要红很久，
 而这段时间里另一条工作流的每一次 `pnpm check` 都会看到与自己无关的红。
 
@@ -173,7 +173,7 @@ aria-label={label}
 而放在数据数组里的字面量仍然是字面量 —— 门禁看不见它，**是纪律在管，不是门禁在管**。
 新增代码时不要把它当成"可以放中文的地方"。
 
-**门禁能失败**（`AGENTS.md` §8.3 的硬要求）已用真实违规输入逐条验过 ——
+**门禁能失败**（`AGENTS.md` 的 §8 工作流第 3 条的硬要求）已用真实违规输入逐条验过 ——
 在一份 `/tmp` 的仓库副本里注入违规、跑门禁、看退出码与诊断，全程不动真实仓库：
 
 | 注入的违规 | 退出码 | 门禁给出的诊断 |
@@ -228,7 +228,7 @@ node scripts/check-pricing-consistency.mjs
 | 层 | 文件 | 谁读它 |
 |---|---|---|
 | 实际收多少 | `server/src/billing/wechat.adapter.ts` | 服务端下单 + 回调金额校验 |
-| 对外怎么说 | `packages/i18n/locales/{zh-CN,en}.ts` 的 `landing.pricing.*` | 落地页 |
+| 对外怎么说 | `packages/i18n/src/locales/{zh-CN,en}.ts` 的 `landing.pricing.*` | 落地页 |
 | 对外怎么承诺 | `server/legal/terms-of-service.heyta.md` | 用户与服务方 |
 | 一句话的价格表 | `docs/reference/pricing-and-entitlements.md` 的 `pricing-ssot` 块 | 人 + 门禁 |
 
@@ -739,10 +739,11 @@ pnpm --filter @heyta/i18n build
 （同一件事还有第二个后果：`/tmp` 里那批 headless Chrome 脚本也一起没了，
 所以"线上验过 WebGL 降级"这件事同样只剩结论、没有脚本。）
 
-**已经固化的是十三组（73 个用例）**：
+**已经固化的是十四组（91 个用例）**（2026-09-27 实测 `node scripts/verify-i18n-failures.mjs` 的输出行：
+`🔴 1/91 个用例不符合预期` —— 见下面的 🔴 说明）：
 
 ```bash
-node scripts/verify-i18n-failures.mjs             # 全部 12 组
+node scripts/verify-i18n-failures.mjs             # 全部 14 组
 node research/tools/audit-cjk-strings.mjs         # 跨包中文清单（不是门禁，是排批次的依据）
 node scripts/verify-i18n-failures.mjs gate        # 只跑一组
 node scripts/verify-i18n-failures.mjs disclosure  # AI 披露 + 熔断状态的结构层面守卫
@@ -755,7 +756,15 @@ node scripts/verify-i18n-failures.mjs preference  # 偏好的「事实 → 句�
 node scripts/verify-i18n-failures.mjs preset      # 出场预设的 label / prerequisite（按 id 映射 + 回退分支）
 node scripts/verify-i18n-failures.mjs aifailure   # 四个 AI 面板失败态（原因码 → 词条，message 降级为详情）
 node scripts/verify-i18n-failures.mjs pricing    # 价格三处一致（价目表 / 词条表 / 法务文本），见 ADR-0017 §3.2
+node scripts/verify-i18n-failures.mjs coupon     # 券的算术 / 判定 / 持久化（ADR-0018）
 ```
+
+🔴 **`coupon` 组现在是坏的，它那 8 条"必须变红"是空转**（2026-09-27 实测）：
+`prepareProbe('coupon', …)` 的复制清单里没有 `server/scripts`
+（`scripts/verify-i18n-failures.mjs` 的 `groupCoupon`）—— 而 `server/tests/billing-pricing-store.pglite.spec.ts:42`
+要 `import … from '../scripts/pricing'`。副本里那个模块不存在，于是**基线自己就是红的**，
+后面 8 条注入自然条条"变红"—— 这正是 §8 末尾说的"空转注入造成的假绿"。
+修法（不在本次改动范围）：把 `server/scripts` 加进那份复制清单，或让该组的基线只跑不依赖它的两份 spec。
 
 它自己会保证两件事：注入前**断言锚点存在**（否则空转的注入会伪装成"验证过了"），
 还原前**确认文件没被别人改过**（这个仓库里同时有多条工作流在改同一个文件，
@@ -766,8 +775,8 @@ node scripts/verify-i18n-failures.mjs pricing    # 价格三处一致（价目�
 | 组 | 用例 | 注入的是什么错法 |
 |---|---|---|
 | `gate` | 3 | 硬编码文案回流、词条表缺 key、门禁规则被放宽 |
-| `catalog` | 4 | en 用中文交差、zh 用英文占位、两份 key 集合不一致 |
-| `recurrence` | 9 | 中英重复规则的映射漂移（含"分隔符进词条表"这条错法） |
+| `catalog` | 3 | en 用中文交差、zh 用英文占位、两份 key 集合不一致 |
+| `recurrence` | 10 | 中英重复规则的映射漂移（含"分隔符进词条表"这条错法） |
 | `disclosure` | 10 | 🔴 把托管 AI 归类成第三方端点（**改分类而非改措辞**）、熔断优先级被破坏、剩余秒数向下取整、**端点健康映射错位（跳闸说成"失败过"）** |
 | `conflict` | 6 | 结构化载荷退化成整份 JSON 丢给界面（当年真实的 bug 形状）、标题字段优先级颠倒 |
 | `storage` | 7 | 把「被别的标签页阻塞」错报成「打不开」、统一 catch 把更具体的原因降级、**冲突判定不看驱动原始错误（这一条是实测发生过的回归：幂等写入的 4 个既有用例当场变红）**、**崩屏建议不再区分失败原因**、**把原始错误文本放回建议位置（英文界面又露中文）** |
@@ -777,7 +786,8 @@ node scripts/verify-i18n-failures.mjs pricing    # 价格三处一致（价目�
 | `aifailure` | 2 | 原因码指错词条 → 用户要做的动作（「去逐功能授权」）从界面消失 |
 | `landing` | 6 | 英文入口的 `lang`/`canonical` 写回中文、hreflang 少一件、英文页顶着中文标题 |
 | `scene` | 5 | 错误边界不再进入失败态（**白屏复发**）、降级时把整节丢掉、渲染器构造失败后不降级 |
-| `pricing` | 7 | 🔴 价目表与页面不一致（用户看到的价格≠实收）、法务文本**另一处**被改（文档里仍留着一个正确数字 —— 这条正是「扫全量金额」的理由）、`pricing-ssot` 块自己被动过、**偷偷加第二个 SKU**、以及锚点失效时必须报错而不是静默通过 |
+| `pricing` | 16 | 🔴 价目表与页面不一致（用户看到的价格≠实收）、法务文本**另一处**被改（文档里仍留着一个正确数字 —— 这条正是「扫全量金额」的理由）、`pricing-ssot` 块自己被动过、**偷偷加第二个 SKU**、以及锚点失效时必须报错而不是静默通过 |
+| `coupon` | 9 | 🔴 **整组现在是空转的**（基线就红，见上）：折扣取整从 `ceil` 改 `floor`（每单多收一分钱）、去掉"折后 0 元不可支付"、门槛 `>=` 改 `>`、限量券超发、`expired`/`reversed` 占用名额、结算不比冻结金额、去掉幂等闸 |
 
 ⚠️ 其中三组（`conflict` / `landing` / `scene`）是**第 9–10 轮才补的**，此前它们只有描述。
 三组都遵守同一条纪律：**基线必须是确定性的** —— `conflict` 故意不跑壳的测试
@@ -787,7 +797,7 @@ node scripts/verify-i18n-failures.mjs pricing    # 价格三处一致（价目�
 | 被保护的检查 | 注入的故障 |
 |---|---|
 | 重复规则中英映射（`apps/mobile/tests/recurrence-display.spec.ts`）| ① `interval === 1` 判反；② 删 `-1`（最后一天）分支；③ 序数恒用 `ordinal.n`；④ 描述不了时返回空串；⑤ 剥掉 `BYDAY` 序数；⑥ 中文列举分隔符换成英文逗号 |
-| ↗ 同一组里的**词条表**注入（最重要的两条）| ⑦ zh「每天」→「每日」（一个字之差，parity 组立刻红）；⑧ zh 星期「三」→「三日」；⑨ en「every day」写成「每天」 |
+| ↗ 同一组里的**词条表**注入（最重要的两条）| ⑦ zh「每天」→「每日」（一个字之差，parity 组立刻红）；⑧ en「every day」写成「每天」 |
 | 冲突载荷摘要（`packages/sync-client/tests/conflict-payload.spec.ts`）| ① 优先级调换成 `name` 先于 `title`；② 去掉标题的 `trim()`；③ 字段上限 4→5；④ 空对象不再算 `empty`；⑤ `null` 不再算 `empty` |
 | 双入口 head（`apps/landing/tests/seo-head.spec.ts`）| ① 英文入口删掉整组 hreflang；② canonical 指回 `/`；③ 照抄中文 `<title>`；④ 照抄中文 description；⑤ 只改英文入口的主题引导脚本 |
 | WebGL 降级（`apps/landing/tests/scene-fallback.spec.tsx`）| ① 渲染器构造抛错；② 懒加载分块失败（`lazy()` reject）|
@@ -1004,29 +1014,42 @@ case 'ollama': return t('common.ai.preset.ollama.label');
 
 ## 十、下一步（按优先级）
 
-1. **web AI 批**（第 10 轮进行中，子代理在跑）：`features/ai/*`（4 文件）+ `AiSettings.tsx`
-   + `features/capture/**` + `MemoryPanel.tsx` + `aiStore.ts` 的 `WEB_KEY_STORAGE_NOTICE`
-   （真的渲染在 `AiSettings.tsx:776` —— 只迁 store 不迁渲染它的面板，会让英文界面露出一句中文）。
-   ⚠️ **验收时不要只看门禁**：门禁此刻会绿，但它看不到下面第 2 条那三条通道。
-   ⚠️ 做完之前**不能说"web 已支持双语"**。
-2. 🔴 **"变量渲染"通道**（§7.10 的「门禁扫不到的一类通道」，第 10/11 轮共抓到 7 处）——
-   门禁永远扫不到，但英文界面里会出现中文：
-   - `AiSettings.tsx:748` `{localApiVerdict.message}`（`local-api` 的 `reason` **已存在** → 纯壳侧改动）；
-   - `AiSettings.tsx:598` 附近 `{r.message}`（`packages/ai` 的 `EndpointUrlVerdict.reason` **已存在** → 纯壳侧改动）；
-   - 🔴 四个面板的 `outcome.message`：**必须先从 app-host 把 `cause`/`status` 传出来**（设计见 §9）。
-   ✅ 第 11/12 轮已修：`{message}` 那条（`error-hint.ts` + `<details>`）、`describeEndpointHealth`（`health-copy.ts`）、`{localApiVerdict.message}`、`{r.message}`、四个面板的 `retentionText`、预设 `label`/`prerequisite`。
-   ⚠️ 修这些时把 **zh 词条写成与现有句子逐字相同**（含插值），既有中文断言就不会回归。
-3. **跨包用户可见中文整批收掉**（§7.10）：`sync-client` 的同步错误（它的 `reason` 码**还没有**）、
-   `app-host` 的 `notConfigured()` 与 AI 错误解释、`domain` 的 `preferences.ts`(31) /
-   `preference-hints.ts`(14) / `recurrence.ts`(27) / `date.ts`(19)。**一次做完，不要零敲碎打** ——
-   它们的处置方式一样（结构化返回 + 各壳措辞）。
-   ⚠️ **注意 `app-host/src/ai-*.ts` 的 107 处里绝大多数是模型提示词**，不是界面文案 ——
-   判据只有一条：**这条字符串会不会被渲染**。别把提示词翻成英文（那会改变模型行为，不是本地化）。
+1. ✅ **web AI 批已完成（第 10 轮起，随整根迁移在第 16 轮收口）**：`features/ai/*`（4 面板 + `RouteUnavailable`）、
+   `features/settings/AiSettings.tsx`、`features/capture/**`、`features/settings/MemoryPanel.tsx`、
+   `aiStore.ts` 那句浏览器密钥提示（已进词条表 `web.ai.settings.keyNotice`，
+   渲染点 `AiSettings.tsx:1057`）全部迁完；`apps/web/src` 现在是整根 `migrated: true`（§7.12）。
+   ⚠️ 但仍然**不能说"web 已支持双语"** —— 原因不是"没迁完"，而是下面第 3 条那三处跨包中文。
+2. ✅ **"变量渲染"通道已修完**（§7.10 的「门禁扫不到的一类通道」；最后一条 —— 四个面板的失败态 —— 第 18 轮修完）：
+   - 四个面板的 `outcome.message`：第 18 轮由 app-host 把 `cause: AiFailureReason` 带出来
+     （`packages/app-host/src/ai-breakdown.ts:248` / `ai-capture.ts:477` / `ai-duration.ts:383` /
+     `ai-prioritize.ts:342`），壳侧 `apps/web/src/features/ai/ai-failure-copy.ts` 按原因码取词条，
+     `message` 降级成 `<details>` 技术详情。
+   - ⚠️ 这条通道留下的纪律（修新通道时照做）：**主文案归词条，技术串只做参数或"详情"**，
+     别把技术串提成主文案。
+3. 🔴 **唯一还开着的一类"英文界面里会出现中文"：web 直接渲染 `packages/domain` 的中文格式化函数。**
+   `packages/domain` 本身**尚未改造**（§7.1），而 web 仍有三个调用点：
+   - `apps/web/src/features/tasks/DueBadge.tsx:68` —— `formatRemaining(countdown.remainingDays)`；
+   - `apps/web/src/features/capture/CaptureComposer.tsx:192` —— 该处注释自己写着
+     `formatRemainingUntil()` 仍返回中文；`…:197` 把它拼进 `dateWithRemaining()`；
+   - `apps/web/src/features/focus/FocusTimer.tsx:128` —— `formatDuration(remaining)`。
+   处置方式与移动端同一套（§7.1：**语义留 domain，措辞搬壳里**），不要另起一套。
+
+   ⚠️ **其余跨包中文不是"还没迁"，别照老清单去做**：`packages/ai/src/routing.ts`(34) /
+   `provider.ts`(11) 那批**已按 §9 的设计降级为兜底句**（壳按 `reason` 取词条）；
+   `packages/ai/src/supply.ts` 的披露已是结构化结论；`packages/sync-client` 的失败**已有 `reason` 码**
+   （第 13 轮，见 `packages/sync-client/src/client.ts`）；`app-host` 的 `notConfigured()`
+   现在返回结构化原因（`packages/app-host/src/host.ts:279`，`reason: 'not-configured'`，不再是一句中文）；
+   `packages/domain/src/preferences.ts` 那 31 处中文**已经不在了**（第 14/15 轮改成
+   `preference-evidence.ts`(17) / `preference-hints.ts`(14) 两份**刻意的中文投影** + 词条表）。
+   📋 出清单用 `node research/tools/audit-cjk-strings.mjs`（2026-09-27 实测：`packages/domain/src/**`
+   仍是最大的一块，其次是 `packages/app-host/src/ai-*.ts`）。判据仍然只有一条：
+   **这条字符串会不会被渲染** —— `ai-*.ts` 里绝大多数是模型提示词，**不要翻**。
 4. ✅ **落地页用新词条表重新发布**（第 17 轮做完）——
    发布方式与线上验收的判据见 §8 尾部的「发布方式」/「线上验收」。
-   ⚠️ 发布前先跑一次**完整**的八组注入验证（`node scripts/verify-i18n-failures.mjs`）——
-   第 10 轮只逐组跑过 `conflict` / `landing` / `scene`（词条表与门禁当时被子代理持有，
-   跑 `catalog` / `gate` 两组会互相干扰）。**这个总数 42 还没有一次性跑过。**
+   ⚠️ 下一次发布前跑一次**完整**的注入验证（`node scripts/verify-i18n-failures.mjs`）。
+   2026-09-27 第一次跑全量：**91 个用例，1 条不符合预期** —— `coupon` 组的基线
+   （原因见 §8，是探针复制清单缺 `server/scripts`，**不是**产品缺陷）。
+   🔴 **它意味着那一组 8 条"必须变红"是空转的，别把这次结果当成全绿。**
 5. **交出去之前看一眼产物，不只是门禁**（§7.11 的教训）：`pnpm check` 现在多了一道
    `check:mobile-bundle`（真的打 android + ios 两份 RN bundle 数 React 份数）。
    i18n 这条线里凡是"加了包 / 动了打包配置"的改动，都要顺带跑它 ——

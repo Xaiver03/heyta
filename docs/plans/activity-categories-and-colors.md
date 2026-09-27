@@ -1,7 +1,8 @@
 # 活动分类与分类着色（增量计划）
 
-> 状态：**设计已拍板，代码未开始**。等 [`motivation-and-progression.md`](motivation-and-progression.md)
-> 落地到 main 之后**另开一个分支**做（用户 2026-09-26 选的节奏）。
+> 状态：**已实现，并已合并进 main**（merge commit `84cc7f5`；落地提交 `38cf3a5` 分类时长 + 用户赋义色槽、
+> `ea48ef6` 移动端分类时长屏、`6d4ba1d` 时长分档与分类报告上移为共享实现）。
+> **§8 是实现实录**（含实测数字与逐条注入证据）。本行原写"设计已拍板，代码未开始"，已按代码更正。
 > 前置依赖：时间必须先能**归到分类上**，颜色只是最后 10%（见 §4）。
 > 相关：[roadmap.md](roadmap.md) §1.2 激励与成长体系 · [`../research/competitor-incentive-teardown.md`](../research/competitor-incentive-teardown.md)（伤害模式）
 
