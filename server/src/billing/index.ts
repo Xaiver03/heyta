@@ -203,3 +203,6 @@ export {
   webhookRoutes,
 } from './webhook.routes';
 export type { WebhookRoutesOptions } from './webhook.routes';
+
+export { checkoutRoutes } from './checkout.routes';
+export type { CheckoutRoutesOptions } from './checkout.routes';

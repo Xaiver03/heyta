@@ -16,7 +16,7 @@ import { prisma, disconnectDb } from './db';
 import websocket from '@fastify/websocket';
 import { apiRoutes } from './api';
 import { pageRoutes } from './pages';
-import { createBillingAdaptersFromConfig, webhookRoutes } from './billing';
+import { checkoutRoutes, createBillingAdaptersFromConfig, webhookRoutes } from './billing';
 import {
   syncRoutes,
   startCleanupJobs,
@@ -500,6 +500,16 @@ export const createServer = (
       await fastifyServer.register(webhookRoutes, {
         prefix: '/api/billing',
         adapters: createBillingAdaptersFromConfig(fullConfig),
+      });
+
+      // 收银台（用户侧）。🔴 **要 authenticate**：下单这件事必须绑定到一个
+      // 已认证的用户，否则订单上写谁的 id 就是客户端说了算。
+      // adapter 列表与 webhook 共用同一份配置；没配通道时它回 503
+      // （而不是让 noop 接单 —— 那会把一笔真实支付变成一个必然抛错的调用）。
+      await fastifyServer.register(checkoutRoutes, {
+        prefix: '/api/billing',
+        adapters: createBillingAdaptersFromConfig(fullConfig),
+        publicUrl: fullConfig.publicUrl,
       });
 
       // WebSocket routes for real-time sync notifications

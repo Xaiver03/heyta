@@ -96,6 +96,38 @@ export const grantsForSku = (priceId: string): readonly string[] | null =>
   SKU_GRANTS[priceId] ?? null;
 
 /**
+ * 🔴 **已定价、已对外承诺，但尚不可交付 —— 因此不得售卖的 SKU。**
+ *
+ * 这是 [ADR-0023](../../docs/adr/0023-managed-ai-quota-not-implemented.md) §3.1
+ * 那条硬约束的**执行点**。只写进 ADR 而没有执行点，就等于没有这条约束 ——
+ * 收银台正是它要挡住的那扇门。
+ *
+ * 为什么是"不得售卖"而不是"不许宣传"：落地页可以继续描述 ¥12（那是**已锁定**的
+ * 产品决定），但**收了钱交付不了**是另一回事。带 `ai` 能力的那一档买的是
+ * 云端 AI 的 300 次/月，而端点、计量、模型调用**一个都不存在**。
+ *
+ * 值里的那句话是给**用户**看的拒绝理由：他点了支付却买不成，必须知道为什么，
+ * 而不是看到一个 500。清单清空之日（ADR-0023 §5）就是这里被删掉之日。
+ *
+ * ⚠️ 这个对象是 `scripts/check-ai-quota-consistency.mjs` §3b 的锚点：
+ * 那个门会**解析下面这个对象字面量**并检查键。所以别把 SKU id 写进本注释里
+ * 当作"已经声明"的证据 —— 门读的是对象体，不是注释。
+ */
+export const NOT_YET_DELIVERABLE_SKUS: Readonly<Record<string, string>> = {
+  'hosted-ai-monthly': '云端 AI 的端点与用量计量尚未上线，这一档暂时无法购买（ADR-0023）',
+};
+
+/**
+ * 这一档现在能不能卖。`null` = 能卖；否则返回**给用户看的**理由。
+ *
+ * 🔴 与 `grantsForSku` 刻意分开：那个回答"这一档给什么能力"（长期属性），
+ * 这个回答"今天能不能交付"（临时状态）。混成一个的话，临时下架会看起来像
+ * "档位被删了"，恢复上架会看起来像"新增了一个档"。
+ */
+export const notSellableReason = (priceId: string): string | null =>
+  NOT_YET_DELIVERABLE_SKUS[priceId] ?? null;
+
+/**
  * 解析一个精确的价目表条目。
  *
  * 语义（三条，缺一不可）：

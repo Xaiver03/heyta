@@ -175,6 +175,53 @@ if (ssot.enforcement === 'enforced') {
   }
 }
 
+// ── 3b. 状态 ↔ **执行点**：收银台必须真的照这个状态办事 ──────────────────
+//
+// §3 检查的是"决定记录与文档在不在"。这一段检查的是"**代码有没有照做**"。
+// 一条只存在于文档里的约束等于没有约束 —— 而且这里的失败形状特别隐蔽：
+// 文档写着"不得售卖"，收银台照样卖得出去，两边的测试都是绿的。
+//
+// 所以执行点必须被**声明**（`NOT_YET_DELIVERABLE_SKUS`）**并且被调用**
+// （`notSellableReason(...)`）。只声明不调用 = 一个好看的常量。
+const PRICE_BOOK = 'server/src/billing/price-book.ts';
+const CHECKOUT_ROUTE = 'server/src/billing/checkout.routes.ts';
+
+const priceBookText = read(PRICE_BOOK);
+// 🔴 必须**先解析对象体、再在体内查键**。第一版这里写的是
+// `/NOT_YET_DELIVERABLE_SKUS[\s\S]*?hosted-ai-monthly/` —— 那个形状**永远为真**：
+// 常量上下的注释里、以及同文件的 `SKU_GRANTS` 里都含有同一个 SKU 字符串，
+// 于是把实际那一条目删掉之后门照样绿。故障注入当场把它证伪了，这就是它的价值。
+const blockBody =
+  /NOT_YET_DELIVERABLE_SKUS[^=]*=\s*\{([\s\S]*?)\n\};/.exec(priceBookText)?.[1] ?? '';
+const declaresBlock = /['"]hosted-ai-monthly['"]\s*:/.test(blockBody);
+const routeText = existsSync(path.join(ROOT, CHECKOUT_ROUTE)) ? read(CHECKOUT_ROUTE) : '';
+// 要求"被赋值调用"，而不是"被提到"：注释里写一句"这里应该调用 notSellableReason()"
+// 不该算作执行点存在。
+const callsBlock = /=\s*notSellableReason\s*\(/.test(routeText);
+
+if (ssot.enforcement === 'not-implemented') {
+  if (!declaresBlock) {
+    problems.push(
+      `🔴 \`enforcement = not-implemented\`，但 ${PRICE_BOOK} 没有把 hosted-ai-monthly\n` +
+        '     列入 `NOT_YET_DELIVERABLE_SKUS`。那是这条约束**唯一的执行点**：\n' +
+        '     没有它，收银台今天就能把一档"收了钱交付不了"的服务卖出去。',
+    );
+  }
+  if (!callsBlock) {
+    problems.push(
+      `🔴 \`enforcement = not-implemented\`，但 ${CHECKOUT_ROUTE} 没有调用 \`notSellableReason(...)\`。\n` +
+        '     声明了常量却不查它 = 一个好看的常量。约束要在**下单那一刻**被问一次，\n' +
+        '     而不是在文件里躺着。对应测试：server/tests/billing-checkout.routes.spec.ts。',
+    );
+  }
+} else if (declaresBlock || callsBlock) {
+  problems.push(
+    '🔴 `enforcement = enforced`，但收银台仍然把 hosted-ai-monthly 当作不可交付。\n' +
+      '     这会让计量上线之后这一档**继续卖不出去** —— 做完了却交付不到用户手上。\n' +
+      '     清空 `NOT_YET_DELIVERABLE_SKUS` 是接上计量的同一个提交里该做的事。',
+  );
+}
+
 // ── 4. 决定记录必须自带最小实现清单 ──────────────────────────────────────
 if (existsSync(path.join(ROOT, ADR))) {
   const adrText = read(ADR);
