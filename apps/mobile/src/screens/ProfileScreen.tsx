@@ -35,6 +35,7 @@ import { isArgon2SlowBackend } from '@heyta/sync-core';
 
 import { Button, Card, Chip, Divider, Screen, SectionHeader, Text, TextField } from '../ui/kit';
 import { ConflictSheet } from './ConflictSheet';
+import { GrowthScreen } from './GrowthScreen';
 import { ListsSection } from './ListsSection';
 import { TagsSection } from './TagsSection';
 import { useLocalePreference } from '../i18n/locale-preference';
@@ -80,6 +81,22 @@ export function ProfileScreen(): React.JSX.Element {
   // 冲突本身在 `status.kind === 'conflict'` 里，所以关掉界面**不会清掉它们** ——
   // 「我的」屏仍会提示还有几处待处理，用户随时能回来继续。
   const [conflictsOpen, setConflictsOpen] = useState(false);
+
+  /**
+   * 「我的成长」是**第二层**页面，不是第 6 个底部标签。
+   *
+   * 🔴 底部标签必须保持 5 个（任务 / 日历 / 专注 / 分类 / 我的）。成长是
+   * "关于我"的回顾视图，与设置同居一处才符合心智；挤进标签栏会让每个标签
+   * 都读不清。返回靠成长屏顶栏的返回键（`GrowthScreen` 的 `onBack`）。
+   *
+   * ⚠️ 这个状态**不落盘**：它只是一次浏览的位置。切到别的标签时本组件会被
+   * 卸载重建（见下面凭据那段注释），于是回到「我的」总是设置首页 ——
+   * 这正是想要的（用户不会"记不住上次在哪一层"）。
+   *
+   * ⚠️ 这个 `useState` 以及下面那个提前 return 必须**在所有 hook 之后** ——
+   * 提前 return 会让后面没跑到的 hook 数量在两次渲染间变化，React 会直接报错。
+   */
+  const [growthOpen, setGrowthOpen] = useState(false);
 
   // 🔴 **输入即写进活配置，不能等到点「立即同步」才写。**
   //
@@ -175,6 +192,20 @@ export function ProfileScreen(): React.JSX.Element {
             pendingUpload === 1 ? 'mobile.profile.pending.countOne' : 'mobile.profile.pending.count',
             { count: pendingUpload },
           );
+
+  /**
+   * 🔴 提前 return **必须在所有 hook 之后**（见 `growthOpen` 的注释）。
+   * 成长屏自带顶栏返回，所以这里不需要任何导航库。
+   */
+  if (growthOpen) {
+    return (
+      <GrowthScreen
+        onBack={() => {
+          setGrowthOpen(false);
+        }}
+      />
+    );
+  }
 
   return (
     <Screen title={t('mobile.profile.title')}>
@@ -276,6 +307,23 @@ export function ProfileScreen(): React.JSX.Element {
 
       <Text variant="caption" tone="subtle">
         {t('mobile.profile.footnote')}
+      </Text>
+
+      {/* 🔴 成长入口是「我的」里的一项，**不是第 6 个底部标签**：
+          标签栏必须保持 5 个（任务 / 日历 / 专注 / 分类 / 我的），
+          而成长是"关于我"的第二层回顾视图，与设置同居一处才符合心智。
+          图标用 `growth.milestones`（奖杯）—— 它是这一屏的代表语义，
+          且有别于任务/专注的任何字形，不会被误认成跳去别的功能。 */}
+      <Button
+        label={t('mobile.growth.entry')}
+        icon="growth.milestones"
+        onPress={() => {
+          setGrowthOpen(true);
+        }}
+        tone="secondary"
+      />
+      <Text variant="caption" tone="subtle">
+        {t('mobile.growth.entry.hint')}
       </Text>
 
       {/* 🔴 语言切换放在「我的」而不是顶部：它不是高频操作，

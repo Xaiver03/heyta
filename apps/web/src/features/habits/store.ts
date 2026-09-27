@@ -26,9 +26,7 @@ import { create } from 'zustand';
 
 import {
   addDays,
-  computeStreak,
   completionRatio,
-  describeHabitResilience,
   toLocalDate,
   type CategorySlot,
   type Habit,
@@ -37,7 +35,12 @@ import {
   type LocalDate,
   type StreakResult,
 } from '@heyta/domain';
-import { createHabitActions, type ActionContext, type NewHabitFields } from '@heyta/app-host';
+import {
+  createHabitActions,
+  habitGrowth,
+  type ActionContext,
+  type NewHabitFields,
+} from '@heyta/app-host';
 
 import { currentState, dispatchIntent, onEngineChange } from '../../lib/oplog.js';
 
@@ -154,6 +157,12 @@ onEngineChange(refresh);
  * `now` 显式传入而不是内部读 `Date.now()`：
  * 否则同一次渲染里不同习惯可能跨过午夜，显示不一致；
  * 而且测试无法稳定断言。
+ *
+ * 🔴 `streak` 与 `resilience` 的**配对**委托给
+ * `@heyta/app-host#habitGrowth`：移动端的成长屏要画同一对数字，
+ * 而"两个数字用同一份日志、同一个 today 算出来"这件事
+ * **分成两处写就是漂移的开始**（结果是同一张卡片上两个数对不上账，
+ * 而两边都不报错）。这里只补本屏独有的 `todayLog` / `todayRatio`。
  */
 export function selectHabitProgress(
   state: HabitState,
@@ -162,8 +171,10 @@ export function selectHabitProgress(
   const today = toLocalDate(now);
 
   return state.habits.map((habit) => {
-    const habitLogs = state.logs.filter((l) => l.habitId === habit.id);
-    const todayLog = habitLogs.find((l) => l.date === today);
+    const todayLog = state.logs.find((l) => l.habitId === habit.id && l.date === today);
+    // ⚠️ 传 HabitLog[] 而不是日期字符串数组 —— 领域层需要看 value 与
+    // deletedAt 才能判定"是否达成"，只给日期会丢掉目标值信息
+    const { streak, resilience } = habitGrowth(habit, state.logs, today);
 
     return {
       habit,
@@ -171,12 +182,8 @@ export function selectHabitProgress(
       doneToday: todayLog !== undefined,
       // 传 undefined 表示"今天还没打卡" —— 领域层会按 value 0 算
       todayRatio: completionRatio(habit, todayLog),
-      // ⚠️ 传 HabitLog[] 而不是日期字符串数组 —— 领域层需要看 value 与
-      // deletedAt 才能判定"是否达成"，只给日期会丢掉目标值信息
-      streak: computeStreak(habit, habitLogs, today),
-      // 韧性与 streak 共用同一份日志、同一个 today，所以两个数字
-      // **不可能对不上账** —— 分开算两次才是漂移的开始。
-      resilience: describeHabitResilience(habit, habitLogs, today),
+      streak,
+      resilience,
     };
   });
 }

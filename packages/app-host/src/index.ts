@@ -221,3 +221,25 @@ export {
   categoryReportFromTables,
   type CategoryTables,
 } from './category-report.js';
+
+/**
+ * 激励体系：物化状态 → 领域输入（`category-report.ts` 的同形状第二次）。
+ *
+ * 两个宿主（Web / 移动端）画的是同一批数字，所以"摊平 + 滤墓碑 + 注入 now"
+ * 只有这一份实现。领域算法仍全在 `@heyta/domain`。
+ */
+export {
+  DEFAULT_ACTIVITY_DAYS,
+  activityTotalsFromState,
+  bestCurrentStreak,
+  dailyActivityCountsFromState,
+  habitGrowth,
+  habitGrowthFromState,
+  identityTagsFromState,
+  milestonesFromState,
+  todayProgressFromState,
+  weeklyReviewFromState,
+  type DailyActivityCount,
+  type HabitGrowthRow,
+  type MotivationTables,
+} from './motivation.js';
