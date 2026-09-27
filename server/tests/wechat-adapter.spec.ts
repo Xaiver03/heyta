@@ -85,6 +85,7 @@ const buildPaymentWebhook = (opts: {
   eventType?: string;
   tradeState?: string;
   omitSuccessTime?: boolean;
+  amountFen?: number;
 }): WebhookFixture =>
   buildWechatPaymentWebhook({
     privateKey: opts.signingPrivateKey ?? privateKey,
@@ -92,6 +93,7 @@ const buildPaymentWebhook = (opts: {
     outTradeNo:
       opts.outTradeNo ?? buildWechatOutTradeNo(42, 1_700_000_000_000, 'deadbeef'),
     ...(opts.attach === undefined ? {} : { attach: opts.attach }),
+    ...(opts.amountFen === undefined ? {} : { amountFen: opts.amountFen }),
     successTime: opts.successTime,
     nonce: opts.nonce,
     resourceNonce: opts.resourceNonce,
@@ -653,7 +655,30 @@ describe('wechat adapter — verifyWebhook 的成功路径与归一化', () => {
       priceId: 'hosted-monthly',
       grants: ['hosting'],
     });
+    // 🔴 商户订单号与**原始到账金额**必须显式带在事件上：webhook 要靠订单号
+    //    去 `checkout_orders` 结算，靠这个金额与订单**冻结的实付**比对。
+    //    此前订单号只存在于 `providerEventId` 的字符串里，签署金额根本没带出来。
+    expect(result.event.outTradeNo).toBe(outTradeNo);
+    expect(result.event.paidAmountMinor).toBe(500);
     expect(result.event.occurredAt).toBe(Date.parse('2026-09-26T04:00:00Z'));
+  });
+
+  it('🔴 金额对不上任何档位时仍然带出**原始金额**（这是回执事实，不是判定）', async () => {
+    const outTradeNo = buildWechatOutTradeNo(42, 1_700_000_000_000, 'deadbeef');
+    const fixture = buildPaymentWebhook({
+      outTradeNo,
+      amountFen: 4321,
+      timestampSeconds: Math.floor(NOW / 1000),
+    });
+    const result = await adapter.verifyWebhook(fixture.body, fixture.headers);
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+
+    expect(result.event.paidAmountMinor).toBe(4321);
+    expect(result.event.outTradeNo).toBe(outTradeNo);
+    // 推不出档位 → 交给订单结算；但金额本身照样带出来（结算才有得比）。
+    expect(result.event.oneTimeGrant).toBeNull();
+    expect(result.event.requiresOrderSettlement).toBe(true);
   });
 
   it('attach 缺失时从 out_trade_no 兜底取 userId', async () => {

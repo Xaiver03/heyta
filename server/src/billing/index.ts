@@ -157,6 +157,9 @@ export {
   appendAudit,
   createOrderWithReservation,
   createPrismaSqlExecutor,
+  // 🔴 事务**内**的结算入口 + 把 Prisma 事务 client 包成 `SqlRunner` 的工厂：
+  // webhook 把"授予权益 + 结算订单"放进同一个事务，用的就是这两个。
+  createPrismaSqlRunner,
   expireStaleOrders,
   failOrder,
   loadCouponUsage,
@@ -167,6 +170,7 @@ export {
   reverseOrderOnRefund,
   serializeRejections,
   settleOrderPaid,
+  settleOrderPaidInTransaction,
   toCouponDefinition,
   toMillis,
   upsertCoupon,
