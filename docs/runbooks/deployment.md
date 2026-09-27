@@ -289,9 +289,12 @@
 | `JWT_SECRET` | 🔒 **存在，值不抄** | ✅ 键存在 |
 | `POSTGRES_PASSWORD` | 🔒 **存在，值不抄** | ✅ 键存在 |
 
-compose 里还有一批**未在 `.env` 中设置、走默认值**的键（`HOST`、`SMTP_*`、`PRIVACY_*`、`ALLOWED_EMAILS`、
+compose 里还有一批**未在 `.env` 中设置、走默认值**的键（`HOST`、`PRIVACY_*`、`ALLOWED_EMAILS`、
 `SUPERSYNC_DEFAULT_STORAGE_QUOTA_BYTES`、`OLD_OPS_CLEANUP_*`、`POSTGRES_MEM_LIMIT` 等）。
 它们不在 `.env` 里，就**没有生效**，由 `server/docker-compose.yml` 的默认值决定（如 `POSTGRES_MEM_LIMIT=1536m`）。
+
+⚠️ **`SMTP_*` 不在上面这批里** —— 它 2026-09-27 当天就加进 `.env` 了（见 §3.9），
+所以那几封邮件是真发得出去的。
 
 ### 3.6 公网实测结果
 
@@ -306,6 +309,32 @@ compose 里还有一批**未在 `.env` 中设置、走默认值**的键（`HOST`
 | `GET https://heyta.finlaw.cloud/app/assets/<hash>.js` | `200` `application/javascript` | ✅ 2026-09-27 |
 | `POST https://heyta.finlaw.cloud/api/login/passkey/options` | `{"rpId":"heyta.finlaw.cloud",…}` | ✅ 2026-09-27 |
 | `GET https://heyta.finlaw.cloud/verify-email`、`/recover-passkey`、`/magic-login` | `400 Token is required`（服务端响应，不是落地页 HTML） | ✅ 2026-09-27 |
+| `GET https://heyta.finlaw.cloud/health` | `200` `application/json` + `{"status":"ok","db":"connected",…}` | ✅ 2026-09-27（当天补的，见下） |
+| `GET https://heyta.finlaw.cloud/live` | `200` `application/json` + `{"status":"ok"}` | ✅ 2026-09-27（当天补的，见下） |
+
+🔴 **`/health` 和 `/live` 是 2026-09-27 补上的 —— 在那之前它们在唯一域名上是坏的。**
+
+新域名的 `location /` 属于落地页（`try_files ... /index.html`），而服务端只在根路径暴露
+两个健康入口（`server/src/server.ts:460` 的 `/health`、`:483` 的 `/live`）。**这两个
+location 从没被写进新域名**，于是探针请求掉进落地页的 `try_files`，拿回一个
+**HTTP 200 + `text/html`**。
+
+这是最坏的一类失效：**不报错，只是永远绿**。旧域名反而一直是对的（它的 `location /`
+整体代理到 1900，健康检查"顺带就有"）—— 迁移时这份顺带的能力没被带过来，
+而"旧域名有、新域名没有"正是最容易被漏掉的形状（谁会去测一个自己刚说已经修好的东西？）。
+
+补法（`/etc/nginx/sites-available/heyta.finlaw.cloud`，已含备份）：
+
+```nginx
+location ~ ^/(health|live)$ {
+    proxy_pass http://127.0.0.1:1900;
+    proxy_set_header Host $host;
+    proxy_set_header X-Forwarded-Proto $scheme;
+}
+```
+
+⚠️ 这条**不在仓库里** —— 和 `/app/` 那段一样，nginx 站点文件只是主机上的文件（见 §7）。
+改完记得回来更新本节。
 
 **旧域名 `heyta-tmp.litopia.space`（已弃用，只留端点与入口 301）：**
 
@@ -507,7 +536,8 @@ Playwright 实测：中文页与英文页各两个入口都指向应用地址且
   `/health`；`/app*` 与 `/landing*` 已改成 **301**），留作回滚路径。它**已经不是入口**了：
   落地页的「立即使用」自 2026-09-27 起指向 `heyta.finlaw.cloud`，而且那里 passkey 不可用（§3.7.1）。
 - 🔴 同步服务端**仍然是测试形态**（`supersync:local` 本机构建、`TEST_MODE=true`、
-  没有 SMTP，见 §3.9）—— 换域名**没有**改变这些。域名只是名字，不是"转生产"。
+  `RUN_MIGRATIONS_ON_STARTUP=false`）—— 换域名**没有**改变这些。域名只是名字，不是"转生产"。
+  ⚠️ 这条原先写的是"没有 SMTP" —— **那当天就不成立了**：§3.9 记着 SMTP 已配好且实测真投递。
 
 #### 原先记在这里、现已做掉的
 
@@ -655,6 +685,101 @@ ssh ubuntu-jcli 'cd ~/heyta/server && \
 `TEST_MODE` 下有个 `autoVerifyUsers` 开关（`config.ts`）会**跳过**邮箱验证
 （并且在跳过时不发验证邮件）。**不要为了"跑通 E2E"在生产打开它** —— 那等于关掉邮箱验证这道门。
 本次没动它。
+
+### 3.10 密钥轮换 —— 2026-09-27 已完成
+
+#### 有哪些"key"
+
+| 位置 | 键 | 能否由我轮换 |
+|---|---|---|
+| `~/heyta/server/.env` | `JWT_SECRET`（64 hex） | ✅ 能 |
+| `~/heyta/server/.env` | `POSTGRES_PASSWORD`（32 hex） | ✅ 能，但**必须同时改数据库里那把锁** |
+| `~/heyta/server/.env` | `SMTP_PASS` | ❌ **不能** —— 它是腾讯云邮件（`gz-smtp.qcloudmail.com`、`SMTP_USER=noreply@finlaw.cloud`）**签发**的应用口令，只能在腾讯云那一侧重签，我够不到 |
+
+⚠️ `WEBAUTHN_RP_ID` / `WEBAUTHN_ORIGIN` **不是密钥**（是公开标识）。"轮换"它们等于**再换一次域名**，
+代价和收益见 §3.7.1 —— 别顺手改。
+
+#### 🔴 三个会让"轮换看起来成功、其实没生效"的坑
+
+**① 只改 `.env` 不改数据库 = 服务端连不上。**
+`POSTGRES_PASSWORD` 对 `postgres` 镜像**只在 initdb 时**生效，而卷 `server_postgres-data`
+已经存在 —— 改 `.env` 不会改库里那个用户的口令。必须同步：
+
+```sql
+ALTER USER heyta WITH PASSWORD '<新口令>';
+```
+
+**② `docker restart` 不会重读 `.env`。** 环境变量在容器**创建时**就烘进去了，必须重建：
+
+```bash
+cd ~/heyta/server && docker compose \
+  -f docker-compose.yml -f docker-compose.monitoring.yml -f docker-compose.build.yml \
+  up -d --no-deps supersync
+```
+
+**③ 🔴 验证"旧口令真的失效了"时，别用 `-h 127.0.0.1` —— 那条路根本不查口令。**
+
+`pg_hba.conf` 里 local 与 127.0.0.1/::1 都是 **`trust`**，只有容器网段走 `scram-sha-256`：
+
+```
+local  all  all               trust
+host   all  all  127.0.0.1/32 trust
+host   all  all  ::1/128      trust
+host   all  all  all          scram-sha-256
+```
+
+所以拿**旧**口令 `psql -h 127.0.0.1` 会**成功** —— 本次第一轮就因此误判成"轮换没生效"。
+要测就必须走容器 IP：
+
+```bash
+IP=$(docker exec supersync-postgres sh -c 'hostname -i')
+docker exec -e PGPASSWORD="$OLD" supersync-postgres psql -h "$IP" -U heyta -d heyta -tAc 'select 1'
+# 期望：认证失败
+```
+
+顺带说清边界：服务端自己连的是 `...@postgres:5432`（容器网段）→ 走 `scram-sha-256`，
+**口令对它才是真边界**；loopback 的 `trust` 只是本机运维的便利，不是"口令没用"。
+
+#### 轮换步骤（实测可用）
+
+```bash
+cd ~/heyta/server
+cp -a .env ".env.rotbak-$(date -u +%Y%m%dT%H%M%SZ)"      # 回滚点
+
+NEW_JWT=$(openssl rand -hex 32)
+NEW_PG=$(openssl rand -hex 16)
+sed -i "s|^JWT_SECRET=.*|JWT_SECRET=${NEW_JWT}|" .env
+sed -i "s|^POSTGRES_PASSWORD=.*|POSTGRES_PASSWORD=${NEW_PG}|" .env
+
+docker exec supersync-postgres psql -U heyta -d heyta \
+  -c "ALTER USER heyta WITH PASSWORD '${NEW_PG}';"
+
+docker compose -f docker-compose.yml -f docker-compose.monitoring.yml \
+  -f docker-compose.build.yml up -d --no-deps supersync
+```
+
+用 `openssl rand -hex` 而不是随机可见字符：口令要被插进 compose 的
+`DATABASE_URL`（`postgresql://user:PASS@host/...`），hex 没有任何需要转义的字符。
+
+#### 复验（三条缺一不可）
+
+```bash
+curl --noproxy '*' -sS https://heyta.finlaw.cloud/health     # {"status":"ok","db":"connected"}
+curl --noproxy '*' -sS -X POST https://heyta.finlaw.cloud/api/login/passkey/options \
+  -H 'Content-Type: application/json' -d '{"email":"<某个真实用户>"}'   # rpId 正确
+# 容器实际拿到的 JWT_SECRET 必须等于 .env 里的新值（比 md5，别打印值）
+```
+
+`/health` 返回 `db:connected` 是**最强的那条证据** —— 它证明服务端用新口令真的连上了库。
+
+#### 已完成的收尾
+
+- ✅ 2026-09-27 轮换 `JWT_SECRET` + `POSTGRES_PASSWORD`；旧口令在 scram 路径上被拒、新口令可用。
+- ✅ 销毁了三个持有旧密钥的备份：`.env.bak-20260927T145733Z`、`.env.bak-smtp-1790521888`、
+  `.env.rotbak-20260927T154324Z`（`shred -u`）。**旧值不再存在于这台机器上。**
+- ⚠️ `JWT_SECRET` 一变，所有已签发的会话/令牌立即失效，用户要重新登录 —— 测试环境可接受。
+- ⚠️ `SMTP_PASS` **没有轮换**（外部签发）：要换得去腾讯云邮件控制台重签应用口令，
+  然后只改 `.env` 里那一行 + 按上面重建 `supersync`。
 
 ---
 
