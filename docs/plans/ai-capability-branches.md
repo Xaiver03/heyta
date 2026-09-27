@@ -1,7 +1,8 @@
 # AI 能力分支与开发分支策略
 
-- **状态**：规划中
-- **上游决策**：[ADR-0005 AI 能力的数据路径](../adr/0005-ai-data-path.md)（**待确认**）
+- **状态**：**已落地**（AI-0 基座 / AI-1 捕获 / AI-2 拆解·优先级·估时 / AI-5 本机接口
+  与记忆层都已实现且端到端可达；AI-3 规划、AI-4 复盘**有意推迟**。见 §9 的实施记录）
+- **上游决策**：[ADR-0005 AI 能力的数据路径](../adr/0005-ai-data-path.md)（**已接受**，2026-09-26）
 - **前置证据**：[AI 竞品与架构调研](../research/ai-competitive-and-architecture.md)
 - **前置阶段**：P2 多端补齐（进行中）—— 本计划**不阻塞** P2，但 AI-0 需要 P2 的宿主抽象已就位
 - **范围**：本文件只回答"做哪几条 AI 能力线、按什么顺序、用什么分支策略"。**不含排期数字。**
@@ -1056,26 +1057,31 @@ http://127.0.0.1:80@evil.com/v1
 
 ### 9.28 仍未做（诚实清单）
 
-1. ⚠️ **MCP 传输层只有 HTTP**：协议处理器与 HTTP 壳都有了，
-   但 **stdio 没实现**；而且**没有用真实 MCP 客户端端到端跑过** ——
-   测试都是自己发的 JSON-RPC，形状对了，"Claude Desktop 真的能连上吗"没被证明过。
+> 复核于 2026-09-29。
+
+1. ✅ **MCP 传输层已补齐**（此前写"只有 HTTP"）：HTTP + **stdio** 两种传输都有了
+   （`apps/node-host/src/mcp-stdio-server.ts`、`cli-mcp.ts`）；并且**已用真实 MCP 客户端
+   端到端跑过** —— `scripts/verify-mcp-real-client.mjs`（官方 MCP SDK）11/11，
+   `pnpm verify:mcp-real`。自发 JSON-RPC 之外，"Claude Desktop 真的能连上吗"已有一层证据。
 2. 🔴 **"受保护条目"没有产品机制**：`readable: false` 目前只能靠"解密失败"置位。
    要做"用户手动标记为受保护"需要一次产品决策（见 ADR-0011 §6.1）。
-3. ✅ **已经接到用户手指上**（本轮）：任务行有「AI 拆解」按钮，
+   决策 1 已定为"先不做，但界面上把话说清楚"（[ai-open-decisions.md](ai-open-decisions.md)）。
+3. ✅ **四个功能都已接到用户手指上**：任务行有「AI 拆解」，捕获/优先级/估时各有入口；
    流程是**披露 → 发送 → 提议 → 用户确认才写入**。
-   计划 §5 验收判据 ④「发送前显示发给哪个端点 + 发哪几个字段」**已落地并有测试钉住**。
-4. ⚠️ **系统钥匙串只有 macOS**（本轮补上）。Web 仍是会话内存（架构上就只能这样，
-   见 ADR-0005 §3.2.2）；**Windows / Linux / 移动端未实现**，
-   且 `isKeychainAvailable` 会如实返回 false 而不是假装能用。
-   ⚠️ 它也**还没被任何地方调用** —— `apps/node-host` 目前没有 AI 设置入口，
-   所以这是一个"已经可用但还没接线"的件。
-5. **熔断状态没落盘**：`requestBreakdown` 已经把 `health` 带出来给调用方了，
-   但**还没有人存它** → 跨重启即忘，等于没有熔断（ADR-0010 §6.1）。
-5. **AI 开关是否多端同步** —— 未定（ADR-0006 §5.5）。
-6. **托管 AI 的数据保留策略** 未定案 → `assertEnableable` 仍按设计抛 `retention-undecided`。
-7. **`packages/ai` / `packages/local-api` 未登记进 `AGENTS.md` §2 仓库地图**
-   （仓库规则不允许单方面改 AGENTS.md 的规则章节）。
-8. **`check:layering` 还没有**"`apps/*` 不得绕过 `LocalApiWritePort` 直接改状态"这条规则 ——
+   计划 §5 验收判据 ④「发送前显示发给哪个端点 + 发哪几个字段」已落地并有测试钉住。
+4. ✅ **系统钥匙串只有 macOS**（Windows / Linux / 移动端未实现；Web 仍是会话内存 ——
+   架构上只能这样，见 ADR-0005 §3.2.2），且 `isKeychainAvailable` 会如实返回 false
+   而不是假装能用。~~⚠️ 它也还没被任何地方调用~~ → **已接线**：
+   `apps/node-host/src/cli-ai.ts:100` 调 `createKeychainSecretStore`。
+5. ✅ **熔断状态已落盘且读回**（此前写"没落盘"）：`apps/web/src/features/settings/aiStore.ts`
+   用 `toHealthSnapshot` / `fromHealthSnapshot` 持久化，四个 AI 组件回写 `onHealth`。
+6. **AI 开关是否多端同步** —— 未定（ADR-0006 §5.5）。
+7. **托管 AI 的数据保留策略** 未定案 → `assertEnableable` 仍按设计抛 `retention-undecided`。
+   档位/价格/模型已定（ADR-0020/0021），但 [ADR-0023](../adr/0023-managed-ai-quota-not-implemented.md)
+   判定本轮不实现（云端端点 / 计量 / 收银台都不存在）。
+8. ✅ ~~**`packages/ai` / `packages/local-api` 未登记进 `AGENTS.md` §2 仓库地图**~~ →
+   **已登记**（`AGENTS.md:35-36`）。
+9. **`check:layering` 还没有**"`apps/*` 不得绕过 `LocalApiWritePort` 直接改状态"这条规则 ——
    现在加会是一条规定空文件的规则，要等真有调用点。
 
 ### 9.8 🔴 真实端点实测（2026-09-26）—— 两条被真数据推翻的假设
@@ -1119,9 +1125,10 @@ dueDate  : 2026-09-27T00:00:00.000Z
 priority : undefined          ← ❌ 「高优先级」没被识别，留在了标题里
 ```
 
-- ❌ **「高优先级」没被解析**（`priority` 是 `undefined`，文字还留在标题里）。
-  这是**真缺陷**，不是设计取舍 —— 现有优先级规则没覆盖"高优先级"这个说法。
-- ❌ **「下午三点」没被解析成时间**（`dueDate` 只有日期，`Task` 也没有时间字段）。
+- ✅ **「高优先级」已修**（2026-09-26 之后）：`packages/domain/src/capture.ts:155-158`
+  的 `PRIORITY_BY_WORD` 现在覆盖「高优先级 / 最高优先级 / 紧急 / 加急」等说法，
+  `priority` 不再留在标题里。~~这是真缺陷~~ —— **已修复**。
+- ❌ **「下午三点」仍没被解析成时间**（`dueDate` 只有日期，`Task` 也没有时间字段）。
 
 > ⚠️ 第二条暴露的是**产品缺口而不是解析缺口**：`Task.dueDate` 是**日期**，
 > 没有"时刻"。所以「下午三点」**目前无处可放** —— 要么加字段（schema 变更，

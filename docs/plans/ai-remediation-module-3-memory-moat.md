@@ -1,6 +1,9 @@
 # 模块 3 任务书：把"记忆护城河"接到用户眼前
 
-> 状态：**规划中**
+> 状态：✅ **已执行并并入 `main`**（merge commit `73b13b2`，1 文件 / +90，2026-09-27）。
+> 「记忆护城河」已接到用户眼前：`computeFocusGaps()` 由 `apps/web/src/App.tsx` 读真实 op 窗口后调用，
+> `MemoryPanel` 展示「说的 vs 做的」落差。
+> ⚠️ 任务书原文保留不改；**不要再照它重做一遍**。
 > 适用对象：**一个 AI 执行者**（本文即提示词，可直接整篇粘贴给该 AI）
 > 上游审计：[`ai-gap-audit-and-remediation.md`](ai-gap-audit-and-remediation.md)
 > 并行模块：模块 1（引擎层）、模块 2（Web 旅程）——**不要碰它们的文件**

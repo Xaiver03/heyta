@@ -1,5 +1,24 @@
 # 交接：AI 方向 —— 从「四件套已落地」到「护城河接上界面」
 
+> ## ✅ 本交接单已被清算（2026-09-27）
+>
+> **本文当时要求接手的"第一件事"（先补隐私闸门、再把护城河接上界面）两件都已完成，
+> 并随 `06d7be3` / `0614475` / `73b13b2` 并入 `main`。**
+> 下面保留原文作为**当时的实测记录**，但**不要照着 §3/§5.1 去重做**：
+>
+> | §3 的缺口 | 现状 |
+> |---|---|
+> | `computeFocusGaps` 零生产调用点 | ✅ 已接线：`apps/web/src/App.tsx` 读真实 op 窗口后调用，`MemoryPanel` 展示落差（`73b13b2`） |
+> | `retainValidConsents` 零生产调用点 | ✅ 已接线：`AiSettings.tsx` 的 `updateRouting` 调它（见 `apps/web/tests/ai-settings.spec.tsx`） |
+> | 「发特征，不要发原文」未实现 | ⚠️ **仍未实现** —— 出境仍是 `title` + `note` 原文（这是唯一还成立的一项） |
+>
+> ⚠️ 唯一仍零生产调用点的是 `describeFocusGaps()`（领域层拼好的中文句子），
+> **这是刻意的**：英文界面不许露中文，壳用 `FocusGap` 结构化字段 + 词条自己拼。
+>
+> 本文里的测试数字是 **2026-09-27 @ `7791bec`** 的旧值；当前值以
+> [`ai-strategy.md`](ai-strategy.md) §7
+> 为准。
+
 > **给接手的 agent。** 这份文档只讲三件事：**什么已经做完（别重做）**、
 > **哪些"未做"其实已经过期（别照着旧清单干）**、**现在真正该做的第一件事是什么**。
 >
@@ -11,22 +30,32 @@
 
 ---
 
-## 0. 一句话
+## 0. 一句话（写于 2026-09-27）
 
 **四个 AI 功能（捕获 / 拆解 / 优先级 / 耗时估计）已经全部端到端可达，且有门禁钉住。
-唯一没接线的核心件是「专注落差」这条护城河 —— `memory.ts` 实现了、测了、导出了，
+当时唯一没接线的核心件是「专注落差」这条护城河 —— `memory.ts` 实现了、测了、导出了，
 零生产调用点。**
+
+> ✅ **这两件现在都已经接线了**（见文首表格）。下面 §0 的其余段落是当时的判断，
+> 保留作记录。
 
 这不是新问题：它是本仓库**已经踩过六次**的同一个 bug 类
 （能力实现了、被测了、但没人调用）。`ai-strategy.md` §8 下一步：信任阶梯
-把它列为「下一步第 2 步」，**到今天仍然没做**。
+把它列为「下一步第 2 步」，**当时仍未做**。
+
+> ⚠️ **关于"六次"这个数字本身不可信**：`docs/runbooks/ai-acceptance.md` 与
+> `scripts/check-ai-coverage.mjs` 的文件头写的是同一件事、数字却是 **"12 次以上"**。
+> 两处都**没有给出可复算的清单**，所以谁也证明不了自己那个数。
+> 能确定的是这个形状出现过**至少六次**；而**唯一可靠的"计数"方式是门禁** ——
+> `check:ai-coverage` 由 `AiFeature` 联合类型驱动，每加一个功能就强制整套接线，
+> 漏一处就红。🔴 **别再引用任何具体次数**，除非你能当场列出清单。
 
 **而且不止一个。** 同一个 bug 类还出现在**隐私闸门**上：
-`packages/ai/src/egress.ts:164` 的 `retainValidConsents()` 同样零调用点，
+`packages/ai/src/egress.ts:164` 的 `retainValidConsents()` 当时同样零调用点，
 而它防的是"陈旧授权复活 → 我没同意过的组合被放行"（§3.4）。
 
-所以接手后的第一件事不是写新功能，是**按代价排序清掉这两个**：
-**先补闸门（§3.4），再把护城河接上界面（§3.1–3.3）**。
+所以当时接手后的第一件事不是写新功能，是**按代价排序清掉这两个**：
+**先补闸门（§3.4），再把护城河接上界面（§3.1–3.3）** —— 两件都已按此顺序完成。
 
 ---
 
@@ -34,12 +63,12 @@
 
 | 分支 | 内容 | 落点 | 我实测的证据 |
 |---|---|---|---|
-| **AI-0** 基座 | 配置路由 / 回退链 / 能力声明 / 健康与熔断 / 出境披露 / 密钥端口 | `packages/ai` | **4 文件 / 144 测试** |
-| **AI-1** 捕获 | 确定性内核（规则优先，**不依赖模型**） | `packages/domain/src/capture.ts` | 含在 domain 的 395 测试里 |
+| **AI-0** 基座 | 配置路由 / 回退链 / 能力声明 / 健康与熔断 / 出境披露 / 密钥端口 | `packages/ai` | **4 文件 / 144 测试**（当前 151） |
+| **AI-1** 捕获 | 确定性内核（规则优先，**不依赖模型**） | `packages/domain/src/capture.ts` | 含在 domain 的 395 测试里（当前 475） |
 | **AI-2** 拆解 | 拆解请求 → `AiSuggestion` → 用户确认才写入 | `packages/app-host/src/ai-breakdown.ts`、`apps/web/src/features/ai/AiBreakdown.tsx` | 同上 |
 | **AI-5** 接口 / 数据主权 | 本机 API / MCP：**默认关、只回环、显式 token、逐工具授权、写入经 `dispatch()`**；**HTTP + stdio 两种传输** | `packages/local-api`、`apps/node-host/src/mcp-stdio-server.ts` | **3 文件 / 79 测试** |
 | **AI-5 真实握手** | 用**官方 MCP SDK** 验证协议，排除"自洽的误解" | `scripts/verify-mcp-real-client.mjs` | 11/11，`pnpm verify:mcp-real` |
-| **记忆 · 事实层** | 推迟次数（**只能从事件流算**）/ 逾期 / 专注分钟 / 从未开始 / **专注落差** | `packages/domain/src/memory.ts` | ⚠️ **零调用点**，见 §3 |
+| **记忆 · 事实层** | 推迟次数（**只能从事件流算**）/ 逾期 / 专注分钟 / 从未开始 / **专注落差** | `packages/domain/src/memory.ts` | ✅ **已接线**（`App.tsx` + `MemoryPanel`），见 §3 |
 | **记忆 · 偏好层 M1–M6** | P1–P7 七条偏好 + 留出法验证 + 接进 prompt + 反馈层 + 可见可纠正界面 | `packages/domain/src/preferences.ts`、`preference-hints.ts`、`ai-feedback.ts`、`apps/web/src/features/settings/MemoryPanel.tsx` | 同上 |
 | **门禁** | AI 功能端到端可达 + 托管 AI 文案不许说成 E2EE | `scripts/check-ai-coverage.mjs` | ✅ 见 §6 |
 
@@ -77,9 +106,12 @@
 
 ---
 
-## 3. 🔴 核心缺口：三个"实现了但没人调用"的件
+## 3. 当时的核心缺口：三个"实现了但没人调用"的件（两个已修）
 
-### 3.1 事实
+> ⚠️ **本节是 2026-09-27 当时的记录。** §3.1–3.4 描述的 `computeFocusGaps` 与
+> `retainValidConsents` 两个缺口**都已接线**（见文首表格）；只有 §3.5 仍然成立。
+
+### 3.1 事实（缺口已修）
 
 `packages/domain/src/memory.ts` 导出三个函数：
 
@@ -87,17 +119,12 @@
 |---|---|
 | `computeTaskMemory(input)` | 每条任务的推迟次数 / 逾期 / 专注分钟 / 从未开始 |
 | `computeFocusGaps(...)` | 🔴 **专注落差** —— 「你标成重要的」vs「你实际花时间的」 |
-| `describeFocusGaps(gaps)` | 把落差**写成一句人话**（**不调用模型**） |
+| `describeFocusGaps(gaps)` | 把落差**写成一句人话**（**不调用模型**，⚠️ 中文，壳不该渲染） |
 
-**谁调用它们？没有人。** 全仓库引用只有两处：
-
-```
-packages/domain/src/index.ts:20:  export * from './memory.js';   ← 只是转出去
-packages/domain/tests/memory.spec.ts:9                          ← 它自己的测试
-```
-
-没有第三个地方。`MemoryPanel.tsx` 接的是**偏好层**（`preferences.ts` /
-`preference-copy.js`），不是事实层。
+**当时谁调用它们？没有人。** 全仓库引用只有 barrel 转出和它自己的测试。
+**现在**：`computeFocusGaps()` 的生产调用点在 `apps/web/src/App.tsx`
+（读真实 op 窗口后计算）与 `apps/web/src/features/settings/MemoryPanel.tsx`（渲染）；
+`describeFocusGaps()` **仍零生产调用点且应当如此** —— 英文界面不许露中文。
 
 ### 3.2 为什么这件事重要
 
@@ -112,8 +139,9 @@ packages/domain/tests/memory.spec.ts:9                          ← 它自己的
 竞品抄不走的原因不是功能差异，是**架构差异**：它的云 AI 手里也有数据，
 但用户不肯把全部历史交上去；而 heyta 的数据本来就在设备上。
 
-**现在这条护城河只存在于 `packages/domain` 里，用户看不见。**
+**当时这条护城河只存在于 `packages/domain` 里，用户看不见。**
 按本仓库的判据（§9.23「去数一数这个函数被谁调用」），它等于**没做**。
+**现在调用点数得到，用户能在 `MemoryPanel` 里看到。**
 
 ### 3.3 验收判据（不许停在"代码接上了"）
 
@@ -129,11 +157,15 @@ packages/domain/tests/memory.spec.ts:9                          ← 它自己的
 | "数据接上了" | 断言那条文案里的**数字**来自真实 op-log（构造已知数据 → 断言出现的是那个数字） |
 
 ⚠️ 样本不足时**不许编**，要明确表现出「我还不了解你」，而不是假装懂。
-空状态是**功能**，不是待办 —— 这条纪律见 `ai-memory-system.md` §5.3 冷启动必须诚实
+空状态是**功能**，不是待办 —— 这条纪律见 `ai-memory-system.md` §5.5 冷启动必须诚实
 
-### 3.4 🔴 同一类问题的第二个（**在隐私闸门上**）：`retainValidConsents` 零调用点
+### 3.4 🔴 同一类问题的第二个（**在隐私闸门上**）：`retainValidConsents` 零调用点（已修）
 
-`packages/ai/src/egress.ts:164` 的 `retainValidConsents()` —— **4 条测试，零生产调用点**
+> ✅ **2026-09-27 已修**：`AiSettings.tsx` 的 `updateRouting` 现在调用
+> `retainValidConsents`，目的地由 `classifyDestination()` 推导（见
+> `apps/web/tests/ai-settings.spec.tsx`）。下面是当时的缺口记录。
+
+`packages/ai/src/egress.ts:164` 的 `retainValidConsents()` —— **4 条测试，当时零生产调用点**
 （全仓库引用只有它自己、`index.ts` 的转出、和它的测试）。
 
 它的注释（`egress.ts:152-163`）自称是「**本文件的核心不变量的另一半**」，
@@ -142,18 +174,17 @@ packages/domain/tests/memory.spec.ts:9                          ← 它自己的
 > 用户从"本地 Ollama"切到"heyta 托管"、再切回"自备远端"时，
 > 那些陈旧记录会**重新**变得可匹配 —— 于是出现"我没同意过这个组合，但它放行了"。
 
-**实测确认：该调它的地方没有调它。** `apps/web/src/features/settings/AiSettings.tsx`
-自己写了一套更弱的行内逻辑：
+**当时实测确认：该调它的地方没有调它。** `apps/web/src/features/settings/AiSettings.tsx`
+曾自己写了一套更弱的行内逻辑（现已改为走 `retainValidConsents`）：
 
-| 位置 | 问题 |
+| 位置 | 当时的问题 |
 |---|---|
-| `grant()` `:406-416` | **硬编码** `destination: 'user-endpoint'` —— 目的地不是从 URL 推导的。而**同一个文件** `:433` 的 `routeTouchesRemote()` 明明在用 `classifyDestination()` |
-| `revoke()` `:418-425` | 同样硬编码 `'user-endpoint'` |
-| 删端点 `:377-390` | 清掉路由，**不清 consents** |
+| `grant()` | **硬编码** `destination: 'user-endpoint'` —— 目的地不是从 URL 推导的 |
+| `revoke()` | 同样硬编码 `'user-endpoint'` |
+| 删端点 | 清掉路由，**不清 consents** |
 
-后果：**删掉一个远端端点、再配一个新的远端端点，旧授权仍留在 `consents` 里，
-会直接放行 —— 用户没有重新同意过。** 这是"同意"这件事被静默降级，
-方向正是本项目最在意的那个（闸门失效）。
+当时后果：**删掉一个远端端点、再配一个新的远端端点，旧授权仍留在 `consents` 里，
+会直接放行 —— 用户没有重新同意过。** 这就是 §3.4 要修的闸门缺口（已修）。
 
 ⚠️ **与 `memory.ts` 的区别**：那个是"功能没交付"，这个是**闸门有缺口**。
 按 `ai-strategy.md` §2 三档结构（按"错了代价多大"分）
@@ -161,7 +192,8 @@ packages/domain/tests/memory.spec.ts:9                          ← 它自己的
 
 **修法不是新写代码** —— 是让 `AiSettings` 改用**已经写好、已经测过**的
 `retainValidConsents`，并把 `grant()` 的目的地改成 `classifyDestination()` 的推导结果。
-（这正好也是 `check-ai-coverage` 那类门禁抓不到的形状：**函数存在、有测试、没人调用**。）
+**✅ 这正是实际采用的修法。**（这本来也是 `check-ai-coverage` 那类门禁抓不到的形状：
+**函数存在、有测试、没人调用**。）
 
 ### 3.5 第三个：「发特征，不要发原文」**还没实现**
 
@@ -212,34 +244,36 @@ if (source.note !== undefined && source.note.trim() !== '') {
 
 ## 5. 交付物（按价值排序）
 
-### 5.1 🔴 第一件事（按代价排）：补隐私闸门，再接护城河
+### 5.1 🔴 第一件事（按代价排）：补隐私闸门，再接护城河 —— ✅ 两件都已完成
 
 **① 先补闸门** —— 把 `retainValidConsents` 接进 `AiSettings`（见 §3.4）。
 它防的是"陈旧授权复活 → 我没同意过的组合被放行"，**错了的代价最大**。
+**✅ 已完成。**
 
 **② 再把「专注落差」接上界面** —— 见 §3.1–3.3。
 这是**唯一一件"做完就算把护城河交付了"**的事。
+**✅ 已完成**（接进 `MemoryPanel.tsx`，没有新建面板）。
 
-落点建议：`apps/web/src/features/` 下新增一个落差面板，
-或接进既有的 `MemoryPanel.tsx`（它已经有"可见可纠正"的骨架）。
-🔴 **推断层必须落在 `packages/`**（ADR-0003：偏好/落差决定 AI 该怎么做，**是业务**），
+落点（已实现）：`apps/web/src/features/settings/MemoryPanel.tsx` 展示落差，
+计算在 `apps/web/src/App.tsx`。
+🔴 **推断层落在 `packages/`**（ADR-0003：偏好/落差决定 AI 该怎么做，**是业务**），
 `apps/*` 只做壳。
 
-### 5.2 真实端点实测撞出来的两个真缺陷（还没修）
+### 5.2 真实端点实测撞出来的两个真缺陷（一个已修、一个仍开放）
 
 来自 `ai-capability-branches.md` §9.8 🔴 真实端点实测（2026-09-26）—— 两条被真数据推翻的假设
 **47 条打桩测试一条都没碰到**：
 
-**(a) 「高优先级」没被解析** —— 真缺陷，不是设计取舍。
+**(a) 「高优先级」没被解析** —— ✅ **已修**（`capture.ts:155-158` 的
+`PRIORITY_BY_WORD` 已覆盖「高优先级」等说法）。
 
 ```
 输入      : 下午三点开周会 高优先级
-title     : 下午三点开周会 高优先级   ← 「高优先级」留在了标题里
-priority  : undefined                 ← ❌
+（当时）title     : 下午三点开周会 高优先级   ← 「高优先级」留在标题里
+（当时）priority  : undefined                 ← ❌
 ```
 
-现有优先级规则没覆盖"高优先级"这个说法（`packages/domain/src/capture.ts`）。
-**这个可以直接修**：加词条 + 测试。
+现有优先级规则当时没覆盖"高优先级"这个说法，**已加词条 + 测试**。
 
 **(b) 「下午三点」无处可放** —— 🔴 **这是产品缺口，不是解析缺口。**
 
@@ -286,29 +320,28 @@ Windows / Linux / 移动端**未实现**，且 `isKeychainAvailable` **如实返
 
 | 位置 | 状态 |
 |---|---|
-| `packages/ai/src/routing.ts:916` `describeRouteIntent` | 零调用点、**零测试** |
-| `packages/ai/src/provider.ts:294` `EGRESS_ORDER_NOTE` | 零调用点、**零测试** |
-| `packages/ai/src/presets.ts:87` `findPreset`、`:98` `presetDestinations` | 有测试，但生产只用 `AI_ENDPOINT_PRESETS` |
-| `packages/ai/src/provider.ts:299` `previewDisclosure` | 有测试，但界面直接用 `buildDisclosure` |
+| `packages/ai/src/routing.ts` `describeRouteIntent` | 零生产调用点，但**现在有测试**（`packages/ai/tests/routing.spec.ts`）；⚠️ 保留作为"壳收掉重复实现"的现成入口，**不要当死代码删** |
+| `packages/ai/src/provider.ts` `EGRESS_ORDER_NOTE` | 零调用点、零测试 |
+| `packages/ai/src/presets.ts` `findPreset`、`presetDestinations` | 有测试，但生产只用 `AI_ENDPOINT_PRESETS` |
+| `packages/ai/src/provider.ts` `previewDisclosure` | 有测试，但界面直接用 `buildDisclosure` |
 
 ⚠️ 删之前先确认它不是"留给下一层的接口" —— 但按本仓库自己的判据，
 见 `ai-capability-branches.md` §9.23 判据：去数一数这个函数被谁调用
 **零调用点 + 零测试 = 死代码**。
 
-**文档里的测试数已经过期**（不影响正确性，但会让人误判规模）：
+**文档里的测试数当时是过期的** —— 这些**已在本轮文档同步中全部修好**
+（不再是待办，记录于此以免有人再"发现"一次）：
 
-| 位置 | 写的 | 实际（我实测） |
+| 位置 | 当时写的 | 当前 |
 |---|---|---|
-| `ai-strategy.md:189` | `packages/ai` 130 | **144** |
-| `ai-strategy.md:191` | 拆解 45 | app-host **55** |
-| `ai-strategy.md:194` | 记忆 20 | **23** |
-| `ai-strategy.md:201` | MemoryPanel 14 | **17** |
-| `ai-open-decisions.md:50-52` | 130 / 173 / 134 | 144 / … / … |
-| `apps/web/tests/app-mount.spec.tsx:21` | 48 / 63 / 14 | **47 / 67 / 17** |
-| `ai-memory-system.md:11` | 状态「**待实施**」 | 🔴 **M1–M6 全部完成**（同文件 §9:274-279 自己写着） |
+| [`ai-strategy.md` §7](ai-strategy.md) | `packages/ai` 130 | **151** |
+| [`ai-strategy.md` §7](ai-strategy.md) | 拆解 45 | app-host `ai-breakdown` **55** |
+| [`ai-strategy.md` §7](ai-strategy.md) | 记忆 20 | **23** |
+| [`ai-strategy.md` §7](ai-strategy.md) | MemoryPanel 14 | **29** |
+| `ai-open-decisions.md` | 130 / 173 / 134 | 151 / 79 + 139 / 576（web） |
+| `ai-memory-system.md` 头 | 状态「**待实施**」 | ✅ **M1–M6 全部完成** |
 
 🔴 **最后一行最要紧**：一份写着"待实施"的计划会让人**从头重做一遍已经做完的事**。
-本文件 §2 那张表就是为同一类问题写的。
 
 ---
 
@@ -318,6 +351,7 @@ Windows / Linux / 移动端**未实现**，且 `isKeychainAvailable` **如实返
 |---|---|---|---|
 | `check:ai-coverage` | ✅ **在** | 4 个 `AiFeature` 全部端到端可达（实现→导出→路由声明→偏好声明→界面），**且不许有豁免**；托管 AI 文案必须仍带「不受端到端加密」的否定 | ❌ |
 | `check:ai-e2e` | ✅ **在**（= preflight + `e2e` 套件） | 端口 4318/4319 是空的，然后跑真浏览器 e2e（含 5 个 AI spec） | ❌ |
+| `check:ai-quota` | ✅ **在** | 「300 次/月」只有一个数字源，且托管 AI 额度未实现的状态被显式声明（ADR-0023） | ❌ |
 | `verify:ai-live` | ❌ 手工 | **真实端点**验路由层：闸门 / 目的地推导 / 请求体只有 `model`+`messages` / 失败分类。**数出**"未授权时网络请求数 = 0" | 🔴 **要真 key** |
 | `verify:ai-breakdown-live` | ❌ 手工 | **整条功能链路**：`requestBreakdown` 从一句描述到可写进备注的 Markdown | 🔴 **要真 key** |
 | `verify:ai-preferences-live` | ❌ 手工 | **记忆层**：偏好有没有被用上、有没有被复述、**关掉时有没有真的不发** | 🔴 **要真 key** |
@@ -339,13 +373,14 @@ Windows / Linux / 移动端**未实现**，且 `isKeychainAvailable` **如实返
 export PATH="/opt/homebrew/bin:/usr/local/bin:$PATH"
 
 # 1. 三个 AI 相关包的测试
-pnpm --filter @heyta/ai test          # 4 文件 / 144 测试
-pnpm --filter @heyta/domain test      # 14 文件 / 395 测试
+pnpm --filter @heyta/ai test          # 4 文件 / 144 测试（当前 151）
+pnpm --filter @heyta/domain test      # 14 文件 / 395 测试（当前 17 文件 / 475）
 pnpm --filter @heyta/local-api test   # 3 文件 / 79 测试
 
 # 2. 门禁
 node scripts/check-ai-coverage.mjs          # ✅ 4 个功能全部端到端可达
 node scripts/check-ai-e2e-preflight.mjs     # ✅ 4318/4319 都是空的
+node scripts/check-ai-quota-consistency.mjs  # ✅ 300 次/月只有一个数字源
 pnpm check                                  # 全链路
 
 # 3. 有真 key 时（强烈建议至少跑一次）
@@ -354,16 +389,16 @@ pnpm verify:ai-preferences-live
 pnpm verify:mcp-real
 ```
 
-**我这一轮实测的数字**（2026-09-27，`main` @ `7791bec`）：
+**我这一轮实测的数字**（2026-09-27，`main` @ `7791bec`；括号里是 2026-09-29 复核值）：
 
 | 命令 | 结果 |
 |---|---|
-| `pnpm --filter @heyta/ai test` | **4 文件 / 144 passed** |
-| `pnpm --filter @heyta/domain test` | **14 文件 / 395 passed** |
+| `pnpm --filter @heyta/ai test` | **4 文件 / 144 passed**（当前 151） |
+| `pnpm --filter @heyta/domain test` | **14 文件 / 395 passed**（当前 17 文件 / 475） |
 | `pnpm --filter @heyta/local-api test` | **3 文件 / 79 passed** |
 | `node scripts/check-ai-coverage.mjs` | **exit 0**，4 个功能全部可达，**无豁免** |
 | `node scripts/check-ai-e2e-preflight.mjs` | **exit 0** |
-| `pnpm check`（全链路，16 项） | **exit 0** |
+| `pnpm check`（全链路，16 项） | **exit 0**（当前项数以 `pnpm check` 实际输出为准） |
 | `pnpm --filter @heyta/sync-server test` | 68 文件 / **1374 passed** \| 1 skipped |
 | e2e AI 套件（`pnpm check:ai-e2e` 内） | 13 passed（含 5 个 AI spec） |
 
@@ -375,10 +410,13 @@ pnpm verify:mcp-real
 
 ### 8.1 判据是"去数调用点"，不是"代码写好了"
 
-这是本仓库最贵的教训，**踩过六次**。`ai-capability-branches.md` §9.23–9.27
+这是本仓库最贵的教训，**踩过六次**（⚠️ 这个次数的争议见 §0 的说明 —— 另有文档写"12 次以上"，
+两处都没有可复算的清单，**别引用具体数字**）。`ai-capability-branches.md` §9.23–9.27
 整整五节都在讲同一件事。**接手后对任何"已完成"的说法，先去 grep 它的调用点。**
 
-`memory.ts` 就是当前唯一还没被这条判据清算的件（§3）。
+`memory.ts` 当时是这条判据**最后还没被清算的件**（§3）；
+2026-09-27 之后它已被清算并接线 —— 同类件现在只剩
+「发特征，不要发原文」（§3.5）。
 
 ### 8.2 那条被跳过的测试是 **by design**，但要知道它意味着什么
 
@@ -396,6 +434,8 @@ pnpm verify:mcp-real
 ### 8.3 明确未验证的
 
 - **托管 AI**：完全未实现（`assertEnableable` 挡着），没有任何一行服务端代码。
+  档位/价格/模型已定（ADR-0020/0021），但 [ADR-0023](../adr/0023-managed-ai-quota-not-implemented.md)
+  判定本轮不实现：云端端点 / 计量 / 收银台都不存在。
 - **Windows / Linux / 移动端钥匙串**：未实现，如实报错。
 - **AI-3 / AI-4**：未开工。
 - **`check:layering` 的"`apps/*` 不得绕过 `LocalApiWritePort` 直接改状态"这条规则**：

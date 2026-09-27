@@ -55,29 +55,38 @@ heyta 的 AI 是**双向**的，两个方向**在不同的包里、有不同的�
 
 | 路径 | 行数 | 职责 |
 |---|---|---|
-| `packages/ai/src/supply.ts` | 230 | 供给模式 `off`/`own`/`managed`；**由端点推导目的地**；托管不可启用的判据 |
-| `packages/ai/src/egress.ts` | 147 | 出境闸门。授权绑定 `(功能, 目的地)`；切换模式时失效旧授权 |
-| `packages/ai/src/provider.ts` | 303 | 单一 provider 端口，OpenAI 兼容 HTTP；**只产出建议，产生不了 op** |
-| `packages/ai/src/routing.ts` | 930 | 多端点路由、能力声明匹配、回退、熔断接线；**回退不得跨越隐私边界** |
-| `packages/ai/src/health-store.ts` | 214 | 端点健康的落盘/读回；**读回来的东西不可信且必须封顶** |
-| `packages/ai/src/presets.ts` | 103 | 内置端点预设（**只有本机**）；`presetDestinations()` 让"预设都是本机的"可断言 |
-| `packages/ai/src/index.ts` | 124 | 四层的收窄说明与再导出 |
+| `packages/ai/src/supply.ts` | 321 | 供给模式 `off`/`own`/`managed`；**由端点推导目的地**；托管不可启用的判据 |
+| `packages/ai/src/egress.ts` | 182 | 出境闸门。授权绑定 `(功能, 目的地)`；切换模式时失效旧授权 |
+| `packages/ai/src/provider.ts` | 348 | 单一 provider 端口，OpenAI 兼容 HTTP；**只产出建议，产生不了 op**；⚠️ 单端点/测试/历史路径，**不是生产出境执行点** |
+| `packages/ai/src/routing.ts` | 980 | 多端点路由、能力声明匹配、回退、熔断接线、`invokeRouted()`（**生产唯一出境执行点**）；**回退不得跨越隐私边界** |
+| `packages/ai/src/health-store.ts` | 263 | 端点健康的落盘/读回；**读回来的东西不可信且必须封顶** |
+| `packages/ai/src/presets.ts` | 116 | 内置端点预设（**只有本机**）；`presetDestinations()` 让"预设都是本机的"可断言 |
+| `packages/ai/src/index.ts` | 130 | 四层的收窄说明与再导出 |
 | `packages/domain/src/capture.ts` | 537 | 规则式快速捕获（**这不是 AI**，是 AI 的确定性对手） |
-| `packages/domain/src/memory.ts` | 354 | 特征层：从事件流算事实（推迟次数、专注落差…） |
+| `packages/domain/src/memory.ts` | 360 | 特征层：从事件流算事实（推迟次数、专注落差…） |
 | `packages/domain/src/recall.ts` | 171 | 确定性检索基线（"要不要向量库"的实验对照组） |
 | `packages/domain/src/preferences.ts` | — | 偏好推断引擎（纯函数，7 条偏好） |
 | `packages/domain/src/preference-hints.ts` | — | 把偏好渲染成提示块；按用途过滤 |
 | `packages/domain/src/preference-corrections.ts` | — | 用户纠正 → op-log |
 | `packages/domain/src/ai-feedback.ts` | — | 建议处置（接受/修改/拒绝）→ op-log |
-| `packages/app-host/src/ai-breakdown.ts` | 403 | 拆解编排：请求 → `AiSuggestion` → 解析 → 待确认清单 |
+| `packages/app-host/src/ai-breakdown.ts` | 407 | 拆解编排：请求 → `AiSuggestion` → 解析 → 待确认清单 |
+| `packages/app-host/src/ai-capture.ts` | 604 | 捕获编排（规则优先 + 模型兜底） |
+| `packages/app-host/src/ai-prioritize.ts` | 470 | 逐条优先级建议编排 |
+| `packages/app-host/src/ai-duration.ts` | 507 | 估时编排 |
 | `packages/app-host/src/local-api-host.ts` | — | 把本机 API 的写入意图接到真的 `dispatch()` |
 | `packages/local-api/src/tools.ts` | 499 | 工具契约 + 授权判定（**唯一实现点**） |
 | `packages/local-api/src/server.ts` | 359 | 传输无关的 JSON-RPC 处理器 |
 | `packages/local-api/src/mcp.ts` | 252 | MCP 形状：工具目录、错误码、会话闸门 |
-| `apps/web/src/features/settings/aiStore.ts` | — | AI 设置状态 + 本地持久化 |
-| `apps/web/src/features/settings/AiSettings.tsx` | — | 开关界面 |
-| `apps/web/src/features/settings/MemoryPanel.tsx` | — | 偏好的可见 / 可忘掉 / 可恢复 |
+| `apps/web/src/features/settings/aiStore.ts` | — | AI 设置状态 + 本地持久化（含熔断健康快照） |
+| `apps/web/src/features/settings/AiSettings.tsx` | — | 开关界面（三道闸 / 端点 / 授权 / 停用开关） |
+| `apps/web/src/features/settings/MemoryPanel.tsx` | — | 偏好的可见 / 可忘掉 / 可恢复 + 「说的 vs 做的」落差 |
 | `apps/web/src/features/ai/AiBreakdown.tsx` | — | 拆解界面（含逐条取舍） |
+| `apps/web/src/features/ai/AiCapture.tsx` | — | 捕获界面 |
+| `apps/web/src/features/ai/AiPrioritize.tsx` | — | 优先级界面 |
+| `apps/web/src/features/ai/AiDuration.tsx` | — | 估时界面 |
+| `apps/web/src/features/ai/RouteUnavailable.tsx` | — | "没有可用端点"时的原因解释 + 下一步 |
+| `apps/web/src/features/ai/route-explanation.ts` | 251 | 壳自己的路由解释（`resolveFeatureRoute()`），消费 `resolution.excluded` |
+| `apps/web/src/features/ai/ai-failure-copy.ts` | — | 失败原因码 → 界面词条 |
 
 ### 1.2 数据流（出站）
 
@@ -87,13 +96,13 @@ heyta 的 AI 是**双向**的，两个方向**在不同的包里、有不同的�
 ① 规则层 —— 必过，不用模型                     capture.ts（537 行）
    日期、重复、优先级标记、排序、倒计时
    ↓ 只有规则解析不了的才往下
-② 特征层 —— 本机纯函数，读 op-log              memory.ts（354 行）
+② 特征层 —— 本机纯函数，读 op-log              memory.ts（360 行）
    推迟过几次、逾期几天、多久没碰、专注落差
    ↓ 🔴 只把②的【摘要】发出去，不是全量任务
-③ 模型层 —— 按档位选端点                       routing.ts → provider.ts
+③ 模型层 —— 按档位选端点                       routing.ts 的 invokeRouted()
    三道闸 → 出境授权 → OpenAI 兼容 HTTP
    ↓
-④ AiSuggestion —— 类型上不可能变成 op          provider.ts
+④ AiSuggestion —— 类型上不可能变成 op          AiSuggestion（类型在 provider.ts）
    ↓
 用户确认 → dispatch() → op-log
 ```
@@ -147,7 +156,9 @@ assertEnableable(config)   // mode === 'managed' 时抛错
 describeRetention('heyta-cloud')  // 返回 undefined
 ```
 
-`AiConfigError.reason` 的封闭取值：`'retention-undecided' | 'endpoint-required' | 'endpoint-invalid' | 'consent-required'`。
+`AiConfigError.reason` 的封闭取值：`'retention-undecided' | 'endpoint-required' | 'endpoint-invalid'`。
+⚠️ 曾经并列过一个 `'consent-required'`，但它**从未被构造过**；已收敛掉（"缺少出境同意"是
+`egress.ts` 的 `consent-missing`，与"配置能不能启用"是两件事）。
 
 🔴 **这不是没写完的占位符，是有意的失败。** ADR-0013 §4 原文：「不能『先把计费
 做了，保留策略以后再说』——那样会先产生数据，再补规则。」要真正开放托管 AI
@@ -226,12 +237,15 @@ interface EgressDisclosure {
 }
 ```
 
-`EgressDecision.reason` 的封闭取值：`'consent-missing' | 'consent-required'`，
-**两个都带 `disclosure`**。
+`EgressDecision.reason` 的封闭取值只有 **一个**：`'consent-missing'`，
+且它**总是**带 `disclosure`。
 
 > ⚠️ 一个只说"未授权"而不说"授权后会发生什么"的提示框，等于逼用户盲签。
+> ⚠️ 曾经并列过一个 `'consent-required'`（注释把它写成"需要授权但本次没有"的提示态），
+> 全仓从未构造过、`authorizeEgress` 也没有第二个 return —— 已收敛掉，不要再把它当成
+> 一个"需要 UI 分开呈现"的 reason。
 
-UI 必须**分开呈现**这两个 reason，因为该做的事不同。`buildDisclosure()` 是纯函数，
+UI 必须把拒绝态渲染在**授权后会发生什么**的上下文里。`buildDisclosure()` 是纯函数，
 测试与 UI 共用同一条路径 —— 这也是"同一句话不能有两个来源"的落实。
 
 ### 3.4 🔴 本机端点必须**真的**免授权
@@ -263,6 +277,13 @@ return consents.filter(c => c.destination === currentDestination);
 ## 4. 供应商端口（`provider.ts`）
 
 ADR-0005 §3.2 与 ADR-0006 §3.2 的实现：**一个端口，多种后端。**
+
+⚠️ **它是"单端点 / 本地 / 测试与历史"执行路径，不是生产的出境执行点。**
+生产（`apps/web` / `apps/node-host` / `apps/mobile`）走 `routing.ts` 的
+`invokeRouted()` —— 只有它带多端点候选、能力过滤、回退不跨隐私边界与熔断。
+`createProvider()` 的依赖方只有本包测试、`apps/web/tests/ai-failure-copy.spec.tsx`
+与 `scripts/verify-ai-live.mjs`。**新增出境功能请接 `invokeRouted`，不要接这里。**
+（两套实现是已登记的存量漂移，见 §15.2。）
 
 ### 4.1 🔴 只产出建议，产生不了 op
 
@@ -469,7 +490,14 @@ type CandidateExclusionReason =
 ```
 
 `describeRouteIntent()` ⚠️ 只做**静态**推导（不含健康状态），所以是"配置意图"
-而不是"实际会怎样"。名称上区分开，免得 UI 拿它当实时状态显示。
+而不是"实际会怎样"。名称上区分开，免得被当成实时状态。
+
+🔴 **它当前零生产调用点。** 壳真正走的是
+`apps/web/src/features/ai/route-explanation.ts` 的 `resolveFeatureRoute()` ——
+它需要中英双语词条，还要把 `resolution.excluded` 翻成人话，所以在 `resolveRoute()` 之上
+自己包了一层。两者是"同一件事的两套实现"；`describeRouteIntent()` 只有一条 3 行实现、
+行为已由测试钉住，保留作为将来壳收掉重复部分时的现成入口，
+**接线时要用它取代那份重复实现，而不是并成第三份**。
 
 ---
 
@@ -711,10 +739,13 @@ reason: 'disabled' | 'not-enough-samples' | 'not-stable-enough' | 'no-data'
 
 | 文件 | 职责 | 对应验收 |
 |---|---|---|
-| `aiStore.ts` | AI 设置的单一状态源；`localStorage` 持久化 | — |
-| `AiSettings.tsx` | 三个开关 + 端点配置 + 出境披露 | 托管文案必须否认 E2EE |
-| `MemoryPanel.tsx` | 偏好可见、单条"忘掉"、**可恢复**的「你已忘记」 | **M6 验收标准**：用户能在界面上看到并改掉它 |
-| `AiBreakdown.tsx` | 拆解建议的逐条取舍 → 确认 → 写备注 | 未确认时**不得**产生任何 op |
+| `aiStore.ts` | AI 设置的单一状态源；`localStorage` 持久化；熔断健康快照的落盘/读回 | 跨重启记忆熔断（`toHealthSnapshot` / `fromHealthSnapshot`） |
+| `AiSettings.tsx` | 三道闸 + 端点配置 + 出境披露 + 逐工具授权 + 端点"停用/启用"开关 | 托管文案必须否认 E2EE |
+| `MemoryPanel.tsx` | 偏好可见、单条"忘掉"、**可恢复**的「你已忘记」；「说的 vs 做的」落差 | **M6 验收标准**：用户能在界面上看到并改掉它 |
+| `AiBreakdown.tsx` / `AiCapture.tsx` / `AiPrioritize.tsx` / `AiDuration.tsx` | 四个功能的界面：建议 → 逐条取舍 → 确认才写入 | 未确认时**不得**产生任何 op |
+| `RouteUnavailable.tsx` | "一个候选都没有"时**说出真实原因**并给"下一步点哪里" | 每个 `CandidateExclusionReason` 有专属文案 |
+| `route-explanation.ts` | 壳自己的路由解释 `resolveFeatureRoute()`（消费 `resolution.excluded`） | 四组件共用这一份，不许各写一套 |
+| `ai-failure-copy.ts` | 失败原因码 → 界面词条（中英） | 英文界面不出现中文 |
 
 ⚠️ `aiStore` 用 zustand v5；`useSyncExternalStore` 要求 selector 结果
 **引用稳定**（需要时用 `zustand/react/shallow` 的 `useShallow`）。
@@ -723,6 +754,10 @@ reason: 'disabled' | 'not-enough-samples' | 'not-stable-enough' | 'no-data'
 在它之前 `invokeRouted()` **没有任何调用点** —— 路由、回退、出境闸门、熔断
 全都只有单测，没有一次"从功能出发真的走了一遍"。那种状态下最危险的失效是：
 **每层都对，接起来不对。**
+
+> 现在四个功能都已经走这条路：`invokeRouted()` 的生产调用点在
+> `packages/app-host/src/ai-{breakdown,capture,prioritize,duration}.ts` 四个模块里，
+> 界面组件消费的是这四个模块。
 
 ### 10.1 拆解的解析策略：宁可判"没读懂"，也不要猜
 
@@ -917,6 +952,9 @@ interface SecretStore { get(keyRef: string): Promise<string | undefined>; }
 
 | 门禁 | 与 AI 的关系 |
 |---|---|
+| `check:ai-coverage` | 每个 `AiFeature` 从「实现 → 导出 → 路由声明 → 偏好声明 → 界面」端到端可达，**不许有豁免**；并断言托管 AI 仍被挡住 |
+| `check:ai-e2e` | 真 Chromium 跑用户旅程（假端点，不接真模型） |
+| `check:ai-quota` | 「300 次/月」只有一个数字源；托管 AI 额度未实现的状态被**显式声明**（ADR-0023） |
 | `check:layering` | `no-model-endpoint-in-apps`、`no-vendor-ai-sdk-in-apps`、`no-loopback-classification-in-apps` —— 拦 `apps/*` 直连模型端点、引入厂商 SDK、自己判回环 |
 | `check:licenses` | AI 调研发现一批**许可证地雷**（Nextcloud AI 全家桶 / Immich = AGPL-3.0；Piper 本体 = GPL-3.0）—— **一行代码都不能进** |
 | `check:ui-language` | 用户可见文案的中文规则 |
@@ -965,7 +1003,7 @@ interface SecretStore { get(keyRef: string): Promise<string | undefined>; }
 | 项 | 现状 |
 |---|---|
 | 🔲 「受保护条目」 | `readable: false` **没有产品机制**。ADR-0011 §6.1 称它是唯一的真空白。壳目前显式传 `isReadable: () => true` |
-| 🔲 熔断状态落盘 | `health-store.ts` 已完备；⚠️ 是否接到壳的持久化**未核实** |
+| ✅ 熔断状态落盘 | `health-store.ts` + 壳的 `aiStore.ts`（`toHealthSnapshot` / `fromHealthSnapshot`）**已接线**：四个 AI 组件回写 `onHealth`，`App.tsx` 落盘并在启动时读回 |
 
 ⚠️ `isReadable` 曾经**默认** `() => true`（fail open），于是「真实产品里
 `readable` 恒为 `true`，Bear 范式那条路径**从不执行**，且没有任何信号」。
@@ -976,13 +1014,13 @@ interface SecretStore { get(keyRef: string): Promise<string | undefined>; }
 
 | 项 | 卡在 |
 |---|---|
-| 托管 AI / MaaS | 5 件前置（服务本体 / 保留策略 / 计费 / Harness 边界 / 上云粒度）**一件未完成** |
+| 托管 AI / MaaS | 已定档（ADR-0020/0021：¥12/月 · 300 次/月 · `deepseek-flash`），但**本轮不实现**（ADR-0023）：服务本体端点 / 计量 / 收银台**都不存在**；保留策略未定案，`assertEnableable` 继续抛 `retention-undecided` |
 | AI-3 规划 | 有意推迟（需要真实数据） |
 | AI-4 复盘 | 受限分支，未开工 |
-| 真实 MCP 客户端端到端 | 只有自发的 JSON-RPC + 真实子进程 |
-| 只读模式 | `grants` 已能表达，但**没有 UI 引导** |
+| 只读模式 | `grants` 已能表达，但**没有"只读预设"的 UI 引导**（逐工具开关已有） |
 | 调用审计 | 未做（考虑过"记录每次调用"，但那本身是一份新的敏感日志） |
 | 「回退披露必须写出整条链」 | ⚠️ 见 §15.3 |
+| `packages/ai` 的"两套实现" | `createProvider()`（单端点/测试/历史）与 `invokeRouted()`（生产）各自组装一次请求；共享 `authorizeEgress`，但"请求怎么拼、失败怎么分类"是两份（见 §4 的说明） |
 | `check:layering` 的第 9 条 | 「`apps/*` 不得绕过 `LocalApiWritePort` 直接改状态」——现在加会是规定一个不存在的违规 |
 
 ### 15.3 未核实
@@ -996,13 +1034,15 @@ interface SecretStore { get(keyRef: string): Promise<string | undefined>; }
 - ⚠️ **「发特征，不要发原文」是判断，不是实测结论** —— 它还没有被任何东西验证过。
 - ⚠️ 「记忆 → 专注落差」这条护城河同样**尚未验证**。
 
-### 15.4 已知的文档内部不一致（如实保留）
+### 15.4 已消除的文档内部不一致（记录，供追溯）
 
-- [`../plans/ai-capability-branches.md`](../plans/ai-capability-branches.md) 头部写
-  「上游决策：ADR-0005（**待确认**）」，而 ADR-0005 实际状态是**已接受**。
-- 同一文件 §9.28 写「MCP 传输层只有 HTTP」，而 ADR-0011 §6.3 与 §9.14 记录 stdio 已落地。
-- ⚠️ [`../plans/ai-memory-system.md`](../plans/ai-memory-system.md) 文档头写「待实施」，
-  而正文 §9 记录 M1–M6 **全部完成**。
+下面三处曾记录为"漂移"，**本轮文档同步已修**（改的是文档，不涉及决策）：
+
+- ~~[`../plans/ai-capability-branches.md`](../plans/ai-capability-branches.md) 头部写
+  「上游决策：ADR-0005（**待确认**）」~~ → 已改为 ADR-0005 **已接受**。
+- ~~同一文件 §9.28 写「MCP 传输层只有 HTTP」~~ → stdio 已落地，§9.28 已更新。
+- ~~[`../plans/ai-memory-system.md`](../plans/ai-memory-system.md) 文档头写「待实施」~~ →
+  文档头已改为 M1–M6 全部完成。
 
 > 这些是**漂移**，不是决策冲突。修改它们属于文档整理，不需要新 ADR。
 

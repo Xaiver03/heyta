@@ -1,6 +1,9 @@
 # 模块 1 任务书：AI 引擎层正确性与孤立分支治理
 
-> 状态：**规划中**
+> 状态：✅ **已执行**（2026-09-27）—— ⚠️ **不要再照这份任务书做一遍。**
+> 模块 1 的产出是**对抗性验证，不是新代码**：任务书 §3.1–§3.5 的修复在分叉点之前
+> 就已落在 `main` 上，所以合并提交 `06d7be3` 是 **0 文件变更** —— 那不是"空跑"，
+> 而是**任务书发出时工作已经做完**（分叉 tag `ai-remediation-fork`）。
 > 适用对象：**一个 AI 执行者**（本文即提示词，可直接整篇粘贴给该 AI）
 > 上游审计：[`ai-gap-audit-and-remediation.md`](ai-gap-audit-and-remediation.md)
 > 并行模块：模块 2（Web 旅程）、模块 3（记忆护城河）——**不要碰它们的文件**
@@ -195,6 +198,13 @@ git add <具体文件> && git commit -m "<msg>" -- <具体路径>
 | `AiEndpointConfig.disabled` | `packages/ai/src/routing.ts` | **有读无写**：过滤会真的跳过它，但 UI/CLI 都不写 |
 | `AiRouteTarget.model` | `packages/ai/src/routing.ts` | **有读无写** |
 | `vision` / `tool_calling` | `packages/ai/src/routing.ts` 的能力词表 | 四个功能一个都不要求 |
+
+> ⚠️ **上表是任务书发出当日的快照，保留不改 —— 但有一行今天已经不成立**：
+> `describeRouteIntent()` 那一格写着「零调用点、**零测试**」，而它**现在有测试了**
+> （`packages/ai/tests/routing.spec.ts`）。"零生产调用点"仍成立，且按本任务书的裁决
+> **是刻意保留**（壳走 `apps/web/src/features/ai/route-explanation.ts` 的
+> `resolveFeatureRoute()` —— 理由见 `ai-architecture.md` §5.7）。
+> 别再把它当成"待清理的死代码"。
 
 **关键判断（请认真做，不要敷衍）**：
 
