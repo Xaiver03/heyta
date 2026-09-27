@@ -39,6 +39,7 @@ import { ListsSection } from './ListsSection';
 import { TagsSection } from './TagsSection';
 import { useLocalePreference } from '../i18n/locale-preference';
 import { formatStamp } from '../lib/date';
+import { useTokens } from '../theme';
 import { describeSyncStatus, statusTone } from '../sync/status-text';
 import { useMobileSync, refreshPendingUpload, syncNow } from '../sync/store';
 import {
@@ -51,6 +52,7 @@ import {
 export function ProfileScreen(): React.JSX.Element {
   const { status, lastSyncedAt, pendingUpload, busy } = useMobileSync();
   const { t } = useI18n();
+  const tokens = useTokens();
   /**
    * 🔴 语言偏好**只放内存**，与凭据同一个取舍（见文件头与 `sync/config.ts`）。
    *
@@ -178,7 +180,7 @@ export function ProfileScreen(): React.JSX.Element {
     <Screen title={t('mobile.profile.title')}>
       <SectionHeader icon="action.sync" title={t('mobile.profile.section.sync')} />
       <Card>
-        <View style={{ gap: 16 }}>
+        <View style={{ gap: tokens['space.4'] }}>
           <TextField
             label={t('mobile.profile.serverUrl.label')}
             value={serverUrl}
@@ -234,7 +236,7 @@ export function ProfileScreen(): React.JSX.Element {
 
       <SectionHeader icon="action.settings" title={t('mobile.profile.section.status')} />
       <Card>
-        <View style={{ gap: 12 }}>
+        <View style={{ gap: tokens['space.3'] }}>
           <StatusRow
             status={status}
             busy={busy}
@@ -282,7 +284,7 @@ export function ProfileScreen(): React.JSX.Element {
           理由与代价见上面 `useLocalePreference()` 那段注释。 */}
       <SectionHeader icon="action.settings" title={t('mobile.profile.section.language')} />
       <Card>
-        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12 }}>
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: tokens['space.3'] }}>
           {LOCALES.map((code) => {
             // 语言名永远用**它自己的语言**写（中文 / English），
             // 不跟着当前语言翻译 —— 否则用户在英文界面里找"中文"
@@ -336,8 +338,9 @@ function StatusRow({
   onOpenConflicts: () => void;
 }): React.JSX.Element {
   const { t } = useI18n();
+  const tokens = useTokens();
   return (
-    <View style={{ gap: 4 }}>
+    <View style={{ gap: tokens['space.1'] }}>
       <Text variant="row-title" tone={busy ? 'muted' : statusTone(status)}>
         {describeSyncStatus(status, t)}
       </Text>
@@ -347,7 +350,7 @@ function StatusRow({
         </Text>
       ) : null}
       {status.kind === 'conflict' ? (
-        <View style={{ gap: 8 }}>
+        <View style={{ gap: tokens['space.2'] }}>
           <Text variant="caption" tone="danger">
             {t('mobile.profile.conflict.body')}
           </Text>
@@ -371,8 +374,9 @@ function Row({
   value: string;
   tone: 'default' | 'muted' | 'subtle';
 }): React.JSX.Element {
+  const tokens = useTokens();
   return (
-    <View style={{ flexDirection: 'row', justifyContent: 'space-between', gap: 12 }}>
+    <View style={{ flexDirection: 'row', justifyContent: 'space-between', gap: tokens['space.3'] }}>
       <Text variant="row-meta" tone="muted">
         {label}
       </Text>
