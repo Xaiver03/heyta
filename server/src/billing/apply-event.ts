@@ -110,10 +110,10 @@ const toEpochMillis = (value: unknown): number | undefined => {
  * `subscription-boundary.md` §6.2 的规则，逐条落在这里：
  *
  * - **一行一用户**：`(userId, provider)` 复用一行，`externalSubscriptionId = null`；
- * - **一次支付 = +365 天**：`max(now, 已有的 currentPeriodEnd ?? now) + 365天`
+ * - **一次支付 = +30 天**：`max(now, 已有的 currentPeriodEnd ?? now) + 30天`
  *   （算术在注入的 `extendPeriod` 里，本文件不含公式）；
  * - **绝不删除**：只写 `status` / `currentPeriodEnd`，这里没有任何删除调用；
- * - **永不 `now + 365天`**：那会让提前续费的用户丢掉已付过钱的剩余时间。
+ * - **永不 `now + 30天`**：那会让提前续费的用户丢掉已付过钱的剩余时间。
  *
  * 幂等**不在这里**：同一 `out_trade_no` 的重复回调在路由层被
  * `(provider, providerEventId)` 唯一约束挡住（`webhook.routes.ts`）。本函数

@@ -9,7 +9,7 @@
  * 本文件不碰任何任务数据 —— 权益判定接受不了任务字段（见 `subscription.ts` 文件头）。
  */
 import { readFileSync } from 'node:fs';
-import { extendSubscriptionPeriod } from '../src/subscription.js';
+import { SUBSCRIPTION_PERIOD_DAYS, extendSubscriptionPeriod } from '../src/subscription.js';
 import { describe, expect, it } from 'vitest';
 
 import {
@@ -226,34 +226,52 @@ describe('extendSubscriptionPeriod —— 一次支付如何变成一段时长',
   const DAY = 24 * 60 * 60 * 1000;
   const NOW = 1_800_000_000_000; // 固定时刻，避免用到真实时钟
 
-  it('首次购买：从当前时刻起算 365 天', () => {
+  /**
+   * 🔴 周期长度是**产品决定**，在整个仓库里只钉这一个具体数字（ADR-0020 §2.2：月付）。
+   *
+   * 下面所有算术都从 `PERIOD` 派生，而不是各写一个 `30` ——
+   * 否则下次改周期要改十几个数字，漏掉一个就是"测试红了但看不出为什么"。
+   * 反过来说：**如果下面任何一条红了，先去看 ADR-0020 改了没有**，
+   * 不要顺手把 30 改成新值 —— 那会让测试从"钉住决策"退化成"复述实现"。
+   */
+  const PERIOD = SUBSCRIPTION_PERIOD_DAYS;
+
+  it('🔴 默认周期 = 30 天（月付；ADR-0017 的 365 天已作废）', () => {
+    expect(PERIOD).toBe(30);
+  });
+
+  it('首次购买：从当前时刻起算一个周期', () => {
     expect(extendSubscriptionPeriod({ now: NOW, currentPeriodEnd: null })).toBe(
-      NOW + 365 * DAY,
+      NOW + PERIOD * DAY,
     );
   });
 
   it('🔴 提前续费必须叠加 —— 不许丢掉已经付过钱的剩余时间', () => {
-    // 还剩 100 天时又买了一年：应该是 100 + 365 = 465 天，
-    // 而不是被重置成 365 天。
-    const existing = NOW + 100 * DAY;
+    // 还剩 10 天时又买一个周期：应该是 10 + 30 = 40 天，而不是被重置成 30 天。
+    //
+    // ⚠️ 剩余天数必须**小于**周期长度，否则测的就不是"提前续费"而是
+    // "过期后续费"。周期从 365 天变成 30 天之后这个窗口小了一个数量级 ——
+    // 月付下"提前续费"本来就比年付下罕见得多（见 subscription-boundary.md）。
+    const remaining = 10;
+    const existing = NOW + remaining * DAY;
     const next = extendSubscriptionPeriod({ now: NOW, currentPeriodEnd: existing });
 
-    expect(next).toBe(NOW + 465 * DAY);
+    expect(next).toBe(NOW + (remaining + PERIOD) * DAY);
     // 钉住"没有被重置"这个性质本身，而不只是钉住那个数字。
-    expect(next).toBeGreaterThan(existing + 364 * DAY);
+    expect(next).toBeGreaterThan(existing + (PERIOD - 1) * DAY);
   });
 
   it('已过期后续费：从当前时刻起算，不从过期的端点起算', () => {
     // 到期日已经过去 10 天。若拿它去叠加，新买的时长会有 10 天埋在过去。
     const lapsed = NOW - 10 * DAY;
     expect(extendSubscriptionPeriod({ now: NOW, currentPeriodEnd: lapsed })).toBe(
-      NOW + 365 * DAY,
+      NOW + PERIOD * DAY,
     );
   });
 
   it('到期日正好是当前时刻：按"已到期"处理，从 now 起算', () => {
     expect(extendSubscriptionPeriod({ now: NOW, currentPeriodEnd: NOW })).toBe(
-      NOW + 365 * DAY,
+      NOW + PERIOD * DAY,
     );
   });
 
@@ -264,13 +282,15 @@ describe('extendSubscriptionPeriod —— 一次支付如何变成一段时长',
 
     expect(second).toBeGreaterThan(first);
     expect(third).toBeGreaterThan(second);
-    expect(third).toBe(NOW + 3 * 365 * DAY);
+    expect(third).toBe(NOW + 3 * PERIOD * DAY);
   });
 
-  it('可以指定别的时长（默认 365 天不是硬编码）', () => {
+  it('可以指定别的时长（默认周期不是硬编码）', () => {
+    // 🔴 用 7 天而不是 30 天：`30` 现在**就是**默认值，拿它当"别的时长"
+    // 等于什么都没测 —— 把默认值改成 30 这条测试也照样绿。
     expect(
-      extendSubscriptionPeriod({ now: NOW, currentPeriodEnd: null, days: 30 }),
-    ).toBe(NOW + 30 * DAY);
+      extendSubscriptionPeriod({ now: NOW, currentPeriodEnd: null, days: 7 }),
+    ).toBe(NOW + 7 * DAY);
   });
 
   it('🔴 非有限输入必须抛异常 —— 这是收钱路径，算不出来就要响', () => {

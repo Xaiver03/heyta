@@ -71,8 +71,8 @@ export const WECHAT_API_BASE_URL = 'https://api.mch.weixin.qq.com';
  */
 export const WECHAT_SIGNATURE_MAX_AGE_MS = 5 * 60 * 1000;
 
-/** 阶段一的产品：一次性年付。与 `packages/domain` 的 `SUBSCRIPTION_PERIOD_DAYS` 同值。 */
-export const WECHAT_ONE_TIME_PERIOD_DAYS = 365;
+/** 产品：**按月付**（ADR-0020 §2.2）。与 `packages/domain` 的 `SUBSCRIPTION_PERIOD_DAYS` 同值。 */
+export const WECHAT_ONE_TIME_PERIOD_DAYS = 30;
 
 /** 默认回调地址的路径（`notify_url` 一般是 `PUBLIC_URL` + 它）。 */
 export const WECHAT_NOTIFY_PATH = '/api/billing/webhooks/wechat';
@@ -649,7 +649,7 @@ export const createWechatBillingAdapter = (
       // 🔴 金额校验 —— 付的钱必须落在价目表上，否则**不授予**。
       //
       // 没有这一道的话：一笔 ¥1 的订单（或任何未来新增的低价 SKU、测试单）
-      // 会按 `WECHAT_ONE_TIME_PERIOD_DAYS` 授予**整整一年**。
+      // 会按 `WECHAT_ONE_TIME_PERIOD_DAYS` 授予**整整一个月**。
       // 这是会实际损失钱的那类洞，不是理论问题。
       //
       // ⚠️ **判据是"金额是价目表里的某一个"**，不是"金额对应的是这一单买的那一项"。

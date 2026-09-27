@@ -1,7 +1,13 @@
 # 价格与优惠券的工程参考
 
 > 决策与理由见 [ADR-0018](../adr/0018-adjustable-pricing-and-coupons.md)（价格可调 + 券域模型）
-> 与 [ADR-0017](../adr/0017-single-paid-tier-and-payment-channel.md)（唯一付费档、¥99/$49、自建免费）。
+> 与 [ADR-0020](../adr/0020-ai-subscription-two-tiers.md)（**恰好两个付费项、都月付**：
+> `hosted-monthly` ¥5/$5、`hosted-ai-monthly` ¥12/$12；一次支付授予 **30 天**；自建永久免费）。
+>
+> 🔴 价格与周期以 **ADR-0020** 为准 —— 它**取代了
+> [ADR-0017](../adr/0017-single-paid-tier-and-payment-channel.md) 的价格与周期结论**：
+> `annual` 唯一付费档、`¥99 / 年`、`$49 / 年`、一次支付授予 365 天 —— **全部作废**
+> （0017 的「自建永久免费」「不自动续费」两条保留）。
 >
 > 本文描述**代码现在长什么样**。与 ADR 冲突时以 ADR 为准。
 > 价格本身不住在这里 —— 它住在 §1.1 说的那个唯一事实源。
@@ -66,7 +72,7 @@
 | `PERCENT_SCALE` | `10_000` | `money.ts` | 百分比用**基点**。`1500` = 15% |
 | `PERCENT_OFF_BP_MAX` | `10_000` | `money.ts` | 100%。等于它就等于免费 |
 | `MIN_CHARGEABLE_AMOUNT_MINOR` | `1` | `money.ts` | 0 元单**不可支付** |
-| `DEFAULT_PRICE_BOOK` | CNY `9_900` / USD `4_900`，`effectiveFrom: 0`、`effectiveUntil: null` | `price-book.ts` | 代码基线 |
+| `DEFAULT_PRICE_BOOK` | **4 条** = 两个 SKU × 两种币种，全部 `effectiveFrom: 0`、`effectiveUntil: null`：`hosted-monthly` CNY/USD 各 `500`（¥5/$5）、`hosted-ai-monthly` CNY/USD 各 `1_200`（¥12/$12） | `price-book.ts` | 代码基线（ADR-0020。旧的单档 `annual` `9_900`/`4_900` 已作废） |
 | `REGIONS` | `['CN','INTL']` | `coupon.ts` | 区域，**与币种是独立的两根轴** |
 | `COUPON_REJECTION_REASONS` | 13 个（见 §3.1） | `coupon.ts` | 券被拒的全部原因 |
 | `MAX_COUPONS_PER_ORDER` | `1` | `quote.ts` | 一单一张。**改了它就抛异常**（叠加语义未实现） |
@@ -75,7 +81,8 @@
 | `REDEMPTION_STATES` | `reserved` / `applied` / `expired` / `reversed` | `pricing-store.ts` | 与 `coupon_redemptions_state_known` CHECK 一致 |
 | `COUNTED_REDEMPTION_STATES` | `reserved` / `applied` / `reversed` | `pricing-store.ts` | 🔴 名额口径的**唯一定义处**。`expired` **不在**里面 |
 | `AUDIT_ACTIONS` | `price_published` / `coupon_upserted` / `coupon_toggled` | `pricing-store.ts` | 审计动作词表 |
-| `WECHAT_ONE_TIME_PERIOD_DAYS` | `365` | `wechat.adapter.ts` | 一次性支付授予的权益天数（与价格无关） |
+| `WECHAT_ONE_TIME_PERIOD_DAYS` | `30` | `wechat.adapter.ts` | 一次支付授予的天数（月付 = 30；ADR-0020 把旧的 `365` 作废）。与价格无关，跟着**周期**走 |
+| `WECHAT_OUT_TRADE_NO_MAX_LENGTH` | `32` | `wechat.adapter.ts` | 微信商户订单号长度上限；调用方传的号超长**在本地就拒** |
 
 ### 3.1 13 个拒绝原因与判定顺序
 
@@ -149,8 +156,16 @@
 **跟订单上冻结的 `final_amount_minor` 比，不跟价目表比。**
 
 旧实现（ADR-0017 §3.2）是"金额是价目表里的某一个"。那在有券之后同时错两个方向：
-付了 ¥99 的人能白拿 ¥20 的折扣（¥99 在价目表上）；而真的付了 ¥79 的人
-**被拒绝授予**（¥79 不在价目表上）。
+按新价位（¥5）说就是 —— 付了 ¥5 的人能白拿 ¥1 的折扣（¥5 在价目表上）；
+而真的付了 ¥4 的人**被拒绝授予**（¥4 不在价目表上）。
+
+🔴 **价格降到 ¥5/月 之后，券的折扣空间只剩几毛钱的量级 —— 这是新定价模型带来的
+产品约束，不是实现细节。** 一张 `fixed` ¥20 的券落在 ¥5 的订单上时，折扣被
+`clampDiscountMinor` 夹到 ¥5、实付变 0，于是撞上**最后一条**拒绝原因
+`not_chargeable_after_discount` —— **券不是"减得多"，而是直接无效**。
+所以在新价位上，"发一张大额券"这种玩法用不出去：能用的量级是「¥5 减 ¥1」
+（`discount_minor: 100`、`final_amount_minor: 400`），或者 `percent` 券
+（`percentOffBp = 800`，即 8% → 折扣 `Math.ceil(500 × 800 / 10000) = 40` 分、实付 460 分）。
 
 ### 4.4 名额口径（`COUNTED_REDEMPTION_STATES`）
 
@@ -246,28 +261,59 @@ expireStaleOrders(sql, { now })
 它**不再持有价格语义**（价目表只剩 `description` 的用途）。
 金额不是正整数时抛 `WechatInvalidAmountError`，不兜底、不回落。
 
-回归测试：`server/tests/wechat-adapter.spec.ts` 里那笔 `priceId: 'annual'`
-但 `amountMinor: 7_900` 的单（即"¥99 用了 ¥20 券"）—— 断言发出去的是 **7900**，
-不是基线 9900。
+回归测试：`server/tests/wechat-adapter.spec.ts` 里那笔 `priceId: 'hosted-monthly'`、
+`amountMinor` 由调用方传成一个**故意不等于基线 `500` 的冻结实付**的单 ——
+断言发出去的是**传进来的那个数**，不是回价目表查到的基线 `500`。
+（同一文件 webhook 侧的夹具：付对 `500 = ¥5` → 授予 **30 天**。）
+
+同一处还有**订单号**：`CreateCheckoutInput.outTradeNo` 由**调用方**生成并传入，
+adapter 必须原样使用。理由是回调按订单号认单（`settleOrderPaid` 用
+`out_trade_no` 查 `checkout_orders`）—— adapter 若另生成一个，库里冻的是 A、
+发给通道的是 B，回调到达时 `unknown-order`，**一笔真实到账的钱授予不出去**。
+
+所以顺序只能是「**先冻结、后下单**」：
+`quoteOrder` → `createOrderWithReservation(..., outTradeNo)` →
+`adapter.createCheckout({ outTradeNo, amountMinor: quote.finalAmountMinor })`。
+反过来（先下单再冻结）会在"名额已满"时留下一个通道侧已经存在、用户还能扫码付款
+的订单，而那时我们没有对应的冻结金额。调用方给的号若为空 / 超长 / 解不出同一个
+`userId`（`attach` 丢失时的归属兜底），在**收钱之前**就抛
+`WechatInvalidOutTradeNoError`。闭环证据在
+`server/tests/billing-pricing-store.pglite.spec.ts`（真 PostgreSQL：冻结的行、
+发给通道的 payload、结算用到的数三者逐字相等）。
 
 ---
 
 ## 7. 未验证项与已知缺口（不假装它们被测过）
 
-1. **行锁的阻塞行为没有被本仓库实测过。** PGlite 是单连接，两个 `BEGIN`
-   无法并存，所以"两个并发预留抢最后一张券"跑不出真交错。我们有的证据是
-   （a）顺序语义：用满之后下一次预留真的抛错；（b）机制形状：一条记录语句顺序的
-   测试断言"锁券行 → 数名额 → 插入"在同一事务里按这个顺序发生。
-   **PostgreSQL 的行锁会阻塞并发写者是其文档保证的行为，但未在本仓库验证。**
-   验证方式：对一个真 PostgreSQL 跑两个并发事务（`server/package.json` 的
-   `test:integration:postgres` 那条链路），断言其中一个阻塞到另一个提交。
-2. **Prisma 的参数绑定层未被测试覆盖。** `createPrismaSqlExecutor` 只做三件事：
-   转发参数、包 `$transaction`、把非数组返回值兜成 `[]`。所有 SQL 文本本身在
-   PGlite 上跑过，但"Prisma 会不会把 `number` 正确绑到 `BIGINT`、把 JS 数组
-   绑到 `text[]`"没有被自动化验证。验证方式：在真库上跑一遍
-   `billing-pricing-store.pglite.spec.ts` 的同名用例（把那套 executor 换成 Prisma 版）。
-   ⚠️ 这个缺口是**有意的取舍**：把 Prisma 的 `$queryRawUnsafe` 包成一个可注入的
-   端口，换来的是"全部 SQL 在真 PostgreSQL 上被跑过"。
+1. ~~**行锁的阻塞行为没有被本仓库实测过。**~~ **已在真 PostgreSQL 上实测 —— 不再是缺口。**
+   PGlite 是单连接，两个 `BEGIN` 无法并存，所以那条链路仍然只给顺序语义 + 机制形状。
+   真交错现在由 `server/tests/integration/coupon-quota-race.integration.spec.ts` 覆盖：
+   两个（以及五个）并发事务同时预留限量券，断言**恰好一个 / 恰好两个成功**、
+   其余抛 `CouponQuotaExceededError`，并**直接查库**核对核销行数。
+
+   🔴 **"真的并发"不是靠运气**：该 spec 给 `SqlExecutor` 包了一层**会合栏**
+   （`withRendezvous`），让各事务在发出 `SELECT … FOR UPDATE` **之前**互相等齐 ——
+   不加这一层，用例可能碰巧串行执行，而"恰好一个成功"在串行下**也成立**，
+   于是断言变成空转。
+   非空转证明（本轮实测）：把 `pricing-store.ts` 里那句 `FOR UPDATE` 删掉 →
+   `Tests 2 failed | 1 passed`；加回去 → `Tests 3 passed`。
+   实测环境：PostgreSQL 17.9（Homebrew，`LC_ALL=C`），32 个迁移全部应用。
+
+   ⚠️ **该 spec 还没注册进 `server/package.json` 的 `test:integration:postgres`**
+   （那个文件此刻被另一条工作流改着），所以 **CI 目前不会跑它**。手动运行：
+   ```
+   DATABASE_URL=… npx vitest run --config vitest.integration.config.ts \
+     tests/integration/coupon-quota-race.integration.spec.ts
+   ```
+2. ~~**Prisma 的参数绑定层未被测试覆盖。**~~ **已被同一个 spec 覆盖（在真库上）。**
+   `createPrismaSqlExecutor` 只做三件事：转发参数、包 `$transaction`、把非数组返回值
+   兜成 `[]`。现在每一次预留都经过它，并且刻意走过两个被点名的形状：
+   `number` → `bigint`（`coupons.valid_from`、`checkout_orders.quoted_at` / `expires_at`）、
+   `number` → `integer`（`*_amount_minor`、`percent_off_bp`）、
+   JS 数组 → `text[]`（`coupons.price_ids` / `regions`，经 `upsertCoupon`）。
+   绑定写错的话语句会直接失败，所以"跑绿"就是证据。
+   ⚠️ 与第 1 条同一前提：这个 spec 还没进 CI 清单。
+   （`$transaction` 的回调**类型**另有一个缺口，见第 8 条。）
 3. ~~`check:pricing` 还没接进 `pnpm check`。~~ **已接入（提交 `e63b100`）。**
    `package.json` 现在有 `check:pricing`，`check` 链路在 `check:docs` 之后调它。
    提交时 `package.json` 是用 `git show HEAD:package.json` 做基底、**只**叠加这一处的 ——
@@ -275,9 +321,12 @@ expireStaleOrders(sql, { now })
    `check:materialized-reads`、harmony 系列 `verify:*`），不为别人提交他们没验证过的东西。
 
    实测：`pnpm check:pricing` → exit 0；`pnpm check` 全链路 → exit 0。
-   **注入探针**：把 `server/src/billing/price-book.ts` 的 `amountMinor: 9_900`
-   手改成 `9_800` → 门禁 exit 1，并指名两个不一致的文件与两个数字；改回后 exit 0。
-   门禁不是空转的。
+   **注入探针**（ADR-0017 的 ¥99 时代实测）：把 `server/src/billing/price-book.ts`
+   的 `amountMinor: 9_900` 手改成 `9_800` → 门禁 exit 1，并指名两个不一致的文件
+   与两个数字；改回后 exit 0。门禁不是空转的。
+   🔴 探针里那两个数字**已经随 ADR-0020 换代**（现在 `hosted-monthly` 的基线是 `500`）——
+   机制一个字没变，但**别照抄旧数字**：要复现就用当前基线值重跑一遍，改哪一条
+   `amountMinor` 都会让 `pricing-ssot` 块与 `price-book.ts` 对不上。
 
    `verify-i18n-failures.mjs` 的 `pricing` / `coupon` 两组是它的**故障注入**验证，
    已注册成 `pnpm verify:i18n-failures`（实测 85 例全部符合预期，其中 `pricing` 10 例、
@@ -292,19 +341,32 @@ expireStaleOrders(sql, { now })
    "用 ¥0 单测试回调链路"这条路走不通。
 7. **微信商家券 / 支付宝商家券的能力仍在灰度或受资质限制**（见 ADR-0018 §2.3）。
    本轮不接，表结构留了 `provider` / `out_trade_no` / `provider_event_id`。
-8. **没有运营用的 CLI。** §6 的三个写入口是**库函数**（`publishPriceVersion` /
-   `upsertCoupon`），还没有 `server/scripts/` 的命令行包装。之所以先不加：
-   支付通道未接线，命令**无法端到端验证**，而一个"能运行但没人能证明它对"的
-   运维脚本比没有它更危险（它会被人当成可靠的工具用）。
-   要加的时候，形状是 `server/scripts/pricing.ts show|set-price|coupon-upsert`
-   包一层参数解析，并把参数解析单独做成可测的纯函数。
-   ⚠️ `server/tsconfig.json` 的 `include` 覆盖 `scripts/**`、`rootDir: "."`，
-   所以脚本会编译到 `dist/scripts/`。
+8. ~~**没有运营用的 CLI。**~~ **已加：`server/scripts/pricing.ts`（本轮）。**
+   形状正如这里原先预告的：`show` / `set-price` / `coupon-upsert` / `coupon-disable`
+   四个子命令，包一层**严格**参数解析 —— 未知选项、重复选项、缺值一律报错，
+   因为在运维工具上"静默忽略"等于"以为改了价其实没改"。参数解析单独做成纯函数
+   `parsePricingCommand`，由 `server/tests/pricing-cli.spec.ts`（30 例）覆盖。
+   写路径只走 §6 的三个写入口，于是"收口旧版 + 插入新版 + 写审计"仍在同一事务里。
+
+   **实测（真 PostgreSQL 17.9）**：`show` 逐条打印基线（今天 = **4 条**：
+   `hosted-monthly` / `hosted-ai-monthly` × CNY/USD）；
+   `set-price --price-id hosted-monthly --currency CNY --amount-minor 13900`
+   → 打印改前 / 改后 / 收口版本 / 生效时刻；`show` 复读为 ¥139（`13900` 只是这次
+   改价探针随手取的值，**不是任何一档的价格**）；`pricing_audit_log`
+   落下 `price_published | hosted-monthly/CNY | actor=ops@heyta`。`coupon-upsert` 建券 →
+   `show` 复读 → `coupon-disable` → `show` 变 🔴 已停用，审计两条齐。
+   生产路径 `node dist/scripts/pricing.js`（`tsc` 产物）同样跑通。
+   退出码契约 0 / 1 / 2 实测：拼错的 `--amout-minor` → 2。
+
+   ⚠️ 这里原先的保留意见**仍然成立**：以上验证的是**库 + 库表**的端到端，
+   不是**钱**的端到端。改价之后"用户真的能按新价付钱"依然没验证过（见第 5 条）。
+   脚本按 `tsconfig` 的 `include: ["src/**/*","scripts/**/*"]` + `rootDir: "."`
+   编译到 `dist/scripts/`（已确认产物存在）。
 9. **回调用券时会被静默拒付 —— 这是接线前必须一起修的洞。**
    `wechat.adapter.ts` 的 `verifyWebhook` 用"金额是不是价目表里的某一个"来定
    `oneTimeGrant`，而**这一层目前是终局判定**：它给出 `oneTimeGrant: null` 之后，
    `apply-event.ts` 把这笔事件归成 `{ status: 'ignored', reason: 'NO_SUBSCRIPTION_REFERENCE' }`。
-   于是一笔"¥99 用 ¥20 券、实付 ¥79"的**真实到账**支付会被拒绝授予权益。
+   于是一笔"¥5 用 ¥1 券、实付 ¥4"的**真实到账**支付会被拒绝授予权益。
    本该接住它的 `settleOrderPaid`（比订单冻结的 `final_amount_minor`）**没有生产调用方**。
    今天不会发生，因为还没有代码能把券带进收银台（通道未接线）——
    但**接线时必须让权威判定只留在 `settleOrderPaid`**，这一层退化成如实上报。
@@ -317,6 +379,23 @@ expireStaleOrders(sql, { now })
    的路径，却把核销推成 `reversed`，而 `reversed` 是**计数**的 —— 等于永久吃掉一个名额。
    §3.4 里"退款不归还名额"的理由（预算已投放）**不适用于没付过款的单**。
    接线时应收紧成只从 `paid` 出发（ADR §3.5 的状态图本来也只画了这条）。
+12. **🔴 新发现：`createPrismaSqlExecutor(prisma)` 在 `strict` 下过不了类型检查。**
+   `PrismaLikeClient.$transaction` 声明为 `(fn: (tx: PrismaLikeClient) => …)`，
+   而 `PrismaClient.$transaction` 的回调给的是
+   `Omit<PrismaClient, ITXClientDenyList>` —— 那个事务 client **故意没有**
+   `$transaction`（它就在 Prisma 的 deny list 里）。于是"回调参数"这一向永远
+   不兼容 → `TS2345`。
+
+   之所以至今没被踩到：`pricing-store.ts` 里**没有任何生产调用点**。文件末尾的注释
+   写着"生产：`createPrismaSqlExecutor(prisma)`"，但那句话至今没有代码兑现
+   （`settleOrderPaid` 还没有生产调用者，见第 9 条）。测试没报，是因为 vitest 只转译、
+   不做类型检查，而 `server/tsconfig.json` 的 `include` 又不含 `tests/**`。
+   `server/scripts/pricing.ts` 是第一个真调用它的地方，那里用一处显式断言绕开
+   （并写明了原因）。
+
+   **正确的修法**：把 `PrismaLikeClient` 拆成"根 client（有 `$transaction`，
+   回调参数是事务 client）"与"事务 client（没有 `$transaction`）"两个接口 ——
+   那属于 `pricing-store.ts` 的公共 API，留给该文件的归属工作流；本工作流只报告不改。
 
 ---
 
@@ -324,7 +403,7 @@ expireStaleOrders(sql, { now })
 
 | 检查 | 命令 | 覆盖 |
 |---|---|---|
-| 价格一致性 | `node scripts/check-pricing-consistency.mjs` | 基线价目表 ↔ 中英词条 ↔ 法务文本 ↔ `pricing-ssot` 块；一档到底；**adapter 里不许有第二个数字** |
+| 价格一致性 | `node scripts/check-pricing-consistency.mjs` | 基线价目表 ↔ 中英词条 ↔ 法务文本 ↔ `pricing-ssot` 块；**恰好两个 SKU**（`hosted-monthly` / `hosted-ai-monthly`），每个都要带 `grants`，而 `grants` 白名单**只有** `hosting` / `ai`（功能名进收费清单 = 虚假宣传）；**adapter 里不许有第二个数字** |
 | 迁移纪律 | `node scripts/check-migrations.mjs` | 迁移文件命名/语句数/禁用语句 |
 | 券与价格的故障注入 | `node scripts/verify-i18n-failures.mjs pricing` / `… coupon` | 10 + 9 例：每一处"改坏"都必须让对应的检查变红 |
 | 单元与集成 | `cd server && npx vitest run tests/billing-*.spec.ts` | 见 §2 的"有测试吗"一列 |

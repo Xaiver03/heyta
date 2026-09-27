@@ -1115,16 +1115,20 @@
 }
 
 /* ════════════════════════════════════════════════════════════
-   价格：两栏对等对比
+   价格：三栏对等对比（自建免费 / 官方托管 / 托管 + 云端 AI）
    ════════════════════════════════════════════════════════════ */
 
-/* 两栏**等宽**，不是「免费窄、付费宽」——
-   两个档是同一个产品的两种用法，版面本身就该说"它们对等"。
-   `stretch`（默认）而不是 `start`：两张卡等高，底部的 CTA / 状态说明才会
-   落在同一条水平线上；否则内容少的那张会矮一截，两个按钮一高一低。 */
+/* 三栏**等宽**，不是「免费的窄、付费的宽」——
+   三栏是同一个产品的三种用法，版面本身就该说"它们对等"。
+   🔴 免费那栏就是**全部功能**（ADR-0020 §3.2）：没有任何一栏是"功能更少"的，
+   所以三栏宽度必须一样，否则版面上就在暗示"免费的是阉割版"。
+   `stretch`（默认）而不是 `start`：三张卡等高，底部的 CTA / 状态说明才会
+   落在同一条水平线上；否则内容少的那张会矮一截，按钮一高一低。
+
+   ⚠️ 三栏比两栏窄，`1024px` 与 `640px` 两处断点都有对应降级（见文件末）。 */
 .lp-pricing__grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: var(--ht-space-4);
 }
 
@@ -1403,10 +1407,15 @@
   }
 
   .lp-showcase__grid,
-  .lp-pricing__grid,
   .lp-selfhost__grid,
   .lp-footer__grid {
     grid-template-columns: minmax(0, 1fr);
+  }
+
+  /* 平板：三栏太窄 → 两栏（第三张换行）。不是塌成一栏 ——
+     一栏会让"三档对比"这件事在平板尺寸上彻底消失。 */
+  .lp-pricing__grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .lp-showcase__stage {
@@ -1423,6 +1432,11 @@
   .lp-sync,
   .lp-footer {
     padding-block-start: calc(var(--ht-space-16) * 1.1);
+  }
+
+  /* 手机：价格三栏一栏一张，垂直读完三档再决定。 */
+  .lp-pricing__grid {
+    grid-template-columns: minmax(0, 1fr);
   }
 
   .lp-bento {

@@ -246,13 +246,17 @@ export const decideHostedSyncAccess = (
 };
 
 /**
- * 一次购买的默认时长：365 天。
+ * 一次购买的默认时长：**30 天**。
  *
- * 🔴 这是**产品决定**，不是常量噪音。阶段一是"一次性年付 ¥139 +
- * 到期提醒手动续费"，所以时长记账由我们自己负责 —— 微信支付**没有订阅对象**，
- * 它的回调不会告诉我们"订阅到哪一天"。见 `subscription-boundary.md` §6。
+ * 🔴 这是**产品决定**，不是常量噪音。ADR-0020 §2.2 把周期定成了**月付**
+ * （旧的年付 ¥99 / $49 已作废），到期提醒手动续费，所以时长记账由我们自己负责 ——
+ * 微信支付**没有订阅对象**，它的回调不会告诉我们"订阅到哪一天"。
+ * 见 `subscription-boundary.md` §6。
+ *
+ * ⚠️ 30 天是**按天记账**，不是"自然月"：1 月 31 日买的会在 3 月 2 日到期。
+ * 对外文案（法务 §4）写的也是"自支付成功起 30 天"，两边口径一致。
  */
-export const SUBSCRIPTION_PERIOD_DAYS = 365;
+export const SUBSCRIPTION_PERIOD_DAYS = 30;
 
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
@@ -261,7 +265,7 @@ export type ExtendSubscriptionPeriodInput = {
   now: number;
   /** 已记录的到期时刻（epoch ms）；从未购买过传 null。 */
   currentPeriodEnd: number | null;
-  /** 本次购买的时长，默认 365 天。 */
+  /** 本次购买的时长，默认 30 天（见 `SUBSCRIPTION_PERIOD_DAYS`）。 */
   days?: number;
 };
 

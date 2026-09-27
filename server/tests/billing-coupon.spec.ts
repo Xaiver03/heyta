@@ -63,7 +63,7 @@ const baseCoupon = (overrides: Partial<CouponDefinition> = {}): CouponDefinition
 
 const baseContext = (overrides: Partial<CouponContext> = {}): CouponContext => ({
   now: NOW,
-  priceId: 'annual',
+  priceId: 'hosted-monthly',
   currency: 'CNY',
   originalAmountMinor: 9_900,
   region: 'CN',
@@ -407,7 +407,7 @@ describe('券判定：不能用的每一条都有理由', () => {
 // ---------------------------------------------------------------------------
 
 const makeRequest = (overrides: Partial<QuoteRequest> = {}): QuoteRequest => ({
-  priceId: 'annual',
+  priceId: 'hosted-monthly',
   currency: 'CNY',
   region: 'CN',
   candidateCodes: [],
@@ -433,23 +433,23 @@ const quote = (
   });
 
 describe('计价：价格来自价目表，不来自别处', () => {
-  it('没有券时原价 = 实付 = 9900', () => {
+  it('没有券时原价 = 实付 = 500', () => {
     const q = quote({});
     expect(q).toMatchObject({
-      priceId: 'annual',
+      priceId: 'hosted-monthly',
       currency: 'CNY',
       region: 'CN',
-      originalAmountMinor: 9_900,
+      originalAmountMinor: 500,
       discountMinor: 0,
-      finalAmountMinor: 9_900,
+      finalAmountMinor: 500,
       appliedCouponId: null,
       rejectedCoupons: [],
     });
   });
 
-  it('海外价 4900，币种跟请求走（两支价格各自独立）', () => {
+  it('海外价 500，币种跟请求走（两支价格各自独立）', () => {
     const q = quote({ currency: 'USD', region: 'INTL' });
-    expect(q.originalAmountMinor).toBe(4_900);
+    expect(q.originalAmountMinor).toBe(500);
     expect(q.currency).toBe('USD');
   });
 
@@ -466,7 +466,7 @@ describe('计价：价格来自价目表，不来自别处', () => {
       {
         overrides: [
           {
-            priceId: 'annual',
+            priceId: 'hosted-monthly',
             currency: 'CNY',
             amountMinor: 6_900,
             effectiveFrom: NOW - HOUR,
@@ -486,7 +486,7 @@ describe('计价：价格来自价目表，不来自别处', () => {
         {
           overrides: [
             {
-              priceId: 'annual',
+              priceId: 'hosted-monthly',
               currency: 'CNY',
               amountMinor: 6_900,
               effectiveFrom: NOW + HOUR,
@@ -509,7 +509,7 @@ describe('计价：价格来自价目表，不来自别处', () => {
         {
           overrides: [
             {
-              priceId: 'annual',
+              priceId: 'hosted-monthly',
               currency: 'CNY',
               amountMinor: 0,
               effectiveFrom: 0,
@@ -523,17 +523,32 @@ describe('计价：价格来自价目表，不来自别处', () => {
 });
 
 describe('计价：选券', () => {
-  const launch = baseCoupon({ id: 'launch', code: 'LAUNCH' });
+  /**
+   * 🔴 券额必须按**新价格**的量级来设，不能沿用 ¥99 时代的数。
+   *
+   * ADR-0020 把价格从 ¥99/年 降到了 **¥5/月**，于是"立减 ¥20"这张基准券
+   * 变成了**折扣大于订单金额** —— 它会被判为无效券，测试里表现为
+   * `appliedCouponId` 是 null 而不是 'launch'。
+   *
+   * 这不是测试的毛病，是价格降下来之后**真实**的产品约束：
+   * ¥5 的单子上，一张 ¥1 的券就是 20% off，折扣空间非常小。
+   * 促销设计要按这个量级来（见 docs/plans/pricing-coupons-handoff.md）。
+   */
+  const launch = baseCoupon({
+    id: 'launch',
+    code: 'LAUNCH',
+    benefit: { kind: 'fixed', amountOffMinor: 100 },
+  });
   const big = baseCoupon({
     id: 'big',
     code: 'BIG',
-    benefit: { kind: 'fixed', amountOffMinor: 3_000 },
+    benefit: { kind: 'fixed', amountOffMinor: 200 },
   });
 
   it('用户敲的码命中 → 用上它', () => {
     const q = quote({ candidateCodes: ['launch'] }, { coupons: [launch, big] });
     expect(q.appliedCouponId).toBe('launch');
-    expect(q.finalAmountMinor).toBe(7_900);
+    expect(q.finalAmountMinor).toBe(400);
   });
 
   it('大小写不影响命中（大小写归一化在计价链路上真的生效）', () => {
@@ -545,7 +560,7 @@ describe('计价：选券', () => {
   it('🔴 **不**自动换成折扣更大的券 —— 订单上记的券必须与用户敲的一致', () => {
     const q = quote({ candidateCodes: ['LAUNCH', 'BIG'] }, { coupons: [launch, big] });
     expect(q.appliedCouponId).toBe('launch');
-    expect(q.discountMinor).toBe(2_000);
+    expect(q.discountMinor).toBe(100);
     expect(q.rejectedCoupons).toEqual([
       expect.objectContaining({ couponId: 'big', reason: 'stacking_not_allowed' }),
     ]);
@@ -567,7 +582,7 @@ describe('计价：选券', () => {
   it('不存在的码 → unknown_coupon，且**不影响**没有券时的价格', () => {
     const q = quote({ candidateCodes: ['NOPE'] }, { coupons: [launch] });
     expect(q.appliedCouponId).toBeNull();
-    expect(q.finalAmountMinor).toBe(9_900);
+    expect(q.finalAmountMinor).toBe(500);
     expect(q.rejectedCoupons).toEqual([
       { couponId: null, rawCode: 'NOPE', reason: 'unknown_coupon', explanation: '没有这个优惠码' },
     ]);
@@ -604,7 +619,13 @@ describe('计价：选券', () => {
   });
 
   it('usageByCouponId 真的被用上了（限额检查走的是调用方给的用量）', () => {
-    const limited = baseCoupon({ id: 'limited', code: 'ONCE', maxRedemptionsPerUser: 1 });
+    const limited = baseCoupon({
+      id: 'limited',
+      code: 'ONCE',
+      maxRedemptionsPerUser: 1,
+      // 券额同样要按 ¥5 的量级（见本 describe 开头的说明）。
+      benefit: { kind: 'fixed', amountOffMinor: 100 },
+    });
     const q = quote(
       {
         candidateCodes: ['ONCE'],
@@ -617,7 +638,13 @@ describe('计价：选券', () => {
   });
 
   it('没给用量时按"从未用过"处理（新用户的第一单就是这个形状）', () => {
-    const limited = baseCoupon({ id: 'limited', code: 'ONCE', maxRedemptionsPerUser: 1 });
+    const limited = baseCoupon({
+      id: 'limited',
+      code: 'ONCE',
+      maxRedemptionsPerUser: 1,
+      // 券额同样要按 ¥5 的量级（见本 describe 开头的说明）。
+      benefit: { kind: 'fixed', amountOffMinor: 100 },
+    });
     expect(quote({ candidateCodes: ['ONCE'] }, { coupons: [limited] }).appliedCouponId).toBe(
       'limited',
     );

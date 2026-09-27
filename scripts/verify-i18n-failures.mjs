@@ -19,8 +19,22 @@
  *   node scripts/verify-i18n-failures.mjs            # 全部
  *   node scripts/verify-i18n-failures.mjs gate       # 只跑一组
  *
- * ⚠️ 这个脚本会**临时修改工作区里的文件**并还原。它不碰 git、不 commit。
- * 别在别的进程正改同一批文件时跑它 —— `withMutation` 会拒绝覆盖别人的改动并直接报错。
+ * ⚠️ 这个脚本不碰 git、不 commit。
+ *
+ * 🔴 **隔离**：`pricing` / `coupon` 两组改的是 `/tmp` 里的**副本**（见 `prepareProbe`），
+ * 真实工作区**一个字都不改**。`recurrence` 的源码副本也是隔离的，但它还会注入
+ * `packages/i18n/dist/index.js` —— 那是**未跟踪的构建产物**，不是源码。
+ *
+ * 隔离是被实测教出来的：注入会在几十秒内把源码故意改坏，而在共享工作区里，这期间
+ * 任何别的进程（`pnpm build` / 另一个 agent）读到的都是**改坏的代码**；一次运行
+ * 还把一批文件的 mtime 全刷新了，差点被当成"别人的未提交改动被抹掉"。
+ *
+ * ⚠️ **其余 11 组仍然就地改真实文件**（gate / catalog / disclosure / conflict /
+ * landing / scene / storage / sync / preference / preset / aifailure），其中 `gate`
+ * 改的还是 `zh-CN.ts` 这种常有别人在改的文件。它们有 journal + 信号处理器 +
+ * "拒绝覆盖别人的改动"三道防线，但**注入期间工作区里确实是坏的**：别在别的进程
+ * 正改同一批文件时跑它们，也别和 `pnpm build` 并行跑。要搬进副本就照
+ * `prepareProbe` 的用法改。
  */
 
 import { execFileSync } from 'node:child_process';
@@ -38,13 +52,15 @@ import path from 'node:path';
 
 const ROOT = path.resolve(import.meta.dirname, '..');
 const NODE_BIN = path.join(path.dirname(process.execPath), 'node');
+/** 隔离副本的根。`/tmp` 被系统清掉会重建，不影响结论。 */
+const PROBE_ROOT = '/tmp/heyta-i18n-probe';
 
 const GATE = path.join(ROOT, 'scripts/check-ui-language.mjs');
 const ZH = path.join(ROOT, 'packages/i18n/src/locales/zh-CN.ts');
 const EN = path.join(ROOT, 'packages/i18n/src/locales/en.ts');
 const I18N_DIST = path.join(ROOT, 'packages/i18n/dist/index.js');
 const MOBILE = path.join(ROOT, 'apps/mobile');
-const MOBILE_PROBE = '/tmp/heyta-i18n-probe/apps/mobile';
+const MOBILE_PROBE = path.join(PROBE_ROOT, 'recurrence/apps/mobile');
 const AI = path.join(ROOT, 'packages/ai');
 const AI_SUPPLY = path.join(AI, 'src/supply.ts');
 const AI_HEALTH = path.join(AI, 'src/health-store.ts');
@@ -67,7 +83,7 @@ const IDB_ADAPTER = path.join(STORAGE, 'src/indexeddb/indexeddb-adapter.ts');
 const ERROR_HINT = path.join(ROOT, 'apps/web/src/features/shell/error-hint.ts');
 const ERROR_SCREEN = path.join(ROOT, 'apps/web/src/features/shell/ErrorScreen.tsx');
 const HEALTH_COPY = path.join(ROOT, 'apps/web/src/features/settings/health-copy.ts');
-// 价格一致性（ADR-0017）：实际收多少 / 对外怎么说 / 对外怎么承诺 —— 三处必须同一个数。
+// 价格一致性（ADR-0020）：实际收多少 / 对外怎么说 / 对外怎么承诺 —— 四处必须同一个数。
 const PRICING_CHECK = path.join(ROOT, 'scripts/check-pricing-consistency.mjs');
 const PRICING_DOC = path.join(ROOT, 'docs/reference/pricing-and-entitlements.md');
 const PRICING_ADAPTER = path.join(ROOT, 'server/src/billing/wechat.adapter.ts');
@@ -76,15 +92,101 @@ const COUPON_MONEY = path.join(ROOT, 'server/src/billing/money.ts');
 const COUPON_RULES = path.join(ROOT, 'server/src/billing/coupon.ts');
 const COUPON_STORE = path.join(ROOT, 'server/src/billing/pricing-store.ts');
 const PRICING_LEGAL = path.join(ROOT, 'server/legal/terms-of-service.heyta.md');
+// 🔴 ADR-0020 新增的第二份法务文本（云端 AI 订阅）。门禁同时扫两份 ——
+// 少了它，AI 档的价格改错了没人拦。
+const PRICING_LEGAL_AI = path.join(ROOT, 'server/legal/terms-of-service.ai.heyta.md');
+/**
+ * `check-pricing-consistency.mjs` 读的**全部** 6 个文件（仓库相对路径）。
+ *
+ * 🔴 这份清单必须与那道门禁保持一致：探针靠它造副本，漏一个文件，
+ * 门禁在副本上就会"读不到 → 报错"，而那会被误读成"注入生效了"。
+ * 故意从上面的绝对常量派生，而不是再手写一遍路径。
+ */
+const PRICING_FILES = [
+  PRICING_DOC,
+  PRICING_PRICE_BOOK,
+  PRICING_ADAPTER,
+  ZH,
+  EN,
+  PRICING_LEGAL,
+  PRICING_LEGAL_AI,
+].map((abs) => path.relative(ROOT, abs));
+
+/**
+ * 造一份**隔离副本**，让故障注入只改副本、真实工作区一个字都不动。
+ *
+ * ## 为什么必须有这个（不是洁癖）
+ *
+ * 注入会在几十秒内把源码**故意改坏**。就地改真实文件时，这期间任何别的进程
+ * —— `pnpm build` / `pnpm typecheck` / 同一个工作区里的另一个 agent —— 读到的都是
+ * 改坏的代码，会去追一个根本不存在的失败。实测代价：一次 `pricing` + `coupon`
+ * 运行把 `money.ts` / `coupon.ts` / `price-book.ts` / `pricing-store.ts` /
+ * `zh-CN.ts` / `terms-of-service` / `pricing-and-entitlements.md` 的 mtime 全刷新了，
+ * 差点被当成"别人的未提交改动被抹掉"（复核后确认无残留 —— 但那是运气，不是设计）。
+ *
+ * ## 形状
+ *
+ * `items` 是**仓库相对路径**（文件或目录），按同样的相对位置复制到
+ * `<PROBE_ROOT>/<group>/` 下。`links` 是需要在副本里重建的 `node_modules` 软链：
+ * pnpm 的 workspace 链接指向真实仓库，不重建的话副本里的包解析不到依赖。
+ *
+ * ⚠️ 调用方必须用 `assertCopied` 断言副本与真实源码一致 ——
+ * 否则"注入成功"可能只是在改一份过期副本，那比不注入更坏。
+ */
+function prepareProbe(group, items, options = {}) {
+  const root = path.join(PROBE_ROOT, group);
+  rmSync(root, { recursive: true, force: true });
+  for (const rel of items) {
+    const dst = path.join(root, rel);
+    mkdirSync(path.dirname(dst), { recursive: true });
+    cpSync(path.join(ROOT, rel), dst, { recursive: true });
+  }
+  for (const [rel, target] of options.links ?? []) {
+    const dst = path.join(root, rel);
+    mkdirSync(path.dirname(dst), { recursive: true });
+    symlinkSync(path.join(ROOT, target), dst, 'dir');
+  }
+  return root;
+}
+
+/** 副本里的这些**文件**必须与真实源码逐字相同 —— 否则注入证明的是副本，不是产品。 */
+function assertCopied(probeRoot, relPaths) {
+  for (const rel of relPaths) {
+    const real = readFileSync(path.join(ROOT, rel), 'utf8');
+    const copy = readFileSync(path.join(probeRoot, rel), 'utf8');
+    if (real !== copy) throw new Error(`隔离副本与真实源码不一致：${rel}`);
+  }
+}
+
+/** 副本用完就删。 */
+function dropProbe(group) {
+  rmSync(path.join(PROBE_ROOT, group), { recursive: true, force: true });
+}
 
 /** 跑一条命令，返回退出码与合并输出。**不抛错** —— 非零退出就是被测的结果。 */
-function run(bin, args, cwd = ROOT) {
+function run(bin, args, cwd = ROOT, env = undefined) {
   try {
-    const out = execFileSync(bin, args, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], cwd });
+    const out = execFileSync(bin, args, {
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'pipe'],
+      cwd,
+      // 只在需要时注入 env：默认完全继承，免得改变了别的组的运行环境。
+      ...(env === undefined ? {} : { env: { ...process.env, ...env } }),
+    });
     return { code: 0, out };
   } catch (error) {
     return { code: error.status ?? 1, out: `${error.stdout ?? ''}${error.stderr ?? ''}` };
   }
+}
+
+/** 报错里怎么称呼一个文件：仓库内的用相对路径，隔离副本里的用"逻辑路径（隔离副本 X）"。 */
+function label(file) {
+  const rel = path.relative(ROOT, file);
+  if (!rel.startsWith('..')) return rel;
+  const probeRel = path.relative(PROBE_ROOT, file);
+  if (probeRel.startsWith('..')) return file;
+  const [group, ...rest] = probeRel.split(path.sep);
+  return `${rest.join(path.sep)}（隔离副本 ${group}）`;
 }
 
 /**
@@ -114,10 +216,22 @@ let inflight = null;
 function restoreInflight(why) {
   if (inflight === null) return false;
   const { file, original, mutated } = inflight;
+  // 隔离副本可能已经整个被删掉了（探针在 /tmp 里工作）—— 那不是故障。
+  // 不判这一条的话，下次启动会报一个看不懂的 ENOENT，把真正的问题埋掉。
+  if (!existsSync(file)) {
+    inflight = null;
+    try {
+      unlinkSync(JOURNAL);
+    } catch {
+      // 日志本来就不在
+    }
+    console.error(`\n⚠️ ${why}：${label(file)} 已经不在了（隔离副本已清理），无需还原。`);
+    return false;
+  }
   const now = readFileSync(file, 'utf8');
   if (now !== mutated) {
     console.error(
-      `\n🔴 ${why}：${path.relative(ROOT, file)} 在注入期间被**别的进程**改过，拒绝还原。\n` +
+      `\n🔴 ${why}：${label(file)} 在注入期间被**别的进程**改过，拒绝还原。\n` +
         `   你的改动已随对方的写入一起消失，请自己确认这个文件是否需要恢复。`,
     );
     return false;
@@ -129,7 +243,7 @@ function restoreInflight(why) {
   } catch {
     // 日志本来就不在
   }
-  console.error(`\n⚠️ ${why}：已还原 ${path.relative(ROOT, file)}。`);
+  console.error(`\n⚠️ ${why}：已还原 ${label(file)}。`);
   return true;
 }
 
@@ -169,7 +283,7 @@ function recoverFromJournal() {
 function withMutation(file, from, to, body) {
   const before = readFileSync(file, 'utf8');
   if (!before.includes(from)) {
-    throw new Error(`注入失败（锚点不存在）：${path.relative(ROOT, file)}\n  锚点：${from}`);
+    throw new Error(`注入失败（锚点不存在）：${label(file)}\n  锚点：${from}`);
   }
   const mutated = before.replace(from, to);
   if (mutated === before) throw new Error(`注入失败（内容没变）：${from}`);
@@ -184,7 +298,7 @@ function withMutation(file, from, to, body) {
     if (now !== mutated) {
       inflight = null;
       throw new Error(
-        `拒绝还原：${path.relative(ROOT, file)} 在探针运行期间被别的进程改过。` +
+        `拒绝还原：${label(file)} 在探针运行期间被别的进程改过。` +
           `你的注入已随对方的写入一起消失，探针没有覆盖任何东西 —— 请重跑。`,
       );
     }
@@ -292,22 +406,23 @@ function groupCatalog() {
 // ── 组 3：重复规则的中英映射 + 中文 parity ───────────────────────────
 /** 造一份移动端的临时副本，避免改真实源码。`/tmp` 丢了会重建，不影响结论。 */
 function prepareMobileProbe() {
-  rmSync('/tmp/heyta-i18n-probe', { recursive: true, force: true });
-  mkdirSync(MOBILE_PROBE, { recursive: true });
-  for (const item of ['src', 'tests', 'package.json', 'tsconfig.json']) {
-    cpSync(path.join(MOBILE, item), path.join(MOBILE_PROBE, item), { recursive: true });
-  }
-  symlinkSync(path.join(MOBILE, 'node_modules'), path.join(MOBILE_PROBE, 'node_modules'), 'dir');
-  cpSync(path.join(ROOT, 'tsconfig.base.json'), '/tmp/heyta-i18n-probe/tsconfig.base.json');
-  return path.join(MOBILE_PROBE, 'src/lib/recurrence-display.ts');
+  const root = prepareProbe(
+    'recurrence',
+    [
+      'apps/mobile/src',
+      'apps/mobile/tests',
+      'apps/mobile/package.json',
+      'apps/mobile/tsconfig.json',
+      'tsconfig.base.json',
+    ],
+    { links: [['apps/mobile/node_modules', 'apps/mobile/node_modules']] },
+  );
+  assertCopied(root, ['apps/mobile/src/lib/recurrence-display.ts']);
+  return path.join(root, 'apps/mobile/src/lib/recurrence-display.ts');
 }
 
 function groupRecurrence() {
   const display = prepareMobileProbe();
-  const real = readFileSync(path.join(MOBILE, 'src/lib/recurrence-display.ts'), 'utf8');
-  if (readFileSync(display, 'utf8') !== real) throw new Error('探针副本与真实源码不一致');
-
-  const spec = path.join(MOBILE_PROBE, 'tests/recurrence-display.spec.ts');
   const mobileRun = () =>
     run(path.join(MOBILE, 'node_modules/.bin/vitest'), ['run', 'tests/recurrence-display.spec.ts'], MOBILE_PROBE);
 
@@ -346,7 +461,7 @@ function groupRecurrence() {
   );
 
   expectGreen('recurrence', '全部还原后重跑，必须回到绿', mobileRun);
-  rmSync('/tmp/heyta-i18n-probe', { recursive: true, force: true });
+  dropProbe('recurrence');
 }
 
 // ── 组 4：AI 披露的**结构化形态**（ADR-0006 的结构层面守卫）──────────
@@ -847,81 +962,175 @@ function groupAiFailure() {
  *
  * 这一组证明那道门禁**真的会红**，而且证明的是它最难的那种情形 ——
  * 「文档里已经有一个正确的价格，另一处被改成了别的数字」：
- * 只检查"某条词条含不含 ¥99"是拦不住的（实测：把法务文本 §4 改成 ¥139 时
- * 那种写法照绿，因为 §2 那张表里还留着一个 ¥99），所以门禁扫的是**全量金额**。
+ * 只检查"某条词条含不含 ¥5"是拦不住的（实测：把法务文本 §4 改成 ¥9 时
+ * 那种写法照绿，因为 §2 那张表里还留着一个 ¥5），所以门禁扫的是**全量金额**。
  *
  * 🔴 最后一条钉的是门禁自己的**锚点失效**：词条被改名之后，
  * 「找不到就跳过」的实现会让这道门禁**永远通过**，而那正是最需要它红的时候。
  */
 function groupPricing() {
-  const pricingRun = () => run(NODE_BIN, [PRICING_CHECK]);
+  // 🔴 整组跑在**副本**上：注入改的是 `/tmp` 里的文件，真实工作区一个字都不动。
+  // 副本里必须齐 7 个文件，否则门禁会"读不到 → 报错"，那会被误读成注入生效。
+  const probe = prepareProbe('pricing', PRICING_FILES);
+  assertCopied(probe, PRICING_FILES);
+  const inProbe = (abs) => path.join(probe, path.relative(ROOT, abs));
+  const BOOK = inProbe(PRICING_PRICE_BOOK);
+  const ADAPTER = inProbe(PRICING_ADAPTER);
+  const DOC = inProbe(PRICING_DOC);
+  const LEGAL = inProbe(PRICING_LEGAL);
+  const LEGAL_AI = inProbe(PRICING_LEGAL_AI);
+  const ZH_PROBE = inProbe(ZH);
+  const EN_PROBE = inProbe(EN);
 
-  expectGreen('pricing', '基线：三处价格一致时必须绿', pricingRun);
+  // `HEYTA_CHECK_ROOT` 让门禁把这 7 个相对路径全部解析到副本根。
+  const pricingRun = () => run(NODE_BIN, [PRICING_CHECK], ROOT, { HEYTA_CHECK_ROOT: probe });
+
+  expectGreen('pricing', '基线：四处价格一致时必须绿', pricingRun);
 
   // ① 实际收多少被改（代码基线价目表）—— 页面写的价格不再是要付的价格。
   expectRed('pricing', '代码基线价目表改了而页面没改（用户看到的价格≠实收）', () =>
-    withMutation(PRICING_PRICE_BOOK, 'amountMinor: 9_900,', 'amountMinor: 13_900,', pricingRun),
-  );
-
-  // ①b 海外价被改 —— 这一条在 ADR-0018 之前**抓不到**：门禁当时只比对大陆价，
-  //     而 $49 只存在于词条表与法务文本里，服务端没有任何地方声明过它。
-  expectRed('pricing', '海外基线价被改而词条没改', () =>
-    withMutation(PRICING_PRICE_BOOK, 'amountMinor: 4_900,', 'amountMinor: 5_900,', pricingRun),
-  );
-
-  // ①c 🔴 把数字**抄回** adapter —— 抄回去的那份不会跟着改价动。
-  //    这是 ADR-0018 新增的那条"负向"检查：价格收敛到一处还不够，
-  //    还得拦住后来的人顺手再抄一份。
-  expectRed('pricing', '把 totalFen 字面量抄回 adapter（同一个数字写两次）', () =>
     withMutation(
-      PRICING_ADAPTER,
-      'export const WECHAT_DEFAULT_PRICES',
-      "const SNEAKY = { annual: { totalFen: 9_900, description: '抄一份' } };\nexport const WECHAT_DEFAULT_PRICES",
+      BOOK,
+      "    priceId: 'hosted-monthly',\n    currency: 'CNY',\n    amountMinor: 500,",
+      "    priceId: 'hosted-monthly',\n    currency: 'CNY',\n    amountMinor: 900,",
       pricingRun,
     ),
   );
 
-  // ①d 把 CNY 基线价整条删掉 —— 门禁必须**报错**（锚点/完整性），不许当成"没有价格所以通过"。
+  // ①b 海外价被改 —— 这一条在 ADR-0018 之前**抓不到**：门禁当时只比对大陆价，
+  //     而 $5 只存在于词条表与法务文本里，服务端没有任何地方声明过它。
+  //     ⚠️ CNY 与 USD 现在**都是 500**，所以锚点必须带上 priceId 与 currency。
+  expectRed('pricing', '海外基线价被改而词条没改', () =>
+    withMutation(
+      BOOK,
+      "    priceId: 'hosted-monthly',\n    currency: 'USD',\n    amountMinor: 500,",
+      "    priceId: 'hosted-monthly',\n    currency: 'USD',\n    amountMinor: 900,",
+      pricingRun,
+    ),
+  );
+
+  // ①c 🔴 **第二档**的价格被改。ADR-0017 时代只有一档，这条无从谈起；
+  //     现在两档各有一条基线，只盯住第一档是不够的。
+  expectRed('pricing', '第二档（hosted-ai-monthly）基线价被改而词条没改', () =>
+    withMutation(
+      BOOK,
+      "    priceId: 'hosted-ai-monthly',\n    currency: 'CNY',\n    amountMinor: 1_200,",
+      "    priceId: 'hosted-ai-monthly',\n    currency: 'CNY',\n    amountMinor: 1_900,",
+      pricingRun,
+    ),
+  );
+
+  // ①d 🔴 把数字**抄回** adapter —— 抄回去的那份不会跟着改价动。
+  //    这是 ADR-0018 新增的那条"负向"检查：价格收敛到一处还不够，
+  //    还得拦住后来的人顺手再抄一份。
+  expectRed('pricing', '把 totalFen 字面量抄回 adapter（同一个数字写两次）', () =>
+    withMutation(
+      ADAPTER,
+      'export const WECHAT_DEFAULT_PRICES',
+      "const SNEAKY = { 'hosted-monthly': { totalFen: 500, description: '抄一份' } };\nexport const WECHAT_DEFAULT_PRICES",
+      pricingRun,
+    ),
+  );
+
+  // ①e 把 CNY 基线价整条删掉 —— 门禁必须**报错**（锚点/完整性），不许当成"没有价格所以通过"。
   expectRed('pricing', 'CNY 基线价被删掉时不许静默通过', () =>
     withMutation(
-      PRICING_PRICE_BOOK,
-      "    priceId: 'annual',\n    currency: 'CNY',\n    amountMinor: 9_900,",
-      "    priceId: 'annual',\n    currency: 'CNY',",
+      BOOK,
+      "    priceId: 'hosted-monthly',\n    currency: 'CNY',\n    amountMinor: 500,",
+      "    priceId: 'hosted-monthly',\n    currency: 'CNY',",
       pricingRun,
     ),
   );
 
   // ② 对外怎么说被改（中文词条）。
   expectRed('pricing', '中文词条的价格被改而价目表没改', () =>
-    withMutation(ZH, "'landing.pricing.hosted.priceCny': '¥99 / 年',", "'landing.pricing.hosted.priceCny': '¥139 / 年',", pricingRun),
+    withMutation(
+      ZH_PROBE,
+      "'landing.pricing.hosted.priceCny': '¥5 / 月',",
+      "'landing.pricing.hosted.priceCny': '¥9 / 月',",
+      pricingRun,
+    ),
   );
 
-  // ③ 🔴 这条是"扫全量金额"的理由：法务文本里**已经有一个 ¥99**，
-  //    只改另一处。按"文档里出现过 ¥99 就算过"的写法，这一条必绿。
-  expectRed('pricing', '法务文本另一处的价格被改（文档里仍留着一个 ¥99）', () =>
-    withMutation(PRICING_LEGAL, '| 价格 | 大陆人民币 **¥99 / 年**；', '| 价格 | 大陆人民币 **¥139 / 年**；', pricingRun),
+  // ②b 英文词条被改 —— 只查中文的话，英文页上那个 `$5` 是没人拦的。
+  expectRed('pricing', '英文词条的价格被改而价目表没改', () =>
+    withMutation(
+      EN_PROBE,
+      "'landing.pricing.hosted.priceUsd': '$5 / month',",
+      "'landing.pricing.hosted.priceUsd': '$9 / month',",
+      pricingRun,
+    ),
+  );
+
+  // ③ 🔴 这条是"扫全量金额"的理由：法务文本里**已经有一个 ¥5**（§2 那张表），
+  //    只改另一处（§4）。按"文档里出现过 ¥5 就算过"的写法，这一条必绿。
+  expectRed('pricing', '同步法务文本另一处的价格被改（文档里仍留着一个 ¥5）', () =>
+    withMutation(LEGAL, '| 价格 | 大陆人民币 **¥5 / 月**；', '| 价格 | 大陆人民币 **¥9 / 月**；', pricingRun),
+  );
+
+  // ③b 🔴 **AI 法务文本**自己被动过。这条钉的是"门禁真的读了两份法务"——
+  //     只读同步条款的实现会让这一条**照绿**，而 AI 档的价格就没人管了。
+  expectRed('pricing', 'AI 法务文本的价格被改而词条没改', () =>
+    withMutation(
+      LEGAL_AI,
+      '| 价格 | 大陆人民币 **¥12 / 月**；',
+      '| 价格 | 大陆人民币 **¥19 / 月**；',
+      pricingRun,
+    ),
   );
 
   // ④ 价格表自己（pricing-ssot 块）被改 —— 门禁必须抓到"唯一事实源"本身被动过。
   expectRed('pricing', 'pricing-ssot 块自己被动过', () =>
-    withMutation(PRICING_DOC, '"totalFen": 9900,', '"totalFen": 13900,', pricingRun),
+    withMutation(
+      DOC,
+      '"cny": { "amountMinor": 500, "display": "¥5 / 月" }',
+      '"cny": { "amountMinor": 900, "display": "¥9 / 月" }',
+      pricingRun,
+    ),
   );
 
-  // ⑤ 🔴 偷偷加第二个档：ADR-0017/0018 只批准了一个档。门禁必须拦住这个，
-  //    不只是拦住价格写错 —— "多一个档"会同时打破产品决策与回调的按单校验。
-  expectRed('pricing', '基线价目表里偷偷加第二个档', () =>
+  // ⑤ 🔴 偷偷加**第三个**档。ADR-0020 批准的是**恰好两个** SKU
+  //    （`EXPECTED_SKU_COUNT = 2`），不是"至多两个"：多一个就直接破坏
+  //    「收费的只有托管与我们的 AI」这条对外承诺。
+  //    ⚠️ 复用已有的 catalogKey，这样唯一的违规就是"多了一个档"。
+  expectRed('pricing', 'pricing-ssot 里偷偷加第三个档', () =>
     withMutation(
-      PRICING_PRICE_BOOK,
-      "  {\n    priceId: 'annual',\n    currency: 'USD',",
-      "  {\n    priceId: 'monthly',\n    currency: 'CNY',\n    amountMinor: 1_900,\n    effectiveFrom: 0,\n    effectiveUntil: null,\n  },\n  {\n    priceId: 'annual',\n    currency: 'USD',",
+      DOC,
+      '      "usd": { "amountMinor": 1200, "display": "$12 / 月" }\n    }\n  ]',
+      '      "usd": { "amountMinor": 1200, "display": "$12 / 月" }\n    },\n    {\n      "priceId": "team-monthly",\n      "period": "month",\n      "grants": ["hosting"],\n      "catalogKey": "landing.pricing.hosted",\n      "cny": { "amountMinor": 3900, "display": "¥39 / 月" },\n      "usd": { "amountMinor": 3900, "display": "$39 / 月" }\n    }\n  ]',
+      pricingRun,
+    ),
+  );
+
+  // ⑤b 🔴 `grants` 里塞一个**功能名**。这是 ADR-0020 §3.2 的核心禁令：
+  //     「非 AI 能力永久免费」在代码里唯一可执行的形式就是"收费清单上没有功能名"。
+  expectRed('pricing', 'grants 里混进功能名（把付费说成解锁功能）', () =>
+    withMutation(DOC, '"grants": ["hosting"],', '"grants": ["hosting", "labels"],', pricingRun),
+  );
+
+  // ⑤c 🔴 把第二档的 `ai` 去掉 —— 两档就变成一样了，"多花 ¥7"没了对应物。
+  //     门禁断言"恰好一个 SKU 含 ai"。
+  expectRed('pricing', '两档的 grants 变成一样（第二档的 ai 被去掉）', () =>
+    withMutation(DOC, '"grants": ["hosting", "ai"],', '"grants": ["hosting"],', pricingRun),
+  );
+
+  // ⑤d 代码基线里也偷偷加第三个档 —— 并且给一个**不在 ssot 里**的 priceId，
+  //     门禁的反向检查（DEFAULT_PRICE_BOOK 不许有 ssot 没批过的 priceId）必须响。
+  expectRed('pricing', '基线价目表里偷偷加 ssot 没批过的档', () =>
+    withMutation(
+      BOOK,
+      "  {\n    priceId: 'hosted-monthly',\n    currency: 'USD',",
+      "  {\n    priceId: 'team-monthly',\n    currency: 'CNY',\n    amountMinor: 3_900,\n    effectiveFrom: 0,\n    effectiveUntil: null,\n  },\n  {\n    priceId: 'hosted-monthly',\n    currency: 'USD',",
       pricingRun,
     ),
   );
 
   // ⑥ 门禁的锚点失效（词条被改名）：必须**报错**，不许静默跳过。
   expectRed('pricing', '门禁锚点失效（词条改名）时不许静默通过', () =>
-    withMutation(ZH, "'landing.pricing.hosted.priceCny':", "'landing.pricing.hosted.priceCNY':", pricingRun),
+    withMutation(ZH_PROBE, "'landing.pricing.hosted.priceCny':", "'landing.pricing.hosted.priceCNY':", pricingRun),
   );
+
+  dropProbe('pricing');
 }
 
 /**
@@ -935,12 +1144,34 @@ function groupPricing() {
  * "那条断言真的会因为这一处坏掉而变红"，而不断言本身。
  */
 function groupCoupon() {
-  const serverDir = path.join(ROOT, 'server');
+  // 🔴 整组跑在**副本**上：`server/` 的源码与测试复制到 /tmp，注入改的都是副本。
+  // `node_modules` 用软链 —— pnpm 的 workspace 链接指向真实仓库，不重建就解析不到依赖。
+  // `prisma/` 也必须带上：`tests/pricing-ddl.helper.ts` 直接读迁移 SQL，
+  // 少了它基线就红 —— 而**基线一红，后面 8 条"必须变红"全都变成空转**。
+  const probe = prepareProbe(
+    'coupon',
+    [
+      'server/src',
+      'server/tests',
+      'server/prisma',
+      'server/package.json',
+      'server/tsconfig.json',
+      'server/vitest.config.ts',
+    ],
+    { links: [['server/node_modules', 'server/node_modules']] },
+  );
+  const serverProbe = path.join(probe, 'server');
+  const inProbe = (abs) => path.join(probe, path.relative(ROOT, abs));
+  const MONEY = inProbe(COUPON_MONEY);
+  const RULES = inProbe(COUPON_RULES);
+  const STORE = inProbe(COUPON_STORE);
+  assertCopied(probe, [COUPON_MONEY, COUPON_RULES, COUPON_STORE].map((abs) => path.relative(ROOT, abs)));
+
   const billingRun = () =>
     run(
-      path.join(serverDir, 'node_modules/.bin/vitest'),
+      path.join(ROOT, 'server/node_modules/.bin/vitest'),
       ['run', 'tests/billing-money.spec.ts', 'tests/billing-coupon.spec.ts', 'tests/billing-pricing-store.pglite.spec.ts'],
-      serverDir,
+      serverProbe,
     );
 
   expectGreen('coupon', '基线：券的算术 / 判定 / 持久化三套测试原样必须绿', billingRun);
@@ -948,45 +1179,47 @@ function groupCoupon() {
   // ① 🔴 取整方向：偏向用户 → 偏向我们自己。33.33% off 的 9900 会从 6600 变 6601。
   //    这一改**不会**报任何错，只会每一笔都多收一分钱 —— 正是最该被拦住的那类。
   expectRed('coupon', '把折扣取整从 ceil 改成 floor（每一单多收用户的钱）', () =>
-    withMutation(COUPON_MONEY, 'return Math.ceil((amountMinor * bp) / PERCENT_SCALE);', 'return Math.floor((amountMinor * bp) / PERCENT_SCALE);', billingRun),
+    withMutation(MONEY, 'return Math.ceil((amountMinor * bp) / PERCENT_SCALE);', 'return Math.floor((amountMinor * bp) / PERCENT_SCALE);', billingRun),
   );
 
   // ② 干掉"折后不可支付"这道闸：0 元单会被放进收银台，然后在支付通道那边失败。
   expectRed('coupon', '去掉"折后为 0 元不可支付"的判定', () =>
-    withMutation(COUPON_RULES, "    return reject('not_chargeable_after_discount');", '    return { ok: true, couponId: coupon.id, discountMinor: discountMinor, finalAmountMinor: 0 };', billingRun),
+    withMutation(RULES, "    return reject('not_chargeable_after_discount');", '    return { ok: true, couponId: coupon.id, discountMinor: discountMinor, finalAmountMinor: 0 };', billingRun),
   );
 
   // ③ 门槛从闭区间改成开区间：刚好够门槛的那一单会被拒，用户莫名其妙用不了券。
   expectRed('coupon', '最低消费门槛 >= 被改成 >（刚好够门槛的单被拒）', () =>
-    withMutation(COUPON_RULES, 'ctx.originalAmountMinor < coupon.minimumOrderMinor', 'ctx.originalAmountMinor <= coupon.minimumOrderMinor', billingRun),
+    withMutation(RULES, 'ctx.originalAmountMinor < coupon.minimumOrderMinor', 'ctx.originalAmountMinor <= coupon.minimumOrderMinor', billingRun),
   );
 
   // ④ 🔴 预留时的名额判定放宽一格 —— 限量 1 张的券会被发出去 2 张。
   //    这是"报价时算一次、落库时再判一次"里落库那一次的全部价值所在。
   expectRed('coupon', '预留名额时把 >= 改成 >（限量券超发一张）', () =>
-    withMutation(COUPON_STORE, 'if (Number(total[0]?.n ?? 0) >= maxTotal) {', 'if (Number(total[0]?.n ?? 0) > maxTotal) {', billingRun),
+    withMutation(STORE, 'if (Number(total[0]?.n ?? 0) >= maxTotal) {', 'if (Number(total[0]?.n ?? 0) > maxTotal) {', billingRun),
   );
 
   // ⑤ 让 `expired` 也占用名额 —— sweep 就白跑了，限量券会被"点了支付没付款"占满。
   expectRed('coupon', '把 expired 也算进名额（占位刷满限量券）', () =>
-    withMutation(COUPON_STORE, "export const COUNTED_REDEMPTION_STATES: readonly RedemptionState[] = [\n  'reserved',\n  'applied',\n  'reversed',\n];", "export const COUNTED_REDEMPTION_STATES: readonly RedemptionState[] = [\n  'reserved',\n  'applied',\n  'reversed',\n  'expired',\n];", billingRun),
+    withMutation(STORE, "export const COUNTED_REDEMPTION_STATES: readonly RedemptionState[] = [\n  'reserved',\n  'applied',\n  'reversed',\n];", "export const COUNTED_REDEMPTION_STATES: readonly RedemptionState[] = [\n  'reserved',\n  'applied',\n  'reversed',\n  'expired',\n];", billingRun),
   );
 
   // ⑥ 让退款归还名额 —— "买 → 退 → 再买"可以无限薅同一份预算。
   expectRed('coupon', '把 reversed 移出名额计数（退款归还名额，可反复薅）', () =>
-    withMutation(COUPON_STORE, "export const COUNTED_REDEMPTION_STATES: readonly RedemptionState[] = [\n  'reserved',\n  'applied',\n  'reversed',\n];", "export const COUNTED_REDEMPTION_STATES: readonly RedemptionState[] = [\n  'reserved',\n  'applied',\n];", billingRun),
+    withMutation(STORE, "export const COUNTED_REDEMPTION_STATES: readonly RedemptionState[] = [\n  'reserved',\n  'applied',\n  'reversed',\n];", "export const COUNTED_REDEMPTION_STATES: readonly RedemptionState[] = [\n  'reserved',\n  'applied',\n];", billingRun),
   );
 
   // ⑦ 结算时不再比对订单上冻结的金额 —— ADR-0018 修掉的那个洞会重新打开：
   //    付了原价的人也能白拿券的折扣。
   expectRed('coupon', '结算时不再比对冻结金额（付原价也能白拿折扣）', () =>
-    withMutation(COUPON_STORE, 'if (!isMinorAmount(input.paidAmountMinor) || input.paidAmountMinor !== expectedMinor) {', 'if (false) {', billingRun),
+    withMutation(STORE, 'if (!isMinorAmount(input.paidAmountMinor) || input.paidAmountMinor !== expectedMinor) {', 'if (false) {', billingRun),
   );
 
   // ⑧ 让它不再幂等：重复投递的支付事件会被当成第二次授予。
   expectRed('coupon', '去掉结算的幂等闸（重复投递重复授予）', () =>
-    withMutation(COUPON_STORE, "if (status === 'paid') {\n      return { outcome: 'already-paid', orderId, userId };\n    }", 'if (false) {\n      return { outcome: \'already-paid\', orderId, userId };\n    }', billingRun),
+    withMutation(STORE, "if (status === 'paid') {\n      return { outcome: 'already-paid', orderId, userId };\n    }", 'if (false) {\n      return { outcome: \'already-paid\', orderId, userId };\n    }', billingRun),
   );
+
+  dropProbe('coupon');
 }
 
 function groupStorage() {

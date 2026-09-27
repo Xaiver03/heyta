@@ -42,7 +42,7 @@ import { CURRENCIES, formatMinor, isCurrency, isMinorAmount, type Currency } fro
  * 历史订单也能用**同一个函数**按它自己的时间点解析出当时的价格。
  */
 export interface PriceBookEntry {
-  /** 价格标识（SKU）。与 `createCheckout` 的 `priceId` 同值，例如 `annual`。 */
+  /** 价格标识（SKU）。与 `createCheckout` 的 `priceId` 同值，例如 `hosted-monthly`。 */
   readonly priceId: string;
   readonly currency: Currency;
   /** 金额，**最小单位整数**（分 / 美分）。 */
@@ -169,20 +169,36 @@ export class PriceNotEffectiveError extends Error {
  */
 export const DEFAULT_PRICE_BOOK: readonly PriceBookEntry[] = [
   {
-    priceId: 'annual',
+    priceId: 'hosted-monthly',
     currency: 'CNY',
-    amountMinor: 9_900,
+    amountMinor: 500,
     effectiveFrom: 0,
     effectiveUntil: null,
-    note: '大陆托管同步 · 年付（基线）',
+    note: '大陆官方托管 · 月付（基线）',
   },
   {
-    priceId: 'annual',
+    priceId: 'hosted-monthly',
     currency: 'USD',
-    amountMinor: 4_900,
+    amountMinor: 500,
     effectiveFrom: 0,
     effectiveUntil: null,
-    note: '海外托管同步 · 年付（基线）',
+    note: '海外官方托管 · 月付（基线）',
+  },
+  {
+    priceId: 'hosted-ai-monthly',
+    currency: 'CNY',
+    amountMinor: 1_200,
+    effectiveFrom: 0,
+    effectiveUntil: null,
+    note: '大陆官方托管 + 云端 AI · 月付（基线）',
+  },
+  {
+    priceId: 'hosted-ai-monthly',
+    currency: 'USD',
+    amountMinor: 1_200,
+    effectiveFrom: 0,
+    effectiveUntil: null,
+    note: '海外官方托管 + 云端 AI · 月付（基线）',
   },
 ];
 
