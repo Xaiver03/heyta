@@ -412,6 +412,26 @@ rsync -az --delete apps/web/dist/ ubuntu-jcli:/var/www/heyta-app/
 （`git ls-tree HEAD packages/` 里没有它），所以 frozen 安装直接失败。
 那是并发 agent 的在途状态，不是本节的长期前提。
 
+#### 线上那份应用是**钉在某个 commit 上的**，main 前进它不会自己更新
+
+同一天第二次踩到，这次不是参数形状变了，是**应用本身落后了**：
+迁移时我在 `ede9c02` 重建了应用，之后 `5154236`（"找回通行密钥的入口"）
+改了 `apps/web/src/features/auth/AuthPanel.tsx` 与 `packages/i18n` ——
+那是**要上线的代码**，而线上那份还是 `ede9c02` 的产物，于是线上少了这个入口。
+
+🔴 这一次不是无关紧要的：**域名迁移把旧域名上的通行密钥全部作废了**
+（WebAuthn 的 RP ID 跨不了 registrable domain，用户已接受重新注册）。
+"找回通行密钥"正是这次迁移伤口的**补救入口** —— 迁移期间它必须在线。
+
+判定"线上是哪一版"的办法：把产物文件名和本地重建的比。
+
+```bash
+ssh ubuntu-jcli 'ls /var/www/heyta-app/assets/'
+```
+
+`apps/web` 一有提交就要重建。这跟落地页那条（`VITE_APP_URL`）是两件事：
+落地页管"入口在不在、指向哪"，应用管"点进去之后是什么"。
+
 #### 变更前备份（回滚用）
 
 - `/etc/nginx/sites-available/heyta.finlaw.cloud.bak-20260927T145658Z`（**迁移前**：只有落地页、没有 `/app/` 与 `/api/`）
