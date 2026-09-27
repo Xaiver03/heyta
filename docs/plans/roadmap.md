@@ -573,18 +573,17 @@ Web 设置页有「导出数据」（JSON 完整保真 / 任务清单 Markdown�
   `research/upstream/`（`.gitignore:39`，一份**永远不在任何新检出里**的本地 vendor 目录），
   以及 `research/{desktop-shell-selection,e2ee-widget-key-handling}.md` —— 后者正被搬进 `docs/research/`
   （工作区里已是未跟踪的新文件），搬完这两个死链就没了。**这条不是本会话的账。**
-- ✅ **两条桌面端用例已在修复后的树上复验通过**（2026-09-28 复验）。开发构建与
-  `release/heyta-darwin-arm64` 的打包 `.app` 都真的打开窗口、画出共享 UI；
+- ✅ **`check:ai-e2e` 全绿：26 passed，exit 0**（2026-09-28 复验）。两条桌面端用例
+  （开发构建 + `release/heyta-darwin-arm64` 的打包 `.app`）都真的打开窗口、画出共享 UI；
   渲染进程崩溃由并行会话的**单实例锁**修复收口（`616b050`）。
-  🔴 **复验同时暴露出另一条失败，经诊断属于并行会话未提交的改动，不是本会话的账**：
-  复验结果是 `25 passed / 1 failed`，唯一失败是 `e2e/tests/ai-prioritize.spec.ts` 超时，
-  真因是 Vite dev server 起不来 ——
+  📌 **复验中途曾出现一条与本会话无关的失败，已由并行会话修复；记下来是因为根因值得记**：
+  那次是 `25 passed / 1 failed`，唯一失败 `ai-prioritize` 的超时真因是 **Vite dev server 起不来** ——
   `Failed to resolve import "@heyta/storage/sqlite/wasm" from "src/worker/storage.worker.ts?worker_file&type=module"`。
-  `packages/storage/package.json` 在工作区里新增了 `./sqlite/wasm` 导出（diff 里是 `+` 行，未提交），
-  但 `pnpm --filter @heyta/storage build` **不产出** `dist/sqlite/sqlite-wasm-driver.*`，
-  于是应用在浏览器里根本加载不出来、`addTask` 找不到任务行。
-  **同一个根因**也让 `apps/web` 的 `tsc --noEmit` 失败（`WEB_TSC_EXIT=2`，整个工程唯一的报错就在那个文件）。
-  该文件与 `packages/storage/**` 都不属于本会话，**不认领**；等并行会话把产物补齐即恢复。
+  并行会话新增了 `package.json` 的 `./sqlite/wasm` 导出，但 `tsup.config.ts` 的 `entry`
+  没有列 `src/sqlite/sqlite-wasm-driver.ts`（**tsup 只产出 `entry` 里列的东西**），
+  于是 `dist/` 里没有那个文件；同一个根因当时也让 `apps/web` 的 `tsc --noEmit` 失败（唯一报错就在那个文件）。
+  该 entry 补进 `tsup.config.ts` 后，**e2e 26 passed、`apps/web` typecheck `exit 0` 全部恢复**。
+  教训：**跨包的子路径导出必须在构建入口里显式列出来，否则"源码在、能 import、但产物没有"。**
   ⚠️ **但 `apps/web` 的全量套件在 HEAD 上是红的**（2026-09-28 实测，**不是** 16 个门禁的一部分，
   所以上面那句"全部绿"仍然成立）：`12 failed | 29 passed | 2 skipped` /
   `89 failed | 596 passed | 12 skipped`，失败**全部**是
@@ -597,7 +596,7 @@ Web 设置页有「导出数据」（JSON 完整保真 / 任务清单 Markdown�
   会让**整包测试**在无关改动里一起红，而且报错信息只说缺哪个全局、不说这是环境缺 polyfill。
   需要并行会话在 vitest setup 里补 `Worker` 替身（或把构造推迟到首次使用）。
 - 🔴 **全量 `pnpm check` 仍未跑通**：它会触发 `prisma generate` 而沙箱报 EPERM（`utime` 在
-  `~/.cache/prisma/.../libquery_engine`）。**但逐个跑过 16 个 `check:*`，全部绿**（`check:ai-e2e` 见上：两条桌面端用例本身已复验通过，另有一条被并行会话的未提交改动挡住）：
+  `~/.cache/prisma/.../libquery_engine`）。**但逐个跑过 16 个 `check:*`，全部绿**（外加 `check:ai-e2e` 26 passed）：
   `migrations / layering / widgets / ui-language / licenses / docs / pricing / ai-quota / payment-entry /
   materialized-reads / design / tokens / ai-coverage / arkts / native-deps / mobile-bundle`。
   卡点只在 `pretest` 里的 `prisma generate`，不在测试本身 —— 直接
