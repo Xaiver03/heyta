@@ -22,6 +22,8 @@ services:
         # 在连不上 dl-cdn.alpinelinux.org 的主机上用 APK_MIRROR 覆盖，
         # 否则 `apk add` 会**无声挂住**（Dockerfile 里有说明）。
         APK_MIRROR: ${APK_MIRROR:-dl-cdn.alpinelinux.org}
+        # npm registry，同理：默认官方，连不上时用 NPM_REGISTRY 覆盖。
+        NPM_REGISTRY: ${NPM_REGISTRY:-https://registry.npmjs.org/}
     image: supersync:local
     environment:
       - MIGRATE_RECOVERY_BUILD_LOCAL=true

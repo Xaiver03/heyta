@@ -34,7 +34,16 @@ COPY server/package.json ./server/
 
 # 安装整个工作区的依赖。
 # --frozen-lockfile：锁文件与清单不一致时**直接失败**，而不是悄悄换版本。
-RUN pnpm install --frozen-lockfile --ignore-scripts
+#
+# 🔧 heyta 改动：npm registry 可覆盖，理由与上面的 APK_MIRROR 完全同形。
+# 在连不上 registry.npmjs.org 的主机上，`pnpm install` 会一路 `error (23)` 重试
+# 到超时（实测 356/360 之后 TimeoutError，整层构建作废），而这一层不作废缓存，
+# 所以**每次重试都从零开始**。registry.npmmirror.com 实测 0.79s 可用。
+#
+# 默认仍是官方 registry：换源只影响"从哪取包"，不影响锁文件里记录的 tarball 完整性
+# 校验，所以 `--frozen-lockfile` 的保证不被削弱。
+ARG NPM_REGISTRY=https://registry.npmjs.org/
+RUN npm_config_registry="$NPM_REGISTRY" pnpm install --frozen-lockfile --ignore-scripts
 
 # 拷贝源码
 COPY packages/sync-core/ ./packages/sync-core/
