@@ -515,28 +515,80 @@ ssh ubuntu-jcli 'cd ~/heyta/server && \
   `prisma migrate status` 报 `Database schema is up to date!`）→
   `https://heyta-tmp.litopia.space/` 上 `Super Productivity` 与 `SuperSync` 各 **0 次**、
   `heyta` **6 次**，`<title>heyta Server - Connect</title>`；`/health` 200。
+- ✅ **2026-09-27 第二次重建**（接入 SMTP + 邮件品牌修正）：同样的三步、
+  `APK_MIRROR`/`NPM_REGISTRY` 照旧不能省；`deploy.sh` 报 `No pending migrations to apply`，
+  `supersync-server` 换成新镜像后 healthy，`/health` 200。
+  随后按本文自己的告诫做了拓扑清理（见上一条 `docker rm -f supersync-caddy dozzle uptime-kuma`）。
+  新的回滚点：`supersync:rollback-20260927-smtp`（上一版是 `supersync:rollback-20260927`）。
+  ⚠️ 域名这时已经**不是** `heyta-tmp.litopia.space` 而是 `heyta.finlaw.cloud`（§3.7.1）。
 
-### 3.9 🔴 生产没配 SMTP ⇒ 注册与登录邮件**发不出去**
+### 3.9 ✅ 生产 SMTP —— 2026-09-27 打通，发信已实测**真投递**
 
-这是 2026-09-27 实测确认的、**当前用户旅程最后一段的实际断点**：
+**历史问题**（保留，因为它是"看起来像代码 bug 的部署缺口"的典型）：
+服务端日志一直是
+`Failed to send verification email: Error: SMTP configuration is required in production environments`
+（`email.ts` `getTransporter`，`NODE_ENV=production` 且 `config.smtp` 为空时抛）。
+后果：`POST /api/register/magic-link` 能建号但验证邮件永不到达；
+`POST /api/login/magic-link` 会生成 `login_token`，发信失败后又**把 token 清掉** ——
+用户点「发送登录链接」之后**什么都不会发生**。
+即**登录/注册面板在承诺一封永远不来的邮件**。
 
-- 服务端日志（真实）：
-  `Failed to send verification email: Error: SMTP configuration is required in production environments`
-  与 `Failed to send magic link login email: …`（`email.ts:61` `getTransporter`）。
-- 后果：`POST /api/register/magic-link` 能建号，**但验证邮件永远不到**；
-  `POST /api/login/magic-link` 会生成 `login_token`，然后因为发信失败**把 token 清掉**
-  （`auth.ts:320-330`）—— 所以用户点「发送登录链接」之后**什么都不会发生**。
-- 因此**应用里刚做好的「登录 / 注册」面板会承诺一封永远不来的邮件**。
-  这不是代码 bug，是部署缺口；但它对用户是同一个结果。
-- ✅ 已经实测**通过**的部分（用运营者视角从库里取真 token，替掉"用户点邮件"这一步）：
-  `POST /api/verify-email {token}` → `Email verified successfully`；
-  `POST /api/login/magic-link/verify {token}` → 真 JWT（215 字符）；
-  面板粘该 token → 登录成功、访问令牌自动填入；
-  随后应用真的打了 `GET /api/sync/status` + `POST /api/sync/ops` → **均 200**，
-  `server_seq` 从 0 推进到 1，真库里留下 1 条 op。**0 pageerror / 0 console.error。**
-- ⚪ 唯一没被验证的一环就是**邮件本身的投递**（缺 SMTP 凭据，属外部阻塞）。
-- ⚠️ 顺带记一条**不要做**的事：`TEST_MODE` 下有个 `autoVerifyUsers` 开关（`config.ts:532`）会跳过邮箱验证。
-  **不要为了"跑通 E2E"在生产打开它** —— 那等于关掉邮箱验证这道门。本次没动它。
+#### 现状：已配好并端到端验证通过
+
+发信走**腾讯云邮件推送（SES）**，发件域名 **`finlaw.cloud`**（与应用同域，`heyta.finlaw.cloud`）。
+
+- ✅ `finlaw.cloud` **此前就已是 SES 里验证通过的发件域名**（`ses GetEmailIdentity`：
+  `VerifiedForSendingStatus: true`，MX / SPF / DKIM(`qcloud._domainkey`) / DMARC 四项 `Status` 全 `true`）。
+  ⇒ **不需要新建发件域名**，也**没有**新建。这一步的"完成验证"是既成事实，不是本次做的。
+- ✅ 新建了一个**该域名下的专用发件地址** `noreply@finlaw.cloud`
+  （`tccli ses CreateEmailAddress` + `UpdateEmailSmtpPassWord`）。
+  🔴 **故意不复用** `abuse@` / `postmaster@` / `legal@` / `invoice@` 那几个 ——
+  它们在 `ListEmailAddress` 里属于别的系统（SSOS），而 `UpdateEmailSmtpPassWord` 是**改写**密码，
+  会给那个系统换掉 SMTP 凭据。
+- ✅ SMTP 参数（本机其它项目同款，非猜的）：
+  `host=gz-smtp.qcloudmail.com`、`port=465`、SSL、**用户名 = 发件地址**。
+- ✅ 配置住在 **`ubuntu-jcli:~/heyta/server/.env`**（compose 从这个文件插值 `SMTP_*`），
+  不是 `~/heyta/.env`（那个文件根本不存在）。
+- ✅ 实测发信链路（服务端日志，真实）：
+  `SMTP configured: gz-smtp.qcloudmail.com:465`
+  → `Verification email sent: <0398d177-…@finlaw.cloud>`
+  → `Magic link login email sent: <4dbc1f64-…@finlaw.cloud>`。
+
+#### 端到端验收（这次把"邮件本身"也验了）
+
+用一次性外部邮箱（Guerrilla Mail，有读取 API）走完整用户旅程：
+
+1. `POST /api/register/magic-link` → 201；
+2. **邮件真的到了外部邮箱**，`From: noreply@finlaw.cloud`、`Subject: Verify your heyta account`、
+   正文 `Welcome to heyta!`、链接 `https://heyta.finlaw.cloud/verify-email?token=…`；
+3. `POST /api/verify-email {token}` → `Email verified successfully`；
+4. `POST /api/login/magic-link` → 第二封真到达，`Subject: Your heyta login link`；
+5. `POST /api/login/magic-link/verify {token}` → **真 JWT（221 字符）**；
+6. `GET /api/sync/status` → **200**，`{"latestSeq":0,"storageUsedBytes":0,"storageQuotaBytes":104857600}`。
+
+**上一版记的"唯一没被验证的一环就是邮件本身的投递"到此关闭。**
+
+#### 🔴 这次挖出的两个坑
+
+- 🔴 **`SMTP_FROM` 的引号写法会让整个 deploy 卡死**。写成
+  `SMTP_FROM="heyta" <noreply@finlaw.cloud>`（——照抄代码里 `email.ts` 那个联引号的旧默认值，
+  它在 JS 里对，在 `.env` 里错）会让 **compose 的 `.env` 解析器**报
+  `failed to read …/.env: line N: unexpected character "<" in variable name`
+  ⇒ `docker compose build` 直接失败，**迁移和换容器都轮不到**。
+  必须**整体**加引号：`SMTP_FROM="heyta <noreply@finlaw.cloud>"`。
+  自检：`docker compose -f … config | grep SMTP_FROM` 应输出 `heyta <noreply@finlaw.cloud>`。
+- 🔴 **收件侧另有一个独立故障，不要误判成发信失败**：往 `@finlaw.cloud` **自己**发信会失败。
+  `finlaw.cloud` 的 MX 是 `mail.finlaw.cloud` → `121.4.24.238`，SES 投递时报
+  `DeliverStatus: 3`，`DeliverMessage: dial tcp 121.4.24.238:25: connect: connection timed out`。
+  这是**收件方**那台机器的 25 端口对 SES 不可达，**与发件域名/凭据无关** ——
+  往外部域（Gmail/QQ/一次性邮箱）发信实测正常。排查时看 `DeliverStatus` 而不是 `SendStatus`：
+  **`SendStatus 0` 只表示"腾讯云收下了"，不等于"送到了"**。
+
+#### ⚠️ 一条**不要做**的事
+
+`TEST_MODE` 下有个 `autoVerifyUsers` 开关（`config.ts`）会**跳过**邮箱验证
+（并且在跳过时不发验证邮件）。**不要为了"跑通 E2E"在生产打开它** —— 那等于关掉邮箱验证这道门。
+本次没动它。
 
 ---
 

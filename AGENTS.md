@@ -1975,6 +1975,97 @@ docker inspect <容器> --format '{{range .Config.Env}}{{println .}}{{end}}' | g
      **关键断言不是"调用成功"，而是把产出的 `clientDataJSON` 解出来、`challenge` 必须原样回显** ——
      长度对但内容错也会被它抓住。
 
+ 79. 🔴 **`tccli` 在 import 时就无条件写日志 —— 被文件沙箱拒写后，连 `tccli --version` 都跑不了。**
+
+     现象：任何 `tccli` 命令都报
+
+     ```
+     PermissionError: [Errno 1] Operation not permitted: '/Users/<you>/.tccli/log/tccli.log'
+     ```
+
+     这不是凭据问题，也不是 tccli 坏了。`tccli/log.py` 在**模块导入时**就建了一个
+     `RotatingFileHandler`，路径硬编码 `expanduser('~/.tccli/log/tccli.log')`；
+     **既没有 `TCCLI_LOG` 之类的环境变量，也没有 `--log-dir` 参数**可改（实测 grep 过整个包）。
+     工作区写权限的沙箱只允许写工作区 ⇒ import 直接失败。
+
+     做法：**换一个 `HOME`**（`log.py` 用 `expanduser`，所以 `HOME` 就是唯一的开关）：
+
+     ```bash
+     mkdir -p /tmp/tccli-home/.tccli/log
+     ln -sf "$HOME/.tccli/default.credential" /tmp/tccli-home/.tccli/default.credential
+     cp -f "$HOME/.tccli/default.configure" /tmp/tccli-home/.tccli/default.configure
+     HOME=/tmp/tccli-home tccli dnspod DescribeDomainList
+     ```
+
+     🔴 **只改 `HOME` 会立刻换成另一个错**：`ModuleNotFoundError: No module named 'tccli'`。
+     tccli 装在**原 HOME 的 user-site**（`~/.local/lib/python3.12/site-packages`），
+     而 user-site 的搜索路径是从 `HOME` 推出来的 ⇒ 必须同时把 `PYTHONPATH` 指回真实站点目录：
+
+     ```bash
+     PYTHONPATH="$REAL_HOME/.local/lib/python3.12/site-packages" HOME=/tmp/tccli-home tccli ...
+     ```
+
+     凭据用**软链**（密钥只留一份在原处，不要复制到 `/tmp`）；`default.configure` 是非机密的端点表，复制即可。
+
+ 80. 🔴 **`.env` 里"只给一部分加引号"会让 `docker compose` 崩在 build 之前，而且看起来像别的问题。**
+
+     `SMTP_FROM` 在代码里的默认值是 `'"SuperSync" <noreply@example.com>'` —— 这在 **JS 字符串里是对的**。
+     照抄进 `.env` 就错了：
+
+     ```ini
+     SMTP_FROM="heyta" <noreply@finlaw.cloud>     # ❌
+     ```
+
+     compose 的 `.env` 解析器不是 dotenv，它更严，直接报
+
+     ```
+     failed to read …/.env: line 22: unexpected character "<" in variable name "<noreply@finlaw.cloud>"
+     ```
+
+     🔴 **误导性在于失败点**：这条报错出现在 `docker compose build` 的**最开头**，
+     紧挨着的输出是"构建/迁移"，很容易被读成构建失败或镜像源问题，而真凶只是**一行 `.env`**。
+
+     正确写法是**整体**加引号（解析出来的值就是 `heyta <noreply@finlaw.cloud>`，不含外层引号）：
+
+     ```ini
+     SMTP_FROM="heyta <noreply@finlaw.cloud>"     # ✅
+     ```
+
+     📌 自检一行：`docker compose -f docker-compose.yml [-f …] config | grep SMTP_FROM`。
+     `config` **先解析 `.env`**，解析不了立刻报错 —— 比"build 到一半失败"早得多、也清楚得多。
+     凡是改完 `.env` 就要 deploy，先跑 `config`。
+
+ 81. ⚠️ **腾讯云 SES 的 `SendStatus: 0` 只表示"腾讯云收下了"，不等于"送到了"。**
+
+     排查"邮件到底有没有到"时，只看 `SendStatus`（0 = 处理成功）就下结论会**判错**。
+     真正表示投递的是同一条记录里的 **`DeliverStatus`**：
+
+     | 值 | 含义 |
+     |---|---|
+     | 0 | 被腾讯云接受，**进入发送队列**（还没送出去） |
+     | 1 | **递送成功**，`DeliverTime` 是成功时间 |
+     | 2 | 邮件被丢弃，原因在 `DeliverMessage` |
+     | 3 | **收件方 ESP 拒信**，常见原因是地址不存在 |
+     | 8 | 被 ESP 延迟递送，原因在 `DeliverMessage` |
+
+     实测踩到的样子：`SendStatus: 0` 但 `DeliverStatus: 3`，
+     `DeliverMessage: dial tcp 121.4.24.238:25: connect: connection timed out` ——
+     即**发件侧全对，是收件方那台机器的 25 端口对 SES 不可达**。
+     差点被误判成"我们 SMTP 配错了"。
+
+     查询：
+
+     ```bash
+     tccli ses GetSendEmailStatus --RequestDate 2026-09-27 --Offset 0 --Limit 20 --ToEmailAddress <addr>
+     ```
+
+     ⚠️ `--RequestDate` 是 **`date` 类型，只吃 `YYYY-MM-DD`**：传 epoch 或
+     `2026-09-27T00:00:00+08:00` 都报 `参数 RequestDate 取值类型错误。参数类型应为 date`。
+
+     📌 要证明"真的能投递"，**别用自己域名的地址自测** ——
+     用带读取 API 的一次性邮箱（如 Guerrilla Mail）走完整旅程，
+     才能把"腾讯云收下了"和"用户真的收到了"分开。
+
 ---
 
 ## 8. 工作流
