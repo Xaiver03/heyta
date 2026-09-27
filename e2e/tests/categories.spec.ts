@@ -182,6 +182,96 @@ test.describe('分类着色：真浏览器契约', () => {
     await expect(section).not.toContainText('还没有可以归类的时间记录');
   });
 
+  test('🔴 样式真的生效：颜色是 token 展开的真值，未归类不冒充分类行', async ({ page }) => {
+    /**
+     * 这一条补的是 jsdom 与"区块可见"都补不上的缝：**样式表到底有没有生效**。
+     *
+     * jsdom 不排版、不算样式（`getComputedStyle` 在那边拿不到 `var()` 展开的值），
+     * 而 `toContainText` 只证明文字在 —— 一个 class 名写错、`tokens.css` 没被引入、
+     * 变量名拼错，三种情况都会让"文字全在、界面是一坨黑字"照样通过。
+     */
+    await page.clock.install({ time: new Date(2026, 8, 24, 20, 0, 0) });
+    await page.clock.resume();
+    await openApp(page);
+
+    // 造一点真数据：一段无任务的专注（它只进"未归类"那句，不画分类行）
+    await switchView(page, '番茄钟');
+    await page.getByRole('button', { name: '开始专注' }).click();
+    await page.clock.fastForward('26:00');
+    await switchView(page, '成长');
+    await expect(page.locator('.ht-categories')).toContainText('25 分钟');
+
+    // ① 区块自己的布局来自样式表
+    const sectionStyle = await page
+      .locator('.ht-categories')
+      .evaluate((el) => {
+        const s = getComputedStyle(el);
+        return { display: s.display, direction: s.flexDirection, gap: s.gap };
+      });
+    expect(sectionStyle.display, '区块的布局来自 app.css，不是浏览器默认的 block').toBe('flex');
+    expect(sectionStyle.direction).toBe('column');
+    expect(sectionStyle.gap, 'gap 来自 space token（不是 0）').not.toBe('0px');
+
+    // ② 说明文字的颜色**真的**是那个 token 展开后的值。
+    //    这条同时钉住三件事：变量名没写错、tokens.css 被引入了、暗色/亮色解析出的是一个真颜色。
+    const note = await page.locator('.ht-categories__note').evaluate((el) => ({
+      color: getComputedStyle(el).color,
+      token: getComputedStyle(document.documentElement)
+        .getPropertyValue('--ht-color-foreground-muted')
+        .trim(),
+    }));
+    expect(note.token, 'token 必须能在 :root 上读到').not.toBe('');
+    // 把 token 的引用展开成实际 rgb：用一个临时元素量一次，避免把 hex 抄进测试
+    const tokenColor = await page.evaluate((value) => {
+      const probe = document.createElement('span');
+      probe.style.color = value;
+      document.body.appendChild(probe);
+      const resolved = getComputedStyle(probe).color;
+      probe.remove();
+      return resolved;
+    }, note.token);
+    expect(note.color, '说明文字的颜色必须等于 color.foreground-muted 展开后的值').toBe(tokenColor);
+
+    /**
+     * ③ 🔴 「未归类」**不画成分类行、也不画成柱子**。
+     *
+     * 它是一句话，不是泳道 —— 否则用户会以为"未归类"是他可以赋色的第九类，
+     * 而且那一行会跟真分类抢同一套视觉语言。
+     *
+     * ⚠️ 这里**不是**在测"没数据时界面空着"这种一眼可见的事，而是在钉两条口径：
+     * 格子的存在与否取决于有没有**分类行**（`report.series`），
+     * 柱子的存在与否取决于 `peakWeeklyMs`（峰值只从分类行来）——
+     * 于是"未归类"这个词在数据模型里根本不是一类，界面也就画不出来。
+     *
+     * 这条能失败：把未归类也塞进 `report.series`（或者让峰值把未归类算进去）就会红。
+     *
+     * 📌 反过来说，**十二格泳道与十二根堆叠柱的 CSS 像素级检查现在做不到** ——
+     * 真数据要有一条"归到某个清单"的专注，而 Web 上今天没有"把任务放进清单"
+     * 的界面（在别人的在飞工作里，见 `docs/plans/activity-categories-and-colors.md` §8.6）。
+     * 那条路径一旦落地，这一段就能升级成"12 条轨道 + 12 个 MM-DD 标签"的断言。
+     * 现在**不假装**：宁可少一条，也不要一条测不到真东西的。
+     */
+    await expect(
+      page.locator('.ht-categories__cell'),
+      '没有分类行时不该有格子（未归类是一句话，不是一行）',
+    ).toHaveCount(0);
+    await expect(
+      page.locator('.ht-categories__bars'),
+      '峰值只从分类行算，未归类不该凭空画出一排柱子',
+    ).toHaveCount(0);
+
+    // ④ 十二周的范围行仍然要在（它说的是窗口，不依赖有没有分类行）
+    await expect(page.locator('.ht-categories__range')).toContainText('至');
+
+    // ⑥ 那句话与上面之间有一条分隔线（样式表里的 border-top 真的落了地）
+    const separated = await page.locator('.ht-categories__unassigned').evaluate((el) => {
+      const s = getComputedStyle(el);
+      return { width: parseFloat(s.borderTopWidth), style: s.borderTopStyle };
+    });
+    expect(separated.style, '分隔线的样式来自 token 的 border-width/border-color').not.toBe('none');
+    expect(separated.width, '分隔线宽度必须 > 0').toBeGreaterThan(0);
+  });
+
   test('反需求：这一块文案里没有排名 / 占比 / 优劣词', async ({ page }) => {
     await openApp(page);
     await switchView(page, '成长');
