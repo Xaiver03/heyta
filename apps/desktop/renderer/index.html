@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <!--
+      CSP 明确写死：本页**不加载任何外部资源**，也不允许 eval。
+      桌面壳里放松 CSP 的代价比网页高 —— 它能读本地文件系统。
+    -->
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'"
+    />
+    <title>heyta</title>
+    <style>
+      body {
+        font: 14px/1.6 system-ui, -apple-system, sans-serif;
+        margin: 0;
+        padding: 32px;
+        color: #1a1a1a;
+      }
+      code {
+        background: #f4f4f5;
+        padding: 2px 6px;
+        border-radius: 4px;
+      }
+      .ok {
+        color: #15803d;
+      }
+      .bad {
+        color: #b91c1c;
+      }
+    </style>
+  </head>
+  <body>
+    <!--
+      ⚠️ 这是**临时占位页**，不是产品界面。
+
+      M1（共享 UI 垂直切片）会把它整个换掉，改由 `packages/ui` 的共享组件渲染。
+      现在它的唯一价值是：让"窗口 → preload → 主进程 → @heyta/node-host → SQLite"
+      这条链在**肉眼可见**的层面被验证一次。
+
+      它刻意不引入任何设计 token 或组件库 —— 一个注定要删的页面不该长在
+      设计系统上（那会让 `check:design` 保护一个临时物）。
+    -->
+    <h1>heyta 桌面壳</h1>
+    <p>
+      这一页是占位物，M1 会替换成共享 UI。它现在只做一件事：
+      证明 IPC 到共享宿主这条链是通的。
+    </p>
+    <p id="status">正在询问宿主…</p>
+
+    <script>
+      const status = document.getElementById('status');
+      window.heytaDesktop
+        .request({ method: 'listTasks' })
+        .then((tasks) => {
+          status.className = 'ok';
+          status.textContent = `✅ 宿主已就绪，当前有 ${tasks.length} 条任务。`;
+        })
+        .catch((error) => {
+          status.className = 'bad';
+          status.textContent = `🔴 宿主不可用：${String(error)}`;
+        });
+    </script>
+  </body>
+</html>
