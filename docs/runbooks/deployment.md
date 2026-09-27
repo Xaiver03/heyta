@@ -401,6 +401,10 @@ ssh ubuntu-jcli 'grep -o "\"lang\"" /var/www/heyta-app/assets/index-*.js | wc -l
 直接用会把别人**未提交**的半成品发布到线上。正确做法是在干净 HEAD 上构建：
 
 ```bash
+# 🔴 先清掉旧的：`git worktree add` 对已存在的路径会直接报错，
+#    而这套命令本来就是要反复跑的（每次 main 前进都要重来一遍）。
+git worktree remove --force /tmp/heyta-head 2>/dev/null || true
+rm -rf /tmp/heyta-head
 git worktree add --detach /tmp/heyta-head HEAD
 cd /tmp/heyta-head && pnpm install && pnpm build
 cd apps/web && pnpm exec tsc -b && pnpm exec vite build --base=/app/
