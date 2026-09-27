@@ -112,6 +112,46 @@ Set-Location C:\src\heyta; node --version; pnpm.cmd --version; git --version; co
   （实测 TCP 可达）；
 - 该配置由 `scripts/windows/setup-build-host.ps1 -Proxy` 写入，**不进仓库**（机器本地状态）。
 
+> 🔄 **2026-09-27 复测：前提仍然成立，但代理换位置了。**
+>
+> **代理现在是那台 Windows 机器本机的 `127.0.0.1:7890`**，不再是 Mac 的
+> `10.111.127.246:7890`。实测：
+>
+> ```powershell
+> netsh winhttp show proxy        # → Direct access (no proxy server)
+> Get-ItemProperty 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Internet Settings' |
+>   Select-Object ProxyEnable, ProxyServer   # → ProxyEnable=1, ProxyServer=127.0.0.1:7890
+> [Environment]::GetEnvironmentVariable('HTTPS_PROXY')   # → (未设置)
+> ```
+>
+> 因此那台机器上 `git config http.proxy` 里写的 `http://10.111.127.246:7890`
+> **已经指向死地址**（本机 Mac 的 7890 当时没有进程在监听）。git 若要继续走代理，
+> 应改成 `http://127.0.0.1:7890`；或者按上面的 `netsh` 结果确认直连是否可用。
+>
+> 🔴 **这是一处极易误判的地方，务必记住这个陷阱：**
+>
+> | 工具 | 是否走系统（WinINET）代理 |
+> |---|---|
+> | PowerShell `Invoke-WebRequest` | ✅ **走** |
+> | Windows 自带 `curl` / `git`（未配 proxy 时） | ❌ 不走 |
+> | **Node 的 `fetch`（含 `@electron/get`）** | ❌ **不走**，除非显式设 `HTTPS_PROXY` |
+>
+> 于是会出现这种**自相矛盾的表象**：
+> `Invoke-WebRequest https://api.github.com/rate_limit` 返回 **HTTP 200**（看起来"直连可用"），
+> 而同一台机器上 Node 去下 Electron 二进制却报 **`TypeError: fetch failed`**。
+> 两者都没错 —— 前者借了系统代理，后者直连。
+>
+> **结论：给 Node 系工具（`@electron/get`、`pnpm`、`corepack` 等）下 GitHub 产物时，
+> 必须显式给环境变量**，不能靠"PowerShell 能打开网页"来判断：
+>
+> ```powershell
+> $env:HTTP_PROXY = 'http://127.0.0.1:7890'
+> $env:HTTPS_PROXY = 'http://127.0.0.1:7890'
+> ```
+>
+> ⚠️ 网络与代理都会变（这是在中国大陆访问 GitHub 的常态）。本节只记录**当时怎么测的**，
+> 不要当成永久结论 —— 换网络/换地点后**重新测一次**，再决定配哪个代理。
+
 ### 1.3 两个脚本
 
 | 脚本 | 作用 |

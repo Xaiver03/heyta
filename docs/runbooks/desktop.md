@@ -72,35 +72,45 @@ Windows `Program Files`），且升级会整个替换它 —— 数据放那里�
 
 ## 4. 怎么跑 GUI
 
-### 4.1 前置：Electron 二进制要单独放行（**已在仓库里放行**）
+### 4.1 前置：Electron 二进制要用 `install.js` 单独取（**不是 postinstall**）
 
-`pnpm-workspace.yaml` 的 `allowBuilds` **默认拒绝**依赖的 postinstall 脚本。
-不放行时 `pnpm install` 拿到的 `electron` 只有 **1.1 MB**（类型与 JS 入口），
-**没有** `path.txt`、也没有 `dist/` 里的那个二进制 —— 于是应用**起不了窗口**。
+> 🔴 **这一节的内容推翻过一个错误结论，先把错的写在这里免得重犯：**
+>
+> 我最初以为"`allowBuilds` 没放行 electron，所以二进制没下下来"，
+> 还据此在 `pnpm-workspace.yaml` 里加了 `electron: true`。**那是错的。**
+> 2026-09-27 实测：**electron 44.4.5 的 `package.json` 里没有 `scripts` 字段** ——
+> 它**根本没有 postinstall**（已装的包与 npm registry 两处读到的结果一致）。
+> 放行它什么也不会发生，那是一条**死配置**（已从仓库移除）。
 
-**2026-09-27 已由项目所有者批准放行**（`pnpm-workspace.yaml` 里已有 `electron: true`）：
+真正的机制：
 
-```yaml
-allowBuilds:
-  esbuild: true
-  '@prisma/client': true
-  '@prisma/engines': true
-  prisma: true
-  electron: true      # ← 已加：决定"能不能双击打开应用"
+| 事实 | 值 |
+|---|---|
+| `pnpm install` 装到的体积 | **1.1 MB**（只有类型与 JS 入口） |
+| 有没有 postinstall | ❌ **没有**（`scripts` 字段为空） |
+| 二进制怎么取 | `node node_modules/.pnpm/electron@*/node_modules/electron/install.js` |
+| 能不能 `pnpm exec install-electron` | ❌ 不行 —— 该 bin 没有链接进 `.bin` |
+| 判据 | `path.txt` 与 `dist\electron.exe` 是否存在 |
+
+**取二进制必须显式给代理**，否则报 `TypeError: fetch failed`：
+
+```powershell
+$env:HTTP_PROXY        = 'http://127.0.0.1:7890'   # 那台 Windows 本机的代理
+$env:HTTPS_PROXY       = 'http://127.0.0.1:7890'
+$env:NODE_USE_ENV_PROXY = '1'   # 🔴 关键：Node 的 fetch 默认**不读**这两个环境变量
+node "$dir\node_modules\electron\install.js"
 ```
 
-放行后 `pnpm install` 会下载 ~100MB 二进制。注意它落在**用户缓存目录**
-（`%LOCALAPPDATA%\electron` / `~/Library/Caches/electron`），**不进仓库、不占仓库体积**。
+> 🔴 `NODE_USE_ENV_PROXY=1` 是最容易被漏掉的一步。没有它，Node 的 `fetch`（undici）
+> 会直连 GitHub 并失败，而**报错只有 `TypeError: fetch failed` 四个字** —— 完全看不出
+> 是代理问题。更坑的是同一台机器上 PowerShell 的 `Invoke-WebRequest` 能返回 200
+> （它走 WinINET 系统代理），于是看起来"网络明明是通的"。
+> 完整的误判链与判据记在 [`../reference/build-matrix.md` §1.2](../reference/build-matrix.md)。
 
-> ⚠️ **只改了配置、还没重新 install 时，`path.txt` 仍然不存在。**
-> 判据就一条：
-> ```powershell
-> Test-Path 'node_modules\.pnpm\electron@*\node_modules\electron\path.txt'
-> ```
-> `False` = 不能跑 GUI（但 §5 的验证照样能跑，代码本身不依赖它）。
->
+实测结果：装上后 `electron.exe` **234.6 MB**，落在包目录内（不进仓库、不占仓库体积）。
+
 > ⚠️ 这台 Windows 机器同时是 Android 打包机，**它的二进制要单独装**：
-> 同步源码之后在那台上再跑一次 `pnpm install`。
+> 同步源码之后在那台上另跑一次上面的 `install.js`。
 
 ### 4.2 命令
 
@@ -192,7 +202,34 @@ Windows 那 11 个用例含"写 → 关 → 重开新引擎 → 数据仍在"—
 ⚠️ **还没有做的事**：GUI 窗口本身仍**未真机冒烟**（没在那台机器上启动过 Electron 窗口）。
 测过的是主进程侧的全部逻辑路径。见 [§6](#6-当前边界明确没做的事)。
 
-### 5.3 途中踩到的坑（留档）
+### 5.3 Electron **运行时**冒烟（真 Windows 实测 ✅）
+
+`tests/` 的 11 个用例跑在**纯 Node** 里，证明不了"应用真正跑在 Electron 主进程里"这件事 ——
+那是另一个运行时（Electron 用自己的 Node 构建）。`src/smoke.ts` 补上这一环：
+
+```bash
+pnpm --filter @heyta/desktop build     # 产物含 dist/smoke.cjs
+pnpm --filter @heyta/desktop smoke     # 需要 §4.1 的二进制
+```
+
+2026-09-27 在 `windows-pc` 上实测通过（**无窗口**，所以能在 SSH 里跑）：
+
+```json
+{"ok":true,"electron":"44.4.5","node":"24.21.0","chrome":"152.0.7977.130",
+ "platform":"win32","arch":"x64","taskCount":1}
+```
+
+它证明的是**纯 Node 测不出来的那部分**：
+
+| 断言 | 为什么重要 |
+|---|---|
+| `node":"24.21.0"` ≠ 系统 `node v24.19.0` | **Electron 用自己的 Node 构建** —— 原生模块必须在这个构建里 load 成功 |
+| `taskCount":1` 且 `ok":true` | `node:sqlite` 经 `NodeSqliteDriver` 在 **Electron 运行时内真的读写了 SQLite 文件** |
+| `platform":"win32"` | 上面两条是在**真 Windows** 上成立的 |
+
+⚠️ 它**不覆盖**"窗口真的画出来了" —— 那需要人眼或截图，见 [§6](#6-当前边界明确没做的事)。
+
+### 5.4 途中踩到的坑（留档）
 
 写测试时我先断言了 `{ completed: true }`，测试**红了才发现**领域模型用的是
 **`completedAt: number` 时间戳**，不是布尔值。
@@ -207,7 +244,8 @@ Windows 那 11 个用例含"写 → 关 → 重开新引擎 → 数据仍在"—
 |---|---|
 | 渲染页 | ⚠️ **临时占位页**，M1（共享 UI 垂直切片）会整个替换 |
 | **macOS 与 Windows 上的构建 + 11 个测试** | ✅ **已实测**（见 [§5.2](#52-在-windows-打包机上验证2026-09-27-实测-)） |
-| GUI 窗口的真机冒烟 | ⬜ **未做** —— 配置已放行二进制（§4.1），但还没在任何机器上真的启动过窗口 |
+| **Electron 运行时冒烟（无窗口）** | ✅ **已实测**（真 Windows，见 [§5.3](#53-electron-运行时冒烟真-windows-实测-)） |
+| GUI 窗口的真机冒烟 | ⬜ **未做** —— 二进制已装好（§4.1），但还没在任何机器上真的启动过窗口 |
 | Windows / macOS / Linux 三平台安装包 | 未做（`electron-builder` 或等价物） |
 | 代码签名 / 公证 | 未做 |
 | 自动更新 | 未做 |
