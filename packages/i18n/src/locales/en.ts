@@ -1450,4 +1450,79 @@ export const en = {
   // Singular sibling; a single conflict is the common case.
   'mobile.sync.conflictOne': 'You have {count} conflict to resolve',
   'mobile.sync.error': 'Sync failed',
+
+  // ── Motivation ──
+  // The mobile growth screen. Same numbers as the web view (they come from
+  // `@heyta/app-host#motivation`), so the two shells cannot drift apart.
+  // The three product red lines are stated in the copy and in the UI:
+  // no currency, compare only with your past self, never guilt-trip.
+  'mobile.growth.title': 'My growth',
+  'mobile.growth.back': 'Back',
+  'mobile.growth.entry': 'My growth',
+  'mobile.growth.entry.hint': 'Today, streaks and milestones',
+  'mobile.growth.compare.note': 'Every number here compares you only with your past self. No leaderboards.',
+
+  // Today (L1)
+  'mobile.growth.today.title': 'Today',
+  'mobile.growth.today.a11y': '{done} of {total} done today',
+  'mobile.growth.today.hint.idle': 'Nothing recorded today yet',
+  'mobile.growth.today.hint.unplanned': '{count} extra finished beyond the plan',
+  'mobile.growth.today.hint.allDone': 'Everything planned for today is done',
+  'mobile.growth.today.hint.remaining': 'Still {count} to go today',
+  'mobile.growth.today.closed': 'Today is complete',
+  'mobile.growth.today.habits': 'Habits {done}/{planned}',
+  'mobile.growth.today.tasks': 'Tasks {done}/{planned}',
+  'mobile.growth.today.bonus': '{count} beyond the plan',
+  'mobile.growth.today.focus': 'Focus {minutes} min',
+
+  // Weekly review (L3). Deltas stay neutral: no red for a lower week.
+  'mobile.growth.week.title': 'This week',
+  'mobile.growth.week.range': '{start} to {end}',
+  'mobile.growth.week.empty': 'Nothing recorded this week yet',
+  'mobile.growth.week.headline.checkIns': 'Check-ins this week: {count}',
+  'mobile.growth.week.headline.tasksCompleted': 'Tasks finished this week: {count}',
+  'mobile.growth.week.headline.focusMinutes': 'Focus this week: {count} min',
+  'mobile.growth.week.stat.checkIns': 'Check-ins',
+  'mobile.growth.week.stat.tasks': 'Tasks',
+  'mobile.growth.week.stat.focus': 'Focus',
+  'mobile.growth.week.stat.previous': 'Last week: {count}',
+  'mobile.growth.week.bestDay': 'Best focus day: {date}, {minutes} min',
+
+  // Continuity (L2). Longest and total never go down, so a break always
+  // leaves at least one number on screen that did not shrink.
+  'mobile.growth.streak.title': 'Streaks',
+  'mobile.growth.streak.note': 'Longest and total never go down — a break is not a loss.',
+  'mobile.growth.streak.empty': 'No habits yet. Habits created on the web sync here.',
+  'mobile.growth.streak.current': 'Current streak (days)',
+  'mobile.growth.streak.longest': 'Longest: {days}',
+  'mobile.growth.streak.total': 'Total: {count}',
+  'mobile.growth.streak.repair': 'Yesterday is still open — repairing makes it {days}',
+  'mobile.growth.streak.freshStart': 'Time since last: {days}. Longest {longest} and total {total} are still yours.',
+  'mobile.growth.streak.a11y': '{name}: current {current}, longest {longest}, total {total}',
+
+  // Milestones (L3). Accumulated totals only grow; nothing is subtracted.
+  'mobile.growth.milestones.title': 'Milestones',
+  'mobile.growth.milestones.note': 'Accumulated totals only ever grow. Nothing is subtracted.',
+  'mobile.growth.milestones.maxed': 'Top tier reached',
+  'mobile.growth.milestones.next': 'Next at {next}',
+  'mobile.growth.milestones.a11y': '{name}: {value} so far, {reached} of {total} tiers earned',
+  'mobile.growth.kind.checkIns': 'Check-ins',
+  'mobile.growth.kind.focusHours': 'Focus hours',
+  'mobile.growth.kind.tasks': 'Tasks done',
+  'mobile.growth.kind.activeDays': 'Active days',
+
+  // Identity tags (L3). An identity, not a reward — no coins, nothing to spend.
+  'mobile.growth.tags.title': 'Identities',
+  'mobile.growth.tags.note': 'An identity is not a reward; it is something you already did.',
+  'mobile.growth.tags.empty': 'No identities yet. Take your time.',
+  'mobile.growth.tags.near': '{gap} to go for "{name}"',
+  'mobile.growth.tags.reachedA11y': 'Earned: {name}',
+  'mobile.growth.tag.started': 'One week in',
+  'mobile.growth.tag.routine': 'Part of the routine',
+  'mobile.growth.tag.steady': 'A steady hundred',
+  'mobile.growth.tag.checkin-hundred': 'A hundred check-ins',
+  'mobile.growth.tag.deep-fifty': 'Fifty deep hours',
+  'mobile.growth.tag.deep-two-hundred': 'Two hundred deep hours',
+  'mobile.growth.tag.finisher-five-hundred': 'Five hundred finished',
+  'mobile.growth.tag.streak-thirty': 'Thirty days straight',
 } satisfies Record<MessageKey, string>;

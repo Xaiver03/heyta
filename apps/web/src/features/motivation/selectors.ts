@@ -3,18 +3,24 @@
  * ================================
  *
  * ─────────────────────────────────────────────────────────────────────────
- * 🔴 **这里没有一行"业务判断"。**
+ * 🔴 **这里没有一行"业务判断"，也没有一行"取数"了。**
  *
  * 判什么算达成、什么算今天该做、冻结怎么算 —— 全部在 `@heyta/domain`
  * 的纯函数里（`today-progress` / `milestones` / `weekly-review` /
- * `identity-tags` / `habit-resilience`）。这个文件只做两件事：
+ * `identity-tags` / `habit-resilience`）。
  *
- *   1. 把物化状态（`Record<id, Entity>`）摊成领域层要的数组；
- *   2. 把 `now` 换算成 `LocalDate`。
+ * 而"把物化状态摊成领域层要的数组、滤掉墓碑、把 `now` 换算成 `LocalDate`"
+ * 这一整段，现在在 `@heyta/app-host` 的 `motivation.ts` 里 —— 因为
+ * **移动端要画同一批数字**，而这段摊平有五种做法、五种做法会漂移
+ * （详见那个文件的文件头）。
  *
- * 之所以仍然值得单独一个文件：**这两件事有五种做法，而五种做法会漂移。**
- * "今天的进度"与"周复盘"如果各自 `Object.values` 再各自算一遍 `today`，
- * 同一个界面上就会出现两个对不上账的真相（比如一次渲染跨了午夜）。
+ * 本文件剩下的只有两件事：
+ *
+ *   1. 把共享层的函数**转发**成 Web 组件已经在用的名字（`select*`）——
+ *      组件一行都不用改，这是"抽出去之后删掉旧实现"的收尾方式：
+ *      旧实现的职责没了，但**调用点**的名字不必跟着改；
+ *   2. 给年视图的格子补上 `level` 分档 —— 那是**热力图库的展示适配**，
+ *      不是业务判据（见 `selectYearActivity` 的注释），所以刻意留在壳里。
  * ─────────────────────────────────────────────────────────────────────────
  *
  * ⚠️ **`now` 一律由调用方传入，绝不在里面读 `Date.now()`。**
@@ -22,84 +28,50 @@
  * 而且测试无法稳定断言。
  */
 
-import { aliveRecords, categoryReportFromTables } from '@heyta/app-host';
 import {
-  computeActivityTotals,
-  computeStreak,
-  computeTodayProgress,
-  computeWeeklyReview,
-  deriveIdentityTags,
-  deriveMilestones,
+  activityTotalsFromState,
+  categoryReportFromTables,
+  dailyActivityCountsFromState,
+  identityTagsFromState,
+  milestonesFromState,
+  todayProgressFromState,
+  weeklyReviewFromState,
+  type MotivationTables,
+} from '@heyta/app-host';
+import {
   toLocalDate,
-  addDays,
   type ActivityTotals,
   type CategoryReport,
-  type FocusSession,
-  type Habit,
-  type HabitLog,
   type IdentityTagProgress,
   type LocalDate,
   type MilestoneProgress,
-  type Project,
-  type Task,
   type TodayProgress,
   type WeeklyReview,
 } from '@heyta/domain';
 
 /**
- * 选择器的输入形状。
+ * 选择器的输入形状 —— 就是共享层的 `MotivationTables`。
  *
- * 🔴 刻意**不**直接依赖 `@heyta/op-log` 的 `MaterializedState`：
- * 那个接口还带着 `aiFeedback` / `preferenceCorrections` 等与激励无关的字段，
- * 而且它每加一个实体，这个文件就要跟着重新审一遍。只声明**真正用到的五张表**，
- * 结构上可赋（`MaterializedState` 天然满足），但耦合面小得多。
+ * 🔴 保留这个名字是**刻意的**：Web 组件与测试已经按它书写，而它比
+ * `MotivationTables` 更贴近"这一屏要的五张表"。类型别名只保留可读性，
+ * 结构定义只有一处。
  */
-export interface MotivationInput {
-  habits: Record<string, Habit>;
-  habitLogs: Record<string, HabitLog>;
-  tasks: Record<string, Task>;
-  projects: Record<string, Project>;
-  focusSessions: Record<string, FocusSession>;
-}
-
-/**
- * 只保留未软删除的记录（语义与实现在 `@heyta/app-host#aliveRecords`）。
- *
- * 🔴 本地这个别名**不是**为了少打几个字：Web 的六个选择器、移动端的分类屏、
- * 以及以后任何统计屏都得滤墓碑，各写一份就是"撤销掉的时间又回到统计里"
- * 这类缺陷的温床。别名只保留可读性，实现只有一处。
- */
-const alive = aliveRecords;
+export type MotivationInput = MotivationTables;
 
 export function selectTodayProgress(state: MotivationInput, now: number): TodayProgress {
-  return computeTodayProgress({
-    habits: alive(state.habits),
-    logs: alive(state.habitLogs),
-    tasks: alive(state.tasks),
-    focusSessions: alive(state.focusSessions),
-    today: toLocalDate(now),
-  });
+  return todayProgressFromState(state, now);
 }
 
 export function selectTotals(state: MotivationInput): ActivityTotals {
-  return computeActivityTotals({
-    logs: alive(state.habitLogs),
-    tasks: alive(state.tasks),
-    focusSessions: alive(state.focusSessions),
-  });
+  return activityTotalsFromState(state);
 }
 
 export function selectMilestones(state: MotivationInput): MilestoneProgress[] {
-  return deriveMilestones(selectTotals(state));
+  return milestonesFromState(state);
 }
 
 export function selectWeeklyReview(state: MotivationInput, now: number): WeeklyReview {
-  return computeWeeklyReview({
-    logs: alive(state.habitLogs),
-    tasks: alive(state.tasks),
-    focusSessions: alive(state.focusSessions),
-    today: toLocalDate(now),
-  });
+  return weeklyReviewFromState(state, now);
 }
 
 /**
@@ -108,18 +80,10 @@ export function selectWeeklyReview(state: MotivationInput, now: number): WeeklyR
  * `bestCurrentStreak` 取的是**所有习惯里当前连续天数最大的那个** ——
  * 不是最长历史记录。理由见计划 §5：身份标签说的是"你现在是什么样的人"，
  * 一个两年前连续过 300 天、此后再没打开过的习惯，不该给用户发身份。
+ * 这条选择已收进共享层（`@heyta/app-host#bestCurrentStreak`）并被单测钉住。
  */
 export function selectIdentityTags(state: MotivationInput, now: number): IdentityTagProgress[] {
-  const today = toLocalDate(now);
-  const habits = alive(state.habits);
-  const logs = alive(state.habitLogs);
-
-  const bestCurrentStreak = habits.reduce((best, habit) => {
-    const own = logs.filter((l) => l.habitId === habit.id);
-    return Math.max(best, computeStreak(habit, own, today).current);
-  }, 0);
-
-  return deriveIdentityTags({ totals: selectTotals(state), bestCurrentStreak });
+  return identityTagsFromState(state, now);
 }
 
 /** 一年视图里的一个格子。 */
@@ -133,37 +97,17 @@ export interface DayActivity {
 /**
  * 近 N 天"有没有在做"的格子。
  *
- * 🔴 口径刻意**不**只为打卡服务：只画打卡热力图的话，一个用 heyta 专注
- * 和完成任务、但从不建习惯的用户会看到一片空白 —— 而那是一片假的空白。
- *
- * ⚠️ 等级阈值（1 / 2 / 3 / 4+）是**展示**参数，不是业务判据，
- * 所以留在这一层；这也是它没有进 `packages/domain` 的原因。
+ * 每天几件是**事实**，由共享层给出；`level` 是
+ * [react-activity-calendar](https://github.com/grubersjoe/react-activity-calendar)
+ * 要的分档 —— 换图表库这份映射就要改，所以它是**展示**参数，
+ * 刻意留在壳里，不进共享层。
  */
 export function selectYearActivity(state: MotivationInput, now: number, days = 365): DayActivity[] {
-  const today = toLocalDate(now);
-  const counts = new Map<LocalDate, number>();
-
-  const bump = (date: LocalDate): void => {
-    counts.set(date, (counts.get(date) ?? 0) + 1);
-  };
-
-  for (const log of alive(state.habitLogs)) bump(log.date);
-  for (const task of alive(state.tasks)) {
-    if (task.completedAt !== undefined) bump(toLocalDate(task.completedAt));
-  }
-  for (const session of alive(state.focusSessions)) {
-    // 与今日进度同口径：只有工作段算"在做"，休息不算。
-    if (session.kind !== 'work') continue;
-    bump(toLocalDate(session.endedAt ?? session.createdAt));
-  }
-
-  const out: DayActivity[] = [];
-  for (let i = days - 1; i >= 0; i -= 1) {
-    const date = addDays(today, -i);
-    const count = counts.get(date) ?? 0;
-    out.push({ date, count, level: levelOf(count) });
-  }
-  return out;
+  return dailyActivityCountsFromState(state, now, days).map(({ date, count }) => ({
+    date,
+    count,
+    level: levelOf(count),
+  }));
 }
 
 function levelOf(count: number): 0 | 1 | 2 | 3 | 4 {

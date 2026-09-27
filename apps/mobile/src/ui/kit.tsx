@@ -307,6 +307,60 @@ export function SectionHeader({
 }
 
 // ─────────────────────────────────────────────────────────────
+// 进度条
+// ─────────────────────────────────────────────────────────────
+
+/**
+ * 一条只读的进度条。
+ *
+ * 🔴 它是**信息**，不是按钮 —— 刻意没有被做成可点区域。加上
+ * `accessibilityRole` / `accessibilityValue`，读屏用户听到的是
+ * "完成 40%"，而不是一根他们感知不到的色条。
+ *
+ * ⚠️ `percent` 由调用方算好（`lib/growth-display.ts` 的 `progressPercent`
+ * 已夹过 0–100）。这里再夹一次是**渲染守卫**：越界宽度在 RN 里不报错，
+ * 只是画到容器外或整条消失，而那种症状看起来像"这块没数据"。
+ *
+ * ⚠️ 首帧不动画是**刻意的**（没有 Animated / LayoutAnimation）：
+ * 这条工单只做"读到成长数据"，不做完成动效（L1 的那一段是独立的一件事）。
+ * 没有动画也就没有"动效在首帧被触发"的问题。
+ */
+export function ProgressBar({
+  percent,
+  label,
+}: {
+  /** 0–100。 */
+  percent: number;
+  /** 无障碍名。进度条没有可见文字，读屏全靠它。 */
+  label: string;
+}): React.JSX.Element {
+  const t = useTokens();
+  const clamped = Math.max(0, Math.min(100, percent));
+
+  return (
+    <View
+      accessibilityRole="progressbar"
+      accessibilityLabel={label}
+      accessibilityValue={{ min: 0, max: 100, now: Math.round(clamped) }}
+      style={{
+        height: t['size.progress-height'],
+        borderRadius: t['radius.full'],
+        backgroundColor: t['color.surface-sunken'],
+        overflow: 'hidden',
+      }}
+    >
+      <View
+        style={{
+          width: `${clamped}%`,
+          height: '100%',
+          backgroundColor: t['color.primary'],
+        }}
+      />
+    </View>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────
 // 勾选框
 // ─────────────────────────────────────────────────────────────
 
