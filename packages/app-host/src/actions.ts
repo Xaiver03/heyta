@@ -40,6 +40,7 @@ import {
   startOfDay,
   toLocalDate,
   today,
+  type QuadrantDropPlan,
   type Task,
 } from '@heyta/domain';
 import type { MaterializedState, OpIntent } from '@heyta/op-log';
@@ -124,6 +125,23 @@ export interface TaskActions {
   setPriority(entityId: string, priority: Priority): Promise<void>;
   /** 四象限的"重要"维度。 */
   setImportant(entityId: string, important: boolean): Promise<void>;
+  /**
+   * **一次拖放 = 一条 op。**
+   *
+   * 拖进某个象限同时决定"重要"和"紧急"两件事，而紧急是从 `dueDate` 推导的 ——
+   * 所以一个拖放意图天然要写两个字段。
+   *
+   * 🔴 **为什么不能拆成 `setImportant` + `setDueDate` 两次调用**：
+   *   - 那是**两条 op**，而 AGENTS.md §3.4 要求"一个用户意图 = 一个 op"；
+   *   - 更糟的是**中间态是可见的**：第一秒"重要但截止时间还没改"，
+   *     如果这时同步或崩溃，用户会得到一个"改了一半"的任务。
+   *     `apps/web` 的 `QuadrantBoard` 原来就是这么写的，注释还写着
+   *     "一次操作 = 一条 op"，而代码是两次 `await`。
+   *
+   * 投放计划由领域层的纯函数 `planQuadrantDrop` 算出来 —— 那是产品语义，
+   * 有穷举测试（4 象限 × 3 种截止时间状态）。这里只负责**原子地写下去**。
+   */
+  setQuadrantDrop(entityId: string, plan: QuadrantDropPlan): Promise<void>;
   /** 传 `undefined` 表示清除截止时间（会写成 `null`，见文件头第 2 条）。 */
   setDueDate(entityId: string, dueDate: number | undefined): Promise<void>;
   /**
@@ -140,6 +158,26 @@ export interface TaskActions {
   setNote(entityId: string, note: string | undefined): Promise<void>;
   /** 传 `undefined` 表示移出项目（会写成 `null`）。 */
   moveToProject(entityId: string, projectId: string | undefined): Promise<void>;
+
+  /**
+   * 覆盖式设置任务的标签集合（**一次调用 = 一条 op**）。
+   *
+   * 🔴 **为什么是"整组覆盖"而不是 `addTag` / `removeTag`。**
+   * `Task.tagIds` 对 reducer 而言是**普通字段**，合并语义是字段级 LWW
+   * （`op-log/src/state.ts` 只覆盖 payload 里出现的字段，数组整体替换）。
+   * 若做成 add/remove，就必须让 reducer 认识"数组求并集/差集"这种**新的合并语义**
+   * —— 那是线协议级别的改动。而"一个用户意图 = 一条 op"（AGENTS.md §3.4）
+   * 用整组覆盖就能满足：界面上点亮一个标签，由界面算出新的整组，写**一条** op。
+   *
+   * ⚠️ **代价要如实说，不要粉饰**：两台设备**同时**给同一个任务加**不同**的标签时，
+   * 字段级 LWW 会丢掉一边（后写的那一组赢）。这与 `projectId` / `note` 的冲突行为
+   * 同类，**不是这里新引入的**；要真正做集合合并需要给 reducer 加集合语义，
+   * 那是另一份 ADR。本轮不假装它能合并。
+   *
+   * 传**空数组**表示清空（写成 `null`，与 `setDueDate` / `setNote` 同一条约定：
+   * `[]` 和"没有这个字段"是同一件事的两种表示，只留一种）。
+   */
+  setTags(entityId: string, tagIds: string[]): Promise<void>;
 
   /**
    * 设置重复规则（RFC 5545 RRULE 串）。传 `undefined` 表示取消重复。
@@ -314,6 +352,19 @@ export function createTaskActions(
       return update(entityId, { important });
     },
 
+    setQuadrantDrop(entityId, plan) {
+      // ⚠️ **只有 `dueDate !== undefined` 时才把 dueDate 放进 payload。**
+      //    `undefined` 在这里的语义是"不用改"，而 `null` 是"清除" ——
+      //    把 `undefined` 直接塞进 payload 会让 reducer 把它当成一次
+      //    "写入 undefined"，在 `dueDate` 这个 `?: number` 字段上表现为
+      //    **静默清除**（同 AGENTS.md #20 的形状）。
+      const payload: Record<string, unknown> = { important: plan.important };
+      if (plan.dueDate !== undefined) {
+        payload.dueDate = plan.dueDate;
+      }
+      return update(entityId, payload);
+    },
+
     setDueDate(entityId, dueDate) {
       // undefined → null：null 能穿过 JSON 表达"清除"。
       return update(entityId, { dueDate: dueDate ?? null });
@@ -326,6 +377,37 @@ export function createTaskActions(
 
     moveToProject(entityId, projectId) {
       return update(entityId, { projectId: projectId ?? null });
+    },
+
+    // 🔴 **必须是 `async`。** 校验失败时 `throw` 会变成一个**被拒绝的 Promise** ——
+    // 与接口签名（`Promise<void>`）一致。写成非 async 的话它会**同步抛出**：
+    // 调用方 `void actions.setTags(...)` 或 `.catch(...)` 都接不住，
+    // 异常会直接穿过 React 的事件处理函数冒到顶层。
+    // （这是本仓库"接口说的是 Promise、实际同步抛"的第 N 次 —— 测试当场抓到了。）
+    async setTags(entityId, tagIds) {
+      // 去重：界面上"点两次同一个标签"不该写出 `[a, a]` —— 那样这条任务的
+      // 标签数会比标签总数还多，而没有任何一处会报错。
+      const unique = [...new Set(tagIds)];
+
+      /**
+       * 🔴 **每个标签都必须真的存在且没被删。**
+       *
+       * 写进一个悬空 id 的后果是"任务上挂着一个任何视图都查不到的标签"：
+       * 界面上表现为"标签数对不上"，而 op-log 里只有一条看起来完全正常的 UPD。
+       * 这类"数据里有个引用、视图里找不到目标"最难查，所以在**写入侧**就拦住。
+       *
+       * （`setDueDate` / `setNote` 之类的同类动作不校验任务是否存在 —— 这里
+       *   保持与它们一致的形状：只校验**本动作新引入**的那个风险，即标签引用。）
+       */
+      for (const id of unique) {
+        const tag = ctx.getState().tags[id];
+        if (tag === undefined || tag.deletedAt !== undefined) {
+          throw new Error(`找不到标签「${id}」`);
+        }
+      }
+
+      // 空集合写 `null` 而不是 `[]` —— 见接口注释。
+      await update(entityId, { tagIds: unique.length === 0 ? null : unique });
     },
 
     async setRepeat(entityId, rule) {

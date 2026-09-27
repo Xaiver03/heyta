@@ -144,7 +144,7 @@ export interface AppHost {
   /**
    * 与真实服务端完整同步一次。
    *
-   * 未配置同步服务时返回 `{ kind: 'error', message: '未配置同步服务' }` ——
+   * 未配置同步服务时返回 `{ kind: 'error', reason: 'not-configured' }` ——
    * **不会**返回"已同步"，因为那会把"没配置"伪装成"同步成功且没有新数据"。
    */
   sync(): Promise<SyncStatus>;
@@ -278,7 +278,7 @@ export async function openAppHost(options: AppHostOptions): Promise<AppHost> {
   /** 未配置同步时的统一答复。**明确说"未配置"，不说"已同步"。** */
   const notConfigured = (): SyncStatus => ({
     kind: 'error',
-    message: '未配置同步服务',
+    reason: 'not-configured',
     retryable: false,
   });
 

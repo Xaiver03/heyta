@@ -39,13 +39,14 @@
  */
 
 import {
+  createProjectActions,
   createTaskActions,
   materializedState,
   openAppHost,
   type AppHost,
   type NewTaskFields,
 } from '@heyta/app-host';
-import type { Task } from '@heyta/domain';
+import type { Project, Tag, Task } from '@heyta/domain';
 import type { OpIntent } from '@heyta/op-log';
 import type { EntityType } from '@heyta/shared-schema';
 import { NodeSqliteDriver } from '@heyta/storage/sqlite/node';
@@ -84,6 +85,24 @@ export interface NodeHost {
   setCompleted(entityId: string, completed: boolean): Promise<void>;
   /** 未删除的任务，按创建时间排序。 */
   listTasks(): Task[];
+  /**
+   * 未删除的清单，按 (createdAt, id) 升序。
+   *
+   * 🔴 这是**验收探针能不能看见新数据**的问题，不是功能问题：
+   * `listTasks()` 一直不吐 `projectId`、也没有任何命令能列清单，
+   * 于是"手机建的清单同步到另一台设备了吗"**无法断言** ——
+   * 而没法断言的字段正是最可能在半路上丢掉的（同 `dueDate` 当初的处境）。
+   */
+  listProjects(): Project[];
+
+  /**
+   * 未删除的标签，顺序同 `listProjects()`。
+   *
+   * 与 `listProjects()` 存在的理由完全相同：没有它，"手机建的标签同步到
+   * 另一台设备了吗"就只能靠任务上的 `tagIds` 间接推断 ——
+   * 而标签实体**自己**有没有过来（名字对不对、有没有变成墓碑）就没人看了。
+   */
+  listTags(): Tag[];
 
   /** **唯一写入入口**（AGENTS.md §3.4）。 */
   dispatch(intent: OpIntent): Promise<void>;
@@ -110,6 +129,7 @@ export async function openNodeHost(options: NodeHostOptions): Promise<NodeHost> 
   });
 
   const actions = createTaskActions(app);
+  const projectActions = createProjectActions(app);
 
   return {
     dbPath: app.dbPath,
@@ -120,6 +140,8 @@ export async function openNodeHost(options: NodeHostOptions): Promise<NodeHost> 
     renameTask: (entityId, title) => actions.rename(entityId, title),
     setCompleted: (entityId, completed) => actions.setCompleted(entityId, completed),
     listTasks: () => actions.listTasks(),
+    listProjects: () => projectActions.listProjects(),
+    listTags: () => projectActions.listTags(),
 
     dispatch: (intent) => app.dispatch(intent),
     sync: () => app.sync(),
