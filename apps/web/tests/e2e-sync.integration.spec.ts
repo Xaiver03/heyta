@@ -82,6 +82,7 @@ async function makeDevice(
       await engine.redispatch(op);
     },
     discardLocal: (ids) => engine.discardPendingUpload(ids),
+    markRejected: (ids) => engine.markRejected(ids),
     getOpsForEntity: (entityType, entityId) =>
       engine.getOpsForEntity(entityType as never, entityId),
     getOpById: (opId) => engine.getOpById(opId),
@@ -526,6 +527,7 @@ describe.skipIf(URL_BASE === undefined)('P1 验收：离线合并与崩溃恢复
         await engine2.redispatch(op);
       },
       discardLocal: (ids) => engine2.discardPendingUpload(ids),
+      markRejected: (ids) => engine2.markRejected(ids),
       getOpsForEntity: (entityType, entityId) =>
         engine2.getOpsForEntity(entityType as never, entityId),
       getOpById: (opId) => engine2.getOpById(opId),

@@ -43,6 +43,7 @@ import {
   type TaskFilter,
 } from './features/tasks/store.js';
 import { DueBadge, type DueDisplayMode } from './features/tasks/DueBadge.js';
+import { TaskOrganizer } from './features/tasks/TaskOrganizer.js';
 import { CaptureComposer } from './features/capture/CaptureComposer.js';
 import { useProjectStore } from './features/projects/store.js';
 import { ConflictDialog } from './features/sync/ConflictDialog.js';
@@ -560,6 +561,15 @@ export function App(): React.JSX.Element {
                     </button>
 
                     <span className="ht-task__title">{task.title}</span>
+
+                    {/* 清单归属 + 标签。Web 端此前**根本没有入口** ——
+                        `moveToProject` 没有任何调用点、`tagIds` 全仓库零读写，
+                        于是侧栏里建出来的清单和标签一个也用不上。 */}
+                    <TaskOrganizer
+                      task={task}
+                      onMoveToProject={(projectId) => store.moveToProject(task.id, projectId)}
+                      onSetTags={(tagIds) => store.setTags(task.id, tagIds)}
+                    />
 
                     <span className="ht-task__meta">
                       <DueBadge task={task} mode={dueDisplay} now={store.now} />

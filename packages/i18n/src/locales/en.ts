@@ -414,6 +414,15 @@ export const en = {
   'web.tags.add': 'Add tag',
   'web.tags.delete': 'Delete tag "{name}"',
 
+  // ── Web · per-row "organize" (list + tags) ────────────────
+  'web.organize.summary': 'Organize task "{title}"',
+  'web.organize.projectLabel': 'List',
+  'web.organize.projectSelect': 'List that task "{title}" belongs to',
+  'web.organize.inbox': 'Inbox',
+  'web.organize.tagsLegend': 'Tags',
+  'web.organize.tagToggle': 'Add or remove tag "{name}" on task "{title}"',
+  'web.organize.noTags': 'No tags yet — create one under "Tags" on the left.',
+
   // ── Web · quadrants ───────────────────────────────────────
   'web.quadrant.do': 'Do now',
   'web.quadrant.q1': 'Important and urgent',
