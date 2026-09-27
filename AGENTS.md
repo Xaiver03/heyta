@@ -1751,6 +1751,131 @@ docker inspect <容器> --format '{{range .Config.Env}}{{println .}}{{end}}' | g
     ② 构建用的 `export LANG=…` **只作用于那一条命令**（`env LANG=… cmd`），
     不要留在跑验收的 shell 里。
 
+70. 🔴 **`check:docs` 的绿是"本机绿" —— 干净 checkout 里它是红的。**
+
+    实测（2026-09-27，两个独立 worktree 复现）：
+
+    | 环境 | `check:docs` |
+    |---|---|
+    | 主工作目录 | ✅ 151 文件 / 777 链接全通 |
+    | 干净 worktree / 新克隆 | ❌ exit 1，6 处死链 |
+
+    死链全部指向 `../../research/upstream/super-productivity/...`，
+    而 `research/upstream/` 在 `.gitignore:25` 里 —— **它根本不是仓库的一部分**。
+    `docs/research/native-widgets.md`（121/309/310/311 行）与
+    `docs/research/multi-platform-selection-evidence.md`（36 行）**被跟踪**，
+    却链接进一个只存在于某些机器上的目录。
+
+    🔴 **为什么这条危险**：它同时骗两个方向 —— 在别人的机器上，一个**本来正确的改动**
+    会看到 `check:docs` 红；而在本机会看到绿，于是没人发现那 6 个链接对读者是坏的。
+    这与 §7 第 69 条是同一类毛病：**判据依赖了不该依赖的环境**。
+
+    **纪律**：相对链接的目标必须**在仓库里**。要引用 gitignore 的上游代码，就写路径文本
+    或指向可公开访问的 URL，不要写成相对链接。
+
+71. 🔴 **国内主机上 `docker compose build` 会"静默卡死"两次 —— 症状像在编译，其实什么都没发生。**
+
+    两个都不是编译慢，是**默认源连不上**，而两者都**不设超时**：
+
+    | 卡在哪 | 默认源 | 实测 | 绕过 |
+    |---|---|---|---|
+    | `RUN apk add` | `dl-cdn.alpinelinux.org` | 超时无响应，卡满 40 分钟**零输出** | `APK_MIRROR=mirrors.aliyun.com`（0.26s） |
+    | `RUN pnpm install` | `registry.npmjs.org` | 0.79s→几分钟；356/360 后 `TimeoutError`，整层作废 | `NPM_REGISTRY=https://registry.npmmirror.com`（0.79s） |
+
+    `server/Dockerfile` 与 `server/docker-compose.build.yml` 已把两者做成**构建参数，默认仍是官方源**
+    （别处的自建者行为不变）。见 `docs/runbooks/deployment.md` §3.8。
+
+    ⚠️ **失败的层不进缓存**，所以 npm 那次是**每次重试都从零开始** ——
+    "再跑一次说不定就过了"在这里不成立。
+
+72. 🔴 **`scripts/tools/ios-ax-shim.py --press` 会假成功 —— 点空了也回 `result=success`。**
+
+    它是"读一次 AX 树 → 按**读到的坐标**点一下"。UI 一动坐标就过期，点击落空，
+    **但回执照样是 success**。实测在「回收站」上被骗 3 次：每次都报成功，界面一动不动。
+    这会让人得出"功能没实现"或"改了没用"的错误结论。
+
+    可靠原语（原子，不靠坐标快照）：
+
+    ```bash
+    idb ui tap <label> --match-key AXLabel --api axbridge   # 按标签定位并点
+    idb ui tap --api hid X Y                                # 真要按坐标时
+    idb ui scroll visible <label> --api ax                  # 先把元素滚进视野
+    ```
+
+73. ⚠️ **`pod install` 在路径含空格的 worktree 里必失败（本仓库路径就含空格）。**
+
+    `All in one Data` → CocoaPods 抛
+    `ArgumentError - path name contains null byte`
+    （`project.rb:452` `Pathname#realdirpath` ← `file_references_installer.rb:228`；
+    上游同形 issue：cocoapods/cocoapods#12866）。
+    设 `CP_CACHE_DIR`/`CP_HOME_DIR` 只能绕过 `~/Library/Caches` 的沙箱拒绝，**救不了这一条**。
+    结论：**原生重建只能在主工作目录做**；在 worktree 里只能换 JS bundle（见下条）。
+
+    ⚠️ 只换 JS bundle 的取证方式（本次用它完成了 iOS 实测）：
+    `react-native bundle` 出 Release bundle → `ditto` 进已安装的 `.app` → 换掉 `main.jsbundle`
+    → `codesign -f -s -` → `simctl install/launch`。
+    **仅在 `ios/`、`package.json`、`pnpm-lock` 都没改时成立**，否则 native 与 JS 会错配。
+
+74. 🔴 **`npm_config_registry` 环境变量会被 pnpm 忽略 —— 换源必须用 `pnpm config set registry`。**
+
+    这是第 71 条的**直接续集**，而且是**更坏的一种**：你明明传了 `NPM_REGISTRY`，
+    Dockerfile 里也 `ARG`/展开得好好的（构建日志会把它打印成
+    `RUN npm_config_registry="https://registry.npmmirror.com" pnpm install …`），
+    但 pnpm **照旧从 `registry.npmjs.org` 取包**，于是还在同一处超时：
+
+    ```
+    #17 [WARN] GET https://registry.npmjs.org/prisma/-/prisma-5.22.0.tgz error (23) …
+    #17 TimeoutError: The operation was aborted due to timeout
+    ```
+
+    "参数传对了"与"真的生效了"是两件事 —— **看日志里的 URL，别看日志里的命令**。
+
+    正确写法（`server/Dockerfile` 已改）：
+
+    ```dockerfile
+    RUN pnpm config set registry "$NPM_REGISTRY" \
+     && pnpm install --frozen-lockfile --ignore-scripts
+    ```
+
+    容器内实测：`pnpm config set registry … && pnpm view zod version` → `4.6.5`，**1.05s**。
+    生产层用的是 npm，`--registry=` 显式传即可。
+
+    补充事实：`grep registry.npmjs.org pnpm-lock.yaml` = **0**，锁文件里没有任何硬编码 URL，
+    所以"从哪取包"完全由配置决定 —— 配置设上了就真的换源了。
+
+75. 🔴 **镜像里少拷两个根级文件，`server` 其实早就构建不出来了 —— 而本地永远绿。**
+
+    一个**潜伏**了很久的缺口，直到 billing 开始 `import` 才炸：
+
+    | 缺什么 | 症状 | 为什么以前没暴露 |
+    |---|---|---|
+    | `packages/domain`（清单 / 源码 / build+pack / tarball） | `TS2307: Cannot find module '@heyta/domain'` | 镜像按 2026-09-26 的源码建的，那时 server 还没 import 它 |
+    | `tsconfig.base.json` | `TS5083: Cannot read file '/repo/tsconfig.base.json'`（tsup 的 dts 阶段） | sync-core / shared-schema 都**不** `extends` 任何东西，只有 `packages/domain` 要 |
+
+    ⚠️ **核心教训**：`pnpm -r build` 在本地**永远看不出这个问题** ——
+    工作区全都在，`@heyta/domain` 与 `tsconfig.base.json` 自然都在。
+    "本地全绿"证不了"镜像能构建"；**只有真的 `docker compose build` 才算数**。
+
+    生产层还有一个必须遵守的点：`pnpm pack` 会把 domain 自己的 `workspace:*` 改写成真实版本号，
+    所以 `domain.tgz` 必须和 `shared-schema.tgz` 放在**同一条** `npm install` 里，
+    npm 才能就地满足它。
+
+76. ⚠️ **`deploy.sh --build` 的"干净输入"守卫在文档写明的部署形态下永远跑不起来**，且它的清单本身是漏的。
+
+    两个独立的毛病：
+
+    - **守不住**：它用 `git diff` 判断输入是否干净，而 `docs/runbooks/deployment.md` §3.2
+      写明的部署形态恰恰是**rsync 上来的源码目录**（`~/heyta` 没有 `.git`）。
+      于是 `git diff` 必然失败 → 失败被当成"有脏文件" → 报
+      `Refusing to build … from dirty tracked input files`，**把一个不存在的原因指给运维**。
+      现在：不是 git 仓库就显式跳过并告警（并讲清代价：镜像标签退化成 `local`、不可回溯）。
+    - **清单漏了**：守卫检查 `packages/{shared-schema,sync-core}`，却**没有** `packages/domain`
+      与 `tsconfig.base.json` —— 正是第 75 条里真正让构建失败的两个文件。
+      也就是说旧守卫会**放过**真正破坏构建的改动，却拦住别的一切。
+
+    📌 推论：**守卫的输入清单必须和 Dockerfile 的 `COPY` 清单同源**，
+    否则它会稳定地守错方向。改 Dockerfile 时请同时改 `deploy.sh` 里那四份清单。
+
 ---
 
 ## 8. 工作流
