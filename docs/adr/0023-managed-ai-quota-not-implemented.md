@@ -17,7 +17,7 @@ ADR-0020/0021 已经把「¥12 / 月 · 300 次/月 · `deepseek-flash`」定成
 | 一个我们的云端 AI **端点**（用户不带 key 也能用） | **不存在** | `server/src/routes/` 目录不存在；`packages/ai/src/` 只有 `provider.ts` / `routing.ts` / `egress.ts` / `presets.ts` / `supply.ts` / `health-store.ts` —— **全部是自带端点（BYO）那一层** |
 | 计量（每周期用了几次） | **不存在** | 全仓 `quota` / `metering` 只命中**同步存储配额**（`server/src/sync/sync.routes.quota.ts` 等），与 AI 次数无关 |
 | 模型的真实调用 | **不存在** | `grep -rn deepseek server/src packages/*/src` → **0 命中**。模型 id 只写在 ADR 与文档里 |
-| 一个能卖 ¥12 的收银台 | **不存在** | 见 [pricing-and-coupons.md](../reference/pricing-and-coupons.md) §7：`quoteOrder` / `createOrderWithReservation` / `settleOrderPaid` **都没有生产调用方** |
+| 一个能卖 ¥12 的收银台 | **收银台已通，但 ¥12 档被主动禁售** | `POST /api/billing/checkout` 已注册（[pricing-and-coupons.md](../reference/pricing-and-coupons.md) §7 第 18 条）；`price-book.ts` 的 `NOT_YET_DELIVERABLE_SKUS` 让 `hosted-ai-monthly` 在报价前就回 `409`（`checkout.routes.ts` 调用 `notSellableReason`），并由 `check:ai-quota` §3b 钉住 |
 | 设置页的「本周期已用 X / 300 次」 | **不存在** | 法务 §5.3 承诺了它 |
 
 而**对外的承诺已经发出去了**，至少 5 处：
@@ -39,7 +39,7 @@ ADR-0020/0021 已经把「¥12 / 月 · 300 次/月 · `deepseek-flash`」定成
 | 选项 | 优点 | 缺点 | 关键证据 |
 |---|---|---|---|
 | **A. 本轮不实现，写进 ADR + 加一条"承诺 ↔ 实现"可失败门禁** | 与仓库现状一致；把"不做"变成一个**有终点、可复算**的决定；承诺漂移立刻变红 | 读者要读 ADR 才知道"300 次现在用不上" | 上表：五个前置条件里**一个都没有** |
-| B. 现在补计量（表 + 计数器 + 闸门），端点后做 | 端点来时额度已经能用了 | 计量为**不存在的调用**而建：次数永远为 0，测试只能自证。是"空转的代码" —— 本仓库已经因为 `settleOrderPaid` 无调用方吃过一次这个教训 | `settleOrderPaid` 至今无生产调用方（§7 第 9 条） |
+| B. 现在补计量（表 + 计数器 + 闸门），端点后做 | 端点来时额度已经能用了 | 计量为**不存在的调用**而建：次数永远为 0，测试只能自证。是"空转的代码" —— 本仓库已经因为 `settleOrderPaid` 无调用方吃过一次这个教训 | `settleOrderPaid` 曾长期无生产调用方（§7 第 9 条；**已于 2026-09-27 接通**） |
 | C. 现在就建云端 AI 端点 + 计量 + 收银台 | 一步到位 | 这是**一个独立工作流**（provider 客户端、出口与内容审核、成本熔断、鉴权、路由、收银台），不是"补一个计数器"；在收银台本身还不存在时开工，顺序是错的 | `server/src/routes/` 不存在 |
 | D. 把「300 次/月」从文案与法务里撤掉 | 承诺与实现立刻一致 | 与**已锁定的产品决定**冲突（用户已定：¥12 含 AI，300 次/月）。而且撤掉文案不等于不欠交付 —— 决定依然要做 | ADR-0020 §3.2 |
 
