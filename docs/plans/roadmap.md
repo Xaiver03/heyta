@@ -316,15 +316,21 @@ Time_NLP 系列（**仓库无 LICENSE**）。
 |---|---|---|
 | 1 | 落地页**没有任何指向应用的链接** | ✅ **已修**。入口由构建期 `VITE_APP_URL` 决定（判据 `apps/landing/src/lib/app-url.ts`）；**未配置时整条入口根本不渲染** —— 仓库默认构建就是未配置，那是故意的（应用没部署却露出「立即使用」比没有入口更坏）。`render.spec.tsx` 把两种状态各钉了一条用例 |
 | 2 | Web 端**没有注册 / 登录界面** | ✅ **已修**。服务端一直有完整的 passkey / magic-link（11 条 `/api/*` 路由），**却没有任何客户端调用**；唯一入口是同步设置里三个手填框。现在协议语义收在 `packages/app-host/src/hosted-auth.ts`，`AuthPanel` 开在**同步设置内部**（认证要用的服务端地址就是那里的地址，分开会出现"对着 A 登录、令牌存到 B"） |
-| 3 | **应用本体从来没被部署过** | ✅ **已修**。`https://heyta-tmp.litopia.space/app/`；与同步服务端**同源** ⇒ `CORS_ORIGINS` / `WEBAUTHN_RP_ID` / `WEBAUTHN_ORIGIN` 一个字都不用改，passkey 也能用。发布方式见 [deployment.md §3.7](../runbooks/deployment.md) |
+| 3 | **应用本体从来没被部署过** | ✅ **已修**。`https://heyta.finlaw.cloud/app/`；与同步服务端**同源** ⇒ `CORS_ORIGINS` / `WEBAUTHN_RP_ID` / `WEBAUTHN_ORIGIN` 都指向它，passkey 才能用。发布方式见 [deployment.md §3.7](../runbooks/deployment.md) |
 | 4 | 定价 CTA **不是按钮** | ⚪ **维持原状，且是有意的** —— 理由写在 `Pricing.tsx` 文件头：不愿造一个"点了没反应的立即购买"。免费档的 CTA 是**自建**，那条仍然成立、也仍然可点 |
 
-**这一段闭环了，但有两个必须一起记住的保留**：
+**这一段闭环了。原先在这里的两条保留都已在 2026-09-27 关掉：**
 
-- 🔴 入口挂在 `heyta-tmp.litopia.space`，而它是**临时资产**（[deployment.md §7.1](../runbooks/deployment.md)）。
-  清掉那个域名，入口就断。清理由时必须**同时**换掉 `VITE_APP_URL` 并重建落地页 —— 不要只清一边。
-- 从**英文**落地页点进去，到的是**默认中文**的应用（应用有自己的语言设置，页面上有
-  English 切换）。落地页的 locale **没有传递过去**。
+- ✅ **入口挂在临时域名上** —— 已修。测试域名固定为 `heyta.finlaw.cloud`
+  （落地页 `/` + 应用 `/app/` + 同步 API `/api/` + 三张凭据页），
+  `VITE_APP_URL` 也随之改成它。迁移动机、代价与验收见
+  [deployment.md §3.7.1](../runbooks/deployment.md)。
+  🔴 代价只有一条：tmp 域名上已注册的 **passkey 全部失效**，需重新注册 ——
+  `WEBAUTHN_RP_ID` 只能取一个值，而两个域名没有公共可注册域，无法两边兼容。
+- ✅ **英文落地页 → 中文应用** —— 已修。落地页给外链带 `?lang=en`
+  （`apps/landing/src/lib/app-url.ts`），应用在**没有已存偏好**时采纳它
+  （`apps/web/src/lib/locale.ts`）。顺序是「已存偏好 > URL 参数」，不能反 ——
+  参数会留在地址栏里，反了就会让一个陈旧参数覆盖用户在应用里的明确选择。
 
 ### 5.1.1 ✅ 界面不再说谎：「导出自由」已兑现 —— **2026-09-27 落地**
 

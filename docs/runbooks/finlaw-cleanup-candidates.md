@@ -378,8 +378,11 @@ sudo -n nginx -t          # 删完必须先验语法
 
 | 站点 | server_name | 行为 |
 |---|---|---|
-| `sites-enabled/heyta-tmp` | `124.223.13.226 heyta-tmp.litopia.space` | `location /` → `proxy_pass http://127.0.0.1:1900`（同步服务）；`/landing/` → `alias /var/www/heyta-landing/` |
-| `sites-enabled/heyta.finlaw.cloud` | `heyta.finlaw.cloud` | `root /var/www/heyta-landing` + SPA 兜底 `try_files $uri $uri/ /index.html`。注释写明「刻意与 heyta-tmp 分开，不碰它的 1900」 |
+| `sites-enabled/heyta.finlaw.cloud` | `heyta.finlaw.cloud` | **测试阶段唯一的域名**（2026-09-27 起）：`/` 与 `/en/` → 落地页（`root /var/www/heyta-landing` + SPA 兜底）；`/app/`（含 `= /app` 重定向与 `/app/assets/`）→ 应用（`alias /var/www/heyta-app/`）；`/api/` 与 `/verify-email`、`/recover-passkey`、`/magic-login` → `proxy_pass http://127.0.0.1:1900`（同步服务，含 WebSocket 升级头）。迁移见 [deployment.md §3.7](deployment.md) 的 3.7.1 小节 |
+| `sites-enabled/heyta-tmp` | `124.223.13.226 heyta-tmp.litopia.space` | `location /` → `proxy_pass http://127.0.0.1:1900`（同步服务的 Connect 页）+ `/app/` → `alias /var/www/heyta-app/`；`/landing*` → `301` 到 `heyta.finlaw.cloud`。**留作回滚路径，已不是入口**，且该域名下 passkey 不可用（`WEBAUTHN_RP_ID` 只能是 `heyta.finlaw.cloud`） |
+
+> ⚠️ 两份站点文件都**不在仓库里**（仓库只跟踪 `server/Caddyfile`），改它们只能上机；
+> 每次改完要回来更新本表，以及 `deployment.md` 里对应的那一节（§3.7，其中有 3.7.1）。
 
 ### 4.4 全机基础设施（与 heyta 无关但动了会出大事）
 
