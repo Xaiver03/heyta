@@ -19,7 +19,7 @@
 
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { afterEach, beforeAll, describe, expect, it } from 'vitest';
+import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 
 import { Landing } from '../src/Landing.js';
 
@@ -61,6 +61,9 @@ beforeAll(() => {
 });
 
 afterEach(() => {
+  // 有用例会把 `VITE_APP_URL` 设成"应用已部署"的状态。不清掉的话，
+  // 后面所有用例都会在一个"应用存在"的页面上跑 —— 而那正是默认状态不该有的样子。
+  vi.unstubAllEnvs();
   if (root !== null) {
     act(() => {
       root?.unmount();
@@ -161,14 +164,65 @@ describe('落地页整页渲染', () => {
     // 所以这里查的是整页文本（含 <code>），而不是链接集合。
     expect(view.textContent ?? '').not.toContain('github.com');
 
-    // 唯一的非锚点链接是语言切换（它指向另一语言的地址，且带 hrefLang）。
+    // 唯一的非锚点链接是语言切换（它指向另一语言的地址，且带 hrefLang）；
+    // 应用已部署时会多一条指向应用的「立即使用」，它必须带 rel=noopener。
+    //
+    // 🔴 断言写成"二者必居其一"而不是"必须带 hrefLang"：后者在应用上线后
+    // 会把正确的外链判成错的。但**没有任何一条外链可以既不带 hrefLang、
+    // 又不带 noopener** —— 那才是这条测试真正拦的风险。
     for (const anchor of view.querySelectorAll<HTMLAnchorElement>('a[href]')) {
       const href = anchor.getAttribute('href') ?? '';
       if (href.startsWith('#')) continue;
-      expect(anchor.getAttribute('hrefLang'), `非锚点链接却不是语言切换：${href}`).not.toBeNull();
+      const isLanguageSwitch = anchor.getAttribute('hrefLang') !== null;
+      const rel = anchor.getAttribute('rel') ?? '';
+      const isSafeExternal = rel.includes('noopener');
+      expect(
+        isLanguageSwitch || isSafeExternal,
+        `外链既不是语言切换、也没带 rel=noopener：${href}`,
+      ).toBe(true);
     }
 
     expect([...view.querySelectorAll('a[target="_blank"]')]).toEqual([]);
+  });
+
+  /**
+   * 🔴 应用入口的**默认状态**：没配置 `VITE_APP_URL` 时，页面里**不许**
+   * 出现任何指向应用的链接。
+   *
+   * 这条是防"提前把按钮放上去"的：应用还没部署时放一个「立即使用」，
+   * 点下去就是 404 —— 比没有入口更坏，因为它看起来是能用的。
+   */
+  it('未配置应用地址时，页面里没有任何指向应用的入口', () => {
+    const view = renderLanding();
+    const hrefs = [...view.querySelectorAll<HTMLAnchorElement>('a[href]')].map(
+      (a) => a.getAttribute('href') ?? '',
+    );
+    expect(hrefs.filter((href) => href.startsWith('http'))).toEqual([]);
+    expect(view.textContent ?? '').not.toContain('立即使用');
+  });
+
+  /**
+   * 应用入口的**上线状态**：配了 `VITE_APP_URL` 就必须真的多出那个入口，
+   * 而且是**外链 + rel=noopener**。
+   *
+   * 这条与上面那条是**一对**：只有两条都在，才能证明"配置与否真的改变了页面"，
+   * 而不是"两边都没做、测试照样绿"。变异验证：把 `startCta()` 写死成返回
+   * `#selfhost`，这条立刻红。
+   */
+  it('配置了应用地址时，导航与收尾 CTA 都出现指向应用的「立即使用」', () => {
+    vi.stubEnv('VITE_APP_URL', 'https://app.example.com/');
+
+    const view = renderLanding();
+    const appLinks = [...view.querySelectorAll<HTMLAnchorElement>('a[href]')].filter(
+      (a) => a.getAttribute('href') === 'https://app.example.com',
+    );
+
+    // 两处：导航一条 + 收尾 CTA 一条。
+    expect(appLinks.length).toBe(2);
+    for (const anchor of appLinks) {
+      expect(anchor.getAttribute('rel')).toBe('noopener noreferrer');
+      expect(anchor.textContent).toContain('立即使用');
+    }
   });
 
   /**

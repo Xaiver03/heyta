@@ -199,6 +199,9 @@ export const en = {
   'landing.cta.title': 'Your task list should never become an asset someone else owns',
   'landing.cta.lede': 'Self-hosting is free forever: once the source is public, one command brings up your own server and moves your data back to your machine.',
   'landing.cta.selfHost': 'Self-host now',
+  // Same intent, the "it is live" state — swapped in at build time when
+  // `VITE_APP_URL` is set (see lib/app-url.ts). Not a second feature.
+  'landing.cta.useApp': 'Use it now',
 
   // ── Landing · footer ──────────────────────────────────────
   'landing.footer.tagline': 'Local-first task management. Data lands on your device first; the cloud is only a sync channel.',
