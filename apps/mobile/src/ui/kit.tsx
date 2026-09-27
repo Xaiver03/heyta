@@ -555,6 +555,14 @@ export interface ButtonProps {
   disabled?: boolean;
   loading?: boolean;
   style?: StyleProp<ViewStyle>;
+  /**
+   * 可选的**无障碍名**，默认就是可见的 `label`。
+   *
+   * 🔴 列表里重复出现的同一个按钮需要它：回收站每一行都有「恢复」/「彻底删除」，
+   * 读屏用户听到 12 个一模一样的「恢复」无法判断会恢复哪一条。
+   * 传 `恢复：买牛奶` 这样的名字，可见文案保持不变。
+   */
+  accessibilityLabel?: string;
 }
 
 export function Button({
@@ -565,6 +573,7 @@ export function Button({
   disabled,
   loading,
   style,
+  accessibilityLabel,
 }: ButtonProps): React.JSX.Element {
   const t = useTokens();
   const text = useText();
@@ -589,7 +598,7 @@ export function Button({
       disabled={isDisabled}
       accessibilityRole="button"
       accessibilityState={{ disabled: isDisabled, busy: loading === true }}
-      accessibilityLabel={label}
+      accessibilityLabel={accessibilityLabel ?? label}
       style={({ pressed }) => [
         {
           // 🔴 触控目标不小于 44×44（UIX Pro 第 2 条），这个值来自 token。
