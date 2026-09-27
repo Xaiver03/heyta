@@ -36,6 +36,7 @@ import {
   createVerify,
   randomBytes,
 } from 'node:crypto';
+import { MIN_CHARGEABLE_AMOUNT_MINOR, isMinorAmount } from './money';
 import { DEFAULT_PRICE_BOOK, projectPrices } from './price-book';
 import type {
   BillingAdapter,
@@ -352,8 +353,18 @@ export interface WechatPrice {
  * ⚠️ 门禁仍然保留，而且现在多了一条：`wechat.adapter.ts` 里**不许再出现
  * `totalFen: <数字>`** —— 防止有人"顺手"把数字抄回来。
  *
- * 运营者仍可以直接给 adapter 传 `prices` 覆盖 —— 改价不改代码是刻意的
- * （运行期改价走 `publishPriceVersion`，见 `pricing-store.ts`）。
+ * ---------------------------------------------------------------------------
+ * 🔴 **这张表不再决定收多少钱。** 它现在只提供 `description`（账单上给用户看的
+ * 商品名），**金额由调用方通过 `CreateCheckoutInput.amountMinor` 传入**。
+ *
+ * 原因：价格有运行期版本（`price_versions`），只有计价层知道"这一刻该收多少"，
+ * 而那个数已经和券一起冻在 `checkout_orders.final_amount_minor` 上。
+ * 在改掉之前，adapter 自己查这张表下单 —— 于是运营者 `publishPriceVersion` 之后
+ * **报价层收新价、收银台按旧价下单**，静默分叉。那正是 ADR-0018 §3.1 要消灭的形状，
+ * 而且它发生在这条路径的**最末端**（真收钱的那一步）。
+ *
+ * `prices` 选项保留下来只为覆盖 `description`；改价**不再**经过它。
+ * 运行期改价走 `publishPriceVersion`（见 `pricing-store.ts`）。
  * （本轮**不做** env 价目表解析：把一个 JSON 表塞进环境变量比它的价值更容易出错。）
  */
 export const WECHAT_DEFAULT_PRICES: Readonly<Record<string, WechatPrice>> = projectPrices(
@@ -420,6 +431,24 @@ export class WechatUnknownPriceError extends Error {
 }
 
 /**
+ * 调用方传进来的 `amountMinor` 不是可收的金额（非正整数）时抛这个。
+ *
+ * 🔴 这一条不是防御性编程，它是**本轮那个 HIGH 缺陷的封堵**：
+ * 在它之前，adapter 自己从价目表里查金额下单（代码基线），于是运营者用
+ * `publishPriceVersion` 改了价之后，**报价层收新价、收银台仍按旧价下单** ——
+ * 没有报错、没有日志，只有少收的钱。现在金额只能由调用方（计价层）给出，
+ * 而计价层的金额来自带生效区间的价目表版本、并在 `checkout_orders` 上冻结。
+ */
+export class WechatInvalidAmountError extends Error {
+  readonly code = 'WECHAT_INVALID_AMOUNT';
+
+  constructor(amountMinor: unknown) {
+    super(`微信支付金额必须是正整数最小单位，收到 ${JSON.stringify(amountMinor)}，拒绝下单`);
+    this.name = 'WechatInvalidAmountError';
+  }
+}
+
+/**
  * 构造微信 Native 扫码 adapter。
  *
  * 行为逐条：
@@ -444,9 +473,13 @@ export const createWechatBillingAdapter = (
     provider: WECHAT_PROVIDER,
 
     async createCheckout(input: CreateCheckoutInput): Promise<CheckoutResult> {
+      // `priceId` 仍然要认得出来（它决定账单上的商品名），但**它不再决定金额**。
       const price = prices[input.priceId];
       if (price === undefined) {
         throw new WechatUnknownPriceError(input.priceId);
+      }
+      if (!isMinorAmount(input.amountMinor) || input.amountMinor < MIN_CHARGEABLE_AMOUNT_MINOR) {
+        throw new WechatInvalidAmountError(input.amountMinor);
       }
 
       const outTradeNo = buildWechatOutTradeNo(
@@ -462,7 +495,7 @@ export const createWechatBillingAdapter = (
         notify_url: options.notifyUrl,
         // attach 是**兜底**的用户归属来源；真正的归属也编在 out_trade_no 里。
         attach: String(input.userId),
-        amount: { total: price.totalFen, currency: 'CNY' },
+        amount: { total: input.amountMinor, currency: 'CNY' },
       };
       // 🔴 只 stringify 一次：签名和发送必须是同一个字节串。
       const body = JSON.stringify(payload);
@@ -619,19 +652,24 @@ export const createWechatBillingAdapter = (
       // 会按 `WECHAT_ONE_TIME_PERIOD_DAYS` 授予**整整一年**。
       // 这是会实际损失钱的那类洞，不是理论问题。
       //
-      // ⚠️ **这一道是粗筛，权威判定在下游。** 它校验的是"金额是价目表里的某一个"，
-      // 而不是"金额对应的是这一单买的那一项"。有券之后两者**不再等价**
-      // （¥99 用 ¥20 券 → 实付 ¥79，而 ¥79 不在价目表上），所以：
+      // ⚠️ **判据是"金额是价目表里的某一个"**，不是"金额对应的是这一单买的那一项"。
+      // 有券之后两者**不再等价**（¥99 用 ¥20 券 → 实付 ¥79，而 ¥79 不在价目表上）。
       //
-      //   🔴 权威判定在 `pricing-store.ts` 的 `settleOrderPaid`：
-      //      它比的是**订单上冻结的 `final_amount_minor`**，同时覆盖 SKU 与折扣。
-      //      ADR-0017 §4 记的那个洞就是这样关掉的（见 ADR-0018 §1.3）。
+      // 🔴 **诚实的现状：这一层目前是终局判定，不是粗筛。** 它给出
+      // `oneTimeGrant: null` 之后，`apply-event.ts` 会把这笔事件归成
+      // `{ status: 'ignored', reason: 'NO_SUBSCRIPTION_REFERENCE' }` ——
+      // 也就是**一笔用了券、真实到账的支付会被拒绝授予权益**。
       //
-      // 这里保留粗筛的理由是它的**失效方向是安全的**：异常金额在这层就被拦下
-      // （`oneTimeGrant: null` → 不授予），不会漏到下游。它的**假阴性**
-      // （付了 ¥79 但 ¥79 不在价目表上）由下游接住 —— 上游说"金额可疑"，
-      // 下游仍会按订单判定，所以**不会**因为这一层而拒绝一笔正确的支付。
-      // ⚠️ 反过来说：这一层**不能**用来替代下游校验，它俩护的是不同的东西。
+      // 本该接住这个假阴性的是 `pricing-store.ts` 的 `settleOrderPaid`
+      // （它比的是订单上冻结的 `final_amount_minor`，同时覆盖 SKU 与折扣），
+      // 但**它目前没有任何生产调用方** —— 只有测试与 `index.ts` 的导出。
+      // 支付通道本身还没接线（ADR-0017 §5），所以这个洞今天是**潜伏的**：
+      // 还没有代码能把一张券带进收银台。
+      //
+      // 🔴 接线时必须一起做的：金额的**权威判定只留在 `settleOrderPaid`**
+      // （比订单冻结金额），这一层退化成"把观察到的金额与异常如实报上去"。
+      // 在那之前，**不要把任何打折的支付接进来** —— 它会被静默拒付。
+      // 见 `docs/reference/pricing-and-coupons.md` §7。
       const paidFen =
         typeof payload.amount?.total === 'number' ? payload.amount.total : null;
       const knownAmounts = new Set(

@@ -174,9 +174,14 @@ unknown_coupon → stacking_not_allowed → disabled → not_started → expired
   **建单之前**就拒绝，不能留给支付通道去失败。理由：一次失败的支付请求会在
   通道侧留下痕迹、会让用户看到一个我们无法解释的错误；而"这一单收不了钱"
   是我们自己**当场就知道**的事。
-- 实付 = 原价 − 折扣 **只有一处**写入（`money.ts` 的 `breakdownAmount`），
+- 实付 = 原价 − 折扣 的**算术**只有一处（`money.ts` 的 `breakdownAmount`），
   数据库还有 CHECK 兜底（`checkout_orders_amounts_coherent`）。
-  公式写两遍就等于两套可能漂移的真值。
+  ⚠️ 但"只有一处"这句原本写得过头了：`quote.ts` 里还有一次
+  `finalAmountMinor = price.amountMinor - discountMinor` 的**赋值**。
+  今天两者数值不可能分叉（`evaluateCoupon` 已经先 `clampDiscountMinor` 过，
+  `breakdownAmount` 是它的恒等重算），所以它是重复而不是分歧 ——
+  但"公式只写一遍"这个说法不成立，接线时要么让 `quote.ts` 复用
+  `breakdownAmount`，要么把这条改掉。
 
 ### 3.4 名额：`reserved` 算、`expired` 不算、`reversed` **算**
 

@@ -117,7 +117,7 @@
 | 表 | 作用 | 关键约束 |
 |---|---|---|
 | `price_versions` | 价格版本（append-only） | `amount_minor > 0`；币种 ∈ {CNY,USD}；`effective_until IS NULL OR effective_until > effective_from` |
-| `pricing_audit_log` | 改价/发券审计（append-only，**没有 UPDATE/DELETE**） | `action` 在词表内 |
+| `pricing_audit_log` | 改价/发券/金额异常审计（append-only，**没有 UPDATE/DELETE**） | ⚠️ **没有任何 CHECK 约束** —— 迁移只建了表与两个索引。词表只活在 TS 的 `AUDIT_ACTIONS` 里，所以**数据库挡不住**一个拼错的 `action`。要补的话得手工追加一条 CHECK（Prisma 表达不了） |
 | `coupons` | 券定义 | 判别联合 XOR：`kind='percent'` ⇔ `percent_off_bp` 非空且 ∈ (0, 10000) 且 `amount_off_minor` 为空；`kind='fixed'` 反之。`code = btrim(upper(code))`；限额 > 0；`applies_to_all_*` 与数组列的在场性一致 |
 | `checkout_orders` | **订单 = 冻结的报价快照** | `original > 0 AND discount >= 0 AND discount <= original AND final = original − discount AND final > 0`；币种/区域/状态在词表内；`status='paid'` ⇒ `paid_at` 非空；`out_trade_no` 唯一 |
 | `coupon_redemptions` | 核销事实 | `order_id` **唯一**（第二道防重复授予的闸）；`discount_minor > 0`；`state='applied'` ⇒ `applied_at` 非空 |
@@ -231,6 +231,25 @@ expireStaleOrders(sql, { now })
 正在报价的人可能拿到旧价（报价是几十毫秒前的快照，这是对的）。想无缝切换要选
 一个未来的时刻。
 
+### 6.1 🔴 改价之后，收银台按哪个数收钱
+
+**按订单上冻结的那个数** —— 这是本轮修掉的一个真实缺陷（复核时发现，
+不是原设计的一部分）。
+
+改之前：`wechat.adapter.ts` 自己从价目表里查金额下单，而它手里那份是
+**代码基线的投影**（`WECHAT_DEFAULT_PRICES`）。于是运营者一 `publishPriceVersion`，
+报价层开始按新价报价、**收银台仍按旧价下单** —— 没有报错、没有日志，
+只有持续少收的钱，而且发生在真收钱的那一步。
+
+现在：`CreateCheckoutInput.amountMinor` 是**必填**入参，由计价层把
+`checkout_orders.final_amount_minor` 传进来；adapter 只负责把这个数签出去，
+它**不再持有价格语义**（价目表只剩 `description` 的用途）。
+金额不是正整数时抛 `WechatInvalidAmountError`，不兜底、不回落。
+
+回归测试：`server/tests/wechat-adapter.spec.ts` 里那笔 `priceId: 'annual'`
+但 `amountMinor: 7_900` 的单（即"¥99 用了 ¥20 券"）—— 断言发出去的是 **7900**，
+不是基线 9900。
+
 ---
 
 ## 7. 未验证项与已知缺口（不假装它们被测过）
@@ -281,6 +300,23 @@ expireStaleOrders(sql, { now })
    包一层参数解析，并把参数解析单独做成可测的纯函数。
    ⚠️ `server/tsconfig.json` 的 `include` 覆盖 `scripts/**`、`rootDir: "."`，
    所以脚本会编译到 `dist/scripts/`。
+9. **回调用券时会被静默拒付 —— 这是接线前必须一起修的洞。**
+   `wechat.adapter.ts` 的 `verifyWebhook` 用"金额是不是价目表里的某一个"来定
+   `oneTimeGrant`，而**这一层目前是终局判定**：它给出 `oneTimeGrant: null` 之后，
+   `apply-event.ts` 把这笔事件归成 `{ status: 'ignored', reason: 'NO_SUBSCRIPTION_REFERENCE' }`。
+   于是一笔"¥99 用 ¥20 券、实付 ¥79"的**真实到账**支付会被拒绝授予权益。
+   本该接住它的 `settleOrderPaid`（比订单冻结的 `final_amount_minor`）**没有生产调用方**。
+   今天不会发生，因为还没有代码能把券带进收银台（通道未接线）——
+   但**接线时必须让权威判定只留在 `settleOrderPaid`**，这一层退化成如实上报。
+   （代码里那条曾经声称"下游会接住"的注释是**错的**，已改成这段实话。）
+10. **`failOrder` 不释放 `reserved` 名额。** 它只把订单置 `failed`，核销行仍是
+   `reserved`，要到 `reserved_until` 被 `expireStaleOrders` 扫到才释放。
+   即"下单后立刻失败/人工取消"会白占一个名额直到支付窗口结束。
+   有界（窗口内），但会烧掉限量券的预算；接线时应在 `failOrder` 里一并释放。
+11. **`reverseOrderOnRefund` 允许 `pending` → `refunded`。** 那是一条**没有钱动过**
+   的路径，却把核销推成 `reversed`，而 `reversed` 是**计数**的 —— 等于永久吃掉一个名额。
+   §3.4 里"退款不归还名额"的理由（预算已投放）**不适用于没付过款的单**。
+   接线时应收紧成只从 `paid` 出发（ADR §3.5 的状态图本来也只画了这条）。
 
 ---
 

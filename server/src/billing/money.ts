@@ -123,7 +123,10 @@ export const computeDiscountMinor = (
           `percentOffBp 必须是 0..${PERCENT_OFF_BP_MAX} 的安全整数，实际 ${bp}`,
         );
       }
-      // `amountMinor * bp` 的上界：安全整数 × 10000 ≪ 2^53，乘法本身不会失真。
+      // `amountMinor * bp` 的精度：**不能**说"安全整数 × 10000 ≪ 2^53" ——
+      // `isMinorAmount` 的上界就是 `Number.MAX_SAFE_INTEGER`，乘 10000 会越界。
+      // 实际安全的原因是**列的类型**：金额存在 PostgreSQL `INTEGER`（≤ 2^31−1）里，
+      // 所以乘积 ≤ 2.15e13 ≪ 2^53。上界由存储层给，不由这个函数给。
       return Math.ceil((amountMinor * bp) / PERCENT_SCALE);
     }
     case 'fixed': {
