@@ -2066,6 +2066,49 @@ docker inspect <容器> --format '{{range .Config.Env}}{{println .}}{{end}}' | g
      用带读取 API 的一次性邮箱（如 Guerrilla Mail）走完整旅程，
      才能把"腾讯云收下了"和"用户真的收到了"分开。
 
+ 82. 🔴 **`pnpm build` 会"成功"却不产出 `.d.ts` —— 又一个"绿但没产物"。**
+     2026-09-27 实测：递归的 `pnpm build` 对 `@heyta/op-log` / `@heyta/ui` /
+     `@heyta/app-host` 报了 `Build success`，但 `dist/` 里**只有 `.js`、没有 `index.d.ts`**。
+     后果不是构建失败，而是**下游**的 `tsc -b` 报一族
+     `TS7016: Could not find a declaration file for module '@heyta/xxx'` ——
+     "上游说成功、下游说找不到"，而真正的原因埋在上游的**缺失产物**里，
+     很容易被误读成"下游配置坏了"。逐个补建即可恢复：
+
+     ```bash
+     pnpm --filter @heyta/op-log build
+     ```
+
+     自检（任何一次"干净构建"之后都该跑一遍）：
+
+     ```bash
+     for d in packages/*/; do p=$(basename "$d"); \
+       [ -f "$d/package.json" ] && [ -d "$d/dist" ] && [ ! -f "$d/dist/index.d.ts" ] \
+       && echo "缺 d.ts: $p"; done
+     ```
+
+     📌 这与"用干净 worktree 构建"是**两件不同的事**：
+     干净是**必要**条件，不是充分条件。干净了还要确认产物真的齐 ——
+     这条坑恰恰是在"我已经很小心了"的时候踩到的。
+
+ 83. 🔴 **别在主工作树里构建要发布的前端产物。**
+     2026-09-27 我图省事直接在主工作树里 `vite build` + rsync，而当时
+     `packages/app-host/src/*`、`packages/domain/src/*`、`packages/sync-core/src/*`
+     都带着**并行会话未提交**的改动，而 `apps/web` 直接消费它们 ——
+     于是别人的半成品上了线（约 6 分钟，直到对方自己重新发布覆盖）。
+     证据是可复核的：脏树产物 `index-CvRMfVI6.js` 与干净 HEAD 产物
+     `index-DUTAmIT2.js` **hash 不同**，说明内容真的不同；线上最终那份与干净 HEAD
+     构建 `cmp` 逐字节相同。
+
+     📌 判据很便宜，发布前跑一下：
+
+     ```bash
+     git status --porcelain -- packages/ apps/web/
+     ```
+
+     非空就**不要**直接构建。完整做法见 `docs/runbooks/deployment.md` §3.7。
+     ⚠️ 发布别人改到一半的同步/加密代码，可能是**上线即静默丢数据**，
+     而责任看起来会落在最后部署的人头上。
+
 ---
 
 ## 8. 工作流
