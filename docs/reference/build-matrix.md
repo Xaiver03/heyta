@@ -24,8 +24,8 @@
 
 | 环境 | SSH 别名 | 地址 | 用户 | 密钥 | 能力 |
 |---|---|---|---|---|---|
-| **本地 Mac**（当前开发机） | — | 本机 | `rocalight` | — | iOS 构建、Android 构建、鸿蒙依赖验证 |
-| **Windows 打包机** | `windows-pc` | `10.111.127.237`（ZeroTier）<br>`192.168.1.3`（局域网） | `41478` | `~/.ssh/id_ed25519` | Android ✅（debug）、Windows 桌面构建 |
+| **本地 Mac**（当前开发机） | — | 本机 | `rocalight` | — | iOS 构建、Android 构建、鸿蒙出包（HAP）验证 |
+| **Windows 打包机** | `windows-pc` | `10.111.127.237`（ZeroTier）<br>`192.168.1.3`（局域网） | `41478` | `~/.ssh/id_ed25519` | Android ✅（debug + release 均实测，见 §2.5）、Windows 桌面构建（选型未定） |
 | 另一台开发 Mac | `chatgpt-other-mac` | `10.111.127.23`（ZeroTier） | `rocalight` | `~/.ssh/id_ed25519` | 备用 |
 
 ### 1.1 Windows 打包机身份（固化）
@@ -242,7 +242,7 @@ pnpm --filter @heyta/mobile run build:android:bundle   # Release AAB（上架用
 
 **仍未做**：Windows 上的 AAB（`bundleRelease`）没跑；签名仍是 debug keystore（见 §2.4）。
 
-### 2.5 Android 备案
+### 2.6 Android 备案
 
 明确指示：**暂不处理**。不阻塞构建。
 
@@ -324,17 +324,27 @@ pnpm build:ios                     # Release, iphonesimulator
 | 项 | 值 |
 |---|---|
 | 构建环境 | 本地 Mac（DevEco Studio 6.1.1.300，SDK API 24） |
-| 产物 | `.hap` |
-| 状态 | 🔲 **从未构建出 HAP** |
+| 产物 | `.hap`（`*-unsigned.hap`，未签名 → 装不进设备） |
+| 状态 | ⚠️ **已实测出 HAP**（含 release 自包含包），**但没在任何设备/模拟器上跑起来** |
 
-已实测打通的是**依赖链**（npm + ohpm 双侧都是 MIT，`ohpm install` 28.9 秒成功），
-**未验证**的是 `hvigorw assembleHap` —— 没编译过一行 C++、没生成过 HAP、
-没在设备或模拟器上跑起来。
+出包这一步**已实测通过**（2026-09-27，两条各自的判据脚本）：
+
+| 脚本 | 验到什么 |
+|---|---|
+| `pnpm verify:harmony-toolchain` | 工具链 → 最小 ArkTS 工程 HAP（含真 `ets/modules.abc`） |
+| `pnpm verify:harmony-rnoh` | RNOH 原生侧 → 37 MB debug HAP（真跑 `BuildNativeWithNinja`） |
+| `pnpm verify:harmony-rnoh-js` | 真 codegen + 真 autolinking + Hermes bundle → **20 MB release HAP**（零桩） |
+
+⚠️ **产物不在仓库里**（脚本把工程建在 `/tmp/heyta-harmony-*` 下），所以这里的状态
+**无法靠 `ls` 二次复核** —— 要复核就重跑上面三条命令。过程与证据见
+[`../plans/phase-2-multi-platform.md`](../plans/phase-2-multi-platform.md) §3.24、§3.25。
+
+**仍然没做的是"跑起来"**，缺三样且都不是写代码能补的：模拟器系统镜像（本机 `~/.Huawei`
+不存在）、签名（产物 `*-unsigned.hap`）、真机/模拟器。所以**不要**把上面读成
+"RN 应用在鸿蒙上能跑"。
 
 🔴 官方《环境搭建》文档写"仅支持 RN 0.72.5"**已过时**，实测两侧都已在 `0.84.x`。
 照文档选版本会选到三年前的分支。
-
-详细计划见 [`../plans/phase-2-multi-platform.md`](../plans/phase-2-multi-platform.md) §3.1。
 
 ---
 
@@ -348,7 +358,8 @@ pnpm build:ios                     # Release, iphonesimulator
 | Windows 桌面 | Windows | — | — | 🔲 选型未定 |
 | macOS 桌面 | Mac | — | — | 🔲 未规划 |
 | Linux 桌面 | Linux | — | — | 🔲 未规划 |
-| HarmonyOS | Mac | — | `.hap` | 🔲 无 HAP |
+| HarmonyOS | Mac | `pnpm verify:harmony-toolchain` 等三条 | `.hap`（release 20 MB / debug 37 MB，**均未签名**） | ⚠️ 有 HAP，未运行 |
 
 **签名现状**：Android release 用 debug keystore（可测试、不可上架）；
-iOS 仅模拟器；其余平台无签名需求。
+iOS 只验到模拟器；**鸿蒙产物是 `*-unsigned.hap`（`signingConfigs: []`，装不进任何设备）**；
+桌面端还没有产物。

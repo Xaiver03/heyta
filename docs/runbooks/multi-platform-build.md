@@ -195,7 +195,8 @@ RN 的 `@react-native/gradle-plugin` 在 `finalizeDsl` 里把它设成 `false`�
 
 ```bash
 pnpm -r build
-pnpm --filter @heyta/mobile run pods    # 原生依赖变了才需要；本机需先处理"路径含空格"
+pnpm --filter @heyta/mobile run pods    # 原生依赖变了才需要；本机需先处理"路径含空格"（见 §2.2）
+                                          # ⚠️ 该脚本不含 §2.2 那三个环境变量，locale 非 UTF-8 时会失败
 pnpm build:ios
 ```
 
@@ -205,16 +206,22 @@ pnpm build:ios
 apps/mobile/ios/build/Build/Products/Release-iphonesimulator/HeytaMobile.app
 ```
 
-### 2.2 `pod install` 的路径空格问题
+### 2.2 `pod install` 的两个环境前提（都实测踩过）
 
 本机仓库路径含空格（`…/All in one Data/…`），RN 的 CocoaPods helper 用
 `URI::File.build`，遇到空格**直接抛异常**。绕法是强制从源码构建 RN core：
 
 ```bash
 cd apps/mobile/ios
-# 见 AGENTS.md §7 第 29 条；代价是首次构建慢很多
-bundle exec pod install
+# ⚠️ 下面三个环境变量缺一不可（见 AGENTS.md §7 第 29 条；代价是首次构建慢很多）：
+#   LANG/LC_ALL  本机 locale 不是 UTF-8，CocoaPods 会崩在 String#unicode_normalize 上
+#   NODE_NO_WARNINGS  Podfile 把 `node -p` 的输出当路径用，Node 的代理警告会混进去
+export LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8
+NODE_NO_WARNINGS=1 RCT_USE_PREBUILT_RNCORE=0 RCT_USE_RN_DEP=0 bundle exec pod install
 ```
+
+> 先自测一下自己的环境：`locale` 输出里 `LANG` 若为空，**不加前两个变量必然失败**，
+> 而且报出来的栈是 CocoaPods 生成错误报告时自己又崩出来的假栈（真错误被盖住）。
 
 ### 2.3 部署目标冲突
 
@@ -303,13 +310,25 @@ Windows PowerShell 5.1 把**无 BOM 的 UTF-8 当 ANSI** 读。`.ps1` 里出现�
 
 ---
 
-## 4. HarmonyOS（未完成）
+## 4. HarmonyOS（出包已通，运行未通）
 
-**当前状态：依赖链已通，从未构建出 HAP。** 见
+**当前状态：HAP 已经真的编出来过（release 20 MB / debug 37 MB），但没在任何设备或模拟器上跑起来。** 见
 [`../reference/build-matrix.md`](../reference/build-matrix.md) §6。
 
-下一步是**验证，不是开发**：先让一个最小 RN 壳在鸿蒙上真跑起来。
-若这步失败，"跨平台"结论需要重估，可能改变 [ADR-0004](../adr/0004-ui-stack.md)。
+```bash
+pnpm verify:harmony-toolchain    # 工具链 → 最小 ArkTS 工程 HAP（验的是"机器能不能出包"）
+pnpm verify:harmony-rnoh         # RNOH 原生侧 → 37 MB debug HAP（真跑 BuildNativeWithNinja）
+pnpm verify:harmony-rnoh-js      # 真 codegen + autolinking + Hermes bundle → 20 MB release HAP
+```
+
+⚠️ 三条脚本都把工程建在 `/tmp/heyta-harmony-*` 下，**产物不在仓库里**；
+要复核状态就重跑它们，别去 `ls` 找 `.hap`。
+
+**仍然没通的是"跑起来"**，卡点不是代码：缺模拟器系统镜像（本机没有 `~/.Huawei`）、
+缺签名（产物是 `*-unsigned.hap`，`signingConfigs: []`）。所以
+**不要**把"能出 HAP"读成"RN 应用在鸿蒙上能跑"。
+
+若最终这步失败，"跨平台"结论需要重估，可能改变 [ADR-0004](../adr/0004-ui-stack.md)。
 
 ---
 
