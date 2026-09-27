@@ -38,6 +38,25 @@ import {
 } from 'node:crypto';
 import { MIN_CHARGEABLE_AMOUNT_MINOR, isMinorAmount } from './money';
 import { DEFAULT_PRICE_BOOK, grantsForSku, projectPrices } from './price-book';
+
+/**
+ * 支付成功事件的 `providerEventId` **前缀** —— 唯一事实源。
+ *
+ * 🔴 它有两处消费者，所以绝不能在两个地方各写一份字面量：
+ * 1. adapter 用它拼幂等键（`payment_succeeded:<out_trade_no>`）；
+ * 2. **对账**（`reconcile.ts`）用它把 `payment_events` 行关联回
+ *    `checkout_orders`（`payment_events` 表上没有 `out_trade_no` 列）。
+ *
+ * 只改一处而不同步另一处，对账会**静默地一条候选都找不到** ——
+ * 它不会报错，只会安静地不做任何事，而那正是"补结算"要消除的失效模式。
+ * 所以拼装与解析都走下面的两个函数，不在别处出现这个字面量。
+ */
+export const WECHAT_PAYMENT_SUCCEEDED_EVENT_PREFIX = 'payment_succeeded:';
+
+/** 支付成功事件的幂等键。**唯一**的拼装点。 */
+export const buildWechatPaymentEventId = (outTradeNo: string): string =>
+  `${WECHAT_PAYMENT_SUCCEEDED_EVENT_PREFIX}${outTradeNo}`;
+
 import type {
   BillingAdapter,
   CheckoutResult,
@@ -783,7 +802,7 @@ export const createWechatBillingAdapter = (
           // 🔴 幂等键 = `out_trade_no`（规格 §3.1/§6.2），并带上归一化事件类型，
           // 这样同一订单的**不同事件**（未来的退款）不会和支付事件互相顶掉。
           // 复投的同一通知 → 同一个 out_trade_no → 同一个键 → 唯一约束挡住。
-          providerEventId: `payment_succeeded:${payload.out_trade_no}`,
+          providerEventId: buildWechatPaymentEventId(payload.out_trade_no),
           // 金额落不到档位时用**不同的事件类型**落审计 —— 能查到"有人付了不对的钱",
           // 而不是悄悄当成一次正常支付。
           eventType: grant === null ? 'payment_amount_mismatch' : 'payment_succeeded',

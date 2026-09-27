@@ -42,6 +42,7 @@ export {
   WECHAT_NOTIFY_PATH,
   WECHAT_ONE_TIME_PERIOD_DAYS,
   WECHAT_OUT_TRADE_NO_MAX_LENGTH,
+  WECHAT_PAYMENT_SUCCEEDED_EVENT_PREFIX,
   WECHAT_PROVIDER,
   WECHAT_SIGNATURE_MAX_AGE_MS,
   WechatApiError,
@@ -53,6 +54,7 @@ export {
   buildRequestSignatureMessage,
   buildWechatAuthorizationHeader,
   buildWechatOutTradeNo,
+  buildWechatPaymentEventId,
   buildWebhookSignatureMessage,
   createWechatBillingAdapter,
   decryptWechatResource,
@@ -203,10 +205,35 @@ export type {
 
 export {
   BILLING_AUDIT_EVENTS,
+  buildSubscriptionApplyDeps,
   isDuplicatePaymentEventError,
+  settleAndApplyEvent,
   webhookRoutes,
 } from './webhook.routes';
-export type { WebhookRoutesOptions } from './webhook.routes';
+export type {
+  SettleAndApplyDeps,
+  SettleAndApplyResult,
+  SubscriptionTxClient,
+  SubscriptionTxDelegate,
+  WebhookRoutesOptions,
+} from './webhook.routes';
+
+// 存量订单对账（补结算）。见 `reconcile.ts` 的文件头：定义、重复性与边界都在那里。
+export {
+  DEFAULT_RECONCILE_LIMIT,
+  buildReconcileEvent,
+  findUnsettledPaidOrders,
+  reconcileUnsettledPaidOrders,
+} from './reconcile';
+export type {
+  FindUnsettledPaidOrdersInput,
+  ReconcileApplier,
+  ReconcileInput,
+  ReconcileOrderOutcome,
+  ReconcileReport,
+  UnsettledPaidOrder,
+} from './reconcile';
+export { runBillingReconciliation } from './reconcile-job';
 
 export { checkoutRoutes } from './checkout.routes';
 export type { CheckoutRoutesOptions } from './checkout.routes';

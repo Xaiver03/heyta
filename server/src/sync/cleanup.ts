@@ -1,5 +1,6 @@
 import { getSyncService } from './sync.service';
 import { Logger } from '../logger';
+import { runBillingReconciliation } from '../billing/reconcile-job';
 import { DEFAULT_SYNC_CONFIG, MS_PER_DAY } from './sync.types';
 import { MIN_CHECKPOINT_SAFE_APP_VERSION } from './checkpoint-gate';
 
@@ -115,6 +116,34 @@ const runDailyCleanup = async (): Promise<void> => {
     }
   } catch (error) {
     Logger.error(`Cleanup [unverified-users] failed: ${error}`);
+  }
+
+  // 7. Backfill billing: settle orders that were paid before the webhook
+  // settlement wiring existed. Payment re-delivery cannot help — the event is
+  // already in `payment_events`, so the idempotency gate answers 200 and does
+  // nothing. Repeatable: the candidate query only sees pending/expired orders,
+  // and settling flips them to paid, so a second run finds nothing (and a
+  // concurrent duplicate returns `already-paid` without writing).
+  // Logged unconditionally (including zero), same reason as [old-ops]: a sweep
+  // that ran is indistinguishable from one that never got there otherwise.
+  try {
+    const report = await runBillingReconciliation({}, Date.now);
+    Logger.info(
+      `Cleanup [billing-reconcile]: settled ${report.settled} of ${report.scanned} candidate(s) ` +
+        `(skipped ${report.skipped}, refused ${report.refused})`,
+    );
+    for (const outcome of report.outcomes) {
+      if (outcome.settlement !== null && outcome.settlement.outcome !== 'granted') {
+        // "有一笔钱没能补上权益"的每一条都必须可查，不能只留一个计数。
+        Logger.warn('Cleanup [billing-reconcile]: 候选未被授予', {
+          orderId: outcome.orderId,
+          outTradeNo: outcome.outTradeNo,
+          outcome: outcome.settlement.outcome,
+        });
+      }
+    }
+  } catch (error) {
+    Logger.error(`Cleanup [billing-reconcile] failed: ${error}`);
   }
 };
 
