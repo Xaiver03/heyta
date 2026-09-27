@@ -97,8 +97,10 @@ export {
  */
 export {
   HOSTED_AUTH_PATHS,
+  beginPasskeyEnrollment,
   beginPasskeyLogin,
   beginPasskeyRegistration,
+  completePasskeyEnrollment,
   completePasskeyLogin,
   completePasskeyRecovery,
   completePasskeyRegistration,

@@ -32,7 +32,7 @@ import { useEffect, useState } from 'react';
 
 import { useI18n, type MessageKey } from '@heyta/i18n';
 import type { HostedAuthFailureReason } from '@heyta/app-host';
-import { AlertTriangle, CheckCircle2, Loader2, RefreshCw, Trash2 } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, Loader2, Plus, RefreshCw, Trash2 } from 'lucide-react';
 
 import { useSyncStore } from '../sync/store.js';
 import { usePasskeysStore } from './passkeysStore.js';
@@ -67,6 +67,30 @@ function loadFailureKey(reason: HostedAuthFailureReason): MessageKey {
 }
 
 /**
+ * 添加失败原因 → 词条 key。
+ *
+ * 🔴 与删除失败**刻意分开**：`passkey-unsupported`（这台设备没有通行密钥能力）
+ * 与 `passkey-cancelled`（用户在系统弹窗里取消）只可能来自添加，而删除那侧
+ * 的 `last-passkey` 只可能来自删除。混用会让用户看到一句解释错动作的话。
+ */
+function addFailureKey(reason: HostedAuthFailureReason): MessageKey {
+  switch (reason) {
+    case 'passkey-unsupported':
+      return 'web.passkeys.error.passkeyUnsupported';
+    case 'passkey-cancelled':
+      return 'web.passkeys.error.passkeyCancelled';
+    case 'passkey-already-registered':
+      return 'web.passkeys.error.passkeyAlreadyRegistered';
+    case 'unauthorized':
+      return 'web.passkeys.error.unauthorized';
+    case 'network':
+      return 'web.passkeys.error.network';
+    default:
+      return 'web.passkeys.error.add';
+  }
+}
+
+/**
  * ISO 8601 → `YYYY-MM-DD`。
  *
  * 🔴 刻意**不用** `Intl` / `toLocaleDateString`：日期在这里只回答"哪一天"，
@@ -87,8 +111,12 @@ export function PasskeyPanel(): React.JSX.Element {
   const deletingId = usePasskeysStore((s) => s.deletingId);
   const deleteFailure = usePasskeysStore((s) => s.deleteFailure);
   const justDeleted = usePasskeysStore((s) => s.justDeleted);
+  const adding = usePasskeysStore((s) => s.adding);
+  const addFailure = usePasskeysStore((s) => s.addFailure);
+  const justAdded = usePasskeysStore((s) => s.justAdded);
   const load = usePasskeysStore((s) => s.load);
   const remove = usePasskeysStore((s) => s.remove);
+  const add = usePasskeysStore((s) => s.add);
   const dismissNotice = usePasskeysStore((s) => s.dismissNotice);
 
   /** 两段式删除：第一下进入"确认"，第二下才真的删。 */
@@ -114,6 +142,29 @@ export function PasskeyPanel(): React.JSX.Element {
       ) : (
         <>
           <div className="ht-settings__actions">
+            {/*
+              🔴 这个按钮是"删最后一条被拒 → 先添加一条新的"那句话的**唯一出口**。
+              没有它，用户被指向一个做不到的动作（添加走公开注册路径是静默
+              空操作），然后删掉旧凭据就再也登不进去。
+            */}
+            <button
+              type="button"
+              className="ht-btn ht-btn--primary"
+              data-testid="passkeys-add"
+              disabled={adding}
+              onClick={() => {
+                dismissNotice();
+                setConfirmingId(undefined);
+                void add(baseUrl, token);
+              }}
+            >
+              {adding ? (
+                <Loader2 size={12} aria-hidden="true" />
+              ) : (
+                <Plus size={12} aria-hidden="true" />
+              )}{' '}
+              {adding ? t('web.passkeys.adding') : t('web.passkeys.add')}
+            </button>
             <button
               type="button"
               className="ht-btn ht-btn--ghost"
@@ -133,6 +184,24 @@ export function PasskeyPanel(): React.JSX.Element {
               {t('web.passkeys.refresh')}
             </button>
           </div>
+
+          {adding && (
+            <p className="ht-settings__hint" role="status" data-testid="passkeys-adding">
+              {t('web.passkeys.waitingForPrompt')}
+            </p>
+          )}
+
+          {justAdded && (
+            <p className="ht-settings__notice" role="status" data-testid="passkeys-added">
+              <CheckCircle2 size={12} aria-hidden="true" /> {t('web.passkeys.added')}
+            </p>
+          )}
+
+          {addFailure !== undefined && (
+            <p className="ht-settings__danger" role="alert" data-testid="passkeys-add-failed">
+              <AlertTriangle size={12} aria-hidden="true" /> {t(addFailureKey(addFailure))}
+            </p>
+          )}
 
           {status.kind === 'loading' && (
             <p className="ht-settings__hint" role="status" data-testid="passkeys-loading">

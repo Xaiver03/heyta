@@ -420,6 +420,10 @@ export const en = {
   // user to see or remove their own credentials.
   'web.passkeys.title': 'Passkeys',
   'web.passkeys.lead': 'These are the passkeys registered for your account on the server. Removing one does not affect credentials on other devices.',
+  'web.passkeys.add': 'Add a passkey',
+  'web.passkeys.adding': 'Adding…',
+  'web.passkeys.waitingForPrompt': 'Complete creating the passkey in the system prompt.',
+  'web.passkeys.added': 'That passkey has been added.',
   'web.passkeys.refresh': 'Refresh list',
   'web.passkeys.loading': 'Loading…',
   'web.passkeys.needsSignIn': 'Sign in first to manage the passkeys on this account.',
@@ -437,6 +441,10 @@ export const en = {
   'web.passkeys.error.lastPasskey': 'This is the only passkey on the account, so it cannot be removed. Add a new passkey first.',
   'web.passkeys.error.unauthorized': 'Your sign-in has expired — sign in again.',
   'web.passkeys.error.network': 'Could not reach the server. Try again later.',
+  'web.passkeys.error.add': 'That passkey could not be added - try again.',
+  'web.passkeys.error.passkeyUnsupported': 'This device or browser does not support passkeys.',
+  'web.passkeys.error.passkeyCancelled': 'Creating the passkey was cancelled or timed out — you can try again.',
+  'web.passkeys.error.passkeyAlreadyRegistered': 'This device already has a passkey for this account.',
   'web.passkeys.error.other': 'That did not work - try again.',
   // ── Web · conflict dialog ─────────────────────────────────
   // Payload summary: `text` is the user's own words (never translated) and
