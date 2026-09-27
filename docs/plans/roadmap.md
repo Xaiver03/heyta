@@ -360,7 +360,7 @@ Web 设置页有「导出数据」（JSON 完整保真 / 任务清单 Markdown�
 | # | 断点 | 状态 |
 |---|---|---|
 | ④⑤ | 收银台 | ✅ **服务端已通**：`POST /api/billing/checkout`（报价 → 冻结 → `createCheckout` 一条链，不可交付的档在报价前回 `409`，12 例真 SQL 测试）。❌ **客户端「付款」按钮仍缺**，且**应当与支付通道一起落地** —— 现在加必然回 `503 BILLING_PROVIDER_NOT_CONFIGURED`，正好造出落地页明确反对的那个东西。所以这一步卡在**外部资质**，不在我们这边 |
-| 交付半段 | ✅ **已修（2026-09-27）** | webhook 现在在**同一个事务**里：占位 `paymentEvent`（唯一约束=幂等闸）→ `settleOrderPaidInTransaction`（比**订单冻结的** `final_amount_minor`、`pending→paid`、券 `reserved→applied`）→ 用**订单冻结的 `price_id`** 覆盖 adapter 的金额启发式 → `applyPaymentEvent` → 标记 `processedAt`。`unknown-order` 回落 legacy 声明；`already-paid` 不重复授予。<br>**未做（仍是缺口）**：退款/拒付侧没接（`reverseOrderOnRefund` 仍零调用方，退款事件在 `unsupported-event-type` 就被挡）；**存量回填**没做（接线前已付款但未结算的订单，重投会被幂等挡住，不会补结算）—— 属对账任务 |
+| 交付半段 | ✅ **已修（2026-09-27）** | webhook 现在在**同一个事务**里：占位 `paymentEvent`（唯一约束=幂等闸）→ `settleOrderPaidInTransaction`（比**订单冻结的** `final_amount_minor`、`pending→paid`、券 `reserved→applied`）→ 用**订单冻结的 `price_id`** 覆盖 adapter 的金额启发式 → `applyPaymentEvent` → 标记 `processedAt`。`unknown-order` 回落 legacy 声明；`already-paid` 不重复授予。<br>**退款/拒付侧：有意不接**（ADR-0026 已接受 —— `reverseOrderOnRefund` 零调用方、退款事件在 `unsupported-event-type` 被拒，两条都是显式决定，不是遗漏；理由是只接订单侧会造成"账本说退款了、权益还在"的半真状态）；**存量回填**没做（接线前已付款但未结算的订单，重投会被幂等挡住，不会补结算）—— 属对账任务 |
 | ⑦⑧ | ¥12 档能不能交付 | 已由 [ADR-0023](../adr/0023-managed-ai-quota-not-implemented.md) 显式判定：**计量存在之前不得被售卖**。云端 AI 端点 / 计量 / 设置页的「本周期已用 X / 300 次」**仍未做** |
 | ⑨⑪ | 续费 / 退款 | 都不存在：`SubscriptionNotice.tsx` 自述"现在不存在可跳转的续费地址"；退款接口"通道尚未接线"，退款政策也未定 |
 | 海外 | $5 / $12 | **没有 USD 通道**（全仓只有微信 adapter，且币种硬编码 CNY），并且缺**币种断言** —— USD 单喂给它会被按 CNY 发出去（`amountMinor: 500` 被当成 500 分），**没有任何一层会报错** |
@@ -445,7 +445,16 @@ Web 设置页有「导出数据」（JSON 完整保真 / 任务清单 Markdown�
   📌 **更正**：上一版据此外推的"server 全量测试跑不了"是**错的** —— 卡住的只是 `pretest`
   里的 `prisma generate`。直接 `pnpm --filter @heyta/sync-server exec vitest run` 可以完整跑：
   实测 **1474 passed / 1 skipped，exit 0**。卡点只在 `pretest`，不在测试本身。
-- **billing 的退款侧与存量回填没做**：`reverseOrderOnRefund` 仍零调用方；接线前已付款未结算的订单不会补结算。
+- **billing 的退款侧：从今以后是「有意不做」，不是「忘了接」**（ADR-0026，
+  `docs/adr/0026-refund-side-entitlement-revocation-not-implemented.md`）。
+  `reverseOrderOnRefund` 继续**零生产调用方**，退款事件继续在 `unsupported-event-type` 被拒 ——
+  两条都是**显式记录的决定**。理由值得抄下来：只接订单侧（订单置 `refunded`、核销置 `reversed`）
+  而**权益不动**，会造出一个**半真状态** —— 运维看到"退款已处理"会合理地以为权益也没了。
+  这正是本仓库反复拒绝的那类形状（"界面/账本说成功、功能没接上"）。
+  ⚠️ **这条已经翻过一次面**：本轮收尾时我按"退款侧是缺口、去接上"派了活，
+  子代理发现 ADR-0026 刚被并行会话写成「已接受」，于是**拒绝执行并上报** ——
+  这是对的。**教训：派活前先看 ADR 的最新状态，别照着一小时前的结论开工。**
+- **存量回填（接线前已付款但未结算的订单）**：见下方"对账"条目。
 
 ---
 
