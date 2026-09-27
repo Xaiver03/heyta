@@ -23,8 +23,19 @@ export PATH="/opt/homebrew/bin:$PATH"
 
 ADB="adb -s emulator-5554"
 PKG=com.heytamobile
-APK="apps/mobile/android/app/build/outputs/apk/release/app-release.apk"
-CLI="apps/node-host/dist/cli.js"
+# 🔴 这两个**必须**是绝对路径，不能是"仓库根相对"。
+#
+#    实测：脚本一旦不是从仓库根跑（例如 `cd scripts && bash verify-mobile-ios.sh`），
+#    `apps/node-host/dist/cli.js` 就解析成 `scripts/apps/...` —— node 直接
+#    `Cannot find module` 崩掉。而笔记本探针只把**错误的最后一行**报上来，
+#    正好是 `Node.js v22.22.3`（node 崩溃横幅的尾巴），看起来像"探针自己坏了"。
+#
+#    那次的表现是：同一份脚本、同一台设备，从仓库根跑 32/32 全绿，从 `scripts/`
+#    跑就"笔记本探针坏了"。探针的 rc=2 分类（探针坏了 ≠ 对端没有）恰好把方向
+#    挡在了同步协议之外，所以没有误导成产品缺陷 —— **但根因是路径，不是探针**。
+HEYTA_REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+APK="$HEYTA_REPO_ROOT/apps/mobile/android/app/build/outputs/apk/release/app-release.apk"
+CLI="$HEYTA_REPO_ROOT/apps/node-host/dist/cli.js"
 # 允许调用方覆盖（两个验收各用一份笔记本库，否则会互相看到对方的任务）
 LAPTOP_DB=${LAPTOP_DB:-/tmp/heyta-conflict-laptop.sqlite}
 
@@ -92,7 +103,9 @@ step() { echo ""; echo "════ $1 ════"; }
 #   2. 重试几次 —— "界面还在动"通常几秒后就结束了。
 dump() {
   local tries
-  for tries in 1 2 3 4 5; do
+  # 🔴 5 次不够：同步进行中界面一直在动，实测要等好几秒才会安静下来。
+  # 代价只是变慢，而"抓不到"的代价是整轮结论作废。
+  for tries in 1 2 3 4 5 6 7 8 9 10; do
     $ADB shell rm -f /sdcard/ui.xml >/dev/null 2>&1
     $ADB shell uiautomator dump /sdcard/ui.xml >/dev/null 2>&1
     $ADB shell cat /sdcard/ui.xml > /tmp/ui.xml 2>/dev/null
@@ -116,6 +129,18 @@ dump() {
           echo "   ⚠️ 检测到系统 ANR 弹窗（宿主机过载），点掉它再重抓界面" >&2
           $ADB shell input tap $anr_xy >/dev/null 2>&1
           sleep 3
+          # 🔴 **点掉弹窗之后必须把应用拉回前台。**
+          #
+          # 实测（2026-09-26）：ANR 弹窗关掉后，前台会落到**别的应用**上
+          # （那次是 Google 搜索）。后续的 `input text` 就全部打进了那个应用的
+          # 输入框 —— 日志里能看到口令被重复输入 7 次、旁边还跟着
+          # `• Search Google`。脚本报的是"口令没填进去"，
+          # 而真相是**它在给另一个应用打字**。
+          #
+          # 这类错误最坏的地方是它会**污染后面的步骤**：应用状态没变，
+          # 但屏幕上全是垃圾输入。所以这里必须纠正前台，不能只关弹窗。
+          ensure_app_foreground
+          sleep 2
           continue
         fi
       fi
@@ -123,8 +148,42 @@ dump() {
     fi
     sleep 1
   done
-  echo "   ⚠️ uiautomator dump 连续 5 次都没抓到界面（一直不空闲？）—— 后续断言读的是空快照" >&2
+  # 🔴 **抓不到界面时不要在这里 `exit` —— 有些"不空闲"是正常的。**
+  #
+  # 实测（2026-09-27）：`wait_synced` 会在**同步进行中**反复 dump，而同步时
+  # 界面上的 `ActivityIndicator` 一直在动 → 窗口永远不空闲 → dump 连续失败。
+  # 一次清单验收的 12 次 dump 失败**全部**落在"手机同步"那一步，就是这个原因。
+  # 在那里退出会把一个**预期内**的状态判成环境故障，把好轮次也毙掉。
+  #
+  # 但也**不能让它静静地失败**：`cat` 会把 `/tmp/ui.xml` **截成空文件**，
+  # 于是后面每条断言都在读空快照、全都报"找不到 X"。一次 run 因此出现过
+  # **13 条失败**，日志读起来像一堆产品缺陷，真正的原因却只有一个、且与应用无关。
+  #
+  # 所以分工是：
+  #   - `dump` 自己：软失败（返回 1）+ 提高重试预算，并**大声**说清后果；
+  #   - 调用方：在"必须在真实界面上断言"的地方用 `require_screen`，
+  #     由**它**决定是否终止整轮（退出码 3 = 这轮在环境上不成立，不是产品失败）。
+  echo "" >&2
+  echo "   ⚠️ uiautomator 连续 10 次抓不到界面（设备不空闲 / 宿主机过载）。" >&2
+  echo "      **/tmp/ui.xml 已被截成空文件** —— 接下来任何断言都会报「找不到 X」，" >&2
+  echo "      那是假红，不是产品缺陷。需要在真实界面上断言的地方请用 require_screen。" >&2
+  echo "      本机负载：$(uptime | sed 's/.*load averages: //')" >&2
   return 1
+}
+
+# 🔴 **要求此刻拿到的是一张真实界面**，否则终止整轮。
+#
+# 用在"下一步要在界面上找东西/点数"之前。抓到空快照时**必须**停下来：
+# 继续跑只会把一次环境问题伪装成一长串产品缺陷。
+#
+# 退出码 3（**不是** 1）：1 = "有断言失败"，3 = "这轮在环境上就不成立"。
+# 两者的处置完全不同，不能混成一个数字。
+require_screen() {
+  if grep -q '<hierarchy' /tmp/ui.xml 2>/dev/null; then return 0; fi
+  echo "" >&2
+  echo "   ❌ 拿不到真实界面 —— **本轮结果无效**（环境失败，不是产品失败）。" >&2
+  echo "      本机负载：$(uptime | sed 's/.*load averages: //')。等空闲后重跑。" >&2
+  exit 3
 }
 
 # 按 content-desc 定位任意节点（按钮、标签）
@@ -163,9 +222,11 @@ has_sub()   { grep -q "text=\"[^\"]*$1" /tmp/ui.xml && echo 1 || echo 0; }
 # 按 content-desc 精确匹配。勾选框、按钮这类节点的可辨识名在 `content-desc` 上，
 # 而不是 `text` —— 用 `has_text` 查它们**永远是 0**，于是"没找到"会被误记成"没生效"。
 has_desc()  { grep -q "content-desc=\"$1\"" /tmp/ui.xml && echo 1 || echo 0; }
+# content-desc 的**前缀**匹配。与 `has_sub` 同理，只是查 desc。
+# 用于"文案尾部会变"的节点（例如同步按钮在 busy 时是「正在同步…」）。
+has_desc_sub() { grep -q "content-desc=\"[^\"]*$1" /tmp/ui.xml && echo 1 || echo 0; }
 
 # 等「我的」页出现「已是最新」。
-#
 # 🔴 首次同步要付一次 Argon2id 密钥派生。Hermes 没有 WebAssembly，走纯 JS ——
 # 官方实测 30–40 秒；而**宿主机负载高时会久得多**（实测 load average 45、
 # 还有一个 iOS 模拟器抢 CPU 时，超过了 125 秒）。
@@ -177,14 +238,161 @@ wait_synced() {  # <轮数>，每轮 5 秒；默认 60 轮 = 300 秒
   # **完全取决于宿主机负载** —— 实测同一份代码在 load 3 时约 40 秒，
   # 在 load 43–151 时超过 300 秒。回显耗时让日志能区分"慢"和"卡死"；
   # 不回显的话，两者在日志里长得一模一样。
+  #
+  # 🔴 两种**都算同步跑完了**的终态，不能只认第一种：
+  #
+  #   1. 「已是最新」—— 全都同步到了；
+  #   2. 「……已跳过 —— 其余数据已同步」—— 这是 ADR-0016 规定的**如实上报**：
+  #      历史里混着别的口令写的 op，读得了的都应用了，读不了的被点名列出。
+  #      这**不是失败**，设备的数据已经是完整的（在该口令下能拿到的部分）。
+  #
+  # 只认第一种的后果是：一台**已经修好、行为完全正确**的设备被验收判红。
+  # 而"假红"比"假绿"更贵 —— 它会让人去改本来正确的东西。
+  #
+  # ⚠️ 这里刻意**不**匹配宽泛的「同步」二字：那会把「同步失败」也放进来，
+  # 于是一条**不能失败**的判据就把"半瘫"判成了通过。匹配的是**只在这个
+  # 降级成功态里才出现**的短语。
+  #
+  # 🔴 而且必须用 `has_sub`，**不能用 `has_text`**：状态行是拼接出来的整句
+  # （`有部分历史数据用当前口令解不开（…），已跳过 —— 其余数据已同步`），
+  # 而 `has_text` 是**整节点精确匹配**（`text="…"` 后面必须紧跟引号）。
+  # 本轮第一版就是这么写错的：判据永远为假，于是**手机已经同步成功**
+  # （界面上的状态行就写着"其余数据已同步"），`wait_synced` 却空转到 180 轮。
+  # 本文件里 `has_sub` 上面那段注释早就记录过同一个坑 —— 状态行不要用精确匹配。
   local n=${1:-60}
   local i
   for i in $(seq 1 "$n"); do
     sleep 5
     dump
-    if [ "$(has_text "已是最新")" = "1" ]; then printf '%s' "$((i * 5))"; return 0; fi
+    if [ "$(has_sub "已是最新")" = "1" ]; then printf '%s' "$((i * 5))"; return 0; fi
+    if [ "$(has_sub "其余数据已同步")" = "1" ]; then printf '%s' "$((i * 5))"; return 0; fi
   done
   return 1
+}
+
+# 触发一次手机同步：按「立即同步」再等结果。
+#
+# 🔴 **这一步一度写在 `verify-mobile-lists.sh` 里**，而标签验收要的是同一件事
+#    （同一个按钮、同一个等待、同一条"按坐标点的是**上一次** dump 的树"的坑）。
+#    放在共用库里的理由是它**不是清单的业务语义** —— 它纯粹是"驱动这台设备"，
+#    与 `wait_synced` / `dump` / `require_screen` 是同一类东西。
+#    各写一份的话，"按钮改了位置"这种改动会只修一处。
+#
+# ⚠️ `xy_text` 读的是**上一次 dump 的树**。不重新 dump 就会拿着别的页面的
+#    坐标去点 —— 清单验收的第一版就在这里报过"找不到「立即同步」"。
+phone_sync() {
+  dump
+  local ax_xy; ax_xy=$(xy_text "立即同步")
+  if [ -z "$ax_xy" ]; then bad "找不到「立即同步」"; return 1; fi
+  $ADB shell input tap $ax_xy; sleep 5
+  wait_synced 180
+}
+
+# 发起一次手机同步（**自动同步感知**）。只负责"让它开始"，**不等结算** ——
+# 各调用点的等待逻辑不同（有的数 900 秒、有的要判冲突）。
+#
+# 🔴 为什么不能写 `XY=$(xy_text "立即同步"); $ADB shell input tap $XY`：
+#
+#   1. **空坐标**。自动同步上线后，busy 时按钮的文案是「正在同步…」
+#      （`ProfileScreen` 里 `label={busy ? … : …}`）。此时 locator 返回空，
+#      而 `input tap` 拿空参数去执行 → adb 抛
+#      `Argument expected after "tap"`。**脚本一行都不报** ——
+#      它没点到任何东西，而验收照样绿（实测：3 次，最终 35/35 全绿）。
+#      这正是本仓库最忌讳的那种**不能失败的检查**：
+#      "点了一下同步"和"什么都没点"在报告里长得一样。
+#   2. **重复点没有意义**。`syncNow()` 在 `busy` 时直接返回当前状态（不排队），
+#      所以"已经在跑"时该做的是**等**，不是再点一下。
+#
+# 🔴 **必须查 `content-desc`，不能查 `text`。** 这是实测踩到的第二层：
+#
+#    `Button` 在 `loading` 时渲染的是
+#        `{loading ? <ActivityIndicator/> : <><Icon/><RNText>{label}</RNText></>}`
+#    —— **只有菊花，没有文字节点**。于是同步进行中时：
+#        · `text="立即同步"`     → 不存在
+#        · `text="正在同步…"`    → **也不存在**（busy 文案只挂在 accessibilityLabel 上）
+#    所以"查不到按钮"这件事本身**不能推出**"按钮不在这一屏"。
+#    第一版就是因为查 `text` 而误报了三条 `bad`（同步其实正在正常进行）。
+#    （本库 `has_desc` 上面那条注释早就写了这条规矩 —— 我写这个函数时违反了它。）
+#
+# 三种情况，**没有一种是静默的**：
+#   · desc 里有「立即同步」   → 真的点下去（先确认坐标非空）
+#   · desc 里有「正在同步…」 → 自动同步抢先了，不重复点，打印一行说明
+#   · 两者都没有               → 真的不在这一屏 → `bad` + 返回 1
+#
+# ⚠️ 这也意味着：在自动同步已经抢跑的情形下，"首次同步成功"这条断言
+#    验的是**自动同步**而不是那个按钮。日志会明确打印是哪一种，
+#    不会让读者以为按钮被测过。
+ensure_phone_sync() {
+  dump
+  if [ "$(has_desc "立即同步")" = "1" ]; then
+    local xy; xy=$(xy_desc "立即同步")
+    if [ -z "$xy" ]; then bad "「立即同步」的 desc 在但取不到坐标"; return 1; fi
+    $ADB shell input tap $xy
+    echo "     已点「立即同步」@ $xy"
+    return 0
+  fi
+  if [ "$(has_desc_sub "正在同步")" = "1" ]; then
+    echo "     （自动同步已经在跑：按钮处于 loading，只渲染菊花 —— 所以这里查的是 content-desc）"
+    return 0
+  fi
+  bad "同步按钮既不空闲也不在忙（desc 里既没有「立即同步」也没有「正在同步…」）"
+  return 1
+}
+
+# 等手机报出冲突。**返回三态**，不是布尔。
+#
+# 用法：wait_conflict <轮数>；每轮 4 秒。回显 "conflict" / "uploading" / "none"。
+#
+# 🔴 为什么必须是三态：
+#   第一版（两个调用点都）只轮询 12×4=48 秒，然后
+#       [ 有冲突 ] && ok || bad "没报冲突"
+#   于是**超时被当成了"冲突没触发"**。而失败现场的屏幕是
+#       • 正在上传…   • 待上传 1 项
+#   —— 同步**根本还没跑完**。这台模拟器跑一次同步实测 160–220 秒
+#   （Hermes 无 WebAssembly，Argon2id 走纯 JS，再叠加宿主机高负载），
+#   48 秒差得远。结果是把**环境慢**误判成**并发检测有 bug**，
+#   然后去改一段本来正确的代码。
+#
+#   区分开之后：
+#     conflict  → ✅ 真的触发了
+#     uploading → ⏳ 还在跑，判不了（环境问题，不是产品结论）
+#     none      → ❌ 同步**已结算**却没有冲突，这才是真的失败
+wait_conflict() {  # <轮数>，每轮 4 秒；默认 90 轮 = 360 秒
+  local n=${1:-90}
+  local i
+  local saw_uploading=0
+  for i in $(seq 1 "$n"); do
+    sleep 4
+    dump
+    if [ "$(has_sub "处冲突待你选择")" = "1" ]; then printf '%s' "conflict"; return 0; fi
+    # 没有冲突、也不在上传 → 同步已结算，冲突就是不存在的
+    if [ "$(has_sub "正在上传")" = "0" ]; then printf '%s' "none"; return 0; fi
+    saw_uploading=1
+  done
+  if [ "$saw_uploading" = "1" ]; then printf '%s' "uploading"; else printf '%s' "none"; fi
+  return 0
+}
+
+# 当前是否**真的**还有未解决的冲突。回显 1 / 0。
+#
+# 🔴 为什么不能直接 `has_sub "处冲突待你选择"`：
+#    冲突提示挂在**「我的」页**上。如果调用时屏幕停在「任务」或「日历」页，
+#    这段文字当然**不存在** —— 于是"冲突已解决"会在**没看对屏幕**的情况下判为真。
+#
+#    实测（2026-09-26 冲突验收）：步骤 8 因此报了 `✅ 冲突已解决`，
+#    而同一步的下一句是 `❌ 手机没显示笔记本那一版`，7b 的屏幕又明确是
+#    `• 有 1 处冲突待你选择` —— 三条证据互相矛盾，真相是**那次解决根本没生效**，
+#    `✅` 是假阳性。
+#
+#    更贵的是它会**级联**：后面所有步骤都建立在一个不存在的前提上，
+#    于是连爆一串看不懂的失败，排查方向被彻底带偏。
+#
+#    所以判据必须**先导航到承载该提示的屏幕**，再判存在性。
+conflict_pending() {  # 回显 1（还有冲突）/ 0（没有）
+  $ADB shell input tap 945 2253 >/dev/null 2>&1   # 「我的」tab
+  sleep 3
+  dump
+  has_sub "处冲突待你选择"
 }
 
 # 等**另一台设备**真的能拉到某条任务（成功时回显轮数）。
@@ -211,7 +419,14 @@ wait_laptop_has() {  # <标题> <轮数>，每轮 5 秒；默认 60 轮 = 300 �
   for i in $(seq 1 "$n"); do
     [ "$i" -gt 1 ] && sleep 5
     local out; out=$(laptop_raw sync)
-    if printf '%s' "$out" | grep -q '"ok":true'; then
+    # 🔴 "跑起来了"不等于"全绿"。`undecryptable-ops` 是一次**真的执行了**的同步：
+    #    它把能读的 op 都应用了、游标也推进了，只是服务端上有几条是**别的口令**
+    #    写下的、永远读不了（详见 sync-client 的 `download()`）。
+    #    这里如果只认 `"ok":true`，那么服务端上只要存在一条这种历史 op，
+    #    这个探针就会永远判成"探针自己坏了"（rc=2）—— 而它其实完全正常，
+    #    真正的判据在下面那行"标题读没读到"。
+    #    这正是"一个没验干净的判据不该有权定性整轮验收"的同一条纪律。
+    if printf '%s' "$out" | grep -qE '"ok":true|undecryptable-ops'; then
       sync_ok=$((sync_ok + 1))
     else
       last_err=$(printf '%s' "$out" | tail -1)
@@ -219,7 +434,7 @@ wait_laptop_has() {  # <标题> <轮数>，每轮 5 秒；默认 60 轮 = 300 �
     if laptop list --all | grep -q "$title"; then printf '%s' "$i"; return 0; fi
   done
   if [ "$sync_ok" = "0" ]; then
-    printf '%s' "NODE=$NODE；laptop sync 一次都没成功，最后一条输出：${last_err:-（空）}"
+    printf '%s' "NODE=${NODE}；laptop sync 一次都没成功，最后一条输出：${last_err:-（空）}"
     return 2
   fi
   return 1
@@ -285,6 +500,28 @@ restore_ime() {
   $ADB shell settings put secure show_ime_with_hard_keyboard 1 >/dev/null 2>&1
 }
 trap restore_ime EXIT
+
+# 把 heyta 拉回前台。
+#
+# 🔴 为什么需要它：系统 ANR 弹窗关掉之后，前台**不一定**回到应用 ——
+#    实测落到了 Google 搜索上，后续 `input text` 全部打进了那个搜索框
+#    （日志里口令被重复 7 次，旁边跟着 `• Search Google`）。
+#    脚本报"字段没填进去"，而真相是**在给别的应用打字**。
+#
+# 用 `am start` 而不是 `monkey`：`monkey` 是随机事件流，会顺带乱点；
+# `am start -n` 是确定的。已经在前面时它是无害的（不会重建 Activity 栈）。
+ensure_app_foreground() {
+  local cur
+  cur=$($ADB shell dumpsys activity activities 2>/dev/null | grep -m1 topResumedActivity | sed 's/.*u0 //;s/ .*//')
+  case "$cur" in
+    "$PKG"/*) return 0 ;;
+  esac
+  echo "   ↻ 前台是 ${cur}，把 $PKG 拉回来" >&2
+  $ADB shell am start -n "$PKG/.MainActivity" >/dev/null 2>&1
+  sleep 2
+  return 0
+}
+
 screen_txt(){
   python3 - <<'PY'
 import re
@@ -339,7 +576,23 @@ clear_and_type() {  # <值> [标签] —— 先全选删除再输入，绝不循
         $ADB shell input text "$piece" >/dev/null 2>&1
         ;;
       *)
-        # 不是前缀（中间丢了、或残留了旧值）→ 全选重来，别在脏状态上叠加
+        # 不是前缀（中间丢了、或残留了旧值）→ 全选重来，别在脏状态上叠加。
+        #
+        # 🔴 **重来之前必须重新点一下这个字段。**
+        #    实测（2026-09-26）：如果焦点已经不在这个字段上（ANR 弹窗把前台
+        #    带去了别的应用），CTRL+A 全选的就不是它、DEL 删的也不是它 ——
+        #    而 `input text` 会**追加**到别处。日志里出现过口令被重复输入 7 次
+        #    （`mobile-e2e-e2ee-pass` × 7），原因就是这一条。
+        #    断言只看"最终对不对"，中间这 6 次重试把界面搞得更脏。
+        local refocus
+        refocus=$(xy_edit "$label" 2>/dev/null)
+        if [ -n "$refocus" ]; then
+          $ADB shell input tap $refocus >/dev/null 2>&1
+          sleep 1
+        else
+          # 连字段都定位不到 → 前台大概不在应用上，先纠正再继续
+          ensure_app_foreground
+        fi
         $ADB shell input keycombination 113 29; sleep 0.6
         $ADB shell input keyevent 67; sleep 0.8
         $ADB shell input text "$want" >/dev/null 2>&1
@@ -435,6 +688,70 @@ idb_ui() { "$IDB_BIN" --companion-path "$IDB_COMPANION" ui "$@" --udid "$IDB_UDI
 # 无障碍树只从这一个入口取，落到文件再交给解析器
 # （`cmd | python3 - <<'PY'` 的 heredoc 会顶掉管道 —— AGENTS §7 第 36 条）。
 idb_dump() { idb_ui describe-all > "$IDB_DUMP_FILE" 2>/dev/null; }
+
+# ── companion 存在性 + 无障碍树健康度 ────────────────────────────────────────
+#
+# 🔴 这两件事**必须分开**，理由是实测踩出来的（一整轮验收的代价）：
+#
+#   · companion 在不在  → 决定 idb 能不能说话；
+#   · 树里有没有内容    → 决定 App 有没有把自己交出来。
+#
+#   把两者混成一句"AX 桥不通"，排查方向会整条偏到 App 上，而真相可能是：
+#
+#   ① **companion 根本不是脚本起的**。idb 不会自动拉它，只连
+#      `/tmp/idb/<UDID>_companion.sock`；没人起就 `[Errno 2] No such file`。
+#   ② **模拟器跑久了，App 的无障碍注册会卡死**（实测 13 小时）：App 在渲染、
+#      在响应点击，但对 AX 只暴露一个**零尺寸的 Application 节点**（label 数 0）。
+#      **重启模拟器立刻恢复**（同一台设备、同一个 App：0 → 42 个 label）。
+#      而该期间**主屏一直能读出 11 个 label** —— 所以"主屏有 label"**不能**
+#      当作"App 的树是好的"的对照。别拿它当判据。
+# 真正的查询体单独起个名字，**故意**不让它和 `idb_ax_label_count` 同名：
+# 这样验收脚本里的"变异缝"可以直接包一层去调它，而**不需要 `eval` + `declare -f`**
+# 那套把戏 —— 实测那套会把函数体里的引号/续行打散，包出来的函数**永远返回 0**，
+# 于是"变异生效了"和"变异把工具弄坏了"看起来一模一样（正是 §7 陷阱 58 的形状）。
+_idb_ax_count_raw() {
+  "$IDB_BIN" --companion-path "$IDB_COMPANION" ui describe-all --udid "$IDB_UDID" 2>/dev/null \
+    | python3 -c "
+import json,sys
+try: d=json.load(sys.stdin)
+except Exception: print(0); raise SystemExit
+n=0
+def w(x):
+    global n
+    if isinstance(x,dict):
+        if x.get('AXLabel'): n+=1
+        for k in ('children','nodes'):
+            for y in (x.get(k) or []): w(y)
+    elif isinstance(x,list):
+        for y in x: w(y)
+w(d); print(n)
+" 2>/dev/null || echo 0
+}
+
+idb_ax_label_count() { _idb_ax_count_raw; }
+
+# 确保 socket 在、companion 能应答。**能应答 ≠ 树有内容**，后者由调用方判断。
+ensure_idb_companion() {
+  local sock="/tmp/idb/${IDB_UDID}_companion.sock"
+  if [ -S "$sock" ] && [ -n "$("$IDB_BIN" --companion-path "$IDB_COMPANION" ui describe-all --udid "$IDB_UDID" 2>/dev/null)" ]; then
+    return 0
+  fi
+  echo "   ⚠️ companion 不在（socket ${sock} 不存在）—— 按官方参数把它拉起来"
+  pkill -f "idb_companion --udid ${IDB_UDID}" 2>/dev/null
+  rm -f "$sock"
+  sleep 1
+  nohup "$IDB_COMPANION" --udid "$IDB_UDID" \
+    --grpc-domain-sock "$sock" --only simulator >/tmp/heyta-idb-companion.log 2>&1 &
+  local waited=0
+  while [ ! -S "$sock" ] && [ "$waited" -lt 30 ]; do sleep 1; waited=$((waited+1)); done
+  if [ ! -S "$sock" ]; then
+    echo "   ❌ companion 30 秒内没起来：$sock" >&2
+    return 1
+  fi
+  sleep 2
+  echo "   ✅ companion 已拉起（${waited}s）"
+  return 0
+}
 
 # 元素中心坐标。**精确标签 + 角色约束**，见本段开头那条子串撞车的说明。
 idb_center() { python3 "$IDB_FIND" "$IDB_DUMP_FILE" "$1" "$2"; }
@@ -571,7 +888,7 @@ require_window() {  # <设备名前缀>
       1) echo "   ❌ 找不到「$1」的窗口（模拟器没开？还是窗口被关了？）" >&2 ;;
       2) echo "   ❌ 「$1」匹配到多个窗口，标题要写具体" >&2 ;;
       3) echo "   ❌ 窗口定位工具编译失败" >&2 ;;
-      *) echo "   ❌ 取窗口矩形失败（退出码 $rc）" >&2 ;;
+      *) echo "   ❌ 取窗口矩形失败（退出码 ${rc}）" >&2 ;;
     esac
     return 1
   fi
@@ -674,7 +991,7 @@ configure_sync_credentials() {
       # （节点只有 `password="true"`）。所以这里不假装能核对它 ——
       # 口令填错/没填的真正证据是后面**首次同步失败**（解不开服务端已有的密文）。
       if [ "$(has_secure)" = "1" ]; then
-        ok "已填 $desc（安全字段，dump 看不到内容；由首次同步成功来证明）"
+        ok "已填 ${desc}（安全字段，dump 看不到内容；由首次同步成功来证明）"
       else bad "$desc 找不到（没有 password=\"true\" 节点）"; fi
     else
       if [ "$(has_text "$val")" = "1" ]; then ok "已填 $desc"
@@ -695,12 +1012,16 @@ configure_sync_credentials() {
 # ── 收尾 ────────────────────────────────────────────────────
 # 每个脚本自己报验收名，但"通过几项 / 失败几项 / 退出码"只有这一处定义 ——
 # 两个脚本各写一份的话，迟早一个是 `-gt 0` 另一个是 `-ne 0`。
-summary() {  # <验收名>
+summary() {  # <验收名> [结尾语]
+  # ⚠️ 结尾语可传。原先是写死的「真机全链路通过」—— 那对**移动端**脚本准确，
+  # 但三端同步验收（`verify-multi-end-sync.sh`）里没有"真机"参与，照抄会
+  # 让输出说一句不成立的话。默认值保持原样，移动端脚本的输出一个字符都不变。
+  local verdict="${2:-真机全链路通过}"
   echo ""
   echo "════════════════════════════════════════"
   echo "  通过 $PASS 项，失败 $FAIL 项"
   if [ "$FAIL" -eq 0 ]; then
-    echo "  ✅ $1：真机全链路通过"
+    echo "  ✅ $1：$verdict"
   else
     echo "  ❌ 有失败项"
   fi

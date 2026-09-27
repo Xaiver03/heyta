@@ -130,14 +130,25 @@ if open_sheet "打开任务：$TITLE"; then
   ok "详情面板已打开"
   # 面板必须绑定**这一条**任务。只断言"面板出现了"是拦不住
   # "面板拿到的是另一条任务的快照"这类 bug 的。
-  VAL=$(python3 /tmp/_xy.py editval "任务标题" 0)
+  # 🔴 字段的无障碍名是**「标题」**（词条 `mobile.detail.field.title`），
+  #    不是「任务标题」—— i18n 迁移（`ccf3e50`）改了文案，脚本没跟着改。
+  #    实测后果：这里恒读到 ''，第 6 步 `xy_edit "任务标题"` 恒找不到输入框，
+  #    再往下第 7、8 步全部连锁失败。**这条验收在自动同步之前就已经是红的**
+  #    （A/B 实测：把自动同步关掉，失败点一模一样）。
+  VAL=$(python3 /tmp/_xy.py editval "标题" 0)
   if [ "$VAL" = "$TITLE" ]; then
     ok "面板绑定的是这一条任务（标题框里是 $TITLE）"
   else
     bad "面板标题框里是 '$VAL'，不是 '$TITLE'"
   fi
-  [ "$(has_text "截止日期")" = "1" ] && ok "面板有「截止日期」区块" || bad "面板缺「截止日期」区块"
-  [ "$(has_text "优先级")" = "1" ] && ok "面板有「优先级」区块" || bad "面板缺「优先级」区块"
+  # 🔴 **必须滚到再断言。** 「优先级」区块在面板里位于「截止日期」**下方**，
+  #    而 UI dump 只看得到**屏幕内**的节点 —— 不滚动就 `has_text`，
+  #    等于把"我没滚到"当成"它没渲染"。实测：这条断言一直是红的，
+  #    而第 5 步却能成功点到「高」并把行变成「高优先级」——
+  #    **区块明明在，只是不在第一屏**。
+  #    （又是那条：**"查不到"不是"不存在"**。）
+  if [ -n "$(scroll_to_text "截止日期")" ]; then ok "面板有「截止日期」区块"; else bad "面板缺「截止日期」区块"; fi
+  if [ -n "$(scroll_to_text "优先级")" ]; then ok "面板有「优先级」区块"; else bad "面板缺「优先级」区块"; fi
   close_sheet && ok "面板已关闭"
 fi
 dump
@@ -191,10 +202,10 @@ fi
 step "6. 改标题"
 if open_sheet "打开任务：$TITLE"; then
   dump
-  XY=$(xy_edit "任务标题")
+  XY=$(xy_edit "标题")
   if [ -z "$XY" ]; then bad "详情面板里找不到标题输入框"; screen_txt; else
     $ADB shell input tap $XY; sleep 1.2
-    clear_and_type "$RENAMED" "任务标题"
+    clear_and_type "$RENAMED" "标题"
     dump
     # 关闭时会提交标题（见 TaskDetailSheet 的 close()）
     close_sheet
@@ -239,20 +250,21 @@ dump
 
 step "8. 手机同步"
 $ADB shell input tap 945 2253; sleep 3   # 「我的」
-dump
-XY=$(xy_text "立即同步")
-if [ -z "$XY" ]; then bad "找不到「立即同步」"; screen_txt; else
-  $ADB shell input tap $XY; sleep 5
-  echo "     首次同步含密钥派生，等待中…（最长等 900 秒）"
-  # 🔴 判据是**结果**（另一台设备能不能拉到），不是本机的状态标签。
-  # 见共享库里 `wait_laptop_has` 的注释：负载高时界面标签会滞后几分钟，
-  # 而"数据其实早就到了"会被报成失败。
-  if ROUNDS=$(wait_laptop_has "$RENAMED" 180); then
-    ok "手机的上传已到达服务端（笔记本第 $ROUNDS 轮拉到，约 $((ROUNDS * 5)) 秒）"
-  else
-    bad "等了约 900 秒，笔记本仍拉不到这条任务"
-    screen_txt
-  fi
+# 🔴 用 `ensure_phone_sync` 而不是自己找按钮：自动同步上线后，busy 时
+#    按钮文案是「正在同步…」，旧写法的 `[ -z "$XY" ] → bad` 会在
+#    **自动同步已经抢跑**时报一条**假红**（"找不到「立即同步」"），
+#    而那一刻同步其实正在正常进行。
+ensure_phone_sync
+sleep 5
+echo "     首次同步含密钥派生，等待中…（最长等 900 秒）"
+# 🔴 判据是**结果**（另一台设备能不能拉到），不是本机的状态标签。
+# 见共享库里 `wait_laptop_has` 的注释：负载高时界面标签会滞后几分钟，
+# 而"数据其实早就到了"会被报成失败。
+if ROUNDS=$(wait_laptop_has "$RENAMED" 180); then
+  ok "手机的上传已到达服务端（笔记本第 $ROUNDS 轮拉到，约 $((ROUNDS * 5)) 秒）"
+else
+  bad "等了约 900 秒，笔记本仍拉不到这条任务"
+  screen_txt
 fi
 
 step "9. 断言：截止日期与优先级同步到了**另一台设备**"

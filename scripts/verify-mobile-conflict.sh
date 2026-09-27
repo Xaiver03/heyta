@@ -128,9 +128,8 @@ dump
 [ "$(has_text "$TITLE")" = "1" ] && ok "任务已创建：$TITLE" || { bad "任务没创建"; screen_txt; }
 
 $ADB shell input tap 945 2253; sleep 3
-dump
-XY=$(xy_text "立即同步")
-$ADB shell input tap $XY; sleep 5
+ensure_phone_sync
+sleep 5
 echo "     首次同步含密钥派生，等待中…（最长等 900 秒）"
 if ELAPSED=$(wait_synced 180); then
   # 回显耗时：同一份代码在 load 3 时约 40 秒，在 load 43–151 时实测超过 300 秒
@@ -208,16 +207,14 @@ fi
 
 step "5. 手机同步 → 应出现冲突"
 $ADB shell input tap 945 2253; sleep 3
-dump
-XY=$(xy_text "立即同步")
-$ADB shell input tap $XY; sleep 8
-for i in $(seq 1 12); do sleep 4; dump; [ "$(has_sub "处冲突待你选择")" = "1" ] && break; done
-dump
-if [ "$(has_sub "处冲突待你选择")" = "1" ]; then
-  ok "手机检测到真实冲突"
-else
-  bad "手机没有报冲突"; screen_txt
-fi
+ensure_phone_sync
+sleep 8
+C=$(wait_conflict)
+case "$C" in
+  conflict)  ok "手机检测到真实冲突" ;;
+  uploading) bad "等满 360 秒手机仍在上传，无法判定是否存在冲突（环境问题，不是产品结论）"; screen_txt ;;
+  *)         bad "同步已结算但没报冲突 —— 这才是真的「未触发冲突」"; screen_txt ;;
+esac
 [ "$(has_text "逐条处理")" = "1" ] && ok "冲突入口按钮已出现" || bad "没有「逐条处理」按钮"
 
 step "6. 打开冲突界面，核对两侧内容都摆出来了"
@@ -253,9 +250,24 @@ if [ -z "$XY" ]; then bad "取不到第二个「保留这一版」按钮"; else
 fi
 
 step "8. 断言：冲突消失，且手机上的值等于笔记本那一版"
-for i in $(seq 1 15); do sleep 4; dump; [ "$(has_sub "处冲突待你选择")" = "0" ] && break; done
-dump
-[ "$(has_sub "处冲突待你选择")" = "0" ] && ok "冲突已解决" || { bad "冲突仍在"; screen_txt; }
+# 🔴 判"冲突消失"必须**先切到「我的」页**，不能在别的页上找"没有这段文字"。
+#    第一版直接 `has_sub "处冲突待你选择" = 0`，而那一刻屏幕在「任务」页 ——
+#    冲突提示本来就不在那，于是**假阳性** `✅ 冲突已解决`。
+#    同一步的下一条却报 `❌ 手机没显示笔记本那一版`，7b 的屏幕又明确写着
+#    `• 有 1 处冲突待你选择`：三条证据互相矛盾，真相是解决根本没生效。
+RESOLVE_REMOTE_OK=0
+# 7b–9b 的级联闸门开关。这里显式初始化：脚本本身没开 `set -u`（空值安全），
+# 但以后谁加上 `set -u` 时，未初始化会直接炸 —— 不值得留这个雷。
+SKIPPED_MACHINE_LOCAL=0
+for i in $(seq 1 15); do
+  if [ "$(conflict_pending)" = "0" ]; then RESOLVE_REMOTE_OK=1; break; fi
+  sleep 4
+done
+if [ "$RESOLVE_REMOTE_OK" = "1" ]; then
+  ok "冲突已解决"
+else
+  bad "冲突仍在（「我的」页上仍有「有 N 处冲突待你选择」）"; screen_txt
+fi
 $ADB shell input tap 135 2253; sleep 3
 # 🔴 同第 4 步的理由：这条任务在第 4 步被勾成了完成，它现在躺在**列表最底部的
 # 「已完成」分组**里，而十几条待办足以把它顶到屏幕外。必须滚过去找。
@@ -263,6 +275,8 @@ if [ -n "$(scroll_to_text "$LAPTOP_TITLE")" ]; then
   ok "手机显示的是笔记本那一版：$LAPTOP_TITLE"
 else
   bad "手机没显示笔记本那一版（滚到列表底部也没找到）"; screen_txt
+  # 值也没收敛 → 这一轮「保留远端」整体不成立，后面不能再往下推
+  RESOLVE_REMOTE_OK=0
 fi
 
 step "9. 断言：笔记本同步后看到同一个值（双端收敛）"
@@ -271,6 +285,28 @@ LT=$(laptop_title_of "$LAPTOP_ID")
 if [ "$LT" = "$LAPTOP_TITLE" ]; then ok "笔记本侧值一致：$LT"; else bad "笔记本侧值不一致：'$LT'"; fi
 
 step "7b. 再造一次冲突，这次选「保留本机」—— 验证**另一个**解决动作"
+
+# 🔴 **级联闸门**：前面「保留远端」要是没成立，这一整段就没有意义。
+#
+#    实测（2026-09-26）：步骤 7 的那一下点击在高负载下**没生效**，
+#    于是冲突一直在、值也没收敛。但脚本照旧往下跑，结果连爆 5 个失败
+#    （干净起点没结算 / 找不到勾选框 / 第二次没报冲突 / 点不到逐条处理 / op 数没增加），
+#    **每一个看起来都像「保留本机」坏了** —— 而真正坏的只是前面那一下点击。
+#
+#    这就是最贵的一类失败：不是"没测出来"，而是**测出来一个错的结论**。
+#    所以前置不成立时必须**明确停机**，而不是继续推。
+if [ "$RESOLVE_REMOTE_OK" != "1" ]; then
+  echo ""
+  echo "   ⛔ 跳过 7b–9b：「保留远端」前置未成立，无法得出关于「保留本机」的任何结论。"
+  echo "      这不是「保留本机」失败 —— 是环境导致的前置步骤未完成（高负载下点击未生效）。"
+  echo "      需要重跑；若重跑仍失败，再怀疑产品。"
+  echo ""
+  SKIPPED_MACHINE_LOCAL=1
+fi
+
+if [ "$SKIPPED_MACHINE_LOCAL" = "1" ]; then
+  : # 跳过下面整段
+else
 
 # 🔴 为什么必须补这一段：
 #    上面只验了「保留远端」。两个动作走的是**完全不同的代码路径**：
@@ -291,32 +327,104 @@ server_op_count() {
 }
 
 # 1) 手机先同步到最新，作为干净起点
+OPS_AT_CLEAN_START=$(server_op_count)
+echo "     干净起点的服务端 op 数 = $OPS_AT_CLEAN_START"
 $ADB shell input tap 945 2253; sleep 3
-dump; XY=$(xy_text "立即同步"); $ADB shell input tap $XY; sleep 10
-for i in $(seq 1 12); do sleep 4; dump; [ "$(has_sub "处冲突待你选择")" = "0" ] && break; done
-ok "手机已同步到最新（起点干净）"
+ensure_phone_sync; sleep 10
+# 🔴 这里**必须断言同步真的结算了**，不能无条件 `ok`。
+#    第一版写的是循环结束就 `ok "起点干净"` —— 那是个**永远不会失败的断言**：
+#    超时和成功打出同一句话。日志里它一直显示 ✅，而紧接着就是
+#    `❌ 第二次没报冲突` + 手机上"正在上传…"，说明"干净起点"根本不存在。
+SYNC_SETTLED=0
+for i in $(seq 1 90); do
+  sleep 4; dump
+  # 结算 = 既没有"正在上传"，也没有冲突待处理
+  if [ "$(has_sub "正在上传")" = "0" ] && [ "$(has_sub "处冲突待你选择")" = "0" ]; then
+    SYNC_SETTLED=1; break
+  fi
+done
+if [ "$SYNC_SETTLED" = "1" ]; then
+  ok "手机已同步到最新（起点干净）"
+else
+  bad "手机同步没有在 360 秒内结算（仍在上传或仍有冲突）——后续步骤的基线不可信"
+  screen_txt
+fi
 
 # 2) 笔记本再改一次标题并同步
 SECOND_TITLE="laptop-second-$TITLE"
 laptop_ok rename "$LAPTOP_ID" "$SECOND_TITLE" && ok "笔记本第二次改名" || bad "笔记本第二次 rename 失败"
 laptop_ok sync && ok "笔记本第二次 sync" || bad "笔记本第二次 sync 失败"
+# 断言它**真的到了服务端**，而不是只看 sync 的返回码
+OPS_AFTER_LAPTOP=$(server_op_count)
+if [ "$OPS_AFTER_LAPTOP" -gt "$OPS_AT_CLEAN_START" ]; then
+  ok "笔记本那条改名确实落到了服务端（op 数 $OPS_AT_CLEAN_START → $OPS_AFTER_LAPTOP）"
+else
+  bad "笔记本 sync 报成功，但服务端 op 数没变（$OPS_AT_CLEAN_START → $OPS_AFTER_LAPTOP）"
+fi
 
 # 3) 手机**在没下载到那条的前提下**再改一次（勾选状态）
+#
+# 🔴 这里必须用 `$LAPTOP_TITLE`（手机**当前**持有的那个标题），**不是** `$SECOND_TITLE`。
+#    手机此刻还没下载笔记本刚做的那次改名，所以它界面上的任务仍然叫 `$LAPTOP_TITLE`
+#    （第 7~9 步刚收敛到的那一版）。用 `$SECOND_TITLE` 去找勾选框会永远找不到 ——
+#    第一版就是这么写的，日志里"找不到勾选框"旁边正好打印着旧标题，一眼能看出来。
+#    这恰恰是**造真并发**的前提：手机在旧基线上改，笔记本在新基线上改。
 $ADB shell input tap 135 2253; sleep 3
 dump
-XY=$(scroll_to_desc "完成：$SECOND_TITLE")
-[ -z "$XY" ] && XY=$(scroll_to_desc "取消完成：$SECOND_TITLE")
+# 🔴 **必须断言状态真的翻转了，不能只断言"点到了"。**
+#
+#    第一版这里只写了"找到勾选框 → 点 → ok"，于是它**通过了**，
+#    但后面"第二次没报冲突"、`解决前服务端 op 数 = 4`（笔记本刚加过一条 op，
+#    本该 ≥5）—— 两条证据合起来说明：**那一下根本没产生本地 op**。
+#    没有本地改动，就没有并发，自然没有冲突。
+#
+#    这正是原脚本第 4 步注释里写过的坑：
+#    「点错位置时坐标照样取得到，只有断言能发现」。
+#    我在新代码里把它忘了，于是又踩了一次。
+XY=$(scroll_to_desc "完成：$LAPTOP_TITLE")
+TAP_LABEL="完成"
+[ -z "$XY" ] && { XY=$(scroll_to_desc "取消完成：$LAPTOP_TITLE"); TAP_LABEL="取消完成"; }
 if [ -z "$XY" ]; then bad "找不到勾选框（第二次造并发）"; screen_txt; else
+  echo "     点的是「$TAP_LABEL：$LAPTOP_TITLE」@ $XY"
   $ADB shell input tap $XY; sleep 3
-  ok "手机第二次本地改动（勾选状态，尚未同步）"
+  # 翻转之后标签会变成**另一个**；而且这条会移进/移出「已完成」分组，
+  # 所以要滚动去找，不能在原地找。
+  if [ "$TAP_LABEL" = "完成" ]; then
+    WANT_AFTER="取消完成：$LAPTOP_TITLE"
+  else
+    WANT_AFTER="完成：$LAPTOP_TITLE"
+  fi
+  if [ -n "$(scroll_to_desc "$WANT_AFTER")" ]; then
+    ok "手机第二次本地改动（勾选状态已翻转，尚未同步）"
+  else
+    bad "勾选框点了但状态没变（滚遍列表也没找到「$WANT_AFTER」）—— 没有本地 op 就不会有冲突"
+    screen_txt
+  fi
 fi
 
 # 4) 同步 → 应再次出现冲突
 $ADB shell input tap 945 2253; sleep 3
-dump; XY=$(xy_text "立即同步"); $ADB shell input tap $XY; sleep 8
-for i in $(seq 1 12); do sleep 4; dump; [ "$(has_sub "处冲突待你选择")" = "1" ] && break; done
-dump
-[ "$(has_sub "处冲突待你选择")" = "1" ] && ok "第二次检测到真冲突" || { bad "第二次没报冲突"; screen_txt; }
+ensure_phone_sync; sleep 8
+#
+# 🔴 **循环必须长到同步真的能跑完，而且必须能区分"还没跑完"和"真的没冲突"。**
+#
+#    实测（2026-09-26）：第一版只轮询 12×4=48 秒就放弃，于是打
+#    `❌ 第二次没报冲突`。但日志紧接着的屏幕内容是
+#        • 正在上传…   • 待上传 1 项
+#    —— **手机上还在上传**。这台模拟器做一次同步要 160 秒
+#    （Argon2id 纯 JS 派生 + 宿主机高负载），48 秒根本不够。
+#
+#    所以判据是**三态**，不是布尔：
+#      出现冲突        → 成功
+#      还在上传        → 继续等（不算失败）
+#      结算了但无冲突  → **这才是真的失败**
+CONFLICT_SEEN=0
+C=$(wait_conflict)
+case "$C" in
+  conflict)  CONFLICT_SEEN=1; ok "第二次检测到真冲突" ;;
+  uploading) bad "等满 360 秒手机仍在上传，无法判定是否存在冲突（环境问题，不是产品结论）"; screen_txt ;;
+  *)         bad "同步已结算但没报冲突 —— 这才是真的「未触发冲突」"; screen_txt ;;
+esac
 
 # 5) 记下解决**之前**的服务端 op 数
 OPS_BEFORE=$(server_op_count)
@@ -336,9 +444,19 @@ if [ -z "$XY" ]; then bad "点不到「逐条处理」（第二次）"; else
 fi
 
 step "8b. 断言：冲突消失，且**派发了新 op**（保留本机 = 重新派发）"
-for i in $(seq 1 15); do sleep 4; dump; [ "$(has_sub "处冲突待你选择")" = "0" ] && break; done
-dump
-[ "$(has_sub "处冲突待你选择")" = "0" ] && ok "第二次冲突已解决" || { bad "第二次冲突仍在"; screen_txt; }
+# 🔴 同步骤 8：判"冲突消失"必须**先在「我的」页上找**，不能原地找"没有这段文字"。
+#    这里原来写的是 `has_sub "处冲突待你选择" = "0"` —— 和步骤 8 一模一样的假阳性，
+#    修步骤 8 时漏了这一处。
+RESOLVE_LOCAL_OK=0
+for i in $(seq 1 15); do
+  if [ "$(conflict_pending)" = "0" ]; then RESOLVE_LOCAL_OK=1; break; fi
+  sleep 4
+done
+if [ "$RESOLVE_LOCAL_OK" = "1" ]; then
+  ok "第二次冲突已解决"
+else
+  bad "第二次冲突仍在"; screen_txt
+fi
 
 # 🔴 这是这一段**最核心**的断言。
 #    「保留本机」的语义是**重新派发一个新 op**，所以服务端 op 数必须**增加**。
@@ -352,9 +470,38 @@ else
   bad "服务端 op 数没有增加（$OPS_BEFORE → $OPS_AFTER）——「保留本机」没有重新派发"
 fi
 
-step "9b. 断言：笔记本同步后收敛到手机那一版（另一侧也走通）"
+step "9b. 断言：笔记本同步后与手机**勾选状态一致**（另一侧也走通）"
 laptop_ok sync || bad "笔记本第三次 sync 失败"
-# 笔记本上这条任务的**勾选状态**应当跟手机一致。
+
+# 🔴 这里断言的是**两端一致**，不是某个写死的方向。
+#    第 3 步是"翻转勾选"，翻转后的方向取决于之前是什么状态 ——
+#    把期望值写死成 completed 是在赌一个我没验证过的前提。
+#    真正的要求是**收敛**：两边看到同一个值。
+#    所以先读手机**当前**是哪个标签，再去比对笔记本。
+#
+# 🔴 **必须先切回「任务」页。** 上一步判"冲突消失"用的是 `conflict_pending()`，
+#    而它为了看到冲突提示会**导航到「我的」页**。留在那一页上 dump，
+#    任务行当然一条都找不到 —— 实测报
+#    `❌ 读不到手机侧勾选状态（两端的标签都没找到）`，屏幕 dump 里是
+#    `• 状态`（「我的」页的字段），而两端其实都收敛了。
+#    **在错误的屏幕上找东西，find 得再勤也没用。**
+$ADB shell input tap 135 2253 >/dev/null 2>&1   # 「任务」tab
+sleep 3
+dump
+PHONE_STATE=""
+# 🔴 **两个标题都要查。** 冲突解决后手机上留的是哪个标题，取决于 op 的落地顺序：
+#    「保留本机」重发的 op 带的是**手机那一版**的载荷，而手机在同步时**又下载了**
+#    笔记本的第二次改名。谁最终胜出依赖向量时钟，不是测试该写死的前提。
+#    实测（2026-09-26）：只查 `$LAPTOP_TITLE` 时报
+#    `❌ 读不到手机侧勾选状态（两端的标签都没找到）` —— 而两边其实都收敛了，
+#    只是手机显示的是另一个标题。**要断言的是勾选状态一致，不是标题是哪一个。**
+for _t in "$LAPTOP_TITLE" "$SECOND_TITLE"; do
+  [ -n "$PHONE_STATE" ] && break
+  [ -n "$(scroll_to_desc "取消完成：$_t")" ] && PHONE_STATE="completed"
+  [ -z "$PHONE_STATE" ] && [ -n "$(scroll_to_desc "完成：$_t")" ] && PHONE_STATE="open"
+done
+echo "     手机侧勾选状态 = ${PHONE_STATE:-（没读到）}"
+
 LT_STATE=$(laptop list --all | python3 -c "
 import json,sys
 try: d=json.load(sys.stdin)
@@ -362,13 +509,16 @@ except Exception: print(''); raise SystemExit
 t=next((t for t in d.get('tasks',[]) if t['id']=='$LAPTOP_ID'), None)
 print('completed' if (t or {}).get('completedAt') else 'open')
 ")
-echo "     笔记本侧勾选状态 = $LT_STATE"
-# 手机在第 3 步把它勾成了完成，且选了「保留本机」→ 笔记本应看到 completed。
-if [ "$LT_STATE" = "completed" ]; then
-  ok "笔记本收敛到手机那一版（completed）"
+echo "     笔记本侧勾选状态 = ${LT_STATE:-（没读到）}"
+
+if [ -z "$PHONE_STATE" ]; then
+  bad "读不到手机侧勾选状态（两端的标签都没找到）"; screen_txt
+elif [ "$PHONE_STATE" = "$LT_STATE" ]; then
+  ok "双端勾选状态一致（都是 $PHONE_STATE）——「保留本机」后另一侧也收敛了"
 else
-  bad "笔记本没收敛到手机那一版（读到 '$LT_STATE'）"
+  bad "双端勾选状态不一致（手机=$PHONE_STATE 笔记本=$LT_STATE）"
 fi
+fi  # ← 对应 7b 开头的「保留远端前置未成立则跳过」闸门
 
 step "10. 直接查 Postgres"
 psql -h 127.0.0.1 -p 5432 -U rocalight -d heyta_mobile_smoke -tAc \

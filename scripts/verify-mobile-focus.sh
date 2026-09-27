@@ -127,21 +127,40 @@ $ADB shell am start -n $PKG/.MainActivity >/dev/null 2>&1; sleep 12
 
 heyta_e2e_assert_client_budget || bad "账号 client 数已逼近向量时钟上限（后续断言不可信）"
 
+# 🔴 **服务端基线必须在"任何本地写入之前"取。**
+#
+#    原来它是在第 10 步（快要断言时）才取的，那个位置在**自动同步上线前**是对的：
+#    那时 op 只有靠脚本点「立即同步」才会出去，所以"点之前的条数"就是"这次运行
+#    之前的条数"。
+#
+#    自动同步上线后这个前提**没了**：第 8 步「放弃这一轮」一派发 op，
+#    自动同步就会在两三秒内把它传上去。等第 10 步再去取基线，
+#    取的其实是**已经含本次那条 op 的数** —— 于是 `3 → 3`，
+#    报「服务端没收到专注记录」，而**同一次运行的下一行**却打印
+#    「笔记本（真 SQLite）有了 1 条 FOCUS_SESSION op」。
+#
+#    A/B 实测（同一条脚本，只切自动同步）：
+#        关：✅ 服务端收到了专注记录（3 → 4）  → 26/26
+#        开：❌ 服务端没收到专注记录（3 → 3）  → 25/26
+#    ——判据没变、产品没坏，变的是"基线取晚了"。
+SRV_FOCUS_BASELINE=$(psql -h 127.0.0.1 -p 5432 -U rocalight -d heyta_mobile_smoke -tAc \
+  "SELECT count(*) FROM operations WHERE entity_type='FOCUS_SESSION';" 2>/dev/null | tr -d ' ')
+echo "     运行前的服务端 FOCUS_SESSION 基线 = ${SRV_FOCUS_BASELINE:-?}"
+
 step "1. 配置同步凭据"
 configure_sync_credentials
 
 step "2. 首次同步（含一次纯 JS 的 Argon2id 派生）"
 $ADB shell input tap $TAB_PROFILE $TAB_Y; sleep 2
-dump
-XY=$(xy_text "立即同步")
-if [ -z "$XY" ]; then bad "找不到「立即同步」"; else
-  $ADB shell input tap $XY; sleep 5
-  echo "     首次同步含密钥派生，等待中…（最长等 900 秒）"
-  if ELAPSED=$(wait_synced 180); then
-    ok "首次同步成功（耗时约 ${ELAPSED} 秒）"
-  else
-    bad "首次同步没成功（已等 900 秒）"
-  fi
+# 🔴 `ensure_phone_sync`：自动同步抢跑时按钮是「正在同步…」，
+#    旧写法的 `[ -z "$XY" ] → bad` 会在那一刻报**假红**。
+ensure_phone_sync
+sleep 5
+echo "     首次同步含密钥派生，等待中…（最长等 900 秒）"
+if ELAPSED=$(wait_synced 180); then
+  ok "首次同步成功（耗时约 ${ELAPSED} 秒）"
+else
+  bad "首次同步没成功（已等 900 秒）"
 fi
 
 step "3. 建一个待办任务（专注要关联它）"
@@ -324,13 +343,13 @@ else
 fi
 
 step "10. 跨设备：服务端收到 + 笔记本物化"
-# 先把同步前的基线记下来 —— 只查绝对条数会被上一次运行的残留骗过
-SRV_BEFORE=$(psql -h 127.0.0.1 -p 5432 -U rocalight -d heyta_mobile_smoke -tAc \
-  "SELECT count(*) FROM operations WHERE entity_type='FOCUS_SESSION';" 2>/dev/null | tr -d ' ')
+# 基线在**第 0 步之后、任何写入之前**就取好了（见那里的注释）。
 $ADB shell input tap $TAB_PROFILE $TAB_Y; sleep 3
-dump
-XY=$(xy_text "立即同步")
-[ -n "$XY" ] && { $ADB shell input tap $XY; sleep 3; }
+# 🔴 旧写法 `[ -n "$XY" ] && { tap; }` 是**静默空操作**：
+#    找不到按钮就什么都不点，然后照样往下断言 ——
+#    "点了一下"和"什么都没点"在报告里完全一样。
+ensure_phone_sync
+sleep 3
 if ELAPSED=$(wait_synced 60); then
   ok "手机第二次同步成功（约 ${ELAPSED} 秒）"
 else
@@ -338,10 +357,10 @@ else
 fi
 SRV_AFTER=$(psql -h 127.0.0.1 -p 5432 -U rocalight -d heyta_mobile_smoke -tAc \
   "SELECT count(*) FROM operations WHERE entity_type='FOCUS_SESSION';" 2>/dev/null | tr -d ' ')
-if [ "${SRV_AFTER:-0}" -gt "${SRV_BEFORE:-0}" ]; then
-  ok "服务端收到了专注记录（$SRV_BEFORE → $SRV_AFTER）"
+if [ "${SRV_AFTER:-0}" -gt "${SRV_FOCUS_BASELINE:-0}" ]; then
+  ok "服务端收到了专注记录（$SRV_FOCUS_BASELINE → $SRV_AFTER，本次运行确实新增了）"
 else
-  bad "服务端没收到专注记录（$SRV_BEFORE → ${SRV_AFTER:-?}）—— 手机上看着像保存成功了"
+  bad "服务端没收到专注记录（$SRV_FOCUS_BASELINE → ${SRV_AFTER:-?}）—— 手机上看着像保存成功了"
 fi
 
 # 真·另一台设备：真 SQLite 文件，库每轮清空，所以"有"就一定是这条同步过来的
