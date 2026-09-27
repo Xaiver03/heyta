@@ -10,25 +10,51 @@ import {
   type Preference,
   type PreferenceSet,
 } from '../src/preferences.js';
+import {
+  preferenceEvidenceText,
+  type PreferenceEvidence,
+} from '../src/preference-evidence.js';
 
-/** 造一条偏好（字段齐全）。 */
-function pref<T>(id: Preference<T>['id'], value: T, evidence = 'e'): Preference<T> {
-  return { id, value, sampleSize: 30, confidence: 0.9, evidence };
+/**
+ * 造一条偏好（字段齐全）。
+ *
+ * ⚠️ 第 14 轮起 `evidenceFacts` 是**必需**字段：壳按它取词条，
+ * 不再渲染 `evidence`（那是领域层拼好的中文）。
+ * 这里传入真实事实，`evidence` 由投影派生 —— 手写一句的话，
+ * 这个 fixture 的形状和真货就不一样了。
+ */
+function pref<T>(id: Preference<T>['id'], value: T, facts: PreferenceEvidence): Preference<T> {
+  return {
+    id,
+    value,
+    sampleSize: 30,
+    confidence: 0.9,
+    evidenceFacts: facts,
+    evidence: preferenceEvidenceText(facts),
+  };
 }
 
 /** 全部偏好都有的开关打开状态。 */
 function full(): PreferenceSet {
   return {
     memoryEnabled: true,
-    estimateBias: pref('estimate-bias', 1.8, '基于 30 次专注，你倾向低估'),
-    deepWorkWindow: pref('deep-work-window', {
-      startHour: 8,
-      endHour: 11,
-      concentration: 0.8,
+    estimateBias: pref('estimate-bias', 1.8, {
+      kind: 'estimate-bias',
+      multiplier: 1.8,
+      samples: 30,
     }),
-    leadTime: pref('lead-time', 3),
-    granularity: pref('granularity', 6),
-    titleStyle: pref('title-style', { cjkShare: 1, medianTitleLength: 12, emojiShare: 0 }),
+    deepWorkWindow: pref(
+      'deep-work-window',
+      { startHour: 8, endHour: 11, concentration: 0.8 },
+      { kind: 'deep-work-window', startHour: 8, endHour: 11, concentration: 0.8, samples: 30 },
+    ),
+    leadTime: pref('lead-time', 3, { kind: 'lead-time', days: 3, samples: 30 }),
+    granularity: pref('granularity', 6, { kind: 'granularity', items: 6, samples: 30 }),
+    titleStyle: pref(
+      'title-style',
+      { cjkShare: 1, medianTitleLength: 12, emojiShare: 0 },
+      { kind: 'title-style', cjkShare: 1, medianTitleLength: 12, emojiShare: 0, samples: 30 },
+    ),
     withheld: [],
   };
 }
@@ -106,18 +132,18 @@ describe('偏好提示：措辞', () => {
     renderPreferenceHints(set, r).find((h) => h.id === id)?.text;
 
   it('低估用「放大」，高估用「收紧」，接近 1 说「很准」', () => {
-    const low = { ...full(), estimateBias: pref('estimate-bias', 1.8) };
-    const high = { ...full(), estimateBias: pref('estimate-bias', 0.6) };
-    const exact = { ...full(), estimateBias: pref('estimate-bias', 1.0) };
+    const low = { ...full(), estimateBias: pref('estimate-bias', 1.8, { kind: 'estimate-bias', multiplier: 1.8, samples: 30 }) };
+    const high = { ...full(), estimateBias: pref('estimate-bias', 0.6, { kind: 'estimate-bias', multiplier: 0.6, samples: 30 }) };
+    const exact = { ...full(), estimateBias: pref('estimate-bias', 1.0, { kind: 'estimate-bias', multiplier: 1, samples: 30 }) };
     expect(textOf(low, 'breakdown', 'estimate-bias')).toContain('放大');
     expect(textOf(high, 'breakdown', 'estimate-bias')).toContain('收紧');
     expect(textOf(exact, 'breakdown', 'estimate-bias')).toContain('很准');
   });
 
   it('提前量：提前 / 逾期 / 踩点 三种措辞分开', () => {
-    const early = { ...full(), leadTime: pref('lead-time', 3) };
-    const late = { ...full(), leadTime: pref('lead-time', -2) };
-    const onTime = { ...full(), leadTime: pref('lead-time', 0) };
+    const early = { ...full(), leadTime: pref('lead-time', 3, { kind: 'lead-time', days: 3, samples: 30 }) };
+    const late = { ...full(), leadTime: pref('lead-time', -2, { kind: 'lead-time', days: -2, samples: 30 }) };
+    const onTime = { ...full(), leadTime: pref('lead-time', 0, { kind: 'lead-time', days: 0, samples: 30 }) };
     expect(textOf(early, 'prioritize', 'lead-time')).toContain('提前 3 天');
     expect(textOf(late, 'prioritize', 'lead-time')).toContain('逾期');
     expect(textOf(onTime, 'prioritize', 'lead-time')).toContain('截止当天');
@@ -129,9 +155,27 @@ describe('偏好提示：措辞', () => {
   });
 
   it('风格：中文 / 英文 / 混用分别措辞，emoji 只在明显时提', () => {
-    const cn = { ...full(), titleStyle: pref('title-style', { cjkShare: 1, medianTitleLength: 12, emojiShare: 0 }) };
-    const en = { ...full(), titleStyle: pref('title-style', { cjkShare: 0, medianTitleLength: 8, emojiShare: 0 }) };
-    const mix = { ...full(), titleStyle: pref('title-style', { cjkShare: 0.5, medianTitleLength: 10, emojiShare: 0.5 }) };
+    const cn = { ...full(), titleStyle: pref(
+      'title-style',
+      { cjkShare: 1, medianTitleLength: 12, emojiShare: 0 },
+      { kind: 'title-style', cjkShare: 1, medianTitleLength: 12, emojiShare: 0, samples: 30 },
+    ) };
+    const en = { ...full(), titleStyle: pref(
+      'title-style',
+      { cjkShare: 0, medianTitleLength: 8, emojiShare: 0 },
+      { kind: 'title-style', cjkShare: 0, medianTitleLength: 8, emojiShare: 0, samples: 30 },
+    ) };
+    const mix = { ...full(), titleStyle: pref(
+      'title-style',
+      { cjkShare: 0.5, medianTitleLength: 10, emojiShare: 0.5 },
+      {
+        kind: 'title-style',
+        cjkShare: 0.5,
+        medianTitleLength: 10,
+        emojiShare: 0.5,
+        samples: 30,
+      },
+    ) };
     expect(textOf(cn, 'capture', 'title-style')).toContain('中文');
     expect(textOf(en, 'capture', 'title-style')).toContain('英文');
     expect(textOf(mix, 'capture', 'title-style')).toContain('中英混用');

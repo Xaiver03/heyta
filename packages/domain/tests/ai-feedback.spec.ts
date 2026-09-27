@@ -98,17 +98,21 @@ describe('反馈层 P6：你采纳的拆解通常几项', () => {
     expect(inferGranularityFromFeedback({ ...ON, feedback: rows }).withheld?.reason).toBe('no-data');
   });
 
-  it('完全没有反馈 → no-data，且文案说明还缺什么', () => {
+  it('完全没有反馈 → no-data（句子由外壳按这条原因取词条）', () => {
     const { withheld } = inferGranularityFromFeedback({ ...ON, feedback: [] });
-    expect(withheld?.reason).toBe('no-data');
-    expect(withheld?.detail).toContain('采纳');
+    // 🔴 第 15 轮起 `WithheldPreference` 里**没有句子**了：`detail: string`（中文）
+    // 只有 `MemoryPanel` 一个消费者，是纯界面文案，已搬到词条表
+    //（`web.memory.withheld.*`）。这里钉的是**原因本身**。
+    expect(withheld).toMatchObject({ reason: 'no-data' });
   });
 
   it('样本不够 → not-enough-samples，并如实说明还差几次', () => {
     const rows = repeat(3, () => row({ appliedCount: 4, outcome: 'modified' }));
     const { withheld } = inferGranularityFromFeedback({ ...ON, feedback: rows });
     expect(withheld?.reason).toBe('not-enough-samples');
-    expect(withheld?.detail).toContain('5');
+    // 数字现在是**结构化字段**，所以断言可以精确（以前只能 `toContain('5')`，
+    // 而"还需要 5 次"和"还需要 15 次"都能让它变绿）。
+    expect(withheld).toMatchObject({ reason: 'not-enough-samples', remaining: 5 });
   });
 
   it('项数忽多忽少 → not-stable-enough（不硬给一个中位数）', () => {

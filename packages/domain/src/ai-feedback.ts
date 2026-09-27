@@ -37,6 +37,7 @@
  */
 
 import type { AiFeedbackOutcome } from './entities.js';
+import { preferenceEvidenceText, type PreferenceEvidence } from './preference-evidence.js';
 import {
   MIN_SAMPLE_SIZE,
   MIN_CONFIDENCE,
@@ -122,7 +123,7 @@ export function inferGranularityFromFeedback(
   if (counts.length === 0) {
     return {
       preference: null,
-      withheld: { id, reason: 'no-data', detail: '还没有采纳过 AI 的拆解建议' },
+      withheld: { id, reason: 'no-data' },
     };
   }
   if (counts.length < MIN_SAMPLE_SIZE) {
@@ -131,7 +132,7 @@ export function inferGranularityFromFeedback(
       withheld: {
         id,
         reason: 'not-enough-samples',
-        detail: `还需要 ${MIN_SAMPLE_SIZE - counts.length} 次采纳`,
+        remaining: MIN_SAMPLE_SIZE - counts.length,
       },
     };
   }
@@ -151,10 +152,15 @@ export function inferGranularityFromFeedback(
       withheld: {
         id,
         reason: 'not-stable-enough',
-        detail: '你采纳的拆解项数差异很大，暂时看不出固定喜好',
       },
     };
   }
+
+  const evidenceFacts: PreferenceEvidence = {
+    kind: 'feedback-granularity',
+    items: value,
+    adopted: counts.length,
+  };
 
   return {
     preference: {
@@ -162,7 +168,8 @@ export function inferGranularityFromFeedback(
       value,
       sampleSize: counts.length,
       confidence,
-      evidence: `基于你采纳的 ${counts.length} 次拆解，通常是 ${value} 项`,
+      evidenceFacts,
+      evidence: preferenceEvidenceText(evidenceFacts),
     },
     withheld: null,
   };
@@ -196,7 +203,7 @@ export function inferKeepRatio(
   if (ratios.length === 0) {
     return {
       preference: null,
-      withheld: { id, reason: 'no-data', detail: '还没有可以对比的拆解建议' },
+      withheld: { id, reason: 'no-data' },
     };
   }
   if (ratios.length < MIN_SAMPLE_SIZE) {
@@ -205,7 +212,7 @@ export function inferKeepRatio(
       withheld: {
         id,
         reason: 'not-enough-samples',
-        detail: `还需要 ${MIN_SAMPLE_SIZE - ratios.length} 次采纳`,
+        remaining: MIN_SAMPLE_SIZE - ratios.length,
       },
     };
   }
@@ -224,21 +231,25 @@ export function inferKeepRatio(
       withheld: {
         id,
         reason: 'not-stable-enough',
-        detail: '你保留建议的比例波动太大，暂时看不出固定习惯',
       },
     };
   }
 
-  const pct = Math.round(value * 100);
-  const evidence =
-    value >= 0.9
-      ? `基于 ${ratios.length} 次采纳，你几乎总是全部保留 AI 的拆解`
-      : value <= 0.3
-        ? `基于 ${ratios.length} 次采纳，你通常只留下 ${pct}% —— AI 给得太多了`
-        : `基于 ${ratios.length} 次采纳，你通常留下约 ${pct}% 的拆解项`;
+  const evidenceFacts: PreferenceEvidence = {
+    kind: 'feedback-keep-ratio',
+    ratio: value,
+    adopted: ratios.length,
+  };
 
   return {
-    preference: { id, value, sampleSize: ratios.length, confidence, evidence },
+    preference: {
+      id,
+      value,
+      sampleSize: ratios.length,
+      confidence,
+      evidenceFacts,
+      evidence: preferenceEvidenceText(evidenceFacts),
+    },
     withheld: null,
   };
 }
