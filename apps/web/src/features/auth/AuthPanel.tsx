@@ -21,20 +21,23 @@
  * 反过来，服务端为防邮箱枚举会把"已发送"回成中性文案，
  * 所以这里也**不许**把它渲染成"登录成功"。
  *
- * ## 通行密钥（未接）
+ * ## 通行密钥（已接）
  *
- * `@heyta/app-host` 已经提供了通行密钥的协议两半（取 options / 交 credential），
- * 中间那一步平台调用（`navigator.credentials`）**刻意留在宿主里**。
- * 本面板目前只走登录链接这条路 —— 它是零额外平台代码、且在浏览器与原生端
- * 行为一致的那条。通行密钥的浏览器接线**尚未做**（见交付报告）。
+ * `@heyta/app-host` 提供通行密钥的协议两半（取 options / 交 credential），
+ * 中间那一步平台调用（`navigator.credentials`）**刻意留在宿主里** —— 对本壳就是
+ * `./passkey-browser.ts`。本面板只负责**触发**它，并把结构化状态渲染成句子。
+ *
+ * ⚠️ 设备不支持时按钮**不禁用**，而是在下面明说"这个浏览器或设备不支持"：
+ * 禁用按钮却不说为什么，用户只会以为界面坏了。
  */
 
 import { useState } from 'react';
 import { cssVar } from '@heyta/design-system';
 import { useI18n, type MessageKey } from '@heyta/i18n';
 import type { HostedAuthFailureReason, HostedAuthSession } from '@heyta/app-host';
-import { AlertTriangle, CheckCircle2, Loader2, Mail, UserPlus, X } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, KeyRound, Loader2, Mail, UserPlus, X } from 'lucide-react';
 
+import { detectPasskeyBrowser } from './passkey-browser.js';
 import { useAuthStore } from './store.js';
 
 export interface AuthPanelProps {
@@ -71,6 +74,12 @@ function authFailureKey(reason: HostedAuthFailureReason): MessageKey {
       return 'web.auth.error.network';
     case 'server-error':
       return 'web.auth.error.server';
+    case 'passkey-unsupported':
+      return 'web.auth.error.passkeyUnsupported';
+    case 'passkey-cancelled':
+      return 'web.auth.error.passkeyCancelled';
+    case 'passkey-already-registered':
+      return 'web.auth.error.passkeyAlreadyRegistered';
     default:
       return 'web.auth.error.unknown';
   }
@@ -81,14 +90,23 @@ export function AuthPanel({ baseUrl, onClose, onSignedIn }: AuthPanelProps): Rea
   const status = useAuthStore((s) => s.status);
   const sendLoginLink = useAuthStore((s) => s.sendLoginLink);
   const registerAccount = useAuthStore((s) => s.registerAccount);
+  const registerPasskey = useAuthStore((s) => s.registerPasskey);
+  const loginWithPasskey = useAuthStore((s) => s.loginWithPasskey);
   const verify = useAuthStore((s) => s.verify);
 
   const [email, setEmail] = useState('');
   const [pasted, setPasted] = useState('');
   const [termsAccepted, setTermsAccepted] = useState(false);
 
+  // 每次渲染都重新探测。缓存成模块级常量会把**第一次**的结果永久钉住，
+  // 而它在 jsdom 与真实浏览器里不同，用户中途接上安全密钥时也会变。
+  const passkeySupported = detectPasskeyBrowser() !== undefined;
+
   const busy = status.kind === 'busy';
   const signingIn = status.kind === 'signed-in';
+  const waitingForPasskey =
+    status.kind === 'busy' &&
+    (status.action === 'passkey-register' || status.action === 'passkey-login');
 
   return (
     <div
@@ -252,6 +270,71 @@ export function AuthPanel({ baseUrl, onClose, onSignedIn }: AuthPanelProps): Rea
             {t('web.auth.register')}
           </button>
         </div>
+
+        {/*
+          通行密钥。与上面两个按钮是**并列的两条路**，不是同一条的快捷方式：
+          这里多了一步系统弹窗。
+        */}
+        <div style={{ display: 'flex', gap: cssVar('space.2'), flexWrap: 'wrap' }}>
+          <button
+            type="button"
+            className="ht-btn ht-btn--ghost"
+            disabled={busy}
+            onClick={() => {
+              void registerPasskey(baseUrl, email, termsAccepted);
+            }}
+          >
+            {status.kind === 'busy' && status.action === 'passkey-register' ? (
+              <Loader2 size={14} aria-hidden="true" className="ht-spin" />
+            ) : (
+              <KeyRound size={14} aria-hidden="true" />
+            )}
+            {t('web.auth.passkey.register')}
+          </button>
+          <button
+            type="button"
+            className="ht-btn ht-btn--ghost"
+            disabled={busy}
+            onClick={() => {
+              void loginWithPasskey(baseUrl, email).then((session) => {
+                if (session !== undefined) onSignedIn?.(session);
+              });
+            }}
+          >
+            {status.kind === 'busy' && status.action === 'passkey-login' ? (
+              <Loader2 size={14} aria-hidden="true" className="ht-spin" />
+            ) : (
+              <KeyRound size={14} aria-hidden="true" />
+            )}
+            {t('web.auth.passkey.login')}
+          </button>
+        </div>
+
+        {/* 不支持时**不禁用按钮、而是说明原因** —— 禁用了却不说，用户只会以为界面坏了。 */}
+        {!passkeySupported ? (
+          <span
+            style={{
+              fontSize: cssVar('font-size.2xs'),
+              color: cssVar('color.foreground-muted'),
+            }}
+          >
+            {t('web.auth.passkey.unavailable')}
+          </span>
+        ) : null}
+
+        {/* 系统弹窗期间必须说"去看弹窗"，否则用户会以为卡住了。 */}
+        {waitingForPasskey ? (
+          <span
+            role="status"
+            aria-live="polite"
+            style={{
+              fontSize: cssVar('font-size.2xs'),
+              color: cssVar('color.foreground-muted'),
+            }}
+          >
+            {t('web.auth.passkey.waiting')}
+          </span>
+        ) : null}
 
         <label style={labelStyle}>
           {t('web.auth.paste.label')}

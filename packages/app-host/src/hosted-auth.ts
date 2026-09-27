@@ -114,7 +114,31 @@ export type HostedAuthFailureReason =
   /** 5xx。 */
   | 'server-error'
   /** 2xx 但响应体不是预期的 JSON 形状。**绝不当成功**。 */
-  | 'malformed-response';
+  | 'malformed-response'
+  /**
+   * 这台设备/浏览器没有通行密钥能力（`navigator.credentials` 或
+   * `PublicKeyCredential` 不存在），请求**一个都没发**。
+   *
+   * 🔴 与"用户拒绝"是**两句不同的话**：这个在这个设备上再试多少次都一样，
+   * 用户该换设备或改用登录链接；而拒绝重试一次就行。
+   */
+  | 'passkey-unsupported'
+  /**
+   * 用户在系统弹窗里取消 / 超时 / 设备上没有可选凭据。
+   *
+   * 🔴 刻意**不复用** `not-allowed`：后者的契约是"服务端 403，该实例不允许
+   * 这个邮箱注册"。拿它当"用户取消"，会让真正的 403 在界面上显示成
+   * "你取消了通行密钥" —— 一句把服务端策略说成用户行为的假话。
+   */
+  | 'passkey-cancelled'
+  /**
+   * 这台设备上**已经有**这个账号的通行密钥了（WebAuthn 的 `InvalidStateError`，
+   * 由服务端下发的 `excludeCredentials` 命中触发）。
+   *
+   * 🔴 同样不复用 `passkey-cancelled`：用户**什么都没取消**，
+   * 该做的是改用"用通行密钥登录"，而不是"再试一次" —— 再试一次会永远同样失败。
+   */
+  | 'passkey-already-registered';
 
 export interface HostedAuthFailure {
   ok: false;

@@ -406,6 +406,10 @@ export const zhCN = {
   'web.auth.email.placeholder': '你的邮箱地址',
   'web.auth.sendLoginLink': '发送登录链接',
   'web.auth.register': '注册新账号',
+  'web.auth.passkey.register': '用通行密钥注册',
+  'web.auth.passkey.login': '用通行密钥登录',
+  'web.auth.passkey.unavailable': '这个浏览器或设备不支持通行密钥，用上面的邮箱方式即可。',
+  'web.auth.passkey.waiting': '请在系统弹窗里完成通行密钥操作…',
   'web.auth.terms.label': '我同意该服务端提供的服务条款与隐私政策',
   'web.auth.paste.label': '或者粘贴登录链接 / 令牌',
   'web.auth.paste.placeholder': '粘贴邮件里的链接，或那串令牌本身',
@@ -422,6 +426,9 @@ export const zhCN = {
   'web.auth.error.network': '连不上服务端，检查地址与网络后重试。',
   'web.auth.error.server': '服务端暂时不可用，请稍后重试。',
   'web.auth.error.unknown': '登录没有完成，请重试。',
+  'web.auth.error.passkeyUnsupported': '这个浏览器或设备不支持通行密钥，改用邮箱登录链接即可。',
+  'web.auth.error.passkeyCancelled': '通行密钥操作被取消或超时了，可以重试。',
+  'web.auth.error.passkeyAlreadyRegistered': '这台设备上已经有这个账号的通行密钥了，改用「用通行密钥登录」。',
   // ── Web · 冲突解决界面 ────────────────────────────────────
   // 载荷摘要：`text` 是用户自己的字（不翻译），`fields` 只报数量 ——
   // 字段名（completedAt 那种）是内部标识符，不能出现在用户可见文案里。
