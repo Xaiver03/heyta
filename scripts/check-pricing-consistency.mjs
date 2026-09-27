@@ -301,6 +301,62 @@ if (extraIds.length > 0) {
   );
 }
 
+// ── 2b. 交付什么：SKU → 能力（`SKU_GRANTS`）────────────────────────────
+/**
+ * 🔴 价格表说某个 SKU 授予什么，而**真正被交付**的是代码里的 `SKU_GRANTS`
+ * —— `verifyWebhook` 由金额查到 priceId 之后，查的就是它，然后写进
+ * `subscriptions.grants`。
+ *
+ * 两者不一致时的后果是最坏的一种：用户付 ¥12 只拿到 hosting，而**其它每一道
+ * 门禁都是绿的** —— "价格对得上、文案对得上、词条对得上、法务对得上"全都成立，
+ * 因为它们校验的都是**收多少钱**，而这件事校验的是**交付什么**。
+ */
+const grantsBody = must(
+  priceBookText,
+  /SKU_GRANTS[^=]*=\s*\{([\s\S]*?)\n\};/,
+  `${PRICE_BOOK} 的 \`SKU_GRANTS\``,
+);
+const codeGrants = new Map(
+  [...grantsBody.matchAll(/'([^']+)':\s*\[([^\]]*)\]/g)].map((m) => [
+    m[1],
+    [...m[2].matchAll(/'([^']+)'/g)].map((g) => g[1]),
+  ]),
+);
+if (codeGrants.size === 0) {
+  problems.push(
+    `${PRICE_BOOK} 的 \`SKU_GRANTS\` 一项都解析不出来 —— 锚点失效，不是"没有能力"。`,
+  );
+}
+for (const sku of ssot.skus) {
+  const code = codeGrants.get(sku.priceId);
+  if (code === undefined) {
+    problems.push(
+      `🔴 价格表批准了 ${sku.priceId}，而 ${PRICE_BOOK} 的 \`SKU_GRANTS\` 里没有它。\n` +
+        '     后果：这笔付款会被判成"推不出档位"（fail-closed），用户付了钱拿不到权益。',
+    );
+    continue;
+  }
+  const expected = [...(sku.grants ?? [])].sort();
+  const actual = [...code].sort();
+  if (expected.join('+') !== actual.join('+')) {
+    problems.push(
+      `🔴 ${sku.priceId} 授予的能力与价格表不一致：\n` +
+        `     ${PRICE_BOOK} 的 \`SKU_GRANTS\` 是 [${actual.join(', ')}]\n` +
+        `     ${PRICING_DOC} 是 [${expected.join(', ')}]\n` +
+        '     后果：用户按价格表付钱、却拿到另一组能力 —— 而"价格 / 文案 / 词条"三道门禁全是绿的。',
+    );
+  }
+}
+/** 反向同 §2：代码里不许有价格表没批准的 SKU。 */
+for (const id of codeGrants.keys()) {
+  if (!approvedIds.has(id)) {
+    problems.push(
+      `🔴 ${PRICE_BOOK} 的 \`SKU_GRANTS\` 里有价格表没批准的 SKU：${id}。` +
+        '它会真实地交付权益，但没有任何对外文案提过它。',
+    );
+  }
+}
+
 // ── 3. 对外怎么说：中英词条表 ────────────────────────────────────────────
 /**
  * 词条槽位由**价格表**推导，不在这里再手写一遍路径 ——

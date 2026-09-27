@@ -170,6 +170,29 @@ model Subscription {
   /// `UNIQUE` 允许多个 `NULL`，所以可空唯一约束不会互相冲突。
   externalSubscriptionId String? @unique @map("external_subscription_id")
 
+  /// 🔴 **买的是哪一档** —— SKU id（`hosted-monthly` / `hosted-ai-monthly`）。
+  ///
+  /// 存在的理由：在此之前 `Subscription` 只有"有没有一条活跃订阅"这一维，
+  /// 于是 ¥5 与 ¥12 **落成同一行、完全无法区分** —— 用户付 ¥12 拿到的
+  /// 和 ¥5 一模一样，且没有任何代码能发现自己发错了货。
+  ///
+  /// 可空是刻意的（AGENTS.md §3.3）：手工授予、以及本列出现之前的老行没有它。
+  /// `null` 不等于"没买过"，只等于"不知道该档位"—— 判定走 `grants`，不走本列。
+  priceId String? @map("price_id")
+
+  /// 🔴 **这一行实际授予的能力**（`hosting` / `ai`），是 `priceId` 对应档位的
+  /// 能力投影（`docs/reference/pricing-and-entitlements.md` 的 `pricing-ssot` 块）。
+  ///
+  /// 为什么把派生值**存下来**，而不是每次去问价目表：
+  /// 1. 运营改价目表不该**追溯**改变已经付过钱的用户拿到什么 —— 付了 ¥5 的人
+  ///    不会因为明天 `hosted-monthly` 多送一项能力就凭空得到它（反之，也不会
+  ///    因为某档位被砍而当场失去已付费的能力）；
+  /// 2. 判定要能在**没有计价层**的进程里做（同步闸门只读这一行）。
+  ///
+  /// 空数组 = **没有任何能力**。它不是"全部"、也不是"未知"：未知必须是
+  /// `null` 那一维的事，而这里能拿到的只有确切的集合。fail-closed。
+  grants String[] @default([])
+
   /// `active` / `past_due` / `canceled` / `expired` 之类。可空，未知即视为无权益。
   status String?
 

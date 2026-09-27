@@ -648,7 +648,11 @@ describe('wechat adapter — verifyWebhook 的成功路径与归一化', () => {
     expect(result.event.status).toBeNull();
     expect(result.event.currentPeriodEnd).toBeNull();
     expect(result.event.userId).toBe(42);
-    expect(result.event.oneTimeGrant).toEqual({ periodDays: 30 });
+    expect(result.event.oneTimeGrant).toEqual({
+      periodDays: 30,
+      priceId: 'hosted-monthly',
+      grants: ['hosting'],
+    });
     expect(result.event.occurredAt).toBe(Date.parse('2026-09-26T04:00:00Z'));
   });
 
@@ -743,17 +747,38 @@ describe('wechat adapter — 🔴 金额校验（付的钱必须落在价目表�
       ...opts,
     });
 
-  it('付对金额（500 = ¥5）→ 授予 30 天', async () => {
+  it('付对金额（500 = ¥5）→ 授予 30 天，且带上**档位与能力**', async () => {
     const f = fixtureWithAmount(500);
     const r = await adapter.verifyWebhook(f.body, f.headers);
 
     expect(r.ok).toBe(true);
     if (!r.ok) return;
     expect(r.event.eventType).toBe('payment_succeeded');
-    expect(r.event.oneTimeGrant).toEqual({ periodDays: 30 });
+    // 🔴 不只是"30 天"：还要说清买的是**哪一档**、授予**哪几项能力**。
+    // 只带天数的话 ¥5 与 ¥12 会落成同一行订阅 —— 付 ¥12 拿到 ¥5 的东西。
+    expect(r.event.oneTimeGrant).toEqual({
+      periodDays: 30,
+      priceId: 'hosted-monthly',
+      grants: ['hosting'],
+    });
   });
 
-  it('🔴 只付 ¥1 → **不授予任何权益**，并落成金额不符事件', async () => {
+  it('🔴 付 ¥12（1200）→ 授予的是 hosted-ai-monthly，能力含 `ai`', async () => {
+    const f = fixtureWithAmount(1_200);
+    const r = await adapter.verifyWebhook(f.body, f.headers);
+
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.event.eventType).toBe('payment_succeeded');
+    // 这一条就是"两档真的可分"的证据：同样的 30 天，能力集合不同。
+    expect(r.event.oneTimeGrant).toEqual({
+      periodDays: 30,
+      priceId: 'hosted-ai-monthly',
+      grants: ['hosting', 'ai'],
+    });
+  });
+
+  it('🔴 只付 ¥1 → **不授予任何权益**，并标成"待订单结算"（不是"无事发生"）', async () => {
     const f = fixtureWithAmount(1);
     const r = await adapter.verifyWebhook(f.body, f.headers);
 
@@ -763,9 +788,14 @@ describe('wechat adapter — 🔴 金额校验（付的钱必须落在价目表�
     expect(r.event.oneTimeGrant).toBeNull();
     // 但要留下可查的痕迹，而不是悄悄当成正常支付。
     expect(r.event.eventType).toBe('payment_amount_mismatch');
+    // 🔴 关键：**观察到了钱、却落不到档位**。这正是"有券的单会被静默拒付"
+    // 那个洞的形状（¥12 档用券 → 实付落不到任何档位原价）。以前它与退款 /
+    // 对账通知拿到同一个原因 `NO_SUBSCRIPTION_REFERENCE` —— 对一笔真实到账的
+    // 支付是假话。现在它被显式标成"需要权威结算"。
+    expect(r.event.requiresOrderSettlement).toBe(true);
   });
 
-  it('金额字段缺失 → 同样不授予（不因为"没写"就放行）', async () => {
+  it('金额字段缺失 → 不授予，但**不算**"待结算"（没有钱，就不该伪装成一笔待结算的支付）', async () => {
     const f = fixtureWithAmount(undefined, { omitAmount: true });
     const r = await adapter.verifyWebhook(f.body, f.headers);
 
@@ -773,6 +803,7 @@ describe('wechat adapter — 🔴 金额校验（付的钱必须落在价目表�
     if (!r.ok) return;
     expect(r.event.oneTimeGrant).toBeNull();
     expect(r.event.eventType).toBe('payment_amount_mismatch');
+    expect(r.event.requiresOrderSettlement).toBe(false);
   });
 
   it('金额为 0 → 不授予', async () => {
@@ -802,7 +833,14 @@ describe('wechat adapter — 🔴 金额校验（付的钱必须落在价目表�
     const ok = fixtureWithAmount(1_500);
     const r1 = await custom.verifyWebhook(ok.body, ok.headers);
     expect(r1.ok).toBe(true);
-    if (r1.ok) expect(r1.event.oneTimeGrant).toEqual({ periodDays: 30 });
+    if (r1.ok) {
+      // 档位还是 `hosted-monthly`（改价改的是金额，**不改档位**），能力也照旧。
+      expect(r1.event.oneTimeGrant).toEqual({
+        periodDays: 30,
+        priceId: 'hosted-monthly',
+        grants: ['hosting'],
+      });
+    }
 
     // 默认的 500 在自定义价目表下**不再**被接受 —— 证明校验读的是
     // 实际生效的价目表，而不是写死的 500。

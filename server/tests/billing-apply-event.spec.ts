@@ -86,7 +86,7 @@ const wechatEvent = (
   status: null,
   currentPeriodEnd: null,
   userId: 42,
-  oneTimeGrant: { periodDays: 365 },
+  oneTimeGrant: { periodDays: 365, priceId: 'hosted-ai-monthly', grants: ['hosting', 'ai'] },
   ...overrides,
 });
 
@@ -205,10 +205,77 @@ describe('applyPaymentEvent — 一次性支付授予路径', () => {
     expect(rows.size).toBe(0);
   });
 
+  it('🔴 有券的支付（金额落不到档位）→ REQUIRES_ORDER_SETTLEMENT，**不是** NO_SUBSCRIPTION_REFERENCE', async () => {
+    // 这正是 §7 第 9 条那个洞：adapter 观察到钱、却推不出档位（¥12 档用券后
+    // 实付落不到任何档位原价）。以前它与"退款 / 对账通知"共用一个原因 ——
+    // 对一笔真实到账的支付是**假话**，运维在日志里看不到"有一笔钱没交付权益"。
+    const { deps, created, rows } = makeDeps();
+    const outcome = await applyPaymentEvent(
+      wechatEvent({ oneTimeGrant: null, requiresOrderSettlement: true }),
+      deps,
+    );
+
+    expect(outcome).toEqual({ status: 'ignored', reason: 'REQUIRES_ORDER_SETTLEMENT' });
+    // 仍然 fail-closed：金额推不出档位，所以在这里**不发**权益。
+    expect(created).toHaveLength(0);
+    expect(rows.size).toBe(0);
+  });
+
+  it('🔴 两个原因**必须可区分**：有无"钱"是两种不同的事', async () => {
+    const noGrant = makeDeps();
+    const a = await applyPaymentEvent(wechatEvent({ oneTimeGrant: null }), noGrant.deps);
+    const needSettle = makeDeps();
+    const b = await applyPaymentEvent(
+      wechatEvent({ oneTimeGrant: null, requiresOrderSettlement: true }),
+      needSettle.deps,
+    );
+
+    // 打平成字符串比较，确保它们不相等 —— 这正是"静默"与"响亮"的分界。
+    expect(JSON.stringify(a)).not.toBe(JSON.stringify(b));
+    expect(a).toEqual({ status: 'ignored', reason: 'NO_SUBSCRIPTION_REFERENCE' });
+    expect(b).toEqual({ status: 'ignored', reason: 'REQUIRES_ORDER_SETTLEMENT' });
+  });
+
   it('自定义 periodDays 生效', async () => {
     const { deps, created } = makeDeps();
-    await applyPaymentEvent(wechatEvent({ oneTimeGrant: { periodDays: 30 } }), deps);
+    await applyPaymentEvent(
+      wechatEvent({
+        oneTimeGrant: { periodDays: 30, priceId: 'hosted-monthly', grants: ['hosting'] },
+      }),
+      deps,
+    );
     expect(created[0].currentPeriodEnd).toBe(NOW + 30 * DAY);
+  });
+
+  it('🔴 档位与能力**必须落到订阅行**：¥12 买到的是 hosted-ai-monthly + ai', async () => {
+    const { deps, created } = makeDeps();
+    await applyPaymentEvent(wechatEvent(), deps);
+
+    // 夹具买的是 `hosted-ai-monthly`（¥12）。断言这两列真的被写下来 ——
+    // 只写到期日的话，付 ¥12 与付 ¥5 会得到完全一样的行。
+    expect(created[0].priceId).toBe('hosted-ai-monthly');
+    expect(created[0].grants).toEqual(['hosting', 'ai']);
+  });
+
+  it('🔴 降级立即生效：能力是**替换**而不是并集（否则付 ¥5 的人一直用着 ¥12）', async () => {
+    const { deps, created, updated } = makeDeps();
+    // 先买 ¥12（hosting + ai）……
+    await applyPaymentEvent(wechatEvent(), deps);
+    expect(created[0].grants).toEqual(['hosting', 'ai']);
+
+    // ……再买 ¥5（只有 hosting）。同一行、只有一个到期日，所以后一次定调。
+    await applyPaymentEvent(
+      wechatEvent({
+        occurredAt: NOW + DAY,
+        providerEventId: 'o2',
+        oneTimeGrant: { periodDays: 30, priceId: 'hosted-monthly', grants: ['hosting'] },
+      }),
+      deps,
+    );
+    expect(updated[0].data.grants).toEqual(['hosting']);
+    expect(updated[0].data.priceId).toBe('hosted-monthly');
+    // 并集（`['hosting','ai']`）是更坏的选择：它让降级永远不生效。
+    expect(updated[0].data.grants).not.toContain('ai');
   });
 
   it('🔴 写入字段里**没有删除语义**：只写 status / currentPeriodEnd / lastEventAt', async () => {

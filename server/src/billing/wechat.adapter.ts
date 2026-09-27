@@ -37,12 +37,13 @@ import {
   randomBytes,
 } from 'node:crypto';
 import { MIN_CHARGEABLE_AMOUNT_MINOR, isMinorAmount } from './money';
-import { DEFAULT_PRICE_BOOK, projectPrices } from './price-book';
+import { DEFAULT_PRICE_BOOK, grantsForSku, projectPrices } from './price-book';
 import type {
   BillingAdapter,
   CheckoutResult,
   CreateCheckoutInput,
   NormalizedPaymentEvent,
+  OneTimeGrant,
   RevokeEntitlementInput,
   SubscriptionStatus,
   WebhookHeaders,
@@ -729,36 +730,51 @@ export const createWechatBillingAdapter = (
         parseUserIdFromAttach(payload.attach) ??
         parseUserIdFromOutTradeNo(payload.out_trade_no);
 
-      // 🔴 金额校验 —— 付的钱必须落在价目表上，否则**不授予**。
+      // 🔴 金额 → **档位** → 能力。以前这里只问"金额是不是价目表里的某一个"
+      // （一个集合），那只能回答"是某一档"，回答不了"是**哪一档**" ——
+      // 而后者才是要落进订阅行的东西（¥5 与 ¥12 的区别）。
       //
-      // 没有这一道的话：一笔 ¥1 的订单（或任何未来新增的低价 SKU、测试单）
+      // 没有这一道的话：一笔 ¥1 的订单（或任何新增的低价 SKU、测试单）
       // 会按 `WECHAT_ONE_TIME_PERIOD_DAYS` 授予**整整一个月**。
       // 这是会实际损失钱的那类洞，不是理论问题。
       //
-      // ⚠️ **判据是"金额是价目表里的某一个"**，不是"金额对应的是这一单买的那一项"。
-      // 有券之后两者**不再等价**（¥99 用 ¥20 券 → 实付 ¥79，而 ¥79 不在价目表上）。
+      // ⚠️ 判据仍然是"**实付金额**精确等于某一档的原价"，所以它对**打折单**
+      // 是**不成立**的：¥12 档用 ¥7 券 → 实付 ¥5，而 ¥5 恰好是另一档的原价。
+      // 那时这一层**无法**判断买的是哪一档。
       //
-      // 🔴 **诚实的现状：这一层目前是终局判定，不是粗筛。** 它给出
-      // `oneTimeGrant: null` 之后，`apply-event.ts` 会把这笔事件归成
-      // `{ status: 'ignored', reason: 'NO_SUBSCRIPTION_REFERENCE' }` ——
-      // 也就是**一笔用了券、真实到账的支付会被拒绝授予权益**。
+      // 🔴 因此这一层**不再是终局判定**，而是分三种、各自如实上报：
+      //   1. 实付 = 某一档原价 → 授予该档（带 `priceId` 与它的 `grants`）；
+      //   2. 有实付但落不到任何档位 → **不授予**（fail-closed），但置
+      //      `requiresOrderSettlement` —— 这是"响亮地不知道"，不是"无事发生"；
+      //   3. 没有实付字段 → 不授予，事件类型如实标成金额不匹配。
       //
-      // 本该接住这个假阴性的是 `pricing-store.ts` 的 `settleOrderPaid`
-      // （它比的是订单上冻结的 `final_amount_minor`，同时覆盖 SKU 与折扣），
-      // 但**它目前没有任何生产调用方** —— 只有测试与 `index.ts` 的导出。
-      // 支付通道本身还没接线（ADR-0017 §5），所以这个洞今天是**潜伏的**：
-      // 还没有代码能把一张券带进收银台。
+      // 情况 2 正是"有券的单会被静默拒付"那个洞：以前它与退款 / 对账通知
+      // 拿到同一个原因字符串 `NO_SUBSCRIPTION_REFERENCE` —— 对一笔真实到账的
+      // 支付来说那是**假话**，运维在日志里看不到"有一笔钱没交付权益"。
       //
-      // 🔴 接线时必须一起做的：金额的**权威判定只留在 `settleOrderPaid`**
-      // （比订单冻结金额），这一层退化成"把观察到的金额与异常如实报上去"。
-      // 在那之前，**不要把任何打折的支付接进来** —— 它会被静默拒付。
-      // 见 `docs/reference/pricing-and-coupons.md` §7。
+      // 🔴 权威判定只留在 `pricing-store.ts` 的 `settleOrderPaid`：它比的是
+      // **订单上冻结的** SKU 与 `final_amount_minor`，两者都覆盖折扣。
+      // 情况 2 的出路就是它。它目前仍无生产调用方（支付通道未接线，
+      // ADR-0017 §5），所以今天这个洞是**潜伏的**。
+      // 见 `docs/reference/pricing-and-coupons.md` §7 第 9 条。
       const paidFen =
         typeof payload.amount?.total === 'number' ? payload.amount.total : null;
-      const knownAmounts = new Set(
-        Object.values(options.prices ?? WECHAT_DEFAULT_PRICES).map((x) => x.totalFen),
-      );
-      const amountMatchesPrice = paidFen !== null && knownAmounts.has(paidFen);
+      const priceTable = options.prices ?? WECHAT_DEFAULT_PRICES;
+      const matchedSku =
+        paidFen === null
+          ? null
+          : (Object.entries(priceTable).find(([, entry]) => entry.totalFen === paidFen)?.[0] ?? null);
+      // 第二步可能落空：价目表有这一档、能力表没有 → **两处不同步**。
+      // 那不是"这一档确定没有能力"，所以绝不当成空数组放过去。
+      const matchedGrants = matchedSku === null ? null : grantsForSku(matchedSku);
+      const grant: OneTimeGrant | null =
+        matchedSku !== null && matchedGrants !== null
+          ? {
+              periodDays: WECHAT_ONE_TIME_PERIOD_DAYS,
+              priceId: matchedSku,
+              grants: matchedGrants,
+            }
+          : null;
 
       return {
         ok: true,
@@ -768,20 +784,24 @@ export const createWechatBillingAdapter = (
           // 这样同一订单的**不同事件**（未来的退款）不会和支付事件互相顶掉。
           // 复投的同一通知 → 同一个 out_trade_no → 同一个键 → 唯一约束挡住。
           providerEventId: `payment_succeeded:${payload.out_trade_no}`,
-          // 金额对不上时用**不同的事件类型**落审计 —— 能查到"有人付了不对的钱",
+          // 金额落不到档位时用**不同的事件类型**落审计 —— 能查到"有人付了不对的钱",
           // 而不是悄悄当成一次正常支付。
-          eventType: amountMatchesPrice ? 'payment_succeeded' : 'payment_amount_mismatch',
+          eventType: grant === null ? 'payment_amount_mismatch' : 'payment_succeeded',
           occurredAt,
           externalSubscriptionId: null,
           // 微信没有订阅状态机 → 明确 null，不编。
           status: null,
           currentPeriodEnd: null,
           userId,
-          // 🔴 授予语义的入口：apply-event 据此走一次性支付路径。
-          // 金额对不上 → `null` → **不授予任何权益**（fail-closed）。
-          oneTimeGrant: amountMatchesPrice
-            ? { periodDays: WECHAT_ONE_TIME_PERIOD_DAYS }
-            : null,
+          // 🔴 授予语义的入口：apply-event 据此走一次性支付路径，并把
+          // `priceId` / `grants` 写进订阅行。落不到档位 → `null` →
+          // **不授予任何权益**（fail-closed），同时由下面的
+          // `requiresOrderSettlement` 把它标成"待结算"而不是"无事发生"。
+          oneTimeGrant: grant,
+          // 只有"观察到了钱、却落不到档位"才算需要结算。没有金额字段的事件
+          // （畸形 / 无金额的通知）不是这种情况，别把它也算进来 —— 否则
+          // 一个空 payload 会伪装成一笔待结算的支付。
+          requiresOrderSettlement: paidFen !== null && grant === null,
         } satisfies NormalizedPaymentEvent,
       };
     },

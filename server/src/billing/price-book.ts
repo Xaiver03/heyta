@@ -67,6 +67,35 @@ export const isEntryEffectiveAt = (entry: PriceBookEntry, now: number): boolean 
   now >= entry.effectiveFrom && (entry.effectiveUntil === null || now < entry.effectiveUntil);
 
 /**
+ * 🔴 SKU → 它授予的能力（`hosting` / `ai`）。
+ *
+ * **按 SKU 而不是按价格版本**：一次改价改的是金额，从不改变"这一档给什么"。
+ * 把 grants 放到 `PriceBookEntry`（一个版本）上会凭空造出一个自由度 ——
+ * 同一 SKU 的两版可以声明不同的能力 —— 而那个自由度没有任何有意义的用法，
+ * 只会变成一个需要门禁去防的不一致。`price_versions` 表也因此不必加列。
+ *
+ * 与下面四处同源：`docs/reference/pricing-and-entitlements.md` 的 `pricing-ssot`
+ * 块、`scripts/check-pricing-consistency.mjs` 的 `ALLOWED_GRANTS`、
+ * `Subscription.grants` 的 DB CHECK，以及 `entitlement.ts` 的
+ * `ENTITLEMENT_CAPABILITIES`。门禁会红在"两处说法不一致"上。
+ */
+export const SKU_GRANTS: Readonly<Record<string, readonly string[]>> = {
+  'hosted-monthly': ['hosting'],
+  'hosted-ai-monthly': ['hosting', 'ai'],
+};
+
+/**
+ * 取某个 SKU 授予的能力。
+ *
+ * 🔴 未知 SKU 返回 `null` 而**不是**空数组 —— 两者语义不同，且混起来很危险：
+ * `[]` 是"这一档确定不授予任何能力"（一个合法的声明），`null` 是"我们不知道
+ * 这个 SKU 是什么"（价目表与能力表不同步）。调用方对前者的处理是"照常授予零项"，
+ * 对后者的处理必须是"不要授予，并告警"。
+ */
+export const grantsForSku = (priceId: string): readonly string[] | null =>
+  SKU_GRANTS[priceId] ?? null;
+
+/**
  * 解析一个精确的价目表条目。
  *
  * 语义（三条，缺一不可）：
