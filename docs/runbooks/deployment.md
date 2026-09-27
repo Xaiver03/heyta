@@ -40,7 +40,7 @@
 
 | 机器 | SSH 别名 | IP | 跑什么 | 对外地址 | 状态 |
 |---|---|---|---|---|---|
-| **腾讯云 ubuntu-jcli** | `ubuntu-jcli`（别名 `finlaw`） | `124.223.13.226` | ✅ **heyta 公网部署**（supersync）；另有 xiaoli-* 等约 34 个容器、宿主机 nginx、mihomo | `https://heyta-tmp.litopia.space` | ✅ 在线，容器 healthy |
+| **腾讯云 ubuntu-jcli** | `ubuntu-jcli`（别名 `finlaw`） | `124.223.13.226` | ✅ **heyta 公网部署**（supersync）；另有 xiaoli-* 等约 34 个容器、宿主机 nginx、mihomo | `https://heyta.finlaw.cloud`（测试阶段唯一域名） | ✅ 在线，容器 healthy |
 | **腾讯云轻量 12km（=OPP）** | `12km` / `12kmroot` | `121.4.24.238` | Caddy + Dokploy + Litopia 生产/预发 + Mailu 邮件 + cloudflared 等 32 个容器 | `mail.litopia.space`（**唯一还指向它的 litopia 域名**） | 🔴 **实例已过期**（2026-09-25 21:32 到期），仍在跑 |
 | **腾讯云 sanjiaozhou** | `sanjiaozhou` | `101.34.250.109` | **mihomo 故障切换代理**；Caddy（80/443）+ 大量项目（Litopia 站点、SSOS、Mailu、CMS 等） | `litopia.space`、`api` / `docs` / `studio` / `staging`、`openpenpal.com`、`finlaw.cloud` 等 | ✅ 在线，负载正常 |
 | **华为云 wunoos** | `wunoos` | `119.8.167.61` | ⚪ 未核实（用户明确交代**不要用**） | `climming.*` / `huagong.finlaw.cloud` 等指向它 | 仅确认 SSH 可达 |
@@ -143,15 +143,22 @@
 ### 3.1 拓扑
 
 ```
-                     DNS: heyta-tmp.litopia.space  A 124.223.13.226   (RecordId 2419225598)
+                     DNS: heyta.finlaw.cloud      A 124.223.13.226  (RecordId 2419295096)  ← 唯一域名
+                          heyta-tmp.litopia.space A 124.223.13.226  (RecordId 2419225598)  ← 已弃用
                                         │
                                         ▼
         ┌──────────────────────── ubuntu-jcli  124.223.13.226 ────────────────────────┐
         │  宿主机 nginx 1.18.0   :443 (TLS, certbot)  ──►  :80 → 301 https              │
         │      │                                                                        │
-        │      ├── /app/       → alias /var/www/heyta-app/  (apps/web 静态产物)          │
-        │      ├── /landing*   → 301 → https://heyta.finlaw.cloud/                       │
-        │      └── /           → proxy_pass http://127.0.0.1:1900                        │
+        │      ├── sites-enabled/heyta.finlaw.cloud   ← **唯一域名**（2026-09-27 起）      │
+        │      │     ├── /               → 落地页 root /var/www/heyta-landing/           │
+        │      │     ├── /app/           → alias /var/www/heyta-app/   (apps/web 产物)   │
+        │      │     ├── /api/           → proxy_pass 127.0.0.1:1900 （含 WS 升级头）     │
+        │      │     └── /verify-email · /recover-passkey · /magic-login → 同一 proxy    │
+        │      │                                                                        │
+        │      └── sites-enabled/heyta-tmp   ← **已弃用**（留作回滚路径）                  │
+        │            ├── /app* /landing* → 301 → https://heyta.finlaw.cloud/            │
+        │            └── / · /api/ · /health → proxy_pass 127.0.0.1:1900 （端点，不 301） │
         │                                    │                                           │
         │                          docker: supersync-server  (supersync:local, healthy)  │
         │                                    │  depends_on service_healthy                │
@@ -193,36 +200,70 @@
 
 ### 3.3 反向代理（宿主机 nginx）
 
-nginx 片段：`/etc/nginx/sites-available/heyta-tmp`，软链到 `/etc/nginx/sites-enabled/heyta-tmp`（✅ 实测）。
+**机器上有两个 heyta 站点**（✅ 实测）：
 
-- ✅ `server_name 124.223.13.226 heyta-tmp.litopia.space;`
-- ✅ 在 `/etc/nginx/nginx.conf` 第 **67** 行被显式 `include`（`include /etc/nginx/sites-enabled/heyta-tmp;`），
-  紧跟在第 66 行 `xiangleideng.site` 之后。**这个 include 不是 `sites-enabled/*` 的通配**——
-  它是逐行手写的白名单（60–67 行），所以新增站点必须手动加一行。
-- ✅ `client_max_body_size 64m;`
-- ✅ 反代块：`proxy_pass http://127.0.0.1:1900;`，带 `Upgrade` / `Connection: upgrade`（WebSocket）、
-  `Host` / `X-Real-IP` / `X-Forwarded-For` / `X-Forwarded-Proto`，`proxy_read_timeout 90s` / `proxy_send_timeout 90s`。
-- ✅ 另有 `/app`、`/app/`、`/app/assets/` 三段与 `/landing*` 三段（见 §3.7）。
-  **`location /app/` 不匹配 `/app`** —— 所以 `/app` 单独有一条 `location = /app { return 301 /app/; }`。
-  少了它，落地页的「立即使用」会把用户送到同步服务端的 JSON 404（实测踩到过）。
+| `/etc/nginx/nginx.conf` 行 | include | 角色（2026-09-27 起） |
+|---|---|---|
+| 67 | `sites-enabled/heyta-tmp;` | **已弃用** —— 只留同步端点 + 入口 301（§3.3.2） |
+| 68 | `sites-enabled/heyta.finlaw.cloud;` | **唯一域名** —— 落地页 + 应用 + API + 凭据页（§3.3.1） |
+
+🔴 这个 include **不是 `sites-enabled/*` 通配**，是逐行手写的白名单（60–68 行）：
+新增站点必须手动加一行，否则 `nginx -t` 照样通过、站点却根本不生效。
+
+#### 3.3.1 `heyta.finlaw.cloud`（唯一域名）
+
+- ✅ `server_name heyta.finlaw.cloud;`、`client_max_body_size 64m;`
+- ✅ `location /` → `root /var/www/heyta-landing;` + SPA 兜底 `try_files $uri $uri/ /index.html`
+  （落地页本身也是 SPA；`/en/` 走同一段）。`/assets/` 单独一段长缓存。
+- ✅ `location /app/` → `alias /var/www/heyta-app/;` + `try_files $uri $uri/index.html /app/index.html`，
+  `Cache-Control: no-cache`；`/app/assets/` 单独一段长缓存。
+- 🔴 `location = /app { return 301 /app/$is_args$args; }` **必须单独写**：`location /app/`
+  **不匹配** `/app`，而落地页给出的地址去掉尾斜杠是**故意的**（`apps/landing/src/lib/app-url.ts`）。
+  少了它，`/app` 会掉进 `location /` 拿回**落地页 HTML**（HTTP 200、看着正常，点进去却是别的页面）。
+  带 `$is_args$args` 是为了**保留查询串** —— `?lang=en` 必须跟着走，否则英文用户又回到中文应用。
+- ✅ `location /api/` → `proxy_pass http://127.0.0.1:1900;`，带 `Upgrade` / `Connection: upgrade`
+  （WebSocket，真实路径 `/api/sync/ws`）、`Host` / `X-Real-IP` / `X-Forwarded-For` /
+  `X-Forwarded-Proto`，`proxy_read_timeout 90s` / `proxy_send_timeout 90s`。
+- ✅ `location ~ ^/(verify-email|recover-passkey|magic-login)$` → 同一个 `proxy_pass`。
+  🔴 这三张是**服务端渲染**的页面（`server/src/pages.ts`），不代理就会掉进落地页的 SPA 兜底，
+  用户看到的是落地页而不是「令牌无效 / 请重新注册」。
+- ✅ certbot 追加的 HTTPS 块 + Let's Encrypt 证书（见 §3.4）。
+
+#### 3.3.2 `heyta-tmp`（已弃用，留作回滚路径）
+
+- ✅ `server_name 124.223.13.226 heyta-tmp.litopia.space;`、`client_max_body_size 64m;`
+- ✅ `/app`、`/app/`、`/landing`、`/landing/` → `301 https://heyta.finlaw.cloud$request_uri`。
+  用 `$request_uri` 而不是 `$is_args$args`：前者原样带上**完整路径与查询串**，
+  `/app?lang=en`、`/app/assets/<hash>.js` 都不会走样。
+- ✅ `location /` → `proxy_pass http://127.0.0.1:1900;`（Connect 页、`/api/`、`/health`）。
+- 🔴 **同步端点刻意不做 301**：301 会让浏览器与客户端把 **POST 改写成 GET**，
+  正在同步的客户端会被**无声地打断** —— 请求"成功"了，内容却丢了。
+  所以这个站点只重定向"给人点的入口"，程序化端点原样直连。
+- 🔴 之所以还留着它：这是**回滚路径**（配 `.env.bak-*` 一起用）。
+  但它给出的应用入口是 301，所以不会再有人在旧域名上撞见
+  「应用能打开、登录永远失败」的 passkey 陷阱（§3.7.1）。
+
 - ✅ **HTTP 行为（与线索不同，务必注意）**：
-  - `http://heyta-tmp.litopia.space/…` → **301** 跳 `https://`（certbot 写的 `if ($host = …)` 块）。
+  - 两个域名的 `http://…/…` → **301** 跳 `https://`（certbot 写的 `if ($host = …)` 块）。
   - `http://124.223.13.226/…` → **404**（certbot 块的兜底是 `return 404`）。
     **用裸 IP 访问不会跳 HTTPS，会 404。** ✅ 实测两次确认。
-- ✅ certbot 追加的 HTTPS 块 + Let's Encrypt 证书（见下）。
 
 ### 3.4 证书与续期
 
-- ✅ `certbot certificates`：
+- ✅ `certbot certificates`（2026-09-27 实查）：
 
   | 证书名 | 域名 | 到期 | 剩余 |
   |---|---|---|---|
-  | `heyta-tmp.litopia.space` | `heyta-tmp.litopia.space` | **2026-12-25 03:35:57 UTC**（= 11:35:57 CST） | 89 天 |
+  | `heyta.finlaw.cloud` | `heyta.finlaw.cloud` | **2026-12-25 06:50:16 UTC** | 88 天 |
+  | `heyta-tmp.litopia.space` | `heyta-tmp.litopia.space` | **2026-12-25 03:35:57 UTC**（= 11:35:57 CST） | 88 天 |
+
+  ✅ **迁域名不需要重新签证书**：`heyta.finlaw.cloud` 那张早就有了（落地页一直住在那儿），
+  所以这次迁移在 TLS 这一层是零改动。两张都在 certbot 的自动续期范围内。
 
   同一台机器上还有 `ai.finlaw.cloud`、`aiconfig.finlaw.cloud`、`aistudy.finlaw.cloud`、`codex.finlaw.cloud`、
   `lingchuang.finlaw.cloud`、`sumei.finlaw.cloud`、`xcreative.finlaw.cloud`、`x.finlaw.cloud`、
   `x-creative.team`、`xiangleideng.site`、`yuanyuan.finlaw.cloud`。
-- ✅ 文件：`/etc/letsencrypt/live/heyta-tmp.litopia.space/{fullchain.pem,privkey.pem}`；
+- ✅ 文件：`/etc/letsencrypt/live/{heyta.finlaw.cloud,heyta-tmp.litopia.space}/{fullchain.pem,privkey.pem}`；
   私钥**存在，位于**该目录（不在本文档抄写内容）。
 - ✅ 自动续期：`certbot.timer`（systemd）已启用，下次触发 2026-09-27 05:54 CST，✅ 上次运行 2026-09-26 12:47。
   注意这是 **snap 之外的系统 certbot 1.21.0**（`snap.certbot.renew.timer` 在这台机器上不存在）。
@@ -234,15 +275,15 @@ nginx 片段：`/etc/nginx/sites-available/heyta-tmp`，软链到 `/etc/nginx/si
 | 变量 | 值 | 说明 |
 |---|---|---|
 | `NODE_ENV` | `production` | ✅ |
-| `PUBLIC_URL` | `https://heyta-tmp.litopia.space` | ✅ |
-| `CORS_ORIGINS` | `https://heyta-tmp.litopia.space` | ✅ |
-| `DOMAIN` | `heyta-tmp.litopia.space` | ✅ 供 compose 的 caddy 服务用（当前没起） |
+| `PUBLIC_URL` | `https://heyta.finlaw.cloud` | ✅ 2026-09-27 起（迁移见 §3.7.1） |
+| `CORS_ORIGINS` | `https://heyta.finlaw.cloud` | ✅ 与 `PUBLIC_URL` 同源 |
+| `DOMAIN` | `heyta.finlaw.cloud` | ✅ 供 compose 的 caddy 服务用（当前没起，nginx 直接反代 1900） |
 | `RUN_MIGRATIONS_ON_STARTUP` | `false` | ✅ 迁移由 `deploy.sh` / `migrate-deploy.sh` 显式跑 |
 | `TEST_MODE` | `true` | ✅ 🔴 **生产环境开着测试模式，见 §7.4** |
 | `TEST_MODE_CONFIRM` | `yes-i-understand-the-risks` | ✅ |
-| `WEBAUTHN_RP_ID` | `heyta-tmp.litopia.space` | ✅ |
+| `WEBAUTHN_RP_ID` | `heyta.finlaw.cloud` | ✅ 🔴 **改它会让旧域名上已注册的 passkey 全部失效**（§3.7.1） |
 | `WEBAUTHN_RP_NAME` | `heyta` | ✅ |
-| `WEBAUTHN_ORIGIN` | `https://heyta-tmp.litopia.space` | ✅ |
+| `WEBAUTHN_ORIGIN` | `https://heyta.finlaw.cloud` | ✅ |
 | `POSTGRES_USER` | `heyta` | ✅ |
 | `POSTGRES_DB` | `heyta` | ✅ |
 | `JWT_SECRET` | 🔒 **存在，值不抄** | ✅ 键存在 |
@@ -254,20 +295,28 @@ compose 里还有一批**未在 `.env` 中设置、走默认值**的键（`HOST`
 
 ### 3.6 公网实测结果
 
+**唯一域名 `heyta.finlaw.cloud`（2026-09-27 起）：**
+
+| 请求 | 结果 | 来源 |
+|---|---|---|
+| `GET https://heyta.finlaw.cloud/` | `200`（落地页中文版） | ✅ 2026-09-27 |
+| `GET https://heyta.finlaw.cloud/en/` | `200`（落地页英文版） | ✅ 2026-09-27 |
+| `GET https://heyta.finlaw.cloud/app/` | `200` `text/html`，`<title>heyta</title>`（迁移前这里返回的是**落地页**） | ✅ 2026-09-27 |
+| `GET https://heyta.finlaw.cloud/app` | `301` → `/app/`（**保留查询串**） | ✅ 2026-09-27 |
+| `GET https://heyta.finlaw.cloud/app/assets/<hash>.js` | `200` `application/javascript` | ✅ 2026-09-27 |
+| `POST https://heyta.finlaw.cloud/api/login/passkey/options` | `{"rpId":"heyta.finlaw.cloud",…}` | ✅ 2026-09-27 |
+| `GET https://heyta.finlaw.cloud/verify-email`、`/recover-passkey`、`/magic-login` | `400 Token is required`（服务端响应，不是落地页 HTML） | ✅ 2026-09-27 |
+
+**旧域名 `heyta-tmp.litopia.space`（已弃用，只留端点与入口 301）：**
+
 | 请求 | 结果 | 来源 |
 |---|---|---|
 | `GET https://heyta-tmp.litopia.space/health` | `200` + `{"status":"ok","db":"connected","wsConnections":0}` | ✅ |
-| `GET https://heyta-tmp.litopia.space/` | `200` | ✅ |
-| `GET https://heyta-tmp.litopia.space/app/` | `200` `text/html`（`apps/web` 产物，`Cache-Control: no-cache`） | ✅ 2026-09-27 |
-| `GET https://heyta-tmp.litopia.space/app` | `301` → `/app/` | ✅ 2026-09-27 |
-| `GET https://heyta-tmp.litopia.space/app/assets/<hash>.js` | `200` `application/javascript`，`Cache-Control: max-age=31536000` | ✅ 2026-09-27 |
-| `GET https://heyta.finlaw.cloud/` | `200`（落地页中文版） | ✅ 2026-09-27 |
-| `GET https://heyta.finlaw.cloud/en/` | `200`（落地页英文版） | ✅ 2026-09-27 |
-| `GET https://heyta.finlaw.cloud/app/` | `200` `text/html`，`<title>heyta</title>`（迁移前这里是**落地页**） | ✅ 2026-09-27 |
-| `GET https://heyta.finlaw.cloud/app` | `301` → `/app/`（保留查询串） | ✅ 2026-09-27 |
-| `GET https://heyta.finlaw.cloud/app/assets/<hash>.js` | `200` `application/javascript` | ✅ 2026-09-27 |
-| `POST https://heyta.finlaw.cloud/api/login/passkey/options` | `{"rpId":"heyta.finlaw.cloud",…}` | ✅ 2026-09-27 |
-| `GET https://heyta-tmp.litopia.space/landing/` | `301` → `https://heyta.finlaw.cloud/`（**不再直接 200**） | ✅ 2026-09-27 |
+| `GET https://heyta-tmp.litopia.space/` | `200`（同步服务端的 Connect 页 —— 这是**端点**，刻意不做 301） | ✅ |
+| `GET https://heyta-tmp.litopia.space/app/` | `301` → `https://heyta.finlaw.cloud/app/`（**原来的 200 已退休**） | ✅ 2026-09-27 |
+| `GET https://heyta-tmp.litopia.space/app?lang=en` | `301` → `https://heyta.finlaw.cloud/app?lang=en`（查询串原样带过去） | ✅ 2026-09-27 |
+| `GET https://heyta-tmp.litopia.space/app/assets/<hash>.js` | `301` → `…/app/assets/<hash>.js`（路径不走样） | ✅ 2026-09-27 |
+| `GET https://heyta-tmp.litopia.space/landing/`、`/landing` | `301` → `https://heyta.finlaw.cloud/`（**不再直接 200**） | ✅ 2026-09-27 |
 | `GET http://heyta-tmp.litopia.space/health` | `301` → `https://…/health` | ✅ |
 | `GET http://124.223.13.226/health` | `404` | ✅ |
 
@@ -289,7 +338,7 @@ compose 里还有一批**未在 `.env` 中设置、走默认值**的键（`HOST`
 | 静态根目录 | `/var/www/heyta-app/`（`ubuntu:ubuntu`）—— 迁移**没动**这个目录，换的只是它挂在哪个域名下 |
 | 为什么放这个域名 | 与同步服务端**同源**：`WEBAUTHN_RP_ID` / `WEBAUTHN_ORIGIN` / `CORS_ORIGINS` 都指向它，passkey 才能用（§3.7.1 解释了为什么不能再挂第二个域名） |
 | nginx 片段 | `/etc/nginx/sites-available/heyta.finlaw.cloud` —— 应用（`/app/`）、同步 API（`/api/`）与三张凭据页都在这里 |
-| 旧地址 | `https://heyta-tmp.litopia.space/app/` 至今仍 200（那份 nginx 没删，留着当回滚路径），但**那里 passkey 不可用** —— 见 §3.7.1 |
+| 旧地址 | `https://heyta-tmp.litopia.space/app/` 现在是 **`301` → 这里**（站点留着当回滚路径，入口已退休，见 §3.3.2）；即便绕过重定向直连，那里 **passkey 也不可用**（§3.7.1） |
 
 #### 重新发布的两条命令
 
@@ -388,9 +437,11 @@ Playwright 实测：中文页与英文页各两个入口都指向应用地址且
 
 - 应用产物没走 CDN、没有 SRI、没有构建版本号注入；`/app/` 那段 nginx **不在仓库里**
   （仓库只跟踪 `server/Caddyfile`），只能上机改 —— 改完记得回来更新本节。
-- `heyta-tmp.litopia.space` 那份 nginx 站点仍在（`location /` → 1900 的 Connect 页、
-  `/app/` → 应用），留作回滚路径。但**它已经不是入口了**：落地页的「立即使用」
-  自 2026-09-27 起指向 `heyta.finlaw.cloud`，而且那里 passkey 不可用（§3.7.1）。
+- `heyta-tmp.litopia.space` 那份 nginx 站点仍在（`location /` → 1900 的 Connect 页与 `/api/`、
+  `/health`；`/app*` 与 `/landing*` 已改成 **301**），留作回滚路径。它**已经不是入口**了：
+  落地页的「立即使用」自 2026-09-27 起指向 `heyta.finlaw.cloud`，而且那里 passkey 不可用（§3.7.1）。
+- 🔴 同步服务端**仍然是测试形态**（`supersync:local` 本机构建、`TEST_MODE=true`、
+  没有 SMTP，见 §3.9）—— 换域名**没有**改变这些。域名只是名字，不是"转生产"。
 
 #### 原先记在这里、现已做掉的
 
@@ -566,8 +617,13 @@ ssh ubuntu-jcli 'cd ~/heyta/server && \
 | `_cdnauth` | TXT | （CDN 校验值） | 2311528102 | 2026-06-09 |
 | `dkim._domainkey` | TXT | `v=DKIM1; k=rsa; p=…`（公钥） | 2402091049 | 2026-09-10 |
 | `qcloud._domainkey` | TXT | `v=DKIM1; k=rsa; p=…`（公钥） | 2402103199 | 2026-09-10 |
-| **`heyta-tmp`** | A | **`124.223.13.226`**（ubuntu-jcli） | **2419225598** | 2026-09-26 12:29:39 |
+| **`heyta-tmp`** | A | **`124.223.13.226`**（ubuntu-jcli） | **2419225598** | 2026-09-26 12:29:39 | ⚠️ **已弃用**（§7.1）—— 入口已 301 到 `heyta.finlaw.cloud` |
 | `@` ×2 | NS | `library.dnspod.net.` / `fair.dnspod.net.` | — | — |
+
+> ✅ **唯一域名的 A 记录在另一个区**（`finlaw.cloud`，DomainId `98829969`）：
+> `heyta` A `124.223.13.226`，RecordId **`2419295096`**，TTL 600。
+> 它与 `heyta-tmp` **指向同一个 IP**，所以 2026-09-27 的域名迁移
+> **一条 DNS 记录都没改** —— 卡点自始至终在 nginx 与 `.env`（§3.7.1）。
 
 🔴 **与旧线索的关键差异**：旧记录说 `@`/`api`/`dev`/`staging`/`studio`/`docs` 都指向 OPP（`121.4.24.238`）。
 **现在不是了** —— 这 6 条在 **2026-09-26 13:39** 已经被改到 sanjiaozhou（`101.34.250.109`）。
@@ -633,31 +689,36 @@ ssh ubuntu-jcli 'cd ~/heyta/server && \
 
 > 本节只做**登记**。文档里不给"现在就去改"的操作指令——真要动，另开一次有意识、可回滚的变更。
 
-### 7.1 🔴 `heyta-tmp.litopia.space` 是**临时资产**
+### 7.1 `heyta-tmp.litopia.space` 已弃用（2026-09-27）
 
-三件东西都是临时的，**用完应该清掉**：
+**它不再是任何东西的入口。** 测试阶段唯一的域名是 `https://heyta.finlaw.cloud/`
+（落地页 + 应用 + 同步 API + 三张凭据页，§3.7.1）。旧域名现在的角色只有两个：
+`/app*` 与 `/landing*` 做 **301** 跳过去；`/`、`/api/`、`/health` 仍直连同步服务端
+（刻意**不** 301 —— 301 会把 POST 改写成 GET，见 §3.3.2）。
 
-1. **临时 DNS 记录**：`litopia.space` 下的 `heyta-tmp` A 记录，RecordId **`2419225598`**，TTL 600。
-2. **临时证书**：Let's Encrypt `heyta-tmp.litopia.space`（到期 2026-12-25 03:35:57 UTC）。
-3. **临时容器与镜像**：`supersync-server` / `supersync-postgres` 用的是本地构建的 `supersync:local`，
-   `RUN_MIGRATIONS_ON_STARTUP=false`，`TEST_MODE=true`。它**不是**正式生产形态。
+| 当初登记的"临时资产" | 2026-09-27 之后 |
+|---|---|
+| DNS `heyta-tmp.litopia.space` A `124.223.13.226`（RecordId **`2419225598`**，TTL 600） | 仍在；清它**不再影响任何入口** |
+| Let's Encrypt `heyta-tmp.litopia.space`（到期 2026-12-25 03:35:57 UTC） | 跟着上面那条一起清 |
+| `sites-available/heyta-tmp` + `sites-enabled` 软链 + `nginx.conf` 第 **67** 行那条**手写** `include` | 现在只提供端点与 301；删它同样不影响入口 |
 
-连带要清的：`/etc/nginx/sites-available/heyta-tmp` + `sites-enabled` 软链 +
-`/etc/nginx/nginx.conf` 第 67 行那条**手写**的 `include`（通配不会替你删）+
-`/var/www/heyta-app/`（`apps/web` 产物，§3.7）+ `/var/www/heyta-landing/`。
+🔴 **仍然不要"只清一半"**：这三样是一套。清 DNS 而留 nginx，同步服务端会少一个可达域名；
+清 nginx 而留 DNS，会留下一个指向 404 的解析。
 
-⚠️ 2026-09-27 的两次变更另外留下了三个备份，清理时要一并决定去留：
+⚠️ **别把这件事和"服务端还是临时形态"混为一谈**：这台机器上的 `supersync-server` 仍是
+本地构建的 `supersync:local`、`RUN_MIGRATIONS_ON_STARTUP=false`、`TEST_MODE=true`
+（见 §7.4）。**换域名没有改变这一点** —— 换的只是它对外叫什么名字。
 
-- `/etc/nginx/sites-available/heyta-tmp.bak-20260927T124302Z`
-- `/etc/nginx/sites-available/heyta-tmp.bak2-20260927T124707Z`
-- `/var/www/heyta-landing.bak-20260927T124628Z`
+2026-09-27 的几次变更留下的备份，清理时一并决定去留：
+
+- `/etc/nginx/sites-available/heyta.finlaw.cloud.bak-20260927T145658Z`（finlaw 加 `/app/` 与 `/api/` 之前）
+- `/etc/nginx/sites-available/heyta-tmp.bak-20260927T151156Z`（tmp 退休成 301 之前）
+- `/etc/nginx/sites-available/heyta-tmp.bak-20260927T124302Z`（tmp 加 `/app/` 之前）
+- `/etc/nginx/sites-available/heyta-tmp.bak2-20260927T124707Z`（tmp 加 `/app` 重定向之前）
+- `/home/ubuntu/heyta/server/.env.bak-20260927T145733Z`（origin 还全指向 tmp 时）
+- `/var/www/heyta-landing.bak-20260927T124628Z`（旧落地页产物）
 
 （同目录下还有 30+ 个更早的 `.bak-*`，见 §7.5。）
-
-✅ **这条连带关系已在 2026-09-27 解除**：落地页的「立即使用」现在指向
-`https://heyta.finlaw.cloud/app`（§3.7.1），不再依赖 `heyta-tmp`。
-清掉 tmp 域名**不会再**打断入口，也不需要再改 `VITE_APP_URL`。
-（`heyta-tmp` 现在只剩两个作用：同步服务的 Connect 页，以及回滚路径。）
 
 ### 7.2 🔴 12km / OPP 到期的连带影响
 

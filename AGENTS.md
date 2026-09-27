@@ -1474,7 +1474,8 @@ docker inspect <容器> --format '{{range .Config.Env}}{{println .}}{{end}}' | g
     - **3000 端口不是我们的。** `curl 127.0.0.1:3000/health` 返回的是
       `{"service":"sumei-print",...}` —— 另一个项目的服务。
       我们的容器发布的是 `1900`（`1900/tcp -> 127.0.0.1:1900`），
-      公网入口是反代到 `https://heyta-tmp.litopia.space`。
+      公网入口是反代到 `https://heyta.finlaw.cloud`（测试阶段唯一的域名，2026-09-27
+      从 `heyta-tmp.litopia.space` 完整迁来；旧域名只留同步端点与入口 301）。
       **在这台机器上按 3000 判"服务端活没活"会得到错误结论。**
     - `CORS_ORIGINS` 生产上设成了自己的 `PUBLIC_URL`（同源），
       所以第 53 条那个上游默认域名在生产上**不生效**。
@@ -2058,14 +2059,17 @@ L3 叙事三层**已实现**，**并已落到 `main`**（merge commit `84cc7f5`�
    ⚠️ **没在真机 / 模拟器上验过**，没过 Metro / Release 打包，没实测暗色主题。
 
 **应用本体的部署**（在此之前它**从来没有被部署过**）：
-`https://heyta-tmp.litopia.space/app/`。方式与两个必须记住的坑见
+`https://heyta.finlaw.cloud/app/`。方式与两个必须记住的坑见
 [deployment.md §3.7](docs/runbooks/deployment.md)。两个要点：
 
 - 🔴 **`vite build --base=/app/` 不能省** —— 默认 `base` 的资源是根绝对路径，
-  挂在 `/app/` 下会去请求同步服务端的路径、拿到 JSON 404，现象是控制台报
-  **样式表 MIME 是 `application/json`**。
-- 🔴 **`heyta-tmp.litopia.space` 是临时资产**（deployment §7.1）—— 清它会**同时**
-  打断落地页的应用入口，两边必须一起处理。
+  挂在 `/app/` 下会去请求落地页的路径、拿回 HTML 而不是样式表，现象是控制台报
+  **样式表 MIME 是 `text/html`**。
+- 🔴 **测试阶段唯一的域名是 `heyta.finlaw.cloud`**（2026-09-27 从
+  `heyta-tmp.litopia.space` 完整迁来，见 deployment §3.7.1）：落地页（`/`）、
+  应用（`/app/`）、同步 API（`/api/`）、三张凭据页都在它下面。
+  旧域名只保留同步服务端（`/api/`、`/health`、Connect 页）与**入口的 301** ——
+  API 端点刻意不做重定向，301 会把 POST 改写成 GET、无声打断正在同步的客户端。
 
 **服务端镜像没有重建**：`server/` 里的品牌改动（SuperSync / Super Productivity → heyta）
 **还没上生产**，线上实测仍有 3 次 "Super Productivity"。要走 `server/scripts/deploy.sh`。

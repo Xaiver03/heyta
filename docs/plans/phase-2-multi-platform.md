@@ -1095,6 +1095,12 @@ NSURLErrorDomain Code=-1022
 
 #### ✅ 但换个传输方式就通了：HTTPS + 域名 = 生产形态首次实测成功
 
+> ⚠️ **本节是历史记录（2026-09-26 那次实测），其中的域名部分已被取代。**
+> 测试阶段的域名自 **2026-09-27** 起固定为 `https://heyta.finlaw.cloud/`
+> （落地页 + 应用 + 同步 API + 三张凭据页），旧的 `heyta-tmp.litopia.space` 已弃用。
+> 迁移动机、代价与验收见 [`deployment.md` §3.7.1](../runbooks/deployment.md)。
+> 下面正文里的域名、`PUBLIC_URL`、证书名都按**当时**写，不要照着配。
+
 用 `tccli` 建了 `heyta-tmp.litopia.space` → `124.223.13.226`，`certbot --nginx` 签了
 Let's Encrypt 证书，服务端切到**真正的生产配置**（`NODE_ENV=production` +
 `PUBLIC_URL=https://heyta-tmp.litopia.space`，**去掉 TEST_MODE** —— 生产模式本来就禁止它）。
@@ -1187,6 +1193,8 @@ meta:   lastServerSeq = 1
 - **真机**仍未测。
 - 这次实测用的域名（`heyta-tmp.litopia.space`）与证书都是**临时资产**，
   用完应当删记录 + 撤容器；**不能当成正式环境**。
+  → **2026-09-27 更新**：域名已换成 `heyta.finlaw.cloud`（[deployment.md §3.7.1](../runbooks/deployment.md)），
+  但**后半句仍然成立** —— 服务端至今还是 `TEST_MODE=true` 的本地镜像，没变正式环境。换域名不等于转生产。
 - **`litopia.space` 自身几乎全部记录都指向 `121.4.24.238`（= OPP/12km，09-27 00:00 停服）** ——
   这次顺带发现的，与 heyta 无关但会一起下线。
 
