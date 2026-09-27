@@ -199,7 +199,7 @@ M0 全部是**纯搬迁 + 再导出**，无行为改变。任一任务出问题�
 - 改：`apps/web/vite.config.ts` 加 `resolve.alias` 把 `react-native` 指向 `react-native-web`
 - 验：`pnpm --filter @heyta/web build` 通过
 
-**M1-4 Mobile 端接入 —— ⚠️ 未完成，且**不能**直接替换（实测结论）**
+**M1-4 Mobile 端接入 —— 当时：⚠️ 不能直接替换（实测结论）；现已补齐**
 
 - 改：`apps/mobile` 用 `@heyta/ui` 的 `TaskList` 替换 `TasksScreen` 里的列表渲染
 - 验：`pnpm --filter @heyta/mobile run build:android:debug` 出包
@@ -224,9 +224,10 @@ M0 全部是**纯搬迁 + 再导出**，无行为改变。任一任务出问题�
 > 44 触控区补偿、checkbox 的 role/state/busy、空态），
 > 本地化内容由宿主注入（**必须整句**，所以 `labels` 每一项都是 `(row) => string`）。
 >
-> **还差的一步是最后一条**：`TasksScreen` 的扁平模式要把分节头插进同一个列表。
-> 在共享组件加上分节支持之前，替换会丢掉分组标题 —— 所以**这一条没做完，
-> 不计入已完成的判据**。
+> **这两步后来都补齐了**（见下面的「M1-4 mobile 替换已完成」）：
+> 分节支持进了共享层，`TasksScreen` 的本地 `TaskRow` 已删除。
+> 上面这张表的价值在于记录**当时判断"不能直接替换"的依据** ——
+> 如果当时硬换，丢掉的就是这些能力，而且不会报错，只会静默少东西。
 >
 > ⚠️ 顺带记一个**刻意选择的默认值**：`onOpenTask` 没传时行体**不可点**，
 > 而**不是**降级成"点行=切换完成"。后者会让"忘了传 onOpenTask"表现成
@@ -295,6 +296,44 @@ M0 全部是**纯搬迁 + 再导出**，无行为改变。任一任务出问题�
 分节形态下共享层负责**展平、跳空组、给稳定 key、行骨架**，
 宿主只给 `renderSectionHeader`。空分组不产生标题这条从 mobile 手写的
 `if (list.length === 0) return;` 提到了共享层，四个端不会各写一遍、也不会有人忘。
+
+### M1-4 mobile 替换已完成（`TasksScreen`）
+
+本地那个 150 行的 `TaskRow` **已删除**（连同新加的注释，文件 763 → 721 行，
++209 / −243）。`TasksScreen` 里 `<FlatList>`、`<Checkbox>`、`function TaskRow`
+的残留**各 0 处**。
+
+**但要注意：这个判据不能只看行数。** 一个文件少 42 行说明不了什么 ——
+真正的产出是把**行机制**从"mobile 一份、web 另一份"变成了一份，
+而 web 那份的代价要到 M3 才收回来。用行数衡量 M1-4 会得出误导性的结论
+（和 M0 那条口径澄清是同一个道理）。
+
+替换后 `TasksScreen` 只剩**属于本端的选择**：
+哪几个分组、什么标题、什么图标、文案怎么说、优先级用哪个色槽。
+其余（排序、行骨架、44 触控区补偿、checkbox 的 role/state/busy、
+空组跳过、分节展平、重排稳定性）全在共享层。
+
+**两个视图都改成了共享分节渲染，但语义刻意不同**：
+
+| 视图 | 空分组 | 理由 |
+|---|---|---|
+| 按今天分组（逾期/今天/收集箱/已完成） | **跳过**（默认） | 一个写着"已完成 0"的标题是纯噪音 |
+| 四象限矩阵 | **保留**（`keepEmptySections`） | 矩阵的价值就在于**四个格子同时在**；藏掉空格会让人以为那个象限不存在 |
+
+这条差异原本是两处手写逻辑，现在是一条有名字、有测试的选项。
+
+⚠️ 替换时抓到并修掉的一个**静默布局 bug**：共享 `TaskList` 第一版自带
+`paddingHorizontal: screen.gutter`，在 web 切片上看完全正常 ——
+但 mobile 的 `<Screen>` **已经**加了同样的 gutter，套上去就是**双倍缩进**。
+症状只是"这一页比别的页窄一点"，不报错。已改为列表**不自带页面边距**
+（页面边距属于宿主，它才知道自己有没有被别的容器包着）。
+
+⚠️ 另记一个类型坑：分节数组的 `meta` 如果不显式标注类型，TS 会把每一项
+各推一个具体类型（`{tone:'danger'} | {tone:undefined} | …`），而
+`TaskSection<TMeta>` 要求**同一个 T**，于是整组赋值失败 —— 报错落在
+`sections={...}` 那一行，看不出是"少了个类型标注"。而 `.map` 的回调
+**只标注左边变量不够**，必须写回调的返回类型，否则 `icon` 被推成字面量
+而不是 `IconName`，图标名拼错就**不会**在编译期报出来。
 
 **M1-4 的前置结论（对 M3 投入决策有用）**
 
@@ -738,7 +777,7 @@ IndexedDB 路径**保留到迁移验证通过之后**再删。两者可并存一
 | **M1-1 / M1-2 / M1-3** ✅ 已完成（`f2c6d84`） | 建 `packages/ui` + `TaskList` + 主题契约；web 端 `react-native-web` 接入 | **+624**（`packages/ui`）+ 74（web 切片入口）⚠️ 净增（M0/M1 口径不适用行数，见上方澄清） | **是**：`apps/web` 与将来的 mobile/鸿蒙 import 同一个 `@heyta/ui` | ✅ **M1 判据 1、2 通过**（真实浏览器实测，见下）；`check:design`/`check:layering`/`check:licenses`/`check:docs` 全绿；ui 包 **15/15 测试** |
 | **M1-4 插槽 + 分节** ✅ 已完成 | `TaskList` 扩成"共享机制 + 宿主内容"；分节形态（联合类型互斥） | +约 150（插槽 + 分节 + 注释）/ −约 40 | **是** | ✅ ui 包 21/21；`check:design`/`check:layering` 全绿 |
 | **M1 徽章** ✅ 已完成 | 图标数据/渲染分离：`lucide` 数据 + 共享 `react-native-svg` 渲染 | +约 260（Icon + TaskBadges + 注释） | **是**：四端字形不可能再漂移 | ✅ **真实浏览器**：4 svg / 13 path、逾期 `#dc2626`≠未逾期 `#94a3b8`、警告三角 3 path vs 日历 5 path |
-| **M1-4 mobile 替换** ⏳ 未做 | 用共享 `TaskList` + `TaskBadges` 换掉 `TasksScreen` 的列表渲染 | （待填） | — | — |
+| **M1-4 mobile 替换** ✅ 已完成 | `TasksScreen` 换用共享 `TaskList` + `TaskBadges`：本地 `TaskRow` **彻底删除** | **−42**（763 → 721；+209 / −243） | **是**：四端同一份行机制 | ✅ mobile typecheck 通过；`check:design`/`check:layering`/`check:licenses`/`check:docs`/**`check:mobile-bundle`** 全绿；`<FlatList>/<Checkbox>/function TaskRow` 残留 **0** 处 |
 | **M1-5** ✅ 脚本已交付 | `scripts/verify-universal-slice.sh` + 浏览器断言 | +约 330（脚本 + 注释）⚠️ 净增 | — | ✅ **8 通过 / 0 失败 / 3 明确未验**（iOS·Android 真机、鸿蒙、桌面加载） |
 | M1-4 收尾（分节支持 + 替换） | 任务列表切片 | — | — | — |
 | M1-5 收尾（鸿蒙 op-sqlite 读写） | 任务列表切片 | — | — | — |

@@ -170,6 +170,13 @@ describe('flattenSections', () => {
     expect(flattenSections([sec('a', []), sec('b', [])])).toEqual([]);
   });
 
+  it('🔴 `keepEmpty` 时保留空组 —— 固定槽位布局（四象限矩阵）需要它', () => {
+    // 矩阵里"这一格是空的"本身就是信息：藏掉会让人以为那个象限不存在，
+    // 而矩阵的价值恰恰在于四个格子**同时**在那儿。所以这是唯一的例外。
+    const rows = flattenSections([sec('q1', []), sec('q2', [mkTask('a')])], { keepEmpty: true });
+    expect(rows.map((r) => r.key)).toEqual(['h-q1', 'h-q2', 'a']);
+  });
+
   it('meta 原样交回（共享层不解释它）', () => {
     const rows = flattenSections([sec('today', [mkTask('a')], '今天')]);
     const header = rows[0];

@@ -19,7 +19,6 @@
 
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-  FlatList,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -52,7 +51,6 @@ import { describeRecurrenceText } from '../lib/recurrence-display';
 import { useText, useTheme, useTokens } from '../theme';
 import {
   Button,
-  Checkbox,
   EmptyState,
   Fab,
   IconButton,
@@ -62,168 +60,42 @@ import {
   Text,
 } from '../ui/kit';
 import { Icon, type IconName } from '../ui/icons';
+/**
+ * 🔴 任务行的**机制**现在来自共享层（M1-4）。
+ *
+ * 以前这个文件里有一个 150 行的本地 `TaskRow`：勾选框、标题、截止/优先级/重复
+ * 三个徽章、删除按钮、无障碍名，全部自己写。web 端另有一套。
+ *
+ * 现在分成两半：
+ *   - **机制**（排序、行骨架、44 触控区补偿、checkbox 的 role/state/busy、
+ *     空组跳过、分节展平）→ `@heyta/ui`，四个端同一份。
+ *   - **内容**（文案、优先级色槽、图标名）→ 仍在本文件，因为这些**本来就不同**：
+ *     共享包不能 import `@heyta/i18n`（它会带进第二份 React，APK 启动即崩）。
+ *
+ * 图标本身通过 `TaskBadges` 共享 —— 字形数据来自框架无关的 `lucide`，
+ * 由共享层用自己的 `react-native-svg` 渲染，所以四个端的字形不可能再漂移。
+ */
+import { TaskBadges, TaskList, type TaskRow as SharedTaskRow, type TaskSection } from '@heyta/ui';
+
+/**
+ * 分节头要显示什么 —— **本端自己的**透传数据。
+ *
+ * 🔴 必须显式声明这个类型并标注到数组上。不标的话 TS 会把数组里每一项的
+ * `meta` 各推一个具体类型，得到 `{tone:'danger'} | {tone:undefined} | …` 的联合，
+ * 而 `TaskSection<TMeta>` 要求**同一个 T**，于是整组赋值失败。
+ * 报错落在 `sections={...}` 那一行，看不出是"少了个类型标注"。
+ */
+type SectionMeta = {
+  readonly icon: IconName;
+  readonly title: string;
+  readonly tone?: 'muted' | 'danger' | 'primary';
+};
 import { openTaskHost } from '../db/open-host';
 import { useMobileSync } from '../sync/store';
 
 import { dueTone, toDueDisplay, type DueDisplayMode } from '../lib/due-display';
 import { priorityBadgeLabel, priorityColorToken } from '../lib/priority';
 import { TaskDetailSheet } from './TaskDetailSheet';
-
-// ─────────────────────────────────────────────────────────────
-// 任务行
-// ─────────────────────────────────────────────────────────────
-
-function TaskRow({
-  task,
-  actions,
-  onChanged,
-  now,
-  dueMode,
-  onOpen,
-}: {
-  task: Task;
-  actions: TaskActions;
-  onChanged: () => void;
-  now: number;
-  dueMode: DueDisplayMode;
-  onOpen: () => void;
-}): React.JSX.Element {
-  const tokens = useTokens();
-  const { t, locale } = useI18n();
-  const [busy, setBusy] = useState(false);
-  // 🔴 完成态读的是 `completedAt`，不是 `completed`。
-  // `Task` 上**没有** `completed` 布尔字段 —— 设计上就用"有没有完成时间"
-  // 表达完成（entities.ts:76：「不另设 completed 布尔，避免两者不一致」）。
-  const done = task.completedAt !== undefined;
-
-  // 🔴 截止显示与档位全部来自 `@heyta/domain` 的共享实现
-  // （`lib/due-display.ts` 只是把它包成"给 UI 的形状"）。
-  // 这里曾经用的是本地的 `formatDue` —— 它与共享实现已经说了两种话
-  // （`已过期` vs `已逾期`、`9月26日` vs `还剩 8 天`）。
-  const due = toDueDisplay(task, dueMode, now, t);
-  const priorityBadge = priorityBadgeLabel(task.priority, t);
-  // 重复规则是**同步读**物化状态（`repeatOf` 不发 op），放在渲染里没有问题。
-  // 它同时决定了要不要多画一个标记、以及读屏时怎么念这条任务。
-  const repeat = actions.repeatOf(task.id);
-  const priorityColor = tokens[priorityColorToken(task.priority ?? Priority.None)];
-
-  const run = useCallback(
-    (p: Promise<unknown>) => {
-      setBusy(true);
-      void p
-        .then(onChanged)
-        .finally(() => setBusy(false));
-    },
-    [onChanged],
-  );
-
-  return (
-    <View
-      style={{
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: tokens['space.1'],
-        minHeight: tokens['size.row-min-height'],
-        // 负外边距把勾选框的 44 触控区拉回与屏幕留白对齐 ——
-        // 视觉上勾选框距屏边 16，但它的可点区域从 16-11=5 开始（仍在屏内）。
-        marginLeft: -(tokens['touch-target.min'] - tokens['size.checkbox']) / 2,
-      }}
-    >
-      <Checkbox
-        checked={done}
-        busy={busy}
-        // 两种状态各写一条**完整的**词条（`complete：{title}` / `uncomplete：{title}`），
-        // 不写成"前缀 + 标题"拼出来的句子 —— 拼接的结果没法整体翻译，
-        // 不同语言的语序（"完成：买牛奶" vs "Complete: Buy milk"）也对不上。
-        label={
-          done
-            ? t('mobile.tasks.a11y.uncomplete', { title: task.title })
-            : t('mobile.tasks.a11y.complete', { title: task.title })
-        }
-        onToggle={() => run(actions.toggleCompleted(task.id))}
-      />
-
-      {/* 🔴 点行 = **打开详情**，不再切换完成。
-          行上的主操作应该是"打开它"；切换完成有专门的勾选框，
-          而且那样更可达：勾选框有自己的无障碍名，读屏用户能直接说
-          "完成：买牛奶"，不必先打开详情再找按钮。 */}
-      <Pressable
-        onPress={onOpen}
-        style={{ flex: 1, paddingVertical: tokens['space.2'], gap: tokens['space.1'] }}
-        accessibilityRole="button"
-        // 重复状态要进无障碍名：读屏用户看不到那个小图标，
-        // 而"这条任务会不会每周回来"直接影响他决定要不要现在做。
-        // 两条完整词条（不带重复 / 带重复），理由同勾选框。
-        accessibilityLabel={
-          repeat === undefined
-            ? t('mobile.tasks.a11y.open', { title: task.title })
-            : t('mobile.tasks.a11y.openRepeat', {
-                title: task.title,
-                repeat: describeRecurrenceText(repeat.rule, t, locale),
-              })
-        }
-      >
-        <Text
-          variant="row-title"
-          tone={done ? 'subtle' : 'default'}
-          numberOfLines={2}
-          style={done ? { textDecorationLine: 'line-through' } : undefined}
-        >
-          {task.title}
-        </Text>
-
-        {due !== null || priorityBadge !== null || repeat !== undefined ? (
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: tokens['space.2'] }}>
-            {due !== null ? (
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: tokens['space.1'] }}>
-                <Icon
-                  name={due.overdue ? 'task.overdue' : 'task.due'}
-                  size="xs"
-                  color={due.overdue ? tokens['color.danger'] : tokens['color.foreground-subtle']}
-                />
-                <Text variant="row-meta" tone={dueTone(due.urgency)}>
-                  {due.text}
-                </Text>
-              </View>
-            ) : null}
-            {/* 🔴 `Priority` 是**数值枚举**（High = 3），不是字符串。
-                我一开始写成 `task.priority === 'high'` —— TS 报了
-                "两个类型没有重叠"，否则这个条件**永远为假**：
-                高优先级任务不会显示标记，而且不报任何错。
-                现在映射只在 `lib/priority.ts` 一处，并有可失败的测试。 */}
-            {priorityBadge !== null ? (
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: tokens['space.1'] }}>
-                <Icon name="task.priority" size="xs" color={priorityColor} />
-                <Text variant="row-meta" style={{ color: priorityColor }}>
-                  {priorityBadge}
-                </Text>
-              </View>
-            ) : null}
-            {/* 重复标记。规则串 → 句子在 `lib/recurrence-display.ts`；
-                **解析**仍然只有 `packages/domain` 一份（`recurrenceParts`）。
-                这里此前直接渲染 `describeRecurrence` 的返回值 —— 那是一句中文，
-                英文界面上会漏出「每周一、三」，而它是跨包的返回值、门禁扫不到。 */}
-            {repeat !== undefined ? (
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: tokens['space.1'] }}>
-                <Icon name="task.repeat" size="xs" color={tokens['color.foreground-subtle']} />
-                <Text variant="row-meta" tone="muted">
-                  {describeRecurrenceText(repeat.rule, t, locale)}
-                </Text>
-              </View>
-            ) : null}
-          </View>
-        ) : null}
-      </Pressable>
-
-      <IconButton
-        icon="task.delete"
-        label={t('mobile.tasks.a11y.delete', { title: task.title })}
-        color={tokens['color.foreground-subtle']}
-        onPress={() => run(actions.remove(task.id))}
-      />
-    </View>
-  );
-}
 
 // ─────────────────────────────────────────────────────────────
 // 新建任务面板
@@ -347,7 +219,9 @@ export function TasksScreen({
   onPendingCountChange?: (pending: number) => void;
 } = {}): React.JSX.Element {
   const tokens = useTokens();
-  const { t } = useI18n();
+  // `locale` 也要：重复规则的句子必须按当前语言说（`describeRecurrenceText`），
+  // 否则英文界面上会漏出「每周一、三」。
+  const { t, locale } = useI18n();
   const [host, setHost] = useState<AppHost | null>(null);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -563,36 +437,129 @@ export function TasksScreen({
 
   const nothing = tasks.length === 0;
 
-  // 用一个扁平的「分组头 + 任务」序列喂给 FlatList ——
-  // 比嵌套 SectionList 更容易控制空分组（空分组不该显示标题）。
-  type Row =
-    | {
-        kind: 'header';
-        key: string;
-        title: string;
-        icon: IconName;
-        count: number;
-        tone?: 'muted' | 'danger' | 'primary';
-      }
-    | { kind: 'task'; key: string; task: Task };
+  /**
+   * 分节数据交给共享 `TaskList`（M1-4）。
+   *
+   * 🔴 以前这里是 30 行手写的「扁平头 + 任务」拼装（`pushGroup` + 一个本地
+   * `Row` 联合类型）。那段逻辑本身没错，但它是**机制**：空组跳过、key 稳定、
+   * 分节展平 —— 这些四个端一模一样，却各写了一遍。
+   * 现在只剩"哪几组、什么标题、什么图标"这个**属于本端的选择**。
+   *
+   * ⚠️ `meta` 里的 `icon` 是各端自己的图标名（`lucide-react-native` 那一套），
+   * 共享层不解释它 —— 它只把整个 `meta` 原样交回给 `renderSectionHeader`。
+   */
+  const listSections: readonly TaskSection<SectionMeta>[] = [
+    { key: 'overdue', tasks: groups.overdue, meta: { icon: 'group.overdue', title: t('mobile.tasks.group.overdue'), tone: 'danger' } },
+    { key: 'today', tasks: groups.dueToday, meta: { icon: 'group.today', title: t('mobile.common.today'), tone: 'primary' } },
+    { key: 'inbox', tasks: groups.inbox, meta: { icon: 'group.inbox', title: t('mobile.tasks.group.inbox') } },
+    { key: 'done', tasks: groups.completed, meta: { icon: 'group.completed', title: t('mobile.tasks.group.completed') } },
+  ];
 
-  const rows: Row[] = [];
-  const pushGroup = (
-    key: string,
-    title: string,
-    icon: IconName,
-    list: Task[],
-    tone?: 'muted' | 'danger' | 'primary',
-  ): void => {
-    // 🔴 空分组不渲染标题 —— 一个写着"已完成 0"的标题是纯噪音。
-    if (list.length === 0) return;
-    rows.push({ kind: 'header', key: `h-${key}`, title, icon, count: list.length, tone });
-    for (const task of list) rows.push({ kind: 'task', key: task.id, task });
-  };
-  pushGroup('overdue', t('mobile.tasks.group.overdue'), 'group.overdue', groups.overdue, 'danger');
-  pushGroup('today', t('mobile.common.today'), 'group.today', groups.dueToday, 'primary');
-  pushGroup('inbox', t('mobile.tasks.group.inbox'), 'group.inbox', groups.inbox);
-  pushGroup('done', t('mobile.tasks.group.completed'), 'group.completed', groups.completed);
+  // 四象限是**固定槽位**布局：空格本身是信息（矩阵的价值就在四个格子同时在），
+  // 所以这里用 keepEmptySections 保留空象限的标题，而不是像上面那样藏掉。
+  //
+  // ⚠️ `.map` 的回调**必须显式写返回类型**：只标注左边的变量不够 ——
+  // `.map` 的泛型先从回调推，推出来 `icon` 是字面量 `"task.priority"` 而不是
+  // `IconName`，于是整组赋值失败。写上返回类型后 `icon` 才会被**校验**
+  // （这也顺带保证图标名拼错会在编译期报出来）。
+  const quadrantSections: readonly TaskSection<SectionMeta>[] = QUADRANT_ORDER.map(
+    (q): TaskSection<SectionMeta> => ({
+      // `Quadrant` 是**数值枚举**，而分节的 `key` 是字符串 —— 显式转，
+      // 不做隐式拼接（隐式转换在这里不会报错，但会让 key 的含义变得含糊）。
+      key: String(q),
+      tasks: quadrants[q],
+      meta: { icon: 'task.priority', title: t(QUADRANT_LABEL_KEY[q]) },
+    }),
+  );
+
+  /**
+   * 每条变更期间把该行置灰 —— 防止连点发出两条 op。
+   *
+   * 以前这个状态在每个 `TaskRow` 内部各存一份（`useState(false)`）。
+   * 提到屏幕这一层是因为行组件现在归共享层所有；提到"一条"而不是"一个集合"
+   * 也够用 —— 用户一次只可能点一行。
+   */
+  const [busyId, setBusyId] = useState<string | null>(null);
+  const runFor = useCallback(
+    (id: string, p: Promise<unknown>): void => {
+      setBusyId(id);
+      void p.then(refresh).finally(() => {
+        setBusyId(null);
+      });
+    },
+    [refresh],
+  );
+
+  /**
+   * 行内插槽。**这些是"内容"，本来就该各端各写**，所以留在本文件。
+   *
+   * ⚠️ 这里不能用 hook（`useTokens` 之类）—— `renderMeta` 是在共享组件的
+   * 渲染过程中被调用的，那不是组件边界。所以颜色一律从屏幕这一层已经拿到的
+   * `tokens` 里取。同理 `notify` 不能在这里调。
+   */
+  const renderTaskMeta = useCallback(
+    (row: SharedTaskRow): React.ReactNode => {
+      const task = row.source;
+      const due = toDueDisplay(task, dueMode, now, t);
+      const badge = priorityBadgeLabel(task.priority, t);
+      const repeat = actions.repeatOf(task.id);
+      return (
+        <TaskBadges
+          due={due === null ? null : { text: due.text, overdue: due.overdue }}
+          priority={
+            badge === null
+              ? null
+              : { text: badge, color: tokens[priorityColorToken(task.priority ?? Priority.None)] }
+          }
+          repeat={repeat === undefined ? null : describeRecurrenceText(repeat.rule, t, locale)}
+        />
+      );
+    },
+    [actions, dueMode, locale, now, t, tokens],
+  );
+
+  const renderTaskTrailing = useCallback(
+    (row: SharedTaskRow): React.ReactNode => (
+      <IconButton
+        icon="task.delete"
+        label={t('mobile.tasks.a11y.delete', { title: row.title })}
+        color={tokens['color.foreground-subtle']}
+        onPress={() => {
+          runFor(row.id, actions.remove(row.id));
+        }}
+      />
+    ),
+    [actions, runFor, t, tokens],
+  );
+
+  /**
+   * 行级无障碍文案。
+   *
+   * 🔴 两条**完整的**词条（`complete：{title}` / `uncomplete：{title}`），
+   * 不是"前缀 + 标题"拼出来的句子 —— 拼接的结果没法整体翻译，
+   * 不同语言的语序也对不上（"完成：买牛奶" vs "Complete: Buy milk"）。
+   * 模板因此必须留在**有 i18n 的这一侧**；共享层只收成品字符串
+   * （它不能 import `@heyta/i18n`，那会带进第二份 React）。
+   *
+   * 重复状态也要进无障碍名：读屏用户看不到那个小图标，而"这条任务会不会
+   * 每周回来"直接影响他决定要不要现在做。
+   */
+  const taskRowLabels = useMemo(
+    () => ({
+      toggleOn: (row: SharedTaskRow) => t('mobile.tasks.a11y.complete', { title: row.title }),
+      toggleOff: (row: SharedTaskRow) => t('mobile.tasks.a11y.uncomplete', { title: row.title }),
+      open: (row: SharedTaskRow) => {
+        const repeat = actions.repeatOf(row.id);
+        return repeat === undefined
+          ? t('mobile.tasks.a11y.open', { title: row.title })
+          : t('mobile.tasks.a11y.openRepeat', {
+              title: row.title,
+              repeat: describeRecurrenceText(repeat.rule, t, locale),
+            });
+      },
+    }),
+    [actions, locale, t],
+  );
 
   return (
     <View style={{ flex: 1 }}>
@@ -659,43 +626,44 @@ export function TasksScreen({
              勾选框 + 标题 + 日期塞不下，会挤成三行。**"矩阵"图形是桌面端的
              形态**；手机上的等效表达是**按象限分组的四段** ——
              信息一模一样，且沿用本页已有的 SectionHeader + 行。
-             落地页卖的是"不用自己想先做哪个"，那个价值在分组里完整保留。 */
-          <View style={{ gap: tokens['space.3'], paddingTop: tokens['space.2'] }}>
-            {QUADRANT_ORDER.map((q) => {
-              const list = quadrants[q];
-              return (
-                <View key={q} style={{ gap: tokens['space.1'] }}>
+             落地页卖的是"不用自己想先做哪个"，那个价值在分组里完整保留。
+
+             ⚠️ 四象限用 `keepEmptySections`：**空格本身是信息**（矩阵的价值
+             就在四个格子同时在）。上面那个按今天分组的列表则相反 ——
+             一个写着"已完成 0"的标题是噪音，所以那边用默认的跳空。 */
+          <View style={{ paddingTop: tokens['space.2'] }}>
+            <TaskList
+              sections={quadrantSections}
+              keepEmptySections
+              onToggleTask={(id) => {
+                runFor(id, actions.toggleCompleted(id));
+              }}
+              onOpenTask={(id) => {
+                setDetailTaskId(id);
+              }}
+              busyTaskId={busyId}
+              labels={taskRowLabels}
+              renderMeta={renderTaskMeta}
+              renderTrailing={renderTaskTrailing}
+              renderSectionHeader={(section) => (
+                <View style={{ paddingTop: tokens['space.3'], gap: tokens['space.1'] }}>
                   <SectionHeader
                     // 🔴 四个象限共用同一个图标。**刻意不给每格配一个语义图标**：
                     // 现有图标集里没有"重要/紧急"这一对，硬套
                     // （比如把 Q3 配成 `conflict.warning`）会给出**错的信号** ——
                     // 那比没有图标更糟。要区分度就得先有字形，那是设计系统的活。
-                    icon="task.priority"
-                    title={t(QUADRANT_LABEL_KEY[q])}
-                    count={list.length}
+                    icon={section.meta.icon}
+                    title={section.meta.title}
+                    count={section.tasks.length}
                   />
-                  {list.length === 0 ? (
+                  {section.tasks.length === 0 ? (
                     <Text variant="row-meta" tone="muted">
                       {t('mobile.tasks.quadrant.empty')}
                     </Text>
-                  ) : (
-                    list.map((task) => (
-                      <TaskRow
-                        key={task.id}
-                        task={task}
-                        actions={actions}
-                        onChanged={refresh}
-                        now={now}
-                        dueMode={dueMode}
-                        onOpen={() => {
-                          setDetailTaskId(task.id);
-                        }}
-                      />
-                    ))
-                  )}
+                  ) : null}
                 </View>
-              );
-            })}
+              )}
+            />
           </View>
         ) : nothing ? (
           <EmptyState
@@ -704,33 +672,31 @@ export function TasksScreen({
             hint={t('mobile.tasks.empty.hint')}
           />
         ) : (
-          <FlatList
-            data={rows}
-            scrollEnabled={false}
-            keyExtractor={(item) => item.key}
-            renderItem={({ item }) =>
-              item.kind === 'header' ? (
-                <SectionHeader
-                  icon={item.icon}
-                  title={item.title}
-                  count={item.count}
-                  tone={item.tone}
-                />
-              ) : (
-                <TaskRow
-                  task={item.task}
-                  actions={actions}
-                  onChanged={refresh}
-                  now={now}
-                  dueMode={dueMode}
-                  onOpen={() => {
-                    setDetailTaskId(item.task.id);
-                  }}
-                />
-              )
-            }
-            contentContainerStyle={{ gap: tokens['space.1'] }}
-          />
+          <View style={{ paddingTop: tokens['space.2'] }}>
+            <TaskList
+              sections={listSections}
+              onToggleTask={(id) => {
+                runFor(id, actions.toggleCompleted(id));
+              }}
+              onOpenTask={(id) => {
+                setDetailTaskId(id);
+              }}
+              busyTaskId={busyId}
+              labels={taskRowLabels}
+              renderMeta={renderTaskMeta}
+              renderTrailing={renderTaskTrailing}
+              renderSectionHeader={(section) => (
+                <View style={{ paddingTop: tokens['space.3'] }}>
+                  <SectionHeader
+                    icon={section.meta.icon}
+                    title={section.meta.title}
+                    count={section.tasks.length}
+                    tone={section.meta.tone}
+                  />
+                </View>
+              )}
+            />
+          </View>
         )}
       </Screen>
 
