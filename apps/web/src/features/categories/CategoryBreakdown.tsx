@@ -195,23 +195,28 @@ function WeeklyBars({ report }: { report: CategoryReport }) {
         return (
           <div className="ht-categories__bar" key={week.start} title={`${week.start} · ${formatDuration(week.totalMs, t)}`}>
             <div className="ht-categories__bar-track">
-              {/* 从下往上堆：最长的类别在**底部**，于是所有柱子的基线
-                  是可比的（从顶部堆会让同一类别在不同柱子里落在不同高度）。 */}
-              {segments
-                .slice()
-                .reverse()
-                .map((segment) => (
-                  <span
-                    className="ht-categories__bar-segment"
-                    key={segment.key}
-                    title={segment.label}
-                    style={{
-                      background: segment.color,
-                      // 高度是**这一段的占比**，不是绝对值 —— 柱子总高由 track 决定
-                      height: `${String((segment.ms / report.peakWeeklyMs) * 100)}%`,
-                    }}
-                  />
-                ))}
+              {/* 从下往上堆，**段序与泳道图的行序一致**（都是总时长降序）：
+                  同一类别在每一根柱子里都落在同一层，用户才能顺着颜色横向读
+                  "这一类这周比上周多还是少"。
+                  🔴 段序**跨周固定**是这里唯一重要的事 —— 不固定的话，
+                  同一个颜色对应的高度每周都在跳，"趋势"就看不出来了。
+                  ⚠️ `column-reverse` 下 DOM 里的第一个孩子落在**底部**，
+                  所以这里**不要**再 `reverse()`：加了它就把最小的那段放到基线，
+                  与注释所写的正好相反。DOM 序 = 行序这一半由
+                  `tests/categories.spec.tsx` 钉住；"底部"那一半是 CSS 语义，
+                  jsdom 不排版，**没有自动检查**。 */}
+              {segments.map((segment) => (
+                <span
+                  className="ht-categories__bar-segment"
+                  key={segment.key}
+                  title={segment.label}
+                  style={{
+                    background: segment.color,
+                    // 高度是**这一段的占比**，不是绝对值 —— 柱子总高由 track 决定
+                    height: `${String((segment.ms / report.peakWeeklyMs) * 100)}%`,
+                  }}
+                />
+              ))}
             </div>
             <span className="ht-categories__bar-label" style={text('caption')}>
               {week.start.slice(5)}

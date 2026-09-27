@@ -535,7 +535,7 @@ export const zhCN = {
   'web.categories.duration.hours': '{hours} 小时',
   'web.categories.duration.hoursMinutes': '{hours} 小时 {minutes} 分',
   'web.categories.lane.aria': '{name}（{kind}），共 {duration}',
-  'web.categories.segment.aria': '{name}：{duration}',
+  'web.categories.segment.aria': '{name}，共 {duration}',
   'web.categories.unassigned': '另有 {duration} 没有归到任何清单或习惯 —— 给任务指定清单，它就会归位。',
   'web.categories.hint.unset': '行首的色块可以在清单和习惯旁边设置：点调色板图标，选 1–8 任意一个。',
   'web.categories.cell.none': '这一周没有记录',

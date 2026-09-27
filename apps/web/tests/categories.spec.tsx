@@ -213,6 +213,45 @@ describe('CategoryBreakdown（真实渲染）', () => {
     expect(levels.some((level) => level !== null && level !== '0')).toBe(true);
   });
 
+  it('🔴 堆叠条的段序 = 泳道图的行序（跨周固定，否则"趋势"看不出来）', () => {
+    // 两行的总时长不同 —— 于是"按行序堆"与"按本周多少堆"必然不同，
+    // 一条"按当周数值临时排序"的实现会被这条抓到。
+    useTaskStore.setState({
+      entities: {
+        ...emptyState(),
+        projects: byId([
+          project({ id: 'p1', name: '深度工作', color: '1' }),
+          project({ id: 'p2', name: '杂事', color: '2' }),
+        ]),
+        tasks: byId([task({ id: 't1', projectId: 'p1' }), task({ id: 't2', projectId: 'p2' })]),
+        focusSessions: byId([
+          session({ id: 'f1', taskId: 't1', actualMs: 50 * 60000 }),
+          session({ id: 'f2', taskId: 't2', actualMs: 10 * 60000 }),
+        ]),
+      },
+      now: NOW,
+    });
+    const el = render(<CategoryBreakdown />);
+
+    const laneNames = [...el.querySelectorAll('.ht-categories__name')].map((n) => n.textContent);
+    expect(laneNames, '行序按总时长降序').toEqual(['深度工作', '杂事']);
+
+    const laneColors = [...el.querySelectorAll('.ht-categories__swatch')].map(
+      (swatch) => (swatch as HTMLElement).style.background,
+    );
+    // 有记录的那一周：两段都在，且**第一段的颜色就是第一行的颜色**。
+    // （段序写反了看不出来差别 —— 但它决定了同一颜色在每根柱子里的层高是否固定，
+    //   而那正是"横向读趋势"的前提。）
+    const track = [...el.querySelectorAll('.ht-categories__bar-track')].find(
+      (t) => t.children.length === 2,
+    );
+    expect(track, '应该有一周同时有两段').toBeDefined();
+    const segmentColors = [...(track?.children ?? [])].map(
+      (segment) => (segment as HTMLElement).style.background,
+    );
+    expect(segmentColors).toEqual(laneColors);
+  });
+
   it('没设色的行照样显示，并给一句可发现的提示（不是追责）', () => {
     useTaskStore.setState({
       entities: {
