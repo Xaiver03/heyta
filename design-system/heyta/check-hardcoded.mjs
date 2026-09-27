@@ -96,6 +96,41 @@ const CHECKS = [
     hint: '用 var(--ht-space-* / --ht-font-size-* / --ht-radius-* / --ht-icon-*)',
   },
   {
+    name: '裸 RN 尺度数字',
+    /**
+     * RN **没有 `px`，也没有 `var()`** —— 间距 / 圆角 / 字号写的是**无单位数字**。
+     * 于是上面那条 `px` 规则在移动端**完全失效**。
+     *
+     * 🔴 实测（2026-09-27，探针文件含 `color:'#2563EB'` + `padding:16` +
+     * `borderRadius:12` + `fontSize:15`）：**4 处硬编码只报出 1 处** ——
+     * 裸 hex 被拦住，三个无单位数字全部漏过。补的就是这个缺口。
+     *
+     * ⚠️ 属性集**刻意收窄**，这是量出来的取舍，不是随手挑的：
+     *
+     *   | 属性集 | 命中 | 性质 |
+     *   |---|---|---|
+     *   | 窄集（本规则）：padding/margin/borderRadius/fontSize/gap | **6 处 / 1 文件** | **全部是真违规，零误报** |
+     *   | 宽集（再加 opacity/width/height/top…） | 29 处 / 9 文件 | 16 处是 `opacity`、5 处 `minWidth`、8 处 `top`/`bottom` —— **大多是合法布局值** |
+     *
+     * 本文件头写着"**宁可少报，不可误报**"，所以只收窄集。
+     * 被**有意排除**的属性及理由：`opacity` 是比例不是尺度；
+     * `width`/`height`/`minWidth` 常由内容或屏幕驱动；`top`/`bottom`/`left`/`right`
+     * 是定位偏移；`borderWidth` 是发丝细节（与 CSS 侧 `1px` 例外同理）。
+     *
+     * `\b` 顺带排除了 `16px` / `12rem`（数字后紧跟字母处没有词边界），
+     * 所以**不会与上面的 `px` 规则重复报同一处**。
+     *
+     * ⚠️ **零值必须在正则里排除，不能靠 ALLOW**：本规则的 `m[0]` 包含
+     * **属性名**（`"padding: 0"`），而 `MATCH_ALLOW` 的
+     * `/^0(px|rem|ms|s)?$/` 是针对**值**写的 —— 拿 `"padding: 0"` 去比
+     * 永远比不中。我第一版就是这样，结果 `apps/web/src/styles/app.css` 里
+     * 35 处 `padding: 0` / `margin: 0` **全部误报**。
+     * `(?!0(?![.\d]))` 精确排除「孤立的 0」，但**保留 `0.5` 之类的小数**。
+     */
+    re: /(?<![\w.-])(?:padding|paddingTop|paddingBottom|paddingLeft|paddingRight|paddingHorizontal|paddingVertical|margin|marginTop|marginBottom|marginLeft|marginRight|marginHorizontal|marginVertical|borderRadius|borderTopLeftRadius|borderTopRightRadius|borderBottomLeftRadius|borderBottomRightRadius|fontSize|gap|rowGap|columnGap)\s*:\s*(?!0(?![.\d]))\d+(?:\.\d+)?\b/g,
+    hint: "RN 侧用 tokens['space.*'] / tokens['radius.*'] / tokens['font-size.*']（`useTokens()` 拿）",
+  },
+  {
     name: '裸动效时长',
     re: /(?<![\w-])\d+(?:\.\d+)?m?s\b/g,
     hint: '用 var(--ht-duration-*)，并配 var(--ht-ease-*)',
