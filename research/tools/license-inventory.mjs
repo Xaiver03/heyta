@@ -161,7 +161,11 @@ for (const p of all) byKind[p.kind].push(p);
 
 // `other` 再分两档：已登记的（放行）与未登记的（失败）。
 // 分档依据是**许可证标识本身** —— 同一个许可只需人判断一次。
-const reviewedOther = byKind.other.filter((p) => Object.hasOwn(REVIEWED_OTHER, p.license));
+const reviewedOther = byKind.other
+  .filter((p) => Object.hasOwn(REVIEWED_OTHER, p.license))
+  // 把登记理由**随数据一起带出去**。渲染器要的是理由原文，
+  // 而不是一个"请你自己去另一个文件里找"的指针 —— 指针会漂，原文不会。
+  .map((p) => ({ ...p, reason: REVIEWED_OTHER[p.license] }));
 const unreviewedOther = byKind.other.filter((p) => !Object.hasOwn(REVIEWED_OTHER, p.license));
 
 /**
@@ -183,58 +187,75 @@ if (jsonOut) {
       2,
     ),
   );
-  process.exit(failing ? 1 : 0);
+  // 🔴 这里**不能**用 `process.exit()`。stdout 是**管道**时写入是异步的，
+  // 而上面那坨 JSON 有 400KB+ —— `exit()` 会在 flush 之前把进程杀掉，
+  // 于是调用方拿到的是**被截断的 JSON**，截断点还常常落在多字节字符中间。
+  //
+  // 实测（2026-09-27）：`node license-inventory.mjs --json | python3 -m json.tool`
+  // 必然失败（`Unterminated string ... position 63395`），而
+  // `node license-inventory.mjs --json > /tmp/x.json` 却完全正常 ——
+  // 差别正是"管道异步 / 文件同步"。这个 bug 极难归因：看起来只是消费方解析错了。
+  //
+  // 改成设 `exitCode` 让进程自然结束，Node 会先把 stdout 排空。
+  // 退出码语义不变（门禁 `check:licenses` 依赖它）。
+  process.exitCode = failing ? 1 : 0;
 }
 
-console.log(`\n依赖树许可证清点（去重后 ${all.length} 个包）\n`);
-console.log(`  宽松许可（可闭源商用） : ${byKind.permissive.length}`);
+// ── 面向人的汇总 ────────────────────────────────────────────────
+//
+// 整块用 `!jsonOut` 把关：`--json` 时**一个字符都不能多打**，
+// 否则管道里会混进非 JSON 文本，消费方又要靠"从第几行开始才是 JSON"来猜。
+if (!jsonOut) {
+  console.log(`\n依赖树许可证清点（去重后 ${all.length} 个包）\n`);
+  console.log(`  宽松许可（可闭源商用） : ${byKind.permissive.length}`);
 
-const licCount = {};
-for (const p of all) licCount[p.license] = (licCount[p.license] ?? 0) + 1;
-console.log('\n  ── 许可证分布（前 12）──');
-for (const [l, n] of Object.entries(licCount).sort((a, b) => b[1] - a[1]).slice(0, 12)) {
-  console.log(`     ${String(n).padStart(4)}  ${l}`);
-}
-
-if (byKind.restricted.length) {
-  console.log(`\n  🔴 需人判断 / 受限 : ${byKind.restricted.length}`);
-  for (const p of byKind.restricted) {
-    console.log(`     ${p.name}@${p.version}  →  ${p.license}`);
+  const licCount = {};
+  for (const p of all) licCount[p.license] = (licCount[p.license] ?? 0) + 1;
+  console.log('\n  ── 许可证分布（前 12）──');
+  for (const [l, n] of Object.entries(licCount).sort((a, b) => b[1] - a[1]).slice(0, 12)) {
+    console.log(`     ${String(n).padStart(4)}  ${l}`);
   }
-}
 
-if (byKind.unknown.length) {
-  console.log(`\n  ⚠️  无许可证字段 : ${byKind.unknown.length}`);
-  for (const p of byKind.unknown.slice(0, 20)) {
-    console.log(`     ${p.name}@${p.version}`);
+  if (byKind.restricted.length) {
+    console.log(`\n  🔴 需人判断 / 受限 : ${byKind.restricted.length}`);
+    for (const p of byKind.restricted) {
+      console.log(`     ${p.name}@${p.version}  →  ${p.license}`);
+    }
   }
-}
 
-if (unreviewedOther.length) {
-  console.log(`\n  ❔ 白名单外、且未登记 : ${unreviewedOther.length}`);
-  for (const p of unreviewedOther) {
-    console.log(`     ${p.name}@${p.version}  →  ${p.license}`);
+  if (byKind.unknown.length) {
+    console.log(`\n  ⚠️  无许可证字段 : ${byKind.unknown.length}`);
+    for (const p of byKind.unknown.slice(0, 20)) {
+      console.log(`     ${p.name}@${p.version}`);
+    }
   }
-  console.log(
-    '     ↳ 这一档**会失败**。要么换成白名单内的许可，要么在\n' +
-      '       research/tools/license-inventory.mjs 的 REVIEWED_OTHER 里逐项登记理由。',
-  );
-}
 
-if (reviewedOther.length) {
-  console.log(`\n  ☑️  白名单外、已逐项登记 : ${reviewedOther.length}`);
-  for (const p of reviewedOther) {
-    console.log(`     ${p.name}@${p.version}  →  ${p.license}`);
-    console.log(`       理由：${REVIEWED_OTHER[p.license]}`);
+  if (unreviewedOther.length) {
+    console.log(`\n  ❔ 白名单外、且未登记 : ${unreviewedOther.length}`);
+    for (const p of unreviewedOther) {
+      console.log(`     ${p.name}@${p.version}  →  ${p.license}`);
+    }
+    console.log(
+      '     ↳ 这一档**会失败**。要么换成白名单内的许可，要么在\n' +
+        '       research/tools/license-inventory.mjs 的 REVIEWED_OTHER 里逐项登记理由。',
+    );
   }
-}
 
-if (flaggedOnly) {
-  console.log('\n（--flagged：只列需人判断的项；退出码仍反映是否存在不合格依赖）');
-  process.exit(failing ? 1 : 0);
-}
+  if (reviewedOther.length) {
+    console.log(`\n  ☑️  白名单外、已逐项登记 : ${reviewedOther.length}`);
+    for (const p of reviewedOther) {
+      console.log(`     ${p.name}@${p.version}  →  ${p.license}`);
+      console.log(`       理由：${p.reason}`);
+    }
+  }
 
-console.log(
-  `\n结论：${failing ? '存在需要处理的项 —— 见上 ❌' : '全部依赖均为宽松许可（含已登记的例外）✅'}\n`,
-);
-process.exit(failing ? 1 : 0);
+  if (flaggedOnly) {
+    console.log('\n（--flagged：只列需人判断的项；退出码仍反映是否存在不合格依赖）');
+  } else {
+    console.log(
+      `\n结论：${failing ? '存在需要处理的项 —— 见上 ❌' : '全部依赖均为宽松许可（含已登记的例外）✅'}\n`,
+    );
+  }
+
+  process.exitCode = failing ? 1 : 0;
+}
