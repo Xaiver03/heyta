@@ -14,7 +14,7 @@ export default defineConfig({
    * `package.json` 里是 `"type": "module"`，所以扩展名必须是 `.cjs` ——
    * 否则 `.js` 会被当成 ESM，而内容却是 CJS。
    */
-  entry: { main: 'src/main.ts', preload: 'src/preload.ts' },
+  entry: { main: 'src/main.ts', preload: 'src/preload.ts', smoke: 'src/smoke.ts' },
   format: ['cjs'],
   outExtension: () => ({ js: '.cjs' }),
   target: 'node22',

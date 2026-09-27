@@ -11,7 +11,8 @@
     "typecheck": "tsc --noEmit -p tsconfig.spec.json",
     "test": "vitest run",
     "test:watch": "vitest",
-    "start": "electron dist/main.cjs"
+    "start": "electron dist/main.cjs",
+    "smoke": "electron dist/smoke.cjs"
   },
   "dependencies": {
     "@heyta/node-host": "workspace:*"
