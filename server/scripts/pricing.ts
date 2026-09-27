@@ -309,7 +309,12 @@ export const describeCopyFootprint = (input: {
  */
 const AUDIT_TAIL = 20;
 
-const runShow = async (sql: SqlExecutor): Promise<void> => {
+/**
+ * `show` 的实现。**导出是为了能被测试直接驱动**：它收一个 `SqlExecutor`，
+ * 所以 PGlite 上跑真 SQL 就能验证"审计打出来了、分叉告警置了退出码"，
+ * 而不必先有一台 PostgreSQL（本地 Prisma Postgres dev server 常年不在跑）。
+ */
+export const runShow = async (sql: SqlExecutor): Promise<void> => {
   const overrides = await loadPriceOverrides(sql);
   const { coupons, invalid } = await loadCoupons(sql);
   const now = Date.now();
@@ -384,7 +389,8 @@ const runShow = async (sql: SqlExecutor): Promise<void> => {
   }
 };
 
-const runSetPrice = async (sql: SqlExecutor, command: Extract<PricingCommand, { kind: 'set-price' }>): Promise<void> => {
+/** `set-price` 的实现。导出理由同 `runShow`。 */
+export const runSetPrice = async (sql: SqlExecutor, command: Extract<PricingCommand, { kind: 'set-price' }>): Promise<void> => {
   const overrides = await loadPriceOverrides(sql);
   const now = Date.now();
   const before = currentEffective(overrides, command.priceId, command.currency, now);
@@ -417,15 +423,42 @@ const runSetPrice = async (sql: SqlExecutor, command: Extract<PricingCommand, { 
   // 收银台按库里这一版收钱，而落地页 / 法务 / 门禁读的是代码基线 ——
   // 只改库、不改基线，页面就会印 ¥5 而实际收 ¥139，且所有门禁都是绿的。
   // 有分叉就以**非零退出码**结束：这不只是提示，是一个会失败的断言点。
+  //
+  // ⚠️ 比的是**改完之后此刻真正生效**的那一版，不是刚发布的那个数：
+  // 排期到未来的改价还没生效，收银台现在收的仍是上一版 —— 拿未生效的价去告警
+  // 会说错话（"库里现在收 ¥13"在那一刻是假的，运营会去改不该改的文案）。
+  // 这也让"排期改价"这个正常操作不会被误判成分叉。
   const baselineEntry = DEFAULT_PRICE_BOOK.find(
     (entry) => entry.priceId === command.priceId && entry.currency === command.currency,
   );
-  const footprint = describeCopyFootprint({
-    priceId: command.priceId,
-    currency: command.currency,
-    baselineMinor: baselineEntry?.amountMinor ?? command.amountMinor,
-    effectiveMinor: command.amountMinor,
-  });
+  const effectiveNow = currentEffective(await loadPriceOverrides(sql), command.priceId, command.currency, now);
+
+  // 🔴 空隙检测。`resolveEffectivePrice` 的裁决是"库里对该 key 有版本 → **只在覆盖里找**，
+  // 找不到就抛 `PriceNotEffectiveError`，**绝不回落基线**"（那是刻意设计：回落会变成
+  // 静默按旧价收款）。代价是：把某个 key 的**第一个**版本排到未来，就会出现一段
+  // "有版本、但没有一版生效"的窗口 —— 收银台在这段时间直接拒单。
+  //
+  // 实测（纯函数，不经库）：基线 500 / 覆盖 1300 排到 +7 天 → `PriceNotEffectiveError`。
+  // 只有**第一个**版本会这样：后续版本会把上一版收口（`effective_until = 新版起点`），
+  // 所以排期本身是好的，坏的只是"第一次就排期"。
+  if (baselineEntry !== undefined && effectiveNow === null) {
+    console.log('\n🔴 你造出了一个**价格空隙**：这个 key 在库里已有版本，但没有一版在**此刻**生效。');
+    console.log('   裁决规则是"有覆盖就不回落基线"，所以从现在到新版本生效为止，收银台会**直接拒单**');
+    console.log('   （`PriceNotEffectiveError`），一张订单都报不出价。');
+    console.log('   典型触发：把某个 key 的**第一个**版本排到未来（后续版本会收口上一版，不留空隙）。');
+    console.log('   要么现在就先发一版立即生效的过渡价，要么把 `--effective-from` 改到当前或更早。');
+    process.exitCode = 1;
+  }
+
+  const footprint =
+    baselineEntry === undefined || effectiveNow === null
+      ? null
+      : describeCopyFootprint({
+          priceId: command.priceId,
+          currency: command.currency,
+          baselineMinor: baselineEntry.amountMinor,
+          effectiveMinor: effectiveNow.amountMinor,
+        });
   if (footprint !== null) {
     console.log(`\n${footprint}`);
     console.log('\n🔴 退出码 1：价格文案与实收价分叉。这不是"改价失败/已回滚"—— 价**已经改了**，');
