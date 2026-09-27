@@ -259,11 +259,27 @@ git merge --no-ff feat/ai-module-2-journey
 cd .worktrees/ai-m2
 export PATH="/opt/homebrew/bin:/usr/local/bin:$PATH"
 
-# 用工作副本里自己那份脚本，别用 ../../scripts（那是主检出的另一份副本 —— 两份会漂移）
-node scripts/check-module-boundaries.mjs --module 2 --rev ai-remediation-fork   # 0 越界
-node scripts/check-ui-language.mjs                                             # exit 0
-pnpm --filter @heyta/web test                                                  # 不低于 527 passed
+# 🔴 门禁脚本与政策文档的**唯一真源在主检出** —— 跑主检出那一份，不要跑工作副本里的副本：
+#    副本冻在分叉点，修好的 bug 进不来。本轮就踩过一次：分叉点那份门禁把一份
+#    过期的索引误报成「越界 1 个文件」，而文件内容其实是对的。
+MAIN=$(git worktree list --porcelain | awk '/^worktree /{print $2; exit}')
+
+node "$MAIN/scripts/check-module-boundaries.mjs" --module 2 --rev ai-remediation-fork   # 0 越界
+node "$MAIN/scripts/check-ui-language.mjs"                                             # exit 0
+pnpm --filter @heyta/web test                                                          # 不低于 527 passed
 ```
 
 分叉点 `5d0d77f` 上实测的基线是 **0 类型错误 / 527 passed / 12 skipped**；
 收工时只要**不低于**它、且 **0 failed**，就可以喊人合并 —— **不需要等另外两个模块**。
+
+### 附：如果门禁说你改了某个文件，而 `git diff` 说没有
+
+先看 `git status --porcelain` 的第一列：`MM` 表示"索引 vs HEAD 有差异"，而
+**工作区可能与 HEAD 完全一致** —— 那是过期的索引，不是你的改动。清掉它：
+
+```bash
+git reset --hard HEAD      # 索引与工作区都对齐到 HEAD；改动已在提交里，不会丢
+```
+
+（这条也是门禁脚本被修的原因：它现在只看**未跟踪文件**与**工作区 vs HEAD**，
+不再把索引差异算作改动。）
