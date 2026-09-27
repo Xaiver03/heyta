@@ -13,6 +13,7 @@ import { useState } from 'react';
 import { cssVar, type TokenName } from '@heyta/design-system';
 import { useI18n, type I18nValue } from '@heyta/i18n';
 import type { SyncStatus } from '@heyta/sync-client';
+import type { HostedAuthSession } from '@heyta/app-host';
 import {
   AlertTriangle,
   CheckCircle2,
@@ -23,6 +24,7 @@ import {
   X,
 } from 'lucide-react';
 
+import { AuthPanel } from '../auth/AuthPanel.js';
 import { statusColorToken, useSyncStore } from './store.js';
 import { SYNC_FAILURE_KEY } from './sync-failure-copy.js';
 
@@ -110,6 +112,15 @@ export function SyncBar() {
   const [baseUrl, setBaseUrl] = useState(sync.baseUrl);
   const [token, setToken] = useState('');
   const [password, setPassword] = useState('');
+  /**
+   * 认证面板的开合。
+   *
+   * 🔴 它在**同步设置对话框里面**打开，而不是另做一个更靠前的入口：
+   * 认证要用的服务端地址就是这里的地址，两者分开会让用户对着 A 登录、
+   * 把令牌存到 B。状态留成局部 state 是因为**只有一个入口**打开它 ——
+   * 两个入口才需要提到 store 里（见 `store.ts` 里 `settingsOpen` 的注释）。
+   */
+  const [authOpen, setAuthOpen] = useState(false);
 
   return (
     <>
@@ -236,6 +247,18 @@ export function SyncBar() {
               />
             </label>
 
+            {/* 「令牌从哪来」的入口。手填**保留**（自建用户可能已有令牌），
+                这里只是补上一条不必手填的路。 */}
+            <p style={hintStyle}>{t('web.auth.tokenHint')}</p>
+            <button
+              type="button"
+              className="ht-btn ht-btn--ghost"
+              style={{ alignSelf: 'flex-start' }}
+              onClick={() => setAuthOpen(true)}
+            >
+              {t('web.auth.open')}
+            </button>
+
             <label style={labelStyle}>
               {t('web.sync.password.label')}
               <input
@@ -286,6 +309,19 @@ export function SyncBar() {
           </div>
         </div>
       )}
+
+      {authOpen ? (
+        <AuthPanel
+          baseUrl={baseUrl}
+          onClose={() => setAuthOpen(false)}
+          onSignedIn={(session: HostedAuthSession) => {
+            // 认证 store 已经把令牌写进了同步配置；这里把**这个对话框的输入框**
+            // 也对齐，否则用户接着点「保存并同步」会用空输入框把它覆盖掉。
+            setToken(session.token);
+            setAuthOpen(false);
+          }}
+        />
+      ) : null}
     </>
   );
 }
@@ -296,6 +332,14 @@ const labelStyle: React.CSSProperties = {
   gap: cssVar('space.1'),
   fontSize: cssVar('font-size.2xs'),
   color: cssVar('color.foreground-muted'),
+};
+
+/** 字段下方的说明句 —— 比标签更轻，但仍然可读。 */
+const hintStyle: React.CSSProperties = {
+  margin: 0,
+  fontSize: cssVar('font-size.2xs'),
+  color: cssVar('color.foreground-muted'),
+  lineHeight: cssVar('line-height.normal'),
 };
 
 const fieldStyle: React.CSSProperties = {

@@ -172,7 +172,7 @@ export async function pageRoutes(fastify: FastifyInstance) {
           <body data-token="${escapeHtml(token)}">
             <div class="container">
               <h1>Complete Your Login</h1>
-              <p>Click the button below to finish logging in to SuperSync.</p>
+              <p>Click the button below to finish logging in to heyta.</p>
               <button id="login-btn">Log In</button>
               <p class="error" id="error"></p>
               <p class="success" id="success">Login successful! Redirecting...</p>
