@@ -29,6 +29,45 @@
 
 ---
 
+## 0.5 开工前：**先确认分叉点是绿的** —— 本轮它不绿
+
+worktree 隔离防的是"互相覆盖"，它**防不住"分叉点自己就构建不过"**。
+本轮实测（tag `ai-remediation-fork`）：
+
+| 项 | 数字 |
+|---|---|
+| `apps/web` 类型错误 | **22 个 / 12 个文件** |
+| `@heyta/web` 测试 | **47 failed** / 480 passed / 12 skipped |
+
+成因还是同一个形状：**改动只提交了一半** —— `apps/web` 那半提交了，
+`packages/*` 那半还躺在主检出的工作区里。可复跑的证据：
+
+```bash
+# PreferenceHint 在**全部已提交历史**里都没有 facts，而 head 上已经有代码在调它
+git log -S facts -- packages/domain/src/            # 输出为空
+grep -n "hint\.facts" apps/web/src/features/ai/AiDuration.tsx
+```
+
+被已提交代码引用、却从未提交的另一半（共 9 处）：
+`PreferenceHint.facts`、`PreferenceEvidence`、`clockText`、`roundedDaysText`、
+`WithheldPreference.remaining`、`Preference.evidenceFacts`、`QuadrantDropPlan`、
+`TaskActions.setQuadrantDrop`、`StorageError`。
+
+🔴 **分叉点红的时候不要开工。** 你会分不清"是我改坏的"还是"本来就坏"。
+本轮 ai-m2 是靠 `git stash` 前后各跑一次全量、逐项对齐
+（47 failed/480 passed → 47 failed/482 passed）才敢说"本改动 +2 通过、0 新增失败"。
+
+🔴 **`pnpm check` 跑在脏检出上等于没跑。** 这是本轮最贵的一课：
+上一轮的交付报告写着"`pnpm check` exit 0"，而那个检出里躺着别人 102 个未提交文件 ——
+**它验证的不是任何一个提交**；已提交状态实际是红的（就是上面那 22 + 47）。
+→ 门禁必须在**干净的 worktree 上、对着某个提交**跑。这是隔离的第二个好处。
+
+**分叉点 tag 的移动协议**：`ai-remediation-fork` 只允许在**没有任何模块开始提交之前**移动。
+本轮它移动过两次（都是预检修复）。一旦有人提交了，再改分叉点就必须
+`git rebase ai-remediation-fork`（本轮 ai-m2 就是这么跟上来的）—— 所以**别再动它**。
+
+---
+
 ## 1. 四条规则
 
 ### R1 · 一个模块一个 worktree（永不共用检出）
@@ -44,10 +83,25 @@ git worktree add .worktrees/ai-m2 -b feat/ai-module-2-journey      "$FORK"
 git worktree add .worktrees/ai-m3 -b feat/ai-module-3-memory-moat  "$FORK"
 
 # 每个 worktree 需要自己的 node_modules（pnpm 走全局 store，硬链接，很快）
+# 实测：ai-m1 32.5s / ai-m2 24.2s / ai-m3 20.5s
 for d in ai-m1 ai-m2 ai-m3; do (cd ".worktrees/$d" && pnpm install --frozen-lockfile); done
+
+# 🔴 还要各自 build 一次。**这一步不做，测试根本跑不起来**：
+# 包间是通过 `dist/` 消费的（`@heyta/i18n` 的入口指向 `dist/index.js`），
+# 而新 worktree 里没有任何 `dist/`。实测（ai-m2，未 build）：
+#   Failed to resolve entry for package "@heyta/i18n" ... Tests: no tests
+# 它长得像"测试配置坏了"，其实是"工作副本还没编译过"。
+#
+# ⚠️ **不要用 `pnpm -r build`**：它会把 `server` 一起带上，而 `server` 的
+# prebuild 是 `prisma generate`，它要写 `~/.cache/prisma/...`（工作区之外）——
+# 在受限沙箱里实测报 `EPERM ... utime 'libquery-engine'` 并**中断整条链**。
+# 那跟三个模块毫无关系。只建自己要用的那棵子图：
+for d in ai-m1 ai-m2 ai-m3; do (cd ".worktrees/$d" && pnpm --filter "@heyta/web..." build); done
 ```
 
 `.worktrees/` 已在 `.git/info/exclude` 里（本仓库既有约定，见 `.worktrees/motivation`）。
+`dist/` 是构建产物、不进 git，所以每个工作副本都得自己来一遍 —— 这是隔离的**代价**，
+一次性的（后面只 `pnpm -r build` 增量重建被改动的包）。
 
 ### R2 · 租约是可执行的，不是一句话
 

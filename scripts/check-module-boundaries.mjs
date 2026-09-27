@@ -31,8 +31,9 @@
  * node scripts/check-module-boundaries.mjs --premerge --rev origin/main
  * ```
  *
- * `--rev <rev>` 用 `<rev>...HEAD` 的三点差异（即"本分支相对分叉点改了什么"）。
- * 不传 `--rev` 时看**工作区未提交**的改动（`git status --porcelain`）。
+ * `--rev <rev>` 用 `<rev>...HEAD` 的三点差异（即"本分支相对分叉点改了什么"），
+ * **并上**工作区未提交的改动 —— 否则没提交时会得到一条假绿（见 `changedVsRev`）。
+ * 不传 `--rev` 时只看**工作区未提交**的改动（`git status --porcelain`）。
  *
  * 退出码：0 = 全部在租约内；1 = 有越界（逐条列出）；2 = 用法错误。
  */
@@ -164,9 +165,20 @@ function changedInWorktree() {
     .filter((path) => path !== '');
 }
 
+/**
+ * `--rev` 的比较结果 —— **必须并上工作区未提交的改动**。
+ *
+ * 🔴 只用 `rev...HEAD` 会漏掉还没提交的东西。实测（ai-m2，改了 6 个文件
+ * 但一个都没提交）：`--module 2 --rev <fork>` 报「改动 0 个文件 / ✅ 全部在租约内」。
+ * 那是一条**假绿** —— 门禁宣布"你没越界"，而它根本没看你的改动。
+ *
+ * 这正是本轮在治的那个形状（**门禁跑在不完整的输入上**），所以在这里一并修掉：
+ * 开发中用 `--rev` 与直接用工作区模式，应当得到同样的结论。
+ */
 function changedVsRev(rev) {
-  const out = git(['diff', '--name-only', `${rev}...HEAD`]);
-  return out === '' ? [] : out.split('\n');
+  const committed = git(['diff', '--name-only', `${rev}...HEAD`]);
+  const list = committed === '' ? [] : committed.split('\n');
+  return [...new Set([...list, ...changedInWorktree()])].sort();
 }
 
 // ─────────────────────────────────────────────────────────────────────────
@@ -250,7 +262,7 @@ const files = args.rev === undefined ? changedInWorktree() : changedVsRev(args.r
 console.log(
   args.rev === undefined
     ? '比较基准：工作区未提交改动\n'
-    : `比较基准：${args.rev}...HEAD\n`,
+    : `比较基准：${args.rev}...HEAD ＋ 工作区未提交改动\n`,
 );
 
 if (args.premerge) {
