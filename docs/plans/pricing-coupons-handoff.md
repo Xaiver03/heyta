@@ -350,10 +350,23 @@ cd apps/landing && npx vitest run              # 期望 71 passed
 
 1. **接上收银台**（④⑤）—— 见第 5.1 节，`createCheckout` 已就绪，缺的是路由 + 客户端按钮。
    没有这一步，"定价策略"再对也没有一分钱收入。
-2. **让 ¥12 可交付**（⑦⑧）—— `Subscription` 加 `priceId`/`grants` 列 + 迁移 + 权益按 grants 分支；
-   云端 AI 端点 + 300 次/月 计量（或一条 ADR 明确"不做"）。
-   **在此之前不要放开 ¥12 的售卖**：收了钱交付不了。
+2. **让 ¥12 可交付**（⑦⑧）
+   - ✅ **已做**：`Subscription.price_id` + `grants` 列 + 迁移
+     `20260929000000_add_subscription_grants`（含 `['hosting']` 回填，否则开关一打开
+     已付费用户会被当场拒绝）+ 权益按 `grants` 分支（`evaluateCapability`）。
+     `¥5` 与 `¥12` 从此在代码里真的可分。
+   - ✅ **已做（决定）**：云端 AI 端点 + 300 次/月 计量**本轮不实现**，
+     由 [ADR-0023](../adr/0023-managed-ai-quota-not-implemented.md) 记录，
+     含**最小实现清单**与硬约束「计量存在之前 `hosted-ai-monthly` 不得被售卖」；
+     `pnpm check:ai-quota` 把承诺的数字与状态绑起来。
+   - ❌ **仍缺**：端点、计量、设置页的「本周期已用 X / 300 次」（法务 §5.3 承诺了它）。
+   **在计量落地之前不要放开 ¥12 的售卖**：收了钱交付不了。
 3. **落地页 → 应用 → 账户的路**（③）—— 落地页外链 + web 注册/登录。
 4. **运营身份与鉴权**（§11.3）—— 目前改价 = 服务器 shell 权限，审计不绑定已认证身份。
+   **唯一管理入口**是 `server/scripts/pricing.ts`（`pnpm --filter server pricing`），
+   它**没有**鉴权、**没有**角色、**没有** HTTP 面 —— 见
+   [pricing-and-coupons.md](../reference/pricing-and-coupons.md) §7 第 14 条。
+   在有意引入 admin 路由之前，这条缺口应当保持**显式**，而不是被一个"内网就安全"的假设盖住。
+
 5. **海外通道**（§11.2）—— 通道未定前，落地页的 `$5/$12` 要么标注"仅限中国区"，
    要么先撤掉；同时给金额加**币种断言**（现在 USD 单会被微信通道按 CNY 发出去）。
