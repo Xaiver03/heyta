@@ -2138,8 +2138,15 @@ L3 叙事三层**已实现**，**并已落到 `main`**（merge commit `84cc7f5`�
    ① **反证**：把服务端下发的 JSON 原样丢给 `navigator.credentials.create()`，Chromium 会以
    `TypeError: Failed to read the 'publicKey' prope…` 拒掉 —— 证明"JSON ↔ ArrayBuffer"转换层不是多余的；
    ② 把产出的 `clientDataJSON` 解出来，`challenge` 必须**原样回显**（长度对但内容错也会被它抓住）。
-   ⚠️ **找回通行密钥仍然没有界面**（`/api/passkey/recover/*` 三个端点在 app-host 里有函数、没有入口），
-   用户自助**增删凭据**也没有 UI 与端点。
+   ✅ **找回通行密钥的入口已补**（2026-09-27）：面板上新增
+   "丢失了通行密钥？发一封找回链接"（`store.ts` 的 `requestRecovery` → `POST /api/recover/passkey`）。
+   🔴 **同时纠正一条这里记错的结论**：上面曾写"三个端点在 app-host 里有函数、没有入口"，
+   读起来像整条流程都缺。**恢复本身早就有** —— 是服务端渲染的 `/recover-passkey` 页面 +
+   `recover-passkey.js`（线上实测两者都 200）；那一步必须在真实浏览器里调
+   `navigator.credentials.create()`，本来就不该在 SPA 里。**缺的只是"触发那封邮件"这一步。**
+   教训：**只在 `apps/web` 里搜，就会把服务端渲染的流程误判成"没做"。**
+   验收：9 条单测 + 变异验证（按钮 `onClick` 换空操作即转红）。
+   ⚠️ 仍然没有的：用户自助**增删凭据**（没有 UI 也没有端点）。
 3. **导出**：`packages/app-host/src/export-dump.ts`。含**墓碑**与完整 op-log，
    另有可核对的 `counts`（丢掉墓碑的"备份"回放时已删数据会复活）。
    入口在 Web 设置页与 node-host CLI，**移动端没有**。**只能导出，不能导回。**
