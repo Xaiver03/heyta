@@ -174,6 +174,16 @@ export class OpLogEngine {
     await this.options.store.discardPendingUpload(opIds);
   }
 
+  /**
+   * 把「服务端永久拒绝」的 op 移出上传队列（**不删除** op、**不标成已上传**）。
+   *
+   * 与 {@link discardPendingUpload} 是两件事，别合并：那个表达"我们不再想上传它"，
+   * 这个表达"服务端说它永远不会被接受"。混成一个会让"数据在云上吗"无法回答。
+   */
+  async markRejected(opIds: string[]): Promise<void> {
+    await this.options.store.markRejected(opIds);
+  }
+
   /** 按 op id 取回本地 op（用户手动解决冲突时用它重新派发）。 */
   async getOpById(opId: string): Promise<Operation<string> | undefined> {
     const all = await this.options.store.getAllOps();

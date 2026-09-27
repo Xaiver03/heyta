@@ -105,14 +105,26 @@ export type ApplyStatus = 'pending' | 'applied' | 'failed';
  *
  * `pending`   —— 尚未成功上传给服务端（离线队列就是它）
  * `uploaded`  —— 服务端已接受
+ * `rejected`  —— 服务端**永久拒绝**，已移出队列
  *
  * 为什么不用 `op.seq === 0` 表示"没上传"：那样无法**建索引**，
  * 每次同步都要全表扫描。而且服务端理论上可能分配 seq 0。
  * 显式状态比特判可靠。
+ *
+ * 🔴 **`rejected` 不能并进 `uploaded`。**
+ *
+ * 服务端可能**永久拒绝**一条 op：`INVALID_CLIENT_ID` 说明这条 op 根本不属于本机
+ * （比如本地库里混进了另一台设备的残留 op），`INVALID_OP_ID` 说明这个 id 已经被
+ * 另一个 op 占用。这类 op 重试多少次都不会被接受，所以**必须移出待上传队列** ——
+ * 否则它会每次同步都被重传、每次都被拒，设备永远卡在"同步失败 + 待上传数不减"。
+ *
+ * 但它**不是上传成功**。标成 `uploaded` 等于说"这条数据在云上"，而那是假话：
+ * 待上传数会归零，数据却哪都没去，用户再也没机会知道它丢了。
+ * 所以它是**第三种状态**：不在队列里，也不声称成功。
  */
-export type UploadStatus = 'pending' | 'uploaded';
+export type UploadStatus = 'pending' | 'uploaded' | 'rejected';
 
-export const UPLOAD_STATUSES: readonly UploadStatus[] = ['pending', 'uploaded'];
+export const UPLOAD_STATUSES: readonly UploadStatus[] = ['pending', 'uploaded', 'rejected'];
 
 /**
  * 把上面那些「指向 Operation 内部字段」的常量在类型层面钉死。
