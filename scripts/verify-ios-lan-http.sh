@@ -88,7 +88,7 @@ elif len(booted) == 1:
     echo "      显式指定：IOS_UDID=<udid> bash scripts/verify-ios-lan-http.sh" >&2
     exit 1
   fi
-  echo "   （自动选中 UDID=$UDID，设备名「$DEVICE_NAME」）"
+  echo "   （自动选中 UDID=${UDID}，设备名「${DEVICE_NAME}」）"
 fi
 
 ACCEPT_NAME="iOS 局域网明文 HTTP（私有 IP 字面量）"
@@ -222,13 +222,13 @@ set_field() {  # <标签> <值> [--secure]
   local xy cur i=0 want_len got_len
 
   xy=$(idb_field_center "$label" 2>/dev/null) || {
-    echo "      ↳ set_field「$label」失败：界面上没有这个输入框" >&2; return 1
+    echo "      ↳ set_field「${label}」失败：界面上没有这个输入框" >&2; return 1
   }
   # 三击全选（不是单击）—— 单击是在**光标处插入**，会把新值拼进旧值里。
   # 这条踩得很实：2a 曾把地址写成 `http://10.0.2.2:3000http://192.168.1.5:3007`。
-  idb_ui multi-tap $xy --count 3 >/dev/null 2>&1 || { echo "      ↳ set_field「$label」失败：三击选不中 @$xy" >&2; return 1; }
+  idb_ui multi-tap $xy --count 3 >/dev/null 2>&1 || { echo "      ↳ set_field「${label}」失败：三击选不中 @$xy" >&2; return 1; }
   sleep 1
-  idb_ui text "$val" >/dev/null 2>&1 || { echo "      ↳ set_field「$label」失败：输入没被接受" >&2; return 1; }
+  idb_ui text "$val" >/dev/null 2>&1 || { echo "      ↳ set_field「${label}」失败：输入没被接受" >&2; return 1; }
 
   # 🔴 **读回要轮询，不能睡一下就下结论。**
   #    实测：225 字符的令牌输入后立刻读，会读到只有 ~157 字符的**前缀** ——
@@ -254,9 +254,9 @@ set_field() {  # <标签> <值> [--secure]
   done
 
   if [ "$mode" = "--secure" ]; then
-    echo "      ↳ set_field「$label」失败（等了 ${i}s）：期望 $want_len 位，读回 $got_len 位" >&2
+    echo "      ↳ set_field「${label}」失败（等了 ${i}s）：期望 $want_len 位，读回 $got_len 位" >&2
   else
-    echo "      ↳ set_field「$label」失败（等了 ${i}s）：期望 '$val'，读回 '$cur'" >&2
+    echo "      ↳ set_field「${label}」失败（等了 ${i}s）：期望 '$val'，读回 '$cur'" >&2
   fi
   return 1
 }
@@ -333,8 +333,8 @@ else
   summary "$ACCEPT_NAME"
 fi
 
-[ -f "$TOKEN_FILE" ] || { bad "缺 $TOKEN_FILE（访问令牌）"; summary "$ACCEPT_NAME"; }
-[ -f "$E2EE_FILE" ] || { bad "缺 $E2EE_FILE（端到端加密口令）"; summary "$ACCEPT_NAME"; }
+[ -f "$TOKEN_FILE" ] || { bad "缺 ${TOKEN_FILE}（访问令牌）"; summary "$ACCEPT_NAME"; }
+[ -f "$E2EE_FILE" ] || { bad "缺 ${E2EE_FILE}（端到端加密口令）"; summary "$ACCEPT_NAME"; }
 TOKEN=$(tr -d '\n' < "$TOKEN_FILE")
 E2EE=$(tr -d '\n' < "$E2EE_FILE")
 ok "凭据已读入（令牌 ${#TOKEN} 字符，口令 ${#E2EE} 字符）"
@@ -347,9 +347,9 @@ if [ -z "$LAN_IP" ]; then
   summary "$ACCEPT_NAME"
 fi
 case "$LAN_IP" in
-  127.*) bad "LAN IP 解析成了环回地址 $LAN_IP，本验收无效"; summary "$ACCEPT_NAME" ;;
+  127.*) bad "LAN IP 解析成了环回地址 ${LAN_IP}，本验收无效"; summary "$ACCEPT_NAME" ;;
 esac
-ok "本机 LAN IP = $LAN_IP（既不是 localhost，也不是 127.0.0.1）"
+ok "本机 LAN IP = ${LAN_IP}（既不是 localhost，也不是 127.0.0.1）"
 
 # 服务端必须真的从这个地址可达 —— **否则实验 B 失败会被误判成 ATS 拦截**。
 if ! curl -s -m 5 -o /dev/null "http://$LAN_IP:$PORT/health"; then
@@ -427,7 +427,7 @@ BEFORE_LAST=$(lastsync_line "$BEFORE")
   bad "上一步之前在界面上读不到「上次成功同步」的值（键盘立着？见 §7 第 34 条）"
   summary "$ACCEPT_NAME"
 }
-echo "    对照前：上次成功同步=「$BEFORE_LAST」"
+echo "    对照前：上次成功同步=「${BEFORE_LAST}」"
 
 # 2a) 对的主机、错的端口
 echo
@@ -443,9 +443,9 @@ fi
 AFTER=$(read_status)
 AFTER_LAST=$(lastsync_line "$AFTER")
 if [ "$AFTER_LAST" = "$BEFORE_LAST" ]; then
-  ok "失败没有刷新「上次成功同步」（仍为「$AFTER_LAST」）—— 时间戳是承重判据"
+  ok "失败没有刷新「上次成功同步」（仍为「${AFTER_LAST}」）—— 时间戳是承重判据"
 else
-  bad "失败路径居然刷新了「上次成功同步」（「$BEFORE_LAST」→「$AFTER_LAST」）—— 这个时间戳不可信"
+  bad "失败路径居然刷新了「上次成功同步」（「${BEFORE_LAST}」→「${AFTER_LAST}」）—— 这个时间戳不可信"
   summary "$ACCEPT_NAME"
 fi
 
@@ -457,7 +457,7 @@ echo
 echo "════ 2b. 对照：$LAN_IP 之外的**另一个私有 IP**（同端口）→ 必须失败 ════"
 echo "    （这一步排掉'应用忽略主机、其实一直在连 127.0.0.1'）"
 DECOY_IP=$(python3 -c "a,b,c,_='$LAN_IP'.split('.'); print(f'{a}.{b}.{c}.99')")
-echo "    诱饵地址：$DECOY_IP:$PORT（本机地址是 $LAN_IP:$PORT）"
+echo "    诱饵地址：$DECOY_IP:${PORT}（本机地址是 $LAN_IP:${PORT}）"
 if curl -s -m 3 -o /dev/null "http://$DECOY_IP:$PORT/health"; then
   bad "诱饵地址 $DECOY_IP:$PORT 竟然可达 —— 这台机器上真有这个地址，换一个诱饵再跑"
   summary "$ACCEPT_NAME"
@@ -475,9 +475,9 @@ fi
 AFTER2=$(read_status)
 AFTER2_LAST=$(lastsync_line "$AFTER2")
 if [ "$AFTER2_LAST" = "$AFTER_LAST" ]; then
-  ok "错 IP 也没有刷新「上次成功同步」（仍为「$AFTER2_LAST」）"
+  ok "错 IP 也没有刷新「上次成功同步」（仍为「${AFTER2_LAST}」）"
 else
-  bad "错 IP 竟然刷新了「上次成功同步」（「$AFTER_LAST」→「$AFTER2_LAST」）"
+  bad "错 IP 竟然刷新了「上次成功同步」（「${AFTER_LAST}」→「${AFTER2_LAST}」）"
   summary "$ACCEPT_NAME"
 fi
 
@@ -500,9 +500,9 @@ if [ -n "$PREV_HM" ]; then
     sleep 2
     WAITED=$((WAITED + 2))
   done
-  echo "    等到新的分钟再同步（上次成功在 $PREV_HM，现在 $(date +%H:%M)，等了 ${WAITED}s）"
+  echo "    等到新的分钟再同步（上次成功在 ${PREV_HM}，现在 $(date +%H:%M)，等了 ${WAITED}s）"
 else
-  echo "    ⚠️ 解析不出「$AFTER_LAST」里的时刻，时间戳前进这条断言将不可靠"
+  echo "    ⚠️ 解析不出「${AFTER_LAST}」里的时刻，时间戳前进这条断言将不可靠"
 fi
 
 trigger_sync "http://$LAN_IP:$PORT" || { bad "无法触发同步（填写/点击失败）"; summary "$ACCEPT_NAME"; }
@@ -518,9 +518,9 @@ fi
 FINAL=$(read_status)
 FINAL_LAST=$(lastsync_line "$FINAL")
 if [ "$FINAL_LAST" != "$AFTER_LAST" ]; then
-  ok "「上次成功同步」前进了：「$AFTER_LAST」→「$FINAL_LAST」"
+  ok "「上次成功同步」前进了：「${AFTER_LAST}」→「${FINAL_LAST}」"
 else
-  bad "「上次成功同步」没前进（仍为「$FINAL_LAST」）—— 状态文字可能是假的"
+  bad "「上次成功同步」没前进（仍为「${FINAL_LAST}」）—— 状态文字可能是假的"
   summary "$ACCEPT_NAME"
 fi
 

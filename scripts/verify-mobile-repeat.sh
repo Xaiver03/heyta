@@ -191,15 +191,15 @@ NEXT2_DATE=$(printf '%s' "$EXPECT" | sed -n 7p)
 DUE_MS=$(printf '%s' "$EXPECT" | sed -n 8p)
 NEXT_MS=$(printf '%s' "$EXPECT" | sed -n 9p)
 NEXT2_MS=$(printf '%s' "$EXPECT" | sed -n 10p)
-ok "锚点 $DUE_DATE（星期$CN_WEEKDAY）→ 规则 $EXPECT_RULE，显示「$EXPECT_LABEL」"
-ok "完成后应推进到 $NEXT_DATE，再完成一次到 $NEXT2_DATE"
+ok "锚点 ${DUE_DATE}（星期${CN_WEEKDAY}）→ 规则 ${EXPECT_RULE}，显示「${EXPECT_LABEL}」"
+ok "完成后应推进到 ${NEXT_DATE}，再完成一次到 $NEXT2_DATE"
 
 # ── 开始 ────────────────────────────────────────────────────
 echo ""
 echo "=== 移动端重复任务验收（真实模拟器 + 真服务端 + 真笔记本设备，零 mock）==="
 echo "  设备: emulator-5554   服务端: $SERVER   库: heyta_mobile_smoke"
 echo "  账号: $EMAIL"
-echo "  任务: $TASK_TITLE（截止 $DUE_DATE，每周重复）"
+echo "  任务: ${TASK_TITLE}（截止 ${DUE_DATE}，每周重复）"
 
 if [ "${#TOKEN}" -lt 100 ]; then
   echo "❌ 令牌看起来不对（长度 ${#TOKEN}）—— 先跑建号脚本"; exit 1
@@ -237,7 +237,7 @@ import json,sys
 print(json.load(sys.stdin).get('id',''))
 " 2>/dev/null)
   if [ -n "$TASK_ID" ]; then
-    ok "笔记本已创建任务（截止 $DUE_DATE）：$TASK_ID"
+    ok "笔记本已创建任务（截止 ${DUE_DATE}）：$TASK_ID"
   else
     bad "笔记本建了任务但取不到 id：$LAPTOP_ADD"
   fi
@@ -264,14 +264,14 @@ if [ -z "$TASK_ID" ]; then
   bad "没有任务 id，后面所有 op 断言都无从谈起 —— 跳过"
 else
   if [ "$(has_text "$TASK_TITLE")" = "1" ]; then
-    ok "任务行已出现：「$TASK_TITLE」"
+    ok "任务行已出现：「${TASK_TITLE}」"
   else
-    bad "任务页里没有「$TASK_TITLE」（同步没到或没渲染）"
+    bad "任务页里没有「${TASK_TITLE}」（同步没到或没渲染）"
   fi
   # 🔴 反向基线：设重复**之前**不该出现任何重复文案。
   # 没有这条的话，"行上有重复标记"这条断言分不清"设成功了"与"一直都显示"。
   if [ "$(has_sub "$EXPECT_LABEL")" = "1" ]; then
-    bad "还没设重复，任务行上就已经有「$EXPECT_LABEL」了 —— 标记是假的"
+    bad "还没设重复，任务行上就已经有「${EXPECT_LABEL}」了 —— 标记是假的"
   else
     ok "尚未设重复，行上没有重复标记（基线成立）"
   fi
@@ -317,37 +317,37 @@ else
     # 🔴 §3.4：**一个用户意图 = 一个 op**。多出一条就说明"设重复"被拆成了两次写入，
     # 而那会产生"任务指着一个还不存在的规则"这样的中间态。
     if [ "$AFTER" = "$((BEFORE + 1))" ]; then
-      ok "设一次重复只产生了 1 条 op（$BEFORE → $AFTER）"
+      ok "设一次重复只产生了 1 条 op（$BEFORE → ${AFTER}）"
     else
       bad "设一次重复产生了 $((AFTER - BEFORE)) 条带 repeatRule 的 op，应该恰好 1 条（§3.4）"
     fi
     if [ "$GOT_RULE" = "$EXPECT_RULE" ]; then
       ok "规则正确：$GOT_RULE"
     else
-      bad "落库的规则是「$GOT_RULE」，期望「$EXPECT_RULE」"
+      bad "落库的规则是「${GOT_RULE}」，期望「${EXPECT_RULE}」"
     fi
     # 锚点必须是**同步过来的截止日**。若界面拿"今天"当锚点而任务截止日是别的日子，
     # "每周"就会高亮着却对应另一天 —— 界面上没有任何地方会显示这件事。
     if [ "$GOT_ANCHOR" = "$DUE_DATE" ]; then
-      ok "锚点正确：$GOT_ANCHOR（就是这条任务的截止日）"
+      ok "锚点正确：${GOT_ANCHOR}（就是这条任务的截止日）"
     else
-      bad "锚点是「$GOT_ANCHOR」，期望「$DUE_DATE」—— 锚点没跟着截止日走"
+      bad "锚点是「${GOT_ANCHOR}」，期望「${DUE_DATE}」—— 锚点没跟着截止日走"
     fi
   else
     bad "找不到「每周」这个选项"
   fi
 fi
 
-step "9. 详情面板显示「当前：$EXPECT_LABEL」"
+step "9. 详情面板显示「当前：${EXPECT_LABEL}」"
 dump
 if [ "$(has_sub "当前：$EXPECT_LABEL")" = "1" ]; then
-  ok "面板上显示了当前规则：「当前：$EXPECT_LABEL」"
+  ok "面板上显示了当前规则：「当前：${EXPECT_LABEL}」"
 else
   # 描述可能被 ScrollView 裁掉，滚一下再找
   if XY=$(scroll_to_text "当前：$EXPECT_LABEL"); then
-    ok "面板上显示了当前规则（滚动后可见）：「当前：$EXPECT_LABEL」"
+    ok "面板上显示了当前规则（滚动后可见）：「当前：${EXPECT_LABEL}」"
   else
-    bad "面板上没有「当前：$EXPECT_LABEL」这个说明"
+    bad "面板上没有「当前：${EXPECT_LABEL}」这个说明"
   fi
 fi
 
@@ -358,9 +358,9 @@ if XY=$(tap_label "关闭任务详情"); then
   sleep 3
   dump
   if [ "$(has_sub "$EXPECT_LABEL")" = "1" ]; then
-    ok "任务行上出现了重复标记：「$EXPECT_LABEL」"
+    ok "任务行上出现了重复标记：「${EXPECT_LABEL}」"
   else
-    bad "关掉面板后，任务行上没有「$EXPECT_LABEL」"
+    bad "关掉面板后，任务行上没有「${EXPECT_LABEL}」"
   fi
   # 面板必须真的关掉了 —— 否则后面点勾选框会打到面板上
   if [ "$(has_text "$TASK_TITLE")" = "1" ]; then
@@ -388,12 +388,12 @@ L_ANCHOR=$(laptop_field "$TASK_ID" repeatDtstart)
 if [ "$L_RULE" = "$EXPECT_RULE" ]; then
   ok "笔记本读到了规则：$L_RULE"
 else
-  bad "笔记本读到的规则是「$L_RULE」，期望「$EXPECT_RULE」—— 规则没同步过去"
+  bad "笔记本读到的规则是「${L_RULE}」，期望「${EXPECT_RULE}」—— 规则没同步过去"
 fi
 if [ "$L_ANCHOR" = "$DUE_DATE" ]; then
   ok "笔记本读到了锚点：$L_ANCHOR"
 else
-  bad "笔记本读到的锚点是「$L_ANCHOR」，期望「$DUE_DATE」"
+  bad "笔记本读到的锚点是「${L_ANCHOR}」，期望「${DUE_DATE}」"
 fi
 
 step "12. 🔴 在**手机**上勾选完成 → 到期日推进，且**没有**被标成已完成"
@@ -406,9 +406,9 @@ if XY=$(tap_label "完成：$TASK_TITLE"); then
   GOT_DUE=$(phone_field "$PHONE_DB" "$TASK_ID" dueDate)
   DONE_WRITES=$(phone_ops_with_field "$PHONE_DB" "$TASK_ID" completedAt)
   if [ "$GOT_DUE" = "$NEXT_MS" ]; then
-    ok "到期日已推进到 $NEXT_DATE（$GOT_DUE）"
+    ok "到期日已推进到 ${NEXT_DATE}（${GOT_DUE}）"
   else
-    bad "到期日是「$GOT_DUE」，期望 $NEXT_DATE（$NEXT_MS）—— 没有顺延"
+    bad "到期日是「${GOT_DUE}」，期望 ${NEXT_DATE}（${NEXT_MS}）—— 没有顺延"
   fi
   # 🔴 这条是本功能的核心：标成完成的话它掉进「已完成」并且**再也不会回来**，
   # 用户下周就看不到它了。所以"没有 completedAt"必须显式断言。
@@ -425,7 +425,7 @@ if XY=$(tap_label "完成：$TASK_TITLE"); then
     bad "勾选后任务从列表里消失了 —— 它被当成普通任务完成了"
   fi
 else
-  bad "找不到勾选框「完成：$TASK_TITLE」"
+  bad "找不到勾选框「完成：${TASK_TITLE}」"
 fi
 
 step "13. 手机同步 → 笔记本看到同一个新到期日，且仍未完成（跨设备一致）"
@@ -443,12 +443,12 @@ L_DONE=$(laptop_field "$TASK_ID" completedAt)
 if [ "$L_DUE" = "$NEXT_MS" ]; then
   ok "笔记本读到的到期日也是 $NEXT_DATE"
 else
-  bad "笔记本读到的到期日是「$L_DUE」，期望 $NEXT_MS —— 顺延没同步过去"
+  bad "笔记本读到的到期日是「${L_DUE}」，期望 $NEXT_MS —— 顺延没同步过去"
 fi
 if [ -z "$L_DONE" ]; then
   ok "笔记本上它仍然是未完成（没有 completedAt）"
 else
-  bad "笔记本上它被标成了已完成（completedAt=$L_DONE）"
+  bad "笔记本上它被标成了已完成（completedAt=${L_DONE}）"
 fi
 
 step "14. 🔴 反向：在**笔记本**上完成同一任务 → 同步回手机，手机的到期日再推进 7 天"
@@ -461,9 +461,9 @@ step "14. 🔴 反向：在**笔记本**上完成同一任务 → 同步回手�
 if laptop_pull; then ok "笔记本已下载到最新到期日（完成前的前提）"; else bad "笔记本下载失败"; fi
 L_DUE_BEFORE=$(laptop_field "$TASK_ID" dueDate)
 if [ "$L_DUE_BEFORE" = "$NEXT_MS" ]; then
-  ok "笔记本手上的到期日已是 $NEXT_DATE（顺延后的值）"
+  ok "笔记本手上的到期日已是 ${NEXT_DATE}（顺延后的值）"
 else
-  bad "笔记本手上的到期日仍是「$L_DUE_BEFORE」，期望 $NEXT_MS —— 后面的顺延结果会连带错"
+  bad "笔记本手上的到期日仍是「${L_DUE_BEFORE}」，期望 $NEXT_MS —— 后面的顺延结果会连带错"
 fi
 
 if laptop complete "$TASK_ID" >/dev/null 2>&1; then
@@ -486,7 +486,7 @@ GOT_DUE2=$(phone_field "$PHONE_DB" "$TASK_ID" dueDate)
 if [ "$GOT_DUE2" = "$NEXT2_MS" ]; then
   ok "手机上的到期日已推进到 $NEXT2_DATE —— 笔记本上的完成也走同一条顺延语义"
 else
-  bad "手机上的到期日是「$GOT_DUE2」，期望 $NEXT2_DATE（$NEXT2_MS）"
+  bad "手机上的到期日是「${GOT_DUE2}」，期望 ${NEXT2_DATE}（${NEXT2_MS}）"
 fi
 
 summary "移动端重复任务"

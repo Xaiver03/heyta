@@ -217,7 +217,7 @@ ROW_XY=$(scroll_to_desc "关联任务：$TASK_TITLE")
 BTN_XY=$(scroll_to_desc "开始专注")
 [ -z "$BTN_XY" ] && BTN_XY=$(scroll_to_text "开始专注")
 if [ -z "$ROW_XY" ]; then
-  bad "专注页里找不到待办任务「$TASK_TITLE」"
+  bad "专注页里找不到待办任务「${TASK_TITLE}」"
 elif [ -z "$BTN_XY" ]; then
   bad "空闲态找不到主按钮「开始专注」"
 else
@@ -358,7 +358,7 @@ fi
 SRV_AFTER=$(psql -h 127.0.0.1 -p 5432 -U rocalight -d heyta_mobile_smoke -tAc \
   "SELECT count(*) FROM operations WHERE entity_type='FOCUS_SESSION';" 2>/dev/null | tr -d ' ')
 if [ "${SRV_AFTER:-0}" -gt "${SRV_FOCUS_BASELINE:-0}" ]; then
-  ok "服务端收到了专注记录（$SRV_FOCUS_BASELINE → $SRV_AFTER，本次运行确实新增了）"
+  ok "服务端收到了专注记录（$SRV_FOCUS_BASELINE → ${SRV_AFTER}，本次运行确实新增了）"
 else
   bad "服务端没收到专注记录（$SRV_FOCUS_BASELINE → ${SRV_AFTER:-?}）—— 手机上看着像保存成功了"
 fi

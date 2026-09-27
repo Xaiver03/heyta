@@ -137,7 +137,7 @@ if open_sheet "打开任务：$TITLE"; then
   #    （A/B 实测：把自动同步关掉，失败点一模一样）。
   VAL=$(python3 /tmp/_xy.py editval "标题" 0)
   if [ "$VAL" = "$TITLE" ]; then
-    ok "面板绑定的是这一条任务（标题框里是 $TITLE）"
+    ok "面板绑定的是这一条任务（标题框里是 ${TITLE}）"
   else
     bad "面板标题框里是 '$VAL'，不是 '$TITLE'"
   fi
@@ -231,7 +231,7 @@ dump
 # 这条断言成立的前提是：本次是全新库，而**只有我们这条任务**有截止日期
 # （下载回来的那些任务从来没有过 dueDate）。
 if [ "$(has_text "$MMDD")" = "0" ]; then
-  ok "切到倒计时后不再显示日期串 $MMDD（换的是说法，不是数据）"
+  ok "切到倒计时后不再显示日期串 ${MMDD}（换的是说法，不是数据）"
 else
   bad "切到倒计时后仍显示 $MMDD —— 开关没生效"
   screen_txt

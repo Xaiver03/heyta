@@ -79,7 +79,7 @@ echo "=== 三端同步验收（真浏览器 + 真服务端 + 真 SQLite，零 mo
 echo "  服务端: $SERVER   库: heyta_mobile_smoke"
 echo "  账号:   $EMAIL"
 echo "  笔记本任务: $NODE_TASK"
-echo "  浏览器端口: $WEB_PORT（离线套件用 4318，刻意错开）"
+echo "  浏览器端口: ${WEB_PORT}（离线套件用 4318，刻意错开）"
 
 # 全新的笔记本库与 handle 文件：上一次跑到一半留下的数据会让断言含混。
 rm -f "$LAPTOP_DB" "$HANDLE"
@@ -172,7 +172,7 @@ CORS_ACAO=$(curl -s -i --noproxy '*' -X OPTIONS "$SERVER/api/sync/push" \
   -H 'Access-Control-Request-Headers: authorization,content-type' 2>/dev/null \
   | tr -d '\r' | grep -i '^access-control-allow-origin:' | head -1)
 if [ -n "$CORS_ACAO" ]; then
-  ok "CORS 放行了 $CORS_ORIGIN（$CORS_ACAO）"
+  ok "CORS 放行了 ${CORS_ORIGIN}（${CORS_ACAO}）"
 else
   echo "   ❌ 服务端没有放行 $CORS_ORIGIN —— 浏览器的同步请求会被**直接拦下**。"
   echo "      症状会诱导你往错的方向查：状态条显示「离线 · 改动已排队」，"
@@ -214,10 +214,10 @@ TITLE=$(handle_field title)
 LIST=$(handle_field list)
 TAG=$(handle_field tag)
 if [ -n "$TITLE" ] && [ -n "$LIST" ] && [ -n "$TAG" ]; then
-  ok "拿到第 1 相创建的名字：任务「$TITLE」清单「$LIST」标签「$TAG」"
+  ok "拿到第 1 相创建的名字：任务「${TITLE}」清单「${LIST}」标签「${TAG}」"
 else
   # 名字拿不到，下面每一步都无从断言 —— 直接终止，别让后面的空串变成假绿。
-  bad "拿不到第 1 相创建的名字（handle=$HANDLE）—— 后续断言无从进行"
+  bad "拿不到第 1 相创建的名字（handle=${HANDLE}）—— 后续断言无从进行"
   summary "三端同步验收"
 fi
 
@@ -230,12 +230,12 @@ TAG_AFTER=$(account_ops CRT TAG)
 if [ -n "$TASK_AFTER" ] && [ "$TASK_AFTER" -gt "$TASK_BEFORE" ]; then
   ok "服务端 TASK/CRT 从 $TASK_BEFORE 涨到 $TASK_AFTER —— 任务那条真的上传了"
 else
-  bad "服务端 TASK/CRT 没有增加（$TASK_BEFORE → $TASK_AFTER）—— 界面说同步完成，但服务端没收到"
+  bad "服务端 TASK/CRT 没有增加（$TASK_BEFORE → ${TASK_AFTER}）—— 界面说同步完成，但服务端没收到"
 fi
 if [ -n "$TAG_AFTER" ] && [ "$TAG_AFTER" -gt "$TAG_BEFORE" ]; then
   ok "服务端 TAG/CRT 从 $TAG_BEFORE 涨到 $TAG_AFTER —— 标签那条真的上传了"
 else
-  bad "服务端 TAG/CRT 没有增加（$TAG_BEFORE → $TAG_AFTER）"
+  bad "服务端 TAG/CRT 没有增加（$TAG_BEFORE → ${TAG_AFTER}）"
 fi
 # 🔴 **记下此刻的设备数** —— 下面第 4 步要拿它当基线。
 #
@@ -272,9 +272,9 @@ except Exception: print(''); raise SystemExit
 print(next((t['id'] for t in d.get('tags',[]) if t['name']=='$TAG'),''))
 ")
 if [ -n "$LT_TAG_ID" ]; then
-  ok "笔记本读到了标签「$TAG」：$LT_TAG_ID"
+  ok "笔记本读到了标签「${TAG}」：$LT_TAG_ID"
 else
-  bad "笔记本没读到标签「$TAG」—— 标签实体没同步过去"
+  bad "笔记本没读到标签「${TAG}」—— 标签实体没同步过去"
 fi
 
 LT_PROJECTS=$(laptop projects)
@@ -285,9 +285,9 @@ except Exception: print(''); raise SystemExit
 print(next((p['id'] for p in d.get('projects',[]) if p['name']=='$LIST'),''))
 ")
 if [ -n "$LT_LIST_ID" ]; then
-  ok "笔记本读到了清单「$LIST」：$LT_LIST_ID"
+  ok "笔记本读到了清单「${LIST}」：$LT_LIST_ID"
 else
-  bad "笔记本没读到清单「$LIST」—— 清单实体没同步过去"
+  bad "笔记本没读到清单「${LIST}」—— 清单实体没同步过去"
 fi
 
 LT_LIST=$(laptop list --all)
@@ -299,20 +299,20 @@ t=next((t for t in d.get('tasks',[]) if t['title']=='$TITLE'),None)
 print(json.dumps(t, ensure_ascii=False) if t else '')
 ")
 if [ -n "$LT_TASK" ]; then
-  ok "笔记本读到了任务「$TITLE」"
+  ok "笔记本读到了任务「${TITLE}」"
   # 归属 + 标签引用都要对上，而且必须是**刚建的那个 id**。
   if printf '%s' "$LT_TASK" | grep -q "$LT_LIST_ID" && [ -n "$LT_LIST_ID" ]; then
-    ok "任务归属与清单 id 一致（$LT_LIST_ID）"
+    ok "任务归属与清单 id 一致（${LT_LIST_ID}）"
   else
     bad "任务的归属对不上：$LT_TASK"
   fi
   if [ -n "$LT_TAG_ID" ] && printf '%s' "$LT_TASK" | grep -q "$LT_TAG_ID"; then
-    ok "任务上的 tagIds 与标签 id 一致（$LT_TAG_ID）—— 标签引用跨端到达"
+    ok "任务上的 tagIds 与标签 id 一致（${LT_TAG_ID}）—— 标签引用跨端到达"
   else
     bad "任务的 tagIds 里没有那个标签 id：$LT_TASK"
   fi
 else
-  bad "笔记本没读到任务「$TITLE」—— 任务没同步过去"
+  bad "笔记本没读到任务「${TITLE}」—— 任务没同步过去"
 fi
 
 # ── 第 4 步：反向 —— 笔记本写一条并上传 ─────────────────────
@@ -320,7 +320,7 @@ fi
 step "4. 第 2 端反向写入并上传（为「Web 能拉到别的设备」准备数据）"
 LT_ADD=$(laptop add "$NODE_TASK")
 if printf '%s' "$LT_ADD" | grep -q '"ok":true'; then
-  ok "笔记本建了任务「$NODE_TASK」"
+  ok "笔记本建了任务「${NODE_TASK}」"
 else
   bad "笔记本建任务失败：$LT_ADD"
 fi
@@ -334,7 +334,7 @@ TASK_AFTER2=$(account_ops CRT TASK)
 if [ -n "$TASK_AFTER2" ] && [ "$TASK_AFTER2" -gt "$TASK_AFTER" ]; then
   ok "服务端 TASK/CRT 从 $TASK_AFTER 涨到 $TASK_AFTER2 —— 笔记本那条真的上传了"
 else
-  bad "服务端 TASK/CRT 没有增加（$TASK_AFTER → $TASK_AFTER2）—— 反向上传没成"
+  bad "服务端 TASK/CRT 没有增加（$TASK_AFTER → ${TASK_AFTER2}）—— 反向上传没成"
 fi
 # 🔴 而且必须是**另一台设备**写的：distinct client_id 要涨。
 # 只数 op 条数的话，"同一条被重复上传"也会让条数变大。
@@ -342,7 +342,7 @@ CLIENTS_AFTER=$(account_clients)
 if [ -n "$CLIENTS_AFTER" ] && [ "$CLIENTS_AFTER" -ge $((CLIENTS_AFTER_WEB + 1)) ]; then
   ok "服务的 client 数从 $CLIENTS_AFTER_WEB 涨到 $CLIENTS_AFTER —— 确实多出一台**新**设备（笔记本）"
 else
-  bad "client 数没有多出新的（$CLIENTS_AFTER_WEB → $CLIENTS_AFTER）—— 无法证明那条是**另一台设备**写的"
+  bad "client 数没有多出新的（$CLIENTS_AFTER_WEB → ${CLIENTS_AFTER}）—— 无法证明那条是**另一台设备**写的"
 fi
 
 # ── 第 5 步：第 3 相 —— 全新 Web 安装把两边的数据都拉回来 ────

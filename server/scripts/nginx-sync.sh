@@ -39,7 +39,7 @@ info() { printf '· %s\n' "$1"; }
 fetch_remote() {
   local out="$1"
   if ! ssh "${SSH_OPTS[@]}" "$SSH_HOST" "sudo -n cat '$REMOTE_PATH'" > "$out"; then
-    die "读取远端失败：$SSH_HOST:$REMOTE_PATH（检查 ssh 与 sudo -n 是否可用）"
+    die "读取远端失败：$SSH_HOST:${REMOTE_PATH}（检查 ssh 与 sudo -n 是否可用）"
   fi
   [ -s "$out" ] || die "远端文件是空的：$SSH_HOST:$REMOTE_PATH —— 拒绝据此比对"
 }
@@ -103,6 +103,6 @@ case "$mode" in
     ;;
 
   *)
-    die "未知参数：$mode（可用：--check / --pull / --apply）"
+    die "未知参数：${mode}（可用：--check / --pull / --apply）"
     ;;
 esac

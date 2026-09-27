@@ -49,7 +49,7 @@ cd "$(dirname "$0")/.." || exit 1
 
 DEVECO_HOME="${DEVECO_HOME:-/Applications/DevEco-Studio.app/Contents}"
 # 🔴 必须用**短路径**：hvigor 内部 pnpm 会拿插件 tarball 的**绝对路径**当 store 索引文件名，
-#    macOS 的 $TMPDIR（/var/folders/5n/...）会把它顶过 255 字节上限，报
+#    macOS 的 ${TMPDIR}（/var/folders/5n/...）会把它顶过 255 字节上限，报
 #    `ERR_PNPM_ENAMETOOLONG`，而 hvigor 只往外抛一个笼统的 `00308002 Operation Error`（§7 第 62 条）。
 WORK="${HEYTA_HARMONY_JS_WORK:-/tmp/heyta-harmony-rnjs}"
 RNOH_VERSION="${RNOH_VERSION:-0.84.4}"
@@ -94,11 +94,11 @@ if [ -x "${NODE_BIN:-}" ]; then
   NODE_VER=$("$NODE_BIN" -v | sed 's/^v//')
   MAJ=${NODE_VER%%.*}; REST=${NODE_VER#*.}; MIN=${REST%%.*}
   if [ "$MAJ" -gt 20 ] || { [ "$MAJ" -eq 20 ] && [ "$MIN" -ge 12 ]; }; then
-    ok "Node $NODE_VER（≥ 20.12，满足 RN 0.84 CLI 的 util.styleText）"
+    ok "Node ${NODE_VER}（≥ 20.12，满足 RN 0.84 CLI 的 util.styleText）"
   else
     bad "Node $NODE_VER 太旧：RN 0.84 的 CLI 需要 ≥ 20.12（DevEco 自带的 18.20.1 会报 styleText）"
     echo "      解决：装 Node 20+ 后 HEYTA_NODE_BIN=/path/to/node pnpm verify:harmony-rnoh-js"
-    echo ""; echo "  通过 $PASS，失败 $FAIL"; exit 3
+    echo ""; echo "  通过 ${PASS}，失败 $FAIL"; exit 3
   fi
 else
   bad "找不到 Node 可执行文件"; exit 3
@@ -107,9 +107,9 @@ command -v npm >/dev/null 2>&1 && ok "npm 在位" || { bad "缺 npm"; exit 3; }
 
 SDK_PKG="$DEVECO_HOME/sdk/default/sdk-pkg.json"
 API=$(python3 -c "import json;print(json.load(open('$SDK_PKG'))['data']['apiVersion'])" 2>/dev/null)
-DISPLAY=$(python3 -c "import json;print(json.load(open('$SDK_PKG'))['data']['displayName'])" 2>/dev/null)
-SDK_FULL="$(printf '%s' "$DISPLAY" | sed 's/HarmonyOS //')(${API})"
-ok "SDK: $DISPLAY（API $API）"
+SDK_NAME=$(python3 -c "import json;print(json.load(open('$SDK_PKG'))['data']['displayName'])" 2>/dev/null)
+SDK_FULL="$(printf '%s' "${SDK_NAME:-}" | sed 's/HarmonyOS //')(${API})"
+ok "SDK: ${SDK_NAME}（API ${API}）"
 
 # ── 第 1 步：JS 侧工程 + 依赖 ───────────────────────────────
 
@@ -292,7 +292,7 @@ print('0x%X' % struct.unpack('<Q',b)[0] if len(b)==8 else 'short')
   if [ "$MAGIC" = "0x1F1903C103BC1FC6" ]; then
     ok "Hermes 魔数正确（$(ls -lh "$HBC" | awk '{print $5}')）"
   else
-    bad "不是 Hermes 字节码（魔数 $MAGIC）—— 可能是改了扩展名的 JS"
+    bad "不是 Hermes 字节码（魔数 ${MAGIC}）—— 可能是改了扩展名的 JS"
   fi
 else
   bad "没有产出 hermes_bundle.hbc"

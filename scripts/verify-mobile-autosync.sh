@@ -159,7 +159,7 @@ step "4. 判据 (b)：另一台设备读得到这条任务（全链路）"
 LAPTOP_OUT=$(wait_laptop_has "$TITLE" "$LAPTOP_ROUNDS"); LAPTOP_RC=$?
 case "$LAPTOP_RC" in
   0)
-    ok "另一台设备（node-host 真 SQLite）在第 $LAPTOP_OUT 轮读到了「$TITLE」—— 全程没点过同步按钮"
+    ok "另一台设备（node-host 真 SQLite）在第 $LAPTOP_OUT 轮读到了「${TITLE}」—— 全程没点过同步按钮"
     ;;
   2)
     # 🔴 "探针自己坏了" 必须和"真的没同步"分开报，否则排查方向会整体跑偏
@@ -167,7 +167,7 @@ case "$LAPTOP_RC" in
     bad "笔记本**探针自己**坏了，判据 (b) 无效（不是产品缺陷）：最后一条输出：$LAPTOP_OUT"
     ;;
   *)
-    bad "笔记本 $((LAPTOP_ROUNDS * 5)) 秒内没读到「$TITLE」—— 数据没有走完全程"
+    bad "笔记本 $((LAPTOP_ROUNDS * 5)) 秒内没读到「${TITLE}」—— 数据没有走完全程"
     ;;
 esac
 
@@ -179,7 +179,7 @@ if [ "$(has_text "已全部上传")" = "1" ]; then
 elif has_sub "项"; then
   # 有「N 项」= 队列里还有东西。把那一行原文一起报出来，便于定位。
   PENDING_TXT=$(grep -oE 'text="[^"]*项"' /tmp/ui.xml | head -1)
-  bad "待上传没有归零 —— 写入没全部推出去（$PENDING_TXT）"
+  bad "待上传没有归零 —— 写入没全部推出去（${PENDING_TXT}）"
 else
   bad "读不到待上传状态"; screen_txt
 fi

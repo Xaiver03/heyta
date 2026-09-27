@@ -23,7 +23,7 @@
     "check:pricing": "node scripts/check-pricing-consistency.mjs",
     "check:ai-quota": "node scripts/check-ai-quota-consistency.mjs",
     "check:payment-entry": "node scripts/check-payment-entry.mjs",
-    "check": "pnpm build && pnpm typecheck && pnpm check:migrations && pnpm check:layering && pnpm check:ui-language && pnpm check:licenses && pnpm check:docs && pnpm check:pricing && pnpm check:ai-quota && pnpm check:payment-entry && pnpm check:design && pnpm check:tokens && pnpm check:arkts && pnpm check:native-deps && pnpm check:mobile-bundle && pnpm check:materialized-reads && pnpm check:ai-coverage && pnpm check:ai-e2e && pnpm check:web-storage && pnpm check:web-storage && pnpm check:web-migration",
+    "check": "pnpm build && pnpm typecheck && pnpm check:migrations && pnpm check:layering && pnpm check:ui-language && pnpm check:licenses && pnpm check:docs && pnpm check:pricing && pnpm check:ai-quota && pnpm check:payment-entry && pnpm check:design && pnpm check:tokens && pnpm check:arkts && pnpm check:native-deps && pnpm check:mobile-bundle && pnpm check:materialized-reads && pnpm check:ai-coverage && pnpm check:ai-e2e && pnpm check:shell-unicode && pnpm check:web-storage && pnpm check:web-migration",
     "check:materialized-reads": "node scripts/check-materialized-reads.mjs",
     "check:design": "node design-system/heyta/check-hardcoded.mjs",
     "verify:p1": "node scripts/verify-p1-sync.mjs",
@@ -58,6 +58,7 @@
     "build:android:debug": "pnpm --filter @heyta/mobile run build:android:debug",
     "build:ios": "pnpm --filter @heyta/mobile run build:ios",
     "check:mobile-bundle": "node scripts/check-mobile-bundle.mjs",
+    "check:shell-unicode": "node scripts/check-shell-unicode-vars.mjs",
     "check:web-storage": "node scripts/verify-web-storage-backend.mjs",
     "check:web-migration": "node scripts/verify-web-migration.mjs"
   },

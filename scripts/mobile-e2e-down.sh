@@ -16,7 +16,7 @@ set -uo pipefail
 PIDFILE="/tmp/heyta-e2e-server.pid"
 
 if [ ! -f "$PIDFILE" ]; then
-  echo "   ⏭  没有 pidfile（$PIDFILE）—— 本脚本起的服务端不在运行。"
+  echo "   ⏭  没有 pidfile（${PIDFILE}）—— 本脚本起的服务端不在运行。"
 else
   PID="$(cat "$PIDFILE" 2>/dev/null)"
   if [ -n "$PID" ] && kill -0 "$PID" 2>/dev/null; then
@@ -30,7 +30,7 @@ else
       echo "   ⚠️  pid $PID 15 秒没退出，强制结束"
       kill -9 "$PID" 2>/dev/null
     else
-      echo "   ✅ 服务端已停止（pid $PID）"
+      echo "   ✅ 服务端已停止（pid ${PID}）"
     fi
   else
     echo "   ⏭  pid $PID 已经不在运行"
