@@ -22,6 +22,19 @@ pnpm -r test     # 应该全绿
 
 ## 2. 提交前门禁（必须全过）
 
+**唯一权威是 `pnpm check`** —— 它是全部门禁的串联，CI 跑的就是它（`.github/workflows/ci.yml`）。
+⚠️ 这里**刻意不写门禁条数** —— 这条纪律有来历，见 `AGENTS.md` §7
+里那条「`pnpm <名字>` 找不到脚本时会去跑 PATH 上同名二进制」的陷阱：那句话漂过一次。
+要数就直接读 `package.json` 的 `check` 脚本，那是唯一权威。
+
+```bash
+pnpm check   # build + typecheck + 迁移 / 分层 / 词条 / 许可证 / 死链 / 定价 / AI 额度 /
+             #   设计 / token / ArkTS / 原生依赖 / 移动包 / 物化读 / AI 覆盖 / AI e2e
+pnpm test    # 全部单测（CI 也跑这一步）
+```
+
+只想快速迭代时，下面几条是最常改动的**子集** —— 但它们**不等于"全过"**：
+
 ```bash
 pnpm -r typecheck                          # 类型
 pnpm -r test                               # 测试
@@ -29,7 +42,9 @@ node research/tools/license-inventory.mjs  # 许可证（引入新依赖时必�
 node research/tools/docs-link-check.mjs    # 改了文档时必跑
 ```
 
-这四条的退出码都是 **0 = 通过**。CI 会跑同样的东西，别等 CI 告诉你。
+退出码 **0 = 通过**。别等 CI 告诉你。这条纪律有来历：在 `.github/workflows/ci.yml`
+建立**之前**，仓库没有任何 CI，`pnpm check` 只由人手动跑 ——
+结果是 **`pnpm check` 在干净检出上从来就没通过过，而这个事实可以一直没人知道**。
 
 ---
 
