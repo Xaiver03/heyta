@@ -35,7 +35,7 @@
 | **M1** | 🔴 垂直切片验证 | **一份** RN 组件在 web + mobile + 桌面三端都渲染出来 | M0 |
 | **M2** | 桌面端骨架（Electron） | 桌面端跑通真实同步，煞有记录 | M1 |
 | **M3** | 逐特性迁移 UI | 每个特性两端共用同一组件；旧 DOM 实现删除 | M2 |
-| **M4** | 数据层统一（web SQLite） | ✅ **决策已落（ADR-0027）**；✅ **`SqliteWasmDriver` 已过同一套契约**；✅ **Worker 接缝已过同一套契约 + 真浏览器端到端**（M4-3a）；✅ **web 已切到 Worker 里的 SQLite，生产构建产出 worker+wasm**（M4-3b）；⬜ 删 IndexedDB 旧路径前的**真实旧库迁移验证**未做；⬜ "FTS5 在 web 可用"已实测**支持**但未接进检索功能 | M0（可与 M3 并行） |
+| **M4** | 数据层统一（web SQLite） | ✅ **决策已落（ADR-0027）**；✅ **`SqliteWasmDriver` 已过同一套契约**；✅ **Worker 接缝已过同一套契约 + 真浏览器端到端**（M4-3a）；✅ **web 已切到 Worker 里的 SQLite，生产构建产出 worker+wasm**（M4-3b）；✅ **真实旧库迁移已验证**（`check:web-migration`，见 §「旧库迁移」）；⬜ "FTS5 在 web 可用"已实测**支持**但未接进检索功能；⬜ 鸿蒙侧**不得假设**有 FTS5/sqlite-vec（见 ADR-0027） | M0（可与 M3 并行） |
 | **M5** | 收敛收尾 + 门禁全端 | DOM UI 删除；门禁覆盖全端；文档固化 | M3、M4 |
 | **M6** | 鸿蒙"跑起来" | 真机/模拟器启动成功 | 外部（模拟器镜像 + 签名） |
 
@@ -371,6 +371,39 @@ M0 全部是**纯搬迁 + 再导出**，无行为改变。任一任务出问题�
 > 独立标为鸿蒙壳的**最大风险**。
 > → 所以 M1-5 的鸿蒙判据**必须包含一次真实的"打开库 + 读 + 写"**，
 > 只报"App 启动成功"**不算过**。
+
+#### 鸿蒙构建实测（2026-09-28 ✅ 两侧全绿）
+
+设备上那一环跑不了，但**构建与代码生成这一环已经用真工具链验过** ——
+它正是 ADR-0004 里"若这一步失败，跨平台结论需重估"所指的那一步。
+
+```bash
+pnpm verify:harmony-rnoh       # 原生侧：17 通过 / 0 失败
+pnpm verify:harmony-rnoh-js    # JS 侧：29 通过 / 0 失败
+```
+
+| 侧 | 实测证据 |
+|---|---|
+| 前置 | SDK **HarmonyOS 6.1.1（API 24）**；DevEco 自带 NDK 的 cmake / ninja / llvm 齐备 |
+| 原料 | 工程来自 **RNOH 官方 CLI 模板**（`npm pack`，32 个文件），**不手写脚手架** |
+| 原生侧 | `ohpm install` 成功（RNOH har **309M**）；`hvigorw assembleHap` 退出码 0；日志确认跑过 **`BuildNativeWithNinja`** |
+| 原生产物 | HAP **37M**，内含**本机编译**的 `librnoh_core.so`(5,097,000) / `librnoh_app.so`(3,105,584) / `libreactnative.so`(13,428,600)，以及 `ets/modules.abc`(942,504) |
+| JS 侧 | 真 autolinking 产物 `RNOHPackagesFactory.{h,ets}` + `autolinking.cmake`；真 codegen 产物 `RNOHGeneratedPackage.h` |
+| 打包 | `bundle-harmony` 退出码 0，**Hermes 魔数正确**（1.5M）；release HAP **20M**，内含 `hermes_bundle.hbc`（自包含，不依赖 Metro） |
+
+⚠️ **这两个脚本的边界（别读成"RN 在鸿蒙上跑得起来"）**：
+两者**都不验运行** —— 产物是 `*-unsigned.hap`，装不进设备。
+原生侧那个还**用桩顶替了 codegen/autolinking**（由 JS 侧那个用真 codegen 覆盖）。
+
+🔴 **设备上那一环精确地卡在哪**（不是代码问题）：
+
+| 缺什么 | 实测 |
+|---|---|
+| 模拟器系统镜像 | `~/Library/Developer/HarmonyOS` **空**；DevEco 的 `tools/emulator` 有二进制但 `find` 不到任何 `.img` |
+| 设备 | `hdc list targets` → `[Empty]` |
+| 签名材料 | `~/.ohos/config` **不存在** |
+
+镜像与证书都要**登录华为账号**在 IDE 里下载/申请 ⇒ 属于账号门禁的交互式步骤。
 
 ### 验收命令
 
@@ -949,9 +982,9 @@ IndexedDB 路径**保留到迁移验证通过之后**再删。两者可并存一
 | **M1-4 插槽 + 分节** ✅ 已完成 | `TaskList` 扩成"共享机制 + 宿主内容"；分节形态（联合类型互斥） | +约 150（插槽 + 分节 + 注释）/ −约 40 | **是** | ✅ ui 包 21/21；`check:design`/`check:layering` 全绿 |
 | **M1 徽章** ✅ 已完成 | 图标数据/渲染分离：`lucide` 数据 + 共享 `react-native-svg` 渲染 | +约 260（Icon + TaskBadges + 注释） | **是**：四端字形不可能再漂移 | ✅ **真实浏览器**：4 svg / 13 path、逾期 `#dc2626`≠未逾期 `#94a3b8`、警告三角 3 path vs 日历 5 path |
 | **M1-4 mobile 替换** ✅ 已完成 | `TasksScreen` 换用共享 `TaskList` + `TaskBadges`：本地 `TaskRow` **彻底删除** | **−42**（763 → 721；+209 / −243） | **是**：四端同一份行机制 | ✅ mobile typecheck 通过；`check:design`/`check:layering`/`check:licenses`/`check:docs`/**`check:mobile-bundle`** 全绿；`<FlatList>/<Checkbox>/function TaskRow` 残留 **0** 处 |
-| **M1-5** ✅ 脚本已交付 | `scripts/verify-universal-slice.sh` + 浏览器断言 | +约 330（脚本 + 注释）⚠️ 净增 | — | ✅ **8 通过 / 0 失败 / 3 明确未验**（iOS·Android 真机、鸿蒙、桌面加载） |
+| **M1-5** ✅ 脚本已交付 | `scripts/verify-universal-slice.sh` + 浏览器断言 + **桌面端真窗口（含打包产物）** | +约 330（脚本 + 注释）⚠️ 净增 | — | ✅ **10 通过 / 0 失败 / 2 明确未验**（iOS·Android 真机、鸿蒙**设备上**运行） |
 | M1-4 收尾（分节支持 + 替换） | 任务列表切片 | — | — | — |
-| M1-5 收尾（鸿蒙 op-sqlite 读写） | 任务列表切片 | — | — | — |
+| **M1-5 收尾（鸿蒙设备上 op-sqlite 读写）** | ⏸ **阻塞在外部** —— 代码侧已备好 | — | — | 本机**没有**模拟器系统镜像（`~/Library/Developer/HarmonyOS` 为空、`hdc list targets` = `[Empty]`）也**没有签名材料**（`~/.ohos/config` 不存在）。镜像要在 DevEco 里**登录华为账号**下载，证书同样账号绑定 ⇒ 非代码问题。**构建侧已全绿**，见下方「鸿蒙构建实测」 |
 
 ### M1-1 ~ M1-3 的实测证据（2026-09-27）
 
