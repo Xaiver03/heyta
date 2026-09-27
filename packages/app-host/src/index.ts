@@ -268,3 +268,20 @@ export {
   type ExportTaskRow,
   type TasksMarkdownCopy,
 } from './export-dump.js';
+
+/**
+ * 导入 / 还原（**导出自由的另一半**）。
+ *
+ * 🔴 本轮**只做「还原到空库」**，不做「合并到已有数据的库」——
+ * 理由（id 冲突、时钟/顺序、本地是否更新版本）见 `import-dump.ts` 文件头。
+ * 还原**绝不**清空或覆盖现有数据：目标非空直接拒绝，且在写之前就拒绝。
+ */
+export {
+  parseExportDocument,
+  restoreIntoEmptyTarget,
+  stateMatchesDocument,
+  type ExportImportFailureReason,
+  type ImportTarget,
+  type ParseExportResult,
+  type RestoreExportResult,
+} from './import-dump.js';
