@@ -149,20 +149,37 @@ function git(args, { trim = true } = {}) {
   return trim ? out.trim() : out.replace(/\n+$/, '');
 }
 
+/**
+ * 工作区里**真实存在**的改动（相对 HEAD）。
+ *
+ * ⚠️ 不要直接用 `git status --porcelain` 的路径列 —— 它会带上"索引 vs HEAD"的差异，
+ * 而索引可能残留过期内容。本轮实测（ai-m1，刚 `reset --hard` 到分叉点之后）：
+ *
+ *   工作区 == HEAD == 修正版 runbook，而**索引里是上一版** runbook
+ *   → `git status` 报 `MM`
+ *   → 门禁报「❌ 越界 1 个：docs/plans/ai-remediation-parallel-runbook.md」
+ *
+ * 那是一条**凭空的越界**，而且开发者也看不懂：文件内容明明是对的。
+ * 所以这里只认两件真实的事：未跟踪文件（`??`）＋ 工作区与 HEAD 的差异（`git diff HEAD`）。
+ *
+ * 代价：只存在于索引、工作区里没有的改动不计入 —— 那不是真实代码。
+ */
 function changedInWorktree() {
-  const out = git(['status', '--porcelain'], { trim: false });
-  if (out === '') return [];
-  return out
-    .split('\n')
-    .map((line) => {
-      const rest = line.slice(3);
-      // 重命名/拷贝是 `old -> new`：两边都算改动。
-      const arrow = rest.indexOf(' -> ');
-      return arrow === -1 ? [rest] : [rest.slice(0, arrow), rest.slice(arrow + 4)];
-    })
-    .flat()
-    .map((path) => path.replace(/^"|"$/g, ''))
-    .filter((path) => path !== '');
+  const status = git(['status', '--porcelain'], { trim: false });
+  const untracked =
+    status === ''
+      ? []
+      : status
+          .split('\n')
+          .filter((line) => line.startsWith('??'))
+          .map((line) => line.slice(3).replace(/^"|"$/g, ''))
+          .filter((path) => path !== '');
+
+  // `--no-renames`：重命名要两边都算改动（光看新路径会漏掉被删的旧路径）。
+  const tracked = git(['diff', '--name-only', '--no-renames', 'HEAD']);
+  const list = tracked === '' ? [] : tracked.split('\n');
+
+  return [...new Set([...untracked, ...list])].sort();
 }
 
 /**
