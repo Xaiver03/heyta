@@ -283,6 +283,37 @@ adapter 必须原样使用。理由是回调按订单号认单（`settleOrderPai
 
 ---
 
+### 6.1.1 🔴 为什么「库里生效价 ↔ 落地页文案」只能由 CLI 守，不能由门禁守
+
+这是一个**被证据支持的结论**，不是"来不及做门禁"的托词：
+
+1. **基价在代码里**（`DEFAULT_PRICE_BOOK`），`price_versions` 初始**是空的**。
+   已在全仓核实：**没有任何一个迁移向 `price_versions` 写过数据**
+   （`grep -rn 'INSERT INTO "price_versions"' server/prisma/migrations/*/migration.sql`
+   为空；所有迁移里唯一的数据 INSERT 是 `pending_passkey_registrations`）。
+2. 因此 `price_versions` 的**唯一**来源是运营在**运行期**执行 `set-price`。
+   运行期的写操作**在结构上不可能出现在仓库里** —— 于是也**不可能被任何 CI
+   门禁读到**。`scripts/check-pricing-consistency.mjs` 只能在"没有 PostgreSQL 的
+   CI"里跑，它钉的是**代码基线 ↔ 中英词条 ↔ 法务 ↔ `pricing-ssot` 块**。
+3. 想加"读库"的门禁只有两条路，都更坏：
+   - 让门禁连库：CI 没有库 → 要么红（挡住所有 PR），要么**静默跳过** ——
+     而静默跳过的检查比没有检查更危险，它会让所有人以为这件事被守着；
+   - 解析迁移流来"重放"价格：迁移里没有价格数据，重放出来永远是基线，
+     即**恒等于**已经在跑的那道门禁 —— 一个看起来更严、其实没多守任何东西的检查。
+
+所以这个不一致**必须**在一个"能看见库、而且会因此变红"的地方被拦：
+`pnpm --filter @heyta/server pricing` 的 `show` 与 `set-price` 都会
+`describeCopyFootprint` 比对生效价与文案，**不一致就 `process.exitCode = 1`**。
+可失败证据：`server/tests/billing-pricing-store.pglite.spec.ts` 的改价 CLI 组
+（真 SQL：写进 `price_versions` 的价格与文案不一致时，退出码必须是 1）。
+
+🔴 这条纪律的实际含义：**改价之后必须有人跑一次 `pricing show`**。
+它没有自动化的替代品，因为"运营刚刚在数据库里做了什么"这件事，
+仓库无从得知。
+
+---
+
+
 ### 6.2 运营的实际入口：一个 CLI，两个「会红」的条件
 
 改价 / 发券**只有一条路**：服务器上的 `server/scripts/pricing.ts`（本轮接进了
