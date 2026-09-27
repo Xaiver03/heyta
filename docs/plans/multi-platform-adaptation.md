@@ -35,7 +35,7 @@
 | **M1** | 🔴 垂直切片验证 | **一份** RN 组件在 web + mobile + 桌面三端都渲染出来 | M0 |
 | **M2** | 桌面端骨架（Electron） | 桌面端跑通真实同步，煞有记录 | M1 |
 | **M3** | 逐特性迁移 UI | 每个特性两端共用同一组件；旧 DOM 实现删除 | M2 |
-| **M4** | 数据层统一（web SQLite） | 三端共用一套存储契约测试；FTS5 在 web 可用 | M0（可与 M3 并行） |
+| **M4** | 数据层统一（web SQLite） | ✅ **决策已落（ADR-0027）**；✅ **`SqliteWasmDriver` 已过同一套契约**；⬜ web 存储迁移（M4-3）未做；⬜ "FTS5 在 web 可用"未验 | M0（可与 M3 并行） |
 | **M5** | 收敛收尾 + 门禁全端 | DOM UI 删除；门禁覆盖全端；文档固化 | M3、M4 |
 | **M6** | 鸿蒙"跑起来" | 真机/模拟器启动成功 | 外部（模拟器镜像 + 签名） |
 
@@ -599,18 +599,23 @@ Electron 壳与自己打包的静态产物是**松耦合**的：即使 UI 收敛
 
 ### 任务
 
-**M4-1 决策（先写 ADR，再动手）**
+**M4-1 决策（先写 ADR，再动手）** ✅ **已完成**
 
-- 建：新 ADR「客户端存储统一 = SQLite」
-- 选项：web 用 `@sqlite.org/sqlite-wasm`（实测 **3.53.4-build1，Apache-2.0**）+ OPFS
-- 必须写明**不做的代价**（web 永远没有本地检索）与**做的代价**（WASM 体积、OPFS 兼容面）
+- 建：新 ADR「客户端存储统一 = SQLite」→ [**ADR-0027**](../adr/0027-unified-client-storage-sqlite-everywhere.md)
+- 选项：web 用 `@sqlite.org/sqlite-wasm`（实测 **3.53.4-build1，Apache-2.0，0 依赖**）+ OPFS
+- 写明**不做的代价**（web 永远没有本地检索）与**做的代价**（WASM 体积、OPFS 兼容面）
+- 🔴 ADR 里记了一条**决定性的**一手事实：`installOpfsSAHPoolVfs()` 异步，
+  但它产出的 `OpfsSAHPoolDb` 继承 `oo1.DB`、方法是**同步**的 ——
+  所以 `SqliteDriver` 的同步接口不用改。**搞反这一点会让三端一起改成 async。**
 
-**M4-2 实现 `SqliteWasmDriver`**
+**M4-2 实现 `SqliteWasmDriver`** ✅ **已完成**
 
 - 建：`packages/storage/src/sqlite/sqlite-wasm-driver.ts`
-- 只需实现**已有的 4 个同步方法**（`exec`/`run`/`all`/`close`）
+- 驱动本体与 OPFS **解耦**（构造只收一个已打开的 `oo1.DB`），因此
+  **映射逻辑能在 Node 里用内存库测**，OPFS 接入留给真浏览器
 - `SqliteAdapter` **一行不改** —— 这正是窄接口的价值
-- 验：`packages/storage/tests/contract.spec.ts` 加一行把新驱动也跑一遍
+- 验：`packages/storage/tests/contract.spec.ts` 各加一行 → **262 个测试全过**，
+  含 `SqliteWasmDriver` 的 DbAdapter 契约与 OpLogStore 契约
 
 > 🔴 **鸿蒙的存储基线必须先查清，否则 M4 会做出一个只有两端的结论**：
 > [ADR-0024](../adr/0024-desktop-shell-and-ui-convergence.md) §2.6 已**一手核实** ——
@@ -741,7 +746,7 @@ IndexedDB 路径**保留到迁移验证通过之后**再删。两者可并存一
 | `react-native-svg` | 15.15.5 | MIT | ✅ **已登记**（M1 徽章：web 端需显式指向 `ReactNativeSVG.web.js`，见 `apps/web/vite.config.ts`） |
 | `lucide` | 1.48.0 | ISC | ✅ **已登记**（**框架无关的图标数据包，零依赖** —— 共享层靠它拿图标，见 §M1 徽章一节） |
 | `electron` | 44.4.5 稳定（自带 Node 24.21.0） | MIT | ✅ **已登记**（M2-1：白名单内**自动**登记，`check:licenses` 通过） |
-| `@sqlite.org/sqlite-wasm` | 3.53.4-build1 | Apache-2.0 | 🔲 待 M4 决策 |
+| `@sqlite.org/sqlite-wasm` | 3.53.4-build1 | Apache-2.0 | ✅ **已登记**（ADR-0027；0 依赖，MIT 之外少见的零传递面） |
 
 ⚠️ **不引入**（除非另有人工核实）：`tamagui`（npm `license` 字段为 `null`，
 与仓库 MIT 冲突，**未读包内 LICENSE**）。

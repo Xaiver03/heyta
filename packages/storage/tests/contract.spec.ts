@@ -15,6 +15,10 @@ import { INDEXEDDB_SCHEMA, IndexedDbAdapter } from '../src/indexeddb/indexeddb-a
 import { MemoryDbAdapter } from '../src/memory/memory-adapter.js';
 import { NodeSqliteDriver } from '../src/sqlite/node-sqlite-driver.js';
 import { SqliteAdapter } from '../src/sqlite/sqlite-adapter.js';
+import {
+  SqliteWasmDriver,
+  type Oo1Db,
+} from '../src/sqlite/sqlite-wasm-driver.js';
 
 import { runDbAdapterContract } from './contract/adapter.contract.js';
 import { runOpLogStoreContract } from './contract/op-log-store.contract.js';
@@ -52,6 +56,37 @@ const sqliteDb = async (): Promise<SqliteAdapter> => {
   return db;
 };
 
+/**
+ * Web 的 `sqlite-wasm` 实现，**在 Node 里用内存库**跑同一套契约。
+ *
+ * 🔴 这里测的是 `SqliteWasmDriver` 的**映射逻辑**（占位符绑定、行形状、
+ * 幂等关闭、唯一冲突判定），**不是 OPFS** —— OPFS 只在浏览器里有，
+ * 它的接入由真浏览器单独验。
+ *
+ * 之所以能把两者分开，是因为驱动的构造只要求一个已经打开的 `oo1.DB`
+ * 对象，不自己碰 OPFS（见 `sqlite-wasm-driver.ts` 文件头第三段）。
+ * 合在一起的话，连"绑定参数对不对"都得靠真浏览器去兜 ——
+ * 而真浏览器比这里慢几个数量级，失败时的指向也远没有这么清楚。
+ */
+const wasmInit = async (): Promise<{ oo1: { DB: new (p: string, f?: string) => Oo1Db } }> => {
+  // 该包无类型声明，且入口通过全局暴露初始化函数（不是 export default）。
+  await import('@sqlite.org/sqlite-wasm');
+  const init = (globalThis as { sqlite3InitModule?: () => Promise<never> }).sqlite3InitModule;
+  if (init === undefined) throw new Error('sqlite3InitModule 未定义');
+  return (await init()) as unknown as { oo1: { DB: new (p: string, f?: string) => Oo1Db } };
+};
+
+const sqliteWasmDb = async (): Promise<SqliteAdapter> => {
+  const sqlite3 = await wasmInit();
+  const db = new SqliteAdapter({
+    schema: INDEXEDDB_SCHEMA,
+    // `'c'` = 建库标志。内存库每个用例一份，与 `freshIndexedDb` 对应。
+    driverFactory: () => new SqliteWasmDriver(new sqlite3.oo1.DB(':memory:', 'c')),
+  });
+  await db.init();
+  return db;
+};
+
 describe('DbAdapter 实现一致性', () => {
   runDbAdapterContract({ name: 'MemoryDbAdapter', create: memoryDb });
   runDbAdapterContract({
@@ -59,6 +94,11 @@ describe('DbAdapter 实现一致性', () => {
     create: () => freshIndexedDb(`contract-${++counter}`),
   });
   runDbAdapterContract({ name: 'SqliteAdapter', create: sqliteDb });
+  /**
+   * 🔴 **M4 的核心判据**：web 的驱动与桌面/测试用的驱动跑的是**同一套契约**。
+   * 这一行就是 ADR-0027「存储统一」的证据 —— 加一行，自动获得全部覆盖。
+   */
+  runDbAdapterContract({ name: 'SqliteWasmDriver', create: sqliteWasmDb });
 
   /**
    * op-log 层必须能跑在**任意** DbAdapter 上。
@@ -77,6 +117,11 @@ describe('DbAdapter 实现一致性', () => {
   runOpLogStoreContract({
     name: 'SqliteAdapter',
     createDb: sqliteDb,
+    create: (db) => new DbOpLogStore(db),
+  });
+  runOpLogStoreContract({
+    name: 'SqliteWasmDriver',
+    createDb: sqliteWasmDb,
     create: (db) => new DbOpLogStore(db),
   });
 });

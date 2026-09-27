@@ -7,7 +7,7 @@
 
 生成时间：2026-09-27
 
-**总计 938 个包** —— 宽松许可 937，受限 0，无许可证 0，白名单外已登记 1。
+**总计 962 个包** —— 宽松许可 961，受限 0，无许可证 0，白名单外已登记 1。
 
 准入门槛（见 THIRD_PARTY_LICENSES.md）：许可允许闭源商用；且 2021 年后仍在更新。
 
@@ -26,7 +26,7 @@
 
 - **CC-BY-4.0**（`caniuse-lite@1.0.30001812`）：caniuse-lite@1.0.30001812：browserslist 的**构建期数据包**，不进入运行时产物；CC-BY 是署名许可（不是禁用的 CC-BY-NC），归属已在 THIRD_PARTY_LICENSES.md §2 登记。
 
-### 📋 全部依赖（938 个）
+### 📋 全部依赖（962 个）
 
 这一段是**全量底稿**：上面两节的所有结论都能在这里逐行核到。严格按包名排序（`localeCompare`），同名多版本分行列出。
 
@@ -170,7 +170,13 @@
 | `@dnd-kit/utilities` | 3.2.2 | MIT |
 | `@electric-sql/pglite` | 0.5.8 | Apache-2.0 |
 | `@electron-internal/extract-zip` | 1.0.5 | BSD-2-Clause |
+| `@electron/asar` | 4.3.1 | MIT |
 | `@electron/get` | 5.1.0 | MIT |
+| `@electron/notarize` | 3.1.1 | MIT |
+| `@electron/osx-sign` | 2.7.0 | BSD-2-Clause |
+| `@electron/packager` | 20.3.0 | BSD-2-Clause |
+| `@electron/universal` | 3.0.6 | MIT |
+| `@electron/windows-sign` | 2.1.0 | BSD-2-Clause |
 | `@esbuild/darwin-arm64` | 0.27.7 | MIT |
 | `@exodus/bytes` | 1.16.0 | MIT |
 | `@fastify/accept-negotiator` | 2.1.0 | MIT |
@@ -212,6 +218,7 @@
 | `@jridgewell/trace-mapping` | 0.3.9 | MIT |
 | `@levischuck/tiny-cbor` | 0.2.11 | MIT |
 | `@lukeed/ms` | 2.0.2 | MIT |
+| `@malept/cross-spawn-promise` | 2.0.0 | Apache-2.0 |
 | `@noble/ciphers` | 2.4.0 | MIT |
 | `@noble/hashes` | 2.4.0 | MIT |
 | `@noble/hashes` | 1.8.0 | MIT |
@@ -282,6 +289,7 @@
 | `@sinclair/typebox` | 0.27.12 | MIT |
 | `@sinonjs/commons` | 3.0.1 | BSD-3-Clause |
 | `@sinonjs/fake-timers` | 10.3.0 | BSD-3-Clause |
+| `@sqlite.org/sqlite-wasm` | 3.53.4-build1 | Apache-2.0 |
 | `@standard-schema/spec` | 1.1.0 | MIT |
 | `@tsconfig/node10` | 1.0.13 | MIT |
 | `@tsconfig/node12` | 1.0.11 | MIT |
@@ -329,6 +337,7 @@
 | `@vitest/spy` | 5.0.1 | MIT |
 | `@vitest/utils` | 4.1.11 | MIT |
 | `@vscode/sudo-prompt` | 9.3.2 | MIT |
+| `@xmldom/xmldom` | 0.9.12 | MIT |
 | `abort-controller` | 3.0.0 | MIT |
 | `abstract-logging` | 2.0.1 | MIT |
 | `accepts` | 1.3.8 | MIT |
@@ -483,6 +492,7 @@
 | `env-paths` | 3.0.0 | MIT |
 | `env-paths` | 2.2.1 | MIT |
 | `envinfo` | 7.21.0 | MIT |
+| `err-code` | 2.0.3 | MIT |
 | `error-ex` | 1.3.4 | MIT |
 | `error-stack-parser` | 2.1.4 | MIT |
 | `errorhandler` | 1.5.2 | MIT |
@@ -527,12 +537,15 @@
 | `fbjs-css-vars` | 1.0.2 | MIT |
 | `fdir` | 6.5.0 | MIT |
 | `fflate` | 0.8.3 | MIT |
+| `filename-reserved-regex` | 3.0.0 | MIT |
+| `filenamify` | 6.0.0 | MIT |
 | `fill-range` | 7.1.1 | MIT |
 | `finalhandler` | 1.1.2 | MIT |
 | `find-my-way` | 9.9.0 | MIT |
 | `find-up` | 4.1.0 | MIT |
 | `find-up` | 5.0.0 | MIT |
 | `fix-dts-default-cjs-exports` | 1.0.1 | MIT |
+| `flora-colossus` | 3.0.2 | MIT |
 | `flow-enums-runtime` | 0.0.6 | MIT |
 | `form-data` | 4.0.6 | MIT |
 | `formidable` | 3.5.4 | MIT |
@@ -542,6 +555,7 @@
 | `fs.realpath` | 1.0.0 | ISC |
 | `fsevents` | 2.3.3 | MIT |
 | `function-bind` | 1.1.2 | MIT |
+| `galactus` | 2.0.2 | MIT |
 | `gensync` | 1.0.0-beta.2 | MIT |
 | `get-caller-file` | 2.0.5 | ISC |
 | `get-intrinsic` | 1.3.0 | MIT |
@@ -597,6 +611,7 @@
 | `is-unicode-supported` | 0.1.0 | MIT |
 | `is-wsl` | 2.2.0 | MIT |
 | `is-wsl` | 1.1.0 | MIT |
+| `isbinaryfile` | 4.0.10 | MIT |
 | `isexe` | 2.0.0 | ISC |
 | `istanbul-lib-coverage` | 3.2.2 | BSD-3-Clause |
 | `istanbul-lib-instrument` | 5.2.1 | BSD-3-Clause |
@@ -623,6 +638,7 @@
 | `json5` | 2.2.3 | MIT |
 | `jsonfile` | 4.0.0 | MIT |
 | `jsonwebtoken` | 9.0.3 | MIT |
+| `junk` | 4.0.1 | MIT |
 | `jwa` | 2.0.1 | MIT |
 | `jws` | 4.0.1 | MIT |
 | `kleur` | 3.0.3 | MIT |
@@ -746,6 +762,7 @@
 | `path-parse` | 1.0.7 | MIT |
 | `path-scurry` | 2.0.2 | BlueOak-1.0.0 |
 | `pathe` | 2.0.3 | MIT |
+| `pe-library` | 1.0.1 | MIT |
 | `picocolors` | 1.1.1 | ISC |
 | `picomatch` | 2.3.2 | MIT |
 | `picomatch` | 4.0.7 | MIT |
@@ -756,9 +773,11 @@
 | `pkg-types` | 1.3.1 | MIT |
 | `playwright` | 1.63.0 | Apache-2.0 |
 | `playwright-core` | 1.63.0 | Apache-2.0 |
+| `plist` | 3.1.1 | MIT |
 | `postcss` | 8.5.28 | MIT |
 | `postcss-load-config` | 6.0.1 | MIT |
 | `postcss-value-parser` | 4.2.0 | MIT |
+| `postject` | 1.0.0-alpha.6 | MIT |
 | `pretty-format` | 29.7.0 | MIT |
 | `prisma` | 5.22.0 | Apache-2.0 |
 | `process-warning` | 5.1.0 | MIT |
@@ -766,6 +785,7 @@
 | `progress` | 2.0.3 | MIT |
 | `promise` | 7.3.1 | MIT |
 | `promise` | 8.3.0 | MIT |
+| `promise-retry` | 2.0.1 | MIT |
 | `prompts` | 2.4.2 | MIT |
 | `pstree.remy` | 1.1.8 | MIT |
 | `punycode` | 2.3.1 | MIT |
@@ -804,11 +824,13 @@
 | `require-directory` | 2.1.1 | MIT |
 | `require-from-string` | 2.0.2 | MIT |
 | `require-main-filename` | 2.0.0 | ISC |
+| `resedit` | 2.0.3 | MIT |
 | `resolve` | 1.22.12 | MIT |
 | `resolve-from` | 5.0.0 | MIT |
 | `resolve-from` | 4.0.0 | MIT |
 | `restore-cursor` | 3.1.0 | MIT |
 | `ret` | 0.5.0 | MIT |
+| `retry` | 0.12.0 | MIT |
 | `reusify` | 1.1.0 | MIT |
 | `rfdc` | 1.4.1 | MIT |
 | `rimraf` | 3.0.2 | ISC |
@@ -957,6 +979,7 @@
 | `ws` | 7.5.13 | MIT |
 | `ws` | 6.2.6 | MIT |
 | `xml-name-validator` | 5.0.0 | Apache-2.0 |
+| `xmlbuilder` | 15.1.1 | MIT |
 | `xmlchars` | 2.2.0 | MIT |
 | `y18n` | 4.0.3 | ISC |
 | `y18n` | 5.0.8 | ISC |
@@ -964,6 +987,7 @@
 | `yaml` | 2.9.1 | ISC |
 | `yargs` | 17.7.3 | MIT |
 | `yargs` | 15.4.1 | MIT |
+| `yargs-parser` | 22.0.0 | ISC |
 | `yargs-parser` | 18.1.3 | ISC |
 | `yargs-parser` | 21.1.1 | ISC |
 | `yn` | 3.1.1 | MIT |
