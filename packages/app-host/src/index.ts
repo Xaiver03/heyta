@@ -189,3 +189,28 @@ export {
   categoryReportFromTables,
   type CategoryTables,
 } from './category-report.js';
+
+/**
+ * 导出（**导出自由**，README 设计原则第 5 条）。
+ *
+ * 🔴 导出的**内容形状**是产品语义，所以它在这里而不在 `apps/*` ——
+ * 理由见 `export-dump.ts` 文件头。宿主只负责把状态、op-log、时间戳递进来，
+ * 以及把结果写进文件/触发下载。
+ */
+export {
+  EXPORT_APP_NAME,
+  EXPORT_FORMAT_VERSION,
+  buildExportDocument,
+  buildTaskExportRows,
+  exportDocumentFromHost,
+  exportFileName,
+  renderTasksMarkdown,
+  serializeExportDocument,
+  type BuildExportOptions,
+  type ExportCounts,
+  type ExportDocument,
+  type ExportEntityCount,
+  type ExportFormat,
+  type ExportTaskRow,
+  type TasksMarkdownCopy,
+} from './export-dump.js';
