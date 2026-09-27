@@ -35,7 +35,7 @@
 | **M1** | 🔴 垂直切片验证 | **一份** RN 组件在 web + mobile + 桌面三端都渲染出来 | M0 |
 | **M2** | 桌面端骨架（Electron） | 桌面端跑通真实同步，煞有记录 | M1 |
 | **M3** | 逐特性迁移 UI | 每个特性两端共用同一组件；旧 DOM 实现删除 | M2 |
-| **M4** | 数据层统一（web SQLite） | ✅ **决策已落（ADR-0027）**；✅ **`SqliteWasmDriver` 已过同一套契约**；✅ **Worker 接缝已过同一套契约 + 真浏览器端到端**（M4-3a）；⬜ 切换 `oplog.ts`（M4-3b）未做；⬜ "FTS5 在 web 可用"未验 | M0（可与 M3 并行） |
+| **M4** | 数据层统一（web SQLite） | ✅ **决策已落（ADR-0027）**；✅ **`SqliteWasmDriver` 已过同一套契约**；✅ **Worker 接缝已过同一套契约 + 真浏览器端到端**（M4-3a）；✅ **web 已切到 Worker 里的 SQLite，生产构建产出 worker+wasm**（M4-3b）；⬜ 删 IndexedDB 旧路径前的**真实旧库迁移验证**未做；⬜ "FTS5 在 web 可用"已实测**支持**但未接进检索功能 | M0（可与 M3 并行） |
 | **M5** | 收敛收尾 + 门禁全端 | DOM UI 删除；门禁覆盖全端；文档固化 | M3、M4 |
 | **M6** | 鸿蒙"跑起来" | 真机/模拟器启动成功 | 外部（模拟器镜像 + 签名） |
 
@@ -684,14 +684,42 @@ Electron 壳与自己打包的静态产物是**松耦合**的：即使 UI 收敛
 2. **同名 VFS 会互抢句柄**（`NoModificationAllowedError`）。因为 VFS 名决定 OPFS 目录名。
    ⇒ **一个页面只应有一个存储 Worker**；**每个独立数据库家族要有自己的 `vfsName`**。
 
-#### M4-3b 切换 `apps/web/src/lib/oplog.ts` ⬜ 未做
+#### M4-3b 切换 `apps/web/src/lib/oplog.ts` ✅ **已完成并端到端验证**
 
-Worker 入口（`apps/web/src/worker/storage.worker.ts`）已就绪且验证通过，
-但**切换本身会动到主线程的启动路径与导入/还原流程**，单独一轮做并单独验。
+`apps/web` 的存储默认走 **Worker 里的 SQLite**；`indexeddb` 保留为回退开关
+（`VITE_HEYTA_STORAGE=indexeddb`），到迁移被验证通过之后再删。
 
-⚠️ 切换前必须处理的已知点：`clientId` 现在由 Worker 交握给出（`ready` Promise），
-而 `oplog.ts` 里 `initOpLog()` 原本自己 `resolveClientId(db)` —— 顺序不能反，
-否则会拿一个还没定的 `clientId` 去建向量时钟（那正是"两份 clientId 实现"那类 bug）。
+**切换本身能成立，靠的是 `OpLogStore` 同型**：`requireStore()` 的返回类型从
+`IndexedDbOpLogStore` 放宽到 `OpLogStore`，**其余代码一行没改**。
+
+证据（✅实测）：
+
+| 验证 | 命令 | 结果 |
+|---|---|---|
+| 真的在用 SQLite（**不是静默回退**） | `pnpm check:web-storage` | **EXIT=0**，三条证据一致 |
+| 应用级 e2e（含"刷新后仍在"） | `pnpm check` | **26 passed** |
+| 生产构建产出 worker + wasm | `pnpm --filter @heyta/web exec vite build` | `storage.worker-*.js` + `sqlite3-*.wasm`（852K / gzip 403K） |
+| 全门禁 | `pnpm check` | **EXIT=0** |
+
+🔴 **为什么不满足于"e2e 全绿"**：**两条路径都能让 e2e 全绿**。
+静默回退到 IndexedDB 时一切看起来都正常 —— 所以新增了
+`scripts/verify-web-storage-backend.mjs`，靠**三条互相独立的证据**：
+应用自报 `window.__heytaStorage.backend`、OPFS 里确实有 `.heyta-web` 目录、
+以及**旧 IndexedDB 侧查得清楚且为 0 条**（证明数据没有分叉到两条路）。
+它已接进 `pnpm check`，不会再无声地退回去。
+
+🔴 **本步踩出来的两个坑**（都是"dev 过、别的场景不过"）：
+
+1. **`worker.format` 默认 `iife`，而存储 Worker 会代码分割** → 生产构建直接失败
+   （`Invalid value "iife" ... not supported for code-splitting builds`），
+   **dev 完全正常**。必须设 `worker: { format: 'es' }`，且调用侧要 `{ type: 'module' }`。
+2. **`build` 里也必须排除 `@sqlite.org/sqlite-wasm` 的预打包** ——
+   与探针里那次同源：esbuild 预打包会破坏"运行时按相对路径找自身资源"的包。
+   这已是同一根因的**第三次**发作。
+
+⚠️ **还没删 IndexedDB 路径**：`migrateLegacyIndexedDb()` 会在 SQLite 为空且旧库有 op 时
+一次性导入（用 `appendImported`，不删旧库），但**这条迁移路径本身还没有被真实数据验过**
+（当前库是空的）。删除旧路径之前必须先造一份真实旧库来验它。
 
 ### 回退
 

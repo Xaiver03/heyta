@@ -13,7 +13,12 @@
  */
 
 import { OpLogEngine, type MaterializedState, type OpIntent } from '@heyta/op-log';
-import { IndexedDbAdapter, IndexedDbOpLogStore } from '@heyta/storage';
+import {
+  createWorkerOpLogSession,
+  IndexedDbAdapter,
+  IndexedDbOpLogStore,
+  type OpLogStore,
+} from '@heyta/storage';
 import type { Operation } from '@heyta/sync-core';
 // 🔴 **clientId 的生成只有一份实现**，在 `@heyta/app-host`。
 // 这里原本自己写了一份：回退用 `Math.random()`、格式也不同，
@@ -31,13 +36,32 @@ let db: IndexedDbAdapter | undefined;
 /**
  * op-log 存储实例。
  *
+ * ⚠️ 类型是 `OpLogStore`（接口），**不是** 某个具体实现 ——
+ * 因为现在有两个实现：IndexedDB（旧）与 Worker 里的 SQLite（M4）。
+ * 两者同型是刻意的：`apps/web` 换存储是"换实现"，不是"改架构"。
+ *
  * 保留引用是因为「构造同步客户端」需要它来读写**同步游标** ——
  * `getLastServerSeq`/`setLastServerSeq` 是 `OpLogStore` 接口的正式成员。
  * 此前同步 store 绕过它、自己再开一个 adapter 去读 `meta`，
  * 等于把游标键名知识复制了第二份。
  */
-let opLogStore: IndexedDbOpLogStore<Operation<string>> | undefined;
+let opLogStore: OpLogStore<Operation<string>> | undefined;
 let initPromise: Promise<void> | undefined;
+
+/**
+ * 选哪条存储路径。
+ *
+ * 默认 `sqlite` —— 那是 M4 的方向。`indexeddb` 是**回退开关**，
+ * 保留到迁移被验证通过之后（见 `docs/plans/multi-platform-adaptation.md` M4-3）。
+ * 用环境变量而不是运行时探测：**探测会让"这次到底用了哪条路"变得不可知**，
+ * 而排查存储问题时，第一个要回答的就是这个问题。
+ */
+export type StorageBackend = 'sqlite' | 'indexeddb';
+
+export function resolveStorageBackend(): StorageBackend {
+  const raw = import.meta.env?.VITE_HEYTA_STORAGE;
+  return raw === 'indexeddb' ? 'indexeddb' : 'sqlite';
+}
 
 /** 事件监听器：状态变化后通知各 store 刷新。 */
 type Listener = () => void;
@@ -54,6 +78,99 @@ function notify(): void {
 }
 
 /**
+ * 打开存储，返回 `{ store, clientId }`。
+ *
+ * 两条路径在这里分流，**其余代码完全不知道差别**。
+ */
+async function openStorage(
+  dbName: string,
+): Promise<{ store: OpLogStore<Operation<string>>; clientId: string }> {
+  if (resolveStorageBackend() === 'indexeddb') {
+    db = new IndexedDbAdapter(dbName);
+    await db.init();
+    const store = new IndexedDbOpLogStore<Operation<string>>(db);
+    return { store, clientId: await resolveClientId(db) };
+  }
+
+  /**
+   * 🔴 **Worker 的 URL 必须写成 `new URL(..., import.meta.url)` 这个字面量形式。**
+   * Vite 靠**静态识别这个模式**来决定"要单独打一个 worker chunk"。
+   * 换成变量、或拼字符串，它会静默地不打这个 chunk ——
+   * 表现为运行时 404，而不是构建报错。
+   */
+  const worker = new Worker(new URL('../worker/storage.worker.ts', import.meta.url), {
+    type: 'module',
+  });
+
+  /**
+   * ⚠️ **顺序不能反**：`createWorkerOpLogSession` 会**同步**挂上监听，
+   * 所以必须在 `await` 任何东西之前调用。先 await 再挂，Worker 的
+   * `ready` 可能在监听装上之前就发出，那条消息会**直接丢失** ——
+   * 表现为永远卡在 `ready`，而不是一个错误。
+   */
+  const session = createWorkerOpLogSession<Operation<string>>(worker);
+
+  /** 等交握：`clientId` 由**库**给出，不能拿一个还没定的值去建向量时钟。 */
+  const { clientId } = await session.ready;
+
+  await migrateLegacyIndexedDb(session.store, dbName);
+
+  return { store: session.store, clientId };
+}
+
+/**
+ * 把**旧 IndexedDB 里的 op** 一次性搬进 SQLite。
+ *
+ * 🔴 没有这一步，切到 SQLite 的用户会看到**一个空应用** ——
+ * 而且不报任何错。"数据看起来没了"是比崩溃更难挽回的一类故障。
+ *
+ * 两条守卫，缺一不可：
+ *  1. **只在目标是空库时导入。** 否则每次启动都会把旧库再灌一遍，
+ *     变成一个自我复制的数据源。判据用 `getLastLocalSeq() === 0`
+ *     而不是"表里有几条" —— 前者是存储层自己的账，不会因过滤条件而失真。
+ *  2. 旧库不存在 / 没有 op 时**安静返回**。首次安装的用户就属于这一类，
+ *     不该在控制台留下任何"迁移失败"的噪音。
+ *
+ * ⚠️ 用 `appendImported` 而不是 `appendLocal`：这些 op **不是本地新写的**，
+ * 它们带着自己原来的因果与 clientId。用 `appendLocal` 会把它们伪装成"本机刚产生"，
+ * 同步层随后对它们的处理就会错。
+ *
+ * ⚠️ **不删旧库。** 迁移期间两个来源都可能被读到，删掉就无法回退
+ * （`docs/plans/multi-platform-adaptation.md` M4-3「两者可并存一个版本周期」）。
+ */
+async function migrateLegacyIndexedDb(
+  target: OpLogStore<Operation<string>>,
+  dbName: string,
+): Promise<void> {
+  if ((await target.getLastLocalSeq()) > 0) return;
+
+  let legacy: IndexedDbAdapter | undefined;
+  try {
+    legacy = new IndexedDbAdapter(dbName);
+    await legacy.init();
+    const legacyStore = new IndexedDbOpLogStore<Operation<string>>(legacy);
+    const ops = (await legacyStore.getAllOps()).map((row) => row.op);
+    if (ops.length === 0) return;
+
+    const result = await target.appendImported(ops);
+    // eslint-disable-next-line no-console -- 迁移必须留下可见痕迹：它是不可逆的数据事件。
+    console.info(
+      `[heyta] 已把旧 IndexedDB 的 ${ops.length} 条 op 导入 SQLite（新增 ${result.appended.length}、已存在 ${result.skipped.length}）`,
+    );
+  } catch (error) {
+    /**
+     * 🔴 **迁移失败不能阻断启动。** 旧库读不出来（版本不符、被占用、浏览器策略）
+     * 时，正确行为是"从空库开始"而不是"应用打不开" —— 后者会让用户
+     * 连导出/反馈的入口都没有。失败必须留痕，因为它意味着数据可能要看一眼。
+     */
+    // eslint-disable-next-line no-console
+    console.error('[heyta] 旧 IndexedDB 迁移失败，将从空 SQLite 库开始', error);
+  } finally {
+    legacy?.close();
+  }
+}
+
+/**
  * 初始化引擎。幂等，可并发调用。
  *
  * 🔴 **崩溃恢复在接受任何新写入之前完成。** 顺序不可换：
@@ -63,15 +180,26 @@ export function initOpLog(dbName = 'heyta'): Promise<void> {
   if (initPromise !== undefined) return initPromise;
 
   initPromise = (async () => {
-    db = new IndexedDbAdapter(dbName);
-    await db.init();
+    const backend = resolveStorageBackend();
+    const opened = await openStorage(dbName);
+    opLogStore = opened.store;
 
-    opLogStore = new IndexedDbOpLogStore<Operation<string>>(db);
-    // 与原生宿主同一个键（`META_KEYS.CLIENT_ID` = 'clientId'），
-    // 所以这次切换**不需要任何数据迁移** —— 已有值会被原样读回。
-    const clientId = await resolveClientId(db);
+    /**
+     * 🔴 **把"这次到底用了哪条存储路径"暴露到 `window` 上。**
+     *
+     * 不是为了调试方便 —— 是因为**这个切换本身无法从行为上区分**：
+     * 两条路径都能让 e2e 全绿，所以"测试通过"证明不了真的切过去了。
+     * 静默回退到 IndexedDB 时，一切看起来都正常，只有这一处会说真话。
+     *
+     * 与 `verify-universal-slice` 里"探针必须自己报出它验的是什么"同一条道理：
+     * **可观测的断言 > 间接的行为推论。**
+     */
+    (globalThis as { __heytaStorage?: unknown }).__heytaStorage = {
+      backend,
+      clientId: opened.clientId,
+    };
 
-    engine = new OpLogEngine({ store: opLogStore, clientId });
+    engine = new OpLogEngine({ store: opLogStore, clientId: opened.clientId });
     await engine.recover();
     notify();
   })();
@@ -89,7 +217,7 @@ export function requireEngine(): OpLogEngine {
 }
 
 /** op-log 存储。同步接线用它读写游标 —— 不要绕过它直接碰 adapter。 */
-export function requireStore(): IndexedDbOpLogStore<Operation<string>> {
+export function requireStore(): OpLogStore<Operation<string>> {
   if (opLogStore === undefined) {
     throw new Error(
       'op-log 存储尚未初始化。请先 await initOpLog()（应用入口应已完成）。',

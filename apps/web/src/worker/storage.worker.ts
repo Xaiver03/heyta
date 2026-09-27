@@ -37,6 +37,20 @@ import type { Operation } from '@heyta/sync-core';
 const DB_FILENAME = 'heyta.sqlite';
 
 /**
+ * OPFS 里的 VFS 名。**决定磁盘目录名**（SAH Pool 用 `'.' + vfsName`）。
+ *
+ * 🔴 两条规则（`packages/storage/probe/oplog-worker.js` 里有完整推导）：
+ *   1. **一个页面只能有一个存储 Worker** —— 同名 VFS 的第二块池拿不到句柄，
+ *      报 `NoModificationAllowedError`。
+ *   2. **每个独立数据库家族用自己的 `vfsName`** —— 否则两块池指向同一批文件。
+ *
+ * 显式写出来还有一个好处：**它是可断言的**。
+ * 验证脚本靠这个名字去 OPFS 里找库文件，从而证明"真的走了 SQLite"，
+ * 而不是只看到"应用没报错"。
+ */
+const DB_VFS_NAME = 'heyta-web';
+
+/**
  * 开库。**失败也要有结果**，不能让它变成一个悬着的 Promise ——
  * 主线程会等 `ready`，永远不决议就是"应用卡在启动、什么都不说"。
  */
@@ -46,7 +60,10 @@ const opened: Promise<{ store: OpLogWorkerStore; clientId: string }> = (async ()
    * 直接传 `openSqliteWasmDriver` 会把 Promise 当驱动塞进适配器
    * （`driverFactory` 的签名是同步的）—— 详见 `createOpfsSahPoolDriverFactory` 的注释。
    */
-  const driverFactory = await createOpfsSahPoolDriverFactory({ filename: DB_FILENAME });
+  const driverFactory = await createOpfsSahPoolDriverFactory({
+    filename: DB_FILENAME,
+    vfsName: DB_VFS_NAME,
+  });
 
   const adapter = new SqliteAdapter({ schema: INDEXEDDB_SCHEMA, driverFactory });
   await adapter.init();

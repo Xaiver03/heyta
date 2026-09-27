@@ -136,9 +136,47 @@ export default defineConfig({
      *
      * 排除之后 `react-native-svg` 不再进预打包，交给上面那套
      * 别名 + `.web.*` 后缀解析 —— 与生产构建走同一条路。
+     *
+     * ─────────────────────────────────────────────────────────────
+     * 🔴 `@sqlite.org/sqlite-wasm` 同样必须排除 —— **同一类坑，第三次踩**
+     * ─────────────────────────────────────────────────────────────
+     * 上面这条注释说"两边不一致"，而 wasm 这个更狠：它在**生产构建里也会炸**，
+     * 只是炸得更晚 —— 直到用户第一次真的用存储。
+     *
+     * 症状（探针里已完整记录过一次，见 `packages/storage/probe/vite.config.mjs`）：
+     *
+     *     CompileError: WebAssembly.instantiate(): expected magic word 00 61 73 6d,
+     *     found 3c 21 64 6f @+0
+     *
+     * `3c 21 64 6f` 是 `<!do` —— wasm 的 URL 拿回来的是 **HTML**。
+     * 原因是 esbuild 预打包把这个包复制进 `node_modules/.vite/deps/`，
+     * 而它**内部按相对路径找 `sqlite3.wasm`**，路径不会跟着搬。
+     *
+     * ⚠️ 真正的教训（已经写进 ADR-0027 §6.1 的代价清单）：
+     * **任何"运行时按相对路径加载自身资源"的依赖，都要先怀疑预打包。**
+     * `react-native-svg`（内部相对路径 import）与 `@sqlite.org/sqlite-wasm`
+     * （内部相对路径找 .wasm）是同一个根因的两次发作。
      */
-    exclude: ['react-native-svg'],
+    exclude: ['react-native-svg', '@sqlite.org/sqlite-wasm'],
   },
+  /**
+   * 🔴 **`worker.format` 必须是 `'es'`。**
+   *
+   * 默认值是 `'iife'`，而存储 Worker **会代码分割**
+   * （它动态 import `@sqlite.org/sqlite-wasm`），于是生产构建直接失败：
+   *
+   *     [vite:worker-import-meta-url] Invalid value "iife" for option
+   *     "worker.format" - UMD and IIFE output formats are not supported
+   *     for code-splitting builds.
+   *
+   * ⚠️ **dev 完全正常，只有 `vite build` 会炸** —— 因为 dev 把 worker 当 ESM 直接提供，
+   * 从不走这条路。这与 `react-native-svg` 那次**方向相反、性质相同**：
+   * 都是"两条构建路径不一致"，而且报错都停在离根因很远的地方。
+   *
+   * `'es'` 能成立的前提是调用侧的 `{ type: 'module' }`
+   * （见 `src/lib/oplog.ts` 里 new Worker 的那一行）—— 两处必须同时改。
+   */
+  worker: { format: 'es' },
   test: {
     environment: 'jsdom',
     globals: true,
