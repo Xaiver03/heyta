@@ -453,7 +453,7 @@ Web 设置页有「导出数据」（JSON 完整保真 / 任务清单 Markdown�
   每对都退化成 LWW + 随机 `clientId` 决胜）、"本地是否更新版本"三条判据都没有可信答案，三条路都会**静默丢数据**。
   若要开这个口子，需要一份独立 ADR。
 - ⚠️ **`verify:mobile-ios` 的基线在本次改动之前就不是绿的**（3 项失败集中在"笔记本读不到 / 自动同步游标"）。
-- 🔴 **手机"收到 12 ops 但一条没落、游标停在 3"—— 这条仍然没结案，但它旁边那条真 bug 已找到并修掉。**
+- ✅ **手机"收到 12 ops 但一条没落、游标停在 3"—— 已结案：复现了，而且它不是同步 bug**（2026-09-28，`4d0e12b`）。
   先说边界，免得读的人以为已经修好了：那行 `Download: 12 ops (sinceSeq=3, latestSeq=15, hasMore=false)`
   是**服务端**在 `reply.send` **之前**打的（`sync.routes.ts:193-197`），它只证明服务端发了一页，
   **不证明客户端落了库**；而 `hasMore=false` 时水位线是在 `applyRemote` **成功之后**才写的
@@ -471,10 +471,30 @@ Web 设置页有「导出数据」（JSON 完整保真 / 任务清单 Markdown�
   验收：先红后绿（红分别是 `sinceSeq=600`，应为 `203` / `501`）+ 两半各自**独立**的变异验证；
   sync-client 64/64、op-log 51/51、storage 212/212、web 674 passed / 12 skipped，typecheck exit 0。
 
-  ⏳ **仍未解**：那台客户端为什么**既没应用也没推进** —— 是 `applyRemote` 抛了（DB 错）？
-  12 条**全都解不开**撞上了 ADR-0016 的抛错（换过/打错了 E2EE 口令，移动端口令只在内存里）？
-  是另一个客户端实例/分支？还是 `applyRemote` 与 `setLastServerSeq` 之间有东西抛了？
-  **不要把这个修复当成那条报告的结论。**
+  ✅ **那条报告本身也结案了 —— 是复现，不是"仍未解"**（2026-09-28，`4d0e12b`）：
+  机理是 **ADR-0016 的 fail-closed 设计行为**：整页 op 一条都解不开时，`download()` 在
+  `setLastServerSeq` **之前**就中断 —— 游标不动、一条不应用。**这是设计要的**（宁可停下，
+  也不静默跳过历史），不是 bug。复现方式（`packages/sync-client/tests/download-undecryptable-page.spec.ts`）：
+  真 `SyncClient` 生产 `download()` + 真 AES-GCM + 真 `OpLogEngine` + 真 SQLite（`node:sqlite` 临时文件），
+  HTTP/服务端 op 表是桩，桩打的日志与服务端**逐字同形**：
+  `Download: 12 ops (sinceSeq=3, latestSeq=15, hasMore=false, gap=false)`。
+  `游标=3` 与 `零落库` 两条断言排在那条 reason 断言**之前并已通过** —— 症状是跑出来的。
+  对照组（同一页换**正确口令**）通过：游标 → 15、12 条落库、12 个 habit。
+  假设 2/3 也被排除：`sinceSeq=3` 就是客户端自己发出去的值（服务端只解析回显）；
+  而 `applyRemote` **先落盘再应用**，若在应用阶段抛，那 12 条**已经**在 op 日志里 → 不可能"零行"。
+
+  🔴 **但顺带查出一个真缺陷并修掉了**：整页解不开抛的是**普通 `Error`** →
+  `sync()` 归成 `reason:'unexpected'` → 两个壳对 `unexpected` **原样渲染 `message`**，
+  于是**我们写的中文说明被当成"诊断数据"渲染**：英文界面出现
+  `Sync error: 这一页 12 条 op 一条都解不开……`（中英混排），主状态行退回与网络抖动
+  无法区分的"同步失败"，而且 `retryable:true` 让**口令打错变成无限自动重试**。
+  修法：新增 `'undecryptable-page'`（与"部分解不开、其余已同步"的 `'undecryptable-ops'`
+  区分 —— 处置不同）+ 类型化 `UndecryptablePageError`；**保留 `throw`、保留 fail-closed**，
+  只把分类做对；`message` 改成非中文、可机器定位的诊断。
+  变异验证：删掉那段分类 → 转红（`expected 'unexpected' to be 'undecryptable-page'`）→ 还原绿。
+  旧测试 `sync.spec.ts` 的断言从"`message` 含中文'口令'"（**被替换掉的旧契约**）改成
+  更强的四条：`reason` + `retryable:false` + 能定位到 op + **`message` 不含汉字**。
+  ⚠️ **这条与 `2cf8712` 是同一份报告里的两个独立机理**，不要混为一谈。
 - ✅ **`check:docs` 的"本机绿"已修，而且根因不止一个**（2026-09-28，`fc32fd6` + `5e4dc1d`）。
   原先它报"检查 **54** 处跨文档章节引用"，修完是 **244** 处 —— **78% 的章节引用从来没被检查过**，
   而门禁一路绿灯。两个缺陷**互相掩护**：
@@ -536,8 +556,20 @@ Web 设置页有「导出数据」（JSON 完整保真 / 任务清单 Markdown�
     去掉 mismatch 排除 → 1 条红；打断与 `payment_events` 的关联 → **10 条全红**；
     让共享函数跳过微信结算 → **6 条既有 webhook 测试红**，证明抽取没有丢掉实时通路的守卫）。
     server 全量 **1488 passed / 1 skipped**，`tsc --noEmit` exit 0。
-  - ⚠️ **边界**：生产只注册了 `noop`，**没有跑过真通道**；`reconcile-job.ts` 的 Prisma 胶水
-    只过类型、**没有 PGlite 覆盖**（CI 无 PostgreSQL）；**没有 `payment_events` 行的单补不了**
+  - ✅ **`reconcile-job.ts` 的 Prisma 胶水已被 PGlite 真跑**（2026-09-28，`5a455dc`）。
+    原先它只过类型、**没有测试**，头部注释还把这件事写成"薄胶水，不被 PGlite 覆盖" ——
+    那正是**最容易被悄悄改坏又没人发现**的形状：它不写业务逻辑，却决定了
+    **SQL 收到哪些参数**（`$1/$2/$3` 顺序；`provider` 与事件前缀一旦对调，SQL 依然合法、
+    只是**一条候选都查不到**，不报错、什么都不做）和**事务开在哪里**（每单一个）。
+    修法：加结构类型 + 第三参 `client: ReconcilePrismaClient = prisma`（**生产默认值不变**，
+    tsc 通过即证明真 `PrismaClient` 可赋给该结构类型），测试从外面注入一个
+    **PGlite 支撑的假 Prisma client**（`$transaction` 跑真 `BEGIN/COMMIT/ROLLBACK` 并计数）。
+    8 条断言 + 4 组变异验证（事务边界改成一个 → 4 红；参数对调 / 时钟 / 丢掉注入 limit 各 1 红）；
+    本会话独立复跑：两个对账 spec **18 passed**、`tsc --noEmit` **exit 0**。
+    ⚠️ **边界（别读大了）**：测试里 `tx.subscription.*` 是**内存替身**，不是真 Prisma 委托；
+    真跑的是 SQL、参数、事务边界与订单/券的真实写入。
+  - ⚠️ **仍未跑过真通道**：生产只注册了 `noop`，且 `.env` 里没有任何 `BILLING_*`/`WECHAT_*`；
+    **没有 `payment_events` 行的单补不了**
     （没有任何东西能证明它付过款）；金额**无法独立复核**（`payment_events` 只存 SHA-256 摘要），
     所以按冻结的 `final_amount_minor` 结算；**只认得微信的 `providerEventId` 形状**。
   - 📌 **与退款侧正交**：对账只对**已经记录为收到钱**的单**授予**，
