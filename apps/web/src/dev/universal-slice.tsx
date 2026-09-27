@@ -22,7 +22,8 @@
  */
 
 import { useCallback, useState } from 'react';
-import { HeytaUiProvider, TaskList } from '@heyta/ui';
+import { HeytaUiProvider, TaskBadges, TaskList, useHeytaTokens } from '@heyta/ui';
+import type { TaskRow } from '@heyta/ui';
 import type { Task } from '@heyta/domain';
 
 /**
@@ -30,10 +31,16 @@ import type { Task } from '@heyta/domain';
  * 未完成 / 已完成 / 重要 / 有截止 / 无截止 / 空标题。
  * 只测"有标题的未完成任务"的话，删除线、空标题兜底、
  * 排序这几条都不会被真正渲染到。
+ *
+ * ⚠️ 截止时间**必须一条过去、一条未来**：
+ * 第一版两条都用了过去的时间戳，于是"未逾期"那个分支**从来没被渲染过** ——
+ * 日历字形与弱色没被验证，而断言"逾期色 ≠ 未逾期色"直接失败，
+ * 看起来像配色接错了，实际是数据没覆盖到。分支没被渲染到，
+ * 等于那个分支不存在。
  */
 const SEED: readonly Task[] = [
   { id: 's1', title: '写 M1 切片验证', createdAt: 0, updatedAt: 0, important: true, dueDate: 1_700_000_000_000 },
-  { id: 's2', title: '核对鸿蒙 op-sqlite 版本差', createdAt: 0, updatedAt: 0, dueDate: 1_700_000_100_000 },
+  { id: 's2', title: '核对鸿蒙 op-sqlite 版本差', createdAt: 0, updatedAt: 0, dueDate: 4_100_000_000_000 },
   { id: 's3', title: '', createdAt: 0, updatedAt: 0 },
   { id: 's4', title: '已完成的示例', createdAt: 0, updatedAt: 0, completedAt: 1 },
 ];
@@ -67,8 +74,36 @@ export function UniversalSlice(): React.JSX.Element {
           fallbackTitle="（无标题）"
           emptyMessage="暂无任务"
           testID="universal-slice"
+          renderMeta={(row) => <SliceBadges row={row} />}
         />
       </HeytaUiProvider>
     </div>
+  );
+}
+
+/**
+ * 徽章这一段是**刻意接上来**的（M1 徽章）。
+ *
+ * 图标走的是 `lucide`（纯数据）+ `react-native-svg`（渲染），而
+ * `react-native-svg` 在 web 上必须显式指向它的 web 实现 —— 这是整条链路上
+ * 最容易断、且断了以后**报错指不到根因**的一环。所以切片必须真的把三种
+ * 徽章都画出来，而不是"构建过了就算"。
+ *
+ * ⚠️ 单独抽成一个组件而不是内联箭头函数，是因为这里要用 `useHeytaTokens()` ——
+ * `renderMeta` 是**在 `TaskList` 的渲染过程中被调用**的，那里不是组件边界，
+ * 调 hook 会违反 hooks 规则。抽成组件后它自己的 Provider 上下文是通的，
+ * 这顺带也验证了"共享 Provider 的 token 能一路流到插槽组件里"。
+ */
+function SliceBadges({ row }: { row: TaskRow }): React.JSX.Element {
+  const tokens = useHeytaTokens();
+  // 种子里的时间戳远早于"现在"，所以有截止的两条都按逾期渲染 ——
+  // 一条数据同时证明了"逾期变红"与"字形换成警告三角"两个分支。
+  const overdue = row.dueAt !== null && row.dueAt < Date.now();
+  return (
+    <TaskBadges
+      due={row.dueAt === null ? null : { text: overdue ? '已逾期' : '还剩 3 天', overdue }}
+      priority={row.important ? { text: '高', color: tokens['color.danger'] } : null}
+      repeat={row.id === 's2' ? '每周一' : null}
+    />
   );
 }

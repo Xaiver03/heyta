@@ -7,7 +7,7 @@
 
 生成时间：2026-09-27
 
-**总计 937 个包** —— 宽松许可 936，受限 0，无许可证 0，白名单外已登记 1。
+**总计 938 个包** —— 宽松许可 937，受限 0，无许可证 0，白名单外已登记 1。
 
 准入门槛（见 THIRD_PARTY_LICENSES.md）：许可允许闭源商用；且 2021 年后仍在更新。
 
@@ -26,7 +26,7 @@
 
 - **CC-BY-4.0**（`caniuse-lite@1.0.30001812`）：caniuse-lite@1.0.30001812：browserslist 的**构建期数据包**，不进入运行时产物；CC-BY 是署名许可（不是禁用的 CC-BY-NC），归属已在 THIRD_PARTY_LICENSES.md §2 登记。
 
-### 📋 全部依赖（937 个）
+### 📋 全部依赖（938 个）
 
 这一段是**全量底稿**：上面两节的所有结论都能在这里逐行核到。严格按包名排序（`localeCompare`），同名多版本分行列出。
 
@@ -651,6 +651,7 @@
 | `loose-envify` | 1.4.0 | MIT |
 | `lru-cache` | 11.5.3 | BlueOak-1.0.0 |
 | `lru-cache` | 5.1.1 | ISC |
+| `lucide` | 1.48.0 | ISC |
 | `lucide-react` | 0.545.0 | ISC |
 | `lucide-react-native` | 1.48.0 | ISC |
 | `magic-string` | 0.30.21 | MIT |
