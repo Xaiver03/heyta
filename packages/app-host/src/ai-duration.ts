@@ -54,6 +54,7 @@ import {
   type HealthMap,
   type RoutedDeps,
 } from '@heyta/ai';
+import type { AiFailureReason } from '@heyta/ai';
 
 /**
  * 一次估时的下限（分钟）。
@@ -378,6 +379,8 @@ export type DurationOutcome =
   | {
       ok: false;
       reason: DurationFailureReason;
+      /** 路由层给的**原因码**。壳据此取词条 —— 见 §7.10 通道 #5。 */
+      cause?: AiFailureReason;
       message: string;
       /**
        * 🔴 **失败分支也要带 health。** 这正是最需要它的地方 ——
@@ -436,6 +439,7 @@ export async function requestDuration(
     return {
       ok: false,
       reason: 'ai-unavailable',
+      cause: result.reason,
       message: specific === '' ? describeRoutedFailure(result.reason) : specific,
       // 🔴 失败也要落盘 —— 这通常正是熔断计数器刚 +1 的那一次。
       health: outcome.health,

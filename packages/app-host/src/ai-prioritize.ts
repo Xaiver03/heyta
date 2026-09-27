@@ -59,6 +59,7 @@ import {
   type HealthMap,
   type RoutedDeps,
 } from '@heyta/ai';
+import type { AiFailureReason } from '@heyta/ai';
 
 /**
  * 一次排序最多带多少条任务。
@@ -337,6 +338,8 @@ export type PrioritizeOutcome =
   | {
       ok: false;
       reason: PrioritizeFailureReason;
+      /** 路由层给的**原因码**。壳据此取词条 —— 见 §7.10 通道 #5。 */
+      cause?: AiFailureReason;
       message: string;
       /**
        * 🔴 **失败分支也要带 health** —— 端点失败才会让熔断计数器 +1，
@@ -400,6 +403,7 @@ export async function requestPrioritize(
     return {
       ok: false,
       reason: 'ai-unavailable',
+      cause: result.reason,
       message: specific === '' ? describeRoutedFailure(result.reason) : specific,
       // 🔴 失败也要落盘 —— 这通常正是熔断计数器刚 +1 的那一次。
       health: outcome.health,

@@ -93,6 +93,14 @@ export function readDurationFromNote(note: string | undefined): number | undefin
  *
  * 与 `writeDurationIntoNote` 对称：没写过就原样返回，
  * **不要顺手把备注重新格式化**。
+ *
+ * ⚠️ **当前生产零调用点**：界面还没有"撤销估时"的入口
+ * （`apps/web` 只在时间线里**读**它 —— `readDurationFromNote`）。
+ * 保留的理由是"写"必须有对称的"擦除"能力：`writeDurationIntoNote` 一旦写进备注，
+ * 用户唯一的清除手段就只剩手工删那一行 —— 而格式（前缀、全角冒号、
+ * "N 分钟"）是这里定义的，让用户去猜等于把内部格式泄漏成用户负担。
+ * 行为已由 `tests/duration-note.spec.ts` 钉住（含"写→擦→回到原文"的往返）。
+ * **接线**（界面上给一个"清除 AI 估时"）属于界面层，不在本模块范围。
  */
 export function removeDurationFromNote(note: string | undefined): string {
   if (note === undefined) return '';

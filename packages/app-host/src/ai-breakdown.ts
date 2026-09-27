@@ -46,6 +46,7 @@ import {
   type HealthMap,
   type RoutedDeps,
 } from '@heyta/ai';
+import type { AiFailureReason } from '@heyta/ai';
 
 /** 一次拆解最多收多少条。超出直接截断并**如实告诉用户**。 */
 export const MAX_BREAKDOWN_ITEMS = 20;
@@ -243,6 +244,8 @@ export type BreakdownOutcome =
   | {
       ok: false;
       reason: BreakdownFailureReason;
+      /** 路由层给的**原因码**。壳据此取词条 —— 见 §7.10 通道 #5。 */
+      cause?: AiFailureReason;
       message: string;
       /**
        * 🔴 **失败分支也要带 health。**
@@ -316,6 +319,7 @@ export async function requestBreakdown(
     return {
       ok: false,
       reason: 'ai-unavailable',
+      cause: result.reason,
       message: specific === '' ? describeRoutedFailure(result.reason) : specific,
       // 🔴 失败也要落盘 —— 这通常正是熔断计数器刚 +1 的那一次。
       health: outcome.health,
