@@ -281,6 +281,61 @@ export const CATEGORY_SLOT_TOKENS = [
 ] as const satisfies readonly TokenName[];
 
 /**
+ * 槽位号 → 分类色 token。
+ *
+ * 🔴 **取值逐项来自 `CATEGORY_SLOT_TOKENS`，不手写第二份。**
+ * 色板重排（换掉某个槽位的颜色）时这里自动跟随 —— 而"手抄一份"不会让任何测试失败：
+ * Web 从常量派生、移动端抄了 8 个字面量，改常量后前者跟着变、**后者静默保持旧色**。
+ *
+ * 为什么用数字字面量做键而不是 `Record<CategorySlot, …>`：
+ * design-system **不依赖 `@heyta/domain`**（它是更底层的包，加依赖会颠倒分层）。
+ * 槽位号的穷尽性由各端自己的一条 `satisfies Record<CategorySlot, …>` 钉住 ——
+ * 那是**各端与领域层的契约**，放在各端才是它该在的地方。
+ *
+ * 为什么 `CATEGORY_SLOT_TOKENS[n]` 索引不会丢掉类型：那个常量是
+ * `as const satisfies readonly TokenName[]`，元素类型是**字面量**而不是 `string`，
+ * 所以这里取到的仍是字面量 key —— RN 侧 `tokens[key]` 因此能窄化成 `string`
+ * （颜色）而不是 `string | number`。派生与"字面量类型"在这里**不冲突**。
+ */
+export const CATEGORY_SLOT_TOKEN_BY_SLOT = {
+  1: CATEGORY_SLOT_TOKENS[0],
+  2: CATEGORY_SLOT_TOKENS[1],
+  3: CATEGORY_SLOT_TOKENS[2],
+  4: CATEGORY_SLOT_TOKENS[3],
+  5: CATEGORY_SLOT_TOKENS[4],
+  6: CATEGORY_SLOT_TOKENS[5],
+  7: CATEGORY_SLOT_TOKENS[6],
+  8: CATEGORY_SLOT_TOKENS[7],
+} as const;
+
+/**
+ * 强度色阶 0–4 → heat token。**全仓库唯一一份。**
+ *
+ * 它编码的是"多少"（这周记录了几次），分类色编码的是"是谁" —— 两者不可混用。
+ * 0 档是"没有记录"，用中性的 `heat-0` 而不是"没有颜色"：
+ * 空白格与浅色格在界面上必须是两种不同的东西。
+ *
+ * 与 `CATEGORY_SLOT_TOKENS` 同一个理由手写：从 registry 派生会拿到 `string[]`，
+ * 拼错 `heat-5` 在编译期什么都不查。
+ */
+export const HEAT_TOKENS = [
+  'color.heat-0',
+  'color.heat-1',
+  'color.heat-2',
+  'color.heat-3',
+  'color.heat-4',
+] as const satisfies readonly TokenName[];
+
+/**
+ * "没设过色"那一行用哪个 token。
+ *
+ * 🔴 **不是**某个分类色，也不是"1 号的浅色" —— 那会让"没设过色"看起来像是
+ * 用户选过的某个类别。用中性的 `foreground-muted`：它在两种主题下都读得出来，
+ * 且**不属于调色板**。
+ */
+export const UNSET_CATEGORY_TOKEN = 'color.foreground-muted' as const satisfies TokenName;
+
+/**
  * WCAG 对比度需要用到的前景/背景配对。
  *
  * 这不是装饰性列表 —— tests/tokens.spec.ts 会**逐个计算真实对比度**，

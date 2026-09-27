@@ -2,9 +2,12 @@
  * 分类色槽位 → 设计 token（Web 壳）
  * ==================================
  *
- * 🔴 这里是一张**穷尽映射**：`Record<CategorySlot, TokenName>`。
- * 少一个槽位会编译失败，多一个也会 —— 所以"加了 9 号色槽但界面不认"
- * 或"界面引用了一个不存在的 token"这两种漂移都不可能出现。
+ * 🔴 **取值不在这个文件里** —— 它们来自 `@heyta/design-system` 的
+ * `CATEGORY_SLOT_TOKEN_BY_SLOT`（设计系统是分类色的唯一点）。
+ * 这里只做两件 Web 特有的事：
+ *
+ *   1. 把 token 名包成 `var(--ht-color-…)` 字符串（RN 不需要这一步）；
+ *   2. 用一条 `satisfies Record<CategorySlot, TokenName>` 钉住**本端与领域层的契约**。
  *
  * 为什么不让调用方拼字符串（`cssVar(\`color.category-${slot}\`)`）：
  * 那个写法在**编译期什么都不会查**，而 `cssVar` 的运行时兜底会抛错 ——
@@ -16,30 +19,22 @@
  * （见 `docs/plans/activity-categories-and-colors.md` §2）。
  */
 
-import { CATEGORY_SLOT_TOKENS, cssVar, type TokenName } from '@heyta/design-system';
-import { CATEGORY_SLOTS, type CategorySlot } from '@heyta/domain';
+import {
+  CATEGORY_SLOT_TOKEN_BY_SLOT,
+  UNSET_CATEGORY_TOKEN,
+  cssVar,
+  type TokenName,
+} from '@heyta/design-system';
+import type { CategorySlot } from '@heyta/domain';
 
 /**
  * 槽位号 → token 名。
  *
- * 🔴 **从设计系统的共享常量派生，不手写第二份。** 这份映射有三处消费者
- * （Web 的 CSS 变量、移动端的原生 token、设计系统的对比度配对），
- * 手写三份 = 三份会漂移的名单；而"抽出了一个共享实现"不等于"重复被消除了"
- * —— 收尾动作是**删掉旧的那份**（AGENTS.md §3.5）。
- *
- * ⚠️ 数组是 1 起始的槽位顺序：`SLOT_TOKENS[1]` 对应数组第 0 项。
+ * 这条 `satisfies` 就是本端的契约：`CATEGORY_SLOTS` 增删一个槽位、
+ * 或设计系统改了某个槽位的取值，这里会在**编译期**给出结论 ——
+ * 而不是在界面上少一块颜色、或者多出一块没人认得的颜色。
  */
-const SLOT_TOKENS = CATEGORY_SLOT_TOKENS.reduce<Record<CategorySlot, TokenName>>(
-  (acc, token, index) => {
-    const slot = index + 1;
-    if (!CATEGORY_SLOTS.includes(slot as CategorySlot)) {
-      throw new Error(`[category-colors] 色槽 ${slot} 不在 CATEGORY_SLOTS 里：常量与领域层漂移了`);
-    }
-    acc[slot as CategorySlot] = token;
-    return acc;
-  },
-  {} as Record<CategorySlot, TokenName>,
-);
+const SLOT_TOKENS = CATEGORY_SLOT_TOKEN_BY_SLOT satisfies Record<CategorySlot, TokenName>;
 
 /** 槽位号 → `var(--ht-color-category-N)`。 */
 export function categorySlotColor(slot: CategorySlot): string {
@@ -49,12 +44,11 @@ export function categorySlotColor(slot: CategorySlot): string {
 /**
  * 没设过色的行用什么？
  *
- * 🔴 **不是**某个分类色，也不是"1 号的浅色" —— 那会让"没设过色"看起来
- * 像是用户选过的某个类别。用中性的 `foreground-muted`：
- * 它在两种主题下都读得出来，且**不属于调色板**。
+ * 🔴 **这个选择本身在 `UNSET_CATEGORY_TOKEN` 里单点定义**（理由是"不能借用分类色，
+ * 否则'没设过色'看起来像用户选过的某个类别"），这里只负责把它包成 CSS 变量。
  */
 export function unsetSlotColor(): string {
-  return cssVar('color.foreground-muted');
+  return cssVar(UNSET_CATEGORY_TOKEN);
 }
 
 /**
