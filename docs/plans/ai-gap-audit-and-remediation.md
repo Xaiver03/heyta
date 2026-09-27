@@ -62,7 +62,7 @@
 | 上表原结论 | 今天的实况 | 证据 |
 |---|---|---|
 | `:43` 记忆事实层 / 专注落差 **零生产调用点** | ✅ **已接线**：`computeFocusGaps()` 由 `apps/web/src/App.tsx:261` 读真实 op 窗口后调用，`MemoryPanel` 展示落差 | merge `73b13b2` |
-| `:46` AI 订阅两档**未落地**（ADR-0020 还是「待确认」） | ⚠️ **一半变了**：ADR-0020 / ADR-0021 **都已接受**，`server/src/billing/price-book.ts:83-84` 已有 `hosted-monthly` + `hosted-ai-monthly` 两个 SKU、收银台路由已通。**但交付半段与云端 AI 端点仍未接**，所以"这一档买不到"依然为真 | `price-book.ts:84,117`；[ADR-0023](../adr/0023-managed-ai-quota-not-implemented.md) |
+| `:46` AI 订阅两档**未落地**（ADR-0020 还是「待确认」） | ⚠️ **一半变了**：ADR-0020 / ADR-0021 **都已接受**，`server/src/billing/price-book.ts:83-84` 已有 `hosted-monthly` + `hosted-ai-monthly` 两个 SKU、收银台路由已通。**交付半段已接（2026-09-27）**，但**云端 AI 端点仍未接**，所以"这一档买不到"依然为真 —— 而且现在是**主动禁售**（`NOT_YET_DELIVERABLE_SKUS` 让它在报价前就回 `409`），不是没人接线 | `price-book.ts:84,117`；[ADR-0023](../adr/0023-managed-ai-quota-not-implemented.md) |
 | `:46` 后半句 `price-book.ts` **只有单一 `annual`**；`check-pricing-consistency.mjs` 强制"恰好一个 `priceId`" | ❌ **已过时** —— 现在是**月付**、**两个**付费 SKU，门禁也早已改成按币种/按档校验 | `price-book.ts:83-84` |
 | `:171` `describeRouteIntent()` **零测试** | ❌ **已过时** —— `packages/ai/tests/routing.spec.ts` 有覆盖 | 同上 |
 | `:44` / `:47` / `:48` AI-3·AI-4 未开工 / 移动端零 AI 入口 / 全量导出未实现 | ✅ **这三条依然成立**，是**产品未做**、不是文档没同步 | 见 [roadmap](roadmap.md) §1.1 与 §5 |

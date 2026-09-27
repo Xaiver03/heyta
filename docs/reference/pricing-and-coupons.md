@@ -465,21 +465,47 @@ pnpm --filter @heyta/server pricing set-price \
    并**反向**断言"没有金额字段的事件不算待结算"（否则一个空 payload 会伪装成
    一笔待结算的支付）。
 
-   **仍然没修的（"交付"这一半）**：`settleOrderPaid` 依旧是**唯一**能做出权威判定
-   的地方（它比订单冻结的 SKU 与 `final_amount_minor`，两者都覆盖折扣），
-   而它**仍然没有生产调用方** —— 收银台路由已经存在（见第 18 条），
-   但 webhook 路径还没有把 ② 转交给它。
-   所以在接线完成之前，② 这一类支付**依然是拿不到权益的**，只是现在它
-   **响亮地**说自己拿不到，并且有一条明确的出路可查。
-   🔴 接线时必须做的三件事：
-   （a）`pricing-store.ts` 的 `OrderRow` 与 `settleOrderPaid` 的返回值要把
-   `checkout_orders.price_id` 带出来 —— **列已经在库里了**（`schema.prisma` 的
-   `CheckoutOrder.priceId`），只是 `SELECT` 没取它，于是"这一单买的是哪一档"
-   在结算时看不见；没有它就没法决定该授予 `hosting` 还是 `hosting`+`ai`；
-   （b）webhook 路径把 ② 交给 `settleOrderPaid`，并按其结论写回
-   `subscriptions.grants`；
-   （c）adapter 要把 `outTradeNo` **显式**放在事件上，不要让人从
-   `providerEventId = "payment_succeeded:hy…"` 里反解。
+   **~~仍然没修的（"交付"这一半）~~ 已修。** ② 这类支付现在**真的拿得到权益**：
+   webhook 把带订单号的支付交给结算，并按其结论写回订阅行。三件事全部落地：
+
+   （a）`pricing-store.ts` 的 `OrderRow` 的 `SELECT` 现在取 `checkout_orders.price_id`，
+   `granted` 结论回带 `priceId` —— "这一单买的是哪一档"在结算时看得见，
+   而这正是决定授予 `hosting` 还是 `hosting`+`ai` 的唯一依据；
+
+   （b）webhook 按结论写回 `subscriptions` 的 `priceId` / `grants`
+   （`webhook.routes.ts` 的 `applySettlementToEvent`）：`granted` → 用**订单冻结的**
+   `grantsForSku(priceId)` **覆盖** adapter 的金额启发式；`already-paid` /
+   `amount-mismatch` / `order-not-grantable` → 返回 `null`，一个字节都不写；
+   `unknown-order` 是**唯一**保留原事件的结论 —— 那不是收银台的支付，
+   没有比 adapter 声明更权威的东西；
+
+   （c）`NormalizedPaymentEvent.outTradeNo` 由 adapter **显式**给出（微信是
+   `out_trade_no`），不再从 `providerEventId = "payment_succeeded:hy…"` 里反解。
+
+   🔴 **事务边界的形状**（"结算与授予同生共死"的实现方式）：结算主体抽成收受限
+   `SqlRunner` 的 `settleOrderPaidInTransaction(tx, …)`，webhook 在**它已有的那个**
+   Prisma 事务里调它；`settleOrderPaid(sql, …)` 只是"自己开事务"的薄壳，留给 CLI / 工具。
+   结算逻辑只有一份，两种入口的差别**仅在事务边界**。
+   这不是风格问题：`settleOrderPaid` 内部若再开一层事务，webhook 的回滚就带不走它 ——
+   订单会变 `paid` 而券的 `reserved` 名额永远占着。
+
+   **回归证据**：`billing-webhook-settlement.pglite.spec.ts`（14 例，真 SQL on PGlite）。
+   「用券的单」一条同时钉两件事：订单真的被结算（接线前永远停在 `pending`、券的
+   `reserved` 永远占着），且**授予用的档位来自订单** —— adapter 看到的是 ¥5
+   （¥12 用 ¥7 券），它的启发式会授予**错的档位**，而断言 `subscription.priceId`
+   是 `hosted-ai-monthly` 且 `grants` **不等于** `['hosting']`。
+   另有「`granted` 结论带回订单冻结的档位」、「`amount-mismatch` → 订单仍 `pending`、
+   零权益写入」、以及两条事务参与性用例（结算随外层事务一起回滚）。
+
+   **非空转证明**（四条注入各自变红、还原后逐个 `md5` 逐字节一致）：
+   - adapter 的 `outTradeNo` 改成 `null` → `wechat-adapter.spec.ts` 红在
+     `expected null to be 'hy16xs44we8xdeadbeef'`（2 例）；
+   - 写入的 `grants` 改成**并集** → `billing-apply-event.spec.ts` 红在
+     `expected [ 'hosting', 'ai' ] to deeply equal [ 'hosting' ]`（降级那条）；
+   - `SELECT` 里的 `price_id` 删掉 → 结算 spec 红 5 例（含 `expected +0 to be 1`：
+     权益一行都没写）；
+   - webhook 的结算**调用点**停掉 → 结算 spec 红 6 例，签名正是
+     `expected 'pending' to be 'paid'`（订单永远不结算）。
 
 10. ~~**`failOrder` 不释放 `reserved` 名额。**~~ **已修（本轮）。**
    它现在是一个事务：先把该订单的 `reserved` 核销置 `expired`（名额放出来），
@@ -618,7 +644,8 @@ pnpm --filter @heyta/server pricing set-price \
    ③ 删掉"不得被售卖" → 红。
 
    ⚠️ **没有引入死代码。** 本轮**不**新建 `ai-quota.ts` 之类"没人调用"的模块 ——
-   那正是第 9 条里 `settleOrderPaid` 无生产调用方留下的教训：
+   那正是第 9 条里 `settleOrderPaid` 曾长期无生产调用方留下的教训
+   （那件事**已经**接通，教训本身不变）：
    为一个不存在的端点建一个永远为 0 的计数器，测试只能自证。
 
 18. **收银台接通了（`POST /api/billing/checkout`）—— 那条链第一次有用户入口。**
