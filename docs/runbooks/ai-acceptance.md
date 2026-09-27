@@ -120,6 +120,13 @@ pnpm run install-browser   # 下载 Chromium
 加任何东西，都会把那些依赖一起提交出去，于是 CI 的 `--frozen-lockfile` 会因为
 "lockfile 里有未提交的 importer"而红。
 
+> ⚠️ **上面那段描写的那个具体原因已经消失了** —— `apps/landing/package.json`
+> 早已提交（`a1fb23b`），而且现在它本来就是根工作区的一员。但 `e2e/` **仍然**
+> 刻意留在根工作区之外，因为另外两点今天依然成立：
+> ① 它的依赖（Playwright + 浏览器二进制）与产品运行时无关，混进根 lockfile 只会污染它；
+> ② `.github/workflows/ci.yml` **显式**多跑一步 `pnpm --dir e2e install --frozen-lockfile`
+> —— 忘了它，`pnpm check` 会死在 `check:ai-e2e`，而报错完全不指向真正的原因。
+
 独立工作区让 E2E 的依赖与根工作区**完全解耦**：根 lockfile 保持干净，
 `e2e/pnpm-lock.yaml` 只描述 Playwright，可独立提交、独立复现。
 

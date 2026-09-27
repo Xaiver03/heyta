@@ -151,7 +151,10 @@ heyta 手里有一份**别人拿不到的数据**：`MaterializedState` 里的 `
 
 ## 5. 供给模式：自备 + 托管，**两条都要**
 
-见 [ADR-0006](../adr/0006-supply-modes.md) 与 [ADR-0013](../adr/0013-cloud-ai-and-maas.md)。
+见 [ADR-0006](../adr/0006-supply-modes.md)、[ADR-0013](../adr/0013-cloud-ai-and-maas.md)、
+[ADR-0020](../adr/0020-ai-subscription-two-tiers.md)、
+[ADR-0021](../adr/0021-managed-ai-model-deepseek-flash.md)、
+[ADR-0023](../adr/0023-managed-ai-quota-not-implemented.md)。
 
 | 模式 | `AiSupplyMode` | 数据到哪 | 与 E2EE 的关系 |
 |---|---|---|---|
@@ -164,6 +167,13 @@ heyta 手里有一份**别人拿不到的数据**：`MaterializedState` 里的 `
 
 **当前代码状态**：`assertEnableable()` 对 `managed` **主动抛错**（`retention-undecided`）。
 这是**故意的** —— 数据保留策略没定案之前不许打开。见 §7。
+
+> 档位与价格已由 [ADR-0020](../adr/0020-ai-subscription-two-tiers.md) /
+> [ADR-0021](../adr/0021-managed-ai-model-deepseek-flash.md) 锁定
+> （¥12 / 月 · 300 次/月 · `deepseek-flash`），但
+> [ADR-0023](../adr/0023-managed-ai-quota-not-implemented.md) 判定它**本轮不实现**：
+> 云端端点、计量、收银台都不存在，`hosted-ai-monthly` 在计量落地前**不得被售卖**。
+> 已有 `check:ai-quota` 门禁把「300 次/月」的数字源与"未实现"状态钉住。
 
 ---
 
@@ -186,26 +196,32 @@ heyta 手里有一份**别人拿不到的数据**：`MaterializedState` 里的 `
 
 | 分支 | 内容 | 落点 | 证据 |
 |---|---|---|---|
-| **AI-0** 基座 | 配置路由 / 回退链 / 能力声明 / 健康与熔断 / 出境披露 / 密钥库 | `packages/ai` | 130 测试 |
-| **AI-1** 捕获 | 确定性内核（规则优先，不依赖模型） | `packages/domain/src/capture.ts` | §9.1 |
-| **AI-2** 拆解 | 拆解请求 → `AiSuggestion` → 用户确认 | `packages/app-host/src/ai-breakdown.ts`、`apps/web/.../AiBreakdown.tsx` | 45 测试 |
-| **AI-5** 接口 / 数据主权 | 本机 API / MCP：默认关、回环、显式 token、逐工具授权、写入经 `dispatch()` | `packages/local-api`、`apps/node-host` | 79 + 139 测试 |
+| **AI-0** 基座 | 配置路由 / 回退链 / 能力声明 / 健康与熔断 / 出境披露 / 密钥库 | `packages/ai` | 4 文件 / **151 测试** |
+| **AI-1** 捕获 | 确定性内核（规则优先，不依赖模型）+ 模型兜底**并存** | `packages/domain/src/capture.ts`、`packages/app-host/src/ai-capture.ts` | §9.1 |
+| **AI-2** 拆解 | 拆解请求 → `AiSuggestion` → 用户确认 | `packages/app-host/src/ai-breakdown.ts`、`apps/web/.../AiBreakdown.tsx` | **55 测试** |
+| **AI-2** 优先级 / 估时 | 逐条优先级建议、估时（时间线视图） | `packages/app-host/src/ai-{prioritize,duration}.ts`、`AiPrioritize.tsx` / `AiDuration.tsx` | 45 + 49 测试 |
+| **AI-5** 接口 / 数据主权 | 本机 API / MCP：默认关、回环、显式 token、逐工具授权、写入经 `dispatch()`；**HTTP + stdio** | `packages/local-api`、`apps/node-host` | **79 + 139 测试** |
 | **AI-5 真实握手** | 用**官方 MCP SDK**（第三方参考实现）验证协议，排除"自洽的误解" | `scripts/verify-mcp-real-client.mjs` | 11/11，`pnpm verify:mcp-real` |
-| **记忆 / 特征层** | 推迟次数（**只能从事件流算**）/ 逾期 / 专注分钟 / 从未开始 / **专注落差** / 把事实写成话（**不调用模型**） | `packages/domain/src/memory.ts` | 20 测试 |
-| **检索基线 + 决策实验** | 词法相似度基线；用重复检测实验决定要不要向量库 | `packages/domain/src/recall.ts`、`tests/recall-experiment.spec.ts` | 5 测试 |
+| **记忆 / 特征层** | 推迟次数（**只能从事件流算**）/ 逾期 / 专注分钟 / 从未开始 / **专注落差** / 把事实写成话（**不调用模型**） | `packages/domain/src/memory.ts` | **23 测试** |
+| **记忆护城河接线** | 「说的 vs 做的」落差第一次接到界面（读真实 op 窗口 → `computeFocusGaps` → `MemoryPanel`）；只读结构化字段、**不渲染领域层中文** | `apps/web/src/App.tsx`、`apps/web/src/features/settings/MemoryPanel.tsx`、`apps/web/src/lib/oplog.ts` | 29 测试（`memory-panel.spec.tsx`，含真 IndexedDB 窗口方向） |
+| **失败态闭环** | 每个 `CandidateExclusionReason` 有专属文案 + "下一步点哪里"；熔断冷却后**可重试**；英文界面不出现中文 | `apps/web/src/features/ai/RouteUnavailable.tsx`、`route-explanation.ts`、`ai-failure-copy.ts` | `ai-failure-locale.spec.tsx` 等 |
+| **检索基线 + 决策实验** | 词法相似度基线；用重复检测实验决定要不要向量库 | `packages/domain/src/recall.ts`、`tests/recall-experiment.spec.ts` | 7 测试 |
 | **偏好推断层** | P1–P5 五条偏好（估算偏差 / 深度时段 / 提前量 / 粒度 / 表达习惯），纯函数 + `sampleSize`/`confidence`/`evidence`；**主开关 fail-closed** | `packages/domain/src/preferences.ts` | 27 测试 |
 | **偏好有效性实验** | 留出法（train80/test20）：五条**全部**优于基线，纯噪声上**零误报** | `packages/domain/tests/preferences-experiment.spec.ts` | 8 测试 |
 | **偏好接入 prompt** | 按用途过滤（只发当前决定需要的）；`preferences` 进出境披露；开关关时零偏好出境 | `packages/domain/src/preference-hints.ts` | 17 测试 |
-| **AI 反馈层** | 记录建议的接受/修改/拒绝（`AI_FEEDBACK`，走 op-log）；子项**逐条可取舍** | `packages/domain/src/ai-feedback.ts`、`apps/web/src/features/ai/AiBreakdown.tsx` | 20 + 12 测试 |
+| **AI 反馈层** | 记录建议的接受/修改/拒绝（`AI_FEEDBACK`，走 op-log）；子项**逐条可取舍** | `packages/domain/src/ai-feedback.ts`、`packages/app-host/src/ai-feedback-actions.ts` | 20 + 17 测试 |
 | **反馈偏好 P6/P7** | 从处置推断粒度与保留率；P6 **MAE 0.167 vs 基线 1.000**；噪声上零误报 | `packages/domain/tests/ai-feedback.spec.ts` | 见上 |
-| **偏好可见可纠正** | `MemoryPanel`：依据原文、单条忘掉、**可恢复**的「你已忘记」 | `apps/web/src/features/settings/MemoryPanel.tsx` | 14 测试 |
+| **偏好可见可纠正** | `MemoryPanel`：依据原文、单条忘掉、**可恢复**的「你已忘记」 | `apps/web/src/features/settings/MemoryPanel.tsx` | **29 测试** |
 | **偏好纠正持久化** | `PREFERENCE_CORRECTION`（走 op-log，跨设备同步） | `packages/domain/src/preference-corrections.ts` | 17 测试 |
+
+> 测试数字为 2026-09-29 在 `main` 上实测；四个包的总数是
+> `@heyta/ai` 151 / `@heyta/domain` 475 / `@heyta/app-host` 435 / `@heyta/local-api` 79（均 0 skip）。
 
 ### 7.2 未落地
 
 | 项 | 卡在哪 |
 |---|---|
-| **托管 AI**（`managed`） | 卡在 ① 服务本体 ② **数据保留策略** ③ 计费。三者都没有 |
+| **托管 AI**（`managed`） | 档位/价格/模型已定（ADR-0020/0021：¥12 / 月 · 300 次/月 · `deepseek-flash`），但 ADR-0023 判定**本轮不实现** —— 云端端点、计量、收银台都不存在；数据保留策略仍未定案，`assertEnableable` 继续挡着 |
 | **AI-3** 规划 | 有意推迟（需要真实数据） |
 | **AI-4** 复盘 | 受限分支，未开工 |
 | 密钥库的其他平台 | 只有 macOS 实现了；Windows / Linux / 移动端未实现（发布时再做） |
@@ -232,6 +248,8 @@ heyta 手里有一份**别人拿不到的数据**：`MaterializedState` 里的 `
 
 > ⚠️ 本文的 ¥139 / 年 是**对标产品的现行价**，不是我们的定价结论；
 > 它在这里的作用是**约束可行性**，不是承诺售价。
+> 我们的定价结论在 [ADR-0020](../adr/0020-ai-subscription-two-tiers.md)（¥12 / 月，含 300 次 AI），
+> 而它的落地顺序被 [ADR-0023](../adr/0023-managed-ai-quota-not-implemented.md) 卡在"计量存在之后"。
 
 
 ### 7.3 关于 Pi（harness）
@@ -257,14 +275,14 @@ heyta 手里有一份**别人拿不到的数据**：`MaterializedState` 里的 `
 | # | 做什么 | 在哪跑 | 为什么是这个顺序 |
 |---|---|---|---|
 | ~~1~~ | ~~特征层原型~~ | — | ✅ **已完成**（见 §7.1）。§4 的护城河已是可运行代码，§2/§4 两条判断已用实验验证 |
-| **2** | 🔴 **把记忆层接进界面**：让「你在躲什么」真的出现在用户眼前 | 本机 | 现在它只是**库里的代码**，用户看不到 —— 这正是我反复犯过的那个 bug 类（**实现了但没人调用**） |
+| ~~2~~ | ~~把记忆层接进界面~~：让「你在躲什么」真的出现在用户眼前 | 本机 | ✅ **已完成**（2026-09-27，merge `73b13b2`）：`computeFocusGaps()` 已在 `apps/web/src/App.tsx` 读真实 op 窗口后调用，`MemoryPanel` 展示「说的 vs 做的」落差与结构化依据。判据仍是"去数调用点"——现在数得到 |
 | 3 | 捕获解析（本机端点，内联） | 本机 | 高频、错了随手改。建立"AI 不添乱"的信任 |
 | 4 | 拆解（显式触发） | 云 / 自备 | 感知价值最高的"哇"功能，低频高价值 |
 | 5 | agent 多步自主 | Pi，**仅桌面** | 长线。等 2–4 的信任和数据都到位 |
 
-**现在的第 2 步有个具体风险**：`memory.ts` 目前**零调用方**。
-按本项目已经踩过五次的教训 —— **能力实现了、被测了，但没人调用** ——
-不接进界面就等于没做。
+⚠️ **一条边界说明**：`describeFocusGaps()`（领域层拼好的中文句子）仍然零生产调用点，
+但那是**刻意的** —— 英文界面不许露中文，壳必须用 `FocusGap` 的结构化字段 +
+本地化词条自己拼。这不是"没接线"，是分层纪律。
 
 ---
 

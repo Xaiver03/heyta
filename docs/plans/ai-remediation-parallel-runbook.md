@@ -61,6 +61,13 @@ worktree 隔离防的是"互相覆盖"，它**防不住"分叉点自己就构建
 追 HEAD 追不上，而且很可能恰好停在那段红窗口里。本轮定的是
 **`ai-remediation-fork` = `5d0d77f`**（实测：0 类型错误 / 527 passed / 12 skipped）。
 
+> ⚠️ **但那个 tag 实际并不落在 `5d0d77f` 上** —— 实测 `git rev-parse ai-remediation-fork`
+> 得到的是 **`1f5f842`**（提交信息：`分叉点 = 已验证绿的 5d0d77f ＋ runbook 修正版 ＋ 门禁修复版`，
+> 即 `5d0d77f` 之后再叠了本 runbook 与门禁修复两笔）。两份都是 `main` 的祖先，所以结论不受影响。
+> 🔴 **真正值得记住的是这个差别从哪来**：`5d0d77f` 是"代码绿的提交"，而**分叉点必须是"代码绿 +
+> 规则也定稿"的提交** —— 边写 runbook 边打 tag，tag 就会落在 runbook 写完之后。
+> 所以本文下面所有用 `ai-remediation-fork` 的地方都以 **tag 名**为准，不要硬编码任何 SHA。
+
 **② 验证一个提交的健康度，要在一次性 worktree 里量。** 三行就够：
 
 ```bash
