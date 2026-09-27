@@ -93,6 +93,21 @@
 **结论**：把"异步初始化"和"同步调用"分开看之后，`SqliteDriver` 的同步接口
 **原样可实现**。初始化走一次异步，之后所有 `exec`/`run`/`all` 都是同步的。
 
+> 🔴 **补充（实测修正，见 [ADR-0028](0028-web-sqlite-must-run-in-worker.md)）**：
+> 上面这段结论**成立，但缺了一个前提 —— 这段代码只能跑在 DedicatedWorker 里**。
+>
+> 真浏览器实测：页面主线程上 `FileSystemFileHandle.prototype.createSyncAccessHandle`
+> 是 **`undefined`**（规范里它是 `[Exposed=DedicatedWorker]`），
+> 于是 `installOpfsSAHPoolVfs()` 在主线程必然报
+> `Error: Missing required OPFS APIs.`。**Worker 里同一项是 `function`，一次通过。**
+>
+> 换句话说：**同步接口在 Worker 内部成立；跨到主线程的那一层必然异步**
+> （postMessage 的性质，不是接口设计问题）。
+>
+> 另外 §6.1 把"OPFS 兼容面"列为代价时**没有区分**两条 VFS：
+> 需要 COOP/COEP 的是**异步 `opfs` VFS**；我们选的 **SAH Pool 这条不需要**
+> （实测 `SharedArrayBuffer` 为 `undefined` 也照样跑通）。这一项风险实际比 §6.1 写的小。
+
 > ⚠️ 这条如果搞反（以为整个 API 都是异步的），结论会完全反过来：
 > 会去改 `SqliteDriver` 的接口，进而牵动三端全部驱动与适配器。
 > **一个二手描述里的"异步"两个字，代价是三个端。**
@@ -168,6 +183,12 @@ IndexedDB 路径**保留到迁移验证通过之后**再删，两者可并存一
 
 **尚未验证、不要当成已完成的事**：
 
-- OPFS SAH Pool 在 **Safari / Firefox** 上的实际行为
-- `installOpfsSAHPoolVfs()` 在**主线程**与 **Worker** 中的差异
-- **鸿蒙端**的 FTS5 / sqlite-vec 是否存在
+- OPFS 的**接入**已在 Chromium 上跑通（`scripts/verify-web-sqlite.mjs`，含跨刷新持久）；
+  ⚠️ 但**只在 Chromium 上验过**
+- OPFS SAH Pool 在 **Safari / Firefox** 上的实际行为 —— **未实测**
+- **鸿蒙端** FTS5 / sqlite-vec 是否存在 —— 未知
+
+**已由后续 ADR 修正的条目**：
+
+- 🔴 **"主线程能不能跑"** —— 不能。见 [ADR-0028](0028-web-sqlite-must-run-in-worker.md)。
+- 🔴 **§6.1 的 COOP/COEP 代价** —— SAH Pool 这条路径**不需要**，风险被高估了。

@@ -134,7 +134,18 @@ export async function openSqliteWasmDriver(
   const sqlite3 = await initModule();
 
   const vfsName = options.vfsName ?? 'heyta-opfs';
-  const pool = (await sqlite3.util.installOpfsSAHPoolVfs({
+  /**
+   * 🔴 `installOpfsSAHPoolVfs` 挂在 **`sqlite3` 顶层**，**不在 `sqlite3.util` 下**。
+   *
+   * 这个位置是**真浏览器**才能验出来的：Node 里根本没有 OPFS，所以
+   * Node 侧探针（版本、行形状、唯一冲突报文都能验）**碰不到这条路径**。
+   * 写错时浏览器里报的是
+   * `TypeError: Cannot read properties of undefined (reading 'installOpfsSAHPoolVfs')`,
+   * 指向"util 不存在"，而真实原因是"这个函数不在 util 下面"。
+   *
+   * 来源：`dist/sqlite3-worker1.mjs` 里 `sqlite3.installOpfsSAHPoolVfs = async function(...)`。
+   */
+  const pool = (await sqlite3.installOpfsSAHPoolVfs({
     name: vfsName,
     /**
      * 目录名与 VFS 名绑在一起：换名字必须同时换目录，
@@ -243,9 +254,8 @@ export class SqliteWasmDriver implements SqliteDriver {
 /** `sqlite3InitModule` 这个全局初始化函数的最小形状。 */
 interface Sqlite3InitModule {
   (config?: unknown): Promise<{
-    readonly util: {
-      installOpfsSAHPoolVfs(options: unknown): Promise<unknown>;
-    };
+    /** ⚠️ **顶层**，不是 `util.installOpfsSAHPoolVfs`（见 `openSqliteWasmDriver` 注释）。 */
+    installOpfsSAHPoolVfs(options: unknown): Promise<unknown>;
   }>;
 }
 

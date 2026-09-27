@@ -616,6 +616,25 @@ Electron 壳与自己打包的静态产物是**松耦合**的：即使 UI 收敛
 - `SqliteAdapter` **一行不改** —— 这正是窄接口的价值
 - 验：`packages/storage/tests/contract.spec.ts` 各加一行 → **262 个测试全过**，
   含 `SqliteWasmDriver` 的 DbAdapter 契约与 OpLogStore 契约
+- 验（**真浏览器**）：`node scripts/verify-web-sqlite.mjs` → 全绿，
+  含**刷新页面后数据仍在**（OPFS 真的落盘）、唯一冲突判定、`close()` 幂等
+- 🔴 截图：`e2e/test-results/web-sqlite-opfs.png`（AGENTS.md §6.2 硬性规定）
+
+**M4-2b 真浏览器验证暴露的关键约束** ✅ **已查明并落 ADR**
+
+真浏览器跑出来两件 **Node 侧永远测不到** 的事，各写进一份记录：
+
+1. **Vite 的 dep 预打包会破坏 wasm**：报 `Incorrect response MIME type` + 魔数变成
+   `<!do`（即拿到了 index.html）。修法是 `optimizeDeps.exclude: ['@sqlite.org/sqlite-wasm']`。
+   ⚠️ 与 `react-native-svg` 是**同一类**坑：**预打包会破坏"按相对路径找自身资源"的包**。
+2. 🔴 **`openSqliteWasmDriver` 必须跑在 DedicatedWorker 里** →
+   [**ADR-0028**](../adr/0028-web-sqlite-must-run-in-worker.md)。
+   主线程上 `FileSystemFileHandle.prototype.createSyncAccessHandle` 是 `undefined`
+   （规范 `[Exposed=DedicatedWorker]`），必然报 `Missing required OPFS APIs.`；
+   Worker 里同一项是 `function`，一次通过。
+   附带纠正：SAH Pool **不需要 COOP/COEP**（`SharedArrayBuffer` 为 `undefined` 也跑通），
+   ADR-0027 §6.1 把这项代价写大了。
+3. ⚠️ 顺带记下：**Chromium 里 FTS5 是可用的**（探针实测，仅记录、不当成三端前提）。
 
 > 🔴 **鸿蒙的存储基线必须先查清，否则 M4 会做出一个只有两端的结论**：
 > [ADR-0024](../adr/0024-desktop-shell-and-ui-convergence.md) §2.6 已**一手核实** ——
