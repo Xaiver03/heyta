@@ -36,7 +36,7 @@ import { Icon } from '../ui/icons';
 import type { IconName } from '../ui/icons';
 
 /**
- * 四个 tab。顺序即显示顺序，也是产品结构。
+ * 五个 tab。顺序即显示顺序，也是产品结构。
  *
  * ⚠️ 这里存的是**词条 key 不是文案**：模块级拿不到 `t`，而把中文写在这里
  * 就是硬编码 —— 迁移模式下门禁会直接判红（这正是"数据数组里的文案"那个盲区，
@@ -46,6 +46,9 @@ export const TABS = [
   { key: 'tasks', labelKey: 'mobile.tab.tasks', icon: 'tab.tasks' },
   { key: 'calendar', labelKey: 'mobile.tab.calendar', icon: 'tab.calendar' },
   { key: 'focus', labelKey: 'mobile.tab.focus', icon: 'tab.focus' },
+  // 「分类」放在专注之后、「我的」之前：它回答的是"我把力气花在哪些事上了"，
+  // 紧接着专注（产生数据的地方）比放进设置区更合乎直觉。
+  { key: 'categories', labelKey: 'mobile.tab.categories', icon: 'tab.categories' },
   { key: 'profile', labelKey: 'mobile.tab.profile', icon: 'tab.profile' },
 ] as const satisfies ReadonlyArray<{ key: string; labelKey: MessageKey; icon: IconName }>;
 
