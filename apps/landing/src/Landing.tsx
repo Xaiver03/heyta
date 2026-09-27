@@ -91,7 +91,10 @@ export function Landing(): React.JSX.Element {
         <Capabilities />
         <Showcase />
         {/* 快滚到这一节才去取 three.js 那个 chunk，并创建 WebGL 上下文 */}
-        <Deferred>
+        {/* 🔴 `id="sync"` 给的是 Deferred 的**占位块**（见 Deferred.tsx 的说明）：
+            给里面那棵树的话，导航点 `#sync` 会因为"找不到落点→不滚动→
+            落点永远不挂载"而变成点了没反应。 */}
+        <Deferred id="sync">
           {/*
             🔴 `SceneBoundary` 必须在 `Deferred` **里面**、包住 `Suspense`。
             两层失败要分开看：

@@ -18,15 +18,24 @@
  *
  * 用 `<div>` 而不是 `display: contents`：后者没有盒子，IntersectionObserver
  * 观察不到（会永远不触发）。
+ *
+ * 🔴 `id` 必须挂在**占位块**上，不能挂在里面那棵子树上。
+ * 否则页内锚点会变成一个**死循环**：导航点 `#sync` → 浏览器找不到落点、不滚动 →
+ * 而落点只有在"滚到附近"才会被挂载 → 于是永远滚不到、也永远不挂载。
+ * 现象是**点了完全没反应、控制台也没有任何报错**，只有真浏览器里手点才发现。
+ * 挂在这里之后：点击立即有落点、浏览器滚过去、IntersectionObserver 随即触发挂载。
  */
 
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 
 export function Deferred({
   children,
+  id,
   minBlockSize = '60vh',
 }: {
   children: ReactNode;
+  /** 占位块上的锚点 id（见上面那段"死循环"说明）。 */
+  id?: string;
   minBlockSize?: string;
 }): React.JSX.Element {
   const ref = useRef<HTMLDivElement>(null);
@@ -64,7 +73,7 @@ export function Deferred({
   }, []);
 
   return (
-    <div ref={ref} className="lp-deferred" style={{ minBlockSize }}>
+    <div ref={ref} id={id} className="lp-deferred" style={{ minBlockSize }}>
       {shown ? children : null}
     </div>
   );
