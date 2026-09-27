@@ -157,6 +157,7 @@ docs/research/<kebab-case>.md     例：reuse-plan.md
 | [local-server-verification.md](runbooks/local-server-verification.md) | ⭐ 不依赖 Docker 跑通服务端 + Docker 部署 + 实测发现 |
 | [deployment.md](runbooks/deployment.md) | ⭐ **运维与部署现状**：哪台服务器跑什么、heyta 公网部署拓扑、反向代理与证书、代理链路、DNS、本机开发环境、🔴 待清理风险（含"实测 / 引用 / 未核实"标记） |
 | [multi-platform-build.md](runbooks/multi-platform-build.md) | ⭐ **多端构建操作手册**：Android / iOS / Windows / 鸿蒙怎么打包、怎么验产物、高频坑 |
+| [desktop.md](runbooks/desktop.md) | ⭐ **桌面端（Electron）操作手册**：骨架由什么组成、Spike S1 结论（主进程持库）、库文件在哪、**Electron 二进制为何没被下载**（要跑 GUI 需放行 `allowBuilds`）、**不装 Electron 也能验证的 11 个用例**、以及"复用而非复制"的机器判据 |
 | [ci-and-runner.md](runbooks/ci-and-runner.md) | ⭐ **CI 与自托管 runner 操作手册**：push 之后发生什么、runner 为什么在 finlaw、日常操作命令、7 条已踩过的坑、安全边界、🔴 **转公开必须改回托管 runner**的硬约束 |
 | [finlaw-cleanup-candidates.md](runbooks/finlaw-cleanup-candidates.md) | **ubuntu-jcli（finlaw）回收候选清单**：只读盘点「该回收什么」——🟢 可安全回收 / 🟡 需确认 / 🔴 绝不能动，每档带判据与总可回收量估算 |
 | [ai-acceptance.md](runbooks/ai-acceptance.md) | ⭐ **AI 验收门禁**：什么叫「AI 功能做完了」——静态可达性门禁查什么（含"引用了 ≠ 用户能用"那条）、真实浏览器 E2E 为什么不接真模型、红了怎么归因、加新功能要补哪几步、以及这道门禁**没覆盖**什么 |
@@ -181,7 +182,9 @@ docs/research/<kebab-case>.md     例：reuse-plan.md
 | [competitor-incentive-teardown.md](research/competitor-incentive-teardown.md) | ⭐ **竞品激励机制拆解**：Forest / Duolingo / Habitica / Streaks / 番茄Todo / 滴答清单 / 小日常 / Apple 健身记录，逐机制规则与数值 + 心理原理 + 对 heyta 的可迁移性 |
 | [native-widgets.md](research/native-widgets.md) | ⭐ **原生小组件可行性**：滴答清单各端组件清单（厂商自述）+ 平台事实与前置条件 + 上游已跑通的（单向快照 + 点击队列）契约 + 🔴 E2EE 明文快照与门禁盲区。**顶部有勘误**：macOS / Windows 的"做不了"已被推翻。支撑 [roadmap](plans/roadmap.md) P3 |
 | ⭐ [multi-platform-ui-fusion.md](research/multi-platform-ui-fusion.md) | 🔴 **多端「一套代码」融合调研**：外部最佳实践 × 本仓库实测。**UI 是唯一重复**（12,277 vs 3,661 行）、移动端缺 67% 特性（8,227 行）、Tauri 无同步 IPC / Electron 有、`node:sqlite` 已是 RC、RN 无 Linux 目标。含**方法偏差声明**（本次 `web_search` 全程 HTTP 432，故候选清单不完整）与 10 条未核实项 |
-| [multi-platform-selection-evidence.md](research/multi-platform-selection-evidence.md) | ⭐ **多端选型的组件视角证据**：组件 UI **不可移植**（本仓库上游一手工程记录）、**真正要写的是 3 份 + 1 个模板不是 5 份**、每平台一次性成本 vs 变体边际成本、ADR-0004 不受影响但有一条要拒绝的诱惑、**桌面壳决策可推迟**（Windows PWA / macOS Continuity 两条捷径）、鸿蒙卡片应与壳解耦。**含 §10 与 [ADR-0024](adr/0024-desktop-shell-and-ui-convergence.md) 的对账**（一条冲突 + 两个空白）。**这是多端选型计划的输入** |
+| [multi-platform-selection-evidence.md](research/multi-platform-selection-evidence.md) | ⭐ **多端选型的组件视角证据**：组件 UI **不可移植**（本仓库上游一手工程记录 + 根因：组件进程跑不了共享运行时）、**真正要写的是 3 份 + 1 个模板不是 5 份**、每平台一次性成本 vs 变体边际成本、拒绝 headless-JS 组件库、**Windows PWA / macOS Continuity 两条路都不免费**、✅ **Developer ID + 公证能带 WidgetKit 扩展（已解决）**、🔴 **Electron 两端都是组件最差项**、鸿蒙卡片**官方封死跨平台**（为卡片建壳收益为 0）。**含 §10 与 [ADR-0024](adr/0024-desktop-shell-and-ui-convergence.md) 的对账**。**这是多端选型计划的输入** |
+| [desktop-shell-selection.md](research/desktop-shell-selection.md) | ⭐ **桌面壳（RN 系 / Tauri / PWA）× 系统组件**：`react-native-macos` **0.81.9 vs RN 0.84.1 硬冲突**（出局）、`react-native-windows` 0.84.0 精确对齐但 New Arch 无 C#、**UI 复用度硬数字**（RN Directory 2716 库中 Win 73 / macOS 54 / 两者仅 28）、macOS 组件**能用**（3 个真实 Developer ID 应用）、Windows 组件**必须 packaged + 独立 COM server** + `sparse package` 新线索。含 12 条未核实项 |
+| [e2ee-widget-key-handling.md](research/e2ee-widget-key-handling.md) | ⭐ **E2EE 产品的组件密钥处理**（源码级判定，不采信搜索）：四模式分类（入口型 / 明文快照 / 组件内解密 / 无组件）+ 逐产品表。🔴 **Bitwarden 根本没有内容组件**（推翻前提）、**只有 Notesnook 走明文**、Proton iOS + Tuta 走**组件内 AES**、**Argon2id 从未进过组件**。🔴 **加密快照 ≠ 锁屏保护（两者正交）**，且 iOS `NSFileProtectionComplete` 与 **macOS Continuity 互斥**。含 CVE-2026-44965（组件配置 Activity 自动登录）
 
 > ⚠️ **两份 AI 调研文档的分工（不要当成重复，也不要让它们漂移）**：
 > - `ai-competitive-and-architecture.md` = **结论层**。只放**影响 ADR-0005 / AI 计划决策**的结论，

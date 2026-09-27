@@ -44,6 +44,17 @@ const SCAN_ROOTS = [
   // 落地页是**面向公众的界面**，裸色值/裸间距在这里的代价比在产品内部更高：
   // 它不受设计系统重构的保护，改一次 token 就会悄悄与产品界面脱节。
   { label: 'apps/landing/src', path: join(ROOT, 'apps/landing/src') },
+  /**
+   * 桌面壳（M2 Spike S2）。**今天就加上，而不是等它有 UI 再加** ——
+   * 原因是上一轮 M0-4 实测出的教训：门禁的范围缺口**不会报错，只会静默失效**，
+   * 而等到"有 UI 了再加"时，第一批 UI 代码已经写进去了。
+   *
+   * ⚠️ 如实说明当前覆盖：桌面壳现在只有 `main.ts` / `preload.ts` / `ipc-contract.ts`
+   * 与一个**临时占位页** `renderer/index.html`。前者没有样式值；
+   * 后者是 HTML，而 `SCAN_EXT` 不含 `.html`（见下方注释），所以**目前这一条基本是空的**。
+   * 它的价值在于：M1 往这里放共享组件时，**覆盖从第一天就成立**。
+   */
+  { label: 'apps/desktop/src', path: join(ROOT, 'apps/desktop/src') },
 ].filter((r) => {
   if (existsSync(r.path)) return true;
   if (verbose) console.log(`⏭  ${r.label} 尚不存在，跳过。`);
@@ -151,6 +162,17 @@ const CHECKS = [
 ];
 
 const SCAN_EXT = new Set(['.ts', '.tsx', '.js', '.jsx', '.css']);
+
+/**
+ * ⚠️ `.html` **刻意不在扫描范围内**，理由是风险不对称：
+ *
+ * 打开它会让 web / landing / desktop 三处的 HTML 一次性进入检查，
+ * 而 HTML 里合法存在大量非设计尺度的值（`width="1100"`、`viewBox`、邮件模板内联样式等），
+ * 很可能**先制造一批误报**。而本文件头的原则是"误报比漏报更致命"。
+ *
+ * 所以这条留在"想做但要先量"的清单上 —— 与 M0-4 补 RN 规则时同样的做法：
+ * **先量命中数，再决定严格度**，不要直接开。
+ */
 
 function collect(dir) {
   const out = [];

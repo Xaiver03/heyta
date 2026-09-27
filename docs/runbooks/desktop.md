@@ -1,0 +1,180 @@
+# 桌面端（Electron）操作手册
+
+> 状态：**骨架已落地并在真实 SQLite 上验证通过；GUI 可运行性待 Electron 二进制落地后确认**。
+> 最后实测：**2026-09-27**。
+> 相关：[ADR-0024](../adr/0024-desktop-shell-and-ui-convergence.md)（桌面端选型）、
+> [多端适配计划](../plans/multi-platform-adaptation.md) M2。
+
+---
+
+## 0. 一句话
+
+桌面端 = **Electron 窗口** + **`@heyta/node-host`**。
+**业务能力一行都不在 `apps/desktop/` 里** —— 它只有 5 个小文件，
+运行时依赖只有 `@heyta/node-host` 一个。
+
+## 0.1 证据标记
+
+沿用 [`deployment.md` §0.1](deployment.md) 的约定：
+
+| 标记 | 含义 |
+|---|---|
+| ✅ **实测** | 本文写作时当场跑过，命令在 [§5](#5-不装-electron-也能验证)。 |
+| 📋 **引用** | 来自官方文档或本仓库其它文档，本次未独立复核。 |
+| ⚪ **未核实** | 明确没验证。**不要当结论用。** |
+
+---
+
+## 1. 它由什么组成 ✅实测
+
+```
+apps/desktop/
+  src/host.ts          库文件定位（userData）+ 转发 openNodeHost    ← 唯一"平台差异"
+  src/ipc-contract.ts  渲染进程 ↔ 主进程的白名单（唯一入口）
+  src/main.ts          Electron 主进程：开窗口、装 IPC、管生命周期
+  src/preload.ts       contextBridge 暴露一层包装函数
+  src/index.ts         不含 electron 的程序化入口（测试直接 import 它）
+  renderer/index.html  ⚠️ 临时占位页，M1 会换成共享 UI
+  tests/*.spec.ts      11 个用例，真实 SQLite 文件、无 mock
+```
+
+`host.ts` 的判据与 `@heyta/node-host` 共用同一句话：
+
+> **这个文件里有没有任何一行在决定"业务上该怎么做"？** 有，就说明提取得不够。
+
+## 2. Spike S1 结论：**主进程持库** ✅实测（决定）
+
+ADR-0024 §5 把它列为未核实项，这里给出结论与理由：
+
+| 方案 | 结论 |
+|---|---|
+| 渲染进程直接 `new NodeSqliteDriver(path)` | ❌ 不用。渲染进程被 `contextIsolation` + `sandbox` 隔离，本来就不该碰文件系统 |
+| **主进程持库 + IPC**（本实现） | ✅ **采用**。主进程是 Node 环境，`node:sqlite` 的 `DatabaseSync` 是**同步**的，与仓库既有的 `SqliteDriver` 窄接口天然相容 |
+
+**关键点：`@heyta/node-host` 与 `NodeSqliteDriver` 一行都没改就被复用了。**
+这不是巧合 —— 那是"驱动必须同步"这个接口决定换来的（见 ADR-0024 §2.4）。
+
+## 3. 库文件在哪 ✅实测
+
+`<userData>/heyta.sqlite`，其中 `userData` 由 Electron 按平台决定：
+
+| 平台 | 路径 📋引用 |
+|---|---|
+| macOS | `~/Library/Application Support/<appName>/` |
+| Windows | `%APPDATA%\<appName>\` |
+| Linux | `~/.config/<appName>/` |
+
+⚠️ **不要**改成可执行文件旁边：安装目录通常不可写（macOS `/Applications`、
+Windows `Program Files`），且升级会整个替换它 —— 数据放那里等于每次升级都丢数据。
+
+⚠️ **不要**改 `DESKTOP_DB_FILENAME`：改了等于让既有用户的本地数据"消失"
+（新建空库，旧库还在磁盘上但没人读）。
+
+## 4. 怎么跑 GUI
+
+### 4.1 前置：Electron 二进制**没有被下载**（这是刻意的）
+
+`pnpm-workspace.yaml` 的 `allowBuilds` **默认拒绝**依赖的 postinstall 脚本，
+只放行了 esbuild / prisma。因此 `pnpm install` 拿到的 `electron` 只有 **1.1 MB**
+（类型与 JS 入口），**没有** `path.txt`、也没有 `dist/` 里的那个二进制。
+
+**要跑 GUI，必须显式放行：**
+
+```yaml
+# pnpm-workspace.yaml
+allowBuilds:
+  esbuild: true
+  '@prisma/client': true
+  '@prisma/engines': true
+  prisma: true
+  electron: true      # ← 加这一行
+```
+
+然后 `pnpm install`（此时会下载 ~100MB 二进制）。
+
+> 🔴 **这是一个需要你拍板的决定，所以我没替你加。**
+> 理由是它同时动了两样东西：一是这条供应链面（让一个包在安装时执行脚本），
+> 二是本机磁盘与下载时间。而**代码本身不需要它就能验证**（见 §5）。
+
+### 4.2 命令
+
+```bash
+pnpm --filter @heyta/desktop build    # 产出 dist/main.cjs + dist/preload.cjs
+pnpm --filter @heyta/desktop start    # 需要 §4.1 的二进制
+```
+
+产物是 **CJS（`.cjs`）而不是 ESM**，这是被 preload 逼的：
+`sandbox: true` 的 preload 必须是 CommonJS，Electron 不会以 ESM 加载它。
+让两个入口同格式，可以避免"主进程 ESM、preload CJS"这种只在运行时才炸的错配。
+
+## 5. 不装 Electron 也能验证 ✅实测
+
+这是本骨架**最重要**的可验证性设计：`main.ts` 与测试**走同两个函数**
+（`openDesktopHost` + `handleDesktopRequest`）。测试另接一套的话，测的就不是应用了。
+
+```bash
+pnpm --filter @heyta/desktop test     # 11 个用例
+pnpm --filter @heyta/desktop typecheck
+```
+
+覆盖的东西：
+
+| 用例 | 证明了什么 |
+|---|---|
+| 库文件落在 `userData` 下 | 路径规则本身 |
+| 打开宿主后磁盘上**真的**出现 `.sqlite` | 不是内存库 |
+| 写 → 关 → **重开新引擎** → 任务仍在 | 经 op-log 落盘，不是进程内缓存 |
+| 改名 / 完成状态经白名单生效 | IPC 转发链路 |
+| `close` **不在**白名单里 | 渲染进程不能关主进程的库连接 |
+| 伪造 `dbPath` 不改变库位置 | 无路径注入（断言的是"位置不受影响"，不是"请求被拒"——见下方坑） |
+| 依赖面白名单 | **"复用而非复制"的机器判据** |
+
+### 5.1 "复用而非复制"是怎么被证明的 ✅实测
+
+`tests/reuse.spec.ts` 断言桌面壳的**依赖面**：
+
+- `src/` 里每个 import 只能是 `electron` / `node:*` / `@heyta/node-host` / 自己人
+- **不得**直接 import `@heyta/domain`、`@heyta/app-host`、`@heyta/storage`、`@heyta/op-log`、
+  `@heyta/sync-*`、`@heyta/ai`、`@heyta/local-api`
+- `package.json` 的运行时依赖**恰好只有** `@heyta/node-host` 一个
+
+对照：`apps/node-host` **允许**直接 import 那些包 —— 因为它**就是**宿主。
+桌面壳是宿主的**用户**，不是另一个宿主。这个区别如果不写成断言，下一个人
+加一行 `import { Task } from '@heyta/domain'` 不会有任何东西变红。
+
+**已证伪**：注入 `import type { Task } from '@heyta/domain'` 后，
+上面前两条**同时变红**并报出 `index.ts → @heyta/domain`；移除后 11 个用例全绿。
+
+### 5.2 途中踩到的坑（留档）
+
+写测试时我先断言了 `{ completed: true }`，测试**红了才发现**领域模型用的是
+**`completedAt: number` 时间戳**，不是布尔值。
+
+这事值得记：桌面壳把 `completed: true` 原样透传给 `setCompleted`，由领域层决定
+落成哪个字段。**壳猜字段名就会猜错**，而领域层本来就该是唯一说话的人 ——
+这正是"壳要薄"的实证。
+
+## 6. 当前边界（明确**没做**的事）
+
+| 项 | 状态 |
+|---|---|
+| 渲染页 | ⚠️ **临时占位页**，M1（共享 UI 垂直切片）会整个替换 |
+| Windows / macOS / Linux 三平台安装包 | 未做（`electron-builder` 或等价物） |
+| 代码签名 / 公证 | 未做 |
+| 自动更新 | 未做 |
+| GUI 的真机冒烟 | 未做（需 §4.1 的二进制） |
+| 真实服务端同步 | 未在本层做 —— 复用 `@heyta/node-host` 的 `sync()`，见 [`multi-platform-build.md`](multi-platform-build.md) |
+
+## 7. 设计门禁的覆盖范围 ✅实测
+
+`check:design` 的 `SCAN_ROOTS` 已含 `apps/desktop/src`（M2 Spike S2）。
+
+**如实说明**：目前这条**基本是空的** —— 桌面壳只有主/preload/契约三个文件（无样式值），
+而占位页是 `.html`，`SCAN_EXT` 不含 `.html`。
+它的价值在于：M1 往这里放共享组件时，**覆盖从第一天就成立**。
+
+`.html` 之所以**刻意不在**扫描范围内，理由是风险不对称：打开它会让
+web / landing / desktop 三处的 HTML 一次性进入检查，而 HTML 里合法存在大量
+非设计尺度的值（`width="1100"`、`viewBox`、邮件模板内联样式等），
+很可能先制造一批误报。而该脚本的原则是"**误报比漏报更致命**"。
+这条留在"想做但要先量"的清单上 —— 与 M0-4 补 RN 规则时同样的做法：**先量命中数，再决定严格度**。
