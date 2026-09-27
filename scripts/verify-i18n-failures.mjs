@@ -1148,12 +1148,16 @@ function groupCoupon() {
   // `node_modules` 用软链 —— pnpm 的 workspace 链接指向真实仓库，不重建就解析不到依赖。
   // `prisma/` 也必须带上：`tests/pricing-ddl.helper.ts` 直接读迁移 SQL，
   // 少了它基线就红 —— 而**基线一红，后面 8 条"必须变红"全都变成空转**。
+  // 🔴 `server/scripts` 同样必需：`tests/billing-pricing-store.pglite.spec.ts` 要
+  // `import … from '../scripts/pricing'`。少了它，**这 9 条曾经全部是假绿** ——
+  // 基线自己就红，"必须变红"的注入于是条条"通过"，实际一个断言都没跑到。
   const probe = prepareProbe(
     'coupon',
     [
       'server/src',
       'server/tests',
       'server/prisma',
+      'server/scripts',
       'server/package.json',
       'server/tsconfig.json',
       'server/vitest.config.ts',
