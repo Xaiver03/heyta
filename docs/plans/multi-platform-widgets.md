@@ -142,9 +142,9 @@
 |---|---|---|---|---|
 | **Android** | AppWidget（RemoteViews 或 Glance） | ❌ 不需要 | 无 —— **最快能验的一端** | [Glance](https://developer.android.com/develop/ui/compose/glance/create-app-widget) |
 | **iOS** | WidgetKit extension | ❌ 不需要 | bundle id + App Group（§1.1）+ **第一个自定义原生模块** | [WidgetKit](https://developer.apple.com/documentation/widgetkit) |
-| **Windows** | 🔴 **PWA widget provider** | 🔴 **不需要！** | PWA 得能从**公网 endpoint** 安装（PWABuilder 不支持 localhost） | [MS Learn: PWA widgets](https://learn.microsoft.com/en-us/microsoft-edge/progressive-web-apps-chromium/how-to/widgets) |
-| **macOS** | 🔴 **Continuity：iPhone 小组件上 Mac** | 🔴 **不需要！** | macOS 14+ / iOS 17+、**同一 Apple 账号**、iPhone 在附近或同 Wi-Fi | [Apple 支持文档](https://support.apple.com/guide/mac-help/mchl3e281fc9/mac) |
-| macOS / Windows（**原生**桌面组件，后置） | WidgetKit / Windows App SDK + MSIX | ✅ 要（桌面壳） | 桌面壳 —— **这正好是 P2 §3.2 那个未决问题**（`phase-2-multi-platform.md:1717`） | [Windows widget providers](https://learn.microsoft.com/en-us/windows/apps/develop/widgets/widget-providers) |
+| **Windows** | 🔴 **PWA widget provider** | 🔴 **不需要**（但**只为 Edge 服务**，且刷新下限 **12 小时** → 需 Web Push 补） | PWA 得能从**公网 endpoint** 安装；本地安装可靠性 **待实测** | [MS Learn: PWA widgets](https://learn.microsoft.com/en-us/microsoft-edge/progressive-web-apps-chromium/how-to/widgets) |
+| **macOS** | 🔴 **Continuity：iPhone 小组件上 Mac** | 🔴 **不需要 Mac 壳 —— 但需要 iOS 壳 + 组件（W2）** | iOS 17+ / macOS **Sonoma 14+** / Mac **所有型号**（不需 Apple Silicon）/ 同一 Apple 账号 / iPhone 在附近或同 Wi-Fi | [Apple：使用 iPhone 组件](https://support.apple.com/en-us/guide/mac-help/mchl52be5da5/mac) |
+| macOS / Windows（**原生**桌面组件，后置） | WidgetKit / Windows App SDK + MSIX | ✅ 要（桌面壳 = **ADR-0024 已选 Electron**） | 🔴 macOS 侧压在"**Developer ID 分发的应用能否带 `.appex`**"这个未实测问题上 | [Windows widget providers](https://learn.microsoft.com/en-us/windows/apps/develop/widgets/widget-providers) |
 | **鸿蒙** | 服务卡片（ArkTS + FormExtensionAbility） | ✅ 要 | 🔴 **唯一一个"组件必须等壳"的平台** | [ArkTS 卡片](https://developer.huawei.com/consumer/cn/doc/harmonyos-guides/arkts-ui-widget-interaction-overview) |
 | **Apple Watch** | watchOS widget extension（同一 Xcode 工程） | ❌ 不需要 | 快照要传到手表（WatchConnectivity）—— 后置 | [Apple: accessory widgets](https://developer.apple.com/documentation/widgetkit/creating-accessory-widgets-and-watch-complications) |
 | **Web** | 无系统级组件 | —— | —— | 但 **Windows PWA 让 Web 用户在 Windows 上有组件** |
@@ -160,7 +160,8 @@
 - manifest 里加 `widgets` 成员：`name` / `description` / `icons` / `screenshots` / `tag` / `ms_ac_template` / `data` / `type` / `auth` / `update`
 - service worker 监听 **`widgetinstall`** / **`widgetuninstall`** / **`widgetclick`**，用 `widgets.updateByTag` 更新
 - 渲染**不是 HTML** —— 是 **Adaptive Card 模板 + JSON 数据**
-- 刷新靠 **Periodic Background Sync**
+- 刷新靠 **Periodic Background Sync** —— 🔴 **但这条实测下来不可用**：Chromium 源码里 `kMinPeriodicSyncEventsInterval = base::Hours(12)`，实际间隔 = 12h × 互动度系数（12/24/36h，或**永不**），且桌面端**没有 OS 级唤醒**（那是 `#if IS_ANDROID`）→ **Windows 上必须 Edge 进程活着**。
+  → **"当日任务列表"必须靠 Web Push 触发 SW 调 `widgets.updateByTag`**（官方点名支持），不能靠 PBS。详见 [选型证据 §5.1](../research/multi-platform-selection-evidence.md)
 
 **对 heyta 的意义**：这个路径**不需要任何 C++/C# 代码**，而且组件签名/容器/App Group 这些**全都不用管**。
 
@@ -176,7 +177,10 @@
 而 Windows PWA 组件的机制**本身就依赖 service worker**（`widgetinstall` / `widgetclick` 事件、`widgets.updateByTag`）。
 → **"把 `apps/web` 变成可安装的 PWA"是 W3 的前置**，不是顺手就有的东西。
 
-⚠️ 另有三个必须先验的未知数（见 §7）：自建用户的 PWA（自己的域名）装了之后组件会不会出现、是否必须走 Microsoft Store、以及 Periodic Background Sync 的实际频率（由浏览器按站点参与度决定，可能远低于 30 分钟）。
+⚠️ 另有三个必须先验的未知数（见 §7）：
+1. 🔴 **它只为 Edge 服务** —— `widgets` manifest 成员**不在 W3C 规范、也不在 Chromium 源码**（grep 0 命中）→ **Chrome 用户拿不到组件**。
+2. 🔴 **本地安装（不上 Store）是否稳定出组件未证实** —— 文档没说必须上 Store，官方 demo 就是本地 Edge 安装；但 2023 年有"5 台机器仅 1 台出现 + 微软称 experimental"的记录，2025–2026 **无正面实测报告**。
+3. **刷新**：见上条 —— PBS 下限 12 小时，必须走 Web Push。
 
 ### 3.2 macOS 那条路（几乎零成本的附带收益）
 
@@ -218,7 +222,7 @@
 - [ ] WidgetKit extension target（部署目标定 **16 或 17**，**app 保持 15.1** —— 交互能力需要 17）
 - [ ] Swift 解析器 + 读**同一份** golden fixture 的单测
 - [ ] 第一个 RN 原生模块（`setWidgetSnapshot` / `drainIntentQueue`）
-- [ ] **macOS 随这一阶段自动获得**（Continuity，§3.2）
+- [ ] **macOS 桌面组件随这一阶段获得**（Continuity）。⚠️ 三处必须写清：① 它是**本阶段的副产品**，不是独立路径（要求 iPhone 上装着带 WidgetKit 扩展的 App）；② 用户需手动开启"使用 iPhone 组件"、且 iPhone 在附近或同 Wi-Fi；③ **交互在 iPhone 上执行**（Mac 只是显示器 + 转发）
 
 ### 阶段 W3 —— Windows（PWA widget）
 
@@ -290,9 +294,11 @@
 
 按"会不会推翻计划"排序：
 
-1. 🔴 **Windows：自建用户的 PWA 装上之后，组件会不会出现在 Widgets Board？是否必须走 Store？**
-   官方文档说 PWA 是一等路径、可打包上架 Store，但**没说清"只在 Edge 里安装"是否足够**。这条不验，W3 的可行性就是空的。
-2. 🔴 **Windows：Periodic Background Sync 的实际最低频率。** 浏览器按站点参与度决定，可能远低于 Android 的 30 分钟。若太慢，Windows 组件的"新鲜度"故事就立不住。
+1. 🔴 **Windows：自建域名 PWA 用 Edge 本地安装（不上 Store）后，组件是否稳定出现在 Widgets Board？**
+   文档没要求必须上 Store，官方 demo 就是本地安装；但 2023 年有"5 台机器仅 1 台出现 + 微软称 experimental"的记录，2025–2026 **无正面实测报告**。**这条不验，W3 的可行性就是空的。**
+   建议实测条件：Win11 24H2/25H2 + 最新 Edge + 一个真实 https 域名。
+2. ✅ **Windows：刷新频率** → **已查明，且结论是负面的**：PBS 下限 **12 小时**（Chromium 源码 `kMinPeriodicSyncEventsInterval`），且桌面端无 OS 级唤醒（`#if IS_ANDROID`）→ **W3 必须改用 Web Push 触发 `widgets.updateByTag`**，不能靠 PBS。
+2b. 🔴 **Windows：它只为 Edge 服务** —— `widgets` manifest 成员**不在 W3C 规范、也不在 Chromium 源码**（grep 0 命中）→ **Chrome 用户拿不到组件**。这是能力边界，不是 bug，须写进产品预期。
 3. **快照加密方案在 iOS extension 里的真实开销**（AES-GCM 解密 + Keychain 读取）—— 对比 WidgetKit 的执行窗口够不够。Apple **未公开**窗口秒数，只能真机测。
 4. **鸿蒙元服务能否承载服务卡片而不需要完整 App**（官方文档倾向"能"，但要实测一遍工程）。
 5. **macOS Continuity 组件的实际可用性**（同账号 + 附近条件在真实用户环境里有多容易满足）。
