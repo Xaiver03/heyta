@@ -1,7 +1,7 @@
 # 桌面端（Electron）操作手册
 
-> 状态：**骨架已落地并在真实 SQLite 上验证通过；GUI 可运行性待 Electron 二进制落地后确认**。
-> 最后实测：**2026-09-27**。
+> 状态：**骨架已在 macOS 与 Windows 上双双验证通过；GUI 窗口本身仍未真机冒烟**。
+> 最后实测：**2026-09-27**（macOS 本机 + `windows-pc` 真机）。
 > 相关：[ADR-0024](../adr/0024-desktop-shell-and-ui-convergence.md)（桌面端选型）、
 > [多端适配计划](../plans/multi-platform-adaptation.md) M2。
 
@@ -72,29 +72,35 @@ Windows `Program Files`），且升级会整个替换它 —— 数据放那里�
 
 ## 4. 怎么跑 GUI
 
-### 4.1 前置：Electron 二进制**没有被下载**（这是刻意的）
+### 4.1 前置：Electron 二进制要单独放行（**已在仓库里放行**）
 
-`pnpm-workspace.yaml` 的 `allowBuilds` **默认拒绝**依赖的 postinstall 脚本，
-只放行了 esbuild / prisma。因此 `pnpm install` 拿到的 `electron` 只有 **1.1 MB**
-（类型与 JS 入口），**没有** `path.txt`、也没有 `dist/` 里的那个二进制。
+`pnpm-workspace.yaml` 的 `allowBuilds` **默认拒绝**依赖的 postinstall 脚本。
+不放行时 `pnpm install` 拿到的 `electron` 只有 **1.1 MB**（类型与 JS 入口），
+**没有** `path.txt`、也没有 `dist/` 里的那个二进制 —— 于是应用**起不了窗口**。
 
-**要跑 GUI，必须显式放行：**
+**2026-09-27 已由项目所有者批准放行**（`pnpm-workspace.yaml` 里已有 `electron: true`）：
 
 ```yaml
-# pnpm-workspace.yaml
 allowBuilds:
   esbuild: true
   '@prisma/client': true
   '@prisma/engines': true
   prisma: true
-  electron: true      # ← 加这一行
+  electron: true      # ← 已加：决定"能不能双击打开应用"
 ```
 
-然后 `pnpm install`（此时会下载 ~100MB 二进制）。
+放行后 `pnpm install` 会下载 ~100MB 二进制。注意它落在**用户缓存目录**
+（`%LOCALAPPDATA%\electron` / `~/Library/Caches/electron`），**不进仓库、不占仓库体积**。
 
-> 🔴 **这是一个需要你拍板的决定，所以我没替你加。**
-> 理由是它同时动了两样东西：一是这条供应链面（让一个包在安装时执行脚本），
-> 二是本机磁盘与下载时间。而**代码本身不需要它就能验证**（见 §5）。
+> ⚠️ **只改了配置、还没重新 install 时，`path.txt` 仍然不存在。**
+> 判据就一条：
+> ```powershell
+> Test-Path 'node_modules\.pnpm\electron@*\node_modules\electron\path.txt'
+> ```
+> `False` = 不能跑 GUI（但 §5 的验证照样能跑，代码本身不依赖它）。
+>
+> ⚠️ 这台 Windows 机器同时是 Android 打包机，**它的二进制要单独装**：
+> 同步源码之后在那台上再跑一次 `pnpm install`。
 
 ### 4.2 命令
 
@@ -145,7 +151,48 @@ pnpm --filter @heyta/desktop typecheck
 **已证伪**：注入 `import type { Task } from '@heyta/domain'` 后，
 上面前两条**同时变红**并报出 `index.ts → @heyta/domain`；移除后 11 个用例全绿。
 
-### 5.2 途中踩到的坑（留档）
+### 5.2 在 Windows 打包机上验证（2026-09-27 实测 ✅）
+
+桌面端不是"写完就算"——它必须**在真正的 Windows 上**也能构建与通过，
+否则"多端"就只是口号。已在 `windows-pc` 上实测：
+
+```bash
+# Mac 侧：同步当前工作树（叠加式解包，保留 node_modules）
+git archive HEAD -- . ':(exclude)research/standalone/.npm-cache' | gzip -1 > /tmp/heyta-src.tar.gz
+scp /tmp/heyta-src.tar.gz windows-pc:C:/src/
+# Windows 侧：tar.exe -xzf C:\src\heyta-src.tar.gz -C C:\src\heyta
+pnpm install && pnpm -r build && pnpm --filter @heyta/desktop test
+```
+
+| 项 | macOS 本机 | `windows-pc` |
+|---|---|---|
+| `pnpm -r build` | ✅ | ✅ **exit 0**（整个 monorepo） |
+| `apps/desktop` tsup 产物 | `main.cjs` 3.23 KB<br>`preload.cjs` 1.44 KB | **同上，字节级一致** |
+| `apps/desktop` 测试 | 11/11 ✅ | **11/11 ✅** |
+| `typecheck` | ✅ | ✅ |
+
+Windows 那 11 个用例含"写 → 关 → 重开新引擎 → 数据仍在"——
+也就是说 `node:sqlite` 经 `NodeSqliteDriver` 在 **Windows 上真的落了盘**，
+不是只在 macOS 上能跑。
+
+> ⚠️ 同步用 `git archive HEAD`（**只含已提交内容**），**不要**照抄
+> [`multi-platform-build.md`](multi-platform-build.md) §1.2 里的 `git add -A && git write-tree`：
+> 那会改动共享工作区的暂存区。桌面端已在提交里，`git archive HEAD` 足够。
+>
+> ⚠️ 也**不要**用 `scripts/windows/bootstrap-repo.ps1 -Force` 做这件事：它会
+> `Remove-Item -Recurse -Force` **整棵 `C:\src\heyta`**（连 node_modules 一起删）。
+> 那台机器同时是 Android 打包机，没必要为了更新源码毁掉它的安装。
+> 叠加式 `tar -xzf ... -C` 只增/改文件，实测 `node_modules` 原样保留。
+
+> ⚠️ `pnpm install` 在 Windows 上会复用 pnpm store，实测 **14.4s**（不是几分钟）。
+> 输出里有 `Lockfile is up to date, resolution step is skipped` 与
+> `Lockfile passes supply-chain policies` —— **同一份 lockfile、零改写**，
+> 这正是"临时同步过去的树没和上游漂移"的判据。
+
+⚠️ **还没有做的事**：GUI 窗口本身仍**未真机冒烟**（没在那台机器上启动过 Electron 窗口）。
+测过的是主进程侧的全部逻辑路径。见 [§6](#6-当前边界明确没做的事)。
+
+### 5.3 途中踩到的坑（留档）
 
 写测试时我先断言了 `{ completed: true }`，测试**红了才发现**领域模型用的是
 **`completedAt: number` 时间戳**，不是布尔值。
@@ -159,10 +206,11 @@ pnpm --filter @heyta/desktop typecheck
 | 项 | 状态 |
 |---|---|
 | 渲染页 | ⚠️ **临时占位页**，M1（共享 UI 垂直切片）会整个替换 |
+| **macOS 与 Windows 上的构建 + 11 个测试** | ✅ **已实测**（见 [§5.2](#52-在-windows-打包机上验证2026-09-27-实测-)） |
+| GUI 窗口的真机冒烟 | ⬜ **未做** —— 配置已放行二进制（§4.1），但还没在任何机器上真的启动过窗口 |
 | Windows / macOS / Linux 三平台安装包 | 未做（`electron-builder` 或等价物） |
 | 代码签名 / 公证 | 未做 |
 | 自动更新 | 未做 |
-| GUI 的真机冒烟 | 未做（需 §4.1 的二进制） |
 | 真实服务端同步 | 未在本层做 —— 复用 `@heyta/node-host` 的 `sync()`，见 [`multi-platform-build.md`](multi-platform-build.md) |
 
 ## 7. 设计门禁的覆盖范围 ✅实测

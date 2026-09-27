@@ -22,6 +22,16 @@ allowBuilds:
   '@prisma/client': true
   '@prisma/engines': true
   prisma: true
+  # Electron 需要 postinstall 下载**运行时二进制**（约 100MB+，落在
+  # `%LOCALAPPDATA%\electron` / `~/Library/Caches/electron`，**不占仓库体积**）。
+  #
+  # 不放行的后果（2026-09-27 实测）：`pnpm install` 只装到 **1.1MB** 的类型与
+  # JS 入口，没有 `path.txt`、也没有 `dist/` 里的可执行文件 ——
+  # 于是 `apps/desktop` **能类型检查、能构建、能跑 11 个测试，但起不了窗口**。
+  #
+  # 由项目所有者批准放行。它与上面四条性质不同：那四条是**构建期工具链**，
+  # 这一条直接决定用户能不能双击把应用打开 —— 是"能跑"与"不能跑"的分界。
+  electron: true
 
 # ⚠️ 必须显式声明，不能依赖默认值 —— 否则构建结果取决于**跑的是哪个 pnpm**。
 #
