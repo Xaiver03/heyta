@@ -424,6 +424,40 @@ rsync -az --delete apps/landing/dist/ ubuntu-jcli:/var/www/heyta-landing/
 "只能自建"。仓库默认构建（无该变量）**是故意的**：应用还没部署时露出一个
 「立即使用」，比没有入口更坏。
 
+#### 🔴 2026-09-27 实况：上面这两条**不是"建议"，是部署命令**
+
+当天用 `pnpm --filter @heyta/web build` 与 `pnpm --filter @heyta/landing build`
+（也就是工作区里那个 `build` 脚本）重新发了一次，**两个坑同时复发**：
+
+| 现象 | 根因 |
+|---|---|
+| `/app/` 白屏、`#root` 空的、`/assets/index-*.js` **404** | 工作区的 `build` 脚本**不带 `--base=/app/`**，产物引用 `/assets/…`，而那个前缀属于落地页 |
+| 落地页的「立即使用」**消失** | 那个 `build` 脚本**不带 `VITE_APP_URL`**，入口按设计不渲染 |
+
+⚠️ 所以：**要发布就用本节这两条命令，不要用 `pnpm --filter … build`。**
+两者名字一样、行为不同 —— 这正是"命令看起来对、结果错得没有报错"的那一类。
+
+#### 🔴 2026-09-27 又两个坑（本次一并修掉，都在站点文件里）
+
+**① `.wasm` 的 MIME**：本机 `/etc/nginx/mime.types` **没有** wasm 条目，nginx 于是返回
+`application/octet-stream`；浏览器据此**拒绝** `WebAssembly.instantiateStreaming`
+（`Incorrect response MIME type. Expected 'application/wasm'`），再回退到 ArrayBuffer。
+**功能没坏、页面没白，只有打开控制台才看得见** —— 属于"不报错就不管"那一类。
+已在 `location /app/assets/` 里修：先 `include /etc/nginx/mime.types;` 再
+`types { application/wasm wasm; }`。
+⚠️ **顺序不能反、也不能省掉 include**：`types` 在嵌套层级是**替换**继承而非叠加，
+只写 wasm 会让同目录的 `.js` / `.css` 一起失去类型（模块脚本直接不执行）。
+
+**② `/en/assets/`**：两侧 HTML 用的都是**绝对路径**（`src="/assets/…"`），所以英文页
+本身是好的；但 `/en/assets/x.js` 会掉进 `location /en/` 的
+`try_files … /en/index.html`，返回 **HTTP 200 + text/html**。当时探测就是这个现象。
+已加 `location /en/assets/ { return 404; }` —— 资源确实不在 `/en/` 下，就别假装它在。
+
+验证方式（都实跑过）：主机上 `curl --resolve` 直连 nginx 与公网各测一遍
+`.wasm` / `.js` / `.css` 三类 `content-type`；再用真浏览器跑域名验收 23 项全过、
+**零 `console.error`**。⚠️ 公网第一次测仍是旧的 `octet-stream`，
+是**缓存**；加随机 query 或稍后重测才是真相，别据此改配置。
+
 #### 🔴 改了入口的 URL 形状，就**必须**同时重建应用本体
 
 2026-09-27 实测踩到，而且**只有真浏览器看得见**。
