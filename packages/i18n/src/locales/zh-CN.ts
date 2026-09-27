@@ -1178,9 +1178,10 @@ export const zhCN = {
   'web.export.markdown.label': '任务清单（Markdown）',
   'web.export.markdown.note': '人能直接打开看的任务列表。它不含已删除的记录，也不含操作日志。',
   'web.export.markdown.button': '下载任务清单',
-  // 🔴 诚实条款：这一轮**不做导入**。不说清楚的话，用户会把它当成还原点 ——
-  //    而一个不能导回来的文件当还原点用，等于没有备份。
-  'web.export.notRestorePoint': '这是导出，还不能导回来 —— 请不要把它当成还原点。',
+  // 🔴 诚实条款。JSON 已经有还原路径了，所以这句不再是"不能导回来"，
+  //    而是如实说出**这一轮的边界**：只支持还原到空库。
+  //    Markdown 清单**真的**不能导回来 —— 它没有 op-log。
+  'web.export.notRestorePoint': 'JSON 导出可以导回来（目前只支持还原到空库）；任务清单只是给人看的，不能导回来。',
   'web.export.counts': '这次的导出里有 {entities} 条记录（其中已删除 {deleted} 条）、{ops} 条操作日志。',
   'web.export.failed': '导出失败，请重试。',
   // Markdown 文件内部的结构文字。**格式由 `packages/app-host` 决定，措辞由这里决定** ——
@@ -1198,6 +1199,33 @@ export const zhCN = {
   'web.export.markdown.colTags': '标签',
   'web.export.markdown.none': '（无）',
   'web.export.markdown.footer': '这是导出文件，还不能导回来，请不要把它当成还原点。',
+
+  // ── Web · 导入 / 还原（导出自由的另一半）───────────────────
+  //
+  // 🔴 本轮**只支持"还原到空库"**，不做"合并到已有数据的库"——
+  //    理由见 `packages/app-host/src/import-dump.ts` 文件头。
+  //    界面必须直说这件事：一句看起来万能的"导入"会让用户以为它能合并两份数据，
+  //    而合并会在 id 冲突与时钟顺序上**静默丢数据**。
+  'web.import.title': '导入 / 还原',
+  'web.import.intro': '从一份 heyta 导出的 JSON 还原数据。还原在本机完成，不经过任何服务器。',
+  'web.import.emptyOnly': '只支持还原到空库：本机已经有数据时会直接拒绝，不会清空或覆盖任何现有数据。',
+  'web.import.fileLabel': '选择导出的 JSON 文件',
+  'web.import.button': '读取并还原',
+  'web.import.busy': '正在还原…',
+  'web.import.success': '已还原 {entities} 条记录（其中已删除 {deleted} 条）、{ops} 条操作日志。',
+  'web.import.skipped': '另有 {skipped} 条操作日志本机已经有了，已跳过。',
+  'web.import.localOnly': '还原只作用在本机：导入的操作日志带着原设备的标识，服务端不会因此收到这些数据。',
+  'web.import.failed': '还原没有完成，请重试。',
+  // 拒绝原因。结构化 `reason` → 词条，与 AI 失败态同一条纪律
+  //（packages 只回 reason，壳取词条；不把文案写进 packages）。
+  'web.import.reason.invalidJson': '这个文件不是合法 JSON。',
+  'web.import.reason.invalidDocument': '这个文件不是一份完整的 heyta 导出。',
+  'web.import.reason.wrongApplication': '这个文件不是 heyta 导出的。',
+  'web.import.reason.unsupportedFormatVersion': '导出格式版本不认识 —— 文件可能来自更新的版本。',
+  'web.import.reason.unsupportedSchemaVersion': '这份导出与本机的 op 版本不同，暂不支持跨版本还原。',
+  'web.import.reason.inconsistentDocument': '文件自相矛盾：重放它的操作日志得不到它自己声称的数据。没有写入任何内容。',
+  'web.import.reason.targetNotEmpty': '本机已经有数据 —— 还原只支持空库，现有数据一个字节都没动。',
+  'web.import.reason.verificationFailed': '写入后的结果与导出不一致，请检查本机数据。',
 
   // ═══════════════════════════════════════════════════════════
   // 移动端（apps/mobile）

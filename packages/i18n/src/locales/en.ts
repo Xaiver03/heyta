@@ -1103,10 +1103,11 @@ export const en = {
   'web.export.markdown.label': 'Task list (Markdown)',
   'web.export.markdown.note': 'A task list a person can open and read. It leaves out deleted records and the operation log.',
   'web.export.markdown.button': 'Download task list',
-  // 🔴 Honesty clause: this round does NOT do import. Without this, users would
-  //    treat the file as a restore point — and a file that cannot be imported back
-  //    used as a restore point is no backup at all.
-  'web.export.notRestorePoint': 'This is an export — you cannot import it back yet. Please do not treat it as a restore point.',
+  // 🔴 Honesty clause. The JSON path now has an import; so this no longer says
+  //    "you cannot import it back" — it states this round's actual boundary:
+  //    empty databases only. The Markdown list genuinely cannot be imported
+  //    (it carries no operation log).
+  'web.export.notRestorePoint': 'The JSON export can be imported back (empty databases only for now); the task list is for reading, not for restoring.',
   'web.export.counts': 'This export holds {entities} records ({deleted} of them deleted) and {ops} operation-log entries.',
   'web.export.failed': 'Export failed. Please try again.',
   // Structure text inside the Markdown file. The layout lives in
@@ -1125,6 +1126,34 @@ export const en = {
   'web.export.markdown.colTags': 'Tags',
   'web.export.markdown.none': '—',
   'web.export.markdown.footer': 'This is an export file — you cannot import it back yet. Do not treat it as a restore point.',
+
+  // ── Web · Import / restore (the other half of "freedom to export") ──
+  //
+  // 🔴 This round supports **restoring into an empty database only**; merging
+  //    into a database that already has data is NOT done — see the header of
+  //    `packages/app-host/src/import-dump.ts`. The UI must say so plainly:
+  //    a generic "Import" button would make users think it can merge two
+  //    datasets, and merging silently loses data on id conflicts and clocks.
+  'web.import.title': 'Import / restore',
+  'web.import.intro': 'Restore data from a JSON file exported by heyta. Restoring happens locally and never touches a server.',
+  'web.import.emptyOnly': 'Restoring works into an empty database only: if this device already has data, it is refused outright and nothing is erased or overwritten.',
+  'web.import.fileLabel': 'Choose an exported JSON file',
+  'web.import.button': 'Read and restore',
+  'web.import.busy': 'Restoring…',
+  'web.import.success': 'Restored {entities} records ({deleted} of them deleted) and {ops} operation-log entries.',
+  'web.import.skipped': '{skipped} operation-log entries already existed on this device and were skipped.',
+  'web.import.localOnly': 'Restoring affects this device only: imported operations carry the original device\u2019s identity, so the server will not receive them from here.',
+  'web.import.failed': 'The restore did not finish. Please try again.',
+  // Rejection reasons. Structured `reason` → catalogue entry, same discipline as
+  // the AI failure states (packages return a reason; the shell picks the entry).
+  'web.import.reason.invalidJson': 'This file is not valid JSON.',
+  'web.import.reason.invalidDocument': 'This file is not a complete heyta export.',
+  'web.import.reason.wrongApplication': 'This file was not exported by heyta.',
+  'web.import.reason.unsupportedFormatVersion': 'This export format version is not recognised — the file may come from a newer version.',
+  'web.import.reason.unsupportedSchemaVersion': 'This export uses a different operation version than this device; cross-version restore is not supported yet.',
+  'web.import.reason.inconsistentDocument': 'The file contradicts itself: replaying its operation log does not reproduce the data it claims. Nothing was written.',
+  'web.import.reason.targetNotEmpty': 'This device already has data — restoring works into an empty database only, and not one byte of the existing data was touched.',
+  'web.import.reason.verificationFailed': 'The result after writing does not match the export. Please check this device\u2019s data.',
 
   // ── Mobile (apps/mobile) ──────────────────────────────────
   'mobile.common.today': 'Today',

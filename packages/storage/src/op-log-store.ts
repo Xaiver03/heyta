@@ -54,6 +54,22 @@ export interface StoredOperation<TOperation extends Operation<string> = Operatio
 }
 
 /**
+ * 一次导入追加的结果。
+ *
+ * 与 `appendLocal` 只返回 seq 不同：导入必须能**区分"写进去了"与"已经在了"**。
+ * 一份导出被导入两次时，第二次全都被跳过 —— 若看不到这个差别，
+ * 调用方只能报"成功"，而用户无从知道这次点击其实什么都没做。
+ */
+export interface ImportedAppendResult<TOperation extends Operation<string> = Operation> {
+  /** 真正写进去的 op（按传入顺序）。 */
+  appended: TOperation[];
+  /** 因为 `opId` 已存在而跳过的 op。 */
+  skipped: TOperation[];
+  /** 与 `appended` 一一对应的 seq（单调递增、无空洞）。 */
+  seqs: number[];
+}
+
+/**
  * 操作日志存储。
  *
  * 实现方必须保证：
@@ -71,6 +87,24 @@ export interface OpLogStore<
    * 返回分配到的 seq（单调递增）。
    */
   appendLocal(ops: TOperation[]): Promise<number[]>;
+
+  /**
+   * 追加**导入**的操作（从一份导出文档还原本机数据）。
+   *
+   * 与 {@link appendLocal} 的差别只有两处语义，都很重要：
+   *
+   *   1. **`source` 记为 `'import'`。** 这不是"本地用户刚做了什么"，
+   *      证据链上要能区分"这条是我写的"与"这条是从一份文件里搬回来的"。
+   *   2. **不进上传队列。** 导入的 op 带着**原来那台设备**的 `clientId`，
+   *      而服务端会逐条以 `INVALID_CLIENT_ID` 拒绝 `op.clientId` 与本机不符的 op
+   *      （`server/src/sync/services/validation.service.ts`）。把它们排进上传队列
+   *      只会得到一批**永久拒绝**、把"待上传"永远挂在那里 —— 而数据一条也上不去。
+   *      所以导入的 op 一律记成 `uploaded`：**不是"它上云了"，是"这台设备不该、
+   *      也不能上传它"**。这一点必须在界面上如实说明。
+   *
+   * 幂等：同一 `opId` 已存在时跳过（复用唯一索引，不做先查后写）。
+   */
+  appendImported(ops: TOperation[]): Promise<ImportedAppendResult<TOperation>>;
 
   // ── 读取 ────────────────────────────────────────────────
 
