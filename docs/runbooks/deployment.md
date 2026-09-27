@@ -1,6 +1,6 @@
 # 运维与部署现状
 
-> **最后实测：2026-09-26（CST），约 15:20–15:40。**
+> **最后实测：2026-09-27（CST）对 §3.7 与应用入口；其余章节仍为 2026-09-26 的实测。**
 > 本文只讲「哪台机器、跑什么、对外地址、怎么核实」，**不讲 heyta 的应用源码**。
 > 应用怎么构建、怎么本地跑，见 [`local-server-verification.md`](local-server-verification.md)；
 > 多端产物见 [`../reference/build-matrix.md`](../reference/build-matrix.md)。
@@ -149,7 +149,8 @@
         ┌──────────────────────── ubuntu-jcli  124.223.13.226 ────────────────────────┐
         │  宿主机 nginx 1.18.0   :443 (TLS, certbot)  ──►  :80 → 301 https              │
         │      │                                                                        │
-        │      ├── /landing/   → alias /var/www/heyta-landing/  (静态落地页)            │
+        │      ├── /app/       → alias /var/www/heyta-app/  (apps/web 静态产物)          │
+        │      ├── /landing*   → 301 → https://heyta.finlaw.cloud/                       │
         │      └── /           → proxy_pass http://127.0.0.1:1900                        │
         │                                    │                                           │
         │                          docker: supersync-server  (supersync:local, healthy)  │
@@ -181,7 +182,13 @@
   `docker-compose.test.yml`、`.env`、`scripts/deploy.sh`。
 - ✅ 发布脚本 `server/scripts/deploy.sh`：校验 Caddyfile 语法 → 拉/建镜像 → **先跑迁移** → 换容器 → 等 healthcheck。
 - ✅ 落地页产物 `apps/landing` 构建后同步到 `/var/www/heyta-landing/`
-  （`index.html` + `assets/` + `favicon.svg`，mtime 2026-09-26 15:20）；通过 `/landing/` 提供，实测 200。
+  （`index.html` + `assets/` + `favicon.svg`）。
+  🔴 **落地页住在 `https://heyta.finlaw.cloud/` 的根，不是 `/landing/`** ——
+  本域名下的 `/landing*` 现在是 **301 跳过去**（见 §3.3 与 §3.7）。本文旧版写的
+  「通过 `/landing/` 提供，实测 200」**已经过期**。
+- ✅ 应用本体 `apps/web` 的产物同步到 `/var/www/heyta-app/`，由本域名的 `/app/` 提供。
+  **构建时必须带 `--base=/app/`** —— 理由见 §3.7，弄错会得到一个「控制台报
+  样式表 MIME 是 `application/json`」的白屏。
 - ⚪ 具体是谁、用什么命令把源码推上来的：**未核实**（没有 git 元数据、本次未查 shell history）。
 
 ### 3.3 反向代理（宿主机 nginx）
@@ -195,8 +202,9 @@ nginx 片段：`/etc/nginx/sites-available/heyta-tmp`，软链到 `/etc/nginx/si
 - ✅ `client_max_body_size 64m;`
 - ✅ 反代块：`proxy_pass http://127.0.0.1:1900;`，带 `Upgrade` / `Connection: upgrade`（WebSocket）、
   `Host` / `X-Real-IP` / `X-Forwarded-For` / `X-Forwarded-Proto`，`proxy_read_timeout 90s` / `proxy_send_timeout 90s`。
-- ✅ 另有 `/landing`、`/landing/assets/`（`expires 1y` + `immutable`）、`/landing/`（alias `/var/www/heyta-landing/`）三个 location。
-  前缀匹配取最长者，所以 `/landing/` 优先于 `/`，不影响服务端的 `/api/*` 与 WebSocket 路径。
+- ✅ 另有 `/app`、`/app/`、`/app/assets/` 三段与 `/landing*` 三段（见 §3.7）。
+  **`location /app/` 不匹配 `/app`** —— 所以 `/app` 单独有一条 `location = /app { return 301 /app/; }`。
+  少了它，落地页的「立即使用」会把用户送到同步服务端的 JSON 404（实测踩到过）。
 - ✅ **HTTP 行为（与线索不同，务必注意）**：
   - `http://heyta-tmp.litopia.space/…` → **301** 跳 `https://`（certbot 写的 `if ($host = …)` 块）。
   - `http://124.223.13.226/…` → **404**（certbot 块的兜底是 `return 404`）。
@@ -248,15 +256,93 @@ compose 里还有一批**未在 `.env` 中设置、走默认值**的键（`HOST`
 
 | 请求 | 结果 | 来源 |
 |---|---|---|
-| `GET https://heyta-tmp.litopia.space/health` | `200` + `{"status":"ok","db":"connected","wsConnections":0}` | ✅ `curl --noproxy '*'` |
+| `GET https://heyta-tmp.litopia.space/health` | `200` + `{"status":"ok","db":"connected","wsConnections":0}` | ✅ |
 | `GET https://heyta-tmp.litopia.space/` | `200` | ✅ |
+| `GET https://heyta-tmp.litopia.space/app/` | `200` `text/html`（`apps/web` 产物，`Cache-Control: no-cache`） | ✅ 2026-09-27 |
+| `GET https://heyta-tmp.litopia.space/app` | `301` → `/app/` | ✅ 2026-09-27 |
+| `GET https://heyta-tmp.litopia.space/app/assets/<hash>.js` | `200` `application/javascript`，`Cache-Control: max-age=31536000` | ✅ 2026-09-27 |
+| `GET https://heyta.finlaw.cloud/` | `200`（落地页中文版） | ✅ 2026-09-27 |
+| `GET https://heyta.finlaw.cloud/en/` | `200`（落地页英文版） | ✅ 2026-09-27 |
+| `GET https://heyta-tmp.litopia.space/landing/` | `301` → `https://heyta.finlaw.cloud/`（**不再直接 200**） | ✅ 2026-09-27 |
 | `GET http://heyta-tmp.litopia.space/health` | `301` → `https://…/health` | ✅ |
 | `GET http://124.223.13.226/health` | `404` | ✅ |
-| `GET https://127.0.0.1/landing/`（带 `Host: heyta-tmp.litopia.space`，在机器上跑） | `200` | ✅ |
 
 > ⚠️ 本机 shell 设了 `HTTP_PROXY`/`HTTPS_PROXY`，**测公网/本机服务必须加 `--noproxy '*'`**，否则走代理，
 > 结果不可信。另外本机 DNS 会把域名解析成 `198.18.0.x`（fake-ip），
 > 所以**判断域名到底解析到哪台机器，要在远端机器上用 `getent hosts` 查**，不要本机 `dig`（见 §8.3）。
+
+### 3.7 应用本体（`apps/web`）的发布 —— 2026-09-27 首次完成
+
+🔴 **在此之前 `apps/web` 从来没有被部署到任何地方。** 落地页与同步服务端都在公网，
+唯独"应用本身"没有任何地址：访客能读落地页、能连服务端，却**无处可以打开应用**。
+这是整条用户旅程上最后一个断点。
+
+#### 它住在哪
+
+| 项 | 值 |
+|---|---|
+| 公网地址 | `https://heyta-tmp.litopia.space/app/` |
+| 静态根目录 | `/var/www/heyta-app/`（`ubuntu:ubuntu`） |
+| 为什么放这个域名 | 与同步服务端**同源** —— 于是 `CORS_ORIGINS`、`WEBAUTHN_RP_ID`、`WEBAUTHN_ORIGIN` **一个字都不用改**，passkey 也能用 |
+| nginx 片段 | `/etc/nginx/sites-available/heyta-tmp`（就是 §3.3 那个文件） |
+
+#### 重新发布的两条命令
+
+```bash
+# 1) 构建：🔴 --base=/app/ 不能省
+cd apps/web && pnpm exec tsc -b && pnpm exec vite build --base=/app/
+
+# 2) 上传
+rsync -az --delete apps/web/dist/ ubuntu-jcli:/var/www/heyta-app/
+```
+
+🔴 **`--base=/app/` 必须显式给。** Vite 默认 `base` 是 `/`，产物的资源引用是
+**根绝对路径**（`/assets/…`）。挂在 `/app/` 下时浏览器会去请求
+`https://heyta-tmp.litopia.space/assets/…` —— 而那个路径属于同步服务端
+（`location /` → `proxy_pass 127.0.0.1:1900`），于是拿到 JSON 404，
+现象是**控制台报样式表 MIME 是 `application/json`**、页面白屏。
+落地页 2026-09-27 踩的就是同一个坑，`sites-available/heyta-tmp` 里那段注释就是为它写的。
+
+#### 落地页上的入口：`VITE_APP_URL`
+
+落地页的「立即使用 / Use it now」由**构建期变量** `VITE_APP_URL` 决定
+（判据在 `apps/landing/src/lib/app-url.ts`）：
+
+```bash
+cd apps/landing && VITE_APP_URL=https://heyta-tmp.litopia.space/app/ pnpm exec vite build
+rsync -az --delete apps/landing/dist/ ubuntu-jcli:/var/www/heyta-landing/
+```
+
+🔴 **不带这个变量重新构建落地页，入口会静默消失** —— 页面不报错，只是又变回
+"只能自建"。仓库默认构建（无该变量）**是故意的**：应用还没部署时露出一个
+「立即使用」，比没有入口更坏。
+
+#### 变更前备份（回滚用）
+
+- `/etc/nginx/sites-available/heyta-tmp.bak-20260927T124302Z`（加 `/app/` 之前）
+- `/etc/nginx/sites-available/heyta-tmp.bak2-20260927T124707Z`（加 `/app` 重定向之前）
+- `/var/www/heyta-landing.bak-20260927T124628Z`（旧落地页产物）
+
+#### 验收方式：**必须用真浏览器**
+
+`apps/web` 是客户端渲染的 SPA，落地页的 CTA 也是 React 渲染出来的 ——
+`curl` 只能证明"文件在"，证明不了"点下去真的能打开应用"。本次用 `e2e/` 里的
+Playwright 实测：中文页与英文页各两个入口都指向
+`https://heyta-tmp.litopia.space/app` 且带 `rel="noopener noreferrer"`；
+点「Use it now」→ 落在 `/app/`、`title=heyta`、`#root` 渲染出 14629 字符、
+**无 pageerror / console.error**。
+
+⚠️ 正是这一步抓到了一个 `curl` 抓不到的 bug：`appUrl()` 会去掉末尾斜杠，
+而 nginx 的 `location /app/` **不匹配** `/app` —— 点链接（而不是手输 `/app/`）
+的用户拿到的是 JSON 404。修法即 `location = /app { return 301 /app/; }`。
+
+#### 还没做的
+
+- **`heyta-tmp.litopia.space` 是临时资产**（§7.1 有清理清单）。这个入口今天是通的，
+  **不是永久的**。换永久域名时只需改 `VITE_APP_URL` 并重跑上面两组命令。
+- 从英文落地页点进去会到**默认中文**的应用（应用有自己的语言设置，页面上有
+  English 切换）—— 落地页的 locale 没有传过去。
+- 应用产物没走 CDN、没有 SRI、没有构建版本号注入；`/app/` 那段 nginx 是手工维护的。
 
 ---
 
@@ -414,7 +500,20 @@ compose 里还有一批**未在 `.env` 中设置、走默认值**的键（`HOST`
    `RUN_MIGRATIONS_ON_STARTUP=false`，`TEST_MODE=true`。它**不是**正式生产形态。
 
 连带要清的：`/etc/nginx/sites-available/heyta-tmp` + `sites-enabled` 软链 +
-`/etc/nginx/nginx.conf` 第 67 行那条**手写**的 `include`（通配不会替你删）+ `/var/www/heyta-landing/`。
+`/etc/nginx/nginx.conf` 第 67 行那条**手写**的 `include`（通配不会替你删）+
+`/var/www/heyta-app/`（`apps/web` 产物，§3.7）+ `/var/www/heyta-landing/`。
+
+⚠️ 2026-09-27 的两次变更另外留下了三个备份，清理时要一并决定去留：
+
+- `/etc/nginx/sites-available/heyta-tmp.bak-20260927T124302Z`
+- `/etc/nginx/sites-available/heyta-tmp.bak2-20260927T124707Z`
+- `/var/www/heyta-landing.bak-20260927T124628Z`
+
+（同目录下还有 30+ 个更早的 `.bak-*`，见 §7.5。）
+
+🔴 **注意这里的连带关系**：`heyta-tmp` 一清，§3.7 那个应用入口就断了，
+落地页上的「立即使用」会指向死地址。所以清理时要么同时换掉 `VITE_APP_URL`
+并重建落地页，要么把入口一起去掉 —— **不要只清一边**。
 
 ### 7.2 🔴 12km / OPP 到期的连带影响
 
