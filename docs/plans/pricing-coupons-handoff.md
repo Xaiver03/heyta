@@ -350,6 +350,16 @@ cd apps/landing && npx vitest run              # 期望 71 passed
 
 1. **接上收银台**（④⑤）—— 见第 5.1 节，`createCheckout` 已就绪，缺的是路由 + 客户端按钮。
    没有这一步，"定价策略"再对也没有一分钱收入。
+   - ✅ **已做（服务端路由）**：`POST /api/billing/checkout` ——
+     `server/src/billing/checkout.routes.ts`，`quoteOrder` → 冻结 →
+     `adapter.createCheckout` 一条链，需认证；金额只从服务端报价来，
+     通道失败时 `failOrder` 释放券名额；不可交付的档（`hosted-ai-monthly`）
+     在报价之前回 `409`。12 例测试跑真 SQL（PGlite）。
+     详见 [pricing-and-coupons.md](../reference/pricing-and-coupons.md) §7 第 18 条。
+   - ❌ **仍缺**：客户端的"付款"按钮（web + 移动端）——**没有它用户还是走不到**；
+     以及"交付"半段：webhook 路径还没有把"金额与所有 SKU 都对不上"的支付
+     交给 `settleOrderPaid`，所以用了券的单**收得上钱、授不出权益**
+     （见同文档 §7 第 9 条末尾列的 (a)(b)(c) 三件事）。
 2. **让 ¥12 可交付**（⑦⑧）
    - ✅ **已做**：`Subscription.price_id` + `grants` 列 + 迁移
      `20260929000000_add_subscription_grants`（含 `['hosting']` 回填，否则开关一打开
