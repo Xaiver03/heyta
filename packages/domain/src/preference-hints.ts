@@ -134,7 +134,16 @@ export function renderPreferenceHints(
   return hints;
 }
 
-/** 该用途下，**所有可能**出现的偏好（用于披露与测试，与实际有没有值无关）。 */
+/**
+ * 该用途下，**所有可能**出现的偏好（用于披露与测试，与实际有没有值无关）。
+ *
+ * 🔴 **零生产调用点是刻意的，不要删。**
+ *
+ * 它是给**一致性检查**用的导出：测试拿它的取值域去核对
+ * `renderPreferenceHints` 只可能吐出同一批偏好 id（`RELEVANT_PREFERENCES`
+ * 是这张表的唯一事实源）。删掉它，那条检查就只能手抄一遍清单 ——
+ * 而手抄的清单会漂移，正是这个仓库反复栽的那种形状。
+ */
 export function relevantPreferenceIds(relevance: PreferenceRelevance): readonly PreferenceId[] {
   return RELEVANT_PREFERENCES[relevance];
 }

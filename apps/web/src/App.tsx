@@ -17,6 +17,7 @@ import { useI18n, type MessageKey } from '@heyta/i18n';
 import {
   applyFeedbackCorrections,
   applyPreferenceCorrections,
+  computeFocusGaps,
   inferFeedbackPreferences,
   inferPreferences,
   presentPreferenceIds,
@@ -24,6 +25,7 @@ import {
   Quadrant,
   suppressedPreferenceIds,
   toLocalDate,
+  type MemoryOp,
 } from '@heyta/domain';
 
 /**
@@ -63,6 +65,7 @@ import {
 } from './features/settings/aiStore.js';
 import { FocusTimer } from './features/focus/FocusTimer.js';
 import { LanguageSwitcher } from './features/shell/LanguageSwitcher.js';
+import { onEngineChange, readRecentOps } from './lib/oplog.js';
 import { applyTheme, resolveInitialTheme, type Theme } from './lib/theme.js';
 
 import './styles/app.css';
@@ -159,6 +162,14 @@ export function App(): React.JSX.Element {
   const [dueDisplay, setDueDisplay] = useState<DueDisplayMode>('date');
 
   /**
+   * 记忆落差的 op 窗口（最近 `MEMORY_OP_WINDOW` 条 op）。
+   *
+   * `null` = **还读不到**（store 未就绪 / 读取失败）—— 面板据此**如实说明**
+   * "暂时算不出推迟次数"，而不是把"算不出"渲染成"推迟 0 次"。
+   */
+  const [opWindow, setOpWindow] = useState<readonly MemoryOp[] | null>(null);
+
+  /**
    * 🔴 记忆层：**每次从 op-log 派生，不落盘**（ADR-0014 §3.3）。
    *
    * 为什么在这里算而不是存起来：存了就会漂移，而漂移的"用户画像"比没有更糟。
@@ -170,6 +181,24 @@ export function App(): React.JSX.Element {
    */
   const memory = useMemo(() => {
     const offsets = { now: Date.now(), utcOffsetMinutes: -new Date().getTimezoneOffset() };
+
+    /**
+     * 🔴 「说的 vs 做的」落差 —— 记忆护城河第一次真正接到界面上。
+     *
+     * 只在**记忆开启**且**事件流已就绪**时计算：
+     *   - 关闭时连算都不算（隐私红线：不留"算了但没显示"的中间态）；
+     *   - `opWindow === null` 时传 `null`，面板据此说明"暂时算不出推迟次数"
+     *     —— 绝不能退化成"推迟 0 次"（那是编造）。
+     */
+    const focusGaps =
+      aiSettings.memoryEnabled === true && opWindow !== null
+        ? computeFocusGaps({
+            tasks: Object.values(store.entities.tasks),
+            focusSessions: Object.values(store.entities.focusSessions),
+            operations: opWindow,
+            now: offsets.now,
+          })
+        : null;
 
     const raw = inferPreferences({
       memoryEnabled: aiSettings.memoryEnabled,
@@ -198,9 +227,46 @@ export function App(): React.JSX.Element {
         kind: 'suppress' as const,
         ...(c.deletedAt === undefined ? {} : { deletedAt: c.deletedAt }),
       })),
+      focusGaps,
     };
-  }, [aiSettings.memoryEnabled, store.entities]);
+  }, [aiSettings.memoryEnabled, store.entities, opWindow]);
 
+  /**
+   * 把最近一段 op 事件流读进 state（`computeFocusGaps` 推算推迟次数必需）。
+   *
+   * 三个刻意的选择：
+   *   1. **只在记忆开启时读** —— 关闭时连读都不读，省电且不留中间态；
+   *   2. **订阅 `onEngineChange` 保持新鲜** —— 只在挂载时读一次会造成
+   *      "数据到了、界面没去看"（本仓库记过的同类 bug）；
+   *   3. **读失败不崩、也不装作成功**：`setOpWindow(null)` → 面板如实说
+   *      "暂时算不出推迟次数"。
+   */
+  useEffect(() => {
+    if (aiSettings.memoryEnabled !== true) {
+      setOpWindow(null);
+      return;
+    }
+
+    let cancelled = false;
+    const load = async (): Promise<void> => {
+      try {
+        const ops = await readRecentOps();
+        if (!cancelled) setOpWindow(ops);
+      } catch {
+        // store 尚未初始化 / IndexedDB 不可用 —— 诚实降级，绝不装作"推迟 0 次"。
+        if (!cancelled) setOpWindow(null);
+      }
+    };
+
+    void load();
+    const unsubscribe = onEngineChange(() => {
+      void load();
+    });
+    return () => {
+      cancelled = true;
+      unsubscribe();
+    };
+  }, [aiSettings.memoryEnabled]);
 
   // 主题应用到 <html data-theme>，tokens.css 的暗色覆盖挂在那里
   useEffect(() => {
@@ -575,6 +641,7 @@ export function App(): React.JSX.Element {
                   feedbackSet={memory.feedbackSet}
                   rawPresentIds={memory.rawPresentIds}
                   corrections={memory.corrections}
+                  focusGaps={memory.focusGaps}
                   onSuppress={(id) => void store.suppressPreference(id)}
                   onRestore={(id) => void store.restorePreference(id)}
                 />

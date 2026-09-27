@@ -816,6 +816,24 @@ export const en = {
   'web.memory.restore': 'Restore',
   'web.memory.footer': 'This inference happens only on this device and is never uploaded. What is sent to AI is just the one summary that the current decision needs, and you are told before it is sent.',
 
+  // ── Web · memory panel · "said vs done" gaps ──────────────
+  // 🔴 Deliberately does NOT render the Chinese sentences built by the domain
+  //    layer's `describeFocusGaps()`; the shell composes from `FocusGap` facts.
+  'web.memory.gap.title': 'Said vs done',
+  'web.memory.gap.note': 'For these tasks you set a priority, marked them important, or gave a due date, but almost no focus time went in.',
+  'web.memory.gap.empty': 'No clear gap right now - you are spending time on what matters.',
+  // Honest degradation when the store is not ready / the event log cannot be read:
+  // it must NOT pretend "postponed 0 times".
+  'web.memory.gap.unavailable': 'Postponements cannot be computed right now (the event log is unavailable), so gaps are hidden.',
+  'web.memory.gap.declared': 'Importance you declared: {declared}',
+  'web.memory.gap.focusMinutes': 'Actual focus: {minutes} min',
+  'web.memory.gap.postponed': 'Postponed {count} times',
+  // Singular sibling: the count is very often 1 ("postponed once" is the common case).
+  'web.memory.gap.postponedOne': 'Postponed {count} time',
+  'web.memory.gap.overdue': 'Overdue by {days} days',
+  // Singular sibling: "overdue by 1 day" must not read "1 days".
+  'web.memory.gap.overdueOne': 'Overdue by {days} day',
+
   // ── Web · capture composer ────────────────────────────────
   // The embedded `formatRemainingUntil()` still returns Chinese (cross-package,
   // `packages/domain` is not converted yet - plan §7.1); this pass migrates only
