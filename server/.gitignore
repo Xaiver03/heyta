@@ -3,6 +3,12 @@ dist
 data
 ./.env
 .env
+# 🔴 备份也要挡。`~/heyta/server/.env.bak-<时间戳>` 与 `.env` 同级、同样含
+#    POSTGRES_PASSWORD / JWT_SECRET，而只写 `.env` 是**匹配不到**它的
+#    （`git check-ignore` 实测 NOT IGNORED）。根 `.gitignore` 里也有 `.env.*`，
+#    这里再写一遍是为了"在哪个目录里看都看得出来这条纪律"。
+.env.*
+!.env.example
 
 # Generated from the *.template.html files at server startup
 public/privacy.html

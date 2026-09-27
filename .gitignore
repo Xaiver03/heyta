@@ -5,6 +5,9 @@ dist-types/
 # 🔴 它**不是** `dist/`，所以上面那条兜不住它 —— 忘了加这一条就会把
 # 一个 400KB+ 的压缩 bundle 提交进仓库。
 renderer-dist/
+# 桌面端打包产物（scripts/package-desktop.mjs 的输出）。
+# ⚠️ 名字叫 release/ 而不是 dist/，所以上面那些规则一条都管不到它。
+release/
 *.tsbuildinfo
 
 # 构建产物：任何层级叫 build/ 的目录都是产物，不是源码。
@@ -14,10 +17,17 @@ renderer-dist/
 # 真要提交某个 build/ 目录时，先确认它确实是源码而不是构建脚本。
 build/
 
-# 环境变量：可能含密钥，绝不入库
+# 环境变量：可能含密钥，绝不入库。
+#
+# 🔴 `.env.*` 这条通配是补的。原来只有 `.env` / `.env.local` / `.env.*.local`
+#    三条，**挡不住备份**：实测 `server/.env.bak-<时间戳>` 用 `git check-ignore`
+#    查出来是 NOT IGNORED，而它和 `.env` 一样含 POSTGRES_PASSWORD / JWT_SECRET。
+#    「改配置前先 cp 一份」是常规操作（2026-09-27 迁测试域名时就做了一次），
+#    所以这不是假想风险 —— 备份迟早会被人 `git add` 进去。
+#    ⚠️ 忽略规则**不会**让已跟踪的文件消失，所以这条只防未来。
 .env
-.env.local
-.env.*.local
+.env.*
+!.env.example
 
 # 编辑器 / 系统
 .DS_Store
