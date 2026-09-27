@@ -406,15 +406,37 @@ pnpm --filter @heyta/server pricing set-price \
    不是**钱**的端到端。改价之后"用户真的能按新价付钱"依然没验证过（见第 5 条）。
    脚本按 `tsconfig` 的 `include: ["src/**/*","scripts/**/*"]` + `rootDir: "."`
    编译到 `dist/scripts/`（已确认产物存在）。
-9. **回调用券时会被静默拒付 —— 这是接线前必须一起修的洞。**
-   `wechat.adapter.ts` 的 `verifyWebhook` 用"金额是不是价目表里的某一个"来定
-   `oneTimeGrant`，而**这一层目前是终局判定**：它给出 `oneTimeGrant: null` 之后，
-   `apply-event.ts` 把这笔事件归成 `{ status: 'ignored', reason: 'NO_SUBSCRIPTION_REFERENCE' }`。
-   于是一笔"¥5 用 ¥1 券、实付 ¥4"的**真实到账**支付会被拒绝授予权益。
-   本该接住它的 `settleOrderPaid`（比订单冻结的 `final_amount_minor`）**没有生产调用方**。
-   今天不会发生，因为还没有代码能把券带进收银台（通道未接线）——
-   但**接线时必须让权威判定只留在 `settleOrderPaid`**，这一层退化成如实上报。
-   （代码里那条曾经声称"下游会接住"的注释是**错的**，已改成这段实话。）
+9. **回调用券时会被静默拒付 —— 已修一半，"静默"这一半修掉了。**
+   `wechat.adapter.ts` 的 `verifyWebhook` 曾经用"金额是不是价目表里的某一个"来定
+   `oneTimeGrant`，而**这一层是终局判定**：它给出 `oneTimeGrant: null` 之后，
+   `apply-event.ts` 把这笔事件归成 `{ status: 'ignored', reason: 'NO_SUBSCRIPTION_REFERENCE' }`
+   —— 对一笔真实到账的支付来说那是**假话**，而且与退款 / 对账通知无法区分。
+   于是一笔"¥12 档用 ¥7 券、实付 ¥5"的**真实到账**支付会被拒绝授予权益，
+   而运维在日志里看到的是"一条被忽略的通知"。
+
+   **本轮改掉的（"静默"这一半）**：`verifyWebhook` 不再做终局判定，而是分成三种、
+   各自如实上报（`wechat.adapter.ts` 的同段注释）：
+   ① 实付 = 某一档原价 → 授予**该档**（带 `priceId` 与它的 `grants`）；
+   ② 有实付但落不到任何档位 → 不授予（fail-closed），但置
+   `requiresOrderSettlement: true`；
+   ③ 没有实付字段 → 不授予，事件类型如实标成金额不匹配。
+
+   `apply-event.ts` 相应地把 ② 归成**新原因** `REQUIRES_ORDER_SETTLEMENT`
+   （`PaymentEventIgnoreReason` 新增的一项），与 `NO_SUBSCRIPTION_REFERENCE`
+   严格区分。回归测试：`billing-apply-event.spec.ts` 的
+   「有券的支付 → REQUIRES_ORDER_SETTLEMENT，**不是** NO_SUBSCRIPTION_REFERENCE」
+   与「两个原因**必须可区分**」；adapter 侧在
+   `wechat-adapter.spec.ts` 的金额校验组里断言 `requiresOrderSettlement` 的取值，
+   并**反向**断言"没有金额字段的事件不算待结算"（否则一个空 payload 会伪装成
+   一笔待结算的支付）。
+
+   **仍然没修的（"交付"这一半）**：`settleOrderPaid` 依旧是**唯一**能做出权威判定
+   的地方（它比订单冻结的 SKU 与 `final_amount_minor`，两者都覆盖折扣），
+   而它**仍然没有生产调用方** —— 收银台路由还不存在（ADR-0017 §5）。
+   所以在接线完成之前，② 这一类支付**依然是拿不到权益的**，只是现在它
+   **响亮地**说自己拿不到，并且有一条明确的出路可查。
+   🔴 接线时必须做的：让 webhook 路径把 ② 交给 `settleOrderPaid`，
+   并把它的结论写回 `subscriptions.grants`。
 10. ~~**`failOrder` 不释放 `reserved` 名额。**~~ **已修（本轮）。**
    它现在是一个事务：先把该订单的 `reserved` 核销置 `expired`（名额放出来），
    再把订单置 `failed` —— 与 `expireStaleOrders` 同形、同样幂等。
@@ -497,6 +519,37 @@ pnpm --filter @heyta/server pricing set-price \
    所以一个不存在的脚本可以被引用很久而没人发现 —— 而它恰好是
    "遮蔽告警"的最后一个落点。`tests/pricing-cli.spec.ts` 现在对 `PRICING_COPY_SITES`
    做**存在性断言**，防止同类漂移再发生在新加的文案清单上。
+16. **订阅行以前记不住"买的是哪一档" —— 已修（本轮）。** `Subscription` 只有
+   "有没有一条活跃订阅"这一维，于是 `hosted-monthly`（¥5）与
+   `hosted-ai-monthly`（¥12）落成**同一行、完全无法区分**：用户付 ¥12 拿到的东西
+   和 ¥5 一模一样，而**没有任何代码能发现发错了货**。
+
+   改动：
+   - `subscriptions.price_id`（`String?`）+ `subscriptions.grants`（`String[]`），
+     迁移 `20260929000000_add_subscription_grants`（`prisma migrate diff` 生成，
+     CHECK 与回填手工追加）；
+   - `entitlement.ts` 新增 `evaluateCapability`：**先判订阅有效、再判能力集合**，
+     新增拒绝原因 `MISSING_GRANTS` / `GRANT_NOT_INCLUDED`；
+     `createEntitlementGuard` 增加 `capability` 选项（默认 `hosting`，
+     于是既有的托管同步闸门行为不变）；
+   - `price-book.ts` 新增 `SKU_GRANTS` / `grantsForSku`（能力属于 **SKU**，
+     不属于价格版本 —— 改价从不改变"这一档给什么"）；
+   - `check-pricing-consistency.mjs` 新增 §2b：**代码的 `SKU_GRANTS` 必须与
+     `pricing-ssot` 的 `grants` 逐档相等**。这是"交付什么"唯一的门禁。
+
+   🔴 **迁移时差点造成的断服**：`grants` 的默认值是 `ARRAY[]::TEXT[]`，
+   而已有行不会被自动回填成"有能力"。判定是 fail-closed 的，所以
+   **开关一打开，每一个已经付过钱的用户会被当场拒绝**，拒绝原因看起来像
+   "权益已过期"。迁移里显式回填 `ARRAY['hosting']`（¥12 从未上线过，
+   老行的正确投影只有 hosting）；`price_id` **刻意不回填** —— 那会编造一条
+   我们并不掌握的购买事实。回归证据：`billing-sku-grants.spec.ts` 与
+   `entitlement.spec.ts` 的 `evaluateCapability` 组。
+
+   ⚠️ **仍未接的一端**：`NormalizedPaymentEvent` 里订阅式 provider 的档位拿不到
+   （事件只带状态与周期），所以那条分支如实写"未知档位 + 不授予任何能力"。
+   今天**不可达**（微信的 `mapSubscriptionState` 明确返回 `null`），
+   但谁实现第一个订阅式 provider，谁就必须把 grants 接进来，否则每个订阅用户
+   都会被闸门拒绝，而拒绝原因看起来像"没买这一档"。
 
 ---
 

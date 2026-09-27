@@ -37,6 +37,23 @@ const ENTITLEMENT_ERROR_MESSAGE =
   'A paid subscription is required to use this hosted service.';
 
 /**
+ * 🔴 能力词表 —— "这一行能用到哪些付费能力"。
+ *
+ * 与下面**四处**同源，四处并存不是重复而是纵深：
+ * - `docs/reference/pricing-and-entitlements.md` 的 `pricing-ssot` 块（`grants`）；
+ * - `scripts/check-pricing-consistency.mjs` 的 `ALLOWED_GRANTS`（门禁）；
+ * - `prisma/schema.prisma` 里 `Subscription.grants` 的注释；
+ * - 迁移 `20260929000000_add_subscription_grants` 的
+ *   `subscriptions_grants_known` CHECK（数据库最后一道防线）。
+ *
+ * 理由很具体：词表是权益判定的基础，**拼错一个字母**（`aI` / `A1`）会让判定
+ * 静默拒绝一个已经付过钱的用户 —— 那是这类故障里最难查的一种。
+ */
+export const ENTITLEMENT_CAPABILITIES = ['hosting', 'ai'] as const;
+
+export type EntitlementCapability = (typeof ENTITLEMENT_CAPABILITIES)[number];
+
+/**
  * 判定策略。默认只有 `active` 算有效；`past_due` / `canceled` / `expired`
  * 以及任何未知状态一律视为无权益。
  *
@@ -57,6 +74,15 @@ export interface EntitlementSubscription {
   status?: string | null;
   /** epoch 毫秒；Prisma 的 `BigInt?` 列到这里就是 `bigint | null`。 */
   currentPeriodEnd?: number | bigint | null;
+  /**
+   * 这一行实际授予的能力（`Subscription.grants`，Prisma 的 `String[]`）。
+   *
+   * `null` / `undefined` 表示**读取方没有拿到这一列**（例如旧调用点只 select 了
+   * 状态与到期日）—— 那是"未知"，一律拒绝；而 `[]` 表示"确实没有任何能力"。
+   * 两者都必须 fail-closed，但原因不同（`MISSING_GRANTS` vs `GRANT_NOT_INCLUDED`），
+   * 所以不合并成一个判断。
+   */
+  grants?: readonly string[] | null;
 }
 
 /** 拒绝原因。对外可区分，写进审计与响应体。 */
@@ -66,7 +92,9 @@ export type EntitlementDenialReason =
   | 'MISSING_PERIOD_END'
   | 'INVALID_PERIOD_END'
   | 'PERIOD_ENDED'
-  | 'INVALID_NOW';
+  | 'INVALID_NOW'
+  | 'MISSING_GRANTS'
+  | 'GRANT_NOT_INCLUDED';
 
 export type EntitlementDecision =
   | { allowed: true }
@@ -145,6 +173,49 @@ export const evaluateEntitlement = (
   return { allowed: true };
 };
 
+/**
+ * 🔴 能力判定：在"订阅有效"之上再问一句"**这一项能力**有没有被买下来"。
+ *
+ * 为什么分成两个函数，而不是把 `capability` 塞进 `evaluateEntitlement`：
+ * 这是两个语义不同的问题，而且**各自都要能单独失败**。
+ * - `evaluateEntitlement` = 这条订阅此刻有效吗（状态 + 到期日）；
+ * - `evaluateCapability` = 有效的话，它的能力集合覆盖 `capability` 吗。
+ *
+ * 合成一个函数之后，"已到期"与"没买这一档"会退化成同一个原因字符串，
+ * 而运营必须区分这两件事：前者要催续费，后者是**卖了没交付**（用户付了 ¥12
+ * 却只拿到 hosting），处理方式完全不同。
+ *
+ * 顺序是刻意的：**先判有效、再判能力**。反过来写的话，一条已过期但 grants
+ * 正确的订阅会以 `allowed: true` 通过能力检查，"到期"被静默漏掉。
+ */
+export const evaluateCapability = (
+  subscription: EntitlementSubscription | null | undefined,
+  capability: EntitlementCapability,
+  now: number,
+  policy: EntitlementPolicy = DEFAULT_ENTITLEMENT_POLICY,
+): EntitlementDecision => {
+  const base = evaluateEntitlement(subscription, now, policy);
+  if (!base.allowed) {
+    return base;
+  }
+
+  // `base.allowed === true` 已保证 subscription 既非 null 也非 undefined。
+  //
+  // 🔴 必须用 `Array.isArray` 而不是只判 `== null`：字符串**也有** `includes`，
+  // 于是 `'hosting,ai'` 这种"数组被序列化成了字符串"的形态会被当成集合用，
+  // 而子串匹配会让 `includes('ai')` 返回 `true` —— 一个本该 fail-closed 的
+  // 位置变成了 fail-open。数据边界上不做类型信任。
+  const grants = subscription?.grants;
+  if (!Array.isArray(grants)) {
+    return { allowed: false, reason: 'MISSING_GRANTS' };
+  }
+  if (!grants.includes(capability)) {
+    return { allowed: false, reason: 'GRANT_NOT_INCLUDED' };
+  }
+
+  return { allowed: true };
+};
+
 /** 守卫读到的开关形状（`ServerConfig['entitlements']` 的子集）。 */
 export interface EntitlementGateConfig {
   enabled: boolean;
@@ -155,6 +226,12 @@ export interface EntitlementGuardOptions {
   gate?: EntitlementGateConfig;
   /** 判定策略。省略用 `DEFAULT_ENTITLEMENT_POLICY`。 */
   policy?: EntitlementPolicy;
+  /**
+   * 这道闸门守的是**哪一项能力**。默认 `hosting` —— 既有调用点
+   * （`sync/sync.routes.ts` 的官方托管同步）守的就是它，默认值保证那一处的
+   * 行为不变。云端 AI 的路由必须显式传 `'ai'`。
+   */
+  capability?: EntitlementCapability;
   /** 可注入时钟，便于把"到期边界"测成确定场景。默认 `Date.now`。 */
   now?: () => number;
   /** 可注入订阅读取，便于不碰数据库地单测守卫。默认查 `prisma`。 */
@@ -189,6 +266,7 @@ export const createEntitlementGuard = (
 ): EntitlementGuard => {
   const gate = options.gate ?? loadConfigFromEnv().entitlements;
   const policy = options.policy ?? DEFAULT_ENTITLEMENT_POLICY;
+  const capability = options.capability ?? 'hosting';
   const now = options.now ?? Date.now;
   const loadSubscription = options.loadSubscription ?? defaultLoadSubscription;
 
@@ -200,7 +278,10 @@ export const createEntitlementGuard = (
 
     const user = getAuthUser(req);
     const subscription = await loadSubscription(user.userId);
-    const decision = evaluateEntitlement(subscription, now(), policy);
+    // 🔴 走 `evaluateCapability` 而不是 `evaluateEntitlement`：只有前者的判据里
+    // 包含"这一行到底授予了哪几项能力"。用后者的话，¥5 的用户与 ¥12 的用户
+    // 会被判成同一件事 —— 那正是本轮要修掉的"两档不可分"。
+    const decision = evaluateCapability(subscription, capability, now(), policy);
     if (decision.allowed) {
       return;
     }
@@ -210,6 +291,9 @@ export const createEntitlementGuard = (
       userId: user.userId,
       errorCode: ENTITLEMENT_ERROR_CODE,
       reason: decision.reason,
+      // 把"守的是哪一项能力"一起记下来：同一个 402 在 hosting 与 ai 上的
+      // 含义完全不同，而响应体里的 reason 不足以区分（运维要查日志）。
+      capability,
       ip: req.ip,
     });
 

@@ -17,7 +17,7 @@
  * 本函数**不做验签、不做去重**：验签在 adapter 里，去重在 webhook 路由的
  * `(provider, providerEventId)` 唯一约束里。调用本函数时事件已经通过那两道闸。
  */
-import type { NormalizedPaymentEvent, SubscriptionStatus } from './types';
+import type { NormalizedPaymentEvent, OneTimeGrant, SubscriptionStatus } from './types';
 import type { ExtendSubscriptionPeriodInput } from '@heyta/domain';
 
 /** 应用结果。审计日志按它区分"真改了"与"看过但没动"。 */
@@ -30,7 +30,14 @@ export type PaymentEventIgnoreReason =
   | 'NO_SUBSCRIPTION_REFERENCE'
   | 'NO_SUBSCRIPTION_STATE'
   | 'NO_USER_REFERENCE'
-  | 'INVALID_OCCURRED_AT';
+  | 'INVALID_OCCURRED_AT'
+  /**
+   * 🔴 **观察到了一笔真钱，但推不出它买的是哪一档**（用券打折后的实付金额
+   * 落不到任何档位原价上）。不授予是刻意的（fail-closed），但它**不是
+   * "无事发生"**：需要拿订单上冻结的 SKU 与实付去做权威结算
+   * （`settleOrderPaid`）。见 `docs/reference/pricing-and-coupons.md` §7 第 9 条。
+   */
+  | 'REQUIRES_ORDER_SETTLEMENT';
 
 /** 既有订阅行的最小形状（Prisma 行是它的超集）。 */
 export interface ExistingSubscription {
@@ -52,6 +59,23 @@ export interface SubscriptionWrite {
   readonly externalSubscriptionId: string | null;
   readonly status: SubscriptionStatus;
   readonly currentPeriodEnd: number | null;
+  /**
+   * 🔴 买的是哪一档（SKU id）。一次性支付路径会写它；订阅式 provider 目前
+   * 拿不到档位，写 `null`（"未知"）。判定**不看**这一列，它只用于追溯与运营。
+   */
+  readonly priceId: string | null;
+  /**
+   * 🔴 这一行实际授予的能力（`hosting` / `ai`）。**权益判定唯一看的就是它。**
+   *
+   * 语义是**替换**而不是并集：一次支付把这一行的能力集合设成**这次买的那一档**
+   * 的能力。降级（先买 ¥12、后买 ¥5）会立即生效 —— 因为"一行订阅只有一个到期日"，
+   * 拆不出两个并行的档位。并集是**更坏**的那个选择：它会让"降级"永远不生效，
+   * 于是用户付 ¥5 却一直用着 ¥12 的能力。
+   *
+   * 类型是可变数组（不是 `readonly`），因为它会被原样交给 Prisma 的
+   * `String[]` 列 —— 只读数组在那里过不了类型。
+   */
+  readonly grants: string[];
   readonly lastEventAt: number;
   readonly updatedAt: number;
 }
@@ -122,7 +146,7 @@ const toEpochMillis = (value: unknown): number | undefined => {
 const applyOneTimeGrant = async (
   event: NormalizedPaymentEvent,
   deps: ApplyPaymentEventDeps,
-  periodDays: number,
+  grant: OneTimeGrant,
 ): Promise<PaymentEventApplyOutcome> => {
   const occurredAt = toEpochMillis(event.occurredAt);
   if (occurredAt === undefined) {
@@ -148,7 +172,7 @@ const applyOneTimeGrant = async (
   const currentPeriodEnd =
     existing === null ? null : (toEpochMillis(existing.currentPeriodEnd) ?? null);
 
-  const nextPeriodEnd = deps.extendPeriod({ now, currentPeriodEnd, days: periodDays });
+  const nextPeriodEnd = deps.extendPeriod({ now, currentPeriodEnd, days: grant.periodDays });
 
   const write: SubscriptionWrite = {
     provider: event.provider,
@@ -156,6 +180,13 @@ const applyOneTimeGrant = async (
     externalSubscriptionId: null,
     status: 'active',
     currentPeriodEnd: nextPeriodEnd,
+    // 🔴 档位与能力**必须一起写**。只写到期日的话，¥5 与 ¥12 会落成完全一样的行 ——
+    // 用户付 ¥12 拿到的东西和 ¥5 一模一样，而没有任何代码能发现。
+    // 未知档位如实写 `null`（不是编一个），能力则如实写 adapter 投影出来的那一组。
+    priceId: grant.priceId,
+    // 复制一份可变数组：`OneTimeGrant.grants` 是只读的（它来自价目表的常量），
+    // 而 Prisma 的 `String[]` 列收的是可变数组。
+    grants: [...grant.grants],
     lastEventAt: occurredAt,
     updatedAt: now,
   };
@@ -184,7 +215,16 @@ export const applyPaymentEvent = async (
     // "没有订阅引用"推断：退款 / 对账通知同样没有订阅引用，而它们**不该发权益**。
     // 把推断写进通用层等于让任何这类事件都变成"发一年"。
     if (event.oneTimeGrant != null) {
-      return applyOneTimeGrant(event, deps, event.oneTimeGrant.periodDays);
+      return applyOneTimeGrant(event, deps, event.oneTimeGrant);
+    }
+    // 🔴 "有一笔真钱，但推不出它买的是哪一档" —— 与下面那条**必须分开**。
+    // 典型来源：用券打折后的实付金额落不到任何档位原价上。
+    // 归成 `NO_SUBSCRIPTION_REFERENCE` 对一笔真实到账的支付是**假话**，
+    // 而且它与退款 / 对账通知无法区分，运维在日志里看不到"有一笔钱没交付权益"。
+    // 这里仍然**不授予**（fail-closed，金额推不出档位），但原因如实、可查。
+    // 权威判定属于 `settleOrderPaid`（比订单冻结的 SKU 与实付）。
+    if (event.requiresOrderSettlement === true) {
+      return { status: 'ignored', reason: 'REQUIRES_ORDER_SETTLEMENT' };
     }
     // 没有声明授予语义的事件：记进 `payment_events` 审计，但不动权益。
     return { status: 'ignored', reason: 'NO_SUBSCRIPTION_REFERENCE' };
@@ -207,6 +247,21 @@ export const applyPaymentEvent = async (
     externalSubscriptionId: event.externalSubscriptionId,
     status: event.status,
     currentPeriodEnd: event.currentPeriodEnd,
+    // 🔴 订阅式 provider 的档位**目前拿不到**：归一化事件里没有 SKU
+    // （`NormalizedPaymentEvent` 只带订阅状态与周期），而 provider 选型本身
+    // 还是未决的（`docs/plans/subscription-provider-selection.md`）。
+    //
+    // ⚠️ 所以这里如实写"未知档位 + 不授予任何能力"，而**不是**猜一个
+    // `['hosting']`。后果是 fail-closed：这条路径上的用户会拿到
+    // `GRANT_NOT_INCLUDED`。这在本仓库里**今天是不可达的** ——
+    // 唯一实现的 provider（微信）的 `mapSubscriptionState` 明确返回 `null`，
+    // 事件永远带不上 `status`，因此在上面就返回了 `NO_SUBSCRIPTION_STATE`。
+    //
+    // 🔴 谁实现第一个订阅式 provider，谁就必须把 grants 接进来
+    // （给 `NormalizedPaymentEvent` 加一个与 `oneTimeGrant` 并列的授予声明），
+    // 否则每一个订阅用户都会被闸门拒绝，而拒绝原因看起来像"没买这一档"。
+    priceId: null,
+    grants: [],
     lastEventAt: occurredAt,
     updatedAt: now,
   };

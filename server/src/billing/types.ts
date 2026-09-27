@@ -122,7 +122,46 @@ export interface NormalizedPaymentEvent {
    * `(userId, provider)` 那一行的到期日按
    * `max(now, 已有到期日 ?? now) + periodDays` 叠加。
    */
-  readonly oneTimeGrant?: { readonly periodDays: number } | null;
+  readonly oneTimeGrant?: OneTimeGrant | null;
+  /**
+   * 🔴 **这是一笔真钱，但 adapter 无法从金额判断它买的是哪一档。**
+   *
+   * 什么时候会置位：金额不在价目表上时（典型来源是**用券打折后的实付**，
+   * 例如 ¥12 档用 ¥7 券 → 实付 ¥5，而 ¥5 恰好是另一档的原价）。
+   *
+   * 为什么必须把它和"没有授予语义的事件"分开：两者以前都返回
+   * `oneTimeGrant: null`，于是 `apply-event.ts` 把它们**归成同一个原因**
+   * `NO_SUBSCRIPTION_REFERENCE` —— 那对一笔真实到账的支付是**假话**，
+   * 而且它与退款 / 对账通知无法区分。运维在日志里看到的只会是
+   * "一笔被忽略的通知"，而不是"有一笔钱没能交付权益"。
+   *
+   * 🔴 置位时**不授予**（fail-closed），因为金额推不出档位；权威判定只能拿
+   * **订单上冻结的** `final_amount_minor` 与 SKU 来做（`settleOrderPaid`）。
+   * 见 `docs/reference/pricing-and-coupons.md` §7 第 9 条。
+   */
+  readonly requiresOrderSettlement?: boolean;
+}
+
+/**
+ * 一次性支付的授予声明。由"没有订阅对象"的 provider（微信）给出。
+ *
+ * 🔴 **档位与能力必须一起带下来**，不能只带天数。只有天数的话，
+ * `hosted-monthly`（¥5）与 `hosted-ai-monthly`（¥12）会写进**同一行订阅**、
+ * 得到完全一样的结果 —— 用户付 ¥12 拿到 ¥5 的东西，且没有任何代码能发现。
+ */
+export interface OneTimeGrant {
+  /** 授予天数。 */
+  readonly periodDays: number;
+  /**
+   * 买的是哪一档（SKU id）。`null` = adapter 不知道 —— 判定走 `grants`，不走它。
+   */
+  readonly priceId: string | null;
+  /**
+   * 这一档授予的能力（`hosting` / `ai`），由 adapter 从**价目表**投影而来：
+   * 金额 → 档位 → 能力的映射只有它知道。落到订阅行之后，权益判定就再也
+   * 不需要价目表了（这正是那一列存在的理由）。
+   */
+  readonly grants: readonly string[];
 }
 
 /**

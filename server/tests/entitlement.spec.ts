@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   DEFAULT_ENTITLEMENT_POLICY,
+  evaluateCapability,
   evaluateEntitlement,
 } from '../src/entitlement';
 
@@ -196,6 +197,113 @@ describe('evaluateEntitlement', () => {
           NOW,
         ),
       ).not.toThrow();
+    }
+  });
+});
+
+/**
+ * 能力判定：在"订阅有效"之上再问一句"**这一项能力**有没有买下来"。
+ *
+ * 这一层存在之前，判定的全部内容就是"有没有一条活跃订阅" —— 于是 ¥5 与 ¥12
+ * 在代码里不可区分，用户付 ¥12 拿到和 ¥5 一样的东西。这一组测试就是
+ * "两档真的分了"的证据。
+ */
+describe('evaluateCapability', () => {
+  const NOW = 1_700_000_000_000;
+  const live = (grants: readonly string[] | null) => ({
+    status: 'active',
+    currentPeriodEnd: NOW + 86_400_000,
+    grants,
+  });
+
+  it('买的是 ¥5（只有 hosting）→ HostedSync 放行、AI 拒绝', () => {
+    expect(evaluateCapability(live(['hosting']), 'hosting', NOW)).toEqual({ allowed: true });
+    expect(evaluateCapability(live(['hosting']), 'ai', NOW)).toEqual({
+      allowed: false,
+      reason: 'GRANT_NOT_INCLUDED',
+    });
+  });
+
+  it('买的是 ¥12（hosting + ai）→ 两项都放行', () => {
+    for (const capability of ['hosting', 'ai'] as const) {
+      expect(evaluateCapability(live(['hosting', 'ai']), capability, NOW)).toEqual({
+        allowed: true,
+      });
+    }
+  });
+
+  it('🔴 顺序：订阅无效时**先**报订阅的原因，不会因为 grants 齐全就放行', () => {
+    // 反过来写的话（先看 grants 再看有效期），一条已过期但 grants 正确的订阅
+    // 会以 allowed:true 通过 —— "到期"被静默漏掉。这是最贵的一类顺序错误。
+    const expiredButGranted = {
+      status: 'active',
+      currentPeriodEnd: NOW - 1,
+      grants: ['hosting', 'ai'],
+    };
+    expect(evaluateCapability(expiredButGranted, 'ai', NOW)).toEqual({
+      allowed: false,
+      reason: 'PERIOD_ENDED',
+    });
+    expect(evaluateCapability(null, 'ai', NOW)).toEqual({
+      allowed: false,
+      reason: 'NO_SUBSCRIPTION',
+    });
+  });
+
+  it('🔴 `[]` 与 `null` 都拒绝，但原因不同', () => {
+    // `[]` = 这一行确实没有任何能力（也是老行的默认值）；
+    // `null`/`undefined` = 读取方没拿到这一列（部署或 select 写错）。
+    expect(evaluateCapability(live([]), 'hosting', NOW)).toEqual({
+      allowed: false,
+      reason: 'GRANT_NOT_INCLUDED',
+    });
+    expect(evaluateCapability(live(null), 'hosting', NOW)).toEqual({
+      allowed: false,
+      reason: 'MISSING_GRANTS',
+    });
+    expect(
+      evaluateCapability({ status: 'active', currentPeriodEnd: NOW + 1 }, 'hosting', NOW),
+    ).toEqual({ allowed: false, reason: 'MISSING_GRANTS' });
+  });
+
+  it('能力集合里出现未知词 → 不匹配任何已知能力（不因为"有东西"就放行）', () => {
+    expect(evaluateCapability(live(['hosting', 'A1']), 'ai', NOW)).toEqual({
+      allowed: false,
+      reason: 'GRANT_NOT_INCLUDED',
+    });
+    // 但已知的那一项不受影响 —— 一个拼错的词不该拖垮整行。
+    expect(evaluateCapability(live(['hosting', 'A1']), 'hosting', NOW)).toEqual({
+      allowed: true,
+    });
+  });
+
+  it('🔴 非数组的 grants 一律按 MISSING_GRANTS 拒绝 —— 字符串的 `includes` 是子串匹配', () => {
+    // 这一条防的是一个**具体的 fail-open**：字符串也有 `includes`，于是
+    // `'hosting,ai'` 会被当集合用，而 `'hosting,ai'.includes('ai')` 是 `true`。
+    // 判定必须拒绝，而不是"看起来能用"。
+    const hostile = [
+      { status: 'active', currentPeriodEnd: NOW + 1, grants: 'hosting,ai' },
+      { status: 'active', currentPeriodEnd: NOW + 1, grants: 'ai' },
+      { status: 'active', currentPeriodEnd: NOW + 1, grants: 42 },
+      { status: 'active', currentPeriodEnd: NOW + 1, grants: { 0: 'ai', length: 1 } },
+    ];
+    for (const value of hostile) {
+      // 不抛异常……
+      expect(() =>
+        evaluateCapability(
+          value as unknown as Parameters<typeof evaluateCapability>[0],
+          'ai',
+          NOW,
+        ),
+      ).not.toThrow();
+      // ……并且**明确拒绝**（只是"不抛"是不够的：fail-open 也不抛）。
+      expect(
+        evaluateCapability(
+          value as unknown as Parameters<typeof evaluateCapability>[0],
+          'ai',
+          NOW,
+        ),
+      ).toEqual({ allowed: false, reason: 'MISSING_GRANTS' });
     }
   });
 });

@@ -260,6 +260,9 @@ describe('entitlement gate on sync routes', () => {
       mocks.prisma.subscription.findFirst.mockResolvedValue({
         status: 'active',
         currentPeriodEnd: BigInt(Date.now() + 86_400_000),
+        // 🔴 `grants` 现在是判定的**必要**一维：这条同步闸门守的是 `hosting`，
+        // 所以夹具必须声明拥有它。少了这一行就是 `MISSING_GRANTS`（下面有专测）。
+        grants: ['hosting'],
       });
 
       await buildApp();
@@ -269,6 +272,54 @@ describe('entitlement gate on sync routes', () => {
       expect(response.json().results[0].accepted).toBe(true);
       expect(mocks.syncService.uploadOps).toHaveBeenCalledOnce();
       expect(auditSpy).not.toHaveBeenCalled();
+    });
+
+    it('🔴 只买了 `ai` 的订阅**不能**用托管同步：档位真的分了', async () => {
+      // 这条就是本轮要证明的东西。`hosted-ai-monthly` 的 grants 是
+      // `['hosting','ai']`，所以现实里不会出现"只有 ai"—— 但夹具故意造出这个
+      // 形状，才说明判定读的**确实是 `grants` 这一维**，而不是"有活跃订阅就放行"。
+      mocks.prisma.subscription.findFirst.mockResolvedValue({
+        status: 'active',
+        currentPeriodEnd: BigInt(Date.now() + 86_400_000),
+        grants: ['ai'],
+      });
+
+      await buildApp();
+      const response = await injectOp();
+
+      expect(response.statusCode).toBe(402);
+      expect(response.json().reason).toBe('GRANT_NOT_INCLUDED');
+      expect(mocks.syncService.uploadOps).not.toHaveBeenCalled();
+    });
+
+    it('🔴 grants 为空 → 拒绝（默认值 `[]` 绝不等于"全部能力"）', async () => {
+      mocks.prisma.subscription.findFirst.mockResolvedValue({
+        status: 'active',
+        currentPeriodEnd: BigInt(Date.now() + 86_400_000),
+        grants: [],
+      });
+
+      await buildApp();
+      const response = await injectOp();
+
+      expect(response.statusCode).toBe(402);
+      expect(response.json().reason).toBe('GRANT_NOT_INCLUDED');
+    });
+
+    it('🔴 读取方没拿到 grants（null）→ MISSING_GRANTS，与"确定没有能力"分开', async () => {
+      mocks.prisma.subscription.findFirst.mockResolvedValue({
+        status: 'active',
+        currentPeriodEnd: BigInt(Date.now() + 86_400_000),
+        grants: null,
+      });
+
+      await buildApp();
+      const response = await injectOp();
+
+      expect(response.statusCode).toBe(402);
+      // 两者都 fail-closed，但原因必须可区分：`null` 是"我们没读到这一列"
+      // （部署 / select 写错），`[]` 是"这一行确实没有能力"。
+      expect(response.json().reason).toBe('MISSING_GRANTS');
     });
 
     it('rejects an expired subscription with reason PERIOD_ENDED', async () => {
