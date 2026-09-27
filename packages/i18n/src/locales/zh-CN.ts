@@ -86,25 +86,35 @@ export const zhCN = {
   'landing.quadrant.dropHere': '拖任务到这里',
 
   // ── 落地页 · 英雄区 ───────────────────────────────────────
-  'landing.hero.eyebrow': '本地优先 · 端到端加密 · 可自建',
+  // 🔴 首屏只讲**大众能感知的结果**。端到端加密 / 自建 / 本地优先这些
+  // 是开发者的决策依据，不是大众的购买理由 —— 它们归 Privacy 与 SelfHost 两节
+  // （那是愿意往下读的人才会到的地方）。首屏讲错话，大众看不到第二节。
+  'landing.hero.eyebrow': '任务 · 清单 · 习惯 · 专注',
   // 标题里的强调部分是独立词条：`<em>` 的边界不能靠翻译字符串里的标记来猜。
-  'landing.hero.titleLead': '任务管理，',
-  'landing.hero.titleEmphasis': '数据归你',
-  'landing.hero.lede': '数据先落本地，服务端看不到明文；也可以完全跑在你自己的服务器上。',
-  'landing.hero.ctaShowcase': '看看真实界面',
+  'landing.hero.titleLead': '今天该做什么，',
+  'landing.hero.titleEmphasis': '一眼看见',
+  'landing.hero.lede': '想到什么先记下来，它替你理清先后。任务、清单、习惯、专注打卡都在一处；手机上记一句，电脑上接着做。',
+  'landing.hero.ctaShowcase': '看看它长什么样',
+  // 主 CTA 指向界面、次 CTA 指向价格 —— 大众先想「好不好用」「多少钱」，
+  // 而不是「我怎么自建」。自建的入口留在 SelfHost 一节和底部。
+  'landing.hero.ctaPricing': '看价格',
   'landing.hero.floatSynced': '已同步到 3 台设备',
   'landing.hero.floatOffline': '离线照常可用',
 
   // ── 落地页 · 事实条 ───────────────────────────────────────
   'landing.facts.ariaLabel': '产品事实',
-  'landing.facts.local.value': '本地',
-  'landing.facts.local.label': '数据先写本机，云端只是同步通道，不是事实源',
-  'landing.facts.cipher.value': '密文',
-  'landing.facts.cipher.label': '加密在客户端完成，服务端强制校验且没有开关可关',
-  'landing.facts.mit.value': 'MIT 许可',
-  'landing.facts.mit.label': '许可证宽松，全部第三方依赖逐项登记、可审计',
-  'landing.facts.selfhost.value': '自建',
-  'landing.facts.selfhost.label': '一条命令起自己的服务端，不用把数据交给别人',
+  // 事实条紧跟在首屏后面，所以它也必须先是**大众能用的理由**。
+  // MIT 许可与「一条命令自建」挪进了 Footer 与 SelfHost —— 那里的读者才关心。
+  // ⚠️ 加密那条**只承诺同步通道**：一旦开了云端 AI，内容是要明文出境的，
+  // 所以这里不能写成笼统的「只有你能看」。
+  'landing.facts.offline.value': '离线',
+  'landing.facts.offline.label': '断网照常记，连上自动补传',
+  'landing.facts.devices.value': '不限设备',
+  'landing.facts.devices.label': '自建永久免费，设备数不封顶、不校验时长',
+  'landing.facts.encrypted.value': '加密同步',
+  'landing.facts.encrypted.label': '任务加密后才上传，同步通道读不出内容',
+  'landing.facts.oneData.value': '一套数据',
+  'landing.facts.oneData.label': '清单、四象限、习惯、专注共用同一份数据，不是几个 App 拼起来',
 
   // ── 落地页 · 能力（bento）─────────────────────────────────
   'landing.capabilities.title': '订阅制把六件事打包卖，我们把它拆开重做',
@@ -164,7 +174,7 @@ export const zhCN = {
   'landing.selfhost.sourcePending': '源码尚未公开，所以第一行的仓库地址先留成占位符。公开之后那一行原样就能执行，照后两条走完即可自建。',
 
   // ── 落地页 · 价格 ─────────────────────────────────────────
-  // 🔴 这里的两个价格必须与 server 的价目表、法务文本一致 ——
+  // 🔴 这里的价格必须与 server 的价目表、两份法务文本一致 ——
   // `scripts/check-pricing-consistency.mjs` 会读这些词条并断言三方一致。
   // 改价时先读 docs/reference/pricing-and-entitlements.md（三层唯一事实源）。
   'landing.pricing.ariaLabel': '价格与权益',
@@ -187,6 +197,7 @@ export const zhCN = {
   'landing.pricing.hosted.body': '我们替你运维那台中继。数据照旧是密文，我们仍然打不开。',
   'landing.pricing.hosted.feature1': '全部功能，与自建完全一致',
   'landing.pricing.hosted.feature2': '多设备之间自动同步',
+  'landing.pricing.hosted.cta': '即将开放',
   'landing.pricing.hosted.feature3': '服务端记录完整保留，到期也不删',
   'landing.pricing.hostedAi.name': '官方托管 + 云端 AI',
   'landing.pricing.hostedAi.priceCny': '¥12 / 月',
@@ -198,7 +209,6 @@ export const zhCN = {
   'landing.pricing.hostedAi.feature2': '云端 AI，每月 300 次',
   'landing.pricing.hostedAi.feature3': '自带端点的 AI 不受影响，仍然免费、不限次',
   'landing.pricing.hostedAi.cta': '即将开放',
-  'landing.pricing.hosted.cta': '即将开放',
   'landing.pricing.statusNote': '收银台还没接完线：大陆与海外的支付通道都在等支付商资质，现在还不能下单。',
 
   // ── 落地页 · 收尾 CTA ─────────────────────────────────────
