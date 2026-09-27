@@ -445,7 +445,42 @@ Web 设置页有「导出数据」（JSON 完整保真 / 任务清单 Markdown�
   📌 **教训（已写进 `AGENTS.md` §7 与部署手册）**：对服务端渲染页面引用的每个资源，
   验收必须断言 **`Content-Type` 和内容开头**，不能只断言 `200`。
   这一类"200 但内容是别的页面"的谎，只看状态码的门禁**结构上抓不到**。
-  ⚠️ 仍然**没有做**的：**用户主动增删凭据**（没有 UI，也没有端点）。
+  ✅ **用户主动增删凭据已做**（2026-09-28，`af47fd4`）。原来这句写的是
+  "没有 UI，也没有端点" —— 两句现在都不成立了：
+  - **端点**：`GET /api/passkeys`（列表）与 `DELETE /api/passkeys/:id`；
+  - **服务层**：`listUserPasskeys` / `deleteUserPasskey`（`server/src/passkey.ts`）；
+  - **app-host**：`listPasskeys` / `deletePasskey` / `passkeyDeletePath`（语义只在这一层）；
+  - **Web**：设置页账号安全区的 `PasskeyPanel`（两段式删除）；
+  - **i18n**：中英各新增 23 条。
+
+  **四条安全边界都有能失败的测试**：未认证 → 401（且断言 `deleteMany` 与 `$transaction`
+  都**没被调用**）；删别人的 → **404**（`not.toBe(403)`），且响应体与"删一个根本不存在的 id"
+  **逐字节相同**（这是"不泄露存在性"唯一能失败得起来的写法）；删最后一条 → **409** +
+  `last_passkey_required` 且不是成功；列表响应体断言不含 `publicKey` / `credentialId`，
+  且返回键集合就是 `createdAt / id / lastUsedAt`。
+
+  🔴 **"删除最后一条"的守卫是原子的**（写在 `deleteMany` 的 `where` 里，而不是先查后删）——
+  它是**唯一的 TOCTOU 防护**：没有它，两个标签页各自删一条会让账号**一条都不剩**。
+  ⚠️ **这条守卫差一点就没有测试**：第一版"删最后一条"用例把 `deleteMany` 桩成 `count: 0`，
+  只覆盖到分支、**没覆盖谓词**；实测把守卫整行删掉两个 spec **全绿**。
+  补上"断言 `deleteMany` 实际收到的 `where`"之后才转红（补断言前删谓词 = 绿；
+  补后 = `1 failed | 11 passed`；还原 = 22 passed）。旁证：删 `userId` 的变异**当时就是红的**，
+  说明只有这一处是缺口。
+
+  ⚠️ **没做改名**：`Passkey` 表没有 `name` 列，加一列要一次 DB 迁移 —— 本轮不做，
+  **也没有**为此造一个假名字段（理由写在 `passkey.ts` 注释里）。
+
+  ✅ **"陈旧凭据"与"验签失败"现在是两个可区分的错误**（同一提交）：服务端已不认得这条凭据
+  → `code: 'passkey_not_found'`；认得但断言没验过 → `code: 'passkey_verification_failed'`。
+  两者 `message` 刻意同样笼统，判别**只靠 `code`**；app-host 映射成两个 reason，
+  两个壳各用**两句不同的话**渲染。测试断言两个 code **不同**，且都不是笼统的
+  `'Authentication failed'`。
+  📌 **泄露取舍**（写在 `/login/passkey/verify` 旁）：该端点未认证，`passkey_not_found` 确实是
+  一个**以"已知 credential ID"为键的存在性预言机**；选择暴露的理由是 credential ID 本非秘密
+  （每次登录明文出现在断言响应里）、32 字节随机不可枚举，且用户正是在**登录失败那一刻**
+  需要这句判别。`SAFE_ERROR_MESSAGES` **没有**被放宽。
+  📌 **没有为"拒绝删除最后一条凭据"这个新产品决定立 ADR** —— 目前只落在代码注释与测试里；
+  它够格单独一份 ADR，但这是需要人来拍的取舍。
 - **回收站的跨设备一致性没有被真正验证**：op 级证明用的是两个真引擎 + 两个真 SQLite，**没有**跑真实的两客户端服务端收敛。
 - ✅ **导入 / 还原已做**（`packages/app-host/src/import-dump.ts`，CLI 与 Web 都有入口）：走**重放导出里的完整 op-log**，
   所以墓碑语义天然保持（已删数据不复活），并且**只支持还原到空库** —— 目标非空时在写任何东西**之前**就拒绝。
@@ -518,12 +553,23 @@ Web 设置页有「导出数据」（JSON 完整保真 / 任务清单 Markdown�
 - ✅ **`check:ai-e2e` 现在全绿：26 passed，exit 0**（2026-09-28 实测）。两条桌面端用例
   （开发构建 + `release/heyta-darwin-arm64` 的打包 `.app`）都真的打开窗口、画出共享 UI；
   渲染进程崩溃由并行会话的**单实例锁**修复收口（`616b050`）。
+  ⚠️ **但 `apps/web` 的全量套件在 HEAD 上是红的**（2026-09-28 实测，**不是** 16 个门禁的一部分，
+  所以上面那句"全部绿"仍然成立）：`12 failed | 29 passed | 2 skipped` /
+  `89 failed | 596 passed | 12 skipped`，失败**全部**是
+  `ReferenceError: Worker is not defined` @ `apps/web/src/lib/oplog.ts:101`。
+  根因是并行会话当天 00:44 提交的 `71594d5`（M4-3b：web 存储默认切到 **Worker 里的 SQLite**）——
+  `oplog.ts` 现在在**模块作用域**构造 `new Worker(...)`，而 vitest/jsdom 里没有 `Worker` 全局。
+  12 个失败文件全是存储相关（`store` / `stores` / `trash` / `export-panel` / `import-panel` /
+  `app-mount` …）；与该提交无关的 spec 单独跑是绿的。
+  📌 **教训**：把"宿主环境才有的全局"（`Worker`、`indexedDB`……）用在**模块作用域**，
+  会让**整包测试**在无关改动里一起红，而且报错信息只说缺哪个全局、不说这是环境缺 polyfill。
+  需要并行会话在 vitest setup 里补 `Worker` 替身（或把构造推迟到首次使用）。
 - 🔴 **全量 `pnpm check` 仍未跑通**：它会触发 `prisma generate` 而沙箱报 EPERM（`utime` 在
   `~/.cache/prisma/.../libquery_engine`）。**但逐个跑过 16 个 `check:*`，全部绿**（外加 `check:ai-e2e` 26 passed）：
   `migrations / layering / widgets / ui-language / licenses / docs / pricing / ai-quota / payment-entry /
   materialized-reads / design / tokens / ai-coverage / arkts / native-deps / mobile-bundle`。
   卡点只在 `pretest` 里的 `prisma generate`，不在测试本身 —— 直接
-  `pnpm --filter @heyta/sync-server exec vitest run` 可以完整跑（**1474 passed / 1 skipped**，exit 0）。
+  `pnpm --filter @heyta/sync-server exec vitest run` 可以完整跑（**1518 passed / 1 skipped**，exit 0）。
 - **billing 的退款侧：从今以后是「有意不做」，不是「忘了接」**（ADR-0026，
   `docs/adr/0026-refund-side-entitlement-revocation-not-implemented.md`）。
   `reverseOrderOnRefund` 继续**零生产调用方**，退款事件继续在 `unsupported-event-type` 被拒 ——
