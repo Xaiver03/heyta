@@ -344,6 +344,92 @@ Playwright 实测：中文页与英文页各两个入口都指向
   English 切换）—— 落地页的 locale 没有传过去。
 - 应用产物没走 CDN、没有 SRI、没有构建版本号注入；`/app/` 那段 nginx 是手工维护的。
 
+### 3.8 服务端镜像（`supersync`）的重建 —— 2026-09-27 首次在本机完成
+
+服务端**不是**静态产物，改动 `server/` 必须重建镜像并换容器。步骤与两个实测陷阱：
+
+```bash
+# 1) 本机：只打包 Dockerfile 真正 COPY 的路径（整个仓库太大，且有 gitignore 的 research/upstream）
+#    ⚠️ packages/domain 与 tsconfig.base.json **必须在列**，见下面的第 3、4 条
+git archive --format=tar.gz -o /tmp/heyta-server-src.tar.gz HEAD \
+  pnpm-workspace.yaml package.json pnpm-lock.yaml tsconfig.base.json \
+  packages/sync-core packages/shared-schema packages/domain server
+scp /tmp/heyta-server-src.tar.gz ubuntu-jcli:/tmp/
+ssh ubuntu-jcli 'cd ~/heyta && tar xzf /tmp/heyta-server-src.tar.gz'   # .env 不在归档里，会被保留
+
+# 2) 主机：🔴 两个镜像源都不能省（见下）
+ssh ubuntu-jcli 'cd ~/heyta/server && \
+  APK_MIRROR=mirrors.aliyun.com NPM_REGISTRY=https://registry.npmmirror.com sudo -E docker compose \
+    -f docker-compose.yml -f docker-compose.build.yml build supersync'
+
+# 3) 主机：跑迁移 + 换容器（deploy.sh 会先迁移、成功后才切，失败时旧容器继续服务）
+ssh ubuntu-jcli 'cd ~/heyta/server && \
+  APK_MIRROR=mirrors.aliyun.com NPM_REGISTRY=https://registry.npmmirror.com \
+  sudo -E ./scripts/deploy.sh --build'
+```
+
+> 第 3 步要**带上和第 2 步一样的两个变量**：`deploy.sh --build` 会再跑一次
+> `docker compose build`，变量不一致就是不同的 ARG ⇒ **缓存全废、重头再建一遍**。
+
+- 🔴 **`APK_MIRROR` 不设会永久挂住，而且看起来像"在编译"**。这台主机**连不上
+  `dl-cdn.alpinelinux.org`**（实测超时无响应；`mirrors.aliyun.com` 0.26s 返回 200），
+  而 `apk add` 不设超时 ⇒ `docker compose build` 卡在 `RUN apk add` 且**零输出**。
+  实测挂满 40 分钟无任何进展。`server/Dockerfile` 与 `docker-compose.build.yml` 现在把它做成了
+  构建参数，**默认仍是官方 CDN**（别处的自建者行为不变）。
+- 🔴 **`NPM_REGISTRY` 同理，而且它有个更坏的坑**：光是把它当**环境变量**传是**没用的** ——
+  pnpm 会忽略 `npm_config_registry`，照旧从 `registry.npmjs.org` 取包并超时
+  （构建日志里命令打印得完全正确，只有 URL 出卖了它）。`server/Dockerfile` 现在用
+  `pnpm config set registry "$NPM_REGISTRY"`。详见 `AGENTS.md` §7 第 74 条。
+- 🔴 **镜像里原来根本没有 `packages/domain`，也没有 `tsconfig.base.json`** ——
+  于是 `server` 其实**早就构建不出来了**（`TS2307` / `TS5083`），而本地 `pnpm -r build` 永远绿。
+  这是本次重建挖出的最危险的一条：**"本地全绿"证不了"镜像能构建"**。
+  见 `AGENTS.md` §7 第 75 条。
+- ⚠️ `deploy.sh` 第一句是 `git pull --ff-only`，而 `~/heyta` **不是 git 仓库** ⇒ 它会打一行
+  WARNING 然后继续。**这是预期的**，不是故障。
+- ⚠️ `deploy.sh --build` 原本还有一道 dirty-input 守卫，靠 `git diff` 判断输入是否干净 ——
+  在没有 `.git` 的目录里它**必然误判为"有脏文件"并拒绝构建**。现已改为"不是 git 仓库就
+  跳过并告警"（`AGENTS.md` §7 第 76 条），所以现在会看到一行 `WARNING: not a git work tree …`，
+  **同样是预期的**。
+- ⚠️ `deploy.sh` 用 in-image 的 `scripts/migrate-deploy.sh` 跑迁移（`docker compose run --rm` 一次性
+  容器），**不要**直接 `prisma migrate deploy`（AGENTS §4）。
+- ⚠️ `deploy.sh` 会自动带上 `docker-compose.monitoring.yml`（若文件存在），于是会顺带建
+  `caddy` / `dozzle` / `uptime-kuma`。**这台主机用 nginx 占着 80/443，`caddy` 必然起不来**
+  （`failed to bind host port 0.0.0.0:80: address already in use`），`up -d --wait` 因此整体报错 ——
+  但**应用容器已经换好了**。本轮的做法是：确认 `supersync` 健康后
+  `docker rm -f supersync-caddy dozzle uptime-kuma` 恢复原拓扑。
+- ⚠️ 重建会**覆盖 `supersync:local` 这个 tag**。先留回滚点：
+  `sudo docker tag supersync:local supersync:rollback-<日期>`（2026-09-27 已留一份
+  `supersync:rollback-20260927`）。
+- ⚪ 构建耗时主要在 `pnpm install`（`registry.npmjs.org` 实测 0–40 KiB/s，多次 error 23 重试），
+  **不是**在编译。换成 `registry.npmmirror.com` 后这一段从"超时作废"变成**秒级**。
+  ⚠️ **失败的层不进缓存**，所以 npm 那次是每次重试都从零开始。
+- ✅ 2026-09-27 实测结果：镜像构建成功 → `deploy.sh` 跑完（迁移全部应用，
+  `prisma migrate status` 报 `Database schema is up to date!`）→
+  `https://heyta-tmp.litopia.space/` 上 `Super Productivity` 与 `SuperSync` 各 **0 次**、
+  `heyta` **6 次**，`<title>heyta Server - Connect</title>`；`/health` 200。
+
+### 3.9 🔴 生产没配 SMTP ⇒ 注册与登录邮件**发不出去**
+
+这是 2026-09-27 实测确认的、**当前用户旅程最后一段的实际断点**：
+
+- 服务端日志（真实）：
+  `Failed to send verification email: Error: SMTP configuration is required in production environments`
+  与 `Failed to send magic link login email: …`（`email.ts:61` `getTransporter`）。
+- 后果：`POST /api/register/magic-link` 能建号，**但验证邮件永远不到**；
+  `POST /api/login/magic-link` 会生成 `login_token`，然后因为发信失败**把 token 清掉**
+  （`auth.ts:320-330`）—— 所以用户点「发送登录链接」之后**什么都不会发生**。
+- 因此**应用里刚做好的「登录 / 注册」面板会承诺一封永远不来的邮件**。
+  这不是代码 bug，是部署缺口；但它对用户是同一个结果。
+- ✅ 已经实测**通过**的部分（用运营者视角从库里取真 token，替掉"用户点邮件"这一步）：
+  `POST /api/verify-email {token}` → `Email verified successfully`；
+  `POST /api/login/magic-link/verify {token}` → 真 JWT（215 字符）；
+  面板粘该 token → 登录成功、访问令牌自动填入；
+  随后应用真的打了 `GET /api/sync/status` + `POST /api/sync/ops` → **均 200**，
+  `server_seq` 从 0 推进到 1，真库里留下 1 条 op。**0 pageerror / 0 console.error。**
+- ⚪ 唯一没被验证的一环就是**邮件本身的投递**（缺 SMTP 凭据，属外部阻塞）。
+- ⚠️ 顺带记一条**不要做**的事：`TEST_MODE` 下有个 `autoVerifyUsers` 开关（`config.ts:532`）会跳过邮箱验证。
+  **不要为了"跑通 E2E"在生产打开它** —— 那等于关掉邮箱验证这道门。本次没动它。
+
 ---
 
 ## 4. 代理链路
