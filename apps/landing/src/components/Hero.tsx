@@ -108,12 +108,17 @@ export function Hero(): React.JSX.Element {
           {t('landing.hero.lede')}
         </motion.p>
 
+        {/*
+          主 CTA 指向界面、次 CTA 指向价格 —— 大众先问「好不好用」「多少钱」，
+          不会先问「我怎么自建」。自建的入口留在 SelfHost 一节与底部，
+          那是愿意往下读的人才到的地方（理由写在 i18n 的 hero 词条上）。
+        */}
         <motion.div className="lp-hero__ctas" variants={copy}>
-          <a className="lp-btn lp-btn--primary lp-btn--lg" href="#selfhost">
-            {t('landing.cta.selfHost')}
-          </a>
-          <a className="lp-btn lp-btn--secondary lp-btn--lg" href="#showcase">
+          <a className="lp-btn lp-btn--primary lp-btn--lg" href="#showcase">
             {t('landing.hero.ctaShowcase')}
+          </a>
+          <a className="lp-btn lp-btn--secondary lp-btn--lg" href="#pricing">
+            {t('landing.hero.ctaPricing')}
           </a>
         </motion.div>
       </motion.div>
@@ -180,6 +185,11 @@ export function Hero(): React.JSX.Element {
  * 每一条都能在仓库里查到出处。
  *
  * 数据挪进组件内是文案迁移的硬要求（模块级拿不到 `t`）。取舍见 `Landing.tsx` 文件头。
+ *
+ * 🔴 选哪四条也是**受众排序**问题，不只是事实问题。这一条紧贴在首屏下面，
+ * 所以放的是大众能用的理由（离线、不限设备、加密同步、一套数据）。
+ * 「MIT 许可」和「一条命令自建」同样是可核实的事实，但它们只对开发者构成理由 ——
+ * 那两条在 Footer 与 SelfHost，愿意读到那里的人才关心。
  */
 export function Facts(): React.JSX.Element {
   const preset = useMotionPreset();
@@ -188,20 +198,20 @@ export function Facts(): React.JSX.Element {
   const facts = useMemo(
     () => [
       {
-        value: t('landing.facts.local.value'),
-        label: t('landing.facts.local.label'),
+        value: t('landing.facts.offline.value'),
+        label: t('landing.facts.offline.label'),
       },
       {
-        value: t('landing.facts.cipher.value'),
-        label: t('landing.facts.cipher.label'),
+        value: t('landing.facts.devices.value'),
+        label: t('landing.facts.devices.label'),
       },
       {
-        value: t('landing.facts.mit.value'),
-        label: t('landing.facts.mit.label'),
+        value: t('landing.facts.encrypted.value'),
+        label: t('landing.facts.encrypted.label'),
       },
       {
-        value: t('landing.facts.selfhost.value'),
-        label: t('landing.facts.selfhost.label'),
+        value: t('landing.facts.oneData.value'),
+        label: t('landing.facts.oneData.label'),
       },
     ],
     [t],

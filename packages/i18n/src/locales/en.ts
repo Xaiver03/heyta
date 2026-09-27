@@ -74,24 +74,32 @@ export const en = {
   'landing.quadrant.dropHere': 'Drag tasks here',
 
   // ── Landing · hero ────────────────────────────────────────
-  'landing.hero.eyebrow': 'Local-first · End-to-end encrypted · Self-hostable',
-  'landing.hero.titleLead': 'Task management where ',
-  'landing.hero.titleEmphasis': 'the data is yours',
-  'landing.hero.lede': 'Data lands on your device first and the server never sees plaintext. You can also run it entirely on your own server.',
-  'landing.hero.ctaShowcase': 'See the real interface',
+  // Mass readers first: encryption, self-hosting and local-first are developer
+  // reasons, not mass-market ones. They belong in Privacy and SelfHost, which
+  // only readers who scroll that far will reach.
+  'landing.hero.eyebrow': 'Tasks · Lists · Habits · Focus',
+  'landing.hero.titleLead': 'See what to do today, ',
+  'landing.hero.titleEmphasis': 'at a glance',
+  'landing.hero.lede': 'Jot things down and it works out the order for you. Tasks, lists, habits and focus sessions in one place - note it on your phone, pick it up on your laptop.',
+  'landing.hero.ctaShowcase': 'See what it looks like',
+  'landing.hero.ctaPricing': 'See pricing',
   'landing.hero.floatSynced': 'Synced to 3 devices',
   'landing.hero.floatOffline': 'Works fine offline',
 
   // ── Landing · facts ───────────────────────────────────────
   'landing.facts.ariaLabel': 'Product facts',
-  'landing.facts.local.value': 'Local',
-  'landing.facts.local.label': 'Data is written to your device first; the cloud is only a sync channel, not the source of truth',
-  'landing.facts.cipher.value': 'Encrypted',
-  'landing.facts.cipher.label': 'Encryption happens on the client. The server always verifies it, and there is no switch to turn it off',
-  'landing.facts.mit.value': 'MIT license',
-  'landing.facts.mit.label': 'A permissive license, with every third-party dependency registered and auditable',
-  'landing.facts.selfhost.value': 'Self-hosted',
-  'landing.facts.selfhost.label': 'Start your own server with one command and never hand your data to anyone else',
+  // This strip sits right under the hero, so it leads with mass reasons too.
+  // The MIT licence and one-command self-hosting moved to Footer and SelfHost.
+  // The encryption fact deliberately promises only the sync channel: turning on
+  // cloud AI does send plaintext out, so it must not read as a blanket claim.
+  'landing.facts.offline.value': 'Offline',
+  'landing.facts.offline.label': 'Keep writing with no connection; it syncs once you are back',
+  'landing.facts.devices.value': 'Any device',
+  'landing.facts.devices.label': 'Self-hosting is free forever, with no device cap and no expiry',
+  'landing.facts.encrypted.value': 'Encrypted sync',
+  'landing.facts.encrypted.label': 'Tasks are encrypted before upload, so the sync channel cannot read them',
+  'landing.facts.oneData.value': 'One dataset',
+  'landing.facts.oneData.label': 'Lists, quadrants, habits and focus share one dataset - not several apps bolted together',
 
   // ── Landing · capabilities ────────────────────────────────
   'landing.capabilities.title': 'Subscriptions sell six things as one bundle. We rebuilt them as separate parts',
@@ -148,7 +156,7 @@ export const en = {
   'landing.selfhost.sourcePending': 'The source is not public yet, so the first line leaves the repository address as a placeholder. Once it is public that line runs as-is, and the two lines after it take you to a running self-host.',
 
   // ── Landing · pricing ─────────────────────────────────────
-  // 🔴 These two prices must match the server price list and the legal text --
+  // 🔴 These prices must match the server price list and both legal texts --
   // `scripts/check-pricing-consistency.mjs` reads these entries and asserts all
   // three agree. Read docs/reference/pricing-and-entitlements.md before changing.
   // ASCII punctuation only in this table (see the file header).
@@ -172,6 +180,7 @@ export const en = {
   'landing.pricing.hosted.body': 'We run the relay for you. The data is still ciphertext, and we still cannot open it.',
   'landing.pricing.hosted.feature1': 'Every feature, identical to self-hosting',
   'landing.pricing.hosted.feature2': 'Sync across your devices',
+  'landing.pricing.hosted.cta': 'Opening soon',
   'landing.pricing.hosted.feature3': 'Server records are kept in full, not deleted when a period ends',
   'landing.pricing.hostedAi.name': 'Managed hosting + cloud AI',
   'landing.pricing.hostedAi.priceCny': 'CNY 12 / month',
@@ -183,7 +192,6 @@ export const en = {
   'landing.pricing.hostedAi.feature2': 'Cloud AI, 300 actions a month',
   'landing.pricing.hostedAi.feature3': 'AI on your own endpoint is unaffected -- still free and unlimited',
   'landing.pricing.hostedAi.cta': 'Opening soon',
-  'landing.pricing.hosted.cta': 'Opening soon',
   'landing.pricing.statusNote': 'Checkout is not wired up yet: the payment channels for both mainland China and international are still waiting on merchant approval, so orders cannot be placed today.',
 
   // ── Landing · final CTA ───────────────────────────────────
