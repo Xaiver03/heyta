@@ -20,6 +20,7 @@ import { Moon, Sun } from 'lucide-react';
 import { useI18n, useLocale } from '@heyta/i18n';
 
 import { otherLocaleHref } from '../lib/locale.js';
+import { startCta } from '../lib/app-url.js';
 import { useMotionPreset } from '../lib/motion.js';
 import type { Theme } from '../lib/theme.js';
 import { BrandMark } from './BrandMark.js';
@@ -46,6 +47,12 @@ import { BrandMark } from './BrandMark.js';
  *
  * ⚠️ 公开仓库还有一条**硬约束**：`.github/workflows/ci.yml` 的 `runs-on`
  * 必须先从自托管 runner 改回 `ubuntu-latest`（见该文件里的说明）。
+ *
+ * 🔴 另一件事不再是"等仓库公开"：**应用本身的入口**。
+ *   这里曾经连"应用部署在哪"都没有一个地方记录 —— 整页 CTA 只落到自建区，
+ *   而自建区的第一步是占位命令。现在应用地址是构建期变量 `VITE_APP_URL`
+ *   （`lib/app-url.ts`）：配了就多出「立即使用」并指向应用，没配就逐字退回
+ *   今天的行为。所以**换域名/换主机是一次构建参数，不是一次改代码**。
  */
 export function Nav({
   theme,
@@ -58,6 +65,8 @@ export function Nav({
   const { scrollY } = useScroll();
   const [floating, setFloating] = useState(false);
   const { t } = useI18n();
+  // 「开始使用」该指向哪，全页只有这一个判据（见 `lib/app-url.ts`）。
+  const cta = startCta();
 
   /**
    * 锚点与 `Landing.tsx` 里各区块的 `id` 必须一致 —— 写错了只是"点了没反应"。
@@ -66,13 +75,21 @@ export function Nav({
    */
   const links = useMemo(
     () => [
-      { href: '#capabilities', label: t('landing.nav.capabilities') },
-      { href: '#showcase', label: t('landing.nav.showcase') },
-      { href: '#sync', label: t('landing.nav.sync') },
-      { href: '#pricing', label: t('landing.nav.pricing') },
-      { href: '#selfhost', label: t('landing.nav.selfhost') },
+      { href: '#capabilities', label: t('landing.nav.capabilities'), external: false },
+      { href: '#showcase', label: t('landing.nav.showcase'), external: false },
+      { href: '#sync', label: t('landing.nav.sync'), external: false },
+      { href: '#pricing', label: t('landing.nav.pricing'), external: false },
+      { href: '#selfhost', label: t('landing.nav.selfhost'), external: false },
+      /**
+       * 应用真的部署起来了才多这一条。
+       *
+       * 🔴 没配置时**不出现**：一个指向 `#selfhost` 的「立即使用」是骗人的，
+       * 而导航里本来就有一条「自建」，再加一条重复的只会让人以为它们不同。
+       * 这个断点以前根本不存在 —— 访客读完一整页也没有任何入口能打开应用。
+       */
+      ...(cta.external ? [{ href: cta.href, label: t(cta.labelKey), external: true }] : []),
     ],
-    [t],
+    [t, cta.external, cta.href, cta.labelKey],
   );
 
   // 主题按钮的可访问名取决于**当前主题**（说的是"切到哪去"）。先把词条取出来再绑。
@@ -122,7 +139,12 @@ export function Nav({
 
         <nav className="lp-nav__links" aria-label={t('landing.nav.ariaLabel')}>
           {links.map((link) => (
-            <a key={link.href} className="lp-nav__link" href={link.href}>
+            <a
+              key={link.href}
+              className="lp-nav__link"
+              href={link.href}
+              {...(link.external ? { rel: 'noopener noreferrer' } : {})}
+            >
               {link.label}
             </a>
           ))}

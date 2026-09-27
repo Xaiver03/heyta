@@ -1,0 +1,95 @@
+/**
+ * 「应用在哪」的判据
+ * ====================
+ *
+ * 这个文件钉的是一件**只有两种情况、而两种情况都必须在测试里出现过**的事：
+ * 应用配了地址 / 没配地址。漏测任何一边都会留下一种谎话 ——
+ * 要么"按钮说能用、点了是 404"，要么应用明明上线了而页面上没有入口。
+ *
+ * 🔴 这里**不顺带测渲染**。渲染层面的证明（CTA 真的换成了外链、真的带了
+ * `rel="noopener noreferrer"`）在 `render.spec.tsx` 里，因为那需要真 DOM。
+ */
+
+import { afterEach, describe, expect, it, vi } from 'vitest';
+
+import { appUrl, startCta } from '../src/lib/app-url.js';
+
+afterEach(() => {
+  // 每个用例都从"没配置"这个默认状态开始。漏了这行，前一个用例设的
+  // `VITE_APP_URL` 会漏到后面 —— 那正是"测试之间互相污染"的经典写法。
+  vi.unstubAllEnvs();
+});
+
+describe('appUrl()：读构建期的 VITE_APP_URL', () => {
+  it('没配置时是 null', () => {
+    vi.stubEnv('VITE_APP_URL', '');
+    expect(appUrl()).toBeNull();
+  });
+
+  it('只有空格也算没配置', () => {
+    vi.stubEnv('VITE_APP_URL', '   ');
+    expect(appUrl()).toBeNull();
+  });
+
+  it('正常地址可用，并去掉末尾斜杠', () => {
+    vi.stubEnv('VITE_APP_URL', 'https://example.com/app/');
+    expect(appUrl()).toBe('https://example.com/app');
+  });
+
+  it('前后的空白会被修掉，不会变成一个点不通的 href', () => {
+    vi.stubEnv('VITE_APP_URL', '  https://example.com/app  ');
+    expect(appUrl()).toBe('https://example.com/app');
+  });
+
+  /**
+   * 🔴 这一组是本文件存在的核心理由。
+   *
+   * 一个不像地址的值如果被原样放进 `href`，浏览器会把它当**相对路径** ——
+   * 用户点下去得到的是当前域名下的 404。那比"没有按钮"更坏，
+   * 因为它看起来是能用的。所以格式不对就当作**没配置**。
+   */
+  it.each([
+    ['少了协议', 'example.com/app'],
+    ['写成相对路径', '/app/'],
+    ['非 http(s) 协议', 'ftp://example.com/app'],
+    ['被写成字符串 undefined', 'undefined'],
+    ['根本不是地址', 'not a url'],
+    ['git 远程写法', 'git@github.com:Xaiver03/heyta.git'],
+  ])('格式不合法就当作没配置：%s', (_why, value) => {
+    vi.stubEnv('VITE_APP_URL', value);
+    expect(appUrl()).toBeNull();
+  });
+
+  it('http 也算合法 —— 内网/自建实例常常没有证书', () => {
+    vi.stubEnv('VITE_APP_URL', 'http://192.168.1.10:5173');
+    expect(appUrl()).toBe('http://192.168.1.10:5173');
+  });
+});
+
+describe('startCta()：全页唯一的「开始使用」意图', () => {
+  it('没配置应用时，逐字退回今天的行为：站内锚点 + 自建说法', () => {
+    vi.stubEnv('VITE_APP_URL', '');
+    const cta = startCta();
+    expect(cta.href).toBe('#selfhost');
+    expect(cta.labelKey).toBe('landing.cta.selfHost');
+    expect(cta.external).toBe(false);
+  });
+
+  it('配置了应用时，指向应用并换成「立即使用」', () => {
+    vi.stubEnv('VITE_APP_URL', 'https://example.com/app/');
+    const cta = startCta();
+    expect(cta.href).toBe('https://example.com/app');
+    expect(cta.labelKey).toBe('landing.cta.useApp');
+    // `external` 是渲染处加 `rel="noopener noreferrer"` 的开关，
+    // 也是导航是否多一条的开关 —— 它必须为真，否则外链没有 rel。
+    expect(cta.external).toBe(true);
+  });
+
+  it('地址不合法时退回站内锚点，而不是给一个坏外链', () => {
+    vi.stubEnv('VITE_APP_URL', 'example.com/app');
+    const cta = startCta();
+    expect(cta.href).toBe('#selfhost');
+    expect(cta.labelKey).toBe('landing.cta.selfHost');
+    expect(cta.external).toBe(false);
+  });
+});
