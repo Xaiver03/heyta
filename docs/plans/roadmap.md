@@ -354,7 +354,7 @@ Web 设置页有「导出数据」（JSON 完整保真 / 任务清单 Markdown�
 | # | 断点 | 状态 |
 |---|---|---|
 | ④⑤ | 收银台 | ✅ **服务端已通**：`POST /api/billing/checkout`（报价 → 冻结 → `createCheckout` 一条链，不可交付的档在报价前回 `409`，12 例真 SQL 测试）。❌ **客户端「付款」按钮仍缺**，且**应当与支付通道一起落地** —— 现在加必然回 `503 BILLING_PROVIDER_NOT_CONFIGURED`，正好造出落地页明确反对的那个东西。所以这一步卡在**外部资质**，不在我们这边 |
-| 交付半段 | 🔴 **完全在我们这边** | webhook 路径还没把"金额与所有 SKU 都对不上"的支付交给 `settleOrderPaid` —— 该函数**至今零生产调用方**（`server/src/billing/pricing-store.ts:893` 导出，全仓无调用点，只有注释引用它）。后果：**用了券的单收得上钱、授不出权益** |
+| 交付半段 | ✅ **已修（2026-09-27）** | webhook 现在在**同一个事务**里：占位 `paymentEvent`（唯一约束=幂等闸）→ `settleOrderPaidInTransaction`（比**订单冻结的** `final_amount_minor`、`pending→paid`、券 `reserved→applied`）→ 用**订单冻结的 `price_id`** 覆盖 adapter 的金额启发式 → `applyPaymentEvent` → 标记 `processedAt`。`unknown-order` 回落 legacy 声明；`already-paid` 不重复授予。<br>**未做（仍是缺口）**：退款/拒付侧没接（`reverseOrderOnRefund` 仍零调用方，退款事件在 `unsupported-event-type` 就被挡）；**存量回填**没做（接线前已付款但未结算的订单，重投会被幂等挡住，不会补结算）—— 属对账任务 |
 | ⑦⑧ | ¥12 档能不能交付 | 已由 [ADR-0023](../adr/0023-managed-ai-quota-not-implemented.md) 显式判定：**计量存在之前不得被售卖**。云端 AI 端点 / 计量 / 设置页的「本周期已用 X / 300 次」**仍未做** |
 | ⑨⑪ | 续费 / 退款 | 都不存在：`SubscriptionNotice.tsx` 自述"现在不存在可跳转的续费地址"；退款接口"通道尚未接线"，退款政策也未定 |
 | 海外 | $5 / $12 | **没有 USD 通道**（全仓只有微信 adapter，且币种硬编码 CNY），并且缺**币种断言** —— USD 单喂给它会被按 CNY 发出去（`amountMinor: 500` 被当成 500 分），**没有任何一层会报错** |
@@ -372,16 +372,34 @@ Web 设置页有「导出数据」（JSON 完整保真 / 任务清单 Markdown�
 
 | # | 断点 | 状态 |
 |---|---|---|
-| 5 | **删了就没有回头路**：`DELETE` reducer 只是打墓碑，数据一直在库里，但**没有任何界面能看到或恢复它** | ✅ **已修**。Web 多了「回收站」视图。还原 = `UPD { deletedAt: null }`；彻底删除 = 打 `purgedAt` **标记**而**不清除 `deletedAt`** —— 清掉它会让离线对端把已删数据**复活**。代码与界面都写明：这**不是**物理擦除 op-log 历史。<br>**未做**：移动端没有回收站界面（能力已在 `packages/app-host`，可直接用）；只有 TASK，不含 PROJECT / TAG |
-| 6 | **移动端没有激励与成长体系**：`mobile.motivation.*` 词条 0 条，streak / 里程碑只有 Web 能看 | ✅ **已修**。共享取数收进 `packages/app-host/src/motivation.ts` —— "摊平 + 滤墓碑 + 注入 now"是每个宿主都必须做得一模一样的事，其中 `bestCurrentStreak` 取 `current` 还是 `longest` 是**真的会漂移**的业务选择（取错会让一个两年前连续 300 天的习惯拿到身份标签）。移动端「我的 → 成长」是**第二层页面，底部仍是 5 个标签**。<br>📌 **未验证**：**没在真机或模拟器上看过一眼**，也没过 Metro / Release 打包、没实测暗色主题 |
-| 7 | **服务端汇入页仍打着上游的品牌**：`server/src/pages.ts` 与 `server/templates/index.template.html` 里是 "SuperSync" / "Super Productivity" | 🟡 **代码已改，但没有部署**。生产上跑的是 **2026-09-26 构建的镜像** —— 实测 `https://heyta-tmp.litopia.space/` 仍然出现 **3 次 "Super Productivity" + 3 次 "SuperSync"**。要走 `server/scripts/deploy.sh`（校验 → 构建 → **先迁移** → 换容器 → 等 healthcheck），比"传静态文件"重得多，**本轮没有做** |
+| 5 | **删了就没有回头路**：`DELETE` reducer 只是打墓碑，数据一直在库里，但**没有任何界面能看到或恢复它** | ✅ **已修**。Web 多了「回收站」视图。还原 = `UPD { deletedAt: null }`；彻底删除 = 打 `purgedAt` **标记**而**不清除 `deletedAt`** —— 清掉它会让离线对端把已删数据**复活**。代码与界面都写明：这**不是**物理擦除 op-log 历史。<br>✅ **移动端也有了**（「我的 → 回收站」二级页，底部仍是 5 个标签，能力全部复用 `packages/app-host`）。<br>📌 **已在 iOS 模拟器上端到端实跑**：删 2 条 → 列出 → 「彻底删除」弹确认框 → **取消后没有写任何 op**（DB 验证）→ 确认后写入 `UPD {"purgedAt":…}`，且**同一条任务的 `DEL` 墓碑仍在**。<br>**未做**：只有 TASK，不含 PROJECT / TAG |
+| 6 | **移动端没有激励与成长体系**：`mobile.motivation.*` 词条 0 条，streak / 里程碑只有 Web 能看 | ✅ **已修**。共享取数收进 `packages/app-host/src/motivation.ts` —— "摊平 + 滤墓碑 + 注入 now"是每个宿主都必须做得一模一样的事，其中 `bestCurrentStreak` 取 `current` 还是 `longest` 是**真的会漂移**的业务选择（取错会让一个两年前连续 300 天的习惯拿到身份标签）。移动端「我的 → 成长」是**第二层页面，底部仍是 5 个标签**。<br>📌 **已在 iOS 模拟器上实跑并截图**（浅色 + 深色两版）：布局无溢出、深色对比正常；**深色是真的切了**（`simctl ui appearance dark`），不是"以为切了"。<br>⚠️ **仍未经真机屏幕验证的一条**：**超长习惯名**的换行 —— 手机上当时没有习惯数据（移动端没有建习惯入口），只证到代码层（`numberOfLines={1}`） |
+| 7 | **服务端汇入页仍打着上游的品牌**：`server/src/pages.ts` 与 `server/templates/index.template.html` 里是 "SuperSync" / "Super Productivity" | ✅ **代码已改并已部署**（2026-09-27）。此前生产上跑的是 **2026-09-26 构建的镜像**，实测仍有 3 次 "Super Productivity" + 3 次 "SuperSync"。<br>🔴 **这个过程挖出三个"镜像其实早就构建不出来 / 一直卡住"的真问题**，都不是品牌改动本身：① Alpine 源 `dl-cdn.alpinelinux.org` 连不上而 `apk add` 不设超时 → **无声挂满 40 分钟**；② `registry.npmjs.org` 取包超时 → 整层作废且**失败层不进缓存**；③ **镜像里根本没有 `packages/domain`**，而 `server/src/billing/*` 真的 import 它 → `TS2307`。③ 尤其危险：它是**潜伏**的，本地 `pnpm -r build` 永远是绿的。<br>修法见 `server/Dockerfile`（两个 mirror 构建参数 + 补 domain）与 `docs/runbooks/deployment.md` §3.8、`AGENTS.md` §7 第 71 条 |
 
 **本轮校验过、但仍然存在的诚实缺口**（不属于"断点"，但读的人需要知道）：
 
+- 🔴 **注册/登录的邮件发不出去 —— 生产没配 SMTP**（**外部阻塞**）。服务端日志实测
+  `SMTP configuration is required in production environments`。后果：注册能建号但验证邮件不到；
+  请求登录链接会生成 token 又**因为发信失败把它清掉**，所以用户点「发送登录链接」之后**什么都不会发生**。
+  **这等于新做好的登录面板在承诺一封永远不来的邮件。** 详见 `docs/runbooks/deployment.md` §3.9。
+- ✅ **认证现在有真实服务端证据了**（不再是"只有契约级"）：用运营者视角从真库取真 token 替掉"用户点邮件"这一步，
+  `verify-email` → `login/magic-link/verify` → 真 JWT → 面板粘贴登录成功 → 应用真的打了
+  `POST /api/sync/ops`（**200**），`server_seq` 从 0 推进到 1，真库里留下 1 条 op，**0 console.error**。
+  唯一没验的就是**邮件投递本身**。
+- **浏览器端通行密钥那一步仍未接线**（只有登录链接 + 粘贴令牌两条路）。
 - **回收站的跨设备一致性没有被真正验证**：op 级证明用的是两个真引擎 + 两个真 SQLite，**没有**跑真实的两客户端服务端收敛。
-- **认证只有契约级证据**：`hosted-auth.ts` 全部靠注入的假 `fetch`，**没有对着真实服务端登录过一次**。浏览器端**通行密钥那一步没接线**（只有登录链接这条路打通）。
-- **导出的浏览器下载已经在真实浏览器里验过**（Playwright：真的落盘、JSON 可解析、`counts` 与实体数一致）；但**导入 / 还原没有做**。
+- ✅ **导入 / 还原已做**（`packages/app-host/src/import-dump.ts`，CLI 与 Web 都有入口）：走**重放导出里的完整 op-log**，
+  所以墓碑语义天然保持（已删数据不复活），并且**只支持还原到空库** —— 目标非空时在写任何东西**之前**就拒绝。
+  **"合并到非空库"是被明确拒绝的**，不是排期问题：id 冲突、无共同因果历史（`compareVectorClocks` 只会给 `CONCURRENT`，
+  每对都退化成 LWW + 随机 `clientId` 决胜）、"本地是否更新版本"三条判据都没有可信答案，三条路都会**静默丢数据**。
+  若要开这个口子，需要一份独立 ADR。
+- ⚠️ **`verify:mobile-ios` 的基线在本次改动之前就不是绿的**（3 项失败集中在"笔记本读不到 / 自动同步游标"）。
+  另有一条**疑似真 bug 未修**：手机收到 `Download: 12 ops (sinceSeq=3, latestSeq=15)` 但
+  **DB 里一条都没落、`lastServerSeq` 仍停在 3** —— 若成立，它会影响"网页端建习惯后自动同步到手机"这条承诺。
+- ⚠️ **`check:docs` 的绿是"本机绿"**：干净 checkout 里它是**红的**（6 处死链指向 `.gitignore:25` 的
+  `research/upstream/`）。这是**门禁判据依赖了不该依赖的环境**，已登记进 `AGENTS.md` §7 第 70 条。
 - **`check:ai-e2e` 与全量 `pnpm check` 本轮没跑**：前者要起服务端 + e2e 工作区，后者会触发 `prisma generate`（沙箱 EPERM）。其余门禁逐项跑过，全绿。
+- **billing 的退款侧与存量回填没做**：`reverseOrderOnRefund` 仍零调用方；接线前已付款未结算的订单不会补结算。
 
 ---
 
