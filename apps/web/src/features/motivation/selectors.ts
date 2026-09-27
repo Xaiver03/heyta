@@ -22,9 +22,9 @@
  * 而且测试无法稳定断言。
  */
 
+import { aliveRecords, categoryReportFromTables } from '@heyta/app-host';
 import {
   computeActivityTotals,
-  computeCategoryReport,
   computeStreak,
   computeTodayProgress,
   computeWeeklyReview,
@@ -62,10 +62,14 @@ export interface MotivationInput {
   focusSessions: Record<string, FocusSession>;
 }
 
-/** 只保留未软删除的记录。撤销就是没发生 —— 这是所有统计的共同前提。 */
-function alive<T extends { deletedAt?: number }>(records: Record<string, T>): T[] {
-  return Object.values(records).filter((r) => r.deletedAt === undefined);
-}
+/**
+ * 只保留未软删除的记录（语义与实现在 `@heyta/app-host#aliveRecords`）。
+ *
+ * 🔴 本地这个别名**不是**为了少打几个字：Web 的六个选择器、移动端的分类屏、
+ * 以及以后任何统计屏都得滤墓碑，各写一份就是"撤销掉的时间又回到统计里"
+ * 这类缺陷的温床。别名只保留可读性，实现只有一处。
+ */
+const alive = aliveRecords;
 
 export function selectTodayProgress(state: MotivationInput, now: number): TodayProgress {
   return computeTodayProgress({
@@ -189,13 +193,7 @@ export function selectCategoryReport(
   now: number,
   weeks?: number,
 ): CategoryReport {
-  return computeCategoryReport({
-    projects: alive(state.projects),
-    tasks: alive(state.tasks),
-    habits: alive(state.habits),
-    habitLogs: alive(state.habitLogs),
-    focusSessions: alive(state.focusSessions),
-    now,
-    weeks,
-  });
+  // 摊平 + 注入 now 走**共享实现**：移动端的分类屏要用同一份
+  // （见 `packages/app-host/src/category-report.ts` 的文件头）。
+  return categoryReportFromTables(state, now, weeks);
 }

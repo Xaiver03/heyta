@@ -17,7 +17,7 @@
 
 import type { I18nValue, MessageKey } from '@heyta/i18n';
 
-import type { CategoryKind, CategorySeries } from '@heyta/domain';
+import { durationParts, type CategoryKind, type CategorySeries } from '@heyta/domain';
 
 /** 一行是清单还是习惯 ── 两种归因链的来源，界面上要能分辨。 */
 export const KIND_COPY: Record<CategoryKind, MessageKey> = {
@@ -30,19 +30,26 @@ export const KIND_COPY: Record<CategoryKind, MessageKey> = {
  *
  * ⚠️ 不用 `@heyta/domain` 的 `formatFocusDuration`：它返回的是**写死的中文**
  * （`"1 小时 20 分钟"`）。领域层产出中文，等于让中文表达变成同步契约的一部分，
- * 而且英文界面会冒出汉字。时长是**展示**问题，留在展示层。
+ * 而且英文界面会冒出汉字。
+ *
+ * 🔴 但**分档口径**（"多长算一小时""先四舍五入到分钟"）是**语义**，
+ * 已经上移到 `@heyta/domain#durationParts` —— 移动端的分类屏要用同一套阈值，
+ * 各写一遍就会让同一个 5400000ms 在一端说「1 小时 30 分」、另一端说「90 分钟」。
+ * 这一层只负责把档位映射成名下的词条。
  */
 export function formatDuration(ms: number, t: I18nValue['t']): string {
-  const totalMinutes = Math.round(Math.max(0, ms) / 60000);
-  if (totalMinutes < 60) {
-    return t('web.categories.duration.minutes', { minutes: totalMinutes });
+  const parts = durationParts(ms);
+  switch (parts.kind) {
+    case 'minutes':
+      return t('web.categories.duration.minutes', { minutes: parts.minutes });
+    case 'hours':
+      return t('web.categories.duration.hours', { hours: parts.hours });
+    case 'hoursMinutes':
+      return t('web.categories.duration.hoursMinutes', {
+        hours: parts.hours,
+        minutes: parts.minutes,
+      });
   }
-  const hours = Math.floor(totalMinutes / 60);
-  const minutes = totalMinutes % 60;
-  if (minutes === 0) {
-    return t('web.categories.duration.hours', { hours });
-  }
-  return t('web.categories.duration.hoursMinutes', { hours, minutes });
 }
 
 /**

@@ -27,7 +27,8 @@ import {
   isMinuteUnit,
   parseCategorySlot,
   weekStartOf,
-} from '../src/activity-categories.js';
+  durationParts,
+  } from '../src/activity-categories.js';
 
 /** 本地时刻 → 时间戳。不要用 `Date.UTC`，否则测试会依赖运行机器时区。 */
 function local(y: number, m: number, d: number, h = 12, min = 0): number {
@@ -378,5 +379,47 @@ describe('强度分档', () => {
 
   it('超过峰值也不会溢出到第 5 档（永远落在 1..4）', () => {
     expect(intensityLevel(500, 100)).toBe(4);
+  });
+});
+
+/**
+ * 时长分档：**语义**（不认识语言）的边界。
+ *
+ * 这一组测试的价值全在边界上 —— "5400000 是 1 小时 30 分"谁都写得对，
+ * 会错的是 30 秒、59 分 30 秒、负数和 `NaN`。
+ */
+describe('durationParts：先四舍五入到分钟，再分档', () => {
+  it('不到一分钟：四舍五入（30 秒算 1 分钟，而不是 0）', () => {
+    expect(durationParts(0)).toEqual({ kind: 'minutes', minutes: 0 });
+    expect(durationParts(29_000)).toEqual({ kind: 'minutes', minutes: 0 });
+    expect(durationParts(30_000)).toEqual({ kind: 'minutes', minutes: 1 });
+    expect(durationParts(60_000)).toEqual({ kind: 'minutes', minutes: 1 });
+  });
+
+  it('🔴 59 分 30 秒 会说成「1 小时」—— 分档读的是**四舍五入后**的分钟数', () => {
+    // ⚠️ 我第一版把这条断言写成 `{ minutes: 60 }`，实测红了 —— 而且**实现是对的**：
+    // 60 分钟从不存在（`totalMinutes < 60` 才走分钟档），59 分 30 秒四舍五入成
+    // 60 之后直接进小时档。留着这段是因为它演示了本仓库的规矩：
+    // **断言红了，先证明谁错**，而不是把断言改成能过的样子。
+    expect(durationParts(59 * 60_000)).toEqual({ kind: 'minutes', minutes: 59 });
+    expect(durationParts(59 * 60_000 + 29_000)).toEqual({ kind: 'minutes', minutes: 59 });
+    expect(durationParts(59 * 60_000 + 30_000)).toEqual({ kind: 'hours', hours: 1 });
+    expect(durationParts(60 * 60_000)).toEqual({ kind: 'hours', hours: 1 });
+  });
+
+  it('整小时不带零头；有零头才用「小时 + 分」', () => {
+    expect(durationParts(90 * 60_000)).toEqual({ kind: 'hoursMinutes', hours: 1, minutes: 30 });
+    expect(durationParts(120 * 60_000)).toEqual({ kind: 'hours', hours: 2 });
+    expect(durationParts(5 * 60 * 60_000 + 7 * 60_000)).toEqual({
+      kind: 'hoursMinutes',
+      hours: 5,
+      minutes: 7,
+    });
+  });
+
+  it('负数与 NaN 当 0 —— 宁可显示 0 分钟，也不要「NaN 分钟」', () => {
+    expect(durationParts(-1)).toEqual({ kind: 'minutes', minutes: 0 });
+    expect(durationParts(Number.NaN)).toEqual({ kind: 'minutes', minutes: 0 });
+    expect(durationParts(Number.POSITIVE_INFINITY)).toEqual({ kind: 'minutes', minutes: 0 });
   });
 });
