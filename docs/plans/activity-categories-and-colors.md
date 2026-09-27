@@ -236,12 +236,14 @@ HABIT.target + unit   →  HABIT.color
 
 | 层 | 证据 |
 |---|---|
-| 领域 | `packages/domain/tests/activity-categories.spec.ts`：**464 通过**（17 文件）。覆盖槽位解析、单位、软删除、跨零点、窗口外、排序确定性、峰值跨行、强度四档边界。 |
+| 领域 | `packages/domain`：**468 通过**（17 文件）。`activity-categories.spec.ts` 覆盖槽位解析、单位、软删除、跨零点、窗口外、排序确定性、峰值跨行、强度四档边界；本轮新增 `durationParts` 的四个边界用例。 |
 | 设计系统 | **402 通过**（6 文件），含 `category-colors.spec.ts` 13 条 + `tokens.spec.ts` 的登记断言。`generate` 已重跑（4 个产物、191 token、暗色覆盖 73）。 |
-| 动作层 | `packages/app-host`：**401 通过**。其中"清除写 `color: null` 而不是让键消失"已用注入（改成不写键）验证会红。 |
-| 界面 | `apps/web/tests/categories.spec.tsx`：**11 通过**。含"每行都有名字/来源/数字"、"格子数=12"、"文案里没有排名与褒贬"（`最多/最少/最差/排名/占比/超标/失衡/第一名` 逐个禁）。已用注入（拿掉行名、把峰值当 0）验证会红。 |
-| 门禁 | `check:design`（111 文件 0 裸值）、`check:ui-language`（108 文件、**989/989** 条 zh/en）、`check:layering`、`check:tokens`、`check:docs`、`check:migrations`、`check:licenses`、`check:arkts`、`check:native-deps`、`check:ai-coverage` 全绿。 |
-| 逐包全量 | domain 464 / design-system 402 / app-host 401 / i18n 10 / op-log 51 / storage 189 / sync-core 280 / shared-schema 70 / ai 144 / local-api 79 / landing 71 / sync-client 39 —— **全绿**。 |
+| 动作层 / 共享摊平 | `packages/app-host`：**409 通过**（本轮 +8：`tests/category-report.spec.ts`）。其中"清除写 `color: null` 而不是让键消失"已用注入（改成不写键）验证会红；摊平那层的三条关键断言（滤墓碑、任务被删进"未归类"、`weeks` 从常量推导）也已注入验证。 |
+| 界面（jsdom） | `apps/web/tests/categories.spec.tsx`：**12 通过** + `category-colors-flow.spec.tsx`：**3 通过**（真 `<App />` + 真 IndexedDB + 真 op-log）。含"每行都有名字/来源/数字"、"格子数 = `DEFAULT_CATEGORY_WEEKS`"、"文案里没有排名与褒贬"。已用注入（拿掉行名、把峰值当 0、给段序加 `reverse()`）验证会红。 |
+| 界面（真浏览器） | `e2e/tests/categories.spec.ts`：**4 通过**（见 §8.6）。逐条注入验证会红。 |
+| 移动端 | `apps/mobile/tests/category-display.spec.ts`：**12 通过**（纯逻辑 —— 本包没有组件渲染测试台，见 §8.7）。注入验证：3 条红。 |
+| 门禁 | `check:design`（114 源文件 0 裸值）、`check:ui-language`（111 文件、**1007/1007** 条 zh/en）、`check:layering`（125 文件）、`check:tokens`（191 token）、`check:docs` 无死链 —— 本轮全绿。 |
+| 逐包全量 | domain **468** / design-system **402** / app-host **409** / i18n **10** —— 本轮改动涉及的四个包**全绿**；其余包本轮未改，故沿用上一轮的数字（op-log 51 / storage 189 / sync-core 280 / shared-schema 70 / ai 144 / local-api 79 / landing 71 / sync-client 39）。 |
 
 ### 8.4.1 两条**被检查逼出来**的修正（不是审美，值得单独记）
 
@@ -273,36 +275,111 @@ main 侧提交了消费者而其生产者只存在于另一个工作树：
 `summarizeConflictPayload` / `SyncFailureReason`（sync-client）、
 `apps/mobile/src/screens/ListsSection.tsx`（mobile）。
 归属判据：报错文件清单 ∩ 本轮 `git diff --name-only` = **空集**。
-`apps/web` 实测 **32 红**（与本轮改动前逐条相同）、`apps/mobile` **4 红**、两处 `typecheck` 同源。
-**不代写、不改测试来掩盖**（AGENTS.md §7 第 34 条的方法侧）。
+本轮复测的当下数字：`apps/web` **32 红 / 484 绿 / 12 跳过**（7 个失败文件全部是
+`ai-*` / `conflict-dialog` / `memory-panel` / `preference-copy`），
+`apps/mobile` **15 红 / 162 绿**（**全部**在 `tests/conflict-view.spec.ts`，
+错误原文 `TypeError: summarizeConflictPayload is not a function`），
+两处 `typecheck` 同源（web 48 条、mobile 9 条，逐条都在上述文件里）。
+**逐条与改动前相同** —— 不代写、不改测试来掩盖（AGENTS.md §7 第 34 条的方法侧）。
 
-### 8.6 真浏览器验收：**本轮做不到**，原因在别人那一半（已取证）
+⚠️ 一处分歧要记下来：这里的 `apps/mobile 15 红` 是**当下**的数字，而 §8.5 的旧版
+记的是 4 红 —— 那是同一批缺失生产者的**演进**（别人在这期间继续提交了消费者），
+不是本轮引入的。判据仍是同一条：失败文件与本轮改动**无交集**。
 
-本特性是纯界面，按仓库习惯该有一条 `e2e/` 的真浏览器契约。**这轮没加，因为加了也验不了**：
+### 8.6 真浏览器验收：**已恢复**，4 条契约（含逐条注入证据）
 
-```
-$ node scripts/check-ai-e2e-preflight.mjs   # ✅ 4318 / 4319 都是空的
-$ cd e2e && pnpm exec playwright test tests/motivation.spec.ts
-  6 failed
-  → openApp 超时：input[placeholder^="添加任务"] 等 15 秒也不出现
-$ # 临时探针（只 load 一次页面，打印 pageerror）：
-  PAGEERROR: The requested module '.../packages/sync-client/dist/index.js'
-             does not provide an export named 'summarizeConflictPayload'
-  BODY:（空字符串 —— 整页白屏）
-```
+上一条（8.6 的旧版）记的是"这轮做不到"，原因是**别人的在飞工作**让这一支上
+Web 应用整页白屏（消费者已提交、生产者在主检出未提交）。本轮把那件事解决了 ——
+**但不是替别人写代码**，而是把白屏的成因挪出测试通道：
 
-**应用在本分支上根本起不来**，而原因是 §8.5 那一批缺失的生产者
-（`apps/web/src/features/sync/*` 已经 import 了 `summarizeConflictPayload`，
-而 `packages/sync-client` 还没导出它）。这与分类色无关，也不该由这一轮来修 ——
-但它的直接后果是：**在这一支上，"真浏览器"这条验证通道是断的**，
-任何新增的 e2e 用例都会红在一个与它无关的理由上。
-**一条因为无关原因常红的检查比没有更糟**（它会教人忽略红色），所以这里选择不加，
-并把探针命令写下来 —— 生产者落地之后，补一条用例的成本大约五分钟。
+`e2e/tests/shims.ts` 只活在测试进程里，拦 dev server 送给浏览器的模块响应，
+给**五个**缺的导出接上"存在、一调用就抛"的占位：
+`storage#StorageError`、`domain#planQuadrantDrop` / `clockText` / `roundedDaysText`、
+`sync-client#summarizeConflictPayload`。三条纪律写在文件头：
+**调用即抛**、**生产者落地后自动失效**（文件里已经有那个名字就什么都不加）、
+**生效时打日志**（`[e2e 垫片] …`）。产品代码、`packages/*`、主检出一个字节没动。
 
-**这一轮的替代物**（不是等价物，说清楚差在哪）：
-`apps/web/tests/category-colors-flow.spec.tsx` 用**真 `<App />` + 真 `LocaleHost` +
-真 IndexedDB + 真 op-log**（与 `motivation-view.spec.tsx` 同一份接线）跑完了
-「界面点 → op → 物化 → 重新渲染」的闭环。它与真浏览器的差别只剩
-**真 DOM 引擎与真 CSS**（jsdom 不排版、不算样式），所以：
-`.ht-categories__*` 那批样式**没有被任何自动检查覆盖**（只有 `check:design` 保证它没裸值）。
-⚠️ 这一条要说给下一个人听：**"我看过截图"这件事这轮没发生。**
+⚠️ 清单是**对账**出来的，不是撞一个补一个：把 `apps/web/src` 里所有
+`import { … } from '@heyta/*'` 与各包 `dist/index.js` 的**实际导出**比一遍。
+实测过撞着补的代价：修好一个之后是下一个（三次白屏、三种报错、同一个成因）。
+⚠️ 还踩了一条：同一个 URL 上注册**多条** `page.route` 只有最后一条生效，
+所以垫片必须**按包分组**（三个同包名字分成三条路由时，只有最后那条真的加上了）。
+
+**这 4 条契约**（`e2e/tests/categories.spec.ts`）：
+
+| 用例 | 注入什么会红（都实测过） |
+|---|---|
+| 区块挂进成长页 + 空状态如实说明 + 无百分号 | 不渲染区块 |
+| 色槽赋色 → **刷新后仍在** → 再点取消 | 赋色不落盘 → 行首当前色块停在未设色（实测 `rgb(226,232,240)`，期望 `rgb(22,163,74)`） |
+| 真实的专注时间进入「未归类」 | 不渲染那句未归类（实测红） |
+| 反需求：没有排名 / 占比 / 优劣词 | 说明里塞一个「最多」（实测红，报 `["最多"]`） |
+
+两条值得单独说的做法：
+
+1. **第 2 条的重点是"刷新"**。不刷新只能证明"点到了"；刷新后仍是 3 号色槽，
+   才能证明它**真的进了 op-log**（换设备/重开应用也要在）。
+   写这条用例时先错了一次：点完色槽就断言 `aria-pressed` —— 而面板选完**自己收起**，
+   那个按钮已经不在 DOM 里。错误本身说明了该证明什么：**读回来的值**，而不是"点到了"。
+2. **第 3 条把浏览器时钟接管过来**（`page.clock.install` + `resume` + `fastForward('26:00')`），
+   于是断言的是真数字「25 分钟」（`advance()` 记的是 `plannedMs`），
+   而不是"跑了 3 秒 → 0 分钟"。⚠️ `install` 之后**必须 `resume`**：
+   装完的时钟默认不走，而应用启动要等 `setTimeout` 才打开本地库 ——
+   不 resume 的症状是白屏，看起来像应用坏了（那会是一次很贵的误判）。
+
+**同一次跑出来的全套**：`categories 4` + `smoke 2` + `motivation 6` +
+`ai-breakdown 1` + `ai-capture 1` + `ai-duration 2` + `ai-prioritize 1` = **17 绿**；
+`ai-unavailable` **1 红**，红在 `'AI 未启用'` 那条断言上 —— 那是**别人在飞工作的半条链**
+（`packages/app-host/src/ai-duration.ts` 未提交的 diff 正是 `cause: result.reason`，
+而 `apps/web/src/features/ai/AiDuration.tsx:245` 已经在用 `outcome.cause`），
+**不改、不代写**（见 §8.5）。顺带修掉一条既有的假红：`smoke.spec.ts` 原本用裸
+`page.goto('/')`，于是它红在"模块图缺名字"上 —— 那既不是环境问题也不是功能问题，
+**恰好毁掉了这条用例唯一的作用**（失败归因），已改为走相同的 `openApp()`。
+
+**仍然没有被自动检查覆盖的东西**（这一条要说给下一个人听）：
+`.ht-categories__*` 那批样式在真浏览器里只被**间接**碰到（区块可见、文字在、
+色块背景取值相等），**没有像素级断言**，这轮也**没截图看过**。
+
+### 8.7 移动端落地（本轮补完第二个缺口）
+
+移动端此前**完全没有**分类视图。现在有了一个「分类」tab，最小完整闭环：
+**能赋值**（点行首色块 → 1–8 / 不用颜色）、**能看到**（一行一来源：色块 + 槽位号 +
+名字 + 来源 + 总时长 + 十二格周视图）、**有测试**（12 条纯逻辑）。
+
+| 文件 | 作用 |
+|---|---|
+| `apps/mobile/src/screens/CategoriesScreen.tsx` | 屏幕本体（`Screen` 外壳 + 泳道 + 行内色板） |
+| `apps/mobile/src/lib/category-display.ts` | 语义结果 → 本端词条 key；屏幕阅读器那句文字事实 |
+| `apps/mobile/src/lib/category-colors.ts` | 槽位 → **原生 token 名**（穷尽 `Record<CategorySlot, …>`） |
+| `apps/mobile/tests/category-display.spec.ts` | 12 条（下表） |
+| `packages/i18n` | `mobile.categories.*` 19 条（zh/en 各 19，**1007/1007**） |
+
+**三条共享口径，移动端一行判断都不写**：时长分档 = `@heyta/domain#durationParts`，
+摊平 + 注入 `now` = `@heyta/app-host#categoryReportFromState`，
+归因/窗口/峰值 = `computeCategoryReport`。为此本轮把前两件事**上移**并删掉了
+Web 那份重复（`durationParts` 的措辞仍分两端：领域层不认识 i18n）。
+
+**12 条测试里最值钱的两条**（都是"两端漂移"型）：
+
+- 🔴 `mobile.categories.*` 与 `web.categories.*` 的六个词条（时长三档 + 来源两种 +
+  未设色）在中英两表里**逐字相同**。两端说同一件事却各说各话时，
+  两端各自的测试都是绿的 —— 只有把"逐字相同"写成断言才会红。
+- 🔴 槽位 → token 映射与设计系统真源 `CATEGORY_SLOT_TOKENS` **逐项相同**。
+  Web 那份手写映射也改为**从同一个常量派生**，于是"色槽 → token"的名单从三份变成一份。
+
+注入验证：把中文时长改成「{hours} 小时 {minutes} 分钟」并互换 5/6 号色槽 →
+**恰好 3 条红**（档位映射、两端逐字相同、与真源逐项相同），还原后 12 条全绿。
+
+**移动端刻意不做的两件事**（都写在 `CategoriesScreen.tsx` 文件头）：
+不做那个堆叠柱状图（手机上 12 根柱子和 12 格泳道抢宽度，宁可只留主视图）；
+不做习惯打卡（移动端没有习惯界面 —— 同步过来的习惯照样显示，但记时长要靠 Web）。
+
+⚠️ **移动端没有组件渲染测试台**（`apps/mobile` 的 devDependencies 里没有
+`@testing-library/react-native`，既有 8 个测试文件全是纯逻辑）。
+所以这一屏**由类型与门禁保证"接线正确"，不保证"渲染出来是什么样"** ——
+本轮**没有在模拟器上看过它**，也没有为加渲染测试而引入新依赖（那要过两道门，
+且 React 19 下的 `react-test-renderer` 路线本身有弃用风险）。
+这一条同样是留给下一个人的话，不是可以默认忽略的细节。
+
+**移动端的接线只有两处落在别人的在飞文件里**（`App.tsx` 挂载一行、
+`ui/icons.tsx` 登记一行，且复用文件里已有的 `ChartColumn` 导入），
+冲突按并集收；`nav/TabBar.tsx` 无人在飞。

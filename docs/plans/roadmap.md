@@ -70,14 +70,17 @@ API 数据出口），已刻意放在**非 AI 分支** —— 理由见该计划
 
 | 层 | 内容 | 状态 |
 |---|---|---|
-| `packages/domain` | `computeCategoryReport`（派生纯函数：专注→任务→清单，习惯按分钟） | ✅ **已实现** |
-| `packages/design-system` | `color.category-1..8`（亮/暗）+ 色盲与对比度**实算** | ✅ **已实现** |
-| `packages/app-host` | `setProjectColor` / `setHabitColor`（存**槽位号**、清除写 `null`） | ✅ **已实现** |
+| `packages/domain` | `computeCategoryReport` + `durationParts`（派生纯函数：专注→任务→清单，习惯按分钟） | ✅ **已实现** |
+| `packages/design-system` | `color.category-1..8`（亮/暗）+ 色盲与对比度**实算** + `CATEGORY_SLOT_TOKENS` 包根导出 | ✅ **已实现** |
+| `packages/app-host` | `setProjectColor` / `setHabitColor`（存**槽位号**、清除写 `null`）+ `categoryReportFromState`（摊平 + 注入 `now`，两端共用） | ✅ **已实现** |
 | `apps/web` | 分类泳道图 + 周堆叠条 + 取色器（清单与习惯两处入口） | ✅ **已实现** |
-| `apps/mobile` | 同上 | ⬜ **未开工**（移动端连激励体系都还没有，本增量跟进它） |
+| `apps/mobile` | 「分类」tab：泳道 + 行内色槽取色器（**不做**堆叠柱状图、**不做**习惯打卡） | ✅ **已实现**（12 条纯逻辑测试；本包无组件渲染测试台，见 §8.7 末段） |
+| 真浏览器契约 | `e2e/tests/categories.spec.ts` 4 条（赋色**刷新后仍在**、真实专注进「未归类」、反需求扫描） | ✅ **已实现**（逐条注入验证会红） |
 
-⚠️ 落地状态与实测数字（含"真浏览器这条通道当前是断的"）见
-[活动分类与分类着色](activity-categories-and-colors.md) §8。
+⚠️ 落地状态与实测数字见
+[活动分类与分类着色](activity-categories-and-colors.md) §8
+（§8.6 真浏览器通道**已恢复**；§8.6 与 §8.7 里各有一段"仍然没有被覆盖的东西"，
+是留给下一个人的话，不是可以默认忽略的细节）。
 
 🔴 两条**结构约束**（不是偏好，已进 ADR）：
 
