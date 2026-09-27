@@ -162,6 +162,7 @@ export {
   loadCouponUsage,
   loadCoupons,
   loadPriceOverrides,
+  loadPricingAudit,
   publishPriceVersion,
   reverseOrderOnRefund,
   serializeRejections,
@@ -177,11 +178,14 @@ export type {
   InvalidCouponRow,
   OrderStatus,
   PrismaLikeClient,
+  PrismaTransactionClient,
+  PricingAuditEntry,
   PublishPriceInput,
   RedemptionState,
   SettleOrderOutcome,
   SettleOrderPaidInput,
   SqlExecutor,
+  SqlRunner,
 } from './pricing-store';
 
 export { applyPaymentEvent } from './apply-event';

@@ -160,7 +160,11 @@ export class PriceNotEffectiveError extends Error {
  * ⚠️ 第 1 条的代价必须说清楚：如果数据库里存在一条旧覆盖，
  * **改这个常量不会让实际价格变** —— 覆盖会遮蔽它。所以
  * `scripts/check-pricing-consistency.mjs` 钉住的是"**基线与对外文案一致**"，
- * 而 `server/scripts/show-price.ts` 会**明确警告**是否存在遮蔽。
+ * 而 `server/scripts/pricing.ts show` 会**明确警告**是否存在遮蔽
+ * （并列出还需要同步的每一个文案落点，退出码 1）。
+ *
+ * 📌 这里原先点名的是 `server/scripts/show-price.ts` —— **那个文件从来不存在**。
+ * 遮蔽告警现在实现在上面那个 CLI 里（`pnpm --filter @heyta/server pricing show`）。
  *
  * 这里的数字必须与 `docs/reference/pricing-and-entitlements.md` 的
  * ```` ```json pricing-ssot ```` 块、中英词条表、法务文本一致，门禁会红。

@@ -12,12 +12,14 @@ import {
   loadCoupons,
   loadCouponUsage,
   loadPriceOverrides,
+  loadPricingAudit,
   publishPriceVersion,
   reverseOrderOnRefund,
   settleOrderPaid,
   toMillis,
   upsertCoupon,
   type PrismaLikeClient,
+  type PrismaTransactionClient,
   type SqlExecutor,
   type SqlRunner,
 } from '../src/billing/pricing-store';
@@ -938,17 +940,74 @@ describe('Prisma 端口的形状（唯一没被 PGlite 覆盖的一层）', () =
         calls.push(sql);
         return 1;
       },
-      $transaction: async <T>(fn: (tx: PrismaLikeClient) => Promise<T>): Promise<T> => fn(fake),
+      // 🔴 回调参数是**事务** client（`PrismaTransactionClient`），不是根 client：
+      // Prisma 的事务 client 故意没有 `$transaction`（`ITXClientDenyList`），
+      // 端口必须承认这一点，否则 `createPrismaSqlExecutor(prisma)` 过不了 tsc。
+      $transaction: async <T>(fn: (tx: PrismaTransactionClient) => Promise<T>): Promise<T> => fn(fake),
     };
     const executor = createPrismaSqlExecutor(fake);
     await executor.query('SELECT 1 WHERE $1 IS NOT NULL', [1]);
     expect(calls).toEqual(['SELECT 1 WHERE $1 IS NOT NULL | 1']);
     expect(await executor.execute('UPDATE t SET a = 1')).toBe(1);
+    // 事务**内**只暴露读写两件事 —— 没有 transaction，于是嵌套事务写不出来。
+    const inside: string[] = [];
+    await executor.transaction(async (tx) => {
+      inside.push(...Object.keys(tx).sort());
+    });
+    expect(inside).toEqual(['execute', 'query']);
     // `$queryRawUnsafe` 在 Prisma 里可能返回非数组（驱动差异），端口要兜住。
     const empty = createPrismaSqlExecutor({
       ...fake,
       $queryRawUnsafe: async <T>(): Promise<T> => undefined as unknown as T,
     });
     expect(await empty.query('SELECT 1')).toEqual([]);
+  });
+});
+
+/**
+ * 审计的**读取**路径。
+ *
+ * 🔴 这一组存在的理由：`pricing_audit_log` 在本轮之前**只写不读** ——
+ * `appendAudit` 是全仓唯一的接触点，于是"谁在什么时候把 ¥12 改成 ¥15"
+ * 在代码里没有任何答案，只能手写 SQL 去问库。审计写下来却读不出来 = 没有审计。
+ */
+describe('🔴 审计能被读出来', () => {
+  it('发布价格版本 + 建券之后，两行都能读到，且新的在前', async () => {
+    await publishPriceVersion(base, {
+      entry: { priceId: 'hosted-monthly', currency: 'CNY', amountMinor: 1_300, effectiveFrom: 0, effectiveUntil: null },
+      effectiveFrom: NOW,
+      actor: 'ops@heyta',
+      note: '涨价探针',
+    });
+    await new Promise((resolve) => setTimeout(resolve, 5)); // 让两行的 created_at 分开
+    await publishCoupon(couponDef());
+
+    const audit = await loadPricingAudit(base, { limit: 20 });
+    expect(audit.length).toBeGreaterThanOrEqual(2);
+    // 新的在前 —— 券是后写的。
+    expect(audit[0]!.action).toBe('coupon_upserted');
+
+    const price = audit.find((entry) => entry.action === 'price_published');
+    expect(price).toBeDefined();
+    expect(price!.target).toBe('hosted-monthly/CNY');
+    expect(price!.actor).toBe('ops@heyta');
+    expect(price!.note).toBe('涨价探针');
+    // 金额必须真的能从审计里读回来 —— 这正是"谁把 ¥12 改成 ¥15"要回答的东西。
+    expect(JSON.parse(price!.afterJson!)).toMatchObject({ amountMinor: 1_300 });
+    // 时间戳要能被读成一个**合理的** epoch 毫秒。这里刻意不断言等于传给
+    // `publishPriceVersion` 的那个 `NOW`：审计记的是**真实发生时刻**（内部
+    // `Date.now()`），不是调用方给的业务时刻 —— 而"读不出来"（0 / undefined）
+    // 才是这条要拦的失败：那会让整段审计退化成看不出先后的一个列表。
+    expect(price!.createdAt).toBeGreaterThan(1_700_000_000_000);
+  });
+
+  it('limit 生效（且只影响条数，不影响顺序）', async () => {
+    await publishCoupon(couponDef({ id: 'c1', code: 'C1' }));
+    await publishCoupon(couponDef({ id: 'c2', code: 'C2' }));
+    await publishCoupon(couponDef({ id: 'c3', code: 'C3' }));
+
+    const one = await loadPricingAudit(base, { limit: 1 });
+    expect(one).toHaveLength(1);
+    expect(one[0]!.target).toBe('c3');
   });
 });

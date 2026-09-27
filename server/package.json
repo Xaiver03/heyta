@@ -33,7 +33,9 @@
     "migrate-payload-bytes": "node dist/scripts/migrate-payload-bytes.js",
     "migrate-payload-bytes:dev": "ts-node scripts/migrate-payload-bytes.ts",
     "dry-run-old-ops-sweep": "node dist/scripts/dry-run-old-ops-sweep.js",
-    "dry-run-old-ops-sweep:dev": "tsx scripts/dry-run-old-ops-sweep.ts"
+    "dry-run-old-ops-sweep:dev": "tsx scripts/dry-run-old-ops-sweep.ts",
+    "pricing": "node dist/scripts/pricing.js",
+    "pricing:dev": "tsx scripts/pricing.ts"
   },
   "dependencies": {
     "@heyta/domain": "workspace:*",

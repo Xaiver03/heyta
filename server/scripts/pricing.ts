@@ -53,6 +53,7 @@ import {
   createPrismaSqlExecutor,
   loadCoupons,
   loadPriceOverrides,
+  loadPricingAudit,
   publishPriceVersion,
   upsertCoupon,
   type SqlExecutor,
@@ -241,6 +242,73 @@ const currentEffective = (
   }
 };
 
+/**
+ * 价格文案的**全部**落点。
+ *
+ * 与 `pnpm check:pricing`（`scripts/check-pricing-consistency.mjs`）的校验范围
+ * **必须一致** —— 那份门禁校验基线 ↔ 中英词条 ↔ 法务文本 ↔ `pricing-ssot` 块
+ * 内部是否自洽，而这里的清单就是"有没有漏掉一处"的答案。
+ * 两处若漂移，门禁会绿而文案会撒谎。
+ */
+export const PRICING_COPY_SITES = [
+  { path: 'server/src/billing/price-book.ts', what: 'DEFAULT_PRICE_BOOK —— 代码基线，也是落地页与门禁的真源' },
+  { path: 'packages/i18n/src/locales/zh-CN.ts', what: 'landing.pricing.* 中文文案' },
+  { path: 'packages/i18n/src/locales/en.ts', what: 'landing.pricing.* 英文文案' },
+  { path: 'docs/reference/pricing-and-entitlements.md', what: 'pricing-ssot 块（机器可读，门禁读它）' },
+  { path: 'server/legal/terms-of-service.heyta.md', what: '服务条款正文里的金额' },
+  { path: 'server/legal/terms-of-service.ai.heyta.md', what: 'AI 条款正文里的金额' },
+] as const;
+
+/**
+ * 改价之后"还有哪些地方在撒谎"。
+ *
+ * 🔴 这是本 CLI 最重要的一条输出，因为**库里生效的价**与**落地页/法务/门禁读的价**
+ * 是两个不同的东西：
+ *   - 收银台按 `price_versions`（本 CLI 写的表）收钱；
+ *   - 落地页文案、法务文本、`pricing-ssot` 块读的是 `price-book.ts` 的
+ *     `DEFAULT_PRICE_BOOK`（代码基线），而 `pnpm check:pricing` **只校验这一侧内部自洽**。
+ *
+ * 于是"改完库里的价、忘了改文案"会让页面印 ¥5、收银台收 ¥139 —— 用户看到的价与
+ * 实收的价不一致，而**所有门禁都是绿的**。这个缺口不是靠自觉能堵住的：
+ * 它需要一个会说出来的断言点，也就是这里。
+ *
+ * 设计上：数据库覆盖版是**应急/试验**用的，长期真源是代码基线（因为只有基线能被
+ * 门禁校验、被法务文本引用）。所以库里的价与基线不一致时，正确动作是
+ * **把基线也改成新价**，让覆盖版变成冗余而不是分叉。
+ *
+ * 纯函数（不读库、不写日志），便于用单元测试钉住措辞与文件清单
+ * （见 `tests/pricing-cli.spec.ts`）。返回 `null` 表示"库里的价与代码基线一致"。
+ */
+export const describeCopyFootprint = (input: {
+  readonly priceId: string;
+  readonly currency: Currency;
+  readonly baselineMinor: number;
+  readonly effectiveMinor: number;
+}): string | null => {
+  if (input.baselineMinor === input.effectiveMinor) return null;
+
+  const lines = [
+    `🔴 ${input.priceId}/${input.currency}：库里现在收 ${formatMinor(input.effectiveMinor, input.currency)}，` +
+      `而代码基线还是 ${formatMinor(input.baselineMinor, input.currency)}。`,
+    '   收银台读库（会按新价收钱），落地页 / 法务 / 门禁读基线（还在印旧价）——',
+    '   也就是说**用户看到的价与实收的价不一致，而所有门禁都还是绿的**。',
+    '   要么把基线也改成新价（推荐：只有基线能被门禁校验），要么撤回这次改价。',
+    '   需要同步的位置：',
+    ...PRICING_COPY_SITES.map((site) => `     ${site.path}   —— ${site.what}`),
+    '   改完跑：pnpm check:pricing（它会指名任何一处对不上的文件与数字）',
+  ];
+  return lines.join('\n');
+};
+
+/**
+ * `show` 打印多少条审计。
+ *
+ * 固定 20 条、且**不**做成选项：这是给人看的一段"最近发生过什么"，
+ * 不是分页查询接口。要查更早的，直接对 `pricing_audit_log` 写 SQL ——
+ * 这个上限存在的意义只是别让 `show` 刷屏刷到看不见价格本身。
+ */
+const AUDIT_TAIL = 20;
+
 const runShow = async (sql: SqlExecutor): Promise<void> => {
   const overrides = await loadPriceOverrides(sql);
   const { coupons, invalid } = await loadCoupons(sql);
@@ -250,9 +318,21 @@ const runShow = async (sql: SqlExecutor): Promise<void> => {
   if (overrides.length === 0) {
     console.log('数据库里没有任何改价版本（一切走代码基线）。');
   }
+  /** 有价格版本与代码基线分叉 —— 读命令也要能用退出码表达这个**错误状态**。 */
+  let copyDiverged = false;
   for (const entry of DEFAULT_PRICE_BOOK) {
     const effective = currentEffective(overrides, entry.priceId, entry.currency, now);
     console.log(`  ${entry.priceId}/${entry.currency}  当前收：${describePrice(effective)}`);
+    const footprint = describeCopyFootprint({
+      priceId: entry.priceId,
+      currency: entry.currency,
+      baselineMinor: entry.amountMinor,
+      effectiveMinor: effective?.amountMinor ?? entry.amountMinor,
+    });
+    if (footprint !== null) {
+      copyDiverged = true;
+      console.log(`\n${footprint}`);
+    }
   }
   if (overrides.length > 0) {
     console.log(`  历史/排期版本（${overrides.length} 条）：`);
@@ -275,10 +355,31 @@ const runShow = async (sql: SqlExecutor): Promise<void> => {
     if (coupon.validUntil !== null && coupon.validUntil < now) console.log(`    ⚠️ 已过期（${iso(coupon.validUntil)}）`);
   }
 
+  // 🔴 审计段。这一段曾经**不存在**：`pricing_audit_log` 只写不读，于是
+  // "谁在什么时候把 ¥12 改成 ¥15"在代码里没有答案，只能手写 SQL 去问库。
+  // 审计写下来却读不出来，等于没有审计 —— 它的全部价值就在于事后能被查到。
+  const audit = await loadPricingAudit(sql, { limit: AUDIT_TAIL });
+  console.log(`\n── 最近 ${AUDIT_TAIL} 条审计（新的在前）──`);
+  if (audit.length === 0) {
+    console.log('  （还没有任何改价 / 改券记录）');
+  }
+  for (const entry of audit) {
+    const when = entry.createdAt === null ? '⚠️ 时间不可读' : iso(entry.createdAt);
+    console.log(`  ${when}  ${entry.action}  ${entry.target}  actor=${entry.actor ?? '（未记）'}`);
+    if (entry.note !== null && entry.note !== '') console.log(`      note：${entry.note}`);
+    console.log(`      before=${entry.beforeJson ?? 'null'}  after=${entry.afterJson ?? 'null'}`);
+  }
+
   // 🔴 坏掉的券必须**打出来**，不能静默丢弃：静默丢弃正是这里要避免的事。
   if (invalid.length > 0) {
     console.log(`\n🔴 ${invalid.length} 张券的定义不合法（它们不会生效，但行还在库里）：`);
     for (const bad of invalid) console.log(`  ${bad.id}: ${bad.problems.join('；')}`);
+    process.exitCode = 1;
+  }
+
+  // 🔴 与坏券同理：库里收的价与页面印的价不一致是**错误状态**，不能 exit 0。
+  if (copyDiverged) {
+    console.log('\n🔴 有价格版本与代码基线分叉（上面已逐条列出）。修好之前退出码是 1。');
     process.exitCode = 1;
   }
 };
@@ -311,6 +412,26 @@ const runSetPrice = async (sql: SqlExecutor, command: Extract<PricingCommand, { 
     console.log(`  ⚠️ 这是**未来**时刻：在 ${iso(command.effectiveFrom)} 之前，收银台仍然按上一版收钱。`);
   }
   console.log(`  审计：actor=${command.actor} note=${command.note}`);
+
+  // 🔴 最关键的一步：**改价之后必须告诉运营还有哪些地方在撒谎**。
+  // 收银台按库里这一版收钱，而落地页 / 法务 / 门禁读的是代码基线 ——
+  // 只改库、不改基线，页面就会印 ¥5 而实际收 ¥139，且所有门禁都是绿的。
+  // 有分叉就以**非零退出码**结束：这不只是提示，是一个会失败的断言点。
+  const baselineEntry = DEFAULT_PRICE_BOOK.find(
+    (entry) => entry.priceId === command.priceId && entry.currency === command.currency,
+  );
+  const footprint = describeCopyFootprint({
+    priceId: command.priceId,
+    currency: command.currency,
+    baselineMinor: baselineEntry?.amountMinor ?? command.amountMinor,
+    effectiveMinor: command.amountMinor,
+  });
+  if (footprint !== null) {
+    console.log(`\n${footprint}`);
+    console.log('\n🔴 退出码 1：价格文案与实收价分叉。这不是"改价失败/已回滚"—— 价**已经改了**，');
+    console.log('   是你还需要把上面那份清单同步掉（或撤回）。改完用 `show` 复读，它会变回 0。');
+    process.exitCode = 1;
+  }
 };
 
 /** 读券定义 JSON。**不**在这里做语义校验 —— 那是 `validateCouponDefinition` 的活。 */
