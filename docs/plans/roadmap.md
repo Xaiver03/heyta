@@ -407,7 +407,13 @@ Web 设置页有「导出数据」（JSON 完整保真 / 任务清单 Markdown�
   **DB 里一条都没落、`lastServerSeq` 仍停在 3** —— 若成立，它会影响"网页端建习惯后自动同步到手机"这条承诺。
 - ⚠️ **`check:docs` 的绿是"本机绿"**：干净 checkout 里它是**红的**（6 处死链指向 `.gitignore:25` 的
   `research/upstream/`）。这是**门禁判据依赖了不该依赖的环境**，已登记进 `AGENTS.md` §7 第 70 条。
-- **`check:ai-e2e` 与全量 `pnpm check` 本轮没跑**：前者要起服务端 + e2e 工作区，后者会触发 `prisma generate`（沙箱 EPERM）。其余门禁逐项跑过，全绿。
+- ⚠️ **`check:ai-e2e` 现在不是绿的：24 passed / 1 failed**，失败的是桌面端那条
+  （`e2e/tests/desktop-window.spec.ts`，`Error: page.waitForTimeout: Page crashed` —— Electron 渲染进程崩了）。
+  **与本次通行密钥 / 文档两个提交无关**，证据是 `git diff --name-only e4e62d3..HEAD` 里
+  **没有** `e2e/` 与 `apps/desktop/`；而 `apps/desktop/{package.json,src/main.ts,tsup.config.ts}`
+  当时正被**另一个并行会话**改到一半（未提交），e2e 跑的是那个工作区状态。留给那个会话收口。
+- 全量 `pnpm check` 仍未跑通：它会触发 `prisma generate` 而沙箱报 EPERM（`utime` 在
+  `~/.cache/prisma/.../libquery_engine`）。**除上面那条桌面端用例外，其余门禁逐项跑过，全绿。**
 - **billing 的退款侧与存量回填没做**：`reverseOrderOnRefund` 仍零调用方；接线前已付款未结算的订单不会补结算。
 
 ---
