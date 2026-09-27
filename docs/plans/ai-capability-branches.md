@@ -354,7 +354,7 @@ ADHD 视觉计时器，以及用户原话 "seeing 3 weeks left motivates me more
 | 1 | `docs/plans/roadmap.md` §2.3 表把 `NOTE` 标为 ❌"领域类型未定义，reducer 不物化" | `packages/domain/src/entities.ts:235-243` 定义了 `Note` 且列入 `MODELED_ENTITY_TYPES`；`packages/op-log/src/state.ts:59-67` 的 `BUCKET_BY_ENTITY` 含 `NOTE` | **roadmap 已过期**。真实未物化清单见 `state.ts` 的 `UNMODELED_ENTITY_TYPES`（`TASK_REPEAT_CFG` / `REMINDER` + 4 个系统实体） |
 | 2 | `docs/research/reusable-components.md` §0/§1 写 RRULE = `rrule.js` | `docs/plans/roadmap.md` §3 已改为 `ical.js`（理由是 rrule.js 停更 + 一个依赖解决 RRULE 与 CalDAV 两件事） | 两份调研结论矛盾，照旧的做会引入停更依赖 |
 | 3 | `docs/research/feature-matrix.md` §11 把"甘特图"列为反需求 | `docs/plans/roadmap.md` §3 把 `frappe/Gantt` 列为 ✅ 通过（MIT，2026-03-05 活跃） | **一个功能同时是"反需求"和"已选组件"**。本计划 §5 第 3 条给出的裁决是"做时间线视图、不做甘特"，需要产品确认后落到某一份文档 |
-| 4 | `docs/research/feature-matrix.md` §1.2 把"子任务"列为 **P0** | `Task` 没有 `parentId`（`packages/domain/src/entities.ts:64-82`） | **P0/P1"已完成"的定义里其实不含子任务**。这直接影响 AI-2 的实现形态 |
+| 4 | `docs/research/feature-matrix.md` §1 把"子任务"列为 **P0** | `Task` 没有 `parentId`（`packages/domain/src/entities.ts:64-82`） | **P0/P1"已完成"的定义里其实不含子任务**。这直接影响 AI-2 的实现形态 |
 
 ---
 

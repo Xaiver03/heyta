@@ -672,7 +672,7 @@ IndexedDB 路径**保留到迁移验证通过之后**再删。两者可并存一
 4. **文档固化**：
    - [构建矩阵](../reference/build-matrix.md) 补桌面端与"一套代码"的渲染路径说明
    - [多端构建手册](../runbooks/multi-platform-build.md) 补桌面端构建与验证
-   - `AGENTS.md` §6.1 更新入口
+   - `AGENTS.md` §6.1 多端构建 —— 把桌面端补进构建入口
 
 ### 判据
 
