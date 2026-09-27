@@ -11,14 +11,60 @@ import {
 } from '../src/preference-corrections.js';
 import { emptyFeedbackPreferenceSet, type FeedbackPreferenceSet } from '../src/ai-feedback.js';
 import { emptyPreferenceSet, type Preference, type PreferenceSet } from '../src/preferences.js';
+import {
+  preferenceEvidenceText,
+  type PreferenceEvidence,
+} from '../src/preference-evidence.js';
 
-const pref = <T>(id: Preference<T>['id'], value: T): Preference<T> => ({
-  id,
-  value,
-  sampleSize: 20,
-  confidence: 0.9,
-  evidence: '依据',
-});
+/**
+ * 造一条偏好。
+ *
+ * ⚠️ 第 14 轮起 `Preference` 有**必需**的 `evidenceFacts`（结构化事实）。
+ * 这个 helper 只关心"有没有这条偏好"，所以给一个形状对得上的最小事实 ——
+ * 但它必须**真的存在**：曾经就是"缺字段"让面板在运行时炸过一次。
+ */
+const factsFor = (id: Preference<unknown>['id'], value: unknown): PreferenceEvidence => {
+  switch (id) {
+    case 'estimate-bias':
+      return { kind: 'estimate-bias', multiplier: value as number, samples: 20 };
+    case 'granularity':
+      return { kind: 'granularity', items: value as number, samples: 20 };
+    case 'lead-time':
+      return { kind: 'lead-time', days: value as number, samples: 20 };
+    case 'feedback-keep-ratio':
+      return { kind: 'feedback-keep-ratio', ratio: value as number, adopted: 20 };
+    case 'feedback-granularity':
+      return { kind: 'feedback-granularity', items: value as number, adopted: 20 };
+    case 'deep-work-window':
+      return {
+        kind: 'deep-work-window',
+        startHour: 8,
+        endHour: 11,
+        concentration: 0.6,
+        samples: 20,
+      };
+    case 'title-style':
+      return {
+        kind: 'title-style',
+        cjkShare: 0.9,
+        medianTitleLength: 10,
+        emojiShare: 0,
+        samples: 20,
+      };
+  }
+};
+
+const pref = <T>(id: Preference<T>['id'], value: T): Preference<T> => {
+  const evidenceFacts = factsFor(id, value);
+  return {
+    id,
+    value,
+    sampleSize: 20,
+    confidence: 0.9,
+    evidenceFacts,
+    evidence: preferenceEvidenceText(evidenceFacts),
+  };
+};
 
 function full(): PreferenceSet {
   return {
@@ -88,7 +134,7 @@ describe('纠正：应用到偏好集', () => {
     const raw: PreferenceSet = {
       ...full(),
       leadTime: null,
-      withheld: [{ id: 'lead-time', reason: 'not-enough-samples', detail: '还需要 5 个任务' }],
+      withheld: [{ id: 'lead-time', reason: 'not-enough-samples', remaining: 5 }],
     };
     const out = applyPreferenceCorrections(raw, new Set(['lead-time']));
     expect(out.withheld).toEqual([]);

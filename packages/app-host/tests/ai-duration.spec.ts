@@ -105,6 +105,7 @@ const withPrefs = (): PreferenceSet => ({
     value: 1.8,
     sampleSize: 30,
     confidence: 0.9,
+    evidenceFacts: { kind: 'estimate-bias', multiplier: 1.8, samples: 30 },
     evidence: '基于 30 次专注，你倾向低估任务耗时 —— 实际用时约为计划的 1.80 倍',
   },
   deepWorkWindow: {
@@ -112,6 +113,13 @@ const withPrefs = (): PreferenceSet => ({
     value: { startHour: 8, endHour: 11, concentration: 0.8 },
     sampleSize: 40,
     confidence: 0.9,
+    evidenceFacts: {
+      kind: 'deep-work-window',
+      startHour: 8,
+      endHour: 11,
+      concentration: 0.8,
+      samples: 40,
+    },
     evidence: '基于 40 次专注，80% 集中在 08:00–11:00',
   },
   leadTime: null,

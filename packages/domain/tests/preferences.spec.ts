@@ -58,7 +58,8 @@ describe('偏好层：冷启动必须诚实（不许编）', () => {
     const { preference, withheld } = inferEstimateBias(sessions);
     expect(preference).toBeNull();
     expect(withheld?.reason).toBe('not-enough-samples');
-    expect(withheld?.detail).toContain('1');
+    // 精确断言：结构化之后的直接好处（`toContain('1')` 连"11"都会放过去）。
+    expect(withheld).toMatchObject({ reason: 'not-enough-samples', remaining: 1 });
   });
 
   it('🔴 不许用「平均用户」填充：样本不足时**绝不**返回一个猜测值', () => {

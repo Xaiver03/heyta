@@ -18,9 +18,12 @@ import {
 } from '../src/date.js';
 import {
   DEFAULT_URGENT_WINDOW_DAYS,
+  DROP_URGENT_LEAD_MS,
   bucketByQuadrant,
   classifyQuadrant,
   isUrgent,
+  planQuadrantDrop,
+  type QuadrantDropPlan,
 } from '../src/quadrant.js';
 // Quadrant 定义在 entities，quadrant.ts 只 import 不 re-export。
 // 从 quadrant.js 导入它会得到 undefined（打包器对不存在的命名导入不报错），
@@ -197,6 +200,123 @@ describe('四象限归类', () => {
       'later',
       'noDue',
     ]);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────
+// 拖放投放计划
+// ─────────────────────────────────────────────────────────────
+
+/** 把 plan 应用到任务上。测试里用它来实现"投放后落在哪一格"的真正判据。 */
+function applyDropPlan(task: Task, plan: QuadrantDropPlan): Task {
+  const next: Task = { ...task, important: plan.important };
+  if (plan.dueDate === null) {
+    delete next.dueDate;
+  } else if (plan.dueDate !== undefined) {
+    next.dueDate = plan.dueDate;
+  }
+  return next;
+}
+
+describe('拖放投放计划（planQuadrantDrop）', () => {
+  // 🔴 这一组的价值在于**它能失败**。
+  //    把实现换回 `apps/web` 原来的那段逻辑（只在 `dueDate === undefined` 时才补），
+  //    第二条会立刻变红 —— 那是它的第一个真缺陷。
+
+  const ALL = [
+    Quadrant.UrgentImportant,
+    Quadrant.ImportantNotUrgent,
+    Quadrant.UrgentNotImportant,
+    Quadrant.Neither,
+  ] as const;
+
+  /** 三种截止时间状态：没有 / 落在窗口内 / 落在窗口外。 */
+  const STATES = [
+    { name: '无截止时间', dueDate: undefined },
+    { name: '窗口内', dueDate: NOW + DAY },
+    { name: '窗口外', dueDate: NOW + 10 * DAY },
+  ] as const;
+
+  it('缺陷回归：窗口**外**的截止时间也必须被推进，否则任务弹回原格', () => {
+    // apps/web/QuadrantBoard.tsx 原来的写法是
+    //   `if (urgent && task.dueDate === undefined)`
+    // —— 只处理"完全没有截止时间"。于是一个 10 天后到期的任务被拖进 Q1 时，
+    // 只会被设成"重要"，而它**仍然不紧急**，任务**弹回 Q2**。
+    // 用户拖了等于没拖，界面上没有任何解释。
+    const t = makeTask({ important: false, dueDate: NOW + 10 * DAY });
+    const plan = planQuadrantDrop(t, Quadrant.UrgentImportant, { now: NOW });
+
+    expect(plan.important).toBe(true);
+    expect(plan.dueDate).toBe(NOW + DROP_URGENT_LEAD_MS);
+    expect(plan.dueDateChange).toBe('pushed');
+
+    // 真正的判据不是"字段变了"，而是**投放后确实落在目标象限**。
+    expect(classifyQuadrant(applyDropPlan(t, plan), { now: NOW })).toBe(
+      Quadrant.UrgentImportant,
+    );
+  });
+
+  it('已经紧急 → 不碰用户的截止时间（拖拽只改它必须改的）', () => {
+    const t = makeTask({ important: false, dueDate: NOW + DAY });
+    const plan = planQuadrantDrop(t, Quadrant.UrgentImportant, { now: NOW });
+
+    expect(plan.important).toBe(true);
+    expect(plan.dueDate).toBeUndefined();
+    expect(plan.dueDateChange).toBeUndefined();
+    expect(classifyQuadrant(applyDropPlan(t, plan), { now: NOW })).toBe(
+      Quadrant.UrgentImportant,
+    );
+  });
+
+  it('拖进非紧急侧会清除截止时间，并**如实报告**（不能无声）', () => {
+    // 清除是可接受的语义（这一格就是"没有迫近的期限"），
+    // 但它**是用户数据的删除**。必须通过 dueDateChange 让 UI 说出来。
+    const t = makeTask({ important: true, dueDate: NOW + DAY });
+    const plan = planQuadrantDrop(t, Quadrant.ImportantNotUrgent, { now: NOW });
+
+    expect(plan.important).toBe(true);
+    expect(plan.dueDate).toBeNull();
+    expect(plan.dueDateChange).toBe('cleared');
+    expect(classifyQuadrant(applyDropPlan(t, plan), { now: NOW })).toBe(
+      Quadrant.ImportantNotUrgent,
+    );
+  });
+
+  it('本来就没有截止时间 → 没什么可清，不上报变化', () => {
+    const t = makeTask({ important: true });
+    const plan = planQuadrantDrop(t, Quadrant.Neither, { now: NOW });
+
+    expect(plan.important).toBe(false);
+    expect(plan.dueDate).toBeUndefined();
+    expect(plan.dueDateChange).toBeUndefined();
+  });
+
+  it('穷举 4 象限 × 3 种截止时间状态：投放后**必须**落在目标格', () => {
+    // 这是这一个函数存在的理由。逐格手写断言会漏组合，
+    // 而"落不到你拖的那一格"正是原实现的缺陷。
+    for (const target of ALL) {
+      for (const state of STATES) {
+        const t = makeTask({ important: true, dueDate: state.dueDate });
+        const plan = planQuadrantDrop(t, target, { now: NOW });
+        const after = applyDropPlan(t, plan);
+
+        expect(
+          classifyQuadrant(after, { now: NOW }),
+          `目标=${target} / 起点=${state.name} 时没有落在目标象限`,
+        ).toBe(target);
+      }
+    }
+  });
+
+  it('已完成的紧急任务不会被推期限（几何判断不复用显示语义）', () => {
+    // `isUrgent` 对已完成任务恒返回 false（显示语义："它已经不需要做了"）。
+    // 若这里复用它，一个已完成的、明天到期的任务会被**推一个新期限** ——
+    // 而它本来就已经在窗口内。
+    const t = makeTask({ important: false, dueDate: NOW + DAY, completedAt: NOW });
+    const plan = planQuadrantDrop(t, Quadrant.UrgentImportant, { now: NOW });
+
+    expect(plan.dueDate).toBeUndefined();
+    expect(plan.dueDateChange).toBeUndefined();
   });
 });
 

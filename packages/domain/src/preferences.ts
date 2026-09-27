@@ -37,6 +37,8 @@
 const MS_PER_DAY = 86_400_000;
 
 /** 低于这个样本量，不产出任何偏好。 */
+import { preferenceEvidenceText, type PreferenceEvidence } from './preference-evidence.js';
+
 export const MIN_SAMPLE_SIZE = 8;
 
 /** 低于这个置信度，不产出偏好（进 `withheld`）。 */
@@ -120,17 +122,41 @@ export interface Preference<T> {
   readonly sampleSize: number;
   /** 0–1。低于 `MIN_CONFIDENCE` 的偏好不会出现在结果里。 */
   readonly confidence: number;
-  /** 给用户看的原话（含样本量与依据）。 */
+  /**
+   * 🔴 **事实**（数字、方向、样本量）。壳用这个取自己的词条。
+   *
+   * 这一条是第 14 轮加的：`evidence` 是**界面文案**（它自己的注释就写着
+   * "给用户看的原话"），但它是领域层拼好的中文，两个壳整句渲染 →
+   * 英文界面永远露中文，而门禁扫不到（壳里渲染的是变量）。
+   * 现在句子的**真源**是事实，`evidence` 只是它的中文投影。
+   */
+  readonly evidenceFacts: PreferenceEvidence;
+  /** 给用户看的原话（含样本量与依据）。**由 `evidenceFacts` 投影而来。** */
   readonly evidence: string;
 }
 
-/** 被**扣下**的偏好 —— 以及为什么。UI 要能据此说「我还不了解你」。 */
-export interface WithheldPreference {
-  readonly id: PreferenceId;
-  readonly reason: 'disabled' | 'not-enough-samples' | 'not-stable-enough' | 'no-data';
-  /** 给用户看的原因（中文）。 */
-  readonly detail: string;
-}
+/**
+ * 被**扣下**的偏好 —— 以及为什么。UI 要能据此说「我还不了解你」。
+ *
+ * 🔴 第 15 轮把那句中文**搬走了**。原来这里有 `detail: string`（领域层拼好的
+ * 21 句中文），而它**只有一个消费者**（`MemoryPanel`）—— 也就是说它是
+ * **纯界面文案**，却住在领域层，于是英文界面永远露中文，而门禁扫不到
+ *（壳里渲染的是变量）。
+ *
+ * 现在只留**结构化原因**，句子在词条表里（`web.memory.withheld.*`）。
+ * `remaining` **只在"样本还不够"这一支**出现 —— 判别联合让"忘了给数字"
+ * 变成编译错误，而不是界面上出现一句"还需要 0 次专注"。
+ */
+export type WithheldPreference =
+  | { readonly id: PreferenceId; readonly reason: 'disabled' }
+  | { readonly id: PreferenceId; readonly reason: 'no-data' }
+  | {
+      readonly id: PreferenceId;
+      readonly reason: 'not-enough-samples';
+      /** 还差多少条样本（`MIN_SAMPLE_SIZE - 已有`）。 */
+      readonly remaining: number;
+    }
+  | { readonly id: PreferenceId; readonly reason: 'not-stable-enough' };
 
 export interface DeepWorkWindow {
   /** 起始小时（0–23，含）。 */
@@ -296,7 +322,7 @@ export function inferEstimateBias(
   if (ratios.length === 0) {
     return {
       preference: null,
-      withheld: { id: 'estimate-bias', reason: 'no-data', detail: '还没有完成过的专注记录' },
+      withheld: { id: 'estimate-bias', reason: 'no-data' },
     };
   }
   if (ratios.length < MIN_SAMPLE_SIZE) {
@@ -305,7 +331,7 @@ export function inferEstimateBias(
       withheld: {
         id: 'estimate-bias',
         reason: 'not-enough-samples',
-        detail: `还需要 ${MIN_SAMPLE_SIZE - ratios.length} 次专注`,
+        remaining: MIN_SAMPLE_SIZE - ratios.length,
       },
     };
   }
@@ -319,20 +345,26 @@ export function inferEstimateBias(
       withheld: {
         id: 'estimate-bias',
         reason: 'not-stable-enough',
-        detail: '你的用时波动太大，暂时算不出稳定的偏差系数',
       },
     };
   }
 
-  const direction = value > 1.05 ? '低估' : value < 0.95 ? '高估' : '估得很准';
-  const ratioText = value.toFixed(2);
-  const evidence =
-    direction === '估得很准'
-      ? `基于 ${ratios.length} 次专注，你的时间估计很准（实际约为计划的 ${ratioText} 倍）`
-      : `基于 ${ratios.length} 次专注，你倾向${direction}任务耗时 —— 实际用时约为计划的 ${ratioText} 倍`;
+  const evidenceFacts: PreferenceEvidence = {
+    kind: 'estimate-bias',
+    multiplier: value,
+    samples: ratios.length,
+  };
+  const evidence = preferenceEvidenceText(evidenceFacts);
 
   return {
-    preference: { id: 'estimate-bias', value, sampleSize: ratios.length, confidence, evidence },
+    preference: {
+      id: 'estimate-bias',
+      value,
+      sampleSize: ratios.length,
+      confidence,
+      evidenceFacts,
+      evidence,
+    },
     withheld: null,
   };
 }
@@ -363,7 +395,7 @@ export function inferDeepWorkWindow(
   if (minutes.length === 0) {
     return {
       preference: null,
-      withheld: { id: 'deep-work-window', reason: 'no-data', detail: '还没有专注记录' },
+      withheld: { id: 'deep-work-window', reason: 'no-data' },
     };
   }
   if (minutes.length < MIN_SAMPLE_SIZE) {
@@ -372,7 +404,7 @@ export function inferDeepWorkWindow(
       withheld: {
         id: 'deep-work-window',
         reason: 'not-enough-samples',
-        detail: `还需要 ${MIN_SAMPLE_SIZE - minutes.length} 次专注`,
+        remaining: MIN_SAMPLE_SIZE - minutes.length,
       },
     };
   }
@@ -404,7 +436,6 @@ export function inferDeepWorkWindow(
       withheld: {
         id: 'deep-work-window',
         reason: 'not-stable-enough',
-        detail: '你的专注时间比较分散，暂时看不出固定的高效时段',
       },
     };
   }
@@ -415,12 +446,24 @@ export function inferDeepWorkWindow(
     endHour,
     concentration,
   };
-  const pct = Math.round(concentration * 100);
-  const pad = (h: number): string => `${String(h).padStart(2, '0')}:00`;
-  const evidence = `基于 ${minutes.length} 次专注，${pct}% 集中在 ${pad(bestStart)}–${pad(endHour)}`;
+  const evidenceFacts: PreferenceEvidence = {
+    kind: 'deep-work-window',
+    startHour: bestStart,
+    endHour,
+    concentration,
+    samples: minutes.length,
+  };
+  const evidence = preferenceEvidenceText(evidenceFacts);
 
   return {
-    preference: { id: 'deep-work-window', value, sampleSize: minutes.length, confidence, evidence },
+    preference: {
+      id: 'deep-work-window',
+      value,
+      sampleSize: minutes.length,
+      confidence,
+      evidenceFacts,
+      evidence,
+    },
     withheld: null,
   };
 }
@@ -451,7 +494,6 @@ export function inferLeadTime(
       withheld: {
         id: 'lead-time',
         reason: 'no-data',
-        detail: '还没有「有截止日期且已完成」的任务',
       },
     };
   }
@@ -461,7 +503,7 @@ export function inferLeadTime(
       withheld: {
         id: 'lead-time',
         reason: 'not-enough-samples',
-        detail: `还需要 ${MIN_SAMPLE_SIZE - leads.length} 个已完成的有截止日期任务`,
+        remaining: MIN_SAMPLE_SIZE - leads.length,
       },
     };
   }
@@ -475,22 +517,26 @@ export function inferLeadTime(
       withheld: {
         id: 'lead-time',
         reason: 'not-stable-enough',
-        detail: '你完成任务的提前量波动太大，暂时看不出固定习惯',
       },
     };
   }
 
-  const abs = Math.abs(value);
-  const rounded = abs < 1 ? abs.toFixed(1) : String(Math.round(abs));
-  const evidence =
-    value > 0.5
-      ? `基于 ${leads.length} 个已完成任务，你平均提前 ${rounded} 天完成`
-      : value < -0.5
-        ? `基于 ${leads.length} 个已完成任务，你平均逾期 ${rounded} 天完成`
-        : `基于 ${leads.length} 个已完成任务，你通常在截止当天完成`;
+  const evidenceFacts: PreferenceEvidence = {
+    kind: 'lead-time',
+    days: value,
+    samples: leads.length,
+  };
+  const evidence = preferenceEvidenceText(evidenceFacts);
 
   return {
-    preference: { id: 'lead-time', value, sampleSize: leads.length, confidence, evidence },
+    preference: {
+      id: 'lead-time',
+      value,
+      sampleSize: leads.length,
+      confidence,
+      evidenceFacts,
+      evidence,
+    },
     withheld: null,
   };
 }
@@ -522,7 +568,6 @@ export function inferGranularity(
       withheld: {
         id: 'granularity',
         reason: 'no-data',
-        detail: '还没有带清单的任务备注',
       },
     };
   }
@@ -532,7 +577,7 @@ export function inferGranularity(
       withheld: {
         id: 'granularity',
         reason: 'not-enough-samples',
-        detail: `还需要 ${MIN_SAMPLE_SIZE - counts.length} 条带清单的任务`,
+        remaining: MIN_SAMPLE_SIZE - counts.length,
       },
     };
   }
@@ -546,14 +591,25 @@ export function inferGranularity(
       withheld: {
         id: 'granularity',
         reason: 'not-stable-enough',
-        detail: '你的清单长度差异很大，暂时算不出固定的粒度偏好',
       },
     };
   }
 
-  const evidence = `你的 ${counts.length} 条带清单任务，中位数是 ${value} 项`;
+  const evidenceFacts: PreferenceEvidence = {
+    kind: 'granularity',
+    items: value,
+    samples: counts.length,
+  };
+  const evidence = preferenceEvidenceText(evidenceFacts);
   return {
-    preference: { id: 'granularity', value, sampleSize: counts.length, confidence, evidence },
+    preference: {
+      id: 'granularity',
+      value,
+      sampleSize: counts.length,
+      confidence,
+      evidenceFacts,
+      evidence,
+    },
     withheld: null,
   };
 }
@@ -582,7 +638,7 @@ export function inferTitleStyle(
   if (titles.length === 0) {
     return {
       preference: null,
-      withheld: { id: 'title-style', reason: 'no-data', detail: '还没有任务标题' },
+      withheld: { id: 'title-style', reason: 'no-data' },
     };
   }
   if (titles.length < MIN_SAMPLE_SIZE) {
@@ -591,7 +647,7 @@ export function inferTitleStyle(
       withheld: {
         id: 'title-style',
         reason: 'not-enough-samples',
-        detail: `还需要 ${MIN_SAMPLE_SIZE - titles.length} 条任务`,
+        remaining: MIN_SAMPLE_SIZE - titles.length,
       },
     };
   }
@@ -617,17 +673,28 @@ export function inferTitleStyle(
       withheld: {
         id: 'title-style',
         reason: 'not-stable-enough',
-        detail: '你的标题长度差异很大，暂时算不出固定的表达习惯',
       },
     };
   }
 
-  const lang = value.cjkShare >= 0.8 ? '以中文为主' : value.cjkShare <= 0.2 ? '以英文为主' : '中英混用';
-  const emoji = value.emojiShare >= 0.2 ? '，常用 emoji' : '';
-  const evidence = `基于 ${titles.length} 条任务，你的标题${lang}，平均 ${Math.round(value.medianTitleLength)} 个字${emoji}`;
+  const evidenceFacts: PreferenceEvidence = {
+    kind: 'title-style',
+    cjkShare: value.cjkShare,
+    medianTitleLength: value.medianTitleLength,
+    emojiShare: value.emojiShare,
+    samples: titles.length,
+  };
+  const evidence = preferenceEvidenceText(evidenceFacts);
 
   return {
-    preference: { id: 'title-style', value, sampleSize: titles.length, confidence, evidence },
+    preference: {
+      id: 'title-style',
+      value,
+      sampleSize: titles.length,
+      confidence,
+      evidenceFacts,
+      evidence,
+    },
     withheld: null,
   };
 }

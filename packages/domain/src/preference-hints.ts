@@ -22,6 +22,7 @@
  * 映射由调用方（app-host）负责。
  */
 
+import type { PreferenceEvidence } from './preference-evidence.js';
 import {
   type PreferenceId,
   type PreferenceSet,
@@ -61,8 +62,13 @@ export interface PreferenceHint {
    * 模型不需要知道样本量，用户才需要）。
    */
   readonly text: string;
-  /** 披露给用户的短摘要（= 该偏好的 `evidence`）。 */
+  /** 披露给用户的短摘要（= 该偏好的 `evidence`）。**中文投影。** */
   readonly summary: string;
+  /**
+   * 🔴 结构化事实。**壳必须用这个取自己的词条**，不要渲染 `summary` ——
+   * 那是领域层拼好的中文，英文界面会露中文（第 14 轮修的就是这个）。
+   */
+  readonly facts: PreferenceEvidence;
 }
 
 const pad2 = (n: number): string => String(n).padStart(2, '0');
@@ -85,7 +91,7 @@ function leadPhrase(days: number): string {
 /** 取一条偏好，转成提示文本；`null` 则返回 `null`。 */
 function toHint(id: PreferenceId, set: PreferenceSet): PreferenceHint | null {
   const pick = <T>(p: Preference<T> | null, render: (v: T) => string): PreferenceHint | null =>
-    p === null ? null : { id, text: render(p.value), summary: p.evidence };
+    p === null ? null : { id, text: render(p.value), summary: p.evidence, facts: p.evidenceFacts };
 
   switch (id) {
     case 'estimate-bias':
