@@ -657,6 +657,18 @@ describe('结算：幂等 + 金额比对订单', () => {
       [orderId],
     );
     expect(redemption[0]!.state).toBe('reserved');
+
+    // 🔴 审计行必须**真的落库**。"有人付了不对的钱"要能在库里查到，
+    // 而不是只活在当时的返回值里 —— 返回值的生命周期只有一次调用。
+    const audit = await base.query<{ action: string; target: string; before_json: string; after_json: string; note: string }>(
+      `SELECT action, target, before_json, after_json, note
+         FROM pricing_audit_log WHERE action = 'order_amount_mismatch'`,
+    );
+    expect(audit).toHaveLength(1);
+    expect(audit[0]!.target).toBe(`order:${orderId}`);
+    expect(JSON.parse(audit[0]!.before_json)).toEqual({ finalAmountMinor: 7_900 });
+    expect(JSON.parse(audit[0]!.after_json)).toEqual({ paidAmountMinor: 9_900 });
+    expect(audit[0]!.note).toContain('不授予权益');
   });
 
   it('认不出的订单号 → unknown-order（不猜、不建行）', async () => {

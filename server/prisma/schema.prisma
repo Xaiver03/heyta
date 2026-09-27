@@ -522,12 +522,16 @@ model CheckoutOrder {
 /// ```
 ///
 /// 🔴 三条不可动摇的规则：
-/// 1. **`expired` 与 `reversed` 都不归还名额。** 退款不"回血"：总量限额是
+/// 1. **`reversed` 不归还名额，`expired` 归还。** 退款不"回血"：总量限额是
 ///    "预算已投放"的语义，归还意味着同一份预算可以被买→退→再买反复薅。
 ///    （行业默认也是不自动归还：微信商家券要商户**主动**调退券接口才回卡包。）
+///    而 `expired` **必须**释放名额 —— 否则一张限 100 张的券会被 100 个
+///    "点了支付但没付"的单永久占满，sweep 就毫无意义了。
+///    唯一事实源是 `pricing-store.ts` 的 `COUNTED_REDEMPTION_STATES`。
 /// 2. **`reserved` 也占名额。** 否则刷预留就能把限量券占满。
-/// 3. **`order_id` 唯一 + `(coupon_id, order_id)` 唯一** 是"同一单不会被核销两次"
-///    的数据库层保证 —— 幂等不靠应用层记得判。
+/// 3. **`order_id` 唯一** 是"同一单不会被核销两次"的数据库层保证 ——
+///    幂等不靠应用层记得判。（`order_id` 唯一已经蕴含 `(coupon_id, order_id)`
+///    唯一，所以没有再声明后者。）
 model CouponRedemption {
   id Int @id @default(autoincrement())
 

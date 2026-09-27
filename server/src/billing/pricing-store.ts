@@ -283,6 +283,12 @@ export const AUDIT_ACTIONS = [
   'price_published',
   'coupon_upserted',
   'coupon_toggled',
+  /**
+   * 🔴 支付到账金额与订单冻结金额不一致。**这是会实际损失钱的那一类事件**，
+   * 所以它必须留下审计行 —— 只在返回值里报一个 `amount-mismatch` 而库里没有痕迹，
+   * 等于"有人付了不对的钱"这件事只存在于当时那条日志里。
+   */
+  'order_amount_mismatch',
 ] as const;
 export type AuditAction = (typeof AUDIT_ACTIONS)[number];
 
@@ -828,6 +834,17 @@ export const settleOrderPaid = async (
 
     const expectedMinor = Number(order.final_amount_minor);
     if (!isMinorAmount(input.paidAmountMinor) || input.paidAmountMinor !== expectedMinor) {
+      // 🔴 落审计，不只是返回一个 outcome。理由见 `AUDIT_ACTIONS` 的说明：
+      // "有人付了不对的钱"必须能在库里被查到，而不是只在当时的返回值里。
+      await appendAudit(tx, {
+        action: 'order_amount_mismatch',
+        target: `order:${orderId}`,
+        beforeJson: JSON.stringify({ finalAmountMinor: expectedMinor }),
+        afterJson: JSON.stringify({ paidAmountMinor: input.paidAmountMinor }),
+        actor: 'system',
+        note: `支付到账金额与订单冻结金额不一致 —— 不授予权益（providerEventId=${input.providerEventId}）`,
+        now: input.now,
+      });
       return {
         outcome: 'amount-mismatch',
         orderId,

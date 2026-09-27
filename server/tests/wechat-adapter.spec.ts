@@ -315,6 +315,10 @@ describe('wechat adapter — createCheckout（stub fetch，🔴 没有真网络�
     const result = await adapter.createCheckout({
       userId: 42,
       priceId: 'annual',
+      // 🔴 **故意不等于 annual 的基线价 9_900**：这是"¥99 用了 ¥20 券"的一单。
+      // adapter 必须签出**传进来的**这个数，而不是自己回价目表里查基线 ——
+      // 回查就是"运营者改价之后收银台仍按旧价下单"那个静默少收钱的形状。
+      amountMinor: 7_900,
       successUrl: 'https://app.example.test/ok',
       cancelUrl: 'https://app.example.test/cancel',
     });
@@ -325,7 +329,8 @@ describe('wechat adapter — createCheckout（stub fetch，🔴 没有真网络�
     const body = JSON.parse(String(captured!.init.body)) as Record<string, unknown>;
     expect(body.appid).toBe(APP_ID);
     expect(body.mchid).toBe(MCH_ID);
-    expect(body.amount).toEqual({ total: 9_900, currency: 'CNY' });
+    // 7_900 而不是 9_900：金额来自入参，价目表只提供 description。
+    expect(body.amount).toEqual({ total: 7_900, currency: 'CNY' });
     expect(body.attach).toBe('42');
     expect(body.notify_url).toBe(NOTIFY_URL);
     expect(parseUserIdFromOutTradeNo(String(body.out_trade_no))).toBe(42);
@@ -362,10 +367,34 @@ describe('wechat adapter — createCheckout（stub fetch，🔴 没有真网络�
       adapter.createCheckout({
         userId: 1,
         priceId: 'nope',
+        amountMinor: 9_900,
         successUrl: 'https://a.test',
         cancelUrl: 'https://a.test',
       }),
     ).rejects.toThrow(/priceId/);
+  });
+
+  it('🔴 金额不是正整数 → 抛错，绝不"兜"成 0 元或基线价', async () => {
+    const adapter = createAdapter({
+      fetchImpl: (async () => {
+        throw new Error('不该发请求');
+      }) as unknown as typeof fetch,
+    });
+
+    // 0 / 负数 / 小数 / NaN / 字符串：每一种都必须是硬错误。
+    // 0 元单在计价层就被拒（MIN_CHARGEABLE_AMOUNT_MINOR），但 adapter 也不能
+    // 依赖上游一定守规矩 —— 它自己是"最后一步"，兜底成基线价就是静默错账。
+    for (const bad of [0, -1, 9_900.5, Number.NaN, Number.POSITIVE_INFINITY, '9900']) {
+      await expect(
+        adapter.createCheckout({
+          userId: 1,
+          priceId: 'annual',
+          amountMinor: bad as unknown as number,
+          successUrl: 'https://a.test',
+          cancelUrl: 'https://a.test',
+        }),
+      ).rejects.toThrow(/金额必须是正整数最小单位/);
+    }
   });
 
   it('微信返回非 2xx → WechatApiError 带状态码与 code', async () => {
@@ -380,6 +409,7 @@ describe('wechat adapter — createCheckout（stub fetch，🔴 没有真网络�
       adapter.createCheckout({
         userId: 1,
         priceId: 'annual',
+        amountMinor: 9_900,
         successUrl: 'https://a.test',
         cancelUrl: 'https://a.test',
       }),
@@ -398,6 +428,7 @@ describe('wechat adapter — createCheckout（stub fetch，🔴 没有真网络�
       adapter.createCheckout({
         userId: 1,
         priceId: 'annual',
+        amountMinor: 9_900,
         successUrl: 'https://a.test',
         cancelUrl: 'https://a.test',
       }),

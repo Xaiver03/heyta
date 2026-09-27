@@ -142,6 +142,18 @@ export interface CreateCheckoutInput {
   readonly userId: number;
   /** 套餐 / 价格标识（provider 侧或我方定义的 price id）。 */
   readonly priceId: string;
+  /**
+   * 🔴 **这一单实际要收多少**（最小单位正整数），由**计价层**冻结后传入。
+   *
+   * 为什么金额是入参、而不是 adapter 自己去查价目表：价格有**运行期版本**
+   * （`price_versions`，带生效区间），只有计价层知道"这一刻该收多少"，
+   * 而且那个数已经和券一起冻在 `checkout_orders.final_amount_minor` 上。
+   * 让 adapter 自己查价目表就等于**多一个价格事实源** —— 运营者改价之后
+   * 报价层收新价、收银台按旧价下单，两边静默分叉，正是 ADR-0018 §3.1 要消灭的形状。
+   *
+   * 所以 adapter 不再持有价目表语义；它只负责把给定的金额签出去。
+   */
+  readonly amountMinor: number;
   /** 成功后的回跳地址。 */
   readonly successUrl: string;
   /** 取消后的回跳地址。 */
