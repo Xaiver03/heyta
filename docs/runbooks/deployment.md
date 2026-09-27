@@ -857,6 +857,37 @@ location ~ ^/(terms|privacy)\.html$ {
 所以两页**都没有发布**。因此 `/terms.html` 与 `/privacy.html` 现在返回的是
 **诚实的 404 —— 这不是故障，是当前正确的状态**（草稿还没过法务，本来就不该对外）。
 
+### 3.12 nginx 站点文件现在**进了仓库**，并且能查漂移
+
+**问题**：上面 §3.3.1、§3.11 记的这些修复，以及更早的 `/app/`、`/assets/` 迁移，
+**全部只发生在服务器上**。仓库里没有任何一处能回答"线上到底有哪些 location" ——
+于是同一天踩了**三次**同一个坑（**HTTP 200，但内容是落地页**），而每次都要靠重新发现。
+
+**做法**：把线上那份**逐字节**抄进仓库，并给一个能 diff 的工具。
+
+| 位置 | 作用 |
+|---|---|
+| `server/deploy/nginx/heyta.finlaw.cloud.conf` | 线上 `/etc/nginx/sites-available/heyta.finlaw.cloud` 的**版本化镜像** |
+| `server/deploy/nginx/README.md` | 为什么要有它、它**不是**部署源、本机 include 白名单的坑 |
+| `server/scripts/nginx-sync.sh` | `--check`（默认，报漂移，退出码 1）/ `--pull` / `--apply` |
+
+```bash
+server/scripts/nginx-sync.sh --check    # 只比对，安全
+server/scripts/nginx-sync.sh --pull     # 服务器上改完 → 抓回来提交
+server/scripts/nginx-sync.sh --apply    # 仓库 → 线上（先备份、先 nginx -t、通过才 reload）
+```
+
+⚠️ **`--apply` 会用仓库副本整体覆盖线上。** 如果仓库副本是旧的，它会连带把线上的修复
+一起回滚 —— 脚本会先打印差异、先备份，但**不替你判断**。所以顺序是先 `--check`，再决定。
+
+⚠️ **它不是自动化的部署路径**：`deploy.sh` 不读这个目录，没有任何 CI 会跑 `--apply`。
+它唯一的作用是**让漂移可见**。相应地有一条纪律：**在服务器上改完 nginx，必须 `--pull`
+回来并提交** —— 否则下次 `--check` 就报漂移，而一个总是响的警报等于没有警报。
+
+⚠️ 本机是**显式 include 白名单**（`nginx.conf` 逐行写 `sites-enabled/<name>`），
+不是 `sites-enabled/*` 通配；新增站点要同时改白名单。`heyta-tmp.litopia.space`
+是**独立**站点文件，**故意不合并**（那份 `location /` 整个代理到 1900）。
+
 ---
 
 ## 4. 代理链路
