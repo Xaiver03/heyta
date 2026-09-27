@@ -187,6 +187,15 @@ export function applyOperation(
 
   // DELETE op：写入墓碑，**不物理删除**。
   // 物理删除会让同步端永远看不到这次删除，另一端会把数据又同步回来。
+  //
+  // 🔴 墓碑**保留实体的全部原字段**（`...existing`）—— 这正是"删除可恢复"
+  // 能兑现的原因：标题、备注、清单、标签、日期、重复规则一个都没丢，
+  // 恢复只需要一条普通的 `UPD { deletedAt: null }`（下面的 `null` → 删字段
+  // 语义会把它清掉），不需要新 op 类型、不需要动 reducer、不需要 bump schema。
+  // 「彻底删除」是另一条路：一条 `UPD { purgedAt: <ts> }` 只做标记，
+  // **不清 `deletedAt`**（清掉墓碑会让离线端把旧数据当"从未删除"又同步回来）。
+  // 两者的 op 都由 `@heyta/app-host` 的 `createTaskActions` 构造 ——
+  // reducer 只认字段，不认"这是恢复还是彻底删除"。
   if (op.opType === OpType.Delete) {
     if (existing === undefined) return state;
 

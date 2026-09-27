@@ -1559,3 +1559,126 @@
   margin: 0;
   color: var(--ht-color-foreground-muted);
 }
+
+/* ── 回收站 ─────────────────────────────────────────── */
+
+.ht-trash {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ht-space-4);
+}
+
+.ht-trash__intro {
+  margin: 0;
+  font-size: var(--ht-font-size-sm);
+  color: var(--ht-color-foreground-muted);
+}
+
+.ht-trash__list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ht-space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.ht-trash__item {
+  display: flex;
+  align-items: center;
+  gap: var(--ht-space-3);
+  padding: var(--ht-space-3) var(--ht-space-4);
+  border: var(--ht-border-width-thin) solid var(--ht-color-border-subtle);
+  border-radius: var(--ht-radius-md);
+  background: var(--ht-color-surface);
+}
+
+.ht-trash__title {
+  flex: 1;
+  min-inline-size: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--ht-color-foreground);
+}
+
+.ht-trash__time {
+  font-size: var(--ht-font-size-xs);
+  color: var(--ht-color-foreground-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.ht-trash__actions {
+  display: flex;
+  align-items: center;
+  gap: var(--ht-space-1);
+}
+
+/* 「彻底删除」是危险动作，用语义 danger 色而不是外观红。 */
+.ht-btn--danger {
+  color: var(--ht-color-danger);
+}
+
+.ht-btn--danger:hover {
+  background: var(--ht-color-danger-subtle);
+  color: var(--ht-color-danger-strong);
+}
+
+.ht-trash__overlay {
+  position: fixed;
+  inset: 0;
+  background: var(--ht-color-overlay);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--ht-space-4);
+  z-index: var(--ht-z-modal);
+}
+
+.ht-trash__dialog {
+  width: 100%;
+  max-width: var(--ht-layout-content-max);
+  display: flex;
+  flex-direction: column;
+  gap: var(--ht-space-5);
+  background: var(--ht-color-surface-raised);
+  border-radius: var(--ht-radius-lg);
+  box-shadow: var(--ht-shadow-lg);
+  padding: var(--ht-space-6);
+  color: var(--ht-color-foreground);
+}
+
+.ht-trash__dialog-head {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--ht-space-3);
+}
+
+.ht-trash__dialog-icon {
+  display: flex;
+  color: var(--ht-color-danger);
+  padding-top: var(--ht-space-1);
+}
+
+.ht-trash__dialog-body {
+  flex: 1;
+  min-inline-size: 0;
+}
+
+.ht-trash__dialog-title {
+  margin: 0;
+  font-size: var(--ht-font-size-lg);
+}
+
+.ht-trash__dialog-text {
+  margin: var(--ht-space-2) 0 0;
+  font-size: var(--ht-font-size-sm);
+  color: var(--ht-color-foreground-muted);
+  line-height: var(--ht-line-height-normal);
+}
+
+.ht-trash__dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--ht-space-2);
+}
