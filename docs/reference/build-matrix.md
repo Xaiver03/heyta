@@ -25,7 +25,8 @@
 | 环境 | SSH 别名 | 地址 | 用户 | 密钥 | 能力 |
 |---|---|---|---|---|---|
 | **本地 Mac**（当前开发机） | — | 本机 | `rocalight` | — | iOS 构建、Android 构建、鸿蒙出包（HAP）验证 |
-| **Windows 打包机** | `windows-pc` | `10.111.127.237`（ZeroTier）<br>`192.168.1.3`（局域网） | `41478` | `~/.ssh/id_ed25519` | Android ✅（debug + release 均实测，见 §2.5）、Windows 桌面构建（选型未定） |
+| **Windows 打包机** | `windows-pc` | `10.111.127.237`（ZeroTier）<br>`192.168.1.3`（局域网） | `41478` | `~/.ssh/id_ed25519` | Android ✅（debug + release 均实测，见 §2.5）、Windows 桌面构建（选型未定）、**通用构建/测试外包**（见 §1.1.1） |
+| **第二台 Windows**（笔记本） | `windows-codex`<br>`laptop-5ueuu7ps` | `10.111.127.151`（ZeroTier） | `rayne` | `~/.ssh/id_ed25519` | ⚪ **未纳入构建矩阵**。2026-09-27 实测**离线**（重试 3 次后由 timeout 变 `Host is down`）。此处只固化身份，**不代表可用** |
 | 另一台开发 Mac | `chatgpt-other-mac` | `10.111.127.23`（ZeroTier） | `rocalight` | `~/.ssh/id_ed25519` | 备用 |
 
 ### 1.1 Windows 打包机身份（固化）
@@ -45,6 +46,50 @@ agent 读不到。这里把它固化进仓库。
 | SSH 密钥 | `~/.ssh/id_ed25519`（Ed25519，公钥认证） |
 | 仓库路径 | `C:\src\heyta` |
 | ZeroTier 网络 ID | `166359304e354777` |
+
+### 1.1.1 实测容量与工具链（2026-09-27）
+
+下面是**当天当场测到的**（命令见本节末），目的是回答"这台机器能不能替我干重活"：
+
+| 项 | 实测值 |
+|---|---|
+| 逻辑 CPU | **12 核**（`Win32_ComputerSystem.NumberOfLogicalProcessors`） |
+| 内存 | **15.8 GB 总量 / 6.0 GB 空闲**（`TotalPhysicalMemory` / `FreePhysicalMemory`） |
+| 磁盘可用 | `C:` **151.9 GB**，`D:` **97.4 GB** |
+| `node` | `v24.19.0` |
+| `pnpm` | **`11.8.0`** —— 在 `C:\src\heyta` 目录内解析所得（corepack 依据 `packageManager` 切换） |
+| `git` | `2.55.0.windows.3` |
+| `corepack` | `0.35.0` |
+
+> 🔴 **两个实测到的坑，新增脚本时必须绕开：**
+>
+> **① pnpm 有两个版本，取决于在哪个目录跑。**
+> 机器全局 pnpm 是 **`12.6.0`**；只有在 `C:\src\heyta` 内才被 corepack 降到仓库锁定的
+> **`11.8.0`**。在**仓库外**跑 `pnpm install` 会用 12.x —— 而 `pnpm-workspace.yaml`
+> 顶部那段注释专门讲过"同一份 lockfile 被不同 pnpm 拒绝"的坑。**任何 pnpm 命令都要在仓库目录内跑。**
+>
+> **② PowerShell 默认执行策略会挡住 `pnpm.ps1` / `npm.ps1`。**
+> 实测报错 `无法加载文件 C:\Program Files\nodejs\pnpm.ps1，因为在此系统上禁止运行脚本`。
+> 绕法：用 **`.cmd` 垫片**（`pnpm.cmd`）或在调用时显式 `-ExecutionPolicy Bypass`。
+> ⚠️ 后者会让**报错静默变成错误结果** —— 我第一次探测时 `pnpm --version` 就因此
+> 回显了 node 的版本号而不是报错。**脚本里读版本要断言，不要只打印。**
+
+<details>
+<summary>复现上面这张表的命令</summary>
+
+```powershell
+# 容量
+$cs = Get-CimInstance Win32_ComputerSystem; $os = Get-CimInstance Win32_OperatingSystem
+$cs.NumberOfLogicalProcessors
+[math]::Round($cs.TotalPhysicalMemory/1GB,1); [math]::Round($os.FreePhysicalMemory/1MB,1)
+Get-PSDrive -PSProvider FileSystem | ForEach-Object { "$($_.Name): $([math]::Round($_.Free/1GB,1))GB" }
+# 工具链（注意：在 C:\src\heyta 内跑）
+Set-Location C:\src\heyta; node --version; pnpm.cmd --version; git --version; corepack --version
+```
+
+经 SSH 调用时，多行脚本要 **base64 + `-EncodedCommand`**：
+`powershell -Command -` 是**逐行**读取的，多行 `foreach` 块会被拆断而**静默失败**。
+</details>
 
 **换网络 / 换地点后不需要改任何配置**，只要：① 机器上 ZeroTier One 在跑；
 ② 本机 Mac 上 ZeroTier One 在跑；③ 在
