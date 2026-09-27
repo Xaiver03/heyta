@@ -17,6 +17,15 @@
 
 > ⚠️ **仓库事实更正**：任务描述称「32 个迁移」。实测 `server/prisma/migrations/` 下 **32 个条目**，但其中 3 个是文件（`README.md`、`migration_lock.toml`、`migrate-passkey-credentials.ts`），**真实迁移目录为 29 个**。
 > 证据：`find server/prisma/migrations -mindepth 1 -maxdepth 1 -type d | wc -l` → `29`；`ls -1 | wc -l` → `32`。
+>
+> 🔴 **勘误（2026-09-27 复测）——迁移又长了，本报告里的计数已过时：**
+> `find server/prisma/migrations -mindepth 1 -maxdepth 1 -type d | wc -l` → **33**；
+> `ls -1 server/prisma/migrations | wc -l` → **36**。所以上面这段与 §1.6、§5 里所有「29 个」都应按 **33** 读，
+> 「32 个条目」按 **36** 读。
+> - 同节表格引的 `server/package.json:44,66` 现已移到 **`server/package.json:47,70`**
+>   （版本事实未变：`prisma` 与 `@prisma/client` 都仍锁 **5.22.0**）。
+> - **结论一条都没变**：`server/scripts/migrate-deploy.sh:6-9` 那条 `P3018 / SQLSTATE 25001` 注释仍在原处，
+>   `server/prisma/migrations/README.md` 也仍在。
 
 ---
 

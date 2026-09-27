@@ -27,7 +27,16 @@
 > - **没有 goal / target / unit 概念**（grep 零命中）、**没有热力图 / 月历统计**
 > - ✅ 但它**确实参与同步**（`SIMPLE_COUNTER` 在 `ENTITY_TYPES` 里）
 >
-> 换句话说：**"打卡 + 连续天数"能用，"滴答清单级别的习惯模块"要自己补**（目标值/单位、备注日记、热力图、统计）。详见 `research/deep-dive-sync-core.md` §2.4。
+> 换句话说：**"打卡 + 连续天数"能用，"滴答清单级别的习惯模块"要自己补**（目标值/单位、备注日记、热力图、统计）。详见 `research/deep-dive-sync-core.md` 的 §2.4。
+>
+> 🔴 **勘误（2026-09-27）：上面那句的出处写错了。** `research/deep-dive-sync-core.md` 里
+> **既没有 §2.4，也完全没有 SimpleCounter / 习惯的内容**（该文件只有 §2.1–§2.3；
+> grep `SimpleCounter` 零命中）。上面这些证据在**上游克隆**里：
+> `research/upstream/super-productivity/src/app/features/simple-counter/`
+> （`simple-counter.model.ts`、`habit-tracker/habit-tracker.component.ts`）
+> 与 `research/upstream/super-productivity/src/app/pages/habit-page/habit-page.component.ts`。
+> ✅ 本节的数字复测仍然准确：36 行 / 327 行 TS / 201 行 HTML，「goal / target / unit」零命中。
+> **结论不变，只是出处按这条找。**
 
 ---
 

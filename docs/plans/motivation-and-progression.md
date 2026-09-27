@@ -1,11 +1,12 @@
 # 激励与成长体系（设计）
 
-> 状态：**L1 / L2 / L3 三层已实现**（分支 `feat/motivation-system`，见 §8.1 的落地对照）。
-> **未做**：Prompt 层（提示时机）、§3.4 新习惯"启动期"。
-> ✅ **本分支已合并 main**（merge commit `0560e82`，3 处冲突全部手工取并集，见 §12.2）；
+> 状态：**L1 / L2 / L3 三层已实现，并已合并进 main**（merge commit `84cc7f5`；
+> 分支侧 `0560e82` 是"把 main 并入本分支"那一步，**两者不是同一次合并**，见 §12.2）。
+> **未做**：Prompt 层（提示时机）、§3.4 新习惯"启动期"（§8.1 逐条核过，代码里 `startup` /
+> `gracePeriod` / `newHabit` 仍为 0 命中）。
 > 界面文案**已全部迁进词条表**（`apps/web/src` 现在是"已迁移"，门禁要求）。
-> 🔴 **尚未落到 `main`**：主检出工作树仍有 200+ 未提交文件（前置门③未开），
-> 且 `main` 自己现在是红的 —— **不是本分支引入的**，证据与归属见 §12.4。
+> ✅ **§12.1 的三条前置门已全开**；§12.5 那条"消费者已提交、生产者还在工作树里"的断裂
+> **也已由它的作者收口**（四个缺失的生产者现已全部在 `main` 里，见 §12.5 的收口记录）。
 > §10 的 5 项开放问题**已附建议**，等拍板。
 > 心理学证据：[`../research/motivation-psychology.md`](../research/motivation-psychology.md)
 > 竞品机制事实：[`../research/competitor-incentive-teardown.md`](../research/competitor-incentive-teardown.md)
@@ -718,6 +719,16 @@ subscription-notice.spec.tsx(190,87)  TS2345 ...
 合并后 `apps/web` 与 `apps/mobile` 的 `build` / `typecheck` 是红的，`apps/web` 的测试也红一批。
 **这不是本分支引入的，本分支一个字都不修**（那是另一条轨道的在制品）。
 全部红灯落在**同一条断裂**上：main 已提交**消费者**，而**生产者至今未提交**。
+
+> ✅ **收口记录（本节写作之后）**：下面四个"缺失的生产者"现在**全部存在于 `main`** ——
+> `packages/storage/src/errors.ts`（含 `StorageError` / `StorageFailure`）、
+> `packages/sync-client/src/client.ts` 的 `summarizeConflictPayload`、
+> `packages/domain/src/quadrant.ts` 的 `QuadrantDropPlan`（配 `packages/app-host/src/actions.ts`）、
+> `apps/mobile/src/screens/ListsSection.tsx`。
+> 🔴 **因此本节下面的复现命令已不再复现原结论**（例如 `git show main:packages/storage/src/index.ts`
+> 现在能通过 `export * from './errors'` 间接导出 `StorageError`，`grep` 计数仍是 0 但结论相反 ——
+> **"grep 计数为 0"不等于"符号不存在"**）。
+> 本节保留的价值是它的**归属判据**（"报错文件清单 ∩ 本分支改动 = 空集"），那个方法仍然有效。
 
 | 消费者（**已提交在 main**） | 缺的生产者（**main HEAD 里不存在**） | 提交 |
 |---|---|---|
