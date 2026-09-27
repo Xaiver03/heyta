@@ -39,7 +39,7 @@
 
 import { useI18n } from '@heyta/i18n';
 import { cssVar } from '@heyta/design-system';
-import { DEFAULT_CATEGORY_WEEKS, intensityLevel, type CategoryReport } from '@heyta/domain';
+import { intensityLevel, type CategoryReport } from '@heyta/domain';
 
 import { text } from '../../lib/text.js';
 import { categorySlotColor, unsetSlotColor } from '../../lib/category-colors.js';
@@ -227,6 +227,3 @@ function WeeklyBars({ report }: { report: CategoryReport }) {
     </div>
   );
 }
-
-/** 窗口周数（导出给测试用：用例不该写死 12，那是配置不是契约）。 */
-export const CATEGORY_WINDOW_WEEKS = DEFAULT_CATEGORY_WEEKS;

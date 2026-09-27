@@ -240,7 +240,25 @@ HABIT.target + unit   →  HABIT.color
 | 设计系统 | **402 通过**（6 文件），含 `category-colors.spec.ts` 13 条 + `tokens.spec.ts` 的登记断言。`generate` 已重跑（4 个产物、191 token、暗色覆盖 73）。 |
 | 动作层 | `packages/app-host`：**401 通过**。其中"清除写 `color: null` 而不是让键消失"已用注入（改成不写键）验证会红。 |
 | 界面 | `apps/web/tests/categories.spec.tsx`：**11 通过**。含"每行都有名字/来源/数字"、"格子数=12"、"文案里没有排名与褒贬"（`最多/最少/最差/排名/占比/超标/失衡/第一名` 逐个禁）。已用注入（拿掉行名、把峰值当 0）验证会红。 |
-| 门禁 | `check:design`（111 文件 0 裸值）、`check:ui-language`（108 文件、**989/989** 条 zh/en）、`check:layering`、`check:tokens` 全绿。 |
+| 门禁 | `check:design`（111 文件 0 裸值）、`check:ui-language`（108 文件、**989/989** 条 zh/en）、`check:layering`、`check:tokens`、`check:docs`、`check:migrations`、`check:licenses`、`check:arkts`、`check:native-deps`、`check:ai-coverage` 全绿。 |
+| 逐包全量 | domain 464 / design-system 402 / app-host 401 / i18n 10 / op-log 51 / storage 189 / sync-core 280 / shared-schema 70 / ai 144 / local-api 79 / landing 71 / sync-client 39 —— **全绿**。 |
+
+### 8.4.1 两条**被检查逼出来**的修正（不是审美，值得单独记）
+
+1. **`check:ui-language` 是形状检查，不是内容检查。** 我的中文词条
+   `'web.categories.segment.aria': '{name}：{duration}'` 形状完全合规
+   （`t('…')` 包着一条存在的 key），但**一个汉字都没有** ——
+   这与"忘了翻译、把英文占位留在中文表里"逐字相同。
+   抓到它的是 `packages/i18n/tests/catalog.spec.ts` 的
+   「中文表每一条都含汉字」，不是那条仓库级门禁。
+   → 结论：**跑完 `check:*` 不等于跑过每个包自己的测试**；这一条也解释了
+   为什么"中文表里只有标点的词条"必须写成有汉字的形式（现在是 `'{name}，共 {duration}'`）。
+2. **`column-reverse` 的"第一个孩子在底部"与 `reverse()` 会互相抵消。**
+   堆叠条原来既写了 `column-reverse` 又写了 `.reverse()`，谁是底、谁是顶
+   与注释所写的**正好相反**，而且没有任何断言看得出来。
+   → 已去掉 `reverse()`，并把"段序 = 行序"变成一条**能失败**的断言
+   （`categories.spec.tsx`：「第一段的颜色 == 第一行的颜色」，两行总时长不同所以顺序有信息量）。
+   注入 `slice().reverse()` 实测红、还原后绿。
 
 🔴 **一条被这一轮修掉的真 bug**：`record()` 最初是"先建分类行、再判窗口"，
 于是窗口外的历史会留下 `totalMs: 0` 的**空行** —— 界面上是"一整行空格子 + 0 分钟"的分类。
