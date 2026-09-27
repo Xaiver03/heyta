@@ -1591,4 +1591,38 @@ export const en = {
   'mobile.growth.tag.deep-two-hundred': 'Two hundred deep hours',
   'mobile.growth.tag.finisher-five-hundred': 'Five hundred finished',
   'mobile.growth.tag.streak-thirty': 'Thirty days straight',
+
+  // ── Trash (mobile second level, entered from Profile) ──────
+  // Kept separate from `web.trash.*` on purpose: the mobile confirmation adds
+  // the "this is not a physical erase" clause. Purge only writes the
+  // `purgedAt` marker — the op-log payload survives locally and on the server.
+  'mobile.trash.title': 'Trash',
+  'mobile.trash.entry': 'Trash',
+  'mobile.trash.entry.hint': 'Restore tasks you deleted',
+  'mobile.trash.intro': 'Deleted tasks land here. Restore one and it goes back where it was.',
+  'mobile.trash.empty.title': 'Trash is empty',
+  'mobile.trash.empty.hint': 'Tasks you delete show up here first',
+  'mobile.trash.deletedAt': 'Deleted {date}',
+  'mobile.trash.restore': 'Restore',
+  'mobile.trash.restoreA11y': 'Restore: {title}',
+  'mobile.trash.purge': 'Delete permanently',
+  'mobile.trash.purgeA11y': 'Delete permanently: {title}',
+  'mobile.trash.confirm.title': 'Delete “{title}” permanently?',
+  'mobile.trash.confirm.body': 'It leaves the trash and cannot be restored.',
+  'mobile.trash.confirm.notErasure': 'This is not a physical erase: the operation log still holds this record — the app simply stops offering a restore.',
+  'mobile.trash.confirm.submit': 'Delete permanently',
+  'mobile.trash.confirm.cancel': 'Cancel',
+
+  // ── Export (mobile second level, entered from Profile) ─────
+  // The export document's own wording and the "you cannot import it back"
+  // clause reuse the web `web.export.*` entries — that wording belongs to the
+  // export, not to the web shell, and both hosts reading the same keys is what
+  // keeps them from ever disagreeing. Only mobile-specific bits live here.
+  'mobile.export.entry': 'Export data',
+  'mobile.export.entry.hint': 'Take your data out (no import back yet)',
+  'mobile.export.json.button': 'Share JSON',
+  'mobile.export.markdown.button': 'Share task list',
+  'mobile.export.shareHint': 'The export is handed to the system share sheet, where you choose where it goes.',
+  'mobile.export.shareTitle': 'heyta export',
+  'mobile.export.shareFailed': 'The system share sheet did not open, so nothing was sent.',
 } satisfies Record<MessageKey, string>;

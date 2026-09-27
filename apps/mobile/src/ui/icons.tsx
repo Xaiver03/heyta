@@ -45,6 +45,7 @@ import {
   Repeat,
   RotateCcw,
   Settings,
+  Share2,
   Smartphone,
   Square,
   Tag,
@@ -139,6 +140,14 @@ const ICONS = {
   'action.close': X,
   'action.settings': Settings,
   'action.sync': RefreshCw,
+  /**
+   * 导出 / 分享。
+   *
+   * 🔴 语义名是 `action.share` 而不是 `action.download`：移动端**没有**
+   * `<a download>`，导出走的是系统分享面板（`Share.share`）。用云朵下载箭头
+   * 会承诺一个并不存在的动作 —— 图标和按钮文案必须说同一件事。
+   */
+  'action.share': Share2,
 
   /**
    * 成长（激励体系）。
