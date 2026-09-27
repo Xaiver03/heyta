@@ -1,0 +1,398 @@
+/**
+ * 导入 / 还原：把一份导出文档变回本机数据
+ * ============================================
+ *
+ * 这个文件兑现 `README.md` 设计原则第 5 条（**导出自由**）的另一半 ——
+ * 在那之前，`export-dump.ts` 造出来的文件只能出、不能回，
+ * 界面与 Markdown 页脚都写着"这是导出，还不是还原点"。
+ *
+ * 🔴 **为什么产品语义在 `packages/app-host` 而不是 `apps/*`：**
+ *
+ * "一份导出文件能不能被接受、导进哪里、怎么保证结果与导出逐项一致"
+ * 全是判断，而且每个宿主都必须给出**一模一样**的答案（AGENTS.md §3.5）。
+ * 放进 `apps/web`，下一个宿主（CLI、移动端）就会再写一遍并漂移。
+ * 所以这里是零运行时依赖的纯函数 + 一条把判断串起来的编排；宿主只负责
+ * "选文件 / 读文本 / 给一个存储目标"。
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * ## 本轮的范围：**只做「还原到空库」，不做「合并到已有数据的库」**
+ *
+ * 这是唯一一个在动手前就想清楚、且必须写下来的决定。
+ *
+ * **两种语义的风险不对称：**
+ *
+ * | | 还原到空库 | 合并到已有数据的库 |
+ * |---|---|---|
+ * | 用户意图 | "把这份备份变回我的数据" | "把两份数据拼起来" |
+ * | id 冲突 | 不可能（目标为空） | 必然：同一 id 在两份数据里可能都改了 |
+ * | 时钟/顺序 | 只需要"并进导出日志里的全部时钟" | 还要判断"两边谁更新" |
+ * | 出错后果 | 结果是导出时的状态 | 可能静默丢掉本地或导入的一端 |
+ *
+ * 合并需要的三件事本轮**一件都没有可靠答案**：
+ *
+ *   1. **id 冲突的判定** —— 本地已有同 id 实体时，是覆盖、保留本地，
+ *      还是按 `updatedAt` 择一？三条路都会在某个场景下丢掉用户的编辑。
+ *   2. **时钟/op 顺序** —— 导入的 op 与本地已接受的 op 之间没有共同因果历史，
+ *      `compareVectorClocks` 只会给出 `CONCURRENT`，于是每一对都退化成
+ *      LWW + `clientId` 决胜 —— 而"谁赢"取决于随机 id 与墙上时钟，不是用户意图。
+ *   3. **"本地已有更新版本"的判定** —— 这是第 2 条的具体后果，本轮没有可信判据。
+ *
+ * 做对一半好过糊弄两种。**合并被明确拒绝，而不是"暂时没实现"**：
+ * 拒绝的理由是"它会静默丢数据"，那是一个产品结论，不是排期问题。
+ *
+ * ## 🔴 导入**绝不**清空或覆盖现有数据
+ *
+ * `restoreIntoEmptyTarget()` 在写任何东西**之前**先读目标 op-log：
+ * 只要里面**有任何一条 op**，就返回 `target-not-empty` 并**什么都不写**。
+ * 所以"导入把用户数据清了"这条路径在代码里根本不存在 —— 不是靠界面拦，
+ * 而是靠这里拦。界面还会再确认一次（见 `ImportPanel`），那是第二道。
+ *
+ * ## 结果必须与导出"逐项一致"，包括"哪些是被删掉的"
+ *
+ * 导出里含墓碑是**故意的**（见 `export-dump.ts` 文件头）：op-log 用
+ * `deletedAt` 表示删除，丢掉墓碑的"备份"回放时已删数据会复活。
+ * 所以还原走的是**重放导出里的完整 op-log**，而不是把 `entities` 写进状态 ——
+ * `DEL` op 重放后天然得到墓碑，已删记录不会复活。`entities` 只用来**核对**。
+ *
+ * 核对分两次，都在下面：
+ *   - **写之前**：`replayOperations(导出.opLog)` 必须与 `导出.entities` /
+ *     `导出.counts` 逐项一致。不一致 = 这份文件被改坏了 / 半截 —— 直接拒绝，
+ *     **一个字节都不写**。
+ *   - **写之后**：本机物化状态必须与 `导出.entities` 逐项一致，
+ *     否则报 `verification-failed` 而不是"成功"。
+ */
+
+import { MODELED_ENTITY_TYPES, bucketFor, emptyState, replayOperations } from '@heyta/op-log';
+import type { MaterializedState } from '@heyta/op-log';
+import { CURRENT_SCHEMA_VERSION } from '@heyta/shared-schema';
+import { OpType, type Operation } from '@heyta/sync-core';
+
+import { EXPORT_APP_NAME, EXPORT_FORMAT_VERSION, type ExportDocument } from './export-dump.js';
+
+/**
+ * 导入/还原被拒绝的原因。
+ *
+ * 🔴 它是**结构化**的，不是一句文案：词条是唯一文案事实源（AGENTS.md），
+ * 所以这里只回 `reason`，界面/CLI 自己取词条。
+ */
+export type ExportImportFailureReason =
+  /** 不是合法 JSON。 */
+  | 'invalid-json'
+  /** 是 JSON，但形状不对（缺字段、字段类型不对、op 形状不对）。 */
+  | 'invalid-document'
+  /** 这不是 heyta 的导出文件。 */
+  | 'wrong-application'
+  /** 导出格式版本不认识（可能来自更新的版本）。 */
+  | 'unsupported-format-version'
+  /** op / 线协议 schema 版本不同 —— 跨版本还原本轮不做。 */
+  | 'unsupported-schema-version'
+  /** 文档**自相矛盾**：重放它的 op-log 得不到它自己声称的 entities/counts。 */
+  | 'inconsistent-document'
+  /** 目标是**空库**才能还原，而它已经有数据了。 */
+  | 'target-not-empty'
+  /** 写完之后结果与导出对不上（不该发生，但必须能被观测到）。 */
+  | 'verification-failed';
+
+/** `parseExportDocument()` 的结果。 */
+export type ParseExportResult =
+  | { ok: true; document: ExportDocument }
+  | { ok: false; reason: ExportImportFailureReason; detail?: string };
+
+/** `restoreIntoEmptyTarget()` 的结果。 */
+export type RestoreExportResult =
+  | {
+      ok: true;
+      /** 真正写进日志的 op 条数。 */
+      importedOps: number;
+      /** 因为已存在而跳过的 op 条数（同一份导出导两次时全在这里）。 */
+      skippedOps: number;
+      /** 还原后的记录总数（含墓碑）。 */
+      entities: number;
+      /** 其中已删除的条数 —— 它必须与导出里的一致。 */
+      deleted: number;
+    }
+  | { ok: false; reason: ExportImportFailureReason; detail?: string };
+
+/**
+ * 还原要落到的目标。
+ *
+ * `AppHost` **结构上**满足它（`engine` + `readOpLog`），所以宿主直接把 host 传进来；
+ * `apps/web` 没有 AppHost 对象，就传一个 `{ engine, readOpLog }` 的薄适配。
+ * 刻意收窄而不是要求完整 `AppHost`：还原只该看到"日志里有什么""写进去""状态是什么"。
+ */
+export interface ImportTarget {
+  engine: {
+    importOperations(ops: readonly Operation<string>[]): Promise<{ imported: number; skipped: number }>;
+    getState(): MaterializedState;
+  };
+  /** 读**完整**本地 op-log（判断目标是否为空，以及拒绝后回报条数）。 */
+  readOpLog(): Promise<Operation<string>[]>;
+}
+
+// ── 解析 ────────────────────────────────────────────────────
+
+/**
+ * 文本 → 导出文档。**纯函数**：不碰存储、不写任何东西。
+ *
+ * 它只做**形状与版本**的校验，不做"内容是否自洽"的判定 ——
+ * 那需要重放整个 op-log，属于 {@link restoreIntoEmptyTarget}（也刻意在写之前）。
+ */
+export function parseExportDocument(text: string): ParseExportResult {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(text);
+  } catch {
+    return { ok: false, reason: 'invalid-json' };
+  }
+
+  if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed)) {
+    return { ok: false, reason: 'invalid-document', detail: '顶层不是对象' };
+  }
+
+  const raw = parsed as Record<string, unknown>;
+
+  if (raw['formatVersion'] !== EXPORT_FORMAT_VERSION) {
+    return {
+      ok: false,
+      reason: 'unsupported-format-version',
+      detail: `formatVersion=${String(raw['formatVersion'])}（本机支持 ${String(EXPORT_FORMAT_VERSION)}）`,
+    };
+  }
+
+  const app = raw['app'];
+  if (
+    app === null ||
+    typeof app !== 'object' ||
+    (app as Record<string, unknown>)['name'] !== EXPORT_APP_NAME
+  ) {
+    return { ok: false, reason: 'wrong-application' };
+  }
+
+  if (raw['schemaVersion'] !== CURRENT_SCHEMA_VERSION) {
+    return {
+      ok: false,
+      reason: 'unsupported-schema-version',
+      detail: `schemaVersion=${String(raw['schemaVersion'])}（本机支持 ${String(CURRENT_SCHEMA_VERSION)}）`,
+    };
+  }
+
+  const entities = raw['entities'];
+  if (entities === null || typeof entities !== 'object' || Array.isArray(entities)) {
+    return { ok: false, reason: 'invalid-document', detail: 'entities 不是对象' };
+  }
+  for (const [entityType, rows] of Object.entries(entities as Record<string, unknown>)) {
+    if (!Array.isArray(rows)) {
+      return { ok: false, reason: 'invalid-document', detail: `entities.${entityType} 不是数组` };
+    }
+  }
+
+  const counts = raw['counts'];
+  if (counts === null || typeof counts !== 'object' || Array.isArray(counts)) {
+    return { ok: false, reason: 'invalid-document', detail: 'counts 不是对象' };
+  }
+
+  const opLog = raw['opLog'];
+  if (!Array.isArray(opLog)) {
+    return { ok: false, reason: 'invalid-document', detail: 'opLog 不是数组' };
+  }
+  for (const op of opLog) {
+    const bad = invalidOpReason(op);
+    if (bad !== undefined) return { ok: false, reason: 'invalid-document', detail: bad };
+  }
+
+  // 计数必须与数组长度自洽 —— 否则"导全了/还原全了"这些数字本身不可信。
+  if ((counts as Record<string, unknown>)['totalOps'] !== opLog.length) {
+    return {
+      ok: false,
+      reason: 'inconsistent-document',
+      detail: `counts.totalOps=${String((counts as Record<string, unknown>)['totalOps'])} 与 opLog 长度 ${String(opLog.length)} 不符`,
+    };
+  }
+
+  return { ok: true, document: raw as unknown as ExportDocument };
+}
+
+/** 一条 op 的形状校验。返回 `undefined` 表示合法。 */
+function invalidOpReason(op: unknown): string | undefined {
+  if (op === null || typeof op !== 'object' || Array.isArray(op)) return 'opLog 里有非对象元素';
+  const record = op as Record<string, unknown>;
+
+  if (typeof record['id'] !== 'string' || record['id'] === '') return '某条 op 缺少 id';
+  if (typeof record['clientId'] !== 'string' || record['clientId'] === '') {
+    return `op ${String(record['id'])} 缺少 clientId`;
+  }
+  if (typeof record['entityType'] !== 'string' || record['entityType'] === '') {
+    return `op ${String(record['id'])} 缺少 entityType`;
+  }
+  if (typeof record['timestamp'] !== 'number' || !Number.isFinite(record['timestamp'])) {
+    return `op ${String(record['id'])} 的 timestamp 不是数字`;
+  }
+  // opType 词表只有一份（sync-core 的 OpType）—— 不认识就拒绝，不要自造词。
+  if (!isKnownOpType(record['opType'])) {
+    return `op ${String(record['id'])} 的 opType「${String(record['opType'])}」不在词表里`;
+  }
+  const clock = record['vectorClock'];
+  if (clock === null || typeof clock !== 'object' || Array.isArray(clock)) {
+    return `op ${String(record['id'])} 的 vectorClock 不是对象`;
+  }
+  for (const value of Object.values(clock as Record<string, unknown>)) {
+    if (typeof value !== 'number' || !Number.isFinite(value)) {
+      return `op ${String(record['id'])} 的 vectorClock 含非数字分量`;
+    }
+  }
+  return undefined;
+}
+
+function isKnownOpType(value: unknown): boolean {
+  return typeof value === 'string' && (Object.values(OpType) as string[]).includes(value);
+}
+
+// ── 还原 ────────────────────────────────────────────────────
+
+/**
+ * 把一份导出文档还原到**空**目标。
+ *
+ * 三种拒绝都不会写任何东西：
+ *   - `target-not-empty` —— 目标已有 op（**绝不清空用户数据**）。
+ *   - `inconsistent-document` —— 重放导出 op-log 得不到它自己声称的状态。
+ *   - `verification-failed` 是写之后才可能出现的，它意味着**真的发生了异常**，
+ *     此时数据已经在库里 —— 如实上报，不要谎报成功。
+ */
+export async function restoreIntoEmptyTarget(
+  target: ImportTarget,
+  document: ExportDocument,
+): Promise<RestoreExportResult> {
+  // 1. 目标必须真的是空库。**这一步在写任何东西之前。**
+  const existing = await target.readOpLog();
+  if (existing.length > 0) {
+    return {
+      ok: false,
+      reason: 'target-not-empty',
+      detail: `本机已有 ${String(existing.length)} 条操作日志`,
+    };
+  }
+
+  // 2. 写之前先证明这份文件自洽：重放它的 op-log 必须得到它自己声称的
+  //    entities 与 counts。不一致 = 文件被改坏/半截 —— 一个字节都不写。
+  const expected = replayOperations(emptyState(), document.opLog);
+  if (!stateMatchesDocument(expected, document)) {
+    return { ok: false, reason: 'inconsistent-document' };
+  }
+
+  // 3. 追加 + 从完整日志重建状态与时钟（墓碑随 DEL op 一起重放，不会复活）。
+  const result = await target.engine.importOperations(document.opLog);
+
+  // 4. 写完之后再核对一次。对不上就必须报失败，而不是"看起来成功了"。
+  const after = target.engine.getState();
+  if (!stateMatchesDocument(after, document)) {
+    return {
+      ok: false,
+      reason: 'verification-failed',
+      detail: `写入了 ${String(result.imported)} 条 op，但结果与导出不一致`,
+    };
+  }
+
+  const totals = countState(after);
+  return {
+    ok: true,
+    importedOps: result.imported,
+    skippedOps: result.skipped,
+    entities: totals.total,
+    deleted: totals.deleted,
+  };
+}
+
+/**
+ * 物化状态是否与导出文档**逐项一致**（含墓碑），并且计数也对得上。
+ *
+ * ⚠️ 这条判据必须能分辨"删了"与"没这条"：导出的每一条（含墓碑）都要在本机
+ * 找到**逐字段相同**的记录。只比"活着的那几条"会让"已删数据复活/丢失"
+ * 两种最要命的错误同时通过。
+ */
+export function stateMatchesDocument(
+  state: MaterializedState,
+  document: ExportDocument,
+): boolean {
+  const entityTypes = new Set<string>([
+    ...MODELED_ENTITY_TYPES,
+    ...Object.keys(document.entities),
+  ]);
+
+  for (const entityType of entityTypes) {
+    const actual = recordsOf(state, entityType);
+    const expected = [...(document.entities[entityType] ?? [])].sort(byRecordId);
+    if (actual.length !== expected.length) return false;
+    for (let i = 0; i < actual.length; i += 1) {
+      if (canonical(actual[i]) !== canonical(expected[i])) return false;
+    }
+  }
+
+  const totals = countState(state);
+  if (totals.total !== document.counts.totalEntities) return false;
+  if (totals.deleted !== document.counts.totalDeleted) return false;
+
+  for (const entityType of entityTypes) {
+    const expectedCount = document.counts.entities[entityType] ?? { total: 0, deleted: 0 };
+    const actualRecords = recordsOf(state, entityType);
+    const actualCount = {
+      total: actualRecords.length,
+      deleted: actualRecords.filter(isTombstone).length,
+    };
+    if (actualCount.total !== expectedCount.total) return false;
+    if (actualCount.deleted !== expectedCount.deleted) return false;
+  }
+
+  return true;
+}
+
+/** 某实体类型在物化状态里的全部记录（含墓碑），按 id 排序。 */
+function recordsOf(state: MaterializedState, entityType: string): unknown[] {
+  const bucket = bucketFor(state, entityType);
+  if (bucket === undefined) return [];
+  return Object.values(bucket).sort(byRecordId);
+}
+
+/** 全库计数（含墓碑）。 */
+function countState(state: MaterializedState): { total: number; deleted: number } {
+  let total = 0;
+  let deleted = 0;
+  for (const entityType of MODELED_ENTITY_TYPES) {
+    const records = recordsOf(state, entityType);
+    total += records.length;
+    deleted += records.filter(isTombstone).length;
+  }
+  return { total, deleted };
+}
+
+function byRecordId(a: unknown, b: unknown): number {
+  const ida = String((a as Record<string, unknown>)['id'] ?? '');
+  const idb = String((b as Record<string, unknown>)['id'] ?? '');
+  return ida.localeCompare(idb);
+}
+
+function isTombstone(record: unknown): boolean {
+  return (record as Record<string, unknown>)['deletedAt'] !== undefined;
+}
+
+/**
+ * 与 `export-dump.ts` 里那个**私有**的排序器同形：递归按 key 排序后 `JSON.stringify`。
+ *
+ * 为什么不从那边 import：那个是序列化细节，导出侧的稳定字节由它自己的测试钉住。
+ * 这里要的是"两个对象是否逐字段相同"的**判据** —— 共用同一个私有函数会把
+ * "导出格式"与"导入校验"焊死，而它们本就该能各自演进。
+ */
+function canonical(value: unknown): string {
+  return JSON.stringify(sortKeysDeep(value));
+}
+
+function sortKeysDeep(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(sortKeysDeep);
+  if (value === null || typeof value !== 'object') return value;
+
+  const source = value as Record<string, unknown>;
+  const sorted: Record<string, unknown> = {};
+  for (const key of Object.keys(source).sort()) {
+    sorted[key] = sortKeysDeep(source[key]);
+  }
+  return sorted;
+}

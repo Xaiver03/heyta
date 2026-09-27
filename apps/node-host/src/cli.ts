@@ -20,14 +20,27 @@
  * HEYTA_PASSWORD / HEYTA_CLIENT_ID。加 `--json` 输出机器可读结果。
  */
 
-import { writeFileSync, writeSync } from 'node:fs';
+import { readFileSync, writeFileSync, writeSync } from 'node:fs';
 
 import { parseLocalDate } from '@heyta/domain';
-import { serializeExportDocument, type NewTaskFields } from '@heyta/app-host';
+import {
+  parseExportDocument,
+  serializeExportDocument,
+  type NewTaskFields,
+} from '@heyta/app-host';
 import { openNodeHost } from './host.js';
 import type { SyncStatus } from '@heyta/sync-client';
 
-const VALUE_FLAGS = new Set(['db', 'server', 'token', 'password', 'client-id', 'due', 'out']);
+const VALUE_FLAGS = new Set([
+  'db',
+  'server',
+  'token',
+  'password',
+  'client-id',
+  'due',
+  'out',
+  'in',
+]);
 const BOOL_FLAGS = new Set(['json', 'all', 'help']);
 
 interface ParsedArgs {
@@ -103,6 +116,39 @@ function describeSyncStatus(status: SyncStatus): string {
   }
 }
 
+/**
+ * 还原失败的结构化原因 → 终端文案。
+ *
+ * 🔴 `target-not-empty` 那一句是**产品的诚实条款**：还原只做「空库」，
+ * 而把这条说成大而化之的"导入失败"，用户会以为文件坏了，
+ * 于是去反复重试或去找别的工具 —— 真正该做的是先清空/另开一个库。
+ */
+function describeRestoreFailure(reason: string, detail?: string): string {
+  const base = ((): string => {
+    switch (reason) {
+      case 'invalid-json':
+        return '这个文件不是合法 JSON';
+      case 'invalid-document':
+        return '这个文件不是一份完整的 heyta 导出';
+      case 'wrong-application':
+        return '这个文件不是 heyta 导出的';
+      case 'unsupported-format-version':
+        return '导出格式版本不认识（文件可能来自更新的版本）';
+      case 'unsupported-schema-version':
+        return 'op schema 版本与本机不同，跨版本还原本轮不支持';
+      case 'inconsistent-document':
+        return '文件自相矛盾：重放它的操作日志得不到它自己声称的数据';
+      case 'target-not-empty':
+        return '本机已经有数据 —— 还原只支持空库，现有数据一个字节都没动';
+      case 'verification-failed':
+        return '写入后结果与导出不一致（数据可能已部分写入，请检查）';
+      default:
+        return `未知原因（${reason}）`;
+    }
+  })();
+  return detail === undefined ? base : `${base}（${detail}）`;
+}
+
 const USAGE = `heyta node-host —— 非 Web 宿主（真实 SQLite + 真实同步）
 
 用法：
@@ -127,6 +173,8 @@ const USAGE = `heyta node-host —— 非 Web 宿主（真实 SQLite + 真实同
   projects                  列出清单
   tags                      列出标签
   export --out <路径>       导出全部数据到 JSON 文件（含已删除记录与完整操作日志）
+  import --in <路径>        从导出的 JSON 还原 —— **只支持还原到空库**；
+                            本机已有数据时拒绝，且不会改动任何现有数据
 `;
 
 /**
@@ -353,6 +401,73 @@ async function main(): Promise<number> {
               `（其中已删除 ${String(doc.counts.totalDeleted)} 条）、` +
               `${String(doc.counts.totalOps)} 条操作日志`,
           );
+        }
+        return 0;
+      }
+
+      case 'import': {
+        const inPath = stringFlag(flags, 'in');
+        if (inPath === undefined) {
+          throw new Error('import 需要 --in <路径>（从哪个 JSON 还原）');
+        }
+        // 解析与"能不能导、导到哪里"全是 `@heyta/app-host` 的产品语义；
+        // CLI 只负责读文件、把结构化 reason 翻译成人话、如实报数。
+        const parsed = parseExportDocument(readFileSync(inPath, 'utf8'));
+        if (!parsed.ok) {
+          if (json) {
+            out(
+              JSON.stringify({
+                ok: false,
+                command: 'import',
+                reason: parsed.reason,
+                detail: parsed.detail ?? null,
+              }),
+            );
+          } else {
+            err(`❌ 拒绝还原：${describeRestoreFailure(parsed.reason, parsed.detail)}`);
+          }
+          return 1;
+        }
+
+        const result = await host.restoreExport(parsed.document);
+        if (!result.ok) {
+          if (json) {
+            out(
+              JSON.stringify({
+                ok: false,
+                command: 'import',
+                reason: result.reason,
+                detail: result.detail ?? null,
+              }),
+            );
+          } else {
+            err(`❌ 拒绝还原：${describeRestoreFailure(result.reason, result.detail)}`);
+          }
+          return 1;
+        }
+
+        if (json) {
+          out(
+            JSON.stringify({
+              ok: true,
+              command: 'import',
+              file: inPath,
+              importedOps: result.importedOps,
+              skippedOps: result.skippedOps,
+              entities: result.entities,
+              deleted: result.deleted,
+            }),
+          );
+        } else {
+          out(
+            `已还原 ${String(result.entities)} 条记录` +
+              `（其中已删除 ${String(result.deleted)} 条）、` +
+              `${String(result.importedOps)} 条操作日志` +
+              (result.skippedOps > 0 ? `（已有 ${String(result.skippedOps)} 条，跳过）` : ''),
+          );
+          // 🔴 诚实条款：导入的 op 带着原来那台设备的 clientId，
+          // 服务端会拒绝它们，所以**这台设备不会把它们上传**。
+          out('注意：还原只作用在本机。服务端不会因此收到这些数据。');
         }
         return 0;
       }

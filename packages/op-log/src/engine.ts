@@ -78,6 +78,14 @@ export interface RemoteApplyResult {
   overwritten: Array<{ entityType: string; entityId: string }>;
 }
 
+/** {@link OpLogEngine.importOperations} 的结果。 */
+export interface ImportOpsResult {
+  /** 真正写进日志的 op 条数。 */
+  imported: number;
+  /** 因为 `opId` 已存在而跳过的条数（同一份导出导入两次时全在这里）。 */
+  skipped: number;
+}
+
 export class OpLogEngine {
   private state: MaterializedState;
   /** 本地向量时钟。每次本地写入递增自己的分量。 */
@@ -326,6 +334,44 @@ export class OpLogEngine {
     }
 
     return { applied, skipped: skippedCount, overwritten };
+  }
+
+  // ── 导入 / 还原 ─────────────────────────────────────────
+
+  /**
+   * 从一份**导出文档的 op-log** 还原本机数据。
+   *
+   * ═════════════════════════════════════════════════════════════════════
+   * 🔴 **这是"导入"这条产品路径的引擎原语，但它自己不做产品判断。**
+   *
+   * 它只回答一个问题："把这些**已经存在的 op** 当成事实追加进日志，
+   * 然后让状态与时钟跟上它们。" 至于"目标是空库还是合并""文档版本对不对"
+   * "结果与导出是否逐项一致" —— 全是产品语义，留在 `@heyta/app-host`。
+   * ═════════════════════════════════════════════════════════════════════
+   *
+   * 为什么**必须**在追加后调用 `recover()`，而不能只 `applyOperation()` 一遍：
+   *
+   *   - `recover()` 会从**整个日志**重建物化状态、重建 `appliedOpIds`、
+   *     并把每条 op 的向量时钟并进 `this.clock`。
+   *   - 🔴 少了"并时钟"这一步，接下来这台设备的**每一次本地写入都会时钟回退**：
+   *     新 op 的时钟是从 `{}` 长出来的，与导入的时钟**并发**甚至更旧，
+   *     于是 reducer 的写入闸门（`shouldAcceptWrite`）会把它们判成"更旧"而
+   *     **静默丢弃** —— 数据写进了日志、界面就是不动，且不报错。
+   *   - 墓碑语义也在这里被保住：导出里带着 `DEL` op，重放它就得到 `deletedAt`。
+   *     任何"只搬 entities 不搬 op"的还原都会让已删数据复活（见 export-dump.ts 文件头）。
+   *
+   * ⚠️ 导入的 op **不进上传队列**（`source: 'import'`）—— 原因见
+   * `OpLogStore.appendImported`：它们带着别的设备的 `clientId`，服务端会拒绝。
+   */
+  async importOperations(ops: readonly Operation<string>[]): Promise<ImportOpsResult> {
+    if (ops.length === 0) return { imported: 0, skipped: 0 };
+
+    const result = await this.options.store.appendImported([...ops]);
+
+    // 追加之后，状态与时钟都必须从**完整日志**重建 —— 见上面的注释。
+    await this.recover();
+
+    return { imported: result.appended.length, skipped: result.skipped.length };
   }
 
   /**

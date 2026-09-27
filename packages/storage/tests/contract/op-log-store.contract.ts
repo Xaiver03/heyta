@@ -216,6 +216,51 @@ export function runOpLogStoreContract({ name, createDb, create }: OpLogStoreCont
       });
     });
 
+    // ── 导入（从一份导出文档还原）───────────────────────────
+    //
+    // 这段契约守的是"还原"路径的两条硬要求：
+    //   1. `source` 必须是 `'import'` —— 证据链要能区分"我写的"与"搬回来的"；
+    //   2. **不进上传队列** —— 导入的 op 带着别的设备的 `clientId`，
+    //      服务端会逐条以 `INVALID_CLIENT_ID` 拒绝（validation.service.ts），
+    //      排进队列只会得到一批永久拒绝。这是产品结论，不是实现细节。
+
+    it('🔴 导入的 op 记为 import，且**不进**上传队列', async () => {
+      await withStore(async (store) => {
+        const op = makeOp({ clientId: 'other-device' });
+        const result = await store.appendImported([op]);
+
+        expect(result.appended.map((o) => o.id)).toEqual([op.id]);
+        expect(await store.findPendingUpload()).toHaveLength(0);
+        expect(await store.findPendingApply()).toHaveLength(0);
+        const rows = await store.getAllOps();
+        expect(rows[0]?.source).toBe('import');
+      });
+    });
+
+    it('导入与本地写入共用同一条 seq 序列（仍然无空洞）', async () => {
+      await withStore(async (store) => {
+        await store.appendLocal([makeOp()]);
+        const imported = await store.appendImported([makeOp(), makeOp()]);
+        expect(imported.seqs).toEqual([2, 3]);
+        expect(await store.getLastLocalSeq()).toBe(3);
+      });
+    });
+
+    it('重复导入同一 op 被跳过，而不是报错或写第二条', async () => {
+      await withStore(async (store) => {
+        const op = makeOp();
+        const first = await store.appendImported([op]);
+        const second = await store.appendImported([op]);
+
+        expect(first.appended).toHaveLength(1);
+        expect(first.skipped).toHaveLength(0);
+        expect(second.appended).toHaveLength(0);
+        expect(second.skipped.map((o) => o.id)).toEqual([op.id]);
+        expect(await store.getAllOps()).toHaveLength(1);
+        expect(await store.getLastLocalSeq()).toBe(1);
+      });
+    });
+
     // ── 上传队列 ───────────────────────────────────────────
 
     it('🔴 待上传队列按本地 seq 升序（上传顺序必须与产出顺序一致）', async () => {
