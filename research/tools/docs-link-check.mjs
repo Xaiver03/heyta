@@ -314,14 +314,19 @@ function assertSelfTest() {
     join(ROOT, 'docs', 'runbooks', 'deployment.md'),
   );
   //     唯一 basename 简写（`deployment.md §3.7.1`）也要认 —— 文档里就这么写。
+  //
+  //     ⚠️ 下面两条**依赖仓库里没有同名文件**：新增第二个 `deployment.md`
+  //     （或第二个 `runbooks/desktop.md`）会让解析**真的变得有歧义**，
+  //     于是这两条转红。那不是自检坏了，是解析行为变了 ——
+  //     口径是"有歧义就不猜"，所以宁可报出来。先看括号里的提示再动代码。
   eq(
-    '唯一 basename 简写要能解析',
+    '唯一 basename 简写要能解析（新增同名文件会合法地让这条红）',
     resolveTarget(plansDir, 'deployment.md'),
     join(ROOT, 'docs', 'runbooks', 'deployment.md'),
   );
   //     路径后缀唯一时也要认：`[`runbooks/desktop.md` §4.3](../runbooks/desktop.md)`。
   eq(
-    '唯一路径后缀要能解析',
+    '唯一路径后缀要能解析（新增同名文件会合法地让这条红）',
     resolveTarget(plansDir, 'runbooks/desktop.md'),
     join(ROOT, 'docs', 'runbooks', 'desktop.md'),
   );
