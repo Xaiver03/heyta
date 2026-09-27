@@ -22,6 +22,7 @@ import {
   EMPTY_HEALTH,
   classifyDestination,
   countsAsEndpointFailure,
+  describeRouteIntent,
   endpointCapabilities,
   findPreset,
   invokeRouted,
@@ -163,9 +164,21 @@ describe('validateEndpointUrl —— 按目的地分岔的规则', () => {
     if (!v.ok) expect(v.reason).toBe('credentials-in-url');
   });
 
-  it('非 http(s) 与解析不了的都拒绝', () => {
-    for (const url of ['ftp://x/v1', 'file:///etc/passwd', 'not a url', '']) {
-      expect(validateEndpointUrl(url).ok, url).toBe(false);
+  it('🔴 非 http(s) 协议 → `bad-scheme`（钉住具体原因，不是"反正失败了"）', () => {
+    // 只断言 `ok === false` 的测试换个失败原因照样绿 —— 它证明不了
+    // "它因为正确的原因失败"。下面两条把两个拒绝原因分别钉死。
+    for (const url of ['ftp://x/v1', 'file:///etc/passwd']) {
+      const v = validateEndpointUrl(url);
+      expect(v.ok, url).toBe(false);
+      if (!v.ok) expect(v.reason, url).toBe('bad-scheme');
+    }
+  });
+
+  it('🔴 解析不了的地址 → `unparseable`（与 bad-scheme 分开）', () => {
+    for (const url of ['not a url', '']) {
+      const v = validateEndpointUrl(url);
+      expect(v.ok, url).toBe(false);
+      if (!v.ok) expect(v.reason, url).toBe('unparseable');
     }
   });
 });
@@ -283,6 +296,32 @@ describe('resolveRoute —— 候选解析', () => {
   });
 });
 
+describe('describeRouteIntent —— 静态意图（零生产调用点，但仍要钉住行为）', () => {
+  it('有候选时：目的地取首选，标签带模型名', () => {
+    const intent = describeRouteIntent(
+      config({ allowRemote: true, routes: { capture: [{ endpointId: 'remote' }] } }),
+      'capture',
+    );
+    expect(intent.destination).toBe('user-endpoint');
+    expect(intent.labels).toEqual(['云端中转（some-model）']);
+  });
+
+  it('路由目标覆盖模型时，标签用覆盖后的模型（与 resolveRoute 同源，不是第三次推导）', () => {
+    const intent = describeRouteIntent(
+      config({ routes: { capture: [{ endpointId: 'local', model: 'qwen3:32b' }] } }),
+      'capture',
+    );
+    expect(intent.destination).toBe('none');
+    expect(intent.labels).toEqual(['本机 Ollama（qwen3:32b）']);
+  });
+
+  it('一个候选都没有时 → destination 是 none、labels 为空（不抛错）', () => {
+    const intent = describeRouteIntent(config(), 'prioritize');
+    expect(intent.destination).toBe('none');
+    expect(intent.labels).toEqual([]);
+  });
+});
+
 describe('熔断 —— 只有端点的锅才算', () => {
   it('连续失败到阈值就跳闸，一次成功立刻清零', () => {
     const policy = DEFAULT_ROUTING_POLICY;
@@ -394,6 +433,36 @@ describe('invokeRouted —— 闸门与短路', () => {
       // 要解释清楚"这不是故障"，否则用户会以为坏了
       expect(out.result.message).toContain('允许远程');
     }
+    expect(calls).toHaveLength(0);
+  });
+
+  it('🔴 唯一端点是"被停用"时，解释说的是"停用"，不是兜底句"检查端点与路由"', async () => {
+    // 被停用是**用户的主动选择**，不是故障。兜底句会把用户引去检查
+    // "端点是否存在 / 地址是否合法" —— 两个根本没问题的方向。
+    // 这与本文件其它分支的注释精神一致（粗粒度文案会把人引去查无关的地方）。
+    const { impl, calls } = countingFetch(() => okResponse());
+    const out = await invokeRouted(
+      config({
+        endpoints: [{ ...LOCAL, disabled: true }],
+        routes: { capture: [{ endpointId: 'local' }] },
+      }),
+      INVOCATION,
+      [],
+      DEFAULT_ROUTING_POLICY,
+      { fetchImpl: impl },
+    );
+
+    expect(out.resolution.excluded).toEqual([
+      { target: { endpointId: 'local' }, reason: 'endpoint-disabled' },
+    ]);
+    expect(out.result.ok).toBe(false);
+    if (!out.result.ok) {
+      expect(out.result.reason).toBe('no-route');
+      // 这句话必须指向"是你自己停的"，而且必须**不是**兜底句。
+      expect(out.result.message).toContain('停用');
+      expect(out.result.message).not.toContain('检查设置里的端点与路由');
+    }
+    // 被排除的端点不该真的被请求
     expect(calls).toHaveLength(0);
   });
 

@@ -32,6 +32,7 @@ import {
   requiresEgressConsent,
   retainValidConsents,
   type EgressConsent,
+  type EgressDecision,
 } from '../src/index.js';
 
 describe('isLoopbackEndpoint —— 只认字面上的回环地址', () => {
@@ -178,22 +179,34 @@ describe('assertEnableable', () => {
     }
   });
 
-  it('自备模式必须有端点', () => {
-    expect(() => {
-      assertEnableable({ mode: 'own' });
-    }).toThrow(AiConfigError);
-    expect(() => {
-      assertEnableable({ mode: 'own', endpoint: '' });
-    }).toThrow(AiConfigError);
+  it('🔴 自备模式必须有端点 —— 原因是 `endpoint-required`', () => {
+    // 只断言 `toThrow(AiConfigError)` 证明不了"因为正确的原因失败"：
+    // 端点为空和端点写错都会抛同一个类。这里把 reason 钉死。
+    for (const config of [{ mode: 'own' } as const, { mode: 'own', endpoint: '' } as const]) {
+      try {
+        assertEnableable(config);
+        expect.unreachable('应当抛错');
+      } catch (e) {
+        expect(e).toBeInstanceOf(AiConfigError);
+        expect((e as AiConfigError).reason).toBe('endpoint-required');
+      }
+    }
   });
 
-  it('自备模式的端点必须能解析且是 http(s)', () => {
-    expect(() => {
-      assertEnableable({ mode: 'own', endpoint: 'not a url' });
-    }).toThrow(AiConfigError);
-    expect(() => {
-      assertEnableable({ mode: 'own', endpoint: 'ftp://x/v1' });
-    }).toThrow(AiConfigError);
+  it('🔴 自备模式的端点必须能解析且是 http(s) —— 原因是 `endpoint-invalid`', () => {
+    for (const endpoint of ['not a url', 'ftp://x/v1']) {
+      try {
+        assertEnableable({ mode: 'own', endpoint });
+        expect.unreachable('应当抛错');
+      } catch (e) {
+        expect(e).toBeInstanceOf(AiConfigError);
+        // 解析失败与协议不对，是**同一个** reason（都是"地址不能用"）
+        expect((e as AiConfigError).reason).toBe('endpoint-invalid');
+      }
+    }
+  });
+
+  it('合法地址放行（对照组，确保上面两条不是"什么都拒"）', () => {
     expect(() => {
       assertEnableable({ mode: 'own', endpoint: 'http://localhost:11434/v1' });
     }).not.toThrow();
@@ -259,6 +272,25 @@ describe('🔴 出境闸门：授权绑定在 (功能, 目的地) 上', () => {
       requiresEgressConsent(classifyDestination({ mode: 'managed' })),
     ).toBe(true);
     expect(requiresEgressConsent('none')).toBe(false);
+  });
+
+  it('🔴 `consent-required` 已从类型里收敛掉（下面这行是**承重的**）', () => {
+    // 这条用例钉的是**类型**，不是运行时行为：
+    // 一旦有人把 `consent-required` 加回 `EgressDecision`，
+    // `@ts-expect-error` 就变成"未使用的指令"，`pnpm typecheck` 立刻报 TS2578。
+    // 换句话说：**"删掉一个死成员"这件事本身现在有测试守着**，
+    // 而不是靠"我记得当时删过"。
+    const decision: EgressDecision = {
+      allowed: false,
+      // @ts-expect-error `consent-required` 从来没有构造点（见 egress.ts 的说明）。
+      reason: 'consent-required',
+      disclosure: buildDisclosure({
+        feature: 'capture',
+        destination: 'heyta-cloud',
+        fields: ['title'],
+      }),
+    };
+    expect(decision.allowed).toBe(false);
   });
 });
 

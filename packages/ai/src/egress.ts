@@ -97,8 +97,17 @@ export type EgressDecision =
   | { allowed: true; disclosure: EgressDisclosure }
   | {
       allowed: false;
-      /** 拒绝原因。UI 必须**分开呈现**，因为该做的事不同。 */
-      reason: 'consent-missing' | 'consent-required';
+      /**
+       * 拒绝原因。UI 必须**分开呈现**，因为该做的事不同。
+       *
+       * ⚠️ 这里曾经并列过一个 `consent-required`（注释说它表示"需要授权但本次没有"）。
+       * 它是**死的**：`authorizeEgress` 只有两个出口，全仓也没有任何地方构造它，
+       * 而本文件自己的注释就写着"这个 reason 不会出现"。一个永远不会出现的联合成员
+       * 读起来像"还有第三种状态要处理"，实际只是让类型说谎 —— 已收敛掉。
+       * 🔴 若将来真的要区分"提示态"与"拒绝态"，**必须先有一条真的构造它的代码路径**，
+       * 再加回类型；不要凭注释预留。
+       */
+      reason: 'consent-missing';
       disclosure: EgressDisclosure;
     };
 
@@ -120,12 +129,15 @@ export function buildDisclosure(request: EgressRequest): EgressDisclosure {
 /**
  * 判定一次出境是否被授权。
  *
- * 注意 `consent-required` 与 `consent-missing` 的区别：
- *   - `consent-required`：目的地是本地（`none`）→ **不需要授权**，这个 reason 不会出现；
- *     它实际用于"需要授权但本次没有"的**提示态**。
- *   - `consent-missing`：需要授权且**找不到匹配的授权记录**。
+ * 唯一的拒绝原因是 `consent-missing`：需要授权，且**找不到匹配的授权记录**。
+ * （"不需要授权"不是拒绝，而是 `allowed: true` —— 见下面本地端点的分支。）
  *
- * ⚠️ 两个 reason 都带上 `disclosure` —— 拒绝时**必须能告诉用户"什么会被发出去"**，
+ * ⚠️ 这里曾经并列过一个 `consent-required`，注释把它写成"需要授权但本次没有的提示态"。
+ * 但 `authorizeEgress` 从未构造过它，全仓也没有第二个构造点 —— 也就是说那条注释
+ * 描述的是一个**不存在**的分支。死分支的害处不是"多一行"，而是**让下一个读代码的人
+ * 以为还有第三种状态要处理**。已从类型里收敛掉，理由与证据见 `EgressDecision`。
+ *
+ * ⚠️ 拒绝时**必须**带上 `disclosure` —— 必须能告诉用户"什么会被发出去"，
  * 否则用户没法做出知情决定。一个只说"未授权"而不说"授权后会发生什么"的
  * 提示框，等于逼用户盲签。
  */

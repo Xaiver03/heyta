@@ -158,10 +158,13 @@ describe('🔴 显式 token', () => {
     expect(validateLocalApiConfig({ ...OPEN_CONFIG, token: '' }).ok).toBe(false);
   });
 
-  it('端口必须是 1–65535 的整数', () => {
+  it('🔴 端口必须是 1–65535 的整数 —— 原因是 `bad-port`（不只是"失败了"）', () => {
+    // 关着的时候端口不校验，所以这里必须用"打开"的配置。
+    // 只断言 `ok === false` 会让这条测试在"端口没错、是别的地方错"时照样绿。
     for (const port of [0, -1, 65_536, 1.5, Number.NaN]) {
       const v = validateLocalApiConfig({ ...OPEN_CONFIG, port });
       expect(v.ok, String(port)).toBe(false);
+      if (!v.ok) expect(v.reason, String(port)).toBe('bad-port');
     }
   });
 

@@ -241,11 +241,19 @@ export function describeRetention(destination: EgressDestination): string | unde
   }
 }
 
-/** 配置无法启用时抛出的错误。 */
+/**
+ * 配置无法启用时抛出的错误。
+ *
+ * ⚠️ 这里曾经并列过一个 `consent-required`。它**从未被构造过**：真正的抛错点只有
+ * 三处（`retention-undecided` / `endpoint-required` / `endpoint-invalid`），
+ * 全仓也没有别的地方构造它。出境授权的"缺少同意"是 `egress.ts` 的
+ * `consent-missing`，与"配置能不能启用"是两件事 —— 把两者的词混在一个联合里，
+ * 只会让读的人以为启用流程也要处理授权缺失。已收敛掉。
+ */
 export class AiConfigError extends Error {
   constructor(
     message: string,
-    readonly reason: 'retention-undecided' | 'endpoint-required' | 'endpoint-invalid' | 'consent-required',
+    readonly reason: 'retention-undecided' | 'endpoint-required' | 'endpoint-invalid',
   ) {
     super(message);
     this.name = 'AiConfigError';
@@ -254,6 +262,22 @@ export class AiConfigError extends Error {
 
 /**
  * 能否启用这份配置。
+ *
+ * 🔴 **它是 `managed` 的安全闸门，不是"顺手写的一个校验"。** 今天的调用点有三类：
+ *   1. `provider.ts` 的 `createProvider()`（单端点 / 本地 / 测试与历史路径）；
+ *   2. 门禁 `scripts/check-ai-coverage.mjs` —— 它在**运行时真的调一次**，
+ *      钉住"托管 AI 仍然被挡住、理由仍然是 `retention-undecided`"；
+ *   3. 本包与界面的测试。
+ *
+ * 也就是说：**它现在的生产可达性依赖第 2 类**，而删除它等于拆掉一个隐私保护
+ * （"想不清楚数据留多久，就不许打开托管"）。所以即使生产出境路径
+ * （`invokeRouted`）不经过它，它也留在这里。
+ *
+ * ⚠️ 顺带说清一件容易被误读的事：`invokeRouted` 走的是 `AiRoutingConfig`，
+ * 而那份配置**没有 `mode` 字段** —— 目的地由端点地址推导
+ * （`classifyDestination({ mode: 'own', ... })`），只可能是 `none` /
+ * `user-endpoint`，**推不出 `heyta-cloud`**。所以"托管云到不了"是**结构上**成立的，
+ * 而不是靠这个函数拦住的；本函数拦的是"把 `mode` 写成 `managed`"那条入口。
  *
  * 🔴 **`managed` 目前一定会失败**，因为它的数据保留策略还没定（ADR-0006 §5 未决项 4/6），
  * 而 `describeRetention` 拒绝编造一个数字。**这是刻意的失败，不是未完成的占位。**
