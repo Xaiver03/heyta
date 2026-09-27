@@ -41,6 +41,7 @@ import {
   describeSuppressed,
   suppressedPreferenceIds,
   type FeedbackPreferenceSet,
+  type FocusGap,
   type Preference,
   type PreferenceSet,
 } from '@heyta/domain';
@@ -72,6 +73,20 @@ export interface MemoryPanelProps {
    */
   rawPresentIds: readonly string[];
   corrections: readonly CorrectionEntry[];
+  /**
+   * 「说的 vs 做的」落差（领域层 `computeFocusGaps()` 的**结构化**结果）。
+   *
+   * 三态是刻意的，不能用"空数组"兼任：
+   *   - `undefined` → 调用方没接这条线，**整个区块不渲染**（老调用方/单测不受影响）；
+   *   - `null` → 事件流读不到，**如实说"暂时算不出推迟次数"**，
+   *     而不是把"算不出"渲染成"推迟 0 次"（那是编造）；
+   *   - 数组 → 正常展示；空数组走**诚实的空状态**，不留一个空白区块
+   *     （空白会被读成"坏了"）。
+   *
+   * 🔴 只接受结构化落差。领域层的 `describeFocusGaps()` 返回中文句子，
+   * **不许渲染**（英文界面会露中文）—— 同 `evidenceFacts` 那一套。
+   */
+  focusGaps?: readonly FocusGap[] | null;
   onSuppress: (preferenceId: string) => void;
   onRestore: (correctionId: string) => void;
 }
@@ -115,8 +130,16 @@ function PreferenceRow({
 }
 
 export function MemoryPanel(props: MemoryPanelProps): React.JSX.Element {
-  const { memoryEnabled, preferenceSet, feedbackSet, rawPresentIds, corrections, onSuppress, onRestore } =
-    props;
+  const {
+    memoryEnabled,
+    preferenceSet,
+    feedbackSet,
+    rawPresentIds,
+    corrections,
+    focusGaps,
+    onSuppress,
+    onRestore,
+  } = props;
   const { t } = useI18n();
 
   if (!memoryEnabled) {
@@ -203,6 +226,85 @@ export function MemoryPanel(props: MemoryPanelProps): React.JSX.Element {
               );
             })}
           </ul>
+        </>
+      )}
+
+      {/* ── 说的 vs 做的（记忆护城河的事实层）────────────────── */}
+      {/*
+        🔴 这一区就是"把护城河接到用户眼前"的落点：`computeFocusGaps` 此前
+        **零生产调用点**，算得再准用户也看不到。渲染的是**结构化字段**，
+        不是领域层 `describeFocusGaps()` 拼好的中文。
+      */}
+      {focusGaps !== undefined && (
+        <>
+          <h3 className="ht-settings__subtitle">{t('web.memory.gap.title')}</h3>
+          <p className="ht-settings__hint">{t('web.memory.gap.note')}</p>
+
+          {focusGaps === null ? (
+            /* 读不到事件流时的**诚实降级**：推迟次数算不出来，说"0 次"就是编造。 */
+            <p className="ht-settings__hint" data-testid="memory-gap-unavailable">
+              {t('web.memory.gap.unavailable')}
+            </p>
+          ) : focusGaps.length === 0 ? (
+            /* 空状态必须诚实：没有落差就明说，**不要**留一个空白区块。 */
+            <p className="ht-settings__hint" data-testid="memory-gap-empty">
+              {t('web.memory.gap.empty')}
+            </p>
+          ) : (
+            <ul className="ht-settings__list" data-testid="memory-gap-list">
+              {focusGaps.map((gap) => (
+                <li
+                  className="ht-settings__item"
+                  key={gap.taskId}
+                  data-testid={`memory-gap-${gap.taskId}`}
+                >
+                  <span className="ht-settings__toggle-body">
+                    {/* 标题是用户自己的文字（任务标题），不是领域层的投影。 */}
+                    <span className="ht-settings__toggle-label">{gap.title}</span>
+                    {/*
+                      🔴 每条至少给三件事：声明了什么、实际投入多少、以及"为什么"
+                      （推迟次数 / 逾期天数）。全部由结构化字段 + 词条现拼。
+                    */}
+                    <span className="ht-settings__hint tabular-nums">
+                      {t('web.memory.gap.declared', { declared: gap.declared })}
+                    </span>
+                    <span className="ht-settings__hint tabular-nums">
+                      {t('web.memory.gap.focusMinutes', {
+                        minutes: Math.round(gap.focusMinutes),
+                      })}
+                    </span>
+                    {gap.postponements > 0 && (
+                      <span
+                        className="ht-settings__hint tabular-nums"
+                        data-testid={`memory-gap-postponed-${gap.taskId}`}
+                      >
+                        {/* 英文按数量分支到单数兄弟（词条表刻意不支持 ICU）。 */}
+                        {t(
+                          gap.postponements === 1
+                            ? 'web.memory.gap.postponedOne'
+                            : 'web.memory.gap.postponed',
+                          { count: gap.postponements },
+                        )}
+                      </span>
+                    )}
+                    {gap.overdueDays !== null && (
+                      <span
+                        className="ht-settings__hint tabular-nums"
+                        data-testid={`memory-gap-overdue-${gap.taskId}`}
+                      >
+                        {t(
+                          gap.overdueDays === 1
+                            ? 'web.memory.gap.overdueOne'
+                            : 'web.memory.gap.overdue',
+                          { days: gap.overdueDays },
+                        )}
+                      </span>
+                    )}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
         </>
       )}
 

@@ -19,12 +19,18 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import {
+  computeFocusGaps,
   preferenceEvidenceText,
   type FeedbackPreferenceSet,
+  type FocusGap,
+  type MemoryFocusSession,
+  type MemoryOp,
+  type MemoryTask,
   type Preference,
   type PreferenceEvidence,
   type PreferenceSet,
 } from '@heyta/domain';
+import { I18nProvider, type Locale } from '@heyta/i18n';
 
 const { MemoryPanel } = await import('../src/features/settings/MemoryPanel.js');
 
@@ -71,23 +77,29 @@ function feedback(over: Partial<FeedbackPreferenceSet> = {}): FeedbackPreference
 let root: Root | undefined;
 let container: HTMLDivElement | undefined;
 
-function render(props: Partial<Parameters<typeof MemoryPanel>[0]> = {}): HTMLDivElement {
+function render(
+  props: Partial<Parameters<typeof MemoryPanel>[0]> = {},
+  locale?: Locale,
+): HTMLDivElement {
   container = document.createElement('div');
   document.body.appendChild(container);
   root = createRoot(container);
+  const panel = (
+    <MemoryPanel
+      memoryEnabled
+      preferenceSet={prefs()}
+      feedbackSet={feedback()}
+      rawPresentIds={[]}
+      corrections={[]}
+      onSuppress={() => undefined}
+      onRestore={() => undefined}
+      {...props}
+    />
+  );
   act(() => {
-    root?.render(
-      <MemoryPanel
-        memoryEnabled
-        preferenceSet={prefs()}
-        feedbackSet={feedback()}
-        rawPresentIds={[]}
-        corrections={[]}
-        onSuppress={() => undefined}
-        onRestore={() => undefined}
-        {...props}
-      />,
-    );
+    // ⚠️ 不传 locale 就**不套 Provider**：既有用例走默认语言（zh-CN），
+    // 顺便证明"面板不依赖外面一定有 Provider"这条约定没有退化。
+    root?.render(locale === undefined ? panel : <I18nProvider locale={locale}>{panel}</I18nProvider>);
   });
   return container;
 }
@@ -292,5 +304,187 @@ describe('🔴 记忆面板：忘掉的必须能恢复', () => {
     });
     expect(el.querySelector('[data-testid="memory-pref-granularity"]')).toBeNull();
     expect(el.querySelector('[data-testid="memory-forgotten"]')).not.toBeNull();
+  });
+});
+
+/**
+ * 🔴 「说的 vs 做的」——把记忆护城河接到界面上
+ * ==============================================
+ *
+ * `computeFocusGaps` 在本轮之前**零生产调用点**：算得准、测过、用户看不见。
+ * 这一组钉住"真的接到了界面上"，以及两条不能重蹈的坑：
+ *   - **英文界面不许露中文**（领域层 `describeFocusGaps()` 返回的正是中文句子）；
+ *   - **记忆关闭时一行推断都不许留**。
+ */
+const gap = (over: Partial<FocusGap> = {}): FocusGap => ({
+  taskId: 'task-1',
+  title: 'Ship the quarterly report',
+  declared: 4,
+  focusMinutes: 0,
+  gap: 4,
+  overdueDays: 3,
+  postponements: 2,
+  ...over,
+});
+
+describe('说的 vs 做的：有落差就展示，且带结构化依据', () => {
+  it('展示任务、声明的重要性、实际投入，以及推迟/逾期这两个"为什么"', () => {
+    const el = render({ focusGaps: [gap()] });
+    expect(el.querySelector('[data-testid="memory-gap-list"]')).not.toBeNull();
+    const text = el.textContent ?? '';
+    expect(text).toContain('Ship the quarterly report');
+    expect(text).toContain('你声明的重要性：4');
+    expect(text).toContain('实际专注：0 分钟');
+    expect(el.querySelector('[data-testid="memory-gap-postponed-task-1"]')?.textContent).toContain(
+      '推迟过 2 次',
+    );
+    expect(el.querySelector('[data-testid="memory-gap-overdue-task-1"]')?.textContent).toContain(
+      '已逾期 3 天',
+    );
+  });
+
+  it('推迟 1 次 / 逾期 1 天也渲染（中文单复数同形）', () => {
+    const el = render({ focusGaps: [gap({ postponements: 1, overdueDays: 1 })] });
+    expect(el.querySelector('[data-testid="memory-gap-postponed-task-1"]')?.textContent).toContain(
+      '推迟过 1 次',
+    );
+    expect(el.querySelector('[data-testid="memory-gap-overdue-task-1"]')?.textContent).toContain(
+      '已逾期 1 天',
+    );
+  });
+
+  it('没有推迟/逾期时那两行不出现（不编一个 0 出来）', () => {
+    const el = render({ focusGaps: [gap({ postponements: 0, overdueDays: null })] });
+    expect(el.querySelector('[data-testid="memory-gap-postponed-task-1"]')).toBeNull();
+    expect(el.querySelector('[data-testid="memory-gap-overdue-task-1"]')).toBeNull();
+  });
+
+  it('🔴 没有落差时给诚挚空状态，而不是留一个空白区块', () => {
+    const el = render({ focusGaps: [] });
+    expect(el.querySelector('[data-testid="memory-gap-empty"]')?.textContent).toContain(
+      '没有发现明显的落差',
+    );
+    expect(el.querySelector('[data-testid="memory-gap-list"]')).toBeNull();
+  });
+
+  it('🔴 读不到事件流时如实说"算不出推迟次数"，不假装推迟 0 次', () => {
+    const el = render({ focusGaps: null });
+    expect(el.querySelector('[data-testid="memory-gap-unavailable"]')).not.toBeNull();
+    expect(el.querySelector('[data-testid="memory-gap-list"]')).toBeNull();
+    expect(el.textContent ?? '').not.toContain('推迟过 0 次');
+  });
+
+  it('调用方没接这条线（undefined）时整个区块不渲染', () => {
+    const el = render();
+    expect(el.querySelector('[data-testid="memory-gap-list"]')).toBeNull();
+    expect(el.querySelector('[data-testid="memory-gap-empty"]')).toBeNull();
+    expect(el.querySelector('[data-testid="memory-gap-unavailable"]')).toBeNull();
+  });
+});
+
+describe('🔴 说的 vs 做的：英文界面不出现一个中文字', () => {
+  /**
+   * 这条是本轮的**灵魂测试**。
+   *
+   * `memory.ts` 的 `describeFocusGaps()` 会把落差拼成一句中文。壳如果图省事
+   * 直接渲染它，中文界面看起来完全正常 —— 只有切到英文才会露出来，
+   * 而 `check-ui-language` 扫的是**字面量**，扫不到"渲染了变量的中文"。
+   * 所以这条断言必须**真的以英文渲染 + 真的传入落差数据**。
+   */
+  it('🔴 英文 render 且带落差数据 → 面板文本不含任何 CJK 字符', () => {
+    const el = render({ focusGaps: [gap()] }, 'en');
+    const text = el.textContent ?? '';
+    expect(text).not.toMatch(/[\u4e00-\u9fff]/);
+    // 顺带证明断言不是"没渲染出来"造成的假绿：
+    expect(text).toContain('Said vs done');
+    expect(text).toContain('Ship the quarterly report');
+    expect(text).toContain('Importance you declared: 4');
+    expect(text).toContain('Actual focus: 0 min');
+  });
+
+  it('英文的数量分支到单数兄弟词条（不说 `1 times` / `1 days`）', () => {
+    const el = render({ focusGaps: [gap({ postponements: 1, overdueDays: 1 })] }, 'en');
+    const text = el.textContent ?? '';
+    expect(text).toContain('Postponed 1 time');
+    expect(text).toContain('Overdue by 1 day');
+    expect(text).not.toContain('1 times');
+    expect(text).not.toContain('1 days');
+    expect(text).not.toMatch(/[\u4e00-\u9fff]/);
+  });
+});
+
+describe('🔴 记忆面板：关闭时连落差区也不渲染（隐私红线）', () => {
+  it('memoryEnabled=false 且传入了落差数据 → 零条推断、零落差、无任务标题', () => {
+    const el = render({ memoryEnabled: false, focusGaps: [gap()] });
+    expect(el.querySelector('[data-testid="memory-off-note"]')).not.toBeNull();
+    expect(el.querySelector('[data-testid="memory-gap-list"]')).toBeNull();
+    expect(el.querySelector('[data-testid="memory-gap-task-1"]')).toBeNull();
+    expect(el.querySelector('[data-testid="memory-gap-empty"]')).toBeNull();
+    expect(el.querySelector('[data-testid="memory-gap-unavailable"]')).toBeNull();
+    expect(el.textContent ?? '').not.toContain('Ship the quarterly report');
+  });
+});
+
+/**
+ * ops → computeFocusGaps → 渲染。
+ *
+ * ⚠️ 覆盖范围要说清：这条覆盖了**后两段**（算法确实把 op 里的推迟数算出来、
+ * 界面确实把那个数字渲染出来）。**第一段（真实 IndexedDB 读取
+ * `readRecentOps()`）没有被这条覆盖** —— 那需要真 store；
+ * 仓库里 `journey-ai-memory.integration.spec.tsx` 有真内存版 IndexedDB 的搭法，
+ * 但它整文件跳过，且不在本模块的白名单里，因此没有改它。
+ */
+describe('🔴 推迟次数真的从事件流一路走到界面上', () => {
+  const now = 1_700_000_000_000;
+  const day = 86_400_000;
+
+  it('ops → computeFocusGaps → 渲染：推迟次数出现在界面上', () => {
+    const tasks: MemoryTask[] = [
+      {
+        id: 't-postponed',
+        title: 'Write the design doc',
+        priority: 2,
+        important: true,
+        dueDate: now + day,
+        createdAt: now - 10 * day,
+        updatedAt: now - day,
+      },
+    ];
+    const focusSessions: MemoryFocusSession[] = [];
+    const operations: MemoryOp[] = [
+      {
+        opType: 'CRT',
+        entityType: 'TASK',
+        entityId: 't-postponed',
+        payload: { title: 'Write the design doc' },
+        timestamp: now - 9 * day,
+      },
+      // 第一次设截止：那是"排期"，不是"推迟" —— 不该被记成推过一次。
+      {
+        opType: 'UPD',
+        entityType: 'TASK',
+        entityId: 't-postponed',
+        payload: { dueDate: now - 2 * day },
+        timestamp: now - 8 * day,
+      },
+      // 往后挪 → 这才是"推迟过一次"。
+      {
+        opType: 'UPD',
+        entityType: 'TASK',
+        entityId: 't-postponed',
+        payload: { dueDate: now + day },
+        timestamp: now - day,
+      },
+    ];
+
+    const gaps = computeFocusGaps({ tasks, focusSessions, operations, now });
+
+    expect(gaps.map((g) => g.taskId)).toEqual(['t-postponed']);
+    expect(gaps[0]?.postponements).toBe(1);
+
+    const el = render({ focusGaps: gaps });
+    expect(
+      el.querySelector('[data-testid="memory-gap-postponed-t-postponed"]')?.textContent,
+    ).toContain('推迟过 1 次');
   });
 });

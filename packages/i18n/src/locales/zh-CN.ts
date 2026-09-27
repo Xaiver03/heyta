@@ -873,6 +873,22 @@ export const zhCN = {
   'web.memory.restore': '恢复',
   'web.memory.footer': '这些推断只在本机进行，不上传。 发给 AI 的只是当前那次决定需要的那一条摘要，并且会在发送前告诉你。',
 
+  // ── Web · 记忆面板 · 「说的 vs 做的」落差 ─────────────────
+  // 🔴 这里刻意**不**渲染领域层 `describeFocusGaps()` 拼好的中文句子，
+  //    而是用 `FocusGap` 的结构化字段 + 这些词条现拼（同 evidence 那一套）。
+  'web.memory.gap.title': '说的 vs 做的',
+  'web.memory.gap.note': '下面这些任务你标了优先级、重要或截止日期，但几乎没有专注投入。',
+  'web.memory.gap.empty': '目前没有发现明显的落差 —— 你在重要的事上花了时间。',
+  // store 还没就绪 / 读事件流失败时的诚实降级：**不说**"推迟 0 次"。
+  'web.memory.gap.unavailable': '暂时算不出推迟次数（读不到事件流），这里先不展示落差。',
+  'web.memory.gap.declared': '你声明的重要性：{declared}',
+  'web.memory.gap.focusMinutes': '实际专注：{minutes} 分钟',
+  'web.memory.gap.postponed': '推迟过 {count} 次',
+  // 中文不分单复数，单数版与复数版**刻意逐字相同**（见 plural-keys 测试的约定）。
+  'web.memory.gap.postponedOne': '推迟过 {count} 次',
+  'web.memory.gap.overdue': '已逾期 {days} 天',
+  'web.memory.gap.overdueOne': '已逾期 {days} 天',
+
   // ── Web · 捕获输入框 ──────────────────────────────────────
   // ⚠️ 日期那一条里嵌的 `formatRemainingUntil()` 仍返回中文（跨包，
   // `packages/domain` 尚未改造，见计划 §7.1），本轮只迁壳里的措辞与括号。

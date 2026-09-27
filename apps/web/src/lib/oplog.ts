@@ -98,6 +98,45 @@ export function currentState(): MaterializedState {
 }
 
 /**
+ * 记忆层重放事件流时最多回看多少条 op（按本地 seq 的**最近**窗口）。
+ *
+ * 🔴 **这是一个产品判断，不是性能调参，所以它有名字、有注释、可以被讨论。**
+ *
+ * 为什么需要上限：`getOpsSince()` 是线性读，全库拉一遍在一个用了两年的
+ * 本地库上会变成每次渲染都做一次全表扫描。而 `computeFocusGaps` 只需要
+ * **最近**的推迟历史。
+ *
+ * ⚠️ **截断的含义（必须写清，不许默默截断）**：窗口只覆盖最近
+ * `MEMORY_OP_WINDOW` 条 op。若某条任务的"最后一次推迟"发生在窗口之前，
+ * 界面会显示 `0` 次 —— 那是**低估**，不是精确值。取 1000 是因为
+ * 它远大于"一个人近期改过的截止日期条数"，同时不至于让一次读变成全表扫描。
+ * 真正要做精确计数，得先给推迟次数做持久化聚合（本条不授权新增持久化字段）。
+ */
+export const MEMORY_OP_WINDOW = 1000;
+
+/**
+ * 读取**最近**一段 op 窗口，供记忆层推算推迟次数。
+ *
+ * 三件事值得写下来：
+ *   1. `getOpsSince` 返回的是 `StoredOperation`（`{seq, op, ...}`），
+ *      领域层的 `MemoryOp` 要的是**裸 `op`** —— 这里替调用方剥掉外壳。
+ *   2. 窗口是**按 seq 从后往前**取的：先拿 `getLastLocalSeq()`，再从
+ *      `lastSeq - maxOps` 读。⚠️ 直接 `getOpsSince(0, maxOps)` 拿到的是
+ *      **最旧**的 N 条（它按 seq 升序切前 N 条），拿它当"最近"是错的。
+ *   3. 存储层保证 seq「单调、无空洞」，所以窗口大小是可预期的；
+ *      若将来出现空洞，窗口会**少**几条 —— 宁可少算也不假装精确。
+ */
+export async function readRecentOps(
+  maxOps: number = MEMORY_OP_WINDOW,
+): Promise<Operation<string>[]> {
+  const store = requireStore();
+  const lastSeq = await store.getLastLocalSeq();
+  const since = Math.max(0, lastSeq - maxOps);
+  const rows = await store.getOpsSince(since, maxOps);
+  return rows.map((row) => row.op);
+}
+
+/**
  * **唯一的写入入口（D4）。**
  *
  * 任何实体变更都必须经过这里。绕过它 = 改动不进 op-log =

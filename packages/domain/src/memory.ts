@@ -333,6 +333,12 @@ export function computeFocusGaps(
  *
  * 这条设计的直接好处：没有配置任何 AI 端点时，这个功能**依然有输出**。
  * 少了它，"AI 未配置"就退化成"整个功能是灰的"。
+ *
+ * ⚠️ **返回的是中文投影，壳不得直接渲染**：用 `FocusGap` 的**结构化字段** +
+ * 本地化词条自己拼句子。直接把这句话塞进界面，英文界面就会露出中文
+ * （同 `PreferenceEvidence` / `WithheldPreference.detail` 已经踩过两次的坑）。
+ * 它保留在这里是因为它是**领域层的确定性模板**（导出/通知等非 UI 场景可用），
+ * 不是"界面文案源"。
  */
 export function describeFocusGaps(gaps: readonly FocusGap[]): string {
   if (gaps.length === 0) return '没有发现明显的落差 —— 你在重要的事上花了时间。';
