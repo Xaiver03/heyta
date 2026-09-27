@@ -35,9 +35,11 @@ import { isArgon2SlowBackend } from '@heyta/sync-core';
 
 import { Button, Card, Chip, Divider, Screen, SectionHeader, Text, TextField } from '../ui/kit';
 import { ConflictSheet } from './ConflictSheet';
+import { ExportScreen } from './ExportScreen';
 import { GrowthScreen } from './GrowthScreen';
 import { ListsSection } from './ListsSection';
 import { TagsSection } from './TagsSection';
+import { TrashScreen } from './TrashScreen';
 import { useLocalePreference } from '../i18n/locale-preference';
 import { formatStamp } from '../lib/date';
 import { useTokens } from '../theme';
@@ -97,6 +99,16 @@ export function ProfileScreen(): React.JSX.Element {
    * 提前 return 会让后面没跑到的 hook 数量在两次渲染间变化，React 会直接报错。
    */
   const [growthOpen, setGrowthOpen] = useState(false);
+
+  /**
+   * 回收站 / 导出同样是**第二层**页面（与成长同一条纪律）：
+   * 底部标签保持 5 个，返回靠各自顶栏的返回键。
+   *
+   * ⚠️ 与 `growthOpen` 一样，这些 `useState` 必须**在所有 hook 之后**才能被
+   * 提前 return 消费 —— 见下面那段注释。
+   */
+  const [trashOpen, setTrashOpen] = useState(false);
+  const [exportOpen, setExportOpen] = useState(false);
 
   // 🔴 **输入即写进活配置，不能等到点「立即同步」才写。**
   //
@@ -197,6 +209,26 @@ export function ProfileScreen(): React.JSX.Element {
    * 🔴 提前 return **必须在所有 hook 之后**（见 `growthOpen` 的注释）。
    * 成长屏自带顶栏返回，所以这里不需要任何导航库。
    */
+  if (trashOpen) {
+    return (
+      <TrashScreen
+        onBack={() => {
+          setTrashOpen(false);
+        }}
+      />
+    );
+  }
+
+  if (exportOpen) {
+    return (
+      <ExportScreen
+        onBack={() => {
+          setExportOpen(false);
+        }}
+      />
+    );
+  }
+
   if (growthOpen) {
     return (
       <GrowthScreen
@@ -324,6 +356,34 @@ export function ProfileScreen(): React.JSX.Element {
       />
       <Text variant="caption" tone="subtle">
         {t('mobile.growth.entry.hint')}
+      </Text>
+
+      {/* 回收站：删除的后悔药。与成长并列，都是"关于我 / 我的数据"的事，
+          所以同住「我的」这一层，都不占底部标签。 */}
+      <Button
+        label={t('mobile.trash.entry')}
+        icon="task.delete"
+        onPress={() => {
+          setTrashOpen(true);
+        }}
+        tone="secondary"
+      />
+      <Text variant="caption" tone="subtle">
+        {t('mobile.trash.entry.hint')}
+      </Text>
+
+      {/* 导出：把数据带走。图标用 `action.share`（不是 download）——
+          移动端没有 `<a download>`，导出走系统分享面板。 */}
+      <Button
+        label={t('mobile.export.entry')}
+        icon="action.share"
+        onPress={() => {
+          setExportOpen(true);
+        }}
+        tone="secondary"
+      />
+      <Text variant="caption" tone="subtle">
+        {t('mobile.export.entry.hint')}
       </Text>
 
       {/* 🔴 语言切换放在「我的」而不是顶部：它不是高频操作，
