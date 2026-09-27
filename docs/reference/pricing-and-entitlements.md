@@ -53,6 +53,12 @@
 **明确说出来**，`scripts/check-ai-coverage.mjs` 会强制断言那句否定
 （`不受端到端加密`）。
 
+ℹ️ **我们云端 AI 跑的是 `deepseek-flash`（DeepSeek V4.1 Flash）** ——
+[ADR-0021](../adr/0021-managed-ai-model-deepseek-flash.md)。这**不是技术细节，
+是单位经济**：¥12 的增量是 ¥7，flash 级 300 次/月 的 token 成本 ≈**¥2.01（29%）**；
+换成 pro 级 ≈**¥7.71**，**超过 ¥7 增量本身**（每份亏 ¥0.71/月）。
+所以「**换模型 = 换价**」，两者不能分开定。
+
 ## 3. 到期后的行为（硬约束）
 
 | | 到期后 |
@@ -177,3 +183,10 @@ Paddle 支持中国大陆卖家**只有政策文本**，**实操放行未验证*
    AIstudy 的契约文档只记录了 `XIAOLI_PAYMENT_CLIENT_ID=learning` 一个。
 4. **工信部 292 号令**对「收费托管同步服务」的定性 —— 需中国律师。
 5. **退款政策** —— 未写（[`subscription-boundary.md`](../plans/subscription-boundary.md) §3 也留着它）。
+6. 🔴 **AI 档的可行性绑在 flash 级的单价上** ——
+   [ADR-0021](../adr/0021-managed-ai-model-deepseek-flash.md) 把模型定成
+   `deepseek-flash`（V4.1 Flash），300 次/月 的成本 ≈¥2.01（占 ¥7 增量 29%）。
+   但**上游调价没有任何通知义务**，所以这是一个会**外部失效**的结论：
+   定价页一变，就要重跑 ADR-0020 §3.6 那张表，看 29% 是否还在 1/3 以内。
+   另外**四个 AI 功能在 flash 上的实际可用性一次都没测过** —— 选它的理由是
+   单位经济，不是"它够用"。
