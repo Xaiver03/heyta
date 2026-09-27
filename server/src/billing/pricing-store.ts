@@ -831,6 +831,19 @@ export type SettleOrderOutcome =
       readonly outcome: 'granted';
       readonly orderId: number;
       readonly userId: number;
+      /**
+       * 🔴 **这一单买的是哪一档**（`checkout_orders.price_id`）。
+       *
+       * 必须带出来：有了它，调用方才能按**订单冻结的** SKU 决定授予什么能力
+       * （`grantsForSku(priceId)`），而不是相信 adapter "实付金额落在价目表上"
+       * 那个启发式 —— 后者遇到打折单会给出**错的档位或给不出档位**。
+       * 列一直在库里，此前只是没被 `SELECT` 取出来。
+       * 见 `docs/reference/pricing-and-coupons.md` §7 第 9 条 (a)。
+       *
+       * `null` = 订单没记档位（不该发生：收银台报价必有 priceId）。
+       * 真出现时是数据异常，调用方应 fail-closed（不授予）。
+       */
+      readonly priceId: string | null;
       /** 支付到账时订单**已经过期**（名额可能已被别人拿走）。应当告警。 */
       readonly afterExpiry: boolean;
       /** 结算后这张券的计数**超过了**上限 —— 见 `COUNTED_REDEMPTION_STATES`。 */
@@ -857,6 +870,7 @@ interface OrderRow {
   readonly id: unknown;
   readonly user_id: unknown;
   readonly status: unknown;
+  readonly price_id: unknown;
   readonly original_amount_minor: unknown;
   readonly discount_minor: unknown;
   readonly final_amount_minor: unknown;
@@ -865,6 +879,120 @@ interface OrderRow {
 
 const isOrderStatus = (value: unknown): value is OrderStatus =>
   typeof value === 'string' && (ORDER_STATUSES as readonly string[]).includes(value);
+
+/**
+ * **在调用方已经开启的事务里结算一笔已支付的订单。**
+ *
+ * 🔴 存在的理由：webhook 的落点是一个 Prisma 交互式事务
+ * （`prisma.$transaction(async (tx) => …)`）。"授予权益"与"结算订单（并把券的
+ * `reserved` 名额转成 `applied`）"必须**同生共死** —— 分开写会留下
+ * "权益发了、订单没结算"或反之的半截状态，而券的额度会被一张已付款的订单
+ * 永久占住。可 `settleOrderPaid` 收的是 `SqlExecutor`，会在**里面再开一层**
+ * 事务；Prisma 的事务 client 没有 `$transaction`（`ITXClientDenyList`），
+ * 所以正确形状不是"把 `$transaction` 硬套进去"，而是把结算主体抽成收
+ * `SqlRunner` 的这一个函数，由两种调用方各自决定事务边界：
+ *
+ * - 独立调用（CLI / 工具）：`settleOrderPaid(sql, input)` 自己开事务；
+ * - 事务内调用（webhook）：`settleOrderPaidInTransaction(tx, input)`。
+ *
+ * 结算逻辑**只有这一份** —— 两种入口的差别仅仅是事务边界。
+ * `SqlRunner` / `SqlExecutor` 那两个接口（本文件上方）讲的"事务回调拿到的是
+ * 受限的只读面"就是这条路径能成立的原因。
+ */
+export const settleOrderPaidInTransaction = async (
+  tx: SqlRunner,
+  input: SettleOrderPaidInput,
+): Promise<SettleOrderOutcome> => {
+  const rows = await tx.query<OrderRow>(
+    `SELECT id, user_id, status, price_id, original_amount_minor, discount_minor, final_amount_minor, coupon_id
+       FROM checkout_orders WHERE out_trade_no = $1 FOR UPDATE`,
+    [input.outTradeNo],
+  );
+  const order = rows[0];
+  if (order === undefined) {
+    return { outcome: 'unknown-order', outTradeNo: input.outTradeNo };
+  }
+  const orderId = Number(order.id);
+  const userId = Number(order.user_id);
+  const status = isOrderStatus(order.status) ? order.status : undefined;
+  if (status === undefined) {
+    throw new Error(`订单 ${orderId} 的状态 ${JSON.stringify(order.status)} 不在词表里 —— 数据已损坏`);
+  }
+
+  if (status === 'paid') {
+    return { outcome: 'already-paid', orderId, userId };
+  }
+  if (status === 'refunded' || status === 'failed') {
+    return { outcome: 'order-not-grantable', orderId, userId, status };
+  }
+
+  const expectedMinor = Number(order.final_amount_minor);
+  if (!isMinorAmount(input.paidAmountMinor) || input.paidAmountMinor !== expectedMinor) {
+    // 🔴 落审计，不只是返回一个 outcome。理由见 `AUDIT_ACTIONS` 的说明：
+    // "有人付了不对的钱"必须能在库里被查到，而不是只在当时的返回值里。
+    await appendAudit(tx, {
+      action: 'order_amount_mismatch',
+      target: `order:${orderId}`,
+      beforeJson: JSON.stringify({ finalAmountMinor: expectedMinor }),
+      afterJson: JSON.stringify({ paidAmountMinor: input.paidAmountMinor }),
+      actor: 'system',
+      note: `支付到账金额与订单冻结金额不一致 —— 不授予权益（providerEventId=${input.providerEventId}）`,
+      now: input.now,
+    });
+    return {
+      outcome: 'amount-mismatch',
+      orderId,
+      userId,
+      expectedMinor,
+      actualMinor: input.paidAmountMinor,
+    };
+  }
+
+  const afterExpiry = status === 'expired';
+  await tx.execute(
+    `UPDATE checkout_orders
+        SET status = 'paid', paid_at = $1, settled_at = $1, updated_at = $1, provider_event_id = $2
+      WHERE id = $3`,
+    [input.now, input.providerEventId, orderId],
+  );
+
+  let quotaExceeded = false;
+  const couponId = order.coupon_id === null || order.coupon_id === undefined ? null : String(order.coupon_id);
+  if (couponId !== null) {
+    // `reserved` → `applied`，以及"到账晚于过期"时的 `expired` → `applied`。
+    await tx.execute(
+      `UPDATE coupon_redemptions
+          SET state = 'applied', applied_at = $1, settled_at = $1
+        WHERE order_id = $2 AND state IN ('reserved', 'expired')`,
+      [input.now, orderId],
+    );
+
+    const coupon = await tx.query<{ max_redemptions: unknown }>(
+      `SELECT max_redemptions FROM coupons WHERE id = $1`,
+      [couponId],
+    );
+    const maxTotal =
+      coupon[0]?.max_redemptions === null || coupon[0]?.max_redemptions === undefined
+        ? null
+        : Number(coupon[0]?.max_redemptions);
+    if (maxTotal !== null) {
+      const counted = await tx.query<{ n: unknown }>(
+        `SELECT count(*)::int AS n FROM coupon_redemptions
+          WHERE coupon_id = $1 AND state IN (${stateList(COUNTED_REDEMPTION_STATES)})`,
+        [couponId],
+      );
+      quotaExceeded = Number(counted[0]?.n ?? 0) > maxTotal;
+    }
+  }
+
+  // 🔴 `priceId` 是这一单**冻结的**档位 —— 调用方按它决定授予什么能力
+  // （`grantsForSku`），而不是相信 adapter 的金额启发式。见类型注释。
+  const priceId =
+    order.price_id === null || order.price_id === undefined
+      ? null
+      : String(order.price_id);
+  return { outcome: 'granted', orderId, userId, priceId, afterExpiry, quotaExceeded };
+};
 
 /**
  * **结算一笔已支付的订单。** 幂等，且是唯一允许把订单推进到 `paid` 的路径。
@@ -889,96 +1017,17 @@ const isOrderStatus = (value: unknown): value is OrderStatus =>
  * 用户真的付了钱。"名额没了所以不给"会同时得罪用户和我们自己（要退款）。
  * 所以 `expired` 也允许推进到 `paid`，并把 `afterExpiry` 与 `quotaExceeded`
  * 一起返回让调用方告警。见 `COUNTED_REDEMPTION_STATES` 的说明。
+ *
+ * ## 事务边界
+ *
+ * 本函数只负责**开事务**；主体在 `settleOrderPaidInTransaction`。webhook 必须
+ * 把自己的"授予权益 + 结算订单"放进同一个事务，所以它调的是那个内层函数。
  */
 export const settleOrderPaid = async (
   sql: SqlExecutor,
   input: SettleOrderPaidInput,
 ): Promise<SettleOrderOutcome> =>
-  sql.transaction(async (tx) => {
-    const rows = await tx.query<OrderRow>(
-      `SELECT id, user_id, status, original_amount_minor, discount_minor, final_amount_minor, coupon_id
-         FROM checkout_orders WHERE out_trade_no = $1 FOR UPDATE`,
-      [input.outTradeNo],
-    );
-    const order = rows[0];
-    if (order === undefined) {
-      return { outcome: 'unknown-order', outTradeNo: input.outTradeNo };
-    }
-    const orderId = Number(order.id);
-    const userId = Number(order.user_id);
-    const status = isOrderStatus(order.status) ? order.status : undefined;
-    if (status === undefined) {
-      throw new Error(`订单 ${orderId} 的状态 ${JSON.stringify(order.status)} 不在词表里 —— 数据已损坏`);
-    }
-
-    if (status === 'paid') {
-      return { outcome: 'already-paid', orderId, userId };
-    }
-    if (status === 'refunded' || status === 'failed') {
-      return { outcome: 'order-not-grantable', orderId, userId, status };
-    }
-
-    const expectedMinor = Number(order.final_amount_minor);
-    if (!isMinorAmount(input.paidAmountMinor) || input.paidAmountMinor !== expectedMinor) {
-      // 🔴 落审计，不只是返回一个 outcome。理由见 `AUDIT_ACTIONS` 的说明：
-      // "有人付了不对的钱"必须能在库里被查到，而不是只在当时的返回值里。
-      await appendAudit(tx, {
-        action: 'order_amount_mismatch',
-        target: `order:${orderId}`,
-        beforeJson: JSON.stringify({ finalAmountMinor: expectedMinor }),
-        afterJson: JSON.stringify({ paidAmountMinor: input.paidAmountMinor }),
-        actor: 'system',
-        note: `支付到账金额与订单冻结金额不一致 —— 不授予权益（providerEventId=${input.providerEventId}）`,
-        now: input.now,
-      });
-      return {
-        outcome: 'amount-mismatch',
-        orderId,
-        userId,
-        expectedMinor,
-        actualMinor: input.paidAmountMinor,
-      };
-    }
-
-    const afterExpiry = status === 'expired';
-    await tx.execute(
-      `UPDATE checkout_orders
-          SET status = 'paid', paid_at = $1, settled_at = $1, updated_at = $1, provider_event_id = $2
-        WHERE id = $3`,
-      [input.now, input.providerEventId, orderId],
-    );
-
-    let quotaExceeded = false;
-    const couponId = order.coupon_id === null || order.coupon_id === undefined ? null : String(order.coupon_id);
-    if (couponId !== null) {
-      // `reserved` → `applied`，以及"到账晚于过期"时的 `expired` → `applied`。
-      await tx.execute(
-        `UPDATE coupon_redemptions
-            SET state = 'applied', applied_at = $1, settled_at = $1
-          WHERE order_id = $2 AND state IN ('reserved', 'expired')`,
-        [input.now, orderId],
-      );
-
-      const coupon = await tx.query<{ max_redemptions: unknown }>(
-        `SELECT max_redemptions FROM coupons WHERE id = $1`,
-        [couponId],
-      );
-      const maxTotal =
-        coupon[0]?.max_redemptions === null || coupon[0]?.max_redemptions === undefined
-          ? null
-          : Number(coupon[0]?.max_redemptions);
-      if (maxTotal !== null) {
-        const counted = await tx.query<{ n: unknown }>(
-          `SELECT count(*)::int AS n FROM coupon_redemptions
-            WHERE coupon_id = $1 AND state IN (${stateList(COUNTED_REDEMPTION_STATES)})`,
-          [couponId],
-        );
-        quotaExceeded = Number(counted[0]?.n ?? 0) > maxTotal;
-      }
-    }
-
-    return { outcome: 'granted', orderId, userId, afterExpiry, quotaExceeded };
-  });
+  sql.transaction((tx) => settleOrderPaidInTransaction(tx, input));
 
 /**
  * 把订单标成失败（下单后支付通道立刻失败，或人工取消）。
@@ -1131,8 +1180,15 @@ export interface PrismaLikeClient extends PrismaTransactionClient {
   $transaction<T>(fn: (tx: PrismaTransactionClient) => Promise<T>): Promise<T>;
 }
 
-/** 事务**内**的面：只有读写，没有 `transaction`（对应 `PrismaTransactionClient`）。 */
-const createPrismaRunner = (client: PrismaTransactionClient): SqlRunner => ({
+/**
+ * 事务**内**的面：只有读写，没有 `transaction`（对应 `PrismaTransactionClient`）。
+ *
+ * 🔴 **导出**是为了让 webhook 能在**自己已经开启的** Prisma 事务里跑结算：
+ * `settleOrderPaidInTransaction(createPrismaSqlRunner(tx), …)`。没有它，webhook
+ * 只能要么再开一层事务（把"权益发了、订单没结算"那个半截窗口留下），
+ * 要么把 `$transaction` 硬套上去（Prisma 的事务 client 上没有它）。
+ */
+export const createPrismaSqlRunner = (client: PrismaTransactionClient): SqlRunner => ({
   query: async <T>(sql: string, params: readonly unknown[] = []): Promise<T[]> => {
     const result = await client.$queryRawUnsafe<T[]>(sql, ...params);
     return Array.isArray(result) ? result : [];
@@ -1142,7 +1198,7 @@ const createPrismaRunner = (client: PrismaTransactionClient): SqlRunner => ({
 });
 
 export const createPrismaSqlExecutor = (client: PrismaLikeClient): SqlExecutor => ({
-  ...createPrismaRunner(client),
+  ...createPrismaSqlRunner(client),
   transaction: <T>(fn: (tx: SqlRunner) => Promise<T>): Promise<T> =>
-    client.$transaction((tx) => fn(createPrismaRunner(tx))),
+    client.$transaction((tx) => fn(createPrismaSqlRunner(tx))),
 });

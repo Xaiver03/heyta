@@ -1,6 +1,7 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, beforeAll, afterAll, vi } from 'vitest';
 import type { MockInstance } from 'vitest';
 import Fastify, { FastifyInstance } from 'fastify';
+import { PGlite } from '@electric-sql/pglite';
 
 /**
  * 微信支付 webhook 的**路由级**测试：
@@ -11,6 +12,15 @@ import Fastify, { FastifyInstance } from 'fastify';
  * 🔴 覆盖面明确写下来：**没有真实商户号、没有真单**。
  * 这里证明的是"同一 out_trade_no 的第二投被唯一约束挡住""两笔真实购买是两次授予"
  * "验签/时效失败不落行"，**不是**"微信会接受我们的请求"。
+ *
+ * ## 为什么这里也起了一个 PGlite（只有空表）
+ *
+ * 接线之后 webhook 会对 **`checkout_orders`** 做一次真 SQL 查询（结算）。
+ * 这些用例**没有建过订单**，所以查询走的是"查不到订单"（`unknown-order`），
+ * 路由随即**回落**到接线前的行为（adapter 的金额声明）—— 这正是本文件要覆盖的
+ * 那一段。SQL 是真的（真 PostgreSQL 语义、真空表），不是打桩返回 `[]`：
+ * 打桩会掩盖"表名/列名写错"这类错误。
+ * 结算成功后按订单 SKU 授予的路径由 `billing-webhook-settlement.pglite.spec.ts` 覆盖。
  */
 const DAY = 24 * 60 * 60 * 1000;
 const PERIOD = 30 * DAY;   // 🔴 月付：一次购买 = 30 天（ADR-0020 §2.2）
@@ -54,6 +64,7 @@ import {
 } from '../src/billing/wechat.adapter';
 import { createNoopBillingAdapter } from '../src/billing/noop.adapter';
 import { Logger } from '../src/logger';
+import { PRICING_SCHEMA_DDL } from './pricing-ddl.helper';
 import {
   TEST_WECHAT_API_V3_KEY,
   TEST_WECHAT_APP_ID,
@@ -65,6 +76,28 @@ import {
 } from './wechat-test-fixture.helper';
 
 const { privateKey, publicKey } = createWechatTestKeyPair();
+
+/** 只有结构、没有订单的真空库：给 webhook 的结算 SQL 一个真实落点。 */
+let ordersDb: PGlite;
+const ordersRunner = {
+  query: async <T>(query: string, params: readonly unknown[] = []): Promise<T[]> => {
+    const res = await ordersDb.query(query, params as unknown[]);
+    return res.rows as T[];
+  },
+  execute: async (query: string, params: readonly unknown[] = []): Promise<number> => {
+    const res = await ordersDb.query(query, params as unknown[]);
+    return res.affectedRows ?? 0;
+  },
+};
+
+beforeAll(async () => {
+  ordersDb = new PGlite();
+  await ordersDb.exec(PRICING_SCHEMA_DDL);
+}, 60_000);
+
+afterAll(async () => {
+  await ordersDb?.close();
+});
 
 describe('wechat webhook routes（stub prisma，🔴 没有真网络 / 没有真商户号）', () => {
   let app: FastifyInstance | undefined;
@@ -89,6 +122,8 @@ describe('wechat webhook routes（stub prisma，🔴 没有真网络 / 没有真
       prefix: '/api/billing',
       ...(adapters ? { adapters: adapters as never } : {}),
       now: () => clock,
+      // 结算 SQL 走真 PGlite（空表 → 查不到订单 → 回落 adapter 声明）。
+      sqlRunner: () => ordersRunner,
     });
     await app.ready();
   };
