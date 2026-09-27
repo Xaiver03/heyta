@@ -412,7 +412,7 @@ Windows / macOS / Linux 三平台各出一个能跑起真实同步的桌面应�
 | M2-2 建桌面壳工程 | ✅ **已完成**（渲染页仍是占位） | `build` 出 `main.cjs` + `preload.cjs`；`typecheck` 通过；11 个测试通过 |
 | **M2-2b 桌面端渲染进程 + GUI 冒烟** | ✅ **已完成**（本轮）—— 同时关掉 **M1 判据第 4 条** | `e2e/tests/desktop-window.spec.ts` 通过；截图见 `e2e/test-results/desktop-window.png` |
 | **Windows 真机验证** | ✅ **已实测**（2026-09-27） | 在 `windows-pc` 上 `pnpm -r build` **exit 0**、桌面端产物**字节级一致**、**11/11 测试通过**。详见 [桌面端手册](../runbooks/desktop.md) §5.2 |
-| M2-3 跑通真实同步 | ⬜ **未做** | 需要真实服务端，见 [本地验证手册](../runbooks/local-server-verification.md) |
+| M2-3 跑通真实同步 | ✅ **已完成并实测**（本轮） | **三端全链路通过（18/18）**：Web（真浏览器）↔ 服务端（真 Postgres）↔ 笔记本（真 SQLite、**另一个 clientId**），第 3 相是**全新浏览器上下文（空 IndexedDB）**把两台设备的数据全拉回来。命令 `pnpm verify:multi-end`，前置见 [本地验证手册](../runbooks/local-server-verification.md)。⚠️ 过程中修掉一个**让整个脚本从没真正跑起来过**的 bug，见下 |
 | M2-4 三平台产包 + 签名 | 🟡 **三平台产包 ✅，桌面签名未做** | `@electron/packager`（BSD-2-Clause）；`release/heyta-{darwin-arm64,win32-x64,linux-x64}` 三份都产出（本轮复测 ✅）。**macOS 包已实测启动 + 截图**（`e2e/tests/desktop-window.spec.ts` 的"打包产物"用例）。⚠️ Windows / Linux 产物**未在对应系统上运行验证过**；桌面端安装器 / 签名 / 公证 / 自动更新**一律未做**（缺证书）。详见 [`runbooks/desktop.md` §4.3](../runbooks/desktop.md) |
 | **Android release AAB + 发布签名** | ✅ **已完成并实测**（本轮） | `./gradlew bundleRelease` → `BUILD SUCCESSFUL`，44 MB AAB。**签名接线已用真 keystore 验证换掉了签名者**。⚠️ 上架用的正式 keystore 仍需自备（见 [多平台构建手册](../runbooks/multi-platform-build.md) §1.5）。**过程中发现 release 打包一直是坏的** —— 见下 |
 
@@ -442,6 +442,37 @@ error: 'import.meta' is currently unsupported   （4 处）
 **并已验证它会红**（注入回原缺陷 → 报 4 次，与 hermesc 的错误数吻合）。
 
 ⚠️ **环境**：JDK 24 会在 `op-sqlite` 的 CMake 配置上失败，必须用 **JDK 17**。
+
+### 🔴 三端同步验收「一直在跑」，其实从没跑到过第 1 步（2026-09-28 修）
+
+`scripts/verify-multi-end-sync.sh` 的头注释写得很到位（"只测一端等于没测"、
+"界面说已同步在上传被拒收时同样会出现"），但**它自己没能跑起来**：
+
+```
+scripts/lib/mobile-e2e-fresh-account.sh: line 81: email�: unbound variable
+```
+
+第 81 行是 `echo "✅ 全新账号：$email（令牌 ${#token} 字符）"`。
+bash **把紧跟 `$email` 的全角括号首字节算进了变量名**。全仓 **172 处**、
+18 个验收脚本都有这个写法（见 `5599141`）。
+
+**教训（比 bug 本身重要）**：这类写法**没有 `set -u` 时不会报错**，
+只是把值打印成乱码 —— 脚本"照常通过"，**证据是错的**。
+对一份以实测输出为证据的验收脚本，这比崩溃更危险：崩溃你看得见，乱码你不看。
+已加 `check:shell-unicode` 常驻护栏。
+
+### ⚠️ 跑三端验收的两个前置（都会伪装成"产品缺陷"）
+
+| 前置 | 少了会怎样 |
+|---|---|
+| 服务端必须放行 web 端口：`CORS_ORIGINS=http://127.0.0.1:4328` | 状态条显示「离线 · 改动已排队」，**服务端日志里一条请求都没有** —— 看着像网络问题，其实请求没发出去 |
+| 服务端要连 `heyta_mobile_smoke`，且以 `TEST_MODE` 跑（`/api/test/create-user` 只在 TEST_MODE 挂载） | 建号失败 |
+
+好消息：脚本的**前置检查**把这两条都拦下来了，并直接给出修法。
+
+⚠️ **不要在被测应用正在被编辑时跑它**：`webServer` 是 Vite dev，
+任何 `apps/web` 改动都会通过 HMR 推给正在跑的页面；
+Zustand store 被热替换会**重置回 `idle`**，表现为"已同步 → 未同步"的假红。
 
 **🔴 与计划原文不同的一处改动（架构上更好，值得记）**：
 
