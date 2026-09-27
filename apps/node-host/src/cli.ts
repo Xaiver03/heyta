@@ -20,14 +20,14 @@
  * HEYTA_PASSWORD / HEYTA_CLIENT_ID。加 `--json` 输出机器可读结果。
  */
 
-import { writeSync } from 'node:fs';
+import { writeFileSync, writeSync } from 'node:fs';
 
 import { parseLocalDate } from '@heyta/domain';
-import type { NewTaskFields } from '@heyta/app-host';
+import { serializeExportDocument, type NewTaskFields } from '@heyta/app-host';
 import { openNodeHost } from './host.js';
 import type { SyncStatus } from '@heyta/sync-client';
 
-const VALUE_FLAGS = new Set(['db', 'server', 'token', 'password', 'client-id', 'due']);
+const VALUE_FLAGS = new Set(['db', 'server', 'token', 'password', 'client-id', 'due', 'out']);
 const BOOL_FLAGS = new Set(['json', 'all', 'help']);
 
 interface ParsedArgs {
@@ -126,6 +126,7 @@ const USAGE = `heyta node-host —— 非 Web 宿主（真实 SQLite + 真实同
   pending                   打印待上传队列长度
   projects                  列出清单
   tags                      列出标签
+  export --out <路径>       导出全部数据到 JSON 文件（含已删除记录与完整操作日志）
 `;
 
 /**
@@ -324,6 +325,34 @@ async function main(): Promise<number> {
           out(JSON.stringify({ ok: true, command: 'sync', status }));
         } else {
           out(`已同步（${new Date(status.at).toISOString()}）`);
+        }
+        return 0;
+      }
+
+      case 'export': {
+        const outPath = stringFlag(flags, 'out');
+        if (outPath === undefined) {
+          throw new Error('export 需要 --out <路径>（把 JSON 写到哪里）');
+        }
+        // 导出形状全部来自 `@heyta/app-host` —— CLI 只负责落盘与汇报计数。
+        const doc = await host.exportDocument();
+        writeFileSync(outPath, serializeExportDocument(doc), 'utf8');
+        if (json) {
+          out(
+            JSON.stringify({
+              ok: true,
+              command: 'export',
+              file: outPath,
+              counts: doc.counts,
+              exportedAt: doc.exportedAt,
+            }),
+          );
+        } else {
+          out(
+            `已导出到 ${outPath}：${String(doc.counts.totalEntities)} 条记录` +
+              `（其中已删除 ${String(doc.counts.totalDeleted)} 条）、` +
+              `${String(doc.counts.totalOps)} 条操作日志`,
+          );
         }
         return 0;
       }

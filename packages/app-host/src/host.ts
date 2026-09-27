@@ -163,6 +163,15 @@ export interface AppHost {
   /** 待上传队列长度（离线队列是否清空，同步后应该为 0）。 */
   pendingUploadCount(): Promise<number>;
 
+  /**
+   * 读**完整** op-log（导出/备份用），按本地 `seq` 升序。
+   *
+   * 🔴 这是刻意的"读全库"入口，与 `getPendingUpload()`（只读待上传队列）不同。
+   * 导出必须能看到**全部** op，包括已上传、已应用、被拒绝的 —— 少了任何一类，
+   * 导出的"完整"就是假的。
+   */
+  readOpLog(): Promise<Operation<string>[]>;
+
   /** 关闭 SQLite 连接。之后不可再用。 */
   close(): void;
 }
@@ -310,6 +319,12 @@ export async function openAppHost(options: AppHostOptions): Promise<AppHost> {
 
     async pendingUploadCount(): Promise<number> {
       return (await engine.getPendingUpload()).length;
+    },
+
+    async readOpLog(): Promise<Operation<string>[]> {
+      // `getAllOps()` 已按 seq 升序，并且是"读全库"的正式入口。
+      const rows = await store.getAllOps();
+      return rows.map((row) => row.op);
     },
 
     close(): void {

@@ -74,6 +74,7 @@ import { AiDuration } from './features/ai/AiDuration.js';
 import { AiSettingsNavigationContext } from './features/ai/ai-settings-navigation.js';
 import type { SettingsTarget } from './features/ai/route-explanation.js';
 import { AiSettings } from './features/settings/AiSettings.js';
+import { ExportPanel } from './features/settings/ExportPanel.js';
 import { MemoryPanel } from './features/settings/MemoryPanel.js';
 import {
   createSessionSecretStore,
@@ -746,33 +747,37 @@ export function App(): React.JSX.Element {
           {view === 'growth' && <GrowthView />}
           {view === 'trash' && <TrashView />}
           {view === 'settings' && (
-            <AiSettings
-              initial={aiSettings}
-              secrets={aiSecrets}
-              focusTarget={settingsFocus}
-              memorySlot={
-                <MemoryPanel
-                  memoryEnabled={aiSettings.memoryEnabled}
-                  preferenceSet={memory.preferenceSet}
-                  feedbackSet={memory.feedbackSet}
-                  rawPresentIds={memory.rawPresentIds}
-                  corrections={memory.corrections}
-                  focusGaps={memory.focusGaps}
-                  onSuppress={(id) => void store.suppressPreference(id)}
-                  onRestore={(id) => void store.restorePreference(id)}
-                />
-              }
-              /**
-               * 🔴 回传并落盘。不传的话 `AiSettings` 会退回自己存 localStorage，
-               * 于是 `aiSettings` 这个 state **不会更新** ——
-               * 用户关掉记忆开关后，界面上的偏好要刷新才消失。
-               * 隐私开关"关不掉当下的行为"是不可接受的。
-               */
-              onChange={(next) => {
-                setAiSettings(next);
-                saveAiSettings(next);
-              }}
-            />
+            <>
+              <AiSettings
+                initial={aiSettings}
+                secrets={aiSecrets}
+                focusTarget={settingsFocus}
+                memorySlot={
+                  <MemoryPanel
+                    memoryEnabled={aiSettings.memoryEnabled}
+                    preferenceSet={memory.preferenceSet}
+                    feedbackSet={memory.feedbackSet}
+                    rawPresentIds={memory.rawPresentIds}
+                    corrections={memory.corrections}
+                    focusGaps={memory.focusGaps}
+                    onSuppress={(id) => void store.suppressPreference(id)}
+                    onRestore={(id) => void store.restorePreference(id)}
+                  />
+                }
+                /**
+                 * 🔴 回传并落盘。不传的话 `AiSettings` 会退回自己存 localStorage，
+                 * 于是 `aiSettings` 这个 state **不会更新** ——
+                 * 用户关掉记忆开关后，界面上的偏好要刷新才消失。
+                 * 隐私开关"关不掉当下的行为"是不可接受的。
+                 */
+                onChange={(next) => {
+                  setAiSettings(next);
+                  saveAiSettings(next);
+                }}
+              />
+              {/* 导出入口与 AI 设置并列在同一个设置页 —— 见 ExportPanel 文件头。 */}
+              <ExportPanel />
+            </>
           )}
         </div>
       </main>

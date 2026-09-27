@@ -1165,6 +1165,40 @@ export const zhCN = {
   // 分支到单数兄弟词条。中文这两条**刻意逐字相同**（不相同才是漏翻）。
   'web.due.overdueOne': '已逾期 {days} 天',
 
+  // ── Web · 导出（设计原则第 5 条「导出自由」）─────────────────
+  //
+  // 🔴 这些词条兑现两句已经对用户说过的话：README 的「任何时刻都能一键带走
+  //    全部数据」，以及订阅到期提示里的「本地数据仍然可以正常查看、编辑和导出」。
+  //    在此之前全仓没有任何用户可见的导出入口 —— 那两句话是不实的。
+  'web.export.title': '导出数据',
+  'web.export.intro': '把这台设备上的数据一次性带走。导出在本机完成，不经过任何服务器。',
+  'web.export.json.label': 'JSON（完整保真）',
+  'web.export.json.note': '包含全部实体、完整操作日志，以及已删除的记录。适合备份或迁移，机器可读。',
+  'web.export.json.button': '下载 JSON',
+  'web.export.markdown.label': '任务清单（Markdown）',
+  'web.export.markdown.note': '人能直接打开看的任务列表。它不含已删除的记录，也不含操作日志。',
+  'web.export.markdown.button': '下载任务清单',
+  // 🔴 诚实条款：这一轮**不做导入**。不说清楚的话，用户会把它当成还原点 ——
+  //    而一个不能导回来的文件当还原点用，等于没有备份。
+  'web.export.notRestorePoint': '这是导出，还不能导回来 —— 请不要把它当成还原点。',
+  'web.export.counts': '这次的导出里有 {entities} 条记录（其中已删除 {deleted} 条）、{ops} 条操作日志。',
+  'web.export.failed': '导出失败，请重试。',
+  // Markdown 文件内部的结构文字。**格式由 `packages/app-host` 决定，措辞由这里决定** ——
+  // 与 AI 失败态「返回 reason、壳取词条」是同一条纪律。
+  'web.export.markdown.heading': '# heyta 任务清单',
+  'web.export.markdown.generatedAt': '导出时间：{at}',
+  'web.export.markdown.empty': '（没有任务）',
+  'web.export.markdown.open': '未完成',
+  'web.export.markdown.done': '已完成',
+  'web.export.markdown.colTitle': '标题',
+  'web.export.markdown.colStatus': '状态',
+  'web.export.markdown.colDue': '截止',
+  'web.export.markdown.colPriority': '优先级',
+  'web.export.markdown.colProject': '清单',
+  'web.export.markdown.colTags': '标签',
+  'web.export.markdown.none': '（无）',
+  'web.export.markdown.footer': '这是导出文件，还不能导回来，请不要把它当成还原点。',
+
   // ═══════════════════════════════════════════════════════════
   // 移动端（apps/mobile）
   // ═══════════════════════════════════════════════════════════
