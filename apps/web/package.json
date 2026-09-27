@@ -32,7 +32,9 @@
     "@heyta/sync-client": "workspace:*",
     "@heyta/app-host": "workspace:*",
     "@heyta/ai": "workspace:*",
-    "@heyta/local-api": "workspace:*"
+    "@heyta/local-api": "workspace:*",
+    "@heyta/ui": "workspace:*",
+    "react-native-web": "0.21.3"
   },
   "devDependencies": {
     "@types/react": "^19.2.2",

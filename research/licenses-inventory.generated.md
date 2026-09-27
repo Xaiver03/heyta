@@ -7,7 +7,7 @@
 
 生成时间：2026-09-27
 
-**总计 919 个包** —— 宽松许可 918，受限 0，无许可证 0，白名单外已登记 1。
+**总计 937 个包** —— 宽松许可 936，受限 0，无许可证 0，白名单外已登记 1。
 
 准入门槛（见 THIRD_PARTY_LICENSES.md）：许可允许闭源商用；且 2021 年后仍在更新。
 
@@ -26,7 +26,7 @@
 
 - **CC-BY-4.0**（`caniuse-lite@1.0.30001812`）：caniuse-lite@1.0.30001812：browserslist 的**构建期数据包**，不进入运行时产物；CC-BY 是署名许可（不是禁用的 CC-BY-NC），归属已在 THIRD_PARTY_LICENSES.md §2 登记。
 
-### 📋 全部依赖（919 个）
+### 📋 全部依赖（937 个）
 
 这一段是**全量底稿**：上面两节的所有结论都能在这里逐行核到。严格按包名排序（`localeCompare`），同名多版本分行列出。
 
@@ -266,6 +266,7 @@
 | `@react-native/js-polyfills` | 0.84.1 | MIT |
 | `@react-native/metro-babel-transformer` | 0.84.1 | MIT |
 | `@react-native/metro-config` | 0.84.1 | MIT |
+| `@react-native/normalize-colors` | 0.74.89 | MIT |
 | `@react-native/normalize-colors` | 0.84.1 | MIT |
 | `@react-native/typescript-config` | 0.84.1 | MIT |
 | `@react-native/virtualized-lists` | 0.84.1 | MIT |
@@ -437,7 +438,9 @@
 | `core-js-compat` | 3.50.0 | MIT |
 | `cosmiconfig` | 9.0.2 | MIT |
 | `create-require` | 1.1.1 | MIT |
+| `cross-fetch` | 3.2.0 | MIT |
 | `cross-spawn` | 7.0.6 | MIT |
+| `css-in-js-utils` | 3.1.0 | MIT |
 | `css-select` | 5.2.2 | BSD-2-Clause |
 | `css-tree` | 3.2.1 | MIT |
 | `css-tree` | 1.1.3 | MIT |
@@ -520,6 +523,8 @@
 | `fastq` | 1.20.3 | ISC |
 | `fb-dotslash` | 0.5.8 | (MIT OR Apache-2.0) |
 | `fb-watchman` | 2.0.2 | Apache-2.0 |
+| `fbjs` | 3.0.5 | MIT |
+| `fbjs-css-vars` | 1.0.2 | MIT |
 | `fdir` | 6.5.0 | MIT |
 | `fflate` | 0.8.3 | MIT |
 | `fill-range` | 7.1.1 | MIT |
@@ -565,6 +570,7 @@
 | `http-proxy-agent` | 7.0.2 | MIT |
 | `https-proxy-agent` | 7.0.6 | MIT |
 | `human-signals` | 2.1.0 | Apache-2.0 |
+| `hyphenate-style-name` | 1.1.0 | BSD-3-Clause |
 | `ical.js` | 2.2.1 | MPL-2.0 |
 | `iconv-lite` | 0.4.24 | MIT |
 | `ieee754` | 1.2.1 | BSD-3-Clause |
@@ -573,6 +579,7 @@
 | `imurmurhash` | 0.1.4 | MIT |
 | `inflight` | 1.0.6 | ISC |
 | `inherits` | 2.0.4 | ISC |
+| `inline-style-prefixer` | 7.0.1 | MIT |
 | `invariant` | 2.2.4 | MIT |
 | `ipaddr.js` | 2.5.0 | MIT |
 | `is-arrayish` | 0.2.1 | MIT |
@@ -656,6 +663,7 @@
 | `mdn-data` | 2.27.1 | CC0-1.0 |
 | `media-typer` | 0.3.0 | MIT |
 | `memoize-one` | 5.2.1 | MIT |
+| `memoize-one` | 6.0.0 | MIT |
 | `merge-stream` | 2.0.0 | MIT |
 | `merge2` | 1.4.1 | MIT |
 | `meshoptimizer` | 1.1.1 | MIT |
@@ -699,6 +707,7 @@
 | `negotiator` | 1.1.0 | MIT |
 | `negotiator` | 0.6.4 | MIT |
 | `nocache` | 3.0.4 | MIT |
+| `node-fetch` | 2.7.0 | MIT |
 | `node-int64` | 0.4.0 | MIT |
 | `node-releases` | 2.0.57 | MIT |
 | `node-stream-zip` | 1.16.0 | MIT |
@@ -748,11 +757,13 @@
 | `playwright-core` | 1.63.0 | Apache-2.0 |
 | `postcss` | 8.5.28 | MIT |
 | `postcss-load-config` | 6.0.1 | MIT |
+| `postcss-value-parser` | 4.2.0 | MIT |
 | `pretty-format` | 29.7.0 | MIT |
 | `prisma` | 5.22.0 | Apache-2.0 |
 | `process-warning` | 5.1.0 | MIT |
 | `process-warning` | 4.0.1 | MIT |
 | `progress` | 2.0.3 | MIT |
+| `promise` | 7.3.1 | MIT |
 | `promise` | 8.3.0 | MIT |
 | `prompts` | 2.4.2 | MIT |
 | `pstree.remy` | 1.1.8 | MIT |
@@ -774,6 +785,7 @@
 | `react-native-get-random-values` | 2.0.0 | MIT |
 | `react-native-safe-area-context` | 5.10.0 | MIT |
 | `react-native-svg` | 15.15.5 | MIT |
+| `react-native-web` | 0.21.3 | MIT |
 | `react-refresh` | 0.14.2 | MIT |
 | `react-refresh` | 0.18.0 | MIT |
 | `readable-stream` | 3.6.2 | MIT |
@@ -817,6 +829,7 @@
 | `serve-static` | 1.16.3 | MIT |
 | `set-blocking` | 2.0.0 | ISC |
 | `set-cookie-parser` | 2.7.2 | MIT |
+| `setimmediate` | 1.0.5 | MIT |
 | `setprototypeof` | 1.2.0 | ISC |
 | `shebang-command` | 2.0.0 | MIT |
 | `shebang-regex` | 3.0.0 | MIT |
@@ -853,6 +866,7 @@
 | `strip-ansi` | 6.0.1 | MIT |
 | `strip-final-newline` | 2.0.0 | MIT |
 | `strnum` | 1.1.2 | MIT |
+| `styleq` | 0.1.3 | MIT |
 | `sucrase` | 3.35.1 | MIT |
 | `sumchecker` | 3.0.1 | Apache-2.0 |
 | `superagent` | 10.4.1 | MIT |
@@ -885,6 +899,7 @@
 | `toidentifier` | 1.0.1 | MIT |
 | `touch` | 3.1.1 | ISC |
 | `tough-cookie` | 6.0.2 | BSD-3-Clause |
+| `tr46` | 0.0.3 | MIT |
 | `tr46` | 6.0.0 | MIT |
 | `tree-kill` | 1.2.2 | MIT |
 | `ts-interface-checker` | 0.1.13 | Apache-2.0 |
@@ -897,6 +912,7 @@
 | `type-fest` | 0.7.1 | (MIT OR CC0-1.0) |
 | `type-is` | 1.6.18 | MIT |
 | `typescript` | 5.9.3 | Apache-2.0 |
+| `ua-parser-js` | 1.0.41 | MIT |
 | `ufo` | 1.6.4 | MIT |
 | `undefsafe` | 2.0.5 | MIT |
 | `undici` | 7.30.0 | MIT |
@@ -923,10 +939,12 @@
 | `walker` | 1.0.8 | Apache-2.0 |
 | `wcwidth` | 1.0.1 | MIT |
 | `webidl-conversions` | 8.0.1 | BSD-2-Clause |
+| `webidl-conversions` | 3.0.1 | BSD-2-Clause |
 | `whatwg-fetch` | 3.6.20 | MIT |
 | `whatwg-mimetype` | 5.0.0 | MIT |
 | `whatwg-mimetype` | 4.0.0 | MIT |
 | `whatwg-url` | 15.1.0 | MIT |
+| `whatwg-url` | 5.0.0 | MIT |
 | `which` | 2.0.2 | ISC |
 | `which-module` | 2.0.1 | ISC |
 | `why-is-node-running` | 2.3.0 | MIT |
