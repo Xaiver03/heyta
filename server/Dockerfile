@@ -43,8 +43,15 @@ COPY server/package.json ./server/
 #
 # 默认仍是官方 registry：换源只影响"从哪取包"，不影响锁文件里记录的 tarball 完整性
 # 校验，所以 `--frozen-lockfile` 的保证不被削弱。
+#
+# ⚠️ 必须用 `pnpm config set registry`，**不能**只给 `npm_config_registry` 环境变量：
+# 实测后者被 pnpm 忽略，包**照旧从 registry.npmjs.org 取**
+# （日志里 `GET https://registry.npmjs.org/… error (23)`），于是还在同一处超时。
+# 锁文件里没有任何硬编码 URL（`grep registry.npmjs.org pnpm-lock.yaml` = 0），
+# 所以取包地址完全由配置决定 —— 把配置真的设上就行了。
 ARG NPM_REGISTRY=https://registry.npmjs.org/
-RUN npm_config_registry="$NPM_REGISTRY" pnpm install --frozen-lockfile --ignore-scripts
+RUN pnpm config set registry "$NPM_REGISTRY" \
+ && pnpm install --frozen-lockfile --ignore-scripts
 
 # 拷贝源码
 COPY packages/sync-core/ ./packages/sync-core/
@@ -133,9 +140,9 @@ COPY --from=builder --chown=supersync:nodejs /repo/packages/domain/heyta-domain-
 # 而 `pnpm pack` 会把 domain 的 `workspace:*` 改写成真实版本号 ——
 # 所以两个 tarball 要在**同一条** `npm install` 里给，npm 才能就地满足它。
 ARG NPM_REGISTRY=https://registry.npmjs.org/
-RUN npm_config_registry="$NPM_REGISTRY" npm install ./sync-core.tgz ./shared-schema.tgz ./domain.tgz --ignore-scripts --omit=dev && \
-    npm_config_registry="$NPM_REGISTRY" npm install --ignore-scripts --omit=dev && \
-    npm_config_registry="$NPM_REGISTRY" npm install prisma@5.22.0 --ignore-scripts --omit=dev && \
+RUN npm install ./sync-core.tgz ./shared-schema.tgz ./domain.tgz --registry="$NPM_REGISTRY" --ignore-scripts --omit=dev && \
+    npm install --registry="$NPM_REGISTRY" --ignore-scripts --omit=dev && \
+    npm install prisma@5.22.0 --registry="$NPM_REGISTRY" --ignore-scripts --omit=dev && \
     npx prisma generate && \
     rm -f sync-core.tgz shared-schema.tgz domain.tgz && \
     npm cache clean --force
