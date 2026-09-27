@@ -22,6 +22,18 @@ import {
 import { DEFAULT_PRICE_BOOK, resolveEffectivePrice } from '../src/billing/price-book';
 import { quoteOrder } from '../src/billing/quote';
 import { normalizeCouponCode, type CouponDefinition } from '../src/billing/coupon';
+import {
+  buildWechatOutTradeNo,
+  createWechatBillingAdapter,
+} from '../src/billing/wechat.adapter';
+import {
+  TEST_WECHAT_API_V3_KEY,
+  TEST_WECHAT_APP_ID,
+  TEST_WECHAT_MCH_ID,
+  TEST_WECHAT_NOTIFY_URL,
+  TEST_WECHAT_SERIAL_NO,
+  createWechatTestKeyPair,
+} from './wechat-test-fixture.helper';
 import { PRICING_SCHEMA_DDL } from './pricing-ddl.helper';
 
 /**
@@ -787,6 +799,70 @@ describe('结算：幂等 + 金额比对订单', () => {
     const second = await expireStaleOrders(base, { now: NOW + 6 * HOUR });
     expect(first.orders).toBe(1);
     expect(second).toEqual({ redemptions: 0, orders: 0 });
+  });
+});
+
+describe('🔴 冻结 → 下单 → 结算：三个数必须同源（§5.1）', () => {
+  const { privateKey, publicKey } = createWechatTestKeyPair();
+
+  it('用券的一单：adapter 签出的订单号与金额 == 库里冻结的那一行，且能结算成功', async () => {
+    const user = await freshUser();
+    await publishCoupon(couponDef());
+
+    // ① 算价：¥99 用 ¥20 券 → 实付 ¥79。
+    const quote = await buildQuote(user, { codes: ['LAUNCH'] });
+    expect(quote.finalAmountMinor).toBe(400);
+
+    // ② **先冻结**：订单号由调用方生成，冻进 `checkout_orders`。
+    const outTradeNo = buildWechatOutTradeNo(user, NOW, 'feedfacecafebeef');
+    const { orderId } = await reserve(user, quote, { outTradeNo });
+
+    // ③ **后下单**：把同一个订单号与冻结后的实付交给 adapter（stub fetch，不连真通道）。
+    let payload: Record<string, unknown> | undefined;
+    const adapter = createWechatBillingAdapter({
+      appId: TEST_WECHAT_APP_ID,
+      mchId: TEST_WECHAT_MCH_ID,
+      serialNo: TEST_WECHAT_SERIAL_NO,
+      apiV3Key: TEST_WECHAT_API_V3_KEY,
+      privateKey,
+      publicKey,
+      notifyUrl: TEST_WECHAT_NOTIFY_URL,
+      now: () => NOW,
+      fetchImpl: (async (_url: string, init: RequestInit) => {
+        payload = JSON.parse(String(init.body)) as Record<string, unknown>;
+        return { ok: true, status: 200, json: async () => ({ code_url: 'weixin://x' }) };
+      }) as unknown as typeof fetch,
+    });
+    await adapter.createCheckout({
+      userId: user,
+      priceId: 'hosted-monthly',
+      amountMinor: quote.finalAmountMinor,
+      outTradeNo,
+      successUrl: 'https://app.example.test/ok',
+      cancelUrl: 'https://app.example.test/cancel',
+    });
+
+    // ④ 库里冻的那一行，与发给微信的那两个数**逐字相等**。
+    //    这一条就是 §5.1 要的：adapter 不再自己查价目表、也不自己另生成订单号。
+    const frozen = await base.query<{ out_trade_no: string; final_amount_minor: unknown }>(
+      'SELECT out_trade_no, final_amount_minor FROM checkout_orders WHERE id = $1',
+      [orderId],
+    );
+    const sentAmountMinor = (payload!.amount as { total: number }).total;
+    expect(payload!.out_trade_no).toBe(frozen[0]!.out_trade_no);
+    expect(sentAmountMinor).toBe(Number(frozen[0]!.final_amount_minor));
+    expect(sentAmountMinor).toBe(400);
+
+    // ⑤ 闭环：回调按**这个**订单号 + **这个**金额结算 → 授予。
+    //    修掉的就是「用户付 ¥79、我们按 ¥99 下单 → settleOrderPaid 判 amount-mismatch
+    //    → 用户付了钱拿不到权益」那一步。
+    const settled = await settleOrderPaid(base, {
+      outTradeNo: String(payload!.out_trade_no),
+      providerEventId: 'evt-coupon-1',
+      paidAmountMinor: sentAmountMinor,
+      now: NOW + HOUR,
+    });
+    expect(settled).toMatchObject({ outcome: 'granted', orderId });
   });
 });
 

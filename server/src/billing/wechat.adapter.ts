@@ -77,6 +77,15 @@ export const WECHAT_ONE_TIME_PERIOD_DAYS = 30;
 /** 默认回调地址的路径（`notify_url` 一般是 `PUBLIC_URL` + 它）。 */
 export const WECHAT_NOTIFY_PATH = '/api/billing/webhooks/wechat';
 
+/**
+ * 微信 `out_trade_no` 的长度上限（文档：6–32 字符）。
+ *
+ * 超长在通道侧一定会被拒，而通道给的错误信息只说"参数错误"。在本地拒一次
+ * 能把原因说清楚，而且失败发生在**收钱之前**。下限由 `OUT_TRADE_NO_PATTERN`
+ * 间接保证（我们自己生成的号远长于 6），所以这里只守上限。
+ */
+export const WECHAT_OUT_TRADE_NO_MAX_LENGTH = 32;
+
 // ---------------------------------------------------------------------------
 // 1. 请求签名（纯函数）
 // ---------------------------------------------------------------------------
@@ -310,6 +319,39 @@ export const parseUserIdFromAttach = (attach: unknown): number | null => {
   return Number.isSafeInteger(id) && id > 0 ? id : null;
 };
 
+/**
+ * 校验**调用方给的**商户订单号能不能安全使用，返回它本身（方便内联）。
+ *
+ * 三条判据，逐条都有具体后果：
+ * 1. **非空字符串** —— 空的 `out_trade_no` 会被通道拒，且我们无法按它认单；
+ * 2. **不超长** —— 超过 32 字符通道必拒（见 `WECHAT_OUT_TRADE_NO_MAX_LENGTH`）；
+ * 3. **能解出同一个 userId** —— 这一条护的是**归属**，不是格式洁癖：
+ *    `verifyWebhook` 在 `attach` 丢失时会回落到从订单号里解 userId
+ *    （`parseUserIdFromOutTradeNo`）。若调用方给的号解不出、或解出的是**别人**，
+ *    那么"attach 恰好没带"的那次真实回调就会把人归错、或者归不到 ——
+ *    而 `attach` 在下单后是否出现在通知里，不由我们决定。
+ *
+ * 🔴 与其静默降级，不如在**收钱之前**就响。这是本文件一贯的 fail-closed 方向。
+ */
+export const assertUsableOutTradeNo = (outTradeNo: unknown, userId: number): string => {
+  if (typeof outTradeNo !== 'string' || outTradeNo.trim() === '') {
+    throw new WechatInvalidOutTradeNoError(outTradeNo, '不是非空字符串');
+  }
+  if (outTradeNo.length > WECHAT_OUT_TRADE_NO_MAX_LENGTH) {
+    throw new WechatInvalidOutTradeNoError(
+      outTradeNo,
+      `长度 ${outTradeNo.length} 超过微信上限 ${WECHAT_OUT_TRADE_NO_MAX_LENGTH}`,
+    );
+  }
+  if (parseUserIdFromOutTradeNo(outTradeNo) !== userId) {
+    throw new WechatInvalidOutTradeNoError(
+      outTradeNo,
+      `解不出 userId=${userId}；attach 丢失时这一单会归错人或归不到人`,
+    );
+  }
+  return outTradeNo;
+};
+
 /** header 取值：Node/Fastify 遇到重复 header 会给数组。 */
 const readHeader = (
   headers: WebhookHeaders,
@@ -449,6 +491,38 @@ export class WechatInvalidAmountError extends Error {
 }
 
 /**
+ * 调用方给的 `outTradeNo` 不能用作商户订单号时抛这个。判据见 `assertUsableOutTradeNo`。
+ *
+ * 🔴 它护的是「冻结的订单号 == 发给通道的订单号」这条不变量：
+ * 回调按订单号认单，两者不一致时**一笔真实到账的钱授予不出去**（`unknown-order`）。
+ */
+export class WechatInvalidOutTradeNoError extends Error {
+  readonly code = 'WECHAT_INVALID_OUT_TRADE_NO';
+
+  constructor(outTradeNo: unknown, reason: string) {
+    super(
+      `微信商户订单号不可用（${reason}）：${JSON.stringify(outTradeNo)}，拒绝下单`,
+    );
+    this.name = 'WechatInvalidOutTradeNoError';
+  }
+}
+
+/**
+ * 解析出来的商品名为空时抛这个。
+ *
+ * 微信要求 `description` 非空；让它到通道才失败，用户看到的会是"支付失败"，
+ * 而原因只是我们传了一个空串。在本地拒能把话说清楚。
+ */
+export class WechatInvalidDescriptionError extends Error {
+  readonly code = 'WECHAT_INVALID_DESCRIPTION';
+
+  constructor(description: unknown) {
+    super(`微信商品名（description）不能为空，收到 ${JSON.stringify(description)}，拒绝下单`);
+    this.name = 'WechatInvalidDescriptionError';
+  }
+}
+
+/**
  * 构造微信 Native 扫码 adapter。
  *
  * 行为逐条：
@@ -482,15 +556,24 @@ export const createWechatBillingAdapter = (
         throw new WechatInvalidAmountError(input.amountMinor);
       }
 
-      const outTradeNo = buildWechatOutTradeNo(
-        input.userId,
-        now(),
-        randomBytes(8).toString('hex'),
-      );
+      // 商品名可以覆盖（运营想改账单上的字），但空串不行 —— 见错误类。
+      const description = input.description ?? price.description;
+      if (typeof description !== 'string' || description.trim() === '') {
+        throw new WechatInvalidDescriptionError(description);
+      }
+
+      // 🔴 订单号优先用**调用方给的**那一个：`checkout_orders.out_trade_no` 与发给
+      // 微信的必须是同一个，否则回调按订单号查不到订单 → 真实到账却授予不出去。
+      // 不传时才退回自己生成（向后兼容尚无冻结概念的旧调用方）。
+      const outTradeNo =
+        input.outTradeNo === undefined
+          ? buildWechatOutTradeNo(input.userId, now(), randomBytes(8).toString('hex'))
+          : assertUsableOutTradeNo(input.outTradeNo, input.userId);
+
       const payload = {
         appid: options.appId,
         mchid: options.mchId,
-        description: price.description,
+        description,
         out_trade_no: outTradeNo,
         notify_url: options.notifyUrl,
         // attach 是**兜底**的用户归属来源；真正的归属也编在 out_trade_no 里。

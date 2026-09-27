@@ -358,6 +358,91 @@ describe('wechat adapter — createCheckout（stub fetch，🔴 没有真网络�
     expect(fields.serial_no).toBe(SERIAL_NO);
   });
 
+  it('🔴 用调用方冻结的 outTradeNo + 实付金额下单 —— 库里的单与微信的单必须同源', async () => {
+    let captured: { url: string; init: RequestInit } | undefined;
+    const fetchImpl = (async (url: string, init: RequestInit) => {
+      captured = { url, init };
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({ code_url: 'weixin://wxpay/bizpayurl?pr=frozen01' }),
+      };
+    }) as unknown as typeof fetch;
+
+    // 调用方（计价层）在 `createOrderWithReservation` 时冻结进
+    // `checkout_orders.out_trade_no` 的那个号 —— adapter 必须**原样**使用。
+    const frozenOutTradeNo = buildWechatOutTradeNo(42, NOW, 'a1b2c3d4e5f60718');
+    const adapter = createAdapter({ fetchImpl, now: () => NOW });
+    await adapter.createCheckout({
+      userId: 42,
+      priceId: 'hosted-monthly',
+      // ¥5 用 ¥1 券 → 冻结后的实付（400 分，不在价目表上）。
+      amountMinor: 400,
+      outTradeNo: frozenOutTradeNo,
+      description: 'heyta 官方托管月付（已用 ¥1 券）',
+      successUrl: 'https://app.example.test/ok',
+      cancelUrl: 'https://app.example.test/cancel',
+    });
+
+    const body = JSON.parse(String(captured!.init.body)) as Record<string, unknown>;
+    // ① 订单号是调用方给的那一个，**不是** adapter 自己生成的 ——
+    //    否则回调按订单号查 `checkout_orders` 会 `unknown-order`，钱到账却授予不出去。
+    expect(body.out_trade_no).toBe(frozenOutTradeNo);
+    // ② 金额是**冻结后的实付**，不是价目表全额（这条就是 §5.1 的核心）。
+    expect(body.amount).toEqual({ total: 400, currency: 'CNY' });
+    // ③ 商品名可覆盖（价目表只提供默认值）。
+    expect(body.description).toBe('heyta 官方托管月付（已用 ¥1 券）');
+  });
+
+  it('🔴 调用方给的 outTradeNo 不可用 → 在收钱之前就拒', async () => {
+    const adapter = createAdapter({
+      fetchImpl: (async () => {
+        throw new Error('不该发请求');
+      }) as unknown as typeof fetch,
+      now: () => NOW,
+    });
+
+    const bad: readonly (readonly [string, RegExp])[] = [
+      ['', /不是非空字符串/],
+      ['   ', /不是非空字符串/],
+      ['x'.repeat(33), /超过微信上限 32/],
+      // 解得出 userId，但是**别人**的（42 的单配了 43 的号）。
+      [buildWechatOutTradeNo(43, NOW, 'deadbeef'), /解不出 userId=42/],
+      // 解不出 userId 的形状：attach 丢失时这一单会归不到人。
+      ['order-123', /解不出 userId=42/],
+    ];
+    for (const [outTradeNo, message] of bad) {
+      await expect(
+        adapter.createCheckout({
+          userId: 42,
+          priceId: 'hosted-monthly',
+          amountMinor: 9_900,
+          outTradeNo,
+          successUrl: 'https://a.test',
+          cancelUrl: 'https://a.test',
+        }),
+      ).rejects.toThrow(message);
+    }
+  });
+
+  it('description 是空串 → 拒（微信要求非空，本地拒比通道拒可读）', async () => {
+    const adapter = createAdapter({
+      fetchImpl: (async () => {
+        throw new Error('不该发请求');
+      }) as unknown as typeof fetch,
+    });
+    await expect(
+      adapter.createCheckout({
+        userId: 1,
+        priceId: 'hosted-monthly',
+        amountMinor: 9_900,
+        description: '  ',
+        successUrl: 'https://a.test',
+        cancelUrl: 'https://a.test',
+      }),
+    ).rejects.toThrow(/description/);
+  });
+
   it('未知 priceId → 明确抛错，不按 0 元下单', async () => {
     const adapter = createAdapter({
       fetchImpl: (async () => {
@@ -458,10 +543,17 @@ describe('wechat adapter — verifyWebhook 的失败路径（fail-closed）', ()
 
   it('签名被改过一个字符 → invalid-signature', async () => {
     const fixture = buildPaymentWebhook({ timestampSeconds: Math.floor(NOW / 1000) });
-    const broken = {
-      ...fixture.headers,
-      'wechatpay-signature': `A${fixture.headers['wechatpay-signature'].slice(1)}`,
-    };
+    const original = fixture.headers['wechatpay-signature'];
+
+    // 🔴 这里不能写成 `'A' + sig.slice(1)`：签名是 base64，首位本来就有 1/64 的
+    // 概率就是 'A'。撞上时"被改坏"的签名与原签名**逐字节相同**，这条断言会悄悄
+    // 退化成"原签名能通过" —— 而它全部的意义就是证明原签名不能通过。
+    // payload 一变签名就变，所以这是个只要有人改 fixture 就会炸的隐藏地雷：
+    // 显式挑一个与原首位**不同**的字符，并把这一点钉住。
+    const flippedSignature = `${original[0] === 'A' ? 'B' : 'A'}${original.slice(1)}`;
+    expect(flippedSignature).not.toBe(original);
+
+    const broken = { ...fixture.headers, 'wechatpay-signature': flippedSignature };
     await expect(adapter.verifyWebhook(fixture.body, broken)).resolves.toEqual({
       ok: false,
       reason: 'invalid-signature',
