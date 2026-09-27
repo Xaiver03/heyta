@@ -113,8 +113,10 @@ supersync_image_source_revision() {
         ../.github/workflows/supersync-docker.yml \
         ../package.json \
         ../pnpm-lock.yaml \
+        ../tsconfig.base.json \
         ../packages/shared-schema \
         ../packages/sync-core \
+        ../packages/domain \
         . 2>/dev/null || true)"
     if [ -n "$revision" ]; then
         printf '%s\n' "$revision"
@@ -127,26 +129,50 @@ supersync_image_source_revision() {
 assert_clean_supersync_image_inputs() {
     local untracked_files
 
+    # 🔧 heyta 改动：源码树**不是** git 仓库时，这个检查没法做，必须显式跳过并告警。
+    #
+    # 文档化的部署形态恰恰就是"rsync 上来的源码目录"—— docs/runbooks/deployment.md §3.2
+    # 写明 `~/heyta` 的 `git status` 报 `fatal: not a git repository`。
+    # 而下面的 `git diff` 在没有 .git 时**必然失败**，失败又被当成"有脏文件"，
+    # 于是 `deploy.sh --build` 在**文档写明的部署方式下永远跑不起来**，
+    # 报的还是 "Refusing to build … from dirty tracked input files"
+    # ——把运维指向一个根本不存在的原因（实测踩到，卡了一整轮）。
+    #
+    # 刻意**不**静默通过：检查做不了就说做不了，并讲清代价（镜像标签退化成 `local`，
+    # 不可回溯到某个 commit）。想拿到可回溯性，就从 git checkout 部署。
+    if ! git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+        echo ""
+        echo "WARNING: not a git work tree — cannot verify that the image inputs are clean."
+        echo "         Skipping the dirty-input guard. The image revision label degrades to"
+        echo "         'local' (nothing to pin it to), so this build is NOT traceable back to"
+        echo "         a commit. Deploy from a git checkout if you need that guarantee."
+        return 0
+    fi
+
     if ! git diff --quiet -- \
         ../.dockerignore \
         ../.github/workflows/supersync-docker.yml \
         ../package.json \
         ../pnpm-lock.yaml \
+        ../tsconfig.base.json \
         ../packages/shared-schema \
         ../packages/sync-core \
+        ../packages/domain \
         . ||
         ! git diff --cached --quiet -- \
             ../.dockerignore \
             ../.github/workflows/supersync-docker.yml \
             ../package.json \
             ../pnpm-lock.yaml \
+            ../tsconfig.base.json \
             ../packages/shared-schema \
             ../packages/sync-core \
+            ../packages/domain \
             .; then
         echo ""
         echo "ERROR: Refusing to build a labeled supersync image from dirty tracked input files."
-        echo "       Commit or stash changes under packages/super-sync-server,"
-        echo "       packages/sync-core, packages/shared-schema, package*.json, or"
+        echo "       Commit or stash changes under packages/sync-core, packages/shared-schema,"
+        echo "       packages/domain, tsconfig.base.json, package*.json, or"
         echo "       .dockerignore/.github/workflows/supersync-docker.yml before running --build."
         exit 1
     fi
@@ -156,8 +182,10 @@ assert_clean_supersync_image_inputs() {
         ../.github/workflows/supersync-docker.yml \
         ../package.json \
         ../pnpm-lock.yaml \
+        ../tsconfig.base.json \
         ../packages/shared-schema \
         ../packages/sync-core \
+        ../packages/domain \
         . 2>/dev/null || true)"
     if [ -n "$untracked_files" ]; then
         echo ""
