@@ -14,9 +14,12 @@
  *   3. **"你已忘记"必须能恢复**（一次误点不能是永久的）
  */
 
+import { IDBFactory, IDBKeyRange } from 'fake-indexeddb';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+
+import { OpType } from '@heyta/sync-core';
 
 import {
   computeFocusGaps,
@@ -33,6 +36,8 @@ import {
 import { I18nProvider, type Locale } from '@heyta/i18n';
 
 const { MemoryPanel } = await import('../src/features/settings/MemoryPanel.js');
+const { __resetOpLogForTests, currentState, dispatchIntent, initOpLog, readRecentOps } =
+  await import('../src/lib/oplog.js');
 
 /**
  * 造一条偏好。
@@ -428,11 +433,9 @@ describe('🔴 记忆面板：关闭时连落差区也不渲染（隐私红线�
 /**
  * ops → computeFocusGaps → 渲染。
  *
- * ⚠️ 覆盖范围要说清：这条覆盖了**后两段**（算法确实把 op 里的推迟数算出来、
- * 界面确实把那个数字渲染出来）。**第一段（真实 IndexedDB 读取
- * `readRecentOps()`）没有被这条覆盖** —— 那需要真 store；
- * 仓库里 `journey-ai-memory.integration.spec.tsx` 有真内存版 IndexedDB 的搭法，
- * 但它整文件跳过，且不在本模块的白名单里，因此没有改它。
+ * 覆盖的是**后两段**（算法确实把 op 里的推迟数算出来、界面确实把那个数字渲染出来）。
+ * **第一段（真实 IndexedDB 读取 `readRecentOps()`）由文件末尾那组
+ * 「真 IndexedDB」用例覆盖** —— 它把三段接成了一条链。
  */
 describe('🔴 推迟次数真的从事件流一路走到界面上', () => {
   const now = 1_700_000_000_000;
@@ -485,6 +488,88 @@ describe('🔴 推迟次数真的从事件流一路走到界面上', () => {
     const el = render({ focusGaps: gaps });
     expect(
       el.querySelector('[data-testid="memory-gap-postponed-t-postponed"]')?.textContent,
+    ).toContain('推迟过 1 次');
+  });
+});
+
+/**
+ * 🔴 真 IndexedDB：把三段接成一条链（这是任务书里唯一承认"没覆盖"的那一段）
+ * ====================================================================
+ *
+ * 上面的用例把 ops 当**数组**喂进去，于是跳过了第一段 ——
+ *「从真正的 op-log 存储里按**最近**窗口读出来」。而第一段恰好有个不成文的坑：
+ * `getOpsSince(0, N)` 拿到的是**最旧**的 N 条（实现是
+ * `getAll({lower: since})` 升序后再 `slice(0, N)`），拿它当"最近"是错的。
+ * 这种错**只错在方向** —— 长度、类型、条数全都对，单看返回值发现不了。
+ *
+ * 搭法与 `journey-ai-memory.integration.spec.tsx` 一致（内存版 IndexedDB），
+ * 但不改那个文件（它整文件默认跳过，且不在本模块白名单里）。
+ */
+describe('🔴 真 IndexedDB：readRecentOps 取的是"最近"一窗（方向错了必红）', () => {
+  let dbCounter = 0;
+
+  beforeEach(async () => {
+    // ⚠️ `IDBKeyRange` 也要装：存储适配器**直接读全局那个名字**
+    //（`indexeddb-adapter.ts` 的 `buildRange`），只装 `indexedDB` 会在
+    // 第一次 `getAll` 时抛 `ReferenceError: IDBKeyRange is not defined`。
+    const g = globalThis as unknown as {
+      indexedDB: IDBFactory;
+      IDBKeyRange: typeof IDBKeyRange;
+    };
+    g.indexedDB = new IDBFactory();
+    g.IDBKeyRange = IDBKeyRange;
+    __resetOpLogForTests();
+    // 每个用例一个独立库名：否则上一个用例的 op 会留在库里，seq 接着涨。
+    dbCounter += 1;
+    await initOpLog(`heyta-m3-window-${String(dbCounter)}`);
+  });
+
+  async function createTask(id: string, payload: Record<string, unknown> = {}): Promise<void> {
+    await dispatchIntent({
+      entityType: 'TASK',
+      entityId: id,
+      opType: OpType.Create,
+      payload: { title: `task ${id}`, ...payload },
+    });
+  }
+
+  it('readRecentOps(k) 返回最近 k 条，而不是最旧 k 条', async () => {
+    for (let i = 1; i <= 5; i += 1) await createTask(`t-${String(i)}`);
+
+    expect(await readRecentOps(100)).toHaveLength(5);
+
+    const recent3 = await readRecentOps(3);
+    // ⚠️ 只断言长度是**不够的** —— "最近 3 条"和"最旧 3 条"都是 3 条。
+    //    必须断言到具体是哪 3 条，方向错了才会红。
+    expect(recent3.map((op) => op.entityId)).toEqual(['t-3', 't-4', 't-5']);
+  });
+
+  it('真实存储 → readRecentOps → computeFocusGaps：推迟次数接得上', async () => {
+    const day = 86_400_000;
+    const now = Date.now();
+    await createTask('t-real', { priority: 2, important: true, dueDate: now - 2 * day });
+    // 把截止日期往后挪 = 推迟过一次（第一次设截止只是排期，不算推迟）。
+    await dispatchIntent({
+      entityType: 'TASK',
+      entityId: 't-real',
+      opType: OpType.Update,
+      payload: { dueDate: now + day },
+    });
+
+    const state = currentState();
+    const gaps = computeFocusGaps({
+      tasks: Object.values(state.tasks),
+      focusSessions: Object.values(state.focusSessions),
+      operations: await readRecentOps(),
+      now,
+    });
+
+    expect(gaps.map((gap) => gap.taskId)).toEqual(['t-real']);
+    expect(gaps[0]?.postponements).toBe(1);
+
+    const el = render({ focusGaps: gaps });
+    expect(
+      el.querySelector('[data-testid="memory-gap-postponed-t-real"]')?.textContent,
     ).toContain('推迟过 1 次');
   });
 });
