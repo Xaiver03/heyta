@@ -21,10 +21,32 @@ import { useI18n } from '@heyta/i18n';
 
 import type { RouteExplanation, SettingsTarget } from './route-explanation.js';
 
+/**
+ * 哪些原因**再点一次就可能好**。
+ *
+ * 🔴 只有熔断。冷却到点之后重新解析，端点就会回到候选里；
+ * 其余五条（远端闸关着 / 能力没声明 / 被停用 / 地址非法 / 端点不存在）
+ * 再点一百次也还是同一句 —— 给它们配一个"重试"，就是在教用户做一件
+ * **永远不会成功**的事，那比没有按钮更糟。
+ *
+ * ⚠️ 键的类型必须是 `RouteExplanation['reason']`，**不能**写成
+ * `CandidateExclusionReason`：后者少了 `'unconfigured'` 与 `'unknown'`
+ * 这两个只存在于解释层的取值，写成窄的那个会让下面 `.has(...)` 编译不过
+ * （实测 `TS2345: Argument of type 'CandidateExclusionReason | "unconfigured" | "unknown"'`）。
+ * 而 `vitest` 不做类型检查 —— 那个错误是单测全绿之后才被 `tsc -b` 抓到的。
+ */
+const RETRYABLE: ReadonlySet<RouteExplanation['reason']> = new Set(['circuit-open']);
+
 export interface RouteUnavailableProps {
   explanation: RouteExplanation;
   /** 未传时不渲染按钮（例如单测里只关心文案）。 */
   onOpenSettings?: ((target: SettingsTarget) => void) | undefined;
+  /**
+   * 重新解析一次路由（熔断冷却到点后的"再试一次"）。
+   *
+   * 未传、或原因不满足 `RETRYABLE` 时不渲染。
+   */
+  onRetry?: (() => void) | undefined;
   /** 沿用各面板已有的 `data-testid`（`ai-no-target` / `duration-no-target`…）。 */
   testId: string;
 }
@@ -32,6 +54,7 @@ export interface RouteUnavailableProps {
 export function RouteUnavailable({
   explanation,
   onOpenSettings,
+  onRetry,
   testId,
 }: RouteUnavailableProps): React.JSX.Element {
   const { t } = useI18n();
@@ -51,6 +74,16 @@ export function RouteUnavailable({
           onClick={() => onOpenSettings(explanation.settingsTarget)}
         >
           {t('web.ai.action.openSettings')}
+        </button>
+      )}
+      {onRetry !== undefined && RETRYABLE.has(explanation.reason) && (
+        <button
+          type="button"
+          className="ht-btn ht-btn--ghost"
+          data-testid={`${testId}-retry`}
+          onClick={onRetry}
+        >
+          {t('web.ai.action.retry')}
         </button>
       )}
     </div>

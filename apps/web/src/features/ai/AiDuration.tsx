@@ -188,6 +188,16 @@ export function AiDuration(props: AiDurationProps): React.JSX.Element {
   const [manualText, setManualText] = useState('');
 
   /** 路由全貌：有路给 `target`，没路给 `explanation`（恰好一个非空）。 */
+  /**
+   * 🔴 熔断冷却到点后的"再试一次"。
+   *
+   * 解析**每次渲染都重跑**（`resolveFeatureRoute` 在渲染体里，`now` 取当前时刻），
+   * 所以重试只需要强制一次重渲染 —— 不必把 tick 传进任何地方。
+   * 这样"重试"与"重新打开面板"走的是**同一条路径**，不会出现第二种解析口径。
+   */
+  const [, retryResolution] = useState(0);
+  const retry = (): void => retryResolution((n) => n + 1);
+
   const health = fromHealthSnapshot(props.healthSnapshot ?? {}, Date.now());
   const { target, explanation } = resolveFeatureRoute(routing, 'duration-estimate', { health });
 
@@ -385,6 +395,7 @@ export function AiDuration(props: AiDurationProps): React.JSX.Element {
             explanation={explanation}
             onOpenSettings={onOpenSettings}
             testId="duration-no-target"
+            onRetry={retry}
           />
         ) : (
           <>

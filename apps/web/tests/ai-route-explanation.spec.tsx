@@ -351,3 +351,73 @@ describe('原因优先级与不变式', () => {
     expect(explanation.key).toBe('web.ai.routeExplain.unknown');
   });
 });
+
+describe('🔴 熔断冷却到点后「再试一次」真的会重新解析', () => {
+  /**
+   * 这是本轮唯一一个**由我自己引入**的死角：披露现在会读 health，
+   * 于是跳闸的端点在冷却期内会显示"端点正在冷却"—— 但如果冷却在此期间
+   * 到点了，面板不会有任何动静（解析只在渲染时跑一次）。
+   * "重试"就是补这个洞：它强制一次重渲染，让解析用新的 `now` 重跑。
+   *
+   * 用 `toFake: ['Date']` 而不是整套假定时器：这里只需要控制 `Date.now()`，
+   * 把 `setTimeout` 一起接管会让渲染路径上任何真实的异步调度行为变样。
+   */
+  it('冷却未过 → 说熔断并给「重试」；把时间推过冷却 → 点它 → 端点回到候选', () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    try {
+      vi.setSystemTime(new Date('2026-01-01T00:00:00Z'));
+      const t0 = Date.now();
+      const c: ReasonCase = {
+        reason: 'circuit-open',
+        key: 'web.ai.routeExplain.circuitOpen',
+        settingsTarget: 'endpoints',
+        testId: 'duration-no-target',
+        panel: 'duration',
+        routing: durationRouting(),
+        healthSnapshot: {
+          version: 1,
+          entries: [{ endpointId: 'local', consecutiveFailures: 3, circuitOpenUntil: t0 + 60_000 }],
+        },
+        generic: 'web.ai.noTarget.duration',
+      };
+
+      const el = renderPanel(c, 'zh-CN', () => undefined);
+      expect(el.querySelector('[data-testid="duration-no-target"]')?.getAttribute('data-route-reason')).toBe(
+        'circuit-open',
+      );
+      const retry = el.querySelector<HTMLButtonElement>('[data-testid="duration-no-target-retry"]');
+      expect(retry, '熔断必须给一个「再试一次」—— 它是唯一一个重试真的有用的原因').toBeTruthy();
+      expect(retry?.textContent).toBe(translate('zh-CN', 'web.ai.action.retry'));
+
+      // 冷却到点（这一步之后的解析必须能看见它 —— 否则"重试"是个摆设）。
+      vi.setSystemTime(new Date(t0 + 61_000));
+      act(() => {
+        retry?.click();
+      });
+
+      expect(
+        el.querySelector('[data-testid="duration-no-target"]'),
+        '冷却过后重试必须重新解析出可用端点，而不是继续显示同一句话',
+      ).toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('重试修不好的原因**不给**按钮 —— 教用户做一件永远不会成功的事，比没有按钮更糟', () => {
+    for (const reason of ['remote-not-allowed', 'capability-missing', 'endpoint-missing'] as const) {
+      const c = CASES.find((x) => x.reason === reason);
+      expect(c, `夹具里必须有 ${reason} 这条 case`).toBeTruthy();
+      const el = renderPanel(c as ReasonCase, 'zh-CN', () => undefined);
+      expect(el.querySelector(`[data-testid="${(c as ReasonCase).testId}-retry"]`)).toBeNull();
+      // 但"去设置"必须在 —— 这类原因只能靠改配置解决。
+      expect(el.querySelector(`[data-testid="${(c as ReasonCase).testId}-settings"]`)).toBeTruthy();
+      act(() => {
+        root?.unmount();
+      });
+      container?.remove();
+      root = undefined;
+      container = undefined;
+    }
+  });
+});
