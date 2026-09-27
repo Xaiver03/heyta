@@ -118,6 +118,27 @@ export default defineConfig({
     dedupe: ['react', 'react-dom'],
   },
   server: { port: 5173 },
+  optimizeDeps: {
+    /**
+     * 🔴 `react-native-svg` **必须排除预打包**，否则只有 `vite dev` 会炸。
+     *
+     * 生产构建（`vite build`，走 Rollup + 上面那套别名/后缀）完全正常，
+     * 但 dev 模式先用 **esbuild 做依赖预打包**，而它解析不了
+     * `react-native-svg` 内部的 `./elements` —— 于是抓到**原生**实现，
+     * 一路拖进 `react-native/Libraries/...` 的 Flow 源码：
+     *
+     *     ✘ [ERROR] Expected "from" but found "{"
+     *       react-native/Libraries/Utilities/codegenNativeComponent.js:13:12
+     *
+     * 这个坑最难受的地方是**两边不一致**：`vite build` 绿、
+     * `pnpm check` 的 e2e（起的是 dev server）红，而报错指向 React Native
+     * 的 Flow 文件，完全看不出根因是我们自己的别名配置。
+     *
+     * 排除之后 `react-native-svg` 不再进预打包，交给上面那套
+     * 别名 + `.web.*` 后缀解析 —— 与生产构建走同一条路。
+     */
+    exclude: ['react-native-svg'],
+  },
   test: {
     environment: 'jsdom',
     globals: true,

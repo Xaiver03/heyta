@@ -99,6 +99,16 @@ interface TaskListSharedProps {
   readonly emptyMessage?: string;
   /** 列表根节点的测试标识。 */
   readonly testID?: string;
+  /**
+   * 空分组是否保留（只在分节形态下有意义）。
+   *
+   * 默认 `false` —— "已完成 0"这种标题是噪音。但**固定槽位**的布局是例外：
+   * 四象限矩阵里空格本身就是信息，藏掉会让人以为那个象限不存在。
+   *
+   * ⚠️ 它放在**共有**属性上而不是分节分支上，是因为解构联合类型时
+   * 只有"所有成员都有"的属性才可见 —— 放在分支上会让解构直接编译不过。
+   */
+  readonly keepEmptySections?: boolean;
 }
 
 /** 平铺形态：一批任务，**共享层负责排序**。 */
@@ -134,6 +144,7 @@ export function TaskList<TMeta = undefined>({
   tasks,
   sections,
   renderSectionHeader,
+  keepEmptySections,
   onToggleTask,
   onOpenTask,
   labels,
@@ -159,18 +170,30 @@ export function TaskList<TMeta = undefined>({
   // 平铺形态走 `toTaskRows`（排序），再统一包成带 `kind` 的同一形状。
   // 这样下面的 `renderItem` 与 `keyExtractor` 各只有一份。
   const items = useMemo<readonly Item[]>(() => {
-    if (sections !== undefined) return flattenSections(sections, { fallbackTitle });
+    if (sections !== undefined) {
+      return flattenSections(sections, { fallbackTitle, keepEmpty: keepEmptySections === true });
+    }
     return toTaskRows(tasks ?? [], { fallbackTitle }).map((row) => ({
       kind: 'task' as const,
       key: row.id,
       row,
     }));
-  }, [tasks, sections, fallbackTitle]);
+  }, [tasks, sections, fallbackTitle, keepEmptySections]);
 
   const styles = useMemo(
     () =>
       StyleSheet.create({
-        list: { paddingHorizontal: tokens['screen.gutter'] },
+        /**
+         * 🔴 列表**不自带水平内边距**。
+         *
+         * 第一版写了 `paddingHorizontal: screen.gutter`，在 web 切片上看没问题 ——
+         * 但 mobile 的 `<Screen>` **已经**加了同样的 gutter，套上去就是**双倍缩进**，
+         * 而症状只是"这一页比别的页窄一点"，不会报错。
+         *
+         * 页面边距属于**宿主**：它才知道自己有没有被别的容器包着。
+         * 列表只管行与行之间的节奏。
+         */
+        list: { gap: tokens['space.1'] },
         row: {
           flexDirection: 'row',
           alignItems: 'center',

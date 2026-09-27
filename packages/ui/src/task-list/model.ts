@@ -132,10 +132,24 @@ export type SectionRow<TMeta> =
   | { readonly kind: 'header'; readonly key: string; readonly section: TaskSection<TMeta> }
   | { readonly kind: 'task'; readonly key: string; readonly row: TaskRow };
 
+/** 分节展平的选项。 */
+export interface FlattenSectionsOptions extends ToTaskRowOptions {
+  /**
+   * 保留**空分组**。
+   *
+   * 默认 `false` —— 一个写着"已完成 0"的标题是纯噪音。
+   *
+   * ⚠️ 但**固定槽位**的布局是例外：四象限矩阵里"这一格是空的"本身
+   * 就是信息，藏掉它会让人以为那个象限不存在，而矩阵的价值恰恰在于
+   * 四个格子**同时**在那儿。这种布局显式传 `true`。
+   */
+  readonly keepEmpty?: boolean;
+}
+
 /**
  * 把分节展平成 `[头, 任务…, 头, 任务…]`。
  *
- * 🔴 **空分组不产生头。** 一个写着"已完成 0"的标题是纯噪音 ——
+ * 🔴 **空分组默认不产生头。** 一个写着"已完成 0"的标题是纯噪音 ——
  * 它占了屏、把视线从真有的内容上引开，却没有任何信息。
  * mobile 原来的实现里这条是手写的（`if (list.length === 0) return;`），
  * 提上来之后四个端都不会再各写一次、也不会有人忘掉。
@@ -147,11 +161,12 @@ export type SectionRow<TMeta> =
  */
 export function flattenSections<TMeta>(
   sections: readonly TaskSection<TMeta>[],
-  options?: ToTaskRowOptions,
+  options?: FlattenSectionsOptions,
 ): readonly SectionRow<TMeta>[] {
+  const keepEmpty = options?.keepEmpty === true;
   const out: SectionRow<TMeta>[] = [];
   for (const section of sections) {
-    if (section.tasks.length === 0) continue;
+    if (section.tasks.length === 0 && !keepEmpty) continue;
     out.push({ kind: 'header', key: `h-${section.key}`, section });
     for (const task of section.tasks) {
       out.push({ kind: 'task', key: task.id, row: toTaskRow(task, options) });
