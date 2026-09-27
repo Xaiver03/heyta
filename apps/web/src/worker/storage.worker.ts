@@ -19,13 +19,23 @@
  */
 
 import {
-  createOpfsSahPoolDriverFactory,
   DbOpLogStore,
   INDEXEDDB_SCHEMA,
   serveOpLogWorker,
   SqliteAdapter,
   type OpLogWorkerStore,
 } from '@heyta/storage';
+/**
+ * 🔴 **必须走 `@heyta/storage/sqlite/wasm` 子路径，不能从主入口拿。**
+ *
+ * 主入口若导出它，Metro（不做代码分割）就会把 `@sqlite.org/sqlite-wasm` 的
+ * Emscripten 胶水层内联进 **Android release 包**，而它用 `import.meta.url`，
+ * Hermes 直接报 `'import.meta' is currently unsupported`，
+ * release 打包整个失败。完整推导见 `packages/storage/src/sqlite/index.ts` 文件头。
+ *
+ * ⚠️ 这个错误**只在 release 现形** —— debug 不跑 Hermes 字节码编译。
+ */
+import { createOpfsSahPoolDriverFactory } from '@heyta/storage/sqlite/wasm';
 import { resolveClientId } from '@heyta/app-host';
 import type { Operation } from '@heyta/sync-core';
 

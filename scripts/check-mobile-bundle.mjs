@@ -57,6 +57,42 @@ const SINGLETONS = [
   { specifier: 'react/jsx-runtime', marker: 'react-jsx-runtime.production.js' },
 ];
 
+/**
+ * 产物里**绝对不能出现**的语法 —— 出现了就代表 release 打不出来。
+ *
+ * ## 为什么 `import.meta` 在这里是致命的
+ *
+ * Hermes **不支持** `import.meta`。它只在 release 才现形，因为 release 会把 JS
+ * 编译成 Hermes 字节码（debug 不做这一步）：
+ *
+ *     error: 'import.meta' is currently unsupported
+ *     > Task :app:createBundleReleaseJsAndAssets FAILED
+ *
+ * 2026-09-28 实测：`packages/storage` 的主入口导出了 Web 的 `SqliteWasmDriver`，
+ * 它拉 `@sqlite.org/sqlite-wasm`，而那份 Emscripten 胶水层用 `import.meta.url`。
+ * 当时的注释写着"它用的是动态 import，所以不会污染别的打包目标" ——
+ * **那个判断只对会做代码分割的打包器成立**；Metro 不做，动态 import 照样内联。
+ *
+ * 🔴 **为什么放在这道门禁里**：它必须看**产物**。看声明是看不出来的 ——
+ * `packages/storage` 的 `package.json` 完全合法，问题只在"谁把它拉进来了"。
+ * 这与本文件开头那件事（两份 React）是**同一类**缺陷：
+ * **门禁全绿、应用却根本起不来**，而且根因不在任何一行业务代码里。
+ *
+ * ⚠️ 用 `--dev false` 打的包**没有**跑 Hermes，所以这个语法会原样留在文本里，
+ * 恰好可以扫到。这也意味着：**这里扫到 = release 一定会炸**。
+ */
+const FORBIDDEN_SYNTAX = [
+  {
+    needle: 'import.meta',
+    why: 'Hermes 不支持 `import.meta`，release 打包会直接失败。',
+    fix: [
+      '找一个浏览器/ESM-only 的依赖被拉进了移动端 bundle。',
+      '修法通常是把它**从主入口移到子路径导出**，让 Metro 根本解析不到它。',
+      '⚠️ 把动态 `import()` 当隔离手段**没用** —— Metro 不做代码分割。',
+    ],
+  },
+];
+
 /** 列出 `packages/` 下的所有 workspace 包目录。 */
 function listPackages() {
   const dir = path.join(ROOT, 'packages');
@@ -134,6 +170,9 @@ if (!existsSync(path.join(MOBILE, 'node_modules'))) {
 /** @type {{ platform: string, specifier: string, count: number }[]} */
 const problems = [];
 
+/** @type {{ platform: string, needle: string, count: number, why: string, fix: string[] }[]} */
+const forbiddenProblems = [];
+
 for (const platform of PLATFORMS) {
   console.log(`   正在打包 ${platform} bundle（用来数 React 份数，约 1–2 分钟）…`);
 
@@ -153,6 +192,15 @@ for (const platform of PLATFORMS) {
       continue;
     }
     problems.push({ platform, specifier, count });
+  }
+
+  for (const { needle, why, fix } of FORBIDDEN_SYNTAX) {
+    const count = built.text.split(needle).length - 1;
+    if (count === 0) {
+      console.log(`   ✅ [${platform}] 产物不含 ${needle}`);
+      continue;
+    }
+    forbiddenProblems.push({ platform, needle, count, why, fix });
   }
 
   console.log(`   ℹ️  [${platform}] 产物 ${built.sizeMb} MB（已清理）`);
@@ -176,6 +224,24 @@ if (problems.length > 0) {
   console.error('         react / react/jsx-runtime / react/jsx-dev-runtime 钉成单实例。');
   console.error('   ⚠️ `extraNodeModules` **修不了** —— 它只是解析失败时的兜底，');
   console.error('      而包自己那份**存在**，正常解析会成功，兜底根本不触发。');
+  console.error('');
+  process.exit(1);
+}
+
+if (forbiddenProblems.length > 0) {
+  console.error('');
+  console.error('🔴 移动端产物里出现了 release 打不出来的语法：');
+  console.error('');
+  for (const { platform, needle, count, why, fix } of forbiddenProblems) {
+    console.error(`   ❌ [${platform}] 出现了 **${count}** 次 \`${needle}\``);
+    console.error(`      ${why}`);
+    console.error('      修法：');
+    for (const line of fix) console.error(`        · ${line}`);
+  }
+  console.error('');
+  console.error('   症状（实测）：release 构建 `:app:createBundleReleaseJsAndAssets` 失败，');
+  console.error("                  `error: 'import.meta' is currently unsupported`；");
+  console.error('                  **debug 构建一切正常**，所以只有 release 会现形。');
   console.error('');
   process.exit(1);
 }

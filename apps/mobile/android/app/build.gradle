@@ -72,6 +72,54 @@ def enableProguardInReleaseBuilds = false
  */
 def jscFlavor = 'io.github.react-native-community:jsc-android:2026004.+'
 
+// ─────────────────────────────────────────────────────────────────────────────
+// 发布签名的读取与告警
+// ─────────────────────────────────────────────────────────────────────────────
+//
+// 放在 `android { }` **外面**：`signingConfigs` 块里读属性时，属性必须先已解析。
+// 用 `providers.gradleProperty(...)` 而不是裸 `project.property(...)`，
+// 是为了让"来自 gradle.properties"与"来自环境变量"走同一条惰性路径，
+// 不必在配置阶段就判断存在性。
+
+/** 依次找 gradle 属性 → 环境变量。找不到返回 null（**不是空串**）。 */
+def heytaSigningValue = { String key ->
+    def fromProperty = providers.gradleProperty(key).orNull
+    if (fromProperty != null && !fromProperty.trim().isEmpty()) return fromProperty.trim()
+    def fromEnv = providers.environmentVariable(key).orNull
+    if (fromEnv != null && !fromEnv.trim().isEmpty()) return fromEnv.trim()
+    return null
+}
+
+def heytaReleaseStoreFile = heytaSigningValue('HEYTA_RELEASE_STORE_FILE')
+def heytaReleaseStorePassword = heytaSigningValue('HEYTA_RELEASE_STORE_PASSWORD')
+def heytaReleaseKeyAlias = heytaSigningValue('HEYTA_RELEASE_KEY_ALIAS')
+def heytaReleaseKeyPassword = heytaSigningValue('HEYTA_RELEASE_KEY_PASSWORD')
+
+def heytaHasReleaseSigning = [
+    heytaReleaseStoreFile, heytaReleaseStorePassword,
+    heytaReleaseKeyAlias, heytaReleaseKeyPassword,
+].every { it != null }
+
+if (heytaHasReleaseSigning) {
+    logger.lifecycle("[heyta] 发布签名：已配置（keystore = ${heytaReleaseStoreFile}）")
+} else {
+    logger.lifecycle("""
+[heyta] ⚠️⚠️⚠️  未配置发布签名，release 构建将使用**调试 keystore**  ⚠️⚠️⚠️
+[heyta]   调试 keystore 是**公开**的（口令 'android' / 'android'），
+[heyta]   用它签名的包**不能上架**，且任何持有公开密钥的人都能签出同身份的更新包。
+[heyta]   只把它用于内测。
+[heyta]   配发布签名：在 ~/.gradle/gradle.properties 里加这四项（keystore 不要进仓库）
+[heyta]     HEYTA_RELEASE_STORE_FILE=/绝对路径/heyta-upload.keystore
+[heyta]     HEYTA_RELEASE_STORE_PASSWORD=…
+[heyta]     HEYTA_RELEASE_KEY_ALIAS=…
+[heyta]     HEYTA_RELEASE_KEY_PASSWORD=…
+[heyta]   生成 keystore：keytool -genkeypair -v -storetype PKCS12 \\
+[heyta]     -keystore heyta-upload.keystore -alias heyta -keyalg RSA -keysize 2048 -validity 10000
+[heyta]   详见 docs/runbooks/multi-platform-build.md
+""".stripIndent())
+}
+
+
 android {
     ndkVersion rootProject.ext.ndkVersion
     buildToolsVersion rootProject.ext.buildToolsVersion
@@ -111,15 +159,55 @@ android {
             keyAlias 'androiddebugkey'
             keyPassword 'android'
         }
+
+        /**
+         * 发布签名。**keystore 绝不进仓库** —— 它只从 Gradle 属性或环境变量读。
+         *
+         * 四个键（任一缺失即视为"没配发布签名"）：
+         *
+         *   HEYTA_RELEASE_STORE_FILE        keystore 的**绝对路径**
+         *   HEYTA_RELEASE_STORE_PASSWORD    仓库口令
+         *   HEYTA_RELEASE_KEY_ALIAS         key 别名
+         *   HEYTA_RELEASE_KEY_PASSWORD      key 口令
+         *
+         * ⚠️ `RELEASE_KEY_ALIAS`/`_STORE_PASSWORD` 这些名字与 React Native 官方文档
+         * 一致，但**不带 `MYAPP_` 前缀**：那是模板占位名，照抄会变成第二套命名。
+         *
+         * 🔴 **必须整块 `if` 包起来。** 本块在**配置阶段**就会求值，
+         * 而没配发布签名时 `heytaReleaseStoreFile` 是 `null` ——
+         * `file(null)` 会直接抛 `Cannot convert 'null' to File`，
+         * 于是**连 debug 构建都跑不起来**。第一版正是这么写的，真机一跑就炸。
+         */
+        if (heytaHasReleaseSigning) {
+            release {
+                storeFile file(heytaReleaseStoreFile)
+                storePassword heytaReleaseStorePassword
+                keyAlias heytaReleaseKeyAlias
+                keyPassword heytaReleaseKeyPassword
+            }
+        }
     }
     buildTypes {
         debug {
             signingConfig signingConfigs.debug
         }
         release {
-            // Caution! In production, you need to generate your own keystore file.
-            // see https://reactnative.dev/docs/signed-apk-android.
-            signingConfig signingConfigs.debug
+            /**
+             * 🔴 **配了发布签名就用它，没配才回退调试签名 —— 但回退必须出声。**
+             *
+             * 为什么不直接 `throw`：现在还需要用 `bundleRelease` 出**内测包**，
+             * 卡死会把这条路的产物也一起断掉。所以允许回退。
+             *
+             * 为什么必须出声：**调试 keystore 是公开的**
+             * （`storePassword 'android'` / `keyPassword 'android'` 就写在上面，
+             * 全世界的 RN 项目共用同一把）。一个用公开密钥签名的 release 包，
+             * 任何人都能签出"同一应用"的更新包 —— 这不是"不够正式"，
+             * 是**能给恶意更新用同一个身份**。所以它绝不能是默默发生的。
+             *
+             * ⚠️ 这也是本仓反复出现的那类缺口的又一例：
+             * **回退本身不错，无声的回退才错。**
+             */
+            signingConfig heytaHasReleaseSigning ? signingConfigs.release : signingConfigs.debug
             minifyEnabled enableProguardInReleaseBuilds
             proguardFiles getDefaultProguardFile("proguard-android.txt"), "proguard-rules.pro"
         }
@@ -155,6 +243,7 @@ androidComponents {
         ext.buildTypes.getByName("release").manifestPlaceholders["usesCleartextTraffic"] = "true"
     }
 }
+
 
 // 🔴 让 JS 打包任务**真的**依赖 workspace 包（`packages`）的构建产物。
 //

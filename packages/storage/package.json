@@ -14,6 +14,10 @@
     "./sqlite/node": {
       "types": "./dist/sqlite/node-sqlite-driver.d.ts",
       "default": "./dist/sqlite/node-sqlite-driver.js"
+    },
+    "./sqlite/wasm": {
+      "types": "./dist/sqlite/sqlite-wasm-driver.d.ts",
+      "default": "./dist/sqlite/sqlite-wasm-driver.js"
     }
   },
   "scripts": {

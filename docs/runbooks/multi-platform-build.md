@@ -178,14 +178,64 @@ RN 的 `@react-native/gradle-plugin` 在 `finalizeDsl` 里把它设成 `false`�
 晚于 `android { }` 块的求值。所以真正的开关在文件末尾的
 `androidComponents.finalizeDsl` 里。**构建成功不等于配置生效，必须用 aapt2 验产物。**
 
-### 1.5 签名（发布前必做）
+### 1.5 发布签名
 
-当前 release 变体用 **debug keystore**，**不能上架**。发布前：
+`app/build.gradle` 里的 `signingConfigs.release` **从 Gradle 属性或环境变量读**，
+keystore 绝不入库。四个键（**任一缺失即视为"没配"**）：
 
-1. 生成正式 keystore；
-2. 口令放环境变量或 `~/.gradle/gradle.properties`，**绝不入库**；
-3. 把 `signingConfigs.release` 接到 release 变体；
-4. `apksigner verify --print-certs` 确认签名者。
+| 键 | 含义 |
+|---|---|
+| `HEYTA_RELEASE_STORE_FILE` | keystore 的**绝对路径** |
+| `HEYTA_RELEASE_STORE_PASSWORD` | 仓库口令 |
+| `HEYTA_RELEASE_KEY_ALIAS` | key 别名 |
+| `HEYTA_RELEASE_KEY_PASSWORD` | key 口令 |
+
+推荐写进 `~/.gradle/gradle.properties`（**不在仓库里**），四条都是 `HEYTA_RELEASE_*`：
+
+```properties
+HEYTA_RELEASE_STORE_FILE=/绝对路径/heyta-upload.keystore
+HEYTA_RELEASE_STORE_PASSWORD=…
+HEYTA_RELEASE_KEY_ALIAS=heyta
+HEYTA_RELEASE_KEY_PASSWORD=…
+```
+
+生成 keystore（**生成后立刻备份，丢了就再也发不了更新**）：
+
+```bash
+keytool -genkeypair -v -storetype PKCS12 \
+  -keystore heyta-upload.keystore -alias heyta \
+  -keyalg RSA -keysize 2048 -validity 10000
+```
+
+#### 🔴 没配的时候会发生什么 —— 这是本节的重点
+
+**不会失败，会用 debug keystore 签名，并打一大段警告。** 为什么不直接 `throw`：
+现在还要用它出内测 AAB，卡死会把这条路也断掉。
+
+但**警告必须显眼**，因为 debug keystore 是**公开**的
+（口令就写在 `build.gradle` 的 `signingConfigs.debug` 里，全世界的 RN 项目共用同一把）。
+一个用公开密钥签名的 release 包，**任何人都能签出"同一应用"的更新包** ——
+这不是"不够正式"，是能给恶意更新用同一个身份。
+
+配好之后，构建日志开头会变成：
+
+```
+[heyta] 发布签名：已配置（keystore = /…/heyta-upload.keystore）
+```
+
+#### 验签名（**不要只看构建成功**）
+
+```bash
+# AAB 用的是 jarsigner 体系，不是 apksigner
+jarsigner -verify -verbose -certs app/build/outputs/bundle/release/app-release.aab | head -20
+
+# 更直接：看签名者是不是你的 alias
+keytool -printcert -jarfile app/build/outputs/bundle/release/app-release.aab | grep -i "owner\|alias"
+```
+
+⚠️ **`bundleRelease` 成功 ≠ 签名对了。** 未配发布签名时它一样成功，
+只是签名者是 `CN=Android Debug`。所以每次发布前都要**看签名者**，
+这正是本仓反复那条："构建成功不等于配置生效，必须验产物"。
 
 ---
 
