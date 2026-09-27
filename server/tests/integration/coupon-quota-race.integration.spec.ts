@@ -42,6 +42,7 @@ import {
   createPrismaSqlExecutor,
   upsertCoupon,
   type SqlExecutor,
+  type SqlRunner,
 } from '../../src/billing/pricing-store';
 
 const DATABASE_URL = process.env.DATABASE_URL;
@@ -78,7 +79,8 @@ const makeBarrier = (expected: number): (() => Promise<void>) => {
  * `SELECT … FROM coupons … FOR UPDATE`，不是事务的开场。
  */
 const withRendezvous = (inner: SqlExecutor, rendezvous: () => Promise<void>): SqlExecutor => {
-  const wrap = (exec: SqlExecutor, state: { tripped: boolean }): SqlExecutor => ({
+  /** 事务**内**的面：只有读写（对应 `SqlRunner`）。会合栏就挂在这里。 */
+  const wrapRunner = (exec: SqlRunner, state: { tripped: boolean }): SqlRunner => ({
     query: async <T>(sql: string, params: readonly unknown[] = []): Promise<T[]> => {
       if (!state.tripped) {
         state.tripped = true;
@@ -87,9 +89,14 @@ const withRendezvous = (inner: SqlExecutor, rendezvous: () => Promise<void>): Sq
       return exec.query<T>(sql, params);
     },
     execute: (sql, params = []) => exec.execute(sql, params),
-    transaction: <T>(fn: (tx: SqlExecutor) => Promise<T>): Promise<T> =>
-      exec.transaction((tx) => fn(wrap(tx, { tripped: false }))),
   });
+
+  const wrap = (exec: SqlExecutor, state: { tripped: boolean }): SqlExecutor => ({
+    ...wrapRunner(exec, state),
+    transaction: <T>(fn: (tx: SqlRunner) => Promise<T>): Promise<T> =>
+      exec.transaction((tx) => fn(wrapRunner(tx, { tripped: false }))),
+  });
+
   return wrap(inner, { tripped: false });
 };
 

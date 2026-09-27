@@ -8,6 +8,7 @@ import {
   createOrderWithReservation,
   createPrismaSqlExecutor,
   expireStaleOrders,
+  failOrder,
   loadCoupons,
   loadCouponUsage,
   loadPriceOverrides,
@@ -18,6 +19,7 @@ import {
   upsertCoupon,
   type PrismaLikeClient,
   type SqlExecutor,
+  type SqlRunner,
 } from '../src/billing/pricing-store';
 import { DEFAULT_PRICE_BOOK, resolveEffectivePrice } from '../src/billing/price-book';
 import { quoteOrder } from '../src/billing/quote';
@@ -66,8 +68,8 @@ const HOUR = 3_600_000;
 let db: PGlite;
 let base: SqlExecutor;
 
-/** 把语句记进日志的包装器。用于断言**顺序**与**事务边界**。 */
-const wrap = (inner: SqlExecutor, log: string[]): SqlExecutor => ({
+/** 事务**内**的日志包装器：只有读写（对应 `SqlRunner`，事务里没有 `transaction`）。 */
+const wrapRunner = (inner: SqlRunner, log: string[]): SqlRunner => ({
   query: async <T>(sql: string, params: readonly unknown[] = []): Promise<T[]> => {
     log.push(sql.replace(/\s+/g, ' ').trim());
     return inner.query<T>(sql, params);
@@ -76,8 +78,13 @@ const wrap = (inner: SqlExecutor, log: string[]): SqlExecutor => ({
     log.push(sql.replace(/\s+/g, ' ').trim());
     return inner.execute(sql, params);
   },
-  transaction: <T>(fn: (tx: SqlExecutor) => Promise<T>): Promise<T> =>
-    inner.transaction((tx) => fn(wrap(tx, log))),
+});
+
+/** 把语句记进日志的包装器。用于断言**顺序**与**事务边界**。 */
+const wrap = (inner: SqlExecutor, log: string[]): SqlExecutor => ({
+  ...wrapRunner(inner, log),
+  transaction: <T>(fn: (tx: SqlRunner) => Promise<T>): Promise<T> =>
+    inner.transaction((tx) => fn(wrapRunner(tx, log))),
 });
 
 const createPgliteExecutor = (pglite: PGlite): SqlExecutor => {
@@ -90,7 +97,7 @@ const createPgliteExecutor = (pglite: PGlite): SqlExecutor => {
       const res = await pglite.query(sql, params as unknown[]);
       return res.affectedRows ?? 0;
     },
-    transaction: async <T>(fn: (tx: SqlExecutor) => Promise<T>): Promise<T> => {
+    transaction: async <T>(fn: (tx: SqlRunner) => Promise<T>): Promise<T> => {
       await pglite.exec('BEGIN');
       try {
         const result = await fn(executor);
@@ -768,6 +775,59 @@ describe('结算：幂等 + 金额比对订单', () => {
     expect(next.rejectedCoupons[0]).toMatchObject({ reason: 'total_redemption_limit_reached' });
     // 但仍能按原价下单（券不能用不等于买不成）。
     await expect(reserve(b, next)).resolves.toBeDefined();
+  });
+
+  it('🔴 failOrder（人工取消 / 通道建单失败）**必须一并释放名额**', async () => {
+    await publishCoupon(couponDef({ maxRedemptions: 1 }));
+    const a = await freshUser();
+    const b = await freshUser();
+
+    const cancelled = await placeOrder(a, { codes: ['LAUNCH'] });
+    // 下单后立刻失败 —— 通道建单失败、或运营人工取消，都是真实路径。
+    const failed = await failOrder(base, { orderId: cancelled.orderId, now: NOW + 1000 });
+    expect(failed).toEqual({ orders: 1, redemptions: 1 });
+
+    const redemption = await base.query<{ state: string }>(
+      'SELECT state FROM coupon_redemptions WHERE order_id = $1',
+      [cancelled.orderId],
+    );
+    // 用 `expired` 而不是 `reversed`：钱从没动过，不该按"预算已投放"计数。
+    expect(redemption[0]!.state).toBe('expired');
+
+    // 名额**回来了**。修复前这里是 null + total_redemption_limit_reached：
+    // 一条已经死掉的路径白占着预算，要等支付窗口结束被 sweep 扫到才放出来。
+    const next = await buildQuote(b, { codes: ['LAUNCH'] });
+    expect(next.appliedCouponId).not.toBeNull();
+  });
+
+  it('🔴 未付款的单**不许**退款：pending → refunded 会永久吃掉一个名额', async () => {
+    await publishCoupon(couponDef({ maxRedemptions: 1 }));
+    const a = await freshUser();
+    const b = await freshUser();
+
+    const pending = await placeOrder(a, { codes: ['LAUNCH'] });
+    // 修复前这里会把订单推成 refunded、核销推成 reversed，而 reversed 是**计数**的
+    // —— 等于用一笔没动过的钱永久吃掉一个名额，账面上还看不到任何异常。
+    const refused = await reverseOrderOnRefund(base, { orderId: pending.orderId, now: NOW + HOUR });
+    expect(refused).toEqual({ orders: 0, redemptions: 0 });
+
+    const row = await base.query<{ status: string }>(
+      'SELECT status FROM checkout_orders WHERE id = $1',
+      [pending.orderId],
+    );
+    expect(row[0]!.status).toBe('pending');
+    const redemption = await base.query<{ state: string }>(
+      'SELECT state FROM coupon_redemptions WHERE order_id = $1',
+      [pending.orderId],
+    );
+    expect(redemption[0]!.state).toBe('reserved');
+
+    // 此刻名额仍被占着（b 拿不到）—— 但它是**可恢复**的，这是与"永久吃掉"的关键区别。
+    const blocked = await buildQuote(b, { codes: ['LAUNCH'] });
+    expect(blocked.appliedCouponId).toBeNull();
+    await expireStaleOrders(base, { now: NOW + 10 * HOUR });
+    const afterSweep = await buildQuote(b, { codes: ['LAUNCH'] });
+    expect(afterSweep.appliedCouponId).not.toBeNull();
   });
 
   it('sweep 只动过期的 pending；已支付的订单不受影响', async () => {
