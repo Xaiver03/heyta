@@ -13,7 +13,15 @@
  */
 import { describe, expect, it } from 'vitest';
 
-import { PricingCliUsageError, parsePricingCommand } from '../scripts/pricing';
+import { existsSync } from 'node:fs';
+import path from 'node:path';
+
+import {
+  PRICING_COPY_SITES,
+  PricingCliUsageError,
+  describeCopyFootprint,
+  parsePricingCommand,
+} from '../scripts/pricing';
 
 const NOW = 1_760_000_000_000; // 固定时钟 —— 断言里不该出现 Date.now()
 
@@ -185,5 +193,52 @@ describe('pricing CLI · 参数解析', () => {
     it('不认识子命令时报错', () => {
       expect(expectUsageError(['refund-everything', '--actor', 'ops'])).toContain('不认识命令');
     });
+  });
+});
+
+/**
+ * 改价之后"还有哪些地方在撒谎"。
+ *
+ * 这一组钉的是这个仓库里**唯一**能被自动断言的一致性缺口：`pnpm check:pricing`
+ * 只校验代码基线 / 中英词条 / 法务 / `pricing-ssot` 这四处**代码侧**文件是否自洽，
+ * 它**不读数据库**（CI 没有 PostgreSQL）。于是"库里的价改了、文案没改"这件事
+ * 没有任何门禁能发现 —— 只能由 CLI 在改价那一刻说出来。
+ *
+ * 所以下面分别钉：**说**（两个数字都要在，只讲"不一致"等于没讲）、
+ * **说全**（每一个落点都要点名）、**清单本身不许过期**
+ * （点名的文件必须真的存在 —— 本仓库踩过"注释点名了一个不存在的脚本"的坑）。
+ */
+describe('pricing CLI · 改价后的文案足迹', () => {
+  const BASE = { priceId: 'hosted-ai-monthly', currency: 'CNY' } as const;
+
+  it('库里与代码基线一致 → 什么都不报', () => {
+    expect(describeCopyFootprint({ ...BASE, baselineMinor: 1_200, effectiveMinor: 1_200 })).toBeNull();
+  });
+
+  it('🔴 库里改了、基线没改 → 两个数字都报出来', () => {
+    const msg = describeCopyFootprint({ ...BASE, baselineMinor: 1_200, effectiveMinor: 1_500 });
+    expect(msg).not.toBeNull();
+    expect(msg).toContain('¥15.00'); // 收银台会收的
+    expect(msg).toContain('¥12.00'); // 页面会印的
+    expect(msg).toContain('hosted-ai-monthly/CNY');
+  });
+
+  it('🔴 报出**每一个**落点（漏一个，就有一处文案会撒谎）', () => {
+    const msg = describeCopyFootprint({ ...BASE, baselineMinor: 1_200, effectiveMinor: 1_500 });
+    for (const site of PRICING_COPY_SITES) expect(msg).toContain(site.path);
+  });
+
+  it('🔴 清单里的文件必须**真的存在**（否则清单自己就在撒谎）', () => {
+    const repoRoot = path.resolve(__dirname, '../..');
+    for (const site of PRICING_COPY_SITES) {
+      expect(
+        existsSync(path.join(repoRoot, site.path)),
+        `文案清单里的 ${site.path} 不存在 —— 清单已漂移`,
+      ).toBe(true);
+    }
+  });
+
+  it('改低也要报（降价同样会让文案撒谎）', () => {
+    expect(describeCopyFootprint({ ...BASE, baselineMinor: 1_500, effectiveMinor: 1_200 })).not.toBeNull();
   });
 });

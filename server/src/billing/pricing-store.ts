@@ -345,6 +345,64 @@ export const appendAudit = async (sql: SqlRunner, input: AuditInput): Promise<vo
   );
 };
 
+/** 读出来的一行审计。金额之类的结构化内容留在 `beforeJson` / `afterJson` 里，不二次解析。 */
+export interface PricingAuditEntry {
+  readonly id: number;
+  readonly action: string;
+  readonly target: string;
+  readonly beforeJson: string | null;
+  readonly afterJson: string | null;
+  readonly actor: string | null;
+  readonly note: string | null;
+  /** `null` = 这一行的时间戳读不出来（数据损坏），调用方负责如实显示，不要兜成 0。 */
+  readonly createdAt: number | null;
+}
+
+/**
+ * 读最近若干条审计，**新的在前**。
+ *
+ * 🔴 这个函数存在的理由：`pricing_audit_log` 在此之前**只写不读** ——
+ * `appendAudit` 是全仓唯一的接触点。于是"谁在什么时候把 ¥12 改成 ¥15"
+ * 这个问题在代码里**没有任何答案**，只能手写 SQL 去问库。
+ * 审计写下来却读不出来，等于没有审计：它的全部价值就在于事后能被查到。
+ *
+ * 只读、无副作用。`limit` 由调用方给（CLI 固定取一个小值，避免刷屏）。
+ * 排序用 `created_at DESC, id DESC`：同一毫秒内落的几行也要有**稳定**顺序，
+ * 否则"最后一条是谁改的"会随查询计划变。
+ */
+export const loadPricingAudit = async (
+  sql: SqlRunner,
+  options: { readonly limit: number },
+): Promise<readonly PricingAuditEntry[]> => {
+  const rows = await sql.query<{
+    readonly id: unknown;
+    readonly action: unknown;
+    readonly target: unknown;
+    readonly before_json: unknown;
+    readonly after_json: unknown;
+    readonly actor: unknown;
+    readonly note: unknown;
+    readonly created_at: unknown;
+  }>(
+    `SELECT id, action, target, before_json, after_json, actor, note, created_at
+       FROM pricing_audit_log
+      ORDER BY created_at DESC, id DESC
+      LIMIT $1`,
+    [options.limit],
+  );
+
+  return rows.map((row) => ({
+    id: Number(row.id),
+    action: String(row.action),
+    target: String(row.target),
+    beforeJson: row.before_json === null || row.before_json === undefined ? null : String(row.before_json),
+    afterJson: row.after_json === null || row.after_json === undefined ? null : String(row.after_json),
+    actor: row.actor === null || row.actor === undefined ? null : String(row.actor),
+    note: row.note === null || row.note === undefined ? null : String(row.note),
+    createdAt: toMillis(row.created_at) ?? null,
+  }));
+};
+
 // ---------------------------------------------------------------------------
 // 券
 // ---------------------------------------------------------------------------
@@ -430,8 +488,11 @@ export interface InvalidCouponRow {
  *   为了一个错别字让所有人买不成，是把影响面放大。
  *
  * ⚠️ 但"分出来"**不等于"默认忽略"**：`invalid` 会原样返回，调用方必须记录
- * 并告警（`server/scripts/show-price.ts` 会把它打出来，人也能查）。
+ * 并告警（`server/scripts/pricing.ts show` 会把它打出来并置退出码 1，人也能查）。
  * 静默丢弃才是这里真正要避免的事。
+ *
+ * 📌 上面原先点名的是 `server/scripts/show-price.ts` —— **那个文件从来不存在**。
+ * 实际打印它的就是那个 CLI。
  */
 export const loadCoupons = async (
   sql: SqlExecutor,
