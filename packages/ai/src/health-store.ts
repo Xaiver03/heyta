@@ -241,9 +241,14 @@ export function endpointHealthDisclosure(
  *
  * ⚠️ 这是"给用户看的"，所以要说人话 —— 不要出现 `consecutiveFailures` 这种词。
  *
- * ⚠️ **兼容路径**：中文句子，结论与 `endpointHealthDisclosure()` 同源
- * （这里 switch 的就是它的 kind）。壳切到结构化版本 + 词条表之后，
- * 它会只剩测试在用 —— 那时再删。
+ * ⚠️ **兼容路径，且壳已经切走了**：设置页现在用
+ * `apps/web/src/features/settings/health-copy.ts` 把 `endpointHealthDisclosure()`
+ * 的 kind 映射成双语词条 + 插值参数（中文逐字沿用这里的句子）。
+ * 因此本函数**当前只剩测试在用** —— 但它不是死代码：
+ * `tests/health-store.spec.ts` 用它钉住中文句子与 kind 的对应关系，
+ * 而那正是"壳翻译得对不对"的参照物。
+ * 🔴 **要删它，必须先让 `apps/**` 不再引用它的注释/断言，并确认没有第二个壳要用**；
+ * 在那之前保留，并保持它与 `endpointHealthDisclosure()` 同源（这里 switch 的就是 kind）。
  */
 export function describeEndpointHealth(entry: EndpointHealth, now: number): string {
   const d = endpointHealthDisclosure(entry, now);

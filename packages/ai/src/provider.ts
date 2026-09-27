@@ -156,6 +156,21 @@ export interface AiProviderConfig {
 /**
  * 组装 provider。
  *
+ * 🔴 **它是 provider 端口的"单端点 / 本地 / 测试与历史"执行路径，
+ * 不是生产的出境执行点。**
+ *
+ * 生产（`apps/web` / `apps/node-host` / `apps/mobile`）的出境执行点是
+ * `routing.ts` 的 `invokeRouted()` —— 只有它带多端点候选、能力过滤、
+ * 回退不跨隐私边界与熔断。本函数**不读 `AiRoutingConfig`**，只有
+ * `baseUrl` + 一个 key。
+ *
+ * 依赖本函数的地方只有三处，都不在生产路径上：本包自己的测试、
+ * `apps/web/tests/ai-failure-copy.spec.tsx`（一条文案测试，`apps/**` 属于别的模块
+ * 且不许改），以及 `scripts/verify-ai-live.mjs`（活体验证脚本）。
+ * 因此**不能删**；也正因如此，它是一个"两套实现"的存量问题：
+ * `docs/reference/ai-architecture.md` 把本函数写成生产的执行点，那是**文档漂移**
+ * （已登记在交付报告里）。**新增出境功能请接 `invokeRouted`，不要接这里。**
+ *
  * 🔴 `assertEnableable` 在**工厂里**就调用，而不是等第一次 `invoke` ——
  * 这样"托管模式因保留策略未定而不许启用"会在**配置那一刻**就失败，
  * 而不是在用户已经打了字、准备提交时才弹错。
@@ -290,12 +305,28 @@ export function extractContent(json: unknown): string | undefined {
  * 🔴 **"先授权、再出境、再显示结果"这个顺序不能被"边发边显示"替代。**
  * 流式输出看起来更流畅，但它意味着**在你决定要不要之前，数据已经在路上了**。
  * 所以如果将来要加流式，必须先回答"怎么在第一个字节发出前完成授权"。
+ *
+ * ⚠️ **当前零调用点（连测试都没有）**：它的消费者是**文档** ——
+ * `docs/reference/ai-architecture.md` 直接引用了这个常量的取值。
+ * 保留它是为了让那条顺序约束有一个**代码里的锚点**，而不是只活在文档的一段话里；
+ * 删掉它会让文档引用悬空。壳要展示这条说明时，应当 import 它而不是另抄一份。
  */
 export const EGRESS_ORDER_NOTE =
   '顺序：先展示会发送哪些字段 → 用户确认 → 才发请求 → 再显示结果。' +
   '不允许先发再问。';
 
-/** 便捷：拿到披露而不发起调用。UI 在"开启前"用这个。 */
+/**
+ * 便捷：拿到披露而不发起调用。UI 在"开启前"用这个。
+ *
+ * ⚠️ **当前零生产调用点**：壳实际直接调 `buildDisclosure()`
+ * （四个 AI 面板各自组装，需要中英双语词条 —— 见
+ * `apps/web/src/features/ai/AiCapture.tsx` 等）。
+ *
+ * 保留的理由：它是"只预览、不发送"这条能力的**端口级表达**，且关闭态的
+ * 披露形状由 `tests/disclosure-shape.spec.ts` 钉住（该文件正是为这个函数写的）。
+ * 与 `describeRouteIntent()` 同形：**在壳愿意收掉自己那份组装逻辑之前保留**，
+ * 不要让它长成第三份实现。
+ */
 export function previewDisclosure(
   config: AiProviderConfig,
   request: { feature: AiFeature; fields: readonly string[] },

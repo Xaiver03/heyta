@@ -83,7 +83,15 @@ export const AI_ENDPOINT_PRESETS: readonly AiEndpointPreset[] = [
   },
 ];
 
-/** 按 id 取预设。 */
+/**
+ * 按 id 取预设。
+ *
+ * ⚠️ **当前零生产调用点**：界面直接消费 `AI_ENDPOINT_PRESETS`（它要整张表渲染）。
+ * 保留的理由：它是"按稳定 id 取一个预设"的端口能力（导入配置、深链、
+ * 未来的"恢复默认端点"都要用到），且行为已被测试钉住
+ * （`findPreset 认得自己目录里的，不认别的`）。**不要因为今天没人调就删** ——
+ * 删掉它只是让下一个需要它的人再写一遍 `.find()`。
+ */
 export function findPreset(id: string): AiEndpointPreset | undefined {
   return AI_ENDPOINT_PRESETS.find((p) => p.id === id);
 }
@@ -94,6 +102,11 @@ export function findPreset(id: string): AiEndpointPreset | undefined {
  * 🔴 这个函数存在的意义是**让"预设都是本机的"成为一条可断言的属性**，
  * 而不是一句注释。将来若有人加了云端预设，测试会红 ——
  * 而那正是需要有人**明确决定**"我们要不要推荐云端"的时刻。
+ *
+ * ⚠️ **它的调用点是测试（与将来可能的设置页只读展示），不是生产路径。**
+ * 这**不是**"零调用点的死代码"：它是**守门用的断言面**，
+ * 删掉它，那条守门测试就只能去自己重新推导"哪些端点算本机"，
+ * 而那会引入第二套判断（本仓库最忌讳的形状）。**保留。**
  */
 export function presetDestinations(): readonly { id: string; isLocalOnly: boolean }[] {
   return AI_ENDPOINT_PRESETS.map((p) => ({

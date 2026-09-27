@@ -91,7 +91,17 @@ export interface AiEndpointConfig {
   capabilities?: readonly AiCapability[];
   /** 钥匙串引用。本机端点（Ollama）通常不需要。 */
   keyRef?: string;
-  /** 单独禁用某个端点，不必把它从配置里删掉。 */
+  /**
+   * 单独禁用某个端点，不必把它从配置里删掉。
+   *
+   * 🔴 **当前生产代码没有写入者**：设置界面的"停用"开关尚未接入（属于界面层）。
+   * 但它是**真实生效的能力**，不是预留字段 —— `resolveRoute` 会真的跳过它，
+   * 并给出 `endpoint-disabled` 这条排除原因，`explainNoCandidate` 也已为它
+   * 写了专属文案（"这是你主动停用的，不是故障"）。
+   *
+   * **不要删**：删掉它同时撤掉一个安全能力（"先别用这个端点，但别丢配置"）
+   * 与一条已经能说给用户听的话。缺的只是**写入口**，不是语义。
+   */
   disabled?: boolean;
 }
 
@@ -101,6 +111,15 @@ export interface AiEndpointConfig {
  * 调用方说的是**能力**，不是"哪个模型" —— 这样换模型不需要改调用点。
  * 移植自 SSOS 的三层词表（task → workload → capability），
  * 但只保留 heyta 真正需要的四项。
+ *
+ * ⚠️ **`vision` / `tool_calling` 当前没有任何功能要求它们**：
+ * `DEFAULT_FEATURE_CAPABILITIES` 只用到 `structured_output` 与 `long_context`，
+ * 所以用户勾上它们不会有任何实际效果（界面里"哪些功能需要它"那一栏是空的）。
+ *
+ * 🔴 **这是保留项，不是待删项**：`AiCapability` 是**对外契约**，设置界面正在
+ * 消费全部四个成员（`apps/web/src/features/settings/AiSettings.tsx` 的
+ * `CAPABILITY_ORDER` 与 `Readonly<Record<AiCapability, string>>` 都要求每个成员存在）。
+ * 收敛词表必须先改界面，而那属于界面层。**在界面不再声明它们之前，不要删。**
  */
 export type AiCapability =
   | 'structured_output'
@@ -129,7 +148,16 @@ const BASELINE_CAPABILITIES: readonly AiCapability[] = ['structured_output'];
 /** 路由目标：某个端点 + 可选的模型覆盖。 */
 export interface AiRouteTarget {
   endpointId: string;
-  /** 覆盖端点的默认模型 —— 同一个端点给不同功能配不同模型是常见需求。 */
+  /**
+   * 覆盖端点的默认模型 —— 同一个端点给不同功能配不同模型是常见需求。
+   *
+   * ⚠️ **当前生产代码没有写入者**：路由构建器只写 `endpointId`。
+   * "读"这一半是通的 —— `resolveRoute` 已经实现 `target.model ?? endpointConfig.model`，
+   * 并有测试钉住（`路由目标可以覆盖端点的默认模型`）。
+   * 缺的是"写"：这属于**产品决策**（要不要让用户按功能选模型、界面怎么放），
+   * 决策未定之前不补生产者。**不要删字段** —— 删掉会让一条已实现且有测试的
+   * 读路径变成死代码，也是能力倒退。
+   */
   model?: string;
 }
 
@@ -904,6 +932,16 @@ function explainNoCandidate(resolution: RouteResolution): string {
   if (reasons.includes('endpoint-missing')) {
     return '路由指向了一个不存在的端点 —— 配置可能已损坏。';
   }
+  // ⚠️ 放在最后一条**具体**分支（兜底句之前）：这样所有输入里，
+  // 只有"排除原因里真的出现了 endpoint-disabled"才会走到这里 ——
+  // 其它组合的既有文案一个字都不变。
+  if (reasons.includes('endpoint-disabled')) {
+    return (
+      '这个功能的端点被**停用**了 —— 这是你（或当前配置）主动做的选择，不是故障，' +
+      '也没有东西坏掉。\n' +
+      '要重新使用，请在设置里把该端点重新打开；heyta 不会自动把它改回来。'
+    );
+  }
   return '没有可用的端点。检查设置里的端点与路由。';
 }
 
@@ -912,6 +950,18 @@ function explainNoCandidate(resolution: RouteResolution): string {
  *
  * ⚠️ 它只做**静态**推导（不含健康状态），所以是"配置意图"而不是"实际会怎样"。
  * 名称上区分开，免得 UI 拿它当实时状态显示。
+ *
+ * 🔴 **当前零生产调用点。** 壳真正走的是
+ * `apps/web/src/features/ai/route-explanation.ts` 的 `resolveFeatureRoute()` ——
+ * 它需要中英双语词条，还要把 `resolution.excluded` 翻成人话，所以自己在
+ * `resolveRoute()` 之上包了一层。也就是说本函数与它**是同一件事的两套实现**，
+ * 而 `docs/reference/ai-architecture.md` 仍把本函数描述成界面入口（文档漂移，
+ * 已登记在交付报告里）。
+ *
+ * 保留的理由：`resolveRoute()` → "这个功能会走到哪"的静态推导是端口自身的能力，
+ * 且本函数只有一条 3 行的实现、行为已由测试钉住（`describeRouteIntent —— 静态意图`）。
+ * 若将来壳要收掉 `route-explanation.ts` 的重复部分，这里是现成的入口。
+ * **要接线时请让它取代那份重复实现，而不是并成第三份。**
  */
 export function describeRouteIntent(
   config: AiRoutingConfig,
