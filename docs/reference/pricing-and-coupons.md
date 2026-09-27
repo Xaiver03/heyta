@@ -432,11 +432,20 @@ pnpm --filter @heyta/server pricing set-price \
 
    **仍然没修的（"交付"这一半）**：`settleOrderPaid` 依旧是**唯一**能做出权威判定
    的地方（它比订单冻结的 SKU 与 `final_amount_minor`，两者都覆盖折扣），
-   而它**仍然没有生产调用方** —— 收银台路由还不存在（ADR-0017 §5）。
+   而它**仍然没有生产调用方** —— 收银台路由已经存在（见第 18 条），
+   但 webhook 路径还没有把 ② 转交给它。
    所以在接线完成之前，② 这一类支付**依然是拿不到权益的**，只是现在它
    **响亮地**说自己拿不到，并且有一条明确的出路可查。
-   🔴 接线时必须做的：让 webhook 路径把 ② 交给 `settleOrderPaid`，
-   并把它的结论写回 `subscriptions.grants`。
+   🔴 接线时必须做的三件事：
+   （a）`pricing-store.ts` 的 `OrderRow` 与 `settleOrderPaid` 的返回值要把
+   `checkout_orders.price_id` 带出来 —— **列已经在库里了**（`schema.prisma` 的
+   `CheckoutOrder.priceId`），只是 `SELECT` 没取它，于是"这一单买的是哪一档"
+   在结算时看不见；没有它就没法决定该授予 `hosting` 还是 `hosting`+`ai`；
+   （b）webhook 路径把 ② 交给 `settleOrderPaid`，并按其结论写回
+   `subscriptions.grants`；
+   （c）adapter 要把 `outTradeNo` **显式**放在事件上，不要让人从
+   `providerEventId = "payment_succeeded:hy…"` 里反解。
+
 10. ~~**`failOrder` 不释放 `reserved` 名额。**~~ **已修（本轮）。**
    它现在是一个事务：先把该订单的 `reserved` 核销置 `expired`（名额放出来），
    再把订单置 `failed` —— 与 `expireStaleOrders` 同形、同样幂等。
@@ -577,6 +586,47 @@ pnpm --filter @heyta/server pricing set-price \
    那正是第 9 条里 `settleOrderPaid` 无生产调用方留下的教训：
    为一个不存在的端点建一个永远为 0 的计数器，测试只能自证。
 
+18. **收银台接通了（`POST /api/billing/checkout`）—— 那条链第一次有用户入口。**
+   在此之前 `quoteOrder` / `createOrderWithReservation` / `createCheckout` /
+   `failOrder` **全部只被测试调用**：计价引擎存在，但用户走不到付钱那一步。
+   新路由 `server/src/billing/checkout.routes.ts`（注册在 `/api/billing`，
+   与 webhook 同一个 prefix 与同一份 adapter 配置）把四步接成一条：
+   `quoteOrder` → 生成订单号 → `createOrderWithReservation` → `adapter.createCheckout`。
+
+   **四个刻意的边界**（每一条都有对应的失败测试）：
+   - 🔴 **金额只从服务端的报价来。** 请求体只有 `priceId` / `couponCode` /
+     `currency` / `region`，**没有任何金额字段**；zod 默认丢弃未知键，
+     所以客户端塞 `amountMinor: 1` 也不会被读到（测试直接断言库里冻的仍是 500）。
+   - 🔴 **先冻结、后下单**，且**同一个订单号**同时用于落库与下单 ——
+     两处不同就是"一笔真实到账的钱授予不出去"。测试断言
+     `checkoutCalls[0].outTradeNo === response.outTradeNo` 且金额与订单行相等。
+   - 🔴 **通道侧下单失败要 `failOrder`**：它是 `failOrder` 的**第一个生产调用方**。
+     测试断言失败后订单为 `failed` 且券的 `reserved` 名额被释放。
+   - 🔴 **不可交付的档在报价之前被挡掉**，理由用给用户看的话（`409` +
+     `PRICE_NOT_SELLABLE`）。这是第 17 条那条硬约束的执行点；见
+     `price-book.ts` 的 `NOT_YET_DELIVERABLE_SKUS` / `notSellableReason`。
+
+   没配支付商（只有 `noop`）时回 `503`，**不是**让 noop 接单 —— 那会把一笔
+   真实支付变成一个必然抛错的调用。
+
+   **改动面**：`server/src/billing/checkout.routes.ts`（新）、`server.ts` 注册、
+   `billing/index.ts` 导出、`price-book.ts` 的两个新导出、
+   `server/tests/billing-checkout.routes.spec.ts`（12 例，真 SQL 跑在 PGlite 上）、
+   `scripts/check-ai-quota-consistency.mjs` 新增 §3b（状态 ↔ **执行点**）。
+
+   已实测非空转（三种注入各自变红，还原后逐字节一致）：
+   ① 拿掉不可交付检查 → `expected 200 to be 409`；
+   ② 拿掉 `failOrder` → `expected 'pending' to be 'failed'`；
+   ③ 把发出去的金额换成 `1` → `expected 1 to be 500`。
+   门禁侧另有两条：删掉对象里那条 SKU → 红；不再调用 `notSellableReason` → 红。
+
+   ⚠️ **本轮写这条检查时踩到过一次空转**：第一版用的是
+   `/NOT_YET_DELIVERABLE_SKUS[\s\S]*?hosted-ai-monthly/` 这种跨全文件的正则，
+   而常量上下的注释与同文件的 `SKU_GRANTS` 里都含有那个 SKU 字符串 ——
+   于是**把真正那一条删掉它照样绿**。已改成先解析对象体、再在体内查键。
+   记在这里是因为它很典型：**跨文件/跨段的正则检查，看起来越"宽松好用"，
+   越可能恒为真。**
+
 ---
 
 ## 8. 对应的门禁与验证
@@ -584,6 +634,7 @@ pnpm --filter @heyta/server pricing set-price \
 | 检查 | 命令 | 覆盖 |
 |---|---|---|
 | 价格一致性 | `node scripts/check-pricing-consistency.mjs` | 基线价目表 ↔ 中英词条 ↔ 法务文本 ↔ `pricing-ssot` 块；**恰好两个 SKU**（`hosted-monthly` / `hosted-ai-monthly`），每个都要带 `grants`，而 `grants` 白名单**只有** `hosting` / `ai`（功能名进收费清单 = 虚假宣传）；**adapter 里不许有第二个数字** |
+| 承诺 ↔ 状态 ↔ **执行点** | `node scripts/check-ai-quota-consistency.mjs` | 「300 次/月」这个数字的**唯一源**（`ai-quota-ssot` 块）↔ 中英词条 ↔ 法务 ↔ 参考文档正文；`enforcement` 取值合法；`enforced` 时计量实现必须存在；`not-implemented` 时决定记录 + "不得被售卖" + **收银台真的调用了 `notSellableReason(...)`** 都必须在场 |
 | 迁移纪律 | `node scripts/check-migrations.mjs` | 迁移文件命名/语句数/禁用语句 |
 | 券与价格的故障注入 | `node scripts/verify-i18n-failures.mjs pricing` / `… coupon` | 10 + 9 例：每一处"改坏"都必须让对应的检查变红 |
 | 单元与集成 | `cd server && npx vitest run tests/billing-*.spec.ts` | 见 §2 的"有测试吗"一列 |
