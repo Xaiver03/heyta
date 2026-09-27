@@ -1,20 +1,34 @@
 # 依赖许可证逐项登记（自动生成）
 
 > ⚠️ **本文件由工具生成，请勿手工编辑。**
-> 重新生成：`node research/tools/license-inventory.mjs --json > /tmp/lic.json` 后再渲染。
+> 重新生成：`node research/tools/render-license-inventory.mjs`
 > 数据来源：**实际安装的依赖树**（pnpm store），不是 lockfile 的声明。
 > 去重口径：`包名@版本`（同名多版本分别登记）。
 
-生成时间：2026-09-26
+生成时间：2026-09-27
 
-**总计 908 个包** —— 宽松许可 907，受限 0，无许可证 0，白名单外已登记 1。
+**总计 919 个包** —— 宽松许可 918，受限 0，无许可证 0，白名单外已登记 1。
 
 准入门槛（见 THIRD_PARTY_LICENSES.md）：许可允许闭源商用；且 2021 年后仍在更新。
 
-### ☑️ 白名单外、已逐项登记的包
+### 🔴 受限 / 未登记 —— 这一节必须为空
+
+**无。** 这是本文件唯一的通过条件。
+
+### ☑️ 白名单外、已逐项登记
 
 这些包的许可证**不在白名单里**，也没有被判定为受限 —— 已经人工确认过它们在产品中的角色，
 并在 `research/tools/license-inventory.mjs` 的 `REVIEWED_OTHER` 里登记了**可以接受的理由**：
+
+| 包 | 版本 | 许可证 |
+|---|---|---|
+| `caniuse-lite` | 1.0.30001812 | CC-BY-4.0 |
+
+- **CC-BY-4.0**（`caniuse-lite@1.0.30001812`）：caniuse-lite@1.0.30001812：browserslist 的**构建期数据包**，不进入运行时产物；CC-BY 是署名许可（不是禁用的 CC-BY-NC），归属已在 THIRD_PARTY_LICENSES.md §2 登记。
+
+### 📋 全部依赖（919 个）
+
+这一段是**全量底稿**：上面两节的所有结论都能在这里逐行核到。严格按包名排序（`localeCompare`），同名多版本分行列出。
 
 | 包 | 版本 | 许可证 |
 |---|---|---|
@@ -155,6 +169,8 @@
 | `@dnd-kit/sortable` | 10.0.0 | MIT |
 | `@dnd-kit/utilities` | 3.2.2 | MIT |
 | `@electric-sql/pglite` | 0.5.8 | Apache-2.0 |
+| `@electron-internal/extract-zip` | 1.0.5 | BSD-2-Clause |
+| `@electron/get` | 5.1.0 | MIT |
 | `@esbuild/darwin-arm64` | 0.27.7 | MIT |
 | `@exodus/bytes` | 1.16.0 | MIT |
 | `@fastify/accept-negotiator` | 2.1.0 | MIT |
@@ -197,8 +213,8 @@
 | `@levischuck/tiny-cbor` | 0.2.11 | MIT |
 | `@lukeed/ms` | 2.0.2 | MIT |
 | `@noble/ciphers` | 2.4.0 | MIT |
-| `@noble/hashes` | 1.8.0 | MIT |
 | `@noble/hashes` | 2.4.0 | MIT |
+| `@noble/hashes` | 1.8.0 | MIT |
 | `@nodelib/fs.scandir` | 2.1.5 | MIT |
 | `@nodelib/fs.stat` | 2.0.5 | MIT |
 | `@nodelib/fs.walk` | 1.2.8 | MIT |
@@ -219,6 +235,7 @@
 | `@peculiar/utils` | 2.0.3 | MIT |
 | `@peculiar/x509` | 1.14.3 | MIT |
 | `@pinojs/redact` | 0.4.0 | MIT |
+| `@playwright/test` | 1.63.0 | Apache-2.0 |
 | `@prisma/client` | 5.22.0 | Apache-2.0 |
 | `@prisma/debug` | 5.22.0 | Apache-2.0 |
 | `@prisma/engines` | 5.22.0 | Apache-2.0 |
@@ -287,6 +304,7 @@
 | `@types/methods` | 1.1.4 | MIT |
 | `@types/ms` | 2.1.0 | MIT |
 | `@types/node` | 20.19.43 | MIT |
+| `@types/node` | 24.19.0 | MIT |
 | `@types/nodemailer` | 7.0.12 | MIT |
 | `@types/react` | 19.3.0 | MIT |
 | `@types/react-dom` | 19.3.0 | MIT |
@@ -398,10 +416,10 @@
 | `colorette` | 1.4.0 | MIT |
 | `combined-stream` | 1.0.8 | MIT |
 | `command-exists` | 1.2.9 | MIT |
+| `commander` | 9.5.0 | MIT |
 | `commander` | 12.1.0 | MIT |
 | `commander` | 2.20.3 | MIT |
 | `commander` | 4.1.1 | MIT |
-| `commander` | 9.5.0 | MIT |
 | `component-emitter` | 1.3.1 | MIT |
 | `compressible` | 2.0.18 | MIT |
 | `compression` | 1.8.2 | MIT |
@@ -421,16 +439,16 @@
 | `create-require` | 1.1.1 | MIT |
 | `cross-spawn` | 7.0.6 | MIT |
 | `css-select` | 5.2.2 | BSD-2-Clause |
-| `css-tree` | 1.1.3 | MIT |
 | `css-tree` | 3.2.1 | MIT |
+| `css-tree` | 1.1.3 | MIT |
 | `css-what` | 6.2.2 | BSD-2-Clause |
 | `cssstyle` | 5.3.7 | MIT |
 | `csstype` | 3.2.3 | MIT |
 | `data-urls` | 6.0.1 | MIT |
 | `date-fns` | 4.4.0 | MIT |
 | `dayjs` | 1.11.23 | MIT |
-| `debug` | 2.6.9 | MIT |
 | `debug` | 4.4.3 | MIT |
+| `debug` | 2.6.9 | MIT |
 | `decamelize` | 1.2.0 | MIT |
 | `decimal.js` | 10.6.0 | MIT |
 | `deepmerge` | 4.3.1 | MIT |
@@ -451,6 +469,7 @@
 | `duplexify` | 4.1.3 | MIT |
 | `ecdsa-sig-formatter` | 1.0.11 | Apache-2.0 |
 | `ee-first` | 1.1.1 | MIT |
+| `electron` | 44.4.5 | MIT |
 | `electron-to-chromium` | 1.5.439 | ISC |
 | `emoji-regex` | 8.0.0 | MIT |
 | `encodeurl` | 1.0.2 | MIT |
@@ -458,6 +477,7 @@
 | `end-of-stream` | 1.4.5 | MIT |
 | `entities` | 4.5.0 | BSD-2-Clause |
 | `entities` | 8.1.0 | BSD-2-Clause |
+| `env-paths` | 3.0.0 | MIT |
 | `env-paths` | 2.2.1 | MIT |
 | `envinfo` | 7.21.0 | MIT |
 | `error-ex` | 1.3.4 | MIT |
@@ -471,8 +491,8 @@
 | `esbuild` | 0.27.7 | MIT |
 | `escalade` | 3.2.0 | MIT |
 | `escape-html` | 1.0.3 | MIT |
-| `escape-string-regexp` | 2.0.0 | MIT |
 | `escape-string-regexp` | 4.0.0 | MIT |
+| `escape-string-regexp` | 2.0.0 | MIT |
 | `esprima` | 4.0.1 | BSD-2-Clause |
 | `estree-walker` | 3.0.3 | MIT |
 | `esutils` | 2.0.3 | BSD-2-Clause |
@@ -491,12 +511,12 @@
 | `fast-querystring` | 1.1.2 | MIT |
 | `fast-safe-stringify` | 2.1.1 | MIT |
 | `fast-text-encoding` | 1.0.6 | Apache-2.0 |
-| `fast-uri` | 3.1.8 | BSD-3-Clause |
 | `fast-uri` | 4.2.1 | BSD-3-Clause |
+| `fast-uri` | 3.1.8 | BSD-3-Clause |
 | `fast-xml-parser` | 4.5.7 | MIT |
 | `fastify` | 5.12.5 | MIT |
-| `fastify-plugin` | 5.1.0 | MIT |
 | `fastify-plugin` | 6.0.0 | MIT |
+| `fastify-plugin` | 5.1.0 | MIT |
 | `fastq` | 1.20.3 | ISC |
 | `fb-dotslash` | 0.5.8 | (MIT OR Apache-2.0) |
 | `fb-watchman` | 2.0.2 | Apache-2.0 |
@@ -568,8 +588,8 @@
 | `is-potential-custom-element-name` | 1.0.1 | MIT |
 | `is-stream` | 2.0.1 | MIT |
 | `is-unicode-supported` | 0.1.0 | MIT |
-| `is-wsl` | 1.1.0 | MIT |
 | `is-wsl` | 2.2.0 | MIT |
+| `is-wsl` | 1.1.0 | MIT |
 | `isexe` | 2.0.0 | ISC |
 | `istanbul-lib-coverage` | 3.2.2 | BSD-3-Clause |
 | `istanbul-lib-instrument` | 5.2.1 | BSD-3-Clause |
@@ -655,11 +675,11 @@
 | `metro-transform-plugins` | 0.83.8 | MIT |
 | `metro-transform-worker` | 0.83.8 | MIT |
 | `micromatch` | 4.0.8 | MIT |
-| `mime` | 1.6.0 | MIT |
-| `mime` | 2.6.0 | MIT |
 | `mime` | 3.0.0 | MIT |
-| `mime-db` | 1.52.0 | MIT |
+| `mime` | 2.6.0 | MIT |
+| `mime` | 1.6.0 | MIT |
 | `mime-db` | 1.54.0 | MIT |
+| `mime-db` | 1.52.0 | MIT |
 | `mime-types` | 2.1.35 | MIT |
 | `mime-types` | 3.0.2 | MIT |
 | `mimic-fn` | 2.1.0 | MIT |
@@ -676,8 +696,8 @@
 | `mz` | 2.7.0 | MIT |
 | `nanoid` | 3.3.19 | MIT |
 | `negotiator` | 0.6.3 | MIT |
-| `negotiator` | 0.6.4 | MIT |
 | `negotiator` | 1.1.0 | MIT |
+| `negotiator` | 0.6.4 | MIT |
 | `nocache` | 3.0.4 | MIT |
 | `node-int64` | 0.4.0 | MIT |
 | `node-releases` | 2.0.57 | MIT |
@@ -693,13 +713,13 @@
 | `object-inspect` | 1.13.4 | MIT |
 | `obug` | 2.2.1 | MIT |
 | `on-exit-leak-free` | 2.1.2 | MIT |
-| `on-finished` | 2.3.0 | MIT |
 | `on-finished` | 2.4.1 | MIT |
+| `on-finished` | 2.3.0 | MIT |
 | `on-headers` | 1.1.0 | MIT |
 | `once` | 1.4.0 | ISC |
 | `onetime` | 5.1.2 | MIT |
-| `open` | 6.4.0 | MIT |
 | `open` | 7.4.2 | MIT |
+| `open` | 6.4.0 | MIT |
 | `ora` | 5.4.1 | MIT |
 | `p-limit` | 2.3.0 | MIT |
 | `p-limit` | 3.1.0 | MIT |
@@ -724,12 +744,15 @@
 | `pino-std-serializers` | 7.1.0 | MIT |
 | `pirates` | 4.0.7 | MIT |
 | `pkg-types` | 1.3.1 | MIT |
+| `playwright` | 1.63.0 | Apache-2.0 |
+| `playwright-core` | 1.63.0 | Apache-2.0 |
 | `postcss` | 8.5.28 | MIT |
 | `postcss-load-config` | 6.0.1 | MIT |
 | `pretty-format` | 29.7.0 | MIT |
 | `prisma` | 5.22.0 | Apache-2.0 |
-| `process-warning` | 4.0.1 | MIT |
 | `process-warning` | 5.1.0 | MIT |
+| `process-warning` | 4.0.1 | MIT |
+| `progress` | 2.0.3 | MIT |
 | `promise` | 8.3.0 | MIT |
 | `prompts` | 2.4.2 | MIT |
 | `pstree.remy` | 1.1.8 | MIT |
@@ -741,8 +764,8 @@
 | `quick-format-unescaped` | 4.0.4 | MIT |
 | `range-parser` | 1.2.1 | MIT |
 | `raw-body` | 2.5.3 | MIT |
-| `react` | 19.2.3 | MIT |
 | `react` | 19.3.0 | MIT |
+| `react` | 19.2.3 | MIT |
 | `react-activity-calendar` | 3.2.1 | MIT |
 | `react-devtools-core` | 6.1.5 | MIT |
 | `react-dom` | 19.3.0 | MIT |
@@ -750,7 +773,6 @@
 | `react-native` | 0.84.1 | MIT |
 | `react-native-get-random-values` | 2.0.0 | MIT |
 | `react-native-safe-area-context` | 5.10.0 | MIT |
-| `react-native-svg` | 15.0.0 | MIT |
 | `react-native-svg` | 15.15.5 | MIT |
 | `react-refresh` | 0.14.2 | MIT |
 | `react-refresh` | 0.18.0 | MIT |
@@ -770,8 +792,8 @@
 | `require-from-string` | 2.0.2 | MIT |
 | `require-main-filename` | 2.0.0 | ISC |
 | `resolve` | 1.22.12 | MIT |
-| `resolve-from` | 4.0.0 | MIT |
 | `resolve-from` | 5.0.0 | MIT |
+| `resolve-from` | 4.0.0 | MIT |
 | `restore-cursor` | 3.1.0 | MIT |
 | `ret` | 0.5.0 | MIT |
 | `reusify` | 1.1.0 | MIT |
@@ -785,8 +807,8 @@
 | `safe-stable-stringify` | 2.5.0 | MIT |
 | `safer-buffer` | 2.1.2 | MIT |
 | `saxes` | 6.0.0 | ISC |
-| `scheduler` | 0.27.0 | MIT |
 | `scheduler` | 0.28.0 | MIT |
+| `scheduler` | 0.27.0 | MIT |
 | `secure-json-parse` | 4.1.0 | BSD-3-Clause |
 | `semver` | 6.3.1 | ISC |
 | `semver` | 7.8.5 | ISC |
@@ -810,8 +832,8 @@
 | `slash` | 3.0.0 | MIT |
 | `slice-ansi` | 2.1.0 | MIT |
 | `sonic-boom` | 4.2.1 | MIT |
-| `source-map` | 0.5.7 | BSD-3-Clause |
 | `source-map` | 0.6.1 | BSD-3-Clause |
+| `source-map` | 0.5.7 | BSD-3-Clause |
 | `source-map` | 0.7.6 | BSD-3-Clause |
 | `source-map-js` | 1.2.1 | BSD-3-Clause |
 | `source-map-support` | 0.5.21 | MIT |
@@ -832,10 +854,11 @@
 | `strip-final-newline` | 2.0.0 | MIT |
 | `strnum` | 1.1.2 | MIT |
 | `sucrase` | 3.35.1 | MIT |
+| `sumchecker` | 3.0.1 | Apache-2.0 |
 | `superagent` | 10.4.1 | MIT |
 | `supertest` | 7.3.0 | MIT |
-| `supports-color` | 5.5.0 | MIT |
 | `supports-color` | 7.2.0 | MIT |
+| `supports-color` | 5.5.0 | MIT |
 | `supports-color` | 8.1.1 | MIT |
 | `supports-preserve-symlinks-flag` | 1.0.0 | MIT |
 | `symbol-tree` | 3.2.4 | MIT |
@@ -866,8 +889,8 @@
 | `tree-kill` | 1.2.2 | MIT |
 | `ts-interface-checker` | 0.1.13 | Apache-2.0 |
 | `ts-node` | 10.9.2 | MIT |
-| `tslib` | 1.14.1 | 0BSD |
 | `tslib` | 2.8.1 | 0BSD |
+| `tslib` | 1.14.1 | 0BSD |
 | `tsup` | 8.5.1 | MIT |
 | `tsyringe` | 4.10.0 | MIT |
 | `type-detect` | 4.0.8 | MIT |
@@ -876,7 +899,9 @@
 | `typescript` | 5.9.3 | Apache-2.0 |
 | `ufo` | 1.6.4 | MIT |
 | `undefsafe` | 2.0.5 | MIT |
+| `undici` | 7.30.0 | MIT |
 | `undici-types` | 6.21.0 | MIT |
+| `undici-types` | 7.24.6 | MIT |
 | `unicode-canonical-property-names-ecmascript` | 2.0.1 | MIT |
 | `unicode-match-property-ecmascript` | 2.0.0 | MIT |
 | `unicode-match-property-value-ecmascript` | 2.2.1 | MIT |
@@ -899,8 +924,8 @@
 | `wcwidth` | 1.0.1 | MIT |
 | `webidl-conversions` | 8.0.1 | BSD-2-Clause |
 | `whatwg-fetch` | 3.6.20 | MIT |
-| `whatwg-mimetype` | 4.0.0 | MIT |
 | `whatwg-mimetype` | 5.0.0 | MIT |
+| `whatwg-mimetype` | 4.0.0 | MIT |
 | `whatwg-url` | 15.1.0 | MIT |
 | `which` | 2.0.2 | ISC |
 | `which-module` | 2.0.1 | ISC |
@@ -909,17 +934,17 @@
 | `wrap-ansi` | 7.0.0 | MIT |
 | `wrappy` | 1.0.2 | ISC |
 | `write-file-atomic` | 4.0.2 | ISC |
-| `ws` | 6.2.6 | MIT |
-| `ws` | 7.5.13 | MIT |
 | `ws` | 8.21.3 | MIT |
+| `ws` | 7.5.13 | MIT |
+| `ws` | 6.2.6 | MIT |
 | `xml-name-validator` | 5.0.0 | Apache-2.0 |
 | `xmlchars` | 2.2.0 | MIT |
 | `y18n` | 4.0.3 | ISC |
 | `y18n` | 5.0.8 | ISC |
 | `yallist` | 3.1.1 | ISC |
 | `yaml` | 2.9.1 | ISC |
-| `yargs` | 15.4.1 | MIT |
 | `yargs` | 17.7.3 | MIT |
+| `yargs` | 15.4.1 | MIT |
 | `yargs-parser` | 18.1.3 | ISC |
 | `yargs-parser` | 21.1.1 | ISC |
 | `yn` | 3.1.1 | MIT |
