@@ -38,7 +38,7 @@
     "pricing:dev": "tsx scripts/pricing.ts"
   },
   "dependencies": {
-    "@heyta/domain": "workspace:*",
+    "@heyta/domain": "*",
     "@fastify/cors": "^11.1.0",
     "@fastify/helmet": "^13.0.2",
     "@fastify/rate-limit": "^10.3.0",

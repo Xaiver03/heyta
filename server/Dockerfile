@@ -30,6 +30,7 @@ RUN corepack enable && corepack prepare pnpm@11.8.0 --activate
 COPY pnpm-workspace.yaml package.json pnpm-lock.yaml ./
 COPY packages/sync-core/package.json ./packages/sync-core/
 COPY packages/shared-schema/package.json ./packages/shared-schema/
+COPY packages/domain/package.json ./packages/domain/
 COPY server/package.json ./server/
 
 # 安装整个工作区的依赖。
@@ -48,9 +49,10 @@ RUN npm_config_registry="$NPM_REGISTRY" pnpm install --frozen-lockfile --ignore-
 # 拷贝源码
 COPY packages/sync-core/ ./packages/sync-core/
 COPY packages/shared-schema/ ./packages/shared-schema/
+COPY packages/domain/ ./packages/domain/
 COPY server/ ./server/
 
-# 先构建 sync-core，再构建 shared-schema —— 顺序不能反，后者依赖前者
+# 先构建 sync-core，再构建 shared-schema，最后 domain —— 顺序不能反，每个都依赖前一个
 WORKDIR /repo/packages/sync-core
 RUN pnpm run build
 
@@ -61,6 +63,20 @@ RUN pnpm pack
 WORKDIR /repo/packages/shared-schema
 RUN pnpm run build
 # Pack shared-schema to tgz for installation in production
+RUN pnpm pack
+
+# 🔧 heyta 改动：domain 也必须在这里构建并打包。
+#
+# `server/package.json` 声明了 `@heyta/domain`，而 `server/src/billing/*` 真的 import 它
+# （`extendSubscriptionPeriod` 等）。少了这一段，构建会在
+# `tsc` 阶段报 `TS2307: Cannot find module '@heyta/domain'`。
+#
+# ⚠️ 这个缺口**潜伏过一段时间**：镜像里原来只有 sync-core + shared-schema，
+# 而当时 server 还没 import domain，所以构建一直是绿的；
+# 直到 billing 开始用 `@heyta/domain`，**镜像就再也构建不出来了**，
+# 而本地 `pnpm -r build`（工作区全都在）完全看不出问题 —— 典型的"只有换台机器才炸"。
+WORKDIR /repo/packages/domain
+RUN pnpm run build
 RUN pnpm pack
 
 # 构建服务端
@@ -103,19 +119,25 @@ COPY --from=builder --chown=supersync:nodejs /repo/server/package.json ./package
 # 🔧 heyta 改动：tarball 名字 sp-* → heyta-*
 COPY --from=builder --chown=supersync:nodejs /repo/packages/sync-core/heyta-sync-core-*.tgz ./sync-core.tgz
 COPY --from=builder --chown=supersync:nodejs /repo/packages/shared-schema/heyta-shared-schema-*.tgz ./shared-schema.tgz
+COPY --from=builder --chown=supersync:nodejs /repo/packages/domain/heyta-domain-*.tgz ./domain.tgz
 
 # Install dependencies and generate Prisma client in single layer
 # Note: prisma CLI installed explicitly for runtime migrate deploy
 # IMPORTANT: prisma version must match @prisma/client in package.json
 #
 # 这里仍然是 npm（不是 pnpm），**刻意的**：
-# 服务端 package.json 里两个工作区依赖写成 `"*"`，npm 能用上面两个 tarball 满足它们；
+# 服务端 package.json 里三个工作区依赖都写成 `"*"`，npm 能用上面三个 tarball 满足它们；
 # 写成 `workspace:*` 的话 npm 会直接报错。这一点很容易踩，别改。
-RUN npm install ./sync-core.tgz ./shared-schema.tgz --ignore-scripts --omit=dev && \
-    npm install --ignore-scripts --omit=dev && \
-    npm install prisma@5.22.0 --ignore-scripts --omit=dev && \
+#
+# ⚠️ `domain.tgz` 必须一起装：它自己还依赖 `@heyta/shared-schema`，
+# 而 `pnpm pack` 会把 domain 的 `workspace:*` 改写成真实版本号 ——
+# 所以两个 tarball 要在**同一条** `npm install` 里给，npm 才能就地满足它。
+ARG NPM_REGISTRY=https://registry.npmjs.org/
+RUN npm_config_registry="$NPM_REGISTRY" npm install ./sync-core.tgz ./shared-schema.tgz ./domain.tgz --ignore-scripts --omit=dev && \
+    npm_config_registry="$NPM_REGISTRY" npm install --ignore-scripts --omit=dev && \
+    npm_config_registry="$NPM_REGISTRY" npm install prisma@5.22.0 --ignore-scripts --omit=dev && \
     npx prisma generate && \
-    rm -f sync-core.tgz shared-schema.tgz && \
+    rm -f sync-core.tgz shared-schema.tgz domain.tgz && \
     npm cache clean --force
 
 USER supersync
