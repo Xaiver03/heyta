@@ -5,7 +5,7 @@
  * 🔴 这个文件里**没有一行业务逻辑**（AGENTS.md §3.5）：
  * 新建任务该写哪些字段、切换完成该发什么 op、清除日期写 null 还是 undefined ——
  * 全部来自 `@heyta/app-host` 的 `createTaskActions`。
- * 这里只负责：**导航外壳**、主题接线。
+ * 这里只负责：**导航外壳**、主题接线、**自动同步的启动**。
  *
  * 唯一的平台差异是**注入哪个 SQLite 驱动**，在 `db/open-host.ts` 里。
  *
@@ -23,7 +23,7 @@
  * 用了最简单正确的东西。
  */
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { StatusBar, View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { I18nProvider, type Locale } from '@heyta/i18n';
@@ -37,6 +37,7 @@ import { TasksScreen } from './screens/TasksScreen';
 import { CalendarScreen } from './screens/CalendarScreen';
 import { FocusScreen } from './screens/FocusScreen';
 import { ProfileScreen } from './screens/ProfileScreen';
+import { startAutoSync } from './sync/auto-sync';
 
 function Shell(): React.JSX.Element {
   const t = useTokens();
@@ -53,6 +54,20 @@ function Shell(): React.JSX.Element {
    * 要么逼 `TabBar` 内部去特判。让"没有"就用"没有"表达。
    */
   const [pendingCount, setPendingCount] = useState<number | undefined>(undefined);
+
+  /**
+   * 🔴 **自动同步**：回到前台时拉一次，本地写入之后（防抖）推一次。
+   *
+   * 在这个 effect 之前，全应用**只有**「我的」页那个按钮会调 `syncNow()`。
+   * 也就是用户建完一条任务，它**不会自己出去** —— 要让它到另一台设备，
+   * 用户得自己想到"去我的页点一下同步"。这不是少个功能，
+   * 这是本地优先应用最核心的承诺没兑现，而且**不报错、界面也看不出异常**。
+   *
+   * `startAutoSync()` 是**幂等**的（React 严格模式下 effect 会跑两次，
+   * 不幂等就会挂两个监听 + 两套定时器，表现为同步请求翻倍），
+   * 并且返回停止函数 —— 正好是清理函数该有的形状。
+   */
+  useEffect(() => startAutoSync(), []);
 
   return (
     <View style={{ flex: 1, backgroundColor: t['color.background'] }}>

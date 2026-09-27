@@ -16,11 +16,33 @@
 
 import { openAppHost, type AppHost } from '@heyta/app-host';
 import { readSyncConfig } from '../sync/config';
+import { emitLocalWrite } from '../sync/write-signal';
 import { opSqliteDriverFactory } from './op-sqlite-driver';
 
 const DB_NAME = 'heyta.sqlite';
 
 let pending: Promise<AppHost> | null = null;
+
+/**
+ * 在宿主外面包一层：**每次写入之后喊一声"写了"**，自动同步据此把改动推出去。
+ *
+ * 🔴 包在 `dispatch` 这个**唯一写入口**上，而不是在各个界面里逐处调用。
+ * 理由是"以后有人加一个新动作，忘了通知同步"这件事一定会发生 ——
+ * 而它的表现是"这个功能创建的数据从来不同步"，且**没有任何一处会报错**
+ * （本地一切正常，只有另一台设备上看不见）。
+ * 挂在写入口上，新增动作自动被覆盖，不需要任何人记得。
+ *
+ * ⚠️ 顺序：**先落库、后喊**。反过来会让同步先查队列、查不到刚写的那条。
+ */
+function withWriteSignal(host: AppHost): AppHost {
+  return {
+    ...host,
+    dispatch: async (intent) => {
+      await host.dispatch(intent);
+      emitLocalWrite();
+    },
+  };
+}
 
 /**
  * 打开（或复用一个已打开的）应用宿主。
@@ -50,7 +72,7 @@ export function openTaskHost(): Promise<AppHost> {
        * 立刻生效，不需要重启应用。
        */
       getSyncConfig: readSyncConfig,
-    });
+    }).then(withWriteSignal);
   }
   return pending;
 }
