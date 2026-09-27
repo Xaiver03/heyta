@@ -413,7 +413,35 @@ Windows / macOS / Linux 三平台各出一个能跑起真实同步的桌面应�
 | **M2-2b 桌面端渲染进程 + GUI 冒烟** | ✅ **已完成**（本轮）—— 同时关掉 **M1 判据第 4 条** | `e2e/tests/desktop-window.spec.ts` 通过；截图见 `e2e/test-results/desktop-window.png` |
 | **Windows 真机验证** | ✅ **已实测**（2026-09-27） | 在 `windows-pc` 上 `pnpm -r build` **exit 0**、桌面端产物**字节级一致**、**11/11 测试通过**。详见 [桌面端手册](../runbooks/desktop.md) §5.2 |
 | M2-3 跑通真实同步 | ⬜ **未做** | 需要真实服务端，见 [本地验证手册](../runbooks/local-server-verification.md) |
-| M2-4 三平台产包 + 签名 | 🟡 **产包已做，签名未做** | `@electron/packager`（BSD-2-Clause）；`release/heyta-{darwin-arm64,win32-x64,linux-x64}`。**macOS 包已实测启动 + 截图**（`e2e/tests/desktop-window.spec.ts` 的"打包产物"用例）。⚠️ Windows / Linux 产物**未在对应系统上运行验证过**；安装器 / 签名 / 公证 / 自动更新**一律未做**（缺证书）。详见 [`runbooks/desktop.md` §4.3](../runbooks/desktop.md) |
+| M2-4 三平台产包 + 签名 | 🟡 **三平台产包 ✅，桌面签名未做** | `@electron/packager`（BSD-2-Clause）；`release/heyta-{darwin-arm64,win32-x64,linux-x64}` 三份都产出（本轮复测 ✅）。**macOS 包已实测启动 + 截图**（`e2e/tests/desktop-window.spec.ts` 的"打包产物"用例）。⚠️ Windows / Linux 产物**未在对应系统上运行验证过**；桌面端安装器 / 签名 / 公证 / 自动更新**一律未做**（缺证书）。详见 [`runbooks/desktop.md` §4.3](../runbooks/desktop.md) |
+| **Android release AAB + 发布签名** | ✅ **已完成并实测**（本轮） | `./gradlew bundleRelease` → `BUILD SUCCESSFUL`，44 MB AAB。**签名接线已用真 keystore 验证换掉了签名者**。⚠️ 上架用的正式 keystore 仍需自备（见 [多平台构建手册](../runbooks/multi-platform-build.md) §1.5）。**过程中发现 release 打包一直是坏的** —— 见下 |
+
+### 🔴 Android release 打包从没跑通过（2026-09-28 修）
+
+真机跑 `bundleRelease` 才暴露：`@sqlite.org/sqlite-wasm` 被打进了 **Android** bundle，
+它的 Emscripten 胶水层用 `import.meta.url`，而 **Hermes 不支持**：
+
+```
+error: 'import.meta' is currently unsupported   （4 处）
+> Task :app:createBundleReleaseJsAndAssets FAILED
+```
+
+起因是 `packages/storage` **主入口**导出了 Web 的 `SqliteWasmDriver`。
+那里的注释写着"它用的是**动态 import**，所以不会让别的打包目标背上那 852 KB"
+—— **那个判断是错的**：它只对会做代码分割的打包器成立，
+**Metro 不做代码分割**，动态 `import()` 照样内联。
+
+**两个可复用的结论**：
+
+1. **"动态 import" 不是隔离手段，子路径导出才是。**
+   本文件里 `NodeSqliteDriver` 早就是这个做法，只是当时没推广到 wasm。
+2. **这一类缺陷只在 release 现形** —— debug 不跑 Hermes 字节码编译，所以 debug 一直是好的。
+   ⇒ **release 构建必须真的跑**，`pnpm check` 全绿不能替代它。
+
+已把 `import.meta` 加进 `check-mobile-bundle.mjs`（它本来就会真打两个包的产物），
+**并已验证它会红**（注入回原缺陷 → 报 4 次，与 hermesc 的错误数吻合）。
+
+⚠️ **环境**：JDK 24 会在 `op-sqlite` 的 CMake 配置上失败，必须用 **JDK 17**。
 
 **🔴 与计划原文不同的一处改动（架构上更好，值得记）**：
 
