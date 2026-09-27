@@ -24,7 +24,11 @@ import { openApp, switchView } from './helpers';
  * **这种"某处故意不显示"的约束最容易被后来的一次重构抹掉，而抹掉之后什么都不报错。**
  */
 
-const TABS = ['任务', '四象限', '习惯', '番茄钟', '时间线', '成长', '设置'] as const;
+// ⚠️ 这张表的**顺序**必须与 `apps/web/src/App.tsx` 的 `VIEW_TABS` 逐字一致。
+// 漂移过一次：`trash`（回收站）加进 VIEW_TABS 之后这里没跟上，两个用例红了
+// 很久没人发现 —— 因为 e2e 不在 `pnpm check` 的主路径上。
+// 加视图时，**先改这里**，再改 App.tsx。
+const TABS = ['任务', '四象限', '习惯', '番茄钟', '时间线', '成长', '回收站', '设置'] as const;
 type Tab = (typeof TABS)[number];
 
 /** 居中标题 === 标签本身的视图（其余视图的标题是清单/筛选名） */
@@ -44,11 +48,11 @@ const CARD_OFF = ['设置', '成长'] as const satisfies readonly Tab[];
 const KNOWN_MISSING = ['/favicon.ico'] as const;
 
 test.describe('激励体系：真浏览器契约', () => {
-  test('七个视图标签齐全，顺序与文案逐字一致', async ({ page }) => {
+  test('八个视图标签齐全，顺序与文案逐字一致', async ({ page }) => {
     await openApp(page);
 
     const tabs = page.getByRole('tab');
-    await expect(tabs).toHaveCount(7);
+    await expect(tabs).toHaveCount(8);
 
     const labels = (await tabs.allTextContents()).map((t) => t.trim());
     expect(labels, '标签的顺序与文案都必须与 VIEW_TABS 逐字一致').toEqual([...TABS]);
