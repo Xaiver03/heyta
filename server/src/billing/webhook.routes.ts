@@ -47,7 +47,11 @@ import { prisma } from '../db';
 import { Logger } from '../logger';
 import { ENTITLEMENT_AUDIT_EVENTS } from '../entitlement';
 import { applyPaymentEvent } from './apply-event';
-import type { ExistingSubscription, PaymentEventApplyOutcome } from './apply-event';
+import type {
+  ApplyPaymentEventDeps,
+  ExistingSubscription,
+  PaymentEventApplyOutcome,
+} from './apply-event';
 import { extendSubscriptionPeriod, SUBSCRIPTION_PERIOD_DAYS } from '@heyta/domain';
 import {
   createBillingAdapterRegistry,
@@ -183,6 +187,124 @@ export const applySettlementToEvent = (
   };
 };
 
+/**
+ * Prisma 事务 client 上**权益写入所需的那个委托**。
+ *
+ * 用结构类型而不是 import Prisma 的具体类型：借方（webhook 的 `tx`）与
+ * 对账（`reconcile.ts`）拿到的是同一个 Prisma 事务 client，但两处的类型
+ * 推导来源不同。声明成"我只用这三件事"之后，两边都能原样传进来，
+ * 而不会为了一个类型去 `as any`（那会让真正的不匹配静默）。
+ */
+export interface SubscriptionTxDelegate {
+  findFirst(args: unknown): Promise<unknown>;
+  create(args: unknown): Promise<unknown>;
+  update(args: unknown): Promise<unknown>;
+}
+
+export interface SubscriptionTxClient {
+  readonly subscription: SubscriptionTxDelegate;
+}
+
+/**
+ * 把 Prisma 事务 client 接成 `ApplyPaymentEventDeps`。
+ *
+ * 🔴 **这是 webhook 与对账共用的唯一一份接线。** 它以前内联在路由里，
+ * 于是"对账也要按同一套语义写权益"就必然要抄一份 —— 抄一份等于两套判定。
+ */
+export const buildSubscriptionApplyDeps = (
+  tx: SubscriptionTxClient,
+  now: () => number,
+): ApplyPaymentEventDeps => ({
+  findSubscription: (externalSubscriptionId) =>
+    tx.subscription.findFirst({
+      where: { externalSubscriptionId },
+    }) as Promise<ExistingSubscription | null>,
+  // 🔴 一次性支付（支付宝 / 微信）没有订阅 id，只能按 (userId, provider)
+  // 定位那**一行长期复用**的订阅（`subscription-boundary.md` §6.2）。
+  findSubscriptionByUser: (userId, provider) =>
+    tx.subscription.findFirst({
+      where: { userId, provider },
+    }) as Promise<ExistingSubscription | null>,
+  createSubscription: (data) => tx.subscription.create({ data }) as Promise<{ id: number }>,
+  updateSubscription: (id, data) => tx.subscription.update({ where: { id }, data }),
+  // 周期叠加的**唯一服务端实现**（本体在 packages/domain，跨包 import
+  // 被硬约束挡住，故曾以镜像形式存在；现直接使用 @heyta/domain）。
+  extendPeriod: extendSubscriptionPeriod,
+  now,
+});
+
+/** `settleAndApplyEvent` 的返回。两半都可能为 `null`（各自代表"没做这一步"）。 */
+export interface SettleAndApplyResult {
+  readonly settlement: SettleOrderOutcome | null;
+  readonly result: PaymentEventApplyOutcome | null;
+}
+
+export interface SettleAndApplyDeps {
+  /** 事务内的 SQL 面 —— 结算必须与权益写入同生共死。 */
+  readonly sql: SqlRunner;
+  readonly subscriptions: ApplyPaymentEventDeps;
+}
+
+/**
+ * 一笔**已验证**支付事件的完整业务应用：先按商户订单号做权威结算，再按结算
+ * 结论写权益。
+ *
+ * 🔴 **webhook 与对账（`reconcile.ts`）共用这一份，不许各写一份。**
+ * 到账 webhook 与"补结算历史订单"要做的是同一件事，差别只在**谁触发**与
+ * **事务边界谁开**：
+ *
+ * - webhook：在它自己的 Prisma 事务里调它（`sql` = 那个事务的 runner）；
+ * - 对账：为每张订单开一个 Prisma 事务，在事务里调它。
+ *
+ * 结算与权益写入必须落在**同一个**事务里：分开写会留下"权益发了、订单没结算
+ * （券的 `reserved` 名额被永久占住）"或反之的半截状态。
+ * `settleOrderPaidInTransaction` 收的是 `SqlRunner`（不是 `SqlExecutor`），
+ * 正是为了能落进一个已经开着的事务。
+ *
+ * `settlement === null`（事件没有订单号）与 `result === null`（结算判定为
+ * 不该/不能授予）是**两件事**，都由返回值如实带出，不合并成 `undefined`。
+ */
+export const settleAndApplyEvent = async (
+  event: NormalizedPaymentEvent,
+  deps: SettleAndApplyDeps,
+): Promise<SettleAndApplyResult> => {
+  let settlement: SettleOrderOutcome | null = null;
+  if (event.outTradeNo != null) {
+    if (event.paidAmountMinor != null) {
+      settlement = await settleOrderPaidInTransaction(deps.sql, {
+        outTradeNo: event.outTradeNo,
+        providerEventId: event.providerEventId,
+        paidAmountMinor: event.paidAmountMinor,
+        now: deps.subscriptions.now(),
+      });
+    } else {
+      // 有订单号却没有实付金额：没有可比的权威金额，fail-closed。
+      // 订单留在 `pending`（会被 sweep 扫成 `expired`），不授予权益。
+      Logger.error('webhook：带订单号的支付没有实付金额 —— 拒绝结算，不授予权益', {
+        provider: event.provider,
+        providerEventId: event.providerEventId,
+        outTradeNo: event.outTradeNo,
+      });
+    }
+  }
+
+  // 权益写入。**不走两套判定**：
+  // - 有订单且结算有结论 → 由结算结论决定（`applySettlementToEvent`
+  //   返回 null = 不写；`unknown-order` 例外，见该函数注释）；
+  // - 没有订单号（兼容路径 / 非收银台支付）→ 沿用 adapter 自己的授予声明。
+  const eventForApply =
+    event.outTradeNo == null
+      ? event
+      : settlement === null
+        ? null
+        : applySettlementToEvent(event, settlement);
+
+  const result =
+    eventForApply === null ? null : await applyPaymentEvent(eventForApply, deps.subscriptions);
+
+  return { settlement, result };
+};
+
 export const webhookRoutes = async (
   fastify: FastifyInstance,
   options: WebhookRoutesOptions = {},
@@ -273,67 +395,18 @@ export const webhookRoutes = async (
             select: { id: true },
           });
 
-          // ② 占位成功才处理。有商户订单号 = 这一笔挂在一张我们冻结过的
-          //    `checkout_orders` 上 → **权威结算在这里、在这个事务里**。
+          // ② + ③ 占位成功才处理：**结算 + 权益写入共用唯一一份业务逻辑**
+          //    （`settleAndApplyEvent`，见其注释）。有商户订单号 = 这一笔挂在一张
+          //    我们冻结过的 `checkout_orders` 上 → 权威结算在这里、在这个事务里。
           //
           //    🔴 结算与权益写入必须在同一个事务里：分开写会留下
           //    "权益发了、订单没结算（券的 `reserved` 名额被永久占住）"或反之的
           //    半截状态。`settleOrderPaidInTransaction` 收的是 `SqlRunner`（不是
           //    `SqlExecutor`），正是为了能落在这个已经开着的事务里。
-          let orderSettlement: SettleOrderOutcome | null = null;
-          if (event.outTradeNo != null) {
-            if (event.paidAmountMinor != null) {
-              const runner = (options.sqlRunner ?? createPrismaSqlRunner)(tx);
-              orderSettlement = await settleOrderPaidInTransaction(runner, {
-                outTradeNo: event.outTradeNo,
-                providerEventId: event.providerEventId,
-                paidAmountMinor: event.paidAmountMinor,
-                now: now(),
-              });
-            } else {
-              // 有订单号却没有实付金额：没有可比的权威金额，fail-closed。
-              // 订单留在 `pending`（会被 sweep 扫成 `expired`），不授予权益。
-              Logger.error('webhook：带订单号的支付没有实付金额 —— 拒绝结算，不授予权益', {
-                provider: event.provider,
-                providerEventId: event.providerEventId,
-                outTradeNo: event.outTradeNo,
-              });
-            }
-          }
-
-          // ③ 权益写入。**不走两套判定**：
-          //    - 有订单且结算有结论 → 由结算结论决定（`applySettlementToEvent`
-          //      返回 null = 不写；`unknown-order` 例外，见该函数注释）；
-          //    - 没有订单号（兼容路径 / 非收银台支付）→ 沿用 adapter 自己的授予声明。
-          const eventForApply =
-            event.outTradeNo == null
-              ? event
-              : orderSettlement === null
-                ? null
-                : applySettlementToEvent(event, orderSettlement);
-
-          const result =
-            eventForApply === null
-              ? null
-              : await applyPaymentEvent(eventForApply, {
-                  findSubscription: (externalSubscriptionId) =>
-                    tx.subscription.findFirst({
-                      where: { externalSubscriptionId },
-                    }) as Promise<ExistingSubscription | null>,
-                  // 🔴 一次性支付（支付宝 / 微信）没有订阅 id，只能按 (userId, provider)
-                  // 定位那**一行长期复用**的订阅（`subscription-boundary.md` §6.2）。
-                  findSubscriptionByUser: (userId, provider) =>
-                    tx.subscription.findFirst({
-                      where: { userId, provider },
-                    }) as Promise<ExistingSubscription | null>,
-                  createSubscription: (data) => tx.subscription.create({ data }),
-                  updateSubscription: (id, data) =>
-                    tx.subscription.update({ where: { id }, data }),
-                  // 周期叠加的**唯一服务端实现**（本体在 packages/domain，跨包 import
-                  // 被硬约束挡住，故曾以镜像形式存在；现直接使用 @heyta/domain。
-                  extendPeriod: extendSubscriptionPeriod,
-                  now,
-                });
+          const { settlement: orderSettlement, result } = await settleAndApplyEvent(event, {
+            sql: (options.sqlRunner ?? createPrismaSqlRunner)(tx),
+            subscriptions: buildSubscriptionApplyDeps(tx, now),
+          });
 
           await tx.paymentEvent.update({
             where: { id: inserted.id },

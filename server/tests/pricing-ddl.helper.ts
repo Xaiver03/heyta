@@ -59,3 +59,35 @@ export const MINIMAL_USERS_DDL = `
 
 /** 在一个干净的 pglite 实例里建好定价/优惠券的全部表与约束。 */
 export const PRICING_SCHEMA_DDL = `${MINIMAL_USERS_DDL}\n${pricingDdlFromMigration()}`;
+
+/**
+ * `payment_events` 的建表 SQL —— 从**发布中的迁移文件**读出来，不抄一份。
+ *
+ * 对账（`reconcile.ts`）必须 join `payment_events`，所以测它的 PGlite 实例
+ * 需要这张表。与定价那张表同一条纪律：读发布物、加锚点检查，迁移改名时
+ * 测试在 setup 阶段就炸，而不是变成一组测着不存在结构的绿灯。
+ */
+const PAYMENT_EVENTS_MIGRATION_DIR = '20260927000000_add_payment_events';
+
+export const paymentEventsDdlFromMigration = (): string => {
+  const sql = readFileSync(join(migrationsDir, PAYMENT_EVENTS_MIGRATION_DIR, 'migration.sql'), 'utf8');
+  if (!sql.includes('CREATE TABLE "payment_events"')) {
+    throw new Error(
+      `${PAYMENT_EVENTS_MIGRATION_DIR}/migration.sql 里找不到 "payment_events" 的建表语句。\n` +
+        '   🔴 迁移被改名/重构时请更新本 helper 的锚点，而不是删掉解析。',
+    );
+  }
+  return sql;
+};
+
+/**
+ * `payment_events` 有一个指向 `subscriptions` 的外键，而真实订阅表与对账主题无关。
+ * 这里给一个**最小替身**（只有主键，外键唯一需要的东西）—— 它不可能与真实表漂移。
+ */
+export const MINIMAL_SUBSCRIPTIONS_DDL = `
+  CREATE TABLE subscriptions (
+    id serial PRIMARY KEY
+  );
+`;
+
+export const PAYMENT_EVENTS_SCHEMA_DDL = `${MINIMAL_SUBSCRIPTIONS_DDL}\n${paymentEventsDdlFromMigration()}`;
