@@ -93,6 +93,7 @@ let container: HTMLDivElement | undefined;
 
 function render(
   locale: Locale,
+  routing: AiRoutingConfig,
   fetchImpl: typeof fetch,
   consents: readonly EgressConsent[] = [],
 ): HTMLDivElement {
@@ -104,7 +105,7 @@ function render(
       <I18nProvider locale={locale}>
         <AiBreakdown
           task={TASK}
-          routing={ROUTING}
+          routing={routing}
           consents={consents}
           secrets={EMPTY_SECRETS}
           onApplyNote={() => Promise.resolve()}
@@ -164,34 +165,80 @@ afterEach(() => {
 });
 
 /**
- * 三种"有目标、但发出去失败"的形态，各来自 `packages/ai` 的一条不同原文：
- * 动态披露 / 状态码 / 传输错误。
+ * 四种"发出去会失败"的形态，各来自 `packages/ai` 的一条不同原文。
+ *
+ * `expectDetail` 是**这条原因该不该有诊断块**：
+ *   - 动态披露 / 状态码 / 传输错误 → **该有**（词条给不了）；
+ *   - `not-configured` → **不该有**（包给的原文就是一句界面话，词条说得更清楚）。
  */
 const CASES: readonly {
   readonly name: string;
+  readonly routing: AiRoutingConfig;
   readonly fetchImpl: typeof fetch;
   readonly consents: readonly EgressConsent[];
+  readonly expectDetail: boolean;
 }[] = [
-  { name: 'egress-not-authorized（原文含动态披露）', fetchImpl: unreachableFetch, consents: [] },
-  { name: 'http-error（原文含状态码与端点名）', fetchImpl: serverErrorFetch, consents: [CONSENT] },
-  { name: 'network（原文含底层传输错误）', fetchImpl: networkFetch, consents: [CONSENT] },
+  {
+    name: 'egress-not-authorized（原文含动态披露）',
+    routing: ROUTING,
+    fetchImpl: unreachableFetch,
+    consents: [],
+    expectDetail: true,
+  },
+  {
+    name: 'http-error（原文含状态码与端点名）',
+    routing: ROUTING,
+    fetchImpl: serverErrorFetch,
+    consents: [CONSENT],
+    expectDetail: true,
+  },
+  {
+    name: 'network（原文含底层传输错误）',
+    routing: ROUTING,
+    fetchImpl: networkFetch,
+    consents: [CONSENT],
+    expectDetail: true,
+  },
+  {
+    // 🔴 总开关关着 —— 最容易遇到的那个"AI 不能用"。
+    //
+    // ⚠️ 它**会**走到失败态：`resolveRoute()` 不看 `enabled`（只有
+    // `invokeRouted()` 在第 1 道闸看），所以候选仍在 → 披露仍然显示 →
+    // 按"发送"才拿到 `not-configured`。这与"没配路由"不同：
+    // 后者候选为空，在披露之前就被 `RouteUnavailable` 拦下了。
+    name: 'not-configured（总开关关着）',
+    routing: { ...ROUTING, enabled: false },
+    fetchImpl: unreachableFetch,
+    consents: [],
+    expectDetail: false,
+  },
 ];
 
 describe('🔴 英文失败态：界面文案里没有中文字', () => {
   for (const c of CASES) {
     it(`${c.name} → 摘掉 <details> 后一个汉字都没有`, async () => {
-      const el = render('en', c.fetchImpl, c.consents);
+      const el = render('en', c.routing, c.fetchImpl, c.consents);
       await sendAndFail(el);
 
       expect(el.querySelector('[data-testid="ai-failed"]'), '应当进入失败态').toBeTruthy();
       const copy = copyOnly(el);
       expect(copy.length, '文案不该是空的（否则下面的断言会空过）').toBeGreaterThan(0);
       expect(CJK.test(copy), `英文文案里出现汉字：${copy}`).toBe(false);
+
+      const detail = el.querySelector('[data-testid="ai-failure-message-detail"]');
+      if (c.expectDetail) {
+        expect(detail, `${c.name} 的原文里有词条给不了的信息，诊断块应当存在`).toBeTruthy();
+      } else {
+        // 🔴 包给的原文就是一句界面话（'AI 未启用。在设置里打开总开关…'），
+        // 词条已经把它说完了 —— 再显示一遍在中文里是重复，
+        // 在英文界面里**就是一句中文**。
+        expect(detail, `${c.name} 的原文是纯重复，不该渲染诊断块`).toBeNull();
+      }
     });
   }
 
   it('🔴 中文对照：同一场故障的主文案**必须有**汉字（证明上一条不是空过）', async () => {
-    const el = render('zh-CN', serverErrorFetch, [CONSENT]);
+    const el = render('zh-CN', ROUTING, serverErrorFetch, [CONSENT]);
     await sendAndFail(el);
 
     expect(el.querySelector('[data-testid="ai-failed"]')).toBeTruthy();
@@ -201,7 +248,7 @@ describe('🔴 英文失败态：界面文案里没有中文字', () => {
 
 describe('🔴 原文只允许出现在折叠的诊断块里（一旦提回主文案就红）', () => {
   it('主文案取自词条，且**不等于**原文', async () => {
-    const el = render('en', serverErrorFetch, [CONSENT]);
+    const el = render('en', ROUTING, serverErrorFetch, [CONSENT]);
     await sendAndFail(el);
 
     const primary = el.querySelector('[data-testid="ai-failure-message"]')?.textContent ?? '';
@@ -217,7 +264,7 @@ describe('🔴 原文只允许出现在折叠的诊断块里（一旦提回主�
   });
 
   it('诊断块是收起的 `<details>`（原文可以留，但不主动占视野）', async () => {
-    const el = render('en', serverErrorFetch, [CONSENT]);
+    const el = render('en', ROUTING, serverErrorFetch, [CONSENT]);
     await sendAndFail(el);
 
     const details = el.querySelector('[data-testid="ai-failure-message-detail"]');
