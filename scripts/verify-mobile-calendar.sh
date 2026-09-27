@@ -162,14 +162,14 @@ TODAY_TITLE=$(printf '%s' "$EXPECT" | sed -n 2p)
 DUE_TITLE=$(printf '%s' "$EXPECT" | sed -n 3p)
 DUE_DATE=$(printf '%s' "$EXPECT" | sed -n 4p)
 DUE_DAY=$(printf '%s' "$EXPECT" | sed -n 5p)
-ok "期望月份「$MONTH_TITLE」，今天「$TODAY_TITLE」，目标日「$DUE_TITLE」（$DUE_DATE）"
+ok "期望月份「${MONTH_TITLE}」，今天「${TODAY_TITLE}」，目标日「${DUE_TITLE}」（${DUE_DATE}）"
 
 # ── 开始 ────────────────────────────────────────────────────
 echo ""
 echo "=== 移动端日历验收（真实模拟器 + 真服务端 + 真笔记本设备，零 mock）==="
 echo "  设备: emulator-5554   服务端: $SERVER   库: heyta_mobile_smoke"
 echo "  账号: $EMAIL"
-echo "  任务: $TASK_TITLE（截止 $DUE_DATE）"
+echo "  任务: ${TASK_TITLE}（截止 ${DUE_DATE}）"
 
 if [ "${#TOKEN}" -lt 100 ]; then
   echo "❌ 令牌看起来不对（长度 ${#TOKEN}）—— 先跑建号脚本"; exit 1
@@ -211,7 +211,7 @@ import json,sys
 print(json.load(sys.stdin).get('id',''))
 " 2>/dev/null)
   if [ -n "$TASK_ID" ]; then
-    ok "笔记本已创建任务（截止 $DUE_DATE）：$TASK_ID"
+    ok "笔记本已创建任务（截止 ${DUE_DATE}）：$TASK_ID"
   else
     bad "笔记本建了任务但取不到 id：$LAPTOP_ADD"
   fi
@@ -237,7 +237,7 @@ dump
 if [ "$(has_text "$MONTH_TITLE")" = "1" ]; then
   ok "月份标题正确：$MONTH_TITLE"
 else
-  bad "月份标题不是「$MONTH_TITLE」（界面上的日历和设备时钟不一致）"
+  bad "月份标题不是「${MONTH_TITLE}」（界面上的日历和设备时钟不一致）"
 fi
 # 列头：周一开头。少一个都不是完整的 7 列。
 MISSING=""
@@ -252,32 +252,32 @@ step "7. 🔴 日历打开时**恰好选中一格**，且那一格就是今天"
 SEL=$(selected_day_desc)
 case "$SEL" in
   '')
-    bad "没有任何格子处于选中态 —— 日历打开时应该选中今天（$TODAY_TITLE）"
+    bad "没有任何格子处于选中态 —— 日历打开时应该选中今天（${TODAY_TITLE}）"
     ;;
   MULTI:*)
-    bad "同时有多个格子处于选中态（$SEL）—— 选中态必须唯一"
+    bad "同时有多个格子处于选中态（${SEL}）—— 选中态必须唯一"
     ;;
   "$TODAY_TITLE"*)
-    ok "恰好选中一格，且就是今天：「$SEL」"
+    ok "恰好选中一格，且就是今天：「${SEL}」"
     ;;
   *)
-    bad "选中的是「$SEL」，但今天是「$TODAY_TITLE」—— 日历认错了今天是哪一天"
+    bad "选中的是「${SEL}」，但今天是「${TODAY_TITLE}」—— 日历认错了今天是哪一天"
     ;;
 esac
 
 step "8. 🔴 笔记本那条任务落在**它截止的那一天**，且那天只显示 1 个任务"
 # 这是本脚本最重要的一条：它同时证明"截止时间同步过来了"和"分到了对的日子"。
-if [ -n "$TASK_ID" ] && [ "$(has_desc_sub "$DUE_TITLE，1 个任务")" = "1" ]; then
-  ok "「$DUE_TITLE」那格显示 1 个任务 —— 跨设备任务落在了正确的那一天"
+if [ -n "$TASK_ID" ] && [ "$(has_desc_sub "${DUE_TITLE}，1 个任务")" = "1" ]; then
+  ok "「${DUE_TITLE}」那格显示 1 个任务 —— 跨设备任务落在了正确的那一天"
 elif [ -n "$TASK_ID" ]; then
-  bad "「$DUE_TITLE」那格不是「1 个任务」—— 任务被放到了别的一天（或没同步过来）"
+  bad "「${DUE_TITLE}」那格不是「1 个任务」—— 任务被放到了别的一天（或没同步过来）"
   # 把每格的读数打出来，好判断是"整体偏一天"还是"根本没到"
   echo "     各格实际读数："
   grep -o 'content-desc="[0-9]*月[0-9]*日[^"]*"' /tmp/ui.xml | sort -u | head -12 | sed 's/^/       /'
 fi
 
 step "9. 点那一天 → 当天列表里出现那条任务"
-DAY_XY=$(xy_desc "$DUE_TITLE，1 个任务")
+DAY_XY=$(xy_desc "${DUE_TITLE}，1 个任务")
 if [ -z "$DAY_XY" ]; then
   # 标签里任务数可能因为同步差异不同，退一步按"日期标题开头"找
   DAY_XY=$(python3 - "$DUE_TITLE" <<'PY'
@@ -303,18 +303,18 @@ if [ -n "$DAY_XY" ]; then
   $ADB shell input tap $DAY_XY; sleep 3
   dump
   if [ "$(has_text "$TASK_TITLE")" = "1" ]; then
-    ok "点「$DUE_TITLE」后，当天列表里出现了「$TASK_TITLE」"
+    ok "点「${DUE_TITLE}」后，当天列表里出现了「${TASK_TITLE}」"
   else
-    bad "点了「$DUE_TITLE」但那天的列表里没有「$TASK_TITLE」"
+    bad "点了「${DUE_TITLE}」但那天的列表里没有「${TASK_TITLE}」"
   fi
   # 列表上方的区块标题也应该跟着变成那一天 —— 否则是"数据变了、标题没变"
   if [ "$(has_desc_sub "$DUE_TITLE")" = "1" ] || [ "$(has_text "$DUE_TITLE")" = "1" ]; then
-    ok "当天区块标题已切到「$DUE_TITLE」"
+    ok "当天区块标题已切到「${DUE_TITLE}」"
   else
     bad "选了那一天，但区块标题没切过去"
   fi
 else
-  bad "找不到「$DUE_TITLE」那一格，点不下去"
+  bad "找不到「${DUE_TITLE}」那一格，点不下去"
 fi
 
 step "10. 点「回到今天」→ 选中回到今天，那条任务从列表里消失"
@@ -323,9 +323,9 @@ if XY=$(tap_label "回到今天"); then
   # 🔴 反向断言：它**必须消失**。只断言"今天的任务出现了"是拦不住
   # "列表根本没换、还是那一天的"这种 bug 的 —— 那样两边都会显示同一条。
   if [ "$(has_text "$TASK_TITLE")" = "0" ]; then
-    ok "「$TASK_TITLE」已从列表消失（列表确实换到了今天）"
+    ok "「${TASK_TITLE}」已从列表消失（列表确实换到了今天）"
   else
-    bad "点了「回到今天」但「$TASK_TITLE」还在列表里 —— 列表没换"
+    bad "点了「回到今天」但「${TASK_TITLE}」还在列表里 —— 列表没换"
   fi
   # ⚠️ 用 `has_sub`（子串）而不是 `has_text`（全等）：界面上的文案带句号，
   # 而全等匹配会因为一个标点而静默不命中。
@@ -336,8 +336,8 @@ if XY=$(tap_label "回到今天"); then
   # 用户点下一格时会以为日历跳了。
   SEL2=$(selected_day_desc)
   case "$SEL2" in
-    "$TODAY_TITLE"*) ok "选中态已回到今天：「$SEL2」" ;;
-    *) bad "点了「回到今天」，但选中态是「$SEL2」而不是今天" ;;
+    "$TODAY_TITLE"*) ok "选中态已回到今天：「${SEL2}」" ;;
+    *) bad "点了「回到今天」，但选中态是「${SEL2}」而不是今天" ;;
   esac
 else
   bad "找不到「回到今天」按钮"
@@ -361,7 +361,7 @@ if [ -n "$DAY_XY" ]; then
       bad "没有任务 id，无法查 op"
     fi
   else
-    bad "找不到该任务行的勾选框（标签应为「标记完成：$TASK_TITLE」）"
+    bad "找不到该任务行的勾选框（标签应为「标记完成：${TASK_TITLE}」）"
   fi
 else
   bad "找不到那一天，跳过了勾选校验"
@@ -387,7 +387,7 @@ print('ERR' if t is None else ('DONE' if t['completedAt'] is not None else 'NOT_
 case "$DONE" in
   DONE)     ok "笔记本从服务端读到该任务已完成 —— 手机上的一次日历勾选跨了设备" ;;
   NOT_DONE) bad "笔记本看到了这条任务，但 completedAt 仍是 null（完成态没同步过去）" ;;
-  *)        bad "笔记本没有这条任务（结果：$DONE）—— 数据没跨过去" ;;
+  *)        bad "笔记本没有这条任务（结果：${DONE}）—— 数据没跨过去" ;;
 esac
 
 summary "移动端日历"

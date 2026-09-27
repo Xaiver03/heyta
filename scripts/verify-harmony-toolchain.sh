@@ -39,7 +39,7 @@ cd "$(dirname "$0")/.." || exit 1
 
 DEVECO_HOME="${DEVECO_HOME:-/Applications/DevEco-Studio.app/Contents}"
 # 🔴 必须用**短路径**：hvigor 内部 pnpm 会拿插件 tarball 的绝对路径当 store 文件名，
-#    macOS 的 $TMPDIR（/var/folders/5n/...）会把它顶到 255 字节上限（见 §7 第 62 条）。
+#    macOS 的 ${TMPDIR}（/var/folders/5n/...）会把它顶到 255 字节上限（见 §7 第 62 条）。
 WORK="${HEYTA_HARMONY_WORK:-/tmp/heyta-harmony-toolchain}"
 
 # 与共享库无关，本脚本自带最简 ok/bad，便于单独运行。
@@ -79,8 +79,15 @@ done
 SDK_PKG="$DEVECO_HOME/sdk/default/sdk-pkg.json"
 if [ -f "$SDK_PKG" ]; then
   API=$(python3 -c "import json;print(json.load(open('$SDK_PKG'))['data']['apiVersion'])" 2>/dev/null)
-  DISPLAY=$(python3 -c "import json;print(json.load(open('$SDK_PKG'))['data']['displayName'])" 2>/dev/null)
-  ok "SDK: $DISPLAY（API $API）"
+  # 🔴 两个坑都在这一行：
+  #   1. 变量名叫 `SDK_NAME` 而不是 `DISPLAY` —— `DISPLAY` 是 X11 的环境变量，
+  #      覆盖它会在任何用到它的下游工具上产生莫名其妙的行为。
+  #   2. 引用必须写成 `${SDK_NAME}` —— **macOS 自带的 bash 3.2** 在非 UTF-8
+  #      locale 下会把紧跟其后的全角字符（`（`）的字节当成变量名的一部分，
+  #      于是 `${DISPLAY}（` 被解析成一个叫 `DISPLAY（` 的变量，
+  #      在 `set -u` 下直接 `unbound variable` 退出。加花括号在**所有**版本上都是对的。
+  SDK_NAME=$(python3 -c "import json;print(json.load(open('$SDK_PKG'))['data']['displayName'])" 2>/dev/null)
+  ok "SDK: ${SDK_NAME}（API ${API}）"
 else
   bad "读不到 sdk-pkg.json（SDK 没装全？）"
   API=""
@@ -111,7 +118,7 @@ cp -R "$TEMPLATE"/. "$WORK"/
 
 # 模板里的 SDK 版本可能是旧的（例如 5.0.0(12)），按**实际** SDK 改写。
 if [ -n "$API" ]; then
-  python3 - "$WORK/build-profile.json5" "$API" "$DISPLAY" <<'PY'
+  python3 - "$WORK/build-profile.json5" "$API" "${SDK_NAME:-}" <<'PY'
 import io, re, sys
 path, api, display = sys.argv[1], sys.argv[2], sys.argv[3]
 ver = display.replace('HarmonyOS ', '')          # "HarmonyOS 6.1.1" -> "6.1.1"

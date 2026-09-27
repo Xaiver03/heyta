@@ -90,9 +90,9 @@ export PATH="$NODE_HOME/bin:$DEVECO_HOME/tools/ohpm/bin:$DEVECO_HOME/tools/hvigo
 
 SDK_PKG="$DEVECO_HOME/sdk/default/sdk-pkg.json"
 API=$(python3 -c "import json;print(json.load(open('$SDK_PKG'))['data']['apiVersion'])" 2>/dev/null)
-DISPLAY=$(python3 -c "import json;print(json.load(open('$SDK_PKG'))['data']['displayName'])" 2>/dev/null)
-[ -n "${API:-}" ] && ok "SDK: $DISPLAY（API $API）" || { bad "读不到 SDK 版本"; exit 3; }
-SDK_VER=$(printf '%s' "$DISPLAY" | sed 's/HarmonyOS //')
+SDK_NAME=$(python3 -c "import json;print(json.load(open('$SDK_PKG'))['data']['displayName'])" 2>/dev/null)
+[ -n "${API:-}" ] && ok "SDK: ${SDK_NAME}（API ${API}）" || { bad "读不到 SDK 版本"; exit 3; }
+SDK_VER=$(printf '%s' "${SDK_NAME:-}" | sed 's/HarmonyOS //')
 SDK_FULL="${SDK_VER}(${API})"
 
 # ── 第 1 步：取官方 CLI 模板 ────────────────────────────────
@@ -225,7 +225,7 @@ fi
 step "4. 验证 HAP 里的原生库（退出码不携带这个信息）"
 HAP=$(find "$PROJ" -name "*.hap" -not -path "*/oh_modules/*" 2>/dev/null | head -1)
 if [ -z "$HAP" ]; then
-  bad "没有产出任何 .hap"; echo ""; echo "  通过 $PASS，失败 $FAIL"; exit 1
+  bad "没有产出任何 .hap"; echo ""; echo "  通过 ${PASS}，失败 $FAIL"; exit 1
 fi
 ok "产出 $(basename "$HAP")（$(ls -lh "$HAP" | awk '{print $5}')）"
 
@@ -237,7 +237,7 @@ unzip -l "$HAP" > /tmp/heyta-rnoh-haplist.txt 2>/dev/null
 for lib in librnoh_core.so librnoh_app.so libreactnative.so; do
   if grep -q "$lib" /tmp/heyta-rnoh-haplist.txt; then
     SZ=$(grep "$lib" /tmp/heyta-rnoh-haplist.txt | head -1 | awk '{print $1}')
-    ok "含 $lib（${SZ} 字节）"
+    ok "含 ${lib}（${SZ} 字节）"
   else
     bad "缺 $lib —— RNOH 原生侧没进包"
   fi

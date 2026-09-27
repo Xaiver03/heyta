@@ -156,7 +156,7 @@ except Exception: print(''); raise SystemExit
 print(next((t['id'] for t in d.get('tasks',[]) if t['title']=='$TITLE'),''))
 ")
 fi
-[ -n "$LAPTOP_ID" ] && ok "笔记本已同步到该任务（id=$LAPTOP_ID）" || bad "笔记本没看到手机那条任务"
+[ -n "$LAPTOP_ID" ] && ok "笔记本已同步到该任务（id=${LAPTOP_ID}）" || bad "笔记本没看到手机那条任务"
 if [ -n "$LAPTOP_ID" ]; then
   laptop_ok rename "$LAPTOP_ID" "$LAPTOP_TITLE" && ok "笔记本改了标题（暂未同步）" || bad "rename 失败"
   laptop_ok sync && ok "笔记本 sync 返回成功" || bad "笔记本 sync 失败"
@@ -224,9 +224,9 @@ if [ -z "$XY" ]; then bad "点不到「逐条处理」（滚动后仍不可点�
   $ADB shell input tap $XY; sleep 4
   dump
   L=$(has_text "本机"); R=$(has_text "其他设备")
-  [ "$L" = "1" ] && [ "$R" = "1" ] && ok "并排显示了两侧（本机 / 其他设备）" || bad "两侧没同时出现（本机=$L 其他设备=$R）"
+  [ "$L" = "1" ] && [ "$R" = "1" ] && ok "并排显示了两侧（本机 / 其他设备）" || bad "两侧没同时出现（本机=$L 其他设备=${R}）"
   N=$(grep -o 'text="保留这一版"' /tmp/ui.xml | wc -l | tr -d ' ')
-  [ "$N" -ge 2 ] && ok "两个「保留这一版」按钮都在（$N 个）" || bad "保留按钮数量不对（$N）"
+  [ "$N" -ge 2 ] && ok "两个「保留这一版」按钮都在（$N 个）" || bad "保留按钮数量不对（${N}）"
   [ "$(has_text "取不到这一侧的版本")" = "1" ] && bad "不该出现「取不到」——两端都应取得到" || ok "两侧都取到了版本"
   [ "$(has_text "$LAPTOP_TITLE")" = "1" ] && ok "界面上能看到对端那一版的内容" || bad "看不到对端内容"
   # 🔴 全中文界面：服务端那句英文诊断（`Concurrent modification detected for TASK:...`）
@@ -357,9 +357,9 @@ laptop_ok sync && ok "笔记本第二次 sync" || bad "笔记本第二次 sync �
 # 断言它**真的到了服务端**，而不是只看 sync 的返回码
 OPS_AFTER_LAPTOP=$(server_op_count)
 if [ "$OPS_AFTER_LAPTOP" -gt "$OPS_AT_CLEAN_START" ]; then
-  ok "笔记本那条改名确实落到了服务端（op 数 $OPS_AT_CLEAN_START → $OPS_AFTER_LAPTOP）"
+  ok "笔记本那条改名确实落到了服务端（op 数 $OPS_AT_CLEAN_START → ${OPS_AFTER_LAPTOP}）"
 else
-  bad "笔记本 sync 报成功，但服务端 op 数没变（$OPS_AT_CLEAN_START → $OPS_AFTER_LAPTOP）"
+  bad "笔记本 sync 报成功，但服务端 op 数没变（$OPS_AT_CLEAN_START → ${OPS_AFTER_LAPTOP}）"
 fi
 
 # 3) 手机**在没下载到那条的前提下**再改一次（勾选状态）
@@ -385,7 +385,7 @@ XY=$(scroll_to_desc "完成：$LAPTOP_TITLE")
 TAP_LABEL="完成"
 [ -z "$XY" ] && { XY=$(scroll_to_desc "取消完成：$LAPTOP_TITLE"); TAP_LABEL="取消完成"; }
 if [ -z "$XY" ]; then bad "找不到勾选框（第二次造并发）"; screen_txt; else
-  echo "     点的是「$TAP_LABEL：$LAPTOP_TITLE」@ $XY"
+  echo "     点的是「${TAP_LABEL}：${LAPTOP_TITLE}」@ $XY"
   $ADB shell input tap $XY; sleep 3
   # 翻转之后标签会变成**另一个**；而且这条会移进/移出「已完成」分组，
   # 所以要滚动去找，不能在原地找。
@@ -397,7 +397,7 @@ if [ -z "$XY" ]; then bad "找不到勾选框（第二次造并发）"; screen_t
   if [ -n "$(scroll_to_desc "$WANT_AFTER")" ]; then
     ok "手机第二次本地改动（勾选状态已翻转，尚未同步）"
   else
-    bad "勾选框点了但状态没变（滚遍列表也没找到「$WANT_AFTER」）—— 没有本地 op 就不会有冲突"
+    bad "勾选框点了但状态没变（滚遍列表也没找到「${WANT_AFTER}」）—— 没有本地 op 就不会有冲突"
     screen_txt
   fi
 fi
@@ -465,9 +465,9 @@ fi
 OPS_AFTER=$(server_op_count)
 echo "     解决后服务端 op 数 = $OPS_AFTER"
 if [ -n "$OPS_BEFORE" ] && [ -n "$OPS_AFTER" ] && [ "$OPS_AFTER" -gt "$OPS_BEFORE" ]; then
-  ok "服务端 op 数增加（$OPS_BEFORE → $OPS_AFTER）—— 确实**重新派发**了新 op"
+  ok "服务端 op 数增加（$OPS_BEFORE → ${OPS_AFTER}）—— 确实**重新派发**了新 op"
 else
-  bad "服务端 op 数没有增加（$OPS_BEFORE → $OPS_AFTER）——「保留本机」没有重新派发"
+  bad "服务端 op 数没有增加（$OPS_BEFORE → ${OPS_AFTER}）——「保留本机」没有重新派发"
 fi
 
 step "9b. 断言：笔记本同步后与手机**勾选状态一致**（另一侧也走通）"
@@ -514,9 +514,9 @@ echo "     笔记本侧勾选状态 = ${LT_STATE:-（没读到）}"
 if [ -z "$PHONE_STATE" ]; then
   bad "读不到手机侧勾选状态（两端的标签都没找到）"; screen_txt
 elif [ "$PHONE_STATE" = "$LT_STATE" ]; then
-  ok "双端勾选状态一致（都是 $PHONE_STATE）——「保留本机」后另一侧也收敛了"
+  ok "双端勾选状态一致（都是 ${PHONE_STATE}）——「保留本机」后另一侧也收敛了"
 else
-  bad "双端勾选状态不一致（手机=$PHONE_STATE 笔记本=$LT_STATE）"
+  bad "双端勾选状态不一致（手机=$PHONE_STATE 笔记本=${LT_STATE}）"
 fi
 fi  # ← 对应 7b 开头的「保留远端前置未成立则跳过」闸门
 

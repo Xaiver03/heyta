@@ -147,7 +147,7 @@ create_list_on_phone() {  # <名字>
   if [ "$GOT" = "$1" ]; then
     ok "已输入清单名：$1"
   else
-    bad "清单名不精确（期望「$1」，实际「$GOT」）"; screen_txt; return 1
+    bad "清单名不精确（期望「$1」，实际「${GOT}」）"; screen_txt; return 1
   fi
   XY=$(scroll_to_desc "新建清单")
   if [ -z "$XY" ]; then bad "找不到「新建清单」按钮"; screen_txt; return 1; fi
@@ -246,9 +246,9 @@ if [ "$(has_text "任务详情")" = "1" ]; then
     fi
     dump
     XY=$(scroll_to_text "$LIST_NAME")
-    if [ -z "$XY" ]; then bad "详情面板里找不到清单「$LIST_NAME」"; screen_txt; else
+    if [ -z "$XY" ]; then bad "详情面板里找不到清单「${LIST_NAME}」"; screen_txt; else
       $ADB shell input tap $XY; sleep 3
-      ok "已点选清单「$LIST_NAME」"
+      ok "已点选清单「${LIST_NAME}」"
     fi
   fi
   close_sheet || true
@@ -274,7 +274,7 @@ if [ -n "$TASK_PROJECT" ]; then
   if [ "$TASK_PROJECT" = "$PROJECT_ID" ]; then
     ok "任务挂的正是刚建的那条清单（id 相等）"
   else
-    bad "任务挂的清单 id 与新建的不是同一条（任务=$TASK_PROJECT 清单=$PROJECT_ID）"
+    bad "任务挂的清单 id 与新建的不是同一条（任务=$TASK_PROJECT 清单=${PROJECT_ID}）"
   fi
 else
   bad "任务的 op 里没有 projectId —— 点选没有真的写进去"; screen_txt
@@ -325,14 +325,14 @@ except Exception: print(''); raise SystemExit
 print(next((p['id'] for p in d.get('projects',[]) if p['name']=='$LIST_NAME'),''))
 ")
 if [ -n "$LT_MATCH" ]; then
-  ok "笔记本读到了清单「$LIST_NAME」：$LT_MATCH"
+  ok "笔记本读到了清单「${LIST_NAME}」：$LT_MATCH"
   if [ "$LT_MATCH" = "$PROJECT_ID" ]; then
-    ok "两端清单 id 一致（$PROJECT_ID）—— 清单真的跨设备同步了"
+    ok "两端清单 id 一致（${PROJECT_ID}）—— 清单真的跨设备同步了"
   else
-    bad "两端清单 id 不一致（手机=$PROJECT_ID 笔记本=$LT_MATCH）"
+    bad "两端清单 id 不一致（手机=$PROJECT_ID 笔记本=${LT_MATCH}）"
   fi
 else
-  bad "笔记本没读到清单「$LIST_NAME」—— 清单没同步过去"; screen_txt
+  bad "笔记本没读到清单「${LIST_NAME}」—— 清单没同步过去"; screen_txt
 fi
 
 step "9. 断言：笔记本读到的任务也挂在同一条清单上"
@@ -348,7 +348,7 @@ if [ -n "$LT_TASK_PROJECT" ]; then
   if [ "$LT_TASK_PROJECT" = "$PROJECT_ID" ]; then
     ok "任务归属跨设备一致 —— 「建清单 → 归入 → 另一台设备读到」全链路无 mock"
   else
-    bad "笔记本上的归属与手机不一致（笔记本=$LT_TASK_PROJECT 手机=$PROJECT_ID）"
+    bad "笔记本上的归属与手机不一致（笔记本=$LT_TASK_PROJECT 手机=${PROJECT_ID}）"
   fi
 else
   bad "笔记本上这条任务没有 projectId —— 归属没同步过去"; screen_txt

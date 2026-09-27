@@ -78,7 +78,7 @@ print(t or '')
   printf '%s' "$email" > "$HEYTA_E2E_EMAIL_FILE"
   printf '%s' "$e2ee"  > "$HEYTA_E2E_E2EE_FILE"
 
-  echo "   ✅ 全新账号：$email（令牌 ${#token} 字符）"
+  echo "   ✅ 全新账号：${email}（令牌 ${#token} 字符）"
   return 0
 }
 
@@ -117,7 +117,7 @@ heyta_e2e_assert_client_budget() {
   fi
 
   if [ "$count" -lt "$HEYTA_E2E_CLOCK_LIMIT" ]; then
-    echo "   ✅ 账号 client 数 $count < $HEYTA_E2E_CLOCK_LIMIT（向量时钟不会被裁剪）"
+    echo "   ✅ 账号 client 数 $count < ${HEYTA_E2E_CLOCK_LIMIT}（向量时钟不会被裁剪）"
     return 0
   fi
   echo "   ❌ 账号 client 数 $count ≥ $HEYTA_E2E_CLOCK_LIMIT —— 向量时钟会被裁剪，"

@@ -145,7 +145,7 @@ create_tag_on_phone() {  # <名字>
   if [ "$GOT" = "$1" ]; then
     ok "已输入标签名：$1"
   else
-    bad "标签名不精确（期望「$1」，实际「$GOT」）"; screen_txt; return 1
+    bad "标签名不精确（期望「$1」，实际「${GOT}」）"; screen_txt; return 1
   fi
   XY=$(scroll_to_desc "新建标签")
   if [ -z "$XY" ]; then bad "找不到「新建标签」按钮"; screen_txt; return 1; fi
@@ -231,9 +231,9 @@ if [ "$(has_text "任务详情")" = "1" ]; then
     ok "详情面板里有「标签」段"
     dump
     XY=$(scroll_to_text "$TAG_NAME")
-    if [ -z "$XY" ]; then bad "详情面板里找不到标签「$TAG_NAME」"; screen_txt; else
+    if [ -z "$XY" ]; then bad "详情面板里找不到标签「${TAG_NAME}」"; screen_txt; else
       $ADB shell input tap $XY; sleep 3
-      ok "已点选标签「$TAG_NAME」"
+      ok "已点选标签「${TAG_NAME}」"
     fi
   fi
   close_sheet || true
@@ -252,7 +252,7 @@ if [ -n "$TASK_TAGS" ]; then
   if printf '%s' "$TASK_TAGS" | grep -q "$TAG_ID"; then
     ok "任务挂的正是刚建的那个标签（id 在 tagIds 里）"
   else
-    bad "任务的 tagIds 里没有刚建的标签 id（tagIds=$TASK_TAGS 标签=$TAG_ID）"
+    bad "任务的 tagIds 里没有刚建的标签 id（tagIds=$TASK_TAGS 标签=${TAG_ID}）"
   fi
 else
   bad "任务的 op 里没有 tagIds —— 点选没有真的写进去"; screen_txt
@@ -293,14 +293,14 @@ except Exception: print(''); raise SystemExit
 print(next((t['id'] for t in d.get('tags',[]) if t['name']=='$TAG_NAME'),''))
 ")
 if [ -n "$LT_MATCH" ]; then
-  ok "笔记本读到了标签「$TAG_NAME」：$LT_MATCH"
+  ok "笔记本读到了标签「${TAG_NAME}」：$LT_MATCH"
   if [ "$LT_MATCH" = "$TAG_ID" ]; then
-    ok "两端标签 id 一致（$TAG_ID）—— 标签实体真的跨设备同步了"
+    ok "两端标签 id 一致（${TAG_ID}）—— 标签实体真的跨设备同步了"
   else
-    bad "两端标签 id 不一致（手机=$TAG_ID 笔记本=$LT_MATCH）"
+    bad "两端标签 id 不一致（手机=$TAG_ID 笔记本=${LT_MATCH}）"
   fi
 else
-  bad "笔记本没读到标签「$TAG_NAME」—— 标签没同步过去"; screen_txt
+  bad "笔记本没读到标签「${TAG_NAME}」—— 标签没同步过去"; screen_txt
 fi
 
 step "9. 断言：笔记本上这条任务的 tagIds 里也有那个 id"

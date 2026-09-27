@@ -71,7 +71,7 @@ echo ""
 echo "=== 同步队列自愈验收（真服务端 + 真 SQLite，零 mock）==="
 echo "  服务端: $SERVER   库: heyta_mobile_smoke"
 echo "  账号:   $EMAIL"
-echo "  被注入的坏 op: $BAD_ID（clientId=$BAD_CLIENT）"
+echo "  被注入的坏 op: ${BAD_ID}（clientId=${BAD_CLIENT}）"
 
 rm -f "$DEVICE_DB" "$PEER_DB"
 
@@ -120,7 +120,7 @@ heyta_e2e_assert_client_budget || bad "账号 client 数已逼近向量时钟上
 step "1. 基线：一台正常设备能建任务并同步"
 LT_ADD=$(laptop add "$TITLE_GOOD")
 if printf '%s' "$LT_ADD" | grep -q '"ok":true'; then
-  ok "设备建了「$TITLE_GOOD」"
+  ok "设备建了「${TITLE_GOOD}」"
 else
   bad "建任务失败：$LT_ADD"
 fi
@@ -161,7 +161,7 @@ step "3. 另一台设备写入一条任务，并确认它上了服务端"
 PEER_ADD=$(LAPTOP_DB="$PEER_DB" laptop add "$TITLE_PEER")
 LAPTOP_DB="$DEVICE_DB"
 if printf '%s' "$PEER_ADD" | grep -q '"ok":true'; then
-  ok "对端建了「$TITLE_PEER」"
+  ok "对端建了「${TITLE_PEER}」"
 else
   bad "对端建任务失败：$PEER_ADD"
 fi
@@ -173,7 +173,7 @@ else
   bad "对端同步失败：$PEER_SYNC"
 fi
 if [ "$(count_status "uploaded")" -ge 1 ] && [ "$(has_title "$TITLE_PEER")" -eq 0 ]; then
-  ok "本机此刻**还没有**「$TITLE_PEER」（它只能靠这次同步下载下来）"
+  ok "本机此刻**还没有**「${TITLE_PEER}」（它只能靠这次同步下载下来）"
 else
   bad "前置状态不对：本机不该已经有对端那条"
 fi
@@ -204,7 +204,7 @@ fi
 
 # 🔴 这一条是本脚本的核心。
 if [ "$(has_title "$TITLE_PEER")" -ge 1 ]; then
-  ok "🔴 被拒的同一次同步里**拉到了对端的「$TITLE_PEER」** —— 上传出错没有阻断下载"
+  ok "🔴 被拒的同一次同步里**拉到了对端的「${TITLE_PEER}」** —— 上传出错没有阻断下载"
 else
   bad "没拉到对端那条 —— **这台设备变聋了**（下载被上传的失败挡住了）"
 fi

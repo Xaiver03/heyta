@@ -31,7 +31,7 @@ fi
 if [ "$need_download" = 1 ]; then
   command -v gh >/dev/null 2>&1 || {
     echo "   ❌ 需要 gh（GitHub CLI）来下载 release 资产。" >&2
-    echo "      或者手动从 https://github.com/facebook/idb/releases 下载这两个文件到 $DEST：" >&2
+    echo "      或者手动从 https://github.com/facebook/idb/releases 下载这两个文件到 ${DEST}：" >&2
     echo "        idb-companion.macos-arm64.tar.gz   fb_idb-${VERSION#v}-py3-none-any.whl" >&2
     exit 1
   }
@@ -50,7 +50,7 @@ print(m.group(0) if m else '')
 ")
     got=$(shasum -a 256 "$DEST/idb-companion.macos-arm64.tar.gz" | awk '{print $1}')
     if [ -n "$want" ] && [ "$want" != "$got" ]; then
-      echo "   ❌ sha256 不一致：期望 $want，实际 $got" >&2
+      echo "   ❌ sha256 不一致：期望 ${want}，实际 $got" >&2
       exit 1
     fi
     echo "      ✅ sha256 一致（${got%"${got#???????}"}…）"
