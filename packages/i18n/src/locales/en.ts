@@ -193,7 +193,7 @@ export const en = {
   'landing.pricing.hostedAi.feature2': 'Cloud AI, 300 actions a month',
   'landing.pricing.hostedAi.feature3': 'AI on your own endpoint is unaffected -- still free and unlimited',
   'landing.pricing.hostedAi.cta': 'Opening soon',
-  'landing.pricing.statusNote': 'Checkout is not wired up yet: the payment channels for both mainland China and international are still waiting on merchant approval, so orders cannot be placed today.',
+  'landing.pricing.statusNote': 'Checkout is wired up, but the payment channels for both mainland China and international are still waiting on merchant approval — orders cannot be placed today.',
 
   // ── Landing · final CTA ───────────────────────────────────
   'landing.cta.title': 'Your task list should never become an asset someone else owns',

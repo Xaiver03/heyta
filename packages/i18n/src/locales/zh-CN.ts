@@ -210,7 +210,7 @@ export const zhCN = {
   'landing.pricing.hostedAi.feature2': '云端 AI，每月 300 次',
   'landing.pricing.hostedAi.feature3': '自带端点的 AI 不受影响，仍然免费、不限次',
   'landing.pricing.hostedAi.cta': '即将开放',
-  'landing.pricing.statusNote': '收银台还没接完线：大陆与海外的支付通道都在等支付商资质，现在还不能下单。',
+  'landing.pricing.statusNote': '收银台已经接通，但大陆与海外的支付通道都还在等支付商资质 —— 现在还不能下单。',
 
   // ── 落地页 · 收尾 CTA ─────────────────────────────────────
   'landing.cta.title': '你的清单，不该是别人的资产',
