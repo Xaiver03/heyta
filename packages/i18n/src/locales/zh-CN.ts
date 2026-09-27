@@ -1674,6 +1674,40 @@ export const zhCN = {
   'mobile.growth.tag.deep-two-hundred': '深度两百小时',
   'mobile.growth.tag.finisher-five-hundred': '完成五百件事',
   'mobile.growth.tag.streak-thirty': '连续三十天',
+
+  // ── 回收站（移动端第二层，入口在「我的」）──────────────────
+  // ⚠️ 与 Web 的 `web.trash.*` **刻意分开**：移动端的确认文案多一句
+  // 「这不是物理擦除」。purge 只写 `purgedAt` 标记，op-log 里的历史载荷
+  // （本地与云端）都还在 —— Web 的措辞没有这一句，照抄会漏掉这个事实。
+  'mobile.trash.title': '回收站',
+  'mobile.trash.entry': '回收站',
+  'mobile.trash.entry.hint': '已删除的任务可以在这里恢复',
+  'mobile.trash.intro': '这里放着已删除的任务。恢复后它会回到原来的位置。',
+  'mobile.trash.empty.title': '回收站是空的',
+  'mobile.trash.empty.hint': '在任务页删除的任务会先放到这里',
+  'mobile.trash.deletedAt': '删除于 {date}',
+  'mobile.trash.restore': '恢复',
+  'mobile.trash.restoreA11y': '恢复：{title}',
+  'mobile.trash.purge': '彻底删除',
+  'mobile.trash.purgeA11y': '彻底删除：{title}',
+  'mobile.trash.confirm.title': '彻底删除「{title}」？',
+  'mobile.trash.confirm.body': '它会从回收站里消失，也无法再恢复。',
+  'mobile.trash.confirm.notErasure': '这不是物理擦除：操作日志里仍然留着这条记录，只是界面不再提供恢复。',
+  'mobile.trash.confirm.submit': '彻底删除',
+  'mobile.trash.confirm.cancel': '取消',
+
+  // ── 导出（移动端第二层，入口在「我的」）──────────────────
+  // 🔴 导出文档本身的措辞、以及「不能导回来」这条诚实条款，**复用 Web 端
+  // `web.export.*` 词条** —— 它们是「导出这件事」的措辞，不是 Web 壳的措辞。
+  // 两端读同一批 key，就不可能出现「网页说不能导回来、手机没说」这种分歧。
+  // 这里只新增移动端**独有**的：入口、按钮动词（分享而非下载）、分享提示。
+  'mobile.export.entry': '导出数据',
+  'mobile.export.entry.hint': '把数据带走（目前还不能导回来）',
+  'mobile.export.json.button': '分享 JSON',
+  'mobile.export.markdown.button': '分享任务清单',
+  'mobile.export.shareHint': '导出内容会交给系统分享面板，由你选择保存或发送到哪里。',
+  'mobile.export.shareTitle': 'heyta 导出',
+  'mobile.export.shareFailed': '系统分享面板没有打开，导出内容没有送出。',
 } as const;
 
 /**
