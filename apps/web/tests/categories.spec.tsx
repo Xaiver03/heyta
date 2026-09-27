@@ -28,6 +28,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 (globalThis as unknown as { IDBKeyRange: typeof IDBKeyRange }).IDBKeyRange = IDBKeyRange;
 
 import { I18nProvider } from '@heyta/i18n';
+import { DEFAULT_CATEGORY_WEEKS } from '@heyta/domain';
 import type { FocusSession, Habit, HabitLog, Project, Task } from '@heyta/domain';
 import { emptyState, type MaterializedState } from '@heyta/op-log';
 
@@ -197,13 +198,15 @@ describe('CategoryBreakdown（真实渲染）', () => {
     expect(text).toContain('5');
   });
 
-  it('泳道格子数 = 窗口周数，且颜色走的是 intensity 分档（不是分类色）', () => {
+  it('泳道格子数 = 窗口周数（**从常量推导**，不写死 12），且走 intensity 分档', () => {
     useTaskStore.setState({ entities: stateWithRows(), now: NOW });
     const el = render(<CategoryBreakdown />);
     const lanes = el.querySelectorAll('.ht-categories__lane');
     expect(lanes).toHaveLength(2);
     for (const lane of lanes) {
-      expect(lane.querySelectorAll('.ht-categories__cell')).toHaveLength(12);
+      // ⚠️ 不写死 12：窗口长度是**配置**，改它不该让这条断言变红
+      // （写死的边界断言会在规模变化后静默空转）。
+      expect(lane.querySelectorAll('.ht-categories__cell')).toHaveLength(DEFAULT_CATEGORY_WEEKS);
     }
     // 有记录的那一格必须是**深于**空白的档位：0 = 这一周没记录。
     const levels = [...el.querySelectorAll('.ht-categories__cell')].map((c) =>
