@@ -755,7 +755,7 @@ ssh ubuntu-jcli 'cd ~/heyta/server && \
 |---|---|---|
 | `~/heyta/server/.env` | `JWT_SECRET`（64 hex） | ✅ 能 |
 | `~/heyta/server/.env` | `POSTGRES_PASSWORD`（32 hex） | ✅ 能，但**必须同时改数据库里那把锁** |
-| `~/heyta/server/.env` | `SMTP_PASS` | ❌ **不能** —— 它是腾讯云邮件（`gz-smtp.qcloudmail.com`、`SMTP_USER=noreply@finlaw.cloud`）**签发**的应用口令，只能在腾讯云那一侧重签，我够不到 |
+| `~/heyta/server/.env` | `SMTP_PASS` | ✅ **能** —— 2026-09-27 实测：它由**腾讯云 SES（邮件推送）**签发，本机 `tccli` 够得到，见下面「SES 口令怎么换」 |
 
 ⚠️ `WEBAUTHN_RP_ID` / `WEBAUTHN_ORIGIN` **不是密钥**（是公开标识）。"轮换"它们等于**再换一次域名**，
 代价和收益见 §3.7.1 —— 别顺手改。
@@ -801,6 +801,27 @@ docker exec -e PGPASSWORD="$OLD" supersync-postgres psql -h "$IP" -U heyta -d he
 顺带说清边界：服务端自己连的是 `...@postgres:5432`（容器网段）→ 走 `scram-sha-256`，
 **口令对它才是真边界**；loopback 的 `trust` 只是本机运维的便利，不是"口令没用"。
 
+**④ 🔴 `ssh host bash -s <<'REMOTE'` 里**绝不能**再出现会读 stdin 的命令。**
+
+本次轮换就栽在这里：远程脚本第 ① 步是 `docker exec **-i** supersync-postgres psql …`。
+`-i` 会把 stdin 接过去，而 stdin 正是 `bash -s` 用来**继续读脚本**的那条流 ——
+于是 docker 把脚本剩下的部分（改 `.env`、重建容器）**全吃掉了**，命令却正常退出。
+
+结果是**最危险的那种中间态**：
+
+| | 状态 |
+|---|---|
+| 数据库里的口令 | ✅ 已经换成新的（第 ① 步执行完了） |
+| `.env` 里的口令 | ❌ 还是旧的 |
+| 容器 | 还活着，靠**已建立的连接池**撑着，`/health` 依旧 `db:connected` |
+
+**一切看起来正常**，但容器一旦重启就再也连不上库。是复验时逐个比对
+`.env` 与新建口令的值才发现的（长度都是 32，光看长度看不出来）。
+
+纪律：远程脚本里用 `docker exec`（不带 `-i`）；要传 stdin 就把脚本先落到远端文件再执行，
+不要嵌套 heredoc 去喂同一份 stdin。**并且永远不要只凭"命令退出码 0"就认为脚本跑完了** ——
+关键步骤要各自回读实际值来验。
+
 #### 轮换步骤（实测可用）
 
 ```bash
@@ -833,14 +854,61 @@ curl --noproxy '*' -sS -X POST https://heyta.finlaw.cloud/api/login/passkey/opti
 
 `/health` 返回 `db:connected` 是**最强的那条证据** —— 它证明服务端用新口令真的连上了库。
 
+#### SES 口令怎么换（`SMTP_PASS`）—— 实测可用
+
+它**不是腾讯企业邮**，是**腾讯云 SES（邮件推送）**，尽管主机名长得像企业邮
+（`gz-smtp.qcloudmail.com`）。所以只能在 SES 侧重签，而 `tccli` 做得到：
+
+```bash
+export PATH="$HOME/.local/bin:$PATH"          # tccli 不在 PATH 里
+tccli ses ListEmailIdentities                  # 确认 finlaw.cloud 域名 SendingEnabled
+tccli ses ListEmailAddress                     # 确认 noreply@finlaw.cloud 存在
+
+# 🔴 口令格式有硬规则，接口会拒：
+#    长度 10~20；至少 2 位**不重复**的数字；含小写；含大写。
+#    （第一次拿 32 位带特殊字符的被拒：InvalidParameterValue.InvalidSmtpPassWord）
+tccli ses UpdateEmailSmtpPassWord \
+  --EmailAddress noreply@finlaw.cloud --Password '<新口令>'
+```
+
+⚠️ **改完不会立刻生效 —— 大约 1~2 分钟内新旧口令都能过，然后旧口令才被拒。**
+本次实测：改完立刻测，**旧口令仍然 LOGIN_OK、新口令反而失败**；等约 45~135 秒后
+再测才是「旧 FAIL / 新 OK」。**别在这个窗口里下"轮换失败"的结论，更别回滚。**
+
+负向验证要在**容器内**做（那才是服务端真正用的那份配置）：
+
+```bash
+docker exec supersync-server node -e '…SMTP AUTH LOGIN…'   # 期望 235 2.0.0 OK
+```
+
+⚠️ 轮换前先确认**没有别的服务共用这个发信地址** —— 换了会把它们一起弄坏：
+
+```bash
+for c in $(docker ps --format '{{.Names}}'); do
+  docker exec "$c" sh -c 'echo "${SMTP_USER:-}${SMTP_FROM:-}"' 2>/dev/null \
+    | grep -q noreply@finlaw.cloud && echo "$c 也用它"
+done
+```
+
+本次实测只有 `supersync-server` 一个，可以放心换。
+
 #### 已完成的收尾
 
 - ✅ 2026-09-27 轮换 `JWT_SECRET` + `POSTGRES_PASSWORD`；旧口令在 scram 路径上被拒、新口令可用。
 - ✅ 销毁了三个持有旧密钥的备份：`.env.bak-20260927T145733Z`、`.env.bak-smtp-1790521888`、
   `.env.rotbak-20260927T154324Z`（`shred -u`）。**旧值不再存在于这台机器上。**
 - ⚠️ `JWT_SECRET` 一变，所有已签发的会话/令牌立即失效，用户要重新登录 —— 测试环境可接受。
-- ⚠️ `SMTP_PASS` **没有轮换**（外部签发）：要换得去腾讯云邮件控制台重签应用口令，
-  然后只改 `.env` 里那一行 + 按上面重建 `supersync`。
+- ✅ **2026-09-27 第二次轮换（本轮）**：`JWT_SECRET`（64 hex）、`POSTGRES_PASSWORD`（32 位字母数字）、
+  `SMTP_PASS`（20 位，走 SES）。三把**全部换掉并逐个复验**：
+  - 数据库：容器 IP 上 **新口令 ✅ 可用 / 旧口令 ✅ 已被拒**；
+  - 容器内 `JWT_SECRET` 与 `.env` **逐字符相等**；
+  - 容器内 SMTP `AUTH` 返回 **`235 2.0.0 OK`**；
+  - `/health` → `{"status":"ok","db":"connected"}`，`docker logs` 无错误，`RestartCount=0`。
+- ✅ **数据没丢**：重建 `supersync` 时 compose 连带重建了 `supersync-postgres`，
+  但卷 `server_postgres-data` 在，复验 `tables=14`、`users=8`。
+  （⚠️ `--force-recreate supersync` 会**连带重建依赖**，不是只重建那一个。）
+- ⚠️ **passkey 没有失效**，与早先的预期不同：凭据存在库里，而库没动；
+  `JWT_SECRET` 只让**已签发的会话**过期。用户重新登录后 passkey 照用。
 
 ### 3.11 法律页（`/terms.html`、`/privacy.html`）—— 2026-09-27 从"伪装成 200 的落地页"改成诚实 404
 
