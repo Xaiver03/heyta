@@ -43,6 +43,13 @@ import { useI18n, type I18nValue } from '@heyta/i18n';
 
 import { LIST_SEPARATOR } from './locale-punctuation.js';
 import { retentionMessageKey } from './disclosure-copy.js';
+import { FailureSettingsAction, RouteUnavailable } from './RouteUnavailable.js';
+import { useAiSettingsNavigation } from './ai-settings-navigation.js';
+import {
+  resolveFeatureRoute,
+  type SettingsTarget,
+} from './route-explanation.js';
+import { preferenceEvidenceCopy } from '../settings/preference-copy.js';
 
 import {
   renderPreferenceHints,
@@ -51,8 +58,6 @@ import {
 import {
   buildDisclosure,
   fromHealthSnapshot,
-  isLoopbackEndpoint,
-  resolveRoute,
 } from '@heyta/ai';
 import type {
   AiHealthSnapshot,
@@ -88,35 +93,15 @@ import type { ResolvedTarget } from './AiBreakdown.js';
 /**
  * 算出估时功能当前的**首选目标**（只看第一个候选，与 `invokeRouted` 一致）。
  *
- * 🔴 用 `packages/ai` 的 `resolveRoute`，**不要在这里做一份平行的过滤** ——
- * 披露说 A、实际发到 B（**另一家公司**）的 bug 就是这么来的
- * （见 `AiBreakdown.resolvePreferredTarget` 的实测记录）。
- *
- * ⚠️ **这份实现与 `resolvePreferredTarget` 是重复的**（只差一个功能名）。
- * 本轮不允许改 `AiBreakdown.tsx`，所以只能各留一份。诚实记下这个坑：
- * 真正的修法是抽一个 `resolvePreferredTargetFor(routing, feature)`，两处都改成调用它。
- * 目前能防住漂移的是界面测试 —— 它断言披露的端点就是请求实际打到的端点。
+ * 🔴 实现已收进 `resolveFeatureRoute()`（`route-explanation.ts`）——
+ * 仓里原本有四份同样的"取首选候选并描述它"。本函数保留为薄包装：
+ * 界面测试直接调它，组件内部用 `resolveFeatureRoute()`。
  */
 export function resolveDurationTarget(
   routing: AiRoutingConfig,
   options: { now?: number } = {},
 ): ResolvedTarget | undefined {
-  const resolution = resolveRoute(routing, 'duration-estimate', {
-    now: options.now ?? Date.now(),
-  });
-  const first = resolution.candidates[0];
-  if (first === undefined) return undefined;
-
-  return {
-    endpointId: first.endpointConfig.id,
-    label: first.endpointConfig.label,
-    endpoint: first.endpointConfig.endpoint,
-    model: first.model,
-    // 回环判据同样只有一份 —— `packages/ai` 的 `isLoopbackEndpoint`。
-    isLocal: isLoopbackEndpoint(first.endpointConfig.endpoint),
-    destination: first.destination as EgressDestination,
-    fallbacks: resolution.candidates.slice(1).map((c) => c.endpointConfig.label),
-  };
+  return resolveFeatureRoute(routing, 'duration-estimate', options).target;
 }
 
 /** 分钟数 → 人话（90 → 「1 小时 30 分钟」）。 */
@@ -172,11 +157,28 @@ export interface AiDurationProps {
    * "这次估时不带偏好"，而不是"偷偷多发数据"。
    */
   preferenceSet?: PreferenceSet | undefined;
+  /**
+   * "去设置"—— 面板**只做导航**（`AiSettings` 才是授权与配置的唯一写入口）。
+   * 未传时不渲染按钮。
+   */
+  onOpenSettings?: ((target: SettingsTarget) => void) | undefined;
 }
 
 export function AiDuration(props: AiDurationProps): React.JSX.Element {
-  const { task, history, routing, consents, secrets, onApply, onHealth, preferenceSet } = props;
+  const {
+    task,
+    history,
+    routing,
+    consents,
+    secrets,
+    onApply,
+    onHealth,
+    preferenceSet,
+    onOpenSettings: onOpenSettingsProp,
+  } = props;
   const { t, locale } = useI18n();
+  /** prop 是单测注入缝；生产路径由 `App.tsx` 的 Provider 提供。 */
+  const onOpenSettings = onOpenSettingsProp ?? useAiSettingsNavigation();
 
   const [phase, setPhase] = useState<Phase>('idle');
   const [proposal, setProposal] = useState<DurationProposal | undefined>(undefined);
@@ -185,7 +187,9 @@ export function AiDuration(props: AiDurationProps): React.JSX.Element {
   /** 手动兜底输入（AI 不可用时的退路，见失败态）。 */
   const [manualText, setManualText] = useState('');
 
-  const target = resolveDurationTarget(routing);
+  /** 路由全貌：有路给 `target`，没路给 `explanation`（恰好一个非空）。 */
+  const health = fromHealthSnapshot(props.healthSnapshot ?? {}, Date.now());
+  const { target, explanation } = resolveFeatureRoute(routing, 'duration-estimate', { health });
 
   /**
    * 🔴 偏好 → 提示。`renderPreferenceHints` 按用途过滤（估时只要
@@ -308,11 +312,26 @@ export function AiDuration(props: AiDurationProps): React.JSX.Element {
         )}
         {hasHints && (
           <ul className="ht-ai__items" data-testid="duration-basis-preferences">
-            {hints.map((hint) => (
-              <li key={hint.id} data-testid={`duration-basis-${hint.id}`}>
-                {hint.summary}
-              </li>
-            ))}
+            {hints.map((hint) => {
+              /**
+               * 🔴🔴 **不渲染 `hint.summary`。**
+               *
+               * 那是 `@heyta/domain` 拼好的**中文投影**（`PreferenceHint.summary`
+               * 的注释写着"中文投影"）。壳整句渲染它，英文界面就会在
+               * 「估时依据」这一块露出中文 —— 而门禁扫不到（它查字面量，
+               * 这里渲染的是变量）。
+               *
+               * 正确做法与 `MemoryPanel.tsx` 完全一样：拿结构化事实
+               * `hint.facts` 去取**当前语言**的词条（映射函数在
+               * `features/settings/preference-copy.ts`，全仓只有一份）。
+               */
+              const copy = preferenceEvidenceCopy(hint.facts, t);
+              return (
+                <li key={hint.id} data-testid={`duration-basis-${hint.id}`}>
+                  {t(copy.key, copy.params)}
+                </li>
+              );
+            })}
           </ul>
         )}
       </div>
@@ -362,10 +381,11 @@ export function AiDuration(props: AiDurationProps): React.JSX.Element {
         </div>
 
         {target === undefined ? (
-          <p className="ht-ai__warn" data-testid="duration-no-target">
-            <AlertTriangle size={12} aria-hidden="true" />
-            {t('web.ai.noTarget.duration')}
-          </p>
+          <RouteUnavailable
+            explanation={explanation}
+            onOpenSettings={onOpenSettings}
+            testId="duration-no-target"
+          />
         ) : (
           <>
             <p className="ht-ai__row" data-testid="duration-destination">
@@ -521,6 +541,13 @@ export function AiDuration(props: AiDurationProps): React.JSX.Element {
           <p>{failure.detail}</p>
         </details>
       )}
+
+      {/* 🔴 失败原因能在设置里修 → 给一条真的能点的路（只导航，不代授权）。 */}
+      <FailureSettingsAction
+        settingsTarget={failure?.settingsTarget}
+        onOpenSettings={onOpenSettings}
+        testId="duration-failure-settings"
+      />
 
       {/* 🔴 手动兜底 —— **不是 AI 生成物**，用户自己填、自己按。 */}
       <p className="ht-ai__row" data-testid="duration-manual">

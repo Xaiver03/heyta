@@ -32,11 +32,21 @@ import type {
 import type { AiFailureReason } from '@heyta/ai';
 import type { MessageKey } from '@heyta/i18n';
 
-/** 一条失败态要渲染的东西：词条 + （可选）技术详情。 */
+import type { SettingsTarget } from './route-explanation.js';
+
+/** 一条失败态要渲染的东西：词条 + （可选）技术详情 + （可选）下一步。 */
 export interface AiFailureCopy {
   readonly key: MessageKey;
   readonly detail: string;
   readonly showDetail: boolean;
+  /**
+   * 这次失败能在设置里修 → "去设置"该落在哪一块。
+   *
+   * 🔴 `undefined` 是有意义的：网络抖动、端点返回空内容、模型没读懂……
+   * 这些**在设置里改什么都修不好**。给它们也放一个"去设置"按钮，
+   * 等于教用户去一个没有答案的地方找答案 —— 比没有按钮更糟。
+   */
+  readonly settingsTarget: SettingsTarget | undefined;
 }
 
 const BREAKDOWN_KEY: Record<BreakdownFailureReason, MessageKey> = {
@@ -96,6 +106,42 @@ export function causeKey(cause: AiFailureReason | undefined): MessageKey {
   return cause === undefined ? 'web.ai.failure.aiUnavailable' : CAUSE_KEY[cause];
 }
 
+/**
+ * 原因码 → "去设置"目标区块。`undefined` = 设置里没有能修它的控件。
+ *
+ * 🔴 这一层是"失败态也要给出下一步"的唯一事实源：四个面板都从这里取，
+ * **不许**各自判断"这个原因该不该显示按钮"（那会变成四份会漂移的策略）。
+ *
+ * ⚠️ 它只导航，不授权。`egress-not-authorized` 指到 `consent` 区块，
+ * 用户到那里按"我同意"才真的写授权 —— 面板自己不碰 `consents`。
+ */
+const CAUSE_SETTINGS_TARGET: Record<AiFailureReason, SettingsTarget | undefined> = {
+  // AI 没开：启用开关就在设置页顶部。
+  'not-configured': 'endpoints',
+  // 未授权：落在逐功能授权那一块（那里才有"我同意"）。
+  'egress-not-authorized': 'consent',
+  // 网络与空响应是**暂时性**的，设置里改什么都修不好。
+  network: undefined,
+  'empty-response': undefined,
+  // 端点报错：多半是密钥 / 余额 / 模型名 —— 都在端点行里。
+  'http-error': 'endpoints',
+  // 没有候选：端点或路由配错了。
+  'no-route': 'endpoints',
+  // 回退端点要另一次授权：同样是逐功能授权那一块。
+  'fallback-needs-consent': 'consent',
+};
+
+export function causeSettingsTarget(
+  cause: AiFailureReason | undefined,
+): SettingsTarget | undefined {
+  return cause === undefined ? undefined : CAUSE_SETTINGS_TARGET[cause];
+}
+
+/** `ai-unavailable` 且有原因码时才谈得上"去设置"；本地就能判定的拒绝没有下一步。 */
+function settingsTargetFor(reason: string, cause: AiFailureReason | undefined): SettingsTarget | undefined {
+  return reason === 'ai-unavailable' ? causeSettingsTarget(cause) : undefined;
+}
+
 /** 这个 reason 的 `message` 里有没有词条给不了的信息。 */
 function showDetailFor(reason: string): boolean {
   return reason === 'ai-unavailable' || reason === 'text-too-long';
@@ -114,6 +160,7 @@ export function breakdownFailureCopy(
         : BREAKDOWN_KEY[reason],
     detail,
     showDetail: showDetailFor(reason),
+    settingsTarget: settingsTargetFor(reason, cause),
   };
 }
 
@@ -130,6 +177,7 @@ export function captureFailureCopy(
         : CAPTURE_KEY[reason],
     detail,
     showDetail: showDetailFor(reason),
+    settingsTarget: settingsTargetFor(reason, cause),
   };
 }
 
@@ -146,6 +194,7 @@ export function durationFailureCopy(
         : DURATION_KEY[reason],
     detail,
     showDetail: showDetailFor(reason),
+    settingsTarget: settingsTargetFor(reason, cause),
   };
 }
 
@@ -162,5 +211,6 @@ export function prioritizeFailureCopy(
         : PRIORITIZE_KEY[reason],
     detail,
     showDetail: showDetailFor(reason),
+    settingsTarget: settingsTargetFor(reason, cause),
   };
 }

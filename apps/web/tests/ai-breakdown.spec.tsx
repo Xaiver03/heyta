@@ -535,14 +535,17 @@ describe('🔴🔴 熔断状态必须真的**读回来**（只落盘不读等于
     });
 
     click(el.querySelector('[data-testid="ai-breakdown-t1"]'));
-    click(el.querySelector('[data-testid="ai-send"]'));
-    await act(async () => {
-      await Promise.resolve();
-    });
+
+    // 🔴 跳闸的端点这次**连发送按钮都不给**：披露阶段就说清"等冷却 / 修端点"。
+    // 用户不必先按一次、等一个必然失败的请求，才知道端点被熔断了。
+    expect(el.querySelector('[data-testid="ai-send"]')).toBeNull();
+    expect(el.querySelector('[data-testid="ai-no-target"]')?.getAttribute('data-route-reason')).toBe(
+      'circuit-open',
+    );
+    expect(el.querySelector('[data-testid="ai-failed"]')).toBeNull();
 
     // 🔴 这就是本 prop 的全部意义：不传它，这里会打出去一个必然失败的请求
     expect(calls).toHaveLength(0);
-    expect(el.querySelector('[data-testid="ai-failed"]')).toBeTruthy();
   });
 
   it('🔴 过期跳闸**不该**继续拦着 —— 退化方向是"再试一次"', async () => {
@@ -596,7 +599,7 @@ describe('🔴🔴 熔断状态必须真的**读回来**（只落盘不读等于
     expect(calls).toHaveLength(1);
   });
 
-  it('🔴 跳闸的端点后面还有可用的 → 走回退，而且是**披露过**的那个', async () => {
+  it('🔴 跳闸的端点后面还有可用的 → 直接以 B 为目的地，而且是**披露过**的那个', async () => {
     const TWO: AiRoutingConfig = {
       enabled: true,
       allowRemote: true,
@@ -622,12 +625,17 @@ describe('🔴🔴 熔断状态必须真的**读回来**（只落盘不读等于
 
     click(el.querySelector('[data-testid="ai-breakdown-t1"]'));
 
-    // 🔴🔴 **这是"回退链披露"之所以是承重的（而不只是礼貌）的原因。**
+    // 🔴🔴 熔断状态现在也参与**披露**——所以 A 不再占着首选位置，
+    // B 直接成为披露的目的地。这条断言因此比"回退链里出现 B"更强：
+    // 用户看到的那个端点，就是请求真正会去的那个。
     //
-    // 披露用的是**不含熔断状态**的静态推导，所以跳闸的 A 仍会出现在首选位置。
-    // 只有当 B 被一并列出时，用户才在按下发送**之前**看到过真正的目的地。
-    // 删掉回退链披露，这里就是一个未披露的目的地变更。
-    expect(el.querySelector('[data-testid="ai-fallback-list"]')?.textContent).toContain('B');
+    // ⚠️ 代价写在这里，别让它悄悄退化：冷却若在"渲染披露"与"点击发送"
+    // 之间过期，发送侧会重新选中 A。窗口只有一个渲染周期，但确实存在。
+    const destination = el.querySelector('[data-testid="ai-destination"]')?.textContent ?? '';
+    expect(destination).toContain('b.example.com');
+    expect(destination).not.toContain('a.example.com');
+    // 只剩一个候选 → 没有回退链（不制造噪音）
+    expect(el.querySelector('[data-testid="ai-fallbacks"]')).toBeNull();
 
     click(el.querySelector('[data-testid="ai-send"]'));
     await act(async () => {
@@ -636,7 +644,7 @@ describe('🔴🔴 熔断状态必须真的**读回来**（只落盘不读等于
     });
 
     expect(calls).toHaveLength(1);
-    // 实际发到 B —— 而 B 已经在上面披露过了
+    // 实际发到 B —— 而 B 就是上面披露的那个
     expect(calls[0]).toContain('b.example.com');
   });
 });

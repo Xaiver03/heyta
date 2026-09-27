@@ -48,6 +48,11 @@ test.describe('AI 不可用：一次请求都不许发出去', () => {
     await expect(page.locator('[data-testid="ai-no-target"]')).toContainText(
       '还没有给「拆解任务」配置端点',
     );
+    // 这一个 case 才是真正的"没配"：结构与文案必须一起说同一件事。
+    await expect(page.locator('[data-testid="ai-no-target"]')).toHaveAttribute(
+      'data-route-reason',
+      'unconfigured',
+    );
     // 没有目标 → 连"发送"按钮都不渲染，物理上不可能发出去。
     await expect(page.locator('[data-testid="ai-send"]')).toHaveCount(0);
     // ⚠️ 没有目标时整个 actions 区都不渲染，所以只剩**头部那个图标按钮**
@@ -104,7 +109,10 @@ test.describe('AI 不可用：一次请求都不许发出去', () => {
     await expectNoStubCall(request);
   });
 
-  test('端点缺 long_context：设置页说明缺口，拆解入口不发请求', async ({ page, request }) => {
+  test('端点缺 long_context：拆解入口说的是「能力没声明」，而不是「没配端点」', async ({
+    page,
+    request,
+  }) => {
     await resetStub(request);
     await openApp(page);
 
@@ -121,10 +129,27 @@ test.describe('AI 不可用：一次请求都不许发出去', () => {
     await addTask(page, '把新版本发到生产环境');
 
     await page.locator('[data-testid^="ai-breakdown-"]').click();
-    await expect(page.locator('[data-testid="ai-no-target"]')).toBeVisible();
+    const note = page.locator('[data-testid="ai-no-target"]');
+    await expect(note).toBeVisible();
+
+    // 🔴🔴 这里配了端点、也配了路由，唯一的问题是**能力没声明**。
+    // 说"还没有配置端点"会把用户送去加第二个端点 —— 加了还是不能用。
+    await expect(note).toHaveAttribute('data-route-reason', 'capability-missing');
+    await expect(note).toContainText('端点没有声明这个功能需要的能力');
+    await expect(note).not.toContainText('还没有给「拆解任务」配置端点');
+
     await expect(page.locator('[data-testid="ai-send"]')).toHaveCount(0);
 
     await expectNoStubCall(request);
+
+    // ── 「去设置」的最后一米：落在设置页，且能力区块被高亮 ────────────────
+    await page.locator('[data-testid="ai-no-target-settings"]').click();
+    await expect(page.locator('[data-testid="ai-settings"]')).toBeVisible();
+    await expect(page.locator('[data-testid="ai-features-section"]')).toBeVisible();
+    await expect(page.locator('[data-testid="ai-features-section"]')).toHaveAttribute(
+      'data-focused',
+      'true',
+    );
   });
 
   test('总开关关掉后：披露仍在，但点"发送"一次请求都不发，界面给出「AI 未启用」', async ({

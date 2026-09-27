@@ -866,6 +866,28 @@ export const zhCN = {
   'web.ai.failure.cause.httpError': '端点返回了错误状态。检查 API key、余额与模型名。',
   'web.ai.failure.cause.emptyResponse': '端点返回了空内容。可以换一个模型再试。',
   'web.ai.failure.details': '技术详情',
+
+  // ── 模块 2：路由解释 + 端点停用开关 ───────────────────────
+  // 🔴 这七条补的是同一件事：**候选一个都不剩时，界面必须说出真实原因**。
+  // 在此之前四个面板只渲染 `web.ai.noTarget.*`（"还没配置端点"），
+  // 而真实原因可能是下面六种里的任意一种 —— 用户照着那句话去添加端点
+  // 是解决不了问题的。每一条都必须同时说清「为什么」和「下一步」。
+  'web.ai.routeExplain.remoteNotAllowed': '端点都在设备之外，而「允许远程端点」没有打开。打开它，这个功能才有可用的端点。',
+  'web.ai.routeExplain.capabilityMissing': '端点没有声明这个功能需要的能力。到设置里补勾能力，否则它永远不会被选中。',
+  'web.ai.routeExplain.endpointDisabled': '路由指向的端点已被停用。在设置里重新启用它，或者改指另一个端点。',
+  'web.ai.routeExplain.endpointUrlRejected': '端点地址没有通过校验（必须是可达的 http/https 地址）。到设置里把它改对。',
+  'web.ai.routeExplain.circuitOpen': '端点连续失败，已被暂时熔断。等冷却结束，或者去设置检查它的地址与密钥。',
+  'web.ai.routeExplain.endpointMissing': '路由指向了一个已经不存在的端点，配置已经对不上。到设置里重新指定端点。',
+  'web.ai.routeExplain.unknown': '没有可用端点，但原因没法从当前配置判定。到设置里检查端点和路由。',
+  'web.ai.action.openSettings': '去设置',
+
+  // 端点停用开关（`AiEndpointConfig.disabled` 的**生产者**）。
+  // ⚠️ 这个字段此前全仓只有"读"没有"写"：引擎真的会跳过停用端点，
+  // 而界面上没有任何地方能停用它 —— 用户只能把端点删掉。
+  'web.ai.settings.endpointDisabled.label': '停用',
+  'web.ai.settings.endpointDisabled.aria': '停用端点：{name}',
+  'web.ai.settings.endpointDisabled.note': '停用后路由不会再选它，配置和密钥都保留。',
+  'web.ai.settings.endpointDisabled.tag': '已停用',
   'web.memory.forgotten.title': '你已忘记',
   'web.memory.forgotten.note': '我不会再用这一条。',
   'web.memory.forget': '忘掉',

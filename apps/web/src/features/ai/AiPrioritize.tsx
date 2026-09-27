@@ -46,12 +46,9 @@ import {
 import {
   buildDisclosure,
   fromHealthSnapshot,
-  isLoopbackEndpoint,
-  resolveRoute,
 } from '@heyta/ai';
 import type {
   AiHealthSnapshot,
-  EgressDestination,
   AiRoutingConfig,
   EgressConsent,
   HealthMap,
@@ -66,55 +63,29 @@ import {
   type PrioritizeTaskInput,
 } from '@heyta/app-host';
 import { prioritizeFailureCopy, type AiFailureCopy } from './ai-failure-copy.js';
+import { FailureSettingsAction, RouteUnavailable } from './RouteUnavailable.js';
+import { useAiSettingsNavigation } from './ai-settings-navigation.js';
+import {
+  resolveFeatureRoute,
+  type ResolvedRouteTarget,
+  type SettingsTarget,
+} from './route-explanation.js';
 
-/** 路由解析结果里"这个功能会走到哪个端点"。 */
-export interface PrioritizeTarget {
-  endpointId: string;
-  label: string;
-  endpoint: string;
-  model: string;
-  isLocal: boolean;
-  /** `resolveRoute` 算出的目的地类别 —— 传给 `buildDisclosure`，不在这里重新判。 */
-  destination: EgressDestination;
-  /**
-   * 🔴 回退链上**其余**的端点标签（不含首选）。
-   *
-   * 回退是真实行为，而且**成功时没有任何提示**。用户同意了 A，
-   * 数据却可能发到 B（**另一家公司**）—— 所以必须提前一并披露。
-   */
-  fallbacks: readonly string[];
-}
+/** 路由解析结果里"这个功能会走到哪个端点"。形状定义在 `route-explanation.ts`。 */
+export type PrioritizeTarget = ResolvedRouteTarget;
 
 /**
  * 算出「优先级排序」当前的**首选目标**。
  *
- * 🔴 过滤规则**全部来自** `packages/ai` 的 `resolveRoute`：能力、熔断、
- * 远端开关、URL 合法性都由它判。这里只负责"取首选候选并描述它"。
- *
- * ⚠️ 这段与 `AiBreakdown.tsx` 的 `resolvePreferredTarget` 形状相同，
- * 但**不是**第二套规则：`AiBreakdown` 那份把功能名硬编码成了 `'breakdown'`，
- * 而本功能必须用 `'prioritize'`（两者需要的能力不同）。本轮不允许改那个文件，
- * 所以只能在这里再写一次"取候选"的壳 —— 真正的过滤仍然只有一份实现。
- * 若哪天那个函数接受 `feature` 参数，这里应当立刻删掉、改为复用。
+ * 🔴 实现已收进 `resolveFeatureRoute()`（`route-explanation.ts`）——
+ * 过滤规则（能力、熔断、远端开关、URL 合法性）**只有一份**，
+ * 就是 `packages/ai` 的 `resolveRoute`。
  */
 export function resolvePrioritizeTarget(
   routing: AiRoutingConfig,
   options: { now?: number } = {},
 ): PrioritizeTarget | undefined {
-  const resolution = resolveRoute(routing, 'prioritize', { now: options.now ?? Date.now() });
-  const first = resolution.candidates[0];
-  if (first === undefined) return undefined;
-
-  return {
-    endpointId: first.endpointConfig.id,
-    label: first.endpointConfig.label,
-    endpoint: first.endpointConfig.endpoint,
-    model: first.model,
-    // 回环判据同样只有一份 —— `packages/ai` 的 `isLoopbackEndpoint`。
-    isLocal: isLoopbackEndpoint(first.endpointConfig.endpoint),
-    destination: first.destination,
-    fallbacks: resolution.candidates.slice(1).map((c) => c.endpointConfig.label),
-  };
+  return resolveFeatureRoute(routing, 'prioritize', options).target;
 }
 
 type Phase = 'idle' | 'disclosing' | 'loading' | 'proposal' | 'failed';
@@ -154,11 +125,27 @@ export interface AiPrioritizeProps {
    * 而不是"偷偷多发数据"。主开关关闭时 `renderPreferenceHints` 返回空数组。
    */
   preferenceSet?: PreferenceSet | undefined;
+  /**
+   * "去设置"—— 面板**只做导航**（授权与配置的唯一写入口是 `AiSettings`）。
+   * 未传时不渲染按钮。
+   */
+  onOpenSettings?: ((target: SettingsTarget) => void) | undefined;
 }
 
 export function AiPrioritize(props: AiPrioritizeProps): React.JSX.Element {
-  const { tasks, routing, consents, secrets, onApply, onHealth, preferenceSet } = props;
+  const {
+    tasks,
+    routing,
+    consents,
+    secrets,
+    onApply,
+    onHealth,
+    preferenceSet,
+    onOpenSettings: onOpenSettingsProp,
+  } = props;
   const { t, locale } = useI18n();
+  /** prop 是单测注入缝；生产路径由 `App.tsx` 的 Provider 提供。 */
+  const onOpenSettings = onOpenSettingsProp ?? useAiSettingsNavigation();
 
   /**
    * 优先级 → 展示文案。
@@ -181,7 +168,9 @@ export function AiPrioritize(props: AiPrioritizeProps): React.JSX.Element {
   const [failure, setFailure] = useState<AiFailureCopy | null>(null);
   const [applied, setApplied] = useState(false);
 
-  const target = resolvePrioritizeTarget(routing);
+  /** 路由全貌：有路给 `target`，没路给 `explanation`（恰好一个非空）。 */
+  const health = fromHealthSnapshot(props.healthSnapshot ?? {}, Date.now());
+  const { target, explanation } = resolveFeatureRoute(routing, 'prioritize', { health });
 
   /**
    * 🔴 出境面在这里收窄：只取排序需要的四个字段，**绝不带 `note`**。
@@ -327,10 +316,11 @@ export function AiPrioritize(props: AiPrioritizeProps): React.JSX.Element {
         </div>
 
         {target === undefined ? (
-          <p className="ht-ai__warn" data-testid="prioritize-no-target">
-            <AlertTriangle size={12} aria-hidden="true" />
-            {t('web.ai.noTarget.prioritize')}
-          </p>
+          <RouteUnavailable
+            explanation={explanation}
+            onOpenSettings={onOpenSettings}
+            testId="prioritize-no-target"
+          />
         ) : (
           <>
             <p className="ht-ai__row" data-testid="prioritize-destination">
@@ -523,6 +513,12 @@ export function AiPrioritize(props: AiPrioritizeProps): React.JSX.Element {
           <p>{failure.detail}</p>
         </details>
       )}
+      {/* 🔴 失败原因能在设置里修 → 给一条真的能点的路（只导航，不代授权）。 */}
+      <FailureSettingsAction
+        settingsTarget={failure?.settingsTarget}
+        onOpenSettings={onOpenSettings}
+        testId="prioritize-failure-settings"
+      />
       <div className="ht-ai__actions">
         <button
           type="button"

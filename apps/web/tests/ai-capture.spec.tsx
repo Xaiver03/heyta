@@ -594,10 +594,14 @@ describe('🔴🔴 熔断状态必须真的**读回来**', () => {
     const el = render({ healthSnapshot: TRIPPED, fetchImpl });
 
     openDisclosure(el);
-    await clickAsync(el.querySelector('[data-testid="capture-send"]'));
 
+    // 🔴 跳闸的端点连发送按钮都不给（披露阶段就说清原因）。
+    expect(el.querySelector('[data-testid="capture-send"]')).toBeNull();
+    expect(
+      el.querySelector('[data-testid="capture-no-target"]')?.getAttribute('data-route-reason'),
+    ).toBe('circuit-open');
+    expect(el.querySelector('[data-testid="capture-failed"]')).toBeNull();
     expect(calls).toHaveLength(0);
-    expect(el.querySelector('[data-testid="capture-failed"]')).toBeTruthy();
   });
 
   it('🔴 过期跳闸**不该**继续拦着 —— 退化方向是"再试一次"', async () => {

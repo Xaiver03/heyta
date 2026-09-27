@@ -43,6 +43,13 @@ import { useI18n, type I18nValue, type Locale } from '@heyta/i18n';
 
 import { LIST_SEPARATOR } from './locale-punctuation.js';
 import { retentionMessageKey } from './disclosure-copy.js';
+import { FailureSettingsAction, RouteUnavailable } from './RouteUnavailable.js';
+import { useAiSettingsNavigation } from './ai-settings-navigation.js';
+import {
+  resolveFeatureRoute,
+  type ResolvedRouteTarget,
+  type SettingsTarget,
+} from './route-explanation.js';
 
 import {
   Priority,
@@ -53,14 +60,11 @@ import {
 import {
   buildDisclosure,
   fromHealthSnapshot,
-  isLoopbackEndpoint,
-  resolveRoute,
 } from '@heyta/ai';
 import type {
   AiHealthSnapshot,
   AiRoutingConfig,
   EgressConsent,
-  EgressDestination,
   HealthMap,
   SecretStore,
 } from '@heyta/ai';
@@ -72,56 +76,20 @@ import {
 } from '@heyta/app-host';
 import { captureFailureCopy, type AiFailureCopy } from './ai-failure-copy.js';
 
-/** 路由解析结果里"这个功能会走到哪个端点"。 */
-export interface ResolvedCaptureTarget {
-  endpointId: string;
-  label: string;
-  endpoint: string;
-  model: string;
-  isLocal: boolean;
-  /** `resolveRoute` 算出的目的地类别 —— 传给 `buildDisclosure`，不在这里重新判。 */
-  destination: EgressDestination;
-  /**
-   * 🔴 回退链上**其余**的端点标签（不含首选）。
-   *
-   * 回退是真实行为 —— 首选失败会自动试下一个。所以披露只说首选是不够的：
-   * 用户同意了 A，数据却可能发到 B（**另一家公司**），
-   * 而这一类切换**不会报错**，因为最终成功了。
-   */
-  fallbacks: readonly string[];
-}
+/** 路由解析结果里"这个功能会走到哪个端点"。形状定义在 `route-explanation.ts`。 */
+export type ResolvedCaptureTarget = ResolvedRouteTarget;
 
 /**
  * 算出这个功能当前的**首选目标**（只看第一个候选，与 `invokeRouted` 一致）。
  *
- * 🔴 用 `packages/ai` 的 `resolveRoute`，**不要在这里做一份平行的过滤**。
- * 披露用的是"配置意图"（不含熔断状态），而发送时 `invokeRouted` 还会按
- * 能力、熔断、远端开关、URL 合法性过滤 —— 两套规则必然得出两套结论，
- * 而结论不一致时**因为成功所以没有任何提示**（见 `AiBreakdown.tsx` 的实测记录）。
- *
- * ⚠️ 这个函数与 `AiBreakdown.tsx` 的 `resolvePreferredTarget` 是**同一段逻辑**，
- * 唯一区别是 `feature`。之所以没抽成共用函数：`packages/app-host` 的导出面
- * 由接线方统一维护，而界面层各自持有自己功能的目标解析是现有形状。
- * 若将来出现第三个 AI 功能，**应当**把它提到共享位置，而不是再抄一份。
+ * 🔴 实现已收进 `resolveFeatureRoute()`（`route-explanation.ts`）。
+ * 仓里原本有四份同样的实现 —— 每份的注释都在说"应当抽出来"。
  */
 export function resolveCaptureTarget(
   routing: AiRoutingConfig,
   options: { now?: number } = {},
 ): ResolvedCaptureTarget | undefined {
-  const resolution = resolveRoute(routing, 'capture', { now: options.now ?? Date.now() });
-  const first = resolution.candidates[0];
-  if (first === undefined) return undefined;
-
-  return {
-    endpointId: first.endpointConfig.id,
-    label: first.endpointConfig.label,
-    endpoint: first.endpointConfig.endpoint,
-    model: first.model,
-    // 回环判据同样只有一份 —— `packages/ai` 的 `isLoopbackEndpoint`。
-    isLocal: isLoopbackEndpoint(first.endpointConfig.endpoint),
-    destination: first.destination,
-    fallbacks: resolution.candidates.slice(1).map((c) => c.endpointConfig.label),
-  };
+  return resolveFeatureRoute(routing, 'capture', options).target;
 }
 
 /** 用户确认后交给调用方的字段。**不是 op，也不是 `Task`。** */
@@ -252,11 +220,32 @@ export interface AiCaptureProps {
     proposedCount: number;
     appliedCount: number;
   }) => void;
+  /**
+   * "去设置"—— 面板**只做导航**（授权与配置的唯一写入口是 `AiSettings`）。
+   * 未传时不渲染按钮。
+   */
+  onOpenSettings?: ((target: SettingsTarget) => void) | undefined;
 }
 
 export function AiCapture(props: AiCaptureProps): React.JSX.Element {
-  const { text, routing, consents, secrets, onApply, onHealth, preferenceSet, onFeedback } = props;
+  const {
+    text,
+    routing,
+    consents,
+    secrets,
+    onApply,
+    onHealth,
+    preferenceSet,
+    onFeedback,
+    onOpenSettings: onOpenSettingsProp,
+  } = props;
   const { t, locale } = useI18n();
+  /**
+   * 🔴 本组件由 `CaptureComposer` 渲染，而那个文件**不在**本轮的写入白名单里。
+   * 所以"去设置"走 `App.tsx` 提供的 context，而不是再往上传一层 prop ——
+   * 为一个导航参数去越界改别的功能不值。prop 保留给单测注入。
+   */
+  const onOpenSettings = onOpenSettingsProp ?? useAiSettingsNavigation();
 
   const [phase, setPhase] = useState<Phase>('idle');
   /**
@@ -279,7 +268,9 @@ export function AiCapture(props: AiCaptureProps): React.JSX.Element {
   const [failure, setFailure] = useState<AiFailureCopy | null>(null);
   const [applied, setApplied] = useState(false);
 
-  const target = resolveCaptureTarget(routing);
+  /** 路由全貌：有路给 `target`，没路给 `explanation`（恰好一个非空）。 */
+  const health = fromHealthSnapshot(props.healthSnapshot ?? {}, Date.now());
+  const { target, explanation } = resolveFeatureRoute(routing, 'capture', { health });
 
   /**
    * 🔴 偏好 → 提示。**这里也是出境面的一个决定点**：
@@ -458,10 +449,11 @@ export function AiCapture(props: AiCaptureProps): React.JSX.Element {
         </p>
 
         {target === undefined ? (
-          <p className="ht-ai__warn" data-testid="capture-no-target">
-            <AlertTriangle size={12} aria-hidden="true" />
-            {t('web.ai.noTarget.capture')}
-          </p>
+          <RouteUnavailable
+            explanation={explanation}
+            onOpenSettings={onOpenSettings}
+            testId="capture-no-target"
+          />
         ) : (
           <>
             <p className="ht-ai__row" data-testid="capture-destination">
@@ -687,6 +679,12 @@ export function AiCapture(props: AiCaptureProps): React.JSX.Element {
           <p>{failure.detail}</p>
         </details>
       )}
+      {/* 🔴 失败原因能在设置里修 → 给一条真的能点的路（只导航，不代授权）。 */}
+      <FailureSettingsAction
+        settingsTarget={failure?.settingsTarget}
+        onOpenSettings={onOpenSettings}
+        testId="capture-failure-settings"
+      />
       <div className="ht-ai__actions">
         <button
           type="button"
