@@ -50,6 +50,11 @@ export const HOSTED_SYNC_SUBSCRIPTION_ERROR_CODE = 'SUBSCRIPTION_REQUIRED';
  * 服务端拒绝原因的**同一份词表**（`EntitlementDenialReason`）。
  *
  * 顺序与成员都要与服务端一致；多一个少一个都会被漂移守卫测试抓到。
+ *
+ * 🔴 最后两个不是"订阅不有效"，而是"**这一项能力没买**"——
+ * 客户端对它们的文案**必须与 `NO_SUBSCRIPTION` / `PERIOD_ENDED` 不同**：
+ * 前者是"你的档位不含这项"，后两者是"你没有订阅 / 订阅到期了"。
+ * 把它们混成一句"请订阅"会让付过 ¥5 的用户以为自己的订阅失效了。
  */
 export const ENTITLEMENT_DENIAL_REASONS = [
   'NO_SUBSCRIPTION',
@@ -58,6 +63,10 @@ export const ENTITLEMENT_DENIAL_REASONS = [
   'INVALID_PERIOD_END',
   'PERIOD_ENDED',
   'INVALID_NOW',
+  /** 读取方**没拿到** `grants` 这一列（部署 / select 写错）——不是"确定没有能力"。 */
+  'MISSING_GRANTS',
+  /** 拿到了 `grants`，但这一项不在里面 —— ¥5 档访问云端 AI 就是这一种。 */
+  'GRANT_NOT_INCLUDED',
 ] as const;
 
 export type EntitlementDenialReason = (typeof ENTITLEMENT_DENIAL_REASONS)[number];
