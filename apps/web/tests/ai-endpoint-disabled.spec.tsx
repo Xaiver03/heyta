@@ -26,7 +26,7 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { I18nProvider } from '@heyta/i18n';
-import type { SecretStore } from '@heyta/ai';
+import type { AiEndpointConfig, SecretStore } from '@heyta/ai';
 import type { Task } from '@heyta/domain';
 
 import {
@@ -138,6 +138,48 @@ describe('🔴 停用端点 —— `disabled` 的写入端', () => {
       box?.click();
     });
     expect(el.querySelector('[data-testid="endpoint-local-disabled-note"]')).not.toBeNull();
+  });
+
+  it('🔴 停用**不清掉**已经给过的授权（重新启用后不该再问一次）', () => {
+    /**
+     * 任务书红线：停用不改变目的地，所以不需要重算授权，
+     * 但**也不许**顺手清掉 —— 清掉等于"重新启用后要再同意一次"，是体验倒退。
+     * 这条走的是真路径：`editEndpoint` → `updateRouting` → `recomputeConsents`
+     * → `retainValidConsents`（`packages/ai` 的唯一事实源）。
+     */
+    const remote: AiEndpointConfig = {
+      id: 'remote',
+      label: 'Cloud vendor',
+      endpoint: 'https://api.example.com/v1',
+      model: 'some-model',
+      capabilities: ['structured_output'],
+    };
+    const withConsent: PersistedAiSettings = {
+      ...defaultAiSettings(),
+      routing: {
+        enabled: true,
+        allowRemote: true,
+        endpoints: [remote],
+        routes: { 'duration-estimate': [{ endpointId: 'remote' }] },
+      },
+      consents: [{ feature: 'duration-estimate', destination: 'user-endpoint', grantedAt: 1 }],
+    };
+    saveAiSettings(withConsent);
+
+    const el = render(
+      <AiSettings initial={withConsent} secrets={createSessionSecretStore()} />,
+    );
+    act(() => {
+      el.querySelector<HTMLInputElement>('[data-testid="endpoint-remote-disabled"]')?.click();
+    });
+
+    const after = loadAiSettings();
+    expect(after.routing.endpoints[0]?.disabled).toBe(true);
+    expect(after.consents).toHaveLength(1);
+    expect(after.consents[0]).toMatchObject({
+      feature: 'duration-estimate',
+      destination: 'user-endpoint',
+    });
   });
 
   it('🔴 停用唯一端点后，AI 面板说的是「端点已被停用」而不是「还没配置端点」', () => {
