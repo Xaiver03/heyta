@@ -4,8 +4,7 @@
 >
 > 配套：
 > - 门禁清单本身见 [`../../AGENTS.md`](../../AGENTS.md) §6；
-> - 服务器分工与代理链路见同目录的 `deployment.md`
->   （⚠️ 该文件**尚未提交**，所以这里只写文件名、不做链接 —— 它落库后应改回链接）；
+> - 服务器分工与代理链路见同目录的 [`deployment.md`](deployment.md)；
 > - AI 相关的门槛（`check:layering` 的 AI 规则等）见
 >   [`../reference/ai-architecture.md`](../reference/ai-architecture.md) §13。
 >
@@ -24,8 +23,11 @@
 ## 1. 一句话
 
 `push` 到 `main`（或提 PR）→ GitHub 把任务派给 **finlaw 上的自托管 runner**
-→ 在容器里干净检出一份新克隆 → 跑 `pnpm check`（12 道门禁）+ `pnpm test`
+→ 在容器里干净检出一份新克隆 → 跑 `pnpm check`（门禁串联）+ `pnpm test`
 → 结果回报 GitHub。
+
+⚠️ **门禁条数刻意不写在这里** —— 它漂过好几次。唯一权威是根 `package.json` 的
+`check` 脚本，`pnpm check` 就是按它逐条跑的；要数就直接读那一行。
 
 **这个 workflow 的核心不是"跑一下测试"，而是每次都在干净环境里重新回答一次
 「一个新克隆能不能自己立起来」。**
@@ -246,14 +248,18 @@ workflow 有**两个 `if: always()` 的诚实步骤**，把跑不了的写进 Jo
 
 | 项 | 值 |
 |---|---|
-| 工作流文件 | [`.github/workflows/ci.yml`](../../.github/workflows/ci.yml)（119 行） |
+| 工作流文件 | [`.github/workflows/ci.yml`](../../.github/workflows/ci.yml)（144 行） |
 | 触发 | `push` 到 `main`、`pull_request`、`workflow_dispatch` |
 | 并发 | 同分支连续 push **取消上一次**（省额度） |
 | 超时 | `timeout-minutes: 40` |
 | Node 版本 | **24**（写死） |
-| 步进 | 检出 → 装 pnpm → 装 Node → `--frozen-lockfile` → `pnpm check` → `pnpm test` → 两条诚实说明 |
-| 门禁 | **12 道**，见 [`../../AGENTS.md`](../../AGENTS.md) §6 |
-| 首次全绿 | run `36228333270`，**12 分 21 秒**，12 道门禁 + 3256 个测试全过 |
+| 步进 | 检出 → 装 pnpm → 装 Node → 根 `--frozen-lockfile` → **`pnpm --dir e2e install --frozen-lockfile`** → 缓存/装 Chromium → `pnpm check` → `pnpm test` → 两条诚实说明 |
+| 门禁 | 见根 `package.json` 的 `check` 脚本（本文件刻意不写条数） |
+| 首次全绿 | run `36228333270`，**12 分 21 秒**，当时那批门禁 + 3256 个测试全过 |
+
+> ⚠️ **`e2e/` 那一步不能省**：它是**独立工作区**（`e2e/pnpm-workspace.yaml`，自带 lockfile），
+> 根 `pnpm install` 不装它。漏掉的表现是 `check:ai-e2e` 报
+> `playwright: command not found` —— 看着像门禁坏了，其实是没装。
 
 ### ⚠️ 关于 Node 版本的一个未核实项
 

@@ -127,8 +127,13 @@ Fastify + PostgreSQL，两台独立宿主各用一个 SQLite 文件，**每条�
 要求：值只在 `tokens.css` 定义一次，其余平台由它**生成**。
 **不许各端各写一份色值** —— 那就是漂移的开始。
 
-**完成情况**：生成 Swift / ArkTS / JSON 三份产物（126 个 token + 59 个暗色 + 5 个
-reduced-motion），237 个测试覆盖（含对生成结果重算 WCAG 对比度）。
+**完成情况**：生成 Swift / ArkTS / JSON / React Native TypeScript 四份产物
+（`generated/HeytaTokens.swift` / `HeytaTokens.ets` / `tokens.json` +
+`src/generated/tokens.native.ts`）；**191 个 token + 73 个暗色 + 6 个
+reduced-motion**，**402 个测试**覆盖（含对生成结果重算 WCAG 对比度）。
+（数字实测：`pnpm --filter @heyta/design-system run generate` 打印
+`4 个文件（191 个 token；暗色覆盖 73；减少动效 6）`；
+`pnpm --filter @heyta/design-system run test` → `Tests 402 passed`。）
 
 已独立验证过它是**解析**而不是**复制**：改 `tokens.css` 里的 `blue-600`，
 生成物真的跟着变；不重新生成时 `generate:check` 退出码非 0；
@@ -1489,7 +1494,7 @@ TypeError: Cannot read property 'useContext' of null
 可默认视图是 `'list'`，我新写的象限分支**在启动时根本不渲染**，
 所以它不可能是渲染逻辑的问题，只可能是**模块级**的问题。
 
-### 真因：`@heyta/i18n` 自己带了一份**另一个版本**的 React
+#### 真因：`@heyta/i18n` 自己带了一份**另一个版本**的 React
 
 `apps/mobile` 与 `packages/i18n` 各自解析到了**不同的 React**：
 
@@ -1668,7 +1673,14 @@ ADR-0003 §2.4 表里那条"P2 要做 tokens → JS 对象导出"**其实已经�
 
 #### 🟡 下一步是验证，不是开发
 
-**依赖链已实测打通，但"构建出 HAP 并运行"仍未验证。**
+> 🔴 **这一小节已被后面两轮推翻一半，先看结论再往下读**：
+> **出包已实测通过** —— §3.24 用官方模板编出最小 ArkTS HAP（126 KB）与
+> RNOH 原生侧 HAP（37 MB），§3.25 又拆掉桩、跑到 **release HAP**（零桩全链路）。
+> **仍然成立的只有"跑起来"这一半**：缺模拟器系统镜像与签名（产物是 `*-unsigned.hap`）。
+> 也就是说：**"构建链通"已从"未验证"变成"已验证"，"能在鸿蒙上跑"仍未验证。**
+> 下面是当时（2026-09-25）的记录，保留对照。
+
+**依赖链已实测打通，但"构建出 HAP 并运行"仍未验证。**（← 当时的状态；见上面的更新）
 
 实测已确认（2026-09-25，本机）：
 
@@ -1679,7 +1691,7 @@ ADR-0003 §2.4 表里那条"P2 要做 tokens → JS 对象导出"**其实已经�
 | `ohpm install` | ✅ **成功，28.9 秒**（309 MB / 11975 文件：2509 `.h`、2216 `.cpp`、40 `.ets`） |
 | npm tarball | ✅ 103 MB / 1391 文件，含 3 个真实 `.har` |
 
-🔴 **仍未验证**：没有跑过 `hvigorw assembleHap`，**没有编译过一行 C++，
+🔴 **仍未验证**（← 当时的状态，**前半句已被 §3.24/§3.25 证伪**）：没有跑过 `hvigorw assembleHap`，**没有编译过一行 C++，
 没有生成过 HAP，没有在设备或模拟器上跑起来**。已确认的是"零件齐全且取得到"，
 未确认的是"这些零件能拼成能跑的东西"。原生侧需本地编译（`.so` 只有 4 个，
 非各 ABI 齐全），这是最可能出问题的地方。
@@ -1691,7 +1703,9 @@ ADR-0003 §2.4 表里那条"P2 要做 tokens → JS 对象导出"**其实已经�
 > 2. 官方《环境搭建》文档写"仅支持 RN **0.72.5**"，**该文档已过时**：
 >    实测两侧都已在 `0.84.x`。**照文档选版本会选到三年前的分支**（陷阱 #22）。
 
-因此**投入 UI 开发之前，第一个任务仍然是"让一个最小 RN 壳在鸿蒙上真跑起来"**。
+因此**投入 UI 开发之前，第一个任务仍然是"让一个最小 RN 壳在鸿蒙上真跑起来"**
+（⚠️ 出包这一步已在 §3.24/§3.25 完成；**剩下的只是"跑起来"**，而它缺的是
+模拟器系统镜像与签名，不是代码）。
 若这一步失败，"跨平台"的结论需要重估（可能退化为"RN 覆盖 iOS/Android +
 鸿蒙单独用 ArkUI"），那会改变 ADR-0004 的结论。
 
@@ -1705,6 +1719,9 @@ ADR-0003 §2.4 表里那条"P2 要做 tokens → JS 对象导出"**其实已经�
 ---
 
 ## 4. 从 P1 带过来的产品问题
+
+> ⚠️ **编号提醒**：§3.10–§3.27 这些后续轮次的记录**排在本节之后**（它们按时间追加，
+> 没有插回 §3 里）。读到 §4 不要以为 §3 已经结束 —— 按标题跳转即可。
 
 P1 计划 §7 留下、尚未回答的：
 
@@ -1889,8 +1906,9 @@ NODE_NO_WARNINGS=1 pod install     # 代理保持开启
 
 `React-Core-prebuilt.podspec` 第 10 行是 `source = ReactNativeCoreUtils.resolve_podspec_source()`，
 即该函数返回了 `nil`。**本轮未查明它为什么返回 nil** ——
-`resolve_podspec_source` 的定义**不在 `react-native` 包内**（在包内全树 grep 不到），
-需要到 RN 的 cocoapods 辅助脚本或 gem 里继续找。
+当时的记录写着"`resolve_podspec_source` 的定义不在 `react-native` 包内"，
+**这句已被证伪**：定义就在包内 `react-native/scripts/cocoapods/rncore.rb:85`
+（同名函数另见 `rndependencies.rb:69`）。真因与解法见下节（§3.12 陷阱 ③）。
 
 **下一轮从这里接**：
 
@@ -1961,7 +1979,8 @@ Failed to download release tarball: bad component(expected absolute path compone
 ```
 
 看起来像**网络失败**，其实是 **Ruby 的 `URI` 错误**。
-真凶在 `scripts/cocoapods/rncore.rb:146`：
+真凶在 `react-native/scripts/cocoapods/rncore.rb:146`（即 `node_modules/` 里的
+RN 包，**不是本仓库的 `scripts/`**）：
 
 ```ruby
 return {:http => URI::File.build(path: destinationDebug).to_s }
@@ -1971,7 +1990,7 @@ return {:http => URI::File.build(path: destinationDebug).to_s }
 而 `URI::File.build` 对空格**直接抛错**。所以下载其实与网络无关。
 
 **解法：让 RN 核心与依赖都从源码构建，整条 URI 路径就不会被走到。**
-`react_native_pods.rb:135` 是决定性的：
+`react-native/scripts/react_native_pods.rb:135` 是决定性的：
 
 ```ruby
 if !ReactNativeCoreUtils.build_rncore_from_source()
@@ -2011,6 +2030,10 @@ NODE_NO_WARNINGS=1 RCT_USE_PREBUILT_RNCORE=0 RCT_USE_RN_DEP=0 pod install
 
 ### 3.13 🔴 `verify-mobile-ios.sh` 走的是**被明令禁止**的那条 I/O 路线（附已验证的替代路线）
 
+> ⚠️ **本节的结论随后被自己推翻**：脚本已改用下面这条 idb 路线，
+> §3.14 验通 shim、§3.15 推进到 28/30、§3.18 收口到 **31/31**。
+> 本节保留，是因为"路线选错了"这个诊断本身仍然成立。
+
 本轮试着跑 `verify-mobile-ios.sh`，**第 0 步就挂了**：
 
 ```
@@ -2023,6 +2046,8 @@ NODE_NO_WARNINGS=1 RCT_USE_PREBUILT_RNCORE=0 RCT_USE_RN_DEP=0 pod install
 
 - 脚本第 83 行：`SIM_PID=$(pgrep -x Simulator | head -1)` —— 它要的是 **Simulator.app 这个 GUI**，
   而我（以及任何 CI）用 `xcrun simctl boot` 起的是**设备**，GUI 根本没开。
+  （⚠️ **这条判据随后已被删除**：现在的 `verify-mobile-ios.sh` 只要求设备 Booted，
+  不再查 Simulator 进程 —— 见 §3.14。）
 - **但就算把 GUI 打开也没用**：脚本第 172 行自己写着
   「本脚本**不会**用 `activate` 去把窗口拽到前台（那等于跟用户抢前台，**已被明确叫停**）」；
   第 30 行还记着目标窗口被另一个项目的 Simulator 窗口**整块盖住**（`遮挡=BLOCK`）。
@@ -2033,10 +2058,14 @@ NODE_NO_WARNINGS=1 RCT_USE_PREBUILT_RNCORE=0 RCT_USE_RN_DEP=0 pod install
 > ⚠️ 还要注意一个更隐蔽的问题：**陈旧默认值**。脚本第 74 行写死
 > `UDID=${IOS_UDID:-691C20D9-FB85-4B81-A3CC-0F5623AEF082}`，
 > 而这个 UDID 在本机**根本不存在**。不覆盖它就会指向一个不存在的设备。
+>
+> ⚠️ **随后已修**：现在脚本自己从 `xcrun simctl list` 里挑 Booted 设备，
+> 写死的默认值已删除（`xcrun simctl list devices | grep 691C20D9` 在本机确实无结果）。
 
 #### ✅ 正确的路线**早就写好了**，只是这个脚本没用
 
-`scripts/lib/mobile-e2e.sh:485` 起，仓库里**已经有一套 idb 版的 iOS I/O**，
+`scripts/lib/mobile-e2e.sh` 里（`resolve_idb()` 起于第 665 行，`idb_dump()` / `idb_center()` /
+`idb_type_into()` 在其后），仓库里**已经有一套 idb 版的 iOS I/O**，
 注释还写得非常清楚：
 
 > `idb`（facebook/idb，MIT）通过 companion 直接和模拟器通信，
@@ -2356,7 +2385,7 @@ Upload   行数: 14          ← 且没有一行属于 user:37
 | §3.17 那个"只拉不推"的根因 | ❌ **证伪** —— 是验收脚本的**点击落在了软键盘上** |
 | 真缺陷 1：legacy 密文在 Hermes 上无兜底 | ✅ 已修（纯 JS PBKDF2），已知答案向量钉住 |
 | 真缺陷 2：一条解不开的 op **永久卡死整台设备** | ✅ 已修（**ADR-0016**），变异验证 + 真服务端复验 |
-| 工具假判据 1：`$VAR）` 在 UTF-8 locale 下炸 | ✅ 22 处改 `${VAR}` |
+| 工具假判据 1：`$VAR）` 在 UTF-8 locale 下炸 | ✅ 本轮改的 `verify-mobile-ios.sh` 里 22 处改 `${VAR}`（⚠️ **只改了这一个脚本**：`scripts/` 下仍剩 47 处 `$VAR）`，分布在后来新增的 14 个脚本里） |
 | 工具假判据 2：键盘遮挡判据多减一次 | ✅ 改成结构性判定（`KeyboardTop` 只在真有候选条时抬高）|
 | `verify-mobile-ios.sh` | ✅ **31 项通过 / 0 失败**（`EXIT=0`）|
 
@@ -2480,6 +2509,11 @@ Hermes 上没有 `crypto.subtle` 时 `decryptLegacy` 直接抛
 （清单 / 标签**确实**还没有管理界面：`packages/app-host` 的 `createProjectActions()`
 已经提供 `createProject` / `createTag`，但移动端没有任何入口，所以这两个词保留。）
 
+> ⚠️ **这句话本身后来也被删掉了**：§3.19 做完清单、§3.20 做完标签之后，
+> `mobile.profile.footnote` 已经不含"清单与标签管理尚未实现"——
+> 现在的值是 `'凭据只保留在内存中，应用完全退出后需要重新输入。'`（`packages/i18n/src/locales/zh-CN.ts`）。
+> 下面那段"产物级核对"是**当时**的证据，不要拿它当现在的状态。
+
 **产物级核对**（不是只看词条表）：转义后同时数新旧值，
 `packages/i18n/dist/index.js` 与 Metro 打的 app bundle 都是 **新值 1 / 旧值 0**。
 ⚠️ 直接 `grep` 中文会命中的是**注释**而不是字符串值（值是 `\uXXXX`）——
@@ -2493,7 +2527,7 @@ Hermes 上没有 `crypto.subtle` 时 `decryptLegacy` 直接抛
 
 1. 先读 `packages/app-host/src/project-actions.ts` 与 `packages/domain` 里 project/tag 的模型；
 2. 在移动端加"清单"入口 + 任务归属选择，**全部经 op-log**（`CRT`/`UPD` 既有词表，不新增）；
-3. 复用 `verify:mobile-task-edit` 那套零 mock E2E 写法，覆盖"建清单 → 任务归入 → 另一端读到"；
+3. 复用 `verify:mobile-edit` 那套零 mock E2E 写法，覆盖"建清单 → 任务归入 → 另一端读到"；
 4. 完成后再改本页脚注（它与代码一起动，不许提前改）。
 
 ### 3.19 ✅ 清单闭环落地；🔴 并查出**手机只能推、不能拉**（ADR-0016 §6）
@@ -2552,7 +2586,8 @@ const decoded = await Promise.all(body.newOps.map((o) => decodeServerOp(o, passw
 #### (d) 验收
 
 **单元层**（`packages/sync-client/tests/sync.spec.ts`，新增 2 条）：
-`pnpm --filter @heyta/sync-client test` → **61/61**。
+`pnpm --filter @heyta/sync-client test` → **61/61**（当时；**现在同一命令是 62/62** ——
+后续又加了用例，见 §3.23）。
 
 **变异验证**：把搭车段改回无保护的 `Promise.all` → **恰好新增的 2 条红**
 （30 通过 / 2 失败）；恢复后全绿。**这证明新用例真的能失败。**
@@ -2625,11 +2660,16 @@ const decoded = await Promise.all(body.newOps.map((o) => decodeServerOp(o, passw
 - 🔴 **首次同步在手机上很慢**：Hermes 没有 WASM，Argon2id 只能走纯 JS，
   页面里**每个不同的 salt** 都要派生一次。手机上新装 + 全量历史 =
   **十几分钟量级**（本轮实测 > 10 分钟，且当时宿主 load 40+）。
-  界面已经写了"首次同步需等待约 30–40 秒"，在**累积了历史**的账号上
+  ~~界面已经写了"首次同步需等待约 30–40 秒"，在**累积了历史**的账号上
   这句话是**低估**的。要么改文案，要么给 KDF 结果做**持久化缓存**
-  （涉及持久化字段 → 需要 ADR）。
+  （涉及持久化字段 → 需要 ADR）。~~
+  → **文案这一半当时就改掉了**（见本节 (e)：已改成"数十秒到数分钟"区间 +
+  说明它随历史数据量增长；现在的词条是 `mobile.profile.sync.slowKdf`）。
+  **仍然没做的是另一半**：给 KDF 结果做持久化缓存（涉及持久化字段 → 需要 ADR）。
 - 🔴 **标签（TAG）仍然没有入口**：`createTag`/`removeTag` 在 `packages/app-host`
   里已有，`TaskActions` 没有 `tagIds`，移动端也没有界面。页脚注保留"标签管理尚未实现"。
+  → **下一节（§3.20）就把这条补完了**：`TaskActions.setTags` 已存在
+  （`packages/app-host/src/actions.ts`），移动端也有标签段。**这一条现在不成立。**
 - **解不开的 op 没有找回路径**（ADR-0016 §4 已记）。
 
 ### 3.20 ✅ 标签闭环落地：从"数据模型里有"到"产品里有"
@@ -2704,7 +2744,8 @@ setTags(entityId: string, tagIds: string[]): Promise<void>
 #### (d) 验收
 
 **单元层**（`packages/app-host/tests/project-actions.spec.ts`，新增 6 条）：
-`pnpm --filter @heyta/app-host test` → **399/399**（原 393）。
+`pnpm --filter @heyta/app-host test` → **399/399**（原 393；⚠️ **现在的同一命令是 435/435** ——
+标签之后的几轮又加了用例）。
 
 **变异验证**（证明新用例真的能失败）：
 - 拿掉"标签必须存在"的校验 → **恰好 2 条红**（两条悬空 id 用例）；
@@ -2804,6 +2845,7 @@ Web 端 `TaskStore.moveToProject` **一直存在**、`ProjectActions` 也**一�
 顺序是刻意的：**先断言 chip 出现 → 再刷新 → 再断言 chip 还在。**
 
 全量套件 **13/13**（原有 11 条 AI 旅程全部保持绿 —— 这条是"没碰坏别人"的证据）。
+（⚠️ 这是**当时**的数字；`e2e/tests/` 现在共 **24 条** `test()`、9 个 spec 文件。）
 
 #### (d) 🔴 两个假红，以及一个"看着能失败、其实不能"的断言
 
@@ -2841,6 +2883,7 @@ op **已经派出去了**。换成 `click()` + 断言**结果**（chip 出现）
   移动端脚本证的是"手机 ↔ 服务端 ↔ node-host"，Web 只证到"本地 op-log 落库"。
   要补得单写一个脚本（自己起服务端 + 配 Web 的同步设置），
   而**不能**塞进这套离线套件。
+  → **下一节（§3.22）就补上了**：新增 `pnpm verify:multi-end`（三端、两相、两个方向）。**这一条现在不成立。**
 - 🔴 **两端都不能改清单/标签的名字。**
 - **同时给同一任务加不同标签会丢一边**（§3.20b 第 2 条，需要给 reducer 加集合语义的 ADR）。
 

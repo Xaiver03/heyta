@@ -1,6 +1,6 @@
 # P1 详细计划：单端闭环
 
-> 状态：**规划中**
+> 状态：**已完成** —— `pnpm verify:p1` 自带真实服务端，跑 11 条零 mock E2E，含两条真实点击 `ConflictDialog` 的双端收敛（与 [总路线图](roadmap.md) 的 P1 行一致）
 > 上级：[总路线图](roadmap.md) ｜ 依据：[复用方案](../research/reuse-plan.md)、[组件决策](../research/reusable-components.md)、[功能矩阵](../research/feature-matrix.md)
 > 前置：P0 已完成（协议通了，见 [roadmap](roadmap.md#p0-完成证据2026-09-25)）
 
@@ -51,7 +51,7 @@ P0 定的是**不可逆层**（协议、实体、服务端）。P1 定的是**�
 
 | 任务 | 产出 | 判据 |
 |---|---|---|
-| 领域模型定义 | `Task` / `Project` / `Tag` / `Habit` / `HabitLog` / `FocusSession` 的类型与不变量 | 与 `@heyta/shared-schema` 的 13 实体对齐 |
+| 领域模型定义 | `Task` / `Project` / `Tag` / `Habit` / `HabitLog` / `FocusSession` 的类型与不变量 | 与 `@heyta/shared-schema` 的实体清单对齐（P1 当时为 13 项） |
 | 纯业务逻辑 | 四象限归类规则、重复规则求值、习惯连续天数、番茄钟状态机 | 单测覆盖，**不 import 任何框架** |
 | 重复规则 | 基于 `ical.js` 的 RRULE 求值（`rrule.js` 已被可维护性门槛排除） | ✅ 覆盖"每周几/每月第几个周几/结束条件"，31 个测试 |
 
@@ -136,7 +136,7 @@ P0 定的是**不可逆层**（协议、实体、服务端）。P1 定的是**�
 | 离线合并 | ✅ 冲突被识别为 `manual` 并上报，两边数据都不丢（**不自动择一**）|
 | 崩溃恢复 | ✅ 丢弃内存引擎、换新适配器重开，状态从日志完整重建 |
 | 加密 | ✅ 服务端存储为不可读密文（`verify:p1` 断言）|
-| 回归 | ✅ `pnpm check` + `pnpm -r test` 1681 通过 |
+| 回归 | ✅ `pnpm check` 全绿（权威门禁以根 `package.json` 的 `check` 脚本为准）+ `pnpm -r test` 全绿 |
 
 ---
 
@@ -184,9 +184,17 @@ P0 定的是**不可逆层**（协议、实体、服务端）。P1 定的是**�
 
 ---
 
-## 7. 未核实项
+## 7. 规划时的未定项（P1 完成后的现状）
 
-- 四象限的"自动归类规则"具体是什么，尚未与你确认（现在只有手动拖拽的假设）。
-- 习惯的"连续天数"口径（是否允许补打卡、时区如何处理）未定。
-- 番茄钟是否需要与任务强制关联，未定。
-- P1 是否包含回收站，取决于你对该功能优先级的判断（功能矩阵标为 P1）。
+- 四象限"自动归类规则"：**已实现** —— 紧迫性由 `dueDate` 推导（默认 2 天窗口），
+  重要性优先取显式 `important` 字段、缺失时回退到 `HIGH` 优先级
+  （`packages/domain/src/quadrant.ts:58`）。
+- 习惯"连续天数"口径：**已实现** —— `computeStreak` 按频率判断"计划日"、"今天还没打卡"不算断
+  （`packages/domain/src/habit-streak.ts:80`）；`computeHabitResilience` 负责中断后的冻结吸收
+  （`packages/domain/src/habit-resilience.ts:117`）；补打卡上限由 `Habit.backfillDays` 控制
+  （`packages/domain/src/entities.ts:203`）。打卡日期是**本地日期**，不是 UTC。
+- 番茄钟是否强制关联任务：**已定为不强制** —— `FocusState.taskId?: string` 是可选字段
+  （`packages/domain/src/focus.ts:60`）。
+- 回收站：**仍未实现** —— 删除已是软删除墓碑（`DEL` op → `deletedAt`，
+  `apps/web/src/features/tasks/store.ts:175`），但全仓库没有恢复入口。
+  这是 3.2 节里唯一没有兑现的判据。

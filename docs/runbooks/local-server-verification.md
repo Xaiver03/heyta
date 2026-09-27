@@ -36,8 +36,9 @@ sh scripts/migrate-deploy.sh
 ```
 
 **为什么不能直接用 Prisma**：Prisma 5 把每个迁移都包在事务里，而 PostgreSQL
-**禁止在事务块里执行 `CREATE/DROP INDEX CONCURRENTLY`**。本项目有 5 个这样的迁移，
-直接 `prisma migrate deploy` 会在第 6 个迁移上以 P3018 失败，之后还会卡在 P3009。
+**禁止在事务块里执行 `CREATE/DROP INDEX CONCURRENTLY`**。本项目有 9 个这样的迁移
+（`grep -l CONCURRENTLY server/prisma/migrations/*/migration.sql`），
+直接 `prisma migrate deploy` 会在**第一个**这样的迁移上以 P3018 失败，之后还会卡在 P3009。
 
 `scripts/migrate-deploy.sh` 会把这类迁移**拆出来在事务外执行**，然后标记为已应用再重试。
 它还有配套的咨询锁与孤儿后端清理，能自动恢复上一次中断的部署。
@@ -87,11 +88,17 @@ dropdb -h 127.0.0.1 -p 5432 -U "$(whoami)" heyta_sync_smoke
 
 | 阶段 | 检查 |
 |---|---|
-| 0 | op 形状通过**真实 zod 契约**；加密载荷不含明文；实体清单是 heyta 的 13 项 |
+| 0 | op 形状通过**真实 zod 契约**；加密载荷不含明文；实体清单是 heyta 自己的（`ENTITY_TYPES`，当前 15 项） |
 | 1 | 服务端可达（`/api/sync/status` 要求鉴权 = 正常） |
 | 2 | 免邮件验证创建测试账号并拿到 JWT |
 | 3 | **明文上传被拒（E2EE_REQUIRED）→ A 加密上传 → B 下载可见 → B 收到的仍是密文** |
 | 4 | **两端基于同一向量时钟并发改同一实体 → 服务端判 `CONFLICT_CONCURRENT`** |
+
+> ⚠️ **脚本里的实体清单断言已陈旧**：`scripts/verify-sync-loop.mjs:154` 仍写死
+> `ENTITY_TYPES.length === 13`，而实体清单已增至 **15**（新增 `AI_FEEDBACK` / `PREFERENCE_CORRECTION`，
+> 见 `packages/shared-schema/src/entity-types.ts:62`）。因此现在跑 `pnpm verify:sync:dry`
+> 会在第 0 阶段报 `实体清单项数异常：15（期望 13）`。
+> 这是那条断言过期，不是实体清单有问题 —— 修脚本，不要改回实体数。
 
 ---
 
@@ -207,11 +214,14 @@ Error: P3018 ... DROP INDEX CONCURRENTLY cannot run inside a transaction block
 ```
 
 这不是故障 —— 是 `migrate-deploy.sh` 在按设计逐个把 CONCURRENTLY 迁移拆到事务外执行。
-**31 个迁移全部应用成功**，容器随后进入 healthy。
+**全部迁移成功应用**（当前仓库有 33 个迁移），容器随后进入 healthy。
 
-### 仍未处理
+### 镜像来源（已处理）
 
-`docker-compose.yml` 的镜像仍指向上游的
-`ghcr.io/super-productivity/supersync:latest`。用 `deploy.sh --build` 或
-`docker-compose.build.yml`（产出 `supersync:local`）不受影响，
-但**直接 `docker compose up` 会拉上游镜像**。上线前需换成 heyta 自己的仓库名。
+`docker-compose.yml` 的 `supersync` 服务**默认已指向本地构建产物**：
+`image: ${SUPERSYNC_IMAGE:-supersync:local}`（`server/docker-compose.yml:36`）。
+上游那行 `ghcr.io/super-productivity/supersync:latest` 被 heyta 显式覆盖，并在原地留了说明注释
+（`server/docker-compose.yml:27`）——**直接 `docker compose up` 不会再拉上游镜像**。
+要托管到别处就显式设 `SUPERSYNC_IMAGE`；`env.example` 里保留了一行被注释的上游示例
+（`server/env.example:264`）。`deploy.sh` 本地构建走 `--build`
+（`server/scripts/deploy.sh:203`，产出 `supersync:local`），不带该参数时才 `pull supersync`。
