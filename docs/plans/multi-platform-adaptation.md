@@ -596,7 +596,7 @@ IndexedDB 路径**保留到迁移验证通过之后**再删。两者可并存一
 
 | 依赖 | 版本（实测） | 许可证（实测） | 状态 |
 |---|---|---|---|
-| `react-native-web` | 0.21.3（2026-09-25） | MIT | 🔲 待登记 |
+| `react-native-web` | 0.21.3（2026-09-25，`latest`） | MIT | ✅ **已登记**（M1-3：白名单内**自动**登记，`check:licenses` 通过，清单第 788 行） |
 | `electron` | 44.4.5 稳定（自带 Node 24.21.0） | MIT | ✅ **已登记**（M2-1：白名单内**自动**登记，`check:licenses` 通过） |
 | `@sqlite.org/sqlite-wasm` | 3.53.4-build1 | Apache-2.0 | 🔲 待 M4 决策 |
 
@@ -632,7 +632,55 @@ IndexedDB 路径**保留到迁移验证通过之后**再删。两者可并存一
 | **M0-4** ✅ 已完成 | native 数字门禁（新增第 6 类规则）+ 修掉 6 处违规 | +约 50（规则 + 注释）⚠️ 净增 | — | ✅ 同一探针 **1 处 → 4 处**；`check:design` 全绿 |
 | **M0-3** ✅ 已完成 | 分层防回潮规则（同时拦具名与结构两种形态） | +约 35（规则 + 注释）⚠️ 净增 | — | ✅ 探针 3 种形态全被抓（含**改名**的）；现状 9 条规则通过 |
 | **M2（骨架部分）** ✅ 已完成 | 桌面壳落地（`apps/desktop`，5 个源文件） | +约 400（含 11 个测试与断言）⚠️ 净增 | **是**：壳只做窗口 + 白名单，业务全经 `@heyta/node-host` | ⏳ 9 个相关门禁全绿；`pnpm check` 的 2 个 E2E 红**与本改动无关**（详见提交说明） |
-| M1 | 任务列表切片 | （待填） | — | — |
+| **M1-1 / M1-2 / M1-3** ✅ 已完成（`f2c6d84`） | 建 `packages/ui` + `TaskList` + 主题契约；web 端 `react-native-web` 接入 | **+624**（`packages/ui`）+ 74（web 切片入口）⚠️ 净增（M0/M1 口径不适用行数，见上方澄清） | **是**：`apps/web` 与将来的 mobile/鸿蒙 import 同一个 `@heyta/ui` | ✅ **M1 判据 1、2 通过**（真实浏览器实测，见下）；`check:design`/`check:layering`/`check:licenses`/`check:docs` 全绿；ui 包 **15/15 测试** |
+| M1-4（mobile 接入） | 任务列表切片 | — | — | — |
+| M1-5（三端验证） | 任务列表切片 | — | — | — |
+
+### M1-1 ~ M1-3 的实测证据（2026-09-27）
+
+判据 1「`react-native-web` 0.21.3 与 RN 0.84.1 + React 19 能否共存」——
+**通过，且是真实浏览器里渲出来的，不是"构建不报错"**：
+
+```
+pnpm --filter @heyta/web run build          ✓ built in 3.88s
+  dist/assets/universal-slice-*.js   159.64 kB   ← 独立懒加载 chunk，不进主包
+  dist/assets/index-*.js             957.62 kB
+
+# 起 `vite preview`，Playwright(chromium) 打开 http://127.0.0.1:4173/?slice=1
+渲染出的行数: 4
+ · "写 M1 切片验证"          ← 有截止时间，排最前
+ · "核对鸿蒙 op-sqlite 版本差"  ← 其次
+ · "（无标题）"               ← 空标题兜底
+ · "✓\n已完成的示例"          ← 已完成沉底 + 勾
+根节点 testID 命中: 1
+点击前: "写 M1 切片验证"
+点击后: "核对鸿蒙 op-sqlite 版本差"   ← 点击后该行变已完成并自动重排到末尾
+页面错误: 无
+```
+
+最后两行是这条判据里信息量最大的地方：它一次同时证明了
+**`Pressable` 可交互 + state 更新 + 重排序**三件事在 `react-native-web` 上都成立。
+只截一张静态渲染图是证明不了这些的。
+
+判据 2「Metro / Vite 能否解析同一个 workspace 包」——
+Vite 侧已通过（`@heyta/ui` 被 import 并成功打包）；**Metro 侧要等 M1-4**。
+
+**踩到并解决的一个真实坑**（值得记下来，因为它只在 pnpm 布局下出现）：
+别名最初写成 `replacement: 'react-native-web'`，构建**直接失败**：
+
+```
+Could not load react-native-web (imported by ../../packages/ui/dist/index.js):
+ENOENT: no such file or directory, open 'react-native-web'
+```
+
+根因是「解析**从导入方所在位置**开始」：`@heyta/ui` 是 workspace 包，Vite 解析到它的
+真实路径 `packages/ui/dist/`，于是从 `packages/ui/` 往上找 —— 而 `react-native-web`
+只装在 `apps/web/node_modules/`（它是 web 端的依赖）。
+修法是把别名指向 `require.resolve('react-native-web/package.json')` 得到的**绝对目录**，
+从根上消掉"从谁的位置找"这个变量。
+
+**M1-5 的前置状态**：判据 3（无第二份 React）与判据 4（桌面端加载同一产物）
+**尚未验证**，鸿蒙更是完全没跑 —— 这三条都不能算过，见 M1-5 那一节。
 
 **M0-2 的展示逻辑归属判定表**（2026-09-27 执行完毕 —— **结论是"几乎都不该动"**）：
 
