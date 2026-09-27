@@ -76,6 +76,7 @@ import {
   type HealthMap,
   type RoutedDeps,
 } from '@heyta/ai';
+import type { AiFailureReason } from '@heyta/ai';
 
 /**
  * 一句话输入的字符上限。超出**直接拒绝**（不是截断）。
@@ -472,6 +473,8 @@ export type CaptureOutcome =
   | {
       ok: false;
       reason: CaptureFailureReason;
+      /** 路由层给的**原因码**。壳据此取词条 —— 见 §7.10 通道 #5。 */
+      cause?: AiFailureReason;
       message: string;
       /** 没有任何端点被尝试过（比如输入为空）时是 `{}`。 */
       health: HealthMap;
@@ -539,6 +542,7 @@ export async function requestCapture(
     return {
       ok: false,
       reason: 'ai-unavailable',
+      cause: result.reason,
       message: specific === '' ? describeRoutedFailure(result.reason) : specific,
       // 🔴 失败也要落盘 —— 这通常正是熔断计数器刚 +1 的那一次。
       health: outcome.health,
