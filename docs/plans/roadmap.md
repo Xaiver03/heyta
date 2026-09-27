@@ -475,18 +475,35 @@ Web 设置页有「导出数据」（JSON 完整保真 / 任务清单 Markdown�
   12 条**全都解不开**撞上了 ADR-0016 的抛错（换过/打错了 E2EE 口令，移动端口令只在内存里）？
   是另一个客户端实例/分支？还是 `applyRemote` 与 `setLastServerSeq` 之间有东西抛了？
   **不要把这个修复当成那条报告的结论。**
-- ⚠️ **`check:docs` 的绿是"本机绿"**：干净 checkout 里它是**红的**（6 处死链指向 `.gitignore:25` 的
-  `research/upstream/`）。这是**门禁判据依赖了不该依赖的环境**，已登记进 `AGENTS.md` §7 第 70 条。
-- ⚠️ **`check:ai-e2e` 现在不是绿的：24 passed / 1 failed**，失败的是桌面端那条
-  （`e2e/tests/desktop-window.spec.ts`，`Error: page.waitForTimeout: Page crashed` —— Electron 渲染进程崩了）。
-  **与本次通行密钥 / 文档两个提交无关**，证据是 `git diff --name-only e4e62d3..HEAD` 里
-  **没有** `e2e/` 与 `apps/desktop/`；而 `apps/desktop/{package.json,src/main.ts,tsup.config.ts}`
-  当时正被**另一个并行会话**改到一半（未提交），e2e 跑的是那个工作区状态。留给那个会话收口。
-- 全量 `pnpm check` 仍未跑通：它会触发 `prisma generate` 而沙箱报 EPERM（`utime` 在
-  `~/.cache/prisma/.../libquery_engine`）。**除上面那条桌面端用例外，其余门禁逐项跑过，全绿。**
-  📌 **更正**：上一版据此外推的"server 全量测试跑不了"是**错的** —— 卡住的只是 `pretest`
-  里的 `prisma generate`。直接 `pnpm --filter @heyta/sync-server exec vitest run` 可以完整跑：
-  实测 **1474 passed / 1 skipped，exit 0**。卡点只在 `pretest`，不在测试本身。
+- ✅ **`check:docs` 的"本机绿"已修，而且根因不止一个**（2026-09-28，`fc32fd6` + `5e4dc1d`）。
+  原先它报"检查 **54** 处跨文档章节引用"，修完是 **244** 处 —— **78% 的章节引用从来没被检查过**，
+  而门禁一路绿灯。两个缺陷**互相掩护**：
+
+  1. `SECTION_REF_RE` 只认两级编号（`(\d+(?:\.\d+)?)`），`§3.3.1` 被截成 `§3.3`，
+     `.1。改完必须…` 再被当成"引用者声称的标题"→ **假**的"标题对不上"；
+  2. 目标路径只按**引用文件所在目录**解析，解析不到就 `continue` ——
+     `docs/plans/*` 里写仓库根相对路径（`docs/runbooks/deployment.md`）**全部静默跳过**。
+
+  (2) 恰好把 (1) 会误报的引用全跳过了，所以谁也没报错。修法：任意层级编号 + 四个解析基准
+  （引用文件目录 / 仓库根 / 唯一 basename / 唯一路径后缀）+ **解析不到必须报错**（不再 `continue`）；
+  顺带修了正则尾巴贪心吞掉下一个引用、表格行号不算编号、标题比对把散文当标题（实测报出一屏、**没有一条是真的**）。
+  📌 并给检查器加了**每次运行都先跑的自检** —— 这类缺陷可以共存到天荒地老，因为**永远不会有测试变红**。
+  变异验证 4 条全过（退回两级编号 / 退回缺陷 (2) 原形 / 解析不到不返回 null / 表格行号失效，各自转红）。
+  端到端也验过：改坏 `roadmap.md` 里一个编号 → 报红；改成 `docs/runbookz/…` → 报"解析不到目标文件"；还原后复绿。
+  记进 `AGENTS.md` §7 第 85 条。
+  ⚠️ **剩下的"干净检出红"是另一件事，而且正在被并行会话修**：10 处死链（不是 6 处）指向
+  `research/upstream/`（`.gitignore:39`，一份**永远不在任何新检出里**的本地 vendor 目录），
+  以及 `research/{desktop-shell-selection,e2ee-widget-key-handling}.md` —— 后者正被搬进 `docs/research/`
+  （工作区里已是未跟踪的新文件），搬完这两个死链就没了。**这条不是本会话的账。**
+- ✅ **`check:ai-e2e` 现在全绿：26 passed，exit 0**（2026-09-28 实测）。两条桌面端用例
+  （开发构建 + `release/heyta-darwin-arm64` 的打包 `.app`）都真的打开窗口、画出共享 UI；
+  渲染进程崩溃由并行会话的**单实例锁**修复收口（`616b050`）。
+- 🔴 **全量 `pnpm check` 仍未跑通**：它会触发 `prisma generate` 而沙箱报 EPERM（`utime` 在
+  `~/.cache/prisma/.../libquery_engine`）。**但逐个跑过 16 个 `check:*`，全部绿**（外加 `check:ai-e2e` 26 passed）：
+  `migrations / layering / widgets / ui-language / licenses / docs / pricing / ai-quota / payment-entry /
+  materialized-reads / design / tokens / ai-coverage / arkts / native-deps / mobile-bundle`。
+  卡点只在 `pretest` 里的 `prisma generate`，不在测试本身 —— 直接
+  `pnpm --filter @heyta/sync-server exec vitest run` 可以完整跑（**1474 passed / 1 skipped**，exit 0）。
 - **billing 的退款侧：从今以后是「有意不做」，不是「忘了接」**（ADR-0026，
   `docs/adr/0026-refund-side-entitlement-revocation-not-implemented.md`）。
   `reverseOrderOnRefund` 继续**零生产调用方**，退款事件继续在 `unsupported-event-type` 被拒 ——
@@ -526,6 +543,34 @@ Web 设置页有「导出数据」（JSON 完整保真 / 任务清单 Markdown�
   - 📌 **与退款侧正交**：对账只对**已经记录为收到钱**的单**授予**，
     从不调用 `reverseOrderOnRefund` / `revokeEntitlement`，候选也排除 `refunded`/`failed`。
     ADR-0026 的结论**没有被碰**。
+  - ✅ **对生产实例做过一次真演练（只读 + 可回滚），2026-09-28**（补上上面那条"没有跑过真通道"的一半）。
+    在 `supersync-postgres`（PostgreSQL 16，**真 schema、真迁移**：`_prisma_migrations` 里
+    `20260929000000_add_subscription_grants` 已 applied）上跑了**与 `reconcile.ts` 逐字相同**的候选查询：
+
+    - **候选数 = 0**。原因是**账单侧从来没开过**，不是"查询对了但没数据"含糊过去：
+      `checkout_orders` / `payment_events` / `pricing_audit_log` / `subscriptions` **四张表全为空**，
+      生产 `.env` 里**没有任何** `BILLING_*` / `WECHAT_*` 键 —— 所以线上只有 `noop`，
+      `503 BILLING_PROVIDER_NOT_CONFIGURED` 是**配置状态**，不是缺口。
+    - 🔴 **但"0 候选"本身不能证明查询是对的**（写错了也是 0）。所以又在一个**显式 `ROLLBACK` 的事务里**
+      造了一条**真候选**（`pending` 单 + `payment_succeeded:<out_trade_no>` 事件），
+      确认查询在生产实例上**恰好找到 1 条**、并且能取到 `buildReconcileEvent` 要读的全部字段
+      （`final_amount_minor`、`provider_event_id`、`occurred_at`）；回滚后三张表**仍然是 0**。
+      这一半才是"SQL 在生产形状下真的能跑"的证据。
+    - ⚠️ **因此"跑一次真补结算"在生产上是 no-op**：候选为 0，且**对账代码根本没部署**
+      （`/app/dist/src/billing/reconcile*.js` 不存在，镜像构建早于 `60db578`）。
+      换句话说：**现在的线上状态既没有积压、也没有能力去补**，两件事都要等账单功能真正启用时才需要收口。
+    - 📌 复现方式（**不改任何一行生产数据**，这是它敢在生产上跑的原因）：把 SQL 从 stdin 灌进容器里的 `psql`，
+      演练部分用显式 `BEGIN` / `ROLLBACK` 包住：
+
+      ```bash
+      ssh <server> 'sudo docker exec -i supersync-postgres \
+        sh -lc '"'"'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB"'"'"'' < dryrun.sql
+      ```
+
+      先跑纯只读的候选查询拿候选数；再在 `BEGIN … ROLLBACK` 里插入合成候选验证查询真的能找到它。
+      ⚠️ 别用 `psql` 的 `\gset` 去接 `INSERT ... RETURNING`：写成 `… RETURNING id AS uid;\n\gset`
+      会**把那条 INSERT 再执行一次**（撞 `users_email_key` 唯一约束）—— 要把 `\gset` 当**终结符**用，
+      即 `INSERT … RETURNING id AS uid` 后面直接跟 `\gset`，不带分号。
 
 ---
 
