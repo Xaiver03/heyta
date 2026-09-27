@@ -356,10 +356,15 @@ cd apps/landing && npx vitest run              # 期望 71 passed
      通道失败时 `failOrder` 释放券名额；不可交付的档（`hosted-ai-monthly`）
      在报价之前回 `409`。12 例测试跑真 SQL（PGlite）。
      详见 [pricing-and-coupons.md](../reference/pricing-and-coupons.md) §7 第 18 条。
-   - ❌ **仍缺**：客户端的"付款"按钮（web + 移动端）——**没有它用户还是走不到**；
-     以及"交付"半段：webhook 路径还没有把"金额与所有 SKU 都对不上"的支付
-     交给 `settleOrderPaid`，所以用了券的单**收得上钱、授不出权益**
-     （见同文档 §7 第 9 条末尾列的 (a)(b)(c) 三件事）。
+   - ❌ **仍缺**：客户端的"付款"按钮（web + 移动端）——**没有它用户还是走不到**。
+     ⚠️ 但这个按钮应当**和支付通道一起**落地，不要提前加：现在加，它必然回
+     `503 BILLING_PROVIDER_NOT_CONFIGURED`，也就是正好造出落地页明确反对的那个
+     东西 —— 一个点了没反应的"立即购买"（见 `apps/landing/src/components/Pricing.tsx`
+     文件头）。所以"用户能走完"这一步现在卡在**外部依赖**（支付商资质）上，
+     不在我们这边：服务端那条路已经通了，`curl` 得到一张真的收款码参数。
+   - ❌ **仍缺（这一件完全在我们这边）**："交付"半段：webhook 路径还没有把
+     "金额与所有 SKU 都对不上"的支付交给 `settleOrderPaid`，所以用了券的单
+     **收得上钱、授不出权益**（见同文档 §7 第 9 条末尾列的三件事）。
 2. **让 ¥12 可交付**（⑦⑧）
    - ✅ **已做**：`Subscription.price_id` + `grants` 列 + 迁移
      `20260929000000_add_subscription_grants`（含 `['hosting']` 回填，否则开关一打开
