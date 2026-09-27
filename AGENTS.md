@@ -38,7 +38,7 @@ heyta 是一个**本地优先**的任务管理应用，目标是做一个功能�
 | `server/` | 同步服务端 + **计费**（Fastify + Prisma + PostgreSQL）。**vendored，MIT** | ✅ 已改造 |
 | `apps/` | 客户端外壳。**只允许放平台差异与 UI 绑定** | ✅ |
 | `apps/web/` | Web 壳（IndexedDB + 浏览器 fetch） | ✅ |
-| `apps/landing/` | **落地页**（Vite，独立于应用）。⚠️ 它目前**没有任何指向应用的链接**（全部是页内锚点）—— 这是已知的用户旅程断点，见 [`docs/plans/roadmap.md`](docs/plans/roadmap.md) §5.1 | ✅ |
+| `apps/landing/` | **落地页**（Vite，独立于应用）。入口由构建期 `VITE_APP_URL` 决定 —— **未配置时整条入口不渲染**（默认构建就是未配置，这是故意的）。别再把 `href` 全是页内锚点当成断点：那取决于构建时给没给这个变量 | ✅ |
 | `apps/mobile/` | 移动壳（React Native 0.84.1 + op-sqlite）。**Android 实机跑通；iOS 模拟器已跑通到交互级（真点击 → 真 op 落库 → 真同步到另一台设备，`pnpm verify:mobile-ios`）**。🟡 **鸿蒙：`apps/mobile` 下没有鸿蒙工程**（即"壳未建"）—— 但 `verify:harmony-toolchain` / `-rnoh` / `-rnoh-js` 已把「JS 源码 → unsigned release HAP」的整条构建链在**树外探针**里实测打通，缺的是模拟器系统镜像与签名 → §3.24 | ✅ |
 | `apps/node-host/` | 非 Web 验证壳（真 SQLite 文件）。**接线已全部来自 `app-host`** | ✅ |
 | `docs/` | 产品文档。**分层规则见 [`docs/README.md`](docs/README.md)** | ✅ |
@@ -1806,6 +1806,37 @@ L3 叙事三层**已实现**，**并已落到 `main`**（merge commit `84cc7f5`�
 **只与自己的过去比**（排行榜/联赛/自习室/组队打 Boss 在 E2EE 下结构上不可能）、
 **从不制造愧疚**。关键裁决见下面 ADR-0022 与
 [`docs/plans/roadmap.md`](docs/plans/roadmap.md) §1.2。
+
+### 2026-09-27：第一段用户旅程闭环（一批并行工单）
+
+[`docs/plans/roadmap.md`](docs/plans/roadmap.md) §5.1 原先列的三条断点**全部关闭**，外加两条同批的：
+
+1. **落地页 → 应用**：入口由构建期 `VITE_APP_URL` 决定（`apps/landing/src/lib/app-url.ts`）。
+   未配置时**整条入口不渲染**；仓库默认构建就是未配置，那是**故意的**。
+2. **Web 注册 / 登录入口**：协议语义收进 `packages/app-host/src/hosted-auth.ts`，
+   面板开在**同步设置内部**（认证要用的服务端地址就是那里的地址，分开会出现"对着 A 登录、令牌存到 B"）。
+   🔴 **通行密钥在浏览器端那一步没有接线**，只有登录链接这条路打通。
+3. **导出**：`packages/app-host/src/export-dump.ts`。含**墓碑**与完整 op-log，
+   另有可核对的 `counts`（丢掉墓碑的"备份"回放时已删数据会复活）。
+   入口在 Web 设置页与 node-host CLI，**移动端没有**。**只能导出，不能导回。**
+4. **回收站**：还原 = `UPD { deletedAt: null }`；彻底删除 = 打 `purgedAt` **标记**，
+   **不清除 `deletedAt`**（清了会让离线对端把已删数据**复活**）。只有 TASK，不含 PROJECT / TAG。
+5. **移动端成长体系**：共享取数在 `packages/app-host/src/motivation.ts`；
+   移动端「我的 → 成长」是**第二层页面**，底部仍是 5 个标签。
+   ⚠️ **没在真机 / 模拟器上验过**，没过 Metro / Release 打包，没实测暗色主题。
+
+**应用本体的部署**（在此之前它**从来没有被部署过**）：
+`https://heyta-tmp.litopia.space/app/`。方式与两个必须记住的坑见
+[deployment.md §3.7](docs/runbooks/deployment.md)。两个要点：
+
+- 🔴 **`vite build --base=/app/` 不能省** —— 默认 `base` 的资源是根绝对路径，
+  挂在 `/app/` 下会去请求同步服务端的路径、拿到 JSON 404，现象是控制台报
+  **样式表 MIME 是 `application/json`**。
+- 🔴 **`heyta-tmp.litopia.space` 是临时资产**（deployment §7.1）—— 清它会**同时**
+  打断落地页的应用入口，两边必须一起处理。
+
+**服务端镜像没有重建**：`server/` 里的品牌改动（SuperSync / Super Productivity → heyta）
+**还没上生产**，线上实测仍有 3 次 "Super Productivity"。要走 `server/scripts/deploy.sh`。
 
 ### 已定的关键决策
 
