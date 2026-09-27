@@ -470,6 +470,29 @@ Web 设置页有「导出数据」（JSON 完整保真 / 任务清单 Markdown�
   ⚠️ **没做改名**：`Passkey` 表没有 `name` 列，加一列要一次 DB 迁移 —— 本轮不做，
   **也没有**为此造一个假名字段（理由写在 `passkey.ts` 注释里）。
 
+  ✅ **"已认证地再加一条凭据"这条通路已落地**（2026-09-28，`b04d3ef`）。它是 ADR-0029 §4
+  那个**前提**：写下"先添加一条新的"的时候，唯一可用的 `registerPasskey` 对已验证账号是
+  **静默空操作**（反枚举设计），照做的用户会删掉旧凭据后再也进不去。只有"删"没有"增"，
+  那条 409 文案是**有害**的。
+  - **端点**：`POST /api/passkeys/registration/{options,complete}`，均 `preHandler: authenticate`；
+    body schema 只有 `credential`（zod 剥未知键 ⇒ 归属无法从请求体注入）；
+  - **服务层**：`generateUserPasskeyOptions(userId)` / `completeUserPasskeyRegistration(userId, credential)`；
+    challenge 用独立命名空间 `'user-registration'`，与公开注册**不能互相消费**；
+    `excludeCredentials` 填当前用户已有的 credential id（与公开注册的 `[]` 相反）；
+  - **app-host**：`beginPasskeyEnrollment` / `completePasskeyEnrollment`（+ 409 原因映射）；
+  - **Web**：`PasskeyPanel` 的"添加一条通行密钥"——能力探测 → begin → create → complete →
+    **重拉列表**；任一步失败绝不置成功；
+  - **i18n**：中英各 +8 条（key 集合 1267/1267 对齐）。
+
+  三个关键行为的**变异验证**（先红后绿，每次 `diff` 确认还原）：生产 `excludeCredentials`
+  退回 `[]` → `1 failed`；`create` 的归属写死成别人 → `2 failed`；`create` 抛错改成返回成功
+  → `1 failed`。
+
+  🔴 **第一版 spec 有一个"同义反复"缺陷，值得记下来**：`generateRegistrationOptions` 的桩返回
+  一个**写死的常量对象**，于是 `excludeCredentials` 那条断言检查的只是这个桩自己的返回值 ——
+  生产把它整个删掉（退回 `[]`）也照样绿。改成**回显生产传入的参数**之后才成为真验收
+  （变异 A 正是因此才转得红）。**断言桩的返回值 ≠ 断言生产的谓词。**
+
   ✅ **"陈旧凭据"与"验签失败"现在是两个可区分的错误**（同一提交）：服务端已不认得这条凭据
   → `code: 'passkey_not_found'`；认得但断言没验过 → `code: 'passkey_verification_failed'`。
   两者 `message` 刻意同样笼统，判别**只靠 `code`**；app-host 映射成两个 reason，
@@ -569,7 +592,7 @@ Web 设置页有「导出数据」（JSON 完整保真 / 任务清单 Markdown�
   `migrations / layering / widgets / ui-language / licenses / docs / pricing / ai-quota / payment-entry /
   materialized-reads / design / tokens / ai-coverage / arkts / native-deps / mobile-bundle`。
   卡点只在 `pretest` 里的 `prisma generate`，不在测试本身 —— 直接
-  `pnpm --filter @heyta/sync-server exec vitest run` 可以完整跑（**1518 passed / 1 skipped**，exit 0）。
+  `pnpm --filter @heyta/sync-server exec vitest run` 可以完整跑（**1527 passed / 1 skipped**，exit 0）。
 - **billing 的退款侧：从今以后是「有意不做」，不是「忘了接」**（ADR-0026，
   `docs/adr/0026-refund-side-entitlement-revocation-not-implemented.md`）。
   `reverseOrderOnRefund` 继续**零生产调用方**，退款事件继续在 `unsupported-event-type` 被拒 ——
