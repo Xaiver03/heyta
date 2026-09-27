@@ -68,6 +68,13 @@ interface TaskState {
   addTask: (title: string, over?: NewTaskFields) => Promise<void>;
   toggleComplete: (id: string) => Promise<void>;
   deleteTask: (id: string) => Promise<void>;
+  /**
+   * 从回收站恢复。**走 op-log**（一条 `UPD { deletedAt: null }`），
+   * 所以另一台设备回放后也会看到条目回来 —— 不是只改本地 UI 状态。
+   */
+  restoreTask: (id: string) => Promise<void>;
+  /** 彻底删除（不可逆）。用户已二次确认。 */
+  purgeTask: (id: string) => Promise<void>;
   setPriority: (id: string, priority: Priority) => Promise<void>;
   setImportant: (id: string, important: boolean) => Promise<void>;
   /**
@@ -178,6 +185,18 @@ export const useTaskStore = create<TaskState>((set) => ({
     await taskActions.remove(id);
   },
 
+  restoreTask: async (id) => {
+    // 恢复同样是一次 op（`UPD { deletedAt: null }`）。这里**不碰 entities** ——
+    // 绕开 op-log 直接改状态就同步不出去，也会在下次同步时被墓碑覆盖回来。
+    await taskActions.restore(id);
+  },
+
+  purgeTask: async (id) => {
+    // 写 `purgedAt` 标记（可加性字段，不 bump schema）。墓碑保留 ——
+    // 清掉它会让离线端把这条旧数据又同步回来。
+    await taskActions.purge(id);
+  },
+
   setPriority: async (id, priority) => {
     await taskActions.setPriority(id, priority);
   },
@@ -274,4 +293,23 @@ export function selectQuadrantCounts(state: TaskState): Record<Quadrant, number>
     [Quadrant.UrgentNotImportant]: buckets[Quadrant.UrgentNotImportant].length,
     [Quadrant.Neither]: buckets[Quadrant.Neither].length,
   };
+}
+
+/**
+ * 回收站列表：**已软删除且未彻底删除**的任务，最近删除的在前（同刻按 id）。
+ *
+ * ⚠️ 判据与顺序必须与 `@heyta/app-host` 的 `TaskActions.listTrashed()` 一致 ——
+ * 那是同一份产品语义的规范定义。selector 在这里重写一遍，是因为它只能读
+ * **传入的 state**：去读引擎单例会破坏 zustand 的引用稳定性约定
+ * （见 `App.tsx` 里 `useShallow` 那段记录的真实崩溃）。
+ */
+export function selectTrashedTasks(state: TaskState): Task[] {
+  return Object.values(state.entities.tasks)
+    .filter((t) => t.deletedAt !== undefined && t.purgedAt === undefined)
+    .sort((a, b) => {
+      const ad = a.deletedAt ?? 0;
+      const bd = b.deletedAt ?? 0;
+      if (ad !== bd) return bd - ad;
+      return a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
+    });
 }

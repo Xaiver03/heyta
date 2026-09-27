@@ -299,6 +299,22 @@ export const en = {
   'web.shell.tasks.complete': 'Complete: {title}',
   'web.shell.tasks.uncomplete': 'Mark incomplete: {title}',
   'web.shell.tasks.delete': 'Delete: {title}',
+  // ── 回收站 ── (Trash)
+  // Entry point is the shell view tab (`VIEW_TABS` in `App.tsx`); the view
+  // itself is `apps/web/src/features/trash/TrashView.tsx`. Deleting is still
+  // a soft delete — this is where a user can see it and restore it. Permanent
+  // deletion is a separate, confirmed, irreversible action.
+  'web.trash.nav': 'Trash',
+  'web.trash.intro': 'Deleted tasks land here. Restore one and it goes back where it was.',
+  'web.trash.empty.title': 'Trash is empty',
+  'web.trash.empty.hint': 'Tasks you delete show up here first',
+  'web.trash.deletedAt': 'Deleted {date}',
+  'web.trash.restore': 'Restore: {title}',
+  'web.trash.purge': 'Delete permanently: {title}',
+  'web.trash.confirm.title': 'Delete “{title}” permanently?',
+  'web.trash.confirm.body': 'Once deleted permanently it leaves the trash and cannot be restored.',
+  'web.trash.confirm.submit': 'Delete permanently',
+  'web.trash.confirm.cancel': 'Cancel',
   // Empty states: every list needs one, and it must say what to do next -
   // a blank screen makes users think the app is broken.
   'web.shell.empty.all.title': 'Your inbox is empty',

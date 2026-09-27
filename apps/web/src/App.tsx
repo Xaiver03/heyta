@@ -82,6 +82,7 @@ import {
   toHealthSnapshot,
 } from './features/settings/aiStore.js';
 import { FocusTimer } from './features/focus/FocusTimer.js';
+import { TrashView } from './features/trash/TrashView.js';
 import { LanguageSwitcher } from './features/shell/LanguageSwitcher.js';
 import { onEngineChange, readRecentOps } from './lib/oplog.js';
 import { applyTheme, resolveInitialTheme, type Theme } from './lib/theme.js';
@@ -143,7 +144,7 @@ const PRIMARY_NAV: NavEntry[] = [
  * 场景下几乎不存在，而成本是又一个需要维护的依赖。
  * 到 P2 需要深链接时再引入 —— 那时才知道真实的约束是什么。
  */
-type ViewKey = 'tasks' | 'quadrant' | 'habits' | 'focus' | 'timeline' | 'growth' | 'settings';
+type ViewKey = 'tasks' | 'quadrant' | 'habits' | 'focus' | 'timeline' | 'growth' | 'trash' | 'settings';
 
 /**
  * 视图切换列表。
@@ -161,6 +162,9 @@ const VIEW_TABS: readonly { key: ViewKey; labelKey: MessageKey; Icon: LucideIcon
   { key: 'focus', labelKey: 'web.shell.views.focus', Icon: Sun },
   { key: 'timeline', labelKey: 'web.shell.views.timeline', Icon: ChartGantt },
   { key: 'growth', labelKey: 'web.shell.views.growth', Icon: TrendingUp },
+  // 回收站。放在设置前面：它是一个**日常会用到**的视图（误删之后要来这里），
+  // 而设置是低频的。
+  { key: 'trash', labelKey: 'web.trash.nav', Icon: Trash2 },
   { key: 'settings', labelKey: 'web.shell.views.settings', Icon: Settings },
 ];
 
@@ -170,6 +174,7 @@ const VIEW_TITLED_BY_TAB: readonly ViewKey[] = [
   'focus',
   'timeline',
   'growth',
+  'trash',
   'settings',
 ];
 
@@ -505,15 +510,16 @@ export function App(): React.JSX.Element {
           {/**
            * 今日进度（激励体系 L1）。
            *
-           * 🔴 **它常驻在三个"做事"的视图上**（任务 / 四象限 / 习惯 / 番茄钟），
-           * 而不常驻设置页与成长页：设置页不产生完成，成长页本身就是在讲
+           * 🔴 **它常驻在那几个"做事"的视图上**（任务 / 四象限 / 习惯 / 番茄钟），
+           * 而不常驻设置页、成长页与回收站：设置页不产生完成，成长页本身就是在讲
            * 更长的尺度 —— 在那里再顶一条"今天 3/5"，会把"历史"重新压回"今天"，
-           * 恰好抵消掉那个页面存在的意义。
+           * 恰好抵消掉那个页面存在的意义；回收站是**找回**已删除东西的地方，
+           * 顶一条今天的进度同样文不对题。
            *
            * 放在这里而不是放进各视图内部：它是**跨视图的同一件事**，
            * 放进四个视图就会长出四份，而它们必然漂移。
            */}
-          {view !== 'settings' && view !== 'growth' && <TodayProgressCard />}
+          {view !== 'settings' && view !== 'growth' && view !== 'trash' && <TodayProgressCard />}
 
           {/* 🔴 托管同步到期/被拒时的提示。它**只解释**"哪一件事被限制了"
               （通过官方托管服务的同步；含超出免费额度的新设备），不挡任何功能 ——
@@ -738,6 +744,7 @@ export function App(): React.JSX.Element {
             />
           )}
           {view === 'growth' && <GrowthView />}
+          {view === 'trash' && <TrashView />}
           {view === 'settings' && (
             <AiSettings
               initial={aiSettings}
