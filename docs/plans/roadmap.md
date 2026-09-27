@@ -386,7 +386,16 @@ Web 设置页有「导出数据」（JSON 完整保真 / 任务清单 Markdown�
   `verify-email` → `login/magic-link/verify` → 真 JWT → 面板粘贴登录成功 → 应用真的打了
   `POST /api/sync/ops`（**200**），`server_seq` 从 0 推进到 1，真库里留下 1 条 op，**0 console.error**。
   唯一没验的就是**邮件投递本身**。
-- **浏览器端通行密钥那一步仍未接线**（只有登录链接 + 粘贴令牌两条路）。
+- ✅ **浏览器端通行密钥那一步已接线**（`apps/web/src/features/auth/passkey-browser.ts`）。
+  `@heyta/app-host` 只到"取 options / 交 credential"，中间 `navigator.credentials` 那一步按设计留在宿主里；
+  缺的就是这一步，所以在此之前面板只有登录链接一条路。现在注册与登录两条都通了。
+  **两道验收**：(a) 单测 45 条（转换层逐字段钉字节 + store 接线 + 失败不被当成成功）；
+  (b) **真浏览器 + 虚拟认证器** 13/13 —— 其中一条是**反证**：把服务端的 JSON 原样丢给
+  `navigator.credentials.create()` 会被 Chromium 以 `TypeError` 拒掉，证明转换层不是多余的；
+  再把产出的 `clientDataJSON` 解出来，`challenge` 必须**原样回显**（长度对但内容错也会被抓），
+  可发现凭据路径解出的 `userHandle` 是注册时的 `user.id`。
+  ⚠️ 仍然**没有做**的服务端那半：**找回通行密钥**（`/api/passkey/recover/*` 三个端点在 app-host 有函数、
+  没有界面），以及**用户主动增删凭据**（没有 UI，也没有端点）。
 - **回收站的跨设备一致性没有被真正验证**：op 级证明用的是两个真引擎 + 两个真 SQLite，**没有**跑真实的两客户端服务端收敛。
 - ✅ **导入 / 还原已做**（`packages/app-host/src/import-dump.ts`，CLI 与 Web 都有入口）：走**重放导出里的完整 op-log**，
   所以墓碑语义天然保持（已删数据不复活），并且**只支持还原到空库** —— 目标非空时在写任何东西**之前**就拒绝。
