@@ -346,6 +346,69 @@ describe('列表顺序', () => {
   });
 });
 
+describe('分类色槽位', () => {
+  it('存的是**槽位号字符串**，不是颜色本身', async () => {
+    const id = await actions.createProject('深度工作');
+    await actions.setProjectColor(id, 3);
+
+    const op = await opWithField('PROJECT', id, 'color');
+    expect(op.opType).toBe(OpType.Update);
+    // 🔴 存 "3" 而不是 "#0d9488"：换配色不该动用户数据。
+    // 写成裸 hex 的话，历史数据里就是旧配色，而它在新主题下可能看不清。
+    expect(payloadOf(op).color).toBe('3');
+  });
+
+  it('清除写 `color: null`（键在、值为 null），而不是"键消失"', async () => {
+    const id = await actions.createProject('深度工作');
+    await actions.setProjectColor(id, 3);
+    await actions.setProjectColor(id, undefined);
+
+    const op = await opWithField('PROJECT', id, 'color');
+    expect('color' in payloadOf(op)).toBe(true);
+    expect(payloadOf(op).color).toBeNull();
+    // 物化之后字段真的没了 —— 于是它在分类时长里回到"无颜色"
+    expect(engine.getState().projects[id]?.color).toBeUndefined();
+  });
+
+  it('🔴 非法槽位**抛错**，不静默写进去', async () => {
+    const id = await actions.createProject('深度工作');
+    // 0 是最可能的真实错误：界面很容易把数组下标（0 起算）传进来，
+    // 而 `"0"` 读回来会被当成"没设过色" —— 症状是"点了 1 号却没颜色"。
+    await expect(actions.setProjectColor(id, 0 as never)).rejects.toThrow(/1–8/);
+    await expect(actions.setProjectColor(id, 9 as never)).rejects.toThrow(/1–8/);
+    expect(engine.getState().projects[id]?.color).toBeUndefined();
+  });
+
+  it('找不到（或已删除）的清单不能上色', async () => {
+    await expect(actions.setProjectColor('不存在', 1)).rejects.toThrow(/找不到清单/);
+
+    const id = await actions.createProject('深度工作');
+    await actions.removeProject(id);
+    await expect(actions.setProjectColor(id, 1)).rejects.toThrow(/找不到清单/);
+  });
+
+  it('另一台设备能读到这个槽位（真的物化了，而不是丢在同步里）', async () => {
+    const adapterB = new SqliteAdapter({
+      schema: INDEXEDDB_SCHEMA,
+      driverFactory: () => new NodeSqliteDriver(':memory:'),
+    });
+    await adapterB.init();
+    const engineB = new OpLogEngine({
+      store: new DbOpLogStore<Operation<string>>(adapterB),
+      clientId: 'client-color',
+      now,
+    });
+
+    const id = await actions.createProject('深度工作');
+    await actions.setProjectColor(id, 6);
+
+    await engineB.applyRemote(await engine.getPendingUpload());
+    expect(engineB.getState().projects[id]?.color).toBe('6');
+
+    adapterB.close();
+  });
+});
+
 describe('🔴 反静默丢弃：另一台设备真的能物化它', () => {
   it('A 写入清单与标签 → B 应用远端 → B 的状态里查得到', async () => {
     const adapterB = new SqliteAdapter({

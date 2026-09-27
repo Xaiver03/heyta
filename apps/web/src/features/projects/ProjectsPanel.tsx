@@ -6,8 +6,10 @@
 import { useState } from 'react';
 import { cssVar } from '@heyta/design-system';
 import { useI18n } from '@heyta/i18n';
+import { parseCategorySlot } from '@heyta/domain';
 import { Folder, Plus, Tag as TagIcon, Trash2 } from 'lucide-react';
 
+import { ColorSlotPicker } from '../categories/ColorSlotPicker.js';
 import { useTaskStore } from '../tasks/store.js';
 import { selectChildProjects, selectTopLevelProjects, useProjectStore } from './store.js';
 
@@ -76,6 +78,11 @@ export function ProjectsPanel() {
                   <span style={{ flex: 1, textAlign: 'left' }}>{p.name}</span>
                   <span style={{ fontVariantNumeric: 'tabular-nums' }}>{countIn(p.id)}</span>
                 </button>
+                <ColorSlotPicker
+                  value={parseCategorySlot(p.color)}
+                  onChange={(slot) => void projects.setProjectColor(p.id, slot)}
+                  targetName={p.name}
+                />
                 <button
                   type="button"
                   onClick={() => void projects.deleteProject(p.id)}
@@ -88,7 +95,7 @@ export function ProjectsPanel() {
               {/* 子清单只渲染一层 —— 领域层明确不支持任意深度嵌套 */}
               <ul style={{ ...listStyle, paddingLeft: cssVar('space.4') }}>
                 {selectChildProjects(projects, p.id).map((c) => (
-                  <li key={c.id}>
+                  <li key={c.id} style={{ display: 'flex', alignItems: 'center' }}>
                     <button
                       type="button"
                       onClick={() => tasks.setFilter({ kind: 'project', projectId: c.id })}
@@ -97,6 +104,11 @@ export function ProjectsPanel() {
                       <span style={{ flex: 1, textAlign: 'left' }}>{c.name}</span>
                       <span style={{ fontVariantNumeric: 'tabular-nums' }}>{countIn(c.id)}</span>
                     </button>
+                    <ColorSlotPicker
+                      value={parseCategorySlot(c.color)}
+                      onChange={(slot) => void projects.setProjectColor(c.id, slot)}
+                      targetName={c.name}
+                    />
                   </li>
                 ))}
               </ul>

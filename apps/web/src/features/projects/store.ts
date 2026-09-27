@@ -27,7 +27,7 @@
 
 import { create } from 'zustand';
 
-import type { Project, Tag } from '@heyta/domain';
+import type { CategorySlot, Project, Tag } from '@heyta/domain';
 import { createProjectActions, type ActionContext } from '@heyta/app-host';
 
 import { currentState, dispatchIntent, onEngineChange } from '../../lib/oplog.js';
@@ -40,6 +40,8 @@ interface ProjectState {
   renameProject: (id: string, name: string) => Promise<void>;
   archiveProject: (id: string) => Promise<void>;
   deleteProject: (id: string) => Promise<void>;
+  /** 分类色槽位（1–8），`undefined` 表示清除。存槽位号，不存颜色本身。 */
+  setProjectColor: (id: string, slot?: CategorySlot) => Promise<void>;
 
   addTag: (name: string) => Promise<void>;
   deleteTag: (id: string) => Promise<void>;
@@ -76,6 +78,13 @@ export const useProjectStore = create<ProjectState>(() => ({
   deleteProject: async (id) => {
     // 软删除（墓碑）。⚠️ 不级联删任务，见文件头。
     await projectActions.removeProject(id);
+  },
+
+  setProjectColor: async (id, slot) => {
+    // 槽位合法性由动作层校验（它会对 0 或 9 抛错）——
+    // 界面这一侧不做第二份判断，两份判断迟早不一致。
+    await projectActions.setProjectColor(id, slot);
+    syncProjects();
   },
 
   addTag: async (name) => {

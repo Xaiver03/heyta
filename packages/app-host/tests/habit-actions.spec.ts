@@ -242,3 +242,40 @@ describe('🔴 反静默丢弃：另一台设备真的能物化它', () => {
     adapterB.close();
   });
 });
+
+describe('分类色槽位', () => {
+  it('与清单同一条规则：存槽位号字符串，清除写 null', async () => {
+    const id = await actions.createHabit('跑步', { unit: '分钟', target: 30 });
+    await actions.setHabitColor(id, 5);
+
+    const withColor = (await engine.getOpsForEntity('HABIT', id)).filter(
+      (op) => 'color' in payloadOf(op),
+    ).at(-1);
+    expect(withColor?.opType).toBe(OpType.Update);
+    expect(payloadOf(withColor!).color).toBe('5');
+
+    await actions.setHabitColor(id, undefined);
+    const cleared = (await engine.getOpsForEntity('HABIT', id)).filter(
+      (op) => 'color' in payloadOf(op),
+    ).at(-1);
+    expect(payloadOf(cleared!).color).toBeNull();
+    expect(engine.getState().habits[id]?.color).toBeUndefined();
+  });
+
+  it('🔴 非法槽位抛错；找不到的习惯也抛错', async () => {
+    const id = await actions.createHabit('跑步');
+    await expect(actions.setHabitColor(id, 0 as never)).rejects.toThrow(/1–8/);
+    await expect(actions.setHabitColor('不存在', 1)).rejects.toThrow(/找不到习惯/);
+  });
+
+  it('上色不影响打卡与连续天数（颜色只是身份，不是状态）', async () => {
+    const id = await actions.createHabit('跑步', { unit: '分钟', target: 30 });
+    await actions.setHabitColor(id, 2);
+    await actions.checkIn(id, DAY1);
+
+    const habit = engine.getState().habits[id];
+    expect(habit?.color).toBe('2');
+    expect(habit?.target).toBe(30);
+    expect(Object.values(engine.getState().habitLogs)).toHaveLength(1);
+  });
+});

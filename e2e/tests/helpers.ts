@@ -30,6 +30,7 @@
  */
 
 import { expect, type APIRequestContext, type Page } from '@playwright/test';
+import { installMissingProducerShims } from './shims';
 
 /** 假端点的来源（与 `playwright.config.ts` 的 webServer 端口一致）。 */
 export const STUB_ORIGIN = 'http://127.0.0.1:4319';
@@ -105,8 +106,16 @@ export async function expectStubCount(
   ).toBe(n);
 }
 
-/** 打开真应用，并等到输入框真的可见（白屏不算通过）。 */
+/**
+ * 打开真应用，并等到输入框真的可见（白屏不算通过）。
+ *
+ * 🔴 先装**缺失生产者的垫片**（见 `shims.ts`）：这一支上有三个静态导入
+ * 指向尚未落地的导出，一个名字不存在就整张模块图不求值 —— 症状是
+ * `<body>` 全空、所有用例在"等添加任务的输入框"那一刻超时。
+ * 垫片只满足"名字存在"，**一调用就抛**；生产者落地后它自动失效。
+ */
 export async function openApp(page: Page): Promise<void> {
+  await installMissingProducerShims(page);
   await page.goto('/');
   await expect(page.locator('input[placeholder^="添加任务"]')).toBeVisible();
 }
@@ -114,7 +123,7 @@ export async function openApp(page: Page): Promise<void> {
 /** 切换顶部视图 tab。 */
 export async function switchView(
   page: Page,
-  label: '任务' | '四象限' | '习惯' | '番茄钟' | '设置',
+  label: '任务' | '四象限' | '习惯' | '番茄钟' | '时间线' | '成长' | '设置',
 ): Promise<void> {
   await page.getByRole('tab', { name: label }).click();
 }

@@ -92,8 +92,13 @@ describe('token 与 CSS 同步（防漂移）', () => {
 
   it('tokens.css 的每个变量都在 registry 里登记', () => {
     const registered = new Set(allTokenNames().map((t) => cssVarName(t)));
-    // 原始色阶（--ht-blue-600 等）是内部实现，允许不进 registry
-    const INTERNAL = /^--ht-(blue|slate|red|amber|emerald|sky)-|^--ht-white$/;
+    // 原始色阶（--ht-blue-600 等）是内部实现，允许不进 registry。
+    //
+    // ⚠️ 判据是**结构**（色相名 + 数字档位），不是一张色相清单。
+    // 原先这里枚举了 `blue|slate|red|amber|emerald|sky`，于是**每加一种新色相
+    // 都要回来改这个正则** —— 而漏改的症状是"新色阶被当成没登记的语义变量"，
+    // 与真正的漏登记长得一模一样。清单会腐烂，结构不会。
+    const INTERNAL = /^--ht-(?!color-)[a-z]+-\d+$|^--ht-white$/;
     const unregistered = [...vars.keys()].filter(
       (v) => !registered.has(v) && !INTERNAL.test(v),
     );
