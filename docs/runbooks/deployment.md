@@ -304,8 +304,8 @@
 | `CORS_ORIGINS` | `https://heyta.finlaw.cloud` | ✅ 与 `PUBLIC_URL` 同源 |
 | `DOMAIN` | `heyta.finlaw.cloud` | ✅ 供 compose 的 caddy 服务用（当前没起，nginx 直接反代 1900） |
 | `RUN_MIGRATIONS_ON_STARTUP` | `false` | ✅ 迁移由 `deploy.sh` / `migrate-deploy.sh` 显式跑 |
-| `TEST_MODE` | `true` | ✅ 🔴 **生产环境开着测试模式，见 §7.4** |
-| `TEST_MODE_CONFIRM` | `yes-i-understand-the-risks` | ✅ |
+| `TEST_MODE` | ~~`true`~~ **已于 2026-09-27 删除** | ✅ **服务端从来不在测试模式**：生产 compose 不转发它，容器里是空的，线上 `/api/test/*` 全是 404。见 §7.4 |
+| `TEST_MODE_CONFIRM` | ~~`yes-i-understand-the-risks`~~ **同时删除** | ✅ 同上；`NODE_ENV=production` 下这两个键只会让服务端起不来 |
 | `WEBAUTHN_RP_ID` | `heyta.finlaw.cloud` | ✅ 🔴 **改它会让旧域名上已注册的 passkey 全部失效**（§3.7.1） |
 | `WEBAUTHN_RP_NAME` | `heyta` | ✅ |
 | `WEBAUTHN_ORIGIN` | `https://heyta.finlaw.cloud` | ✅ |
@@ -560,9 +560,11 @@ Playwright 实测：中文页与英文页各两个入口都指向应用地址且
 - `heyta-tmp.litopia.space` 那份 nginx 站点仍在（`location /` → 1900 的 Connect 页与 `/api/`、
   `/health`；`/app*` 与 `/landing*` 已改成 **301**），留作回滚路径。它**已经不是入口**了：
   落地页的「立即使用」自 2026-09-27 起指向 `heyta.finlaw.cloud`，而且那里 passkey 不可用（§3.7.1）。
-- 🔴 同步服务端**仍然是测试形态**（`supersync:local` 本机构建、`TEST_MODE=true`、
-  `RUN_MIGRATIONS_ON_STARTUP=false`）—— 换域名**没有**改变这些。域名只是名字，不是"转生产"。
+- 🔴 同步服务端**仍然是临时形态**（`supersync:local` 本机构建、`RUN_MIGRATIONS_ON_STARTUP=false`）——
+  换域名**没有**改变这些。域名只是名字，不是"转生产"。
   ⚠️ 这条原先写的是"没有 SMTP" —— **那当天就不成立了**：§3.9 记着 SMTP 已配好且实测真投递。
+  ⚠️ 也**不要**再往这里写 `TEST_MODE=true`：服务端**从来不在**测试模式（§7.4），
+  那两个键已于 2026-09-27 从 `.env` 删掉 —— 它们在生产 `NODE_ENV` 下只会让服务端起不来。
 
 #### 原先记在这里、现已做掉的
 
@@ -974,8 +976,8 @@ curl --noproxy '*' -sS -X POST https://heyta.finlaw.cloud/api/login/passkey/opti
 清 nginx 而留 DNS，会留下一个指向 404 的解析。
 
 ⚠️ **别把这件事和"服务端还是临时形态"混为一谈**：这台机器上的 `supersync-server` 仍是
-本地构建的 `supersync:local`、`RUN_MIGRATIONS_ON_STARTUP=false`、`TEST_MODE=true`
-（见 §7.4）。**换域名没有改变这一点** —— 换的只是它对外叫什么名字。
+本地构建的 `supersync:local`、`RUN_MIGRATIONS_ON_STARTUP=false`（见 §7.4）。
+**换域名没有改变这一点** —— 换的只是它对外叫什么名字。
 
 2026-09-27 的几次变更留下的备份，清理时一并决定去留：
 
@@ -1013,10 +1015,34 @@ OPP 已过期、随时回收。✅ 已经搬走的（**这次实测确认不在 
 ✅ DNS 已指向 sanjiaozhou，但 Caddy 配置里**没有这个 vhost**，TLS 握手直接失败（`tlsv1 alert internal error`）。
 是一次迁移没搬全的残留。
 
-### 7.4 🔴 生产环境开着 `TEST_MODE=true`
+### 7.4 ✅ 原判「生产环境开着 `TEST_MODE=true`」**是错的** —— 服务端从来不在测试模式
 
-✅ `ubuntu-jcli:~/heyta/server/.env` 里 `TEST_MODE=true` + `TEST_MODE_CONFIRM=yes-i-understand-the-risks`，
-而 `NODE_ENV=production`。线索里没提这一条。**这是需要人拍板的事，不是本文档能改的。**
+**2026-09-27 更正。** 本节原先写着：`.env` 里 `TEST_MODE=true`、`NODE_ENV=production`，
+"这是需要人拍板的事"。**它把"配置里写了"当成了"运行时长这样"**，而这两件事在这里恰好相反。
+
+实际链路（逐层查过）：
+
+| 层 | `TEST_MODE` |
+|---|---|
+| `~/heyta/server/.env` | `true` —— **当天已删** |
+| `server/docker-compose.yml` 的 `environment:` | **不转发**（它是显式白名单，没有这一行） |
+| 容器内 `$TEST_MODE` | **空**（`docker exec … 'echo $TEST_MODE'`） |
+| 线上 `/api/test/create-user`、`/api/test/users`、`/api/test/reset` | **全部 404**（实测） |
+
+所以服务端**一直**不在测试模式，`/api/test/*` 没被暴露过。而且这件事不可能反过来：
+
+1. `server/docker-compose.test.yml:11-14` 明写了 TEST_MODE "**必须通过覆盖文件注入，
+   绝不能写进生产 compose**" —— 这是**设计**，不是疏漏；
+2. 就算硬塞进去也**起不来**：`config.ts:540` 见 `NODE_ENV=production` 且 `TEST_MODE=true`
+   会直接 `throw`。
+
+**真正的问题是那两行死配置。** 留着它有两个害处：(a) 让本文档这样误判（已发生）；
+(b) 诱使后来者"顺手"往生产 compose 补一行让它生效 —— 而那会让服务端**直接崩**。
+已于 2026-09-27 从 `.env` 删除（**20 键 → 18 键**），容器全程不受影响，因为它本来就没拿到这两个变量。
+
+> ⚠️ **这一节的教训不是"漏了核实"，而是核实错了层。** 配置文件的真相不在文件里，
+> 在 `docker exec <容器> sh -c 'echo $VAR'` 里。凡是"某个开关是不是开着"，
+> 都要落在**运行时**上，否则记下来的是意图而不是事实。
 
 ### 7.5 备份文件堆积
 
@@ -1195,7 +1221,7 @@ pnpm check:docs
 | 6 | sanjiaozhou "在跑代理" | 不只是代理：它现在是 **litopia.space 等站点的对外主机**（Caddy + PM2 Litopia + Mailu + SSOS 等） | Caddyfile、PM2 list、docker compose project 列表 |
 | 7 | OPP "预计停服 2026-09-27 00:00" | 到期时间 `2026-09-25T13:32:10Z` **已过**，但实例仍 `RUNNING`、`InstanceRestrictState=NORMAL`；"09-27 停服"**无 API 可复核** | `tccli lighthouse DescribeInstances` |
 | 8 | （未提） | `dev.litopia.space` **当前 TLS 失败**：DNS 已切但 Caddy 无 vhost | `curl -k --resolve` + grep caddy conf |
-| 9 | heyta 生产 env 清单 | 基本吻合，但**多出 `TEST_MODE=true`**（线索没提），且 `POSTGRES_USER`/`POSTGRES_DB` 都是 `heyta` | `ssh ubuntu-jcli 'cat ~/heyta/server/.env'`（去值） |
+| 9 | heyta 生产 env 清单 | 基本吻合；`POSTGRES_USER`/`POSTGRES_DB` 都是 `heyta`。~~多出 `TEST_MODE=true`~~ → **查实为死配置**（生产 compose 不转发它，服务端从不在测试模式，§7.4），已于 2026-09-27 从 `.env` 删除 | `ssh ubuntu-jcli 'cat ~/heyta/server/.env'`（去值）**加** `docker exec … 'echo $TEST_MODE'` |
 | 10 | 交付路径 `docs/ops/deployment.md` | 按 [`docs/README.md`](../README.md) 的分层规则，运维操作手册归 **`runbooks/`**，故落在 **`docs/runbooks/deployment.md`**（命名规范 `runbooks/<kebab-case>.md`） | `docs/README.md` §一、§二 |
 | 11 | 备份文件 `ubuntu-jcli:…config.yaml.bak-before-newsub-20260926T125425` | 文件存在，但**只有 1265 B、无 proxies**——是"换订阅之前的直连小配置"，不是旧订阅 | `ls -la` + `head` |
 | 12 | 本机跑 Android 模拟器 `emulator-5554`（AVD `SSOS-Parity-A36`） | ✅ **属实**（这次仍在跑） | `adb -s emulator-5554 emu avd name` |
