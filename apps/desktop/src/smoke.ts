@@ -250,8 +250,34 @@ async function smoke(): Promise<number> {
     second.close();
     return ok ? 0 : 1;
   } finally {
-    rmSync(dir, { recursive: true, force: true });
+    cleanupTempDir(dir);
   }
+}
+
+/**
+ * 删临时目录，**失败不让它否决结论**。
+ *
+ * 🔴 Windows 上实测：`rmSync` 会因 SQLite 的文件句柄还没释放而抛
+ * `EPERM`（`\\?\C:\Users\…\Temp\heyta-desktop-smoke-…`）。第一版没有兜住，
+ * 于是"清理失败"把整个冒烟变成了红色 —— 而**判据其实已经算出来了**。
+ *
+ * 这是"证据"与"打扫"混在一起的老问题：打扫不该能否决证据。
+ * 所以这里退避重试几次，仍失败就**打印一行警告并放行**，退出码不受影响。
+ * 临时目录残留是可接受的代价，用一行警告换"结论不被无关原因污染"值得。
+ */
+function cleanupTempDir(dir: string): void {
+  for (let attempt = 0; attempt < 5; attempt++) {
+    try {
+      rmSync(dir, { recursive: true, force: true });
+      return;
+    } catch {
+      // Windows 释放句柄是异步的，睡一会儿再试。
+      // `Atomics.wait` 是 Node 里正经的**同步**睡眠 —— 这里不能用 await
+      // （`finally` 里没有 async 上下文），也不该忙等烧 CPU。
+      Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 200);
+    }
+  }
+  console.warn(`⚠️ 临时目录没能删掉（不影响结论）：${dir}`);
 }
 
 /**
