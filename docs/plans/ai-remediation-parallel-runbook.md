@@ -29,42 +29,83 @@
 
 ---
 
-## 0.5 开工前：**先确认分叉点是绿的** —— 本轮它不绿
+## 0.5 开工前：**分叉点必须是一个已验证绿的提交**（不是 main 的 HEAD）
 
 worktree 隔离防的是"互相覆盖"，它**防不住"分叉点自己就构建不过"**。
-本轮实测（tag `ai-remediation-fork`）：
 
-| 项 | 数字 |
+本轮的实测经过值得整段记住：我在 10:0x 量到 main 是红的 ——
+`apps/web` **22 个类型错误 / 12 个文件**、`@heyta/web` **47 failed / 480 passed**。
+当时的头号证据看着像"改动只提交了一半"：
+`apps/web/src/features/ai/AiDuration.tsx` 已经在调 `preferenceEvidenceCopy(hint.facts, t)`，
+而 `git log -S facts -- packages/domain/src/` **输出为空**。
+
+**但那个结论是错的（至少是过期的）。** 十分钟后再量，同一棵树是 **0 错误 / 527 通过**。
+真因不是"有人漏提交"，而是**一次跨包改动正在分几笔落地**，
+而 `apps/web` 那半先于 `packages/*` 那半进了 main：
+
+| 提交 | 补上了什么 |
 |---|---|
-| `apps/web` 类型错误 | **22 个 / 12 个文件** |
-| `@heyta/web` 测试 | **47 failed** / 480 passed / 12 skipped |
+| `e9f2701` feat(domain): 四象限派生化 + 偏好证据结构化（ADR-0015） | `PreferenceHint.facts` / `PreferenceEvidence` / `QuadrantDropPlan` |
+| `9d22f09` refactor(storage): 存储失败结构化（ADR-0016/0019） | `StorageError` |
+| `219e13d` fix(sync): 上传被拒不再阻断下载（ADR-0019） | `SyncFailureReason` 的 `upload-rejected` |
+| `113406e` feat(app-host): 把新的存储/同步状态接到宿主层 | 宿主侧接线 |
+| `5d0d77f` feat(web): 任务行上的「整理」 | 界面侧 |
 
-成因还是同一个形状：**改动只提交了一半** —— `apps/web` 那半提交了，
-`packages/*` 那半还躺在主检出的工作区里。可复跑的证据：
+→ 所以**红窗口是"改动正在落地"的正常中间态，不是谁忘了提交**。
+把它误判成"有人漏了"，下一步就会去替别人提交 —— 那才是真会出事的地方。
+
+### 由此得到的两条硬规则
+
+**① 分叉点要挑一个已验证绿的提交，而不是 main 的 HEAD。**
+实测 10 分钟内 HEAD 动了 **4** 次（`de603b1 → 5d0d77f → d51181d → eeb8265 → 0a7b23e → 7147568`）。
+追 HEAD 追不上，而且很可能恰好停在那段红窗口里。本轮定的是
+**`ai-remediation-fork` = `5d0d77f`**（实测：0 类型错误 / 527 passed / 12 skipped）。
+
+**② 验证一个提交的健康度，要在一次性 worktree 里量。** 三行就够：
 
 ```bash
-# PreferenceHint 在**全部已提交历史**里都没有 facts，而 head 上已经有代码在调它
-git log -S facts -- packages/domain/src/            # 输出为空
-grep -n "hint\.facts" apps/web/src/features/ai/AiDuration.tsx
+git worktree add --detach .worktrees/ai-probe <commit>
+cd .worktrees/ai-probe && pnpm install --frozen-lockfile
+pnpm --filter "@heyta/web..." build     # ⚠️ 不要用 pnpm -r build，见 R1 里的 prisma 坑
+pnpm --filter @heyta/web test
+cd .. && git worktree remove --force .worktrees/ai-probe    # 用完就删
 ```
 
-被已提交代码引用、却从未提交的另一半（共 9 处）：
-`PreferenceHint.facts`、`PreferenceEvidence`、`clockText`、`roundedDaysText`、
-`WithheldPreference.remaining`、`Preference.evidenceFacts`、`QuadrantDropPlan`、
-`TaskActions.setQuadrantDrop`、`StorageError`。
+这条命令本轮用过三次，也正是它纠正了上面那个错判 —— **量，不要推断**。
 
-🔴 **分叉点红的时候不要开工。** 你会分不清"是我改坏的"还是"本来就坏"。
-本轮 ai-m2 是靠 `git stash` 前后各跑一次全量、逐项对齐
-（47 failed/480 passed → 47 failed/482 passed）才敢说"本改动 +2 通过、0 新增失败"。
+### 如果**找不到**绿的提交：把工作区冻结成分叉点
 
-🔴 **`pnpm check` 跑在脏检出上等于没跑。** 这是本轮最贵的一课：
-上一轮的交付报告写着"`pnpm check` exit 0"，而那个检出里躺着别人 102 个未提交文件 ——
-**它验证的不是任何一个提交**；已提交状态实际是红的（就是上面那 22 + 47）。
+有一刻 main 上确实没有绿提交可用。此时不要从红的提交开工，也不要替别人提交，
+而是把**当下这个能构建的工作区**冻成一个 git 对象（不碰工作区、不碰索引）：
+
+```bash
+export GIT_INDEX_FILE=/tmp/heyta-baseline-index   # 用临时索引，真实的索引/工作区一个字节都不动
+rm -f "$GIT_INDEX_FILE"; git read-tree HEAD; git add -A
+git commit-tree "$(git write-tree)" -p HEAD -m "wip(baseline): 冻结当前工作区的绿色状态"
+git tag -f ai-remediation-fork <上面输出的 sha>
+```
+
+本轮实测过这条路（快照 = 0 错误 / 527 通过，与工作区逐项一致），
+但它**故意不是 main 的祖先**：等工作真落到 main 之后要这样摘回来 ——
+
+```bash
+git rebase --onto <新的 main> ai-remediation-fork <模块分支>
+```
+
+⚠️ 最终没有采用它：几分钟后真的绿提交出现了。**能用真提交就别用快照。**
+
+### 🔴 `pnpm check` 跑在脏检出上等于没跑
+
+这是本轮最贵的一课，与上面无关、单独成立：
+上一轮的交付报告写着"`pnpm check` exit 0"，而那个检出里躺着别人 **102 个未提交文件** ——
+**它验证的不是任何一个提交**。已提交状态当时实际是红的（就是上面那 22 + 47）。
 → 门禁必须在**干净的 worktree 上、对着某个提交**跑。这是隔离的第二个好处。
 
-**分叉点 tag 的移动协议**：`ai-remediation-fork` 只允许在**没有任何模块开始提交之前**移动。
-本轮它移动过两次（都是预检修复）。一旦有人提交了，再改分叉点就必须
-`git rebase ai-remediation-fork`（本轮 ai-m2 就是这么跟上来的）—— 所以**别再动它**。
+### 分叉点 tag 的移动协议
+
+`ai-remediation-fork` 只允许在**没有任何模块开始提交之前**移动。
+本轮它移动过数次（都是预检修复）。一旦有人提交了，再改分叉点就必须 rebase
+（ai-m2 的 `1db37fc` 就是这么跟上来的）—— **所以从现在起别再动它**。
 
 ---
 
@@ -218,9 +259,11 @@ git merge --no-ff feat/ai-module-2-journey
 cd .worktrees/ai-m2
 export PATH="/opt/homebrew/bin:/usr/local/bin:$PATH"
 
-node ../../scripts/check-module-boundaries.mjs --module 2 --rev ai-remediation-fork   # 0 越界
-node ../../scripts/check-ui-language.mjs                                  # exit 0
-pnpm --filter @heyta/web test                                            # 不低于基线
+# 用工作副本里自己那份脚本，别用 ../../scripts（那是主检出的另一份副本 —— 两份会漂移）
+node scripts/check-module-boundaries.mjs --module 2 --rev ai-remediation-fork   # 0 越界
+node scripts/check-ui-language.mjs                                             # exit 0
+pnpm --filter @heyta/web test                                                  # 不低于 527 passed
 ```
 
-三行都过，才可以喊人合并 —— **不需要等另外两个模块**。
+分叉点 `5d0d77f` 上实测的基线是 **0 类型错误 / 527 passed / 12 skipped**；
+收工时只要**不低于**它、且 **0 failed**，就可以喊人合并 —— **不需要等另外两个模块**。
