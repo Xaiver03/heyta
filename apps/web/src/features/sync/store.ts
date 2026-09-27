@@ -59,6 +59,15 @@ interface SyncStoreState {
   settingsOpen: boolean;
 
   configure: (baseUrl: string, token: string, password: string) => void;
+  /**
+   * 认证成功后写回同步配置。
+   *
+   * 🔴 **只动 `baseUrl` 与 `token`。** 口令是用户在设置里另填的一件事，
+   * 这里"顺手"把它清掉的话，症状是"登录明明成功了，同步却说自己没配置" ——
+   * 而用户刚在上一屏把口令输进去过。所以它是一条**专门的、窄的**动作，
+   * 而不是复用 `configure(baseUrl, token, '')`。
+   */
+  applyAuthToken: (baseUrl: string, token: string) => void;
   clearCredentials: () => void;
   syncNow: () => Promise<SyncStatus>;
   /** 用户手动解决一处冲突。两个方向都走 op-log（重新派发），不直接改状态。 */
@@ -156,6 +165,11 @@ export const useSyncStore = create<SyncStoreState>((set, get) => ({
 
   configure: (baseUrl, token, password) => {
     set({ baseUrl, token, password, status: { kind: 'idle' } });
+  },
+
+  applyAuthToken: (baseUrl, token) => {
+    // 口令与上次同步时间原样保留 —— 见接口上的说明。
+    set({ baseUrl, token, status: { kind: 'idle' } });
   },
 
   clearCredentials: () => {
