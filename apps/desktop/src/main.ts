@@ -22,6 +22,11 @@ import { DESKTOP_CHANNELS, handleDesktopRequest, type DesktopRequest } from './i
 let host: NodeHost | null = null;
 let quitting = false;
 
+/**
+ * 当前主窗口。只在 `second-instance` 里用来把已有窗口拉回前台。
+ */
+let mainWindow: BrowserWindow | null = null;
+
 async function bootHost(): Promise<NodeHost> {
   host ??= await openDesktopHost({ userDataDir: app.getPath('userData') });
   return host;
@@ -123,28 +128,59 @@ function createWindow(): BrowserWindow {
    */
   void window.loadFile(join(__dirname, '..', 'renderer-dist', 'index.html'));
 
+  mainWindow = window;
+  window.on('closed', () => {
+    if (mainWindow === window) mainWindow = null;
+  });
+
   return window;
 }
 
-app.whenReady().then(
-  () => {
-    ipcMain.handle(DESKTOP_CHANNELS.request, async (_event, request: DesktopRequest) => {
-      const opened = await bootHost();
-      return handleDesktopRequest(opened, request);
-    });
+/**
+ * 🔴 **单实例锁**。
+ *
+ * 这个应用**独占一个 SQLite 文件**（`userData/` 下）。没有锁时，双击两次就真的
+ * 会跑起两个进程、各自开一个连接写同一个库 —— **本机实测：两个实例能同时活着、
+ * 谁也不报错**。所以这不是"会不会崩"的问题，而是"两个 writer 悄悄写同一份数据"
+ * 的问题，等发现时数据已经不对了。
+ *
+ * `requestSingleInstanceLock()` 按 **userData 目录** 区分实例，所以 e2e
+ * 用 `--user-data-dir=<临时目录>` 启动时**不受影响**（见
+ * `e2e/tests/desktop-window.spec.ts`）—— 每个测试仍是独立实例。
+ *
+ * ⚠️ 第二个实例**不静默消失**：它先把已有窗口拉到前台再退出。
+ * 直接 `app.quit()` 的话，用户双击图标会得到"什么都没发生"，
+ * 那看起来**正好像是应用意外退出了** —— 一个正确的保护会被误读成 bug。
+ */
+if (!app.requestSingleInstanceLock()) {
+  app.quit();
+} else {
+  app.on('second-instance', () => {
+    if (mainWindow === null) return;
+    if (mainWindow.isMinimized()) mainWindow.restore();
+    mainWindow.focus();
+  });
 
-    createWindow();
+  app.whenReady().then(
+    () => {
+      ipcMain.handle(DESKTOP_CHANNELS.request, async (_event, request: DesktopRequest) => {
+        const opened = await bootHost();
+        return handleDesktopRequest(opened, request);
+      });
 
-    // macOS：点 Dock 图标且没有窗口时重开一个（平台惯例，不是业务逻辑）。
-    app.on('activate', () => {
-      if (BrowserWindow.getAllWindows().length === 0) createWindow();
-    });
-  },
-  (error: unknown) => {
-    console.error('桌面应用启动失败：', error);
-    app.quit();
-  },
-);
+      createWindow();
+
+      // macOS：点 Dock 图标且没有窗口时重开一个（平台惯例，不是业务逻辑）。
+      app.on('activate', () => {
+        if (BrowserWindow.getAllWindows().length === 0) createWindow();
+      });
+    },
+    (error: unknown) => {
+      console.error('桌面应用启动失败：', error);
+      app.quit();
+    },
+  );
+}
 
 app.on('window-all-closed', () => {
   // macOS 的惯例是关窗不退应用；其他平台退出。
