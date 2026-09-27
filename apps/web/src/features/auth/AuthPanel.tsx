@@ -89,6 +89,17 @@ function authFailureKey(reason: HostedAuthFailureReason): MessageKey {
       return 'web.auth.error.passkeyCancelled';
     case 'passkey-already-registered':
       return 'web.auth.error.passkeyAlreadyRegistered';
+    // 缺口 B：设备上这条旧凭据服务端已经不认了 —— 说"重新注册 / 换登录方式"，
+    // 而不是笼统的"登录没有完成"。
+    case 'passkey-not-found':
+      return 'web.auth.error.passkeyNotFound';
+    // 凭据还在但断言没验过 —— 说"可以再试一次"，与上一条是两句不同的话。
+    case 'passkey-rejected':
+      return 'web.auth.error.passkeyRejected';
+    // 这条原因也会从删除路径冒出来（最后一条被拒绝）。登录面板上不太可能
+    // 出现，但封闭集合里必须有着落，否则类型系统会拦下这个 switch。
+    case 'last-passkey':
+      return 'web.auth.error.lastPasskey';
     default:
       return 'web.auth.error.unknown';
   }
