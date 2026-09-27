@@ -32,7 +32,13 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
 import { colorOf, contrast, extractVars } from '../src/css-tokens.js';
-import { CATEGORY_SLOT_TOKENS, TOKEN_GROUPS } from '../src/tokens.js';
+import {
+  CATEGORY_SLOT_TOKEN_BY_SLOT,
+  CATEGORY_SLOT_TOKENS,
+  HEAT_TOKENS,
+  TOKEN_GROUPS,
+  UNSET_CATEGORY_TOKEN,
+} from '../src/tokens.js';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const CSS = readFileSync(resolve(HERE, '../src/tokens.css'), 'utf8');
@@ -242,5 +248,57 @@ describe('色盲模拟不是空操作', () => {
     for (const matrix of [PROTANOPIA, DEUTERANOPIA]) {
       expect(deltaE(gray, simulate(gray, matrix))).toBeLessThan(1.5);
     }
+  });
+});
+
+// ─────────────────────────────────────────────────────────────
+// 共享映射：这里是"只有一份"的机器判据
+// ─────────────────────────────────────────────────────────────
+
+/**
+ * 这几条不是重复上面的对比度检查，它们钉的是**另一件事**：
+ * 各端消费的那张「槽位号 → token」映射，与 `CATEGORY_SLOT_TOKENS` 是不是同一份取值。
+ *
+ * 为什么需要：在加这几条之前，**移动端手抄了 8 个槽位值 + 5 个 heat 值**。
+ * 那种写法有一个不会失败的失败 —— 改掉一个槽位取值后，Web 从常量派生、跟着变；
+ * 移动端手抄、**静默保持旧色**；而没有任何测试会红。
+ * 现在取值只有一处（`CATEGORY_SLOT_TOKEN_BY_SLOT` / `HEAT_TOKENS`），
+ * 这几条就是保证它**继续只有一处**。
+ */
+describe('共享映射与常量同源', () => {
+  it('🔴 槽位映射与 CATEGORY_SLOT_TOKENS **逐项相同**（不是"差不多"）', () => {
+    const slots = [1, 2, 3, 4, 5, 6, 7, 8] as const;
+    expect(slots.map((slot) => CATEGORY_SLOT_TOKEN_BY_SLOT[slot])).toEqual([
+      ...CATEGORY_SLOT_TOKENS,
+    ]);
+  });
+
+  it('槽位键恰好 1–8：没有洞、没有多余键（槽位号是**持久化数据**）', () => {
+    expect(Object.keys(CATEGORY_SLOT_TOKEN_BY_SLOT).map(Number).sort((a, b) => a - b)).toEqual([
+      1, 2, 3, 4, 5, 6, 7, 8,
+    ]);
+  });
+
+  it('heat 色阶恰好 5 档且按 0–4 排列（顺序即数值，错位会静默画错深浅）', () => {
+    expect(HEAT_TOKENS).toHaveLength(5);
+    expect([...HEAT_TOKENS]).toEqual([
+      'color.heat-0',
+      'color.heat-1',
+      'color.heat-2',
+      'color.heat-3',
+      'color.heat-4',
+    ]);
+  });
+
+  it('heat 色阶每一个都真的在 registry 里（否则 RN 侧取到 undefined，颜色静默变透明）', () => {
+    const registered = TOKEN_GROUPS.color.map((name) => `color.${name}`);
+    for (const token of HEAT_TOKENS) {
+      expect(registered, `${token} 不在 TOKEN_GROUPS.color 里`).toContain(token);
+    }
+  });
+
+  it('🔴 "未设色"用的 token **不在**分类色板里（否则"没设过色"看起来像第 9 种可选项）', () => {
+    expect(CATEGORY_SLOT_TOKENS).not.toContain(UNSET_CATEGORY_TOKEN);
+    expect(TOKEN_GROUPS.color.map((name) => `color.${name}`)).toContain(UNSET_CATEGORY_TOKEN);
   });
 });

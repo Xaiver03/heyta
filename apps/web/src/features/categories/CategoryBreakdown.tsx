@@ -38,7 +38,7 @@
  */
 
 import { useI18n } from '@heyta/i18n';
-import { cssVar } from '@heyta/design-system';
+import { HEAT_TOKENS, cssVar } from '@heyta/design-system';
 import { intensityLevel, type CategoryReport } from '@heyta/domain';
 
 import { text } from '../../lib/text.js';
@@ -46,15 +46,6 @@ import { categorySlotColor, unsetSlotColor } from '../../lib/category-colors.js'
 import { useTaskStore } from '../tasks/store.js';
 import { selectCategoryReport } from '../motivation/selectors.js';
 import { KIND_COPY, formatDuration, laneDescription, segmentLabel } from './copy.js';
-
-/** 强度色阶：0 档是"这周没记录"，用中性的 heat-0（不是"没有颜色"）。 */
-const HEAT_VARS = [
-  'color.heat-0',
-  'color.heat-1',
-  'color.heat-2',
-  'color.heat-3',
-  'color.heat-4',
-] as const;
 
 export function CategoryBreakdown() {
   const { t } = useI18n();
@@ -154,7 +145,7 @@ function Swimlanes({ report }: { report: CategoryReport }) {
                     className="ht-categories__cell"
                     key={report.weeks[index]?.start ?? String(index)}
                     data-level={level}
-                    style={{ background: cssVar(HEAT_VARS[level]) }}
+                    style={{ background: cssVar(HEAT_TOKENS[level]) }}
                     // 鼠标悬停给出这一格的确切数字 —— 深浅只能看个大概。
                     title={ms === 0 ? t('web.categories.cell.none') : formatDuration(ms, t)}
                   />
