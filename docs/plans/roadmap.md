@@ -5,7 +5,7 @@
 > P1 的详细计划见 `docs/plans/phase-1-single-client-loop.md`。
 > P2 的详细计划见 `docs/plans/phase-2-multi-platform.md`。
 > **AI 能力线与开发分支策略见 `docs/plans/ai-capability-branches.md`**（与 P2/P3 **并行**，不是下一个阶段）。
-> AI 的数据路径决策见 [ADR-0005](../adr/0005-ai-data-path.md)（**待确认**）。
+> AI 的数据路径决策见 [ADR-0005](../adr/0005-ai-data-path.md)（✅ 已接受）。
 
 ---
 
@@ -25,7 +25,7 @@
 | 阶段 | 目标 | 交付判据 | 状态 |
 |---|---|---|---|
 | **P0 奠基** | 工程骨架 + 实体模型 + 服务端跑通 | 能在 Docker 上完成一次真实的「A 端写入 → B 端同步可见」 | ✅ **已完成**（2026-09-25） |
-| **P1 单端闭环** | 1 个端（Web）跑通核心功能 | 任务/清单/四象限/习惯/番茄钟可用，能同步 | ✅ **已完成**（6 条零 mock E2E）→ [详细计划](phase-1-single-client-loop.md) |
+| **P1 单端闭环** | 1 个端（Web）跑通核心功能 | 任务/清单/四象限/习惯/番茄钟可用，能同步 | ✅ **已完成**（`pnpm verify:p1` 自带真实服务端，跑 11 条零 mock E2E，含"真实点击 `ConflictDialog` → 双端收敛"两条）→ [详细计划](phase-1-single-client-loop.md) |
 | **P2 多端补齐** | 桌面 + 移动 | 存储可替换（同一套契约跑遍所有实现）+ 原生端 SQLite，共享同一套核心 | 🔄 **进行中** → [详细计划](phase-2-multi-platform.md) |
 | **P3 平台特有能力** | 小组件、通知、CalDAV 双向同步 | 依赖前两阶段 | ⏸ |
 
@@ -36,12 +36,17 @@ AI **不是 P4**，而是一条与 P2/P3 并行的轨道 —— 理由与排序�
 
 | 分支 | 内容 | 前置 | 状态 |
 |---|---|---|---|
-| **AI-0 基座** | `packages/ai` 的 provider 端口 + BYOK/自托管后端 + 隐私提示 + 分层门禁 | 两个 spike（浏览器 CORS、RN 端侧运行时） | 📋 规划中 |
-| **AI-1 捕获** | 一句话 → 结构化任务字段（`chrono-node` 打底，AI 只兜长尾） | AI-0 | 📋 规划中 |
-| **AI-2 结构化** | 拆解任务（先落 `note` checklist）、逐条象限/优先级建议 | AI-0 | 📋 规划中 |
-| **AI-3 规划** | 今日计划、时间块、AI 排程 | AI-1/AI-2 的真实使用数据 | ⏸ 推迟 |
-| **AI-4 复盘** | 周报、习惯趋势叙述 | AI-0 + 端侧推理（受限分支） | ⏸ 受限 |
-| **AI-5 接口 / 数据主权** | 全量导出、本地 API、MCP server | **无**（与 AI-0 解耦，可并行） | 📋 规划中 |
+| **AI-0 基座** | `packages/ai` 的 provider 端口 + BYOK/自托管后端 + 隐私提示 + 分层门禁 | 两个 spike（浏览器 CORS、RN 端侧运行时） | ✅ **已实现**（`packages/ai/src`：`provider` / `routing` / `egress` / `presets` / `supply` / `health-store`） |
+| **AI-1 捕获** | 一句话 → 结构化任务字段（`chrono-node` 打底，AI 只兜长尾） | AI-0 | ✅ **已实现**（功能 id `capture`；入口 `apps/web/src/features/ai/AiCapture.tsx`，发送前逐步披露） |
+| **AI-2 结构化** | 拆解任务（先落 `note` checklist）、逐条象限/优先级建议 | AI-0 | ✅ **已实现**（功能 id `breakdown` / `prioritize`；入口 `AiBreakdown.tsx` / `AiPrioritize.tsx`） |
+| **AI-3 规划** | 今日计划、时间块、AI 排程 | AI-1/AI-2 的真实使用数据 | ⏸ **未实现**（`packages/ai` 与 `apps/web/src/features/ai` 里没有排程功能 id） |
+| **AI-4 复盘** | 周报、习惯趋势叙述 | AI-0 + 端侧推理（受限分支） | ⏸ **未实现**（成长页的周复盘信是**派生纯函数**，不由 AI 生成） |
+| **AI-5 接口 / 数据主权** | 全量导出、本地 API、MCP server | **无**（与 AI-0 解耦，可并行） | 🟡 **部分实现**：本地 API / MCP ✅（`packages/local-api`，6 个工具：`list_tasks` / `get_task` / `list_projects` / `create_task` / `update_task` / `complete_task`）；**全量导出 ❌ 未实现**（没有任何用户可见的导出入口） |
+
+> 表里没有列到的第 5 个已上线功能是 **`duration-estimate`（时长估算）** ——
+> 入口 `apps/web/src/features/ai/AiDuration.tsx`。它是后来加的，原表的三条分支设想里没有它。
+> 功能 id 的完整集合以 `packages/app-host/tests/ai-*.spec.ts` 里那四个
+> （`capture` / `breakdown` / `prioritize` / `duration-estimate`）为准。
 
 ⚠️ 同一份计划里还有 **3 条不是 AI 的功能设想**（甘特图→时间线视图、Time Left 式倒计时、
 API 数据出口），已刻意放在**非 AI 分支** —— 理由见该计划 §1 与 §5。
@@ -90,18 +95,20 @@ API 数据出口），已刻意放在**非 AI 分支** —— 理由见该计划
 - **只与自己的过去比** —— 排行榜 / 联赛 / 自习室 / 组队打 Boss **结构上不可能**：
   它们需要可信的跨用户聚合，而 E2EE 下服务端看不到明文，本地优先下也没有可信的汇总方。
 
-⚠️ 状态：**代码已实现并通过验证，但分支尚未合并进 `main`**（等并发会话提交完它未提交的
-`packages/i18n` 等改动；`main` 当前按提交状态无法构建）。合并后本条随之更新。
+✅ 状态：**已并入 `main`**（merge commit `84cc7f5`，2026-09-27，75 文件 / +11008 行）。
+当初挡在前面的两件事都已消失：主检出的未提交改动由各自的所有者提交并推送，
+`main` 的 build / typecheck / test 现在全绿。分支 `feat/motivation-system` 与
+worktree `.worktrees/motivation` **已删除**（相关提交仍是 `main` 的祖先，随时可达）。
 
 ### P0 完成证据（2026-09-25）
 
 | 交付判据 | 证据 |
 |---|---|
 | 工程骨架 | pnpm monorepo：`packages/sync-core`、`packages/shared-schema`、`packages/storage`、`server` |
-| 实体模型 | 13 个实体，含 heyta 特有的 `HABIT` / `HABIT_LOG` / `FOCUS_SESSION` |
-| Docker 跑通 | 镜像 `supersync:local` 构建成功；31 个迁移在容器内应用；容器 healthy |
+| 实体模型 | 13 个实体（P0 当日；**现为 15 个**，后加 `AI_FEEDBACK` / `PREFERENCE_CORRECTION`），含 heyta 特有的 `HABIT` / `HABIT_LOG` / `FOCUS_SESSION` |
+| Docker 跑通 | 镜像 `supersync:local` 构建成功；31 个迁移在容器内应用（当日数；**现为 33 个**）；容器 healthy |
 | 真实同步闭环 | `pnpm verify:sync` 退出码 0：A 加密上传 → B 可见 → 载荷仍为密文 → 并发判 `CONFLICT_CONCURRENT` |
-| 回归 | `pnpm -r build/typecheck/test` 全绿，1444 个测试通过 |
+| 回归 | `pnpm -r build/typecheck/test` 全绿，1444 个测试通过（当日数；**当前 16 个工作区项目 4652 passed / 13 skipped**，见根 `README.md`） |
 | 许可证 | 315 个依赖全部宽松许可，逐项登记；门禁工具经"注入假 AGPL 包"验证过**能失败** |
 
 复现步骤见 [`docs/runbooks/local-server-verification.md`](../runbooks/local-server-verification.md)。
@@ -112,6 +119,11 @@ API 数据出口），已刻意放在**非 AI 分支** —— 理由见该计划
 ---
 
 ## 2. 第一阶段（P0）任务分解
+
+> 📜 **本节是历史记录**：P0 已于 2026-09-25 完成（证据见 §1）。它保留下来是因为
+> §2.3 的实体清单决策、§2.5 的迁移纪律和 §2.6 的验收口径**至今仍是现役约束**，
+> 而 §2.1/§2.2/§2.4 描述的是"当时怎么做成的"，**不要照它重新开工**。
+> 现在的活在哪：见 §5 与 [`phase-2-multi-platform.md`](phase-2-multi-platform.md)。
 
 ### 2.1 工程骨架
 
@@ -157,18 +169,28 @@ heyta/
 | `HABIT` `HABIT_LOG` | **新增** | ✅ | 上游只有 `SIMPLE_COUNTER`，语义不够 |
 | `FOCUS_SESSION` | **新增** | ✅ | 上游借用 `METRIC` |
 | `GLOBAL_CONFIG` `MIGRATION` `RECOVERY` `ALL` | 沿用 | — | 系统实体，有意不物化 |
-| 🔴 `NOTE` | 沿用 | ❌ | **领域类型未定义，reducer 不物化** |
-| 🔴 `TASK_REPEAT_CFG` | 沿用 | ❌ | **同上；重复展开语义未定** |
-| 🔴 `REMINDER` | 沿用 | ❌ | **同上；通知调度未定** |
+| `NOTE` | 沿用 | ✅ | **已补齐**（早期是 ❌，见下） |
+| `AI_FEEDBACK` `PREFERENCE_CORRECTION` | **新增** | ✅ | 后加的（AI 反馈、ADR-0014 的偏好纠正） |
+| `TASK_REPEAT_CFG` | 沿用 | ❌ **决定不用** | 重复规则放在 `Task.repeatRule` / `Task.repeatDtstart` 上（`packages/domain/src/entities.ts`）；登记理由里明写**「本条不是"还没做"，是"决定不用"」** |
+| `REMINDER` | 沿用 | ❌ **仍未做** | 通知调度与产品决策未定（P3）；登记在 `UNMODELED_ENTITY_TYPES` |
 | ~~`WORK_CONTEXT`~~ `TIME_TRACKING` `ISSUE_PROVIDER` `PLUGIN_*` `MENU_TREE` | **删除** | — | 不需要 |
 
-⚠️ **改一处要同步改两处**：`shared-schema` 与服务端 `validation.service.ts` 都依赖这份清单，
-服务端**会拒绝未知实体类型**。
+⚠️ **改一处要同步改三处**：`shared-schema` 与服务端 `validation.service.ts` 都依赖这份清单，
+服务端**会拒绝未知实体类型**；再加上 `packages/domain/src/entities.ts` 的
+`MODELED_ENTITY_TYPES`（它与 `EntityModelMap` 之间有**编译期断言**，漏一个 `typecheck` 就红）。
 
-🔴 **上表里三个 ❌ 是实测确认的静默丢数据**，不是"还没做"那么轻描淡写：
+🔴 **早期上表里那三个 ❌ 是实测确认的静默丢数据**，不是"还没做"那么轻描淡写：
 它们是**合法实体**（`isEntityType()` 为 true），`dispatch` **不报错**，op 照常入队、
 上传、同步到所有设备 —— 但**没有任何设备会物化它们**。用户建一条重复任务，
 它同步得到处都是，哪儿也不显示，且任何一层都不报错。
+
+⚠️ **这三条后来走了不同的路，不要再当成一类**（这是本文档自身漂移过的地方）：
+
+| 实体 | 现在的真实状态 |
+|---|---|
+| `NOTE` | **已补齐**，进了 `MODELED_ENTITY_TYPES` |
+| `TASK_REPEAT_CFG` | **从"语义未定"变成了决定**：重复规则放在 `Task.repeatRule` 上 —— 因为「一个用户意图必须是一个 op」，而本引擎的 reducer 不处理跨实体类型的 op |
+| `REMINDER` | **确实还没做**（P3 通知调度），是上表唯一一个"仍未实现"的 ❌ |
 
 门禁已就位：`packages/op-log/tests/entity-coverage.spec.ts` 要求每个 `ENTITY_TYPES`
 成员要么物化、要么在 `UNMODELED_ENTITY_TYPES` 里显式登记原因。**实现后必须把登记移掉**，
@@ -254,7 +276,7 @@ Time_NLP 系列（**仓库无 LICENSE**）。
 | **Schema 版本策略误用** | bump 是近乎单向的栅栏，且**保护不了已发布客户端** | 继承上游政策：**默认不 bump**，优先用 payload marker 向前兼容 |
 | **Prisma 版本跨度** | 上游锁 5.22.0，当前稳定线 7.10.0 | P0 **先沿用上游版本**跑通，升级单独立项 |
 | **`prisma db push` 丢索引** | 多租户冲突检测会退化成全表扫描（上游真实事故） | 必须走 `prisma migrate`，且索引要写进 schema 文件 |
-| **服务端从未真实运行过** | 未知的部署问题 | P0 头等大事，优先在服务器上验证 |
+| ~~**服务端从未真实运行过**~~ → **已消除** | 未知的部署问题 | P0 已在 Docker 上跑通（镜像构建 + 31 个迁移 + 容器 healthy + `pnpm verify:sync` 退出码 0），生产拓扑见 [`docs/runbooks/deployment.md`](../runbooks/deployment.md)。**保留下来的教训**：部署问题只会在真环境里出现，所以每次都说清"实测 / 引用 / 未核实" |
 | **op-log 那 5 万行无法直接搬** | 编排层要从零写 | 当作**参考答案**读语义（状态机、墓碑、崩溃恢复），不搬代码 |
 | **线协议 schema 不校验实体成员**（P0 实测发现） | 客户端拼错实体名时，**本地不会失败**，要到上传后被服务端拒绝才发现 | 客户端在构造 op 时用 `isEntityType()` 自查。这是客户端/服务端校验的**不对称**，已在 `scripts/verify-sync-loop.mjs` 中固化为断言 |
 
@@ -275,18 +297,67 @@ Time_NLP 系列（**仓库无 LICENSE**）。
 3. **A 写入 → B 下载可见**
 4. **并发冲突必须被服务端拒绝**（两端基于同一向量时钟并发改同一实体）
 
-**当前状态**：`--dry-run` 已实测通过；实时模式**尚未运行**（需要 Docker 环境）。
+**当前状态**：两种模式都**已实测通过** —— `--dry-run` 不需要服务器；实时模式见上面 §1 的 P0
+证据（`pnpm verify:sync` 退出码 0，A 加密上传 → B 可见 → 载荷仍为密文 → 并发判 `CONFLICT_CONCURRENT`）。
+工具本身保留，作为协议层的回归入口（另见 `pnpm verify:sync-recovery`）。
 
 ---
 
-## 5. 下一步动作（按顺序）
+## 5. 下一步动作（按"用户在哪一步走不下去"排序）
 
-1. **确认许可证 ADR-0001**（`docs/adr/0001-license-decision.md` 仍标"待确认"）——这是唯一还挡在前面的决策
-2. 在服务器上 `docker compose up` 跑通 `super-sync-server`，确认 `/api/sync/status` 可达
-3. 建 monorepo 骨架，引入 `sync-core`（原版不改）
-4. 写 heyta 实体清单 + 7 个 host Port 适配
-5. 实现 IndexedDB 存储适配
-6. 跑通 §2.6 的同步闭环验收
+> ⚠️ 本节原先列的是 P0 的 6 步 —— **它们已全部完成**。现在的瓶颈不在工程侧的内部一致性，
+> 而在**用户旅程的断点**上：仓库的门禁已经多到足以证明"代码是对的"，
+> 但**没有任何一道门禁能发现"用户根本没有入口"**。
+> 下面按用户实际会撞到的顺序排，每条都带可复现证据。
+
+### 5.1 🔴 第一段：新用户到不了产品（完全在我们这边，不依赖任何外部资质）
+
+| # | 断点 | 证据 |
+|---|---|---|
+| 1 | 落地页**没有任何指向应用的链接** | `apps/landing/src` 里除语言切换外，**每一条 `href` 都是页内锚点**（`#pricing` / `#showcase` / `#selfhost` …）—— 落地页**到不了产品** |
+| 2 | Web 端**没有注册 / 登录界面** | `apps/web/src` **没有 auth 目录**；服务端已有 passkey / magic-link（`server/src/api.ts`），客户端只有 `SyncBar.tsx` 的三个手填框（服务器地址 + 令牌） |
+| 3 | 定价 CTA **不是按钮** | `apps/landing/src/components/Pricing.tsx` 是 `<p>` + 沙漏 +「即将开放」。**这是有意为之**（理由写在文件头：不愿造一个"点了没反应的立即购买"），但净结果仍是"想付钱的人无处可点" |
+
+**这一段是当前最该做的**：它挡住的是**所有**新用户的入口，而且**没有任何外部依赖**。
+
+### 5.1.1 🔴 界面在说谎：承诺了「导出」，但没有导出功能
+
+托管同步到期/被拒的提示 —— 也就是用户**最担心"我会不会丢数据"的那一刻** —— 在**两种语言**里都写着：
+
+> zh：这台设备上的全部数据仍然可以正常查看、编辑和**导出**，不需要续费。
+> en：Everything on this device can still be viewed, edited and **exported** — no renewal needed.
+> —— `web.subscription.notice.localData`（`packages/i18n/src/locales/zh-CN.ts:997` / `en.ts:936`）
+
+**但全仓没有任何用户可见的导出入口。** `apps/web/src` 下搜不到导出功能，
+设置页也没有这一项。同时 `README.md` 的项目原则第 5 条写着
+**「导出自由：任何时刻都能一键带走全部数据」** —— 两条承诺**都没有兑现**。
+
+这正是 `scripts/check-ai-coverage.mjs` 文件头点名的那类失效 —— **「功能是空的，界面在说谎」**，
+而且是最坏的一类：**类型系统不会报**（词条 key 合法）、**单测不会报**（没有东西可测）、
+`check:ui-language` 也全绿（两种语言都真的翻了）。它**不在 AI 轨里**，所以没有任何门禁会红。
+
+> **最小修法二选一**：要么**补上导出**（本地优先架构下，本质是把 op-log + 物化状态导成 JSON，
+> 让用户在无服务端时也能带走数据），要么**把这句删掉**。
+> 不要两边都不动 —— 那是在"数据主权"这件产品原则上说了不实的话。
+
+### 5.2 第二段：付费的"交付"半段（详见 [pricing-coupons-handoff.md](pricing-coupons-handoff.md) §11.1 的 11 段表）
+
+| # | 断点 | 状态 |
+|---|---|---|
+| ④⑤ | 收银台 | ✅ **服务端已通**：`POST /api/billing/checkout`（报价 → 冻结 → `createCheckout` 一条链，不可交付的档在报价前回 `409`，12 例真 SQL 测试）。❌ **客户端「付款」按钮仍缺**，且**应当与支付通道一起落地** —— 现在加必然回 `503 BILLING_PROVIDER_NOT_CONFIGURED`，正好造出落地页明确反对的那个东西。所以这一步卡在**外部资质**，不在我们这边 |
+| 交付半段 | 🔴 **完全在我们这边** | webhook 路径还没把"金额与所有 SKU 都对不上"的支付交给 `settleOrderPaid` —— 该函数**至今零生产调用方**（`server/src/billing/pricing-store.ts:893` 导出，全仓无调用点，只有注释引用它）。后果：**用了券的单收得上钱、授不出权益** |
+| ⑦⑧ | ¥12 档能不能交付 | 已由 [ADR-0023](../adr/0023-managed-ai-quota-not-implemented.md) 显式判定：**计量存在之前不得被售卖**。云端 AI 端点 / 计量 / 设置页的「本周期已用 X / 300 次」**仍未做** |
+| ⑨⑪ | 续费 / 退款 | 都不存在：`SubscriptionNotice.tsx` 自述"现在不存在可跳转的续费地址"；退款接口"通道尚未接线"，退款政策也未定 |
+| 海外 | $5 / $12 | **没有 USD 通道**（全仓只有微信 adapter，且币种硬编码 CNY），并且缺**币种断言** —— USD 单喂给它会被按 CNY 发出去（`amountMinor: 500` 被当成 500 分），**没有任何一层会报错** |
+
+### 5.3 第三段：剩下的工程（按轨道）
+
+| 轨道 | 下一步 |
+|---|---|
+| **P2 多端** | 鸿蒙**仍未跑起来**：构建链已实测打通（20 MB release HAP、双 ABI），但缺**模拟器系统镜像 + 签名**（产物 unsigned）→ [phase-2-multi-platform.md](phase-2-multi-platform.md) |
+| **AI 线** | AI-0 / AI-1 / AI-2 / 本地 API（MCP）✅ 已上线；**AI-3 规划、AI-4 复盘未实现**；**全量导出未实现** |
+| **运营面** | 改价目前等于**服务器 shell 权限**（唯一入口是 `server/scripts/pricing.ts` CLI，无鉴权 / 无角色 / 无 HTTP 面，`--actor` 可伪造）。**在有意引入 admin 路由之前，这条缺口应当保持显式**，而不是被"内网就安全"盖住 |
+| **P3** | 小组件 / 通知 / CalDAV —— 未开工。可行性见 [native-widgets.md](../research/native-widgets.md)，**改造计划见 [multi-platform-widgets.md](multi-platform-widgets.md)**：小组件是**多端适配的输出形态**（不是后续阶段），且 **Windows（PWA provider）与 macOS（Continuity）反而不需要新建壳** |
 
 ---
 
