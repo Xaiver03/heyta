@@ -88,6 +88,28 @@ node scripts/check-module-boundaries.mjs --module 2 --rev ai-remediation-fork
 三条分支可以任意顺序落地，因为它们改的文件集合互不相交（共享的只有追加区）。
 "必须先 1 再 2 再 3"是旧模型的产物，删掉。
 
+### R5 · 门禁的扫描面已经梳理过（唯一越界的那一个已修）
+
+并行开工后有一个新问题：**别人的半成品会不会把我的门禁弄红？**
+三个"从磁盘找文件"的门禁实测如下：
+
+| 门禁 | 扫描根 | 会走进 `.worktrees/` 吗 |
+|---|---|---|
+| `scripts/check-ui-language.mjs` | 写死的相对目录（`apps/web/src` 等） | 不会 |
+| `scripts/check-ai-coverage.mjs` | `packages/app-host/src`、`apps/web/src` | 不会 |
+| `research/tools/docs-link-check.mjs` | **仓库根递归** | **会** → 已修 |
+
+docs 那一个是实测出来的：在 `.worktrees/ai-m1` 里放一个死链，
+主检出的 `check:docs` 立刻 `exit 1` —— 等于"另一个模块的半成品文档能卡住主检出"。
+已把 `.worktrees` 加进它的跳过表。
+
+**修的是扫描面，不是阈值**，两个方向的对照实验都做了：
+
+1. worktree 里的死链 → 主检出 `exit 0`（隔离生效）；
+2. 主检出自己的死链 → 仍然 `exit 1`（门禁没被削弱）。
+
+🔴 以后新增任何"从磁盘找文件"的门禁时，先确认它的扫描根不会走到 `.worktrees/`。
+
 ---
 
 ## 2. 跨模块需要新符号怎么办（这是"要不要等"的唯一真实来源）
