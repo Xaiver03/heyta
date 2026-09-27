@@ -4,7 +4,10 @@
 > 依据：[多端「一套代码」融合调研](../research/multi-platform-ui-fusion.md) ·
 > 选型：[ADR-0024](../adr/0024-desktop-shell-and-ui-convergence.md)（⚠️ **待确认**）
 > 关系：本计划是 [P2 多端补齐](phase-2-multi-platform.md) 的**主体执行计划**，
-> 不是 P3（平台特有能力）。P3 依赖本计划产出的"一套 UI"。
+> 不是 P3（平台特有能力）。**P3 中除去系统小组件的部分**依赖本计划产出的"一套 UI"；
+> **系统小组件不依赖它**（见 §6.2）—— 组件是该平台的**原生 UI**，用不了这套 RN 组件，
+> 所以[小组件计划](multi-platform-widgets.md)与 M0/M1 **并行不冲突**，
+> **不要因为 M1 的结果去等待或取消小组件工作**。
 
 ---
 
@@ -218,6 +221,16 @@ M0 全部是**纯搬迁 + 再导出**，无行为改变。任一任务出问题�
 >
 > 所以**必须在投入任何大规模 UI 迁移之前**让鸿蒙在场并给出结论。
 > 一个只跑通 web + iOS/Android 的切片，**不足以**支撑 M3 的投入决策。
+>
+> 🔴 **"鸿蒙在场"要验的核心一条是存储，不是"App 能启动"。**
+> `@react-native-oh-tpl/op-sqlite` 是 **8.0.2**，而仓库用 `@op-engineering/op-sqlite@^18.2.5`
+> （**差 10 个大版本**）。要验的是**这个版本 + Hermes 能不能真的打开既有加密库并读写**。
+> 两条**互相独立**的调研都命中了这一条：本仓 [ADR-0024](../adr/0024-desktop-shell-and-ui-convergence.md) §2.6，
+> 以及本次[选型调研](../research/multi-platform-selection-evidence.md) §9 的移动壳线 ——
+> 后者在不知道前者的前提下，把"RNOH 0.84.4 上 `op-sqlite` + Hermes 兼容性"
+> 独立标为鸿蒙壳的**最大风险**。
+> → 所以 M1-5 的鸿蒙判据**必须包含一次真实的"打开库 + 读 + 写"**，
+> 只报"App 启动成功"**不算过**。
 
 ### 验收命令
 
@@ -328,14 +341,14 @@ Electron 壳与自己打包的静态产物是**松耦合**的：即使 UI 收敛
 [多端小组件改造计划](multi-platform-widgets.md) §3.1–§3.2 有两条与本阶段直接相关的结论，
 **必须一起读，否则两个计划会各说各话**：
 
-| 平台 | 组件路径 | 要桌面壳吗 |
-|---|---|---|
-| **Windows** | **PWA widget provider** | 🔴 **不需要** —— 但 PWA 必须能从**公网 endpoint** 安装（PWABuilder 不支持 localhost） |
-| **macOS** | **Continuity**（iPhone 组件上 Mac） | 🔴 **不需要** |
-| macOS / Windows（**原生**组件，后置） | WidgetKit / Windows App SDK + MSIX | ✅ 要，**这正是本阶段的壳** |
+| 平台 | 组件路径 | 要桌面壳吗 | 🔴 不能省略的前提与代价 |
+|---|---|---|---|
+| **Windows** | **PWA widget provider** | **不需要**（确实不需要写 C++/C#） | 但 **PWA 仍必须 MSIX 打包** —— package identity 是注册组件 appExtension 的硬前提；PWA 必须能从**公网 endpoint** 安装（PWABuilder 不支持 localhost）；⚠️ **"只在 Edge 里安装、不上 Store"到底行不行，无一手定论**（官方成文路径只有 PWABuilder→Store；2023 年有"5 台机器仅 1 台出现"的反面记录）→ **这是唯一可能推翻整条路的单点，必须实测** |
+| **macOS** | **Continuity**（iPhone 组件上 Mac） | **不需要 Mac 壳** | 但**需要 iPhone 上装着带 WidgetKit 扩展的原生 App** —— 它是 **iOS 组件工作的副产品，不是独立路径**；**交互在 iPhone 上执行**（Mac 只是显示器 + 转发器）；🔴 且与"iOS 锁屏隐藏内容"（给扩展加 Data Protection capability 设 `NSFileProtectionComplete`）**互斥，二者只能选一** |
+| macOS / Windows（**原生**组件，后置） | WidgetKit / Windows App SDK + MSIX | ✅ 要，**这正是本阶段的壳** | ⚠️ **Electron 在两端都是组件最差项**：上游 `electron#35751`「macOS Notification Center Widget」**Closed as not planned**；electron-builder 官方称它「**never re-signs** `Contents/PlugIns`」→ 自嵌 `.appex` 要自己写全套签名钩子，且**无真实 Electron 应用带 WidgetKit 组件的先例** |
 
 **因此本阶段的定位要说清**：Electron 壳**不是**"Windows/macOS 上有组件"的前提
-（那两条靠 PWA 与 Continuity 就够了），而是**"这两个平台上有真正的桌面应用"**的前提 ——
+（那两条不依赖壳，但**各有前提，见上表**），而是**"这两个平台上有真正的桌面应用"**的前提 ——
 即**原生 SQLite、脱离浏览器窗口、可离线长驻**。
 
 **顺带一个组合效应**：M4 若把 web 换上 SQLite（sqlite-wasm + OPFS），
@@ -379,6 +392,15 @@ Electron 壳与自己打包的静态产物是**松耦合**的：即使 UI 收敛
 | 10 | `motivation` | 1,090 |
 | 11 | `timeline` | 1,483 |
 | 12 | `ai` | 3,207 |
+
+> 💡 **与小组件计划的接口：投影层只定义一次（别让组件计划长出第二套"怎么算今日"）。**
+> 第二组里的 `quadrant` / `habits` / `timeline` / `motivation`，正是
+> [小组件计划](multi-platform-widgets.md)要展示的**同一批派生视图**（今日任务、四象限、习惯热力）。
+> **"怎么算今日 / 怎么算四象限"只能有一份实现** —— 否则 M3 迁完 UI 之后，
+> 组件会长出第二套投影，重复 M0 刚刚证明"不该做"的那种**静默漂移**
+> （改一处**不会让任何测试变红**，正是 M0-1 的教训）。
+> → 投影层归本计划的共享层（`packages/`），由小组件计划的 `packages/widget-core`
+> **消费**它，而不是各自实现一遍。
 
 ### 每轮的固定流程（不许跳步）
 
@@ -522,11 +544,31 @@ IndexedDB 路径**保留到迁移验证通过之后**再删。两者可并存一
 | 门禁 | 现状 | 本计划要做的 |
 |---|---|---|
 | `check:layering` | ✅ **9 条规则**（M0-3 补了色槽映射那条） | M5 覆盖新端 |
-| `check:design` | ✅ 扫 web/mobile/landing，**6 类规则**（M0-4 补了 RN 无单位数字） | M2-2 加桌面；M5 加 `packages/ui` |
-| `check:licenses` | ✅ 已有 | M2-1 登记 `electron`、`react-native-web` |
+| `check:design` | ✅ 扫 web/mobile/landing/**desktop**，**6 类规则**（M0-4 补了 RN 无单位数字；M2-2 加了桌面） | M5 加 `packages/ui` |
+| `check:licenses` | ✅ 已有；`electron` 已自动登记（M2-1） | M1 登记 `react-native-web` |
 | `check:mobile-bundle` | ✅ 已有（双 React 雷区） | M1-5 必须跑 |
 | `check:native-deps` | ✅ 已有 | 新增原生模块时兜底 |
 | **新增**：apps 不得直接依赖 `react-native-web` | ❌ | M5 加 |
+| 🔴 **`check:widgets`** | ❌ **不存在** | 由[小组件计划](multi-platform-widgets.md) §2 拥有；理由见下 |
+
+### 🔴 原生代码是现有门禁的盲区（实测，2026-09-27）
+
+规则集里有一条 **`no-op-construction-in-apps`**（第 7 条）—— 它存在的理由就是"**别让外壳自己构造 op**"。
+但**原生代码完全不在它的视野内**：
+
+| 门禁 | 扫描范围（实测） | 原生代码（`.swift` / `.kt` / `.ets`） |
+|---|---|---|
+| `check:layering` | `EXTENSIONS = ['.ts', '.tsx', '.mts', '.cts']`；`SKIP_DIRS` 含 **`ios`**、**`android`** | ❌ **全部跳过** |
+| `check:design` | `SCAN_ROOTS` = 4 个 `src` 目录 | ❌ 窗口外 |
+| `check:ui-language` | `ROOTS` = 3 个 `apps/*/src` | ❌ 窗口外 |
+
+**后果**：一旦组件存在（iOS 的 `.appex`、Android 的 Kotlin、鸿蒙的 ArkTS），
+**没有任何东西拦得住"组件直接构造一个 op"** —— 而"点一下勾选完成"恰好**就是**一次 op，
+这正是组件最自然的实现方式，也是 `no-op-construction-in-apps` 当初被写出来的原因。
+
+→ **`check:widgets` 至少要锁三件事**：① 各端解析器吃**同一份** golden fixture；
+② 原生侧**不得构造 op**（意图只能进队列，由 `packages/app-host` 转换）；
+③ 原生侧不得直接打开加密 DB。设计见[小组件计划](multi-platform-widgets.md) §2.4 与 §5。
 
 ---
 
@@ -542,6 +584,9 @@ IndexedDB 路径**保留到迁移验证通过之后**再删。两者可并存一
 | 🔴 `node:sqlite` 在 Electron 渲染进程不可用 | 桌面存储需绕路 | Spike S1 先验；退路是 `sendSync` + 主进程 |
 | Electron 体积/内存 | 用户观感 | 明确接受（换存储正确性）；写入文档 |
 | 桌面签名/公证成本未知 | 无法分发 | 本阶段只做未签名产包，**如实标注** |
+| 🔴 **原生组件代码不在任何门禁覆盖内** | 组件"点一下勾选完成"时**没有任何东西会失败**，而 `no-op-construction-in-apps` 正是为拦这类事存在的 | [小组件计划](multi-platform-widgets.md) 新增 `check:widgets`；证据见 §2 下方"原生代码是现有门禁的盲区" |
+| 🔴 **Windows PWA 组件本地安装是否可用未证实** | 若不可用，Windows 组件要另做 MSIX + 原生 provider | 官方成文路径只有 PWABuilder→Store，**先实测再承诺**（唯一可能推翻该路径的单点） |
+| ⚠️ **macOS Continuity 与"锁屏隐藏内容"互斥** | 二者只能选一：要 Mac 桌面覆盖，就得放弃 iOS 锁屏内容保护 | 产品决策，须写进 ADR；首版可用"默认脱敏 + 显式 opt-in"折中 |
 | 拖拽/甘特无 RN 等价物 | 交互降级 | 逐特性评估；可能需要产品决策 |
 | 本次调研无联网搜索 | 候选清单不完整 | 调研 §6.2 已列出全部缺口，**不假装完整** |
 
@@ -552,7 +597,7 @@ IndexedDB 路径**保留到迁移验证通过之后**再删。两者可并存一
 | 依赖 | 版本（实测） | 许可证（实测） | 状态 |
 |---|---|---|---|
 | `react-native-web` | 0.21.3（2026-09-25） | MIT | 🔲 待登记 |
-| `electron` | 44.4.5 稳定（自带 Node 24.21.0） | MIT | 🔲 待登记 |
+| `electron` | 44.4.5 稳定（自带 Node 24.21.0） | MIT | ✅ **已登记**（M2-1：白名单内**自动**登记，`check:licenses` 通过） |
 | `@sqlite.org/sqlite-wasm` | 3.53.4-build1 | Apache-2.0 | 🔲 待 M4 决策 |
 
 ⚠️ **不引入**（除非另有人工核实）：`tamagui`（npm `license` 字段为 `null`，

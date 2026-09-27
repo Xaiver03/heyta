@@ -22,15 +22,28 @@ allowBuilds:
   '@prisma/client': true
   '@prisma/engines': true
   prisma: true
-  # Electron 需要 postinstall 下载**运行时二进制**（约 100MB+，落在
-  # `%LOCALAPPDATA%\electron` / `~/Library/Caches/electron`，**不占仓库体积**）。
+  # 🔴 electron 这条**必须有**，但要搞清它是为了什么 —— 不是"为了下载二进制"。
   #
-  # 不放行的后果（2026-09-27 实测）：`pnpm install` 只装到 **1.1MB** 的类型与
-  # JS 入口，没有 `path.txt`、也没有 `dist/` 里的可执行文件 ——
-  # 于是 `apps/desktop` **能类型检查、能构建、能跑 11 个测试，但起不了窗口**。
+  # 【它解决的问题】不给显式决定，**所有 pnpm 命令都会失败**：
+  #   2026-09-27 实测，删掉这条之后任何 `pnpm <script>` 都报
+  #     [ERR_PNPM_IGNORED_BUILDS] Ignored build scripts: electron@44.4.5
+  #   （pnpm 跑任何脚本前会先做依赖状态检查，所以卡住的是整个仓库，不只是 desktop。）
   #
-  # 由项目所有者批准放行。它与上面四条性质不同：那四条是**构建期工具链**，
-  # 这一条直接决定用户能不能双击把应用打开 —— 是"能跑"与"不能跑"的分界。
+  # 【一个必须知道的副作用】🔴 **pnpm 会自己往这个文件里写东西。**
+  #   处于上面那种状态时，pnpm 往 `allowBuilds:` 下注入了一行占位符：
+  #       electron: set this to true or false
+  #   也就是说它会**改动一个提交进仓库的配置文件**。看到那行占位符不要去提交它 ——
+  #   要么改成 `true`，要么改成 `false` 表示确实要禁掉。
+  #
+  # 【它**不**解决什么 —— 与直觉相反，一并记下免得误判】
+  #   置 `true` 之后 `pnpm install` 并**不会**把 Electron 的运行时二进制下下来：
+  #   实测已安装的 electron 包 `package.json` 里**没有 `scripts` 字段**，
+  #   install 输出一直是 "Already up to date"，`path.txt` 始终不存在。
+  #   二进制必须显式取：
+  #       node node_modules/.pnpm/electron@*/node_modules/electron/install.js
+  #   而且**必须带代理 + `NODE_USE_ENV_PROXY=1`** —— Node 的 `fetch`（undici）
+  #   默认**不读** `HTTP_PROXY`/`HTTPS_PROXY`，否则只报 `TypeError: fetch failed`，
+  #   完全看不出是代理问题。完整诊断链见 docs/runbooks/desktop.md §4.1。
   electron: true
 
 # ⚠️ 必须显式声明，不能依赖默认值 —— 否则构建结果取决于**跑的是哪个 pnpm**。
