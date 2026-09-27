@@ -55,7 +55,6 @@ import {
   loadPriceOverrides,
   publishPriceVersion,
   upsertCoupon,
-  type PrismaLikeClient,
   type SqlExecutor,
 } from '../src/billing/pricing-store';
 
@@ -380,25 +379,19 @@ async function main(): Promise<void> {
     return;
   }
 
-  /**
-   * ⚠️ 这里必须显式断言 —— 而这不是本文件的问题，是一个**已存在的类型缺口**：
-   *
-   * `createPrismaSqlExecutor` 的 `PrismaLikeClient` 要求 `$transaction(
-   * fn: (tx: PrismaLikeClient) => …)`，而 `PrismaClient` 的 `$transaction` 回调
-   * 给的是 `Omit<PrismaClient, ITXClientDenyList>` —— 那个 tx client **故意没有**
-   * `$transaction`（Prisma 的 deny list 里就有它）。于是"回调参数"这一个方向
-   * 永远不兼容，`createPrismaSqlExecutor(prisma)` 在 `strict` 下必然报 TS2345。
-   *
-   * 之前没人踩到，是因为 `pricing-store.ts` 里**没有任何生产调用点**：
-   * 它的 §13 注释写着"生产：`createPrismaSqlExecutor(prisma)`"，但那句话至今
-   * 没有代码兑现（`settleOrderPaid` 还没有生产调用者，见 handoff §7 第 9 条）。
-   * 测试没报是因为 vitest 只转译、不做类型检查。
-   *
-   * 正确的修法是把 `PrismaLikeClient` 拆成"根 client（有 `$transaction`）"与
-   * "事务 client（没有）"两个接口 —— 但那是 `pricing-store.ts` 的公共 API，
-   * 按工作区纪律（handoff §6）不在这条工作流里改，只在这里绕开并在报告里说明。
-   */
-  const sql = createPrismaSqlExecutor(prisma as unknown as PrismaLikeClient);
+  // ✅ 这里原先有一处 `prisma as unknown as PrismaLikeClient` 的**绕行断言**，
+  // 因为 `createPrismaSqlExecutor(prisma)` 在 strict 下必然报 TS2345：
+  // `PrismaLikeClient` 要求 `$transaction(fn: (tx: PrismaLikeClient) => …)`，
+  // 而 `PrismaClient.$transaction` 的回调给的是
+  // `Omit<PrismaClient, ITXClientDenyList>` —— 那个 tx client **故意没有**
+  // `$transaction`（它就在 Prisma 的 deny list 里），于是"回调参数"这一向永远不兼容。
+  //
+  // 缺口已修：`PrismaLikeClient` 拆成"根 / 事务"两个接口（见 `pricing-store.ts`
+  // 末尾与 `docs/reference/pricing-and-coupons.md` §7 第 12 条）。
+  //
+  // 🔴 下面这一行**没有断言**，所以它本身就是那条修复的回归证据：
+  // 谁把两个接口合回去，`pnpm typecheck` 就会红在这行。
+  const sql = createPrismaSqlExecutor(prisma);
   switch (command.kind) {
     case 'show':
       await runShow(sql);

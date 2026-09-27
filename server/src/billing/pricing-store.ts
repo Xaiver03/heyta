@@ -45,11 +45,28 @@ import type { OrderQuote, RejectedCoupon } from './quote';
 // ---------------------------------------------------------------------------
 
 /** 最小 SQL 执行端口。参数一律用 `$1, $2 …` 占位（PostgreSQL 原生）。 */
-export interface SqlExecutor {
+export interface SqlRunner {
   query<T>(sql: string, params?: readonly unknown[]): Promise<T[]>;
   /** 返回受影响行数。 */
   execute(sql: string, params?: readonly unknown[]): Promise<number>;
-  transaction<T>(fn: (tx: SqlExecutor) => Promise<T>): Promise<T>;
+}
+
+/**
+ * 根 SQL 面：`SqlRunner` + 开事务。
+ *
+ * 🔴 **事务回调拿到的是受限的 `SqlRunner`，不是 `SqlExecutor`** —— 这个区分是
+ * 类型层的，不是注释层的。Prisma 的事务 client **故意没有** `$transaction`
+ * （它在 `ITXClientDenyList` 里），所以"回调参数能不能再开一层事务"这件事，
+ * 一旦声明成 `SqlExecutor` 就**永远**不兼容 `PrismaClient.$transaction`：
+ * `createPrismaSqlExecutor(prisma)` 在 strict 下抛 `TS2345`。
+ *
+ * 那条路径当时没有生产调用点，于是这个洞躲过了 `tsc`（vitest 只转译、不做类型
+ * 检查，而 `server/tsconfig.json` 的 `include` 又不含 `tests/**`）。现在拆开之后，
+ * "不许嵌套事务"由类型拦住，而不是靠人记得。
+ * 原缺口记录见 `docs/reference/pricing-and-coupons.md` §7 第 12 条。
+ */
+export interface SqlExecutor extends SqlRunner {
+  transaction<T>(fn: (tx: SqlRunner) => Promise<T>): Promise<T>;
 }
 
 // ---------------------------------------------------------------------------
@@ -302,8 +319,16 @@ interface AuditInput {
   readonly now: number;
 }
 
-/** 追加一行审计。**只追加**（没有任何 UPDATE / DELETE），与迁移的注释一致。 */
-export const appendAudit = async (sql: SqlExecutor, input: AuditInput): Promise<void> => {
+/**
+ * 追加一行审计。**只追加**（没有任何 UPDATE / DELETE），与迁移的注释一致。
+ *
+ * 收 `SqlRunner` 而不是 `SqlExecutor`：它只写一行，**不该**有能力开事务 ——
+ * 而且它几乎总是在别的事务**里面**被调用（`publishPriceVersion` / `upsertCoupon` /
+ * `settleOrderPaid` 都要"改数据 + 写审计"原子完成）。声明成 `SqlExecutor` 会让
+ * 事务内的 `appendAudit(tx, …)` 类型不合法，逼出要么绕行、要么把审计挪到事务外的
+ * 二选一 —— 后者会留下"改了价但审计没写"的窗口。
+ */
+export const appendAudit = async (sql: SqlRunner, input: AuditInput): Promise<void> => {
   await sql.execute(
     `INSERT INTO pricing_audit_log
        (action, target, before_json, after_json, actor, note, created_at)
@@ -894,16 +919,38 @@ export const settleOrderPaid = async (
     return { outcome: 'granted', orderId, userId, afterExpiry, quotaExceeded };
   });
 
-/** 把订单标成失败（下单后支付通道立刻失败，或人工取消）。 */
+/**
+ * 把订单标成失败（下单后支付通道立刻失败，或人工取消）。
+ *
+ * 🔴 **必须一并释放名额。** 只把订单置 `failed`、留着核销行 `reserved`，就等于
+ * "这条路已经死了，但它占的位置还锁着" —— 要等支付窗口结束、被
+ * `expireStaleOrders` 扫到才放出来。有界（窗口内），但限量券的预算会在窗口里
+ * 被白白烧掉，而且"人工取消"恰恰是最不该占着名额的那种。
+ *
+ * 释放用 `expired` 而不是 `reversed`：`reversed` 是**计数**的（预算是"已投放"），
+ * 而这里的钱**从没动过**。见 `COUNTED_REDEMPTION_STATES`。
+ *
+ * 与 `expireStaleOrders` 同形：两条 UPDATE 都幂等（条件里带状态），
+ * 顺序是**先放名额再改订单**（名额才是稀缺资源）。
+ */
 export const failOrder = async (
   sql: SqlExecutor,
   input: { readonly orderId: number; readonly now: number },
-): Promise<number> =>
-  sql.execute(
-    `UPDATE checkout_orders SET status = 'failed', settled_at = $1, updated_at = $1
-      WHERE id = $2 AND status = 'pending'`,
-    [input.now, input.orderId],
-  );
+): Promise<{ readonly orders: number; readonly redemptions: number }> =>
+  sql.transaction(async (tx) => {
+    const redemptions = await tx.execute(
+      `UPDATE coupon_redemptions
+          SET state = 'expired', settled_at = $1
+        WHERE order_id = $2 AND state = 'reserved'`,
+      [input.now, input.orderId],
+    );
+    const orders = await tx.execute(
+      `UPDATE checkout_orders SET status = 'failed', settled_at = $1, updated_at = $1
+        WHERE id = $2 AND status = 'pending'`,
+      [input.now, input.orderId],
+    );
+    return { orders, redemptions };
+  });
 
 /**
  * 🔴 **扫掉过期的预留**：未支付且已过期的订单 → `expired`，其预留 → `expired`。
@@ -945,6 +992,18 @@ export const expireStaleOrders = async (
  * 🔴 **不归还名额**（`reversed` 是计数的）。理由见 `COUNTED_REDEMPTION_STATES`：
  * 归还意味着同一份预算能被"买 → 退 → 再买"反复薅，而那正是退款滥用最常见的形状。
  *
+ * 🔴 **只允许从 `paid` 出发。** 先前的条件是 `IN ('paid', 'pending')`，那是一条
+ * **钱从没动过**的路径（下单后立刻取消 / 支付通道建单失败），却把核销推成
+ * `reversed` —— 而 `reversed` 是**计数**的，等于**永久吃掉一个名额**。
+ * 上面"退款不归还名额"的理由（预算已投放）恰恰不适用于没付过款的单：
+ * 那笔预算根本还没投放。同一条 15 分钟窗口里被人反复触发，就能把限量券的
+ * 名额一点点耗光，而账面上看不到任何一笔钱。
+ *
+ * 核销侧同步收紧成 `applied`（去掉 `reserved`）：`settleOrderPaid` 在**同一个
+ * 事务**里把订单置 `paid`、把核销置 `applied`，所以 `paid` ⇒ `applied`。
+ * 那个 `reserved` 分支因此不可达，留着只会**掩盖**一个坏了的不变量 ——
+ * 万一真出现 `paid` + `reserved`，我们要的是它炸出来，不是悄悄记一笔核销。
+ *
  * ⚠️ 本轮**不做资金侧退款**：这一步只改我们自己的账。真正的退款要调支付商的
  * 退款接口，而通道尚未接线（见 `pricing-and-entitlements.md` §5）。
  * 也就是说这个函数现在是"退款被**确认之后**的状态同步"，不是退款本身。
@@ -957,13 +1016,13 @@ export const reverseOrderOnRefund = async (
     const orders = await tx.execute(
       `UPDATE checkout_orders
           SET status = 'refunded', settled_at = $1, updated_at = $1
-        WHERE id = $2 AND status IN ('paid', 'pending')`,
+        WHERE id = $2 AND status = 'paid'`,
       [input.now, input.orderId],
     );
     const redemptions = await tx.execute(
       `UPDATE coupon_redemptions
           SET state = 'reversed', settled_at = $1
-        WHERE order_id = $2 AND state IN ('reserved', 'applied')`,
+        WHERE order_id = $2 AND state = 'applied'`,
       [input.now, input.orderId],
     );
     return { orders, redemptions };
@@ -981,26 +1040,48 @@ export const serializeRejections = (rejected: readonly RejectedCoupon[]): string
   );
 
 /**
- * Prisma 版 `SqlExecutor`。
+ * Prisma 版 `SqlExecutor` 的**两个**端口。
  *
  * 🔴 这是本文件里**唯一**没被 pglite 测到的一段（CI 没有 PostgreSQL）。
  * 它只做三件事：把 `?` 换成 `$n` 的活不干（Prisma 原生就用 `$n`）、
  * 转发参数、把 `$transaction` 包起来。所有 SQL 文本本身在 pglite 上跑过。
  * 这个边界在 `docs/reference/pricing-and-coupons.md` §7 写明。
+ *
+ * **为什么是两个接口而不是一个**：`PrismaClient.$transaction` 的回调给的是
+ * `Omit<PrismaClient, ITXClientDenyList>` —— 那个 client **故意没有** `$transaction`。
+ * 声明成"一个接口、回调参数也是它自己"就跟上游**永远**不兼容，
+ * 于是 `createPrismaSqlExecutor(prisma)` 在 strict 下抛 `TS2345`
+ * （§7 第 12 条）。拆成"根 / 事务"两个接口之后，这一向才对得上。
  */
-export interface PrismaLikeClient {
+
+/**
+ * Prisma 的**事务** client —— 也就是 `PrismaClient.$transaction` 回调参数的类型。
+ *
+ * 原始查询都有，`$transaction` **没有**：它就在 Prisma 的 `ITXClientDenyList` 里。
+ * 这个"没有"是上游的设计，不是我们的选择，所以我们的两个端口必须承认它。
+ */
+export interface PrismaTransactionClient {
   $queryRawUnsafe<T = unknown>(sql: string, ...params: unknown[]): Promise<T>;
   $executeRawUnsafe(sql: string, ...params: unknown[]): Promise<number>;
-  $transaction<T>(fn: (tx: PrismaLikeClient) => Promise<T>): Promise<T>;
 }
 
-export const createPrismaSqlExecutor = (client: PrismaLikeClient): SqlExecutor => ({
+/** Prisma 的**根** client：在事务 client 之上多一个 `$transaction`。 */
+export interface PrismaLikeClient extends PrismaTransactionClient {
+  $transaction<T>(fn: (tx: PrismaTransactionClient) => Promise<T>): Promise<T>;
+}
+
+/** 事务**内**的面：只有读写，没有 `transaction`（对应 `PrismaTransactionClient`）。 */
+const createPrismaRunner = (client: PrismaTransactionClient): SqlRunner => ({
   query: async <T>(sql: string, params: readonly unknown[] = []): Promise<T[]> => {
     const result = await client.$queryRawUnsafe<T[]>(sql, ...params);
     return Array.isArray(result) ? result : [];
   },
   execute: (sql: string, params: readonly unknown[] = []): Promise<number> =>
     client.$executeRawUnsafe(sql, ...params),
-  transaction: <T>(fn: (tx: SqlExecutor) => Promise<T>): Promise<T> =>
-    client.$transaction((tx) => fn(createPrismaSqlExecutor(tx))),
+});
+
+export const createPrismaSqlExecutor = (client: PrismaLikeClient): SqlExecutor => ({
+  ...createPrismaRunner(client),
+  transaction: <T>(fn: (tx: SqlRunner) => Promise<T>): Promise<T> =>
+    client.$transaction((tx) => fn(createPrismaRunner(tx))),
 });

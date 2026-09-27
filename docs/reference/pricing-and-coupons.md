@@ -371,31 +371,49 @@ adapter 必须原样使用。理由是回调按订单号认单（`settleOrderPai
    今天不会发生，因为还没有代码能把券带进收银台（通道未接线）——
    但**接线时必须让权威判定只留在 `settleOrderPaid`**，这一层退化成如实上报。
    （代码里那条曾经声称"下游会接住"的注释是**错的**，已改成这段实话。）
-10. **`failOrder` 不释放 `reserved` 名额。** 它只把订单置 `failed`，核销行仍是
-   `reserved`，要到 `reserved_until` 被 `expireStaleOrders` 扫到才释放。
-   即"下单后立刻失败/人工取消"会白占一个名额直到支付窗口结束。
-   有界（窗口内），但会烧掉限量券的预算；接线时应在 `failOrder` 里一并释放。
-11. **`reverseOrderOnRefund` 允许 `pending` → `refunded`。** 那是一条**没有钱动过**
-   的路径，却把核销推成 `reversed`，而 `reversed` 是**计数**的 —— 等于永久吃掉一个名额。
-   §3.4 里"退款不归还名额"的理由（预算已投放）**不适用于没付过款的单**。
-   接线时应收紧成只从 `paid` 出发（ADR §3.5 的状态图本来也只画了这条）。
-12. **🔴 新发现：`createPrismaSqlExecutor(prisma)` 在 `strict` 下过不了类型检查。**
-   `PrismaLikeClient.$transaction` 声明为 `(fn: (tx: PrismaLikeClient) => …)`，
-   而 `PrismaClient.$transaction` 的回调给的是
-   `Omit<PrismaClient, ITXClientDenyList>` —— 那个事务 client **故意没有**
-   `$transaction`（它就在 Prisma 的 deny list 里）。于是"回调参数"这一向永远
-   不兼容 → `TS2345`。
+10. ~~**`failOrder` 不释放 `reserved` 名额。**~~ **已修（本轮）。**
+   它现在是一个事务：先把该订单的 `reserved` 核销置 `expired`（名额放出来），
+   再把订单置 `failed` —— 与 `expireStaleOrders` 同形、同样幂等。
+   "人工取消"恰恰是最不该占着名额的情形；释放用 `expired` 而不是 `reversed`，
+   因为那笔钱从没动过，不该按"预算已投放"计数。
 
-   之所以至今没被踩到：`pricing-store.ts` 里**没有任何生产调用点**。文件末尾的注释
-   写着"生产：`createPrismaSqlExecutor(prisma)`"，但那句话至今没有代码兑现
-   （`settleOrderPaid` 还没有生产调用者，见第 9 条）。测试没报，是因为 vitest 只转译、
-   不做类型检查，而 `server/tsconfig.json` 的 `include` 又不含 `tests/**`。
-   `server/scripts/pricing.ts` 是第一个真调用它的地方，那里用一处显式断言绕开
-   （并写明了原因）。
+   **回归证据**：`billing-pricing-store.pglite.spec.ts` 的
+   「failOrder（人工取消 / 通道建单失败）**必须一并释放名额**」——断言返回值
+   `{ orders: 1, redemptions: 1 }`、核销为 `expired`，且**下一个人拿得到这张限量券**。
+   非空转证明：把那条释放名额的 UPDATE 去掉，该用例红在
+   `expected { orders: 1, redemptions: +0 } to deeply equal { orders: 1, redemptions: 1 }`。
+11. ~~**`reverseOrderOnRefund` 允许 `pending` → `refunded`。**~~ **已修（本轮）。**
+   订单侧收紧成 `status = 'paid'`，**核销侧一并收紧成 `state = 'applied'`**。
 
-   **正确的修法**：把 `PrismaLikeClient` 拆成"根 client（有 `$transaction`，
-   回调参数是事务 client）"与"事务 client（没有 `$transaction`）"两个接口 ——
-   那属于 `pricing-store.ts` 的公共 API，留给该文件的归属工作流；本工作流只报告不改。
+   🔴 第二处收紧不是顺手清理，是复核时实测出来的**独立**危险：只收紧订单门、
+   保留 `state IN ('reserved','applied')`，那么对一张 `pending` 单调用它时
+   **订单纹丝不动（`orders: 0`），核销却照样被推成 `reversed`（`redemptions: 1`）**
+   —— 那条"永久吃掉一个名额"的路径**根本不经过订单门**，放宽核销条件就能单独触发。
+   所以 `reserved` 分支是必须删掉的，不是可以留着的。
+   收紧成 `applied` 安全，因为 `settleOrderPaid` 在**同一个事务**里置
+   `paid` + `applied`，即 `paid` ⇒ `applied`。
+
+   **回归证据**：同文件的「未付款的单**不许**退款」——断言
+   `{ orders: 0, redemptions: 0 }`、订单仍是 `pending`、核销仍是 `reserved`，
+   并且**名额是可恢复的**（`expireStaleOrders` 之后下一个人拿得到）：
+   "可恢复"正是它与"永久吃掉"的关键区别。
+   非空转证明：把两个条件放回旧形态，该用例红在
+   `expected { orders: +0, redemptions: 1 } to deeply equal { orders: +0, redemptions: +0 }`。
+12. ~~**🔴 新发现：`createPrismaSqlExecutor(prisma)` 在 `strict` 下过不了类型检查。**~~ **已修（本轮）。**
+   按这里预告的修法落地：`PrismaLikeClient` 拆成两个接口 ——
+   `PrismaTransactionClient`（有原始查询、**没有** `$transaction`）与
+   `PrismaLikeClient extends` 它并补上 `$transaction`。配套地 `SqlExecutor` 也拆出
+   `SqlRunner`，于是 `transaction` 的回调参数是**受限的** `SqlRunner`：
+   "Prisma 的事务里再开一层事务"从此是**类型错误**，不是运行期惊喜。
+
+   这个拆分当场抓出三处真实缺陷：`appendAudit(tx, …)` 在 `publishPriceVersion` /
+   `upsertCoupon` / `settleOrderPaid` 的事务内被调用，而它的形参声明成 `SqlExecutor`。
+   它只写一行、且**总是在事务里**，所以已改成收 `SqlRunner`；不改的话只能把审计
+   挪到事务外，那会留下"改了价但审计没写"的窗口。
+
+   **证据**：`server/scripts/pricing.ts` 里那处 `as unknown as PrismaLikeClient`
+   绕行断言**已删除**，`npx tsc --noEmit -p server/tsconfig.json` → exit 0。
+   删掉断言那一行本身就是回归测试：把两个接口合回去，`pnpm typecheck` 会红在那里。
 
 ---
 
