@@ -905,7 +905,8 @@ ssh ubuntu-jcli 'docker inspect supersync-postgres --format "{{.Config.Image}} {
 ssh ubuntu-jcli 'docker ps -a --format "{{.Names}} {{.Status}}" | grep -i caddy || echo "no caddy container"'
 
 # nginx 片段与 include 位置
-ssh ubuntu-jcli 'cat /etc/nginx/sites-available/heyta-tmp'
+ssh ubuntu-jcli 'cat /etc/nginx/sites-available/heyta.finlaw.cloud'   # 唯一域名
+ssh ubuntu-jcli 'cat /etc/nginx/sites-available/heyta-tmp'            # 已弃用（端点 + 入口 301）
 ssh ubuntu-jcli 'grep -n include /etc/nginx/nginx.conf'
 ssh ubuntu-jcli 'sudo -n nginx -t'
 
@@ -920,13 +921,25 @@ ssh ubuntu-jcli 'sed -E "s/=.*/=<REDACTED>/" ~/heyta/server/.env'
 ### 8.4 公网端点（**必须 `--noproxy '*'`**）
 
 ```bash
-curl --noproxy '*' -sS -m 15 -w '\nHTTP %{http_code}\n' https://heyta-tmp.litopia.space/health
-curl --noproxy '*' -sS -m 15 -o /dev/null -D - http://heyta-tmp.litopia.space/health   # 期望 301
+# ── 唯一域名 heyta.finlaw.cloud：落地页 / 应用 / API / 凭据页 ──────────
+curl --noproxy '*' -sS -m 15 -w '\nHTTP %{http_code}\n' https://heyta.finlaw.cloud/health
+curl --noproxy '*' -sS -m 15 -o /dev/null -w 'HTTP %{http_code}\n' https://heyta.finlaw.cloud/app/
+curl --noproxy '*' -sS -m 15 -o /dev/null -D - https://heyta.finlaw.cloud/app     # 期望 301 → /app/（带 $is_args$args）
+# 凭据页必须是**服务端**响应（400 Token is required），不是落地页的 HTML
+curl --noproxy '*' -sS -m 15 -w '\nHTTP %{http_code}\n' https://heyta.finlaw.cloud/recover-passkey
+
+# ── 旧域名 heyta-tmp.litopia.space：入口 301、端点直连 ─────────────────
+curl --noproxy '*' -sS -m 15 -o /dev/null -D - https://heyta-tmp.litopia.space/app/    # 期望 301
+curl --noproxy '*' -sS -m 15 -w '\nHTTP %{http_code}\n' https://heyta-tmp.litopia.space/health  # 期望 200，**不能**是 301
 curl --noproxy '*' -sS -m 15 -o /dev/null -D - http://124.223.13.226/health            # 期望 404
 
 # 强制指定解析目标，绕开本机 fake-ip / 代理
 curl --noproxy '*' -sS -m 12 -k --resolve litopia.space:443:101.34.250.109 -o /dev/null -w 'HTTP %{http_code}\n' https://litopia.space/
 ```
+
+> ⚠️ **`/health` 那一条是这套检查里最容易看错的一条**：旧域名上它必须是 **200**，
+> 因为它仍然直连同步服务端。如果它变成 301，说明有人把旧域名整个重定向了 ——
+> 那会**打断正在同步的客户端**（301 让 POST 变 GET，客户端"成功"了却丢了内容）。
 
 ### 8.5 DNS（**只读，不要改**）
 
@@ -937,8 +950,12 @@ tccli dnspod DescribeRecordList --Domain litopia.space --output json
 tccli dnspod DescribeRecordList --Domain litopia.space --output json \
   | python3 -c 'import json,sys;[print(f"{r[\"Name\"]:<20}{r[\"Type\"]:<6}{r[\"Value\"]:<45}id={r[\"RecordId\"]}upd={r[\"UpdatedOn\"]}") for r in json.load(sys.stdin)["RecordList"]]'
 
+# 唯一域名的 A 记录在**另一个区**（finlaw.cloud，DomainId 98829969）
+tccli dnspod DescribeRecordList --Domain finlaw.cloud --output json \
+  | python3 -c 'import json,sys;[print(f"{r[\"Name\"]:<20}{r[\"Type\"]:<6}{r[\"Value\"]:<30}id={r[\"RecordId\"]}") for r in json.load(sys.stdin)["RecordList"] if r["Name"]=="heyta"]'
+
 # 判断域名到底解析到哪台机器：在远端查，别在本机 dig
-ssh ubuntu-jcli 'getent hosts litopia.space mail.litopia.space heyta-tmp.litopia.space'
+ssh ubuntu-jcli 'getent hosts litopia.space mail.litopia.space heyta-tmp.litopia.space heyta.finlaw.cloud'
 ```
 
 ### 8.6 12km 实例信息（只读）
