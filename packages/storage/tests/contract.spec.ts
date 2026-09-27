@@ -13,6 +13,7 @@ import { describe } from 'vitest';
 import { DbOpLogStore } from '../src/db-op-log-store.js';
 import { INDEXEDDB_SCHEMA, IndexedDbAdapter } from '../src/indexeddb/indexeddb-adapter.js';
 import { MemoryDbAdapter } from '../src/memory/memory-adapter.js';
+import { createWorkerOpLogStore, serveOpLogWorker } from '../src/sqlite/oplog-worker-bridge.js';
 import { NodeSqliteDriver } from '../src/sqlite/node-sqlite-driver.js';
 import { SqliteAdapter } from '../src/sqlite/sqlite-adapter.js';
 import {
@@ -87,6 +88,59 @@ const sqliteWasmDb = async (): Promise<SqliteAdapter> => {
   return db;
 };
 
+/**
+ * 一对**进程内**端口，模拟 `postMessage` 的两端。
+ *
+ * 🔴 为什么不用真 Worker：这里要验的是**协议与转发**（方法名对不对、参数过不过得去、
+ * 异常能不能带着堆栈回来），而不是浏览器的消息设施本身。
+ * 真的起一个 Worker 会把失败原因埋在浏览器进程边界后面，比这里慢几个数量级、
+ * 指向也远没有这么清楚 —— 而真 Worker 由 `scripts/verify-web-sqlite.mjs` 单独验。
+ *
+ * ⚠️ **投递必须是异步的**（真实 `postMessage` 就是异步的）。
+ * 这里用 `queueMicrotask`，于是"代理假设响应会同步到达"这类错误会当场暴露，
+ * 而不是在真浏览器里才偶发。
+ */
+function inProcessPortPair(): {
+  /** 主线程那侧：`createWorkerOpLogStore` 拿到的就是它。 */
+  mainSide: {
+    postMessage(message: unknown): void;
+    addEventListener(type: string, listener: (event: { data: unknown }) => void): void;
+  };
+  /** Worker 那侧：`serveOpLogWorker` 拿到的就是它。 */
+  workerSide: {
+    postMessage(message: unknown): void;
+    onmessage: ((event: { data: unknown }) => void) | null;
+  };
+} {
+  const mainListeners: Array<(event: { data: unknown }) => void> = [];
+  let workerOnMessage: ((event: { data: unknown }) => void) | null = null;
+
+  const mainSide = {
+    postMessage(message: unknown): void {
+      queueMicrotask(() => workerOnMessage?.({ data: message }));
+    },
+    addEventListener(_type: string, listener: (event: { data: unknown }) => void): void {
+      mainListeners.push(listener);
+    },
+  };
+
+  const workerSide = {
+    postMessage(message: unknown): void {
+      queueMicrotask(() => {
+        for (const listener of mainListeners) listener({ data: message });
+      });
+    },
+    get onmessage(): ((event: { data: unknown }) => void) | null {
+      return workerOnMessage;
+    },
+    set onmessage(value: ((event: { data: unknown }) => void) | null) {
+      workerOnMessage = value;
+    },
+  };
+
+  return { mainSide, workerSide };
+}
+
 describe('DbAdapter 实现一致性', () => {
   runDbAdapterContract({ name: 'MemoryDbAdapter', create: memoryDb });
   runDbAdapterContract({
@@ -123,5 +177,27 @@ describe('DbAdapter 实现一致性', () => {
     name: 'SqliteWasmDriver',
     createDb: sqliteWasmDb,
     create: (db) => new DbOpLogStore(db),
+  });
+
+  /**
+   * 🔴 **Worker 桥接的透明性**（`oplog-worker-bridge.ts`）。
+   *
+   * 这是 M4-3 的关键判据：web 端最终用的不是 `DbOpLogStore` 本身，
+   * 而是"隔着 Worker 的那个代理"。如果代理把某个方法的参数丢掉、或把返回值
+   * 的形状改了，上层会**静默**拿到错的数据 —— 所以它必须过**同一套**契约，
+   * 而不是另写几条"桥能通"的断言。
+   *
+   * 这一行通过 = 隔着 Worker 的行为与本地直连**逐条相同**。
+   */
+  runOpLogStoreContract({
+    name: 'Worker 桥接（Worker 侧 SqliteWasmDriver + 主线程代理）',
+    createDb: sqliteWasmDb,
+    create: (db) => {
+      const store = new DbOpLogStore(db);
+      const { mainSide, workerSide } = inProcessPortPair();
+      // 顺序要紧：先把服务端挂上，再建代理 —— 否则最初的几条消息会丢在空气里。
+      serveOpLogWorker(workerSide, Promise.resolve({ store, clientId: 'contract' }));
+      return createWorkerOpLogStore(mainSide);
+    },
   });
 });

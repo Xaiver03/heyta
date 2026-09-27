@@ -120,6 +120,46 @@ export interface SqliteWasmDriverOptions {
 export async function openSqliteWasmDriver(
   options: SqliteWasmDriverOptions,
 ): Promise<SqliteDriver> {
+  const pool = await installOpfsSahPool(options);
+  return new SqliteWasmDriver(new pool.OpfsSAHPoolDb(normalizeFilename(options.filename)));
+}
+
+/**
+ * 造一个**同步**的驱动工厂，供 `SqliteAdapter` 用。
+ *
+ * ─────────────────────────────────────────────────────────────
+ * 🔴 为什么需要它：`driverFactory` 是同步的，而装 VFS 是异步的
+ * ─────────────────────────────────────────────────────────────
+ * `SqliteAdapterOptions.driverFactory` 的类型是 `() => SqliteDriver`（**同步**），
+ * 而 `installOpfsSAHPoolVfs()` 是异步的 —— 直接把 `openSqliteWasmDriver` 塞进去，
+ * 适配器内部会把一个 Promise 当驱动用，报一个和真实原因无关的错。
+ *
+ * 关键在于**异步的只有"装池"这一件事，而且每个 origin 只需装一次**：
+ * 池装好之后，`new pool.OpfsSAHPoolDb(name)` 本身是**同步**的。
+ * 所以这里把异步边界提前吃掉，交出一个同步工厂。
+ *
+ * ⚠️ 不要退化成"开一个驱动、之后每次都返回它"：`SqliteAdapter.close()`
+ * 的契约是"后续操作透明重开"，而一个已 `close()` 的驱动**无法复活**
+ * （`sqlite-adapter.ts` 里那段注释就是为此写的）。所以这里每次调用都新建句柄 ——
+ * 它们共享同一个底层池/VFS，不是"开了两个库"。
+ */
+export async function createOpfsSahPoolDriverFactory(
+  options: SqliteWasmDriverOptions,
+): Promise<() => SqliteDriver> {
+  const pool = await installOpfsSahPool(options);
+  const filename = normalizeFilename(options.filename);
+  return () => new SqliteWasmDriver(new pool.OpfsSAHPoolDb(filename));
+}
+
+/**
+ * 装 OPFS 的 SAH Pool VFS，返回池工具。
+ *
+ * 单独导出是为了让 `SqliteAdapter` 的调用方能**先 await 它、再交出同步工厂**
+ * （见 `createOpfsSahPoolDriverFactory`）。
+ */
+export async function installOpfsSahPool(
+  options: SqliteWasmDriverOptions,
+): Promise<OpfsSahPoolUtil> {
   /**
    * ⚠️ 这里是**两步**，别合并成一句。
    *
@@ -145,7 +185,7 @@ export async function openSqliteWasmDriver(
    *
    * 来源：`dist/sqlite3-worker1.mjs` 里 `sqlite3.installOpfsSAHPoolVfs = async function(...)`。
    */
-  const pool = (await sqlite3.installOpfsSAHPoolVfs({
+  return (await sqlite3.installOpfsSAHPoolVfs({
     name: vfsName,
     /**
      * 目录名与 VFS 名绑在一起：换名字必须同时换目录，
@@ -155,8 +195,6 @@ export async function openSqliteWasmDriver(
     initialCapacity: options.initialCapacity ?? 8,
     ...(options.clearOnInit === true ? { clearOnInit: true } : {}),
   })) as OpfsSahPoolUtil;
-
-  return new SqliteWasmDriver(new pool.OpfsSAHPoolDb(normalizeFilename(options.filename)));
 }
 
 /**

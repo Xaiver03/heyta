@@ -26,3 +26,13 @@ export * from './sqlite-adapter.js';
  * 因此在 Node 里也能用内存库跑同一套契约测试（见 `tests/contract.spec.ts`）。
  */
 export * from './sqlite-wasm-driver.js';
+
+/**
+ * op-log 存储的 Worker 桥接（web 端把 SQLite 放进 Worker 的接缝）。
+ *
+ * 🔴 为什么边界画在 `OpLogStore` 而不是 `DbAdapter`：
+ * `DbAdapter.transaction()` **接收回调**，而回调不能跨 Worker 序列化。
+ * 画在 `DbAdapter` 就得把一次原子事务拆成一串请求发过去，等于**把原子性拆掉**。
+ * 详见 `oplog-worker-bridge.ts` 文件头。
+ */
+export * from './oplog-worker-bridge.js';
