@@ -362,6 +362,12 @@ interface UploadResponse {
   results?: UploadResult[];
   latestSeq?: number;
   newOps?: ServerOperation[];
+  /**
+   * 搭车返回的 `newOps` **只是第一页**（服务端达到 `PIGGYBACK_LIMIT` 且后面还有）。
+   * 见 `sync.routes.ops-handler.ts`：设了它就不能把游标推到 `latestSeq`，
+   * 否则剩下的 op 会被紧跟的 `download()` 跳过。
+   */
+  hasMorePiggyback?: boolean;
 }
 
 /**
@@ -917,12 +923,39 @@ export class SyncClient {
        *
        * 反过来的话，游标前进了却不知道哪些 op 传过 —— 下次会重传整批。
        * 而"整批解不开"时推进游标，等于把这段历史静默跳过（ADR-0016 明确禁止）。
+       *
+       * 🔴 搭车页也可能**只是第一页**：`newOps` 达到 `PIGGYBACK_LIMIT`(500)
+       * 且服务端后面还有 op 时会带 `hasMorePiggyback: true`
+       * （`sync.routes.ops-handler.ts:346-355,370`），剩下的靠紧跟其后的
+       * `download()` 拉。这时候推进到 `latestSeq` 会让下载从**全局水位**开始，
+       * 搭车页之后、`latestSeq` 之前的 op 就被永久静默跳过
+       * —— 与上面 `download()` 里被修掉的是同一个形状。
+       * 实测探针：`latestSeq=600`、`newOps=2..501`、`hasMorePiggyback=true`
+       * → 游标变成 600，502..600 全丢。
+       *
+       * 所以 `hasMorePiggyback=true` 时只推进到**最后一条已应用的搭车 op**；
+       * 只有搭完一页（或没有搭车 op）时才用 `latestSeq`。
+       * 同 `download()`：用最大 `serverSeq` 归约，不依赖返回顺序假设。
        */
       if (
         !piggybackAllUndecodable &&
         typeof body.latestSeq === 'number'
       ) {
-        await this.options.setLastServerSeq(body.latestSeq);
+        if (body.hasMorePiggyback === true) {
+          let lastPiggybackSeq: number | undefined;
+          for (const o of body.newOps ?? []) {
+            if (lastPiggybackSeq === undefined || o.serverSeq > lastPiggybackSeq) {
+              lastPiggybackSeq = o.serverSeq;
+            }
+          }
+          // hasMorePiggyback 只可能由「取满一页」推出，理论上必有 newOps；
+          // 万一没有，就没有可推进的位点，原地不动好过跳到水位。
+          if (lastPiggybackSeq !== undefined) {
+            await this.options.setLastServerSeq(lastPiggybackSeq);
+          }
+        } else {
+          await this.options.setLastServerSeq(body.latestSeq);
+        }
       }
     }
   }
@@ -1223,15 +1256,48 @@ export class SyncClient {
       }
 
       /**
-       * 🔴 游标推进必须用 `latestSeq`，**不是最后一条 op 的 serverSeq**。
+       * 🔴 游标推进要和「这一页真的消费到哪里」对齐 —— **分页时绝不能跳到 `latestSeq`**。
        *
-       * 这两者在有并发写入时不同：服务端可能已经分配了更大的序号，
-       * 但那些 op 因为 excludeClient 或过滤没有出现在本页。
-       * 用最后一条的 serverSeq 会让游标落后，下次重复下载同一批；
-       * 而用 latestSeq 才表示"我看到这个位置为止"。
+       * `latestSeq` 是**全局**水位（服务端此刻已分配的最大序号），而本页只覆盖到
+       * 本页最后一条 op。旧实现无条件推进到 `latestSeq`，于是 `hasMore=true` 时
+       * 下一轮从 `sinceSeq=latestSeq` 开始 —— **本页之后、`latestSeq` 之前的 op
+       * 一次都没拉取，被永久静默跳过**（服务端的空洞检测恰好因为
+       * `excludeClient` 被关掉，所以连警告都没有，见 `operation-download.service.ts`）。
+       * 实测探针：第 1 页 seq 4..203 / `hasMore=true` / `latestSeq=600`
+       * → 第 2 次下载的 `sinceSeq` 变成 600，204..600 全丢。
+       *
+       * 正确规则分两种：
+       *   - `hasMore=true`（还有下一页）：只推进到**本页已消费的最后一条**，
+       *     剩下的交给下一轮循环 —— 这正是 AGENTS §7:797「游标不提前推进」。
+       *   - 最后一页（`hasMore !== true`）：才用 `latestSeq`。此时并发写入者
+       *     可能分配了比本页末条更大的序号，而 (本页末, latestSeq] 里的 op
+       *     要么被 `excludeClient` 过滤（本机自己的，早已应用过），要么根本不存在；
+       *     用末条 seq 反而让游标落后、下次重复下载（test:434 约束的就是这一页）。
+       *
+       * ⚠️ 分页那一支取的是「本页消费到的**最大** `serverSeq`」，而不是
+       * 「最后一条**解开**的 op」：服务端取数是 `sinceSeq` 之后**升序**取
+       * （`orderBy: { serverSeq: 'asc' }`，`operation-download.service.ts:211-213`），
+       * 所以正常情况下两者相同。但某条 op 解不开时它会被记入 `unreadableOps`
+       * 并**有意跳过**（ADR-0016：重试也不会变好）；拿「最后一条解开的」会退回到
+       * 那条坏 op 之前，下一轮又从它开始 —— 若那一页恰好只剩它一条，就会误报
+       * 「整页解不开 = 口令不对」。取本页最大 seq 才与「这一页都处理完了
+       * （应用，或如实上报后跳过）」的语义一致。这里用 max 归约而非取下标，
+       * 以免把「服务端升序」这个假设写死在客户端。
        */
       if (typeof body.latestSeq === 'number') {
-        await this.options.setLastServerSeq(body.latestSeq);
+        if (body.hasMore === true) {
+          let pageMaxSeq: number | undefined;
+          for (const o of ops) {
+            if (pageMaxSeq === undefined || o.serverSeq > pageMaxSeq) pageMaxSeq = o.serverSeq;
+          }
+          // 空页 + hasMore（线上的服务端不会这样发：hasMore 由「取到 limit+1 条」推出，
+          // 但测试覆盖了这个形状）没有已消费的位点 —— 原地不动，别把游标推到水位。
+          if (pageMaxSeq !== undefined) {
+            await this.options.setLastServerSeq(pageMaxSeq);
+          }
+        } else {
+          await this.options.setLastServerSeq(body.latestSeq);
+        }
       }
 
       // 用 latestSeq 判定终止，而不是 ops.length ——

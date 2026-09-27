@@ -464,6 +464,57 @@ describe('同步客户端 — 上传与游标', () => {
     expect(h.cursor.value).toBe(100);
   });
 
+  it('🔴 搭车返回还有下一页（hasMorePiggyback）时，游标只推进到最后一条搭车 op', async () => {
+    /**
+     * 复现（临时探针实测）：
+     *   上传响应 latestSeq=600、newOps=seq 2..501、hasMorePiggyback=true
+     *   → 旧实现把游标推到 600，紧跟的 download() 用 sinceSeq=600
+     *   → 502..600 的 op 一次都没被拉取，**永久静默丢失**。
+     *
+     * 契约：hasMorePiggyback=true 时游标只能推进到**最后一条已应用的搭车 op**；
+     * 剩下的交给紧跟其后的 `download()` 分页拉取。
+     */
+    const newOps = Array.from({ length: 500 }, (_, i) => ({
+      serverSeq: 2 + i, // 2..501
+      receivedAt: 1,
+      op: {
+        id: `p${String(2 + i)}`,
+        clientId: 'other',
+        actionType: 'CREATE_TASK',
+        opType: 'CRT',
+        entityType: 'TASK',
+        entityId: `e${String(2 + i)}`,
+        payload: {},
+        vectorClock: {},
+        timestamp: 1,
+        schemaVersion: 1,
+        isPayloadEncrypted: false,
+      },
+    }));
+
+    const h = makeHarness(
+      (_url, init) => {
+        if (init?.method === 'POST') {
+          return okJson({
+            results: [{ opId: 'op-1', accepted: true, serverSeq: 1 }],
+            latestSeq: 600,
+            newOps,
+            hasMorePiggyback: true,
+          });
+        }
+        return okJson({ ops: [], hasMore: false, latestSeq: 600 });
+      },
+      { ops: [makeOp()] },
+    );
+
+    await h.client.sync();
+
+    expect(h.downloads.length).toBeGreaterThanOrEqual(1);
+    // 搭车页只到 501 —— 用 600 会把 502..600 整段跳过
+    expect(h.downloads[0]).toContain('sinceSeq=501');
+    expect(h.downloads[0]).not.toContain('sinceSeq=600');
+  });
+
   it('无本地 op 时不发上传请求（省一次往返）', async () => {
     const h = makeHarness(() => okJson({ ops: [], hasMore: false, latestSeq: 0 }), {
       ops: [],
@@ -748,6 +799,50 @@ describe('同步客户端 — 下载与解密', () => {
     );
     const status = await h.client.sync();
     expect(status.kind).toBe('error');
+  });
+
+  it('🔴 hasMore=true 时游标只推进到本页最后一条 op，不能跳到 latestSeq（否则中间整段永久跳过）', async () => {
+    /**
+     * 复现（临时探针实测）：
+     *   第 1 页 seq 4..203、hasMore=true、latestSeq=600
+     *   → 旧实现把游标推到 600，第 2 次下载的 sinceSeq 变成了 600
+     *   → 204..600 的 op 一次都没被拉取，**永久静默丢失**。
+     *
+     * 契约：hasMore=true 时游标只能推进到**本页已消费的最后一条 op**；
+     * 只有最后一页（hasMore=false）才允许用 latestSeq
+     * —— 见上面那条「游标用 latestSeq 推进」，它约束的是最后一页。
+     */
+    const ops = Array.from({ length: 200 }, (_, i) => ({
+      serverSeq: 4 + i, // 4..203
+      receivedAt: 1,
+      op: {
+        id: `r${String(4 + i)}`,
+        clientId: 'other',
+        actionType: 'CREATE_TASK',
+        opType: 'CRT',
+        entityType: 'TASK',
+        entityId: `e${String(4 + i)}`,
+        payload: {},
+        vectorClock: {},
+        timestamp: 1,
+        schemaVersion: 1,
+        isPayloadEncrypted: false,
+      },
+    }));
+
+    let page = 0;
+    const h = makeHarness(() => {
+      page += 1;
+      if (page === 1) return okJson({ ops, hasMore: true, latestSeq: 600 });
+      return okJson({ ops: [], hasMore: false, latestSeq: 600 });
+    });
+
+    await h.client.sync();
+
+    expect(h.downloads.length).toBeGreaterThanOrEqual(2);
+    // 第 2 次必须从 203 继续，而不是从 600 —— 600 会把 204..600 整段跳过
+    expect(h.downloads[1]).toContain('sinceSeq=203');
+    expect(h.downloads[1]).not.toContain('sinceSeq=600');
   });
 
   it('hasMore 为真且有空页时终止（避免死循环）', async () => {
