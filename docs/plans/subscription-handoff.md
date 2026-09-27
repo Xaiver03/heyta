@@ -19,9 +19,19 @@
 
 服务端测试：`59 files passed | 1148 passed | 1 skipped`。
 
-## 2. 🔴 未提交 —— 后台 agent 正在写，**没有任何测试**
+## 2. ✅ 曾经「未提交」的那批 —— 现已全部落地（原样保留作记录）
+
+> 🔴 **本节记录的是当时那一刻的状态，已被后续工作取代。**
+> 下面列出的文件**现在全部已跟踪、已提交、且有测试**：
+> `git ls-files server/src/billing/` 列出 13 个文件（含后来新增的
+> `checkout.routes.ts` / `price-book.ts` / `coupon.ts` / `money.ts` /
+> `pricing-store.ts` / `quote.ts` / `wechat.adapter.ts`），
+> `server/tests/` 下有 10 个 `billing-*.spec.ts` +
+> `wechat-adapter.spec.ts` / `pricing-cli.spec.ts` / `entitlement.spec.ts`。
+> §4 第 1 条（billing 的测试）因此**已完成**，不再是待办。
 
 ```
+（当时的工作区快照，勿再照此判断现状）
 ?? server/src/billing/                                    ← 6 个文件，全部未跟踪
      apply-event.ts  index.ts  noop.adapter.ts
      registry.ts  types.ts  webhook.routes.ts
@@ -30,11 +40,10 @@
  M server/src/server.ts                                   ← webhook 路由注册
 ```
 
-**这些文件在磁盘上，不会因为会话结束而丢失**，但它们**零测试**。
-
-🔴 **不要直接提交它们。** 这个目标里已经犯过一次同类错误：`entitlement.ts`
-先于它的测试进了 HEAD，结果 HEAD 里躺着一份**看起来做完了、实际零验证**的实现。
-顺序必须是 **写完全部测试 → 一次跑通 → 再提交**。
+当时这些文件在磁盘上但**零测试**，所以写下了那条纪律：
+**写完全部测试 → 一次跑通 → 再提交**。这条纪律**已经执行完** ——
+现在它们是 `billing-apply-event.spec.ts` / `billing-webhook.routes.spec.ts` /
+`billing-wechat.routes.spec.ts` / `billing-wechat-config.spec.ts` 等覆盖的对象。
 
 `server/package.json` 的改动**不是这条线的**（并发 agent 的），提交时排除。
 
@@ -56,7 +65,7 @@
 
 | # | 事项 | 注意 |
 |---|---|---|
-| 1 | **billing 的测试** | 🔴 必需。至少覆盖：**同一 `providerEventId` 投递两次不产生第二次副作用且两次都返回 200**（返回非 2xx 会让支付商一直重试）；**不同 provider 的同名 eventId 不算重复**；**验签失败时不落 `PaymentEvent`**（否则攻击者能用垃圾请求占掉 eventId，导致真事件被当成重复而丢弃 —— 真实攻击面）；落库字段里**没有原始 payload**（PII） |
+| 1 | ~~**billing 的测试**~~ ✅ **已完成** | 🔴 必需。至少覆盖：**同一 `providerEventId` 投递两次不产生第二次副作用且两次都返回 200**（返回非 2xx 会让支付商一直重试）；**不同 provider 的同名 eventId 不算重复**；**验签失败时不落 `PaymentEvent`**（否则攻击者能用垃圾请求占掉 eventId，导致真事件被当成重复而丢弃 —— 真实攻击面）；落库字段里**没有原始 payload**（PII） |
 | 2 | **乱序测试** | "至少一次投递 + 不保证顺序"是七家共同前提 → 构造 `occurredAt` 更早但**后到达**的事件，断言状态**不回退** |
 | 3 | 客户端按权益降级 | 🔴 **到期不许锁本地数据**（见 `subscription-boundary.md`「到期后的降级语义」——那是硬约束，不是偏好） |
 | 4 | 真实支付测试模式门禁 | 依赖选型定稿（⚠️ 见 §5 的方向变更）。能做的是**官方 webhook 模拟器**把真实签名 payload 打进来 + 重投断言幂等；**做不到**真实扣款清算全自动 |
@@ -86,29 +95,29 @@
 
 ## 9. 两件"需要协调才能做"的收尾（不是技术问题，是共享工作区问题）
 
-### 9.1 给 server 加 `@heyta/domain` 依赖（正解，但被挡住）
+### 9.1 ✅ 给 server 加 `@heyta/domain` 依赖 —— 已做完
 
-`server/src/billing/extend-period.ts` 是 `packages/domain/src/subscription.ts`
-里 `extendSubscriptionPeriod` 的**镜像**，因为服务端**无法 import 它**：
-`server/package.json` 的 dependencies 里没有 `@heyta/domain`，而相对路径 import
-会撞 `rootDir`（TS6059）+ ESM/CJS 不匹配。
+> 本节原记的是一个"被共享工作区挡住"的正解。**它已经落地了**：
+> `server/package.json` 的 dependencies 里现在有 `"@heyta/domain": "workspace:*"`；
+> `server/src/billing/extend-period.ts` **已不存在**，
+> 漂移守卫 `server/tests/billing-extend-period.spec.ts` 也**已不存在** ——
+> 两边现在直接 import 同一份实现，镜像与守卫都不再需要。
 
-**镜像目前是安全的**：`billing-extend-period.spec.ts` 是漂移守卫，
-它直接 import domain 那份源文件，把两份实现放在同一张用例表上比对。
-**风险是被检测的，不是被假设的。**
+（原记录：`extend-period.ts` 曾是 `packages/domain/src/subscription.ts` 里
+`extendSubscriptionPeriod` 的**镜像**，因为服务端当时**无法 import 它**：
+dependencies 里没有 `@heyta/domain`，而相对路径 import 会撞
+`rootDir`（TS6059）+ ESM/CJS 不匹配。当时的漂移守卫是
+`billing-extend-period.spec.ts`，它直接 import domain 那份源文件做逐条比对。）
 
-正解：给 `server/package.json` 加 `"@heyta/domain": "workspace:*"`，
-删掉 `extend-period.ts` 与漂移守卫，改为直接 import。
+🔴 **当时没做的原因（已解除）**：`server/package.json` 与 `pnpm-lock.yaml`
+当时都有另一个 agent 的未提交改动。那两个文件现在已干净。
 
-🔴 **为什么当时没做**：`server/package.json` 与 `pnpm-lock.yaml` 此刻**都有
-另一个 agent 的未提交改动**（`server/package.json` 上是删掉 `prebuild` 那行；
-lockfile 上还有 landing 页 agent 的改动）。改它们、尤其跑 `pnpm install`
-去重写 lockfile，会把别人的在途状态一起搅进来。
-**等这两个文件干净后再做，或者由正在改它们的那个会话做。**
+### 9.2 ✅ 让 AI / i18n 那批未提交改动进版本库 —— 已做完
 
-### 9.2 让 AI / i18n 那批未提交改动进版本库
-
-工作区里有一大批**功能上已完成且全绿**但未提交的改动：
+> 本节原记的是一大批"功能上已完成且全绿、但未提交"的改动。**它们已经全部提交**：
+> `packages/i18n/src/locales/{zh-CN,en}.ts` 等现在都被 git 跟踪
+> （`git ls-files packages/i18n/src/locales/` 有输出），工作区干净。
+> 下面是当时的清单，保留作记录：
 
 - `packages/i18n/**`（**全新包**，17 个文件；`dist/` 与 `*.tsbuildinfo` 已被 gitignore）
 - `packages/ai/src/{egress,health-store,index,provider,supply}.ts` + `tests/health-store.spec.ts`
@@ -138,6 +147,11 @@ AI 文件 import `@heyta/i18n`，所以 **`packages/i18n` 必须同一个提交*
 
 - ✅ **金额校验**（`fb14eba`）：微信回调必须金额落在价目表上，否则**不授予**。
   详见 `docs/plans/subscription-boundary.md` §6 与代码注释里的强度上限说明。
+  > 🔴 **后补（`9684d2a`）：这一层已不再是"终局判定"。** `verifyWebhook` 现在分成三种
+  > 如实上报（实付 = 某档原价 → 授予该档；有实付但落不到档位 → 不授予但标
+  > `requiresOrderSettlement: true`；无实付字段 → 标金额不匹配），
+  > 权威判定只留在 `settleOrderPaid`（比订单冻结的 SKU 与实付）。详见
+  > [pricing-and-coupons.md](../reference/pricing-and-coupons.md) §7 第 9 条。
 - ✅ **本地凭证**：`server/.env`（0600、gitignore、git 看不见）已写入借用的
   `WX_*` 六个变量。⚠️ 是**别家公司的**，新凭证到位后替换并**停用旧的**。
 

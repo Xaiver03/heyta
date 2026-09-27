@@ -5,8 +5,8 @@
 > 本文件回答**"代码该改哪里"**，不改任何 ADR 的结论。
 
 > ⚠️ **本文件的行号会漂移。** 共享文件随时可能被其他改动推移几行 ——
-> 上面这批行号在 2026-09-26 核对过一次（`check-migrations.mjs` 34、
-> `sync.routes.ts` 46、`server.ts` 488/494/501）。
+> 上面这批行号在 2026-09-27 复核过一次（`sync.routes.ts` 97、
+> `server.ts` 488/494/516）。
 > **引用行号时请用 `grep -n` 现场核一遍**，不要把这里的数字当权威：
 > 结论是稳的，行号不是。
 
@@ -31,6 +31,20 @@
 > ⚠️ 我把这条单独拎出来，是因为它**改变了这个目标的形状**：
 > 原计划里"补 ToS"被当成一个收尾小项，实际上它是一个**独立的前置项**。
 
+> ✅ **后补（2026-09-27）：这份"heyta 自己的法务文本"已经存在（仍是草稿）。**
+> 仓库里现在有两份，且是 `check-pricing-consistency.mjs` 交叉校验价格的对象
+> （`LEGAL_FILES`）：
+> - `server/legal/terms-of-service.heyta.md` —— 托管同步服务条款（草稿），
+>   与 `terms-of-service.md`（上游德语 AGB）**互相独立**；
+> - `server/legal/terms-of-service.ai.heyta.md` —— 云端 AI 订阅条款（草稿）。
+>
+> 🔴 **但两份都还是草稿、未经法务复核、不得对外**（见各文件头的红字）。
+> 所以 §9 落地顺序第 1 项从"要写出来"变成"要律师过目并签字"，**仍未完成**。
+> 另外 [ADR-0017](../adr/0017-single-paid-tier-and-payment-channel.md) §3.3 决定
+> 支付通道复用同公司的「晓黎支付中心」，本节 §8 写的 webhook 端点形状
+> （`/api/billing/webhooks/:provider`）**已落地**（`server/src/billing/webhook.routes.ts`，
+> 注册在 `/api/billing`）。
+
 ## 1. HTTP 层：Fastify 5（不是 Express）
 
 路由用 `fastify.get/post/delete` 写在各插件里，再由 `server.ts` 按前缀挂载。
@@ -38,7 +52,7 @@
 ```
 server/src/server.ts:488  await fastifyServer.register(apiRoutes,  { prefix: '/api' })
 server/src/server.ts:494  await fastifyServer.register(syncRoutes, { prefix: '/api/sync' })
-server/src/server.ts:501  await fastifyServer.register(wsRoutes,   { prefix: '/api/sync' })
+server/src/server.ts:516  await fastifyServer.register(wsRoutes,   { prefix: '/api/sync' })
 ```
 （`server/package.json`：`"fastify": "^5.12.1"`）
 
@@ -52,7 +66,7 @@ server/src/middleware.ts:22   getAuthUser(req): { userId: number; email: string 
 
 挂法有两种，都可照抄：
 - 单路由：`{ preHandler: authenticate }`（`api.ts:187`）
-- 整组：`fastify.addHook('preHandler', authenticate)`（`sync/sync.routes.ts:96`）
+- 整组：`fastify.addHook('preHandler', authenticate)`（`sync/sync.routes.ts:97`）
 
 ## 3. 权益校验挂哪：preHandler，排在 `authenticate` 之后
 
@@ -73,8 +87,8 @@ server/src/sync/sync.routes.ops-handler.ts:271-274
 
 它一次性示范了四件该做的事：**返回布尔 + 自行 `reply` 错误 + 发结构化错误码 + 写审计**。
 
-其余三种：按用户限流（`ops-handler.ts:111`，429 + `RATE_LIMITED`）、
-E2EE ingress gate（`payload.ts:61`）、注册白名单（`email-allowlist.ts`）。
+其余三种：按用户限流（`ops-handler.ts:113`，429 + `RATE_LIMITED`）、
+E2EE ingress gate（`sync.routes.payload.ts:62`）、注册白名单（`email-allowlist.ts`）。
 
 ## 4. 数据库：新表是普通迁移，**不影响 `CURRENT_SCHEMA_VERSION`**
 
@@ -138,7 +152,7 @@ server/src/logger.ts:73   Logger.audit(entry)
 （`server.ts:488` 附近，`{ prefix: '/api/billing' }`）。
 
 🔴 **不能套 `authenticate`** —— 调用方是支付商的机器，没有 JWT，改**验签**。
-验签要**原始 body**，可照 `sync/sync.routes.ts:56 addContentTypeParser` 的
+验签要**原始 body**，可照 `sync/sync.routes.ts:57 addContentTypeParser` 的
 `parseAs: 'buffer'` 写法。
 
 **幂等是硬要求**（目标里写了「重复回调不许重复授予」）：按支付商的 event id

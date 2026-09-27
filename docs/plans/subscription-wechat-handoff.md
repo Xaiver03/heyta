@@ -5,6 +5,17 @@
 
 ## 0. 一句话
 
+> 🔴 **后补（2026-09-27）：本任务书里"要做"的东西已经做完了。**
+> `server/src/billing/wechat.adapter.ts` **已存在、已提交、有测试**
+> （`server/tests/wechat-adapter.spec.ts` / `billing-wechat.routes.spec.ts` /
+> `billing-wechat-config.spec.ts`）；`server/src/billing/extend-period.ts` 的镜像
+> 也已取消（`server/package.json` 直接依赖 `@heyta/domain`）。
+> **仍然没做的**只有两件：① 真实商户凭证下的端到端验证（§9 要求的诚实项，
+> 至今未做）；② `settleOrderPaid` 在 webhook 路径上的接线
+> （见 [pricing-and-coupons.md](../reference/pricing-and-coupons.md) §7 第 9 条）。
+> 另外价格与周期已由 ADR-0020 改成**月付 ¥5/¥12、一次支付 30 天** ——
+> §3.1 的 ¥99/年 与 365 天**已作废**。下面正文保留作当时的任务书。
+
 heyta 的订阅功能已经做完了 4/6 项（数据模型、服务端权益与幂等、客户端降级、
 ToS 草稿），**只剩微信支付 adapter 与真实支付 E2E 门禁**。
 adapter 曾派过一个 agent 连做三轮零产出，已中断。你要做的是把它做完。
@@ -35,12 +46,18 @@ adapter 曾派过一个 agent 连做三轮零产出，已中断。你要做的�
 
 ### 3.1 一次性支付的授予语义
 
-微信支付**没有订阅对象**，回调只说"一笔订单付成功了"。阶段一是**一次性年付 ¥99**，
+微信支付**没有订阅对象**，回调只说"一笔订单付成功了"。
+~~阶段一是**一次性年付 ¥99**~~ → 🔴 **已改为一次性月付**：
+`hosted-monthly` ¥5/月、`hosted-ai-monthly` ¥12/月（ADR-0020），
 所以 `NO_SUBSCRIPTION_REFERENCE` 在阶段一是**主路径**，不是边界情况。
 
 ```
-currentPeriodEnd = max(now, 已有的 currentPeriodEnd ?? now) + 365 天
+currentPeriodEnd = max(now, 已有的 currentPeriodEnd ?? now) + 30 天
 ```
+
+> ⚠️ 上面那个 `365` 已随 ADR-0020 改成 **`30`**：`SUBSCRIPTION_PERIOD_DAYS`
+> 与 `WECHAT_ONE_TIME_PERIOD_DAYS` 现在都是 `30`（实测
+> `packages/domain/src/subscription.ts` 与 `server/src/billing/wechat.adapter.ts`）。
 
 - **`max` 是全部要点**：提前续费**不许丢掉已付过钱的剩余时间**。
 - 已过期的到期日从 `now` 起算（否则新买的时长会有一部分埋进过去）。

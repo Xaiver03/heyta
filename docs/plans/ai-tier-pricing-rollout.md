@@ -247,6 +247,11 @@ ADR-0020 §4.1 要 `check-pricing-consistency.mjs` 把「恰好一个 priceId」
 
 ### 4.2 落地页：**2 张主卡 + 一行附注**（已拍板）
 
+> 🔴 **后补：实际落地的是三栏，不是本节写的「2 张主卡 + 一行附注」。**
+> 见 `apps/landing/src/components/Pricing.tsx` 文件头（「版面：**三栏**」）——
+> 自建免费 / `hosted-monthly` ¥5 / `hosted-ai-monthly` ¥12 各占一栏。
+> 本节正文保留作当时的计划记录，**以代码为准**。
+
 **结论：不做 4 张卡平铺。**
 
 `Pricing.tsx` 现在是两栏：`free`（`apps/landing/src/components/Pricing.tsx:76-106`）+
@@ -304,8 +309,11 @@ ADR-0020 §4.1 要 `check-pricing-consistency.mjs` 把「恰好一个 priceId」
 4. `/en/` → 200 且 `<html lang="en"`；英文海外价是 `$5 / month` 与 `$12 / month`，
    英文大陆价带 `CNY` 前缀（`CNY 5 / month` / `CNY 12 / month`），与中文一致。
 5. `#pricing` 里的 `<button>` 数量 → **0**（两档都还没接线，不许出现点了没反应的按钮）。
-6. `#pricing` 的主视觉是 **2 张卡**（自建 / 含 AI），`¥5` 托管以**一行附注**出现 ——
-   不是第 3、4 张卡（§4.2）。
+6. ~~`#pricing` 的主视觉是 **2 张卡**（自建 / 含 AI），`¥5` 托管以**一行附注**出现 ——
+   不是第 3、4 张卡（§4.2）~~ 🔴 **实际落地的不是这个形状**：现在是**三栏**
+   （自建免费 / 官方托管 ¥5 / 官方托管 + 云端 AI ¥12），见
+   `apps/landing/src/components/Pricing.tsx` 文件头的「版面：**三栏**」。
+   即 §4.2 的「2 张主卡 + 一行附注」**没有按字面执行** —— **以代码为准**。
 
 ---
 
