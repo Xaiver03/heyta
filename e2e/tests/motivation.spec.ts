@@ -10,7 +10,7 @@ import { openApp, switchView } from './helpers';
  *
  * ## 判据来自哪些源码
  *
- * - 7 个标签与顺序：`apps/web/src/App.tsx` 的 `VIEW_TABS`
+ * - 8 个标签与顺序：`apps/web/src/App.tsx` 的 `VIEW_TABS`
  * - 哪 5 个视图的居中标题 === 标签：同文件的 `VIEW_TITLED_BY_TAB`
  * - 进度卡的可见范围：同文件的 `{view !== 'settings' && view !== 'growth' && …}`
  * - 周复盘 / 年度视图 / 中性差值：`apps/web/src/features/motivation/GrowthView.tsx`
