@@ -32,6 +32,11 @@ ios/DerivedData/
 **/xcuserdata/
 ios/.xcode.env.local
 *.podspec.bak
+# `pod install` 生成的 Xcode 工作区 —— 它是产物，不是源码。
+# 它引用的 `Pods/Pods.xcodeproj` 本身就在上面被忽略，所以提交它
+# 等于提交一个在全新克隆里**悬空**的引用：新克隆必须先跑 `pod install`，
+# 而那一步会把它重新生成出来。
+ios/*.xcworkspace/
 
 # ── Metro / RN ──
 .metro-health-check*

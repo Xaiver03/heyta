@@ -47,6 +47,52 @@ const config = {
     ],
     // 原生模块的产物里可能引用 .cjs/.mjs，Metro 默认不认。
     sourceExts: ['js', 'jsx', 'ts', 'tsx', 'json', 'cjs', 'mjs'],
+
+    /**
+     * 把 React 强制钉成**单实例**。
+     *
+     * 🔴 这里原本只靠 `nodeModulesPaths` 的顺序，**它不够** —— 实测证据：
+     *    打进 release APK 的 bundle 里有**两份** React：
+     *
+     *      apps/mobile/node_modules/react     -> 19.2.3   （app 的依赖）
+     *      packages/i18n/node_modules/react   -> 19.3.0   （i18n 的 devDependencies）
+     *
+     *    因为 `packages/i18n/dist/index.js` 位于**仓库根**下，
+     *    Metro 从它出发**逐级向上查找**时命中的是 `packages/i18n/node_modules/react`，
+     *    而**不是** `nodeModulesPaths` 里的那两份。
+     *    （`nodeModulesPaths` 是"找不到时才去的地方"，本包自己有就不去。）
+     *
+     *    代价是应用**一启动就崩**，而且崩在**看起来毫不相干**的地方：
+     *
+     *      TypeError: Cannot read property 'useContext' of null
+     *        at TasksScreen
+     *
+     *    因为 `@heyta/i18n` 的 `useContext` 来自 19.3.0 那份，
+     *    而 `TasksScreen` 自己的 hook 来自 19.2.3 那份 ——
+     *    两个 React 各有各的 dispatcher，i18n 那一侧就是 `null`。
+     *
+     * ⚠️ `extraNodeModules` **修不了这个**：它只是解析失败时的兜底，
+     *    而 i18n 本地那份 React **存在**，正常解析会成功，兜底根本不会触发。
+     *    所以必须在这里**硬改写** `originModulePath`，让这三个说明符
+     *    一律从 app 根出发解析。
+     *
+     * ⚠️ 范围**刻意收窄**到 `react` 的三个入口：不要顺手把 `react-native`
+     *    也拦进来 —— 它内部有大量相对/嵌套解析，改写起点会连带弄坏它们。
+     */
+    resolveRequest: (context, moduleName, platform) => {
+      /** 只有这三个说明符需要唯一化。`react-dom` 在 RN 里用不到。 */
+      const SINGLETONS = ['react', 'react/jsx-runtime', 'react/jsx-dev-runtime'];
+
+      if (SINGLETONS.includes(moduleName)) {
+        return context.resolveRequest(
+          // 把解析起点伪装成 app 根目录，于是必然命中 app 自己那份。
+          { ...context, originModulePath: path.join(projectRoot, 'index.js') },
+          moduleName,
+          platform,
+        );
+      }
+      return context.resolveRequest(context, moduleName, platform);
+    },
   },
 };
 
