@@ -107,12 +107,14 @@ docs/research/<kebab-case>.md     例：reuse-plan.md
 | [0021](adr/0021-managed-ai-model-deepseek-flash.md) | 🤖 **托管 AI 用 DeepSeek V4.1 Flash**：关闭 [0020](adr/0020-ai-subscription-two-tiers.md) §5 第 1 条。选它的理由是**单位经济**而不是「它够用」—— 300 次/月 的 token 成本 ≈¥2.01（占 ¥7 增量 **29%**），换 pro 级 ≈¥7.71 **超过 ¥7 增量本身**；所以「换模型 = 换价」，两者不能分开定 | ✅ **已接受** |
 | [0022](adr/0022-resilience-state-stays-derived.md) | 习惯韧性的**冻结余额保持纯派生且不上界面**（界面只显示"它替你保住了什么"）；🔴 **冻结参数只能放宽、不能收紧**，收紧必须走代码常量切分点 —— **仍然不加字段** | ✅ **已接受** |
 | [0023](adr/0023-managed-ai-quota-not-implemented.md) | 🔴 **托管 AI 的「300 次/月」本轮不实现**：不改变 [0020](adr/0020-ai-subscription-two-tiers.md)/[0021](adr/0021-managed-ai-model-deepseek-flash.md) 的额度与模型，判定的是**落地顺序** —— 端点 / 计量 / `deepseek` 调用 / 收银台**一个都不存在**，而承诺已在文案与法务里，所以定成「**计量存在之前 `hosted-ai-monthly` 不得被售卖**」；`pnpm check:ai-quota` 把**唯一数字源**（参考文档 `ai-quota-ssot` 块）与五处承诺、以及状态↔实现绑定起来 | ✅ **已接受** |
+| 🔴 [0024](adr/0024-desktop-shell-and-ui-convergence.md) | **UI 收敛方向 = React Native + react-native-web；桌面壳 = Electron**：UI 只写一份 RN 组件；桌面选 Electron 而非 Tauri，**因为 `SqliteDriver` 是同步接口而 Tauri 只有异步 IPC**，Electron 有同步 IPC（`sendSync`）且自带 Node 24（现成 `NodeSqliteDriver` 零改动）；否决 react-native-windows（**Linux 无官方目标** + macOS 落后 v0.81.9 vs RN 0.84.1）。🔴 含**显式例外**：系统小组件**不纳入** UI 收敛（是 3 份原生 UI + 1 个 JSON 模板，禁用 headless-JS 组件库） | ⚠️ **待确认**（等产品负责人拍板） |
 
 ### 计划
 
 | 文档 | 内容 |
 |---|---|
 | [roadmap.md](plans/roadmap.md) | ⭐ **总路线图**：阶段划分、P0 完成情况、组件决策、风险 |
+| ⭐ [multi-platform-adaptation.md](plans/multi-platform-adaptation.md) | 🔴 **多端适配实施计划（一套代码）**：M0 共享层补完 → **M1 垂直切片验证（成败点）** → M2 Electron 桌面壳 → M3 逐特性迁移 UI → M4 数据层统一 → M5 收尾 → M6 鸿蒙。含**进度账本**（净行数必须持续为负）、门禁设计、风险登记，以及"明确不做的事"（小组件/向量库/样式库）。依据 [融合调研](research/multi-platform-ui-fusion.md)、选型 [ADR-0024](adr/0024-desktop-shell-and-ui-convergence.md) |
 | [phase-1-single-client-loop.md](plans/phase-1-single-client-loop.md) | ⭐ **P1 详细计划**：单端（Web）闭环 |
 | [phase-2-multi-platform.md](plans/phase-2-multi-platform.md) | **P2 详细计划**：多端补齐（存储契约 / SQLite / RN / 鸿蒙） |
 | [ai-memory-necessity.md](research/ai-memory-necessity.md) | ⭐ **要不要向量数据库**：用重复检测做可证伪实验得出的结论（难档召回 0%） |
@@ -177,7 +179,9 @@ docs/research/<kebab-case>.md     例：reuse-plan.md
 | [ai-competitive-teardown.html](research/ai-competitive-teardown.html) | 上两条的**可视化渲染**（战情室风格功能矩阵，单文件、离线可看）。⚠️ **`.md` 是唯一事实源**，本文件只是呈现 |
 | [motivation-psychology.md](research/motivation-psychology.md) | ⭐ **习惯养成与激励的心理学证据**：B=MAP / Hook / 实施意图 / 损失厌恶 / 断签放弃效应 / 目标梯度 / 禀赋进度 / 新鲜开始 / SDT / 过度理由效应 / 小胜原则 / 排行榜证据。每条带来源与证据强度标记 |
 | [competitor-incentive-teardown.md](research/competitor-incentive-teardown.md) | ⭐ **竞品激励机制拆解**：Forest / Duolingo / Habitica / Streaks / 番茄Todo / 滴答清单 / 小日常 / Apple 健身记录，逐机制规则与数值 + 心理原理 + 对 heyta 的可迁移性 |
-| [native-widgets.md](research/native-widgets.md) | ⭐ **原生小组件可行性**：滴答清单各端组件清单（厂商自述）+ **iOS / Android 能做、鸿蒙与桌面端被"没有壳"卡住** + 上游已跑通的（单向快照 + 点击队列）契约 + 🔴 E2EE 明文快照与门禁盲区。支撑 [roadmap](plans/roadmap.md) P3 |
+| [native-widgets.md](research/native-widgets.md) | ⭐ **原生小组件可行性**：滴答清单各端组件清单（厂商自述）+ 平台事实与前置条件 + 上游已跑通的（单向快照 + 点击队列）契约 + 🔴 E2EE 明文快照与门禁盲区。**顶部有勘误**：macOS / Windows 的"做不了"已被推翻。支撑 [roadmap](plans/roadmap.md) P3 |
+| ⭐ [multi-platform-ui-fusion.md](research/multi-platform-ui-fusion.md) | 🔴 **多端「一套代码」融合调研**：外部最佳实践 × 本仓库实测。**UI 是唯一重复**（12,277 vs 3,661 行）、移动端缺 67% 特性（8,227 行）、Tauri 无同步 IPC / Electron 有、`node:sqlite` 已是 RC、RN 无 Linux 目标。含**方法偏差声明**（本次 `web_search` 全程 HTTP 432，故候选清单不完整）与 10 条未核实项 |
+| [multi-platform-selection-evidence.md](research/multi-platform-selection-evidence.md) | ⭐ **多端选型的组件视角证据**：组件 UI **不可移植**（本仓库上游一手工程记录）、**真正要写的是 3 份 + 1 个模板不是 5 份**、每平台一次性成本 vs 变体边际成本、ADR-0004 不受影响但有一条要拒绝的诱惑、**桌面壳决策可推迟**（Windows PWA / macOS Continuity 两条捷径）、鸿蒙卡片应与壳解耦。**含 §10 与 [ADR-0024](adr/0024-desktop-shell-and-ui-convergence.md) 的对账**（一条冲突 + 两个空白）。**这是多端选型计划的输入** |
 
 > ⚠️ **两份 AI 调研文档的分工（不要当成重复，也不要让它们漂移）**：
 > - `ai-competitive-and-architecture.md` = **结论层**。只放**影响 ADR-0005 / AI 计划决策**的结论，
