@@ -180,15 +180,18 @@ describe('落地页整页渲染', () => {
    *   2. **没有一个点了没反应的购买按钮** —— 托管档现在买不到
    *      （大陆通道没接线、海外 KYC 没过），放一个"立即购买"比不放更坏。
    */
-  it('价格区：两个数字都在，且没有假的购买按钮', () => {
+  it('价格区：两个付费档的价格都在，且没有假的购买按钮', () => {
     const view = renderLanding();
     const pricing = view.querySelector('#pricing');
     expect(pricing).not.toBeNull();
     const text = pricing?.textContent ?? '';
 
-    expect(text).toContain('¥99');
-    expect(text).toContain('$49');
-    // 两档功能一致这条论断必须真的在页面上（否则"只有一个付费档"会被读成阉割版）
+    // ADR-0020：月付两个档（¥5 托管 / ¥12 含云端 AI），两种币都必须在页面上。
+    expect(text).toContain('¥5');
+    expect(text).toContain('¥12');
+    expect(text).toContain('$5');
+    expect(text).toContain('$12');
+    // 两档功能一致这条论断必须真的在页面上（否则"付费解锁功能"会被读成真的）
     expect(text).toContain('功能完全一样');
 
     // 唯一的可点元素是免费档的 CTA，指向自建那一节；托管档没有任何按钮/链接。

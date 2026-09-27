@@ -107,7 +107,7 @@ const couponDef = (overrides: Partial<CouponDefinition> = {}): CouponDefinition 
   id: 'launch-2026',
   code: 'LAUNCH',
   name: '上线推广',
-  benefit: { kind: 'fixed', amountOffMinor: 2_000 },
+  benefit: { kind: 'fixed', amountOffMinor: 100 },
   currency: 'CNY',
   priceIds: null,
   validFrom: NOW - HOUR,
@@ -147,7 +147,7 @@ const buildQuote = async (
     userId,
   );
   return quoteOrder(
-    { priceId: 'annual', currency: 'CNY', region: 'CN', candidateCodes: codes, usageByCouponId: usage },
+    { priceId: 'hosted-monthly', currency: 'CNY', region: 'CN', candidateCodes: codes, usageByCouponId: usage },
     {
       baseline: DEFAULT_PRICE_BOOK,
       overrides: await loadPriceOverrides(base),
@@ -210,7 +210,7 @@ describe('时间戳归一化：驱动差异的收敛点', () => {
 describe('改价：append 一版，不是就地改一行', () => {
   it('第一次改价只是插入一版，不关闭任何东西', async () => {
     const result = await publishPriceVersion(base, {
-      entry: { priceId: 'annual', currency: 'CNY', amountMinor: 6_900, effectiveFrom: 0, effectiveUntil: null },
+      entry: { priceId: 'hosted-monthly', currency: 'CNY', amountMinor: 6_900, effectiveFrom: 0, effectiveUntil: null },
       effectiveFrom: NOW,
       actor: '运营',
       note: '双十一',
@@ -218,19 +218,19 @@ describe('改价：append 一版，不是就地改一行', () => {
     expect(result.closedVersionId).toBeNull();
     const rows = await loadPriceOverrides(base);
     expect(rows).toEqual([
-      { priceId: 'annual', currency: 'CNY', amountMinor: 6_900, effectiveFrom: NOW, effectiveUntil: null, note: '双十一' },
+      { priceId: 'hosted-monthly', currency: 'CNY', amountMinor: 6_900, effectiveFrom: NOW, effectiveUntil: null, note: '双十一' },
     ]);
   });
 
   it('第二次改价把上一版收口，新的一版接管 —— 任何时刻只有一版生效', async () => {
     await publishPriceVersion(base, {
-      entry: { priceId: 'annual', currency: 'CNY', amountMinor: 6_900, effectiveFrom: 0, effectiveUntil: null },
+      entry: { priceId: 'hosted-monthly', currency: 'CNY', amountMinor: 6_900, effectiveFrom: 0, effectiveUntil: null },
       effectiveFrom: NOW,
       actor: '运营',
       note: '双十一',
     });
     const second = await publishPriceVersion(base, {
-      entry: { priceId: 'annual', currency: 'CNY', amountMinor: 7_900, effectiveFrom: 0, effectiveUntil: null },
+      entry: { priceId: 'hosted-monthly', currency: 'CNY', amountMinor: 7_900, effectiveFrom: 0, effectiveUntil: null },
       effectiveFrom: NOW + 7 * 24 * HOUR,
       actor: '运营',
       note: '恢复价',
@@ -244,12 +244,12 @@ describe('改价：append 一版，不是就地改一行', () => {
 
     // 用同一个解析函数按**两个时间点**各问一次 —— 这就是"历史订单能按当时的价格解释"。
     const during = resolveEffectivePrice(DEFAULT_PRICE_BOOK, rows, {
-      priceId: 'annual',
+      priceId: 'hosted-monthly',
       currency: 'CNY',
       now: NOW + HOUR,
     });
     const after = resolveEffectivePrice(DEFAULT_PRICE_BOOK, rows, {
-      priceId: 'annual',
+      priceId: 'hosted-monthly',
       currency: 'CNY',
       now: NOW + 8 * 24 * HOUR,
     });
@@ -259,14 +259,14 @@ describe('改价：append 一版，不是就地改一行', () => {
 
   it('🔴 新版生效时刻不晚于旧版起点 → 拒绝（否则两版会重叠，报价变成未定义）', async () => {
     await publishPriceVersion(base, {
-      entry: { priceId: 'annual', currency: 'CNY', amountMinor: 6_900, effectiveFrom: 0, effectiveUntil: null },
+      entry: { priceId: 'hosted-monthly', currency: 'CNY', amountMinor: 6_900, effectiveFrom: 0, effectiveUntil: null },
       effectiveFrom: NOW,
       actor: '运营',
       note: '双十一',
     });
     await expect(
       publishPriceVersion(base, {
-        entry: { priceId: 'annual', currency: 'CNY', amountMinor: 5_900, effectiveFrom: 0, effectiveUntil: null },
+        entry: { priceId: 'hosted-monthly', currency: 'CNY', amountMinor: 5_900, effectiveFrom: 0, effectiveUntil: null },
         effectiveFrom: NOW,
         actor: '运营',
         note: '错误的重叠',
@@ -281,7 +281,7 @@ describe('改价：append 一版，不是就地改一行', () => {
   it('非法的金额在**写库前**就被拒（价目表坏掉没有合理的降级行为）', async () => {
     await expect(
       publishPriceVersion(base, {
-        entry: { priceId: 'annual', currency: 'CNY', amountMinor: 0, effectiveFrom: 0, effectiveUntil: null },
+        entry: { priceId: 'hosted-monthly', currency: 'CNY', amountMinor: 0, effectiveFrom: 0, effectiveUntil: null },
         effectiveFrom: NOW,
         actor: '运营',
         note: '0 元',
@@ -291,13 +291,13 @@ describe('改价：append 一版，不是就地改一行', () => {
 
   it('每一次改价都留审计，且 before/after 都有值', async () => {
     await publishPriceVersion(base, {
-      entry: { priceId: 'annual', currency: 'CNY', amountMinor: 6_900, effectiveFrom: 0, effectiveUntil: null },
+      entry: { priceId: 'hosted-monthly', currency: 'CNY', amountMinor: 6_900, effectiveFrom: 0, effectiveUntil: null },
       effectiveFrom: NOW,
       actor: '运营甲',
       note: '双十一',
     });
     await publishPriceVersion(base, {
-      entry: { priceId: 'annual', currency: 'CNY', amountMinor: 7_900, effectiveFrom: 0, effectiveUntil: null },
+      entry: { priceId: 'hosted-monthly', currency: 'CNY', amountMinor: 7_900, effectiveFrom: 0, effectiveUntil: null },
       effectiveFrom: NOW + HOUR,
       actor: '运营乙',
       note: '恢复',
@@ -341,13 +341,13 @@ describe('券：写入与读取', () => {
 
   it('数组字段往返：applies_to_all_* 与 null 语义一一对应', async () => {
     await publishCoupon(
-      couponDef({ id: 'scoped', code: 'SCOPED', priceIds: ['annual'], regions: ['CN'] }),
+      couponDef({ id: 'scoped', code: 'SCOPED', priceIds: ['hosted-monthly'], regions: ['CN'] }),
     );
     await publishCoupon(couponDef({ id: 'open', code: 'OPEN', priceIds: null, regions: null }));
     const { coupons } = await loadCoupons(base);
     const scoped = coupons.find((c) => c.id === 'scoped')!;
     const open = coupons.find((c) => c.id === 'open')!;
-    expect(scoped.priceIds).toEqual(['annual']);
+    expect(scoped.priceIds).toEqual(['hosted-monthly']);
     expect(scoped.regions).toEqual(['CN']);
     expect(open.priceIds).toBeNull();
     expect(open.regions).toBeNull();
@@ -407,7 +407,7 @@ describe('券：写入与读取', () => {
     await settleOrderPaid(base, {
       outTradeNo: await outTradeNoOf(second.orderId),
       providerEventId: 'evt-1',
-      paidAmountMinor: 7_900,
+      paidAmountMinor: 400,
       now: NOW + 2 * HOUR,
     });
     await reverseOrderOnRefund(base, { orderId: second.orderId, now: NOW + 3 * HOUR });
@@ -435,15 +435,15 @@ describe('下单：报价快照落库 + 名额预留', () => {
     const user = await freshUser();
     const { orderId, redemptionId, quote } = await placeOrder(user);
     expect(redemptionId).toBeNull();
-    expect(quote.finalAmountMinor).toBe(9_900);
+    expect(quote.finalAmountMinor).toBe(500);
     const rows = await base.query<Record<string, unknown>>(
       'SELECT original_amount_minor, discount_minor, final_amount_minor, status, coupon_id FROM checkout_orders WHERE id = $1',
       [orderId],
     );
     expect(rows[0]).toMatchObject({
-      original_amount_minor: 9_900,
+      original_amount_minor: 500,
       discount_minor: 0,
-      final_amount_minor: 9_900,
+      final_amount_minor: 500,
       status: 'pending',
       coupon_id: null,
     });
@@ -460,9 +460,9 @@ describe('下单：报价快照落库 + 名额预留', () => {
     );
     expect(redemption[0]).toMatchObject({
       state: 'reserved',
-      original_amount_minor: 9_900,
-      discount_minor: 2_000,
-      final_amount_minor: 7_900,
+      original_amount_minor: 500,
+      discount_minor: 100,
+      final_amount_minor: 400,
     });
   });
 
@@ -505,7 +505,7 @@ describe('下单：报价快照落库 + 名额预留', () => {
     expect(fresh.appliedCouponId).toBeNull();
     expect(fresh.rejectedCoupons[0]).toMatchObject({ reason: 'total_redemption_limit_reached' });
     // 券不能用**不影响**原价 —— 这一单照常可以下。
-    expect(fresh.finalAmountMinor).toBe(9_900);
+    expect(fresh.finalAmountMinor).toBe(500);
   });
 
   it('每人限额按**用户**分别计算', async () => {
@@ -548,7 +548,7 @@ describe('下单：报价快照落库 + 名额预留', () => {
     const user2 = user;
     const { coupons } = await loadCoupons(base);
     const quote = quoteOrder(
-      { priceId: 'annual', currency: 'CNY', region: 'CN', candidateCodes: ['LAUNCH'] },
+      { priceId: 'hosted-monthly', currency: 'CNY', region: 'CN', candidateCodes: ['LAUNCH'] },
       {
         baseline: DEFAULT_PRICE_BOOK,
         overrides: [],
@@ -592,7 +592,7 @@ describe('结算：幂等 + 金额比对订单', () => {
     const outcome = await settleOrderPaid(base, {
       outTradeNo,
       providerEventId: 'evt-1',
-      paidAmountMinor: 7_900,
+      paidAmountMinor: 400,
       now: NOW + HOUR,
     });
     expect(outcome).toMatchObject({ outcome: 'granted', afterExpiry: false, quotaExceeded: false });
@@ -615,14 +615,14 @@ describe('结算：幂等 + 金额比对订单', () => {
     const first = await settleOrderPaid(base, {
       outTradeNo,
       providerEventId: 'evt-1',
-      paidAmountMinor: 9_900,
+      paidAmountMinor: 500,
       now: NOW + HOUR,
     });
     expect(first.outcome).toBe('granted');
     const second = await settleOrderPaid(base, {
       outTradeNo,
       providerEventId: 'evt-1',
-      paidAmountMinor: 9_900,
+      paidAmountMinor: 500,
       now: NOW + 2 * HOUR,
     });
     expect(second).toMatchObject({ outcome: 'already-paid', orderId });
@@ -643,10 +643,10 @@ describe('结算：幂等 + 金额比对订单', () => {
       providerEventId: 'evt-1',
       // 付了原价 —— 在旧实现里“9900 是价目表里的某一个”会**照常授予**，
       // 用户等于白拿了一张券。
-      paidAmountMinor: 9_900,
+      paidAmountMinor: 500,
       now: NOW + HOUR,
     });
-    expect(outcome).toMatchObject({ outcome: 'amount-mismatch', expectedMinor: 7_900, actualMinor: 9_900 });
+    expect(outcome).toMatchObject({ outcome: 'amount-mismatch', expectedMinor: 400, actualMinor: 500 });
     const order = await base.query<{ status: string }>(
       'SELECT status FROM checkout_orders WHERE id = $1',
       [orderId],
@@ -666,8 +666,8 @@ describe('结算：幂等 + 金额比对订单', () => {
     );
     expect(audit).toHaveLength(1);
     expect(audit[0]!.target).toBe(`order:${orderId}`);
-    expect(JSON.parse(audit[0]!.before_json)).toEqual({ finalAmountMinor: 7_900 });
-    expect(JSON.parse(audit[0]!.after_json)).toEqual({ paidAmountMinor: 9_900 });
+    expect(JSON.parse(audit[0]!.before_json)).toEqual({ finalAmountMinor: 400 });
+    expect(JSON.parse(audit[0]!.after_json)).toEqual({ paidAmountMinor: 500 });
     expect(audit[0]!.note).toContain('不授予权益');
   });
 
@@ -675,7 +675,7 @@ describe('结算：幂等 + 金额比对订单', () => {
     const outcome = await settleOrderPaid(base, {
       outTradeNo: 'hy-forged',
       providerEventId: 'evt-x',
-      paidAmountMinor: 9_900,
+      paidAmountMinor: 500,
       now: NOW,
     });
     expect(outcome).toEqual({ outcome: 'unknown-order', outTradeNo: 'hy-forged' });
@@ -686,14 +686,14 @@ describe('结算：幂等 + 金额比对订单', () => {
     await settleOrderPaid(base, {
       outTradeNo,
       providerEventId: 'evt-1',
-      paidAmountMinor: 9_900,
+      paidAmountMinor: 500,
       now: NOW + HOUR,
     });
     await reverseOrderOnRefund(base, { orderId, now: NOW + 2 * HOUR });
     const outcome = await settleOrderPaid(base, {
       outTradeNo,
       providerEventId: 'evt-2',
-      paidAmountMinor: 9_900,
+      paidAmountMinor: 500,
       now: NOW + 3 * HOUR,
     });
     expect(outcome).toMatchObject({ outcome: 'order-not-grantable', status: 'refunded' });
@@ -714,7 +714,7 @@ describe('结算：幂等 + 金额比对订单', () => {
     const outcome = await settleOrderPaid(base, {
       outTradeNo,
       providerEventId: 'evt-late',
-      paidAmountMinor: 7_900,
+      paidAmountMinor: 400,
       now: NOW + 4 * HOUR,
     });
     expect(outcome).toMatchObject({ outcome: 'granted', afterExpiry: true });
@@ -738,7 +738,7 @@ describe('结算：幂等 + 金额比对订单', () => {
     await settleOrderPaid(base, {
       outTradeNo,
       providerEventId: 'evt-1',
-      paidAmountMinor: 7_900,
+      paidAmountMinor: 400,
       now: NOW + HOUR,
     });
     const refunded = await reverseOrderOnRefund(base, { orderId: paid.orderId, now: NOW + 2 * HOUR });
@@ -765,7 +765,7 @@ describe('结算：幂等 + 金额比对订单', () => {
     await settleOrderPaid(base, {
       outTradeNo: await outTradeNoOf(paidOrderA.orderId),
       providerEventId: 'evt-1',
-      paidAmountMinor: 9_900,
+      paidAmountMinor: 500,
       now: NOW + HOUR,
     });
     const pendingB = await placeOrder(b);

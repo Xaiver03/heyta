@@ -314,11 +314,11 @@ describe('wechat adapter — createCheckout（stub fetch，🔴 没有真网络�
     const adapter = createAdapter({ fetchImpl, now: () => NOW });
     const result = await adapter.createCheckout({
       userId: 42,
-      priceId: 'annual',
-      // 🔴 **故意不等于 annual 的基线价 9_900**：这是"¥99 用了 ¥20 券"的一单。
+      priceId: 'hosted-monthly',
+      // 🔴 **故意不等于 hosted-monthly 的基线价 500**：这是"¥5 用了 ¥1 券"的一单。
       // adapter 必须签出**传进来的**这个数，而不是自己回价目表里查基线 ——
       // 回查就是"运营者改价之后收银台仍按旧价下单"那个静默少收钱的形状。
-      amountMinor: 7_900,
+      amountMinor: 400,
       successUrl: 'https://app.example.test/ok',
       cancelUrl: 'https://app.example.test/cancel',
     });
@@ -329,8 +329,9 @@ describe('wechat adapter — createCheckout（stub fetch，🔴 没有真网络�
     const body = JSON.parse(String(captured!.init.body)) as Record<string, unknown>;
     expect(body.appid).toBe(APP_ID);
     expect(body.mchid).toBe(MCH_ID);
-    // 7_900 而不是 9_900：金额来自入参，价目表只提供 description。
-    expect(body.amount).toEqual({ total: 7_900, currency: 'CNY' });
+    // 400 而不是基线 500：金额来自入参（这一单用了 ¥1 券），
+    // 价目表只提供 description。
+    expect(body.amount).toEqual({ total: 400, currency: 'CNY' });
     expect(body.attach).toBe('42');
     expect(body.notify_url).toBe(NOTIFY_URL);
     expect(parseUserIdFromOutTradeNo(String(body.out_trade_no))).toBe(42);
@@ -384,11 +385,11 @@ describe('wechat adapter — createCheckout（stub fetch，🔴 没有真网络�
     // 0 / 负数 / 小数 / NaN / 字符串：每一种都必须是硬错误。
     // 0 元单在计价层就被拒（MIN_CHARGEABLE_AMOUNT_MINOR），但 adapter 也不能
     // 依赖上游一定守规矩 —— 它自己是"最后一步"，兜底成基线价就是静默错账。
-    for (const bad of [0, -1, 9_900.5, Number.NaN, Number.POSITIVE_INFINITY, '9900']) {
+    for (const bad of [0, -1, 500.5, Number.NaN, Number.POSITIVE_INFINITY, '500']) {
       await expect(
         adapter.createCheckout({
           userId: 1,
-          priceId: 'annual',
+          priceId: 'hosted-monthly',
           amountMinor: bad as unknown as number,
           successUrl: 'https://a.test',
           cancelUrl: 'https://a.test',
@@ -408,7 +409,7 @@ describe('wechat adapter — createCheckout（stub fetch，🔴 没有真网络�
     await expect(
       adapter.createCheckout({
         userId: 1,
-        priceId: 'annual',
+        priceId: 'hosted-monthly',
         amountMinor: 9_900,
         successUrl: 'https://a.test',
         cancelUrl: 'https://a.test',
@@ -427,7 +428,7 @@ describe('wechat adapter — createCheckout（stub fetch，🔴 没有真网络�
     await expect(
       adapter.createCheckout({
         userId: 1,
-        priceId: 'annual',
+        priceId: 'hosted-monthly',
         amountMinor: 9_900,
         successUrl: 'https://a.test',
         cancelUrl: 'https://a.test',
@@ -555,7 +556,7 @@ describe('wechat adapter — verifyWebhook 的成功路径与归一化', () => {
     expect(result.event.status).toBeNull();
     expect(result.event.currentPeriodEnd).toBeNull();
     expect(result.event.userId).toBe(42);
-    expect(result.event.oneTimeGrant).toEqual({ periodDays: 365 });
+    expect(result.event.oneTimeGrant).toEqual({ periodDays: 30 });
     expect(result.event.occurredAt).toBe(Date.parse('2026-09-26T04:00:00Z'));
   });
 
@@ -650,14 +651,14 @@ describe('wechat adapter — 🔴 金额校验（付的钱必须落在价目表�
       ...opts,
     });
 
-  it('付对金额（9_900 = ¥99）→ 授予 365 天', async () => {
-    const f = fixtureWithAmount(9_900);
+  it('付对金额（500 = ¥5）→ 授予 30 天', async () => {
+    const f = fixtureWithAmount(500);
     const r = await adapter.verifyWebhook(f.body, f.headers);
 
     expect(r.ok).toBe(true);
     if (!r.ok) return;
     expect(r.event.eventType).toBe('payment_succeeded');
-    expect(r.event.oneTimeGrant).toEqual({ periodDays: 365 });
+    expect(r.event.oneTimeGrant).toEqual({ periodDays: 30 });
   });
 
   it('🔴 只付 ¥1 → **不授予任何权益**，并落成金额不符事件', async () => {
@@ -666,7 +667,7 @@ describe('wechat adapter — 🔴 金额校验（付的钱必须落在价目表�
 
     expect(r.ok).toBe(true);
     if (!r.ok) return;
-    // 这是这个校验存在的全部理由：一笔错价的订单不许换来整整一年。
+    // 这是这个校验存在的全部理由：一笔错价的订单不许换来整整一个月。
     expect(r.event.oneTimeGrant).toBeNull();
     // 但要留下可查的痕迹，而不是悄悄当成正常支付。
     expect(r.event.eventType).toBe('payment_amount_mismatch');
@@ -692,7 +693,7 @@ describe('wechat adapter — 🔴 金额校验（付的钱必须落在价目表�
   });
 
   it('篡改金额过不了验签（密文受签名保护）', async () => {
-    const f = fixtureWithAmount(9_900);
+    const f = fixtureWithAmount(500);
     const tampered = Buffer.from(f.body.toString('utf8').replace('ciphertext', 'ciphertexT'));
     await expect(adapter.verifyWebhook(tampered, f.headers)).resolves.toEqual({
       ok: false,
@@ -703,17 +704,17 @@ describe('wechat adapter — 🔴 金额校验（付的钱必须落在价目表�
   it('运营者自定义价目表时，按自定义金额校验', async () => {
     const custom = createAdapter({
       now: () => NOW,
-      prices: { annual: { totalFen: 19_900, description: '促销' } },
+      prices: { 'hosted-monthly': { totalFen: 1_500, description: '促销' } },
     });
 
-    const ok = fixtureWithAmount(19_900);
+    const ok = fixtureWithAmount(1_500);
     const r1 = await custom.verifyWebhook(ok.body, ok.headers);
     expect(r1.ok).toBe(true);
-    if (r1.ok) expect(r1.event.oneTimeGrant).toEqual({ periodDays: 365 });
+    if (r1.ok) expect(r1.event.oneTimeGrant).toEqual({ periodDays: 30 });
 
-    // 默认的 9_900 在自定义价目表下**不再**被接受 —— 证明校验读的是
-    // 实际生效的价目表，而不是写死的 9900。
-    const stale = fixtureWithAmount(9_900);
+    // 默认的 500 在自定义价目表下**不再**被接受 —— 证明校验读的是
+    // 实际生效的价目表，而不是写死的 500。
+    const stale = fixtureWithAmount(500);
     const r2 = await custom.verifyWebhook(stale.body, stale.headers);
     expect(r2.ok).toBe(true);
     if (r2.ok) expect(r2.event.oneTimeGrant).toBeNull();

@@ -13,7 +13,7 @@ import Fastify, { FastifyInstance } from 'fastify';
  * "验签/时效失败不落行"，**不是**"微信会接受我们的请求"。
  */
 const DAY = 24 * 60 * 60 * 1000;
-const YEAR = 365 * DAY;
+const PERIOD = 30 * DAY;   // 🔴 月付：一次购买 = 30 天（ADR-0020 §2.2）
 const NOW = 1_700_000_000_000;
 
 const mocks = vi.hoisted(() => {
@@ -215,7 +215,7 @@ describe('wechat webhook routes（stub prisma，🔴 没有真网络 / 没有真
     expect(mocks.state.createCalls).toBe(1);
     expect(mocks.state.updateCalls).toBe(0);
     expect(mocks.state.rows).toHaveLength(1);
-    expect(mocks.state.rows[0].currentPeriodEnd).toBe(NOW + YEAR);
+    expect(mocks.state.rows[0].currentPeriodEnd).toBe(NOW + PERIOD);
     expect(mocks.state.rows[0].externalSubscriptionId).toBeNull();
     expect(mocks.state.rows[0].status).toBe('active');
 
@@ -244,7 +244,7 @@ describe('wechat webhook routes（stub prisma，🔴 没有真网络 / 没有真
     expect(mocks.state.rows).toHaveLength(1);
     expect(mocks.state.createCalls).toBe(1);
     expect(mocks.state.updateCalls).toBe(1);
-    expect(mocks.state.rows[0].currentPeriodEnd).toBe(NOW + 2 * YEAR);
+    expect(mocks.state.rows[0].currentPeriodEnd).toBe(NOW + 2 * PERIOD);
     // 两条事件都落进了审计。
     expect(mocks.state.seenPaymentEvents.size).toBe(2);
   });
@@ -289,16 +289,17 @@ describe('wechat webhook routes（stub prisma，🔴 没有真网络 / 没有真
     await buildApp([adapter()]);
     const first = await deliver(payment(buildWechatOutTradeNo(42, NOW, 'eeeeeee5'), NOW));
     expect(first.statusCode).toBe(200);
-    expect(mocks.state.rows[0].currentPeriodEnd).toBe(NOW + YEAR);
+    expect(mocks.state.rows[0].currentPeriodEnd).toBe(NOW + PERIOD);
 
-    // 距到期还有 275 天时续费。
-    clock = NOW + 90 * DAY;
+    // 🔴 续费时点必须**落在本期内**，否则测的就不是"提前续费"了。
+    // 周期只有 30 天，所以取第 10 天（距到期还有 20 天）。
+    clock = NOW + 10 * DAY;
     const second = await deliver(payment(buildWechatOutTradeNo(42, clock, 'fffffff6'), clock));
     expect(second.statusCode).toBe(200);
 
-    // 从"原到期日"再叠 365 天；写成 now + 365 天会得到 NOW + 455 天。
-    expect(mocks.state.rows[0].currentPeriodEnd).toBe(NOW + 2 * YEAR);
-    expect(mocks.state.rows[0].currentPeriodEnd).not.toBe(clock + YEAR);
+    // 从"原到期日"再叠 30 天；写成 now + 30 天会得到 NOW + 40 天（丢掉已付的 10 天）。
+    expect(mocks.state.rows[0].currentPeriodEnd).toBe(NOW + 2 * PERIOD);
+    expect(mocks.state.rows[0].currentPeriodEnd).not.toBe(clock + PERIOD);
   });
 
   it('未注册 wechat adapter（自托管默认）→ 404，且不落任何行', async () => {
