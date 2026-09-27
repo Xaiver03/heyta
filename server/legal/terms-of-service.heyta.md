@@ -10,6 +10,16 @@
 > Johannes Millan），规范的是**上游自己的**托管服务。本文件与之**互相独立**：
 > 我们自建自营 heyta 托管服务，适用本文件，不适用那份 AGB。
 > **不要**把本文件的条款合并进那份，也不要把那份的条款当作我们的。
+>
+> 📌 **本文件不是发布源 —— 它不会被渲染成任何页面。**
+> 线上 `/terms.html` 只可能来自操作者**自己**放进数据卷的
+> `<dataDir>/legal/terms.html`（`server/src/server.ts` 的 `installOperatorLegalPages`），
+> 而且默认**不安装**、要显式 `SUPERSYNC_INSTALL_REPO_TERMS=true` 才会装。
+> 本文件的实际用途有两个：被门禁当作**「对外承诺」**来核对金额
+> （`scripts/check-pricing-consistency.mjs`），以及给人读。
+> 发布路径见 `docs/runbooks/deployment.md` §3.11。
+> ⚠️ 仓库里那个 `server/legal/terms.html` 是**上游的**、不是本文件的 HTML ——
+> 把两者搞混，等于把**别人的**条款当成自己的发布出去（`deploy.sh` 对这条有专门警告）。
 
 > ⚠️ 与 [`terms-of-service.ai.heyta.md`](terms-of-service.ai.heyta.md) 的分工：
 > 那一份规范**云端 AI 订阅**。两者是**两件独立的收费服务**，可以只买其中一个。

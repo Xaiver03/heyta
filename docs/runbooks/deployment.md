@@ -808,6 +808,55 @@ curl --noproxy '*' -sS -X POST https://heyta.finlaw.cloud/api/login/passkey/opti
 - ⚠️ `SMTP_PASS` **没有轮换**（外部签发）：要换得去腾讯云邮件控制台重签应用口令，
   然后只改 `.env` 里那一行 + 按上面重建 `supersync`。
 
+### 3.11 法律页（`/terms.html`、`/privacy.html`）—— 2026-09-27 从"伪装成 200 的落地页"改成诚实 404
+
+#### 🔴 原缺口：服务条款的网址，打开是营销页
+
+新域名**没有** `/terms.html` / `/privacy.html` 这两个 location，于是它们掉进
+`location /` 的 SPA 兜底 —— 返回**落地页**，`HTTP 200`、`text/html`，
+且与 `/var/www/heyta-landing/index.html` **逐字节相同**（实测 2370 字节，`cmp` 过）。
+
+这是"**200 但内容是别的页面**"的又一次出现（同一形状见 §3.3.1 的 `/*.js`）。
+在这里后果特别坏：做 **KYC / 上架审查**的人恰恰会点开这两个地址 ——
+**看到 200 就当作"有条款"**，而实际上什么都没有。
+
+已补 location 并代理到 1900，让服务端那份**诚实的 404** 透出来：
+
+```nginx
+location ~ ^/(terms|privacy)\.html$ {
+    proxy_pass http://127.0.0.1:1900;
+    proxy_set_header Host $host;
+    proxy_set_header X-Forwarded-Proto $scheme;
+}
+```
+
+复验：`/terms.html`、`/privacy.html` → **404 `application/json`**；
+`/`、`/en/`、`/app/`、`/health` 不受影响。旧域名本来就对（它的 `location /` 整体代理到 1900）。
+
+#### 法律页怎么才**真的**会对外
+
+| 页 | 来源 | 默认 | 打开它的开关 |
+|---|---|---|---|
+| `/terms.html` | **操作者自己**放进数据卷的 `<dataDir>/legal/terms.html`（`installOperatorLegalPages`） | **不发布** | `SUPERSYNC_INSTALL_REPO_TERMS=true` |
+| `/privacy.html` | 由 `templates/privacy.template.html` 渲染 | **不发布** | 五个 `PRIVACY_*` **全部**设齐；缺一个**直接报错**，不回落占位文本 |
+
+已有的几道防线：`installOperatorLegalPages` **拒绝符号链接**（复制目标是公开可读的
+`/terms.html`，跟着软链走会把 `.env` 发布出去）、有大小上限、模板残留由
+`assertFullyRendered` 兜住（见 `server/src/server.ts`）。
+
+⚠️ **仓库里那个 `server/legal/terms.html` 是上游的** —— Super Productivity Sync 的德语 AGB，
+服务提供者是**另一家公司**。把 `SUPERSYNC_INSTALL_REPO_TERMS` 打开去装它，
+等于把**别人的条款**当成自己的发布出去；`deploy.sh` 对这条有专门警告。
+
+⚠️ 两份 heyta 条款草稿（`server/legal/terms-of-service.heyta.md` 与
+`terms-of-service.ai.heyta.md`）**不是发布源**，不会被渲染成任何页面。
+它们是**门禁的输入**（被当作"对外承诺"核对金额与额度）以及给人读的正文 ——
+这一点已就地写在两份草稿的头部，免得有人以为改了 `.md` 线上就变了。
+
+**线上现状（2026-09-27 实测）**：`.env` 里 `PRIVACY_*` **0 条**、数据卷里**没有** `legal/`，
+所以两页**都没有发布**。因此 `/terms.html` 与 `/privacy.html` 现在返回的是
+**诚实的 404 —— 这不是故障，是当前正确的状态**（草稿还没过法务，本来就不该对外）。
+
 ---
 
 ## 4. 代理链路
