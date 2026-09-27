@@ -353,7 +353,7 @@ sudo -n nginx -t          # 删完必须先验语法
 | 卷 `server_postgres-data` / `server_supersync-data` | `LINKS=1`，被上面两个容器挂着 |
 | `/var/www/heyta-landing/` | 由 `heyta.finlaw.cloud` 的 `root` 直接服务（[§4.3](#43-heyta-的两个公网入口)） |
 | nginx `sites-enabled/heyta-tmp` + `sites-enabled/heyta.finlaw.cloud` | 在 `nginx.conf` 第 67、68 行被显式 include |
-| 证书 `heyta-tmp.litopia.space` / `heyta.finlaw.cloud` | 均 `VALID: 89 days` |
+| 证书 `heyta-tmp.litopia.space` / `heyta.finlaw.cloud` | 均 `VALID: 88 days`（2026-09-27 复查） |
 | DNS `heyta-tmp.litopia.space`（RecordId `2419225598`） / `heyta.finlaw.cloud`（RecordId `2419295096`） | 均 → `124.223.13.226` |
 
 ### 4.2 heyta CI runner 与 `/opt/heyta-ci`
@@ -379,7 +379,7 @@ sudo -n nginx -t          # 删完必须先验语法
 | 站点 | server_name | 行为 |
 |---|---|---|
 | `sites-enabled/heyta.finlaw.cloud` | `heyta.finlaw.cloud` | **测试阶段唯一的域名**（2026-09-27 起）：`/` 与 `/en/` → 落地页（`root /var/www/heyta-landing` + SPA 兜底）；`/app/`（含 `= /app` 重定向与 `/app/assets/`）→ 应用（`alias /var/www/heyta-app/`）；`/api/` 与 `/verify-email`、`/recover-passkey`、`/magic-login` → `proxy_pass http://127.0.0.1:1900`（同步服务，含 WebSocket 升级头）。迁移见 [deployment.md §3.7](deployment.md) 的 3.7.1 小节 |
-| `sites-enabled/heyta-tmp` | `124.223.13.226 heyta-tmp.litopia.space` | `location /` → `proxy_pass http://127.0.0.1:1900`（同步服务的 Connect 页）+ `/app/` → `alias /var/www/heyta-app/`；`/landing*` → `301` 到 `heyta.finlaw.cloud`。**留作回滚路径，已不是入口**，且该域名下 passkey 不可用（`WEBAUTHN_RP_ID` 只能是 `heyta.finlaw.cloud`） |
+| `sites-enabled/heyta-tmp` | `124.223.13.226 heyta-tmp.litopia.space` | `location /`、`/api/`、`/health` → `proxy_pass http://127.0.0.1:1900`（同步服务的 Connect 页 —— 端点，**刻意不 301**）；`/app*` 与 `/landing*` → `301` 到 `heyta.finlaw.cloud`。**已弃用，留作回滚路径，不是入口**；该域名下 passkey 不可用（`WEBAUTHN_RP_ID` 只能是 `heyta.finlaw.cloud`） |
 
 > ⚠️ 两份站点文件都**不在仓库里**（仓库只跟踪 `server/Caddyfile`），改它们只能上机；
 > 每次改完要回来更新本表，以及 `deployment.md` 里对应的那一节（§3.7，其中有 3.7.1）。
@@ -501,8 +501,8 @@ $ sudo -n cat /var/lib/docker-prune-safe.last-success
 
 | 记录 | 值 | 最后更新 | 备注 |
 |---|---|---|---|
-| `litopia.space` / `heyta-tmp` | `124.223.13.226` | 2026-09-26 12:29 | heyta 临时入口，📋 [`deployment.md` §7.1](deployment.md) 登记为「用完应清」 |
-| `finlaw.cloud` / `heyta` | `124.223.13.226` | **2026-09-26 15:46** | **brief 与 `deployment.md` 都没提的新入口** |
+| `litopia.space` / `heyta-tmp` | `124.223.13.226` | 2026-09-26 12:29 | ⚠️ **已弃用**（2026-09-27）：入口全部 301 到 `heyta.finlaw.cloud`，📋 [`deployment.md` §7.1](deployment.md) |
+| `finlaw.cloud` / `heyta` | `124.223.13.226` | **2026-09-26 15:46** | ✅ **现在是测试阶段唯一的域名**（落地页 + 应用 + 同步 API + 凭据页，见 [deployment.md](deployment.md) 的 3.7.1 小节）。**迁移没有改过这条记录。** |
 | `litopia.space` / `mail` | **`101.34.250.109`** | **2026-09-26 15:28** | 🔴 [`deployment.md` §5.1](deployment.md) 说它「仍是 OPP `121.4.24.238`」——**本次实测已切到 sanjiaozhou**。文档已过期。 |
 | `finlaw.cloud` / `deploy` `*.deploy` `12km` `nexus` `mail` | `121.4.24.238` | 06-27 ~ 09-10 | 仍压在已过期的 OPP 上（📋 非本文范围） |
 
@@ -512,8 +512,8 @@ $ sudo -n cat /var/lib/docker-prune-safe.last-success
 
 | 证书 | 剩余天数 | 与 heyta 的关系 |
 |---|---|---|
-| `heyta-tmp.litopia.space` | 89 天 | **heyta 的** |
-| `heyta.finlaw.cloud` | 89 天 | **heyta 的（新）** |
+| `heyta-tmp.litopia.space` | 88 天 | **heyta 的（已弃用）** |
+| `heyta.finlaw.cloud` | 88 天 | **heyta 的（唯一域名）** |
 | `ai` / `aiconfig` / `aistudy` / `codex` / `lingchuang` / `sumei` / `xcreative` / `x.finlaw.cloud` / `x-creative.team` / `xiangleideng.site` / `yuanyuan.finlaw.cloud` | 52 ~ 89 天 | 别的项目 |
 
 > 任务提到的「过期证书」在这台机器上**没有**。[`deployment.md` §7.2](deployment.md) 记的那张过期证书
