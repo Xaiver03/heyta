@@ -310,35 +310,44 @@ Time_NLP 系列（**仓库无 LICENSE**）。
 > 但**没有任何一道门禁能发现"用户根本没有入口"**。
 > 下面按用户实际会撞到的顺序排，每条都带可复现证据。
 
-### 5.1 🔴 第一段：新用户到不了产品（完全在我们这边，不依赖任何外部资质）
+### 5.1 ✅ 第一段：新用户到不了产品 —— **2026-09-27 已打通**
 
-| # | 断点 | 证据 |
+| # | 断点 | 状态 |
 |---|---|---|
-| 1 | 落地页**没有任何指向应用的链接** | `apps/landing/src` 里除语言切换外，**每一条 `href` 都是页内锚点**（`#pricing` / `#showcase` / `#selfhost` …）—— 落地页**到不了产品** |
-| 2 | Web 端**没有注册 / 登录界面** | `apps/web/src` **没有 auth 目录**；服务端已有 passkey / magic-link（`server/src/api.ts`），客户端只有 `SyncBar.tsx` 的三个手填框（服务器地址 + 令牌） |
-| 3 | 定价 CTA **不是按钮** | `apps/landing/src/components/Pricing.tsx` 是 `<p>` + 沙漏 +「即将开放」。**这是有意为之**（理由写在文件头：不愿造一个"点了没反应的立即购买"），但净结果仍是"想付钱的人无处可点" |
+| 1 | 落地页**没有任何指向应用的链接** | ✅ **已修**。入口由构建期 `VITE_APP_URL` 决定（判据 `apps/landing/src/lib/app-url.ts`）；**未配置时整条入口根本不渲染** —— 仓库默认构建就是未配置，那是故意的（应用没部署却露出「立即使用」比没有入口更坏）。`render.spec.tsx` 把两种状态各钉了一条用例 |
+| 2 | Web 端**没有注册 / 登录界面** | ✅ **已修**。服务端一直有完整的 passkey / magic-link（11 条 `/api/*` 路由），**却没有任何客户端调用**；唯一入口是同步设置里三个手填框。现在协议语义收在 `packages/app-host/src/hosted-auth.ts`，`AuthPanel` 开在**同步设置内部**（认证要用的服务端地址就是那里的地址，分开会出现"对着 A 登录、令牌存到 B"） |
+| 3 | **应用本体从来没被部署过** | ✅ **已修**。`https://heyta-tmp.litopia.space/app/`；与同步服务端**同源** ⇒ `CORS_ORIGINS` / `WEBAUTHN_RP_ID` / `WEBAUTHN_ORIGIN` 一个字都不用改，passkey 也能用。发布方式见 [deployment.md §3.7](../runbooks/deployment.md) |
+| 4 | 定价 CTA **不是按钮** | ⚪ **维持原状，且是有意的** —— 理由写在 `Pricing.tsx` 文件头：不愿造一个"点了没反应的立即购买"。免费档的 CTA 是**自建**，那条仍然成立、也仍然可点 |
 
-**这一段是当前最该做的**：它挡住的是**所有**新用户的入口，而且**没有任何外部依赖**。
+**这一段闭环了，但有两个必须一起记住的保留**：
 
-### 5.1.1 🔴 界面在说谎：承诺了「导出」，但没有导出功能
+- 🔴 入口挂在 `heyta-tmp.litopia.space`，而它是**临时资产**（[deployment.md §7.1](../runbooks/deployment.md)）。
+  清掉那个域名，入口就断。清理由时必须**同时**换掉 `VITE_APP_URL` 并重建落地页 —— 不要只清一边。
+- 从**英文**落地页点进去，到的是**默认中文**的应用（应用有自己的语言设置，页面上有
+  English 切换）。落地页的 locale **没有传递过去**。
 
-托管同步到期/被拒的提示 —— 也就是用户**最担心"我会不会丢数据"的那一刻** —— 在**两种语言**里都写着：
+### 5.1.1 ✅ 界面不再说谎：「导出自由」已兑现 —— **2026-09-27 落地**
 
-> zh：这台设备上的全部数据仍然可以正常查看、编辑和**导出**，不需要续费。
-> en：Everything on this device can still be viewed, edited and **exported** — no renewal needed.
-> —— `web.subscription.notice.localData`（`packages/i18n/src/locales/zh-CN.ts:997` / `en.ts:936`）
+**原来的状态**（值得留下，因为它是这个仓库最危险的一类失效）：订阅到期提示 —— 也就是用户
+最担心"我会不会丢数据"的那一刻 —— 在**两种语言**里都写着本地数据「可以查看、编辑和**导出**」，
+`README.md` 的设计原则第 5 条写着「导出自由：任何时刻都能一键带走全部数据」，
+**而全仓没有任何用户可见的导出入口。**
 
-**但全仓没有任何用户可见的导出入口。** `apps/web/src` 下搜不到导出功能，
-设置页也没有这一项。同时 `README.md` 的项目原则第 5 条写着
-**「导出自由：任何时刻都能一键带走全部数据」** —— 两条承诺**都没有兑现**。
+它躲过了所有门禁：类型系统不报（词条 key 合法）、单测不报（没有东西可测）、
+`check:ui-language` 也全绿（两种语言都真的翻了）。**没有任何一道门禁能发现"功能是空的"。**
 
-这正是 `scripts/check-ai-coverage.mjs` 文件头点名的那类失效 —— **「功能是空的，界面在说谎」**，
-而且是最坏的一类：**类型系统不会报**（词条 key 合法）、**单测不会报**（没有东西可测）、
-`check:ui-language` 也全绿（两种语言都真的翻了）。它**不在 AI 轨里**，所以没有任何门禁会红。
+**现状**：`packages/app-host/src/export-dump.ts` 定导出的**内容形状**（产品语义，所以不在
+`apps/*`），产出一份含**墓碑**与**完整 op-log**的文档，外加可核对的 `counts`
+（每类实体 total/deleted、op 总数）—— 让"导全了"能被**验证**而不是靠信。
+Web 设置页有「导出数据」（JSON 完整保真 / 任务清单 Markdown），node-host 有 `export --out`。
 
-> **最小修法二选一**：要么**补上导出**（本地优先架构下，本质是把 op-log + 物化状态导成 JSON，
-> 让用户在无服务端时也能带走数据），要么**把这句删掉**。
-> 不要两边都不动 —— 那是在"数据主权"这件产品原则上说了不实的话。
+**墓碑为什么不能丢**：op-log 用 `deletedAt` 表示删除，丢掉墓碑的"备份"回放时已删数据会**复活**。
+只有给人看的那份 Markdown 才过滤墓碑 —— 这个反差有单独用例钉住。
+
+**覆盖率要如实说**：入口目前只在 **Web 设置页**与 **node-host CLI**，**移动端还没有**。
+`README.md` 第 5 条已补上范围说明，避免又把"部分为真"读成"全部为真"。
+
+**另一条诚实条款**：这是**导出，不是还原点** —— 还**没有导入**。界面与 Markdown 页脚都写明了。
 
 ### 5.2 第二段：付费的"交付"半段（详见 [pricing-coupons-handoff.md](pricing-coupons-handoff.md) §11.1 的 11 段表）
 
@@ -355,9 +364,24 @@ Time_NLP 系列（**仓库无 LICENSE**）。
 | 轨道 | 下一步 |
 |---|---|
 | **P2 多端** | 鸿蒙**仍未跑起来**：构建链已实测打通（20 MB release HAP、双 ABI），但缺**模拟器系统镜像 + 签名**（产物 unsigned）→ [phase-2-multi-platform.md](phase-2-multi-platform.md) |
-| **AI 线** | AI-0 / AI-1 / AI-2 / 本地 API（MCP）✅ 已上线；**AI-3 规划、AI-4 复盘未实现**；**全量导出未实现** |
+| **AI 线** | AI-0 / AI-1 / AI-2 / 本地 API（MCP）✅ 已上线；**AI-3 规划、AI-4 复盘未实现**。~~全量导出未实现~~ → ✅ **2026-09-27 已实现**（见 §5.1.1；入口在 Web 设置页与 node-host，移动端未做） |
 | **运营面** | 改价目前等于**服务器 shell 权限**（唯一入口是 `server/scripts/pricing.ts` CLI，无鉴权 / 无角色 / 无 HTTP 面，`--actor` 可伪造）。**在有意引入 admin 路由之前，这条缺口应当保持显式**，而不是被"内网就安全"盖住 |
 | **P3** | 小组件 / 通知 / CalDAV —— 未开工。可行性见 [native-widgets.md](../research/native-widgets.md)，**改造计划见 [multi-platform-widgets.md](multi-platform-widgets.md)**：小组件是**多端适配的输出形态**（不是后续阶段），且 **Windows（PWA provider）与 macOS（Continuity）反而不需要新建壳** |
+
+### 5.4 本轮同时关闭的其它断点（2026-09-27）
+
+| # | 断点 | 状态 |
+|---|---|---|
+| 5 | **删了就没有回头路**：`DELETE` reducer 只是打墓碑，数据一直在库里，但**没有任何界面能看到或恢复它** | ✅ **已修**。Web 多了「回收站」视图。还原 = `UPD { deletedAt: null }`；彻底删除 = 打 `purgedAt` **标记**而**不清除 `deletedAt`** —— 清掉它会让离线对端把已删数据**复活**。代码与界面都写明：这**不是**物理擦除 op-log 历史。<br>**未做**：移动端没有回收站界面（能力已在 `packages/app-host`，可直接用）；只有 TASK，不含 PROJECT / TAG |
+| 6 | **移动端没有激励与成长体系**：`mobile.motivation.*` 词条 0 条，streak / 里程碑只有 Web 能看 | ✅ **已修**。共享取数收进 `packages/app-host/src/motivation.ts` —— "摊平 + 滤墓碑 + 注入 now"是每个宿主都必须做得一模一样的事，其中 `bestCurrentStreak` 取 `current` 还是 `longest` 是**真的会漂移**的业务选择（取错会让一个两年前连续 300 天的习惯拿到身份标签）。移动端「我的 → 成长」是**第二层页面，底部仍是 5 个标签**。<br>📌 **未验证**：**没在真机或模拟器上看过一眼**，也没过 Metro / Release 打包、没实测暗色主题 |
+| 7 | **服务端汇入页仍打着上游的品牌**：`server/src/pages.ts` 与 `server/templates/index.template.html` 里是 "SuperSync" / "Super Productivity" | 🟡 **代码已改，但没有部署**。生产上跑的是 **2026-09-26 构建的镜像** —— 实测 `https://heyta-tmp.litopia.space/` 仍然出现 **3 次 "Super Productivity" + 3 次 "SuperSync"**。要走 `server/scripts/deploy.sh`（校验 → 构建 → **先迁移** → 换容器 → 等 healthcheck），比"传静态文件"重得多，**本轮没有做** |
+
+**本轮校验过、但仍然存在的诚实缺口**（不属于"断点"，但读的人需要知道）：
+
+- **回收站的跨设备一致性没有被真正验证**：op 级证明用的是两个真引擎 + 两个真 SQLite，**没有**跑真实的两客户端服务端收敛。
+- **认证只有契约级证据**：`hosted-auth.ts` 全部靠注入的假 `fetch`，**没有对着真实服务端登录过一次**。浏览器端**通行密钥那一步没接线**（只有登录链接这条路打通）。
+- **导出的浏览器下载已经在真实浏览器里验过**（Playwright：真的落盘、JSON 可解析、`counts` 与实体数一致）；但**导入 / 还原没有做**。
+- **`check:ai-e2e` 与全量 `pnpm check` 本轮没跑**：前者要起服务端 + e2e 工作区，后者会触发 `prisma generate`（沙箱 EPERM）。其余门禁逐项跑过，全绿。
 
 ---
 
