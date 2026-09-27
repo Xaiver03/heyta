@@ -41,6 +41,13 @@ import { useI18n } from '@heyta/i18n';
 
 import { LIST_SEPARATOR } from './locale-punctuation.js';
 import { retentionMessageKey } from './disclosure-copy.js';
+import { RouteUnavailable, FailureSettingsAction } from './RouteUnavailable.js';
+import { useAiSettingsNavigation } from './ai-settings-navigation.js';
+import {
+  resolveFeatureRoute,
+  type ResolvedRouteTarget,
+  type SettingsTarget,
+} from './route-explanation.js';
 
 import {
   renderPreferenceHints,
@@ -50,12 +57,9 @@ import {
 import {
   buildDisclosure,
   fromHealthSnapshot,
-  isLoopbackEndpoint,
-  resolveRoute,
 } from '@heyta/ai';
 import type {
   AiHealthSnapshot,
-  EgressDestination,
   AiRoutingConfig,
   EgressConsent,
   HealthMap,
@@ -70,71 +74,28 @@ import {
 } from '@heyta/app-host';
 import type { Task } from '@heyta/domain';
 
-/** 路由解析结果里"这个功能会走到哪个端点"。 */
-export interface ResolvedTarget {
-  endpointId: string;
-  label: string;
-  endpoint: string;
-  model: string;
-  isLocal: boolean;
-  /** `resolveRoute` 算出的目的地类别 —— 传给 `buildDisclosure`，不在这里重新判。 */
-  destination: EgressDestination;
-  /**
-   * 🔴 回退链上**其余**的端点标签（不含首选）。
-   *
-   * 回退是真实行为 —— 首选失败会自动试下一个。所以披露只说首选是不够的：
-   * 用户同意了 A，数据却可能发到 B（**另一家公司**）。
-   * 而这一类切换**不会报错**，因为最终成功了。
-   */
-  fallbacks: readonly string[];
-}
+/**
+ * 路由解析结果里"这个功能会走到哪个端点"。
+ *
+ * ⚠️ 形状定义在 `route-explanation.ts`（四个面板共用一份）。
+ * 这里保留这个名字只是为了不改动已有的导入点。
+ */
+export type ResolvedTarget = ResolvedRouteTarget;
 
 /**
  * 算出这个功能当前的**首选目标**（只看第一个候选，与 `invokeRouted` 一致）。
  *
- * 🔴 披露必须用**真实路由配置**算，不能自己猜"大概是本机"。
- * 猜错的披露比没有披露更糟 —— 它给了一个错误的保证。
+ * 🔴 实现已收进 `resolveFeatureRoute()` —— 仓里原本有**四份**同样的
+ * "取首选候选并描述它"，每份的注释都在说"应当抽出来"。现在只有一份。
  *
- * ⚠️ 这里不复制 `resolveRoute` 的全部过滤（能力、熔断、URL 合法性）：
- * 那会让同一套规则有两个实现。本函数只负责"取首选候选并描述它"，
- * 真正的过滤仍由 `invokeRouted` 在发送时执行。
- * 若两者结论不一致（例如端点刚好跳闸了），失败会照常显示出来，不会静默。
+ * 本函数保留为薄包装：界面测试直接调它，而组件内部用的是
+ * `resolveFeatureRoute()`（它同时给出"为什么没有目标"）。
  */
 export function resolvePreferredTarget(
   routing: AiRoutingConfig,
   options: { now?: number } = {},
 ): ResolvedTarget | undefined {
-  // 🔴🔴 **用 `packages/ai` 的 `resolveRoute`，不要在这里做一份平行的过滤。**
-  //
-  // 早先这里自己遍历 `chain`，只跳过 `undefined` / `disabled`，
-  // 而 `resolveRoute` 还会按**能力、熔断、远端开关、URL 合法性**过滤。
-  // 两套规则 ⇒ 两套结论。实测：
-  //
-  //   路由 [A(缺 long_context), B(齐全)]
-  //     本函数 → 披露"将发往 A（a.example.com）"
-  //     invokeRouted → 实际请求打到 b.example.com
-  //     结果 ok = true  ← **成功了，所以用户永远不会知道去了 B**
-  //
-  // 用户同意了 A，数据发给了 B（**另一家公司**）。这是披露准确性问题，
-  // 与 ADR-0010 §3.11 记的回环 bug 是同一个形状：同一件事两个实现。
-  //
-  // ⚠️ 用 `resolveRoute` 之后，"披露"和"发送"至少在**过滤规则**上不可能分歧。
-  // 唯一的剩余差异是熔断状态（这里是配置意图，发送时才检查），
-  // 而回退链本来就一并披露了，所以即便真的回退，用户也已经看到过 B。
-  const resolution = resolveRoute(routing, 'breakdown', { now: options.now ?? Date.now() });
-  const first = resolution.candidates[0];
-  if (first === undefined) return undefined;
-
-  return {
-    endpointId: first.endpointConfig.id,
-    label: first.endpointConfig.label,
-    endpoint: first.endpointConfig.endpoint,
-    model: first.model,
-    // 回环判据同样只有一份 —— `packages/ai` 的 `isLoopbackEndpoint`。
-    isLocal: isLoopbackEndpoint(first.endpointConfig.endpoint),
-    destination: first.destination,
-    fallbacks: resolution.candidates.slice(1).map((c) => c.endpointConfig.label),
-  };
+  return resolveFeatureRoute(routing, 'breakdown', options).target;
 }
 
 type Phase = 'idle' | 'disclosing' | 'loading' | 'proposal' | 'failed';
@@ -195,12 +156,34 @@ export interface AiBreakdownProps {
     proposedCount: number;
     appliedCount: number;
   }) => void;
+  /**
+   * "去设置"—— 面板**只做导航**，把用户送到能修它的那个控件前面。
+   *
+   * 🔴 这里**不做授权**。授权只能经 `AiSettings` 已有的
+   * `updateRouting` / `grant()` 写入；面板里直接改 `consents`
+   * 会造出第二套事实源。未传时不渲染按钮（单测用得上）。
+   */
+  onOpenSettings?: ((target: SettingsTarget) => void) | undefined;
 }
 
 export function AiBreakdown(props: AiBreakdownProps): React.JSX.Element {
-  const { task, routing, consents, secrets, onApplyNote, onHealth, preferenceSet, onFeedback } =
-    props;
+  const {
+    task,
+    routing,
+    consents,
+    secrets,
+    onApplyNote,
+    onHealth,
+    preferenceSet,
+    onFeedback,
+    onOpenSettings: onOpenSettingsProp,
+  } = props;
   const { t, locale } = useI18n();
+  /**
+   * 🔴 生产路径由 `App.tsx` 的 Provider 给（`CaptureComposer` 渲染的捕获面板
+   * 也走同一条路）；prop 是单测的注入缝。两者形状完全一样，只有一个通道。
+   */
+  const onOpenSettings = onOpenSettingsProp ?? useAiSettingsNavigation();
 
   const [phase, setPhase] = useState<Phase>('idle');
   const [proposal, setProposal] = useState<BreakdownProposal | undefined>(undefined);
@@ -215,7 +198,12 @@ export function AiBreakdown(props: AiBreakdownProps): React.JSX.Element {
   const [failure, setFailure] = useState<AiFailureCopy | null>(null);
   const [applied, setApplied] = useState(false);
 
-  const target = resolvePreferredTarget(routing);
+  /**
+   * 路由全貌：**有路**时给 `target`（披露与发送都用它），
+   * **没路**时给 `explanation`（为什么 + 下一步）。两者恰好一个非空。
+   */
+  const health = fromHealthSnapshot(props.healthSnapshot ?? {}, Date.now());
+  const { target, explanation } = resolveFeatureRoute(routing, 'breakdown', { health });
 
   /**
    * 🔴 偏好 → 提示。**这里也是出境面的一个决定点**：
@@ -369,10 +357,11 @@ export function AiBreakdown(props: AiBreakdownProps): React.JSX.Element {
         </div>
 
         {target === undefined ? (
-          <p className="ht-ai__warn" data-testid="ai-no-target">
-            <AlertTriangle size={12} aria-hidden="true" />
-            {t('web.ai.noTarget.breakdown')}
-          </p>
+          <RouteUnavailable
+            explanation={explanation}
+            onOpenSettings={onOpenSettings}
+            testId="ai-no-target"
+          />
         ) : (
           <>
             <p className="ht-ai__row" data-testid="ai-destination">
@@ -530,6 +519,11 @@ export function AiBreakdown(props: AiBreakdownProps): React.JSX.Element {
           <p>{failure.detail}</p>
         </details>
       )}
+      <FailureSettingsAction
+        settingsTarget={failure?.settingsTarget}
+        onOpenSettings={onOpenSettings}
+        testId="ai-failure-settings"
+      />
       <div className="ht-ai__actions">
         <button
           type="button"

@@ -594,13 +594,14 @@ describe('🔴🔴 熔断状态必须真的**读回来**', () => {
     });
 
     toDisclosure(el);
-    click(el.querySelector('[data-testid="duration-send"]'));
-    await act(async () => {
-      await Promise.resolve();
-    });
 
+    // 🔴 跳闸的端点连发送按钮都不给（披露阶段就说清原因）。
+    expect(el.querySelector('[data-testid="duration-send"]')).toBeNull();
+    expect(
+      el.querySelector('[data-testid="duration-no-target"]')?.getAttribute('data-route-reason'),
+    ).toBe('circuit-open');
+    expect(el.querySelector('[data-testid="duration-failed"]')).toBeNull();
     expect(calls).toHaveLength(0);
-    expect(el.querySelector('[data-testid="duration-failed"]')).toBeTruthy();
   });
 
   it('🔴 过期跳闸**不该**继续拦着 —— 退化方向是"再试一次"', async () => {

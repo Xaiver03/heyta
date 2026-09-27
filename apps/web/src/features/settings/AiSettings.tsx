@@ -23,7 +23,7 @@
  * 会拦下任何试图在这里直接 fetch 模型的代码。
  */
 
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   AI_ENDPOINT_PRESETS,
   classifyDestination,
@@ -95,6 +95,7 @@ import { AlertTriangle, Check, Lock, Plus, ShieldCheck, Trash2 } from 'lucide-re
 import { useI18n, type I18nValue, type Locale } from '@heyta/i18n';
 
 import { LIST_SEPARATOR, PAIRED_PARENS } from '../ai/locale-punctuation.js';
+import type { SettingsTarget } from '../ai/route-explanation.js';
 import { endpointHealthCopy } from './health-copy.js';
 import {
   defaultAiSettings,
@@ -267,15 +268,37 @@ export interface AiSettingsProps {
    * 谁持有 `preferenceSet` 谁负责组装，这里只留位置。
    */
   memorySlot?: React.ReactNode;
+  /**
+   * 从 AI 面板的"去设置"跳进来时，**该落在哪一块**。
+   *
+   * 🔴 这是"让界面说出下一步"的最后一米：面板算出"去开闸 2 / 去补能力 /
+   * 去授权"，用户点过来必须**真的看到那一个控件**，而不是又要在设置页里
+   * 自己找一遍。找不到的话，前面那句"去设置"就只是把问题换了个地方。
+   *
+   * ⚠️ 它只影响**呈现**（滚动 + 高亮），不改变任何配置 ——
+   * 授权仍然只能由用户在这里按"我同意"完成。
+   */
+  focusTarget?: SettingsTarget | undefined;
 }
 
-export function AiSettings({ initial, secrets, onChange, memorySlot }: AiSettingsProps) {
+export function AiSettings({ initial, secrets, onChange, memorySlot, focusTarget }: AiSettingsProps) {
   const [settings, setSettings] = useState<PersistedAiSettings>(initial);
   const [keyDraft, setKeyDraft] = useState<Record<string, string>>({});
   /** 被拒绝的端点地址及其原因 —— 必须显示，不能静默丢弃。 */
   const [rejected, setRejected] = useState<
     readonly { endpoint: string; reason: EndpointRejectionReason }[]
   >([]);
+  /**
+   * 当前被"去设置"高亮的那一块。
+   *
+   * 用 state 而不是直接改 DOM：高亮是**呈现状态**，必须随下次渲染自然消失，
+   * 而且测试要能在 DOM 上断言它（`data-focused`），不能靠读 class。
+   */
+  const [focused, setFocused] = useState<SettingsTarget | undefined>(undefined);
+
+  const endpointsSectionRef = useRef<HTMLElement | null>(null);
+  const remoteGateRef = useRef<HTMLDivElement | null>(null);
+  const featuresSectionRef = useRef<HTMLElement | null>(null);
 
   const { t, locale } = useI18n();
   const capabilityLabel = capabilityLabels(t);
@@ -356,6 +379,32 @@ export function AiSettings({ initial, secrets, onChange, memorySlot }: AiSetting
 
   const { routing, localApi } = settings;
   const localApiVerdict = validateLocalApiConfig(localApi);
+
+  /**
+   * 🔴 「去设置」的落点。
+   *
+   * 面板切过来时本组件是**新挂载**的（`view === 'settings'` 才渲染它），
+   * 所以每次跳转这个 effect 都会跑一次。依赖刻意只有 `focusTarget`：
+   * 用户在设置页里改配置不该让页面自己滚动。
+   *
+   * ⚠️ `scrollIntoView` 用可选调用：jsdom 没有实现它，而"落点对不对"
+   * 必须能在组件测试里断言（断言的是 `data-focused`，不是滚动本身）。
+   */
+  useEffect(() => {
+    if (focusTarget === undefined) return;
+    const target =
+      focusTarget === 'endpoints'
+        ? endpointsSectionRef.current
+        : focusTarget === 'remote'
+          ? remoteGateRef.current
+          : featuresSectionRef.current;
+    if (target === null) return;
+    target.scrollIntoView?.({ block: 'start' });
+    setFocused(focusTarget);
+    // 高亮是**瞬时的**：留着它，用户会以为那是一块需要一直盯着的状态。
+    const timer = setTimeout(() => setFocused(undefined), 2500);
+    return () => clearTimeout(timer);
+  }, [focusTarget]);
 
   // ── 端点 ────────────────────────────────────────────────────────────
   function addEndpoint(config: AiEndpointConfig): void {
@@ -537,13 +586,19 @@ export function AiSettings({ initial, secrets, onChange, memorySlot }: AiSetting
       {routing.enabled && (
         <>
           {/* ── 闸 2：允许远程 ───────────────────────────────────── */}
-          <Toggle
-            id="ai-allow-remote"
-            label={t('web.ai.settings.allowRemote.label')}
-            note={t('web.ai.settings.allowRemote.note')}
-            checked={routing.allowRemote}
-            onChange={(v) => updateRouting({ ...routing, allowRemote: v })}
-          />
+          <div
+            ref={remoteGateRef}
+            data-testid="ai-remote-gate"
+            data-focused={focused === 'remote' ? 'true' : undefined}
+          >
+            <Toggle
+              id="ai-allow-remote"
+              label={t('web.ai.settings.allowRemote.label')}
+              note={t('web.ai.settings.allowRemote.note')}
+              checked={routing.allowRemote}
+              onChange={(v) => updateRouting({ ...routing, allowRemote: v })}
+            />
+          </div>
 
           {routing.allowRemote && (
             <p className="ht-settings__danger" role="note" data-testid="remote-warning">
@@ -555,7 +610,12 @@ export function AiSettings({ initial, secrets, onChange, memorySlot }: AiSetting
           )}
 
           {/* ── 端点列表 ─────────────────────────────────────────── */}
-          <section className="ht-settings__section">
+          <section
+            className="ht-settings__section"
+            ref={endpointsSectionRef}
+            data-testid="ai-endpoints-section"
+            data-focused={focused === 'endpoints' ? 'true' : undefined}
+          >
             <h3 className="ht-settings__h3">{t('web.ai.settings.endpoints.title')}</h3>
 
             {/* 🔴🔴 **这一段曾经写的是"我们没有提供托管 AI"，那是错的。**
@@ -639,6 +699,37 @@ export function AiSettings({ initial, secrets, onChange, memorySlot }: AiSetting
                         />
                       </label>
 
+                      {/* 🔴 停用开关 —— `AiEndpointConfig.disabled` 的**唯一生产者**。
+                          这个字段一直只有"读"：`resolveRoute` 真的会跳过停用端点，
+                          而全仓没有任何地方写它。用户想"暂时别用这个端点"只能删掉，
+                          删除会连带清掉路由与授权 —— 代价完全不成比例。
+                          ⚠️ 写入走 `editEndpoint` → `updateRouting`（唯一路由写入口），
+                          所以授权会被重算一遍；停用**不改变目的地**，授权不会被清掉。 */}
+                      <label className="ht-settings__inline">
+                        <input
+                          type="checkbox"
+                          data-testid={`endpoint-${endpoint.id}-disabled`}
+                          aria-label={t('web.ai.settings.endpointDisabled.aria', {
+                            name: endpoint.label,
+                          })}
+                          checked={endpoint.disabled === true}
+                          onChange={(e) =>
+                            editEndpoint(endpoint.id, { disabled: e.target.checked })
+                          }
+                        />
+                        <span className="ht-settings__inline-label">
+                          {t('web.ai.settings.endpointDisabled.label')}
+                        </span>
+                      </label>
+                      {endpoint.disabled === true && (
+                        <p
+                          className="ht-settings__hint"
+                          data-testid={`endpoint-${endpoint.id}-disabled-note`}
+                        >
+                          <strong>{t('web.ai.settings.endpointDisabled.tag')}</strong>
+                          {t('web.ai.settings.endpointDisabled.note')}
+                        </p>
+                      )}
                       {/* 🔴 能力声明 —— 不勾就没有。见文件上方 CAPABILITY_ORDER 的说明。 */}
                       <fieldset className="ht-settings__caps">
                         <legend className="ht-settings__inline-label">{t('web.ai.settings.field.capability')}</legend>
@@ -776,7 +867,14 @@ export function AiSettings({ initial, secrets, onChange, memorySlot }: AiSetting
           </section>
 
           {/* ── 功能路由 + 逐功能授权 ────────────────────────────── */}
-          <section className="ht-settings__section">
+          <section
+            className="ht-settings__section"
+            ref={featuresSectionRef}
+            data-testid="ai-features-section"
+            data-focused={
+              focused === 'capability' || focused === 'consent' ? 'true' : undefined
+            }
+          >
             <h3 className="ht-settings__h3">{t('web.ai.settings.features.title')}</h3>
             <p className="ht-settings__hint">
               {t('web.ai.settings.features.hintLead')}<strong>{t('web.ai.settings.features.hintStrong')}</strong>{t('web.ai.settings.features.hintTail')}

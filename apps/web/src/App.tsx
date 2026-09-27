@@ -8,7 +8,7 @@
  *   - 所有取值走 `var(--ht-*)`，**不出现裸 hex / px**
  */
 
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { CalendarDays, ChartGantt, Check, CircleDot, Inbox, Moon, Sun, Timer, Trash2, type LucideIcon, Settings } from 'lucide-react';
 
@@ -55,6 +55,8 @@ import { TimelineView } from './features/timeline/TimelineView.js';
 import { AiBreakdown } from './features/ai/AiBreakdown.js';
 import { AiPrioritize } from './features/ai/AiPrioritize.js';
 import { AiDuration } from './features/ai/AiDuration.js';
+import { AiSettingsNavigationContext } from './features/ai/ai-settings-navigation.js';
+import type { SettingsTarget } from './features/ai/route-explanation.js';
 import { AiSettings } from './features/settings/AiSettings.js';
 import { MemoryPanel } from './features/settings/MemoryPanel.js';
 import {
@@ -150,6 +152,26 @@ export function App(): React.JSX.Element {
   const counts = useTaskStore(useShallow(selectQuadrantCounts));
   const [view, setView] = useState<ViewKey>('tasks');
   const [aiSettings, setAiSettings] = useState(loadAiSettings);
+  /**
+   * AI 面板的「去设置」请求：切到设置页并**落在哪一块**。
+   *
+   * `undefined` = 用户自己点进来的，不做任何定位。侧栏/视图 tab 的点击
+   * 会把它清掉 —— 否则"上次从估时面板跳到授权区块"这件事会粘住，
+   * 下次从别处进设置页时页面自己滚一下，看起来像故障。
+   */
+  const [settingsFocus, setSettingsFocus] = useState<SettingsTarget | undefined>(undefined);
+  /**
+   * AI 面板唯一的"下一步"入口（经 `AiSettingsNavigationContext` 传给四个面板）。
+   *
+   * 🔴 它**只做两件事**：切视图、记落点。授权到这里为止 ——
+   * 真正写 `consents` 的仍然只有 `AiSettings` 里的 `grant()` / `updateRouting`。
+   * 用 `useCallback` 是因为它是 context 的 value：每次渲染换一个新函数
+   * 会让四个面板连带重渲染。
+   */
+  const openAiSettings = useCallback((target: SettingsTarget) => {
+    setSettingsFocus(target);
+    setView('settings');
+  }, []);
   // 🔴 密钥只在内存里，只活在这个标签页（Web 没有系统钥匙串）
   const [aiSecrets] = useState(createSessionSecretStore);
   /**
@@ -304,7 +326,15 @@ export function App(): React.JSX.Element {
   }, [store.filter, projects.projects, t]);
 
   return (
-    <div className="ht-app">
+    /**
+     * 🔴 「去设置」的导航通道。
+     *
+     * 四个 AI 面板里，捕获那个是 `CaptureComposer` 渲染的，而那个文件
+     * 不在本轮的写入白名单里。用 context 让**唯一的新接入点**留在
+     * `App.tsx`（视图切换本来就在这里），而不是为一个导航参数去改别的功能。
+     */
+    <AiSettingsNavigationContext.Provider value={openAiSettings}>
+      <div className="ht-app">
       <nav className="ht-sidebar" aria-label={t('web.shell.nav.aria')}>
         <div className="ht-brand">
           <span className="ht-brand__dot" aria-hidden="true" />
@@ -362,7 +392,11 @@ export function App(): React.JSX.Element {
                 role="tab"
                 aria-selected={view === v.key}
                 className={`ht-viewtab${view === v.key ? ' ht-viewtab--active' : ''}`}
-                onClick={() => setView(v.key)}
+                onClick={() => {
+                  // 用户自己导航 = 不定位。见 `settingsFocus` 的说明。
+                  setSettingsFocus(undefined);
+                  setView(v.key);
+                }}
               >
                 <v.Icon size={14} aria-hidden="true" />
                 {t(v.labelKey)}
@@ -634,6 +668,7 @@ export function App(): React.JSX.Element {
             <AiSettings
               initial={aiSettings}
               secrets={aiSecrets}
+              focusTarget={settingsFocus}
               memorySlot={
                 <MemoryPanel
                   memoryEnabled={aiSettings.memoryEnabled}
@@ -660,7 +695,8 @@ export function App(): React.JSX.Element {
           )}
         </div>
       </main>
-    </div>
+      </div>
+    </AiSettingsNavigationContext.Provider>
   );
 }
 

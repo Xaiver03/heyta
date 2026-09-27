@@ -809,6 +809,23 @@ export const en = {
   'web.ai.failure.cause.httpError': 'The endpoint returned an error status. Check the API key, balance and model name.',
   'web.ai.failure.cause.emptyResponse': 'The endpoint returned nothing. Try a different model.',
   'web.ai.failure.details': 'Technical details',
+
+  // Module 2: route explanations + the endpoint disable switch.
+  // Each sentence has to answer both "why" and "what do I do next" - a reason
+  // without a next step leaves the user exactly where they were.
+  'web.ai.routeExplain.remoteNotAllowed': 'Every endpoint is off this device, but \u201cAllow remote endpoints\u201d is off. Turn it on to give this feature a usable endpoint.',
+  'web.ai.routeExplain.capabilityMissing': 'The endpoint does not declare the capability this feature needs. Tick it in Settings, or the endpoint will never be selected.',
+  'web.ai.routeExplain.endpointDisabled': 'The endpoint this feature routes to is disabled. Re-enable it in Settings, or route the feature somewhere else.',
+  'web.ai.routeExplain.endpointUrlRejected': 'The endpoint address did not pass validation (it must be a reachable http/https address). Fix it in Settings.',
+  'web.ai.routeExplain.circuitOpen': 'The endpoint failed repeatedly and has been tripped for now. Wait for the cooldown, or check its address and key in Settings.',
+  'web.ai.routeExplain.endpointMissing': 'This feature routes to an endpoint that no longer exists, so the configuration is out of sync. Pick an endpoint again in Settings.',
+  'web.ai.routeExplain.unknown': 'No endpoint is usable, and the reason cannot be determined from the current configuration. Check endpoints and routes in Settings.',
+  'web.ai.action.openSettings': 'Open settings',
+
+  'web.ai.settings.endpointDisabled.label': 'Disable',
+  'web.ai.settings.endpointDisabled.aria': 'Disable endpoint: {name}',
+  'web.ai.settings.endpointDisabled.note': 'A disabled endpoint is skipped by routing; its configuration and key are kept.',
+  'web.ai.settings.endpointDisabled.tag': 'Disabled',
   'web.memory.forgotten.title': 'You have forgotten',
   'web.memory.forgotten.note': 'I will not use this one again.',
   'web.memory.forget': 'Forget',
