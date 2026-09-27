@@ -263,6 +263,10 @@ compose 里还有一批**未在 `.env` 中设置、走默认值**的键（`HOST`
 | `GET https://heyta-tmp.litopia.space/app/assets/<hash>.js` | `200` `application/javascript`，`Cache-Control: max-age=31536000` | ✅ 2026-09-27 |
 | `GET https://heyta.finlaw.cloud/` | `200`（落地页中文版） | ✅ 2026-09-27 |
 | `GET https://heyta.finlaw.cloud/en/` | `200`（落地页英文版） | ✅ 2026-09-27 |
+| `GET https://heyta.finlaw.cloud/app/` | `200` `text/html`，`<title>heyta</title>`（迁移前这里是**落地页**） | ✅ 2026-09-27 |
+| `GET https://heyta.finlaw.cloud/app` | `301` → `/app/`（保留查询串） | ✅ 2026-09-27 |
+| `GET https://heyta.finlaw.cloud/app/assets/<hash>.js` | `200` `application/javascript` | ✅ 2026-09-27 |
+| `POST https://heyta.finlaw.cloud/api/login/passkey/options` | `{"rpId":"heyta.finlaw.cloud",…}` | ✅ 2026-09-27 |
 | `GET https://heyta-tmp.litopia.space/landing/` | `301` → `https://heyta.finlaw.cloud/`（**不再直接 200**） | ✅ 2026-09-27 |
 | `GET http://heyta-tmp.litopia.space/health` | `301` → `https://…/health` | ✅ |
 | `GET http://124.223.13.226/health` | `404` | ✅ |
@@ -281,10 +285,11 @@ compose 里还有一批**未在 `.env` 中设置、走默认值**的键（`HOST`
 
 | 项 | 值 |
 |---|---|
-| 公网地址 | `https://heyta-tmp.litopia.space/app/` |
-| 静态根目录 | `/var/www/heyta-app/`（`ubuntu:ubuntu`） |
-| 为什么放这个域名 | 与同步服务端**同源** —— 于是 `CORS_ORIGINS`、`WEBAUTHN_RP_ID`、`WEBAUTHN_ORIGIN` **一个字都不用改**，passkey 也能用 |
-| nginx 片段 | `/etc/nginx/sites-available/heyta-tmp`（就是 §3.3 那个文件） |
+| 公网地址 | `https://heyta.finlaw.cloud/app/`（**2026-09-27 从 tmp 域名迁来**，见 §3.7.1） |
+| 静态根目录 | `/var/www/heyta-app/`（`ubuntu:ubuntu`）—— 迁移**没动**这个目录，换的只是它挂在哪个域名下 |
+| 为什么放这个域名 | 与同步服务端**同源**：`WEBAUTHN_RP_ID` / `WEBAUTHN_ORIGIN` / `CORS_ORIGINS` 都指向它，passkey 才能用（§3.7.1 解释了为什么不能再挂第二个域名） |
+| nginx 片段 | `/etc/nginx/sites-available/heyta.finlaw.cloud` —— 应用（`/app/`）、同步 API（`/api/`）与三张凭据页都在这里 |
+| 旧地址 | `https://heyta-tmp.litopia.space/app/` 至今仍 200（那份 nginx 没删，留着当回滚路径），但**那里 passkey 不可用** —— 见 §3.7.1 |
 
 #### 重新发布的两条命令
 
@@ -298,10 +303,9 @@ rsync -az --delete apps/web/dist/ ubuntu-jcli:/var/www/heyta-app/
 
 🔴 **`--base=/app/` 必须显式给。** Vite 默认 `base` 是 `/`，产物的资源引用是
 **根绝对路径**（`/assets/…`）。挂在 `/app/` 下时浏览器会去请求
-`https://heyta-tmp.litopia.space/assets/…` —— 而那个路径属于同步服务端
-（`location /` → `proxy_pass 127.0.0.1:1900`），于是拿到 JSON 404，
-现象是**控制台报样式表 MIME 是 `application/json`**、页面白屏。
-落地页 2026-09-27 踩的就是同一个坑，`sites-available/heyta-tmp` 里那段注释就是为它写的。
+`https://<域名>/assets/…` —— 而那个路径属于**落地页**（`root /var/www/heyta-landing`），
+于是拿到落地页的 HTML 而不是样式表，现象是**控制台报样式表 MIME 是 `text/html`**、
+页面白屏。落地页 2026-09-27 踩的就是同一个坑，两个站点文件里都有对应注释。
 
 #### 落地页上的入口：`VITE_APP_URL`
 
@@ -309,7 +313,7 @@ rsync -az --delete apps/web/dist/ ubuntu-jcli:/var/www/heyta-app/
 （判据在 `apps/landing/src/lib/app-url.ts`）：
 
 ```bash
-cd apps/landing && VITE_APP_URL=https://heyta-tmp.litopia.space/app/ pnpm exec vite build
+cd apps/landing && VITE_APP_URL=https://heyta.finlaw.cloud/app/ pnpm exec vite build
 rsync -az --delete apps/landing/dist/ ubuntu-jcli:/var/www/heyta-landing/
 ```
 
@@ -319,18 +323,62 @@ rsync -az --delete apps/landing/dist/ ubuntu-jcli:/var/www/heyta-landing/
 
 #### 变更前备份（回滚用）
 
-- `/etc/nginx/sites-available/heyta-tmp.bak-20260927T124302Z`（加 `/app/` 之前）
-- `/etc/nginx/sites-available/heyta-tmp.bak2-20260927T124707Z`（加 `/app` 重定向之前）
+- `/etc/nginx/sites-available/heyta.finlaw.cloud.bak-20260927T145658Z`（**迁移前**：只有落地页、没有 `/app/` 与 `/api/`）
+- `/home/ubuntu/heyta/server/.env.bak-20260927T145733Z`（**迁移前**：origin 全指向 `heyta-tmp.litopia.space`）
+- `/etc/nginx/sites-available/heyta-tmp.bak-20260927T124302Z`（tmp 站点加 `/app/` 之前）
+- `/etc/nginx/sites-available/heyta-tmp.bak2-20260927T124707Z`（tmp 站点加 `/app` 重定向之前）
 - `/var/www/heyta-landing.bak-20260927T124628Z`（旧落地页产物）
+
+#### 3.7.1 2026-09-27：把测试域名固定到 `heyta.finlaw.cloud`
+
+**为什么迁。** 测试阶段要有**一个**固定域名，不能把入口挂在一个被文档标成"临时资产"
+的域名上。迁完 `heyta.finlaw.cloud` 同时提供落地页（`/`）、应用（`/app/`）、
+同步 API（`/api/`）和三张凭据页，是测试阶段唯一的域名。
+
+**为什么不能只把应用挂过去、API 留在 tmp。** 🔴 应用与同步服务端做 WebAuthn
+时**必须同源**：`WEBAUTHN_RP_ID` 只能取一个值，而 `finlaw.cloud` 与 `litopia.space`
+是**不同的可注册域**、没有公共 RP ID —— 跨源时 passkey 不可能工作（浏览器会拒绝）。
+所以 API 与凭据页必须跟应用一起搬。
+
+**改了三处，缺一不可：**
+
+| 层 | 改动 |
+|---|---|
+| nginx | `sites-available/heyta.finlaw.cloud` 新增 `location /app/`（含 `/app` 重定向与 `/app/assets/`）、`location /api/`（含 WebSocket 升级头）、三张凭据页的 `proxy_pass`；`client_max_body_size` 与 tmp 站点对齐到 `64m` |
+| 服务端 env | `~/heyta/server/.env` 的 `PUBLIC_URL` / `CORS_ORIGINS` / `DOMAIN` / `WEBAUTHN_RP_ID` / `WEBAUTHN_ORIGIN` 五个值全部改成 `heyta.finlaw.cloud`，然后 `docker compose … up -d --no-build supersync` 换容器 |
+| 落地页 | `VITE_APP_URL=https://heyta.finlaw.cloud/app/` 重新构建并 rsync |
+
+**DNS 不用改。** `heyta.finlaw.cloud` 与 `heyta-tmp.litopia.space` 本来就是**同一个 IP**
+（`124.223.13.226`），两个 A 记录都指向它 —— 所以这件事 tccli 帮不上忙，
+卡点一直是 nginx 与 env，不是解析。
+
+**🔴 已知代价（唯一一条）：tmp 域名上已注册的 passkey 全部失效，测试者要重新注册。**
+这不是可以两边兼容的事 —— 见上，RP ID 只能一个。JWT 不受影响（不绑 origin），
+所以已登录会话照常。
+
+**验收（2026-09-27 实测）：**
+
+| 请求 | 结果 |
+|---|---|
+| `GET https://heyta.finlaw.cloud/` / `/en/` | `200` 落地页中/英 |
+| `GET https://heyta.finlaw.cloud/app/` | `200` `text/html`，`<title>heyta</title>`（**迁移前这里返回的是落地页**） |
+| `GET https://heyta.finlaw.cloud/app` | `301` → `/app/`，**且保留查询串**（`?lang=en` → `/app/?lang=en`） |
+| `GET https://heyta.finlaw.cloud/app/assets/<hash>.js` | `200` `application/javascript` |
+| `POST https://heyta.finlaw.cloud/api/login/passkey/options` | `{"rpId":"heyta.finlaw.cloud",…}` —— WebAuthn 的 RP ID 真的换了 |
+| `GET https://heyta.finlaw.cloud/verify-email`、`/recover-passkey`、`/magic-login` | `400 Token is required` —— 是**服务端**的响应，不是落地页 HTML（即代理通了） |
+| `GET https://heyta.finlaw.cloud/api/<不存在>` | Fastify 的 JSON 404，与 tmp 域名**逐字一致**（即 `/api/` 真的到 1900） |
 
 #### 验收方式：**必须用真浏览器**
 
 `apps/web` 是客户端渲染的 SPA，落地页的 CTA 也是 React 渲染出来的 ——
 `curl` 只能证明"文件在"，证明不了"点下去真的能打开应用"。本次用 `e2e/` 里的
-Playwright 实测：中文页与英文页各两个入口都指向
-`https://heyta-tmp.litopia.space/app` 且带 `rel="noopener noreferrer"`；
-点「Use it now」→ 落在 `/app/`、`title=heyta`、`#root` 渲染出 14629 字符、
-**无 pageerror / console.error**。
+Playwright 实测：中文页与英文页各两个入口都指向应用地址且带
+`rel="noopener noreferrer"`；点「Use it now」→ 落在 `/app/`、`title=heyta`、
+`#root` 渲染出 14629 字符、**无 pageerror / console.error**。
+
+（迁移前那次跑的目标是 `https://heyta-tmp.litopia.space/app`；迁移后入口变成
+`https://heyta.finlaw.cloud/app`，且**英文页会多一个 `?lang=en`**。
+上面那条实测结论与具体域名无关，仍然成立。）
 
 ⚠️ 正是这一步抓到了一个 `curl` 抓不到的 bug：`appUrl()` 会去掉末尾斜杠，
 而 nginx 的 `location /app/` **不匹配** `/app` —— 点链接（而不是手输 `/app/`）
@@ -338,11 +386,20 @@ Playwright 实测：中文页与英文页各两个入口都指向
 
 #### 还没做的
 
-- **`heyta-tmp.litopia.space` 是临时资产**（§7.1 有清理清单）。这个入口今天是通的，
-  **不是永久的**。换永久域名时只需改 `VITE_APP_URL` 并重跑上面两组命令。
-- 从英文落地页点进去会到**默认中文**的应用（应用有自己的语言设置，页面上有
-  English 切换）—— 落地页的 locale 没有传过去。
-- 应用产物没走 CDN、没有 SRI、没有构建版本号注入；`/app/` 那段 nginx 是手工维护的。
+- 应用产物没走 CDN、没有 SRI、没有构建版本号注入；`/app/` 那段 nginx **不在仓库里**
+  （仓库只跟踪 `server/Caddyfile`），只能上机改 —— 改完记得回来更新本节。
+- `heyta-tmp.litopia.space` 那份 nginx 站点仍在（`location /` → 1900 的 Connect 页、
+  `/app/` → 应用），留作回滚路径。但**它已经不是入口了**：落地页的「立即使用」
+  自 2026-09-27 起指向 `heyta.finlaw.cloud`，而且那里 passkey 不可用（§3.7.1）。
+
+#### 原先记在这里、现已做掉的
+
+- ✅ **入口依赖临时域名** —— 已修（§3.7.1）：`VITE_APP_URL` 改成
+  `https://heyta.finlaw.cloud/app/`，入口不再挂在一个被标成"临时资产"的域名上。
+- ✅ **从英文落地页点进去会到默认中文的应用** —— 已修：
+  `apps/landing/src/lib/app-url.ts` 给外链带 `?lang=en`，应用侧
+  `apps/web/src/lib/locale.ts` 在**没有已存偏好**时采纳它（已存偏好优先 ——
+  反过来的话，一个陈旧的地址栏参数会覆盖用户在应用里的明确选择）。
 
 ### 3.8 服务端镜像（`supersync`）的重建 —— 2026-09-27 首次在本机完成
 
@@ -597,9 +654,10 @@ ssh ubuntu-jcli 'cd ~/heyta/server && \
 
 （同目录下还有 30+ 个更早的 `.bak-*`，见 §7.5。）
 
-🔴 **注意这里的连带关系**：`heyta-tmp` 一清，§3.7 那个应用入口就断了，
-落地页上的「立即使用」会指向死地址。所以清理时要么同时换掉 `VITE_APP_URL`
-并重建落地页，要么把入口一起去掉 —— **不要只清一边**。
+✅ **这条连带关系已在 2026-09-27 解除**：落地页的「立即使用」现在指向
+`https://heyta.finlaw.cloud/app`（§3.7.1），不再依赖 `heyta-tmp`。
+清掉 tmp 域名**不会再**打断入口，也不需要再改 `VITE_APP_URL`。
+（`heyta-tmp` 现在只剩两个作用：同步服务的 Connect 页，以及回滚路径。）
 
 ### 7.2 🔴 12km / OPP 到期的连带影响
 
