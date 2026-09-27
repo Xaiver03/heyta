@@ -28,7 +28,7 @@
  * 所以非 `http(s)` 一律当作"没配置"。
  */
 
-import type { MessageKey } from '@heyta/i18n';
+import { DEFAULT_LOCALE, type Locale, type MessageKey } from '@heyta/i18n';
 
 /**
  * 读到并校验构建期的 `VITE_APP_URL`。
@@ -58,6 +58,28 @@ export function appUrl(): string | null {
 }
 
 /**
+ * 把落地页的语言**带进应用**。
+ *
+ * 🔴 不这样做会留下一个真实的尴尬：访客在**英文**落地页上读完、点「Use it now」，
+ * 落到的却是**中文**界面。原因是两边判断语言的依据不同 ——
+ * 落地页由 URL 决定（要 SEO），应用由自己的偏好存储决定（`apps/web/src/lib/locale.ts`）。
+ * 这是 `docs/plans/roadmap.md` §5.1 留下的两条保留之一。
+ *
+ * 默认语言**不带参数**：应用在没有任何偏好时本来就是默认语言，
+ * 带上只会给每个链接加一段噪音，也让 `lang=` 失去"这条链接特意指定了语言"的含义。
+ */
+const LANG_PARAM = 'lang';
+
+function withLocale(url: string, locale: Locale): string {
+  if (locale === DEFAULT_LOCALE) return url;
+  // 用 `URL` 拼而不是字符串相加：`VITE_APP_URL` 自己可能带查询串
+  // （例如带一个灰度参数），手拼 `?`/`&` 会在那种情况下生成坏地址。
+  const parsed = new URL(url);
+  parsed.searchParams.set(LANG_PARAM, locale);
+  return parsed.toString();
+}
+
+/**
  * 「开始使用」这个意图该指向哪。
  *
  * 全页**只有这一个**意图对应**一个**标签（见 `FinalCta.tsx` 顶部）：
@@ -73,9 +95,14 @@ export interface StartCta {
   readonly external: boolean;
 }
 
-export function startCta(): StartCta {
+/**
+ * @param locale 当前页面的语言。**必须显式传入**，不从路径里偷偷读 ——
+ *   隐式读取会让这个函数依赖 `window.location`，而"英文页 / 中文页"两种状态的
+ *   测试就得去 stub 全局对象，那时测试断的是 stub 而不是真实判据。
+ */
+export function startCta(locale: Locale): StartCta {
   const url = appUrl();
   return url === null
     ? { href: '#selfhost', labelKey: 'landing.cta.selfHost', external: false }
-    : { href: url, labelKey: 'landing.cta.useApp', external: true };
+    : { href: withLocale(url, locale), labelKey: 'landing.cta.useApp', external: true };
 }

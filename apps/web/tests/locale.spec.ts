@@ -9,12 +9,12 @@
  * `heyta.locale`），**不是设备语言** —— 后者是移动端的做法，见
  * `apps/mobile/src/i18n/locale.ts`。这两条契约都必须钉住：
  *
- *   - 读：没存过 / 存了不支持的值 → `DEFAULT_LOCALE`；
+ *   - 读：已存偏好 > 落地页带来的 `?lang=` > `DEFAULT_LOCALE`；
  *   - 写：`applyLocale` 必须落到正确的键、并同步 `<html lang>`；
  *   - **不读 `navigator.language`**（web 刻意不做自动判断）。
  */
 
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { DEFAULT_LOCALE } from '@heyta/i18n';
 
@@ -59,6 +59,42 @@ describe('resolveInitialLocale', () => {
     const spy = vi.spyOn(navigator, 'language', 'get').mockReturnValue('en-US');
     expect(resolveInitialLocale()).toBe(DEFAULT_LOCALE);
     spy.mockRestore();
+  });
+});
+
+describe('resolveInitialLocale：落地页带来的 `?lang=`', () => {
+  /**
+   * 🔴 这一段钉的是 roadmap §5.1 留下的保留之一：读完**英文**落地页点进应用，
+   * 看到的却是中文。落地页靠 URL 定语言（要 SEO），应用靠偏好存储定语言，
+   * 两边原本不通；`apps/landing/src/lib/app-url.ts` 现在会在外链上带 `?lang=en`。
+   */
+  afterEach(() => {
+    window.history.replaceState({}, '', '/');
+  });
+
+  it('没存过偏好时接受 URL 里的语言', () => {
+    window.history.replaceState({}, '', '/?lang=en');
+    expect(resolveInitialLocale()).toBe('en');
+  });
+
+  it('URL 里是不受支持的语言时回落到默认语言，而不是被它带走', () => {
+    window.history.replaceState({}, '', '/?lang=fr-FR');
+    expect(resolveInitialLocale()).toBe(DEFAULT_LOCALE);
+  });
+
+  it('🔴 已存偏好**胜过** URL 参数 —— 陈旧参数不许覆盖用户的明确选择', () => {
+    // 真实场景：带 `?lang=en` 进来（偏好存成 en）→ 用户在应用里切成中文 →
+    // 刷新时地址栏里那个参数**还在**。若参数更强，用户会被翻回英文，
+    // 而这件事看起来像"语言设置没保存"。
+    // 断言写成"期望 en、URL 给 zh-CN"，才能把"存的高过 URL"与"恰好都是默认值"区分开。
+    localStorage.setItem('heyta.locale', 'en');
+    window.history.replaceState({}, '', '/?lang=zh-CN');
+    expect(resolveInitialLocale()).toBe('en');
+  });
+
+  it('没有参数时行为与从前一致（回归）', () => {
+    window.history.replaceState({}, '', '/');
+    expect(resolveInitialLocale()).toBe(DEFAULT_LOCALE);
   });
 });
 
