@@ -48,6 +48,7 @@ import {
   isImportant,
   toLocalDate,
   type Project,
+  type Tag,
   type Task,
 } from '@heyta/domain';
 import type { MessageKey } from '@heyta/i18n';
@@ -87,6 +88,7 @@ export function TaskDetailSheet({
   onClose,
   actions,
   projects,
+  tags,
   projectActions,
   onChanged,
   now,
@@ -100,6 +102,11 @@ export function TaskDetailSheet({
    * 可选的清单（**不含「收集箱」** —— 那个选项不是实体，见下面的渲染）。
    */
   projects: Project[];
+  /**
+   * 全部未删除的标签。**空数组是合法且常见的情况**（还没建过标签），
+   * 不是"加载失败" —— 所以下面渲染的是一句指路文案，而不是什么都不画。
+   */
+  tags: Tag[];
   /** 要新建清单时需要它。为 `null` 时「新建清单」不出现（宿主还没打开）。 */
   projectActions: ProjectActions | null;
   onChanged: () => void;
@@ -333,7 +340,9 @@ export function TaskDetailSheet({
                     <TextInput
                       value={newListName}
                       onChangeText={setNewListName}
-                      accessibilityLabel={t('mobile.detail.field.project')}
+                      // 🔴 与段落标题「清单」**不同名**：同名会让无障碍树里
+                      // 出现两个「清单」，按标签取节点就得靠 role 去猜。
+                      accessibilityLabel={t('mobile.detail.project.newPlaceholder')}
                       placeholder={t('mobile.detail.project.newPlaceholder')}
                       placeholderTextColor={tokens['color.foreground-subtle']}
                       autoFocus
@@ -369,6 +378,45 @@ export function TaskDetailSheet({
                       setNewListName('');
                     }}
                   />
+                </View>
+              )}
+            </View>
+
+            {/* 标签：与清单**并列但语义不同** —— 清单是"属于哪个容器"（单选），
+                标签是"还跟什么有关"（多选）。所以这里是开关式的 Chip，
+                不是一个"选中就切换"的互斥组。
+
+                🔴 每次点击都写**整组**（`setTags`），一条 op。
+                在界面里维护"待改动集合"再一次性提交是另一种做法，但那会让
+                "点了之后立刻同步"变成"要点保存才同步"，而这一屏的其他字段
+                （截止日、重复、优先级）全是即点即写 —— 不一致的交互更贵。 */}
+            <View style={{ gap: tokens['space.2'] }}>
+              <SectionHeader icon="task.tag" title={t('mobile.detail.field.tags')} />
+              {tags.length === 0 ? (
+                <Text variant="caption" tone="subtle">
+                  {t('mobile.detail.tags.empty')}
+                </Text>
+              ) : (
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: tokens['space.2'] }}>
+                  {tags.map((tag) => {
+                    const assigned = task.tagIds?.includes(tag.id) ?? false;
+                    return (
+                      <Chip
+                        key={tag.id}
+                        label={tag.name}
+                        selected={assigned}
+                        onPress={() => {
+                          const current = task.tagIds ?? [];
+                          // 去重与"空数组写 null"都由 app-host 的 `setTags` 决定，
+                          // 这里只负责算出用户想要的那一组。
+                          const next = assigned
+                            ? current.filter((id) => id !== tag.id)
+                            : [...current, tag.id];
+                          run(actions.setTags(task.id, next));
+                        }}
+                      />
+                    );
+                  })}
                 </View>
               )}
             </View>

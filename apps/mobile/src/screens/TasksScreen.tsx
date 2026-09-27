@@ -27,7 +27,7 @@ import {
   TextInput,
   View,
 } from 'react-native';
-import type { Project, Task } from '@heyta/domain';
+import type { Project, Tag, Task } from '@heyta/domain';
 // `formatDayTitleText` 在壳里把领域层给的 `LocalDate` 说成当前语言：
 // **"某一天的标题"的日期语义（`isoWeekday`、`parseLocalDate`）仍只有领域层一份**，
 // 壳里只负责措辞（见 `apps/mobile/src/lib/date.ts` 文件头）。
@@ -408,6 +408,11 @@ export function TasksScreen({
    * 早晚有人给它加上"删除"或"改名"。
    */
   const [projects, setProjects] = useState<Project[]>([]);
+  /**
+   * 全部未删除的标签。与清单同一份物化状态、同一条刷新时机 ——
+   * 详情页的「标签」多选靠它渲染可选项。
+   */
+  const [tags, setTags] = useState<Tag[]>([]);
 
   const refresh = useCallback(() => {
     if (!actions) return;
@@ -415,7 +420,10 @@ export function TasksScreen({
     // 我一度写成 `.then(...)` —— 运行时那里直接抛 "then is not a function"，
     // 而界面只是停在"正在打开本地数据"，看起来像数据库慢。
     setTasks(actions.listTasks());
-    if (projectActions) setProjects(projectActions.listProjects());
+    if (projectActions) {
+      setProjects(projectActions.listProjects());
+      setTags(projectActions.listTags());
+    }
   }, [actions, projectActions]);
 
   useEffect(() => {
@@ -735,6 +743,7 @@ export function TasksScreen({
           }}
           actions={actions}
           projects={projects}
+          tags={tags}
           projectActions={projectActions}
           onChanged={refresh}
           now={now}
