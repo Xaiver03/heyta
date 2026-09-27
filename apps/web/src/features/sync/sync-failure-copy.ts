@@ -37,5 +37,6 @@ export const SYNC_FAILURE_KEY: Record<Exclude<SyncFailureReason, 'unexpected'>, 
   'local-op-missing': 'common.sync.error.localOpMissing',
   'remote-version-unavailable': 'common.sync.error.remoteVersionUnavailable',
   'undecryptable-ops': 'common.sync.error.undecryptableOps',
+  'undecryptable-page': 'common.sync.error.undecryptablePage',
   'upload-rejected': 'common.sync.error.uploadRejected',
 };

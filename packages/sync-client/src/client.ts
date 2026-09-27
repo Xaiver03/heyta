@@ -314,6 +314,23 @@ export type SyncFailureReason =
    */
   | 'undecryptable-ops'
   /**
+   * 服务端返回的**整页** op 都用当前口令解不开 —— 同步停在这一页。
+   *
+   * 与 `'undecryptable-ops'`（部分解不开、其余已同步、游标已推进）是**两种处置**，
+   * 所以必须是两个原因：
+   *   - 这里**一条都没应用、游标也没推进**（ADR-0016 的 fail-closed）；
+   *   - 最常见的原因是**口令不匹配**（口令打错，或这一页全是在另一个口令下写入的）。
+   *
+   * 🔴 为什么不能让它落进 `'unexpected'`：那条通道渲染的是**原始 `message`**，
+   * 而这里抛出的是一句我们写的中文说明。英文界面的用户会读到
+   * `Sync error: 这一页 12 条 op 一条都解不开……` —— 中英混排，而且"意外异常"
+   * 这个分类本身就在骗人：这是一个已知的、可行动的诊断（去核对口令）。
+   *
+   * `retryable: false`：同样的口令重试多少次都解不开；用户改对口令后的下一次
+   * 手动同步会从**同一个位点**重新拉到这一页，不会跳过任何历史。
+   */
+  | 'undecryptable-page'
+  /**
    * 服务端**拒绝了本机上传的 op**，这些改动不在云上。
    *
    * 🔴 单独一种原因，因为它和"网络不好"是**完全相反**的处置：
@@ -380,6 +397,31 @@ interface UnreadableOp {
   serverSeq: number;
   opId: string;
   errorName: string;
+}
+
+/**
+ * 服务端返回的**整页** op 一条都解不开。
+ *
+ * 🔴 用**类型**（而不是错误文案）承载"这是哪一类失败"，是因为 `sync()` 的
+ * `catch` 只能看类型来决定归类。若这里抛普通 `Error`，它会被归进
+ * `'unexpected'` —— 而那条通道把 `message` 当诊断数据**原样渲染**，
+ * 于是我们写的中文说明会出现在英文界面里。归属到
+ * `'undecryptable-page'` 后，壳用**词条**渲染，`message` 只进日志。
+ *
+ * `message` 因此只放**可机器定位**的非中文诊断（序号 + opId + 错误名）。
+ */
+class UndecryptablePageError extends Error {
+  override readonly name = 'UndecryptablePageError';
+
+  constructor(
+    readonly count: number,
+    readonly first: UnreadableOp,
+  ) {
+    super(
+      `${String(count)} op(s) undecryptable in one page; ` +
+        `first=${String(first.serverSeq)}:${first.opId}(${first.errorName})`,
+    );
+  }
 }
 
 /** 线协议里的 op 本体（不含 serverSeq，那个在外面）。 */
@@ -698,6 +740,26 @@ export class SyncClient {
 
       return report({ kind: 'synced', at: this.now() });
     } catch (error: unknown) {
+      /**
+       * 🔴 整页解不开要**有分类地**上报，不能落进 `'unexpected'`。
+       *
+       * `'unexpected'` 通道渲染的是原始 `message`（那是意外异常的技术细节），
+       * 而这里是一个已知、可行动的诊断：口令不匹配。落进 `'unexpected'` 会有
+       * 两个后果 —— 英文界面读到我们写的中文长句（中英混排），以及用户只看到
+       * 一句和网络抖动无法区分的"同步失败"。归类到 `'undecryptable-page'`
+       * 之后，壳用词条渲染整句，`message` 只作日志。
+       *
+       * 语义不变：这条路仍然是在 `download()` 里**抛**出来的，游标没有推进、
+       * 一条 op 都没应用（ADR-0016 的 fail-closed）。
+       */
+      if (error instanceof UndecryptablePageError) {
+        return report({
+          kind: 'error',
+          reason: 'undecryptable-page',
+          retryable: false,
+          message: error.message,
+        });
+      }
       const message = error instanceof Error ? error.message : String(error);
       const offline = isNetworkError(error);
       return report(
@@ -1241,13 +1303,22 @@ export class SyncClient {
 
         if (failed.length > 0) {
           if (decoded.length === 0) {
+            /**
+             * 整页一条都解不开 —— 最常见的原因是**口令打错**。
+             *
+             * 🔴 抛出的是**有类型的** `UndecryptablePageError`，不是普通 `Error`：
+             * 普通 `Error` 会被 `sync()` 归进 `'unexpected'`，而那条通道渲染原始
+             * `message`。这里中断的语义必须保留（不推进游标、不静默跳过整段历史，
+             * 见 ADR-0016），但分类必须准确 —— 用户看到的是"口令不匹配、同步已暂停"
+             * 这条可行动的词条，而不是和网络抖动无法区分的"同步失败"。
+             */
             const first = failed[0];
-            throw new Error(
-              `这一页 ${String(ops.length)} 条 op **一条都解不开**` +
-                `（第一条 ${first?.serverSeq ?? '?'}:${first?.opId ?? '?'}，` +
-                `${first?.errorName ?? '?'}）。这几乎总是"端到端加密口令不对"，` +
-                `所以**不推进游标** —— 否则一次手滑就会静默跳过整段历史。`,
-            );
+            if (first !== undefined) {
+              throw new UndecryptablePageError(ops.length, first);
+            }
+            // `failed.length > 0` 保证 `first` 一定存在；这里只是让控制流对
+            // `noUncheckedIndexedAccess` 收敛，并**绝不**退化成"跳过整页"。
+            throw new Error('internal: failed page reported without a first failure');
           }
           // 有的解开、有的解不开 = 口令确实是对的，只是历史里混着别的口令写的数据。
           // 跳过它们（重试也不会变好），但要**如实上报**，不能装作没这回事。

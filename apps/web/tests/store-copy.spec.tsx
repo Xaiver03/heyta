@@ -98,6 +98,9 @@ describe('sync store 只带数据', () => {
       'no-encryption-password',
       'local-op-missing',
       'remote-version-unavailable',
+      // 整页 op 都解不开（口令不匹配）—— 曾经落进 'unexpected'，
+      // 于是英文界面把 sync-client 里的中文长句当"技术细节"原样渲染出来。
+      'undecryptable-page',
     ] as const;
 
     const seenEn = new Set<string>();
