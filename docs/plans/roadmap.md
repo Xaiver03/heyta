@@ -360,7 +360,7 @@ Web 设置页有「导出数据」（JSON 完整保真 / 任务清单 Markdown�
 | # | 断点 | 状态 |
 |---|---|---|
 | ④⑤ | 收银台 | ✅ **服务端已通**：`POST /api/billing/checkout`（报价 → 冻结 → `createCheckout` 一条链，不可交付的档在报价前回 `409`，12 例真 SQL 测试）。❌ **客户端「付款」按钮仍缺**，且**应当与支付通道一起落地** —— 现在加必然回 `503 BILLING_PROVIDER_NOT_CONFIGURED`，正好造出落地页明确反对的那个东西。所以这一步卡在**外部资质**，不在我们这边 |
-| 交付半段 | ✅ **已修（2026-09-27）** | webhook 现在在**同一个事务**里：占位 `paymentEvent`（唯一约束=幂等闸）→ `settleOrderPaidInTransaction`（比**订单冻结的** `final_amount_minor`、`pending→paid`、券 `reserved→applied`）→ 用**订单冻结的 `price_id`** 覆盖 adapter 的金额启发式 → `applyPaymentEvent` → 标记 `processedAt`。`unknown-order` 回落 legacy 声明；`already-paid` 不重复授予。<br>**退款/拒付侧：有意不接**（ADR-0026 已接受 —— `reverseOrderOnRefund` 零调用方、退款事件在 `unsupported-event-type` 被拒，两条都是显式决定，不是遗漏；理由是只接订单侧会造成"账本说退款了、权益还在"的半真状态）；**存量回填**没做（接线前已付款但未结算的订单，重投会被幂等挡住，不会补结算）—— 属对账任务 |
+| 交付半段 | ✅ **已修（2026-09-27）** | webhook 现在在**同一个事务**里：占位 `paymentEvent`（唯一约束=幂等闸）→ `settleOrderPaidInTransaction`（比**订单冻结的** `final_amount_minor`、`pending→paid`、券 `reserved→applied`）→ 用**订单冻结的 `price_id`** 覆盖 adapter 的金额启发式 → `applyPaymentEvent` → 标记 `processedAt`。`unknown-order` 回落 legacy 声明；`already-paid` 不重复授予。<br>**退款/拒付侧：有意不接**（ADR-0026 已接受 —— `reverseOrderOnRefund` 零调用方、退款事件在 `unsupported-event-type` 被拒，两条都是显式决定，不是遗漏；理由是只接订单侧会造成"账本说退款了、权益还在"的半真状态）；**存量回填**✅ **已做（2026-09-27）**（接线前已付款但未结算的订单，重投会被幂等挡住，现在由对账补结算）—— 见下方"存量回填"条目 |
 | ⑦⑧ | ¥12 档能不能交付 | 已由 [ADR-0023](../adr/0023-managed-ai-quota-not-implemented.md) 显式判定：**计量存在之前不得被售卖**。云端 AI 端点 / 计量 / 设置页的「本周期已用 X / 300 次」**仍未做** |
 | ⑨⑪ | 续费 / 退款 | 都不存在：`SubscriptionNotice.tsx` 自述"现在不存在可跳转的续费地址"；退款接口"通道尚未接线"，退款政策也未定 |
 | 海外 | $5 / $12 | **没有 USD 通道**（全仓只有微信 adapter，且币种硬编码 CNY），并且缺**币种断言** —— USD 单喂给它会被按 CNY 发出去（`amountMinor: 500` 被当成 500 分），**没有任何一层会报错** |
@@ -418,11 +418,33 @@ Web 设置页有「导出数据」（JSON 完整保真 / 任务清单 Markdown�
   （`store.ts` 的 `requestRecovery` → app-host 的 `requestPasskeyRecovery` → `POST /api/recover/passkey`）。
   🔴 **同时纠正一条上一版记错的结论**：这里曾写"`/api/passkey/recover/*` 三个端点在 app-host 有函数、
   **没有界面**"，读起来像整条流程都缺。实际上**恢复本身早就有** —— 是服务端渲染的
-  `/recover-passkey` 页面 + `recover-passkey.js`（线上实测两者都 200）——
+  `/recover-passkey` 页面 + `recover-passkey.js` ——
   那一步必须在真实浏览器里调 `navigator.credentials.create()`，本来就不该在 SPA 里。
   **缺的只是"触发那封邮件"这一步。** 当初只在 `apps/web` 里搜，所以搜漏了。
   验收：9 条单测（含"成功是中性响应、不是邮箱存在的证据"与"失败绝不说成成功"）+ 变异验证
   （把按钮 `onClick` 换空操作 → 转红）。
+- 🔴 **同一段旧记载里还有第二个、更严重的错误**：它写"线上实测 `/recover-passkey` 页面 + `.js` **两者都 200**"，
+  并把它当作"恢复这条路是通的"的证据。**200 是真的，但它返回的是落地页 HTML。**
+  nginx 只代理了三张页面的**路径**，没代理页面引用的**脚本**，
+  于是 `/*.js` 掉进 `location /` 的 SPA 兜底 → `/var/www/heyta-landing/index.html`。
+  浏览器报 `Unexpected token '<'`、`SimpleWebAuthnBrowser` 是 `undefined`，
+  点「Register New Passkey」**一点反应都没有、零请求**。
+
+  **后果不是"少个功能"**：丢了通行密钥的用户**收到邮件 → 点开链接 → 按钮不动 → 进不去**；
+  同一条缺陷也打死了**魔法登录链接**（`/magic-login-confirm.js` 同样被吞）——
+  也就是**主要的登录路径**。而它躲过了此前所有验收，因为
+  **每一次都是只看状态码、没看响应体**。
+
+  ✅ 已修（2026-09-27，nginx 加三个脚本的 `proxy_pass`；配置在服务器上、不在仓库里，
+  所以完整记录写在 `docs/runbooks/deployment.md` §3.3.1）。修完后的真浏览器实测：
+  `Content-Type: application/javascript`、`SimpleWebAuthnBrowser === "object"`、
+  点按钮 → `200 /api/recover/passkey/options` + `200 /api/recover/passkey/complete`、
+  页面出现成功文案；并且**清空虚拟认证器**（= 真的丢了通行密钥）后用恢复出的新凭据
+  登录拿到真 JWT、`GET /api/sync/status` 200。
+
+  📌 **教训（已写进 `AGENTS.md` §7 与部署手册）**：对服务端渲染页面引用的每个资源，
+  验收必须断言 **`Content-Type` 和内容开头**，不能只断言 `200`。
+  这一类"200 但内容是别的页面"的谎，只看状态码的门禁**结构上抓不到**。
   ⚠️ 仍然**没有做**的：**用户主动增删凭据**（没有 UI，也没有端点）。
 - **回收站的跨设备一致性没有被真正验证**：op 级证明用的是两个真引擎 + 两个真 SQLite，**没有**跑真实的两客户端服务端收敛。
 - ✅ **导入 / 还原已做**（`packages/app-host/src/import-dump.ts`，CLI 与 Web 都有入口）：走**重放导出里的完整 op-log**，
@@ -431,8 +453,28 @@ Web 设置页有「导出数据」（JSON 完整保真 / 任务清单 Markdown�
   每对都退化成 LWW + 随机 `clientId` 决胜）、"本地是否更新版本"三条判据都没有可信答案，三条路都会**静默丢数据**。
   若要开这个口子，需要一份独立 ADR。
 - ⚠️ **`verify:mobile-ios` 的基线在本次改动之前就不是绿的**（3 项失败集中在"笔记本读不到 / 自动同步游标"）。
-  另有一条**疑似真 bug 未修**：手机收到 `Download: 12 ops (sinceSeq=3, latestSeq=15)` 但
-  **DB 里一条都没落、`lastServerSeq` 仍停在 3** —— 若成立，它会影响"网页端建习惯后自动同步到手机"这条承诺。
+- 🔴 **手机"收到 12 ops 但一条没落、游标停在 3"—— 这条仍然没结案，但它旁边那条真 bug 已找到并修掉。**
+  先说边界，免得读的人以为已经修好了：那行 `Download: 12 ops (sinceSeq=3, latestSeq=15, hasMore=false)`
+  是**服务端**在 `reply.send` **之前**打的（`sync.routes.ts:193-197`），它只证明服务端发了一页，
+  **不证明客户端落了库**；而 `hasMore=false` 时水位线是在 `applyRemote` **成功之后**才写的
+  （`client.ts:1233-1235`）。所以"服务端说 12 条、客户端游标还在 3"**不能**由下面这个 bug 解释。
+
+  ✅ **但在查它的过程中真的找到并复现了另一条静默丢数据路径**（2026-09-27 已修，`2cf8712`）：
+  分页下载在只应用了**第 1 页**之后就把游标推到**全局** `latestSeq`，于是"最后一条已应用 op"
+  与 `latestSeq` 之间的整段 op **被永久跳过**；搭车上传那条路径形状相同
+  （推到 `body.latestSeq` 却**从没读过** `hasMorePiggyback`）。
+  **它是静默的**：服务端的空洞检测恰好在 `excludeClient` 被设置时关闭
+  （`operation-download.service.ts:285-294`），而下载路径总是设置它（`client.ts:1155`）——
+  服务端**永远不会**对客户端刚造出来的空洞发出警告。这与 `AGENTS.md` §7 第 797 条
+  "游标不提前推进"**直接矛盾**。
+  修法：`hasMore` 为真时只推进到**本页 op 的 `serverSeq` 最大值**（`latestSeq` 留给最后一页）。
+  验收：先红后绿（红分别是 `sinceSeq=600`，应为 `203` / `501`）+ 两半各自**独立**的变异验证；
+  sync-client 64/64、op-log 51/51、storage 212/212、web 674 passed / 12 skipped，typecheck exit 0。
+
+  ⏳ **仍未解**：那台客户端为什么**既没应用也没推进** —— 是 `applyRemote` 抛了（DB 错）？
+  12 条**全都解不开**撞上了 ADR-0016 的抛错（换过/打错了 E2EE 口令，移动端口令只在内存里）？
+  是另一个客户端实例/分支？还是 `applyRemote` 与 `setLastServerSeq` 之间有东西抛了？
+  **不要把这个修复当成那条报告的结论。**
 - ⚠️ **`check:docs` 的绿是"本机绿"**：干净 checkout 里它是**红的**（6 处死链指向 `.gitignore:25` 的
   `research/upstream/`）。这是**门禁判据依赖了不该依赖的环境**，已登记进 `AGENTS.md` §7 第 70 条。
 - ⚠️ **`check:ai-e2e` 现在不是绿的：24 passed / 1 failed**，失败的是桌面端那条
@@ -454,7 +496,36 @@ Web 设置页有「导出数据」（JSON 完整保真 / 任务清单 Markdown�
   ⚠️ **这条已经翻过一次面**：本轮收尾时我按"退款侧是缺口、去接上"派了活，
   子代理发现 ADR-0026 刚被并行会话写成「已接受」，于是**拒绝执行并上报** ——
   这是对的。**教训：派活前先看 ADR 的最新状态，别照着一小时前的结论开工。**
-- **存量回填（接线前已付款但未结算的订单）**：见下方"对账"条目。
+- ✅ **存量回填（接线前已付款但未结算的订单）已做**（2026-09-27，`60db578`）：
+  订单在 webhook 接线**之前**付了款，那条 `payment_events` 行就永远停在那儿 ——
+  重投会被幂等闸挡住（唯一约束按 `provider_event_id`），而没有任何东西会**重新驱动**它。
+  于是"钱收了、权益没发"，且**没有任何错误**，这正是最难发现的一类账。
+
+  - **候选判据是从真实状态机读出来的，不是猜的**：`checkout_orders.status IN ('pending','expired')`
+    **且**存在一条 `payment_events`，其 `provider_event_id = 'payment_succeeded:' || out_trade_no`
+    （这是 schema 里**唯一**能把事件关联回订单的链接 —— `payment_events` 上没有 `out_trade_no` 列）。
+    🔴 **刻意用 `status` 而不是 `settled_at`**：`expireStaleOrders` **也**会写 `settled_at`，
+    所以它根本区分不出"结算过"和"过期关掉过"。
+    🔴 另外**排除已经留下 `order_amount_mismatch` 审计的单** —— 金额已经知道对不上的，
+    该给人看，不该被自动重试抹平。
+  - **不许复制业务逻辑**：把原本内联的"结算 + 授予"编排抽成**同一个**
+    `settleAndApplyEvent(event, {sql, subscriptions})`（`webhook.routes.ts`），
+    实时 webhook 与对账**跑的是同一个函数**，差别只在**谁开事务**（对账是每单一个事务）。
+  - **幂等键格式收敛到唯一事实源**：`WECHAT_PAYMENT_SUCCEEDED_EVENT_PREFIX` +
+    `buildWechatPaymentEventId`（`wechat.adapter.ts`）。它有两处消费者，
+    只改一处会让对账**静默地一条候选都找不到**（不报错、只是什么都不做）。
+  - 日常清理的第 7 步跑对账，**零结果也打日志**，非 `granted` 的候选逐个 `Logger.warn`。
+  - 验收：10 条真 SQL 的 PGlite 测试 + **4 组变异验证**（去掉 `status` 判据 → 2 条红；
+    去掉 mismatch 排除 → 1 条红；打断与 `payment_events` 的关联 → **10 条全红**；
+    让共享函数跳过微信结算 → **6 条既有 webhook 测试红**，证明抽取没有丢掉实时通路的守卫）。
+    server 全量 **1488 passed / 1 skipped**，`tsc --noEmit` exit 0。
+  - ⚠️ **边界**：生产只注册了 `noop`，**没有跑过真通道**；`reconcile-job.ts` 的 Prisma 胶水
+    只过类型、**没有 PGlite 覆盖**（CI 无 PostgreSQL）；**没有 `payment_events` 行的单补不了**
+    （没有任何东西能证明它付过款）；金额**无法独立复核**（`payment_events` 只存 SHA-256 摘要），
+    所以按冻结的 `final_amount_minor` 结算；**只认得微信的 `providerEventId` 形状**。
+  - 📌 **与退款侧正交**：对账只对**已经记录为收到钱**的单**授予**，
+    从不调用 `reverseOrderOnRefund` / `revokeEntitlement`，候选也排除 `refunded`/`failed`。
+    ADR-0026 的结论**没有被碰**。
 
 ---
 
