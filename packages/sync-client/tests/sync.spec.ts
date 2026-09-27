@@ -422,12 +422,20 @@ describe('同步客户端 — 上传与游标', () => {
 
     // 游标停在原位 —— 这批 op 还看得见，没有被静默跳过
     expect(h.cursor.value).toBe(0);
-    // 下载照常执行，并且给出的是 download() 那套"整页解不开"的诊断
+    // 下载照常执行，并且给出的是 download() 那套"整页解不开"的**有分类**诊断。
+    // ⚠️ 这里原来断言 `status.message` 含中文"口令"。那个契约被本次修复替换了：
+    // 整页解不开现在归到 `'undecryptable-page'`，壳用**词条**渲染整句，
+    // `message` 只作日志（因此必须是可机器定位、非中文的），不能再被当成用户文案。
     expect(h.downloads.length).toBeGreaterThan(0);
-    expect(status.kind).toBe('error');
+    expect(status).toMatchObject({
+      kind: 'error',
+      reason: 'undecryptable-page',
+      retryable: false,
+    });
     if (status.kind === 'error') {
-      // download() 的整页解不开文案点了"口令"
-      expect(status.message).toContain('口令');
+      // 诊断可定位到具体 op，且**不混进中文**（否则英文界面会中英混排）
+      expect(status.message).toContain('poison-45');
+      expect(status.message ?? '').not.toMatch(/[\u4e00-\u9fff]/);
     }
   });
 

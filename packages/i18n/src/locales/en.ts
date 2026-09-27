@@ -43,6 +43,7 @@ export const en = {
   'common.sync.error.localOpMissing': 'That local change is no longer queued; sync again',
   'common.sync.error.remoteVersionUnavailable': 'The other version is unavailable, so keeping the remote copy is not possible - keep the local one instead',
   'common.sync.error.undecryptableOps': 'Some older data could not be decrypted with the current password (it may have been written under a different one) and was skipped - everything else synced',
+  'common.sync.error.undecryptablePage': 'Nothing on this page could be decrypted with the current password, so syncing is paused and no history was skipped - this usually means the end-to-end encryption password does not match the data on the server. Check your password and sync again.',
   'common.sync.error.uploadRejected': 'Some changes were rejected by the server and are not in the cloud — retrying them has stopped. See sync details.',
 
   // ── Landing · generic ─────────────────────────────────────

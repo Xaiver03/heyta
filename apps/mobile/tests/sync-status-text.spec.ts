@@ -105,6 +105,10 @@ describe('describeSyncStatus', () => {
       'no-encryption-password',
       'local-op-missing',
       'remote-version-unavailable',
+      // 整页 op 都解不开（口令不匹配）。以前它落进 'unexpected'，
+      // 移动端主状态行只显示笼统的 `mobile.sync.error`（"同步失败"），
+      // 与网络抖动无法区分；现在必须有自己的整句。
+      'undecryptable-page',
     ] as const;
 
     const seen = new Set<string>();
