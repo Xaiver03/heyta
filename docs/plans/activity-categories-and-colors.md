@@ -257,3 +257,34 @@ main 侧提交了消费者而其生产者只存在于另一个工作树：
 归属判据：报错文件清单 ∩ 本轮 `git diff --name-only` = **空集**。
 `apps/web` 实测 **32 红**（与本轮改动前逐条相同）、`apps/mobile` **4 红**、两处 `typecheck` 同源。
 **不代写、不改测试来掩盖**（AGENTS.md §7 第 34 条的方法侧）。
+
+### 8.6 真浏览器验收：**本轮做不到**，原因在别人那一半（已取证）
+
+本特性是纯界面，按仓库习惯该有一条 `e2e/` 的真浏览器契约。**这轮没加，因为加了也验不了**：
+
+```
+$ node scripts/check-ai-e2e-preflight.mjs   # ✅ 4318 / 4319 都是空的
+$ cd e2e && pnpm exec playwright test tests/motivation.spec.ts
+  6 failed
+  → openApp 超时：input[placeholder^="添加任务"] 等 15 秒也不出现
+$ # 临时探针（只 load 一次页面，打印 pageerror）：
+  PAGEERROR: The requested module '.../packages/sync-client/dist/index.js'
+             does not provide an export named 'summarizeConflictPayload'
+  BODY:（空字符串 —— 整页白屏）
+```
+
+**应用在本分支上根本起不来**，而原因是 §8.5 那一批缺失的生产者
+（`apps/web/src/features/sync/*` 已经 import 了 `summarizeConflictPayload`，
+而 `packages/sync-client` 还没导出它）。这与分类色无关，也不该由这一轮来修 ——
+但它的直接后果是：**在这一支上，"真浏览器"这条验证通道是断的**，
+任何新增的 e2e 用例都会红在一个与它无关的理由上。
+**一条因为无关原因常红的检查比没有更糟**（它会教人忽略红色），所以这里选择不加，
+并把探针命令写下来 —— 生产者落地之后，补一条用例的成本大约五分钟。
+
+**这一轮的替代物**（不是等价物，说清楚差在哪）：
+`apps/web/tests/category-colors-flow.spec.tsx` 用**真 `<App />` + 真 `LocaleHost` +
+真 IndexedDB + 真 op-log**（与 `motivation-view.spec.tsx` 同一份接线）跑完了
+「界面点 → op → 物化 → 重新渲染」的闭环。它与真浏览器的差别只剩
+**真 DOM 引擎与真 CSS**（jsdom 不排版、不算样式），所以：
+`.ht-categories__*` 那批样式**没有被任何自动检查覆盖**（只有 `check:design` 保证它没裸值）。
+⚠️ 这一条要说给下一个人听：**"我看过截图"这件事这轮没发生。**
