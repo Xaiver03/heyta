@@ -191,10 +191,13 @@ pnpm 用符号链接 + 嵌套 `node_modules`，打包器复制过去的是一堆
 - ❌ **签名 / 公证**：产物是未签名的，macOS 上首次打开会被 Gatekeeper 拦。
 - ❌ **安装器**：没有 `.dmg` / `.exe`(NSIS) / `.AppImage`，只有应用包本身。
 - ❌ **自动更新**。
-- ❌ **Windows / Linux 产物未在对应系统上运行验证过** —— 它们是在 macOS 上
-  交叉打出来的。"打得出来"与"跑得起来"是两件事，这一条**没有实测证据**。
+- ⚠️ **Windows 产物**：✅ 已实测**能启动并建出 op-log schema**（[§5.6](#56-打包产物在-windows-上真的跑起来了2026-09-28-实测-)）；
+  ⏳ 它的**可见窗口**截图仍缺（无头 SSH 会话里截不到）。
+- ⚠️ **Linux 产物**：❌ 仍未在 Linux 上运行过 —— 没有 Linux 机器。
+  "打得出来"与"跑得起来"是两件事。
 
-这四项都要等证书到位，届时的工具大概率是 `electron-builder`（它做安装器与签名）。
+签名 / 公证 / 安装器 / 自动更新这四项都要等证书到位，届时的工具大概率是
+`electron-builder`（它做安装器与签名）。
 **在那之前不要写"三平台已验证可运行"。**
 
 ### 4.4 🔴 "Electron 总是意外退出" —— 先把退出**是谁触发的**分清 ✅实测
@@ -351,6 +354,81 @@ pnpm --filter @heyta/desktop smoke     # 需要 §4.1 的二进制
 落成哪个字段。**壳猜字段名就会猜错**，而领域层本来就该是唯一说话的人 ——
 这正是"壳要薄"的实证。
 
+### 5.5 开窗冒烟：`--window`（真 Windows 实测 ✅）
+
+§5.3 那个冒烟**刻意不开窗**（所以 SSH 里能跑），代价是"窗口画出来了没有"
+一直只能靠人眼。`--window` 补上这一环，而且**无头会话里也能截到图**：
+
+```bash
+# macOS
+HEYTA_SMOKE_SHOT=/tmp/desktop.png pnpm --filter @heyta/desktop smoke -- --window
+# Windows（真打包机）
+set HEYTA_SMOKE_SHOT=C:\src\heyta-win-desktop.png
+pnpm --filter @heyta/desktop smoke -- --window
+```
+
+输出是一行 JSON，关键是这三个字段：
+
+| 字段 | 含义 |
+|---|---|
+| `bridge` | preload 真注入了。为 `false` 说明 preload 路径又错了，渲染进程是瞎的 |
+| `rows` | 共享 `TaskList` 真渲染出的任务行数（判据是 `[data-testid^="task-row-"]`） |
+| `hiddenBlank` / `colorBuckets` | 第一张（隐藏时截的）是否空白；颜色种类数。**空白就说明没合成出帧** |
+
+真 Windows（`windows-pc`, `win32 x64`）实测：
+
+```json
+{"ok":true,…,"window":{"bridge":true,"rows":1,"docTitle":"heyta",
+ "shotBytes":11081,"hiddenBlank":false,"hiddenColorBuckets":97,"usedVisible":false}}
+```
+
+截图已**肉眼确认**：标题「heyta」、副标题「桌面端 · 共享 UI 垂直切片」、
+按钮「添加一条示例任务」、任务行「electron 运行时冒烟」都在，字体是 Windows 的。
+
+#### 🔴 为什么不用 `--remote-debugging-port` + CDP（两条路都试过）
+
+1. **端口可能早就被别人占着。** 实测那台 Windows 上 9222 被一个**完全无关的
+   Tauri 应用**（`tauri.localhost`，标题"创业OS"）占着。CDP 探针连上去、
+   拿到页面列表、**截了图**，输出一切正常 —— 而那是**别人的界面**。
+   *没有任何一处会提示"你连错应用了"。*
+2. 打包后的 Electron 在无桌面会话里未必起得来调试端口（实测 60s 内没开）。
+
+`webContents.capturePage()` 走进程内 API：**没有端口、没有竞态、
+拿到的一定是本进程这个窗口。**
+
+#### 无头会话里的两条让步（如实记下）
+
+| 让步 | 原因 |
+|---|---|
+| `app.disableHardwareAcceleration()`（仅开窗模式） | 无桌面会话里 GPU 进程会崩（`exit_code=34`），`capturePage` 随之抛 `UnknownVizError`。关掉后走软件合成 |
+| 临时目录清理**失败不影响结论** | Windows 释放 SQLite 句柄是异步的，`rmSync` 抛 `EPERM`。打扫不该能否决证据 —— 退避重试后仍失败就打印警告放行 |
+
+⚠️ 所以这个冒烟证明的是「这套 UI 在 Electron 的 Chromium 里能渲染出来」，
+**不是**「GPU 加速路径在这台机器上健康」—— 后一条只有可见桌面上跑才算。
+
+### 5.6 打包产物**在 Windows 上真的跑起来了**（2026-09-28 实测 ✅）
+
+`release/heyta-win32-x64/heyta.exe` 送进真 Windows 机器启动后，它自己的
+`userData`（`%APPDATA%\@heyta\desktop\`）里留下了：
+
+```
+heyta.sqlite        73,728 字节
+Local Storage / Preferences / Network / ShaderCache / …
+```
+
+把库取回来看，**schema 是完整的**：
+
+```
+__heyta_seq   archive   meta   ops   ops__mt3   state        （6 张表）
+SQLite 3.x, version-valid-for 13, written using SQLite 3.53.4
+```
+
+也就是说打包件**真的在 Windows 上启动了**：起了 Chromium、解开了 `app.asar`、
+初始化了桌面宿主并建出了 op-log 的 schema。
+
+📌 这条判据是**产物级**的（看它在自己机器上留下了什么），
+不是"源码树上跑通了"—— 后者证明不了打包配置对不对。
+
 ## 6. 当前边界（明确**没做**的事）
 
 | 项 | 状态 |
@@ -359,7 +437,10 @@ pnpm --filter @heyta/desktop smoke     # 需要 §4.1 的二进制
 | **macOS 与 Windows 上的构建 + 11 个测试** | ✅ **已实测**（见 [§5.2](#52-在-windows-打包机上验证2026-09-27-实测-)） |
 | **Electron 运行时冒烟（无窗口）** | ✅ **已实测**（真 Windows，见 [§5.3](#53-electron-运行时冒烟真-windows-实测-)）；**macOS 也已通过** |
 | **GUI 窗口的真机冒烟** | ✅ **已做**（macOS arm64 实测）—— `desktop-window.spec.ts`，**开发构建与打包产物各跑一遍**，见 [§4.2](#42-命令)；截图见 `e2e/test-results/desktop-window-{dev,packaged}.png` |
-| 三平台**应用包** | ✅ **已产出**（`@electron/packager`，见 [§4.3](#43-打包m2-4)）—— ⚠️ 但 **Windows / Linux 产物未在对应系统上运行验证过** |
+| **开窗冒烟（`--window`，截图可看）** | ✅ **已实测**（真 Windows + macOS，见 [§5.5](#55-开窗冒烟--window真-windows-实测-)）—— 断言 `bridge`/`rows`/`colorBuckets`，截图**肉眼确认非空白** |
+| 三平台**应用包** | ✅ **已产出**（`@electron/packager`，见 [§4.3](#43-打包m2-4)）· **Windows 打包件已在真 Windows 上启动并建库**（见 [§5.6](#56-打包产物在-windows-上真的跑起来了2026-09-28-实测-)） |
+| ⚠️ 仍未做：**Windows 打包件的「可见窗口」截图** | 打包进程能起来并建库（§5.6），但无头 SSH 会话里截不到**它**的窗口；§5.5 那张图来自同一份渲染产物在 Windows 上的构建。要补这一条需要在**有桌面的会话**里跑一次 |
+| ⚠️ 仍未做：**Linux 产物在 Linux 上运行** | 没有 Linux 机器（三平台包都只在 macOS 上产出过） |
 | 三平台**安装器**（dmg / nsis / AppImage） | 未做 |
 | 代码签名 / 公证 | 未做 |
 | 自动更新 | 未做 |
