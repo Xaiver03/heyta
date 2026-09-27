@@ -150,11 +150,40 @@ if (isEntityType('TASK') && !isEntityType('NOT_A_REAL_ENTITY')) {
   bad('isEntityType() 行为不正确 —— 客户端无法提前发现非法实体');
 }
 
-// 实体清单必须是 heyta 的
-if (ENTITY_TYPES.length === 13) {
-  ok(`实体清单是 heyta 的（${ENTITY_TYPES.length} 项）`);
+// 实体清单必须是 heyta 的（不是上游 Super Productivity 的 21 项清单）
+//
+// ⚠️ 这里**刻意不写死项数**。原先写的是 `ENTITY_TYPES.length === 13`，而 heyta
+// 后来新增了 `AI_FEEDBACK` / `PREFERENCE_CORRECTION`（可加性变更，见 ADR-0014 §3.2），
+// 清单变成 15 项，于是这条检查**在没有真 bug 的情况下一直红**，还把
+// `pnpm verify:sync:dry`（P0 验收脚本）一起弄红了。
+// 项数是**会漂的**，而这条检查真正想证明的是"这份清单是 heyta 自己设计的" ——
+// 所以判据改成"必须包含 heyta 专属实体、且不混入上游专属实体"。
+const HEYTA_SPECIFIC_ENTITIES = [
+  'HABIT',
+  'HABIT_LOG',
+  'FOCUS_SESSION',
+  'AI_FEEDBACK',
+  'PREFERENCE_CORRECTION',
+];
+// 上游有、而 heyta 刻意**没有**的实体（摘自上表 21 项中最有辨识度的几个）
+const UPSTREAM_ONLY_ENTITIES = [
+  'SIMPLE_COUNTER',
+  'METRIC',
+  'TIME_TRACKING',
+  'PLUGIN_METADATA',
+  'WORK_CONTEXT',
+];
+const missingHeytaEntities = HEYTA_SPECIFIC_ENTITIES.filter((t) => !ENTITY_TYPES.includes(t));
+const leakedUpstreamEntities = UPSTREAM_ONLY_ENTITIES.filter((t) => ENTITY_TYPES.includes(t));
+if (missingHeytaEntities.length === 0 && leakedUpstreamEntities.length === 0) {
+  ok(
+    `实体清单是 heyta 的（${ENTITY_TYPES.length} 项，含 ${HEYTA_SPECIFIC_ENTITIES.length} 个 heyta 专属；未混入上游实体）`
+  );
 } else {
-  bad(`实体清单项数异常：${ENTITY_TYPES.length}（期望 13）`);
+  bad(
+    `实体清单不是 heyta 的：缺少 heyta 专属 ${missingHeytaEntities.join(' / ') || '（无）'}；` +
+      `混入上游专属 ${leakedUpstreamEntities.join(' / ') || '（无）'}`
+  );
 }
 
 // 加密 op 的载荷必须不是明文
