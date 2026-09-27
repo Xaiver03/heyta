@@ -312,6 +312,10 @@ export const zhCN = {
   'web.shell.views.habits': '习惯',
   'web.shell.views.focus': '番茄钟',
   'web.shell.views.timeline': '时间线',
+  // 成长页（激励体系 L3）。⚠️ 它必须在词条表里**真实存在**：
+  // `App.tsx` 的 `VIEW_TABS` 用 `labelKey` 渲染标签，而 `t()` 查不到词条是**抛错**，
+  // 不是回退 —— 少一条就是整个外壳白屏（真浏览器验收抓到过）。
+  'web.shell.views.growth': '成长',
   'web.shell.views.settings': '设置',
   'web.shell.dueMode.aria': '截止时间显示方式',
   'web.shell.dueMode.date': '日期',
@@ -423,6 +427,143 @@ export const zhCN = {
   'web.habits.a11y.undo': '撤销「{name}」今日打卡',
   'web.habits.checkedIn': '已打卡',
   'web.habits.checkIn': '打卡',
+  // 冻结与续接：**先给数字，再给按钮** —— 说的是"补上之后你会得到什么"。
+  'web.habits.freeze': '这段连续里有 {count} 天是冻结保住的',
+  'web.habits.repair': '{date} 那天漏了。现在补上，就是连续 {count} 天。',
+  'web.habits.repairAction': '补上',
+  'web.habits.a11y.repair': '把 {date} 的「{name}」补上',
+  // 新鲜开始：**不出现"你已经落后了"** —— 只陈述"过去的没有被清掉"。
+  'web.habits.freshStart': '已经 {days} 天没打卡了。最长 {longest} 天、累计 {total} 次都还在，重新开始不会清掉它们。',
+  'web.habits.freshStartAction': '今天重新开始',
+  'web.habits.a11y.freshStart': '今天为「{name}」重新打卡',
+  // 三个指标里的第三个：**只增不减**的那个（累计）。
+  // 中文无单复数，两句刻意逐字相同（en 侧才会不同）。
+  'web.habits.streak.total': '累计 {count} 次',
+  'web.habits.streak.totalOne': '累计 {count} 次',
+  // 热力图文案由**我们**传给 react-activity-calendar —— 它的默认文案是英文，
+  // 而 `{{count}}` 是**库自己的**占位符，必须原样留着（不是我们的 `{name}` 形状）。
+  'web.habits.heatmap': '最近 90 天共 {{count}} 次打卡',
+
+  // ── Web · 热力图共用文案（习惯页与成长页）─────────────────
+  // 月份与图例同样是画在界面上的字，所以同样要走词条表 ——
+  // 英文界面上写着「1月」与「少 / 多」是漏翻，不是"库只能这样"。
+  'web.heatmap.month.1': '1月',
+  'web.heatmap.month.2': '2月',
+  'web.heatmap.month.3': '3月',
+  'web.heatmap.month.4': '4月',
+  'web.heatmap.month.5': '5月',
+  'web.heatmap.month.6': '6月',
+  'web.heatmap.month.7': '7月',
+  'web.heatmap.month.8': '8月',
+  'web.heatmap.month.9': '9月',
+  'web.heatmap.month.10': '10月',
+  'web.heatmap.month.11': '11月',
+  'web.heatmap.month.12': '12月',
+  'web.heatmap.less': '少',
+  'web.heatmap.more': '多',
+
+  // ── Web · 今日进度（激励体系 L1）──────────────────────────
+  'web.progress.aria': '今日进度',
+  'web.progress.today': '今天',
+  // `done > total` 时说的是"计划外完成" —— 那个负数就是这样被结构性地消掉的。
+  'web.progress.hint.unplanned': '计划外完成 {count} 件',
+  'web.progress.hint.idle': '今天还没有安排',
+  'web.progress.hint.allDone': '计划内都做完了',
+  'web.progress.hint.remaining': '还有 {count} 件没做',
+  // 进度条的可访问名：`done > total` 时必须说清分母是什么。
+  'web.progress.label.noPlan': '今日完成 {count} 件，没有计划内事项',
+  'web.progress.label.bonus': '今日完成 {done} 件，计划内 {total} 件，另有 {bonus} 件计划外',
+  'web.progress.label.plain': '今日完成 {done} 件，共 {total} 件',
+  // 数字在 JSX 里单独成 span（`.tabular-nums`），所以标签与单位分成两条。
+  'web.progress.focus': '专注',
+  'web.progress.focusUnit': '分钟',
+  'web.progress.closed': '今天的都做完了',
+  'web.progress.breakdown.habits': '习惯',
+  'web.progress.breakdown.tasks': '任务',
+  'web.progress.breakdown.bonus': '计划外',
+
+  // ── Web · 成长（激励体系 L3）──────────────────────────────
+  'web.growth.week.title': '本周',
+  'web.growth.week.range': '{start} 至 {end}',
+  'web.growth.week.empty': '这一周还没有记录。从今天的一件小事开始就好。',
+  // 三句主标题各自成条：句尾带数字，英文的语序与量词都在句子里。
+  'web.growth.headline.checkIns': '这周打卡最多：{count} 次',
+  'web.growth.headline.tasksCompleted': '这周完成最多：{count} 件',
+  'web.growth.headline.focusMinutes': '这周专注最多：{count} 分钟',
+  'web.growth.week.bestDay': '最专注的一天是 {date}，专注了 {minutes} 分钟。',
+  'web.growth.stat.previous': '上周 {count}',
+  'web.growth.stat.checkIns': '打卡',
+  'web.growth.stat.checkIns.unit': '次',
+  'web.growth.stat.tasks': '完成任务',
+  'web.growth.stat.tasks.unit': '件',
+  'web.growth.stat.focus': '专注',
+  'web.growth.stat.focus.unit': '分钟',
+  'web.growth.year.title': '这一年',
+  'web.growth.year.note': '一格是一天。有记录的日子才会亮起来 —— 打卡、完成任务、跑完一轮专注都算。',
+  'web.growth.year.heatmap': '最近一年共 {{count}} 次记录',
+  'web.growth.milestones.title': '里程碑',
+  'web.growth.milestones.note': '只增不减。中断不会让这些数字变小。',
+  'web.growth.milestone.allReached': '{name}的里程碑已全部达成',
+  // 可访问名里必须同时有**目标**和**差距** —— 只说"距离下一档"读屏用户不知道下一档是多少。
+  'web.growth.milestone.nextLabel': '{name}：下一个里程碑是 {threshold} {unit}，还差 {gap} {unit}',
+  'web.growth.milestone.next': '下一个里程碑是 {threshold} {unit}，还差 {gap} {unit}',
+  'web.growth.milestone.dimensionDone': '这个维度已经全部达成',
+  // 四个累计维度。里程碑用这一组（专注按**小时**计），周复盘用下面那一组（按分钟）。
+  'web.growth.kind.checkIns': '打卡',
+  'web.growth.kind.checkIns.unit': '次',
+  'web.growth.kind.focusHours': '专注',
+  'web.growth.kind.focusHours.unit': '小时',
+  'web.growth.kind.tasks': '完成任务',
+  'web.growth.kind.tasks.unit': '件',
+  'web.growth.kind.activeDays': '活跃天数',
+  'web.growth.kind.activeDays.unit': '天',
+  'web.growth.unit.streakDays': '天连续',
+  'web.growth.tags.title': '你的标签',
+  'web.growth.tags.empty': '还没有标签。继续记录，这里会自己长出来。',
+  'web.growth.tags.near': '距离「{name}」还差 {gap} {unit}',
+  'web.growth.tags.nearNote': '上面这些是离你最近的两个。到了就会出现在这里。',
+  // 身份标签：全部是**描述做过什么**，没有一句人格评价。
+  'web.growth.tag.started': '起步的人',
+  'web.growth.tag.routine': '有节奏的人',
+  'web.growth.tag.steady': '长期主义',
+  'web.growth.tag.checkin-hundred': '百次打卡',
+  'web.growth.tag.deep-fifty': '深度工作 50 小时',
+  'web.growth.tag.deep-two-hundred': '深度工作 200 小时',
+  'web.growth.tag.finisher-five-hundred': '完成 500 件',
+  'web.growth.tag.streak-thirty': '连续 30 天',
+  'web.growth.share.title': '带走这一周',
+  'web.growth.share.note': '复制成一段纯文字，粘到哪都行。它不含你的账号、设备或任何标识。',
+  'web.growth.share.copy': '复制本周小结',
+  'web.growth.share.copied': '已复制',
+  'web.growth.share.failed': '当前环境不允许复制，可以手动选中上面的数字。',
+  // 复制出去的那段纯文本 —— 它同样会被人读到，所以同样要翻。
+  'web.growth.summary.title': '本周小结（{start} 至 {end}）',
+  'web.growth.summary.line': '打卡 {checkIns} 次 · 完成 {tasks} 件 · 专注 {minutes} 分钟',
+  'web.growth.summary.bestDay': '最专注的一天：{date}（{minutes} 分钟）',
+  'web.growth.summary.totals': '累计：打卡 {checkIns} 次 · 专注 {hours} 小时 · 完成 {tasks} 件 · 活跃 {activeDays} 天',
+
+  // ── Web · 分类时长（成长视图） ─────────────────────────────
+  // 🔴 这一组里**只许有事实句**：某类做了多久、这些时间怎么算出来的。
+  //    没有"最多/最少/失衡/超标"，也没有排名与占比（见计划 §2 反需求）。
+  'web.categories.title': '分类时长',
+  'web.categories.note': '按清单与习惯各自统计近 12 周的专注与打卡时间。颜色由你自己赋义，这一页不做任何评价。',
+  'web.categories.empty': '还没有可以归类的时间记录。用清单组织任务、或用习惯记下时长，这里就会长出内容。',
+  'web.categories.range': '{start} 至 {end}',
+  'web.categories.kind.project': '清单',
+  'web.categories.kind.habit': '习惯',
+  'web.categories.slot.none': '无',
+  'web.categories.duration.minutes': '{minutes} 分钟',
+  'web.categories.duration.hours': '{hours} 小时',
+  'web.categories.duration.hoursMinutes': '{hours} 小时 {minutes} 分',
+  'web.categories.lane.aria': '{name}（{kind}），共 {duration}',
+  'web.categories.segment.aria': '{name}，共 {duration}',
+  'web.categories.unassigned': '另有 {duration}没有归到任何清单或习惯 —— 给任务指定清单，它就会归位。',
+  'web.categories.hint.unset': '行首的色块可以在清单和习惯旁边设置：点调色板图标，选 1–8 任意一个。',
+  'web.categories.cell.none': '这一周没有记录',
+  'web.categories.bars.aria': '近 12 周每周总时长的堆叠柱状图，每一段对应上面的一个分类。',
+  'web.categories.picker.toggle': '给「{name}」设置分类颜色',
+  'web.categories.picker.group': '「{name}」的分类颜色',
+  'web.categories.picker.slot': '色槽 {slot}',
 
   // ── Web · 清单与标签 ──────────────────────────────────────
   'web.projects.ariaLabel': '清单与标签',
@@ -988,6 +1129,31 @@ export const zhCN = {
   'mobile.tab.calendar': '日历',
   'mobile.tab.focus': '专注',
   'mobile.tab.profile': '我的',
+  'mobile.tab.categories': '分类',
+
+  // ── 移动端 · 分类时长 ──────────────────────────────────────
+  // 🔴 这一组里**只许有事实句**：某类做了多久、这些时间怎么算出来的。
+  //    没有"最多/最少/失衡/超标"，也没有排名与占比（见计划 §2 反需求）。
+  // ⚠️ 文案与 `web.categories.*` **逐字相同**（移动端交互不同处除外）：
+  //    两端说同一件事就不该有两种说法，将来合并命名空间时这是一次纯改名。
+  'mobile.categories.title': '分类时长',
+  'mobile.categories.note': '按清单与习惯各自统计近 12 周的专注与打卡时间。颜色由你自己赋义，这一页不做任何评价。',
+  'mobile.categories.empty': '还没有可以归类的时间记录。用清单组织任务、或用习惯记下时长，这里就会长出内容。',
+  'mobile.categories.range': '{start} 至 {end}',
+  'mobile.categories.kind.project': '清单',
+  'mobile.categories.kind.habit': '习惯',
+  'mobile.categories.slot.none': '无',
+  'mobile.categories.duration.minutes': '{minutes} 分钟',
+  'mobile.categories.duration.hours': '{hours} 小时',
+  'mobile.categories.duration.hoursMinutes': '{hours} 小时 {minutes} 分',
+  'mobile.categories.lane.a11y': '{name}（{kind}），共 {duration}',
+  'mobile.categories.unassigned': '另有 {duration}没有归到任何清单或习惯 —— 给任务指定清单，它就会归位。',
+  'mobile.categories.hint.unset': '点行首的色块可以给这一类挑颜色（1–8 任意一个）。颜色只是标记，方便你认出它。',
+  'mobile.categories.cell.none': '这一周没有记录',
+  'mobile.categories.picker.toggle': '给「{name}」设置分类颜色',
+  'mobile.categories.picker.group': '「{name}」的分类颜色',
+  'mobile.categories.picker.slot': '色槽 {slot}',
+
 
   // ── 移动端 · 截止时间 ─────────────────────────────────────
   // 阈值照搬 domain 的 formatRemaining：今天 / 明天 / 后天 / 还剩 N 天。

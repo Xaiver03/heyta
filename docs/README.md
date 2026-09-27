@@ -95,9 +95,9 @@ docs/research/<kebab-case>.md     例：reuse-plan.md
 | [0009](adr/0009-duplicate-op-idempotent-success.md) | 精确重复的 op 回**幂等成功**（附原 serverSeq），不再回 `DUPLICATE_OPERATION`；id 冲突仍硬拒绝 | ✅ **已接受** |
 | [0010](adr/0010-ai-config-routing.md) | AI **配置路由**：三道闸（总开关 / 允许远程 / 逐功能出境授权）；🔴 **回退不得跨越隐私边界**；能力显式声明不推断；URL 校验双点执行 | ✅ **已接受** |
 | [0011](adr/0011-local-api-mcp.md) | 本机 API / MCP：默认关、只监听回环、显式 token、逐工具授权；🔴 **加密条目可列举不可读**；写入只能经 `dispatch()` 形状的端口 | ✅ **已接受** |
-| [0014](adr/0014-memory-switch-and-corrections.md) | 🔴 记忆偏好层的两个闸门：**主开关默认关闭且 fail-closed**（必填参数，不是可选）；用户**纠正进 op-log** 跨设备同步，且因 `applyOperation` 静默忽略未建模实体类型 —— **不需 bump schema** | ✅ **已接受** |
 | [0013](adr/0013-cloud-ai-and-maas.md) | 🔴 云端 AI 与 MaaS：**方向已定**（会提供统一云端 AI 并按此收费，后续 MaaS），但**开放条件未满足**；托管模式**不是端到端加密**（承接 ADR-0006） | ✅ **已接受** |
 | [0012](adr/0012-self-host-transport-policy.md) | 自托管传输策略：生产环境**只**拒绝**公网**明文 `PUBLIC_URL`（私网/回环放行）—— 与 iOS ATS 的"私网放行、公网明文拦截"对齐 | ✅ **已接受** |
+| [0014](adr/0014-memory-switch-and-corrections.md) | 🔴 记忆偏好层的两个闸门：**主开关默认关闭且 fail-closed**（必填参数，不是可选）；用户**纠正进 op-log** 跨设备同步，且因 `applyOperation` 静默忽略未建模实体类型 —— **不需 bump schema** | ✅ **已接受** |
 | [0015](adr/0015-four-quadrant-as-derived-view.md) | 四象限是**派生视图**，不是第四套存储｜`important` 与 `urgent` 从既有字段推导，不加持久化字段 | ✅ **已接受** |
 | [0016](adr/0016-undecryptable-ops-do-not-block-sync.md) | 🔴 读侧解不开的 op **跳过 + 推进游标 + 结构化上报**（否则一条坏 op 让**别的**设备永久卡死）；但**整页都解不开时抛错且不推进游标**（口令打错≠历史混口令）。是 [ADR-0009](adr/0009-duplicate-op-idempotent-success.md) 的读侧对偶 | ✅ **已接受** |
 | [0017](adr/0017-single-paid-tier-and-payment-channel.md) | 💰 **唯一付费档的价格与支付通道**：大陆 **¥99/年**、海外 **$49/年**、自建**永久免费**（承接 [subscription-boundary.md](plans/subscription-boundary.md) §0，并**关闭**它 §3 一直留着的「价格未定」）；改价必须三处同时改，由 `scripts/check-pricing-consistency.mjs` 拦 —— ⚠️ **价格与周期结论（¥99/年、$49/年、年付）已被 [ADR-0020](adr/0020-ai-subscription-two-tiers.md) 取代**；「自建永久免费」与「不自动续费」两条**保留** | ⚠️ **已取代**（仅价格与周期结论） |
@@ -105,6 +105,7 @@ docs/research/<kebab-case>.md     例：reuse-plan.md
 | [0019](adr/0019-upload-rejection-does-not-block-download.md) | 🔴 **上传被拒不得阻断下载**：被服务端**永久拒绝**的 op **移出重传队列**并结构化上报（新 `UploadStatus` 取值 `rejected`、新上报原因 `upload-rejected`）—— 否则一条坏 op 让一台设备**永远失去下载能力**，队列也永不收敛；但**只对永久拒绝**这么做：可恢复失败（网络抖动 / 限流）照旧退避重传，否则会静默丢数据。被拒的 op **不删除**，仍留在 op-log 里 | ✅ **已接受** |
 | [0020](adr/0020-ai-subscription-two-tiers.md) | 💰 **托管与 AI 都按月卖**：收费的是**我们替你运维服务器**与**我们的云端 AI**（不是功能、不是同步）；非 AI 能力永久免费；**两档 —— ¥5/$5（全部功能 + 官方托管同步）与 ¥12/$12（再加我们的云端 AI 300 次/月）**，两档功能完全相同，差的只是含不含我们的 AI；自带端点的 AI **永久免费且不计量**；计量只记**动作次数**（不记 token —— token 数暴露内容长度） | ✅ **已接受** |
 | [0021](adr/0021-managed-ai-model-deepseek-flash.md) | 🤖 **托管 AI 用 DeepSeek V4.1 Flash**：关闭 [0020](adr/0020-ai-subscription-two-tiers.md) §5 第 1 条。选它的理由是**单位经济**而不是「它够用」—— 300 次/月 的 token 成本 ≈¥2.01（占 ¥7 增量 **29%**），换 pro 级 ≈¥7.71 **超过 ¥7 增量本身**；所以「换模型 = 换价」，两者不能分开定 | ✅ **已接受** |
+| [0022](adr/0022-resilience-state-stays-derived.md) | 习惯韧性的**冻结余额保持纯派生且不上界面**（界面只显示"它替你保住了什么"）；🔴 **冻结参数只能放宽、不能收紧**，收紧必须走代码常量切分点 —— **仍然不加字段** | ✅ **已接受** |
 
 ### 计划
 
@@ -121,6 +122,8 @@ docs/research/<kebab-case>.md     例：reuse-plan.md
 | [ai-capability-branches.md](plans/ai-capability-branches.md) | **AI 能力分支与开发分支策略**（含对 5 条功能设想的逐条裁决）—— 大而全，深挖用 |
 | [ai-open-decisions.md](plans/ai-open-decisions.md) | **AI 功能需要拍板的决策清单**（不是需求表单，是「代码解决不了的事」） |
 | [i18n-multilingual.md](plans/i18n-multilingual.md) | 🌐 **中英双语实施计划**：为什么自研零依赖词条表、落地页用 URL 而应用用偏好、`check:ui-language` 契约的**变更与两处按 key 的例外**、分阶段迁移进度、以及**还没解决的域层文案** |
+| [motivation-and-progression.md](plans/motivation-and-progression.md) | ⭐ **激励与成长体系设计**：三层架构（即时反馈/连续性/叙事）× 四个循环，含「不改 schema」的落地映射、反需求 2.0、E2EE 下的指标方案 |
+| [activity-categories-and-colors.md](plans/activity-categories-and-colors.md) | **活动分类与分类着色**（增量，设计已拍板未开工）：颜色由**用户自赋义**、App 不判健康度；真正的工程量在时间归因（零新增字段可跑通第一版）；分类泳道图 + 周堆叠条 |
 
 ### 工程参考
 
@@ -159,6 +162,8 @@ docs/research/<kebab-case>.md     例：reuse-plan.md
 | [ai-feature-landscape.md](research/ai-feature-landscape.md) | ⭐ **AI 格局层**：13 个竞品逐产品详述 + 374 条内联来源 + 25 处「未找到公开信息」。⚠️ 与上一条的分工见下方注 |
 | [e2ee-apps-ai.md](research/e2ee-apps-ai.md) | ⭐ **E2EE 产品怎么做 AI**（192 处 ✅ 官方全文）：Bear / Joplin / Anytype / Standard Notes / Obsidian / Proton Lumo。🔴 核心结论：**"厂商托管 AI + 维持 E2EE" 在所有样本中一个都不存在**。支撑 [ADR-0006](adr/0006-supply-modes.md) |
 | [ai-competitive-teardown.html](research/ai-competitive-teardown.html) | 上两条的**可视化渲染**（战情室风格功能矩阵，单文件、离线可看）。⚠️ **`.md` 是唯一事实源**，本文件只是呈现 |
+| [motivation-psychology.md](research/motivation-psychology.md) | ⭐ **习惯养成与激励的心理学证据**：B=MAP / Hook / 实施意图 / 损失厌恶 / 断签放弃效应 / 目标梯度 / 禀赋进度 / 新鲜开始 / SDT / 过度理由效应 / 小胜原则 / 排行榜证据。每条带来源与证据强度标记 |
+| [competitor-incentive-teardown.md](research/competitor-incentive-teardown.md) | ⭐ **竞品激励机制拆解**：Forest / Duolingo / Habitica / Streaks / 番茄Todo / 滴答清单 / 小日常 / Apple 健身记录，逐机制规则与数值 + 心理原理 + 对 heyta 的可迁移性 |
 
 > ⚠️ **两份 AI 调研文档的分工（不要当成重复，也不要让它们漂移）**：
 > - `ai-competitive-and-architecture.md` = **结论层**。只放**影响 ADR-0005 / AI 计划决策**的结论，

@@ -36,6 +36,7 @@ import { TasksScreen } from './screens/TasksScreen';
 // 已按它自己文件头写好的方式删除（"实现一个就移走一个，最后删掉它"）。
 import { CalendarScreen } from './screens/CalendarScreen';
 import { FocusScreen } from './screens/FocusScreen';
+import { CategoriesScreen } from './screens/CategoriesScreen';
 import { ProfileScreen } from './screens/ProfileScreen';
 import { startAutoSync } from './sync/auto-sync';
 
@@ -83,6 +84,7 @@ function Shell(): React.JSX.Element {
         {tab === 'tasks' ? <TasksScreen onPendingCountChange={setPendingCount} /> : null}
         {tab === 'calendar' ? <CalendarScreen /> : null}
         {tab === 'focus' ? <FocusScreen /> : null}
+        {tab === 'categories' ? <CategoriesScreen /> : null}
         {tab === 'profile' ? <ProfileScreen /> : null}
       </View>
       <TabBar

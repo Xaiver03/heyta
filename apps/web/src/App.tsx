@@ -10,7 +10,20 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
-import { CalendarDays, ChartGantt, Check, CircleDot, Inbox, Moon, Sun, Timer, Trash2, type LucideIcon, Settings } from 'lucide-react';
+import {
+  CalendarDays,
+  ChartGantt,
+  Check,
+  CircleDot,
+  Inbox,
+  Moon,
+  Sun,
+  Timer,
+  TrendingUp,
+  Trash2,
+  type LucideIcon,
+  Settings,
+} from 'lucide-react';
 
 import { useI18n, type MessageKey } from '@heyta/i18n';
 
@@ -52,6 +65,8 @@ import { SubscriptionNotice } from './features/subscription/SubscriptionNotice.j
 import { ProjectsPanel } from './features/projects/ProjectsPanel.js';
 import { QuadrantBoard } from './features/quadrant/QuadrantBoard.js';
 import { HabitsView } from './features/habits/HabitsView.js';
+import { GrowthView } from './features/motivation/GrowthView.js';
+import { TodayProgressCard } from './features/motivation/TodayProgressCard.js';
 import { TimelineView } from './features/timeline/TimelineView.js';
 import { AiBreakdown } from './features/ai/AiBreakdown.js';
 import { AiPrioritize } from './features/ai/AiPrioritize.js';
@@ -128,7 +143,35 @@ const PRIMARY_NAV: NavEntry[] = [
  * 场景下几乎不存在，而成本是又一个需要维护的依赖。
  * 到 P2 需要深链接时再引入 —— 那时才知道真实的约束是什么。
  */
-type ViewKey = 'tasks' | 'quadrant' | 'habits' | 'focus' | 'timeline' | 'settings';
+type ViewKey = 'tasks' | 'quadrant' | 'habits' | 'focus' | 'timeline' | 'growth' | 'settings';
+
+/**
+ * 视图切换列表。
+ *
+ * 🔴 提出来当**唯一一份**定义：它既是顶栏的按钮，也是页面标题的来源。
+ * 原来这张表内联在 JSX 里，而标题另有一条只从 `store.filter`（任务是域的概念）
+ * 推导的逻辑 —— 于是在习惯 / 番茄钟 / 成长 / 设置 这些页面上，顶部标题写着
+ * 「收集箱」：那是**上一个视图的残留**，会让人以为没切过去。
+ * 同一件事写两遍，漂移是注定的。
+ */
+const VIEW_TABS: readonly { key: ViewKey; labelKey: MessageKey; Icon: LucideIcon }[] = [
+  { key: 'tasks', labelKey: 'web.shell.nav.tasks', Icon: Inbox },
+  { key: 'quadrant', labelKey: 'web.shell.nav.quadrant', Icon: CircleDot },
+  { key: 'habits', labelKey: 'web.shell.views.habits', Icon: Check },
+  { key: 'focus', labelKey: 'web.shell.views.focus', Icon: Sun },
+  { key: 'timeline', labelKey: 'web.shell.views.timeline', Icon: ChartGantt },
+  { key: 'growth', labelKey: 'web.shell.views.growth', Icon: TrendingUp },
+  { key: 'settings', labelKey: 'web.shell.views.settings', Icon: Settings },
+];
+
+/** 标题直接跟着视图走的那些视图（任务 / 四象限的标题有更具体的信息，不在此列）。 */
+const VIEW_TITLED_BY_TAB: readonly ViewKey[] = [
+  'habits',
+  'focus',
+  'timeline',
+  'growth',
+  'settings',
+];
 
 export function App(): React.JSX.Element {
   const { t } = useI18n();
@@ -306,6 +349,22 @@ export function App(): React.JSX.Element {
 
   const title = useMemo(() => {
     const f = store.filter;
+    // 习惯 / 番茄钟 / 时间线 / 成长 / 设置：标题跟**视图**走。
+    // 这些视图里没有"任务筛选"这回事，标题必须由视图自己决定，
+    // 否则显示的是上一个视图残留的清单名。
+    //
+    // 🔴 取的是 `labelKey` 再 `t(...)`，**不是**表里的中文本身 ——
+    // 模块级常量里不能有句子（见 `NavEntry.labelKey` 的注释）。
+    if (VIEW_TITLED_BY_TAB.includes(view)) {
+      const tab = VIEW_TABS.find((v) => v.key === view);
+      return tab === undefined ? t('web.shell.nav.tasks') : t(tab.labelKey);
+    }
+    /**
+     * 四象限页要看筛选**是否真的落在某个象限上**：
+     * 落上了就用更具体的象限名（「重要且紧急」比「四象限」有用），
+     * 没落上（用户只是点了顶部标签）就不能显示上一个视图的清单名。
+     */
+    if (view === 'quadrant' && f.kind !== 'quadrant') return t('web.shell.nav.quadrant');
     if (f.kind === 'all') return t('web.shell.nav.inbox');
     if (f.kind === 'today') return t('web.shell.nav.today');
     if (f.kind === 'completed') return t('web.shell.nav.completed');
@@ -322,9 +381,9 @@ export function App(): React.JSX.Element {
       return projects.projects.find((p) => p.id === f.projectId)?.name ?? t('web.shell.nav.project');
     }
     return t('web.shell.nav.tasks');
-    // `t` 进依赖：语言变了标题必须跟着变。`projects.projects` 同理 ——
-    // 清单改名后标题不该还是旧名字。
-  }, [store.filter, projects.projects, t]);
+    // `t` 与 `view` 都进依赖：语言变了标题必须跟着变，视图换了标题也得跟着换。
+    // `projects.projects` 同理 —— 清单改名后标题不该还是旧名字。
+  }, [store.filter, projects.projects, view, t]);
 
   return (
     /**
@@ -377,16 +436,7 @@ export function App(): React.JSX.Element {
           <h1 className="ht-header__title">{title}</h1>
           {/* 视图切换。用 role=tablist 让屏幕阅读器理解这是一组互斥选项 */}
           <div role="tablist" aria-label={t('web.shell.views.aria')} className="ht-viewtabs">
-            {(
-              [
-                { key: 'tasks', labelKey: 'web.shell.nav.tasks', Icon: Inbox },
-                { key: 'quadrant', labelKey: 'web.shell.nav.quadrant', Icon: CircleDot },
-                { key: 'habits', labelKey: 'web.shell.views.habits', Icon: Check },
-                { key: 'focus', labelKey: 'web.shell.views.focus', Icon: Sun },
-                { key: 'timeline', labelKey: 'web.shell.views.timeline', Icon: ChartGantt },
-                { key: 'settings', labelKey: 'web.shell.views.settings', Icon: Settings },
-              ] as const satisfies readonly { key: ViewKey; labelKey: MessageKey; Icon: LucideIcon }[]
-            ).map((v) => (
+            {VIEW_TABS.map((v) => (
               <button
                 key={v.key}
                 type="button"
@@ -452,6 +502,19 @@ export function App(): React.JSX.Element {
         </header>
 
         <div className="ht-content">
+          {/**
+           * 今日进度（激励体系 L1）。
+           *
+           * 🔴 **它常驻在三个"做事"的视图上**（任务 / 四象限 / 习惯 / 番茄钟），
+           * 而不常驻设置页与成长页：设置页不产生完成，成长页本身就是在讲
+           * 更长的尺度 —— 在那里再顶一条"今天 3/5"，会把"历史"重新压回"今天"，
+           * 恰好抵消掉那个页面存在的意义。
+           *
+           * 放在这里而不是放进各视图内部：它是**跨视图的同一件事**，
+           * 放进四个视图就会长出四份，而它们必然漂移。
+           */}
+          {view !== 'settings' && view !== 'growth' && <TodayProgressCard />}
+
           {/* 🔴 托管同步到期/被拒时的提示。它**只解释**"哪一件事被限制了"
               （通过官方托管服务的同步；含超出免费额度的新设备），不挡任何功能 ——
               本地任务照常查看 / 编辑 / 导出（subscription-boundary.md §2）。
@@ -660,7 +723,7 @@ export function App(): React.JSX.Element {
           {view === 'habits' && <HabitsView />}
           {view === 'focus' && <FocusTimer />}
           {/**
-           * 时间线（功能 ③）。排的是**当前视图里的任务**，每个任务一块。
+           * 时间线。排的是**当前视图里的任务**，每个任务一块。
            *
            * 🔴 起始日取"今天"（`store.now`）—— 时间线总得从某一天起算，
            * 而从今天起排是唯一不需要问用户、也不会说谎的默认值。
@@ -674,6 +737,7 @@ export function App(): React.JSX.Element {
               now={store.now}
             />
           )}
+          {view === 'growth' && <GrowthView />}
           {view === 'settings' && (
             <AiSettings
               initial={aiSettings}

@@ -271,12 +271,21 @@ pnpm check:design     # 非零退出 = 有裸值
 pnpm install                    # 安装（工作区）
 pnpm -r build                   # 全量构建
 pnpm -r typecheck               # 全量类型检查
-pnpm -r test                    # 全量测试（当前 2562 个通过 + 12 个跳过：11 浏览器 E2E 默认跳过 + 1 服务端）
+pnpm -r test                    # 全量测试（当前 2592 个通过 + 12 个跳过：11 浏览器 E2E 默认跳过 + 1 服务端）
+                                # ⚠️ 沙箱里跑不了 `@heyta/sync-server`（`prisma generate` EPERM），
+                                #    用 `pnpm -r --filter '!@heyta/sync-server' test` 复现这 2592；
+                                #    该包本身只贡献 1 个跳过、0 个通过，所以两者可比
 
 pnpm verify:sync                # P0 验收：真实同步闭环（需要服务端在跑）
 pnpm verify:sync:dry            # 不需要服务端，只校验 op 形状
 pnpm verify:p1                  # P1 验收：**自带真实服务端**，跑零 mock 的端到端同步（11 条）
 pnpm verify:p2                  # P2 验收：**自带真实服务端**，非 Web 壳（Node+SQLite）真实读写+同步
+
+# 真浏览器验收（Playwright）。⚠️ 它在 `e2e/` 里，**刻意不在根 pnpm 工作区内**
+#   （理由见 `e2e/pnpm-workspace.yaml`，别把它的依赖并回根 lockfile）。
+#   依赖要单独装：`cd e2e && pnpm install`（它自己一份 lockfile）
+pnpm check:ai-e2e               # 跑整个 e2e 套件（起 vite dev + 假端点，零 mock）
+                                #   激励体系的设计契约：e2e/tests/motivation.spec.ts（6 条）
 
 # 移动端验收：真模拟器（emulator-5554）+ 真服务端 + 真笔记本设备（node-host），全部零 mock
 pnpm verify:mobile-edit         # 任务可编辑（截止时间/优先级/重命名/删除）
@@ -957,6 +966,56 @@ docker inspect <容器> --format '{{range .Config.Env}}{{println .}}{{end}}' | g
     ⚠️ 还有一处同名冲突要记住：共享库里 `dump()` 是 **Android** 的 uiautomator 快照
     （`/tmp/ui.xml`），所以 iOS 的 AX dump 入口**必须叫别的名字**（现在叫 `ax_dump`）——
     两种设备、两种格式、同一个动作名，叫同一个名字就是在制造漂移。
+
+38. 🔴 **一个常量当两种单位用：`grace` 同时被当"日历日"和"漏了几次"，
+    于是每 7 天一次的习惯**可以漏 7 次**。**
+
+    **现象**：`computeStreak` 的 `current` 本该在"漏掉一个计划日"后归零。
+    实测（`interval / everyNDays: 7`，计划日 9-10 / 9-17 / 9-24 / 10-01）：
+
+    | 场景 | `current` |
+    |---|---|
+    | 漏 1 个计划日 | 1（**没归零**） |
+    | 漏 2 个计划日 | 1（**没归零**） |
+    | 漏 7 个计划日 | 0（才归零） |
+    | 对照·**每日**习惯漏 1 天 | 0 ✅ |
+
+    **真因**：`isStillAlive` 里 `const grace = daily ? 1 : 7`，然后
+    先用它比**日历日**（`if (gap <= grace) return true`），
+    再用它比**漏掉的计划日个数**（`missed >= grace` / `return missed < grace`）。
+    同一个常量、两种单位。
+
+    **为什么它活了这么久**：grace=1 时两种单位**恰好等价**，所以每日习惯上
+    完全看不出来；而本仓库的测试与手动验证几乎都是每日习惯。
+    它从 P1（`b59dfb6`）就在，同一条路径上的 `longest` 反倒写对了 ——
+    只有"该不该断"这一条是错的。**一个只在非默认频率下才现形的错误，
+    会被"默认频率的用例全绿"完整地遮住。**
+
+    **为什么不是"更宽松的有意设计"**：同文件上方的注释写着
+    「超过一个完整周期没打，连续就该归零」与「允许**一个**完整周期」——
+    实现给了 **7 个**。**代码与它自己的意图矛盾**，这才是判据。
+    光看代码是看不出错的（`missed >= 7` 长得很像有意为之），
+    要连着注释一起读、再用探针把数字打出来。
+
+    **它真的会到用户面前**：`apps/web/.../selectors.ts` 的 `bestCurrentStreak`
+    直接把 `computeStreak(...).current` 喂给 `streakDays` 身份标签（阈值 30）。
+    于是"六周没打卡还算连着"会变成**一枚不该发的身份标签** ——
+    而身份标签的定位恰恰是"你现在是什么样的人"。
+
+    **修法**：删掉 `grace`，只留一条判据 —— 扫 `(lastDate, today)`、
+    **不含今天**（今天没过完），遇到"该打卡却空着"的计划日就断。
+    "允许一个完整周期"这句话本来就由**逐日扫描**表达
+    （扫完没有落空的计划日 = 下一个计划日还没到），不需要第二个阈值。
+    代码因此变短而不是变长 —— **当"两个阈值"能用"一条规则"表达时，
+    多余的阈值就是错的来源。**
+
+    **测试侧（与第 33 条同源，更普遍）**：这里**一条测试都没有**钉住它。
+    旁边那条「cessation 判定也要按频率」用的场景（9-21 打了、今天 9-25）
+    在**两种语义下答案相同**，所以它一直是绿的 —— 它测的是"没漏的情况"。
+    ⚠️ **边界测试必须用"能区分两种假设"的输入**；覆盖了那条分支
+    不等于覆盖了那个判据。新守卫先跑红
+    （`AssertionError: expected 1 to be +0`）再修，并配一条对照组
+    （下一个计划日还没到 → 不能归零）防止修过头。
 
 > 第 4、7 条的根因相同：**两套并行定义**（词表 / 时钟语义）。
 > 这类 bug 单元测试抓不到 —— mock 是按实现者对协议的理解写的，理解错了 mock 跟着错。
@@ -1722,6 +1781,34 @@ docker inspect <容器> --format '{{range .Config.Env}}{{println .}}{{end}}' | g
 
 总路线图：[`docs/plans/roadmap.md`](docs/plans/roadmap.md)
 
+### 并行轨道：激励与成长体系（**已实现、已并入 main 的分支，尚未落到 main**）
+
+分支 `feat/motivation-system`（worktree `.worktrees/motivation`）。L1 即时反馈 / L2 连续性 /
+L3 叙事三层**已实现**；渲染层 23 条 + 域 438 条测试全绿，
+外加 `e2e/tests/motivation.spec.ts` 的 6 条真浏览器契约。
+
+✅ **已把 `main` 合进本分支**（merge commit `0560e82`，3 处冲突手工取并集；
+界面文案已整体迁进 `packages/i18n` 词条表 —— `apps/web/src` 现在是"已迁移"）。
+📄 落地程序、冲突解法、验证矩阵与回退点在
+[激励与成长体系设计](docs/plans/motivation-and-progression.md) **§12**。
+
+🔴 **但它还不能落到 `main`** —— 而且**不是**因为本分支有问题：
+
+1. 主检出工作树仍有 200+ 未提交文件（前置门③）；main 的未提交改动与本次合并改动
+   **在三个文件上重叠**，连快进都会被 git 拒绝。
+2. `main` 目前**自己 build / typecheck / test 都红**：`f57f248`（web 壳接入词条表）与
+   `27764c9`（移动端接入词条表）提交了**消费者**，而**生产者**至今没提交
+   （`packages/storage/src/errors.ts`、`packages/sync-client` 的 `SyncFailureReason` /
+   `summarizeConflictPayload`、`packages/domain/src/quadrant.ts`、`apps/mobile/.../ListsSection.tsx`）。
+   连带后果之一：`apps/web` 在真浏览器里**整个挂不上**（`main.tsx` 的 import 图撞上
+   `sync-client` 少一个导出），激励体系的 6 条 e2e 因此全红。
+   **归属判据、复现命令与处置见计划 §12.5** —— 本分支只记录，**不代写**那部分。
+
+设计红线：**不发行任何货币**（没有金币/积分/商店，也不卖"后悔"）、
+**只与自己的过去比**（排行榜/联赛/自习室/组队打 Boss 在 E2EE 下结构上不可能）、
+**从不制造愧疚**。关键裁决见下面 ADR-0022 与
+[`docs/plans/roadmap.md`](docs/plans/roadmap.md) §1.2。
+
 ### 已定的关键决策
 
 - **ADR-0001 许可证 = MIT** ✅（[文档](docs/adr/0001-license-decision.md)）。与 vendored 的 MIT 底座天然兼容。
@@ -1762,6 +1849,13 @@ docker inspect <容器> --format '{{range .Config.Env}}{{println .}}{{end}}' | g
   `memoryEnabled` **必填且默认关闭（fail-closed）**；推断结果**不持久化**
   （纯函数，每次从 op-log 重算），只有用户**纠正**进 op-log 跨设备同步；
   两个新实体是**纯可加性**的 —— **不需 bump `CURRENT_SCHEMA_VERSION`**。
+- **ADR-0022 习惯韧性的「冻结余额」= 纯派生且不上界面** ✅（[文档](docs/adr/0022-resilience-state-stays-derived.md)）。
+  它是**库存**不是事实（等于说"你还有 N 次可以不来的机会"）、用户对它**不可操作**、
+  且是整套体系里**唯一的货币** —— 唯一一处会让 heyta 读起来像资源管理游戏的地方。
+  关键推论：**界面上不出现的东西不需要稳定的持久化结构**，
+  于是「派生还是加字段」这个二选一被**消解**（承接 ADR-0014 的"派生不持久化"）。
+  🔴 配套纪律：**冻结参数只能放宽、不能收紧** —— 收紧会让重放把历史连续天数
+  **变小**，违反"只增不减"；真要收紧走**代码常量切分点**，**仍然不加字段**。
 - **AI 的完整架构**见 [`docs/reference/ai-architecture.md`](docs/reference/ai-architecture.md)
   （模块地图 / 封闭词表 / 全部具名常量 / 20 条不变量清单）。
   **AI 的入口文档是 [`docs/plans/ai-strategy.md`](docs/plans/ai-strategy.md)**，先读那份。

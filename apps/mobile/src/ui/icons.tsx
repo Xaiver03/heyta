@@ -64,6 +64,10 @@ const ICONS = {
   'tab.tasks': ListTodo,
   'tab.calendar': CalendarDays,
   'tab.focus': Timer,
+  // ⚠️ 这一行只**新增**一个登记项，依赖的是文件里已有的 `ChartColumn` 导入
+  // （与热点图、统计有关的那一类图标）。纯附加改动，冲突时按并集收，
+  // 若上游重写时删掉了 `ChartColumn`，修法是把导入补回来 —— 一个词。
+  'tab.categories': ChartColumn,
   'tab.profile': User,
 
   // 任务

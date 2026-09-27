@@ -65,6 +65,14 @@ export interface HeytaNativeTokens {
   readonly 'color.heat-2': string;
   readonly 'color.heat-3': string;
   readonly 'color.heat-4': string;
+  readonly 'color.category-1': string;
+  readonly 'color.category-2': string;
+  readonly 'color.category-3': string;
+  readonly 'color.category-4': string;
+  readonly 'color.category-5': string;
+  readonly 'color.category-6': string;
+  readonly 'color.category-7': string;
+  readonly 'color.category-8': string;
   readonly 'color.focus-work': string;
   readonly 'color.focus-break': string;
   readonly 'color.overlay': string;
@@ -268,6 +276,14 @@ export const lightTokens: HeytaNativeTokens = {
   'color.heat-2': "#93c5fd",
   'color.heat-3': "#3b82f6",
   'color.heat-4': "#1d4ed8",
+  'color.category-1': "#991b1b",
+  'color.category-2': "#ea580c",
+  'color.category-3': "#16a34a",
+  'color.category-4': "#0d9488",
+  'color.category-5': "#0e7490",
+  'color.category-6': "#1d4ed8",
+  'color.category-7': "#a21caf",
+  'color.category-8': "#be185d",
   'color.focus-work': "#2563eb",
   'color.focus-break': "#059669",
   'color.overlay': "#0f172a80",
@@ -454,6 +470,14 @@ export const darkTokens: HeytaNativeTokens = {
   'color.heat-2': "#1d4ed8",
   'color.heat-3': "#3b82f6",
   'color.heat-4': "#93c5fd",
+  'color.category-1': "#f87171",
+  'color.category-2': "#fb923c",
+  'color.category-3': "#34d399",
+  'color.category-4': "#99f6e4",
+  'color.category-5': "#22d3ee",
+  'color.category-6': "#6366f1",
+  'color.category-7': "#e879f9",
+  'color.category-8': "#f472b6",
   'color.focus-work': "#60a5fa",
   'color.focus-break': "#34d399",
   'color.overlay': "#020617b3",

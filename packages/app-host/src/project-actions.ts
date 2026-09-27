@@ -30,7 +30,7 @@
  * ─────────────────────────────────────────────────────────────────────────
  */
 
-import type { Project, Tag } from '@heyta/domain';
+import { parseCategorySlot, type CategorySlot, type Project, type Tag } from '@heyta/domain';
 import type { EntityType } from '@heyta/shared-schema';
 import { OpType } from '@heyta/sync-core';
 
@@ -48,6 +48,20 @@ export interface ProjectActions {
   /** 新建清单。`parentId` 省略表示顶层清单。返回新实体 id。 */
   createProject(name: string, parentId?: string): Promise<string>;
   renameProject(entityId: string, name: string): Promise<void>;
+  /**
+   * 给清单指定一个**分类色槽位**（1–8），或 `undefined` 表示清掉。
+   *
+   * 🔴 存的是**槽位号**，不是颜色本身。
+   *
+   * 理由（见 `docs/plans/activity-categories-and-colors.md` §6）：颜色会随主题与
+   * 设计系统调整，而用户的**语义**（"这条清单是我用来标记那一类事的"）不该跟着变。
+   * 存 `"3"` 的话换配色不动数据；存 `"#0d9488"` 的话，历史数据里写死的是旧配色，
+   * 而它在新主题下可能根本看不清 —— 那是一次没法收场的迁移。
+   *
+   * 🔴 这里**不做**任何健康度判断：槽位是我们给的，含义是用户赋的。
+   * 动作层永远不知道 3 号是"学习"还是"刷手机"。
+   */
+  setProjectColor(entityId: string, slot?: CategorySlot): Promise<void>;
   /** 归档：隐藏但**保留数据**，可以再取消归档。 */
   archiveProject(entityId: string): Promise<void>;
   /** 软删除。⚠️ 不级联删除其下的任务（见文件头第 2 条）。 */
@@ -128,6 +142,22 @@ export function createProjectActions(
       const trimmed = name.trim();
       if (trimmed === '') throw new Error('清单名称不能为空');
       await updateProject(entityId, { name: trimmed });
+    },
+
+    async setProjectColor(entityId, slot) {
+      // 边界上真的验一次，而不是靠类型：`slot` 来自界面，而界面很容易传成
+      // **数组下标**（`CATEGORY_SLOTS.map((s, i) => …)` 里传 `i`）——
+      // 那是 0 起算的，于是第 1 个色块会静默写成 `"0"`（一个不存在的槽位）。
+      // 读的时候 `parseCategorySlot` 会把它当"没设过色"，所以症状是
+      // "点了 1 号但颜色没生效"，而且永远不报错。
+      const clean = slot === undefined ? undefined : parseCategorySlot(slot);
+      if (slot !== undefined && clean === undefined) {
+        throw new Error(`分类色槽位必须是 1–8 的整数，收到 ${JSON.stringify(slot)}`);
+      }
+      // 清除写 `null` 而不是"不放这个键"或 `undefined` —— 与文件头第 1 条同一条规则：
+      // `null` 能穿过 JSON 表达"清除"；`undefined` 会让整个键在 JSON 里消失，
+      // 两台设备对同一次"清掉颜色"生成的 op 于是长得不一样。
+      await updateProject(entityId, { color: clean === undefined ? null : String(clean) });
     },
 
     async archiveProject(entityId) {
