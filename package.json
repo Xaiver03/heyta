@@ -40,6 +40,7 @@
     "verify:sync-recovery": "bash scripts/verify-sync-rejection-recovery.sh",
     "verify:harmony-toolchain": "bash scripts/verify-harmony-toolchain.sh",
     "verify:harmony-rnoh": "bash scripts/verify-harmony-rnoh.sh",
+    "verify:web-sqlite": "node scripts/verify-web-sqlite.mjs",
     "verify:harmony-rnoh-js": "bash scripts/verify-harmony-rnoh-js.sh",
     "verify:i18n-failures": "node scripts/verify-i18n-failures.mjs",
     "check:tokens": "pnpm --filter @heyta/design-system run generate:check",
