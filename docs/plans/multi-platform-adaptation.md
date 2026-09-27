@@ -50,9 +50,19 @@
 
 ### 判据
 
-1. `apps/web/src/lib/` 与 `apps/mobile/src/lib/` 的**同名文件归零**（当前有 `category-colors.ts` 一处）。
-2. 新增的展示逻辑有**单测**，且测试只写一份。
-3. `check:layering` 新增一条规则：`apps/*` 不得再自定义类别颜色映射。
+> ⚠️ **M0-2 执行后修正（原判据被证伪）**：原来写的是"同名文件归零"。
+> 执行后确认那条**既不现实也不该做** —— 见 §5 的判定表：
+> 同名剩余的是**按端 i18n key 的薄适配**（且 `due-display` 连算法都相同、
+> 只是前缀不同），归零等于砍掉刻意的设计。改成下面三条**可验证**的：
+
+1. 🔴 **同一个「事实」只有一份**（这是 M0 真正的判据，不是文件名）：
+   任何**取值/阈值/分类**都不得在 `apps/*` 里被定义 —— 必须在 `packages/`。
+   已验证：`CATEGORY_SLOT_TOKENS` 派生的槽位映射（M0-1）、
+   `durationParts` 阈值、`CountdownUrgency`、`intensityLevel` 全部在 `packages/`。
+2. **每条"只有一份"都要有能证伪的测试**：M0-1 已用注入漂移验证过
+   （新测试红、旧测试仍绿）。
+3. `check:layering` 新增一条规则：`apps/*` 不得再自定义类别颜色映射或热力色阶。
+4. **M0-4（native 数字门禁）完成** —— 因为已实测 `check:design` 对 RN 数字失效。
 
 ### 任务
 
@@ -526,19 +536,44 @@ IndexedDB 路径**保留到迁移验证通过之后**再删。两者可并存一
 | M0-4 | native 设计门禁（数字规则） | （待填） | — | — |
 | M1 | 任务列表切片 | （待填） | — | — |
 
-**M0-2 的展示逻辑归属判定表**（执行后写回这里）：
+**M0-2 的展示逻辑归属判定表**（2026-09-27 执行完毕 —— **结论是"几乎都不该动"**）：
 
-| mobile `lib/` 文件 | 判定 | 去处 |
-|---|---|---|
-| `category-display.ts` | （待填） | |
-| `date.ts` | （待填） | |
-| `due-display.ts` | （待填） | |
-| `focus-display.ts` | （待填） | |
-| `focus-timer.ts` | （待填） | |
-| `priority.ts` | （待填） | |
-| `quick-dates.ts` | （待填） | |
-| `recurrence-display.ts` | （待填） | |
-| `use-today.ts` | （待填） | |
+> 🔴 **根因发现（比这张表本身重要）**：heyta 的"重复"有一个**结构性来源** ——
+> **按端命名的 i18n key**（`web.*` vs `mobile.*`）。
+> 只要一个展示函数要取词，它的**算法即使逐字相同，也必须写两遍**，因为 key 前缀不同。
+>
+> 也就是说：**共享层现在的天花板不是"没抽干净"，而是"文案按端命名"这个刻意设计。**
+>
+> 三条实测证据（本次逐字比对）：
+> - 两端 `formatDuration` **逐字同构**，只差 key 前缀；
+> - 两端 `KIND` 映射（mobile `KIND_KEY` / web `KIND_COPY`）只差 key 前缀；
+> - 两端 `remainingText` 的 `-1 / 0 / 1 / 2 / 其他` 分支**完全相同**，只差 key 前缀。
+
+| mobile `lib/` 文件 | 语义核心在哪 | 判定 | 依据 |
+|---|---|---|---|
+| `category-display.ts` | ✅ **已在 `@heyta/domain`**（`durationParts` 阈值、`CategoryKind`、`CategorySeries`） | **保留在两端** | 剩下的是 key 前缀映射。web 的对应物叫 `features/categories/copy.ts` —— **文件名不同**，这正是"按文件名找重复"会漏掉的一个 |
+| `due-display.ts` | ✅ **已在 `@heyta/domain`**（`CountdownUrgency`、倒计时分类） | **保留在两端** | 剩下的是 key 前缀映射。单复数不变量**已由两端测试钉住**：mobile `plural-keys.spec.ts` 断言 `'1 day overdue'` 且**不含** `'1 days'`；web `due-display.spec.tsx` |
+| `date.ts` | 部分在 domain | **保留** | web **零等价物** —— 单消费方 |
+| `focus-display.ts` | — | **保留** | web **零等价物** —— 单消费方 |
+| `focus-timer.ts` | — | **保留** | web **零等价物** —— 单消费方 |
+| `priority.ts` | — | **保留** | web **零等价物** —— 单消费方 |
+| `quick-dates.ts` | — | **保留** | web **零等价物** —— 单消费方 |
+| `recurrence-display.ts` | — | **保留** | web **零等价物** —— 单消费方 |
+| `use-today.ts` | — | **保留** | 依赖 RN `AppState` —— 属"**平台 hook**"，本就不该进 `packages/` |
+
+**为什么"没搬"是刻意的（三条判据，写下来免得下次有人重做这轮清点）**：
+
+1. **单消费方进 `packages/` 不是共享，是把代码挪远** —— 多一层间接、少一份就地可读性，
+   而且**没有任何门禁能证明它被复用了**。抽象要有第二个消费者。
+2. **语义核心已在 domain、只剩按端文案映射的模块，合并会同时踩两件事**：
+   与 `check:ui-language` 的按端词条设计冲突，并制造一个只做字符串拼接的空抽象层。
+3. 🔴 **真正的重复只有 `category-colors.ts` 一处，而它不在这张表里** ——
+   因为它的**取值不在任何 package 内**，漂移是**静默**的（改一处不会让任何测试变红）。
+   **M0-1 已修，并补了可证伪的测试。**
+
+> **对 M0 剩余工作的含义**：**不再有值得做的抽取**。
+> M0 剩下的是**门禁**（M0-4 native 数字规则、M0-3 分层防回潮），
+> 不是更多搬迁。这条结论省掉的工作量，比它写出来的字数多得多。
 
 ---
 
