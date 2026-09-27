@@ -44,9 +44,11 @@ import {
   exportDocumentFromHost,
   materializedState,
   openAppHost,
+  restoreIntoEmptyTarget,
   type AppHost,
   type ExportDocument,
   type NewTaskFields,
+  type RestoreExportResult,
 } from '@heyta/app-host';
 import type { Project, Tag, Task } from '@heyta/domain';
 import type { OpIntent } from '@heyta/op-log';
@@ -122,6 +124,15 @@ export interface NodeHost {
    */
   exportDocument(): Promise<ExportDocument>;
 
+  /**
+   * 从一份导出文档**还原到空库**。
+   *
+   * 🔴 语义与拒绝条件全在 `@heyta/app-host` 的 `restoreIntoEmptyTarget`
+   * （含"目标非空就拒绝、且什么都不写"）。**本壳不判断任何产品语义**，
+   * 只把 `AppHost` 递进去 —— 它结构上就满足 `ImportTarget`。
+   */
+  restoreExport(document: ExportDocument): Promise<RestoreExportResult>;
+
   /** 关闭 SQLite 连接。之后不可再用。 */
   close(): void;
 }
@@ -157,6 +168,7 @@ export async function openNodeHost(options: NodeHostOptions): Promise<NodeHost> 
     sync: () => app.sync(),
     pendingUploadCount: () => app.pendingUploadCount(),
     exportDocument: () => exportDocumentFromHost(app, { exportedAt: Date.now(), host: 'node' }),
+    restoreExport: (document) => restoreIntoEmptyTarget(app, document),
     close: () => {
       app.close();
     },

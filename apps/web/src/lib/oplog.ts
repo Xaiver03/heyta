@@ -19,7 +19,12 @@ import type { Operation } from '@heyta/sync-core';
 // 这里原本自己写了一份：回退用 `Math.random()`、格式也不同，
 // 而 `ids.ts` 的文件头那张"漂移对照表"里**已经列过它**。
 // 两份实现的差距不是风格问题 —— clientId 是 LWW 冲突的决胜依据。
-import { resolveClientId } from '@heyta/app-host';
+import {
+  parseExportDocument,
+  resolveClientId,
+  restoreIntoEmptyTarget,
+  type RestoreExportResult,
+} from '@heyta/app-host';
 
 let engine: OpLogEngine | undefined;
 let db: IndexedDbAdapter | undefined;
@@ -151,6 +156,36 @@ export async function dispatchIntent(intent: OpIntent): Promise<void> {
 export async function applyRemoteOps(ops: Operation<string>[]): Promise<void> {
   await requireEngine().applyRemote(ops);
   notify();
+}
+
+/**
+ * 从一段导出文本**还原到空库**。
+ *
+ * 🔴 产品语义（能不能导、导到哪里、结果对不对）全在 `@heyta/app-host` 的
+ * `parseExportDocument` / `restoreIntoEmptyTarget`。这里只做两件宿主该做的事：
+ *
+ *   1. **把本地 op-log 递给它** —— 还原要能读"日志里有什么"来决定是否拒绝；
+ *   2. **成功后通知各 store 刷新** —— 不通知的话数据在库里、界面不动，
+ *      用户会以为还原没生效（同 `dispatchIntent` 的理由）。
+ *
+ * ⚠️ 它**绝不**先清库：目标非空时 `restoreIntoEmptyTarget` 在写之前就拒绝，
+ * 本函数只是如实把结果转发给界面。
+ */
+export async function restoreFromExport(text: string): Promise<RestoreExportResult> {
+  const parsed = parseExportDocument(text);
+  if (!parsed.ok) {
+    return { ok: false, reason: parsed.reason, detail: parsed.detail };
+  }
+
+  const result = await restoreIntoEmptyTarget(
+    {
+      engine: requireEngine(),
+      readOpLog: async () => (await requireStore().getAllOps()).map((row) => row.op),
+    },
+    parsed.document,
+  );
+  if (result.ok) notify();
+  return result;
 }
 
 /** 仅供测试：重置模块级单例。 */

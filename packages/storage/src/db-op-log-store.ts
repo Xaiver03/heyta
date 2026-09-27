@@ -41,6 +41,7 @@ import type { DbAdapter, DbKeyRange, DbTx } from './db.types.js';
 import {
   OpLogStoreError,
   OpLogStoreErrorCode,
+  type ImportedAppendResult,
   type OpLogStore,
   type OperationSource,
   type StoredOperation,
@@ -88,6 +89,19 @@ export class DbOpLogStore<TOperation extends Operation<string> = Operation>
   async appendLocal(ops: TOperation[]): Promise<number[]> {
     const result = await this.appendBatch(ops, 'local', {});
     return result.seqs;
+  }
+
+  /**
+   * 追加导入的 op。
+   *
+   * `appendBatch` 里 `uploadStatus` 的规则是 `source === 'local' ? 'pending' : 'uploaded'`，
+   * 所以这里天然得到"不进上传队列"——**这正是想要的**，理由见接口注释
+   * （导入的 op 带着别的设备的 `clientId`，上传会被服务端逐条 `INVALID_CLIENT_ID` 拒绝）。
+   * 不要为了"让它也能上传"把 source 改成 'local'。
+   */
+  async appendImported(ops: TOperation[]): Promise<ImportedAppendResult<TOperation>> {
+    const result = await this.appendBatch(ops, 'import', {});
+    return { appended: result.appended, skipped: result.skipped, seqs: result.seqs };
   }
 
   async appendBatchSkipDuplicates(
@@ -143,7 +157,8 @@ export class DbOpLogStore<TOperation extends Operation<string> = Operation>
             source,
             // 字符串而不是布尔 —— IndexedDB 不能索引布尔（见 stores.ts）
             applyStatus: flags.pendingApply === true ? 'pending' : 'applied',
-            // 本地 op 等待上传；远程 op 我们本来就收到了，无需上传
+            // 本地 op 等待上传；远程 op 我们本来就收到了，无需上传。
+            // 导入的 op 同理不进队列 —— 它的 clientId 属于别的设备，上传必被拒（见 appendImported）。
             uploadStatus: source === 'local' ? 'pending' : 'uploaded',
           };
 

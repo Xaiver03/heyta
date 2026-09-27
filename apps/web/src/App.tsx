@@ -75,6 +75,7 @@ import { AiSettingsNavigationContext } from './features/ai/ai-settings-navigatio
 import type { SettingsTarget } from './features/ai/route-explanation.js';
 import { AiSettings } from './features/settings/AiSettings.js';
 import { ExportPanel } from './features/settings/ExportPanel.js';
+import { ImportPanel } from './features/settings/ImportPanel.js';
 import { MemoryPanel } from './features/settings/MemoryPanel.js';
 import {
   createSessionSecretStore,
@@ -777,6 +778,8 @@ export function App(): React.JSX.Element {
               />
               {/* 导出入口与 AI 设置并列在同一个设置页 —— 见 ExportPanel 文件头。 */}
               <ExportPanel />
+              {/* 导入 / 还原是导出的另一半 —— 只支持还原到空库，见 ImportPanel 文件头。 */}
+              <ImportPanel />
             </>
           )}
         </div>
