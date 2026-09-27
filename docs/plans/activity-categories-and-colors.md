@@ -240,8 +240,9 @@ HABIT.target + unit   →  HABIT.color
 | 设计系统 | **402 通过**（6 文件），含 `category-colors.spec.ts` 13 条 + `tokens.spec.ts` 的登记断言。`generate` 已重跑（4 个产物、191 token、暗色覆盖 73）。 |
 | 动作层 / 共享摊平 | `packages/app-host`：**409 通过**（本轮 +8：`tests/category-report.spec.ts`）。其中"清除写 `color: null` 而不是让键消失"已用注入（改成不写键）验证会红；摊平那层的三条关键断言（滤墓碑、任务被删进"未归类"、`weeks` 从常量推导）也已注入验证。 |
 | 界面（jsdom） | `apps/web/tests/categories.spec.tsx`：**12 通过** + `category-colors-flow.spec.tsx`：**3 通过**（真 `<App />` + 真 IndexedDB + 真 op-log）。含"每行都有名字/来源/数字"、"格子数 = `DEFAULT_CATEGORY_WEEKS`"、"文案里没有排名与褒贬"。已用注入（拿掉行名、把峰值当 0、给段序加 `reverse()`）验证会红。 |
-| 界面（真浏览器） | `e2e/tests/categories.spec.ts`：**4 通过**（见 §8.6）。逐条注入验证会红。 |
-| 移动端 | `apps/mobile/tests/category-display.spec.ts`：**12 通过**（纯逻辑 —— 本包没有组件渲染测试台，见 §8.7）。注入验证：3 条红。 |
+| 界面（真浏览器） | `e2e/tests/categories.spec.ts`：**5 通过**（见 §8.6）。逐条注入验证会红。 |
+| 移动端（纯逻辑） | `apps/mobile/tests/category-display.spec.ts`：**12 通过**（本包没有组件渲染测试台，见 §8.7）。注入验证：3 条红。 |
+| 移动端（真设备） | iPhone 17 Pro 模拟器上 Release 构建**真的跑起来了**：空状态、12 周区间、未归类那句、5 个 tab 的选中态都对（`idb` 读的设备内无障碍树，见 §8.7.1）。⚠️ 一次性取证，不是回归防线；且**依赖两条别人在飞的修复**才能复现。 |
 | 门禁 | `check:design`（114 源文件 0 裸值）、`check:ui-language`（111 文件、**1007/1007** 条 zh/en）、`check:layering`（125 文件）、`check:tokens`（191 token）、`check:docs` 无死链 —— 本轮全绿。 |
 | 逐包全量 | domain **468** / design-system **402** / app-host **409** / i18n **10** —— 本轮改动涉及的四个包**全绿**；其余包本轮未改，故沿用上一轮的数字（op-log 51 / storage 189 / sync-core 280 / shared-schema 70 / ai 144 / local-api 79 / landing 71 / sync-client 39）。 |
 
@@ -286,7 +287,7 @@ main 侧提交了消费者而其生产者只存在于另一个工作树：
 记的是 4 红 —— 那是同一批缺失生产者的**演进**（别人在这期间继续提交了消费者），
 不是本轮引入的。判据仍是同一条：失败文件与本轮改动**无交集**。
 
-### 8.6 真浏览器验收：**已恢复**，4 条契约（含逐条注入证据）
+### 8.6 真浏览器验收：**已恢复**，5 条契约（含逐条注入证据）
 
 上一条（8.6 的旧版）记的是"这轮做不到"，原因是**别人的在飞工作**让这一支上
 Web 应用整页白屏（消费者已提交、生产者在主检出未提交）。本轮把那件事解决了 ——
@@ -305,7 +306,7 @@ Web 应用整页白屏（消费者已提交、生产者在主检出未提交）�
 ⚠️ 还踩了一条：同一个 URL 上注册**多条** `page.route` 只有最后一条生效，
 所以垫片必须**按包分组**（三个同包名字分成三条路由时，只有最后那条真的加上了）。
 
-**这 4 条契约**（`e2e/tests/categories.spec.ts`）：
+**这 5 条契约**（`e2e/tests/categories.spec.ts`）：
 
 | 用例 | 注入什么会红（都实测过） |
 |---|---|
@@ -313,6 +314,7 @@ Web 应用整页白屏（消费者已提交、生产者在主检出未提交）�
 | 色槽赋色 → **刷新后仍在** → 再点取消 | 赋色不落盘 → 行首当前色块停在未设色（实测 `rgb(226,232,240)`，期望 `rgb(22,163,74)`） |
 | 真实的专注时间进入「未归类」 | 不渲染那句未归类（实测红） |
 | 反需求：没有排名 / 占比 / 优劣词 | 说明里塞一个「最多」（实测红，报 `["最多"]`） |
+| **样式真的落到了浏览器里**（下面单独说） | 说明文字换色 / 去掉 `border-top` / 无条件渲染柱状图 |
 
 两条值得单独说的做法：
 
@@ -326,18 +328,35 @@ Web 应用整页白屏（消费者已提交、生产者在主检出未提交）�
    装完的时钟默认不走，而应用启动要等 `setTimeout` 才打开本地库 ——
    不 resume 的症状是白屏，看起来像应用坏了（那会是一次很贵的误判）。
 
-**同一次跑出来的全套**：`categories 4` + `smoke 2` + `motivation 6` +
-`ai-breakdown 1` + `ai-capture 1` + `ai-duration 2` + `ai-prioritize 1` = **17 绿**；
-`ai-unavailable` **1 红**，红在 `'AI 未启用'` 那条断言上 —— 那是**别人在飞工作的半条链**
+**同一次跑出来的全套**（本轮复跑，`npx playwright test --reporter=list`）：
+`categories 5` + `smoke 2` + `motivation 6` + `ai-breakdown 1` + `ai-capture 1` +
+`ai-duration 2` + `ai-prioritize 1` + `ai-unavailable 3` = **21 绿 / 1 红**；
+那条红是 `ai-unavailable.spec.ts:130`，期望「AI 未启用」拿到「AI 服务暂时不可用。」—— 那是**别人在飞工作的半条链**
 （`packages/app-host/src/ai-duration.ts` 未提交的 diff 正是 `cause: result.reason`，
 而 `apps/web/src/features/ai/AiDuration.tsx:245` 已经在用 `outcome.cause`），
 **不改、不代写**（见 §8.5）。顺带修掉一条既有的假红：`smoke.spec.ts` 原本用裸
 `page.goto('/')`，于是它红在"模块图缺名字"上 —— 那既不是环境问题也不是功能问题，
 **恰好毁掉了这条用例唯一的作用**（失败归因），已改为走相同的 `openApp()`。
 
-**仍然没有被自动检查覆盖的东西**（这一条要说给下一个人听）：
-`.ht-categories__*` 那批样式在真浏览器里只被**间接**碰到（区块可见、文字在、
-色块背景取值相等），**没有像素级断言**，这轮也**没截图看过**。
+**第 5 条（本轮补）专门盯样式**：它读的是**浏览器算完的值**，不是"类名在不在"。
+`.ht-categories` 的 `display` 必须是 `flex`、方向 `column`、`gap` 非零；说明文字的
+`color` 必须**等于**当场用探针元素解析出来的 `--ht-color-foreground-muted`
+（**不写死 hex** —— 写死就变成"抄一遍 token"，token 一改断言照样绿）；
+没有分类行时 `.ht-categories__cell` 与 `.ht-categories__bars` 的**条数必须是 0**
+（🔴 这条防的是"未归类被伪装成一根柱子"）；区间文案里有「至」；未归类那句必须有
+`border-top` 且宽度 > 0。逐条注入都实测会红：说明文字换成 `--ht-color-foreground`
+（`rgb(100,116,139)` → `rgb(15,23,42)`）、删掉 `border-top`、把 `WeeklyBars`
+改成 `{true && …}`。
+
+这条用例写错过一次，值得记：最初断言 `.ht-categories__bar-label` 有 12 条 ——
+**红的是我的期望，不是实现**：`WeeklyBars` 只在 `peakWeeklyMs > 0` 时才渲染，
+而本轮能造出来的清单行是 0 ms。改成"未归类不得伪装成泳道或柱子"之后才是在测真东西。
+
+⚠️ **仍然没有像素级断言的地方**（说清边界，不要当它已被覆盖）：
+`.ht-categories__cell` / `__bar-label` 那 **12 格 / 12 根**的具体形状**没有断言**，
+因为 Web 上还没有"给任务指定清单"的界面，`peakWeeklyMs` 造不出正数。
+本轮是**用眼睛在真浏览器里看过的**（区块、泳道、行首色块、色槽面板、十二格网格都渲染正常，
+无重叠无裁切）—— 但那是一次性取证，不是回归防线。
 
 ### 8.7 移动端落地（本轮补完第二个缺口）
 
@@ -390,11 +409,78 @@ error Unable to resolve module ../lib/category-display.js from …/CategoriesScr
 `verify:mobile-*` 那条路径本来就是干这个的，多一个入口只会多一处要维护的东西）。
 
 ⚠️ **移动端没有组件渲染测试台**（`apps/mobile` 的 devDependencies 里没有
-`@testing-library/react-native`，既有 8 个测试文件全是纯逻辑）。
-所以这一屏**由类型与门禁保证"接线正确"，不保证"渲染出来是什么样"** ——
-本轮**没有在模拟器上看过它**，也没有为加渲染测试而引入新依赖（那要过两道门，
-且 React 19 下的 `react-test-renderer` 路线本身有弃用风险）。
-这一条同样是留给下一个人的话，不是可以默认忽略的细节。
+`@testing-library/react-native`，既有测试文件全是纯逻辑）—— 这条结论**不变**，
+本轮也**没有为截图而引入新依赖**（那要过两道门，且 React 19 下的
+`react-test-renderer` 路线本身有弃用风险）。但"没看过"这半句本轮补上了：
+
+### 8.7.1 真模拟器上看过了（含两条**只有跑起来才会发现**的阻断）
+
+对象：iPhone 17 Pro 模拟器（`1B785D80-…`，iOS 26.5），本支 Release 构建装进设备；
+驱动方式是 **`idb`**（`~/.heyta-tools/idb/…` 已在 `scripts/lib/mobile-e2e.sh` 的候选路径里）——
+`idb ui describe-all` 从**设备内部**读无障碍树、`idb ui tap` 点按，
+**不需要 Simulator 窗口在当前 Space，也没有抢前台**
+（这正是 AGENTS §7 第 37 条要的形状）。
+
+**看到的**（`describe-all` 的原文，不是我的转述）：
+
+```
+分类时长 | 按清单与习惯各自统计近 12 周的专注与打卡时间。颜色由你自己赋义，这一页不做任何评价。
+还没有可以归类的时间记录。用清单组织任务、或用习惯记下时长，这里就会长出内容。
+任务 | 日历 | 专注 | 分类 | 我的
+```
+
+随后在设备上**真起了一轮专注**（点「开始专注」→ 14 秒后点「放弃这一轮」），
+专注页自己报「中途放弃 1 次」，回到「分类」页就变成：
+
+```
+分类时长 | …不做任何评价。 | 2026-07-06 至 2026-09-27 |
+另有 0 分钟没有归到任何清单或习惯 —— 给任务指定清单，它就会归位。
+```
+
+也就是说：**空状态、12 周区间、未归类那句（含本轮修掉的空格）、5 个 tab 的选中态**
+都在真设备上渲染正确、无重叠无裁切。放弃的那一轮**照样进统计**（`aliveRecords`
+不按 status 过滤）—— 与"打断不等于从头开始"那条设计口径一致，这条是**看出来的**，不是推出来的。
+
+🔴 **阻断一：应用一启动就崩，而且与本特性无关。** Release 应用装上去打开即退出，
+日志只有一句 `Unhandled JS Exception: TypeError: Cannot read property 'useContext' of null`
+（`at TasksScreen`）。真因是**一个 bundle 里有两份 React**：
+`apps/mobile` 钉 `react@19.2.3`，而 `packages/i18n` 声明 `react: ^19.2.0` → pnpm 解析成
+**19.3.0** 并链在 `packages/i18n/node_modules/react`，`packages/i18n/src/react.tsx`
+的 `useI18n` 用的就是那一份。**决定性证据**是 dev bundle 里两种真实路径并存
+（`react@19.2.3/…` 与 `react@19.3.0/…`），以及一次 A/B：
+把 i18n 那份链到 app 那份 → **能启动**（4 个 tab 正常渲染）；还原成两份 →
+**同一份源码、同样崩**。所以它**不是本轮引入的**，`typecheck`/`vitest`/`xcodebuild`
+全绿也照样发生（与 §7 第 27、28、31、32 条同形）。
+
+⚠️ **修复不在本支**：主检出的 `apps/mobile/metro.config.js` 里已经有一份**在飞的**
+同因修复（`resolveRequest` 把三个 react 说明符的解析起点改写成 app 根），诊断与修法一致、
+说明符清单比我这版更准。按"一个语义只有一份、不替并发会话提交在飞文件"（§3.5）**本支不重复那份修复** ——
+于是**本支的 Release 应用在那条修复落地（或版本对齐）之前，仍然会启动即崩**。
+上面那些截图是在**本地临时合入等价修复**的条件下拍的，这就是它们成立的前提；
+复现前先确认那件事。
+
+🔴 **阻断二：`ListsSection` 有消费者没生产者。** `ProfileScreen.tsx:38`
+（**本支 HEAD 里就有**）`import { ListsSection } from './ListsSection'`，而该文件
+只存在于主检出的未提交工作里 → Metro 直接
+`Unable to resolve module ./ListsSection`，**整个 bundle 打不出来**。
+本轮临时放了一个只 `return null` 的替身让它能求值，**取证完已删除** ——
+留着一个假实现等于替别人写他的功能（§3.5），而且会把"这里缺一个文件"这件事实
+悄悄盖住。删掉之后打包会**大声失败**，那才是真实状态。实测原话：
+
+```
+$ npx react-native bundle --entry-file index.js --platform ios --dev true …
+error Unable to resolve module ./ListsSection from …/apps/mobile/src/screens/ProfileScreen.tsx
+```
+
+⚠️ 顺带记一个**没修的小瑕疵**（不是缺陷，是想清楚后决定不动的）：那一轮只跑了 14 秒，
+摊到分钟上就是 0，于是句子是「另有 **0 分钟**没有归到…」。数值本身没错
+（`durationParts` 就是这么分的档，Web 端同一个函数同样行为），只是读起来怪。
+要改的话是"不足 1 分钟"这类措辞 + 新词条 + 两端一起改，**属于另一个决定**，本轮只记录。
+
+⚠️ **仍然是空白的地方**（留给下一个人）：移动端没有习惯界面、也没有"给任务指定清单"的界面，
+所以**"带真实颜色的一行泳道（色块 + 槽位号 + 十二格）"在真设备上仍然没被看过** ——
+本轮能看到的最多只是"未归类"那句。另外这些截图是**一次性取证，不是回归防线**：
+下次改 `CategoriesScreen` 的布局，没有任何自动检查会拦住它。
 
 **移动端的接线只有两处落在别人的在飞文件里**（`App.tsx` 挂载一行、
 `ui/icons.tsx` 登记一行，且复用文件里已有的 `ChartColumn` 导入），
