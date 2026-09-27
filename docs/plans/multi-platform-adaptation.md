@@ -35,7 +35,7 @@
 | **M1** | 🔴 垂直切片验证 | **一份** RN 组件在 web + mobile + 桌面三端都渲染出来 | M0 |
 | **M2** | 桌面端骨架（Electron） | 桌面端跑通真实同步，煞有记录 | M1 |
 | **M3** | 逐特性迁移 UI | 每个特性两端共用同一组件；旧 DOM 实现删除 | M2 |
-| **M4** | 数据层统一（web SQLite） | ✅ **决策已落（ADR-0027）**；✅ **`SqliteWasmDriver` 已过同一套契约**；⬜ web 存储迁移（M4-3）未做；⬜ "FTS5 在 web 可用"未验 | M0（可与 M3 并行） |
+| **M4** | 数据层统一（web SQLite） | ✅ **决策已落（ADR-0027）**；✅ **`SqliteWasmDriver` 已过同一套契约**；✅ **Worker 接缝已过同一套契约 + 真浏览器端到端**（M4-3a）；⬜ 切换 `oplog.ts`（M4-3b）未做；⬜ "FTS5 在 web 可用"未验 | M0（可与 M3 并行） |
 | **M5** | 收敛收尾 + 门禁全端 | DOM UI 删除；门禁覆盖全端；文档固化 | M3、M4 |
 | **M6** | 鸿蒙"跑起来" | 真机/模拟器启动成功 | 外部（模拟器镜像 + 签名） |
 
@@ -652,6 +652,46 @@ Electron 壳与自己打包的静态产物是**松耦合**的：即使 UI 收敛
 - ⚠️ **这是数据迁移**，需要一次性把用户既有 IndexedDB 数据导入 SQLite
 - 参照 [迁移纪律](../../AGENTS.md)：不可逆层优先干净
 - 判据：契约测试三端同一套；FTS5 检索在 web 可用
+
+#### M4-3a 接缝 ✅ **已完成并端到端验证**（commit `a453dff`）
+
+**边界画在 `OpLogStore`，不画在 `DbAdapter`** —— 这是本步唯一的关键决定：
+
+`DbAdapter.transaction()` **接收回调**，而回调无法跨 Worker 序列化。画在 `DbAdapter`
+就得把一次原子事务拆成一串请求发过去，**等于把原子性拆掉**。所以
+`SqliteAdapter` 与 `DbOpLogStore` 都在 Worker 里，主线程只拿 `OpLogStore` 代理。
+
+`DbAdapter` 的接口**本来就是全异步的**，所以这条接缝**没改任何接口** ——
+主线程代理与 `IndexedDbOpLogStore` 完全同型，切换是"换实现"而不是"改架构"。
+
+证据（✅实测）：
+
+| 验证 | 命令 | 结果 |
+|---|---|---|
+| 桥接过**同一套** `OpLogStore` 契约 | `pnpm --filter @heyta/storage test` | **288 passed**（+26） |
+| 真浏览器端到端（真 schema + 真桥接 + 跨刷新） | `node scripts/verify-web-sqlite.mjs` | **EXIT=0，13 项全过** |
+| 截图（已亲眼看过，非白屏） | 同上 | `e2e/test-results/web-sqlite-opfs.png` |
+| 全门禁 | `pnpm check` | **EXIT=0，26 passed** |
+
+契约用的端口是**进程内假端口**，投递走 `queueMicrotask`（与真实 `postMessage`
+一样是异步的）—— 这样"假设响应同步到达"这类错会当场暴露。
+
+🔴 **本步踩出来的两条约束**（都已写进代码注释，Node 侧永远验不出来）：
+
+1. **`driverFactory` 是同步的，而装 VFS 是异步的。**
+   异步的只有"装池"且每个 origin 只装一次；池装好后 `new pool.OpfsSAHPoolDb(name)`
+   是同步的。所以有 `createOpfsSahPoolDriverFactory()` 把异步边界提前吃掉。
+2. **同名 VFS 会互抢句柄**（`NoModificationAllowedError`）。因为 VFS 名决定 OPFS 目录名。
+   ⇒ **一个页面只应有一个存储 Worker**；**每个独立数据库家族要有自己的 `vfsName`**。
+
+#### M4-3b 切换 `apps/web/src/lib/oplog.ts` ⬜ 未做
+
+Worker 入口（`apps/web/src/worker/storage.worker.ts`）已就绪且验证通过，
+但**切换本身会动到主线程的启动路径与导入/还原流程**，单独一轮做并单独验。
+
+⚠️ 切换前必须处理的已知点：`clientId` 现在由 Worker 交握给出（`ready` Promise），
+而 `oplog.ts` 里 `initOpLog()` 原本自己 `resolveClientId(db)` —— 顺序不能反，
+否则会拿一个还没定的 `clientId` 去建向量时钟（那正是"两份 clientId 实现"那类 bug）。
 
 ### 回退
 
