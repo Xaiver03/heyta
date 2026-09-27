@@ -380,6 +380,10 @@ export const en = {
   'web.auth.email.placeholder': 'you@example.com',
   'web.auth.sendLoginLink': 'Send login link',
   'web.auth.register': 'Create account',
+  'web.auth.passkey.register': 'Create an account with a passkey',
+  'web.auth.passkey.login': 'Sign in with a passkey',
+  'web.auth.passkey.unavailable': 'This browser or device does not support passkeys — use the email option above.',
+  'web.auth.passkey.waiting': 'Complete the passkey step in the system prompt…',
   'web.auth.terms.label': 'I agree to the terms of service and privacy policy published by this server',
   'web.auth.paste.label': 'Or paste a login link / token',
   'web.auth.paste.placeholder': 'Paste the link from your email, or the token itself',
@@ -396,6 +400,9 @@ export const en = {
   'web.auth.error.network': 'Could not reach the server. Check the URL and your connection.',
   'web.auth.error.server': 'The server is unavailable right now - try again later.',
   'web.auth.error.unknown': 'Signing in did not complete - try again.',
+  'web.auth.error.passkeyUnsupported': 'This browser or device does not support passkeys — use the email login link instead.',
+  'web.auth.error.passkeyCancelled': 'The passkey step was cancelled or timed out. You can try again.',
+  'web.auth.error.passkeyAlreadyRegistered': 'This device already has a passkey for this account — use "Sign in with a passkey" instead.',
   // ── Web · conflict dialog ─────────────────────────────────
   // Payload summary: `text` is the user's own words (never translated) and
   // `fields` reports only a count - field names such as `completedAt` are

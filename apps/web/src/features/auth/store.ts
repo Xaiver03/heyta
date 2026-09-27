@@ -30,6 +30,10 @@
 import { create } from 'zustand';
 
 import {
+  beginPasskeyLogin,
+  beginPasskeyRegistration,
+  completePasskeyLogin,
+  completePasskeyRegistration,
   extractAuthLinkToken,
   registerWithMagicLink,
   requestMagicLink,
@@ -39,9 +43,25 @@ import {
 } from '@heyta/app-host';
 
 import { useSyncStore } from '../sync/store.js';
+import {
+  createPasskeyCredential,
+  detectPasskeyBrowser,
+  getPasskeyCredential,
+  type PasskeyBrowser,
+} from './passkey-browser.js';
 
-/** 正在进行的动作。用来禁用按钮并把状态如实说出来（"正在发送…"）。 */
-export type AuthBusyAction = 'login-link' | 'register' | 'verify';
+/**
+ * 正在进行的动作。用来禁用按钮并把状态如实说出来（"正在发送…"）。
+ *
+ * `passkey-*` 两条与邮件那条**分成不同的动作**：界面上要能显示
+ * "等待系统弹窗…"，而不是笼统的"正在登录"（用户此刻应该去看系统弹窗）。
+ */
+export type AuthBusyAction =
+  | 'login-link'
+  | 'register'
+  | 'verify'
+  | 'passkey-register'
+  | 'passkey-login';
 
 export type AuthStatus =
   /** 还没有凭据 —— 界面必须给出**明确的空状态**，而不是假装成功。 */
@@ -73,6 +93,30 @@ export interface AuthStoreState {
    * 就会用空的输入框把刚拿到的令牌覆盖掉）。
    */
   verify: (baseUrl: string, input: string) => Promise<HostedAuthSession | undefined>;
+  /**
+   * 用通行密钥注册。**与邮件注册是两条路，不是同一条的快捷方式**：
+   * 这里多了一步"让系统弹窗创建凭据"，而它**必须发生在浏览器里**。
+   *
+   * `browser` 可注入（jsdom 没有 `navigator.credentials`）；不传时自动探测。
+   *
+   * ⚠️ 成功**不等于已登录** —— 服务端建的还是待验证账号，仍要去邮箱点验证链接，
+   * 所以状态是 `registered` 而不是 `signed-in`。
+   */
+  registerPasskey: (
+    baseUrl: string,
+    email: string,
+    termsAccepted: boolean,
+    browser?: PasskeyBrowser,
+  ) => Promise<void>;
+  /**
+   * 用通行密钥登录。**这是第二个（也是唯一另一个）产出令牌的入口**，
+   * 成功时同样已经把令牌写进同步配置。
+   */
+  loginWithPasskey: (
+    baseUrl: string,
+    email: string,
+    browser?: PasskeyBrowser,
+  ) => Promise<HostedAuthSession | undefined>;
   /** 回到空状态（关闭/重开认证面板时用）。 */
   reset: () => void;
 }
@@ -126,6 +170,85 @@ export const useAuthStore = create<AuthStoreState>((set) => ({
     applyAuthSession(baseUrl, outcome.session);
     set({ status: { kind: 'signed-in', email: outcome.session.user.email } });
     return outcome.session;
+  },
+
+  registerPasskey: async (baseUrl, email, termsAccepted, browser) => {
+    // 🔴 能力探测必须发生在**发任何请求之前**。不支持的设备上先问服务端要
+    // options 是白问，而且会把"这台设备不支持"伪装成一次失败的网络请求。
+    const resolved = browser ?? detectPasskeyBrowser();
+    if (resolved === undefined || !resolved.supported) {
+      set({ status: { kind: 'failed', reason: 'passkey-unsupported' } });
+      return;
+    }
+
+    set({ status: { kind: 'busy', action: 'passkey-register' } });
+
+    // ① 取 options（协议在 app-host）
+    const begun = await beginPasskeyRegistration(
+      { baseUrl },
+      termsAccepted ? { email, termsAccepted: true } : { email },
+    );
+    if (!begun.ok) {
+      set({ status: { kind: 'failed', reason: begun.reason } });
+      return;
+    }
+
+    // ② 平台那一步（**这一段是本次补上的**）。用户在系统弹窗上操作，
+    //    所以这里可能停住很久 —— 状态已经是 busy，界面会如实显示"等待系统弹窗…"。
+    const created = await createPasskeyCredential(begun.options, resolved);
+    if (!created.ok) {
+      set({ status: { kind: 'failed', reason: created.reason } });
+      return;
+    }
+
+    // ③ 交回服务端回验
+    const completed = await completePasskeyRegistration(
+      { baseUrl },
+      { email, credential: created.credential },
+    );
+    set({
+      status: completed.ok
+        ? { kind: 'registered' }
+        : { kind: 'failed', reason: completed.reason },
+    });
+  },
+
+  loginWithPasskey: async (baseUrl, email, browser) => {
+    // 同上：不支持的设备一个请求都不发。
+    const resolved = browser ?? detectPasskeyBrowser();
+    if (resolved === undefined || !resolved.supported) {
+      set({ status: { kind: 'failed', reason: 'passkey-unsupported' } });
+      return undefined;
+    }
+
+    set({ status: { kind: 'busy', action: 'passkey-login' } });
+
+    const begun = await beginPasskeyLogin({ baseUrl }, email);
+    if (!begun.ok) {
+      set({ status: { kind: 'failed', reason: begun.reason } });
+      return undefined;
+    }
+
+    const assertion = await getPasskeyCredential(begun.options, resolved);
+    if (!assertion.ok) {
+      set({ status: { kind: 'failed', reason: assertion.reason } });
+      return undefined;
+    }
+
+    const completed = await completePasskeyLogin(
+      { baseUrl },
+      { email, credential: assertion.credential },
+    );
+    if (!completed.ok) {
+      set({ status: { kind: 'failed', reason: completed.reason } });
+      return undefined;
+    }
+
+    // 与 verify 走**同一个** applyAuthSession —— 令牌落进同步配置这件事
+    // 只允许有一份实现，否则两个入口迟早有一个漏掉。
+    applyAuthSession(baseUrl, completed.session);
+    set({ status: { kind: 'signed-in', email: completed.session.user.email } });
+    return completed.session;
   },
 
   reset: () => {
