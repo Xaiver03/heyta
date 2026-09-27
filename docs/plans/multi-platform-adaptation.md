@@ -410,6 +410,7 @@ Windows / macOS / Linux 三平台各出一个能跑起真实同步的桌面应�
 | Spike S2（`check:design` 范围） | ✅ **已加** `apps/desktop/src` | `check:design` 通过 |
 | M2-1 依赖登记 | ✅ `electron@44.4.5`（MIT） | `check:licenses` 通过（白名单内，**自动**登记，无需手工） |
 | M2-2 建桌面壳工程 | ✅ **已完成**（渲染页仍是占位） | `build` 出 `main.cjs` + `preload.cjs`；`typecheck` 通过；11 个测试通过 |
+| **M2-2b 桌面端渲染进程 + GUI 冒烟** | ✅ **已完成**（本轮）—— 同时关掉 **M1 判据第 4 条** | `e2e/tests/desktop-window.spec.ts` 通过；截图见 `e2e/test-results/desktop-window.png` |
 | **Windows 真机验证** | ✅ **已实测**（2026-09-27） | 在 `windows-pc` 上 `pnpm -r build` **exit 0**、桌面端产物**字节级一致**、**11/11 测试通过**。详见 [桌面端手册](../runbooks/desktop.md) §5.2 |
 | M2-3 跑通真实同步 | ⬜ **未做** | 需要真实服务端，见 [本地验证手册](../runbooks/local-server-verification.md) |
 | M2-4 三平台产包 + 签名 | ⬜ **未做** | 打包器与 Electron 二进制都还没接 |
