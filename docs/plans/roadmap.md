@@ -384,14 +384,28 @@ Web 设置页有「导出数据」（JSON 完整保真 / 任务清单 Markdown�
 
 **本轮校验过、但仍然存在的诚实缺口**（不属于"断点"，但读的人需要知道）：
 
-- 🔴 **注册/登录的邮件发不出去 —— 生产没配 SMTP**（**外部阻塞**）。服务端日志实测
-  `SMTP configuration is required in production environments`。后果：注册能建号但验证邮件不到；
-  请求登录链接会生成 token 又**因为发信失败把它清掉**，所以用户点「发送登录链接」之后**什么都不会发生**。
-  **这等于新做好的登录面板在承诺一封永远不来的邮件。** 详见 `docs/runbooks/deployment.md` §3.9。
-- ✅ **认证现在有真实服务端证据了**（不再是"只有契约级"）：用运营者视角从真库取真 token 替掉"用户点邮件"这一步，
-  `verify-email` → `login/magic-link/verify` → 真 JWT → 面板粘贴登录成功 → 应用真的打了
+- ✅ **注册/登录的邮件现在真的发得出去，而且实测真的投递到了**（2026-09-27 关闭，**不再是外部阻塞**）。
+  走腾讯云 SES + 发件域名 `finlaw.cloud`（**该域名本来就已在 SES 里验证通过**，四项 DNS 记录全 true，
+  所以没有新建发件域名；新增的是该域名下的专用发件地址 `noreply@finlaw.cloud`）。
+  端到端验收用一次性外部邮箱（Guerrilla Mail，有读取 API）走完整旅程：
+  `POST /api/register/magic-link` → **邮件真到达**（`From: noreply@finlaw.cloud`、
+  `Subject: Verify your heyta account`、正文 `Welcome to heyta!`）→ `POST /api/verify-email` 通过 →
+  `POST /api/login/magic-link` → 第二封真到达 → 真 JWT（221 字符）→ `GET /api/sync/status` **200**。
+  服务端日志佐证：`SMTP configured: gz-smtp.qcloudmail.com:465` /
+  `Verification email sent` / `Magic link login email sent`。详见 `docs/runbooks/deployment.md` §3.9。
+  ⚠️ 往 **`@finlaw.cloud` 自己**发信会失败（收件方 `mail.finlaw.cloud` → `121.4.24.238:25`
+  对 SES 超时，`DeliverStatus: 3`）—— 那是**收件侧**的独立故障，往外部域正常。
+  排查时看 `DeliverStatus` 而不是 `SendStatus`（见 `AGENTS.md` §7 第 81 条）。
+- 🔴 **伴随这次接线挖出的品牌漂移**：改名只改了页面、**整个 `email.ts` 漏了**。
+  用户点邮件链接会落到说 heyta 的页面，而那封邮件写着 `Verify your SuperSync account` ——
+  同一趟流程两种品牌，看起来像钓鱼。已修（`config.ts` 的 `PRODUCT_NAME` / `DEFAULT_SMTP_FROM`
+  收成各一份，7 处字面量归一），并有 7 条能失败的单测 + 变异验证。
+  **这个漂移此前没人看见，是因为生产从来没配 SMTP —— 发不出去的邮件没人读。**
+- ✅ **认证现在有真实服务端证据了**（不再是"只有契约级"）：`verify-email` →
+  `login/magic-link/verify` → 真 JWT → 面板粘贴登录成功 → 应用真的打了
   `POST /api/sync/ops`（**200**），`server_seq` 从 0 推进到 1，真库里留下 1 条 op，**0 console.error**。
-  唯一没验的就是**邮件投递本身**。
+  上一版记的"唯一没验的就是**邮件投递本身**"**已关闭**（见上）。
+
 - ✅ **浏览器端通行密钥那一步已接线**（`apps/web/src/features/auth/passkey-browser.ts`）。
   `@heyta/app-host` 只到"取 options / 交 credential"，中间 `navigator.credentials` 那一步按设计留在宿主里；
   缺的就是这一步，所以在此之前面板只有登录链接一条路。现在注册与登录两条都通了。
@@ -400,8 +414,16 @@ Web 设置页有「导出数据」（JSON 完整保真 / 任务清单 Markdown�
   `navigator.credentials.create()` 会被 Chromium 以 `TypeError` 拒掉，证明转换层不是多余的；
   再把产出的 `clientDataJSON` 解出来，`challenge` 必须**原样回显**（长度对但内容错也会被抓），
   可发现凭据路径解出的 `userHandle` 是注册时的 `user.id`。
-  ⚠️ 仍然**没有做**的服务端那半：**找回通行密钥**（`/api/passkey/recover/*` 三个端点在 app-host 有函数、
-  没有界面），以及**用户主动增删凭据**（没有 UI，也没有端点）。
+  ✅ **找回通行密钥的入口已补**（2026-09-27）：面板上新增"丢失了通行密钥？发一封找回链接"
+  （`store.ts` 的 `requestRecovery` → app-host 的 `requestPasskeyRecovery` → `POST /api/recover/passkey`）。
+  🔴 **同时纠正一条上一版记错的结论**：这里曾写"`/api/passkey/recover/*` 三个端点在 app-host 有函数、
+  **没有界面**"，读起来像整条流程都缺。实际上**恢复本身早就有** —— 是服务端渲染的
+  `/recover-passkey` 页面 + `recover-passkey.js`（线上实测两者都 200）——
+  那一步必须在真实浏览器里调 `navigator.credentials.create()`，本来就不该在 SPA 里。
+  **缺的只是"触发那封邮件"这一步。** 当初只在 `apps/web` 里搜，所以搜漏了。
+  验收：9 条单测（含"成功是中性响应、不是邮箱存在的证据"与"失败绝不说成成功"）+ 变异验证
+  （把按钮 `onClick` 换空操作 → 转红）。
+  ⚠️ 仍然**没有做**的：**用户主动增删凭据**（没有 UI，也没有端点）。
 - **回收站的跨设备一致性没有被真正验证**：op 级证明用的是两个真引擎 + 两个真 SQLite，**没有**跑真实的两客户端服务端收敛。
 - ✅ **导入 / 还原已做**（`packages/app-host/src/import-dump.ts`，CLI 与 Web 都有入口）：走**重放导出里的完整 op-log**，
   所以墓碑语义天然保持（已删数据不复活），并且**只支持还原到空库** —— 目标非空时在写任何东西**之前**就拒绝。
@@ -420,6 +442,9 @@ Web 设置页有「导出数据」（JSON 完整保真 / 任务清单 Markdown�
   当时正被**另一个并行会话**改到一半（未提交），e2e 跑的是那个工作区状态。留给那个会话收口。
 - 全量 `pnpm check` 仍未跑通：它会触发 `prisma generate` 而沙箱报 EPERM（`utime` 在
   `~/.cache/prisma/.../libquery_engine`）。**除上面那条桌面端用例外，其余门禁逐项跑过，全绿。**
+  📌 **更正**：上一版据此外推的"server 全量测试跑不了"是**错的** —— 卡住的只是 `pretest`
+  里的 `prisma generate`。直接 `pnpm --filter @heyta/sync-server exec vitest run` 可以完整跑：
+  实测 **1474 passed / 1 skipped，exit 0**。卡点只在 `pretest`，不在测试本身。
 - **billing 的退款侧与存量回填没做**：`reverseOrderOnRefund` 仍零调用方；接线前已付款未结算的订单不会补结算。
 
 ---
