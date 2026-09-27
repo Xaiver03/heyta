@@ -2109,6 +2109,30 @@ docker inspect <容器> --format '{{range .Config.Env}}{{println .}}{{end}}' | g
      ⚠️ 发布别人改到一半的同步/加密代码，可能是**上线即静默丢数据**，
      而责任看起来会落在最后部署的人头上。
 
+ 84. 🔴 **`200` 不代表拿到了你以为的那个东西 —— 验收必须看 `Content-Type` 和内容开头。**
+     2026-09-27 我验收通行密钥找回，写的是"`/recover-passkey` 页面和 `recover-passkey.js`
+     **线上实测都是 200**"，并据此判断"恢复这条路是通的"。**两个 200 都是真的，
+     但那个 `.js` 返回的是落地页 HTML**（nginx 只代理了页面路径，没代理页面引用的脚本，
+     于是 `/*.js` 掉进 `location /` 的 SPA 兜底 → `/var/www/heyta-landing/index.html`）。
+
+     后果不是"少个功能"：丢了通行密钥的用户**收到邮件 → 点开链接 → 按钮不动 → 进不去**；
+     同一条缺陷也打死了**魔法登录链接**（`/magic-login-confirm.js` 同样被吞）——
+     也就是**主要的登录路径**。而它躲过了此前**所有**验收。
+
+     📌 这一类的形状是**"看着正常、其实是另一个页面"**，只看状态码的门禁**结构上抓不到**。
+     服务端渲染页面引用的每个资源，验收都要断言三件事：
+
+     ```bash
+     curl -s -o /tmp/a.js -w "%{http_code} %{content_type} %{size_download}\n" \
+       https://<域名>/recover-passkey.js   # 还要 head -c 20 确认不是 <!doctype/<html
+     ```
+
+     📌 同一条纪律适用于任何"文件真的存在吗"的判断：**存在**、**200**、**内容正确**
+     是三件不同的事（对照第 82 条：`pnpm build` 报成功但没产出 `.d.ts`）。
+
+     ⚠️ 这份 nginx 配置**不在仓库里**，只在服务器上 —— 所以修复与完整说明写在
+     `docs/runbooks/deployment.md` 的 §3.3.1。改完必须 `nginx -t` 再 `reload`。
+
 ---
 
 ## 8. 工作流

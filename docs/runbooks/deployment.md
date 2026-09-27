@@ -227,6 +227,31 @@
 - ✅ `location ~ ^/(verify-email|recover-passkey|magic-login)$` → 同一个 `proxy_pass`。
   🔴 这三张是**服务端渲染**的页面（`server/src/pages.ts`），不代理就会掉进落地页的 SPA 兜底，
   用户看到的是落地页而不是「令牌无效 / 请重新注册」。
+- 🔴 `location ~ ^/(recover-passkey|magic-login-confirm)\.js$` 与
+  `location = /simplewebauthn-browser.min.js` → 同一个 `proxy_pass`。
+  **只代页面不代脚本 = 页面画得出来、按钮是死的。** 2026-09-27 线上实测过这个形状：
+
+  | | 真值 |
+  |---|---|
+  | `GET /recover-passkey.js` | **`200` 但 `Content-Type: text/html`**，内容是**落地页**（2370 B） |
+  | 浏览器 | `Unexpected token '<'`，`window.SimpleWebAuthnBrowser === undefined` |
+  | 点「Register New Passkey」 | 文案不变、无报错、**零请求**（`apiCallsFromPage: []`） |
+  | `curl` 看状态码 | **200，完全正常** —— 所以只看状态码的验收抓不到它 |
+
+  后果不是"少个功能"：丢了通行密钥的用户**收到邮件 → 点开链接 → 按钮不动 → 进不去**。
+  同一条缺陷也打死了**魔法登录链接**（`/magic-login-confirm.js` 同样被吞），
+  也就是**主要的登录路径**。修完之后的实测：`Content-Type: application/javascript`、
+  `SimpleWebAuthnBrowser === "object"`、点按钮 → `200 /api/recover/passkey/options`
+  + `200 /api/recover/passkey/complete`、页面成功文案出现。
+
+  📌 **只列这三个**：它们是 `server/src/pages.ts` 里三张页面**真正引用**的脚本。
+  `server/public/` 里另有 `app.js` / `style.css` / `eu-stars.svg`，但那是服务端**自带
+  standalone 首页**（`templates/index.template.html`）的资源；本域名 `/` 服务的是真正的
+  落地页（`/var/www/heyta-landing/`，它只用 `/assets/*` 与 `/favicon.svg`），
+  那份首页在这里用不到 —— 所以**故意不代**，免得把 `/style.css` 这种通用名字从落地页手里抢走。
+
+  ⚠️ **验收纪律**：这一整类缺陷只在"看响应体"时才现形。对**服务端渲染页面引用的每个资源**，
+  验收必须断言 `Content-Type` **和**内容开头，不能只断言 `200`。
 - ✅ certbot 追加的 HTTPS 块 + Let's Encrypt 证书（见 §3.4）。
 
 #### 3.3.2 `heyta-tmp`（已弃用，留作回滚路径）
