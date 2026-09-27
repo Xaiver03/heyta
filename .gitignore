@@ -1,6 +1,10 @@
 node_modules/
 dist/
 dist-types/
+# 桌面端渲染进程的构建产物（`apps/desktop/vite.config.ts` 的 outDir）。
+# 🔴 它**不是** `dist/`，所以上面那条兜不住它 —— 忘了加这一条就会把
+# 一个 400KB+ 的压缩 bundle 提交进仓库。
+renderer-dist/
 *.tsbuildinfo
 
 # 构建产物：任何层级叫 build/ 的目录都是产物，不是源码。

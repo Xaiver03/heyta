@@ -27,15 +27,38 @@ async function bootHost(): Promise<NodeHost> {
   return host;
 }
 
+/**
+ * 冒烟/自动化模式下不让窗口抢焦点。
+ *
+ * 🔴 为什么需要它：`window.show()` 会把窗口激活到前台。跑 GUI 冒烟时这等于
+ * **每跑一次测试就把用户从正在做的事里踢出来** —— 本机实测就是这样，
+ * 用户明确要求不要抢前台。自动化里窗口只需要"能被截图"，不需要"被聚焦"。
+ *
+ * `focusable: false` 是更硬的一道：在 macOS 上光用 `showInactive()` 有时
+ * 仍会因为窗口可聚焦而被激活，禁止聚焦之后它就不可能抢走输入焦点。
+ */
+const NO_FOCUS = process.env.HEYTA_DESKTOP_NO_FOCUS === '1';
+
 function createWindow(): BrowserWindow {
   const window = new BrowserWindow({
     width: 1100,
     height: 760,
     // 先不显示，等首帧就绪再 show —— 否则会看到一段白屏闪一下。
     show: false,
+    focusable: !NO_FOCUS,
     title: 'heyta',
     webPreferences: {
-      preload: join(app.getAppPath(), 'dist', 'preload.cjs'),
+      /**
+       * 🔴 同样是 `app.getAppPath()` 那个坑（见下面 `loadFile` 的注释）：
+       * 它返回的是 `dist/`，所以这里**不能**再拼一次 `'dist'`。
+       *
+       * 拼错时 `preload` 静默不加载 —— Electron **不会**因为 preload 文件
+       * 不存在而拒绝开窗口，渲染进程里 `window.heytaDesktop` 直接是
+       * `undefined`，界面上表现为一句
+       * `TypeError: Cannot read properties of undefined (reading 'request')`。
+       * 这个错误看起来像"宿主坏了"，实际只是路径多了一层。
+       */
+      preload: join(app.getAppPath(), 'preload.cjs'),
       /**
        * 🔴 这三项是桌面端**唯一**的安全边界，不要为了图方便放开任何一个：
        * - `contextIsolation` 让 preload 与页面在**不同的 JS 世界**
@@ -50,12 +73,45 @@ function createWindow(): BrowserWindow {
   });
 
   window.once('ready-to-show', () => {
-    window.show();
+    /**
+     * 🔴 自动化里用 `showInactive()`：窗口会出现（Playwright 才截得到图），
+     * 但**不会**被激活到前台。手动启动时仍然用 `show()` —— 双击应用的人
+     * 当然希望它到前台来。
+     */
+    if (NO_FOCUS) window.showInactive();
+    else window.show();
   });
 
-  // ⚠️ 临时占位页。M1（共享 UI 垂直切片）会把它换成真正的共享组件；
-  // 在那之前它至少证明"窗口 → preload → 主进程 → 共享宿主 → SQLite"这条链是通的。
-  void window.loadFile(join(app.getAppPath(), 'renderer', 'index.html'));
+  /**
+   * 🔴 加载的是**构建产物** `renderer-dist/`，不是源码目录 `renderer/`。
+   *
+   * `renderer/` 里是 `.tsx` + 一个 `<script type="module" src="./main.tsx">` ——
+   * Chromium **不认识 TSX**，直接 `loadFile` 源码目录会得到一个白窗口。
+   * 产物由 `vite build` 生成（见 `apps/desktop/vite.config.ts`）。
+   *
+   * ─────────────────────────────────────────────────────────────
+   * 🔴🔴 `app.getAppPath()` 是**入口脚本所在目录**，不是包根
+   * ─────────────────────────────────────────────────────────────
+   *
+   * 这里踩过一次真实的坑，而且**症状是全白、没有任何报错**：
+   *
+   * 第一版写的是 `join(app.getAppPath(), 'renderer', 'index.html')`。
+   * 直觉上 `getAppPath()` 应该是"应用的根目录"（`apps/desktop`），
+   * 但实测它是 **`apps/desktop/dist`** —— 也就是 `dist/main.cjs` 所在的那个
+   * 目录。于是拼出来的路径是：
+   *
+   *     file:///…/apps/desktop/dist/renderer-dist/index.html   ← 不存在
+   *
+   * Electron 只在**终端**里打一行
+   *     electron: Failed to load URL: … error: ERR_FILE_NOT_FOUND
+   * 窗口本身照常打开、照常是白的，Playwright 那边表现为
+   * `electron.launch()` 直接超时（连窗口对象都拿不到）。
+   * 换句话说：**这个 bug 从占位页时期就存在**，桌面端从来没显示过东西。
+   *
+   * 所以路径要从 `dist/` **往上走一级**。写成 `'..'` 而不是依赖 cwd，
+   * 是因为 cwd 取决于谁启动的（`pnpm start`、Playwright、双击 .app 各不相同）。
+   */
+  void window.loadFile(join(app.getAppPath(), '..', 'renderer-dist', 'index.html'));
 
   return window;
 }

@@ -7,21 +7,31 @@
   "type": "module",
   "main": "dist/main.cjs",
   "scripts": {
-    "build": "tsup",
-    "typecheck": "tsc --noEmit -p tsconfig.spec.json",
+    "build": "tsup && vite build",
+    "typecheck": "tsc --noEmit -p tsconfig.spec.json && tsc --noEmit -p tsconfig.renderer.json",
     "test": "vitest run",
     "test:watch": "vitest",
     "start": "electron dist/main.cjs",
     "smoke": "electron dist/smoke.cjs"
   },
   "dependencies": {
-    "@heyta/node-host": "workspace:*"
+    "@heyta/node-host": "workspace:*",
+    "@heyta/domain": "workspace:*",
+    "@heyta/ui": "workspace:*",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
+    "react-native-svg": "15.15.5",
+    "react-native-web": "0.21.3"
   },
   "devDependencies": {
     "@types/node": "^20.0.0",
     "electron": "^44.4.5",
     "tsup": "^8.5.1",
     "typescript": "^5.9.3",
-    "vitest": "^5.0.1"
+    "vitest": "^5.0.1",
+    "@types/react": "^19.2.2",
+    "@types/react-dom": "^19.2.1",
+    "@vitejs/plugin-react": "^5.0.4",
+    "vite": "^7.1.9"
   }
 }

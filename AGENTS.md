@@ -347,6 +347,60 @@ pnpm --filter @heyta/mobile run build:android:bundle   # 上架用 AAB
 
 **提交前至少跑**：`pnpm -r typecheck && pnpm -r test`。
 
+### 6.2 界面验收：两条**硬性规定**（不是建议）
+
+#### 规定一：Playwright 必须真跑，而且**必须截图 + 人真的看**
+
+任何"界面能用 / 界面画出来了"的结论，**只有截图能作为证据**。
+`pnpm check` 绿、元素断言过、元素数量对 —— **都不算**。
+
+```bash
+cd e2e && npx playwright test tests/<某个>.spec.ts
+# 截图落在 e2e/test-results/ 下，固定文件名，直接打开看
+```
+
+写验收时必须做到这四条（后来者不要删）：
+
+1. **先截图，再断言。** 截图在 `try` 之前就落盘，**失败时也要有图** ——
+   否则失败只会得到一个 `Test timeout of 60000ms exceeded`，它**不会告诉你
+   界面长什么样**。
+2. **截图放固定路径**（如 `e2e/test-results/desktop-window.png`），不随测试名变化，
+   这样 `pnpm check` 之后可以直接打开同一个文件看。
+3. **抓控制台 `console` 与 `pageerror`**，并在断言失败时打印。
+   白窗口的根因**几乎只在这里现形**（模块 404、CSP 拦脚本、React 抛错）。
+   ⚠️ 监听要在**窗口一创建**就挂上（Electron 用 `app.on('window')`），
+   挂晚了收不到加载期错误 —— 输出会显示"控制台无内容"，那是最误导人的结果。
+4. **人必须打开那张图看一眼。** 不是"截了就算"，是"看了才算"。
+
+**为什么定成硬性规定 —— 这是当天实测出来的三连击。**
+桌面端窗口**全白**，而当时的断言只写了"某个元素可见"。加上截图之后，
+**一张图连续抓出三个各自独立、断言都没报出根因的 bug**：
+
+| # | 界面上看到的 | 真实根因 |
+|---|---|---|
+| 1 | 全白，`launch()` 直接超时 | `app.getAppPath()` 是**入口脚本所在目录**（`dist/`），不是包根 —— 拼出的 `dist/renderer-dist/index.html` 不存在。🔴 **这个 bug 从占位页时期就存在，桌面端从来没显示过东西。** |
+| 2 | `宿主不可用：TypeError: Cannot read properties of undefined (reading 'request')` | 同一类错误：`preload` 路径多拼了一层 `dist`。preload 缺失时 Electron **不报错、照常开窗**，只是 `window.heytaDesktop` 是 `undefined`。 |
+| 3 | 全白，`#root` 长度为 0 | 少了 `<HeytaUiProvider>`（共享组件**主动抛错**而不是静默降级，这点值得表扬） |
+
+三条里有两条的症状是"白屏"，而**白屏在自动化里最阴的地方是它什么都不报**：
+不崩、不 timeout（除了第一条）、日志干净 —— 只是"那个元素没出现"。
+只有图能一眼区分"没渲染"和"渲染成了空白"。
+
+#### 规定二：跑验收**不要抢前台**
+
+**任何会开窗口的操作（Electron 冒烟、真浏览器、模拟器）都必须在后台跑，
+且不得抢走用户的输入焦点。** 用户可能在同一个界面上做别的事，
+每跑一次测试就把人踢出正在做的事，是不可接受的。
+
+- 命令用**后台任务**跑（`run_in_background`），不要卡在前台。
+- Electron 窗口必须**不抢焦点**：已有实现见 `apps/desktop/src/main.ts`
+  的 `NO_FOCUS`（`focusable: false` + `showInactive()`），
+  由环境变量 `HEYTA_DESKTOP_NO_FOCUS=1` 打开，
+  GUI 冒烟在 `electron.launch({ env: … })` 里传它。
+- ⚠️ 光用 `showInactive()` 在 macOS 上**不够** —— 窗口仍可能因为"可聚焦"
+  而被激活。`focusable: false` 才是硬保证。
+- 新增任何会弹窗的验收脚本时，照这个模式做，别等用户投诉。
+
 ---
 
 ## 7. 环境陷阱（实测踩过，会复现）
