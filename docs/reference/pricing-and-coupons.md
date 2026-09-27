@@ -283,6 +283,50 @@ adapter 必须原样使用。理由是回调按订单号认单（`settleOrderPai
 
 ---
 
+### 6.2 运营的实际入口：一个 CLI，两个「会红」的条件
+
+改价 / 发券**只有一条路**：服务器上的 `server/scripts/pricing.ts`（本轮接进了
+`package.json`，所以不必再手敲 `tsx`）：
+
+```bash
+pnpm --filter @heyta/server pricing show          # 生产（跑 dist）
+pnpm --filter @heyta/server pricing:dev show      # 开发（直接跑 tsx）
+pnpm --filter @heyta/server pricing set-price \
+  --price-id hosted-ai-monthly --currency CNY --amount-minor 1500 \
+  --actor ops@heyta --note "国庆活动"
+```
+
+没有 HTTP 管理接口、没有管理界面，**也没有 admin 鉴权 / 角色** —— 能登服务器就能改价，
+`--actor` 是一段自由文本（可伪造）。这是本轮如实记录的缺口，不是设计（见 §7 第 14 条）。
+
+`show` 打印四段：价格（基线与生效价）→ 券 → **审计（最近 20 条）** → 告警。
+审计段是本轮补的：`pricing_audit_log` 在此之前**只写不读**，于是"谁在什么时候把 ¥12
+改成 ¥15"在代码里没有答案，只能手写 SQL 去问库。审计写下来却读不出来 = 没有审计。
+
+**两个条件会让 CLI 以退出码 1 结束。** 注意这两个都不是"改价失败、已回滚"——
+价**已经改了**，只是还有事没做完：
+
+| 条件 | 含义 | 恢复方式 |
+|---|---|---|
+| **文案分叉** | 库里此刻生效的价 ≠ 代码基线（而落地页 / 法务 / 门禁读的是基线） | 把基线也改成新价并跑 `pnpm check:pricing`；或撤回 |
+| **价格空隙** | 该 key 在库里有版本，但**没有一版在此刻生效** → 收银台直接拒单 | 先发一版立即生效的过渡价，或把 `--effective-from` 改到当前/更早 |
+
+「文案分叉」这一条补的是**门禁唯一的盲区**：`check:pricing` 只校验代码基线 ↔
+中英词条 ↔ 法务 ↔ `pricing-ssot` 这四处**代码侧**文件是否自洽，它**不读数据库**
+（CI 没有 PostgreSQL）。所以"库里改了、文案没改"以前没有任何机制会发现 ——
+页面印 ¥5、收银台收 ¥139，而全部门禁是绿的。CLI 是唯一能在**改价那一刻**说出来的
+地方，因此它必须**失败**，不能只是提示。
+
+修这个盲区时还顺手修掉了一个精度问题：比的是**改完之后此刻真正生效**的那一版，
+不是刚发布的那个数。否则"排期到未来"这个正常操作会被误判成分叉
+（"库里现在收 ¥13"在那一刻是假的）。价格空隙的成因见 §7 第 13 条。
+
+该清单**自身**也被断言：`tests/pricing-cli.spec.ts` 会检查 `PRICING_COPY_SITES`
+里点名的每个文件**真的存在** —— 因为本仓库刚踩过"注释点名了一个不存在的脚本"
+（§7 第 15 条），而清单漂移的后果是"少改一处文案"。
+
+---
+
 ## 7. 未验证项与已知缺口（不假装它们被测过）
 
 1. ~~**行锁的阻塞行为没有被本仓库实测过。**~~ **已在真 PostgreSQL 上实测 —— 不再是缺口。**
@@ -414,6 +458,45 @@ adapter 必须原样使用。理由是回调按订单号认单（`settleOrderPai
    **证据**：`server/scripts/pricing.ts` 里那处 `as unknown as PrismaLikeClient`
    绕行断言**已删除**，`npx tsc --noEmit -p server/tsconfig.json` → exit 0。
    删掉断言那一行本身就是回归测试：把两个接口合回去，`pnpm typecheck` 会红在那里。
+13. **🔴 新发现：把某个 key 的「第一个」版本排到未来，会造出"没有生效价"的空隙。**
+   `resolveEffectivePrice` 的裁决是"库里对该 key 有版本 → 只在覆盖里找，找不到就抛
+   `PriceNotEffectiveError`，**绝不回落基线**"（§1.2，刻意设计：回落会变成静默按旧价收款）。
+   但 `publishPriceVersion` 只"收口上一版"，而**第一个**版本没有上一版可收口 ——
+   于是 `[现在, 新版本起点)` 这段区间一版生效价都没有，收银台在这段时间**直接拒单**。
+
+   **实测（纯函数，不经库）**：基线 `hosted-monthly/CNY = 500`；覆盖
+   `1300 / effective_from = now + 7d` → `resolveEffectivePrice(…, now)` 抛
+   `PriceNotEffectiveError：价目表 hosted-monthly/CNY 有版本，但没有一版覆盖 …`。
+   只有**第一个**版本会这样：后续版本会把上一版收口（`effective_until = 新版起点`），
+   所以"排期"本身没问题，坏的是"**第一次就排期**"。
+
+   本轮**没有改**这个语义（它动的是"按哪个数收钱"，属 ADR 级决定），而是让 CLI 在发布
+   那一刻就把它喊出来并以退出码 1 结束（§6.2），外加 `show` 如实显示
+   「当前没有生效版本」。回归测试：`billing-pricing-store.pglite.spec.ts` 的
+   「把**第一个**版本排到未来 → 造出价格空隙，必须当场喊出来」与
+   「已有生效版本时再排期 → 不留空隙（上一版被收口），也不算分叉」。
+
+   **建议的修法（待定，需一条 ADR）**：`publishPriceVersion` 在插入某 key 的**第一个**
+   版本、且该版本起点晚于"现在"时，先**显式写一版基线作为过渡**
+   （`effective_from = 0`、`effective_until = 新版起点`），使区间连续。理由与"不回落基线"
+   完全一致：**让生效的东西是显式的一行**，而不是隐式的回落。
+14. **🔴 没有 admin 鉴权 / 角色 / HTTP 管理面。** `server/src` 里没有任何
+   role / permission / isAdmin 实现，HTTP 上只有
+   `POST /api/billing/webhooks/:provider` 一条计费路由。改价 = 能登服务器 + shell 权限，
+   `--actor` 是自由文本（**可伪造**）。所以审计记的是"有人这么敲了"，不是
+   "某个已认证身份这么做了"。
+
+   最小缺口集：① 运营身份认证 + 角色；② 受鉴权的管理面（查价 / 改价 / 查审计 / 回滚）；
+   ③ 把"是否被 DB 覆盖"纳入同一条门禁或人工确认步骤。
+   本轮**不建**（超出"定价一致性"这件事的范围），如实记录为缺口而不是"已完成"。
+15. **`server/scripts/show-price.ts` 从来不存在，却被两处注释点名。** 已修：
+   `price-book.ts` 与 `pricing-store.ts` 的注释改成指向真正的入口
+   （`server/scripts/pricing.ts show`），并写明"原先点名的文件不存在"。
+
+   这个错误的**形状**值得单独记下来：注释里点名的文件没有任何门禁校验其存在性，
+   所以一个不存在的脚本可以被引用很久而没人发现 —— 而它恰好是
+   "遮蔽告警"的最后一个落点。`tests/pricing-cli.spec.ts` 现在对 `PRICING_COPY_SITES`
+   做**存在性断言**，防止同类漂移再发生在新加的文案清单上。
 
 ---
 

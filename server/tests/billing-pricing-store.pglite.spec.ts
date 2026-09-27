@@ -1,5 +1,5 @@
 import { PGlite } from '@electric-sql/pglite';
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   COUNTED_REDEMPTION_STATES,
   CouponDefinitionRejectedError,
@@ -39,6 +39,7 @@ import {
   createWechatTestKeyPair,
 } from './wechat-test-fixture.helper';
 import { PRICING_SCHEMA_DDL } from './pricing-ddl.helper';
+import { PRICING_COPY_SITES, parsePricingCommand, runSetPrice, runShow } from '../scripts/pricing';
 
 /**
  * 持久化层的证据文件：**真的 PostgreSQL**（PGlite）上跑真的 SQL。
@@ -1009,5 +1010,118 @@ describe('🔴 审计能被读出来', () => {
     const one = await loadPricingAudit(base, { limit: 1 });
     expect(one).toHaveLength(1);
     expect(one[0]!.target).toBe('c3');
+  });
+});
+
+/**
+ * 改价 CLI 本身，在**真 SQL** 上跑一遍。
+ *
+ * 🔴 这一组是"价格能自由改，而且改完**必然会说**文案还没改"的回归证据：
+ * 它把 `describeCopyFootprint` 的输出**和退出码**一起钉住 —— 只有退出码会让
+ * 运营和未来的 CI 真的停下来。
+ *
+ * 用 PGlite 而不是真 PostgreSQL：这台机器上的 Prisma Postgres dev server
+ * 不常驻（51213/51214 无监听），而 CLI 收的正是一个 `SqlExecutor`，
+ * 所以真 SQL 在 PGlite 上照样跑得起来。这也是本轮**没有**在真库上复跑
+ * `scripts/pricing.ts` 的诚实边界（见 `docs/reference/pricing-and-coupons.md` §7）。
+ */
+describe('改价 CLI（真 SQL 在 PGlite 上跑）', () => {
+  /**
+   * ⚠️ 这里**故意不传**固定时钟给解析器：`runSetPrice` 内部用 `Date.now()` 判断
+   * "此刻真正生效的是哪一版"，而 `--effective-from` 缺省就是**解析那一刻的**
+   * `Date.now()`。用固定时钟（`NOW` = 2027 年）会让新版本排在**未来**，
+   * 于是根本没有生效版本 —— 那测的就变成"排期"而不是"改价"了。
+   * 真实时钟下这两次 `Date.now()` 相差几毫秒，版本落在半开区间内，立即生效。
+   */
+  const setPrice = (amountMinor: number, extra: readonly string[] = []) =>
+    parsePricingCommand([
+      'set-price',
+      '--price-id', 'hosted-monthly',
+      '--currency', 'CNY',
+      '--amount-minor', String(amountMinor),
+      '--actor', 'ops@heyta',
+      '--note', '探针',
+      ...extra,
+    ]);
+
+  /** 把 `console.log` 收起来，返回拼好的文本（CLI 的输出就是它的界面）。 */
+  const capture = async (fn: () => Promise<void>): Promise<string> => {
+    const lines: string[] = [];
+    const spy = vi.spyOn(console, 'log').mockImplementation((...args: unknown[]) => {
+      lines.push(args.map(String).join(' '));
+    });
+    try {
+      await fn();
+    } finally {
+      spy.mockRestore();
+    }
+    return lines.join('\n');
+  };
+
+  const asSetPrice = (command: ReturnType<typeof parsePricingCommand>) => {
+    if (command.kind !== 'set-price') throw new Error('解析没给出 set-price');
+    return command;
+  };
+
+  beforeEach(() => {
+    process.exitCode = 0;
+  });
+
+  it('🔴 改成 ¥13：逐个点名文案落点，并把退出码置 1', async () => {
+    const out = await capture(() => runSetPrice(base, asSetPrice(setPrice(1_300))));
+
+    expect(out).toContain('¥13.00'); // 库里现在收的
+    expect(out).toContain('¥5.00'); // 页面还在印的
+    for (const site of PRICING_COPY_SITES) expect(out).toContain(site.path);
+    expect(process.exitCode).toBe(1);
+  });
+
+  it('改成与基线相同的 ¥5：不告警，退出码保持 0', async () => {
+    const out = await capture(() => runSetPrice(base, asSetPrice(setPrice(500))));
+    expect(out).not.toContain('而代码基线还是');
+    expect(process.exitCode).toBe(0);
+  });
+
+  it('🔴 把**第一个**版本排到未来 → 造出价格空隙，必须当场喊出来', async () => {
+    const out = await capture(() =>
+      runSetPrice(base, asSetPrice(setPrice(1_300, ['--effective-from', String(NOW + 24 * HOUR)]))),
+    );
+    // 裁决规则是"有覆盖就不回落基线"，所以此刻**没有**任何生效价 → 收银台拒单。
+    expect(out).toContain('价格空隙');
+    expect(out).toContain('PriceNotEffectiveError');
+    // 因此不能说"库里现在收 ¥13" —— 此刻根本没价，也就谈不上分叉。
+    expect(out).not.toContain('而代码基线还是');
+    expect(process.exitCode).toBe(1);
+
+    // `show` 也要如实报"当前没有生效版本"，而不是显示一个不存在的价。
+    process.exitCode = 0;
+    const showOut = await capture(() => runShow(base));
+    expect(showOut).toContain('当前没有生效版本');
+  });
+
+  it('已有生效版本时再排期 → 不留空隙（上一版被收口），也不算分叉', async () => {
+    // 先发一版立刻生效、且与基线同价（¥5），于是"此刻收的"= 基线。
+    await capture(() => runSetPrice(base, asSetPrice(setPrice(500))));
+    process.exitCode = 0;
+
+    const out = await capture(() =>
+      runSetPrice(base, asSetPrice(setPrice(1_300, ['--effective-from', String(Date.now() + 24 * HOUR)]))),
+    );
+    expect(out).not.toContain('价格空隙'); // 上一版被收口，区间连续
+    expect(out).toContain('未来'); // 但排期提醒必须在
+    expect(process.exitCode).toBe(0); // 此刻收的仍是 ¥5 == 基线 → 不分叉
+  });
+
+  it('🔴 show 会把审计打出来，并因为分叉而退出码 1', async () => {
+    await capture(() => runSetPrice(base, asSetPrice(setPrice(1_300))));
+
+    process.exitCode = 0;
+    const out = await capture(() => runShow(base));
+    expect(out).toContain('price_published');
+    expect(out).toContain('hosted-monthly/CNY');
+    expect(out).toContain('ops@heyta');
+    expect(out).toContain('探针');
+    // 库里 ¥13、基线 ¥5 → `show` 也是错误状态。
+    expect(process.exitCode).toBe(1);
   });
 });
