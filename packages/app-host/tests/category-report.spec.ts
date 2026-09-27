@@ -164,7 +164,13 @@ describe('categoryReportFromTables：只摊平，不判断', () => {
     // ⚠️ 不写死 12：窗口长度是**配置**。写死的边界断言会在改配置后静默空转，
     // 而那正是本仓库 §7 第 33 条的形状。
     expect(report.weeks).toHaveLength(DEFAULT_CATEGORY_WEEKS);
-    expect(report.weeklyPeak?.length ?? report.weeks.length).toBe(DEFAULT_CATEGORY_WEEKS);
+    // ⚠️ 这里曾有一行 `expect(report.weeklyPeak?.length ?? report.weeks.length)...`。
+    // `weeklyPeak` 这个字段**从来没有存在过** —— 它只是靠 `??` 回退到 `weeks.length`
+    // 才在运行时"通过"，而 `tsc` 一直是红的（`6d4ba1d` 引入，合并时才发现）。
+    // 逐格对齐那条不变量（`series[].weeklyMs.length === weeks.length`）由领域层
+    // 那条**带数据**的测试守着，比这里强得多：
+    // `packages/domain/tests/activity-categories.spec.ts`「weeklyMs 的长度永远
+    // 等于 weeks.length」。不要在这里重新加一行同义的断言。
   });
 });
 
