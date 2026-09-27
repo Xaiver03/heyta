@@ -42,6 +42,8 @@ import {
   type HostedEntitlementReading,
 } from '@heyta/domain';
 
+import { joinEndpointUrl } from './endpoint-url.js';
+
 /**
  * 权益探测端点。放在常量里而不是散落的字面量：它同时被测试当作断言目标。
  *
@@ -59,10 +61,6 @@ export interface HostedEntitlementProbeOptions {
   /** 探测端点，便于测试。默认 {@link HOSTED_ENTITLEMENT_PATH}。 */
   path?: string;
 }
-
-/** 去掉根地址末尾的斜杠，避免 `//api/...` 这种拼法。 */
-const joinUrl = (baseUrl: string, path: string): string =>
-  `${baseUrl.replace(/\/+$/, '')}${path}`;
 
 /**
  * 拉一次权益状态。
@@ -87,11 +85,14 @@ export async function fetchHostedEntitlementReading(
 
   let response: Response;
   try {
-    response = await fetchImpl(joinUrl(options.baseUrl, options.path ?? HOSTED_ENTITLEMENT_PATH), {
-      method: 'GET',
-      headers: { authorization: `Bearer ${token}` },
-      // 🔴 刻意没有 `body`：这次请求不携带任何用户内容。
-    });
+    response = await fetchImpl(
+      joinEndpointUrl(options.baseUrl, options.path ?? HOSTED_ENTITLEMENT_PATH),
+      {
+        method: 'GET',
+        headers: { authorization: `Bearer ${token}` },
+        // 🔴 刻意没有 `body`：这次请求不携带任何用户内容。
+      },
+    );
   } catch {
     // 断网 / DNS / 证书 / 平台策略拦截 —— 一律 fail-open，不降级。
     return { kind: 'unavailable', cause: 'network' };

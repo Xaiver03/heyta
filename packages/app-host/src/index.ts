@@ -87,6 +87,38 @@ export {
 } from './entitlement.js';
 
 /**
+ * 服务端认证客户端。**所有宿主共用这一份** —— 见 `hosted-auth.ts` 文件头：
+ * 服务端早就有完整认证，而此前**没有任何客户端调用它**（用户只能在同步设置里
+ * 手填令牌，没人告诉他令牌从哪来）。
+ *
+ * 🔴 协议语义（哪个路径、发什么字段、凭据在响应体里不是 cookie、
+ * 失败如何归类）一律在 `packages/app-host`，`apps/*` 只负责
+ * 「用什么网络实现」和「把通行密钥 options 交给平台的人机接口」。
+ */
+export {
+  HOSTED_AUTH_PATHS,
+  beginPasskeyLogin,
+  beginPasskeyRegistration,
+  completePasskeyLogin,
+  completePasskeyRecovery,
+  completePasskeyRegistration,
+  extractAuthLinkToken,
+  getPasskeyRecoveryOptions,
+  registerWithMagicLink,
+  requestMagicLink,
+  requestPasskeyRecovery,
+  verifyEmailAddress,
+  verifyMagicLink,
+  type HostedAuthFailure,
+  type HostedAuthFailureReason,
+  type HostedAuthOptions,
+  type HostedAuthOutcome,
+  type HostedAuthSession,
+  type HostedPasskeyCredential,
+  type HostedPasskeyOptions,
+} from './hosted-auth.js';
+
+/**
  * 重复规则的预设。**"每周"到底是哪一天是产品语义**，所以在这里而不在界面里
  * （判据见 §3.5："这段代码里有没有一行在决定业务上该怎么做？"）。
  * 界面只负责选 id 与显示文字。

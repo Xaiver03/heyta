@@ -391,6 +391,37 @@ export const zhCN = {
   // 同 `mobile.common.badge.countOne`：中文无单复数，刻意与复数版逐字相同。
   'web.sync.status.conflictOne': '{count} 处改动需要你确认',
   'web.sync.status.errorRetryable': '同步出错：{message}',
+  // ── 认证 ──
+  // 服务端早就有完整认证，此前没有任何客户端调用它：用户只能在同步设置里
+  // 手填令牌，而没人告诉他令牌从哪来。这一组就是那个缺失的入口。
+  // ⚠️ 电子邮件地址的**格式校验在服务端**（唯一事实源），这里的占位符只示范形状。
+  'web.auth.title': '登录 / 注册',
+  'web.auth.close': '关闭',
+  'web.auth.open': '登录 / 注册以获取令牌',
+  // 同步设置里令牌字段下面的指路句 —— 它回答的正是"令牌从哪来"。
+  'web.auth.tokenHint': '访问令牌由服务端签发。点上面的按钮登录或注册，令牌会自动填进来；已经有令牌的可以直接粘贴填写。',
+  'web.auth.empty.title': '还没有凭据',
+  'web.auth.empty.body': '同步需要服务端签发的访问令牌。用邮箱登录或注册即可获得，令牌会自动写入下面的同步设置。',
+  'web.auth.email.label': '邮箱',
+  'web.auth.email.placeholder': '你的邮箱地址',
+  'web.auth.sendLoginLink': '发送登录链接',
+  'web.auth.register': '注册新账号',
+  'web.auth.terms.label': '我同意该服务端提供的服务条款与隐私政策',
+  'web.auth.paste.label': '或者粘贴登录链接 / 令牌',
+  'web.auth.paste.placeholder': '粘贴邮件里的链接，或那串令牌本身',
+  'web.auth.verify': '完成登录',
+  'web.auth.sent.login': '如果这个邮箱有账号，登录链接已经发出。打开邮件里的链接，或把链接粘贴回上面的输入框。',
+  'web.auth.sent.register': '注册申请已提交。请查收邮件并点开验证链接；验证完成后回到这里登录。',
+  'web.auth.signedIn.title': '已登录',
+  'web.auth.signedIn.body': '令牌已写入同步设置（{email}）。填好端到端加密口令后即可同步。',
+  'web.auth.error.unconfigured': '先在上面填好服务端地址。',
+  'web.auth.error.invalidEmail': '这个邮箱地址或令牌看起来不对，检查后重试。',
+  'web.auth.error.notAllowed': '这个服务端不允许用该邮箱注册。',
+  'web.auth.error.unauthorized': '链接无效或已过期，请重新发送一封。',
+  'web.auth.error.rateLimited': '请求太频繁了，请过一会儿再试。',
+  'web.auth.error.network': '连不上服务端，检查地址与网络后重试。',
+  'web.auth.error.server': '服务端暂时不可用，请稍后重试。',
+  'web.auth.error.unknown': '登录没有完成，请重试。',
   // ── Web · 冲突解决界面 ────────────────────────────────────
   // 载荷摘要：`text` 是用户自己的字（不翻译），`fields` 只报数量 ——
   // 字段名（completedAt 那种）是内部标识符，不能出现在用户可见文案里。

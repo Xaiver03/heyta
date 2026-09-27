@@ -364,6 +364,38 @@ export const en = {
   // Singular sibling; one change is the common case.
   'web.sync.status.conflictOne': '{count} change needs your review',
   'web.sync.status.errorRetryable': 'Sync error: {message}',
+  // ── Authentication ──
+  // The server has had full authentication for a while; until now no client called
+  // it. The only credential entry point was the hand-typed token field in sync
+  // settings, and nothing told the user where a token comes from.
+  // The email format check lives on the server (single source of truth); the
+  // placeholder only shows the shape.
+  'web.auth.title': 'Sign in or register',
+  'web.auth.close': 'Close',
+  'web.auth.open': 'Sign in or register to get a token',
+  'web.auth.tokenHint': 'Access tokens are issued by the server. Sign in or register with the button above and the token is filled in automatically; if you already have one, paste it directly.',
+  'web.auth.empty.title': 'No credentials yet',
+  'web.auth.empty.body': 'Syncing needs an access token issued by the server. Sign in or register with your email to get one - the token is written into the sync settings below.',
+  'web.auth.email.label': 'Email',
+  'web.auth.email.placeholder': 'you@example.com',
+  'web.auth.sendLoginLink': 'Send login link',
+  'web.auth.register': 'Create account',
+  'web.auth.terms.label': 'I agree to the terms of service and privacy policy published by this server',
+  'web.auth.paste.label': 'Or paste a login link / token',
+  'web.auth.paste.placeholder': 'Paste the link from your email, or the token itself',
+  'web.auth.verify': 'Finish signing in',
+  'web.auth.sent.login': 'If an account with that email exists, a login link is on its way. Open the link in the email, or paste it into the field above.',
+  'web.auth.sent.register': 'Registration submitted. Check your email and open the verification link; come back here to sign in once verified.',
+  'web.auth.signedIn.title': 'Signed in',
+  'web.auth.signedIn.body': 'The token has been written into the sync settings ({email}). Set the end-to-end encryption passphrase and syncing can start.',
+  'web.auth.error.unconfigured': 'Fill in the server URL above first.',
+  'web.auth.error.invalidEmail': 'That email address or token does not look right - check it and try again.',
+  'web.auth.error.notAllowed': 'This server does not allow registration with that email address.',
+  'web.auth.error.unauthorized': 'That link is invalid or has expired. Send yourself a new one.',
+  'web.auth.error.rateLimited': 'Too many requests - try again in a little while.',
+  'web.auth.error.network': 'Could not reach the server. Check the URL and your connection.',
+  'web.auth.error.server': 'The server is unavailable right now - try again later.',
+  'web.auth.error.unknown': 'Signing in did not complete - try again.',
   // ── Web · conflict dialog ─────────────────────────────────
   // Payload summary: `text` is the user's own words (never translated) and
   // `fields` reports only a count - field names such as `completedAt` are
