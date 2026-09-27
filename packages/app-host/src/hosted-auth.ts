@@ -73,7 +73,20 @@ export const HOSTED_AUTH_PATHS = {
   passkeyRecoverRequest: '/api/recover/passkey',
   passkeyRecoverOptions: '/api/recover/passkey/options',
   passkeyRecoverComplete: '/api/recover/passkey/complete',
+  /** 自助管理：列出 / 删除当前账号自己的通行密钥。 */
+  passkeys: '/api/passkeys',
 } as const;
+
+/**
+ * 删除单条凭据的路径。
+ *
+ * 🔴 `encodeURIComponent` 不是装饰：id 会原样进 URL 路径。
+ * 服务端那边的行 id 是 cuid（不含特殊字符），但这里**不假设**它安全 ——
+ * 拼接属于协议，协议在 app-host 里只有一份，不能指望每个调用方都记得转义。
+ */
+export function passkeyDeletePath(id: string): string {
+  return `${HOSTED_AUTH_PATHS.passkeys}/${encodeURIComponent(id)}`;
+}
 
 /** 一次登录得到的会话。`token` 就是要填进同步设置的访问令牌。 */
 export interface HostedAuthSession {
@@ -138,7 +151,31 @@ export type HostedAuthFailureReason =
    * 🔴 同样不复用 `passkey-cancelled`：用户**什么都没取消**，
    * 该做的是改用"用通行密钥登录"，而不是"再试一次" —— 再试一次会永远同样失败。
    */
-  | 'passkey-already-registered';
+  | 'passkey-already-registered'
+  /**
+   * 这条通行密钥服务端**已经不认了**（多半是在别处删掉了的陈旧凭据）。
+   *
+   * 🔴 与 `unauthorized` 分开是缺口 B 的全部目的：以前两者都是
+   * "Authentication failed"，用户分不清"这条旧密钥失效了，请重新注册或
+   * 换登录方式"与"刚建的新密钥坏了"。服务端给出稳定的
+   * `code: 'passkey_not_found'`，这里把它翻成一句**可执行**的话。
+   */
+  | 'passkey-not-found'
+  /**
+   * 服务端**认得**这条凭据，但这次断言没验过（签名 / 计数器 / 来源）。
+   *
+   * 🔴 与 `passkey-not-found` 分开：这种情况"再试一次"是有意义的，
+   * 而陈旧凭据再试多少次都一样。两句不同的话对应两个不同的动作。
+   */
+  | 'passkey-rejected'
+  /**
+   * 这是账号上最后一条通行密钥，服务端**拒绝**删除（409）。
+   *
+   * 🔴 删掉它可能把用户永久锁在门外（`User.passwordHash` 可空，
+   * 纯通行密钥账号没有别的登录方式）。界面该说的是"先添加一条新的"，
+   * 而不是"操作失败，请重试" —— 后者会让用户一直重试同一个不可能成功的操作。
+   */
+  | 'last-passkey';
 
 export interface HostedAuthFailure {
   ok: false;
@@ -147,6 +184,13 @@ export interface HostedAuthFailure {
   status?: number;
   /** 服务端给的**安全**错误串。是数据，不是文案。 */
   message?: string;
+  /**
+   * 服务端给的稳定机器码（`{ code }` 字段），原样透传。
+   *
+   * 🔴 判别**只**按它，不按对 `message` 做字符串匹配：文案一改，
+   * 匹配就悄悄失效，而失败会静默退化成笼统的一类。
+   */
+  code?: string;
 }
 
 /** 统一的返回形状：成功分支自己带字段，失败分支永远可判定。 */
@@ -166,11 +210,13 @@ const failure = (
   reason: HostedAuthFailureReason,
   status?: number,
   message?: string,
+  code?: string,
 ): HostedAuthFailure => ({
   ok: false,
   reason,
   ...(status === undefined ? {} : { status }),
   ...(message === undefined ? {} : { message }),
+  ...(code === undefined ? {} : { code }),
 });
 
 /** 服务端的错误体形如 `{ error: string, details?: ... }`。只取可展示的那一段。 */
@@ -180,10 +226,48 @@ function readServerError(body: unknown): string | undefined {
   return typeof error === 'string' && error !== '' ? error : undefined;
 }
 
+/** 服务端的稳定机器码（`{ code: string }`）。缺了就是 `undefined`，不猜。 */
+function readServerCode(body: unknown): string | undefined {
+  if (body === null || typeof body !== 'object' || Array.isArray(body)) return undefined;
+  const code = (body as Record<string, unknown>)['code'];
+  return typeof code === 'string' && code !== '' ? code : undefined;
+}
+
 function readServerMessage(body: unknown): string | undefined {
   if (body === null || typeof body !== 'object' || Array.isArray(body)) return undefined;
   const message = (body as Record<string, unknown>)['message'];
   return typeof message === 'string' && message !== '' ? message : undefined;
+}
+
+/**
+ * 服务端的 `code` → 本层的封闭原因。
+ *
+ * 🔴 白名单，不是"有 code 就用"。服务端以后加一个新码，客户端**不会**
+ * 悄悄把它当成某一种已知失败 —— 它会退回按状态码分类（最保守的结论），
+ * 而不是猜一个可能错的动作。
+ */
+const FAILURE_REASON_BY_SERVER_CODE: Readonly<Record<string, HostedAuthFailureReason>> = {
+  // 登录时出示的凭据服务端不认得（缺口 B）。
+  passkey_not_found: 'passkey-not-found',
+  // 登录时凭据认得但断言没通过（缺口 B 的另一半）。
+  passkey_verification_failed: 'passkey-rejected',
+  // 删除时目标凭据不是自己的 / 不存在 —— 服务端故意与上一条分开命名，
+  // 但对用户来说是同一件事："这条凭据不在你的账号上了"。
+  passkey_not_found_for_user: 'passkey-not-found',
+  // 删除最后一条被拒绝。
+  last_passkey_required: 'last-passkey',
+};
+
+/** 由服务端 `code` 与 HTTP 状态共同决定原因；只有白名单里的码会覆盖状态分类。 */
+function classifyFailure(
+  status: number,
+  code: string | undefined,
+): HostedAuthFailureReason {
+  if (code !== undefined) {
+    const mapped = FAILURE_REASON_BY_SERVER_CODE[code];
+    if (mapped !== undefined) return mapped;
+  }
+  return classifyStatus(status);
 }
 
 /** HTTP 状态 → 原因。分类只按**用户能做的动作**分，不按服务端实现分。 */
@@ -204,16 +288,21 @@ function classifyStatus(status: number): HostedAuthFailureReason {
 }
 
 /**
- * 发一次 POST 并归一结果。
+ * 发一次请求并归一结果。
  *
  * 🔴 **不抛错**。三种失败各有归宿：地址没配（不发请求）、网络层抛错（`network`）、
  * 宿主根本没有 `fetch`（同样是 `network` —— Hermes 上"没有这个全局量"是
  * 一种环境事实，不是产品崩溃）。
+ *
+ * `token` 是**访问令牌**（服务端发的是 Bearer，不是 cookie）。带上它时
+ * 请求就是"以某个已登录用户的名义"发的 —— 列 / 删自己的凭据走这条。
  */
-async function postJson(
+async function sendJson(
   options: HostedAuthOptions,
+  method: 'GET' | 'POST' | 'DELETE',
   path: string,
-  payload: unknown,
+  payload?: unknown,
+  token?: string,
 ): Promise<PostResult> {
   if (options.baseUrl.trim() === '') return failure('unconfigured');
 
@@ -223,12 +312,16 @@ async function postJson(
   // 没有可用的网络实现：判成 network，而不是让 "undefined is not a function" 炸出去。
   if (impl === undefined) return failure('network');
 
+  const headers: Record<string, string> = {};
+  if (payload !== undefined) headers['content-type'] = 'application/json';
+  if (token !== undefined) headers['authorization'] = `Bearer ${token}`;
+
   let response: Response;
   try {
     response = await impl(joinEndpointUrl(options.baseUrl, path), {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify(payload),
+      method,
+      headers,
+      ...(payload === undefined ? {} : { body: JSON.stringify(payload) }),
     });
   } catch {
     return failure('network');
@@ -243,7 +336,13 @@ async function postJson(
   }
 
   if (!response.ok) {
-    return failure(classifyStatus(response.status), response.status, readServerError(body));
+    const code = readServerCode(body);
+    return failure(
+      classifyFailure(response.status, code),
+      response.status,
+      readServerError(body),
+      code,
+    );
   }
 
   // 🔴 2xx 但没有可解析的主体 = **不能当成功**。
@@ -253,6 +352,16 @@ async function postJson(
 
   return { ok: true, body };
 }
+
+/** 发一次 POST。既有调用方全部走它，行为与重构前逐字相同。 */
+async function postJson(
+  options: HostedAuthOptions,
+  path: string,
+  payload: unknown,
+): Promise<PostResult> {
+  return sendJson(options, 'POST', path, payload);
+}
+
 
 /** 邮箱归一：服务端自己做格式校验（唯一事实源），这里只挡"空的"这一种。 */
 function normalizedEmail(email: string): string | undefined {
@@ -532,4 +641,102 @@ export async function completePasskeyRecovery(
   });
   if (!result.ok) return result;
   return { ok: true, message: readServerMessage(result.body) ?? '' };
+}
+
+// ── 自助管理通行密钥（列 / 删）────────────────────────────────
+//
+// 服务端此前只有注册 / 登录 / 恢复，用户**没有任何自助管理凭据的能力**。
+// 这两个函数是那半边的协议一侧：路径、方法、令牌怎么带、响应怎么验。
+//
+// 🔴 「最后一条能不能删」不是这里决定的 —— 服务端拒绝并给出
+// `last_passkey_required`，这里只把它翻成 `last-passkey` 这个
+// 结构化原因。把守卫写在客户端等于没有守卫（旧版本客户端、直接调 API 都绕过）。
+
+/**
+ * 一条通行密钥的**用户可见**投影。
+ *
+ * 🔴 只有这三个字段，**没有** `credentialId` / `publicKey`：
+ * 这不是"服务端顺手少给"，而是接口契约 —— 列表接口不返回凭据内部数据。
+ * 客户端连解析它们的代码都不该有。
+ */
+export interface HostedPasskeySummary {
+  /** 服务端行 id。删除时用它，**不是** credential ID。 */
+  id: string;
+  /** ISO 8601 字符串（原样透传服务端，不在这里转 Date）。 */
+  createdAt: string;
+  /** ISO 8601 或 null（从未使用过）。 */
+  lastUsedAt: string | null;
+}
+
+/** 只把服务端给的三个字段挑出来。缺任何一个都判 `malformed-response`。 */
+function parsePasskeySummaries(body: unknown): HostedPasskeySummary[] | undefined {
+  if (body === null || typeof body !== 'object' || Array.isArray(body)) return undefined;
+  const list = (body as Record<string, unknown>)['passkeys'];
+  if (!Array.isArray(list)) return undefined;
+
+  const summaries: HostedPasskeySummary[] = [];
+  for (const entry of list) {
+    if (entry === null || typeof entry !== 'object' || Array.isArray(entry)) return undefined;
+    const record = entry as Record<string, unknown>;
+    const id = record['id'];
+    const createdAt = record['createdAt'];
+    const lastUsedAt = record['lastUsedAt'];
+    if (typeof id !== 'string' || id === '') return undefined;
+    if (typeof createdAt !== 'string' || createdAt === '') return undefined;
+    if (lastUsedAt !== null && typeof lastUsedAt !== 'string') return undefined;
+    // 🔴 白名单映射：服务端哪天多返回一个字段，也**不会**流到界面上。
+    summaries.push({ id, createdAt, lastUsedAt });
+  }
+  return summaries;
+}
+
+/**
+ * 列出当前账号的通行密钥。
+ *
+ * `token` 是访问令牌；空令牌**不发请求**（判 `unauthorized`）——
+ * 未登录却去问服务端要一次 401 是没有意义的往返。
+ */
+export async function listPasskeys(
+  options: HostedAuthOptions,
+  token: string,
+): Promise<HostedAuthOutcome<{ passkeys: HostedPasskeySummary[] }>> {
+  const trimmed = token.trim();
+  if (trimmed === '') return failure('unauthorized');
+
+  const result = await sendJson(options, 'GET', HOSTED_AUTH_PATHS.passkeys, undefined, trimmed);
+  if (!result.ok) return result;
+
+  const passkeys = parsePasskeySummaries(result.body);
+  // 2xx 但形状不对 → 不能当"没有凭据"。界面把空列表画成"还没有凭据"，
+  // 一次反代配错就会让用户以为自己的凭据全没了。
+  if (passkeys === undefined) return failure('malformed-response');
+  return { ok: true, passkeys };
+}
+
+/**
+ * 删除当前账号的一条通行密钥。
+ *
+ * 归属由服务端按令牌判定；本函数**不**发送任何"这是谁的"字段。
+ * 404（不是自己的 / 不存在）与 409（最后一条）各有自己的
+ * `HostedAuthFailureReason`，界面据此说不同的话。
+ */
+export async function deletePasskey(
+  options: HostedAuthOptions,
+  input: { token: string; id: string },
+): Promise<HostedAuthOutcome<{ deleted: true }>> {
+  const trimmedToken = input.token.trim();
+  if (trimmedToken === '') return failure('unauthorized');
+  const id = input.id.trim();
+  if (id === '') return failure('invalid-input');
+
+  const result = await sendJson(
+    options,
+    'DELETE',
+    passkeyDeletePath(id),
+    undefined,
+    trimmedToken,
+  );
+  if (!result.ok) return result;
+
+  return { ok: true, deleted: true };
 }

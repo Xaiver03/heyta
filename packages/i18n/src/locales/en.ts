@@ -406,6 +406,38 @@ export const en = {
   'web.auth.error.passkeyUnsupported': 'This browser or device does not support passkeys — use the email login link instead.',
   'web.auth.error.passkeyCancelled': 'The passkey step was cancelled or timed out. You can try again.',
   'web.auth.error.passkeyAlreadyRegistered': 'This device already has a passkey for this account — use "Sign in with a passkey" instead.',
+  // Used only when the server answers `code: 'passkey_not_found'`: the credential
+  // this device holds is no longer registered (usually removed elsewhere). It is a
+  // deliberately different sentence from the rejected-assertion one, because the
+  // action the user should take is different: register again, or use another method.
+  'web.auth.error.passkeyNotFound': 'This passkey is no longer registered on the server — it may have been removed from another device. Register a new passkey, or use an email login link.',
+  // Used when the server answers `code: 'passkey_verification_failed'`: the
+  // credential is known but this assertion did not verify. Retrying is meaningful.
+  'web.auth.error.passkeyRejected': 'The passkey could not be verified. Try once more; if it keeps failing, register a new one.',
+  'web.auth.error.lastPasskey': 'This is the only passkey on the account. Removing it could lock you out — add a new passkey first, then remove this one.',
+  // ── Web · self-service passkey management ─────────────────
+  // The server had registration / login / recovery only; there was no way for a
+  // user to see or remove their own credentials.
+  'web.passkeys.title': 'Passkeys',
+  'web.passkeys.lead': 'These are the passkeys registered for your account on the server. Removing one does not affect credentials on other devices.',
+  'web.passkeys.refresh': 'Refresh list',
+  'web.passkeys.loading': 'Loading…',
+  'web.passkeys.needsSignIn': 'Sign in first to manage the passkeys on this account.',
+  'web.passkeys.empty': 'This account has no passkeys yet.',
+  'web.passkeys.createdAt': 'Created {date}',
+  'web.passkeys.lastUsedAt': 'Last used {date}',
+  'web.passkeys.neverUsed': 'Never used',
+  'web.passkeys.delete': 'Remove',
+  'web.passkeys.confirmDelete': 'Confirm removal',
+  'web.passkeys.cancel': 'Cancel',
+  'web.passkeys.deleting': 'Removing…',
+  'web.passkeys.deleted': 'That passkey has been removed.',
+  'web.passkeys.error.load': 'Could not load your passkeys.',
+  'web.passkeys.error.passkeyNotFound': 'That passkey is no longer on the server — the list has been refreshed.',
+  'web.passkeys.error.lastPasskey': 'This is the only passkey on the account, so it cannot be removed. Add a new passkey first.',
+  'web.passkeys.error.unauthorized': 'Your sign-in has expired — sign in again.',
+  'web.passkeys.error.network': 'Could not reach the server. Try again later.',
+  'web.passkeys.error.other': 'That did not work - try again.',
   // ── Web · conflict dialog ─────────────────────────────────
   // Payload summary: `text` is the user's own words (never translated) and
   // `fields` reports only a count - field names such as `completedAt` are

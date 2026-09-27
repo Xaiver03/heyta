@@ -102,8 +102,11 @@ export {
   completePasskeyLogin,
   completePasskeyRecovery,
   completePasskeyRegistration,
+  deletePasskey,
   extractAuthLinkToken,
   getPasskeyRecoveryOptions,
+  listPasskeys,
+  passkeyDeletePath,
   registerWithMagicLink,
   requestMagicLink,
   requestPasskeyRecovery,
@@ -116,6 +119,7 @@ export {
   type HostedAuthSession,
   type HostedPasskeyCredential,
   type HostedPasskeyOptions,
+  type HostedPasskeySummary,
 } from './hosted-auth.js';
 
 /**

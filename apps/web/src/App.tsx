@@ -77,6 +77,8 @@ import { AiSettings } from './features/settings/AiSettings.js';
 import { ExportPanel } from './features/settings/ExportPanel.js';
 import { ImportPanel } from './features/settings/ImportPanel.js';
 import { MemoryPanel } from './features/settings/MemoryPanel.js';
+// 通行密钥自助管理（列 / 删）—— 服务端早就有端点，此前界面没有任何入口。
+import { PasskeyPanel } from './features/settings/PasskeyPanel.js';
 import {
   createSessionSecretStore,
   loadAiSettings,
@@ -780,6 +782,8 @@ export function App(): React.JSX.Element {
               <ExportPanel />
               {/* 导入 / 还原是导出的另一半 —— 只支持还原到空库，见 ImportPanel 文件头。 */}
               <ImportPanel />
+              {/* 账号安全：管理自己的通行密钥（列 / 删）。见 PasskeyPanel 文件头。 */}
+              <PasskeyPanel />
             </>
           )}
         </div>
