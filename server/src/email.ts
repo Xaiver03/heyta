@@ -1,6 +1,6 @@
 import * as nodemailer from 'nodemailer';
 import { Logger } from './logger';
-import { loadConfigFromEnv } from './config';
+import { DEFAULT_SMTP_FROM, loadConfigFromEnv, PRODUCT_NAME } from './config';
 
 let transporter: nodemailer.Transporter | null = null;
 
@@ -52,20 +52,20 @@ export const sendVerificationEmail = async (
   try {
     const mailTransporter = await getTransporter();
     const config = loadConfigFromEnv();
-    const from = config.smtp?.from || '"SuperSync" <noreply@example.com>';
+    const from = config.smtp?.from || DEFAULT_SMTP_FROM;
 
     const verificationLink = `${config.publicUrl}/verify-email?token=${token}`;
 
     const info = await mailTransporter.sendMail({
       from,
       to,
-      subject: 'Verify your SuperSync account',
+      subject: `Verify your ${PRODUCT_NAME} account`,
       text:
         `Please verify your account by clicking the following link: ${verificationLink}\n\n` +
         `If clicking the link doesn't work, copy and paste it into your browser.`,
       html: `
         <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto;">
-          <h2>Welcome to SuperSync!</h2>
+          <h2>Welcome to ${PRODUCT_NAME}!</h2>
           <p>Please verify your account by clicking the button below:</p>
           <a
             href="${verificationLink}"
@@ -102,14 +102,14 @@ export const sendPasskeyRecoveryEmail = async (
   try {
     const mailTransporter = await getTransporter();
     const config = loadConfigFromEnv();
-    const from = config.smtp?.from || '"SuperSync" <noreply@example.com>';
+    const from = config.smtp?.from || DEFAULT_SMTP_FROM;
 
     const recoveryLink = `${config.publicUrl}/recover-passkey?token=${token}`;
 
     const info = await mailTransporter.sendMail({
       from,
       to,
-      subject: 'Recover your SuperSync passkey',
+      subject: `Recover your ${PRODUCT_NAME} passkey`,
       text:
         `You requested to recover your passkey. Click the following link to register a new passkey: ${recoveryLink}\n\n` +
         `If you did not request this, please ignore this email.\n\n` +
@@ -159,21 +159,21 @@ export const sendLoginMagicLinkEmail = async (
   try {
     const mailTransporter = await getTransporter();
     const config = loadConfigFromEnv();
-    const from = config.smtp?.from || '"SuperSync" <noreply@example.com>';
+    const from = config.smtp?.from || DEFAULT_SMTP_FROM;
 
     const loginLink = `${config.publicUrl}/magic-login?token=${token}`;
 
     const info = await mailTransporter.sendMail({
       from,
       to,
-      subject: 'Your SuperSync login link',
+      subject: `Your ${PRODUCT_NAME} login link`,
       text:
-        `Click the following link to log in to SuperSync: ${loginLink}\n\n` +
+        `Click the following link to log in to ${PRODUCT_NAME}: ${loginLink}\n\n` +
         `If you did not request this, please ignore this email.\n\n` +
         `This link will expire in 15 minutes.`,
       html: `
         <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto;">
-          <h2>Login to SuperSync</h2>
+          <h2>Login to ${PRODUCT_NAME}</h2>
           <p>Click the button below to log in:</p>
           <a
             href="${loginLink}"
