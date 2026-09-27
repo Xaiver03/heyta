@@ -802,6 +802,14 @@ export const createWechatBillingAdapter = (
           // （畸形 / 无金额的通知）不是这种情况，别把它也算进来 —— 否则
           // 一个空 payload 会伪装成一笔待结算的支付。
           requiresOrderSettlement: paidFen !== null && grant === null,
+          // 🔴 商户订单号**显式**带出来（`out_trade_no` 上面已校验为非空字符串）。
+          // 有了它，webhook 才能把这一笔交给 `settleOrderPaid` 做权威结算 ——
+          // 而不是让人从 `providerEventId = "payment_succeeded:hy…"` 里反解
+          // （见 `docs/reference/pricing-and-coupons.md` §7 第 9 条 (c)）。
+          outTradeNo: payload.out_trade_no,
+          // 回执里的实付金额。它是**原始事实**：与订单冻结金额的比较由
+          // `settleOrderPaid` 做，本层不判。`null` = 报文没有金额字段。
+          paidAmountMinor: paidFen,
         } satisfies NormalizedPaymentEvent,
       };
     },

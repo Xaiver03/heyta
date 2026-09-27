@@ -140,6 +140,28 @@ export interface NormalizedPaymentEvent {
    * 见 `docs/reference/pricing-and-coupons.md` §7 第 9 条。
    */
   readonly requiresOrderSettlement?: boolean;
+  /**
+   * 🔴 **商户订单号** —— 这一笔支付对应的、我们**已经冻结**的 `checkout_orders` 行。
+   *
+   * 由 adapter 从 provider 的明细里**显式**取出（微信是 `out_trade_no`），
+   * **不是**从 `providerEventId` 里反解。理由是"权威判定属于订单"：
+   * 只有拿到订单号，webhook 才能在**同一个事务**里把权威结算交给
+   * `settleOrderPaid`（比订单冻结的 SKU 与 `final_amount_minor`），
+   * 而不是继续相信"实付金额落在价目表上"这个会错的启发式。
+   *
+   * `null`/缺省 = 这一笔与任何冻结订单无关（旧路径 / 非收银台的支付）。
+   * 那条路径沿用 adapter 自己的授予声明（`oneTimeGrant`）。
+   */
+  readonly outTradeNo?: string | null;
+  /**
+   * **支付商回执里的实付金额**（最小单位整数）。
+   *
+   * 🔴 它是**原始事实**，不是判定：判定由 `settleOrderPaid` 拿它去和订单上
+   * 冻结的 `final_amount_minor` 比，本层**不做任何比较**。
+   * `null`/缺省 = 事件没带金额，此时带 `outTradeNo` 的支付会 fail-closed
+   * （没有金额就没有权威校验可以过）。
+   */
+  readonly paidAmountMinor?: number | null;
 }
 
 /**
