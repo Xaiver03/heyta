@@ -1058,6 +1058,31 @@ export const zhCN = {
   'mobile.tab.calendar': '日历',
   'mobile.tab.focus': '专注',
   'mobile.tab.profile': '我的',
+  'mobile.tab.categories': '分类',
+
+  // ── 移动端 · 分类时长 ──────────────────────────────────────
+  // 🔴 这一组里**只许有事实句**：某类做了多久、这些时间怎么算出来的。
+  //    没有"最多/最少/失衡/超标"，也没有排名与占比（见计划 §2 反需求）。
+  // ⚠️ 文案与 `web.categories.*` **逐字相同**（移动端交互不同处除外）：
+  //    两端说同一件事就不该有两种说法，将来合并命名空间时这是一次纯改名。
+  'mobile.categories.title': '分类时长',
+  'mobile.categories.note': '按清单与习惯各自统计近 12 周的专注与打卡时间。颜色由你自己赋义，这一页不做任何评价。',
+  'mobile.categories.empty': '还没有可以归类的时间记录。用清单组织任务、或用习惯记下时长，这里就会长出内容。',
+  'mobile.categories.range': '{start} 至 {end}',
+  'mobile.categories.kind.project': '清单',
+  'mobile.categories.kind.habit': '习惯',
+  'mobile.categories.slot.none': '无',
+  'mobile.categories.duration.minutes': '{minutes} 分钟',
+  'mobile.categories.duration.hours': '{hours} 小时',
+  'mobile.categories.duration.hoursMinutes': '{hours} 小时 {minutes} 分',
+  'mobile.categories.lane.a11y': '{name}（{kind}），共 {duration}',
+  'mobile.categories.unassigned': '另有 {duration} 没有归到任何清单或习惯 —— 给任务指定清单，它就会归位。',
+  'mobile.categories.hint.unset': '点行首的色块可以给这一类挑颜色（1–8 任意一个）。颜色只是标记，方便你认出它。',
+  'mobile.categories.cell.none': '这一周没有记录',
+  'mobile.categories.picker.toggle': '给「{name}」设置分类颜色',
+  'mobile.categories.picker.group': '「{name}」的分类颜色',
+  'mobile.categories.picker.slot': '色槽 {slot}',
+
 
   // ── 移动端 · 截止时间 ─────────────────────────────────────
   // 阈值照搬 domain 的 formatRemaining：今天 / 明天 / 后天 / 还剩 N 天。

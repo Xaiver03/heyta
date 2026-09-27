@@ -983,6 +983,28 @@ export const en = {
   'mobile.tab.calendar': 'Calendar',
   'mobile.tab.focus': 'Focus',
   'mobile.tab.profile': 'Profile',
+  'mobile.tab.categories': 'Categories',
+
+  // ── Mobile · time by category ──────────────────────────────
+  // Verbatim the same as `web.categories.*` (except where the interaction differs).
+  'mobile.categories.title': 'Time by category',
+  'mobile.categories.note': 'Focus and check-in time per list and habit over the last 12 weeks. You decide what each color means; this page does not judge it.',
+  'mobile.categories.empty': 'Nothing to sort into categories yet. Group tasks into lists, or track a habit in minutes, and rows will appear here.',
+  'mobile.categories.range': '{start} to {end}',
+  'mobile.categories.kind.project': 'List',
+  'mobile.categories.kind.habit': 'Habit',
+  'mobile.categories.slot.none': 'None',
+  'mobile.categories.duration.minutes': '{minutes} min',
+  'mobile.categories.duration.hours': '{hours} h',
+  'mobile.categories.duration.hoursMinutes': '{hours} h {minutes} min',
+  'mobile.categories.lane.a11y': '{name} ({kind}), {duration} total',
+  'mobile.categories.unassigned': 'Another {duration} is not attached to any list or habit — give those tasks a list and it will land there.',
+  'mobile.categories.hint.unset': 'Tap the swatch at the start of a row to pick a color (any slot from 1 to 8). The color is just a label, so you can recognise it.',
+  'mobile.categories.cell.none': 'Nothing recorded this week',
+  'mobile.categories.picker.toggle': 'Set a category color for "{name}"',
+  'mobile.categories.picker.group': 'Category color for "{name}"',
+  'mobile.categories.picker.slot': 'Color slot {slot}',
+
 
   // ── Mobile · due dates ────────────────────────────────────
   'mobile.due.overdue': '{days} days overdue',
