@@ -26,22 +26,24 @@ heyta 是一个**本地优先**的任务管理应用，目标是做一个功能�
 |---|---|---|
 | `packages/sync-core/` | 同步内核（加密、向量时钟、冲突判定）。**vendored 自 Super Productivity，MIT** | ⚠️ 尽量不改，改了要更新 `PROVENANCE.md` |
 | `packages/shared-schema/` | 实体清单、schema 版本、HTTP 线协议契约（zod） | ✅ heyta 已改造，是**不可逆层** |
-| `packages/storage/` | 存储适配层接口 + 索引↔SQLite 两套实现（`DbAdapter` / `OpLogStore`） | ✅ |
+| `packages/storage/` | 存储适配层接口 + **三套实现**（IndexedDB / SQLite / 内存）（`DbAdapter` / `OpLogStore`） | ✅ |
 | `packages/op-log/` | op-log 引擎与 reducer（物化状态、向量时钟闸门、墓碑） | ✅ |
 | `packages/domain/` | 领域实体与 `EntityModelMap`（哪些实体真的被物化） | ✅ |
 | `packages/sync-client/` | 宿主无关的同步编排（上传/下载/冲突上报） | ✅ |
 | `packages/design-system/` | 设计变量唯一事实源 + 三端生成器（Swift / ArkTS / RN） | ✅ |
+| `packages/i18n/` | **中英词条表**（自研零依赖）。🔴 它是**唯一文案事实源** —— 界面里不许出现硬编码文案，由 `check:ui-language` 拦 | ⚠️ 改词条**必须中英同步** |
 | `packages/app-host/` | **宿主无关的应用接线与写入动作**（见下文 §3.5） | ✅ |
 | `packages/ai/` | **出站 AI**：供给模式 / **出境闸门** / provider 端口 / 配置路由 / 健康熔断。🔴 **只产出建议，类型上产生不了 op**；零厂商 SDK | ✅ 零运行时依赖 |
 | `packages/local-api/` | **入站 AI 接口**：本机 API / MCP 的工具契约 + 授权判定 + JSON-RPC 处理器。默认关、只监听回环、逐工具授权；🔴 **不构造 op** | ✅ 零运行时依赖 |
-| `server/` | 同步服务端（Fastify + Prisma + PostgreSQL）。**vendored，MIT** | ✅ 已改造 |
+| `server/` | 同步服务端 + **计费**（Fastify + Prisma + PostgreSQL）。**vendored，MIT** | ✅ 已改造 |
 | `apps/` | 客户端外壳。**只允许放平台差异与 UI 绑定** | ✅ |
 | `apps/web/` | Web 壳（IndexedDB + 浏览器 fetch） | ✅ |
-| `apps/mobile/` | 移动壳（React Native 0.84.1 + op-sqlite）。**Android 实机跑通；iOS 模拟器已跑通到交互级（真点击 → 真 op 落库 → 真同步到另一台设备，`pnpm verify:mobile-ios`）；鸿蒙壳未建** | ✅ |
+| `apps/landing/` | **落地页**（Vite，独立于应用）。⚠️ 它目前**没有任何指向应用的链接**（全部是页内锚点）—— 这是已知的用户旅程断点，见 [`docs/plans/roadmap.md`](docs/plans/roadmap.md) §5.1 | ✅ |
+| `apps/mobile/` | 移动壳（React Native 0.84.1 + op-sqlite）。**Android 实机跑通；iOS 模拟器已跑通到交互级（真点击 → 真 op 落库 → 真同步到另一台设备，`pnpm verify:mobile-ios`）**。🟡 **鸿蒙：`apps/mobile` 下没有鸿蒙工程**（即"壳未建"）—— 但 `verify:harmony-toolchain` / `-rnoh` / `-rnoh-js` 已把「JS 源码 → unsigned release HAP」的整条构建链在**树外探针**里实测打通，缺的是模拟器系统镜像与签名 → §3.24 | ✅ |
 | `apps/node-host/` | 非 Web 验证壳（真 SQLite 文件）。**接线已全部来自 `app-host`** | ✅ |
 | `docs/` | 产品文档。**分层规则见 [`docs/README.md`](docs/README.md)** | ✅ |
 | `research/` | 调研原料：上游克隆、原始报告、一次性脚本。**不是产品文档** | ⚠️ 归档性质 |
-| `scripts/` | 仓库级脚本（如 P0 验收） | ✅ |
+| `scripts/` | 仓库级脚本与**门禁**（全部 `check:*` 的实现，以及各 `verify:*` 验收脚本） | ✅ |
 
 ---
 
@@ -1781,28 +1783,24 @@ docker inspect <容器> --format '{{range .Config.Env}}{{println .}}{{end}}' | g
 
 总路线图：[`docs/plans/roadmap.md`](docs/plans/roadmap.md)
 
-### 并行轨道：激励与成长体系（**已实现、已并入 main 的分支，尚未落到 main**）
+### 并行轨道：激励与成长体系（✅ **已并入 `main`**）
 
 分支 `feat/motivation-system`（worktree `.worktrees/motivation`）。L1 即时反馈 / L2 连续性 /
-L3 叙事三层**已实现**；渲染层 23 条 + 域 438 条测试全绿，
-外加 `e2e/tests/motivation.spec.ts` 的 6 条真浏览器契约。
+L3 叙事三层**已实现**，**并已落到 `main`**（merge commit `84cc7f5`，2026-09-27，
+75 文件 / +11008 行）。分支与 worktree **已删除**（相关提交仍是 `main` 的祖先，随时可达）。
 
-✅ **已把 `main` 合进本分支**（merge commit `0560e82`，3 处冲突手工取并集；
-界面文案已整体迁进 `packages/i18n` 词条表 —— `apps/web/src` 现在是"已迁移"）。
-📄 落地程序、冲突解法、验证矩阵与回退点在
+📄 落地程序、验证矩阵与回退点在
 [激励与成长体系设计](docs/plans/motivation-and-progression.md) **§12**。
 
-🔴 **但它还不能落到 `main`** —— 而且**不是**因为本分支有问题：
+同批落地的还有**活动分类与分类着色** —— 成长视图里的分类泳道图 + 周堆叠条，
+入口是清单与习惯编辑处的色槽取色器（1–8，**调色板由我们给、含义由用户赋**）。
+🔴 核心裁决：**颜色由用户自己赋义，App 永不判断某个活动"健康／不健康"、也永不自动上色**。
+分层清单见 [`docs/plans/roadmap.md`](docs/plans/roadmap.md) §1.2。
 
-1. 主检出工作树仍有 200+ 未提交文件（前置门③）；main 的未提交改动与本次合并改动
-   **在三个文件上重叠**，连快进都会被 git 拒绝。
-2. `main` 目前**自己 build / typecheck / test 都红**：`f57f248`（web 壳接入词条表）与
-   `27764c9`（移动端接入词条表）提交了**消费者**，而**生产者**至今没提交
-   （`packages/storage/src/errors.ts`、`packages/sync-client` 的 `SyncFailureReason` /
-   `summarizeConflictPayload`、`packages/domain/src/quadrant.ts`、`apps/mobile/.../ListsSection.tsx`）。
-   连带后果之一：`apps/web` 在真浏览器里**整个挂不上**（`main.tsx` 的 import 图撞上
-   `sync-client` 少一个导出），激励体系的 6 条 e2e 因此全红。
-   **归属判据、复现命令与处置见计划 §12.5** —— 本分支只记录，**不代写**那部分。
+> ⚠️ 下面这段是**历史记录，不是现状** —— 分支当初确实被挡过，挡它的两件事都已消失：
+> 主检出的 200+ 未提交改动由各自的所有者提交并推送；`main` 自己 build / typecheck / test
+> 的那批红灯（消费者已提交、生产者在路上）也随同一批提交补齐。**留在这里是为了让后来者
+> 认出"分几笔落地"这个形状**，而不是照它行动。
 
 设计红线：**不发行任何货币**（没有金币/积分/商店，也不卖"后悔"）、
 **只与自己的过去比**（排行榜/联赛/自习室/组队打 Boss 在 E2EE 下结构上不可能）、
@@ -1856,8 +1854,19 @@ L3 叙事三层**已实现**；渲染层 23 条 + 域 438 条测试全绿，
   于是「派生还是加字段」这个二选一被**消解**（承接 ADR-0014 的"派生不持久化"）。
   🔴 配套纪律：**冻结参数只能放宽、不能收紧** —— 收紧会让重放把历史连续天数
   **变小**，违反"只增不减"；真要收紧走**代码常量切分点**，**仍然不加字段**。
+- **ADR-0023 托管 AI 的「300 次/月」本轮不实现** ✅（[文档](docs/adr/0023-managed-ai-quota-not-implemented.md)）。
+  它**不**改动 ADR-0020 / ADR-0021 的价格、额度或模型 —— 判定的是**落地顺序**：
+  端点 / 计量 / `deepseek` 调用 / 收银台**一个都不存在**，而承诺已写进文案与法务（5 处）。
+  🔴 硬约束：**计量存在之前 `hosted-ai-monthly` 不得被售卖**（违反了就是收钱不交付）。
+  `pnpm check:ai-quota` 把**唯一数字源**（`docs/reference/pricing-and-entitlements.md` 的
+  `ai-quota-ssot` 块）与那 5 处承诺、以及"状态声明 ↔ 实现"绑定起来。
+  ⚠️ 这是**有终点的决定**，不是拖延：清空 ADR §5 的最小清单之日，就是它被取代之日。
 - **AI 的完整架构**见 [`docs/reference/ai-architecture.md`](docs/reference/ai-architecture.md)
   （模块地图 / 封闭词表 / 全部具名常量 / 20 条不变量清单）。
   **AI 的入口文档是 [`docs/plans/ai-strategy.md`](docs/plans/ai-strategy.md)**，先读那份。
 
-**当前没有阻塞性决策**，P1 可以持续推进。
+**当前没有阻塞性决策**，P2 可以持续推进；P0 / P1 已交付，AI 轨道的 AI-0 / AI-1 / AI-2 与
+本地 API（MCP）也已落地（清单见 [`docs/plans/roadmap.md`](docs/plans/roadmap.md) §1.1）。
+
+**唯一一条"已知会收钱不交付"的红线**在 ADR-0023：`hosted-ai-monthly`（¥12 档）
+**计量存在之前不得被售卖**，收银台不许把它变成可支付的订单。

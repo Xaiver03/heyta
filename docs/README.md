@@ -120,11 +120,23 @@ docs/research/<kebab-case>.md     例：reuse-plan.md
 | [ai-strategy.md](plans/ai-strategy.md) | ⭐⭐ **AI 入口文档**：读这一份就够（定位 / 三档结构 / 护城河 / 现状 / 下一步） |
 | 🔴 [subscription-boundary.md](plans/subscription-boundary.md) | **会员订阅的免费/付费边界**：收费的是「服务器」不是「功能」；为什么按设备数卡而不按存储量；「到期不许变成数据 hostage」这条硬约束 |
 | 🔴 [subscription-integration.md](plans/subscription-integration.md) | **会员订阅的服务端接入点**：Fastify/JWT/配额守卫/迁移纪律的落点，以及 🔴「代码里没有官方实例标志，付费闸门必须默认关」 |
+| [subscription-provider-selection.md](plans/subscription-provider-selection.md) | **支付商选型**：阶段一 = **只做国内市场**（跨境方案 Paddle / Stripe / Paddle 等一律不适用） |
+| [subscription-handoff.md](plans/subscription-handoff.md) | **会员订阅交接**：只记「当前停在哪」，不重复决策 |
+| [subscription-wechat-handoff.md](plans/subscription-wechat-handoff.md) | **交接：微信支付 adapter + 真实支付 E2E 门禁**（给全新会话的完整任务书） |
+| [pricing-coupons-handoff.md](plans/pricing-coupons-handoff.md) | **交接：可调价 + 优惠券** —— 从「领域层已落地」到「收银台真的能用」 |
+| [ai-tier-pricing-rollout.md](plans/ai-tier-pricing-rollout.md) | **推进计划：把定价故事换成「自建永久免费 + 月付 ¥5 / ¥12」** —— 执行清单，决策看 ADR-0020 |
 | [ai-capability-branches.md](plans/ai-capability-branches.md) | **AI 能力分支与开发分支策略**（含对 5 条功能设想的逐条裁决）—— 大而全，深挖用 |
 | [ai-open-decisions.md](plans/ai-open-decisions.md) | **AI 功能需要拍板的决策清单**（不是需求表单，是「代码解决不了的事」） |
+| 🔴 [ai-gap-audit-and-remediation.md](plans/ai-gap-audit-and-remediation.md) | **AI 功能实现度审计与整改方案**：审计基线 `c667fb4`，**只读**审计，把缺口拆成三个互不重叠的模块交给三个 AI 执行 |
+| [ai-remediation-parallel-runbook.md](plans/ai-remediation-parallel-runbook.md) | **三个 AI 模块并行开工的 runbook**：分叉点 tag、可执行的租约门禁（`scripts/check-module-boundaries.mjs`）、合并程序 —— ✅ 已执行完毕，留作可复现记录 |
+| [ai-remediation-module-1-engine.md](plans/ai-remediation-module-1-engine.md) | 模块 1 任务书：**AI 引擎层正确性与孤立分支治理** —— ✅ 交付物是**对抗性验证**（零源码改动：修复早于分叉点就已落地） |
+| [ai-remediation-module-2-journey.md](plans/ai-remediation-module-2-journey.md) | 模块 2 任务书：**AI 用户旅程闭环与「界面说真话」**（失败态英文界面契约 + 熔断冷却后的「重试」）—— ✅ 已并入 `main` |
+| [ai-remediation-module-3-memory-moat.md](plans/ai-remediation-module-3-memory-moat.md) | 模块 3 任务书：**把「记忆护城河」接到用户眼前**（用真 IndexedDB 钉死 `readRecentOps` 的窗口方向）—— ✅ 已并入 `main` |
+| [ai-handoff.md](plans/ai-handoff.md) | **AI 方向交接**：什么已经做完（别重做）、哪些「未做」其实已经过期（别照旧清单干）、现在真正该做的第一件事 |
 | [i18n-multilingual.md](plans/i18n-multilingual.md) | 🌐 **中英双语实施计划**：为什么自研零依赖词条表、落地页用 URL 而应用用偏好、`check:ui-language` 契约的**变更与两处按 key 的例外**、分阶段迁移进度、以及**还没解决的域层文案** |
+| 🔴 [multi-platform-widgets.md](plans/multi-platform-widgets.md) | **多端小组件改造计划**：小组件是**多端适配的输出形态**，不是额外项目。含**必须现在做对的 5 件事**（App Group 定名 / 预留容器 / 不把 SQLite 搬进共享容器）、`packages/widget-core` + golden fixture + 门禁扩展、**Windows 走 PWA provider、macOS 走 Continuity —— 这两端反而不需要壳**、W0–W5 排序与"什么能自动验/什么不能"。支撑 [roadmap](plans/roadmap.md) P3 |
 | [motivation-and-progression.md](plans/motivation-and-progression.md) | ⭐ **激励与成长体系设计**：三层架构（即时反馈/连续性/叙事）× 四个循环，含「不改 schema」的落地映射、反需求 2.0、E2EE 下的指标方案 |
-| [activity-categories-and-colors.md](plans/activity-categories-and-colors.md) | **活动分类与分类着色**（增量，设计已拍板未开工）：颜色由**用户自赋义**、App 不判健康度；真正的工程量在时间归因（零新增字段可跑通第一版）；分类泳道图 + 周堆叠条 |
+| [activity-categories-and-colors.md](plans/activity-categories-and-colors.md) | **活动分类与分类着色**（✅ 已实现并并入 `main`）：颜色由**用户自赋义**、App 不判健康度；真正的工程量在时间归因（零新增字段跑通了第一版）；分类泳道图 + 周堆叠条。落地状态与实测数字见其 §8 |
 
 ### 工程参考
 
@@ -165,6 +177,7 @@ docs/research/<kebab-case>.md     例：reuse-plan.md
 | [ai-competitive-teardown.html](research/ai-competitive-teardown.html) | 上两条的**可视化渲染**（战情室风格功能矩阵，单文件、离线可看）。⚠️ **`.md` 是唯一事实源**，本文件只是呈现 |
 | [motivation-psychology.md](research/motivation-psychology.md) | ⭐ **习惯养成与激励的心理学证据**：B=MAP / Hook / 实施意图 / 损失厌恶 / 断签放弃效应 / 目标梯度 / 禀赋进度 / 新鲜开始 / SDT / 过度理由效应 / 小胜原则 / 排行榜证据。每条带来源与证据强度标记 |
 | [competitor-incentive-teardown.md](research/competitor-incentive-teardown.md) | ⭐ **竞品激励机制拆解**：Forest / Duolingo / Habitica / Streaks / 番茄Todo / 滴答清单 / 小日常 / Apple 健身记录，逐机制规则与数值 + 心理原理 + 对 heyta 的可迁移性 |
+| [native-widgets.md](research/native-widgets.md) | ⭐ **原生小组件可行性**：滴答清单各端组件清单（厂商自述）+ **iOS / Android 能做、鸿蒙与桌面端被"没有壳"卡住** + 上游已跑通的（单向快照 + 点击队列）契约 + 🔴 E2EE 明文快照与门禁盲区。支撑 [roadmap](plans/roadmap.md) P3 |
 
 > ⚠️ **两份 AI 调研文档的分工（不要当成重复，也不要让它们漂移）**：
 > - `ai-competitive-and-architecture.md` = **结论层**。只放**影响 ADR-0005 / AI 计划决策**的结论，
