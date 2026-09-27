@@ -1038,6 +1038,43 @@ export const en = {
   // ever reached with days >= 3.
   'web.due.overdueOne': '{days} day overdue',
 
+  // ── Web · Export (design principle #5, "freedom to export") ──
+  //
+  // 🔴 These entries make good on two promises already made to users: README's
+  //    "take all your data with you at any moment", and the subscription notice's
+  //    "local data can still be viewed, edited and exported". Until now the repo
+  //    had no user-visible export entry at all — those sentences were untrue.
+  'web.export.title': 'Export data',
+  'web.export.intro': 'Take everything on this device with you in one go. The export runs locally and never touches a server.',
+  'web.export.json.label': 'JSON (full fidelity)',
+  'web.export.json.note': 'Every entity, the complete operation log, and deleted records included. Machine-readable, good for backup or migration.',
+  'web.export.json.button': 'Download JSON',
+  'web.export.markdown.label': 'Task list (Markdown)',
+  'web.export.markdown.note': 'A task list a person can open and read. It leaves out deleted records and the operation log.',
+  'web.export.markdown.button': 'Download task list',
+  // 🔴 Honesty clause: this round does NOT do import. Without this, users would
+  //    treat the file as a restore point — and a file that cannot be imported back
+  //    used as a restore point is no backup at all.
+  'web.export.notRestorePoint': 'This is an export — you cannot import it back yet. Please do not treat it as a restore point.',
+  'web.export.counts': 'This export holds {entities} records ({deleted} of them deleted) and {ops} operation-log entries.',
+  'web.export.failed': 'Export failed. Please try again.',
+  // Structure text inside the Markdown file. The layout lives in
+  // `packages/app-host`; the wording lives here — same discipline as the AI
+  // failure states (return a reason, the shell picks the entry).
+  'web.export.markdown.heading': '# heyta task list',
+  'web.export.markdown.generatedAt': 'Exported at: {at}',
+  'web.export.markdown.empty': '(no tasks)',
+  'web.export.markdown.open': 'Open',
+  'web.export.markdown.done': 'Completed',
+  'web.export.markdown.colTitle': 'Title',
+  'web.export.markdown.colStatus': 'Status',
+  'web.export.markdown.colDue': 'Due',
+  'web.export.markdown.colPriority': 'Priority',
+  'web.export.markdown.colProject': 'List',
+  'web.export.markdown.colTags': 'Tags',
+  'web.export.markdown.none': '—',
+  'web.export.markdown.footer': 'This is an export file — you cannot import it back yet. Do not treat it as a restore point.',
+
   // ── Mobile (apps/mobile) ──────────────────────────────────
   'mobile.common.today': 'Today',
   'mobile.common.cancel': 'Cancel',

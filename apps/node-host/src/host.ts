@@ -41,9 +41,11 @@
 import {
   createProjectActions,
   createTaskActions,
+  exportDocumentFromHost,
   materializedState,
   openAppHost,
   type AppHost,
+  type ExportDocument,
   type NewTaskFields,
 } from '@heyta/app-host';
 import type { Project, Tag, Task } from '@heyta/domain';
@@ -112,6 +114,14 @@ export interface NodeHost {
   /** 待上传队列长度（同步后应该为 0）。 */
   pendingUploadCount(): Promise<number>;
 
+  /**
+   * 导出一份**完整保真**的文档（含全部实体、墓碑与完整 op-log）。
+   *
+   * 这个壳跑在**真 SQLite 文件**上，所以这条命令是"导出真的读到了全部数据"
+   * 最硬的证据 —— 导出形状本身由 `@heyta/app-host` 决定，这里只负责读库。
+   */
+  exportDocument(): Promise<ExportDocument>;
+
   /** 关闭 SQLite 连接。之后不可再用。 */
   close(): void;
 }
@@ -146,6 +156,7 @@ export async function openNodeHost(options: NodeHostOptions): Promise<NodeHost> 
     dispatch: (intent) => app.dispatch(intent),
     sync: () => app.sync(),
     pendingUploadCount: () => app.pendingUploadCount(),
+    exportDocument: () => exportDocumentFromHost(app, { exportedAt: Date.now(), host: 'node' }),
     close: () => {
       app.close();
     },
