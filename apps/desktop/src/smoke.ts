@@ -62,6 +62,23 @@ const WANT_WINDOW = process.argv.includes('--window');
 const SHOT_PATH = process.env['HEYTA_SMOKE_SHOT'] ?? '';
 
 /**
+ * 🔴 开窗模式下**关掉硬件加速**（必须在 `app.whenReady()` 之前）。
+ *
+ * 在无桌面会话（SSH / CI）里跑，真 Windows 上实测 GPU 进程直接崩：
+ *
+ *     ERROR:content\browser\gpu\gpu_process_host.cc] GPU process exited
+ *       unexpectedly: exit_code=34
+ *
+ * 跟着 `webContents.capturePage()` 抛 `[Error: UnknownVizError]` ——
+ * 没有合成器就没有帧。关掉硬件加速后走软件合成，这一环在无头环境里也成立。
+ *
+ * ⚠️ **这是一条测试环境的让步，要如实说**：这个冒烟证明的是
+ * "这套 UI 在 Electron 的 Chromium 里能渲染出来"，
+ * **不是**"GPU 加速路径在这台机器上健康"。后一条只有可见桌面上跑才算。
+ */
+if (WANT_WINDOW) app.disableHardwareAcceleration();
+
+/**
  * 判断一张截图是不是"什么都没画"。
  *
  * 判据是**采样点的颜色种类数**：真实界面有文字、边框、色块，采样出来几十种颜色；
