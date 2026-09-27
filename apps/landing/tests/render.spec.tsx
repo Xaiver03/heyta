@@ -100,19 +100,21 @@ describe('落地页整页渲染', () => {
       (a) => a.getAttribute('href') ?? '',
     );
     expect(hrefs.length).toBeGreaterThan(0);
-    // `#sync` 那一节由 `<Deferred>` 包着、在 jsdom 里**不会挂载**（见本文件最后
-    // 一条测试），所以它是唯一允许缺席的落点。允许清单写死在这里，
-    // 别的锚点一个都不许缺 —— 也不许"多一个缺席的"。
-    const NOT_MOUNTED_IN_JSDOM = new Set(['#sync']);
-    const missing = hrefs.filter(
-      (href) => !NOT_MOUNTED_IN_JSDOM.has(href) && view.querySelector(href) === null,
-    );
+    // ⚠️ 这里**曾经**有一份 `NOT_MOUNTED_IN_JSDOM = new Set(['#sync'])` 的豁免，
+    // 理由是"那一节由 <Deferred> 包着、在 jsdom 里不会挂载"。
+    // 那个豁免本身就是 bug：`#sync` 的落点只有**滚到附近**才存在，于是
+    // 导航点「同步」→ 浏览器找不到落点、不滚动 → 落点永远不挂载 ——
+    // 在真浏览器里就是**点了完全没反应，且控制台无报错**；豁免让这条测试
+    // 永远绿着，把它盖了一整轮。
+    // 现在 `id="sync"` 挂在 Deferred 的**占位块**上，落点一开始就在（而那棵
+    // WebGL 子树依旧在 jsdom 里不挂载，见本文件最后一条测试），所以豁免可以删掉 ——
+    // 一个豁免都不留。
+    const missing = hrefs.filter((href) => view.querySelector(href) === null);
     expect(missing).toEqual([]);
-    for (const href of NOT_MOUNTED_IN_JSDOM) {
-      expect(view.querySelector(href), `${href} 本该在 jsdom 里缺席`).toBeNull();
-    }
     // 价格那一节必须有锚点：导航、页脚、以及它自己都指向它。
     expect(view.querySelector('#pricing')).not.toBeNull();
+    // 被推迟挂载的那一节，**落点**同样必须在场（里面的 canvas 不在场，两回事）。
+    expect(view.querySelector('#sync')).not.toBeNull();
   });
 
   it('一级标题存在且不为空', () => {
@@ -245,8 +247,15 @@ describe('落地页整页渲染', () => {
     expect(text).toContain('¥12');
     expect(text).toContain('$5');
     expect(text).toContain('$12');
-    // 两档功能一致这条论断必须真的在页面上（否则"付费解锁功能"会被读成真的）
-    expect(text).toContain('功能完全一样');
+    // "付费档不靠阉割功能卖钱"这条论断必须真的在页面上
+    //（否则"付费解锁功能"会被读成真的）。
+    //
+    // ⚠️ 这里原先断言的是「功能完全一样」，那是**错的**：¥12 那一档自己写着
+    //    「加上我们的云端 AI」，与 ¥5 档并不一样。断言一句站不住的话，比不断言更坏 ——
+    //    它会把错误措辞钉在页面上（这条测试当时正是这么挡住了一次修正）。
+    //    现在断言的是修正后的说法：不阉割功能，第二档贵出来的钱买的是云端 AI。
+    expect(text).toContain('都不阉割功能');
+    expect(text).toContain('云端 AI');
 
     // 唯一的可点元素是免费档的 CTA，指向自建那一节；托管档没有任何按钮/链接。
     expect(pricing?.querySelectorAll('button').length).toBe(0);

@@ -366,7 +366,10 @@ export function SyncScene(): React.JSX.Element {
   }, [preset.reduced, webglFailed]);
 
   return (
-    <section className="lp-sync" id="sync" ref={sectionRef}>
+    // 锚点 `id="sync"` **不在这里** —— 它在 `Landing.tsx` 的 `<Deferred id="sync">`
+    // 占位块上。原因见 Deferred.tsx：这一节只有在滚到附近时才挂载，
+    // 锚点落点若跟着它一起迟到，导航点「同步」就永远滚不过来（死循环）。
+    <section className="lp-sync" ref={sectionRef}>
       {/*
         ⚠️ `.lp-wrap` 在**外层**，不能和 `.lp-sync__head` 写在同一元素上。
         `.lp-wrap` 带 `margin-inline: auto`（用来居中 1200px 的版心），
