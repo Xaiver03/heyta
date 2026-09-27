@@ -154,6 +154,30 @@ export interface CreateCheckoutInput {
    * 所以 adapter 不再持有价目表语义；它只负责把给定的金额签出去。
    */
   readonly amountMinor: number;
+  /**
+   * 商户订单号 —— **由调用方生成，adapter 必须原样使用**，不得自己再生成一个。
+   *
+   * 🔴 为什么必须是入参：`createOrderWithReservation` 把报价冻结在
+   * `checkout_orders.out_trade_no` 上，而回调（`settleOrderPaid`）是按
+   * **订单号**去认这一单的。adapter 若另生成一个，库里冻的是 A、发给通道的是 B，
+   * 回调到达时按 B 查不到订单 → `unknown-order` → **一笔真实到账的钱授予不出去**。
+   *
+   * 所以顺序只能是「**先冻结、后下单**」：调用方先 `quoteOrder` → 生成订单号 →
+   * `createOrderWithReservation(..., outTradeNo)` → 再把**同一个** `outTradeNo`
+   * 连同 `amountMinor` 交给 adapter。反过来（先下单再冻结）会在"名额已满"时留下
+   * 一个通道侧已经存在、用户还能扫码付款的订单 —— 那时我们没有对应的冻结金额，
+   * 收也不是、拒也不是。
+   *
+   * 不传时 adapter 退回自己生成（向后兼容尚无冻结概念的旧调用方）；但那意味着
+   * 这一单**没有**与之对应的冻结订单，只有旧路径才该这么做。
+   */
+  readonly outTradeNo?: string;
+  /**
+   * 账单上给用户看的商品名。不传时由 adapter 按 `priceId` 投影出默认值。
+   *
+   * ⚠️ 金额**不**从这里取，也不从 adapter 的价目表取 —— 只从 `amountMinor`。
+   */
+  readonly description?: string;
   /** 成功后的回跳地址。 */
   readonly successUrl: string;
   /** 取消后的回跳地址。 */
