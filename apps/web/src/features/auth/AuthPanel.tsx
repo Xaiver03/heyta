@@ -35,7 +35,16 @@ import { useState } from 'react';
 import { cssVar } from '@heyta/design-system';
 import { useI18n, type MessageKey } from '@heyta/i18n';
 import type { HostedAuthFailureReason, HostedAuthSession } from '@heyta/app-host';
-import { AlertTriangle, CheckCircle2, KeyRound, Loader2, Mail, UserPlus, X } from 'lucide-react';
+import {
+  AlertTriangle,
+  CheckCircle2,
+  KeyRound,
+  LifeBuoy,
+  Loader2,
+  Mail,
+  UserPlus,
+  X,
+} from 'lucide-react';
 
 import { detectPasskeyBrowser } from './passkey-browser.js';
 import { useAuthStore } from './store.js';
@@ -92,6 +101,7 @@ export function AuthPanel({ baseUrl, onClose, onSignedIn }: AuthPanelProps): Rea
   const registerAccount = useAuthStore((s) => s.registerAccount);
   const registerPasskey = useAuthStore((s) => s.registerPasskey);
   const loginWithPasskey = useAuthStore((s) => s.loginWithPasskey);
+  const requestRecovery = useAuthStore((s) => s.requestRecovery);
   const verify = useAuthStore((s) => s.verify);
 
   const [email, setEmail] = useState('');
@@ -209,6 +219,9 @@ export function AuthPanel({ baseUrl, onClose, onSignedIn }: AuthPanelProps): Rea
                   {status.kind === 'link-sent' ? <span>{t('web.auth.sent.login')}</span> : null}
                   {status.kind === 'registered' ? (
                     <span>{t('web.auth.sent.register')}</span>
+                  ) : null}
+                  {status.kind === 'recovery-sent' ? (
+                    <span>{t('web.auth.sent.recovery')}</span>
                   ) : null}
                 </>
               )}
@@ -335,6 +348,32 @@ export function AuthPanel({ baseUrl, onClose, onSignedIn }: AuthPanelProps): Rea
             {t('web.auth.passkey.waiting')}
           </span>
         ) : null}
+
+        {/*
+          找回通行密钥的**入口**（只是入口 —— 恢复本身在邮件点开后的服务端页面上完成，
+          因为那一步必须在真实浏览器里让系统弹窗创建新凭据）。
+
+          🔴 补这个按钮之前，丢了通行密钥的用户**没有任何办法拿到恢复链接**：
+          服务端 `/api/recover/passkey` 与 app-host 的 `requestPasskeyRecovery`
+          都是完整实现，却零调用方 —— 功能做完了，用户做不到。
+        */}
+        <div style={{ display: 'flex' }}>
+          <button
+            type="button"
+            className="ht-btn ht-btn--ghost"
+            disabled={busy}
+            onClick={() => {
+              void requestRecovery(baseUrl, email);
+            }}
+          >
+            {status.kind === 'busy' && status.action === 'recovery' ? (
+              <Loader2 size={14} aria-hidden="true" className="ht-spin" />
+            ) : (
+              <LifeBuoy size={14} aria-hidden="true" />
+            )}
+            {t('web.auth.recovery.request')}
+          </button>
+        </div>
 
         <label style={labelStyle}>
           {t('web.auth.paste.label')}

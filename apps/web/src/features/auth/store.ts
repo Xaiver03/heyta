@@ -37,6 +37,7 @@ import {
   extractAuthLinkToken,
   registerWithMagicLink,
   requestMagicLink,
+  requestPasskeyRecovery,
   verifyMagicLink,
   type HostedAuthFailureReason,
   type HostedAuthSession,
@@ -61,7 +62,8 @@ export type AuthBusyAction =
   | 'register'
   | 'verify'
   | 'passkey-register'
-  | 'passkey-login';
+  | 'passkey-login'
+  | 'recovery';
 
 export type AuthStatus =
   /** 还没有凭据 —— 界面必须给出**明确的空状态**，而不是假装成功。 */
@@ -71,6 +73,8 @@ export type AuthStatus =
   | { kind: 'link-sent' }
   /** 注册申请已提交，还需要去邮箱点验证链接。**这不是"已登录"。** */
   | { kind: 'registered' }
+  /** 找回通行密钥的邮件已发出（入口见 `requestRecovery`）。同样不断言邮箱存在。 */
+  | { kind: 'recovery-sent' }
   | { kind: 'signed-in'; email: string }
   | { kind: 'failed'; reason: HostedAuthFailureReason };
 
@@ -117,6 +121,20 @@ export interface AuthStoreState {
     email: string,
     browser?: PasskeyBrowser,
   ) => Promise<HostedAuthSession | undefined>;
+  /**
+   * 申请**找回**通行密钥：让服务端把恢复链接发到邮箱。
+   *
+   * 🔴 这是恢复流程的**入口**，不是恢复本身。恢复本身（拿邮件里的令牌注册一个新通行密钥）
+   * 由服务端渲染的 `/recover-passkey` 页面 + `recover-passkey.js` 完成 ——
+   * 那一步必须在真实浏览器里调 `navigator.credentials.create()`，不可能放在这里。
+   *
+   * 补它的理由很具体：在此之前**丢了通行密钥的用户没有任何入口能拿到恢复链接**。
+   * 服务端 `/api/recover/passkey` 与 app-host 的 `requestPasskeyRecovery` 都是完整实现，
+   * 但**零调用方** —— 也就是"功能做完了、用户做不到"，本仓库反复记过的那类缺陷。
+   *
+   * 与登录链接一样，服务端用中性文案防邮箱枚举 ⇒ 成功也**不断言邮箱存在**。
+   */
+  requestRecovery: (baseUrl: string, email: string) => Promise<void>;
   /** 回到空状态（关闭/重开认证面板时用）。 */
   reset: () => void;
 }
@@ -249,6 +267,14 @@ export const useAuthStore = create<AuthStoreState>((set) => ({
     applyAuthSession(baseUrl, completed.session);
     set({ status: { kind: 'signed-in', email: completed.session.user.email } });
     return completed.session;
+  },
+
+  requestRecovery: async (baseUrl, email) => {
+    set({ status: { kind: 'busy', action: 'recovery' } });
+    const outcome = await requestPasskeyRecovery({ baseUrl }, email);
+    set({
+      status: outcome.ok ? { kind: 'recovery-sent' } : { kind: 'failed', reason: outcome.reason },
+    });
   },
 
   reset: () => {
