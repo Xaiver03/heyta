@@ -27,7 +27,11 @@ RUN set -eux; \
 RUN corepack enable && corepack prepare pnpm@11.8.0 --activate
 
 # 根工作区文件 + 各包的 package.json（先只拷清单，让依赖层可缓存）
-COPY pnpm-workspace.yaml package.json pnpm-lock.yaml ./
+# ⚠️ `tsconfig.base.json` 也必须拷：`packages/domain` 的 tsconfig 是
+# `"extends": "../../tsconfig.base.json"`，少了它 tsup 的 dts 构建会报
+# `TS5083: Cannot read file '/repo/tsconfig.base.json'`。
+# sync-core / shared-schema 不 extends 任何东西，所以少了它**只有 domain 会炸**。
+COPY pnpm-workspace.yaml package.json pnpm-lock.yaml tsconfig.base.json ./
 COPY packages/sync-core/package.json ./packages/sync-core/
 COPY packages/shared-schema/package.json ./packages/shared-schema/
 COPY packages/domain/package.json ./packages/domain/
