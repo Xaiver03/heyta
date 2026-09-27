@@ -26,7 +26,9 @@
 **收银台也已经接通**：`POST /api/billing/checkout`
 （`server/src/billing/checkout.routes.ts`）—— 见
 [pricing-and-coupons.md](../reference/pricing-and-coupons.md) §7 第 18 条。
-**仍然没做的**是客户端「付款」按钮与「交付」半段（webhook → `settleOrderPaid`），
+**「交付」半段也已经接通**（webhook 在**同一个事务**里调 `settleOrderPaidInTransaction`，
+按订单冻结的 `price_id` 写回 `subscriptions.grants`）—— 见 §11.5 第 1 条与 §12。
+**现在唯一还缺的用户侧一环**是客户端「付款」按钮，而它**卡在外部**（支付商资质），
 见 §11.5。
 
 > ⚠️ 本文的价格数字（`¥99/$49`、年付）**已随 ADR-0020 作废**，
@@ -409,9 +411,20 @@ cd apps/landing && npx vitest run              # 期望 71 passed
      东西 —— 一个点了没反应的"立即购买"（见 `apps/landing/src/components/Pricing.tsx`
      文件头）。所以"用户能走完"这一步现在卡在**外部依赖**（支付商资质）上，
      不在我们这边：服务端那条路已经通了，`curl` 得到一张真的收款码参数。
-   - ❌ **仍缺（这一件完全在我们这边）**："交付"半段：webhook 路径还没有把
-     "金额与所有 SKU 都对不上"的支付交给 `settleOrderPaid`，所以用了券的单
-     **收得上钱、授不出权益**（见同文档 §7 第 9 条末尾列的三件事）。
+   - ✅ **已做**："交付"半段。webhook 把带订单号的支付交给
+     `settleOrderPaidInTransaction`，**落在它已有的那个 `prisma.$transaction` 里**；
+     `applySettlementToEvent` 按结论决定写不写权益（`granted` → 用**订单冻结的**
+     `grantsForSku(priceId)` **覆盖** adapter 的金额启发式；`already-paid` /
+     `amount-mismatch` / `order-not-grantable` → 一个字节都不写；`unknown-order`
+     是唯一回落的结论）。`NormalizedPaymentEvent.outTradeNo` 由 adapter 显式给出，
+     不再从 `providerEventId` 反解。**用了券的单不再"收得上钱、授不出权益"。**
+     回归证据：`server/tests/billing-webhook-settlement.pglite.spec.ts`（14 例真 SQL）；
+     非空转由**四次故障注入**证明（改 adapter 的 `outTradeNo`、把写入的 `grants`
+     改成并集、删掉 `SELECT` 里的 `price_id`、停掉 webhook 的结算调用点 → 各自变红）。
+     详见 [pricing-and-coupons.md](../reference/pricing-and-coupons.md) §7 第 9 条。
+   - ❌ **仍缺（属对账，不属"接线"）**：**退款/拒付侧**没接（`reverseOrderOnRefund`
+     仍零生产调用方，退款事件在 `unsupported-event-type` 就被挡）；
+     **存量回填**没做（接线前已付款但未结算的订单，重投会被幂等挡住，不会补结算）。
 2. **让 ¥12 可交付**（⑦⑧）
    - ✅ **已做**：`Subscription.price_id` + `grants` 列 + 迁移
      `20260929000000_add_subscription_grants`（含 `['hosting']` 回填，否则开关一打开
@@ -432,3 +445,49 @@ cd apps/landing && npx vitest run              # 期望 71 passed
 
 5. **海外通道**（§11.2）—— 通道未定前，落地页的 `$5/$12` 要么标注"仅限中国区"，
    要么先撤掉；同时给金额加**币种断言**（现在 USD 单会被微信通道按 CNY 发出去）。
+
+## 12. 本轮收尾状态
+
+> 这一节只记**可操作状态**，供下一次会话零上下文接手。事实与假设分开写。
+
+### 12.1 事实
+
+- **交付半段已接通并提交。** 工作区 `HEAD = 77b4e25`，与 `origin/main` 同步。
+  ⚠️ 实现本身来自**并行的 `ws/billing-settle` 工作流**（merge `42bee60`）；
+  本轮的贡献是**独立复核 + 补上可失败证据 + 修正四处过时文档**（提交 `77b4e25`）。
+- **验证**：16 道门禁逐条 PASS（`check:migrations` / `layering` / `widgets` /
+  `ui-language` / `licenses` / `docs` / `pricing` / `ai-quota` / `design` / `tokens` /
+  `arkts` / `native-deps` / `mobile-bundle` / `materialized-reads` / `ai-coverage`…）；
+  `server` 72 文件 / **1468 passed | 1 skipped**；billing 相关 101 例全过。
+- 🔴 **整条 `pnpm check` / `pnpm test` 当前是红的，但红在别处。** `apps/desktop`
+  的 typecheck/test 与 `check:ai-e2e` 失败，原因是另一个 agent 正在做的桌面壳还是
+  **未提交**状态：`apps/desktop/*` 是 modified，`renderer/main.tsx`、
+  `tsconfig.renderer.json`、`e2e/tests/desktop-window.spec.ts` 还是 untracked。
+  已在 HEAD 的干净 worktree 上实测：`apps/desktop` typecheck `exit 0`、
+  vitest `11 passed`（脏工作区里是 `1 failed | 10 passed`），且那个 e2e spec 在 HEAD
+  根本不存在。**即已提交状态下整条链是绿的。**
+  ⚠️ **不要为了让门禁变绿去动那些文件** —— 那是别人的在途工作。
+- 客户端「付款」按钮**仍未加**，这是**故意**的（见 §11.5 第 1 条）。
+
+### 12.2 假设（未验证）
+
+- 桌面壳工作流提交后，整条 `pnpm check` / `pnpm test` 会回到全绿。**未实测**，
+  因为无法预知那位 agent 何时提交、提交后是否自洽。
+
+### 12.3 按顺序的下一步
+
+1. 等桌面壳提交后，重跑 `pnpm check` 与 `pnpm test`，确认全链绿。
+2. 客户端「付款」按钮 —— **只在支付通道就绪时**加，否则必然 `503` 死按钮。
+3. 退款/拒付侧接线（`reverseOrderOnRefund` 目前零生产调用方）。
+4. 存量订单回填（对账任务）。
+5. 海外通道与币种断言（§11.5 第 5 条）。
+
+### 12.4 别重复踩的坑
+
+- ❌ **不要用 `git checkout <file>` 还原故障注入** —— 它会连带毁掉未提交的新增。
+  用 `/tmp` 备份 + `md5 -q` 核对还原。
+- ❌ **不要 `git add -A`。** 这是多 agent 共享工作区，别人正在写文件；
+  只用**显式路径列表** staging，再用 `git show :<path> | diff -q - <path>` 核对
+  index 与工作区一致。
+- ❌ 本仓库这个 git 版本里 `git apply --cached` 与 `git commit --only <paths>` 都不可靠
+  （后者会用工作区内容绕过 index）。正常 `git add` 显式路径 + 普通 `git commit`。
