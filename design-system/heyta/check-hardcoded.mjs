@@ -41,6 +41,17 @@ const verbose = process.argv.includes('--verbose');
 const SCAN_ROOTS = [
   { label: 'apps/web/src', path: join(ROOT, 'apps/web/src') },
   { label: 'apps/mobile/src', path: join(ROOT, 'apps/mobile/src') },
+  /**
+   * 🔴 共享 UI（M1）。**必须在写第一个组件的同时就加上**。
+   *
+   * 这一条比其他几条都关键：`packages/ui` 里的组件会被**四个端同时渲染**，
+   * 所以一个裸色值/裸间距不是"错一次"，而是**一次错四个端**。
+   *
+   * 而它原本正好落在扫描范围之外 —— 上面四条 `apps/<应用>/src` 谁都不覆盖 `packages/`。
+   * 这正是本文件反复吃亏的那类失效：范围缺口**不报错，只会静默失效**。
+   * （`apps/desktop/src` 那条也是同样的理由提前加的，见上方注释。）
+   */
+  { label: 'packages/ui/src', path: join(ROOT, 'packages/ui/src') },
   // 落地页是**面向公众的界面**，裸色值/裸间距在这里的代价比在产品内部更高：
   // 它不受设计系统重构的保护，改一次 token 就会悄悄与产品界面脱节。
   { label: 'apps/landing/src', path: join(ROOT, 'apps/landing/src') },
