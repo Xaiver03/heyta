@@ -44,6 +44,7 @@ import {
   Settings,
   Smartphone,
   Square,
+  Tag,
   Target,
   Timer,
   TriangleAlert,
@@ -83,6 +84,15 @@ const ICONS = {
    * 点清单就是回任务列表。**语义名相同就复用，不同就必须换字形。**
    */
   'task.project': Folder,
+
+  /**
+   * 标签。
+   *
+   * 🔴 与 `task.project` **必须不同字形**：清单和标签在数据模型上是两个实体，
+   * 在界面上又出现在同一屏的相邻两段（「我的」页）。同一个 Folder 画两次
+   * 会让人以为"标签"是清单的另一种写法。
+   */
+  'task.tag': Tag,
 
   // 分组
   'group.today': ListTodo,

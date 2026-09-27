@@ -1199,6 +1199,7 @@ export const zhCN = {
   'mobile.detail.project.newPlaceholder': '清单名称',
   'mobile.lists.empty': '还没有清单',
   'mobile.lists.empty.hint': '还没归类的任务都在「收集箱」里，不会丢。',
+  'mobile.lists.nameLabel': '清单名称',
   'mobile.lists.newPlaceholder': '给新清单起个名字',
   'mobile.lists.add': '新建清单',
   // 删除清单**不删里面的任务**（见 `project-actions.ts` 文件头第 2 条）。
@@ -1206,6 +1207,24 @@ export const zhCN = {
   // 于是**不敢删**——一个不敢用的功能等于没有。
   'mobile.lists.removeHint': '删除清单不会删掉里面的任务，它们会回到「收集箱」。',
   'mobile.lists.remove': '删除清单「{name}」',
+
+  // ── 标签 ───────────────────────────────────────────────────
+  // 清单和标签在数据上是两个实体，在产品上是同一件事的两个面（组织任务）：
+  // 清单回答"它属于哪个容器"（一个），标签回答"它还跟什么有关"（多个）。
+  'mobile.profile.section.tags': '标签',
+  'mobile.tags.empty': '还没有标签',
+  'mobile.tags.empty.hint': '标签可以跨清单给任务归类，比如「紧急」「等回复」。',
+  'mobile.tags.nameLabel': '标签名称',
+  'mobile.tags.newPlaceholder': '给新标签起个名字',
+  'mobile.tags.add': '新建标签',
+  // 与清单那条同理，但这里更微妙：用户看到"这个标签在 5 个任务上用着"时，
+  // 会以为删除等于动那 5 个任务。不说清楚就会**不敢删**。
+  'mobile.tags.removeHint': '删除标签不会删掉任何任务，只是把它们身上的这个标签摘掉。',
+  'mobile.tags.remove': '删除标签「{name}」',
+  'mobile.detail.field.tags': '标签',
+  // 一个标签都没有时的提示。指向「我的」页 —— 那里是唯一能新建标签的地方，
+  // 不指路的话用户会以为"这里应该有东西可点，只是坏了"。
+  'mobile.detail.tags.empty': '还没有标签，先到「我的」页新建一个。',
   'mobile.detail.important.on': '标记为重要',
   'mobile.detail.important.off': '取消重要',
   'mobile.detail.markIncomplete': '标记为未完成',
@@ -1232,7 +1251,7 @@ export const zhCN = {
   'mobile.profile.sync.busy': '正在同步…',
   'mobile.profile.sync.now': '立即同步',
   'mobile.profile.sync.notConfigured': '填好服务器地址与访问令牌后才能同步。',
-  'mobile.profile.sync.slowKdf': '这台设备没有 WebAssembly，密钥派生要用纯 JS 计算：首次同步需等待约 30–40 秒，同一会话内之后就会很快。任务内容不受影响，照常可离线使用。',
+  'mobile.profile.sync.slowKdf': '这台设备没有 WebAssembly，密钥派生要用纯 JS 逐批计算：首次同步可能要等数十秒到数分钟（历史数据越多越久）。同一会话内之后的同步就会很快。任务内容不受影响，照常可离线使用。',
   'mobile.profile.pending.label': '待上传',
   'mobile.profile.pending.loading': '读取中…',
   'mobile.profile.pending.allUploaded': '已全部上传',
@@ -1242,11 +1261,13 @@ export const zhCN = {
   'mobile.profile.lastSync.label': '上次成功同步',
   'mobile.profile.lastSync.never': '从未',
   'mobile.profile.clearCredentials': '清除本机保存的凭据',
-  // 🔴 原句是"日历、专注、清单与标签管理尚未实现"，**已经与事实不符了**：
-  // 日历（`CalendarScreen`）与专注（`FocusScreen`）都已经是真屏幕。
-  // 这句是**面向用户的陈述**，说错了就是应用在骗人 —— 迁移时可以"只搬不改"，
-  // 但事实变了就必须改。清单 / 标签**确实**还没有管理界面，所以保留这两个。
-  'mobile.profile.footnote': '凭据只保留在内存中，应用完全退出后需要重新输入。清单与标签管理尚未实现。',
+  // 🔴 这句是**面向用户的陈述**，说错了就是应用在骗人 —— 迁移时可以"只搬不改"，
+  // 但每做完一个功能就必须回来改它。原句是"日历、专注、清单与标签管理尚未实现"：
+  //   日历（`CalendarScreen`）、专注（`FocusScreen`）先做完 → 去掉；
+  //   清单（`ListsSection` + 详情页归属）本轮做完 → 去掉；
+  // 现在只剩**标签**还没有管理界面（`createTag` 在 app-host 里有，
+  // 但移动端没有入口，而且 `tagIds` 连"指派"的动作都还没有）。
+  'mobile.profile.footnote': '凭据只保留在内存中，应用完全退出后需要重新输入。',
   'mobile.profile.conflict.body': '这几处两边都改过，heyta 不会替你挑——自动挑一个会悄悄丢掉另一边的改动。数据没有丢，但选完之前它们不会上传。',
   'mobile.profile.conflict.open': '逐条处理',
 

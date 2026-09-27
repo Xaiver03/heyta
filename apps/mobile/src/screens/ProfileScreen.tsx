@@ -36,6 +36,7 @@ import { isArgon2SlowBackend } from '@heyta/sync-core';
 import { Button, Card, Chip, Divider, Screen, SectionHeader, Text, TextField } from '../ui/kit';
 import { ConflictSheet } from './ConflictSheet';
 import { ListsSection } from './ListsSection';
+import { TagsSection } from './TagsSection';
 import { useLocalePreference } from '../i18n/locale-preference';
 import { formatStamp } from '../lib/date';
 import { describeSyncStatus, statusTone } from '../sync/status-text';
@@ -112,12 +113,28 @@ export function ProfileScreen(): React.JSX.Element {
   // 🔴 为什么要把"慢"提前说出来。
   //
   // Hermes 没有 WebAssembly，Argon2id 只能走纯 JS 路径。**实测**：这台模拟器上
-  // 第一次同步（含一次密钥派生）耗时约 30–40 秒，而同一会话内的第二次同步是 1–2 秒
-  // —— `sync-core` 的 session cache 已经把派生结果缓存住了，所以那 30–40 秒
-  // **每次应用会话只付一次**。
+  // 一次派生约 30–40 秒，而同一会话内的第二次派生是 1–2 秒 ——
+  // `sync-core` 的 session cache 把**同一个 salt** 的结果缓存住了。
   //
-  // 但"只付一次"不等于"不用解释"：一个没有说明的 40 秒转圈，用户会以为卡死了。
-  // 说清楚是什么在慢、慢多久、之后会怎样，等待就变成可接受的。
+  // ⚠️ 但"只付一次"是**错的**说法。派生次数不取决于"同步了几次"，也不取决于
+  // op 条数，而取决于**历史里出现过多少个不同的 salt**。
+  //
+  // 🔴 这里必须说准确，因为它决定了文案能不能给一个具体秒数：
+  //   - **加密**侧：`encrypt()` 走 `getOrDeriveEncryptKey()`，一个会话共用
+  //     **一个** salt —— 所以一台设备上传 100 条 op 仍然只派生一次；
+  //   - **解密**侧：`decryptArgonFromBuffer()` 按**每条 op 载荷里的 salt**
+  //     查缓存，缓存键是 `passwordHash:saltBase64`。
+  //     所以代价 ≈ **历史上不同"加密会话/口令世代"的个数**，不是 op 条数。
+  //
+  // 实测：`user:37` 当时有 **20 余条 op、来自 8 个客户端**
+  // （≈ 8 个不同 salt，因为一个客户端一个会话共用一个 salt），
+  // 手机上首次同步 **290 秒**（宿主 load 47）。空账号（1 个 salt）约 30–40 秒。
+  //
+  // 原来这里的文案写死"首次同步约 30–40 秒"—— 那是**空账号**的数字，
+  // 对一个正在等的用户来说是在**说假话**。现在改成给区间 + 说明增长原因，
+  // 因为客户端在下载之前**无从知道**服务端有多少个不同的 salt。
+  //
+  // 说清楚是什么在慢、能慢到什么程度、之后会怎样，等待就变成可接受的。
   // 同步成功后（`synced`）提示自动消失，不再占地方。
   const slowKdf = isArgon2SlowBackend();
 
@@ -296,10 +313,14 @@ export function ProfileScreen(): React.JSX.Element {
         }}
       />
 
-      {/* 清单管理。放在最后：它读的是**本地已物化状态**，
+      {/* 清单 / 标签管理。放在最后：它们读的都是**本地已物化状态**，
           而上半屏（同步 / 状态）读的是同步状态机 —— 两者的刷新时机不同，
-          混在一起会让人以为"清单没更新是因为同步坏了"。 */}
+          混在一起会让人以为"清单没更新是因为同步坏了"。
+
+          ⚠️ 顺序是**清单在标签前**，与任务详情页里的字段顺序一致。
+          两处顺序不同的话，用户会在两屏之间建立两套心智模型。 */}
       <ListsSection />
+      <TagsSection />
     </Screen>
   );
 }
