@@ -99,14 +99,44 @@ else
 fi
 printf '\n'
 
+# ── 3b. 桌面端：**同一份 web 产物**在 Electron 里画不画得出来（判据 4）──
+#
+# 🔴 这一段曾经是一条 `skip`，理由写的是"M2 的打包尚未接入" —— **那是陈旧的**。
+# `e2e/tests/desktop-window.spec.ts` 早就在跑了（`pnpm check` 的 e2e 里含它 2 条），
+# 而且"打包产物"那条是**从 `app.asar` 里**加载 `renderer-dist/index.html` 的，
+# 正好就是判据 4 要的东西。把已验证的事说成"未验"会让人重复劳动，
+# 也会让这份清单逐渐失去可信度 —— 所以改成**真的去跑**。
+printf '【3b】桌面端（Electron 加载同一份 web 产物 —— 判据 4）\n'
+if command -v node >/dev/null 2>&1 && [ -d e2e/node_modules/@playwright ]; then
+  run '桌面端（开发构建）：真窗口打开且共享 UI 画出来了' \
+    sh -c 'cd e2e && npx playwright test tests/desktop-window.spec.ts --grep "开发构建" --reporter=line'
+
+  # 打包产物只在**对应平台**存在。macOS 上要有 `release/heyta-darwin-arm64`。
+  case "$(uname -s)" in
+    Darwin) packaged_dir='release/heyta-darwin-arm64' ;;
+    Linux)  packaged_dir='release/heyta-linux-x64' ;;
+    MINGW*|MSYS*|CYGWIN*) packaged_dir='release/heyta-win32-x64' ;;
+    *)      packaged_dir='' ;;
+  esac
+
+  if [ -n "$packaged_dir" ] && [ -d "$packaged_dir" ]; then
+    run '桌面端（打包产物）：从 app.asar 里加载同一份产物' \
+      sh -c 'cd e2e && npx playwright test tests/desktop-window.spec.ts --grep "打包产物" --reporter=line'
+  else
+    skip '桌面端打包产物加载（判据 4 的"打包"那一半）' \
+      "没有 $packaged_dir —— 先跑 node scripts/package-desktop.mjs"
+  fi
+else
+  skip '桌面端渲染' 'e2e/node_modules/@playwright 不存在（先跑 pnpm -C e2e install）'
+fi
+printf '\n'
+
 # ── 4. 没验的那些，如实说 ─────────────────────────────────────────
 printf '【4】本机跑不了的判据\n'
 skip 'iOS / Android 真机渲染' \
   '需要 Xcode 模拟器或 adb 设备；本脚本不假装检测器存在'
 skip '鸿蒙（RNOH）渲染 + op-sqlite 打开/读/写' \
   '需要 DevEco Studio + RNOH 工具链与设备，当前环境没有'
-skip '桌面端加载同一个 web 产物（判据 4）' \
-  'M2 的打包尚未接入（无 electron-builder 等价物）'
 printf '\n'
 
 printf '════ 结果 ════\n'
