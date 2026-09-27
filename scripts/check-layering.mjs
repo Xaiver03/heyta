@@ -178,6 +178,38 @@ const RULES = [
       '`classifyDestination()`。⚠️ 注意区分：`listen(port, \'127.0.0.1\')` 是' +
       '**我们自己**在监听，属于外壳职责，不受本规则限制。',
   },
+  {
+    id: 'no-local-category-color-map',
+    /**
+     * 两种形态都拦 —— 因为两种都真实出现过（M0-1，2026-09-27）：
+     *
+     *   (a) 起个名字（`SLOT_TOKENS` / `HEAT_VARS`…），再赋一个数组/对象字面量
+     *   (b) 名字起成别的，但结构是「数字槽位键 → 颜色 token 字符串」
+     *
+     * (b) 分支存在的理由：只按变量名拦是**可绕过的** ——
+     * 下一个人把 `SLOT_TOKEN` 改名成 `colors` 就溜过去了，而漂移照旧。
+     *
+     * ⚠️ 它**不匹配**合法形态：`const SLOT_TOKENS = CATEGORY_SLOT_TOKEN_BY_SLOT`
+     * 是**从单点派生**（`=` 后不是字面量），规则要求 `=` 后紧跟 `[` 或 `{`，
+     * 所以放行 —— 那正是要鼓励的写法。
+     */
+    pattern:
+      /(?:SLOT_TOKENS?|HEAT_VARS|HEAT_TOKENS)\s*(?::[^=]+)?=\s*[[{]|\{\s*1\s*:\s*['"](?:color\.|--ht-)/,
+    what: '外壳里手写「槽位 / 热力」到颜色的映射',
+    why:
+      '这是 ADR-0010 §3.10.1 那个形状最隐蔽的版本：**它不会失败**。' +
+      '实测（M0-1）：槽位映射在 `packages/design-system` 有一份真源，' +
+      '`apps/web` 从真源**派生**，而 `apps/mobile` **手抄了 8 个槽位值 + 5 个 heat 值**。' +
+      '于是改掉一个槽位取值后，Web 跟着变、移动端**静默保持旧色**，' +
+      '而**没有任何测试会红** —— 设计系统原有的测试只钉自己的 registry，' +
+      '从不看外壳的副本。更糟的是移动端那份的注释还写着' +
+      '"设计系统那边的测试已经在钉这件事"，而那句话是错的。' +
+      '取值必须只有一份，且那一份在 `packages/` 里。',
+    fix:
+      '用 `CATEGORY_SLOT_TOKEN_BY_SLOT` / `HEAT_TOKENS` / `UNSET_CATEGORY_TOKEN`' +
+      '（`@heyta/design-system`）。外壳只保留**最后一层适配**：' +
+      'Web 用 `cssVar()` 包成 `var(--ht-*)`，RN 多传一个 `tokens` 参数。',
+  },
 ];
 
 /** 该行是否在注释里（粗略但足够：只看行首 token）。 */
