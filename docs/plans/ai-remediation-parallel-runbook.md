@@ -233,19 +233,26 @@ docs 那一个是实测出来的：在 `.worktrees/ai-m1` 里放一个死链，
 ## 3. 落地（任意顺序）
 
 ```bash
-cd "/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta"   # 主检出
+cd .worktrees/ai-m2                       # ← ①②必须在**模块自己的 worktree** 里跑
+MAIN=$(git worktree list --porcelain | awk '/^worktree /{print $2; exit}')
 FORK=ai-remediation-fork
 
 # ① 谁要落地，先自证没越界
-node scripts/check-module-boundaries.mjs --module 2 --rev "$FORK"
+node "$MAIN/scripts/check-module-boundaries.mjs" --module 2 --rev "$FORK"
 
 # ② 体检：主检出脏文件 × 本分支改动文件，交集必须为空
-node scripts/check-module-boundaries.mjs --premerge --rev "$FORK"
+#    ⚠️ --rev 是必需的；不带就只看未提交改动，已提交的分支会得到假绿。
+node "$MAIN/scripts/check-module-boundaries.mjs" --premerge --rev "$FORK"
 
-# ③ 合并（任意顺序）
+# ③ 合并（任意顺序）—— 这一步回主检出做
+cd "$MAIN"
 git checkout main
 git merge --no-ff feat/ai-module-2-journey
 ```
+
+> 🔴 **①② 在主检出里跑是错的**（本轮实测踩过）：`--module` 检查的是**当前目录那个 HEAD**，
+> 在主检出里跑就是在检查 main 自己；`--premerge` 则变成拿主检出和自己比。
+> 现在脚本会把这两种误用直接拒掉（exit 2）并说明原因。
 
 ⚠️ **主检出脏的时候不要合并，也不要更新 `main` ref**（`git push . …:main` 这类）——
 那正是 §0 里那个 7 文件交集的成因。worktree 模型下主检出本来就该是干净的；
