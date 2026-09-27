@@ -150,7 +150,7 @@ export const en = {
   'landing.selfhost.step3.title': 'Point the client at it',
   'landing.selfhost.step3.body': 'On first launch, pick one: your own server address or the hosted option. You can switch whenever you want.',
   'landing.selfhost.warnStrong': 'Do not run Prisma migrations directly.',
-  'landing.selfhost.warnBody': 'The project has 5 migrations that build indexes concurrently. Prisma wraps migrations in a transaction, and PostgreSQL does not allow concurrent index creation inside one, so the sixth migration fails. Use the repository ',
+  'landing.selfhost.warnBody': 'The project has 9 migrations that build indexes concurrently. Prisma wraps migrations in a transaction, and PostgreSQL does not allow concurrent index creation inside one, so the first such migration fails. Use the repository ',
   'landing.selfhost.warnCode': 'migration script scripts/migrate-deploy.sh.',
   // The repository is private today, so the `git clone` command above does not
   // work for visitors. This is an honest disclosure, not marketing copy.

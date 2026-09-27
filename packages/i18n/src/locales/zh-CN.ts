@@ -165,7 +165,7 @@ export const zhCN = {
   'landing.selfhost.step3.title': '在客户端填地址',
   'landing.selfhost.step3.body': '首次启动时二选一：填自己的服务器地址，或者用托管。选了随时能换。',
   'landing.selfhost.warnStrong': '数据库迁移不要直接调 Prisma。',
-  'landing.selfhost.warnBody': '项目里有 5 个并发建索引的迁移，Prisma 会把迁移包进事务，而 PostgreSQL 不允许在事务里建并发索引，跑到第 6 个就会失败。请用仓库里的',
+  'landing.selfhost.warnBody': '项目里有 9 个并发建索引的迁移，Prisma 会把迁移包进事务，而 PostgreSQL 不允许在事务里建并发索引，跑到第一个这样的迁移就会失败。请用仓库里的',
   // 句末的「。」并进代码词条里：单独立一条纯标点词条会被
   // catalog.spec.ts 的"中文词条必须含汉字"判定为违规（它是对的 ——
   // 一条只有标点的词条没有办法自查语言）。

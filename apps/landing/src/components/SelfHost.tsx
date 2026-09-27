@@ -10,7 +10,7 @@
  *   - PostgreSQL **≥ 16**（compose 里是 `postgres:16-alpine`）
  *   - 迁移**必须走 `sh scripts/migrate-deploy.sh`，不能用 `prisma migrate deploy`**
  *     —— 后者会把每个迁移包进事务，而 PostgreSQL 禁止在事务块里执行
- *     `CREATE INDEX CONCURRENTLY`，项目里有 5 个这样的迁移，会在第 6 个上失败。
+ *     `CREATE INDEX CONCURRENTLY`，项目里有 9 个这样的迁移，会在第一个上失败。
  *   把这条"为什么"留在页面上，比只给一行命令有用。
  */
 
