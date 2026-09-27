@@ -16,7 +16,7 @@
 
 import type { Task } from '@heyta/domain';
 
-/** 列表渲染需要的**最小**字段集。刻意不是整个 `Task`。 */
+/** 列表渲染需要的**最小**字段集。刻意不是整个 `Task` 的展开。 */
 export interface TaskRow {
   readonly id: string;
   readonly title: string;
@@ -24,6 +24,20 @@ export interface TaskRow {
   readonly important: boolean;
   /** 截止时间（epoch ms）。没有截止时间是 `null`，不是 `0`。 */
   readonly dueAt: number | null;
+  /**
+   * 原始的 `Task`。
+   *
+   * 🔴 为什么把整个实体带进来，而不是只加几个字段：
+   *
+   * 宿主需要在插槽里渲染**本地化**的元信息（截止文案、优先级徽章、重复规则），
+   * 而那些都要求拿到任务本体（`priority` 是数值枚举、`repeatOf` 还要按 id 查）。
+   * 每多一个这样的需求就往 `TaskRow` 上加一个字段，等于让这个"最小字段集"
+   * 无限膨胀，而且每加一次都要改这个文件 —— 却没有任何判断可复用。
+   *
+   * 把本体挂在这里，插槽就能自己取；`TaskRow` 自己那四个字段仍然是
+   * **派生过、有测试钉着**的（见本文件的 `toTaskRow`），不是摆设。
+   */
+  readonly source: Task;
 }
 
 export interface ToTaskRowOptions {
@@ -52,6 +66,7 @@ export function toTaskRow(task: Task, options?: ToTaskRowOptions): TaskRow {
     done: task.completedAt !== undefined,
     important: task.important === true,
     dueAt: task.dueDate ?? null,
+    source: task,
   };
 }
 

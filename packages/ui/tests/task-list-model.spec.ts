@@ -20,16 +20,18 @@ const ids = (tasks: readonly Task[]): string[] => tasks.map((t) => t.id);
 
 describe('toTaskRow', () => {
   it('把 Task 映射成渲染所需的最小字段集', () => {
-    const row = toTaskRow(
-      mkTask('a', { title: '写周报', important: true, dueDate: 1_700_000_000_000 }),
-    );
-    expect(row).toEqual({
+    const task = mkTask('a', { title: '写周报', important: true, dueDate: 1_700_000_000_000 });
+    const row = toTaskRow(task);
+    // 断言**派生**出来的那几个字段。`source` 是原样透传的任务本体
+    //（宿主插槽要用它取 priority / repeat 之类），单独验它是不是同一个引用。
+    expect(row).toMatchObject({
       id: 'a',
       title: '写周报',
       done: false,
       important: true,
       dueAt: 1_700_000_000_000,
     });
+    expect(row.source).toBe(task);
   });
 
   it('🔴 completedAt 判的是"存不存在"而不是真值 —— 0 也是已完成', () => {
