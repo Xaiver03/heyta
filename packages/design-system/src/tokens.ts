@@ -72,6 +72,22 @@ export const TOKEN_GROUPS = {
     'heat-2',
     'heat-3',
     'heat-4',
+    /**
+     * 活动分类的 8 个色槽位（用户自己赋义，见
+     * `docs/plans/activity-categories-and-colors.md`）。
+     *
+     * 🔴 **只能当图形色用**：它们保证的是与 surface 的 3:1（WCAG 1.4.11），
+     * **不保证**正文的 4.5:1。要当文字色就得先单独过 AA —— 现在没有这个需求，
+     * 界面上的分类名一律用 `foreground`。
+     */
+    'category-1',
+    'category-2',
+    'category-3',
+    'category-4',
+    'category-5',
+    'category-6',
+    'category-7',
+    'category-8',
     'focus-work',
     'focus-break',
     /** 弹窗遮罩。半透明，故与前景配对不参与对比度检查。 */
@@ -241,6 +257,30 @@ export function allTokenNames(): TokenName[] {
 }
 
 /**
+ * 分类色槽位的 token 名（`color.category-1` … `color.category-8`）。
+ *
+ * 🔴 **手写 8 个字面量 + `satisfies`，而不是从 registry 里 `filter` 派生**。
+ * 派生看起来更"不会漂移"，但它拿到的是 `string[]`，于是拼错一个名字
+ * （`category-9`、`category-one`）**编译期什么都不查** —— 要等运行时
+ * `cssVar()` 抛错、或者根本没人引用而不报错。
+ * 这里手写，`satisfies readonly TokenName[]` 会把拼错变成编译错误。
+ *
+ * ⚠️ 手写的代价是"加了 9 号槽位却忘了登记对比度"，那由
+ * `tests/category-colors.spec.ts` 的**集合相等**断言兜住：
+ * registry 里所有 `category-*` 必须与这 8 个逐项相同。
+ */
+export const CATEGORY_SLOT_TOKENS = [
+  'color.category-1',
+  'color.category-2',
+  'color.category-3',
+  'color.category-4',
+  'color.category-5',
+  'color.category-6',
+  'color.category-7',
+  'color.category-8',
+] as const satisfies readonly TokenName[];
+
+/**
  * WCAG 对比度需要用到的前景/背景配对。
  *
  * 这不是装饰性列表 —— tests/tokens.spec.ts 会**逐个计算真实对比度**，
@@ -285,4 +325,12 @@ export const GRAPHIC_PAIRS: ReadonlyArray<{
 }> = [
   { fg: 'color.border', bg: 'color.surface', min: 1.2, why: '分隔线（可见即可，非 3:1）' },
   { fg: 'color.ring', bg: 'color.background', min: 3, why: '焦点环' },
+  // 分类色槽位只当**图形**用（色块 / 堆叠条的段），故走 3:1 这条线。
+  // ⚠️ 它们**不**保证 4.5:1，所以不许拿去写正文（见 TOKEN_GROUPS 里的注释）。
+  ...CATEGORY_SLOT_TOKENS.map((token) => ({
+    fg: token,
+    bg: 'color.surface' as const,
+    min: 3,
+    why: '分类色块（图形）',
+  })),
 ];

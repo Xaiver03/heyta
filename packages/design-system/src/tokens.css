@@ -56,6 +56,21 @@
   --ht-sky-600: #0284c7;
   --ht-sky-700: #0369a1;
 
+  /*
+    活动分类色板（`--ht-color-category-1..8` 的底层取值）。
+    ⚠️ 这一组的取值**不是按"好看"挑的**，是按 `tests/category-colors.spec.ts`
+    算出来的：两两在正常视觉、红色盲、绿色盲三种条件下都要能分开，
+    且各自与 surface 的对比度 ≥ 3:1。**改任何一个值都要重跑那个测试** ——
+    它们是一组，单独调一个几乎一定会撞到另一个。
+  */
+  --ht-red-800: #991b1b;
+  --ht-orange-600: #ea580c;
+  --ht-green-600: #16a34a;
+  --ht-teal-600: #0d9488;
+  --ht-cyan-700: #0e7490;
+  --ht-fuchsia-700: #a21caf;
+  --ht-pink-700: #be185d;
+
   --ht-white: #ffffff;
 }
 
@@ -134,6 +149,27 @@
   --ht-color-heat-2: var(--ht-blue-300);
   --ht-color-heat-3: var(--ht-blue-500);
   --ht-color-heat-4: var(--ht-blue-700);
+
+  /* ── 活动分类色槽位 ──────────────────────────────────────────
+     **调色板由我们给，褒贬由用户自己赋。** 这 8 个槽位本身不带任何含义：
+     用户把「短视频」设成 1 号还是 5 号，是**他的**信号，不是我们的说教
+     （见 docs/plans/activity-categories-and-colors.md §2）。
+
+     🔴 取值是一组，**不能单独调**:它们在正常视觉 / 红色盲 / 绿色盲下
+     两两可区分，且各自与 surface 的对比度 ≥ 3:1 —— 由
+     `tests/category-colors.spec.ts` 实算保证（含色盲模拟矩阵）。
+     换掉其中一个几乎一定会撞到另一个。
+
+     🔴 用法限制：**只能当图形色**（色块、堆叠条的段），不能当正文色 ——
+     它们只保证 3:1（WCAG 1.4.11 图形门槛），不保证 4.5:1。 */
+  --ht-color-category-1: var(--ht-red-800);
+  --ht-color-category-2: var(--ht-orange-600);
+  --ht-color-category-3: var(--ht-green-600);
+  --ht-color-category-4: var(--ht-teal-600);
+  --ht-color-category-5: var(--ht-cyan-700);
+  --ht-color-category-6: var(--ht-blue-700);
+  --ht-color-category-7: var(--ht-fuchsia-700);
+  --ht-color-category-8: var(--ht-pink-700);
 
   /* 番茄钟 */
   --ht-color-focus-work: var(--ht-blue-600);
@@ -489,6 +525,21 @@
   --ht-color-quadrant-3-subtle: rgb(217 119 6 / 0.16);
   --ht-color-quadrant-4: var(--ht-slate-400);
   --ht-color-quadrant-4-subtle: rgb(148 163 184 / 0.14);
+
+  /*
+    分类色槽位（暗色）。
+    🔴 **不是亮色值的"变亮"**，而是重新解了一次同一组约束：
+    每个槽位与亮色**同色系**（用户的"3 号是绿的"在两种主题下都成立），
+    但明度整体抬高，且两两可区分度由测试实算保证。
+  */
+  --ht-color-category-1: #f87171;
+  --ht-color-category-2: #fb923c;
+  --ht-color-category-3: #34d399;
+  --ht-color-category-4: #99f6e4;
+  --ht-color-category-5: #22d3ee;
+  --ht-color-category-6: #6366f1;
+  --ht-color-category-7: #e879f9;
+  --ht-color-category-8: #f472b6;
 
   --ht-color-priority-high: #f87171;
   --ht-color-priority-medium: #fbbf24;

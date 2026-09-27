@@ -30,6 +30,7 @@ import {
   completionRatio,
   describeHabitResilience,
   toLocalDate,
+  type CategorySlot,
   type Habit,
   type HabitLog,
   type HabitResilienceView,
@@ -84,6 +85,8 @@ interface HabitState {
   /** 撤销打卡。 */
   undoCheckIn: (habitId: string, date?: LocalDate) => Promise<void>;
   deleteHabit: (habitId: string) => Promise<void>;
+  /** 分类色槽位（1–8），`undefined` 表示清除。存槽位号，不存颜色本身。 */
+  setHabitColor: (habitId: string, slot?: CategorySlot) => Promise<void>;
 }
 
 /** 与任务 / 专注 / 清单 store 同一个形状。只含两个函数引用，不含任何判断。 */
@@ -121,6 +124,11 @@ export const useHabitStore = create<HabitState>(() => ({
   deleteHabit: async (habitId) => {
     // 软删除。打卡记录**不**级联删除 —— 撤销删除后历史还在。
     await habitActions.removeHabit(habitId);
+    refresh();
+  },
+
+  setHabitColor: async (habitId, slot) => {
+    await habitActions.setHabitColor(habitId, slot);
     refresh();
   },
 }));

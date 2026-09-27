@@ -75,6 +75,10 @@ function input(over: Partial<MotivationInput> = {}): MotivationInput {
     habits: {},
     habitLogs: {},
     tasks: {},
+    // 清单是**分类时长**那一块的输入（专注会话 → 任务 → 清单）。
+    // 加上它意味着 `MotivationInput` 从"四张表"变成"五张表" ——
+    // 每个用例都必须在场，否则漏掉的表会让统计恒为 0 而不报错。
+    projects: {},
     focusSessions: {},
     ...over,
   };

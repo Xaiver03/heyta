@@ -487,6 +487,29 @@ export const en = {
   'web.growth.summary.bestDay': 'Most focused day: {date} ({minutes} minutes)',
   'web.growth.summary.totals': 'All time: {checkIns} check-ins · {hours} focus hours · {tasks} tasks completed · {activeDays} active days',
 
+  // ── Web · Category time (growth view) ─────────────────────
+  // 🔴 Facts only: how long each category ran, and how that time was counted.
+  //    No "most/least/imbalanced", no ranking, no share-of-total percentage.
+  'web.categories.title': 'Time by category',
+  'web.categories.note': 'Focus and check-in time per list and habit over the last 12 weeks. You decide what each color means; this page does not judge it.',
+  'web.categories.empty': 'Nothing to sort into categories yet. Group tasks into lists, or track a habit in minutes, and rows will appear here.',
+  'web.categories.range': '{start} to {end}',
+  'web.categories.kind.project': 'List',
+  'web.categories.kind.habit': 'Habit',
+  'web.categories.slot.none': 'None',
+  'web.categories.duration.minutes': '{minutes} min',
+  'web.categories.duration.hours': '{hours} h',
+  'web.categories.duration.hoursMinutes': '{hours} h {minutes} min',
+  'web.categories.lane.aria': '{name} ({kind}), {duration} total',
+  'web.categories.segment.aria': '{name}: {duration}',
+  'web.categories.unassigned': 'Another {duration} is not attached to any list or habit — give those tasks a list and it will land there.',
+  'web.categories.hint.unset': 'Set the color swatch beside a list or habit: tap the palette icon and pick any slot from 1 to 8.',
+  'web.categories.cell.none': 'Nothing recorded this week',
+  'web.categories.bars.aria': 'Stacked bars of total time per week over the last 12 weeks; each segment matches a category above.',
+  'web.categories.picker.toggle': 'Set a category color for "{name}"',
+  'web.categories.picker.group': 'Category color for "{name}"',
+  'web.categories.picker.slot': 'Color slot {slot}',
+
   // ── Web · lists and tags ──────────────────────────────────
   'web.projects.ariaLabel': 'Lists and tags',
   'web.projects.heading': 'Lists',
