@@ -28,7 +28,8 @@
  * node scripts/check-module-boundaries.mjs --all --rev origin/main
  *
  * # 落地前体检：主检出脏文件 × 本分支改动文件，交集非空就别合并
- * node scripts/check-module-boundaries.mjs --premerge --rev origin/main
+ * # ⚠️ 必须在**模块自己的 worktree 里**跑，且 --rev 是必需的（缺了就只看未提交改动 → 假绿）
+ * cd .worktrees/ai-m2 && node "$MAIN/scripts/check-module-boundaries.mjs" --premerge --rev ai-remediation-fork
  * ```
  *
  * `--rev <rev>` 用 `<rev>...HEAD` 的三点差异（即"本分支相对分叉点改了什么"），
@@ -39,7 +40,7 @@
  */
 
 import { execFileSync } from 'node:child_process';
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync, realpathSync } from 'node:fs';
 
 /**
  * 每个模块的写入租约。
@@ -144,8 +145,9 @@ function matchesAny(file, globs) {
  * （` M AGENTS.md`）。`trim()` 会把这个空格吃掉，于是 `slice(3)`
  * 从第 4 个字符开始切，文件名第一个字母被砍掉（实测：`AGENTS.md` → `GENTS.md`）。
  */
-function git(args, { trim = true } = {}) {
-  const out = execFileSync('git', args, { encoding: 'utf8' });
+function git(args, { trim = true, dir = undefined } = {}) {
+  const full = dir === undefined ? args : ['-C', dir, ...args];
+  const out = execFileSync('git', full, { encoding: 'utf8' });
   return trim ? out.trim() : out.replace(/\n+$/, '');
 }
 
@@ -164,8 +166,8 @@ function git(args, { trim = true } = {}) {
  *
  * 代价：只存在于索引、工作区里没有的改动不计入 —— 那不是真实代码。
  */
-function changedInWorktree() {
-  const status = git(['status', '--porcelain'], { trim: false });
+function changedInWorktree(dir = undefined) {
+  const status = git(['status', '--porcelain'], { trim: false, dir });
   const untracked =
     status === ''
       ? []
@@ -176,10 +178,25 @@ function changedInWorktree() {
           .filter((path) => path !== '');
 
   // `--no-renames`：重命名要两边都算改动（光看新路径会漏掉被删的旧路径）。
-  const tracked = git(['diff', '--name-only', '--no-renames', 'HEAD']);
+  const tracked = git(['diff', '--name-only', '--no-renames', 'HEAD'], { dir });
   const list = tracked === '' ? [] : tracked.split('\n');
 
   return [...new Set([...untracked, ...list])].sort();
+}
+
+/**
+ * 主检出（第一个 worktree）的绝对路径。
+ *
+ * 🔴 `--premerge` 必须去**主检出那里**读"未提交改动"，不能用当前目录。
+ * 实测（本轮）：在 `.worktrees/ai-m2` 里跑 `--premerge`，它把 ai-m2 自己的工作区改动
+ * 当成了"主检出未提交"，于是报出**自己和自己交集 2 个文件**的假红；
+ * 而真正的交集（主检出脏的 `server/*`）它根本没看。
+ */
+function mainWorktreePath() {
+  const out = git(['worktree', 'list', '--porcelain']);
+  const line = out.split('\n').find((l) => l.startsWith('worktree '));
+  if (line === undefined) throw new Error('无法从 git worktree list 里找到主检出路径');
+  return line.slice('worktree '.length);
 }
 
 /**
@@ -247,9 +264,10 @@ function checkModule(moduleNumber, files) {
   return 1;
 }
 
-function premerge(files) {
-  const mainDirty = changedInWorktree();
+function premerge(files, mainPath) {
+  const mainDirty = changedInWorktree(mainPath);
   const overlap = files.filter((file) => mainDirty.includes(file));
+  console.log(`读完主检出的未提交改动：${mainPath}`);
   console.log(`本分支改动 ${String(files.length)} 个文件；主检出未提交 ${String(mainDirty.length)} 个。`);
   if (overlap.length === 0) {
     console.log('✅ 交集为空 —— 可以落地。');
@@ -266,7 +284,8 @@ if (args.error !== undefined) {
   console.error(`用法错误：${args.error}`);
   console.error('用法：node scripts/check-module-boundaries.mjs --module <1|2|3> [--rev <rev>]');
   console.error('      node scripts/check-module-boundaries.mjs --all [--rev <rev>]');
-  console.error('      node scripts/check-module-boundaries.mjs --premerge [--rev <rev>]');
+  console.error('      node scripts/check-module-boundaries.mjs --premerge --rev <分叉点>');
+  console.error('      （--premerge 要在模块自己的 worktree 里跑；--rev 必需）');
   process.exit(2);
 }
 
@@ -275,16 +294,32 @@ if (!existsSync('.git')) {
   process.exit(2);
 }
 
+if (args.premerge) {
+  // 🔴 三条都是本轮实测踩出来的，缺一条都会给出**错的结论**：
+  //   ① 在主检出里跑 → 拿它和自己比；
+  //   ② 不带 --rev    → 只看未提交改动，分支已提交的改动全看不到（假绿）；
+  //   ③ 不去主检出读  → 把当前 worktree 的改动当成"主检出未提交"（假红）。
+  const mainPath = mainWorktreePath();
+  if (realpathSync(mainPath) === realpathSync(process.cwd())) {
+    console.error('用法错误：--premerge 要在**模块自己的 worktree 里**跑。');
+    console.error('          在主检出里跑等于拿它和自己比。');
+    process.exit(2);
+  }
+  if (args.rev === undefined) {
+    console.error('用法错误：--premerge 必须带 --rev <分叉点>。');
+    console.error('          不带的话只看得到未提交改动，已经提交的分支会得到假绿。');
+    console.error('          本流程用：--rev ai-remediation-fork');
+    process.exit(2);
+  }
+  process.exit(premerge(changedVsRev(args.rev), mainPath));
+}
+
 const files = args.rev === undefined ? changedInWorktree() : changedVsRev(args.rev);
 console.log(
   args.rev === undefined
     ? '比较基准：工作区未提交改动\n'
     : `比较基准：${args.rev}...HEAD ＋ 工作区未提交改动\n`,
 );
-
-if (args.premerge) {
-  process.exit(premerge(files));
-}
 
 if (args.all) {
   let code = 0;
