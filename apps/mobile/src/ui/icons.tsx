@@ -19,9 +19,12 @@
 
 import React from 'react';
 import {
+  ArrowLeft,
+  BadgeCheck,
   Bell,
   CalendarDays,
   CalendarClock,
+  CalendarRange,
   ChartColumn,
   Check,
   ChevronLeft,
@@ -49,6 +52,7 @@ import {
   Timer,
   TriangleAlert,
   Trash2,
+  Trophy,
   User,
   X,
 } from 'lucide-react-native';
@@ -128,9 +132,24 @@ const ICONS = {
   // 通用
   'action.prev-month': ChevronLeft,
   'action.next-month': ChevronRight,
+  // 🔴 「返回」与「上一月」是**不同语义**，所以用不同字形：`ArrowLeft` 是
+  // 进出层级的通用返回，`ChevronLeft` 是月历的翻页。两者在成长屏与日历屏
+  // 各出现一次，字形相同会让人以为它们做同一件事。
+  'action.back': ArrowLeft,
   'action.close': X,
   'action.settings': Settings,
   'action.sync': RefreshCw,
+
+  /**
+   * 成长（激励体系）。
+   *
+   * 「今天」与「连续」**复用**已有的 `group.today` / `focus.streak` ——
+   * 语义相同就该是同一个字形。另外三个是这个界面独有的语义，各给一个
+   * 新字形（周视图 / 里程碑 / 身份），避免与任务、专注的图标混在一起。
+   */
+  'growth.week': CalendarRange,
+  'growth.milestones': Trophy,
+  'growth.identity': BadgeCheck,
 } as const satisfies Record<string, LucideIcon>;
 
 export type IconName = keyof typeof ICONS;

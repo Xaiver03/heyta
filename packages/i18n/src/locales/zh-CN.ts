@@ -1495,6 +1495,79 @@ export const zhCN = {
   // 同 `mobile.common.badge.countOne`：中文无单复数，刻意逐字相同。
   'mobile.sync.conflictOne': '有 {count} 处冲突待你选择',
   'mobile.sync.error': '同步失败',
+
+  // ── 激励 ──
+  // 移动端成长屏。数字与 Web 端同源（`@heyta/app-host#motivation`），
+  // 所以两端不会各算一套。三条产品红线同时写进文案与界面：
+  // 不发行货币、只与自己比、从不制造愧疚。
+  'mobile.growth.title': '我的成长',
+  'mobile.growth.back': '返回',
+  'mobile.growth.entry': '我的成长',
+  'mobile.growth.entry.hint': '今日进度、连续天数与里程碑',
+  'mobile.growth.compare.note': '这里的数字只和过去的自己比，没有排行榜。',
+
+  // 今日进度（L1）
+  'mobile.growth.today.title': '今天',
+  'mobile.growth.today.a11y': '今天完成 {done} 件，共 {total} 件',
+  'mobile.growth.today.hint.idle': '今天还没有记录',
+  'mobile.growth.today.hint.unplanned': '计划之外还完成了 {count} 件',
+  'mobile.growth.today.hint.allDone': '今天的都完成了',
+  'mobile.growth.today.hint.remaining': '还剩 {count} 件',
+  'mobile.growth.today.closed': '今天闭环了',
+  'mobile.growth.today.habits': '习惯 {done}/{planned}',
+  'mobile.growth.today.tasks': '任务 {done}/{planned}',
+  'mobile.growth.today.bonus': '计划外 {count} 件',
+  'mobile.growth.today.focus': '专注 {minutes} 分钟',
+
+  // 本周复盘（L3）。差值只用中性表述，不给下降配红色。
+  'mobile.growth.week.title': '本周',
+  'mobile.growth.week.range': '{start} 至 {end}',
+  'mobile.growth.week.empty': '这一周还没有记录',
+  'mobile.growth.week.headline.checkIns': '这周打卡 {count} 次',
+  'mobile.growth.week.headline.tasksCompleted': '这周完成 {count} 件',
+  'mobile.growth.week.headline.focusMinutes': '这周专注 {count} 分钟',
+  'mobile.growth.week.stat.checkIns': '打卡',
+  'mobile.growth.week.stat.tasks': '完成',
+  'mobile.growth.week.stat.focus': '专注',
+  'mobile.growth.week.stat.previous': '上周 {count}',
+  'mobile.growth.week.bestDay': '最专注的一天：{date}，{minutes} 分钟',
+
+  // 连续性（L2）。最长与累计只增不减，中断之后屏幕上一定有数字没变小。
+  'mobile.growth.streak.title': '连续',
+  'mobile.growth.streak.note': '最长与累计只增不减——中断不等于失去。',
+  'mobile.growth.streak.empty': '还没有习惯。在网页端建好习惯后会自动同步到这里。',
+  'mobile.growth.streak.current': '当前连续（天）',
+  'mobile.growth.streak.longest': '最长 {days} 天',
+  'mobile.growth.streak.total': '累计 {count} 次',
+  'mobile.growth.streak.repair': '昨天还能补回来——补完是 {days} 天',
+  'mobile.growth.streak.freshStart': '距上次 {days} 天。最长 {longest} 天、累计 {total} 次都还在。',
+  'mobile.growth.streak.a11y': '{name}：当前连续 {current} 天，最长 {longest} 天，累计 {total} 次',
+
+  // 里程碑（L3）。累计只加不减，没有扣分项。
+  'mobile.growth.milestones.title': '里程碑',
+  'mobile.growth.milestones.note': '累计只加不减，没有扣分项。',
+  'mobile.growth.milestones.maxed': '已到最高一档',
+  'mobile.growth.milestones.next': '下一档 {next}',
+  'mobile.growth.milestones.a11y': '{name}：当前 {value}，已达成 {reached} 档，共 {total} 档',
+  'mobile.growth.kind.checkIns': '打卡',
+  'mobile.growth.kind.focusHours': '专注小时',
+  'mobile.growth.kind.tasks': '完成任务',
+  'mobile.growth.kind.activeDays': '活跃天数',
+
+  // 身份标签（L3）。给的是身份不是奖励，所以没有金币也没有可兑换物。
+  'mobile.growth.tags.title': '身份',
+  'mobile.growth.tags.note': '身份不是奖励，是你已经做过的事。',
+  'mobile.growth.tags.empty': '还没有达成的身份。慢慢来。',
+  'mobile.growth.tags.near': '距「{name}」还差 {gap}',
+  'mobile.growth.tags.reachedA11y': '已达成：{name}',
+  'mobile.growth.tag.started': '坚持一周',
+  'mobile.growth.tag.routine': '成为日常',
+  'mobile.growth.tag.steady': '稳定百日',
+  'mobile.growth.tag.checkin-hundred': '百次打卡',
+  'mobile.growth.tag.deep-fifty': '深度五十小时',
+  'mobile.growth.tag.deep-two-hundred': '深度两百小时',
+  'mobile.growth.tag.finisher-five-hundred': '完成五百件事',
+  'mobile.growth.tag.streak-thirty': '连续三十天',
 } as const;
 
 /**
