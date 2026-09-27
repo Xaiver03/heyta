@@ -18,8 +18,10 @@
  *   必须一致 —— `scripts/check-pricing-consistency.mjs` 会红。
  *   改价时先读 `docs/reference/pricing-and-entitlements.md`。
  *
- * ⚠️ 两个付费档**现在都买不到**（大陆通道没接线、海外 KYC 没过），
- *   所以这里**刻意不放按钮**：一个点了没反应的"立即购买"比没有按钮更坏。
+ * ⚠️ 两个付费档**现在都买不到** —— 但原因**不是"没接线"**：服务端收银台路由
+ *   （`POST /api/billing/checkout`）已经接通，且会走到 `adapter.createCheckout`；
+ *   真正缺的是**通道本身** —— 实例里只有 `noop` adapter，所以必然回 `503`；
+ *   海外则是 KYC 没过。所以这里**刻意不放按钮**：一个点了没反应的"立即购买"比没有按钮更坏。
  *   状态由各自的 `*.cta` + `landing.pricing.statusNote` 如实说明。
  */
 

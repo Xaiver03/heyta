@@ -11,8 +11,27 @@
 ## 0. 一句话
 
 **计价、账、券的状态机已经全部落地并提交（`2d2d4dd`，20 个文件）**，
-`pnpm check` 与 `pnpm test` 全绿。剩下的是把它接到收银台上：
-**adapter 现在仍然按价目表全额下单，完全不认识券** —— 第 5.1 节是本节最有价值的部分。
+`pnpm check` 与 `pnpm test` 全绿。
+~~剩下的是把它接到收银台上：**adapter 现在仍然按价目表全额下单，完全不认识券**~~
+—— 🔴 **本任务书要做的四件事（§5.1–§5.4）已经全部做完**：
+
+- §5.1 adapter 收「冻结后的实付金额」：**已做**（`CreateCheckoutInput.amountMinor` 是必填，
+  adapter 不再持有价格语义，见 [pricing-and-coupons.md](../reference/pricing-and-coupons.md) §6.1）；
+- §5.2 `check:pricing` 接进 `pnpm check`：**已做**（提交 `e63b100`）；
+- §5.3 运营 CLI `server/scripts/pricing.ts`：**已做**（`show` / `set-price` /
+  `coupon-upsert` / `coupon-disable`）；
+- §5.4 真库行锁并发验证：**已做**（`server/tests/integration/coupon-quota-race.integration.spec.ts`，
+  真 PostgreSQL 17.9；⚠️ 但**仍没注册进 `test:integration:postgres`，CI 不跑它**）。
+
+**收银台也已经接通**：`POST /api/billing/checkout`
+（`server/src/billing/checkout.routes.ts`）—— 见
+[pricing-and-coupons.md](../reference/pricing-and-coupons.md) §7 第 18 条。
+**仍然没做的**是客户端「付款」按钮与「交付」半段（webhook → `settleOrderPaid`），
+见 §11.5。
+
+> ⚠️ 本文的价格数字（`¥99/$49`、年付）**已随 ADR-0020 作废**，
+> 现役价格是月付 `hosted-monthly` ¥5/$5 与 `hosted-ai-monthly` ¥12/$12。
+> 正文保留作记录，**别拿旧数字当现状**。
 
 ## 1. 已经做完的（不要重做，不要改）
 
@@ -34,14 +53,19 @@
 | 文档 | `docs/reference/pricing-and-coupons.md` | 模块地图 / 常量 / 状态机 / 未验证项 |
 | 测试 | `server/tests/billing-money.spec.ts`（17） / `billing-coupon.spec.ts`（60） / `billing-pricing-schema.pglite.spec.ts`（32） / `billing-pricing-store.pglite.spec.ts`（33） | 全部真跑过 |
 
-落地页（`apps/landing`）**不需要改**，也**不要改**：价格没变（¥99/$49），
-门禁证明了三处仍然一致。它的 71 个测试与 `pnpm check` 都是绿的。
+落地页（`apps/landing`）~~**不需要改**，也**不要改**：价格没变（¥99/$49）~~ ——
+🔴 **价格已随 ADR-0020 改成 ¥5/$5 与 ¥12/$12，落地页已同步重写为三栏**
+（`apps/landing/src/components/Pricing.tsx`，见
+[ai-tier-pricing-rollout.md](ai-tier-pricing-rollout.md)）。
+门禁证明价格四处（代码基线 / 中英词条 / 法务 / `pricing-ssot` 块）仍然一致。
 
 ## 2. 必读（按顺序）
 
 1. `docs/adr/0018-adjustable-pricing-and-coupons.md` —— 为什么这么设计、否决了什么。
 2. `docs/reference/pricing-and-coupons.md` —— 代码现在长什么样；**§7 是未验证项清单**（你做完一件事就去那里划掉一条）。
-3. `docs/adr/0017-single-paid-tier-and-payment-channel.md` —— 一档到底、¥99/$49、自建免费、支付通道选择。
+3. `docs/adr/0017-single-paid-tier-and-payment-channel.md` —— 自建免费、不自动续费、
+   支付通道结论（⚠️ 它的**价格与周期结论已被 ADR-0020 取代**：`¥99/$49`、年付、
+   一档到底全部作废；见该 ADR 文件头的补注）。
 4. `docs/plans/subscription-wechat-handoff.md` —— 支付接线本身的规格（验签、解密、凭证、零依赖）。
 5. `server/src/billing/pricing-store.ts` 的文件头 —— 两条不可动摇的规则。
 
@@ -80,9 +104,19 @@
 
 ## 5. 交付物（按价值排序）
 
+> ✅ **后补（2026-09-27）：本节 5.1 – 5.4 全部已完成。** 下面保留当时的规格原文
+> 作记录；现状以 [pricing-and-coupons.md](../reference/pricing-and-coupons.md)
+> §6.1 / §7 为准。
+
 ### 5.1 🔴 adapter 必须收「冻结后的实付金额」，而不是价目表全额
 
-**这是现在最要命的洞。** `createWechatBillingAdapter` 的 `createCheckout` 用的是：
+> ✅ **已完成。** `CreateCheckoutInput.amountMinor` / `outTradeNo` 现在都是
+> **必填**入参，adapter 只负责把调用方给的数签出去；
+> 收银台按「报价 → 冻结 → 下单」的顺序接线（`checkout.routes.ts`）。
+> 回归证据：`server/tests/wechat-adapter.spec.ts` 里那笔 `amountMinor` 故意
+> 不等于基线 `500` 的单，断言发出去的是传进来的数。
+
+**这是当时最要命的洞。** `createWechatBillingAdapter` 的 `createCheckout` 用的是：
 
 ```ts
 const price = prices[input.priceId];
@@ -122,15 +156,22 @@ amount: { total: price.totalFen, currency: 'CNY' },
 的 `amount.total`"，并且断言"`outTradeNo` 用的是调用方给的那个"。
 用 stub `fetchImpl` 拦 payload，不要去连真通道。
 
-#### 5.1.1 `failOrder` 之后名额会怎样（别把它当 bug）
+#### 5.1.1 ✅ `failOrder` 之后名额会怎样 —— 已修
 
-`failOrder` 只把订单改成 `failed`，**不动核销行**。那条 `reserved` 会由
+> 🔴 **后补：这一节描述的行为已经被修掉了。** `failOrder` 现在是一个事务：
+> 先把该订单的 `reserved` 核销置 `expired`（名额**立刻**放出来），再把订单置
+> `failed` —— 见 `server/src/billing/pricing-store.ts` 的 `failOrder`，
+> 以及 [pricing-and-coupons.md](../reference/pricing-and-coupons.md) §7 第 10 条。
+> 收银台在通道侧下单失败时调用它（`server/src/billing/checkout.routes.ts`），
+> 测试断言失败后券的 `reserved` 名额被释放。
+
+（原记录：`failOrder` 只把订单改成 `failed`、**不动核销行**。那条 `reserved` 会由
 `expireStaleOrders` 在 `reserved_until` 到点后放掉，所以名额**不会永久泄漏**，
 但会被占住最长一个支付窗口（2 小时）。
 
 ⚠️ 由此 `expireStaleOrders` 返回的 `redemptions` **可能大于** `orders`
 （一个 `failed` 订单的核销行也会被扫成 `expired`）。这是**对的**：
-若改用 `reversed`，因为 `reversed` 是计数的，名额反而**不会**放出来。
+若改用 `reversed`，因为 `reversed` 是计数的，名额反而**不会**放出来。）
 
 ### 5.2 `check:pricing` 接进 `pnpm check`
 
@@ -209,7 +250,7 @@ pnpm check                                     # 期望退出码 0
 pnpm test                                      # 期望退出码 0
 pnpm --filter @heyta/sync-server test          # 期望 1373 passed / 1 skipped
 node scripts/check-migrations.mjs              # 若动了迁移
-node scripts/check-pricing-consistency.mjs     # 期望"价格三处一致"
+node scripts/check-pricing-consistency.mjs     # 期望"价格四处一致"
 node scripts/verify-i18n-failures.mjs pricing  # 期望 10 个用例全绿
 node scripts/verify-i18n-failures.mjs coupon   # 期望 9 个用例全绿
 cd apps/landing && npx vitest run              # 期望 71 passed
@@ -252,7 +293,9 @@ cd apps/landing && npx vitest run              # 期望 71 passed
 - `prisma migrate diff` 必须用来生成迁移体；CHECK 约束手工追加在其后。
 - `docs/reference/pricing-and-coupons.md` §5.1：**`expireStaleOrders` 必须真的
   作为定时任务在跑**，否则 `maxRedemptions` 只是句空话。接通道时一并把它排上去。
-- `server/src/billing/wechat.adapter.ts` 里的金额粗筛（`knownAmounts`）
+- `server/src/billing/wechat.adapter.ts` 里的金额粗筛
+  （现在是 `verifyWebhook` 里按 `priceTable` 找 `matchedSku` 的那几行；
+  ⚠️ 旧文写它叫 `knownAmounts`，**该标识符现在不存在**）
   **不能**替代 `settleOrderPaid` 的权威校验 —— 有券之后"金额是价目表里的某一个"
   两个方向都会错。注释里已写明，别把它删了也别把它当权威。
 
@@ -270,32 +313,36 @@ cd apps/landing && npx vitest run              # 期望 71 passed
 | ① | 落地页看到价格 | ✅ | `apps/landing/src/components/Pricing.tsx:73-82`；`packages/i18n/src/locales/zh-CN.ts:194-205` |
 | ② | 点 CTA | ❌ | `Pricing.tsx:96-99` 是 `<p>` + 沙漏**不是按钮**；词条 =「即将开放」 |
 | ③ | 注册 / 登录 | ⚠️ 服务端有、客户端无 | `server/src/api.ts:271,546` 有 passkey / magic-link；`apps/web` **没有 auth 目录**，只有 `SyncBar.tsx:218-248` 三个手填框。落地页 `Footer.tsx:33-43` **全是 `#` 锚点、0 条外链** |
-| ④ | 选档下单 | ❌ | 无 checkout / quote / orders 路由；`createOrderWithReservation` 只被测试调用 |
-| ⑤ | 唤起支付 | ❌ 不可达 | `wechat.adapter.ts:549` `createCheckout` 已实现、`registry.ts:62-80` 可注册，但**没有任何路由调它** |
-| ⑥ | 支付回调 | ✅ 代码层 | `webhook.routes.ts:107`；`server.ts:500-503` |
-| ⑦ | 授予权益 | ⚠️ 有实现、不可达 | `apply-event.ts:122-174` 写 `status=active` + `+30 天`；`schema.prisma:162-202` **无 plan / grants 列** |
-| ⑧ | 看「买了什么 / 剩多少 AI」 | ❌ | web 只有降级提示 `SubscriptionNotice.tsx`；i18n 里**没有任何额度词条** |
+| ④ | 选档下单 | ✅ **服务端已通** | `POST /api/billing/checkout`（`server/src/billing/checkout.routes.ts`）把 `quoteOrder` → 冻结 → `createCheckout` 接成一条（提交 `81df2e9`） |
+| ⑤ | 唤起支付 | ⚠️ 通到通道口，但没配通道 | 路由确实调了 `adapter.createCheckout`；但只有 `noop` 时回 `503`，且**客户端没有付款按钮** |
+| ⑥ | 支付回调 | ✅ 代码层 | `webhook.routes.ts:107`；`server.ts:500-504` |
+| ⑦ | 授予权益 | ⚠️ 有实现、**仍不可达** | `apply-event.ts` 写 `status=active` + `+30 天`；`schema.prisma` **已有 `price_id` / `grants` 列**（`9684d2a`），但 webhook 路径**仍未**把待结算的支付交给 `settleOrderPaid`（[pricing-and-coupons.md](../reference/pricing-and-coupons.md) §7 第 9 条） |
+| ⑧ | 看「买了什么 / 剩多少 AI」 | ❌ | web 只有降级提示 `SubscriptionNotice.tsx`；i18n 里的额度词条**只有落地页的** `landing.pricing.hostedAi.feature2`（「每月 300 次」），**没有**「本周期已用 X / 300 次」的界面 |
 | ⑨ | 续费 | ❌ | `SubscriptionNotice.tsx:12-18` 自述「现在不存在可跳转的续费地址」 |
 | ⑩ | 到期降级 | ⚠️ 通但默认关 | `entitlement.ts:114-146`（半开区间，`now===end` 即过期）；`config.ts:203-205` 默认 `enabled:false`；测试只覆盖**同步** |
 | ⑪ | 退款 / 取消 | ❌ | `pricing-store.ts` 「退款接口，通道尚未接线」；`wechat.adapter.ts:436-443` 空操作；退款政策未定（`subscription-boundary.md:136`） |
 
-**三个最致命的断点**：
+**三个最致命的断点**（每条都标了审计之后的变化）：
 
-1. **收银台整段不存在（④⑤）** —— 用户在"想付钱"处直接撞墙，付费转化率恒为 0。
-   且这不是"资质在等"：`createCheckout` 已经写好却**没有一行路由接它**，属工程未接线。
-2. **¥12 那一档在代码里无法表达、无法交付、无法计量（⑦⑧）** —— 即使打通支付，
-   `hosted-ai-monthly` 与 `hosted-monthly` 会落成**同一行订阅**（无 plan 列），`ai` 授权无处存储；
-   服务端**根本没有云端 AI 端点**（`server/src` 无 AI 路由，`packages/ai/src` 无 quota 字样）。
-   用户付 ¥12 拿到的东西与 ¥5 完全一样，且没有任何代码能发现发错了货 ——
-   **收了钱交付不了，是收钱路径上最坏的一种静默。**
-3. **从落地页到账户没有路（③）** —— 落地页 0 条外链、web 应用无注册/登录界面。
-   收银台明天上线，新用户也到不了应用、建不了账号。
+1. ~~**收银台整段不存在（④⑤）**~~ ✅ **服务端已修**：`POST /api/billing/checkout`
+   （`81df2e9`）已把「报价 → 冻结 → 下单」接通。**剩下的断点是客户端与外部依赖**：
+   没有「付款」按钮、也没有配真实支付通道（只见 `noop` → `503`）。
+   所以"用户在界面上想付钱"这一步**仍然撞墙**，但原因从"我们没接线"
+   变成了"支付商资质 + 客户端未做"。
+2. ~~**¥12 那一档在代码里无法表达**~~ ✅ **已可表达**（`subscriptions.price_id` +
+   `grants`，`9684d2a`）；**但"无法交付、无法计量"仍然成立** —— 服务端**没有**云端 AI
+   端点、**没有**计量、**没有**一处 `deepseek` 调用（实测：`grep deepseek server/src
+   packages/ai/src` 为空），所以 `hosted-ai-monthly` 被 `NOT_YET_DELIVERABLE_SKUS`
+   在收银台**挡住不卖**（ADR-0023）。这一条现在是**有终点的决定**，不再是静默。
+3. **从落地页到账户没有路（③）** —— 🔴 **仍然没做**：落地页 `Footer.tsx` 全是 `#`
+   锚点、**0 条外链**；`apps/web/src/features/` 下**没有 auth 目录**，无注册/登录界面，
+   只有 `SyncBar.tsx` 三个手填框。服务端收银台再通，新用户也到不了应用、建不了账号。
 
 ### 11.2 海外：$5 / $12 是"在卖一个买不了的东西"
 
-`$5/$12` 有价格（`zh-CN.ts:195,205`、`price-book.ts:184-200`），但**没有任何 USD 通道**：
-全仓只有微信 adapter，且它把币种硬编码成 `currency:'CNY'`（`wechat.adapter.ts:581`）。
-文档自己承认这一点（`pricing-and-entitlements.md:124-131`）。
+`$5/$12` 有价格（`zh-CN.ts:195,205`、`price-book.ts:235`），但**没有任何 USD 通道**：
+全仓只有微信 adapter，且它把币种硬编码成 `currency:'CNY'`（`wechat.adapter.ts:582`）。
+文档自己承认这一点（[pricing-and-entitlements.md](../reference/pricing-and-entitlements.md) §5.2）。
 **更糟**：若把 USD 单喂给现有微信通道，`amountMinor: 500` 会被当成 500 分（¥5）发出去 ——
 金额单位一致，币种不一致，**没有任何一层会报错**。
 

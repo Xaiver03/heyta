@@ -620,9 +620,11 @@ tccli dnspod DescribeRecordList --Domain finlaw.cloud  --output json
 node research/tools/docs-link-check.mjs
 ```
 
-> 📋 `pnpm check:docs` 在本机因 `node_modules` 与 lockfile 不同步、precheck 阶段直接抛
-> `ERR_PNPM_ABORTED_REMOVE_MODULES_DIR_NO_TTY` 而跑不起来（见 [`deployment.md` §8.9](deployment.md)）。
-> 直接用上面这条它真正调用的命令。
+> ✅ **后补（2026-09-27）：`pnpm check:docs` 现在跑得起来。** 在本仓库实测
+> exit 0，输出「扫描 139 个 Markdown 文件，检查 568 个相对链接 —— ✅ 无死链」。
+> 当时那条 `ERR_PNPM_ABORTED_REMOVE_MODULES_DIR_NO_TTY` 是**那台机器**
+> `node_modules` 与 lockfile 不同步的本地环境问题（见 [`deployment.md` §8.9](deployment.md)），
+> **不是仓库状态**。上面那条底层命令仍然可用。
 
 ---
 

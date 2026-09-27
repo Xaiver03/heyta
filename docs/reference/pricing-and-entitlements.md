@@ -143,7 +143,21 @@ SKU 与折扣，实现在 `settleOrderPaid`。
 ### 5.1 大陆通道
 
 `wechat.adapter.ts` 已实现且有测试（下单 / 验签 / 解密 / 金额校验 / 一次性授予），
-但**尚未接线到 HTTP 路由**，也没有客户端收银台。
+收银台路由**也已接通** —— `POST /api/billing/checkout`
+（`server/src/billing/checkout.routes.ts`，注册在 `/api/billing`）。
+所以服务端「报价 → 冻结 → 下单」这条链**已经通了**，不再是"计价引擎存在、
+但用户走不到付钱那一步"。详见
+[pricing-and-coupons.md](pricing-and-coupons.md) §7 第 18 条。
+
+**但用户仍然买不成**，卡在两件与这条路由**无关**的事上：
+
+1. 🔴 **这台实例没有配真实支付通道。** 只有 `noop` 时收银台回
+   `503 BILLING_PROVIDER_NOT_CONFIGURED` —— 卡在支付商的资质 / 凭证，
+   不在我们的代码里。
+2. 🔴 **客户端还没有「付款」按钮**（web + 移动端）。它应当**和支付通道一起**落地：
+   现在加，必然回上面那个 503，正好造出落地页明确反对的那个东西 ——
+   一个点了没反应的「立即购买」（见 `apps/landing/src/components/Pricing.tsx` 文件头）。
+
 [`subscription-handoff.md`](../plans/subscription-handoff.md) §4 把「客户端按权益降级」
 与「真实支付测试模式门禁」列为未完成。
 
@@ -191,12 +205,16 @@ Paddle 支持中国大陆卖家**只有政策文本**，**实操放行未验证*
 ## 7. 未核实项
 
 > 价格可调与优惠券的完整缺口清单在
-> [pricing-and-coupons.md](pricing-and-coupons.md) §7（行锁阻塞行为未实测、
-> Prisma 参数绑定层未覆盖、有券订单的发票金额口径未与会计确认、
-> 支付通道未接线）。下面只列价格本身的。
+> [pricing-and-coupons.md](pricing-and-coupons.md) §7。**仍然开着的**是：
+> 有券订单的发票金额口径未与会计确认（第 4 条）、收款通道资质未落地 + 退款
+> 未接线（第 5 条）、webhook → `settleOrderPaid` 的**交付半段**未接（第 9 条）、
+> 价格空隙的语义未改（第 13 条）、无 admin 鉴权（第 14 条）。
+> 下面只列价格本身的。
 >
 > （`check:pricing` 曾经也在这份缺口清单里，**已接入 `pnpm check`**，
-> 见 [pricing-and-coupons.md](pricing-and-coupons.md) §7 第 3 条。）
+> 见 [pricing-and-coupons.md](pricing-and-coupons.md) §7 第 3 条。
+> 同期关闭的还有第 1、2 条 —— 行锁真并发与 Prisma 参数绑定**都已在
+> 真 PostgreSQL 上实测**，不再是缺口。）
 
 1. **Paddle 对中国大陆卖家的 KYC 放行** —— 只有用户本人能验证（ADR-0017 §5.1）。
 2. 🔴 **$5 / 月 的通道经济性 —— 比年付时代更尖锐。** MoR 费率（PayPal 中国大陆
@@ -204,7 +222,8 @@ Paddle 支持中国大陆卖家**只有政策文本**，**实操放行未验证*
    **单笔费用是客单价的 7 倍** —— 也就是说按月付 + 每笔单独结算，这个通道
    **在数学上不成立**，不是"毛利变薄"。月付要跑通，必须要么走 MoR 平台的
    **订阅自动扣款**（但 ADR-0020 §1.4 定了不自动续费），要么把多个月合并成
-   一次结算。**这是 ADR-0020 落地前必须回答的问题**，见其 §5 未核实项。
+   一次结算。**这仍是 [ADR-0020](../adr/0020-ai-subscription-two-tiers.md) §5 的
+   未核实项**（该 ADR 已经落地，所以它不是"落地前要回答"，而是**落地后仍欠的账**）。
 3. **晓黎支付中心能否给 heyta 开新 client id 与 CNY 账本** —— 本次未核实，
    AIstudy 的契约文档只记录了 `XIAOLI_PAYMENT_CLIENT_ID=learning` 一个。
 4. **工信部 292 号令**对「收费托管同步服务」的定性 —— 需中国律师。
