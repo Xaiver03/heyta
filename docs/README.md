@@ -106,6 +106,7 @@ docs/research/<kebab-case>.md     例：reuse-plan.md
 | [0020](adr/0020-ai-subscription-two-tiers.md) | 💰 **托管与 AI 都按月卖**：收费的是**我们替你运维服务器**与**我们的云端 AI**（不是功能、不是同步）；非 AI 能力永久免费；**两档 —— ¥5/$5（全部功能 + 官方托管同步）与 ¥12/$12（再加我们的云端 AI 300 次/月）**，两档功能完全相同，差的只是含不含我们的 AI；自带端点的 AI **永久免费且不计量**；计量只记**动作次数**（不记 token —— token 数暴露内容长度） | ✅ **已接受** |
 | [0021](adr/0021-managed-ai-model-deepseek-flash.md) | 🤖 **托管 AI 用 DeepSeek V4.1 Flash**：关闭 [0020](adr/0020-ai-subscription-two-tiers.md) §5 第 1 条。选它的理由是**单位经济**而不是「它够用」—— 300 次/月 的 token 成本 ≈¥2.01（占 ¥7 增量 **29%**），换 pro 级 ≈¥7.71 **超过 ¥7 增量本身**；所以「换模型 = 换价」，两者不能分开定 | ✅ **已接受** |
 | [0022](adr/0022-resilience-state-stays-derived.md) | 习惯韧性的**冻结余额保持纯派生且不上界面**（界面只显示"它替你保住了什么"）；🔴 **冻结参数只能放宽、不能收紧**，收紧必须走代码常量切分点 —— **仍然不加字段** | ✅ **已接受** |
+| [0023](adr/0023-managed-ai-quota-not-implemented.md) | 🔴 **托管 AI 的「300 次/月」本轮不实现**：不改变 [0020](adr/0020-ai-subscription-two-tiers.md)/[0021](adr/0021-managed-ai-model-deepseek-flash.md) 的额度与模型，判定的是**落地顺序** —— 端点 / 计量 / `deepseek` 调用 / 收银台**一个都不存在**，而承诺已在文案与法务里，所以定成「**计量存在之前 `hosted-ai-monthly` 不得被售卖**」；`pnpm check:ai-quota` 把**唯一数字源**（参考文档 `ai-quota-ssot` 块）与五处承诺、以及状态↔实现绑定起来 | ✅ **已接受** |
 
 ### 计划
 

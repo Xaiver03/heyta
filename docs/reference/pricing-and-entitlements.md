@@ -53,6 +53,32 @@
 **明确说出来**，`scripts/check-ai-coverage.mjs` 会强制断言那句否定
 （`不受端到端加密`）。
 
+### 2.1 🔴 「300 次/月」的当前状态：**已声明、未实现**
+
+```json ai-quota-ssot
+{
+  "quota": 300,
+  "unit": "次 / 计费周期",
+  "enforcement": "not-implemented",
+  "decidedIn": "docs/adr/0023-managed-ai-quota-not-implemented.md"
+}
+```
+
+**这个块是额度数字的唯一事实源。** 中英词条、法务、以及本文件正文里的那个数字
+都必须与它相等 —— 由 `pnpm check:ai-quota` 强制
+（`scripts/check-ai-quota-consistency.mjs`）。
+
+🔴 **`enforcement = not-implemented` 的含义是：这 300 次的计量与端点都还不存在。**
+具体到文件：没有云端 AI 路由、没有计数器、没有一处 `deepseek` 调用、也没有能卖
+¥12 的收银台。承诺写在落地页与法务里是**已锁定的产品决定**（ADR-0020 §3.2），
+但从这份状态推出一条硬约束：
+
+> **在计量存在之前，`hosted-ai-monthly` 不得被售卖。** 收了钱交付不了就是虚假宣传。
+
+状态是**被声明的**，不是被推断的：把 `enforcement` 改成 `enforced` 会让门禁要求
+计量实现真的存在；删掉这个块、或只改一处数字，门禁立刻变红。
+决定与最小实现清单见 [ADR-0023](../adr/0023-managed-ai-quota-not-implemented.md)。
+
 ℹ️ **我们云端 AI 跑的是 `deepseek-flash`（DeepSeek V4.1 Flash）** ——
 [ADR-0021](../adr/0021-managed-ai-model-deepseek-flash.md)。这**不是技术细节，
 是单位经济**：¥12 的增量是 ¥7，flash 级 300 次/月 的 token 成本 ≈**¥2.01（29%）**；
