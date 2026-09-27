@@ -21,7 +21,7 @@
 import { motion } from 'motion/react';
 import { ArrowRight } from 'lucide-react';
 
-import { useI18n } from '@heyta/i18n';
+import { useI18n, useLocale } from '@heyta/i18n';
 
 import { startCta } from '../lib/app-url.js';
 import { revealVariants, staggerContainer, useMotionPreset, VIEWPORT } from '../lib/motion.js';
@@ -29,7 +29,9 @@ import { revealVariants, staggerContainer, useMotionPreset, VIEWPORT } from '../
 export function FinalCta(): React.JSX.Element {
   const preset = useMotionPreset();
   const { t } = useI18n();
-  const cta = startCta();
+  // 英文页要把 `?lang=en` 带进应用，否则访客进应用看到的是中文（见 `lib/app-url.ts`）。
+  const locale = useLocale();
+  const cta = startCta(locale);
 
   return (
     <section className="lp-section lp-cta">

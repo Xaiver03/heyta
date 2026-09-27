@@ -69,7 +69,7 @@ describe('appUrl()：读构建期的 VITE_APP_URL', () => {
 describe('startCta()：全页唯一的「开始使用」意图', () => {
   it('没配置应用时，逐字退回今天的行为：站内锚点 + 自建说法', () => {
     vi.stubEnv('VITE_APP_URL', '');
-    const cta = startCta();
+    const cta = startCta('zh-CN');
     expect(cta.href).toBe('#selfhost');
     expect(cta.labelKey).toBe('landing.cta.selfHost');
     expect(cta.external).toBe(false);
@@ -77,7 +77,7 @@ describe('startCta()：全页唯一的「开始使用」意图', () => {
 
   it('配置了应用时，指向应用并换成「立即使用」', () => {
     vi.stubEnv('VITE_APP_URL', 'https://example.com/app/');
-    const cta = startCta();
+    const cta = startCta('zh-CN');
     expect(cta.href).toBe('https://example.com/app');
     expect(cta.labelKey).toBe('landing.cta.useApp');
     // `external` 是渲染处加 `rel="noopener noreferrer"` 的开关，
@@ -87,9 +87,39 @@ describe('startCta()：全页唯一的「开始使用」意图', () => {
 
   it('地址不合法时退回站内锚点，而不是给一个坏外链', () => {
     vi.stubEnv('VITE_APP_URL', 'example.com/app');
-    const cta = startCta();
+    const cta = startCta('zh-CN');
     expect(cta.href).toBe('#selfhost');
     expect(cta.labelKey).toBe('landing.cta.selfHost');
+    expect(cta.external).toBe(false);
+  });
+});
+
+describe('startCta()：把落地页的语言带进应用', () => {
+  /**
+   * 🔴 这一段钉的是 roadmap §5.1 留下的保留之一：
+   * 英文落地页点「Use it now」进应用，看到的却是**中文**界面。
+   * 落地页靠 URL 定语言、应用靠自己的偏好存储定语言，两边原本不通。
+   */
+  it('英文页：外链带上 ?lang=en', () => {
+    vi.stubEnv('VITE_APP_URL', 'https://example.com/app');
+    expect(startCta('en').href).toBe('https://example.com/app?lang=en');
+  });
+
+  it('默认语言（中文）**不带**参数 —— 不让每条链接都多一段噪音', () => {
+    vi.stubEnv('VITE_APP_URL', 'https://example.com/app');
+    expect(startCta('zh-CN').href).toBe('https://example.com/app');
+  });
+
+  it('应用地址自己带查询串时，参数是追加而不是覆盖', () => {
+    // 手拼 `?`/`&` 会在这里生成坏地址（`...?flag=1?lang=en`）。
+    vi.stubEnv('VITE_APP_URL', 'https://example.com/app?flag=1');
+    expect(startCta('en').href).toBe('https://example.com/app?flag=1&lang=en');
+  });
+
+  it('没配置应用时，语言参数也无处可去 —— 仍然是站内锚点', () => {
+    vi.stubEnv('VITE_APP_URL', '');
+    const cta = startCta('en');
+    expect(cta.href).toBe('#selfhost');
     expect(cta.external).toBe(false);
   });
 });

@@ -65,8 +65,14 @@ export function Nav({
   const { scrollY } = useScroll();
   const [floating, setFloating] = useState(false);
   const { t } = useI18n();
+  /**
+   * 语言既决定文案，也决定「开始使用」指向的应用地址 —— 英文页必须把 `?lang=en`
+   * 带过去，否则访客读完英文页、进应用看到的却是中文（见 `lib/app-url.ts`）。
+   * 所以它要在算 `cta` **之前**取到。
+   */
+  const locale = useLocale();
   // 「开始使用」该指向哪，全页只有这一个判据（见 `lib/app-url.ts`）。
-  const cta = startCta();
+  const cta = startCta(locale);
 
   /**
    * 锚点与 `Landing.tsx` 里各区块的 `id` 必须一致 —— 写错了只是"点了没反应"。
@@ -110,7 +116,6 @@ export function Nav({
    * 与主题按钮不同，它是 `<a>` 而不是 `<button>`：切换会整页跳到另一个地址
    * （理由见 src/lib/locale.ts），刷新、复制链接、前进后退都符合浏览器预期。
    */
-  const locale = useLocale();
   const otherLocale = locale === 'en' ? 'zh-CN' : 'en';
   const langHref = otherLocaleHref(locale);
   const langLabel = otherLocale === 'en' ? t('common.lang.en') : t('common.lang.zh');
