@@ -422,6 +422,25 @@ export class DbOpLogStore<TOperation extends Operation<string> = Operation>
     });
   }
 
+  async markRejected(opIds: string[]): Promise<number> {
+    if (opIds.length === 0) return 0;
+
+    return this.db.transaction([STORES.OPS], 'readwrite', async (tx) => {
+      let updated = 0;
+      for (const opId of opIds) {
+        const key = await tx.getKeyFromIndex(STORES.OPS, OP_INDEXES.OP_ID, opId);
+        if (key === undefined) continue;
+        const record = await tx.get<StoredOperation<TOperation>>(STORES.OPS, key);
+        if (record === undefined) continue;
+        // 与 discard 只差这一个值 —— 而正是这个值让"服务端永久拒绝"可观测。
+        // op 本身照旧不动：它是事实来源，删了就解释不了本机曾经是什么值。
+        await tx.put(STORES.OPS, { ...record, uploadStatus: 'rejected' });
+        updated += 1;
+      }
+      return updated;
+    });
+  }
+
   async getLastServerSeq(): Promise<number> {
     return readMetaNumber(this.db, META_KEYS.LAST_SERVER_SEQ);
   }

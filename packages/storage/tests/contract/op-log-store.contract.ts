@@ -274,6 +274,40 @@ export function runOpLogStoreContract({ name, createDb, create }: OpLogStoreCont
       });
     });
 
+    it('🔴 markRejected 把 op 移出队列，但**不标成已上传**（拒绝 ≠ 成功）', async () => {
+      await withStore(async (store) => {
+        const ops = [makeOp(), makeOp()];
+        await store.appendLocal(ops);
+
+        const n = await store.markRejected([ops[0]!.id]);
+        expect(n).toBe(1);
+
+        // 队列里没了 —— 否则这条永远传不上去的 op 会每次同步都被重传并被拒
+        expect(ids(await store.findPendingUpload())).toEqual([ops[1]!.id]);
+        // 日志里还在 —— 移出队列 ≠ 删除事实
+        expect(ids(await store.getAllOps())).toEqual(ops.map((o) => o.id));
+
+        // 🔴 但它**不是** uploaded：那等于说"这条在云上"，而服务端刚拒绝了它。
+        // 这个断言是"拒绝态可观测"的存储层保证 —— 少了它，验收脚本就只能断言
+        // "队列空了"，而"队列空了"在**数据被静默丢弃**时同样成立。
+        // ⚠️ 记录形状是 `{ op, source, applyStatus, uploadStatus, seq }` ——
+        // op 的业务字段是**嵌套**的，`o.id` 永远是 undefined。
+        // （我第一版就写成了 `o.id`，于是 find 恒返回 undefined，
+        //   断言读到的自然也是 undefined。查 `OpFieldName` 那一段注释。）
+        const all = await store.getAllOps();
+        const rejected = all.find((o) => o.op.id === ops[0]!.id);
+        expect(rejected?.uploadStatus).toBe('rejected');
+        const stillPending = all.find((o) => o.op.id === ops[1]!.id);
+        expect(stillPending?.uploadStatus).toBe('pending');
+      });
+    });
+
+    it('markRejected 对不存在的 opId 是安全空操作', async () => {
+      await withStore(async (store) => {
+        expect(await store.markRejected(['nope'])).toBe(0);
+      });
+    });
+
     // ── 归档 ───────────────────────────────────────────────
 
     it('archiveUpTo 把老 op 移入归档，但日志仍可读', async () => {

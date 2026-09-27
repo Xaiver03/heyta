@@ -37,6 +37,7 @@ import type {
   StoreSchema,
 } from '../db.types.js';
 import { assertIterateLimit } from '../db.types.js';
+import { StorageError, asStorageError, storageError } from '../errors.js';
 import {
   ALL_STORES,
   OP_FIELDS,
@@ -177,7 +178,7 @@ function req<T>(request: IDBRequest<T>, suppressError = false): Promise<T> {
         event.preventDefault();
         event.stopPropagation();
       }
-      reject(request.error ?? new Error('IndexedDB 请求失败'));
+      reject(storageError(request.error, 'IndexedDB 请求失败', { kind: 'request-failed' }));
     };
   });
 }
@@ -247,11 +248,14 @@ export class IndexedDbAdapter implements DbAdapter {
       };
 
       request.onerror = () =>
-        reject(request.error ?? new Error('无法打开 IndexedDB'));
+        reject(storageError(request.error, '无法打开 IndexedDB', { kind: 'open-failed' }));
+      // 🔴 这一条**无条件**抛（`onblocked` 事件没有 error 对象），
+      // 所以它是错误屏上真正会露出来的那句中文。
       request.onblocked = () =>
         reject(
-          new Error(
+          new StorageError(
             'IndexedDB 升级被其它标签页阻塞 —— 请关闭该应用的其它窗口后重试',
+            { kind: 'upgrade-blocked' },
           ),
         );
     });
@@ -284,7 +288,8 @@ export class IndexedDbAdapter implements DbAdapter {
       try {
         idbTx = db.transaction(stores, mode);
       } catch (error) {
-        reject(error instanceof Error ? error : new Error(String(error)));
+        // 走到这里几乎只有一种可能：调用的 store 名或模式不合法 —— 编程错误。
+        reject(asStorageError(error, '无法开始事务', { kind: 'programming-error' }));
         return;
       }
 
@@ -298,12 +303,12 @@ export class IndexedDbAdapter implements DbAdapter {
       idbTx.onabort = () => {
         if (settled) return;
         settled = true;
-        reject(idbTx.error ?? new Error('IndexedDB 事务被中止'));
+        reject(storageError(idbTx.error, 'IndexedDB 事务被中止', { kind: 'transaction-failed' }));
       };
       idbTx.onerror = () => {
         if (settled) return;
         settled = true;
-        reject(idbTx.error ?? new Error('IndexedDB 事务失败'));
+        reject(storageError(idbTx.error, 'IndexedDB 事务失败', { kind: 'transaction-failed' }));
       };
 
       const tx = this.makeTx(idbTx, stores);
@@ -328,7 +333,7 @@ export class IndexedDbAdapter implements DbAdapter {
           } catch {
             // 已结束
           }
-          reject(error instanceof Error ? error : new Error(String(error)));
+          reject(asStorageError(error, '事务内的操作失败', { kind: 'request-failed' }));
         },
       );
     });
@@ -340,8 +345,9 @@ export class IndexedDbAdapter implements DbAdapter {
     const assert = (store: string): void => {
       if (!storeNames.has(store)) {
         // 明确抛错而不是让 IDB 抛 —— 后者信息量太低
-        throw new Error(
+        throw new StorageError(
           `事务未包含 store「${store}」。请把它加进 transaction([...]) 的列表：${allowed.join(', ')}`,
+          { kind: 'programming-error' },
         );
       }
     };
@@ -370,11 +376,15 @@ export class IndexedDbAdapter implements DbAdapter {
           // —— 那会让上层也被迫处理 Date / ArrayBuffer。
           return { ok: true, key: typeof key === 'number' ? key : Number(key) };
         } catch (error) {
+          // 🔴 看的是**驱动自己的**错误名。抛出来的现在一律是 `StorageError`
+          // （`name` 已经被换成 `'StorageError'`），所以必须往 `cause` 里找
+          // —— 否则唯一索引冲突会被当成真失败，幂等写入直接坏掉。
+          const driverError = error instanceof StorageError ? error.cause : error;
           if (
-            typeof error === 'object' &&
-            error !== null &&
-            'name' in error &&
-            (error as { name: string }).name === 'ConstraintError'
+            typeof driverError === 'object' &&
+            driverError !== null &&
+            'name' in driverError &&
+            (driverError as { name: string }).name === 'ConstraintError'
           ) {
             return { ok: false, reason: 'duplicate' };
           }
@@ -453,7 +463,7 @@ export class IndexedDbAdapter implements DbAdapter {
       };
 
       request.onerror = () =>
-        reject(request.error ?? new Error('IndexedDB 游标失败'));
+        reject(storageError(request.error, 'IndexedDB 游标失败', { kind: 'request-failed' }));
     });
   }
 
@@ -546,7 +556,8 @@ export class IndexedDbAdapter implements DbAdapter {
     await new Promise<void>((resolve, reject) => {
       const request = indexedDB.deleteDatabase(this.dbName);
       request.onsuccess = () => resolve();
-      request.onerror = () => reject(request.error ?? new Error('删除数据库失败'));
+      request.onerror = () =>
+        reject(storageError(request.error, '删除数据库失败', { kind: 'request-failed' }));
       request.onblocked = () => resolve(); // 有其它连接时也可能成功
     });
   }
