@@ -14,8 +14,10 @@ import { useState } from 'react';
 import { ActivityCalendar } from 'react-activity-calendar';
 import { cssVar } from '@heyta/design-system';
 import { useI18n, type I18nValue } from '@heyta/i18n';
+import { parseCategorySlot } from '@heyta/domain';
 import { Check, Flame, Plus, Undo2 } from 'lucide-react';
 
+import { ColorSlotPicker } from '../categories/ColorSlotPicker.js';
 import { selectHabitProgress, selectHeatmap, useHabitStore } from './store.js';
 import { text } from '../../lib/text.js';
 import { activityLabels, heatmapTheme } from '../../lib/heatmap-theme.js';
@@ -153,8 +155,17 @@ export function HabitsView() {
               }}
             >
               <div style={{ flex: 1 }}>
-                <div className="ht-habit__name" style={text('row-title')}>
-                  {p.habit.name}
+                <div className="ht-habit__title">
+                  <span className="ht-habit__name" style={text('row-title')}>
+                    {p.habit.name}
+                  </span>
+                  {/* 分类色槽位。它决定这个习惯在「成长 → 分类时长」里那一行
+                      的颜色；没设也能显示，只是没有颜色。 */}
+                  <ColorSlotPicker
+                    value={parseCategorySlot(p.habit.color)}
+                    onChange={(slot) => void store.setHabitColor(p.habit.id, slot)}
+                    targetName={p.habit.name}
+                  />
                 </div>
                 {/**
                  * 三指标**并存**（计划 §4）：当前连续 / 历史最长 / 累计。

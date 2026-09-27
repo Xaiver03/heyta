@@ -521,6 +521,29 @@ export const zhCN = {
   'web.growth.summary.bestDay': '最专注的一天：{date}（{minutes} 分钟）',
   'web.growth.summary.totals': '累计：打卡 {checkIns} 次 · 专注 {hours} 小时 · 完成 {tasks} 件 · 活跃 {activeDays} 天',
 
+  // ── Web · 分类时长（成长视图） ─────────────────────────────
+  // 🔴 这一组里**只许有事实句**：某类做了多久、这些时间怎么算出来的。
+  //    没有"最多/最少/失衡/超标"，也没有排名与占比（见计划 §2 反需求）。
+  'web.categories.title': '分类时长',
+  'web.categories.note': '按清单与习惯各自统计近 12 周的专注与打卡时间。颜色由你自己赋义，这一页不做任何评价。',
+  'web.categories.empty': '还没有可以归类的时间记录。用清单组织任务、或用习惯记下时长，这里就会长出内容。',
+  'web.categories.range': '{start} 至 {end}',
+  'web.categories.kind.project': '清单',
+  'web.categories.kind.habit': '习惯',
+  'web.categories.slot.none': '无',
+  'web.categories.duration.minutes': '{minutes} 分钟',
+  'web.categories.duration.hours': '{hours} 小时',
+  'web.categories.duration.hoursMinutes': '{hours} 小时 {minutes} 分',
+  'web.categories.lane.aria': '{name}（{kind}），共 {duration}',
+  'web.categories.segment.aria': '{name}：{duration}',
+  'web.categories.unassigned': '另有 {duration} 没有归到任何清单或习惯 —— 给任务指定清单，它就会归位。',
+  'web.categories.hint.unset': '行首的色块可以在清单和习惯旁边设置：点调色板图标，选 1–8 任意一个。',
+  'web.categories.cell.none': '这一周没有记录',
+  'web.categories.bars.aria': '近 12 周每周总时长的堆叠柱状图，每一段对应上面的一个分类。',
+  'web.categories.picker.toggle': '给「{name}」设置分类颜色',
+  'web.categories.picker.group': '「{name}」的分类颜色',
+  'web.categories.picker.slot': '色槽 {slot}',
+
   // ── Web · 清单与标签 ──────────────────────────────────────
   'web.projects.ariaLabel': '清单与标签',
   'web.projects.heading': '清单',

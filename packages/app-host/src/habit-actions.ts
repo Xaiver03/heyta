@@ -27,7 +27,14 @@
  * ─────────────────────────────────────────────────────────────────────────
  */
 
-import { toLocalDate, type Habit, type HabitLog, type LocalDate } from '@heyta/domain';
+import {
+  parseCategorySlot,
+  toLocalDate,
+  type CategorySlot,
+  type Habit,
+  type HabitLog,
+  type LocalDate,
+} from '@heyta/domain';
 import type { EntityType } from '@heyta/shared-schema';
 import { OpType } from '@heyta/sync-core';
 
@@ -54,6 +61,18 @@ export interface HabitActions {
   createHabit(name: string, over?: NewHabitFields): Promise<string>;
   /** 软删除习惯。⚠️ 打卡记录**不**级联删除（撤销删除后历史还在）。 */
   removeHabit(entityId: string): Promise<void>;
+
+  /**
+   * 给习惯指定一个**分类色槽位**（1–8），或 `undefined` 表示清掉。
+   *
+   * 与 `setProjectColor` 是同一条规则（存槽位号，不存颜色本身；不做健康度判断），
+   * 理由写在 `docs/plans/activity-categories-and-colors.md` §6。
+   *
+   * ⚠️ 习惯要**按分钟计量**才会进分类时长统计（`unit` 是"分钟"/"min" 之类）——
+   * 一个"每天 8 杯水"的习惯可以有颜色，但它不贡献分钟数，
+   * 因为"杯"换不成时间，而我们**不猜换算**。
+   */
+  setHabitColor(entityId: string, slot?: CategorySlot): Promise<void>;
 
   /**
    * 打卡。省略 `date` 表示**今天**。
@@ -129,6 +148,22 @@ export function createHabitActions(
         payload: { name: trimmed, target: 1, ...over },
       });
       return entityId;
+    },
+
+    async setHabitColor(entityId, slot) {
+      if (habitOf(entityId) === undefined) throw new Error(`找不到习惯「${entityId}」`);
+      // 与 `setProjectColor` 同一道边界校验，理由见那边（界面容易传成 0 起算的下标）。
+      const clean = slot === undefined ? undefined : parseCategorySlot(slot);
+      if (slot !== undefined && clean === undefined) {
+        throw new Error(`分类色槽位必须是 1–8 的整数，收到 ${JSON.stringify(slot)}`);
+      }
+      await ctx.dispatch({
+        entityType: 'HABIT' as EntityType,
+        entityId,
+        opType: OpType.Update,
+        // 清除写 `null`（穿过 JSON 表达"清除"），不写"不放这个键"。
+        payload: { color: clean === undefined ? null : String(clean) },
+      });
     },
 
     async removeHabit(entityId) {

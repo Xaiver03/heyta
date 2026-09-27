@@ -1226,6 +1226,231 @@
   color: var(--ht-color-foreground-muted);
 }
 
+.ht-habit__title {
+  display: flex;
+  align-items: center;
+  gap: var(--ht-space-2);
+}
+
+/* ── 分类时长 ─────────────────────────────────────────────────────── */
+
+.ht-categories {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ht-space-3);
+}
+
+.ht-categories h2 {
+  margin: 0;
+  color: var(--ht-color-foreground);
+}
+
+.ht-categories__note,
+.ht-categories__range,
+.ht-categories__empty,
+.ht-categories__hint,
+.ht-categories__unassigned {
+  margin: 0;
+  color: var(--ht-color-foreground-muted);
+}
+
+.ht-categories__range {
+  color: var(--ht-color-foreground-subtle);
+}
+
+.ht-categories__unassigned {
+  padding-top: var(--ht-space-2);
+  border-top: var(--ht-border-width-thin) solid var(--ht-color-border);
+}
+
+.ht-categories__lanes {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ht-space-3);
+}
+
+.ht-categories__lane {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ht-space-1);
+}
+
+.ht-categories__lane-head {
+  display: flex;
+  align-items: center;
+  gap: var(--ht-space-2);
+}
+
+/* 色块只编码"是谁"。它旁边**永远**有槽位号与名字 ——
+   所以它看得见当然好，看不见也不丢信息（设计系统硬规则）。 */
+.ht-categories__swatch {
+  width: var(--ht-space-3);
+  height: var(--ht-space-3);
+  border-radius: var(--ht-radius-sm);
+  flex: none;
+}
+
+.ht-categories__slot,
+.ht-categories__kind {
+  color: var(--ht-color-foreground-subtle);
+  flex: none;
+}
+
+.ht-categories__name {
+  color: var(--ht-color-foreground);
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ht-categories__total {
+  color: var(--ht-color-foreground);
+  flex: none;
+}
+
+.ht-categories__cells {
+  display: grid;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  gap: var(--ht-space-1);
+}
+
+/* 格子深浅 = 那一周做了多少（跨行共享同一个峰值）。
+   ⚠️ 没有 `outline` 之类的移除；这些格子是装饰（父级 aria-hidden），
+   但**悬停仍有 title** —— 深浅只能看个大概，数字要能看到。 */
+.ht-categories__cell {
+  height: var(--ht-space-3);
+  border-radius: var(--ht-radius-sm);
+}
+
+.ht-categories__bars {
+  display: grid;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  gap: var(--ht-space-1);
+  align-items: end;
+  padding-top: var(--ht-space-2);
+}
+
+.ht-categories__bar {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ht-space-1);
+  align-items: center;
+}
+
+.ht-categories__bar-track {
+  width: 100%;
+  height: var(--ht-space-12);
+  display: flex;
+  flex-direction: column-reverse;
+  justify-content: flex-start;
+  border-radius: var(--ht-radius-sm);
+  overflow: hidden;
+  background: var(--ht-color-surface);
+  border: var(--ht-border-width-thin) solid var(--ht-color-border);
+}
+
+.ht-categories__bar-segment {
+  width: 100%;
+  flex: none;
+}
+
+.ht-categories__bar-label {
+  color: var(--ht-color-foreground-subtle);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── 色槽位选择器 ───────────────────────────────────────────────────── */
+
+/* 收起时只是一个 44px 的图标按钮；展开时下面出现一行槽位。
+   刻意**不用浮层**：浮层要处理定位、层级、点外部关闭、焦点陷阱，
+   而它出现在每一行清单旁边 —— 那些复杂度换不来任何东西。 */
+.ht-slot-picker {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: var(--ht-space-1);
+  flex: none;
+}
+
+.ht-slot-picker__toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--ht-space-1);
+  min-width: var(--ht-touch-target-min);
+  min-height: var(--ht-touch-target-min);
+  justify-content: center;
+  padding: 0 var(--ht-space-1);
+  cursor: pointer;
+  border: none;
+  background: transparent;
+  color: var(--ht-color-foreground-muted);
+  border-radius: var(--ht-radius-md);
+}
+
+.ht-slot-picker__current {
+  width: var(--ht-space-3);
+  height: var(--ht-space-3);
+  border-radius: var(--ht-radius-sm);
+  border: var(--ht-border-width-thin) solid var(--ht-color-border);
+}
+
+/* 3 列 × 3 行：8 个槽位 + 1 个"不用颜色"，正好铺满。
+   宽度由**触控目标**推出（44 × 3 + 间隙），于是它既守得住 44px 下限，
+   又能在侧栏（窄）和习惯卡片（宽）里长得一样。
+   ⚠️ 不用 `1fr` 自适应：在收缩容器里 `auto-fit` 会塌成一列。 */
+.ht-slot-picker__options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--ht-space-1);
+  width: calc(var(--ht-touch-target-min) * 3 + var(--ht-space-1) * 2);
+}
+
+/* 选项是「色块 + 编号」两件东西：色块给看得见的人，编号给看不清的人。
+   ⚠️ 选中态走 `aria-pressed` + 边框，不靠颜色深浅 —— 8 个色块本身
+   就是要用户挑的颜色，用"变淡"表达选中会让人以为是另一个颜色。 */
+.ht-slot-picker__option {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--ht-space-1);
+  min-width: var(--ht-touch-target-min);
+  min-height: var(--ht-touch-target-min);
+  justify-content: center;
+  padding: 0 var(--ht-space-1);
+  cursor: pointer;
+  border: var(--ht-border-width-thin) solid transparent;
+  background: transparent;
+  color: var(--ht-color-foreground);
+  border-radius: var(--ht-radius-md);
+}
+
+.ht-slot-picker__option[aria-pressed='true'] {
+  border-color: var(--ht-color-primary);
+}
+
+.ht-slot-picker__option:focus-visible {
+  outline: var(--ht-border-width-thick) solid var(--ht-color-ring);
+  outline-offset: var(--ht-space-1);
+}
+
+.ht-slot-picker__swatch {
+  width: var(--ht-space-3);
+  height: var(--ht-space-3);
+  border-radius: var(--ht-radius-sm);
+  flex: none;
+}
+
+.ht-slot-picker__swatch--none {
+  background: transparent;
+  border: var(--ht-border-width-thin) solid var(--ht-color-border);
+}
+
+.ht-slot-picker__number {
+  font-size: var(--ht-font-size-2xs);
+  font-variant-numeric: tabular-nums;
+}
+
 /* ── 里程碑 ───────────────────────────────────────────────────────── */
 
 .ht-milestones {

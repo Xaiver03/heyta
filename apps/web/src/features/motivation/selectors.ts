@@ -24,6 +24,7 @@
 
 import {
   computeActivityTotals,
+  computeCategoryReport,
   computeStreak,
   computeTodayProgress,
   computeWeeklyReview,
@@ -32,12 +33,14 @@ import {
   toLocalDate,
   addDays,
   type ActivityTotals,
+  type CategoryReport,
   type FocusSession,
   type Habit,
   type HabitLog,
   type IdentityTagProgress,
   type LocalDate,
   type MilestoneProgress,
+  type Project,
   type Task,
   type TodayProgress,
   type WeeklyReview,
@@ -48,13 +51,14 @@ import {
  *
  * 🔴 刻意**不**直接依赖 `@heyta/op-log` 的 `MaterializedState`：
  * 那个接口还带着 `aiFeedback` / `preferenceCorrections` 等与激励无关的字段，
- * 而且它每加一个实体，这个文件就要跟着重新审一遍。只声明**真正用到的四张表**，
+ * 而且它每加一个实体，这个文件就要跟着重新审一遍。只声明**真正用到的五张表**，
  * 结构上可赋（`MaterializedState` 天然满足），但耦合面小得多。
  */
 export interface MotivationInput {
   habits: Record<string, Habit>;
   habitLogs: Record<string, HabitLog>;
   tasks: Record<string, Task>;
+  projects: Record<string, Project>;
   focusSessions: Record<string, FocusSession>;
 }
 
@@ -169,4 +173,29 @@ function levelOf(count: number): 0 | 1 | 2 | 3 | 4 {
 /** 今天的日期字符串。组件用它做"是否已跨天"的判据，不参与计算。 */
 export function todayOf(now: number): LocalDate {
   return toLocalDate(now);
+}
+
+/**
+ * 分类时长报告（近 N 周，按清单 / 按习惯归因）。
+ *
+ * 归因链、口径、窗口全在 `computeCategoryReport`（`@heyta/domain`）里，
+ * 这里只把四张表摊平并注入 `now` —— 与上面几个选择器同一条纪律。
+ *
+ * ⚠️ 标签（TAG）**不参与**：标签是多对多的，一条任务挂两个标签时
+ * 同一分钟会被算两次，而"总时长"立刻变成假数。已拍板 D2（见计划 §7）。
+ */
+export function selectCategoryReport(
+  state: MotivationInput,
+  now: number,
+  weeks?: number,
+): CategoryReport {
+  return computeCategoryReport({
+    projects: alive(state.projects),
+    tasks: alive(state.tasks),
+    habits: alive(state.habits),
+    habitLogs: alive(state.habitLogs),
+    focusSessions: alive(state.focusSessions),
+    now,
+    weeks,
+  });
 }

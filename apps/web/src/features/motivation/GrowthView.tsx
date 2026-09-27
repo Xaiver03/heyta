@@ -38,6 +38,7 @@ import { useI18n, type MessageKey } from '@heyta/i18n';
 import { text } from '../../lib/text.js';
 import { activityLabels, heatmapTheme } from '../../lib/heatmap-theme.js';
 import { useTaskStore } from '../tasks/store.js';
+import { CategoryBreakdown } from '../categories/CategoryBreakdown.js';
 import { buildShareSummary, HEADLINE_COPY, headlineCount } from './copy.js';
 import { IdentityTagList } from './IdentityTagList.js';
 import { MilestoneMap } from './MilestoneMap.js';
@@ -135,6 +136,12 @@ export function GrowthView() {
           labels={activityLabels(t('web.growth.year.heatmap'), t)}
         />
       </section>
+
+      {/*
+        分类时长放在**周复盘与一年之间**：它比"这一年"细（按来源拆开），
+        又比"这一周"粗（十二周的趋势）—— 三个时间尺度的顺序因此是连续的。
+      */}
+      <CategoryBreakdown />
 
       <section className="ht-growth__section">
         <h2 style={text('section-title')}>{t('web.growth.milestones.title')}</h2>
