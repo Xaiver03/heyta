@@ -329,6 +329,21 @@ export const zhCN = {
   'web.shell.tasks.complete': '完成：{title}',
   'web.shell.tasks.uncomplete': '取消完成：{title}',
   'web.shell.tasks.delete': '删除：{title}',
+  // ── 回收站 ──
+  // 入口是外壳的视图 tab（`App.tsx` 的 `VIEW_TABS`），视图本体在
+  // `apps/web/src/features/trash/TrashView.tsx`。删除仍然只是软删除，
+  // 这里让用户能看见并且**恢复**；彻底删除是二次确认后的不可逆动作。
+  'web.trash.nav': '回收站',
+  'web.trash.intro': '这里放着已删除的任务。恢复后它会回到原来的位置。',
+  'web.trash.empty.title': '回收站是空的',
+  'web.trash.empty.hint': '在任务页删除的任务会先放到这里',
+  'web.trash.deletedAt': '删除于 {date}',
+  'web.trash.restore': '恢复：{title}',
+  'web.trash.purge': '彻底删除：{title}',
+  'web.trash.confirm.title': '彻底删除「{title}」？',
+  'web.trash.confirm.body': '彻底删除后它不会再出现在回收站里，也无法恢复。',
+  'web.trash.confirm.submit': '彻底删除',
+  'web.trash.confirm.cancel': '取消',
   // 空状态：任何列表都必须有空状态，而且要说**下一步做什么** ——
   // 留白屏会让用户以为应用坏了。`all` 同时是兜底（新的 filter.kind 不留白）。
   'web.shell.empty.all.title': '收集箱是空的',
