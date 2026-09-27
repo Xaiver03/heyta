@@ -80,6 +80,14 @@ interface TaskState {
   setNote: (id: string, note: string | undefined) => Promise<void>;
   moveToProject: (id: string, projectId: string | undefined) => Promise<void>;
   /**
+   * 覆盖式设置任务的标签集合（**一次调用 = 一条 op**）。
+   *
+   * ⚠️ 传的是**整组**，不是"加一个" —— 契约见
+   * `packages/app-host/src/actions.ts` 的 `TaskActions.setTags`。
+   * 算出"用户想要的那一组"是界面的事。
+   */
+  setTags: (id: string, tagIds: string[]) => Promise<void>;
+  /**
    * 记录用户对一次 AI 建议的处置（采用 / 改后采用 / 拒绝）。
    *
    * 🔴 走 op-log，因此**跨设备同步** —— 换台设备 AI 不必重新学一遍。
@@ -209,6 +217,10 @@ export const useTaskStore = create<TaskState>((set) => ({
 
   moveToProject: async (id, projectId) => {
     await taskActions.moveToProject(id, projectId);
+  },
+
+  setTags: async (id, tagIds) => {
+    await taskActions.setTags(id, tagIds);
   },
 
   setFilter: (filter) => set({ filter }),

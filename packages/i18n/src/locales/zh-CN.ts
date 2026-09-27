@@ -437,6 +437,18 @@ export const zhCN = {
   'web.tags.add': '添加标签',
   'web.tags.delete': '删除标签「{name}」',
 
+  // ── Web · 任务行上的「整理」（清单归属 + 标签）──────────────
+  // ⚠️ 与面板里的「新清单名称」「新标签名称」**刻意不同名**：同名会让无障碍树里
+  //    出现多个同名节点，按名字取节点只能靠 role 去猜，而猜错就是静默设错元素。
+  //    这几条都带上任务标题，读屏用户才知道正在给**哪一条**任务归类。
+  'web.organize.summary': '整理任务「{title}」',
+  'web.organize.projectLabel': '清单',
+  'web.organize.projectSelect': '任务「{title}」所属清单',
+  'web.organize.inbox': '收集箱',
+  'web.organize.tagsLegend': '标签',
+  'web.organize.tagToggle': '给任务「{title}」加上或去掉标签「{name}」',
+  'web.organize.noTags': '还没有标签 —— 在左侧「标签」里新建一个。',
+
   // ── Web · 四象限 ──────────────────────────────────────────
   'web.quadrant.do': '马上做',
   'web.quadrant.q1': '重要且紧急',
