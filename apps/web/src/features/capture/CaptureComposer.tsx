@@ -33,10 +33,11 @@ import { dateWithRemaining } from '../ai/locale-punctuation.js';
 
 import {
   Priority,
+  diffDays,
   dueDateToEpoch,
-  formatRemainingUntil,
   localDateTimeToEpoch,
   parseCapture,
+  today,
   type AiFeedbackOutcome,
   type CaptureExclusion,
   type PreferenceSet,
@@ -52,6 +53,7 @@ import type {
 import { AiCapture } from '../ai/AiCapture.js';
 import { WEB_EMPTY_SECRET_STORE } from '../settings/aiStore.js';
 import { useTaskStore } from '../tasks/store.js';
+import { remainingText } from '../../lib/due-display.js';
 
 /**
  * 接线所需的 AI 配置 —— 全部由 `App.tsx` 透传，本组件**不做任何判断**。
@@ -82,6 +84,13 @@ export interface CaptureComposerProps {
 export function CaptureComposer(props: CaptureComposerProps): React.JSX.Element {
   const addTask = useTaskStore((s) => s.addTask);
   const { t, locale } = useI18n();
+  /**
+   * 一次渲染里的所有匹配行必须用**同一个"现在"**。
+   *
+   * 逐行各调一次 `Date.now()` 的话，跨零点时同一屏上的两行会算出不同的日期 ——
+   * 与 `TasksScreen` 冻结 `now`、`DueBadge` 要求调用方传 `now` 是同一条纪律。
+   */
+  const previewNow = Date.now();
   const priorityLabel: Record<number, string> = {
     [Priority.High]: t('web.capture.priority.high'),
     [Priority.Medium]: t('web.capture.priority.medium'),
@@ -189,12 +198,19 @@ export function CaptureComposer(props: CaptureComposerProps): React.JSX.Element 
           {parsed.matches.map((m) => {
             // dueDate 的 display 是 YYYY-MM-DD。同时给出人话剩余时间，
             // 因为"2026-09-26"不直观而"明天"直观 —— 用户要确认的是后者。
-            // ⚠️ `formatRemainingUntil()` 仍返回中文（`packages/domain` 跨包，
-            // 本轮不迁）。外壳的文字（不加汉字）只是正字法，所以走代码常量
-            // 而不是词条表 —— 与 `LIST_SEPARATOR` 同一个先例。
+            // ✅ 剩余天数由领域层算（`diffDays` / `today`），**说法**按当前语言
+            // 从词条表取（`remainingText`）—— 以前这里直接嵌领域层的
+            // `formatRemainingUntil()`，那是一句写死的中文，英文界面会露汉字。
+            // 括号与空格是正字法（一个汉字都没有），所以仍走
+            // `dateWithRemaining` 的代码常量而不是词条表 —— 与
+            // `LIST_SEPARATOR` 同一个先例。
             const valueLabel =
               m.field === 'dueDate' && m.dueDate !== undefined
-                ? dateWithRemaining(m.dueDate, formatRemainingUntil(m.dueDate), locale)
+                ? dateWithRemaining(
+                    m.dueDate,
+                    remainingText(diffDays(today(previewNow), m.dueDate), t),
+                    locale,
+                  )
                 : (priorityLabel[m.priority ?? Priority.None] ?? m.display);
 
             return (
