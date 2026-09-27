@@ -15,7 +15,12 @@
  *      所以"没设色时说「无」、设了就说数字"是一条设计契约，不是格式化细节。
  */
 
-import { CATEGORY_SLOT_TOKENS } from '@heyta/design-system';
+import {
+  CATEGORY_SLOT_TOKEN_BY_SLOT,
+  HEAT_TOKENS,
+  UNSET_CATEGORY_TOKEN,
+  type HeytaNativeTokens,
+} from '@heyta/design-system';
 import { CATEGORY_SLOTS, durationParts, type CategorySeries } from '@heyta/domain';
 import { translate, zhCN, en } from '@heyta/i18n';
 import { describe, expect, it } from 'vitest';
@@ -26,7 +31,7 @@ import {
   laneLabel,
   slotText,
 } from '../src/lib/category-display';
-import { HEAT_TOKENS, SLOT_TOKEN } from '../src/lib/category-colors';
+import { heatColor, slotColor, unsetColor } from '../src/lib/category-colors';
 
 /** 与界面同一条路：走真的词条表（缺 key 会**抛**，不是返回空串）。 */
 const t = (key: Parameters<typeof translate>[1], vars?: Record<string, string | number>): string =>
@@ -127,26 +132,67 @@ describe('laneLabel：屏幕阅读器读到的那句话', () => {
   });
 });
 
+/**
+ * 色槽 → 颜色：移动端这一侧不许漂移
+ * =====================================
+ *
+ * 🔴 **这个 describe 在 2026-09-27 被重写过，原因是原来的断言变成了恒真。**
+ *
+ * 原来移动端手抄了 8 个槽位取值 + 5 个 heat 取值，测试拿它和设计系统的
+ * `CATEGORY_SLOT_TOKENS` 逐项对比 —— 那时这条对比**真的会红**，是对的。
+ *
+ * 但设计系统那轮重构（`c1d67b8`）把取值收进单点之后，移动端不再持有自己的
+ * 那份，"移动端与真源相同"就变成了**拿一个值和它自己比**：`SLOT_TOKEN` 就是
+ * `CATEGORY_SLOT_TOKEN_BY_SLOT`，断言 `SLOT_TOKEN[slot] === 真源[slot]` 永远成立。
+ * 这种"恒真的护栏"比没有护栏更坏 —— 它看起来还在守着，实际什么也没守。
+ *
+ * 现在断言的是**移动端函数的行为**（`slotColor` / `unsetColor` / `heatColor`），
+ * 那才是这一端真正可能写错的地方（比如哪天有人图快写死一个颜色）。
+ * 变异验证：把 `slotColor` 改成返回固定色，本块立刻红。
+ */
 describe('色槽 → token：移动端这一侧不许漂移', () => {
-  it('八个槽位齐全，且每个都指向**不同**的 token', () => {
-    const names = CATEGORY_SLOTS.map((slot) => SLOT_TOKEN[slot]);
-    expect(names).toHaveLength(8);
-    expect(new Set(names).size).toBe(8);
+  /**
+   * 只填本文件会用到的 token 名，值取互不相同的假色。
+   * 目的不是模仿主题，而是让"取到的是不是**同一个** token"可被观察。
+   */
+  const fixtureTokens = (): HeytaNativeTokens => {
+    const names: string[] = [
+      ...Object.values(CATEGORY_SLOT_TOKEN_BY_SLOT),
+      ...HEAT_TOKENS,
+      UNSET_CATEGORY_TOKEN,
+    ];
+    return Object.fromEntries(
+      names.map((name, i) => [name, `#${(i + 1).toString(16).padStart(6, '0')}`]),
+    ) as unknown as HeytaNativeTokens;
+  };
+
+  it('八个槽位齐全，且每个都指向**不同**的颜色', () => {
+    const tokens = fixtureTokens();
+    const colors = CATEGORY_SLOTS.map((slot) => slotColor(slot, tokens));
+    expect(colors).toHaveLength(8);
+    expect(new Set(colors).size).toBe(8);
   });
 
-  it('🔴 与设计系统的真源逐项相同（`CATEGORY_SLOT_TOKENS`）', () => {
-    // 真源在 tokens.css，设计系统导出 token 名；Web 用它拼 CSS 变量，
-    // 移动端从主题里按 token 名取值。三处一致靠这条 + 设计系统那条共同保证。
-    expect(CATEGORY_SLOTS.map((slot) => SLOT_TOKEN[slot])).toEqual([...CATEGORY_SLOT_TOKENS]);
+  it('每个槽位取的就是设计系统为它指定的那个 token', () => {
+    const tokens = fixtureTokens();
+    for (const slot of CATEGORY_SLOTS) {
+      expect(slotColor(slot, tokens)).toBe(tokens[CATEGORY_SLOT_TOKEN_BY_SLOT[slot]]);
+    }
+  });
+
+  it('「未设色」是中性灰，且**不在**那八个槽位里', () => {
+    const tokens = fixtureTokens();
+    const slotColors = new Set(CATEGORY_SLOTS.map((slot) => slotColor(slot, tokens)));
+    // 让"没设色"看起来像第 9 种颜色，用户会以为那是可以选的。
+    expect(slotColors.has(unsetColor(tokens))).toBe(false);
   });
 
   it('强度档位 0–4 五个都在，且互不相同', () => {
-    expect([...HEAT_TOKENS]).toEqual([
-      'color.heat-0',
-      'color.heat-1',
-      'color.heat-2',
-      'color.heat-3',
-      'color.heat-4',
-    ]);
+    const tokens = fixtureTokens();
+    const levels = [0, 1, 2, 3, 4] as const;
+    expect(levels.map((level) => heatColor(level, tokens))).toEqual(
+      HEAT_TOKENS.map((name) => tokens[name]),
+    );
+    expect(new Set(levels.map((level) => heatColor(level, tokens))).size).toBe(5);
   });
 });
