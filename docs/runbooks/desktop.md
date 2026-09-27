@@ -115,13 +115,87 @@ node "$dir\node_modules\electron\install.js"
 ### 4.2 命令
 
 ```bash
-pnpm --filter @heyta/desktop build    # 产出 dist/main.cjs + dist/preload.cjs
+pnpm --filter @heyta/desktop build    # ① tsup：dist/main.cjs + dist/preload.cjs
+                                      # ② vite：renderer-dist/（共享 UI 的浏览器产物）
 pnpm --filter @heyta/desktop start    # 需要 §4.1 的二进制
+
+# 真窗口 + 真截图（🔴 硬性规定：界面验收必须跑 Playwright 并**人眼看图**，见 AGENTS.md §6.2）
+cd e2e && npx playwright test tests/desktop-window.spec.ts
+#   → e2e/test-results/desktop-window-dev.png       （开发构建）
+#   → e2e/test-results/desktop-window-packaged.png  （打包产物）
 ```
+
+**为什么 `build` 里有两个构建器**：主进程（Node 侧）和渲染进程（浏览器侧）
+是两套完全不同的运行时，一个 tsup 包不了两者。渲染进程走 **Vite + RNW**
+（`apps/desktop/vite.config.ts`，与 `apps/web` 共用 `scripts/vite-rnw-resolve.mjs`
+的解析规则）—— 这是"M1 判据第 4 条：桌面端与 web 端跑同一套 UI"的落点：
+`renderer/main.tsx` 里 import 的就是 `@heyta/ui` 的共享 `TaskList`。
+
+🔴 **加载的是 `renderer-dist/`（产物），不是 `renderer/`（源码）**。
+源码目录里是 `.tsx` + `<script src="./main.tsx">`，Chromium **不认识 TSX** ——
+直接 `loadFile` 源码目录会得到一个**白窗口**。
 
 产物是 **CJS（`.cjs`）而不是 ESM**，这是被 preload 逼的：
 `sandbox: true` 的 preload 必须是 CommonJS，Electron 不会以 ESM 加载它。
 让两个入口同格式，可以避免"主进程 ESM、preload CJS"这种只在运行时才炸的错配。
+
+### 4.2.1 🔴 两个"白窗口且不报错"的路径陷阱（都实测踩过）
+
+Electron 的路径错**不会**崩、**不会**弹错、日志也基本干净，只是窗口全白。
+下面两条各让桌面端白屏过一次，它们**在开发形态下都看不出来**：
+
+| 写法 | 为什么错 |
+|---|---|
+| `join(app.getAppPath(), 'renderer-dist', …)` | `app.getAppPath()` 是**入口脚本所在目录**（`dist/`），**不是包根**。拼出来是 `dist/renderer-dist/`，不存在。 |
+| `join(app.getAppPath(), '..', 'renderer-dist', …)` | 开发时是对的（`dist/..` = 包根），**打包后 `getAppPath()` 变成 `app.asar` 本身**，`'..'` 跑到 `Resources/` 去了。 |
+
+**正确的是 `join(__dirname, '..', 'renderer-dist', 'index.html')`** ——
+`__dirname` 就是 `main.cjs` 所在目录，开发时 `apps/desktop/dist`、
+打包后 `app.asar/dist`，两种形态下 `'..'` 都恰好落在该在的地方。
+preload 同理（`join(__dirname, 'preload.cjs')`），**少写一层**即可 ——
+多写一层时 preload 静默不加载，界面显示
+`宿主不可用：TypeError: Cannot read properties of undefined (reading 'request')`。
+
+⚠️ 正因为这两条**只在打包后才现形**，`desktop-window.spec.ts` 才**同时**验证
+开发构建与打包产物。只测开发端的话，把 `__dirname` 改回 `getAppPath()` 依然是全绿的。
+
+### 4.3 打包（M2-4）
+
+```bash
+pnpm --filter @heyta/desktop run package       # 三平台全打
+pnpm --filter @heyta/desktop run package:mac   # 只打 macOS（迭代时用）
+```
+
+产出在 `release/`（**已 gitignore**）：`heyta-darwin-arm64/`、`heyta-win32-x64/`、
+`heyta-linux-x64/`。用 `@electron/packager`（BSD-2-Clause，白名单内自动登记）。
+
+**选它而不是 `electron-builder` 的理由**：packager 做的是"应用包"这件核心的事，
+一条命令交叉产出三平台、**在 macOS 上就能全部跑完**，于是"三平台产包"是
+**当场可验证**的。builder 多出来的是安装器 / 签名 / 公证 / 自动更新 ——
+这些**当前一个都做不了**（仓库没有 Apple Developer ID 与 Windows 代码签名证书），
+引入一个用不上其核心能力的重依赖只会让依赖面和 `pnpm check` 一起变慢。
+
+#### 🔴 打包能这么简单，是因为产物**自包含**
+
+`tsup.config.ts` 里 `noExternal: [/^@heyta\//]` 把工作区依赖全打进了 `main.cjs`
+（1.15 MB，只 `require` `electron` / `node:path` / `node:sqlite`），
+所以打包**不需要带 `node_modules`**。
+
+这不是顺手的小优化，而是**绕开了 pnpm + Electron 打包的经典死结**：
+pnpm 用符号链接 + 嵌套 `node_modules`，打包器复制过去的是一堆断链的 symlink，
+运行时 `MODULE_NOT_FOUND`。通行解法只有两个 —— 打成自包含，
+或者改 `node-linker=hoisted`（会改掉整个仓库的依赖布局，影响所有人）。这里选前者。
+
+#### 明确**没做**的事（不要误以为做了）
+
+- ❌ **签名 / 公证**：产物是未签名的，macOS 上首次打开会被 Gatekeeper 拦。
+- ❌ **安装器**：没有 `.dmg` / `.exe`(NSIS) / `.AppImage`，只有应用包本身。
+- ❌ **自动更新**。
+- ❌ **Windows / Linux 产物未在对应系统上运行验证过** —— 它们是在 macOS 上
+  交叉打出来的。"打得出来"与"跑得起来"是两件事，这一条**没有实测证据**。
+
+这四项都要等证书到位，届时的工具大概率是 `electron-builder`（它做安装器与签名）。
+**在那之前不要写"三平台已验证可运行"。**
 
 ## 5. 不装 Electron 也能验证 ✅实测
 
@@ -242,11 +316,12 @@ pnpm --filter @heyta/desktop smoke     # 需要 §4.1 的二进制
 
 | 项 | 状态 |
 |---|---|
-| 渲染页 | ⚠️ **临时占位页**，M1（共享 UI 垂直切片）会整个替换 |
+| 渲染页 | ✅ **已替换**：加载 `@heyta/ui` 的共享 `TaskList`（M1 判据第 4 条落点，见 [§4.2](#42-命令)） |
 | **macOS 与 Windows 上的构建 + 11 个测试** | ✅ **已实测**（见 [§5.2](#52-在-windows-打包机上验证2026-09-27-实测-)） |
-| **Electron 运行时冒烟（无窗口）** | ✅ **已实测**（真 Windows，见 [§5.3](#53-electron-运行时冒烟真-windows-实测-)） |
-| GUI 窗口的真机冒烟 | ⬜ **未做** —— 二进制已装好（§4.1），但还没在任何机器上真的启动过窗口 |
-| Windows / macOS / Linux 三平台安装包 | 未做（`electron-builder` 或等价物） |
+| **Electron 运行时冒烟（无窗口）** | ✅ **已实测**（真 Windows，见 [§5.3](#53-electron-运行时冒烟真-windows-实测-)）；**macOS 也已通过** |
+| **GUI 窗口的真机冒烟** | ✅ **已做**（macOS arm64 实测）—— `desktop-window.spec.ts`，**开发构建与打包产物各跑一遍**，见 [§4.2](#42-命令)；截图见 `e2e/test-results/desktop-window-{dev,packaged}.png` |
+| 三平台**应用包** | ✅ **已产出**（`@electron/packager`，见 [§4.3](#43-打包m2-4)）—— ⚠️ 但 **Windows / Linux 产物未在对应系统上运行验证过** |
+| 三平台**安装器**（dmg / nsis / AppImage） | 未做 |
 | 代码签名 / 公证 | 未做 |
 | 自动更新 | 未做 |
 | 真实服务端同步 | 未在本层做 —— 复用 `@heyta/node-host` 的 `sync()`，见 [`multi-platform-build.md`](multi-platform-build.md) |
@@ -255,9 +330,10 @@ pnpm --filter @heyta/desktop smoke     # 需要 §4.1 的二进制
 
 `check:design` 的 `SCAN_ROOTS` 已含 `apps/desktop/src`（M2 Spike S2）。
 
-**如实说明**：目前这条**基本是空的** —— 桌面壳只有主/preload/契约三个文件（无样式值），
-而占位页是 `.html`，`SCAN_EXT` 不含 `.html`。
-它的价值在于：M1 往这里放共享组件时，**覆盖从第一天就成立**。
+⚠️ **`renderer/` 还没有进扫描**：占位页时代的理由是"`.html` 不在 `SCAN_EXT` 里"，
+但那个理由**现在过期了** —— 渲染层已经是 `.tsx`（`renderer/main.tsx`），
+而 `SCAN_ROOTS` 里只有 `apps/desktop/src`。
+**这是本轮留下的真实缺口**：桌面端渲染层目前**不受设计门禁覆盖**。
 
 `.html` 之所以**刻意不在**扫描范围内，理由是风险不对称：打开它会让
 web / landing / desktop 三处的 HTML 一次性进入检查，而 HTML 里合法存在大量

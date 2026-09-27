@@ -59,13 +59,22 @@ const SCAN_ROOTS = [
    * 桌面壳（M2 Spike S2）。**今天就加上，而不是等它有 UI 再加** ——
    * 原因是上一轮 M0-4 实测出的教训：门禁的范围缺口**不会报错，只会静默失效**，
    * 而等到"有 UI 了再加"时，第一批 UI 代码已经写进去了。
-   *
-   * ⚠️ 如实说明当前覆盖：桌面壳现在只有 `main.ts` / `preload.ts` / `ipc-contract.ts`
-   * 与一个**临时占位页** `renderer/index.html`。前者没有样式值；
-   * 后者是 HTML，而 `SCAN_EXT` 不含 `.html`（见下方注释），所以**目前这一条基本是空的**。
-   * 它的价值在于：M1 往这里放共享组件时，**覆盖从第一天就成立**。
    */
   { label: 'apps/desktop/src', path: join(ROOT, 'apps/desktop/src') },
+  /**
+   * 🔴 桌面端的**渲染层**（M2-2b）。它和上面的 `apps/desktop/src` 是**两个目录**，
+   * 上面那条**盖不住它**。
+   *
+   * 这一条是"范围缺口只会静默失效"的**第二次**发生：
+   * 原来这里写的是"渲染页是 `.html`，而 `SCAN_EXT` 不含 `.html`，所以覆盖基本是空的" ——
+   * 那个说法**当时是对的**。但渲染层已经换成 `.tsx`（`renderer/main.tsx`），
+   * 于是那句注释变成了一条**过期的免责说明**：
+   * 它描述的前提没了，而缺的覆盖**没有任何东西会提醒你**。
+   *
+   * 教训：注释里"当前覆盖是空的，因为 X"这种话**自带保质期**，
+   * 一旦 X 变了，它就从解释变成了伪装。
+   */
+  { label: 'apps/desktop/renderer', path: join(ROOT, 'apps/desktop/renderer') },
 ].filter((r) => {
   if (existsSync(r.path)) return true;
   if (verbose) console.log(`⏭  ${r.label} 尚不存在，跳过。`);

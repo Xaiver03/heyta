@@ -413,7 +413,7 @@ Windows / macOS / Linux 三平台各出一个能跑起真实同步的桌面应�
 | **M2-2b 桌面端渲染进程 + GUI 冒烟** | ✅ **已完成**（本轮）—— 同时关掉 **M1 判据第 4 条** | `e2e/tests/desktop-window.spec.ts` 通过；截图见 `e2e/test-results/desktop-window.png` |
 | **Windows 真机验证** | ✅ **已实测**（2026-09-27） | 在 `windows-pc` 上 `pnpm -r build` **exit 0**、桌面端产物**字节级一致**、**11/11 测试通过**。详见 [桌面端手册](../runbooks/desktop.md) §5.2 |
 | M2-3 跑通真实同步 | ⬜ **未做** | 需要真实服务端，见 [本地验证手册](../runbooks/local-server-verification.md) |
-| M2-4 三平台产包 + 签名 | ⬜ **未做** | 打包器与 Electron 二进制都还没接 |
+| M2-4 三平台产包 + 签名 | 🟡 **产包已做，签名未做** | `@electron/packager`（BSD-2-Clause）；`release/heyta-{darwin-arm64,win32-x64,linux-x64}`。**macOS 包已实测启动 + 截图**（`e2e/tests/desktop-window.spec.ts` 的"打包产物"用例）。⚠️ Windows / Linux 产物**未在对应系统上运行验证过**；安装器 / 签名 / 公证 / 自动更新**一律未做**（缺证书）。详见 [`runbooks/desktop.md` §4.3](../runbooks/desktop.md) |
 
 **🔴 与计划原文不同的一处改动（架构上更好，值得记）**：
 
@@ -685,7 +685,7 @@ IndexedDB 路径**保留到迁移验证通过之后**再删。两者可并存一
 | 门禁 | 现状 | 本计划要做的 |
 |---|---|---|
 | `check:layering` | ✅ **9 条规则**（M0-3 补了色槽映射那条） | M5 覆盖新端 |
-| `check:design` | ✅ 扫 web/mobile/landing/**desktop**，**6 类规则**（M0-4 补了 RN 无单位数字；M2-2 加了桌面） | M5 加 `packages/ui` |
+| `check:design` | ✅ 扫 web/mobile/landing/**desktop/src**/**desktop/renderer**/**packages/ui**，**6 类规则**（M0-4 补了 RN 无单位数字；M2-2 加了桌面；M2-4 补了桌面渲染层 —— 补上时**当场抓出 6 处裸值**） | 新增平台壳时必须同步加 `SCAN_ROOTS` |
 | `check:licenses` | ✅ 已有；`electron` 已自动登记（M2-1） | M1 登记 `react-native-web` |
 | `check:mobile-bundle` | ✅ 已有（双 React 雷区） | M1-5 必须跑 |
 | `check:native-deps` | ✅ 已有 | 新增原生模块时兜底 |

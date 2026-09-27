@@ -28,6 +28,24 @@ export default defineConfig({
   /** `electron` 由运行时提供，绝不打包进去。 */
   external: ['electron'],
   /**
+   * 🔴 **把工作区依赖打进产物**（`@heyta/*`），这是为了让桌面端能打包分发。
+   *
+   * tsup 默认会把 `package.json` 的 `dependencies` 全部**外置**（只留 require），
+   * 于是 `main.cjs` 里出现了 `require("@heyta/node-host")`。在开发机上没问题，
+   * 但**打包时这是个死结**：pnpm 用符号链接 + 嵌套 `node_modules` 布局，
+   * Electron 打包器复制过去的是一堆断链的 symlink，运行时 `MODULE_NOT_FOUND`。
+   * （`electron-builder` / `@electron/packager` 都有这个问题，
+   * 通行解法要么装 `node-linker=hoisted`，要么就是把依赖打进去。）
+   *
+   * 打进去之后产物**自包含**：除了 `electron` 与 Node 内建模块，
+   * 不再 require 任何东西 —— 打包就退化成"复制 dist + renderer-dist + package.json"。
+   *
+   * ⚠️ `@heyta/node-host` 一路依赖到 `node:sqlite`（Node 内建），
+   * 所以它在任何情况下都不会被外部化 —— 这也是上面 `removeNodeProtocol: false`
+   * 必须存在的原因（见 AGENTS.md §7）。
+   */
+  noExternal: [/^@heyta\//],
+  /**
    * **不生成 .d.ts**：这是应用壳，没有人 import 它的构建产物
    * （`index.ts` 是给测试直接读源码用的）。
    * `node-host` 需要 dts 是因为它是被消费的工作区依赖，此处不同。
