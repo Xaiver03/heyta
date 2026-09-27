@@ -55,6 +55,7 @@ export const zhCN = {
   'common.sync.error.localOpMissing': '那条本地改动已经不在队列里了，请重新同步',
   'common.sync.error.remoteVersionUnavailable': '取不到对端版本，没法保留远端 —— 请选择保留本地',
   'common.sync.error.undecryptableOps': '有部分历史数据用当前口令解不开（可能是在另一个口令下写入的），已跳过 —— 其余数据已同步',
+  'common.sync.error.uploadRejected': '有改动被服务端拒绝了，它们不在云端 —— 已停止重传，请查看同步详情',
 
   // ── 落地页 · 通用 ─────────────────────────────────────────
   'landing.skipLink': '跳到主要内容',

@@ -40,6 +40,8 @@ interface Harness {
   uploads: Array<{ url: string; body: Record<string, unknown> }>;
   downloads: string[];
   marked: Array<ReadonlyMap<string, number>>;
+  /** `markRejected` 的调用记录（按批）。用于断言"永久拒绝被移出队列"。 */
+  rejected: string[][];
   applied: Operation<string>[][];
   cursor: { value: number };
 }
@@ -51,6 +53,7 @@ function makeHarness(
   const uploads: Harness['uploads'] = [];
   const downloads: string[] = [];
   const marked: Harness['marked'] = [];
+  const rejected: Harness['rejected'] = [];
   const applied: Harness['applied'] = [];
   const cursor = { value: 0 };
 
@@ -82,13 +85,16 @@ function makeHarness(
     },
     redispatch: async () => undefined,
     discardLocal: async () => undefined,
+    markRejected: async (ids) => {
+      rejected.push([...ids]);
+    },
     getOpsForEntity: async () => [],
     getOpById: async () => undefined,
     redispatchPayload: async () => undefined,
     fetchImpl,
   });
 
-  return { client, uploads, downloads, marked, applied, cursor };
+  return { client, uploads, downloads, marked, rejected, applied, cursor };
 }
 
 function okJson(body: unknown): Response {
@@ -169,63 +175,259 @@ describe('同步客户端 — 上传与游标', () => {
     expect(h.marked[0]!.get('op-1')).toBe(42);
   });
 
-  it('🔴 一批里有硬拒绝时，同批**已被接受**的 op 仍必须落盘（否则永久重传）', async () => {
+  it('🔴 一批里有永久拒绝时：已接受的落盘、被拒的**移出队列**、且**下载照常**', async () => {
     // 现场：一台设备的队列里混进了一条 clientId 不属于本机的 op。
     // 服务端逐条判定，接受 op-1、拒绝 op-2 —— 而响应整体是 HTTP 200。
     //
-    // 修之前，上面那个 `throw` 发生在 `markUploaded` **之前**，于是：
-    //   op-1 已被服务端收下，却在本地永远留在"待上传"
-    //   → 下次同步重传 op-1 → 服务端回"已存在" → 又一次硬拒绝
-    //   → **这台设备的同步永久卡死**，用户看到"同步一直失败 + 待上传数不减"。
+    // 🔴 这条用例是**改写过的**。它原来断言的是「抛错 + 文案里点明同批接受了几条」，
+    // 而那个"抛错"本身就是缺陷：抛出点在 `download()` **之前**，于是
+    // **一条永远传不上去的 op 就让这台设备再也拉不到任何远端数据**
+    // （实测：连续两次同步都是 error、待上传数恒为 1、设备再没下载过东西）。
+    // 所以判据从"错误文案好不好看"改成了三条实质行为：
+    //   ① 已接受的照旧落盘；② 被拒的进 `rejected`（而不是 `uploaded`）；
+    //   ③ **下载仍然执行** —— 这一条才是"设备不会变聋"的正面证据。
     const h = makeHarness(
-      () =>
-        okJson({
-          results: [
-            { opId: 'op-1', accepted: true, serverSeq: 42 },
-            {
-              opId: 'op-2',
-              accepted: false,
-              errorCode: 'INVALID_CLIENT_ID',
-              error: 'Operation clientId does not match request clientId',
-            },
-          ],
-          latestSeq: 42,
-        }),
+      (url) =>
+        url.includes('/ops')
+          ? okJson({
+              results: [
+                { opId: 'op-1', accepted: true, serverSeq: 42 },
+                {
+                  opId: 'op-2',
+                  accepted: false,
+                  errorCode: 'INVALID_CLIENT_ID',
+                  error: 'Operation clientId does not match request clientId',
+                },
+              ],
+              latestSeq: 42,
+            })
+          : okJson({ ops: [], latestSeq: 42, hasMore: false }),
       { ops: [makeOp({ id: 'op-1' }), makeOp({ id: 'op-2' })] },
     );
     const status = await h.client.sync();
 
     // 被拒的那条仍必须让用户知道 —— 不要为了"看起来成功"把错误吞掉
     expect(status.kind).toBe('error');
+    if (status.kind === 'error') {
+      expect(status.reason).toBe('upload-rejected');
+      // 永久拒绝：重试无意义，界面不该劝用户重试
+      expect(status.retryable).toBe(false);
+      // 要点名是哪一条，否则用户无从查起
+      expect(status.message).toContain('op-2');
+    }
 
-    // 但已被接受的那条**绝不能**留在待上传队列里
+    // 已被接受的那条**绝不能**留在待上传队列里
     expect(h.marked).toHaveLength(1);
     expect(h.marked[0]!.get('op-1')).toBe(42);
-    // 被拒的那条**不许**被误标成已上传
+    // 被拒的那条**不许**被误标成已上传（标了就等于说"它在云上"，那是假话）
     expect(h.marked[0]!.has('op-2')).toBe(false);
 
+    // 被拒的那条要**移出队列**，否则每次同步都会被重传并被拒
+    expect(h.rejected).toEqual([['op-2']]);
+
+    // 🔴 核心：上传出了被拒的事，**下载也必须跑过**。
+    // 少了这一条，前面几条全绿也可能只是"把错误显示得更好看"。
+    expect(h.downloads.length).toBeGreaterThan(0);
+
     // 🔴 游标不能推进：这条路径下面还有 piggyback 的 newOps 没被应用，
-    // 先推进会跳过它们（那是真的丢数据，比"多下几次"严重得多）
-    expect(h.cursor.value).toBe(0);
+    // 先推进会跳过它们（那是真的丢数据，比"多下几次"严重得多）。
+    //
+    // ⚠️ 这里只在**搭车 op 整批解不开**时才要求不推进；本条没有搭车 op，
+    // 所以 latestSeq 正常推进。真正不能推进的那条用例在下面（"整批都解不开"）。
+    expect(h.cursor.value).toBe(42);
   });
 
-  it('🔴 硬拒绝的错误文案要点明"同批有几条已被接受"（否则会误判成全军覆没）', async () => {
+  it('🔴 只是"暂时被挡"（限流）时：op **留在队列里**，且 retryable=true', async () => {
+    // 与永久拒绝相反的一侧。两者都报 `upload-rejected`，但处置完全相反：
+    // 限流等一会儿就好，把它也移出队列就等于**丢掉一条本来能上去的改动**。
     const h = makeHarness(
-      () =>
-        okJson({
-          results: [
-            { opId: 'op-1', accepted: true, serverSeq: 7 },
-            { opId: 'op-2', accepted: false, errorCode: 'INVALID_CLIENT_ID', error: 'x' },
-          ],
-          latestSeq: 7,
-        }),
-      { ops: [makeOp({ id: 'op-1' }), makeOp({ id: 'op-2' })] },
+      (url) =>
+        url.includes('/ops')
+          ? okJson({
+              results: [
+                { opId: 'op-1', accepted: false, errorCode: 'RATE_LIMITED', error: 'slow down' },
+              ],
+              latestSeq: 3,
+            })
+          : okJson({ ops: [], latestSeq: 3, hasMore: false }),
+      { ops: [makeOp({ id: 'op-1' })] },
     );
     const status = await h.client.sync();
+
     expect(status.kind).toBe('error');
     if (status.kind === 'error') {
-      expect(status.message).toContain('1/2');
-      expect(status.message).toContain('1 条已被接受');
+      expect(status.reason).toBe('upload-rejected');
+      expect(status.retryable).toBe(true);
+    }
+    // 关键：**没有**被移出队列 —— 下次同步还要重传它
+    expect(h.rejected).toEqual([]);
+    expect(h.marked).toEqual([]);
+    // 下载同样必须跑（上传被挡不该影响拉取）
+    expect(h.downloads.length).toBeGreaterThan(0);
+  });
+
+  it('🔴 未知错误码按"暂时"处理（判错方向要选"多试一次"而不是"丢掉"）', async () => {
+    // 名单只收"重试无意义"的码。拿不准的留在暂时那一类：
+    // 判成永久会丢一条本来能上去的改动，而"多试几次"已经不会再卡死设备了。
+    const h = makeHarness(
+      (url) =>
+        url.includes('/ops')
+          ? okJson({
+              results: [
+                { opId: 'op-1', accepted: false, errorCode: 'SOME_NEW_CODE', error: '?' },
+              ],
+              latestSeq: 3,
+            })
+          : okJson({ ops: [], latestSeq: 3, hasMore: false }),
+      { ops: [makeOp({ id: 'op-1' })] },
+    );
+    await h.client.sync();
+    expect(h.rejected).toEqual([]);
+  });
+
+  it('🔴 上传响应搭车回来的 op 里有一条解不开时，**不能拖垮整次同步**（下载必须照常执行）', async () => {
+    /**
+     * 现场（Android 模拟器 + 真实服务端）：手机上有 3 条待上传的 op，
+     * 上传成功后服务端在**同一个响应**里搭车回了 14 条新 op，其中 2 条是
+     * 换口令之前写下的（AES-GCM 认证失败）。这里原来是无保护的
+     * `Promise.all(body.newOps.map((o) => decodeServerOp(o, password)))` ——
+     * 一条抛错整次同步作废：
+     *
+     *   1. 抛在 `sync()` 的 **upload 阶段**，于是 `download()` 根本没执行，
+     *      设备一条远端数据都没拉到（实测本地库里远端 op 数 = 0）；
+     *   2. 界面只显示"同步失败"，而且被归成 `unexpected` + `retryable: true`，
+     *      用户重试多少次都一样；
+     *   3. `upload()` 在没有待上传 op 时**提前 return**（见该方法开头），
+     *      所以拿干净数据库复现永远踩不到 —— 这正是它一直没被发现的原因。
+     *
+     * 这和 `download()` 里被 ADR-0016 修掉的那处是同一个形状。
+     * 期望的契约：能读的应用、读不了的跳过并如实上报，且**下载照常执行**。
+     */
+    const good = await encrypt(JSON.stringify({ title: '搭车能读的' }), PASSWORD);
+    const bad = await encrypt('{}', 'an-old-password');
+
+    const poisonOp = (serverSeq: number) => ({
+      serverSeq,
+      receivedAt: serverSeq,
+      op: {
+        id: 'poison-piggy',
+        clientId: 'other',
+        actionType: 'CREATE_TASK',
+        opType: 'CRT',
+        entityType: 'TASK',
+        entityId: 'e-poison',
+        payload: bad,
+        vectorClock: { other: 1 },
+        timestamp: 200,
+        schemaVersion: 1,
+        isPayloadEncrypted: true,
+      },
+    });
+
+    const h = makeHarness(
+      (_url, init) => {
+        if (init?.method === 'POST') {
+          return okJson({
+            results: [{ opId: 'op-1', accepted: true, serverSeq: 40 }],
+            latestSeq: 50,
+            newOps: [
+              {
+                serverSeq: 45,
+                receivedAt: 45,
+                op: {
+                  id: 'good-piggy',
+                  clientId: 'other',
+                  actionType: 'CREATE_TASK',
+                  opType: 'CRT',
+                  entityType: 'TASK',
+                  entityId: 'e-good',
+                  payload: good,
+                  vectorClock: { other: 1 },
+                  timestamp: 100,
+                  schemaVersion: 1,
+                  isPayloadEncrypted: true,
+                },
+              },
+              poisonOp(46),
+            ],
+          });
+        }
+        return okJson({ ops: [], hasMore: false, latestSeq: 50 });
+      },
+      { ops: [makeOp()] },
+    );
+
+    const status = await h.client.sync();
+
+    // 1. 🔴 关键判据：下载**真的执行了**。修之前整次同步死在 upload 阶段。
+    expect(h.downloads.length).toBeGreaterThan(0);
+
+    // 2. 搭车里能读的那条确实进了 op-log（不是"整批放弃"）
+    const appliedIds = h.applied.flat().map((o) => o.id);
+    expect(appliedIds).toContain('good-piggy');
+
+    // 3. 上传本身仍然算成功：op-1 必须被标记，否则下次重传
+    expect(h.marked).toHaveLength(1);
+    expect(h.marked[0]!.get('op-1')).toBe(40);
+
+    // 4. 有的解开、有的解不开 → 游标推进（否则永久卡在同一批上）
+    expect(h.cursor.value).toBe(50);
+
+    // 5. 状态结构化地点名读不了的那条，而不是报 synced / 报"未知错误"
+    expect(status).toMatchObject({
+      kind: 'error',
+      reason: 'undecryptable-ops',
+      retryable: false,
+    });
+    expect(status.kind === 'error' ? status.message : '').toContain('poison-piggy');
+  });
+
+  it('🔴 搭车 op 整批都解不开时不推进游标，把判断交给 download（口令不对只有一个策略）', async () => {
+    // 整批解不开最常见的原因是口令打错。ADR-0016 规定这种情况**不许推进游标**，
+    // 否则一次手滑就静默跳过大段历史。搭车路径同理，而且这里**不自己再判一次**：
+    // 把游标留在原位，让紧随其后的 `download()` 用同一套策略给出正确区分
+    //（"口令不对"还是"历史里混着别的口令"）。两套策略迟早会漂移。
+    const bad = await encrypt('{}', 'an-old-password');
+    const poison = (serverSeq: number) => ({
+      serverSeq,
+      receivedAt: serverSeq,
+      op: {
+        id: `poison-${String(serverSeq)}`,
+        clientId: 'other',
+        actionType: 'CREATE_TASK',
+        opType: 'CRT',
+        entityType: 'TASK',
+        entityId: 'e-poison',
+        payload: bad,
+        vectorClock: { other: 1 },
+        timestamp: 200,
+        schemaVersion: 1,
+        isPayloadEncrypted: true,
+      },
+    });
+
+    const h = makeHarness(
+      (_url, init) =>
+        init?.method === 'POST'
+          ? okJson({
+              results: [{ opId: 'op-1', accepted: true, serverSeq: 40 }],
+              latestSeq: 50,
+              newOps: [poison(45), poison(46)],
+            })
+          : okJson({ ops: [poison(45), poison(46)], hasMore: false, latestSeq: 50 }),
+      { ops: [makeOp()] },
+    );
+
+    const status = await h.client.sync();
+
+    // 游标停在原位 —— 这批 op 还看得见，没有被静默跳过
+    expect(h.cursor.value).toBe(0);
+    // 下载照常执行，并且给出的是 download() 那套"整页解不开"的诊断
+    expect(h.downloads.length).toBeGreaterThan(0);
+    expect(status.kind).toBe('error');
+    if (status.kind === 'error') {
+      // download() 的整页解不开文案点了"口令"
+      expect(status.message).toContain('口令');
     }
   });
 
@@ -346,6 +548,177 @@ describe('同步客户端 — 下载与解密', () => {
 
     expect(status.kind).toBe('error');
     expect(h.applied).toHaveLength(0);
+  });
+
+  it('🔴 整页一条都解不开时**不推进游标**（口令打错绝不能静默跳过整段历史）', async () => {
+    // 这一条是上一条的另一半：拒绝整页之后，游标必须**原地不动**。
+    // 如果这里推进了，一次口令手滑 = 用户的历史被永久跳过。
+    const h = makeHarness(() =>
+      okJson({
+        ops: [
+          {
+            serverSeq: 1,
+            receivedAt: 1,
+            op: {
+              id: 'bad',
+              clientId: 'other',
+              actionType: 'CREATE_TASK',
+              opType: 'CRT',
+              entityType: 'TASK',
+              payload: 'not-even-valid-ciphertext',
+              vectorClock: { other: 1 },
+              timestamp: 1,
+              schemaVersion: 1,
+              isPayloadEncrypted: true,
+            },
+          },
+        ],
+        hasMore: false,
+        latestSeq: 77,
+      }),
+    );
+    const status = await h.client.sync();
+
+    expect(status.kind).toBe('error');
+    expect(h.cursor.value).toBe(0);
+  });
+
+  it('🔴 混着"解得开"和"解不开"时：能读的应用、读不了的跳过，并如实上报', async () => {
+    /**
+     * 实测场景（真实服务端 + 真机模拟器）：
+     * 服务端上混着两条**另一个口令**写下的 op。原来的实现是
+     * `Promise.all(ops.map(decodeServerOp))` —— 一条抛错整页作废，
+     * 而且抛在 `setLastServerSeq` 之前，于是**游标永远不推进**、
+     * 每次同步都在同一个位点再撞一次，设备**永久**同步不了。
+     *
+     * 这里的期望就是修复后的契约：
+     *   1. 好的那条**真的被应用**（不是"整页放弃"）；
+     *   2. 坏的那些**被跳过**（重试也不会变好）；
+     *   3. 游标**推进**（否则还是永久卡死）；
+     *   4. 状态**不是 `synced`** —— 报"已是最新"等于无声的数据丢失。
+     */
+    const good = await encrypt(JSON.stringify({ title: '能读的' }), PASSWORD);
+    const bad = await encrypt('{}', 'an-old-password');
+    const h = makeHarness(() =>
+      okJson({
+        ops: [
+          {
+            serverSeq: 1,
+            receivedAt: 1,
+            op: {
+              id: 'good',
+              clientId: 'other',
+              actionType: 'CREATE_TASK',
+              opType: 'CRT',
+              entityType: 'TASK',
+              entityId: 'e1',
+              payload: good,
+              vectorClock: { other: 1 },
+              timestamp: 100,
+              schemaVersion: 1,
+              isPayloadEncrypted: true,
+            },
+          },
+          {
+            serverSeq: 2,
+            receivedAt: 2,
+            op: {
+              id: 'poison',
+              clientId: 'other',
+              actionType: 'CREATE_TASK',
+              opType: 'CRT',
+              entityType: 'TASK',
+              entityId: 'e2',
+              // 另一个口令写的 → 用当前口令解不开（AES-GCM 认证失败）
+              payload: bad,
+              vectorClock: { other: 1 },
+              timestamp: 200,
+              schemaVersion: 1,
+              isPayloadEncrypted: true,
+            },
+          },
+        ],
+        hasMore: false,
+        latestSeq: 2,
+      }),
+    );
+    const status = await h.client.sync();
+
+    // 1. 能读的那条确实进了 op-log（payload 是明文）
+    expect(h.applied).toHaveLength(1);
+    expect(h.applied[0]!.map((o) => o.id)).toEqual(['good']);
+
+    // 2. 游标推进 —— 否则下次同步再撞同一条，永久卡死
+    expect(h.cursor.value).toBe(2);
+
+    // 3. 状态结构化地说明"有东西没读进来"，而不是报 synced
+    expect(status).toMatchObject({
+      kind: 'error',
+      reason: 'undecryptable-ops',
+      retryable: false,
+    });
+    // 诊断信息要**可定位**到具体是哪条 op
+    expect(status.kind === 'error' ? status.message : '').toContain('poison');
+  });
+
+  it('解不开的计数是每次同步现算的，不会跨次累积', async () => {
+    // 否则一旦出现过一次解不开的 op，界面会永远挂着那句提示。
+    const good = await encrypt(JSON.stringify({ title: 'ok' }), PASSWORD);
+    const bad = await encrypt('{}', 'an-old-password');
+    let page = 0;
+    const h = makeHarness(() => {
+      page += 1;
+      if (page === 1) {
+        return okJson({
+          ops: [
+            {
+              serverSeq: 1,
+              receivedAt: 1,
+              op: {
+                id: 'good-1',
+                clientId: 'other',
+                actionType: 'CREATE_TASK',
+                opType: 'CRT',
+                entityType: 'TASK',
+                entityId: 'e1',
+                payload: good,
+                vectorClock: {},
+                timestamp: 1,
+                schemaVersion: 1,
+                isPayloadEncrypted: true,
+              },
+            },
+            {
+              serverSeq: 2,
+              receivedAt: 2,
+              op: {
+                id: 'poison',
+                clientId: 'other',
+                actionType: 'CREATE_TASK',
+                opType: 'CRT',
+                entityType: 'TASK',
+                entityId: 'e2',
+                payload: bad,
+                vectorClock: {},
+                timestamp: 2,
+                schemaVersion: 1,
+                isPayloadEncrypted: true,
+              },
+            },
+          ],
+          hasMore: false,
+          latestSeq: 2,
+        });
+      }
+      // 第二次同步：服务端已经没有任何解不开的东西
+      return okJson({ ops: [], hasMore: false, latestSeq: 2 });
+    });
+
+    const first = await h.client.sync();
+    expect(first.kind).toBe('error');
+
+    const second = await h.client.sync();
+    expect(second.kind).toBe('synced');
   });
 
   it('标记为加密但 payload 不是字符串时明确报错', async () => {
@@ -473,6 +846,7 @@ describe('同步客户端 — 离线与错误区分', () => {
       applyRemote: async () => undefined,
       redispatch: async () => undefined,
       discardLocal: async () => undefined,
+      markRejected: async () => undefined,
       getOpsForEntity: async () => [],
       getOpById: async () => undefined,
       redispatchPayload: async () => undefined,
@@ -484,7 +858,29 @@ describe('同步客户端 — 离线与错误区分', () => {
 
     const status = await client.sync();
     expect(status.kind).toBe('error');
+    // 🔴 断言**结构化原因**，不只是 `kind`：壳靠它取词条，
+    // 而这个字段以前没有任何测试钉着 —— 改错了不会有测试红。
+    expect(status).toMatchObject({ kind: 'error', reason: 'not-signed-in' });
     expect(uploads).toHaveLength(0);
+  });
+
+  it('🔴 有 token 但没设加密口令时：明确失败，且一条 op 都不上传', async () => {
+    // 🔴 这条是"绝不降级成明文"的最后一道闸。服务端本来也会 400 E2EE_REQUIRED，
+    // 但更糟的是"看起来同步成功" —— 所以必须在**本地**就停下，
+    // 而且要给壳一个能说清原因的结构化 `reason`（不是一句笼统的"同步失败"）。
+    const h = makeHarness(() => okJson({}), { password: undefined, ops: [makeOp()] });
+    const status = await h.client.sync();
+
+    expect(status).toMatchObject({ kind: 'error', reason: 'no-encryption-password' });
+    expect(h.uploads).toHaveLength(0);
+  });
+
+  it('口令是空串也当作没设（空串不是"没有口令"的合法表达）', async () => {
+    const h = makeHarness(() => okJson({}), { password: '', ops: [makeOp()] });
+    const status = await h.client.sync();
+
+    expect(status).toMatchObject({ kind: 'error', reason: 'no-encryption-password' });
+    expect(h.uploads).toHaveLength(0);
   });
 });
 
@@ -511,7 +907,7 @@ describe('离线重试调度', () => {
       const run = vi.fn(
         async (): Promise<SyncStatus> => ({
           kind: 'error',
-          message: '未登录',
+          reason: 'not-signed-in',
           retryable: false,
         }),
       );

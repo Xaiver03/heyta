@@ -37,6 +37,7 @@ const SYNC_FAILURE_KEY: Record<Exclude<SyncFailureReason, 'unexpected'>, Message
   'local-op-missing': 'common.sync.error.localOpMissing',
   'remote-version-unavailable': 'common.sync.error.remoteVersionUnavailable',
   'undecryptable-ops': 'common.sync.error.undecryptableOps',
+  'upload-rejected': 'common.sync.error.uploadRejected',
 };
 
 export function describeSyncStatus(status: SyncStatus, t: Translate): string {
