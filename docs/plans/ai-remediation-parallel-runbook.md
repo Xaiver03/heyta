@@ -17,7 +17,8 @@
 | 三个 AI 共用同一个检出目录 | 本轮实测：`git status` 里 **102 个未提交文件**，分属 5 个不同的工作 | **一模块一 worktree** |
 
 第二条是关键，而且它有一个**可运行的证据**：本仓库已经吃过一次亏 ——
-[`motivation-and-progression.md`](motivation-and-progression.md) 记着实测：
+未合并分支 `feat/motivation-system` 的 `7ac61bf` 记着实测（该文件只在那个分支上，
+所以这里不写链接，写了就是死链）：
 主检出的未提交改动与本分支改动的**交集是 7 个文件**，git 直接拒绝合并
 （`local changes would be overwritten`），处置只有一句"**等对方先提交**"。
 那句话就是"我必须等一个 AI 做完才能唤醒下一个"的真正来源。
