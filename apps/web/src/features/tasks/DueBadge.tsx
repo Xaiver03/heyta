@@ -30,25 +30,19 @@
 
 import { CalendarDays, Timer } from 'lucide-react';
 
-import {
-  computeCountdown,
-  formatCompactDate,
-  formatRemaining,
-  type CountdownUrgency,
-  type Task,
-} from '@heyta/domain';
+import { computeCountdown, type Task } from '@heyta/domain';
+import { useI18n } from '@heyta/i18n';
 
-export type DueDisplayMode = 'date' | 'countdown';
+import { URGENCY_CLASS, dueText, type DueDisplayMode } from '../../lib/due-display.js';
 
-/** 档位 → CSS 类。**语义名到样式名的映射只在这一处。** */
-const URGENCY_CLASS: Record<CountdownUrgency, string> = {
-  none: '',
-  overdue: ' ht-due--overdue',
-  today: ' ht-due--today',
-  soon: ' ht-due--soon',
-  later: '',
-};
+export type { DueDisplayMode };
 
+/**
+ * ⚠️ `formatRemaining()`（`@heyta/domain`）返回的是**写死的中文句子**，
+ * 这里**不能**用它 —— 直接渲染就是"英文界面里冒出汉字"。
+ * 天数仍由领域层算（`dueText()` 内部调 `computeCountdown`），
+ * 说法由 `dueText()` 按当前语言给。详见 `apps/web/src/lib/due-display.ts`。
+ */
 export function DueBadge({
   task,
   mode,
@@ -58,15 +52,13 @@ export function DueBadge({
   mode: DueDisplayMode;
   now: number;
 }): React.JSX.Element | null {
+  const { t } = useI18n();
+
   if (task.dueDate === undefined) return null;
 
   const countdown = computeCountdown(task, { now });
   const Icon = mode === 'countdown' ? Timer : CalendarDays;
-
-  const text =
-    mode === 'countdown'
-      ? (formatRemaining(countdown.remainingDays) ?? '')
-      : formatCompactDate(task.dueDate, now);
+  const text = dueText(task, mode, now, t) ?? '';
 
   return (
     <span className={`ht-due${URGENCY_CLASS[countdown.urgency]}`}>

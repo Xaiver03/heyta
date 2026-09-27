@@ -30,8 +30,13 @@ export const PAIRED_PARENS: Record<Locale, readonly [open: string, close: string
  * 日期 + 人话剩余时间的外壳：中文 `2026-09-26（明天）`，英文 `2026-09-26 (tomorrow)`。
  *
  * ⚠️ 英文这边多一个空格，中文不加 —— 这同样是**正字法**，不是文案。
- * 汉字在 `remaining`（它由 `formatRemainingUntil()` / `formatDueDate()` 产出，
- * 两者都在跨包的 `packages/domain`，本轮不迁）。
+ * 所以本函数只提供括号与空格，**`remaining` 由调用方给**（现在是
+ * `lib/due-display.ts` 的 `remainingText()` 按当前语言产出）。
+ *
+ * 🔴 这里曾经写着"汉字在 `remaining`，而那由 `formatRemainingUntil()` 产出，
+ * 跨包、本轮不迁" —— 那句话把**一个真 bug** 记录成了"已知事项"，然后英文
+ * 界面上就一直显示中文。**登记不是修复。** 现在 `remaining` 已经是当前语言的
+ * 字符串，本函数不再替任何人背这个锅。
  */
 export function dateWithRemaining(date: string, remaining: string, locale: Locale): string {
   const [open, close] = PAIRED_PARENS[locale];

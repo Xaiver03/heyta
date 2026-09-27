@@ -1076,8 +1076,8 @@ export const zhCN = {
   'web.memory.gap.overdueOne': '已逾期 {days} 天',
 
   // ── Web · 捕获输入框 ──────────────────────────────────────
-  // ⚠️ 日期那一条里嵌的 `formatRemainingUntil()` 仍返回中文（跨包，
-  // `packages/domain` 尚未改造，见计划 §7.1），本轮只迁壳里的措辞与括号。
+  // ✅ 日期那一条里**不再**嵌 `formatRemainingUntil()` 的中文了 ——
+  // 剩余天数现在由壳按当前语言说（`web.due.*`，见下）。
   'web.capture.placeholder': '添加任务，回车确认（可写「明天」「下周三」「!1」）',
   'web.capture.addLabel': '新任务标题',
   'web.capture.add': '添加',
@@ -1092,6 +1092,28 @@ export const zhCN = {
   'web.capture.unused': '未采用，仍在标题中',
   'web.capture.previewLead': '实际标题：',
   'web.capture.previewEmpty': '（空）',
+
+  // ── Web · 截止时间怎么说（不是怎么算）──────────────────────
+  //
+  // 🔴 领域层保留**怎么算天数**（`computeCountdown` / `diffDays`），这里只负责
+  // **怎么说**。分家的理由不是"顺手"：`packages/domain` 是纯函数层、依赖不了
+  // 词条表，它的 `formatRemaining()` 返回的是一句**写死的中文** ——
+  // 直接渲染就是"英文界面里冒出中文"（这正是本组词条要修的那个 bug）。
+  //
+  // 🔴 阈值语义**照搬** `@heyta/domain` 的 `formatRemaining`（今天 / 明天 /
+  // 后天 / 还剩 N 天 / 已逾期 N 天），因为那是**产品语义**而不是措辞：
+  // 自己发明一套"几天算后天"，同一个任务在两个端上就会显示成两句话。
+  // 与移动端 `apps/mobile/src/lib/due-display.ts` 同构 —— 措辞各写各的
+  // （两端可以合法地不同），但**分档必须相同**，且由
+  // `apps/web/tests/due-display.spec.ts` 逐日与领域层对账。
+  'web.due.today': '今天',
+  'web.due.tomorrow': '明天',
+  'web.due.dayAfterTomorrow': '后天',
+  'web.due.remaining': '还剩 {days} 天',
+  'web.due.overdue': '已逾期 {days} 天',
+  // ⚠️ 英文有单复数、中文没有 —— 词条表刻意不支持 ICU，所以按数量在**调用方**
+  // 分支到单数兄弟词条。中文这两条**刻意逐字相同**（不相同才是漏翻）。
+  'web.due.overdueOne': '已逾期 {days} 天',
 
   // ═══════════════════════════════════════════════════════════
   // 移动端（apps/mobile）

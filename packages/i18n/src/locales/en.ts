@@ -998,9 +998,8 @@ export const en = {
   'web.memory.gap.overdueOne': 'Overdue by {days} day',
 
   // ── Web · capture composer ────────────────────────────────
-  // The embedded `formatRemainingUntil()` still returns Chinese (cross-package,
-  // `packages/domain` is not converted yet - plan §7.1); this pass migrates only
-  // the shell wording and the brackets around it.
+  // ✅ The embedded `formatRemainingUntil()` Chinese is gone: the remaining
+  // days are now spoken by the shell in the current language (`web.due.*`).
   'web.capture.placeholder': 'Add a task, press Enter to confirm (you can write "tomorrow", "next Wednesday", "!1")',
   'web.capture.addLabel': 'New task title',
   'web.capture.add': 'Add',
@@ -1015,6 +1014,29 @@ export const en = {
   'web.capture.unused': 'Not used, still in the title',
   'web.capture.previewLead': 'Actual title:',
   'web.capture.previewEmpty': '(empty)',
+
+  // ── Web · how a due date is *said* (not how it is computed) ───
+  //
+  // The day arithmetic stays in `@heyta/domain` (`computeCountdown` /
+  // `diffDays`, shared with mobile); only the wording lives here, because the
+  // domain layer is a pure-function package that cannot depend on the message
+  // catalog - its `formatRemaining()` returns a hard-coded Chinese sentence,
+  // and rendering that directly is exactly the bug these keys fix.
+  //
+  // The day buckets are copied from `@heyta/domain`'s `formatRemaining`
+  // (today / tomorrow / day after tomorrow / N days left / N days overdue)
+  // because the buckets are product semantics, not phrasing. Wording may
+  // legitimately differ per app; the buckets must not. `apps/web/tests/
+  // due-display.spec.ts` checks every day against the domain layer.
+  'web.due.today': 'Today',
+  'web.due.tomorrow': 'Tomorrow',
+  'web.due.dayAfterTomorrow': 'Day after tomorrow',
+  'web.due.remaining': '{days} days left',
+  'web.due.overdue': '{days} days overdue',
+  // ⚠️ `remaining` never needs a singular sibling: days === 1 and 2 are already
+  // taken by `tomorrow` / `dayAfterTomorrow`, so "{days} days left" is only
+  // ever reached with days >= 3.
+  'web.due.overdueOne': '{days} day overdue',
 
   // ── Mobile (apps/mobile) ──────────────────────────────────
   'mobile.common.today': 'Today',
