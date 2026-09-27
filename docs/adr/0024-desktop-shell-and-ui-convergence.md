@@ -1,15 +1,19 @@
 # ADR-0024：UI 收敛方向 = React Native + react-native-web；桌面壳 = Electron
 
-> 状态：**待确认**
-> 日期：2026-09-27
+> 状态：**已接受**（产品负责人 2026-09-27 确认：桌面端路线 = **Electron**）
+> 日期：2026-09-27（确认日期：2026-09-27）
 > 决策者：产品负责人（指示原话：「多端尽可能减少代码量，维护同一套代码，提高可维护性」）
 > 影响层：`apps/*`（新增桌面壳与共享 UI 包）、`packages/`（共享层补完）、`packages/storage`（桌面驱动复用）
 > 依据：[多端「一套代码」融合调研](../research/multi-platform-ui-fusion.md) ·
 > 执行：[多端适配实施计划](../plans/multi-platform-adaptation.md)
 
-> ⚠️ **为什么是「待确认」而不是「已接受」**：本 ADR 由工程侧依据实测证据推导，
-> 但仓库惯例是 ADR 的决策者是产品负责人（见 [ADR-0004](0004-ui-stack.md) 的决策者字段）。
-> 结论已写明，**等产品负责人确认后改状态**。在确认之前，§5 的未核实项不得当作已成立。
+> ✅ **已确认**：2026-09-27 产品负责人在「确认 Electron / 改用 Tauri / 先不定」中**选择确认 Electron**，
+> 本 ADR 状态由「待确认」改为「已接受」。
+>
+> ⚠️ 但 §5 的未核实项**仍然是未核实的** —— 它们是**待做的 spike，不是拦路石**。
+> 决策已定，接下来要用 [M1/M2](../plans/multi-platform-adaptation.md) 的实测去**验证**它们，
+> 而不是用它们去**推翻**决策。若某条实测不成立，走 §2.2 与 §5 已写明的降级路径，
+> 不要默默改设计。
 
 ---
 
@@ -136,6 +140,45 @@ Tamagui / NativeWind / restyle 都**自带主题配置**，引入即等于**制�
 > 无 manifest、无 service worker、无图标、无 PWA 插件。
 > 而且 PWA widget provider 要求 PWA 能从**公网 endpoint** 安装（PWABuilder 不支持 localhost）。
 > 详见[多端小组件改造计划](../plans/multi-platform-widgets.md) §3.1。
+
+### 2.6 ⚠️ 两条必须写进决策的反面证据
+
+#### (1) 🔴 已独立核实：鸿蒙侧的第三方库适配层滞后，且与仓库现状已经冲突
+
+用 npm registry 一手核实（2026-09-27，本次亲自执行）：
+
+| 库 | 仓库实际 | RNOH 适配版 |
+|---|---|---|
+| `react-native` | **0.84.1** | `@react-native-oh/react-native-harmony@0.84.4` 的 peer = **`0.84.1`** ✅ |
+| `@op-engineering/op-sqlite` | **^18.2.5** | `@react-native-oh-tpl/op-sqlite` = **8.0.2** ⚠️ **差 10 个大版本** |
+| `react-native-safe-area-context` | **^5.5.2** | `@react-native-oh-tpl/…` = **4.7.4** ⚠️ |
+| `react-native-screens` | — | `@react-native-oh-tpl/…` = **3.34.0** |
+
+**三条推论，都要落到计划里**：
+
+1. ✅ **RNOH 与 RN 0.84.1 精确对齐** —— 这是本项目**宝贵的既成资产**。
+   **因此本轮任何 UI 收敛都不得改动 RN 版本**（跳到 0.85+ 会直接掉出 RNOH 支持范围）。
+2. 🔴 **`op-sqlite` 在鸿蒙上只有 8.0.2，而 iOS/Android 是 18.2.5。**
+   本仓库既有调研称「`op-sqlite` 已内置 FTS5 与 sqlite-vec」——
+   **该结论是否覆盖 8.0.2 未核实**。因此 [M4](../plans/multi-platform-adaptation.md)
+   **不得**把 FTS5 / sqlite-vec 当作鸿蒙端已具备的能力。
+3. ⚠️ 适配是**patch 模式**（固定基线、不随上游升级），所以这不是"等一等就好"，
+   而是一个**需要长期维护的版本落差**。
+
+#### (2) ⚠️ 未独立核实（引自子代理调研，引用前请自行复核）：web 重写的先例风险
+
+一份 AI 子代理调研（`research/universal-rn-monorepo-ui-2026-09.md`）主张：
+公开记录里**没有**"DOM/CSS React 应用迁到 RNW"的具名成功案例；
+而 RNW 作者 Nicolas Gallagher 在 2025-11 公开论证这条路对 web-first 团队
+是 *"massive switching cost with questionable returns"*，并已转向 React Strict DOM。
+
+🔴 **我（写这份 ADR 的人）没有复核这两条主张** —— 来源是子代理，我没读原文。
+但它的**方向与本 ADR §3「负面」已承认的最大成本一致**（12,277 行 DOM → RN 迁移），
+所以它**不改变结论，而是加强了对 M3 的约束**：
+
+> **M3 必须逐特性增量、每轮独立可回退，不得是"先重写、再验证"的大爆炸。**
+> 并且 —— 见 [计划](../plans/multi-platform-adaptation.md) 的 M3 —— **web 保留现有
+> DOM/CSS 实现，通过别名逐组件接入共享 UI，而不是整体替换。**
 
 ---
 
