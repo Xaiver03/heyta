@@ -194,6 +194,122 @@ describe('标签', () => {
   });
 });
 
+describe('🔴 把标签打到任务上（setTags）', () => {
+  /** 建一条任务，返回 id。 */
+  async function makeTask(title: string): Promise<string> {
+    const taskActions = createTaskActions(engine, {
+      now,
+      newTaskId: () => `task-t-${title}`,
+    });
+    return taskActions.create(title);
+  }
+
+  function taskOf(engineToRead: OpLogEngine, entityId: string): Record<string, unknown> {
+    const state = engineToRead.getState();
+    return state.tasks[entityId] as unknown as Record<string, unknown>;
+  }
+
+  it('一次调用 = **一条** UPD op，载荷里是整组 tagIds', async () => {
+    const taskActions = createTaskActions(engine, { now, newTaskId: () => 'task-t-1' });
+    const taskId = await taskActions.create('写周报');
+    const a = await actions.createTag('紧急');
+    const b = await actions.createTag('工作');
+
+    const before = (await engine.getPendingUpload()).length;
+    clock += 1000;
+    await taskActions.setTags(taskId, [a, b]);
+
+    // 一个用户意图 = 一条 op（AGENTS.md §3.4）。两条 op 会留下可见的中间态。
+    expect((await engine.getPendingUpload()).length).toBe(before + 1);
+
+    const ops = await engine.getOpsForEntity('TASK', taskId);
+    const withTags = ops.filter((o) => 'tagIds' in payloadOf(o));
+    expect(withTags).toHaveLength(1);
+    expect(payloadOf(withTags[0]!).tagIds).toEqual([a, b]);
+    // 写进去的是整组，不是"只加了一个"。
+    expect(taskOf(engine, taskId).tagIds).toEqual([a, b]);
+  });
+
+  it('重复的标签会被去掉 —— 不写出 `[a, a]`', async () => {
+    const taskActions = createTaskActions(engine, { now, newTaskId: () => 'task-t-2' });
+    const taskId = await taskActions.create('写周报');
+    const a = await actions.createTag('紧急');
+
+    await taskActions.setTags(taskId, [a, a, a]);
+    const ops = await engine.getOpsForEntity('TASK', taskId);
+    expect(payloadOf(ops.filter((o) => 'tagIds' in payloadOf(o))[0]!).tagIds).toEqual([a]);
+  });
+
+  it('传空数组 = 清空，写的是 `null`，物化后字段**消失**（不是留个 `[]`）', async () => {
+    const taskActions = createTaskActions(engine, { now, newTaskId: () => 'task-t-3' });
+    const taskId = await taskActions.create('写周报');
+    const a = await actions.createTag('紧急');
+
+    await taskActions.setTags(taskId, [a]);
+    expect(taskOf(engine, taskId).tagIds).toEqual([a]);
+
+    clock += 1000;
+    await taskActions.setTags(taskId, []);
+    const ops = await engine.getOpsForEntity('TASK', taskId);
+    const last = ops.filter((o) => 'tagIds' in payloadOf(o)).at(-1)!;
+    // `[]` 和"没有这个字段"是同一件事的两种表示，只留一种。
+    expect(payloadOf(last).tagIds).toBeNull();
+    expect('tagIds' in taskOf(engine, taskId)).toBe(false);
+  });
+
+  it('🔴 悬空标签 id **抛错**，而且**一条 op 都不留**', async () => {
+    const taskActions = createTaskActions(engine, { now, newTaskId: () => 'task-t-4' });
+    const taskId = await taskActions.create('写周报');
+    const before = (await engine.getPendingUpload()).length;
+
+    await expect(taskActions.setTags(taskId, ['tag-从未存在'])).rejects.toThrow(/找不到标签/);
+
+    // 只断言"抛了错"是不够的：**要证明没有留下半截状态**。
+    expect((await engine.getPendingUpload()).length).toBe(before);
+    expect('tagIds' in taskOf(engine, taskId)).toBe(false);
+  });
+
+  it('🔴 已被删除的标签也不能再挂上去', async () => {
+    const taskActions = createTaskActions(engine, { now, newTaskId: () => 'task-t-5' });
+    const taskId = await taskActions.create('写周报');
+    const a = await actions.createTag('临时');
+
+    await actions.removeTag(a);
+    await expect(taskActions.setTags(taskId, [a])).rejects.toThrow(/找不到标签/);
+  });
+
+  it('🔴 反静默丢弃：A 打标签 → B 应用远端 → B 的任务上真的挂着那两个标签', async () => {
+    const adapterB = new SqliteAdapter({
+      schema: INDEXEDDB_SCHEMA,
+      driverFactory: () => new NodeSqliteDriver(':memory:'),
+    });
+    await adapterB.init();
+    const engineB = new OpLogEngine({
+      store: new DbOpLogStore<Operation<string>>(adapterB),
+      clientId: 'client-tags-other',
+      now,
+    });
+
+    const taskActions = createTaskActions(engine, { now, newTaskId: () => 'task-t-6' });
+    const taskId = await taskActions.create('写周报');
+    const a = await actions.createTag('紧急');
+    const b = await actions.createTag('工作');
+    await taskActions.setTags(taskId, [a, b]);
+
+    const pending = await engine.getPendingUpload();
+    const result = await engineB.applyRemote(pending);
+    expect(result.applied).toHaveLength(pending.length);
+
+    const onB = createTaskActions(engineB, { now });
+    expect(onB.findTask(taskId)?.tagIds).toEqual([a, b]);
+    // 标签实体本身也要在 B 上物化出来 —— 否则任务指着两个查不到的 id。
+    const tagsOnB = createProjectActions(engineB).listTags();
+    expect(tagsOnB.map((t) => t.id).sort()).toEqual([a, b].sort());
+
+    adapterB.close();
+  });
+});
+
 describe('列表顺序', () => {
   it('按 createdAt 升序（而不是存储返回顺序）', async () => {
     const a = await actions.createProject('A');

@@ -106,6 +106,9 @@ export function createSyncClient(options: SyncWiringOptions): SyncClient {
     // 冲突判定为「保留远端」→ 把远端载荷表达成本地的一条新 op。
     // 直接改状态是不行的 —— 那正是 D4 禁止的绕开 op-log 的写入。
     discardLocal: (ids) => engine.discardPendingUpload(ids),
+    // 服务端**永久拒绝**的 op：移出队列但**不标成已上传** —— 数据没上云，
+    // 标成 uploaded 会让"待上传数"和"已同步"同时说假话。
+    markRejected: (ids) => engine.markRejected(ids),
     getOpsForEntity: (entityType, entityId) =>
       engine.getOpsForEntity(entityType as EntityType, entityId),
     getOpById: (opId) => engine.getOpById(opId),

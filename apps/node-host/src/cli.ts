@@ -92,7 +92,12 @@ function describeSyncStatus(status: SyncStatus): string {
     case 'offline':
       return '离线：改动已排队，联网后重试';
     case 'error':
-      return status.message;
+      // 🔴 终端界面**不在**三个外壳的本地化范围内（它的输出本来就是中文），
+      // 所以这里不接词条表。但已知原因现在**没有 `message`**（那是给壳用的
+      // 结构化 `reason`，见 `SyncFailureReason`）—— 所以退回原因码本身：
+      // 对看终端的人来说 `not-configured` 比空字符串有用得多。
+      return status.message ?? `同步失败（${status.reason}）`;
+
     default:
       return status.kind;
   }
@@ -119,7 +124,18 @@ const USAGE = `heyta node-host —— 非 Web 宿主（真实 SQLite + 真实同
   reopen <id>               取消完成
   sync                      与真实服务端同步一次
   pending                   打印待上传队列长度
+  projects                  列出清单
+  tags                      列出标签
 `;
+
+/**
+ * ⚠️ 帮助文本**必须与 `case` 分支保持同步**。
+ *
+ * 它一度只列到 `pending`，而 `projects` 早就实现了 —— 于是验收脚本的作者
+ * 会以为"没有列清单的命令"，转而用界面上有没有那个名字去推断跨设备同步，
+ * 而那正是本仓库反复栽过的那种证据。**少写一行帮助文本的代价，是让别人
+ * 选错判据。** 新增命令时同时改这里。
+ */
 
 async function main(): Promise<number> {
   const { command, positionals, flags } = parseArgv(process.argv.slice(2));
@@ -203,6 +219,14 @@ async function main(): Promise<number> {
                 // 而"没法断言的字段"正是最可能在半路上丢掉的。
                 repeatRule: task.repeatRule ?? null,
                 repeatDtstart: task.repeatDtstart ?? null,
+                // 清单归属也要能断言：没有它，"手机把任务放进清单后
+                // 另一台设备读到了吗"就只能靠界面上有没有那个名字来猜 ——
+                // 而界面上"看起来有"正是本仓库反复栽过的那种证据。
+                projectId: task.projectId ?? null,
+                // 标签也要能断言，理由与 `projectId` 完全一样：
+                // 没有它，"手机给任务打的标签另一台设备读到了吗"就只能看
+                // 界面上有没有那个名字 —— 而"看起来有"是本仓库反复栽过的证据。
+                tagIds: task.tagIds ?? null,
                 createdAt: task.createdAt,
                 updatedAt: task.updatedAt,
               })),
@@ -215,6 +239,47 @@ async function main(): Promise<number> {
             const mark = task.completedAt === undefined ? '[ ]' : '[x]';
             out(`${mark} ${task.title}  (${task.id})`);
           }
+        }
+        return 0;
+      }
+
+      case 'projects': {
+        const projects = host.listProjects();
+        if (json) {
+          out(
+            JSON.stringify({
+              ok: true,
+              command: 'projects',
+              projects: projects.map((project) => ({
+                id: project.id,
+                name: project.name,
+                parentId: project.parentId ?? null,
+                archived: project.archived ?? false,
+              })),
+            }),
+          );
+        } else if (projects.length === 0) {
+          out('（没有清单）');
+        } else {
+          for (const project of projects) out(`${project.name}  (${project.id})`);
+        }
+        return 0;
+      }
+
+      case 'tags': {
+        const tags = host.listTags();
+        if (json) {
+          out(
+            JSON.stringify({
+              ok: true,
+              command: 'tags',
+              tags: tags.map((tag) => ({ id: tag.id, name: tag.name })),
+            }),
+          );
+        } else if (tags.length === 0) {
+          out('（没有标签）');
+        } else {
+          for (const tag of tags) out(`${tag.name}  (${tag.id})`);
         }
         return 0;
       }

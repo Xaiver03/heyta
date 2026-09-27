@@ -82,11 +82,17 @@ describe('openAppHost：真实 SQLite 文件', () => {
     // 是客户端主动拒绝。报成 offline 会让用户以为"等联网就好了"，
     // 而它永远不会自己好。
     expect(status.kind).toBe('error');
-    if (status.kind === 'error') {
-      expect(status.message, '必须说清是口令缺失、且不会降级成明文').toMatch(
-        /口径|口令|加密/,
-      );
-    }
+    if (status.kind !== 'error') throw new Error('unreachable');
+    // 🔴 第 13 轮：钉子从**散文**换成**结构**。
+    //
+    // 原来断言 `status.message` 里有「口令/加密」这几个字 —— 而那句话是
+    // `packages/sync-client` 里的中文文案，现在整句搬到词条表了
+    //（`common.sync.error.noPassword`，两个壳共用）。
+    // 换结构断言不是"为了过测试而放宽"，而是**更强**：
+    // 以前换一种说法（`密码`、`passphrase`）测试照样绿，现在必须是**这个原因**。
+    expect(status.reason, '必须是「缺口令」这一种，而不是别的失败').toBe(
+      'no-encryption-password',
+    );
   });
 
   it('给了口令但服务端不可达时报 offline（与上面那条是**不同**的失败）', async () => {
@@ -296,7 +302,9 @@ describe('运行时可变同步凭据', () => {
     expect(status.kind).toBe('error');
     if (status.kind !== 'error') throw new Error('unreachable');
     expect(status.retryable, '用户没配置不是可重试的错误，重试一万次也一样').toBe(false);
-    expect(status.message).toContain('未配置');
+    // 🔴 同上：句子搬到词条表了（`common.sync.error.notConfigured`），
+    // 这里钉结构化原因 —— 它同时排除了"报成别的失败"这种更隐蔽的错法。
+    expect(status.reason).toBe('not-configured');
   });
 
   it('只有地址没有令牌时也算未配置（不能只查地址）', async () => {
