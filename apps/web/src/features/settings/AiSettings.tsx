@@ -32,12 +32,15 @@ import {
   endpointHealthDisclosure,
   fromHealthSnapshot,
   isAvailable,
+  requiresEgressConsent,
+  retainValidConsents,
   type AiRoutingConfig,
   type AiCapability,
   type AiEndpointConfig,
   type AiEndpointPreset,
   type AiFeature,
   type EgressConsent,
+  type EgressDestination,
 } from '@heyta/ai';
 
 /**
@@ -284,6 +287,73 @@ export function AiSettings({ initial, secrets, onChange, memorySlot }: AiSetting
     else saveAiSettings(next);
   }
 
+  /**
+   * 一个功能当前会走到的目的地 —— **由端点推导**（`classifyDestination`），
+   * 不读存储里的声明，也不硬编码。
+   *
+   * 🔴 这替换掉原来 `grant()` 里硬编码的 `'user-endpoint'`。硬编码的后果是：
+   * 授权记录看起来**永远合理**，于是"同意的是 A、实际放行的是 B"这件事
+   * 没有任何地方会发现 —— 而这正是本闸门存在的理由。
+   *
+   * 链上只要有一个端点会把明文送出设备，就必须为那个目的地征求授权
+   * （回退候选各自过闸门，见 `invokeRouted`）。
+   */
+  function destinationForFeature(feature: AiFeature, from: AiRoutingConfig): EgressDestination {
+    for (const target of from.routes[feature] ?? []) {
+      const endpoint = from.endpoints.find((e) => e.id === target.endpointId);
+      if (endpoint === undefined) continue;
+      const destination = classifyDestination({ mode: 'own', endpoint: endpoint.endpoint });
+      if (requiresEgressConsent(destination)) return destination;
+    }
+    return 'none';
+  }
+
+  /**
+   * 路由变了 → 授权跟着**重算并写回存储**。
+   *
+   * 🔴 唯一的过滤事实源是 `retainValidConsents()`（`packages/ai/src/egress.ts`）。
+   * 这里只按功能把它调用一次，**绝不自己再写一套目的地比对** ——
+   * 两套规则一定会漂移，而这是隐私闸门。
+   *
+   * 不重算的后果（这就是本组件原来的洞）：旧授权一直躺在存储里，
+   * 等用户删掉旧端点、再配一个新端点时，那条记录会重新变得可匹配 ——
+   * 于是"我没同意过的组合"被放行。
+   */
+  function recomputeConsents(
+    consents: readonly EgressConsent[],
+    next: AiRoutingConfig,
+  ): EgressConsent[] {
+    // 先按功能归堆：`(功能, 目的地)` 是授权的粒度，
+    // 而 `retainValidConsents` 只判断目的地。归堆不是第二套过滤规则。
+    const byFeature = new Map<AiFeature, EgressConsent[]>();
+    for (const consent of consents) {
+      const bucket = byFeature.get(consent.feature) ?? [];
+      bucket.push(consent);
+      byFeature.set(consent.feature, bucket);
+    }
+    const kept: EgressConsent[] = [];
+    for (const feature of FEATURE_ORDER) {
+      kept.push(
+        ...retainValidConsents(byFeature.get(feature) ?? [], destinationForFeature(feature, next)),
+      );
+    }
+    return kept;
+  }
+
+  /**
+   * 唯一的路由写入路径 —— 改路由时顺手把授权重算并写回。
+   *
+   * 任何绕过它的路由改动都会把陈旧授权留在存储里，所以所有端点/路由修改
+   * 都必须走这里（`update()` 只留给与路由无关的字段）。
+   */
+  function updateRouting(next: AiRoutingConfig): void {
+    update({
+      ...settings,
+      routing: next,
+      consents: recomputeConsents(settings.consents, next),
+    });
+  }
+
   const { routing, localApi } = settings;
   const localApiVerdict = validateLocalApiConfig(localApi);
 
@@ -296,7 +366,7 @@ export function AiSettings({ initial, secrets, onChange, memorySlot }: AiSetting
     }
     setRejected((r) => r.filter((x) => x.endpoint !== config.endpoint));
     if (routing.endpoints.some((e) => e.id === config.id)) return;
-    update({ ...settings, routing: { ...routing, endpoints: [...routing.endpoints, config] } });
+    updateRouting({ ...routing, endpoints: [...routing.endpoints, config] });
   }
 
   /**
@@ -311,12 +381,9 @@ export function AiSettings({ initial, secrets, onChange, memorySlot }: AiSetting
    * 所以"存下来"和"能用"是两件事，前者宽松、后者严格。
    */
   function editEndpoint(id: string, patch: Partial<AiEndpointConfig>): void {
-    update({
-      ...settings,
-      routing: {
-        ...routing,
-        endpoints: routing.endpoints.map((e) => (e.id === id ? { ...e, ...patch } : e)),
-      },
+    updateRouting({
+      ...routing,
+      endpoints: routing.endpoints.map((e) => (e.id === id ? { ...e, ...patch } : e)),
     });
   }
 
@@ -335,42 +402,39 @@ export function AiSettings({ initial, secrets, onChange, memorySlot }: AiSetting
    */
   function addCustomEndpoint(): void {
     const n = routing.endpoints.length + 1;
-    update({
-      ...settings,
-      routing: {
-        ...routing,
-        endpoints: [
-          ...routing.endpoints,
-          {
-            id: `custom-${String(n)}`,
-            label: t('web.ai.settings.customLabel', { n }),
-            endpoint: '',
-            model: '',
-            /**
-             * 🔴 **必须给 `keyRef`，否则这个端点根本无法鉴权。**
-             *
-             * 密钥输入框的渲染条件是 `endpoint.keyRef !== undefined`，
-             * 而路由层取值也是 `keyRef === undefined ? undefined : await store.get(keyRef)`
-             * —— 两处都由它开关。不设的后果是：
-             *
-             *   1. 界面上**永远不出现**密钥输入框（用户没地方输）
-             *   2. 请求**永远不带** `authorization` 头
-             *
-             * 也就是「自己接入 AI」这条路对有鉴权的服务商**完全走不通**，
-             * 只有两个本机预设能用。
-             *
-             * 这个洞藏了很久，因为密钥 UI 的单测**自己造了带 `keyRef` 的配置**
-             * （见 `ai-settings.spec.tsx`），于是它一直是绿的 ——
-             * 典型的"能力实现了、有单测、但零生产调用点"。
-             * 直到真实用户旅程测试去点真界面才暴露。
-             *
-             * ⚠️ 空密钥是安全的：`routing.ts` 里 `apiKey !== ''` 才加头。
-             * 所以不需要"要不要密钥"的开关，无条件给上即可。
-             */
-            keyRef: `custom-${String(n)}`,
-          },
-        ],
-      },
+    updateRouting({
+      ...routing,
+      endpoints: [
+        ...routing.endpoints,
+        {
+          id: `custom-${String(n)}`,
+          label: t('web.ai.settings.customLabel', { n }),
+          endpoint: '',
+          model: '',
+          /**
+           * 🔴 **必须给 `keyRef`，否则这个端点根本无法鉴权。**
+           *
+           * 密钥输入框的渲染条件是 `endpoint.keyRef !== undefined`，
+           * 而路由层取值也是 `keyRef === undefined ? undefined : await store.get(keyRef)`
+           * —— 两处都由它开关。不设的后果是：
+           *
+           *   1. 界面上**永远不出现**密钥输入框（用户没地方输）
+           *   2. 请求**永远不带** `authorization` 头
+           *
+           * 也就是「自己接入 AI」这条路对有鉴权的服务商**完全走不通**，
+           * 只有两个本机预设能用。
+           *
+           * 这个洞藏了很久，因为密钥 UI 的单测**自己造了带 `keyRef` 的配置**
+           * （见 `ai-settings.spec.tsx`），于是它一直是绿的 ——
+           * 典型的"能力实现了、有单测、但零生产调用点"。
+           * 直到真实用户旅程测试去点真界面才暴露。
+           *
+           * ⚠️ 空密钥是安全的：`routing.ts` 里 `apiKey !== ''` 才加头。
+           * 所以不需要"要不要密钥"的开关，无条件给上即可。
+           */
+          keyRef: `custom-${String(n)}`,
+        },
+      ],
     });
   }
 
@@ -380,13 +444,10 @@ export function AiSettings({ initial, secrets, onChange, memorySlot }: AiSetting
       const kept = (targets ?? []).filter((t) => t.endpointId !== id);
       if (kept.length > 0) routes[feature as AiFeature] = kept;
     }
-    update({
-      ...settings,
-      routing: {
-        ...routing,
-        endpoints: routing.endpoints.filter((e) => e.id !== id),
-        routes,
-      },
+    updateRouting({
+      ...routing,
+      endpoints: routing.endpoints.filter((e) => e.id !== id),
+      routes,
     });
   }
 
@@ -399,44 +460,42 @@ export function AiSettings({ initial, secrets, onChange, memorySlot }: AiSetting
     const routes = { ...routing.routes };
     if (next.length === 0) delete routes[feature];
     else routes[feature] = next;
-    update({ ...settings, routing: { ...routing, routes } });
+    updateRouting({ ...routing, routes });
   }
 
   // ── 授权 ────────────────────────────────────────────────────────────
   function grant(feature: AiFeature): void {
-    const consent: EgressConsent = {
-      feature,
-      destination: 'user-endpoint',
-      grantedAt: Date.now(),
-    };
-    const kept = settings.consents.filter(
-      (c) => !(c.feature === feature && c.destination === 'user-endpoint'),
+    // 🔴 目的地**推导**，不硬编码 —— 见 `destinationForFeature`。
+    const destination = destinationForFeature(feature, routing);
+    // 本地端点根本没出境，不该产生授权记录（留着就是将来误放行的种子）。
+    if (!requiresEgressConsent(destination)) return;
+
+    const consent: EgressConsent = { feature, destination, grantedAt: Date.now() };
+    // 先按唯一事实源重算（丢掉陈旧记录），再去重后写入本次同意。
+    const kept = recomputeConsents(settings.consents, routing).filter(
+      (c) => !(c.feature === feature && c.destination === destination),
     );
     update({ ...settings, consents: [...kept, consent] });
   }
 
   function revoke(feature: AiFeature): void {
+    // 撤销就该把这个功能的授权清干净：留一条"当前目的地不匹配但存在"的
+    // 记录没有意义，反而是将来某次变动后的误放行种子。
     update({
       ...settings,
-      consents: settings.consents.filter(
-        (c) => !(c.feature === feature && c.destination === 'user-endpoint'),
-      ),
+      consents: settings.consents.filter((c) => c.feature !== feature),
     });
   }
 
   /** 这个功能当前是否会走到远端（决定要不要问授权）。 */
   function routeTouchesRemote(feature: AiFeature): boolean {
-    const targets = routing.routes[feature] ?? [];
-    return targets.some((t) => {
-      const endpoint = routing.endpoints.find((e) => e.id === t.endpointId);
-      if (endpoint === undefined) return false;
-      return classifyDestination({ mode: 'own', endpoint: endpoint.endpoint }) !== 'none';
-    });
+    return requiresEgressConsent(destinationForFeature(feature, routing));
   }
 
   function hasConsent(feature: AiFeature): boolean {
+    const destination = destinationForFeature(feature, routing);
     return settings.consents.some(
-      (c) => c.feature === feature && c.destination === 'user-endpoint',
+      (c) => c.feature === feature && c.destination === destination,
     );
   }
 
@@ -455,7 +514,7 @@ export function AiSettings({ initial, secrets, onChange, memorySlot }: AiSetting
         label={t('web.ai.settings.enabled.label')}
         note={t('web.ai.settings.enabled.note')}
         checked={routing.enabled}
-        onChange={(v) => update({ ...settings, routing: { ...routing, enabled: v } })}
+        onChange={(v) => updateRouting({ ...routing, enabled: v })}
       />
 
       {/* ── 闸：记忆（ADR-0014）─────────────────────────────────
@@ -483,7 +542,7 @@ export function AiSettings({ initial, secrets, onChange, memorySlot }: AiSetting
             label={t('web.ai.settings.allowRemote.label')}
             note={t('web.ai.settings.allowRemote.note')}
             checked={routing.allowRemote}
-            onChange={(v) => update({ ...settings, routing: { ...routing, allowRemote: v } })}
+            onChange={(v) => updateRouting({ ...routing, allowRemote: v })}
           />
 
           {routing.allowRemote && (

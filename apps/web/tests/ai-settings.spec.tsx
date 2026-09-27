@@ -881,6 +881,78 @@ describe('🔴🔴 本机 API 面板必须说清"配在哪里才生效"', () => 
 
 // ─────────────────────────────────────────────────────────────────────────
 
+describe('🔴🔴 出境授权绑定目的地 —— 删掉旧端点后旧授权不许复活', () => {
+  /**
+   * 一个远端端点 + 一条到「AI 拆解」的路由 + 一条**已经给过的**授权。
+   *
+   * 这是真实会发生的历史：用户配了一台远端端点、点了同意，后来把端点删了。
+   */
+  function withGrantedRemote() {
+    const base = defaultAiSettings();
+    return {
+      ...base,
+      routing: {
+        enabled: true,
+        allowRemote: true,
+        endpoints: [
+          { id: 'r1', label: '旧云端', endpoint: 'https://old.example.com/v1', model: 'm' },
+        ],
+        routes: { breakdown: [{ endpointId: 'r1' }] },
+      },
+      // 用户此前已为「拆解 → 远端」点过同意
+      consents: [
+        { feature: 'breakdown' as const, destination: 'user-endpoint' as const, grantedAt: 1 },
+      ],
+    };
+  }
+
+  /**
+   * 🔴 这条钉的是"能力实现了、有单测、但零生产调用点"的同一个洞：
+   * `retainValidConsents()`（`packages/ai/src/egress.ts`）写好了、测过了，
+   * 但 `AiSettings` 从不调它，而是自己写了一套更弱的逻辑 ——
+   * 结果删掉旧端点后旧授权留在存储里，再配一个新端点时旧授权复活，
+   * **用户没同意过的组合被放行**。
+   */
+  it('🔴🔴 删掉旧的远端端点、再配一个新的：旧授权不再放行，必须重新征求同意', () => {
+    const el = render({ initial: withGrantedRemote(), secrets: createSessionSecretStore() });
+
+    // 前提：旧授权此刻仍然有效（否则下面验不出"复活"）
+    expect(el.querySelector('[data-testid="granted-breakdown"]')).toBeTruthy();
+
+    // ① 删掉旧的远端端点 —— 旧授权必须随它一起失效，而不是留在存储里等复活
+    const oldItem = el.querySelector('[data-testid="endpoint-r1"]');
+    expect(oldItem, '旧端点行应该渲染出来').toBeTruthy();
+    click(oldItem?.querySelector('button'));
+
+    const afterDelete = loadAiSettings().consents.filter((c) => c.feature === 'breakdown');
+    expect(afterDelete, '删端点必须清掉绑定它的旧授权（陈旧的种子）').toEqual([]);
+
+    // ② 配一个新的远端端点，并把它接到同一个功能上
+    click(el.querySelector('[data-testid="add-custom-endpoint"]'));
+    const fresh = el.querySelector('[data-testid="endpoint-custom-1"]');
+    expect(fresh, '新端点行应该出现').toBeTruthy();
+    const url = fresh?.querySelector<HTMLInputElement>('[aria-label$="的地址"]');
+    expect(url, '新端点要有地址输入框').toBeTruthy();
+    act(() => {
+      const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set;
+      setter?.call(url, 'https://new.example.com/v1');
+      url?.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+    const chip = el.querySelector<HTMLButtonElement>(
+      '[data-testid="feature-breakdown"] .ht-settings__chips button',
+    );
+    expect(chip, '新端点的路由按钮应该出现').toBeTruthy();
+    click(chip);
+
+    // ③ 新端点会把明文送出设备，而用户从没为新端点同意过 —— 必须重新问
+    expect(
+      el.querySelector('[data-testid="consent-breakdown"]'),
+      '旧授权复活了：新端点被"我没同意过的组合"放行',
+    ).toBeTruthy();
+    expect(el.querySelector('[data-testid="granted-breakdown"]')).toBeNull();
+  });
+});
+
 describe('🔴🔴 必须说清"我们只提供两种供给方式中的哪一种"', () => {
   function enabled() {
     const base = defaultAiSettings();
