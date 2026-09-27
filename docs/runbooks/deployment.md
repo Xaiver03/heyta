@@ -370,6 +370,48 @@ rsync -az --delete apps/landing/dist/ ubuntu-jcli:/var/www/heyta-landing/
 "只能自建"。仓库默认构建（无该变量）**是故意的**：应用还没部署时露出一个
 「立即使用」，比没有入口更坏。
 
+#### 🔴 改了入口的 URL 形状，就**必须**同时重建应用本体
+
+2026-09-27 实测踩到，而且**只有真浏览器看得见**。
+
+落地页开始往外链带 `?lang=en`（`545d22a`）之后，`/var/www/heyta-app/` 里那份应用
+**还是旧的、不认识这个参数** —— 于是英文用户被送进 `/app/?lang=en`，
+应用却按默认语言渲染成**中文**。当时所有 `curl` 检查**全绿**：
+`/app/` 返回 200、`<title>heyta</title>`、bundle 在、旧域名零命中。
+缺的只是"用真浏览器打开它看一眼"这一步。
+
+**判据**（实测）：构建产物里 `"lang"` 这个字面量出现几次。
+
+| | `"lang"` 出现次数 | 行为 |
+|---|---|---|
+| 旧产物（`index-gkCtydgq.js`） | **0** | 不认识 `?lang=`，英文用户落到中文应用 |
+| 重建后（`index-B3XVhPzM.js`） | **1** | 认了；真浏览器复验 `html lang="en"` |
+
+```bash
+ssh ubuntu-jcli 'grep -o "\"lang\"" /var/www/heyta-app/assets/index-*.js | wc -l'
+```
+
+修法是**重建应用本体**（§3.7 那两条命令），不是重发落地页。实测结果：
+中文页 → `/app/` → `#root` 141 字符；英文页 → `/app/?lang=en` → `html lang="en"`、
+`#root` 335 字符；旧域名 `/app/` → 301 → 同样可用；`/health` 仍 200 JSON 未被重定向。
+（共 23 项断言，见 `verify-domain` 脚本；它住在 `/tmp`，不属于仓库。）
+
+🔴 **发布应用时不要直接用这个工作区构建。** 本工作区有并发 agent 在改
+`packages/domain` / `packages/app-host`，而 `apps/web` 是从它们的**源码**编译的 ——
+直接用会把别人**未提交**的半成品发布到线上。正确做法是在干净 HEAD 上构建：
+
+```bash
+git worktree add --detach /tmp/heyta-head HEAD
+cd /tmp/heyta-head && pnpm install && pnpm build
+cd apps/web && pnpm exec tsc -b && pnpm exec vite build --base=/app/
+rsync -az --delete apps/web/dist/ ubuntu-jcli:/var/www/heyta-app/
+```
+
+⚠️ 2026-09-27 那次 `pnpm install` 得加 `--no-frozen-lockfile`：当时 HEAD 的
+`pnpm-lock.yaml` 已经引用 `packages/widget-core`，而那个包**还没被提交**
+（`git ls-tree HEAD packages/` 里没有它），所以 frozen 安装直接失败。
+那是并发 agent 的在途状态，不是本节的长期前提。
+
 #### 变更前备份（回滚用）
 
 - `/etc/nginx/sites-available/heyta.finlaw.cloud.bak-20260927T145658Z`（**迁移前**：只有落地页、没有 `/app/` 与 `/api/`）
