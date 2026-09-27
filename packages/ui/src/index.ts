@@ -12,14 +12,25 @@
  *     任何 DOM 标签、任何裸样式值（`check:design` 会拦）。
  */
 
-export { TaskList, type TaskListProps } from './task-list/TaskList.js';
 export {
+  TaskList,
+  type FlatTaskListProps,
+  type SectionedTaskListProps,
+  type TaskListLabels,
+  type TaskListProps,
+} from './task-list/TaskList.js';
+export { TaskBadges, type TaskBadgesProps } from './task-list/TaskBadges.js';
+export {
+  flattenSections,
   sortTasksForDisplay,
   toTaskRow,
   toTaskRows,
+  type SectionRow,
   type TaskRow,
+  type TaskSection,
   type ToTaskRowOptions,
 } from './task-list/model.js';
+export { HeytaIcon, type HeytaIconData, type HeytaIconProps } from './icon/Icon.js';
 
 export {
   HeytaUiProvider,

@@ -28,9 +28,55 @@ const require = createRequire(import.meta.url);
  */
 const reactNativeWebDir = dirname(require.resolve('react-native-web/package.json'));
 
+/**
+ * 🔴 `react-native-svg` 也要指向它的 **web 实现**（M1 徽章）
+ *
+ * 共享组件 `@heyta/ui` 现在会用 `react-native-svg` 画图标（图标数据来自
+ * 框架无关的 `lucide` 包，见 `packages/ui/src/icon/Icon.tsx`）。
+ * `react-native-svg` 的 `main` 是**原生**实现，web 端必须走它自带的
+ * `ReactNativeSVG.web.js`，否则会在 import 阶段就崩在原生桥接上。
+ *
+ * ⚠️ Vite 的默认 `resolve.extensions` 里**没有** `.web.js`，所以
+ * "让打包器自己按平台挑后缀"这条不成立 —— 必须显式指到文件。
+ * 这也是这里直接要求 `.js` 全路径、而不是解析 `package.json` 的原因。
+ */
+const reactNativeSvgWeb = require.resolve(
+  'react-native-svg/lib/module/ReactNativeSVG.web.js',
+);
+
 export default defineConfig({
   plugins: [react()],
   resolve: {
+    /**
+     * 🔴 `.web.*` 必须排在普通后缀**前面** —— 这是 `react-native-svg` 能跑起来的必要条件。
+     *
+     * 只把裸包名 `react-native-svg` 指到 `ReactNativeSVG.web.js` **不够**：
+     * 那个文件内部写的是 `export * from './elements'`，而 Vite 默认的
+     * `resolve.extensions` 里没有 `.web.js`，于是 `./elements` 解析到了
+     * **原生**的 `elements.js`，一路拖进 `react-native/Libraries/...` 的
+     * Flow 源码，最终报成一句和根因毫无关系的语法错误：
+     *
+     *     Expected ',', got '{' in react-native/Libraries/Utilities/codegenNativeComponent.js
+     *
+     * 那句报错会让人以为是 RN 版本或 babel 配置的问题，而真正的原因只是
+     * "后缀没配对"。把 `.web.*` 放前面，`react-native-svg`（以及将来任何
+     * 采用同一约定的 RNW 生态包）内部的相对 import 才会自动走 web 实现。
+     */
+    extensions: [
+      '.web.mjs',
+      '.web.js',
+      '.web.mts',
+      '.web.ts',
+      '.web.jsx',
+      '.web.tsx',
+      '.mjs',
+      '.js',
+      '.mts',
+      '.ts',
+      '.jsx',
+      '.tsx',
+      '.json',
+    ],
     alias: [
       /**
        * 🔴 把 `react-native` 指向 `react-native-web`（M1-3）。
@@ -48,6 +94,11 @@ export default defineConfig({
        * 开头的包一起改写。正则 `/^react-native$/` 只命中裸包名，没有这种歧义。
        */
       { find: /^react-native$/, replacement: reactNativeWebDir },
+      /**
+       * ⚠️ 顺序无关（两条正则互不重叠）：`/^react-native$/` 只命中裸包名，
+       * `/^react-native-svg$/` 只命中这一个包，不会互相吃掉。
+       */
+      { find: /^react-native-svg$/, replacement: reactNativeSvgWeb },
     ],
     /**
      * 🔴 `dedupe` 是**防第二份 React 的那道闸**（M1 判据第 3 条）。

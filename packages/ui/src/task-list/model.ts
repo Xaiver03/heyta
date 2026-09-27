@@ -108,3 +108,54 @@ export function toTaskRows(
 ): readonly TaskRow[] {
   return sortTasksForDisplay(tasks).map((task) => toTaskRow(task, options));
 }
+
+/**
+ * 一个分组。
+ *
+ * `meta` 是**宿主自己的**透传数据（图标名、色调、计数…），共享层完全不解释它，
+ * 只在渲染分节头时原样交回给 `renderSectionHeader`。
+ *
+ * 🔴 为什么不把 `title` / `icon` / `count` 定死在这里：
+ * `icon` 是**各端不同**的东西（mobile 用 `lucide-react-native` 的字形名，
+ * web 用 `lucide-react`，两边的名字集合并不完全重合）。定死就等于
+ * 让共享层去认识某个图标库 —— 那正是"一份 UI 代码"最容易被悄悄破坏的地方。
+ * 泛型参数让它保持类型安全，而不是退化成 `unknown` + 强转。
+ */
+export interface TaskSection<TMeta = undefined> {
+  readonly key: string;
+  readonly tasks: readonly Task[];
+  readonly meta: TMeta;
+}
+
+/** 分节列表展平后的一行：要么是分节头，要么是任务。 */
+export type SectionRow<TMeta> =
+  | { readonly kind: 'header'; readonly key: string; readonly section: TaskSection<TMeta> }
+  | { readonly kind: 'task'; readonly key: string; readonly row: TaskRow };
+
+/**
+ * 把分节展平成 `[头, 任务…, 头, 任务…]`。
+ *
+ * 🔴 **空分组不产生头。** 一个写着"已完成 0"的标题是纯噪音 ——
+ * 它占了屏、把视线从真有的内容上引开，却没有任何信息。
+ * mobile 原来的实现里这条是手写的（`if (list.length === 0) return;`），
+ * 提上来之后四个端都不会再各写一次、也不会有人忘掉。
+ *
+ * ⚠️ **不重排 `section.tasks` 的顺序。** 分组顺序与组内顺序都属于宿主的语义
+ * （"今天 / 逾期 / 收集箱 / 已完成"这种次序不是按截止时间能推出来的）。
+ * 共享层只负责展平、跳空组、给稳定的 key —— 排序的重排是 `sortTasksForDisplay`
+ * 的职责，它在无分组的 `toTaskRows` 路径上生效。
+ */
+export function flattenSections<TMeta>(
+  sections: readonly TaskSection<TMeta>[],
+  options?: ToTaskRowOptions,
+): readonly SectionRow<TMeta>[] {
+  const out: SectionRow<TMeta>[] = [];
+  for (const section of sections) {
+    if (section.tasks.length === 0) continue;
+    out.push({ kind: 'header', key: `h-${section.key}`, section });
+    for (const task of section.tasks) {
+      out.push({ kind: 'task', key: task.id, row: toTaskRow(task, options) });
+    }
+  }
+  return out;
+}

@@ -9,7 +9,12 @@
 
 import { describe, expect, it } from 'vitest';
 import type { Task } from '@heyta/domain';
-import { sortTasksForDisplay, toTaskRow, toTaskRows } from '../src/task-list/model.js';
+import {
+  flattenSections,
+  sortTasksForDisplay,
+  toTaskRow,
+  toTaskRows,
+} from '../src/task-list/model.js';
 
 /** 造一条任务。默认未完成、无截止 —— 每条用例只覆盖它真正关心的字段。 */
 function mkTask(id: string, overrides: Partial<Task> = {}): Task {
@@ -136,5 +141,55 @@ describe('toTaskRows', () => {
   it('把 fallbackTitle 透传给每一行', () => {
     const rows = toTaskRows([mkTask('a', { title: '' })], { fallbackTitle: '（无标题）' });
     expect(rows[0]?.title).toBe('（无标题）');
+  });
+});
+
+describe('flattenSections', () => {
+  const sec = (key: string, tasks: Task[], meta?: string) => ({ key, tasks, meta });
+
+  it('展平成 [头, 任务…, 头, 任务…]', () => {
+    const rows = flattenSections([
+      sec('today', [mkTask('a'), mkTask('b')], '今天'),
+      sec('done', [mkTask('c')], '已完成'),
+    ]);
+    expect(rows.map((r) => r.kind)).toEqual(['header', 'task', 'task', 'header', 'task']);
+    expect(rows.map((r) => r.key)).toEqual(['h-today', 'a', 'b', 'h-done', 'c']);
+  });
+
+  it('🔴 空分组**不产生头** —— 一个写着"已完成 0"的标题是纯噪音', () => {
+    const rows = flattenSections([
+      sec('today', [mkTask('a')]),
+      sec('overdue', []),
+      sec('done', [mkTask('b')]),
+    ]);
+    expect(rows.map((r) => r.key)).toEqual(['h-today', 'a', 'h-done', 'b']);
+    expect(rows.some((r) => r.kind === 'header' && r.section.key === 'overdue')).toBe(false);
+  });
+
+  it('全部为空时得到空数组', () => {
+    expect(flattenSections([sec('a', []), sec('b', [])])).toEqual([]);
+  });
+
+  it('meta 原样交回（共享层不解释它）', () => {
+    const rows = flattenSections([sec('today', [mkTask('a')], '今天')]);
+    const header = rows[0];
+    expect(header?.kind === 'header' && header.section.meta).toBe('今天');
+  });
+
+  it('组内顺序**不**被重排 —— 次序是宿主的语义', () => {
+    // "今天 / 逾期 / 收集箱" 这种分组次序不是按截止时间能推出来的，
+    // 所以这里刻意不调用 sortTasksForDisplay。
+    const late = mkTask('late', { dueDate: 900 });
+    const early = mkTask('early', { dueDate: 100 });
+    const rows = flattenSections([sec('today', [late, early])]);
+    expect(rows.slice(1).map((r) => r.key)).toEqual(['late', 'early']);
+  });
+
+  it('任务行仍然是 toTaskRow 的产物（fallbackTitle 生效）', () => {
+    const rows = flattenSections([sec('today', [mkTask('a', { title: '' })])], {
+      fallbackTitle: '（无标题）',
+    });
+    const taskRow = rows[1];
+    expect(taskRow?.kind === 'task' && taskRow.row.title).toBe('（无标题）');
   });
 });

@@ -149,6 +149,69 @@ try {
     fail('点击后重排', `点击后首行仍是 ${JSON.stringify(firstAfter)}`);
   }
 
+  // ── 断言 5（M1 徽章）：图标真的画成了 SVG ──────────────────────────
+  //
+  // 🔴 这一组断言的存在理由：`react-native-svg` 在 web 上要经过
+  // "别名 + `.web.*` 后缀解析"两道关，**任何一道没配好，表现都不是报错**，
+  // 而是图标那一块**什么都没画**（Svg 渲染成空容器）。
+  // 所以必须数 `<path>` 元素的个数，而不是看"构建成功"。
+  const svgCount = await page.locator('[data-testid^="task-row-"] svg').count();
+  if (svgCount > 0) {
+    pass('徽章渲染出 SVG', `${svgCount} 个 <svg>`);
+  } else {
+    fail('徽章渲染出 SVG', '一行里都没有 <svg> —— react-native-svg 在 web 上没生效');
+  }
+
+  const pathCount = await page.locator('[data-testid^="task-row-"] svg path').count();
+  if (pathCount > 0) {
+    pass('lucide 图标数据变成了真实几何', `${pathCount} 个 <path>`);
+  } else {
+    fail('lucide 图标数据变成了真实几何', '<svg> 里一个 <path> 都没有（数据没喂进去）');
+  }
+
+  // 逾期徽章：文案 + **字形** + **颜色**三样都必须变。
+  // 只看文案的话，字形映射接错了也测不出来；只看颜色的话，
+  // "逾期换了图标"这条（给色觉障碍用户的冗余信号）就没被验证。
+  const overdueStroke = await page
+    .locator('[data-testid^="task-row-s1"] svg')
+    .first()
+    .getAttribute('stroke');
+  const normalStroke = await page
+    .locator('[data-testid^="task-row-s2"] svg')
+    .first()
+    .getAttribute('stroke');
+  if (overdueStroke && normalStroke && overdueStroke !== normalStroke) {
+    pass('逾期用危险色、未逾期用弱色', `${overdueStroke} ≠ ${normalStroke}`);
+  } else {
+    fail('逾期配色', `逾期=${String(overdueStroke)} 未逾期=${String(normalStroke)}（应当不同）`);
+  }
+
+  // 字形不同 = 截止图标的 `<path>` 条数不同（警告三角 3 条、日历钟 9 条）。
+  // ⚠️ 必须**限定到第一个 `svg`**：一行里可能同时有截止和优先级两个图标，
+  // 数整行会把它们加在一起，两个分支的数字凑巧不同也可能让断言通过。
+  const overduePaths = await page
+    .locator('[data-testid^="task-row-s1"] svg')
+    .first()
+    .locator('path')
+    .count();
+  const normalPaths = await page
+    .locator('[data-testid^="task-row-s2"] svg')
+    .first()
+    .locator('path')
+    .count();
+  if (overduePaths !== normalPaths) {
+    pass('逾期换了字形', `警告三角 ${overduePaths} 条 path vs 日历 ${normalPaths} 条`);
+  } else {
+    fail('逾期字形', `两个分支都是 ${overduePaths} 条 path（应当换成警告三角）`);
+  }
+
+  const allText = texts.join('\n');
+  if (allText.includes('已逾期') && allText.includes('还剩 3 天')) {
+    pass('逾期与未逾期两种文案都渲染到了');
+  } else {
+    fail('截止文案分支', '「已逾期」与「还剩 3 天」没有同时出现 —— 有个分支没被渲染到');
+  }
+
   if (pageErrors.length === 0) {
     pass('无页面错误');
   } else {

@@ -34,7 +34,8 @@
     "@heyta/ai": "workspace:*",
     "@heyta/local-api": "workspace:*",
     "@heyta/ui": "workspace:*",
-    "react-native-web": "0.21.3"
+    "react-native-web": "0.21.3",
+    "react-native-svg": "15.15.5"
   },
   "devDependencies": {
     "@types/react": "^19.2.2",

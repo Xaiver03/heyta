@@ -53,7 +53,13 @@ import React, { useCallback, useMemo } from 'react';
 import { FlatList, Pressable, StyleSheet, Text, View, type StyleProp, type TextStyle } from 'react-native';
 import type { Task } from '@heyta/domain';
 import { useHeytaText, useHeytaTokens } from '../theme.js';
-import { toTaskRows, type TaskRow } from './model.js';
+import {
+  flattenSections,
+  toTaskRows,
+  type SectionRow,
+  type TaskRow,
+  type TaskSection,
+} from './model.js';
 
 /** 行级无障碍文案。**每一项都是一整句**，不要用前缀拼标题。 */
 export interface TaskListLabels {
@@ -65,8 +71,7 @@ export interface TaskListLabels {
   readonly open?: (row: TaskRow) => string;
 }
 
-export interface TaskListProps {
-  readonly tasks: readonly Task[];
+interface TaskListSharedProps {
   /** 勾选/取消勾选。**不要在组件内部改数据** —— 变更必须走宿主的 action 层。 */
   readonly onToggleTask: (taskId: string) => void;
   /**
@@ -96,8 +101,39 @@ export interface TaskListProps {
   readonly testID?: string;
 }
 
-export function TaskList({
+/** 平铺形态：一批任务，**共享层负责排序**。 */
+export interface FlatTaskListProps {
+  readonly tasks: readonly Task[];
+  readonly sections?: never;
+  readonly renderSectionHeader?: never;
+}
+
+/** 分节形态：宿主已经分好组，共享层负责展平、跳空组、给稳定 key。 */
+export interface SectionedTaskListProps<TMeta> {
+  readonly tasks?: never;
+  readonly sections: readonly TaskSection<TMeta>[];
+  /**
+   * 分节头节点。**必须提供** —— 共享层不解释 `section.meta`
+   *（图标名各端不同，见 `model.ts` 的 `TaskSection`），所以它没法自己画一个头。
+   */
+  readonly renderSectionHeader: (section: TaskSection<TMeta>) => React.ReactNode;
+}
+
+/**
+ * 两种形态**互斥**，所以用联合类型，而不是把 `tasks` / `sections` 都设成可选。
+ *
+ * 🔴 都设成可选的话，"两个都传"与"一个都没传"在**类型上都合法** ——
+ * 而它们都是 bug，且只会在运行时表现成一张空列表（不报错）。
+ * 这正是本仓库反复吃亏的那类失效：**能编译，但结果不对**。
+ */
+export type TaskListProps<TMeta = undefined> =
+  | (TaskListSharedProps & FlatTaskListProps)
+  | (TaskListSharedProps & SectionedTaskListProps<TMeta>);
+
+export function TaskList<TMeta = undefined>({
   tasks,
+  sections,
+  renderSectionHeader,
   onToggleTask,
   onOpenTask,
   labels,
@@ -107,13 +143,29 @@ export function TaskList({
   fallbackTitle,
   emptyMessage,
   testID,
-}: TaskListProps): React.JSX.Element {
+}: TaskListProps<TMeta>): React.JSX.Element {
   const tokens = useHeytaTokens();
   const text = useHeytaText();
 
-  // `fallbackTitle` 参与 rows 的派生，但它是个 string（原始值），
+  /** 展平后喂给 `FlatList` 的一行：要么是分节头，要么是任务。 */
+  type Item =
+    | SectionRow<TMeta>
+    | { readonly kind: 'task'; readonly key: string; readonly row: TaskRow };
+
+  // `fallbackTitle` 参与 items 的派生，但它是个 string（原始值），
   // 放进 deps 是安全的 —— 不要在这里传对象/数组，否则 useMemo 每轮都会重算。
-  const rows = useMemo(() => toTaskRows(tasks, { fallbackTitle }), [tasks, fallbackTitle]);
+  //
+  // 两种形态在这里合流：`sections` 走 `flattenSections`（跳空组 + 展平），
+  // 平铺形态走 `toTaskRows`（排序），再统一包成带 `kind` 的同一形状。
+  // 这样下面的 `renderItem` 与 `keyExtractor` 各只有一份。
+  const items = useMemo<readonly Item[]>(() => {
+    if (sections !== undefined) return flattenSections(sections, { fallbackTitle });
+    return toTaskRows(tasks ?? [], { fallbackTitle }).map((row) => ({
+      kind: 'task' as const,
+      key: row.id,
+      row,
+    }));
+  }, [tasks, sections, fallbackTitle]);
 
   const styles = useMemo(
     () =>
@@ -166,16 +218,24 @@ export function TaskList({
   );
 
   const renderItem = useCallback(
-    ({ item }: { item: TaskRow }) => {
-      const busy = busyTaskId === item.id;
-      const toggleLabel = item.done
-        ? (labels?.toggleOff?.(item) ?? item.title)
-        : (labels?.toggleOn?.(item) ?? item.title);
-      const openLabel = labels?.open?.(item);
+    ({ item }: { item: Item }) => {
+      if (item.kind === 'header') {
+        // 🔴 分节头由宿主给。共享层**不解释** `section.meta` ——
+        // 图标名各端不同（mobile 是 `lucide-react-native` 的名字集合），
+        // 定死就等于让共享层去认识某个平台专属的包。
+        return <>{renderSectionHeader?.(item.section) ?? null}</>;
+      }
+
+      const row = item.row;
+      const busy = busyTaskId === row.id;
+      const toggleLabel = row.done
+        ? (labels?.toggleOff?.(row) ?? row.title)
+        : (labels?.toggleOn?.(row) ?? row.title);
+      const openLabel = labels?.open?.(row);
 
       const title = (
-        <Text style={[text['row-title'], item.done ? styles.titleDone : null]} numberOfLines={2}>
-          {item.title}
+        <Text style={[text['row-title'], row.done ? styles.titleDone : null]} numberOfLines={2}>
+          {row.title}
         </Text>
       );
 
@@ -185,15 +245,15 @@ export function TaskList({
             accessibilityRole="checkbox"
             // 无障碍状态必须显式给：读屏用户靠它知道"这条是待办还是已完成"，
             // 而勾选框的**颜色**对他们完全不可见。
-            accessibilityState={{ checked: item.done, busy }}
+            accessibilityState={{ checked: row.done, busy }}
             accessibilityLabel={toggleLabel}
             disabled={busy}
-            onPress={() => onToggleTask(item.id)}
+            onPress={() => onToggleTask(row.id)}
             style={styles.checkboxHit}
-            testID={`task-toggle-${item.id}`}
+            testID={`task-toggle-${row.id}`}
           >
-            <View style={[styles.box, item.done ? styles.boxDone : null]}>
-              {item.done ? <Text style={[text.badge, styles.tick]}>✓</Text> : null}
+            <View style={[styles.box, row.done ? styles.boxDone : null]}>
+              {row.done ? <Text style={[text.badge, styles.tick]}>✓</Text> : null}
             </View>
           </Pressable>
 
@@ -203,31 +263,31 @@ export function TaskList({
             而两个语义重叠的命中区在触屏上也很难区分。
           */}
           {onOpenTask === undefined ? (
-            <View style={styles.body} testID={`task-row-${item.id}`}>
+            <View style={styles.body} testID={`task-row-${row.id}`}>
               {title}
-              {renderMeta === undefined ? null : <View style={styles.metaRow}>{renderMeta(item)}</View>}
+              {renderMeta === undefined ? null : <View style={styles.metaRow}>{renderMeta(row)}</View>}
             </View>
           ) : (
             <Pressable
               accessibilityRole="button"
               {...(openLabel === undefined ? {} : { accessibilityLabel: openLabel })}
-              onPress={() => onOpenTask(item.id)}
+              onPress={() => onOpenTask(row.id)}
               style={styles.body}
-              testID={`task-row-${item.id}`}
+              testID={`task-row-${row.id}`}
             >
               {title}
-              {renderMeta === undefined ? null : <View style={styles.metaRow}>{renderMeta(item)}</View>}
+              {renderMeta === undefined ? null : <View style={styles.metaRow}>{renderMeta(row)}</View>}
             </Pressable>
           )}
 
-          {renderTrailing === undefined ? null : renderTrailing(item)}
+          {renderTrailing === undefined ? null : renderTrailing(row)}
         </View>
       );
     },
-    [busyTaskId, labels, onOpenTask, onToggleTask, renderMeta, renderTrailing, styles, text],
+    [busyTaskId, labels, onOpenTask, onToggleTask, renderMeta, renderSectionHeader, renderTrailing, styles, text],
   );
 
-  const keyExtractor = useCallback((item: TaskRow) => item.id, []);
+  const keyExtractor = useCallback((item: Item) => item.key, []);
 
   const empty = useMemo(
     () =>
@@ -243,7 +303,7 @@ export function TaskList({
 
   return (
     <FlatList
-      data={rows}
+      data={items}
       renderItem={renderItem}
       keyExtractor={keyExtractor}
       ListEmptyComponent={empty}
@@ -252,6 +312,3 @@ export function TaskList({
     />
   );
 }
-
-/** 供插槽复用的标题样式类型。 */
-export type TaskTitleStyle = StyleProp<TextStyle>;
