@@ -365,3 +365,35 @@ export function intensityLevel(ms: number, peakMs: number): 0 | 1 | 2 | 3 | 4 {
   if (ratio <= 0.75) return 3;
   return 4;
 }
+
+/**
+ * 时长的**语义分档**（不认识语言）。
+ *
+ * 分类时长要在三处显示成文字（Web 泳道、移动端分类屏、以及以后的任何宿主），
+ * 而"多长才算一小时""几点几分四舍五入"是**语义**，不是文案：
+ * 三个地方各写一遍，早晚出现同一个 5400000ms 在一端是「1 小时 30 分」、
+ * 在另一端是「90 分钟」。
+ *
+ * 所以这里只回答"该说哪一档、数字是几"，**具体措辞留给各端的词条表**
+ * （`web.categories.duration.*` / `mobile.categories.duration.*`）——
+ * 领域层不认识 i18n，也不该认识。
+ *
+ * 口径（与 Web 端迁移前逐字相同，故意保持）：
+ * - **先四舍五入到分钟**，再分档。所以 30 秒 = 1 分钟、59 分 31 秒 = 60 分钟
+ *   （不是「1 小时」—— 60 分钟这一档的边界是"整 60 分钟及以上"）；
+ * - 负数与 `NaN` 当 0（计时器出错时宁可显示 0，也不要显示 `NaN 分钟`）。
+ */
+export type DurationParts =
+  | { kind: 'minutes'; minutes: number }
+  | { kind: 'hours'; hours: number }
+  | { kind: 'hoursMinutes'; hours: number; minutes: number };
+
+export function durationParts(ms: number): DurationParts {
+  const safe = Number.isFinite(ms) ? Math.max(0, ms) : 0;
+  const totalMinutes = Math.round(safe / 60000);
+  if (totalMinutes < 60) return { kind: 'minutes', minutes: totalMinutes };
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+  if (minutes === 0) return { kind: 'hours', hours };
+  return { kind: 'hoursMinutes', hours, minutes };
+}

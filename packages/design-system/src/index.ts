@@ -25,6 +25,7 @@ export {
   TOKEN_GROUPS,
   AA_PAIRS,
   GRAPHIC_PAIRS,
+  CATEGORY_SLOT_TOKENS,
   cssVar,
   cssVarName,
   allTokenNames,

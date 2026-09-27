@@ -16,20 +16,30 @@
  * （见 `docs/plans/activity-categories-and-colors.md` §2）。
  */
 
-import { cssVar, type TokenName } from '@heyta/design-system';
-import type { CategorySlot } from '@heyta/domain';
+import { CATEGORY_SLOT_TOKENS, cssVar, type TokenName } from '@heyta/design-system';
+import { CATEGORY_SLOTS, type CategorySlot } from '@heyta/domain';
 
-/** 槽位号 → token 名。穷尽映射，见文件头。 */
-const SLOT_TOKENS: Record<CategorySlot, TokenName> = {
-  1: 'color.category-1',
-  2: 'color.category-2',
-  3: 'color.category-3',
-  4: 'color.category-4',
-  5: 'color.category-5',
-  6: 'color.category-6',
-  7: 'color.category-7',
-  8: 'color.category-8',
-};
+/**
+ * 槽位号 → token 名。
+ *
+ * 🔴 **从设计系统的共享常量派生，不手写第二份。** 这份映射有三处消费者
+ * （Web 的 CSS 变量、移动端的原生 token、设计系统的对比度配对），
+ * 手写三份 = 三份会漂移的名单；而"抽出了一个共享实现"不等于"重复被消除了"
+ * —— 收尾动作是**删掉旧的那份**（AGENTS.md §3.5）。
+ *
+ * ⚠️ 数组是 1 起始的槽位顺序：`SLOT_TOKENS[1]` 对应数组第 0 项。
+ */
+const SLOT_TOKENS = CATEGORY_SLOT_TOKENS.reduce<Record<CategorySlot, TokenName>>(
+  (acc, token, index) => {
+    const slot = index + 1;
+    if (!CATEGORY_SLOTS.includes(slot as CategorySlot)) {
+      throw new Error(`[category-colors] 色槽 ${slot} 不在 CATEGORY_SLOTS 里：常量与领域层漂移了`);
+    }
+    acc[slot as CategorySlot] = token;
+    return acc;
+  },
+  {} as Record<CategorySlot, TokenName>,
+);
 
 /** 槽位号 → `var(--ht-color-category-N)`。 */
 export function categorySlotColor(slot: CategorySlot): string {

@@ -183,3 +183,9 @@ export {
   renderDurationLine,
   writeDurationIntoNote,
 } from './duration-note.js';
+export {
+  aliveRecords,
+  categoryReportFromState,
+  categoryReportFromTables,
+  type CategoryTables,
+} from './category-report.js';
