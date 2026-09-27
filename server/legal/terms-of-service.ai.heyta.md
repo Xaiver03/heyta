@@ -13,6 +13,13 @@
 > 🔴 **本文件与托管同步条款是两件独立的收费服务**，可以只买其中一个。
 > **不要把两份合并** —— 同步服务的核心承诺是"我们只中转密文、看不到你的任务内容"，
 > 而云端 AI **必须**看到明文（§3）。合并会让那个强承诺变成一句空话。
+>
+> 📌 **本文件不是发布源 —— 它不会被渲染成任何页面。**
+> 线上 `/terms.html` 只可能来自操作者自己放进数据卷的 `<dataDir>/legal/terms.html`，
+> 而且默认**不安装**、要显式 `SUPERSYNC_INSTALL_REPO_TERMS=true` 才会装。
+> 本文件的实际用途有两个：被门禁当作**「对外承诺」**来核对额度与金额
+> （`scripts/check-ai-quota-consistency.mjs`、`scripts/check-pricing-consistency.mjs`），
+> 以及给人读。发布路径见 `docs/runbooks/deployment.md` §3.11。
 
 ## 1. 服务提供者
 
