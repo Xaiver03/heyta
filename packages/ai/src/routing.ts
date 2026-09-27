@@ -937,9 +937,9 @@ function explainNoCandidate(resolution: RouteResolution): string {
   // 其它组合的既有文案一个字都不变。
   if (reasons.includes('endpoint-disabled')) {
     return (
-      '这个功能的端点被**停用**了 —— 这是你（或当前配置）主动做的选择，不是故障，' +
-      '也没有东西坏掉。\n' +
-      '要重新使用，请在设置里把该端点重新打开；heyta 不会自动把它改回来。'
+      '这个功能的端点被停用了 —— 这是你（或当前配置）主动做的选择，不是故障，' +
+      '也没有东西坏掉。要重新使用，请在设置里把该端点重新打开；' +
+      'heyta 不会自动把它改回来。'
     );
   }
   return '没有可用的端点。检查设置里的端点与路由。';
