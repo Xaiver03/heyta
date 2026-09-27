@@ -2,6 +2,7 @@ import 'dotenv/config';
 import { createServer } from './server';
 import * as path from 'path';
 import { Logger } from './logger';
+import { PRODUCT_NAME } from './config';
 
 // Create server instance with config overrides
 // The server will load additional config from environment variables
@@ -49,7 +50,7 @@ process.on('unhandledRejection', (reason, promise) => {
 start()
   .then((address) => {
     Logger.info('');
-    Logger.info('🚀 SuperSync Server is running!');
+    Logger.info(`🚀 ${PRODUCT_NAME} Server is running!`);
     Logger.info(`   URL: ${address}`);
     Logger.info('');
     Logger.info('Press Ctrl+C to stop the server');

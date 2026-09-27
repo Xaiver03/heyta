@@ -1,6 +1,27 @@
 import * as path from 'path';
 import { Logger } from './logger';
 
+/**
+ * 产品名 —— **面向用户的地方只能有这一份**。
+ *
+ * 🔴 这里真的漂移过一次：SuperSync → heyta 的改名里 `pages.ts` 改到了
+ * （"logging in to heyta"），**`email.ts` 整个漏了**。后果不是文案不统一那么轻：
+ * 用户点邮件里的链接会落到一个说 heyta 的页面，而那封邮件本身写着
+ * "Verify your SuperSync account" —— 看起来就像钓鱼。
+ *
+ * 根因是同一个字符串散在 7 处字面量里（3 个 subject、3 个正文、1 个 From 兜底）。
+ * 收成常量不是为了好看，是为了下次改名时**一次改完**。
+ */
+export const PRODUCT_NAME = 'heyta';
+
+/**
+ * `SMTP_FROM` 未配置时的兜底发件人。
+ *
+ * ⚠️ `noreply@example.com` 是**占位符**：真部署必须设 `SMTP_FROM`，
+ * 否则邮件会以一个不存在的域名发出（会被 SPF/DMARC 判失败）。
+ */
+export const DEFAULT_SMTP_FROM = `"${PRODUCT_NAME}" <noreply@example.com>`;
+
 /** CORS origin can be a string or RegExp for pattern matching (e.g., localhost with any port) */
 export type CorsOrigin = string | RegExp;
 
@@ -388,7 +409,7 @@ export const loadConfigFromEnv = (
           : port === 465,
       user: process.env.SMTP_USER,
       pass: process.env.SMTP_PASS,
-      from: process.env.SMTP_FROM || '"SuperSync" <noreply@example.com>',
+      from: process.env.SMTP_FROM || DEFAULT_SMTP_FROM,
     };
   }
 
