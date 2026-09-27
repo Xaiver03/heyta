@@ -66,7 +66,7 @@ inode 不是瓶颈：✅ `df -i` = 27%。
 | 目录 | 占用 | 主要内容（谁的东西） |
 |---|---|---|
 | `/var/lib/docker` | **19 G** | `rootfs/` 14 G、`volumes/` 1.6 G、`buildkit/` 1.4 G、`containers/` 411 M |
-| `/home` | **11 G** | 见 [§1.4](#14-home-的构成) |
+| `/home` | **11 G** | 见 [§1.4](#14-home-的构成-du--sh-) |
 | `/opt` | **7.5 G** | `heyta-ci` 3.0 G、`lingchuang-motor` 2.0 G、`home` 1.3 G、`x-creative-team` 1.2 G、`asset-inventory` 23 M |
 | `/var/www` | **3.1 G** | `xiaoli-platform` 1.6 G、`sub2api` 1.1 G、`sumei` 401 M、`heyta-landing` 980 K |
 | `/var/log` | **752 M** | journal 597 M、`syslog` 116 M、`auth.log` 15 M、nginx 8.5 M |
@@ -126,7 +126,7 @@ inode 不是瓶颈：✅ `df -i` = 27%。
 > ⚠️ **Build Cache 的「可回收」两个口径打架**：`docker system df` 报 0 B（因为当时有构建在跑），
 > 而 `docker buildx du --builder default` 报 **Total 9.14 GB / Reclaimable 9.079 GB**。
 > 两个数都不是错的，是「是否把当前构建正在用的记录算进去」的区别。
-> 见 [§3.2](#32-其他项目的其他-reclaimable)。
+> 见 [§3.2](#32-b-组其他项目的-reclaimable--仅登记不建议动作)。
 
 ---
 
@@ -181,7 +181,7 @@ $ stat -c "%y" ~/heyta/.pnpm-store
 - ⑤ mtime 停在 **2026-09-25 14:40**，即源码上传当天，之后再没被写过。
 
 **代价**：删掉后，**下次有人在宿主上跑 `pnpm install` 会重新下载全部依赖**。CI 不受影响（CI 用的是
-`/opt/heyta-ci/data/setup-pnpm`，见 [§4.2](#42--heyta-ci-runner-与-opt-heyta-ci)）。
+`/opt/heyta-ci/data/setup-pnpm`，见 [§4.2](#42-heyta-ci-runner-与-optheyta-ci)）。
 
 #### 2.2.2 悬空镜像 —— 88.7 MB
 
@@ -196,7 +196,7 @@ $ sudo -n docker images -f dangling=true -q | wc -l
 **为什么无主**：`dangling=true` 的定义就是「没有 tag、没有任何容器引用」。且它已存在 4 小时。
 
 > ⚠️ **别把 `docker images -a` 里的 58 个 `<none>` 也算进来**：那些是**构建的中间层**，
-> 只能由 builder prune 处理，`docker image prune` 不动它们。见 [§3.2](#32-其他项目的其他-reclaimable)。
+> 只能由 builder prune 处理，`docker image prune` 不动它们。见 [§3.2](#32-b-组其他项目的-reclaimable--仅登记不建议动作)。
 >
 > 📋 本机的 `docker-prune-safe`（[§5.1](#51--heyta-自己的容器把全机的-docker-自动回收卡死了)）本来每 30 分钟就会清掉这一类，
 > **目前被 heyta 自己的容器挡住了**——这正是它现在还剩 88.7 MB 的原因。
@@ -306,7 +306,7 @@ sudo -n nginx -t          # 删完必须先验语法
 > `node_modules`、`dist`、`build`、`.next`、`.turbo`（`find -type d` 空）；
 > `*.tar` / `*.tar.gz` / `*.tgz`（`find ~ -maxdepth 4` 只命中 litopia 和 npm 预编译包）；
 > 旧镜像 tag（`docker images` 里 `supersync` 只有 `local` 一个 tag）。
-> **`~/heyta` = 218 M，其中 211 M 是 `.pnpm-store`（[§2.2.1](#221-heyta-pnpm-store--211-mb)），剩下 7 M 是源码。**
+> **`~/heyta` = 218 M，其中 211 M 是 `.pnpm-store`（[§2.2.1](#221-heytapnpm-store--211-mb)），剩下 7 M 是源码。**
 > brief 里猜的「构建中间产物 / 临时 tar 包 / 旧镜像 tag」在这台机器上**不存在**。
 
 ### 3.2 B 组：其他项目的 reclaimable —— **仅登记，不建议动作**
@@ -365,7 +365,7 @@ sudo -n nginx -t          # 删完必须先验语法
 | 目录 `/opt/heyta-ci` | **3.0 GB**，mtime 2026-09-26 15:37：`data/setup-pnpm` 1.3 G、`data/externals` 597 M、`data/_work/heyta` **994 M**、`data/bin` 81 M |
 | 容器 `heyta-ci-runner` | ✅ `Up 9 minutes`，compose project `heyta-ci`，`/opt/heyta-ci/docker-compose.yml` |
 | 镜像 `heyta-ci-runner:local` | **3.12 GB**，正在被上面那个容器使用 |
-| 镜像 `ghcr.io/actions/actions-runner:latest` | **2.15 GB**，0 个容器引用——**但它是 `heyta-ci-runner:local` 的 `FROM` 基镜像（`/opt/heyta-ci/Dockerfile:5`）。Docker 会拒绝删除有子镜像的父镜像。⚠️ 它不是 [§3.2](#32-其他项目的其他-reclaimable) 那种「无引用可回收」，别误删。** |
+| 镜像 `ghcr.io/actions/actions-runner:latest` | **2.15 GB**，0 个容器引用——**但它是 `heyta-ci-runner:local` 的 `FROM` 基镜像（`/opt/heyta-ci/Dockerfile:5`）。Docker 会拒绝删除有子镜像的父镜像。⚠️ 它不是 [§3.2](#32-b-组其他项目的-reclaimable--仅登记不建议动作) 那种「无引用可回收」，别误删。** |
 | `/opt/heyta-ci/.env` | 🔒 token **存在，位于**该文件（43 字节），**内容未抄写** |
 
 > 🔴 `data/setup-pnpm`（1.3 G）和 `data/_work/heyta`（994 M）是**刻意的持久化缓存**——
@@ -521,7 +521,7 @@ $ sudo -n cat /var/lib/docker-prune-safe.last-success
 
 | # | 意外 | 证据 |
 |---|---|---|
-| 1 | **heyta 有一条 brief 完全没提的 CI 生产线**（`/opt/heyta-ci` 3.0 G + runner 容器 + 3.12 GB 镜像 + `heyta.finlaw.cloud` 站点/证书，全部 2026-09-26 15:37–15:48 才建）。**这是「看起来像垃圾其实在用」的头号项。** | [§4.2](#42--heyta-ci-runner-与-opt-heyta-ci) |
+| 1 | **heyta 有一条 brief 完全没提的 CI 生产线**（`/opt/heyta-ci` 3.0 G + runner 容器 + 3.12 GB 镜像 + `heyta.finlaw.cloud` 站点/证书，全部 2026-09-26 15:37–15:48 才建）。**这是「看起来像垃圾其实在用」的头号项。** | [§4.2](#42-heyta-ci-runner-与-optheyta-ci) |
 | 2 | `supersync-server` 的 entrypoint 挡住了全机 Docker 自动回收 | [§5.1](#51--heyta-自己的容器把全机的-docker-自动回收卡死了) |
 | 3 | brief 说的 Mailu/SSOS/openpenpal/litopia 在这台机器上**一个都没有** | [§5.3](#53-容器与项目归属) |
 | 4 | `mail.litopia.space` 的 DNS 在盘点期间从 OPP 切到了 sanjiaozhou，`deployment.md` 已过期 | [§5.4](#54-dns盘点期间还在动) |
@@ -634,4 +634,4 @@ node research/tools/docs-link-check.mjs
 - **「需确认」的量约 38 GB**，但其中 25 GB（Docker 镜像 + BuildKit 缓存）**全是别的项目的**，
   且**本来就有脚本打算回收，只是被 heyta 自己的容器挡住了**（[§5.1](#51--heyta-自己的容器把全机的-docker-自动回收卡死了)）；
 - 这台机器上**没有任何「看起来是垃圾、其实有人在用」的 heyta 资产被漏判**——
-  反而新发现了一条 **brief 完全没提、必须保护的 heyta CI 生产线**（[§4.2](#42--heyta-ci-runner-与-opt-heyta-ci)）。
+  反而新发现了一条 **brief 完全没提、必须保护的 heyta CI 生产线**（[§4.2](#42-heyta-ci-runner-与-optheyta-ci)）。

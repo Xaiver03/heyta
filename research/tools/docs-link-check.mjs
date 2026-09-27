@@ -217,7 +217,117 @@ for (const file of files) {
   });
 }
 
+// ── 页内锚点检查 ────────────────────────────────────────────────
+//
+// 为什么需要它（2026-09-27 实测发现的缺口）：上面两条都抓不到 `](#xxx)`。
+// 死链检查把 `#` 之后的部分 `split` 掉了，`isExternal` 又把 `#` 开头的链接
+// 整个跳过 —— 于是**页内锚点从来没被校验过**。
+//
+// 实测证据：故意把 finlaw-cleanup-candidates.md 的一个锚点改成
+// `#14-这个锚点故意写错`，`check:docs` 依旧 `exit 0` 并报「无死链」。
+// 而补上这个检查后一跑，真的找出 **11 处**解析不到的锚点（全是手写的）。
+//
+// 锚点算法必须与 GitHub 一致（文档主要在那里读）—— GitHub 用 github-slugger：
+//   小写 → 删掉所有标点与符号（保留字母/数字/空格/`-`/`_`）→ 每个空格变 `-`
+//
+// 🔴 两个最容易手写错的地方：
+//   1. **空格不合并**：`store —— 211` 里 `——` 被删掉后剩**两个**空格，
+//      于是 slug 是 `store--211`，不是 `store-211`；
+//   2. **`.` 和 `/` 是被删掉、不是变 `-`**：`~/heyta/.pnpm-store` →
+//      `heytapnpm-store`（不是 `heyta-pnpm-store`）。
+//   这两条正是上面那 11 处里绝大多数写错的原因。
+function ghSlug(heading) {
+  return heading
+    .trim()
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}\p{M}\s\-_]/gu, '')
+    .replace(/ /g, '-');
+}
+
+/** 一个文件里所有标题的锚点集合（含 GitHub 对同名标题加的 -1 / -2 后缀）。 */
+function headingSlugs(markdown) {
+  const out = new Set();
+  const seen = new Map();
+  let inFence = false;
+  for (const rawLine of markdown.split('\n')) {
+    if (/^\s*(```|~~~)/.test(rawLine)) {
+      inFence = !inFence;
+      continue;
+    }
+    if (inFence) continue;
+    const m = /^#{1,6}\s+(.*?)\s*$/.exec(rawLine);
+    if (!m) continue;
+    const base = ghSlug(m[1]);
+    const n = seen.get(base) ?? 0;
+    seen.set(base, n + 1);
+    // GitHub 里第二个同名标题的锚点是 `base-1`，第三个是 `base-2`……
+    out.add(n === 0 ? base : `${base}-${n}`);
+  }
+  return out;
+}
+
+const slugCache = new Map();
+function slugsOf(path) {
+  let s = slugCache.get(path);
+  if (s === undefined) {
+    s = headingSlugs(readFileSync(path, 'utf8'));
+    slugCache.set(path, s);
+  }
+  return s;
+}
+
+const badAnchors = [];
+let checkedAnchors = 0;
+
+for (const file of files) {
+  const dir = dirname(file);
+  const content = readFileSync(file, 'utf8');
+  let inFence = false;
+  content.split('\n').forEach((rawLine, i) => {
+    if (/^\s*(```|~~~)/.test(rawLine)) {
+      inFence = !inFence;
+      return;
+    }
+    if (inFence) return;
+
+    // 与死链检查一样，先挖空行内代码 —— 文档里会**故意展示**锚点写法当例子。
+    for (const m of blankOutCode(rawLine).matchAll(LINK_RE)) {
+      const raw = m[1];
+      const hashAt = raw.indexOf('#');
+      if (hashAt === -1) continue;
+      // 外链里的锚点由对方站点决定，这里管不着。
+      if (/^(https?:|mailto:|tel:|data:|ftp:)/i.test(raw)) continue;
+
+      const frag = decodeURIComponent(raw.slice(hashAt + 1));
+      if (!frag) continue;
+      // `#L12` 是行号锚点约定，不指向标题。
+      if (/^L\d+/.test(frag)) continue;
+
+      const rawPath = raw.slice(0, hashAt).split('?')[0];
+      const targetFile =
+        rawPath === '' ? file : resolve(dir, decodeURIComponent(rawPath));
+      // 文件不存在由死链检查报；非 Markdown 的锚点是别的格式，不归这里管。
+      if (!existsSync(targetFile) || !targetFile.endsWith('.md')) continue;
+
+      checkedAnchors++;
+      const slugs = slugsOf(targetFile);
+      if (!slugs.has(frag)) {
+        badAnchors.push({
+          file: relative(ROOT, file),
+          line: i + 1,
+          target: rawPath === '' ? '(本文件)' : rawPath,
+          frag,
+          hint: [...slugs].find((s) => s.startsWith(frag.slice(0, 5))) ?? null,
+        });
+      }
+    }
+  });
+}
+
 console.log(`检查 ${checkedRefs} 处跨文档章节引用。`);
+console.log(`检查 ${checkedAnchors} 处页内锚点。`);
+
+const hasProblems = badRefs.length > 0 || badAnchors.length > 0 || broken.length > 0;
 
 if (badRefs.length > 0) {
   console.log(`\n🔴 发现 ${badRefs.length} 处**失效的章节引用**（值是错的，但链接是活的）：\n`);
@@ -227,20 +337,32 @@ if (badRefs.length > 0) {
     if (b.available) console.log(`      ${b.target} 实际有：§${b.available}`);
   }
   console.log('');
-  process.exit(1);
 }
+
+if (badAnchors.length > 0) {
+  console.log(`\n🔴 发现 ${badAnchors.length} 处**解析不到的页内锚点**：\n`);
+  for (const b of badAnchors) {
+    console.log(`   ${b.file}:${b.line}  ->  ${b.target} #${b.frag}`);
+    if (b.hint) console.log(`      你是不是想写：#${b.hint}`);
+  }
+  console.log(
+    '\n   ⚠️ 锚点规则记牢两条：空格不合并（`a —— b` → `a--b`）、' +
+      '`.`/`/` 是被删掉而不是变 `-`。\n',
+  );
+}
+
+if (broken.length > 0) {
+  console.log(`\n🔴 发现 ${broken.length} 个死链：\n`);
+  for (const b of broken) {
+    console.log(`   ${b.file}:${b.line}`);
+    console.log(`      -> ${b.target}`);
+  }
+  console.log('');
+}
+
+if (hasProblems) process.exit(1);
 
 console.log(`\n扫描 ${files.length} 个 Markdown 文件，检查 ${checked} 个相对链接。`);
+console.log('\n✅ 无死链、无失效章节引用、无失效锚点。\n');
+process.exit(0);
 
-if (broken.length === 0) {
-  console.log('\n✅ 无死链。\n');
-  process.exit(0);
-}
-
-console.log(`\n🔴 发现 ${broken.length} 个死链：\n`);
-for (const b of broken) {
-  console.log(`   ${b.file}:${b.line}`);
-  console.log(`      -> ${b.target}`);
-}
-console.log('');
-process.exit(1);
