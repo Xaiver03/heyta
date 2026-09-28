@@ -198,8 +198,15 @@ pnpm check:crosslang-contract      # = node scripts/check-crosslang-contract.mjs
 | `entry.ts` | 打包入口：真源码出口 + **原样**契约 runner + 替身 |
 | `vitest-shim.ts` | `describe` / `it` / `expect` 的最小替身（含 `rejects.toThrow`） |
 | `probe.js` | 跑在 Jint 里：第一阶段 16 步 + 第二阶段契约重放 |
-| `cs/Program.cs` | C# 宿主：同步 `SqliteDriver` + 微任务泵 + 独立复核 |
-| `run.sh` | 一键：esbuild（含 `--alias:vitest=`）+ `dotnet run` |
+| `bench.js` | 第三阶段：跨语言编组开销基准（三条路径 × 两个消费层次） |
+| `cs/Program.cs` | C# 宿主：同步 `SqliteDriver` + 微任务泵 + 独立复核 + 基准引擎 |
+| `run.sh` | 一键：打包（`research/tools/bundle-spike.mjs`）+ `dotnet run` |
+
+🔴 **不要自己拼 esbuild 的命令行。** 用 `research/tools/bundle-spike.mjs`（esbuild 的
+**JS API**）。原因见那个文件头：`esbuild` 不是任何 `package.json` 的直接依赖，
+**主仓库里 `packages/domain/node_modules/.bin/esbuild` 那个链接是陈旧状态** ——
+干净检出里没有它。这个 bug 让 `check:crosslang-contract` **在 CI 上必红、本机全绿**，
+是本轮"在干净检出的 git worktree 里跑一遍完整 `pnpm check`"抓出来的。
 
 🔴 `run.sh` 里那个 `--alias:vitest="$HERE/vitest-shim.ts"` 是契约能**原样**跑的关键。
 去掉它，`import ... from 'vitest'` 就解析不到 —— 那会逼人"照着契约另写一套断言"，

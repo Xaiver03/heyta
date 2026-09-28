@@ -32,21 +32,15 @@ CS_REPORT="$OUT_DIR/cs-report.json"
 echo "▸ 输出目录：$OUT_DIR"
 echo "▸ 1/4 构建自包含 bundle（--platform=neutral：不注入 Node/浏览器垫片）"
 
-# 🔴 esbuild 只装在 packages/domain 自己的 node_modules 里（pnpm 的隔离布局，
-# 根目录**没有** .bin/esbuild）。所以不能用 `npx esbuild` ——
-# 实测那会以 `sh: esbuild: command not found` 失败（exit 127）。
-ESBUILD="$ROOT/packages/domain/node_modules/.bin/esbuild"
-if [ ! -x "$ESBUILD" ]; then
-  echo "找不到 esbuild：$ESBUILD" >&2
-  echo "先在仓库根跑一次：pnpm install --store-dir .pnpm-store" >&2
-  exit 1
-fi
-
-# --platform=neutral 是关键：esbuild 不会替我们补 process/Buffer 之类的垫片。
-# 于是"bundle 需要宿主能力"这件事会在**构建期**就暴露，而不是留到引擎里才炸。
-"$ESBUILD" "$ROOT/packages/domain/src/index.ts" \
-  --bundle --format=iife --global-name=HeytaDomain \
-  --outfile="$BUNDLE" --platform=neutral --target=es2020 --log-level=warning
+# 🔴 用 `research/tools/bundle-spike.mjs`（esbuild 的 **JS API**），**不要**调 CLI。
+#    原先这里写死 `packages/domain/node_modules/.bin/esbuild`，而那个链接是**主仓库的
+#    陈旧状态** —— `packages/domain/package.json` 从没声明过 esbuild（它是 tsup 的依赖），
+#    干净检出的树里没有它。于是"本机绿、CI 红"。
+#    抓出它的是"在干净检出的 git worktree 里跑一遍完整 pnpm check"。
+node "$ROOT/research/tools/bundle-spike.mjs" \
+  --entry "$ROOT/packages/domain/src/index.ts" \
+  --out "$BUNDLE" \
+  --global HeytaDomain
 
 # TZ=UTC：领域层有大量本地日历日运算，两侧必须同一个时区才可比。
 # （同一个坑已经踩过一次：packages/widget-core 的 golden fixture 就是因为时区而字节漂移。）
