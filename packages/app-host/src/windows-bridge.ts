@@ -99,8 +99,12 @@ const wrapDriver = (clr: ClrSqliteDriver) => ({
   exec: (sql: string): void => clr.exec(sql),
   run: (sql: string, params?: readonly unknown[]): void =>
     clr.run(sql, JSON.stringify(params ?? [])),
-  all: (sql: string, params?: readonly unknown[]): unknown[] =>
-    JSON.parse(clr.all(sql, JSON.stringify(params ?? []))) as unknown[],
+  // 泛型是必须的：契约里 `all<T = Record<string, SqlValue>>(...): T[]` 是**泛型方法**，
+  // 返回 `unknown[]` 不满足它（第一版就是这么被 app-host 的 typecheck 抓到的 ——
+  // 这也正是"把门面放进 app-host"换来的东西：它自动进了 typecheck）。
+  // 这里用 `Record<string, unknown>` 作默认，避免为了一个类型名去引 @heyta/storage 的内部路径。
+  all: <T = Record<string, unknown>>(sql: string, params?: readonly unknown[]): T[] =>
+    JSON.parse(clr.all(sql, JSON.stringify(params ?? []))) as T[],
   close: (): void => clr.close(),
 });
 
