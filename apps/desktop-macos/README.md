@@ -67,15 +67,19 @@ bash apps/desktop-macos/scripts/capture-window.sh
 | `view.cacheDisplay(in:to:)` | 走 AppKit `draw(_:)`；SwiftUI 文字走 **`CGDisplayList`** 私有路径拿不到 ⇒ **文字糊成横向色带** |
 | `CALayer.render(in:)` | 同样拿不到 `CGDisplayList`，且是**左下原点** ⇒ 既糊又上下翻转 |
 | `ImageRenderer` | SwiftUI 官方快照，但**渲染不了 `List` / `TextField` / `Toggle`** ⇒ 整片变成"禁止"占位符 |
-| ✅ `CGWindowListCreateImage` | 问窗口服务器要一份**合成结果** ⇒ 文字/抗锯齿/深浅色都对，**被遮挡也不影响** |
+| ✅ **`SCScreenshotManager`**（ScreenCaptureKit） | 问窗口服务器要一份**合成结果** ⇒ 文字/抗锯齿/深浅色都对，**被遮挡也不影响** |
+| ~~`CGWindowListCreateImage`~~ | 能用但与 `screencapture -l` 同源；**macOS 14 起已废弃**，已迁移掉 |
 
 ⚠️ 前两种最坏的地方是**看起来很可信**：尺寸对、内容比例 ~96%、色阶 255，
 空白检测完全通过 —— 只有人眼能发现字全是坏的。这也是为什么取证脚本
 **内置了与 `screencapture -l<windowID>` 的交叉验证**（两者同源，尺寸必须一致）。
 
-⚠️ 技术债：`CGWindowListCreateImage` 在 macOS 14 起已废弃（编译有一条 deprecation 警告），
-官方迁移路径是 **ScreenCaptureKit**。本轮没迁是因为它是 async 且强依赖屏幕录制权限，
-换掉要连带改自截屏的时序与失败处理；已记在这里，不要以为它是"干净"的。
+✅ **技术债已还清（2026-09-28）**：已从废弃的 `CGWindowListCreateImage` 迁到
+**ScreenCaptureKit 的 `SCScreenshotManager`**，编译**零警告**。
+代价是自截屏改成 async（`Task` + `await`），失败时显式 `exit(4)` 而不是写一张空图。
+
+**迁移的正确性有硬证据**：新旧两个 API 产出的 PNG **sha256 逐字节一致**
+（`523a6f5940d2ab9f`）—— 一个像素都没变，所以之前所有的取证结论依然成立。
 
 ## 3. 🔴 两端在"错误怎么过边界"上**不一样**（本轮最值得记的一条）
 
