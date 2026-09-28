@@ -44,6 +44,7 @@ import { join, dirname, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import {
+  REVIEWED_LICENSE_FILE_PACKAGES,
   REVIEWED_OTHER,
   classifyLicense,
   normalizeLicense,
@@ -80,6 +81,30 @@ function findProjects(dir, found = []) {
     }
   }
   return found;
+}
+
+/**
+ * 这个工程是不是**只在 Windows 上能还原**？
+ *
+ * 🔴 加它的原因：本门禁原来无脑遍历仓库里所有 `*.csproj`。
+ *    `apps/desktop-windows`（WinUI 3）落地之后，在 macOS/Linux 上
+ *    `dotnet list package` 会**还原失败**（`net10.0-windows...` 目标需要 Windows SDK），
+ *    于是整个门禁在非 Windows 上直接炸 —— 而这不是"依赖有问题"，是"这个工程在这里根本评不了"。
+ *
+ * 判定：读 csproj 的 `TargetFramework(s)`，只要有一个带 `-windows` 且在非 win32 上，就跳过。
+ * **跳过要印出来**（见 main），不能静默 —— 静默跳过会变成"看着在查，其实没查"。
+ */
+function isWindowsOnly(targetPath) {
+  let text;
+  try {
+    text = readFileSync(targetPath, 'utf8');
+  } catch {
+    return false;
+  }
+  const match = /<TargetFrameworks?>\s*([^<]+?)\s*<\/TargetFrameworks?>/i.exec(text);
+  if (match === null) return false;
+  const frameworks = match[1].split(';').map((f) => f.trim().toLowerCase());
+  return frameworks.some((f) => f.includes('-windows'));
 }
 
 const hasDotnet = () => {
@@ -154,16 +179,44 @@ const main = async () => {
     return 0;
   }
 
+  // Windows-only 的工程在非 Windows 上**评不了**（还原就会失败）。
+  // 跳过，但必须**印出来** —— 静默跳过会变成"看着在查，其实没查"。
+  const evaluable = projects.filter(
+    (project) => !(process.platform !== 'win32' && isWindowsOnly(project)),
+  );
+  const notEvaluable = projects.filter((project) => !evaluable.includes(project));
+  if (notEvaluable.length > 0) {
+    log(
+      `⚠️  跳过 ${notEvaluable.length} 个**只在 Windows 上可评**的工程（当前平台 ${process.platform}）：`,
+    );
+    for (const project of notEvaluable) log(`     ${relative(ROOT, project)}`);
+    log('    ⇒ 它们的 NuGet 依赖这一轮**没有被验过**，要在 Windows 上跑才会覆盖。');
+  }
+
   const packages = new Map();
-  for (const project of projects) {
+  for (const project of evaluable) {
     for (const [key, value] of listPackages(project)) packages.set(key, value);
   }
 
-  log(`扫描 ${projects.length} 个 .NET 工程，依赖树里 ${packages.size} 个包（含传递依赖）。`);
+  log(`扫描 ${evaluable.length} 个 .NET 工程，依赖树里 ${packages.size} 个包（含传递依赖）。`);
 
-  // ── 刷新模式：联网取许可证，重写清单 ──────────────────────────────
+  // ── 刷新模式：联网取许可证，写清单 ────────────────────────────────
+  //
+  // 🔴 **是"合并"不是"覆盖"。** 理由：清单是**跨平台共用**的，而有些工程
+  //    只能在某一个平台上评（`apps/desktop-windows` 的 WinUI 工程在 macOS 上
+  //    还原不了）。如果每次刷新都覆盖，那么在 macOS 上刷一次就会把
+  //    WindowsAppSDK 那些条目**删掉**，然后在 Windows 上刷一次又把 spike 的删掉 ——
+  //    永远凑不齐一份完整清单。
+  //    ⇒ 合并；某条目的来源平台由 `refresh` 时的实际依赖树决定。
   if (refresh) {
-    const inventory = {};
+    let existing = {};
+    try {
+      existing = JSON.parse(readFileSync(INVENTORY_PATH, 'utf8')).packages ?? {};
+    } catch {
+      existing = {};
+    }
+
+    const inventory = { ...existing };
     const sorted = [...packages.keys()].sort();
     for (const key of sorted) {
       const { id, version } = packages.get(key);
@@ -176,13 +229,19 @@ const main = async () => {
           generatedAt: new Date().toISOString().slice(0, 10),
           source: 'NuGet flatcontainer 的 .nuspec `license` 字段（SPDX expression）',
           why: '入库存档，好让门禁在**不联网**的情况下也能判定；新增 NuGet 包必须 --refresh 一次。',
+          platforms: '合并式：Windows-only 的工程（WinUI）只能在 Windows 上刷新，见本脚本的 isWindowsOnly。',
           packages: inventory,
         },
         null,
         2,
       )}\n`,
     );
-    log(`✅ 已刷新清单：${relative(ROOT, INVENTORY_PATH)}（${sorted.length} 个包）`);
+    const added = sorted.filter((key) => !Object.hasOwn(existing, key));
+    log(
+      `✅ 已刷新清单：${relative(ROOT, INVENTORY_PATH)} —— 本次触及 ${sorted.length} 个包，` +
+        `其中**新增 ${added.length} 个**，清单总计 ${Object.keys(inventory).length} 个。`,
+    );
+    for (const key of added) log(`     + ${key}  →  ${inventory[key].license}`);
     return 0;
   }
 
@@ -198,6 +257,7 @@ const main = async () => {
 
   const missing = [];
   const buckets = { permissive: [], restricted: [], other: [], unknown: [] };
+  const reviewedByPackage = [];
   for (const key of [...packages.keys()].sort()) {
     const entry = inventory[key];
     if (entry === undefined) {
@@ -205,7 +265,24 @@ const main = async () => {
       continue;
     }
     const license = normalizeLicense(entry.license);
-    buckets[classifyLicense(license)].push({ key, license });
+    const kind = classifyLicense(license);
+
+    // 有些包**根本没有 SPDX 标识符**：nuspec 写的是 `<license type="file">license.txt</license>`，
+    // 于是能拿到的只是文件名。这类只能**按包名**登记（见 license-policy.mjs 的说明）。
+    // ⚠️ 它只对 `other` / `unknown` 生效 —— 一个被识别成 restricted 的包**不会**因为
+    //    在包名白名单里就被放行。
+    if (kind === 'other' || kind === 'unknown') {
+      const packageId = key.split('@')[0];
+      const prefix = Object.keys(REVIEWED_LICENSE_FILE_PACKAGES).find((name) =>
+        packageId.startsWith(name),
+      );
+      if (prefix !== undefined) {
+        reviewedByPackage.push({ key, license, reason: REVIEWED_LICENSE_FILE_PACKAGES[prefix] });
+        continue;
+      }
+    }
+
+    buckets[kind].push({ key, license });
   }
 
   if (asJson) {
@@ -221,6 +298,13 @@ const main = async () => {
       log(`  ${icon} ${kind} : ${list.length}`);
       if (kind !== 'permissive') {
         for (const item of list) log(`     ${item.key}  →  ${item.license}`);
+      }
+    }
+    if (reviewedByPackage.length > 0) {
+      log(`  ☑️  按**包名**登记（许可证是随包附带的文件，没有 SPDX 标识符）：${reviewedByPackage.length}`);
+      for (const item of reviewedByPackage) {
+        log(`     ${item.key}  →  ${item.license}`);
+        log(`       理由：${item.reason}`);
       }
     }
     log('');
