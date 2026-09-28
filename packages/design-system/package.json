@@ -1,6 +1,9 @@
 {
   "name": "@heyta/design-system",
   "version": "0.0.0",
+  "sideEffects": [
+    "**/*.css"
+  ],
   "private": true,
   "description": "heyta 设计系统 —— 蓝白色系，所有设计变量的唯一事实源",
   "type": "module",

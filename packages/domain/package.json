@@ -1,6 +1,7 @@
 {
   "name": "@heyta/domain",
   "version": "0.0.0",
+  "sideEffects": false,
   "private": true,
   "description": "heyta 领域层：纯业务逻辑，无框架依赖（四象限 / 习惯连续天数 / 番茄钟状态机 / 重复规则）",
   "license": "MIT",

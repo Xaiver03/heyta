@@ -25,6 +25,8 @@
     "@heyta/storage": "workspace:*",
     "@heyta/sync-client": "workspace:*",
     "@heyta/sync-core": "workspace:*",
+    "@heyta/ui": "workspace:*",
+    "@heyta/widget-core": "workspace:*",
     "@op-engineering/op-sqlite": "^18.2.5",
     "fast-text-encoding": "^1.0.6",
     "lucide-react-native": "1.48.0",
@@ -32,8 +34,7 @@
     "react-native": "0.84.1",
     "react-native-get-random-values": "^2.0.0",
     "react-native-safe-area-context": "^5.5.2",
-    "react-native-svg": "15.15.5",
-    "@heyta/ui": "workspace:*"
+    "react-native-svg": "15.15.5"
   },
   "devDependencies": {
     "@babel/core": "^7.25.2",

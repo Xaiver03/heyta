@@ -27,7 +27,8 @@
     "@heyta/shared-schema": "workspace:*",
     "@heyta/storage": "workspace:*",
     "@heyta/sync-client": "workspace:*",
-    "@heyta/sync-core": "workspace:*"
+    "@heyta/sync-core": "workspace:*",
+    "@heyta/widget-core": "workspace:*"
   },
   "devDependencies": {
     "tsup": "^8.5.1",
