@@ -128,6 +128,23 @@ for (const file of files) {
       if (existsSync(resolved)) {
         if (verbose) console.log(`  ok   ${relative(ROOT, file)}:${i + 1} -> ${raw}`);
       } else {
+        // 🔴 指向 `SKIP_PATHS`（上游克隆、独立工作副本等）的链接**不是死链**。
+        //
+        // 那些目录是**刻意不进版本控制**的（见 `.gitignore` 的 `research/upstream/`），
+        // 所以在干净检出上必然不存在 —— 而"干净检出"正是 CI 的唯一形态。
+        // 报它等于让 `check:docs` 在 CI 上**永远红**。
+        //
+        // 实测（2026-09-28）：8 条指向 `research/upstream/super-productivity/`
+        // 的链接让 CI 必红，而本机因为那份 185 MB 的克隆在，**永远绿**。
+        // 这和"夹具字节随时区变"是同一类病：**结论取决于本机恰好有什么**。
+        //
+        // `SKIP_PATHS` 原来只用在 `collect()` 里 —— 跳过**扫描**那些目录，
+        // 但**指向**它们的链接照样解析、照样报死。这里补上另一半。
+        const relTarget = relative(ROOT, resolved);
+        if (SKIP_PATHS.some((p) => relTarget === p || relTarget.startsWith(p + '/'))) {
+          skipped++;
+          continue;
+        }
         broken.push({ file: relative(ROOT, file), line: i + 1, target: raw });
       }
     }
@@ -612,6 +629,19 @@ if (broken.length > 0) {
 if (hasProblems) process.exit(1);
 
 console.log(`\n扫描 ${files.length} 个 Markdown 文件，检查 ${checked} 个相对链接。`);
+
+// 🔴 跳过必须**说出来**。静默跳过会让"没检查"和"检查过且没问题"看起来一样 ——
+//    那正是本仓反复踩的那类病（见 AGENTS.md §7 与 ci-and-runner.md §8.1）。
+if (skipped > 0) {
+  console.log(
+    `\nℹ️  跳过 ${skipped} 个指向 ${SKIP_PATHS.map((p) => '`' + p + '/`').join(' / ')} 的链接：\n` +
+      '   这些目录**刻意不进版本控制**（本机有、干净检出没有），\n' +
+      '   所以它们的目标在 CI 上必然不存在 —— 那不是死链。\n' +
+      '   ⚠️ 代价要说清楚：**这些链接在 CI 上没有任何保护**，\n' +
+      '   只有本机 clone 过上游的人才能发现它们指错了。',
+  );
+}
+
 console.log('\n✅ 无死链、无失效章节引用、无失效锚点。\n');
 process.exit(0);
 
