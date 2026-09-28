@@ -28,6 +28,9 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, describe, expect, it } from 'vitest';
 
 import { I18nProvider, type Locale } from '@heyta/i18n';
+// M3 第二刀之后，`FocusTimer` 的计时核心来自共享 `FocusPanel`，它从 context 取
+// token —— 所以渲染它的树必须挂 `HeytaUiProvider`（应用里挂在 App 最外层）。
+import { HeytaUiProvider } from '@heyta/ui';
 
 import { FocusTimer } from '../src/features/focus/FocusTimer.js';
 import { useFocusStore } from '../src/features/focus/store.js';
@@ -44,7 +47,11 @@ function render(node: React.ReactNode, locale: Locale): HTMLDivElement {
   document.body.appendChild(container);
   root = createRoot(container);
   act(() => {
-    root!.render(<I18nProvider locale={locale}>{node}</I18nProvider>);
+    root!.render(
+      <I18nProvider locale={locale}>
+        <HeytaUiProvider>{node}</HeytaUiProvider>
+      </I18nProvider>,
+    );
   });
   return container;
 }

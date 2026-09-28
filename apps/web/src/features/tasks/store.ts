@@ -30,10 +30,20 @@
 
 import { create } from 'zustand';
 
-import { Priority, Quadrant, bucketByQuadrant, type QuadrantDropPlan, type Task } from '@heyta/domain';
+import {
+  Priority,
+  Quadrant,
+  bucketByQuadrant,
+  filterTasks,
+  searchTasks,
+  type QuadrantDropPlan,
+  type Task,
+  type TaskFilter,
+} from '@heyta/domain';
 import { emptyState, type MaterializedState } from '@heyta/op-log';
 import {
   createAiFeedbackActions,
+  createLocalApiHost,
   createPreferenceCorrectionActions,
   createTaskActions,
   type ActionContext,
@@ -41,6 +51,7 @@ import {
   type NewTaskFields,
   type WidgetDrainTasks,
 } from '@heyta/app-host';
+import type { LocalApiHost } from '@heyta/local-api';
 
 import {
   __resetOpLogForTests as resetEngine,
@@ -50,17 +61,26 @@ import {
   onEngineChange,
 } from '../../lib/oplog.js';
 
-export type TaskFilter =
-  | { kind: 'all' }
-  | { kind: 'today' }
-  | { kind: 'completed' }
-  | { kind: 'quadrant'; quadrant: Quadrant }
-  | { kind: 'project'; projectId: string };
+/**
+ * 🔴 **类型与判据都来自 `@heyta/domain`，这里只做转发。**
+ *
+ * 它们原先就定义在这个文件里 —— 那是 M1 违规："哪些任务算今天的"
+ * 是产品语义，而 `apps/web` 是壳。移动端拿不到，于是自己又写了一份分组
+ * （见 `packages/domain/src/task-filter.ts` 文件头）。
+ */
+export type { TaskFilter } from '@heyta/domain';
 
 interface TaskState {
   /** 物化状态快照。**由 op-log 引擎提供，不是自建的真相。** */
   entities: MaterializedState;
   filter: TaskFilter;
+  /**
+   * 搜索串。**它是在筛选之上再收窄**，不是替代筛选。
+   *
+   * 🔴 语义（"筛完之后再搜"）由 `selectVisibleTasks` 定，判据在
+   * `@heyta/domain` 的 `searchTasks` —— 两端共用一份，不在这里重写。
+   */
+  query: string;
   /** 当前时间，供象限归类。显式存下来避免渲染间漂移。 */
   now: number;
   ready: boolean;
@@ -112,6 +132,7 @@ interface TaskState {
   /** 撤销一次「忘掉」。 */
   restorePreference: (correctionId: string) => Promise<void>;
   setFilter: (filter: TaskFilter) => void;
+  setQuery: (query: string) => void;
   refreshNow: () => void;
 }
 
@@ -162,6 +183,21 @@ export const widgetDrainTasks: WidgetDrainTasks = {
   findTask: (entityId) => taskActions.findTask(entityId),
   setCompleted: (entityId, completed) => taskActions.setCompleted(entityId, completed),
 };
+
+/**
+ * 内置 AI 调工具用的**进程内**宿主。
+ *
+ * 🔴 复用 `createLocalApiHost()` —— 与 MCP 侧是**同一份**工具执行语义
+ * （受保护条目投影、参数校验、`submit` → `dispatch`）。这里不重写任何一条：
+ * 重写就会出现"同一个 `list_tasks` 在 AI 路径与 MCP 路径返回不同的东西"。
+ *
+ * ⚠️ `isReadable: () => true` 是**如实**的：heyta 目前没有"受保护条目"这个产品概念
+ * （ADR-0011 §6.1 与 `ai-open-decisions.md` 决策 1：先不做）。
+ * 将来接解密失败那条路径时，只需要改这一处。
+ */
+export function createAiToolHost(): LocalApiHost {
+  return createLocalApiHost(actionContext, taskActions, { isReadable: () => true });
+}
 /**
  * 反馈动作。**与任务动作分开**：它写的不是用户内容，而是"用户怎么用 AI"。
  * 混在一起会让"任务写入"这个语义变得不清晰。
@@ -177,6 +213,7 @@ onEngineChange(() => {
 export const useTaskStore = create<TaskState>((set) => ({
   entities: emptyState(),
   filter: { kind: 'all' },
+  query: '',
   now: Date.now(),
   ready: false,
 
@@ -259,6 +296,7 @@ export const useTaskStore = create<TaskState>((set) => ({
   },
 
   setFilter: (filter) => set({ filter }),
+  setQuery: (query) => set({ query }),
   refreshNow: () => set({ now: Date.now() }),
 }));
 
@@ -267,36 +305,20 @@ export const useTaskStore = create<TaskState>((set) => ({
 // ─────────────────────────────────────────────────────────────
 
 export function selectVisibleTasks(state: TaskState): Task[] {
-  const alive = Object.values(state.entities.tasks).filter(
-    (t) => t.deletedAt === undefined,
-  );
-
-  // ⚠️ 必须提取成局部常量。反复写 `state.filter.kind` / `state.filter.projectId`
-  // 时 TypeScript **无法跨表达式保持 narrowing** —— 属性访问每次都会重新
-  // 取一遍类型，判别联合的收窄就丢掉了。
-  const filter = state.filter;
-
-  switch (filter.kind) {
-    case 'all':
-      return alive.filter((t) => t.completedAt === undefined);
-    case 'completed':
-      return alive.filter((t) => t.completedAt !== undefined);
-    case 'today': {
-      const todayStr = new Date(state.now).toDateString();
-      return alive.filter(
-        (t) =>
-          t.completedAt === undefined &&
-          t.dueDate !== undefined &&
-          new Date(t.dueDate).toDateString() === todayStr,
-      );
-    }
-    case 'quadrant':
-      return bucketByQuadrant(alive, { now: state.now })[filter.quadrant];
-    case 'project':
-      return alive.filter(
-        (t) => t.completedAt === undefined && t.projectId === filter.projectId,
-      );
-  }
+  /**
+   * 🔴 **一行委派，不再自己 switch。**
+   *
+   * 这里原先是一段 `switch (filter.kind)`，与移动端 `TasksScreen` 的分组
+   * 是**两份互不校验的实现**。判据现在只有一份（`@heyta/domain`），
+   * 加一个筛选分支（例如 `tag`）时，四端同时拿到它。
+   */
+  // 🔴 「先筛再搜」：搜索是在当前筛选之上**收窄**，不替代它。
+  //    反过来（先搜再筛）在"已完成"这类分支上会得到不同结果 ——
+  //    而那种差别用户只会读成"搜索有时候不准"。
+  const filtered = filterTasks(Object.values(state.entities.tasks), state.filter, {
+    now: state.now,
+  });
+  return searchTasks(filtered, state.query);
 }
 
 export function selectQuadrantCounts(state: TaskState): Record<Quadrant, number> {

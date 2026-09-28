@@ -145,7 +145,7 @@ describe('从界面选一个色槽，最后真的出现在成长视图里', () =
     expect(text).toContain('分类时长');
     expect(text).toContain('跑步');
     expect(text).toContain('30 分钟');
-    const lane = container?.querySelector('.ht-categories__lane');
+    const lane = container?.querySelector('[data-testid="category-lane"]');
     expect(lane?.textContent, '行首要写出槽位号（颜色只是加速器）').toContain('3');
   });
 
@@ -166,7 +166,7 @@ describe('从界面选一个色槽，最后真的出现在成长视图里', () =
 
     click(byText('成长'));
     await flush();
-    const lane = container?.querySelector('.ht-categories__lane');
+    const lane = container?.querySelector('[data-testid="category-lane"]');
     // 没设色的行**照样显示**（时长与名字都在），只是没有颜色。
     expect(lane?.textContent).toContain('跑步');
     expect(lane?.textContent).toContain('30 分钟');

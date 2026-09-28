@@ -171,7 +171,10 @@ describe('CaptureComposer：日期芯片里的剩余时间是当前语言', () =
       input.dispatchEvent(new Event('input', { bubbles: true }));
     });
 
-    const value = el.querySelector('.ht-capture__chip .ht-capture__value');
+    // ⚠️ M3 第八刀（capture）把芯片换成了共享 `@heyta/ui` 的 `CaptureComposer`，
+    //    所以这里按 `testID` 寻址（RNW → `data-testid`），不再用旧的
+    //    `.ht-capture__value` 类名 —— 类名随 DOM 实现一起删掉了。
+    const value = el.querySelector('[data-testid="capture-chip-value"]');
     // 芯片里的"原样输入"是中文（那是用户自己打的字，本来就该原样显示）；
     // 但**解析结果**那半边必须是英文 —— 这里两者分得开，正是本测试要的。
     expect(value?.textContent).toMatch(/Tomorrow/);

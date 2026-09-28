@@ -34,13 +34,12 @@
  */
 
 import { useState } from 'react';
-import { AlertTriangle, Cloud, HardDrive, Sparkles, X } from 'lucide-react';
+import { AlertTriangle, Sparkles, X } from 'lucide-react';
 
 import { breakdownFailureCopy, type AiFailureCopy } from './ai-failure-copy.js';
 import { useI18n } from '@heyta/i18n';
 
-import { LIST_SEPARATOR } from './locale-punctuation.js';
-import { retentionMessageKey } from './disclosure-copy.js';
+import { AiDisclosureHost } from './AiDisclosureHost.js';
 import { RouteUnavailable, FailureSettingsAction } from './RouteUnavailable.js';
 import { useAiSettingsNavigation } from './ai-settings-navigation.js';
 import {
@@ -375,53 +374,15 @@ export function AiBreakdown(props: AiBreakdownProps): React.JSX.Element {
           />
         ) : (
           <>
-            <p className="ht-ai__row" data-testid="ai-destination">
-              {target.isLocal ? (
-                <HardDrive size={12} aria-hidden="true" />
-              ) : (
-                <Cloud size={12} aria-hidden="true" />
-              )}
-              {t('web.ai.disclosure.destinationLead')}<strong>{target.label}</strong>
-              <code>{target.endpoint}</code>
-              <span>{t('web.ai.disclosure.model', { model: target.model })}</span>
-              <span className="ht-ai__tag" data-testid="ai-destination-kind">
-                {target.isLocal ? t('web.ai.disclosure.local') : t('web.ai.disclosure.remote')}
-              </span>
-            </p>
-
-            {/* 🔴 回退链必须披露 —— 首选失败时会自动换一个端点，
-                而那是**另一家公司**。成功了就没有任何提示，
-                所以只能在这里先说清楚。 */}
-            {target.fallbacks.length > 0 && (
-              <p className="ht-ai__row ht-ai__row--warn" data-testid="ai-fallbacks">
-                <AlertTriangle size={12} aria-hidden="true" />
-                {t('web.ai.disclosure.fallbackLead')}
-                <strong data-testid="ai-fallback-list">{target.fallbacks.join(LIST_SEPARATOR[locale])}</strong>
-              </p>
-            )}
-
-            {/* 🔴 「留多久」是披露的三维之一（发给谁 / 发什么 / 留多久）。
-                早先这一维完全没显示 —— `describeRetention()` 有现成的文案，
-                而 UI 用的是自己手写的那一套。 */}
-            {disclosure !== undefined && (
-              <p className="ht-ai__row" data-testid="ai-retention">
-                {t('web.ai.disclosure.retentionLead')}<strong data-testid="ai-retention-text">
-                  {t(retentionMessageKey(disclosure.retentionDisclosure.kind))}
-                </strong>
-              </p>
-            )}
-
-            <p className="ht-ai__row" data-testid="ai-fields">
-              {t('web.ai.disclosure.fieldsLead')}
-              <strong data-testid="ai-field-list">{invocation.fields.join(LIST_SEPARATOR[locale])}</strong>
-            </p>
-
-            {!target.isLocal && (
-              <p className="ht-ai__warn" data-testid="ai-e2ee-warning">
-                <AlertTriangle size={12} aria-hidden="true" />
-                {t('web.ai.disclosure.e2eeLead')}<strong>{t('web.ai.disclosure.e2eeStrong')}</strong>
-              </p>
-            )}
+            {/* 🔴 披露的五个维度由 `@heyta/ui` 的 `AiDisclosure` 渲染 ——
+                五个 AI 入口共用同一份实现，所以"某一处漏披露一个维度"
+                在结构上不可能再出现（跨面板一致性有专门的 spec 钉住）。 */}
+            <AiDisclosureHost
+              testIdPrefix="ai-"
+              target={target}
+              fields={invocation.fields}
+              retentionDisclosure={disclosure?.retentionDisclosure}
+            />
 
             <div className="ht-ai__actions">
               <button type="button" className="ht-btn" data-testid="ai-send" onClick={() => void send()}>

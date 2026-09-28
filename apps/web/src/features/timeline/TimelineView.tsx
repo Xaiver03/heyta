@@ -53,16 +53,16 @@
 
 import { readDurationFromNote } from '@heyta/app-host';
 import { cssVar } from '@heyta/design-system';
-import type { LocalDate } from '@heyta/domain';
-import { useI18n } from '@heyta/i18n';
-
 import {
   MIN_DURATION_MINUTES,
   buildTimeline,
   parseChecklistFromNote,
   type ChecklistItem,
+  type LocalDate,
   type TimelinePlan,
-} from './buildTimeline.js';
+} from '@heyta/domain';
+import { useI18n } from '@heyta/i18n';
+
 import { GanttChart, formatMinutes } from './GanttChart.js';
 
 /**

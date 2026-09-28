@@ -16,11 +16,18 @@
  *
  * 本文件剩下的只有两件事：
  *
- *   1. 把共享层的函数**转发**成 Web 组件已经在用的名字（`select*`）——
- *      组件一行都不用改，这是"抽出去之后删掉旧实现"的收尾方式：
- *      旧实现的职责没了，但**调用点**的名字不必跟着改；
- *   2. 给年视图的格子补上 `level` 分档 —— 那是**热力图库的展示适配**，
- *      不是业务判据（见 `selectYearActivity` 的注释），所以刻意留在壳里。
+ *   把共享层的函数**转发**成 Web 组件已经在用的名字（`select*`）——
+ *   调用点不必跟着改，这是"抽出去之后删掉旧实现"的收尾方式。
+ *
+ * 🔴 **M3 第十一刀收尾：`levelOf` 已删。**
+ *
+ * 年视图的分档（0 / 1 / 2 / 3 / 4+）曾经在这里有第二份实现
+ * （`levelOf`，见 `git show <迁移前>` 的 `selectYearActivity`）。共享层的
+ * `motivation/model.ts#activityLevel` 与它逐字同口径 —— 这就是这一刀**新产生**
+ * 的第二份实现，必须删掉。现在分档只发生在 `ActivityHeatmap` 内部
+ * （`toActivityHeatmapDays`），本文件连 `level` 这个概念都不再产出。
+ * 年视图的事实序列由 GrowthView 直接向 `@heyta/app-host` 取
+ * （`dailyActivityCountsFromState`），结构上就是 `ActivityDayCount`。
  * ─────────────────────────────────────────────────────────────────────────
  *
  * ⚠️ **`now` 一律由调用方传入，绝不在里面读 `Date.now()`。**
@@ -31,7 +38,6 @@
 import {
   activityTotalsFromState,
   categoryReportFromTables,
-  dailyActivityCountsFromState,
   identityTagsFromState,
   milestonesFromState,
   todayProgressFromState,
@@ -84,38 +90,6 @@ export function selectWeeklyReview(state: MotivationInput, now: number): WeeklyR
  */
 export function selectIdentityTags(state: MotivationInput, now: number): IdentityTagProgress[] {
   return identityTagsFromState(state, now);
-}
-
-/** 一年视图里的一个格子。 */
-export interface DayActivity {
-  date: LocalDate;
-  /** 这一天"完成了几件事"：打卡 + 完成的任务 + 专注轮次。 */
-  count: number;
-  level: 0 | 1 | 2 | 3 | 4;
-}
-
-/**
- * 近 N 天"有没有在做"的格子。
- *
- * 每天几件是**事实**，由共享层给出；`level` 是
- * [react-activity-calendar](https://github.com/grubersjoe/react-activity-calendar)
- * 要的分档 —— 换图表库这份映射就要改，所以它是**展示**参数，
- * 刻意留在壳里，不进共享层。
- */
-export function selectYearActivity(state: MotivationInput, now: number, days = 365): DayActivity[] {
-  return dailyActivityCountsFromState(state, now, days).map(({ date, count }) => ({
-    date,
-    count,
-    level: levelOf(count),
-  }));
-}
-
-function levelOf(count: number): 0 | 1 | 2 | 3 | 4 {
-  if (count <= 0) return 0;
-  if (count === 1) return 1;
-  if (count === 2) return 2;
-  if (count === 3) return 3;
-  return 4;
 }
 
 /** 今天的日期字符串。组件用它做"是否已跨天"的判据，不参与计算。 */

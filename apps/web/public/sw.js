@@ -231,6 +231,7 @@
   var DB_VERSION = 1;
   var STORE_CLICKS = "clicks";
   var STORE_DATA = "data";
+  var PUSH_MARKER_KEY = "__last_push_received_at";
   function openDb() {
     return new Promise((resolve, reject) => {
       const request = indexedDB.open(DB_NAME, DB_VERSION);
@@ -390,6 +391,7 @@
             return "";
           }
         })();
+        await tx(STORE_DATA, "readwrite", (store) => store.put(Date.now(), PUSH_MARKER_KEY));
         for (const client of clients) {
           client.postMessage({ type: "heyta:push", payload });
         }

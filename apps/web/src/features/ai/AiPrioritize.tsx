@@ -30,12 +30,11 @@
  */
 
 import { useState } from 'react';
-import { AlertTriangle, Cloud, HardDrive, Sparkles, X } from 'lucide-react';
+import { AlertTriangle, Sparkles, X } from 'lucide-react';
 
 import { useI18n } from '@heyta/i18n';
 
-import { LIST_SEPARATOR } from './locale-punctuation.js';
-import { retentionMessageKey } from './disclosure-copy.js';
+import { AiDisclosureHost } from './AiDisclosureHost.js';
 
 import {
   Priority,
@@ -334,54 +333,19 @@ export function AiPrioritize(props: AiPrioritizeProps): React.JSX.Element {
           />
         ) : (
           <>
-            <p className="ht-ai__row" data-testid="prioritize-destination">
-              {target.isLocal ? (
-                <HardDrive size={12} aria-hidden="true" />
-              ) : (
-                <Cloud size={12} aria-hidden="true" />
-              )}
-              {t('web.ai.disclosure.destinationLead')}<strong>{target.label}</strong>
-              <code>{target.endpoint}</code>
-              <span>{t('web.ai.disclosure.model', { model: target.model })}</span>
-              <span className="ht-ai__tag" data-testid="prioritize-destination-kind">
-                {target.isLocal ? t('web.ai.disclosure.local') : t('web.ai.disclosure.remote')}
-              </span>
-            </p>
-
-            {/* 🔴 回退链必须披露 —— 首选失败时会自动换一个端点，
-                而那是**另一家公司**，且成功了就没有任何提示。 */}
-            {target.fallbacks.length > 0 && (
-              <p className="ht-ai__row ht-ai__row--warn" data-testid="prioritize-fallbacks">
-                <AlertTriangle size={12} aria-hidden="true" />
-                {t('web.ai.disclosure.fallbackLead')}
-                <strong data-testid="prioritize-fallback-list">{target.fallbacks.join(LIST_SEPARATOR[locale])}</strong>
+            {/* 🔴 披露的五个维度由 `@heyta/ui` 的 `AiDisclosure` 渲染 ——
+                五个 AI 入口共用同一份实现。面板专有的 count 行走 children 插槽，
+                摆在 `fields` 与 E2EE 警告之间（与改造前顺序逐字相同）。 */}
+            <AiDisclosureHost
+              testIdPrefix="prioritize-"
+              target={target}
+              fields={invocation.fields}
+              retentionDisclosure={disclosure?.retentionDisclosure}
+            >
+              <p className="ht-ai__note" data-testid="prioritize-count">
+                {t('web.ai.prioritize.countLead')} <strong>{source.tasks.length}</strong> {t('web.ai.prioritize.countTail')}
               </p>
-            )}
-
-            {/* 🔴 「留多久」是披露的三维之一（发给谁 / 发什么 / 留多久）。 */}
-            {disclosure !== undefined && (
-              <p className="ht-ai__row" data-testid="prioritize-retention">
-                {t('web.ai.disclosure.retentionLead')}<strong data-testid="prioritize-retention-text">
-                  {t(retentionMessageKey(disclosure.retentionDisclosure.kind))}
-                </strong>
-              </p>
-            )}
-
-            <p className="ht-ai__row" data-testid="prioritize-fields">
-              {t('web.ai.disclosure.fieldsLead')}
-              <strong data-testid="prioritize-field-list">{invocation.fields.join(LIST_SEPARATOR[locale])}</strong>
-            </p>
-
-            <p className="ht-ai__note" data-testid="prioritize-count">
-              {t('web.ai.prioritize.countLead')} <strong>{source.tasks.length}</strong> {t('web.ai.prioritize.countTail')}
-            </p>
-
-            {!target.isLocal && (
-              <p className="ht-ai__warn" data-testid="prioritize-e2ee-warning">
-                <AlertTriangle size={12} aria-hidden="true" />
-                {t('web.ai.disclosure.e2eeLead')}<strong>{t('web.ai.disclosure.e2eeStrong')}</strong>
-              </p>
-            )}
+            </AiDisclosureHost>
 
             <div className="ht-ai__actions">
               <button

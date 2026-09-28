@@ -1,0 +1,386 @@
+/**
+ * 判据：**习惯卡片（打卡 + 连续 + 热力图）只有 `packages/ui` 那一份实现**
+ * ======================================================================
+ *
+ * 出处：`docs/plans/multi-platform-adaptation.md` 的 M3「每轮的固定流程」
+ * 第 1–2 步，以及 §判据 A「该特性在 `apps/web` 与 `apps/mobile` 下
+ * **不再各有一份实现**」。
+ *
+ * 为什么这条值得单独一个测试：迁移前 web 有一份 374 行的 DOM 实现，
+ * mobile **一行都没有**。两端"各自回答什么算打过、冻结保住了几天、
+ * 热力图几档"的差异**不会让任何测试变红** —— 差异本身没有断言。
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * 判据怎么定的（四道）
+ *
+ * **A. 热力图是自绘的，且每一格带得住确切数字。**
+ *    `react-activity-calendar` 是 DOM 库，共享层换成 RN 原语自绘；
+ *    它内置的悬停提示因此消失，补回来的路是 `cellTooltip` → `data-cell-title`
+ *    （宿主 CSS 的 `::after` 负责显示，见 `app.css`）。
+ *    ⇒ 断言：90 格都带 `data-cell-title`；**不给** `cellTooltip` 时一格都不带
+ *    （mobile 没有鼠标 —— 产出属性就是承诺一个不存在的交互）。
+ *
+ * **B. 打卡按钮的状态与语义。**
+ *    `aria-pressed` 反映 `doneToday`，点击调 `onCheckIn`，已打卡时调
+ *    `onUndoCheckIn`。
+ *
+ * **C. 补打卡 / 重新开始只在领域层给出机会时出现。**
+ *    `resilience.repair` / `freshStart` 由 `@heyta/domain` 判定
+ *    （`streakIfRepaired ≥ 2` 等），共享层**不许**自己再判一次。
+ *
+ * **D. 空态只有共享层那一句。**
+ *
+ * ⚠️ RNW 的 `Pressable` 渲染成 `<div role="button">`（不是 `<button>`），
+ * 所以下面一律用 `testID`（RNW → `data-testid`）寻址，不用标签名。
+ *
+ * ⚠️ 本测试用 `@heyta/ui` 的 **`dist/`**（package exports）。
+ * 改完 `packages/ui` 源码必须先 `pnpm --filter @heyta/ui build`，
+ * 否则看到的是**上一次构建**的结果（假红或假绿都可能，本 Goal 因此误判过两次）。
+ */
+
+import { readFileSync } from 'node:fs';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+import { act, type ReactElement } from 'react';
+import { createRoot, type Root } from 'react-dom/client';
+import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
+
+import type { Habit, HabitLog } from '@heyta/domain';
+import { I18nProvider, zhCN } from '@heyta/i18n';
+import {
+  HabitBoard,
+  HeytaUiProvider,
+  type HabitBoardLabels,
+  type HabitGrowthFn,
+} from '@heyta/ui';
+
+const HERE = dirname(fileURLToPath(import.meta.url));
+/**
+ * 判据要读的源码根。
+ *
+ * ⚠️ 两个环境变量是**只读接缝**，只给故障注入用（把目录复制到 `/tmp`、改一处、
+ * 指过去，证明"真实现漂了 → 红"），与 `mockup-quadrant-shape.spec.tsx` 的
+ * `HEYTA_MOCKUP_*` 同一约定。不设它们时就是真实路径。
+ */
+const WEB_SRC = process.env.HEYTA_HABITS_WEB_SRC ?? resolve(HERE, '../src');
+const UI_SRC = process.env.HEYTA_HABITS_UI_SRC ?? resolve(HERE, '../../../packages/ui/src');
+
+/** 稳定的"现在"：2026-09-28 12:00（周一）。**不读 `Date.now()`**。 */
+const NOW = new Date(2026, 8, 28, 12, 0, 0).getTime();
+
+function habit(over: Partial<Habit> = {}): Habit {
+  return { id: 'h1', name: '喝水', createdAt: 1, updatedAt: 1, ...over };
+}
+
+function log(date: string, over: Partial<HabitLog> = {}): HabitLog {
+  return { id: `h1:${date}`, habitId: 'h1', date, createdAt: 1, updatedAt: 1, ...over };
+}
+
+/** 桩：连续 / 韧性由"宿主"给 —— 共享层不认识 `@heyta/app-host`。 */
+const growth: HabitGrowthFn = () => ({
+  streak: { current: 3, longest: 9 },
+  resilience: {
+    resilience: {
+      current: 3,
+      longest: 9,
+      total: 12,
+      freezesHeld: 1,
+      frozenDays: 2,
+      frozenInCurrentRun: 0,
+    },
+  },
+});
+
+const LABELS: HabitBoardLabels = {
+  checkIn: '打卡',
+  checkedIn: '已打卡',
+  checkInA11y: ({ name, doneToday }) => (doneToday ? `撤销「${name}」` : `为「${name}」打卡`),
+  streakCurrent: (count) => `连续 ${String(count)} 天`,
+  streakLongest: (count) => `最长 ${String(count)} 天`,
+  streakTotal: (count) => `累计 ${String(count)} 次`,
+  freeze: (count) => `这段连续里有 ${String(count)} 天是冻结保住的`,
+  repair: ({ date, count }) => `${date} 那天漏了。现在补上，就是连续 ${String(count)} 天。`,
+  repairAction: '补上',
+  repairA11y: ({ date, name }) => `把 ${date} 的「${name}」补上`,
+  freshStart: ({ days, longest, total }) =>
+    `已经 ${String(days)} 天没打卡了。最长 ${String(longest)} 天、累计 ${String(total)} 次都还在。`,
+  freshStartAction: '今天重新开始',
+  freshStartA11y: (name) => `今天为「${name}」重新打卡`,
+  empty: '还没有习惯。添加一个开始打卡。',
+  heatmap: {
+    month: () => '某月',
+    grid: ({ name, total, days }) =>
+      `「${name}」最近 ${String(days)} 天共 ${String(total)} 次打卡`,
+    cellTooltip: ({ date, count }) => `${date}：${String(count)} 次`,
+    less: '少',
+    more: '多',
+  },
+};
+
+/** 不给 `cellTooltip` 的一份 —— 用来证明"不产出属性"那一半真的成立。 */
+const LABELS_NO_TOOLTIP: HabitBoardLabels = {
+  ...LABELS,
+  heatmap: { month: LABELS.heatmap.month, grid: LABELS.heatmap.grid },
+};
+
+/** jsdom 里 RNW 偶尔会问 `ResizeObserver` —— 给个空实现，与别的 spec 一致。 */
+class NoopResizeObserver implements ResizeObserver {
+  observe(): void {}
+  unobserve(): void {}
+  disconnect(): void {}
+}
+
+let container: HTMLDivElement | null = null;
+let root: Root | null = null;
+
+beforeAll(() => {
+  (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+  (globalThis as unknown as { ResizeObserver: typeof ResizeObserver }).ResizeObserver =
+    NoopResizeObserver as unknown as typeof ResizeObserver;
+});
+
+afterEach(() => {
+  if (root !== null) {
+    act(() => {
+      root?.unmount();
+    });
+    root = null;
+  }
+  container?.remove();
+  container = null;
+});
+
+function render(node: ReactElement): HTMLElement {
+  container = document.createElement('div');
+  document.body.append(container);
+  root = createRoot(container);
+  act(() => {
+    root?.render(
+      <I18nProvider locale="zh-CN">
+        <HeytaUiProvider>{node}</HeytaUiProvider>
+      </I18nProvider>,
+    );
+  });
+  return container;
+}
+
+/** 用共享 `HabitBoard` 渲染一次（默认桩与标签）。 */
+function renderBoard(props: {
+  habits: readonly Habit[];
+  logs: readonly HabitLog[];
+  labels?: HabitBoardLabels;
+  onCheckIn?: (id: string, date?: string) => void;
+  onUndoCheckIn?: (id: string, date?: string) => void;
+  busyHabitId?: string | null;
+  growthFn?: HabitGrowthFn;
+}): HTMLElement {
+  return render(
+    <HabitBoard
+      habits={props.habits}
+      logs={props.logs}
+      now={NOW}
+      growth={props.growthFn ?? growth}
+      labels={props.labels ?? LABELS}
+      onCheckIn={props.onCheckIn ?? (() => undefined)}
+      onUndoCheckIn={props.onUndoCheckIn ?? (() => undefined)}
+      busyHabitId={props.busyHabitId ?? null}
+    />,
+  );
+}
+
+function byTestId(view: HTMLElement, testId: string): HTMLElement | null {
+  return view.querySelector<HTMLElement>(`[data-testid="${testId}"]`);
+}
+
+describe('A. 热力图自绘 + 悬停的确切数字', () => {
+  it('90 天 = 90 格，且每一格都带 `data-cell-title`（web 才传 cellTooltip）', () => {
+    const view = renderBoard({ habits: [habit()], logs: [] });
+    const cells = view.querySelectorAll('[data-cell-title]');
+    expect(cells).toHaveLength(90);
+  });
+
+  it('🔴 不给 `cellTooltip` 时**一格都不带**（mobile 没有鼠标，不许承诺悬停）', () => {
+    const view = renderBoard({ habits: [habit()], logs: [], labels: LABELS_NO_TOOLTIP });
+    // 先用月份标签证明热力图确实画出来了 —— 否则"0 个"可能只是整块没渲染（空转断言）。
+    expect(view.textContent ?? '').toContain('某月');
+    expect(view.querySelectorAll('[data-cell-title]').length).toBe(0);
+  });
+
+  it('打过的日子在 DOM 上留下"1 次"的痕迹（数字来自日志，不是猜的）', () => {
+    const view = renderBoard({ habits: [habit()], logs: [log('2026-09-28')] });
+    const titles = [...view.querySelectorAll('[data-cell-title]')].map((el) =>
+      el.getAttribute('data-cell-title'),
+    );
+    expect(titles).toContain('2026-09-28：1 次');
+    expect(titles).toContain('2026-09-27：0 次');
+  });
+
+  it('图例取"少 → 多"（两端共用同一份 heat 色阶）', () => {
+    const view = renderBoard({ habits: [habit()], logs: [] });
+    const flat = (view.textContent ?? '').replace(/\s+/gu, '');
+    expect(flat).toContain('少');
+    expect(flat).toContain('多');
+  });
+});
+
+describe('B. 打卡按钮：状态、语义与动作', () => {
+  it('未打卡：`aria-pressed=false`，点击调 onCheckIn（只带 habitId）', () => {
+    const onCheckIn = vi.fn();
+    const view = renderBoard({ habits: [habit()], logs: [], onCheckIn });
+    const button = byTestId(view, 'habit-checkin-h1');
+    expect(button).not.toBeNull();
+    expect(button?.getAttribute('aria-pressed')).toBe('false');
+    expect(button?.textContent).toContain('打卡');
+    act(() => {
+      button?.click();
+    });
+    expect(onCheckIn).toHaveBeenCalledWith('h1');
+  });
+
+  it('已打卡：`aria-pressed=true`，文案是「已打卡」，点击调 onUndoCheckIn', () => {
+    const onUndo = vi.fn();
+    const view = renderBoard({
+      habits: [habit()],
+      logs: [log('2026-09-28')],
+      onUndoCheckIn: onUndo,
+    });
+    const button = byTestId(view, 'habit-checkin-h1');
+    expect(button?.getAttribute('aria-pressed')).toBe('true');
+    expect(button?.textContent).toContain('已打卡');
+    act(() => {
+      button?.click();
+    });
+    expect(onUndo).toHaveBeenCalledWith('h1');
+  });
+
+  it('忙碌中的那一行按钮被置灰（防连点发出两条 op）', () => {
+    const view = renderBoard({ habits: [habit()], logs: [], busyHabitId: 'h1' });
+    const button = byTestId(view, 'habit-checkin-h1');
+    // RNW 的 `Pressable` 渲染成 div，`disabled` 体现在 `aria-disabled`。
+    expect(button?.getAttribute('aria-disabled')).toBe('true');
+  });
+});
+
+describe('C. 补打卡 / 重新开始：只渲染领域层给出的机会', () => {
+  const withRepair: HabitGrowthFn = () => ({
+    streak: { current: 0, longest: 9 },
+    resilience: {
+      resilience: {
+        current: 0,
+        longest: 9,
+        total: 12,
+        freezesHeld: 0,
+        frozenDays: 2,
+        frozenInCurrentRun: 0,
+      },
+      repair: { date: '2026-09-27', streakIfRepaired: 5 },
+    },
+  });
+
+  const withFreshStart: HabitGrowthFn = () => ({
+    streak: { current: 0, longest: 21 },
+    resilience: {
+      resilience: {
+        current: 0,
+        longest: 21,
+        total: 40,
+        freezesHeld: 0,
+        frozenDays: 2,
+        frozenInCurrentRun: 0,
+      },
+      freshStart: { daysSinceLast: 9, longest: 21, total: 40 },
+    },
+  });
+
+  it('没有 repair / freshStart 时，两块都不出现', () => {
+    const view = renderBoard({ habits: [habit()], logs: [] });
+    expect(byTestId(view, 'habit-repair-h1')).toBeNull();
+    expect(byTestId(view, 'habit-freshstart-h1')).toBeNull();
+  });
+
+  it('给了 repair 才出现，且补打卡按钮把**那一天**传回去（不是今天）', () => {
+    const onCheckIn = vi.fn();
+    const view = renderBoard({ habits: [habit()], logs: [], onCheckIn, growthFn: withRepair });
+    const button = byTestId(view, 'habit-repair-h1');
+    expect(button).not.toBeNull();
+    expect(button?.textContent).toContain('补上');
+    act(() => {
+      button?.click();
+    });
+    expect(onCheckIn).toHaveBeenCalledWith('h1', '2026-09-27');
+  });
+
+  it('给了 freshStart 才出现，且它打的是**今天**（不带日期）', () => {
+    const onCheckIn = vi.fn();
+    const view = renderBoard({
+      habits: [habit()],
+      logs: [],
+      onCheckIn,
+      growthFn: withFreshStart,
+    });
+    const button = byTestId(view, 'habit-freshstart-h1');
+    expect(button).not.toBeNull();
+    act(() => {
+      button?.click();
+    });
+    expect(onCheckIn).toHaveBeenCalledWith('h1');
+  });
+});
+
+describe('D. 空态由共享层渲染', () => {
+  it('一个习惯都没有时，渲染的是共享层的 `labels.empty` 那一句', () => {
+    const view = renderBoard({ habits: [], logs: [] });
+    expect((view.textContent ?? '').trim()).toBe(LABELS.empty);
+    // 空态不是"画一张空热力图"。
+    expect(view.querySelectorAll('[data-cell-title]').length).toBe(0);
+  });
+});
+
+describe('E. web 视图不再有第二份实现（源码级判据）', () => {
+  const hostSource = (): string =>
+    readFileSync(resolve(WEB_SRC, 'features/habits/HabitsView.tsx'), 'utf8');
+  const boardSource = (): string =>
+    readFileSync(resolve(UI_SRC, 'habits/HabitBoard.tsx'), 'utf8');
+
+  it('web 宿主从 `@heyta/ui` 取 `HabitBoard`，且不再 import `react-activity-calendar`', () => {
+    const host = hostSource();
+    expect(host).toContain('HabitBoard');
+    expect(host).toContain('@heyta/ui');
+    // 🔴 DOM 库不许回潮：它是"热力图在共享层自绘"这件事的反面。
+    // ⚠️ 判据必须盯 **import 语句**而不是文件里出现过这个词 ——
+    // 文件头的说明文字里就写着 `react-activity-calendar`（实测第一版因此假红）。
+    expect(host).not.toMatch(/from\s+['"]react-activity-calendar['"]/);
+  });
+
+  it('热力图的骨架在共享层（自绘 `View` 网格），不在 web 的 JSX 里', () => {
+    const board = boardSource();
+    expect(board).toContain('toHeatmapWeeks');
+    expect(board).toContain('heatmapLevelToken');
+    expect(hostSource()).not.toContain('heatmapLevelToken');
+  });
+
+  it('文案一律由宿主注入：共享层不 import `@heyta/i18n`', () => {
+    // 同样盯 import 语句，不盯"文件里出现过这个词"（文件头正是这么写的）。
+    expect(boardSource()).not.toMatch(/from\s+['"]@heyta\/i18n/);
+  });
+
+  it('用真词条渲染一次：累计数字与中文文案对得上', () => {
+    const view = render(
+      <HabitBoard
+        habits={[habit()]}
+        logs={[log('2026-09-28')]}
+        now={NOW}
+        growth={growth}
+        labels={{
+          ...LABELS,
+          streakTotal: (count) =>
+            zhCN['web.habits.streak.total'].replace('{count}', String(count)),
+        }}
+        onCheckIn={() => undefined}
+        onUndoCheckIn={() => undefined}
+      />,
+    );
+    expect((view.textContent ?? '').replace(/\s+/gu, '')).toContain('累计12次');
+  });
+});

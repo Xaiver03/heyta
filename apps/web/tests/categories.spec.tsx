@@ -201,19 +201,47 @@ describe('CategoryBreakdown（真实渲染）', () => {
   it('泳道格子数 = 窗口周数（**从常量推导**，不写死 12），且走 intensity 分档', () => {
     useTaskStore.setState({ entities: stateWithRows(), now: NOW });
     const el = render(<CategoryBreakdown />);
-    const lanes = el.querySelectorAll('.ht-categories__lane');
+    // ⚠️ 选择器走 `testID`（RNW 渲染成 `data-testid`），不再绑 CSS 类名：
+    // 泳道已经迁到共享 `@heyta/ui`，类名属于 web 外壳、共享层不认识它。
+    const lanes = el.querySelectorAll('[data-testid="category-lane"]');
     expect(lanes).toHaveLength(2);
     for (const lane of lanes) {
       // ⚠️ 不写死 12：窗口长度是**配置**，改它不该让这条断言变红
       // （写死的边界断言会在规模变化后静默空转）。
-      expect(lane.querySelectorAll('.ht-categories__cell')).toHaveLength(DEFAULT_CATEGORY_WEEKS);
+      expect(lane.querySelectorAll('[data-testid^="category-cell-"]')).toHaveLength(
+        DEFAULT_CATEGORY_WEEKS,
+      );
     }
     // 有记录的那一格必须是**深于**空白的档位：0 = 这一周没记录。
-    const levels = [...el.querySelectorAll('.ht-categories__cell')].map((c) =>
-      c.getAttribute('data-level'),
+    // 档位写在 testID 里（`category-cell-<level>`）—— 深浅是**分档**，
+    // 只是"大约多少"；确切数字走下面的 `data-cell-title`。
+    const levels = [...el.querySelectorAll('[data-testid^="category-cell-"]')].map((c) =>
+      c.getAttribute('data-testid')?.replace('category-cell-', ''),
     );
     expect(levels).toContain('0');
-    expect(levels.some((level) => level !== null && level !== '0')).toBe(true);
+    expect(levels.some((level) => level !== undefined && level !== '0')).toBe(true);
+    // 🔴 格子上的**确切数字**必须在 DOM 里。
+    // 深浅只能看个大概，精确值只有悬停才看得到 —— 这条断言是**回归哨**：
+    // 第一版迁移把 `title` 整个丢了，而**当时没有任何测试会红**。
+    // 现在的出口是共享层写出的 `data-cell-title`（`cellTooltip` prop，
+    // 只有 web 传）+ app.css 的 `[data-cell-title]:hover::after` 提示泡。
+    const cells = [...el.querySelectorAll('[data-testid^="category-cell-"]')];
+    expect(cells).toHaveLength(2 * DEFAULT_CATEGORY_WEEKS);
+    for (const cell of cells) {
+      const tip = cell.getAttribute('data-cell-title');
+      expect(tip).toBeTruthy();
+      // 文案必须来自**同一个** `labels.duration`，不是手抄的第二份。
+      expect(tip).toMatch(/小时|分钟/);
+    }
+    // 有记录的那一格与空白格说的不是同一句话（否则"有数字"是假的）。
+    const tips = new Set(cells.map((c) => c.getAttribute('data-cell-title')));
+    expect(tips.size).toBeGreaterThan(1);
+    // 柱状图的每一段同样带确切数字（同一个 prop，两条出口不能只通一条）。
+    const segments = [...el.querySelectorAll('[data-testid="category-bar-segment"]')];
+    expect(segments.length).toBeGreaterThan(0);
+    for (const segment of segments) {
+      expect(segment.getAttribute('data-cell-title')).toMatch(/小时|分钟/);
+    }
   });
 
   it('🔴 堆叠条的段序 = 泳道图的行序（跨周固定，否则"趋势"看不出来）', () => {
@@ -236,21 +264,23 @@ describe('CategoryBreakdown（真实渲染）', () => {
     });
     const el = render(<CategoryBreakdown />);
 
-    const laneNames = [...el.querySelectorAll('.ht-categories__name')].map((n) => n.textContent);
+    const laneNames = [...el.querySelectorAll('[data-testid="category-lane-name"]')].map(
+      (n) => n.textContent,
+    );
     expect(laneNames, '行序按总时长降序').toEqual(['深度工作', '杂事']);
 
-    const laneColors = [...el.querySelectorAll('.ht-categories__swatch')].map(
-      (swatch) => (swatch as HTMLElement).style.background,
+    const laneColors = [...el.querySelectorAll('[data-testid="category-swatch"]')].map(
+      (swatch) => (swatch as HTMLElement).style.backgroundColor,
     );
     // 有记录的那一周：两段都在，且**第一段的颜色就是第一行的颜色**。
     // （段序写反了看不出来差别 —— 但它决定了同一颜色在每根柱子里的层高是否固定，
     //   而那正是"横向读趋势"的前提。）
-    const track = [...el.querySelectorAll('.ht-categories__bar-track')].find(
+    const track = [...el.querySelectorAll('[data-testid="category-bar-track"]')].find(
       (t) => t.children.length === 2,
     );
     expect(track, '应该有一周同时有两段').toBeDefined();
     const segmentColors = [...(track?.children ?? [])].map(
-      (segment) => (segment as HTMLElement).style.background,
+      (segment) => (segment as HTMLElement).style.backgroundColor,
     );
     expect(segmentColors).toEqual(laneColors);
   });
@@ -277,7 +307,7 @@ describe('CategoryBreakdown（真实渲染）', () => {
     const el = render(<CategoryBreakdown />);
     const text = el.textContent ?? '';
     expect(text).toContain('还没有可以归类的时间记录');
-    expect(el.querySelectorAll('.ht-categories__lane')).toHaveLength(0);
+    expect(el.querySelectorAll('[data-testid="category-lane"]')).toHaveLength(0);
   });
 
   it('🔴 文案里没有排名与褒贬（反需求写死在测试里）', () => {

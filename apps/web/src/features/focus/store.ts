@@ -39,12 +39,10 @@ import {
   DEFAULT_FOCUS_CONFIG,
   abort as abortFn,
   advance,
-  focusProgress,
   focusStatsForDay,
   initialFocusState,
   isFinished,
   pause as pauseFn,
-  remainingMs,
   resume as resumeFn,
   shouldPersistSession,
   start as startFn,
@@ -55,6 +53,7 @@ import {
 import { createFocusActions, type ActionContext } from '@heyta/app-host';
 
 import { currentState, dispatchIntent, onEngineChange } from '../../lib/oplog.js';
+import { loadFocusConfig, saveFocusConfig } from '../../lib/focus-config.js';
 
 interface FocusStoreState {
   config: FocusConfig;
@@ -87,7 +86,12 @@ interface FocusStoreState {
   resume: () => void;
   /** 中止并落盘（记为未自然完成）。 */
   abort: () => Promise<void>;
-  setConfig: (partial: Partial<FocusConfig>) => void;
+  /**
+   * 改时长设置。**只在 idle 时生效**，且会持久化到 `localStorage`。
+   *
+   * @returns `true` = 改了；`false` = 计时进行中，**没有改**（调用方必须解释原因）。
+   */
+  setConfig: (partial: Partial<FocusConfig>) => boolean;
   /** 由计时循环调用：推进状态并落盘。 */
   tickOnce: () => Promise<void>;
 }
@@ -119,7 +123,14 @@ function deriveCompletedToday(): number {
 }
 
 export const useFocusStore = create<FocusStoreState>((set, get) => ({
-  config: DEFAULT_FOCUS_CONFIG,
+  /**
+   * 🔴 从 `localStorage` 读，**不是** `DEFAULT_FOCUS_CONFIG`。
+   *
+   * 在此之前这个字段永远是默认值，因为 `setConfig` 没有任何调用点 ——
+   * 用户改不了时长。补上 UI 之后，"改完刷新就没了"会让设置变成一个假控件，
+   * 所以持久化必须和 UI 一起落地（读写的形状与校验在 `lib/focus-config.ts`）。
+   */
+  config: loadFocusConfig(),
   state: initialFocusState(),
   completedToday: 0,
   tick: 0,
@@ -159,7 +170,22 @@ export const useFocusStore = create<FocusStoreState>((set, get) => ({
   },
 
   setConfig: (partial) => {
-    set({ config: { ...get().config, ...partial } });
+    /**
+     * 🔴 进行中拒绝改时长，而且**不是静默拒绝**。
+     *
+     * 本轮的计划时长在 `start()` 那一刻就冻结进了 `state.plannedMs`
+     * （进度环、`FocusSession.plannedMs` 都用它）。进行中改 config 只有两种结果：
+     * 本轮不变（用户以为改了、其实没改），或者本轮跟着变（进度环跳一下、
+     * 而落盘的计划时长与实际不符）。两种都比"暂时不让改"更坏。
+     *
+     * 返回 `false` 让调用方能给出解释 —— 灰掉一个控件却不说为什么，
+     * 是这个仓库反复记过的最坏做法（对照 `roadmap.md` §5.1.1）。
+     */
+    if (get().state.phase !== 'idle') return false;
+    const config = { ...get().config, ...partial };
+    saveFocusConfig(config);
+    set({ config });
+    return true;
   },
 
   tickOnce: async () => {
@@ -244,28 +270,4 @@ export function __resetFocusForTests(): void {
     tick: 0,
     error: undefined,
   });
-}
-
-// ─────────────────────────────────────────────────────────────
-// 选择器
-// ─────────────────────────────────────────────────────────────
-
-/** 剩余毫秒（每次由领域层重算，不累减）。 */
-export function selectRemaining(s: FocusStoreState, now: number): number {
-  return remainingMs(s.state, now);
-}
-
-/**
- * 进度 0–1，供环形进度条使用。
- *
- * 实现已移到 `@heyta/domain` 的 `focusProgress()` —— 移动端要有同一个数，
- * 两处各写一份的话，症状是"网页的环走完了、手机的还差一点"，且不报错。
- */
-export function selectProgress(s: FocusStoreState, now: number): number {
-  return focusProgress(s.state, now);
-}
-
-/** 当前阶段是否是工作段（决定配色）。 */
-export function isWorkPhase(s: FocusStoreState): boolean {
-  return s.state.kind === 'work';
 }

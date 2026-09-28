@@ -37,12 +37,12 @@
  */
 
 import { useState } from 'react';
-import { AlertTriangle, Cloud, HardDrive, Sparkles, X } from 'lucide-react';
+import { AlertTriangle, Sparkles, X } from 'lucide-react';
 
 import { useI18n, type I18nValue, type Locale } from '@heyta/i18n';
 
 import { LIST_SEPARATOR } from './locale-punctuation.js';
-import { retentionMessageKey } from './disclosure-copy.js';
+import { AiDisclosureHost } from './AiDisclosureHost.js';
 import { FailureSettingsAction, RouteUnavailable } from './RouteUnavailable.js';
 import { useAiSettingsNavigation } from './ai-settings-navigation.js';
 import {
@@ -467,52 +467,14 @@ export function AiCapture(props: AiCaptureProps): React.JSX.Element {
           />
         ) : (
           <>
-            <p className="ht-ai__row" data-testid="capture-destination">
-              {target.isLocal ? (
-                <HardDrive size={12} aria-hidden="true" />
-              ) : (
-                <Cloud size={12} aria-hidden="true" />
-              )}
-              {t('web.ai.disclosure.destinationLead')}<strong>{target.label}</strong>
-              <code>{target.endpoint}</code>
-              <span>{t('web.ai.disclosure.model', { model: target.model })}</span>
-              <span className="ht-ai__tag" data-testid="capture-destination-kind">
-                {target.isLocal ? t('web.ai.disclosure.local') : t('web.ai.disclosure.remote')}
-              </span>
-            </p>
-
-            {/* 🔴 回退链必须披露 —— 首选失败时会自动换一个端点，
-                而那是**另一家公司**。成功了就没有任何提示。 */}
-            {target.fallbacks.length > 0 && (
-              <p className="ht-ai__row ht-ai__row--warn" data-testid="capture-fallbacks">
-                <AlertTriangle size={12} aria-hidden="true" />
-                {t('web.ai.disclosure.fallbackLead')}
-                <strong data-testid="capture-fallback-list">{target.fallbacks.join(LIST_SEPARATOR[locale])}</strong>
-              </p>
-            )}
-
-            {/* 🔴 「留多久」是披露的三维之一（发给谁 / 发什么 / 留多久）。 */}
-            {disclosure !== undefined && (
-              <p className="ht-ai__row" data-testid="capture-retention">
-                {t('web.ai.disclosure.retentionLead')}
-                <strong data-testid="capture-retention-text">
-                  {t(retentionMessageKey(disclosure.retentionDisclosure.kind))}
-                </strong>
-              </p>
-            )}
-
-            <p className="ht-ai__row" data-testid="capture-fields">
-              {t('web.ai.disclosure.fieldsLead')}
-              <strong data-testid="capture-field-list">{invocation.fields.join(LIST_SEPARATOR[locale])}</strong>
-            </p>
-
-            {!target.isLocal && (
-              <p className="ht-ai__warn" data-testid="capture-e2ee-warning">
-                <AlertTriangle size={12} aria-hidden="true" />
-                {t('web.ai.disclosure.e2eeLead')}
-                <strong>{t('web.ai.disclosure.e2eeStrong')}</strong>
-              </p>
-            )}
+            {/* 🔴 披露的五个维度由 `@heyta/ui` 的 `AiDisclosure` 渲染 ——
+                五个 AI 入口共用同一份实现。 */}
+            <AiDisclosureHost
+              testIdPrefix="capture-"
+              target={target}
+              fields={invocation.fields}
+              retentionDisclosure={disclosure?.retentionDisclosure}
+            />
 
             <div className="ht-ai__actions">
               <button

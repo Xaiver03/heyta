@@ -19,6 +19,11 @@ import { beforeEach, describe, expect, it } from 'vitest';
 
 import { translate } from '@heyta/i18n';
 import type { FocusSession, Habit, HabitLog, Task } from '@heyta/domain';
+// 年视图的**分档**现在只有一份实现（共享 `model.ts#toActivityHeatmapDays`），
+// 宿主侧只取事实（`dailyActivityCountsFromState`）—— 本文件用共享纯函数
+// 把两者接起来断言，而不是在 `selectors.ts` 里留第二份 `levelOf`。
+import { dailyActivityCountsFromState } from '@heyta/app-host';
+import { toActivityHeatmapDays } from '@heyta/ui';
 
 import { selectHabitProgress, useHabitStore } from '../src/features/habits/store.js';
 import { buildShareSummary } from '../src/features/motivation/copy.js';
@@ -28,7 +33,6 @@ import {
   selectTodayProgress,
   selectTotals,
   selectWeeklyReview,
-  selectYearActivity,
   type MotivationInput,
 } from '../src/features/motivation/selectors.js';
 
@@ -199,30 +203,40 @@ describe('selectMilestones / selectIdentityTags（接线）', () => {
   });
 });
 
-describe('selectYearActivity（接线）', () => {
+describe('年视图（接线）：事实来自 app-host，分档来自共享 model', () => {
+  /*
+    🔴 迁移前这一块测的是 `selectYearActivity`（web 壳自己给 `level` 分档）。
+    它已经删掉 —— `levelOf` 与共享层新造的 `activityLevel` 逐字同口径，
+    属于这一刀**新产生**的第二份实现。断言没有消失，只是改成了它们现在真实的
+    两段：事实取 `@heyta/app-host#dailyActivityCountsFromState`，分档取
+    `@heyta/ui` 的 `toActivityHeatmapDays`（纯函数断言在
+    `packages/ui/tests/motivation-model.spec.ts`）。
+  */
   it('格子数等于天数，最后一格是今天', () => {
-    const year = selectYearActivity(input(), NOW, 30);
-    expect(year).toHaveLength(30);
-    expect(year.at(-1)?.date).toBe(TODAY);
+    const days = toActivityHeatmapDays(dailyActivityCountsFromState(input(), NOW, 30));
+    expect(days).toHaveLength(30);
+    expect(days.at(-1)?.date).toBe(TODAY);
   });
 
   it('打卡 / 完成任务 / 工作段专注都会点亮，休息不会', () => {
-    const year = selectYearActivity(
-      input({
-        habitLogs: byId([log('h1', '2026-09-24')]),
-        tasks: byId([task({ id: 't1', completedAt: at(2026, 9, 24, 9) })]),
-        focusSessions: byId([
-          session({ id: 'f1', endedAt: at(2026, 9, 24, 14) }),
-          // 休息不算 —— 它与今日进度、累计专注使用同一条判据
-          session({ id: 'f2', kind: 'shortBreak', endedAt: at(2026, 9, 24, 15) }),
-          session({ id: 'f3', endedAt: at(2026, 9, 23, 14), deletedAt: 1 }),
-        ]),
-      }),
-      NOW,
-      30,
+    const days = toActivityHeatmapDays(
+      dailyActivityCountsFromState(
+        input({
+          habitLogs: byId([log('h1', '2026-09-24')]),
+          tasks: byId([task({ id: 't1', completedAt: at(2026, 9, 24, 9) })]),
+          focusSessions: byId([
+            session({ id: 'f1', endedAt: at(2026, 9, 24, 14) }),
+            // 休息不算 —— 它与今日进度、累计专注使用同一条判据
+            session({ id: 'f2', kind: 'shortBreak', endedAt: at(2026, 9, 24, 15) }),
+            session({ id: 'f3', endedAt: at(2026, 9, 23, 14), deletedAt: 1 }),
+          ]),
+        }),
+        NOW,
+        30,
+      ),
     );
 
-    const today = year.at(-1);
+    const today = days.at(-1);
     // 打卡 + 完成任务 + 一轮工作段专注 = 3
     expect(today?.count).toBe(3);
     expect(today?.level).toBe(3);

@@ -44,8 +44,188 @@ const reactNativeSvgWeb = require.resolve(
   'react-native-svg/lib/module/ReactNativeSVG.web.js',
 );
 
+/**
+ * 🔴 **把 `react-native-svg` 里那一个 CJS 文件补上 ESM 具名导出**
+ *
+ * ─────────────────────────────────────────────────────────────
+ * 为什么必须有这个插件（这是一个**只有 dev 会炸**的真 P0）
+ * ─────────────────────────────────────────────────────────────
+ *
+ * 上游 `react-native-svg@15.15.5` 的 `lib/module`（ESM 构建）里**混了一个 CJS 文件**：
+ *
+ *   · `lib/extract/extractTransform.js:2` → `import { parse } from './transform';`（ESM 具名导入）
+ *   · `lib/extract/transform.js`          → `module.exports = { SyntaxError, parse }`（CJS）
+ *
+ * 它**没有** `.web.js` 兄弟文件，所以上面那套后缀偏好救不了它。
+ * 生产构建有 Rollup 的 commonjs 插件做 interop，dev **没有** ——
+ * 而它又被 `optimizeDeps.exclude` 排除在预打包之外（那是为了躲开
+ * `./elements` 被解析成原生实现那个坑，见下面的注释），于是浏览器拿到的是
+ * 一个**原样的 CJS 文件**，具名导入直接失败：
+ *
+ *     The requested module '…/lib/extract/transform.js' does not provide an export named 'parse'
+ *
+ * ⇒ 表现是**整个 web 应用白屏**，而 `pnpm --filter @heyta/web test`（jsdom）、
+ *   `pnpm -r typecheck`、以及全部静态门禁**都发现不了** ——
+ *   只有真起 dev server 的验收脚本（`check:web-storage` / `check:web-migration`）会红。
+ *
+ * ─────────────────────────────────────────────────────────────
+ * 为什么不是别的三种修法（三种都**实测试过**）
+ * ─────────────────────────────────────────────────────────────
+ *   · **整包改成预打包** → esbuild 解析 `./elements` 时抓到**原生**实现，
+ *     一路拖进 `react-native/Libraries/...` 的 Flow 源码（`vite dev` 直接起不来）。
+ *   · **`optimizeDeps.include` 指这个深路径** → 无效：那条 import 是**相对**的，
+ *     优化器不接管它，文件仍然从 `@fs/` 原样提供（报错一字不变）。
+ *   · **`optimizeDeps.needsInterop`** → 只对**被预打包**的依赖生效，而这个是排除项。
+ *
+ * ⇒ 只剩"在 Vite 的 transform 阶段把这一个文件翻成 ESM"这一条路。
+ *   范围**只有一个文件**，不动别名、不动后缀偏好、不动 wasm 的排除。
+ *
+ * ⚠️ **形状变了就抛错，不许静默退回。** 上游改这个文件时（换 PEG 版本、
+ *    改成真 ESM……），下面的 `indexOf` 会落空 —— 那时**必须红**，
+ *    因为"静默无效"的代价是整个 web 应用白屏，而且只在真浏览器里看得见。
+ */
+const reactNativeSvgCjsInterop = {
+  name: 'heyta:rns-svg-cjs-interop',
+  enforce: 'pre' as const,
+  transform(code: string, id: string) {
+    /**
+     * ⚠️ 正则**不能**用 `$` 锚定：带 `?v=` 的文件（被缓存失效重写的那些）
+     * 会把查询串带进 id，`$` 就匹配不上了 —— 而失败方式是**插件静默不生效**，
+     * 症状与"插件没写"完全一样。这是实测踩出来的（第一版就是 `$` 锚定，
+     * 结果报错一字不变，看起来像"插件根本没用"）。
+     *
+     * ─────────────────────────────────────────────────────────────
+     * 🔴 **包白名单**（而不是"任意 CJS 文件"）
+     * ─────────────────────────────────────────────────────────────
+     * 这个插件本质是在 dev 阶段补 Rollup commonjs 插件缺的那一步。对**任何** CJS
+     * 都生效会改变第三方包的加载语义（有的包依赖 CJS 的循环引用/延迟求值），
+     * 而收益只在 RNW 这一族上。
+     *
+     * ⚠️ **这份名单会随着主包的 import 图增长而变长。** 每多一个 RNW 生态的共享
+     * 组件被接进 web 主包，就可能多一个这样的包。判断依据很机械：
+     * `pnpm check:web-storage` 报 `does not provide an export named …`，
+     * **报错 URL 里的包名就是该加进来的下一个**（实测就是这么走过来的：
+     * `react-native-svg` → `@react-native/assets-registry`）。
+     */
+    const CJS_INTEROP_PACKAGES = ['react-native-svg', '@react-native/assets-registry'];
+    if (!CJS_INTEROP_PACKAGES.some((name) => id.includes(`/${name}/`))) return null;
+    if (!/\.js(\?|$)/.test(id)) return null;
+
+    /**
+     * 🔴 **是"一族"文件，不是一个**（实测）。
+     *
+     * 只按第一个报错去修会连着踩三次：修好 `lib/extract/transform.js` 之后，
+     * 浏览器立刻改报 `lib/extract/transformToRn.js`，再之后是
+     * `filter-image/extract/extractFiltersString.js`。三个都是 PEG.js 生成的
+     * 解析器，都是 `module.exports = { StartRules, SyntaxError, parse }`
+     * —— **同一个上游打包缺陷的三个副本**。
+     * ⇒ 所以这里按**目录**匹配，不按文件名；`module.exports = {` 找不到就返回
+     * `null`（那才是"这个文件没问题"）。
+     */
+    const marker = 'module.exports = {';
+    const at = code.indexOf(marker);
+    if (at < 0) return null;
+
+    /** 对象字面量的正文（到第一个 `};` 为止 —— 这三个文件都是这个形状）。 */
+    const end = code.indexOf('};', at);
+    if (end < 0) {
+      throw new Error(
+        `react-native-svg 的 ${id} 里 \`module.exports = {\` 没有对应的 \`};\` —— 形状变了。\n` +
+          '见 apps/web/vite.config.ts 的 `heyta:rns-svg-cjs-interop`：请核对上游产物并同步注释。',
+      );
+    }
+    const body = code.slice(at + marker.length, end);
+
+    /**
+     * 从对象字面量里取具名导出的**键**。
+     *
+     * 🔴 **不能只按"行首的 `名字:`"去匹配**（第一版就是那样）—— 实测漏掉了一整个形状：
+     * `@react-native/assets-registry/registry.js` 写的是**单行简写**
+     *   `module.exports = {registerAsset, getAssetByID};`
+     * 键既不在行首、也没有冒号，于是 `keys` 为空 ⇒ 抛错 ⇒ **Vite 把它记进自己的日志、
+     * 页面继续拿到原样的 CJS**，而浏览器报的还是那句 "does not provide an export named"。
+     * （排查时教训：我用 `grep -v '[vite]'` 看探针输出，正好把 Vite 的那条错误滤掉了 ——
+     *  **读 OUTPUT 不能只读过滤后的那一半**。）
+     *
+     * ⇒ 改成"按顶层逗号切分，取冒号左边（没有冒号就是简写）"，并先剥掉方括号里的内容
+     *   （数组字面量里的逗号不是分隔符）。
+     *
+     * 🔴 取不到就必须抛错，**不许静默返回原文**。
+     */
+    const stripped = body.replace(/\[[^\]]*\]|\{[^}]*\}/g, '');
+    const keys = stripped
+      .split(',')
+      .map((part) => {
+        const name = (part.includes(':') ? part.slice(0, part.indexOf(':')) : part).trim();
+        return name;
+      })
+      .filter((name) => /^[A-Za-z_$][\w$]*$/.test(name));
+    if (keys.length === 0) {
+      throw new Error(
+        `react-native-svg 的 ${id} 里解析不出任何导出键（形状变了）。\n` +
+          '见 apps/web/vite.config.ts 的 `heyta:rns-svg-cjs-interop`。',
+      );
+    }
+
+    /**
+     * 🔴 **必须用"别名导出"，不能写 `export const parse = __rnsSvgExports.parse;`。**
+     *
+     * 后者会声明一个与文件里**已有绑定同名**的新绑定，于是：
+     *   `SyntaxError: Identifier 'registerAsset' has already been declared`
+     * （`@react-native/assets-registry/registry.js` 里就有 `function registerAsset`，
+     * 而它同时又出现在 `module.exports` 的对象里 —— 实测撞到过。）
+     * 换成 `const __rnsE0 = …; export { __rnsE0 as registerAsset }` 就没有新同名绑定。
+     */
+    const locals = keys.map((key, i) => `const __rnsE${String(i)} = __rnsSvgExports[${JSON.stringify(key)}];`);
+    const exportClause = `export { ${keys
+      .map((key, i) => `__rnsE${String(i)} as ${key}`)
+      .join(', ')} };`;
+    return {
+      code:
+        `${code.slice(0, at)}const __rnsSvgExports = {` +
+        body +
+        '};\n' +
+        'export default __rnsSvgExports;\n' +
+        `${locals.join('\n')}\n` +
+        `${exportClause}\n` +
+        code.slice(end + 2),
+      map: null,
+    };
+  },
+};
+
 export default defineConfig({
-  plugins: [react()],
+  /**
+   * 🔴 `global` 必须存在 —— 否则**成长页整棵 React 树会卸载成白屏**。
+   *
+   * 症状与根因（2026-10-05，由一位 agent 用真 Chromium 探针锁定并验证了修法）：
+   * M3 motivation 那一刀把**全仓唯一一处 `react-native` 的 `Animated`** 引入了 web
+   * （`packages/ui/src/motivation/ProgressBar.tsx`）。RNW 的动画实现在
+   * `react-native-web/dist/vendor/react-native/Animated/animations/TimingAnimation.js` 里写的是
+   *
+   *     global.cancelAnimationFrame(this._animationFrame);
+   *
+   * （`SpringAnimation.js` / `DecayAnimation.js` 同形）。**浏览器只有 `window` / `globalThis`，
+   * 没有 `global`** ⇒ 抛 `ReferenceError: global is not defined` ⇒ 组件抛错 ⇒ 整棵树卸载。
+   *
+   * 实测（workspace dev server + 真 Chromium）：
+   * ```
+   * 不加垫片：click 成长 → board=0  cells=0  bodyLen=0   errors=["ReferenceError: global is not defined" ×3]
+   * 加  垫片：click 成长 → board=1  cells=365 bodyLen=597 errors=[]
+   * ```
+   *
+   * ⚠️ **为什么这一处特别危险**：`pnpm --filter @heyta/web test`（jsdom）全绿、
+   * `pnpm -r typecheck` 全绿、全部静态门禁全绿 —— 只有**真浏览器**会红。
+   * 而 `check:web-storage` / `check:web-migration` **也发现不了**（它们不切到成长页）。
+   * 唯一能抓到它的是 e2e（`pnpm --dir e2e run test`）。
+   *
+   * ⚠️ **`define` 两处都要给**：源码里的引用会被 Vite 的 `define` 替换，
+   * 但 `react-native` 是**预打包**的（`node_modules/.vite/deps/react-native.js`），
+   * 那份产物由 esbuild 生成 ⇒ 必须同时给 `optimizeDeps.esbuildOptions.define`，
+   * 否则 dev 下预打包产物里仍然留着裸 `global`。
+   */
+  define: { global: 'globalThis' },
+  plugins: [react(), reactNativeSvgCjsInterop],
   resolve: {
     /**
      * 🔴 `.web.*` 必须排在普通后缀**前面** —— 这是 `react-native-svg` 能跑起来的必要条件。
@@ -135,12 +315,36 @@ export default defineConfig({
      * 的 Flow 文件，完全看不出根因是我们自己的别名配置。
      *
      * 排除之后 `react-native-svg` 不再进预打包，交给上面那套
-     * 别名 + `.web.*` 后缀解析 —— 与生产构建走同一条路。
+     * 别名 + `.web.*` 后缀解析。
      *
      * ─────────────────────────────────────────────────────────────
-     * 🔴 `@sqlite.org/sqlite-wasm` 同样必须排除 —— **同一类坑，第三次踩**
+     * 🔴 **更正：上面那句"与生产构建走同一条路"是错的**（2026-10-05 实测）
      * ─────────────────────────────────────────────────────────────
-     * 上面这条注释说"两边不一致"，而 wasm 这个更狠：它在**生产构建里也会炸**，
+     * 生产构建除了别名与后缀解析，**还有 Rollup 的 commonjs 插件**做
+     * CJS→ESM interop；而 dev 对被 `exclude` 的文件**没有**这一步。
+     * 于是只要有 `.web.*` 路径走到一个**用 `module.exports` 写的文件**，
+     * dev 就会在浏览器里抛：
+     *
+     *     The requested module '…/lib/extract/transform.js' does not
+     *     provide an export named 'parse'
+     *
+     * 根因是上游 `react-native-svg@15.15.5` 的 `lib/module`（ESM 构建）里
+     * **混了一个 CJS 文件**：
+     *   · `lib/extract/extractTransform.js:2` → `import { parse } from './transform';`（ESM 具名导入）
+     *   · `lib/extract/transform.js`          → `module.exports = { …, parse }`（CJS）
+     * 它没有 `.web.js` 兄弟文件，所以后缀解析救不了它。
+     *
+     * ⇒ 修法是**让这一个文件单独走预打包**（`include`），由 esbuild 做 interop；
+     * 包本身仍然 `exclude`，`.web.*` 后缀偏好不受影响。
+     * 这条 `include` 是**必需的**，不是优化 —— 去掉它，
+     * 只要主包里出现任何一个用 `HeytaIcon` 的共享组件就会白屏。
+     * （本轮就是这么撞上的：便签板与提醒列表把 `HeytaIcon` 带进了 App 主包，
+     * 在那之前只有 dev 切片用得到 `TaskBadges`。）
+     */
+    /**
+     * 🔴 `@sqlite.org/sqlite-wasm` 同样必须排除 —— **同一类坑，第三次踩**
+     *
+     * 上面那条注释说"两边不一致"，而 wasm 这个更狠：它在**生产构建里也会炸**，
      * 只是炸得更晚 —— 直到用户第一次真的用存储。
      *
      * 症状（探针里已完整记录过一次，见 `packages/storage/probe/vite.config.mjs`）：
@@ -158,6 +362,8 @@ export default defineConfig({
      * （内部相对路径找 .wasm）是同一个根因的两次发作。
      */
     exclude: ['react-native-svg', '@sqlite.org/sqlite-wasm'],
+    // 🔴 见文件头 `define` 那段：预打包产物里也要把 `global` 换掉。
+    esbuildOptions: { define: { global: 'globalThis' } },
   },
   /**
    * 🔴 **`worker.format` 必须是 `'es'`。**

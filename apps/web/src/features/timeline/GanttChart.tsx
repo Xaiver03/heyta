@@ -55,15 +55,19 @@
  * "用户的今天"在三端必须是同一个概念，本地日历日与 UTC 的差异会静默错一天。
  */
 
-import { addDays, diffDays, formatCompactDate, parseLocalDate, type LocalDate } from '@heyta/domain';
-import { cssVar } from '@heyta/design-system';
-import { useI18n, type I18nValue } from '@heyta/i18n';
-
 import {
   DEFAULT_DURATION_MINUTES,
   MIN_DURATION_MINUTES,
+  addDays,
+  diffDays,
+  formatCompactDate,
+  parseLocalDate,
+  type LocalDate,
   type TimelineEntry,
-} from './buildTimeline.js';
+} from '@heyta/domain';
+import { cssVar } from '@heyta/design-system';
+import { useI18n, type I18nValue } from '@heyta/i18n';
+
 
 /** 一天有多少分钟。轴的分日计算用它。 */
 const MINUTES_PER_DAY = 1440;

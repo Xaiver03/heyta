@@ -13,6 +13,8 @@
 
 import { create } from 'zustand';
 
+import { publishWidgetPlaceholders } from '../../pwa/publish.js';
+
 import {
   applyRemoteOps,
   currentState,
@@ -176,6 +178,23 @@ export const useSyncStore = create<SyncStoreState>((set, get) => ({
     retry?.stop();
     retry = undefined;
     set({ token: undefined, password: undefined, status: { kind: 'idle' } });
+
+    // 🔴 **登出必须同时把桌面的四款小组件置成占位态（决策 D6）。**
+    //
+    // 少了这一步，**组件会在用户已经登出之后继续显示他的任务** ——
+    // 而这是这一类缺陷里最严重的一种：用户以为"我登出了"，屏幕上却还挂着
+    // 他的任务标题。⚠️ 而且它**不会报错**、不会崩、看起来一切正常，
+    // 只有"组件上的内容"与"用户的心智模型"不一致 —— 而那一处没有断言。
+    //
+    // ⚠️ **刻意不 `await`、也不让失败冒泡**：
+    //    登出这个动作本身必须成功（用户点了就要生效），
+    //    而推送占位只是它的一个副作用。`void` + `catch` 是有意的：
+    //    原生/浏览器端推不动时，**用户仍然登出成功**，只是组件可能还挂着旧内容 ——
+    //    那是一个可接受的降级，而"登出点了没反应"不是。
+    // ⚠️ 但**不能静默**：失败要留痕，否则将来排查时完全看不出这里跑过。
+    void publishWidgetPlaceholders().catch((error: unknown) => {
+      console.warn('[widget] 登出后推送占位态失败（用户已登出，组件可能仍显示旧内容）：', error);
+    });
   },
 
   syncNow: async () => {
@@ -232,20 +251,15 @@ export const useSyncStore = create<SyncStoreState>((set, get) => ({
   },
 }));
 
-/** 状态对应的语义色 token 名。 */
-export function statusColorToken(status: SyncStatus): string {
-  switch (status.kind) {
-    case 'synced':
-      return 'color.success';
-    case 'syncing':
-      return 'color.info';
-    case 'offline':
-      return 'color.warning';
-    case 'conflict':
-      return 'color.warning';
-    case 'error':
-      return 'color.danger';
-    case 'idle':
-      return 'color.foreground-muted';
-  }
-}
+/**
+ * ⚠️ 「状态 → 语义色」的映射**已经不在这里**。
+ *
+ * 它原来叫 `statusColorToken`，是 web 独有的一份；移动端另有一份
+ * （`apps/mobile/src/sync/status-text.ts` 的 `statusTone`），
+ * 而两份**三行对不上**（`offline` 一端警示一端中性、`syncing` 一端信息一端普通、
+ * `conflict` 一端警示一端危险）—— 同一个状态在两端呈现成三种态度，
+ * 且没有任何测试会红。
+ *
+ * 现在它是 `@heyta/ui` 的 `syncStatusSeverity` / `syncStatusColorToken`
+ * （`packages/ui/src/sync/model.ts`，有单测）。store 只管状态，不管怎么画。
+ */

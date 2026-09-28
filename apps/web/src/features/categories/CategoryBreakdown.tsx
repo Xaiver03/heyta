@@ -1,51 +1,38 @@
 /**
- * 分类时长（成长视图里的一块）
- * ==============================
+ * 分类时长（Web 壳）
+ * =====================
  *
- * 用户问的是"我这段时间到底把力气花在哪些事上了"。这一块用一个**泳道图**
- * 回答它：一行一个来源（清单 / 习惯），一行十二格（十二周），格子深 =
- * 那一周这一类做得多。
+ * 🔴 M3 第三刀之后，这个文件**只剩接线**。
  *
- * ## 三条必须活着的约束
+ * 泳道（色块 + 槽位号 + 名字 + 来源 + 总时长 + 十二格）、堆叠柱状图、空态 /
+ * 区间 / 未归类 / 未设色提示，全部由 `@heyta/ui` 的 `CategoryReportView`
+ * 渲染 —— 与 mobile 是**同一份实现**。这里只回答 web 自己的两个问题：
+ *
+ *   1. 报告从哪来 → `selectCategoryReport`（归因链、窗口、软删除、缺省
+ *      `actualMs` 全在 `@heyta/domain` 的 `computeCategoryReport` 里）；
+ *   2. 页面周边挂什么 → 区块标题（页面大标题在顶栏上）与文案注入。
+ *
+ * ## 为什么这一块仍然守着三条约束（现在由共享层落实）
  *
  * 1. 🔴 **不做排行、不做评价。** 行序按总时长降序 —— 那是**读数**顺序，
- *    不是"第一名"。界面上没有"最多/最少/最差/失衡"任何一句话，
- *    没有奖牌、没有百分号占比、没有把某一行标红。用户在别处（清单编辑界面）
- *    给颜色赋值，颜色只是**身份**，App 永远不知道红色代表什么。
+ *    不是"第一名"。界面上没有"最多/最少/最差/失衡"，颜色只是**身份**。
+ * 2. 🔴 **不许只用颜色表达信息。** 每一行都有槽位号、名字、来源、总时长；
+ *    格子是装饰。
+ * 3. 🔴 **口径只有一份。** 这里不再算任何"这周多少分钟" —— 算第二次就迟早
+ *    会和周复盘对不上账，而两个数字在同一屏时用户没法知道该信哪个。
  *
- * 2. 🔴 **不许只用颜色表达信息。** 每一行都有：位置（第几行）、
- *    名字、来源（清单/习惯）、总时长（数字），格子本身是装饰。
- *    8 个色槽在色觉障碍下可能只是深浅不同的灰（见下方"为什么不用颜色区分行"）。
- *
- * 3. 🔴 **口径只有一份。** 归因链、窗口、软删除、缺省 `actualMs` 全部在
- *    `@heyta/domain` 的 `computeCategoryReport` 里；这里的 selector 只摊平状态。
- *    如果这里再算一次"这周多少分钟"，它迟早会和周复盘对不上账 ——
- *    而两个数字在同一个屏幕上时，用户没法知道该信哪个。
- *
- * ## 为什么泳道图用强度色阶、不用分类色
- *
- * 分类色只有 8 个，而"强度"有 5 档；两者相乘就是 40 个颜色，
- * 那既过不了对比度也过不了色盲可分度（见
- * `packages/design-system/tests/category-colors.spec.ts`）。
- * 所以分工是：**分类色只出现在行首的色块和堆叠条里**（编码"是谁"），
- * **格子用共用的强度色阶**（`color.heat-*`，编码"多少"）——
- * 后者是单色阶，深浅即数值，不依赖色相。
- *
- * ## 为什么没有"占比 %"
- *
- * 占比看起来无害，但它把每一行都变成一个比分：用户会开始优化数字分配，
- * 而不是去做事。这一块只回答"做了多久"，不回答"你分配得对不对"。
+ * ⚠️ `CategoryReportView` 会 import `react-native`（web 上由 Vite 别名到
+ * `react-native-web`），所以它必须挂在 `<HeytaUiProvider>` 之内 ——
+ * 缺了会在运行时抛错，而类型与单测都不会红（`check:ui-provider` 拦这个）。
  */
 
 import { useI18n } from '@heyta/i18n';
-import { HEAT_TOKENS, cssVar } from '@heyta/design-system';
-import { intensityLevel, type CategoryReport } from '@heyta/domain';
+import { CategoryReportView, HeytaUiProvider } from '@heyta/ui';
 
 import { text } from '../../lib/text.js';
-import { categorySlotColor, unsetSlotColor } from '../../lib/category-colors.js';
 import { useTaskStore } from '../tasks/store.js';
 import { selectCategoryReport } from '../motivation/selectors.js';
-import { KIND_COPY, formatDuration, laneDescription, segmentLabel } from './copy.js';
+import { categoryReportLabels } from './copy.js';
 
 export function CategoryBreakdown() {
   const { t } = useI18n();
@@ -53,168 +40,32 @@ export function CategoryBreakdown() {
   const now = useTaskStore((s) => s.now);
 
   const report = selectCategoryReport(entities, now);
+  // 只建一次，两处用：`labels.duration` 同时是格子提示的格式化函数。
+  const labels = categoryReportLabels(t);
 
   return (
     <section className="ht-categories">
       {/* ⚠️ section-title 而不是 screen-title —— 与成长视图其余几块一致，
           页面大标题在顶栏上。 */}
       <h2 style={text('section-title')}>{t('web.categories.title')}</h2>
-      <p className="ht-categories__note" style={text('caption')}>
-        {t('web.categories.note')}
-      </p>
-
-      {report.series.length === 0 && report.unassignedMs === 0 ? (
-        <p className="ht-categories__empty" style={text('row-meta')}>
-          {t('web.categories.empty')}
-        </p>
-      ) : (
-        <>
-          <p className="ht-categories__range" style={text('caption')}>
-            {t('web.categories.range', {
-              start: report.weeks[0]?.start ?? '',
-              end: report.weeks.at(-1)?.end ?? '',
-            })}
-          </p>
-
-          <Swimlanes report={report} />
-
-          {report.peakWeeklyMs > 0 && <WeeklyBars report={report} />}
-
-          {/* 没归到任何类别的时间**如实说出来**。它的正确归宿是
-              "给这条清单起个名 / 用清单组织任务"，而不是消失在总数里。 */}
-          {report.unassignedMs > 0 && (
-            <p className="ht-categories__unassigned" style={text('caption')}>
-              {t('web.categories.unassigned', {
-                duration: formatDuration(report.unassignedMs, t),
-              })}
-            </p>
-          )}
-
-          {/* 有行但一行都没设色：这是**可发现的入口**，不是错误。
-              ⚠️ 不许写成"你还没给清单分色"式的追责语气。 */}
-          {report.series.some((row) => row.slot === undefined) && (
-            <p className="ht-categories__hint" style={text('caption')}>
-              {t('web.categories.hint.unset')}
-            </p>
-          )}
-        </>
-      )}
+      <HeytaUiProvider>
+        <CategoryReportView
+          report={report}
+          labels={labels}
+          showWeeklyBars
+          /**
+           * 格子 / 柱段的确切时长（深浅只能看个大概，精确值在这里）。
+           *
+           * 🔴 **只有 web 给这一项** —— mobile 没有鼠标。共享层把它写进
+           * `data-cell-title`，提示泡本身由 `app.css` 的 `[data-cell-title]`
+           * 规则渲染（`content: attr(data-cell-title)`）：提示是**外观**，
+           * 归宿主外壳（L3）；共享层只负责把确切数字放进 DOM。
+           * 完整来龙去脉（含"第一版为什么把它丢了"）见 `CategoryReport.tsx` 文件头。
+           */
+          cellTooltip={labels.duration}
+          testID="category-report"
+        />
+      </HeytaUiProvider>
     </section>
-  );
-}
-
-/** 一行一个来源，一行十二格。 */
-function Swimlanes({ report }: { report: CategoryReport }) {
-  const { t } = useI18n();
-
-  return (
-    <div className="ht-categories__lanes">
-      {report.series.map((row) => {
-        const color = row.slot === undefined ? unsetSlotColor() : categorySlotColor(row.slot);
-        return (
-          // ⚠️ `role="group"` + aria-label 是**文字事实**，格子本身是装饰 ——
-          // 屏幕阅读器只念一次"深度工作（清单），共 5 小时 20 分"，
-          // 而不是念十二个格子。
-          <div className="ht-categories__lane" key={row.key} role="group" aria-label={laneDescription(row, t)}>
-            <div className="ht-categories__lane-head">
-              <span
-                className="ht-categories__swatch"
-                style={{ background: color }}
-                aria-hidden="true"
-              />
-              {/* 槽位号是**文字**，不是颜色 —— 色觉障碍用户靠它把这一行
-                  和堆叠条里的那一段对上。 */}
-              <span className="ht-categories__slot" style={text('caption')}>
-                {row.slot === undefined ? t('web.categories.slot.none') : String(row.slot)}
-              </span>
-              <span className="ht-categories__name">{row.name}</span>
-              <span className="ht-categories__kind" style={text('caption')}>
-                {t(KIND_COPY[row.kind])}
-              </span>
-              <span className="ht-categories__total" style={text('numeric-body')}>
-                {formatDuration(row.totalMs, t)}
-              </span>
-            </div>
-            <div className="ht-categories__cells" aria-hidden="true">
-              {row.weeklyMs.map((ms, index) => {
-                // 强度分档是**跨行共享**的（同一个 peak）—— 两行同样深浅就代表
-                // 同样多，这正是"行与行可以比一比节奏"的前提。
-                const level = intensityLevel(ms, report.peakWeeklyMs);
-                return (
-                  <span
-                    className="ht-categories__cell"
-                    key={report.weeks[index]?.start ?? String(index)}
-                    data-level={level}
-                    style={{ background: cssVar(HEAT_TOKENS[level]) }}
-                    // 鼠标悬停给出这一格的确切数字 —— 深浅只能看个大概。
-                    title={ms === 0 ? t('web.categories.cell.none') : formatDuration(ms, t)}
-                  />
-                );
-              })}
-            </div>
-          </div>
-        );
-      })}
-    </div>
-  );
-}
-
-/**
- * 一周一根柱，按类别堆叠（辅形状）。
- *
- * 它比泳道图**快**（一眼看出"最近几周整体在动"），但看不出趋势的细节 ——
- * 所以它是辅，泳道图是主。柱子高度按**窗口内最高的一周**归一，
- * 与格子的强度分档共用同一个峰值，两处不会出现两种"最深"。
- */
-function WeeklyBars({ report }: { report: CategoryReport }) {
-  const { t } = useI18n();
-
-  return (
-    // `role="img"` + 一个总说明：柱状图对屏幕阅读器是**一张图**，不是一堆节点。
-    // 每一段的确切数字由上面的泳道图负责（那里是文字）。
-    <div className="ht-categories__bars" role="img" aria-label={t('web.categories.bars.aria')}>
-      {report.weeks.map((week, index) => {
-        const segments = report.series
-          .map((row) => ({
-            key: row.key,
-            ms: row.weeklyMs[index] ?? 0,
-            color: row.slot === undefined ? unsetSlotColor() : categorySlotColor(row.slot),
-            label: segmentLabel(row, t),
-          }))
-          .filter((segment) => segment.ms > 0);
-
-        return (
-          <div className="ht-categories__bar" key={week.start} title={`${week.start} · ${formatDuration(week.totalMs, t)}`}>
-            <div className="ht-categories__bar-track">
-              {/* 从下往上堆，**段序与泳道图的行序一致**（都是总时长降序）：
-                  同一类别在每一根柱子里都落在同一层，用户才能顺着颜色横向读
-                  "这一类这周比上周多还是少"。
-                  🔴 段序**跨周固定**是这里唯一重要的事 —— 不固定的话，
-                  同一个颜色对应的高度每周都在跳，"趋势"就看不出来了。
-                  ⚠️ `column-reverse` 下 DOM 里的第一个孩子落在**底部**，
-                  所以这里**不要**再 `reverse()`：加了它就把最小的那段放到基线，
-                  与注释所写的正好相反。DOM 序 = 行序这一半由
-                  `tests/categories.spec.tsx` 钉住；"底部"那一半是 CSS 语义，
-                  jsdom 不排版，**没有自动检查**。 */}
-              {segments.map((segment) => (
-                <span
-                  className="ht-categories__bar-segment"
-                  key={segment.key}
-                  title={segment.label}
-                  style={{
-                    background: segment.color,
-                    // 高度是**这一段的占比**，不是绝对值 —— 柱子总高由 track 决定
-                    height: `${String((segment.ms / report.peakWeeklyMs) * 100)}%`,
-                  }}
-                />
-              ))}
-            </div>
-            <span className="ht-categories__bar-label" style={text('caption')}>
-              {week.start.slice(5)}
-            </span>
-          </div>
-        );
-      })}
-    </div>
   );
 }
