@@ -220,6 +220,34 @@ RN 生态**没有 Linux**。真原生只能 GTK4 / libadwaita（或 Qt），即*
 | **新增：多壳断言一致性** | Electron / WinUI 必须过**同一份** `desktop-window` 断言 | 见 W1-4；这是"同一套 UI 契约"唯一的机器保证 |
 | ~~`check:mobile-bundle`~~ | **不需要为 WinUI 3 跑** | 该门禁防的是 Hermes 的 `import.meta` 坑；WinUI 3 不走 Hermes（这一条随 RNW 出局而消失） |
 
+### 6.1 🔴 门禁必须在**干净检出**上验一次（本轮验证，2026-09-28）
+
+**本机的工作区会替真实依赖"兜底"，于是缺东西的脚本一直显示绿的。** 这不是理论：
+
+```bash
+git worktree add --detach /tmp/heyta-head HEAD
+cd /tmp/heyta-head
+pnpm install --store-dir "<主仓库>/.pnpm-store" --frozen-lockfile   # 热 store → 10 秒
+(cd e2e && pnpm install --store-dir "<主仓库>/.pnpm-store")
+pnpm check                                                          # → exit 0，137 秒
+```
+
+第一次跑就抓出**两个"本机绿、CI 红"**：
+
+| # | 问题 | 为什么本机看不见 | 归属 |
+|---|---|---|---|
+| 1 | `research/spikes/*/run.sh` 写死 `packages/domain/node_modules/.bin/esbuild` | 那个链接是**主仓库的历史遗留**；`packages/domain/package.json` 从没声明过 esbuild（它是 tsup 的依赖），干净树里没有它。**而 `check:crosslang-contract` 已接进 `pnpm check` ⇒ CI 必红** | 我（W0-2 那一轮） |
+| 2 | `docs/README.md` 有 4 个死链，指向从未提交的文件 | 那 4 个文件在**工作区里以未跟踪状态存在**，`check:docs` 按磁盘路径解析 ⇒ "看起来是通的" | 我（`b2adb45` 扫入了指向未提交文档的索引行） |
+
+两个都已修（`1c56439` / `de9b001`）；**修完在干净检出上 `pnpm check` = exit 0（137 秒）**。
+
+⚠️ **如实标注这次验证的边界**：e2e 是 **24 passed / 2 skipped** ——
+跳过的正是 `desktop-window.spec.ts` 的两条，因为**干净检出里 Electron 二进制没有下载**
+（我们自己的 `test.skip(electronBinary === '', …)` 按设计优雅跳过，而不是把整套 e2e 带崩）。
+那两条在**主工作区**里是真跑的、且通过（截图已 `read_image` 看过）。
+⇒ **"干净检出全绿"成立；但其中 2 条桌面窗口冒烟在那次运行里没被验过。**
+
+
 ---
 
 ## 7. 风险登记
@@ -259,6 +287,7 @@ RN 生态**没有 Linux**。真原生只能 GTK4 / libadwaita（或 Qt），即*
 | W0-3 原生库缺口清单 | ✅ **已完成**，且**做成了可重跑的脚本** | **4 个原生库 / 3 个缺口**（[ADR-0034](../adr/0034-windows-native-winui3-not-rnw.md) §1.5）。复现：`node research/tools/windows-native-gaps.mjs` —— 它会现场数一遍，并在**清单过期**（包不再是直接依赖）或**可能漏报**（某依赖声明了 `codegenConfig` 却不在清单里）时报警 |
 | W0-1 装工具链 + 起窗口 | 🟡 **编译已通，开窗未做**（2026-09-28） | .NET SDK **10.0.401** 已装（`winget`）；该机**无 VS** 但 WinUI 3 / WinAppSDK 2.5.1 **`dotnet build` 0 警告 0 错误**，产出 **162304 字节的 exe** —— 见 [spike](../../research/spikes/winui3-toolchain-probe/README.md)。⬜ 启动窗口 + 截图仍待做（无桌面会话 + 需装 WinAppSDK 运行时） |
 | W0-2 同步 SQLite 驱动（C#） | ✅ **已完成；契约全量重放 + 编组开销已测**（2026-09-28） | ① 未改一行的 `SqliteAdapter` + `DbOpLogStore` 跑**原样契约 50/50 通过**（约 2 秒），已做成门禁 `check:crosslang-contract`；反假通过：条数与真 vitest 对齐、注入细微 bug 能抓 6 条。② 编组开销：固定 **6 µs/次**、JSON 桥 **4.9 µs/行** ⇒ 保留 JSON 桥；2000 行时纯 C# 基线占 46%，该优化的是"少搬行"。⚠️ 未测：Windows 宿主上的性能；`widget-core` golden fixture 未进通道 |
+| **门禁：干净检出上 `pnpm check`** | ✅ **exit 0**（2026-09-28，137 秒） | 在 `git worktree` 的 HEAD 干净检出上跑完整 `pnpm check`（**并行会话的文件一个都不在**）⇒ 全绿。抓出并修掉两个"本机绿、CI 红"（esbuild 陈旧链接 `1c56439`、4 个死链 `de9b001`），见 §6.1。⚠️ e2e **24 passed / 2 skipped**（干净检出没下 Electron 二进制；那两条在主工作区真跑且通过） |
 | W0-5 决策点 | ✅ **已判：进 W1**（2026-09-28） | W0-1 / W0-2 / W0-4 三条门槛都过；放弃判据仍有效。⚠️ 更正：blob 曾被写成 W1 硬前置，实测**没有一处把二进制写进库** ⇒ 不是在用路径上的缺口 |
 | **W0-4 🔴 领域层单源 spike** | ✅ **bundle 级已证 D2 可行**（2026-09-28） | 同一份 bundle（338445 B / 146 导出）在裸 V8 与 .NET+Jint 上 **22/22 一致、零宿主全局**；复现 `bash research/spikes/domain-single-source/run.sh`。⚠️ 性能/ES 覆盖率未测 |
 | W1 WinUI 3 渲染最小切片 | ⬜ 未开始 | — |
