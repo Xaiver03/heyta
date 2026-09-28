@@ -1,0 +1,144 @@
+/**
+ * W0-2 spike：在 C# 宿主的 JS 引擎里，用**真正的 TS `SqliteAdapter`**
+ * 跑在**C# 提供的同步 `SqliteDriver`** 上。
+ *
+ * 这就是 D2 路线的存储形态：
+ *   WinUI 3 壳（C#）  →  内嵌 JS 引擎  →  TS 存储栈（同一份源码）
+ *                                        ↓ 只在这一层跨语言
+ *                                      C# 同步 SqliteDriver（Microsoft.Data.Sqlite）
+ *
+ * 🔴 测的每一条都是**驱动契约里最容易挂**的地方，而不是"能开库"：
+ *    · 复合主键 store（state: ['entityType','entityId']）
+ *    · 唯一索引（ops.by_opId）＋ 重复写入必须被拒
+ *    · `addToleratingDuplicate` 必须把唯一冲突**吸收成 { ok:false }**，
+ *      而不是让整个事务失败 —— 它依赖驱动/适配器的 `isUniqueViolation` 回退
+ *    · multiEntry 索引（ops.by_entityIds）
+ *    · 事务提交 与 事务回滚（回滚后值必须不存在）
+ *
+ * 结果全部塞进 `globalThis.__result`（JSON 字符串），由 C# 侧打印。
+ * `globalThis.__done` 是给宿主看的分帧标志（见 Program.cs 的微任务泵）。
+ */
+
+globalThis.__done = false;
+globalThis.__result = null;
+
+(async () => {
+  const S = HeytaStorage;
+  const steps = [];
+  // 🔴 `undefined` 必须显式归一化：`JSON.stringify({name, value: undefined})` 会把
+  //    `value` 这个键**整个丢掉**，于是宿主侧 `GetProperty("value")` 抛
+  //    KeyNotFoundException —— 而"回滚后读到 undefined"恰恰是**正确结果**，
+  //    不是异常。第一次跑就是这么被自己的打印代码炸掉的。
+  const record = (name, value) =>
+    steps.push({ name, value: value === undefined ? '__undefined__' : value });
+
+  // 🔴 这就是"跨语言边界"，而且只有这一层：
+  //    参数与行**都过 JSON 文本**。选 JSON 而不是 CLR 对象直接编组，
+  //    是为了让类型映射只有一处、可被读懂；代价是编组开销（见 README 未测项）。
+  const driver = {
+    exec(sql) {
+      host.exec(sql);
+    },
+    run(sql, params) {
+      host.run(sql, JSON.stringify(params ?? []));
+    },
+    all(sql, params) {
+      return JSON.parse(host.all(sql, JSON.stringify(params ?? [])));
+    },
+    close() {
+      host.close();
+    },
+  };
+
+  const db = new S.SqliteAdapter({
+    schema: S.INDEXEDDB_SCHEMA,
+    driverFactory: () => driver,
+  });
+
+  await db.init();
+  record('init（建 4 个 store + 索引）', 'ok');
+
+  // ── meta：字符串主键 ─────────────────────────────────────────────
+  await db.put(S.STORES.META, { key: 'probe', value: 42 });
+  record('meta 往返', await db.get(S.STORES.META, 'probe'));
+  record('meta count', await db.count(S.STORES.META));
+
+  // ── state：复合主键 ['entityType','entityId'] ───────────────────
+  await db.put(S.STORES.STATE, { entityType: 'task', entityId: 't1', title: 'A' });
+  await db.put(S.STORES.STATE, { entityType: 'task', entityId: 't2', title: 'B' });
+  record('state 复合主键 get', await db.get(S.STORES.STATE, ['task', 't1']));
+  record('state getAll 条数', (await db.getAll(S.STORES.STATE)).length);
+
+  // ── ops：自增主键 + 唯一索引 + 复合索引 + multiEntry ──────────────
+  const opRecord = (id, entityIds) => ({
+    op: { id, entityType: 'task', entityId: 't1', entityIds, kind: 'task.create', payload: {} },
+    source: 'local',
+    uploadStatus: 'pending',
+    applyStatus: 'pending',
+  });
+
+  await db.add(S.STORES.OPS, opRecord('o1', ['t1', 't2']));
+  await db.add(S.STORES.OPS, opRecord('o2', ['t1']));
+  record('ops count', await db.count(S.STORES.OPS));
+  record(
+    'ops by_entity 复合索引命中数',
+    (await db.getAllFromIndex(S.STORES.OPS, S.OP_INDEXES.ENTITY, ['task', 't1'])).length,
+  );
+  record(
+    'ops by_entityIds multiEntry 命中数（t2 只在 o1 里）',
+    (await db.getAllFromIndex(S.STORES.OPS, S.OP_INDEXES.ENTITY_IDS, 't2')).length,
+  );
+  record(
+    'ops by_applyStatus 命中数',
+    (await db.getAllFromIndex(S.STORES.OPS, S.OP_INDEXES.PENDING_APPLY, 'pending')).length,
+  );
+
+  // ── 唯一冲突：必须抛（这是唯一索引的意义）────────────────────────
+  let uniqueThrew = false;
+  let uniqueMessage = '';
+  try {
+    await db.add(S.STORES.OPS, opRecord('o1', ['t1']));
+  } catch (error) {
+    uniqueThrew = true;
+    uniqueMessage = String(error && error.message ? error.message : error);
+  }
+  record('重复 opId 被拒', uniqueThrew);
+  record('重复 opId 的错误文案', uniqueMessage);
+  record('冲突后 ops count 未变', await db.count(S.STORES.OPS));
+
+  // ── addToleratingDuplicate：冲突要被**吸收**，不能让事务炸 ────────
+  const tolerated = await db.transaction([S.STORES.OPS], 'readwrite', (tx) =>
+    tx.addToleratingDuplicate(S.STORES.OPS, opRecord('o1', ['t1'])),
+  );
+  record('addToleratingDuplicate 吸收冲突', tolerated);
+
+  // ── 事务提交 ────────────────────────────────────────────────────
+  await db.transaction([S.STORES.META], 'readwrite', (tx) =>
+    tx.put(S.STORES.META, { key: 'tx', value: 'committed' }),
+  );
+  record('事务提交后能读到', await db.get(S.STORES.META, 'tx'));
+
+  // ── 事务回滚 ────────────────────────────────────────────────────
+  let rollbackMessage = '';
+  try {
+    await db.transaction([S.STORES.META], 'readwrite', async (tx) => {
+      await tx.put(S.STORES.META, { key: 'rolled-back', value: 'should-not-exist' });
+      throw new Error('boom');
+    });
+  } catch (error) {
+    rollbackMessage = String(error && error.message ? error.message : error);
+  }
+  record('回滚：错误冒泡', rollbackMessage);
+  record('回滚：值必须不存在', await db.get(S.STORES.META, 'rolled-back'));
+
+  db.close();
+  globalThis.__result = JSON.stringify({ ok: true, steps });
+  globalThis.__done = true;
+})().catch((error) => {
+  globalThis.__result = JSON.stringify({
+    ok: false,
+    error: String(error && error.message ? error.message : error),
+    stack: String(error && error.stack ? error.stack : ''),
+  });
+  globalThis.__done = true;
+});

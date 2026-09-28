@@ -273,3 +273,32 @@ C# 进程**跑不了 TS**。两条路，**由 W0 spike 拍板，本文不预先�
    而 `packages/domain` 正式的 tsup 产物是 ESM + CJS，两者是否等价未测。
 5. **Jint vs ClearScript 未比较** —— 选 Jint 只因它**无原生依赖**（本决策正在为"少一个原生依赖"付代价），
    ClearScript/V8 可能更快，未测。
+
+### 6.2 W0-2（同步 SQLite 驱动）也过了 —— C1 现在**不再是待验项**
+
+**结论：C1 结清。** 复现：`bash research/spikes/sqlite-driver-csharp/run.sh`（exit 0）。
+
+**未改一行的** `SqliteAdapter`（`packages/storage`）在 **.NET 10 + Jint 4.16.4** 里，
+跑在 **C# 提供的同步 `SqliteDriver`**（`Microsoft.Data.Sqlite` 10.0.12）之上，
+契约里最容易挂的每一条都过了：复合主键 store、唯一索引、
+**`addToleratingDuplicate` 吸收冲突 = `{ok:false, reason:"duplicate"}`**、
+**multiEntry 索引命中数正确**、事务提交、以及**回滚后值不存在**。
+C# 侧还开了一个**新连接**独立复核盘上的库（`__heyta_seq` / `archive` / `meta` / `ops` /
+`ops__mt3` / `state` + 各索引，行数对得上）—— 不信 JS 的自述。
+
+⇒ §1.4 的判断（"C1 是**栈相关**的，不是 Windows 平台的性质"）**从推理变成了实测**。
+
+🔴 **同时撞出两个"默认值就是错的"陷阱**（都不测就不会知道，且只在第一次真冲突时现形）：
+
+1. **`Microsoft.Data.Sqlite` 只认具名参数**，而 heyta 的 `SqliteDriver` 契约是
+   `?` **位置**占位符 ⇒ 任何 Windows 侧的真驱动都必须做 `?` → `$pN` 的翻译，
+   且必须**跳过字符串字面量**里的 `?`（否则 `WHERE title = 'a?b'` 会被静默改坏）。
+2. **Jint 默认把 CLR 异常冒泡给宿主、中断脚本**（官方文档原文）⇒ 而 heyta 的存储契约
+   **整个建立在异常上**（驱动抛错 → 适配器回滚 → `isUniqueViolation` 吸收冲突）。
+   **不打开 `CatchClrExceptions`，一条重复写入会直接杀掉整个桌面进程。**
+
+⚠️ **仍未结清**（进 W1）：**blob（`Uint8Array`）过不了 JSON 桥** ——
+契约的 `SqlValue` 含二进制，当前的 JSON 编组**根本表达不了**；
+以及**完整契约重放**（`packages/storage/tests/contract/adapter.contract.ts` 的几十条断言，
+本 spike 只挑了最危险的 16 步）。细节见
+[spike README](../../research/spikes/sqlite-driver-csharp/README.md)。
