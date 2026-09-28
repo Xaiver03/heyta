@@ -24,28 +24,24 @@ OUT_DIR="${SQLITE_SPIKE_OUT:-$(mktemp -d -t heyta-sqlite-spike.XXXXXX)}"
 BUNDLE="$OUT_DIR/storage.iife.js"
 DB="$OUT_DIR/probe.sqlite"
 
-echo "▸ 输出目录：$OUT_DIR"
-
-# 🔴 esbuild 只装在 packages/domain 自己的 node_modules 里（pnpm 隔离布局，
-# 根目录没有 .bin/esbuild）。不能用 `npx esbuild`。
-ESBUILD="$ROOT/packages/domain/node_modules/.bin/esbuild"
-if [ ! -x "$ESBUILD" ]; then
-  echo "找不到 esbuild：$ESBUILD" >&2
-  echo "先在仓库根跑一次：pnpm install --store-dir .pnpm-store" >&2
-  exit 1
-fi
-
 echo "▸ 1/2 打包真正的 TS 存储栈 + 原样契约（--platform=neutral：不注入 Node/浏览器垫片）"
 
-# 🔴 `--alias:vitest=…` 是契约重放能成立的关键：两个 `*.contract.ts` 都写着
-#    `import { describe, expect, it } from 'vitest'`，把它们指到 `vitest-shim.ts`
+# 🔴 `--alias vitest=…` 是契约重放能成立的关键：两个 `*.contract.ts` 都写着
+#    `import { describe, expect, it } from 'vitest'`，把它指到 `vitest-shim.ts`
 #    （一个几十行的替身），就能让**同一份契约源码、一个字不改**在 Jint 里跑。
 #    如果改成"照着契约另写一套断言"，那测的就是实现者的假设，不是接口本身 ——
 #    而 contract.spec.ts 的文件头明确禁止那种做法。
-"$ESBUILD" "$HERE/entry.ts" \
-  --bundle --format=iife --global-name=HeytaStorage \
-  --alias:vitest="$HERE/vitest-shim.ts" \
-  --outfile="$BUNDLE" --platform=neutral --target=es2020 --log-level=warning
+#
+# 🔴 用 `research/tools/bundle-spike.mjs`（esbuild 的 **JS API**），**不要**调 CLI：
+#    这里原先写死 `packages/domain/node_modules/.bin/esbuild`，而那个链接是主仓库的
+#    **陈旧状态** —— `packages/domain/package.json` 从没声明过 esbuild（它是 tsup 的依赖），
+#    于是**干净检出的树里没有它**，门禁在 CI 上必红、本机却一直绿。
+#    抓出它的是"在干净 worktree 里跑一遍完整 pnpm check"。
+node "$ROOT/research/tools/bundle-spike.mjs" \
+  --entry "$HERE/entry.ts" \
+  --out "$BUNDLE" \
+  --global HeytaStorage \
+  --alias "vitest=$HERE/vitest-shim.ts"
 
 # 每次从零开始：否则上一轮的库会被复用，"建表"这一步就白验了。
 rm -f "$DB" "$DB-wal" "$DB-shm"
