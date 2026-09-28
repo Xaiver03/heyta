@@ -29,17 +29,23 @@ export function QuadrantGrid(): React.JSX.Element {
   const { t } = useI18n();
 
   // 数据挪进组件内是文案迁移的硬要求（模块级拿不到 `t`）。取舍见 `Landing.tsx` 文件头。
+  //
+  // 🔴 象限**标题与副标题**用应用自己的 key（`web.quadrant.*`，来源
+  // `features/quadrant/QuadrantBoard.tsx`）—— 原来走的是 `landing.quadrant.*`，
+  // 两边的值逐字相同，那正是下一个漂移源。
+  // **任务标题**（`landing.mock.task.*`）保持 landing 命名空间：那是示例数据，
+  // 产品里没有对应物，本来就得由我们编。
   const quadrants = useMemo<Quadrant[]>(
     () => [
       {
-        title: t('landing.quadrant.do'),
-        hint: t('landing.quadrant.q1'),
+        title: t('web.quadrant.do'),
+        hint: t('web.quadrant.q1'),
         swatch: 'mk-swatch--q1',
         cards: [t('landing.mock.task.quote'), t('landing.mock.task.weeklyReport')],
       },
       {
-        title: t('landing.quadrant.plan'),
-        hint: t('landing.quadrant.q2'),
+        title: t('web.quadrant.plan'),
+        hint: t('web.quadrant.q2'),
         swatch: 'mk-swatch--q2',
         cards: [
           t('landing.mock.task.q4Draft'),
@@ -48,14 +54,14 @@ export function QuadrantGrid(): React.JSX.Element {
         ],
       },
       {
-        title: t('landing.quadrant.delegate'),
-        hint: t('landing.quadrant.q3'),
+        title: t('web.quadrant.delegate'),
+        hint: t('web.quadrant.q3'),
         swatch: 'mk-swatch--q3',
         cards: [t('landing.mock.task.dentist')],
       },
       {
-        title: t('landing.quadrant.drop'),
-        hint: t('landing.quadrant.q4'),
+        title: t('web.quadrant.drop'),
+        hint: t('web.quadrant.q4'),
         swatch: 'mk-swatch--q4',
         cards: [],
       },
@@ -65,29 +71,40 @@ export function QuadrantGrid(): React.JSX.Element {
 
   return (
     <div className="mk-quadrant">
-      {quadrants.map((q) => (
-        <section key={q.title} className="mk-quad">
-          <div className="mk-quad__head">
-            <span className={`mk-swatch ${q.swatch}`} />
-            {q.title}
-          </div>
-          <p className="mk-quad__hint">{q.hint}</p>
+      <div className="mk-quadrant__grid">
+        {quadrants.map((q) => (
+          <section key={q.title} className="mk-quad">
+            <div className="mk-quad__head">
+              <span className={`mk-swatch ${q.swatch}`} />
+              {q.title}
+            </div>
+            <p className="mk-quad__hint">{q.hint}</p>
 
-          <div className="mk-quad__list">
-            {q.cards.map((card) => (
-              <div key={card} className="mk-quad__card">
-                {card}
-              </div>
-            ))}
-            {q.cards.length === 0 && (
-              <div className="mk-quad__empty">
-                <CheckCircle2 size={16} />
-                {t('landing.quadrant.dropHere')}
-              </div>
-            )}
-          </div>
-        </section>
-      ))}
+            <div className="mk-quad__list">
+              {q.cards.map((card) => (
+                <div key={card} className="mk-quad__card">
+                  {card}
+                </div>
+              ))}
+              {q.cards.length === 0 && (
+                <div className="mk-quad__empty">
+                  {/* 与真应用 `QuadrantBoard.tsx` 同一个图标、同一段文案 */}
+                  <CheckCircle2 size={16} />
+                  {t('web.quadrant.dropHere')}
+                </div>
+              )}
+            </div>
+          </section>
+        ))}
+      </div>
+
+      {/*
+        🔴 底部注释。真应用 `QuadrantBoard.tsx` 的四宫格下面有这一条
+        （`web.quadrant.footnote`，讲"拖拽同时会改截止时间"），复刻原来没有。
+        它不只是装饰：**它解释了这张界面的核心不变量** ——
+        紧急度不是手选的，是从截止时间推导的。少了它，四象限看起来就只是个普通看板。
+      */}
+      <p className="mk-quadrant__footnote">{t('web.quadrant.footnote')}</p>
     </div>
   );
 }
