@@ -39,6 +39,7 @@ import { FocusScreen } from './screens/FocusScreen';
 import { CategoriesScreen } from './screens/CategoriesScreen';
 import { ProfileScreen } from './screens/ProfileScreen';
 import { startAutoSync } from './sync/auto-sync';
+import { startWidgetLifecycle } from './widgets/lifecycle';
 
 function Shell(): React.JSX.Element {
   const t = useTokens();
@@ -69,6 +70,28 @@ function Shell(): React.JSX.Element {
    * 并且返回停止函数 —— 正好是清理函数该有的形状。
    */
   useEffect(() => startAutoSync(), []);
+
+  /**
+   * 🔴 **小组件**：启动时醒一次，回到前台再醒一次。醒来做两件事 ——
+   * **drain**（把组件里攒下的点击落成 op）与 **publish**（重发快照）。
+   *
+   * 为什么必须有这个 effect：
+   *
+   * 1. 组件**产生不了 op**（刻意的红线，见 `packages/app-host/src/widget-actions.ts`
+   *    的文件头）。用户在组件上勾了一下，那条意图只是躺在共享容器里 ——
+   *    没有任何东西会主动叫醒应用。少了 drain，症状是"我在组件上勾了，
+   *    进应用还是没勾"，而数据**好好地躺在容器里**。
+   * 2. 发布只挂在 `dispatch` 之后，所以"应用开了但什么都没改"不触发任何发布 ——
+   *    而那正是**每天早上最常见的情况**。少了 publish，`validUntil` 还是昨天
+   *    的零点，组件一整天都显示"数据已过期"。
+   *
+   * 两条都**不报错**，都只在时间流逝之后才出现，所以都不能靠肉眼验收。
+   *
+   * `startWidgetLifecycle()` 与 `startAutoSync()` 同样是幂等的，也返回停止函数。
+   * 单独一个（而不是塞进 `startAutoSync`）是为了不引入
+   * `auto-sync → open-host → …` 的又一条循环依赖边。
+   */
+  useEffect(() => startWidgetLifecycle(), []);
 
   return (
     <View style={{ flex: 1, backgroundColor: t['color.background'] }}>

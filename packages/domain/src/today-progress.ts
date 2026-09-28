@@ -60,6 +60,45 @@ function isOn(timestamp: number, today: LocalDate): boolean {
   return toLocalDate(timestamp) === today;
 }
 
+/**
+ * 任务是否属于「**今天该做的**」。
+ *
+ * 这是本文件第 1 条口径（"今天排期的习惯 + 今天到期或已逾期的未完成任务"）
+ * 在任务侧的唯一实现。判据是三条：
+ *
+ *   1. 未删除；
+ *   2. **截止日**是今天或已逾期（`diffDays(due, today) >= 0`，注意 `diffDays(a, b) = b - a`）；
+ *   3. 不在今天之前就完成了 —— 昨天就做完的任务不该再占今天的位置。
+ *
+ * ## 🔴 为什么它必须**导出**，而不是继续内联在 `computeTodayProgress` 里
+ *
+ * 小组件的「今日任务」组件要显示的**就是这一批任务**。
+ * 如果判据留在这里内联，组件侧只能照抄一份 —— 而那正是
+ * `M0-1` 踩过的那种**静默漂移**：
+ *
+ *   > 两处判据长得一样、跑起来也对，但改了一处**不会让任何测试变红**。
+ *   > 用户看到的是"今日进度说 5 件、组件列了 4 件"，而且两边都不报错。
+ *
+ * 所以判据收在这里一份，今日进度与小组件**都调它**。
+ * 配套的等价性测试在 `tests/today-progress.spec.ts`：一旦有人把判据重新内联回去，
+ * 那个测试会红。
+ *
+ * ⚠️ 注意它**只管"是否进入今天的计划"**，不管"是否已完成"。
+ * `computeTodayProgress` 的 `tasksDone` 口径更宽（**含计划外**今天完成的），
+ * 那一项故意留在这里、不放进本函数 —— 两者的语义不同，混起来会同时错两处。
+ */
+export function isTaskPlannedForToday(task: Task, today: LocalDate): boolean {
+  if (task.deletedAt !== undefined) return false;
+
+  // 今天之前就完成的：不再算今天的计划
+  const completedToday = task.completedAt !== undefined && isOn(task.completedAt, today);
+  if (task.completedAt !== undefined && !completedToday) return false;
+
+  if (task.dueDate === undefined) return false;
+  // `diffDays(a, b) = b - a`，所以 >= 0 表示截止日**是今天或已过去**（逾期）
+  return diffDays(toLocalDate(task.dueDate), today) >= 0;
+}
+
 export function computeTodayProgress(input: TodayProgressInput): TodayProgress {
   const { habits, logs, tasks, focusSessions, today } = input;
 
@@ -89,19 +128,17 @@ export function computeTodayProgress(input: TodayProgressInput): TodayProgress {
   for (const task of tasks) {
     if (task.deletedAt !== undefined) continue;
 
+    // ⚠️ `tasksDone` 的口径**比 planned 宽** —— 计划外今天做完的也算（文件头第 2 条）。
+    // 所以这一句必须在 `isTaskPlannedForToday` **之前**：它统计的是"今天做了什么"，
+    // 而不是"今天该做什么"。把它挪到判据之后，只有截止日恰好是今天的任务才会被计入。
     const completedToday =
       task.completedAt !== undefined && isOn(task.completedAt, today);
     if (completedToday) {
       tasksDone += 1;
     }
 
-    if (task.dueDate === undefined) continue;
-    const due = toLocalDate(task.dueDate);
-    // 今天到期或已逾期
-    if (diffDays(due, today) < 0) continue;
-    // 在今天之前就完成的，不算今天的计划
-    if (task.completedAt !== undefined && !completedToday) continue;
-
+    // 判据只有一份，在 `isTaskPlannedForToday` 里 —— 小组件的「今日任务」也调它。
+    if (!isTaskPlannedForToday(task, today)) continue;
     tasksPlanned += 1;
     if (completedToday) tasksPlannedDone += 1;
   }

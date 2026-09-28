@@ -68,6 +68,32 @@ export {
   setArgon2ParamsForTesting,
   setLegacyKdfWarningHandler,
 } from './encryption';
+
+/**
+ * 裸的 AES-GCM 原语与字节/Base64 互转 —— 给**小组件快照**这类
+ * "自带信封格式、只是需要一次 AES-GCM" 的调用方用。
+ *
+ * ## 为什么要开这个口子
+ *
+ * 上面那组 `encrypt` / `decrypt` 是**口令式**的（`string → string`）：它们自己
+ * 管 Argon2id 派生、盐、版本前缀。小组件快照用不上那一整套 ——
+ * 它的密钥是**设备密钥**（不经口令派生），而它的信封格式由
+ * `@heyta/widget-core` 的契约定义、还要把明文信封绑进 AAD。
+ *
+ * 可选做法是让它自己引一个 AES 库，但那会在本仓出现**第二份 AES-GCM 实现** ——
+ * 两份实现最难查的不是"哪份错了"，而是**它们对 AAD / tag 长度的默认值不一样**，
+ * 于是 iOS 能解、Android 解不开，而症状只是"组件没数据"。
+ * 所以这里把**已有的那一份**导出，而不是再写一份。
+ *
+ * ⚠️ 导出的是原语，**没有任何口令派生** —— 调用方自己负责密钥的来源与生命周期。
+ */
+export {
+  aesEncrypt,
+  aesDecrypt,
+  encodeBase64,
+  decodeBase64,
+  getRandomBytes,
+} from './encryption/web-crypto';
 export type {
   DerivedKey,
   DecryptSettledItem,

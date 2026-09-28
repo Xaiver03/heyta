@@ -17,6 +17,8 @@
 import { openAppHost, type AppHost } from '@heyta/app-host';
 import { readSyncConfig } from '../sync/config';
 import { emitLocalWrite } from '../sync/write-signal';
+import { hostPublishSource } from '../widgets/publish-source';
+import { publishWidgetSnapshot } from '../widgets/publish';
 import { opSqliteDriverFactory } from './op-sqlite-driver';
 
 const DB_NAME = 'heyta.sqlite';
@@ -24,7 +26,8 @@ const DB_NAME = 'heyta.sqlite';
 let pending: Promise<AppHost> | null = null;
 
 /**
- * 在宿主外面包一层：**每次写入之后喊一声"写了"**，自动同步据此把改动推出去。
+ * 在宿主外面包一层：**每次写入之后喊一声"写了"**，自动同步据此把改动推出去，
+ * 小组件据此重发快照。
  *
  * 🔴 包在 `dispatch` 这个**唯一写入口**上，而不是在各个界面里逐处调用。
  * 理由是"以后有人加一个新动作，忘了通知同步"这件事一定会发生 ——
@@ -35,11 +38,30 @@ let pending: Promise<AppHost> | null = null;
  * ⚠️ 顺序：**先落库、后喊**。反过来会让同步先查队列、查不到刚写的那条。
  */
 function withWriteSignal(host: AppHost): AppHost {
+  const widgetSource = hostPublishSource(host);
+
   return {
     ...host,
     dispatch: async (intent) => {
       await host.dispatch(intent);
       emitLocalWrite();
+
+      /**
+       * 🔴 **重发小组件快照**。
+       *
+       * 挂在这里而不是挂在"任务被勾选"那一处：小组件显示的是**今天的整体视图**
+       * （任务 + 四象限 + 习惯 + 专注 + 清单颜色），能影响它的写入有很多种 ——
+       * 完成任务、改标题、换清单颜色、记一次习惯…… 逐个挂钩必然漏掉某个，
+       * 而漏掉的表现是"某个操作之后组件要等下一次别的写入才更新"，**不会报错**。
+       *
+       * ⚠️ **不 `await`**：这条管线和用户正在做的写入无关，让它挡在 `dispatch`
+       * 的返回路径上，会把一次本地写入的延迟变成"读状态 + AES + 写盘"的总和。
+       * [publishWidgetSnapshot] 自己保证永不抛异常，所以不 await 不会产生
+       * 未处理的 rejection。
+       *
+       * ⚠️ 也**不 `void` 掉就完**：它自己被合并，密集写入不会打成一堆并发。
+       */
+      void publishWidgetSnapshot(widgetSource);
     },
   };
 }

@@ -465,6 +465,23 @@ export const zhCN = {
   'web.passkeys.error.lastPasskey': '这是账号上最后一条通行密钥，不能删除。先添加一条新的。',
   'web.passkeys.error.unauthorized': '登录状态已失效，请重新登录。',
   'web.passkeys.error.network': '连不上服务端，请稍后重试。',
+
+  // ── Windows 小组件的后台刷新（Web Push）────────────────────────────
+  // ⚠️ 这些词条只在**能力真的可用**时才会被画出来（`probeWidgetPush`）。
+  //    http:// 上、没配 VAPID 的自托管实例上，整个面板都不画 ——
+  //    一个点了必然失败的开关比没有开关更糟。
+  'web.widgetPush.title': '小组件后台刷新',
+  'web.widgetPush.description': '开启后，任务在别的设备上发生变化时，Windows 上 pin 的 heyta 小组件会自动更新；关闭时只有打开 Heyta 才会刷新。',
+  'web.widgetPush.rowLabel': '允许后台刷新小组件',
+  'web.widgetPush.status.subscribed': '已开启',
+  'web.widgetPush.status.off': '未开启',
+  'web.widgetPush.status.working': '处理中…',
+  'web.widgetPush.status.denied': '浏览器已拒绝通知权限。请到浏览器的网站设置里允许通知后重试。',
+  'web.widgetPush.status.disabled': '这台服务器没有配置 Web Push，小组件只会在打开 Heyta 时刷新。',
+  'web.widgetPush.status.failed': '开启失败：{reason}',
+  'web.widgetPush.status.failedOff': '关闭失败：{reason}',
+  'web.widgetPush.note.privacy': '推送内容只有一句“有更新了”，不含你的任何任务内容 —— 服务端没有你的密钥，解密只在这台设备上发生。',
+  'web.widgetPush.note.windowsOnly': '这个开关只影响 Windows 上的小组件。手机端的小组件由系统自己按计划刷新。',
   'web.passkeys.error.add': '没能添加这条通行密钥，请重试。',
   'web.passkeys.error.passkeyUnsupported': '这台设备或浏览器不支持通行密钥。',
   'web.passkeys.error.passkeyCancelled': '通行密钥的创建被取消或超时了，可以再试一次。',
@@ -1616,6 +1633,10 @@ export const zhCN = {
   // 现在只剩**标签**还没有管理界面（`createTag` 在 app-host 里有，
   // 但移动端没有入口，而且 `tagIds` 连"指派"的动作都还没有）。
   'mobile.profile.footnote': '凭据只保留在内存中，应用完全退出后需要重新输入。',
+  'mobile.profile.section.widget': '小组件',
+  'mobile.profile.widgetPrivacy.label': '锁屏上隐藏任务标题',
+  'mobile.profile.widgetPrivacy.hint': '打开后，锁屏上的 Heyta 小组件只显示数量，不显示任务标题。系统本身也会在未解锁时遮挡，这一项是额外的一层。',
+  'mobile.profile.widgetPrivacy.failed': '没能保存这一项设置，请再试一次。',
   'mobile.profile.conflict.body': '这几处两边都改过，heyta 不会替你挑——自动挑一个会悄悄丢掉另一边的改动。数据没有丢，但选完之前它们不会上传。',
   'mobile.profile.conflict.open': '逐条处理',
 

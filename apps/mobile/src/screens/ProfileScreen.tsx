@@ -26,8 +26,8 @@
  * 现在给出双方的内容并让用户选一边，两个方向都走 op-log 重新派发。
  */
 
-import React, { useEffect, useState } from 'react';
-import { View } from 'react-native';
+import React, { useCallback, useEffect, useState } from 'react';
+import { Pressable, View } from 'react-native';
 import type { SyncStatus } from '@heyta/sync-client';
 import { classifyTransportSecurity } from '@heyta/sync-client';
 import { LOCALES, useI18n } from '@heyta/i18n';
@@ -51,6 +51,12 @@ import {
   clearSyncConfig,
   readSyncConfig,
 } from '../sync/config';
+import { wipeCredentialsAndWidgets } from '../widgets/credential-wipe';
+import {
+  clearWidgetState,
+  readWidgetPrivacy,
+  setWidgetPrivacy,
+} from '../widgets/widget-bridge';
 
 export function ProfileScreen(): React.JSX.Element {
   const { status, lastSyncedAt, pendingUpload, busy } = useMobileSync();
@@ -83,6 +89,58 @@ export function ProfileScreen(): React.JSX.Element {
   // 冲突本身在 `status.kind === 'conflict'` 里，所以关掉界面**不会清掉它们** ——
   // 「我的」屏仍会提示还有几处待处理，用户随时能回来继续。
   const [conflictsOpen, setConflictsOpen] = useState(false);
+
+  /**
+   * W5-2 · 锁屏组件的"隐藏任务标题"开关。
+   *
+   * 🔴 `null` 有三重含义，**必须区分**：
+   *   - `null` = **这个平台没有这一项**（安卓/鸿蒙）或还没读到 → **整段不渲染**；
+   *   - `false` = 用户关着；
+   *   - `true` = 用户开着。
+   *
+   * 把 `null` 当成 `false` 会让安卓上出现一个**按了没反应的开关**，
+   * 而用户会以为他设上了 —— 这比不显示更坏。
+   *
+   * ⚠️ 与上面"语言偏好只放内存"**不同**：这一项**必须**从原生读回来。
+   *    切到别的标签时本组件会被卸载重建（见上面凭据那段注释），
+   *    只放内存的话回来会显示成"关"，而文件里其实是"开" —— 那是在撒谎。
+   */
+  const [hideTitles, setHideTitles] = useState<boolean | null>(null);
+  /** 写失败时的一句提示。⚠️ **不能静默** —— 见 `setWidgetPrivacy` 的注释。 */
+  const [privacyFailed, setPrivacyFailed] = useState(false);
+  const [privacyBusy, setPrivacyBusy] = useState(false);
+
+  useEffect(() => {
+    let alive = true;
+    void readWidgetPrivacy().then((value) => {
+      // 卸载后不要再 setState（切标签很快时必然发生）。
+      if (alive) setHideTitles(value);
+    });
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  const toggleHideTitles = useCallback((): void => {
+    if (hideTitles === null || privacyBusy) return;
+    const next = !hideTitles;
+    // 乐观：先动开关（让点击有即时反馈），失败了再改回来 + 提示。
+    setHideTitles(next);
+    setPrivacyFailed(false);
+    setPrivacyBusy(true);
+    void setWidgetPrivacy(next)
+      .then((ok) => {
+        if (!ok) {
+          // 🔴 回滚。写不成的后果是"用户以为设了、其实没设" ——
+          //    留着一个假的"开"比留着一个假的"关"更危险。
+          setHideTitles(!next);
+          setPrivacyFailed(true);
+        }
+      })
+      .finally(() => {
+        setPrivacyBusy(false);
+      });
+  }, [hideTitles, privacyBusy]);
 
   /**
    * 「我的成长」是**第二层**页面，不是第 6 个底部标签。
@@ -329,13 +387,61 @@ export function ProfileScreen(): React.JSX.Element {
       <Button
         label={t('mobile.profile.clearCredentials')}
         onPress={() => {
-          clearSyncConfig();
+          // 🔴 清凭据必须**连小组件一起清**（决策 D6）。
+          //
+          //    小组件那份快照是**设备密钥**加密的，不是凭据加密的 ——
+          //    所以"清了凭据"绝不等于"小组件读不到数据"。
+          //    不一起清的话，主屏和锁屏上会**继续显示上一个账号的任务**，
+          //    而且没有任何报错。
+          //
+          //    顺序与"抛异常也要清"的理由写在 `credential-wipe.ts` 文件头；
+          //    `void` 是安全的 —— 那个函数**永不抛**。
+          void wipeCredentialsAndWidgets({
+            clearCredentials: clearSyncConfig,
+            clearWidgets: clearWidgetState,
+            onWidgetError: (error) => {
+              // ⚠️ 组件没清干净是这里**唯一真正危险**的失败，
+              //    所以必须留下痕迹，而不是退化成没人知道的 false。
+              console.warn('[widgets] 清除凭据时没能清掉小组件状态', error);
+            },
+          });
           setToken('');
           setPassword('');
         }}
         tone="ghost"
         disabled={token === '' && password === ''}
       />
+
+      {/* W5-2 · 锁屏组件隐私。`hideTitles === null`（这个平台没有这一项）时**整段不渲染** ——
+          不显示胜过显示一个按了没反应的开关。 */}
+      {hideTitles === null ? null : (
+        <>
+          <SectionHeader
+            icon="action.settings"
+            title={t('mobile.profile.section.widget')}
+          />
+          <Card>
+            <View style={{ gap: tokens['space.3'] }}>
+              <Row
+                label={t('mobile.profile.widgetPrivacy.label')}
+                value={hideTitles ? '✓' : ''}
+                tone={hideTitles ? 'default' : 'muted'}
+                // 整行可点：这个开关的目标点击区是**行**，不是那个 20pt 的方框。
+                onPress={toggleHideTitles}
+              />
+              <Divider />
+              <Text variant="caption" tone="subtle">
+                {t('mobile.profile.widgetPrivacy.hint')}
+              </Text>
+              {privacyFailed ? (
+                <Text variant="caption" tone="danger">
+                  {t('mobile.profile.widgetPrivacy.failed')}
+                </Text>
+              ) : null}
+            </View>
+          </Card>
+        </>
+      )}
 
       <Text variant="caption" tone="subtle">
         {t('mobile.profile.footnote')}
@@ -477,13 +583,24 @@ function Row({
   label,
   value,
   tone,
+  onPress,
 }: {
   label: string;
   value: string;
   tone: 'default' | 'muted' | 'subtle';
+  /**
+   * 给了就是**可点的整行**（W5-2 的隐私开关用这条路径）。
+   *
+   * 🔴 为什么点的是**行**而不是行里那个小方框：设置项的可点区域在 iOS 上是 44pt，
+   *    而一个 20pt 的方框在"我看着这一行、想把它打开"的心智下是**打不中**的，
+   *    打不中就会以为"这个开关坏了"。任务行不传这个参数，所以不受影响。
+   *
+   * ⚠️ `hitSlop` 一起给：行本身的高度由内容决定，可能不足 44pt。
+   */
+  onPress?: () => void;
 }): React.JSX.Element {
   const tokens = useTokens();
-  return (
+  const body = (
     <View style={{ flexDirection: 'row', justifyContent: 'space-between', gap: tokens['space.3'] }}>
       <Text variant="row-meta" tone="muted">
         {label}
@@ -493,6 +610,17 @@ function Row({
         {value}
       </Text>
     </View>
+  );
+  if (onPress === undefined) return body;
+  return (
+    <Pressable
+      onPress={onPress}
+      hitSlop={{ top: 12, bottom: 12, left: 8, right: 8 }}
+      accessibilityRole="switch"
+      accessibilityState={{ checked: tone === 'default' }}
+    >
+      {body}
+    </Pressable>
   );
 }
 

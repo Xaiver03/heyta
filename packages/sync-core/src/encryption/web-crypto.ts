@@ -121,10 +121,26 @@ export const getRandomBytes = (length: number): Uint8Array<ArrayBuffer> =>
 // One branch on isCryptoSubtleAvailable() per call. WebCrypto's importKey is
 // ~10μs, dwarfed by the surrounding Argon2id derivation (~500ms+ on mobile).
 
+/**
+ * `aad` 是**可选**的追加认证数据（AEAD 的 "associated data"）。
+ *
+ * ## 为什么现在才加
+ *
+ * 本仓的同步加密不需要 AAD：它的密文自带盐与前缀、结构上已经自证。
+ * 但**小组件快照契约需要** —— 信封里的 `v` / `dayStr` / `validUntil` 是
+ * **明文传输**的（组件要在拿不到密钥时也能判断"过期了"），所以它们必须被
+ * **密码学绑定**进去，否则有人把 `validUntil` 改成一年后，组件就会
+ * 一直显示一份早已过期的"今天"。AAD 正是干这个的。
+ *
+ * 加默认参数而不是新函数：网上已经有太多"两套 AES 实现"的事故，
+ * 本仓不该再添一套 —— 而且 `crypto.subtle` 分支与 `@noble` 分支的 AAD 语义
+ * 必须**完全一致**，写在同一个函数里才有可能一眼看出不一致。
+ */
 export const aesEncrypt = async (
   keyBytes: Uint8Array,
   iv: Uint8Array,
   data: Uint8Array,
+  aad?: Uint8Array,
 ): Promise<Uint8Array> => {
   if (isCryptoSubtleAvailable()) {
     const subtle = getRequiredSubtle();
@@ -136,19 +152,26 @@ export const aesEncrypt = async (
       ['encrypt'],
     );
     const out = await subtle.encrypt(
-      { name: ALGORITHM, iv: iv as Uint8Array<ArrayBuffer> },
+      {
+        name: ALGORITHM,
+        iv: iv as Uint8Array<ArrayBuffer>,
+        // ⚠️ 不传 `additionalData` 与传 `undefined` 在有些实现里不等价，
+        // 所以这里显式分支，只在真的有 AAD 时才放进算法参数对象。
+        ...(aad ? { additionalData: aad as Uint8Array<ArrayBuffer> } : {}),
+      },
       key,
       data as Uint8Array<ArrayBuffer>,
     );
     return new Uint8Array(out);
   }
-  return gcm(keyBytes, iv).encrypt(data);
+  return gcm(keyBytes, iv, aad).encrypt(data);
 };
 
 export const aesDecrypt = async (
   keyBytes: Uint8Array,
   iv: Uint8Array,
   data: Uint8Array,
+  aad?: Uint8Array,
 ): Promise<Uint8Array> => {
   if (isCryptoSubtleAvailable()) {
     const subtle = getRequiredSubtle();
@@ -160,13 +183,17 @@ export const aesDecrypt = async (
       ['decrypt'],
     );
     const out = await subtle.decrypt(
-      { name: ALGORITHM, iv: iv as Uint8Array<ArrayBuffer> },
+      {
+        name: ALGORITHM,
+        iv: iv as Uint8Array<ArrayBuffer>,
+        ...(aad ? { additionalData: aad as Uint8Array<ArrayBuffer> } : {}),
+      },
       key,
       data as Uint8Array<ArrayBuffer>,
     );
     return new Uint8Array(out);
   }
-  return gcm(keyBytes, iv).decrypt(data);
+  return gcm(keyBytes, iv, aad).decrypt(data);
 };
 
 // ============================================================================

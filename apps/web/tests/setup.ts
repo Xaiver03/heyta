@@ -1,4 +1,24 @@
 /**
+ * vitest 的 jsdom 环境补丁。
+ *
+ * 🔴 **`fake-indexeddb/auto` 必须在任何被测模块之前加载。**
+ *
+ * `src/lib/oplog.ts` 的 `resolveStorageBackend()` 有两条路径：
+ *   - `VITE_HEYTA_STORAGE=indexeddb` → `IndexedDbAdapter`（jsdom **没有** IndexedDB，靠这里补）；
+ *   - 其它 → SQLite **Worker**（jsdom 也没有 `Worker`）。
+ *
+ * 如果不补 IndexedDB **且**不切后端，测试会走 Worker 路径并死在
+ * `ReferenceError: Worker is not defined` —— 那个报错完全指不到
+ * "你少了一个后端开关"。
+ *
+ * ⚠️ **不要**用"给 jsdom 塞一个假 Worker"来绕。那样 `oplog` 会在一个
+ * 什么都不做的假 Worker 上跑，而"任务真的写进了 op-log"这类断言
+ * 会变成**测一个假实现** —— 绿得毫无意义。正确的做法是让测试走
+ * **真实存在**的另一条存储路径（IndexedDB + `fake-indexeddb`）。
+ */
+import 'fake-indexeddb/auto';
+
+/**
  * jsdom 环境补齐
  * ================
  *
