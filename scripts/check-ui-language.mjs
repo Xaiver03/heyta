@@ -142,8 +142,51 @@ const CATALOG_EN = join(ROOT, CATALOG_DIR, 'en.ts');
  *
  * 品牌名与语言自称这类纯拉丁词是**真实例外**，显式列出，而不是给整条规则开口子 ——
  * 开口子之后，"用英文占位中文"也能溜过去。
+ *
+ * ── 站点「平台状态」页的两类例外（2026-09-28 加）
+ *
+ * `/platforms` 里有两类文案**不该被翻译**，逐条登记在这里：
+ *
+ *   1. **平台名**（`Web` / `Android` / `iOS` / `HarmonyOS`）——
+ *      它们在中英两版里**必须逐字相同**。把 Android 写成「安卓」，
+ *      用户拿这个词去搜不到任何东西：官方文档、报错信息、应用商店里
+ *      写的都是 Android。这是**产品名，不是普通名词**。
+ *   2. **可复现的命令与文件路径**（`pnpm verify:*`、`node scripts/*.mjs`、
+ *      `server/docker-compose.yml`）—— 它们是**给用户照着敲的**。
+ *      翻译它等于把命令改坏：用户复制过去会 `command not found`，
+ *      而这恰好是这一页承诺"每条都能自己验"的那部分。
+ *
+ * 🔴 两类都满足同一条判据：**把它写成本地语言会让它失去作用**
+ * （与 `common.lang.en` 必须用当地写法是同一个理由）。
+ * 不满足这条的，一律不许进这张表。
  */
-const ZH_LATIN_OK = new Set(['common.brand', 'common.lang.en']);
+const ZH_LATIN_OK = new Set([
+  'common.brand',
+  'common.lang.en',
+  // 平台名（产品名，不是普通名词）
+  'site.platforms.web.name',
+  'site.platforms.android.name',
+  'site.platforms.ios.name',
+  'site.platforms.harmony.name',
+  // 技术缩写：中文语境里本来就这么写（写成「人工智能」反而让缩写对不上）
+  'site.pricing.compare.row.ai',
+]);
+
+/**
+ * 🔴 `*.evidence` 走**按后缀**的例外，而不是逐条登记 —— 因为它的值是**契约**。
+ *
+ * 那个契约的执法者是 `scripts/check-claims.mjs`：
+ * **`*.evidence` 的值只能是命令 / 仓库内路径 / 绝对地址，不许出现汉字**
+ * （出现了就判红，理由写在那个脚本的文件头）。也就是说：
+ * 这里要是坚持"zh 必须含汉字"，两条门禁就会互相矛盾 ——
+ * 而人遇到矛盾的第一反应是把其中一条关掉。
+ *
+ * 所以后缀例外是**同一份契约的另一面**，而不是给规则开口子：
+ * 名字必须明说它装的是证据，而"用英文占位中文"不会恰好取这种名字。
+ * 平台名（`site.platforms.*.name`）仍然逐条登记 —— 它们是产品名，
+ * 与这份契约无关。
+ */
+const EVIDENCE_KEY_SUFFIX = /\.evidence$/;
 
 /**
  * en 表里允许出现汉字的 key —— 只有**语言自称**（endonym）。
@@ -453,6 +496,8 @@ function checkCatalogs() {
   // 规则 2：zh 必须含中文。
   for (const [key, value] of zh) {
     if (ZH_LATIN_OK.has(key)) continue;
+    // 见上面那段：值是命令/路径，汉字由 `check:claims.mjs` 反过来禁止。
+    if (EVIDENCE_KEY_SUFFIX.test(key)) continue;
     if (!CJK.test(value)) {
       violations.push({
         where: `${relZh}`,
