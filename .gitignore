@@ -82,3 +82,37 @@ blob-report/
 e2e/.playwright/
 e2e/.cache/
 
+
+#
+# Python 字节码缓存（`research/tools/*.py` 跑一次就会长出来）
+#
+__pycache__/
+*.pyc
+
+#
+# 🔴 Xcode 的 clang 模块缓存，被某个**畸形 `-Xcc` 参数**当成了目录名建在
+# `HeytaMobile.xcodeproj/` 里面。它是构建产物、体积上千个文件，
+# 而且因为落在 `.xcodeproj/` 底下，很容易被当成"工程文件"顺手提交。
+# 正确的 `-Xcc` 用法是给 clang 传参（`-Xcc -fmodule-map-file=...`），
+# 不是一个路径；写错时 Xcode 不报错，而是默默建出这个目录。
+apps/mobile/ios/**/-Xcc/
+
+#
+# 🔴 SwiftPM 的构建产物目录（`.build/`）。
+#
+# 实测 `apps/mobile/ios/HeytaWidgetCore/.build/` 是 **572 MB、7109 个文件**
+# （`.pcm` / `.o` / `.d` / `.swiftmodule` / `.swiftdeps` …）。
+# `.swiftmodule`/`.dia` 这类文件里含**绝对路径**，提交进去等于把本机目录结构
+# 固化进仓库，换台机器就是一堆失效引用。
+# 只该跟踪 `Package.swift` / `Sources/` / `Tests/`。
+.build/
+*.swiftmodule
+*.swiftdeps
+*.swiftconstvalues
+
+#
+# 鸿蒙（hvigor）的构建产物与依赖缓存。
+# `.hvigor/` 是构建缓存、`entry/build/` 是产物目录，都会随构建变化。
+apps/mobile/harmony/.hvigor/
+apps/mobile/harmony/**/build/
+apps/mobile/harmony/**/oh_modules/
