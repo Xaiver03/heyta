@@ -61,7 +61,7 @@ RNW 看起来显然，**唯一**理由是"与 RN 0.84.1 版本精确对齐" —�
 | # | 代价 | 现状 | 为什么绕不开 |
 |---|---|---|---|
 | **C-A** | **一整套 Windows UI 要另写** | `packages/ui`（React/RNW）对 Windows **不再复用** | 这是"原生优先于复用度"的直接价格，**已由产品授权** |
-| **C-B** | 🔴 **`packages/domain`（6603 行纯 TS）的单源问题** | **未解决** —— 这是全计划唯一真正的未知数 | C# 进程跑不了 TS。要么移植成两份源（永久双份维护），要么内嵌 JS 引擎跑同一份 bundle。**W0-4 拍板**（[ADR-0034](../adr/0034-windows-native-winui3-not-rnw.md) §3.1） |
+| **C-B** | 🔴 **`packages/domain`（6603 行纯 TS）的单源问题** | 🟡 **已有结论：D2 可行**（[spike](../../research/spikes/domain-single-source/README.md) 2026-09-28） | C# 进程跑不了 TS。D1 移植 = 永久两份源；D2 内嵌 JS 引擎跑同一份 bundle。**spike 实测：同一份 bundle 字节在裸 V8 与 .NET+Jint 上 22/22 用例一致、零宿主全局依赖** ⇒ **不必**认 D1 的永久双份维护。⚠️ 仅证明"可行"，未证明"够快"（[spike README 未证明项](../../research/spikes/domain-single-source/README.md)） |
 | **C-C** | 门禁与许可证口径要扩到**非 npm** 世界 | `check:*` 全是 JS/TS 扫描器；`license-inventory.mjs` 只扫 npm | WinUI / .NET / `Microsoft.Data.Sqlite` / `SQLitePCLRaw` **扫不到 ≠ 合规**（§6） |
 
 **已经不再是代价的三条**（ADR-0032 曾把它们记成硬前置）：
@@ -89,8 +89,8 @@ RNW 看起来显然，**唯一**理由是"与 RN 0.84.1 版本精确对齐" —�
 | **W0-1** 装工具链并起一个空窗口 | `windows-pc` 上装 VS 2022（WinUI 工作负载）+ .NET SDK ⇒ `dotnet --info` 有输出、`dotnet new` 出的 WinUI 3 工程**能启动一个窗口并截图** | 🔴 **2026-09-28 实测：该机 `dotnet` absent、`vswhere` absent** —— 装机本身没做，这是硬前置 |
 | **W0-2** **同步 SQLite 驱动（C#）** | 实现 `SqliteDriver`（`packages/storage/src/sqlite/sqlite-driver.ts` 的 4 个同步方法），并**逐条跑通同一套 `DbAdapter` 契约** | 契约测试**已经存在**（`packages/storage/tests/contract/adapter.contract.ts`），不需要新写判据；难的是**在 C# 侧重放它**（§6 的跨语言通道） |
 | **W0-3** 原生库缺口清单 | 数出 `apps/mobile` 用到的原生库及其 Windows 状态 | ✅ **已完成**：[ADR-0034](../adr/0034-windows-native-winui3-not-rnw.md) §1.5，**4 个原生库 / 3 个缺口**，含可复现命令 |
-| **W0-4** 🔴 **领域层单源 spike** | 拿 `packages/domain` 的**真实**逻辑（如 `recurrence.ts` / `habit-streak.ts`）跑通两条路中的至少一条：**D1** C# 移植 + golden fixture 逐字节校验；**D2** C# 侧内嵌 JS 引擎执行同一份 tsup bundle | **这是全计划唯一可能推翻 Windows 原生路线、或把它变成永久双份维护的点。** 它**不是**代码量问题，所以不被"哪怕是代码量偏大"覆盖 |
-| **W0-5** 决策点 | D1/D2 有结论 → 进 W1；两条都不成立 → **停**，回 Electron 并记录原因 | 明确写出"什么情况下放弃"，避免沉没成本推着走 |
+| **W0-4** 🔴 **领域层单源 spike** | ✅ **bundle 级已证 D2 可行**（2026-09-28）。实测：同一份 `@heyta/domain` bundle 字节（338445 B / 146 个导出）在**裸 V8 上下文**（零宿主全局访问）与 **.NET 10 + Jint 4.16.4** 上跑 22/22 用例，**结果逐条一致**。含打包进来的 `ical.js` RRULE 求值。复现：`bash research/spikes/domain-single-source/run.sh`（exit 0） | **这是全计划唯一可能推翻 Windows 原生路线、或把它变成永久双份维护的点。** D2 成立 ⇒ **不认** D1 的永久双份维护。⚠️ **只答了"可行"，没答"够快"**：ES 覆盖率、跨引擎浮点边界、Jint 性能与内存**均未测**（[spike README 未证明项](../../research/spikes/domain-single-source/README.md)）—— 这些进 W1 |
+| **W0-5** 决策点 | D2 可行 → **进 W1**；两条都不成立 → 停，回 Electron 并记录原因 | 明确写出"什么情况下放弃"，避免沉没成本推着走 |
 
 ⚠️ **W0 的产物不进 `apps/desktop`**，放独立 spike 目录 ——
 避免"半成品壳"污染现有可用的 Electron 路线。
@@ -254,7 +254,7 @@ RN 生态**没有 Linux**。真原生只能 GTK4 / libadwaita（或 Qt），即*
 | W0-3 原生库缺口清单 | ✅ **已完成** | **4 个原生库 / 3 个缺口**（[ADR-0034](../adr/0034-windows-native-winui3-not-rnw.md) §1.5，含复现命令） |
 | W0-1 装工具链 + 起窗口 | ⬜ 未开始 | 已实测该机 `dotnet` / `vswhere` 均 absent |
 | W0-2 同步 SQLite 驱动（C#） | ⬜ 未开始 | 契约已存在：`packages/storage/tests/contract/adapter.contract.ts` |
-| **W0-4 🔴 领域层单源 spike** | ⬜ 未开始 | **全计划门槛** |
+| **W0-4 🔴 领域层单源 spike** | ✅ **bundle 级已证 D2 可行**（2026-09-28） | 同一份 bundle（338445 B / 146 导出）在裸 V8 与 .NET+Jint 上 **22/22 一致、零宿主全局**；复现 `bash research/spikes/domain-single-source/run.sh`。⚠️ 性能/ES 覆盖率未测 |
 | W1 WinUI 3 渲染最小切片 | ⬜ 未开始 | — |
 | W2 组件 + MSIX | ⬜ 未开始 | — |
 | W3 替换 Windows 端 Electron | ⬜ 未开始 | — |

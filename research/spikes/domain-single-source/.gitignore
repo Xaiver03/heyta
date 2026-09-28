@@ -1,0 +1,3 @@
+# .NET 构建产物（spike 是临时工程，产物一律不入库）
+cs/bin/
+cs/obj/

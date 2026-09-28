@@ -1,0 +1,27 @@
+{
+  "note": "W0-4 spike：两份引擎跑同一份 bundle 字节 + 同一份用例源码。用例必须与引擎无关（只用 ECMAScript 内建 + D 命名空间）。",
+  "cases": {
+    "addDays/负向跨月": "D.addDays('2026-09-28', -45)",
+    "addDays/跨月": "D.addDays('2026-09-28', 45)",
+    "addDays/闰年末跨年": "D.addDays('2026-02-28', 1)",
+    "addDays/跨年": "D.addDays('2026-12-31', 1)",
+    "describeRecurrence/每周一三五": "D.describeRecurrence('FREQ=WEEKLY;BYDAY=MO,WE,FR')",
+    "isValidRecurrenceRule/非法": "D.isValidRecurrenceRule('完全不是规则')",
+    "isValidRecurrenceRule/合法": "D.isValidRecurrenceRule('FREQ=WEEKLY;BYDAY=MO')",
+    "occurrencesInRange/每秒规则不崩": "D.occurrencesInRange('FREQ=SECONDLY', '2026-01-01', '2026-01-01', '2026-01-02')",
+    "occurrencesInRange/每周一三": "D.occurrencesInRange('FREQ=WEEKLY;BYDAY=MO,WE;COUNT=6', '2026-09-28', '2026-09-28', '2026-11-30')",
+    "occurrencesInRange/每月末": "D.occurrencesInRange('FREQ=MONTHLY;BYMONTHDAY=-1;COUNT=4', '2026-01-31', '2026-01-01', '2026-12-31')",
+    "occurrencesInRange/无效规则": "D.occurrencesInRange('完全不是规则', '2026-01-01', '2026-01-01', '2026-12-31')",
+    "completionRatio/超目标截断": "D.completionRatio({ target: 3 }, { value: 5 })",
+    "completionRatio/部分": "D.completionRatio({ target: 3 }, { value: 2 })",
+    "computeTodayProgress/空输入": "D.computeTodayProgress({ habits: [], logs: [], tasks: [], focusSessions: [], today: '2026-09-28' })",
+    "countChecklistItems/混合行": "D.countChecklistItems('- [ ] a\\n- [x] b\\nplain\\n* [ ] c\\n  - [X] d')",
+    "countChecklistItems/空": "D.countChecklistItems('')",
+    "daysBetween/反向": "D.daysBetween(Date.UTC(2026, 10, 12), Date.UTC(2026, 8, 28))",
+    "daysBetween/同月": "D.daysBetween(Date.UTC(2026, 8, 28), Date.UTC(2026, 9, 12))",
+    "daysInMonth/二月": "D.daysInMonth('2026-02-01')",
+    "daysInMonth/十二月": "D.daysInMonth('2026-12-01')",
+    "recurrenceParts/每周": "JSON.stringify(D.recurrenceParts('FREQ=WEEKLY;INTERVAL=2;BYDAY=MO'))",
+    "exports/数量": "Object.keys(D).length"
+  }
+}
