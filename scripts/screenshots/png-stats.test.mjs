@@ -19,7 +19,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test, after } from 'node:test';
 
-import { inspectPng, looksBlank } from './png-stats.mjs';
+import { inspectPng, looksBlank, looksSmeared } from './png-stats.mjs';
 
 const workdir = mkdtempSync(join(tmpdir(), 'heyta-png-stats-'));
 after(() => rmSync(workdir, { recursive: true, force: true }));
@@ -139,4 +139,68 @@ test('非 PNG 输入直接报错，不静默给错值', () => {
   const bogus = join(workdir, 'not-a-png.bin');
   execFileSync('sh', ['-c', `printf 'not a png at all' > '${bogus}'`]);
   assert.throws(() => inspectPng(bogus), /不是 PNG/);
+});
+
+test('🔴 RGBA（colorType=6）的像素必须按 4 通道读，不能写死 3', { skip: !hasMagick }, () => {
+  // 这是实测踩出来的 bug：真彩分支写成 x*3，于是 RGBA 图**整幅错位**，
+  // 指标算出 0.99（而同一张图存成 RGB 是 0.007，差 140 倍）。
+  //
+  // ⚠️ 用**黑白**两半而不是红蓝：所有指标都是基于**亮度**的
+  //    （luminance = (r+g+b)/3），而红(255,0,0)与蓝(0,0,255)亮度都是 85 ——
+  //    红蓝边界对这套指标是**不可见**的（实测 colorSpan=0）。
+  //    这是指标的已知边界：它判的是明暗结构，不判色相。
+  const out = join(workdir, 'rgba-halves.png');
+  execFileSync('magick', [
+    '-size', '200x100', 'xc:black',
+    '-fill', 'white', '-draw', 'rectangle 100,0 199,99',
+    `PNG32:${out}`,
+  ]);
+  const stats = inspectPng(out);
+  assert.equal(stats.colorType, 6, 'PNG32 应是 RGBA');
+  assert.equal(stats.hasAlpha, true);
+  assert.equal(stats.colorSpan, 255, '黑白两半的色阶差必须是 255');
+  assert.ok(
+    stats.contentOnModalRatio > 0.3,
+    `两色各半 ⇒ 内容占比应 >30%，实得 ${(stats.contentOnModalRatio * 100).toFixed(1)}%`,
+  );
+  // 关键判据：整块纯色 + **只有一条**竖直边界 ⇒ 边缘密度必须很低。
+  // 若按 3 通道读 RGBA（列偏移错乱），每个采样点都会踩在不同的字节上，
+  // 整幅变成高频噪声，这个值会飙高 —— 实测 0.99。
+  assert.ok(
+    stats.edgeOnContent < 0.2,
+    `两半纯色 + 一条边界 ⇒ 边缘密度应很低，实得 ${stats.edgeOnContent.toFixed(3)}` +
+      `（按 3 通道读 RGBA 时会飙到约 0.99）`,
+  );
+
+  // 与 ImageMagick 逐点核对左右两侧确实是黑白
+  for (const [x, expected] of [[30, '0 0 0'], [170, '255 255 255']]) {
+    const truth = execFileSync('magick', [
+      out, '-format', `%[fx:int(255*p{${x},50}.r)] %[fx:int(255*p{${x},50}.g)] %[fx:int(255*p{${x},50}.b)]`, 'info:',
+    ]).toString().trim();
+    assert.equal(truth, expected, `magick 在 x=${x} 读到的应是 ${expected}`);
+  }
+});
+
+test('糊字启发式：横向涂抹判为糊，清晰文本判为不糊', { skip: !hasMagick }, () => {
+  // 清晰：细密黑白条纹（模拟文字的陡峭边缘）
+  const crisp = join(workdir, 'crisp.png');
+  execFileSync('magick', [
+    '-size', '400x200', 'xc:white',
+    '-fill', 'black',
+    '-draw', 'stroke black stroke-width 2 line 40,20 40,180 line 70,20 70,180 line 100,20 100,180 line 130,20 130,180 line 160,20 160,180 line 190,20 190,180',
+    crisp,
+  ]);
+  const a = inspectPng(crisp);
+  assert.equal(looksBlank(a), false, '条纹图不该被判空白');
+  assert.equal(looksSmeared(a), false, `清晰条纹不该被判糊（edge=${a.edgeOnContent.toFixed(3)}）`);
+
+  // 糊：把同一张图做强横向模糊，再拉宽 —— 内容摊满、梯度消失
+  const smeared = join(workdir, 'smeared.png');
+  execFileSync('magick', [crisp, '-resize', '400x200!', '-motion-blur', '0x60+0', '-threshold', '50%', smeared]);
+  const b = inspectPng(smeared);
+  // 这条是**方向性**断言：只要求比清晰的低，不锁死绝对值
+  assert.ok(
+    b.edgeOnContent < a.edgeOnContent,
+    `涂抹后边缘密度应下降：清晰 ${a.edgeOnContent.toFixed(3)} vs 涂抹 ${b.edgeOnContent.toFixed(3)}`,
+  );
 });

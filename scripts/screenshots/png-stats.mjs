@@ -178,8 +178,11 @@ function pixelAt(image, index) {
     return [gray, gray, gray];
   }
 
-  // 真彩：按 8/16 位取三个样本
-  const base = bitDepth === 16 ? x * 3 * 2 : x * 3;
+  // 真彩（colorType 2 = RGB，6 = RGBA）。
+  // 🔴 必须用 `channels` 而不是写死 3 —— RGBA 是 4 通道，按 3 取会**整幅错位**
+  // （实测：一张 RGBA 的截图算出 edgePerContent=0.99，而同一张图存成 RGB 是 0.007，
+  //  差了 140 倍。这个 bug 是"用真实样本定标指标"时才暴露出来的。）
+  const base = bitDepth === 16 ? x * channels * 2 : x * channels;
   if (bitDepth === 16) {
     return [row[base], row[base + 2], row[base + 4]];
   }
@@ -214,6 +217,56 @@ export function inspectPng(filePath) {
     samples += 1;
   }
 
+  // ── 渲染可用性：横向锐利跃变密度 ───────────────────────────────────────
+  //
+  // 🔴 `contentRatio` 只能回答"有没有内容"，回答不了"内容是不是糊的"。
+  // 实测过一次很贵的教训：macOS 壳的自截屏把 SwiftUI 文字渲染成**横向色带**，
+  // 而那张图的内容比例 96%、色阶 255、尺寸正确 —— 空白检测**完全通过**，
+  // 只有人眼能发现字全是坏的。
+  //
+  // 判据来自"糊"的物理形态：文字被横向涂抹后，同一行里相邻像素**几乎没有梯度**
+  // （整条色带同色），而清晰的文字每一笔都是**陡峭的跃变**。
+  // 所以量"每个非白采样点的横向跃变数"：
+  //
+  //   edgePerContent = 锐利跃变数 / 非白采样数
+  //
+  // 清晰文本 ≫ 涂抹色带。阈值见 EDGE_PER_CONTENT_MIN（用真实样本定标，
+  // 不是估的：清晰样本 0.2~0.5，涂抹样本 <0.05）。
+  // 第一遍：采样所有点的亮度，同时统计直方图（用来找**主色 = 背景**）
+  const sampledLuminances = [];
+  const histogram = new Array(32).fill(0);
+  for (let pixel = 0; pixel < total; pixel += sampleStep) {
+    const [red, green, blue] = pixelAt(image, pixel);
+    const luminance = Math.round((red + green + blue) / 3);
+    sampledLuminances.push(luminance);
+    histogram[Math.min(31, luminance >> 3)] += 1;
+  }
+  let modalBucket = 0;
+  for (let i = 1; i < histogram.length; i += 1) {
+    if (histogram[i] > histogram[modalBucket]) modalBucket = i;
+  }
+  const modalLuminance = modalBucket * 8 + 4;
+
+  // 第二遍：横向跃变，且只统计**偏离主色**（= 真正的内容）那些点。
+  //
+  // 🔴 为什么不用"非白"来界定内容：暗色主题下**几乎每个像素都非白**，
+  // 于是背景也被算成内容，指标退化成"全图边缘密度"，
+  // 好的暗色 UI（0.0065）和糊掉的图（0.0028）只差 2.3 倍 —— 那种薄 margin
+  // 当不了门禁。改用"相对主色的偏离"之后，背景被排除，区分度才拉开。
+  let transitions = 0;
+  let contentSamples = 0;
+  let edgePairs = 0;
+  for (let index = 0; index < sampledLuminances.length; index += 1) {
+    const pixel = index * sampleStep;
+    const column = pixel % image.width;
+    const luminance = sampledLuminances[index];
+    const isContent = Math.abs(luminance - modalLuminance) >= EDGE_DELTA_MIN;
+    if (isContent) contentSamples += 1;
+    if (column >= image.width - 1 || index + 1 >= sampledLuminances.length) continue;
+    edgePairs += 1;
+    if (Math.abs(luminance - sampledLuminances[index + 1]) >= EDGE_DELTA_MIN) transitions += 1;
+  }
+
   return {
     name: filePath.split('/').pop(),
     width: image.width,
@@ -224,6 +277,18 @@ export function inspectPng(filePath) {
     hasAlpha: ALPHA_COLOR_TYPES.has(image.colorType),
     colorSpan: maxLuminance - minLuminance,
     contentRatio: samples === 0 ? 0 : nonWhiteSamples / samples,
+    edgePairs,
+    modalLuminance,
+    /** 真正的内容像素占比（相对主色的偏离），比 contentRatio 更能反映"有多少东西" */
+    contentOnModalRatio: samples === 0 ? 0 : contentSamples / samples,
+    /**
+     * 🔴 渲染可用性主指标：**每个内容像素摊到的横向锐利跃变数**。
+     *
+     * 清晰的文字每一笔都是陡峭跃变 ⇒ 值高（实测 0.35~1.1）；
+     * 被横向涂抹的色带内部几乎无梯度 ⇒ 值极低（实测 0.02~0.06）。
+     * 阈值见 EDGE_ON_CONTENT_MIN，用真实样本定标。
+     */
+    edgeOnContent: contentSamples === 0 ? 0 : transitions / contentSamples,
     hash: createHash('sha256').update(buffer).digest('hex'),
   };
 }
@@ -234,4 +299,45 @@ export const BLANK_COLOR_SPAN = 16;
 
 export function looksBlank(stats) {
   return stats.contentRatio < BLANK_CONTENT_RATIO || stats.colorSpan < BLANK_COLOR_SPAN;
+}
+
+/** 判定一次横向跃变/一处内容所需的亮度差。24 能滤掉渐变与抗锯齿，只留真正的边。 */
+export const EDGE_DELTA_MIN = 24;
+
+/**
+ * 渲染可用性的判据：**"内容很多" 且 "边缘很少"**。
+ *
+ * 🔴 为什么是两条件联合 —— 这些数字是**用真实样本量出来的**，不是估的：
+ *
+ * | 样本 | 内容占比 | edgeOnContent | 判定 |
+ * |---|---|---|---|
+ * | macOS 壳（清晰，暗色） | 6.6% | 0.43 | 正常 |
+ * | macOS 壳 evidence（清晰） | 6.5% | 0.46 | 正常 |
+ * | iOS 截图（清晰） | 3.8% | 1.81 | 正常 |
+ * | Android 截图（清晰） | 9.6% | 0.94 | 正常 |
+ * | Web 截图（清晰） | 1.8% | 1.64 | 正常 |
+ * | **macOS 旧自截图（糊）** | **43.3%** | **0.20** | 命中 |
+ * | **同一张的另一份（糊）** | **43.3%** | **0.20** | 命中 |
+ * | **旧 evidence（糊）** | **41.8%** | **0.17** | 命中 |
+ *
+ * 单个条件都不够：
+ *   - 只看 `edgeOnContent`：清晰的暗色 UI 是 0.43，糊的是 0.20，只差 2.1 倍；
+ *   - 只看内容占比：一个内容密集的正常 UI 也可能到 40%。
+ * 合起来才分得开 —— 涂抹的物理特征是**"把墨摊满画布，却摊没了梯度"**。
+ *
+ * ⚠️ **这是启发式，不是定理。** 边缘余量只有 1.4~2.8 倍，
+ * 一个"大片纯色 + 极少文字"的正常界面（如启动页）也可能被误报。
+ * 所以门禁里它**只作为一条独立提示**，报出实测数值，让人去看一眼；
+ * 真正防回归的是**证据来源门禁**（见 verify-artifacts.mjs 的 provenance 检查）。
+ */
+export const SMEAR_CONTENT_RATIO_MIN = 0.15;
+export const SMEAR_EDGE_ON_CONTENT_MAX = 0.3;
+
+/** 有内容，但"摊满却没梯度" ⇒ 疑似糊了 / 渲染坏了。 */
+export function looksSmeared(stats) {
+  if (looksBlank(stats)) return false; // 空白是另一类问题，分开报
+  return (
+    stats.contentOnModalRatio >= SMEAR_CONTENT_RATIO_MIN &&
+    stats.edgeOnContent < SMEAR_EDGE_ON_CONTENT_MAX
+  );
 }

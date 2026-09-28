@@ -163,3 +163,39 @@ export function expectedGroups() {
 export function artifactName(target) {
   return `${target.id}-${target.name}.png`;
 }
+
+/**
+ * 原生壳的**窗口证据**：必须来自已被验证忠实的采集路径。
+ *
+ * 🔴 这一条是**防回归的核心**，不是锦上添花。
+ * 实测过一次很贵的教训：macOS 壳的自截屏用 `cacheDisplay` 把 SwiftUI 文字
+ * 渲染成横向色带，而那张图尺寸对、内容比例 96%、色阶 255，
+ * **像素级检查全部通过** —— 只有人眼能发现字全是坏的。
+ * 所以真正能挡住它的是"**这份证据是怎么来的**"，而不是"它长什么样"。
+ */
+export const SHELL_EVIDENCE = [
+  {
+    label: 'macOS 原生壳',
+    png: 'apps/desktop-macos/evidence/window-first-run.png',
+    note: 'apps/desktop-macos/evidence/window-first-run.txt',
+  },
+];
+
+/**
+ * 允许的采集方式白名单。**不在表里的一律判失败**。
+ *
+ *   - `cgs-window-server`   ：`CGWindowListCreateImage`，窗口服务器合成结果
+ *                              （= `screencapture -l` 同源）。
+ *   - `screencapture-window`：外部 `screencapture -l<windowID>`。
+ *
+ * ⛔ 明确**不允许**（都实测证伪，会把 SwiftUI 文字渲染坏）：
+ *   `cache-display`、`calayer-render`、`image-renderer`。
+ */
+export const ALLOWED_CAPTURE_METHODS = new Set(['cgs-window-server', 'screencapture-window']);
+
+/** 采集方式里的已知坏值，单独列出来是为了把失败信息说清楚。 */
+export const KNOWN_BAD_CAPTURE_METHODS = new Map([
+  ['cache-display', 'AppKit draw(_) 路径，拿不到 SwiftUI 的 CGDisplayList ⇒ 文字糊成色带'],
+  ['calayer-render', '图层树里没有 CGDisplayList，且是左下原点 ⇒ 既糊又上下翻转'],
+  ['image-renderer', '渲染不了 List / TextField / Toggle ⇒ 整片变成"禁止"占位符'],
+]);
