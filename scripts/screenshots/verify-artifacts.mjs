@@ -111,11 +111,14 @@ for (const evidence of SHELL_EVIDENCE) {
   if (looksBlank(stats)) {
     problems.push(`${evidence.label}: 🔴 证据图疑似空白（内容 ${(stats.contentRatio * 100).toFixed(1)}%）`);
   } else if (looksSmeared(stats)) {
-    problems.push(
-      `${evidence.label}: 🔴 证据图疑似**渲染坏了**（内容占比 ${(stats.contentOnModalRatio * 100).toFixed(1)}%，` +
-        `边缘密度 ${stats.edgeOnContent.toFixed(3)}）\n` +
-        `    ⇒ "内容摊满画布却没有梯度"是横向涂抹的典型形态。\n` +
-        `      先查采集方式，别去调阈值。`,
+    // ⚠️ 只警告、不失败 —— 这条启发式**已被实测证伪过一次误报**：
+    //    Linux 壳的 Xvfb 整屏截图里 50.8% 是纯黑桌面（内部零边缘），
+    //    把边缘密度稀释到 0.134 而误判为"糊"，但同一张图裁到窗口是 0.994。
+    //    所以它只是**去看一眼的提示**；真正挡回归的是下面的来源门禁。
+    notes.push(
+      `${evidence.label}: ⚠️ 启发式提示"疑似渲染坏了"（内容占比 ${(stats.contentOnModalRatio * 100).toFixed(1)}%，` +
+        `边缘密度 ${stats.edgeOnContent.toFixed(3)}）—— 请人眼看一眼。\n` +
+        `       已知误报：截图含大片非主色纯色区（如黑桌面）时会被稀释。`,
     );
   }
 

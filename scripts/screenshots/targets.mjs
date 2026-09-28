@@ -183,6 +183,28 @@ export const SHELL_EVIDENCE = [
     requiresCrosscheck: true,
   },
   {
+    label: 'Linux 原生壳',
+    png: 'apps/desktop-linux/evidence/window-first-run.png',
+    note: 'apps/desktop-linux/evidence/window-first-run.txt',
+    // Xvfb 里 `import -window root` 再裁到窗口。设备/虚拟屏截图是权威来源。
+    methods: ['xvfb-import-crop'],
+    requiresCrosscheck: false,
+  },
+  {
+    label: 'Windows 原生壳',
+    png: 'apps/desktop-windows/evidence/window-first-run.png',
+    note: 'apps/desktop-windows/evidence/window-first-run.txt',
+    methods: ['winui-schtasks-copyfromscreen'],
+    requiresCrosscheck: false,
+  },
+  {
+    label: '鸿蒙端',
+    png: 'apps/mobile/evidence/harmonyos.png',
+    note: 'apps/mobile/evidence/harmonyos.txt',
+    methods: ['hdc-snapshot-display'],
+    requiresCrosscheck: false,
+  },
+  {
     label: 'iOS release 包',
     png: 'apps/mobile/evidence/ios-release.png',
     note: 'apps/mobile/evidence/ios-release.txt',
