@@ -8,6 +8,18 @@
       content="width=device-width, initial-scale=1, viewport-fit=cover"
     />
     <meta name="color-scheme" content="light dark" />
+    <!--
+      W3-1：可安装 PWA 的四件套（manifest / 图标 / service worker / 注册）。
+      图标与 manifest 都是**生成物** —— 见 scripts/gen-pwa.mjs。
+      ⚠️ manifest 里的 `theme_color` 取自 design-system token，不在这里写死。
+    -->
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <link rel="icon" type="image/svg+xml" href="/icons/icon.svg" />
+    <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
+    <!-- iOS 全屏安装后的状态栏样式；`default` 会变成黑底黑字 -->
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-title" content="heyta" />
     <title>heyta</title>
   </head>
   <body>

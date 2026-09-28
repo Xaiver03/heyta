@@ -1,0 +1,91 @@
+{
+  "$schema": "http://adaptivecards.io/schemas/adaptive-card.json",
+  "type": "AdaptiveCard",
+  "version": "1.5",
+  "body": [
+    {
+      "type": "TextBlock",
+      "text": "打开 Heyta 以显示小组件",
+      "wrap": true,
+      "isSubtle": true,
+      "isVisible": "${showPlaceholder}"
+    },
+    {
+      "type": "Container",
+      "isVisible": "${!showPlaceholder}",
+      "items": [
+        {
+          "type": "TextBlock",
+          "text": "四象限",
+          "wrap": true,
+          "weight": "Bolder",
+          "size": "Medium"
+        },
+        {
+          "type": "Container",
+          "$data": "${slots}",
+          "items": [
+            {
+              "type": "TextBlock",
+              "text": "${label}（${count}）",
+              "wrap": true,
+              "weight": "Bolder",
+              "spacing": "Medium"
+            },
+            {
+              "type": "TextBlock",
+              "text": "${hint}",
+              "wrap": true,
+              "isSubtle": true,
+              "spacing": "None"
+            },
+            {
+              "type": "Container",
+              "$data": "${rows}",
+              "items": [
+                {
+                  "type": "ColumnSet",
+                  "spacing": "Small",
+                  "selectAction": {
+                    "type": "Action.Execute",
+                    "verb": "toggle",
+                    "data": {
+                      "taskId": "${id}",
+                      "targetIsDone": "${targetIsDone}"
+                    }
+                  },
+                  "columns": [
+                    {
+                      "type": "Column",
+                      "width": "auto",
+                      "items": [
+                        {
+                          "type": "TextBlock",
+                          "text": "·",
+                          "size": "Medium"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "Column",
+                      "width": "stretch",
+                      "items": [
+                        {
+                          "type": "TextBlock",
+                          "text": "${title}",
+                          "wrap": true,
+                          "color": "${style}",
+                          "strikethrough": "${strikethrough}"
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
