@@ -16,13 +16,17 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from 'react';
 import {
   CalendarDays,
+  ChartGantt,
   Check,
   CircleDot,
   Inbox,
   Moon,
   Plus,
+  Settings,
   Sun,
   Timer,
+  Trash2,
+  TrendingUp,
   Zap,
 } from 'lucide-react';
 
@@ -115,13 +119,32 @@ export function AppWindow({
   const scale = useStageScale(frameRef);
   const { t } = useI18n();
 
-  // 数据挪进组件内是文案迁移的硬要求（模块级拿不到 `t`）。取舍见 `Landing.tsx` 文件头。
-  const viewTabs = useMemo<{ key: MockView; label: string; Icon: typeof Inbox }[]>(
+  /**
+   * 视图切换条。
+   *
+   * 🔴 **8 项，与 `apps/web/src/App.tsx` 的 `VIEW_TABS` 逐项对齐。**
+   * 复数过一次：这里原来只有 4 项（任务/四象限/习惯/番茄钟），而复刻出来的界面
+   * 因此**比真应用好看** —— 访客在页面上看到 4 个干净的标签，装上应用拿到 8 个。
+   * 详见 `docs/research/showcase-fidelity-audit.md` §2。
+   *
+   * 标签直接用**应用自己的词条 key**（`web.shell.*` / `web.trash.*`），
+   * 而不是另写一份 `landing.*`：同一个界面元素用同一份文案，
+   * **改词的人不可能只改一边**。这也是这条漂移最不容易被注意到的地方 ——
+   * 4 项 vs 8 项是结构差异，肉眼扫一眼看不出来。
+   *
+   * 后 4 项（时间线/成长/回收站/设置）在这一屏里**没有对应内容**，
+   * 它们只是外壳的一部分（复刻刻意不可交互，见文件头）。
+   */
+  const viewTabs = useMemo<{ label: string; Icon: typeof Inbox; view?: MockView }[]>(
     () => [
-      { key: 'tasks', label: t('landing.feature.tasks'), Icon: Inbox },
-      { key: 'quadrant', label: t('landing.feature.quadrant'), Icon: CircleDot },
-      { key: 'habits', label: t('landing.feature.habits'), Icon: Check },
-      { key: 'focus', label: t('landing.feature.focus'), Icon: Sun },
+      { view: 'tasks', label: t('web.shell.nav.tasks'), Icon: Inbox },
+      { view: 'quadrant', label: t('web.shell.nav.quadrant'), Icon: CircleDot },
+      { view: 'habits', label: t('web.shell.views.habits'), Icon: Check },
+      { view: 'focus', label: t('web.shell.views.focus'), Icon: Sun },
+      { label: t('web.shell.views.timeline'), Icon: ChartGantt },
+      { label: t('web.shell.views.growth'), Icon: TrendingUp },
+      { label: t('web.trash.nav'), Icon: Trash2 },
+      { label: t('web.shell.views.settings'), Icon: Settings },
     ],
     [t],
   );
@@ -147,23 +170,52 @@ export function AppWindow({
             </div>
 
             <div className="mk-nav">
-              <NavItem icon={<Inbox size={16} />} label={t('landing.mock.inbox')} active={view === 'tasks'} />
-              <NavItem icon={<Sun size={16} />} label={t('landing.mock.today')} />
+              <NavItem icon={<Inbox size={16} />} label={t('web.shell.nav.inbox')} active={view === 'tasks'} />
+              <NavItem icon={<Sun size={16} />} label={t('web.shell.nav.today')} />
+              {/* 🔴 「已完成」原来**漏了**。真应用的 PRIMARY_NAV 是三项
+                  （收集箱 / 今天 / 已完成）—— 少画一个入口是"不完整"，
+                  而下面那几个编出来的计数是"不诚实"，后者更要先修。 */}
+              <NavItem icon={<Check size={16} />} label={t('web.shell.nav.completed')} />
             </div>
 
-            <div className="mk-nav__section">{t('landing.feature.quadrant')}</div>
+            <div className="mk-nav__section">{t('web.shell.nav.quadrant')}</div>
             <div className="mk-nav">
-              <NavItem swatch="mk-swatch--q1" label={t('landing.quadrant.q1')} count={3} />
-              <NavItem swatch="mk-swatch--q2" label={t('landing.quadrant.q2')} count={5} />
-              <NavItem swatch="mk-swatch--q3" label={t('landing.quadrant.q3')} count={2} />
-              <NavItem swatch="mk-swatch--q4" label={t('landing.quadrant.q4')} count={1} />
+              {/*
+                🔴 这里原来给四个象限各画了一个计数（3 / 5 / 2 / 1）。
+                真应用的 `QUADRANT_NAV` **根本没有 count 字段** —— 那四个数字
+                是凭空编的，访客会以为界面上有它们。
+                **手抄的复刻可以编造产品没做的 UI，截图不可能** ——
+                这是复刻这条路线唯一真正的风险。
+              */}
+              <NavItem swatch="mk-swatch--q1" label={t('web.shell.nav.q1')} />
+              <NavItem swatch="mk-swatch--q2" label={t('web.shell.nav.q2')} />
+              <NavItem swatch="mk-swatch--q3" label={t('web.shell.nav.q3')} />
+              <NavItem swatch="mk-swatch--q4" label={t('web.shell.nav.q4')} />
+            </div>
+
+            {/*
+              清单与标签。真应用里这两块都是 `ProjectsPanel`（aria-label「清单与标签」），
+              每块 = 标题 + **输入框形态的「新…」+ `+`**。
+              复刻原来把清单画成三行静态名字（工作 / 个人 / 读书），**标签整块没有**。
+            */}
+            <div className="mk-projects">
+              <div className="mk-nav__section">{t('web.projects.heading')}</div>
+              <div className="mk-field">
+                <span className="mk-field__box">{t('web.projects.newPlaceholder')}</span>
+                <span className="mk-field__add">
+                  <Plus size={14} />
+                </span>
+              </div>
             </div>
 
             <div className="mk-projects">
-              <div className="mk-nav__section">{t('landing.mock.projectsSection')}</div>
-              <div className="mk-project">{t('landing.mock.project.work')}</div>
-              <div className="mk-project">{t('landing.mock.project.personal')}</div>
-              <div className="mk-project">{t('landing.mock.project.reading')}</div>
+              <div className="mk-nav__section">{t('web.tags.heading')}</div>
+              <div className="mk-field">
+                <span className="mk-field__box">{t('web.tags.newPlaceholder')}</span>
+                <span className="mk-field__add">
+                  <Plus size={14} />
+                </span>
+              </div>
             </div>
           </nav>
 
@@ -174,9 +226,9 @@ export function AppWindow({
               <div className="mk-viewtabs">
                 {viewTabs.map((tab) => (
                   <div
-                    key={tab.key}
+                    key={tab.label}
                     className={`mk-viewtab${
-                      tab.key === view ? ' mk-viewtab--active' : ''
+                      tab.view === view ? ' mk-viewtab--active' : ''
                     }`}
                   >
                     <tab.Icon size={14} />
