@@ -20,69 +20,19 @@ import { readdirSync, readFileSync, existsSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+// 🔴 许可证政策（白名单 / 限制清单 / REVIEWED_OTHER 登记表 / 归类函数）的
+//    **唯一真源**是 `license-policy.mjs` —— npm 侧与 NuGet 侧共用同一份。
+//    两边各维护一份白名单一定会漂移，而漂移的规则比没有规则更危险：
+//    agent 会照着过期的那份执行，而且没人知道哪份是对的。
+import {
+  PERMISSIVE,
+  RESTRICTED,
+  REVIEWED_OTHER,
+  normalizeLicense as normalize,
+  classifyLicense as classify,
+} from './license-policy.mjs';
+
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '../..');
-
-/** 宽松许可：允许闭源商用。 */
-const PERMISSIVE = [
-  'MIT', 'ISC', 'Apache-2.0', 'BSD-2-Clause', 'BSD-3-Clause',
-  '0BSD', 'Unlicense', 'CC0-1.0', 'Python-2.0', 'BlueOak-1.0.0',
-  'MIT-0', 'Apache-2.0 WITH LLVM-exception', 'Zlib',
-  // MPL-2.0 是**文件级** copyleft：改动过的文件要开源，但可以与闭源代码链接、
-  // 一起分发。heyta 的政策明确允许（见 docs/02-licensing-and-compliance.md）。
-  // 漏了它会把 lightningcss 误报成"待判断"。
-  'MPL-2.0',
-];
-
-/** 需要人判断或明确禁止。 */
-const RESTRICTED = [
-  'AGPL', 'GPL', 'LGPL', 'SSPL', 'BUSL', 'BSL', 'FSL', 'Elastic',
-  'CC-BY-NC', 'CC-BY-SA', 'EUPL', 'OSL', 'CPAL', 'Commons Clause',
-];
-
-/**
- * 白名单**之外**、但已逐个复核并接受的许可证。
- * ==============================================
- *
- * 🔴 存在的理由：这个脚本以前把"需归类"（`other`）**只打印、不判定** ——
- * 退出码里完全不含 `other`，于是它打印完 `❔ 其他（需归类）: 1`
- * 之后接着报 `结论：全部依赖均为宽松许可 ✅` 并退出 **0**。
- *
- * 那等于**这一档永远不会失败**：白名单是显式枚举的，所以任何不在表里的许可
- * 都会落进 `other` 并被静默放行 —— 正好是白名单想拦的那一类。
- * `THIRD_PARTY_LICENSES.md` 早就把这个弱点写在纸上了，
- * 但**写在纸上的弱点拦不住任何一次引入**。
- *
- * 现在的语义：`other` **默认失败**，只有在这里逐项登记（并写明为什么可以接受）
- * 才放行。加一条的成本是刻意的 —— 它逼人为这个许可做一次真正的判断，
- * 而不是让它悄悄混进"全部宽松"里。
- *
- * 键是许可证标识，值是**接受它的理由**（会被打印出来，所以必须说清楚）。
- */
-const REVIEWED_OTHER = {
-  'CC-BY-4.0':
-    'caniuse-lite@1.0.30001812：browserslist 的**构建期数据包**，不进入运行时产物；' +
-    'CC-BY 是署名许可（不是禁用的 CC-BY-NC），归属已在 THIRD_PARTY_LICENSES.md §2 登记。',
-};
-
-const normalize = (raw) => {
-  if (raw == null) return 'UNKNOWN';
-  if (typeof raw === 'string') return raw;
-  if (typeof raw === 'object') {
-    if (typeof raw.type === 'string') return raw.type;
-    if (Array.isArray(raw)) return raw.map(normalize).join(' OR ');
-  }
-  if (Array.isArray(raw)) return raw.map(normalize).join(' OR ');
-  return 'UNKNOWN';
-};
-
-const classify = (lic) => {
-  const up = lic.toUpperCase();
-  if (lic === 'UNKNOWN') return 'unknown';
-  // 先判限制类：'MIT OR GPL-3.0' 这种双许可要人看
-  if (RESTRICTED.some((k) => up.includes(k.toUpperCase()))) return 'restricted';
-  if (PERMISSIVE.some((k) => up.includes(k.toUpperCase()))) return 'permissive';
-  return 'other';
-};
 
 /**
  * 要扫的 pnpm store 列表。

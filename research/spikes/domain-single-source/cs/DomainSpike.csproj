@@ -10,8 +10,10 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <!-- Jint：纯 C# 的 ECMAScript 引擎（MIT）。选它而不是 ClearScript/V8，
-         是因为它没有原生依赖 —— 桌面端本来就在为"少一个原生依赖"付代价。 -->
+    <!-- Jint：纯 C# 的 ECMAScript 引擎（**BSD-2-Clause** —— 许可证是从 NuGet 的
+         .nuspec 实测出来的，不是猜的；一开始写成了 MIT，被 nuget-license-inventory
+         抓出来改正）。选它而不是 ClearScript/V8，是因为它没有原生依赖 ——
+         桌面端本来就在为"少一个原生依赖"付代价。 -->
     <PackageReference Include="Jint" Version="4.16.4" />
   </ItemGroup>
 
