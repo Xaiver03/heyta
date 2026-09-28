@@ -319,7 +319,9 @@ pnpm verify:harmony-rnoh-js     # 鸿蒙 JS 侧全链路（零桩）：真 codeg
                                 #   ⚠️ 只到"编得出包"：不验运行（缺模拟器镜像+签名）
                                 #   需要 Node ≥ 20.12（DevEco 自带的 18 会报 styleText，见 §7 第 59 条）
 
-pnpm check                      # 全部门禁：类型 + 迁移 + 分层 + 界面文案 + 许可证 + 文档 + 设计变量 + iOS 原生依赖
+pnpm check                      # 全部门禁 + **全量单元测试**：类型 + 迁移 + 分层 + 界面文案 + 许可证 + 文档 + 设计变量 + iOS 原生依赖 + `pnpm -r test`
+                                # 🔴 末尾的 `pnpm -r test` 是后补的：在此之前 `check` **不跑任何单元测试**，
+                                #    于是 `apps/web` 的测试套件红了很久都没有任何东西会失败（原因见下）。
 pnpm check:design               # 只跑设计变量硬编码检查
 pnpm check:layering             # 只跑分层边界检查（apps/* 不得重新长出业务/接线）
 pnpm check:ui-language          # 界面文案必须全是中文（见 §5）
