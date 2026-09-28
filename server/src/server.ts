@@ -24,6 +24,9 @@ import {
   initSyncService,
   getSyncService,
 } from './sync';
+import { pushRoutes } from './push/push.routes';
+import { createPrismaPushSubscriptionStore } from './push/subscriptions';
+import { configureWidgetPush } from './push/notify';
 import { wsRoutes } from './sync/websocket.routes';
 import {
   getWsConnectionService,
@@ -510,6 +513,39 @@ export const createServer = (
         prefix: '/api/billing',
         adapters: createBillingAdaptersFromConfig(fullConfig),
         publicUrl: fullConfig.publicUrl,
+      });
+
+      // Web Push 订阅（Windows PWA 小组件的刷新机制）。
+      //
+      // 🔴 与收银台同一姿态：**没配 VAPID 时路由照常注册，但全部回 503**。
+      //    不注册的话浏览器会拿到 404，而 404 与"这个能力没开"是两件事 ——
+      //    客户端分不清"这台服务器不支持"和"我路径写错了"。
+      // 🔴 启动时**一次性**把 Web Push 的运行期配置定下来。
+      //
+      //    不做成"每次推送时再读一次 config"：`config.webPush` 是**可选**的，
+      //    于是每个调用点都要判一次 null —— 而那种判断会被漏掉一处，
+      //    症状是"某个入口静默不推送"。这里只判一次。
+      //
+      //    ⚠️ 没配时就传 `null`：`notifyWidgetSubscribers` 见到 null 会
+      //    **立刻返回，连一次数据库查询都不做**（自托管是默认形态，
+      //    而同步热路径上的每一次多余查询都会被乘以每个用户每次上传）。
+      configureWidgetPush(
+        fullConfig.webPush
+          ? {
+              vapidKeys: {
+                privateKey: Buffer.from(fullConfig.webPush.privateKey, 'base64url'),
+                publicKey: Buffer.from(fullConfig.webPush.publicKey, 'base64url'),
+              },
+              subject: fullConfig.webPush.subject,
+            }
+          : null,
+        createPrismaPushSubscriptionStore(),
+      );
+
+      await fastifyServer.register(pushRoutes, {
+        prefix: '/api/push',
+        store: createPrismaPushSubscriptionStore(),
+        vapidPublicKey: fullConfig.webPush?.publicKey ?? null,
       });
 
       // WebSocket routes for real-time sync notifications

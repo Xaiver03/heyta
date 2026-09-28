@@ -128,6 +128,31 @@ export interface WechatPayConfig {
   readonly notifyUrl: string;
 }
 
+/**
+ * Web Push 的配置（RFC 8292 的 VAPID 密钥对）。
+ *
+ * 🔴 **默认不存在**：只有运营者显式设 `WEB_PUSH_ENABLED=true` 且**两个变量
+ * 齐全**时才填出这个对象 —— 与 `WechatPayConfig` 同一姿态。
+ *
+ * 为什么少了就**整个能力不存在**（而不是用一对临时密钥兜底）：
+ * VAPID 密钥对是**长期身份**。用临时密钥起的服务能发出推送，但推送服务
+ * 那边记录的身份每次重启都变；而更糟的是，换密钥会让**所有既有订阅全部作废**
+ * （客户端是用旧公钥订阅的），而服务器无从知道这件事 ——
+ * 表现是"某次重启之后，所有 Windows 用户的组件再也不刷新了"。
+ * 所以：**宁可这个能力不存在，也不要一个会自己失效的身份。**
+ *
+ * 自托管实例**不需要开**：这只影响 Windows 上的组件刷新频率，
+ * 组件本身照常工作（打开应用时会刷新）。见 U12。
+ */
+export interface WebPushConfig {
+  /** 公钥，base64url 的 65 字节未压缩点。**不是秘密**，会发给每个浏览器。 */
+  readonly publicKey: string;
+  /** 私钥，base64url 的 32 字节。**是秘密**，只用于签 VAPID JWT。 */
+  readonly privateKey: string;
+  /** VAPID 的 `sub`：`mailto:` 或 `https:`。推送服务会校验它。 */
+  readonly subject: string;
+}
+
 export interface ServerConfig {
   port: number;
   host: string;
@@ -187,6 +212,8 @@ export interface ServerConfig {
    * 见 `WechatPayConfig` 与 `docs/plans/subscription-boundary.md` §6。
    */
   wechatPay?: WechatPayConfig;
+  /** Web Push（Windows PWA 小组件的刷新机制）。**默认不存在**，见下面接口的说明。 */
+  webPush?: WebPushConfig;
   /**
    * Test mode configuration. When enabled, provides endpoints for E2E testing.
    * NEVER enable in production!
@@ -565,6 +592,36 @@ export const loadConfigFromEnv = (
 
   if (!config.dataDir) {
     throw new Error('Data directory configuration is missing');
+  }
+
+  // Web Push（可选能力）。与微信支付同一姿态：ENABLED 且两个变量齐全才存在。
+  if (process.env.WEB_PUSH_ENABLED === 'true') {
+    const publicKey = process.env.WEB_PUSH_VAPID_PUBLIC_KEY?.trim();
+    const privateKey = process.env.WEB_PUSH_VAPID_PRIVATE_KEY?.trim();
+    // 🔴 `sub` **没有默认值**：RFC 8292 §2.1 要求它是一条真实的联系方式
+    //    （`mailto:` 或 `https:`），而推送服务**真的会校验**。给它编一个默认值
+    //    等于把"你没配全"变成一个会在第一次推送时才暴露的 403。
+    const subject = process.env.WEB_PUSH_VAPID_SUBJECT?.trim();
+    const missing = [
+      ['WEB_PUSH_VAPID_PUBLIC_KEY', publicKey],
+      ['WEB_PUSH_VAPID_PRIVATE_KEY', privateKey],
+      ['WEB_PUSH_VAPID_SUBJECT', subject],
+    ]
+      .filter(([, v]) => !v)
+      .map(([k]) => k);
+    if (missing.length > 0) {
+      // ⚠️ **启动期硬错误**，不是静默降级 —— 与 `WechatPayConfig` 同一理由：
+      //    一个"看起来配了但发不出"的通道，表现为"组件有时候更新有时候不更新"。
+      throw new Error(
+        `WEB_PUSH_ENABLED=true 但缺少 ${missing.join(' / ')}。` +
+          '要不用它就删掉 WEB_PUSH_ENABLED，要不用 server/scripts/gen-vapid-keys.mjs 生成一对密钥。',
+      );
+    }
+    config.webPush = {
+      publicKey: publicKey as string,
+      privateKey: privateKey as string,
+      subject: subject as string,
+    };
   }
 
   return config;
