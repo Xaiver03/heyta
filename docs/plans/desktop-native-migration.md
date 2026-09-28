@@ -213,10 +213,10 @@ RN 生态**没有 Linux**。真原生只能 GTK4 / libadwaita（或 Qt），即*
 | `check:design` | `SCAN_ROOTS` 加 `apps/desktop-windows` | 上次加桌面渲染层时**当场抓出 6 处裸值** —— 盲区里一定已经攒了债 |
 | `check:layering` | 覆盖新壳（壳不得直接构造 op） | 但**扫描器本身是 JS/TS 的** ⇒ C# 需要新的、语言无关的兜底，见下两行 |
 | 🔴 **新增：跨语言契约重放** | `packages/storage` 的 `DbAdapter` / `OpLogStore` 契约、`packages/widget-core` 的 golden fixture，**必须能在 C# 侧重放** | 这是"同一套契约"唯一的机器保证。C# 侧不能靠"我们照着写了"来证明 |
-| 🔴 **新增：非 npm 许可证清单** | `dotnet list package --include-transitive` 的产物必须进许可证检查 | `license-inventory.mjs` 只扫 npm；**扫不到 ≠ 合规** |
+| ✅ **已完成：非 npm 许可证清单** | `check:licenses:nuget` = `node research/tools/nuget-license-inventory.mjs`。它跑 `dotnet list package --include-transitive --format json` 读**本机实际还原出来的依赖树**，再去查**已入库的** `research/nuget-licenses-inventory.json`；新增 NuGet 包没刷新清单 → **失败并点名是哪个包**。白名单/`REVIEWED_OTHER` 与 npm 侧**共用** `license-policy.mjs`（避免两份白名单漂移） | `license-inventory.mjs` 只扫 npm；**扫不到 ≠ 合规**。✅ **已接进 `pnpm check`**（在 `check:licenses` 之后）。⚠️ 三条如实标注的边界：**没有 `dotnet` 时它显式报告"已跳过"**（不是假装通过）；`dotnet list package` 会**隐式还原**，所以 **NuGet 缓存冷的机器上这一步要联网**；**当前只覆盖 2 个 spike 工程**，`apps/desktop-windows` 落地后自动纳入 |
+| `check:licenses` | ✅ 已登记 .NET 侧 8 个包：`Jint` **BSD-2-Clause**（原先被我误写成 MIT，**是这个门禁抓出来的**）、`Acornima` BSD-3-Clause、`Microsoft.Data.Sqlite`(.Core) MIT、`SQLitePCLRaw.*` Apache-2.0 | ADR-0034 §4 |
 | **新增：`check:windows-dotnet`** | Windows 上跑 `dotnet test`；非 Windows 上**显式报告跳过** | §2.4：否则 C# 代码永远不在门禁里 |
 | **新增：多壳断言一致性** | Electron / WinUI 必须过**同一份** `desktop-window` 断言 | 见 W1-4；这是"同一套 UI 契约"唯一的机器保证 |
-| `check:licenses` | 登记 .NET / Windows App SDK / `Microsoft.Data.Sqlite` / `SQLitePCLRaw` | ADR-0034 §4 |
 | ~~`check:mobile-bundle`~~ | **不需要为 WinUI 3 跑** | 该门禁防的是 Hermes 的 `import.meta` 坑；WinUI 3 不走 Hermes（这一条随 RNW 出局而消失） |
 
 ---
@@ -227,7 +227,7 @@ RN 生态**没有 Linux**。真原生只能 GTK4 / libadwaita（或 Qt），即*
 |---|---|---|
 | 🔴 **C-B 领域层只能做成两份源** | **核心业务逻辑永久双份维护** —— 不是代码量问题，**不被"哪怕是代码量偏大"覆盖** | **W0-4 前置**；若两路都不成立则**停**（W0-5） |
 | 🔴 `windows-pc` 无任何 .NET 工具链 | W0 无法开始 | **W0-1**：装机是硬前置，已实测记录（[ADR-0034](../adr/0034-windows-native-winui3-not-rnw.md) §5.1） |
-| 非 npm 依赖的许可证无人扫 | 合规盲区 | §6 新增非 npm 许可证清单 |
+| ~~非 npm 依赖的许可证无人扫~~ | 合规盲区 | ✅ **已处理**：`check:licenses:nuget` 已接进门禁（§6）。**残余风险两条**：① 机器上没有 `dotnet` 时它**报告跳过**（不是假装通过）—— 别把"绿"读成"验过"；② 它只覆盖**仓库里的 `.csproj`**，`Microsoft.WindowsAppSDK` 要等 `apps/desktop-windows` 落地才会被纳入 |
 | C# 不在 `pnpm check` 内 | 新壳成为门禁盲区 | §2.4 + §6 的 `check:windows-dotnet` |
 | 双壳维护（Electron + WinUI 并存期） | 两套构建/签名/发布流水线 | 并存期尽量短；W3 完成即下线 Windows 的 Electron 产物 |
 | macOS / Linux 长期停在 Electron | "原生"承诺在两端不成立 | **如实标注为过渡**（§3、§4），不包装成原生 |

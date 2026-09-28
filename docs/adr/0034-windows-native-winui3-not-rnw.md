@@ -200,6 +200,14 @@ C# 进程**跑不了 TS**。两条路，**由 W0 spike 拍板，本文不预先�
 - **`check:licenses` 的口径要扩**：`.NET` / `Windows App SDK` / `Microsoft.Data.Sqlite` /
   `SQLitePCLRaw` 是**非 npm** 依赖，现有 `research/tools/license-inventory.mjs` 只扫 npm ⇒
   要么扩脚本，要么新开一份清单。**不能因为"扫不到"就默认合规。**
+  ✅ **2026-09-28 已落地**：新增 `check:licenses:nuget`（`research/tools/nuget-license-inventory.mjs`）
+  并接进 `pnpm check`。它读 `dotnet list package --include-transitive` 的**本机实际依赖树**，
+  对已入库的 `research/nuget-licenses-inventory.json` 判定；白名单与 `REVIEWED_OTHER`
+  与 npm 侧**共用** `license-policy.mjs`，避免两份白名单漂移。
+  🔴 **它当场抓出一个错误**：本 ADR §6 原先把 `Jint` 写成 MIT，实测是 **BSD-2-Clause**。
+  ⚠️ 边界（不许读成"已全合规"）：没有 `dotnet` 时它**显式报告跳过**；
+  `dotnet list package` 会**隐式还原**，NuGet 缓存冷的机器上这一步要联网；
+  当前只覆盖仓库里已有的 `.csproj`。
 - **Windows 小组件这条路反而变短了**：C# provider 有官方教程，且 MSIX 打包是 WinUI 3 的
   标准交付形态（widgets 本身就要求 packaged app）。
 - 不接受"用 Tauri 换更少代码"的反提议：Tauri 的渲染层是 WebView2，不满足"原生 UI"这个前提。
@@ -251,7 +259,7 @@ C# 进程**跑不了 TS**。两条路，**由 W0 spike 拍板，本文不预先�
 |---|---|
 | bundle | `@heyta/domain` 自包含 IIFE，**338445 字节 / 146 个导出**，零 `require` |
 | 引擎 A | **node v22.22.3 / `vm.createContext`（空沙箱）** —— 常见宿主全局（`process`/`require`/`window`/`fetch`/`Buffer`…）都定义成**一访问就抛错**的 getter |
-| 引擎 B | **.NET 10.0.8 / Jint 4.16.4.0**（MIT，纯 C#，无原生依赖） |
+| 引擎 B | **.NET 10.0.8 / Jint 4.16.4.0**（**BSD-2-Clause**，纯 C#，无原生依赖） |
 | 用例 | **22 条，两侧都成功 22 条，结果逐条一致** |
 | bundle 触碰宿主全局 | **0 次** |
 

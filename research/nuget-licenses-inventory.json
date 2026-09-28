@@ -1,0 +1,47 @@
+{
+  "generatedAt": "2026-09-28",
+  "source": "NuGet flatcontainer 的 .nuspec `license` 字段（SPDX expression）",
+  "why": "入库存档，好让门禁在**不联网**的情况下也能判定；新增 NuGet 包必须 --refresh 一次。",
+  "packages": {
+    "Acornima@1.7.0": {
+      "license": "BSD-3-Clause",
+      "projectUrl": "https://github.com/adams85/acornima",
+      "authors": "Adam Simon"
+    },
+    "Jint@4.16.4": {
+      "license": "BSD-2-Clause",
+      "projectUrl": "https://github.com/sebastienros/jint",
+      "authors": "Sebastien Ros"
+    },
+    "Microsoft.Data.Sqlite.Core@10.0.12": {
+      "license": "MIT",
+      "projectUrl": "https://docs.microsoft.com/dotnet/standard/data/sqlite/",
+      "authors": "Microsoft"
+    },
+    "Microsoft.Data.Sqlite@10.0.12": {
+      "license": "MIT",
+      "projectUrl": "https://docs.microsoft.com/dotnet/standard/data/sqlite/",
+      "authors": "Microsoft"
+    },
+    "SQLitePCLRaw.bundle_e_sqlite3@2.1.12": {
+      "license": "Apache-2.0",
+      "projectUrl": null,
+      "authors": "Eric Sink"
+    },
+    "SQLitePCLRaw.core@2.1.12": {
+      "license": "Apache-2.0",
+      "projectUrl": null,
+      "authors": "Eric Sink"
+    },
+    "SQLitePCLRaw.lib.e_sqlite3@2.1.12": {
+      "license": "Apache-2.0",
+      "projectUrl": null,
+      "authors": "Eric Sink"
+    },
+    "SQLitePCLRaw.provider.e_sqlite3@2.1.12": {
+      "license": "Apache-2.0",
+      "projectUrl": null,
+      "authors": "Eric Sink"
+    }
+  }
+}
