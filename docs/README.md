@@ -149,7 +149,6 @@ docs/research/<kebab-case>.md     例：reuse-plan.md
 | ⭐ [multi-platform-widgets-progress.md](plans/multi-platform-widgets-progress.md) | 🔴 **小组件实施进度账本（唯一真源）**：W0–W5 逐任务记录**已完成 / 未完成 / 阻塞**并附可验证证据。含 D1–D6 六个已拍板决策（**D1 = 设备密钥加密快照**）、阻塞登记（鸿蒙镜像/签名、Windows 真机、iOS 账号）、7 条未核实项、以及「下一步」唯一入口。状态只有四种，**不允许"基本完成"** |
 | [motivation-and-progression.md](plans/motivation-and-progression.md) | ⭐ **激励与成长体系设计**：三层架构（即时反馈/连续性/叙事）× 四个循环，含「不改 schema」的落地映射、反需求 2.0、E2EE 下的指标方案 |
 | [activity-categories-and-colors.md](plans/activity-categories-and-colors.md) | **活动分类与分类着色**（✅ 已实现并并入 `main`）：颜色由**用户自赋义**、App 不判健康度；真正的工程量在时间归因（零新增字段跑通了第一版）；分类泳道图 + 周堆叠条。落地状态与实测数字见其 §8 |
-| 🔴 [site-and-parity-alignment.md](plans/site-and-parity-alignment.md) | ⭐ **站点补齐与能力对标：任务计划**（2026-09-28 立项）：**A 轨站点**（A0 多页架构 → `/features` `/platforms` `/pricing` `/help` `/signin` `/changelog` `/integrations`）、**B 轨能力**（B0 六个低成本高杠杆 → B1 提醒/Web 日历/子任务/搜索 → B2 二十条 P1）、**C 轨文档与门禁**（含 🔴 **新增 `check:reachability`**：查"实体已建模但零 action / 零调用点"）。含 6 条先决决策（D1 多页架构**需要新 ADR**）、6 个波次、7 条风险与不可逆点、11 条明确不做 |
 
 ### 工程参考
 
@@ -178,9 +177,6 @@ docs/research/<kebab-case>.md     例：reuse-plan.md
 | 文档 | 内容 |
 |---|---|
 | [feature-matrix.md](research/feature-matrix.md) | 滴答清单功能对照矩阵 —— 需求基准线（P0/P1/P2 分级） |
-| 🔴 [dida365-feature-benchmark.md](research/dida365-feature-benchmark.md) | ⭐ **滴答清单功能对标：heyta 的真实缺口**（2026-09-28 代码级审计）：逐类给 `文件:行号` 证据 + 缺口分级（P0/P1/P2）。含 **13 项「看起来有、其实没有」**（提醒 / 通知 / 子任务 / Web 日历 / 已完成入口 / 手动排序 / 番茄自定义 / 习惯计数型 / 实时同步 / 桌面端 / 笔记 / 鸿蒙 / 全量导出）、**13 处文档与代码的矛盾**、以及**我们独有的 9 条能力**。🔴 核心判据：**"做完了" = 有 action + 有调用点 + 有从用户动作出发的验收** |
-| [dida365-help-center-ia.md](research/dida365-help-center-ia.md) | ⭐ **滴答清单帮助中心与官网 IA 实测**（2026-09-28）：解析 Next.js `__NEXT_DATA__` 得到 **97 篇**完整目录（任务 21 / 日历 9 / 四象限 3 / 番茄 6 / 习惯 4 / 倒数日 4 / 导入与关联 15 / AI 7 / 账号与安全 6…）、**FAQ 67 问分 8 组**、**定价逐项对比表**（￥139/年 · ￥16/月 · 连续包月 ￥13.9；国际版 $49.99/年）、下载页 7 平台分发方式、登录 6 种方式、更新动态 5 条 + 3 个年度归档。含 6 条未核实项 |
-| [site-ia-and-landing-audit.md](research/site-ia-and-landing-audit.md) | ⭐ **heyta 落地页审计与双向对齐**（2026-09-28）：现状清单（10 段区块 / 导航 / 页脚 / i18n / SEO / 主题 / 应用入口 / 构建部署 / 测试门禁）+ **22 行对齐矩阵**（A 对标补齐 / B 能力回填 / C 明确不对齐）+ **不能照抄的 8 件事**。滴答侧数据不在此重复，见上一条 |
 | [oss-landscape.md](research/oss-landscape.md) | 开源项目盘点（16 个项目的许可证、成熟度、可复用性） |
 | [licensing-and-compliance.md](research/licensing-and-compliance.md) | 许可证与合规边界（AGPL §13、商标、上架成本、定价数据） |
 | [codebase-assessment.md](research/codebase-assessment.md) | 上游代码体检：依赖许可证扫描 + 代码量实测 |
