@@ -45,6 +45,39 @@ export const REVIEWED_OTHER = {
     'CC-BY 是署名许可（不是禁用的 CC-BY-NC），归属已在 THIRD_PARTY_LICENSES.md §2 登记。',
 };
 
+/**
+ * **按包名**登记的例外 —— 给那些"许可证是随包附带的文件、不是一个标识符"的包。
+ *
+ * 🔴 为什么必须按包名，而不是塞进上面的 `REVIEWED_OTHER`：
+ *
+ *   微软的 Windows App SDK / Windows SDK 组件在 nuspec 里写的是
+ *   `<license type="file">license.txt</license>` —— 也就是说**根本拿不到 SPDX 标识符**，
+ *   能拿到的只是文件名 `license.txt`。
+ *   如果把这个字符串放进 `REVIEWED_OTHER`，那么**任何**将来附带 `license.txt`
+ *   的包都会被自动放行 —— 恰好把这道门禁想拦的那一类放过去。
+ *   键在包名上，影响面就精确到这几个包。
+ *
+ * 键是**包名前缀**（写全名也行）；值是接受它的理由，会被打印出来。
+ *
+ * ⚠️ 前缀是**家族级**决定，不是逐包复核 —— 这是刻意的：微软的 Windows 平台包
+ *    （`Microsoft.WindowsAppSDK.*`、`Microsoft.Windows.AI.*`、`Microsoft.Windows.SDK.BuildTools*`）
+ *    全都用同一套"随包附带许可文件"的做法，逐包登记只会变成打地鼠
+ *    （实测就漏过一个 `Microsoft.Windows.AI.MachineLearning`）。
+ *    范围仍然**限于微软自己的命名空间** —— NuGet 把 `Microsoft.*` 前缀保留给微软，
+ *    第三方包不能占用，所以这不是"任何带 license.txt 的包都放行"。
+ */
+export const REVIEWED_LICENSE_FILE_PACKAGES = {
+  'Microsoft.Windows':
+    '微软的 Windows 平台组件家族（WindowsAppSDK.Base/Foundation/WinUI/Widgets/AI/ML/DWrite/Search/Runtime…、' +
+    'Windows.AI.MachineLearning、Windows.SDK.BuildTools 及其 MSIX 工具）：nuspec 用' +
+    '`<license type="file">license.txt</license>` 或 `sdk_license.txt`，**没有 SPDX 标识符**。' +
+    '它们是 Windows 上的 WinUI 3 壳赖以运行的官方运行时/构建组件，许可允许随应用再分发。' +
+    '⚠️ 家族级登记：新增**别的**微软家族请另开一条，不要扩大这一条。',
+  'Microsoft.Web.WebView2':
+    'WebView2 运行时：随包附带 `LICENSE.txt`，无 SPDX 标识符。由 Windows App SDK 传递引入；' +
+    '**heyta 自己的界面不用 WebView**（原生性是本决策的前提），此处仅作为依赖树里的一环登记。',
+};
+
 /** 把各来源的许可证字段（字符串 / `{type}` / 数组）压成一个字符串。 */
 export const normalizeLicense = (raw) => {
   if (raw == null) return 'UNKNOWN';

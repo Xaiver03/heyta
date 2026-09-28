@@ -2,6 +2,7 @@
   "generatedAt": "2026-09-28",
   "source": "NuGet flatcontainer 的 .nuspec `license` 字段（SPDX expression）",
   "why": "入库存档，好让门禁在**不联网**的情况下也能判定；新增 NuGet 包必须 --refresh 一次。",
+  "platforms": "合并式：Windows-only 的工程（WinUI）只能在 Windows 上刷新，见本脚本的 isWindowsOnly。",
   "packages": {
     "Acornima@1.7.0": {
       "license": "BSD-3-Clause",
@@ -42,6 +43,86 @@
       "license": "Apache-2.0",
       "projectUrl": null,
       "authors": "Eric Sink"
+    },
+    "Microsoft.Web.WebView2@1.0.3719.77": {
+      "license": "LICENSE.txt",
+      "projectUrl": "https://aka.ms/webview",
+      "authors": "Microsoft"
+    },
+    "Microsoft.Windows.AI.MachineLearning@2.1.74": {
+      "license": "license.txt",
+      "projectUrl": "https://github.com/microsoft/windowsappsdk",
+      "authors": "Microsoft"
+    },
+    "Microsoft.Windows.SDK.BuildTools.MSIX@1.7.251221100": {
+      "license": "sdk_license.txt",
+      "projectUrl": "https://aka.ms/WinSDKProjectURL",
+      "authors": "Microsoft"
+    },
+    "Microsoft.Windows.SDK.BuildTools@10.0.26100.4654": {
+      "license": "https://aka.ms/WinSDKLicenseURL",
+      "projectUrl": "https://aka.ms/WinSDKProjectURL",
+      "authors": "Microsoft"
+    },
+    "Microsoft.WindowsAppSDK.AI@2.5.5": {
+      "license": "license.txt",
+      "projectUrl": "https://github.com/microsoft/windowsappsdk",
+      "authors": "Microsoft"
+    },
+    "Microsoft.WindowsAppSDK.Base@2.0.4": {
+      "license": "license.txt",
+      "projectUrl": "https://github.com/microsoft/windowsappsdk",
+      "authors": "Microsoft"
+    },
+    "Microsoft.WindowsAppSDK.DWrite@2.1.0": {
+      "license": "license.txt",
+      "projectUrl": "https://aka.ms/WindowsAppSDK",
+      "authors": "Microsoft"
+    },
+    "Microsoft.WindowsAppSDK.Foundation@2.3.12": {
+      "license": "license.txt",
+      "projectUrl": "https://aka.ms/windowsappsdk",
+      "authors": "Microsoft"
+    },
+    "Microsoft.WindowsAppSDK.InteractiveExperiences@2.1.9": {
+      "license": "license.txt",
+      "projectUrl": "https://aka.ms/windowsappsdk",
+      "authors": "Microsoft"
+    },
+    "Microsoft.WindowsAppSDK.ML@2.1.94": {
+      "license": "license.txt",
+      "projectUrl": "https://github.com/microsoft/windowsappsdk",
+      "authors": "Microsoft"
+    },
+    "Microsoft.WindowsAppSDK.Runtime@2.5.1": {
+      "license": "license.txt",
+      "projectUrl": "https://github.com/microsoft/windowsappsdk",
+      "authors": "Microsoft"
+    },
+    "Microsoft.WindowsAppSDK.Search@2.5.5": {
+      "license": "license.txt",
+      "projectUrl": "https://github.com/microsoft/windowsappsdk",
+      "authors": "Microsoft"
+    },
+    "Microsoft.WindowsAppSDK.Widgets@2.0.5": {
+      "license": "license.txt",
+      "projectUrl": "https://github.com/microsoft/windowsappsdk",
+      "authors": "Microsoft"
+    },
+    "Microsoft.WindowsAppSDK.WinUI@2.3.9": {
+      "license": "license.txt",
+      "projectUrl": "https://github.com/microsoft/windowsappsdk",
+      "authors": "Microsoft"
+    },
+    "Microsoft.WindowsAppSDK@2.5.1": {
+      "license": "license.txt",
+      "projectUrl": "https://github.com/microsoft/windowsappsdk",
+      "authors": "Microsoft"
+    },
+    "System.Numerics.Tensors@9.0.0": {
+      "license": "MIT",
+      "projectUrl": "https://dot.net/",
+      "authors": "Microsoft"
     }
   }
 }
