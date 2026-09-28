@@ -33,14 +33,17 @@
 | **Windows**（备选） | react-native-windows | 🔴 **本轮出局** | RNW 最新稳定版 = **0.84.0**（`peerDep: RN 0.84.1`），**无 0.85+ 稳定版**；而 RN 上游已 0.87.1 ⇒ 选它 = 把 `apps/mobile` 一起冻在出了支持窗口的 RN 上 |
 | **macOS** | SwiftUI / AppKit 原生 | ✅ **已完成（2026-09-28）** | `apps/desktop-macos`（SwiftPM）。**JavaScriptCore 与 libsqlite3 都是 macOS 自带** ⇒ 不引第三方依赖；加载的是**同一个** `bridge-bundle/native-bridge.js`。无头冒烟 **14/14**；窗口已启动并自截屏（[evidence](../../apps/desktop-macos/evidence/)） |
 | **macOS**（备选） | `react-native-macos` | 🔴 **不需要了** | 最新 **0.81.9**（`peerDep: react-native 0.81.6`）与 heyta 的 0.84.1 硬冲突 —— 但自从 D2（内嵌 JS 引擎跑同一份 TS）成立，这条路本来就不必走 |
-| **Linux** | GTK4 / libadwaita（或 Qt） | ⏸ **最后一个非原生端，接下来做** | RN 生态没有 Linux ⇒ 只能自己造（[§4](#4-linux最后一个非原生端--确定要做)）。**机器是有的**（`ubuntu-jcli` / `sanjiaozhou`，实测 SSH 可达） |
+| **Linux** | **GTK4 / C** | ✅ **已完成（2026-09-28）** | `apps/desktop-linux`。**libjavascriptcoregtk-4.1 与 libsqlite3**；选 JSC 是因为它与 macOS 自带的是**同一个引擎家族**。冒烟 **12/12**；窗口在 `sanjiaozhou` 上用 Xvfb 启动并截图（[evidence](../../apps/desktop-linux/evidence/)） |
 | **iOS / Android** | React Native | ✅ **已经是原生** | `apps/mobile`；且已落地真原生小组件（WidgetKit / App Widget） |
 | **鸿蒙** | RNOH + ArkTS 卡片 | ✅ **已经是原生** | `apps/mobile/harmony`；出包已通，模拟器已可用 |
 | **Web** | —— | ✅ 就是 Web（定义如此） | `apps/web` |
 
-**结论（2026-09-28 复核）**：**七端里六端已是原生** ——
-Windows（WinUI 3）、macOS（SwiftUI）、iOS/Android（RN）、鸿蒙（RNOH）、Web（定义如此）。
-**只剩 Linux 还是 Electron**，那是下一个要补的（[§4](#4-linux最后一个非原生端--确定要做)）。
+**结论（2026-09-28 复核）**：🔴 **七端全部是原生壳** ——
+Windows（WinUI 3 / C#）、macOS（SwiftUI / Swift）、Linux（GTK4 / C）、
+iOS / Android（React Native + 原生小组件）、鸿蒙（RNOH + ArkTS）、Web（定义如此）。
+
+三个**桌面**原生壳加载的是**同一个** `packages/app-host/bridge-bundle/native-bridge.js`，
+各自只实现「同步 SQLite 驱动 + 窄 JSON 门面」那一层。
 
 > 🔴 **为什么这条要写在最前面**：如果计划写成"桌面三端统一上原生"，
 > 那么它在 macOS 上会撞版本墙、在 Linux 上无墙可撞（只能自己造一个），
@@ -189,28 +192,44 @@ D2 一旦成立，"用 RN 复用 UI"就不再是省事的唯一办法，而它�
 
 ---
 
-## 4. Linux：**最后一个非原生端** —— 确定要做
+## 4. Linux：✅ **已完成** —— GTK4 原生壳（曾经是最后一个非原生端）
 
 现状（实测，不是印象）：`release/heyta-linux-x64/` 里是 `chrome-sandbox` +
-`chrome_*.pak` + `LICENSES.chromium.html` ⇒ **Electron，不是原生**。
+`chrome_*.pak` + `LICENSES.chromium.html` ⇒ 那**曾经**是 Electron，不是原生。
 
-RN 生态**没有 Linux**，所以真原生只能 GTK4 / libadwaita（或 Qt）—— **自己造**。
-好消息是路已经铺好：macOS 那一轮证明了"**窄 JSON 门面 + 各端自带的 JS 引擎与 SQLite**"
-这套形状可以搬到任何语言/运行时上，Linux 只是第三个消费者。
+## 4.1 ✅ 已完成（2026-09-28）：GTK4 原生壳
 
-**本计划的处理**：
+| 项 | 结果 |
+|---|---|
+| 壳 | `apps/desktop-linux`（C + GTK4，`Makefile` 一把构建） |
+| 原生依据 | **GTK4 原生控件**，不是 WebView、不是 Electron |
+| 跨语言那层 | **`libjavascriptcoregtk-4.1` + `libsqlite3`** —— 选前者是因为它与**macOS 自带的是同一个引擎家族**，引擎语义差异只算一次 |
+| 加载的代码 | **同一个** `packages/app-host/bridge-bundle/native-bridge.js` |
+| 冒烟 | `./heyta-smoke` → **12/12**（`-Werror` 下 0 警告 0 错误） |
+| 窗口 | 在 `sanjiaozhou` 上用 **Xvfb** 启动并截图（`WINDOW_SIZE=900x560`）→ [evidence](../../apps/desktop-linux/evidence/)；库表与其它端一致 |
+
+**当初这条"不启动第四个原生壳"的判断为什么变了**：那时的理由是"**没有 Linux 桌面用户的证据**"，
+而现在的需求是「**所有端都必须是原生**」—— 前提变了，结论跟着变。
+⚠️ 但那条理由本身**没有被推翻**：仍然没有 Linux 桌面用户的证据。
+这次做它是因为**它是硬需求**，不是因为需求证据出现了。
+
+## 4.2 原来那份判断（保留，作为"当时为什么不做"的记录）
 
 1. 🔴 **先如实承认证据状况**：团队有自己的 Linux 主机
    （`ubuntu-jcli` 124.223.13.226 / `sanjiaozhou` 101.34.250.109，实测 SSH 可达，
    见 [`local-server-verification.md`](../runbooks/local-server-verification.md) §0），
    但它们是 **CI / 部署服务器**，**不是 Linux 桌面用户**。
    "我们有 Linux 机器" ≠ "有人要用 Linux 桌面版"。
-   目前**没有任何 Linux 桌面用户的证据** ⇒ **不启动第四个原生壳**。
+   目前**没有任何 Linux 桌面用户的证据** ⇒ 当时判断：不启动第四个原生壳。
 2. Linux **继续用 Electron**，如实标注为过渡；
 3. **但必须真的跑起来** —— Linux 产物至今**从未在 Linux 上运行过**。
    这是**欠的活**，不是缺的条件（机器已具备）；
-4. 若将来"Linux 也要原生"被提成硬需求 → **另开 ADR**，
-   它会是一次"引入第四个代码库"的决策 —— 而且**应当在 §3 的领域层答案之后**。
+4. 若将来"Linux 也要原生"被提成硬需求 → **另开 ADR**。
+
+> 📌 2026-09-28：第 4 条触发了 —— 需求方明确要求"所有端都原生"。
+> 落地方案见 §4.1，**没有另开 ADR**：因为技术选型并不是新决策，
+> 它是 [ADR-0034](../adr/0034-windows-native-winui3-not-rnw.md) 的 D2 路线**第三次被复用**
+> （同一个窄门面 + 各端自带的 JS 引擎与 SQLite），不构成新的架构分叉。
 
 ---
 
@@ -312,8 +331,9 @@ pnpm check                                                          # → exit 0
 | W1 WinUI 3 渲染最小切片 | 🟡 **数据通道 ✅，界面待长** | 通道有门禁（`check:windows-shell` 12/12）；⚠️ W1-3/W1-4 的判据要重述：Windows 是 XAML，**不可能与 Electron 共用 DOM testid**（见 §2.3） |
 | W2 组件 + MSIX | ⬜ 未开始 | — |
 | W3 替换 Windows 端 Electron | ⬜ 未开始 | — |
-| **Linux 原生壳（GTK4）** | ⬜ **未开始 —— 下一个** | 这是**最后一个非原生端**（§4）。机器已具备（`ubuntu-jcli` / `sanjiaozhou`，实测 SSH 可达） |
-| Linux 产物在 Linux 上运行 | ⬜ 未开始 | 同上 |
+| **Linux 原生壳（GTK4）** | ✅ **已完成（2026-09-28）** | `apps/desktop-linux`（C + GTK4 + libjavascriptcoregtk-4.1 + libsqlite3）。`-Werror` 下 0 警告 0 错误；冒烟 **12/12**；窗口在 `sanjiaozhou` 上用 Xvfb 启动并截图（`WINDOW_SIZE=900x560`），库表与其它端一致。见 §4.1 与 [evidence](../../apps/desktop-linux/evidence/) |
+| Linux 产物在 Linux 上运行 | ✅ **已完成** | 同上一行 —— 这是**第一次**真的在 Linux 上跑起来（此前三平台包都只在 macOS 上产出过）。复现：`cd apps/desktop-linux && make && ./heyta-smoke`；窗口见 README §4 |
+| **七端原生壳** | ✅ **全部完成（2026-09-28）** | Windows（WinUI 3）/ macOS（SwiftUI）/ Linux（GTK4）/ iOS·Android（RN）/ 鸿蒙（RNOH）/ Web。三个桌面壳加载**同一个** `native-bridge.js` |
 | 鸿蒙 RN 应用上设备 | ⬜ 未开始 | 模拟器已具备（[§4.1](../runbooks/multi-platform-build.md)） |
 | W0-2 同步 SQLite 驱动（C#） | ✅ **已完成；契约全量重放 + 编组开销已测**（2026-09-28） | ① 未改一行的 `SqliteAdapter` + `DbOpLogStore` 跑**原样契约 50/50 通过**（约 2 秒），已做成门禁 `check:crosslang-contract`；反假通过：条数与真 vitest 对齐、注入细微 bug 能抓 6 条。② 编组开销：固定 **6 µs/次**、JSON 桥 **4.9 µs/行** ⇒ 保留 JSON 桥；2000 行时纯 C# 基线占 46%，该优化的是"少搬行"。⚠️ 未测：Windows 宿主上的性能；`widget-core` golden fixture 未进通道 |
 | **门禁：干净检出上 `pnpm check`** | ✅ **exit 0**（2026-09-28，137 秒） | 在 `git worktree` 的 HEAD 干净检出上跑完整 `pnpm check`（**并行会话的文件一个都不在**）⇒ 全绿。抓出并修掉两个"本机绿、CI 红"（esbuild 陈旧链接 `1c56439`、4 个死链 `de9b001`），见 §6.1。⚠️ e2e **24 passed / 2 skipped**（干净检出没下 Electron 二进制；那两条在主工作区真跑且通过） |
