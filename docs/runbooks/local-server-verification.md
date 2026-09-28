@@ -8,6 +8,48 @@
 
 ---
 
+## 0. 手上有哪些 Linux 机器可以真跑（2026-09-28 实测）
+
+macOS 上跑通不等于 Linux 上跑通。要验"跨平台"，就必须落在一台真 Linux 上。
+下面这些是**本团队自己的机器**，SSH 别名定义在 `~/.ssh/config`；
+分工与端口见 [`deployment.md`](deployment.md) §1。
+
+| SSH 别名 | IP | 系统 | 规格 | 2026-09-28 连通性 | 能不能用来验证 |
+|---|---|---|---|---|---|
+| `ubuntu-jcli`（=`finlaw`） | `124.223.13.226` | Ubuntu **22.04.5** LTS | 4C / 7 GB | ✅ SSH 可达 | ⚠️ **它同时是 heyta 的公网部署机**，只做**只读**核实；别在上面跑会改状态的东西 |
+| `sanjiaozhou` | `101.34.250.109` | Ubuntu **24.04** LTS | 8C / 15 GB | ✅ SSH 可达 | ✅ 负载正常、余量最大，**跑构建/测试最合适的一台** |
+| `12km`（OPP） | `121.4.24.238` | Ubuntu 24.04 | 4C / 8 GB | 🔴 **SSH 连接被关闭**（`Connection closed by ... port 22`） | ❌ 实例已过期，**不要用**。⚠️ 见下 |
+
+⚠️ **`12km` 的状态变了。** [`deployment.md`](deployment.md) §2.2 写的是"已过期但仍在正常运行"，
+2026-09-28 实测 **SSH 已经连不上**（端口 22 直接被关闭）。这类"随时可能被回收"的机器，
+**判断只以当场实测为准**。
+
+**先自测再动手**（别照抄表格）：
+
+```bash
+for h in ubuntu-jcli sanjiaozhou; do
+  echo "--- $h"
+  ssh -o ConnectTimeout=20 -o BatchMode=yes "$h" \
+    '. /etc/os-release; echo "$PRETTY_NAME"; nproc; free -g | sed -n 2p; uname -r'
+done
+```
+
+### 0.1 CI runner 本身也在 Linux 上
+
+`push` 到 `main` 后，GitHub 把任务派给 **finlaw 上的自托管 runner**，在容器里
+干净检出一份新克隆，跑 `pnpm check` + 全量测试（见 [`ci-and-runner.md`](ci-and-runner.md)）。
+**这是最省事的一条 Linux 验证路径** —— 不需要自己登机器，代价是它只跑仓库里已有的门禁。
+
+```bash
+gh run list --limit 5
+gh run view <id> --json jobs -q '.jobs[].steps[] | "\(.conclusion//"-") \(.name)"'
+```
+
+🔴 **判读要点见 [`ci-and-runner.md`](ci-and-runner.md) §8.1**：
+一步失败会把后面的步骤变成 `-`（跳过），"CI 红了"有可能意味着**门禁一个都没跑**。
+
+---
+
 ## 前提
 
 | 依赖 | 说明 |

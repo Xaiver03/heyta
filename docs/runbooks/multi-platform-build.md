@@ -360,13 +360,121 @@ Windows PowerShell 5.1 把**无 BOM 的 UTF-8 当 ANSI** 读。`.ps1` 里出现�
 
 ---
 
-## 4. HarmonyOS（出包已通，运行未通）
+## 4. HarmonyOS
 
-**当前状态：HAP 已经真的编出来过（release 20 MB / debug 37 MB），但没在任何设备或模拟器上跑起来。** 见
-[`../reference/build-matrix.md`](../reference/build-matrix.md) §6。
+### 4.0 现在的真实状态（2026-09-28 实测）
+
+| 步骤 | 状态 | 证据 |
+|---|---|---|
+| 工具链在不在 | ✅ | `Emulator -version` → `HarmonyOS Emulator :6.1.1.350`；SDK = HarmonyOS 6.1.1 / API 24 |
+| 能不能出 HAP | ✅ | `assembleHap` → `BUILD SUCCESSFUL`，`entry-default-unsigned.hap` **352,587 字节** |
+| 有没有模拟器 | ✅ | 镜像 2.37 GB 已下、实例 `heyta_test` 已建、**已启动**，hdc 认到 `127.0.0.1:5557` |
+| 能不能装上去 | ✅ | `hdc install -r <**未签名**>.hap` **成功**，`bm dump -a` 列出 `com.heyta.mobile` |
+| 应用跑起来 | ⚠️ **能启动，但白屏** | `aa start -a EntryAbility -b com.heyta.mobile` → `start ability successfully`，截图**纯白** |
+| RN 应用跑起来 | ❌ | 上面装的是**模板工程**的 HAP，不是 RN 的；RN HAP 由 `verify:harmony-rnoh-js` 产在 `/tmp` |
+
+🔴 **本节 2026-09-28 之前写着"卡点是缺模拟器系统镜像（本机没有 `~/.Huawei`）"。那句话是错的**，错在两处：
+
+1. **`~/.Huawei` 根本不是镜像的落盘位置。** 镜像落在
+   `~/Library/Huawei/Sdk/system-image/HarmonyOS-6.1.1/<device>_all_arm/`
+   （本机实测该目录 **4.4 GB**，而 `~/.Huawei` 自始至终是 **0 字节**）。
+   拿 `~/.Huawei` 是否为空来判断"有没有镜像"，判的是一个**永远为空**的路径。
+2. **镜像不需要 GUI、不需要华为账号**，模拟器自带完整 CLI（见 4.1）。
+
+**白屏的根因也已经定位**（不是"运行未通"这种含糊说法）：
+
+```jsonc
+// apps/mobile/harmony/entry/src/main/resources/base/profile/main_pages.json
+{ "src": ["generated/Index"] }
+```
+
+应用首页被指向了 **`generated/Index`** —— 那是 **DevEco 预览器的报错占位页**
+（内容是「预览失败 / Preview failed / 无法启动预览器…」），
+是 IDE 生成物，**从来就不该是应用入口**。所以"能启动、白屏"是**真缺陷**，
+不是环境问题：截图里连那四行报错文字都没渲染出来，说明这一页本身就没加载成功。
+
+### 4.1 模拟器：全 CLI，不需要 GUI / 不需要华为账号
+
+🔴 **以前没做这一步，是因为以为必须点 Device Manager 并登录华为账号。不是的。**
 
 ```bash
-pnpm verify:harmony-toolchain    # 工具链 → 最小 ArkTS 工程 HAP（验的是"机器能不能出包"）
+E=/Applications/DevEco-Studio.app/Contents/tools/emulator/Emulator
+
+# ① 看能力（这一步就知道有没有 -install）
+"$E" -help
+#   关键子命令：-license / -imageList / -install / -create / -start / -stop / -list / -delete
+
+# ② 接受许可（一次性）
+"$E" -license accept          # → All licenses have been automatically accepted.
+
+# ③ 看有哪些镜像可下（国内必须走代理，见下）
+"$E" -imageList -http_proxy http://127.0.0.1:7890
+#   phone / foldable / triplefold / widefold / tv，都是 HarmonyOS 6.1.1(24) Release
+
+# ④ 下 phone 镜像（2,368,067,717 字节）
+"$E" -install -deviceType phone -osVersion "HarmonyOS 6.1.1(24)" \
+     -http_proxy http://127.0.0.1:7890
+#   ⚠️ 输出是一长串 \r 进度，**必须重定向到文件**，否则刷屏且看不出结果
+#   ⚠️ 没有 -http_proxy 会**卡住不动**（不报错），这是最费时间的一个坑
+
+# ⑤ 建实例 —— 🔴 名字不能带连字符
+"$E" -create heyta_test -deviceType phone -osVersion "HarmonyOS 6.1.1(24)"
+#   带连字符（如 heyta-test）会报：
+#     The virtual device name can only contain letters, spaces, numbers, underscores (_) and plus sign(+)
+#   但 **exit code 仍是 0** —— 只看退出码会以为建成功了
+
+# ⑥ 启动（长驻进程，放后台）
+"$E" -start heyta_test > /tmp/emulator-start.log 2>&1 &
+
+# ⑦ 等 hdc 认到它（约 30 秒）
+HDC=/Applications/DevEco-Studio.app/Contents/sdk/default/openharmony/toolchains/hdc
+"$HDC" list targets              # → 127.0.0.1:5557
+
+# ⑧ 确认真的起来了
+"$HDC" -t 127.0.0.1:5557 shell "param get const.product.os.dist.name"   # HarmonyOS
+"$HDC" -t 127.0.0.1:5557 shell "param get const.product.model"          # emulator
+"$HDC" -t 127.0.0.1:5557 shell "param get const.ohos.apiversion"        # 24
+```
+
+**截图 —— 后缀必须是 `.jpeg`**：
+
+```bash
+# 🔴 .png 会被直接拒绝：error: fileName ... invalid, suffix must be .jpeg
+"$HDC" -t 127.0.0.1:5557 shell "snapshot_display -f /data/local/tmp/x.jpeg"
+"$HDC" -t 127.0.0.1:5557 file recv /data/local/tmp/x.jpeg /tmp/harmony.jpeg
+# → success: snapshot display 0 ... width: 1256, height: 2760
+```
+
+⚠️ `snapshot_display` 的成功信息走 **stdout**，而"后缀不对"是 `[Fail]` 走在别处 ——
+**别把"命令没报错"当成"图存下来了"**，一定回去 `ls` 那个文件。
+
+### 4.2 出包与装机
+
+```bash
+# 出包（在 apps/mobile/harmony 下）
+export DEVECO_HOME=/Applications/DevEco-Studio.app/Contents
+export DEVECO_SDK_HOME="$DEVECO_HOME/sdk"     # 🔴 不设会报 00303217 Configuration Error
+export PATH="$DEVECO_HOME/tools/ohpm/bin:$DEVECO_HOME/tools/hvigor/bin:$DEVECO_HOME/tools/node/bin:$PATH"
+ohpm install
+hvigorw assembleHap --no-daemon
+# → entry/build/default/outputs/default/entry-default-unsigned.hap
+
+# 装到模拟器 —— 未签名也能装
+"$HDC" -t 127.0.0.1:5557 install -r <路径>/entry-default-unsigned.hap
+"$HDC" -t 127.0.0.1:5557 shell "bm dump -a | grep -i heyta"   # → com.heyta.mobile
+
+# 起来看
+"$HDC" -t 127.0.0.1:5557 shell "aa start -a EntryAbility -b com.heyta.mobile"
+```
+
+**签名**：`build-profile.json5` 里 `signingConfigs` 为空，hvigor 会打一行
+`WARN: Will skip sign 'hos_hap'`。**模拟器不吃签名这套，所以未签名 HAP 直接能装**；
+真机才需要签名（见 [`../reference/build-matrix.md`](../reference/build-matrix.md) §6）。
+
+### 4.3 RN 侧的出包验证（不在真机上）
+
+```bash
+pnpm verify:harmony-toolchain    # 工具链 → 最小 ArkTS 工程 HAP（验"机器能不能出包"）
 pnpm verify:harmony-rnoh         # RNOH 原生侧 → 37 MB debug HAP（真跑 BuildNativeWithNinja）
 pnpm verify:harmony-rnoh-js      # 真 codegen + autolinking + Hermes bundle → 20 MB release HAP
 ```
@@ -374,9 +482,8 @@ pnpm verify:harmony-rnoh-js      # 真 codegen + autolinking + Hermes bundle →
 ⚠️ 三条脚本都把工程建在 `/tmp/heyta-harmony-*` 下，**产物不在仓库里**；
 要复核状态就重跑它们，别去 `ls` 找 `.hap`。
 
-**仍然没通的是"跑起来"**，卡点不是代码：缺模拟器系统镜像（本机没有 `~/.Huawei`）、
-缺签名（产物是 `*-unsigned.hap`，`signingConfigs: []`）。所以
-**不要**把"能出 HAP"读成"RN 应用在鸿蒙上能跑"。
+🔴 **仍然没通的是"RN 应用在鸿蒙的设备上跑起来"。** 现在有了模拟器，这一步**不再是外部阻塞**，
+而是**待做工作**。在此之前，**不要**把"能出 HAP"读成"RN 应用在鸿蒙上能跑"。
 
 若最终这步失败，"跨平台"结论需要重估，可能改变 [ADR-0004](../adr/0004-ui-stack.md)。
 
