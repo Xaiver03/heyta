@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Windows 壳的**无头冒烟**：在任意能跑 .NET 的操作系统上验证跨语言那一层
+    （同步驱动 + Jint + TS facade 契约 + 真的落盘）。
+
+    它**不开窗**，所以不需要 Windows。这正是把 Core 拆出来的目的：
+    壳里最容易错的部分能进 CI，而不是只能等一台 Windows 机器。
+  -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <AssemblyName>Heyta.Windows.Smoke</AssemblyName>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../Heyta.Windows.Core/Heyta.Windows.Core.csproj" />
+  </ItemGroup>
+
+</Project>
