@@ -28,6 +28,7 @@ import type {
   HabitLog,
   Note,
   Project,
+  Reminder,
   Tag,
   Task,
 } from '@heyta/domain';
@@ -52,6 +53,14 @@ export interface MaterializedState {
   aiFeedback: Record<string, AiFeedback>;
   /** 用户对推断偏好的纠正。见 `PreferenceCorrection`。 */
   preferenceCorrections: Record<string, PreferenceCorrection>;
+  /**
+   * 任务提醒（B1-1）。
+   *
+   * ⚠️ 它与 `tasks[*].dueDate` **不是同一个东西**：`dueDate` 是截止瞬间
+   * （ADR-0015 的紧迫性轴），提醒是通知规则（可多条、可提前、可 snooze）。
+   * 理由逐条写在 `packages/domain/src/entities.ts` 的 `Reminder` 上。
+   */
+  reminders: Record<string, Reminder>;
 }
 
 export function emptyState(): MaterializedState {
@@ -65,6 +74,7 @@ export function emptyState(): MaterializedState {
     focusSessions: {},
     aiFeedback: {},
     preferenceCorrections: {},
+    reminders: {},
   };
 }
 
@@ -79,6 +89,7 @@ const BUCKET_BY_ENTITY = {
   FOCUS_SESSION: 'focusSessions',
   AI_FEEDBACK: 'aiFeedback',
   PREFERENCE_CORRECTION: 'preferenceCorrections',
+  REMINDER: 'reminders',
 } as const;
 
 type ModeledEntity = keyof typeof BUCKET_BY_ENTITY;
@@ -120,9 +131,16 @@ export const MODELED_ENTITY_TYPES: readonly string[] = Object.keys(BUCKET_BY_ENT
  *   1. **未知的未来实体**：老客户端不认识它，应当优雅跳过，别让同步卡死（合理）。
  *   2. **已知且合法的实体，只是还没实现**：跳过它 = **静默丢用户数据**。
  *
- * 实测过第 2 种：`NOTE` / `TASK_REPEAT_CFG` / `REMINDER` 都是合法实体
+ * 实测过第 2 种：`NOTE` / `TASK_REPEAT_CFG` 都是合法实体
  * （`isEntityType()` 返回 true），`dispatch` **不报错**，op **正常入队并同步到所有设备**，
  * 但**没有任何设备会物化它们**。用户建一条重复任务，它同步得到处都是，哪儿也不显示。
+ *
+ * ⚠️ **`REMINDER` 曾经也在这份清单里，2026-10-02 已从"未物化"移出** ——
+ * 它现在进了 `BUCKET_BY_ENTITY`（桶 `reminders`），有领域模型
+ * （`packages/domain/src/entities.ts` 的 `Reminder`）、领域规则
+ * （`packages/domain/src/reminders.ts`）与写路径
+ * （`packages/app-host/src/reminder-actions.ts`）。
+ * 移除登记就是这个清单文件头说的"那个实体的物化已经实现"。
  *
  * 静默是这里最糟的部分。所以这份清单 + `entity-coverage` 测试把"跳过"变成
  * **必须显式登记的决定**：往 `ENTITY_TYPES` 里加一个新实体却忘了实现，
@@ -138,10 +156,6 @@ export const UNMODELED_ENTITY_TYPES: readonly { entityType: string; reason: stri
       '重复规则放在 Task.repeatRule / Task.repeatDtstart 上（见 packages/domain/src/entities.ts），' +
       '因为一个用户意图必须是一个 op，而本引擎的 reducer 不处理跨实体类型的 op。' +
       '本条不是"还没做"，是"决定不用"。',
-  },
-  {
-    entityType: 'REMINDER',
-    reason: '提醒；需要通知调度与产品决策，尚未开始',
   },
   {
     entityType: 'GLOBAL_CONFIG',
@@ -210,7 +224,9 @@ export function applyOperation(
     return {
       ...state,
       [bucket]: {
-        ...state[bucket],
+        // 与上方第 198 行同款断言：`bucket` 的类型退化成 any，
+        // 不标注就报 TS7053（这是并行会话在途代码里唯一挡住整仓构建的两处）
+        ...(state[bucket] as Record<string, unknown>),
         [entityId]: {
           ...existing,
           deletedAt: op.timestamp,
@@ -273,7 +289,7 @@ export function applyOperation(
 
   return {
     ...state,
-    [bucket]: { ...state[bucket], [entityId]: merged },
+    [bucket]: { ...(state[bucket] as Record<string, unknown>), [entityId]: merged },
   } as MaterializedState;
 }
 
