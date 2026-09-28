@@ -46,6 +46,43 @@ import {
   type EgressDisclosure,
 } from './egress.js';
 
+/**
+ * 一个可供模型调用的工具（**中性描述**，与厂商无关）。
+ *
+ * 🔴 **本包不认识任何业务工具。** 调用方（`packages/app-host`）把
+ * `@heyta/local-api` 的工具目录映射成这个形状递进来；`packages/ai` 只负责
+ * 把它序列化成 OpenAI 兼容的 `tools` 数组。
+ *
+ * 为什么不让 `packages/ai` 直接 import `@heyta/local-api`：
+ * 那会把**出站**（我们发数据给模型）与**入站**（别的程序拉我们的数据）
+ * 两套信任模型并在一个包里 —— 正是 ADR-0011 §2 明令禁止的那件事。
+ * 所以边界是**数据**（描述符），不是**依赖**。
+ */
+export interface AiToolDescriptor {
+  /** 工具名。与工具目录里的名字**逐字相同** —— 调用方靠它对回目录。 */
+  name: string;
+  /** 给模型看的说明。 */
+  description: string;
+  /** 参数 schema（JSON Schema 子集）。原样进请求的 `parameters`。 */
+  parameters: Readonly<Record<string, unknown>>;
+}
+
+/**
+ * 模型返回的一次工具调用。
+ *
+ * ⚠️ `arguments` **保持模型给的原始字符串**，本包不 `JSON.parse`：
+ * 解析失败要由调用方**显式**处理（回问而不是猜），
+ * 而在本包里 try/catch 会把"模型给了坏 JSON"变成一句笼统的失败。
+ * 与 `AiSuggestion.text` 同一条纪律：**本包不解析业务格式**。
+ */
+export interface AiToolCall {
+  /** 模型给的调用 id。回灌工具结果时要用它配对。 */
+  id: string;
+  name: string;
+  /** `arguments` 的原文（通常是 JSON 字符串）。**未解析**。 */
+  arguments: string;
+}
+
 /** 一次调用的输入。 */
 export interface AiInvocation {
   feature: AiFeature;
@@ -55,6 +92,14 @@ export interface AiInvocation {
   user: string;
   /** 本次实际送出的字段名，用于披露。**不能省略**，它就是披露的依据。 */
   fields: readonly string[];
+  /**
+   * 这次调用允许模型调用的工具。省略 = 不带 `tools` 字段（与从前逐字相同）。
+   *
+   * 🔴 这些工具的**名字与说明会进入请求体**，所以它们**也是出境数据**：
+   * 调用方的 `fields` 里必须把 `tools` 这一项写进去（有测试钉住）。
+   * 一个工具名本身就可能泄露能力范围（对照 `mcp.ts` 里"未授权即不可见"的立场）。
+   */
+  tools?: readonly AiToolDescriptor[];
 }
 
 /**
@@ -67,6 +112,13 @@ export interface AiSuggestion {
   text: string;
   /** 本次调用的出境目的地，供 UI 标注"这条建议来自云端"。 */
   destination: EgressDestination;
+  /**
+   * 模型要求调用的工具（若有）。
+   *
+   * 🔴 有它**不等于**要执行：写工具一律只能变成"待确认提案"（ADR-0035）。
+   * 本包只负责把模型的原话递出来。
+   */
+  toolCalls?: readonly AiToolCall[];
 }
 
 /** 调用失败的原因。**分类是为了让 UI 能给出不同的处理**。 */
@@ -220,6 +272,21 @@ export function createProvider(config: AiProviderConfig, deps: ProviderDeps = {}
           { role: 'system', content: invocation.system },
           { role: 'user', content: invocation.user },
         ],
+        // 与 `invokeRouted()` 保持同一形状（见那里的注释）：
+        // 省略 `tools` 时请求体与从前逐字相同。
+        ...(invocation.tools === undefined || invocation.tools.length === 0
+          ? {}
+          : {
+              tools: invocation.tools.map((tool) => ({
+                type: 'function',
+                function: {
+                  name: tool.name,
+                  description: tool.description,
+                  parameters: tool.parameters,
+                },
+              })),
+              tool_choice: 'auto',
+            }),
       };
 
       // ── 3. 网络。超时用 AbortController，**不能只靠 fetch 的默认行为**。 ─
@@ -251,8 +318,10 @@ export function createProvider(config: AiProviderConfig, deps: ProviderDeps = {}
         }
 
         const json: unknown = await res.json();
+        const toolCalls = extractToolCalls(json);
         const text = extractContent(json);
-        if (text === undefined || text.trim() === '') {
+        // 有工具调用时 `content` 可以为空（模型"只调工具、不说话"）。
+        if (toolCalls === undefined && (text === undefined || text.trim() === '')) {
           return {
             ok: false,
             reason: 'empty-response',
@@ -260,7 +329,15 @@ export function createProvider(config: AiProviderConfig, deps: ProviderDeps = {}
           };
         }
 
-        return { ok: true, suggestion: { feature: invocation.feature, text, destination } };
+        return {
+          ok: true,
+          suggestion: {
+            feature: invocation.feature,
+            text: text ?? '',
+            destination,
+            ...(toolCalls === undefined ? {} : { toolCalls }),
+          },
+        };
       } catch (error) {
         const aborted = error instanceof Error && error.name === 'AbortError';
         return {
@@ -297,6 +374,50 @@ export function extractContent(json: unknown): string | undefined {
   if (typeof message !== 'object' || message === null) return undefined;
   const content = (message as { content?: unknown }).content;
   return typeof content === 'string' ? content : undefined;
+}
+
+/**
+ * 从 OpenAI 兼容响应里取工具调用。
+ *
+ * 与 `extractContent` 同一条纪律：**不信任响应形状**。
+ * 解析规则是"逐层收窄 + 坏项丢弃"：
+ * - 没有 `tool_calls` → 返回 `undefined`（**不是空数组** —— 这两者含义不同：
+ *   前者是"模型没要求调工具"，后者会诱导调用方以为"要求了但列表为空"）
+ * - 数组里某一项缺 `name` → **丢这一项**，不因此丢掉整份响应
+ * - `arguments` 不是字符串 → 按空串处理（调用方解析空串会失败并回问，不猜）
+ *
+ * ⚠️ `arguments` **不做 JSON.parse**：坏 JSON 要由调用方显式处理成"回问用户"，
+ * 而不是在这里变成一句笼统的失败（见 `AiToolCall` 的注释）。
+ */
+export function extractToolCalls(json: unknown): readonly AiToolCall[] | undefined {
+  if (typeof json !== 'object' || json === null) return undefined;
+  const choices = (json as { choices?: unknown }).choices;
+  if (!Array.isArray(choices) || choices.length === 0) return undefined;
+  const first: unknown = choices[0];
+  if (typeof first !== 'object' || first === null) return undefined;
+  const message = (first as { message?: unknown }).message;
+  if (typeof message !== 'object' || message === null) return undefined;
+  const raw = (message as { tool_calls?: unknown }).tool_calls;
+  if (!Array.isArray(raw)) return undefined;
+
+  const calls: AiToolCall[] = [];
+  raw.forEach((entry, index) => {
+    if (typeof entry !== 'object' || entry === null) return;
+    const fn = (entry as { function?: unknown }).function;
+    if (typeof fn !== 'object' || fn === null) return;
+    const name = (fn as { name?: unknown }).name;
+    if (typeof name !== 'string' || name === '') return;
+    const args = (fn as { arguments?: unknown }).arguments;
+    const id = (entry as { id?: unknown }).id;
+    calls.push({
+      // 模型没给 id 时**造一个稳定的**（`call_<index>`）：回灌结果要能配对。
+      id: typeof id === 'string' && id !== '' ? id : `call_${String(index)}`,
+      name,
+      arguments: typeof args === 'string' ? args : '',
+    });
+  });
+
+  return calls.length === 0 ? undefined : calls;
 }
 
 /**

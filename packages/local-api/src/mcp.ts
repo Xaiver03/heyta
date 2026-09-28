@@ -52,7 +52,7 @@ export const MCP_SERVER_NAME = 'heyta';
  * 因为 `@heyta/local-api` 是零依赖包，不引 schema 生成库；
  * 而且工具只有 6 个，手写比引入一套生成器更清楚。
  */
-export interface McpToolDefinition {
+export interface AuthorizedToolDefinition {
   name: string;
   description: string;
   inputSchema: {
@@ -62,6 +62,16 @@ export interface McpToolDefinition {
     additionalProperties: false;
   };
 }
+
+/**
+ * MCP 形状的工具定义。
+ *
+ * 🔴 **它就是 `AuthorizedToolDefinition`，不是第二份。**
+ * 内置 AI 的工具路径（`@heyta/app-host` 的 `ai-tool-call.ts`）用的是同一个函数
+ * （`listAuthorizedTools`）—— 于是"未授权即不可见"这条立场、
+ * 以及给模型看的描述，两个调用方**逐字相同**（不变量 19）。
+ */
+export type McpToolDefinition = AuthorizedToolDefinition;
 
 /** 每个工具的参数 schema。 */
 const INPUT_SCHEMAS: Readonly<Record<string, McpToolDefinition['inputSchema']>> = {
@@ -134,7 +144,30 @@ const INPUT_SCHEMAS: Readonly<Record<string, McpToolDefinition['inputSchema']>> 
  * "猜到用户想干什么"之间的界限很容易糊掉。
  */
 export function listMcpTools(config: LocalApiConfig): readonly McpToolDefinition[] {
-  const granted = LOCAL_API_TOOLS.filter((tool) => config.grants?.[tool.name] === true);
+  return listAuthorizedTools(config.grants);
+}
+
+/**
+ * 已授权工具的**中性定义**——MCP 与内置 AI **共用同一份投影**。
+ *
+ * 🔴 抽出来不是为了少写几行，而是为了让两个调用方**不可能漂移**：
+ *
+ * | 调用方 | 用途 |
+ * |---|---|
+ * | `listMcpTools()`（MCP 握手） | 告诉外部客户端"有哪些工具" |
+ * | `@heyta/app-host` 的 `ai-tool-call.ts` | 把工具喂给模型（`tools` 数组） |
+ *
+ * 两边都必须守**同一条立场**："未授权即不可见"（不是"看得见但调不动"），
+ * 且必须给模型**同一份描述**。如果各写一份，就会出现
+ * "模型看到的工具集与 MCP 客户端看到的不一样"这种静默分裂。
+ *
+ * ⚠️ 它**不看** `enabled` / `token`：列表是"这个用户授权过哪些工具"，
+ * 与"服务有没有在监听"无关（后者由 `authorizeToolCall` 在调用时管）。
+ */
+export function listAuthorizedTools(
+  grants: LocalApiConfig['grants'],
+): readonly AuthorizedToolDefinition[] {
+  const granted = LOCAL_API_TOOLS.filter((tool) => grants?.[tool.name] === true);
 
   return granted.map((tool) => {
     const schema = INPUT_SCHEMAS[tool.name];

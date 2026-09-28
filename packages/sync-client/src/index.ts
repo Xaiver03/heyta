@@ -15,4 +15,5 @@
  * 平台差异通过 {@link SyncClientOptions} 注入（fetch、存储、令牌、口令）。
  */
 export * from './client.js';
+export * from './realtime.js';
 export * from './server-url.js';

@@ -64,6 +64,7 @@ export {
   EGRESS_ORDER_NOTE,
   createProvider,
   extractContent,
+  extractToolCalls,
   previewDisclosure,
   type AiFailure,
   type AiFailureReason,
@@ -72,6 +73,8 @@ export {
   type AiProviderConfig,
   type AiResult,
   type AiSuggestion,
+  type AiToolCall,
+  type AiToolDescriptor,
   type ProviderDeps,
 } from './provider.js';
 

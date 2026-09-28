@@ -33,6 +33,7 @@
 import {
   LOCAL_API_TOOLS,
   authorizeToolCall,
+  findTool,
   projectAllForTool,
   readItemForTool,
   type LocalApiConfig,
@@ -245,20 +246,45 @@ function toolDenial(reason: string): JsonRpcError {
 }
 
 /**
- * 执行一个已授权的工具。
+ * 把参数收成一个普通对象。
  *
- * 🔴 三条不容商量的规则在这里落地：
+ * 非对象（`null` / 字符串 / 数组）一律当作"没有参数"，
+ * 于是缺必填字段会在下面各自的分支里被拒 —— **不猜**。
+ */
+function asRecord(args: unknown): Record<string, unknown> {
+  return typeof args === 'object' && args !== null && !Array.isArray(args)
+    ? (args as Record<string, unknown>)
+    : {};
+}
+
+/**
+ * 只读工具的执行结果（**已投影**，还没包成协议形状）。
+ *
+ * 🔴 与 `executeTool` 分开，是为了让**第二个调用方**（heyta 自己的 AI）复用
+ * 同一份语义。AI 那条路径在进程内、不走 JSON-RPC，但它必须和 MCP 侧
+ * 得到**逐字相同**的受保护条目处理 —— 否则同一份保护在两个入口有两种行为。
+ */
+export type ToolReadOutcome =
+  | { ok: true; payload: unknown }
+  | { ok: false; kind: 'invalid-args' | 'not-readable' | 'not-a-read-tool'; message: string };
+
+/**
+ * 执行一个**只读**工具。
+ *
+ * 🔴 两条不容商量的规则在这里落地：
  *
  * 1. **读列表时逐条投影** —— 受保护的条目只出元数据（`projectAllForTool`）
  * 2. **读单条时明确拒绝** —— 不是返回空（`readItemForTool`）
- * 3. **写只走 `host.submit`** —— 本函数里没有任何别的地方能改数据
+ *
+ * ⚠️ `get_task` 找不到时**不是错误**，而是一个带 `error` 字段的正常结果 ——
+ * 这是既有行为，测试钉着它。别顺手改成 `ok: false`。
  */
-async function executeTool(
+export async function runReadTool(
   host: LocalApiHost,
   name: string,
   args: unknown,
-): Promise<{ result: unknown } | { error: JsonRpcError }> {
-  const a = (typeof args === 'object' && args !== null ? args : {}) as Record<string, unknown>;
+): Promise<ToolReadOutcome> {
+  const a = asRecord(args);
 
   switch (name) {
     case 'list_tasks': {
@@ -268,70 +294,133 @@ async function executeTool(
         ...(typeof a['limit'] === 'number' ? { limit: a['limit'] } : {}),
       });
       // 🔴 投影：受保护条目只留元数据
-      return { result: toolText(projectAllForTool(items)) };
+      return { ok: true, payload: projectAllForTool(items) };
     }
 
     case 'get_task': {
       if (typeof a['taskId'] !== 'string') {
-        return { error: { code: JSON_RPC_ERRORS.invalidParams, message: 'get_task 需要 taskId。' } };
+        return { ok: false, kind: 'invalid-args', message: 'get_task 需要 taskId。' };
       }
       const item = await host.getTask(a['taskId']);
       if (item === undefined) {
-        return { result: toolText({ error: '没有找到这个任务。' }) };
+        return { ok: true, payload: { error: '没有找到这个任务。' } };
       }
       const read = readItemForTool(item);
       // 🔴 受保护 → **错误**，不是空结果。调用方必须知道"读失败"而不是"没内容"。
       if (!read.ok) {
-        return { error: { code: JSON_RPC_ERRORS.invalidRequest, message: read.message } };
+        return { ok: false, kind: 'not-readable', message: read.message };
       }
-      return { result: toolText(read.item) };
+      return { ok: true, payload: read.item };
     }
 
     case 'list_projects': {
-      const projects = await host.listProjects();
-      return { result: toolText(projects) };
+      return { ok: true, payload: await host.listProjects() };
     }
 
+    default:
+      return { ok: false, kind: 'not-a-read-tool', message: `「${name}」不是只读工具。` };
+  }
+}
+
+/**
+ * 工具参数 → 写入意图。**纯函数，不碰 host，因此不可能改数据。**
+ *
+ * 🔴 抽出来是这次改动的核心：写工具现在有两个下场，而两者必须用**同一份**
+ * 参数解释（不变量 19）：
+ *
+ * | 调用方 | 拿到 intent 之后 |
+ * |---|---|
+ * | MCP / 本机 API | 立刻 `host.submit(intent)` |
+ * | **heyta 自己的 AI** | **不 submit** —— 包成"提案"交给用户确认；确认后才 `submit` |
+ *
+ * 如果这条映射被抄成两份，"同一个 `create_task` 调用在两条路径上建出不同字段
+ * 的任务"就会发生，而且**不会报错** —— 正是本仓库反复栽过的那类漂移。
+ */
+export type ToolWriteIntentOutcome =
+  | { ok: true; intent: LocalApiWriteIntent }
+  | { ok: false; message: string };
+
+export function toWriteIntent(name: string, args: unknown): ToolWriteIntentOutcome {
+  const a = asRecord(args);
+
+  switch (name) {
     case 'create_task': {
       if (typeof a['title'] !== 'string' || a['title'].trim() === '') {
-        return { error: { code: JSON_RPC_ERRORS.invalidParams, message: 'create_task 需要 title。' } };
+        return { ok: false, message: 'create_task 需要 title。' };
       }
-      return writeResult(
-        await host.submit({
+      return {
+        ok: true,
+        intent: {
           action: 'create-task',
           title: a['title'],
           ...(typeof a['dueDate'] === 'string' ? { dueDate: a['dueDate'] } : {}),
           ...(typeof a['priority'] === 'string' ? { priority: a['priority'] } : {}),
           ...(typeof a['projectId'] === 'string' ? { projectId: a['projectId'] } : {}),
-        }),
-      );
+        },
+      };
     }
 
     case 'update_task': {
       if (typeof a['taskId'] !== 'string' || typeof a['fields'] !== 'object' || a['fields'] === null) {
-        return {
-          error: { code: JSON_RPC_ERRORS.invalidParams, message: 'update_task 需要 taskId 与 fields。' },
-        };
+        return { ok: false, message: 'update_task 需要 taskId 与 fields。' };
       }
-      return writeResult(
-        await host.submit({
+      return {
+        ok: true,
+        intent: {
           action: 'update-task',
           taskId: a['taskId'],
           fields: a['fields'] as Record<string, unknown>,
-        }),
-      );
+        },
+      };
     }
 
     case 'complete_task': {
       if (typeof a['taskId'] !== 'string') {
-        return { error: { code: JSON_RPC_ERRORS.invalidParams, message: 'complete_task 需要 taskId。' } };
+        return { ok: false, message: 'complete_task 需要 taskId。' };
       }
-      return writeResult(await host.submit({ action: 'complete-task', taskId: a['taskId'] }));
+      return { ok: true, intent: { action: 'complete-task', taskId: a['taskId'] } };
     }
 
     default:
-      return { error: METHOD_NOT_FOUND };
+      return { ok: false, message: `「${name}」不是会改数据的工具。` };
   }
+}
+
+/**
+ * 执行一个已授权的工具（MCP / 本机 API 路径）。
+ *
+ * 🔴 三条不容商量的规则在这里落地：
+ *
+ * 1. **读列表时逐条投影** —— 见 `runReadTool`
+ * 2. **读单条时明确拒绝** —— 见 `runReadTool`
+ * 3. **写只走 `host.submit`** —— 本函数是**唯一**调 `submit` 的地方
+ *
+ * 本函数只是把上面两个导出件拼起来；**语义都在它们里面**，
+ * 所以第二个调用方（AI）用同样的两个件，行为必然一致。
+ */
+async function executeTool(
+  host: LocalApiHost,
+  name: string,
+  args: unknown,
+): Promise<{ result: unknown } | { error: JsonRpcError }> {
+  const tool = findTool(name);
+  if (tool === undefined) return { error: METHOD_NOT_FOUND };
+
+  if (tool.kind === 'read') {
+    const read = await runReadTool(host, name, args);
+    if (!read.ok) {
+      const code =
+        read.kind === 'invalid-args' ? JSON_RPC_ERRORS.invalidParams : JSON_RPC_ERRORS.invalidRequest;
+      return { error: { code, message: read.message } };
+    }
+    return { result: toolText(read.payload) };
+  }
+
+  const write = toWriteIntent(name, args);
+  if (!write.ok) {
+    return { error: { code: JSON_RPC_ERRORS.invalidParams, message: write.message } };
+  }
+  return writeResult(await host.submit(write.intent));
 }
 
 /** 把结果包成 MCP 的 `content` 形状。 */

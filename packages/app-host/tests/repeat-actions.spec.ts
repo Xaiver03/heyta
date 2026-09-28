@@ -21,7 +21,7 @@
  * 用真实时钟的话它们只能在某个特定日子通过 —— 那还不如不写。
  */
 
-import { Recurrence, parseLocalDate, toLocalDate } from '@heyta/domain';
+import { Recurrence, parseLocalDate, toLocalDate, type Reminder } from '@heyta/domain';
 import { OpLogEngine } from '@heyta/op-log';
 import { DbOpLogStore, INDEXEDDB_SCHEMA, SqliteAdapter } from '@heyta/storage';
 import { NodeSqliteDriver } from '@heyta/storage/sqlite/node';
@@ -29,6 +29,7 @@ import { OpType, type Operation } from '@heyta/sync-core';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { createTaskActions, type TaskActions } from '../src/actions.js';
+import { createReminderActions } from '../src/reminder-actions.js';
 
 /** 2026-09-14 是周一（本仓库已多处锚定 2026-09-26 是周六）。 */
 const MONDAY = '2026-09-14';
@@ -283,5 +284,136 @@ describe('🔴 完成一个重复任务：推进到期日，而不是标记完�
     expect(actions.findTask(plain)!.completedAt).toBe(clock);
     await actions.toggleCompleted(plain);
     expect(actions.findTask(plain)!.completedAt).toBeUndefined();
+  });
+});
+
+/**
+ * 🔴 这一组补的是一个**实测出来的"最后一米"**。
+ *
+ * 领域层的 `nextTriggerAfterRepeat` 写了、`reminder-actions.ts` 的
+ * `rescheduleForRepeat` 也写了、`reminder-actions.spec.ts` 里还有 3 条单测 ——
+ * 而 `grep rescheduleForRepeat` 在**生产代码里零命中**：
+ * 完成一个重复任务时，它的提醒**不会**跟着新的截止走。
+ *
+ * 这个形状的特点是：**每一块单独看都是绿的**。
+ * 动作层测试证明"到期日推进了"，提醒层测试证明"顺延函数算得对"，
+ * 而两者之间**没有一条调用边** —— 只有把两件事放进**同一个**场景里才看得见。
+ * （`docs/research/dida365-feature-benchmark.md` §3 的"基础设施做完了、最后一米没接"。）
+ */
+describe('🔴 完成重复任务时，它的提醒跟着新的截止走', () => {
+  /**
+   * 把"现在"从周一**正午**挪到周一**上午 10 点**。
+   *
+   * 🔴 这不是为了让测试"过得去"，是因为 `createReminderBeforeDue` 对**过去**的
+   * 时刻**明确抛错**（领域层的宽限只有 1 分钟，见 `reminderRejection`）。
+   * 外层台架把 `clock` 定在 `noonOf(MONDAY)`，那么"截止前 30 分钟"算出的是
+   * 11:30 —— 一个**已经过去**的时刻，第一步建提醒就会抛。
+   * ⇒ 要测"顺延之后提醒去哪了"，前提是这条提醒**先建得出来**。
+   */
+  beforeEach(() => {
+    clock = noonOf(MONDAY) - 2 * 60 * 60 * 1000;
+  });
+
+  /** 与 `reminder-actions.ts` 里 `reminderId` 同形：`${taskId}:${triggerAt}`。 */
+  const reminderIdOf = (taskId: string, triggerAt: number): string =>
+    `${taskId}:${String(triggerAt)}`;
+
+  /**
+   * 顺延之后的到期时刻。
+   *
+   * 🔴 **它是下一个周一的零点，不是"原来那个时刻顺延一周"。**
+   * `nextOccurrence` 返回的是 `LocalDate`（`'2026-09-21'`），
+   * 而 `completeTask` 写的是 `parseLocalDate(next).getTime()` —— 于是**时刻被归零**。
+   * 既有测试刻意只断言 `toLocalDate(dueDate) === NEXT_MONDAY`（日期级），
+   * 所以这一点以前**没有任何判据**。
+   *
+   * ⚠️ 本轮**不修**它：那是"重复任务的时刻该不该保留"的**产品决定**，
+   * 不是提醒接线该顺手改的。本条判据只负责"提醒跟着新的截止走"——
+   * 到期日落在哪一刻，提醒就跟到那一刻，这是对的。
+   * 该残差已登记到 `docs/plans/site-and-parity-alignment.md` 的欠账。
+   */
+  const advancedDueMs = parseLocalDate(NEXT_MONDAY).getTime();
+
+  function remindersOf(taskId: string): Reminder[] {
+    return Object.values(engine.getState().reminders).filter((r) => r.taskId === taskId);
+  }
+
+  it('带 `offsetMs` 的提醒重置到「新截止 − 提前量」', async () => {
+    const reminders = createReminderActions(engine, { now });
+    const taskId = await actions.create('每周一的会', { dueDate: noonOf(MONDAY) });
+    await actions.setRepeat(taskId, EVERY_MONDAY);
+
+    const THIRTY_MIN = 30 * 60 * 1000;
+    await reminders.createReminderBeforeDue(taskId, THIRTY_MIN);
+    const first = remindersOf(taskId);
+    expect(first).toHaveLength(1);
+    expect(first[0]?.triggerAt).toBe(noonOf(MONDAY) - THIRTY_MIN);
+
+    await actions.setCompleted(taskId, true);
+
+    // 任务顺延到下一个周一（**零点**，见 `advancedDueMs`）。
+    expect(actions.findTask(taskId)!.dueDate).toBe(advancedDueMs);
+
+    const after = remindersOf(taskId);
+    expect(after).toHaveLength(1);
+    // 🔴 提醒也跟着走 —— 这正是本轮补上的那条调用边。
+    expect(after[0]?.triggerAt).toBe(advancedDueMs - THIRTY_MIN);
+  });
+
+  it('**绝对时刻**的提醒不动（"9 点提醒我"里的 9 点是绝对时间）', async () => {
+    const reminders = createReminderActions(engine, { now });
+    const taskId = await actions.create('每周一的会', { dueDate: noonOf(MONDAY) });
+    await actions.setRepeat(taskId, EVERY_MONDAY);
+
+    const absolute = noonOf(NEXT_MONDAY) + 3 * 60 * 60 * 1000;
+    await reminders.createReminder(taskId, absolute);
+
+    await actions.setCompleted(taskId, true);
+
+    expect(remindersOf(taskId)[0]?.triggerAt).toBe(absolute);
+  });
+
+  it('顺带清掉上一个周期的投递/关闭/推迟状态（新周期它们没有意义）', async () => {
+    const reminders = createReminderActions(engine, { now });
+    const taskId = await actions.create('每周一的会', { dueDate: noonOf(MONDAY) });
+    await actions.setRepeat(taskId, EVERY_MONDAY);
+    const THIRTY_MIN = 30 * 60 * 1000;
+    const id = await reminders.createReminderBeforeDue(taskId, THIRTY_MIN);
+
+    // 先让它"已投递"，再顺延 —— 不清的话下个周期到点不会弹（fired 优先于到点）。
+    expect(await reminders.markReminderFired(id)).toBe(true);
+    expect(engine.getState().reminders[id]?.firedAt).toBeDefined();
+
+    await actions.setCompleted(taskId, true);
+
+    expect(engine.getState().reminders[id]?.firedAt).toBeUndefined();
+    expect(engine.getState().reminders[id]?.triggerAt).toBe(advancedDueMs - THIRTY_MIN);
+  });
+
+  it('**没有规则的普通任务**完成时不会碰提醒（回归保护）', async () => {
+    const reminders = createReminderActions(engine, { now });
+    const taskId = await actions.create('普通任务', { dueDate: noonOf(MONDAY) });
+    const id = await reminders.createReminder(taskId, noonOf(MONDAY) + 60 * 60 * 1000);
+    const before = engine.getState().reminders[id]?.triggerAt;
+
+    await actions.setCompleted(taskId, true);
+
+    expect(engine.getState().reminders[id]?.triggerAt).toBe(before);
+  });
+
+  it('墓碑提醒不会被顺延（不白写 op）', async () => {
+    const reminders = createReminderActions(engine, { now });
+    const taskId = await actions.create('每周一的会', { dueDate: noonOf(MONDAY) });
+    await actions.setRepeat(taskId, EVERY_MONDAY);
+    const THIRTY_MIN = 30 * 60 * 1000;
+    const id = await reminders.createReminderBeforeDue(taskId, THIRTY_MIN);
+    await reminders.removeReminder(id);
+
+    const opsBefore = (await engine.getOpsForEntity('REMINDER', id)).length;
+    await actions.setCompleted(taskId, true);
+
+    expect((await engine.getOpsForEntity('REMINDER', id)).length).toBe(opsBefore);
+    // 顺带确认 `reminderId` 的形状没变（它是这个用例定位实体的前提）。
+    expect(id).toBe(reminderIdOf(taskId, noonOf(MONDAY) - THIRTY_MIN));
   });
 });

@@ -421,8 +421,7 @@ export function authorizeToolCall(
     };
   }
 
-  // 🔴 未列出 = 关闭。不是"默认开启"。
-  if (config.grants?.[toolName] !== true) {
+  if (!isToolGranted(config.grants, toolName)) {
     return {
       allowed: false,
       reason: 'tool-not-granted',
@@ -431,6 +430,28 @@ export function authorizeToolCall(
   }
 
   return { allowed: true, tool };
+}
+
+/**
+ * 工具是否被用户授权。**未列出 = 关闭。**
+ *
+ * 🔴 抽出来是因为**判据只能有一份**（不变量 19）。
+ * 现在有**两个调用方**要用这条判断：
+ *
+ * | 调用方 | 为什么不能直接复用 `authorizeToolCall` |
+ * |---|---|
+ * | MCP / 本机 API | 它还要验会话：总开关、token、工具是否存在 |
+ * | **heyta 自己的 AI**（`@heyta/app-host` 的 AI 工具路径） | 那是**进程内**调用：没有 listener、没有 token —— 那两道闸在这里不成立，硬套就得伪造一个 token |
+ *
+ * 所以把「授权」这一条单独拿出来给两边共用；`authorizeToolCall` 仍然是
+ * 它加会话闸的组合。这样"同一个工具在两个入口被两套规则判定"这件事**不会发生**。
+ *
+ * ⚠️ **它不检查工具是否存在** —— 不存在的工具在 `grants` 里也不会是 `true`，
+ * 所以返回 `false` 是安全的（fail-closed）。调用方若要区分"不存在"与"未授权"，
+ * 得自己先 `findTool()`：MCP 侧刻意这么做，为的是**不泄露工具目录**。
+ */
+export function isToolGranted(grants: LocalApiConfig['grants'], toolName: string): boolean {
+  return grants?.[toolName] === true;
 }
 
 /**
