@@ -370,11 +370,13 @@ asc profiles create --name "heyta App Store" --profile-type IOS_APP_STORE \
 asc profiles download --id 4Z8AV534TG --output /tmp/p.mobileprovision
 asc profiles local install --path /tmp/p.mobileprovision
 
-# 出包
-xcodebuild -workspace HeytaMobile.xcworkspace -scheme HeytaMobile -configuration Release \
-  -destination 'generic/platform=iOS' -archivePath /tmp/heyta.xcarchive archive \
-  DEVELOPMENT_TEAM=V5S2LT9YV8
+# 出包（**一个命令，带 preflight**）
+bash apps/mobile/ios/scripts/archive-release.sh /tmp/heyta.xcarchive
 ```
+
+`archive-release.sh` 会把五个前提（团队 / 证书 / 两个 profile / 两个 App ID / **App Group**）
+前置成一次 preflight，缺哪条就直接说缺哪条、去哪儿补；出包后再从**已签名的 .app** 里
+读回签名证书指纹（备案要的权威值）。
 
 #### 🔴 现在卡在哪：App Group 建不了
 
