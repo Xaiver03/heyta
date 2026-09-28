@@ -216,9 +216,15 @@ pnpm check:crosslang-contract      # = node scripts/check-crosslang-contract.mjs
    ⚠️ **但仍有一条没有覆盖**：契约在真 vitest 里是**每个实现各跑一遍**，
    而这里只跑了 `SqliteAdapter` 一个实现 —— 这正是重点（要验的就是 C# 驱动），
    但**不能**因此说"契约在所有实现上都过了"。
-3. **没有测 blob（`Uint8Array`）。** JSON 桥**根本表达不了二进制** ——
-   当前这条桥遇到 blob 会坏。契约的 `SqlValue` 是含 `Uint8Array` 的，
-   所以这是**已知的、必须在 W1 前解决**的缺口。
+3. **没有测 blob（`Uint8Array`）** —— JSON 桥表达不了二进制，遇到 blob 会坏。
+   ⚠️ **但 2026-09-28 复核后修正：这不是 W1 的前置，先前写重了。**
+   全仓库 `grep -rn Uint8Array packages/*/src apps/*/src` 共 85 处，
+   与存储相关的**只有 `sqlite-driver.ts` 那一行类型声明** ——
+   **没有任何一处把二进制写进库**：加密层（`sync-core/encryption`）在出门前就把字节
+   转成 base64（`encodeBase64`；`snapshot-sealer.ts` 返回
+   `{ nonce: base64, ciphertext: base64 }`），op 的 `payload` 是 JSON。
+   ⇒ **已声明的能力缺口，不是在用路径上的缺口。**
+   它变成真需求的那一天 = 有人把字节直接当列值存的那一天。
 4. **没有测 `isUniqueViolation` 被显式实现的情况**（本 spike 走的是文案回退）。
 5. **没有测 WAL 之外的并发形状**：单连接、单线程。
    契约里"所有方法可安全并发调用"那条由适配器的 FIFO 队列保证，**未在跨语言下验证**。

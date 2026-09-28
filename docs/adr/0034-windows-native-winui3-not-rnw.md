@@ -314,8 +314,17 @@ C# 侧还开了一个**新连接**独立复核盘上的库（`__heyta_seq` / `ar
 
 ⚠️ **仍未结清**（进 W1）：
 
-1. 🔴 **blob（`Uint8Array`）过不了 JSON 桥** —— 契约的 `SqlValue` 含二进制，
-   当前的 JSON 编组**根本表达不了**。这是 W1 的硬前置。
+1. **blob（`Uint8Array`）过不了 JSON 桥** —— 契约的 `SqlValue` 含二进制，
+   当前的 JSON 编组表达不了。
+   ⚠️ **但 2026-09-28 复核后修正：这条不是 W1 的前置，我先前把它写重了。**
+   全仓库实测（`grep -rn Uint8Array packages/*/src apps/*/src`，85 处），
+   与存储相关的**只有 `sqlite-driver.ts` 的那一行类型声明** ——
+   **没有任何一处把二进制写进库**。加密层（`sync-core/encryption`）在离开自身之前
+   就把字节转成了 base64（`encodeBase64`；`snapshot-sealer.ts` 返回
+   `{ nonce: base64, ciphertext: base64 }`），op 的 `payload` 是 JSON。
+   ⇒ 这是**已声明的能力缺口**，不是**在用路径上的缺口**。
+   它变成真需求的那一天 = 有人把字节直接当列值存的那一天。
+   **到那时再补，不必现在挡 W1。**
 2. **跨语言编组开销未测**：每次驱动调用都过一趟 `JSON.stringify` / `JSON.parse`。
    `微任务泵次数：0` 说明它不会被事件循环拖慢，但**单次调用的开销**没测 ——
    存储层在同步热路径上是高频调用的。**这一条可能否掉当前这种 JSON 桥。**
