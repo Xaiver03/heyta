@@ -71,7 +71,7 @@ test.describe('任务整理：清单归属 + 标签', () => {
     await expect(row.getByTestId('task-chip-project')).toHaveCount(0);
     await expect(row.getByTestId('task-chip-tag')).toHaveCount(0);
 
-    await row.locator('summary').click();
+    await row.getByTestId('task-organize-summary').click();
 
     await row.getByLabel(`任务「${TITLE}」所属清单`).selectOption({ label: LIST });
     await expect(row.getByTestId('task-chip-project')).toHaveText(LIST);
@@ -115,7 +115,7 @@ test.describe('任务整理：清单归属 + 标签', () => {
     ).toHaveText(TAG);
 
     // 展开面板里控件的**状态**也要跟着回来（不只是那几个 chip 好看）。
-    await afterReload.locator('summary').click();
+    await afterReload.getByTestId('task-organize-summary').click();
     // 直接断言**被选中的那个 option 的文字** —— 比拿 value（清单 id）去比对
     // 更贴近"用户看到的是对的"，也少一次 await。
     await expect(
@@ -139,7 +139,7 @@ test.describe('任务整理：清单归属 + 标签', () => {
     await expect(sidebar.getByText(TAG, { exact: true })).toBeVisible();
 
     const row = rowFor(page, title);
-    await row.locator('summary').click();
+    await row.getByTestId('task-organize-summary').click();
     const checkbox = row.getByRole('checkbox', {
       name: `给任务「${title}」加上或去掉标签「${TAG}」`,
     });
@@ -170,7 +170,7 @@ test.describe('任务整理：清单归属 + 标签', () => {
     // 写 `[]` 的话 chip 也会消失，但下一次**加**标签的合并结果会不一样
     // （`[]` 是个真值，会在 reducer 的字段合并里继续占位）。
     const row2 = rowFor(page, title);
-    await row2.locator('summary').click();
+    await row2.getByTestId('task-organize-summary').click();
     await row2
       .getByRole('checkbox', {
         name: `给任务「${title}」加上或去掉标签「${TAG}」`,
@@ -182,7 +182,7 @@ test.describe('任务整理：清单归属 + 标签', () => {
     await expect(page.locator('input[placeholder^="添加任务"]')).toBeVisible();
     const afterReload = rowFor(page, title);
     await expect(afterReload.getByTestId('task-chip-tag')).toHaveCount(0);
-    await afterReload.locator('summary').click();
+    await afterReload.getByTestId('task-organize-summary').click();
     await expect(
       afterReload.getByRole('checkbox', {
         name: `给任务「${title}」加上或去掉标签「${TAG}」`,

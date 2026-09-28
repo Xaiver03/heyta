@@ -122,7 +122,17 @@ export function TaskOrganizer({
           🔴 无障碍名必须带上**是哪一条任务**：读屏用户在一长串列表里听到
           二十个「整理」而无从分辨要给哪个任务归类。
         */}
-        <summary aria-label={t('web.organize.summary', { title: task.title })}>
+        <summary
+          aria-label={t('web.organize.summary', { title: task.title })}
+          /*
+            🔴 `data-testid` 不是可有可无的：任务行上**不止一个** `<details>` ——
+            后来「备注」也加了一个。此前 e2e 用 `row.locator('summary')` 这种
+            **结构选择器**，第二个 disclosure 一出现就变成 strict-mode violation，
+            而失败信息指向的是断言，不是"你加了个并列元素"。
+            给它一个稳定的钩子，测试就不再依赖"这一行里有几个 summary"。
+          */
+          data-testid="task-organize-summary"
+        >
           <SlidersHorizontal size={TRIGGER_ICON_SIZE} aria-hidden="true" />
         </summary>
 
