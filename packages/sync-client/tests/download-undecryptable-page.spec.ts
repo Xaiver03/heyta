@@ -225,6 +225,29 @@ afterEach(() => {
   for (const dir of tempDirs.splice(0)) rmSync(dir, { recursive: true, force: true });
 });
 
+/**
+ * 🔴 这两条必须给**显式超时**，默认的 5 秒在这条测试上是个掷硬币。
+ *
+ * 实测同一份代码、同一批断言：
+ *
+ * | 机器 | 单条耗时 |
+ * |---|---|
+ * | 本机（Apple Silicon） | **1.34 s** |
+ * | CI runner | **5.12 s → 超时** |
+ *
+ * 也就是这条 CPU 密集路径（真 AES-GCM × 12 条 + 真 SQLite 落库）
+ * **在 CI 上慢约 3.5 倍**，而设备的对照用例在 CI 上跑出 4427 ms ——
+ * 两条都贴着 5000 ms 这条线。这不是"偶尔慢"，是**本来就不该用默认值**。
+ *
+ * ⚠️ 为什么这种红比"直接失败"更坏：它会让人开始**忽略红**。
+ * 一个偶尔因超时变红的门禁，很快就会被当成"重跑一下就好"，
+ * 而那正是它再也挡不住真问题的开始。
+ *
+ * 60 秒 = 实测最坏值的 ~12 倍，余量足够吸收 CI 的抖动，
+ * 又仍能在真正卡死时明确失败。
+ */
+const CRYPTO_TEST_TIMEOUT_MS = 60_000;
+
 describe('复现：服务端整页 op 都解不开（口令不匹配）', () => {
   it('🔴 12 条全解不开 → 服务端日志同形 + 游标不动 + 零落库 + 有分类的失败原因', async () => {
     const dir = tempDir();
@@ -270,7 +293,7 @@ describe('复现：服务端整页 op 都解不开（口令不匹配）', () => 
     );
     expect(await readCursor(adapter)).toBe(3);
     expect(await adapter.count(STORES.OPS)).toBe(0);
-  });
+  }, CRYPTO_TEST_TIMEOUT_MS);
 
   it('对照：同一页换**正确口令** → 12 条全部落库、游标推进到 15', async () => {
     const dir = tempDir();
@@ -291,5 +314,5 @@ describe('复现：服务端整页 op 都解不开（口令不匹配）', () => 
     expect(await readCursor(adapter)).toBe(15);
     expect(await adapter.count(STORES.OPS)).toBe(12);
     expect(Object.keys(engine.getState().habits)).toHaveLength(12);
-  });
+  }, CRYPTO_TEST_TIMEOUT_MS);
 });
