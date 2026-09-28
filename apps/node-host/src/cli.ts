@@ -276,6 +276,11 @@ async function main(): Promise<number> {
                 // 没有它，"手机给任务打的标签另一台设备读到了吗"就只能看
                 // 界面上有没有那个名字 —— 而"看起来有"是本仓库反复栽过的证据。
                 tagIds: task.tagIds ?? null,
+                // 备注也要能断言。在此之前它**不在**这里，而移动端那时也没有写备注的
+                // 入口 —— 于是"用户自己写的备注有没有跨设备到达"这件事根本没有判据。
+                // 现在两端都能写备注了（Web 的任务行 + 移动端详情面板），
+                // 而没有这一项就只能靠界面上"看起来有字"来猜。
+                note: task.note ?? null,
                 createdAt: task.createdAt,
                 updatedAt: task.updatedAt,
               })),

@@ -21,7 +21,7 @@ test.describe('冒烟：验收链路本身', () => {
     // 后者在白屏时也会通过。`openApp` 内部已经断言了输入框可见，
     // 这里再断言一次外壳标题，证明**应用骨架**也起来了（不只是那个输入框）。
     await expect(page.locator('input[placeholder^="添加任务"]')).toBeVisible();
-    await expect(page.getByRole('tab')).toHaveCount(8);
+    await expect(page.getByRole('tab')).toHaveCount(9);
   });
 
   test('假端点活着，且计数接口可用', async ({ request }) => {
