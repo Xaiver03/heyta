@@ -12,6 +12,7 @@
 //   · 自己写 SqliteDriver 适配而不是找个现成库 —— 因为契约里那几个可选钩子
 //     （isUniqueViolation 的回退）才是真正会挂的地方。
 
+using System.Diagnostics;
 using System.Text;
 using System.Text.Json;
 using Jint;
@@ -19,6 +20,7 @@ using Microsoft.Data.Sqlite;
 
 var bundlePath = Require("SQLITE_SPIKE_BUNDLE");
 var probePath = Require("SQLITE_SPIKE_PROBE");
+var benchPath = Require("SQLITE_SPIKE_BENCH");
 var dbPath = Require("SQLITE_SPIKE_DB");
 var dbDir = Require("SQLITE_SPIKE_DBDIR");
 
@@ -117,6 +119,73 @@ using (var host = new HostSqliteDriver(dbPath, dbDir))
             contractFailed < 0
                 ? "契约重放没能跑起来（见上面的错误）"
                 : $"契约重放失败 {contractFailed} 条 —— 见上面的断言明细");
+    }
+
+    // ── 第三阶段：跨语言编组开销 ──────────────────────────────────────
+    //   前两阶段答"对不对"，这一段答"快不快" —— 它是 D2 存储设计**唯一**
+    //   还可能被否掉的地方（见 README「编组开销」一节）。
+    //
+    // 🔴 **必须换一个引擎，而且不设内存上限。** 两条理由，都是实测撞出来的：
+    //
+    //   ① `Options.LimitMemory(n)` **不是"峰值内存上限"，是"累计分配预算"**。
+    //      Jint 官方文档原文：*"allocation between two checks is **irreversible** and
+    //      unbounded per statement"* —— 也就是说它数的是**脚本跑完全程一共分配了多少**，
+    //      不是"同时占着多少"。基准要跑几千次调用，**任何**一条路径都会撞上；
+    //      第一次跑就是这么被它炸掉的，而且会**误读成"直接编组更费内存"**。
+    //   ② 那个约束**在 JS 里 catch 不住**（它由 `MemoryLimitConstraint.Check()` 抛，
+    //      不走 interop，因此 `CatchClrExceptions` 也不管），异常直接掀掉整个进程。
+    //      对产品代码的含义：**内嵌引擎的失控会杀掉桌面进程，而不是被优雅处理**。
+    //
+    //   基准测的是**每次调用的开销**，不是沙箱预算，所以这里不设内存上限、
+    //   只保留一个宽松的超时（超时同样 catch 不住，见上）。
+    var benchEngine = new Engine(options => options
+        .TimeoutInterval(TimeSpan.FromMinutes(5))
+        .CatchClrExceptions(_ => true));
+    benchEngine.SetValue("host", host);
+    benchEngine.Execute(File.ReadAllText(bundlePath));
+    benchEngine.Execute(File.ReadAllText(benchPath));
+
+    var benchSpins = 0;
+    while (!benchEngine.GetValue("__benchDone").AsBoolean() && benchSpins < 200_000)
+    {
+        benchEngine.Advanced.ProcessTasks();
+        benchSpins++;
+    }
+
+    Console.WriteLine();
+    Console.WriteLine("=== 第三阶段：跨语言编组开销（µs/次）===");
+    var benchRaw = benchEngine.GetValue("__bench");
+    var benchJson = benchRaw.IsNull() || benchRaw.IsUndefined() ? "null" : benchRaw.AsString();
+    using (var benchParsed = JsonDocument.Parse(benchJson!))
+    {
+        var benchRoot = benchParsed.RootElement;
+        if (!benchRoot.GetProperty("ok").GetBoolean())
+        {
+            Console.WriteLine($"  ✗ {benchRoot.GetProperty("error").GetString()}");
+        }
+        else
+        {
+            Console.WriteLine($"  {"用例",-46}{"次/调用",10}{"µs/次",10}{"总耗时 ms",12}");
+            foreach (var row in benchRoot.GetProperty("rows").EnumerateArray())
+            {
+                // ⚠️ 某些用例**测不出来**（例如直接编组撑爆内存上限）。
+                //    那条路径要把"测不出来"印出来，而不是让打印代码自己炸掉 ——
+                //    第一次跑就是被这个坑把整份报告变成空白的。
+                var perCall = row.TryGetProperty("perCallUs", out var p) && p.ValueKind == JsonValueKind.Number
+                    ? p.GetDouble().ToString("0.00")
+                    : "—";
+                var total = row.TryGetProperty("totalMs", out var t) && t.ValueKind == JsonValueKind.Number
+                    ? t.GetDouble().ToString("0.00")
+                    : "—";
+                var note = row.TryGetProperty("error", out var e) ? $"   ⚠️ {e.GetString()}" : string.Empty;
+                Console.WriteLine(
+                    $"  {row.GetProperty("label").GetString(),-46}" +
+                    $"{row.GetProperty("iterations").GetInt32(),10}" +
+                    $"{perCall,10}" +
+                    $"{total,12}" +
+                    note);
+            }
+        }
     }
 }
 
@@ -221,7 +290,44 @@ internal sealed class HostSqliteDriver : IDisposable
     public string all(string sql, string paramsJson)
     {
         using var command = CreateCommand(sql, paramsJson);
+        return JsonSerializer.Serialize(ReadRows(command));
+    }
 
+    /// <summary>
+    /// 同一条查询，但**返回 CLR 对象数组**而不是 JSON 文本。
+    ///
+    /// 存在的唯一理由：基准里要对比"过 JSON 文本"与"交给 Jint interop 直接包"
+    /// 两条返回路径。**它不是候选实现** —— 直接编组会把类型映射散到 Jint 的
+    /// interop 规则里，而 JSON 桥把类型映射收在一处（见 README 的取舍）。
+    /// </summary>
+    public Dictionary<string, object?>[] allDirect(string sql, string paramsJson)
+    {
+        using var command = CreateCommand(sql, paramsJson);
+        return ReadRows(command).ToArray();
+    }
+
+    /// <summary>
+    /// 只做 **C# 这一侧**的工作（读行 + 序列化成 JSON），然后**只返回字符串长度**。
+    ///
+    /// 基准里拿它做**归因**：把"SQLite 读行 + C# 序列化"从
+    /// "字符串过桥 + JS 侧 `JSON.parse`"里剥出来。
+    /// 没有这一条就只能看到"JSON 桥比直接编组慢 3 倍"，却不知道慢在哪一段 ——
+    /// 于是会去优化错的东西。
+    /// </summary>
+    public int allJsonLength(string sql, string paramsJson)
+    {
+        using var command = CreateCommand(sql, paramsJson);
+        return JsonSerializer.Serialize(ReadRows(command)).Length;
+    }
+
+    /// <summary>
+    /// 高精度时钟（微秒）。给 JS 侧计时用的 —— Jint 里没有 `performance.now()`，
+    /// 而用宿主侧的统一计时才不会把 JS 引擎自己的时钟精度混进结论。
+    /// </summary>
+    public double nowMicros() => Stopwatch.GetTimestamp() * 1_000_000.0 / Stopwatch.Frequency;
+
+    private static List<Dictionary<string, object?>> ReadRows(SqliteCommand command)
+    {
         using var reader = command.ExecuteReader();
         var rows = new List<Dictionary<string, object?>>();
         while (reader.Read())
@@ -233,7 +339,7 @@ internal sealed class HostSqliteDriver : IDisposable
             }
             rows.Add(row);
         }
-        return JsonSerializer.Serialize(rows);
+        return rows;
     }
 
     /// <summary>关闭连接。必须幂等。</summary>

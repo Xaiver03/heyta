@@ -325,12 +325,23 @@ C# 侧还开了一个**新连接**独立复核盘上的库（`__heyta_seq` / `ar
    ⇒ 这是**已声明的能力缺口**，不是**在用路径上的缺口**。
    它变成真需求的那一天 = 有人把字节直接当列值存的那一天。
    **到那时再补，不必现在挡 W1。**
-2. **跨语言编组开销未测**：每次驱动调用都过一趟 `JSON.stringify` / `JSON.parse`。
-   `微任务泵次数：0` 说明它不会被事件循环拖慢，但**单次调用的开销**没测 ——
-   存储层在同步热路径上是高频调用的。**这一条可能否掉当前这种 JSON 桥。**
-3. **`widget-core` 的 golden fixture 还没进这条跨语言通道**（`DbAdapter` / `OpLogStore`
+2. ~~跨语言编组开销未测~~ → ✅ **已测（2026-09-28）**，结论：**保留 JSON 桥**。
+   固定开销 **6 µs/次**（可忽略），代价随行数线性（JSON 桥约 **4.9 µs/行**，
+   直接编组约 2.3 µs/行）⇒ 现实场景（一屏 ≤200 行）**0.4~1.0 ms**，在一帧之内；
+   **2000 行整表扫描才 ~10 ms**。
+   🔴 关键归因：2000 行时**纯 C#、不过桥**的基线就已经要 **4.5 ms**（占 46%）——
+   **换编组方式救不了这 46%，只能靠"少搬行"（索引 + limit）**。
+   ⚠️ 未测：绝对数有 ±40% 噪声，且**只在 macOS/arm64 上测过，Windows 宿主未测**。
+3. 🔴 **Jint 的约束在 JS 里 `catch` 不住** —— `MemoryLimitExceededException`
+   由 `MemoryLimitConstraint.Check()` 抛出、**不走 interop**，因此
+   `CatchClrExceptions(_ => true)` 也不管它，异常直接掀掉整个进程（实测退出码 134）；超时同理。
+   顺带纠正一个语义：**`Options.LimitMemory(n)` 是"累计分配预算"，不是"峰值内存上限"**
+   （官方文档原文："allocation between two checks is **irreversible**"）。
+   ⇒ **对桌面的含义：内嵌引擎一旦失控（死循环/内存暴涨），杀掉的是整个应用进程。**
+   W1 要么给引擎做进程内隔离，要么**显式接受并写下**这个风险。
+4. **`widget-core` 的 golden fixture 还没进这条跨语言通道**（`DbAdapter` / `OpLogStore`
    已经进了）。
-4. **Worker 桥（`oplog-worker-bridge.ts`）没测** —— 那是 web 端专用的进程内端口，
+5. **Worker 桥（`oplog-worker-bridge.ts`）没测** —— 那是 web 端专用的进程内端口，
    桌面壳不走它。
 
 细节见 [spike README](../../research/spikes/sqlite-driver-csharp/README.md)。
