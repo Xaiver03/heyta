@@ -1,0 +1,375 @@
+{
+  "_guide": "CAC 算法备案单一事实源模板。复制到项目里填写；null 表示『尚未取得证据』，不是『随便填一个』。生成前所有 null 必须清零（脚本会逐条列出来）。字段逐项说明见 references/ledger-schema.md。叙述文本放在 documents 段，用 {{字段路径}} 引用上面的事实，避免同一事实写两遍。",
+  "projectName": "heyta",
+  "desktopShortcutName": "heyta算法备案材料",
+  "preparedAt": null,
+  "packageVersion": null,
+  "packageVersionPrefix": null,
+  "serviceProvider": {
+    "legalName": "晓黎（杭州）人工智能科技有限公司",
+    "unifiedSocialCreditCode": "91330106MAKNJ6DX7M",
+    "entityType": "有限责任公司(自然人独资)",
+    "registeredRegion": "浙江省杭州市西湖区",
+    "registeredAddress": "浙江省杭州市西湖区蒋村街道文一西路830号蒋村商务中心3号楼210室",
+    "algorithmSafetyOfficer": "邓湘雷",
+    "algorithmSafetyOfficerPhone": "13077328906",
+    "algorithmSafetyOfficerPhoneEvidence": null,
+    "legalRepresentative": {
+      "name": "邓湘雷",
+      "idType": "居民身份证",
+      "idNumber": "430381200307030011",
+      "idIssuingAuthority": "湘乡市公安局",
+      "idValidity": "2026.06.18-2036.06.18",
+      "idAddress": "湖南省湘乡市金薮乡马坪村西冲村民组121号",
+      "idEvidence": {
+        "directory": "/Users/rocalight/private/身份证",
+        "files": {
+          "正面.jpg": "1d495895c19ee3bef1f5892eb7672aef598b75090f83e298021d1fe8cadc4290",
+          "国徽面.jpg": "efc0ec90baa2f88e3cdd8639128e46fc29f83b78818f4dc635218206ff7cf0d2"
+        },
+        "note": "证件原件留在 private/身份证，不复制进仓库；仅记录路径与 SHA-256。门户两个附件字段只能 jpg/png/bmp、≤10MB。"
+      },
+      "idTypePortalOption": "身份证"
+    },
+    "businessLicense": {
+      "registeredCapital": "壹佰万元整",
+      "establishedAt": "2026-09-22",
+      "registrationAuthority": "杭州市西湖区市场监督管理局",
+      "registeredAddress": "浙江省杭州市西湖区蒋村街道文一西路830号蒋村商务中心3号楼210室",
+      "businessTerm": "长期",
+      "businessTermNote": "负责人 2026-09-28 确认：营业期限为长期。执照正面未印该栏，以负责人确认为准。",
+      "evidence": {
+        "directory": "/Users/rocalight/Desktop/All in one Data/02_AREAS/晓黎杭州",
+        "files": {
+          "副本.jpg": "59e3e128afc66d8a6816bb4e5778c4be97007b5d98e5647b560d1eedb98e479d",
+          "整本.jpg": "a94eb45158fe6de523f3c603e54bf6d99f91bb4a1705512bcf8e586617328ab6",
+          "微信图片_20260922210911_632_4.jpg": "409d85080f141c036631e645662033ce1241a06bdd711590b4cc9d05939e3b4f"
+        },
+        "note": "证照原件留在 02_AREAS，不复制进仓库；仅记录路径与 SHA-256。"
+      }
+    },
+    "legalRepresentativeNote": "法定代表人（营业执照）与算法安全责任人（ICP/APP 备案登记的服务负责人）为**同一自然人**：邓湘雷，身份证号 430381200307030011，有效期 2026.06.18-2036.06.18 —— 身份证与两份登记记录三处交叉一致。⚠️ 但门户把两个角色分成两个自然人分组采集，**证件附件要分别上传**，不要因为同一人就只传一次。**不要在本机关的承诺书/自评估报告里默认两个角色一定是同一人** —— 这是本项目的事实，不是通用规则。",
+    "algorithmSafetyOfficerIdNumber": "430381200307030011",
+    "entityTypePortalOption": "企业",
+    "entityTypeNote": "营业执照写「有限责任公司(自然人独资)」，但门户「主体类型」下拉**没有这一项**。实测选项为：企业 / 事业单位 / 机关 / 社会组织 / 个体工商户 / 其他组织机构 ⇒ 选「企业」。",
+    "certificateTypePortalOption": "营业执照",
+    "algorithmSafetyOfficerIdTypePortalOption": "身份证"
+  },
+  "algorithm": {
+    "name": "heyta任务智能辅助生成合成算法",
+    "category": "生成合成类（深度合成）",
+    "categoryKey": "生成合成类",
+    "serviceCategory": "办公与效率工具",
+    "serviceProviderRole": "服务提供者",
+    "onlineStatus": "未上线，正在开发阶段",
+    "onlineDate": null,
+    "classificationBasis": {
+      "type": "生成合成类（深度合成）",
+      "why": [
+        "AI 助手产出的是文本（任务拆解、建议与解释）→ 依《互联网信息服务深度合成管理规定》，智能对话/文本生成属深度合成。",
+        "heyta 规划并已定案的托管 AI（ADR-0020 两档定价 + ADR-0021 定 deepseek-v4-flash）意味着 heyta 面向用户提供生成服务，是服务提供者，而非单纯客户端。",
+        "上游模型备案不解除下游服务提供者自身的责任（不引用上游备案替代自身）。"
+      ],
+      "ruledOut": {
+        "个性化推送类": "无基于用户画像的个性化内容/商品推送。",
+        "排序精选类": "四象限/优先级是确定性规则分类，不构成对外提供的排序精选算法服务。",
+        "信息检索类": "任务搜索是常规本地文本检索，不作为算法服务对外提供。",
+        "内容过滤类": "输入输出安全审查是自身控制措施，不是对外提供的内容过滤服务。",
+        "调度决策类": "不提供自动排程；AI 只产出建议，类型上无法产生 op。"
+      },
+      "residualUncertainty": [
+        "是否具有『舆论属性或社会动员能力』未决 —— 这是强制备案的触发条件。本地优先的个人任务管理工具通常不具备，但属法律判断，保留为不确定并留存证据。",
+        "托管模式当前被代码闸门挡住（retentionDisclosure('heyta-cloud') === 'undecided'，见 ADR-0006 §5）。材料必须如实写当前状态，不得声称托管服务已上线。"
+      ],
+      "decidedBy": "agent（受负责人授权）",
+      "decidedAt": "2026-09-28"
+    }
+  },
+  "filing": {
+    "status": "submitted_pending_review",
+    "statusTextMap": {
+      "draft_prepared_not_saved": "草稿待保存，尚未提交审核",
+      "draft_saved_not_submitted": "草稿已保存，尚未提交审核",
+      "submitted_pending_review": "已提交，待审核"
+    },
+    "publicReleaseStatus": "not_released",
+    "submissionRestriction": "主体信息已提交并进入审核（2026-09-28）。未经负责人确认不得再次修改或重新提交；初审通过后方可进行算法、产品及功能信息填报。",
+    "submittedAt": "2026-09-28",
+    "portalStatusText": "待审核",
+    "portalBanner": "主体信息还未审核通过！待初审通过后即可填报",
+    "postSubmitRoute": "#/prinInfo（渲染为「认证主体信息」只读页，操作按钮为「申请查看加密信息」/「修改主体信息」）",
+    "submissionEvidence": {
+      "file": "docs/operations/cac-algorithm-filing/evidence/2026-09-28_主体信息认证_提交成功_待审核.png",
+      "sha256": "1b4982dd676a66f7b4aa1f925174117e50ef770aae9986fbca6b20d5612e2866",
+      "note": "门户显示「待审核」徽标与「主体信息还未审核通过！待初审通过后即可填报」。"
+    }
+  },
+  "allowedStatuses": [
+    "draft_prepared_not_saved",
+    "draft_saved_not_submitted",
+    "submitted_pending_review"
+  ],
+  "generationGates": {
+    "filing.publicReleaseStatus": "not_released"
+  },
+  "platforms": [
+    "Android",
+    "iOS",
+    "HarmonyOS",
+    "Web"
+  ],
+  "serviceMetrics": {
+    "asOf": "2026-09-28",
+    "registeredNonBannedAccountCount": 8,
+    "definition": "已注册且未被禁用的账号数；不包含个人身份信息。",
+    "portalEntry": "0.0008",
+    "portalUnit": "万",
+    "basis": "负责人 2026-09-28 确认：已有 8 个内测用户（产品仍处开发阶段，未对外公开发布）。",
+    "note": "门户「月活跃用户量」单位为万，故填 0.0008 而不是 8。"
+  },
+  "modelService": {
+    "provider": "DeepSeek 开放平台",
+    "providerLegalName": "杭州深度求索人工智能基础技术研究有限公司",
+    "endpoint": "https://api.deepseek.com",
+    "textModel": "deepseek-v4-flash",
+    "visionModel": "不适用（无任何功能要求图片识别能力）",
+    "embedding": "不适用（未提供向量检索能力）",
+    "contractReference": null,
+    "evidence": "docs/adr/0021-managed-ai-model-deepseek-flash.md（已接受 2026-09-27）",
+    "contractReferenceNote": "尚无已签署的模型服务协议编号。不得编造；未取得前该字段保持为空并在材料中如实说明。"
+  },
+  "publicDisclosure": {
+    "canonicalPath": null,
+    "supportPath": null
+  },
+  "userSafeguards": {
+    "visibleLabel": null,
+    "humanReview": null,
+    "feedback": null,
+    "implicitLabel": {
+      "status": null,
+      "productionVerificationStatus": null,
+      "format": null,
+      "boundary": null
+    }
+  },
+  "documents": {
+    "_guide": "两份材料的全部文字都放这里。kind 取值：h1 / h2 / h3 / title / p / image / pagebreak / flowDiagram。",
+    "selfAssessment": {
+      "officialTitle": "互联网信息服务算法安全自评估报告",
+      "coreTitle": null,
+      "outputStem": null,
+      "narrativeRowIndexes": [],
+      "formCells": [
+        {
+          "row": 0,
+          "col": 1,
+          "text": "{{serviceProvider.legalName}}",
+          "size": 9
+        },
+        {
+          "row": 0,
+          "col": 4,
+          "text": "{{serviceProvider.unifiedSocialCreditCode}}",
+          "size": 9
+        },
+        {
+          "row": 1,
+          "col": 1,
+          "text": "{{algorithm.name}}",
+          "size": 9
+        },
+        {
+          "row": 1,
+          "col": 4,
+          "text": "{{algorithm.categoryKey}}",
+          "size": 9
+        },
+        {
+          "row": 2,
+          "col": 1,
+          "text": "{{algorithm.serviceCategory}}",
+          "size": 9
+        },
+        {
+          "row": 5,
+          "col": 1,
+          "text": "{{preparedAt}}",
+          "size": 9
+        },
+        {
+          "row": 5,
+          "col": 4,
+          "text": "{{preparedAt}}",
+          "size": 9
+        },
+        {
+          "row": 8,
+          "col": 1,
+          "text": "《“{{algorithm.name}}”拟公示算法机制机理内容（附件）》",
+          "size": 9
+        },
+        {
+          "row": 9,
+          "col": 1,
+          "text": "《“{{serviceProvider.legalName}}”落实算法安全主体责任基本情况（附件一）》",
+          "size": 9
+        },
+        {
+          "row": 13,
+          "col": 1,
+          "text": "（签名）",
+          "size": 9
+        },
+        {
+          "row": 13,
+          "col": 5,
+          "text": "{{serviceProvider.algorithmSafetyOfficerPhone}}",
+          "size": 9
+        }
+      ],
+      "flowDiagram": {
+        "fileStem": "heyta-flow-diagram",
+        "title": "【待填：算法服务流程标题】",
+        "boxes": [
+          {
+            "label": "用户输入\n（本地优先）",
+            "fill": "#dbeafe"
+          },
+          {
+            "label": "出境闸门\n授权判定",
+            "fill": "#e0f2fe"
+          },
+          {
+            "label": "用户自配端点\n（本机或第三方）",
+            "fill": "#ede9fe"
+          },
+          {
+            "label": "结果回流\n仅产出建议",
+            "fill": "#dcfce7"
+          }
+        ],
+        "footnote": "【待填：异常处置说明】",
+        "widthCm": 16.0
+      },
+      "body": [
+        {
+          "kind": "h1",
+          "text": "一、算法情况"
+        },
+        {
+          "kind": "h2",
+          "text": "（一）算法流程"
+        },
+        {
+          "kind": "flowDiagram"
+        },
+        {
+          "kind": "p",
+          "text": "【待填：算法服务链路说明。用 {{字段路径}} 引用台账事实，不要手打主体名/算法名。】"
+        },
+        {
+          "kind": "h2",
+          "text": "（二）算法数据"
+        },
+        {
+          "kind": "h3",
+          "text": "输入数据"
+        },
+        {
+          "kind": "p",
+          "text": "【待填】"
+        },
+        {
+          "kind": "h3",
+          "text": "输出数据"
+        },
+        {
+          "kind": "p",
+          "text": "【待填】"
+        },
+        {
+          "kind": "h3",
+          "text": "训练数据与检索数据"
+        },
+        {
+          "kind": "p",
+          "text": "【待填】"
+        },
+        {
+          "kind": "h1",
+          "text": "二、服务情况"
+        },
+        {
+          "kind": "p",
+          "text": "【待填】"
+        },
+        {
+          "kind": "h1",
+          "text": "三、风险研判"
+        },
+        {
+          "kind": "p",
+          "text": "【待填】"
+        },
+        {
+          "kind": "h1",
+          "text": "四、风险防控情况"
+        },
+        {
+          "kind": "p",
+          "text": "【待填】"
+        },
+        {
+          "kind": "h1",
+          "text": "五、安全评估结论"
+        },
+        {
+          "kind": "p",
+          "text": "【待填】"
+        },
+        {
+          "kind": "h1",
+          "text": "六、其他应当说明的相关情况"
+        },
+        {
+          "kind": "p",
+          "text": "【待填】"
+        }
+      ],
+      "evidence": []
+    },
+    "publicNotice": {
+      "coreTitle": "拟公示算法机制机理内容（附件）",
+      "outputStem": "拟公示算法机制机理内容（附件）",
+      "title": "“{{algorithm.name}}”拟公示算法机制机理内容（附件）",
+      "narrativeRowIndexes": [
+        2,
+        4
+      ],
+      "rows": [
+        "【待填，共 6 行，对应官方拟公示模板的表格行】",
+        "【待填，共 6 行，对应官方拟公示模板的表格行】",
+        "【待填，共 6 行，对应官方拟公示模板的表格行】",
+        "【待填，共 6 行，对应官方拟公示模板的表格行】",
+        "【待填，共 6 行，对应官方拟公示模板的表格行】",
+        "【待填，共 6 行，对应官方拟公示模板的表格行】"
+      ],
+      "footerLines": [
+        "服务提供者：{{serviceProvider.legalName}}",
+        "材料日期：{{preparedAt}}。直接模型服务：{{modelService.provider}}（{{modelService.endpoint}}）。"
+      ]
+    }
+  },
+  "optionalFields": [
+    "serviceProvider.algorithmSafetyOfficerPhoneEvidence",
+    "algorithm.onlineDate",
+    "modelService.contractReference"
+  ],
+  "_optionalNote": "product 未上线 ⇒ 无真实用户统计（MAU 不编造）；上线日期待定；负责人电话未附合同证据（本机无 heyta 侧已签协议）；模型协议编号待补。",
+  "_licenseReadAt": "2026-09-28",
+  "_licenseSource": "营业执照副本 / 整本 / 电子执照 三张一致",
+  "_idCardReadAt": "2026-09-28",
+  "_idCardCrossCheck": "号码与有效期与 docs/operations/icp-app-filing.md 登记的「服务负责人」逐字一致",
+  "platformsNote": "桌面两端（Windows/macOS）当前无正式包名，本轮不列；Web 为自托管/官网形态。"
+}

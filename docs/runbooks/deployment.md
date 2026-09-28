@@ -424,6 +424,53 @@ rsync -az --delete apps/landing/dist/ ubuntu-jcli:/var/www/heyta-landing/
 "只能自建"。仓库默认构建（无该变量）**是故意的**：应用还没部署时露出一个
 「立即使用」，比没有入口更坏。
 
+#### 应用里的站点入口：`VITE_SITE_URL`（通常**不用配**）
+
+2026-09-28 起，应用内新增了「帮助与关于」（设置页），以及两处上下文入口
+（同步出错时的「查看帮助」、托管到期提示里的「价格与订阅」）。它们指向站点 ——
+判据在 `apps/web/src/lib/site-url.ts`。
+
+那个文件**默认取应用自己的来源**（`window.location.origin`），因为 §3.3.1 定的是
+**唯一域名**：站点住 `/`、应用住 `/app/`。所以"站点在应用所在来源的根上"是一个
+已知事实，不是猜一个域名。`VITE_SITE_URL` 只给**分域名部署**那种形态留口子：
+
+```bash
+# 只有分域名部署时才有意义。单域名（现状）不要给 —— 给了反而会指向错的地方。
+cd apps/web && VITE_SITE_URL=https://site.example.com pnpm exec tsc -b && \
+  pnpm exec vite build --base=/app/
+```
+
+#### 🔴 站点已经是多页站点：`try_files` 里的 `$uri/` **不能删**
+
+落地页从 2026-09-28 起不再是一页：`/features/`、`/platforms/`、`/pricing/`、
+`/help/`、`/changelog/`、`/signin/` 各自是一个**目录 + `index.html`**
+（中英双份，共 14 份入口，由 `apps/landing/scripts/gen-entries.mjs` 生成）。
+
+§3.3.1 里那条 `try_files $uri $uri/ /index.html` 的 **`$uri/` 正是它们能打开的原因**。
+🔴 把它简化成 `try_files $uri /index.html`（看起来只是少了一个候选）的后果是：
+
+| | 结果 |
+|---|---|
+| `/features/` | 返回 **HTTP 200 + 落地页首页的 HTML**（`$uri` 是个目录、不存在同名文件） |
+| 浏览器 | 页面画得出来、看着"正常"，只是**永远停在首页** —— 标题、正文、锚点全是首页的 |
+| `curl -I` | 200，完全正常 |
+
+也就是说：**任何一个"只看状态码"的验收都抓不到它**，而用户看到的是
+"点了功能却什么也没发生"。同理，`/app/` 那条的 `$uri/index.html` 也不能删。
+
+#### 🔴 站点与应用要**一起**发布，而且站点先发
+
+应用里的那三条链接指向站点的 `/help`、`/changelog`、`/pricing`。
+先发应用、后发站点，用户点到的就是一个 **200 + 首页**（SPA 兜底，同上表）——
+不是 404，但也不是他要的那一页。
+
+**发布顺序**：站点（`VITE_APP_URL=… pnpm --filter @heyta/landing build` → rsync）
+→ 再发应用。反过来做的那段时间里，帮助入口是坏的。
+
+⚠️ 生成物必须与站点结构一致。CI 里的 `pnpm --filter @heyta/landing check:entries`
+会拦住"改了注册表忘了重新生成"（`gen-entries.mjs --check`）。
+`dev` / `build` / `test` 三个脚本**各自会先生成一次**，所以本地不会因此踩空。
+
 #### 🔴 2026-09-27 实况：上面这两条**不是"建议"，是部署命令**
 
 当天用 `pnpm --filter @heyta/web build` 与 `pnpm --filter @heyta/landing build`

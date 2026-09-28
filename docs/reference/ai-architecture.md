@@ -57,7 +57,7 @@ heyta 的 AI 是**双向**的，两个方向**在不同的包里、有不同的�
 |---|---|---|
 | `packages/ai/src/supply.ts` | 321 | 供给模式 `off`/`own`/`managed`；**由端点推导目的地**；托管不可启用的判据 |
 | `packages/ai/src/egress.ts` | 182 | 出境闸门。授权绑定 `(功能, 目的地)`；切换模式时失效旧授权 |
-| `packages/ai/src/provider.ts` | 348 | 单一 provider 端口，OpenAI 兼容 HTTP；**只产出建议，产生不了 op**；⚠️ 单端点/测试/历史路径，**不是生产出境执行点** |
+| `packages/ai/src/provider.ts` | 348 | 单一 provider 端口，OpenAI 兼容 HTTP；**只产出建议，产生不了 op**；含工具线格式（`AiInvocation.tools` / `extractToolCalls`）；⚠️ 单端点/测试/历史路径，**不是生产出境执行点** |
 | `packages/ai/src/routing.ts` | 980 | 多端点路由、能力声明匹配、回退、熔断接线、`invokeRouted()`（**生产唯一出境执行点**）；**回退不得跨越隐私边界** |
 | `packages/ai/src/health-store.ts` | 263 | 端点健康的落盘/读回；**读回来的东西不可信且必须封顶** |
 | `packages/ai/src/presets.ts` | 116 | 内置端点预设（**只有本机**）；`presetDestinations()` 让"预设都是本机的"可断言 |
@@ -74,9 +74,12 @@ heyta 的 AI 是**双向**的，两个方向**在不同的包里、有不同的�
 | `packages/app-host/src/ai-prioritize.ts` | 470 | 逐条优先级建议编排 |
 | `packages/app-host/src/ai-duration.ts` | 507 | 估时编排 |
 | `packages/app-host/src/local-api-host.ts` | — | 把本机 API 的写入意图接到真的 `dispatch()` |
-| `packages/local-api/src/tools.ts` | 499 | 工具契约 + 授权判定（**唯一实现点**） |
-| `packages/local-api/src/server.ts` | 359 | 传输无关的 JSON-RPC 处理器 |
-| `packages/local-api/src/mcp.ts` | 252 | MCP 形状：工具目录、错误码、会话闸门 |
+| `packages/app-host/src/ai-tool-selection.ts` | — | **内置 AI 的工具选择**：自然语言 → 工具（纯规则、grants 过滤、歧义/未授权分开）。⚠️ 不叫 intent（`OpIntent` / `WidgetIntent` 已占用该名） |
+| `packages/app-host/src/ai-tool-run.ts` | — | **内置 AI 的工具执行（单步）**：读即执行 / 写**只产出提案**；`confirmAiToolProposal()` 是唯一写点（[ADR-0035](../adr/0035-ai-tool-calling-reuses-local-api.md)） |
+| `packages/app-host/src/ai-tool-call.ts` | — | **内置 AI 的模型路径**：规则先跑（命中即零出境短路）→ `invokeRouted` 带 `tools` → 校验后复用 `runSelectedTool`。出境字段 = `text` + `tools` |
+| `packages/local-api/src/tools.ts` | 499 | 工具契约 + 授权判定（**唯一实现点**）。`isToolGranted()` 被 MCP 与内置 AI **共用** |
+| `packages/local-api/src/server.ts` | 359 | 传输无关的 JSON-RPC 处理器。`runReadTool()` / `toWriteIntent()` 亦被内置 AI 复用 |
+| `packages/local-api/src/mcp.ts` | 252 | 工具形状：`listAuthorizedTools()`（中性定义，MCP 与内置 AI 共用）+ 错误码 + 会话闸门 |
 | `apps/web/src/features/settings/aiStore.ts` | — | AI 设置状态 + 本地持久化（含熔断健康快照） |
 | `apps/web/src/features/settings/AiSettings.tsx` | — | 开关界面（三道闸 / 端点 / 授权 / 停用开关） |
 | `apps/web/src/features/settings/MemoryPanel.tsx` | — | 偏好的可见 / 可忘掉 / 可恢复 + 「说的 vs 做的」落差 |
@@ -84,6 +87,7 @@ heyta 的 AI 是**双向**的，两个方向**在不同的包里、有不同的�
 | `apps/web/src/features/ai/AiCapture.tsx` | — | 捕获界面 |
 | `apps/web/src/features/ai/AiPrioritize.tsx` | — | 优先级界面 |
 | `apps/web/src/features/ai/AiDuration.tsx` | — | 估时界面 |
+| `apps/web/src/features/ai/AiToolRun.tsx` | — | **工具调用面板**：规则命中不出境（并明说）；需模型时先披露再发送；写工具出提案 + 确认 |
 | `apps/web/src/features/ai/RouteUnavailable.tsx` | — | "没有可用端点"时的原因解释 + 下一步 |
 | `apps/web/src/features/ai/route-explanation.ts` | 251 | 壳自己的路由解释（`resolveFeatureRoute()`），消费 `resolution.excluded` |
 | `apps/web/src/features/ai/ai-failure-copy.ts` | — | 失败原因码 → 界面词条 |
@@ -955,6 +959,7 @@ interface SecretStore { get(keyRef: string): Promise<string | undefined>; }
 | `check:ai-coverage` | 每个 `AiFeature` 从「实现 → 导出 → 路由声明 → 偏好声明 → 界面」端到端可达，**不许有豁免**；并断言托管 AI 仍被挡住 |
 | `check:ai-e2e` | 真 Chromium 跑用户旅程（假端点，不接真模型） |
 | `check:ai-quota` | 「300 次/月」只有一个数字源；托管 AI 额度未实现的状态被**显式声明**（ADR-0023） |
+| `check:ai-tools` | 内置 AI 工具路径：**写只能出现在 `confirmAiToolProposal()` 里且恰好一处**；无 op 构造、无网络调用、不 import `@heyta/op-log`（ADR-0035；已做 5 类故障注入） |
 | `check:layering` | `no-model-endpoint-in-apps`、`no-vendor-ai-sdk-in-apps`、`no-loopback-classification-in-apps` —— 拦 `apps/*` 直连模型端点、引入厂商 SDK、自己判回环 |
 | `check:licenses` | AI 调研发现一批**许可证地雷**（Nextcloud AI 全家桶 / Immich = AGPL-3.0；Piper 本体 = GPL-3.0）—— **一行代码都不能进** |
 | `check:ui-language` | 用户可见文案的中文规则 |
@@ -1017,6 +1022,7 @@ interface SecretStore { get(keyRef: string): Promise<string | undefined>; }
 | 托管 AI / MaaS | 已定档（ADR-0020/0021：¥12/月 · 300 次/月 · `deepseek-flash`），但**本轮不实现**（ADR-0023）：服务本体端点 / 计量 / 收银台**都不存在**；保留策略未定案，`assertEnableable` 继续抛 `retention-undecided` |
 | AI-3 规划 | 有意推迟（需要真实数据） |
 | AI-4 复盘 | 受限分支，未开工 |
+| **AI 工具调用的 P3–P4** | P0–P2 已落地（[ADR-0035](../adr/0035-ai-tool-calling-reuses-local-api.md)）：规则选择 + 单步执行 + 模型线格式（`tool_calling` 能力已由 `'tool-calling'` 功能消费）+ 面板入口。**只读循环（P3）与需实体 id 的工具（P4）未开工**；托管路径的权益闸门（`capability:'ai'`）也因托管 AI 未实现而未接 |
 | 只读模式 | `grants` 已能表达，但**没有"只读预设"的 UI 引导**（逐工具开关已有） |
 | 调用审计 | 未做（考虑过"记录每次调用"，但那本身是一份新的敏感日志） |
 | 「回退披露必须写出整条链」 | ⚠️ 见 §15.3 |

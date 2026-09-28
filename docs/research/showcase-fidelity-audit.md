@@ -318,3 +318,43 @@ cd e2e && node_modules/.bin/playwright test tests/smoke.spec.ts --reporter=line
 > 折行的版面上 8 个 tab 全都"在"，只是难看。**"全部可见"与"全部可读"不是一回事**，
 > 而只检查"元素在不在"的断言会同时放过这两种状态。
 
+
+---
+
+## 7. 勘误（2026-09-28 晚 —— **不改写上面的原文**）
+
+### 7.1 🔴 §2 #2 与 §6 的「真应用不显示象限计数」是**误判**，而且 §6 已按误判动过手
+
+**触发**：landing 的 M3 第 3.5 步（同步 showcase）落地时，复核了这条结论。
+
+**原文错在哪**（§2 #2 的表格行 + §6 第 2 行）：
+
+| 原文写的 | 实测 |
+|---|---|
+| 「`QUADRANT_NAV` 里没有 count 字段」 | ✅ **对** —— 但这是**无关的事实** |
+| 「所以**不显示计数**」→ §6「**删掉**四个数字」 | ❌ **错。真应用是显示计数的。** |
+
+**真应用的完整链路**（2026-09-28 复核，可直接重跑）：
+
+```
+apps/web/src/App.tsx:240   const counts = useTaskStore(useShallow(selectQuadrantCounts));
+apps/web/src/App.tsx:650   count={entry.filter.kind === 'quadrant' ? counts[entry.filter.quadrant] : undefined}
+apps/web/src/App.tsx:1044  {count !== undefined && count > 0 && (<span className="ht-nav__count">{count}</span>)}
+                           ↑ 计数不在 QUADRANT_NAV 元素上，是**渲染时算出来单独传进去的**
+```
+
+**审计当初为什么看错**：截图取自**空账号** ⇒ 每个象限计数 = 0 ⇒ 而渲染条件是
+**`count > 0`** ⇒ 一个数字都不出现。**「位置在、值为 0」被读成了「没有这个位置」。**
+这一步推理错在把**「元素上没有这个字段」**当成了**「界面上没有这个信息」** ——
+前者是**静态结构**，后者取决于**运行时的数据与条件渲染**。
+
+**影响面**：§6 那条「删掉四个数字」已经执行过 ⇒ 有一段时间 showcase **比真应用更少**信息，
+而不是"更真实"。现已按正确方向改成**从唯一一份样例任务派生**（`bucketByQuadrant` 实算，
+已完成任务不计入），并在 `apps/landing/tests/mockup-shell-shape.spec.tsx` 里用
+**领域层自己的 `bucketByQuadrant`** 重算比对 —— 阈值与算口径**没有第二份实现**。
+
+完整落地记录见 [dida-view-unification.md](dida-view-unification.md) **§9.4**。
+
+**教训（比这条本身值钱）**：审计里凡是写「真应用没有 X」的结论，
+必须区分**「结构里没有这个字段」**与**「渲染时不会出现这个信息」**。
+前者读源码就能判定；后者要**连渲染条件与输入数据一起看** —— 截图只是其中一种输入。

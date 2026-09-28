@@ -254,3 +254,25 @@ HTML 生成时为每个 locale 各生成一份。
 这比原文的方案更符合 N3：默认构建下应用里的帮助入口**也存在**，
 不必依赖"记得加构建参数"。代价是开发环境下那个链接会落回应用自己
 （Vite 的 SPA 兜底），已在文件头如实写明。
+
+## 7. 勘误（2026-09-28）
+
+### 7.1 §2 / §4 的「真静态」说过头了：正文仍然靠 JS
+
+正文 §2 的选项表把多 HTML 入口的优点写成「每页是**真静态**：SEO 最好、首屏最快」，
+§4 又把入口数称作「**『真静态』的必要成本**」。**这两处断言被实测证伪**：
+
+```
+$ grep -o 'id="root"[^>]*>[^<]*' apps/landing/help/index.html apps/landing/index.html
+apps/landing/help/index.html:id="root">
+apps/landing/index.html:id="root">
+```
+
+生成的全部入口 HTML 里 `#root` **是空容器**，正文由 `main.tsx` 挂载的 React 树渲染。
+所以真正兑现的是「**爬虫拿到的 head 完整**」（`<title>` / description / canonical /
+hreflang / og / JSON-LD 全部在静态 HTML 里），**不是**「首屏不用等 JS」。
+
+⇒ **结论不变，改的是措辞的适用范围**：选多 HTML 入口的理由是
+**每页独立地址 + 静态头部**，不是「无 JS 首屏」；要兑现后者需要预渲染或 SSR，
+那是另一份决策（本 ADR 未做，也不据此声称）。
+`apps/landing/scripts/gen-entries.mjs` 的文件头已按同一口径改写。

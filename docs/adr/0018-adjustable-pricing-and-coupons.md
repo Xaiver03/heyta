@@ -300,3 +300,38 @@ unknown_coupon → stacking_not_allowed → disabled → not_started → expired
 | 价格只写一次 | `scripts/check-pricing-consistency.mjs` + `verify-i18n-failures.mjs` 的 `pricing` 组（10 例） |
 | 券的算术/名额规则被真的拦住了 | `verify-i18n-failures.mjs` 的 `coupon` 组（9 例，8 个 mutant 全部让测试变红） |
 | 迁移符合仓库纪律 | `node scripts/check-migrations.mjs` |
+
+---
+
+## 6. 勘误（2026-09-28 —— **不改写上面的原文**）
+
+按 [`../README.md`](../README.md) 的文档规则，ADR 原文不可改，更正以**勘误段**追加。
+
+### 6.1 🔴 §4.1 第 1 条没有兑现：`expireStaleOrders` 零调用者
+
+§4.1 写的是：
+
+> **`expireStaleOrders` 必须作为定时任务运行。** 它不是优化，是 `maxRedemptions`
+> 语义的组成部分（§3.4）。
+
+**实测（2026-09-28）**：
+
+| 检查 | 结果 |
+|---|---|
+| 定义 | `server/src/billing/pricing-store.ts:1079` ✅ 存在 |
+| 导出 | `server/src/billing/index.ts:167` ✅ 在导出清单里 |
+| **调用者** | 🔴 **零** —— `grep -rn "expireStaleOrders(" server/src server/scripts` 无命中，没有任何调度器 / 路由 / 脚本会跑它 |
+
+后果与 §4.1 自己写的那句话一字不差：**限量券的预算在窗口内不会真的被释放**。
+而且它的失败形态正如原文所料 —— "sweep 挂了不会立刻可见"，
+因为**根本没有任何东西在跑它**，所以连监控都没有对象。
+
+⚠️ 这一条**不是"文档写错了"，是"承诺没有兑现"**：原文用的是"必须"，
+现状是"没有"。两者都留在案；不要把它读成"当时写错了"。
+
+**修法与追踪**：本项属于"基础设施做完了、最后一米没接"这一类，
+清单在 [`../research/dida365-feature-benchmark.md`](../research/dida365-feature-benchmark.md) §3；
+产生这一类问题的**机制**由 `check:reachability`（见
+[`../plans/site-and-parity-alignment.md`](../plans/site-and-parity-alignment.md) C-8）负责拦。
+🔴 **在 sweep 真的接上调度之前，本 ADR §3.4 的"名额会在窗口内释放"不能当成已实现的能力讲。**
+

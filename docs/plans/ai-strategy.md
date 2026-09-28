@@ -213,9 +213,12 @@ heyta 手里有一份**别人拿不到的数据**：`MaterializedState` 里的 `
 | **反馈偏好 P6/P7** | 从处置推断粒度与保留率；P6 **MAE 0.167 vs 基线 1.000**；噪声上零误报 | `packages/domain/tests/ai-feedback.spec.ts` | 见上 |
 | **偏好可见可纠正** | `MemoryPanel`：依据原文、单条忘掉、**可恢复**的「你已忘记」 | `apps/web/src/features/settings/MemoryPanel.tsx` | **29 测试** |
 | **偏好纠正持久化** | `PREFERENCE_CORRECTION`（走 op-log，跨设备同步） | `packages/domain/src/preference-corrections.ts` | 17 测试 |
+| **AI 工具调用 P0–P2** | 复用既有工具目录/授权/执行器（不新建）：规则选择（零出境）→ 模型路径（`tools`/`tool_calls`，新 `AiFeature` `'tool-calling'`）→ 读即执行、写只提案、确认才落库 | `packages/app-host/src/ai-tool-{selection,run,call}.ts`、`apps/web/src/features/ai/AiToolRun.tsx`、`packages/ai` 工具线格式 | 见 [ADR-0035](../adr/0035-ai-tool-calling-reuses-local-api.md) 与 [计划](ai-tool-calling.md) |
 
 > 测试数字为 2026-09-29 在 `main` 上实测；四个包的总数是
 > `@heyta/ai` 151 / `@heyta/domain` 475 / `@heyta/app-host` 435 / `@heyta/local-api` 79（均 0 skip）。
+> ⚠️ 上面这行是**当时的快照**；AI 工具调用落地后已变为
+> `@heyta/ai` 162 / `@heyta/app-host` 598（`@heyta/web` 820）。**要数字就重新跑**，别引用这里。
 
 ### 7.2 未落地
 
