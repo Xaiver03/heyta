@@ -1,0 +1,13 @@
+# macOS 原生壳第一次成功启动的实测记录
+#
+# 采集方式：应用**自截屏**（HEYTA_SELF_CAPTURE=<png>），窗口起来 3 秒后
+# 把自己那个窗口渲染成 PNG 再退出。
+#
+# 为什么不用 screencapture 从外面截：
+#   ① 整屏截图里别人的窗口会盖在上面（实测就是这样）；
+#   ② screencapture 还要屏幕录制权限，CI/无人值守下未必有。
+#   自渲染拿到的恰好是**这个窗口**的内容，而且可重复。
+
+WINDOW_SIZE=900x560
+WINDOW_TITLE=heyta
+PNG_BYTES=82721

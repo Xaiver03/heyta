@@ -31,15 +31,16 @@
 |---|---|---|---|
 | **Windows** | **WinUI 3 / Windows App SDK（C#）** | ✅ **本次就做** | 不碰 RN 版本 ⇒ 移动端保持升级自由；ADO.NET 同步 SQLite；**官方 C# widget provider 教程**（[ADR-0034](../adr/0034-windows-native-winui3-not-rnw.md) §1.3/§1.4） |
 | **Windows**（备选） | react-native-windows | 🔴 **本轮出局** | RNW 最新稳定版 = **0.84.0**（`peerDep: RN 0.84.1`），**无 0.85+ 稳定版**；而 RN 上游已 0.87.1 ⇒ 选它 = 把 `apps/mobile` 一起冻在出了支持窗口的 RN 上 |
-| **macOS** | SwiftUI / AppKit 原生 | ⚠️ **可达，但本轮不启动** | 见 [ADR-0034](../adr/0034-windows-native-winui3-not-rnw.md) §3.1：先解 `packages/domain` 单源问题，否则 Swift 也跑不了 TS —— **排在 Windows 之后**（§3） |
-| **macOS**（备选） | `react-native-macos` | 🔴 **现在不可行** | 最新 **0.81.9**（`peerDep: react-native 0.81.6`），官方要求"同一 minor"；heyta 在 **0.84.1** → 硬冲突 |
-| **Linux** | GTK4 / libadwaita（或 Qt） | ⏸ **可达，但没有需求证据** | RN 生态没有 Linux。真原生 = **又一个独立代码库**；而**目前没有任何 Linux 桌面用户的证据**（§4） |
+| **macOS** | SwiftUI / AppKit 原生 | ✅ **已完成（2026-09-28）** | `apps/desktop-macos`（SwiftPM）。**JavaScriptCore 与 libsqlite3 都是 macOS 自带** ⇒ 不引第三方依赖；加载的是**同一个** `bridge-bundle/native-bridge.js`。无头冒烟 **14/14**；窗口已启动并自截屏（[evidence](../../apps/desktop-macos/evidence/)） |
+| **macOS**（备选） | `react-native-macos` | 🔴 **不需要了** | 最新 **0.81.9**（`peerDep: react-native 0.81.6`）与 heyta 的 0.84.1 硬冲突 —— 但自从 D2（内嵌 JS 引擎跑同一份 TS）成立，这条路本来就不必走 |
+| **Linux** | GTK4 / libadwaita（或 Qt） | ⏸ **最后一个非原生端，接下来做** | RN 生态没有 Linux ⇒ 只能自己造（[§4](#4-linux最后一个非原生端--确定要做)）。**机器是有的**（`ubuntu-jcli` / `sanjiaozhou`，实测 SSH 可达） |
 | **iOS / Android** | React Native | ✅ **已经是原生** | `apps/mobile`；且已落地真原生小组件（WidgetKit / App Widget） |
 | **鸿蒙** | RNOH + ArkTS 卡片 | ✅ **已经是原生** | `apps/mobile/harmony`；出包已通，模拟器已可用 |
 | **Web** | —— | ✅ 就是 Web（定义如此） | `apps/web` |
 
-**结论**：**Windows 本次迁**；**macOS 排在 Windows 的领域层方案之后**；
-**Linux 等需求证据**；三端在没有原生壳之前**保留 Electron 并如实标注为过渡**，不假装它们是原生的。
+**结论（2026-09-28 复核）**：**七端里六端已是原生** ——
+Windows（WinUI 3）、macOS（SwiftUI）、iOS/Android（RN）、鸿蒙（RNOH）、Web（定义如此）。
+**只剩 Linux 还是 Electron**，那是下一个要补的（[§4](#4-linux最后一个非原生端--确定要做)）。
 
 > 🔴 **为什么这条要写在最前面**：如果计划写成"桌面三端统一上原生"，
 > 那么它在 macOS 上会撞版本墙、在 Linux 上无墙可撞（只能自己造一个），
@@ -160,25 +161,42 @@ Windows 侧从未失去可用产物。W0-5 明确写下放弃判据。
 
 ---
 
-## 3. macOS：可达，但**排在 Windows 的领域层方案之后**
+## 3. macOS：✅ **已完成（2026-09-28）** —— SwiftUI 原生壳
 
-两条路，顺序明确：
+这条当初的判断是"**排在 Windows 的领域层方案之后**"，理由写在下面（先有一个答案再去用第二次）。
+**现在那个答案有了，第二步已经走完**：
 
-| 路 | 触发条件 | 说明 |
-|---|---|---|
-| **A. SwiftUI / AppKit 原生**（推荐方向） | **Windows 的 W0-4 有结论之后** | 它和 Windows 卡在**同一个**问题上：跨语言调用 `packages/domain`。**同一个答案用两次**，边际成本才合理。先做 macOS 就是把那个问题付两遍 |
-| **B. `react-native-macos`** | 上游发布 **≥ 0.84 的 stable** 且 RN 版本能对上 | 更省 UI，但会重新引入"桌面壳反向锁死 RN 版本"的老问题（§2 的教训）。**触发时须重新权衡，不能默认回到这条路** |
+| 项 | 结果 |
+|---|---|
+| 壳 | `apps/desktop-macos`（SwiftPM：`HeytaShellCore` + `heyta-smoke` + `HeytaMac`） |
+| 原生依据 | **SwiftUI 原生控件**，不是 WebView、不是 Electron |
+| 跨语言那层 | **JavaScriptCore + libsqlite3 —— 两者都由 macOS 自带** ⇒ 零第三方依赖 |
+| 加载的代码 | **同一个** `packages/app-host/bridge-bundle/native-bridge.js`（与 Windows 壳同一份字节） |
+| 冒烟 | `swift run heyta-smoke` → **14/14** |
+| 窗口 | 已启动并**自截屏**（`HEYTA_SELF_CAPTURE`）→ [`evidence/`](../../apps/desktop-macos/evidence/)；库里的表与其它端一致（`ops` / `ops__mt3` / `state` / `__heyta_seq` …） |
 
-在触发之前，macOS 用 **Electron**，并**在文档里如实标注为过渡形态**（不叫"原生"）。
+原先的两条路里，**A（SwiftUI 原生）已落地**；B（`react-native-macos`）**不再需要** ——
+D2 一旦成立，"用 RN 复用 UI"就不再是省事的唯一办法，而它还会把版本锁死（§2 的教训）。
 
-⚠️ **不能顺手把 macOS 塞进 Windows 那一轮**：它会同时打开第二个"领域层怎么被调用"的
-实现，让 W0-4 的结论不再唯一。**先有一个答案，再去用第二次。**
+🔴 **两端在"错误怎么过边界"上不一样，这是这条路上最值钱的一条发现**：
+
+  · Windows（Jint）：CLR 异常开 `CatchClrExceptions` 后能被 JS `try/catch` 接住。
+  · macOS（JSC）：native 方法抛 `NSException` **不会**变成 JS 异常，而 **Swift 接不住
+    ObjC 异常**（直接抛 = 终止进程）⇒ 改成**返回信封**，由 TS 侧拆开并 `throw`。
+
+于是两端**共用同一个驱动包装**：有信封就拆，没有就走异常。细节见
+[`apps/desktop-macos/README.md`](../../apps/desktop-macos/README.md) §3。
 
 ---
 
-## 4. Linux：**没有 RN 目标**，且**没有需求证据** —— 这是产品判断不是排期问题
+## 4. Linux：**最后一个非原生端** —— 确定要做
 
-RN 生态**没有 Linux**。真原生只能 GTK4 / libadwaita（或 Qt），即**又一个独立代码库**。
+现状（实测，不是印象）：`release/heyta-linux-x64/` 里是 `chrome-sandbox` +
+`chrome_*.pak` + `LICENSES.chromium.html` ⇒ **Electron，不是原生**。
+
+RN 生态**没有 Linux**，所以真原生只能 GTK4 / libadwaita（或 Qt）—— **自己造**。
+好消息是路已经铺好：macOS 那一轮证明了"**窄 JSON 门面 + 各端自带的 JS 引擎与 SQLite**"
+这套形状可以搬到任何语言/运行时上，Linux 只是第三个消费者。
 
 **本计划的处理**：
 
@@ -288,14 +306,16 @@ pnpm check                                                          # → exit 0
 |---|---|---|
 | W0-0 复核 RNW 是否有 ≥0.85 | ✅ **已完成** | npm `dist-tags`：`latest=0.84.0`，无 0.85+ 稳定版（[ADR-0034](../adr/0034-windows-native-winui3-not-rnw.md) §1.2） |
 | W0-3 原生库缺口清单 | ✅ **已完成**，且**做成了可重跑的脚本** | **4 个原生库 / 3 个缺口**（[ADR-0034](../adr/0034-windows-native-winui3-not-rnw.md) §1.5）。复现：`node research/tools/windows-native-gaps.mjs` —— 它会现场数一遍，并在**清单过期**（包不再是直接依赖）或**可能漏报**（某依赖声明了 `codegenConfig` 却不在清单里）时报警 |
-| W0-1 装工具链 + 起窗口 | 🟡 **编译已通，开窗未做**（2026-09-28） | .NET SDK **10.0.401** 已装（`winget`）；该机**无 VS** 但 WinUI 3 / WinAppSDK 2.5.1 **`dotnet build` 0 警告 0 错误**，产出 **162304 字节的 exe** —— 见 [spike](../../research/spikes/winui3-toolchain-probe/README.md)。⬜ 启动窗口 + 截图仍待做（无桌面会话 + 需装 WinAppSDK 运行时） |
+| W0-1 装工具链 + 起窗口 | ✅ **已完成（含"可运行"）**（2026-09-28） | .NET SDK **10.0.401**（`winget`）；该机**无 VS** 但 WinUI 3 / WinAppSDK 2.5.1 **`dotnet build` 0 警告 0 错误**；🔴 **窗口已在真机交互式桌面会话里启动并截图**（`MAIN_WINDOW_TITLE=heyta`、`1152x587`、`DB_EXISTS=True`）—— 见 [evidence](../../apps/desktop-windows/evidence/) 与 [README §7](../../apps/desktop-windows/README.md) |
+| **七端原生壳审计** | ✅ **已完成（2026-09-28）** | 逐端实测壳的类型（不是凭印象）：Windows=WinUI 3、macOS=SwiftUI、iOS/Android=RN、鸿蒙=RNOH、Web=定义如此 ⇒ **六端原生**；**Linux 仍是 Electron**（`release/heyta-linux-x64/` 里是 `chrome-sandbox` + `chrome_*.pak`）⇒ 见 §4 |
+| **macOS 原生壳** | ✅ **已完成（2026-09-28）** | `apps/desktop-macos`（SwiftPM）。**JavaScriptCore + libsqlite3 均为 macOS 自带** ⇒ 零第三方依赖；加载**同一个** `native-bridge.js`。冒烟 `swift run heyta-smoke` → **14/14**；窗口自截屏入库（[evidence](../../apps/desktop-macos/evidence/)），库表与其它端一致（`ops`/`ops__mt3`/`state`/`__heyta_seq`） |
+| W1 WinUI 3 渲染最小切片 | 🟡 **数据通道 ✅，界面待长** | 通道有门禁（`check:windows-shell` 12/12）；⚠️ W1-3/W1-4 的判据要重述：Windows 是 XAML，**不可能与 Electron 共用 DOM testid**（见 §2.3） |
+| W2 组件 + MSIX | ⬜ 未开始 | — |
+| W3 替换 Windows 端 Electron | ⬜ 未开始 | — |
+| **Linux 原生壳（GTK4）** | ⬜ **未开始 —— 下一个** | 这是**最后一个非原生端**（§4）。机器已具备（`ubuntu-jcli` / `sanjiaozhou`，实测 SSH 可达） |
+| Linux 产物在 Linux 上运行 | ⬜ 未开始 | 同上 |
+| 鸿蒙 RN 应用上设备 | ⬜ 未开始 | 模拟器已具备（[§4.1](../runbooks/multi-platform-build.md)） |
 | W0-2 同步 SQLite 驱动（C#） | ✅ **已完成；契约全量重放 + 编组开销已测**（2026-09-28） | ① 未改一行的 `SqliteAdapter` + `DbOpLogStore` 跑**原样契约 50/50 通过**（约 2 秒），已做成门禁 `check:crosslang-contract`；反假通过：条数与真 vitest 对齐、注入细微 bug 能抓 6 条。② 编组开销：固定 **6 µs/次**、JSON 桥 **4.9 µs/行** ⇒ 保留 JSON 桥；2000 行时纯 C# 基线占 46%，该优化的是"少搬行"。⚠️ 未测：Windows 宿主上的性能；`widget-core` golden fixture 未进通道 |
 | **门禁：干净检出上 `pnpm check`** | ✅ **exit 0**（2026-09-28，137 秒） | 在 `git worktree` 的 HEAD 干净检出上跑完整 `pnpm check`（**并行会话的文件一个都不在**）⇒ 全绿。抓出并修掉两个"本机绿、CI 红"（esbuild 陈旧链接 `1c56439`、4 个死链 `de9b001`），见 §6.1。⚠️ e2e **24 passed / 2 skipped**（干净检出没下 Electron 二进制；那两条在主工作区真跑且通过） |
 | W0-5 决策点 | ✅ **已判：进 W1**（2026-09-28） | W0-1 / W0-2 / W0-4 三条门槛都过；放弃判据仍有效。⚠️ 更正：blob 曾被写成 W1 硬前置，实测**没有一处把二进制写进库** ⇒ 不是在用路径上的缺口 |
 | **W0-4 🔴 领域层单源 spike** | ✅ **bundle 级已证 D2 可行**（2026-09-28） | 同一份 bundle（338445 B / 146 导出）在裸 V8 与 .NET+Jint 上 **22/22 一致、零宿主全局**；复现 `bash research/spikes/domain-single-source/run.sh`。⚠️ 性能/ES 覆盖率未测 |
-| W1 WinUI 3 渲染最小切片 | ⬜ 未开始 | — |
-| W2 组件 + MSIX | ⬜ 未开始 | — |
-| W3 替换 Windows 端 Electron | ⬜ 未开始 | — |
-| macOS 原生 | ⏸ **排在 W0-4 之后** | §3 |
-| Linux 产物在 Linux 上运行 | ⬜ 未开始 | 机器已具备（[§0](../runbooks/local-server-verification.md)） |
-| 鸿蒙 RN 应用上设备 | ⬜ 未开始 | 模拟器已具备（[§4.1](../runbooks/multi-platform-build.md)） |
