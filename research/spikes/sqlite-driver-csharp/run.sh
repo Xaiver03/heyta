@@ -52,10 +52,11 @@ rm -f "$DB" "$DB-wal" "$DB-shm"
 rm -rf "$OUT_DIR/db"
 mkdir -p "$OUT_DIR/db"
 
-echo "▸ 2/2 C# 宿主 + Jint 跑 probe + 契约重放"
+echo "▸ 2/2 C# 宿主 + Jint 跑 probe + 契约重放 + 编组开销基准"
 SQLITE_SPIKE_BUNDLE="$BUNDLE" \
   SQLITE_SPIKE_DBDIR="$OUT_DIR/db" \
   SQLITE_SPIKE_PROBE="$HERE/probe.js" \
+  SQLITE_SPIKE_BENCH="$HERE/bench.js" \
   SQLITE_SPIKE_DB="$DB" \
   DOTNET_CLI_TELEMETRY_OPTOUT=1 DOTNET_NOLOGO=1 \
   dotnet run -c Release --project "$HERE/cs/DriverSpike.csproj"
