@@ -3,6 +3,7 @@ import { SuperSyncUploadOpsRequestSchema } from '@heyta/shared-schema';
 import { getAuthUser } from '../middleware';
 import { Logger } from '../logger';
 import { getSyncService } from './sync.service';
+import { notifyWidgetSubscribers } from '../push/notify';
 import { getWsConnectionService } from './services/websocket-connection.service';
 import {
   createStateReplacementRequiredResults,
@@ -373,6 +374,21 @@ export const uploadOpsHandler = async (
     // Notify other connected clients about new ops (fire-and-forget)
     if (accepted > 0) {
       getWsConnectionService().notifyNewOps(userId, clientId, latestSeq);
+
+      // 🔴 小组件刷新（Windows PWA 的 Web Push）。**fire-and-forget 且从不抛** ——
+      //    与上面那条 ws 通知同一个条件、同一个姿态。
+      //
+      //    为什么必须是 fire-and-forget：这是同步热路径，而推送是一次到几次
+      //    网络往返（每个订阅一次 ECDH + AES + POST）。等它会让每一次上传
+      //    都慢上几百毫秒；让它抛会让**用户的任务同步失败** ——
+      //    而"组件没刷新"与"任务没同步"完全不是一个量级的后果。
+      //
+      //    ⚠️ 没有 `.catch()` 就是错的：浮动的 Promise 在 Node 里会变成
+      //    未处理拒绝。`notifyWidgetSubscribers` 内部已经全吞，这里再兜一层
+      //    是为了让"它真的不会炸到这里"这件事在调用点可见。
+      void notifyWidgetSubscribers(userId).catch(() => {
+        // 已经记过日志了。这里只保证不会有未处理拒绝。
+      });
     }
 
     return reply.send(response);

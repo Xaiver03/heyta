@@ -40,6 +40,7 @@ model User {
   subscriptions               Subscription[]
   checkoutOrders              CheckoutOrder[]
   couponRedemptions           CouponRedemption[]
+  widgetPushSubscriptions     WidgetPushSubscription[]
 
   @@index([verificationToken])
   @@index([resetPasswordToken])
@@ -54,6 +55,7 @@ model Passkey {
   publicKey    Bytes     @map("public_key")
   counter      BigInt    @default(0)
   transports   String? // JSON array of transport types
+  name         String? // 用户自己起的名字；NULL = 没起过，界面回落到日期等既有信息
   createdAt    DateTime  @default(now()) @map("created_at")
   lastUsedAt   DateTime? @map("last_used_at")
 
@@ -593,4 +595,50 @@ model CouponRedemption {
   /// sweep 的扫描面：`state = 'reserved' AND reserved_until < now`。
   @@index([state, reservedUntil])
   @@map("coupon_redemptions")
+}
+
+// ---------------------------------------------------------------------------
+// Windows PWA 小组件的 Web Push 订阅（见 docs/plans/multi-platform-widgets.md 的 U12）
+// ---------------------------------------------------------------------------
+
+/// 一台设备的推送订阅。
+///
+/// 🔴 **`endpoint` 本身就是一个凭据。** 它是推送服务签发的能力 URL ——
+/// 拿到它的人就能给这台设备发任意载荷（载荷是密文，所以读不到内容，
+/// 但能反复打扰用户）。所以：**不要把它记进日志、不要回显给前端**。
+/// 它在这里的存在方式是"主键式的查找键"，不是"可展示的数据"。
+///
+/// 为什么 `endpoint` 全局唯一（而不是 `(userId, endpoint)`）：同一个浏览器
+/// 订阅只可能属于一个身份 —— 重新订阅时拿到的会是一个**新的** endpoint。
+/// 唯一约束让"重新订阅"变成一个自然的 upsert，而不是往库里堆重复行。
+/// ⚠️ 反过来说：谁掌握了这个 URL 谁就能把它注册到自己名下。这是 Web Push
+/// 协议本身的性质（能力即身份），不是这里的取舍。
+model WidgetPushSubscription {
+  id         Int    @id @default(autoincrement())
+  userId     Int    @map("user_id")
+  endpoint   String @unique
+  /// 用户代理的 P-256 公钥，base64url 编码的 65 字节未压缩点。
+  p256dh     String
+  /// 用户代理的认证密钥，base64url 编码的 16 字节。
+  auth       String
+
+  /// 🔴 **连续失败次数**，到阈值由调用方删除这一行。
+  ///
+  /// 为什么要计数而不是一失败就删：`429` / `5xx` 是推送服务自己的问题，
+  /// 删掉订阅等于惩罚用户。而**永远的**失败（推送服务持续返回 410 之外的错
+  /// 但设备其实已经卸载）需要一个收尾机制，否则这张表会无限增长。
+  /// 只统计**确定指向这一行有问题**的结果（见 repo 的 `recordPushFailure`）。
+  failureCount Int @default(0) @map("failure_count")
+
+  createdAt  BigInt  @map("created_at")
+  /// 最后一次成功发送的时间。用来排查"这个订阅还有没有在用"。可空。
+  lastUsedAt BigInt? @map("last_used_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  /// ⚠️ 索引是给"取某个用户的所有订阅"用的 —— 那是推送时唯一的热路径。
+  /// 普通 `CREATE INDEX` 就够：这张表与用户数同阶，永远不大
+  /// （AGENTS.md §4 优先级 1：表够小就别用 CONCURRENTLY）。
+  @@index([userId])
+  @@map("widget_push_subscriptions")
 }
