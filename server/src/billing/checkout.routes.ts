@@ -21,12 +21,18 @@
  * 4. 🔴 **不可交付的档在这里被挡掉**（`notSellableReason`）。这是
  *    ADR-0023 §3.1「计量存在之前 `hosted-ai-monthly` 不得被售卖」的**执行点**：
  *    没有它，这条路由今天就能把一档收了钱交付不了的服务卖出去。
+ * 5. 🔴 **通道要收得了这个币种，而且要在冻结之前判**（`supportedCurrencies`）。
+ *    金额是最小单位整数、不带币种，所以"报价冻 USD、通道按 CNY 签出去"是
+ *    一个**数值对得上、币种对不上、没有一层会报错**的分叉 —— 结算也只比
+ *    `final_amount_minor`，照样授予权益。这里按 `currency` 选通道，
+ *    选不到就 409，一张订单都不落；adapter 自己也必须拒（声明与执行同源）。
  *
  * ## 不在这里做的事
  *
  * - **不授予权益**。授予仍然只有一条写入路径：webhook → `applyPaymentEvent`。
  *   收银台只负责"把钱收上来"，不负责"把权益发下去"。
- * - **不推断币种与区域**。它们由调用方给（默认 CNY / CN），并且只接受词表里的值。
+ * - **不推断币种与区域**。它们由调用方给（默认 CNY / CN），并且只接受词表里的值，
+ *   再按 ⑤ 与通道声明的能力对齐 —— 但**不替调用方猜**一个它能收的币种。
  */
 
 import type { FastifyPluginAsync } from 'fastify';
@@ -144,14 +150,27 @@ export const checkoutRoutes: FastifyPluginAsync<CheckoutRoutesOptions> = async (
       if (!isRegion(region)) {
         return reply.code(400).send({ error: 'UNSUPPORTED_REGION', region });
       }
-      // ── ④ 必须有真通道 ────────────────────────────────────────────────
+      // ── ④ 必须有真通道，而且它得收得了这个币种 ──────────────────────────
       const usable = (options.adapters ?? []).filter((a) => a.provider !== NOOP_PROVIDER);
       if (usable.length === 0) {
         // 自托管默认就是这个形状（只配了 noop）。这不是 500：系统是好的，
         // 只是这台实例没有开通收款能力。
         return reply.code(503).send({ error: 'BILLING_PROVIDER_NOT_CONFIGURED' });
       }
-      const adapter = usable[0]!;
+      // 🔴 币种能力在**冻结之前**判。理由与"先冻结后下单"是同一条纪律的反面：
+      //    等到 `createCheckout` 才拒，那张订单**已经落库**了（随后被 `failOrder`
+      //    改成 `failed`），用户换来一个 502 和一条无用的失败订单，而真实原因只是
+      //    "这台实例收不了这个币种"—— 本可以在建单之前就说清楚。
+      //    `PROVIDER_CURRENCY_UNSUPPORTED` 与 `UNSUPPORTED_CURRENCY`（③ 的词表拒绝）
+      //    刻意是两个错误：前者是"这台实例没有能力"，后者是"这个值我们根本不认识"。
+      const adapter = usable.find((a) => a.supportedCurrencies.includes(currency));
+      if (adapter === undefined) {
+        return reply.code(409).send({
+          error: 'PROVIDER_CURRENCY_UNSUPPORTED',
+          currency,
+          providers: usable.map((a) => a.provider),
+        });
+      }
 
       const nowMs = now();
 
@@ -245,6 +264,10 @@ export const checkoutRoutes: FastifyPluginAsync<CheckoutRoutesOptions> = async (
           priceId: body.priceId,
           // 金额**只从冻结的报价来**。
           amountMinor: quote.finalAmountMinor,
+          // 🔴 币种也**只从冻结的报价来**，且必须与所选通道声明的能力一致
+          //    （上面 ④ 已经按它选过通道）。传字面量 'CNY' 就是"报价冻 USD、
+          //    通道收 CNY"那个静默收错钱的形状。
+          currency: quote.currency,
           outTradeNo,
           successUrl,
           cancelUrl,

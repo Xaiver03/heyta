@@ -57,6 +57,9 @@ let checkoutBehaviour: 'qr' | 'throw' = 'qr';
 
 const fakeAdapter: BillingAdapter = {
   provider: 'wechat',
+  // 真实微信通道只收 CNY（`WECHAT_SUPPORTED_CURRENCIES`）。这个 fake 必须声明
+  // 同样的能力 —— 收银台正是按"声明的能力"选通道，而那条判据是本 spec 要测的东西。
+  supportedCurrencies: ['CNY'],
   createCheckout: async (input): Promise<CheckoutResult> => {
     checkoutCalls.push(input);
     if (checkoutBehaviour === 'throw') throw new Error('通道侧炸了');
@@ -220,6 +223,61 @@ describe('收银台 —— 认证与准入', () => {
     expect((await post({ priceId: 'hosted-monthly', region: 'MARS' })).json().error).toBe(
       'UNSUPPORTED_REGION',
     );
+  });
+
+  it('🔴 通道收不了这个币种 → 409，且**连订单都不建**（能力判定在冻结之前）', async () => {
+    // 顺序是「报价 → 冻结 → 下单」。若等到 `createCheckout` 才拒，这张单**已经
+    // 落库**了（随后被 failOrder 改成 failed），用户拿到的是 502 + 一条无用的
+    // 失败订单，而真实原因只是"这台实例收不了美元"——本可以在建单之前说清楚。
+    //
+    // ⚠️ 与上面那条 `UNSUPPORTED_CURRENCY`（400，词表外的值）刻意是两个错误：
+    //    那个是"这个值我们根本不认识"，这个是"这台实例没有收它的能力"。
+    const res = await post({ priceId: 'hosted-monthly', currency: 'USD' });
+
+    expect(res.statusCode).toBe(409);
+    expect(res.json().error).toBe('PROVIDER_CURRENCY_UNSUPPORTED');
+    expect(res.json().currency).toBe('USD');
+    const rows = await sql.query<{ n: unknown }>('SELECT count(*)::int AS n FROM checkout_orders');
+    expect(Number(rows[0]?.n)).toBe(0);
+    expect(checkoutCalls).toHaveLength(0);
+  });
+
+  it('🔴 按**声明的能力**选通道，而不是"列表里第一个"，且发出去的是报价冻的币种', async () => {
+    // 一个只收 USD 的通道。两个方向都要证明：
+    // ① CNY 单**不能**因为它排在列表里就被接走（否则声明形同虚设）；
+    // ② USD 单要真的走到它，并且拿到的是**报价冻的 USD**，不是写死的 CNY。
+    const usdOnly: BillingAdapter = {
+      ...fakeAdapter,
+      provider: 'usd-only',
+      supportedCurrencies: ['USD'],
+    };
+    const usdApp = await buildApp({ adapters: [usdOnly] });
+    const inject = (payload: Record<string, unknown>) =>
+      usdApp.inject({
+        method: 'POST',
+        url: '/api/billing/checkout',
+        payload,
+        headers: { authorization: `Bearer ${H.GOOD_TOKEN}` },
+      });
+
+    const cny = await inject({ priceId: 'hosted-monthly' });
+    expect(cny.statusCode).toBe(409);
+    expect(cny.json().error).toBe('PROVIDER_CURRENCY_UNSUPPORTED');
+
+    const usd = await inject({ priceId: 'hosted-monthly', currency: 'USD' });
+    expect(usd.statusCode).toBe(200);
+    expect(usd.json().currency).toBe('USD');
+
+    // 库里冻的那一行：币种是 USD（不是默认的 CNY）。
+    const row = await orderRow(usd.json().outTradeNo as string);
+    expect(row).not.toBeNull();
+    expect(row!.currency).toBe('USD');
+    // 🔴 交给通道的币种与金额都来自**冻结的报价行**，逐字相等。
+    const sent = checkoutCalls.at(-1)!;
+    expect(sent.currency).toBe('USD');
+    expect(sent.amountMinor).toBe(row!.final_amount_minor);
+
+    await usdApp.close();
   });
 
   it('只配了 noop（= 没配通道）→ 503，而不是让 noop 接一笔真实支付', async () => {

@@ -63,6 +63,8 @@ import type {
 /** 假 adapter：对称 HMAC 验签，签名覆盖**原始字节**。 */
 const createTestAdapter = (provider = TEST_PROVIDER): BillingAdapter => ({
   provider,
+  // 这个 fake 只用来测 webhook 路由，收银台从不选它；声明 CNY 与真实 provider 一致。
+  supportedCurrencies: ['CNY'],
   async createCheckout(_input: CreateCheckoutInput) {
     return { redirectUrl: 'https://pay.example.test/checkout' };
   },

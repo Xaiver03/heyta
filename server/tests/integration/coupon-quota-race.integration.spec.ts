@@ -27,8 +27,9 @@
  *   DATABASE_URL=postgresql://… npx vitest run --config vitest.integration.config.ts \
  *     tests/integration/coupon-quota-race.integration.spec.ts
  *
- * ⚠️ 本文件**不**在 `server/package.json` 的 `test:integration:postgres` 清单里：
- * 那个文件此刻被另一条工作流改着（见 handoff §5.4），寄存器留给人合并。
+ * ✅ 本文件**已注册**进 `server/package.json` 的 `test:integration:postgres`
+ * （在此之前它只在 CI 之外被手动跑过 —— `server/package.json` 当时被另一条
+ * 工作流改着，见 handoff §5.4）。所以 CI 现在真的会跑这组并发用例。
  */
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { PrismaClient } from '@prisma/client';
@@ -158,7 +159,13 @@ describeWithDb('Coupon quota race (PostgreSQL)', () => {
   const buildQuote = (coupon: CouponDefinition): OrderQuote =>
     quoteOrder(
       {
-        priceId: 'annual',
+        // 🔴 这里曾经是 `'annual'`（ADR-0017 的 ¥99 年付时代）。ADR-0020 把 SKU
+        //    换成 `hosted-monthly` / `hosted-ai-monthly` 之后，`'annual'` 在基线价目表里
+        //    不存在了，`resolveEffectivePrice` 直接抛 `UnknownPriceError` ——
+        //    也就是这个用例从那次改价起就一直是**红的**。
+        //    之所以没人发现，正是因为本文件当时**不在** `test:integration:postgres`
+        //    清单里（handoff §5.4）：CI 不跑它，"注册"这一步本身就是修复的一半。
+        priceId: 'hosted-monthly',
         currency: 'CNY',
         region: 'CN',
         candidateCodes: [coupon.code ?? coupon.id],
