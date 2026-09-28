@@ -215,6 +215,8 @@ C# 进程**跑不了 TS**。两条路，**由 W0 spike 拍板，本文不预先�
    ⇒ **Visual Studio 2022（含 WinUI 工作负载）+ .NET SDK 是必须先装的前置**，
    而**装机本身没做**。这是 W0-1。
 2. **D1 vs D2 未拍板** —— §3.1 的 spike 没做。这是全计划真正的未知数。
+   ⚠️ **2026-09-28 追加**：spike **已做**，结论见下方 §6。**D1/D2 仍未最终拍板**，
+   但 D2 的"同一份字节两台引擎结果一致"这一半**已被实测证明**。
 3. **WinUI 3 应用在 `windows-pc` 上能否真正起来**（含 Windows App SDK 2.5.1 的
    self-contained / framework-dependent 选择）—— 未在本机 init 过任何工程。
 4. **C# `IWidgetProvider` 与 WinUI 3 主应用共存**的工程形态 —— 官方教程是"C# 控制台应用"
@@ -223,3 +225,36 @@ C# 进程**跑不了 TS**。两条路，**由 W0 spike 拍板，本文不预先�
 6. **`apps/desktop-windows` 的测试怎么进 `pnpm check`** —— C# 不在现有
    `pnpm -r test` / vitest 体系内，需要新的一条 `dotnet test` 通道（不在 macOS 上可跑）。
 7. **Windows 打包件的可见窗口截图**仍未取得（无头会话限制，与壳无关）。
+
+---
+
+## 6. 追加：§3.1 领域层 spike 的实测结果（2026-09-28）
+
+**结论：D2 的"同一份字节"这一半成立。** 复现：`bash research/spikes/domain-single-source/run.sh`（exit 0）。
+
+| 观测 | 值 |
+|---|---|
+| bundle | `@heyta/domain` 自包含 IIFE，**338445 字节 / 146 个导出**，零 `require` |
+| 引擎 A | **node v22.22.3 / `vm.createContext`（空沙箱）** —— 常见宿主全局（`process`/`require`/`window`/`fetch`/`Buffer`…）都定义成**一访问就抛错**的 getter |
+| 引擎 B | **.NET 10.0.8 / Jint 4.16.4.0**（MIT，纯 C#，无原生依赖） |
+| 用例 | **22 条，两侧都成功 22 条，结果逐条一致** |
+| bundle 触碰宿主全局 | **0 次** |
+
+用例不是"能加载"就算过，覆盖了：纯日期运算（跨月/跨年/闰年末、`daysBetween` 双向）、
+**打包进来的 `ical.js` RRULE 求值**（每周一三、`BYMONTHDAY=-1`、以及 `FREQ=SECONDLY`
+那条已知会抛错的保护路径）、多行 checkbox 正则、`computeTodayProgress` 的整个返回对象、
+`describeRecurrence` 的中文产出。
+
+⇒ **`packages/domain` 不需要为了 Windows 变成两份源**（D1 的主要代价因此可以避免）。
+
+### 6.1 这个结果**没有**证明的事（不要外推）
+
+1. **22 条用例是采样，不是全量**。Jint 对全部 ES 语法/内建的支持面**未验**；
+   真正的验收要等 W1 把整个领域层接上去、用 `packages/domain` 自己的测试反过来验 C# 侧。
+2. **跨引擎的浮点/大整数边界未验** —— 现有用例只有一条浮点，且恰好是二进制可精确比较的 `2/3`。
+3. **性能与内存完全未测**。Jint 是解释执行；若领域层在 UI 热路径被高频调用，开销可能不可接受。
+   **这一条足以让 D2 在 W1 被否掉**，所以它进 W1，不算已结清。
+4. **打包形态不等价**：spike 用的是 esbuild 现场产出的 IIFE，
+   而 `packages/domain` 正式的 tsup 产物是 ESM + CJS，两者是否等价未测。
+5. **Jint vs ClearScript 未比较** —— 选 Jint 只因它**无原生依赖**（本决策正在为"少一个原生依赖"付代价），
+   ClearScript/V8 可能更快，未测。
