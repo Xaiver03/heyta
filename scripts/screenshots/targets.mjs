@@ -178,24 +178,35 @@ export const SHELL_EVIDENCE = [
     label: 'macOS 原生壳',
     png: 'apps/desktop-macos/evidence/window-first-run.png',
     note: 'apps/desktop-macos/evidence/window-first-run.txt',
+    // 窗口截图**必须**交叉验证：存在"应用自己重绘"这条会把 SwiftUI 渲染坏的歧路
+    methods: ['cgs-window-server', 'screencapture-window'],
+    requiresCrosscheck: true,
+  },
+  {
+    label: 'iOS release 包',
+    png: 'apps/mobile/evidence/ios-release.png',
+    note: 'apps/mobile/evidence/ios-release.txt',
+    // 设备截图是权威来源，没有"重绘"歧路，所以采集方式登记即可、不需交叉验证
+    methods: ['simctl-screenshot'],
+    requiresCrosscheck: false,
+  },
+  {
+    label: 'Android release 包',
+    png: 'apps/mobile/evidence/android-release.png',
+    note: 'apps/mobile/evidence/android-release.txt',
+    methods: ['adb-screencap'],
+    requiresCrosscheck: false,
   },
 ];
 
 /**
- * 允许的采集方式白名单。**不在表里的一律判失败**。
- *
- *   - `cgs-window-server`   ：`CGWindowListCreateImage`，窗口服务器合成结果
- *                              （= `screencapture -l` 同源）。
- *   - `screencapture-window`：外部 `screencapture -l<windowID>`。
- *
- * ⛔ 明确**不允许**（都实测证伪，会把 SwiftUI 文字渲染坏）：
- *   `cache-display`、`calayer-render`、`image-renderer`。
+ * 采集方式里的已知坏值。列出来是为了把失败信息说清楚 ——
+ * 这些方式都实测会把 SwiftUI 的 Text 渲染坏。
  */
-export const ALLOWED_CAPTURE_METHODS = new Set(['cgs-window-server', 'screencapture-window']);
-
-/** 采集方式里的已知坏值，单独列出来是为了把失败信息说清楚。 */
 export const KNOWN_BAD_CAPTURE_METHODS = new Map([
   ['cache-display', 'AppKit draw(_) 路径，拿不到 SwiftUI 的 CGDisplayList ⇒ 文字糊成色带'],
   ['calayer-render', '图层树里没有 CGDisplayList，且是左下原点 ⇒ 既糊又上下翻转'],
-  ['image-renderer', '渲染不了 List / TextField / Toggle ⇒ 整片变成"禁止"占位符'],
+  ['image-renderer', '渲染不了 List / TextField / Toggle ⇒ 整片变成禁止占位符'],
 ]);
+
+/** 采集方式里的已知坏值，单独列出来是为了把失败信息说清楚。 */

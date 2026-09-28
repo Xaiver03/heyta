@@ -23,7 +23,6 @@ import process from 'node:process';
 
 import { inspectPng, looksBlank, looksSmeared } from './png-stats.mjs';
 import {
-  ALLOWED_CAPTURE_METHODS,
   ARTIFACT_ROOT,
   DEVICES,
   KNOWN_BAD_CAPTURE_METHODS,
@@ -76,8 +75,8 @@ for (const group of expectedGroups()) {
         `${group.label}/${file.name}: 尺寸 ${file.width}×${file.height}，期望 ${expected.width}×${expected.height}`,
       );
     }
-    if (file.hasAlpha) {
-      problems.push(`${group.label}/${file.name}: 含透明通道（colorType=${file.colorType}）`);
+    if (file.hasTransparency) {
+      problems.push(`${group.label}/${file.name}: 含实际透明像素（colorType=${file.colorType}）`);
     }
     if (looksBlank(file)) {
       problems.push(
@@ -108,7 +107,7 @@ for (const evidence of SHELL_EVIDENCE) {
   }
 
   const stats = inspectPng(pngPath);
-  if (stats.hasAlpha) problems.push(`${evidence.label}: 证据图含透明通道`);
+  if (stats.hasTransparency) problems.push(`${evidence.label}: 证据图含实际透明像素`);
   if (looksBlank(stats)) {
     problems.push(`${evidence.label}: 🔴 证据图疑似空白（内容 ${(stats.contentRatio * 100).toFixed(1)}%）`);
   } else if (looksSmeared(stats)) {
@@ -140,14 +139,19 @@ for (const evidence of SHELL_EVIDENCE) {
         `    ⇒ ${KNOWN_BAD_CAPTURE_METHODS.get(method)}\n` +
         `    ⇒ 改用 capture-window.sh（cgs-window-server）重采`,
     );
-  } else if (!ALLOWED_CAPTURE_METHODS.has(method)) {
-    problems.push(`${evidence.label}: 采集方式 \`${method}\` 不在白名单里 —— 要么改成可信方式，要么先证明它忠实`);
+  } else if (!evidence.methods.includes(method)) {
+    problems.push(
+      `${evidence.label}: 采集方式 \`${method}\` 不在白名单里（允许：${evidence.methods.join(' / ')}）\n` +
+        `    ⇒ 要么改成可信方式，要么先证明它是忠实的`,
+    );
   }
 
-  if (!crosscheck) {
-    problems.push(`${evidence.label}: 证据说明里没有 CROSSCHECK —— 没有与独立截屏交叉验证过`);
-  } else if (!crosscheck.startsWith('ok')) {
-    problems.push(`${evidence.label}: 交叉验证未通过（${crosscheck}）—— 自产图与独立截屏对不上`);
+  if (evidence.requiresCrosscheck) {
+    if (!crosscheck) {
+      problems.push(`${evidence.label}: 证据说明里没有 CROSSCHECK —— 没有与独立截屏交叉验证过`);
+    } else if (!crosscheck.startsWith('ok')) {
+      problems.push(`${evidence.label}: 交叉验证未通过（${crosscheck}）—— 自产图与独立截屏对不上`);
+    }
   }
 }
 

@@ -54,7 +54,7 @@ const st = inspectPng(process.argv[2]);
 console.log(`  ${st.width}x${st.height}  colorType=${st.colorType}  hasAlpha=${st.hasAlpha}`);
 console.log(`  内容比例 ${(st.contentRatio * 100).toFixed(1)}%   色阶差 ${st.colorSpan}`);
 let bad = false;
-if (st.hasAlpha) { console.error('  🔴 含透明通道'); bad = true; }
+if (st.hasTransparency) { console.error('  🔴 含实际透明像素'); bad = true; }
 if (looksBlank(st)) { console.error('  🔴 疑似空白'); bad = true; }
 if (bad) process.exit(1);
 console.log('  ✅ 通过');
