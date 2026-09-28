@@ -22,7 +22,7 @@
 | ~~**B2**~~ | ✅ **已解决：换成正式发布签名**（2026-09-28） | 生成了正式 keystore（RSA-4096 / 10000 天，`~/.heyta-signing/heyta-release.keystore`），密钥与口令**都在仓库外**（`~/.gradle/gradle.properties`，权限 600）。重建后 `[heyta] 发布签名：已配置`，AAB 与 APK 都用正式证书签名 （AAB 里 `META-INF/HEYTA.RSA`；APK 是 v2/v3 签名块 8184 字节）。⚠️ 旧的那个 `heyta test upload` 测试密钥与它签过的包**作废** | 我（已完成） |
 | ~~**B3**~~ | ✅ **已解决：证书已确认**（2026-09-28） | 在 ASC 建了 App ID（`com.heyta.mobile` = `Z979YYN9FY`、`com.heyta.mobile.WidgetExtension` = `6BZWPRPJ9Z`）+ APP_GROUPS 能力，并用 `Apple Distribution`（cert id `2R8LJZ6Q36`）建了两个 App Store profile。🔴 **profile 里嵌的证书 SHA-1 就是答案**（这是苹果自己的记录，比在钥匙串里猜可靠）：`79:51:52:08:57:8A:81:0F:82:C8:9E:5A:3D:48:24:37:DC:2D:EF:26`。⚠️ **Archive 仍被 App Group 卡住** —— 见下面的 B4 | 我（已完成） |
 
-| **B4** | 🟡 **Archive 差一步：App Group 还没建** | 报错原文：`Provisioning profile "heyta App Store" doesn't support the group.com.heyta.mobile App Group`。根因：**App Store Connect 的公开 API 不提供建 App Group 的能力**（`asc capabilities` 里签名域只覆盖 bundleIds / capabilities / certificates / profiles / devices），而 web 通道需要交互式 Apple ID 登录（`asc web auth status` → `authenticated: false`）。⚠️ 两个 entitlements 文件都声明了 `group.com.heyta.mobile`，widget 靠它共享容器 ⇒ 不能删了绕过。**需要你做的只有一步**：在 ASC 网页 Identifiers → App Groups 建 `group.com.heyta.mobile`，并把两个 App ID 都勾上它；之后我重建 profile 就能出包 | 你（建 App Group） |
+| ~~**B4**~~ | ✅ **已解决（2026-09-28）**：App Group 已建并挂上，Archive 已产出 | `group.com.heyta.mobile` 已在 App Store Connect 建好并**同时挂给** `com.heyta.mobile` 与 `com.heyta.mobile.WidgetExtension`；两个 App Store profile 重建后 `com.apple.security.application-groups` 从 `[]` 变成 `['group.com.heyta.mobile']`。**真机归档已成功**：`/tmp/heyta.xcarchive`（`HeytaMobile.app` 22 MB，`codesign --verify --deep --strict` → exit 0），签名证书 SHA-1 从**已签名产物内嵌的 profile** 读回，与前文一致 | 我（已完成） |
 
 另外两条**产品决策**（不是阻断，但会影响填法）：
 
