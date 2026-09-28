@@ -113,38 +113,48 @@ xcodebuild -workspace HeytaMobile.xcworkspace -scheme HeytaMobile -configuration
 
 echo ""
 echo "=== 从**已签名产物**里读回签名证书（这是备案要的权威值）==="
+
 APP="$ARCHIVE_PATH/Products/Applications/HeytaMobile.app"
 [ -d "$APP" ] || fail "归档里没有 HeytaMobile.app"
-codesign -dvvv "$APP" 2>&1 | grep -E "Authority|TeamIdentifier|Identifier=" | sed 's/^/  /'
 
-# 🔴 两个坑叠在一起：
+# 🔴 三个坑叠在一起，所以这段长这样：
 #    ① `codesign -d --extract-certificates <prefix>` **实测不产出文件**（静默失败）；
-#    ② .app 里的 `embedded.mobileprovision` 是 **CMS/PKCS#7 编码**的，
-#       不能直接 `plistlib.loads(bytes)`（会报 Invalid file），
-#       必须先 `security cms -D` 解出来。
-#    所以：读 .app 内嵌 profile（它才是真正签了这个包的 profile），先解码再解析。
+#    ② `.app` 里的 `embedded.mobileprovision` 是 **CMS/PKCS#7 编码**的，
+#       不能直接 `plistlib.loads`（报 Invalid file），必须先 `security cms -D` 解出来；
+#    ③ **heredoc 与管道不能同时用**：`cmd | python3 - <<'EOF'` 里 heredoc 会**接管 stdin**，
+#       把管道送来的数据丢掉 —— python 读到的其实是脚本文本，于是报 Invalid file。
+#    ⇒ 先把 profile 解到临时 plist 文件，再**以参数**把路径交给 python。
 if [ -f "$APP/embedded.mobileprovision" ]; then
-  security cms -D -i "$APP/embedded.mobileprovision" 2>/dev/null | python3 - <<'PYCERT'
-import hashlib, plistlib, subprocess, sys, tempfile, pathlib
+  PLIST_TMP=$(mktemp)
+  security cms -D -i "$APP/embedded.mobileprovision" > "$PLIST_TMP" 2>/dev/null
+  python3 - "$PLIST_TMP" <<'PYCERT'
+import hashlib, plistlib, pathlib, subprocess, sys, tempfile
+
 try:
-    d = plistlib.loads(sys.stdin.buffer.read())
+    data = plistlib.loads(pathlib.Path(sys.argv[1]).read_bytes())
 except Exception as exc:
-    print("  ⚠️ 解析内嵌 profile 失败：%s" % exc); raise SystemExit(0)
-print("  内嵌 profile : %s" % d.get('Name'))
-print("  app-groups  : %s" % d.get('Entitlements', {}).get('com.apple.security.application-groups'))
-for der in d.get('DeveloperCertificates', []):
+    print("  (解析内嵌 profile 失败：%s)" % exc)
+    raise SystemExit(0)
+
+print("  内嵌 profile : %s" % data.get('Name'))
+print("  app-groups  : %s" % data.get('Entitlements', {}).get('com.apple.security.application-groups'))
+for der in data.get('DeveloperCertificates', []):
     for algo in ('sha1', 'md5', 'sha256'):
         h = hashlib.new(algo, der).hexdigest().upper()
-        print("  %-6s = %s" % (algo.upper(), ':'.join(h[i:i+2] for i in range(0, len(h), 2))))
+        print("  %-6s = %s" % (algo.upper(), ':'.join(h[i:i + 2] for i in range(0, len(h), 2))))
     with tempfile.NamedTemporaryFile(suffix='.der', delete=False) as fh:
-        fh.write(der); tmp = fh.name
-    print("  " + subprocess.run(['openssl', 'x509', '-inform', 'DER', '-in', tmp, '-noout', '-subject'],
-                                capture_output=True, text=True).stdout.strip()[:130])
+        fh.write(der)
+        tmp = fh.name
+    subject = subprocess.run(['openssl', 'x509', '-inform', 'DER', '-in', tmp, '-noout', '-subject'],
+                             capture_output=True, text=True).stdout.strip()
     pathlib.Path(tmp).unlink(missing_ok=True)
+    print("  %s" % subject[:130])
 PYCERT
+  rm -f "$PLIST_TMP"
 else
-  echo "  ⚠️ .app 里没有 embedded.mobileprovision"
+  echo "  (.app 里没有 embedded.mobileprovision)"
 fi
+
 echo ""
 echo "=== 产物 ==="
 ls -la "$ARCHIVE_PATH" | sed 's/^/  /'
