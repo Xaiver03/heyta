@@ -51,11 +51,31 @@ cd apps/desktop-macos && swift run heyta-smoke
 
 # ③ 窗口
 swift run HeytaMac
-# 或自截屏（无人值守时用它验证窗口真的渲染）
-HEYTA_SELF_CAPTURE=/tmp/macos-window.png swift run HeytaMac
+# 或**取证**（跑起来 → 自截屏 → 校验 → 与 screencapture 交叉验证 → 落 evidence）
+bash apps/desktop-macos/scripts/capture-window.sh
 ```
 
 前置：Xcode / Swift 6（本机实测 Swift 6.4，Xcode 27.1 beta）。
+
+### 🔴 窗口取证：必须用 `CGWindowListCreateImage`，不能用"应用自己重绘"
+
+三种"看起来更干净"的内进程渲染**全部实测证伪**（详见
+`evidence/window-first-run.txt` 与 `Sources/HeytaMac/HeytaMacApp.swift` 的注释）：
+
+| 方式 | 实测结果 |
+|---|---|
+| `view.cacheDisplay(in:to:)` | 走 AppKit `draw(_:)`；SwiftUI 文字走 **`CGDisplayList`** 私有路径拿不到 ⇒ **文字糊成横向色带** |
+| `CALayer.render(in:)` | 同样拿不到 `CGDisplayList`，且是**左下原点** ⇒ 既糊又上下翻转 |
+| `ImageRenderer` | SwiftUI 官方快照，但**渲染不了 `List` / `TextField` / `Toggle`** ⇒ 整片变成"禁止"占位符 |
+| ✅ `CGWindowListCreateImage` | 问窗口服务器要一份**合成结果** ⇒ 文字/抗锯齿/深浅色都对，**被遮挡也不影响** |
+
+⚠️ 前两种最坏的地方是**看起来很可信**：尺寸对、内容比例 ~96%、色阶 255，
+空白检测完全通过 —— 只有人眼能发现字全是坏的。这也是为什么取证脚本
+**内置了与 `screencapture -l<windowID>` 的交叉验证**（两者同源，尺寸必须一致）。
+
+⚠️ 技术债：`CGWindowListCreateImage` 在 macOS 14 起已废弃（编译有一条 deprecation 警告），
+官方迁移路径是 **ScreenCaptureKit**。本轮没迁是因为它是 async 且强依赖屏幕录制权限，
+换掉要连带改自截屏的时序与失败处理；已记在这里，不要以为它是"干净"的。
 
 ## 3. 🔴 两端在"错误怎么过边界"上**不一样**（本轮最值得记的一条）
 

@@ -1,13 +1,40 @@
-# macOS 原生壳第一次成功启动的实测记录
+# macOS 原生壳窗口取证记录
 #
-# 采集方式：应用**自截屏**（HEYTA_SELF_CAPTURE=<png>），窗口起来 3 秒后
-# 把自己那个窗口渲染成 PNG 再退出。
+# 采集命令（可复现）：
+#   bash apps/desktop-macos/scripts/capture-window.sh
 #
-# 为什么不用 screencapture 从外面截：
-#   ① 整屏截图里别人的窗口会盖在上面（实测就是这样）；
-#   ② screencapture 还要屏幕录制权限，CI/无人值守下未必有。
-#   自渲染拿到的恰好是**这个窗口**的内容，而且可重复。
+# 采集方式：应用**自截屏**（HEYTA_SELF_CAPTURE=<png>），走
+#           CGWindowListCreateImage 取**窗口服务器合成结果**。
+#
+# 🔴 为什么不是"应用自己重绘一遍"—— 三条弯路，全部实测证伪：
+#
+#   1. view.cacheDisplay(in:to:)
+#      走 AppKit 的 draw(_:) 路径。现代 SwiftUI 的文字走 **CGDisplayList**
+#      私有渲染路径，拿不到 ⇒ **文字糊成横向色带**；而 NSButton / NSTextField
+#      因为 AppKit 自绘所以清晰。三次运行字节完全相同（确定性，非时序）。
+#      最坏的是它**看起来很可信**：尺寸对、内容比例 96%、色阶 255，
+#      空白检测完全通过 —— 只有人眼能发现字全是坏的。
+#
+#   2. CALayer.render(in:)
+#      走图层树同样拿不到 CGDisplayList，且是**左下原点** ⇒ 既糊又上下翻转。
+#
+#   3. ImageRenderer（SwiftUI 官方快照 API）
+#      渲染不了 List / TextField / Toggle ⇒ 整片变成"禁止"占位符。
+#
+#   4. ✅ CGWindowListCreateImage
+#      不重绘任何东西，是**问窗口服务器要一份**，所以文字/抗锯齿/深浅色都对，
+#      **被别的窗口遮挡也不影响**。与外部 `screencapture -l<windowID>` 同源。
+#
+# ⚠️ 需要屏幕录制权限。没有权限时窗口服务器只给一张桌面背景图，
+#    应用会**显式判失败**（比对尺寸）—— 绝不写一张"看起来成功其实是空的"图。
+#
+# PNG 后处理：窗口截图必然带 alpha（圆角/投影），已按窗口自身外观
+# （深色→黑底 / 浅色→白底）合成到**不透明**底上，便于查看与逐字节比对。
+#
+# 交叉验证（本脚本自动执行）：自截图与 `screencapture -l` 的尺寸必须一致。
 
 WINDOW_SIZE=900x560
 WINDOW_TITLE=heyta
-PNG_BYTES=82721
+PNG_BYTES=86681
+CAPTURE_METHOD=cgs-window-server
+CROSSCHECK=ok(1800x1120)
