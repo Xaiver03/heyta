@@ -2245,6 +2245,39 @@ grep -oE "✓[^│|]*[0-9]{3,}ms" /tmp/alltests.log | grep -v "tests)" | \
      现在只有"这段文字**确实是目标文档里另一个章节的标题**"才报错，
      那才是这个检查本来要抓的东西（编号对、链接活、只有**意思**错了）。
 
+77. 🔴 **`sed` 在 C locale 下遇到多字节序列会报 `illegal byte sequence` 并"中断整条管道"。**
+    本轮在 8 个打包/取证脚本里踩了 27 处，形态都一样：
+
+        sed: RE error: illegal byte sequence
+
+    触发条件不是"文件是二进制"，而是**流里有非 ASCII 字节**——最常见的两个来源是
+    **远端 PowerShell 的中文报错**、以及 **`git status` 里的中文文件名**。
+    要命的地方在于它是**在管道中间炸的**：你看到的输出像是"命令没跑"或"输出为空"，
+    于是很容易去怀疑上游命令。实测当时同一个 `ssh ... powershell` 明明跑成功了，
+    只是 `| sed 's/^/  /'` 那一段死了。
+
+    ✅ 修法：给行首加前缀一律用 `awk`（按字节处理，不挑 locale）：
+
+        ... | awk '{print "  " $0}'          # 而不是 | sed 's/^/  /'
+
+    若确实要用 `sed`，至少 `LC_ALL=C sed`。
+    📌 一般化：**"给输出加前缀/缩进"这种纯格式化的活，不要用对 locale 敏感的工具。**
+    把它当成与内容编码无关的操作。
+
+78. 🔴 **远端 PowerShell 只回一句乱码「命令行太长」时，问题在 `-EncodedCommand` 的长度上限。**
+    `-EncodedCommand` 收的是 **UTF-16LE + base64**，体积约为原脚本的 **2.7 倍字符**；
+    一个 9KB 的 `.ps1` 编码后约 24K 字符，直接超限。
+    远端返回的是 GBK 编码的中文错误，在 UTF-8 终端里显示成 `������̫����` ——
+    **完全指不到真正的原因**，很容易误判成"脚本语法错"或"SSH 传参被截断"。
+
+    ✅ 修法：**先 `scp` 过去，再用 `-File` 跑**：
+
+        scp -q script.ps1 host:C:/src/script.ps1
+        ssh host "powershell -NoProfile -ExecutionPolicy Bypass -File C:/src/script.ps1"
+
+    📌 顺带一条：`-EncodedCommand` 仍适合**很短**的探针（十来行），
+    那时它很省事；一旦脚本超过几行就换 `-File`。**长度不是风格问题，是硬上限。**
+
 ---
 
 ## 8. 工作流
