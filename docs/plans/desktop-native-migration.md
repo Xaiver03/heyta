@@ -67,7 +67,9 @@ RNW 看起来显然，**唯一**理由是"与 RN 0.84.1 版本精确对齐" —�
 **已经不再是代价的三条**（ADR-0032 曾把它们记成硬前置）：
 
 - ~~C1 同步 SQLite~~ → `Microsoft.Data.Sqlite` 是 **ADO.NET**，API 全同步
-  （[ADR-0034](../adr/0034-windows-native-winui3-not-rnw.md) §1.4，含官方原文）。
+  （[ADR-0034](../adr/0034-windows-native-winui3-not-rnw.md) §1.4，含官方原文）；
+  **且已端到端验过**：未改一行的 `SqliteAdapter` 在 Jint + C# 驱动上过契约
+  （[spike](../../research/spikes/sqlite-driver-csharp/README.md)，exit 0）。
 - ~~C3 provider 只能 C++/WinRT、无先例~~ → 微软**有 C# 版官方教程**
   （[ADR-0034](../adr/0034-windows-native-winui3-not-rnw.md) §1.3）。
 - ~~C2 生态只有 2.8% 支持 Windows~~ → **heyta 自己只有 4 个原生库**，
@@ -87,10 +89,10 @@ RNW 看起来显然，**唯一**理由是"与 RN 0.84.1 版本精确对齐" —�
 | 任务 | 判据（可执行） | 为什么是这一条 |
 |---|---|---|
 | **W0-1** 装工具链并起一个空窗口 | 🟡 **编译这一半已通**（2026-09-28）：`windows-pc` 上 **`winget install Microsoft.DotNet.SDK.10`** → **10.0.401**；该机 **从未装过 Visual Studio**（`C:\Program Files\Microsoft Visual Studio` 不存在），但 WinUI 3（Windows App SDK **2.5.1**）工程 **`dotnet build` 成功**（0 警告 0 错误）。⬜ **仍未做**：真的**启动一个窗口并截图** | 🔴 **2026-09-28 实测修正了官方文档的前置**：微软写的是"VS 2022 + WinUI 工作负载"，但**命令行编译不需要 VS**（[spike](../../research/spikes/winui3-toolchain-probe/README.md)）⇒ 省掉一个 10~20 GB 的共享机安装。⚠️ **"能编译" ≠ "能开窗"**：unpackaged 还需要机器上装 Windows App SDK 运行时，且**需要一个真实桌面会话**（SSH 进来的是无会话环境） |
-| **W0-2** **同步 SQLite 驱动（C#）** | 实现 `SqliteDriver`（`packages/storage/src/sqlite/sqlite-driver.ts` 的 4 个同步方法），并**逐条跑通同一套 `DbAdapter` 契约** | 契约测试**已经存在**（`packages/storage/tests/contract/adapter.contract.ts`），不需要新写判据；难的是**在 C# 侧重放它**（§6 的跨语言通道） |
+| **W0-2** **同步 SQLite 驱动（C#）** | ✅ **已完成**（2026-09-28，exit 0）。**未改一行的** `SqliteAdapter` 在 **.NET 10 + Jint** 里跑在 C# 同步驱动（`Microsoft.Data.Sqlite` 10.0.12）上：复合主键、唯一索引、**`addToleratingDuplicate` 吸收冲突 = `{ok:false}`**、**multiEntry 索引命中 1**、事务提交与回滚**全过**；并由 C# 侧**独立复核**盘上的库（`ops__mt3` 边表在、行数对得上）。复现：`bash research/spikes/sqlite-driver-csharp/run.sh` | 契约测试**已经存在**，难的是**在 C# 侧重放它**。⚠️ **两个"默认值就是错的"陷阱**已写进 [spike README](../../research/spikes/sqlite-driver-csharp/README.md)：`Microsoft.Data.Sqlite` **只认具名参数**（契约是 `?` 位置），以及 **Jint 默认把 CLR 异常冒泡给宿主、中断脚本**（不打开 `CatchClrExceptions`，一条重复写入会**杀掉整个桌面进程**）。⚠️ 仍欠：**blob（`Uint8Array`）过不了 JSON 桥** —— W1 前必须解决 |
 | **W0-3** 原生库缺口清单 | 数出 `apps/mobile` 用到的原生库及其 Windows 状态 | ✅ **已完成**：[ADR-0034](../adr/0034-windows-native-winui3-not-rnw.md) §1.5，**4 个原生库 / 3 个缺口**，含可复现命令 |
 | **W0-4** 🔴 **领域层单源 spike** | ✅ **bundle 级已证 D2 可行**（2026-09-28）。实测：同一份 `@heyta/domain` bundle 字节（338445 B / 146 个导出）在**裸 V8 上下文**（零宿主全局访问）与 **.NET 10 + Jint 4.16.4** 上跑 22/22 用例，**结果逐条一致**。含打包进来的 `ical.js` RRULE 求值。复现：`bash research/spikes/domain-single-source/run.sh`（exit 0） | **这是全计划唯一可能推翻 Windows 原生路线、或把它变成永久双份维护的点。** D2 成立 ⇒ **不认** D1 的永久双份维护。⚠️ **只答了"可行"，没答"够快"**：ES 覆盖率、跨引擎浮点边界、Jint 性能与内存**均未测**（[spike README 未证明项](../../research/spikes/domain-single-source/README.md)）—— 这些进 W1 |
-| **W0-5** 决策点 | D2 可行 → **进 W1**；两条都不成立 → 停，回 Electron 并记录原因 | 明确写出"什么情况下放弃"，避免沉没成本推着走 |
+| **W0-5** 决策点 | ✅ **已判：进 W1**（2026-09-28）。三条门槛都过了 —— W0-1 **命令行可编译**（不需要 VS）、W0-2 **同步 SQLite 驱动过契约**、W0-4 **领域层不必两份源**。⚠️ W1 的第一件事是**结清两个已知缺口**：**blob 过不了 JSON 桥**、**完整契约重放**未做 | 明确写出"什么情况下放弃"。**放弃判据依然有效**：若 W1 暴露出跨语言编组性能不可接受、或 blob 通道做不出来，仍回 Electron 并记录 |
 
 ⚠️ **W0 的产物不进 `apps/desktop`**，放独立 spike 目录 ——
 避免"半成品壳"污染现有可用的 Electron 路线。
@@ -252,8 +254,9 @@ RN 生态**没有 Linux**。真原生只能 GTK4 / libadwaita（或 Qt），即*
 |---|---|---|
 | W0-0 复核 RNW 是否有 ≥0.85 | ✅ **已完成** | npm `dist-tags`：`latest=0.84.0`，无 0.85+ 稳定版（[ADR-0034](../adr/0034-windows-native-winui3-not-rnw.md) §1.2） |
 | W0-3 原生库缺口清单 | ✅ **已完成**，且**做成了可重跑的脚本** | **4 个原生库 / 3 个缺口**（[ADR-0034](../adr/0034-windows-native-winui3-not-rnw.md) §1.5）。复现：`node research/tools/windows-native-gaps.mjs` —— 它会现场数一遍，并在**清单过期**（包不再是直接依赖）或**可能漏报**（某依赖声明了 `codegenConfig` 却不在清单里）时报警 |
-| W0-1 装工具链 + 起窗口 | 🟡 **编译已通，开窗未做**（2026-09-28） | .NET SDK **10.0.401** 已装（`winget`）；该机**无 VS** 但 WinUI 3 / WinAppSDK 2.5.1 **`dotnet build` 0 警告 0 错误** —— 见 [spike](../../research/spikes/winui3-toolchain-probe/README.md)。⬜ 启动窗口 + 截图仍待做（无桌面会话 + 需装 WinAppSDK 运行时） |
-| W0-2 同步 SQLite 驱动（C#） | ⬜ 未开始 | 契约已存在：`packages/storage/tests/contract/adapter.contract.ts` |
+| W0-1 装工具链 + 起窗口 | 🟡 **编译已通，开窗未做**（2026-09-28） | .NET SDK **10.0.401** 已装（`winget`）；该机**无 VS** 但 WinUI 3 / WinAppSDK 2.5.1 **`dotnet build` 0 警告 0 错误**，产出 **162304 字节的 exe** —— 见 [spike](../../research/spikes/winui3-toolchain-probe/README.md)。⬜ 启动窗口 + 截图仍待做（无桌面会话 + 需装 WinAppSDK 运行时） |
+| W0-2 同步 SQLite 驱动（C#） | ✅ **已完成**（2026-09-28） | 未改一行的 `SqliteAdapter` 在 Jint + C# 同步驱动上过契约最危险的一组（含 multiEntry、唯一冲突吸收、回滚）；C# 侧独立复核盘上库。复现 `bash research/spikes/sqlite-driver-csharp/run.sh`。⚠️ blob 与完整契约重放仍未做 |
+| W0-5 决策点 | ✅ **已判：进 W1**（2026-09-28） | W0-1 / W0-2 / W0-4 三条门槛都过；放弃判据仍有效 |
 | **W0-4 🔴 领域层单源 spike** | ✅ **bundle 级已证 D2 可行**（2026-09-28） | 同一份 bundle（338445 B / 146 导出）在裸 V8 与 .NET+Jint 上 **22/22 一致、零宿主全局**；复现 `bash research/spikes/domain-single-source/run.sh`。⚠️ 性能/ES 覆盖率未测 |
 | W1 WinUI 3 渲染最小切片 | ⬜ 未开始 | — |
 | W2 组件 + MSIX | ⬜ 未开始 | — |
