@@ -86,7 +86,7 @@ RNW 看起来显然，**唯一**理由是"与 RN 0.84.1 版本精确对齐" —�
 
 | 任务 | 判据（可执行） | 为什么是这一条 |
 |---|---|---|
-| **W0-1** 装工具链并起一个空窗口 | `windows-pc` 上装 VS 2022（WinUI 工作负载）+ .NET SDK ⇒ `dotnet --info` 有输出、`dotnet new` 出的 WinUI 3 工程**能启动一个窗口并截图** | 🔴 **2026-09-28 实测：该机 `dotnet` absent、`vswhere` absent** —— 装机本身没做，这是硬前置 |
+| **W0-1** 装工具链并起一个空窗口 | 🟡 **编译这一半已通**（2026-09-28）：`windows-pc` 上 **`winget install Microsoft.DotNet.SDK.10`** → **10.0.401**；该机 **从未装过 Visual Studio**（`C:\Program Files\Microsoft Visual Studio` 不存在），但 WinUI 3（Windows App SDK **2.5.1**）工程 **`dotnet build` 成功**（0 警告 0 错误）。⬜ **仍未做**：真的**启动一个窗口并截图** | 🔴 **2026-09-28 实测修正了官方文档的前置**：微软写的是"VS 2022 + WinUI 工作负载"，但**命令行编译不需要 VS**（[spike](../../research/spikes/winui3-toolchain-probe/README.md)）⇒ 省掉一个 10~20 GB 的共享机安装。⚠️ **"能编译" ≠ "能开窗"**：unpackaged 还需要机器上装 Windows App SDK 运行时，且**需要一个真实桌面会话**（SSH 进来的是无会话环境） |
 | **W0-2** **同步 SQLite 驱动（C#）** | 实现 `SqliteDriver`（`packages/storage/src/sqlite/sqlite-driver.ts` 的 4 个同步方法），并**逐条跑通同一套 `DbAdapter` 契约** | 契约测试**已经存在**（`packages/storage/tests/contract/adapter.contract.ts`），不需要新写判据；难的是**在 C# 侧重放它**（§6 的跨语言通道） |
 | **W0-3** 原生库缺口清单 | 数出 `apps/mobile` 用到的原生库及其 Windows 状态 | ✅ **已完成**：[ADR-0034](../adr/0034-windows-native-winui3-not-rnw.md) §1.5，**4 个原生库 / 3 个缺口**，含可复现命令 |
 | **W0-4** 🔴 **领域层单源 spike** | ✅ **bundle 级已证 D2 可行**（2026-09-28）。实测：同一份 `@heyta/domain` bundle 字节（338445 B / 146 个导出）在**裸 V8 上下文**（零宿主全局访问）与 **.NET 10 + Jint 4.16.4** 上跑 22/22 用例，**结果逐条一致**。含打包进来的 `ical.js` RRULE 求值。复现：`bash research/spikes/domain-single-source/run.sh`（exit 0） | **这是全计划唯一可能推翻 Windows 原生路线、或把它变成永久双份维护的点。** D2 成立 ⇒ **不认** D1 的永久双份维护。⚠️ **只答了"可行"，没答"够快"**：ES 覆盖率、跨引擎浮点边界、Jint 性能与内存**均未测**（[spike README 未证明项](../../research/spikes/domain-single-source/README.md)）—— 这些进 W1 |
@@ -251,8 +251,8 @@ RN 生态**没有 Linux**。真原生只能 GTK4 / libadwaita（或 Qt），即*
 | 阶段 | 状态 | 证据 |
 |---|---|---|
 | W0-0 复核 RNW 是否有 ≥0.85 | ✅ **已完成** | npm `dist-tags`：`latest=0.84.0`，无 0.85+ 稳定版（[ADR-0034](../adr/0034-windows-native-winui3-not-rnw.md) §1.2） |
-| W0-3 原生库缺口清单 | ✅ **已完成** | **4 个原生库 / 3 个缺口**（[ADR-0034](../adr/0034-windows-native-winui3-not-rnw.md) §1.5，含复现命令） |
-| W0-1 装工具链 + 起窗口 | ⬜ 未开始 | 已实测该机 `dotnet` / `vswhere` 均 absent |
+| W0-3 原生库缺口清单 | ✅ **已完成**，且**做成了可重跑的脚本** | **4 个原生库 / 3 个缺口**（[ADR-0034](../adr/0034-windows-native-winui3-not-rnw.md) §1.5）。复现：`node research/tools/windows-native-gaps.mjs` —— 它会现场数一遍，并在**清单过期**（包不再是直接依赖）或**可能漏报**（某依赖声明了 `codegenConfig` 却不在清单里）时报警 |
+| W0-1 装工具链 + 起窗口 | 🟡 **编译已通，开窗未做**（2026-09-28） | .NET SDK **10.0.401** 已装（`winget`）；该机**无 VS** 但 WinUI 3 / WinAppSDK 2.5.1 **`dotnet build` 0 警告 0 错误** —— 见 [spike](../../research/spikes/winui3-toolchain-probe/README.md)。⬜ 启动窗口 + 截图仍待做（无桌面会话 + 需装 WinAppSDK 运行时） |
 | W0-2 同步 SQLite 驱动（C#） | ⬜ 未开始 | 契约已存在：`packages/storage/tests/contract/adapter.contract.ts` |
 | **W0-4 🔴 领域层单源 spike** | ✅ **bundle 级已证 D2 可行**（2026-09-28） | 同一份 bundle（338445 B / 146 导出）在裸 V8 与 .NET+Jint 上 **22/22 一致、零宿主全局**；复现 `bash research/spikes/domain-single-source/run.sh`。⚠️ 性能/ES 覆盖率未测 |
 | W1 WinUI 3 渲染最小切片 | ⬜ 未开始 | — |
