@@ -121,6 +121,7 @@ HeytaApp.open 失败：'c' is an invalid start of a value. LineNumber: 0
 | **编组开销** | 用 JSON 文本过边界，实测约 **4.9 µs/行**（[基准](../../research/spikes/sqlite-driver-csharp/README.md)）。这是**已知取舍**，换的是"类型映射只有一处" |
 | **Jint 约束不可捕获** | 引擎失控（死循环/内存暴涨）会**杀掉整个进程**。W1 要么做隔离，要么显式接受（已进计划风险登记） |
 | **不在任何门禁里** | `check:design` / `check:layering` 等扫描器都是 JS/TS 的，看不到 C#。计划 §6 已登记要补 |
+| 🔴 **「任务行单一来源」门禁看不见这里的 XAML** | `scripts/check-row-single-source.mjs` 只扫 JS/TS（`.tsx`），而 `MainWindow.xaml` 里的任务行模板**是第二份实现**。**这是刻意的例外，不是漏网**：原生 UI 不可能复用 React 组件 —— 这正是 [ADR-0034](../../docs/adr/0034-windows-native-winui3-not-rnw.md) §4 已经承认的「`packages/ui` 对 Windows 归零」。⚠️ 代价要认：**任务行的视觉/行为在 Windows 上会独立漂移**，门禁不会替你发现。要么接受，要么将来为它加一条"渲染同一份数据契约"的视觉回归 |
 
 ## 6. 下一步（按价值排序）
 
