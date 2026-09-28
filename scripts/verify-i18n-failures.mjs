@@ -1219,8 +1219,16 @@ function groupCoupon() {
   );
 
   // ⑧ 让它不再幂等：重复投递的支付事件会被当成第二次授予。
+  //
+  // 🔴 锚点**只取那一行 `if`**，不要连函数体一起写死。2026-09-27 实测：这个用例
+  //    曾长期失效（探针抛「锚点不存在：…already-paid…」）—— 根因是函数体被重新
+  //    缩进过一次（`return` 从 6 空格变 4 空格），而旧锚点把缩进一起钉住了。
+  //    这一行在 `pricing-store.ts` 里**唯一**（`grep -c` = 1），所以单行就够定位，
+  //    也不会再随缩进漂移。风格与上一条（⑦）一致。
+  //    ⚠️ 顺带一条值得记住的：探针**没有**静默放过它，而是抛异常报出来 ——
+  //    这正是 `withMutation` 先断言锚点存在的原因（空转的注入比没有更坏）。
   expectRed('coupon', '去掉结算的幂等闸（重复投递重复授予）', () =>
-    withMutation(STORE, "if (status === 'paid') {\n      return { outcome: 'already-paid', orderId, userId };\n    }", 'if (false) {\n      return { outcome: \'already-paid\', orderId, userId };\n    }', billingRun),
+    withMutation(STORE, "if (status === 'paid') {", 'if (false) {', billingRun),
   );
 
   dropProbe('coupon');

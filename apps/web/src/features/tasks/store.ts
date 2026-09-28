@@ -39,6 +39,7 @@ import {
   type ActionContext,
   type AiFeedbackInput,
   type NewTaskFields,
+  type WidgetDrainTasks,
 } from '@heyta/app-host';
 
 import {
@@ -146,6 +147,21 @@ const actionContext: ActionContext = {
 };
 
 const taskActions = createTaskActions(actionContext);
+
+/**
+ * 小组件 drain 需要的那两个动作。
+ *
+ * 🔴 **在这里导出、不在 `pwa/` 里重新 `createTaskActions`。**
+ * 再建一份的话，`findTask` 读的会是**当时**的 `currentState()`，
+ * 而 `setCompleted` 走的是**同一个** dispatch —— 看起来一样，
+ * 但第二份 `taskActions` 会在未来"动作层开始持有状态"时静默分叉。
+ * 类型也**故意收窄**成 `WidgetDrainTasks`（见 app-host 的注释）：
+ * 以后 `TaskActions` 长大时，小组件这条路的权限不会被顺手放宽。
+ */
+export const widgetDrainTasks: WidgetDrainTasks = {
+  findTask: (entityId) => taskActions.findTask(entityId),
+  setCompleted: (entityId, completed) => taskActions.setCompleted(entityId, completed),
+};
 /**
  * 反馈动作。**与任务动作分开**：它写的不是用户内容，而是"用户怎么用 AI"。
  * 混在一起会让"任务写入"这个语义变得不清晰。

@@ -180,6 +180,19 @@ export default defineConfig({
   test: {
     environment: 'jsdom',
     globals: true,
+    /**
+     * 🔴 **必须把存储后端切到 `indexeddb`。**
+     *
+     * `oplog.ts` 的默认后端是 SQLite，而它由**一个 Worker** 承载 ——
+     * jsdom 没有 `Worker`，于是 45 个测试文件里有 12 个死在
+     * `ReferenceError: Worker is not defined`，报错停在离根因很远的地方。
+     *
+     * 这里用真实存在的**另一条**路径（`IndexedDbAdapter`，由 `tests/setup.ts`
+     * 的 `fake-indexeddb/auto` 提供实现）跑测试。
+     * ⚠️ **不是**给 jsdom 塞一个假 Worker —— 那会让"任务真的写进了 op-log"
+     * 这类断言变成**测一个假实现**。
+     */
+    env: { VITE_HEYTA_STORAGE: 'indexeddb' },
     include: ['tests/**/*.spec.{ts,tsx}'],
     /**
      * jsdom 没有 CSSOM 的 `CSS.supports`，而热力图与成长页用的

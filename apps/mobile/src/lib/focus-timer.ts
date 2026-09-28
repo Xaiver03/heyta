@@ -138,6 +138,21 @@ export function useFocusTimer(): FocusTimerSnapshot {
   return useSyncExternalStore(subscribe, getSnapshot);
 }
 
+/**
+ * **非 React** 调用方读当前专注状态 —— 目前唯一的调用方是小组件发布管线
+ *（`src/widgets/publish.ts`）。
+ *
+ * 🔴 为什么要专门开一个口子：小组件契约里的 `focus` **不是物化状态的一部分**
+ *（正在跑的番茄钟不落盘，`FocusSession` 是结束之后才写的），必须由应用**传进去**。
+ * 而发布管线不是 React 组件，拿不到 `useFocusTimer`。
+ *
+ * ⚠️ 不加这个口子的话，发布时只能传 `undefined`，于是**专注组件永远显示"没有进行中的专注"**
+ * —— 即使手机上正跑着一个番茄钟。那不是"功能没做"，是**画了一句假话**。
+ */
+export function currentFocusState(): FocusState {
+  return snapshot.state;
+}
+
 /** 当前配置。界面要用它显示"这一轮多长"。 */
 export const FOCUS_CONFIG: FocusConfig = DEFAULT_FOCUS_CONFIG;
 

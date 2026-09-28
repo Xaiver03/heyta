@@ -79,6 +79,7 @@ import { ImportPanel } from './features/settings/ImportPanel.js';
 import { MemoryPanel } from './features/settings/MemoryPanel.js';
 // 通行密钥自助管理（列 / 删）—— 服务端早就有端点，此前界面没有任何入口。
 import { PasskeyPanel } from './features/settings/PasskeyPanel.js';
+import { WidgetPushPanel } from './features/settings/WidgetPushPanel.js';
 import {
   createSessionSecretStore,
   loadAiSettings,
@@ -784,6 +785,14 @@ export function App(): React.JSX.Element {
               <ImportPanel />
               {/* 账号安全：管理自己的通行密钥（列 / 删）。见 PasskeyPanel 文件头。 */}
               <PasskeyPanel />
+              {/*
+                Windows 小组件的后台刷新（Web Push）。
+                🔴 **能力不可用时这个面板自己不画** —— http:// 上、没配 VAPID 的
+                自托管实例上、权限被拒之后，它都是一个点了必然失败的开关。
+                判断逻辑在 `WidgetPushPanel` 里（`probeWidgetPush`），
+                **不在这里** —— 调用点判断条件会被漏掉，而组件自己判断不会。
+              */}
+              <WidgetPushPanel />
             </>
           )}
         </div>

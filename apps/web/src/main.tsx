@@ -18,6 +18,18 @@ import { ErrorScreen } from './features/shell/ErrorScreen.js';
 import { storageHintKey } from './features/shell/error-hint.js';
 import { initOpLog } from './features/tasks/store.js';
 import { LocaleHost } from './lib/locale-host.js';
+import { startWidgetLifecycle } from './pwa/lifecycle.js';
+import { registerWidgetServiceWorker } from './pwa/register.js';
+
+/**
+ * W3-1：注册 service worker（Windows 的 PWA 组件靠它接事件）。
+ *
+ * ⚠️ **放在 `initOpLog()` 之前、而且不等它**：小组件是增强而不是功能前提，
+ * 它注册失败不该让应用起不来；反过来，等 op-log 初始化完再注册会白白推后
+ * `widgetinstall` 的就绪时间（用户装完组件到能看到数据的那段空窗）。
+ * 函数内部自己吞掉所有失败（见 `pwa/register.ts`）。
+ */
+registerWidgetServiceWorker();
 
 const container = document.getElementById('root');
 if (container === null) {
@@ -55,6 +67,18 @@ if (new URLSearchParams(window.location.search).has('slice')) {
    */
   initOpLog()
     .then(() => {
+      /**
+       * W3：小组件生命周期（收点击 + 推数据）。
+       *
+       * 🔴 **必须在 `initOpLog()` 之后**：它第一步就是 drain 组件点击、
+       * 并把结果落成 op；op-log 没就绪时 dispatch 会失败，
+       * 而那几条点击会被当成"执行失败"写回日志、每次启动重试一遍 —— 永远不会成功。
+       * 这正是移动端 `main` 里同一个顺序的理由。
+       *
+       * 它自己吞掉所有失败（见 `pwa/lifecycle.ts`）：组件是增强，不是功能前提。
+       */
+      startWidgetLifecycle();
+
       root.render(
         <StrictMode>
           <LocaleHost>

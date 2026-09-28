@@ -14,7 +14,7 @@ import { describe, expect, it } from 'vitest';
 
 import type { FocusSession, Habit, HabitLog, Task } from '../src/entities.js';
 import { computeActivityTotals, deriveMilestones } from '../src/milestones.js';
-import { computeTodayProgress } from '../src/today-progress.js';
+import { computeTodayProgress, isTaskPlannedForToday } from '../src/today-progress.js';
 import { computeWeeklyReview, weekWindowOf } from '../src/weekly-review.js';
 import { deriveIdentityTags, reachedIdentityTagIds } from '../src/identity-tags.js';
 
@@ -199,6 +199,93 @@ describe('computeTodayProgress', () => {
       today: TODAY,
     });
     expect(p.focusMinutes).toBe(0);
+  });
+});
+
+describe('isTaskPlannedForToday —— 单一判据（小组件与今日进度必须同源）', () => {
+  const TODAY = '2026-09-24'; // 周四
+  const YESTERDAY = '2026-09-23';
+
+  it('今天到期 → 是', () => {
+    expect(isTaskPlannedForToday(task({ dueDate: local(2026, 9, 24) }), TODAY)).toBe(true);
+  });
+
+  it('已逾期 → 是（"今天该做的"在用户心里包含逾期未完成的）', () => {
+    expect(isTaskPlannedForToday(task({ dueDate: local(2026, 9, 20) }), TODAY)).toBe(true);
+  });
+
+  it('明天到期 → 否', () => {
+    expect(isTaskPlannedForToday(task({ dueDate: local(2026, 9, 25) }), TODAY)).toBe(false);
+  });
+
+  it('没有截止日 → 否', () => {
+    expect(isTaskPlannedForToday(task(), TODAY)).toBe(false);
+  });
+
+  it('今天完成 → 仍是（已完成也要占今天的位置，界面上才看得到进度）', () => {
+    expect(
+      isTaskPlannedForToday(
+        task({ dueDate: local(2026, 9, 24), completedAt: local(2026, 9, 24, 15) }),
+        TODAY,
+      ),
+    ).toBe(true);
+  });
+
+  it('🔴 今天之前就完成 → 否，即使截止日就是今天', () => {
+    // 昨天做完的任务不该再占今天的位置。这一条把 completedAt 与 dueDate 解耦，
+    // 是最容易在别处被漏掉的分支。
+    expect(
+      isTaskPlannedForToday(
+        task({ dueDate: local(2026, 9, 24), completedAt: local(2026, 9, 23, 20) }),
+        TODAY,
+      ),
+    ).toBe(false);
+  });
+
+  it('已删除 → 否（即使到期且未完成）', () => {
+    expect(
+      isTaskPlannedForToday(task({ dueDate: local(2026, 9, 24), deletedAt: 1 }), TODAY),
+    ).toBe(false);
+  });
+
+  it('🔴 与 computeTodayProgress 的 tasksPlanned 逐一等价（防回退）', () => {
+    // ─────────────────────────────────────────────────────────────
+    // 这条测试的全部价值在于**将来会有人把判据重新内联回 computeTodayProgress**。
+    // 那一刻它不会报错、不会崩、界面上也看不出问题 ——
+    // 只会让"今日进度说 5 件"与"小组件列了 4 件"同时存在，而两边都不报错。
+    //
+    // 今天它必然通过（两边调的是同一个函数）。但它**能**失败 ——
+    // 只要有人把那份判据fork 出去，它立刻红。这正是 §5 要的那种检查。
+    // ─────────────────────────────────────────────────────────────
+    const Y = (d: number) => local(2026, 9, d);
+    const corpus: Task[] = [
+      task({ id: 'a', dueDate: Y(24) }),                                 // 今天到期
+      task({ id: 'b', dueDate: Y(20) }),                                 // 逾期
+      task({ id: 'c', dueDate: Y(25) }),                                 // 明天
+      task({ id: 'd' }),                                                 // 无截止日
+      task({ id: 'e', dueDate: Y(24), completedAt: local(2026, 9, 24, 9) }),  // 今天完成
+      task({ id: 'f', dueDate: Y(24), completedAt: local(2026, 9, 23, 9) }),  // 昨天完成
+      task({ id: 'g', dueDate: Y(24), deletedAt: 1 }),                   // 已删除
+      task({ id: 'h', dueDate: Y(24), purgedAt: 1, deletedAt: 1 }),      // 已彻底删除
+      task({ id: 'i', completedAt: local(2026, 9, 24, 9) }),             // 计划外今天完成
+    ];
+
+    const byPredicate = corpus.filter((t) => isTaskPlannedForToday(t, TODAY)).length;
+    const p = computeTodayProgress({ habits: [], logs: [], tasks: corpus, focusSessions: [], today: TODAY });
+
+    expect(p.tasksPlanned).toBe(byPredicate);
+    // 独立定值，防止"两边一起错"：今天到期 a、逾期 b、今天完成的 e、昨天完成的 f 不算、
+    // 删除的 g/h 不算、明天的 c 不算、无截止日 d 不算。→ 3 件
+    expect(p.tasksPlanned).toBe(3);
+    // `tasksDone` 的口径更宽：含计划外（i）→ a? 否。e + i = 2
+    expect(p.tasksDone).toBe(2);
+  });
+
+  it('昨天的日期参数不影响判据（同一批任务换"今天"就换结果）', () => {
+    const t = task({ dueDate: local(2026, 9, 24) });
+    expect(isTaskPlannedForToday(t, TODAY)).toBe(true);
+    // 站在昨天看，"明天到期"的任务不算今天该做
+    expect(isTaskPlannedForToday(t, YESTERDAY)).toBe(false);
   });
 });
 
