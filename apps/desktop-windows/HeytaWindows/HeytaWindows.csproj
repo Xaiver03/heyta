@@ -22,6 +22,14 @@
     <!-- 开发期跑 non-packaged（不需要 MSIX 就能启动）。widgets 那条路才需要 packaged。 -->
     <EnableMsixTooling>false</EnableMsixTooling>
     <WindowsPackageType>None</WindowsPackageType>
+    <!--
+      🔴 unpackaged 的 WinUI 3 **默认要求机器上装了 Windows App SDK 运行时**。
+      带上这一条，运行时随产物一起走 ⇒ 换一台没装过运行时的机器也能直接起来。
+      代价是产物变大；但对一个"要能给别人试"的原生应用来说这个代价值得：
+      否则第一步就卡在"请先安装 Windows App Runtime"，
+      而那是最容易被误判成"应用本身有问题"的失败形态。
+    -->
+    <WindowsAppSDKSelfContained>true</WindowsAppSDKSelfContained>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
   </PropertyGroup>
