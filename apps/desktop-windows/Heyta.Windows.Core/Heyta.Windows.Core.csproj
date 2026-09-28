@@ -1,0 +1,31 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    🔴 **这个工程刻意用 `net10.0`，没有 `-windows` 后缀。**
+
+    壳里真正会出错的部分不是 XAML，而是**跨语言那一层**：
+    同步 SqliteDriver、`?` → `$pN` 翻译、Jint 的微任务泵、JSON 编组、
+    以及"和 TS 的 facade 契约对不对得上"。这些**一点 Windows API 都不需要**。
+
+    把它们放在一个能在 macOS / Linux 上构建的库里，换来两件事：
+      1. 它们可以进 CI（Linux runner 就能跑），而不必等一台 Windows；
+      2. 平台相关的部分被压缩到只剩 XAML + 窗口生命周期 —— 那部分靠人眼看。
+
+    代价是多一个工程。相对"整个壳只能在 Windows 上验"，这个代价是划算的。
+  -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <AssemblyName>Heyta.Windows.Core</AssemblyName>
+    <RootNamespace>Heyta.Windows.Host</RootNamespace>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- C# 与 TS 之间的桥：Jint 执行 bundle，Microsoft.Data.Sqlite 提供同步驱动。 -->
+    <PackageReference Include="Jint" Version="4.16.4" />
+    <PackageReference Include="Microsoft.Data.Sqlite" Version="10.0.12" />
+  </ItemGroup>
+
+</Project>

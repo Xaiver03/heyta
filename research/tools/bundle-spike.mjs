@@ -117,6 +117,14 @@ await esbuild.build({
   // 🔴 `neutral` 是关键：esbuild 不会替我们补 process/Buffer 之类的垫片，
   //    于是"bundle 需要宿主能力"这件事在**构建期**就暴露，而不是留到引擎里才炸。
   platform: 'neutral',
+  // 🔴 **`neutral` 平台默认 `mainFields: []` —— 也就是完全不理 `main`。**
+  //    实测代价：`sync-core` 依赖 `hash-wasm`，而后者**只有 `main`**
+  //    （`"main": "dist/index.umd.js"`，没有 `module` / `exports`），
+  //    于是构建报 `Could not resolve "hash-wasm"`。
+  //    那个报错看着像"缺依赖"，其实是"解析规则没配" —— 能跑在 Node 里的包
+  //    在这个 bundle 里就是进不来。必须显式给 mainFields / conditions。
+  mainFields: ['module', 'main'],
+  conditions: ['import', 'module', 'default'],
   target: 'es2020',
   ...(Object.keys(alias).length > 0 ? { alias } : {}),
   logLevel: 'warning',

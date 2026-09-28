@@ -1,0 +1,49 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Windows 原生壳本体（WinUI 3 / Windows App SDK）。**只在 Windows 上构建** ——
+    所以这里刻意做得很薄：能被 CI 验的那部分全在 `Heyta.Windows.Core` 里。
+
+    职责只有三件：
+      1. 窗口与 XAML 界面；
+      2. 生命周期（初始化 AppApi、把 bundle 路径指到 exe 旁边）；
+      3. 把界面事件转成 AppApi 调用。
+    **任何业务规则都不许写在这里**（排序、完成态、派生视图都在 TS）。
+  -->
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows10.0.19041.0</TargetFramework>
+    <TargetPlatformMinVersion>10.0.17763.0</TargetPlatformMinVersion>
+    <RootNamespace>Heyta.Shell</RootNamespace>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <Platforms>x64;arm64</Platforms>
+    <RuntimeIdentifiers>win-x64;win-arm64</RuntimeIdentifiers>
+    <UseWinUI>true</UseWinUI>
+    <!-- 开发期跑 non-packaged（不需要 MSIX 就能启动）。widgets 那条路才需要 packaged。 -->
+    <EnableMsixTooling>false</EnableMsixTooling>
+    <WindowsPackageType>None</WindowsPackageType>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.WindowsAppSDK" Version="2.5.1" />
+    <ProjectReference Include="../Heyta.Windows.Core/Heyta.Windows.Core.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- bundle 只有一份（../assets/app-bridge.js），冒烟与壳共用。
+         链接成 exe 旁边的 app-bridge.js，于是运行时按 AppContext.BaseDirectory 找得到。 -->
+    <None Include="../assets/app-bridge.js" Link="app-bridge.js" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <!--
+    🔴 缺 bundle 就**明确报错**，而不是等运行时白屏。
+    "窗口打开了但什么都没有"是最难排查的一类失败，而这里完全可以在构建期拦下。
+  -->
+  <Target Name="RequireBridgeBundle" BeforeTargets="Build">
+    <Error Condition="!Exists('$(MSBuildProjectDirectory)/../assets/app-bridge.js')"
+           Text="缺少 assets/app-bridge.js。先在仓库根跑：node apps/desktop-windows/scripts/build-bridge.mjs" />
+  </Target>
+
+</Project>
