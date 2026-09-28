@@ -17,12 +17,20 @@
  * 退出码：有问题 = 1，全过 = 0（可直接进 CI）。
  */
 
-import { existsSync, readdirSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import process from 'node:process';
 
-import { inspectPng, looksBlank } from './png-stats.mjs';
-import { ARTIFACT_ROOT, DEVICES, artifactName, expectedGroups } from './targets.mjs';
+import { inspectPng, looksBlank, looksSmeared } from './png-stats.mjs';
+import {
+  ALLOWED_CAPTURE_METHODS,
+  ARTIFACT_ROOT,
+  DEVICES,
+  KNOWN_BAD_CAPTURE_METHODS,
+  SHELL_EVIDENCE,
+  artifactName,
+  expectedGroups,
+} from './targets.mjs';
 
 const root = process.cwd();
 const problems = [];
@@ -83,6 +91,63 @@ for (const group of expectedGroups()) {
   const extra = files.filter((file) => !group.targets.some((t) => artifactName(t) === file.name));
   if (extra.length > 0) {
     notes.push(`${group.label}: 有 ${extra.length} 张不在注册表里（可能是改名后残留）—— ${extra.slice(0, 3).map((f) => f.name).join('、')}`);
+  }
+}
+
+// ── 原生壳证据：**来源门禁**（防回归的核心）＋ 糊字启发式 ─────────────────
+//
+// 顺序很重要：先证明"这份证据是可信的采集路径产出的"，再看它长什么样。
+// 反过来做就会出现"图看着没问题、其实是渲染坏的"那种漏检。
+for (const evidence of SHELL_EVIDENCE) {
+  const pngPath = join(root, evidence.png);
+  const notePath = join(root, evidence.note);
+
+  if (!existsSync(pngPath)) {
+    notes.push(`${evidence.label}: 证据图还没生成（${evidence.png}）`);
+    continue;
+  }
+
+  const stats = inspectPng(pngPath);
+  if (stats.hasAlpha) problems.push(`${evidence.label}: 证据图含透明通道`);
+  if (looksBlank(stats)) {
+    problems.push(`${evidence.label}: 🔴 证据图疑似空白（内容 ${(stats.contentRatio * 100).toFixed(1)}%）`);
+  } else if (looksSmeared(stats)) {
+    problems.push(
+      `${evidence.label}: 🔴 证据图疑似**渲染坏了**（内容占比 ${(stats.contentOnModalRatio * 100).toFixed(1)}%，` +
+        `边缘密度 ${stats.edgeOnContent.toFixed(3)}）\n` +
+        `    ⇒ "内容摊满画布却没有梯度"是横向涂抹的典型形态。\n` +
+        `      先查采集方式，别去调阈值。`,
+    );
+  }
+
+  // 🔴 来源门禁
+  if (!existsSync(notePath)) {
+    problems.push(
+      `${evidence.label}: 缺少证据说明 ${evidence.note} —— **无法证明这份图是怎么采的**\n` +
+        `    ⇒ 请用 apps/desktop-macos/scripts/capture-window.sh 重新采集（它会写好说明）`,
+    );
+    continue;
+  }
+  const note = readFileSync(notePath, 'utf8');
+  const method = /^CAPTURE_METHOD=(.+)$/m.exec(note)?.[1]?.trim();
+  const crosscheck = /^CROSSCHECK=(.+)$/m.exec(note)?.[1]?.trim();
+
+  if (!method) {
+    problems.push(`${evidence.label}: 证据说明里没有 CAPTURE_METHOD —— 无法判定采集路径是否可信`);
+  } else if (KNOWN_BAD_CAPTURE_METHODS.has(method)) {
+    problems.push(
+      `${evidence.label}: 🔴 采集方式是不可信的 \`${method}\`\n` +
+        `    ⇒ ${KNOWN_BAD_CAPTURE_METHODS.get(method)}\n` +
+        `    ⇒ 改用 capture-window.sh（cgs-window-server）重采`,
+    );
+  } else if (!ALLOWED_CAPTURE_METHODS.has(method)) {
+    problems.push(`${evidence.label}: 采集方式 \`${method}\` 不在白名单里 —— 要么改成可信方式，要么先证明它忠实`);
+  }
+
+  if (!crosscheck) {
+    problems.push(`${evidence.label}: 证据说明里没有 CROSSCHECK —— 没有与独立截屏交叉验证过`);
+  } else if (!crosscheck.startsWith('ok')) {
+    problems.push(`${evidence.label}: 交叉验证未通过（${crosscheck}）—— 自产图与独立截屏对不上`);
   }
 }
 
