@@ -14,7 +14,7 @@
  * | 漂移 | 形状 |
  * |---|---|
  * | 漏「已完成」 | 真应用 `PRIMARY_NAV` 三项，复刻两项 |
- * | 编造象限计数 | 真应用 `QUADRANT_NAV` **没有 count 字段**，复刻画了 3/5/2/1 |
+ * | 编造象限计数 | 真应用的计数由 `bucketByQuadrant()` 算出，复刻画了写死的 3/5/2/1 |
  * | 漏「标签」整块 | 真应用 `ProjectsPanel` 有「标签」区，复刻没有 |
  * | 清单形态不同 | 真应用是「新清单」输入框 + `+`，复刻是三行静态名字 |
  * | 只画 4 个视图 tab | 真应用 `VIEW_TABS` 是 **8 个** |
@@ -29,7 +29,8 @@
  * 那正是真应用渲染时用的同一份词条。于是：
  *   - 改词的人不可能只改一边（两边本来就是同一份）；
  *   - 这里不会出现"测试里抄了一份文案、产品改了词、测试还绿着"。
- * 真正被钉住的是**结构**：8 项、有「已完成」、有「标签」、没有计数。
+ * 真正被钉住的是**结构**：8 项、有「已完成」、有「标签」、计数从样例任务派生。
+ * （更权威的对账在 `tests/mockup-shell-shape.spec.tsx` —— 它直接读 web 源码。）
  */
 
 import { act } from 'react';
@@ -39,25 +40,28 @@ import { afterEach, beforeAll, describe, expect, it } from 'vitest';
 import { I18nProvider, zhCN } from '@heyta/i18n';
 
 import { AppWindow } from '../src/mockup/AppWindow.js';
+import {
+  SHELL_PRIMARY_NAV,
+  SHELL_QUADRANT_NAV,
+  SHELL_VIEW_TABS,
+} from '../src/mockup/app-shell-shape.js';
+import { showcaseQuadrantCounts, SHOWCASE_TODAY_PROGRESS } from '../src/mockup/showcase-data.js';
 
-/** 真应用 `apps/web/src/App.tsx` 的 `VIEW_TABS`，按顺序。 */
-const APP_VIEW_TABS = [
-  'web.shell.nav.tasks',
-  'web.shell.nav.quadrant',
-  'web.shell.views.habits',
-  'web.shell.views.focus',
-  'web.shell.views.timeline',
-  'web.shell.views.growth',
-  'web.trash.nav',
-  'web.shell.views.settings',
-] as const;
-
-/** 真应用 `apps/web/src/App.tsx` 的 `PRIMARY_NAV`，按顺序。 */
-const APP_PRIMARY_NAV = [
-  'web.shell.nav.inbox',
-  'web.shell.nav.today',
-  'web.shell.nav.completed',
-] as const;
+/**
+ * 🔴 **这里曾经各抄了一份 `VIEW_TABS` / `PRIMARY_NAV`**（产品决策 P6）。
+ *
+ * 那正是 showcase 那几处漂移的**产生机制**：两处定义、只有一处生效，
+ * 于是真漂移只能靠运气被发现 —— 实测就是这样漏掉了「已完成」与「视图 tab 4 vs 8」。
+ *
+ * 现在两份都在 `app-shell-shape.ts`（外壳结构的**唯一登记处**，纯数据、
+ * 不 import React），这里**只做推导**。而"登记处与真应用是否一致"由
+ * `mockup-shell-shape.spec.tsx` 对账 `apps/web/src/App.tsx` 的**源码文本**来钉。
+ *
+ * ⚠️ 所以：**本文件不再是权威**。它测的是"渲染出来的东西 = 登记处"，
+ * 不测"登记处 = 真应用" —— 后者是那份新 spec 的职责，别在这里再抄一份。
+ */
+const APP_VIEW_TABS = SHELL_VIEW_TABS.map((tab) => tab.labelKey);
+const APP_PRIMARY_NAV = SHELL_PRIMARY_NAV.map((item) => item.labelKey);
 
 /**
  * jsdom 不实现 `ResizeObserver`，而 `AppWindow` 用它算缩放比。
@@ -115,8 +119,18 @@ describe('展厅复刻与应用一致', () => {
       const view = renderMockup(v);
       const today = view.querySelector('.mk-today');
       expect(today, `${v} 缺今天进度卡`).not.toBeNull();
-      expect(today?.textContent ?? '').toContain(zhCN['web.progress.today']);
-      expect(today?.textContent ?? '').toContain(zhCN['web.progress.hint.remaining'].replace('{count}', '3'));
+      // 🔴 M3 第十一刀之后卡片来自共享 `TodayProgressCard`：它**没有**"今天"标签
+      // （迁移前 web 的 `.ht-today__label` 有），比例是 `done/total` 一整段。
+      // 结构/token 的权威对账在 `mockup-today-shape.spec.tsx`。
+      expect(today?.querySelector('.mk-today__count')?.textContent?.trim()).toMatch(
+        /^\d+\/\d+$/u,
+      );
+      expect(today?.textContent ?? '').toContain(
+        zhCN['web.progress.hint.remaining'].replace(
+          '{count}',
+          String(SHOWCASE_TODAY_PROGRESS.remaining),
+        ),
+      );
       expect(view.querySelector('.mk-compose'), `${v} 缺捕获输入框`).not.toBeNull();
       // 输入框里的提示语必须是应用自己的那条
       expect(view.querySelector('.mk-input')?.textContent?.trim()).toBe(
@@ -183,15 +197,23 @@ describe('展厅复刻与应用一致', () => {
     }
   });
 
-  it('四象限**不显示计数** —— 真应用的 QUADRANT_NAV 没有 count 字段', () => {
+  it('四象限显示计数，且计数是**从样例任务算出来的**（不是手写的那四个数）', () => {
     const view = renderMockup();
-    // 复刻曾经在这里画了 3 / 5 / 2 / 1 四个数字，而产品界面上没有它们。
-    // 「多出来」比「少」更该先修：少一个入口是不完整，多一个数字是不诚实。
-    expect(view.querySelectorAll('.mk-nav__count')).toHaveLength(0);
-    const sidebarText = view.querySelector('.mk-sidebar')?.textContent ?? '';
-    for (const n of ['3', '5', '2', '1']) {
-      expect(sidebarText.includes(n), `侧栏不该出现凭空编的计数 ${n}`).toBe(false);
-    }
+    // 🔴 这里曾经断言「一个计数都不显示」，理由是"真应用 QUADRANT_NAV 没有 count 字段"。
+    //    那是一条**钉住错误事实**的判据：字段确实不在 `QUADRANT_NAV` 上，但计数是
+    //    `selectQuadrantCounts()`（→ `bucketByQuadrant()`）在渲染时算出来、单独传进
+    //    `NavButton` 的；`NavButton` 只在 `count > 0` 时渲染，所以**空账号的截图里
+    //    一个数字都没有** —— 审计当时把"位在、值为 0"读成了"产品没有这个位"。
+    //    正确的修法不是删掉计数位，而是让它**从同一份样例任务派生**。
+    //    判据的权威版本在 `tests/mockup-shell-shape.spec.tsx`（用领域层重算）。
+    const counts = showcaseQuadrantCounts();
+    const rendered = [...view.querySelectorAll('.mk-sidebar .mk-nav__count')].map(
+      (el) => el.textContent?.trim() ?? '',
+    );
+    const expected = SHELL_QUADRANT_NAV.map((q) => counts[q.quadrant]).filter((n) => n > 0);
+    expect(rendered).toEqual(expected.map(String));
+    // 编造的那四个数不许作为一组回来。
+    expect(rendered.join(',')).not.toBe('3,5,2,1');
   });
 
   it('清单与标签两区都在，且都是「输入框 + 加号」的形态', () => {

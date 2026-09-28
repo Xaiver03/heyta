@@ -40,9 +40,10 @@ function Ring({ progress }: { progress: number }): React.JSX.Element {
   const offset = circumference * (1 - progress);
 
   return (
+    // 🔴 尺寸**不在 JSX 里写死**：写死 `11.25rem` 会与 `--ht-size-focus-ring`
+    // 同值而**不会跟改**（看起来完全没错）。尺寸由 `mockup.css` 的
+    // `.mk-focus__ring svg` 从 token 取；判据见 mockup-focus-ring.spec.tsx。
     <svg
-      width="11.25rem"
-      height="11.25rem"
       viewBox={`0 0 ${String(VIEWBOX)} ${String(VIEWBOX)}`}
       style={{ transform: 'rotate(-90deg)' }}
     >

@@ -1,12 +1,25 @@
 /**
- * 整页冒烟测试
- * ==============
+ * 整站冒烟测试（每一页）
+ * ========================
  *
- * 目的只有一个：**证明这棵组件树在真实 DOM 里能渲染出来**。
+ * 目的有两个，而且第二个比第一个重要得多：
  *
- * 构建通过 ≠ 页面能渲染。类型系统看不见的东西包括：hook 调用顺序、
- * `useScroll` 的 target 为空、某个子组件在渲染期抛错、
- * 以及"文案写对了但根本没挂上去"。
+ *   1. **证明这棵组件树在真实 DOM 里能渲染出来**。构建通过 ≠ 页面能渲染：
+ *      类型系统看不见 hook 调用顺序、`useScroll` 的 target 为空、
+ *      某个子组件在渲染期抛错、以及"文案写对了但根本没挂上去"。
+ *
+ *   2. 🔴 **证明没有孤立路由**（N2）。这条以前不可能测 —— 整站只有一页，
+ *      "有没有人链得到它"是个空问题。现在站点有 7 个页面，而"加了一页、
+ *      组件写好了、HTML 也生成了，就是没有任何地方链得到它"是这类站点的
+ *      典型事故：页面能打开、返回 200、测试全绿，而线上没人到得了。
+ *      所以这里从**每一页**出发收集站内链接，逐个反解回注册表，
+ *      再看有没有哪个注册页面一次都没被指向。
+ *
+ * ⚠️ 计划 §9 曾把 `check:site-reachability` 列为一门独立的门禁脚本，**它尚未落地**
+ * （归 W4/A8）。所以**本用例就是当前唯一的站点内可达性判据**，
+ * 而且这是**故意**的：这道门禁要管的不只是渲染出来的链接，还有
+ * "应用 → 站点"那一半（`apps/web` 里的链接，渲染在另一个 app 里）。
+ * 这里管的是"站点内部不自成孤岛"，那条脚本管的是"两个产品不是一个孤岛"。
  *
  * 🔴 **刻意不挂载 WebGL 那一节。**
  * 做法是把 `IntersectionObserver` 换成一个**永不触发**的桩：
@@ -14,14 +27,19 @@
  * 理由是 jsdom 没有 WebGL，`three` 会抛 "Error creating WebGL context" ——
  * 那是**测试环境**的限制，不是产品缺陷。让它在 jsdom 里"通过"只能靠把
  * WebGL 整个 mock 掉，那种测试验证的是 mock，不是代码。
- * 所以 3D 那一节的验证方式是构建产物 + 真实浏览器，见交付说明。
+ * 所以 3D 那一节的验证方式是构建产物 + 真实浏览器。
  */
 
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 
-import { Landing } from '../src/Landing.js';
+import { I18nProvider } from '@heyta/i18n';
+
+import { PAGE_COMPONENTS } from '../src/pages/index.js';
+import { pageById, SITE_PAGES, type SitePageId } from '../src/site/pages.js';
+import { pageFromPath } from '../src/site/paths.js';
+import { SiteLayout } from '../src/site/SiteLayout.js';
 
 /** 永不触发的 IntersectionObserver：让 `Deferred` 保持未挂载。 */
 class NeverIntersectingObserver implements IntersectionObserver {
@@ -60,10 +78,8 @@ beforeAll(() => {
   globalThis.ResizeObserver = NoopResizeObserver as unknown as typeof ResizeObserver;
 });
 
-afterEach(() => {
-  // 有用例会把 `VITE_APP_URL` 设成"应用已部署"的状态。不清掉的话，
-  // 后面所有用例都会在一个"应用存在"的页面上跑 —— 而那正是默认状态不该有的样子。
-  vi.unstubAllEnvs();
+/** 卸载并移除当前容器。**幂等** —— 已经是干净状态时什么都不做。 */
+function cleanupPage(): void {
   if (root !== null) {
     act(() => {
       root?.unmount();
@@ -72,92 +88,101 @@ afterEach(() => {
   }
   container?.remove();
   container = null;
+}
+
+afterEach(() => {
+  // 有用例会把 `VITE_APP_URL` 设成"应用已部署"的状态。不清掉的话，
+  // 后面所有用例都会在一个"应用存在"的页面上跑 —— 而那正是默认状态不该有的样子。
+  vi.unstubAllEnvs();
+  cleanupPage();
 });
 
-function renderLanding(): HTMLDivElement {
+/**
+ * 渲染**一整页**（外壳 + 正文），与 `main.tsx` 的分派走同一条路。
+ *
+ * 走 `PAGE_COMPONENTS` 而不是直接渲染页面组件是刻意的：这样"注册表里有、
+ * 映射表里没有"会在测试里表现成渲染失败，而不是另一个只在线上出现的空白页。
+ */
+function renderPage(pageId: SitePageId): HTMLDivElement {
+  // 🔴 先清掉上一棵（同一个用例里可能连渲染多页）。
+  //
+  // 不这么做就会**在一个 document 里留下多个 `id="main"`**，而 jsdom 的
+  // id 选择器（nwsapi）在文档里有重复 id 时会返回"第一个匹配、但不是本作用域
+  // 内的"那个元素 —— 于是 `view.querySelector('#main')` 返回 `null`，
+  // 而 `view.querySelectorAll('[id]')` 明明列得出它。
+  // 那种失败看起来像**产品少了那一节**，实际是测试脚手架自己造成的。
+  // 所以"同一时刻只有一个容器"是这套用例的硬前提，由这一步保证，
+  // 而不是靠每个用例自觉。
+  cleanupPage();
+
+  const page = pageById(pageId);
+  const Page = PAGE_COMPONENTS[page.id];
   container = document.createElement('div');
   document.body.appendChild(container);
   root = createRoot(container);
   act(() => {
-    root?.render(<Landing />);
+    root?.render(
+      <I18nProvider locale="zh-CN">
+        <SiteLayout page={page}>
+          <Page page={page} />
+        </SiteLayout>
+      </I18nProvider>,
+    );
   });
   return container;
 }
 
-describe('落地页整页渲染', () => {
-  it('渲染不抛错，且挂出了主要内容', () => {
-    const view = renderLanding();
+/** 站内链接（以 `/` 开头的相对地址）。锚点与外链都不算。 */
+function internalHrefs(view: HTMLElement): string[] {
+  return [...view.querySelectorAll<HTMLAnchorElement>('a[href]')]
+    .map((anchor) => anchor.getAttribute('href') ?? '')
+    .filter((href) => href.startsWith('/'));
+}
+
+/**
+ * 全部页面 —— 每一个用例都跑一遍。
+ *
+ * 不逐个写用例：那样"加了第八页忘了补测试"就会静默发生，
+ * 而这一整个文件的意义正是**不留下可以静默漏掉的东西**。
+ */
+const ALL_PAGE_IDS = SITE_PAGES.map((page) => page.id);
+
+describe('每一页都能渲染，且外壳完整', () => {
+  it.each(ALL_PAGE_IDS)('%s：渲染不抛错，有 #main、有 H1、有页脚免责声明', (pageId) => {
+    const view = renderPage(pageId);
     expect(view.querySelector('#main')).not.toBeNull();
-    expect(view.textContent?.length ?? 0).toBeGreaterThan(500);
-  });
 
-  it('页内锚点全部有落点 —— 导航与页脚的链接不会指向空处', () => {
-    const view = renderLanding();
-    // 把锚点**从 DOM 里读出来**再逐个查落点，而不是硬编码一份 id 清单：
-    // 硬编码的清单会在加了一个区块之后仍然全绿（"以为管住了，其实没管"），
-    // 而写错/删掉一个区块 id 的后果就是"点了没反应"。
-    const hrefs = [...view.querySelectorAll<HTMLAnchorElement>('a[href^="#"]')].map(
-      (a) => a.getAttribute('href') ?? '',
-    );
-    expect(hrefs.length).toBeGreaterThan(0);
-    // ⚠️ 这里**曾经**有一份 `NOT_MOUNTED_IN_JSDOM = new Set(['#sync'])` 的豁免，
-    // 理由是"那一节由 <Deferred> 包着、在 jsdom 里不会挂载"。
-    // 那个豁免本身就是 bug：`#sync` 的落点只有**滚到附近**才存在，于是
-    // 导航点「同步」→ 浏览器找不到落点、不滚动 → 落点永远不挂载 ——
-    // 在真浏览器里就是**点了完全没反应，且控制台无报错**；豁免让这条测试
-    // 永远绿着，把它盖了一整轮。
-    // 现在 `id="sync"` 挂在 Deferred 的**占位块**上，落点一开始就在（而那棵
-    // WebGL 子树依旧在 jsdom 里不挂载，见本文件最后一条测试），所以豁免可以删掉 ——
-    // 一个豁免都不留。
-    const missing = hrefs.filter((href) => view.querySelector(href) === null);
-    expect(missing).toEqual([]);
-    // 价格那一节必须有锚点：导航、页脚、以及它自己都指向它。
-    expect(view.querySelector('#pricing')).not.toBeNull();
-    // 被推迟挂载的那一节，**落点**同样必须在场（里面的 canvas 不在场，两回事）。
-    expect(view.querySelector('#sync')).not.toBeNull();
-  });
-
-  it('一级标题存在且不为空', () => {
-    const view = renderLanding();
     const h1 = view.querySelector('h1');
-    expect(h1).not.toBeNull();
-    expect((h1?.textContent ?? '').trim().length).toBeGreaterThan(0);
-  });
+    expect(h1?.textContent?.trim().length ?? 0).toBeGreaterThan(0);
 
-  it('每个区块都有二级标题 —— 页面结构对读屏软件是可导航的', () => {
-    const view = renderLanding();
-    expect(view.querySelectorAll('h2').length).toBeGreaterThanOrEqual(6);
-  });
-
-  it('真实界面的复现件挂上了（任务列表、四象限、热力图、进度环）', () => {
-    const view = renderLanding();
-    expect(view.querySelector('.mk-frame')).not.toBeNull();
-    expect(view.querySelector('.lp-mini-quad')).not.toBeNull();
-    expect(view.querySelector('.lp-mini-heat')).not.toBeNull();
-  });
-
-  it('页脚带免责声明 —— 这是最容易被截图传播、也最不能漏的一句', () => {
-    const view = renderLanding();
+    // 页脚那句免责声明：README 里写着「本仓库为个人项目，与滴答清单/TickTick
+    // 及其关联公司无任何关系」。落地页是最容易被截图传播的界面，漏掉这句
+    // 会让人误以为这是官方产品 —— 而且它对**每一页**都成立，不只是首页。
     expect(view.textContent).toContain('滴答清单');
     expect(view.textContent).toContain('无任何关系');
   });
 
-  /**
-   * 🔴 仓库当前是**私有的**，所以任何 `github.com/Xaiver03/heyta` 链接
-   * 对访客都是 404 —— 一个"看起来能点、点了是 404"的链接比没有链接更坏。
-   *
-   * 这条测试钉的就是"整条链路已经摘干净"。它比原来那条
-   * 「GitHub 链接是外链且带 rel=noopener」更强：
-   * 原来那条只要求"如果有外链，就得带 noopener"，一个外链都没有时它**恒假**
-   * （而它当时确实红了，正好证明它测的是"存在性"而不是"安全性"）。
-   *
-   * 仓库公开之后要做的不是删这条测试，而是把它换回"外链必须带 noopener" ——
-   * 清单见 `Nav.tsx` 顶部。
-   */
-  it('整页不出现私有仓库地址，也没有 target=_blank', () => {
-    const view = renderLanding();
+  it.each(ALL_PAGE_IDS)('%s：正文有实质内容（不是空壳）', (pageId) => {
+    const view = renderPage(pageId);
+    expect(view.textContent?.length ?? 0).toBeGreaterThan(500);
+  });
+
+  it.each(ALL_PAGE_IDS)('%s：主题按钮可点击，并会把 data-theme 写到 <html> 上', (pageId) => {
+    const view = renderPage(pageId);
+    const toggle = view.querySelector<HTMLButtonElement>('button[aria-label*="主题"]');
+    expect(toggle).not.toBeNull();
+
+    const before = document.documentElement.dataset['theme'];
+    act(() => {
+      toggle?.click();
+    });
+    expect(document.documentElement.dataset['theme']).not.toBe(before);
+  });
+
+  it.each(ALL_PAGE_IDS)('%s：整页不出现私有仓库地址，也没有 target=_blank', (pageId) => {
+    const view = renderPage(pageId);
     const hrefs = [...view.querySelectorAll<HTMLAnchorElement>('a[href]')].map(
-      (a) => a.getAttribute('href') ?? '',
+      (anchor) => anchor.getAttribute('href') ?? '',
     );
     expect(hrefs.filter((href) => href.includes('github.com'))).toEqual([]);
 
@@ -166,25 +191,170 @@ describe('落地页整页渲染', () => {
     // 所以这里查的是整页文本（含 <code>），而不是链接集合。
     expect(view.textContent ?? '').not.toContain('github.com');
 
-    // 唯一的非锚点链接是语言切换（它指向另一语言的地址，且带 hrefLang）；
-    // 应用已部署时会多一条指向应用的「立即使用」，它必须带 rel=noopener。
-    //
-    // 🔴 断言写成"二者必居其一"而不是"必须带 hrefLang"：后者在应用上线后
-    // 会把正确的外链判成错的。但**没有任何一条外链可以既不带 hrefLang、
-    // 又不带 noopener** —— 那才是这条测试真正拦的风险。
+    // 站内相对链接（`/features/` 这类）既不是外链、也不需要 noopener ——
+    // 它们是**同一个站点内的跳转**，这正是本轮新增的那一类链接。
+    // 真正要拦的是"既不是语言切换、又没有 noopener 的外链"。
     for (const anchor of view.querySelectorAll<HTMLAnchorElement>('a[href]')) {
       const href = anchor.getAttribute('href') ?? '';
-      if (href.startsWith('#')) continue;
+      if (href.startsWith('#') || href.startsWith('/')) continue;
       const isLanguageSwitch = anchor.getAttribute('hrefLang') !== null;
       const rel = anchor.getAttribute('rel') ?? '';
-      const isSafeExternal = rel.includes('noopener');
       expect(
-        isLanguageSwitch || isSafeExternal,
+        isLanguageSwitch || rel.includes('noopener'),
         `外链既不是语言切换、也没带 rel=noopener：${href}`,
       ).toBe(true);
     }
 
     expect([...view.querySelectorAll('a[target="_blank"]')]).toEqual([]);
+  });
+});
+
+describe('🔴 没有孤立路由（N2）', () => {
+  /**
+   * 从每一页出发能到达的注册页面。
+   *
+   * ⚠️ 这里**只算导航与页脚**（外加页面正文里的站内链接）—— 也就是
+   * "一个真实访客能点到的东西"。手打 URL 不算可达：那正是孤立路由的定义。
+   */
+  function reachablePageIds(): Set<string> {
+    const seen = new Set<string>();
+    for (const pageId of ALL_PAGE_IDS) {
+      const view = renderPage(pageId);
+      for (const href of internalHrefs(view)) {
+        seen.add(pageFromPath(href).id);
+      }
+      cleanupPage();
+    }
+    return seen;
+  }
+
+  it('每一个注册页面都至少被某一页的某条站内链接指向', () => {
+    const reachable = reachablePageIds();
+    const orphans = ALL_PAGE_IDS.filter((id) => !reachable.has(id));
+    // 报出**具体是哪些**页面孤立：只说"有孤立路由"会让人去猜。
+    expect(orphans).toEqual([]);
+  });
+
+  it('首页一定可达 —— 字标指向它，而字标在每一页的导航与页脚里', () => {
+    for (const pageId of ALL_PAGE_IDS) {
+      const view = renderPage(pageId);
+      const hrefs = internalHrefs(view);
+      expect(hrefs.filter((href) => pageFromPath(href).id === 'home').length).toBeGreaterThan(0);
+    }
+  });
+
+  it('顶部导航里的每一条都指向一个注册页面（不是手写的死地址）', () => {
+    const view = renderPage('home');
+    const navHrefs = [
+      ...view.querySelectorAll<HTMLAnchorElement>('.lp-nav__links a[href]'),
+    ].map((anchor) => anchor.getAttribute('href') ?? '');
+    expect(navHrefs.length).toBeGreaterThanOrEqual(4);
+    for (const href of navHrefs) {
+      // 反解回注册表：如果导航里出现一条注册表没有的地址，
+      // `pageFromPath` 会把它当成首页 —— 所以这里同时断言"不是首页"。
+      expect(pageFromPath(href).id).not.toBe('home');
+    }
+  });
+
+  it('页脚包含每一个 `inFooter` 的页面', () => {
+    const view = renderPage('home');
+    const footerHrefs = internalHrefs(view.querySelector<HTMLElement>('.lp-footer') ?? view);
+    const footerPageIds = new Set(footerHrefs.map((href) => pageFromPath(href).id));
+    for (const page of SITE_PAGES) {
+      if (!page.inFooter) continue;
+      expect(footerPageIds.has(page.id), `页脚里没有 ${page.id}`).toBe(true);
+    }
+  });
+});
+
+describe('切语言保持当前页面（子页面上最容易错的一处）', () => {
+  it.each(ALL_PAGE_IDS)('%s：切换器的落点是本页的另一种语言', (pageId) => {
+    const view = renderPage(pageId);
+    const switcher = view.querySelector<HTMLAnchorElement>('a.lp-lang');
+    expect(switcher).not.toBeNull();
+    const href = switcher?.getAttribute('href') ?? '';
+    // 语言变了、页面没变。写死 `/en/` 时这条对子页面会红。
+    expect(href).toContain('/en/');
+    expect(pageFromPath(href).id).toBe(pageId);
+  });
+});
+
+describe('富文本：`**粗**` 与反引号不能被原样显示', () => {
+  /**
+   * 词条表里写了大量 `**强调**` 与 `` `命令` ``。**不处理它们的后果是把星号和
+   * 反引号直接显示给用户**，而那种错误在所有测试里都不会红：文本非空、
+   * key 存在、门禁只看有没有硬编码。
+   */
+  it.each(ALL_PAGE_IDS)('%s：整页文本里没有 `**`，且确实渲染出了 <strong>', (pageId) => {
+    const view = renderPage(pageId);
+    expect(view.textContent ?? '').not.toContain('**');
+  });
+
+  it('首页之后的功能页与平台页有粗体与等宽命令', () => {
+    const features = renderPage('features');
+    expect(features.querySelectorAll('strong').length).toBeGreaterThan(0);
+
+    const platforms = renderPage('platforms');
+    // 验证方式那几行是等宽的 —— 它们不是卖点，是给人复制去跑的。
+    expect(platforms.querySelectorAll('.lp-evidence code, .lp-evidence').length).toBeGreaterThan(0);
+  });
+});
+
+describe('首页（原有断言，一个都不放松）', () => {
+  it('页内锚点全部有落点 —— 导航与页脚的链接不会指向空处', () => {
+    const view = renderPage('home');
+    // 把锚点**从 DOM 里读出来**再逐个查落点，而不是硬编码一份 id 清单：
+    // 硬编码的清单会在加了一个区块之后仍然全绿（"以为管住了，其实没管"），
+    // 而写错/删掉一个区块 id 的后果就是"点了没反应"。
+    const hrefs = [...view.querySelectorAll<HTMLAnchorElement>('a[href^="#"]')].map(
+      (a) => a.getAttribute('href') ?? '',
+    );
+    expect(hrefs.length).toBeGreaterThan(0);
+    // eslint-disable-next-line no-console
+    const missing = hrefs.filter((href) => view.querySelector(href) === null);
+    expect(missing).toEqual([]);
+    // 价格那一节必须有锚点：导航、页脚、以及它自己都指向它。
+    expect(view.querySelector('#pricing')).not.toBeNull();
+    // 被推迟挂载的那一节，**落点**同样必须在场（里面的 canvas 不在场，两回事）。
+    expect(view.querySelector('#sync')).not.toBeNull();
+  });
+
+  it('每个区块都有二级标题 —— 页面结构对读屏软件是可导航的', () => {
+    const view = renderPage('home');
+    expect(view.querySelectorAll('h2').length).toBeGreaterThanOrEqual(6);
+  });
+
+  it('真实界面的复现件挂上了（任务列表、四象限、热力图）', () => {
+    const view = renderPage('home');
+    expect(view.querySelector('.mk-frame')).not.toBeNull();
+    expect(view.querySelector('.lp-mini-quad')).not.toBeNull();
+    expect(view.querySelector('.lp-mini-heat')).not.toBeNull();
+  });
+
+  it('WebGL 那一节在 jsdom 下**没有**被挂载（Deferred 的桩永不触发）', () => {
+    const view = renderPage('home');
+    // canvas 属于 SyncScene；它不该出现，因为 Deferred 没触发
+    expect(view.querySelector('.lp-sync__canvas')).toBeNull();
+  });
+
+  it('价格区：两个付费档的价格都在，且没有假的购买按钮', () => {
+    const view = renderPage('home');
+    const pricing = view.querySelector('#pricing');
+    expect(pricing).not.toBeNull();
+    const text = pricing?.textContent ?? '';
+
+    // ADR-0020：月付两个档（¥5 托管 / ¥12 含云端 AI），两种币都必须在页面上。
+    expect(text).toContain('¥5');
+    expect(text).toContain('¥12');
+    expect(text).toContain('$5');
+    expect(text).toContain('$12');
+    expect(text).toContain('都不阉割功能');
+    expect(text).toContain('云端 AI');
+
+    // 唯一的可点元素是免费档的 CTA，指向自建那一节；托管档没有任何按钮/链接。
+    expect(pricing?.querySelectorAll('button').length).toBe(0);
+    const anchors = [...(pricing?.querySelectorAll('a[href]') ?? [])];
+    expect(anchors.map((a) => a.getAttribute('href'))).toEqual(['#selfhost']);
   });
 
   /**
@@ -195,7 +365,7 @@ describe('落地页整页渲染', () => {
    * 点下去就是 404 —— 比没有入口更坏，因为它看起来是能用的。
    */
   it('未配置应用地址时，页面里没有任何指向应用的入口', () => {
-    const view = renderLanding();
+    const view = renderPage('home');
     const hrefs = [...view.querySelectorAll<HTMLAnchorElement>('a[href]')].map(
       (a) => a.getAttribute('href') ?? '',
     );
@@ -214,7 +384,7 @@ describe('落地页整页渲染', () => {
   it('配置了应用地址时，导航与收尾 CTA 都出现指向应用的「立即使用」', () => {
     vi.stubEnv('VITE_APP_URL', 'https://app.example.com/');
 
-    const view = renderLanding();
+    const view = renderPage('home');
     const appLinks = [...view.querySelectorAll<HTMLAnchorElement>('a[href]')].filter(
       (a) => a.getAttribute('href') === 'https://app.example.com',
     );
@@ -227,60 +397,189 @@ describe('落地页整页渲染', () => {
     }
   });
 
+  it('子页面上配了应用地址时，导航与页头都有应用入口（不是只有导航）', () => {
+    vi.stubEnv('VITE_APP_URL', 'https://app.example.com/');
+
+    const view = renderPage('features');
+    const appLinks = [...view.querySelectorAll<HTMLAnchorElement>('a[href]')].filter(
+      (a) => a.getAttribute('href')?.startsWith('https://app.example.com') === true,
+    );
+    // 两处：导航一条 + 页头一条。页头那条少了的话，访客读完一整页
+    // 必须滚回顶部才有入口。
+    expect(appLinks.length).toBe(2);
+  });
+});
+
+describe('子页面的正文真的挂上了', () => {
+  it('/features 把注册表里的分区都渲染出来（不是只有页头）', () => {
+    const view = renderPage('features');
+    // 八个能力模块 + 「还没做的」+「明确不做的」。
+    expect(view.querySelectorAll('.lp-row').length).toBeGreaterThanOrEqual(10);
+    expect(view.querySelectorAll('.lp-list__item').length).toBeGreaterThanOrEqual(15);
+  });
+
   /**
-   * 🔴 价格区的**前端侧**契约。
+   * 🔴 A1-2：每个能力模块配**真实界面素材**，而且判据是"**不用截图**"。
    *
-   * 价格本身在三处必须一致（`scripts/check-pricing-consistency.mjs` 管），
-   * 这里管的是另外两件只有渲染出来才看得见的事：
-   *   1. 页面上真的出现了那两个数字（门禁读的是词条表，读不到"有没有渲染"）；
-   *   2. **没有一个点了没反应的购买按钮** —— 托管档现在买不到
-   *      （大陆通道没接线、海外 KYC 没过），放一个"立即购买"比不放更坏。
+   * 截图会过期（改了设计系统就对不上），DOM 复现件跟着设计系统走。
+   * 所以这里断言的是**复现件挂上了**（`.mk-frame` 是复现件的外框），
+   * 而不是"页面里有张图"。
    */
-  it('价格区：两个付费档的价格都在，且没有假的购买按钮', () => {
-    const view = renderLanding();
-    const pricing = view.querySelector('#pricing');
-    expect(pricing).not.toBeNull();
-    const text = pricing?.textContent ?? '';
-
-    // ADR-0020：月付两个档（¥5 托管 / ¥12 含云端 AI），两种币都必须在页面上。
-    expect(text).toContain('¥5');
-    expect(text).toContain('¥12');
-    expect(text).toContain('$5');
-    expect(text).toContain('$12');
-    // "付费档不靠阉割功能卖钱"这条论断必须真的在页面上
-    //（否则"付费解锁功能"会被读成真的）。
-    //
-    // ⚠️ 这里原先断言的是「功能完全一样」，那是**错的**：¥12 那一档自己写着
-    //    「加上我们的云端 AI」，与 ¥5 档并不一样。断言一句站不住的话，比不断言更坏 ——
-    //    它会把错误措辞钉在页面上（这条测试当时正是这么挡住了一次修正）。
-    //    现在断言的是修正后的说法：不阉割功能，第二档贵出来的钱买的是云端 AI。
-    expect(text).toContain('都不阉割功能');
-    expect(text).toContain('云端 AI');
-
-    // 唯一的可点元素是免费档的 CTA，指向自建那一节；托管档没有任何按钮/链接。
-    expect(pricing?.querySelectorAll('button').length).toBe(0);
-    const anchors = [...(pricing?.querySelectorAll('a[href]') ?? [])];
-    expect(anchors.map((a) => a.getAttribute('href'))).toEqual(['#selfhost']);
+  it('/features 的能力模块挂着真实界面的 DOM 复现件（不是截图）', () => {
+    const view = renderPage('features');
+    // 四种视图各一件：任务 / 四象限 / 习惯 / 专注。
+    expect(view.querySelectorAll('.mk-frame').length).toBe(4);
+    // 一张 `<img>` 都不许有 —— 有图就说明有人贴了截图。
+    expect(view.querySelectorAll('img').length).toBe(0);
   });
 
-  it('WebGL 那一节在 jsdom 下**没有**被挂载（Deferred 的桩永不触发）', () => {
-    const view = renderLanding();
-    // canvas 属于 SyncScene；它不该出现，因为 Deferred 没触发
-    expect(view.querySelector('.lp-sync__canvas')).toBeNull();
+  /**
+   * 🔴 A1-3：每条能力都要有**可核对的出处**，而"强大""智能"这类形容词不能算。
+   *
+   * ⚠️ 出处是**命令或路径的文本，不是链接** —— 仓库当前是私有的，
+   * 做成链接就是 404。这一条同时钉住"标签来自词条表（要翻译）、
+   * 值不翻译"这个分工：标签每一条都在，值是等宽的。
+   */
+  it('/features 每个能力模块都给出「验证方式」，且不是形容词', () => {
+    const view = renderPage('features');
+    const evidence = [...view.querySelectorAll('.lp-evidence')];
+    // 八个能力模块各一条（同步那节两条：同步 + 隐私/加密）。
+    expect(evidence.length).toBe(9);
+
+    for (const line of evidence) {
+      // 标签（可翻译）与值（不翻译）都必须在。
+      expect(line.querySelector('.lp-evidence__label')?.textContent).toBe('验证方式');
+      const value = line.textContent?.replace('验证方式', '').trim() ?? '';
+      // 值必须是**能去跑/去看的东西**：命令或路径。
+      expect(value, `「${value}」不是命令也不是路径`).toMatch(
+        /(pnpm |packages\/|apps\/|docs\/|server\/)/,
+      );
+    }
   });
 
-  it('主题按钮可点击，并会把 data-theme 写到 <html> 上', () => {
-    const view = renderLanding();
-    const toggle = view.querySelector<HTMLButtonElement>('button[aria-label*="主题"]');
-    expect(toggle).not.toBeNull();
+  it('/signin 在配了应用地址时给出找回通行密钥的入口，未配置时不猜地址', () => {
+    // 未配置：没有那条链接（猜一个地址点下去是 404，比没有入口更坏）。
+    const bare = renderPage('signin');
+    expect(bare.querySelector('a[href$="/recover-passkey"]')).toBeNull();
 
-    const before = document.documentElement.dataset['theme'];
-    act(() => {
-      toggle?.click();
-    });
-    const after = document.documentElement.dataset['theme'];
+    // 配了：链接落在**域名的根**上（那三张凭据页是服务端渲染的，不在 /app/ 下）。
+    vi.stubEnv('VITE_APP_URL', 'https://heyta.finlaw.cloud/app/');
+    const wired = renderPage('signin');
+    const link = wired.querySelector<HTMLAnchorElement>('a[href$="/recover-passkey"]');
+    expect(link).not.toBeNull();
+    expect(link!.getAttribute('href')).toBe('https://heyta.finlaw.cloud/recover-passkey');
+  });
 
-    expect(after).not.toBe(before);
-    expect(['light', 'dark']).toContain(after);
+  it('/platforms 每一端都给出可复现的验证方式', () => {
+    const view = renderPage('platforms');
+    // 六端：Web / Android / iOS / 桌面 / 鸿蒙 / 自建。
+    expect(view.querySelectorAll('.lp-row').length).toBe(6);
+    expect(view.querySelectorAll('.lp-evidence').length).toBe(6);
+  });
+
+  /**
+   * 🔴 A7：`/integrations` 是**数据主权**那一页，判据与 `/features` 同形 ——
+   * 每个能力模块一段，每段一条**可复现**的验证方式（不是形容词）。
+   *
+   * ⚠️ 这里刻意数到 **9**：它是 benchmark §5 的九条独有能力，一条不少。
+   * 少一条就说明有人把某个能力从页面结构里拿掉了，而那时页面看起来仍然"有内容"。
+   */
+  it('/integrations 九条独有能力各有一节，且各给一条可核对的验证方式', () => {
+    const view = renderPage('integrations');
+    expect(view.querySelectorAll('.lp-row').length).toBe(9);
+    const evidence = [...view.querySelectorAll('.lp-evidence')];
+    expect(evidence.length).toBe(9);
+
+    for (const line of evidence) {
+      expect(line.querySelector('.lp-evidence__label')?.textContent).toBe('验证方式');
+      const value = line.textContent?.replace('验证方式', '').trim() ?? '';
+      // 值必须是**能去跑/去看的东西**：命令或仓库内路径。
+      expect(value, `「${value}」不是命令也不是路径`).toMatch(
+        /(pnpm |packages\/|apps\/|docs\/|server\/)/,
+      );
+    }
+  });
+
+  it('/pricing 有对照表、有 FAQ，而且**没有购买按钮**', () => {
+    const view = renderPage('pricing');
+    expect(view.querySelectorAll('.lp-compare__row').length).toBe(6);
+    expect(view.querySelectorAll('.lp-faq__item').length).toBe(4);
+    // 对照表里"功能"与"锁定"两行跨列渲染（同一句话不做两遍）。
+    expect(view.querySelectorAll('.lp-compare__cell--same').length).toBe(2);
+    expect(view.querySelectorAll('.lp-pricing__card').length).toBe(3);
+    expect(view.querySelectorAll('button').length).toBe(1); // 只剩主题按钮
+  });
+
+  it('/help 的每一条问题都有答案，且答案在页面上（没被折叠起来）', () => {
+    const view = renderPage('help');
+    const questions = view.querySelectorAll('.lp-faq__q');
+    const answers = view.querySelectorAll('.lp-faq__a');
+    // 🔴 A4-2：首批必须覆盖**用户最会撞到的 10 个问题**。数到 10 是刻意的 ——
+    // 少一条就说明有人把某个问题从清单里拿掉了，而页面看起来仍然"有内容"。
+    expect(questions.length).toBe(10);
+    expect(answers.length).toBe(questions.length);
+    // ⚠️ 只查正文：导航里那个窄屏折叠菜单**就是** `<details>`（见 `Nav.tsx`），
+    // 它是导航，不是"被折起来的答案"。
+    expect(view.querySelector('#main')?.querySelectorAll('details').length).toBe(0);
+    // A4-1：按**功能模块**组织 —— 至少有 5 个模块小标题。
+    expect(view.querySelectorAll('.lp-help__module').length).toBeGreaterThanOrEqual(5);
+  });
+
+  it('/changelog 每条都有机器可读的日期', () => {
+    const view = renderPage('changelog');
+    const times = [...view.querySelectorAll('time[datetime]')];
+    expect(times.length).toBeGreaterThanOrEqual(5);
+    for (const time of times) {
+      expect(time.getAttribute('datetime')).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+    }
+  });
+
+  it('/signin 说清两种方式与为什么认证在应用里', () => {
+    const view = renderPage('signin');
+    expect(view.querySelectorAll('.lp-methods__item').length).toBe(2);
+    expect(view.textContent).toContain('通行密钥');
+  });
+});
+
+describe('🔴 /platforms 只有散文、没有状态 —— 徽标与图例', () => {
+  /**
+   * 🔴 这一页叫「平台状态」，而在此之前它**没有状态**。
+   *
+   * `site.platforms.status.*` 与 `site.platforms.legend.*` 六条词条写好了、
+   * 门禁也绿，但 `SectionSpec` 上没有 `status` 字段 —— **结构上渲染不出来**。
+   * 访客只能逐段读散文才知道某个平台到底能不能用，而这一页存在的全部意义
+   * 就是让他一眼看出来。这是"看起来有、其实没有"里最贵的一种：
+   * **页面在，但它要传达的那件事不在。**
+   */
+  it('六个平台各有一个状态徽标，且档位与页面正文的说法一致', () => {
+    const view = renderPage('platforms');
+
+    const badges = [...view.querySelectorAll<HTMLElement>('.lp-status')];
+    // 6 个平台 + 3 条图例
+    expect(badges.length).toBe(9);
+
+    const byStatus = (s: string): number =>
+      badges.filter((b) => b.dataset['status'] === s).length;
+    // 平台上：web 可用；android/ios/desktop/selfhost 进行中；harmony 阻塞
+    expect(byStatus('available')).toBe(1 + 1); // 1 个平台 + 1 条图例
+    expect(byStatus('partial')).toBe(4 + 1);
+    expect(byStatus('blocked')).toBe(1 + 1);
+  });
+
+  it('三个档位都有中文说法 —— 徽标不能是三个没有定义的词', () => {
+    const text = renderPage('platforms').textContent ?? '';
+    expect(text).toContain('能用，且有端到端验收');
+    expect(text).toContain('进行中');
+    expect(text).toContain('有明确的外部依赖没解决');
+  });
+
+  it('其它页面**不**出现状态徽标（它只属于 /platforms）', () => {
+    for (const id of ALL_PAGE_IDS) {
+      if (id === 'platforms') continue;
+      expect(
+        renderPage(id).querySelectorAll('.lp-status').length,
+        `${id} 上不该有平台状态徽标`,
+      ).toBe(0);
+    }
   });
 });

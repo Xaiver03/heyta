@@ -81,6 +81,25 @@ function withLocale(url: string, locale: Locale): string {
 }
 
 /**
+ * 应用**自己**提供的某个路径的绝对地址（服务端渲染的页面，不在 `/app/` 下）。
+ *
+ * 🔴 为什么要按路径拼而不是把整条地址写进常量：`/recover-passkey`、`/verify-email`、
+ * `/magic-login` 这三张是**服务端渲染**的页面，住在**域名的根**上
+ * （`docs/runbooks/deployment.md` §3.3.1 的 nginx 段），而 `/app/` 只是应用产物。
+ * 所以"站点上的这个链接指向哪"= `VITE_APP_URL` 的**来源** + 这条路径。
+ * 把整条绝对地址写成常量，换域名时就会漏掉它（而漏掉的表现是 404）。
+ *
+ * @returns 绝对地址；**未配置应用地址时返回 `null`** —— 调用点据此**不渲染**
+ *   那个链接。这与 `startCta()` 的取舍是同一条：一个猜出来的地址点下去是 404，
+ *   比没有这个入口更坏。
+ */
+export function appPathHref(path: string): string | null {
+  const url = appUrl();
+  if (url === null) return null;
+  return new URL(path.startsWith('/') ? path : `/${path}`, url).toString();
+}
+
+/**
  * 「开始使用」这个意图该指向哪。
  *
  * 全页**只有这一个**意图对应**一个**标签（见 `FinalCta.tsx` 顶部）：

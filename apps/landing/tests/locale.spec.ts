@@ -1,13 +1,22 @@
 /**
- * 语言路由
- * ========
+ * 站点寻址：URL ↔ (页面, 语言)
+ * ==============================
  *
- * 语言**由路径决定**，所以这段判断是整站双语的唯一开关：它错了，
- * 英文用户会看到中文，或者中文用户分享出去的链接在别人那里变成英文。
+ * 🔴 **这是全站寻址的唯一实现**（`src/lib/locale.ts` 只是它的门面），
+ * 所以它错的时候，错法是**成片**的：语言切换器、hreflang、sitemap、
+ * 导航里的每一条链接都从它算出来。
  *
- * 最值得钉住的是**前缀不能当子串匹配**：`/energy`、`/enigma` 这类路径
- * 开头也是 `en`。用 `startsWith('en')` 写会静默把它们当成英文版 ——
- * 这种 bug 在手工点几下时几乎不会碰到，但一旦有别的路径就会发作。
+ * 本文件钉住三件事，每一件都对应一种真实发生过的错：
+ *
+ *   1. **前缀不能当子串匹配** —— `/energy`、`/enigma` 开头也是 `en`。
+ *      用 `startsWith('en')` 写会静默把它们当成英文版：手工点几下几乎
+ *      碰不到，一旦有别的路径就发作。
+ *   2. 🔴 **切语言必须保持当前页面**。这里曾经返回写死的 `/` 或 `/en/`：
+ *      当时整站只有一页，所以那是对的；有了子页面之后，在 `/features` 上点
+ *      English 会被丢回**英文首页** —— 页面换了语言**也换了页面**，
+ *      而地址栏看起来完全合理（`/en/` 确实存在）。
+ *   3. **认不出的路径回落到首页**而不是抛错：访客可能访问了一个旧链接
+ *      或拼错的地址，那时应当渲染首页，而不是白屏。
  *
  * ⚠️ 本文件跑在 vitest 里，`import.meta.env.BASE_URL` 是 `/`，
  * 所以"子路径部署"（`/landing/en/`）这一支**没有被真正覆盖** ——
@@ -17,7 +26,14 @@
 
 import { describe, expect, it } from 'vitest';
 
-import { localeFromPath, otherLocaleHref } from '../src/lib/locale.js';
+import { localeFromPath } from '../src/lib/locale.js';
+import {
+  localeFromPath as localeFromPaths,
+  otherLocaleHrefFor,
+  pageFromPath,
+  siteHref,
+} from '../src/site/paths.js';
+import { SITE_PAGES } from '../src/site/pages.js';
 
 describe('localeFromPath', () => {
   it('根路径是中文', () => {
@@ -44,16 +60,75 @@ describe('localeFromPath', () => {
     expect(localeFromPath('/anything')).toBe('zh-CN');
     expect(localeFromPath('/zh-CN/')).toBe('zh-CN');
   });
+
+  it('`src/lib/locale.ts` 的门面导出的是**同一个函数**，不是另一份实现', () => {
+    // 🔴 判据是 `toBe`（引用相等），不是 `toBeTypeOf('function')`。
+    // 后者只要门面里再写一份实现就仍然绿 —— 而两份实现漂移的表现正是
+    // "main.tsx 认一种语言、导航认另一种"。R9 把这条测试从自证改成真判据。
+    expect(localeFromPath).toBe(localeFromPaths);
+  });
 });
 
-describe('otherLocaleHref', () => {
-  it('中文版切到 /en/，英文版切回 /', () => {
-    expect(otherLocaleHref('zh-CN')).toBe('/en/');
-    expect(otherLocaleHref('en')).toBe('/');
+describe('pageFromPath', () => {
+  it('每个页面自己的路径都能解析回它自己', () => {
+    for (const page of SITE_PAGES) {
+      expect(pageFromPath(page.path === '/' ? '/' : `${page.path}/`).id).toBe(page.id);
+    }
   });
 
-  it('互切两次回到原处 —— 切换器不能把人送进死胡同', () => {
-    expect(localeFromPath(otherLocaleHref('zh-CN'))).toBe('en');
-    expect(localeFromPath(otherLocaleHref('en'))).toBe('zh-CN');
+  it('语言前缀不影响页面解析 —— 语言是路径的另一个维度', () => {
+    expect(pageFromPath('/en/features/').id).toBe('features');
+    expect(pageFromPath('/en').id).toBe('home');
+  });
+
+  it('只取第一段：更深的路径仍落在同一个页面上', () => {
+    // 帮助页的问题锚点是 `#id`，不是子路由；这里确认将来加文章路由时
+    // 不会意外落到首页。
+    expect(pageFromPath('/help/some-article/').id).toBe('help');
+  });
+
+  it('🔴 认不出的路径回落到首页，而不是抛错', () => {
+    // 旧链接、拼错的地址、将来被删掉的页面 —— 那时应当渲染首页
+    // （nginx 的 SPA 兜底本来也是这样），白屏是最坏的答案。
+    expect(pageFromPath('/deleted-page').id).toBe('home');
+    expect(pageFromPath('/featuresx').id).toBe('home');
+    expect(pageFromPath('/feature').id).toBe('home');
+  });
+});
+
+describe('otherLocaleHrefFor：切语言**保持当前页面**', () => {
+  it('🔴 子页面切语言后仍是同一个页面 —— 不是被丢回首页', () => {
+    // 这是本文件存在的主要理由。写死 `/` 或 `/en/` 时这条会红：
+    // 那时 `/features` → 英文得到 `/en/`，即"英文首页"。
+    const features = SITE_PAGES.find((page) => page.id === 'features');
+    expect(features).toBeDefined();
+    if (features === undefined) return;
+
+    expect(otherLocaleHrefFor(features, 'zh-CN')).toBe('/en/features/');
+
+    const enFeatures = SITE_PAGES.find((page) => page.id === 'features');
+    expect(enFeatures).toBeDefined();
+    if (enFeatures === undefined) return;
+    expect(otherLocaleHrefFor(enFeatures, 'en')).toBe('/features/');
+  });
+
+  it('首页切语言就是 / 与 /en/（与只有一个页面时的行为一致）', () => {
+    const home = pageFromPath('/');
+    expect(otherLocaleHrefFor(home, 'zh-CN')).toBe('/en/');
+    expect(otherLocaleHrefFor(home, 'en')).toBe('/');
+  });
+
+  it('每一页都有两个语言版本，且互切两次回到原处', () => {
+    for (const page of SITE_PAGES) {
+      for (const locale of ['zh-CN', 'en'] as const) {
+        const href = otherLocaleHrefFor(page, locale);
+        // 切过去之后：语言变了、页面没变。
+        expect(localeFromPath(href)).not.toBe(locale);
+        expect(pageFromPath(href).id).toBe(page.id);
+        // 再切一次回到出发点 —— 切换器不能把人送进死胡同。
+        const back = otherLocaleHrefFor(pageFromPath(href), localeFromPath(href));
+        expect(back).toBe(siteHref(page, locale));
+      }
+    }
   });
 });

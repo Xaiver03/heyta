@@ -1,0 +1,45 @@
+/**
+ * 「页面 id → 页面组件」的映射
+ * ================================
+ *
+ * 🔴 **`Record<SitePageId, …>` 不是类型体操，它是"忘了写组件"这条漏法的封堵。**
+ *
+ * 站点注册表（`src/site/pages.ts`）决定有哪些路由，而路由要能打开，还得有人
+ * 画出它的正文。这两件事分在两层是必须的（注册表不该 import React），
+ * 代价是"注册了页面但没写组件"成为一种可能。用 `Record<SitePageId, …>`
+ * 之后，那条漏法是**编译期**错误（`tsc -b` 直接失败），而不是
+ * "线上打开是一个空白页、而所有测试都绿"——空白页恰恰是本轮要根除的形态。
+ *
+ * 加一个页面的完整清单（也是 `pages.ts` 文件头里那三步）：
+ *   1. `src/site/pages.ts` 加一条（含 headingKey / ledeKey / 三个 seo 词条 key）；
+ *   2. `packages/i18n` 的 zh/en **两张表都**加词条；
+ *   3. 在这里登记组件（漏了这一步编译不过），以及它的正文 key 清单
+ *      （`src/site/content.ts`）。
+ * 然后跑 `pnpm --filter @heyta/landing gen:entries` 生成入口与 sitemap。
+ * 🔴 **不需要**改导航、页脚、sitemap 或 vite 配置。
+ */
+
+import type { ComponentType } from 'react';
+
+import { Landing } from '../Landing.js';
+import { ChangelogPage } from './ChangelogPage.js';
+import { FeaturesPage } from './FeaturesPage.js';
+import { HelpPage } from './HelpPage.js';
+import { IntegrationsPage } from './IntegrationsPage.js';
+import { PlatformsPage } from './PlatformsPage.js';
+import { PricingPage } from './PricingPage.js';
+import { SigninPage } from './SigninPage.js';
+import type { SitePage, SitePageId } from '../site/pages.js';
+
+type PageComponent = ComponentType<{ page: SitePage }>;
+
+export const PAGE_COMPONENTS: Record<SitePageId, PageComponent> = {
+  home: Landing,
+  features: FeaturesPage,
+  platforms: PlatformsPage,
+  pricing: PricingPage,
+  integrations: IntegrationsPage,
+  help: HelpPage,
+  changelog: ChangelogPage,
+  signin: SigninPage,
+};

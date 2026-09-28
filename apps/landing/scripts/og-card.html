@@ -1,0 +1,109 @@
+<!doctype html>
+<!--
+  社交分享卡片（1200×630）的**源文件**。
+  由 `scripts/gen-og-card.mjs` 用无头 Chrome 渲染成 `public/og-card.png`。
+
+  🔴 为什么要有它、而不是"随便找张截图"：
+  链接贴进微信 / X / Slack 时的**第一印象就是这张图**，而它同时也是
+  og:image 的落点 —— 一张 404 的 og:image 会让卡片退化成纯文字，
+  比不声明 og:image 更坏（平台会显示一个破图位）。
+
+  ⚠️ 它是**生成物的源**，不是手改的对象：改这里，然后跑
+      pnpm --filter @heyta/landing gen:og
+  生成的 PNG 签进仓库 —— 于是没有 Chrome 的环境（CI、别人的机器）
+  照样有图，只是不能重新生成。
+
+  尺寸与排版都是**锁死的**（1200×630、固定字号）：卡片里不用相对单位，
+  因为它不会被"响应式"地渲染 —— 那反而会让同一份源产出不同尺寸的图。
+-->
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      html,
+      body {
+        inline-size: 1200px;
+        block-size: 630px;
+        overflow: hidden;
+      }
+
+      body {
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+        padding: 72px 80px;
+        background: {{PAPER_BG}};
+        color: {{PAPER_INK}};
+        font-family:
+          -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC',
+          'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
+      }
+
+      /* 品牌那条蓝：与 design tokens 的 primary 同一个色相，
+         卡片是"同一个产品"的第一眼，不该出现第二种蓝。 */
+      .dot {
+        inline-size: 28px;
+        block-size: 28px;
+        border-radius: 50%;
+        background: {{PRIMARY}};
+        margin-block-end: 28px;
+      }
+
+      .title {
+        font-size: 76px;
+        line-height: 1.12;
+        font-weight: 700;
+        letter-spacing: -0.02em;
+      }
+
+      .lede {
+        margin-block-start: 28px;
+        font-size: 30px;
+        line-height: 1.45;
+        color: {{PAPER_INK_MUTED}};
+        max-inline-size: 900px;
+      }
+
+      .footer {
+        display: flex;
+        align-items: baseline;
+        gap: 20px;
+        font-size: 26px;
+        color: {{PAPER_INK_MUTED}};
+      }
+
+      .brand {
+        font-size: 30px;
+        font-weight: 700;
+        color: {{PAPER_INK}};
+        letter-spacing: -0.01em;
+      }
+
+      /* 右下角那条竖线是唯一的装饰：它把"品牌"和"域名"分开，
+         而不需要再加一个图标或一条横贯全宽的色带。 */
+      .sep {
+        inline-size: 2px;
+        block-size: 22px;
+        background: {{PAPER_RULE}};
+      }
+    </style>
+  </head>
+  <body>
+    <div>
+      <div class="dot"></div>
+      <h1 class="title">{{CARD_TITLE1}}<br />{{CARD_TITLE2}}</h1>
+      <p class="lede">{{CARD_LEDE}}</p>
+    </div>
+    <div class="footer">
+      <span class="brand">heyta</span>
+      <span class="sep"></span>
+      <span>{{SITE_HOST}}</span>
+    </div>
+  </body>
+</html>

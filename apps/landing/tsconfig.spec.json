@@ -5,7 +5,14 @@
     "declaration": false,
     "declarationMap": false,
     "noEmit": true,
-    "rootDir": ".",
+    // 🔴 `rootDir` 必须放宽到**仓库根**，而不是 `.`。
+    //    `tests/mockup-shell-shape.spec.tsx` 用**相对路径**直取领域层的纯源码
+    //    （`packages/domain/src/quadrant.ts`）来重算象限计数 —— 因为在写入租约下
+    //    不能把 `@heyta/domain` 加进 package.json（那会改 pnpm-lock.yaml）。
+    //    钉在 `.` 时 tsc 报 TS6059（"not under rootDir"）。这里是 `noEmit`，
+    //    rootDir 只影响"文件必须在其下"这条校验；放宽的唯一后果是
+    //    tsc 会顺带类型检查被 import 的领域层源码 —— 那本来就是想要的。
+    "rootDir": "../..",
     // 🔴 `types` **会整体覆盖**父级 tsconfig.json 里的 `["vite/client"]`，不会合并。
     //    少了它，任何 `import.meta.env.X` 都会报 TS2339
     //    （实测：`src/lib/locale.ts(23,26): Property 'env' does not exist on type 'ImportMeta'`）。

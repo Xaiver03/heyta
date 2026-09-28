@@ -1,6 +1,11 @@
 /**
- * 落地页根组件
- * ==============
+ * 首页正文
+ * ==========
+ *
+ * 🔴 **这里只有首页的九个区块 —— 导航、页脚、跳转链接、主题状态都不在这里了。**
+ * 它们搬去了 `src/site/SiteLayout.tsx`，理由只有一个：站点现在不止一页，
+ * 而那些东西每一页都要有。留在这里的话，第二个页面要么复制一份（两份漂移），
+ * 要么漏掉（页面没有出口）。
  *
  * 版面顺序（每个区块用**不同的布局族**，避免"八段长得一样"）：
  *   1. 英雄区        非对称分栏（左文右 3D 景）
@@ -12,11 +17,14 @@
  *   7. 价格          两栏对等对比（免费的自建 / 收费的托管）
  *   8. 自建          分栏（终端 + 步骤）
  *   9. 收尾 CTA      居中宣言
- *  10. 页脚
  *
  * ⚠️ 价格排在自建**之前**：叙述是「只有一件事收费 → 而免费的那条路就在下面」。
  *    反过来放的话，读者先在自建那节读完一整段终端流程，才看到原来还有收费档，
  *    而那时他已经不知道自己在选什么了。导航里的顺序与此一致。
+ *
+ * ⚠️ 首页**保留**这些页内锚点（`#selfhost` 等）：它们是首页内容的章节，
+ *    不是站点导航。站点的跨页入口由注册表决定（见 `src/site/pages.ts`）——
+ *    两者是两回事，混起来才会得到"导航里一半是锚点一半是页面"那种观感。
  *
  * 主题：**亮色为主，可切暗色**。切换只改 `<html data-theme>`，
  * 组件零改动 —— 这是设计系统"组件只消费语义变量"的直接收益。
@@ -38,13 +46,14 @@
  * 反过来说，`const` 数组从模块级挪进组件是**必要**的：模块级拿不到 hook，
  * 而在模块级读一个全局"当前语言"会让模块单例绑定到第一次执行时的语言 ——
  * 那种 bug 在切语言后才出现，且看起来像"某些文案没更新"。
+ *
+ * ⚠️ 子页面（`/features` 等）是**另一套写法**：它们的正文只由词条 key 组成
+ * （见 `src/site/PageSections.tsx`）。这里保留"在组件内构造文案数组"是为了
+ * 不动九个已上线的区块；新页面不该照抄这一套 —— key 清单更容易一眼看完。
  */
 
 import { lazy, Suspense } from 'react';
 
-import { useI18n } from '@heyta/i18n';
-
-import { Nav } from './components/Nav.js';
 import { Hero, Facts } from './components/Hero.js';
 import { Capabilities } from './components/Capabilities.js';
 import { Showcase } from './components/Showcase.js';
@@ -55,8 +64,6 @@ import { Privacy } from './components/Privacy.js';
 import { Pricing } from './components/Pricing.js';
 import { SelfHost } from './components/SelfHost.js';
 import { FinalCta } from './components/FinalCta.js';
-import { Footer } from './components/Footer.js';
-import { useTheme } from './lib/theme.js';
 
 /**
  * WebGL 那一节**动态导入**。
@@ -74,50 +81,37 @@ const SyncScene = lazy(async () => {
 });
 
 export function Landing(): React.JSX.Element {
-  const { theme, toggleTheme } = useTheme();
-  const { t } = useI18n();
-
   return (
-    <div className="lp">
-      <a className="lp-skip" href="#main">
-        {t('landing.skipLink')}
-      </a>
-
-      <Nav theme={theme} onToggleTheme={toggleTheme} />
-
-      <main id="main">
-        <Hero />
-        <Facts />
-        <Capabilities />
-        <Showcase />
-        {/* 快滚到这一节才去取 three.js 那个 chunk，并创建 WebGL 上下文 */}
-        {/* 🔴 `id="sync"` 给的是 Deferred 的**占位块**（见 Deferred.tsx 的说明）：
-            给里面那棵树的话，导航点 `#sync` 会因为"找不到落点→不滚动→
-            落点永远不挂载"而变成点了没反应。 */}
-        <Deferred id="sync">
-          {/*
-            🔴 `SceneBoundary` 必须在 `Deferred` **里面**、包住 `Suspense`。
-            两层失败要分开看：
-              - `Deferred` 自己不会抛，把它留在外面，3D 那一节炸了之后
-                外面的占位块还在，页面高度不会塌；
-              - `Suspense` 的 children 抛错、以及 **lazy chunk 加载失败**
-                （131 kB 的 three 分片在弱网下 404/超时是真会发生的）
-                都会冒泡到最近的 boundary。没有它，这两种情况都会
-                卸载整棵树 —— 整页白屏，不是"少一节"。
-          */}
-          <SceneBoundary fallback={<SyncFallback />}>
-            <Suspense fallback={null}>
-              <SyncScene />
-            </Suspense>
-          </SceneBoundary>
-        </Deferred>
-        <Privacy />
-        <Pricing />
-        <SelfHost />
-        <FinalCta />
-      </main>
-
-      <Footer />
-    </div>
+    <>
+      <Hero />
+      <Facts />
+      <Capabilities />
+      <Showcase />
+      {/* 快滚到这一节才去取 three.js 那个 chunk，并创建 WebGL 上下文 */}
+      {/* 🔴 `id="sync"` 给的是 Deferred 的**占位块**（见 Deferred.tsx 的说明）：
+          给里面那棵树的话，导航点 `#sync` 会因为"找不到落点→不滚动→
+          落点永远不挂载"而变成点了没反应。 */}
+      <Deferred id="sync">
+        {/*
+          🔴 `SceneBoundary` 必须在 `Deferred` **里面**、包住 `Suspense`。
+          两层失败要分开看：
+            - `Deferred` 自己不会抛，把它留在外面，3D 那一节炸了之后
+              外面的占位块还在，页面高度不会塌；
+            - `Suspense` 的 children 抛错、以及 **lazy chunk 加载失败**
+              （131 kB 的 three 分片在弱网下 404/超时是真会发生的）
+              都会冒泡到最近的 boundary。没有它，这两种情况都会
+              卸载整棵树 —— 整页白屏，不是"少一节"。
+        */}
+        <SceneBoundary fallback={<SyncFallback />}>
+          <Suspense fallback={null}>
+            <SyncScene />
+          </Suspense>
+        </SceneBoundary>
+      </Deferred>
+      <Privacy />
+      <Pricing />
+      <SelfHost />
+      <FinalCta />
+    </>
   );
 }
