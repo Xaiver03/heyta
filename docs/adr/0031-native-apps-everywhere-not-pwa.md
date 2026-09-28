@@ -1,0 +1,110 @@
+# ADR-0031：每一端都交付原生应用；PWA 不是任何端的交付形态
+
+> 状态：**待确认**
+> 日期：2026-09-28
+> 取代：无（**确认并收窄** [ADR-0024](0024-desktop-shell-and-ui-convergence.md) §2.5 的表述）
+
+## 1. 背景与约束
+
+### 1.1 触发这次决策的一句话
+
+> 「在 Windows 端上，我们希望是用 Capacitor 打包，而不是用那个 PWA，
+> 我们希望是原生的 APP 应用，在各个端上都是原生的应用。
+> 只是说希望尽可能减少我们的代码量。」
+
+这句话里有一个**方向**和一个**具体工具**。方向与 [ADR-0024](0024-desktop-shell-and-ui-convergence.md)
+（桌面壳 = Electron、UI 只写一份 RN 组件）一致；**具体工具在 Windows 上不成立**。
+两者必须分开回答 —— 否则会为了一个不存在的工具去改一个已经能用的架构。
+
+### 1.2 硬约束一：Capacitor 没有 Windows 目标
+
+Capacitor 官方文档的平台导航只有三项：**iOS / Android / Web(PWA)**。
+`npx cap add` 的取值也只有 `android` / `ios`。**没有 `windows`。**
+（来源：<https://capacitorjs.com/docs/getting-started>，2026-09-28 抓取。）
+
+也就是说 "用 Capacitor 打包 Windows" 这条路径**在技术上不存在**，
+不是"配置麻烦"或"文档少"——是没有这个平台。
+
+🔴 顺带一个容易混的点：Capacitor 的 Web 平台**本身**就是 PWA。
+所以"用 Capacitor 而不用 PWA"在 Windows 上是自相矛盾的：
+Capacitor 在 Windows 上能给的，恰恰就是 PWA 那一份。
+
+### 1.3 硬约束二：iOS / Android 换 Capacitor 会**增加**代码量
+
+heyta 的移动端是 React Native（`apps/mobile`），并且已经落地了**真原生小组件**：
+WidgetKit（iOS）、App Widget（Android）、ArkTS 卡片（鸿蒙）。
+
+Capacitor 是"Web 视图 + 插件"，它**渲染不了**这些平台的系统组件 ——
+要小组件仍然得**手写各端原生代码**（这一点与
+[`../research/desktop-shell-selection.md`](../research/desktop-shell-selection.md) §3 对鸿蒙的判定同构）。
+所以换成 Capacitor 的净效果是：**丢掉已有的 RN 组件工作，
+再额外补回同样多的原生代码** —— 与"减少代码量"的目标相反。
+
+### 1.4 硬约束三：Windows 原生应用**已经存在且有实测证据**
+
+`apps/desktop` 就是 Windows 桌面应用（Electron）。本轮已有实测：
+
+| 证据 | 位置 |
+|---|---|
+| `release/heyta-win32-x64` 产物产出 | [`../plans/multi-platform-adaptation.md`](../plans/multi-platform-adaptation.md) M2-4 |
+| 打包件在**真 Windows** 上启动并建出完整 op-log schema（`heyta.sqlite`，6 张表） | [`../runbooks/desktop.md`](../runbooks/desktop.md) §5.6 |
+| 开窗冒烟 `--window` 在真 Windows 上通过**并截图**（内容已人眼确认非空白） | [`../runbooks/desktop.md`](../runbooks/desktop.md) §5.5 |
+
+而且它**复用的就是 `apps/web` 那一套**：`apps/desktop/package.json` 直接依赖
+`@heyta/ui`，窗口里渲染的 `TaskList` 就是共享组件（冒烟断言的
+`data-testid="task-row-*"` 由 `@heyta/ui` 自己打）。
+
+**"原生应用"和"代码只写一份"这两件事，现在是同时成立的** —— 不需要引入新壳。
+
+## 2. 选项
+
+| 选项 | 优点 | 缺点 | 关键证据 |
+|---|---|---|---|
+| **A. 各端原生应用，共享 `packages/ui`**（现状） | Windows/macOS/Linux 走 Electron，iOS/Android/鸿蒙走 RN；**组件只写一份**；原生能力（小组件、SQLite、钥匙串）都在 | 需要维护两条壳（Electron + RN）；桌面端体积/内存大于纯 Web | 选项 1.4 的三条实测；ADR-0024 §2.1–2.2 |
+| **B. Windows 改用 Capacitor 打包** | — | 🔴 **Capacitor 没有 Windows 平台**，做不了 | <https://capacitorjs.com/docs/getting-started>（平台导航只有 iOS / Android / Web） |
+| **C. 全部端改用 Capacitor** | 只需一套 Web 代码 | ① Windows 仍无平台；② iOS/Android 的**系统小组件要重写原生**；③ 丢掉已有 RN 组件工作 | 选项 1.3；`../research/desktop-shell-selection.md` §3 |
+| **D. Windows 交付 PWA（不装原生壳）** | 最省事，代码复用 100% | 拿不到 package identity ⇒ **注册不了 Windows 小组件**；系统集成最弱；离线/存储受浏览器约束 | `../research/desktop-shell-selection.md` §5、§7 |
+
+## 3. 结论
+
+1. **每一端的交付物都是"原生应用"**，不存在"某一端交 PWA 就行"。
+   - Windows / macOS / Linux → `apps/desktop`（Electron）
+   - iOS / Android → `apps/mobile`（React Native）
+   - 鸿蒙 → `apps/mobile/harmony`（RNOH 壳 + ArkTS 卡片）
+2. **Capacitor 被否决**，理由两条且**互相独立**：
+   - Windows 上没有这个平台（1.2）；
+   - iOS/Android 上它会让原生小组件的工作量**增加**（1.3）。
+3. **"减少代码量"靠共享包实现，不靠换壳实现**：
+   `packages/ui`（组件）、`packages/domain`（业务规则）、`packages/sync-core`（协议与加密）
+   由各端共用；**换壳只会换掉最外层，换不掉这些**。
+4. **PWA 降级为"Web 端的可安装层"，不是任何端的交付形态。**
+   ⚠️ 这一条**收窄**了 [ADR-0024](0024-desktop-shell-and-ui-convergence.md) §2.5 里
+   "PWA 化价值上升"的表述 —— 那里说的"价值上升"指的是
+   **Windows 小组件注册所必需的 package identity 这条技术路**（MSIX→Store），
+   **不是**"Windows 可以交一个 PWA 了事"。两份 ADR 说的是两件事，此处明确边界。
+
+## 4. 后果
+
+- **不再评估 Capacitor。** 以后有人提"用 Capacitor 少写点代码"，直接引本 ADR §1.2/§1.3。
+- 桌面端要继续承担 Electron 的体积与内存代价 —— 这是换取"一套 React 组件跑两端"付的价，
+  已被 ADR-0024 §2.2 接受。
+- **PWA 的工作不白做，但目标变了**：它服务的是
+  ① Web 端可安装、② Windows 小组件的 package identity 路径。
+  **不 service 任何"原生应用"的替代目标。**
+- 多端验证的判据不变，且**必须以原生应用为准**：
+  桌面 → [`../runbooks/desktop.md`](../runbooks/desktop.md)；移动 → `pnpm verify:mobile-*`。
+
+## 5. 未核实项
+
+1. **Electron 在 Windows 上注册系统小组件**是否可行 —— 上游 `electron#35751`
+   「macOS Notification Center Widget」**Closed as not planned**，
+   且**未找到**真实 Electron 应用带 WidgetKit / Windows 小组件的先例。
+   所以"Windows 原生应用"与"Windows 小组件"目前是**两条独立的路**，
+   后者仍押在 PWA + MSIX 上（见 `../research/desktop-shell-selection.md` §6）。
+2. **Windows 打包件的可见窗口截图**仍未取得 —— 现有 Windows 证据是无头会话下
+   进程内 `capturePage()` 拿的（`../runbooks/desktop.md` §5.5）。
+3. **Linux 产物在 Linux 上运行**未实测。机器是有的
+   （见 [`../runbooks/local-server-verification.md`](../runbooks/local-server-verification.md) §0），
+   缺的是"去做"而不是"没有机器"。
+4. Capacitor 未来是否会新增 Windows 平台 —— 按 §1.2 的抓取时点，**没有**。
+   若上游新增，本 ADR 的 §1.2 需要重估（但 §1.3 的结论不受影响）。

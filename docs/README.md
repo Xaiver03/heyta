@@ -112,6 +112,7 @@ docs/research/<kebab-case>.md     例：reuse-plan.md
 | [0026](adr/0026-refund-side-entitlement-revocation-not-implemented.md) | 💰 **退款/拒付侧的权益回收本轮不做**：三个洞不是同一个洞 —— 退款通知被 adapter 有意 fail-closed 拒绝、`reverseOrderOnRefund` 零生产调用方、`onRevoke` 未注入；🔴 真阻塞是**权益模型里没有"哪一笔支付买了哪一段"**（`Subscription` 只有一行 + 单个 `currentPeriodEnd`，能力是**替换**而支付是**叠加**），所以"退第 2 笔、保留第 1 笔"**无法表达**，按笔回收的最小单位是整行 = **过度回收**；退款政策本身也未定（业主决定）。否决"只接订单侧"的半截路径，含**最小实现清单**（清空之日即本 ADR 被取代之日） | ✅ **已接受** |
 | 🔑 [0029](adr/0029-refuse-to-delete-last-passkey.md) | 🔐 **账号上最后一条通行密钥不允许被自助删除**（409 `last_passkey_required`），判断写在 `deleteMany` 的**谓词里**而不是先查后删 —— 那是**唯一的 TOCTOU 防护**（两个标签页各删一条会让账号一条都不剩）；否决"允许删到零"与"允许但二次确认写清楚"，因为两者都把账号可进入性寄托在**用户读到一条文案**上，而这个操作恰恰发生在用户"整理旧设备"、最不细读文案的时刻。🔴 **依赖一条已认证的"添加凭据"通路** —— 邮箱注册路径对已验证账号是**静默空操作**（`verifyRegistration` 防枚举），照做的用户会以为加上了、删掉旧的、然后进不去。⚠️ 不做改名（`Passkey` 无 `name` 列，需迁移） | ✅ **已接受** |
 | 🕵️ [0030](adr/0030-passkey-not-found-existence-oracle.md) | **未认证的通行密钥验证端点明确接受一个存在性预言机**：用两个 `code`（`passkey_not_found` / `passkey_verification_failed`）区分"服务端已不认得这条凭据"与"验签没过"，而 `message` 刻意保持同样笼统，判别**只靠 `code`** —— 因为这两种成因需要**完全相反**的动作（重新注册 vs 再试一次）。接受的代价是：调用方能以**已知 credential ID** 为键问出"它是否还注册着"。理由：该 id 本非秘密（每次登录明文出现在断言响应里）、32 字节随机不可枚举，且收益落在**已经进不来的用户**身上。🔴 **不外推**：不为"账号/邮箱是否存在"、"某个 id 属于谁"背书（删除路径上"不是你的"与"不存在"仍**逐字节同形**）；`SAFE_ERROR_MESSAGES` **未**放宽。⚠️ 隐含前提：一旦 credential ID 变成可枚举，本结论**立即失效** | ✅ **已接受** |
+| 📱 [0031](adr/0031-native-apps-everywhere-not-pwa.md) | **每一端都交付原生应用，PWA 不是任何端的交付形态**。Windows/macOS/Linux 走 `apps/desktop`（Electron）、iOS/Android 走 `apps/mobile`（RN）、鸿蒙走 RNOH 壳。🔴 **Capacitor 被否决，两条理由互相独立**：① 它**根本没有 Windows 平台**（官方平台导航只有 iOS / Android / Web(PWA)，`npx cap add` 无 `windows`）；② 在 iOS/Android 上它是"WebView + 插件"，**渲染不了系统小组件**，换过去会丢掉已有 RN 组件工作、再补回同样多的原生代码 —— 与"减少代码量"相反。**"代码只写一份"靠 `packages/ui` 共享实现，不靠换壳**（换壳只换最外层）。⚠️ **收窄** [ADR-0024](adr/0024-desktop-shell-and-ui-convergence.md) §2.5：那里说的"PWA 价值上升"指 **Windows 小组件注册所需的 package identity 这条技术路**，不是"Windows 可以交 PWA 了事" | 🟡 **待确认** |
 
 ### 计划
 
@@ -145,6 +146,7 @@ docs/research/<kebab-case>.md     例：reuse-plan.md
 | ⭐ [multi-platform-widgets-progress.md](plans/multi-platform-widgets-progress.md) | 🔴 **小组件实施进度账本（唯一真源）**：W0–W5 逐任务记录**已完成 / 未完成 / 阻塞**并附可验证证据。含 D1–D6 六个已拍板决策（**D1 = 设备密钥加密快照**）、阻塞登记（鸿蒙镜像/签名、Windows 真机、iOS 账号）、7 条未核实项、以及「下一步」唯一入口。状态只有四种，**不允许"基本完成"** |
 | [motivation-and-progression.md](plans/motivation-and-progression.md) | ⭐ **激励与成长体系设计**：三层架构（即时反馈/连续性/叙事）× 四个循环，含「不改 schema」的落地映射、反需求 2.0、E2EE 下的指标方案 |
 | [activity-categories-and-colors.md](plans/activity-categories-and-colors.md) | **活动分类与分类着色**（✅ 已实现并并入 `main`）：颜色由**用户自赋义**、App 不判健康度；真正的工程量在时间归因（零新增字段跑通了第一版）；分类泳道图 + 周堆叠条。落地状态与实测数字见其 §8 |
+| 🔴 [site-and-parity-alignment.md](plans/site-and-parity-alignment.md) | ⭐ **站点补齐与能力对标：任务计划**（2026-09-28 立项）：**A 轨站点**（A0 多页架构 → `/features` `/platforms` `/pricing` `/help` `/signin` `/changelog` `/integrations`）、**B 轨能力**（B0 六个低成本高杠杆 → B1 提醒/Web 日历/子任务/搜索 → B2 二十条 P1）、**C 轨文档与门禁**（含 🔴 **新增 `check:reachability`**：查"实体已建模但零 action / 零调用点"）。含 6 条先决决策（D1 多页架构**需要新 ADR**）、6 个波次、7 条风险与不可逆点、11 条明确不做 |
 
 ### 工程参考
 
@@ -173,6 +175,9 @@ docs/research/<kebab-case>.md     例：reuse-plan.md
 | 文档 | 内容 |
 |---|---|
 | [feature-matrix.md](research/feature-matrix.md) | 滴答清单功能对照矩阵 —— 需求基准线（P0/P1/P2 分级） |
+| 🔴 [dida365-feature-benchmark.md](research/dida365-feature-benchmark.md) | ⭐ **滴答清单功能对标：heyta 的真实缺口**（2026-09-28 代码级审计）：逐类给 `文件:行号` 证据 + 缺口分级（P0/P1/P2）。含 **13 项「看起来有、其实没有」**（提醒 / 通知 / 子任务 / Web 日历 / 已完成入口 / 手动排序 / 番茄自定义 / 习惯计数型 / 实时同步 / 桌面端 / 笔记 / 鸿蒙 / 全量导出）、**13 处文档与代码的矛盾**、以及**我们独有的 9 条能力**。🔴 核心判据：**"做完了" = 有 action + 有调用点 + 有从用户动作出发的验收** |
+| [dida365-help-center-ia.md](research/dida365-help-center-ia.md) | ⭐ **滴答清单帮助中心与官网 IA 实测**（2026-09-28）：解析 Next.js `__NEXT_DATA__` 得到 **97 篇**完整目录（任务 21 / 日历 9 / 四象限 3 / 番茄 6 / 习惯 4 / 倒数日 4 / 导入与关联 15 / AI 7 / 账号与安全 6…）、**FAQ 67 问分 8 组**、**定价逐项对比表**（￥139/年 · ￥16/月 · 连续包月 ￥13.9；国际版 $49.99/年）、下载页 7 平台分发方式、登录 6 种方式、更新动态 5 条 + 3 个年度归档。含 6 条未核实项 |
+| [site-ia-and-landing-audit.md](research/site-ia-and-landing-audit.md) | ⭐ **heyta 落地页审计与双向对齐**（2026-09-28）：现状清单（10 段区块 / 导航 / 页脚 / i18n / SEO / 主题 / 应用入口 / 构建部署 / 测试门禁）+ **22 行对齐矩阵**（A 对标补齐 / B 能力回填 / C 明确不对齐）+ **不能照抄的 8 件事**。滴答侧数据不在此重复，见上一条 |
 | [oss-landscape.md](research/oss-landscape.md) | 开源项目盘点（16 个项目的许可证、成熟度、可复用性） |
 | [licensing-and-compliance.md](research/licensing-and-compliance.md) | 许可证与合规边界（AGPL §13、商标、上架成本、定价数据） |
 | [codebase-assessment.md](research/codebase-assessment.md) | 上游代码体检：依赖许可证扫描 + 代码量实测 |
