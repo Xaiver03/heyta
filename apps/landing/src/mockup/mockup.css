@@ -279,48 +279,62 @@
 }
 
 /* ── 今日进度卡 ─────────────────────────────────────────────
-   复现 `apps/web/src/features/motivation/TodayProgressCard.tsx` 的 `.ht-today`。
-   真应用在任务 / 四象限 / 习惯 / 番茄钟四个视图上都常驻它，复刻原来一张都没有。 */
+   复现**共享** `packages/ui/src/motivation/TodayProgressCard.tsx`
+   （M3 第十一刀之后 web 侧不再有 `.ht-today` DOM/CSS）。
+   真应用在任务 / 四象限 / 习惯 / 番茄钟四个视图上都常驻它，复刻原来一张都没有。
+
+   🔴 与迁移前的三处**可见差异**（照共享组件改，别照旧 app.css 抄回来）：
+     · 没有"今天"这个标签 —— 共享卡片只画"比例 + 提示 + 横条"；
+     · 比例是一整段 `2/5`（numeric-display：4xl/bold/tight/display 字距），
+       不是"2xl 大数字 + base 小分母"；
+     · 提示与比例**并排**在 head 一行里（`align-items: flex-end`），不换行到下面。
+
+   ⚠️ 逐 token 对账的判据在 `tests/mockup-today-shape.spec.tsx`：它读共享组件源码，
+   把每个 `tokens['…']` 与本节里的 `var(--ht-…)` 比对 —— 共享改了这里就会红。 */
 .mk-today {
-  padding: var(--ht-space-4) var(--ht-space-5);
+  display: flex;
+  flex-direction: column;
+  gap: var(--ht-space-2);
+  padding: var(--ht-space-3);
   border-radius: var(--ht-radius-lg);
   border: var(--ht-border-width-thin) solid var(--ht-color-border);
   background: var(--ht-color-surface);
+  /* 布局补偿，不是卡片自己的取值：真应用的卡片外壳（`ht-content`）靠父级 gap
+     留白，而展厅的 `.mk-content` 没有 gap。 */
   margin-block-end: var(--ht-space-4);
 }
 
-.mk-today__label {
-  font-size: var(--ht-font-size-xs);
-  color: var(--ht-color-foreground-muted);
-}
-
-.mk-today__count {
+.mk-today__head {
   display: flex;
-  align-items: baseline;
-  gap: var(--ht-space-1);
-  font-size: var(--ht-font-size-2xl);
-  font-weight: var(--ht-font-weight-semibold);
+  align-items: flex-end;
+  gap: var(--ht-space-2);
+}
+
+/* = `numeric-display` 语义样式：font-size.4xl / bold / tight / tracking.display。 */
+.mk-today__count {
+  color: var(--ht-color-foreground);
+  font-size: var(--ht-font-size-4xl);
+  font-weight: var(--ht-font-weight-bold);
+  line-height: var(--ht-line-height-tight);
+  letter-spacing: var(--ht-tracking-display);
   font-variant-numeric: tabular-nums;
-  line-height: var(--ht-line-height-tight, 1.1);
 }
 
-.mk-today__count-total {
-  font-size: var(--ht-font-size-base);
-  font-weight: var(--ht-font-weight-regular);
-  color: var(--ht-color-foreground-muted);
-}
-
+/* = `row-meta` 语义样式：font-size.sm / regular / normal / tracking.body。 */
 .mk-today__hint {
-  font-size: var(--ht-font-size-xs);
+  flex-shrink: 1;
+  padding-block-end: var(--ht-space-1);
   color: var(--ht-color-foreground-muted);
-  margin-block-start: var(--ht-space-1);
+  font-size: var(--ht-font-size-sm);
+  font-weight: var(--ht-font-weight-regular);
+  line-height: var(--ht-line-height-normal);
+  letter-spacing: var(--ht-tracking-body);
 }
 
-/* 结构与取值都照 `app.css` 的 `.ht-bar`：轨道 `--ht-space-2` 高、
-   `--ht-radius-full` 圆角，填充用 `scaleX` 从左往右长。 */
+/* 横条 = 共享 `MotivationProgressBar`：轨道 `size.progress-height` 高、full 圆角，
+   填充给 **inline-size**（RN 的 `scaleX` 以中心为原点，所以共享层改成宽度插值）。 */
 .mk-today__bar {
-  margin-block-start: var(--ht-space-3);
-  block-size: var(--ht-space-2);
+  block-size: var(--ht-size-progress-height);
   border-radius: var(--ht-radius-full);
   background: var(--ht-color-surface-sunken);
   overflow: hidden;
@@ -328,11 +342,9 @@
 
 .mk-today__bar-fill {
   display: block;
-  inline-size: 100%;
   block-size: 100%;
   border-radius: var(--ht-radius-full);
   background: var(--ht-color-primary);
-  transform-origin: left center;
 }
 
 /* ── 输入行 ─────────────────────────────────────────────── */
@@ -369,30 +381,85 @@
   font-weight: var(--ht-font-weight-medium);
 }
 
-/* ── 任务列表 ───────────────────────────────────────────── */
+/* 🔴 捕获输入行：与共享 `CaptureComposer` 的 `makeStyles()` 逐项对齐。
+   ```
+   compose    { gap: space.2 }
+   input      { paddingHorizontal: size.field-padding-x }
+   addButton  { gap: space.1, paddingHorizontal: size.field-padding-x }
+   addDisabled{ opacity: state.disabled-opacity }
+   ```
+   ⚠️ 只加 `--capture` 修饰类，**基础规则一字不动**：`.mk-input` / `.mk-btn-primary`
+   同时被 `FocusRing.tsx` 用着，而 `FocusPanel` 的按钮确实是 `space.4` / `space.2` /
+   `font-weight.medium`。改基础规则 = 顺手改掉另一个复刻件的保真度。
+   取值由 `tests/mockup-capture-shape.spec.tsx` 从共享层源码文本逐项对账。 */
+.mk-input--capture {
+  padding-inline: var(--ht-size-field-padding-x);
+  font-weight: var(--ht-font-weight-regular);
+  line-height: var(--ht-line-height-normal);
+  letter-spacing: var(--ht-tracking-body);
+}
 
+.mk-btn-primary--capture {
+  gap: var(--ht-space-1);
+  padding-inline: var(--ht-size-field-padding-x);
+  font-weight: var(--ht-font-weight-regular);
+  line-height: var(--ht-line-height-normal);
+  letter-spacing: var(--ht-tracking-body);
+}
+
+/* 空标题 ⇒ `captureCanSubmit` 为 false ⇒ 真实现给 `addDisabled` 那一层透明度。
+   复刻原来画的是一个**全不透明**的添加按钮 —— 那是一个产品里不存在的状态。 */
+.mk-btn-primary--off {
+  opacity: var(--ht-state-disabled-opacity);
+}
+
+/* ── 任务列表 ───────────────────────────────────────────────
+   🔴 **这一行的几何不是"自己挑的一组 token"。**
+   下面 `.mk-task*` 用到的每一个 token 都必须与
+   `packages/design-system/src/task-row-shape.ts` 的 `TASK_ROW_SHAPE` /
+   `TASK_ROW_TEXT` 逐项对上 —— 而共享的 RN 行
+   （`packages/ui/src/task-list/TaskList.tsx`）**从同一份常量取值**。
+   两边一起改：只改一处会让 `tests/mockup-task-row.spec.tsx` 变红。
+
+   为什么不在运行时 `import { TASK_ROW_SHAPE }` 直接拼样式：实测那样会把
+   `@heyta/design-system` 的 native token 表带进首屏（**+24.5 kB gzip**），
+   而这一节就在首屏（`Hero.tsx` 也渲染它）。理由与拒绝 `react-native-web`
+   完全相同（见 `TaskList.tsx` 文件头）。
+
+   留在这里的还有**颜色**（跟随主题）与**宿主外壳**（卡片背景/描边/圆角/
+   左右内边距 —— 那是容器的事：共享 `TaskList` 明确不自带背景与水平内边距）。 */
+
+/* 列表容器：行间距 = `TASK_ROW_SHAPE.listGap`。 */
 .mk-tasklist {
   display: flex;
   flex-direction: column;
-  gap: var(--ht-space-2);
+  gap: var(--ht-space-1);
 }
 
+/* 宿主外壳。**不是"行"** —— 与 mobile 的 `<Screen>` 自带 gutter 同一类决策。
+   行高 / 行内间距 / 内容间距见下面各条（全部来自契约）。 */
 .mk-task {
   display: flex;
   align-items: center;
-  gap: var(--ht-space-3);
-  padding: var(--ht-space-3) var(--ht-space-4);
+  min-block-size: var(--ht-size-row-min-height);
+  gap: var(--ht-space-1);
+  padding-inline: var(--ht-space-4);
   background: var(--ht-color-surface);
   border: var(--ht-border-width-thin) solid var(--ht-color-border);
   border-radius: var(--ht-radius-lg);
 }
 
+/* 勾选框：尺寸 / 圆角 / 描边宽度 = `TASK_ROW_SHAPE` 的对应项。
+   这里原来抄的是 `--ht-icon-md`（20px）+ `--ht-radius-full`（圆），
+   而共享行是 22px 的圆角方 —— 那就是一处实测漂移。 */
 .mk-task__check {
-  inline-size: var(--ht-icon-md);
-  block-size: var(--ht-icon-md);
+  inline-size: var(--ht-size-checkbox);
+  block-size: var(--ht-size-checkbox);
   flex: none;
-  border: var(--ht-border-width-thick) solid var(--ht-color-border-strong);
-  border-radius: var(--ht-radius-full);
+  border-style: solid;
+  border-width: var(--ht-border-width-thin);
+  border-radius: var(--ht-radius-sm);
+  border-color: var(--ht-color-border-strong);
   display: grid;
   place-items: center;
   color: transparent;
@@ -404,9 +471,24 @@
   color: var(--ht-color-on-primary);
 }
 
-.mk-task__title {
+/* 文字块：上下内间距与行内间距 = `TASK_ROW_SHAPE.bodyPaddingBlock` / `gap`。 */
+.mk-task__body {
   flex: 1;
-  font-size: var(--ht-font-size-sm);
+  display: flex;
+  flex-direction: column;
+  padding-block: var(--ht-space-2);
+  gap: var(--ht-space-1);
+  min-inline-size: 0;
+}
+
+/* 标题：**语义文字样式** `TASK_ROW_TEXT.title`（= `row-title`）的四个 token。
+   这里原来抄的是 `--ht-font-size-sm`，而 `row-title` 是 `font-size.base` ——
+   另一处实测漂移。 */
+.mk-task__title {
+  font-size: var(--ht-font-size-base);
+  font-weight: var(--ht-font-weight-regular);
+  line-height: var(--ht-line-height-normal);
+  letter-spacing: var(--ht-tracking-body);
   min-inline-size: 0;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -419,11 +501,15 @@
   color: var(--ht-color-foreground-subtle);
 }
 
+/* 徽章行：间距 = `TASK_ROW_SHAPE.metaGap`；排版 = `TASK_ROW_TEXT.meta`。 */
 .mk-task__meta {
   display: flex;
   align-items: center;
   gap: var(--ht-space-2);
-  font-size: var(--ht-font-size-xs);
+  font-size: var(--ht-font-size-sm);
+  font-weight: var(--ht-font-weight-regular);
+  line-height: var(--ht-line-height-normal);
+  letter-spacing: var(--ht-tracking-body);
   color: var(--ht-color-foreground-subtle);
   font-variant-numeric: tabular-nums;
 }
@@ -436,7 +522,8 @@
   white-space: nowrap;
 }
 
-/* 紧迫度**不能只用颜色表达**：语义由文字承载，颜色只是冗余通道。 */
+/* 紧迫度**不能只用颜色表达**：语义由文字承载，颜色只是冗余通道。
+   档位来自 `@heyta/domain` 的 `computeCountdown()`，不是手写字段。 */
 .mk-due--overdue {
   color: var(--ht-color-danger);
   font-weight: var(--ht-font-weight-medium);
@@ -470,10 +557,15 @@
   gap: var(--ht-space-3);
 }
 
+/* 底部注释。真实现给它的是**语义文字样式** `caption`（`text.caption`）+
+   弱化色 —— 复刻原来抄的是 `font-size-2xs`（更小）而没跟语义样式。
+   判据 `mockup-quadrant-shape.spec.tsx` 逐项比对 `TEXT_STYLES.caption`。 */
 .mk-quadrant__footnote {
   margin: 0;
-  font-size: var(--ht-font-size-2xs);
-  line-height: var(--ht-line-height-relaxed, 1.5);
+  font-size: var(--ht-font-size-xs);
+  font-weight: var(--ht-font-weight-medium);
+  line-height: var(--ht-line-height-normal);
+  letter-spacing: var(--ht-tracking-caption);
   color: var(--ht-color-foreground-muted);
 }
 
@@ -487,27 +579,48 @@
   border: var(--ht-border-width-thick) solid var(--ht-color-border);
 }
 
+/* 大标题：真实现用 `text['row-meta']`（字号 sm）+ 覆盖成 semibold。
+   四个 token 全部与 `TEXT_STYLES['row-meta']` 对账（weight 是 semibold 覆盖）。 */
 .mk-quad__head {
   display: flex;
   align-items: center;
   gap: var(--ht-space-2);
-  font-weight: var(--ht-font-weight-semibold);
   font-size: var(--ht-font-size-sm);
+  font-weight: var(--ht-font-weight-semibold);
+  line-height: var(--ht-line-height-normal);
+  letter-spacing: var(--ht-tracking-body);
 }
 
+/* 🔴 看板里的色块比侧栏的 `.mk-swatch`（= `.ht-swatch`，`space.2`）**大一倍**：
+   真实现 `QuadrantBoard` 给色块的是 `icon.sm`。两族尺寸都真实存在，
+   所以这里单独一条覆写，而不是把 `.mk-swatch` 改掉（那会连带改侧栏）。 */
+.mk-quad__swatch {
+  inline-size: var(--ht-icon-sm);
+  block-size: var(--ht-icon-sm);
+}
+
+/* 说明：真实现用语义文字样式 `caption`（`text.caption`）+ 弱化色。 */
 .mk-quad__hint {
   margin-block-start: var(--ht-space-1);
-  font-size: var(--ht-font-size-2xs);
+  font-size: var(--ht-font-size-xs);
+  font-weight: var(--ht-font-weight-medium);
+  line-height: var(--ht-line-height-normal);
+  letter-spacing: var(--ht-tracking-caption);
   color: var(--ht-color-foreground-muted);
 }
 
+/* 格里的列表：行间距与共享 `TaskList` 同一个契约（`TASK_ROW_SHAPE.listGap`），
+   原来抄的是 `space.2`（更宽）。 */
 .mk-quad__list {
   margin-block-start: var(--ht-space-2);
   display: flex;
   flex-direction: column;
-  gap: var(--ht-space-2);
+  gap: var(--ht-space-1);
 }
 
+/* ⚠️ 保真度差距（如实记账）：真实现每一格直接渲染共享 `TaskList` 的行
+   （勾选框 + 标题 + 宿主插槽），这里是一张只有标题的静态卡 —— 见
+   `QuadrantGrid.tsx` 文件头与 §9.1 的豁免判决。 */
 .mk-quad__card {
   padding: var(--ht-space-2);
   background: var(--ht-color-surface);
@@ -516,11 +629,16 @@
   font-size: var(--ht-font-size-sm);
 }
 
+/* 空格占位。真实现是 `TaskList` 的 `ListEmptyComponent`：
+   一句 `caption` 文字（`paddingVertical: space.8`、水平居中）、**没有图标**。
+   复刻曾经自己加了一只 `CheckCircle2`，已删（判据守着"不许回来"）。 */
 .mk-quad__empty {
-  display: flex;
-  align-items: center;
-  gap: var(--ht-space-2);
-  font-size: var(--ht-font-size-2xs);
+  padding-block: var(--ht-space-8);
+  text-align: center;
+  font-size: var(--ht-font-size-xs);
+  font-weight: var(--ht-font-weight-medium);
+  line-height: var(--ht-line-height-normal);
+  letter-spacing: var(--ht-tracking-caption);
   color: var(--ht-color-foreground-muted);
 }
 
@@ -611,6 +729,14 @@
   place-items: center;
 }
 
+/* 环的直径走 token（**不许在这里写死 rem**）：写死就与 `--ht-size-focus-ring`
+   同值而不会跟改，看起来完全没错。判据见
+   apps/landing/tests/mockup-focus-ring.spec.tsx（首跑就抓到了原先写死的那一处）。 */
+.mk-focus__ring svg {
+  width: var(--ht-size-focus-ring);
+  height: var(--ht-size-focus-ring);
+}
+
 .mk-focus__readout {
   position: absolute;
   text-align: center;
@@ -651,17 +777,6 @@
   display: flex;
   flex-direction: column;
   gap: var(--ht-space-1);
-}
-
-.mk-project {
-  display: flex;
-  align-items: center;
-  gap: var(--ht-space-3);
-  min-block-size: var(--ht-touch-target-min);
-  padding: 0 var(--ht-space-3);
-  border-radius: var(--ht-radius-md);
-  font-size: var(--ht-font-size-sm);
-  color: var(--ht-color-foreground-muted);
 }
 
 /* 「新清单 / 新标签」—— 真应用里 `ProjectsPanel` 与标签区各是一个

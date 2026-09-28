@@ -12,7 +12,7 @@
 
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { appUrl, startCta } from '../src/lib/app-url.js';
+import { appPathHref, appUrl, startCta } from '../src/lib/app-url.js';
 
 afterEach(() => {
   // 每个用例都从"没配置"这个默认状态开始。漏了这行，前一个用例设的
@@ -121,5 +121,36 @@ describe('startCta()：把落地页的语言带进应用', () => {
     const cta = startCta('en');
     expect(cta.href).toBe('#selfhost');
     expect(cta.external).toBe(false);
+  });
+});
+
+/**
+ * `appPathHref`：应用**自己**提供的服务端渲染页面（`/recover-passkey` 等）。
+ *
+ * 🔴 判据只有两条，但两条都对应真实会出错的形状：
+ *   1. **住在域名的根上，不在 `/app/` 下** —— 那三张凭据页是 `server/src/pages.ts`
+ *      渲染的（`docs/runbooks/deployment.md` §3.3.1 的 nginx 段），
+ *      拼到 `/app/recover-passkey` 会 404；
+ *   2. **未配置应用地址时不猜** —— 返回 `null`，让调用点**不渲染**那个链接。
+ */
+describe('appPathHref', () => {
+  it('落在应用地址的**来源**上，避开 `/app/` 前缀', () => {
+    vi.stubEnv('VITE_APP_URL', 'https://heyta.finlaw.cloud/app/');
+    expect(appPathHref('/recover-passkey')).toBe('https://heyta.finlaw.cloud/recover-passkey');
+  });
+
+  it('应用挂在子路径下也一样只取来源', () => {
+    vi.stubEnv('VITE_APP_URL', 'https://example.com/deep/app/');
+    expect(appPathHref('/verify-email')).toBe('https://example.com/verify-email');
+  });
+
+  it('🔴 未配置应用时返回 null —— 调用点据此不渲染，而不是猜一个地址', () => {
+    vi.stubEnv('VITE_APP_URL', '');
+    expect(appPathHref('/recover-passkey')).toBeNull();
+  });
+
+  it('漏写开头的斜杠也能拼对', () => {
+    vi.stubEnv('VITE_APP_URL', 'https://example.com/app');
+    expect(appPathHref('recover-passkey')).toBe('https://example.com/recover-passkey');
   });
 });

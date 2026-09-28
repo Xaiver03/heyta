@@ -11,41 +11,46 @@
  * 一律 404 —— 一个「看起来能点、点了是 404」的链接比没有链接更坏，
  * 所以整组摘掉了。加回来的完整清单（别只把图标放回来）见 `Nav.tsx` 顶部。
  *
- * 现在剩下的链接**全部是页内锚点**，所以不再需要
- * `target="_blank"` / `rel="noreferrer"` 那一套。
+ * ─────────────────────────────────────────────────────────────────────────
+ * 🔴 **分组与链接同样来自站点注册表**（`footerGroups()`），与导航同源。
+ *
+ * 页脚是"可达性"的最后一道保险：某些页面（更新日志 / 登录）**故意不进导航**
+ * —— 导航栏是给第一次来的访客用的 —— 但它们在页脚里一定有一条。
+ * 于是"页面上有但没人链得到"这件事在结构上不可能发生：见
+ * `src/site/pages.ts` 的文件头。判据本身住在 `render.spec.tsx` 的 N2 用例里
+ * （从渲染出的 DOM 走可达性），**不是**一个独立的 `check:site-reachability` 脚本 ——
+ * 那个脚本截至 2026-09-28 尚未落地（见计划 §9 与 ADR-0033 §5）。
+ *
+ * ⚠️ 空分组**不渲染**：一个只有标题、没有链接的分组看起来像渲染坏了。
+ * 法律组（Terms / Privacy / License）现在就是空的 —— 依据 A6-1，
+ * 链接要等**线上真的能打开**再加（404 的法务链接比没有更坏）。
  */
 
-import { useMemo } from 'react';
+import { useI18n, useLocale, type MessageKey } from '@heyta/i18n';
 
-import { useI18n } from '@heyta/i18n';
-
+import { footerGroups, pageById, type SiteGroup } from '../site/pages.js';
+import { siteHref } from '../site/paths.js';
 import { BrandMark } from './BrandMark.js';
 
+/**
+ * 分组的标题词条。`SiteGroup` 的三个取值与词条表一一对应。
+ *
+ * 🔴 参数类型用**注册表导出的 `SiteGroup`**，不在这里再抄一遍
+ * `'product' | 'support' | 'legal'`（R18）—— 加一个分组时，抄的那份不会跟着变，
+ * 而它恰好是"分组标题该取哪条词条"的唯一依据。
+ */
+function groupTitleKey(group: SiteGroup): MessageKey {
+  return `site.footer.group.${group}`;
+}
+
+/**
+ * 页脚**不需要知道当前是哪一页**：它每一条都是站点绝对地址
+ * （`siteHref(page, locale)`），没有一处依赖"我在哪"。
+ * 收一个 `page` 参数只会让下一个人以为它有用。
+ */
 export function Footer(): React.JSX.Element {
   const { t } = useI18n();
-
-  // 数据挪进组件内是文案迁移的硬要求（模块级拿不到 `t`）。取舍见 `Landing.tsx` 文件头。
-  const groups = useMemo<{ title: string; links: { label: string; href: string }[] }[]>(
-    () => [
-      {
-        title: t('landing.footer.group.product'),
-        links: [
-          { label: t('landing.nav.capabilities'), href: '#capabilities' },
-          { label: t('landing.nav.showcase'), href: '#showcase' },
-          { label: t('landing.footer.syncHow'), href: '#sync' },
-          { label: t('landing.footer.privacy'), href: '#privacy' },
-        ],
-      },
-      {
-        title: t('landing.footer.group.gettingStarted'),
-        links: [
-          { label: t('landing.footer.pricing'), href: '#pricing' },
-          { label: t('landing.footer.selfHostServer'), href: '#selfhost' },
-        ],
-      },
-    ],
-    [t],
-  );
+  const locale = useLocale();
 
   return (
     <footer className="lp-footer">
@@ -57,27 +62,36 @@ export function Footer(): React.JSX.Element {
               之前两处品牌表达不一致（导航是字标、页脚是圆点+文字），
               同一个品牌在一页里出现两种画法是没道理的区别。
               它标了 aria-hidden，所以链接的可访问名由 aria-label 提供。
+
+              🔴 落点是首页，与导航里的字标同一判据（`#top` 只在首页存在）。
             */}
-            <a className="lp-brand" href="#top" aria-label={t('common.brand')}>
+            <a
+              className="lp-brand"
+              href={siteHref(pageById('home'), locale)}
+              aria-label={t('common.brand')}
+            >
               <BrandMark />
             </a>
             <p className="lp-footer__tagline">{t('landing.footer.tagline')}</p>
           </div>
 
-          {groups.map((group) => (
-            <nav key={group.title} className="lp-footer__group" aria-label={group.title}>
-              <h3 className="lp-footer__group-title">{group.title}</h3>
-              <ul className="lp-footer__links">
-                {group.links.map((link) => (
-                  <li key={link.label}>
-                    <a className="lp-footer__link" href={link.href}>
-                      {link.label}
-                    </a>
-                  </li>
-                ))}
-              </ul>
-            </nav>
-          ))}
+          {footerGroups().map((entry) => {
+            const title = t(groupTitleKey(entry.group));
+            return (
+              <nav key={entry.group} className="lp-footer__group" aria-label={title}>
+                <h3 className="lp-footer__group-title">{title}</h3>
+                <ul className="lp-footer__links">
+                  {entry.pages.map((target) => (
+                    <li key={target.id}>
+                      <a className="lp-footer__link" href={siteHref(target, locale)}>
+                        {t(target.labelKey)}
+                      </a>
+                    </li>
+                  ))}
+                </ul>
+              </nav>
+            );
+          })}
         </div>
 
         <div className="lp-footer__bottom">

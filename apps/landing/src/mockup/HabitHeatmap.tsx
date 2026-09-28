@@ -16,6 +16,13 @@ import { useMemo } from 'react';
 
 import { useI18n } from '@heyta/i18n';
 
+import {
+  MOCK_HABIT_HEAT_LEVELS,
+  MOCK_HABIT_HEAT_WEEKS,
+  MOCK_HABIT_KEYS,
+  mockHeatCellClass,
+} from './habit-shape.js';
+
 export interface Habit {
   name: string;
   streak: string;
@@ -25,7 +32,12 @@ export interface Habit {
   density: number;
 }
 
-const WEEKS = 26;
+/**
+ * 列数从**登记处**取（原来的 `const WEEKS = 26` 是本文件自己的一份）。
+ * `levelFor` 的"最近几周更密"曲线依赖它，所以两处必须同一个值 ——
+ * 各写一份会让图案曲线在改窗口时悄悄变形（而图案"看起来仍然像热力图"）。
+ */
+const WEEKS = MOCK_HABIT_HEAT_WEEKS;
 
 /**
  * 确定性的"假数据"。
@@ -76,7 +88,8 @@ function Heatmap({ habit }: { habit: Habit }): React.JSX.Element {
           return (
             <span
               key={`${String(week)}-${String(day)}`}
-              className={`mk-heat__cell${level > 0 ? ` mk-heat__cell--${String(level)}` : ''}`}
+              // 类名来自登记处（0 档没有修饰类）—— 见 `habit-shape.ts`。
+              className={mockHeatCellClass(level)}
             />
           );
         }),
@@ -123,13 +136,16 @@ export function HabitHeatmap(): React.JSX.Element {
           </div>
           <Heatmap habit={habit} />
           <div className="mk-heat__legend">
-            <span>{t('landing.mock.heat.less')}</span>
-            <span className="mk-heat__cell" />
-            <span className="mk-heat__cell mk-heat__cell--1" />
-            <span className="mk-heat__cell mk-heat__cell--2" />
-            <span className="mk-heat__cell mk-heat__cell--3" />
-            <span className="mk-heat__cell mk-heat__cell--4" />
-            <span>{t('landing.mock.heat.more')}</span>
+            <span>{t(MOCK_HABIT_KEYS.less)}</span>
+            {/*
+              🔴 图例的格数由**登记处**推导（`MOCK_HABIT_HEAT_LEVELS`），
+              不是手抄 5 个 <span>：手抄的那一版漏一档/多一档都不会报错，
+              图例仍然"看起来像一个图例"（与 `quadrant-shape.ts` 同一个理由）。
+            */}
+            {MOCK_HABIT_HEAT_LEVELS.map((level) => (
+              <span key={level} className={mockHeatCellClass(level)} />
+            ))}
+            <span>{t(MOCK_HABIT_KEYS.more)}</span>
           </div>
         </section>
       ))}

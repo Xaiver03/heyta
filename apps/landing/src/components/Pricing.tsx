@@ -32,7 +32,7 @@ import { Check, Cloud, Hourglass, Server, Sparkles } from 'lucide-react';
 import { useI18n } from '@heyta/i18n';
 
 import { revealVariants, staggerContainer, useMotionPreset, VIEWPORT } from '../lib/motion.js';
-
+import { useSelfHostHref } from '../site/cta.js';
 /**
  * 两个付费档的形状完全一样，只有词条前缀不同。
  *
@@ -106,6 +106,7 @@ function PaidCard({
 export function Pricing(): React.JSX.Element {
   const preset = useMotionPreset();
   const { t } = useI18n();
+  const selfHostHref = useSelfHostHref();
 
   // 数据挪进组件内是文案迁移的硬要求（模块级拿不到 `t`）。取舍见 `Landing.tsx` 文件头。
   const free = useMemo(
@@ -167,7 +168,11 @@ export function Pricing(): React.JSX.Element {
               ))}
             </ul>
 
-            <a className="lp-btn lp-btn--primary lp-pricing__cta" href="#selfhost">
+            {/* 🔴 这个链接的目标**取决于当前在哪一页**（见 `site/cta.ts`）：
+                首页上是本页锚点 `#selfhost`，搬到 `/pricing` 上就变成
+                `/{locale}/#selfhost`。写死 `#selfhost` 的话，/pricing 上
+                这个按钮点下去**完全没有反应**（页面上没有那个 id）。 */}
+            <a className="lp-btn lp-btn--primary lp-pricing__cta" href={selfHostHref}>
               {t('landing.pricing.free.cta')}
             </a>
           </motion.article>

@@ -1,12 +1,12 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
-  两个语言入口。hreflang 三件套（zh-CN / en / x-default）必须与
-  index.html 里的 <link rel="alternate"> 以及 <link rel="canonical"> 说同一件事 ——
-  三处任一不一致，搜索引擎就会各自挑一个当成"真正的那个页面"。
+  由 scripts/gen-entries.mjs 生成，不要手改（见该文件的文件头）。
 
-  刻意**只列** `/` 与 `/en/`：落地页是单页站点，其余路径都是 SPA 兜底，
-  不指向自己的锚点（`#pricing` 之类），因为锚点不是独立 URL。
-  `/app/` 不进 sitemap：它需要登录，见 robots.txt 的 Disallow。
+  每个页面 × 每种语言各一条，hreflang 三件套与入口 HTML 里那一组
+  说同一件事 —— 两处不一致时搜索引擎会各自挑一个当成"真正的那个页面"。
+
+  刻意**不列** `/app/`：它需要登录，见 robots.txt 的 Disallow。
+  也**不列**锚点（`#pricing` 之类）：锚点不是独立 URL。
 -->
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
         xmlns:xhtml="http://www.w3.org/1999/xhtml">
@@ -23,5 +23,103 @@
     <xhtml:link rel="alternate" hreflang="zh-CN" href="https://heyta.finlaw.cloud/" />
     <xhtml:link rel="alternate" hreflang="en" href="https://heyta.finlaw.cloud/en/" />
     <xhtml:link rel="alternate" hreflang="x-default" href="https://heyta.finlaw.cloud/" />
+  </url>
+  <url>
+    <loc>https://heyta.finlaw.cloud/features/</loc>
+    <changefreq>weekly</changefreq>
+    <xhtml:link rel="alternate" hreflang="zh-CN" href="https://heyta.finlaw.cloud/features/" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://heyta.finlaw.cloud/en/features/" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://heyta.finlaw.cloud/features/" />
+  </url>
+  <url>
+    <loc>https://heyta.finlaw.cloud/en/features/</loc>
+    <changefreq>weekly</changefreq>
+    <xhtml:link rel="alternate" hreflang="zh-CN" href="https://heyta.finlaw.cloud/features/" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://heyta.finlaw.cloud/en/features/" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://heyta.finlaw.cloud/features/" />
+  </url>
+  <url>
+    <loc>https://heyta.finlaw.cloud/platforms/</loc>
+    <changefreq>weekly</changefreq>
+    <xhtml:link rel="alternate" hreflang="zh-CN" href="https://heyta.finlaw.cloud/platforms/" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://heyta.finlaw.cloud/en/platforms/" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://heyta.finlaw.cloud/platforms/" />
+  </url>
+  <url>
+    <loc>https://heyta.finlaw.cloud/en/platforms/</loc>
+    <changefreq>weekly</changefreq>
+    <xhtml:link rel="alternate" hreflang="zh-CN" href="https://heyta.finlaw.cloud/platforms/" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://heyta.finlaw.cloud/en/platforms/" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://heyta.finlaw.cloud/platforms/" />
+  </url>
+  <url>
+    <loc>https://heyta.finlaw.cloud/pricing/</loc>
+    <changefreq>weekly</changefreq>
+    <xhtml:link rel="alternate" hreflang="zh-CN" href="https://heyta.finlaw.cloud/pricing/" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://heyta.finlaw.cloud/en/pricing/" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://heyta.finlaw.cloud/pricing/" />
+  </url>
+  <url>
+    <loc>https://heyta.finlaw.cloud/en/pricing/</loc>
+    <changefreq>weekly</changefreq>
+    <xhtml:link rel="alternate" hreflang="zh-CN" href="https://heyta.finlaw.cloud/pricing/" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://heyta.finlaw.cloud/en/pricing/" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://heyta.finlaw.cloud/pricing/" />
+  </url>
+  <url>
+    <loc>https://heyta.finlaw.cloud/integrations/</loc>
+    <changefreq>weekly</changefreq>
+    <xhtml:link rel="alternate" hreflang="zh-CN" href="https://heyta.finlaw.cloud/integrations/" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://heyta.finlaw.cloud/en/integrations/" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://heyta.finlaw.cloud/integrations/" />
+  </url>
+  <url>
+    <loc>https://heyta.finlaw.cloud/en/integrations/</loc>
+    <changefreq>weekly</changefreq>
+    <xhtml:link rel="alternate" hreflang="zh-CN" href="https://heyta.finlaw.cloud/integrations/" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://heyta.finlaw.cloud/en/integrations/" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://heyta.finlaw.cloud/integrations/" />
+  </url>
+  <url>
+    <loc>https://heyta.finlaw.cloud/help/</loc>
+    <changefreq>weekly</changefreq>
+    <xhtml:link rel="alternate" hreflang="zh-CN" href="https://heyta.finlaw.cloud/help/" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://heyta.finlaw.cloud/en/help/" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://heyta.finlaw.cloud/help/" />
+  </url>
+  <url>
+    <loc>https://heyta.finlaw.cloud/en/help/</loc>
+    <changefreq>weekly</changefreq>
+    <xhtml:link rel="alternate" hreflang="zh-CN" href="https://heyta.finlaw.cloud/help/" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://heyta.finlaw.cloud/en/help/" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://heyta.finlaw.cloud/help/" />
+  </url>
+  <url>
+    <loc>https://heyta.finlaw.cloud/changelog/</loc>
+    <changefreq>weekly</changefreq>
+    <xhtml:link rel="alternate" hreflang="zh-CN" href="https://heyta.finlaw.cloud/changelog/" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://heyta.finlaw.cloud/en/changelog/" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://heyta.finlaw.cloud/changelog/" />
+  </url>
+  <url>
+    <loc>https://heyta.finlaw.cloud/en/changelog/</loc>
+    <changefreq>weekly</changefreq>
+    <xhtml:link rel="alternate" hreflang="zh-CN" href="https://heyta.finlaw.cloud/changelog/" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://heyta.finlaw.cloud/en/changelog/" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://heyta.finlaw.cloud/changelog/" />
+  </url>
+  <url>
+    <loc>https://heyta.finlaw.cloud/signin/</loc>
+    <changefreq>weekly</changefreq>
+    <xhtml:link rel="alternate" hreflang="zh-CN" href="https://heyta.finlaw.cloud/signin/" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://heyta.finlaw.cloud/en/signin/" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://heyta.finlaw.cloud/signin/" />
+  </url>
+  <url>
+    <loc>https://heyta.finlaw.cloud/en/signin/</loc>
+    <changefreq>weekly</changefreq>
+    <xhtml:link rel="alternate" hreflang="zh-CN" href="https://heyta.finlaw.cloud/signin/" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://heyta.finlaw.cloud/en/signin/" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://heyta.finlaw.cloud/signin/" />
   </url>
 </urlset>

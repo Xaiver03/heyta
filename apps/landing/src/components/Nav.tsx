@@ -11,18 +11,35 @@
  * 交互：滚动超过一屏的 24px 后，导航从"贴着页面"变成"浮在内容上"
  * （加重阴影）。这是 Apple 的 **scroll edge effect** ——
  * 用材料变化表达"内容从下面过去了"，而不是加一条硬分割线。
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * 🔴 **链接来自站点注册表，不来自这个文件。**
+ *
+ * 这里曾经是一张手写的链接表（全是 `#capabilities` 这类页内锚点），
+ * 在整站只有一页时完全够用。有了子页面之后，手写表就是"孤立路由"的
+ * 生产装置：加了页面而忘了改这里，页面就只存在于 URL 里。
+ *
+ * 现在链接是 `navPages()` 的**函数**（顺序也由注册表决定），所以
+ * **没有一条路径能新增页面而不出现在导航里**。加页面只改
+ * `src/site/pages.ts` —— 见那个文件的文件头。
+ *
+ * ⚠️ 两条不在 `navPages()` 里、但**同样由注册表提供**的链接：
+ *   - 字标 → 首页（不是 `#top`。子页面上 `#top` 是个死锚点）；
+ *   - 「登录」→ `/signin`，挂在右侧操作位（理由见 `pages.ts` 的 signin 条目）。
+ * 这两条都不是"手写文案"：标签同样来自词条表。
  */
 
 import { useMemo, useState } from 'react';
 import { motion, useMotionValueEvent, useScroll } from 'motion/react';
-import { Moon, Sun } from 'lucide-react';
+import { Menu, Moon, Sun } from 'lucide-react';
 
-import { useI18n, useLocale } from '@heyta/i18n';
+import { otherLocale, useI18n, useLocale } from '@heyta/i18n';
 
-import { otherLocaleHref } from '../lib/locale.js';
 import { startCta } from '../lib/app-url.js';
 import { useMotionPreset } from '../lib/motion.js';
 import type { Theme } from '../lib/theme.js';
+import { navPages, pageById, type SitePage } from '../site/pages.js';
+import { otherLocaleHrefFor, siteHref } from '../site/paths.js';
 import { BrandMark } from './BrandMark.js';
 
 /**
@@ -55,9 +72,11 @@ import { BrandMark } from './BrandMark.js';
  *   今天的行为。所以**换域名/换主机是一次构建参数，不是一次改代码**。
  */
 export function Nav({
+  page,
   theme,
   onToggleTheme,
 }: {
+  page: SitePage;
   theme: Theme;
   onToggleTheme: () => void;
 }): React.JSX.Element {
@@ -71,32 +90,28 @@ export function Nav({
    * 所以它要在算 `cta` **之前**取到。
    */
   const locale = useLocale();
-  // 「开始使用」该指向哪，全页只有这一个判据（见 `lib/app-url.ts`）。
+  // 「开始使用」该指向哪，全站只有这一个判据（见 `lib/app-url.ts`）。
   const cta = startCta(locale);
 
-  /**
-   * 锚点与 `Landing.tsx` 里各区块的 `id` 必须一致 —— 写错了只是"点了没反应"。
-   *
-   * 挪进组件内是文案迁移的硬要求：模块级拿不到 `t`。取舍见 `Landing.tsx` 文件头。
-   */
+  /** 站点链接。顺序、标签、是否出现**全部**由注册表决定（见文件头）。 */
   const links = useMemo(
-    () => [
-      { href: '#capabilities', label: t('landing.nav.capabilities'), external: false },
-      { href: '#showcase', label: t('landing.nav.showcase'), external: false },
-      { href: '#sync', label: t('landing.nav.sync'), external: false },
-      { href: '#pricing', label: t('landing.nav.pricing'), external: false },
-      { href: '#selfhost', label: t('landing.nav.selfhost'), external: false },
-      /**
-       * 应用真的部署起来了才多这一条。
-       *
-       * 🔴 没配置时**不出现**：一个指向 `#selfhost` 的「立即使用」是骗人的，
-       * 而导航里本来就有一条「自建」，再加一条重复的只会让人以为它们不同。
-       * 这个断点以前根本不存在 —— 访客读完一整页也没有任何入口能打开应用。
-       */
-      ...(cta.external ? [{ href: cta.href, label: t(cta.labelKey), external: true }] : []),
-    ],
-    [t, cta.external, cta.href, cta.labelKey],
+    () =>
+      navPages().map((target) => ({
+        href: siteHref(target, locale),
+        label: t(target.labelKey),
+        current: target.id === page.id,
+      })),
+    [t, locale, page.id],
   );
+
+  /**
+   * 「登录」是注册表里的一条页面，但它挂在**操作位**而不是链接组里 ——
+   * 它是回访用户的入口，与「立即使用」（新访客的入口）是两个不同的意图，
+   * 混进一列同质链接里就没人找得到了（依据 A5-2，见 `pages.ts` 的 signin 条目）。
+   */
+  const signin = pageById('signin');
+  const signinHref = siteHref(signin, locale);
+  const signinLabel = t(signin.labelKey);
 
   // 主题按钮的可访问名取决于**当前主题**（说的是"切到哪去"）。先把词条取出来再绑。
   // 不要在无障碍名属性的三元分支里直接内联两个 `t(...)`：门禁的花括号扫描会把
@@ -113,12 +128,19 @@ export function Nav({
    * 所以 `common.lang.*` 这两条在中英两表里**刻意是同一个词**，
    * 门禁为此开了一个按 key 的白名单（见 scripts/check-ui-language.mjs）。
    *
+   * 🔴 落点是 `otherLocaleHrefFor(page, locale)` —— **保持当前页面、只换语言**。
+   * 这里曾经写死 `/` 或 `/en/`：在 `/features` 上点 English 会被丢回英文首页，
+   * 而地址栏看起来完全合理。见 `src/site/paths.ts` 的文件头。
+   *
    * 与主题按钮不同，它是 `<a>` 而不是 `<button>`：切换会整页跳到另一个地址
    * （理由见 src/lib/locale.ts），刷新、复制链接、前进后退都符合浏览器预期。
    */
-  const otherLocale = locale === 'en' ? 'zh-CN' : 'en';
-  const langHref = otherLocaleHref(locale);
-  const langLabel = otherLocale === 'en' ? t('common.lang.en') : t('common.lang.zh');
+  // 🔴 "另一种语言"只有一份定义（`@heyta/i18n` 的 `otherLocale`，见 R18）：
+  // 这里曾经自己写了一遍 `locale === 'en' ? 'zh-CN' : 'en'`，与 `site/paths.ts`
+  // 各写一份。两份写法漂移的表现是"语言切换器指向自己"（点了没反应）。
+  const targetLocale = otherLocale(locale);
+  const langHref = otherLocaleHrefFor(page, locale);
+  const langLabel = targetLocale === 'en' ? t('common.lang.en') : t('common.lang.zh');
   const langAria = t('landing.nav.switchLanguage', { language: langLabel });
 
   // 只在跨过阈值时改变状态；React 对同值 setState 会 bail out，
@@ -137,8 +159,14 @@ export function Nav({
         style={{ boxShadow: floating ? 'var(--ht-shadow-lg)' : 'var(--ht-shadow-sm)' }}
       >
         {/* 字标本身标了 aria-hidden，所以链接的可访问名由 aria-label 提供 ——
-            否则这个链接会变成一个没有名字的控件。 */}
-        <a className="lp-brand" href="#top" aria-label={t('common.brand')}>
+            否则这个链接会变成一个没有名字的控件。
+            🔴 落点是**首页**而不是 `#top`：`#top` 只在首页存在，子页面上它是个
+            点了没反应的死锚点（导航是每一页共用的，这个差别它看不见）。 */}
+        <a
+          className="lp-brand"
+          href={siteHref(pageById('home'), locale)}
+          aria-label={t('common.brand')}
+        >
           <BrandMark />
         </a>
 
@@ -148,7 +176,8 @@ export function Nav({
               key={link.href}
               className="lp-nav__link"
               href={link.href}
-              {...(link.external ? { rel: 'noopener noreferrer' } : {})}
+              // 当前页标出来：读屏软件靠它回答"我在哪"，而不只是"能去哪"。
+              {...(link.current ? { 'aria-current': 'page' as const } : {})}
             >
               {link.label}
             </a>
@@ -156,14 +185,30 @@ export function Nav({
         </nav>
 
         <div className="lp-nav__actions">
+          <a className="lp-nav__link lp-nav__signin" href={signinHref}>
+            {signinLabel}
+          </a>
+
+          {/* 应用真的部署起来了才多这一条。没配置时不出现 —— 一个指向
+              「自建」的「立即使用」是骗人的，而导航里本来就有一条自建入口。 */}
+          {cta.external ? (
+            <a
+              className="lp-btn lp-btn--primary lp-nav__cta"
+              href={cta.href}
+              rel="noopener noreferrer"
+            >
+              {t(cta.labelKey)}
+            </a>
+          ) : null}
+
           {/*
-            hrefLang 告诉辅助技术与搜索引擎这个链接指向**另一种语言**的页面 ——
+            `hrefLang` 告诉辅助技术与搜索引擎这个链接指向**另一种语言**的页面 ——
             光看链接文字（`English` / `中文`）看不出这一点。
           */}
           <a
             className="lp-lang"
             href={langHref}
-            hrefLang={otherLocale}
+            hrefLang={targetLocale}
             aria-label={langAria}
           >
             {langLabel}
@@ -190,6 +235,36 @@ export function Nav({
               {theme === 'light' ? <Moon size={18} /> : <Sun size={18} />}
             </motion.span>
           </button>
+
+          {/*
+            🔴 窄屏下 `.lp-nav__links` 整个被隐藏（≤1024px，见 landing.css）。
+            在只有一个页面时那没问题 —— 那些链接本来就是页内锚点。
+            有了子页面之后，"隐藏"就等于**窄屏访客没有任何跨页入口**，
+            只能在页脚里找。所以这里补一个折叠菜单。
+
+            用 `<details>` 而不是自己写 `useState`：键盘操作、`aria-expanded`、
+            焦点顺序都由浏览器给，而自己实现的那三样恰恰是最容易做漏的。
+          */}
+          <details className="lp-nav__menu">
+            <summary className="lp-iconbtn" aria-label={t('site.nav.aria')}>
+              <Menu size={18} />
+            </summary>
+            <nav className="lp-nav__menu-panel" aria-label={t('landing.nav.ariaLabel')}>
+              {links.map((link) => (
+                <a
+                  key={link.href}
+                  className="lp-nav__menu-link"
+                  href={link.href}
+                  {...(link.current ? { 'aria-current': 'page' as const } : {})}
+                >
+                  {link.label}
+                </a>
+              ))}
+              <a className="lp-nav__menu-link" href={signinHref}>
+                {signinLabel}
+              </a>
+            </nav>
+          </details>
         </div>
       </motion.div>
     </header>

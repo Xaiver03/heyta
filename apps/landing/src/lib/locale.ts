@@ -11,33 +11,25 @@
  *
  * 所以切换器是一个**链接**（`<a href>`），不是一个开关。代价是切换会整页跳转，
  * 但对落地页来说这恰好是想要的：URL 变了，可以直接复制分享。
- */
-
-import { DEFAULT_LOCALE, type Locale } from '@heyta/i18n';
-
-/**
- * 部署基路径。落地页挂在 `heyta.finlaw.cloud` 的根上（`/`），
- * 但历史上也用过 `/landing/` 子路径，所以这里从 Vite 的 base 推导，
- * 而不是把 `/` 写死 —— 写死会让子路径部署时中英互链全部 404。
- */
-const BASE = import.meta.env.BASE_URL;
-
-/** 英文版的路径前缀，相对基路径。 */
-const EN_SEGMENT = 'en/';
-
-/**
- * 从路径判断语言。**只认 `/en/` 前缀**，其余一律回落到默认语言。
  *
- * 不做「按 Accept-Language 自动跳转」：那会让第一次访问中文站的英文浏览器用户
- * 被弹到 `/en/`，而中文用户分享出去的链接在别人那里变成英文。
- * 想换语言的人点一下切换器即可，那是一次明确的意图。
+ * ─────────────────────────────────────────────────────────────────────────
+ * 🔴 **本文件现在只是门面，真正的寻址在 `src/site/paths.ts`。**
+ *
+ * 这里曾经自己实现了两件事，而它们在站点只有一页时都是对的：
+ *
+ *   1. `localeFromPath` —— 解析 `/en/` 前缀。它必须与**入口生成器**用同一套规则，
+ *      否则会出现"生成器写了 `/en/features/`、解析器认不出"这种一半对一半错的状态。
+ *
+ * 它现在**照样从 `site/paths.ts` 取**（这里只是一层 re-export）。文件保留下来，
+ * 是因为「语言为什么由 URL 决定」这段理由需要一个家，而且调用点
+ * （`main.tsx` / `Nav.tsx`）不该关心路径是被解析还是被生成。
+ *
+ * ⚠️ 这里曾经还有一个 `otherLocaleHref(locale)`（返回写死的 `/` 或 `/en/`）。
+ * 站点有子页面之后它就成了 bug —— 在 `/features` 上点 English 会被丢回
+ * **英文首页** —— 而它**零调用**（R9 登记的欠账）。已删除：需要这个能力的地方
+ * 一律用 `site/paths.ts` 的 `otherLocaleHrefFor(page, locale)`，页面由当前地址决定。
  */
-export function localeFromPath(pathname: string): Locale {
-  const rest = pathname.startsWith(BASE) ? pathname.slice(BASE.length) : pathname;
-  return rest === 'en' || rest.startsWith(EN_SEGMENT) ? 'en' : DEFAULT_LOCALE;
-}
 
-/** 另一种语言的地址，用于切换器与 hreflang。 */
-export function otherLocaleHref(locale: Locale): string {
-  return locale === 'en' ? BASE : `${BASE}${EN_SEGMENT}`;
-}
+import { localeFromPath } from '../site/paths.js';
+
+export { localeFromPath };
