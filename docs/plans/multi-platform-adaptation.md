@@ -33,11 +33,11 @@
 |---|---|---|---|
 | **M0** ✅ **已完成** | 共享展示层补完 | ✅ 取值只有一份（`category-colors` **3 份 → 1 份**）；✅ 门禁拦住回潮（两条新规则，**各自证伪过**） | 无 |
 | **M1** | 🔴 垂直切片验证 | **一份** RN 组件在 web + mobile + 桌面三端都渲染出来 | M0 |
-| **M2** | 桌面端骨架（Electron） | 桌面端跑通真实同步，煞有记录 | M1 |
+| **M2** | 桌面端骨架（**原生优先**，见 [ADR-0032](../adr/0032-windows-native-via-rnw.md)） | 桌面端跑通真实同步；**Windows 从 Electron 迁到 RNW 原生** | M1 |
 | **M3** | 逐特性迁移 UI | 每个特性两端共用同一组件；旧 DOM 实现删除 | M2 |
 | **M4** | 数据层统一（web SQLite） | ✅ **决策已落（ADR-0027）**；✅ **`SqliteWasmDriver` 已过同一套契约**；✅ **Worker 接缝已过同一套契约 + 真浏览器端到端**（M4-3a）；✅ **web 已切到 Worker 里的 SQLite，生产构建产出 worker+wasm**（M4-3b）；✅ **真实旧库迁移已验证**（`check:web-migration`，见 §「旧库迁移」）；⬜ "FTS5 在 web 可用"已实测**支持**但未接进检索功能；⬜ 鸿蒙侧**不得假设**有 FTS5/sqlite-vec（见 ADR-0027） | M0（可与 M3 并行） |
 | **M5** | 收敛收尾 + 门禁全端 | DOM UI 删除；门禁覆盖全端；文档固化 | M3、M4 |
-| **M6** | 鸿蒙"跑起来" | 真机/模拟器启动成功 | 外部（模拟器镜像 + 签名） |
+| **M6** | 鸿蒙"跑起来" | 真机/模拟器启动成功 | ✅ **不再是外部依赖**（模拟器已可全 CLI 起，见 [多平台构建手册](../runbooks/multi-platform-build.md) §4.1） |
 
 🔴 **M1 是成败点。** 它失败则 ADR-0024 需要重估（可能退化为"RN 覆盖移动端 + 桌面用 Web 壳"）。
 **在 M1 通过之前，M3 不得大规模投入。**
@@ -424,12 +424,41 @@ M1 是**独立分支上的实验**。若 `react-native-web` 与 RN 0.84.1 不兼
 
 ---
 
-## M2：桌面端骨架（Electron）
+## M2：桌面端骨架（Electron → **原生优先**）
 
 ### 目标
 
 Windows / macOS / Linux 三平台各出一个能跑起真实同步的桌面应用，
 **存储复用已有实现，不新写引擎**。
+
+### 🔴 交付形态已改：**原生优先，Windows 明确要原生**
+
+2026-09-28 的产品要求（原话）：
+
+> 「我们尽可能需要原生，包括 Windows 上面也需要原生。**哪怕是代码量偏大。**」
+
+这条**推翻了** [ADR-0024](../adr/0024-desktop-shell-and-ui-convergence.md) §2.2 里
+"桌面壳选 Electron"的**权衡前提** —— 那里的论证建立在"UI 复用度最高"上，
+而现在**原生性优先于复用度**。新的决策见
+[ADR-0032：Windows 迁到 react-native-windows 原生](../adr/0032-windows-native-via-rnw.md)。
+
+Electron 骨架**不废弃**，角色变了：它是
+① 已实测可用的**基线**、② macOS/Linux 在原生路线打通前的**过渡壳**、
+③ RNW 路线的**对照基准**（同一套断言必须两边都过）。
+
+三端的原生可达性**不一样**，这是本阶段最需要说清的一件事：
+
+| 平台 | 真原生方案 | 可达性 | 卡点 |
+|---|---|---|---|
+| **Windows** | **react-native-windows（RNW）** | ✅ **可行** | RNW 0.84.0 的 peerDependency = `react-native: 0.84.1`，**与 heyta 精确相等**；New Arch（C++/WinAppSDK/Win32/Composition） |
+| **macOS** | `react-native-macos` | 🔴 **现在不可行** | 最新 **0.81.9**，peerDep `react-native: 0.81.6`，官方要求"同一 minor"；heyta 在 **0.84.1** → **硬冲突**。降级移动端到 0.81 不可接受 |
+| **macOS**（备选） | SwiftUI 原生 | ⚠️ 可行但要**另写一整套 UI** | 那是**第四份** UI 实现，与"停止写两遍"直接对立 |
+| **Linux** | 无 RN 目标 | 🔴 **不存在** | RN 系没有 Linux；真原生 = GTK4/Qt，**又一个独立代码库** |
+
+⇒ **本阶段的取舍**：Windows **真的迁**（可行且对齐）；
+macOS/Linux **保留 Electron 并如实标注为过渡**，
+不假装它们"也是原生的"。详表见
+[多端原生构建计划](desktop-native-migration.md)。
 
 ### ✅ 已完成的部分（2026-09-27）
 
@@ -446,7 +475,7 @@ Windows / macOS / Linux 三平台各出一个能跑起真实同步的桌面应�
 | **M2-2b 桌面端渲染进程 + GUI 冒烟** | ✅ **已完成**（本轮）—— 同时关掉 **M1 判据第 4 条** | `e2e/tests/desktop-window.spec.ts` 通过；截图见 `e2e/test-results/desktop-window.png` |
 | **Windows 真机验证** | ✅ **已实测**（2026-09-27） | 在 `windows-pc` 上 `pnpm -r build` **exit 0**、桌面端产物**字节级一致**、**11/11 测试通过**。详见 [桌面端手册](../runbooks/desktop.md) §5.2 |
 | M2-3 跑通真实同步 | ✅ **已完成并实测**（本轮） | **三端全链路通过（18/18）**：Web（真浏览器）↔ 服务端（真 Postgres）↔ 笔记本（真 SQLite、**另一个 clientId**），第 3 相是**全新浏览器上下文（空 IndexedDB）**把两台设备的数据全拉回来。命令 `pnpm verify:multi-end`，前置见 [本地验证手册](../runbooks/local-server-verification.md)。⚠️ 过程中修掉一个**让整个脚本从没真正跑起来过**的 bug，见下 |
-| M2-4 三平台产包 + 签名 | 🟡 **三平台产包 ✅，Windows 已实测运行 ✅，桌面签名未做** | `@electron/packager`（BSD-2-Clause）；`release/heyta-{darwin-arm64,win32-x64,linux-x64}` 三份都产出（本轮复测 ✅）。**macOS 包已实测启动 + 截图**（`desktop-window.spec.ts` 的"打包产物"用例）。**Windows 打包件已在真 Windows 上启动并建出完整 op-log schema**（`heyta.sqlite` 6 张表，见 [`runbooks/desktop.md` §5.6](../runbooks/desktop.md)）；**开窗冒烟 `--window` 在真 Windows 上通过并截图**（§5.5）。⚠️ 仍缺：Windows 打包件的**可见窗口**截图、**Linux 产物在 Linux 上运行**（无 Linux 机器）；安装器 / 签名 / 公证 / 自动更新**一律未做**（缺证书）。详见 [`runbooks/desktop.md` §4.3](../runbooks/desktop.md) |
+| M2-4 三平台产包 + 签名 | 🟡 **三平台产包 ✅，Windows 已实测运行 ✅，桌面签名未做** | `@electron/packager`（BSD-2-Clause）；`release/heyta-{darwin-arm64,win32-x64,linux-x64}` 三份都产出（本轮复测 ✅）。**macOS 包已实测启动 + 截图**（`desktop-window.spec.ts` 的"打包产物"用例）。**Windows 打包件已在真 Windows 上启动并建出完整 op-log schema**（`heyta.sqlite` 6 张表，见 [`runbooks/desktop.md` §5.6](../runbooks/desktop.md)）；**开窗冒烟 `--window` 在真 Windows 上通过并截图**（§5.5）。⚠️ 仍缺：Windows 打包件的**可见窗口**截图、**Linux 产物在 Linux 上运行**（🔴 **不是没有机器** —— `ubuntu-jcli` / `sanjiaozhou` 实测 SSH 可达，见 [`local-server-verification.md` §0](../runbooks/local-server-verification.md)）；安装器 / 签名 / 公证 / 自动更新**一律未做**（缺证书）。详见 [`runbooks/desktop.md` §4.3](../runbooks/desktop.md) |
 | **Android release AAB + 发布签名** | ✅ **已完成并实测**（本轮） | `./gradlew bundleRelease` → `BUILD SUCCESSFUL`，44 MB AAB。**签名接线已用真 keystore 验证换掉了签名者**。⚠️ 上架用的正式 keystore 仍需自备（见 [多平台构建手册](../runbooks/multi-platform-build.md) §1.5）。**过程中发现 release 打包一直是坏的** —— 见下 |
 
 ### 🔴 Android release 打包从没跑通过（2026-09-28 修）
@@ -861,22 +890,43 @@ IndexedDB 路径**保留到迁移验证通过之后**再删。两者可并存一
 
 ---
 
-## M6：鸿蒙"跑起来"（外部依赖）
+## M6：鸿蒙"跑起来"（**不再是外部依赖**）
 
-### 现状（实测）
+### 🔴 2026-09-28 更正：原来那句"缺的三样都不是写代码能补的"是错的
 
-出包**已完成**：`pnpm verify:harmony-toolchain` / `verify:harmony-rnoh` / `verify:harmony-rnoh-js`
-三条判据脚本能出 HAP（release 20 MB / debug 37 MB）。
+本节的旧结论建立在一条**没有验证过**的判断上：
 
-**缺的三样都不是写代码能补的**：
+> 「模拟器系统镜像：本机 `~/.Huawei` 不存在」
 
-| 缺什么 | 说明 |
-|---|---|
-| 模拟器系统镜像 | 本机 `~/.Huawei` 不存在 |
-| 签名 | 产物是 `*-unsigned.hap`（`signingConfigs: []`，装不进任何设备） |
-| 真机或模拟器 | — |
+**`~/.Huawei` 从来不是镜像的落盘位置，而且它永远是空的。**
+镜像实际落在 `~/Library/Huawei/Sdk/system-image/HarmonyOS-6.1.1/<device>_all_arm/`。
+拿一个**永远为空**的目录去判断"有没有镜像"，每次都会得出"没有" ——
+于是这条被写成了"外部依赖"，而它其实只是**没去下载**。
 
-**因此 M6 不排期**，只在具备条件时执行。ADR-0024 不依赖 M6。
+模拟器有**完整 CLI**（`-license` / `-imageList` / `-install` / `-create` / `-start`），
+**不需要 GUI、不需要华为账号**。完整命令见
+[多平台构建手册](../runbooks/multi-platform-build.md) §4.1。
+
+### 已实测到的进度
+
+| 步骤 | 状态 | 证据 |
+|---|---|---|
+| 出包 | ✅ | `verify:harmony-toolchain` / `verify:harmony-rnoh` / `verify:harmony-rnoh-js`（release 20 MB / debug 37 MB） |
+| 模拟器镜像 | ✅ **2.37 GB 已下载** | `~/Library/Huawei/Sdk/system-image/…`（落盘 4.4 GB） |
+| 实例 | ✅ `heyta_test` | `Emulator -list` |
+| 模拟器运行 | ✅ hdc 认到 `127.0.0.1:5557` | `hdc list targets` |
+| 装 HAP | ✅ **未签名也能装** | `hdc install -r entry-default-unsigned.hap` → `bm dump -a` 列出 `com.heyta.mobile` |
+| 模板工程渲染 | ✅ **已修白屏并看到界面** | 修前 `Failed to load the content. Cause: {"code":401}` → 修后 `Succeeded` + "Hello World" |
+| **RN 应用在设备上跑** | ❌ **待做** | 上面装的是模板工程的 HAP，不是 RN 的 |
+
+### 剩下的工作（全部是"写代码/跑构建"，没有一项是等外部条件）
+
+1. 把 `verify:harmony-rnoh-js` 产出的 **RN HAP 装到模拟器**上并启动；
+2. 卡片（ArkTS）在模拟器上**能否添加/渲染** —— 华为文档没有明文，
+   **这是一个待实测的问题，不是"条件不具备"**；
+3. 真机签名（`signingConfigs: []`）—— 模拟器不需要，真机需要。
+
+**⇒ M6 应当排期。** ADR-0024 仍然不依赖 M6（组件是平台原生 UI，与 UI 收敛正交）。
 
 ---
 

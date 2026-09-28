@@ -193,7 +193,11 @@ pnpm 用符号链接 + 嵌套 `node_modules`，打包器复制过去的是一堆
 - ❌ **自动更新**。
 - ⚠️ **Windows 产物**：✅ 已实测**能启动并建出 op-log schema**（[§5.6](#56-打包产物在-windows-上真的跑起来了2026-09-28-实测-)）；
   ⏳ 它的**可见窗口**截图仍缺（无头 SSH 会话里截不到）。
-- ⚠️ **Linux 产物**：❌ 仍未在 Linux 上运行过 —— 没有 Linux 机器。
+- ⚠️ **Linux 产物**：❌ 仍未在 Linux 上运行过。
+  🔴 **但"没有 Linux 机器"这个理由不成立** —— 团队自己的机器就在那里：
+  `ubuntu-jcli`（124.223.13.226，Ubuntu 22.04.5）、`sanjiaozhou`（101.34.250.109，Ubuntu 24.04 8C/15G）
+  实测 SSH 可达，清单与连通性见 [本地验证手册](local-server-verification.md) §0。
+  所以这一条是**欠的活，不是缺的条件**。
   "打得出来"与"跑得起来"是两件事。
 
 签名 / 公证 / 安装器 / 自动更新这四项都要等证书到位，届时的工具大概率是
@@ -440,7 +444,7 @@ SQLite 3.x, version-valid-for 13, written using SQLite 3.53.4
 | **开窗冒烟（`--window`，截图可看）** | ✅ **已实测**（真 Windows + macOS，见 [§5.5](#55-开窗冒烟--window真-windows-实测-)）—— 断言 `bridge`/`rows`/`colorBuckets`，截图**肉眼确认非空白** |
 | 三平台**应用包** | ✅ **已产出**（`@electron/packager`，见 [§4.3](#43-打包m2-4)）· **Windows 打包件已在真 Windows 上启动并建库**（见 [§5.6](#56-打包产物在-windows-上真的跑起来了2026-09-28-实测-)） |
 | ⚠️ 仍未做：**Windows 打包件的「可见窗口」截图** | 打包进程能起来并建库（§5.6），但无头 SSH 会话里截不到**它**的窗口；§5.5 那张图来自同一份渲染产物在 Windows 上的构建。要补这一条需要在**有桌面的会话**里跑一次 |
-| ⚠️ 仍未做：**Linux 产物在 Linux 上运行** | 没有 Linux 机器（三平台包都只在 macOS 上产出过） |
+| ⚠️ 仍未做：**Linux 产物在 Linux 上运行** | **不是因为没有机器**（`ubuntu-jcli` / `sanjiaozhou` 实测 SSH 可达，见 [本地验证手册](local-server-verification.md) §0），是还没去做。三平台包此前都只在 macOS 上产出过 |
 | 三平台**安装器**（dmg / nsis / AppImage） | 未做 |
 | 代码签名 / 公证 | 未做 |
 | 自动更新 | 未做 |
