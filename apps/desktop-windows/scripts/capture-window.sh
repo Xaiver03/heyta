@@ -36,7 +36,7 @@ cat > /tmp/heyta-win-clean.ps1 <<'PS1'
 Get-ChildItem C:\src\heyta\apps\desktop-windows -Recurse -Force -Filter '._*' -EA SilentlyContinue |
   ForEach-Object { Remove-Item $_.FullName -Force }
 PS1
-cat "$TARBALL" | ssh -o ConnectTimeout=10 "$HOST" "tar -xzf - -C $REMOTE_REPO && echo EXTRACT_OK" | sed 's/^/  /'
+cat "$TARBALL" | ssh -o ConnectTimeout=10 "$HOST" "tar -xzf - -C $REMOTE_REPO && echo EXTRACT_OK" | awk '{print "  " $0}'
 ps /tmp/heyta-win-clean.ps1 >/dev/null
 
 echo ""
@@ -46,7 +46,7 @@ Set-Location C:\src\heyta
 dotnet build apps\desktop-windows\HeytaWindows\HeytaWindows.csproj -c Release -p:Platform=x64 2>&1 |
   Select-String -Pattern 'error|Build succeeded' | Select-Object -First 8 | ForEach-Object { Write-Output $_.Line }
 PS1
-ps /tmp/heyta-win-build.ps1 | sed 's/^/  /'
+ps /tmp/heyta-win-build.ps1 | awk '{print "  " $0}'
 
 echo ""
 echo "=== ④ 推取证脚本并在交互式会话里执行 ==="
@@ -62,7 +62,7 @@ schtasks /run /tn heyta-window-capture 2>&1 | Out-Null
 Start-Sleep -Seconds 30
 if (Test-Path C:\src\heyta-window.txt) { Get-Content C:\src\heyta-window.txt | ForEach-Object { Write-Output $_ } }
 PS1
-ps /tmp/heyta-win-sched.ps1 | sed 's/^/  /'
+ps /tmp/heyta-win-sched.ps1 | awk '{print "  " $0}'
 
 echo ""
 echo "=== ⑤ 取回证据 ==="

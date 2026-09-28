@@ -18,13 +18,13 @@ PKG="${HEYTA_HARMONY_PACKAGE:-com.heyta.mobile}"
 echo "=== 起应用 ==="
 "$HDC" shell aa force-stop "$PKG" >/dev/null 2>&1 || true
 sleep 1
-"$HDC" shell aa start -a EntryAbility -b "$PKG" | sed 's/^/  /'
+"$HDC" shell aa start -a EntryAbility -b "$PKG" | awk '{print "  " $0}'
 sleep 15
 
 echo ""
 echo "=== 截图 ==="
-"$HDC" shell snapshot_display -f /data/local/tmp/heyta.jpeg 2>&1 | tail -1 | sed 's/^/  /'
-"$HDC" file recv /data/local/tmp/heyta.jpeg /tmp/harmony-app.jpeg | tail -1 | sed 's/^/  /'
+"$HDC" shell snapshot_display -f /data/local/tmp/heyta.jpeg 2>&1 | tail -1 | awk '{print "  " $0}'
+"$HDC" file recv /data/local/tmp/heyta.jpeg /tmp/harmony-app.jpeg | tail -1 | awk '{print "  " $0}'
 
 mkdir -p "$MOBILE/evidence"
 magick /tmp/harmony-app.jpeg "$MOBILE/evidence/harmonyos.png"

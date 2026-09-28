@@ -71,7 +71,7 @@ verify_ios() {
 
   xcrun simctl uninstall "$IOS_UDID" "$IOS_BUNDLE" >/dev/null 2>&1 || true
   xcrun simctl install "$IOS_UDID" "$app"
-  xcrun simctl launch "$IOS_UDID" "$IOS_BUNDLE" | sed 's/^/  /'
+  xcrun simctl launch "$IOS_UDID" "$IOS_BUNDLE" | awk '{print "  " $0}'
   sleep 15
   local png="$EVIDENCE/ios-release.png"
   xcrun simctl io "$IOS_UDID" screenshot "$png" >/dev/null 2>&1
@@ -104,7 +104,7 @@ verify_android() {
   echo "  APK: $(stat -f%z "$apk") 字节"
 
   adb -s "$ANDROID_SERIAL" uninstall "$ANDROID_PACKAGE" >/dev/null 2>&1 || true
-  adb -s "$ANDROID_SERIAL" install "$apk" | tail -1 | sed 's/^/  /'
+  adb -s "$ANDROID_SERIAL" install "$apk" | tail -1 | awk '{print "  " $0}'
   adb -s "$ANDROID_SERIAL" reverse --remove-all >/dev/null 2>&1 || true
   adb -s "$ANDROID_SERIAL" shell am force-stop "$ANDROID_PACKAGE" >/dev/null 2>&1 || true
   adb -s "$ANDROID_SERIAL" shell monkey -p "$ANDROID_PACKAGE" -c android.intent.category.LAUNCHER 1 >/dev/null 2>&1
@@ -138,4 +138,4 @@ esac
 
 echo ""
 echo "=== 产物 ==="
-ls -la "$EVIDENCE" | sed 's/^/  /'
+ls -la "$EVIDENCE" | awk '{print "  " $0}'

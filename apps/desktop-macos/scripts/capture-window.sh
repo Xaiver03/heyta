@@ -37,11 +37,11 @@ rm -f "$OUT" "$OUT.txt"
 
 echo "=== 构建 ==="
 cd "$SHELL_DIR"
-swift build 2>&1 | grep -E "error:|Build complete" | sed 's/^/  /'
+swift build 2>&1 | grep -E "error:|Build complete" | awk '{print "  " $0}'
 
 echo ""
 echo "=== 运行 + 自截屏 ==="
-HEYTA_SELF_CAPTURE="$OUT" "$SHELL_DIR/.build/out/Products/Debug/HeytaMac" 2>&1 | sed 's/^/  /'
+HEYTA_SELF_CAPTURE="$OUT" "$SHELL_DIR/.build/out/Products/Debug/HeytaMac" 2>&1 | awk '{print "  " $0}'
 
 [ -f "$OUT" ] || { echo "🔴 没产出截图"; exit 1; }
 
@@ -148,6 +148,6 @@ rm -f "$OUT.txt"
 
 echo ""
 echo "=== 产物 ==="
-ls -la "$OUT" "$NARRATIVE" 2>/dev/null | sed 's/^/  /'
+ls -la "$OUT" "$NARRATIVE" 2>/dev/null | awk '{print "  " $0}'
 echo "  --- 证据说明 ---"
 sed 's/^/  /' "$NARRATIVE" | tail -12

@@ -37,7 +37,7 @@ echo ""
 echo "=== 远端构建 + 冒烟 + 起窗口截图 ==="
 # 用**加引号的** heredoc：让远端自己展开 $ 与 $(...)，
 # 变量通过 ssh 的环境传入（未加引号的话 $(ls ...) 会在本地先跑，那是错的）
-ssh "$HOST" "REMOTE_DIR='${REMOTE_DIR}' WIN_W='${WIN_W}' WIN_H='${WIN_H}' bash -s" <<'REMOTE' 2>&1 | grep -vE "DRI3|libEGL|Gtk-WARNING|GtkA11y" | sed 's/^/  /'
+ssh "$HOST" "REMOTE_DIR='${REMOTE_DIR}' WIN_W='${WIN_W}' WIN_H='${WIN_H}' bash -s" <<'REMOTE' 2>&1 | grep -vE "DRI3|libEGL|Gtk-WARNING|GtkA11y" | awk '{print "  " $0}'
 set -e
 cd "$REMOTE_DIR/apps/desktop-linux"
 export HEYTA_BRIDGE_BUNDLE="$REMOTE_DIR/packages/app-host/bridge-bundle/native-bridge.js"
@@ -117,4 +117,4 @@ EOF
 
 echo ""
 echo "=== 产物 ==="
-ls -la "$LINUX_DIR/evidence/" | sed 's/^/  /'
+ls -la "$LINUX_DIR/evidence/" | awk '{print "  " $0}'
