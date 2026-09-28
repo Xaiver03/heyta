@@ -308,6 +308,10 @@ export const zhCN = {
   'web.shell.nav.completed': '已完成',
   'web.shell.nav.quadrant': '四象限',
   'web.shell.nav.project': '清单',
+  'web.shell.nav.tag': '标签',
+  'web.shell.search.placeholder': '搜索任务',
+  'web.shell.search.aria': '搜索任务（标题与备注）',
+  'web.shell.search.clear': '清除搜索',
   'web.shell.nav.tasks': '任务',
   'web.shell.nav.q1': '重要且紧急',
   'web.shell.nav.q2': '重要不紧急',
@@ -321,6 +325,9 @@ export const zhCN = {
   // `App.tsx` 的 `VIEW_TABS` 用 `labelKey` 渲染标签，而 `t()` 查不到词条是**抛错**，
   // 不是回退 —— 少一条就是整个外壳白屏（真浏览器验收抓到过）。
   'web.shell.views.growth': '成长',
+  // 便签（幻觉 #12「笔记模块」）。放在回收站/设置之前 ——
+  // 它与习惯/成长同属"日常会翻一下"的内容视图。
+  'web.shell.views.notes': '便签',
   'web.shell.views.settings': '设置',
   'web.shell.dueMode.aria': '截止时间显示方式',
   'web.shell.dueMode.date': '日期',
@@ -330,6 +337,14 @@ export const zhCN = {
   'web.shell.tasks.complete': '完成：{title}',
   'web.shell.tasks.uncomplete': '取消完成：{title}',
   'web.shell.tasks.delete': '删除：{title}',
+  // ── 任务备注 ──
+  // 🔴 在它之前，Web 上**没有任何备注输入框**：`Task.note` 存在、`setNote` 存在，
+  // 但唯一调用点是 AI 拆解与 AI 估时。数据层是通的（备注会被导出、会同步），
+  // 缺的只是"用户自己能不能写"这一米。见 `features/tasks/NoteEditor.tsx` 文件头。
+  'web.note.toggle': '备注',
+  'web.note.placeholder': '写点什么（支持 Markdown）',
+  'web.note.a11y.edit': '编辑「{title}」的备注',
+  'web.note.hint': '离开输入框时自动保存',
   // ── 回收站 ──
   // 入口是外壳的视图 tab（`App.tsx` 的 `VIEW_TABS`），视图本体在
   // `apps/web/src/features/trash/TrashView.tsx`。删除仍然只是软删除，
@@ -472,11 +487,49 @@ export const zhCN = {
   'web.passkeys.error.unauthorized': '登录状态已失效，请重新登录。',
   'web.passkeys.error.network': '连不上服务端，请稍后重试。',
 
+  // ── 应用内的小组件旅程（把卡片加到桌面）──────────────────────────
+  'mobile.widgetJourney.sectionTitle': '桌面小组件',
+  'mobile.widgetJourney.card.today': '今日任务',
+  'mobile.widgetJourney.card.quadrant': '四象限',
+  'mobile.widgetJourney.card.habits': '今日习惯',
+  'mobile.widgetJourney.card.focus': '今日专注',
+  'mobile.widgetJourney.intro': '今日任务、四象限、习惯、专注 —— 四张卡片可以把它们放在桌面上。',
+  'mobile.widgetJourney.howTo': '如何添加',
+  'mobile.widgetJourney.openOnce': '添加后如果卡片显示「打开 Heyta 以显示小组件」，打开一次 Heyta 就会填充内容。',
+  'mobile.widgetJourney.cannotAutoAdd': '系统不允许应用替你把小组件放上桌面，所以只能按下面的步骤自己加一次。',
+  'mobile.widgetJourney.ios.step1': '长按桌面空白处，直到图标开始抖动',
+  'mobile.widgetJourney.ios.step2': '点左上角的「+」',
+  'mobile.widgetJourney.ios.step3': '搜索「Heyta」，选一种尺寸',
+  'mobile.widgetJourney.ios.step4': '点「添加小组件」',
+  'mobile.widgetJourney.android.step1': '长按桌面空白处',
+  'mobile.widgetJourney.android.step2': '选「小部件」（部分机型叫「微件」）',
+  'mobile.widgetJourney.android.step3': '找到 Heyta，长按并拖到桌面上',
+  'mobile.widgetJourney.other.step1': '长按桌面空白处，从小组件列表里找到 Heyta',
+  'mobile.widgetJourney.other.step2': '把它拖到桌面上',
+  'mobile.widgetJourney.privacyTitle': '锁屏时不显示任务标题',
+  'mobile.widgetJourney.privacyHint': '开启后，锁屏与锁屏相关的小组件只显示任务数量，不显示标题。',
+  'mobile.widgetJourney.privacyFailed': '没能保存这个设置，请重试。',
+
   // ── Windows 小组件的后台刷新（Web Push）────────────────────────────
   // ⚠️ 这些词条只在**能力真的可用**时才会被画出来（`probeWidgetPush`）。
   //    http:// 上、没配 VAPID 的自托管实例上，整个面板都不画 ——
   //    一个点了必然失败的开关比没有开关更糟。
   'web.widgetPush.title': '小组件后台刷新',
+
+  // ── Web/Windows 的小组件旅程（先装成应用，卡片才会出现在面板里）──────
+  'web.widgetJourney.sectionTitle': '桌面小组件',
+  'web.widgetJourney.intro': 'heyta 可以变成桌面上的应用，今日任务、四象限、习惯、专注四张卡片会出现在系统的小组件面板里。',
+  'web.widgetJourney.status.standalone': '已作为应用运行',
+  'web.widgetJourney.status.browser': '正在浏览器标签页里运行',
+  'web.widgetJourney.howToInstall': '如何装成应用',
+  'web.widgetJourney.windows.step1': '在地址栏右侧点「…」或应用图标',
+  'web.widgetJourney.windows.step2': '选「应用」→「将此站点作为应用安装」',
+  'web.widgetJourney.windows.step3': '装好后，四张卡片会出现在 Windows 的小组件面板里（按 Win+W 打开）',
+  'web.widgetJourney.macos.step1': '在地址栏右侧点「安装 heyta」图标',
+  'web.widgetJourney.macos.step2': '装好后从「应用程序」里打开它',
+  'web.widgetJourney.other.step1': '在浏览器菜单里找「安装应用」或「添加到主屏幕」',
+  'web.widgetJourney.other.step2': '装好后从应用列表里打开它',
+  'web.widgetJourney.note.widgetSource': '卡片只来自已安装的应用 —— 一个没安装的网页不会出现在小组件面板里。',
   'web.widgetPush.description': '开启后，任务在别的设备上发生变化时，Windows 上 pin 的 heyta 小组件会自动更新；关闭时只有打开 Heyta 才会刷新。',
   'web.widgetPush.rowLabel': '允许后台刷新小组件',
   'web.widgetPush.status.subscribed': '已开启',
@@ -522,6 +575,11 @@ export const zhCN = {
   'web.focus.start': '开始',
   'web.focus.a11y.pause': '暂停专注',
   'web.focus.pause': '暂停',
+  // M3 第二刀：主按钮的"暂停 → 继续"映射搬进了 `@heyta/ui` 的共享面板，
+  // 所以 web 也需要"继续"这一条（原来 web 的暂停之后只有"开始"，
+  // 而那个走的是 `start()`，会把已走过的进度清掉）。
+  'web.focus.a11y.resume': '继续专注',
+  'web.focus.resume': '继续',
   'web.focus.a11y.stop': '中止专注',
   'web.focus.stop': '中止',
   'web.focus.task.label': '关联任务（可选）',
@@ -532,6 +590,18 @@ export const zhCN = {
   // 落盘失败时 store 只带 `{ reason }`（底层实现的原始文本，是数据），
   // 句子在这里拼 —— 否则英文界面会漏出一句中文。
   'web.focus.error.saveFailed': '专注记录保存失败：{reason}',
+  // 时长设置。**只在 idle 时可改**（进行中改会让本轮的计划时长含义不明），
+  // 所以有一条专门的说明解释为什么现在是灰的 —— 灰掉而不解释是最坏的做法。
+  'web.focus.config.title': '时长设置',
+  'web.focus.config.work': '专注',
+  'web.focus.config.shortBreak': '短休息',
+  'web.focus.config.longBreak': '长休息',
+  'web.focus.config.longBreakEvery': '长休息间隔',
+  'web.focus.config.minutes': '{minutes} 分钟',
+  'web.focus.config.sessions': '{count} 个专注',
+  'web.focus.config.locked': '计时进行中不能改时长 —— 先中止本轮，改完再开始。',
+  'web.focus.config.a11y.minutes': '{label}时长，单位分钟',
+  'web.focus.config.a11y.sessions': '{label}，单位个数',
 
   // ── Web · 习惯 ────────────────────────────────────────────
   'web.habits.addPlaceholder': '新习惯，例如「喝水」',
@@ -563,7 +633,12 @@ export const zhCN = {
   'web.habits.streak.totalOne': '累计 {count} 次',
   // 热力图文案由**我们**传给 react-activity-calendar —— 它的默认文案是英文，
   // 而 `{{count}}` 是**库自己的**占位符，必须原样留着（不是我们的 `{name}` 形状）。
-  'web.habits.heatmap': '最近 90 天共 {{count}} 次打卡',
+  // ── M3 第七刀（habits）：共享热力图的两条文案 ──────────────
+  // 🔴 上面那条是**库的形状**（`{{count}}` 是 react-activity-calendar 自己的
+  // 占位符），所以自绘热力图**不能复用它** —— 复用会渲染出字面的 `{5}`
+  // （我们的插值器只认单层 `{count}`，两层会剩下外层钩）。下面两条是我们自己的形状。
+  'web.habits.heatmap.a11y': '「{name}」最近 {days} 天共 {count} 次打卡',
+  'web.habits.heatmap.cell': '{date}：{count} 次',
 
   // ── Web · 热力图共用文案（习惯页与成长页）─────────────────
   // 月份与图例同样是画在界面上的字，所以同样要走词条表 ——
@@ -833,21 +908,51 @@ export const zhCN = {
   'web.ai.noTarget.breakdown': '还没有给「拆解任务」配置端点。去「设置」里添加端点并指定路由。',
   'web.ai.noTarget.duration': '还没有给「耗时估计」配置端点。去「设置」里添加端点并指定路由。',
   'web.ai.noTarget.prioritize': '还没有给「优先级排序」配置端点。去「设置」里添加端点并指定路由。',
+  'web.ai.noTarget.toolCalling': '还没有给「AI 工具调用」配置端点。去「设置」里添加端点、勾上「工具调用」能力并指定路由。',
 
   // ── Web · AI · 功能名 / 能力名 ────────────────────────────
   'web.ai.feature.capture': '一句话捕获',
   'web.ai.feature.breakdown': '拆解任务',
   'web.ai.feature.prioritize': '优先级建议',
   'web.ai.feature.duration': '预估耗时',
+  'web.ai.feature.toolCalling': 'AI 工具调用',
   // 能力勾选框旁的"哪些功能需要它"——原文是另一套更短的用法名。
   'web.ai.needs.capture': '快速捕获',
   'web.ai.needs.breakdown': '拆解任务',
   'web.ai.needs.prioritize': '排序建议',
   'web.ai.needs.duration': '耗时估计',
+  'web.ai.needs.toolCalling': '工具调用',
   'web.ai.capability.structuredOutput': '结构化输出',
   'web.ai.capability.longContext': '长上下文',
   'web.ai.capability.vision': '图片理解',
   'web.ai.capability.toolCalling': '工具调用',
+
+  // ── Web · AI · 工具调用面板 ────────────────────────────────
+  //
+  // 🔴 "规则命中不出境"这句话必须让用户看见：规则路径**一个字节都不发**，
+  // 而模型路径会把这句话 + 工具目录发出去。两条路的隐私后果完全不同。
+  'web.ai.tools.title': 'AI 工具调用',
+  'web.ai.tools.hint': '用一句话让 AI 调一个工具。规则能处理的不会离开这台设备。',
+  'web.ai.tools.placeholder': '例如：列出所有任务',
+  'web.ai.tools.inputAria': 'AI 工具调用的输入',
+  'web.ai.tools.run': '运行',
+  'web.ai.tools.viaRule': '本机规则命中 —— 没有联网',
+  'web.ai.tools.viaModel': '由模型选择',
+  'web.ai.tools.disclosureAria': 'AI 工具调用 —— 发送前确认',
+  'web.ai.tools.observationLead': '读取结果',
+  'web.ai.tools.proposalLead': '将要执行（需要你确认）',
+  'web.ai.tools.confirm': '确认执行',
+  'web.ai.tools.confirmAria': '确认执行这个工具',
+  'web.ai.tools.confirmedOk': '已执行',
+  'web.ai.tools.confirmedFail': '执行失败：{message}',
+  'web.ai.tools.modelTextLead': '模型说：',
+  'web.ai.tools.ambiguousLead': '这句话可能指好几件事，请说得更具体一些。可以试试：',
+  'web.ai.tools.empty': '没听懂这句话。换一种说法，或直接手动操作。',
+  'web.ai.tools.deniedLead': '这个工具还没有授权，需要先在设置里打开。',
+  'web.ai.tools.failedLead': '没能完成：',
+  'web.ai.tools.intentCreate': '新建任务「{title}」',
+  'web.ai.tools.intentUpdate': '修改任务 {id}',
+  'web.ai.tools.intentComplete': '把任务 {id} 标记完成',
 
   // ── Web · AI · 拆解面板 ───────────────────────────────────
   'web.ai.breakdown.button': 'AI 拆解',
@@ -1470,16 +1575,13 @@ export const zhCN = {
   'mobile.tasks.empty.title': '今天还没有安排',
   'mobile.tasks.empty.hint': '点右下角的加号，写下第一件事。',
   'mobile.tasks.mode.date': '日期',
+  'mobile.tasks.tagFilter.all': '全部',
   'mobile.tasks.mode.countdown': '倒计时',
   // 同一页上的两种视图。**不是两个 tab** —— 见 ADR-0015 §4。
   'mobile.tasks.view.list': '列表',
   'mobile.tasks.view.quadrant': '四象限',
   // 四象限分组。与 `web.quadrant.q1..q4` 同义，但按壳分命名空间 ——
   // 与 `landing.quadrant.q1..q4` 的存在是同一个理由：文案各壳可独立演进。
-  'mobile.quadrant.q1': '重要且紧急',
-  'mobile.quadrant.q2': '重要不紧急',
-  'mobile.quadrant.q3': '紧急不重要',
-  'mobile.quadrant.q4': '不重要不紧急',
   'mobile.tasks.quadrant.empty': '这里还没有任务',
   'mobile.tasks.group.overdue': '已过期',
   'mobile.tasks.group.inbox': '收集箱',
@@ -1520,6 +1622,9 @@ export const zhCN = {
   'mobile.focus.phase.idle': '准备好了就开始',
   'mobile.focus.phase.working': '专注中',
   'mobile.focus.phase.breaking': '休息中',
+  // 进度环的无障碍名。手机端原来是一条水平进度条（没有这条），
+  // M3 第二刀把进度环收进共享层后，两端都需要它。
+  'mobile.focus.a11y.progress': '进度 {percent}%',
   'mobile.focus.action.pause': '暂停',
   'mobile.focus.action.resume': '继续',
   'mobile.focus.action.startWork': '开始专注',
@@ -1547,6 +1652,11 @@ export const zhCN = {
   'mobile.detail.title': '任务详情',
   'mobile.detail.close': '关闭任务详情',
   'mobile.detail.field.title': '标题',
+  // 🔴 在它之前移动端**没有备注输入框**：`Task.note` 与 `setNote` 都在，
+  // 但唯一调用点是 AI（拆解 checklist / 估时写时长）—— 用户自己写不了。
+  'mobile.detail.field.note': '备注',
+  'mobile.detail.note.placeholder': '写点什么（支持 Markdown）',
+  'mobile.detail.note.hint': '离开输入框或关闭面板时保存',
   'mobile.detail.field.dueDate': '截止日期',
   'mobile.detail.field.repeat': '重复',
   'mobile.detail.repeat.none': '不重复',
@@ -1639,10 +1749,6 @@ export const zhCN = {
   // 现在只剩**标签**还没有管理界面（`createTag` 在 app-host 里有，
   // 但移动端没有入口，而且 `tagIds` 连"指派"的动作都还没有）。
   'mobile.profile.footnote': '凭据只保留在内存中，应用完全退出后需要重新输入。',
-  'mobile.profile.section.widget': '小组件',
-  'mobile.profile.widgetPrivacy.label': '锁屏上隐藏任务标题',
-  'mobile.profile.widgetPrivacy.hint': '打开后，锁屏上的 Heyta 小组件只显示数量，不显示任务标题。系统本身也会在未解锁时遮挡，这一项是额外的一层。',
-  'mobile.profile.widgetPrivacy.failed': '没能保存这一项设置，请再试一次。',
   'mobile.profile.conflict.body': '这几处两边都改过，heyta 不会替你挑——自动挑一个会悄悄丢掉另一边的改动。数据没有丢，但选完之前它们不会上传。',
   'mobile.profile.conflict.open': '逐条处理',
 
@@ -1713,6 +1819,12 @@ export const zhCN = {
   'mobile.growth.back': '返回',
   'mobile.growth.entry': '我的成长',
   'mobile.growth.entry.hint': '今日进度、连续天数与里程碑',
+  // ── M3 第七刀（habits）：移动端「我的 → 习惯」入口 ──────────
+  // 移动端此前**没有**习惯屏（成长屏只读连续数字，连打卡都做不到），
+  // 所以标签用「习惯」而不是「我的成长」—— 后者是回顾，这里是操作。
+  // ⚠️ 入口放在「我的」的第二层、不加 tab（ADR-0015 §4 与 P10 的连带有判决）。
+  'mobile.habits.entry': '习惯',
+  'mobile.habits.entry.hint': '打卡、连续天数与热力图',
   'mobile.growth.compare.note': '这里的数字只和过去的自己比，没有排行榜。',
 
   // 今日进度（L1）
@@ -1724,9 +1836,13 @@ export const zhCN = {
   'mobile.growth.today.hint.remaining': '还剩 {count} 件',
   'mobile.growth.today.closed': '今天闭环了',
   'mobile.growth.today.habits': '习惯 {done}/{planned}',
+  'web.growth.today.habits': '习惯 {done}/{planned}',
   'mobile.growth.today.tasks': '任务 {done}/{planned}',
+  'web.growth.today.tasks': '任务 {done}/{planned}',
   'mobile.growth.today.bonus': '计划外 {count} 件',
+  'web.growth.today.bonus': '计划外 {count} 件',
   'mobile.growth.today.focus': '专注 {minutes} 分钟',
+  'web.growth.today.focus': '专注 {minutes} 分钟',
 
   // 本周复盘（L3）。差值只用中性表述，不给下降配红色。
   'mobile.growth.week.title': '本周',
@@ -1811,6 +1927,427 @@ export const zhCN = {
   'mobile.export.shareHint': '导出内容会交给系统分享面板，由你选择保存或发送到哪里。',
   'mobile.export.shareTitle': 'heyta 导出',
   'mobile.export.shareFailed': '系统分享面板没有打开，导出内容没有送出。',
+
+  // ══════════════════════════════════════════════════════════════════
+  // 站点（多页）—— 见 docs/adr/0033-multi-page-site-and-bidirectional-reachability.md
+  //
+  // 🔴 这一段的 key 全部由 `apps/landing/src/site/pages.ts` 的**注册表**驱动：
+  //    导航、页脚、每页的 <title>/<meta>、sitemap 都由它派生。
+  //    **加页面只改注册表 + 这里 + 一个组件**，不要再去改导航或 sitemap。
+  //
+  // 🔴 产品负责人的硬约束（同一个产品的两张皮）：
+  //    · 禁止孤立路由 —— 每条路由都必须出现在导航或页脚（或由可达页面链接指向）；
+  //    · 禁止产品孤岛 —— 站点与应用必须**双向**可达；
+  //    · 不新建第二套导航语汇 —— 站点与应用用同一批 footer key。
+  // ══════════════════════════════════════════════════════════════════
+  'site.nav.home': '首页',
+  'site.nav.features': '功能介绍',
+  'site.nav.platforms': '平台状态',
+  'site.nav.pricing': '价格',
+  'site.nav.integrations': '独有能力',
+  'site.nav.help': '帮助',
+  'site.nav.changelog': '更新动态',
+  'site.nav.signin': '登录',
+  'site.nav.aria': '站点导航',
+  'site.footer.group.product': '产品',
+  'site.footer.group.support': '支持',
+  'site.footer.group.legal': '法律',
+  // 🔴 R2（2026-10-05）：这里曾有 9 条**零引用**的词条，已删：
+  //   `site.footer.{terms,privacy,license,aria}`、`site.backHome`、
+  //   `site.appLink.{label,pending,pendingCta}`、`site.signin.cta`。
+  //
+  // 判据不是"看着像没用"，而是**实测**：把 `dist/` 与词条表本身排除后，
+  // 全仓（含 `.mjs` / `.html`）对这 9 个 key 的引用是 **0 处**
+  // （`grep` 原始命中 4 处，全部是 `packages/i18n/dist/**` 的构建产物 ——
+  // **不过滤 dist 会得到"它们还在用"的假象**，这一点已踩过）。
+  //
+  // 为什么删而不是留：计划 §欠账 R2 的原话是「**要么接上，要么删** ——
+  // 留着就是"设计了没实现"的味道」。页脚 legal 组（A6-1）尚未开工，
+  // 留着这 4 条只会让下一个人以为"法律页已经有了"。
+  //
+  // ⚠️ **重新加回来时不要只加词条**：`MessageKey` 是从本表派生的，
+  // 只加词条不会有任何东西渲染它们 —— 那正是这次删掉的那 9 条的来历。
+  // 加词条必须和接上它的界面同时发生。
+
+  // ── 首页 SEO（原写在 index.html 里，现在进词条表以便逐页生成）──
+  'site.home.seo.title': 'heyta：本地优先的任务管理，可自建自托管',
+  'site.home.seo.description': 'heyta 是一个本地优先的任务管理应用：数据先落本地，云端只是同步通道，服务端看不到明文。功能对标滴答清单，可以完全用自己的服务器。',
+
+  // ── 功能介绍 ──
+  'site.features.seo.title': '功能介绍 —— heyta',
+  'site.features.seo.description': 'heyta 能做什么：任务与清单、四象限、习惯打卡、番茄专注、时间线、成长体系、加密同步、本机 API 与 MCP。只列已经能用的，每条都给可验证的出处。',
+  'site.features.title': '功能介绍',
+  'site.features.lede': '这里只列**已经能用**的功能。还没做的进「更新动态」与路线图，不混进来当卖点 —— 一个列着做不了的功能的页面，比没有这个页面更坏。',
+  'site.features.section.tasks': '任务与清单',
+  'site.features.section.views': '视图',
+  'site.features.section.habits': '习惯打卡',
+  'site.features.section.focus': '番茄专注',
+  'site.features.section.growth': '激励与成长',
+  'site.features.section.sync': '同步与隐私',
+  'site.features.section.ai': 'AI（自带端点）',
+  'site.features.section.api': '本机 API 与 MCP',
+  'site.features.item.task.fields': '标题、备注（Markdown）、优先级、截止时间、所属清单、标签',
+  'site.features.item.task.repeat': '重复任务：日 / 周 / 工作日 / 每月四种预设，基于 RFC 5545 RRULE',
+  'site.features.item.task.projects': '清单支持一层文件夹嵌套；清单与标签都有独立管理面板',
+  'site.features.item.task.trash': '回收站：软删除 + 恢复 + 彻底删除（标记，不是物理擦除）',
+  'site.features.item.task.export': '导出：JSON（含完整 op-log 与墓碑）+ Markdown，可核对条数',
+  'site.features.item.view.quadrant': '四象限：由「重要性」与截止时间**推导**，拖动即改归类，不是第四套存储',
+  'site.features.item.view.timeline': '时间线：按预估时长排布，用于个人项目排期',
+  'site.features.item.view.today': '今天 / 收集箱 / 已完成 / 回收站：智能清单',
+  'site.features.item.habit.model': '每日打卡与撤销打卡（打卡记录跨设备同步）',
+  'site.features.item.habit.streak': '连续天数与最长记录，含**冻结 / 续接 / 修复**的韧性机制',
+  'site.features.item.habit.heat': '热力图与年度视图',
+  'site.features.item.focus.timer': '番茄钟与长休息，时长可自定义（1–180 分钟）',
+  'site.features.item.focus.link': '专注可关联到具体任务，记录进统计',
+  'site.features.item.growth.feedback': '今日进度卡：真实口径，含计划外完成',
+  'site.features.item.growth.narrative': '周复盘信、里程碑地图、身份标签',
+  'site.features.item.growth.colors': '活动分类着色：颜色由**你自己赋义**，App 永不判断某项活动「健康」与否',
+  'site.features.item.sync.e2ee': '端到端加密：任务在**你的设备上**加密后才上传，服务端只中转密文',
+  'site.features.item.sync.offline': '离线优先：断网照常记，连上自动补传',
+  'site.features.item.sync.conflict': '冲突可见：并发修改不会静默丢数据，会让你选保留哪个',
+  'site.features.item.sync.selfhost': '自建服务器：docker compose 起应用 + PostgreSQL + 反代，不需要 Redis 或对象存储',
+  'site.features.item.ai.byok': 'AI 用**你自己的**推理端点（本地 Ollama / LM Studio 或任何 OpenAI 兼容地址）',
+  'site.features.item.ai.gate': '三道出境闸：总开关、允许远程、逐功能授权；开关默认关',
+  'site.features.item.ai.features': '四个功能：一句话捕获、任务拆解、象限与优先级建议、时长估算',
+  'site.features.item.api.mcp': 'MCP server：6 个工具（列任务 / 取任务 / 列清单 / 建任务 / 改任务 / 完成任务）',
+  'site.features.item.api.local': '本机 API：默认关、只监听回环、显式令牌、逐工具授权',
+  'site.features.note': '⚠️ **这份清单是当前真实状态**，依据是代码级审计与逐条实测（见仓库 `docs/research/dida365-feature-benchmark.md`）。它**刻意不包含**还在做或明确不做的东西 —— 那两类各有专门的位置。',
+  'site.features.pending.title': '还没做的',
+  'site.features.pending.body': '习惯的**目标值 / 单位 / 频率**（计数型、时长型、每周 N 次、固定周几）—— 数据模型已经有了，但**没有设置界面**，判定逻辑也只是纯函数，所以现在只能用单次打卡；提醒、Web 日历视图、子任务、搜索、自定义筛选器、看板视图、批量操作、从滴答清单导入、ICS 订阅、重复任务在 Web 上的设置入口。这些是滴答清单的日常主路径，我们还没有 —— 它们排在路线图上，但**不会**出现在上面的清单里。',
+  'site.features.notdoing.title': '明确不做的',
+  'site.features.notdoing.body': '排行榜与社交（端到端加密下没有可信的汇总方）、金币与积分商店、按功能收费、微信提醒（需要服务端读明文）。',
+
+  // ── 平台状态 ──
+  'site.platforms.seo.title': '平台状态 —— heyta',
+  'site.platforms.seo.description': 'heyta 各平台的真实进度：Web 已上线；Android 实机跑通；iOS 到模拟器交互级；桌面可打包但未签名；鸿蒙能出包但还没跑起来。每条都给可复现的命令。',
+  'site.platforms.title': '平台状态',
+  'site.platforms.lede': '这里说的是**每端现在到哪了**，不是「即将推出」。每条都给出可复现的验证方式 —— 没有证据的进度不该被相信，包括我们自己说的。',
+  'site.platforms.status.available': '可用',
+  'site.platforms.status.partial': '进行中',
+  'site.platforms.status.blocked': '阻塞',
+  'site.platforms.legend.available': '能用，且有端到端验收',
+  'site.platforms.legend.partial': '能跑起来，但还缺发布所必需的东西',
+  'site.platforms.legend.blocked': '有明确的外部依赖没解决',
+  'site.platforms.web.name': 'Web',
+  'site.platforms.web.body': '完整产品，不是演示。安装为 PWA 后可离线使用，数据存在浏览器本地的 SQLite（OPFS）。',
+  'site.platforms.web.evidence': 'https://heyta.finlaw.cloud/app/',
+  'site.platforms.android.name': 'Android',
+  'site.platforms.android.body': '真机跑通：建任务、改期、优先级、清单、标签、重复、专注、冲突解决、回收站、成长页。四款桌面小组件代码齐备，但真机验收尚未做；当前签名不是发布配置。',
+  'site.platforms.android.evidence': 'pnpm verify:mobile-ios && pnpm verify:mobile-conflict && pnpm verify:mobile-focus',
+  'site.platforms.ios.name': 'iOS',
+  'site.platforms.ios.body': '到**模拟器交互级**：Release 构建 → 安装 → 启动 → 真 SQLite 建库 → 全链路到另一台设备。**未上真机**（需要签名）。',
+  'site.platforms.ios.evidence': 'pnpm verify:mobile-ios',
+  'site.platforms.desktop.name': '桌面（Windows / macOS / Linux）',
+  'site.platforms.desktop.body': 'Electron 壳可打包三平台，产物在 release/ 下。⚠️ **未签名、未公证、无安装器**；界面仍是垂直切片，还不是完整产品。',
+  'site.platforms.desktop.evidence': 'node scripts/package-desktop.mjs',
+  'site.platforms.harmony.name': '鸿蒙',
+  'site.platforms.harmony.body': '⚠️ **能出 HAP，但应用还跑不起来**：构建链已实测打通（20 MB release HAP、双 ABI），但缺少模拟器系统镜像与签名，而且 RN 的 JS 应用还没有接进 ArkTS 入口页。',
+  'site.platforms.harmony.evidence': 'pnpm verify:harmony-toolchain && pnpm verify:harmony-rnoh',
+  'site.platforms.selfhost.name': '自建服务器',
+  'site.platforms.selfhost.body': 'docker compose 起应用 + PostgreSQL + Caddy，不需要 Redis 或对象存储。⚠️ **不是零配置一键**：必须自己写 .env（JWT 密钥与数据库口令没有默认值），镜像默认本地构建。',
+  'site.platforms.selfhost.evidence': 'server/docker-compose.yml + docs/runbooks/deployment.md',
+  'site.platforms.note': '⚠️ 「未签名」为什么值得单独说：macOS 上未签名、未公证的应用**双击会被系统拦下**，需要右键打开。把这句省掉，用户会以为包坏了。',
+
+  // ── 价格 ──
+  'site.pricing.seo.title': '价格 —— heyta',
+  'site.pricing.seo.description': 'heyta 的价格：自建永久免费，官方托管 ¥5 / 月，官方托管加云端 AI ¥12 / 月。不按功能收费 —— 免费档就是全部功能。',
+  'site.pricing.title': '价格',
+  'site.pricing.lede': '只有两件事收费：**我们替你运维那台同步服务器**，以及**我们的云端 AI**。功能不收费 —— 免费那一栏就是全部功能。',
+  'site.pricing.compare.title': '自建 vs 我们托管',
+  'site.pricing.compare.diy': '自己运维（免费）',
+  'site.pricing.compare.hosted': '我们托管（付费）',
+  'site.pricing.compare.row.function': '功能',
+  'site.pricing.compare.function.same': '完全相同',
+  'site.pricing.compare.row.server': '服务器',
+  'site.pricing.compare.server.diy': '你的机器，你来升级与备份',
+  'site.pricing.compare.server.hosted': '我们的机器，我们运维',
+  'site.pricing.compare.row.data': '数据位置',
+  'site.pricing.compare.data.diy': '完全在你手里',
+  'site.pricing.compare.data.hosted': '你的设备上；我们的服务器只有密文',
+  'site.pricing.compare.row.ai': 'AI',
+  'site.pricing.compare.ai.diy': '自带端点，永久免费且不计量',
+  'site.pricing.compare.ai.hosted': '自带端点免费；用我们的云端 AI 需 ¥12 档',
+  'site.pricing.compare.row.lockin': '锁定',
+  'site.pricing.compare.lockin.same': '两边都能随时导出全部数据（JSON 含完整操作日志 + Markdown）',
+  'site.pricing.faq.title': '常见问题',
+  'site.pricing.faq.expire.q': '订阅到期后数据会丢吗？',
+  'site.pricing.faq.expire.a': '不会。数据一直在你自己的设备上，到期只是停掉我们这边的托管同步与云端 AI，本地数据一条都不动，也随时可以导出。',
+  'site.pricing.faq.where.q': '我的数据放在哪？',
+  'site.pricing.faq.where.a': '先落在你的设备上。云端只是同步通道，而且**只有密文** —— 密钥只在你手里，服务端读不出内容。',
+  'site.pricing.faq.export.q': '不续费了，怎么把数据带走？',
+  'site.pricing.faq.export.a': '设置页有「导出数据」，产出 JSON（含完整操作日志与已删除记录，可核对条数）与 Markdown。不需要经过我们同意，也不需要联网。',
+  'site.pricing.faq.buy.q': '现在能买吗？',
+  'site.pricing.faq.buy.a': '**还不能。** 收银台的服务端已经通了，但支付通道（微信支付商户资质）尚未接通，所以页面上刻意**没有购买按钮** —— 一个点了没反应的购买按钮比没有按钮更坏。',
+
+  // ── 独有能力（数据主权 + 对照滴答清单，A7）──
+  //    素材来自 dida365-feature-benchmark §5 的九条，按 A7 的三条判据重组：
+  //    数据主权 / 对照滴答 / 其余两条。每条都要给可复现的验证方式。
+  'site.integrations.seo.title': '独有能力 —— heyta',
+  'site.integrations.seo.description': 'heyta 独有的能力：端到端加密同步、可自建服务器、本机 API 与 MCP、自带 AI 端点、可核对的导出，以及不按功能收费。每条都给可复现的验证方式。',
+  'site.integrations.title': '独有能力',
+  'site.integrations.lede': '这一页只讲滴答清单**没有**的东西 —— 而它们的共同点是：**数据在谁手里**。每一条都能自己验证，不用相信我们的措辞。',
+  'site.integrations.e2ee.title': '端到端加密同步（服务端强制密文）',
+  'site.integrations.e2ee.body': '任务在你设备上加密后才上传，服务端的同步入口**只接受密文**：收到明文一律拒绝，而不是"接受但不用"。所以服务器上没有一份可读的任务库。',
+  'site.integrations.e2ee.item.ingress': '明文上传被拒：服务端返回 **400 `E2EE_REQUIRED`**，不是静默丢弃',
+  'site.integrations.e2ee.item.keys': '密钥只在你手里 —— 口令填错时旧数据就解不开，这是代价，也是它真的加密了的证据',
+  'site.integrations.e2ee.evidence': 'server/src/sync/sync.routes.payload.ts',
+  'site.integrations.selfhost.title': '自建服务器，永久免费',
+  'site.integrations.selfhost.body': '同步服务器可以完全跑在你自己机器上：`docker compose` 三件套（应用 + PostgreSQL + Caddy），**不需要 Redis，也不需要对象存储**。自建不产生费用，也不需要经过我们同意。',
+  'site.integrations.selfhost.item.compose': '三件套起服务，数据落在你自己的磁盘上',
+  'site.integrations.selfhost.item.free': '不按用量收费，也没有"自建版少一个功能"这回事',
+  'site.integrations.selfhost.evidence': 'server/docker-compose.yml',
+  'site.integrations.localApi.title': '本机 API + MCP：默认关，逐工具授权',
+  'site.integrations.localApi.body': 'heyta 内置一个只监听回环地址的本机 API 与 MCP server，模型或脚本可以读任务、建任务。与滴答清单的 URL Scheme 页对照，差别在于**它是默认关的，而且每个工具都要你单独授权** —— 不是打开一次就全放行。',
+  'site.integrations.localApi.item.tools': '六个工具：`list_tasks` / `get_task` / `list_projects` / `create_task` / `update_task` / `complete_task`',
+  'site.integrations.localApi.item.gate': '默认 `enabled: false`，只绑 `127.0.0.1`；每次调用都过 `authorizeToolCall` 逐工具判定',
+  'site.integrations.localApi.evidence': 'packages/local-api/src/tools.ts',
+  'site.integrations.byok.title': 'BYOK：自带推理端点',
+  'site.integrations.byok.body': 'AI 能力不绑定任何厂商 SDK：你填端点与模型名，请求直连你指定的地址。内置预设只有**本机**的 Ollama 与 LM Studio —— 我们没有"只能用我们的云"这一条路。',
+  'site.integrations.byok.item.presets': '预设只有本机 Ollama / LM Studio，云端端点由你自己填',
+  'site.integrations.byok.item.nosdk': '零厂商 SDK，请求层是可替换的普通 HTTP',
+  'site.integrations.byok.evidence': 'packages/ai/src',
+  'site.integrations.export.title': '导出含墓碑与完整 op-log',
+  'site.integrations.export.body': '导出不是"把当前列表存成 JSON"，而是把**完整的操作日志**连同已删除记录的墓碑一起导出，并在文件里带一份 `counts` —— 于是"导全了"这件事可以被**核对**，而不是只能相信。',
+  'site.integrations.export.item.json': 'JSON：完整操作日志 + 墓碑 + 可核对的 `counts`',
+  'site.integrations.export.item.markdown': '另有一份给人读的 Markdown',
+  'site.integrations.export.evidence': 'packages/app-host/src/export-dump.ts',
+  'site.integrations.pricing.title': '不按功能收费',
+  'site.integrations.pricing.body': '免费档就是**全部功能**，没有"清单 9 个、任务 99 条"这类闸门（那是滴答免费档的口径）。收费的只有两件事：我们替你运维那台服务器，以及我们的云端 AI。',
+  'site.integrations.pricing.item.nogate': '没有功能闸门：收费项只允许出现托管与云端 AI',
+  'site.integrations.pricing.item.onlytwo': '价格与覆盖面由一致性门禁强制，不靠文案自觉',
+  'site.integrations.pricing.evidence': 'pnpm check:pricing',
+  'site.integrations.quadrant.title': '四象限是派生视图，不是第四套存储',
+  'site.integrations.quadrant.body': '四象限（重要 / 紧急）不是给任务多加一个字段，而是**从截止日期与优先级当场算出来**的视图。所以它不会与你的任务数据漂移 —— 改一处，四处都跟着对。',
+  'site.integrations.quadrant.item.derived': '象限由 `dueDate` 与优先级派生，不给任务加 `quadrant` 字段',
+  'site.integrations.quadrant.item.nodrift': '因此没有"看起来有、其实没同步上"的第二份状态',
+  'site.integrations.quadrant.evidence': 'docs/adr/0015-four-quadrant-as-derived-view.md',
+  'site.integrations.resilience.title': '习惯韧性：冻结、续接、修复',
+  'site.integrations.resilience.body': '连续打卡会断，而断一次就把几周的记录清零是最伤人的设计。heyta 允许**冻结**缺口、**续接**一段被打断的连续，并在数据受损时**修复**；三件都不发行货币，也不卖"后悔"。',
+  'site.integrations.resilience.item.states': '冻结有上限：它是保险，不是免打卡通行证',
+  'site.integrations.resilience.item.nocurrency': '全部状态由（习惯、日志、今天）派生 —— 没有可以拿去卖的虚拟货币',
+  'site.integrations.resilience.evidence': 'packages/domain/src/habit-resilience.ts',
+  'site.integrations.conflict.title': '冲突解决可视化',
+  'site.integrations.conflict.body': '两台设备同时改一条任务时，冲突**不会被静默丢掉一边**：界面会把两个版本摆出来，由你选。底层是实体级的最后写入优先，但"最后写入的是谁"这件事你**看得见**。',
+  'site.integrations.conflict.item.visible': '两个版本并排，选择权在用户手里',
+  'site.integrations.conflict.item.lww': '共享层决定"为什么冲突"，两端用同一份判定与同一套文案',
+  'site.integrations.conflict.evidence': 'packages/ui/src/sync/ConflictResolutionView.tsx',
+  'site.integrations.note': '⚠️ 这一页讲的是**我们独有**的能力，所以它没有"即将推出"：待做的功能在 `/features` 的「还没做的」那一条里如实列着。',
+
+  // ── 帮助 ──
+  'site.help.seo.title': '帮助中心 —— heyta',
+  'site.help.seo.description': 'heyta 帮助中心：怎么建任务、怎么同步、忘了加密口令怎么办、通行密钥怎么用、四象限怎么归类、重复任务怎么设、专注怎么用、怎么导出数据、怎么自建服务器、数据到底放在哪。',
+  'site.help.title': '帮助中心',
+  'site.help.lede': '按**你在做什么**组织，不按文档类型 —— 每一条都写清"点哪里、点完看到什么"。',
+  'site.help.topics.title': '从这里开始',
+  'site.help.module.start': '开始使用',
+  'site.help.module.sync': '同步与账号',
+  'site.help.module.organize': '组织与节奏',
+  'site.help.module.data': '数据与自建',
+  'site.help.module.trust': '隐私',
+  'site.help.q.create': '怎么建一条任务？',
+  'site.help.a.create': '打开应用顶部的捕获框，写一句话回车即可。日期与优先级可以直接写在句子里（例如"明天下午三点交周报"），识别出来的部分会显示成可以撤销的芯片；也可以只写标题，之后在任务行上补备注。',
+  'site.help.q.sync': '换设备了，数据怎么过去？',
+  'site.help.a.sync': '在设置里填同步服务器地址与访问令牌即可。数据是加密后上传的，所以**口令必须填对** —— 换了口令的旧数据解不开（这是端到端加密的代价，不是 bug）。',
+  'site.help.q.passphrase': '忘了加密口令怎么办？',
+  'site.help.a.passphrase': '**没有找回途径，这是设计而不是疏漏。** 端到端加密意味着服务端只有密文、没有能解开它的口令 —— 任何"找回"都等于服务端能读你的数据。能做的是：在还能解锁的旧设备上把数据导出，然后在新设备上设一个新口令重新开始。所以口令请自己存好。',
+  'site.help.q.passkey': '通行密钥怎么用？',
+  'site.help.a.passkey': '登录时选「通行密钥」，用设备本身的人脸 / 指纹 / 系统 PIN 确认即可，没有密码可记，也没有密码可撞库。丢了的话，登录页有「丢失了通行密钥？」，会发一封找回邮件，点进去可以注册一条新的。⚠️ **最后一条凭据不允许被删除** —— 删掉就进不去了。',
+  'site.help.q.quadrant': '四象限是怎么归类的？',
+  'site.help.a.quadrant': '象限是**当场算出来的**，不是给任务打的标签：紧迫与否看截止日期是否落在近期窗口内，重要与否看你自己标的重要标记（没标过就按优先级推导）。所以改截止日期或优先级，任务会自动换格 —— 不会出现"象限和任务对不上"。',
+  'site.help.q.repeat': '重复任务怎么设？',
+  'site.help.a.repeat': '在**移动端**打开任务详情可以设置重复规则；勾掉一条重复任务时，下一次到期日按规则顺延，基准是**原本的到期日**而不是"你几点勾的"。⚠️ **Web 端目前还没有重复规则的入口** —— 这件事在 `/features` 的「还没做的」里如实列着，不假装两端一样。',
+  'site.help.q.focus': '专注（番茄钟）怎么用？',
+  'site.help.a.focus': '在专注页选一条任务开始计时，结束后这一次专注会记入成长统计。时长可以自己改（默认 25 分钟专注 / 5 分钟休息），改完会记住 —— 刷新页面后仍是新值。',
+  'site.help.q.export': '怎么把数据带走？',
+  'site.help.a.export': '设置页 →「导出数据」。JSON 含完整操作日志与墓碑（所以能被验证"导出全了"），另有一份给人看的 Markdown。**目前只能导出，不能导回**，界面与文件里都写明了。',
+  'site.help.q.selfhost': '怎么自己搭一套？',
+  'site.help.a.selfhost': 'docker compose 起应用 + PostgreSQL + Caddy，不需要 Redis 或对象存储。⚠️ **不是零配置一键**：密钥与数据库口令必须自己写进 .env（没有默认值），具体步骤在仓库的部署手册里。',
+  'site.help.q.privacy': '数据到底放在哪？',
+  'site.help.a.privacy': '先落在你自己的设备上；开了同步之后，云端也只存密文 —— 服务端收到明文会直接拒绝。但**元数据不是密的**：同步时间、设备标识、以及"有一个任务被改过"这件事服务端能看到。我们不会把"什么都看不到"拿来宣传。',
+
+  // ── 更新动态 ──
+  'site.changelog.seo.title': '更新动态 —— heyta',
+  'site.changelog.seo.description': 'heyta 的更新动态：按日期记录实际发生了什么，含实测证据与被明确判定「不做」的条目。',
+  'site.changelog.title': '更新动态',
+  'site.changelog.lede': '按日期倒序，只记**真的发生了什么**。包含被判定「不做」的条目 —— 一个只长功能不做减法的路线图不值得相信。',
+  'site.changelog.20261005.title': '便签与提醒在两端都可用了',
+  'site.changelog.20261005.body': '便签与提醒这两个此前"建了模型、没有入口"的实体，补齐了领域规则、动作层与**两个宿主**的真实入口。同一批把「已建模但零调用点」的可达性门禁从长期红转为全绿 —— 它抓的正是这种"零件齐、最后一米没接"的形状。',
+  'site.changelog.20261002.title': '任务提醒从数据模型做到动作层',
+  'site.changelog.20261002.body': '提醒作为**独立实体**落地（而不是任务上的一个数组字段）：调度规则、提前量、顺延与稍后提醒进领域层，增删改查进动作层。此前提醒只是路线图上的一句话。',
+  'site.changelog.20260928.title': '站点与应用接成同一个产品',
+  'site.changelog.20260928.body': '新增功能介绍、平台状态、价格、帮助、更新动态、登录六个页面，并把导航、页脚与站点地图改成由一份页面注册表派生 —— 从此加页面不可能忘记挂入口。应用侧新增「帮助与关于」入口，站点与应用第一次**双向可达**。',
+  'site.changelog.20260928b.title': '任务备注可以自己写了',
+  'site.changelog.20260928b.body': '在此之前，备注字段只有 AI 会写（拆解出的清单、估时结果），用户自己写不了。现在 Web 任务行与移动端详情面板都能写，并真的落进操作日志、跨设备同步。',
+  'site.changelog.20260928c.title': '「已完成」终于有入口了',
+  'site.changelog.20260928c.body': '筛选类型、列表逻辑、标题、空态文案全都写好了，唯独没有任何按钮能把筛选切过去 —— 于是 Web 上已完成的任务永远看不见。顺手修掉一个同形状的问题：在别的视图点侧栏筛选，此前什么都不会发生。',
+  'site.changelog.20260927.title': '第一段用户旅程闭环',
+  'site.changelog.20260927.body': '落地页有了指向应用的入口、Web 有了注册与登录界面、应用本体第一次被真正部署、数据导出兑现。同一批还关了回收站、移动端成长体系、服务端品牌漂移三个断点。',
+  'site.changelog.20260926.title': '四象限从落地页承诺变成真的能用',
+  'site.changelog.20260926.body': '在此之前，落地页把四象限当产品支柱讲，而应用里没有它 —— 这是最不该出现的一类不一致：承诺在页面上、功能不在产品里。',
+  'site.changelog.note': '更早的记录在仓库的 docs/plans/roadmap.md 里，每条都带日期与实测证据。',
+
+  // ── 登录 ──
+  'site.signin.seo.title': '登录 —— heyta',
+  'site.signin.seo.description': '登录 heyta：支持通行密钥（Passkey）与邮件登录链接两种方式。',
+  'site.signin.title': '登录',
+  'site.signin.lede': 'heyta 的账号只有两种进入方式，没有密码。',
+  'site.signin.method.passkey.title': '通行密钥（推荐）',
+  'site.signin.method.passkey.body': '用设备本身的人脸 / 指纹 / 系统 PIN 登录。密钥永不离开你的设备，也没有可以被撞库的密码。',
+  'site.signin.method.magic.title': '邮件登录链接',
+  'site.signin.method.magic.body': '填邮箱，收一封含一次性链接的邮件，点开即登录。适合还没配好通行密钥的设备。',
+  'site.signin.noPassword': '⚠️ 为什么没有「邮箱 + 密码」：一个可被撞库、可被钓鱼、需要在服务端存哈希的凭据，在我们这个"服务端看不到明文"的产品里是唯一的薄弱环节。',
+  // R2：`site.signin.cta`（"去应用登录"）曾在这里，源码里 0 引用，已删
+  // —— 这一页的 CTA 用的是 `site.signin.recover.link` 与导航里的登录入口。
+  'site.signin.recover.title': '通行密钥丢了？',
+  'site.signin.recover.body': '在应用里点「丢失了通行密钥？」会发一封找回邮件，点进去可以注册新的。',
+  'site.signin.why.title': '为什么登录在应用里、不在这一页',
+  'site.signin.why.body': '通行密钥必须绑定**一个确定的域名**，而登录要用的服务器地址就是应用同步设置里那个地址。把认证界面复制到这一页，会出现"对着 A 服务器登录、令牌却存到 B"的问题 —— 所以这一页是入口，不是第二个登录框。',
+
+  // ── 应用内的「帮助与关于」（指向站点，见 apps/web/src/lib/site-url.ts）──
+  //    站点的三块内容在这里只做**入口**，不复制正文：正文复制过去就是第二份
+  //    会漂移的副本，而漂移的那一半恰恰是搜索引擎收不到的那一半。
+  'web.about.title': '帮助与关于',
+  'web.about.lead': '帮助中心、更新动态与价格都在站点上 —— 它们要能被搜索引擎收录、被单独分享，所以内容只有一份。',
+  'web.about.help.label': '帮助中心',
+  'web.about.help.hint': '怎么建任务、怎么同步、忘了口令怎么办、怎么把数据带走',
+  'web.about.changelog.label': '更新动态',
+  'web.about.changelog.hint': '最近改了什么，以及被判定「不做」的条目',
+  'web.about.pricing.label': '价格与订阅',
+  'web.about.pricing.hint': '自建免费与官方托管各是什么，收费的只有两件事',
+  'web.about.updateNote': '这里没有「检查更新」按钮：应用是 PWA，更新由浏览器在后台决定 —— 一个点了不会生效的按钮比没有按钮更坏。',
+  'web.sync.help.link': '查看帮助',
+
+  // ── 能力清单的「验证方式」（A1-3）──
+  //    🔴 每条都是**命令或路径**，刻意不是链接：仓库当前是私有的，
+  //    做成链接就是 404（"看起来能点、点了是 404"比没有更坏）。
+  //    也刻意不是形容词 —— 一句"强大"没有任何人能去核对。
+  //    这几条的值在中英两表里**逐字相同**：命令与文件路径不该被翻译，
+  //    翻译一份命令等于让它跑不起来。它们靠 `site.evidence.label` 带上语义。
+  'site.evidence.label': '验证方式',
+  'site.features.tasks.evidence': 'pnpm --filter @heyta/domain test',
+  'site.features.views.evidence': 'docs/adr/0015-four-quadrant-as-derived-view.md',
+  'site.features.habits.evidence': 'packages/domain/src/habit-streak.ts + habit-resilience.ts',
+  'site.features.focus.evidence': 'pnpm verify:mobile-focus',
+  'site.features.growth.evidence': 'packages/domain/src/weekly-review.ts + milestones.ts',
+  'site.features.sync.evidence': 'pnpm verify:multi-end && pnpm verify:sync',
+  'site.features.privacy.evidence': 'pnpm verify:mobile-ios',
+  'site.features.ai.evidence': 'pnpm verify:ai-live && pnpm verify:ai-breakdown-live',
+  'site.features.api.evidence': 'pnpm verify:mcp-real',
+  'site.signin.recover.link': '去应用找回通行密钥',
+
+  // ── 分享卡片（og:image）的替代文字 ──
+  //    🔴 它不是装饰：图加载不出来时（弱网、平台不抓图）这就是卡片上唯一的说明，
+  //    而读屏软件读的也是它。
+  'site.og.imageAlt': 'heyta 分享卡片：本地优先的任务管理，数据先落你自己的设备；端到端加密同步、可自建自托管、不按功能收费。',
+  // 🔴 R16：卡片**分语言生成**（`og-card.png` / `og-card-en.png`），
+  //    所以这三条是**卡片上真的印着的字**，不是译给 alt 看的描述。
+  //    它们与 `site.og.imageAlt` 必须描述同一张图 —— 否则英文页的无障碍文本
+  //    会描述一张不存在的中文卡（或反过来）。
+  'site.og.card.title1': '本地优先的任务管理',
+  'site.og.card.title2': '数据先落你自己的设备',
+  'site.og.card.lede': '端到端加密同步 · 可自建自托管 · 不按功能收费',
+
+  // ═══════════════════════════════════════════════════════════════════════
+  // M3 第四刀（sync）收尾 —— 实体名 / 冲突原因改为两端共用（追加块）
+  //
+  // 🔴 这一块是**追加**的（词条表是多写者共享文件，只许追加）。
+  // 为什么必须有它：web `ConflictDialog.tsx` 与 mobile `conflict-view.ts`
+  // 各有一张"实体类型 → 名字"的表，会漂移的是**集合**而不是句子 ——
+  // 加一个新实体只改一端，另一端会静默显示 `AI_FEEDBACK` 这种内部标识符。
+  // 现在两张表都收进 `@heyta/ui` 的 `sync/model.ts`，key 落在这里一份。
+  //
+  // ⚠️ `mobile.entity.*` / `mobile.conflict.reason.*` 是**旧命名空间**，
+  // 已被本块取代（两端都切过来了）。它们今天无调用点 ——
+  // 本表只许追加，删旧键属于别人的改动，留作一笔已登记的死词条债。
+  // ═══════════════════════════════════════════════════════════════════════
+
+  // 实体类型 → 名称。键集合与 shared-schema 的 `ENTITY_TYPES` 对齐（有测试钉住）。
+  'common.entity.TASK': '任务',
+  'common.entity.PROJECT': '清单',
+  'common.entity.TAG': '标签',
+  'common.entity.NOTE': '笔记',
+  'common.entity.TASK_REPEAT_CFG': '重复规则',
+  'common.entity.REMINDER': '提醒',
+  'common.entity.HABIT': '习惯',
+  'common.entity.HABIT_LOG': '打卡记录',
+  'common.entity.FOCUS_SESSION': '专注记录',
+  'common.entity.AI_FEEDBACK': 'AI 使用记录',
+  'common.entity.PREFERENCE_CORRECTION': '偏好纠正',
+  'common.entity.GLOBAL_CONFIG': '全局设置',
+  'common.entity.MIGRATION': '数据迁移',
+  'common.entity.RECOVERY': '灾难恢复',
+  'common.entity.ALL': '全量数据',
+
+  // 冲突原因。`reason` 的来源有两处：服务端 `errorCode`（`CONFLICT_*`）与
+  // `sync-core` 的 LWW 判定编码（`remote-archive` 等），两者共用这一张表。
+  'common.conflict.reason.concurrent': '两台设备在对方不知情的时候都改了它',
+  'common.conflict.reason.superseded': '这条改动基于的版本已经不是最新的了',
+  'common.conflict.reason.timestampOrTie': '两边的改动时间很接近，分不出先后',
+  'common.conflict.reason.localTimestamp': '本机的改动更新一些',
+  'common.conflict.reason.remoteDeleteWins': '另一台设备删除了它',
+  'common.conflict.reason.localDeleteWins': '本机删除了它',
+  'common.conflict.reason.remoteArchive': '另一台设备把它归档了',
+  'common.conflict.reason.localArchive': '本机把它归档了',
+  // 认不出来时的兜底：不能回落成服务端那句英文诊断，也不能什么都不说。
+  'common.conflict.reason.fallback': '两边对同一处做了不同的改动',
+
+  // ─────────────────────────────────────────────────────────────
+  // 提醒（B1-1 的界面层；web 与 mobile 共用同一批词条）
+  // ─────────────────────────────────────────────────────────────
+  // 🔴 `reminder.offset.*` **必须与 `REMINDER_OFFSET_PRESETS_MS` 一一对应、同序**：
+  //    共享组件按下标取文案（`labels.offsets[i]` ↔ `presets[i]`）。
+  //    加一个预设却忘了加词条 → 下标错位，界面会画出**张冠李戴的时间**；
+  //    这条对应关系由 `apps/web/src/features/reminders/*` 的宿主测试钉住
+  //    （`packages/ui` 只跑纯 `model.ts` 单测，不挂渲染）。
+  'reminder.title': '提醒',
+  'reminder.empty': '还没有提醒',
+  'reminder.add': '添加提醒',
+  'reminder.offset.0': '截止时',
+  'reminder.offset.5m': '提前 5 分钟',
+  'reminder.offset.15m': '提前 15 分钟',
+  'reminder.offset.30m': '提前 30 分钟',
+  'reminder.offset.1h': '提前 1 小时',
+  'reminder.offset.1d': '提前 1 天',
+  // 没有截止时间时的**绝对时刻**入口。⚠️ 键名里的 `1h` 是**契约的一部分**：
+  // 文案写"1 小时后"，宿主就必须用它建提醒（`now + 1h`）——
+  // 文案与默认值分居两处，键名是唯一能把它们绑在一起的地方。
+  'reminder.absolute.1h': '1 小时后提醒',
+  'reminder.snooze': '稍后提醒',
+  'reminder.dismiss': '关闭提醒',
+  'reminder.remove': '删除提醒',
+  // 状态徽标。与 `ReminderPhase` 一一对应（五个）。
+  'reminder.phase.scheduled': '待触发',
+  'reminder.phase.snoozed': '已推迟',
+  'reminder.phase.due': '已到点',
+  'reminder.phase.fired': '已提醒',
+  'reminder.phase.dismissed': '已关闭',
+  // 没有截止时间时不能建"提前提醒"——说清原因，不要让按钮静默消失。
+  'reminder.hint.noDueDate': '这个任务没有截止时间，只能按绝对时刻提醒',
+  'reminder.a11y.list': '「{title}」的提醒',
+  'reminder.a11y.remove': '删除 {when} 的提醒',
+  'reminder.a11y.snooze': '把 {when} 的提醒推迟 10 分钟',
+  'reminder.a11y.dismiss': '关闭 {when} 的提醒',
+
+  // ─────────────────────────────────────────────────────────────
+  // 便签（幻觉 #12「笔记模块」的界面层；web 与 mobile 共用）
+  // ─────────────────────────────────────────────────────────────
+  // ⚠️ 与任务上的「备注」(`web.note.*` / `mobile.detail.field.note`) 是**两件事**：
+  //    那是任务正文，这是独立的一条记录（可不挂清单、可钉到「今天」）。
+  //    文案上刻意不叫「备注」，否则用户会以为它就是任务里那个。
+  'notes.title': '便签',
+  'notes.empty': '还没有便签',
+  'notes.empty.hint': '把不想变成任务的事记在这里',
+  'notes.composer.placeholder': '写点什么…',
+  'notes.add': '添加便签',
+  'notes.pin': '钉到今天',
+  'notes.unpin': '取消钉选',
+  'notes.remove': '删除便签',
+  'notes.badge.today': '今天',
+  'notes.a11y.edit': '编辑便签「{excerpt}」',
+  'notes.a11y.remove': '删除便签「{excerpt}」',
+  'notes.a11y.pin': '把便签「{excerpt}」钉到今天',
+  'notes.a11y.unpin': '取消便签「{excerpt}」的钉选',
+  'notes.error.empty': '便签不能是空的',
 } as const;
 
 /**

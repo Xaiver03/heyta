@@ -24,21 +24,69 @@
  *    `remove()`，就是一个只在特定导航路径下才复现的泄漏。
  *
  * Provider 内部**自带一份默认解析**，所以不传 `value` 也能工作
- * （`apps/web` 起步时就不必先写一个主题层）。移动端现在可以继续传自己的
- * `theme` 值 —— 两者形状相同，将来收敛到一处时不需要改组件。
+ * （`apps/web` 起步时就不必先写一个主题层）。
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * 🔴 这里现在是 token / 文本样式的**唯一来源**（2026-09-28 收敛）
+ *
+ * 收敛之前 `apps/mobile/src/theme.tsx` 是第二份实现：它自己调
+ * `resolveNativeTokens` / `resolveAllTextStyles` 建表，再通过 `UiThemeBridge`
+ * 把值回灌给这个 Provider —— 同一份主题被解析了两遍，两边各订阅一次
+ * `reduceMotionChanged`。现在移动端只做**转发**（
+ * `apps/mobile/src/theme.tsx` 只剩 re-export），门禁
+ * `scripts/check-theme-single-source.mjs` 钉住这一点。
+ *
+ * `native` 那组归一化访问器（字体栈 / 行高 / 字距 / 阴影 / 缓动）也收在这一层：
+ * 它是**同一份 token 的 RN 视图**（字体栈 / box-shadow / cubic-bezier 只在 CSS 里
+ * 合法），不是平台差异。唯一的宿主差异是"打包了哪些字体"，由 `packagedFonts`
+ * 显式表达 —— 默认空数组 = 全用系统字体。
  */
 
 import React, { createContext, useContext, useMemo } from 'react';
 import { AccessibilityInfo, useColorScheme } from 'react-native';
 import {
+  parseCssShadow,
+  parseCubicBezier,
   resolveAllTextStyles,
+  resolveFontFamily,
+  resolveLineHeight,
   resolveNativeTokens,
   resolveThemeName,
+  resolveTracking,
+  TEXT_STYLES,
+  type CubicBezier,
   type HeytaNativeTokens,
+  type RnShadow,
   type RnTextStyle,
   type TextStyleName,
   type ThemeName,
 } from '@heyta/design-system';
+
+/**
+ * RN 侧的归一化访问器 —— **别直接读 `tokens` 里的 font / shadow / ease**。
+ *
+ * 那三个分组的原始值只在 CSS 里合法（理由见 `design-system/src/native-values.ts`
+ * 的文件头）：行高在 CSS 里是**倍数**、字距是 **em**、阴影是 `box-shadow` 字符串、
+ * 缓动是 `cubic-bezier(...)`。原样塞给 RN 会"不报错但画错"。
+ */
+export interface HeytaUiNativeAccessors {
+  /** RN 的 `fontFamily`：要么是已打包的字体名，要么 `undefined`（系统字体）。 */
+  readonly fontSans: string | undefined;
+  readonly fontMono: string | undefined;
+  /** 绝对行高（px）。`tokens['line-height.*']` 是**倍数**，不能直接传给 RN。 */
+  readonly lineHeight: (
+    key: 'line-height.tight' | 'line-height.normal' | 'line-height.relaxed',
+    fontSize: number,
+  ) => number;
+  /** 绝对字距（px）。`tokens['tracking.*']` 是 **em 比例**，不能直接传给 RN。 */
+  readonly tracking: (key: TextStyleName, fontSize: number) => number;
+  readonly shadow: (
+    key: 'shadow.sm' | 'shadow.md' | 'shadow.lg' | 'shadow.xl' | 'shadow.focus',
+  ) => RnShadow | null;
+  readonly easing: (
+    key: 'ease.standard' | 'ease.enter' | 'ease.exit' | 'ease.spring',
+  ) => CubicBezier | null;
+}
 
 /** 共享组件能用到的一切样式来源。 */
 export interface HeytaUiTheme {
@@ -53,9 +101,46 @@ export interface HeytaUiTheme {
    * 而漏掉的结果是行高塌成字号本身 —— 不报错，只是难看。
    */
   readonly text: Record<TextStyleName, RnTextStyle>;
+  /** token 的 RN 视图（见 `HeytaUiNativeAccessors`）。 */
+  readonly native: HeytaUiNativeAccessors;
 }
 
 const ThemeContext = createContext<HeytaUiTheme | null>(null);
+
+/**
+ * 🔴 目前**没有打包任何自定义字体**。
+ *
+ * `font.sans` 的第一项是 `'Plus Jakarta Sans'`，但它没有随包分发 ——
+ * 而 `resolveFontFamily` 只会在字体确实登记进这个清单时才返回它。
+ *
+ * 直接把它当 `fontFamily` 传给 RN 的后果是**实测过的**：不报错，
+ * 屏幕上是条纹状的乱码文字。所以这里刻意留空，让 RN 用系统字体
+ * （iOS/Android 的系统字体对中文支持本来就更好）。
+ *
+ * 要启用品牌字体，需要先确认字体许可证能进产品代码（AGENTS.md §3.2 的
+ * 白名单里**没有 OFL**，而 Plus Jakarta Sans 正是 OFL），再打包字体文件
+ * 并把这个清单传给 `<HeytaUiProvider packagedFonts={…}>`。那是需要单独决定的事，
+ * 不该顺手做掉。
+ *
+ * ⚠️ 它是**宿主差异**，所以走 prop 而不是写死在这里：某个端将来打包了字体，
+ * 不该为了登记它去改共享层。
+ */
+const DEFAULT_PACKAGED_FONTS: readonly string[] = [];
+
+/** 从一份 token 表派生 RN 归一化访问器。纯函数（字体清单除外）。 */
+function resolveNativeAccessors(
+  tokens: HeytaNativeTokens,
+  packagedFonts: readonly string[],
+): HeytaUiNativeAccessors {
+  return {
+    fontSans: resolveFontFamily(tokens['font.sans'], packagedFonts),
+    fontMono: resolveFontFamily(tokens['font.mono'], packagedFonts),
+    lineHeight: (key, fontSize) => resolveLineHeight(tokens[key], fontSize),
+    tracking: (key, fontSize) => resolveTracking(tokens[TEXT_STYLES[key].tracking], fontSize),
+    shadow: (key) => parseCssShadow(tokens[key]),
+    easing: (key) => parseCubicBezier(tokens[key]),
+  };
+}
 
 /**
  * 订阅系统的「减少动效」。
@@ -89,6 +174,8 @@ function useReducedMotion(): boolean {
 export function resolveHeytaUiTheme(options?: {
   scheme?: ReturnType<typeof useColorScheme>;
   reducedMotion?: boolean;
+  /** 宿主已打包的字体名清单。省略 = 全用系统字体。 */
+  packagedFonts?: readonly string[];
 }): HeytaUiTheme {
   // 🔴 `resolveThemeName` 负责把 `null` / `'unspecified'` 归一成 `'light'`。
   // 直接拿 scheme 当索引会得到 undefined，而 RN 拿到 undefined 颜色
@@ -102,24 +189,31 @@ export function resolveHeytaUiTheme(options?: {
     tokens,
     // 排版与主题无关 —— 换主题只该换颜色，不该让版面重排。
     text: resolveAllTextStyles(tokens),
+    native: resolveNativeAccessors(tokens, options?.packagedFonts ?? DEFAULT_PACKAGED_FONTS),
   };
 }
 
 export interface HeytaUiProviderProps {
-  /** 宿主自己的主题值（比如 `apps/mobile` 的 `ThemeValue`）。省略则自动解析。 */
+  /** 宿主自己解析好的主题值（有应用级主题开关的端才需要传）。省略则自动解析。 */
   readonly value?: HeytaUiTheme;
+  /** 宿主已打包的字体名清单，透传给 `native.fontSans` / `native.fontMono`。 */
+  readonly packagedFonts?: readonly string[];
   readonly children: React.ReactNode;
 }
 
-export function HeytaUiProvider({ value, children }: HeytaUiProviderProps): React.JSX.Element {
+export function HeytaUiProvider({
+  value,
+  packagedFonts,
+  children,
+}: HeytaUiProviderProps): React.JSX.Element {
   const scheme = useColorScheme();
   const reducedMotion = useReducedMotion();
   // hooks 必须无条件调用，所以即使传了 `value` 也照常订阅 ——
   // 代价是宿主传值时这里多订阅一次；换来的是**调用顺序不会随 props 变化**，
   // 而条件式 hook 是 React 里最典型的一类"有时才崩"。
   const fallback = useMemo(
-    () => resolveHeytaUiTheme({ scheme, reducedMotion }),
-    [scheme, reducedMotion],
+    () => resolveHeytaUiTheme({ scheme, reducedMotion, packagedFonts }),
+    [scheme, reducedMotion, packagedFonts],
   );
   return <ThemeContext.Provider value={value ?? fallback}>{children}</ThemeContext.Provider>;
 }

@@ -71,3 +71,9 @@ export type { RnShadow, CubicBezier } from './native-values.js';
 // 它只**组合**已有 token，不引入新取值，因此不构成第二个事实源。
 export { TEXT_STYLES, resolveTextStyle, resolveAllTextStyles } from './typography.js';
 export type { TextStyleName, TextStyleSpec, RnTextStyle } from './typography.js';
+
+// 任务行的**形状契约**（一行用哪些 token / 哪条语义文字样式）。
+// 🔴 它只**登记**已有取值，不引入新取值 —— 但它让"共享的 RN 行"与
+// "落地页的 DOM 复刻件"能从**同一份**形状派生，而不是各抄一组字号与间距。
+// 动机与那次实测漂移（勾选框 20 vs 22px、标题 sm vs base）见该文件头。
+export { TASK_ROW_SHAPE, TASK_ROW_TEXT } from './task-row-shape.js';

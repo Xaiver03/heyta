@@ -30,6 +30,20 @@
  * 而**"一行长什么样"这件事本身**只写一次。
  *
  * ─────────────────────────────────────────────────────────────────────────
+ * 🔴 `TaskList` 只负责"列表"，**行本身在 `TaskRow.tsx`**（2026-09-28 抽出）
+ *
+ * 抽取前，行的 JSX **内联在本文件的 `renderItem` 里** —— 于是
+ * `docs/research/dida-view-unification.md` §4.2 的契约
+ *（列表 = `<TaskRow density="comfortable" />` / 象限卡 = `compact` /
+ * 日历格 = `minimal`）**只满足了一半**：象限确实复用了共享 `TaskList`，
+ * 但不存在一个能传档位的行组件，"同一行、多档密度"无从谈起。
+ *
+ * 现在：行 = `<TaskRow density>`（`TaskRow.tsx`），
+ * 档位差异 = `DENSITY_SPEC`（`density.ts`）。本文件只把 `density`
+ * 透传下去（默认 `comfortable`），**不解释**任何档位细节。
+ * 判据见 `tests/task-row-density.spec.ts`。
+ *
+ * ─────────────────────────────────────────────────────────────────────────
  * 🔴 本文件刻意**不 import `@heyta/i18n`**
  *
  * i18n 包曾自己带了一份 React，导致 Android 产物里出现**两个 React 实例**
@@ -50,26 +64,31 @@
  */
 
 import React, { useCallback, useMemo } from 'react';
-import { FlatList, Pressable, StyleSheet, Text, View, type StyleProp, type TextStyle } from 'react-native';
+import { FlatList, StyleSheet, Text, View } from 'react-native';
+import { TASK_ROW_SHAPE } from '@heyta/design-system';
 import type { Task } from '@heyta/domain';
 import { useHeytaText, useHeytaTokens } from '../theme.js';
+import type { TaskRowDensity } from './density.js';
+import { TaskRow, type TaskRowLabels } from './TaskRow.js';
 import {
   flattenSections,
   toTaskRows,
   type SectionRow,
-  type TaskRow,
+  type TaskRow as TaskRowModel,
   type TaskSection,
 } from './model.js';
 
-/** 行级无障碍文案。**每一项都是一整句**，不要用前缀拼标题。 */
-export interface TaskListLabels {
-  /** 未完成时勾选框的念法，如「完成：买牛奶」。 */
-  readonly toggleOn?: (row: TaskRow) => string;
-  /** 已完成时勾选框的念法，如「取消完成：买牛奶」。 */
-  readonly toggleOff?: (row: TaskRow) => string;
-  /** 整行可点时它的念法，如「打开：买牛奶」。 */
-  readonly open?: (row: TaskRow) => string;
-}
+/**
+ * 行级无障碍文案。**每一项都是一整句**，不要用前缀拼标题。
+ *
+ * ⚠️ 定义已搬到 `TaskRow.tsx`（`TaskRowLabels`）—— 行是本文件渲染的，
+ * 所以 `TaskList` import `TaskRow`（值）；若 `TaskRow` 反过来 import
+ * `TaskList`（类型），就成了互相 import。这里只做**名字转发**，
+ * 公开名 `TaskListLabels` 与 `index.ts` 的导出行都不变。
+ * 理由与"为什么同名函数/接口可以合并"见 `TaskRow.tsx` 文件头。
+ */
+export type { TaskRowLabels };
+export type TaskListLabels = TaskRowLabels;
 
 interface TaskListSharedProps {
   /** 勾选/取消勾选。**不要在组件内部改数据** —— 变更必须走宿主的 action 层。 */
@@ -88,9 +107,9 @@ interface TaskListSharedProps {
   readonly onOpenTask?: (taskId: string) => void;
   readonly labels?: TaskListLabels;
   /** 标题下方的元信息行（截止 / 优先级 / 重复…）。 */
-  readonly renderMeta?: (row: TaskRow) => React.ReactNode;
+  readonly renderMeta?: (row: TaskRowModel) => React.ReactNode;
   /** 行尾的动作（比如删除按钮）。 */
-  readonly renderTrailing?: (row: TaskRow) => React.ReactNode;
+  readonly renderTrailing?: (row: TaskRowModel) => React.ReactNode;
   /** 正在处理中的行 id —— 用于置灰该行，避免连点发出两条变更。 */
   readonly busyTaskId?: string | null;
   /** 标题为空时的替代文案（空标题是真实存在的，见 `model.ts`）。 */
@@ -99,6 +118,16 @@ interface TaskListSharedProps {
   readonly emptyMessage?: string;
   /** 列表根节点的测试标识。 */
   readonly testID?: string;
+  /**
+   * **本列表里的行有多紧凑。** 默认 `'comfortable'` —— 就是抽取 `TaskRow`
+   * 之前那段内联行的行为，所以不传时逐字节等价。
+   *
+   * 这一个 prop 是"容器决定密度"的落点：列表不传、象限卡传 `compact`、
+   * 日历格传 `minimal`（`dida-view-unification.md` §4.3 的"视图 = 查询 +
+   * 容器 + 密度"）。差异本身全在 `density.ts` 的 `DENSITY_SPEC`，
+   * 这里只做透传，**不认识任何档位**。
+   */
+  readonly density?: TaskRowDensity;
   /**
    * 空分组是否保留（只在分节形态下有意义）。
    *
@@ -154,6 +183,7 @@ export function TaskList<TMeta = undefined>({
   fallbackTitle,
   emptyMessage,
   testID,
+  density,
 }: TaskListProps<TMeta>): React.JSX.Element {
   const tokens = useHeytaTokens();
   const text = useHeytaText();
@@ -161,7 +191,7 @@ export function TaskList<TMeta = undefined>({
   /** 展平后喂给 `FlatList` 的一行：要么是分节头，要么是任务。 */
   type Item =
     | SectionRow<TMeta>
-    | { readonly kind: 'task'; readonly key: string; readonly row: TaskRow };
+    | { readonly kind: 'task'; readonly key: string; readonly row: TaskRowModel };
 
   // `fallbackTitle` 参与 items 的派生，但它是个 string（原始值），
   // 放进 deps 是安全的 —— 不要在这里传对象/数组，否则 useMemo 每轮都会重算。
@@ -193,48 +223,7 @@ export function TaskList<TMeta = undefined>({
          * 页面边距属于**宿主**：它才知道自己有没有被别的容器包着。
          * 列表只管行与行之间的节奏。
          */
-        list: { gap: tokens['space.1'] },
-        row: {
-          flexDirection: 'row',
-          alignItems: 'center',
-          minHeight: tokens['size.row-min-height'],
-          gap: tokens['space.1'],
-        },
-        /**
-         * 🔴 负外边距把勾选框的**触控区**拉回来与屏幕留白对齐。
-         *
-         * 它的可点区域按无障碍要求是 `touch-target.min`（44），比**视觉尺寸**
-         * `size.checkbox` 大。不补偿的话整行会比其它界面元素多缩进几个点 ——
-         * 看起来只是"没对齐"，而原因藏在触控区里，光读这一行看不出来。
-         */
-        checkboxHit: {
-          marginLeft: -(tokens['touch-target.min'] - tokens['size.checkbox']) / 2,
-        },
-        box: {
-          width: tokens['size.checkbox'],
-          height: tokens['size.checkbox'],
-          borderRadius: tokens['radius.sm'],
-          borderWidth: tokens['border-width.thin'],
-          borderColor: tokens['color.border-strong'],
-          alignItems: 'center',
-          justifyContent: 'center',
-        },
-        boxDone: {
-          backgroundColor: tokens['color.primary'],
-          borderColor: tokens['color.primary'],
-        },
-        // 勾的形状用文字画，避免为它引入一个图标依赖
-        //（图标库正是各端不一样的那一类依赖）。
-        tick: { color: tokens['color.on-primary'] },
-        body: { flex: 1, paddingVertical: tokens['space.2'], gap: tokens['space.1'] } as const,
-        titleDone: {
-          color: tokens['color.foreground-subtle'],
-          // 已完成加删除线。**不能只靠颜色变淡** —— 那会漏掉色觉障碍用户，
-          // 而"这条到底做完了没有"是列表里最要紧的一个判断。
-          // `textDecorationLine` 是 RN 的样式枚举，不是设计尺度，无需 token。
-          textDecorationLine: 'line-through',
-        } as const,
-        metaRow: { flexDirection: 'row', alignItems: 'center', gap: tokens['space.2'] },
+        list: { gap: tokens[TASK_ROW_SHAPE.listGap] },
         empty: { paddingVertical: tokens['space.8'], alignItems: 'center' },
       }),
     [tokens],
@@ -249,65 +238,28 @@ export function TaskList<TMeta = undefined>({
         return <>{renderSectionHeader?.(item.section) ?? null}</>;
       }
 
+      /**
+       * 🔴 行本身**只在这一处渲染**（`TaskRow.tsx`）。
+       *
+       * 抽取前那段行的 JSX 就长在这个分支里；现在它的几何与结构与
+       * 默认档（`comfortable`）字面相同，只是搬了家。本文件**不再认识**
+       * 勾选框尺寸 / 行高 / 间距 —— 那些属于行，不属于列表。
+       */
       const row = item.row;
-      const busy = busyTaskId === row.id;
-      const toggleLabel = row.done
-        ? (labels?.toggleOff?.(row) ?? row.title)
-        : (labels?.toggleOn?.(row) ?? row.title);
-      const openLabel = labels?.open?.(row);
-
-      const title = (
-        <Text style={[text['row-title'], row.done ? styles.titleDone : null]} numberOfLines={2}>
-          {row.title}
-        </Text>
-      );
-
       return (
-        <View style={styles.row}>
-          <Pressable
-            accessibilityRole="checkbox"
-            // 无障碍状态必须显式给：读屏用户靠它知道"这条是待办还是已完成"，
-            // 而勾选框的**颜色**对他们完全不可见。
-            accessibilityState={{ checked: row.done, busy }}
-            accessibilityLabel={toggleLabel}
-            disabled={busy}
-            onPress={() => onToggleTask(row.id)}
-            style={styles.checkboxHit}
-            testID={`task-toggle-${row.id}`}
-          >
-            <View style={[styles.box, row.done ? styles.boxDone : null]}>
-              {row.done ? <Text style={[text.badge, styles.tick]}>✓</Text> : null}
-            </View>
-          </Pressable>
-
-          {/*
-            🔴 没有 `onOpenTask` 时，行体**不是**可点的。
-            在勾选框外面再套一层可点区域会让读屏念两遍，
-            而两个语义重叠的命中区在触屏上也很难区分。
-          */}
-          {onOpenTask === undefined ? (
-            <View style={styles.body} testID={`task-row-${row.id}`}>
-              {title}
-              {renderMeta === undefined ? null : <View style={styles.metaRow}>{renderMeta(row)}</View>}
-            </View>
-          ) : (
-            <Pressable
-              accessibilityRole="button"
-              {...(openLabel === undefined ? {} : { accessibilityLabel: openLabel })}
-              onPress={() => onOpenTask(row.id)}
-              style={styles.body}
-              testID={`task-row-${row.id}`}
-            >
-              {title}
-              {renderMeta === undefined ? null : <View style={styles.metaRow}>{renderMeta(row)}</View>}
-            </Pressable>
-          )}
-
-          {renderTrailing === undefined ? null : renderTrailing(row)}
-        </View>
+        <TaskRow
+          row={row}
+          {...(density === undefined ? {} : { density: density })}
+          busy={busyTaskId === row.id}
+          onToggleTask={onToggleTask}
+          {...(onOpenTask === undefined ? {} : { onOpenTask })}
+          {...(labels === undefined ? {} : { labels })}
+          {...(renderMeta === undefined ? {} : { renderMeta })}
+          {...(renderTrailing === undefined ? {} : { renderTrailing })}
+        />
       );
     },
-    [busyTaskId, labels, onOpenTask, onToggleTask, renderMeta, renderSectionHeader, renderTrailing, styles, text],
+    [busyTaskId, labels, onOpenTask, onToggleTask, renderMeta, renderSectionHeader, renderTrailing, density],
   );
 
   const keyExtractor = useCallback((item: Item) => item.key, []);
