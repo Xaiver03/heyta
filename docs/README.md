@@ -115,6 +115,7 @@ docs/research/<kebab-case>.md     例：reuse-plan.md
 | 📱 [0031](adr/0031-native-apps-everywhere-not-pwa.md) | **每一端都交付原生应用，PWA 不是任何端的交付形态**。🔴 **Capacitor 被否决**：它**根本没有 Windows 平台**（官方平台导航只有 iOS / Android / Web(PWA)，`npx cap add` 无 `windows`），且它是"WebView + 插件"、**渲染不了系统小组件** —— 理由是**能力**，不是代码量（代码量口径已被 0032 作废）。**"代码只写一份"靠 `packages/ui` 共享实现，不靠换壳**。⚠️ **收窄** [ADR-0024](adr/0024-desktop-shell-and-ui-convergence.md) §2.5：那里说的"PWA 价值上升"指 **Windows 小组件注册所需的 package identity 这条技术路**，不是"Windows 可以交 PWA 了事"。⚠️ Windows 那一行先由 [0032](adr/0032-windows-native-via-rnw.md) 改为 RNW、**又由 [0034](adr/0034-windows-native-winui3-not-rnw.md) 改为 WinUI 3 原生** | 🟡 **待确认** |
 | ⚪ [0032](adr/0032-windows-native-via-rnw.md) | ~~Windows 桌面端迁到 react-native-windows 原生~~。**🔴 已被 [ADR-0034](adr/0034-windows-native-winui3-not-rnw.md) 全部取代**：本文 §3.1 的前置"先升 RN 再上 RNW"**自我否定** —— RNW 最新**稳定版就是 0.84.0**、**无 0.85+**，抬了 RN 就没有 RNW 可用。仍然有效的部分：Capacitor 没有 Windows 平台、"哪怕是代码量偏大"抽掉了 ADR-0024 §2.2 的论证前提、以及它记录的三笔成本清单（C1/C2/C3 —— 0034 §1.3/§1.4/§1.5 在三条上做了复核并改判） | ⚪ **已取代** |
 | 🪟 [0034](adr/0034-windows-native-winui3-not-rnw.md) | **Windows 走 WinUI 3 / Windows App SDK 原生（C#），不走 RNW**。🔴 决定性事实：RNW npm `dist-tags` 的 `latest = 0.84.0`，**稳定版 0.85/0.86/0.87 全部不存在**，而 RN 上游已 **0.87.1** ⇒ 选 RNW = 把整个 monorepo（含旗舰 `apps/mobile`）**冻在一个已出上游支持窗口的 RN 上** —— 那是**产品**代价，而"哪怕是代码量偏大"只授权**代码量**。**同时改判三条**：C1 消失（`Microsoft.Data.Sqlite` 是 **ADO.NET**，API 全同步）、C3 消失（微软有**官方 C# widget provider 教程**，"无先例"只是选 RNW 造成的）、C2 真实规模是 **heyta 自己的 4 个原生库 / 3 个缺口**（不是生态的 2.8%）。⚠️ 唯一没解决的：**`packages/domain`（6603 行纯 TS）的单源问题**，由 spike 拍板（D1 C# 移植 + golden fixture ↔ D2 内嵌 JS 引擎） | 🟡 **待确认** |
+| 🌐 [0033](adr/0033-multi-page-site-and-bidirectional-reachability.md) | **站点多页架构 = 单一页面注册表驱动的静态入口，且站点与应用互为可达**。产品要求「完整的产品及路由实现，**禁止孤立路由、禁止产品孤岛**，完美融入现有界面」。选**多 HTML 入口**（内容站、SEO 最好、**不推翻**"不引入路由库"），但入口/导航/页脚/sitemap/门禁**全部由一份 `site/pages.ts` 注册表生成** ⇒ **没有一条路径能新增页面而不出现在导航里**（N2 从主张变成结构）。🔴 另一半是**实测为零**的反向链路：`apps/web/src` 里 `href=` **0 处**、`mobile` 里 `Linking.openURL` **0 处** ⇒ 应用对外**一个链接都没有** —— 这正是"产品孤岛"。新增构建期 `VITE_SITE_URL`（与 `VITE_APP_URL` 完全对称，未配置时**不渲染**），应用里三个落点：设置页「帮助与关于」→ `/help`、`/changelog`；订阅/到期提示 → `/pricing`；同步出错提示 → `/help`。配套 **A8 `check:site-reachability`** 门禁 | 🟡 **待确认** |
 
 ### 计划
 
@@ -149,6 +150,7 @@ docs/research/<kebab-case>.md     例：reuse-plan.md
 | ⭐ [multi-platform-widgets-progress.md](plans/multi-platform-widgets-progress.md) | 🔴 **小组件实施进度账本（唯一真源）**：W0–W5 逐任务记录**已完成 / 未完成 / 阻塞**并附可验证证据。含 D1–D6 六个已拍板决策（**D1 = 设备密钥加密快照**）、阻塞登记（鸿蒙镜像/签名、Windows 真机、iOS 账号）、7 条未核实项、以及「下一步」唯一入口。状态只有四种，**不允许"基本完成"** |
 | [motivation-and-progression.md](plans/motivation-and-progression.md) | ⭐ **激励与成长体系设计**：三层架构（即时反馈/连续性/叙事）× 四个循环，含「不改 schema」的落地映射、反需求 2.0、E2EE 下的指标方案 |
 | [activity-categories-and-colors.md](plans/activity-categories-and-colors.md) | **活动分类与分类着色**（✅ 已实现并并入 `main`）：颜色由**用户自赋义**、App 不判健康度；真正的工程量在时间归因（零新增字段跑通了第一版）；分类泳道图 + 周堆叠条。落地状态与实测数字见其 §8 |
+| 🔴 [site-and-parity-alignment.md](plans/site-and-parity-alignment.md) | ⭐ **站点补齐与能力对标：任务计划**（2026-09-28 立项）：**A 轨站点**（A0 多页架构 → `/features` `/platforms` `/pricing` `/help` `/signin` `/changelog` `/integrations`）、**B 轨能力**（B0 六个低成本高杠杆 → B1 提醒/Web 日历/子任务/搜索 → B2 二十条 P1）、**C 轨文档与门禁**（含 🔴 **新增 `check:reachability`**：查"实体已建模但零 action / 零调用点"）。含 6 条先决决策（D1 多页架构**需要新 ADR**）、6 个波次、7 条风险与不可逆点、11 条明确不做 |
 
 ### 工程参考
 
@@ -177,6 +179,9 @@ docs/research/<kebab-case>.md     例：reuse-plan.md
 | 文档 | 内容 |
 |---|---|
 | [feature-matrix.md](research/feature-matrix.md) | 滴答清单功能对照矩阵 —— 需求基准线（P0/P1/P2 分级） |
+| 🔴 [dida365-feature-benchmark.md](research/dida365-feature-benchmark.md) | ⭐ **滴答清单功能对标：heyta 的真实缺口**（2026-09-28 代码级审计）：逐类给 `文件:行号` 证据 + 缺口分级（P0/P1/P2）。含 **13 项「看起来有、其实没有」**（提醒 / 通知 / 子任务 / Web 日历 / 已完成入口 / 手动排序 / 番茄自定义 / 习惯计数型 / 实时同步 / 桌面端 / 笔记 / 鸿蒙 / 全量导出）、**13 处文档与代码的矛盾**、以及**我们独有的 9 条能力**。🔴 核心判据：**"做完了" = 有 action + 有调用点 + 有从用户动作出发的验收** |
+| [dida365-help-center-ia.md](research/dida365-help-center-ia.md) | ⭐ **滴答清单帮助中心与官网 IA 实测**（2026-09-28）：解析 Next.js `__NEXT_DATA__` 得到 **97 篇**完整目录（任务 21 / 日历 9 / 四象限 3 / 番茄 6 / 习惯 4 / 倒数日 4 / 导入与关联 15 / AI 7 / 账号与安全 6…）、**FAQ 67 问分 8 组**、**定价逐项对比表**（￥139/年 · ￥16/月 · 连续包月 ￥13.9；国际版 $49.99/年）、下载页 7 平台分发方式、登录 6 种方式、更新动态 5 条 + 3 个年度归档。含 6 条未核实项 |
+| [site-ia-and-landing-audit.md](research/site-ia-and-landing-audit.md) | ⭐ **heyta 落地页审计与双向对齐**（2026-09-28）：现状清单（10 段区块 / 导航 / 页脚 / i18n / SEO / 主题 / 应用入口 / 构建部署 / 测试门禁）+ **22 行对齐矩阵**（A 对标补齐 / B 能力回填 / C 明确不对齐）+ **不能照抄的 8 件事**。滴答侧数据不在此重复，见上一条 |
 | [oss-landscape.md](research/oss-landscape.md) | 开源项目盘点（16 个项目的许可证、成熟度、可复用性） |
 | [licensing-and-compliance.md](research/licensing-and-compliance.md) | 许可证与合规边界（AGPL §13、商标、上架成本、定价数据） |
 | [codebase-assessment.md](research/codebase-assessment.md) | 上游代码体检：依赖许可证扫描 + 代码量实测 |
