@@ -1,0 +1,29 @@
+# 鸿蒙（HarmonyOS）端窗口取证记录
+#
+# 采集命令（可复现）：
+#   bash apps/mobile/scripts/verify-harmonyos.sh
+#
+# 设备：DevEco 模拟器（`hdc list targets` → 127.0.0.1:5557）
+# 包名：com.heyta.mobile（设备上已安装）
+#
+# 实测：
+#   hdc shell aa start -a EntryAbility -b com.heyta.mobile   → start ability successfully
+#   hdc shell snapshot_display -f /data/local/tmp/heyta.jpeg  → 1256x2760 jpeg
+#   hdc file recv ...                                        → 146,075 字节
+#
+# ⚠️ **它现在起来的是「heyta 小组件」测试页，不是主产品界面**：
+#
+#     heyta 小组件
+#     卡片现在能显示真实内容（今日 6 条，契约 v1）。
+#     下面写入的是**示例数据**（四端共用的那份黄金夹具），不是你的真实任务。
+#     [把示例任务写进卡片]  [取走这些意图（drain）]  [清掉卡片数据与设备密钥]
+#
+#   这**仍然是有意义的证据**（鸿蒙壳能起来、能渲染、文案与状态都是真的），
+#   但它不构成"主界面可用"的证明 —— 如实记在这里，不要当成后者用。
+#
+# 🔴 顺带发现一个 UI bug：`**示例数据**` 的 Markdown 星号被**原样显示**了
+#   （字符串里有 markdown 语法但没走渲染）。留给 UI 那条线。
+#
+# 另：鸿蒙签名仍是空的（`signingConfigs: []`），当前产物**未签名**。
+
+CAPTURE_METHOD=hdc-snapshot-display

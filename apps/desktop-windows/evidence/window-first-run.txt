@@ -1,0 +1,38 @@
+# Windows（WinUI 3）原生壳窗口取证记录 —— 从 Windows 侧日志逐字抄录
+#
+# 采集命令（可复现）：
+#   bash apps/desktop-windows/scripts/capture-window.sh
+#
+# 采集机制：SSH 打完命令就断，**没有桌面**。所以靠 `schtasks /ru <user> /it`
+#           把脚本投进用户的**交互式会话**（session 2）里执行，
+#           再用 System.Drawing 的 CopyFromScreen + GetWindowRect
+#           **只截应用窗口**（不是整屏）。
+#
+# 实测：
+#
+#   === capture in session 2 ===
+#   BUNDLE_COPIED=True
+#   PID=21664
+#   MAIN_WINDOW_HANDLE=5834884
+#   MAIN_WINDOW_TITLE=heyta
+#   WINDOW_RECT=130,130,1152x587
+#   PNG_SAVED=True bytes=34072
+#   RESULT=OK
+#   DB_EXISTS=True            ← 库真的建出来了
+#
+# 窗口里那行「还没有任务。上面写一条试试。」不是硬编码 —— 它是 listTasks()
+# 穿过 Jint → app-host → SQLite 之后返回的空列表被渲染出来。
+# **所以这张截图同时证明了整条 D2 链路。**
+#
+# ── 两个必须记下的坑 ─────────────────────────────────────────────────────
+#
+# 1. **PowerShell 5.1 把 UTF-8 无 BOM 的脚本按 ANSI 解码**，中文注释会把字符串
+#    字面量拆坏，报出的解析错误**位置离现场很远**。
+#    本次的做法更省事：`capture-window.ps1` **整份写成纯 ASCII**，
+#    从根上消掉这个失效模式；中文说明放在这份 .txt 里。
+#
+# 2. **macOS 的 `tar` 会注入 AppleDouble `._*` 文件**，到 Windows 上
+#    C# 直接报 `CS2015 ... 是二进制文件而非文本文件`（一次注入了 16 个）。
+#    修法：打包时 `COPYFILE_DISABLE=1` **且** `--exclude='._*'`。
+
+CAPTURE_METHOD=winui-schtasks-copyfromscreen

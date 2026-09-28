@@ -1,84 +1,24 @@
-# Linux 原生壳第一次成功启动的实测记录
+# Linux（GTK4）原生壳窗口取证记录
+#
+# 采集命令（可复现）：
+#   bash apps/desktop-linux/scripts/capture-window.sh sanjiaozhou
+#
+# 目标机：sanjiaozhou（Ubuntu，x86_64）
+# 工具链：gtk4 4.14.5 · javascriptcoregtk-4.1 2.52.6 · sqlite3 3.45.1
+#
+# 构建：make（-Werror）→ 0 警告
+# 窗口：Xvfb :99 -screen 0 1280x800x24 → GTK4 无 GPU 时从 ngl 退回 cairo 软件渲染
+#       （日志里的 libEGL / DRI3 警告**不是错误**）
+# 截图：DISPLAY=:99 import -window root
+#
+# 🔴 为什么裁到 900x560：
+#   Xvfb 整屏 1280x800，窗口只占左上 900x560，**其余 50.8% 是纯黑桌面**。
+#   那片黑区内部零边缘，会把「每个内容像素摊到的跃变数」稀释到阈值以下 ——
+#   实测整屏 edge=0.134（被判"糊"），裁到窗口 edge=0.994（正常）。
+#   裁切既是更好的证据（画面里只有窗口），也消除了这个误报源。
+#
+# 窗口里那行「还没有任务。上面写一条试试。」不是硬编码 —— 它是 listTasks()
+# 穿过 JavaScriptCore → @heyta/app-host → SqliteAdapter → C 同步驱动 → SQLite
+# 之后返回的空列表被渲染出来。底部是真实数据（库路径 + 从 SQLite 读出的 clientId）。
 
-采集时间：2026-09-28
-目标机：`sanjiaozhou`（Ubuntu 24.04 LTS，x86_64，gcc 13）
-工具链：gtk4 **4.14.5** · javascriptcoregtk-4.1 **2.52.6** · sqlite3 **3.45.1**
-
-## 构建
-
-```
-cc -std=c11 -O2 -Wall -Wextra -Werror ...
-  → heyta-linux  51696 字节
-  → heyta-smoke  41072 字节
-```
-
-`-Werror` 下 **0 警告 0 错误**。
-
-## 无头冒烟（12/12）
-
-```
-bundle：/tmp/heyta-linux/packages/app-host/bridge-bundle/native-bridge.js
-db：/tmp/heyta-linux-smoke-3542715/smoke.sqlite
-
-  ✅ 打开宿主并拿到 clientId
-  ✅ 新库列出来是空的
-  ✅ 两条任务拿到不同的 id
-  ✅ 新建后列出 2 条
-  ✅ 按 (createdAt, id) 升序 —— 与 TaskActions 文档一致
-  ✅ 只有一条被标成完成
-  ✅ 被标完成的是第一条
-  ✅ 空标题被拒（TaskActions 的既定语义，跨语言之后仍然成立）
-  ✅ 重开后仍然是 2 条（数据真的落盘）
-  ✅ 重开后完成态还在
-  ✅ 软删除后只剩 1 条
-  ✅ 驱动出错时拿得到错误消息（而不是静默）
-
-✅ 跨语言那一层 + 落盘 全部通过。
-```
-
-## 窗口（Xvfb，1280x800 屏）
-
-```
-libEGL warning: DRI3 error: Could not get DRI3 device
-（↑ Xvfb 没有 GPU，GTK4 从 ngl 退回 cairo 软件渲染；**不是错误**）
-
-WINDOW_TITLE=heyta
-WINDOW_SIZE=900x560
-```
-
-截图：`window-first-run.png`（1280x800，25,983 字节）。
-窗口里那行「还没有任务。上面写一条试试。」不是硬编码 —— 它是 `listTasks()`
-穿过 JavaScriptCore → `@heyta/app-host` → `SqliteAdapter` → C 同步驱动 → SQLite
-之后返回的空列表被渲染出来。
-
-底部那行是**真实数据**：`库：/root/.local/share/heyta/heyta.sqlite　设备：muktls4b-1-h20tnb83`
-—— clientId 是从 SQLite 里读出来、穿过 app-host 到 GTK4 的。
-
-## 库真的建出来了（与其它端同构）
-
-```
-$ sqlite3 ~/.local/share/heyta/heyta.sqlite ".tables"
-__heyta_seq  archive  meta  ops  ops__mt3  state
-```
-
-`heyta.sqlite` = 73,728 字节，表结构与 macOS / Windows 壳**完全一致**。
-
-## 复现
-
-```bash
-# 在 Linux 机器上（Ubuntu/Debian）
-sudo apt-get install -y build-essential pkg-config \
-    libgtk-4-dev libjavascriptcoregtk-4.1-dev libsqlite3-dev xvfb x11-utils imagemagick
-
-# 仓库根：先打包 TS 门面（与 Windows / macOS 壳共用同一个产物）
-node packages/app-host/scripts/build-native-bridge.mjs
-
-cd apps/desktop-linux && make
-HEYTA_BRIDGE_BUNDLE=../../packages/app-host/bridge-bundle/native-bridge.js ./heyta-smoke
-
-# 窗口 + 截图（无头）
-Xvfb :99 -screen 0 1280x800x24 &
-export DISPLAY=:99 GDK_BACKEND=x11 GSK_RENDERER=cairo
-HEYTA_EXIT_AFTER_MS=9000 ./heyta-linux &
-sleep 5 && import -window root window.png
-```
+CAPTURE_METHOD=xvfb-import-crop
