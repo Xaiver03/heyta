@@ -49,3 +49,4 @@ npm-debug.log*
 yarn-error.log*
 *.mobileprovision
 *.p12
+*.p8
