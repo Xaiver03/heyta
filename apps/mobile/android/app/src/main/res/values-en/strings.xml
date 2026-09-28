@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  小组件文案的英文对照（W1-3）。
+
+  只覆盖小组件用到的条目 —— Android 会**逐条**回退到默认 `values/strings.xml`，
+  所以不需要在这里重复 `app_name` 之类。
+
+  🔴 改 `values/strings.xml` 里的小组件文案时，**必须**同时改这里。
+  `check:ui-language` 不扫原生 XML（只扫 `apps/mobile/src` 的 TS），
+  所以漏改**不会有任何门禁报警** —— 它只会表现为英文用户看到中文。
+-->
+<resources>
+    <string name="widget_today_description">Today\'s tasks</string>
+    <string name="widget_header">%1$s · %2$d/%3$d</string>
+    <string name="widget_row_done">✓ %1$s</string>
+    <string name="widget_row_todo">○ %1$s</string>
+    <string name="widget_message_open_app">Open Heyta to show content</string>
+    <string name="widget_message_stale">Data expired — open Heyta to refresh</string>
+    <string name="widget_message_no_tasks">Nothing for today</string>
+    <!-- ===== Widgets (W1-3 today / W1-5 the other three) =====
+         ⚠️ Keep this section in sync with values/strings.xml by hand:
+         check:ui-language only scans .ts/.tsx under apps/*/src, never these XML files. -->
+
+    <!-- Quadrants -->
+    <string name="widget_quadrant_description">Quadrants</string>
+    <string name="widget_quadrant_header">%1$s %2$d/%3$d</string>
+    <string name="widget_quadrant_1">Important &amp; urgent</string>
+    <string name="widget_quadrant_2">Important, not urgent</string>
+    <string name="widget_quadrant_3">Urgent, not important</string>
+    <string name="widget_quadrant_4">Neither</string>
+
+    <!-- Today\'s habits -->
+    <string name="widget_habits_description">Today\'s habits</string>
+    <string name="widget_habits_empty">No habits yet</string>
+    <string name="widget_habit_row">%1$s · %2$d-day streak</string>
+
+    <!-- Focus -->
+    <string name="widget_focus_description">Focus</string>
+    <string name="widget_focus_untitled">Focusing</string>
+    <string name="widget_focus_target">Target %1$d min</string>
+    <string name="widget_focus_idle">No focus session running</string>
+</resources>

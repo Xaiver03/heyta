@@ -1,3 +1,59 @@
 <resources>
     <string name="app_name">HeytaMobile</string>
+
+    <!--
+      小组件文案（W1-3）。
+
+      ⚠️ 这些是**原生资源**，不经过 `@heyta/i18n`（那是 JS 侧的目录）。
+      英文对照放在 `values-en/strings.xml`，与 Android 的常规做法一致。
+      `check:ui-language` 只看 `apps/mobile/src`（TS），**不扫这里** ——
+      所以这几条是"手工保持同步"的，改中文时**必须**同时改 `values-en`。
+    -->
+    <string name="widget_today_description">今天的任务</string>
+
+    <!-- 头部：%1$s = 日期，%2$d = 已完成数，%3$d = 总数 -->
+    <string name="widget_header">%1$s · %2$d/%3$d</string>
+
+    <!-- 行：%1$s = 任务标题。前缀在资源里，免得在 Kotlin 里拼字符串。 -->
+    <string name="widget_row_done">✓ %1$s</string>
+    <string name="widget_row_todo">○ %1$s</string>
+
+    <!--
+      三种"没有可信任务可看"的情况，各自文案不同 ——
+      对用户来说它们的原因不同，处理方式也不同：
+        - 没数据/拿不到密钥 → 打开应用就有了
+        - 过期             → 数据是旧的，不能当成今天
+        - 今天确实没任务   → 一切正常，无事可做
+    -->
+    <string name="widget_message_open_app">打开 Heyta 以显示内容</string>
+    <string name="widget_message_stale">数据已过期，打开 Heyta 刷新</string>
+    <string name="widget_message_no_tasks">今天没有任务</string>
+    <!-- ===== 小组件（W1-3 今日任务 / W1-5 其余三款）=====
+
+         ⚠️🔴 `check:ui-language` 门禁**只扫 `apps/*/src` 下的 .ts/.tsx**，
+         Android 的 `res/values*/strings.xml` **不在扫描范围内**。
+         所以"中英两份必须同步"在这里**没有任何自动门禁**保护 ——
+         漏一条的表现是英文用户在组件上看到一句中文（或者相反），
+         而那要等真机切语言才看得见。改这一节时请**两份一起改**。 -->
+
+    <!-- 四象限 -->
+    <string name="widget_quadrant_description">四象限</string>
+    <string name="widget_quadrant_header">%1$s %2$d/%3$d</string>
+    <!-- ⚠️ 这四个名称必须与 `packages/domain/src/quadrant.ts` 的 QUADRANT_META.label 一致 ——
+         不一致的表现是"应用里叫重要且紧急、组件上叫别的"，两处都"对"，只是不同。 -->
+    <string name="widget_quadrant_1">重要且紧急</string>
+    <string name="widget_quadrant_2">重要不紧急</string>
+    <string name="widget_quadrant_3">紧急不重要</string>
+    <string name="widget_quadrant_4">不重要不紧急</string>
+
+    <!-- 今日习惯 -->
+    <string name="widget_habits_description">今日习惯</string>
+    <string name="widget_habits_empty">还没有习惯</string>
+    <string name="widget_habit_row">%1$s · 连续 %2$d 天</string>
+
+    <!-- 今日专注 -->
+    <string name="widget_focus_description">今日专注</string>
+    <string name="widget_focus_untitled">专注中</string>
+    <string name="widget_focus_target">目标 %1$d 分钟</string>
+    <string name="widget_focus_idle">没有进行中的专注</string>
 </resources>

@@ -6,4 +6,46 @@
         <item name="android:editTextBackground">@drawable/rn_edit_text_material</item>
     </style>
 
+    <!--
+      小组件里的一行任务。
+
+      ⚠️ 只放**结构**属性（行高、字号、省略），不放任何颜色：
+      颜色全部走布局里的 `?android:attr/...` 主题属性，这样组件跟着**启动器**的明暗走。
+      详见 widget_today.xml 顶部的注释。
+
+      `singleLine` 而不是 `maxLines`：行槽的高度必须**固定**，
+      否则 5 个槽会随着长标题各自换行，把布局撑成高低不齐的样子。
+    -->
+    <style name="HeytaWidgetRow" parent="">
+        <item name="android:layout_width">match_parent</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:textSize">13sp</item>
+        <item name="android:textColor">?android:attr/textColorPrimary</item>
+        <item name="android:singleLine">true</item>
+        <item name="android:ellipsize">end</item>
+        <item name="android:paddingTop">3dp</item>
+        <item name="android:paddingBottom">3dp</item>
+    </style>
+
+    <!--
+      四象限组件的**象限标题**样式（W1-5）。
+
+      与 HeytaWidgetRow 的区别只有三处，每处都有理由：
+        - `textSize` 12sp（行是 13sp）：标题是**分类标签**，比内容轻一档；
+        - `textStyle` bold：四个标签要在视觉上压得住下面两行；
+        - `paddingTop` 6dp（行是 3dp）：象限之间要**看得出分组**，
+          否则四组 8 行会连成一片，2×2 的格局就散了。
+    -->
+    <style name="HeytaWidgetGroupHeader" parent="">
+        <item name="android:layout_width">match_parent</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:textSize">12sp</item>
+        <item name="android:textStyle">bold</item>
+        <item name="android:textColor">?android:attr/textColorPrimary</item>
+        <item name="android:singleLine">true</item>
+        <item name="android:ellipsize">end</item>
+        <item name="android:paddingTop">6dp</item>
+        <item name="android:paddingBottom">1dp</item>
+    </style>
+
 </resources>
