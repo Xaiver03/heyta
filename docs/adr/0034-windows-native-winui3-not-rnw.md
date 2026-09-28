@@ -117,7 +117,14 @@ ADR-0032 §3 用生态级数字描述 C2（"2716 个库里只有 73 个支持 Wi
 
 复现：`curl` RN Directory 的 `react-native-libraries.json` 后按 `windows` 字段计数
 （2026-09-28 实抓：total 2717、`windows` present=73、`macos` present=54，与调研一致），
-再对每个仓库探测 `https://github.com/<repo>/tree/<branch>/windows` 的 HTTP 状态。
+再对每个仓库探测 `https://github.com/<repo>/tree/<HEAD>/windows` 的 HTTP 状态。
+
+⚠️ **这条已经做成脚本，别手抄数字**：`node research/tools/windows-native-gaps.mjs`
+（2026-09-28 实测输出：8 个直接依赖 → 4 个原生 → **3 个缺口**）。
+脚本刻意**不自动判定"哪个包是原生模块"** —— 第一版按"上游有没有 `windows/` 目录"
+一刀切，把 `react` / `fast-text-encoding` / `lucide-react-native` 这些**纯 JS** 包
+全报成了缺口（7 个）。**一个会撒谎的数字比没有数字更糟**，所以原生清单是显式手维护的，
+而脚本负责证明它没过期（清单条目还在不在依赖里 / 有没有声明 `codegenConfig` 的包被漏掉）。
 
 ⇒ **C2 是 3 个库，不是"整个生态"** —— 而且其中 2 个（safe-area / random-values）在桌面窗口上
 语义本就接近于常量，属于**可替换**而不是"重写原生模块"。
@@ -214,6 +221,14 @@ C# 进程**跑不了 TS**。两条路，**由 W0 spike 拍板，本文不预先�
 
    ⇒ **Visual Studio 2022（含 WinUI 工作负载）+ .NET SDK 是必须先装的前置**，
    而**装机本身没做**。这是 W0-1。
+   ⚠️ **2026-09-28 追加实测，本条已部分推翻**：.NET SDK **10.0.401** 已用
+   `winget install Microsoft.DotNet.SDK.10` 装上，且**该机从未装过 Visual Studio**
+   （`C:\Program Files\Microsoft Visual Studio` 不存在）的情况下，
+   一个 WinUI 3 / Windows App SDK **2.5.1** 工程 **`dotnet build` 成功**
+   （0 警告 0 错误，约 46 s）。⇒ **"必须先装 VS"这条前置至少对编译不成立**，
+   省掉一个 10~20 GB 的共享机安装。细节与**未证事项**（能不能开窗、CI 镜像、
+   MSIX 打包路径、C# COM exe server 工程是否仍需 VS）见
+   [spike README](../../research/spikes/winui3-toolchain-probe/README.md)。
 2. **D1 vs D2 未拍板** —— §3.1 的 spike 没做。这是全计划真正的未知数。
    ⚠️ **2026-09-28 追加**：spike **已做**，结论见下方 §6。**D1/D2 仍未最终拍板**，
    但 D2 的"同一份字节两台引擎结果一致"这一半**已被实测证明**。
