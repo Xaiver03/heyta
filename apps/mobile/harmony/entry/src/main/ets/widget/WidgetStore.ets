@@ -22,11 +22,12 @@ import { preferences } from '@kit.ArkData';
 // ⚠️ 写入方要记日志（写失败不抛，只记）—— 所以这个 import 是必需的，
 //    没有它 ArkTS 编译期就报 `Cannot find name 'hilog'`。
 import { hilog } from '@kit.PerformanceAnalysisKit';
+import { util } from '@kit.ArkTS';
 // ⚠️ 按**名字**导入，不是 `{ WidgetKey }` —— 那个模块导出的是函数，
 //    没有一个叫 `WidgetKey` 的成员（报错是 `has no exported member 'WidgetKey'`）。
-import { loadKey, decrypt } from './WidgetKey';
-import type { DecryptResult } from './WidgetKey';
-import { parseEnvelope, parsePayload, isStale, envelopeAad } from './WidgetParse';
+import { loadKey, decrypt, getOrCreate, encrypt } from './WidgetKey';
+import type { DecryptResult, EncryptResult } from './WidgetKey';
+import { parseEnvelope, parsePayload, isStale, envelopeAad, WIDGET_CONTRACT_VERSION, WIDGET_ALG, MAX_EPOCH_MS } from './WidgetParse';
 import type { WidgetEnvelope, WidgetPayload, EnvelopeParseResult } from './WidgetParse';
 import { buildTodayModel, buildQuadrantModel, buildHabitsModel, buildFocusModel } from './WidgetModels';
 import type { TodayModel, QuadrantModel, HabitsModel, FocusModel } from './WidgetModels';
@@ -149,6 +150,12 @@ export function focusCard(snapshot: SnapshotResult): FocusModel | CardState {
 // 写入方 —— 卡片读什么，这里就写什么
 // ---------------------------------------------------------------------------
 
+/** base64 → 字节。⚠️ 只在这里用一次，所以不额外抽公共模块。 */
+function base64ToBytes(b64: string): Uint8Array {
+  const helper: util.Base64Helper = new util.Base64Helper();
+  return helper.decodeSync(b64);
+}
+
 /**
  * 把**已经加密好的**信封 JSON 写进快照。
  *
@@ -210,4 +217,71 @@ export async function clearSnapshot(context: Context): Promise<boolean> {
     hilog.error(0x0000, 'heyta', 'clearSnapshot 失败：%{public}s', err instanceof Error ? err.message : 'unknown');
     return false;
   }
+}
+
+// ---------------------------------------------------------------------------
+// 封包 —— 把明文载荷加密成信封，再落盘
+// ---------------------------------------------------------------------------
+
+/**
+ * 把**明文载荷**封成信封并落盘。这是整个鸿蒙链路的**上半截**。
+ *
+ * 🔴 **在此之前鸿蒙侧完全没有这个函数**，所以：卡片能读、解密逻辑齐全、
+ * 但**没有任何人能把数据写进去** —— 卡片会永远停在占位态
+ * 「打开 Heyta 以显示小组件」。这不是"少个功能"，是这条链**不成立**。
+ *
+ * ## 与其它三端必须逐字节一致的两处
+ *
+ * 1. **AAD** = `${契约版本}|${dayStr}|${validUntil}`（`envelopeAad()` 的同一个拼法）。
+ *    差一个字符 = GCM 认证失败 = **只有鸿蒙这一端解不开**，而其它三端全正常。
+ * 2. **线上格式** = `ciphertext || tag`（不是 `nonce || ciphertext || tag`）。
+ *    这个差异坑过一次（Swift 的 `SealedBox(combined:)` 期望后者）。
+ *
+ * ⚠️ 加密本身在 `WidgetKey.encrypt`，它带**自解校验** —— 见那里的注释。
+ *    一个不自检的封包会把错误推迟到"卡片显示占位态"，而在卡片上
+ *    "解不开"与"没有数据"长得一模一样。
+ *
+ * ⚠️ 密钥用 `getOrCreate`（**应用侧**，用户正在使用应用，可以生成密钥）。
+ *    卡片侧恰恰相反，只用 `loadKey` —— 自己造密钥会把正确的密钥**覆盖掉**。
+ */
+export async function sealSnapshot(
+  context: Context,
+  payloadJson: string,
+  dayStr: string,
+  validUntil: number,
+): Promise<boolean> {
+  if (dayStr.length === 0) {
+    hilog.warn(0x0000, 'heyta', 'sealSnapshot：dayStr 不能为空（它进 AAD）');
+    return false;
+  }
+  if (validUntil < 0 || validUntil > MAX_EPOCH_MS) {
+    hilog.warn(0x0000, 'heyta', 'sealSnapshot：validUntil 越界');
+    return false;
+  }
+
+  const keyB64: string = await getOrCreate(context);
+  if (keyB64.length === 0) {
+    hilog.error(0x0000, 'heyta', 'sealSnapshot：拿不到设备密钥');
+    return false;
+  }
+  const keyBytes: Uint8Array = base64ToBytes(keyB64);
+
+  const aad: string = `${WIDGET_CONTRACT_VERSION}|${dayStr}|${validUntil}`;
+  const sealed: EncryptResult = await encrypt(keyBytes, payloadJson, aad);
+  if (!sealed.ok || sealed.ciphertextB64 === undefined || sealed.nonceB64 === undefined) {
+    hilog.error(0x0000, 'heyta', 'sealSnapshot：加密失败：%{public}s', sealed.reason ?? '未知');
+    return false;
+  }
+
+  // ⚠️ 字段名与顺序跟其它三端一致 —— `parseEnvelope` 会逐字段校验。
+  const envelopeJson: string = JSON.stringify({
+    v: WIDGET_CONTRACT_VERSION,
+    dayStr: dayStr,
+    validUntil: validUntil,
+    alg: WIDGET_ALG,
+    nonce: sealed.nonceB64,
+    ciphertext: sealed.ciphertextB64,
+  });
+
+  return await writeSnapshot(context, envelopeJson);
 }

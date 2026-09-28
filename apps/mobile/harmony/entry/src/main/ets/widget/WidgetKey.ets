@@ -177,3 +177,143 @@ export async function decrypt(
     return { ok: false, reason: `解密失败：${message}` };
   }
 }
+
+// ---------------------------------------------------------------------------
+// 加密 —— 读路径的**镜像**（在此之前鸿蒙侧只有解密，所以卡片能读、没人能写）
+// ---------------------------------------------------------------------------
+
+/** 一次加密的结果。与 `DecryptResult` 对称：**不抛**，失败也返回对象。 */
+export interface EncryptResult {
+  ok: boolean;
+  /** 成功时给出：`ciphertext || tag` 的 base64。 */
+  ciphertextB64?: string;
+  /** 成功时给出：nonce 的 base64。 */
+  nonceB64?: string;
+  reason?: string;
+}
+
+/**
+ * 生成一个 12 字节随机 nonce。
+ *
+ * 🔴 **绝不能复用 nonce。** GCM 下同一个密钥 + 同一个 nonce 加密两份不同的明文，
+ * 会同时泄露两份明文的内容并让认证失效 —— 而它的表现是"卡片的字变成了乱码"，
+ * 完全指不到 nonce 上。所以每次封包都必须新取一个。
+ */
+function newNonce(): Uint8Array {
+  const bytes: Uint8Array = new Uint8Array(NONCE_BYTES);
+  const rand: cryptoFramework.Random = cryptoFramework.createRandom();
+  // ArkTS 不接受把 `generateRandomSync` 的返回值直接当数组用，先收进 DataBlob。
+  const blob: cryptoFramework.DataBlob = rand.generateRandomSync(NONCE_BYTES);
+  bytes.set(blob.data);
+  return bytes;
+}
+
+function bytesToBase64(bytes: Uint8Array): string {
+  const helper: util.Base64Helper = new util.Base64Helper();
+  return helper.encodeToStringSync(bytes);
+}
+
+/**
+ * 用设备密钥做一次 AES-256-GCM 加密，输出**与其它三端相同的线上格式**：
+ * `ciphertext || tag`（16 字节 tag 拼在密文后面），base64 编码。
+ *
+ * ## 🔴 「authTag 是入参还是出参」这件事**没有猜，是当场定的**
+ *
+ * `GcmParamsSpec` 三个字段里 `iv` / `aad` 的含义是明确的，而 **`authTag` 在加密时
+ * 该填什么，本地 API 文档只给了字段表、没给可运行的例子**。
+ * 两种可能的约定都存在（填空数组、由算法库回填；或把 tag 直接拼在 `doFinal` 输出里）。
+ *
+ * **所以这里不假设**：加密后**立刻用同一个函数解一次**，比对是否逐字节相同。
+ * - 对得上 → 采用这种取法；
+ * - 对不上 → 换另一种取法再验一次；
+ * - 两种都不行 → 返回失败，**绝不写入一份谁都读不开的快照**。
+ *
+ * ⚠️ 一个不自检的 `seal` 会把错误推迟到"卡片显示占位态"那一刻 ——
+ * 而在卡片上，"解不开"与"没有数据"长得一模一样。
+ */
+export async function encrypt(
+  keyBytes: Uint8Array,
+  plaintext: string,
+  aad: string,
+): Promise<EncryptResult> {
+  let nonce: Uint8Array;
+  try {
+    nonce = newNonce();
+  } catch (err) {
+    const message: string = err === null || err === undefined ? '未知错误' : JSON.stringify(err);
+    return { ok: false, reason: `取随机数失败：${message}` };
+  }
+  if (nonce.length !== NONCE_BYTES) {
+    return { ok: false, reason: `nonce 应为 ${NONCE_BYTES} 字节，实际 ${nonce.length}` };
+  }
+
+  const plainBytes: Uint8Array = new util.TextEncoder().encodeInto(plaintext);
+  const aadBytes: Uint8Array = new util.TextEncoder().encodeInto(aad);
+
+  // 取法 A：authTag 由算法库回填（先给一个空的）。
+  const attemptA: Uint8Array | null = await tryEncrypt(keyBytes, plainBytes, nonce, aadBytes, false);
+  // 取法 B：tag 是 doFinal 输出的一部分（末尾 16 字节）。
+  const attemptB: Uint8Array | null = await tryEncrypt(keyBytes, plainBytes, nonce, aadBytes, true);
+
+  for (const candidate of [attemptA, attemptB]) {
+    if (candidate === null) continue;
+    if (candidate.length <= TAG_BYTES) continue;
+    const back: DecryptResult = await decrypt(keyBytes, bytesToBase64(candidate), bytesToBase64(nonce), aad);
+    if (back.ok && back.plaintext === plaintext) {
+      return { ok: true, ciphertextB64: bytesToBase64(candidate), nonceB64: bytesToBase64(nonce) };
+    }
+  }
+
+  return { ok: false, reason: '两种 authTag 取法都通不过自解校验，拒绝写入' };
+}
+
+/**
+ * 真正调用算法库的那一步。
+ *
+ * `tagAlreadyAppended = true` 时假定 `doFinal` 的输出**已经**是 `ciphertext || tag`，
+ * 此时把 `authTag` 当纯出参回填（不把它拼回去）；否则把回填的 `authTag` 拼在密文后面。
+ */
+async function tryEncrypt(
+  keyBytes: Uint8Array,
+  plainBytes: Uint8Array,
+  nonce: Uint8Array,
+  aadBytes: Uint8Array,
+  tagAlreadyAppended: boolean,
+): Promise<Uint8Array | null> {
+  try {
+    const generator: cryptoFramework.SymKeyGenerator = cryptoFramework.createSymKeyGenerator('AES256');
+    const keyBlob: cryptoFramework.DataBlob = { data: keyBytes };
+    const symKey: cryptoFramework.SymKey = await generator.convertKey(keyBlob);
+
+    const ivBlob: cryptoFramework.DataBlob = { data: nonce };
+    const aadBlob: cryptoFramework.DataBlob = { data: aadBytes };
+    const tagPlaceholder: cryptoFramework.DataBlob = { data: new Uint8Array(TAG_BYTES) };
+    const gcmParams: cryptoFramework.GcmParamsSpec = {
+      algName: 'GcmParamsSpec',
+      iv: ivBlob,
+      aad: aadBlob,
+      authTag: tagPlaceholder,
+    };
+
+    const cipher: cryptoFramework.Cipher = cryptoFramework.createCipher('AES256|GCM|NoPadding');
+    await cipher.init(cryptoFramework.CryptoMode.ENCRYPT_MODE, symKey, gcmParams);
+    const input: cryptoFramework.DataBlob = { data: plainBytes };
+    const output: cryptoFramework.DataBlob = await cipher.doFinal(input);
+
+    const body: Uint8Array = new Uint8Array(output.data);
+    const filledTag: Uint8Array = new Uint8Array(gcmParams.authTag.data);
+
+    if (tagAlreadyAppended) {
+      // 假定输出已含 tag —— 直接用它，不再拼。
+      return body.length > TAG_BYTES ? body : null;
+    }
+    // 假定 authTag 是回填的：拼在密文后面。
+    if (filledTag.length !== TAG_BYTES) return null;
+    const combined: Uint8Array = new Uint8Array(body.length + TAG_BYTES);
+    combined.set(body);
+    combined.set(filledTag, body.length);
+    return combined;
+  } catch (err) {
+    return null;
+  }
+}

@@ -13,23 +13,20 @@
  */
 import { WidgetStrings } from './WidgetStrings';
 import { WidgetHeader, WidgetTaskRow, WidgetMessage, messageFor } from './WidgetCardParts';
-import type { TodayModel, QuadrantModel, HabitsModel, FocusModel } from './WidgetModels';
+import type { QuadrantModel, HabitsModel, FocusModel } from './WidgetModels';
 
-/** 从 `LocalStorage` 里安全地取一个 JSON 数组/对象。坏数据一律当空。 */
+/**
+ * JSON 字符串 → 数组。**解析不了就是空数组，不抛。**
+ *
+ * ⚠️ 这个函数被我误删过一次（用"从注释到第一个 `}`"的方式删隔壁的死函数时删多了）。
+ * 教训：**按文本范围删代码是不可靠的**，编译一次才知道删掉了什么。
+ */
 function parseJsonArray<T>(text: string): T[] {
   try {
-    const value = JSON.parse(text) as T[];
-    return Array.isArray(value) ? value : [];
+    const parsed: Object = JSON.parse(text) as Object;
+    return Array.isArray(parsed) ? (parsed as T[]) : [];
   } catch (err) {
     return [];
-  }
-}
-
-function parseToday(text: string): TodayModel | null {
-  try {
-    return JSON.parse(text) as TodayModel;
-  } catch (err) {
-    return null;
   }
 }
 
@@ -44,8 +41,27 @@ export struct WidgetCardRoot {
   @LocalStorageProp('focusModel') focusModel: string = '{}';
   @LocalStorageProp('isZh') isZh: boolean = true;
 
-  private today(): TodayModel | null {
-    return parseToday(this.todayRows);
+  /**
+   * 今天的行。
+   *
+   * 🔴 **这里曾经有一个"同一字段两种读法"的 bug**，症状是卡片显示「今天没有任务」
+   * 而数据其实好好地在那儿：
+   *
+   * ```
+   * parseToday(this.todayRows)   // 期望：JSON.parse 出**整个 TodayModel**（要 .count）
+   * parseJsonArray<TodayRowView>(this.todayRows)   // 期望：**数组**（ForEach 用）
+   * ```
+   *
+   * 而写入方（`WidgetForms.buildData`）发的是 `JSON.stringify(model.rows)` —— **数组**。
+   * 数组被 `as TodayModel` 强转后 `.count` 是 `undefined`，`?? 0` 就把它变成 0，
+   * 于是渲染成空状态。**两种读法不可能同时对**，而它们之间没有任何一处会报错 ——
+   * `JSON.parse` 对数组是成功的，`as` 只是把类型系统骗过去了。
+   *
+   * 现在统一成**数组**，与 `buildData` 以及另外三张卡片（`habitList` 等）一致。
+   * `count` 由数组长度现算，不再依赖一个不存在的字段。
+   */
+  private todayRowsList(): TodayRowView[] {
+    return parseJsonArray<TodayRowView>(this.todayRows);
   }
 
   /**
@@ -92,15 +108,15 @@ export struct WidgetCardRoot {
   todayBody() {
     WidgetHeader({
       title: WidgetStrings.title('today', this.isZh),
-      badge: (this.today()?.count ?? 0) > 0 ? `${this.today()?.count}` : '',
+      badge: this.todayRowsList().length > 0 ? `${this.todayRowsList().length}` : '',
     })
-    if ((this.today()?.count ?? 0) === 0) {
+    if (this.todayRowsList().length === 0) {
       WidgetMessage({ text: WidgetStrings.emptyToday(this.isZh) })
     } else {
       List({ space: 0 }) {
-        ForEach(parseJsonArray<TodayRowView>(this.todayRows), (row: TodayRowView) => {
+        ForEach(this.todayRowsList(), (row: TodayRowView) => {
           ListItem() {
-            WidgetTaskRow({ title: row.title, isDone: row.isDone, accent: row.color ?? '' })
+            WidgetTaskRow({ title: row.title, isDone: row.isDone, accent: row.color ?? '', taskId: row.id })
           }
         }, (row: TodayRowView) => row.id)
       }

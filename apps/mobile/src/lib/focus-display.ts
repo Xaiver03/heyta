@@ -17,6 +17,10 @@
 
 import { focusDurationMs, type FocusConfig, type FocusSessionKind, type FocusState } from '@heyta/domain';
 import type { MessageKey } from '@heyta/i18n';
+// 主按钮此刻该做什么由**共享层**决定（`@heyta/ui` 的 `focusPrimaryAction`）——
+// 这里只把那个动作翻成文案。两端各判一次的话，"暂停 → 继续"这种映射
+// 会在某一端悄悄变成"重新开始"（web 端迁移前正是如此）。
+import type { FocusPrimaryAction } from '@heyta/ui';
 
 import type { Translate } from '../i18n/translate';
 
@@ -68,21 +72,18 @@ export function phaseLabel(state: FocusState, t: Translate): string {
  *
  * 🔴 运行中必须叫「暂停」而不是「停止」：用户按下去时最怕的是"我刚才那 20 分钟
  * 是不是白干了"。中止是另一个按钮，而且它自己讲清了后果。
+ *
+ * `action` 由共享层的 `focusPrimaryAction()` 给出（不是这里从 phase 再推一遍）——
+ * 判据只有一处，文案才不可能与行为对不上。
  */
-export function primaryActionLabel(state: FocusState, t: Translate): string {
-  if (state.phase === 'running') return t('mobile.focus.action.pause');
-  if (state.phase === 'paused') return t('mobile.focus.action.resume');
+export function primaryActionLabel(
+  action: FocusPrimaryAction,
+  state: FocusState,
+  t: Translate,
+): string {
+  if (action === 'pause') return t('mobile.focus.action.pause');
+  if (action === 'resume') return t('mobile.focus.action.resume');
   return state.kind === 'work'
     ? t('mobile.focus.action.startWork')
     : t('mobile.focus.action.startBreak');
-}
-
-/** 主按钮的图标，与文案同源 —— 两者不能各判一次。 */
-export function primaryActionIcon(state: FocusState): 'focus.play' | 'focus.pause' {
-  return state.phase === 'running' ? 'focus.pause' : 'focus.play';
-}
-
-/** 计时卡与进度条的颜色。**语义名，不是外观名**（AGENTS.md §5）。 */
-export function phaseColorToken(state: FocusState): 'color.focus-work' | 'color.focus-break' {
-  return state.kind === 'work' ? 'color.focus-work' : 'color.focus-break';
 }

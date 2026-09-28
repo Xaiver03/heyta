@@ -17,6 +17,13 @@ export struct WidgetTaskRow {
   isDone: boolean = false;
   accent: string = '';
   compact: boolean = false;
+  /**
+   * 任务 id。空串 = **不可点**（有些卡片位置只做展示）。
+   *
+   * 🔴 默认空串是刻意的：把"忘了传 id"变成"点了没反应"而不是"点错任务"。
+   *    点错任务会改到别的数据，而点了没反应只是少一个功能。
+   */
+  taskId: string = '';
 
   build() {
     Row({ space: 6 }) {
@@ -33,6 +40,17 @@ export struct WidgetTaskRow {
     }
     .width('100%')
     .padding({ top: 3, bottom: 3 })
+    // 🔴 卡片**不能直接改数据** —— 它没有 op-log、不知道冲突规则。
+    //    这里只把「用户希望这条变成什么状态」作为一条 message 发给 EntryFormAbility，
+    //    由它写进意图队列，应用下次唤醒时 drain 出来转成真正的 op。
+    //    ⚠️ 发的是**目标状态**（`!isDone`）而不是"切换"：动作在过期视图上会算错。
+    .onClick(() => {
+      if (this.taskId.length === 0) return;
+      postCardAction(this, {
+        action: 'message',
+        params: { taskId: this.taskId, targetIsDone: !this.isDone },
+      });
+    })
   }
 }
 

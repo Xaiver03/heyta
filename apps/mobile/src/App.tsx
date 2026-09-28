@@ -11,7 +11,9 @@
  *
  * ---
  *
- * 导航结构：**5 个 tab —— 任务 / 日历 / 专注 / 分类 / 我的**（`nav/TabBar.tsx` 的 `TABS`）。
+ * 导航结构：**5 个 tab —— 任务 / 日历 / 专注 / 分类 / 我的**
+ * （`nav/TabBar.tsx` 的 `TABS`）。四象限**不在**导航里：它是「任务」页内的视图切换
+ * （ADR-0015 §4），不再是第 6 个 tab（P10 已撤销那一刀）。
  *
  * 🔴 刻意**不引入导航库**（React Navigation / Expo Router）。
  * 当前需求是"5 个平级 tab、无栈、无深链" —— 这是一段不到 200 行的状态切换。
@@ -32,8 +34,10 @@ import { LocalePreferenceProvider } from './i18n/locale-preference';
 import { resolveDeviceLocale } from './i18n/locale';
 import { TabBar, type TabKey } from './nav/TabBar';
 import { TasksScreen } from './screens/TasksScreen';
-// 🔴 四个 tab 现在**全部是真实屏幕**了 —— `screens/NotYetImplemented.tsx`
+// 🔴 五个 tab 现在**全部是真实屏幕**了 —— `screens/NotYetImplemented.tsx`
 // 已按它自己文件头写好的方式删除（"实现一个就移走一个，最后删掉它"）。
+// ⚠️ `QuadrantScreen` 不再是 tab：它已改为**「任务」页内那一档**的实现，
+// import 在 `screens/TasksScreen.tsx` 里（不再由外壳渲染）。
 import { CalendarScreen } from './screens/CalendarScreen';
 import { FocusScreen } from './screens/FocusScreen';
 import { CategoriesScreen } from './screens/CategoriesScreen';
@@ -141,7 +145,26 @@ function LocaleHost(): React.JSX.Element {
   );
 }
 
-/** 入口：SafeAreaProvider + ThemeProvider + 语言宿主。 */
+/**
+ * 入口：SafeAreaProvider + 主题 + 语言宿主。
+ *
+ * 🔴 **这里不再需要 `UiThemeBridge`**（2026-09-28 收敛后删掉）。
+ *
+ * 在收敛之前，`./theme` 的 `ThemeProvider` 是**自建的第二份主题实现**，
+ * 共享 `TaskList` / `TaskBadges` 透过它拿不到 `HeytaUiProvider` 的 context ——
+ * 实测后果是一个 P0：应用一有任务就崩在主界面
+ * （`useHeytaUiTheme 必须在 <HeytaUiProvider> 内使用`）。当时的修法是加一层桥，
+ * 把移动端解析好的 `ThemeValue` 回灌给共享 Provider。
+ *
+ * 现在 `./theme` 的 `ThemeProvider` **就是** `HeytaUiProvider`
+ * （`apps/mobile/src/theme.tsx` 只剩转发，见那里的文件头），所以桥没有存在的意义：
+ * 整棵树里只有**一次**解析、**一次** `reduceMotionChanged` 订阅，
+ * 也不再有"哪份主题才是权威"的问题。
+ *
+ * ⚠️ 之前那段注释说"移动端有自己的主题选择" —— **实测这句话是错的**：
+ * `apps/mobile/src` 里没有任何主题偏好/持久化，`useColorScheme()` 是唯一来源。
+ * 所以"传移动端解析的值"与"不传 `value` 让 Provider 自己解析"结果逐字段相同。
+ */
 export function Root(): React.JSX.Element {
   return (
     <SafeAreaProvider>

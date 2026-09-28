@@ -38,7 +38,27 @@ import PackageDescription
  本机是 macOS 27，所以两个平台的编译都能跑。
  */
 let package = Package(
+    /**
+     🔴 **`defaultLocalization` 不是可选的装饰。**
+
+     `ToggleTaskIntent` 的 `title` 是 `LocalizedStringResource`，而
+     `LocalizedStringResource` 的**元数据提取**要在 bundle 的本地化表里查。
+     不声明这个键时，模拟器日志里出现的是这两条：
+
+     ```
+     lsd:  development region en not found in localizations available for bundle …HeytaWidgetExtension.appex/
+     linkd: [com.apple.appintents:Metadata] Failed to fetch metadata for ToggleTaskIntent
+     ```
+
+     而它们的后果是 —— **组件装好了、扩展进程也起来了（`Submitting extension overlay`），
+     但系统组件画廊里不列它**。也就是"能装 ≠ 能用"。
+
+     ⚠️ SwiftPM 的规则是：**包里只要用到本地化资源（`LocalizedStringResource` 也算），
+     就必须显式声明 `defaultLocalization`**。不声明时它不会报错，只会在运行时表现为
+     "查不到本地化" —— 又是一个**失败点离原因很远**的例子。
+    */
     name: "HeytaWidgetCore",
+    defaultLocalization: "en",
     platforms: [
         .iOS(.v17),
         .macOS(.v14),

@@ -41,6 +41,12 @@ import type { IconName } from '../ui/icons';
  * ⚠️ 这里存的是**词条 key 不是文案**：模块级拿不到 `t`，而把中文写在这里
  * 就是硬编码 —— 迁移模式下门禁会直接判红（这正是"数据数组里的文案"那个盲区，
  * 本仓库明确不许利用它）。
+ *
+ * 🔴 **四象限不在这里** —— 它是**同一份任务的另一种投影**，不是独立功能域；
+ * 给它一个 tab 会暗示"这里有一批新数据"，而其实一条都没有。入口是「任务」页
+ * 顶部的视图切换（[ADR-0015](../../../../docs/adr/0015-four-quadrant-as-derived-view.md) §4）。
+ * 曾经有过第 6 个 `quadrant` tab，那是**任务书写错**造成的（P10 已撤销，
+ * 见 `docs/plans/multi-platform-adaptation.md`）。
  */
 export const TABS = [
   { key: 'tasks', labelKey: 'mobile.tab.tasks', icon: 'tab.tasks' },

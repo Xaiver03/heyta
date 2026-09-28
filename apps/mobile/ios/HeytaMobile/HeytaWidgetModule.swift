@@ -144,7 +144,14 @@ final class HeytaWidgetModule: NSObject {
 
   /// W5-3 · 推进灵动岛。返回结局字符串（见 `FocusActivityRefresh`）。
   @objc(syncFocusActivity:reject:)
-  func syncFocusActivity(resolve: RCTPromiseResolveBlock, reject: RCTPromiseRejectBlock) {
+  // 🔴 `resolve` 必须标 `@escaping`：下面 `Task { }` 的闭包是**逃逸**的
+  //    （它在 `syncFocusActivity` 返回之后才跑），而 Swift 默认把函数参数
+  //    当成非逃逸。不标就编译不过：
+  //      `escaping closure captures non-escaping parameter 'resolve'`
+  //    ⚠️ **这个错误此前一直没暴露** —— 因为只构建过 widget **扩展**（`HeytaWidgetCore`），
+  //    而本文件在 **App target** 里，App 从来没被编译过。
+  //    "扩展能构建"与"App 能构建"是两件事，这个桥在后者里。
+  func syncFocusActivity(resolve: @escaping RCTPromiseResolveBlock, reject: RCTPromiseRejectBlock) {
     // ⚠️ `Task` 因为 `FocusActivityRefresh.syncNow()` 是 `async`。
     //    这里**不 reject** 任何东西 —— 那个函数契约是"永不抛"，
     //    拿不到结局就是 `"none"`，不该把一个附属功能变成红屏。

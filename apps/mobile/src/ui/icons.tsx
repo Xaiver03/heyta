@@ -48,6 +48,7 @@ import {
   Share2,
   Smartphone,
   Square,
+  StickyNote,
   Tag,
   Target,
   Timer,
@@ -65,7 +66,7 @@ import { useTokens } from '../theme';
  * 与设计 token 同样的理由：换图标库时语义名不用改。
  */
 const ICONS = {
-  // 四个 tab
+  // 底部标签栏的五个 tab（见 `nav/TabBar.tsx`）
   'tab.tasks': ListTodo,
   'tab.calendar': CalendarDays,
   'tab.focus': Timer,
@@ -102,6 +103,15 @@ const ICONS = {
    * 会让人以为"标签"是清单的另一种写法。
    */
   'task.tag': Tag,
+
+  /**
+   * 便签（NOTE）。
+   *
+   * 🔴 与 `task.reminder`（Bell）**必须不同字形**：便签是一条独立记录
+   * （可不挂清单、可钉到「今天」），与「提醒」是两件事。也不复用 `Inbox` ——
+   * 那是 `group.inbox`「收集箱」分组的字形，语义不同。
+   */
+  'note.sticky': StickyNote,
 
   // 分组
   'group.today': ListTodo,

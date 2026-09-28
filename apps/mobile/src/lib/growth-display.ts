@@ -1,178 +1,309 @@
 /**
- * 成长屏的**展示**逻辑（纯函数）
- * ==============================
+ * 成长屏的**文案接线**（移动壳）
+ * =================================
  *
- * 🔴 这个文件里**没有一行"该怎么算"**。今天该做几件、连续怎么数、里程碑阈值
- * 是多少、身份标签的判据 —— 全部在 `@heyta/domain`，摊平与滤墓碑在
- * `@heyta/app-host#motivation`。这里只做两件事，而这两件事都是**界面形状**：
+ * M3 第十一刀（motivation）的移动端换装之后，本文件只剩一件事：
+ * 把共享 `GrowthBoard` 要的 `GrowthBoardLabels` 从本端词条表构造出来。
  *
- *   1. 把领域结果压成"这一屏要画几个块、每块的下一档是哪个数"；
- *   2. 决定该用哪一句文案（`GrowthHint` 那种**分支选择**）。
+ * ─────────────────────────────────────────────────────────────────────────
+ * 🔴 迁移前这里有 178 行"第二份展示实现"，现在那七条纯函数**全部删掉**
  *
- * ## 为什么它值得单独一个文件、还值得测
+ * | 迁移前本文件的函数 | 现在在哪 |
+ * |---|---|
+ * | `growthHint` | `packages/ui/src/motivation/model.ts` |
+ * | `ratioText` | 同上 |
+ * | `progressPercent` | 同上 |
+ * | `milestoneGroups` | 同上 |
+ * | `reachedTagIds` | 同上 |
+ * | `nearMissTags` | 同上（共享层多带一个 `kind`，见下） |
+ * | `weekHeadlineCount` | 同上 |
  *
- * 分支选择是"安静出错"的重灾区：`total === 0` 时到底算"今天没事"还是
- * "今天全做完了"，反过来写界面照样渲染，只是说了一句**相反的话**。
- * 而进度条的百分数不夹紧，一个负数或 >1 的 ratio 会让条子画出容器外 ——
- * RN 不报错，只是看起来"没画"。
+ * 它们逐条是**纯展示**（分支选择 / 顺序 / 夹紧 / 取前 N 条），没有一行移动端
+ * 特有语义，所以收编进共享层是这一刀的目的；留在这里就是第二份真相。
  *
- * ⚠️ 本文件**绝不 import `react-native`**：移动端测试在 node 里跑，
- * 加载 react-native 会直接解析失败（见 `tests/plural-keys.spec.ts` 的说明）。
- * 它只依赖类型，所以能被单测直接调用。
+ * ⚠️ **断言没有跟着删。** `tests/growth-display.spec.ts` 仍然逐条断言那七个
+ * 函数的行为，只是改成直接 import **共享源码**
+ * （`../../../packages/ui/src/motivation/model.ts`）。
+ * 为什么绕这一下：移动单测跑在 node，`@heyta/ui` 的 dist 顶层 import
+ * `react-native`（Flow 源码），node 解析不了 —— 与 `lib/habits-display.ts`
+ * 文件头记的是同一个坑。共享 `model.ts` 自己**不 import react-native**
+ * （那个文件头把这条写成了硬约束），所以直接指源码是安全的。
+ *
+ * ⚠️ `nearMissTags` 的返回值形状**变了**（共享层加了 `kind`），那两条断言
+ * 也跟着更新 —— 这是契约变化，不是删断言。
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * 🔴 已知命名残差：三处借用了别的命名空间的键
+ *
+ *   · `web.growth.milestone.allReached` / `web.growth.milestone.nextLabel`
+ *     （里程碑的无障碍名）—— 移动端从来没有这两句，而它们与"里程碑"同义。
+ *   · `web.growth.tags.nearNote`（还没拿到标签时那句说明）—— web 有、mobile 没有；
+ *     共享层把它渲染出来了，所以必须给一条真话。
+ *   · `mobile.growth.tags.reachedA11y`（单档位徽章）—— 本意是身份标签的键，
+ *     这里借来给"已达成的档位"用（"已达成：50"）。它该有一条
+ *     `mobile.growth.milestones.tierReached`，但 `packages/i18n` 不在本刀白名单。
+ *
+ * 修法都是**纯改名 + 各加一条词条**（文案不动），留待 i18n 可改的那一刀。
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * 🔴 本文件不做任何领域判断，也不 import `@heyta/ui` 的**值**
+ *
+ * 连续怎么数、里程碑阈值、身份判据全在 `@heyta/domain`；
+ * 摊平 / 滤墓碑 / 注入 now 在 `@heyta/app-host#motivation`。
+ * 这里只搬字。`import type { GrowthBoardLabels }` 是**类型**（编译期擦除），
+ * 所以 node 下的单测不会把 react-native 拉进来。
  */
 
-import type {
-  IdentityTagProgress,
-  MilestoneKind,
-  MilestoneProgress,
-  TodayProgress,
-  WeeklyReview,
-} from '@heyta/domain';
+import type { IdentityTagKind, MilestoneKind, WeeklyReview } from '@heyta/domain';
+import type { I18nValue, MessageKey } from '@heyta/i18n';
+import type { GrowthBoardLabels, WeekStatId } from '@heyta/ui';
+
+import { MOBILE_HEATMAP_MONTH_KEYS } from './habits-display';
 
 /**
- * 今日进度该说哪句话。
+ * 里程碑维度 → 文案 key。
  *
- * 四种状态是**互斥且穷尽**的，顺序即优先级：
- *   - `idle`：今天什么都没做、也没有计划 —— 不安慰也不指责，只陈述；
- *   - `unplanned`：没有计划但做了事 —— 这正是小胜原则要的那种反馈，
- *     **不能**因为"计划是 0"就说成 0%；
- *   - `allDone`：有计划且做完了 —— 闭环态；
- *   - `remaining`：还有没做的 —— 只报数量，不催。
+ * 🔴 类型是 `Record<MilestoneKind, MessageKey>`：领域层将来多一个维度，
+ * 这里**编译不过**；词条表里少一条，也在 `@heyta/i18n` 的类型上就红。
+ * 两处都不需要靠人记得同步。
  */
-export type GrowthHint = 'idle' | 'unplanned' | 'allDone' | 'remaining';
+const KIND_KEY: Record<MilestoneKind, MessageKey> = {
+  checkIns: 'mobile.growth.kind.checkIns',
+  focusHours: 'mobile.growth.kind.focusHours',
+  tasks: 'mobile.growth.kind.tasks',
+  activeDays: 'mobile.growth.kind.activeDays',
+};
 
-export function growthHint(progress: TodayProgress): GrowthHint {
-  if (progress.total === 0) {
-    return progress.done > 0 ? 'unplanned' : 'idle';
-  }
-  return progress.done >= progress.total ? 'allDone' : 'remaining';
-}
+/** 本周主标题的维度（`WeeklyReview['headline']` 去掉 `none`）。 */
+type HeadlineKind = Exclude<WeeklyReview['headline'], 'none'>;
 
-/** 进度数字 `已完成/计划`（纯数字与斜杠，不含语言）。 */
-export function ratioText(progress: TodayProgress): string {
-  return `${String(progress.done)}/${String(progress.total)}`;
-}
+/** 本周主标题 → 文案 key。`none` 没有主标题，走空态文案（由共享层判）。 */
+const HEADLINE_KEY: Record<HeadlineKind, MessageKey> = {
+  checkIns: 'mobile.growth.week.headline.checkIns',
+  tasksCompleted: 'mobile.growth.week.headline.tasksCompleted',
+  focusMinutes: 'mobile.growth.week.headline.focusMinutes',
+};
+
+/** 周复盘的三个维度 → 文案 key（顺序由共享层的 `WEEK_STAT_IDS` 决定）。 */
+const WEEK_STAT_KEY: Record<WeekStatId, MessageKey> = {
+  checkIns: 'mobile.growth.week.stat.checkIns',
+  tasksCompleted: 'mobile.growth.week.stat.tasks',
+  focusMinutes: 'mobile.growth.week.stat.focus',
+};
 
 /**
- * 进度条宽度百分比，夹在 0–100。
+ * 身份标签 id → 文案 key。
  *
- * 🔴 必须夹紧：`ratio` 由领域层给出时理论上已在 0–1，但进度条是**渲染**层，
- * 一个越界的值在这里表现为"条子不见了"或"条子盖住整行"，而没有任何报错。
- * 夹紧是一次廉价的防御，测试能证明它在。
+ * ⚠️ 用 `Partial` 而不是 `Record`：标签 id 由**同步过来的数据**决定，
+ * 一台更新的客户端可能带来这个版本还不认识的 id。共享层拿到 `undefined`
+ * 会**跳过**它，而不是把 `checkin-hundred` 这种内部 id 渲染给用户看。
+ * 领域层的 `IDENTITY_TAG_DEFINITIONS` 是唯一事实源，这里只是一张翻译表。
  */
-export function progressPercent(ratio: number): number {
-  if (!Number.isFinite(ratio)) return 0;
-  return Math.max(0, Math.min(1, ratio)) * 100;
-}
-
-/** 里程碑里的一个档位。 */
-export interface MilestoneTier {
-  threshold: number;
-  reached: boolean;
-}
-
-/** 里程碑里一个维度压成的一块。 */
-export interface MilestoneGroup {
-  kind: MilestoneKind;
-  /** 当前值（`focusHours` 已是小时数，与领域层一致）。 */
-  current: number;
-  /** 已达成档数 / 总档数。 */
-  reached: number;
-  total: number;
-  /** 下一档阈值；该维度全部达成时为 undefined。 */
-  next?: number;
-  /** 距离下一档的进度 0–1；全部达成时为 1。 */
-  ratio: number;
-  maxed: boolean;
-  /** 全部档位（阈值升序，含各自是否达成）—— 界面据此画那一排档位。 */
-  tiers: MilestoneTier[];
-}
+const TAG_KEY: Partial<Record<string, MessageKey>> = {
+  started: 'mobile.growth.tag.started',
+  routine: 'mobile.growth.tag.routine',
+  steady: 'mobile.growth.tag.steady',
+  'checkin-hundred': 'mobile.growth.tag.checkin-hundred',
+  'deep-fifty': 'mobile.growth.tag.deep-fifty',
+  'deep-two-hundred': 'mobile.growth.tag.deep-two-hundred',
+  'finisher-five-hundred': 'mobile.growth.tag.finisher-five-hundred',
+  'streak-thirty': 'mobile.growth.tag.streak-thirty',
+};
 
 /**
- * 把领域层"每一档一条"的列表压成"每个维度一块"。
+ * 未达成身份标签的计量单位 → 文案 key。
  *
- * 维度顺序 = 输入里首次出现的顺序（即 `MILESTONE_DEFINITIONS` 的顺序），
- * **刻意不按达成数重排** —— 那是排行榜的形状，而本设计的红线是"只与自己比"。
+ * ⚠️ `streakDays` 也是 `IdentityTagKind` 的一种，但它的单位（"天"）**不属于**
+ * 里程碑那四个维度 —— 共享层的 `IdentityTagListLabels.nearUnit` 单独留了口子
+ * 正是为了保住这条例外（web 迁移前为此走 `web.growth.unit.streakDays`）。
+ *
+ * 🔴 本轮移动端**用不到**它：`mobile.growth.tags.near` 的模板里没有 `{unit}`
+ * 占位符（迁移前就不带单位）。仍然如实给全，是因为共享层一定会调用它，
+ * 返回空串会在将来有人给模板补上单位时安静地拼出双空格。
  */
-export function milestoneGroups(milestones: readonly MilestoneProgress[]): MilestoneGroup[] {
-  const order: MilestoneKind[] = [];
-  const byKind = new Map<MilestoneKind, MilestoneProgress[]>();
-
-  for (const item of milestones) {
-    let bucket = byKind.get(item.kind);
-    if (bucket === undefined) {
-      bucket = [];
-      byKind.set(item.kind, bucket);
-      order.push(item.kind);
-    }
-    bucket.push(item);
-  }
-
-  return order.map((kind) => {
-    const items = byKind.get(kind)!;
-    // 同一个维度的每一档共享同一个 `value`，取第一条即可（领域层保证）。
-    const current = items[0]?.value ?? 0;
-    const reached = items.filter((i) => i.reached).length;
-    const next = items.find((i) => !i.reached)?.threshold;
-    return {
-      kind,
-      current,
-      reached,
-      total: items.length,
-      ...(next === undefined ? {} : { next }),
-      ratio: next === undefined ? 1 : Math.max(0, Math.min(1, current / next)),
-      maxed: next === undefined,
-      // 领域层的顺序即定义表顺序；**不在这里重排**（重排就是排行榜的形状）。
-      tiers: items.map((i) => ({ threshold: i.threshold, reached: i.reached })),
-    };
-  });
-}
-
-/** 已达成的身份标签 id（顺序与定义表一致，不重排）。 */
-export function reachedTagIds(tags: readonly IdentityTagProgress[]): string[] {
-  return tags.filter((tag) => tag.reached).map((tag) => tag.id);
-}
+const NEAR_UNIT_KEY: Record<IdentityTagKind, MessageKey> = {
+  checkIns: 'web.growth.kind.checkIns.unit',
+  focusHours: 'web.growth.kind.focusHours.unit',
+  tasks: 'web.growth.kind.tasks.unit',
+  activeDays: 'web.growth.kind.activeDays.unit',
+  streakDays: 'web.growth.unit.streakDays',
+};
 
 /**
- * 本周主标题要讲的那个数字。
+ * 构造共享 `GrowthBoard` 需要的全部文案。
  *
- * `headline` 由领域层选出"本周最活跃的维度"，这里的映射必须**穷尽**它 ——
- * 否则会出现"标题在讲打卡，数字却是专注分钟"。用 `switch` 而不是查表，
- * 是为了让领域层将来多一个维度时这里**编译报错**，而不是默默取到 0。
+ * 共享层**不 import i18n**（见它的文件头），所以模板留在这里；
+ * 字段名必须与 `GrowthBoardLabels` 逐项对上 —— 漏了编译不过。
  */
-export function weekHeadlineCount(review: WeeklyReview): number {
-  switch (review.headline) {
-    case 'checkIns':
-      return review.checkIns;
-    case 'tasksCompleted':
-      return review.tasksCompleted;
-    case 'focusMinutes':
-      return review.focusMinutes;
-    case 'none':
-      return 0;
-  }
-}
+export function growthBoardLabels(t: I18nValue['t']): GrowthBoardLabels {
+  return {
+    /**
+     * 🔴 "只与自己比"那一句（`compareNote`）是**移动端有、web 没有**的。
+     * 共享层把它放在最上面（见 `GrowthBoard` 文件头第 1 条），这里必须给，
+     * 否则换装会把这句话丢掉 —— 而它是本屏反排行榜立场的唯一显式声明。
+     */
+    compareNote: t('mobile.growth.compare.note'),
 
-/** 一个"还差多少"的标签。 */
-export interface TagNearMiss {
-  id: string;
-  gap: number;
-}
+    today: {
+      /**
+       * 四种分支（idle / unplanned / allDone / remaining）由**本端**选词条。
+       * 共享层只给判据 + `remaining`（**可能是负数**，计划外完成时），
+       * 所以 `remaining` 这一支只在 `hint === 'remaining'` 时用它的值 ——
+       * 与迁移前的写法逐字一致。
+       */
+      hint: ({ hint, done, remaining }) => {
+        switch (hint) {
+          case 'idle':
+            return t('mobile.growth.today.hint.idle');
+          case 'unplanned':
+            return t('mobile.growth.today.hint.unplanned', { count: done });
+          case 'allDone':
+            return t('mobile.growth.today.hint.allDone');
+          case 'remaining':
+            return t('mobile.growth.today.hint.remaining', { count: remaining });
+        }
+      },
+      /**
+       * ⚠️ 迁移前这条词条只有 `{done}` / `{total}`，**不含 bonus**。
+       * 共享层的 `barA11y` 给了 `bonus`，这里**刻意不用**：
+       * 本刀不改文案口径（加 bonus 要新增/改词条，`packages/i18n` 不在白名单）。
+       * 后果：计划外完成时读屏听到的分母仍是计划数 —— 与迁移前逐字相同。
+       */
+      barA11y: ({ done, total }) => t('mobile.growth.today.a11y', { done, total }),
+      habits: ({ done, planned }) => t('mobile.growth.today.habits', { done, planned }),
+      tasks: ({ done, planned }) => t('mobile.growth.today.tasks', { done, planned }),
+      focus: (minutes) => t('mobile.growth.today.focus', { minutes }),
+      bonus: (count) => t('mobile.growth.today.bonus', { count }),
+      closed: t('mobile.growth.today.closed'),
+    },
 
-/**
- * 最接近达成的未获得标签（最多 `limit` 个）。
- *
- * 排序用**距达标的比例**从近到远，并列时按 id 保证确定 —— 随机顺序会让
- * 每次渲染的列表跳动，而"目标梯度"要的恰恰是"下一个就在眼前"的稳定感。
- */
-export function nearMissTags(
-  tags: readonly IdentityTagProgress[],
-  limit: number,
-): TagNearMiss[] {
-  return tags
-    .filter((tag) => !tag.reached)
-    .slice()
-    .sort((a, b) => b.ratio - a.ratio || a.id.localeCompare(b.id))
-    .slice(0, limit)
-    .map((tag) => ({ id: tag.id, gap: tag.threshold - tag.value }));
+    week: {
+      range: ({ start, end }) => t('mobile.growth.week.range', { start, end }),
+      empty: t('mobile.growth.week.empty'),
+      headline: ({ headline, count }) => t(HEADLINE_KEY[headline], { count }),
+      stat: (id) => t(WEEK_STAT_KEY[id]),
+      /**
+       * ⚠️ **刻意不给 `statUnit`**：共享层给了才渲染单位，移动端迁移前
+       * 不渲染（单位由维度名承担 —— "专注" 而非 "专注 12 分钟"），
+       * 而 web 给。共享层把这一项做成可选正是为了保住这个差异。
+       */
+      previous: (count) => t('mobile.growth.week.stat.previous', { count }),
+      bestDay: ({ date, minutes }) => t('mobile.growth.week.bestDay', { date, minutes }),
+    },
+
+    streaks: {
+      empty: t('mobile.growth.streak.empty'),
+      current: t('mobile.growth.streak.current'),
+      longest: (count) => t('mobile.growth.streak.longest', { days: count }),
+      total: (count) => t('mobile.growth.streak.total', { count }),
+      /**
+       * ⚠️ **刻意不给 `freeze`**：这条连续的冻结说明只有在领域层给出
+       * `frozenDays > 0` 时才渲染，而移动端迁移前没有这句（web 有）。
+       * 不给我一条编的文案，让它退回"不存在"。
+       */
+      repair: ({ count }) => t('mobile.growth.streak.repair', { days: count }),
+      /**
+       * ⚠️ **刻意不给 `repairAction` / `freshStartAction`**：
+       * 共享层"不给按钮就只显示提示文字"，而移动端迁移前正是**只有文字**。
+       * 移动端没有剪贴板之外的写路径接线（补打卡要走 action 层），
+       * 本轮不引入 —— 见 `GrowthBoard` 的 `onRepair` / `onFreshStart` 也没传。
+       */
+      freshStart: ({ days, longest, total }) =>
+        t('mobile.growth.streak.freshStart', { days, longest, total }),
+      /**
+       * 习惯名的无障碍名。
+       *
+       * ⚠️ 移动端只有一条 `mobile.growth.streak.a11y`，它的模板要
+       * `{name} {current} {longest} {total}` 四个值，而共享层的 `a11yHabit`
+       * **只给 name** —— 拿不到那三个数字。返回 name 与 RN 的默认行为等价
+       * （那段文本内容就是 name），所以**与迁移前完全一致**。
+       * 要念出完整那句，需要一条只吃 `{name}` 的词条（i18n 不在白名单）。
+       */
+      a11yHabit: (name) => name,
+    },
+
+    milestones: {
+      kindName: (kind) => t(KIND_KEY[kind]),
+      /** ⚠️ 同 `week.statUnit`：不给单位，移动端迁移前就不给。 */
+      maxed: t('mobile.growth.milestones.maxed'),
+      /**
+       * ⚠️ 移动端的这条词条只有 `{next}`（"下一档 50"），没有 `{unit}`/`{gap}`。
+       * 共享层给的 `gap` 因此被忽略 —— 与迁移前逐字相同。
+       */
+      next: ({ threshold }) => t('mobile.growth.milestones.next', { next: threshold }),
+      /**
+       * ⚠️ 借用 web 的两条里程碑无障碍词条，理由见文件头"命名残差"。
+       * `nextA11y` 的模板里有两处 `{unit}`，而本端 `kindUnit` 缺席（传空串），
+       * 于是读屏会听到 "下一个里程碑是 50 ，还差 38 "（逗号前多一个空格）。
+       * 这是**已知且刻意接受**的残差：修它要一条不带单位的词条。
+       */
+      allReachedA11y: (name) => t('web.growth.milestone.allReached', { name }),
+      nextA11y: ({ name, threshold, unit, gap }) =>
+        t('web.growth.milestone.nextLabel', { name, threshold, unit, gap }),
+      /**
+       * ⚠️ 单档位徽章的无障碍名借了身份标签那条键（"已达成：50"）。
+       * 已达成的档位共享层还画了一个对勾（`HeytaIcon`），所以这里必须把
+       * "已达成"念出来 —— 只念数字对读屏用户等于没有那条线索。
+       */
+      tierA11y: ({ threshold, reached }) =>
+        reached
+          ? t('mobile.growth.tags.reachedA11y', { name: String(threshold) })
+          : String(threshold),
+      /**
+       * ⚠️ **死字段**，但类型要求必须给。共享层的 `MilestoneMap` 只在
+       * `milestones` 为空时渲染它，而 `deriveMilestones` 恒返回四个维度。
+       * 返回空串而不是编一句假话；真出现空输入时宁可少一句话。
+       * 最小一步：给 `mobile.growth.milestones.empty` 补一条词条。
+       */
+      empty: '',
+    },
+
+    tags: {
+      tagName: (id) => {
+        const key = TAG_KEY[id];
+        // 未知 id → `undefined` → 共享层跳过（见 `TAG_KEY` 的注释）。
+        return key === undefined ? undefined : t(key);
+      },
+      near: ({ name, gap }) => t('mobile.growth.tags.near', { name, gap }),
+      nearUnit: (kind) => t(NEAR_UNIT_KEY[kind]),
+      empty: t('mobile.growth.tags.empty'),
+      /** web 有、mobile 没有的一句（还没拿到任何标签时的说明）。 */
+      nearNote: t('web.growth.tags.nearNote'),
+      reachedA11y: (name) => t('mobile.growth.tags.reachedA11y', { name }),
+    },
+
+    /**
+     * 🔴 热力图的两条文案是**类型要求的死字段**：本端**不传** `activityDays`，
+     * 所以 `GrowthBoard` 永远不会调用它们（`GrowthBoard.tsx` 里
+     * `activityDays === undefined` 直接不渲染那一块）。
+     *
+     * 为什么本轮不给移动端加年度热力图 —— 两条独立的理由：
+     *   1. **缺一条可用的词条。** 唯一候选 `web.growth.year.heatmap` 用的是
+     *      **库自己的** `{{count}}` 占位符（react-activity-calendar），
+     *      `t()` 会把它渲染成字面的 `{5}` —— 这正是 `habits-display.ts`
+     *      文件头记过的坑。而 `packages/i18n` 不在本刀白名单。
+     *   2. 它是**产品决定**：手机屏幕小，把 web 的年度视图免费带过来要另一次
+     *      真机验收（横向滚动/尺寸），本轮拿不到真机。
+     *
+     * 月份表复用 `habits-display.ts` 已经导出的那份（不复制第三份）；
+     * `grid` 返回空串而不是编一句错的话。
+     * 最小一步：补 `mobile.growth.year.heatmap`（含 `{total}`/`{days}`），
+     * 再把 `dailyActivityCountsFromState(tables, now)` 传给 `GrowthBoard`。
+     */
+    heatmap: {
+      month: (month) => t(MOBILE_HEATMAP_MONTH_KEYS[month - 1] ?? 'web.heatmap.month.1'),
+      grid: () => '',
+    },
+
+    /**
+     * 🔴 分享块同样是**类型要求的死字段**：本端不传 `share`，共享层不渲染。
+     * 移动端没有剪贴板接线（`ShareSummarySection` 要一个真的 `onCopy`），
+     * 所以这里借用 web 那三条真词条 —— 一旦将来接上剪贴板，至少文案是真的。
+     */
+    share: {
+      copy: t('web.growth.share.copy'),
+      copied: t('web.growth.share.copied'),
+      failed: t('web.growth.share.failed'),
+    },
+  };
 }

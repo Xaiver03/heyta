@@ -1,6 +1,6 @@
 /**
- * 冲突解决界面
- * ==============
+ * 冲突解决界面（mobile 外壳）
+ * ==============================
  *
  * 「我的」屏原来在冲突时显示的是一句死路：
  *
@@ -11,22 +11,33 @@
  * 把双方分别是什么摆出来，让用户点一下选一边。
  *
  * ═════════════════════════════════════════════════════════════════════════
- * 🔴 设计与 Web 端 `apps/web/src/features/sync/ConflictDialog.tsx` **对齐**
+ * 🔴 M3 第四刀之后，这里**只剩 mobile 特有的那一层**
  *
- * 同一个产品问题在两个平台必须是同一个解法，否则用户会以为是两件事。
- * 具体对齐的是：
+ * 两个平台共有的部分已经收进 `@heyta/ui` 的 `ConflictResolutionView`
+ * （web 的 `ConflictDialog` 渲染的是**同一份**）：
+ * 逐条列出冲突、并排摆出两边的**内容**与时间、标出哪一侧较新、
+ * 每一侧一个「保留这一版」、把"为什么点不了"说出来。
  *
- *   - **并排显示两边的「内容」**，不是只显示时间戳。
- *     时间戳谁新谁旧，用户判断不了"哪个才是我要的"——他改的是标题、
- *     备注还是完成状态，只有内容本身能告诉他。
- *   - **取不到对端时明说「取不到这一侧的版本」**，绝不留白。
- *     留白会让人以为"对端什么都没写"，从而做出相反的判断。
- *   - **自动解决的那些不会走到这里** —— 只有 `suggestConflictResolution`
- *     返回 `manual` 的才需要人决定。
+ * 本文件只负责：
+ *   · **底部弹层外壳**（`Modal` + 遮罩 + 圆角浮层 + 阴影）—— 那是 L3；
+ *   · **标题 / 说明 / 关闭**（mobile 的 `IconButton` 与 kit `Text`）；
+ *   · **词条**（`labels`）—— 共享层不许 import `@heyta/i18n`；
+ *   · **把点击接到 `resolveConflictNow`**（见下面 `pick` 的注释）。
  *
- * ⚠️ 移动端与 Web 端**唯一刻意的差异**是排布方式：手机上横向空间只有
- * 411dp 左右，两侧面板各占一半是这个尺寸下还能并排读的下限。
- * 面板内文字限制行数，避免一处长备注把整个界面撑成一条竖线。
+ * ⚠️ 两处**有意的端差异**（与 web 不同，都写在共享层的文件头里）：
+ *   · `summaryLines={3}` —— 手机横向只有 411dp 左右，一处长备注会把界面撑成竖线；
+ *   · 用**共享版按钮**（`ConflictResolutionView` 的 `Pressable`）而不是 kit 的
+ *     `Button`：RN 上 `disabled` 是普通属性，不需要 web 那条
+ *     "真实 `<button disabled>`" 的绕路，所以这里直接用共享实现。
+ *     代价是按钮外观从 kit 的样式变成共享样式（与 `FocusPanel` 同一取舍）。
+ *
+ * ═════════════════════════════════════════════════════════════════════════
+ * ✅ 曾经的移动端重复实现（`apps/mobile/src/sync/conflict-view.ts`）**已删除**。
+ *
+ * 那两个查表函数（实体名 / 冲突原因）已经收进 `@heyta/ui` 的 `sync/model.ts`
+ * （词条 key 落成共享的 `common.entity.*` / `common.conflict.reason.*`），
+ * web 的 `ConflictDialog.tsx` 也从**同一张表**取 —— 于是"哪些实体/原因有名字"
+ * 只有一份定义，加一个新实体只改一处，不会再出现"一端有名字、另一端漏英文代号"。
  * ═════════════════════════════════════════════════════════════════════════
  *
  * 🔴 **关掉界面不会清掉冲突状态。** 冲突来自 `status`，`onClose` 只控制可见性；
@@ -36,115 +47,25 @@
 import React, { useState } from 'react';
 import { Modal, ScrollView, View } from 'react-native';
 
-import type { ConflictInfo } from '@heyta/sync-client';
 import { useI18n } from '@heyta/i18n';
+import type { ConflictInfo } from '@heyta/sync-client';
+import { compareConflictFreshness, summarizeConflictPayload } from '@heyta/sync-client';
+import {
+  ConflictResolutionView,
+  conflictLookupCode,
+  conflictReasonLabelOf,
+  entityLabelOf,
+  type ConflictChoice,
+  type ConflictResolutionLabels,
+} from '@heyta/ui';
 
 import { useTheme, useTokens } from '../theme';
 import { useMobileSync, resolveConflictNow } from '../sync/store';
-import {
-  choiceBlockedReason,
-  positionLabel,
-  toConflictView,
-  type ConflictChoice,
-  type ConflictSideView,
-  type ConflictView,
-} from '../sync/conflict-view';
-import { Button, IconButton, Text } from '../ui/kit';
+import { formatStamp } from '../lib/date';
+import { IconButton, Text } from '../ui/kit';
 // 🔴 `Icon` 不在 kit 里 —— 它在登记表 `ui/icons.tsx`。
 // kit 只是**内部**用它，没有把它再导出。
 import { Icon } from '../ui/icons';
-
-/** 一侧的面板：内容 + 时间 + 「保留这一版」。 */
-function Side({
-  side,
-  view,
-  choice,
-  busy,
-  onPick,
-}: {
-  side: ConflictSideView;
-  view: ConflictView;
-  choice: ConflictChoice;
-  busy: boolean;
-  onPick: (choice: ConflictChoice) => void;
-}): React.JSX.Element {
-  const tokens = useTokens();
-  const { t } = useI18n();
-  const blocked = choiceBlockedReason(view, choice, t);
-  const icon = choice === 'keep-local' ? 'device.local' : 'device.remote';
-
-  return (
-    <View
-      style={{
-        flex: 1,
-        minWidth: 0,
-        gap: tokens['space.3'],
-        padding: tokens['space.3'],
-        borderRadius: tokens['radius.md'],
-        borderWidth: tokens['border-width.thin'],
-        // 较新的一侧用主色描边做视觉强调 —— 这只是帮用户建立直觉，
-        // **不是裁决依据**（判定见 sync-client 的 compareConflictFreshness）。
-        borderColor: side.isNewer ? tokens['color.primary'] : tokens['color.border'],
-        backgroundColor: tokens['color.surface'],
-      }}
-    >
-      <View
-        style={{
-          flexDirection: 'row',
-          alignItems: 'center',
-          gap: tokens['space.1'],
-        }}
-      >
-        <Icon name={icon} size="xs" color={tokens['color.foreground-muted']} />
-        <Text variant="caption" tone="muted">
-          {side.label}
-        </Text>
-        {side.isNewer ? (
-          <View style={{ marginLeft: 'auto' }}>
-            <Text variant="badge" tone="primary">
-              {t('mobile.conflict.newer')}
-            </Text>
-          </View>
-        ) : null}
-      </View>
-
-      {side.available && side.summary !== undefined ? (
-        <Text variant="row-title" numberOfLines={3}>
-          {side.summary}
-        </Text>
-      ) : (
-        // 🔴 取不到就明说。显示成空白会让人以为对端什么都没写。
-        <Text variant="caption" tone="muted" style={{ fontStyle: 'italic' }}>
-          {t('mobile.conflict.remoteUnavailable')}
-        </Text>
-      )}
-
-      {side.time === undefined ? null : (
-        <Text variant="numeric-body" tone="subtle">
-          {side.time}
-        </Text>
-      )}
-
-      <Button
-        label={t('mobile.conflict.keepThis')}
-        icon="action.keep"
-        tone={side.isNewer ? 'primary' : 'secondary'}
-        disabled={blocked !== undefined}
-        loading={busy}
-        onPress={() => {
-          onPick(choice);
-        }}
-        style={{ marginTop: 'auto' }}
-      />
-
-      {blocked === undefined ? null : (
-        <Text variant="caption" tone="warning">
-          {blocked}
-        </Text>
-      )}
-    </View>
-  );
-}
 
 export function ConflictSheet({
   visible,
@@ -165,19 +86,49 @@ export function ConflictSheet({
 
   const conflicts = status.kind === 'conflict' ? status.conflicts : [];
   const open = visible && conflicts.length > 0;
+
+  /**
+   * 面板全部文案。**每一项都由宿主注入**（共享层不 import i18n）。
+   *
+   * 实体名与冲突原因由共享 `sync/model.ts` 的查表函数产出词条 key ——
+   * "哪些实体/原因有名字"因此只有一份定义（web 与这里同一份）。
+   */
+  const labels: ConflictResolutionLabels = {
+    position: (index, total) => t('mobile.conflict.position', { index: index + 1, total }),
+    entity: (entityType) => entityLabelOf(entityType, t),
+    // 🔴 `errorCode ?? reason` 由共享 model 的 `conflictLookupCode` 定顺序；
+    // 查不到走共享兜底句（`common.conflict.reason.fallback`），**绝不回落成
+    // 服务端那句英文诊断**。
+    reason: (conflict) => conflictReasonLabelOf(conflictLookupCode(conflict), t),
+    side: (side) =>
+      t(side === 'local' ? 'mobile.conflict.side.local' : 'mobile.conflict.side.remote'),
+    newer: t('mobile.conflict.newer'),
+    remoteUnavailable: t('mobile.conflict.remoteUnavailable'),
+    keepThis: t('mobile.conflict.keepThis'),
+    emptyPayload: t('mobile.conflict.payload.empty'),
+    // 词条表没有 ICU：1 个字段走单数兄弟词条，否则英文是 "1 fields changed"。
+    payloadFields: (count) =>
+      count === 1
+        ? t('mobile.conflict.payload.fieldsOne', { count })
+        : t('mobile.conflict.payload.fields', { count }),
+    blocked: () => t('mobile.conflict.blocked.remoteMissing'),
+    time: (ms) => formatStamp(ms),
+  };
+
   if (!open) return null;
 
   const pick = (conflict: ConflictInfo, choice: ConflictChoice): void => {
     if (busy) return;
     setPending(conflict.id);
     /**
-     * 🔴 传的是**原始的 `ConflictInfo`**，不是上面那个视图模型。
+     * 🔴 传的是**原始的 `ConflictInfo`**，不是任何视图模型 ——
+     * `ConflictResolutionView` 的 `onResolve` 交回来的就是清单里那个真对象
+     * （它把 `conflict` 放进了 `renderSideAction` 的入参与回调里）。
      *
      * `resolveConflictNow` → `SyncClient.resolveConflict` 要用
      * `conflict.local.opId` 去 op-log 里取回那条 op 并重新派发/丢弃。
-     * 视图模型里没有 `opId`，拿它去凑一个对象（哪怕字段齐全但值是我编的）
-     * 会让解决**必然失败**：`getOpById('')` 取不到，报"本地那条改动已经不在队列里了"。
-     * 所以 `pick` 的第一个参数必须是 list 里那个真对象。
+     * 拿一个字段齐全但值是编的对象去凑，会让解决**必然失败**：
+     * `getOpById('')` 取不到，报"本地那条改动已经不在队列里了"。
      *
      * ⚠️ 同理，这里**不 await 之后报"已解决"** —— store 放进去的是**解决之后的真实状态**
      * （可能还剩别的冲突，也可能又出了别的错）。界面下一帧会跟着 `status` 更新。
@@ -239,38 +190,21 @@ export function ConflictSheet({
           </View>
 
           <ScrollView contentContainerStyle={{ gap: tokens['space.5'] }}>
-            {conflicts.map((conflict, index) => {
-              const view = toConflictView(conflict, t);
-              return (
-                <View key={view.id} style={{ gap: tokens['space.2'] }}>
-                  <Text variant="caption" tone="muted">
-                    {[positionLabel(index, conflicts.length, t), view.entityLabel, view.reasonLabel].join(
-                      ' · ',
-                    )}
-                  </Text>
-                  <View style={{ flexDirection: 'row', gap: tokens['space.3'], alignItems: 'stretch' }}>
-                    <Side
-                      side={view.local}
-                      view={view}
-                      choice="keep-local"
-                      busy={busy || pending !== null}
-                      onPick={() => {
-                        pick(conflict, 'keep-local');
-                      }}
-                    />
-                    <Side
-                      side={view.remote}
-                      view={view}
-                      choice="keep-remote"
-                      busy={busy || pending !== null}
-                      onPick={() => {
-                        pick(conflict, 'keep-remote');
-                      }}
-                    />
-                  </View>
-                </View>
-              );
-            })}
+            {/* 🔴 共享的那一段（与 web 同一份源码）。
+                宿主不必自己挂 Provider —— 移动端整棵树都在
+                `<ThemeProvider>`（= `HeytaUiProvider`）之内。 */}
+            <ConflictResolutionView
+              conflicts={conflicts}
+              labels={labels}
+              freshnessOf={(conflict) =>
+                compareConflictFreshness(conflict.local, conflict.remote)
+              }
+              summarize={summarizeConflictPayload}
+              summaryLines={3}
+              busy={busy || pending !== null}
+              onResolve={pick}
+              testID="conflict-resolution"
+            />
           </ScrollView>
         </View>
       </View>
