@@ -40,9 +40,10 @@
   </ItemGroup>
 
   <ItemGroup>
-    <!-- bundle 只有一份（../assets/app-bridge.js），冒烟与壳共用。
-         链接成 exe 旁边的 app-bridge.js，于是运行时按 AppContext.BaseDirectory 找得到。 -->
-    <None Include="../assets/app-bridge.js" Link="app-bridge.js" CopyToOutputDirectory="PreserveNewest" />
+    <!-- bundle 只有一份，且**不属于任何一个壳**：
+         packages/app-host/bridge-bundle/native-bridge.js（由 packages/app-host/scripts/build-native-bridge.mjs 生成）。
+         Windows 壳与 macOS 壳加载的是同一个文件；这里把它拷到 exe 旁边。 -->
+    <None Include="../../../packages/app-host/bridge-bundle/native-bridge.js" Link="native-bridge.js" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
   <!--
@@ -50,8 +51,8 @@
     "窗口打开了但什么都没有"是最难排查的一类失败，而这里完全可以在构建期拦下。
   -->
   <Target Name="RequireBridgeBundle" BeforeTargets="Build">
-    <Error Condition="!Exists('$(MSBuildProjectDirectory)/../assets/app-bridge.js')"
-           Text="缺少 assets/app-bridge.js。先在仓库根跑：node apps/desktop-windows/scripts/build-bridge.mjs" />
+    <Error Condition="!Exists('$(MSBuildProjectDirectory)/../../../packages/app-host/bridge-bundle/native-bridge.js')"
+           Text="缺少 bridge-bundle/native-bridge.js。先在仓库根跑：node packages/app-host/scripts/build-native-bridge.mjs" />
   </Target>
 
 </Project>

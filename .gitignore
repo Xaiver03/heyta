@@ -116,3 +116,7 @@ apps/mobile/ios/**/-Xcc/
 apps/mobile/harmony/.hvigor/
 apps/mobile/harmony/**/build/
 apps/mobile/harmony/**/oh_modules/
+
+# 原生壳共用的 TS 门面产物（构建产物）
+# 生成：node packages/app-host/scripts/build-native-bridge.mjs
+packages/app-host/bridge-bundle/

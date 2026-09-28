@@ -10,7 +10,7 @@ namespace Heyta.Shell;
 /// 壳的代码后置。**这里只有"把界面事件转成 AppApi 调用"这一件事。**
 ///
 /// 🔴 纪律：任何业务规则（排序、完成态判定、派生视图）都不许写进这个文件。
-/// 它们全在 `packages/app-host/src/windows-bridge.ts` 里 —— 那份代码
+/// 它们全在 `packages/app-host/src/native-bridge.ts` 里 —— 那份代码
 /// web / mobile / macOS / Linux 用的是同一套。写在这里就等于分叉出第二份实现。
 /// 详见 apps/desktop-windows/README.md。
 /// </summary>
@@ -42,7 +42,7 @@ public sealed partial class MainWindow : Window
     {
         try
         {
-            var bundle = Path.Combine(AppContext.BaseDirectory, "app-bridge.js");
+            var bundle = Path.Combine(AppContext.BaseDirectory, "native-bridge.js");
             _dbPath = Path.Combine(
                 Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
                 "heyta",

@@ -36,7 +36,7 @@ public sealed class ScriptHost : IDisposable
         // 宿主注入同步驱动 —— facade 不自己实现驱动，存储引擎仍是 packages/storage 那一份。
         _engine.SetValue("__heytaDriverFactory", new Func<SqliteBridge>(() => _driver));
 
-        _engine.Execute(_source, "app-bridge.js");
+        _engine.Execute(_source, "native-bridge.js");
         if (_engine.GetValue("HeytaApp").IsUndefined())
         {
             throw new InvalidOperationException("bundle 里没有 HeytaApp —— 打包入口/globalName 不对");

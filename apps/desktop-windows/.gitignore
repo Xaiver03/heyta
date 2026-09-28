@@ -2,6 +2,3 @@
 bin/
 obj/
 
-# TS 门面的打包产物 —— 是**构建产物**，不入库。
-# 生成：node apps/desktop-windows/scripts/build-bridge.mjs
-assets/app-bridge.js

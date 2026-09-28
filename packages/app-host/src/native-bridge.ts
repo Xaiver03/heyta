@@ -67,45 +67,78 @@ const requireHost = (): AppHost => {
   return host;
 };
 
-/** C# 侧 `SqliteBridge` 的形状：只有这 4 个方法，参数与行都是 JSON 文本。 */
-interface ClrSqliteDriver {
-  exec(sql: string): void;
-  run(sql: string, paramsJson: string): void;
-  all(sql: string, paramsJson: string): string;
+/**
+ * 原生侧驱动的形状：只有这 4 个方法，参数与行都是 JSON 文本。
+ *
+ * ⚠️ 返回值刻意写成 `unknown`：**两端在"怎么报错"上不一样**
+ *   · Windows（Jint）：方法抛 CLR 异常，Jint 的 `CatchClrExceptions` 把它变成
+ *     JS 错误 ⇒ 这里什么都不用做。
+ *   · macOS（JavaScriptCore）：native 方法里抛 `NSException` **不会**变成 JS 异常，
+ *     而且 Swift 接不住 ObjC 异常（直接抛 = 终止进程）⇒ 那边改成**返回信封**
+ *     `{"__heytaDriverError":"…"}`，由下面的 `throwIfDriverError` 拆开并 `throw`。
+ *
+ * 两端因此共用**这一个**包装：有信封就拆，没有就当普通返回值/异常走。
+ */
+interface NativeSqliteDriver {
+  exec(sql: string): unknown;
+  run(sql: string, paramsJson: string): unknown;
+  all(sql: string, paramsJson: string): unknown;
   close(): void;
 }
 
+/** 信封的键。⚠️ 改它必须同步改 `apps/desktop-macos/.../SqliteBridge.swift`。 */
+const DRIVER_ERROR_KEY = '__heytaDriverError';
+
 /**
- * 把 C# 的同步驱动包成契约里的 `SqliteDriver`。
+ * 拆驱动信封：只有"看起来就是信封"的输入才会被当成错误。
  *
- * 🔴 **这一层包装必须在这里（JS 侧），不能把 CLR 对象直接交给适配器。**
+ * 🔴 判据刻意收得很紧 —— `all()` 返回的是**行数组**（以 `[` 开头），
+ * 而某个字段的值完全可能**恰好**是 `"__heytaDriverError"` 这个字符串。
+ * 所以必须是"以 `{` 开头 + 能 parse 成对象 + 该键是字符串"三者同时成立。
+ * 松一点的写法会把"某一行数据里刚好有这个字符串"误判成驱动出错。
+ */
+const throwIfDriverError = (payload: unknown): void => {
+  if (typeof payload !== 'string' || !payload.startsWith('{')) return;
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(payload);
+  } catch {
+    return; // 不是 JSON ⇒ 不是信封
+  }
+  if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed)) return;
+  const message = (parsed as Record<string, unknown>)[DRIVER_ERROR_KEY];
+  if (typeof message === 'string') throw new Error(message);
+};
+
+/**
+ * 把原生侧的同步驱动包成契约里的 `SqliteDriver`。
+ *
+ * 🔴 **这一层包装必须在这里（JS 侧），不能把原生对象直接交给适配器。**
  *
  * 第一版就是直接 `driverFactory: () => clrDriver`，结果一跑就炸：
  *
  *     HeytaApp.open 失败：'c' is an invalid start of a value. LineNumber: 0
- *       at all (app-bridge.js:11966)   ← 适配器在 JSON.parse 行数据
+ *       at all (native-bridge.js:11966)   ← 适配器在 JSON.parse 行数据
  *
  * 原因：契约里的 `driver.all(sql, params)` 第二个参数是**参数数组**
- * （`SqlValue[]`），而 C# 的 `all` 收的是**JSON 文本**。Jint 会把 JS 数组
+ * （`SqlValue[]`），而原生侧的 `all` 收的是**JSON 文本**。引擎会把 JS 数组
  * 塞给 `string` 形参（得到垃圾字符串），于是拿回来的东西不是 JSON。
  *
- * ⇒ 参数与行的编组**只在 JS 这一侧发生一次**；C# 只看见字符串。
- *    这与 W0-2 spike 里验证过的形状逐字相同。
+ * ⇒ 参数与行的编组**只在 JS 这一侧发生一次**；两端都只看见字符串。
  *
  * ⚠️ 当前用 JSON 文本过边界，实测代价约 4.9 µs/行（见 spike README 的编组基准）。
  *    也就是说：**这是一条已知性能取舍**，不是疏忽 —— 它换的是"类型映射只有一处"。
  */
-const wrapDriver = (clr: ClrSqliteDriver) => ({
-  exec: (sql: string): void => clr.exec(sql),
+const wrapDriver = (native: NativeSqliteDriver) => ({
+  exec: (sql: string): void => throwIfDriverError(native.exec(sql)),
   run: (sql: string, params?: readonly unknown[]): void =>
-    clr.run(sql, JSON.stringify(params ?? [])),
-  // 泛型是必须的：契约里 `all<T = Record<string, SqlValue>>(...): T[]` 是**泛型方法**，
-  // 返回 `unknown[]` 不满足它（第一版就是这么被 app-host 的 typecheck 抓到的 ——
-  // 这也正是"把门面放进 app-host"换来的东西：它自动进了 typecheck）。
-  // 这里用 `Record<string, unknown>` 作默认，避免为了一个类型名去引 @heyta/storage 的内部路径。
-  all: <T = Record<string, unknown>>(sql: string, params?: readonly unknown[]): T[] =>
-    JSON.parse(clr.all(sql, JSON.stringify(params ?? []))) as T[],
-  close: (): void => clr.close(),
+    throwIfDriverError(native.run(sql, JSON.stringify(params ?? []))),
+  all: <T = Record<string, unknown>>(sql: string, params?: readonly unknown[]): T[] => {
+    const payload = native.all(sql, JSON.stringify(params ?? []));
+    throwIfDriverError(payload);
+    return JSON.parse(payload as string) as T[];
+  },
+  close: (): void => native.close(),
 });
 
 /**
@@ -119,10 +152,10 @@ export async function open(input: { dbPath: string }): Promise<{ clientId: strin
   if (host !== null) {
     return { clientId: host.clientId };
   }
-  const factory = (globalThis as { __heytaDriverFactory?: () => ClrSqliteDriver })
+  const factory = (globalThis as { __heytaDriverFactory?: () => NativeSqliteDriver })
     .__heytaDriverFactory;
   if (typeof factory !== 'function') {
-    throw new Error('宿主没有注入 __heytaDriverFactory —— C# 侧忘了挂同步驱动');
+    throw new Error('宿主没有注入 __heytaDriverFactory —— 原生壳忘了挂同步驱动');
   }
   host = await openAppHost({
     driverFactory: () => wrapDriver(factory()),

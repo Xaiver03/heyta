@@ -2,7 +2,7 @@
 //
 // 它只是一层薄薄的类型化包装：把 JSON 结果解析成 record，把错误往上抛。
 // **这里不许出现任何业务规则** —— 排序、完成态、派生视图都在 TS 的
-// `packages/app-host/src/windows-bridge.ts` 里。新增能力 = 那边加函数 + 这里加一行。
+// `packages/app-host/src/native-bridge.ts` 里。新增能力 = 那边加函数 + 这里加一行。
 
 using System.Text.Json;
 using System.Text.Json.Serialization;

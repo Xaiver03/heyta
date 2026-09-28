@@ -35,7 +35,7 @@ Windows 端交付**真正的原生应用**：WinUI 3 / Windows App SDK，原生�
 │  **这里没有一行 Windows API** —— 所以它能进 CI。               │
 └───────────────────────────┬────────────────────────────────────┘
                             │ 只认识「函数名 + JSON」
-┌─ packages/app-host/src/windows-bridge.ts（TS，唯一真源）───────┐
+┌─ packages/app-host/src/native-bridge.ts（TS，唯一真源）───────┐
 │  open / listTasks / addTask / setTaskDone / removeTask         │
 │  业务与存储全在这里，和 web / mobile / macOS / Linux 同一份。   │
 └───────────────────────────────────────────────────────────────┘
@@ -56,11 +56,11 @@ Windows 端交付**真正的原生应用**：WinUI 3 / Windows App SDK，原生�
 
 ```bash
 # ① 打包 TS 门面（在**仓库根**跑；产物是构建产物，不入库）
-node apps/desktop-windows/scripts/build-bridge.mjs
-#    → apps/desktop-windows/assets/app-bridge.js（约 1.2 MB，整个 app-host 栈）
+node packages/app-host/scripts/build-native-bridge.mjs
+#    → packages/app-host/bridge-bundle/native-bridge.js（约 1.2 MB，整个 app-host 栈）
 
 # ② 跨语言那一层：无头冒烟（任意 OS，已通过 12/12）
-HEYTA_BRIDGE_BUNDLE="$PWD/apps/desktop-windows/assets/app-bridge.js" \
+HEYTA_BRIDGE_BUNDLE="$PWD/packages/app-host/bridge-bundle/native-bridge.js" \
   dotnet run -c Release --project apps/desktop-windows/smoke/Smoke.csproj
 
 # ③ 壳本体：**只在 Windows 上**
@@ -83,7 +83,7 @@ esbuild 从那里往上走也解析不到。三个选项里选了最省事、最
 |---|---|
 | 给本目录建 `package.json` + `pnpm install` | ❌ 要动 lockfile，而此时另一个会话正在同一个仓库里改 `package.json` |
 | bundler 里用 `nodePaths` 借别的 app 的 `node_modules` | ❌ 把 A 的依赖树借给 B 用，比问题本身更难维护 |
-| **放进 `packages/app-host/src/windows-bridge.ts`** | ✅ 天然解析得到 `@heyta/*`，**且自动进入该包既有的 typecheck** |
+| **放进 `packages/app-host/src/native-bridge.ts`** | ✅ 天然解析得到 `@heyta/*`，**且自动进入该包既有的 typecheck** |
 
 ## 4. 🔴 两个"本机绿、Windows 上必炸"的坑（都是冒烟抓出来的）
 
@@ -99,7 +99,7 @@ esbuild 从那里往上走也解析不到。三个选项里选了最省事、最
 
 ```
 HeytaApp.open 失败：'c' is an invalid start of a value. LineNumber: 0
-  at all (app-bridge.js:11966)   ← 适配器在 JSON.parse 行数据
+  at all (native-bridge.js:11966)   ← 适配器在 JSON.parse 行数据
 ```
 
 原因：契约里 `driver.all(sql, params)` 的第二个参数是**参数数组**，
