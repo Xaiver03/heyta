@@ -5,7 +5,7 @@
 #
 # 默认输出 `apps/desktop-macos/evidence/window-first-run.png`。
 #
-# ── 取图方式：`CGWindowListCreateImage`（窗口服务器合成结果）────────────
+# ── 取图方式：`SCScreenshotManager`（ScreenCaptureKit，窗口服务器合成结果）──
 #
 # 🔴 这段路是踩出来的。**三种"看起来更干净"的内进程渲染全部实测证伪**：
 #
