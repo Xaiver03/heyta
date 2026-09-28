@@ -213,6 +213,102 @@ windows 占 iOS 的 2.8%   macos 占 iOS 的 2.1%
 
 ---
 
+## 8. 🔴 2026-09-28 复核：三条会把结论改掉的新事实
+
+本文 §1–§7 的观测时点是 **2026-09-27**，且**默认"代码量是判据"**。
+2026-09-28 产品明确"**哪怕是代码量偏大**"（原生性优先于复用度），并在同一天做了复核。
+**以下三条改变了 §1 的结论 2 与 §7.2 的推荐。**
+
+### 8.1 RNW 停在 0.84，且没有任何 ≥0.85 的稳定版 —— "版本精确对齐"是负债
+
+§2 的现状表记录了"RNW 0.84.0 ↔ RN 0.84.1 精确对齐"，并把它当成**优点**。
+复核发现**对齐的另一半没人看**：
+
+```
+$ curl -s https://registry.npmjs.org/react-native-windows | node -e '…读 dist-tags…'
+latest   = 0.84.0          v0.83-stable = 0.83.2     v0.82-stable = 0.82.8
+preview  = 0.85.0-preview.2                          v0.81-stable = 0.81.36
+稳定版 0.85 / 0.86 / 0.87 = ABSENT
+
+$ curl -s https://registry.npmjs.org/react-native | … '."dist-tags".latest'
+0.87.1        （发布 2026-08-26）
+```
+
+| 事实 | 值 |
+|---|---|
+| RNW 最新**稳定**版 | **0.84.0** |
+| RNW 是否有 0.85/0.86/0.87 **稳定**版 | **没有**（仅 `0.85.0-preview.2`） |
+| RN 上游最新稳定版 | **0.87.1** |
+| heyta 停在 | RN **0.84.1** |
+
+⇒ RNW 与 RN 是**版本号一一对应**的（本文 §2 自己引的官方 support matrix）。
+既然 RNW 没有 0.85+，那么
+
+> **"先把 RN 抬到受支持版本，再上 RNW"这条前置是自我否定的** ——
+> 抬了 RN 就没有 RNW 可用；不抬 RN 就把整个 monorepo（含旗舰 `apps/mobile`）
+> 冻在一个**已出上游支持窗口**的版本上。
+
+**这条把"选 RNW"的代价从"未来维护负担"改判为"当下锁死移动端产品"。**
+代价的**性质**变了：它不再是代码量问题，因此**不被"哪怕是代码量偏大"覆盖**。
+→ [ADR-0034](../adr/0034-windows-native-winui3-not-rnw.md) §1.2 据此全部取代 [ADR-0032](../adr/0032-windows-native-via-rnw.md)。
+
+### 8.2 §3.2 的 C3「provider 只能写 C++/WinRT、无先例」**只在选 RNW 时成立**
+
+§3.2 记的是：*"RNW New Arch 不支持 C# ⇒ 微软样例里只能用 C++/WinRT 版"*。
+复核发现微软**同时发布了 C# 版官方教程**（C++/WinRT 版正文里直接链过去）：
+
+- C++/WinRT：<https://learn.microsoft.com/en-us/windows/apps/develop/widgets/implement-widget-provider-win32>
+  原文：*"…adapted from the Windows App SDK Widgets Sample.
+  **To implement a widget provider using C#, see [Implement a widget provider in a win32 app (C#)]**"*
+- **C#**：<https://learn.microsoft.com/en-us/windows/apps/develop/widgets/implement-widget-provider-cs>
+  （2026-09-28 实抓 **HTTP 200**；标题 *"Implement a widget provider in a **C# Windows App**"*；
+  第一步 *"Create a new **C# console app**"*；前置 *"Visual Studio 2022 or later with the
+  WinUI application development workload"*）
+
+⇒ **"无先例"是 RNW 的属性，不是 Windows 平台的属性。**
+换成 .NET 栈，这条路**有官方教程可抄**。
+
+### 8.3 §4.2 用生态数字（2.8%）描述 heyta 的缺口 —— 实际只有 **4 个**原生库
+
+§4.1 的 2717/73/54 复核**一致**（`windows` present=**73**、`macos` present=**54**，
+总条目 **2717**）。但那个数字**不是 heyta 的暴露面**。实测 `apps/mobile/package.json` 逐个查：
+
+| heyta 的原生依赖 | RN Directory 声明 Windows | 上游仓库 `windows/` 目录 |
+|---|---|---|
+| `@op-engineering/op-sqlite` | ❌ | ❌ HTTP 404 |
+| `react-native-safe-area-context` | ❌（不在 Directory） | ❌ HTTP 404 |
+| `react-native-get-random-values` | ❌（不在 Directory） | ❌ HTTP 404 |
+| `react-native-svg` | ❌（不在 Directory） | ✅ **HTTP 200** |
+| `fast-text-encoding` / `lucide-react-native` | — | 纯 JS，无原生代码 |
+
+复现：
+
+```bash
+# 1) 生态计数（与 §4.1 一致：73 / 54）
+curl -sL https://raw.githubusercontent.com/react-native-community/directory/main/react-native-libraries.json \
+  | node -e 'const l=JSON.parse(require("fs").readFileSync(0,"utf8"));
+             console.log("total",l.length,"windows",l.filter(x=>x.windows).length,
+                         "macos",l.filter(x=>x.macos).length)'
+# 2) 每个仓库有没有 Windows 实现
+for r in software-mansion/react-native-svg th3rdwave/react-native-safe-area-context \
+         LinusU/react-native-get-random-values OP-Engineering/op-sqlite; do
+  echo "$r -> $(curl -sL -o /dev/null -w '%{http_code}' https://github.com/$r/tree/main/windows)"
+done
+```
+
+⇒ **C2 的真实规模是 3 个库的缺口**，其中 `safe-area-context`（桌面窗口没有刘海）
+与 `get-random-values`（可退化为纯 JS）属于**可替换**而非"重写原生模块"。
+
+### 8.4 §1 结论 2 与 §7.2 推荐顺序的现状
+
+| 本文原结论 | 2026-09-28 之后 |
+|---|---|
+| 结论 2「Windows 版本上完全可行，但代价在别处」 | ⚠️ **改为**：可行**仅在把移动端一起冻在 RN 0.84.1 的前提下** —— 那个前提不成立（§8.1） |
+| §7.2「系统小组件是硬需求」时的优先级 1/2/3 | ⚠️ 该排序建立在"代码量是判据"之上；在"原生优先、代码量不设上限"下重排，见 [多端原生构建计划](../plans/desktop-native-migration.md) §1、[ADR-0034](../adr/0034-windows-native-winui3-not-rnw.md) §2 |
+| 结论 5「UI 复用度被严重高估」 | ✅ **仍然成立**，且是 §8.2/§8.3 的背景 |
+
+---
+
 ## 附：来源
 
 **仓库一手（LICENSE / README / 源码，2026-09-27 实测）**
