@@ -1,0 +1,77 @@
+{
+  "$schema": "http://adaptivecards.io/schemas/adaptive-card.json",
+  "type": "AdaptiveCard",
+  "version": "1.5",
+  "body": [
+    {
+      "type": "TextBlock",
+      "text": "打开 Heyta 以显示小组件",
+      "wrap": true,
+      "isSubtle": true,
+      "isVisible": "${showPlaceholder}"
+    },
+    {
+      "type": "Container",
+      "isVisible": "${!showPlaceholder}",
+      "items": [
+        {
+          "type": "TextBlock",
+          "text": "习惯",
+          "wrap": true,
+          "weight": "Bolder",
+          "size": "Medium"
+        },
+        {
+          "type": "TextBlock",
+          "text": "还没有习惯",
+          "wrap": true,
+          "isSubtle": true,
+          "isVisible": "${isEmpty}"
+        },
+        {
+          "type": "Container",
+          "$data": "${rows}",
+          "items": [
+            {
+              "type": "ColumnSet",
+              "spacing": "Small",
+              "columns": [
+                {
+                  "type": "Column",
+                  "width": "stretch",
+                  "items": [
+                    {
+                      "type": "TextBlock",
+                      "text": "${title}",
+                      "wrap": true
+                    }
+                  ]
+                },
+                {
+                  "type": "Column",
+                  "width": "auto",
+                  "items": [
+                    {
+                      "type": "TextBlock",
+                      "text": "${doneLabel}",
+                      "wrap": true,
+                      "color": "good"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "TextBlock",
+              "text": "${streakLabel}",
+              "wrap": true,
+              "isSubtle": true,
+              "size": "Small",
+              "spacing": "None"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

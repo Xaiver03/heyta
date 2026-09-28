@@ -1,0 +1,48 @@
+{
+  "$schema": "http://adaptivecards.io/schemas/adaptive-card.json",
+  "type": "AdaptiveCard",
+  "version": "1.5",
+  "body": [
+    {
+      "type": "TextBlock",
+      "text": "打开 Heyta 以显示小组件",
+      "wrap": true,
+      "isSubtle": true,
+      "isVisible": "${showPlaceholder}"
+    },
+    {
+      "type": "Container",
+      "isVisible": "${!showPlaceholder}",
+      "items": [
+        {
+          "type": "TextBlock",
+          "text": "数据已过期，打开 Heyta 刷新",
+          "wrap": true,
+          "isSubtle": true,
+          "isVisible": "${state == 'stale'}"
+        },
+        {
+          "type": "TextBlock",
+          "text": "没有进行中的专注",
+          "wrap": true,
+          "isSubtle": true,
+          "isVisible": "${state == 'idle'}"
+        },
+        {
+          "type": "TextBlock",
+          "text": "${sessionTitle}",
+          "wrap": true,
+          "weight": "Bolder",
+          "isVisible": "${state == 'active'}"
+        },
+        {
+          "type": "TextBlock",
+          "text": "${targetLabel}",
+          "wrap": true,
+          "isSubtle": true,
+          "isVisible": "${state == 'active'}"
+        }
+      ]
+    }
+  ]
+}

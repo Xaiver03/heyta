@@ -1,0 +1,99 @@
+{
+  "name": "heyta",
+  "short_name": "heyta",
+  "description": "本地优先、端到端加密的待办与习惯应用",
+  "id": "/",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#f8fafc",
+  "theme_color": "#2563eb",
+  "lang": "zh-CN",
+  "dir": "ltr",
+  "icons": [
+    {
+      "src": "/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "widgets": [
+    {
+      "name": "今日任务",
+      "description": "今天要做的事，点一下就能完成",
+      "tag": "heyta-today",
+      "ms_ac_template": "/widgets/today.json",
+      "data": "/widgets/today.data.json",
+      "type": "adaptivecard",
+      "update": 1800,
+      "icons": [
+        {
+          "src": "/icons/icon-192.png",
+          "sizes": "192x192",
+          "type": "image/png"
+        }
+      ]
+    },
+    {
+      "name": "四象限",
+      "description": "按重要与紧急分组的任务",
+      "tag": "heyta-quadrant",
+      "ms_ac_template": "/widgets/quadrant.json",
+      "data": "/widgets/quadrant.data.json",
+      "type": "adaptivecard",
+      "update": 1800,
+      "icons": [
+        {
+          "src": "/icons/icon-192.png",
+          "sizes": "192x192",
+          "type": "image/png"
+        }
+      ]
+    },
+    {
+      "name": "习惯",
+      "description": "今天的习惯与连续天数",
+      "tag": "heyta-habits",
+      "ms_ac_template": "/widgets/habits.json",
+      "data": "/widgets/habits.data.json",
+      "type": "adaptivecard",
+      "update": 1800,
+      "icons": [
+        {
+          "src": "/icons/icon-192.png",
+          "sizes": "192x192",
+          "type": "image/png"
+        }
+      ]
+    },
+    {
+      "name": "专注",
+      "description": "正在进行的专注会话",
+      "tag": "heyta-focus",
+      "ms_ac_template": "/widgets/focus.json",
+      "data": "/widgets/focus.data.json",
+      "type": "adaptivecard",
+      "update": 1800,
+      "icons": [
+        {
+          "src": "/icons/icon-192.png",
+          "sizes": "192x192",
+          "type": "image/png"
+        }
+      ]
+    }
+  ]
+}
