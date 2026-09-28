@@ -42,8 +42,8 @@
 
 ### 1.2 每个新壳建立时预留 widget 的目录与共享容器（**只占位，不写逻辑**）
 
-- 鸿蒙壳：`entry/src/main/ets/` 下预留 `widget/` 与 `form_config.json` 的位置
-- 桌面壳（若做）：预留 Xcode widget extension target / MSIX widget provider 的位置
+- 🔴 **鸿蒙：占位要在「元服务 / 独立 ArkTS 工程」里，不是 RN 壳的 `entry/src/main/ets/` 下** —— 因为**元服务与 App 不能共享包名、也不能共享 entry 模块**（官方 FAQ 明文）。官方还明确**卡片只支持 ArkUI，暂不支持跨平台开发，且不支持 native so** → **为卡片建 RN 壳收益为 0**，卡片工程应与壳解耦（细节见 [选型证据 §6](../research/multi-platform-selection-evidence.md)）
+- 桌面壳（若做）：预留 Xcode widget extension target / MSIX widget provider 的位置。⚠️ Electron **两端都是最差项**（上游 `#35751` not planned、electron-builder 从不重签 `Contents/PlugIns`），别指望壳自己长出组件
 - **不写任何组件逻辑**，只保证"以后加不用动工程结构"
 
 ### 1.3 `packages/widget-core` 与 golden fixture 先落
@@ -73,10 +73,16 @@
 
 | 内容 | 说明 |
 |---|---|
-| `widgetSnapshotSchema`（zod，`v: 1`） | 契约的唯一事实源。字段与边界见 [native-widgets.md](../research/native-widgets.md) §3；🔴 **未知 `v` 必须 fail closed 到空列表** |
+| **手写校验器** `parseEnvelope()` / `parsePayload()`（`v: 1`） | 契约的唯一事实源。字段与边界见 [native-widgets.md](../research/native-widgets.md) §3；🔴 **未知 `v` 必须 fail closed 到空列表** |
 | **选择器** | 从物化状态算快照：「今天」「四象限」「今日习惯」「今日专注」。复用 `packages/domain`（四象限已是派生视图，[ADR-0015](../adr/0015-four-quadrant-as-derived-view.md)） |
 | **意图队列语义** | `DoneIntent = { taskId, targetIsDone }` 的 last-wins 合并、去重、**跳过"已经在目标状态"的**（防回放噪声） |
 | 🔴 **不构造 op** | 与 `packages/local-api` 同一条红线：**类型上就产生不了 op** |
+
+> ⚠️ **更正（2026-09-27，W0-8）：本表原写「`widgetSnapshotSchema`（zod）」，实现刻意没用 zod。**
+> 原因不是省事：**上一行那句"零运行时依赖"是更硬的约束**，而 zod 是**运行时**依赖。
+> 真正的理由是原生的锁是 **golden fixture**、不是 TS 校验器 ——
+> **四端根本用不了 TS 的校验器**，所以把 zod 引进来只会让"最受限的那个消费方"多一个放不进去的东西。
+> 详见 `packages/widget-core/src/contract.ts` 的「本包为什么零运行时依赖」。
 
 **为什么它必须是独立的包**：它是**唯一能被三端（Kotlin / Swift / ArkTS / JS）测试共同锁定的东西**。
 
@@ -130,7 +136,43 @@
 - 生成器**只有在变体数量上来之后才划算**。滴答清单光 iOS 桌面就有 ~15 款 —— **那时**才需要生成
 - 现在做生成器，是在**需求形状还没稳定时**固化一套抽象
 
-**触发条件（写成可判定的）**：当"变体数 × 平台数 > 10"时，再上生成器。到那时代码生成的目标不是 HTML/CSS，而是**各端的原生 widget layout**。
+**触发条件**：见下面的更正 —— 原来那条**判不出来**，已替换。
+
+---
+
+> ⚠️ **更正（2026-09-27，W0-8）：原来那条触发条件是"不可能失败的判据"，已作废。**
+>
+> **原文（已作废）**：
+>
+> > **触发条件（写成可判定的）**：当"变体数 × 平台数 > 10"时，再上生成器。
+>
+> **它为什么判不出来**：两个乘数**都没有定义**，而不同读法**横跨阈值**（阈值是 10）：
+>
+> | 读法 | 算式 | 结果 | 会不会触发 |
+> |---|---|---|---|
+> | 按本节上面自己写的 v1 规模 | 4 个组件类型 × 2 端 | **8** | ❌ 不触发 |
+> | 按 [ADR-0024](../adr/0024-desktop-shell-and-ui-convergence.md) 的 3 份原生 UI | 4 × 3 | **12** | ✅ 触发 |
+> | 按 4 个载体（3 原生 + Windows JSON 模板） | 4 × 4 | **16** | ✅ 触发 |
+>
+> 也就是说：**同一个仓库、同一份文档，换个读法结论就反过来** ——
+> 这不是"可判定的"，这是**把不可判定伪装成数字**。一个人说"8，不该做"、
+> 另一个人说"16，早该做了"，**两人都没法被证伪**。
+>
+> **更根本的问题**：这个量本身就不对。**变体数不影响生成器的价值** ——
+> 新增一个变体要么是复用同一套布局（根本不需要生成器），要么是一个新布局（生成器也帮不上抽象）。
+> 真正决定成本的是 **同一份布局要手写几遍 = 载体数**。
+>
+> **新的触发条件（这次真的可判定）**：
+>
+> **在进度账本里逐次记录「一次布局改动需要在几个载体各写一遍」。累计出现 ≥ 5 次
+> 『同一布局在 ≥ 4 个载体各改一遍』的改动时，启动生成器评估。**
+>
+> 判据的形状为什么换成这样：
+> - **计的是事件，不是估算**：每次布局改动都是**已经发生的事实**，数一下就知道；
+> - **可被外部核对**：账本里有记录，别人能复查我数得对不对；
+> - **不会被读法翻转**：没有需要定义的乘数。
+>
+> 到那时代码生成的目标不是 HTML/CSS，而是**各端的原生 widget layout**。
 
 ---
 
@@ -144,7 +186,7 @@
 | **iOS** | WidgetKit extension | ❌ 不需要 | bundle id + App Group（§1.1）+ **第一个自定义原生模块** | [WidgetKit](https://developer.apple.com/documentation/widgetkit) |
 | **Windows** | 🔴 **PWA widget provider** | 🔴 **不需要**（但**只为 Edge 服务**，且刷新下限 **12 小时** → 需 Web Push 补） | PWA 得能从**公网 endpoint** 安装；本地安装可靠性 **待实测** | [MS Learn: PWA widgets](https://learn.microsoft.com/en-us/microsoft-edge/progressive-web-apps-chromium/how-to/widgets) |
 | **macOS** | 🔴 **Continuity：iPhone 小组件上 Mac** | 🔴 **不需要 Mac 壳 —— 但需要 iOS 壳 + 组件（W2）** | iOS 17+ / macOS **Sonoma 14+** / Mac **所有型号**（不需 Apple Silicon）/ 同一 Apple 账号 / iPhone 在附近或同 Wi-Fi | [Apple：使用 iPhone 组件](https://support.apple.com/en-us/guide/mac-help/mchl52be5da5/mac) |
-| macOS / Windows（**原生**桌面组件，后置） | WidgetKit / Windows App SDK + MSIX | ✅ 要（桌面壳 = **ADR-0024 已选 Electron**） | 🔴 macOS 侧压在"**Developer ID 分发的应用能否带 `.appex`**"这个未实测问题上 | [Windows widget providers](https://learn.microsoft.com/en-us/windows/apps/develop/widgets/widget-providers) |
+| macOS / Windows（**原生**桌面组件，后置） | WidgetKit / Windows App SDK + MSIX | ✅ 要（桌面壳 = **ADR-0024 已选 Electron**） | ⚠️ **但 Electron 是两端里最差的选择**（上游 `electron#35751` **Closed as not planned**；electron-builder 官方称「**never re-signs** `Contents/PlugIns`」→ 自嵌 appex 要自己写全套钩子；**无任何真实 Electron 应用带 WidgetKit 组件**）。✅ macOS 那个签名问题**已解决：Developer ID + 公证 + 直接分发能带组件**（3 个真实应用）。详见 [选型证据 §5.3–5.4](../research/multi-platform-selection-evidence.md) | [Windows widget providers](https://learn.microsoft.com/en-us/windows/apps/develop/widgets/widget-providers) |
 | **鸿蒙** | 服务卡片（ArkTS + FormExtensionAbility） | ✅ 要 | 🔴 **唯一一个"组件必须等壳"的平台** | [ArkTS 卡片](https://developer.huawei.com/consumer/cn/doc/harmonyos-guides/arkts-ui-widget-interaction-overview) |
 | **Apple Watch** | watchOS widget extension（同一 Xcode 工程） | ❌ 不需要 | 快照要传到手表（WatchConnectivity）—— 后置 | [Apple: accessory widgets](https://developer.apple.com/documentation/widgetkit/creating-accessory-widgets-and-watch-complications) |
 | **Web** | 无系统级组件 | —— | —— | 但 **Windows PWA 让 Web 用户在 Windows 上有组件** |

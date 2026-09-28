@@ -291,3 +291,18 @@ export {
   type ParseExportResult,
   type RestoreExportResult,
 } from './import-dump.js';
+
+/**
+ * 小组件意图的落地（`widget-core/intents.ts` → 真正的 op）。
+ *
+ * 🔴 这一组导出是 `packages/widget-core` **在类型上产生不了 op** 那条红线的另一半：
+ * 组件写意图，`widget-core` 负责合并与分类，**只有这里**把意图变成 op。
+ *
+ * 这条边界由 `scripts/check-widgets.mjs` 反向钉住：
+ * `packages/widget-core` 不得 import `@heyta/app-host`（否则就绕回来了）。
+ */
+export {
+  drainWidgetIntents,
+  type WidgetDrainResult,
+  type WidgetDrainTasks,
+} from './widget-actions.js';
