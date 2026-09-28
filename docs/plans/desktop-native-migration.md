@@ -104,7 +104,7 @@ RNW 看起来显然，**唯一**理由是"与 RN 0.84.1 版本精确对齐" —�
 
 | 任务 | 判据 | 状态 |
 |---|---|---|
-| W1-1 建 `apps/desktop-windows`（WinUI 3） | `dotnet build` + 现有 `pnpm typecheck` 不因它变红 | 🟡 **分层已定、Core 已通**：拆成 `Heyta.Windows.Core`（**net10.0，任意 OS 可构建可测**）+ `HeytaWindows`（WinUI 3，仅 Windows）。Core 在 macOS 与真 Windows 上都构建通过 |
+| W1-1 建 `apps/desktop-windows`（WinUI 3） | `dotnet build` + 现有 `pnpm typecheck` 不因它变红 | ✅ **已完成（含"可运行"）**：拆成 `Heyta.Windows.Core`（**net10.0，任意 OS 可构建可测**）+ `HeytaWindows`（WinUI 3，仅 Windows）。真 Windows 上 `dotnet build` **0 警告 0 错误**；🔴 **窗口已在真机交互式桌面会话里启动并截图**（`MAIN_WINDOW_TITLE=heyta`、`1152x587`、库真的建出来）—— **"可构建"与"可运行"都验过了**，见 [evidence](../../apps/desktop-windows/evidence/) 与 [README §7](../../apps/desktop-windows/README.md) |
 | W1-2 接上 W0-4 选定的领域层通道 | 界面能读到**真实**（非硬编码）任务数据 | ✅ **通道已通并有门禁**：`check:windows-shell` 跑无头冒烟 —— 开库/建任务/排序/完成态/**重开仍落盘**/软删除，**12/12 通过**（macOS 与真 Windows 各一遍）。⚠️ 界面本身尚未渲染（见 W1-3） |
 | W1-3 渲染出**同一份** UI 契约 | `data-testid="task-row-*"` 可查（这是 `@heyta/ui` 自己打的锚点，与 Electron/web 一致） | ⬜ **未做**。⚠️ 而且这条判据本身需要重新表述：Windows 壳是 **XAML**，`@heyta/ui` 是 React/RNW —— 两者**不可能共用 DOM testid**。要么改成"同一份**数据契约**"（facade 的 `TaskView`），要么承认 Windows 不复用 `@heyta/ui`（这正是 ADR-0034 §4 已经承认的：`packages/ui` 对 Windows 归零） |
 | **W1-4** 🔴 **同一份断言** | `e2e/tests/desktop-window.spec.ts` 的断言**照搬**到 Windows 壳（**不许改写断言，只许换 launch 方式**） | ⬜ **未做**，且与 W1-3 同一个问题：Electron 那份断言查的是 DOM。**在动手前必须先决定"哪些断言对两者都成立"**，否则会变成写一套新断言然后声称是同一套 |

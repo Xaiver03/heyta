@@ -37,7 +37,14 @@
                             <ColumnDefinition Width="*" />
                             <ColumnDefinition Width="Auto" />
                         </Grid.ColumnDefinitions>
-                        <CheckBox Grid.Column="0" IsChecked="{x:Bind Done, Mode=OneWay}"
+                        <!--
+                          `Mode=OneTime` 是对的，不是省事：`TaskItem` 是**不可变**的
+                          （Id/Title/Done 都只有 init），每次操作后我们是**重建整个列表**
+                          再赋给 ItemsSource —— 没有"同一个对象的值变了要通知界面"这回事。
+                          用 OneWay 反而会招来 XamlCompiler 的 WMC1506 警告：
+                          "OneWay 绑定要求至少一个环节支持变更通知"。
+                        -->
+                        <CheckBox Grid.Column="0" IsChecked="{x:Bind Done, Mode=OneTime}"
                                   Click="OnToggleDone" Tag="{x:Bind Id}" />
                         <TextBlock Grid.Column="1" Text="{x:Bind Title}" VerticalAlignment="Center"
                                    TextWrapping="Wrap" />

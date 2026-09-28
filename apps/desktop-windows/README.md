@@ -1,7 +1,11 @@
 # `apps/desktop-windows` —— Windows 原生壳（WinUI 3 / C#）
 
-> 状态：**最小垂直切片已通过**。壳能在真 Windows 上构建；跨语言那一层有**自动化冒烟**
-> （在任意 OS 上可跑，已通过 12/12）。
+> 状态：**已可构建、已可运行**。
+> 壳在真 Windows 上构建通过（0 警告 0 错误）；跨语言那一层有**自动化冒烟**
+> （任意 OS 可跑，12/12）；🔴 **窗口已在真机桌面会话里启动并截图**
+> —— 见 [`evidence/window-first-run.png`](evidence/window-first-run.png)
+> （原始日志不单独存档 —— 仓库的 `.gitignore` 明确忽略 `*.log`；
+> 下面 §7 里把关键行**逐字**列出来了。）
 > 决策依据：[ADR-0034](../../docs/adr/0034-windows-native-winui3-not-rnw.md)、
 > 计划：[多端原生构建计划](../../docs/plans/desktop-native-migration.md) §2。
 
@@ -109,7 +113,7 @@ HeytaApp.open 失败：'c' is an invalid start of a value. LineNumber: 0
 
 | 缺口 | 说明 |
 |---|---|
-| **没有开窗截图** | 壳能构建，但"启动一个窗口并截图"需要在有桌面会话的 Windows 上做；本仓目前的 Windows 验证都是 SSH（无会话） |
+| ~~没有开窗截图~~ | ✅ **已关闭（2026-09-28）**：在真机的**交互式桌面会话**里启动并截图成功 —— `MAIN_WINDOW_HANDLE=328280`、`MAIN_WINDOW_TITLE=heyta`、`1152x587`、`DB_EXISTS=True`。见 [`evidence/`](evidence/)。复现步骤见 §7 |
 | **打包 / 签名 / 安装器** | 未做（MSIX 与签名证书都缺）；目前只能 `dotnet build` 出 exe |
 | **系统小组件** | 未做。widgets 要求 **packaged app** + 一个独立的 `IWidgetProvider` COM exe server；计划 §2.3 W2 |
 | **同步未接线** | facade 故意不传 `serverUrl` ⇒ 不建同步客户端。要接的时候是**在 facade 加一个函数**，不是把同步写进 C# |
@@ -120,8 +124,66 @@ HeytaApp.open 失败：'c' is an invalid start of a value. LineNumber: 0
 
 ## 6. 下一步（按价值排序）
 
-1. **在真 Windows 上启动窗口并截图**（需要桌面会话）。
-2. 把无头冒烟接进门禁：`dotnet` 存在就跑，不存在就**显式报告跳过**。
+1. ~~在真 Windows 上启动窗口并截图~~ ✅ 已完成，见 §7 与 [`evidence/`](evidence/)。
+2. 把无头冒烟接进门禁：✅ `check:windows-shell` 已接进 `pnpm check`。
+   **还没做的**：让它在**真 Windows** 上跑（现在 macOS 也跑，但 Windows 上更接近真实）。
 3. 门禁覆盖 C#：`check:licenses:nuget` 已经会扫到本目录的 `*.csproj`（它按仓库遍历）。
+   ⚠️ WinUI 工程只在 Windows 上评（macOS 上还原就失败，脚本会**显式跳过并印出来**）。
 4. 界面按需长：一个视图一个视图地加，**每加一个都要问"原生界面真的渲染它吗"**，
    不要为了让 C# "看起来完整"而搬运无用数据。
+
+---
+
+## 7. 🔴 怎么在**没有桌面的 SSH 通道**上验证一个 GUI
+
+### 结论：可以，靠 `schtasks` 把脚本投进用户的交互式会话
+
+```powershell
+# 1) 确认那边**有**人登录着（没登录就没有桌面可画）
+query user          # 要能看到 console 会话与用户
+Get-Process explorer | Measure-Object   # explorer 在跑 = 有桌面
+
+# 2) 把"启动 + 等待 + 截图"写成一个 .ps1，再用一个 .cmd 包一层把 stdout 重定向到文件
+#    （直接交给计划任务的话，脚本自己解析失败时**什么都留不下**）
+# 3) 注册成**交互式**计划任务并立刻运行
+schtasks /create /tn heyta-window-capture /tr C:\src\heyta-capture.cmd `
+  /sc once /st 00:00 /ru <用户名> /it /f
+schtasks /run /tn heyta-window-capture
+```
+
+截图用 `System.Drawing` 的 `CopyFromScreen` + `GetWindowRect`（只截应用窗口，不截整屏）。
+
+**实测证据**（截图见 [`evidence/window-first-run.png`](evidence/window-first-run.png)；
+下面这段是从 Windows 侧日志里**逐字**抄下来的，原文件按仓库规则不入库）：
+
+```
+=== capture in session 2 ===
+MAIN_WINDOW_HANDLE=328280
+MAIN_WINDOW_TITLE=heyta
+WINDOW_RECT=26,26,1152x587
+PNG_SAVED=True bytes=42088
+DB_EXISTS=True            ← 库真的建出来了
+```
+
+窗口里那行「还没有任务。上面写一条试试。」不是硬编码 —— 它是 `listTasks()` 穿过
+Jint → `app-host` → `SQLite` 之后返回的空列表被渲染出来。**所以这张截图同时证明了整条 D2 链路。**
+
+### 这条路上一共踩了 6 个坑（都写下来，省下一次重走）
+
+| # | 现象 | 根因 | 修法 |
+|---|---|---|---|
+| 1 | 脚本报"意外的标记 / 缺少大括号"，**位置离现场很远** | **PowerShell 5.1 把 UTF-8 无 BOM 的脚本按 ANSI 解码**，中文注释把字符串字面量拆坏 | 脚本存成 **UTF-8 with BOM** + CRLF |
+| 2 | `@'...'@` here-string 解析失败 | 同上（LF 行尾 + 无 BOM） | 同上；或干脆**避免 here-string**，用数组 `@(...) -join "`n"` |
+| 3 | C# 报 `CS2015 是二进制文件而非文本文件` | macOS `tar` 把 AppleDouble `._*` 资源叉也打进了包，编译器当成源文件 | 打包用 `COPYFILE_DISABLE=1` + `--exclude='._*'` |
+| 4 | 计划任务"成功"了，但**什么都没发生** | 一行残留的 `Set-Content -Value $cmd` 把刚写好的 `.cmd` **覆盖成 0 字节** | 任务返回 0 **不等于**它做了事 —— 必须回头查产物（这次是 `.cmd` 的字节数与 stdout 文件） |
+| 5 | `Register-ScheduledTask -Principal` 报参数为空 | 在本机这条 SSH 通道上 `$principal` 拿到 null（**根因未查明**） | 改用 `schtasks.exe /ru <用户> /it`，实测可用 |
+| 6 | 在 SSH 里直接跑 exe 得到 `0xC0000142` | 会话 0 没有桌面，WinUI 起不来 | 这是**预期**的；必须走交互式会话（也就是本节的做法） |
+
+⚠️ 另外两条与"能不能跑"无关但会误导判断的：
+
+- **`self-contained` 的判定别用 `Microsoft.WindowsAppRuntime.Bootstrap.dll`** ——
+  自包含模式下要看 `Microsoft.WindowsAppRuntime.dll`（实测输出目录 162 个文件、
+  14 个 `WindowsAppRuntime*`）。用错文件名会把"已经自包含"误判成"没自包含"。
+- **日志编码**：PS 5.1 的 `Add-Content` 默认按 ANSI(GBK) 写，中文会变乱码。
+  留档时按 GBK 解码再转 UTF-8，否则证据读不出来。
+
