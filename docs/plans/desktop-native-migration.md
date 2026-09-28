@@ -212,7 +212,7 @@ RN 生态**没有 Linux**。真原生只能 GTK4 / libadwaita（或 Qt），即*
 |---|---|---|
 | `check:design` | `SCAN_ROOTS` 加 `apps/desktop-windows` | 上次加桌面渲染层时**当场抓出 6 处裸值** —— 盲区里一定已经攒了债 |
 | `check:layering` | 覆盖新壳（壳不得直接构造 op） | 但**扫描器本身是 JS/TS 的** ⇒ C# 需要新的、语言无关的兜底，见下两行 |
-| 🔴 **新增：跨语言契约重放** | `packages/storage` 的 `DbAdapter` / `OpLogStore` 契约、`packages/widget-core` 的 golden fixture，**必须能在 C# 侧重放** | 这是"同一套契约"唯一的机器保证。C# 侧不能靠"我们照着写了"来证明 |
+| ✅ **已完成：跨语言契约重放** | `check:crosslang-contract` = `node scripts/check-crosslang-contract.mjs`。它跑的是 `packages/storage/tests/contract/*.contract.ts` 的**全部 50 条断言、一个字不改**（靠 `--alias:vitest=<替身>` 送进 Jint），**实测 50/50 通过**，全程约 2 秒。**契约没被复制、也没被改写** —— 见 [spike](../../research/spikes/sqlite-driver-csharp/README.md) | 这是"同一套契约"唯一的机器保证；C# 侧不能靠"我们照着写了"来证明。✅ **已接进 `pnpm check`**。🔴 **四道反假通过**：① 条数与真 vitest **逐一对齐**（每实现 24+26=50，真 vitest 也是 50）；② 注入"顺序颠倒"的细微 bug → 契约**当场抓 6 条**、非零退出，而 probe 阶段察觉不到；③ 没有 `dotnet` 时**显式报告跳过**；④ 只覆盖 `SqliteAdapter` 一个实现 + `DbOpLogStore`，**Worker 桥与 `widget-core` golden fixture 还没进这条通道** |
 | ✅ **已完成：非 npm 许可证清单** | `check:licenses:nuget` = `node research/tools/nuget-license-inventory.mjs`。它跑 `dotnet list package --include-transitive --format json` 读**本机实际还原出来的依赖树**，再去查**已入库的** `research/nuget-licenses-inventory.json`；新增 NuGet 包没刷新清单 → **失败并点名是哪个包**。白名单/`REVIEWED_OTHER` 与 npm 侧**共用** `license-policy.mjs`（避免两份白名单漂移） | `license-inventory.mjs` 只扫 npm；**扫不到 ≠ 合规**。✅ **已接进 `pnpm check`**（在 `check:licenses` 之后）。⚠️ 三条如实标注的边界：**没有 `dotnet` 时它显式报告"已跳过"**（不是假装通过）；`dotnet list package` 会**隐式还原**，所以 **NuGet 缓存冷的机器上这一步要联网**；**当前只覆盖 2 个 spike 工程**，`apps/desktop-windows` 落地后自动纳入 |
 | `check:licenses` | ✅ 已登记 .NET 侧 8 个包：`Jint` **BSD-2-Clause**（原先被我误写成 MIT，**是这个门禁抓出来的**）、`Acornima` BSD-3-Clause、`Microsoft.Data.Sqlite`(.Core) MIT、`SQLitePCLRaw.*` Apache-2.0 | ADR-0034 §4 |
 | **新增：`check:windows-dotnet`** | Windows 上跑 `dotnet test`；非 Windows 上**显式报告跳过** | §2.4：否则 C# 代码永远不在门禁里 |
@@ -255,7 +255,7 @@ RN 生态**没有 Linux**。真原生只能 GTK4 / libadwaita（或 Qt），即*
 | W0-0 复核 RNW 是否有 ≥0.85 | ✅ **已完成** | npm `dist-tags`：`latest=0.84.0`，无 0.85+ 稳定版（[ADR-0034](../adr/0034-windows-native-winui3-not-rnw.md) §1.2） |
 | W0-3 原生库缺口清单 | ✅ **已完成**，且**做成了可重跑的脚本** | **4 个原生库 / 3 个缺口**（[ADR-0034](../adr/0034-windows-native-winui3-not-rnw.md) §1.5）。复现：`node research/tools/windows-native-gaps.mjs` —— 它会现场数一遍，并在**清单过期**（包不再是直接依赖）或**可能漏报**（某依赖声明了 `codegenConfig` 却不在清单里）时报警 |
 | W0-1 装工具链 + 起窗口 | 🟡 **编译已通，开窗未做**（2026-09-28） | .NET SDK **10.0.401** 已装（`winget`）；该机**无 VS** 但 WinUI 3 / WinAppSDK 2.5.1 **`dotnet build` 0 警告 0 错误**，产出 **162304 字节的 exe** —— 见 [spike](../../research/spikes/winui3-toolchain-probe/README.md)。⬜ 启动窗口 + 截图仍待做（无桌面会话 + 需装 WinAppSDK 运行时） |
-| W0-2 同步 SQLite 驱动（C#） | ✅ **已完成**（2026-09-28） | 未改一行的 `SqliteAdapter` 在 Jint + C# 同步驱动上过契约最危险的一组（含 multiEntry、唯一冲突吸收、回滚）；C# 侧独立复核盘上库。复现 `bash research/spikes/sqlite-driver-csharp/run.sh`。⚠️ blob 与完整契约重放仍未做 |
+| W0-2 同步 SQLite 驱动（C#） | ✅ **已完成，且契约已全量重放**（2026-09-28） | 未改一行的 `SqliteAdapter` + `DbOpLogStore` 在 Jint + C# 同步驱动上跑**原样契约 50/50 通过**（约 2 秒），并已做成门禁 `check:crosslang-contract`。反假通过：条数与真 vitest 对齐、注入细微 bug 能抓 6 条。⚠️ **blob（`Uint8Array`）仍过不了 JSON 桥** —— W1 前必须解决 |
 | W0-5 决策点 | ✅ **已判：进 W1**（2026-09-28） | W0-1 / W0-2 / W0-4 三条门槛都过；放弃判据仍有效 |
 | **W0-4 🔴 领域层单源 spike** | ✅ **bundle 级已证 D2 可行**（2026-09-28） | 同一份 bundle（338445 B / 146 导出）在裸 V8 与 .NET+Jint 上 **22/22 一致、零宿主全局**；复现 `bash research/spikes/domain-single-source/run.sh`。⚠️ 性能/ES 覆盖率未测 |
 | W1 WinUI 3 渲染最小切片 | ⬜ 未开始 | — |

@@ -35,20 +35,25 @@ globalThis.__result = null;
   // 🔴 这就是"跨语言边界"，而且只有这一层：
   //    参数与行**都过 JSON 文本**。选 JSON 而不是 CLR 对象直接编组，
   //    是为了让类型映射只有一处、可被读懂；代价是编组开销（见 README 未测项）。
-  const driver = {
+  //
+  //    包成函数是因为契约重放那一阶段要**为每个用例造一个新的宿主驱动**
+  //    （契约要求 `create()` 返回全新且已 init 的适配器）。
+  const wrapDriver = (h) => ({
     exec(sql) {
-      host.exec(sql);
+      h.exec(sql);
     },
     run(sql, params) {
-      host.run(sql, JSON.stringify(params ?? []));
+      h.run(sql, JSON.stringify(params ?? []));
     },
     all(sql, params) {
-      return JSON.parse(host.all(sql, JSON.stringify(params ?? [])));
+      return JSON.parse(h.all(sql, JSON.stringify(params ?? [])));
     },
     close() {
-      host.close();
+      h.close();
     },
-  };
+  });
+
+  const driver = wrapDriver(host);
 
   const db = new S.SqliteAdapter({
     schema: S.INDEXEDDB_SCHEMA,
@@ -132,7 +137,43 @@ globalThis.__result = null;
   record('回滚：值必须不存在', await db.get(S.STORES.META, 'rolled-back'));
 
   db.close();
-  globalThis.__result = JSON.stringify({ ok: true, steps });
+
+  // ══════════════════════════════════════════════════════════════════
+  // 第二阶段：**契约重放**
+  //
+  // 上面那 16 步是我**挑**的（危险项优先）。这里跑的是
+  // `packages/storage/tests/contract/*.contract.ts` 的**全部断言**，
+  // 一个不挑、一个字不改 —— 配合 `vitest-shim.ts` 在引擎里跑。
+  //
+  // 🔴 契约的价值全在"同一套断言跑遍所有实现"。C# 侧另写一套断言，
+  //    测的就是实现者的假设，而不是接口本身（contract.spec.ts 文件头明令禁止）。
+  // ══════════════════════════════════════════════════════════════════
+  let contractCounter = 0;
+  const makeContractDb = async () => {
+    contractCounter += 1;
+    const name = `contract-${contractCounter}`;
+    // 🔴 每个用例一个**文件库**而不是 `:memory:`：契约要求 `close()` 之后能透明重开，
+    //    而重开会再调一次 driverFactory。若用内存库，新连接就是**空库**，
+    //    "关掉再打开数据还在"会假失败 —— 那是测试替身的问题，不是实现的问题。
+    const adapter = new S.SqliteAdapter({
+      schema: S.INDEXEDDB_SCHEMA,
+      driverFactory: () => wrapDriver(host.newDriver(name)),
+    });
+    await adapter.init();
+    return adapter;
+  };
+
+  S.resetResults();
+  S.runDbAdapterContract({ name: 'SqliteAdapter（C# 同步驱动 + Jint）', create: makeContractDb });
+  S.runOpLogStoreContract({
+    name: 'DbOpLogStore（同一个 C# 驱动）',
+    createDb: makeContractDb,
+    create: (adapter) => new S.DbOpLogStore(adapter),
+  });
+  await S.settle();
+  const contract = S.report();
+
+  globalThis.__result = JSON.stringify({ ok: true, steps, contract });
   globalThis.__done = true;
 })().catch((error) => {
   globalThis.__result = JSON.stringify({

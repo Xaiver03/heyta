@@ -296,6 +296,13 @@ C# 侧还开了一个**新连接**独立复核盘上的库（`__heyta_seq` / `ar
 
 ⇒ §1.4 的判断（"C1 是**栈相关**的，不是 Windows 平台的性质"）**从推理变成了实测**。
 
+🔴 **而且契约是"全量重放"的，不是抽样。** `packages/storage/tests/contract/*.contract.ts`
+的**全部 50 条断言、一个字不改**在 Jint 里跑，**50/50 通过**（约 2 秒）。
+做法是把 `import ... from 'vitest'` 别名指到一个几十行的替身，**不复制、不改写断言**。
+两处反假通过的核对：① 条数与真 vitest 逐一对齐（每实现 24+26=50，真 vitest 也是 50）；
+② 故意注入"返回顺序颠倒"的细微 bug，契约**当场抓 6 条**并非零退出，而手挑的 probe
+阶段察觉不到。已做成门禁 `check:crosslang-contract`。
+
 🔴 **同时撞出两个"默认值就是错的"陷阱**（都不测就不会知道，且只在第一次真冲突时现形）：
 
 1. **`Microsoft.Data.Sqlite` 只认具名参数**，而 heyta 的 `SqliteDriver` 契约是
@@ -305,8 +312,16 @@ C# 侧还开了一个**新连接**独立复核盘上的库（`__heyta_seq` / `ar
    **整个建立在异常上**（驱动抛错 → 适配器回滚 → `isUniqueViolation` 吸收冲突）。
    **不打开 `CatchClrExceptions`，一条重复写入会直接杀掉整个桌面进程。**
 
-⚠️ **仍未结清**（进 W1）：**blob（`Uint8Array`）过不了 JSON 桥** ——
-契约的 `SqlValue` 含二进制，当前的 JSON 编组**根本表达不了**；
-以及**完整契约重放**（`packages/storage/tests/contract/adapter.contract.ts` 的几十条断言，
-本 spike 只挑了最危险的 16 步）。细节见
-[spike README](../../research/spikes/sqlite-driver-csharp/README.md)。
+⚠️ **仍未结清**（进 W1）：
+
+1. 🔴 **blob（`Uint8Array`）过不了 JSON 桥** —— 契约的 `SqlValue` 含二进制，
+   当前的 JSON 编组**根本表达不了**。这是 W1 的硬前置。
+2. **跨语言编组开销未测**：每次驱动调用都过一趟 `JSON.stringify` / `JSON.parse`。
+   `微任务泵次数：0` 说明它不会被事件循环拖慢，但**单次调用的开销**没测 ——
+   存储层在同步热路径上是高频调用的。**这一条可能否掉当前这种 JSON 桥。**
+3. **`widget-core` 的 golden fixture 还没进这条跨语言通道**（`DbAdapter` / `OpLogStore`
+   已经进了）。
+4. **Worker 桥（`oplog-worker-bridge.ts`）没测** —— 那是 web 端专用的进程内端口，
+   桌面壳不走它。
+
+细节见 [spike README](../../research/spikes/sqlite-driver-csharp/README.md)。
