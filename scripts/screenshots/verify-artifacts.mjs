@@ -65,8 +65,9 @@ for (const group of expectedGroups()) {
   }
 
   const expected = {
-    width: group.device.viewport.width * group.device.viewport.deviceScaleFactor,
-    height: group.device.viewport.height * group.device.viewport.deviceScaleFactor,
+    // 缩放读**设备层**，不是 viewport 里的（放错会算出 NaN×NaN）
+    width: group.device.viewport.width * (group.device.deviceScaleFactor ?? 1),
+    height: group.device.viewport.height * (group.device.deviceScaleFactor ?? 1),
   };
 
   for (const { target, file } of present) {
