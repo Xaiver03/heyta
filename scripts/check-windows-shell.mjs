@@ -7,7 +7,7 @@
  * 这是把 `Heyta.Windows.Core` 拆成 `net10.0` 的全部理由（见 apps/desktop-windows/README.md §1）。
  *
  * 它做两件事：
- *   1. 打包 TS 门面（`packages/app-host/src/windows-bridge.ts` → `assets/app-bridge.js`）
+ *   1. 打包 TS 门面（`packages/app-host/src/native-bridge.ts` → `bridge-bundle/native-bridge.js`）
  *      —— 顺带证明那份门面**打得出来**（`--platform=neutral` 下很多包会解析失败，
  *      实测 `hash-wasm` 就是：它只有 `main`，而 neutral 默认不理 `main`）。
  *   2. 跑无头冒烟（开库 / 建任务 / 排序 / 完成态 / 错误过边界 / **重开仍落盘** / 软删除）。
@@ -25,8 +25,8 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
-const BUNDLE_SCRIPT = join(ROOT, 'apps/desktop-windows/scripts/build-bridge.mjs');
-const BUNDLE = join(ROOT, 'apps/desktop-windows/assets/app-bridge.js');
+const BUNDLE_SCRIPT = join(ROOT, 'packages/app-host/scripts/build-native-bridge.mjs');
+const BUNDLE = join(ROOT, 'packages/app-host/bridge-bundle/native-bridge.js');
 const SMOKE_PROJECT = join(ROOT, 'apps/desktop-windows/smoke/Smoke.csproj');
 
 const hasDotnet = () => {

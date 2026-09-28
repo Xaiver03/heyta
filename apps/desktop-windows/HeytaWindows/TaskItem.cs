@@ -4,7 +4,7 @@ namespace Heyta.Shell;
 
 /// <summary>
 /// 列表里的一行。**只是界面数据的搬运工** —— 没有排序、没有完成态推导，
-/// 那些都在 TS 的 facade 里做完才过来（见 windows-bridge.ts）。
+/// 那些都在 TS 的 facade 里做完才过来（见 native-bridge.ts）。
 /// </summary>
 public sealed class TaskItem
 {

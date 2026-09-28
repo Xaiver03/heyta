@@ -9,18 +9,18 @@
 // 一个只打印的冒烟脚本会在没人读输出时悄悄变成"一直绿"。
 //
 // 用法：
-//   HEYTA_BRIDGE_BUNDLE=<path/app-bridge.js> dotnet run --project apps/desktop-windows/smoke
+//   HEYTA_BRIDGE_BUNDLE=<path/native-bridge.js> dotnet run --project apps/desktop-windows/smoke
 //
-// 前置：先跑 `node apps/desktop-windows/scripts/build-bridge.mjs`。
+// 前置：先跑 `node packages/app-host/scripts/build-native-bridge.mjs`。
 
 using Heyta.Windows.Host;
 
 var bundle = Environment.GetEnvironmentVariable("HEYTA_BRIDGE_BUNDLE")
-    ?? Path.Combine(AppContext.BaseDirectory, "app-bridge.js");
+    ?? Path.Combine(AppContext.BaseDirectory, "native-bridge.js");
 if (!File.Exists(bundle))
 {
     Console.Error.WriteLine($"❌ 找不到 bundle：{bundle}");
-    Console.Error.WriteLine("   先跑：node apps/desktop-windows/scripts/build-bridge.mjs");
+    Console.Error.WriteLine("   先跑：node packages/app-host/scripts/build-native-bridge.mjs");
     return 1;
 }
 
