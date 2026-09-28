@@ -27,5 +27,12 @@ let package = Package(
             name: "heyta-smoke",
             dependencies: ["HeytaShellCore"]
         ),
+        // SwiftUI 窗口。只有它需要图形会话 —— 所以核心与冒烟都不依赖它。
+        // ⚠️ UI 的适配与统一**不在这里**（那是另一条线在做）。这个窗口只负责
+        //    "证明原生壳搭起来了、数据真的从共享 TS 那一侧过来了"。
+        .executableTarget(
+            name: "HeytaMac",
+            dependencies: ["HeytaShellCore"]
+        ),
     ]
 )
