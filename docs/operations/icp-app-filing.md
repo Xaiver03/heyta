@@ -19,8 +19,10 @@
 | # | 阻断 | 事实 | 需要谁定 |
 |---|---|---|---|
 | ~~**B1**~~ | ✅ **已解决：域名就是 `heyta.finlaw.cloud`** | 见 [deployment.md](../runbooks/deployment.md)：`DNS: heyta.finlaw.cloud → A 124.223.13.226`（RecordId 2419295096），nginx 站点 `sites-enabled/heyta.finlaw.cloud` 是**当前唯一域名**（2026-09-27 起）。⚠️ **待确认**：域名实名主体是否就是「晓黎（杭州）人工智能科技有限公司」—— 备案要求域名实名主体与备案主体一致，否则需要域名授权书 | 你（确认域名实名主体） |
-| **B2** | **Android 用的是测试签名** | AAB 的签名证书主体是 `CN=heyta test upload, O=heyta, C=CN` —— 这是**测试上传密钥**，不是发布证书。而且 `app-release.apk` **根本没签名**（`META-INF` 里 0 个签名文件） | 你（确定走 Google Play 应用签名 / 还是自有发布密钥） |
-| **B3** | **iOS 没有发布签名产物** | 本机只有 `Debug-iphonesimulator` 的 `.app`（模拟器）；**没有** `.ipa` / `.xcarchive`。而钥匙串里有**两张**都有效的 `Apple Distribution` 证书 → 现在无法确定哪一张会签正式包 | 你（跑一次 Archive，或告诉我用哪张） |
+| ~~**B2**~~ | ✅ **已解决：换成正式发布签名**（2026-09-28） | 生成了正式 keystore（RSA-4096 / 10000 天，`~/.heyta-signing/heyta-release.keystore`），密钥与口令**都在仓库外**（`~/.gradle/gradle.properties`，权限 600）。重建后 `[heyta] 发布签名：已配置`，AAB 与 APK 都用正式证书签名 （AAB 里 `META-INF/HEYTA.RSA`；APK 是 v2/v3 签名块 8184 字节）。⚠️ 旧的那个 `heyta test upload` 测试密钥与它签过的包**作废** | 我（已完成） |
+| ~~**B3**~~ | ✅ **已解决：证书已确认**（2026-09-28） | 在 ASC 建了 App ID（`com.heyta.mobile` = `Z979YYN9FY`、`com.heyta.mobile.WidgetExtension` = `6BZWPRPJ9Z`）+ APP_GROUPS 能力，并用 `Apple Distribution`（cert id `2R8LJZ6Q36`）建了两个 App Store profile。🔴 **profile 里嵌的证书 SHA-1 就是答案**（这是苹果自己的记录，比在钥匙串里猜可靠）：`79:51:52:08:57:8A:81:0F:82:C8:9E:5A:3D:48:24:37:DC:2D:EF:26`。⚠️ **Archive 仍被 App Group 卡住** —— 见下面的 B4 | 我（已完成） |
+
+| **B4** | 🟡 **Archive 差一步：App Group 还没建** | 报错原文：`Provisioning profile "heyta App Store" doesn't support the group.com.heyta.mobile App Group`。根因：**App Store Connect 的公开 API 不提供建 App Group 的能力**（`asc capabilities` 里签名域只覆盖 bundleIds / capabilities / certificates / profiles / devices），而 web 通道需要交互式 Apple ID 登录（`asc web auth status` → `authenticated: false`）。⚠️ 两个 entitlements 文件都声明了 `group.com.heyta.mobile`，widget 靠它共享容器 ⇒ 不能删了绕过。**需要你做的只有一步**：在 ASC 网页 Identifiers → App Groups 建 `group.com.heyta.mobile`，并把两个 App ID 都勾上它；之后我重建 profile 就能出包 | 你（建 App Group） |
 
 另外两条**产品决策**（不是阻断，但会影响填法）：
 
@@ -59,8 +61,8 @@
 
 | 平台 | 包名 / Bundle ID | 指纹 | 来源 |
 |---|---|---|---|
-| 安卓 | `com.heytamobile` | **MD5 `7B:AF:77:DF:13:C2:0F:66:18:60:78:19:BD:3F:8A:E3`**<br>SHA1 `D8:A4:31:8D:68:07:F6:F3:9C:F1:D8:C2:FC:16:0C:C4:39:90:1C:53`<br>SHA256 `CB:CA:3A:05:13:68:3D:2F:43:07:4A:0E:A7:C4:5A:B4:83:63:59:E2:E7:3E:9B:B7:C8:70:D4:78:EF:A2:92:60` | `applicationId`；指纹从 `app-release.aab` 的 PKCS#7 里取的证书（见 §3 复现） |
-| 苹果 | `com.heyta.mobile` | **SHA-1 见 B3**（两张候选：`35:28:80:81:C9:02:1E:14:B1:1B:8A:B2:B1:4D:12:DD:34:8B:27:EB` / `79:51:52:08:57:8A:81:0F:82:C8:9E:5A:3D:48:24:37:DC:2D:EF:26`） | `project.pbxproj` → `PRODUCT_BUNDLE_IDENTIFIER`；证书来自本机钥匙串 |
+| 安卓 | `com.heytamobile` | ✅ **MD5 `22:87:08:96:6F:FD:3F:96:A9:2D:5C:87:9F:E7:B2:A9`**<br>SHA1 `54:B7:0E:92:13:CE:92:39:7A:6F:F0:EE:FE:39:5F:2B:AA:0B:9A:3A`<br>SHA256 `C4:6D:03:86:17:9C:3C:EF:12:58:2D:13:47:ED:2F:87:1E:B0:3A:64:AA:A2:BF:F9:65:11:C1:CB:76:06:25:56` | **正式发布证书**（主体 `C=CN, ST=Zhejiang, L=Hangzhou, O=Xiaoli Creativity Culture Industry, OU=Mobile, CN=heyta`）。从正式签名的 `app-release.aab` 的 `META-INF/HEYTA.RSA` 里取，**keytool 与 openssl 两边对得上** |
+| 苹果 | `com.heyta.mobile` | ✅ **SHA-1 `79:51:52:08:57:8A:81:0F:82:C8:9E:5A:3D:48:24:37:DC:2D:EF:26`**<br>（MD5 `9D:E3:FE:22:16:8A:8C:FE:1B:FF:97:D4:EB:1E:BB:6D`） | 🔴 **取自苹果自己的 App Store provisioning profile**（`heyta App Store`，id `4Z8AV534TG`）—— profile 里嵌了且只嵌了这一张证书。另有两处独立印证：`security find-identity -p codesigning` 的 identity hash 相同；用该身份 `codesign` 真实签名成功，Authority 链与 `TeamIdentifier=V5S2LT9YV8` 都对 |
 | 鸿蒙 | `com.heyta.mobile` | 鸿蒙侧一般填包名 + 签名证书；**待你确认鸿蒙的签名方式** | `AppScope/app.json5` → `bundleName` |
 | LINUX | ⬜ 暂不填报 | — | 原生壳未完成（计划 §4） |
 | windows | ⬜ 暂不填报 | — | 无 MSIX 标识 |

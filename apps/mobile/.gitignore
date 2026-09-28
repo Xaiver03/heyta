@@ -47,3 +47,5 @@ android/app/src/main/assets/index.android.bundle
 *.log
 npm-debug.log*
 yarn-error.log*
+*.mobileprovision
+*.p12

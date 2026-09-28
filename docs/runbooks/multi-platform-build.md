@@ -237,6 +237,42 @@ keytool -printcert -jarfile app/build/outputs/bundle/release/app-release.aab | g
 只是签名者是 `CN=Android Debug`。所以每次发布前都要**看签名者**，
 这正是本仓反复那条："构建成功不等于配置生效，必须验产物"。
 
+#### 1.5.1 ✅ 正式发布签名（2026-09-28 已切换）
+
+生成脚本：`apps/mobile/android/scripts/generate-release-keystore.sh`
+
+| 项 | 值 |
+|---|---|
+| keystore | `~/.heyta-signing/heyta-release.keystore`（**仓库外**，权限 600） |
+| 算法 / 有效期 | RSA-4096 / SHA256withRSA / 10000 天 |
+| 主体 | `C=CN, ST=Zhejiang, L=Hangzhou, O=Xiaoli Creativity Culture Industry, OU=Mobile, CN=heyta` |
+| 四个键 | 写在 `~/.gradle/gradle.properties`（**仓库外**，权限 600） |
+
+**证书指纹（备案用）**：
+
+```
+MD5    22:87:08:96:6F:FD:3F:96:A9:2D:5C:87:9F:E7:B2:A9
+SHA1   54:B7:0E:92:13:CE:92:39:7A:6F:F0:EE:FE:39:5F:2B:AA:0B:9A:3A
+SHA256 C4:6D:03:86:17:9C:3C:EF:12:58:2D:13:47:ED:2F:87:1E:B0:3A:64:AA:A2:BF:F9:65:11:C1:CB:76:06:25:56
+```
+
+🔴 **`keystore 丢了就再也发不了更新`** —— 请连同 `~/.gradle/gradle.properties` 一起离线备份。
+
+验证签名（**别用 `unzip -l` 找 `META-INF/*.RSA` 去判断 APK** —— 那只对 AAB/JAR 签名成立）：
+
+```bash
+# AAB（JAR 签名）：签名块在 META-INF
+unzip -l app/build/outputs/bundle/release/app-release.aab | grep 'META-INF/.*\.RSA'
+
+# APK：现代 APK 用 v2/v3 签名块，**META-INF 里什么都没有**
+python3 -c "
+d=open('app/build/outputs/apk/release/app-release.apk','rb').read()
+print('v2/v3 签名块:', d.rfind(b'APK Sig Block 42') >= 0)"
+```
+
+⚠️ 本轮就在这上面判错过一次：APK 的 `META-INF` 里 0 个签名文件被我读成"没签名"，
+实际是 v2/v3 签名块（8184 字节）—— **同一份产物，两套签名机制，判据不能混用。**
+
 ---
 
 ## 2. iOS
@@ -299,6 +335,63 @@ pnpm verify:ios-lan-http   # 私有 IP 明文 HTTP 可用性
 
 当前只验证到**模拟器**。真机需要 Apple Developer 签名 + provisioning profile。
 **iOS ATS 对明文 HTTP 的覆盖范围仍未实测** —— 别假设模拟器通过就等于真机通过。
+
+### 2.6 发布签名（2026-09-28 已配置到"差一个 App Group"）
+
+团队账号：`V5S2LT9YV8`（Xiaoli Creativity Culture Industry Development (beijing) Co., Ltd.）。
+
+| 资源 | 值 |
+|---|---|
+| App ID（主 App） | `com.heyta.mobile` = `Z979YYN9FY` |
+| App ID（小组件） | `com.heyta.mobile.WidgetExtension` = `6BZWPRPJ9Z` |
+| 分发证书 | `Apple Distribution`，cert id `2R8LJZ6Q36`，2027-06-19 到期 |
+| App Store profile | `heyta App Store` = `4Z8AV534TG` |
+| App Store profile（小组件） | `heyta Widget App Store` = `KM6K4WWAM2` |
+
+🔴 **证书指纹（备案用）** —— 取自 **Apple 自己的 provisioning profile**（profile 里嵌了且只嵌了这一张）：
+
+```
+SHA-1  79:51:52:08:57:8A:81:0F:82:C8:9E:5A:3D:48:24:37:DC:2D:EF:26
+MD5    9D:E3:FE:22:16:8A:8C:FE:1B:FF:97:D4:EB:1E:BB:6D
+```
+
+**工程里的签名配置**（`project.pbxproj`，本轮补的 —— 之前**完全没有** `DEVELOPMENT_TEAM`，
+所以谁都 Archive 不了）：两个 target 的 Release 配置都设了
+`DEVELOPMENT_TEAM` / `CODE_SIGN_STYLE = Manual` / `PROVISIONING_PROFILE_SPECIFIER` / `CODE_SIGN_IDENTITY = "Apple Distribution"`。
+
+复现命令：
+
+```bash
+# 建/查签名资产
+asc bundle-ids list --paginate
+asc certificates list --paginate                      # certificateType 是 DISTRIBUTION（不是 IOS_DISTRIBUTION）
+asc profiles create --name "heyta App Store" --profile-type IOS_APP_STORE \
+    --bundle Z979YYN9FY --certificate 2R8LJZ6Q36      # ⚠️ --bundle 要**资源 id**，不是 identifier
+asc profiles download --id 4Z8AV534TG --output /tmp/p.mobileprovision
+asc profiles local install --path /tmp/p.mobileprovision
+
+# 出包
+xcodebuild -workspace HeytaMobile.xcworkspace -scheme HeytaMobile -configuration Release \
+  -destination 'generic/platform=iOS' -archivePath /tmp/heyta.xcarchive archive \
+  DEVELOPMENT_TEAM=V5S2LT9YV8
+```
+
+#### 🔴 现在卡在哪：App Group 建不了
+
+```
+error: Provisioning profile "heyta App Store" doesn't support the group.com.heyta.mobile App Group.
+```
+
+- 两个 entitlements 文件都声明了 `group.com.heyta.mobile`（小组件靠它读主 App 的数据）⇒ **不能删了绕过**。
+- **App Store Connect 的公开 API 不提供建 App Group 的能力**（签名域只覆盖
+  bundleIds / capabilities / certificates / profiles / devices），
+  而 web 通道要交互式 Apple ID 登录（`asc web auth status` → `authenticated: false`）。
+- ⇒ **要人做一步**：ASC 网页 → Identifiers → App Groups → 建 `group.com.heyta.mobile`，
+  并把上面两个 App ID 都勾上它；之后重建 profile 就能 Archive。
+
+⚠️ 另一个坑：`-allowProvisioningUpdates`（自动签名）在本机**不可用** ——
+`error: No Accounts: Add a new account in Accounts settings.`，Xcode 没登录 Apple ID。
+所以这里必须走**手动签名 + 显式 profile**。
 
 ---
 
