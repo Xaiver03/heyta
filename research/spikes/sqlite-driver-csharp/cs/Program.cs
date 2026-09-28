@@ -20,6 +20,7 @@ using Microsoft.Data.Sqlite;
 var bundlePath = Require("SQLITE_SPIKE_BUNDLE");
 var probePath = Require("SQLITE_SPIKE_PROBE");
 var dbPath = Require("SQLITE_SPIKE_DB");
+var dbDir = Require("SQLITE_SPIKE_DBDIR");
 
 var engine = new Engine(options => options
     .LimitMemory(512_000_000)
@@ -37,7 +38,7 @@ var engine = new Engine(options => options
     // 而不是被 `try/catch` 接住 —— 实测就是这么炸的。
     .CatchClrExceptions(_ => true));
 
-using (var host = new HostSqliteDriver(dbPath))
+using (var host = new HostSqliteDriver(dbPath, dbDir))
 {
     engine.SetValue("host", host);
 
@@ -67,7 +68,8 @@ using (var host = new HostSqliteDriver(dbPath))
 
     var raw = engine.GetValue("__result");
     var json = raw.IsNull() || raw.IsUndefined() ? "null" : raw.AsString();
-    Console.WriteLine("=== probe 结果 ===");
+    Console.WriteLine("=== 第一阶段：probe（16 步，危险项优先）===");
+    var contractFailed = 0;
     using (var parsed = JsonDocument.Parse(json!))
     {
         var root = parsed.RootElement;
@@ -79,6 +81,20 @@ using (var host = new HostSqliteDriver(dbPath))
                 var value = step.TryGetProperty("value", out var v) ? v.ToString() : "(缺 value 键)";
                 Console.WriteLine($"  · {name} = {value}");
             }
+
+            // ── 第二阶段：契约重放 ────────────────────────────────────
+            Console.WriteLine();
+            Console.WriteLine("=== 第二阶段：契约重放（packages/storage 的**原样**契约）===");
+            var contract = root.GetProperty("contract");
+            var total = contract.GetProperty("total").GetInt32();
+            var passed = contract.GetProperty("passed").GetInt32();
+            contractFailed = contract.GetProperty("failed").GetInt32();
+            Console.WriteLine($"  断言 {total} 条，通过 {passed} 条，失败 {contractFailed} 条");
+            foreach (var failure in contract.GetProperty("failures").EnumerateArray())
+            {
+                Console.WriteLine($"  ✗ [{failure.GetProperty("suite").GetString()}] {failure.GetProperty("name").GetString()}");
+                Console.WriteLine($"      {failure.GetProperty("error").GetString()}");
+            }
         }
         else
         {
@@ -87,10 +103,21 @@ using (var host = new HostSqliteDriver(dbPath))
             {
                 Console.WriteLine(stack.GetString());
             }
+            contractFailed = -1;
         }
     }
 
+    Console.WriteLine();
     Console.WriteLine($"probe_ok={JsonDocument.Parse(json!).RootElement.GetProperty("ok").GetBoolean()}");
+
+    // 🔴 契约失败必须是**非零退出码**。一个不会失败的"重放"没有意义。
+    if (contractFailed != 0)
+    {
+        throw new InvalidOperationException(
+            contractFailed < 0
+                ? "契约重放没能跑起来（见上面的错误）"
+                : $"契约重放失败 {contractFailed} 条 —— 见上面的断言明细");
+    }
 }
 
 // ── 外部证据：不信 JS 的自述，自己开一个**新连接**看盘上的库 ──────────
@@ -130,16 +157,49 @@ static string Require(string name) =>
 internal sealed class HostSqliteDriver : IDisposable
 {
     private readonly SqliteConnection _connection;
+    private readonly string? _baseDir;
+    private readonly List<HostSqliteDriver> _children = new();
 
-    public HostSqliteDriver(string path)
+    public HostSqliteDriver(string path, string? baseDir = null)
     {
         _connection = new SqliteConnection($"Data Source={path}");
         _connection.Open();
+        _baseDir = baseDir;
 
         // 与其它端一致的开关：外键约束打开、WAL 让"多读一写"不至于互相堵。
+        // ⚠️ 内存库不支持 WAL（SQLite 会自己留在 memory 模式，不报错），
+        //    所以只在文件库上设。
         using var pragma = _connection.CreateCommand();
-        pragma.CommandText = "PRAGMA foreign_keys=ON; PRAGMA journal_mode=WAL;";
+        pragma.CommandText = path == ":memory:"
+            ? "PRAGMA foreign_keys=ON;"
+            : "PRAGMA foreign_keys=ON; PRAGMA journal_mode=WAL;";
         pragma.ExecuteNonQuery();
+    }
+
+    /// <summary>
+    /// 派生一个**全新的**同步驱动，落在 <c>&lt;dbdir&gt;/&lt;name&gt;.sqlite</c>。
+    ///
+    /// 契约要求 `create()` 每次返回"全新且已 init"的适配器，而且 `close()` 之后
+    /// 要能透明重开 —— 所以每个用例一个文件库（内存库在重开时会变空库）。
+    /// 已存在的同名文件会被删掉，保证从零开始。
+    /// </summary>
+    public HostSqliteDriver newDriver(string name)
+    {
+        if (_baseDir is null)
+        {
+            throw new InvalidOperationException("根驱动没有 baseDir，不能派生新驱动");
+        }
+        var path = Path.Combine(_baseDir, $"{name}.sqlite");
+        foreach (var suffix in new[] { string.Empty, "-wal", "-shm" })
+        {
+            if (File.Exists(path + suffix))
+            {
+                File.Delete(path + suffix);
+            }
+        }
+        var child = new HostSqliteDriver(path, _baseDir);
+        _children.Add(child);
+        return child;
     }
 
     /// <summary>执行一段（可含多条语句的）SQL，不返回结果。DDL / BEGIN / COMMIT 走这里。</summary>
@@ -187,6 +247,11 @@ internal sealed class HostSqliteDriver : IDisposable
 
     public void Dispose()
     {
+        foreach (var child in _children)
+        {
+            child.Dispose();
+        }
+        _children.Clear();
         _connection.Dispose();
     }
 
