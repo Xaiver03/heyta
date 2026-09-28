@@ -144,6 +144,7 @@ docs/research/<kebab-case>.md     例：reuse-plan.md
 | [ai-remediation-module-2-journey.md](plans/ai-remediation-module-2-journey.md) | 模块 2 任务书：**AI 用户旅程闭环与「界面说真话」**（失败态英文界面契约 + 熔断冷却后的「重试」）—— ✅ 已并入 `main` |
 | [ai-remediation-module-3-memory-moat.md](plans/ai-remediation-module-3-memory-moat.md) | 模块 3 任务书：**把「记忆护城河」接到用户眼前**（用真 IndexedDB 钉死 `readRecentOps` 的窗口方向）—— ✅ 已并入 `main` |
 | [ai-handoff.md](plans/ai-handoff.md) | **AI 方向交接**：什么已经做完（别重做）、哪些「未做」其实已经过期（别照旧清单干）、现在真正该做的第一件事 |
+| [desktop-packaging-handoff.md](plans/desktop-packaging-handoff.md) | **交接：桌面三端安装包** —— macOS（Developer ID 签名 + 公证 + 装订）与 Linux（.deb）已完整交付并实测装完能起来；Windows MSIX 打包+签名成功但 `Add-AppxPackage` 被拒，卡在安装，下一步与已排除的猜测都写在里面 |
 | [i18n-multilingual.md](plans/i18n-multilingual.md) | 🌐 **中英双语实施计划**：为什么自研零依赖词条表、落地页用 URL 而应用用偏好、`check:ui-language` 契约的**变更与两处按 key 的例外**、分阶段迁移进度、以及**还没解决的域层文案** |
 | [landing-motion-audit/](plans/landing-motion-audit/) | 🎬 **落地页动效审计与整改**（`improve-animations` skill 产出，基线 `18b34ce`）：5 条发现全部 DONE，判据与取值都注明来源，含真实 Chrome 行为断言。原先游离在仓库根 `plans/`，已移入此处 |
 | 🔴 [multi-platform-widgets.md](plans/multi-platform-widgets.md) | **多端小组件改造计划**：小组件是**多端适配的输出形态**，不是额外项目。含**必须现在做对的 5 件事**（App Group 定名 / 预留容器 / 不把 SQLite 搬进共享容器）、`packages/widget-core` + golden fixture + 门禁扩展、**Windows 走 PWA provider、macOS 走 Continuity —— 这两端反而不需要壳**、W0–W5 排序与"什么能自动验/什么不能"。支撑 [roadmap](plans/roadmap.md) P3 |
