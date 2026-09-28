@@ -77,7 +77,14 @@ export type PasskeyErrorCode =
    * app-host 翻成 `passkey-already-registered`）。这里是**服务端**的最后
    * 一道守卫：绕过前端的调用方不会把同一条凭据写成两行。
    */
-  | 'passkey_already_registered';
+  | 'passkey_already_registered'
+  /**
+   * 改名的输入超过 `PASSKEY_NAME_MAX_LENGTH`。
+   *
+   * 边界校验在接口层的 zod 里（→ 400），这个码是**服务层的兜底**：
+   * 绕过 HTTP 的调用方不该能让一列无上限的文本进库。
+   */
+  | 'passkey_name_too_long';
 
 /**
  * 带稳定 `code` 的通行密钥错误。
@@ -1017,4 +1024,72 @@ export const deleteUserPasskey = async (
     );
   }
   throw new PasskeyError('passkey_not_found_for_user', 'Passkey not found');
+};
+
+/**
+ * 名字去掉首尾空白之后的最大长度。
+ *
+ * 与服务层、接口层（zod）、app-host 的输入框共用同一个数字：三处各写一个字面量
+ * 迟早会漂移，而漂移的表现是"界面允许输入、服务端 400"。
+ */
+export const PASSKEY_NAME_MAX_LENGTH = 60;
+
+/**
+ * 规范化用户输入的名字。
+ *
+ * `null`、空串、纯空白**全部**映射成 `null`（= 没名字）。这样：
+ *   * "把输入框清空再保存"就是"去掉名字"，不需要额外一个删除按钮；
+ *   * 库里不会留下 `''` —— 那是个既不是名字、又会让 `name === null` 判断失效的值。
+ */
+export const normalizePasskeyName = (input: string | null): string | null => {
+  if (input === null) return null;
+  const trimmed = input.trim();
+  return trimmed === '' ? null : trimmed;
+};
+
+/**
+ * 给当前用户的一条通行密钥改名（或去掉名字）。
+ *
+ * ## 归属：与删除同一条纪律
+ *
+ * 谓词里同时带 `id` 与 `userId`，所以"别人的 id"与"不存在的 id"走同一条路，
+ * 抛**同一个** `passkey_not_found_for_user`。接口层投影成 404 ——
+ * 用 403 就会把"这条 id 存在但不属于你"变成一个存在性预言机。
+ *
+ * ## 为什么用 `updateMany` 而不是 `update`
+ *
+ * `update` 只接受唯一键，只能写 `where: { id }`，归属就得靠先查后改（TOCTOU）
+ * 或者 `where: { id, userId }` 这种 Prisma 在 `update` 上不接受的形状。
+ * `updateMany` 把归属写进 `where`，判定与写入是**同一条语句**。
+ *
+ * ## 审计
+ *
+ * 只记事件与行 id，**不记名字本身** —— 与 `PASSKEY_DELETED` 同一个理由：
+ * 审计日志不该变成第二处存放用户内容的地方。
+ */
+export const renameUserPasskey = async (
+  userId: number,
+  passkeyId: string,
+  name: string | null,
+): Promise<{ renamed: true }> => {
+  const normalized = normalizePasskeyName(name);
+  if (normalized !== null && normalized.length > PASSKEY_NAME_MAX_LENGTH) {
+    throw new PasskeyError('passkey_name_too_long', 'Passkey name is too long');
+  }
+
+  const updated = await prisma.passkey.updateMany({
+    where: { id: passkeyId, userId },
+    data: { name: normalized },
+  });
+
+  if (updated.count !== 1) {
+    throw new PasskeyError('passkey_not_found_for_user', 'Passkey not found');
+  }
+
+  Logger.audit({
+    event: 'PASSKEY_RENAMED',
+    userId,
+    entityId: passkeyId,
+  });
+  return { renamed: true };
 };

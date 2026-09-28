@@ -30,6 +30,12 @@ const TOKEN = 'jwt-token';
 interface FetchCall {
   method: string;
   url: string;
+  /**
+   * 请求体（已解析）。改名要断言"送出去的就是用户打的那个名字"，
+   * 只看 method + url 不够 —— 名字送没送、送的是原文还是被本地改过，
+   * 都只在 body 里。
+   */
+  body?: unknown;
 }
 
 let calls: FetchCall[];
@@ -39,7 +45,12 @@ function stubFetch(script: Array<{ status: number; body?: unknown }>): void {
   calls = [];
   let index = 0;
   const mock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
-    calls.push({ method: init?.method ?? 'GET', url: String(input) });
+    const raw = typeof init?.body === 'string' ? init.body : undefined;
+    calls.push({
+      method: init?.method ?? 'GET',
+      url: String(input),
+      ...(raw === undefined ? {} : { body: JSON.parse(raw) as unknown }),
+    });
     const next = script[Math.min(index, script.length - 1)] ?? { status: 500 };
     index += 1;
     return Promise.resolve({
@@ -433,5 +444,191 @@ describe('PasskeyPanel — 添加一条', () => {
     const failure = byId('passkeys-add-failed');
     expect(failure).not.toBeNull();
     expect(failure!.textContent).toContain('does not support passkeys');
+  });
+});
+
+describe('PasskeyPanel — 改名', () => {
+  const NAMED_ROW = { ...PASSKEY_ROW, name: 'MacBook 的 Touch ID' };
+
+  /**
+   * 改受控 input 的值。
+   *
+   * 🔴 必须走原生 setter 再派发 `input`：React 会记录上一次的值，
+   * 直接 `el.value = x` 会让它认为"没变过"而不触发 onChange ——
+   * 那样"保存"送出去的还是旧值，用例会以假绿通过。
+   */
+  function typeInto(id: string, value: string): void {
+    const el = byId(id) as HTMLInputElement | null;
+    if (el === null) throw new Error(`missing testid ${id}`);
+    act(() => {
+      const setter = Object.getOwnPropertyDescriptor(
+        window.HTMLInputElement.prototype,
+        'value',
+      )?.set;
+      setter?.call(el, value);
+      el.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+  }
+
+  it('有名字 → 渲染名字；同时仍然显示创建时间', async () => {
+    stubFetch([{ status: 200, body: { passkeys: [NAMED_ROW] } }]);
+
+    await renderPanel();
+
+    const name = byId('passkey-name-pk_row_1');
+    expect(name).not.toBeNull();
+    expect(name!.textContent).toBe('MacBook 的 Touch ID');
+    expect(byId('passkey-row-pk_row_1')!.textContent).toContain('2026-01-02');
+  });
+
+  it('没名字 → 不渲染名字元素（而不是编一个"未命名"）', async () => {
+    stubFetch([{ status: 200, body: { passkeys: [PASSKEY_ROW] } }]);
+
+    await renderPanel();
+
+    expect(byId('passkey-name-pk_row_1')).toBeNull();
+    expect(byId('passkey-row-pk_row_1')).not.toBeNull();
+  });
+
+  it('点"改名" → 出现输入框，且预填当前名字', async () => {
+    stubFetch([{ status: 200, body: { passkeys: [NAMED_ROW] } }]);
+
+    await renderPanel();
+    click('passkey-rename-pk_row_1');
+
+    const input = byId('passkey-name-input-pk_row_1') as HTMLInputElement | null;
+    expect(input).not.toBeNull();
+    expect(input!.value).toBe('MacBook 的 Touch ID');
+    // 还没保存，绝不该发 PATCH。
+    expect(calls.filter((c) => c.method === 'PATCH')).toHaveLength(0);
+  });
+
+  it('保存 → PATCH 到那条凭据，body 只有 name，并且**重拉列表**', async () => {
+    // 第三次响应故意回一个**不一样**的名字：界面必须显示服务端那个，
+    // 才能证明列表是重拉来的、不是本地就地改的。
+    stubFetch([
+      { status: 200, body: { passkeys: [NAMED_ROW] } },
+      { status: 200, body: { success: true } },
+      { status: 200, body: { passkeys: [{ ...PASSKEY_ROW, name: 'Server 说了算' }] } },
+    ]);
+
+    await renderPanel();
+    click('passkey-rename-pk_row_1');
+    typeInto('passkey-name-input-pk_row_1', '我的新名字');
+    click('passkey-name-save-pk_row_1');
+    await settle();
+
+    const patch = calls.find((c) => c.method === 'PATCH');
+    expect(patch).toBeDefined();
+    expect(patch!.url).toBe(`${BASE_URL}/api/passkeys/pk_row_1`);
+    expect(patch!.body).toEqual({ name: '我的新名字' });
+
+    // 改完重拉：最后一个请求是 GET。
+    expect(calls[calls.length - 1]!.method).toBe('GET');
+    expect(byId('passkeys-renamed')).not.toBeNull();
+    expect(byId('passkey-name-pk_row_1')!.textContent).toBe('Server 说了算');
+    // 成功后输入框收起。
+    expect(byId('passkey-name-input-pk_row_1')).toBeNull();
+  });
+
+  it('清空后保存 → 送空串（归一化成"没名字"是**服务端**的事）', async () => {
+    stubFetch([
+      { status: 200, body: { passkeys: [NAMED_ROW] } },
+      { status: 200, body: { success: true } },
+      { status: 200, body: { passkeys: [PASSKEY_ROW] } },
+    ]);
+
+    await renderPanel();
+    click('passkey-rename-pk_row_1');
+    typeInto('passkey-name-input-pk_row_1', '');
+    click('passkey-name-save-pk_row_1');
+    await settle();
+
+    const patch = calls.find((c) => c.method === 'PATCH');
+    // 客户端**不**替服务端决定"空串等于没名字"：原样送出去，规则只有一处。
+    expect(patch!.body).toEqual({ name: '' });
+    expect(byId('passkey-name-pk_row_1')).toBeNull();
+  });
+
+  it('🔴 名字太长被拒 → 说清楚是"太长"，且输入框**不关**（不丢用户打的字）', async () => {
+    stubFetch([
+      { status: 200, body: { passkeys: [PASSKEY_ROW] } },
+      { status: 400, body: { error: 'Passkey name is too long', code: 'passkey_name_too_long' } },
+    ]);
+
+    await renderPanel();
+    click('passkey-rename-pk_row_1');
+    typeInto('passkey-name-input-pk_row_1', 'x'.repeat(61));
+    click('passkey-name-save-pk_row_1');
+    await settle();
+
+    const failure = byId('passkeys-rename-failed');
+    expect(failure).not.toBeNull();
+    // 不是笼统的"没成功"：用户要知道改短一点就能过。
+    expect(failure!.textContent).toContain('too long');
+    // 🔴 输入框还在，且用户打的字还在。
+    const input = byId('passkey-name-input-pk_row_1') as HTMLInputElement | null;
+    expect(input).not.toBeNull();
+    expect(input!.value).toBe('x'.repeat(61));
+    // 失败绝不能说成功。
+    expect(byId('passkeys-renamed')).toBeNull();
+  });
+
+  it('🔴 404（已经不在了）→ 重拉列表，那一行消失', async () => {
+    stubFetch([
+      { status: 200, body: { passkeys: [PASSKEY_ROW] } },
+      {
+        status: 404,
+        body: { error: 'Passkey not found', code: 'passkey_not_found_for_user' },
+      },
+      { status: 200, body: { passkeys: [] } },
+    ]);
+
+    await renderPanel();
+    click('passkey-rename-pk_row_1');
+    typeInto('passkey-name-input-pk_row_1', 'x');
+    click('passkey-name-save-pk_row_1');
+    await settle();
+
+    expect(calls[calls.length - 1]!.method).toBe('GET');
+    expect(byId('passkey-row-pk_row_1')).toBeNull();
+    expect(byId('passkeys-rename-failed')).not.toBeNull();
+  });
+
+  it('取消 → 输入框消失，且一个 PATCH 都不发', async () => {
+    stubFetch([{ status: 200, body: { passkeys: [NAMED_ROW] } }]);
+
+    await renderPanel();
+    click('passkey-rename-pk_row_1');
+    typeInto('passkey-name-input-pk_row_1', '打了但不要了');
+    click('passkey-name-cancel-pk_row_1');
+    await settle();
+
+    expect(byId('passkey-name-input-pk_row_1')).toBeNull();
+    expect(calls.filter((c) => c.method === 'PATCH')).toHaveLength(0);
+    // 名字没变。
+    expect(byId('passkey-name-pk_row_1')!.textContent).toBe('MacBook 的 Touch ID');
+  });
+
+  it('改名与删除互斥：点改名不会同时进入删除确认', async () => {
+    stubFetch([{ status: 200, body: { passkeys: [NAMED_ROW] } }]);
+
+    await renderPanel();
+    click('passkey-delete-pk_row_1');
+
+    // 🔴 进入删除确认后，"改名"按钮**根本不渲染** —— 比"点了再收起"更强：
+    // 两个"下一步"同时挂着迟早点错，而不可点击的按钮点不错。
+    expect(byId('passkey-confirm-pk_row_1')).not.toBeNull();
+    expect(byId('passkey-rename-pk_row_1')).toBeNull();
+
+    click('passkey-cancel-pk_row_1');
+    expect(byId('passkey-confirm-pk_row_1')).toBeNull();
+    expect(byId('passkey-rename-pk_row_1')).not.toBeNull();
+
+    click('passkey-rename-pk_row_1');
+    // 反过来同样成立：改名开场后删除确认必须收起。
+    expect(byId('passkey-name-input-pk_row_1')).not.toBeNull();
+    expect(byId('passkey-confirm-pk_row_1')).toBeNull();
+    expect(byId('passkey-delete-pk_row_1')).toBeNull();
   });
 });

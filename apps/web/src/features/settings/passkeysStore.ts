@@ -11,14 +11,17 @@
  * 这里**不做协议判断**，也不做产品判断：
  *   - 打哪个端点、带什么令牌、失败怎么归类 —— `@heyta/app-host` 的 `hosted-auth.ts`；
  *   - "最后一条能不能删" —— **服务端**说了算（403/409 那个码）；
+ *   - 名字怎么归一化（首尾空白、空串 → 没名字）—— **服务端**说了算，
+ *     见 `normalizePasskeyName`。这里原样送出用户输入。
  *   - 用户看到的句子 —— 界面按结构化 `reason` 取词条。
  * 本文件只负责"什么时候调用一次"以及把结果放进 state。
  *
- * ## 🔴 删除后列表以**服务端**为准，不做本地减法
+ * ## 🔴 增 / 删 / 改名之后，列表一律以**服务端**为准重拉
  *
- * 删成功后重新拉一次列表，而不是从本地数组里 `filter` 掉。理由：本地减法
- * 会在"这条其实已经被别的设备删掉了"时显示出一个服务端并不存在的世界，
- * 而用户下一步操作就基于那个错的世界。重拉一次是最便宜的真相。
+ * 三个动作都不做本地变更（不 `filter`、不 `push`、不就地改名字）。
+ * 理由：本地变更会在"这条其实已经被别的设备删掉了 / 改过了"时显示出一个
+ * 服务端并不存在的世界，而用户下一步操作就基于那个错的世界。
+ * 重拉一次是最便宜的真相。
  */
 
 import { create } from 'zustand';
@@ -28,6 +31,7 @@ import {
   completePasskeyEnrollment,
   deletePasskey,
   listPasskeys,
+  renamePasskey,
   type HostedAuthFailureReason,
   type HostedPasskeySummary,
 } from '@heyta/app-host';
@@ -65,9 +69,27 @@ export interface PasskeysStoreState {
   addFailure?: HostedAuthFailureReason;
   /** 刚添加成功。注意：它只在服务端**真的写入**之后才会置位。 */
   justAdded: boolean;
+  /** 正在改名的凭据行 id（用来禁用那一行的输入与按钮）。 */
+  renamingId?: string;
+  /** 改名失败的结构化原因。 */
+  renameFailure?: HostedAuthFailureReason;
+  /** 刚改完名字（含"去掉名字"）—— 给一句确认，而不是静默。 */
+  justRenamed: boolean;
 
   load: (baseUrl: string, token: string | undefined) => Promise<void>;
   remove: (baseUrl: string, token: string | undefined, id: string) => Promise<void>;
+  /**
+   * 给一条凭据改名；`name` 为空串或 `null` 表示**去掉名字**。
+   *
+   * 成功后重拉列表（见文件头"列表一律以服务端为准"），所以界面上看到的
+   * 名字永远是服务端存的那个，而不是本地以为的那个。
+   */
+  rename: (
+    baseUrl: string,
+    token: string | undefined,
+    id: string,
+    name: string | null,
+  ) => Promise<void>;
   /**
    * 给当前账号再添一条通行密钥。
    *
@@ -92,6 +114,7 @@ export const usePasskeysStore = create<PasskeysStoreState>((set, get) => ({
   justDeleted: false,
   adding: false,
   justAdded: false,
+  justRenamed: false,
 
   load: async (baseUrl, token) => {
     set({ status: { kind: 'loading' } });
@@ -119,6 +142,24 @@ export const usePasskeysStore = create<PasskeysStoreState>((set, get) => ({
     }
 
     set({ deletingId: undefined, justDeleted: true });
+    await get().load(baseUrl, token);
+  },
+
+  rename: async (baseUrl, token, id, name) => {
+    set({ renamingId: id, renameFailure: undefined, justRenamed: false });
+    const outcome = await renamePasskey({ baseUrl }, { token: token ?? '', id, name });
+
+    if (!outcome.ok) {
+      set({ renamingId: undefined, renameFailure: outcome.reason });
+      // 与删除同一形状：这条已经不在服务端了，界面不该继续显示它。
+      if (outcome.reason === 'passkey-not-found') {
+        await get().load(baseUrl, token);
+      }
+      return;
+    }
+
+    set({ renamingId: undefined, justRenamed: true });
+    // 与删除 / 添加同一条纪律：列表以**服务端**为准重拉，不做本地改名。
     await get().load(baseUrl, token);
   },
 
@@ -165,7 +206,14 @@ export const usePasskeysStore = create<PasskeysStoreState>((set, get) => ({
   },
 
   dismissNotice: () => {
-    set({ justDeleted: false, deleteFailure: undefined, addFailure: undefined, justAdded: false });
+    set({
+      justDeleted: false,
+      deleteFailure: undefined,
+      addFailure: undefined,
+      justAdded: false,
+      renameFailure: undefined,
+      justRenamed: false,
+    });
   },
 
   reset: () => {
@@ -177,6 +225,9 @@ export const usePasskeysStore = create<PasskeysStoreState>((set, get) => ({
       adding: false,
       addFailure: undefined,
       justAdded: false,
+      renamingId: undefined,
+      renameFailure: undefined,
+      justRenamed: false,
     });
   },
 }));
@@ -196,5 +247,8 @@ export function __resetPasskeysForTests(): void {
     adding: false,
     addFailure: undefined,
     justAdded: false,
+    renamingId: undefined,
+    renameFailure: undefined,
+    justRenamed: false,
   });
 }

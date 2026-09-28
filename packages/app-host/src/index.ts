@@ -97,6 +97,7 @@ export {
  */
 export {
   HOSTED_AUTH_PATHS,
+  HOSTED_PASSKEY_NAME_MAX_LENGTH,
   beginPasskeyEnrollment,
   beginPasskeyLogin,
   beginPasskeyRegistration,
@@ -109,7 +110,9 @@ export {
   getPasskeyRecoveryOptions,
   listPasskeys,
   passkeyDeletePath,
+  passkeyPath,
   registerWithMagicLink,
+  renamePasskey,
   requestMagicLink,
   requestPasskeyRecovery,
   verifyEmailAddress,
