@@ -45,9 +45,13 @@ The image revision check requires Docker Compose support for
 > to a `master-<sha>` tag if you need a fixed one.
 
 ```bash
-# 1. Clone the repo (deploy.sh runs from this checkout) and enter this directory
-git clone https://github.com/super-productivity/super-productivity.git
-cd super-productivity/packages/super-sync-server
+# 1. Enter the server directory **of this repository**.
+#
+#    🔴 这里是 `server/`，不是上游的 `packages/super-sync-server/`。
+#    本 README 是从上游 SuperSync fork 来的，下面这些命令**全部相对本目录**
+#    （`env.example`、`scripts/deploy.sh` 都在这里）。照抄上游路径会 cd 到一个
+#    在这个 checkout 里不存在的目录 —— 而那时你只是"进不去"，看不出是文档过期。
+cd server
 
 # 2. Copy environment example
 cp env.example .env
