@@ -17,12 +17,15 @@ import { describe, expect, it } from 'vitest';
 
 import {
   HOSTED_AUTH_PATHS,
+  HOSTED_PASSKEY_NAME_MAX_LENGTH,
   beginPasskeyEnrollment,
   completePasskeyEnrollment,
   completePasskeyLogin,
   deletePasskey,
   listPasskeys,
   passkeyDeletePath,
+  passkeyPath,
+  renamePasskey,
   type HostedAuthOptions,
 } from '../src/hosted-auth.js';
 
@@ -80,6 +83,7 @@ describe('listPasskeys 契约', () => {
             id: 'pk_row_1',
             createdAt: '2026-01-02T03:04:05.000Z',
             lastUsedAt: null,
+            name: 'MacBook 的 Touch ID',
             // 服务端**不该**返回这些；就算返回了，客户端也不许带出去。
             credentialId: 'BASE64URLSECRET',
             publicKey: 'PUBLICKEYBYTES',
@@ -93,14 +97,64 @@ describe('listPasskeys 契约', () => {
 
     expect(outcome.ok).toBe(true);
     if (!outcome.ok) return;
+    // 🔴 `name` 必须显式出现在期望里：`toEqual` 认为"少一个 undefined 键"
+    // 与"键不存在"相等，所以只靠 `{ id, createdAt, lastUsedAt }` 期望
+    // **漏掉 name 的映射也会绿**。这里给它真值，漏掉就一定红。
     expect(outcome.passkeys).toEqual([
-      { id: 'pk_row_1', createdAt: '2026-01-02T03:04:05.000Z', lastUsedAt: null },
+      {
+        id: 'pk_row_1',
+        createdAt: '2026-01-02T03:04:05.000Z',
+        lastUsedAt: null,
+        name: 'MacBook 的 Touch ID',
+      },
     ]);
-    expect(Object.keys(outcome.passkeys[0]!).sort()).toEqual(['createdAt', 'id', 'lastUsedAt']);
+    // 键的集合钉住：白名单既不许漏 `name`，也不许被摊宽。
+    expect(Object.keys(outcome.passkeys[0]!).sort()).toEqual([
+      'createdAt',
+      'id',
+      'lastUsedAt',
+      'name',
+    ]);
     const serialized = JSON.stringify(outcome);
     expect(serialized).not.toContain('publicKey');
     expect(serialized).not.toContain('credentialId');
     expect(serialized).not.toContain('BASE64URLSECRET');
+  });
+
+  it('没起过名字的凭据 → name 是 null（而不是掉字段或空串）', async () => {
+    const { impl } = recordingFetch(() => ({
+      status: 200,
+      body: {
+        passkeys: [
+          { id: 'pk_row_1', createdAt: '2026-01-02T03:04:05.000Z', lastUsedAt: null },
+        ],
+      },
+    }));
+
+    const outcome = await listPasskeys(opts({ fetchImpl: impl }), 'tok');
+
+    expect(outcome.ok).toBe(true);
+    if (!outcome.ok) return;
+    // 老服务端不回这个键 = 没名字，**不是**畸形响应：少一个可选字段
+    // 不该让整个列表变成错误（那会把"没名字"显示成"列表加载失败"）。
+    expect(outcome.passkeys[0]!.name).toBeNull();
+  });
+
+  it('🔴 name 是数字等非字符串 → malformed-response（不静默当成没名字）', async () => {
+    const { impl } = recordingFetch(() => ({
+      status: 200,
+      body: {
+        passkeys: [
+          { id: 'pk_row_1', createdAt: '2026-01-02T03:04:05.000Z', lastUsedAt: null, name: 42 },
+        ],
+      },
+    }));
+
+    const outcome = await listPasskeys(opts({ fetchImpl: impl }), 'tok');
+
+    expect(outcome.ok).toBe(false);
+    if (outcome.ok) return;
+    expect(outcome.reason).toBe('malformed-response');
   });
 
   it('空令牌 → unauthorized，且一个请求都不发', async () => {
@@ -445,5 +499,167 @@ describe('已认证"再加一条"凭据的客户端契约', () => {
 
     expect(outcome.ok).toBe(false);
     if (!outcome.ok) expect(outcome.reason).toBe('unauthorized');
+  });
+});
+
+describe('renamePasskey 契约', () => {
+  it('PATCH /api/passkeys/:id，带 bearer 令牌，请求体只有 name', async () => {
+    const { impl, calls } = recordingFetch(() => ({ status: 200, body: { success: true } }));
+
+    const outcome = await renamePasskey(opts({ fetchImpl: impl }), {
+      token: 'tok',
+      id: 'pk_row_1',
+      name: 'MacBook 的 Touch ID',
+    });
+
+    expect(outcome).toEqual({ ok: true, renamed: true });
+    expect(calls).toHaveLength(1);
+    expect(calls[0]!.url).toBe('https://sync.example.com/api/passkeys/pk_row_1');
+    expect(calls[0]!.init?.method).toBe('PATCH');
+    expect(headerOf(calls[0]!.init)['authorization']).toBe('Bearer tok');
+    // 🔴 只送 name：别的字段（尤其是 id / userId）都不许出现在请求体里，
+    // 归属只能由令牌决定。
+    expect(calls[0]!.body).toEqual({ name: 'MacBook 的 Touch ID' });
+    expect(Object.keys(calls[0]!.body as object)).toEqual(['name']);
+  });
+
+  it('id 进路径前会转义（与删除共用同一条路径构造）', async () => {
+    const { impl, calls } = recordingFetch(() => ({ status: 200, body: { success: true } }));
+
+    await renamePasskey(opts({ fetchImpl: impl }), {
+      token: 'tok',
+      id: 'a/b c?d',
+      name: 'x',
+    });
+
+    expect(calls[0]!.url).toBe('https://sync.example.com/api/passkeys/a%2Fb%20c%3Fd');
+    // 与删除逐字节同一条路径 —— 协议只有一份。
+    expect(passkeyPath('a/b c?d')).toBe(passkeyDeletePath('a/b c?d'));
+  });
+
+  it('name: null 照常送出（去掉名字也是一种改名）', async () => {
+    const { impl, calls } = recordingFetch(() => ({ status: 200, body: { success: true } }));
+
+    const outcome = await renamePasskey(opts({ fetchImpl: impl }), {
+      token: 'tok',
+      id: 'pk_row_1',
+      name: null,
+    });
+
+    expect(outcome).toEqual({ ok: true, renamed: true });
+    expect(calls[0]!.body).toEqual({ name: null });
+  });
+
+  it('不做客户端归一化：空串原样送出，由服务端决定"空 = 没名字"', async () => {
+    const { impl, calls } = recordingFetch(() => ({ status: 200, body: { success: true } }));
+
+    await renamePasskey(opts({ fetchImpl: impl }), { token: 'tok', id: 'pk_row_1', name: '   ' });
+
+    // 归一化规则只在服务端一处；客户端 trim 会让两边对"什么算没名字"产生分歧。
+    expect(calls[0]!.body).toEqual({ name: '   ' });
+  });
+
+  it('🔴 404 + passkey_not_found_for_user → passkey-not-found（不是笼统失败）', async () => {
+    const { impl } = recordingFetch(() => ({
+      status: 404,
+      body: { error: 'Passkey not found', code: 'passkey_not_found_for_user' },
+    }));
+
+    const outcome = await renamePasskey(opts({ fetchImpl: impl }), {
+      token: 'tok',
+      id: 'belongs-to-user-2',
+      name: 'x',
+    });
+
+    expect(outcome.ok).toBe(false);
+    if (outcome.ok) return;
+    expect(outcome.reason).toBe('passkey-not-found');
+  });
+
+  it('🔴 400 + passkey_name_too_long → passkey-name-too-long（不是笼统的 invalid-input）', async () => {
+    const { impl } = recordingFetch(() => ({
+      status: 400,
+      body: { error: 'Passkey name is too long', code: 'passkey_name_too_long' },
+    }));
+
+    const outcome = await renamePasskey(opts({ fetchImpl: impl }), {
+      token: 'tok',
+      id: 'pk_row_1',
+      name: 'x'.repeat(HOSTED_PASSKEY_NAME_MAX_LENGTH + 1),
+    });
+
+    expect(outcome.ok).toBe(false);
+    if (outcome.ok) return;
+    // 笼统的 invalid-input 只会让用户以为"哪一项填错了"，而这条要能做
+    // "把名字改短一点"这个具体动作 —— 所以必须有自己的原因。
+    expect(outcome.reason).toBe('passkey-name-too-long');
+  });
+
+  it('空令牌 / 空 id → 不发请求', async () => {
+    const { impl, calls } = recordingFetch(() => ({ status: 200, body: { success: true } }));
+
+    const noToken = await renamePasskey(opts({ fetchImpl: impl }), {
+      token: '',
+      id: 'pk_row_1',
+      name: 'x',
+    });
+    const noId = await renamePasskey(opts({ fetchImpl: impl }), {
+      token: 'tok',
+      id: '',
+      name: 'x',
+    });
+
+    expect(noToken).toEqual({ ok: false, reason: 'unauthorized' });
+    expect(noId).toEqual({ ok: false, reason: 'invalid-input' });
+    expect(calls).toHaveLength(0);
+  });
+
+  it('未配置地址 → unconfigured，且一个请求都不发', async () => {
+    const { impl, calls } = recordingFetch(() => ({ status: 200, body: { success: true } }));
+
+    const outcome = await renamePasskey(opts({ baseUrl: '', fetchImpl: impl }), {
+      token: 'tok',
+      id: 'pk_row_1',
+      name: 'x',
+    });
+
+    expect(outcome).toEqual({ ok: false, reason: 'unconfigured' });
+    expect(calls).toHaveLength(0);
+  });
+
+  it('🔴 2xx 但响应体解析不出来 → 不当成功（反代返回 HTML 的那种）', async () => {
+    // 与 deletePasskey 同一条 fail-safe：状态码 2xx 不足以说明"名字改了"，
+    // 主体必须真的能解析成 JSON。
+    const impl = (() =>
+      Promise.resolve({
+        status: 200,
+        ok: true,
+        json: () => Promise.reject(new Error('not json')),
+      } as unknown as Response)) as unknown as typeof fetch;
+
+    const outcome = await renamePasskey(opts({ fetchImpl: impl }), {
+      token: 'tok',
+      id: 'pk_row_1',
+      name: 'x',
+    });
+
+    expect(outcome).toEqual({ ok: false, reason: 'malformed-response', status: 200 });
+  });
+
+  it('401 → unauthorized（而不是当成名字已改）', async () => {
+    const { impl } = recordingFetch(() => ({
+      status: 401,
+      body: { error: 'Missing or invalid Authorization header' },
+    }));
+
+    const outcome = await renamePasskey(opts({ fetchImpl: impl }), {
+      token: 'stale',
+      id: 'pk_row_1',
+      name: 'x',
+    });
+
+    expect(outcome.ok).toBe(false);
+    if (outcome.ok) return;
+    expect(outcome.reason).toBe('unauthorized');
   });
 });

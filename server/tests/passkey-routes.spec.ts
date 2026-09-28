@@ -28,6 +28,7 @@ vi.mock('../src/db', () => {
       findUnique: vi.fn(),
       deleteMany: vi.fn(),
       update: vi.fn(),
+      updateMany: vi.fn(),
     },
     $transaction: vi.fn(),
   };
@@ -54,6 +55,7 @@ const mockPrisma = prisma as unknown as {
     findUnique: Mock;
     deleteMany: Mock;
     update: Mock;
+    updateMany: Mock;
   };
   $transaction: Mock;
 };
@@ -197,6 +199,124 @@ describe('通行密钥自助管理（HTTP）', () => {
       // 路由不匹配空段 → 404；这里只是确认它没有被当成"删全部"。
       expect([400, 404]).toContain(res.statusCode);
       expect(mockPrisma.passkey.deleteMany).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('PATCH /api/passkeys/:id（改名）', () => {
+    const patch = (
+      url: string,
+      payload?: unknown,
+      headers: Record<string, string> = AUTH,
+    ): ReturnType<typeof app.inject> =>
+      app.inject({
+        method: 'PATCH',
+        url,
+        headers,
+        ...(payload === undefined ? {} : { payload }),
+      });
+
+    it('未认证 → 401，且一次改名都没发生', async () => {
+      const res = await patch('/api/passkeys/pk_row_1', { name: 'x' }, {});
+
+      expect(res.statusCode).toBe(401);
+      expect(mockPrisma.passkey.updateMany).not.toHaveBeenCalled();
+    });
+
+    it('改自己的某一条 → 200 { success: true }', async () => {
+      mockPrisma.passkey.updateMany.mockResolvedValue({ count: 1 });
+
+      const res = await patch('/api/passkeys/pk_row_1', { name: 'MacBook 的 Touch ID' });
+
+      expect(res.statusCode).toBe(200);
+      expect(res.json()).toEqual({ success: true });
+      expect(mockPrisma.passkey.updateMany).toHaveBeenCalledWith({
+        where: { id: 'pk_row_1', userId: 1 },
+        data: { name: 'MacBook 的 Touch ID' },
+      });
+    });
+
+    it('name: null → 200，且 data.name 是 null（去掉名字）', async () => {
+      mockPrisma.passkey.updateMany.mockResolvedValue({ count: 1 });
+
+      const res = await patch('/api/passkeys/pk_row_1', { name: null });
+
+      expect(res.statusCode).toBe(200);
+      expect(mockPrisma.passkey.updateMany).toHaveBeenCalledWith({
+        where: { id: 'pk_row_1', userId: 1 },
+        data: { name: null },
+      });
+    });
+
+    it('🔴 改别人的 → 404（不是 403），且与"改不存在的 id"逐字节相同', async () => {
+      mockPrisma.passkey.updateMany.mockResolvedValue({ count: 0 });
+
+      const others = await patch('/api/passkeys/belongs-to-user-2', { name: 'x' });
+      const ghost = await patch('/api/passkeys/no-such-row-at-all', { name: 'x' });
+
+      expect(others.statusCode).toBe(404);
+      // 403 会说"存在但不归你"；这条断言就是防它回来的。
+      expect(others.statusCode).not.toBe(403);
+      expect(others.json()).toEqual({
+        error: 'Passkey not found',
+        code: 'passkey_not_found_for_user',
+      });
+      // 不泄露存在性：两种输入必须产出**完全相同**的响应。
+      expect(others.body).toBe(ghost.body);
+    });
+
+    it('🔴 改名的 404 与删除的 404 **逐字节相同**（同一件事只能有一种说法）', async () => {
+      mockPrisma.passkey.updateMany.mockResolvedValue({ count: 0 });
+      mockPrisma.passkey.deleteMany.mockResolvedValue({ count: 0 });
+      mockPrisma.passkey.findFirst.mockResolvedValue(null);
+
+      const renamed = await patch('/api/passkeys/belongs-to-user-2', { name: 'x' });
+      const deleted = await app.inject({
+        method: 'DELETE',
+        url: '/api/passkeys/belongs-to-user-2',
+        headers: AUTH,
+      });
+
+      expect(renamed.statusCode).toBe(deleted.statusCode);
+      expect(renamed.body).toBe(deleted.body);
+    });
+
+    it('🔴 超长 → 400 + passkey_name_too_long，且**根本没写库**', async () => {
+      const res = await patch('/api/passkeys/pk_row_1', { name: 'x'.repeat(61) });
+
+      expect(res.statusCode).toBe(400);
+      // 不写库是关键：不是"写完再骂"。
+      expect(mockPrisma.passkey.updateMany).not.toHaveBeenCalled();
+    });
+
+    it('请求体里塞 userId 改不了归属（zod 剥未知键）', async () => {
+      mockPrisma.passkey.updateMany.mockResolvedValue({ count: 1 });
+
+      const res = await patch('/api/passkeys/pk_row_1', {
+        name: 'still mine',
+        userId: 2,
+        id: 'some-other-row',
+      });
+
+      expect(res.statusCode).toBe(200);
+      // 🔴 归属仍然来自令牌：`where.id` 是 URL 里的那条，`userId` 是 1。
+      expect(mockPrisma.passkey.updateMany).toHaveBeenCalledWith({
+        where: { id: 'pk_row_1', userId: 1 },
+        data: { name: 'still mine' },
+      });
+    });
+
+    it('name 不是字符串 → 400，且不写库', async () => {
+      const res = await patch('/api/passkeys/pk_row_1', { name: 123 });
+
+      expect(res.statusCode).toBe(400);
+      expect(mockPrisma.passkey.updateMany).not.toHaveBeenCalled();
+    });
+
+    it('没有请求体 → 400，且不写库', async () => {
+      const res = await patch('/api/passkeys/pk_row_1');
+
+      expect(res.statusCode).toBe(400);
+      expect(mockPrisma.passkey.updateMany).not.toHaveBeenCalled();
     });
   });
 

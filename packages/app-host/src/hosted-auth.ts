@@ -94,9 +94,30 @@ export const HOSTED_AUTH_PATHS = {
  * 服务端那边的行 id 是 cuid（不含特殊字符），但这里**不假设**它安全 ——
  * 拼接属于协议，协议在 app-host 里只有一份，不能指望每个调用方都记得转义。
  */
-export function passkeyDeletePath(id: string): string {
+export function passkeyPath(id: string): string {
   return `${HOSTED_AUTH_PATHS.passkeys}/${encodeURIComponent(id)}`;
 }
+
+/**
+ * 删除单条凭据的路径。
+ *
+ * 删除与改名是**同一个资源**（`/api/passkeys/:id`），只是 HTTP 方法不同，
+ * 所以这里与 `renamePasskey` 共用一个实现（`passkeyPath`）。
+ * 保留这个名字是因为已有调用方和测试在用；它不再自己拼字符串。
+ */
+export function passkeyDeletePath(id: string): string {
+  return passkeyPath(id);
+}
+
+/**
+ * 凭据名字的最大长度。**权威在服务端**（`PASSKEY_NAME_MAX_LENGTH`，zod 用它
+ * 返回 400 + `passkey_name_too_long`）。
+ *
+ * 这里放一份是为了界面能用 `maxLength` 在**输入时**就挡住：让用户打完 100 个字
+ * 再被拒是一次没必要的往返。两处万一不一致，表现是"界面让输、服务端 400"，
+ * 而那条错误码会在界面上说清为什么 —— 不会变成一个说不明白的失败。
+ */
+export const HOSTED_PASSKEY_NAME_MAX_LENGTH = 60;
 
 /** 一次登录得到的会话。`token` 就是要填进同步设置的访问令牌。 */
 export interface HostedAuthSession {
@@ -185,7 +206,16 @@ export type HostedAuthFailureReason =
    * 纯通行密钥账号没有别的登录方式）。界面该说的是"先添加一条新的"，
    * 而不是"操作失败，请重试" —— 后者会让用户一直重试同一个不可能成功的操作。
    */
-  | 'last-passkey';
+  | 'last-passkey'
+  /**
+   * 改名的输入超过上限（服务端 400 + `code: 'passkey_name_too_long'`）。
+   *
+   * 🔴 与 `invalid-input` 分开：那个是"输入不合法"的统称，用户不知道该怎么办；
+   * 这个能直接说"名字最多 60 字"。正常路径上界面的 `maxLength` 就会挡住，
+   * 所以它出现就说明调用方绕过了界面 —— 但那更该给出准确的话，而不是笼统的
+   * "输入不合法"。
+   */
+  | 'passkey-name-too-long';
 
 export interface HostedAuthFailure {
   ok: false;
@@ -270,6 +300,9 @@ const FAILURE_REASON_BY_SERVER_CODE: Readonly<Record<string, HostedAuthFailureRe
   // 前端正常会被 excludeCredentials 先挡在设备侧（InvalidStateError，
   // 同样映射到这个原因），这是绕过前端时的服务端守卫给出的码。
   passkey_already_registered: 'passkey-already-registered',
+  // 改名时名字超过上限。没有这一条它会退回 classifyStatus(400) → 'invalid-input'，
+  // 也是一句正确但没用的话；用户需要知道"最多 60 字"。
+  passkey_name_too_long: 'passkey-name-too-long',
 };
 
 /** 由服务端 `code` 与 HTTP 状态共同决定原因；只有白名单里的码会覆盖状态分类。 */
@@ -313,7 +346,7 @@ function classifyStatus(status: number): HostedAuthFailureReason {
  */
 async function sendJson(
   options: HostedAuthOptions,
-  method: 'GET' | 'POST' | 'DELETE',
+  method: 'GET' | 'POST' | 'PATCH' | 'DELETE',
   path: string,
   payload?: unknown,
   token?: string,
@@ -680,9 +713,24 @@ export interface HostedPasskeySummary {
   createdAt: string;
   /** ISO 8601 或 null（从未使用过）。 */
   lastUsedAt: string | null;
+  /**
+   * 用户自己起的名字；**没起过时为 `null`**。
+   *
+   * 界面据此回落到创建时间。刻意与空串区分：`''` 既不是名字、
+   * 又会让"有没有名字"的判断失效，服务端因此把它归一成 `null`。
+   */
+  name: string | null;
 }
 
-/** 只把服务端给的三个字段挑出来。缺任何一个都判 `malformed-response`。 */
+/**
+ * 只把服务端给的字段挑出来。缺任何一个都判 `malformed-response`。
+ *
+ * ⚠️ `name` 必须显式列进这个白名单。它是**新增**字段，而白名单的语义是
+ * "服务端多给的字段不会流到界面上" —— 光靠服务端返回、不在这里挑，
+ * 名字会**静默丢掉**，界面永远只显示回落值，而且没有任何测试会红
+ * （这正是 `apps/web/tests/passkey-panel.spec.tsx` 里那条"改名之后
+ * 列表里出现新名字"的用例要钉住的东西）。
+ */
 function parsePasskeySummaries(body: unknown): HostedPasskeySummary[] | undefined {
   if (body === null || typeof body !== 'object' || Array.isArray(body)) return undefined;
   const list = (body as Record<string, unknown>)['passkeys'];
@@ -695,11 +743,15 @@ function parsePasskeySummaries(body: unknown): HostedPasskeySummary[] | undefine
     const id = record['id'];
     const createdAt = record['createdAt'];
     const lastUsedAt = record['lastUsedAt'];
+    const name = record['name'];
     if (typeof id !== 'string' || id === '') return undefined;
     if (typeof createdAt !== 'string' || createdAt === '') return undefined;
     if (lastUsedAt !== null && typeof lastUsedAt !== 'string') return undefined;
+    // 老服务端不会有这个键 → `undefined`。那是"没名字"，不是畸形响应：
+    // 服务端可能还没升级，而少一个可选字段不该让整个列表变成错误。
+    if (name !== undefined && name !== null && typeof name !== 'string') return undefined;
     // 🔴 白名单映射：服务端哪天多返回一个字段，也**不会**流到界面上。
-    summaries.push({ id, createdAt, lastUsedAt });
+    summaries.push({ id, createdAt, lastUsedAt, name: typeof name === 'string' ? name : null });
   }
   return summaries;
 }
@@ -753,6 +805,40 @@ export async function deletePasskey(
   if (!result.ok) return result;
 
   return { ok: true, deleted: true };
+}
+
+/**
+ * 给当前账号的一条通行密钥改名；`name: null`（或空串）表示**去掉名字**。
+ *
+ * 归属由服务端按令牌判定；本函数**不**发送任何"这是谁的"字段 ——
+ * 与 `deletePasskey` 同一条纪律。
+ *
+ * 归一化（首尾空白、空串 → `null`）**只做在服务端**：客户端再写一遍
+ * 就是第二个真相源，两处迟早对不上。这里原样送出去。
+ *
+ * ⚠️ 成功时**不返回**改名后的对象。界面的真相来自重新拉取列表
+ * （`passkeysStore.rename` 之后会 `refresh()`）。在这里回传一份
+ * "我以为服务端存了什么"的副本，只会多一个可能与服务端不一致的状态。
+ */
+export async function renamePasskey(
+  options: HostedAuthOptions,
+  input: { token: string; id: string; name: string | null },
+): Promise<HostedAuthOutcome<{ renamed: true }>> {
+  const trimmedToken = input.token.trim();
+  if (trimmedToken === '') return failure('unauthorized');
+  const id = input.id.trim();
+  if (id === '') return failure('invalid-input');
+
+  const result = await sendJson(
+    options,
+    'PATCH',
+    passkeyPath(id),
+    { name: input.name },
+    trimmedToken,
+  );
+  if (!result.ok) return result;
+
+  return { ok: true, renamed: true };
 }
 
 // ── 已认证地给当前账号「再加一条」凭据（协议一半）──────────────

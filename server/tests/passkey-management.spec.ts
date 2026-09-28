@@ -32,6 +32,7 @@ vi.mock('../src/db', () => {
       findUnique: vi.fn(),
       deleteMany: vi.fn(),
       update: vi.fn(),
+      updateMany: vi.fn(),
     },
     $transaction: vi.fn(),
   };
@@ -50,6 +51,8 @@ import * as simplewebauthn from '@simplewebauthn/server';
 import {
   listUserPasskeys,
   deleteUserPasskey,
+  renameUserPasskey,
+  PASSKEY_NAME_MAX_LENGTH,
   generateAuthenticationOptions,
   verifyAuthentication,
   PasskeyError,
@@ -63,6 +66,7 @@ const mockPrisma = prisma as unknown as {
     findUnique: Mock;
     deleteMany: Mock;
     update: Mock;
+    updateMany: Mock;
   };
   $transaction: Mock;
 };
@@ -75,6 +79,9 @@ const rowWithSecrets = {
   id: 'pk_row_1',
   createdAt: new Date('2026-01-02T03:04:05.000Z'),
   lastUsedAt: new Date('2026-02-03T04:05:06.000Z'),
+  // 名字是**用户可见**的字段，故意和敏感列放在同一行里：映射必须是白名单，
+  // 所以"漏掉 name"（界面永远看不到名字）与"摊平 row"（泄露公钥）都要变红。
+  name: 'MacBook 的 Touch ID',
   credentialId: Buffer.from([1, 2, 3, 4]),
   publicKey: Buffer.from([5, 6, 7, 8]),
   counter: BigInt(3),
@@ -89,6 +96,8 @@ beforeEach(() => {
   );
   mockPrisma.passkey.deleteMany.mockResolvedValue({ count: 1 });
   mockPrisma.passkey.findFirst.mockResolvedValue(null);
+  // 改名默认命中 1 行（成功）。需要失败形状的用例自己覆盖。
+  mockPrisma.passkey.updateMany.mockResolvedValue({ count: 1 });
   mockGenerateAuthentication.mockResolvedValue({
     challenge: 'test-challenge',
     rpId: 'localhost',
@@ -96,16 +105,20 @@ beforeEach(() => {
 });
 
 describe('listUserPasskeys', () => {
-  it('返回形状是白名单：只有 id / createdAt / lastUsedAt', async () => {
+  it('返回形状是白名单：只有 id / createdAt / lastUsedAt / name', async () => {
     mockPrisma.passkey.findMany.mockResolvedValue([rowWithSecrets]);
 
     const summaries = await listUserPasskeys(1);
 
+    // 🔴 必须显式写出 `name`，不能靠"没写就等于没有"：`toEqual` 认为
+    // `{ name: undefined }` 与"根本没有 name 键"相等，所以**漏掉 name 的映射
+    // 在旧写法下照样绿**。这里把名字给成真值，漏掉就一定会红。
     expect(summaries).toEqual([
       {
         id: 'pk_row_1',
         createdAt: '2026-01-02T03:04:05.000Z',
         lastUsedAt: '2026-02-03T04:05:06.000Z',
+        name: 'MacBook 的 Touch ID',
       },
     ]);
   });
@@ -119,10 +132,16 @@ describe('listUserPasskeys', () => {
     expect(serialized).not.toContain('publicKey');
     expect(serialized).not.toContain('credentialId');
     // 键的**集合**也钉住：多一个字段就说明白名单被改宽了。
-    expect(Object.keys(summaries[0]!).sort()).toEqual(['createdAt', 'id', 'lastUsedAt']);
+    // `name` 是唯一新增的可展示字段 —— 它在这里出现，敏感列一个都不在。
+    expect(Object.keys(summaries[0]!).sort()).toEqual([
+      'createdAt',
+      'id',
+      'lastUsedAt',
+      'name',
+    ]);
   });
 
-  it('查询本身就只 select 这三个字段（少读一次敏感列）', async () => {
+  it('查询本身就只 select 这四个字段（少读一次敏感列）', async () => {
     mockPrisma.passkey.findMany.mockResolvedValue([]);
 
     await listUserPasskeys(7);
@@ -130,7 +149,7 @@ describe('listUserPasskeys', () => {
     expect(mockPrisma.passkey.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
         where: { userId: 7 },
-        select: { id: true, createdAt: true, lastUsedAt: true },
+        select: { id: true, createdAt: true, lastUsedAt: true, name: true },
       }),
     );
   });
@@ -298,5 +317,116 @@ describe('缺口 B：陈旧凭据与验签失败是两个不同的码', () => {
     );
 
     expect(notFound.code).not.toBe(badSignature.code);
+  });
+});
+
+/**
+ * 改名 —— 服务层。
+ *
+ * 这里钉的是三件事，都不是"函数能不能跑"：
+ *   1. **归属**：谓词里必须带 `userId`，否则任何登录用户都能改别人凭据的名字；
+ *      "别人的 / 不存在的"抛**同一个**码（接口层投影成 404），响应里没有
+ *      任何东西能区分两者。
+ *   2. **归一化**：空串 / 纯空白 → `null`（去掉名字），首尾空白被 trim。
+ *      库里绝不留 `''` —— 那是个既不是名字、又让 `name === null` 失效的值。
+ *   3. **不谎报成功**：`count !== 1` 时抛错，绝不返回 `{ renamed: true }`。
+ */
+describe('renameUserPasskey', () => {
+  it('谓词同时带 id 与 userId（否则能改别人的）', async () => {
+    const result = await renameUserPasskey(1, 'pk_row_1', '我的备用密钥');
+
+    expect(result).toEqual({ renamed: true });
+    expect(mockPrisma.passkey.updateMany).toHaveBeenCalledWith({
+      where: { id: 'pk_row_1', userId: 1 },
+      data: { name: '我的备用密钥' },
+    });
+  });
+
+  it('🔴 改别人的 / 不存在的 → 同一个码（调用方无法区分）', async () => {
+    mockPrisma.passkey.updateMany.mockResolvedValue({ count: 0 });
+
+    const error = await renameUserPasskey(1, 'someone-elses-row', 'x').catch((e: unknown) => e);
+
+    expect(error).toBeInstanceOf(PasskeyError);
+    expect((error as PasskeyError).code).toBe('passkey_not_found_for_user');
+    // 与删除同一个码：接口层因此能用**逐字节相同**的 404 回这两件事。
+    expect(mockPrisma.passkey.updateMany).toHaveBeenCalledWith({
+      where: { id: 'someone-elses-row', userId: 1 },
+      data: { name: 'x' },
+    });
+  });
+
+  it('count 0 时绝不谎报成功', async () => {
+    mockPrisma.passkey.updateMany.mockResolvedValue({ count: 0 });
+
+    let resolved: unknown = undefined;
+    await renameUserPasskey(1, 'pk_row_1', 'x')
+      .then((r) => {
+        resolved = r;
+      })
+      .catch(() => undefined);
+
+    expect(resolved).toBeUndefined();
+  });
+
+  it('空串 / 纯空白 → null（去掉名字，而不是存一个空字符串）', async () => {
+    await renameUserPasskey(1, 'pk_row_1', '');
+    expect(mockPrisma.passkey.updateMany).toHaveBeenLastCalledWith({
+      where: { id: 'pk_row_1', userId: 1 },
+      data: { name: null },
+    });
+
+    await renameUserPasskey(1, 'pk_row_1', '   ');
+    expect(mockPrisma.passkey.updateMany).toHaveBeenLastCalledWith({
+      where: { id: 'pk_row_1', userId: 1 },
+      data: { name: null },
+    });
+  });
+
+  it('显式 null 也是去掉名字', async () => {
+    await renameUserPasskey(1, 'pk_row_1', null);
+    expect(mockPrisma.passkey.updateMany).toHaveBeenLastCalledWith({
+      where: { id: 'pk_row_1', userId: 1 },
+      data: { name: null },
+    });
+  });
+
+  it('首尾空白被 trim 掉（" 名字 " 与 "名字" 是同一个名字）', async () => {
+    await renameUserPasskey(1, 'pk_row_1', '  MacBook  ');
+    expect(mockPrisma.passkey.updateMany).toHaveBeenLastCalledWith({
+      where: { id: 'pk_row_1', userId: 1 },
+      data: { name: 'MacBook' },
+    });
+  });
+
+  it('🔴 超长 → passkey_name_too_long，且**根本不写库**', async () => {
+    const tooLong = 'x'.repeat(PASSKEY_NAME_MAX_LENGTH + 1);
+
+    const error = await renameUserPasskey(1, 'pk_row_1', tooLong).catch((e: unknown) => e);
+
+    expect(error).toBeInstanceOf(PasskeyError);
+    expect((error as PasskeyError).code).toBe('passkey_name_too_long');
+    // 关键：不是"写完再骂" —— 越长的输入越不该先落库。
+    expect(mockPrisma.passkey.updateMany).not.toHaveBeenCalled();
+  });
+
+  it('恰好到上限是允许的（边界不小一）', async () => {
+    const atLimit = 'x'.repeat(PASSKEY_NAME_MAX_LENGTH);
+
+    await expect(renameUserPasskey(1, 'pk_row_1', atLimit)).resolves.toEqual({ renamed: true });
+    expect(mockPrisma.passkey.updateMany).toHaveBeenCalledWith({
+      where: { id: 'pk_row_1', userId: 1 },
+      data: { name: atLimit },
+    });
+  });
+
+  it('trim 之后才判长度（62 个空格不是"太长"，是"没名字"）', async () => {
+    const spaces = ' '.repeat(PASSKEY_NAME_MAX_LENGTH + 2);
+
+    await expect(renameUserPasskey(1, 'pk_row_1', spaces)).resolves.toEqual({ renamed: true });
+    expect(mockPrisma.passkey.updateMany).toHaveBeenCalledWith({
+      where: { id: 'pk_row_1', userId: 1 },
+      data: { name: null },
+    });
   });
 });

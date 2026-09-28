@@ -21,6 +21,8 @@ import {
   completePasskeyRecovery,
   listUserPasskeys,
   deleteUserPasskey,
+  renameUserPasskey,
+  PASSKEY_NAME_MAX_LENGTH,
   generateUserPasskeyOptions,
   completeUserPasskeyRegistration,
   PasskeyError,
@@ -101,6 +103,21 @@ const PasskeyIdParamSchema = z.object({
 });
 
 /**
+ * 改名请求体。
+ *
+ * `null` 是**合法值**，表示"去掉名字"（与空串同义 —— 服务层的
+ * `normalizePasskeyName` 把两者都归一成 `null`）。
+ *
+ * ⚠️ 顺序是 `.trim()` 在 `.max()` **之前**：先去掉首尾空白再判长度，
+ * 否则一串 200 个空格会因为"太长"被 400 掉，而它其实等于"清空名字"。
+ * 长度上限与 `PASSKEY_NAME_MAX_LENGTH` 共用同一个常量 —— 界面、zod、
+ * 服务层各写一个字面量迟早漂移，而漂移的样子是"界面让输、服务端 400"。
+ */
+const PasskeyRenameSchema = z.object({
+  name: z.string().trim().max(PASSKEY_NAME_MAX_LENGTH).nullable(),
+});
+
+/**
  * 已认证地"再加一条凭据"的完成体。
  *
  * 🔴 只有 `credential` 一个字段，**没有任何"这是谁的凭据"的字段** ——
@@ -137,6 +154,8 @@ type MagicLinkVerifyBody = z.infer<typeof MagicLinkVerifySchema>;
 type PasskeyIdParams = z.infer<typeof PasskeyIdParamSchema>;
 type PasskeyEnrollmentCompleteBody = z.infer<typeof PasskeyEnrollmentCompleteSchema>;
 
+type PasskeyRenameBody = z.infer<typeof PasskeyRenameSchema>;
+
 /**
  * 客户端可见的通行密钥文案。
  *
@@ -152,6 +171,7 @@ const LAST_PASSKEY_MESSAGE =
   'This is your only passkey, so it cannot be removed. Add another passkey first.';
 const PASSKEY_ALREADY_REGISTERED_MESSAGE =
   'This passkey is already registered on this account.';
+const PASSKEY_NAME_TOO_LONG_MESSAGE = 'Passkey name is too long';
 
 // Known safe error messages that can be shown to clients
 const SAFE_ERROR_MESSAGES = new Set([
@@ -714,6 +734,70 @@ export const apiRoutes = async (
           });
         }
         return reply.status(500).send({ error: 'Failed to delete passkey.' });
+      }
+    },
+  );
+
+  // Rename one of the caller's own passkeys（或去掉名字 —— `name: null`）
+  //
+  // 为什么需要它：设置页同时支持"再加一条"和"删一条"，而一条凭据能展示的
+  // 只有创建时间与最后使用时间。同一台设备反复加过几条之后，用户没有任何
+  // 办法分辨"要删的是哪一条" —— 在"至少留一条，否则账号会被锁死"的规则下，
+  // 删错一条是有代价的。
+  fastify.patch<{ Params: PasskeyIdParams }>(
+    '/passkeys/:id',
+    {
+      preHandler: authenticate,
+      config: {
+        rateLimit: {
+          max: 20,
+          timeWindow: '15 minutes',
+        },
+      },
+    },
+    async (req, reply) => {
+      const parsedParams = PasskeyIdParamSchema.safeParse(req.params);
+      if (!parsedParams.success) {
+        return reply.status(400).send({
+          error: 'Validation failed',
+          details: parsedParams.error.issues,
+        });
+      }
+
+      const parsedBody = PasskeyRenameSchema.safeParse(req.body);
+      if (!parsedBody.success) {
+        return reply.status(400).send({
+          error: 'Validation failed',
+          details: parsedBody.error.issues,
+        });
+      }
+
+      try {
+        const { userId } = getAuthUser(req);
+        await renameUserPasskey(userId, parsedParams.data.id, parsedBody.data.name);
+        // 不回传改名后的对象：界面的真相来自重新拉取列表
+        // （见 `passkeysStore.rename` 的注释）。
+        return reply.send({ success: true });
+      } catch (err) {
+        const errMsg = err instanceof Error ? err.message : 'Unknown error';
+        Logger.error(`Passkey rename error: ${errMsg}`);
+
+        // 与删除**逐字节相同**的 404：别人的凭据与不存在的凭据不可区分。
+        // 这里多一个不同的码（或者换成 403）就等于把 404 那条纪律作废。
+        if (err instanceof PasskeyError && err.code === 'passkey_not_found_for_user') {
+          return reply.status(404).send({
+            error: PASSKEY_NOT_FOUND_FOR_USER_MESSAGE,
+            code: 'passkey_not_found_for_user',
+          });
+        }
+        // zod 已经挡了正常输入；这是绕过 HTTP 的调用方才撞得到的兜底。
+        if (err instanceof PasskeyError && err.code === 'passkey_name_too_long') {
+          return reply.status(400).send({
+            error: PASSKEY_NAME_TOO_LONG_MESSAGE,
+            code: 'passkey_name_too_long',
+          });
+        }
+        return reply.status(500).send({ error: 'Failed to rename passkey.' });
       }
     },
   );
