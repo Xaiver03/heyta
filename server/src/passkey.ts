@@ -907,6 +907,13 @@ export interface PasskeySummary {
   createdAt: string;
   /** ISO 8601；从未用过时为 null。 */
   lastUsedAt: string | null;
+  /**
+   * 用户自己起的名字；**没起过时为 `null`**，不是空字符串。
+   *
+   * 界面据此回落到创建时间。区分 `null` 与 `''` 很重要：空字符串会让
+   * "这条没名字"和"这条的名字被清空了"变得无法分辨，而两者都该走同一条回落。
+   */
+  name: string | null;
 }
 
 /**
@@ -918,7 +925,7 @@ export interface PasskeySummary {
 export const listUserPasskeys = async (userId: number): Promise<PasskeySummary[]> => {
   const rows = await prisma.passkey.findMany({
     where: { userId },
-    select: { id: true, createdAt: true, lastUsedAt: true },
+    select: { id: true, createdAt: true, lastUsedAt: true, name: true },
     // 新的在前 —— 用户最可能想删的是刚加错的那条。
     orderBy: { createdAt: 'desc' },
   });
@@ -927,6 +934,7 @@ export const listUserPasskeys = async (userId: number): Promise<PasskeySummary[]
     id: row.id,
     createdAt: row.createdAt.toISOString(),
     lastUsedAt: row.lastUsedAt === null ? null : row.lastUsedAt.toISOString(),
+    name: row.name,
   }));
 };
 
