@@ -22,7 +22,7 @@ ARCHIVE="${1:-/tmp/heyta.xcarchive}"
 OUT_DIR="${2:-/tmp/heyta-ipa}"
 TEAM="V5S2LT9YV8"
 
-[ -d "$ARCHIVE" ] || { echo "🔴 找不到归档：$ARCHIVE（先跑 archive-release.sh）"; exit 1; }
+[ -d "$ARCHIVE" ] || { echo "🔴 找不到归档：${ARCHIVE}（先跑 archive-release.sh）"; exit 1; }
 
 TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT

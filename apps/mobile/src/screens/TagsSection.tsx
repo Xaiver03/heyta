@@ -1,14 +1,18 @@
 /**
- * 标签管理（「我的」页里的一段）
- * ==============================
+ * 标签管理（「我的」页里的一段）—— **只剩接线**
+ * =================================================
  *
- * 补的是清单之后剩下的那块归类缺口：**同一个任务要跨清单出现在多个视角里**。
+ * M3 第九刀（projects）：与清单**同一个 `OrganizerList`**（`kind="tag"`）。
+ * 本文件只提供"标签"的语义：读哪些数据、调哪个动作、说什么话。
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * 标签与清单**不是替代关系**
+ *
  * 清单是"一件任务属于哪个容器"（一个任务只能在一个清单），
- * 标签是"这件任务还跟什么有关"（一个任务可以有多个）—— 两者不是替代关系。
+ * 标签是"这件任务还跟什么有关"（一个任务可以有多个）。
  *
  * 在此之前：`EntityBase` 上有 `tagIds`、`ProjectActions` 有 `createTag` / `listTags`、
- * 线协议里 `TAG` 也是合法的 `entityType`，**但全仓库没有任何一处读写过
- * `tagIds`**（`apps/web` 的 projects store 只列了标签，也没法把它打到任务上）。
+ * 线协议里 `TAG` 也是合法的 `entityType`，**但全仓库没有任何一处读写过 `tagIds`**。
  * 也就是说：标签在数据模型里存在了好几个月，在产品上**完全不存在**。
  *
  * ═════════════════════════════════════════════════════════════════════════
@@ -18,12 +22,14 @@
  *    与清单同一条原则（`project-actions.ts` 文件头第 2 条）：删一个分组不该
  *    毁掉里面的东西。但标签这里更微妙 —— 用户看到"标签在 N 个任务上用着"时
  *    会以为删标签=动那些任务，所以要**在界面上说清楚**（`mobile.tags.removeHint`）。
- *
  * 2. **不改名。** 与清单一致：改名要一个内联编辑态，会把这一段的交互重量翻倍。
- *    先用起来，没做的不假装做了。
  *
- * ⚠️ 界面结构与 `ListsSection` **完全同一个形状**，所以共用 `OrganizerSection`。
- * 本文件只提供"标签"的语义：读哪些数据、调哪个动作、说什么话。
+ * ─────────────────────────────────────────────────────────────────────────
+ * 🔴 与 `ListsSection` 同一条形状，但**不再各写一份 JSX**
+ *
+ * 迁移前两段共用的是"移动端本地"的 `OrganizerSection`，而 web 那边**根本不是
+ * 这个组件** —— 所以"清单/标签行长什么样"仍然是两份实现。现在两段与 web
+ * 走同一个共享 `OrganizerList`（行骨架只有一份），层级/计数口径在共享模型里。
  *
  * 🔴 本文件里**没有一行业务逻辑**：空名字由 `createTag` 抛错、删除写什么 op、
  * 标签 id 怎么生成，全部由 `@heyta/app-host` 决定。
@@ -34,10 +40,11 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import type { Tag } from '@heyta/domain';
 import { useI18n } from '@heyta/i18n';
 import { createProjectActions, type AppHost, type ProjectActions } from '@heyta/app-host';
+import { OrganizerList, toOrganizerNodes, toTagItems } from '@heyta/ui';
 
 import { openTaskHost } from '../db/open-host';
 import { useMobileSync } from '../sync/store';
-import { OrganizerSection, type OrganizerItem } from './OrganizerSection';
+import { Button, Card, SectionHeader, Text, TextField } from '../ui/kit';
 
 export function TagsSection(): React.JSX.Element {
   const { t } = useI18n();
@@ -51,6 +58,7 @@ export function TagsSection(): React.JSX.Element {
 
   const [host, setHost] = useState<AppHost | null>(null);
   const [tags, setTags] = useState<Tag[]>([]);
+  const [name, setName] = useState('');
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
@@ -88,37 +96,60 @@ export function TagsSection(): React.JSX.Element {
     [read],
   );
 
-  const add = useCallback(
-    (name: string): void => {
-      if (actions === null) return;
-      run(actions.createTag(name));
-    },
-    [actions, run],
-  );
+  /** 标签是平表（没有父子关系），共享层把它包成"没有子级的树"。 */
+  const nodes = useMemo(() => toOrganizerNodes(toTagItems(tags)), [tags]);
 
-  const remove = useCallback(
-    (item: OrganizerItem): void => {
-      if (actions === null) return;
-      run(actions.removeTag(item.id));
-    },
-    [actions, run],
-  );
+  const add = useCallback((): void => {
+    const trimmed = name.trim();
+    if (trimmed === '' || actions === null) return;
+    setName('');
+    run(actions.createTag(trimmed));
+  }, [actions, name, run]);
 
   return (
-    <OrganizerSection
-      icon="task.tag"
-      title={t('mobile.profile.section.tags')}
-      items={tags}
-      emptyText={t('mobile.tags.empty')}
-      emptyHint={t('mobile.tags.empty.hint')}
-      removeLabel={(name) => t('mobile.tags.remove', { name })}
-      removeHint={t('mobile.tags.removeHint')}
-      nameLabel={t('mobile.tags.nameLabel')}
-      placeholder={t('mobile.tags.newPlaceholder')}
-      addLabel={t('mobile.tags.add')}
-      busy={busy}
-      onAdd={add}
-      onRemove={remove}
-    />
+    <>
+      <SectionHeader icon="task.tag" title={t('mobile.profile.section.tags')} />
+      <Card>
+        {/*
+          🔴 与清单**同一个组件**（`kind` 只影响 React key 前缀与测试 id）。
+          本条不传 `counts`：标签没有"未完成任务数"这个概念 ——
+          给它算一个会是产品改动，不是迁移。
+        */}
+        <OrganizerList
+          kind="tag"
+          items={nodes}
+          labels={{
+            removeLabel: (label) => t('mobile.tags.remove', { name: label }),
+            empty: t('mobile.tags.empty'),
+            emptyHint: t('mobile.tags.empty.hint'),
+          }}
+          onRemove={(item) => {
+            if (actions === null) return;
+            run(actions.removeTag(item.id));
+          }}
+          busy={busy}
+          testID="mobile-tags-list"
+        />
+      </Card>
+      <Text variant="caption" tone="subtle">
+        {t('mobile.tags.removeHint')}
+      </Text>
+
+      <TextField
+        label={t('mobile.tags.nameLabel')}
+        value={name}
+        onChangeText={setName}
+        placeholder={t('mobile.tags.newPlaceholder')}
+        autoCapitalize="sentences"
+      />
+      <Button
+        label={t('mobile.tags.add')}
+        tone="secondary"
+        icon="task.add"
+        loading={busy}
+        disabled={name.trim() === ''}
+        onPress={add}
+      />
+    </>
   );
 }

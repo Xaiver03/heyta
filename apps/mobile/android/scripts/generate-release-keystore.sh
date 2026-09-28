@@ -6,8 +6,8 @@
 #   · **口令不打印到任何输出**（用 keytool 的 `:env` 修饰符传，避免出现在进程列表里）。
 #
 # ⚠️ 本轮踩过的坑（所以本脚本长这样）：
-#   第一版在 `echo "... $GRADLE_PROPS（权限 600 ..."` 处崩了 ——
-#   bash 把**紧跟变量的中文括号**当成了变量名的一部分（`$GRADLE_PROPS（`），
+#   第一版在 `echo "... $GRADLE_PROPS （权限 600 ..."` 处崩了 ——
+#   bash 把**紧跟变量的中文括号**当成了变量名的一部分（`$GRADLE_PROPS （`），
 #   配合 `set -u` 直接 unbound variable 退出。后果是：
 #   **keystore 生成了，但口令还没写下来，脚本就死了** ⇒ 那个 keystore 变成废的。
 #   ⇒ 两条修法，都已落地：① 变量一律写 `${GRADLE_PROPS}`；

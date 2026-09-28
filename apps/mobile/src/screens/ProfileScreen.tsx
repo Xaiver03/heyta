@@ -24,20 +24,68 @@
  * 此前这一屏在冲突时显示的是"解决界面尚未实现"—— 那句话诚实，
  * 但用户**无处可选**，数据会一直卡在待上传队列里。
  * 现在给出双方的内容并让用户选一边，两个方向都走 op-log 重新派发。
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * 🔴 **设置行的骨架已收进共享层**（M3 第五刀，settings）
+ *
+ * 「一行设置长什么样」现在只有 `@heyta/ui` 的 `SettingsRow` /
+ * `SettingsSection` 一份实现，web 的设置页用的是同一个（见
+ * `apps/web/src/features/settings/HelpPanel.tsx` 等）。本文件**删掉了本地
+ * 的 `Row`**，并把三处"`Button` + 说明文字"的成对写法换成了共享动作行。
+ *
+ * 端特有外壳仍然留在这里：`Screen` / `SectionHeader` / `Card` / `Chip` /
+ * `TextField` 都是移动端 L2/L3 原语，共享层只拿 `leading` 插槽接一个字形、
+ * 拿 `children` 接一组语言胶囊。
+ *
+ * 判据在共享层的 `model.ts`（有单测），本文件不再自己判：
+ *   · **待上传三态**（`resolvePendingUploadPresentation`）——
+ *     `undefined` = 还没读到、`0` = 全传完了，两者不能合并
+ *     （这一屏曾经因为初值是 `0` 而把"一条没传"显示成"已全部上传"）；
+ *   · **锁屏隐私开关的可用性**（`resolveSettingAvailability`）——
+ *     `null`（平台没有这一项）→ 整行不渲染；`false` 是"用户关着"，照常渲染。
+ *
+ * ⚠️ **一处真实的外观变化**（不是损失，是有意的形状统一）：成长 / 回收站 /
+ * 导出三个入口原来画成 kit 的 `Button`（带边框），现在是共享动作行
+ * （主色文字 + 说明，无边框）。文案、点击行为、44pt 触控目标与
+ * `accessibilityRole="button"` 都没变。
+ *
+ * ⚠️ **一处真实的损失**：**共享层没有输入行（`TextField` 那一档）**。
+ * 同步表单仍是移动端 `TextField`（它管 secure / keyboard / hint 三件事），
+ * 本刀没有为它做共享行 —— 理由是 web 那侧的输入框（`AiSettings` 的十几个
+ * `#ai-*`）动不了（既有测试断言真实的 `<input type="checkbox">` 与 DOM
+ * `disabled`，而 RNW 的 `Pressable` 不产出后者），所以共享输入行今天只会
+ * 有**一个真实调用点**。最小可行的一步：等 `AiSettings` 的测试可以改时，
+ * 让两端的输入行走同一个行骨架。
+ *
+ * 另外，`SettingsSection` 的 `leading` 是**插槽**（本文件传的是移动端
+ * `ui/icons.tsx` 的 `<Icon>`）—— 因为两端字形不同源：共享层吃 `lucide` 的
+ * **数据**（`HeytaIcon` 再拿 `react-native-svg` 画），本端用的是
+ * `lucide-react-native` 的**组件**映射表。所以记号由宿主给，不进共享层的 props。
  */
 
 import React, { useCallback, useEffect, useState } from 'react';
-import { Pressable, View } from 'react-native';
+import { Platform, View } from 'react-native';
 import type { SyncStatus } from '@heyta/sync-client';
 import { classifyTransportSecurity } from '@heyta/sync-client';
 import { LOCALES, useI18n } from '@heyta/i18n';
 import { isArgon2SlowBackend } from '@heyta/sync-core';
+import {
+  SettingsRow,
+  SettingsSection,
+  resolvePendingUploadPresentation,
+  resolveSettingAvailability,
+  shouldRenderSettingsRow,
+  type SettingsRowModel,
+} from '@heyta/ui';
 
 import { Button, Card, Chip, Divider, Screen, SectionHeader, Text, TextField } from '../ui/kit';
+import { Icon } from '../ui/icons';
 import { ConflictSheet } from './ConflictSheet';
 import { ExportScreen } from './ExportScreen';
 import { GrowthScreen } from './GrowthScreen';
+import { HabitsScreen } from './HabitsScreen';
 import { ListsSection } from './ListsSection';
+import { NotesSection } from './NotesSection';
 import { TagsSection } from './TagsSection';
 import { TrashScreen } from './TrashScreen';
 import { useLocalePreference } from '../i18n/locale-preference';
@@ -54,9 +102,24 @@ import {
 import { wipeCredentialsAndWidgets } from '../widgets/credential-wipe';
 import {
   clearWidgetState,
+  isWidgetBridgeAvailable,
   readWidgetPrivacy,
   setWidgetPrivacy,
 } from '../widgets/widget-bridge';
+import {
+  WIDGET_CARD_KEYS,
+  resolveWidgetPlatform,
+  shouldShowWidgetJourney,
+  widgetAddSteps,
+} from '../widgets/widget-journey';
+
+/**
+ * 这台设备该显示哪套"如何添加"步骤。
+ *
+ * ⚠️ **在模块级算一次**，不在渲染里算：`Platform.OS` 在一次进程生命周期内不会变，
+ * 而放在渲染里会让每次重渲染都重建数组 —— 白白让下游的 `key` 失效。
+ */
+const WIDGET_ADD_STEPS = widgetAddSteps(resolveWidgetPlatform(Platform.OS));
 
 export function ProfileScreen(): React.JSX.Element {
   const { status, lastSyncedAt, pendingUpload, busy } = useMobileSync();
@@ -106,6 +169,15 @@ export function ProfileScreen(): React.JSX.Element {
    *    只放内存的话回来会显示成"关"，而文件里其实是"开" —— 那是在撒谎。
    */
   const [hideTitles, setHideTitles] = useState<boolean | null>(null);
+  /**
+   * 这台设备上小组件的原生桥在不在。
+   *
+   * 🔴 它是**整段旅程画不画的唯一判据**（不是平台名）—— 理由在 `widget-journey.ts` 文件头。
+   * ⚠️ 只在挂载时算一次：原生模块在进程生命周期内不变，
+   *    而且这个函数会触发一次「模块缺失」的警告，每帧调用会刷屏。
+   */
+  const [widgetBridgeAvailable] = useState(() => isWidgetBridgeAvailable());
+
   /** 写失败时的一句提示。⚠️ **不能静默** —— 见 `setWidgetPrivacy` 的注释。 */
   const [privacyFailed, setPrivacyFailed] = useState(false);
   const [privacyBusy, setPrivacyBusy] = useState(false);
@@ -167,6 +239,15 @@ export function ProfileScreen(): React.JSX.Element {
    */
   const [trashOpen, setTrashOpen] = useState(false);
   const [exportOpen, setExportOpen] = useState(false);
+  /**
+   * 习惯（M3 第七刀）。
+   *
+   * 🔴 它是**另一批数据**（HABIT / HABIT_LOG），不是任务的另一种投影 ——
+   * 但入口仍然走「我的」的第二层、**不加 tab**：ADR-0015 §4 的判决与
+   * P10（撤销 `tab.quadrant`）都指向"底部标签保持 5 个"。
+   * ⚠️ 代价是发现性：用户要「我的 → 习惯」两步才到（已写进本刀汇报）。
+   */
+  const [habitsOpen, setHabitsOpen] = useState(false);
 
   // 🔴 **输入即写进活配置，不能等到点「立即同步」才写。**
   //
@@ -242,26 +323,152 @@ export function ProfileScreen(): React.JSX.Element {
   };
 
   /**
-   * 「待上传」的三态文案**在 JSX 外面算好**。
+   * 「待上传」的三态判定在**共享层**（`@heyta/ui` 的
+   * `resolvePendingUploadPresentation`，有单测）：`undefined` 是"还没读到"、
+   * `0` 是"全传完了"，两者**绝不能合并** —— 这一屏曾经因为初值是 `0`
+   * 而把"本地一条没传"显示成"已全部上传"。英文单复数（词条表没有 ICU，
+   * 靠兄弟词条）也归它判，两端不再各判一次。
    *
-   * 🔴 两个理由，都会真的踩到：
-   *   1. 三态：`undefined` 是"还没读到"，`0` 是"全部上传完"，两者都不能显示成数字。
-   *   2. 门禁只认"字面量紧跟在 `t(` 之后"这一种形状；在属性里写
-   *      `t(count === 1 ? 'a' : 'b')` 会被判成硬编码文案
-   *      （落地页 `Nav.tsx` 记着同一条教训）。
-   *
-   * 顺带把英文单复数也放进这一层（词条表没有 ICU）：`1` 走单数兄弟词条，
-   * 否则英文会渲染成 `1 items`。
+   * ⚠️ 词条仍在这里选：门禁只认"字面量紧跟在 `t(` 之后"这一种形状
+   * （落地页 `Nav.tsx` 记着同一条教训），所以每个分支都写完整的 `t('key')`。
    */
+  const pending = resolvePendingUploadPresentation(pendingUpload);
   const pendingValue =
-    pendingUpload === undefined
+    pending.kind === 'unknown'
       ? t('mobile.profile.pending.loading')
-      : pendingUpload === 0
+      : pending.kind === 'none'
         ? t('mobile.profile.pending.allUploaded')
-        : t(
-            pendingUpload === 1 ? 'mobile.profile.pending.countOne' : 'mobile.profile.pending.count',
-            { count: pendingUpload },
-          );
+        : t(pending.plural ? 'mobile.profile.pending.count' : 'mobile.profile.pending.countOne', {
+            count: pending.count,
+          });
+
+  /**
+   * 同步状态那两张卡里的**值行**。
+   *
+   * 🔴 行的骨架来自 `@heyta/ui` 的共享 `SettingsRow`（与 web 的设置页同一份）——
+   * 这里只给"标签 / 值 / 色调"，不再自己拼 `justifyContent:'space-between'`。
+   * 色调是**状态语义**（未知/没有 → 弱化），不是外观偏好。
+   */
+  const statusRows: readonly SettingsRowModel[] = [
+    {
+      kind: 'value',
+      label: t('mobile.profile.pending.label'),
+      value: pendingValue,
+      tone: pending.kind === 'count' ? 'default' : 'muted',
+      valueTestID: 'profile-pending-value',
+    },
+    {
+      kind: 'value',
+      label: t('mobile.profile.lastSync.label'),
+      value:
+        lastSyncedAt === undefined
+          ? t('mobile.profile.lastSync.never')
+          : formatStamp(lastSyncedAt),
+      tone: lastSyncedAt === undefined ? 'subtle' : 'muted',
+      valueTestID: 'profile-last-sync-value',
+    },
+  ];
+
+  /**
+   * 小组件旅程（应用内）。
+   *
+   * 🔴 整段的判据是「这台设备上小组件的原生桥在不在」，不是平台名
+   * （理由在 `widget-journey.ts` 文件头）。整段不画时，用户照做会得到一张
+   * **永远显示占位**的卡片 —— 与"一个点了没反应的开关比没有更糟"同一条纪律。
+   *
+   * 🔴 锁屏隐私开关的**可用性**走共享 `resolveSettingAvailability`：
+   *   - `null`（安卓/鸿蒙没有这一项）→ `unsupported` → 共享层**整行不渲染**；
+   *   - `true` / `false` → `ready` → 正常渲染。
+   * 把 `null` 当成 `false` 会画出一个**按了没反应的开关**，而用户会以为他设上了。
+   */
+  const widgetRows: readonly SettingsRowModel[] = [
+    { kind: 'note', text: t('mobile.widgetJourney.intro') },
+    // 四张卡片的名字要**列出来** —— 用户得先知道有什么可加。
+    { kind: 'note', text: WIDGET_CARD_KEYS.map((key) => t(key)).join(' · ') },
+    { kind: 'heading', text: t('mobile.widgetJourney.howTo'), divider: true },
+    ...WIDGET_ADD_STEPS.map((key, index) => ({
+      kind: 'note' as const,
+      // ⚠️ `testID` 用词条 key 而不是下标：步骤表是常量，
+      //    用下标会在将来插入步骤时让 React 复用错的行。
+      testID: `widget-step-${key}`,
+      // 🔴 序号由**共享层**画（`index`），不在宿主里拼 `${i + 1}. ` ——
+      //    web 原来用 `<ol>`、本端原来拼字符串，那是同一件事的两份实现，
+      //    两端的格式会各自漂移。现在只有 `SettingsRow` 一处画序号。
+      index: index + 1,
+      text: t(key),
+    })),
+    // 🔴 下面这两句都不是客套话：`cannotAutoAdd` 先说清"这件事得你自己做"，
+    //    用户才不会去找那个不存在的按钮；`openOnce` 解释"为什么刚加上去是空的"。
+    { kind: 'note', text: t('mobile.widgetJourney.cannotAutoAdd'), divider: true },
+    { kind: 'note', text: t('mobile.widgetJourney.openOnce') },
+    {
+      kind: 'toggle',
+      testID: 'widget-privacy-toggle',
+      label: t('mobile.widgetJourney.privacyTitle'),
+      hint: t('mobile.widgetJourney.privacyHint'),
+      checked: hideTitles === true,
+      onToggle: toggleHideTitles,
+      disabled: privacyBusy,
+      availability: resolveSettingAvailability(hideTitles),
+    },
+    ...(privacyFailed
+      ? ([
+          {
+            kind: 'note',
+            text: t('mobile.widgetJourney.privacyFailed'),
+            tone: 'danger',
+            role: 'alert',
+          },
+        ] as const)
+      : []),
+  ];
+
+  /**
+   * 「关于我 / 我的数据」的三个入口。
+   *
+   * 🔴 它们从 `Button` + 说明文字改成了**共享动作行**：设置页里"一行一个动作"
+   * 这件事应该和 web 的设置页是同一个骨架（这正是本刀的目标形状）。
+   * 代价是**去掉了 kit 按钮的边框外观** —— 文案、点击行为、可达性都没变
+   * （动作行自带 44pt 触控目标与 `accessibilityRole="button"`）。
+   */
+  const entryRows: readonly SettingsRowModel[] = [
+    {
+      kind: 'action',
+      testID: 'profile-entry-growth',
+      label: t('mobile.growth.entry'),
+      hint: t('mobile.growth.entry.hint'),
+      onPress: () => {
+        setGrowthOpen(true);
+      },
+    },
+    {
+      kind: 'action',
+      testID: 'profile-entry-habits',
+      label: t('mobile.habits.entry'),
+      hint: t('mobile.habits.entry.hint'),
+      onPress: () => {
+        setHabitsOpen(true);
+      },
+    },
+    {
+      kind: 'action',
+      testID: 'profile-entry-trash',
+      label: t('mobile.trash.entry'),
+      hint: t('mobile.trash.entry.hint'),
+      onPress: () => {
+        setTrashOpen(true);
+      },
+    },
+    {
+      kind: 'action',
+      testID: 'profile-entry-export',
+      label: t('mobile.export.entry'),
+      hint: t('mobile.export.entry.hint'),
+      onPress: () => {
+        setExportOpen(true);
+      },
+    },
+  ];
 
   /**
    * 🔴 提前 return **必须在所有 hook 之后**（见 `growthOpen` 的注释）。
@@ -292,6 +499,16 @@ export function ProfileScreen(): React.JSX.Element {
       <GrowthScreen
         onBack={() => {
           setGrowthOpen(false);
+        }}
+      />
+    );
+  }
+
+  if (habitsOpen) {
+    return (
+      <HabitsScreen
+        onBack={() => {
+          setHabitsOpen(false);
         }}
       />
     );
@@ -366,21 +583,10 @@ export function ProfileScreen(): React.JSX.Element {
             }}
           />
           <Divider />
-          <Row
-            label={t('mobile.profile.pending.label')}
-            // 三态 + 英文单复数的分支都在 `pendingValue` 里（见上面的注释）。
-            value={pendingValue}
-            tone={pendingUpload === undefined || pendingUpload === 0 ? 'muted' : 'default'}
-          />
-          <Row
-            label={t('mobile.profile.lastSync.label')}
-            value={
-              lastSyncedAt === undefined
-                ? t('mobile.profile.lastSync.never')
-                : formatStamp(lastSyncedAt)
-            }
-            tone={lastSyncedAt === undefined ? 'subtle' : 'muted'}
-          />
+          {/* 值行的骨架来自共享 `SettingsRow`（`statusRows` 见上）。 */}
+          {statusRows.map((row) => (
+            <SettingsRow key={row.testID ?? row.kind} row={row} />
+          ))}
         </View>
       </Card>
 
@@ -412,92 +618,68 @@ export function ProfileScreen(): React.JSX.Element {
         disabled={token === '' && password === ''}
       />
 
-      {/* W5-2 · 锁屏组件隐私。`hideTitles === null`（这个平台没有这一项）时**整段不渲染** ——
-          不显示胜过显示一个按了没反应的开关。 */}
-      {hideTitles === null ? null : (
-        <>
-          <SectionHeader
-            icon="action.settings"
-            title={t('mobile.profile.section.widget')}
-          />
-          <Card>
-            <View style={{ gap: tokens['space.3'] }}>
-              <Row
-                label={t('mobile.profile.widgetPrivacy.label')}
-                value={hideTitles ? '✓' : ''}
-                tone={hideTitles ? 'default' : 'muted'}
-                // 整行可点：这个开关的目标点击区是**行**，不是那个 20pt 的方框。
-                onPress={toggleHideTitles}
-              />
-              <Divider />
-              <Text variant="caption" tone="subtle">
-                {t('mobile.profile.widgetPrivacy.hint')}
-              </Text>
-              {privacyFailed ? (
-                <Text variant="caption" tone="danger">
-                  {t('mobile.profile.widgetPrivacy.failed')}
-                </Text>
-              ) : null}
-            </View>
-          </Card>
-        </>
-      )}
+      {/*
+        桌面小组件 —— **应用内的用户旅程**。
+        ================================================================
+        🔴 这一段存在的理由：一个小组件功能如果只在系统里存在，而应用里
+        一个字都不提，那它对用户来说就**不存在** —— 他不知道卡片有几种、
+        不知道该怎么加上去、更不知道"加了之后要先打开一次应用"。
+
+        🔴 **整段的判据是"原生桥在不在这台设备上"，不是平台名。**
+        桥不在时**整段不画**：画了的话用户照做会在桌面得到一张
+        **永远显示占位**的卡片。与「一个点了没反应的开关比没有更糟」同一条纪律。
+        判据与理由都在 `widget-journey.ts` 文件头。
+
+        ⚠️ 这里**没有**"添加小组件"按钮 —— iOS/Android/鸿蒙**都不允许**
+        应用替用户把小组件放上桌面。所以是引导，不是按钮：一个按下去
+        什么都不会发生的按钮，比一段说明文字糟糕得多。
+      */}
+      {shouldShowWidgetJourney(widgetBridgeAvailable) ? (
+        // 骨架来自共享 `SettingsSection`（与 web 的「小组件旅程」同一份实现）——
+        // 行的内容与可用性判据在 `widgetRows` 里。
+        <SettingsSection
+          variant="card"
+          testID="widget-journey"
+          title={t('mobile.widgetJourney.sectionTitle')}
+          leading={<Icon name="action.settings" size="sm" color={tokens['color.foreground-muted']} />}
+          rows={widgetRows}
+        />
+      ) : null}
 
       <Text variant="caption" tone="subtle">
         {t('mobile.profile.footnote')}
       </Text>
 
-      {/* 🔴 成长入口是「我的」里的一项，**不是第 6 个底部标签**：
-          标签栏必须保持 5 个（任务 / 日历 / 专注 / 分类 / 我的），
-          而成长是"关于我"的第二层回顾视图，与设置同居一处才符合心智。
-          图标用 `growth.milestones`（奖杯）—— 它是这一屏的代表语义，
-          且有别于任务/专注的任何字形，不会被误认成跳去别的功能。 */}
-      <Button
-        label={t('mobile.growth.entry')}
-        icon="growth.milestones"
-        onPress={() => {
-          setGrowthOpen(true);
-        }}
-        tone="secondary"
-      />
-      <Text variant="caption" tone="subtle">
-        {t('mobile.growth.entry.hint')}
-      </Text>
+      {/*
+        「关于我 / 我的数据」的三个入口。
+        🔴 成长**不是第 6 个底部标签**：标签栏必须保持 5 个
+        （任务 / 日历 / 专注 / 分类 / 我的），而成长是"关于我"的第二层回顾视图，
+        与设置同居一处才符合心智；回收站是删除的后悔药；导出是把数据带走
+        （移动端没有 `<a download>`，走系统分享面板）。
 
-      {/* 回收站：删除的后悔药。与成长并列，都是"关于我 / 我的数据"的事，
-          所以同住「我的」这一层，都不占底部标签。 */}
-      <Button
-        label={t('mobile.trash.entry')}
-        icon="task.delete"
-        onPress={() => {
-          setTrashOpen(true);
-        }}
-        tone="secondary"
-      />
-      <Text variant="caption" tone="subtle">
-        {t('mobile.trash.entry.hint')}
-      </Text>
-
-      {/* 导出：把数据带走。图标用 `action.share`（不是 download）——
-          移动端没有 `<a download>`，导出走系统分享面板。 */}
-      <Button
-        label={t('mobile.export.entry')}
-        icon="action.share"
-        onPress={() => {
-          setExportOpen(true);
-        }}
-        tone="secondary"
-      />
-      <Text variant="caption" tone="subtle">
-        {t('mobile.export.entry.hint')}
-      </Text>
+        骨架来自共享动作行（`entryRows` 见上）—— 文案、行为、触控目标都没变，
+        去掉的只是 kit 按钮的边框外观。
+      */}
+      <View style={{ gap: tokens['space.3'] }} testID="profile-entries">
+        {entryRows.filter(shouldRenderSettingsRow).map((row) => (
+          <SettingsRow key={row.testID ?? row.kind} row={row} />
+        ))}
+      </View>
 
       {/* 🔴 语言切换放在「我的」而不是顶部：它不是高频操作，
           放进顶栏会让每一次切屏都多一个不该点的目标。
           切换**只改内存里的状态**（`LocalePreferenceProvider`），
-          理由与代价见上面 `useLocalePreference()` 那段注释。 */}
-      <SectionHeader icon="action.settings" title={t('mobile.profile.section.language')} />
-      <Card>
+          理由与代价见上面 `useLocalePreference()` 那段注释。
+
+          胶囊本身是移动端 L2 原语（`Chip`），所以走**插槽**注入 ——
+          共享层只负责分组骨架、标题与说明。 */}
+      <SettingsSection
+        variant="card"
+        testID="profile-language"
+        title={t('mobile.profile.section.language')}
+        note={t('mobile.profile.language.hint')}
+        leading={<Icon name="action.settings" size="sm" color={tokens['color.foreground-muted']} />}
+      >
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: tokens['space.3'] }}>
           {LOCALES.map((code) => {
             // 语言名永远用**它自己的语言**写（中文 / English），
@@ -517,10 +699,7 @@ export function ProfileScreen(): React.JSX.Element {
             );
           })}
         </View>
-      </Card>
-      <Text variant="caption" tone="subtle">
-        {t('mobile.profile.language.hint')}
-      </Text>
+      </SettingsSection>
 
       <ConflictSheet
         visible={conflictsOpen}
@@ -529,14 +708,22 @@ export function ProfileScreen(): React.JSX.Element {
         }}
       />
 
-      {/* 清单 / 标签管理。放在最后：它们读的都是**本地已物化状态**，
+      {/* 清单 / 标签 / 便签管理。放在最后：它们读的都是**本地已物化状态**，
           而上半屏（同步 / 状态）读的是同步状态机 —— 两者的刷新时机不同，
           混在一起会让人以为"清单没更新是因为同步坏了"。
 
           ⚠️ 顺序是**清单在标签前**，与任务详情页里的字段顺序一致。
-          两处顺序不同的话，用户会在两屏之间建立两套心智模型。 */}
+          两处顺序不同的话，用户会在两屏之间建立两套心智模型。
+
+          🔴 **便签排在清单/标签「之后」**，不是插在中间。理由：清单与标签
+          是**同一类**东西（"任务属于哪个容器 / 还跟什么有关"，都是任务的
+          组织维度，详情页里也紧挨着），便签读的是**另一批实体**（NOTE），
+          与任务无关。把便签插进这两段之间会打断那条组织维度的线索；
+          排在后面则读成"任务相关的在上、独立的记录在下"。
+          ⚠️ 不新增 tab（P10）：底部标签保持 5 个，见 `NotesSection` 文件头。 */}
       <ListsSection />
       <TagsSection />
+      <NotesSection />
     </Screen>
   );
 }
@@ -578,49 +765,3 @@ function StatusRow({
     </View>
   );
 }
-
-function Row({
-  label,
-  value,
-  tone,
-  onPress,
-}: {
-  label: string;
-  value: string;
-  tone: 'default' | 'muted' | 'subtle';
-  /**
-   * 给了就是**可点的整行**（W5-2 的隐私开关用这条路径）。
-   *
-   * 🔴 为什么点的是**行**而不是行里那个小方框：设置项的可点区域在 iOS 上是 44pt，
-   *    而一个 20pt 的方框在"我看着这一行、想把它打开"的心智下是**打不中**的，
-   *    打不中就会以为"这个开关坏了"。任务行不传这个参数，所以不受影响。
-   *
-   * ⚠️ `hitSlop` 一起给：行本身的高度由内容决定，可能不足 44pt。
-   */
-  onPress?: () => void;
-}): React.JSX.Element {
-  const tokens = useTokens();
-  const body = (
-    <View style={{ flexDirection: 'row', justifyContent: 'space-between', gap: tokens['space.3'] }}>
-      <Text variant="row-meta" tone="muted">
-        {label}
-      </Text>
-      {/* 数字用等宽样式，避免 9 → 10 时整行宽度跳动。 */}
-      <Text variant="numeric-body" tone={tone} numberOfLines={1} style={{ flexShrink: 1 }}>
-        {value}
-      </Text>
-    </View>
-  );
-  if (onPress === undefined) return body;
-  return (
-    <Pressable
-      onPress={onPress}
-      hitSlop={{ top: 12, bottom: 12, left: 8, right: 8 }}
-      accessibilityRole="switch"
-      accessibilityState={{ checked: tone === 'default' }}
-    >
-      {body}
-    </Pressable>
-  );
-}
-

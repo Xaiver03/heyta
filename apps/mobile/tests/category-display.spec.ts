@@ -1,6 +1,6 @@
 /**
- * 移动端分类时长的文案与配色接线测试
- * =====================================
+ * 移动端分类时长的文案接线测试
+ * ==============================
  *
  * 🔴 这里防的**不是"函数算错了"**，而是**两端漂移**：
  *
@@ -8,30 +8,29 @@
  *      但**措辞**仍分两端（`mobile.categories.duration.*` / `web.categories.duration.*`）。
  *      两张词条表如果对同一个数字说两种话（「1 小时 30 分」vs「90 分钟」），
  *      两端各自的测试都是绿的 —— 只有把"逐字相同"写成断言才会红。
- *   2. 色槽 → token 名的映射在**三处**必须一致：tokens.css（真源）、
- *      Web 的 CSS 变量名、移动端的原生 token 名。设计系统那侧已经钉住了
- *      registry 与常量；这里钉住**移动端这一侧**，中间任意一端改动都会红。
- *   3. 槽位号必须以**文字**出现在界面上（色觉障碍用户唯一的对齐依据），
+ *   2. 槽位号必须以**文字**出现在界面上（色觉障碍用户唯一的对齐依据），
  *      所以"没设色时说「无」、设了就说数字"是一条设计契约，不是格式化细节。
+ *   3. `categoryReportLabels` 是这一端与共享 `CategoryReportView` 的**唯一接缝** ——
+ *      少给一项、或给错了命名空间，共享层不会报错，只是界面上少一句话。
+ *
+ * ⚠️ **色槽 → 颜色的映射测试在 2026-09-28 搬走了**：M3 第三刀把那段映射收进
+ * `@heyta/ui` 的 `categories/model.ts`（`categorySlotToken` / `categoryHeatToken`），
+ * 覆盖它的断言现在在 `packages/ui/tests/category-model.spec.ts`。
+ * 原来这里的那个 describe 测的是移动端本地副本 `lib/category-colors.ts`，
+ * 而那份副本在迁移后已删除 —— 留着一个测不到生产代码的断言比没有更坏。
  */
 
-import {
-  CATEGORY_SLOT_TOKEN_BY_SLOT,
-  HEAT_TOKENS,
-  UNSET_CATEGORY_TOKEN,
-  type HeytaNativeTokens,
-} from '@heyta/design-system';
-import { CATEGORY_SLOTS, durationParts, type CategorySeries } from '@heyta/domain';
+import { durationParts, type CategorySeries } from '@heyta/domain';
 import { translate, zhCN, en } from '@heyta/i18n';
 import { describe, expect, it } from 'vitest';
 
 import {
   KIND_KEY,
+  categoryReportLabels,
   formatDuration,
   laneLabel,
   slotText,
 } from '../src/lib/category-display';
-import { heatColor, slotColor, unsetColor } from '../src/lib/category-colors';
 
 /** 与界面同一条路：走真的词条表（缺 key 会**抛**，不是返回空串）。 */
 const t = (key: Parameters<typeof translate>[1], vars?: Record<string, string | number>): string =>
@@ -132,67 +131,21 @@ describe('laneLabel：屏幕阅读器读到的那句话', () => {
   });
 });
 
-/**
- * 色槽 → 颜色：移动端这一侧不许漂移
- * =====================================
- *
- * 🔴 **这个 describe 在 2026-09-27 被重写过，原因是原来的断言变成了恒真。**
- *
- * 原来移动端手抄了 8 个槽位取值 + 5 个 heat 取值，测试拿它和设计系统的
- * `CATEGORY_SLOT_TOKENS` 逐项对比 —— 那时这条对比**真的会红**，是对的。
- *
- * 但设计系统那轮重构（`c1d67b8`）把取值收进单点之后，移动端不再持有自己的
- * 那份，"移动端与真源相同"就变成了**拿一个值和它自己比**：`SLOT_TOKEN` 就是
- * `CATEGORY_SLOT_TOKEN_BY_SLOT`，断言 `SLOT_TOKEN[slot] === 真源[slot]` 永远成立。
- * 这种"恒真的护栏"比没有护栏更坏 —— 它看起来还在守着，实际什么也没守。
- *
- * 现在断言的是**移动端函数的行为**（`slotColor` / `unsetColor` / `heatColor`），
- * 那才是这一端真正可能写错的地方（比如哪天有人图快写死一个颜色）。
- * 变异验证：把 `slotColor` 改成返回固定色，本块立刻红。
- */
-describe('色槽 → token：移动端这一侧不许漂移', () => {
-  /**
-   * 只填本文件会用到的 token 名，值取互不相同的假色。
-   * 目的不是模仿主题，而是让"取到的是不是**同一个** token"可被观察。
-   */
-  const fixtureTokens = (): HeytaNativeTokens => {
-    const names: string[] = [
-      ...Object.values(CATEGORY_SLOT_TOKEN_BY_SLOT),
-      ...HEAT_TOKENS,
-      UNSET_CATEGORY_TOKEN,
-    ];
-    return Object.fromEntries(
-      names.map((name, i) => [name, `#${(i + 1).toString(16).padStart(6, '0')}`]),
-    ) as unknown as HeytaNativeTokens;
-  };
-
-  it('八个槽位齐全，且每个都指向**不同**的颜色', () => {
-    const tokens = fixtureTokens();
-    const colors = CATEGORY_SLOTS.map((slot) => slotColor(slot, tokens));
-    expect(colors).toHaveLength(8);
-    expect(new Set(colors).size).toBe(8);
+describe('categoryReportLabels：这一端与共享视图的唯一接缝', () => {
+  it('每一项文案都走本端命名空间（不会冒出 web.* 的说法）', () => {
+    const labels = categoryReportLabels(t);
+    expect(labels.slot(undefined)).toBe('无');
+    expect(labels.slot(3)).toBe('3');
+    expect(labels.kind('project')).toBe('清单');
+    expect(labels.kind('habit')).toBe('习惯');
+    expect(labels.duration(90 * 60_000)).toBe('1 小时 30 分');
+    expect(labels.laneA11y(row())).toContain('深度工作');
+    expect(labels.swatchA11y?.(row())).toContain('深度工作');
   });
 
-  it('每个槽位取的就是设计系统为它指定的那个 token', () => {
-    const tokens = fixtureTokens();
-    for (const slot of CATEGORY_SLOTS) {
-      expect(slotColor(slot, tokens)).toBe(tokens[CATEGORY_SLOT_TOKEN_BY_SLOT[slot]]);
-    }
-  });
-
-  it('「未设色」是中性灰，且**不在**那八个槽位里', () => {
-    const tokens = fixtureTokens();
-    const slotColors = new Set(CATEGORY_SLOTS.map((slot) => slotColor(slot, tokens)));
-    // 让"没设色"看起来像第 9 种颜色，用户会以为那是可以选的。
-    expect(slotColors.has(unsetColor(tokens))).toBe(false);
-  });
-
-  it('强度档位 0–4 五个都在，且互不相同', () => {
-    const tokens = fixtureTokens();
-    const levels = [0, 1, 2, 3, 4] as const;
-    expect(levels.map((level) => heatColor(level, tokens))).toEqual(
-      HEAT_TOKENS.map((name) => tokens[name]),
-    );
-    expect(new Set(levels.map((level) => heatColor(level, tokens))).size).toBe(5);
+  it('🔴 刻意不给柱状图的词条（移动端不画柱）', () => {
+    // 共享层把 `barsA11y` 做成可选正是为此；给了反而会让 native 拿到无意义的值。
+    const labels = categoryReportLabels(t);
+    expect(labels.barsA11y).toBeUndefined();
   });
 });

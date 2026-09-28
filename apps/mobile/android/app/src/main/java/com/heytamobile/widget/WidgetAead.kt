@@ -148,9 +148,12 @@ object WidgetDeviceKeyStore {
     /**
      * 取密钥；不存在就**生成**一把随机的。
      *
-     * 🔴 **随机由 Keystore 产生**（`KeyGenerator` + 不传 `setRandomizedEncryptionRequired`
-     * 之外的任何 IV 设定），**不经过 JS**。这是 W1-4 定的密钥归属：
+     * 🔴 **密钥本身不经过 JS**。这是 W1-4 定的密钥归属：
      * 密钥不穿桥 → 不进 JS 堆、不进日志、不进崩溃上报。
+     *
+     * ⚠️ 但 **IV（nonce）是调用方传进来的**，不是 Keystore 产生的 ——
+     * 见下面 `setRandomizedEncryptionRequired(false)` 处那段注释：
+     * 卡片的 nonce 必须写进信封，所以必须由我们指定。
      */
     fun getOrCreate(): SecretKey {
         existing()?.let { return it }
@@ -164,6 +167,31 @@ object WidgetDeviceKeyStore {
                 .setBlockModes(KeyProperties.BLOCK_MODE_GCM)
                 .setEncryptionPaddings(KeyProperties.ENCRYPTION_PADDING_NONE)
                 .setKeySize(256)
+                /*
+                 * 🔴 **必须显式关掉"随机加密"，否则调用方自带 IV 会被 Keystore 拒绝。**
+                 *
+                 * 这一条是真机上才发现的（`logcat`）：
+                 *
+                 *     E_WIDGET_WRITE_FAILED: Caller-provided IV not permitted
+                 *
+                 * `KeyGenParameterSpec` 的**默认值**是 `setRandomizedEncryptionRequired(true)`，
+                 * 它的语义是"用这把密钥加密时，**IV 由 Keystore 自己随机产生**，
+                 * 调用方不许自带 IV"。而我们**必须**自带 IV：
+                 * 卡片的 nonce 要写进信封里（`runCipher` 第 107 行传的就是它），
+                 * 卡片侧读信封才能解 —— 这正是"单一写入者"那条不变量的要求。
+                 *
+                 * 所以默认值与我们的契约**直接冲突**，必须显式关掉。
+                 *
+                 * ⚠️ **这里原本的注释写反了**：它说"随机由 Keystore 产生，
+                 * 不传 `setRandomizedEncryptionRequired` 之外的任何 IV 设定"，
+                 * 而同一份文件第 107 行一直在传调用方的 nonce。
+                 * 注释描述的是**意图**，代码做的是**另一件事**，两者矛盾且都没报错 ——
+                 * 直到真机第一次执行才暴露。**注释不能当作行为的证据。**
+                 *
+                 * ⚠️ 改这里**不会**影响已经生成的密钥：老的 alias 仍然拒绝自带 IV，
+                 * 必须 `delete()` 之后再 `getOrCreate()`（或 `pm clear`）才会生效。
+                 */
+                .setRandomizedEncryptionRequired(false)
                 // 见类注释第 1、2 条：不要求用户认证、不要求解锁设备。
                 .setUserAuthenticationRequired(false)
                 .build(),

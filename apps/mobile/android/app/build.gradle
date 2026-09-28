@@ -126,12 +126,39 @@ android {
     compileSdk rootProject.ext.compileSdkVersion
 
     namespace "com.heytamobile"
+    sourceSets {
+        androidTest {
+            assets.srcDirs += "../../../../packages/widget-core/fixtures"
+        }
+    }
+
     defaultConfig {
         applicationId "com.heytamobile"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 1
         versionName "1.0"
+
+        /*
+         * instrumented 测试（`app/src/androidTest`）需要显式指定 runner。
+         *
+         * 🔴 **这一类测试存在的唯一理由：`AndroidKeyStore` 在 JVM 上是桩（`Stub!`）。**
+         * `WidgetAead.kt` 的类注释早就写着"本类在 JVM 单测里无法验证，必须真机验收" ——
+         * 而真机上第一次执行就暴露了 `Caller-provided IV not permitted`（见进度账本 R4）。
+         * 那正是**唯一真正保护用户数据的那条路径**，也是 137 条 JVM 单测永远碰不到的地方。
+         * 所以这里不是"补个测试"，是把那条路径**真的放到设备上跑**。
+         */
+        testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+
+        /*
+         * 🔴 **instrumented 测试直接吃仓库里的真黄金夹具，不抄一份。**
+         *
+         * 抄一份进 `androidTest/assets/` 看起来更省事，但那份副本**必然漂移** ——
+         * 而"四端读同一份夹具"是这个功能的契约本身（见进度账本 ⑱）。
+         * 挂目录而不是拷文件，让"同一份"成为**结构上的事实**。
+         *
+         * 路径：`app/` → 上四级 = 仓库根 → `packages/widget-core/fixtures`。
+         */
 
         // 🔴 放开明文 HTTP。这不是图省事，是自建场景的可用性刚需。
         //
@@ -332,4 +359,11 @@ dependencies {
     //    不要因为这个盲区就以为它被审过了。
     testImplementation("junit:junit:4.13.2")
     testImplementation("com.vaadin.external.google:android-json:0.0.20131108.vaadin1")
+
+    // ── instrumented 测试（`androidTestImplementation` = 打进**测试 APK**，不进正式产物）──
+    // ⚠️ 许可证同属"门禁看不见"的那一类（`license-inventory.mjs` 只扫 pnpm store，
+    //    不看 Gradle 依赖）。androidx.test 系全部是 **Apache-2.0**，在允许清单内。
+    androidTestImplementation("androidx.test.ext:junit:1.2.1")
+    androidTestImplementation("androidx.test:runner:1.6.2")
+    androidTestImplementation("androidx.test:rules:1.6.1")
 }

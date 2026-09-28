@@ -16,11 +16,20 @@
  *      离线是本地优先的正常工作状态，标红会让用户以为数据出了问题。
  */
 
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import type { ConflictInfo, SyncStatus } from '@heyta/sync-client';
 import { translate } from '@heyta/i18n';
+import { syncStatusSeverity } from '@heyta/ui';
 
 import { describeSyncStatus, statusTone } from '../src/sync/status-text';
+
+/**
+ * 🔴 移动端单测跑在 node 里，而 `@heyta/ui` 的入口会拖进 `react-native`
+ * 的 Flow 源码（直接解析失败）。把裸导入指向**共享层的那个纯模块源码** ——
+ * 用的是**同一份实现**，不是重写一份 mock（重写就正好把本轮要消除的漂移又造回来）。
+ * 理由与代价（以及将来的最小改进）写在 `../src/sync/status-text.ts` 文件头第 1 条。
+ */
+vi.mock('@heyta/ui', () => import('../../../packages/ui/src/sync/model'));
 
 const CONFLICT: ConflictInfo = {
   id: 'c1',
@@ -190,15 +199,46 @@ describe('describeSyncStatus', () => {
 });
 
 describe('statusTone', () => {
+  /**
+   * 🔴 这条是本轮**收尾**的核心断言：`statusTone` 不再自己判断，
+   * 而是 `syncStatusSeverity` 的纯投影。两边不一致时这里必红 ——
+   * 而不是像迁之前那样"三行语义对不上却没有任何测试会红"。
+   */
+  it('🔴 它是 `syncStatusSeverity` 的纯投影（同一个判断，两端同一条）', () => {
+    const expectedBySeverity = {
+      neutral: 'muted',
+      progress: 'default',
+      success: 'success',
+      attention: 'warning',
+      failure: 'danger',
+    } as const;
+    for (const status of EVERY_STATUS) {
+      expect(statusTone(status)).toBe(expectedBySeverity[syncStatusSeverity(status)]);
+    }
+    // 六种状态都被覆盖到，且投影的每个取值都真的被用到过（没有死角）。
+    const used = new Set(EVERY_STATUS.map((s) => statusTone(s)));
+    expect([...used].sort()).toEqual(['danger', 'default', 'muted', 'success', 'warning']);
+  });
+
   it('🔴 离线用 muted，不用 danger', () => {
     // 本地优先的应用离线是正常工作状态。标红 = 告诉用户"出问题了"，
     // 而实际上什么都没坏 —— 这类假警报会让用户开始不信任颜色。
     expect(statusTone({ kind: 'offline', since: 1 })).toBe('muted');
+    expect(syncStatusSeverity({ kind: 'offline', since: 1 })).toBe('neutral');
   });
 
-  it('只有 error 与 conflict 用 danger', () => {
+  it('🔴 冲突用 warning（attention），**不再**用 danger —— 与 web 同步条同一态度', () => {
+    const conflict: SyncStatus = { kind: 'conflict', conflicts: [CONFLICT] };
+    expect(statusTone(conflict)).toBe('warning');
+    expect(syncStatusSeverity(conflict)).toBe('attention');
+    // 迁之前这里是 danger（红），而 web 是 warning —— 本轮把它对齐。
+    expect(statusTone(conflict)).not.toBe('danger');
+    expect(syncStatusSeverity(conflict)).not.toBe('failure');
+  });
+
+  it('只有 error 用 danger', () => {
     const danger = EVERY_STATUS.filter((s) => statusTone(s) === 'danger').map((s) => s.kind);
-    expect([...new Set(danger)].sort()).toEqual(['conflict', 'error']);
+    expect([...new Set(danger)].sort()).toEqual(['error']);
   });
 
   it('同步成功用 success', () => {
@@ -206,6 +246,6 @@ describe('statusTone', () => {
   });
 
   it.each(EVERY_STATUS)('$kind 的 tone 是合法的取值', (status) => {
-    expect(['default', 'muted', 'danger', 'success']).toContain(statusTone(status));
+    expect(['default', 'muted', 'danger', 'success', 'warning']).toContain(statusTone(status));
   });
 });

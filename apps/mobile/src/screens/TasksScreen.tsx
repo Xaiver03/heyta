@@ -1,5 +1,5 @@
 /**
- * 任务屏（4 个 tab 的第一个，也是默认落点）
+ * 任务屏（5 个 tab 的第一个，也是默认落点）
  * ==========================================
  *
  * 产品决策：**默认落在"今天"**，而不是一个扁平列表。
@@ -23,6 +23,7 @@ import {
   Modal,
   Platform,
   Pressable,
+  ScrollView,
   TextInput,
   View,
 } from 'react-native';
@@ -32,12 +33,17 @@ import type { Project, Tag, Task } from '@heyta/domain';
 // 壳里只负责措辞（见 `apps/mobile/src/lib/date.ts` 文件头）。
 import {
   Priority,
-  Quadrant,
-  bucketByQuadrant,
-  startOfDay,
+  // 🔴 分组归属规则与 Web 共用同一份（见下面 `groups` 的说明）。
+  sectionTasks,
+  // 标签筛选的判据也共用 —— Web 侧栏点标签走的就是它。
+  filterTasks,
+  // 搜索判据同样共用 —— Web 的搜索框走的就是它。
+  searchTasks,
+  // 待办口径也只有一份 —— "哪几组算待办"是产品说法，不是某一屏的选择。
+  pendingCount,
   toLocalDate,
 } from '@heyta/domain';
-import { useI18n, type MessageKey } from '@heyta/i18n';
+import { useI18n } from '@heyta/i18n';
 import {
   createProjectActions,
   createTaskActions,
@@ -96,6 +102,9 @@ import { useMobileSync } from '../sync/store';
 import { dueTone, toDueDisplay, type DueDisplayMode } from '../lib/due-display';
 import { priorityBadgeLabel, priorityColorToken } from '../lib/priority';
 import { TaskDetailSheet } from './TaskDetailSheet';
+// 🔴 「四象限」那一档的实现（P10 收敛后**唯一**的实现）——
+// 它是共享 `QuadrantBoard` 的移动宿主，不再是第 6 个 tab 的整屏。
+import { QuadrantScreen } from './QuadrantScreen';
 
 // ─────────────────────────────────────────────────────────────
 // 新建任务面板
@@ -219,6 +228,9 @@ export function TasksScreen({
   onPendingCountChange?: (pending: number) => void;
 } = {}): React.JSX.Element {
   const tokens = useTokens();
+  // 搜索框要 `fontSans` 与 `row-meta` 两样（都走归一化访问器）。
+  const text = useText();
+  const { native } = useTheme();
   // `locale` 也要：重复规则的句子必须按当前语言说（`describeRecurrenceText`），
   // 否则英文界面上会漏出「每周一、三」。
   const { t, locale } = useI18n();
@@ -238,8 +250,29 @@ export function TasksScreen({
    * 所以它是同一页上的视图切换，**不是第 5 个 tab**
    * （理由见 `docs/adr/0015-four-quadrant-as-derived-view.md` §4：
    *  给象限一个 tab 会暗示"这里有一批新数据"，而其实一条都没有）。
+   *
+   * 🔴 **象限那一档只有一个实现**：`./QuadrantScreen`（它是共享 `QuadrantBoard` 的
+   * 移动宿主）。这里以前手写过一份"按象限分组的四段列表"，P10 收敛时已删除 ——
+   * 同一件事有两份呈现 = 两份会各自漂移，而且不会有测试变红。
    */
   const [view, setView] = useState<'list' | 'quadrant'>('list');
+  /**
+   * 标签筛选。`undefined` = 不筛。
+   *
+   * 🔴 **判据来自 `@heyta/domain` 的 `filterTasks`，与 Web 侧栏点标签是同一份**
+   * —— 两端都是"只看带这个标签的未完成任务"。在此之前移动端**根本没有标签筛选入口**，
+   * 而 Web 有：同一件能力两端不一致，正是 M1/M2 要避免的。
+   */
+  const [tagFilter, setTagFilter] = useState<string | undefined>(undefined);
+  /**
+   * 搜索串。与标签筛选**叠加**（先按标签收窄、再按文字收窄）。
+   *
+   * 🔴 判据（匹配哪些字段 / 大小写 / 多词是 AND）全在
+   * `packages/domain/src/search.ts`，与 Web 的搜索框是**同一份**。
+   * ⚠️ 文案复用 `web.shell.search.*` —— 与 `web.export.*` 同一个取舍：
+   * 同一件能力两端读同一批 key，就不可能出现「网页能搜备注、手机不能」这种分歧。
+   */
+  const [query, setQuery] = useState('');
   // 🔴 "现在"由 `useToday` 提供：**回到前台**与**跨过本地零点**时会刷新。
   //
   // 原来是 `useMemo(() => Date.now(), [])` —— 它把"跨零点"这件真事一起冻住了：
@@ -315,26 +348,30 @@ export function TasksScreen({
   }, [host, refresh, dataRevision]);
 
   const groups = useMemo(() => {
-    const today = startOfDay(now);
-    const overdue: Task[] = [];
-    const dueToday: Task[] = [];
-    const inbox: Task[] = [];
-    const completed: Task[] = [];
-    for (const task of tasks) {
-      if (task.completedAt !== undefined) {
-        completed.push(task);
-      } else if (task.dueDate === undefined) {
-        inbox.push(task);
-      } else if (startOfDay(task.dueDate) < today) {
-        overdue.push(task);
-      } else if (startOfDay(task.dueDate) === today) {
-        dueToday.push(task);
-      } else {
-        // 未来的任务暂时归入"收集箱"上方的"今天"之后 ——
-        // 完整的"未来"分组留给日历 tab。
-        inbox.push(task);
-      }
-    }
+    /**
+     * 🔴 **归属规则来自 `@heyta/domain`，这里只负责展示顺序。**
+     *
+     * 这一段以前是自己写的一遍 —— 而 `apps/web` 的 `selectVisibleTasks`
+     * 是另一遍（`kind: 'today'` / `'completed'` 等）。**两份互不校验的实现**，
+     * 这正是 M1 要拦的东西："什么算逾期、什么算今天"是产品判断，
+     * 不该由某个屏幕决定。
+     *
+     * 现在判据只有一份（`packages/domain/src/task-filter.ts`），
+     * 加一个筛选/分组时四端同时拿到它。
+     */
+    // 🔴 **先按标签筛，再分节** —— 顺序不能反：分节会把已完成分到单独一组，
+    // 而 `{kind:'tag'}` 的语义是"只看未完成"（与 Web 侧栏一致），
+    // 反过来的话标签视图里会冒出一个"已完成"分组，两端就不一样了。
+    const scoped =
+      tagFilter === undefined
+        ? tasks
+        : filterTasks(tasks, { kind: 'tag', tagId: tagFilter }, { now });
+    // 🔴 **先筛标签、再搜、最后分节** —— 顺序与 Web 一致。
+    //    搜索是在当前筛选之上**收窄**，不替代它；反过来在任何一种筛选下
+    //    都会得到不同结果，而用户只会读成"搜索有时候不准"。
+    const searched = searchTasks(scoped, query);
+    const sections = sectionTasks(searched, { now });
+    const { overdue, dueToday, inbox, completed } = sections;
     // 🔴 分组内**倒序展示**（新的在上）。
     //
     // `listTasks()` 给的是 `createdAt` **升序**，那是**跨端一致的规范顺序**
@@ -350,51 +387,22 @@ export function TasksScreen({
       inbox: inbox.reverse(),
       completed: completed.reverse(),
     };
-  }, [tasks, now]);
+  }, [tasks, now, tagFilter, query]);
 
   /**
    * 待办数。**这是全应用唯一的待办口径** —— 屏幕上的摘要文字与标签栏角标
    * 都从这一个值来，不允许各自再算一遍。
-   */
-  const pending = groups.overdue.length + groups.dueToday.length + groups.inbox.length;
-
-  /**
-   * 四象限分桶。**派生，不存储** —— 见 ADR-0015 §2：
-   * 一旦象限归属被存成独立数据，它就会和 `important` / `dueDate` 漂移，
-   * 而这类 bug 不报错，只让人不再信任界面。
    *
-   * ⚠️ `bucketByQuadrant` 会**排除已完成与已删除**的任务（那是它写明的语义：
-   * 象限是"待办决策工具"）。所以切到四象限时"已完成"分组会消失 ——
-   * 那是设计，不是漏了。
+   * 🔴 口径本身来自 `@heyta/domain` 的 `pendingCount`：它原先在这里是
+   * `overdue.length + dueToday.length + inbox.length` —— 而"哪几组算待办"
+   * 是一个产品说法，不是这一屏的排版选择。写在这里等于四端各有一份。
    */
-  const quadrants = useMemo(() => bucketByQuadrant(tasks, { now }), [tasks, now]);
+  const pending = pendingCount(groups);
 
-  /**
-   * 展示顺序：Q1 → Q2 → Q3 → Q4。
-   *
-   * 🔴 刻意**不用** `Object.values(quadrants)` —— 那依赖对象键的插入顺序，
-   * 换个地方构造桶就会悄悄改变展示顺序。象限的排序就是它的语义，写死。
-   */
-  const QUADRANT_ORDER: Quadrant[] = [
-    Quadrant.UrgentImportant,
-    Quadrant.ImportantNotUrgent,
-    Quadrant.UrgentNotImportant,
-    Quadrant.Neither,
-  ];
-
-  /**
-   * 象限名走 `t()`，**不用 `QUADRANT_META[q].label`**。
-   *
-   * `QUADRANT_META` 里的 `label` / `hint` 是写死的中文，它是**领域层的元数据**，
-   * 不是 UI 文案。`check-ui-language.mjs` 只扫 `apps/`，所以直接用不会报错 ——
-   * 那正是危险之处：它会**静默**让英文界面显示中文，而门禁看不见。
-   */
-  const QUADRANT_LABEL_KEY: Record<Quadrant, MessageKey> = {
-    [Quadrant.UrgentImportant]: 'mobile.quadrant.q1',
-    [Quadrant.ImportantNotUrgent]: 'mobile.quadrant.q2',
-    [Quadrant.UrgentNotImportant]: 'mobile.quadrant.q3',
-    [Quadrant.Neither]: 'mobile.quadrant.q4',
-  };
+  // 🔴 四象限的分桶 / 排序 / 展示顺序**都不在本文件**：它们在领域层
+  // （`bucketByQuadrant`）与共享层（`@heyta/ui` 的 `quadrant/model.ts`），
+  // 由 `./QuadrantScreen` 里的共享 `QuadrantBoard` 直接消费。
+  // 本文件曾经手写过一份"四段分节"的同义实现，P10 收敛时已删除。
 
   // 🔴 由 id 反查任务，而不是存一份对象：列表刷新后 `Task` 是新引用，
   // 存下来的那份会变成过期快照（改了日期却显示旧值）。
@@ -406,34 +414,6 @@ export function TasksScreen({
   useEffect(() => {
     onPendingCountChange?.(pending);
   }, [pending, onPendingCountChange]);
-
-  if (error !== null) {
-    return (
-      <Screen title={t('mobile.tasks.title')}>
-        <EmptyState
-          icon="group.overdue"
-          title={t('mobile.tasks.loadError.title')}
-          hint={t('mobile.tasks.loadError.hint')}
-          // 🔴 原始错误原样附上（并允许长按复制）：它多半是英文的系统信息，
-          // 但**不能翻译** —— 翻译之后就没法拿去搜索、也没法对照日志。
-          // 分工是：说明走 `hint` 词条，技术原文走 `detail` 变量。
-          detail={t('mobile.tasks.loadError.detail', { detail: error })}
-        />
-      </Screen>
-    );
-  }
-
-  if (host === null || actions === null) {
-    return (
-      <Screen title={t('mobile.tasks.title')}>
-        <EmptyState
-          icon="action.sync"
-          title={t('mobile.tasks.loading.title')}
-          hint={t('mobile.tasks.loading.hint')}
-        />
-      </Screen>
-    );
-  }
 
   const nothing = tasks.length === 0;
 
@@ -454,23 +434,6 @@ export function TasksScreen({
     { key: 'inbox', tasks: groups.inbox, meta: { icon: 'group.inbox', title: t('mobile.tasks.group.inbox') } },
     { key: 'done', tasks: groups.completed, meta: { icon: 'group.completed', title: t('mobile.tasks.group.completed') } },
   ];
-
-  // 四象限是**固定槽位**布局：空格本身是信息（矩阵的价值就在四个格子同时在），
-  // 所以这里用 keepEmptySections 保留空象限的标题，而不是像上面那样藏掉。
-  //
-  // ⚠️ `.map` 的回调**必须显式写返回类型**：只标注左边的变量不够 ——
-  // `.map` 的泛型先从回调推，推出来 `icon` 是字面量 `"task.priority"` 而不是
-  // `IconName`，于是整组赋值失败。写上返回类型后 `icon` 才会被**校验**
-  // （这也顺带保证图标名拼错会在编译期报出来）。
-  const quadrantSections: readonly TaskSection<SectionMeta>[] = QUADRANT_ORDER.map(
-    (q): TaskSection<SectionMeta> => ({
-      // `Quadrant` 是**数值枚举**，而分节的 `key` 是字符串 —— 显式转，
-      // 不做隐式拼接（隐式转换在这里不会报错，但会让 key 的含义变得含糊）。
-      key: String(q),
-      tasks: quadrants[q],
-      meta: { icon: 'task.priority', title: t(QUADRANT_LABEL_KEY[q]) },
-    }),
-  );
 
   /**
    * 每条变更期间把该行置灰 —— 防止连点发出两条 op。
@@ -499,10 +462,17 @@ export function TasksScreen({
    */
   const renderTaskMeta = useCallback(
     (row: SharedTaskRow): React.ReactNode => {
+      // ⚠️ 这个回调声明在下面那两个守卫**之前**（hook 必须在守卫之前，见守卫处的注释），
+      //    所以 TS 在这里收窄不到 `actions`。实际运行时到不了：`actions === null` 时
+      //    组件会在守卫处提前 return，这个回调根本不会被调用。用一句显式判空换回类型安全。
       const task = row.source;
       const due = toDueDisplay(task, dueMode, now, t);
       const badge = priorityBadgeLabel(task.priority, t);
-      const repeat = actions.repeatOf(task.id);
+      // ⚠️ 可空调用：这个回调声明在下面那两个守卫**之前**（hook 必须在守卫之前），
+      //    所以 TS 收窄不到 `actions`。运行到不了 null —— 那时组件已在守卫处 return。
+      //    写成 `?.` 而不是 `!`：拿不到 actions 时语义上就是"这条没有重复规则"，
+      //    而 `!` 会把一个真实的类型洞埋进代码里。
+      const repeat = actions?.repeatOf(task.id);
       return (
         <TaskBadges
           due={due === null ? null : { text: due.text, overdue: due.overdue }}
@@ -519,16 +489,25 @@ export function TasksScreen({
   );
 
   const renderTaskTrailing = useCallback(
-    (row: SharedTaskRow): React.ReactNode => (
-      <IconButton
-        icon="task.delete"
-        label={t('mobile.tasks.a11y.delete', { title: row.title })}
-        color={tokens['color.foreground-subtle']}
-        onPress={() => {
-          runFor(row.id, actions.remove(row.id));
-        }}
-      />
-    ),
+    (row: SharedTaskRow): React.ReactNode => {
+      // ⚠️ 这个回调声明在下面那两个守卫**之前**（hook 必须在守卫之前，见守卫处的注释），
+      //    所以 TS 在这里收窄不到 `actions`。实际运行时到不了：`actions === null` 时
+      //    组件会在守卫处提前 return，这个回调根本不会被调用。用一句显式判空换回类型安全。
+      return (
+        <IconButton
+          icon="task.delete"
+          label={t('mobile.tasks.a11y.delete', { title: row.title })}
+          color={tokens['color.foreground-subtle']}
+          onPress={() => {
+            // ⚠️ 判空放在**这里**而不是让整个回调返回 null：这个回调签名要求返回
+            //    `ReactNode`，返回 null 会把 `TaskListLabels` 那一侧的类型一起带偏
+            //    （`open` 会变成 `string | null`）。实际运行到不了 null。
+            if (actions === null) return;
+            runFor(row.id, actions.remove(row.id));
+          }}
+        />
+      );
+    },
     [actions, runFor, t, tokens],
   );
 
@@ -549,7 +528,10 @@ export function TasksScreen({
       toggleOn: (row: SharedTaskRow) => t('mobile.tasks.a11y.complete', { title: row.title }),
       toggleOff: (row: SharedTaskRow) => t('mobile.tasks.a11y.uncomplete', { title: row.title }),
       open: (row: SharedTaskRow) => {
-        const repeat = actions.repeatOf(row.id);
+        // ⚠️ 同上：这个 `useMemo` 的 body 立刻执行，但它**声明在守卫之前**。
+        //    闭包只在列表真的渲染时被调用，那时 `actions` 一定非空。
+        // ⚠️ 同上，可空调用；拿不到 actions 就当这条没有重复规则。
+        const repeat = actions?.repeatOf(row.id);
         return repeat === undefined
           ? t('mobile.tasks.a11y.open', { title: row.title })
           : t('mobile.tasks.a11y.openRepeat', {
@@ -560,6 +542,52 @@ export function TasksScreen({
     }),
     [actions, locale, t],
   );
+
+  /**
+   * 🔴 **两个提前 return 必须在**所有 hook **之后。**
+   *
+   * 这里踩过一个真 bug（在 Android 模拟器上才暴露）：这两个守卫原本在
+   * 组件中部，而 `busyId` / `runFor` / `renderTaskMeta` / `renderTaskTrailing` /
+   * `taskRowLabels` **五个 hook 在它们之后**。于是：
+   *
+   *   第 1 次渲染：`host === null`（还在加载）→ 提前 return，只用掉 24 个 hook；
+   *   第 2 次渲染：host 就绪 → 继续往下 → 撞上第 25 个 hook
+   *   ⇒ `Rendered more hooks than during the previous render.`，整屏白。
+   *
+   * ⚠️ 这一条**在单测里永远看不见**：jsdom 测试直接给全了 host/actions，
+   * 从来没有"先 null 后就绪"的那两次渲染。只有真跑一次应用才会暴露。
+   * 所以它也顺带说明：**"hook 都写在最前面"不是风格偏好，是硬约束。**
+   *
+   * 代价是下面那三个用到 `actions` 的回调**自己收窄不到**（它们在守卫之前声明），
+   * 各自带一句显式判空 —— 见它们的注释。
+   */
+  if (error !== null) {
+    return (
+      <Screen title={t('mobile.tasks.title')}>
+        <EmptyState
+          icon="group.overdue"
+          title={t('mobile.tasks.loadError.title')}
+          hint={t('mobile.tasks.loadError.hint')}
+          // 🔴 原始错误原样附上（并允许长按复制）：它多半是英文的系统信息，
+          // 但**不能翻译** —— 翻译之后就没法拿去搜索、也没法对照日志。
+          // 分工是：说明走 `hint` 词条，技术原文走 `detail` 变量。
+          detail={t('mobile.tasks.loadError.detail', { detail: error })}
+        />
+      </Screen>
+    );
+  }
+
+  if (host === null || actions === null) {
+    return (
+      <Screen title={t('mobile.tasks.title')}>
+        <EmptyState
+          icon="action.sync"
+          title={t('mobile.tasks.loading.title')}
+          hint={t('mobile.tasks.loading.hint')}
+        />
+      </Screen>
+    );
+  }
 
   return (
     <View style={{ flex: 1 }}>
@@ -578,6 +606,57 @@ export function TasksScreen({
                   completed: groups.completed.length,
                 })}
           </Text>
+        </View>
+
+        {/*
+          搜索框。
+
+          🔴 **它此前不存在** —— 而 Web 有。同一件能力两端不一致，正是 M1/M2 要避免的。
+          判据在 `packages/domain/src/search.ts`（与 Web 共用），这里只负责把字读出来。
+
+          ⚠️ 放**标题之下、视图切换之上**：它是"在当前这一屏里找东西"，
+          所以属于内容区（跟着滚），不属于顶栏。
+        */}
+        <View
+          style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: tokens['space.2'],
+            paddingTop: tokens['space.2'],
+          }}
+        >
+          <TextInput
+            value={query}
+            onChangeText={setQuery}
+            placeholder={t('web.shell.search.placeholder')}
+            accessibilityLabel={t('web.shell.search.aria')}
+            placeholderTextColor={tokens['color.foreground-subtle']}
+            returnKeyType="search"
+            // ⚠️ 走归一化访问器。直接传 `tokens['font.sans']` 会把整条 CSS 字体栈
+            // 交给 RN，字体解析失败且**不报错**（已实测）。
+            style={[
+              text['row-meta'],
+              {
+                flex: 1,
+                minHeight: tokens['touch-target.min'],
+                paddingHorizontal: tokens['space.3'],
+                borderRadius: tokens['radius.md'],
+                borderWidth: tokens['border-width.thin'],
+                borderColor: tokens['color.border'],
+                backgroundColor: tokens['color.surface-sunken'],
+                color: tokens['color.foreground'],
+                fontFamily: native.fontSans,
+              },
+            ]}
+          />
+          {query !== '' ? (
+            <Chip
+              label={t('web.shell.search.clear')}
+              onPress={() => {
+                setQuery('');
+              }}
+            />
+          ) : null}
         </View>
 
         {/* 视图切换：**列表**（按今天分组）↔ **四象限**（艾森豪威尔矩阵）。
@@ -621,50 +700,71 @@ export function TasksScreen({
           />
         </View>
 
-        {view === 'quadrant' ? (
-          /* ⚠️ 这里**不是** 2×2 网格。手机宽 402px，四格每格只剩 ~190px，
-             勾选框 + 标题 + 日期塞不下，会挤成三行。**"矩阵"图形是桌面端的
-             形态**；手机上的等效表达是**按象限分组的四段** ——
-             信息一模一样，且沿用本页已有的 SectionHeader + 行。
-             落地页卖的是"不用自己想先做哪个"，那个价值在分组里完整保留。
+        {/*
+          标签筛选行。
 
-             ⚠️ 四象限用 `keepEmptySections`：**空格本身是信息**（矩阵的价值
-             就在四个格子同时在）。上面那个按今天分组的列表则相反 ——
-             一个写着"已完成 0"的标题是噪音，所以那边用默认的跳空。 */
-          <View style={{ paddingTop: tokens['space.2'] }}>
-            <TaskList
-              sections={quadrantSections}
-              keepEmptySections
-              onToggleTask={(id) => {
-                runFor(id, actions.toggleCompleted(id));
+          🔴 **它必须在空态时也可见** —— 否则"筛选之后一条都没有"会让这一行
+          跟着消失，用户**没有办法清掉筛选**，只能杀掉应用。所以它渲染在
+          `view === 'quadrant' ? … : nothing ? … : …` **之前**，而不是列表分支里。
+
+          ⚠️ 只在**列表视图**出现：四象限视图是"按重要性/紧迫性分组"，
+          在它上面叠一层标签筛选会得到四种"筛过之后还剩几条"，而那一档的
+          全部价值就是四个格子同时在场（见下面 `QuadrantScreen` 的说明）。
+        */}
+        {view === 'list' && tags.length > 0 ? (
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={{ gap: tokens['space.2'], paddingVertical: tokens['space.2'] }}
+          >
+            <Chip
+              label={t('mobile.tasks.tagFilter.all')}
+              selected={tagFilter === undefined}
+              onPress={() => {
+                setTagFilter(undefined);
               }}
-              onOpenTask={(id) => {
-                setDetailTaskId(id);
-              }}
-              busyTaskId={busyId}
-              labels={taskRowLabels}
-              renderMeta={renderTaskMeta}
-              renderTrailing={renderTaskTrailing}
-              renderSectionHeader={(section) => (
-                <View style={{ paddingTop: tokens['space.3'], gap: tokens['space.1'] }}>
-                  <SectionHeader
-                    // 🔴 四个象限共用同一个图标。**刻意不给每格配一个语义图标**：
-                    // 现有图标集里没有"重要/紧急"这一对，硬套
-                    // （比如把 Q3 配成 `conflict.warning`）会给出**错的信号** ——
-                    // 那比没有图标更糟。要区分度就得先有字形，那是设计系统的活。
-                    icon={section.meta.icon}
-                    title={section.meta.title}
-                    count={section.tasks.length}
-                  />
-                  {section.tasks.length === 0 ? (
-                    <Text variant="row-meta" tone="muted">
-                      {t('mobile.tasks.quadrant.empty')}
-                    </Text>
-                  ) : null}
-                </View>
-              )}
             />
-          </View>
+            {tags.map((tag) => (
+              <Chip
+                key={tag.id}
+                label={tag.name}
+                selected={tagFilter === tag.id}
+                onPress={() => {
+                  // 再点一次同一个标签 = 取消筛选（开关语义），否则用户要先点
+                  // "全部"才知道能清掉 —— 那是一次没有反馈的摸索。
+                  setTagFilter((current) => (current === tag.id ? undefined : tag.id));
+                }}
+              />
+            ))}
+          </ScrollView>
+        ) : null}
+
+        {view === 'quadrant' ? (
+          /*
+           * 🔴 象限那一档 = **共享 `QuadrantBoard` 的 2×2 矩阵**（`./QuadrantScreen`）。
+           *
+           * 这里原来是本文件手写的一份"按象限分组的四段列表"（共享 `TaskList` +
+           * `keepEmptySections`），删于 P10 —— 同一件事有两份呈现，就会各自漂移，
+           * 而且不会有任何测试变红。现在象限**只有这一个实现**。
+           *
+           * ⚠️ 行的元信息 / 行尾动作 / 行级无障碍文案全部**复用列表视图的那三份**
+           * （`renderTaskMeta` / `renderTaskTrailing` / `taskRowLabels`），
+           * 所以两档里的同一行读屏拿到的是同一句话。
+           */
+          <QuadrantScreen
+            tasks={tasks}
+            now={now}
+            busyTaskId={busyId}
+            labels={taskRowLabels}
+            renderMeta={renderTaskMeta}
+            renderTrailing={renderTaskTrailing}
+            onToggleTask={(id) => {
+              runFor(id, actions.toggleCompleted(id));
+            }}
+            onOpenTask={(id) => {
+              setDetailTaskId(id);
+            }}
+          />
         ) : nothing ? (
           <EmptyState
             icon="group.inbox"

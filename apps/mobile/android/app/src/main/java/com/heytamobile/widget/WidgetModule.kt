@@ -160,6 +160,34 @@ class WidgetModule(reactContext: ReactApplicationContext) :
     }
 
     /**
+     * W5-3 · 灵动岛（Live Activity）—— **Android 上没有这个东西**。
+     *
+     * 🔴 **这个方法存在的唯一目的是让 JS 侧不必知道平台。**
+     *
+     * `lifecycle.ts` 的 `wake()` 会**无条件**调它（和 iOS 走同一条代码路径）。
+     * 在补这个方法之前，Android 上每次唤醒都会打一行：
+     *
+     *     '[widget] 推进灵动岛失败：', 'undefined is not a function'
+     *
+     * 不致命（`callNativeSafely` 兜住了），但**是真噪音**：
+     * 一行"每次都会出现、且永远不代表有问题"的警告，会训练人忽略这个标签，
+     * 于是真正的问题出现时也看不见了。
+     *
+     * 另一条路是在 JS 里写 `if (Platform.OS === 'ios')`。**没选那条**，理由与
+     * `readWidgetPrivacy` 返回 `null` 让界面自己省略开关是同一条：
+     * **平台能力的判断属于原生侧** —— 只有它真的知道这台设备有什么。
+     * JS 里散落平台字符串，迟早会有人漏掉一处。
+     *
+     * ⚠️ 返回 `"none"` 而**不是**报错：`'none'` 正是 iOS 侧
+     * "当前没有活跃的专注会话"的同一种结局字符串，调用方本来就要处理它。
+     * 报错会让"这个平台不支持"看起来像"这一步出错了"。
+     */
+    @ReactMethod
+    fun syncFocusActivity(promise: Promise) {
+        promise.resolve("none")
+    }
+
+    /**
      * 把载荷 JSON 封成信封，返回信封 JSON 字符串。
      *
      * 🔴 **密钥不穿桥**：JS 交明文、拿回密文，全程拿不到密钥字节。

@@ -9,7 +9,10 @@
  *   - 计时状态与重绘              → `../lib/focus-timer`
  *   - 文案映射                    → `../lib/focus-display`
  *
- * 本文件只负责**把上面这些拼成界面**。
+ * 🔴 **M3 第二刀之后，计时界面本身也不在这里了** —— 进度环、倒计时、阶段、
+ * 主按钮 / 中止按钮全部来自 `@heyta/ui` 的共享 `FocusPanel`，与 web 端
+ * **是同一份实现**。这个文件只负责"壳"：把面板放上去，再挂上两端各自
+ * 才有的东西（类型胶囊、关联任务选择、今日统计卡）。
  *
  * ─────────────────────────────────────────────────────────────────────────
  * 三个刻意的产品决定：
@@ -28,19 +31,16 @@
  */
 
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { Pressable, View, type DimensionValue } from 'react-native';
+import { Pressable, View } from 'react-native';
 
 import {
-  focusDisplayMs,
-  focusProgress,
   focusStatsForDay,
-  formatDuration,
   type FocusSession,
   type FocusSessionKind,
-  type FocusState,
   type Task,
 } from '@heyta/domain';
 import { useI18n } from '@heyta/i18n';
+import { FocusPanel } from '@heyta/ui';
 import { createFocusActions, createTaskActions, type AppHost } from '@heyta/app-host';
 
 import { useText, useTokens } from '../theme';
@@ -62,9 +62,7 @@ import {
   formatFocusDurationText,
   kindDurationLabel,
   kindLabel,
-  phaseColorToken,
   phaseLabel,
-  primaryActionIcon,
   primaryActionLabel,
 } from '../lib/focus-display';
 
@@ -78,70 +76,6 @@ const KIND_ORDER: ReadonlyArray<FocusSessionKind> = ['work', 'shortBreak', 'long
  * 要翻找全部待办，那是「任务」页的事。列太长会把计时卡挤出第一屏。
  */
 const MAX_PICKER_TASKS = 5;
-
-// ─────────────────────────────────────────────────────────────
-// 计时卡
-// ─────────────────────────────────────────────────────────────
-
-function TimerCard({ now, state }: { now: number; state: FocusState }): React.JSX.Element {
-  const tokens = useTokens();
-  const { t } = useI18n();
-  const color = tokens[phaseColorToken(state)];
-  // 空闲时显示的是**这一轮的长度**（25:00），不是 00:00 —— 见 `focusDisplayMs`。
-  const shown = focusDisplayMs(state, now);
-  const progress = focusProgress(state, now);
-
-  /**
-   * 进度条填充宽度。
-   *
-   * ⚠️ 这里的 `as DimensionValue` 是**准确的窄化**，不是拿来消音的强转：
-   * 这个字符串一定由 `Math.round()` 产出，形态必然是 `${number}%`，
-   * 而 TypeScript 不会把模板拼接的结果推断成那个字面量类型。
-   * （AGENTS.md §7 第 14 条警告的是用强转**掩盖接口缺失**，不是这种。）
-   */
-  const fillWidth = `${String(Math.round(progress * 100))}%` as DimensionValue;
-
-  return (
-    <Card>
-      <View style={{ alignItems: 'center', gap: tokens['space.3'] }}>
-        <Text variant="row-meta" style={{ color }}>
-          {phaseLabel(state, t)}
-        </Text>
-
-        {/* 大号倒计时。`numeric-display` 带 `tabular-nums` ——
-            数字等宽，否则秒数跳动时整块会左右抖。 */}
-        <Text variant="numeric-display" style={{ color }}>
-          {formatDuration(shown)}
-        </Text>
-
-        {/* 进度条。轨道色用已有的 `color.surface-sunken`，填充色跟随阶段。 */}
-        <View
-          style={{
-            width: '100%',
-            height: tokens['size.progress-height'],
-            borderRadius: tokens['radius.full'],
-            backgroundColor: tokens['color.surface-sunken'],
-            overflow: 'hidden',
-          }}
-        >
-          <View
-            style={{
-              width: fillWidth,
-              height: '100%',
-              backgroundColor: color,
-            }}
-          />
-        </View>
-
-        <Text variant="caption" tone="subtle">
-          {t('mobile.focus.roundLength', {
-            duration: kindDurationLabel(state.kind, FOCUS_CONFIG, t),
-          })}
-        </Text>
-      </View>
-    </Card>
-  );
-}
 
 // ─────────────────────────────────────────────────────────────
 // 待办任务选择
@@ -289,20 +223,6 @@ export function FocusScreen(): React.JSX.Element {
     [tasks, state.taskId],
   );
 
-  const onPrimary = useCallback(() => {
-    if (state.phase === 'running') {
-      pauseFocus();
-    } else if (state.phase === 'paused') {
-      resumeFocus();
-    } else {
-      startFocus(state.taskId);
-    }
-  }, [state.phase, state.taskId]);
-
-  const onAbort = useCallback(() => {
-    void abortFocus();
-  }, []);
-
   /**
    * 错误**句子**在壳里拼，不在 store 里。
    *
@@ -319,35 +239,37 @@ export function FocusScreen(): React.JSX.Element {
 
   return (
     <Screen title={t('mobile.focus.title')}>
-      <TimerCard now={timer.now} state={state} />
-
-      <View style={{ flexDirection: 'row', gap: tokens['space.2'] }}>
-        <Button
-          label={primaryActionLabel(state, t)}
-          icon={primaryActionIcon(state)}
-          tone="primary"
-          onPress={onPrimary}
-          style={{ flex: 1 }}
-        />
-        {/* 只有真的在计时才给"放弃" —— 空闲时它没有可放弃的东西。 */}
-        {state.phase !== 'idle' ? (
-          <Button
-            label={t('mobile.focus.abort')}
-            icon="focus.abort"
-            tone="ghost"
-            onPress={onAbort}
-          />
-        ) : null}
-      </View>
-
-      {/* 落盘失败必须看得见。静默的话用户会以为记录存下了。 */}
-      {errorText !== undefined ? (
-        <Card>
-          <Text variant="row-meta" tone="danger">
-            {errorText}
-          </Text>
-        </Card>
-      ) : null}
+      {/*
+        🔴 计时核心是**共享的**（`@heyta/ui`）—— 这里只注入文案与回调。
+        进度环、倒计时、阶段、主按钮 / 中止按钮的骨架不在这份文件里，
+        与 web 端是同一份实现（M3 第二刀）。
+      */}
+      <FocusPanel
+        state={state}
+        now={timer.now}
+        // 手机的内容区有确定宽度：主按钮撑满才够按（见 FocusPanel 的说明）。
+        fillControls
+        labels={{
+          phase: (s) => phaseLabel(s, t),
+          // 文案跟着**共享层给出的动作**走，不在这里从 phase 再推一遍。
+          primary: (action, s) => primaryActionLabel(action, s, t),
+          primaryA11y: (action, s) => primaryActionLabel(action, s, t),
+          abort: t('mobile.focus.abort'),
+          ring: (percent) => t('mobile.focus.a11y.progress', { percent }),
+          roundLength: t('mobile.focus.roundLength', {
+            duration: kindDurationLabel(state.kind, FOCUS_CONFIG, t),
+          }),
+          ...(errorText === undefined ? {} : { error: errorText }),
+        }}
+        onStart={() => {
+          startFocus(state.taskId);
+        }}
+        onPause={pauseFocus}
+        onResume={resumeFocus}
+        onAbort={() => {
+          void abortFocus();
+        }}
+      />
 
       {/* 类型选择只在空闲时出现 —— 见文件头第 3 条。 */}
       {state.phase === 'idle' ? (

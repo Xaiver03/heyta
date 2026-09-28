@@ -19,6 +19,7 @@
  */
 
 import { durationParts, type CategoryKind, type CategorySeries } from '@heyta/domain';
+import type { CategoryReportLabels } from '@heyta/ui';
 import type { I18nValue, MessageKey } from '@heyta/i18n';
 
 /** 一行是清单还是习惯 —— 两种归因链的来源，界面上要能分辨。 */
@@ -67,4 +68,29 @@ export function laneLabel(row: CategorySeries, t: I18nValue['t']): string {
     kind: t(KIND_KEY[row.kind]),
     duration: formatDuration(row.totalMs, t),
   });
+}
+
+/**
+ * 构造共享 `CategoryReportView` 需要的全部文案。
+ *
+ * 🔴 共享层**不 import i18n**（见它的文件头），所以模板留在这里；
+ * 而字段名必须与 `CategoryReportLabels` 逐项对上 —— 漏了编译不过。
+ *
+ * ⚠️ 这里**刻意不给** `segmentA11y` / `barsA11y` / `cellTitle`：
+ * 移动端不画堆叠柱状图（12 根柱子和 12 格泳道抢同一块宽度），
+ * 格子也没有悬停（没有鼠标）。共享层把这几项做成可选正是为此。
+ */
+export function categoryReportLabels(t: I18nValue['t']): CategoryReportLabels {
+  return {
+    note: t('mobile.categories.note'),
+    empty: t('mobile.categories.empty'),
+    range: (start, end) => t('mobile.categories.range', { start, end }),
+    unassigned: (duration) => t('mobile.categories.unassigned', { duration }),
+    hintUnset: t('mobile.categories.hint.unset'),
+    kind: (kind) => t(KIND_KEY[kind]),
+    slot: (slot) => slotText(slot, t),
+    duration: (ms) => formatDuration(ms, t),
+    laneA11y: (row) => laneLabel(row, t),
+    swatchA11y: (row) => t('mobile.categories.picker.toggle', { name: row.name }),
+  };
 }

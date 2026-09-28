@@ -109,7 +109,7 @@ rm -rf "$ARCHIVE_PATH"
 xcodebuild -workspace HeytaMobile.xcworkspace -scheme HeytaMobile -configuration Release \
   -destination 'generic/platform=iOS' -archivePath "$ARCHIVE_PATH" archive \
   DEVELOPMENT_TEAM="$TEAM" 2>&1 | grep -E "BUILD SUCCEEDED|BUILD FAILED|error:" | head -10
-[ -d "$ARCHIVE_PATH" ] || fail "归档失败（没有产出 $ARCHIVE_PATH）"
+[ -d "$ARCHIVE_PATH" ] || fail "归档失败（没有产出 ${ARCHIVE_PATH}）"
 
 echo ""
 echo "=== 从**已签名产物**里读回签名证书（这是备案要的权威值）==="

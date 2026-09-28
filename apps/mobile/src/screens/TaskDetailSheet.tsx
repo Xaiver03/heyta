@@ -31,7 +31,7 @@
  * 删除是软删还是硬删，全部来自 `@heyta/app-host` 的 `createTaskActions`。
  */
 
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   KeyboardAvoidingView,
   Modal,
@@ -60,9 +60,13 @@ import {
   type RepeatPresetId,
   type TaskActions,
 } from '@heyta/app-host';
+import { ReminderList } from '@heyta/ui';
 
+import { formatStamp } from '../lib/date';
 import { PRIORITY_ORDER, priorityColorToken, priorityLabel } from '../lib/priority';
 import { describeRecurrenceText } from '../lib/recurrence-display';
+import { reminderListLabels } from '../lib/reminders-display';
+import { useTaskReminders } from '../lib/reminders';
 import { useText, useTheme, useTokens } from '../theme';
 import { DatePicker } from '../ui/DatePicker';
 import { Button, Chip, IconButton, SectionHeader, Text } from '../ui/kit';
@@ -118,12 +122,37 @@ export function TaskDetailSheet({
   const { t, locale } = useI18n();
 
   const [title, setTitle] = useState('');
+  const [note, setNote] = useState('');
   const [busy, setBusy] = useState(false);
   /** 行内「新建清单」的输入态与草稿名。 */
   const [newListOpen, setNewListOpen] = useState(false);
   const [newListName, setNewListName] = useState('');
 
   const taskId = task?.id;
+
+  /**
+   * 提醒面板的接线（见 `lib/reminders.ts`）。
+   *
+   * 🔴 **必须在提前 return 之前调用** —— `task === undefined` 时本组件会
+   * `return null`，那个 return 在所有 hook 之后（见文件里那两处注释：
+   * 提前 return 会让两次渲染的 hook 数量不同，React 直接报错）。
+   * `taskId === undefined` 由 hook 自己兜住（返回空列表 + 空操作），
+   * 所以这里可以无条件调用。
+   *
+   * ⚠️ 提醒的**动作**全部来自 hook（唯一一处 `createReminderActions`）；
+   * 本文件只管把它们摆到共享 `ReminderList` 上。
+   */
+  const {
+    reminders,
+    error: reminderError,
+    addBeforeDue,
+    addAbsoluteInOneHour,
+    snooze,
+    dismiss,
+    remove: removeReminder,
+  } = useTaskReminders(taskId);
+
+  const reminderLabels = useMemo(() => reminderListLabels(t), [t]);
 
   // 🔴 只按**任务 id 与可见性**重同步，依赖里**刻意没有** `task.title`。
   // 带上它的话，正在打字时只要有一次后台同步回来（或冲突解决改了标题），
@@ -132,6 +161,8 @@ export function TaskDetailSheet({
   // 因为"保住用户正在打的字"比"显示别处的最新值"重要。
   useEffect(() => {
     setTitle(task?.title ?? '');
+    // 备注同理，而且它比标题更怕被冲掉 —— 备注更长、写起来更慢。
+    setNote(task?.note ?? '');
   }, [taskId, visible]);
 
   /**
@@ -168,10 +199,32 @@ export function TaskDetailSheet({
     run(actions.rename(task.id, next));
   }, [task, title, run, actions]);
 
+  /**
+   * 提交备注。**清空 = 清除**（传 `undefined`，`app-host` 写成 `null`）。
+   *
+   * 🔴 在它之前移动端**没有任何备注输入框** —— `Task.note` 与 `setNote` 都在，
+   * 但唯一调用点是 AI（拆解 checklist / 估时写时长）。也就是说这条任务上的备注
+   * 只能由 AI 写，用户自己写不了（见 `docs/research/dida365-feature-benchmark.md` §3 #4）。
+   *
+   * 与标题同样**离开输入框才提交**：备注更长，每敲一个字写一条 op 会把 op-log
+   * 灌满噪音（AGENTS.md §3.4 的"一个用户意图 = 一个 op"）。
+   */
+  const commitNote = useCallback((): void => {
+    if (task === undefined) return;
+    const trimmed = note.trim();
+    const next = trimmed === '' ? undefined : note;
+    // 没变就不写 —— 否则"点开详情又退出"会给每条任务白写一条 op。
+    if (next === (task.note === undefined || task.note === '' ? undefined : task.note)) return;
+    run(actions.setNote(task.id, next));
+  }, [task, note, run, actions]);
+
   const close = useCallback((): void => {
     commitTitle();
+    // 🔴 收起面板也要提交备注。只在 `onBlur` 提交的话，用户写完直接点「关闭」
+    // 会丢掉刚打的字 —— 而移动端上"写完就关"是最常见的动作。
+    commitNote();
     onClose();
-  }, [commitTitle, onClose]);
+  }, [commitTitle, commitNote, onClose]);
 
   if (task === undefined) return null;
 
@@ -292,6 +345,46 @@ export function TaskDetailSheet({
                   },
                 ]}
               />
+            </View>
+
+            <View style={{ gap: tokens['space.1'] }}>
+              <Text variant="row-meta" tone="muted">
+                {t('mobile.detail.field.note')}
+              </Text>
+              <TextInput
+                value={note}
+                onChangeText={setNote}
+                onBlur={commitNote}
+                multiline
+                // 备注是长文本，不该被"完成"键打断 —— 收起键盘靠点别处或关闭面板。
+                // 面板本身是 ScrollView，键盘弹起时有 KeyboardAvoidingView 兜着。
+                numberOfLines={4}
+                textAlignVertical="top"
+                accessibilityLabel={t('mobile.detail.field.note')}
+                placeholder={t('mobile.detail.note.placeholder')}
+                placeholderTextColor={tokens['color.foreground-subtle']}
+                style={[
+                  text['row-meta'],
+                  {
+                    minHeight: tokens['touch-target.min'],
+                    paddingHorizontal: tokens['space.3'],
+                    paddingVertical: tokens['space.2'],
+                    borderRadius: tokens['radius.md'],
+                    borderWidth: tokens['border-width.thin'],
+                    borderColor: tokens['color.border'],
+                    backgroundColor: tokens['color.surface-sunken'],
+                    color: tokens['color.foreground'],
+                    // ⚠️ 走归一化访问器。直接传 `tokens['font.sans']` 会把整条
+                    // CSS 字体栈交给 RN，字体解析失败且**不报错**（已实测）。
+                    fontFamily: native.fontSans,
+                  },
+                ]}
+              />
+              {/* 如实说明"什么时候存" —— 失焦才提交是刻意的，
+                  但用户看不见这条规则时会以为它已经在同步了。 */}
+              <Text variant="row-meta" tone="muted">
+                {t('mobile.detail.note.hint')}
+              </Text>
             </View>
 
             <View style={{ gap: tokens['space.2'] }}>
@@ -482,6 +575,54 @@ export function TaskDetailSheet({
                 </Text>
               )}
             </View>
+
+            {/*
+              提醒（B1-1 的界面层）。
+              ============================================================
+              🔴 面板挂在**任务详情**里，不是第 6 个 tab —— ADR-0015 §4 与 P10
+              已经判决过"底部标签保持 5 个"，而且 `scripts/verify-mobile-*`
+              按坐标（108/324/540/756/972）寻址标签栏。
+
+              🔴 整块的标题、空态、状态徽标、按钮排布全在共享 `ReminderList` 里
+              （web 与移动同一份源码），本文件只把 hook 的动作与文案摆上去。
+              因此这里**不再套一个 `<SectionHeader>`**：组件自己会渲染
+              `labels.title` 作为区段标题，套两层会出现两个"提醒"。
+
+              ⚠️ 刻意**没有**外包一层 `View style={{ gap }}`：一来组件内部
+              已有 `space.3` 的纵向间距，二来 `screens/**` 的内联样式有
+              **只减不增**的基线（`check:l4-no-style` 断言 C），
+              这里不必新增一处。
+            */}
+            <ReminderList
+              reminders={reminders}
+              // 显式传 `now` —— 跨过触发点时徽标要跟着从"待触发"变"已到点"；
+              // `useToday()` 在回到前台与跨零点时会刷新它（见 `lib/use-today.ts`）。
+              now={now}
+              // 没有截止时间时，共享组件只留**绝对时刻**那一个入口，
+              // 并显示 `labels.noDueDate` 解释原因 —— 它**不会**渲染
+              // 写着「截止时」的按钮（那个按钮按下去必然抛错）。
+              hasDueDate={task.dueDate !== undefined}
+              onAdd={addBeforeDue}
+              onAddAbsolute={addAbsoluteInOneHour}
+              onSnooze={snooze}
+              onDismiss={dismiss}
+              onRemove={removeReminder}
+              labels={reminderLabels}
+              // 🔴 时刻格式化注入移动端唯一的实现：**不用 `Intl`**
+              // （Hermes 上 Intl 是可选编译的，拿不到会抛）。见 `lib/date.ts`。
+              formatWhen={formatStamp}
+              testID="task-reminders"
+            />
+            {/*
+              动作抛错必须**看得见**（任务没有截止时间、超过每任务上限）。
+              原始信息是**数据**不是文案，所以**不翻译** —— 要能拿去搜索/对照日志
+              （与 `HabitsScreen` / `ProfileScreen` 的错误显示同一条分工）。
+            */}
+            {reminderError !== null ? (
+              <Text variant="caption" tone="danger" selectable>
+                {reminderError}
+              </Text>
+            ) : null}
 
             <View style={{ gap: tokens['space.2'] }}>
               <SectionHeader icon="task.priority" title={t('mobile.detail.field.priority')} />
