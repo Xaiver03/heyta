@@ -65,6 +65,40 @@ export {
 } from './habit-actions.js';
 
 /**
+ * 提醒动作（B1-1 的写路径）。
+ *
+ * 🔴 `apps/*` 里**不得出现 `entityType: 'REMINDER'` 的字面量** —— 出现就说明
+ * 宿主在自己拼 op（同 `no-op-construction-in-apps` 规则，见 AGENTS.md §3.5）。
+ * 到期判定在 `@heyta/domain` 的 `reminders.ts`，这里只负责把它变成 op。
+ */
+export {
+  createReminderActions,
+  reminderId,
+  rescheduleRemindersForRepeat,
+  type NewReminderFields,
+  type ReminderActions,
+  type ReminderActionsOptions,
+} from './reminder-actions.js';
+
+/**
+ * 便签动作（幻觉 #12「笔记模块」的写路径）。
+ *
+ * 🔴 `apps/*` 里**不得出现 `entityType: 'NOTE'` 的字面量** —— 出现就说明
+ * 宿主在自己拼 op（同 `no-op-construction-in-apps` 规则，见 AGENTS.md §3.5）。
+ * 排序 / 归属 / 摘要全在 `@heyta/domain` 的 `notes.ts`，这里只负责把它变成 op。
+ *
+ * ⚠️ 与任务上的 `note` 字段**不是同一个东西**：那是任务正文（估时会往里写，
+ * 见 `duration-note.ts`），这是独立的一条记录（可不挂项目、可钉到「今天」、
+ * 任务删掉它还在）。理由写在 `packages/domain/src/notes.ts` 的文件头上。
+ */
+export {
+  createNoteActions,
+  type NewNoteFields,
+  type NoteActions,
+  type NoteActionsOptions,
+} from './note-actions.js';
+
+/**
  * 同步接线。**所有宿主共用这一份** —— 见 `sync-wiring.ts` 文件头：
  * 它此前在 `packages/app-host` 与 `apps/web` 里各有一份，连注释都是复制的。
  *
@@ -219,6 +253,40 @@ export {
   type RequestCaptureDeps,
 } from './ai-capture.js';
 export {
+  DEFAULT_TOOL_SELECTION_RULES,
+  findCatalogTool,
+  resolveToolSelection,
+  type ResolveToolSelectionOptions,
+  type ToolArgs,
+  type ToolCandidate,
+  type ToolSelection,
+  type ToolSelectionContext,
+  type ToolSelectionNoneReason,
+  type ToolSelectionRule,
+} from './ai-tool-selection.js';
+export {
+  confirmAiToolProposal,
+  grantedToolNames,
+  runAiTool,
+  runSelectedTool,
+  type AiToolProposal,
+  type AiToolRunOutcome,
+  type AiToolRunnerDeps,
+} from './ai-tool-run.js';
+export {
+  MAX_TOOL_CALL_TEXT_LENGTH,
+  TOOL_CALL_EGRESS_FIELDS,
+  buildToolCallInvocation,
+  parseToolArguments,
+  requestToolCall,
+  toToolDescriptors,
+  type ParsedToolArguments,
+  type RequestToolCallDeps,
+  type ToolCallFailureReason,
+  type ToolCallOutcome,
+  type ToolCallSource,
+} from './ai-tool-call.js';
+export {
   readDurationFromNote,
   removeDurationFromNote,
   renderDurationLine,
@@ -309,3 +377,28 @@ export {
   type WidgetDrainResult,
   type WidgetDrainTasks,
 } from './widget-actions.js';
+
+/**
+ * 滴答清单导入：**导入计划 → op 批次**的构造器。
+ *
+ * `packages/domain` 产出纯数据的 `TickTickImportPlan` + `TickTickImportReport`；
+ * 这个文件把它按引用完整性排好序、翻成 op、派发进 op-log，并把报告**原样**
+ * 交回调用方。顺序 / 幂等 / 引用校验都单点定义在那里 —— 见文件头。
+ *
+ * 🔴 `apps/*` 里**不得**自己把计划拼成 op，也不得把"先建清单再建任务"
+ * 的次序写第二遍 —— 出现就说明宿主在重造产品语义（AGENTS.md §3.5）。
+ * 这条由 `pnpm check:layering` 的 `no-op-construction-in-apps` 规则钉住
+ * （`entityType: 'TASK' | 'PROJECT' | 'TAG'` 字面量）。
+ */
+export {
+  TICKTICK_IMPORT_ORDER,
+  createTickTickImportActions,
+  planTickTickImportBatch,
+  tickTickTaskPayload,
+  type TickTickImportActions,
+  type TickTickImportBatch,
+  type TickTickImportBatchEntry,
+  type TickTickImportCounts,
+  type TickTickImportKind,
+  type TickTickImportResult,
+} from './ticktick-import-actions.js';

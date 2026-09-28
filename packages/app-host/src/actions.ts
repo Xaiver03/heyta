@@ -48,6 +48,14 @@ import type { EntityType } from '@heyta/shared-schema';
 import { OpType } from '@heyta/sync-core';
 
 import { newTaskId } from './ids.js';
+/**
+ * 🔴 任务完成一个**重复**任务时，它的提醒要跟着新的截止走
+ * （见 `reminder-actions.ts` 里那个函数的文件头）。
+ *
+ * ⚠️ 这**不构成运行时循环依赖**：`reminder-actions.ts` 对 `./actions.js` 的引用是
+ * `import type`（编译后被抹掉），所以运行时只有一条边 `actions → reminder-actions`。
+ */
+import { rescheduleRemindersForRepeat } from './reminder-actions.js';
 
 /**
  * 动作层需要引擎能力的最小面。
@@ -344,7 +352,23 @@ export function createTaskActions(
 
     // 只动到期日：`completedAt` 保持不存在，任务仍然是"待办"。
     // 要把它标成完成必须显式清掉规则，否则两种状态会互相打架。
-    await update(entityId, { dueDate: parseLocalDate(next).getTime() });
+    const nextDueMs = parseLocalDate(next).getTime();
+    await update(entityId, { dueDate: nextDueMs });
+
+    /**
+     * 🔴 **提醒必须跟着新的截止走** —— 见 `reminder-actions.ts` 的
+     * `rescheduleRemindersForRepeat`。
+     *
+     * 带 `offsetMs` 的提醒重置到"新截止 − 提前量"；**绝对时刻**的提醒不动
+     * （"每天 9 点提醒我"里的 9 点是绝对时间，跟着 `dueDate` 漂移反而是错的）。
+     * 这两句话就是 `nextTriggerAfterRepeat` 的定义，这里**不重写**它 —— 只调用。
+     *
+     * 不接这一步的后果（本仓"最后一米"的又一个实例）：用户给"每周一的会"
+     * 挂了"提前 30 分钟"，勾掉之后任务顺延到下周，而那条提醒**仍然钉在上一个周一**
+     * —— 到点弹一条通知，点进去是下周的任务。而所有 op 都是对的、
+     * 相关单测也是绿的，因为"任务顺延"与"提醒顺延"之间**没有任何调用边**。
+     */
+    await rescheduleRemindersForRepeat(ctx, entityId, nextDueMs);
   };
 
   return {

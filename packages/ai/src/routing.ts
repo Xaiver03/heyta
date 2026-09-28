@@ -51,7 +51,15 @@ import {
   type EgressDestination,
 } from './supply.js';
 import { authorizeEgress, type AiFeature, type EgressConsent } from './egress.js';
-import { extractContent, type AiFailure, type AiResult, type AiSuggestion } from './provider.js';
+import {
+  extractContent,
+  extractToolCalls,
+  type AiFailure,
+  type AiInvocation,
+  type AiResult,
+  type AiSuggestion,
+  type AiToolCall,
+} from './provider.js';
 
 // ─────────────────────────────────────────────────────────────────────────
 // 配置
@@ -112,14 +120,17 @@ export interface AiEndpointConfig {
  * 移植自 SSOS 的三层词表（task → workload → capability），
  * 但只保留 heyta 真正需要的四项。
  *
- * ⚠️ **`vision` / `tool_calling` 当前没有任何功能要求它们**：
- * `DEFAULT_FEATURE_CAPABILITIES` 只用到 `structured_output` 与 `long_context`，
- * 所以用户勾上它们不会有任何实际效果（界面里"哪些功能需要它"那一栏是空的）。
+ * ⚠️ **`vision` 当前没有任何功能要求它**：`DEFAULT_FEATURE_CAPABILITIES` 用到了
+ * `structured_output` / `long_context` / `tool_calling`（后者由 `'tool-calling'` 功能要求），
+ * 所以用户勾上 `vision` 仍然不会有任何实际效果（界面里"哪些功能需要它"那一栏是空的）。
  *
- * 🔴 **这是保留项，不是待删项**：`AiCapability` 是**对外契约**，设置界面正在
+ * 🔴 **`vision` 是保留项，不是待删项**：`AiCapability` 是**对外契约**，设置界面正在
  * 消费全部四个成员（`apps/web/src/features/settings/AiSettings.tsx` 的
  * `CAPABILITY_ORDER` 与 `Readonly<Record<AiCapability, string>>` 都要求每个成员存在）。
  * 收敛词表必须先改界面，而那属于界面层。**在界面不再声明它们之前，不要删。**
+ *
+ * ✅ `tool_calling` 已于 2026-09-28 被 `'tool-calling'` 功能真正消费
+ * （见 `DEFAULT_FEATURE_CAPABILITIES` 与 [ADR-0035](../../../docs/adr/0035-ai-tool-calling-reuses-local-api.md)）。
  */
 export type AiCapability =
   | 'structured_output'
@@ -140,6 +151,9 @@ export const DEFAULT_FEATURE_CAPABILITIES: Readonly<
   breakdown: ['structured_output', 'long_context'],
   prioritize: ['structured_output'],
   'duration-estimate': ['structured_output'],
+  // 🔴 这一条是 `tool_calling` 能力**第一个真实消费者** ——
+  // 在此之前它只是词表里的一个成员，勾上没有任何效果（见 `AiCapability` 注释）。
+  'tool-calling': ['tool_calling'],
 };
 
 /** 端点未声明能力时的默认值 —— 只有基线，不含视觉/工具/长上下文。 */
@@ -631,12 +645,7 @@ export interface RoutedOutcome {
  */
 export async function invokeRouted(
   config: AiRoutingConfig,
-  invocation: {
-    feature: AiFeature;
-    system: string;
-    user: string;
-    fields: readonly string[];
-  },
+  invocation: AiInvocation,
   consents: readonly EgressConsent[],
   policy: AiRoutingPolicy = DEFAULT_ROUTING_POLICY,
   deps: RoutedDeps = {},
@@ -779,6 +788,7 @@ export async function invokeRouted(
           feature: invocation.feature,
           text: failure.text,
           destination: candidate.destination,
+          ...(failure.toolCalls === undefined ? {} : { toolCalls: failure.toolCalls }),
         },
       },
       attempts,
@@ -821,10 +831,10 @@ export async function invokeRouted(
 async function attemptOnce(
   candidate: ResolvedCandidate,
   apiKey: string | undefined,
-  invocation: { system: string; user: string },
+  invocation: Pick<AiInvocation, 'system' | 'user' | 'tools'>,
   doFetch: typeof fetch,
   timeoutMs: number,
-): Promise<{ ok: true; text: string } | AiFailure> {
+): Promise<{ ok: true; text: string; toolCalls?: readonly AiToolCall[] } | AiFailure> {
   // 🔴🔴 第二次 URL 校验 —— **在真正要发的那一刻**。
   //
   // 移植自 SSOS 最有价值的一条工程实践（原文见 `validateEndpointUrl` 注释）：
@@ -858,13 +868,28 @@ async function attemptOnce(
         'content-type': 'application/json',
         ...(apiKey !== undefined && apiKey !== '' ? { authorization: `Bearer ${apiKey}` } : {}),
       },
-      // 数据面**恰好**是 system + user。没有别的字段。
+      // 数据面**恰好**是 system + user（+ 可选 tools）。没有别的字段。
       body: JSON.stringify({
         model: candidate.model,
         messages: [
           { role: 'system', content: invocation.system },
           { role: 'user', content: invocation.user },
         ],
+        // 🔴 `tools` 只在调用方给了工具时才出现 —— 省略时请求体与从前**逐字相同**。
+        // 这保证"给四个既有功能加工具线格式"这件事对它们零影响。
+        ...(invocation.tools === undefined || invocation.tools.length === 0
+          ? {}
+          : {
+              tools: invocation.tools.map((tool) => ({
+                type: 'function',
+                function: {
+                  name: tool.name,
+                  description: tool.description,
+                  parameters: tool.parameters,
+                },
+              })),
+              tool_choice: 'auto',
+            }),
       }),
       signal: controller.signal,
     });
@@ -879,15 +904,22 @@ async function attemptOnce(
     }
 
     const json: unknown = await res.json();
+    const toolCalls = extractToolCalls(json);
     const text = extractContent(json);
-    if (text === undefined || text.trim() === '') {
+    // 🔴 有工具调用时，`content` 允许为空 —— 模型可以"只调工具、不说话"。
+    // 反过来（既没文本也没工具调用）才是真的空响应。
+    if (toolCalls === undefined && (text === undefined || text.trim() === '')) {
       return {
         ok: false,
         reason: 'empty-response',
         message: `端点「${candidate.endpointConfig.label}」返回了空内容。`,
       };
     }
-    return { ok: true, text };
+    return {
+      ok: true,
+      text: text ?? '',
+      ...(toolCalls === undefined ? {} : { toolCalls }),
+    };
   } catch (error) {
     const aborted = error instanceof Error && error.name === 'AbortError';
     return {
