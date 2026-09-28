@@ -42,7 +42,7 @@
 import { createRequire } from 'node:module';
 import { existsSync, mkdirSync, mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { _electron as electron, expect, test, type Page } from '@playwright/test';
@@ -79,10 +79,56 @@ function shotPath(target: { readonly label: string }): string {
  * 并**不会**把二进制装下来，必须显式跑一次
  * `node apps/desktop/node_modules/electron/install.js`（且要带代理 + `NODE_USE_ENV_PROXY=1`，
  * 见 `pnpm-workspace.yaml` 的 `allowBuilds.electron` 与 `docs/runbooks/desktop.md` §4.1）。
- * 也就是说：**没装二进制时，这一行会静默触发一次 100MB+ 的下载**。
+ *
+ * ─────────────────────────────────────────────────────────────
+ * 🔴🔴 所以**绝对不能在模块顶层直接 require 它**
+ * ─────────────────────────────────────────────────────────────
+ *
+ * 本文件原来就是 `const electronBinary = desktopRequire('electron')` 写在顶层的，
+ * 于是产生了一个很坏的后果：**这个文件只要被"收集"（还没跑任何用例），
+ * 就会触发一次 100 MB+ 的下载。**
+ *
+ * 实测事故（2026-09-28，CI）：`check:ai-e2e` 会跑整个 e2e 套件，收集到这个文件时
+ * Electron 开始下载 → runner 拉不到二进制（`TypeError: fetch failed`，90 秒后超时）
+ * → `electron/index.js` 抛 `Error: Electron failed to install correctly`
+ * → **整个 Playwright 进程在收集阶段就崩了**，`门禁` 步骤直接 exit 1。
+ *
+ * 🔴 关键在于：**这不是"某个用例失败"，而是"这个文件把整套测试带崩了"**。
+ * 一个可选二进制的缺失，不该有能力否决整个测试套件。
+ *
+ * 修法是两条，缺一不可：
+ *   1. **不在收集期下载** —— 先看 `path.txt` 在不在，在才 require；
+ *   2. 不在就**响亮跳过**（`test.skip` 带理由），而不是静默通过。
  */
 const desktopRequire = createRequire(join(DESKTOP_DIR, 'package.json'));
-const electronBinary = desktopRequire('electron') as unknown as string;
+
+/**
+ * Electron 包目录（**只是路径解析，不触发下载**）。
+ *
+ * ⚠️ `require.resolve` 与 `require` 的区别就是这里的全部要害：
+ * 前者只查路径，后者会执行 `index.js` 并可能发起下载。
+ */
+const ELECTRON_DIR = dirname(desktopRequire.resolve('electron'));
+
+/** `path.txt` 是 `electron/index.js` 判断"二进制在不在"的唯一依据。 */
+const ELECTRON_PATH_TXT = join(ELECTRON_DIR, 'path.txt');
+
+/**
+ * 二进制路径；**没装就是空串**（不是抛错、更不是去下载）。
+ */
+const electronBinary = existsSync(ELECTRON_PATH_TXT)
+  ? (desktopRequire('electron') as unknown as string)
+  : '';
+
+/**
+ * 跳过理由。**要说清"是什么没了"和"怎么补上"** ——
+ * 只说 "electron not available" 会让人去查半天。
+ */
+const ELECTRON_MISSING =
+  `Electron 二进制没装（${ELECTRON_PATH_TXT} 不存在）。` +
+  '本机补装：`node apps/desktop/node_modules/electron/install.js`' +
+  '（需要代理 + `NODE_USE_ENV_PROXY=1`，见 docs/runbooks/desktop.md §4.1）。' +
+  'CI 上拉不到该二进制，所以本条在 CI 里**必然跳过**。';
 
 /**
  * 把窗口当前的样子拍下来。
@@ -228,6 +274,9 @@ async function verifyWindow(target: DesktopTarget): Promise<void> {
 
 test('桌面端（开发构建）：真窗口打开，且共享 UI 真的画出来了', async () => {
   test.setTimeout(120_000);
+  // 🔴 二进制不在时**响亮跳过**，理由见文件头的「绝对不能在模块顶层直接 require 它」。
+  //    静默跳过会让"桌面端从没被验过"看起来像"桌面端没事"。
+  test.skip(electronBinary === '', ELECTRON_MISSING);
   await verifyWindow(DEV_TARGET);
 });
 
