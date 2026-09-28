@@ -1,0 +1,150 @@
+{
+  "capturedAt": "2026-09-28T13:44:44.938Z",
+  "targets": 18,
+  "artifacts": [
+    {
+      "path": "screenshots/landing/L01-官网首屏.png",
+      "width": 1440,
+      "height": 900,
+      "contentRatio": 0.1481,
+      "colorSpan": 228,
+      "sha256": "13037859a94344cc20d3455d32e742524f7717e8dc7279a45d87f69c4a81e2ed"
+    },
+    {
+      "path": "screenshots/landing/L02-功能.png",
+      "width": 1440,
+      "height": 900,
+      "contentRatio": 0.0655,
+      "colorSpan": 228,
+      "sha256": "d50c5e60440db70818f395abbecba4040ced8653f05a5f92ed32245da39c75fb"
+    },
+    {
+      "path": "screenshots/landing/L03-平台.png",
+      "width": 1440,
+      "height": 900,
+      "contentRatio": 0.0306,
+      "colorSpan": 228,
+      "sha256": "23ecfd25fa6ac235c5905e4a271808a39011cf99a6f5782b9f56b43e14bb791a"
+    },
+    {
+      "path": "screenshots/landing/L04-定价.png",
+      "width": 1440,
+      "height": 900,
+      "contentRatio": 0.0451,
+      "colorSpan": 228,
+      "sha256": "7812cc0a83b88bba8d01df73bca9cf8b0933ae8b0c5411cbe637d2c3d0777770"
+    },
+    {
+      "path": "screenshots/landing/L05-帮助.png",
+      "width": 1440,
+      "height": 900,
+      "contentRatio": 0.0294,
+      "colorSpan": 228,
+      "sha256": "db1758870434d4ce64656ab22b25a6127a3c1670a6e84123b61b09b301ab1446"
+    },
+    {
+      "path": "screenshots/landing/L06-更新日志.png",
+      "width": 1440,
+      "height": 900,
+      "contentRatio": 0.0391,
+      "colorSpan": 228,
+      "sha256": "20ae442ad2b51ecdb0c3a99026124c1d9a9b95baf78c56cacab3ddcbee90923b"
+    },
+    {
+      "path": "screenshots/landing/L07-登录.png",
+      "width": 1440,
+      "height": 900,
+      "contentRatio": 0.0336,
+      "colorSpan": 228,
+      "sha256": "8e4524275f8701cd6b5888adef1695834660d51807d7eaf703325913c0c6ea8a"
+    },
+    {
+      "path": "screenshots/web-desktop/W01-任务.png",
+      "width": 1440,
+      "height": 900,
+      "contentRatio": 0.0525,
+      "colorSpan": 228,
+      "sha256": "e1b17be3d022dcfd71a7d36793282909efb5c48e580e8b169fb884bdd7870560"
+    },
+    {
+      "path": "screenshots/web-desktop/W02-四象限.png",
+      "width": 1440,
+      "height": 900,
+      "contentRatio": 0.0727,
+      "colorSpan": 228,
+      "sha256": "7734420477af71ba6d27f6dc005a9835b1740a8401361f13acb95dab776c779a"
+    },
+    {
+      "path": "screenshots/web-desktop/W03-习惯.png",
+      "width": 1440,
+      "height": 900,
+      "contentRatio": 0.0603,
+      "colorSpan": 228,
+      "sha256": "402535db32dafb0de689fd4a0a7d6f013b09d9ba42d568e2e621244c7107007a"
+    },
+    {
+      "path": "screenshots/web-desktop/W04-番茄钟.png",
+      "width": 1440,
+      "height": 900,
+      "contentRatio": 0.0693,
+      "colorSpan": 228,
+      "sha256": "5fc5fcbd5f06ff1af74217e1f0cb76015509e97817111c419c3186a93426b00a"
+    },
+    {
+      "path": "screenshots/web-desktop/W05-时间线.png",
+      "width": 1440,
+      "height": 900,
+      "contentRatio": 0.0595,
+      "colorSpan": 228,
+      "sha256": "e0acd67747cd0802c6e94d17913637b1a122240f36157329946d9092ddabb159"
+    },
+    {
+      "path": "screenshots/web-desktop/W06-成长.png",
+      "width": 1440,
+      "height": 900,
+      "contentRatio": 0.133,
+      "colorSpan": 228,
+      "sha256": "82e27a348d7dfa2435075606181754ae1111b38b571249350ab9cf0b23384fc4"
+    },
+    {
+      "path": "screenshots/web-desktop/W07-回收站.png",
+      "width": 1440,
+      "height": 900,
+      "contentRatio": 0.0524,
+      "colorSpan": 228,
+      "sha256": "2d41921f28d9a4381c3c1216a0d542fa61fb665c5df2b54e22072a116f1aa5dd"
+    },
+    {
+      "path": "screenshots/web-desktop/W08-设置.png",
+      "width": 1440,
+      "height": 900,
+      "contentRatio": 0.0849,
+      "colorSpan": 228,
+      "sha256": "7abd4af542b125c7a55989b8bb7a23592b83dd6ca6735fc17ded4c62cf07146f"
+    },
+    {
+      "path": "screenshots/web-mobile/MW01-移动端任务.png",
+      "width": 1170,
+      "height": 2532,
+      "contentRatio": 0.0785,
+      "colorSpan": 229,
+      "sha256": "8d476f57441b815419de079607e0c2fc37229c864a628b7c6b30420746167071"
+    },
+    {
+      "path": "screenshots/web-mobile/MW02-移动端四象限.png",
+      "width": 1170,
+      "height": 2532,
+      "contentRatio": 0.0618,
+      "colorSpan": 228,
+      "sha256": "d70c84f842483da760cf803e7a75a55fe448bfd501910f9803c25089a1de8d60"
+    },
+    {
+      "path": "screenshots/web-mobile/MW03-移动端习惯.png",
+      "width": 1170,
+      "height": 2532,
+      "contentRatio": 0.0689,
+      "colorSpan": 228,
+      "sha256": "60ab3e77eb2f1260853eb12b3a298453cfacd29d6247a8fdc8252981340419d4"
+    }
+  ]
+}

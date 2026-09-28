@@ -100,7 +100,7 @@ verify_android() {
   echo ""
   echo "=== Android release ==="
   local apk="$MOBILE/android/app/build/outputs/apk/release/app-release.apk"
-  [ -f "$apk" ] || { echo "  🔴 找不到 $apk。先构建：pnpm --filter @heyta/mobile build:android"; exit 1; }
+  [ -f "$apk" ] || { echo "  🔴 找不到 ${apk}。先构建：pnpm --filter @heyta/mobile build:android"; exit 1; }
   echo "  APK: $(stat -f%z "$apk") 字节"
 
   adb -s "$ANDROID_SERIAL" uninstall "$ANDROID_PACKAGE" >/dev/null 2>&1 || true

@@ -49,13 +49,19 @@ export const DEVICES = {
  * 两者靠 `deviceScaleFactor` 对上（如 iPhone 6.9"：440 × 3 = 1320）。
  * 尺寸不对会在 App Store Connect 上传时被拒，所以校验门禁逐张比对像素尺寸。
  */
+// 🔴 `deviceScaleFactor` / `isMobile` / `hasTouch` / `userAgent` 一律放**设备层**，
+//    不要塞进 `viewport` —— 那是 Playwright `newContext` 的形状。
+//    之前两边放法不一致，验证器从 `viewport.deviceScaleFactor` 读，算出 `NaN×NaN`。
 export const APP_STORE_DEVICES = {
   'iphone-6.9': {
     id: 'iphone-6.9',
     label: 'iPhone 6.9 英寸',
     deviceType: 'APP_IPHONE_69',
     output: { width: 1320, height: 2868 },
-    viewport: { width: 440, height: 956, deviceScaleFactor: 3, isMobile: true, hasTouch: true },
+    viewport: { width: 440, height: 956 },
+    deviceScaleFactor: 3,
+    isMobile: true,
+    hasTouch: true,
     userAgent:
       'Mozilla/5.0 (iPhone; CPU iPhone OS 26_0 like Mac OS X) AppleWebKit/605.1.15 Mobile/15E148',
   },
@@ -64,7 +70,10 @@ export const APP_STORE_DEVICES = {
     label: 'iPad 13 英寸',
     deviceType: 'APP_IPAD_PRO_3GEN_129',
     output: { width: 2064, height: 2752 },
-    viewport: { width: 1032, height: 1376, deviceScaleFactor: 2, isMobile: true, hasTouch: true },
+    viewport: { width: 1032, height: 1376 },
+    deviceScaleFactor: 2,
+    isMobile: true,
+    hasTouch: true,
     userAgent:
       'Mozilla/5.0 (iPad; CPU OS 26_0 like Mac OS X) AppleWebKit/605.1.15 Mobile/15E148',
   },
@@ -73,7 +82,10 @@ export const APP_STORE_DEVICES = {
     label: 'Mac 12.9 英寸',
     deviceType: 'APP_DESKTOP',
     output: { width: 1440, height: 900 },
-    viewport: { width: 1440, height: 900, deviceScaleFactor: 1, isMobile: false, hasTouch: false },
+    viewport: { width: 1440, height: 900 },
+    deviceScaleFactor: 1,
+    isMobile: false,
+    hasTouch: false,
     userAgent:
       'Mozilla/5.0 (Macintosh; Intel Mac OS X 15_0) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Safari/605.1.15',
   },
@@ -119,7 +131,7 @@ export const TARGETS = [
   { id: 'L01', name: '官网首屏', site: 'landing', openVia: 'path', path: '/', readyText: 'heyta' },
   { id: 'L02', name: '功能', site: 'landing', openVia: 'path', path: '/features', readyText: '功能' },
   { id: 'L03', name: '平台', site: 'landing', openVia: 'path', path: '/platforms', readyText: '平台' },
-  { id: 'L04', name: '定价', site: 'landing', openVia: 'path', path: '/pricing', readyText: '定价' },
+  { id: 'L04', name: '定价', site: 'landing', openVia: 'path', path: '/pricing', readyText: '价格' },
   { id: 'L05', name: '帮助', site: 'landing', openVia: 'path', path: '/help', readyText: '帮助' },
   { id: 'L06', name: '更新日志', site: 'landing', openVia: 'path', path: '/changelog', readyText: '更新' },
   { id: 'L07', name: '登录', site: 'landing', openVia: 'path', path: '/signin', readyText: '登录' },
