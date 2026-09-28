@@ -35,7 +35,12 @@ import {
  * 用「这个决定需要知道什么」命名，而不是用「哪个功能」命名 ——
  * 功能会改名、会合并，而"估时需要知道什么"是稳定的。
  */
-export type PreferenceRelevance = 'breakdown' | 'capture' | 'prioritize' | 'duration-estimate';
+export type PreferenceRelevance =
+  | 'breakdown'
+  | 'capture'
+  | 'prioritize'
+  | 'duration-estimate'
+  | 'tool-calling';
 
 /**
  * 每个用途**真正需要**的偏好。
@@ -52,6 +57,16 @@ const RELEVANT_PREFERENCES: Record<PreferenceRelevance, readonly PreferenceId[]>
   prioritize: ['lead-time', 'deep-work-window'],
   // 估时：偏差系数 + 时段（不同时段效率不同）
   'duration-estimate': ['estimate-bias', 'deep-work-window'],
+  // 🔴 工具调用：**一条偏好都不需要。**
+  //
+  // 它是"该调哪个工具"的**路由**决定，不是"怎么写 / 估多久"的**生成**决定 ——
+  // 用户的历史习惯帮不上忙（也不会让它选得更准）。空数组是**刻意的保守**：
+  // 上面每加一条，就等于允许该功能多送一条用户信息出境。
+  //
+  // ⚠️ 这个 key 必须存在（不是可选的）：`check:ai-coverage` 由 `AiFeature` 驱动，
+  // 要求每个功能**显式回答**"你要不要偏好"。缺了这个 key，
+  // "我们想过，答案是不要"就变成了"有人忘了想"。
+  'tool-calling': [],
 };
 
 /** 一条要注入 prompt 的偏好提示。 */

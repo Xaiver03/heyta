@@ -66,9 +66,20 @@ export enum Priority {
 /**
  * 艾森豪威尔象限。
  *
- * 注意：**象限是 TASK 的存储字段，不是派生视图。**
- * 存下来的理由是"重要性"是用户的主观判断，无法从其他字段推导 ——
- * 紧迫性可以从 dueDate 推导，重要性不行。
+ * 🔴 **象限是派生视图，不是 TASK 的存储字段** —— 见
+ * `docs/adr/0015-four-quadrant-as-derived-view.md`。这个枚举只是**分类结果**，
+ * 落盘的是它的两个**轴**：
+ *
+ *   - **重要性** → `Task.important`（**存**。它是用户的主观判断，推不出来）
+ *   - **紧迫性** → `Task.dueDate`（**推**。由截止时间与"紧迫窗口"算出）
+ *
+ * 判定是纯函数：`packages/domain/src/quadrant.ts` 的
+ * `classifyQuadrant` / `bucketByQuadrant`。**不要给 `Task` 加 `quadrant` 字段** ——
+ * 那会让同一件事有两份定义，而它们必然会漂移。
+ *
+ * ⚠️ 这条注释曾经写反（写着"象限是 TASK 的存储字段，不是派生视图"），
+ * 与 ADR-0015 和当时的代码都矛盾。**它会诱导下一个人去加字段**，
+ * 而加字段正是 ADR-0015 §2 明令禁止的事。改动前先读 ADR。
  */
 export enum Quadrant {
   /** 重要且紧急 —— 立即做 */
@@ -87,6 +98,29 @@ export interface Task extends EntityBase {
   note?: string;
   /** 所属清单。未归类时为 undefined（收集箱）。 */
   projectId?: string;
+  /**
+   * 父任务 ID（**子任务**）。
+   *
+   * 🔴 **这是可选字段，不是 schema bump**（AGENTS.md §3.3、见 B1-3）。
+   * 运行时默认值：**`undefined` = 顶级任务**。读的时候一律走
+   * `packages/domain/src/subtasks.ts` 的 `parentIdOf()`，不要各端自己写
+   * `task.parentId ?? undefined` —— 那样"顶级"这件事会有第二份定义。
+   *
+   * 语义边界（**本轮只定义到这里，其余是未决的产品决策**）：
+   *
+   *   - **父任务必须存在、且未软删除。** 指向不存在父的任务在
+   *     `buildTaskTree` 里被当作**顶级**处理（`detached`）；父已删除的记进
+   *     `promotedFromDeletedParent`。两种都**如实上报**，不静默丢、也不强行
+   *     造一个空父节点。
+   *   - **不许出现环**：把 A 的父设成 A 的后代必须被拒绝。判据是
+   *     {@link validateParentChange} 的 `cycle`，这是本模块最关键的一条。
+   *   - **深度 / 直接子数上限**单点定义在 `subtasks.ts` 的
+   *     `MAX_SUBTASK_DEPTH` / `MAX_SUBTASK_CHILDREN`，超限**返回失败原因**。
+   *   - ⚠️ **父任务完成时子任务怎样、删父任务时子任务怎样 —— 仓库现状没有
+   *     任何逻辑，本轮也刻意不发明默认值。** 详见 `subtasks.ts` 文件头的
+   *     「两件刻意不决定的事」。
+   */
+  parentId?: string;
   tagIds?: string[];
   priority?: Priority;
   /** 是否标记为重要（象限的第 1 个轴）。 */
@@ -161,9 +195,9 @@ export interface Tag extends EntityBase {
  * 独立便签（**不是**任务的备注字段）。
  *
  * 语义移植自上游 `features/note/note.model.ts`（MIT）：便签可挂在项目下、
- * 也可不挂（`projectId: null`），并可钉到「今天」。
+ * 也可不挂（= 未归属），并可钉到「今天」。
  *
- * 与上游的两处**有意不同**：
+ * 与上游的三处**有意不同**：
  *
  * 1. 上游有 `created` / `modified`，本地由 `EntityBase` 的
  *    `createdAt` / `updatedAt` 统一提供，不另立一套时间字段
@@ -173,10 +207,23 @@ export interface Tag extends EntityBase {
  *    要支持便签配色，正确的做法是先在 `tokens.css` 里加语义 token
  *    （并通过对比度测试），而不是让用户数据里出现自由 hex。
  *    在 token 就位之前，此字段**刻意缺席** —— 缺席比开一个后门好。
+ * 3. 🔴 **`projectId` 是可选的、且"未归属"= 字段不存在，不是 `null`。**
+ *    上游写 `projectId: null`，但本地 **reducer 把 `null` 定义为"显式清除
+ *    这个字段"**（`packages/op-log/src/state.ts`：合并语义下传递
+ *    "取消完成"这类意图只能靠 `null` 穿过 JSON，然后在 reducer 里翻成
+ *    `delete`）。所以往 op 载荷里写 `projectId: null`，物化后读回来是
+ *    **`undefined` 而不是 `null`** —— 声明成必填的 `string | null` 会是一个
+ *    **类型谎言**：类型说有值，运行时没有。
+ *    （实测来源：`packages/app-host/tests/note-actions.spec.ts` 的
+ *    「未归属永远合法」那条，最初断言 `toBeNull()` 直接红了。）
+ *
+ *    于是这里与 `Task.projectId` 对齐：**可选，缺省 = 未归属**。
+ *    需要显式 `null` 表达"未归属"的调用方走 `notes.ts` 的
+ *    {@link noteProjectId} —— 它是唯一一处把 `undefined` 归一成 `null` 的地方。
  */
 export interface Note extends EntityBase {
-  /** 所属项目；`null` = 不归属任何项目。 */
-  projectId: string | null;
+  /** 所属清单；**缺省 = 未归属**（不是 `null`，理由见上面第 3 条）。 */
+  projectId?: string;
   /** 是否钉到「今天」。 */
   isPinnedToToday: boolean;
   /** 正文。 */
@@ -304,6 +351,77 @@ export interface PreferenceCorrection extends EntityBase {
   kind: PreferenceCorrectionKind;
 }
 
+// ─────────────────────────────────────────────────────────────
+// 提醒
+// ─────────────────────────────────────────────────────────────
+
+/**
+ * 任务提醒（**独立实体，不是 `Task.dueDate` 的派生视图**）。
+ *
+ * 🔴 **为什么必须是独立实体**（这是 B1-1 的关键决定，依据逐条列出）：
+ *
+ * 1. **没有 ADR 管这件事。** `docs/adr/` 里没有任何一份决定"提醒用独立实体还是
+ *    派生"（`grep -rn "提醒\|REMINDER" docs/adr/` 只命中 ADR-0020 的订阅到期提醒，
+ *    与任务提醒无关）。所以本条不是"ADR 已定、照做"，而是**新拍的产品决定**；
+ *    拍它的依据是下一条。
+ * 2. **计划里已经登记了结论。** `docs/plans/site-and-parity-alignment.md` §B1-1
+ *    写的是「**物化 `REMINDER`** + 调度 + 本地通知」，并把"物化新实体要动
+ *    `EntityModelMap` / `BUCKET_BY_ENTITY` / 编译期断言三处"列为关键难点 ——
+ *    即一条已经记录的、要动实体层的工作。
+ * 3. **`dueDate` 表达不了一条提醒。** `dueDate` 是**一个瞬间**，语义由
+ *    [ADR-0015](../docs/adr/0015-four-quadrant-as-derived-view.md) §2 钉死为
+ *    "紧迫性轴"（象限由它派生）。提醒是**通知规则**，实际用法是：
+ *    「截止前 30 分钟提醒」、一条任务挂**多个**提醒、只看时间不看截止
+ *    （绝对时刻提醒）。把这些塞进 `dueDate` 会让同一个字段同时表达
+ *    "截止"与"何时通知"两件事，而它们必然在某次编辑里漂移。
+ * 4. **一个用户意图 = 一个 op，而提醒的增删改是独立意图。**
+ *    （AGENTS.md §3.4；`Task.repeatRule` 的注释用同一条推理否决了
+ *    `TASK_REPEAT_CFG`，见 `UNMODELED_ENTITY_TYPES`。）
+ *    若把提醒做成 `Task.reminders[]` 数组：加一条提醒 = 重写整条任务的载荷，
+ *    于是"改标题"与"加提醒"在同一实体上 LWW 互斥（一端加的提醒会被另一端
+ *    改标题的 op 覆盖掉），而**单条提醒的删除/顺延也做不到**。独立实体让
+ *    每条提醒有自己的 id 与时钟，这正是 `HabitLog` 相对 `Habit` 的关系。
+ *
+ * 判据（什么时候算到期、重复怎么算）全在纯函数模块
+ * `packages/domain/src/reminders.ts`；op 的构造在
+ * `packages/app-host/src/reminder-actions.ts`。**不要在任何 `apps/*` 里重新判断。**
+ *
+ * ⚠️ 持久化字段的可选性：`taskId` / `triggerAt` 是**实体身份的一部分**
+ * （没有它们这条提醒没有意义），所以是必填 —— 与 `HabitLog.habitId` / `date`
+ * 同一条先例。其余状态字段一律可选 + 运行时默认值（AGENTS.md §3.3），
+ * 这样老数据/另一端少写一个字段不会让 hydration 炸。
+ */
+export interface Reminder extends EntityBase {
+  /**
+   * 提醒归属的任务 id。
+   *
+   * 本轮的产品口径是**任务提醒**（B1-1 的验收就是"给任务建一条 10 分钟后的提醒"）。
+   * 将来若要支持独立提醒（不挂任务），正确做法是把它改成可选并**同时**定义
+   * "无任务提醒"的语义，而不是在调用方约定 `taskId: ''`。
+   */
+  taskId: string;
+  /**
+   * 触发时刻（epoch ms）—— **权威值**。到没到只看它（`snoozedUntil` 优先）。
+   */
+  triggerAt: number;
+  /**
+   * 相对任务 `dueDate` 的提前量（ms，正数 = 提前）。
+   *
+   * ⚠️ **它只用于重复任务的重算**，不是第二个权威值：读"何时触发"一律走
+   * `reminderEffectiveAt()`。给了它，任务完成顺延时提醒跟着走
+   * （`nextTriggerAfterRepeat()`）；不给 = 绝对时刻提醒，**不随重复移动**
+   * —— 这是刻意的：「每天 9 点提醒我」里的 9 点是绝对时间，跟着 dueDate
+   * 漂移反而是错的。
+   */
+  offsetMs?: number;
+  /** 已投递的时刻。存在即表示本机已经发过这条通知（幂等依据）。 */
+  firedAt?: number;
+  /** 「稍后提醒」到（epoch ms）。存在且未到时，触发时刻以它为准。 */
+  snoozedUntil?: number;
+  /** 用户主动关闭。存在即不再触发（清除写 `null`，见 `reminders.ts`）。 */
+  dismissedAt?: number;
+}
+
 /**
  * 实体类型 → 领域模型 的映射。
  * 用于 op-log 的 apply 阶段做类型收窄。
@@ -318,6 +436,7 @@ export interface EntityModelMap {
   FOCUS_SESSION: FocusSession;
   AI_FEEDBACK: AiFeedback;
   PREFERENCE_CORRECTION: PreferenceCorrection;
+  REMINDER: Reminder;
 }
 
 export type ModeledEntityType = keyof EntityModelMap;
@@ -344,6 +463,7 @@ export const MODELED_ENTITY_TYPES = [
   'FOCUS_SESSION',
   'AI_FEEDBACK',
   'PREFERENCE_CORRECTION',
+  'REMINDER',
 ] as const satisfies readonly ModeledEntityType[];
 
 /** 编译期兜底：清单漏掉 `EntityModelMap` 的任何一个键都会让这里类型错误。 */
