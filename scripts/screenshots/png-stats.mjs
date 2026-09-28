@@ -189,6 +189,17 @@ function pixelAt(image, index) {
   return [row[base], row[base + 1], row[base + 2]];
 }
 
+/** 取第 index 个像素的 alpha。没有 alpha 通道的格式一律当 255（不透明）。 */
+function alphaAt(image, index) {
+  const { channels, rows, stride, colorType, bitDepth } = image;
+  if (colorType !== 4 && colorType !== 6) return 255;
+  const y = Math.floor(index / image.width);
+  const x = index % image.width;
+  const row = rows.subarray(y * stride, (y + 1) * stride);
+  if (bitDepth !== 8) return 255; // 低位深/16 位在截图场景里不出现，不猜
+  return colorType === 6 ? row[x * channels + 3] : row[x * channels + 1];
+}
+
 /**
  * 统计一张 PNG。参数是文件路径。
  *
@@ -253,6 +264,7 @@ export function inspectPng(filePath) {
   // 于是背景也被算成内容，指标退化成"全图边缘密度"，
   // 好的暗色 UI（0.0065）和糊掉的图（0.0028）只差 2.3 倍 —— 那种薄 margin
   // 当不了门禁。改用"相对主色的偏离"之后，背景被排除，区分度才拉开。
+  let transparentSamples = 0;
   let transitions = 0;
   let contentSamples = 0;
   let edgePairs = 0;
@@ -262,6 +274,7 @@ export function inspectPng(filePath) {
     const luminance = sampledLuminances[index];
     const isContent = Math.abs(luminance - modalLuminance) >= EDGE_DELTA_MIN;
     if (isContent) contentSamples += 1;
+    if (alphaAt(image, pixel) < 255) transparentSamples += 1;
     if (column >= image.width - 1 || index + 1 >= sampledLuminances.length) continue;
     edgePairs += 1;
     if (Math.abs(luminance - sampledLuminances[index + 1]) >= EDGE_DELTA_MIN) transitions += 1;
@@ -275,6 +288,15 @@ export function inspectPng(filePath) {
     colorType: image.colorType,
     bitDepth: image.bitDepth,
     hasAlpha: ALPHA_COLOR_TYPES.has(image.colorType),
+    /**
+     * 🔴 这张图**是否真的用了透明**（存在 alpha < 255 的像素）。
+     *
+     * 和 `hasAlpha`（只有格式带 alpha 通道）不是一回事：
+     * 设备截图（`simctl io` / `adb screencap`）存成 RGBA，但每个像素 alpha 都是 255，
+     * 实际完全不透明 —— 那种格式差异不该被判失败。
+     * 真正要管的是"有没有真的透明"，那才会在查看器里出黑边、也无法逐字节比对。
+     */
+    hasTransparency: transparentSamples > 0,
     colorSpan: maxLuminance - minLuminance,
     contentRatio: samples === 0 ? 0 : nonWhiteSamples / samples,
     edgePairs,

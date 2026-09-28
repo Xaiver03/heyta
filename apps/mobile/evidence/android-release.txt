@@ -1,0 +1,12 @@
+# Android release 包进入产品界面的取证
+#
+# 复现：bash apps/mobile/scripts/verify-release-builds.sh android
+#
+# 🔴 前置条件是**先确认 8081（Metro）无监听**，并 `adb reverse --remove-all`
+#   撤销端口转发 —— 这样"能起来"才等价于"JS bundle 真的内嵌在包里"。
+#
+# 构建：pnpm --filter @heyta/mobile build:android（assembleRelease）
+# 签名：正式发布签名（见 docs/runbooks/multi-platform-build.md §1.5.1）
+# 设备：emulator-5554
+
+CAPTURE_METHOD=adb-screencap
