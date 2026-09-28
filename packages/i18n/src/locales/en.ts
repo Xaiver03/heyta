@@ -284,6 +284,10 @@ export const en = {
   'web.shell.nav.completed': 'Completed',
   'web.shell.nav.quadrant': 'Quadrants',
   'web.shell.nav.project': 'List',
+  'web.shell.nav.tag': 'Tag',
+  'web.shell.search.placeholder': 'Search tasks',
+  'web.shell.search.aria': 'Search tasks (title and note)',
+  'web.shell.search.clear': 'Clear search',
   'web.shell.nav.tasks': 'Tasks',
   'web.shell.nav.q1': 'Important and urgent',
   'web.shell.nav.q2': 'Important, not urgent',
@@ -294,6 +298,7 @@ export const en = {
   'web.shell.views.focus': 'Focus timer',
   'web.shell.views.timeline': 'Timeline',
   'web.shell.views.growth': 'Growth',
+  'web.shell.views.notes': 'Sticky notes',
   'web.shell.views.settings': 'Settings',
   'web.shell.dueMode.aria': 'Due date display',
   'web.shell.dueMode.date': 'Date',
@@ -303,6 +308,15 @@ export const en = {
   'web.shell.tasks.complete': 'Complete: {title}',
   'web.shell.tasks.uncomplete': 'Mark incomplete: {title}',
   'web.shell.tasks.delete': 'Delete: {title}',
+  // ── Task notes ──
+  // 🔴 Before this there was no note input anywhere on the web: `Task.note` and
+  // `setNote` both existed, but the only callers were AI breakdown and AI duration.
+  // The data layer was wired (notes export and sync); only the last metre — a user
+  // being able to write one — was missing. See `features/tasks/NoteEditor.tsx`.
+  'web.note.toggle': 'Note',
+  'web.note.placeholder': 'Write something (Markdown supported)',
+  'web.note.a11y.edit': 'Edit the note on "{title}"',
+  'web.note.hint': 'Saves when you leave the field',
   // ── 回收站 ── (Trash)
   // Entry point is the shell view tab (`VIEW_TABS` in `App.tsx`); the view
   // itself is `apps/web/src/features/trash/TrashView.tsx`. Deleting is still
@@ -448,8 +462,46 @@ export const en = {
   'web.passkeys.error.unauthorized': 'Your sign-in has expired — sign in again.',
   'web.passkeys.error.network': 'Could not reach the server. Try again later.',
 
+  // ── In-app widget journey (adding cards to the home screen) ─────────
+  'mobile.widgetJourney.sectionTitle': 'Home screen widgets',
+  'mobile.widgetJourney.card.today': 'Today\'s tasks',
+  'mobile.widgetJourney.card.quadrant': 'Quadrants',
+  'mobile.widgetJourney.card.habits': 'Today\'s habits',
+  'mobile.widgetJourney.card.focus': 'Today\'s focus',
+  'mobile.widgetJourney.intro': 'Today\'s tasks, quadrants, habits and focus — four cards you can keep on your home screen.',
+  'mobile.widgetJourney.howTo': 'How to add',
+  'mobile.widgetJourney.openOnce': 'If the card says “Open Heyta to show your widget” after adding it, opening Heyta once fills it in.',
+  'mobile.widgetJourney.cannotAutoAdd': 'The system does not let an app place a widget for you, so you add it once by hand.',
+  'mobile.widgetJourney.ios.step1': 'Touch and hold an empty spot on the home screen until the icons jiggle',
+  'mobile.widgetJourney.ios.step2': 'Tap the “+” in the top-left corner',
+  'mobile.widgetJourney.ios.step3': 'Search for “Heyta” and pick a size',
+  'mobile.widgetJourney.ios.step4': 'Tap “Add Widget”',
+  'mobile.widgetJourney.android.step1': 'Touch and hold an empty spot on the home screen',
+  'mobile.widgetJourney.android.step2': 'Tap “Widgets”',
+  'mobile.widgetJourney.android.step3': 'Find Heyta, then touch and hold it and drag it onto the home screen',
+  'mobile.widgetJourney.other.step1': 'Touch and hold the home screen and find Heyta in the widget list',
+  'mobile.widgetJourney.other.step2': 'Drag it onto the home screen',
+  'mobile.widgetJourney.privacyTitle': 'Hide task titles on the lock screen',
+  'mobile.widgetJourney.privacyHint': 'When on, lock screen and lock-screen widgets show only the number of tasks, not their titles.',
+  'mobile.widgetJourney.privacyFailed': 'Could not save this setting. Try again.',
+
   // ── Windows widget background refresh (Web Push) ───────────────────
   'web.widgetPush.title': 'Widget background refresh',
+
+  // ── Web/Windows widget journey (install the app first, then cards appear) ──
+  'web.widgetJourney.sectionTitle': 'Desktop widgets',
+  'web.widgetJourney.intro': 'heyta can become an app on your desktop. Four cards — today, quadrants, habits and focus — then show up in your system widget board.',
+  'web.widgetJourney.status.standalone': 'Running as an app',
+  'web.widgetJourney.status.browser': 'Running in a browser tab',
+  'web.widgetJourney.howToInstall': 'How to install it as an app',
+  'web.widgetJourney.windows.step1': 'Click the "…" or app icon on the right of the address bar',
+  'web.widgetJourney.windows.step2': 'Choose "Apps" → "Install this site as an app"',
+  'web.widgetJourney.windows.step3': 'Once installed, the four cards appear in the Windows widget board (press Win+W)',
+  'web.widgetJourney.macos.step1': 'Click the "Install heyta" icon on the right of the address bar',
+  'web.widgetJourney.macos.step2': 'Then open it from your Applications folder',
+  'web.widgetJourney.other.step1': 'Look for "Install app" or "Add to Home screen" in your browser menu',
+  'web.widgetJourney.other.step2': 'Then open it from your app list',
+  'web.widgetJourney.note.widgetSource': 'Cards only come from an installed app — a website you have not installed will not appear in the widget board.',
   'web.widgetPush.description': 'When on, the heyta widget pinned on Windows updates by itself when your tasks change on another device. When off, it only refreshes after you open Heyta.',
   'web.widgetPush.rowLabel': 'Allow background widget refresh',
   'web.widgetPush.status.subscribed': 'On',
@@ -496,6 +548,11 @@ export const en = {
   'web.focus.start': 'Start',
   'web.focus.a11y.pause': 'Pause focus session',
   'web.focus.pause': 'Pause',
+  // M3 second cut: the shared `@heyta/ui` panel now owns the pause -> resume
+  // mapping, so web needs its own "Resume" entry (it previously had only
+  // "Start", which called `start()` and discarded elapsed progress).
+  'web.focus.a11y.resume': 'Resume focus session',
+  'web.focus.resume': 'Resume',
   'web.focus.a11y.stop': 'Stop focus session',
   'web.focus.stop': 'Stop',
   'web.focus.task.label': 'Linked task (optional)',
@@ -506,6 +563,19 @@ export const en = {
   // The store carries only `{ reason }` (raw text from the failing layer, i.e.
   // data); the sentence is assembled here so the English UI stays English.
   'web.focus.error.saveFailed': 'Could not save the focus record: {reason}',
+  // Duration settings. Editable only while idle (changing mid-session would make
+  // the current round's planned length ambiguous), so there is a dedicated line
+  // explaining the disabled state — disabling without saying why is the worst option.
+  'web.focus.config.title': 'Durations',
+  'web.focus.config.work': 'Focus',
+  'web.focus.config.shortBreak': 'Short break',
+  'web.focus.config.longBreak': 'Long break',
+  'web.focus.config.longBreakEvery': 'Long break every',
+  'web.focus.config.minutes': '{minutes} minutes',
+  'web.focus.config.sessions': '{count} sessions',
+  'web.focus.config.locked': 'Durations cannot change while the timer runs — stop this round, edit, then start again.',
+  'web.focus.config.a11y.minutes': '{label} duration in minutes',
+  'web.focus.config.a11y.sessions': '{label} in sessions',
 
   // ── Web · habits ──────────────────────────────────────────
   'web.habits.addPlaceholder': 'New habit, for example "Drink water"',
@@ -534,7 +604,12 @@ export const en = {
   'web.habits.streak.totalOne': '{count} check-in',
   // Heatmap copy is passed *by us* to react-activity-calendar; its defaults are English-only.
   // `{{count}}` is the library's own placeholder and must survive verbatim.
-  'web.habits.heatmap': '{count} check-ins in the last 90 days',
+  // ── M3 knife 7 (habits): copy for the self-drawn heatmap ──
+  // The key above is the *library's* shape (`{{count}}` is
+  // react-activity-calendar's own placeholder), so the shared heatmap cannot
+  // reuse it — it would render a literal `{5}`. These two use our shape.
+  'web.habits.heatmap.a11y': '"{name}": {count} check-ins in the last {days} days',
+  'web.habits.heatmap.cell': '{date}: {count}',
 
   // ── Web · heatmap copy shared by habits and growth ────────
   'web.heatmap.month.1': 'Jan',
@@ -789,20 +864,47 @@ export const en = {
   'web.ai.noTarget.breakdown': 'No endpoint is configured for "Task breakdown" yet. Add an endpoint in Settings and route the feature to it.',
   'web.ai.noTarget.duration': 'No endpoint is configured for "Time estimate" yet. Add an endpoint in Settings and route the feature to it.',
   'web.ai.noTarget.prioritize': 'No endpoint is configured for "Prioritization" yet. Add an endpoint in Settings and route the feature to it.',
+  'web.ai.noTarget.toolCalling': 'No endpoint is configured for "AI tool calling" yet. Add an endpoint in Settings, declare the "Tool calling" capability, and route the feature to it.',
 
   // ── Web · AI · feature / capability names ─────────────────
   'web.ai.feature.capture': 'One-sentence capture',
   'web.ai.feature.breakdown': 'Task breakdown',
   'web.ai.feature.prioritize': 'Priority suggestions',
   'web.ai.feature.duration': 'Time estimate',
+  'web.ai.feature.toolCalling': 'AI tool calling',
   'web.ai.needs.capture': 'Quick capture',
   'web.ai.needs.breakdown': 'Task breakdown',
   'web.ai.needs.prioritize': 'Sorting suggestions',
   'web.ai.needs.duration': 'Time estimate',
+  'web.ai.needs.toolCalling': 'Tool calling',
   'web.ai.capability.structuredOutput': 'Structured output',
   'web.ai.capability.longContext': 'Long context',
   'web.ai.capability.vision': 'Image understanding',
   'web.ai.capability.toolCalling': 'Tool calling',
+
+  // ── Web · AI · tool calling panel ─────────────────────────
+  'web.ai.tools.title': 'AI tool calling',
+  'web.ai.tools.hint': 'Ask in one sentence and AI will call one tool. What the rules can handle never leaves this device.',
+  'web.ai.tools.placeholder': 'e.g. list all tasks',
+  'web.ai.tools.inputAria': 'Input for AI tool calling',
+  'web.ai.tools.run': 'Run',
+  'web.ai.tools.viaRule': 'Matched by a local rule — no network',
+  'web.ai.tools.viaModel': 'Chosen by the model',
+  'web.ai.tools.disclosureAria': 'AI tool calling — confirm before sending',
+  'web.ai.tools.observationLead': 'Result',
+  'web.ai.tools.proposalLead': 'About to run (needs your confirmation)',
+  'web.ai.tools.confirm': 'Confirm',
+  'web.ai.tools.confirmAria': 'Confirm running this tool',
+  'web.ai.tools.confirmedOk': 'Done',
+  'web.ai.tools.confirmedFail': 'Failed: {message}',
+  'web.ai.tools.modelTextLead': 'The model said: ',
+  'web.ai.tools.ambiguousLead': 'That could mean several things. Be more specific. Try:',
+  'web.ai.tools.empty': 'Could not understand that. Try rephrasing, or do it manually.',
+  'web.ai.tools.deniedLead': 'This tool is not authorized yet — enable it in settings first.',
+  'web.ai.tools.failedLead': 'Could not finish: ',
+  'web.ai.tools.intentCreate': 'Create task "{title}"',
+  'web.ai.tools.intentUpdate': 'Update task {id}',
+  'web.ai.tools.intentComplete': 'Mark task {id} as done',
 
   // ── Web · AI · breakdown panel ────────────────────────────
   'web.ai.breakdown.button': 'AI breakdown',
@@ -1383,13 +1485,10 @@ export const en = {
   'mobile.tasks.empty.title': 'Nothing scheduled for today',
   'mobile.tasks.empty.hint': 'Tap the plus button in the corner and write down your first task.',
   'mobile.tasks.mode.date': 'Date',
+  'mobile.tasks.tagFilter.all': 'All',
   'mobile.tasks.mode.countdown': 'Countdown',
   'mobile.tasks.view.list': 'List',
   'mobile.tasks.view.quadrant': 'Quadrants',
-  'mobile.quadrant.q1': 'Important & urgent',
-  'mobile.quadrant.q2': 'Important, not urgent',
-  'mobile.quadrant.q3': 'Urgent, not important',
-  'mobile.quadrant.q4': 'Neither',
   'mobile.tasks.quadrant.empty': 'Nothing here yet',
   'mobile.tasks.group.overdue': 'Overdue',
   'mobile.tasks.group.inbox': 'Inbox',
@@ -1430,6 +1529,9 @@ export const en = {
   'mobile.focus.phase.idle': 'Ready when you are',
   'mobile.focus.phase.working': 'Focusing',
   'mobile.focus.phase.breaking': 'On a break',
+  // Accessibility name for the progress ring. Mobile used a horizontal bar
+  // before (so it had no such entry); the shared ring needs it on both ends.
+  'mobile.focus.a11y.progress': 'Progress {percent}%',
   'mobile.focus.action.pause': 'Pause',
   'mobile.focus.action.resume': 'Resume',
   'mobile.focus.action.startWork': 'Start focusing',
@@ -1457,6 +1559,12 @@ export const en = {
   'mobile.detail.title': 'Task details',
   'mobile.detail.close': 'Close task details',
   'mobile.detail.field.title': 'Title',
+  // 🔴 Before this there was no note input on mobile either: `Task.note` and
+  // `setNote` both existed, but the only callers were AI features — a user
+  // could not write one themselves.
+  'mobile.detail.field.note': 'Note',
+  'mobile.detail.note.placeholder': 'Write something (Markdown supported)',
+  'mobile.detail.note.hint': 'Saves when you leave the field or close the panel',
   'mobile.detail.field.dueDate': 'Due date',
   'mobile.detail.field.repeat': 'Repeat',
   'mobile.detail.repeat.none': 'Does not repeat',
@@ -1525,10 +1633,6 @@ export const en = {
   'mobile.profile.lastSync.never': 'Never',
   'mobile.profile.clearCredentials': 'Clear credentials saved on this device',
   'mobile.profile.footnote': 'Credentials are kept in memory only and must be re-entered after the app fully exits.',
-  'mobile.profile.section.widget': 'Widgets',
-  'mobile.profile.widgetPrivacy.label': 'Hide task titles on the Lock Screen',
-  'mobile.profile.widgetPrivacy.hint': 'When on, the Heyta Lock Screen widget shows counts only, never task titles. iOS already blurs content while locked; this is an extra layer.',
-  'mobile.profile.widgetPrivacy.failed': 'Could not save this setting. Please try again.',
   'mobile.profile.conflict.body': 'Both sides changed these places, and heyta will not choose for you - picking one automatically would silently drop the other side. Nothing is lost, but nothing uploads until you choose.',
   'mobile.profile.conflict.open': 'Review one by one',
 
@@ -1600,6 +1704,9 @@ export const en = {
   'mobile.growth.back': 'Back',
   'mobile.growth.entry': 'My growth',
   'mobile.growth.entry.hint': 'Today, streaks and milestones',
+  // ── M3 knife 7 (habits): the mobile "Profile → Habits" entry ──
+  'mobile.habits.entry': 'Habits',
+  'mobile.habits.entry.hint': 'Check in, streaks and the heatmap',
   'mobile.growth.compare.note': 'Every number here compares you only with your past self. No leaderboards.',
 
   // Today (L1)
@@ -1611,9 +1718,13 @@ export const en = {
   'mobile.growth.today.hint.remaining': 'Still {count} to go today',
   'mobile.growth.today.closed': 'Today is complete',
   'mobile.growth.today.habits': 'Habits {done}/{planned}',
+  'web.growth.today.habits': 'Habits {done}/{planned}',
   'mobile.growth.today.tasks': 'Tasks {done}/{planned}',
+  'web.growth.today.tasks': 'Tasks {done}/{planned}',
   'mobile.growth.today.bonus': '{count} beyond the plan',
+  'web.growth.today.bonus': '{count} beyond the plan',
   'mobile.growth.today.focus': 'Focus {minutes} min',
+  'web.growth.today.focus': 'Focus {minutes} min',
 
   // Weekly review (L3). Deltas stay neutral: no red for a lower week.
   'mobile.growth.week.title': 'This week',
@@ -1699,4 +1810,384 @@ export const en = {
   'mobile.export.shareHint': 'The export is handed to the system share sheet, where you choose where it goes.',
   'mobile.export.shareTitle': 'heyta export',
   'mobile.export.shareFailed': 'The system share sheet did not open, so nothing was sent.',
+
+  // ══════════════════════════════════════════════════════════════════
+  // Site (multi-page) — see docs/adr/0033-multi-page-site-and-bidirectional-reachability.md
+  //
+  // 🔴 Every key below is driven by the page registry in
+  //    `apps/landing/src/site/pages.ts`: nav, footer, per-page <title>/<meta>
+  //    and the sitemap are all derived from it. Adding a page means editing the
+  //    registry + this table + one component — never the nav or the sitemap.
+  // ══════════════════════════════════════════════════════════════════
+  'site.nav.home': 'Home',
+  'site.nav.features': 'Features',
+  'site.nav.platforms': 'Platforms',
+  'site.nav.pricing': 'Pricing',
+  'site.nav.integrations': 'What\'s different',
+  'site.nav.help': 'Help',
+  'site.nav.changelog': 'What\'s new',
+  'site.nav.signin': 'Sign in',
+  'site.nav.aria': 'Site navigation',
+  'site.footer.group.product': 'Product',
+  'site.footer.group.support': 'Support',
+  'site.footer.group.legal': 'Legal',
+  // 🔴 R2 (2026-10-05): nine zero-reference entries used to live here and have
+  // been deleted: `site.footer.{terms,privacy,license,aria}`, `site.backHome`,
+  // `site.appLink.{label,pending,pendingCta}`, `site.signin.cta`.
+  //
+  // The criterion was measurement, not eyeballing: after excluding `dist/` and
+  // the catalogues themselves, repo-wide references (including `.mjs` / `.html`)
+  // are 0. A raw grep showed 4 hits each — all build artifacts under
+  // `packages/i18n/dist/**`, i.e. **not filtering `dist/` makes dead keys look
+  // alive**.
+  //
+  // ⚠️ When adding one back, do not add the entry alone: `MessageKey` is derived
+  // from the Chinese catalogue, so an entry nobody renders compiles fine — which
+  // is exactly how those nine came to exist. Adding the entry and wiring the
+  // surface must happen together.
+
+  // ── Home SEO (was hard-coded in index.html; now in the table so every page
+  //    can be generated from one source) ──
+  'site.home.seo.title': 'heyta: local-first task management you can self-host',
+  'site.home.seo.description': 'heyta is a local-first task manager: your data lands on your device first, the cloud is only a sync channel, and the server never sees plaintext. TickTick-class features, and you can run it entirely on your own server.',
+
+  // ── Features ──
+  'site.features.seo.title': 'Features — heyta',
+  'site.features.seo.description': 'What heyta actually does: tasks and lists, the four quadrants, habits, focus timer, timeline, growth system, encrypted sync, local API and MCP. Shipped features only, each with something you can check.',
+  'site.features.title': 'Features',
+  'site.features.lede': 'Only features that **work today** are listed here. Unfinished ones live on the changelog and the roadmap instead of doubling as selling points — a page that lists things it cannot do is worse than no page at all.',
+  'site.features.section.tasks': 'Tasks and lists',
+  'site.features.section.views': 'Views',
+  'site.features.section.habits': 'Habits',
+  'site.features.section.focus': 'Focus',
+  'site.features.section.growth': 'Motivation and growth',
+  'site.features.section.sync': 'Sync and privacy',
+  'site.features.section.ai': 'AI (bring your own endpoint)',
+  'site.features.section.api': 'Local API and MCP',
+  'site.features.item.task.fields': 'Title, note (Markdown), priority, due date, list, tags',
+  'site.features.item.task.repeat': 'Recurring tasks: daily / weekly / weekdays / monthly presets, built on RFC 5545 RRULE',
+  'site.features.item.task.projects': 'Lists support one level of folders; lists and tags each have their own panel',
+  'site.features.item.task.trash': 'Trash: soft delete, restore, and permanent delete (a marker, not a physical erase)',
+  'site.features.item.task.export': 'Export: JSON (full operation log plus tombstones) and Markdown, with countable totals',
+  'site.features.item.view.quadrant': 'Four quadrants: **derived** from importance and the due date, drag to reclassify — not a second copy of your data',
+  'site.features.item.view.timeline': 'Timeline: laid out by estimated duration, for personal project planning',
+  'site.features.item.view.today': 'Today / Inbox / Completed / Trash: smart lists',
+  'site.features.item.habit.model': 'Daily check-in and undo (check-ins sync across devices)',
+  'site.features.item.habit.streak': 'Streaks and longest run, with **freeze / reconnect / repair** resilience',
+  'site.features.item.habit.heat': 'Heatmap and a year view',
+  'site.features.item.focus.timer': 'Focus timer with long breaks; durations are yours to set (1–180 minutes)',
+  'site.features.item.focus.link': 'A session can be linked to a specific task and lands in your stats',
+  'site.features.item.growth.feedback': 'Today\'s progress card: honest numbers, including work you did not plan',
+  'site.features.item.growth.narrative': 'Weekly review letter, milestone map, identity tags',
+  'site.features.item.growth.colors': 'Activity colours: **you** assign the meaning; the app never judges whether an activity is "healthy"',
+  'site.features.item.sync.e2ee': 'End-to-end encryption: tasks are encrypted **on your device** before upload; the server only relays ciphertext',
+  'site.features.item.sync.offline': 'Offline first: keep working with no connection; changes go up when it returns',
+  'site.features.item.sync.conflict': 'Visible conflicts: concurrent edits are never silently dropped — you choose which to keep',
+  'site.features.item.sync.selfhost': 'Self-hosting: docker compose brings up the app, PostgreSQL and a reverse proxy; no Redis or object storage',
+  'site.features.item.ai.byok': 'AI runs against **your own** endpoint (local Ollama / LM Studio, or any OpenAI-compatible URL)',
+  'site.features.item.ai.gate': 'Three egress gates: master switch, allow-remote, and per-feature consent — all off by default',
+  'site.features.item.ai.features': 'Four features: one-line capture, task breakdown, quadrant and priority suggestions, duration estimate',
+  'site.features.item.api.mcp': 'MCP server: six tools (list, get, list lists, create, update, complete)',
+  'site.features.item.api.local': 'Local API: off by default, loopback only, explicit token, per-tool consent',
+  'site.features.note': '⚠️ This list is the **current, real state**, based on a code-level audit and per-item checks (see `docs/research/dida365-feature-benchmark.md` in the repository). It deliberately excludes what is still being built and what we decided not to build — each of those has its own home below.',
+  'site.features.pending.title': 'Not built yet',
+  'site.features.pending.body': 'Habit **targets, units and frequency** (counted, timed, N times a week, fixed weekdays) — the data model exists, but there is **no settings screen** and the progress rules are pure functions only, so today you can only check in once per day; reminders, a web calendar view, subtasks, search, custom filters, a kanban view, bulk actions, importing from TickTick, ICS subscriptions, and a place to set recurring rules on the web. These are TickTick everyday paths and we do not have them — they are on the roadmap, and they are **not** in the list above.',
+  'site.features.notdoing.title': 'Decided against',
+  'site.features.notdoing.body': 'Leaderboards and social features (there is no trustworthy aggregator under end-to-end encryption), coin or point stores, charging per feature, and WeChat reminders (they need the server to read plaintext).',
+
+  // ── Platforms ──
+  'site.platforms.seo.title': 'Platform status — heyta',
+  'site.platforms.seo.description': 'Where heyta really stands on each platform: web is live, Android runs on a real device, iOS reaches simulator-level interaction, desktop builds but is unsigned, HarmonyOS builds a package but does not run yet. Each with a reproducible command.',
+  'site.platforms.title': 'Platform status',
+  'site.platforms.lede': 'This says **where each platform is right now**, not "coming soon". Every claim comes with something you can run — progress without evidence should not be believed, including ours.',
+  'site.platforms.status.available': 'Available',
+  'site.platforms.status.partial': 'In progress',
+  'site.platforms.status.blocked': 'Blocked',
+  'site.platforms.legend.available': 'Works, and has an end-to-end check',
+  'site.platforms.legend.partial': 'It runs, but something required for release is missing',
+  'site.platforms.legend.blocked': 'There is a specific external dependency we have not cleared',
+  'site.platforms.web.name': 'Web',
+  'site.platforms.web.body': 'The complete product, not a demo. Install it as a PWA and it works offline, with data in SQLite (OPFS) inside your browser.',
+  'site.platforms.web.evidence': 'https://heyta.finlaw.cloud/app/',
+  'site.platforms.android.name': 'Android',
+  'site.platforms.android.body': 'Verified on a real device: create, reschedule, priority, lists, tags, repeat, focus, conflict resolution, trash, growth. Four home-screen widgets are written but not yet verified on hardware; the current signing config is not a release one.',
+  'site.platforms.android.evidence': 'pnpm verify:mobile-ios && pnpm verify:mobile-conflict && pnpm verify:mobile-focus',
+  'site.platforms.ios.name': 'iOS',
+  'site.platforms.ios.body': 'Reaches **simulator-level interaction**: release build, install, launch, a real SQLite database, and a full round trip to another device. **Not yet on real hardware** (that needs signing).',
+  'site.platforms.ios.evidence': 'pnpm verify:mobile-ios',
+  'site.platforms.desktop.name': 'Desktop (Windows / macOS / Linux)',
+  'site.platforms.desktop.body': 'The Electron shell packages for all three platforms, with output under release/. ⚠️ **Unsigned, unnotarised, and no installer**; the UI is still a vertical slice rather than the full product.',
+  'site.platforms.desktop.evidence': 'node scripts/package-desktop.mjs',
+  'site.platforms.harmony.name': 'HarmonyOS',
+  'site.platforms.harmony.body': '⚠️ **It builds a HAP, but the app does not run**: the build chain is verified end to end (a 20 MB release HAP, both ABIs), yet the simulator system image and signing are missing, and the React Native JS app is not wired into the ArkTS entry page.',
+  'site.platforms.harmony.evidence': 'pnpm verify:harmony-toolchain && pnpm verify:harmony-rnoh',
+  'site.platforms.selfhost.name': 'Self-hosting',
+  'site.platforms.selfhost.body': 'docker compose brings up the app, PostgreSQL and Caddy; no Redis, no object storage. ⚠️ **Not a zero-config one-liner**: you write .env yourself (the JWT secret and database password have no defaults) and the image is built locally by default.',
+  'site.platforms.selfhost.evidence': 'server/docker-compose.yml + docs/runbooks/deployment.md',
+  'site.platforms.note': '⚠️ Why "unsigned" deserves its own line: on macOS an unsigned, unnotarised app **is refused on double-click**, and has to be opened via the context menu. Leave that out and people think the download is broken.',
+
+  // ── Pricing ──
+  'site.pricing.seo.title': 'Pricing — heyta',
+  'site.pricing.seo.description': 'heyta pricing: self-hosting is free forever, official hosting is ¥5/month, official hosting with cloud AI is ¥12/month. Nothing is charged per feature — the free tier is the whole product.',
+  'site.pricing.title': 'Pricing',
+  'site.pricing.lede': 'Exactly two things cost money: **us running the sync server for you**, and **our cloud AI**. Features are not for sale — the free column is every feature.',
+  'site.pricing.compare.title': 'Self-hosting vs our hosting',
+  'site.pricing.compare.diy': 'You run it (free)',
+  'site.pricing.compare.hosted': 'We run it (paid)',
+  'site.pricing.compare.row.function': 'Features',
+  'site.pricing.compare.function.same': 'Identical',
+  'site.pricing.compare.row.server': 'Server',
+  'site.pricing.compare.server.diy': 'Your machine, your upgrades and backups',
+  'site.pricing.compare.server.hosted': 'Our machine, we run it',
+  'site.pricing.compare.row.data': 'Where data lives',
+  'site.pricing.compare.data.diy': 'Entirely in your hands',
+  'site.pricing.compare.data.hosted': 'On your device; our server holds ciphertext only',
+  'site.pricing.compare.row.ai': 'AI',
+  'site.pricing.compare.ai.diy': 'Your own endpoint — free forever, never metered',
+  'site.pricing.compare.ai.hosted': 'Your own endpoint is free; our cloud AI needs the ¥12 tier',
+  'site.pricing.compare.row.lockin': 'Lock-in',
+  'site.pricing.compare.lockin.same': 'Either way you can export everything at any time (JSON with the full operation log, plus Markdown)',
+  'site.pricing.faq.title': 'Questions',
+  'site.pricing.faq.expire.q': 'Do I lose my data when a subscription ends?',
+  'site.pricing.faq.expire.a': 'No. Your data lives on your own device. Expiry stops the hosting and cloud AI on our side; nothing local is touched, and you can export at any point.',
+  'site.pricing.faq.where.q': 'Where is my data kept?',
+  'site.pricing.faq.where.a': 'On your device first. The cloud is only a sync channel, and it holds **ciphertext only** — the keys stay with you, so the server cannot read any of it.',
+  'site.pricing.faq.export.q': 'If I stop paying, how do I take my data?',
+  'site.pricing.faq.export.a': 'Settings has an export: JSON with the full operation log and deleted records (with countable totals) plus Markdown. You need neither our permission nor a connection.',
+  'site.pricing.faq.buy.q': 'Can I buy it now?',
+  'site.pricing.faq.buy.a': '**Not yet.** The checkout route works, but the payment channel (a WeChat Pay merchant account) is not connected, so this page deliberately has **no buy button** — a button that does nothing is worse than no button.',
+
+  // ── What's different (data sovereignty + contrast with TickTick, A7) ──
+  //    Material: dida365-feature-benchmark §5's nine capabilities, regrouped by
+  //    A7's three criteria: sovereignty / contrast / the other two. Every claim
+  //    carries a reproducible verification.
+  'site.integrations.seo.title': 'What\'s different — heyta',
+  'site.integrations.seo.description': 'What only heyta does: end-to-end encrypted sync, self-hostable server, local API and MCP, bring-your-own AI endpoint, verifiable export, and no feature gating. Every claim comes with a reproducible check.',
+  'site.integrations.title': 'What\'s different',
+  'site.integrations.lede': 'This page is only about what TickTick **does not** have — and the common thread is **who holds the data**. Every claim is something you can check yourself.',
+  'site.integrations.e2ee.title': 'End-to-end encrypted sync (ciphertext enforced by the server)',
+  'site.integrations.e2ee.body': 'Tasks are encrypted on your device before upload, and the sync ingress **only accepts ciphertext**: plaintext is rejected outright, not accepted-and-ignored. So the server holds no readable task database.',
+  'site.integrations.e2ee.item.ingress': 'Plaintext upload is refused with **400 `E2EE_REQUIRED`** — rejected, not silently dropped',
+  'site.integrations.e2ee.item.keys': 'Keys stay with you — a wrong passphrase really cannot decrypt old data. That is the cost, and the proof it is encrypted.',
+  'site.integrations.e2ee.evidence': 'server/src/sync/sync.routes.payload.ts',
+  'site.integrations.selfhost.title': 'Self-host the server, free forever',
+  'site.integrations.selfhost.body': 'The sync server can run entirely on your own machine: a `docker compose` trio (app + PostgreSQL + Caddy) that needs **no Redis and no object storage**. Self-hosting costs nothing and needs nobody\'s permission.',
+  'site.integrations.selfhost.item.compose': 'Three services, and the data lands on your own disk',
+  'site.integrations.selfhost.item.free': 'No usage-based pricing, and no "self-hosted build is missing a feature" tier',
+  'site.integrations.selfhost.evidence': 'server/docker-compose.yml',
+  'site.integrations.localApi.title': 'Local API + MCP: off by default, per-tool authorization',
+  'site.integrations.localApi.body': 'heyta ships a local API and MCP server bound to loopback only, so models or scripts can read and create tasks. Next to TickTick\'s URL Scheme page, the difference is that **it is off by default and every tool must be authorized individually** — flipping one switch does not open everything.',
+  'site.integrations.localApi.item.tools': 'Six tools: `list_tasks` / `get_task` / `list_projects` / `create_task` / `update_task` / `complete_task`',
+  'site.integrations.localApi.item.gate': 'Defaults to `enabled: false`, bound to `127.0.0.1`; every call goes through `authorizeToolCall`',
+  'site.integrations.localApi.evidence': 'packages/local-api/src/tools.ts',
+  'site.integrations.byok.title': 'BYOK: bring your own inference endpoint',
+  'site.integrations.byok.body': 'AI is not tied to any vendor SDK: you supply the endpoint and model name, and requests go straight there. The built-in presets are **local** Ollama and LM Studio only — "our cloud or nothing" is not a path we offer.',
+  'site.integrations.byok.item.presets': 'Presets cover local Ollama / LM Studio; cloud endpoints are yours to fill in',
+  'site.integrations.byok.item.nosdk': 'Zero vendor SDKs — the request layer is replaceable plain HTTP',
+  'site.integrations.byok.evidence': 'packages/ai/src',
+  'site.integrations.export.title': 'Export with tombstones and the full op-log',
+  'site.integrations.export.body': 'Export is not "save the current list as JSON": it writes the **full operation log** together with tombstones for deleted records, and a `counts` block in the file — so "everything was exported" can be **checked**, not merely trusted.',
+  'site.integrations.export.item.json': 'JSON: full op-log + tombstones + a countable `counts` block',
+  'site.integrations.export.item.markdown': 'Plus a Markdown copy written for humans',
+  'site.integrations.export.evidence': 'packages/app-host/src/export-dump.ts',
+  'site.integrations.pricing.title': 'No feature gating',
+  'site.integrations.pricing.body': 'The free tier is **every feature** — there is no "9 lists, 99 tasks" ceiling (that is TickTick\'s free tier). Only two things cost money: us running the server for you, and our cloud AI.',
+  'site.integrations.pricing.item.nogate': 'No feature gates: paid items may only be hosting and cloud AI',
+  'site.integrations.pricing.item.onlytwo': 'Price and coverage are enforced by a consistency gate, not by good intentions',
+  'site.integrations.pricing.evidence': 'pnpm check:pricing',
+  'site.integrations.quadrant.title': 'The four quadrants are a derived view, not a fourth store',
+  'site.integrations.quadrant.body': 'The four quadrants (important / urgent) are not an extra field on a task — they are **computed on the spot** from the due date and priority. So they cannot drift from your task data: change one place and all four follow.',
+  'site.integrations.quadrant.item.derived': 'Quadrants derive from `dueDate` and priority; tasks get no `quadrant` field',
+  'site.integrations.quadrant.item.nodrift': 'So there is no second copy of state that "looks present but never synced"',
+  'site.integrations.quadrant.evidence': 'docs/adr/0015-four-quadrant-as-derived-view.md',
+  'site.integrations.resilience.title': 'Habit resilience: freeze, resume, repair',
+  'site.integrations.resilience.body': 'Streaks break, and resetting weeks of progress over one missed day is the cruellest possible design. heyta lets you **freeze** a gap, **resume** an interrupted streak, and **repair** damaged data — none of which issues currency or sells "regret".',
+  'site.integrations.resilience.item.states': 'Freezes are capped: insurance, not a free pass to skip days',
+  'site.integrations.resilience.item.nocurrency': 'All state derives from (habit, logs, today) — no virtual currency to sell',
+  'site.integrations.resilience.evidence': 'packages/domain/src/habit-resilience.ts',
+  'site.integrations.conflict.title': 'Conflicts, made visible',
+  'site.integrations.conflict.body': 'When two devices edit the same task, the conflict is **never silently resolved by dropping one side**: the UI shows both versions and you pick. Underneath it is entity-level last-write-wins, but **which** write was last is something you can **see**.',
+  'site.integrations.conflict.item.visible': 'Both versions side by side; the choice belongs to the user',
+  'site.integrations.conflict.item.lww': 'The shared layer decides **why** it conflicts; both hosts share one decision and one set of strings',
+  'site.integrations.conflict.evidence': 'packages/ui/src/sync/ConflictResolutionView.tsx',
+  'site.integrations.note': '⚠️ This page is about what **we alone** do, so it contains no "coming soon": pending work is listed honestly under "Not yet" on `/features`.',
+
+  // ── Help ──
+  'site.help.seo.title': 'Help — heyta',
+  'site.help.seo.description': 'heyta help: creating tasks, syncing, what to do when the encryption passphrase is lost, how passkeys work, how quadrants are classified, how repeats are set, how focus works, exporting your data, self-hosting, and where your data actually lives.',
+  'site.help.title': 'Help',
+  'site.help.lede': 'Organised by **what you are trying to do**, not by document type — and every answer says where to click and what you should see afterwards.',
+  'site.help.topics.title': 'Start here',
+  'site.help.module.start': 'Getting started',
+  'site.help.module.sync': 'Sync and accounts',
+  'site.help.module.organize': 'Organising and rhythm',
+  'site.help.module.data': 'Your data and self-hosting',
+  'site.help.module.trust': 'Privacy',
+  'site.help.q.create': 'How do I create a task?',
+  'site.help.a.create': 'Type one line into the capture box at the top of the app and press Enter. Dates and priorities can be written inside the sentence (for example "submit the report tomorrow at 3pm"); whatever it recognises appears as a chip you can undo. A bare title is fine too — you can add a note later on the task row.',
+  'site.help.q.sync': 'I have a new device — how does my data get there?',
+  'site.help.a.sync': 'Enter the sync server address and an access token in settings. Data is uploaded encrypted, so **the passphrase must match** — data encrypted under a different passphrase cannot be decrypted. That is the cost of end-to-end encryption, not a bug.',
+  'site.help.q.passphrase': 'I forgot my encryption passphrase. What now?',
+  'site.help.a.passphrase': '**There is no recovery, and that is by design, not an oversight.** End-to-end encryption means the server holds only ciphertext and has no passphrase that unlocks it — any "recovery" would mean the server could read your data. What you can do: export your data from an old device that can still unlock, then start fresh with a new passphrase on the new one. So keep the passphrase safe.',
+  'site.help.q.passkey': 'How do passkeys work?',
+  'site.help.a.passkey': 'Choose "passkey" when signing in and confirm with your device\'s face / fingerprint / system PIN. There is no password to remember and none to breach. If you lose it, the sign-in page offers "Lost your passkey?", which emails a recovery link where you register a new one. ⚠️ **The last remaining credential cannot be deleted** — delete it and you are locked out.',
+  'site.help.q.quadrant': 'How are the four quadrants classified?',
+  'site.help.a.quadrant': 'Quadrants are **computed on the spot**, not labels you attach to a task: "urgent" depends on whether the due date falls inside the near-term window, and "important" comes from the flag you set yourself (falling back to priority when you never set it). Change the due date or priority and the task changes cell — so the quadrants can never disagree with your tasks.',
+  'site.help.q.repeat': 'How do I set up a repeating task?',
+  'site.help.a.repeat': 'Open a task\'s details on **mobile** to set a repeat rule; when you tick off a repeating task its next due date advances by the rule, measured from the **original due date** rather than from the moment you ticked it. ⚠️ **There is no repeat rule entry point on the web yet** — `/features` lists that honestly under "Not yet" rather than pretending both ends are the same.',
+  'site.help.q.focus': 'How does focus (the pomodoro timer) work?',
+  'site.help.a.focus': 'Pick a task on the focus screen and start the timer; when it finishes the session is recorded and feeds your growth stats. You can change the durations yourself (25 minutes focus / 5 minutes break by default) and they are remembered — a page refresh keeps the new values.',
+  'site.help.q.export': 'How do I take my data with me?',
+  'site.help.a.export': 'Settings → export. The JSON includes the full operation log and tombstones (so "everything was exported" can be checked), and there is a Markdown copy for people. **Export only for now, no import back** — the UI and the file both say so.',
+  'site.help.q.selfhost': 'How do I run my own server?',
+  'site.help.a.selfhost': 'docker compose brings up the app, PostgreSQL and Caddy; no Redis and no object storage needed. ⚠️ **It is not a zero-config one-liner**: the secrets and database password have no defaults and must be written into .env yourself. The steps are in the repository deployment runbook.',
+  'site.help.q.privacy': 'Where does my data actually live?',
+  'site.help.a.privacy': 'On your own device first; once sync is on, the cloud holds ciphertext only — the server rejects plaintext outright. **Metadata is not encrypted**, though — sync times, device identifiers, and the fact that a task changed are visible to it. We do not advertise "we can see nothing".',
+
+  // ── Changelog ──
+  'site.changelog.seo.title': 'What\'s new — heyta',
+  'site.changelog.seo.description': 'What changed in heyta, dated, with the evidence and with the things we explicitly decided not to do.',
+  'site.changelog.title': 'What\'s new',
+  'site.changelog.lede': 'Newest first, and only things that **actually happened**. Items we decided against are in here too — a roadmap that only grows is not worth trusting.',
+  'site.changelog.20261005.title': 'Notes and reminders work on both hosts',
+  'site.changelog.20261005.body': 'Notes and reminders — two entities that had a data model but no entry point — gained their domain rules, an action layer, and real entry points in **both hosts**. The same pass took the "modeled but never called" reachability gate from a long-standing red to fully green; that gate exists precisely to catch "all the parts are there, the last metre is not wired".',
+  'site.changelog.20261002.title': 'Task reminders, from data model to action layer',
+  'site.changelog.20261002.body': 'Reminders landed as an **entity of their own** rather than an array field on a task: scheduling rules, lead times, repeat roll-forward and snooze live in the domain layer, with create/update/delete in the action layer. Before this, reminders were a single line on the roadmap.',
+  'site.changelog.20260928.title': 'The site and the app became one product',
+  'site.changelog.20260928.body': 'Six new pages (features, platforms, pricing, help, changelog, sign-in), and the navigation, footer and sitemap are now derived from a single page registry — so a new page can no longer be added without appearing in the navigation. The app gained a help/about entry, making the site and the app reachable from each other for the first time.',
+  'site.changelog.20260928b.title': 'You can write task notes yourself',
+  'site.changelog.20260928b.body': 'Until now only the AI wrote notes (the checklists it breaks a task into, the durations it estimates) — you could not write one. Both the web task row and the mobile detail panel can now write them, and they land in the operation log and sync across devices.',
+  'site.changelog.20260928c.title': '"Completed" finally has a way in',
+  'site.changelog.20260928c.body': 'The filter branch, the list logic, the page title and the empty state all existed — but nothing could switch the filter, so completed tasks were invisible on the web. A same-shaped bug went with it: clicking a sidebar filter from another view did nothing at all.',
+  'site.changelog.20260927.title': 'The first stretch of the user journey closed',
+  'site.changelog.20260927.body': 'The landing page got a way into the app, the web client got sign-up and sign-in, the app was deployed for the first time, and data export shipped. The same batch closed the trash view, the mobile growth screen, and a server-side brand drift.',
+  'site.changelog.20260926.title': 'The four quadrants stopped being a promise',
+  'site.changelog.20260926.body': 'The landing page advertised the four quadrants as a pillar while the app did not have them — the worst kind of mismatch, because the promise is on the page and the feature is not in the product.',
+  'site.changelog.note': 'Earlier entries live in docs/plans/roadmap.md in the repository, each with a date and the evidence behind it.',
+
+  // ── Sign in ──
+  'site.signin.seo.title': 'Sign in — heyta',
+  'site.signin.seo.description': 'Sign in to heyta with a passkey or an emailed sign-in link.',
+  'site.signin.title': 'Sign in',
+  'site.signin.lede': 'There are exactly two ways in, and there is no password.',
+  'site.signin.method.passkey.title': 'Passkey (recommended)',
+  'site.signin.method.passkey.body': 'Sign in with the device itself — face, fingerprint or system PIN. The key never leaves your device, and there is no password to be reused or leaked.',
+  'site.signin.method.magic.title': 'Emailed sign-in link',
+  'site.signin.method.magic.body': 'Enter an address, get a one-time link, click it and you are in. Handy on a device whose passkey is not set up yet.',
+  'site.signin.noPassword': '⚠️ Why there is no "email + password": a credential that can be stuffed, phished, and needs a hash stored server-side is the one weak link in a product whose server cannot read your content.',
+  // R2: `site.signin.cta` was here with zero source references; the page's CTAs
+  // come from `site.signin.recover.link` and the nav's sign-in entry.
+  'site.signin.recover.title': 'Lost your passkey?',
+  'site.signin.recover.body': 'Inside the app, "Lost your passkey?" emails a recovery link where you can register a new one.',
+  'site.signin.why.title': 'Why signing in happens in the app, not on this page',
+  'site.signin.why.body': 'A passkey must be bound to **one specific domain**, and the server address used for signing in is the very one in the app’s sync settings. Copying the auth UI onto this page would recreate "sign in against server A while the token is stored for B" — so this page is a doorway, not a second login box.',
+
+  'web.about.title': 'Help & about',
+  'web.about.lead': 'The help centre, the changelog and pricing all live on the website — they need to be indexable and shareable on their own, so there is only one copy of each.',
+  'web.about.help.label': 'Help centre',
+  'web.about.help.hint': 'Creating a task, syncing, forgetting your passphrase, taking your data with you',
+  'web.about.changelog.label': 'Changelog',
+  'web.about.changelog.hint': 'What changed recently, including the things we decided not to build',
+  'web.about.pricing.label': 'Pricing & subscription',
+  'web.about.pricing.hint': 'Self-hosting for free vs. our hosted service, and the only two things that cost money',
+  'web.about.updateNote': 'There is no "check for updates" button here: heyta is a PWA and updates are decided by the browser in the background — a button that does nothing is worse than no button.',
+  'web.sync.help.link': 'View help',
+
+  'site.evidence.label': 'How to check',
+  'site.features.tasks.evidence': 'pnpm --filter @heyta/domain test',
+  'site.features.views.evidence': 'docs/adr/0015-four-quadrant-as-derived-view.md',
+  'site.features.habits.evidence': 'packages/domain/src/habit-streak.ts + habit-resilience.ts',
+  'site.features.focus.evidence': 'pnpm verify:mobile-focus',
+  'site.features.growth.evidence': 'packages/domain/src/weekly-review.ts + milestones.ts',
+  'site.features.sync.evidence': 'pnpm verify:multi-end && pnpm verify:sync',
+  'site.features.privacy.evidence': 'pnpm verify:mobile-ios',
+  'site.features.ai.evidence': 'pnpm verify:ai-live && pnpm verify:ai-breakdown-live',
+  'site.features.api.evidence': 'pnpm verify:mcp-real',
+  'site.signin.recover.link': 'Recover your passkey in the app',
+
+  'site.og.imageAlt': 'heyta share card: local-first task management where your data lands on your own device first; end-to-end encrypted sync, self-hostable, no feature gating.',
+  // 🔴 R16：the card is **generated per language** (og-card.png / og-card-en.png),
+  //    so these are the words actually printed on it — not a description for alt.
+  'site.og.card.title1': 'Local-first task management',
+  'site.og.card.title2': 'Your data lands on your own device first',
+  'site.og.card.lede': 'End-to-end encrypted sync · Self-hostable · No feature gating',
+
+  // ═══════════════════════════════════════════════════════════════════════
+  // M3 第四刀（sync）收尾 —— entity names / conflict reasons shared by both
+  // shells (append-only block; zh-CN.ts is the source of the keys).
+  // Replaces both `ConflictDialog.tsx`'s and `conflict-view.ts`'s local tables.
+  // ═══════════════════════════════════════════════════════════════════════
+
+  'common.entity.TASK': 'Task',
+  'common.entity.PROJECT': 'List',
+  'common.entity.TAG': 'Tag',
+  'common.entity.NOTE': 'Note',
+  'common.entity.TASK_REPEAT_CFG': 'Repeat rule',
+  'common.entity.REMINDER': 'Reminder',
+  'common.entity.HABIT': 'Habit',
+  'common.entity.HABIT_LOG': 'Check-in record',
+  'common.entity.FOCUS_SESSION': 'Focus session',
+  'common.entity.AI_FEEDBACK': 'AI usage record',
+  'common.entity.PREFERENCE_CORRECTION': 'Preference correction',
+  'common.entity.GLOBAL_CONFIG': 'Global settings',
+  'common.entity.MIGRATION': 'Data migration',
+  'common.entity.RECOVERY': 'Disaster recovery',
+  'common.entity.ALL': 'All data',
+
+  'common.conflict.reason.concurrent': 'Two devices changed it without knowing about each other',
+  'common.conflict.reason.superseded': 'This change was based on a version that is no longer the latest',
+  'common.conflict.reason.timestampOrTie': 'The two changes are too close in time to order',
+  'common.conflict.reason.localTimestamp': 'This device change is newer',
+  'common.conflict.reason.remoteDeleteWins': 'The other device deleted it',
+  'common.conflict.reason.localDeleteWins': 'This device deleted it',
+  'common.conflict.reason.remoteArchive': 'The other device archived it',
+  'common.conflict.reason.localArchive': 'This device archived it',
+  'common.conflict.reason.fallback': 'Both sides made different changes to the same thing',
+
+  // Reminders (B1-1 UI layer; shared by web and mobile).
+  // 🔴 `reminder.offset.*` must stay 1:1 and in order with
+  //    `REMINDER_OFFSET_PRESETS_MS` — the shared component reads
+  //    `labels.offsets[i]` for `presets[i]`.
+  'reminder.title': 'Reminders',
+  'reminder.empty': 'No reminders yet',
+  'reminder.add': 'Add reminder',
+  'reminder.offset.0': 'At due time',
+  'reminder.offset.5m': '5 minutes before',
+  'reminder.offset.15m': '15 minutes before',
+  'reminder.offset.30m': '30 minutes before',
+  'reminder.offset.1h': '1 hour before',
+  'reminder.offset.1d': '1 day before',
+  // The absolute-time entry shown when a task has no due date. The `1h` in the
+  // key is part of the contract: the host must create the reminder at now + 1h.
+  'reminder.absolute.1h': 'Remind me in 1 hour',
+  'reminder.snooze': 'Snooze',
+  'reminder.dismiss': 'Dismiss',
+  'reminder.remove': 'Delete reminder',
+  'reminder.phase.scheduled': 'Scheduled',
+  'reminder.phase.snoozed': 'Snoozed',
+  'reminder.phase.due': 'Due now',
+  'reminder.phase.fired': 'Sent',
+  'reminder.phase.dismissed': 'Dismissed',
+  'reminder.hint.noDueDate': 'This task has no due date, so only an absolute time can be set',
+  'reminder.a11y.list': 'Reminders for "{title}"',
+  'reminder.a11y.remove': 'Delete the reminder at {when}',
+  'reminder.a11y.snooze': 'Snooze the reminder at {when} by 10 minutes',
+  'reminder.a11y.dismiss': 'Dismiss the reminder at {when}',
+
+  // Notes (the UI layer of hallucination #12). Distinct from a task's own
+  // note field, so the copy deliberately avoids the word "note" alone.
+  'notes.title': 'Sticky notes',
+  'notes.empty': 'No sticky notes yet',
+  'notes.empty.hint': 'Jot down what should not become a task',
+  'notes.composer.placeholder': 'Write something…',
+  'notes.add': 'Add note',
+  'notes.pin': 'Pin to today',
+  'notes.unpin': 'Unpin',
+  'notes.remove': 'Delete note',
+  'notes.badge.today': 'Today',
+  'notes.a11y.edit': 'Edit the note "{excerpt}"',
+  'notes.a11y.remove': 'Delete the note "{excerpt}"',
+  'notes.a11y.pin': 'Pin the note "{excerpt}" to today',
+  'notes.a11y.unpin': 'Unpin the note "{excerpt}"',
+  'notes.error.empty': 'A note cannot be empty',
 } satisfies Record<MessageKey, string>;

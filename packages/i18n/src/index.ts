@@ -8,7 +8,7 @@
  *   2. **零运行时依赖**：许可证门禁（check:licenses）与体积都不受影响。
  *   3. 落地页与移动端都不需要复数规则；真要用了再加，不提前背 ICU。
  */
-export { LOCALES, DEFAULT_LOCALE } from './types.js';
+export { LOCALES, DEFAULT_LOCALE, otherLocale } from './types.js';
 export type { Locale, MessageVars } from './types.js';
 
 export { CATALOGS, translate } from './translate.js';

@@ -29,6 +29,7 @@ import {
   contrast,
   colorOf,
   extractVars,
+  parseColor,
   resolveVar,
 } from '../src/css-tokens.js';
 import {
@@ -64,6 +65,40 @@ describe('对比度（WCAG AA）', () => {
     expect(
       Number(ratio.toFixed(2)),
       `${fg} on ${bg} 实测 ${ratio.toFixed(2)}:1，要求 ≥ ${min}:1`,
+    ).toBeGreaterThanOrEqual(min);
+  });
+});
+
+describe('分享卡片的暖纸色（R15）—— 升格为 token 之后必须过对比度', () => {
+  /**
+   * 🔴 这组纸色此前**硬编码在 `og-card.html` 里**，而 `.html` 不在 `check:design`
+   * 的扫描面内 —— 于是"卡片上有一套没人管的颜色"没有任何判据能发现（R15）。
+   * 升格成 token 之后，这里按 WCAG 真的算一遍：
+   *   · 正文与次要文字必须过 AA（4.5:1）；
+   *   · 分隔线是**装饰性**的（WCAG 的非文本对比 3:1 针对的是承载信息的图形，
+   *     它不承载），所以这里只兜一个"看得见"的下限 1.3:1 —— 实测 1.39:1。
+   *     这不是把阈值迁就取值：`#d8d6d1` 是卡片既有的分隔线色，判据拦的是
+   *     "有人把它调到与纸面几乎同色"那种回归。
+   */
+  const vars = extractVars(CSS);
+  const paper = (name: string): [number, number, number] => {
+    const value = vars.get(name);
+    if (value === undefined) throw new Error(`tokens.css 里没有 ${name}`);
+    return parseColor(value);
+  };
+
+  const PAIRS = [
+    { fg: '--ht-paper-900', bg: '--ht-paper-50', min: 4.5, why: '卡片正文' },
+    { fg: '--ht-paper-600', bg: '--ht-paper-50', min: 4.5, why: '卡片次要文字' },
+    { fg: '--ht-paper-200', bg: '--ht-paper-50', min: 1.3, why: '分隔线（装饰，只需看得见）' },
+    { fg: '--ht-paper-900', bg: '--ht-paper-200', min: 4.5, why: '纸色上的深色文字' },
+  ];
+
+  it.each(PAIRS)('$fg on $bg ≥ $min:1（$why）', ({ fg, bg, min, why }) => {
+    const ratio = contrast(paper(fg), paper(bg));
+    expect(
+      Number(ratio.toFixed(2)),
+      `${fg} on ${bg}（${why}）实测 ${ratio.toFixed(2)}:1，要求 ≥ ${min}:1`,
     ).toBeGreaterThanOrEqual(min);
   });
 });

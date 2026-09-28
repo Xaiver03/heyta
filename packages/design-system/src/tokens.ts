@@ -157,6 +157,15 @@ export const TOKEN_GROUPS = {
     'field-height',
     'field-padding-x',
     'progress-height',
+    /**
+     * 番茄钟进度环的直径与描边宽度。
+     *
+     * 🔴 为什么进 token 而不是让组件写两个数字：M3 第二刀把专注环收进了
+     * `packages/ui`（四端同一份实现），而共享层里的裸数字没有任何约束力 ——
+     * 一个端改了圆的大小，另外三个端不会有任何提示。
+     */
+    'focus-ring',
+    'focus-ring-stroke',
   ],
   /**
    * 字距。Apple 规则：字距随字号变，一个固定值必然在某处是错的。
