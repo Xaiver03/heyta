@@ -256,6 +256,18 @@
   color: var(--ht-color-foreground-muted);
 }
 
+/* 语言切换。真应用里是 `.ht-btn--ghost` —— 与主题按钮同一档的全局控件，
+   不该长成一个醒目的大按钮。 */
+.mk-lang {
+  display: inline-flex;
+  align-items: center;
+  min-block-size: var(--ht-touch-target-min);
+  padding: 0 var(--ht-space-3);
+  border-radius: var(--ht-radius-md);
+  font-size: var(--ht-font-size-sm);
+  color: var(--ht-color-foreground-muted);
+}
+
 .mk-content {
   flex: 1;
   padding: var(--ht-space-6);
@@ -264,6 +276,63 @@
   margin-inline: auto;
   min-block-size: 0;
   overflow: hidden;
+}
+
+/* ── 今日进度卡 ─────────────────────────────────────────────
+   复现 `apps/web/src/features/motivation/TodayProgressCard.tsx` 的 `.ht-today`。
+   真应用在任务 / 四象限 / 习惯 / 番茄钟四个视图上都常驻它，复刻原来一张都没有。 */
+.mk-today {
+  padding: var(--ht-space-4) var(--ht-space-5);
+  border-radius: var(--ht-radius-lg);
+  border: var(--ht-border-width-thin) solid var(--ht-color-border);
+  background: var(--ht-color-surface);
+  margin-block-end: var(--ht-space-4);
+}
+
+.mk-today__label {
+  font-size: var(--ht-font-size-xs);
+  color: var(--ht-color-foreground-muted);
+}
+
+.mk-today__count {
+  display: flex;
+  align-items: baseline;
+  gap: var(--ht-space-1);
+  font-size: var(--ht-font-size-2xl);
+  font-weight: var(--ht-font-weight-semibold);
+  font-variant-numeric: tabular-nums;
+  line-height: var(--ht-line-height-tight, 1.1);
+}
+
+.mk-today__count-total {
+  font-size: var(--ht-font-size-base);
+  font-weight: var(--ht-font-weight-regular);
+  color: var(--ht-color-foreground-muted);
+}
+
+.mk-today__hint {
+  font-size: var(--ht-font-size-xs);
+  color: var(--ht-color-foreground-muted);
+  margin-block-start: var(--ht-space-1);
+}
+
+/* 结构与取值都照 `app.css` 的 `.ht-bar`：轨道 `--ht-space-2` 高、
+   `--ht-radius-full` 圆角，填充用 `scaleX` 从左往右长。 */
+.mk-today__bar {
+  margin-block-start: var(--ht-space-3);
+  block-size: var(--ht-space-2);
+  border-radius: var(--ht-radius-full);
+  background: var(--ht-color-surface-sunken);
+  overflow: hidden;
+}
+
+.mk-today__bar-fill {
+  display: block;
+  inline-size: 100%;
+  block-size: 100%;
+  border-radius: var(--ht-radius-full);
+  background: var(--ht-color-primary);
+  transform-origin: left center;
 }
 
 /* ── 输入行 ─────────────────────────────────────────────── */
@@ -388,9 +457,24 @@
 /* ── 四象限 ─────────────────────────────────────────────── */
 
 .mk-quadrant {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ht-space-3);
+}
+
+/* 四宫格与底部注释是**两行**（真应用 `QuadrantBoard` 也是这个结构：
+   网格 + 下面一条 footnote），所以网格本身单独一层。 */
+.mk-quadrant__grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: var(--ht-space-3);
+}
+
+.mk-quadrant__footnote {
+  margin: 0;
+  font-size: var(--ht-font-size-2xs);
+  line-height: var(--ht-line-height-relaxed, 1.5);
+  color: var(--ht-color-foreground-muted);
 }
 
 .mk-quad {

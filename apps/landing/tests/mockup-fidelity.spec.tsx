@@ -88,21 +88,72 @@ afterEach(() => {
   container = null;
 });
 
-function renderMockup(): HTMLElement {
+function renderMockup(view: 'tasks' | 'quadrant' | 'habits' | 'focus' = 'quadrant'): HTMLElement {
   container = document.createElement('div');
   document.body.append(container);
   root = createRoot(container);
   act(() => {
     root?.render(
       <I18nProvider locale="zh-CN">
-        <AppWindow view="quadrant" />
+        <AppWindow view={view} />
       </I18nProvider>,
     );
   });
   return container;
 }
 
+/**
+ * 真应用 `App.tsx` 里**四个"做事"的视图都常驻**的两件东西：
+ * `TodayProgressCard` 与 `CaptureComposer`。
+ * 复刻原来只在"任务"那一屏画了输入框、四屏一张进度卡都没有。
+ */
+const VIEWS_WITH_TODAY_AND_COMPOSER = ['tasks', 'quadrant', 'habits', 'focus'] as const;
+
 describe('展厅复刻与应用一致', () => {
+  it('四个视图都常驻「今天进度卡 + 捕获输入框」', () => {
+    for (const v of VIEWS_WITH_TODAY_AND_COMPOSER) {
+      const view = renderMockup(v);
+      const today = view.querySelector('.mk-today');
+      expect(today, `${v} 缺今天进度卡`).not.toBeNull();
+      expect(today?.textContent ?? '').toContain(zhCN['web.progress.today']);
+      expect(today?.textContent ?? '').toContain(zhCN['web.progress.hint.remaining'].replace('{count}', '3'));
+      expect(view.querySelector('.mk-compose'), `${v} 缺捕获输入框`).not.toBeNull();
+      // 输入框里的提示语必须是应用自己的那条
+      expect(view.querySelector('.mk-input')?.textContent?.trim()).toBe(
+        zhCN['web.capture.placeholder'],
+      );
+      // 每渲染一个视图就卸载一次，避免容器累积
+      act(() => {
+        root?.unmount();
+      });
+      root = null;
+      container?.remove();
+      container = null;
+    }
+  });
+
+  it('四象限底部有 footnote —— 它解释「紧急度由截止时间推导」这条核心不变量', () => {
+    const view = renderMockup('quadrant');
+    const note = view.querySelector('.mk-quadrant__footnote');
+    expect(note).not.toBeNull();
+    expect(note?.textContent?.trim()).toBe(zhCN['web.quadrant.footnote']);
+  });
+
+  it('顶栏右侧是完整的四件：同步状态 + 立即同步 + 设置 + 语言 + 主题', () => {
+    const view = renderMockup();
+    const actions = view.querySelector('.mk-header__actions');
+    expect(actions).not.toBeNull();
+    const text = actions?.textContent ?? '';
+    expect(text).toContain(zhCN['web.sync.status.synced']);
+    // 语言按钮上是**另一种语言自己的名字**
+    expect(text).toContain(zhCN['common.lang.en']);
+    const labels = [...(actions?.querySelectorAll('[aria-label]') ?? [])].map((el) =>
+      el.getAttribute('aria-label'),
+    );
+    expect(labels).toContain(zhCN['web.sync.a11y.syncNow']);
+    expect(labels).toContain(zhCN['web.sync.settings.title']);
+  });
+
   it('视图切换条是 8 项，且标签逐字等于应用自己的词条', () => {
     const view = renderMockup();
     const tabs = [...view.querySelectorAll('.mk-viewtab')].map((el) => el.textContent?.trim() ?? '');

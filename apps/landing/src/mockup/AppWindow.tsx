@@ -22,6 +22,7 @@ import {
   Inbox,
   Moon,
   Plus,
+  RefreshCw,
   Settings,
   Sun,
   Timer,
@@ -117,7 +118,16 @@ export function AppWindow({
 }): React.JSX.Element {
   const frameRef = useRef<HTMLDivElement>(null);
   const scale = useStageScale(frameRef);
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
+
+  /**
+   * 语言切换按钮上的词 = **另一种语言自己的名字**（与 `LanguageSwitcher.tsx`
+   * 同一条规则：用目标语言的发音规则读它，所以中文界面显示 "English"）。
+   *
+   * ⚠️ 分支写在 `t(...)` **外面** —— `check:ui-language` 只认"字面量紧跟 `t(`"，
+   * `t(cond ? 'a' : 'b')` 那种写法它认不出来（真应用那个组件里也留了同样的注释）。
+   */
+  const otherLangLabel = locale === 'zh-CN' ? t('common.lang.en') : t('common.lang.zh');
 
   /**
    * 视图切换条。
@@ -149,15 +159,35 @@ export function AppWindow({
     [t],
   );
 
+  /**
+   * 顶部标题。
+   *
+   * 🔴 与 `VIEW_TABS` 同理：用**应用自己的词条 key**，不另写一份 `landing.*`。
+   * 原来这里四个标题走的是 `landing.mock.inbox` / `landing.feature.*`，
+   * 而它们的值与 `web.shell.*` 逐字相同 —— 同一句话写两遍就是下一个漂移源。
+   */
   const titles = useMemo<Record<MockView, string>>(
     () => ({
-      tasks: t('landing.mock.inbox'),
-      quadrant: t('landing.feature.quadrant'),
-      habits: t('landing.feature.habits'),
-      focus: t('landing.feature.focus'),
+      tasks: t('web.shell.nav.inbox'),
+      quadrant: t('web.shell.nav.quadrant'),
+      habits: t('web.shell.views.habits'),
+      focus: t('web.shell.views.focus'),
     }),
     [t],
   );
+
+  /**
+   * 今日进度卡（复现 `features/motivation/TodayProgressCard.tsx` 的 `.ht-today`）。
+   *
+   * 🔴 真应用在**任务 / 四象限 / 习惯 / 番茄钟**四个视图上都常驻这张卡
+   * （`App.tsx` 的 `view !== 'settings' && … && <TodayProgressCard />`），
+   * 而复刻原来四屏**一张都没有**。
+   *
+   * 数值是**示例数据**，与下面那些示例任务标题同一性质 —— 界面元素是真的，
+   * 填进去的数字是编的。这与之前被删掉的"象限计数"不一样：**那张卡上确实有数字位**，
+   * 而 `QUADRANT_NAV` 上根本没有计数位。区别是"往真有的位置填样例" vs "造一个不存在的位置"。
+   */
+  const today = useMemo(() => ({ done: 2, total: 5, remaining: 3 }), []);
 
   return (
     <div ref={frameRef} className={`mk-frame${className !== undefined ? ` ${className}` : ''}`}>
@@ -241,16 +271,31 @@ export function AppWindow({
                 <div className="mk-viewtabs">
                   <div className="mk-viewtab mk-viewtab--active">
                     <CalendarDays size={14} />
-                    {t('landing.mock.date')}
+                    {t('web.shell.dueMode.date')}
                   </div>
                   <div className="mk-viewtab">
                     <Timer size={14} />
-                    {t('landing.mock.countdown')}
+                    {t('web.shell.dueMode.countdown')}
                   </div>
                 </div>
                 <div className="mk-sync mk-sync--ok">
                   <Zap size={12} />
-                  {t('landing.mock.synced')}
+                  {t('web.sync.status.synced')}
+                </div>
+                {/*
+                  🔴 这三件原来都漏了。真应用的顶栏右侧是
+                  **SyncBar（状态 + 立即同步 + 设置）+ LanguageSwitcher + 主题**，
+                  而复刻只画了状态那一个胶囊。
+                  文案用应用自己的 key，图标与真应用同一套（lucide）。
+                */}
+                <div className="mk-iconbtn" role="img" aria-label={t('web.sync.a11y.syncNow')}>
+                  <RefreshCw size={14} />
+                </div>
+                <div className="mk-iconbtn" role="img" aria-label={t('web.sync.settings.title')}>
+                  <Settings size={14} />
+                </div>
+                <div className="mk-lang" lang={locale === 'zh-CN' ? 'en' : 'zh-CN'}>
+                  {otherLangLabel}
                 </div>
                 <div className="mk-iconbtn">
                   <Moon size={18} />
@@ -258,21 +303,39 @@ export function AppWindow({
               </div>
             </header>
 
+            {/*
+              🔴 内容区的顺序照抄 `apps/web/src/App.tsx`：
+              **今天进度卡 → 捕获输入框 → 视图内容**。
+              复刻原来只在"任务"那一屏画了输入框、四屏都没有进度卡 ——
+              而真应用两者在四个视图上**都在**。
+            */}
             <div className="mk-content">
-              {view === 'tasks' && (
-                <>
-                  <div className="mk-compose">
-                    <div className="mk-input">
-                      {t('landing.mock.composeHint')}
-                    </div>
-                    <div className="mk-btn-primary">
-                      <Plus size={16} />
-                      {t('landing.mock.add')}
-                    </div>
-                  </div>
-                  <TaskList />
-                </>
-              )}
+              <section className="mk-today" aria-label={t('web.progress.aria')}>
+                <div className="mk-today__label">{t('web.progress.today')}</div>
+                <div className="mk-today__count">
+                  <span>{today.done}</span>
+                  <span className="mk-today__count-total">/ {today.total}</span>
+                </div>
+                <div className="mk-today__hint">
+                  {t('web.progress.hint.remaining', { count: today.remaining })}
+                </div>
+                <div className="mk-today__bar">
+                  <span
+                    className="mk-today__bar-fill"
+                    style={{ transform: `scaleX(${String(today.done / today.total)})` }}
+                  />
+                </div>
+              </section>
+
+              <div className="mk-compose">
+                <div className="mk-input">{t('web.capture.placeholder')}</div>
+                <div className="mk-btn-primary">
+                  <Plus size={16} />
+                  {t('web.capture.add')}
+                </div>
+              </div>
+
+              {view === 'tasks' && <TaskList />}
               {view === 'quadrant' && <QuadrantGrid />}
               {view === 'habits' && <HabitHeatmap />}
               {view === 'focus' && <FocusRing />}
