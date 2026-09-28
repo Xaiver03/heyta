@@ -243,10 +243,24 @@ ADR-0004 已定 RN，硬约束是"留在 JS 生态 + 不用 WebView 套壳"。**
 |---|---|---|---|
 | 版本 / 许可 | npm `@react-native-oh/react-native-harmony` **0.84.4**（2026-09-24，**MIT**，138 版本）+ ohpm `@rnoh/react-native-openharmony` **0.84.3** | GitCode `CPF-Flutter/flutter_flutter`，**BSD-3-Clause**，基于 Flutter 3.35.7（2026-09-24；**落后上游约 4 个月**） | 华为官方，随 HarmonyOS 走（本机 SDK **6.1.1 / API 24**） |
 | 能编包 | ✅ 实测（release HAP 20MB） | 未验 | ✅ 实测（126KB） |
-| **真跑** | ❌ 未验证（缺镜像 + 签名） | ❌ 未验证 | ❌ 未验证 |
+| **真跑** | ⚠️ **能启动，白屏**（2026-09-28 实测） | ❌ 未验证 | ⚠️ 同左（未签 HAP 已装上模拟器） |
 | **服务卡片** | 🔴 **框架渲染不了，仍需手写 ArkTS** | 🔴 **同上** | ✅ **Form Kit 一等公民** |
 
-**本机实测环境**：`/Applications/DevEco-Studio.app` **6.1.1.300** 在；SDK = HarmonyOS 6.1.1 / API 24；🔴 **`~/.Huawei` 存在但完全为空** → **没有模拟器实例、没有系统镜像**（需 Device Manager GUI 下载）。
+**本机实测环境**：`/Applications/DevEco-Studio.app` **6.1.1.300** 在；SDK = HarmonyOS 6.1.1 / API 24。
+
+> 🔴 **2026-09-28 更正。** 这里原本写的是："`~/.Huawei` 存在但完全为空 → **没有模拟器实例、没有系统镜像**（需 Device Manager GUI 下载）。"
+> **两条结论都错了**：
+>
+> 1. **`~/.Huawei` 不是镜像的落盘位置，而且它永远是空的。** 镜像实际落在
+>    `~/Library/Huawei/Sdk/system-image/HarmonyOS-6.1.1/<device>_all_arm/`。
+>    拿一个**永远为空**的目录去判断"有没有镜像"，等于每次都会得出"没有"。
+> 2. **镜像完全不需要 GUI、不需要华为账号。** 模拟器自带 CLI：
+>    `-imageList` / `-install` / `-create` / `-start`，实测已下 phone 镜像 2.37 GB、
+>    建好实例并**启动成功**（hdc 认到 `127.0.0.1:5557`），并用**未签名 HAP**
+>    把 `com.heyta.mobile` 装了上去。
+>
+> 完整可复制命令见 [`../runbooks/multi-platform-build.md`](../runbooks/multi-platform-build.md) §4.1。
+> 教训：**"这台机器上找不到"不等于"这个东西不存在"** —— 先确认自己找的是不是它该在的地方。
 
 ### 6.5 元服务（免安装）路线 —— 可独立上架，但装不下 RN 壳
 
@@ -265,7 +279,11 @@ ADR-0004 已定 RN，硬约束是"留在 JS 生态 + 不用 WebView 套壳"。**
 ### 6.6 最小可验证步骤（不碰 RN 壳）
 
 1. DevEco 新建**元服务工程**（不是 Application）→ 新建 **Dynamic Widget** → 写一个 2×2 卡片显示"今日 N 个任务" + 一个 `postCardAction(message)` 按钮 → FormExtensionAbility 在 `onFormEvent` 里改 Preferences 再 `formProvider.updateForm` 推回。**跑通 = "鸿蒙上真能出卡片"被验证。**
-2. 下模拟器镜像 + 注册模拟器调试凭据，确认**卡片能在模拟器上被添加**。⚠️ **这条是真正的卡点**：华为文档**没有明文**说模拟器能添加/渲染服务卡片（见 §9）。
+2. 下模拟器镜像 + 建实例 → 确认**卡片能在模拟器上被添加**。
+   ✅ **2026-09-28：镜像已下（2.37 GB）、实例已建、模拟器已启动**，所以"下镜像"这半步不再是卡点
+   （命令见 [`../runbooks/multi-platform-build.md`](../runbooks/multi-platform-build.md) §4.1）。
+   ⚠️ **剩下的真卡点变成**：华为文档**没有明文**说模拟器能添加/渲染服务卡片（见 §9）——
+   这是一个**待实测的问题**，而不是"外部条件不具备"。
 3. 再决定要不要 RN 壳。
 
 ⚠️ **要做"卡片上勾选完成"，必须用动态卡片**（静态卡片只有 UI + `FormLink`，不支持 `postCardAction`）。卡片内**不支持**：`setTimeout`、HSP、native so、断点调试、热重载，且导入 particleAbility/audio/camera/media/backgroundTaskManager 等 Kit 会**直接 JS crash**。

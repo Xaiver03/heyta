@@ -430,6 +430,56 @@ docker inspect <容器> --format '{{range .Config.Env}}{{println .}}{{end}}' | g
 同一份 lockfile 本地过、容器报 `lockfile contains entries that the active policies reject`。
 已在 `pnpm-workspace.yaml` 钉死，**不要删那行**。
 
+### 🔴 锁文件与 `package.json` 必须同一次提交
+
+`pnpm install --frozen-lockfile` 只有在**两者一致**时才过。
+分开提交（哪怕只差一个 commit）会让**每一个新的干净检出**当场失败：
+
+```
+ERR_PNPM_OUTDATED_LOCKFILE  Cannot install with "frozen-lockfile" because
+pnpm-lock.yaml is not up to date with <ROOT>/packages/xxx/package.json
+```
+
+本仓踩过：一个提交把 `pnpm-lock.yaml` 改成了"含 `@heyta/widget-core`"，
+但对应的 `package.json` 和那个包**还没提交**（在另一个会话的工作区里）。
+本机因为有 `node_modules` 所以毫无感觉，**CI 从此每次都红**（见
+[`docs/runbooks/ci-and-runner.md`](docs/runbooks/ci-and-runner.md) §6）。
+
+修的时候注意一个 git 陷阱：**`git commit -- <pathspec>` 会绕过索引、提交工作区版本**，
+不是你想要的那个 blob。要比对/提交特定内容，先 `git hash-object -w` +
+`git update-index --cacheinfo`，再**不带 pathspec** 地 `git commit`。
+
+### 🔴 门禁里的 golden 夹具：时区必须钉死
+
+**症状**：`check:widgets` 在本机（UTC+8）全绿，CI（UTC）全红；差异**只有一个字段**，
+而且正好是 8 小时。
+
+**根因**：夹具里存了**绝对 epoch**（`endsAt`），而它是从"本地日历日的正午"推出来的 ——
+同一个**本地时刻**在不同时区是**不同的毫秒数**。密文是对明文整体加密的，于是整个
+`ciphertext` 跟着变。（`dueDate` 不受影响，因为它在载荷里是 `YYYY-MM-DD` 字符串。）
+
+**修法**：`packages/widget-core/vitest.config.ts` 里 `env: { TZ: 'UTC' }`，
+生成与校验在**同一条件**下进行。**不要删那个 `TZ`。**
+
+**验的时候必须用外层 `TZ` 干扰**，否则验不出这个 bug（配置要能压过环境变量）：
+
+```bash
+for tz in Asia/Shanghai UTC America/New_York Pacific/Kiritimati; do
+  TZ=$tz pnpm --filter @heyta/widget-core test tests/fixtures.spec.ts
+done
+```
+
+**推广**：凡是被**逐字节比对**的产物（golden 文件、哈希、密文），
+都要问一句"它的字节依赖哪些**环境**？"——时区、locale、换行符、文件系统排序都会。
+答案必须**显式钉死**，不能让"谁生成的"决定结论。
+
+### 🔴 `pnpm check` 平时**不跑测试**
+
+链路是 `build → typecheck → check:*`。所以"`pnpm check` 全绿"**不等于**"测试都过了"。
+CI 里 `pnpm check` 之后还有一步 `全量测试`，两者都绿才算。
+写新门禁时如果它依赖某个 spec，要么在那个 `check:*` 里**显式跑那个 spec**
+（`check:widgets` 就是这么接的），要么别指望它会被跑到。
+
 ### 线协议与运行时不对称
 
 1. 服务端**强制 E2EE 且没有开关**：`isPayloadEncrypted` 必须显式 `true`，明文一律 400 `E2EE_REQUIRED`。

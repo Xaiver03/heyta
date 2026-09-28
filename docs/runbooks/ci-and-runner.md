@@ -228,6 +228,58 @@ workflow 有**两个 `if: always()` 的诚实步骤**，把跑不了的写进 Jo
 ⚠️ 测试汇总里的 **skipped 数量就来自第二项**。
 看到 skipped 不要当成失败，但也不要当成通过 —— 去 Job Summary 看它说了什么。
 
+### 8.1 🔴🔴 最难发现的一种红：**看着在跑，其实什么都没验**
+
+**2026-09-27→28 实测**：CI 连续 5 次 `failure`，而失败点**全都**是
+`按 lockfile 严格安装`（`pnpm install --frozen-lockfile`）。
+后面那两步在 GitHub 的步骤列表里显示成 **`-`（灰色横线，不是 `✗`）**：
+
+```
+  ✓ 按 lockfile 严格安装          ← 这一版是修好之后
+  ✓ 装 E2E 工作区（独立 lockfile）
+  ✓ 缓存 Chromium
+  ✓ 装 Chromium
+  X 门禁                          ← 真正的红在这里
+  - 全量测试                      ← 被跳过
+```
+
+**修好之前是这样**：
+
+```
+  X 按 lockfile 严格安装
+  - 装 E2E 工作区（独立 lockfile）
+  - 缓存 Chromium
+  - 装 Chromium
+  - 门禁                          ← -！不是 ✗
+  - 全量测试                      ← -！不是 ✗
+```
+
+🔴 **所以"CI 红了"当时只意味着"装依赖失败了"，22 道门禁一次都没跑过。**
+而 `gh run view` 的默认输出里，一线人员最可能扫的就是那个 `X` 和结论词 `failure`，
+**不会去数后面有几个 `-`**。
+
+**怎么识破**（任一）：
+
+```bash
+# ① 数一数到底有几个步骤被跳过 —— 跳过的门禁不产生任何保护
+gh run view <id> | sed -n '/JOBS/,/ANNOTATIONS/p'
+
+# ② 直接看那一步的日志标题行，别猜
+gh run view <id> --log-failed | grep -E "frozen-lockfile|OUTDATED_LOCKFILE|ELIFECYCLE"
+
+# ③ 只信"门禁"和"全量测试"两步都是 ✓
+gh run view <id> --json jobs -q '.jobs[].steps[] | "\(.conclusion//"-") \(.name)"'
+```
+
+⚠️ 配套的两个陷阱，都在 [`../../AGENTS.md`](../../AGENTS.md) §7：
+
+- `--frozen-lockfile` 失败**只在干净检出上出现**。本机有 `node_modules`，**毫无感觉**。
+- `pnpm check` 的链路是 `build → typecheck → check:*`，**它平时不跑测试**。
+  所以"门禁全绿"和"测试全过"是**两件独立的事**，必须都看。
+
+**教训**：一条把前一步失败**吞成"跳过"**的流水线，会让人把"没验"读成"验过了"。
+判断 CI 健康，看的是**每一步的结论**，不是那个总体的 `X`。
+
 ---
 
 ## 9. 排障速查
@@ -241,6 +293,9 @@ workflow 有**两个 `if: always()` 的诚实步骤**，把跑不了的写进 Jo
 | 日志打印出 shell 变量、runner 没注册 | `command: \|` 被按空白拆成 argv | entrypoint 写成列表（见 §4.2） |
 | `Invalid configuration provided for url` | Compose 插值吃掉了 `$RUNNER_*` | 转义成 `$$RUNNER_*`（见 §4.2） |
 | clone 永久卡住 | finlaw 直连 github.com 超时 | 确认代理环境变量在容器里生效（见 §4.3） |
+| CI 红，但红的只有 `按 lockfile 严格安装`，**后面全是 `-`** | 锁文件与 `package.json` 不一致 —— 后面的门禁**一个都没跑** | 见 §8.1；修复见 [`../../AGENTS.md`](../../AGENTS.md) §7 |
+| 门禁在 CI 红、本机全绿 | 产物字节依赖**环境**（时区 / locale / 换行符） | 见 [`../../AGENTS.md`](../../AGENTS.md) §7 的「golden 夹具：时区必须钉死」 |
+| ArkTS 门禁每次都是 `⚠️ 跳过` | runner 上没有 `es2abc`（随 DevEco 分发） | 这是**已交代**的跳过（见 §8），不是通过；只有本机能真跑 |
 
 ---
 
