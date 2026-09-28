@@ -82,6 +82,7 @@ function featuresNeeding(capability: AiCapability, t: I18nValue['t'], locale: Lo
     breakdown: t('web.ai.needs.breakdown'),
     prioritize: t('web.ai.needs.prioritize'),
     'duration-estimate': t('web.ai.needs.duration'),
+    'tool-calling': t('web.ai.needs.toolCalling'),
   };
   const hit: string[] = [];
   for (const [feature, label] of Object.entries(names)) {
@@ -146,6 +147,7 @@ function featureLabels(t: I18nValue['t']): Readonly<Record<AiFeature, string>> {
     breakdown: t('web.ai.feature.breakdown'),
     prioritize: t('web.ai.feature.prioritize'),
     'duration-estimate': t('web.ai.feature.duration'),
+    'tool-calling': t('web.ai.feature.toolCalling'),
   };
 }
 
@@ -154,6 +156,7 @@ const FEATURE_ORDER: readonly AiFeature[] = [
   'breakdown',
   'prioritize',
   'duration-estimate',
+  'tool-calling',
 ];
 
 /**

@@ -1,47 +1,70 @@
 /**
- * 快速捕获输入框（含解析预览）
- * ==============================
+ * 快速捕获输入框（Web 壳）
+ * ==========================
  *
- * 这是 AI-1（捕获）的**确定性版本**。UI 层在这里只做三件事：
- * 收集输入、展示解析结果、调用写入动作。
- * **解析逻辑一行都不在这里** —— 它在 `@heyta/domain` 的 `capture.ts`。
- * 判据还是 AGENTS.md §3.5 那句：这里有没有任何一行在决定"业务上该怎么做"？
- * 没有。所以它留在 `apps/` 是合规的。
+ * 🔴 M3 第八刀之后，这个文件**只剩接线**。
  *
- * 🔴 **为什么必须有预览，不能"直接落库"**
+ * 输入行、识别芯片（原文 → 解析结果 → 取消/恢复/「未采用」）、实际标题预览，
+ * 全部由 `@heyta/ui` 的 `CaptureComposer` 渲染 —— 与移动端将是**同一份实现**。
+ * 这里只回答 web 自己的三个问题：
  *
- * 中文没有词边界，规则解析的误报是**结构性**的："明天启程"里的"明天"
- * 会被认成日期。如果输入框直接落 op，用户写的字就被悄悄删改，而且
- * **没有任何地方能告诉他发生了什么**。
+ *   1. **文案**从哪来 → `@heyta/i18n` 的 `web.capture.*`（**零新增词条**；
+ *      芯片的剩余天数由共享层算，措辞在这里说成当前语言）；
+ *   2. **提交**到哪去 → `useTaskStore#addTask`（op-log 的唯一写入口，AGENTS.md §3.4）；
+ *   3. **AI 一句话捕获面板** → `renderAssistant` 插槽（见下）。
  *
- * 所以本组件的契约是：
- *   1. **识别结果一律先显示。** 用户看得见"我读懂了什么"。
- *   2. **每一条都能单独取消**（点 ×），取消 = 把那几个字放回输入。
- *   3. **没被采纳的匹配会显式标成"未采用"** —— 否则用户会误以为它生效了。
+ * 解析一行都不在这里：它仍然是 `@heyta/domain#parseCapture`。判据还是
+ * AGENTS.md §3.5 那句：这里有没有任何一行在决定"业务上该怎么做"？
+ * 没有 —— 判断（芯片三态 / 忽略清单 / 提交换算）在
+ * `packages/ui/src/capture/model.ts`，写库在 app-host 的 action 层。
  *
- * 这套"建议 → 用户确认 → 才落 op"的形状是**刻意先建出来的**：
- * 等 AI-1 真正接入模型时，要换的只是"谁来产生候选"，
- * 而不是重新设计一遍交互。ADR-0005 §3.1 的"A 建议、人确认"就是这个形状。
+ * ─────────────────────────────────────────────────────────────────────────
+ * 🔴 `HeytaUiProvider` 必须包在**这一处**
+ *
+ * 共享 `CaptureComposer` 透过 `useHeytaTokens` / `useHeytaText` 取 token，
+ * 而 `App.tsx` 里 `CaptureComposer` 挂在内容区，**不在** `tasks` 那棵树内
+ * （那个 Provider 只包了一棵子树）。所以这里自己内联挂一层 ——
+ * 这正是 M3 第二刀（focus）在运行时抛
+ * 「useHeytaUiTheme 必须在 <HeytaUiProvider> 内使用」的形状。
+ *
+ * ✅ 本轮**同时**把 `CaptureComposer` 登记进了 `scripts/check-ui-provider.mjs`
+ * 的 `PROVIDER_DEPENDENT`（那个缺口此前连续出现过五次，见
+ * `apps/web/src/features/settings/HelpPanel.tsx` 文件头）。别把下面这层删掉：
+ * 删了门禁会红。
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * 🔴 AI 面板留在 web（经 `renderAssistant` 插槽），不进共享层
+ *
+ * `AiCapture` 约 380 行，是 DOM + `@heyta/ai` 的实现；而 `apps/mobile` 里
+ * AI 是 **0 行**（P8 的移动端阻塞在宿主 SecretStore，不在 UI 层）。
+ * 强行共享等于让 iOS 去解析 DOM。最小一步：M3 `ai` 的"流程型面板族"
+ * 落地后接进这个插槽（披露块已经有共享 `AiDisclosure`）。
+ *
+ * ⚠️ 插槽的渲染条件（"空输入框上不出现 AI 按钮"）留在这里，因为
+ * "什么算空"与"点下去会不会必然失败"是 AI 交互的产品决策。
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * 🔴 本刀真实丢掉的东西（登记，不是修复）
+ *
+ * 1. **`.ht-input` 的悬停态**：迁移前输入框走 `styles/app.css` 的 `.ht-input`
+ *    （`:hover` / `:focus-visible` 换边框色），共享层是 RN `TextInput`，
+ *    RN 没有 hover。**桌面鼠标用户在这一处少了一个反馈** —— 这不是实现细节。
+ *    最小一步：共享层加 `onFocus`/`onBlur` 状态 + 边框色，需要产品先定焦点环。
+ * 2. ✅ **`.ht-compose-wrap` / `.ht-capture*` 是死规则**（`grep` 实测 TSX 里
+ *    0 处引用）。⚠️ `.ht-compose` **不是**死的 —— `features/tasks/NoteEditor.tsx`
+ *    还在用它当"输入行"容器（实测）。
+ *    **已在 2026-09-28 由父 agent 删除**（`app.css` 不在本刀白名单）：
+ *    顶层 `ht-*` 选择器 205 → 190（删 15 条：`.ht-compose-wrap` 2 + `.ht-capture*` 13），
+ *    `.ht-compose` 已保留；`HT_FAMILY_BASELINE` **29 → 28**（P1 棘轮）。
+ *    ⚠️ 删除前特意核过"我扫到的那处引用是不是真代码" —— 结果是**本文件自己这段注释**。
+ *    **在这个仓库里，`grep` 的命中必须先区分"代码"与"描述代码的文字"。**
  */
 
-import { useMemo, useState } from 'react';
-import { Plus, RotateCcw, X } from 'lucide-react';
+import { useCallback, useMemo } from 'react';
 
 import { useI18n } from '@heyta/i18n';
 
-import { dateWithRemaining } from '../ai/locale-punctuation.js';
-
-import {
-  Priority,
-  diffDays,
-  dueDateToEpoch,
-  localDateTimeToEpoch,
-  parseCapture,
-  today,
-  type AiFeedbackOutcome,
-  type CaptureExclusion,
-  type PreferenceSet,
-} from '@heyta/domain';
+import type { AiFeedbackOutcome, PreferenceSet } from '@heyta/domain';
 import type {
   AiHealthSnapshot,
   AiRoutingConfig,
@@ -50,6 +73,17 @@ import type {
   SecretStore,
 } from '@heyta/ai';
 
+import {
+  CaptureComposer as SharedCaptureComposer,
+  HeytaUiProvider,
+  captureChipRemainingDays,
+  capturePriorityLabelKey,
+  type CaptureAssistantContext,
+  type CaptureComposerLabels,
+  type CaptureSubmitPlan,
+} from '@heyta/ui';
+
+import { dateWithRemaining } from '../ai/locale-punctuation.js';
 import { AiCapture } from '../ai/AiCapture.js';
 import { WEB_EMPTY_SECRET_STORE } from '../settings/aiStore.js';
 import { useTaskStore } from '../tasks/store.js';
@@ -75,219 +109,94 @@ export interface CaptureComposerProps {
   }) => void) | undefined;
 }
 
-/**
- * 优先级 → 可读文案。与 `capture.ts` 的 display 保持一致口径。
- *
- * ⚠️ 与 `AiPrioritize` 里的那份是**同一件事的第二个副本**（本轮不允许改
- * `packages/domain` 造成的）；只放显示文案，不参与任何判断。
- */
 export function CaptureComposer(props: CaptureComposerProps): React.JSX.Element {
   const addTask = useTaskStore((s) => s.addTask);
   const { t, locale } = useI18n();
-  /**
-   * 一次渲染里的所有匹配行必须用**同一个"现在"**。
-   *
-   * 逐行各调一次 `Date.now()` 的话，跨零点时同一屏上的两行会算出不同的日期 ——
-   * 与 `TasksScreen` 冻结 `now`、`DueBadge` 要求调用方传 `now` 是同一条纪律。
-   */
-  const previewNow = Date.now();
-  const priorityLabel: Record<number, string> = {
-    [Priority.High]: t('web.capture.priority.high'),
-    [Priority.Medium]: t('web.capture.priority.medium'),
-    [Priority.Low]: t('web.capture.priority.low'),
-    [Priority.None]: t('web.capture.priority.none'),
-  };
-  const [draft, setDraft] = useState('');
-  /**
-   * 用户显式忽略的识别。
-   *
-   * ⚠️ 它在语义上是"**这段文字是标题的一部分**"，不是"删掉这几个字"。
-   * 所以这里存的是"忽略清单"，而**不是**去改 `draft` ——
-   * 改 `draft` 会把用户写的字真的删掉，那正是本组件最不能犯的错。
-   */
-  const [ignored, setIgnored] = useState<CaptureExclusion[]>([]);
-
-  // 解析是纯函数且很便宜（十来条正则），但输入框每次按键都重算仍然浪费。
-  // 依赖只有 draft + ignored —— 时间源用默认的 Date.now()，不放进依赖数组，
-  // 因为"跨过午夜后预览里的'今天'会过期"的代价只是刷新一次输入。
-  const parsed = useMemo(() => parseCapture(draft, { exclude: ignored }), [draft, ignored]);
-
-  const canSubmit = parsed.title.trim() !== '';
-
-  function submit(): void {
-    if (!canSubmit) return;
-    void addTask(parsed.title, {
-      ...(parsed.dueDate !== undefined ? { dueDate: dueDateToEpoch(parsed.dueDate) } : {}),
-      ...(parsed.priority !== undefined ? { priority: parsed.priority } : {}),
-    });
-    setDraft('');
-    setIgnored([]);
-  }
-
-  /** 忽略 / 恢复一条识别。只动"忽略清单"，**绝不动输入框里的字**。 */
-  function toggleIgnore(m: CaptureExclusion & { rejected: boolean }): void {
-    setIgnored((list) =>
-      m.rejected
-        ? list.filter((e) => !(e.field === m.field && e.raw === m.raw))
-        : [...list, { field: m.field, raw: m.raw }],
-    );
-  }
-
-  /** 输入变了，旧的忽略清单可能已经指向不存在的文字 —— 清掉以免残留状态。 */
-  function onDraftChange(value: string): void {
-    setDraft(value);
-    if (ignored.length > 0) setIgnored([]);
-  }
 
   /**
-   * AI 解析出的字段落库。
+   * 文案全部由宿主注入（共享层不 import `@heyta/i18n`）。
    *
-   * 🔴 走的是**和回车完全相同的那条路**（`addTask` → op-log），
-   * 所以它同样可同步、可撤销、可被别的设备看到 —— AI 没有旁路。
-   *
-   * ⚠️ `dueDate` 在这里从「本地日期时间串」换算成 epoch 毫秒。
-   * 这一步**必须**在界面侧做，因为 `ai-capture` 只给本地串
-   * （它不替 domain 决定时区语义，见那个文件头）。
-   * 换算失败（模型给了不存在的日期）就**当作没给** —— 宁可少一个截止时间，
-   * 也不要一个静默错位的日期。
+   * `valueLabel` 里**天数是共享层算的**（`captureChipRemainingDays` ←
+   * `@heyta/domain#diffDays` + `today`），这里只负责说成当前语言 ——
+   * 迁移前这一步在 web 组件里，那就是"同一个日期在两端可以差一天"的种子。
    */
-  async function applyCapture(fields: {
-    title: string;
-    dueDate?: string | undefined;
-    priority?: Priority | undefined;
-  }): Promise<void> {
-    const due =
-      fields.dueDate === undefined ? undefined : localDateTimeToEpoch(fields.dueDate);
-    await addTask(fields.title, {
-      ...(due !== undefined ? { dueDate: due } : {}),
-      ...(fields.priority !== undefined ? { priority: fields.priority } : {}),
-    });
-    // 建完清空输入框：AI 应用与回车应当是**同一种结果**，
-    // 否则用户会面对两套行为（一个清、一个不清），而且残留的文字
-    // 会让下一次回车悄悄建出重复任务。
-    setDraft('');
-    setIgnored([]);
-  }
+  const labels = useMemo<CaptureComposerLabels>(
+    () => ({
+      placeholder: t('web.capture.placeholder'),
+      addLabel: t('web.capture.addLabel'),
+      add: t('web.capture.add'),
+      matchesAria: t('web.capture.matches.aria'),
+      rejected: t('web.capture.rejected'),
+      unused: t('web.capture.unused'),
+      previewLead: t('web.capture.previewLead'),
+      previewEmpty: t('web.capture.previewEmpty'),
+      restoreAria: (raw) => t('web.capture.restoreAria', { raw }),
+      ignoreAria: (raw) => t('web.capture.ignoreAria', { raw }),
+      valueLabel: (chip, now) => {
+        const days = captureChipRemainingDays(chip, now);
+        if (chip.dueDate !== undefined && days !== undefined) {
+          return dateWithRemaining(chip.dueDate, remainingText(days, t), locale);
+        }
+        return t(capturePriorityLabelKey(chip.priority));
+      },
+    }),
+    [t, locale],
+  );
+
+  /**
+   * 提交。`plan.dueDate` 已经是 epoch ms（共享层换算完），这里只把它交给
+   * op-log 的唯一写入口 —— **不再做第二次时区换算**。
+   */
+  const onSubmit = useCallback(
+    (plan: CaptureSubmitPlan) =>
+      addTask(plan.title, {
+        ...(plan.dueDate !== undefined ? { dueDate: plan.dueDate } : {}),
+        ...(plan.priority !== undefined ? { priority: plan.priority } : {}),
+      }),
+    [addTask],
+  );
+
+  const {
+    routing,
+    consents,
+    secrets,
+    healthSnapshot,
+    preferenceSet,
+    onFeedback,
+    onHealth,
+  } = props;
+
+  const renderAssistant = useCallback(
+    (ctx: CaptureAssistantContext) => {
+      // ⚠️ 只在**有内容**时出现：空输入框上挂一个"AI 解析"按钮，
+      //    点下去必然失败，那是在制造一次注定报错的交互。
+      //    没配置 AI 时也照样出现 —— "找不到入口"和"入口说为什么不可用"
+      //    是两件事（`AiCapture` 自己会说该去开什么）。
+      if (routing === undefined || ctx.draft.trim() === '') return null;
+      return (
+        <AiCapture
+          text={ctx.draft}
+          routing={routing}
+          consents={consents ?? []}
+          secrets={secrets ?? WEB_EMPTY_SECRET_STORE}
+          healthSnapshot={healthSnapshot}
+          preferenceSet={preferenceSet}
+          onApply={ctx.apply}
+          {...(onFeedback !== undefined ? { onFeedback } : {})}
+          {...(onHealth !== undefined ? { onHealth } : {})}
+        />
+      );
+    },
+    [routing, consents, secrets, healthSnapshot, preferenceSet, onFeedback, onHealth],
+  );
 
   return (
-    <div className="ht-compose-wrap">
-      <div className="ht-compose">
-        <input
-          className="ht-input"
-          value={draft}
-          placeholder={t('web.capture.placeholder')}
-          aria-label={t('web.capture.addLabel')}
-          onChange={(e) => onDraftChange(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter') submit();
-          }}
-        />
-        <button
-          type="button"
-          className="ht-btn ht-btn--primary"
-          onClick={submit}
-          disabled={!canSubmit}
-        >
-          <Plus size={18} aria-hidden="true" />
-          {t('web.capture.add')}
-        </button>
-      </div>
-
-      {parsed.matches.length > 0 && (
-        <ul className="ht-capture" aria-label={t('web.capture.matches.aria')}>
-          {parsed.matches.map((m) => {
-            // dueDate 的 display 是 YYYY-MM-DD。同时给出人话剩余时间，
-            // 因为"2026-09-26"不直观而"明天"直观 —— 用户要确认的是后者。
-            // ✅ 剩余天数由领域层算（`diffDays` / `today`），**说法**按当前语言
-            // 从词条表取（`remainingText`）—— 以前这里直接嵌领域层的
-            // `formatRemainingUntil()`，那是一句写死的中文，英文界面会露汉字。
-            // 括号与空格是正字法（一个汉字都没有），所以仍走
-            // `dateWithRemaining` 的代码常量而不是词条表 —— 与
-            // `LIST_SEPARATOR` 同一个先例。
-            const valueLabel =
-              m.field === 'dueDate' && m.dueDate !== undefined
-                ? dateWithRemaining(
-                    m.dueDate,
-                    remainingText(diffDays(today(previewNow), m.dueDate), t),
-                    locale,
-                  )
-                : (priorityLabel[m.priority ?? Priority.None] ?? m.display);
-
-            return (
-              <li
-                key={`${m.field}-${String(m.start)}-${m.raw}`}
-                className={`ht-capture__chip${m.applied ? '' : ' ht-capture__chip--off'}`}
-              >
-                <span className="ht-capture__raw">{m.raw}</span>
-                <span className="ht-capture__arrow" aria-hidden="true">
-                  →
-                </span>
-                <span className="ht-capture__value">
-                  {m.rejected ? t('web.capture.rejected') : valueLabel}
-                </span>
-                {m.rejected ? (
-                  // 恢复：把它重新纳入解析
-                  <button
-                    type="button"
-                    className="ht-capture__x"
-                    aria-label={t('web.capture.restoreAria', { raw: m.raw })}
-                    onClick={() => toggleIgnore(m)}
-                  >
-                    <RotateCcw size={12} aria-hidden="true" />
-                  </button>
-                ) : m.applied ? (
-                  <button
-                    type="button"
-                    className="ht-capture__x"
-                    aria-label={t('web.capture.ignoreAria', { raw: m.raw })}
-                    onClick={() => toggleIgnore(m)}
-                  >
-                    <X size={12} aria-hidden="true" />
-                  </button>
-                ) : (
-                  // 未被采纳（同字段已有更早的匹配）= 它**还在标题里**。
-                  // 必须说出来，否则用户会以为识别失败了，
-                  // 而不知道那段字其实原样保留着。
-                  <span className="ht-capture__hint">{t('web.capture.unused')}</span>
-                )}
-              </li>
-            );
-          })}
-        </ul>
-      )}
-
-      {parsed.matches.length > 0 && (
-        <p className="ht-capture__preview">
-          {t('web.capture.previewLead')}{' '}
-          <strong>{parsed.title === '' ? t('web.capture.previewEmpty') : parsed.title}</strong>
-        </p>
-      )}
-
-      {/* AI 一句话捕获（功能 ①）。
-          🔴 它与上面的规则解析**并存**，不是替换 —— 规则那条路对「明天」
-          「下周三」「!1」是**算准的**，而 `packages/ai/src/index.ts` 记着一次实测：
-          同一个句子里模型算出来的日期错了约 4.5 个月。所以凡规则能算准的，
-          继续走规则；AI 补的是规则覆盖不到的（"下下个季度前"、含歧义的表达）。
-
-          ⚠️ 只在**有内容**时出现：空输入框上挂一个"AI 解析"按钮，
-          点下去必然失败，那是在制造一次注定报错的交互。
-
-          ⚠️ 没配置 AI 时也**照样出现**（`routing` 缺省时组件自己会说该去开什么）——
-          "找不到入口"和"入口说为什么不可用"是两件事。但这一条只在
-          `App.tsx` 传了 AI 配置时才成立；纯确定性场景（单测）不渲染它。 */}
-      {props.routing !== undefined && draft.trim() !== '' && (
-        <AiCapture
-          text={draft}
-          routing={props.routing}
-          consents={props.consents ?? []}
-          secrets={props.secrets ?? WEB_EMPTY_SECRET_STORE}
-          healthSnapshot={props.healthSnapshot}
-          preferenceSet={props.preferenceSet}
-          onApply={applyCapture}
-          {...(props.onFeedback !== undefined ? { onFeedback: props.onFeedback } : {})}
-          {...(props.onHealth !== undefined ? { onHealth: props.onHealth } : {})}
-        />
-      )}
-    </div>
+    <HeytaUiProvider>
+      <SharedCaptureComposer
+        labels={labels}
+        onSubmit={onSubmit}
+        renderAssistant={renderAssistant}
+      />
+    </HeytaUiProvider>
   );
 }

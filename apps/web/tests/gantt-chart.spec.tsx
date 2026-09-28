@@ -24,7 +24,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { App } from '../src/App.js';
 import { LocaleHost } from '../src/lib/locale-host.js';
 import { __resetOpLogForTests, initOpLog } from '../src/lib/oplog.js';
-import { buildTimeline, type TimelineEntry } from '../src/features/timeline/buildTimeline.js';
+import { buildTimeline, type TimelineEntry } from '@heyta/domain';
 import { GanttChart } from '../src/features/timeline/GanttChart.js';
 import { TimelineView } from '../src/features/timeline/TimelineView.js';
 

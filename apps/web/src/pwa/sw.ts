@@ -119,6 +119,11 @@ const DB_NAME = 'heyta-widget';
 const DB_VERSION = 1;
 const STORE_CLICKS = 'clicks';
 const STORE_DATA = 'data';
+/**
+ * 「最近一次收到推送的时刻」的存储键。**与四款组件的数据共用一个 object store**，
+ * 但键名不是 `kind`（`today`/`quadrant`/…），所以不会被 `getWidgetRecord` 误读。
+ */
+const PUSH_MARKER_KEY = '__last_push_received_at';
 
 function openDb(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
@@ -389,6 +394,20 @@ sw.addEventListener('push', (event: PushEventLike) => {
           return '';
         }
       })();
+
+      // 🔴 **先把"收到过推送"这件事持久化，再管有没有页面。**
+      //
+      // 这一段是补一个**观测缺口**，而它刚刚真的让我瞎走过一轮：
+      // 原来的处理器除了 `postMessage` **没有任何持久副作用**，于是当页面活着、
+      // 监听器也装好了、却什么都没收到时，**从外面无法区分**下面两件事：
+      //   （a）SW 根本没收到推送；
+      //   （b）SW 收到了，但没能送到页面。
+      // 而这两件的修法完全不同 —— (a) 是投递/安装的问题，(b) 是消息转发的问题。
+      //
+      // ⚠️ 写在客户端循环**之前**是刻意的：即使一个页面都没有，这个标记也要留下。
+      //    "没有页面"是一个正常状态（用户关了标签页），但"没有页面所以什么都没留下"
+      //    会让下一次排查从零开始。
+      await tx(STORE_DATA, 'readwrite', (store) => store.put(Date.now(), PUSH_MARKER_KEY));
 
       for (const client of clients) {
         client.postMessage({ type: 'heyta:push', payload });

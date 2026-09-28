@@ -1,12 +1,23 @@
 /**
- * 冲突解决界面
- * ==============
+ * 冲突解决界面（web 外壳）
+ * ==========================
  *
  * P1 把冲突做到了"能判定并上报"，但**没有解决的地方** ——
  * 用户看到一句"需要手动选择保留哪一边"，却无处可选，数据卡在待上传队列里。
  * 一个必然需要人判断的问题，被做成了一句死路。
  *
- * 这个界面的唯一职责：把**双方分别是什么**摆出来，让用户点一下选一边。
+ * ═════════════════════════════════════════════════════════════════════════
+ * 🔴 M3 第四刀之后，这里**只剩 web 特有的那一层**
+ *
+ * 两个平台共有的部分已经收进 `@heyta/ui` 的 `ConflictResolutionView`：
+ * 逐条列出冲突、并排摆出两边的**内容**与时间、标出哪一侧较新、
+ * 每一侧一个「保留这一版」、把"为什么点不了"说出来。
+ * 本文件只负责 web 这一侧的外壳与措辞：
+ *
+ *   · **对话框语义**（`role="dialog"` / `aria-modal` / `aria-labelledby` /
+ *     Esc 关闭 / 打开时把焦点移进去）—— 那是 L3 外壳，RN 侧没有对应物；
+ *   · **真实 `<button disabled>`** —— 见下面 `renderSideAction` 的注释；
+ *   · **词条**（`labels`）—— 共享层不许 import `@heyta/i18n`。
  *
  * ═════════════════════════════════════════════════════════════════════════
  * 🔴 为什么必须并排显示两边的**内容**，而不是只显示"本机/远端"和时间
@@ -18,29 +29,52 @@
  *
  * ⚠️ 自动解决（sync-core 的 `suggestConflictResolution` 能判定的那些）
  * **不会**走到这里 —— 只有它返回 `manual` 的才需要用户决定。
+ *
+ * ═════════════════════════════════════════════════════════════════════════
+ * 🔴 `HeytaUiProvider` 是**本文件自己挂**的
+ *
+ * 共享视图透过 `useHeytaTokens` 取 token，缺 Provider 会**运行时抛错**。
+ * `apps/web/src/App.tsx` 里的 Provider 都挂在各视图**局部**
+ * （tasks 一棵树、focus 一棵树），而 `<SyncBar/>` / `<ConflictDialog/>`
+ * 挂在顶栏 —— **不在任何一棵之内**。本来该由 App.tsx 在顶栏再挂一层，
+ * 但 `App.tsx` 不在本刀白名单里，所以在自己的入口挂是最小且不越界的一步。
+ *
+ * ✅ `ConflictResolutionView` 已登记进 `scripts/check-ui-provider.mjs` 的
+ * `PROVIDER_DEPENDENT` 清单：把这层 `<HeytaUiProvider>` 拆掉会让那道门禁
+ * **变红并指名道姓**（已故障注入实测）。第四刀刚落地时它**没登记**、
+ * 门禁照样全绿 —— 已补齐，别再把这一层当成"手工保证"。
  */
 
-import { useEffect, useRef } from 'react';
-import { AlertTriangle, Check, Monitor, Smartphone, X } from 'lucide-react';
+import { useEffect, useMemo, useRef } from 'react';
+import { AlertTriangle, Check, X } from 'lucide-react';
 
-import { cssVar, type TokenName } from '@heyta/design-system';
-import { useI18n, type I18nValue, type Locale } from '@heyta/i18n';
-
-import { useSyncStore } from './store.js';
+import { cssVar } from '@heyta/design-system';
+import { useI18n } from '@heyta/i18n';
+import {
+  ConflictResolutionView,
+  HeytaUiProvider,
+  conflictLookupCode,
+  conflictReasonLabelOf,
+  entityLabelOf,
+  type ConflictResolutionLabels,
+  type ConflictSideRenderInfo,
+} from '@heyta/ui';
 import {
   compareConflictFreshness,
   summarizeConflictPayload,
   type ConflictInfo,
-  type ConflictSide,
 } from '@heyta/sync-client';
+
+import { useSyncStore } from './store.js';
 
 /**
  * 时间戳 → 可读时间。冲突界面里"谁更新"是判断依据，必须看得懂。
  *
  * ⚠️ 这里原先把 `'zh-CN'` 写死 —— 英文界面会用中文习惯排日期。
  * 现在用当前语言（`useI18n().locale`），这是最容易被漏掉的一类"看不见的文案"。
+ * 格式属于宿主，所以共享层收的是 `labels.time(ms)` 函数而不是一个字符串。
  */
-function formatTime(ms: number, locale: Locale): string {
+function formatTime(ms: number, locale: string): string {
   return new Date(ms).toLocaleString(locale, {
     month: 'numeric',
     day: 'numeric',
@@ -50,145 +84,21 @@ function formatTime(ms: number, locale: Locale): string {
 }
 
 /**
- * 冲突载荷 → 一句用户能读的摘要。
+ * 实体类型 → 词条 key **收进共享层了**（`@heyta/ui` 的 `sync/model.ts`）。
  *
- * 🔴 **判断不在这里**：这段载荷里哪个字段能当标题，由 `@heyta/sync-client`
- * 的 `summarizeConflictPayload` 决定 —— 那是唯一知道载荷形状的地方，
- * 两端（web / mobile）消费同一份判断，不会漂移。这里只负责措辞：
+ * 🔴 这里曾经有一份本地 `ENTITY_LABEL_KEYS`，而移动端
+ * `apps/mobile/src/sync/conflict-view.ts` 也有**同一张表**。key 相同、句子不漂移，
+ * 但**集合本身是两份**：加一个新实体只改一端时，另一端不会报错、也没有测试会红，
+ * 只会静默地把 `AI_FEEDBACK` 这种内部标识符显示给用户。
  *
- *   - `text`：**用户自己的字**（标题、项目名…），直接显示、不翻译；
- *   - `fields`：**只报数量**，绝不列字段名 —— `completedAt` 那种内部标识符
- *     出现在用户可见文案里正是门禁要拦的东西（跨包返回值曾经绕过它）；
- *   - `empty`：单独一条词条。空载荷与"取不到这一侧"是两回事，不能混。
+ * 现在两端都调共享的 `entityLabelOf`（词条落成 `common.entity.*`）——
+ * 修掉了旧注释记着的那笔命名空间债（web 曾借 `mobile.entity.*`），
+ * web 用户与移动端用户看到的是**同一张表**给出的同一个名字。
+ * 认不出来的实体回落成原始类型名（不编一个，也不吞掉）。
  */
-function payloadSummaryText(payload: unknown, t: I18nValue['t']): string {
-  const summary = summarizeConflictPayload(payload);
-  switch (summary.kind) {
-    case 'text':
-      return summary.text;
-    case 'empty':
-      return t('web.conflict.payload.empty');
-    case 'fields': {
-      const count = summary.fields.length;
-      if (count === 1) return t('web.conflict.payload.fieldsOne', { count });
-      return t('web.conflict.payload.fields', { count });
-    }
-  }
-}
-
-function Side({
-  side,
-  label,
-  icon,
-  isNewer,
-  disabled,
-  onPick,
-}: {
-  side: ConflictSide | undefined;
-  label: string;
-  icon: React.JSX.Element;
-  isNewer: boolean;
-  disabled: boolean;
-  onPick: () => void;
-}): React.JSX.Element {
-  const { t, locale } = useI18n();
-
-  return (
-    <div
-      style={{
-        flex: 1,
-        minWidth: 0,
-        display: 'flex',
-        flexDirection: 'column',
-        gap: cssVar('space.3'),
-        padding: cssVar('space.4'),
-        borderStyle: 'solid',
-        borderWidth: cssVar('border-width.thin'),
-        borderColor: isNewer
-          ? (cssVar('color.primary') as string)
-          : (cssVar('color.border') as string),
-        borderRadius: cssVar('radius.md'),
-        background: cssVar('color.surface'),
-      }}
-    >
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: cssVar('space.2'),
-          fontSize: cssVar('font-size.xs'),
-          color: cssVar('color.foreground-muted'),
-        }}
-      >
-        {icon}
-        <span>{label}</span>
-        {isNewer ? (
-          <span
-            style={{
-              marginLeft: 'auto',
-              fontSize: cssVar('font-size.2xs'),
-              color: cssVar('color.primary'),
-            }}
-          >
-            {t('web.conflict.newer')}
-          </span>
-        ) : null}
-      </div>
-
-      {side === undefined ? (
-        // 🔴 取不到对端版本时必须**明说**。
-        // 显示成空白会让人以为"对端什么都没写"，从而做出相反的判断。
-        <p
-          style={{
-            margin: 0,
-            fontSize: cssVar('font-size.sm'),
-            color: cssVar('color.foreground-muted'),
-            fontStyle: 'italic',
-          }}
-        >
-          {t('web.conflict.remoteUnavailable')}
-        </p>
-      ) : (
-        <>
-          <p
-            style={{
-              margin: 0,
-              fontSize: cssVar('font-size.base'),
-              color: cssVar('color.foreground'),
-              lineHeight: cssVar('line-height.normal'),
-              wordBreak: 'break-word',
-            }}
-          >
-            {payloadSummaryText(side.payload, t)}
-          </p>
-          <span
-            style={{
-              fontSize: cssVar('font-size.2xs'),
-              color: cssVar('color.foreground-muted'),
-              fontVariantNumeric: 'tabular-nums',
-            }}
-          >
-            {formatTime(side.timestamp, locale)}
-          </span>
-        </>
-      )}
-
-      <button
-        type="button"
-        className={isNewer ? 'ht-btn ht-btn--primary' : 'ht-btn'}
-        disabled={disabled || side === undefined}
-        onClick={onPick}
-        style={{ marginTop: 'auto' }}
-      >
-        <Check size={15} aria-hidden="true" />
-        {t('web.conflict.keepThis')}
-      </button>
-    </div>
-  );
-}
 
 export function ConflictDialog(): React.JSX.Element | null {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const status = useSyncStore((s) => s.status);
   const resolveConflict = useSyncStore((s) => s.resolveConflict);
   const dialogOpen = useSyncStore((s) => s.conflictDialogOpen);
@@ -217,7 +127,33 @@ export function ConflictDialog(): React.JSX.Element | null {
   // 打开时把焦点移进对话框 —— 否则键盘用户还停在背后的页面上
   useEffect(() => {
     if (open) dialogRef.current?.focus();
-  }, [open, closeConflictDialog]);
+  }, [open]);
+
+  const labels: ConflictResolutionLabels = useMemo(
+    () => ({
+      entity: (entityType) => entityLabelOf(entityType, t),
+      // 🔴 「原因」这一行 web 以前**没有**（只有 `mobile.conflict.reason.*`，
+      // `common.conflict.reason.*` 不存在，所以省略）。本轮补了共享词条，
+      // 两端从此在同一位置说同一句「为什么这件事需要人来定」。
+      // 查表用码由共享 `conflictLookupCode`（`errorCode ?? reason`）决定。
+      reason: (conflict) => conflictReasonLabelOf(conflictLookupCode(conflict), t),
+      side: (side) =>
+        t(side === 'local' ? 'web.conflict.side.local' : 'web.conflict.side.remote'),
+      newer: t('web.conflict.newer'),
+      remoteUnavailable: t('web.conflict.remoteUnavailable'),
+      keepThis: t('web.conflict.keepThis'),
+      // 空载荷与"取不到这一侧"是两回事，不能混成一句（见共享层 model 的注释）。
+      emptyPayload: t('web.conflict.payload.empty'),
+      // 词条表没有 ICU：1 个字段必须走单数兄弟词条，否则英文是 "1 fields changed"。
+      payloadFields: (count) =>
+        count === 1
+          ? t('web.conflict.payload.fieldsOne', { count })
+          : t('web.conflict.payload.fields', { count }),
+      blocked: () => t('web.conflict.remoteUnavailable'),
+      time: (ms) => formatTime(ms, locale),
+    }),
+    [t, locale],
+  );
 
   if (!open) return null;
 
@@ -229,6 +165,31 @@ export function ConflictDialog(): React.JSX.Element | null {
     conflicts.length === 1
       ? t('web.conflict.titleOne', { count: conflicts.length })
       : t('web.conflict.title', { count: conflicts.length });
+
+  /**
+   * 每一侧的按钮**由 web 自己渲染**。
+   *
+   * 🔴 这不是偷懒，是实测的硬约束：RNW 的 `Pressable` 虽然会渲染成真实
+   * `<button>`，但它的 `disabled` **只产出 `aria-disabled`**，
+   * 不产出 DOM 的 `disabled` 属性（属性白名单里没有它）。而
+   * `apps/web/tests/conflict-dialog.spec.tsx` 断言"取不到对端那一侧的按钮
+   * 必须真的带 `disabled` 属性" —— 那份测试不在本刀白名单，也不该为迁就让步。
+   * 共享层仍然负责**决定**（`blockedReason` / `preferred` 都在入参里）。
+   */
+  const renderSideAction = (info: ConflictSideRenderInfo<ConflictInfo>): React.JSX.Element => (
+    <button
+      type="button"
+      className={info.preferred ? 'ht-btn ht-btn--primary' : 'ht-btn'}
+      disabled={info.blockedReason !== undefined || info.busy}
+      onClick={() => {
+        void resolveConflict(info.conflict, info.choice);
+      }}
+      style={{ marginTop: 'auto' }}
+    >
+      <Check size={15} aria-hidden="true" />
+      {labels.keepThis}
+    </button>
+  );
 
   return (
     <div
@@ -275,7 +236,7 @@ export function ConflictDialog(): React.JSX.Element | null {
           <span
             style={{
               display: 'flex',
-              color: cssVar('color.warning' as TokenName),
+              color: cssVar('color.warning-strong'),
               paddingTop: cssVar('space.1'),
             }}
           >
@@ -290,7 +251,7 @@ export function ConflictDialog(): React.JSX.Element | null {
             </h2>
             <p
               style={{
-                margin: `${cssVar('space.2') as string} 0 0`,
+                margin: `${cssVar('space.2')} 0 0`,
                 fontSize: cssVar('font-size.sm'),
                 color: cssVar('color.foreground-muted'),
                 lineHeight: cssVar('line-height.normal'),
@@ -311,78 +272,24 @@ export function ConflictDialog(): React.JSX.Element | null {
           </button>
         </div>
 
-        {conflicts.map((conflict) => {
-          /**
-           * 🔴 「较新」的判定**不在这里**，而是调 `@heyta/sync-client` 的
-           * `compareConflictFreshness`。这条规则原本只在本文件里，
-           * 移动端做冲突界面时若再写一遍就是两份实现 —— 而漂移的后果是
-           * **同一个冲突在两个平台上"较新"标在不同的一侧**。
-           * 一处实现、两端消费；规则本身的可失败检查在 `sync-client` 的测试里。
-           *
-           * ⚠️ 它只影响哪个按钮被高亮，**不影响任何一个字节的数据**。
-           */
-          const { localNewer, remoteNewer } = compareConflictFreshness(
-            conflict.local,
-            conflict.remote,
-          );
-          const busy = status.kind === 'syncing';
-
-          return (
-            <div
-              key={conflict.id}
-              style={{
-                display: 'flex',
-                flexDirection: 'column',
-                gap: cssVar('space.3'),
-              }}
-            >
-              <div
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: cssVar('space.2'),
-                  fontSize: cssVar('font-size.xs'),
-                  color: cssVar('color.foreground-muted'),
-                  borderTopStyle: 'solid',
-                  borderTopWidth: cssVar('border-width.thin'),
-                  borderTopColor: cssVar('color.border-subtle') as string,
-                  paddingTop: cssVar('space.3'),
-                }}
-              >
-                <span>{conflict.entityType}</span>
-              </div>
-
-              <div
-                style={{
-                  display: 'flex',
-                  gap: cssVar('space.3'),
-                  alignItems: 'stretch',
-                }}
-              >
-                <Side
-                  side={conflict.local}
-                  label={t('web.conflict.side.local')}
-                  icon={<Monitor size={14} aria-hidden="true" />}
-                  isNewer={localNewer}
-                  disabled={busy}
-                  onPick={() => {
-                    void resolveConflict(conflict, 'keep-local');
-                  }}
-                />
-                <Side
-                  side={conflict.remote}
-                  label={t('web.conflict.side.remote')}
-                  icon={<Smartphone size={14} aria-hidden="true" />}
-                  isNewer={remoteNewer}
-                  disabled={busy}
-                  onPick={() => {
-                    void resolveConflict(conflict, 'keep-remote');
-                  }}
-                />
-              </div>
-            </div>
-          );
-        })}
+        {/* 🔴 共享的那一段：逐条冲突 + 两侧内容 + 保留按钮。
+            上面那层 Provider 见文件头（顶栏不在任何一棵 Provider 子树里）。 */}
+        <HeytaUiProvider>
+          <ConflictResolutionView
+            conflicts={conflicts}
+            labels={labels}
+            freshnessOf={(conflict) =>
+              compareConflictFreshness(conflict.local, conflict.remote)
+            }
+            summarize={summarizeConflictPayload}
+            busy={status.kind === 'syncing'}
+            renderSideAction={renderSideAction}
+            onResolve={(conflict, choice) => {
+              void resolveConflict(conflict, choice);
+            }}
+            testID="conflict-resolution"
+          />
+        </HeytaUiProvider>
       </div>
     </div>
   );

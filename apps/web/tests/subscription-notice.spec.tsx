@@ -138,6 +138,37 @@ describe('托管同步到期', () => {
     expect(useSyncStore.getState().settingsOpen).toBe(true);
   });
 
+  /**
+   * 🔴 「到期了」之后的下一步里，**必须**有一条能读到"现在能不能续、为什么"。
+   *
+   * 本组件开头写着"现在不存在可跳转的续费地址"，那句话到今天仍然成立。
+   * 所以这里指向站点的价格页 —— 它如实写着"现在买不到、原因是什么"，
+   * 而那正是到期用户接下来要问的那个问题。
+   * 判据是"链接存在且指向 /pricing"，而不是"有续费按钮"：后者会被
+   * `check:payment-entry` 直接判红（渠道未接通时不许有付款入口）。
+   */
+  it('🔴 到期提示能走到价格页 —— 但那是「说明」，不是续费入口', async () => {
+    stubProbe(402, { errorCode: 'SUBSCRIPTION_REQUIRED', reason: 'PERIOD_ENDED' });
+    const el = await renderNotice();
+
+    const link = el.querySelector<HTMLAnchorElement>(
+      'a[data-testid="subscription-pricing-link"]',
+    );
+    expect(
+      link,
+      '到期提示里没有任何指向价格页的链接 —— 用户读完提示仍然不知道该去哪问"还能不能续"',
+    ).not.toBeNull();
+    // 站点地址默认取**当前来源**（站点在同一个域名的根上，见 lib/site-url.ts）。
+    expect(link!.getAttribute('href')).toBe(`${window.location.origin}/pricing`);
+    expect(link!.getAttribute('rel')).toBe('noopener noreferrer');
+
+    // 反向判据：不许出现任何"点了没反应"的催收措辞。
+    const text = el.textContent ?? '';
+    for (const forbidden of ['立即续费', '立即购买', '去支付', '开通会员']) {
+      expect(text).not.toContain(forbidden);
+    }
+  });
+
   it('uses a different, honest wording when the refusal is not an expiry', async () => {
     stubProbe(402, { errorCode: 'SUBSCRIPTION_REQUIRED', reason: 'STATUS_NOT_ENTITLED' });
     const el = await renderNotice();

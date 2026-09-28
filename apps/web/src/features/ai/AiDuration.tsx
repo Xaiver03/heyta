@@ -40,12 +40,11 @@
  */
 
 import { useState } from 'react';
-import { AlertTriangle, Clock, Cloud, HardDrive, X } from 'lucide-react';
+import { AlertTriangle, Clock, X } from 'lucide-react';
 
 import { useI18n, type I18nValue } from '@heyta/i18n';
 
-import { LIST_SEPARATOR } from './locale-punctuation.js';
-import { retentionMessageKey } from './disclosure-copy.js';
+import { AiDisclosureHost } from './AiDisclosureHost.js';
 import { FailureSettingsAction, RouteUnavailable } from './RouteUnavailable.js';
 import { useAiSettingsNavigation } from './ai-settings-navigation.js';
 import {
@@ -402,52 +401,17 @@ export function AiDuration(props: AiDurationProps): React.JSX.Element {
           />
         ) : (
           <>
-            <p className="ht-ai__row" data-testid="duration-destination">
-              {target.isLocal ? (
-                <HardDrive size={12} aria-hidden="true" />
-              ) : (
-                <Cloud size={12} aria-hidden="true" />
-              )}
-              {t('web.ai.disclosure.destinationLead')}<strong>{target.label}</strong>
-              <code>{target.endpoint}</code>
-              <span>{t('web.ai.disclosure.model', { model: target.model })}</span>
-              <span className="ht-ai__tag" data-testid="duration-destination-kind">
-                {target.isLocal ? t('web.ai.disclosure.local') : t('web.ai.disclosure.remote')}
-              </span>
-            </p>
-
-            {/* 🔴 回退链必须披露 —— 首选失败时会自动换一个端点，而那是**另一家公司**。 */}
-            {target.fallbacks.length > 0 && (
-              <p className="ht-ai__row ht-ai__row--warn" data-testid="duration-fallbacks">
-                <AlertTriangle size={12} aria-hidden="true" />
-                {t('web.ai.disclosure.fallbackLead')}
-                <strong data-testid="duration-fallback-list">{target.fallbacks.join(LIST_SEPARATOR[locale])}</strong>
-              </p>
-            )}
-
-            {/* 🔴 「留多久」是披露的三维之一（发给谁 / 发什么 / 留多久）。 */}
-            {disclosure !== undefined && (
-              <p className="ht-ai__row" data-testid="duration-retention">
-                {t('web.ai.disclosure.retentionLead')}<strong data-testid="duration-retention-text">
-                  {t(retentionMessageKey(disclosure.retentionDisclosure.kind))}
-                </strong>
-              </p>
-            )}
-
-            <p className="ht-ai__row" data-testid="duration-fields">
-              {t('web.ai.disclosure.fieldsLead')}
-              <strong data-testid="duration-field-list">{invocation.fields.join(LIST_SEPARATOR[locale])}</strong>
-            </p>
-
-            {/* 🔴 依据必须在**发送前**就能看到：用户据此决定要不要发。 */}
-            {renderBasis()}
-
-            {!target.isLocal && (
-              <p className="ht-ai__warn" data-testid="duration-e2ee-warning">
-                <AlertTriangle size={12} aria-hidden="true" />
-                {t('web.ai.disclosure.e2eeLead')}<strong>{t('web.ai.disclosure.e2eeStrong')}</strong>
-              </p>
-            )}
+            {/* 🔴 披露的五个维度由 `@heyta/ui` 的 `AiDisclosure` 渲染。
+                估时依据必须**发送前**就能看到，所以它走 children 插槽，
+                摆在 `fields` 与 E2EE 警告之间（与改造前顺序逐字相同）。 */}
+            <AiDisclosureHost
+              testIdPrefix="duration-"
+              target={target}
+              fields={invocation.fields}
+              retentionDisclosure={disclosure?.retentionDisclosure}
+            >
+              {renderBasis()}
+            </AiDisclosureHost>
 
             <div className="ht-ai__actions">
               <button

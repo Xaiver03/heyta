@@ -93,7 +93,7 @@ if (typeof existing.supports !== 'function') {
  *
  * ⚠️ 注意它读的是**系统**的 `prefers-color-scheme`，不是应用自己的主题开关。
  * 这在本项目里是无害的：两套主题色传的是同一组 `var(--ht-…)`，
- * 实际颜色由我们自己的 CSS 变量按应用主题解析（见 `src/lib/heatmap-theme.ts`）。
+ * 实际颜色由我们自己的 CSS 变量按应用主题解析（该文件已删：热力图改成 RN 自绘后不再需要库的 theme 注入）。
  *
  * 需要测暗色的用例可以自己覆盖 `window.matchMedia`。
  */

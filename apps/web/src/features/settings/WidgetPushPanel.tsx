@@ -39,12 +39,39 @@
  * "我的任务会不会被传到服务器"。答案是**不会**（载荷只是一句"有更新了"，
  * 服务端没有密钥），而用户**没有任何别的途径知道这件事** ——
  * 不说，他就只能猜。
+ *
+ * ## 🔴 M3 第五刀（settings）：骨架已收进共享层
+ *
+ * 标题 / 说明 / 开关 / 两条错误 / 两句 note，现在都由 `@heyta/ui` 的
+ * `SettingsSection` 渲染（与 mobile 的「我的」屏同一份实现）；本文件不再自己
+ * 拼 `<section class="ht-panel">` 与 `<button class="ht-button--row">`。
+ * "整个面板不画"这条判据**没有动** —— 它在渲染之前（`visibility !== 'shown'`
+ * 直接 `return null`），与行的实现无关。
+ *
+ * ⚠️ **两处真实差异，都记在这里**：
+ *
+ *   1. **`disabled` 在 web 上只产出 `aria-disabled`**（RNW 的 `Pressable`
+ *      白名单里没有 `disabled`）。忙时点击确实被拦住、读屏也报"已禁用"，
+ *      但 `element.disabled` 读不到。本面板没有 DOM 级测试，所以这不是损失，
+ *      只是已知边界；要写断言就用 `aria-disabled`。
+ *   2. **开关的角色从 `aria-pressed` 变成了 `role="switch"` + `aria-checked`。**
+ *      两者都能表达"开/关"，但**不是同一个 ARIA 语义**：`role="switch"`
+ *      要求命名不带状态（名字是"允许后台刷新小组件"，状态在 `aria-checked`），
+ *      这正是这里要的。原来那对组合的意图相同，所以这次换的是**更标准**的
+ *      那一件；如果将来有人写断言，用 `role="switch"`。
+ *
+ * ⚠️ 每个面板各自包一层 `<HeytaUiProvider>`（理由见 `HelpPanel.tsx` 文件头）。
  */
 
 import { useCallback, useEffect, useState } from 'react';
 
 import { useI18n } from '@heyta/i18n';
 import { BellRing, Loader2, RefreshCw } from 'lucide-react';
+import {
+  HeytaUiProvider,
+  SettingsSection,
+  type SettingsRowModel,
+} from '@heyta/ui';
 
 import {
   probeWidgetPush,
@@ -131,50 +158,73 @@ export function WidgetPushPanel(): React.JSX.Element | null {
       ? 'web.widgetPush.status.subscribed'
       : 'web.widgetPush.status.off';
 
+  /**
+   * 面板内容 → 共享的类型化行（与 mobile 的「我的」屏同一份骨架）。
+   *
+   * 🔴 开关行的 `disabled` 在 web 上**只产出 `aria-disabled`**，不产出 DOM 的
+   * `disabled` —— RNW 的 `Pressable` 白名单里没有它。完整取舍与影响面写在
+   * `packages/ui/src/settings/Settings.tsx` 的文件头（本面板没有 DOM 级测试，
+   * 所以这一条目前不是损失，只是已知边界）。
+   */
+  const rows: readonly SettingsRowModel[] = [
+    {
+      kind: 'toggle',
+      testID: 'widget-push-toggle',
+      label: t('web.widgetPush.rowLabel'),
+      // 这一行是**状态**，不是提示：开关的标签永远不变，状态只能靠它传达。
+      // 忙的时候让字形转圈（图标属于外壳，所以由宿主给）。
+      hint: t(statusKey),
+      checked: subscribed,
+      onToggle: () => void toggle(),
+      disabled: busy,
+      busy,
+      leading: busy ? (
+        <Loader2 aria-hidden="true" size={16} className="ht-spin" />
+      ) : (
+        <RefreshCw aria-hidden="true" size={16} />
+      ),
+    },
+    ...(error
+      ? ([
+          {
+            kind: 'note',
+            testID: 'widget-push-error',
+            role: 'alert',
+            tone: 'danger',
+            text: t(
+              error.key === 'failedOff'
+                ? 'web.widgetPush.status.failedOff'
+                : 'web.widgetPush.status.failed',
+              { reason: error.reason },
+            ),
+          },
+        ] as const)
+      : []),
+    ...(denied
+      ? ([
+          {
+            kind: 'note',
+            testID: 'widget-push-denied',
+            role: 'alert',
+            tone: 'danger',
+            text: t('web.widgetPush.status.denied'),
+          },
+        ] as const)
+      : []),
+    // 载荷里没有任务内容 —— 用户没有别的途径知道这件事。见文件头。
+    { kind: 'note', text: t('web.widgetPush.note.privacy'), divider: true },
+    { kind: 'note', text: t('web.widgetPush.note.windowsOnly') },
+  ];
+
   return (
-    <section className="ht-panel" aria-labelledby="ht-widget-push-title">
-      <h2 className="ht-panel__title" id="ht-widget-push-title">
-        <BellRing aria-hidden="true" size={18} />
-        {t('web.widgetPush.title')}
-      </h2>
-      <p className="ht-panel__description">{t('web.widgetPush.description')}</p>
-
-      <button
-        type="button"
-        className="ht-button ht-button--row"
-        onClick={() => void toggle()}
-        disabled={busy}
-        // 🔴 `aria-pressed` 让读屏用户能听出当前状态 —— 这个开关的**标签不变**
-        //    （永远叫"允许后台刷新小组件"），所以状态只能靠它传达。
-        aria-pressed={subscribed}
-        aria-busy={busy}
-      >
-        {busy ? (
-          <Loader2 aria-hidden="true" size={16} className="ht-spin" />
-        ) : (
-          <RefreshCw aria-hidden="true" size={16} />
-        )}
-        <span>{t('web.widgetPush.rowLabel')}</span>
-        <span className="ht-button__hint">{t(statusKey)}</span>
-      </button>
-
-      {error ? (
-        <p className="ht-panel__error" role="alert">
-          {t(error.key === 'failedOff' ? 'web.widgetPush.status.failedOff' : 'web.widgetPush.status.failed', {
-            reason: error.reason,
-          })}
-        </p>
-      ) : null}
-
-      {denied ? (
-        <p className="ht-panel__error" role="alert">
-          {t('web.widgetPush.status.denied')}
-        </p>
-      ) : null}
-
-      {/* 载荷里没有任务内容 —— 用户没有别的途径知道这件事。见文件头。 */}
-      <p className="ht-panel__note">{t('web.widgetPush.note.privacy')}</p>
-      <p className="ht-panel__note">{t('web.widgetPush.note.windowsOnly')}</p>
-    </section>
+    <HeytaUiProvider>
+      <SettingsSection
+        testID="widget-push-panel"
+        title={t('web.widgetPush.title')}
+        note={t('web.widgetPush.description')}
+        leading={<BellRing aria-hidden="true" size={18} />}
+        rows={rows}
+      />
+    </HeytaUiProvider>
   );
 }

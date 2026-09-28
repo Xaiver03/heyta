@@ -54,6 +54,7 @@ const VARIANT_KEYS: Record<SubscriptionNoticeVariant, { title: MessageKey; body:
 };
 import { useSubscriptionStore } from './store.js';
 import { useSyncStore } from '../sync/store.js';
+import { siteLink } from '../../lib/site-url.js';
 
 export function SubscriptionNotice(): React.JSX.Element | null {
   const { t } = useI18n();
@@ -116,11 +117,27 @@ export function SubscriptionNotice(): React.JSX.Element | null {
         <p style={bodyStyle}>{body}</p>
         {/* 这一句是整个提示的重点：明确告诉用户"你的数据没被扣"。 */}
         <p style={bodyStyle}>{localData}</p>
-        <div style={{ marginBlockStart: cssVar('space.1') }}>
+        <div className="ht-settings__actions">
           <button type="button" className="ht-btn ht-btn--ghost" onClick={openSettings}>
             <Server size={14} aria-hidden="true" />
             {selfHost}
           </button>
+          {/*
+            🔴 这一条是**说明**，不是续费入口 —— 而且这正是它存在的理由。
+            本文件开头写着"现在不存在可跳转的续费地址"，那句话到今天仍然成立
+            （支付通道未接通）。所以这里指向站点的价格页：它**如实写着
+            "现在买不到、为什么"**，而那正是到期用户接下来要问的那个问题。
+            一个点进去能读到答案的链接，比一个点了没反应的"立即续费"诚实得多
+            （后者会被 `check:payment-entry` 直接判红）。
+          */}
+          <a
+            className="ht-btn ht-btn--ghost"
+            href={siteLink('/pricing')}
+            rel="noopener noreferrer"
+            data-testid="subscription-pricing-link"
+          >
+            {t('web.about.pricing.label')}
+          </a>
         </div>
       </div>
     </div>

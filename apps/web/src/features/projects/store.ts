@@ -28,6 +28,7 @@
 import { create } from 'zustand';
 
 import type { CategorySlot, Project, Tag } from '@heyta/domain';
+import { childProjects, topLevelProjects } from '@heyta/ui';
 import { createProjectActions, type ActionContext } from '@heyta/app-host';
 
 import { currentState, dispatchIntent, onEngineChange } from '../../lib/oplog.js';
@@ -111,12 +112,25 @@ onEngineChange(syncProjects);
 // 选择器（纯读，不改状态）
 // ─────────────────────────────────────────────────────────────
 
-/** 顶层清单（无 parentId）。 */
+/**
+ * 🔴 M3 第九刀（projects）：这两个选择器的**判断搬到了 `@heyta/ui`**。
+ *
+ * 它们原先只存在于这里，于是移动端拿不到 —— `ListsSection` 直接把
+ * `listProjects()` 的原数组渲染成一段平表，而 web 分层渲染。
+ * "清单有且只有一层嵌套"这条领域规则因此在两端有两种界面表现，
+ * 而且差异不会让任何测试变红。
+ *
+ * 现在它们是**薄转发**（保留导出是为了 `TaskOrganizer.tsx` 与
+ * `tests/stores.spec.ts` 的既有调用点，也为了不把一次迁移变成一次改名）。
+ * 新代码请直接 import `@heyta/ui` 的 `topLevelProjects` / `childProjects`。
+ */
+
+/** 顶层清单（无 `parentId`、未归档）。 */
 export function selectTopLevelProjects(state: ProjectState): Project[] {
-  return state.projects.filter((p) => p.archived !== true && p.parentId === undefined);
+  return topLevelProjects(state.projects);
 }
 
-/** 某个清单下的子清单。 */
+/** 某个清单下的一层子清单（未归档）。 */
 export function selectChildProjects(state: ProjectState, parentId: string): Project[] {
-  return state.projects.filter((p) => p.archived !== true && p.parentId === parentId);
+  return childProjects(state.projects, parentId);
 }

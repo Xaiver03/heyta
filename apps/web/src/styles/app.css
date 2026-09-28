@@ -227,77 +227,15 @@
 }
 
 /* ── 任务列表 ───────────────────────────────────────── */
-
-.ht-tasklist {
-  display: flex;
-  flex-direction: column;
-  gap: var(--ht-space-2);
-}
-
-.ht-task {
-  display: flex;
-  align-items: center;
-  gap: var(--ht-space-3);
-  padding: var(--ht-space-3) var(--ht-space-4);
-  background: var(--ht-color-surface);
-  border: 1px solid var(--ht-color-border);
-  border-radius: var(--ht-radius-lg);
-  text-align: left;
-  inline-size: 100%;
-  transition: border-color var(--ht-duration-fast) var(--ht-ease-standard),
-    background-color var(--ht-duration-fast) var(--ht-ease-standard);
-}
-
-.ht-task:hover {
-  border-color: var(--ht-color-border-strong);
-}
-
-.ht-task__check {
-  inline-size: var(--ht-icon-md);
-  block-size: var(--ht-icon-md);
-  flex: none;
-  border: 1.5px solid var(--ht-color-border-strong);
-  border-radius: var(--ht-radius-full);
-  display: grid;
-  place-items: center;
-  color: transparent;
-  transition: background-color var(--ht-duration-fast) var(--ht-ease-standard),
-    border-color var(--ht-duration-fast) var(--ht-ease-standard);
-}
-
-.ht-task__check:hover {
-  border-color: var(--ht-color-primary);
-}
-
-.ht-task--done .ht-task__check {
-  background: var(--ht-color-primary);
-  border-color: var(--ht-color-primary);
-  color: var(--ht-color-on-primary);
-}
-
-.ht-task__title {
-  flex: 1;
-  font-size: var(--ht-font-size-sm);
-  min-inline-size: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.ht-task--done .ht-task__title {
-  /* 用删除线 + 弱化色双重表达完成态，不只靠颜色（色盲可辨） */
-  text-decoration: line-through;
-  color: var(--ht-color-foreground-subtle);
-}
-
-.ht-task__meta {
-  display: flex;
-  align-items: center;
-  gap: var(--ht-space-2);
-  font-size: var(--ht-font-size-xs);
-  color: var(--ht-color-foreground-subtle);
-  font-variant-numeric: tabular-nums;
-}
+/*
+ * 🔴 这里原本是 70 行手写的 `.ht-tasklist` / `.ht-task*`（行骨架、勾选框、
+ * 标题、元信息排版）。M3 第一刀之后**整族删除** —— 那一段现在是
+ * `@heyta/ui` 的 `TaskList`（与 mobile 同一份实现），排版由共享层的
+ * RN 样式与 token 决定，web 不再有第二份。
+ *
+ * 只留"行尾本端控件"的排版（内联 token 值，见 `App.tsx` 的
+ * `renderTaskTrailing`）与 `.ht-due`（本端特有的截止呈现：日期/倒计时两种）。
+ */
 
 /* ── 截止时间徽标 ───────────────────────────────────── */
 
@@ -329,106 +267,46 @@
   color: var(--ht-color-foreground-muted);
 }
 
-/* ── 捕获预览 ───────────────────────────────────────── */
-
-.ht-compose-wrap {
-  margin-bottom: var(--ht-space-4);
-}
-
-/* 输入行与预览是一组，所以底部的间距挪到 wrapper 上 */
-.ht-compose-wrap .ht-compose {
-  margin-bottom: 0;
-}
-
-.ht-capture {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--ht-space-2);
-  margin: var(--ht-space-2) 0 0;
-  padding: 0;
-  list-style: none;
-}
-
-.ht-capture__chip {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--ht-space-1);
-  padding: var(--ht-space-1) var(--ht-space-2);
-  background: var(--ht-color-primary-subtle);
-  border: 1px solid var(--ht-color-border-subtle);
-  border-radius: var(--ht-radius-full);
-  font-size: var(--ht-font-size-xs);
-  font-variant-numeric: tabular-nums;
-  color: var(--ht-color-foreground);
-}
-
-/* 未被采纳的匹配：**它还在标题里**。用虚线边框 + 弱化色，
-   既与已采纳的区分开，又不至于消失（消失会让用户以为它生效了）。 */
-.ht-capture__chip--off {
-  background: transparent;
-  border-style: dashed;
-  color: var(--ht-color-foreground-subtle);
-}
-
-.ht-capture__raw {
-  font-weight: var(--ht-font-weight-medium);
-}
-
-.ht-capture__arrow {
-  color: var(--ht-color-foreground-subtle);
-}
-
-.ht-capture__value {
-  color: var(--ht-color-primary);
-}
-
-.ht-capture__chip--off .ht-capture__value {
-  color: inherit;
-}
-
-.ht-capture__hint {
-  color: var(--ht-color-foreground-subtle);
-  font-size: var(--ht-font-size-2xs);
-}
-
-.ht-capture__x {
-  display: grid;
-  place-items: center;
-  inline-size: var(--ht-icon-sm);
-  block-size: var(--ht-icon-sm);
-  border-radius: var(--ht-radius-full);
-  color: var(--ht-color-foreground-subtle);
-  transition: color var(--ht-duration-fast) var(--ht-ease-standard),
-    background-color var(--ht-duration-fast) var(--ht-ease-standard);
-}
-
-.ht-capture__x:hover {
-  color: var(--ht-color-danger);
-  background: var(--ht-color-hover);
-}
-
-.ht-capture__x:focus-visible {
-  outline: var(--ht-border-width-thick) solid var(--ht-color-ring);
-  outline-offset: var(--ht-space-1);
-}
-
-.ht-capture__preview {
-  margin: var(--ht-space-2) 0 0;
-  font-size: var(--ht-font-size-xs);
-  color: var(--ht-color-foreground-subtle);
-}
-
-.ht-capture__preview strong {
-  color: var(--ht-color-foreground);
-  font-weight: var(--ht-font-weight-medium);
-}
-
 /* ── 输入行 ─────────────────────────────────────────── */
 
 .ht-compose {
   display: flex;
   gap: var(--ht-space-2);
   margin-bottom: var(--ht-space-4);
+}
+
+/**
+ * 任务行上的提醒面板：`<details>` + chip，展开后是一个浮层。
+ *
+ * 🔴 类名刻意挂在 `.ht-compose` 族上（`--popover` / `-panel` 都是它的下游）：
+ * `check-row-single-source.mjs` 的 `HT_FAMILY_BASELINE` 钉死 app.css 的
+ * 顶层 `ht-*` 族**只减不增**，新开一个 `.ht-reminder` 族会让那道门禁变红。
+ *
+ * ⚠️ `.ht-compose` 本体是 flex 行，这里**不能**复用它当详情容器 ——
+ * 所以只挂修饰类，展开面板用 `-panel` 单独定位。
+ */
+.ht-compose--popover {
+  position: relative;
+}
+
+.ht-compose--popover > summary {
+  /* 藏掉 `<summary>` 自带的展开三角：chip 里已经有图标表达同一件事。 */
+  list-style: none;
+}
+
+.ht-compose-panel {
+  position: absolute;
+  z-index: var(--ht-z-popover);
+  inset-inline-end: 0;
+  margin-block-start: var(--ht-space-2);
+  padding: var(--ht-space-3);
+  /* 浮层宽度与 TaskOrganizer 的下拉同量级；`rem` 随宿主字号缩放，不写死 px。 */
+  min-inline-size: 18rem;
+  max-inline-size: 24rem;
+  background: var(--ht-color-surface);
+  border: var(--ht-border-width-thin) solid var(--ht-color-border);
+  border-radius: var(--ht-radius-lg);
+  box-shadow: var(--ht-shadow-lg);
 }
 
 .ht-input {
@@ -962,151 +840,6 @@
    就是第二套降级策略，两套必然漂移。
    ─────────────────────────────────────────────────────────────────────── */
 
-/* ── 进度横条（唯一实现，见 ProgressBar.tsx） ────────────────────────── */
-
-.ht-bar {
-  display: flex;
-  align-items: center;
-  gap: var(--ht-space-2);
-}
-
-.ht-bar__track {
-  position: relative;
-  flex: 1;
-  height: var(--ht-space-2);
-  overflow: hidden;
-  border-radius: var(--ht-radius-full);
-  background: var(--ht-color-surface-sunken);
-}
-
-.ht-bar__fill {
-  width: 100%;
-  height: 100%;
-  /* 从左边开始长，而不是从中心两边同时长 —— 进度是"从左往右积累"的隐喻。 */
-  transform-origin: left center;
-  /* 首帧的落点由行内 style 给（scaleX(ratio)），这里只给初值。
-     没有 transition 类时它就是"直接出现"，这正是"首次渲染不播动画"。 */
-  transform: scaleX(0);
-  border-radius: var(--ht-radius-full);
-}
-
-.ht-bar__fill--animated {
-  transition:
-    transform var(--ht-duration-slow) var(--ht-ease-spring),
-    background var(--ht-duration-normal) var(--ht-ease-standard);
-}
-
-.ht-bar__fill--primary {
-  background: var(--ht-color-primary);
-}
-
-.ht-bar__fill--success {
-  background: var(--ht-color-success);
-}
-
-.ht-bar__fill--muted {
-  background: var(--ht-color-foreground-subtle);
-}
-
-.ht-bar__value {
-  min-width: var(--ht-space-8);
-  color: var(--ht-color-foreground-muted);
-  text-align: right;
-}
-
-/* ── L1 今日进度卡 ─────────────────────────────────────────────────── */
-
-.ht-today {
-  margin-bottom: var(--ht-space-4);
-  padding: var(--ht-space-4);
-  border: var(--ht-border-width-thin) solid var(--ht-color-border);
-  border-radius: var(--ht-radius-lg);
-  background: var(--ht-color-surface);
-}
-
-.ht-today__head {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: var(--ht-space-3);
-  margin-bottom: var(--ht-space-3);
-}
-
-.ht-today__label {
-  color: var(--ht-color-foreground-subtle);
-}
-
-.ht-today__count {
-  display: flex;
-  align-items: baseline;
-  gap: var(--ht-space-1);
-  color: var(--ht-color-foreground);
-}
-
-/* 分母比分子小一档：它必须可读，但不该和"完成了几件"抢同一层视觉重量。 */
-.ht-today__count-total {
-  color: var(--ht-color-foreground-subtle);
-  font-size: var(--ht-font-size-lg);
-}
-
-.ht-today__hint {
-  margin-top: var(--ht-space-1);
-  color: var(--ht-color-foreground-muted);
-}
-
-.ht-today__facts {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: var(--ht-space-1);
-}
-
-.ht-today__fact {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--ht-space-1);
-  color: var(--ht-color-foreground-muted);
-}
-
-/* 闭环那一刻的反馈。
-   🔴 它挂在"刚挂载的元素"上，所以每次闭环都会重播一次 ——
-   而这是对的：用户刚刚确实做了一件事，此刻该有一次回应。
-   位移只有一格间距，且 reduced-motion 下时长被压到 1ms。 */
-@keyframes ht-rise {
-  from {
-    opacity: 0;
-    transform: translateY(var(--ht-space-1));
-  }
-  to {
-    opacity: 1;
-    transform: none;
-  }
-}
-
-.ht-today__fact--done {
-  color: var(--ht-color-success);
-  animation: ht-rise var(--ht-duration-normal) var(--ht-ease-spring);
-}
-
-.ht-today__breakdown {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--ht-space-3);
-  margin: var(--ht-space-3) 0 0;
-  padding: 0;
-  list-style: none;
-  color: var(--ht-color-foreground-muted);
-}
-
-.ht-today__breakdown li {
-  display: inline-flex;
-  gap: var(--ht-space-1);
-}
-
-.ht-today__bonus {
-  color: var(--ht-color-success);
-}
-
 /* ── L2 习惯卡片：三指标 / 冻结 / 续接 / 重新开始 ───────────────────── */
 
 .ht-habit__name {
@@ -1172,91 +905,6 @@
   transform: scale(var(--ht-motion-press-scale));
 }
 
-/* ── L3 成长视图 ───────────────────────────────────────────────────── */
-
-.ht-growth {
-  display: flex;
-  flex-direction: column;
-  gap: var(--ht-space-8);
-}
-
-.ht-growth__section {
-  display: flex;
-  flex-direction: column;
-  gap: var(--ht-space-3);
-}
-
-.ht-growth__section h2 {
-  margin: 0;
-  color: var(--ht-color-foreground);
-}
-
-.ht-growth__range {
-  color: var(--ht-color-foreground-subtle);
-}
-
-.ht-growth__headline {
-  margin: 0;
-  color: var(--ht-color-foreground);
-}
-
-.ht-growth__empty,
-.ht-growth__note {
-  margin: 0;
-  color: var(--ht-color-foreground-muted);
-}
-
-.ht-growth__stats {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: var(--ht-space-3);
-  margin: 0;
-}
-
-.ht-growth__stat {
-  padding: var(--ht-space-3);
-  border: var(--ht-border-width-thin) solid var(--ht-color-border);
-  border-radius: var(--ht-radius-md);
-  background: var(--ht-color-surface);
-}
-
-.ht-growth__stat dt {
-  margin: 0;
-  color: var(--ht-color-foreground-subtle);
-}
-
-.ht-growth__stat-value {
-  display: flex;
-  align-items: baseline;
-  gap: var(--ht-space-1);
-  margin: 0;
-  color: var(--ht-color-foreground);
-}
-
-.ht-growth__unit {
-  color: var(--ht-color-foreground-muted);
-}
-
-/* 🔴 上周的数字**中性呈现**：不给下降配红、不给上升配绿。
-   一个正常的一周不需要被判分（计划 §4 的温和干预清单）。 */
-.ht-growth__stat-prev {
-  margin: 0;
-  color: var(--ht-color-foreground-subtle);
-}
-
-.ht-growth__copy {
-  align-self: flex-start;
-  display: inline-flex;
-  align-items: center;
-  gap: var(--ht-space-2);
-}
-
-.ht-growth__copy-state {
-  margin: 0;
-  min-height: var(--ht-space-4);
-  color: var(--ht-color-foreground-muted);
-}
-
 .ht-habit__title {
   display: flex;
   align-items: center;
@@ -1276,120 +924,51 @@
   color: var(--ht-color-foreground);
 }
 
-.ht-categories__note,
-.ht-categories__range,
-.ht-categories__empty,
-.ht-categories__hint,
-.ht-categories__unassigned {
-  margin: 0;
-  color: var(--ht-color-foreground-muted);
+/* 🔴 `.ht-categories__*`（泳道 / 格子 / 柱子 / 提示语）**已在 M3 第三刀后全部删除**：
+   泳道图与柱状图现在由 `@heyta/ui` 的 `CategoryReportView` 渲染（RN 样式），
+   一个都不读这些类名 —— 实测 TSX 里引用 **0 处**。
+   留着它们 = 留一份"布局的第二份定义"：没人知道它还算不算数，改版时也不敢删。
+   ⚠️ `.ht-categories`（外层 section）与 `.ht-categories h2` **保留** —— 它们仍在使用，
+   所以 `ht-*` 族数仍是 29（没有为了把数字做小而删掉在用的东西）。
+   产品决策见 docs/plans/multi-platform-adaptation.md 的「产品决策登记」P2。 */
+
+
+/* ── 分类泳道图 / 柱状图的确切数字提示（web 专属） ──────────────────────
+ *
+ * 🔴 **为什么提示泡写在这里，而不是共享层**：提示是**外观**，归宿主外壳（L3）。
+ * 共享层只负责把确切数字放进 DOM —— `CategoryReportView` 的 `cellTooltip`
+ * 会产出 `data-cell-title`（`react-native-web` 的 `dataSet` → `data-*`；
+ * 这是它 `forwardedProps` 白名单里**唯一**能带出任意文本的通道 ——
+ * `title` 不在白名单里，透传会被直接丢弃）。
+ * **所以这里必须靠 `attr()` 把它读回来。**
+ *
+ * 完整来龙去脉（含"第一版迁移为什么把它丢了、以及结论错在哪一步"）
+ * 见 `packages/ui/src/categories/CategoryReport.tsx` 文件头。
+ *
+ * ⚠️ 已知边界：提示泡绝对定位浮在格子正上方，**祖先若设了
+ * `overflow: hidden` 会被裁掉**。格子容器目前没有，所以能显示；
+ * 将来若在 `.ht-categories` 上加了裁剪，这段要跟着改成 portal。
+ */
+[data-cell-title] {
+  position: relative;
 }
 
-.ht-categories__range {
-  color: var(--ht-color-foreground-subtle);
-}
-
-.ht-categories__unassigned {
-  padding-top: var(--ht-space-2);
-  border-top: var(--ht-border-width-thin) solid var(--ht-color-border);
-}
-
-.ht-categories__lanes {
-  display: flex;
-  flex-direction: column;
-  gap: var(--ht-space-3);
-}
-
-.ht-categories__lane {
-  display: flex;
-  flex-direction: column;
-  gap: var(--ht-space-1);
-}
-
-.ht-categories__lane-head {
-  display: flex;
-  align-items: center;
-  gap: var(--ht-space-2);
-}
-
-/* 色块只编码"是谁"。它旁边**永远**有槽位号与名字 ——
-   所以它看得见当然好，看不见也不丢信息（设计系统硬规则）。 */
-.ht-categories__swatch {
-  width: var(--ht-space-3);
-  height: var(--ht-space-3);
+[data-cell-title]:hover::after {
+  content: attr(data-cell-title);
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  margin-bottom: var(--ht-space-1);
+  padding: var(--ht-space-1) var(--ht-space-2);
   border-radius: var(--ht-radius-sm);
-  flex: none;
-}
-
-.ht-categories__slot,
-.ht-categories__kind {
-  color: var(--ht-color-foreground-subtle);
-  flex: none;
-}
-
-.ht-categories__name {
-  color: var(--ht-color-foreground);
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  background: var(--ht-color-foreground);
+  color: var(--ht-color-foreground-inverse);
+  font-size: var(--ht-font-size-xs);
+  line-height: var(--ht-line-height-tight);
   white-space: nowrap;
-}
-
-.ht-categories__total {
-  color: var(--ht-color-foreground);
-  flex: none;
-}
-
-.ht-categories__cells {
-  display: grid;
-  grid-template-columns: repeat(12, minmax(0, 1fr));
-  gap: var(--ht-space-1);
-}
-
-/* 格子深浅 = 那一周做了多少（跨行共享同一个峰值）。
-   ⚠️ 没有 `outline` 之类的移除；这些格子是装饰（父级 aria-hidden），
-   但**悬停仍有 title** —— 深浅只能看个大概，数字要能看到。 */
-.ht-categories__cell {
-  height: var(--ht-space-3);
-  border-radius: var(--ht-radius-sm);
-}
-
-.ht-categories__bars {
-  display: grid;
-  grid-template-columns: repeat(12, minmax(0, 1fr));
-  gap: var(--ht-space-1);
-  align-items: end;
-  padding-top: var(--ht-space-2);
-}
-
-.ht-categories__bar {
-  display: flex;
-  flex-direction: column;
-  gap: var(--ht-space-1);
-  align-items: center;
-}
-
-.ht-categories__bar-track {
-  width: 100%;
-  height: var(--ht-space-12);
-  display: flex;
-  flex-direction: column-reverse;
-  justify-content: flex-start;
-  border-radius: var(--ht-radius-sm);
-  overflow: hidden;
-  background: var(--ht-color-surface);
-  border: var(--ht-border-width-thin) solid var(--ht-color-border);
-}
-
-.ht-categories__bar-segment {
-  width: 100%;
-  flex: none;
-}
-
-.ht-categories__bar-label {
-  color: var(--ht-color-foreground-subtle);
-  font-variant-numeric: tabular-nums;
+  pointer-events: none;
+  z-index: var(--ht-z-dropdown);
 }
 
 /* ── 色槽位选择器 ───────────────────────────────────────────────────── */
@@ -1480,115 +1059,6 @@
 .ht-slot-picker__number {
   font-size: var(--ht-font-size-2xs);
   font-variant-numeric: tabular-nums;
-}
-
-/* ── 里程碑 ───────────────────────────────────────────────────────── */
-
-.ht-milestones {
-  display: flex;
-  flex-direction: column;
-  gap: var(--ht-space-4);
-}
-
-.ht-milestones__group {
-  display: flex;
-  flex-direction: column;
-  gap: var(--ht-space-2);
-  padding: var(--ht-space-3);
-  border: var(--ht-border-width-thin) solid var(--ht-color-border);
-  border-radius: var(--ht-radius-md);
-  background: var(--ht-color-surface);
-}
-
-.ht-milestones__head {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: var(--ht-space-2);
-}
-
-.ht-milestones__head h3 {
-  margin: 0;
-  color: var(--ht-color-foreground);
-}
-
-.ht-milestones__value {
-  color: var(--ht-color-foreground-muted);
-}
-
-.ht-milestones__steps {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--ht-space-1);
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.ht-milestones__next {
-  margin: 0;
-  color: var(--ht-color-foreground-muted);
-}
-
-/* 阶梯上的每一档。未达成用中性边框（不是灰掉的、更不是红的）：
-   它代表"还没到"，而"还没到"不是错误。 */
-.ht-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--ht-space-1);
-  padding: 0 var(--ht-space-2);
-  border: var(--ht-border-width-thin) solid var(--ht-color-border);
-  border-radius: var(--ht-radius-full);
-  color: var(--ht-color-foreground-muted);
-}
-
-.ht-chip--reached {
-  border-color: var(--ht-color-success);
-  background: var(--ht-color-success-subtle);
-  color: var(--ht-color-success-strong);
-}
-
-/* ── 身份标签 ─────────────────────────────────────────────────────── */
-
-.ht-tags {
-  display: flex;
-  flex-direction: column;
-  gap: var(--ht-space-3);
-}
-
-.ht-tags__list {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--ht-space-2);
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.ht-tags__item {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--ht-space-1);
-  padding: var(--ht-space-1) var(--ht-space-3);
-  border-radius: var(--ht-radius-full);
-  color: var(--ht-color-foreground-muted);
-}
-
-.ht-tags__item--reached {
-  background: var(--ht-color-success-subtle);
-  color: var(--ht-color-success-strong);
-}
-
-.ht-tags__near {
-  display: flex;
-  flex-direction: column;
-  gap: var(--ht-space-1);
-}
-
-.ht-tags__near-item,
-.ht-tags__empty {
-  margin: 0;
-  color: var(--ht-color-foreground-muted);
 }
 
 /* ── 回收站 ─────────────────────────────────────────── */
@@ -1712,4 +1182,32 @@
   display: flex;
   justify-content: flex-end;
   gap: var(--ht-space-2);
+}
+
+/* 任务搜索。宽度用 `clamp` 而不是固定值：窄屏上它要让位给视图标签，
+   宽屏上不该拉成一整行（一个占满宽度、只有一个词的输入框看起来像页面标题）。 */
+.ht-search {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+.ht-search__input {
+  inline-size: clamp(8rem, 18vw, 16rem);
+  min-block-size: var(--ht-touch-target-min);
+  padding-inline: var(--ht-space-3);
+  border: var(--ht-border-width-thin) solid var(--ht-color-border);
+  border-radius: var(--ht-radius-md);
+  background: var(--ht-color-surface);
+  color: var(--ht-color-foreground);
+  font-family: var(--ht-font-sans);
+  font-size: var(--ht-font-size-sm);
+}
+.ht-search__clear {
+  position: absolute;
+  inset-inline-end: var(--ht-space-1);
+  border: 0;
+  background: none;
+  color: var(--ht-color-foreground-muted);
+  font-size: var(--ht-font-size-lg);
+  cursor: pointer;
 }

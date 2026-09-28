@@ -1,26 +1,57 @@
 /**
- * 习惯视图：打卡 / 撤销 / 连续天数 / 热力图
- * ============================================
+ * 习惯视图（Web 壳）
+ * ==================
  *
- * 热力图用 `react-activity-calendar`（MIT，2026-09 仍在更新），
- * **不自研** —— 自研要处理日期网格、周起始、跨年、tooltip 定位，
- * 这些都是已解决的问题。
+ * 🔴 M3 第七刀之后，这个文件**只剩接线**。
  *
- * ⚠️ 组件库的主题通过 props 传入值，不走 CSS 变量，
- * 所以这里**从设计 token 取值再传进去** —— 保持"值只在 tokens.css 定义"。
+ * 打卡按钮、三个连续数字、冻结说明、补打卡 / 重新开始、近 90 天热力图，
+ * 全部由 `@heyta/ui` 的 `HabitBoard` 渲染 —— 与 mobile 是**同一份实现**。
+ * 这里只回答 web 自己的三个问题：
+ *
+ *   1. 习惯与打卡记录从哪来 → `useHabitStore`；
+ *   2. 「现在」从哪来 → `sessionStorage` 的固定值（见下面 `NOW_STATE_KEY`）；
+ *   3. web 特有的交互 → 「新建习惯」的输入框（DOM `<input>`）与取色入口
+ *      （`ColorSlotPicker`，DOM 的展开式按钮 + `Esc`）。
+ *
+ * 连续 / 韧性的**配对**不在这里算：`HabitBoard` 的 `growth` prop 收的是
+ * 函数，这里传 `@heyta/app-host#habitGrowth` —— 那是配对的唯一实现。
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * 🔴 热力图不再用 `react-activity-calendar`
+ *
+ * 它是 **DOM 库**，而共享层必须只用 RN 原语。自绘之后**失去**的是那个库
+ * 内置的悬停提示；补回来的方式是 `cellTooltip` 写 `data-cell-title` +
+ * `apps/web/src/styles/app.css` 的 `[data-cell-title]::after`
+ * （与 `CategoryReportView` 同一条路，那段 CSS 已经在了）。
+ *
+ * ⚠️ 顺带一条**必须记住的**：`web.habits.heatmap` 那条词条用的是
+ * `{{count}}`（**库自己的**占位符），我们的插值器只认单层 `{count}` ——
+ * 复用它渲染自定义热力图会得到字面的 `{5}`。所以自绘热力图的整块无障碍名
+ * 用的是新加的 `web.habits.heatmap.a11y`，每一格的悬停文案是
+ * `web.habits.heatmap.cell`。
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * 🔴 `HeytaUiProvider` 必须包在**这一处**
+ *
+ * `App.tsx` 的 Provider 只包了 `tasks` 那棵树，而习惯是它的**兄弟节点**
+ * （`{view === 'habits' && <HabitsView />}`）。M3 第二刀（focus）就是这样
+ * 在运行时抛出「useHeytaUiTheme 必须在 <HeytaUiProvider> 内使用」的。
+ *
+ * ✅ `HabitBoard` 已登记进 `scripts/check-ui-provider.mjs` 的
+ * `PROVIDER_DEPENDENT`（父 agent 收尾时补的），门禁能看见这里 ——
+ * 别把下面那层 Provider 删掉（已实测：拆掉会在 `/tmp` 副本上变红）。
  */
 
-import { useState } from 'react';
-import { ActivityCalendar } from 'react-activity-calendar';
+import { useCallback, useMemo, useState, type ReactNode } from 'react';
+import { habitGrowth } from '@heyta/app-host';
 import { cssVar } from '@heyta/design-system';
+import { parseCategorySlot, type Habit, type LocalDate } from '@heyta/domain';
 import { useI18n, type I18nValue } from '@heyta/i18n';
-import { parseCategorySlot } from '@heyta/domain';
-import { Check, Flame, Plus, Undo2 } from 'lucide-react';
+import { HEATMAP_MONTH_KEYS, HabitBoard, HeytaUiProvider, type HabitBoardLabels } from '@heyta/ui';
+import { Plus } from 'lucide-react';
 
 import { ColorSlotPicker } from '../categories/ColorSlotPicker.js';
-import { selectHabitProgress, selectHeatmap, useHabitStore } from './store.js';
-import { text } from '../../lib/text.js';
-import { activityLabels, heatmapTheme } from '../../lib/heatmap-theme.js';
+import { useHabitStore } from './store.js';
 
 const NOW_STATE_KEY = 'now';
 
@@ -59,19 +90,83 @@ function checkInLabel(name: string, doneToday: boolean, t: I18nValue['t']): stri
     : t('web.habits.a11y.checkIn', { name });
 }
 
+/**
+ * 构造共享 `HabitBoard` 需要的全部文案。
+ *
+ * 共享层**不 import i18n**（见它的文件头），所以模板留在这里；
+ * 字段名必须与 `HabitBoardLabels` 逐项对上 —— 漏了编译不过。
+ *
+ * ⚠️ 月份 key 的表在共享层（`HEATMAP_MONTH_KEYS`）—— 两端各写一份 12 项的
+ * 列表就是漂移的起点（改一处不会红，只会让一个端少一个月）。
+ */
+export function habitBoardLabels(t: I18nValue['t']): HabitBoardLabels {
+  return {
+    checkIn: t('web.habits.checkIn'),
+    checkedIn: t('web.habits.checkedIn'),
+    checkInA11y: ({ name, doneToday }) => checkInLabel(name, doneToday, t),
+    streakCurrent: (count) => currentStreakText(count, t),
+    streakLongest: (count) => longestStreakText(count, t),
+    streakTotal: (count) => totalCheckInText(count, t),
+    freeze: (count) => t('web.habits.freeze', { count }),
+    repair: ({ date, count }) => t('web.habits.repair', { date, count }),
+    repairAction: t('web.habits.repairAction'),
+    repairA11y: ({ date, name }) => t('web.habits.a11y.repair', { date, name }),
+    freshStart: ({ days, longest, total }) =>
+      t('web.habits.freshStart', { days, longest, total }),
+    freshStartAction: t('web.habits.freshStartAction'),
+    freshStartA11y: (name) => t('web.habits.a11y.freshStart', { name }),
+    empty: t('web.habits.empty'),
+    heatmap: {
+      // ⚠️ `month` 由 `monthOfDate` 从日期串切出来，理论上恒为 1–12；
+      // 兜底写**字面量**而不是 `HEATMAP_MONTH_KEYS[0]`（后者在
+      // `noUncheckedIndexedAccess` 下仍是 `… | undefined`，编译不过）。
+      month: (month) => t(HEATMAP_MONTH_KEYS[month - 1] ?? 'web.heatmap.month.1'),
+      grid: ({ name, total, days }) =>
+        t('web.habits.heatmap.a11y', { name, count: total, days }),
+      // 有鼠标才有悬停 —— web 传它，mobile 不传（共享层据此不产出属性）。
+      cellTooltip: ({ date, count }) => t('web.habits.heatmap.cell', { date, count }),
+      less: t('web.heatmap.less'),
+      more: t('web.heatmap.more'),
+    },
+  };
+}
+
 export function HabitsView() {
   const { t } = useI18n();
   const store = useHabitStore();
   const [draft, setDraft] = useState('');
+  /** 正在落盘的习惯 —— 置灰它那一行的按钮，防连点发出两条 op。 */
+  const [busyId, setBusyId] = useState<string | null>(null);
   // 固定"现在"，避免同一次渲染里跨午夜导致不一致
   const now = Number(sessionStorage.getItem(NOW_STATE_KEY) ?? Date.now());
 
-  const progress = selectHabitProgress(store, now);
+  const labels = useMemo(() => habitBoardLabels(t), [t]);
 
   async function add(): Promise<void> {
     await store.addHabit(draft);
     setDraft('');
   }
+
+  /** 一次变更：先置灰，落盘后恢复。**不在这里判断业务**（那是 action 层的事）。 */
+  const run = useCallback((habitId: string, pending: Promise<unknown>): void => {
+    setBusyId(habitId);
+    void pending.finally(() => {
+      setBusyId(null);
+    });
+  }, []);
+
+  const renderColorSlot = useCallback(
+    (habit: Habit): ReactNode => (
+      <ColorSlotPicker
+        value={parseCategorySlot(habit.color)}
+        onChange={(slot) => {
+          void store.setHabitColor(habit.id, slot);
+        }}
+        targetName={habit.name}
+      />
+    ),
+    [store],
+  );
 
   return (
     <div style={{ padding: cssVar('space.4') }}>
@@ -123,252 +218,25 @@ export function HabitsView() {
         </button>
       </form>
 
-      {progress.length === 0 && (
-        <p style={{ color: cssVar('color.foreground-muted'), fontSize: cssVar('font-size.sm') }}>
-          {t('web.habits.empty')}
-        </p>
-      )}
-
-      <ul style={{ listStyle: 'none', margin: 0, padding: 0 }}>
-        {progress.map((p) => {
-          // 解构一次，免得下面全是 `p.resilience.resilience.xxx` 那种噪音。
-          const r = p.resilience.resilience;
-          const { repair, freshStart } = p.resilience;
-
-          return (
-          <li
-            key={p.habit.id}
-            style={{
-              marginBottom: cssVar('space.3'),
-              padding: cssVar('space.3'),
-              borderRadius: cssVar('radius.lg'),
-              background: cssVar('color.surface'),
-              border: `${cssVar('border-width.thin')} solid ${cssVar('color.border')}`,
-            }}
-          >
-            <div
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: cssVar('space.3'),
-                marginBottom: cssVar('space.3'),
-              }}
-            >
-              <div style={{ flex: 1 }}>
-                <div className="ht-habit__title">
-                  <span className="ht-habit__name" style={text('row-title')}>
-                    {p.habit.name}
-                  </span>
-                  {/* 分类色槽位。它决定这个习惯在「成长 → 分类时长」里那一行
-                      的颜色；没设也能显示，只是没有颜色。 */}
-                  <ColorSlotPicker
-                    value={parseCategorySlot(p.habit.color)}
-                    onChange={(slot) => void store.setHabitColor(p.habit.id, slot)}
-                    targetName={p.habit.name}
-                  />
-                </div>
-                {/**
-                 * 三指标**并存**（计划 §4）：当前连续 / 历史最长 / 累计。
-                 *
-                 * 🔴 其中「累计」是唯一只增不减、且不被任何中断影响的数字 ——
-                 * 它是断链那天用户最需要看见的东西，所以它必须**常驻**，
-                 * 不能只在"断链之后"才出现：那样它就成了一句安慰，而不是一个事实。
-                 *
-                 * ⚠️ 前两个走的是**韧性口径**（`r`：冻结算数），不是日历口径的
-                 * `p.streak`。两个"连续"数字**永远不能相减**（ADR-0022）——
-                 * 界面上只出现一个，出现的是那个能解释"中断过却还连着"的。
-                 */}
-                <div
-                  className="ht-habit__metrics"
-                  // 🔴 数字现在在**句子里**（英文语序要求如此），
-                  // 所以等宽数字给在整行上，而不是给某一个 span。
-                  style={{ ...text('caption'), fontVariantNumeric: 'tabular-nums' }}
-                >
-                  <span className="ht-habit__metric ht-habit__metric--current">
-                    <Flame size={12} aria-hidden="true" />
-                    {currentStreakText(r.current, t)}
-                  </span>
-                  <span className="ht-habit__metric">{longestStreakText(r.longest, t)}</span>
-                  <span className="ht-habit__metric">{totalCheckInText(r.total, t)}</span>
-                </div>
-
-                {/**
-                 * 冻结**必须明说**。
-                 *
-                 * 🔴 悄悄替用户吸收一次中断，等于偷走了他对规则的理解：
-                 * 他会以为自己从没断过，而这恰好是下一次中断时"我明明一直连着"
-                 * 那种困惑与不信任的来源。所以这里写的不是"你还剩几个道具"，
-                 * 而是**它刚刚替你保住了什么**。
-                 *
-                 * 🔴 这一版才**真的**把余额删掉了。上一版这句话写在注释里，
-                 * 而紧跟着的代码渲染的正是「还剩 N 个冻结」—— **注释是对的，代码没照做**。
-                 * 删它的理由不是审美：
-                 *   1. 它是**库存**。它等于在告诉用户"你还有 2 次可以不来的机会"，
-                 *      而冻结是给**意外**的宽容，不是**计划内**的额度 —— 这个数字
-                 *      把后者摆到了台面上，等于鼓励按额度缺勤。
-                 *   2. 它**不可操作**。用户不能主动花掉它、不能多挣、不能选时机。
-                 *      一个做什么都用不上的数字就是纯噪声（Apple 的"克制"指的是这个）。
-                 *   3. 它把冻结变成了**货币**，而整套体系里没有第二种货币。
-                 *      这是唯一一处会让 heyta 读起来像资源管理游戏的地方 —— 调性不统一。
-                 *   4. 少了它，"余额"就彻底是**实现细节**：界面上不出现的东西不需要
-                 *      稳定的持久化结构。**产品决策把"要不要给它加字段"这个问题消解掉了**
-                 *      （完整决策记录见 `docs/adr/0022-resilience-state-stays-derived.md`）。
-                 *
-                 * 规则本身仍然要可解释，但解释的位置是**首次真正用到的那一刻**——
-                 * 也就是下面这一行本身，而不是一个常驻的计数器。
-                 */}
-                {r.frozenInCurrentRun > 0 && (
-                  <p
-                    className="ht-habit__freeze"
-                    style={{ ...text('caption'), fontVariantNumeric: 'tabular-nums' }}
-                  >
-                    {t('web.habits.freeze', { count: r.frozenInCurrentRun })}
-                  </p>
-                )}
-              </div>
-
-              <button
-                type="button"
-                className="ht-habit__checkin"
-                onClick={() => {
-                  if (p.doneToday) {
-                    void store.undoCheckIn(p.habit.id);
-                  } else {
-                    void store.checkIn(p.habit.id);
-                  }
-                }}
-                aria-label={checkInLabel(p.habit.name, p.doneToday, t)}
-                aria-pressed={p.doneToday}
-                style={{
-                  minWidth: cssVar('touch-target.min'),
-                  minHeight: cssVar('touch-target.min'),
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: cssVar('space.1'),
-                  padding: `0 ${cssVar('space.3')}`,
-                  cursor: 'pointer',
-                  borderRadius: cssVar('radius.md'),
-                  // 已打卡用主色实心，未打卡用边框 —— 状态差异清晰且不靠颜色单独承载
-                  border: `${cssVar('border-width.thin')} solid ${
-                    p.doneToday ? cssVar('color.primary') : cssVar('color.border')
-                  }`,
-                  background: p.doneToday ? cssVar('color.primary') : 'transparent',
-                  color: p.doneToday ? cssVar('color.on-primary') : cssVar('color.foreground'),
-                  fontSize: cssVar('font-size.2xs'),
-                  // 按下反馈：缩放本身由 `.ht-habit__checkin:active` 给（行内写不出伪类），
-                  // 这里只把 transform 加进过渡，否则缩放是瞬时跳变。
-                  transition: `background ${cssVar('duration.fast')} ${cssVar('ease.standard')}, transform ${cssVar('duration.press')} ${cssVar('ease.standard')}`,
-                }}
-              >
-                {p.doneToday ? (
-                  <>
-                    <Check size={16} aria-hidden="true" />
-                    {t('web.habits.checkedIn')}
-                  </>
-                ) : (
-                  <>
-                    {/**
-                     * 🔴 这里是 `Plus`，不是 `Undo2`。
-                     *
-                     * 原来用的是 `Undo2`（一个回退箭头）—— 那是"撤销"的意思，
-                     * 却挂在"去打卡"这个按钮上，语义正好反了。
-                     * 改成 `Plus`（"加上一次"）之后，两个状态的差别也不只靠颜色：
-                     * 「✓ 已打卡」相对「＋ 打卡」，字形本身就不同。
-                     */}
-                    <Plus size={16} aria-hidden="true" />
-                    {t('web.habits.checkIn')}
-                  </>
-                )}
-              </button>
-            </div>
-
-            {/**
-             * 续接（计划 §4 的"绝不错过两次"）。
-             *
-             * 🔴 **先给数字，再给按钮。** 反过来的话，这个卡片读起来是
-             * "你该做点什么"；而先说"补上就是连续 21 天"，它给的是
-             * "补上之后你会得到什么" —— 同一件事，一个是指令，一个是承诺。
-             *
-             * 🔴 只在 `streakIfRepaired ≥ 2` 时才出现（判据在领域层）。
-             * 补一次只换来"连续 1 天"的时候，这个提示帮不到任何人，
-             * 只会让人为了一根刚长出来的 1 反复回来 ———— 那是焦虑，不是动力。
-             */}
-            {repair !== undefined && (
-              <div className="ht-habit__action">
-                <p
-                  className="ht-habit__action-text"
-                  style={{ ...text('caption'), fontVariantNumeric: 'tabular-nums' }}
-                >
-                  {t('web.habits.repair', {
-                    date: repair.date,
-                    count: repair.streakIfRepaired,
-                  })}
-                </p>
-                <button
-                  type="button"
-                  className="ht-btn ht-btn--ghost ht-habit__action-btn"
-                  onClick={() => void store.checkIn(p.habit.id, repair.date)}
-                  aria-label={t('web.habits.a11y.repair', {
-                    date: repair.date,
-                    name: p.habit.name,
-                  })}
-                >
-                  <Undo2 size={14} aria-hidden="true" />
-                  {t('web.habits.repairAction')}
-                </button>
-              </div>
-            )}
-
-            {/**
-             * 重新开始（新鲜开始效应）。
-             *
-             * 🔴 这里**不能**出现"你已经落后了""重新来过吧"这类措辞。
-             * 中断超过一周的人此刻最需要的不是被提醒损失，而是被明确告知
-             * **过去那些天没有被清掉** —— 已经发生的事不会因为停止而消失，
-             * 这是唯一一句能让"重新开始"不显得像从零开始的实话。
-             */}
-            {freshStart !== undefined && (
-              <div className="ht-habit__action">
-                <p
-                  className="ht-habit__action-text"
-                  style={{ ...text('caption'), fontVariantNumeric: 'tabular-nums' }}
-                >
-                  {t('web.habits.freshStart', {
-                    days: freshStart.daysSinceLast,
-                    longest: freshStart.longest,
-                    total: freshStart.total,
-                  })}
-                </p>
-                <button
-                  type="button"
-                  className="ht-btn ht-btn--ghost ht-habit__action-btn"
-                  onClick={() => void store.checkIn(p.habit.id)}
-                  aria-label={t('web.habits.a11y.freshStart', { name: p.habit.name })}
-                >
-                  {t('web.habits.freshStartAction')}
-                </button>
-              </div>
-            )}
-
-            <ActivityCalendar
-              data={selectHeatmap(store, p.habit.id, now, 90)}
-              blockSize={10}
-              blockMargin={3}
-              blockRadius={2}
-              showMonthLabels
-              showWeekdayLabels={false}
-              // 主题色走共享实现（成长页的年度视图用同一份）——
-              // 那里记着为什么**必须**是 `var(--ht-…)` 而不能是裸 token 名，
-              // 以及为什么空档要用 `heat-0` 而不是 `surface-sunken`。
-              theme={heatmapTheme()}
-              // 文案也要覆盖 —— 库的默认值是英文（`Less / More`、`Oct`、`N activities in YYYY`）
-              labels={activityLabels(t('web.habits.heatmap'), t)}
-            />
-          </li>
-          );
-        })}
-      </ul>
+      <HeytaUiProvider>
+        <HabitBoard
+          habits={store.habits}
+          logs={store.logs}
+          now={now}
+          // 🔴 配对函数来自 app-host —— 共享层不认识它（见那边的文件头）。
+          growth={habitGrowth}
+          labels={labels}
+          onCheckIn={(habitId, date?: LocalDate) => {
+            run(habitId, store.checkIn(habitId, date));
+          }}
+          onUndoCheckIn={(habitId, date?: LocalDate) => {
+            run(habitId, store.undoCheckIn(habitId, date));
+          }}
+          busyHabitId={busyId}
+          renderColorSlot={renderColorSlot}
+          testID="habit-board"
+        />
+      </HeytaUiProvider>
     </div>
   );
 }

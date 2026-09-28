@@ -114,6 +114,7 @@ const NO_TARGET_KEY: Record<AiFeature, MessageKey> = {
   breakdown: 'web.ai.noTarget.breakdown',
   prioritize: 'web.ai.noTarget.prioritize',
   'duration-estimate': 'web.ai.noTarget.duration',
+  'tool-calling': 'web.ai.noTarget.toolCalling',
 };
 
 /**

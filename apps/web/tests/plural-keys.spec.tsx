@@ -28,7 +28,7 @@ import { SyncBar } from '../src/features/sync/SyncBar.js';
 import { useSyncStore } from '../src/features/sync/store.js';
 import { GanttChart } from '../src/features/timeline/GanttChart.js';
 import { TimelineView } from '../src/features/timeline/TimelineView.js';
-import type { TimelineEntry } from '../src/features/timeline/buildTimeline.js';
+import type { TimelineEntry } from '@heyta/domain';
 
 const zh = (key: Parameters<typeof translate>[1], vars?: Record<string, string | number>): string =>
   translate('zh-CN', key, vars);

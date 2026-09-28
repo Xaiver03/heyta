@@ -13,8 +13,14 @@
  *   - 任何颜色好坏判断（颜色只是身份，见 `lib/category-colors.ts`）
  *
  * 界面上只有两种事实句子：**"某类做了多久"** 和 **"这些时间是怎么算出来的"**。
+ *
+ * ⚠️ M3 第三刀之后，**结构**已经搬进 `@heyta/ui` 的 `CategoryReportView`
+ * （与 mobile 同一份），这里只剩"把语义结果映射到本端词条"这一层 ——
+ * 所以它现在是 `CategoryReportLabels` 的一个构造器。字段与共享层一一对应，
+ * 少给一个编译期就会报（共享层的 `labels` 是必填的）。
  */
 
+import type { CategoryReportLabels } from '@heyta/ui';
 import type { I18nValue, MessageKey } from '@heyta/i18n';
 
 import { durationParts, type CategoryKind, type CategorySeries } from '@heyta/domain';
@@ -56,7 +62,7 @@ export function formatDuration(ms: number, t: I18nValue['t']): string {
  * 泳道图每一行给屏幕阅读器/无颜色用户的**文字事实**。
  *
  * 🔴 「不许只用颜色表达信息」在这里的落点是：每行都有名字、都有数字，
- * 而格子本身是 `aria-hidden` 的装饰。所以**这句是被读出来的那一份**，
+ * 而格子本身是装饰。所以**这句是被读出来的那一份**，
  * 它必须自己说清"这一行是多少"，不能依赖格子。
  */
 export function laneDescription(row: CategorySeries, t: I18nValue['t']): string {
@@ -68,14 +74,27 @@ export function laneDescription(row: CategorySeries, t: I18nValue['t']): string 
 }
 
 /**
- * 堆叠条里一段的说明（悬停提示 + 无障碍名）。
+ * 构造共享 `CategoryReportView` 需要的全部文案。
  *
- * 数字与泳道图**共用同一个 `formatDuration`** —— 两处各写一次是漂移的开始，
- * 而这两处的数字在同一个屏幕上，用户一眼就能看出不一样。
+ * 🔴 共享层**不 import i18n**（见它的文件头），所以模板留在这里；
+ * 而字段名必须与 `CategoryReportLabels` 逐项对上 —— 漏了编译不过。
+ *
+ * ⚠️ **没有** `cellTitle` / `weekTitle` / `segmentA11y` 三项：格子与柱子的
+ * 悬停提示在共享层装不下（`react-native-web` 的 `View`/`Text` 会丢弃 `title`），
+ * 详见 `packages/ui/src/categories/CategoryReport.tsx` 文件头的"一处没有搬过来的行为"。
+ * `web.categories.cell.none` 这个词条因此暂时没有调用点。
  */
-export function segmentLabel(row: CategorySeries, t: I18nValue['t']): string {
-  return t('web.categories.segment.aria', {
-    name: row.name,
-    duration: formatDuration(row.totalMs, t),
-  });
+export function categoryReportLabels(t: I18nValue['t']): CategoryReportLabels {
+  return {
+    note: t('web.categories.note'),
+    empty: t('web.categories.empty'),
+    range: (start, end) => t('web.categories.range', { start, end }),
+    unassigned: (duration) => t('web.categories.unassigned', { duration }),
+    hintUnset: t('web.categories.hint.unset'),
+    kind: (kind) => t(KIND_COPY[kind]),
+    slot: (slot) => (slot === undefined ? t('web.categories.slot.none') : String(slot)),
+    duration: (ms) => formatDuration(ms, t),
+    laneA11y: (row) => laneDescription(row, t),
+    barsA11y: t('web.categories.bars.aria'),
+  };
 }
