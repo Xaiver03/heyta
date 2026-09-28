@@ -1,0 +1,15 @@
+-- 用户可以给自己的凭据起一个认得出来的名字（"MacBook 上的 Touch ID"）。
+--
+-- 动机：设置页现在同时支持"再加一条"和"删一条"，而一条凭据能被展示的信息
+-- 只有创建时间与最后使用时间。同一台设备反复加过几条之后，用户没有任何办法
+-- 分辨"要删的是哪一条" —— 而在"至少留一条，否则账号会被锁死"的规则下，
+-- 删错一条是有代价的。
+--
+-- 纯新增可空列，所以：
+--   * **不 bump `CURRENT_SCHEMA_VERSION`**（那是 op-log 的版本，与本表无关）；
+--   * 不重写表、不回填。Nullable, no default: `ADD COLUMN` 不带默认值在
+--     PostgreSQL 上是 catalog-only 变更。
+--   * `passkeys` 是一人几行的表，所以**不需要** CONCURRENTLY 形状，
+--     也就不会走 `migrate-deploy.sh` 的恢复路径（AGENTS.md §4 优先级 1）。
+--   * 没起过名字的行保持 NULL；界面回落到创建时间，不显示空字符串。
+ALTER TABLE "passkeys" ADD COLUMN "name" TEXT;
