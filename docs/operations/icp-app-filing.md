@@ -63,7 +63,7 @@
 |---|---|---|---|
 | 安卓 | `com.heytamobile` | ✅ **MD5 `22:87:08:96:6F:FD:3F:96:A9:2D:5C:87:9F:E7:B2:A9`**<br>SHA1 `54:B7:0E:92:13:CE:92:39:7A:6F:F0:EE:FE:39:5F:2B:AA:0B:9A:3A`<br>SHA256 `C4:6D:03:86:17:9C:3C:EF:12:58:2D:13:47:ED:2F:87:1E:B0:3A:64:AA:A2:BF:F9:65:11:C1:CB:76:06:25:56` | **正式发布证书**（主体 `C=CN, ST=Zhejiang, L=Hangzhou, O=Xiaoli Creativity Culture Industry, OU=Mobile, CN=heyta`）。从正式签名的 `app-release.aab` 的 `META-INF/HEYTA.RSA` 里取，**keytool 与 openssl 两边对得上** |
 | 苹果 | `com.heyta.mobile` | ✅ **SHA-1 `79:51:52:08:57:8A:81:0F:82:C8:9E:5A:3D:48:24:37:DC:2D:EF:26`**<br>（MD5 `9D:E3:FE:22:16:8A:8C:FE:1B:FF:97:D4:EB:1E:BB:6D`） | 🔴 **取自苹果自己的 App Store provisioning profile**（`heyta App Store`，id `4Z8AV534TG`）—— profile 里嵌了且只嵌了这一张证书。另有两处独立印证：`security find-identity -p codesigning` 的 identity hash 相同；用该身份 `codesign` 真实签名成功，Authority 链与 `TeamIdentifier=V5S2LT9YV8` 都对 |
-| 鸿蒙 | `com.heyta.mobile` | 鸿蒙侧一般填包名 + 签名证书；**待你确认鸿蒙的签名方式** | `AppScope/app.json5` → `bundleName` |
+| 鸿蒙 | `com.heyta.mobile` | 🟡 **签名还没配**：`build-profile.json5` 的 `signingConfigs` 是**空数组** `[]`，而 `products[0].signingConfig` 却引用 `"default"` ⇒ 现在出的是**未签名 HAP**（与 runbook 里的 `entry-default-unsigned.hap` 一致）。签名要在 **DevEco Studio 的签名向导**里配，需要**华为开发者账号登录** ⇒ 需要你 | `AppScope/app.json5` → `bundleName`；`build-profile.json5` → `signingConfigs`（空） |
 | LINUX | ⬜ 暂不填报 | — | 原生壳未完成（计划 §4） |
 | windows | ⬜ 暂不填报 | — | 无 MSIX 标识 |
 
