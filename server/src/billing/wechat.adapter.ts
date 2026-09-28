@@ -38,6 +38,21 @@ import {
 } from 'node:crypto';
 import { MIN_CHARGEABLE_AMOUNT_MINOR, isMinorAmount } from './money';
 import { DEFAULT_PRICE_BOOK, grantsForSku, projectPrices } from './price-book';
+import type { Currency } from './money';
+import type {
+  BillingAdapter,
+  CheckoutResult,
+  CreateCheckoutInput,
+  NormalizedPaymentEvent,
+  OneTimeGrant,
+  RevokeEntitlementInput,
+  SubscriptionStatus,
+  WebhookHeaders,
+  WebhookVerification,
+} from './types';
+
+/** provider 名。与 `PaymentEvent.provider` / 路由路径 `/webhooks/wechat` 同值。 */
+export const WECHAT_PROVIDER = 'wechat';
 
 /**
  * 支付成功事件的 `providerEventId` **前缀** —— 唯一事实源。
@@ -57,20 +72,17 @@ export const WECHAT_PAYMENT_SUCCEEDED_EVENT_PREFIX = 'payment_succeeded:';
 export const buildWechatPaymentEventId = (outTradeNo: string): string =>
   `${WECHAT_PAYMENT_SUCCEEDED_EVENT_PREFIX}${outTradeNo}`;
 
-import type {
-  BillingAdapter,
-  CheckoutResult,
-  CreateCheckoutInput,
-  NormalizedPaymentEvent,
-  OneTimeGrant,
-  RevokeEntitlementInput,
-  SubscriptionStatus,
-  WebhookHeaders,
-  WebhookVerification,
-} from './types';
 
-/** provider 名。与 `PaymentEvent.provider` / 路由路径 `/webhooks/wechat` 同值。 */
-export const WECHAT_PROVIDER = 'wechat';
+/**
+ * 🔴 微信支付能收的币种 —— **唯一一处**，同时喂给
+ * `BillingAdapter.supportedCurrencies`（收银台据此在冻结之前选通道）与
+ * `createCheckout` 里那道校验（声明与执行必须同源，见 `WechatUnsupportedCurrencyError`）。
+ *
+ * 微信没有跨币种能力：商户号绑定的结算币种决定了它只能收那一种。本 adapter
+ * 实现的是人民币商户号，所以这里是单一的 `CNY`。要收美元需要**另一个** adapter /
+ * 另一个商户号，而不是把 `USD` 加进这个数组。
+ */
+export const WECHAT_SUPPORTED_CURRENCIES: readonly Currency[] = ['CNY'];
 
 /** Native 下单的 APIv3 路径（**相对路径**，签名串里用的就是它）。 */
 export const WECHAT_NATIVE_PATH = '/v3/pay/transactions/native';
@@ -543,12 +555,42 @@ export class WechatInvalidDescriptionError extends Error {
 }
 
 /**
+ * 调用方给了一个**微信收不了的币种**时抛这个。
+ *
+ * 🔴 它封的是一个会**静默收错钱**的洞。`amountMinor` 只是"最小单位整数"，
+ * 不带币种：`USD` 的 `500` 与 `CNY` 的 `500` 数值相等、语义差约 7 倍。
+ * 在它之前，这个文件把 `currency` 硬编码成 `'CNY'`，于是收银台按报价冻了一个
+ * USD 单、签出去的却是人民币单 —— **金额对得上、币种对不上，没有任何一层会报错**，
+ * 而结算只比 `final_amount_minor`（也只看数额），照样授予权益。
+ *
+ * 判据来自 adapter 自己声明的 `supportedCurrencies`（微信只有 `CNY`）：
+ * 声明与这个校验必须同源，否则声明就成了装饰。
+ *
+ * ⚠️ 抛在**任何网络调用之前**：拒一次本地校验，不是在收钱之后再退。
+ */
+export class WechatUnsupportedCurrencyError extends Error {
+  readonly code = 'WECHAT_UNSUPPORTED_CURRENCY';
+
+  constructor(
+    readonly currency: unknown,
+    readonly supported: readonly string[],
+  ) {
+    super(
+      `微信支付只支持 ${supported.join(' / ')}，收到 ${JSON.stringify(currency)}，` +
+        `拒绝下单（金额数值在币种之间不可比，静默按 CNY 发出会收错钱）`,
+    );
+    this.name = 'WechatUnsupportedCurrencyError';
+  }
+}
+
+/**
  * 构造微信 Native 扫码 adapter。
  *
  * 行为逐条：
  * - `createCheckout` → `POST /v3/pay/transactions/native`，返回 `{ qrCode: code_url }`。
  *   `successUrl` / `cancelUrl` **对 Native 无意义，被忽略**（扫码支付没有回跳；
- *   到账靠 webhook）。
+ *   到账靠 webhook）。🔴 `currency` 只接受 `WECHAT_SUPPORTED_CURRENCIES` 里的值
+ *   （只有 `CNY`），否则在**任何网络调用之前**抛 `WechatUnsupportedCurrencyError`。
  * - `verifyWebhook` → 验签 + 时间戳时效 + 解密 + 归一化；任何一步失败都 fail-closed。
  * - `mapSubscriptionState` → **恒 `null`**：微信没有订阅状态机，
  *   不编一个（这是 `types.ts` 明说的"支付宝 / 微信没有订阅状态机 → status 为 null"）。
@@ -565,8 +607,16 @@ export const createWechatBillingAdapter = (
 
   return {
     provider: WECHAT_PROVIDER,
+    supportedCurrencies: WECHAT_SUPPORTED_CURRENCIES,
 
     async createCheckout(input: CreateCheckoutInput): Promise<CheckoutResult> {
+      // 🔴 币种**先于**一切：金额数值在币种之间不可比，一个 USD 单被本地按
+      //    `currency: 'CNY'` 签出去就是"金额对得上、币种对不上"的静默收错钱
+      //    （见 `WechatUnsupportedCurrencyError`）。这一道必须在任何签名 /
+      //    网络调用**之前**，否则拒的是一笔已经发出去的单。
+      if (!WECHAT_SUPPORTED_CURRENCIES.includes(input.currency)) {
+        throw new WechatUnsupportedCurrencyError(input.currency, WECHAT_SUPPORTED_CURRENCIES);
+      }
       // `priceId` 仍然要认得出来（它决定账单上的商品名），但**它不再决定金额**。
       const price = prices[input.priceId];
       if (price === undefined) {
@@ -598,7 +648,10 @@ export const createWechatBillingAdapter = (
         notify_url: options.notifyUrl,
         // attach 是**兜底**的用户归属来源；真正的归属也编在 out_trade_no 里。
         attach: String(input.userId),
-        amount: { total: input.amountMinor, currency: 'CNY' },
+        // 🔴 币种来自**入参**（上面已断言过它等于 `WECHAT_SUPPORTED_CURRENCIES`
+        //    里那一项），不是这里的字面量：字面量会让"报价冻 USD、通道收 CNY"
+        //    重新变成一个没有错误、没有日志的分叉。
+        amount: { total: input.amountMinor, currency: input.currency },
       };
       // 🔴 只 stringify 一次：签名和发送必须是同一个字节串。
       const body = JSON.stringify(payload);

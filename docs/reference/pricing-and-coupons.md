@@ -374,8 +374,24 @@ pnpm --filter @heyta/server pricing set-price \
    `Tests 2 failed | 1 passed`；加回去 → `Tests 3 passed`。
    实测环境：PostgreSQL 17.9（Homebrew，`LC_ALL=C`），32 个迁移全部应用。
 
-   ⚠️ **该 spec 还没注册进 `server/package.json` 的 `test:integration:postgres`**
-   （那个文件此刻被另一条工作流改着），所以 **CI 目前不会跑它**。手动运行：
+   ✅ **该 spec 已注册进 `server/package.json` 的 `test:integration:postgres`**
+   （2026-09-27：`server/package.json` 当时已被另一条工作流交还，不再被占着）。
+   所以 **CI 现在真的会跑它**。实测（PostgreSQL 15.13，Homebrew，本地真库）：
+
+   - `pnpm test:integration:postgres` → 该 spec **3 passed**；
+   - 🔴 **注册这一步本身就是修复的一半**：这个 spec 从 [ADR-0020](../adr/0020-ai-subscription-two-tiers.md)
+     改 SKU 那天起就一直是**红的** —— 它还在用 `priceId: 'annual'`，而那个 SKU
+     在基线价目表里已经不存在，`resolveEffectivePrice` 直接抛 `UnknownPriceError`。
+     因为当时 CI 不跑它，**没人发现**。已改成 `hosted-monthly`。
+   - 非空转证明（重新实测）：剥掉 `pricing-store.ts` 里**券行**那条
+     `SELECT … FOR UPDATE`（`createOrderWithReservation` 内，不是 `upsertCoupon` 里那条）
+     → `Tests 2 failed | 1 passed`（"恰好一个成功" / "恰好两个"变红，
+     "不限名额全部成功"仍绿）；加回去 → `3 passed`；还原后逐字节一致。
+     ⚠️ 第一次注入**打错了目标**：`FROM coupons WHERE id = $1 FOR UPDATE` 这个模式在文件里
+     出现两次，`perl` 无 `/g` 只替换了 `upsertCoupon` 里那条（只读路径），于是用例照绿 ——
+     差点被误判成"空转"。**注入要按唯一上下文定位，不能按会重复的模式。**
+
+   手动运行：
    ```
    DATABASE_URL=… npx vitest run --config vitest.integration.config.ts \
      tests/integration/coupon-quota-race.integration.spec.ts
@@ -415,6 +431,15 @@ pnpm --filter @heyta/server pricing set-price \
    `503 BILLING_PROVIDER_NOT_CONFIGURED`，ADR-0017 §5 的支付商资质问题仍在。
    **退款**那条线确实仍未接线：`reverseOrderOnRefund` 里的"退款"是
    **退款被确认之后的状态同步**，不是退款本身。
+
+   🔴 **2026-09-27：这条已经从"没接线"升级成一个正式决定** ——
+   [ADR-0026](../adr/0026-refund-side-entitlement-revocation-not-implemented.md)。
+   查实的硬约束是：权益模型里**没有"哪一笔支付买了哪一段"**
+   （`Subscription` 只有一行 + 单个 `currentPeriodEnd`，能力是**替换**、支付是**叠加**），
+   所以"退第 2 笔、保留第 1 笔"**无法表达**，按笔回收的最小作用单位是**整行** = 过度回收。
+   于是**否决**了"只接订单侧、权益不动"的半截路径（它会造出"订单说退了、用户还在用"的
+   对账时无法自解释的状态）。`reverseOrderOnRefund` 因此**继续**零生产调用方 ——
+   但这一条现在是**显式记录**，不是"忘了接"；终点由 ADR-0026 §5 的清单定义。
 6. **微信是否接受 ¥0 订单未核实。** 我们的设计里 0 元单在建单之前就被拒
    （`MIN_CHARGEABLE_AMOUNT_MINOR`），所以这一点不影响正确性；但它意味着
    "用 ¥0 单测试回调链路"这条路走不通。
@@ -689,6 +714,81 @@ pnpm --filter @heyta/server pricing set-price \
    记在这里是因为它很典型：**跨文件/跨段的正则检查，看起来越"宽松好用"，
    越可能恒为真。**
 
+19. **币种断言：USD 单不再可能被微信通道按 CNY 静默发出去（2026-09-27 已做）。**
+   洞的形状：`amountMinor` 是**最小单位的整数**，它**不带币种** ——
+   `USD` 的 `500` 与 `CNY` 的 `500` 数值相等、语义差约 7 倍。
+   在此之前收银台按报价冻了一个 USD 单，而 `wechat.adapter.ts` 把 payload 里的
+   `currency` **硬编码成 `'CNY'`**：金额对得上、币种对不上、**没有任何一层会报错**，
+   而 `settleOrderPaidInTransaction` 只比 `final_amount_minor`（也只看数额），
+   照样授予权益。这是 [ADR-0018](../adr/0018-adjustable-pricing-and-coupons.md) §3.1
+   要消灭的"静默分叉"的又一处，只是这次分叉的是币种而不是数。
+
+   **修法是三层，且"声明"与"执行"同源：**
+   1. `CreateCheckoutInput.currency` **必填、无默认值** —— 给一个默认币种等于把这个洞
+      重新打开（调用方少传一次，美元单就又被当成人民币发出去）；
+   2. `BillingAdapter.supportedCurrencies` **必填**（`noop` = `[]` 是诚实的：
+      它不是通道；`wechat` = `WECHAT_SUPPORTED_CURRENCIES` = `['CNY']`），
+      并且 adapter 自己也拿**同一个常量**在**任何签名 / 网络调用之前**拒
+      （`WechatUnsupportedCurrencyError`）—— 声明要是装饰，收银台就会按声明选通道、
+      adapter 却照收；
+   3. 收银台按 `currency` **在冻结之前**选通道（`checkout.routes.ts` 的 ④）。
+      选不到回 **`409 PROVIDER_CURRENCY_UNSUPPORTED`**（与词表拒绝
+      `400 UNSUPPORTED_CURRENCY` 刻意分开：那个是"这个值我们不认识"，这个是
+      "这台实例没有收它的能力"），**一张订单都不落** —— 等到 `createCheckout` 才拒，
+      那张单已经落库了，用户换来一个 502 + 一条无用的失败订单。
+
+   **已实测非空转**（两次注入各自变红，还原后逐字节一致）：
+   ① 把 adapter 那道守卫改成 `if (false)` → `2 failed | 49 passed`；
+   ② 把 `usable.find((a) => a.supportedCurrencies.includes(currency))` 换成 `usable[0]`
+   → `2 failed | 12 passed`（`expected 200 to be 409`）。
+   另有 `pnpm check` 里的 `check:pricing` 保持绿；`server` 全量单测 1478 passed | 1 skipped。
+
+   ⚠️ **诚实的局限**：payload 里用 `input.currency` 而**不是**字面量 `'CNY'` 这一点，
+   **在当前是观测不到的** —— `supportedCurrencies` 是单元素 `['CNY']`，
+   所以改回字面量不会有任何用例变红。真正被钉住的不变量是
+   **"非 CNY 的报价到不了 adapter"**（两条彼此独立的守卫）。要收 USD 需要
+   **另一个** adapter / 另一个商户号，而不是把 `USD` 加进那个数组。
+
+   ⚠️ **落地页与海外（未改文案，业主决定）**：词条表里的 `$5/$12` 仍在，而
+   **没有任何通道支持 USD**。落地页本身已如实说明"两个付费档现在都买不到"
+   并且**不放按钮**（`apps/landing/src/components/Pricing.tsx` 文件头），
+   所以当前的"承诺 ↔ 能力"缺口是**文案级**的，不是点不动的死按钮。
+   撤掉 `$` 价或标注"仅限中国区"是市场/业主决定（handoff §11.5 第 5 条），**本轮没动**。
+
+20. **存量订单回填（handoff §12.3-4）：判定为「不适用」，不是「还没做」。**
+   证据：本机整个 PostgreSQL 实例（62 个库）里**只有本轮为验证而新建的那个库**
+   有 `checkout_orders` 表；四个 `heyta_*`（smoke）库**连计价 / 券的表都不存在**。
+   并且 `WECHAT_PAY_ENABLED` 未设（`server/.env` 里 0 次命中、shell 未导出）→
+   生产 adapter 列表只有 `noop` → **不可能**存在"已付款、却没被结算"的订单。
+   所以此刻写对账任务是**为 0 行数据写代码**，与第 17 条是同一条纪律
+   （"没有引入死代码"）。
+
+   🔴 **触发条件（所以这不是永久豁免）**：一旦真通道上线、且**在回填之前**就产生过订单，
+   webhook 的幂等约束会让那些订单**永远**不被结算 —— 它们的 `PaymentEvent` 已经落库，
+   重投会被 `(provider, providerEventId)` 挡住（`webhook.routes.ts` 文件头已写明）。
+   到那时才需要一个"按 `checkout_orders.status = 'pending'` + 通道侧对账"的任务。
+
+21. **`coupon` 故障注入里有一条检查曾长期是死的（2026-09-27 已修）。**
+   `scripts/verify-i18n-failures.mjs` 的 `coupon` 组第 ⑧ 例
+   （"去掉结算的幂等闸 → 重复投递重复授予"）锚点写死成
+   `if (status === 'paid') {\n      return { outcome: 'already-paid', … };\n    }` ——
+   **连缩进一起钉住**。而 `pricing-store.ts` 的函数体后来被重新缩进过一次
+   （`return` 从 6 空格变 4 空格），锚点于是再也匹配不上。
+
+   🔴 **根因值得单独记**：这条检查保护的是"重复投递重复授予"，
+   也就是**幂等闸**本身 —— 而它自己却在整整一段时间里**什么都没保护**。
+   它能被发现，靠的是 `withMutation` **先断言锚点存在**：
+   锚点失效 → 抛异常 → 用例报 ❌，而不是静默通过。
+   **空转的注入比没有更坏**，这条探针的设计正是为了不让前者发生。
+
+   已改成**只取那一行 `if (status === 'paid') {`**（在文件里唯一，`grep -c` = 1），
+   与相邻第 ⑦ 例的写法一致，不再随缩进漂移。
+   修后重跑：`coupon` **9/9 全部符合预期**。
+
+   ⚠️ **这一组不在 `pnpm check` 里**（`pricing` / `coupon` 共 25 例），
+   所以它变红**不会**拦住任何人 —— 它属于那条单独跑的 CI 作业。
+   也正因如此，`coupon` 的 ⑧ 例失效了那么久才被这次接手会话发现。
+
 ---
 
 ## 8. 对应的门禁与验证
@@ -698,5 +798,5 @@ pnpm --filter @heyta/server pricing set-price \
 | 价格一致性 | `node scripts/check-pricing-consistency.mjs` | 基线价目表 ↔ 中英词条 ↔ 法务文本 ↔ `pricing-ssot` 块；**恰好两个 SKU**（`hosted-monthly` / `hosted-ai-monthly`），每个都要带 `grants`，而 `grants` 白名单**只有** `hosting` / `ai`（功能名进收费清单 = 虚假宣传）；**adapter 里不许有第二个数字** |
 | 承诺 ↔ 状态 ↔ **执行点** | `node scripts/check-ai-quota-consistency.mjs` | 「300 次/月」这个数字的**唯一源**（`ai-quota-ssot` 块）↔ 中英词条 ↔ 法务 ↔ 参考文档正文；`enforcement` 取值合法；`enforced` 时计量实现必须存在；`not-implemented` 时决定记录 + "不得被售卖" + **收银台真的调用了 `notSellableReason(...)`** 都必须在场 |
 | 迁移纪律 | `node scripts/check-migrations.mjs` | 迁移文件命名/语句数/禁用语句 |
-| 券与价格的故障注入 | `node scripts/verify-i18n-failures.mjs pricing` / `… coupon` | 10 + 9 例：每一处"改坏"都必须让对应的检查变红 |
+| 券与价格的故障注入 | `node scripts/verify-i18n-failures.mjs pricing` / `… coupon` | **16 + 9** 例：每一处"改坏"都必须让对应的检查变红。`pricing`/`coupon` 两组改的是 `/tmp` 里的**隔离副本**，真实工作区一个字都不改。⚠️ 这一组**不在** `pnpm check` 里（见 §7 第 21 条） |
 | 单元与集成 | `cd server && npx vitest run tests/billing-*.spec.ts` | 见 §2 的"有测试吗"一列 |

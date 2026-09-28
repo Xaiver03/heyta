@@ -53,9 +53,15 @@ export const NOOP_PROVIDER = 'noop';
  * - `mapSubscriptionState` → 恒 `null`（没有状态机）。
  * - `revokeEntitlement` → **什么都不做**。它是"自托管默认什么都不做"的落点，
  *   也是"绝不删数据"的机械保证：这里没有任何 `prisma.delete*` 调用。
+ *
+ * 🔴 `supportedCurrencies: []` 是**空的、也是诚实的**：它不是"一个收不了钱的通道"
+ * 的近似，它就是"这里没有通道"。任何一个币种都不在它的能力里 —— 收银台本来也
+ * 会把 noop 过滤掉（见 `checkout.routes.ts` 的 ④），这个空数组是那条过滤的
+ * 类型层面回声，不是重复判据。
  */
 export const createNoopBillingAdapter = (): BillingAdapter => ({
   provider: NOOP_PROVIDER,
+  supportedCurrencies: [],
 
   async createCheckout(_input: CreateCheckoutInput): Promise<CheckoutResult> {
     throw new BillingProviderNotConfiguredError(NOOP_PROVIDER);

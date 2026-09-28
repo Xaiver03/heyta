@@ -5,6 +5,8 @@ import {
   WECHAT_NATIVE_PATH,
   WECHAT_PROVIDER,
   WECHAT_SIGNATURE_MAX_AGE_MS,
+  WECHAT_SUPPORTED_CURRENCIES,
+  WechatUnsupportedCurrencyError,
   buildRequestSignatureMessage,
   buildWechatAuthorizationHeader,
   buildWechatOutTradeNo,
@@ -321,6 +323,7 @@ describe('wechat adapter — createCheckout（stub fetch，🔴 没有真网络�
       // adapter 必须签出**传进来的**这个数，而不是自己回价目表里查基线 ——
       // 回查就是"运营者改价之后收银台仍按旧价下单"那个静默少收钱的形状。
       amountMinor: 400,
+      currency: 'CNY',
       successUrl: 'https://app.example.test/ok',
       cancelUrl: 'https://app.example.test/cancel',
     });
@@ -380,6 +383,7 @@ describe('wechat adapter — createCheckout（stub fetch，🔴 没有真网络�
       priceId: 'hosted-monthly',
       // ¥5 用 ¥1 券 → 冻结后的实付（400 分，不在价目表上）。
       amountMinor: 400,
+      currency: 'CNY',
       outTradeNo: frozenOutTradeNo,
       description: 'heyta 官方托管月付（已用 ¥1 券）',
       successUrl: 'https://app.example.test/ok',
@@ -419,6 +423,7 @@ describe('wechat adapter — createCheckout（stub fetch，🔴 没有真网络�
           userId: 42,
           priceId: 'hosted-monthly',
           amountMinor: 9_900,
+          currency: 'CNY',
           outTradeNo,
           successUrl: 'https://a.test',
           cancelUrl: 'https://a.test',
@@ -438,6 +443,7 @@ describe('wechat adapter — createCheckout（stub fetch，🔴 没有真网络�
         userId: 1,
         priceId: 'hosted-monthly',
         amountMinor: 9_900,
+        currency: 'CNY',
         description: '  ',
         successUrl: 'https://a.test',
         cancelUrl: 'https://a.test',
@@ -456,6 +462,7 @@ describe('wechat adapter — createCheckout（stub fetch，🔴 没有真网络�
         userId: 1,
         priceId: 'nope',
         amountMinor: 9_900,
+        currency: 'CNY',
         successUrl: 'https://a.test',
         cancelUrl: 'https://a.test',
       }),
@@ -478,6 +485,7 @@ describe('wechat adapter — createCheckout（stub fetch，🔴 没有真网络�
           userId: 1,
           priceId: 'hosted-monthly',
           amountMinor: bad as unknown as number,
+          currency: 'CNY',
           successUrl: 'https://a.test',
           cancelUrl: 'https://a.test',
         }),
@@ -498,6 +506,7 @@ describe('wechat adapter — createCheckout（stub fetch，🔴 没有真网络�
         userId: 1,
         priceId: 'hosted-monthly',
         amountMinor: 9_900,
+        currency: 'CNY',
         successUrl: 'https://a.test',
         cancelUrl: 'https://a.test',
       }),
@@ -517,10 +526,62 @@ describe('wechat adapter — createCheckout（stub fetch，🔴 没有真网络�
         userId: 1,
         priceId: 'hosted-monthly',
         amountMinor: 9_900,
+        currency: 'CNY',
         successUrl: 'https://a.test',
         cancelUrl: 'https://a.test',
       }),
     ).rejects.toMatchObject({ apiCode: 'MISSING_CODE_URL' });
+  });
+
+  it('🔴 USD 单 → 在签名 / 发请求**之前**就拒（金额数值在币种之间不可比）', async () => {
+    // 这个洞的形状：`amountMinor` 只是"最小单位整数"，不带币种。USD 的 500 与
+    // CNY 的 500 数值相等、语义差约 7 倍。曾经这个文件把 currency 硬编码成
+    // 'CNY'，于是「报价冻了 USD、通道签出 CNY」——金额对得上、币种对不上，
+    // 没有任何一层会报错，而结算只比金额，照样授予权益。
+    let called = false;
+    const adapter = createAdapter({
+      now: () => 1_700_000_000_000,
+      fetchImpl: (async () => {
+        called = true;
+        throw new Error('不该发请求');
+      }) as unknown as typeof fetch,
+    });
+
+    await expect(
+      adapter.createCheckout({
+        userId: 42,
+        priceId: 'hosted-monthly',
+        amountMinor: 500,
+        currency: 'USD',
+        successUrl: 'https://a.test',
+        cancelUrl: 'https://a.test',
+      }),
+    ).rejects.toBeInstanceOf(WechatUnsupportedCurrencyError);
+
+    // 🔴 关键断言：失败发生在**任何网络调用之前**。扣的是本地校验，
+    //    不是一笔已经发给微信、用户还能扫码付款的单。
+    expect(called).toBe(false);
+  });
+
+  it('声明的能力与执行同源：supportedCurrencies 就是那道校验的判据', async () => {
+    const adapter = createAdapter({ now: () => 1_700_000_000_000 });
+
+    // 声明本身就是"这个通道能收什么"的事实源，收银台按它选通道。
+    expect(adapter.supportedCurrencies).toEqual(['CNY']);
+    expect(WECHAT_SUPPORTED_CURRENCIES).toEqual(['CNY']);
+
+    // 反过来：声明里没有的币种，`createCheckout` 一定拒 —— 声明要是装饰，
+    // 收银台就会按声明选通道、adapter 却照收（这正是"声明与实现漂移"的形状）。
+    await expect(
+      adapter.createCheckout({
+        userId: 42,
+        priceId: 'hosted-monthly',
+        amountMinor: 500,
+        currency: 'USD',
+        successUrl: 'https://a.test',
+        cancelUrl: 'https://a.test',
+      }),
+    ).rejects.toThrow(/只支持 CNY/);
   });
 });
 
@@ -742,11 +803,14 @@ describe('wechat adapter — 接口语义', () => {
 
     const bare = createAdapter();
     // adapter 上不存在任何 delete；回收只改状态（无端口时什么都不做）。
+    // `supportedCurrencies` 是收银台选通道的唯一判据（见 `BillingAdapter`），
+    // 所以它必须出现在这个**穷举**的接口形状断言里，而不是被漏掉。
     expect(Object.keys(bare).sort()).toEqual([
       'createCheckout',
       'mapSubscriptionState',
       'provider',
       'revokeEntitlement',
+      'supportedCurrencies',
       'verifyWebhook',
     ]);
     await expect(

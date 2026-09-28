@@ -19,6 +19,8 @@
  * 这里只把接口形状定死，让 Paddle ↔ Creem ↔ 支付宝 之间换手只改一个 adapter。
  */
 
+import type { Currency } from './money';
+
 /**
  * 我方统一的、**provider 无关**的订阅状态枚举。
  *
@@ -216,6 +218,20 @@ export interface CreateCheckoutInput {
    */
   readonly amountMinor: number;
   /**
+   * 🔴 **这一单收的是哪个币种**，由**计价层**冻结后传入，与 `amountMinor` 同源。
+   *
+   * 为什么币种也必须进契约：`amountMinor` 是**最小单位的整数**，它本身不带币种。
+   * 一个 `USD` 的 `500` 与一个 `CNY` 的 `500` 在数值上完全相等、语义上差 7 倍，
+   * 而**没有任何一层会因此报错** —— 收银台按报价冻 USD、adapter 内部硬编码
+   * `currency: 'CNY'`，于是用户被按人民币收了一笔美元单，订单上却写着 USD。
+   * 这是 ADR-0018 §3.1 要消灭的"静默分叉"的又一处，只是这次分叉的是币种而不是数。
+   *
+   * 🔴 **必填，没有默认值。** 给一个默认币种等于把这个洞重新打开：调用方少传一次，
+   * 美元单就又被静默当成人民币发出去。adapter 必须拿它与自己的
+   * `supportedCurrencies` 对齐，不匹配就**在收钱之前**拒（见 `supportedCurrencies`）。
+   */
+  readonly currency: Currency;
+  /**
    * 商户订单号 —— **由调用方生成，adapter 必须原样使用**，不得自己再生成一个。
    *
    * 🔴 为什么必须是入参：`createOrderWithReservation` 把报价冻结在
@@ -271,6 +287,23 @@ export interface RevokeEntitlementInput {
 export interface BillingAdapter {
   /** 该 adapter 对应的 provider 名（与 `NormalizedPaymentEvent.provider` 同值）。 */
   readonly provider: string;
+
+  /**
+   * 🔴 **这个通道能收哪些币种** —— 由 adapter 自己声明，收银台据此在**冻结之前**选通道。
+   *
+   * 为什么需要它，而不是"让 adapter 在 `createCheckout` 里抛"：收银台的顺序是
+   * 「报价 → 冻结 → 下单」。等到 `createCheckout` 才拒，那张订单**已经落库**了
+   * （随后被 `failOrder` 改成 `failed`）—— 用户换来的是一个 502 和一条无用的
+   * 失败订单，而真实原因是"这台实例收不了这个币种"，本可以在冻结之前就说清楚。
+   *
+   * 🔴 **必填，空数组是合法且诚实的值**（`noop` 就是 `[]`：它不是通道，什么都收不了）。
+   * 做成有默认值的可选字段会得到相反的效果：一个忘了声明的 adapter 会"什么都能收"，
+   * 而那正是这个字段要防的事。
+   *
+   * ⚠️ 声明与实现必须一致：`createCheckout` 收到不在这个列表里的 `currency` 时
+   * **必须拒**，否则收银台会按声明选它、adapter 却照收 —— 声明就成了装饰。
+   */
+  readonly supportedCurrencies: readonly Currency[];
 
   /**
    * 创建结账会话。

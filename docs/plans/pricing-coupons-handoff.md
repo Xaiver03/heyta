@@ -449,6 +449,10 @@ cd apps/landing && npx vitest run              # 期望 71 passed
 ## 12. 本轮收尾状态
 
 > 这一节只记**可操作状态**，供下一次会话零上下文接手。事实与假设分开写。
+>
+> 🔄 **2026-09-27 接手会话见 §12.5。**
+> 🔴 **代码完成度状态表在 §12.5.4** —— 结论：**本任务书 §12.3 范围内没有未完成的代码工作**，
+> 剩下的全是「外部阻塞 / 业主决定 / ADR 级语义」。验证状态也在那一节分开列了。
 
 ### 12.1 事实
 
@@ -476,11 +480,21 @@ cd apps/landing && npx vitest run              # 期望 71 passed
 
 ### 12.3 按顺序的下一步
 
+> 🔄 **2026-09-27 接手会话的进展见 §12.5。** 下面五条里 1 / 3 / 4 / 5 都已有结论。
+
 1. 等桌面壳提交后，重跑 `pnpm check` 与 `pnpm test`，确认全链绿。
+   ⚠️ **仍未达成，但红点已变**：见 §12.5 第 1 条。
 2. 客户端「付款」按钮 —— **只在支付通道就绪时**加，否则必然 `503` 死按钮。
+   **仍然不动**（外部资质未落地）。
 3. 退款/拒付侧接线（`reverseOrderOnRefund` 目前零生产调用方）。
-4. 存量订单回填（对账任务）。
+   ✅ **已有结论：本轮不做**，见 [ADR-0026](../adr/0026-refund-side-entitlement-revocation-not-implemented.md)
+   —— 真阻塞不是"没接线"，而是**权益模型无法表达"退哪一笔"**。
+4. 存量订单回填（对账任务）。✅ **判定为「不适用」**（0 行数据），见
+   [pricing-and-coupons.md](../reference/pricing-and-coupons.md) §7 第 20 条。
 5. 海外通道与币种断言（§11.5 第 5 条）。
+   ✅ **币种断言已做**（三层：契约必填 / adapter 声明与执行同源 / 收银台冻结前选通道）；
+   ⚠️ **落地页 `$5/$12` 文案未动**（业主/市场决定，且落地页已如实标注买不到）。
+   见 [pricing-and-coupons.md](../reference/pricing-and-coupons.md) §7 第 19 条。
 
 ### 12.4 别重复踩的坑
 
@@ -491,3 +505,166 @@ cd apps/landing && npx vitest run              # 期望 71 passed
   index 与工作区一致。
 - ❌ 本仓库这个 git 版本里 `git apply --cached` 与 `git commit --only <paths>` 都不可靠
   （后者会用工作区内容绕过 index）。正常 `git add` 显式路径 + 普通 `git commit`。
+
+### 12.5 2026-09-27 接手会话的增量
+
+> 🤝 **本节的写法与 12.1 一致：事实与假设分开，红就是红。**
+> 会话起点 `HEAD = a410e58`（比 §12.1 记的 `77b4e25` 前进了**很多**提交，
+> 且工作区里有**另一条**工作流未提交的组件工作 —— `packages/widget-core`、
+> `apps/mobile/*`、`packages/app-host/*`、根 `package.json`、`docs/README.md`）。
+> 本会话**没有提交任何东西**（多 agent 共享工作区，提交留给业主）。
+
+#### 12.5.1 事实
+
+1. 🔴 **`pnpm check` 仍然是红的，而且红点换了一个地方。**
+   本会话实测 `pnpm check`：`check:ai-e2e` 的 `e2e/tests/desktop-window.spec.ts`
+   两条用例 `Page crashed`（开发构建与打包产物各一条），
+   `2 failed | 24 passed` → `exit 1`。
+   ✅ **但这是整条链上唯一红的一道**：`check` 是 `&&` 串起来的
+   （`build` → `typecheck` → `check:migrations` → `layering` → `widgets` →
+   `ui-language` → `licenses` → `docs` → `pricing` → `ai-quota` → `design` →
+   `tokens` → `arkts` → `native-deps` → `mobile-bundle` →
+   `materialized-reads` → `ai-coverage` → `ai-e2e`），
+   而 `check:ai-e2e` **确实跑到了**（上面那两条失败就是它打的）——
+   也就是说**它前面的 16 道全部退出 0**。这是 `&&` 链的性质，不是印象。
+   即 §12.2 那条假设**没有被证实**：桌面壳工作流的文件**仍在**工作区里未提交
+   （`apps/desktop/package.json`、`renderer/main.tsx`、`src/main.ts`、
+   `tsup.config.ts`、`e2e/tests/desktop-window.spec.ts` 都是 modified）。
+   **本会话没有动这些文件**（§12.4 的纪律 + §6 的占用清单）。
+
+   ✅ **但 `server` 侧是绿的**：`server` 全量单测 **72 文件 / 1478 passed | 1 skipped**；
+   `npx tsc --noEmit -p server/tsconfig.json` → `TSC_OK`；
+   `node scripts/check-pricing-consistency.mjs` → `exit 0`。
+   ⚠️ 这是**快照**：同一时间另一条工作流正在改 `webhook.routes.ts`（见本节第 8、9 条），
+   所以 1478 这个数只代表**那一刻**的树，不代表它不会被对方的下一次编辑改动。
+
+2. ✅ **① 币种断言已落地**（洞是"USD 单被微信通道按 CNY 静默发出去"）。
+   三层：`CreateCheckoutInput.currency` 必填 / `BillingAdapter.supportedCurrencies`
+   必填且 adapter 用**同一个常量**在任何网络调用前拒 / 收银台**在冻结之前**按币种选通道并回
+   `409 PROVIDER_CURRENCY_UNSUPPORTED`。两次注入各自变红、还原后逐字节一致。
+   详见 [pricing-and-coupons.md](../reference/pricing-and-coupons.md) §7 第 19 条。
+
+3. ✅ **③ 行锁并发 spec 已注册进 CI，而且注册这一步本身就修好了一条长期的红。**
+   `server/package.json` 的 `test:integration:postgres` 现在包含
+   `coupon-quota-race.integration.spec.ts`。实测（本地真 PostgreSQL **15.13**，
+   经 `sh scripts/migrate-deploy.sh` 应用 38 个迁移的新库）：
+   - 该 spec 单跑 → **3 passed**；
+   - 整条 `pnpm test:integration:postgres` → **16 passed | 3 failed**，**失败的三条与本轮无关**
+     （`migrate-deploy-lock-retry` / `old-ops-boundary-plan` /
+     `operations-autovacuum-reloptions`）。其中
+     `operations-autovacuum-reloptions` 是**环境**原因：它断言
+     `server_version_num >= 160000`，而本机 :5432 上的服务端是 **15.13**
+     （`psql --version` 报 17.9 的是**客户端**）—— 仓库声明的下限是 16。
+   - 🔴 **该 spec 从 ADR-0020 改 SKU 那天起一直是红的**：它还在用
+     `priceId: 'annual'`，那个 SKU 早已不存在。**因为 CI 不跑它，没人发现。**
+     已改成 `hosted-monthly`，并重新证明非空转（剥掉券行 `FOR UPDATE`
+     → `2 failed | 1 passed`）。
+     ⚠️ 第一次注入**打错了目标**（那个 SQL 模式在文件里出现两次）——
+     差点把"注入打偏"误判成"用例空转"。**注入必须按唯一上下文定位。**
+4. ✅ **④ 存量订单回填：判定「不适用」**。证据：本机整个 PostgreSQL 实例（62 个库）
+   里只有**本轮为验证新建的那个**库有 `checkout_orders`；四个 `heyta_*` 库连计价表都没有；
+   `WECHAT_PAY_ENABLED` 未设 → 只有 `noop`。**0 行数据**，见 §7 第 20 条。
+5. ✅ **② 退款/拒付侧：本轮不做，写成 ADR**（[ADR-0026](../adr/0026-refund-side-entitlement-revocation-not-implemented.md)）。
+   **这是本会话最重要的发现**：handoff 把这条描述成"没接线"，但真阻塞是
+   **权益模型里没有"哪一笔支付买了哪一段"**（`Subscription` 一行 + 单个
+   `currentPeriodEnd`；能力**替换**、支付**叠加**；`findFirst` 定位，
+   连 `@@unique([userId, provider])` 都没有）。所以"退第 2 笔、保留第 1 笔"
+   **无法表达**，按笔回收的最小单位是**整行** = **过度回收**。
+   业主在"只接订单侧（半真状态）/ 写 ADR（选它）/ 全量建账本"三条里选了**写 ADR**。
+6. ⚠️ **落地页海外文案未动**（`$5/$12` 仍在），因为落地页**已**如实标注两个付费档买不到
+   且**不放按钮**，所以缺口是文案级的；撤掉或标注"仅限中国区"属市场/业主决定。
+7. 🔴 **顺手发现并修好了一条"死了很久"的检查**：`verify-i18n-failures.mjs` 的
+   `coupon` 组第 ⑧ 例（"去掉结算的幂等闸 → 重复投递重复授予"）锚点**连缩进一起写死**，
+   而 `pricing-store.ts` 的函数体后来被重新缩进过，于是它再也匹配不上 ——
+   也就是说**幂等闸这条检查自己在很长一段时间里什么都没保护**。
+   已改成只取唯一的那行 `if (status === 'paid') {`；修后 `coupon` **9/9**。
+   ⚠️ 这组**不在** `pnpm check` 里，所以它变红拦不住任何人。
+   详见 §7 第 21 条。
+8. ⚠️ **一次并发碰撞，记下来当教训**：本会话中途看到 `webhook.routes.ts` 里多了一行
+   `import type { ApplyPaymentEventDeps }`（**只在 import 语句里出现、别处没用**），
+   当时判断成"残留的半截改动"，于是把它还原成 HEAD 的单行 import，
+   并确认过那一刻 `git diff --stat` 是干净的。
+
+   🔴 **判断错了。** 几分钟后再看，那个文件已经被改成一大段重构
+   （抽出 `settleAndApplyEvent` / `buildSubscriptionApplyDeps`，注释指向一个
+   还不存在的 `reconcile.ts`）—— 也就是说，那行 import 是**另一条正在写
+   "对账 / 补结算"的工作流**改到一半时的中间态，**不是我的残留**；
+   我看到的"干净"只是它两次编辑之间的一个瞬间。（当前该文件 `tsc --noEmit`
+   通过，说明对方已经写完整。）
+
+   👉 **教训（比代码本身值钱）**：在多 agent 共享工作区里，
+   **"看起来像残留的 diff" 也可能是别人正在写的中间态**。
+   判据不是"这行有没有用"，而是"**这个文件是不是我正在负责的**"——
+   `webhook.routes.ts` 本会话**只读不写**，本来就不该去动它。
+   因此：**停留在该文件上的一切改动都不属于本会话的变更集**，
+   接手时请按"另一条工作流在做对账"来看它。
+9. 👀 **另一条工作流正在做 §12.3-4 的对账/补结算**（`webhook.routes.ts` 已抽出
+   `settleAndApplyEvent`，注释指向 `reconcile.ts`；目标是"webhook 与对账共用
+   唯一一份业务逻辑"）。这与 §12.5.1 第 4 条**不冲突**：第 4 条说的是
+   "**现在**没有可回填的数据（0 行）"，而不是"这件事不该做"。
+   ⚠️ 只是**别把那份工作记成本会话做的**。
+
+#### 12.5.2 假设（未验证）
+
+- **微信退款通知的真实载荷与幂等键未核实**（ADR-0026 §6 记着）——
+  本会话没有对着官方文档逐字段核对，也没有一笔真实退款通知。
+- **`@@unique([userId, provider])` 的缺失是否刻意**，未核实。它可能是一个独立的
+  真问题（"一行一用户"只是意图，没有被约束保证），但**不要在 ADR-0026 里顺手加**。
+- **桌面壳提交后整条链会全绿**：**仍未实测**（§12.2 的假设原样保留，且本次实测反而
+  显示它的文件还在工作区里）。
+- **本机集成测试不能代表 CI**：服务端是 PG **15.13**，而仓库下限是 **16**。
+  凡是依赖 PG 16 行为或 vacuum 状态的用例（即 12.5.1 第 3 条里那三个失败）
+  在**本机红不代表 CI 红**，反之亦然。**本会话没有在 PG 16 上验证过它们。**
+
+#### 12.5.3 下一会话第一件事
+
+1. 桌面壳那批文件提交后重跑 `pnpm check` / `pnpm test`，确认 §12.2 的假设。
+2. 若要推进退款：**先做 ADR-0026 §5 第 1 条**（权益粒度：账本 vs 政策）。
+   在那之前不要写退款 handler。
+3. 若要卖海外：**先定通道**，再改落地页文案（`$` 价现在是"写得出、买不了"）。
+
+#### 12.5.4 代码完成度状态表（本任务书 §12.3 的范围）
+
+> 判据：**"代码工作"= 需要改 `server/` / `scripts/` 下源文件的事。**
+> 配置、资质、文案、ADR 级语义决定**不算**代码工作 —— 它们在"非代码阻塞"一节。
+> 结论：**§12.3 范围内没有任何未完成的代码工作。**
+
+| §12.3 | 事项 | 代码 | 验证 | 非代码阻塞 |
+|---|---|---|---|---|
+| 1 | 等桌面壳提交后重跑门禁 | — 不属本任务书代码 | ✅ 已跑：16 道绿，仅 `check:ai-e2e` 红（对方的文件） | 桌面壳那批文件**仍**未提交 |
+| 2 | 客户端「付款」按钮 | ⛔ **不做** | — | 🔴 **外部资质**：无支付商资质 = 必然 `503` 死按钮；且 `apps/web/**`、`apps/mobile/**` 属他人占用（§6 白名单外） |
+| 3 | 退款/拒付侧接线 | ⛔ **不做**（业主选 B，[ADR-0026](../adr/0026-refund-side-entitlement-revocation-not-implemented.md)） | — | 🔴 权益模型**无法表达"退哪一笔"**（写代码必然过度回收）+ 退款政策未定 |
+| 4 | 存量订单回填 | — **不适用**（0 行数据，§7 第 20 条） | — | 真通道上线**且**在回填前产生过订单时才需要 |
+| 5 | 海外通道与**币种断言** | ✅ **已做**（币种断言三层） | ✅ 单测 + 两次注入 | ⚠️ 落地页 `$5/$12` 文案 = 业主/市场决定，且词条在 `packages/i18n`（占用） |
+
+**本会话额外完成的代码工作**（不在 §12.3 字面上，但属同一片区域）：
+
+| 事项 | 代码 | 验证 |
+|---|---|---|
+| ③ `coupon-quota-race` 注册进 CI **并修掉它长期变红的 `'annual'` SKU** | ✅ | ✅ 真库 3 passed；剥掉券行 `FOR UPDATE` → 2 failed |
+| 修复 `coupon` 探针里**长期失效**的结算幂等闸锚点（§7 第 21 条） | ✅ | ✅ `coupon` 9/9 |
+
+**明确"不是代码工作"的剩余项**（别再当成待写的代码）：
+
+| 事项 | 性质 |
+|---|---|
+| 云端 AI 端点 / 300 次计量 / 设置页用量 | ⛔ 按 [ADR-0023](../adr/0023-managed-ai-quota-not-implemented.md) **本轮不实现**，含最小实现清单；硬约束「计量存在前不得售卖 `hosted-ai-monthly`」 |
+| 价格空隙语义（§7 第 13 条：某 key 的**第一个**版本排到未来） | ⛔ **需一条 ADR**（动的是"按哪个数收钱"）；已用 CLI 当场喊红 + 退出码 1 兜住 |
+| admin 鉴权 / 角色 / HTTP 管理面（§7 第 14 条） | ⛔ 明确**超出**"定价一致性"范围，已如实记为缺口 |
+| 发票金额口径（`final` vs 原价） | ⛔ 需**会计确认**（§7 第 4 条） |
+| 微信 ¥0 订单是否被接受、商家券资质 | ⛔ 需**真实商户号 + 官方渠道**验证（§7 第 6、7 条） |
+| 行为级对账（`reconcile.ts`） | 👀 **另一条工作流在做**（见 §12.5.1 第 9 条），不记在本会话名下 |
+
+**验证状态（本会话已跑 vs 未跑）**：
+
+- ✅ 已跑：`server` 全量单测 72 文件 / 1478 passed | 1 skipped；`tsc --noEmit` `TSC_OK`；
+  `check:pricing`、`check:docs` 绿；`pnpm check` 除最后一道 `check:ai-e2e` 外全绿；
+  `verify-i18n-failures.mjs pricing`（16/16）与 `coupon`（9/9）；
+  真 PostgreSQL 上 `pnpm test:integration:postgres`（该 spec 3 passed，整条 16/19）。
+- ⚠️ **未跑 / 跑不了**（**不要**把上一条读成"能收款"）：
+  没有任何**真实支付商网络调用**（adapter 仍是 stub `fetchImpl`）；
+  没有**真实商户号/密钥**；没有一笔**真实支付或退款通知**；
+  集成测试跑在 **PG 15.13** 而仓库下限是 **16**；
+  `recurrence` 等其余 9 组故障注入探针**没跑**；
+  桌面壳提交后的整链绿**仍未证实**。
+

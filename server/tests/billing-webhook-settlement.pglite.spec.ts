@@ -146,6 +146,8 @@ interface TestPayload {
 
 const createTestAdapter = (): BillingAdapter => ({
   provider: PROVIDER,
+  // 这个 fake 只用来测结算，收银台从不选它；声明 CNY 与真实 provider 一致。
+  supportedCurrencies: ['CNY'],
   async createCheckout(_input: CreateCheckoutInput): Promise<CheckoutResult> {
     return { qrCode: 'weixin://wxpay/bizpayurl?pr=FAKE' };
   },
