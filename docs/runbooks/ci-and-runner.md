@@ -215,7 +215,7 @@ CI 属于"**可以慢、不可以抢**"的负载，2 核 / 3G 是刻意留余量
 
 ---
 
-## 8. CI 里跑不了的两件事（已如实交代）
+## 8. CI 里跑不了的三件事（已如实交代）
 
 workflow 有**两个 `if: always()` 的诚实步骤**，把跑不了的写进 Job Summary
 并 `::warning`，**不让它们安静地空跑**：
@@ -224,9 +224,44 @@ workflow 有**两个 `if: always()` 的诚实步骤**，把跑不了的写进 Jo
 |---|---|---|
 | `check:arkts` | 需要真 ArkTS 编译器 `es2abc`（随 DevEco Studio 分发）。找不到时它**故意 exit 0 并打印"跳过"** | 在装有 DevEco Studio 的 macOS 上跑 |
 | `apps/web` 的真实用户旅程测试 | 需要真实模型端点（`/tmp/heyta-ai-live/provider.json`），CI 里不存在，会 `skipIf` 跳过 | `pnpm verify:ai-live` 系列 |
+| **桌面窗口冒烟**（`e2e/tests/desktop-window.spec.ts` 的"开发构建"一条） | **runner 拉不到 Electron 二进制**：`electron/index.js` 打印 `Downloading Electron binary...`，90 秒后 `TypeError: fetch failed`。装不上就 `test.skip` | `node apps/desktop/node_modules/electron/install.js`（要代理，见 [`desktop.md`](desktop.md) §4.1）后跑 `pnpm --dir e2e test` |
 
-⚠️ 测试汇总里的 **skipped 数量就来自第二项**。
+⚠️ 测试汇总里的 **skipped 数量就来自第二、三项**。
 看到 skipped 不要当成失败，但也不要当成通过 —— 去 Job Summary 看它说了什么。
+
+### 🔴 第三项曾经不是"跳过"，而是**把整套测试带崩**
+
+2026-09-28 实测：那一版 `desktop-window.spec.ts` 把
+
+```ts
+const electronBinary = desktopRequire('electron');   // ← 模块顶层
+```
+
+写在**模块顶层**。而 `electron/index.js` 在 `path.txt` 缺失时会**自动发起下载** ——
+于是这个文件**只要被"收集"（还没跑任何用例）**就会下载 100 MB+，
+拉到失败就抛 `Error: Electron failed to install correctly`。
+
+后果比"某条用例失败"严重得多：`check:ai-e2e` 跑的是整个 e2e 套件，
+**收集阶段就崩 → Playwright 进程直接死 → `门禁` 步骤 exit 1**，
+**其余所有 e2e 用例连跑的机会都没有**。
+
+**一个可选二进制的缺失，不该有能力否决整个测试套件。** 修法两条缺一不可：
+
+1. **收集期绝不下载**：先看 `path.txt` 在不在（`existsSync`），在才 `require`；
+   判存在用 `require.resolve`（只解析路径），不要用 `require`（会执行）。
+2. 不在就 `test.skip(理由)` **响亮跳过** —— 理由里写清"是什么没了"和"怎么补上"。
+
+验证方式（本机，两条都要看）：
+
+```bash
+cd e2e
+npx playwright test desktop-window --list        # ① 有二进制：应列出 2 条且 exit 0
+mv ../../node_modules/.pnpm/electron@*/node_modules/electron/path.txt{,.bak}
+npx playwright test desktop-window --list        # ② 没二进制：**也不能崩**，仍 exit 0
+npx playwright test desktop-window -g 开发构建    #    → 1 skipped（不是 failed）
+mv ../../node_modules/.pnpm/electron@*/node_modules/electron/path.txt{.bak,}
+npx playwright test desktop-window -g 开发构建    # ③ 还原后：1 passed（**不能变成永远跳过**）
+```
 
 ### 8.1 🔴🔴 最难发现的一种红：**看着在跑，其实什么都没验**
 
