@@ -345,8 +345,9 @@ pnpm verify:ios-lan-http   # 私有 IP 明文 HTTP 可用性
 | App ID（主 App） | `com.heyta.mobile` = `Z979YYN9FY` |
 | App ID（小组件） | `com.heyta.mobile.WidgetExtension` = `6BZWPRPJ9Z` |
 | 分发证书 | `Apple Distribution`，cert id `2R8LJZ6Q36`，2027-06-19 到期 |
-| App Store profile | `heyta App Store` = `4Z8AV534TG` |
-| App Store profile（小组件） | `heyta Widget App Store` = `KM6K4WWAM2` |
+| App Store profile | `heyta App Store` = `9P2RP348X2`（旧 `4Z8AV534TG` 已因 capability 变更作废删除） |
+| App Store profile（小组件） | `heyta Widget App Store` = `QBGYAXY63F`（旧 `KM6K4WWAM2` 同上） |
+| App Group | `group.com.heyta.mobile`（2026-09-28 建成，已挂给两个 App ID） |
 
 🔴 **证书指纹（备案用）** —— 取自 **Apple 自己的 provisioning profile**（profile 里嵌了且只嵌了这一张）：
 
@@ -378,18 +379,30 @@ bash apps/mobile/ios/scripts/archive-release.sh /tmp/heyta.xcarchive
 前置成一次 preflight，缺哪条就直接说缺哪条、去哪儿补；出包后再从**已签名的 .app** 里
 读回签名证书指纹（备案要的权威值）。
 
-#### 🔴 现在卡在哪：App Group 建不了
+#### ✅ App Group：已解决，以及它为什么只能人在网页上做
 
-```
-error: Provisioning profile "heyta App Store" doesn't support the group.com.heyta.mobile App Group.
-```
+**结论**：`group.com.heyta.mobile` 已建成并挂给两个 App ID，Archive 通过。
+但**公开 API 在结构上做不到这件事**，四条独立证据：
 
-- 两个 entitlements 文件都声明了 `group.com.heyta.mobile`（小组件靠它读主 App 的数据）⇒ **不能删了绕过**。
-- **App Store Connect 的公开 API 不提供建 App Group 的能力**（签名域只覆盖
-  bundleIds / capabilities / certificates / profiles / devices），
-  而 web 通道要交互式 Apple ID 登录（`asc web auth status` → `authenticated: false`）。
-- ⇒ **要人做一步**：ASC 网页 → Identifiers → App Groups → 建 `group.com.heyta.mobile`，
-  并把上面两个 App ID 都勾上它；之后重建 profile 就能 Archive。
+| # | 证据 |
+|---|---|
+| 1 | `GET /v1/appGroups` 与 `/v1/appGroupIds` 均 **404**（该资源不存在） |
+| 2 | 给 `APP_GROUPS` 能力写 `--settings` 时，服务端回出**允许取值的完整清单**：只有 `ICLOUD_VERSION` / `DATA_PROTECTION_PERMISSION_LEVEL` / `APPLE_ID_AUTH_APP_CONSENT` —— **没有 app group 相关的 key** |
+| 3 | `asc web bundle-ids capabilities` 只有 `sync-app-clip` 一个子命令 |
+| 4 | `xcodebuild -allowProvisioningUpdates -authenticationKey*`（Apple 文档说它不需要 Apple ID）在本机四种变体全部 `Authentication failed`，而**同一把 key** 自签 JWT 调 `/v1/bundleIds` 返回 200、`xcrun altool --list-apps` 也成功 ⇒ 这条路不通（Xcode 27.1 beta 或 key 角色不足） |
+
+⇒ 只能在**人工登录的** App Store Connect / 开发者门户网页上做。**用独立 profile 的 Chrome 开调试端口可以自动化**：
+`--user-data-dir=/tmp/asc-chrome --remote-debugging-port=9223`（⚠️ Chrome ≥ v136 禁止在**默认 profile** 上开调试端口，必须给独立 user-data-dir），
+再用 Playwright `connectOverCDP` 附着。唯一的人工步骤是**登录**。
+
+🔴 **这里有一个极其隐蔽的坑，卡了三轮**：在 App ID 编辑页勾选/取消 capability 后点页面 Save，Apple 会弹一个
+**「Modify App Capabilities」**确认框（文案：*Adding or removing capabilities can invalidate any existing profiles...*）。
+**必须点弹窗里的 `Confirm`**（不是页面的 Save、也不是弹窗里的字面 "Save"）。
+只点页面 Save **不报错、页面看着像保存了，但刷新后改动全部丢失**。
+⇒ 每步之后都要**回读**（重载页面看复选框 / 重开 Configure 弹窗看 `N of M item(s) selected`），
+并用**独立手段**验收（重建 profile 看 `application-groups` 是否非空）。
+
+⚠️ 另外：改 capability **会让已有 profile 失效**（弹窗自己说的），所以必须**删掉重建**两个 profile。
 
 ⚠️ 另一个坑：`-allowProvisioningUpdates`（自动签名）在本机**不可用** ——
 `error: No Accounts: Add a new account in Accounts settings.`，Xcode 没登录 Apple ID。

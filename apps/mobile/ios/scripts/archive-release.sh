@@ -48,6 +48,7 @@ check_profile() {
   result=$(python3 - "$PROFILE_DIR" "$name" <<'PYPROFILE'
 import plistlib, pathlib, subprocess, sys
 directory, want = sys.argv[1], sys.argv[2]
+matches = []
 for f in sorted(pathlib.Path(directory).glob('*.mobileprovision')):
     try:
         plist = plistlib.loads(subprocess.run(['security', 'cms', '-D', '-i', str(f)],
@@ -56,9 +57,21 @@ for f in sorted(pathlib.Path(directory).glob('*.mobileprovision')):
         continue
     if plist.get('Name') == want:
         groups = plist.get('Entitlements', {}).get('com.apple.security.application-groups', []) or []
-        print('FOUND:' + ','.join(groups))
-        raise SystemExit(0)
-print('MISSING:')
+        matches.append({
+            'uuid': plist.get('UUID', '?'),
+            'expires': plist.get('ExpirationDate'),
+            'groups': groups,
+            'file': f.name,
+        })
+if not matches:
+    print('MISSING:')
+    raise SystemExit(0)
+# 🔴 同名 profile 可能有多份（改过 capability 之后旧的仍在磁盘上）。
+#    取**过期时间最新**的那份，而不是排序后的第一份 —— 否则会拿到过期副本，
+#    报出"没有授予 app group"这种假警报（这个坑实测踩过一次）。
+matches.sort(key=lambda m: (m['expires'] is not None, m['expires']), reverse=True)
+best = matches[0]
+print('FOUND:' + ','.join(best['groups']) + ('|DUP' if len(matches) > 1 else '') + '|UUID:' + str(best['uuid']))
 PYPROFILE
 )
   case "$result" in
@@ -68,7 +81,11 @@ PYPROFILE
                   asc profiles local install --path /tmp/p.mobileprovision
       （PROFILE_ID 见 README 的表）" ;;
   esac
-  local granted="${result#FOUND:}"
+  local payload="${result#FOUND:}"
+  local granted="${payload%%|*}"
+  if printf '%s' "$payload" | grep -q '|DUP'; then
+    echo "  ⚠️ 磁盘上有多个同名 profile「${name}」—— 已取过期时间最新的那份（旧的可以删掉）"
+  fi
   if ! printf '%s' "$granted" | grep -q "${APP_GROUP}"; then
     fail "profile「${name}」没有授予 ${APP_GROUP}（当前授权：[${granted}]）
     ⇒ 请在 App Store Connect 网页操作（**公开 API 建不了 App Group**）：
@@ -100,24 +117,34 @@ APP="$ARCHIVE_PATH/Products/Applications/HeytaMobile.app"
 [ -d "$APP" ] || fail "归档里没有 HeytaMobile.app"
 codesign -dvvv "$APP" 2>&1 | grep -E "Authority|TeamIdentifier|Identifier=" | sed 's/^/  /'
 
-TMP=$(mktemp -d)
-codesign -d --extract-certificates "$TMP/cert" "$APP" >/dev/null 2>&1
-CERT=$(ls "$TMP"/cert* 2>/dev/null | head -1)
-if [ -n "${CERT:-}" ]; then
-  python3 - "$CERT" <<'PY'
-import hashlib, pathlib, subprocess, sys
-der = pathlib.Path(sys.argv[1]).read_bytes()
-print("  " + subprocess.run(["openssl","x509","-inform","DER","-in",sys.argv[1],"-noout","-subject"],
-                           capture_output=True, text=True).stdout.strip()[:120])
-for algo in ("sha1", "md5", "sha256"):
-    h = hashlib.new(algo, der).hexdigest().upper()
-    print(f"  {algo.upper():6} = " + ":".join(h[i:i+2] for i in range(0, len(h), 2)))
-PY
+# 🔴 两个坑叠在一起：
+#    ① `codesign -d --extract-certificates <prefix>` **实测不产出文件**（静默失败）；
+#    ② .app 里的 `embedded.mobileprovision` 是 **CMS/PKCS#7 编码**的，
+#       不能直接 `plistlib.loads(bytes)`（会报 Invalid file），
+#       必须先 `security cms -D` 解出来。
+#    所以：读 .app 内嵌 profile（它才是真正签了这个包的 profile），先解码再解析。
+if [ -f "$APP/embedded.mobileprovision" ]; then
+  security cms -D -i "$APP/embedded.mobileprovision" 2>/dev/null | python3 - <<'PYCERT'
+import hashlib, plistlib, subprocess, sys, tempfile, pathlib
+try:
+    d = plistlib.loads(sys.stdin.buffer.read())
+except Exception as exc:
+    print("  ⚠️ 解析内嵌 profile 失败：%s" % exc); raise SystemExit(0)
+print("  内嵌 profile : %s" % d.get('Name'))
+print("  app-groups  : %s" % d.get('Entitlements', {}).get('com.apple.security.application-groups'))
+for der in d.get('DeveloperCertificates', []):
+    for algo in ('sha1', 'md5', 'sha256'):
+        h = hashlib.new(algo, der).hexdigest().upper()
+        print("  %-6s = %s" % (algo.upper(), ':'.join(h[i:i+2] for i in range(0, len(h), 2))))
+    with tempfile.NamedTemporaryFile(suffix='.der', delete=False) as fh:
+        fh.write(der); tmp = fh.name
+    print("  " + subprocess.run(['openssl', 'x509', '-inform', 'DER', '-in', tmp, '-noout', '-subject'],
+                                capture_output=True, text=True).stdout.strip()[:130])
+    pathlib.Path(tmp).unlink(missing_ok=True)
+PYCERT
 else
-  echo "  ⚠️ 没能从产物里提取证书（改用 profile 里的证书指纹）"
+  echo "  ⚠️ .app 里没有 embedded.mobileprovision"
 fi
-rm -rf "$TMP"
-
 echo ""
 echo "=== 产物 ==="
 ls -la "$ARCHIVE_PATH" | sed 's/^/  /'
