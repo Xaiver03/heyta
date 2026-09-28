@@ -137,12 +137,19 @@
 .ht-header__title {
   font-size: var(--ht-font-size-xl);
   font-weight: var(--ht-font-weight-semibold);
+  /* 🔴 与 .ht-viewtabs 那段成对：**只让 tab 栏吸收溢出压力**（它已经能横向滚动）。
+     标题不许被压 —— 否则「收集箱」会竖排成「收集 / 箱」（1280 宽实测如此），
+     与 tab 标签折行是同一个根因：flex 子项缩到内容宽度以下。 */
+  white-space: nowrap;
+  flex: 0 0 auto;
 }
 
 .ht-header__actions {
   margin-inline-start: auto;
   display: flex;
   gap: var(--ht-space-2);
+  /* 同上：右侧动作（日期/倒计时/同步状态/主题）不被压窄 */
+  flex: 0 0 auto;
 }
 
 .ht-content {
@@ -515,7 +522,22 @@
 }
 
 /* ── 视图切换条 ─────────────────────────────────────────────
-   扁平风格：用边框与背景表达选中态，不用阴影或位移。 */
+   扁平风格：用边框与背景表达选中态，不用阴影或位移。
+
+   🔴 2026-09-28 实测修：**8 个视图 tab 的标签在 ≤1440px 会全部折成两行**。
+   栏本身**不溢出**（1280 实测 `scrollWidth == clientWidth == 524`），原因是
+   `.ht-viewtabs` 是 flex、`.ht-viewtab` 是 inline-flex，而两处都没有
+   `white-space: nowrap` 与 `flex: 0 0 auto` —— 于是宽度不够时 flex 不是
+   "放不下就溢出"，而是**把每个 tab 压到内容宽度以下**，标签就在
+   `min-height: 44px` 的盒子里折成两行。
+
+   ⚠️ 正因如此，**`min-height: 44px` 这条最常用的不变量在这里是骗人的**：
+   量 tab 高度永远是 44px（8 个全过），只有量标签的**行盒数**才看得见
+   （1280/1440 = 10/10 折行，1680 = 0/10）。别用高度去验这一条。
+
+   修法：标签不折行、tab 不被压窄，放不下就让**这一条**横向滚动。
+   隐藏滚动条是刻意的 —— 否则滚动条会占掉高度，header 会随视口宽跳一下
+   （那是 CLS）；tab 在获得焦点时浏览器会自动把它滚进视野。 */
 .ht-viewtabs {
   display: flex;
   gap: var(--ht-space-1);
@@ -523,6 +545,12 @@
   border-radius: var(--ht-radius-md);
   background: var(--ht-color-surface-sunken);
   margin-right: auto;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.ht-viewtabs::-webkit-scrollbar {
+  display: none;
 }
 
 .ht-viewtab {
@@ -532,6 +560,9 @@
   /* 44px 最小点击目标（UIX Pro 硬规则 2） */
   min-height: var(--ht-touch-target-min);
   padding: 0 var(--ht-space-3);
+  /* 🔴 与上面那段注释成对：不折行、不被压窄 */
+  white-space: nowrap;
+  flex: 0 0 auto;
   cursor: pointer;
   border: var(--ht-border-width-thin) solid transparent;
   border-radius: var(--ht-radius-sm);

@@ -172,8 +172,17 @@
   font-size: var(--ht-font-size-xl);
   font-weight: var(--ht-font-weight-semibold);
   letter-spacing: var(--ht-tracking-title);
+  /* 与 `.ht-header__title` 成对：只让 tab 栏吸收溢出压力，标题不许被压。
+     少这一条，「四象限」会竖排成「四象 / 限」。 */
+  white-space: nowrap;
+  flex: 0 0 auto;
 }
 
+/* 🔴 与 `apps/web/src/styles/app.css` 的 `.ht-viewtabs` **必须成对维护**：
+   真应用那边不加 `nowrap` + `flex: 0 0 auto` 会让 8 个 tab 的标签折成两行
+   （1280/1440 实测 10/10 折行）；复刻这边少一条，复刻就会**比真应用还难看** ——
+   而"复刻比真应用好看"正是这份 mockup 最该避免的事。
+   见 `docs/research/showcase-fidelity-audit.md` §3。 */
 .mk-viewtabs {
   display: flex;
   gap: var(--ht-space-1);
@@ -181,6 +190,12 @@
   border-radius: var(--ht-radius-md);
   background: var(--ht-color-surface-sunken);
   margin-inline-end: auto;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.mk-viewtabs::-webkit-scrollbar {
+  display: none;
 }
 
 .mk-viewtab {
@@ -194,6 +209,8 @@
   color: var(--ht-color-foreground-muted);
   font-size: var(--ht-font-size-xs);
   font-weight: var(--ht-font-weight-medium);
+  white-space: nowrap;
+  flex: 0 0 auto;
 }
 
 .mk-viewtab--active {
@@ -207,6 +224,8 @@
   display: flex;
   align-items: center;
   gap: var(--ht-space-2);
+  /* 与 `.ht-header__actions` 成对：右侧动作不被压窄 */
+  flex: 0 0 auto;
 }
 
 /* 同步状态。复现 SyncBar：状态用**图标 + 文字**，不只靠颜色。 */
@@ -558,6 +577,32 @@
   padding: 0 var(--ht-space-3);
   border-radius: var(--ht-radius-md);
   font-size: var(--ht-font-size-sm);
+  color: var(--ht-color-foreground-muted);
+}
+
+/* 「新清单 / 新标签」—— 真应用里 `ProjectsPanel` 与标签区各是一个
+   **输入框 + 框外一个 `+`**，不是一行静态名字。复刻照它的形态画。 */
+.mk-field {
+  display: flex;
+  align-items: center;
+  gap: var(--ht-space-2);
+}
+
+.mk-field__box {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  min-block-size: var(--ht-touch-target-min);
+  padding: 0 var(--ht-space-3);
+  border: var(--ht-border-width-thin) solid var(--ht-color-border);
+  border-radius: var(--ht-radius-md);
+  font-size: var(--ht-font-size-sm);
+  color: var(--ht-color-foreground-muted);
+}
+
+.mk-field__add {
+  display: inline-flex;
+  align-items: center;
   color: var(--ht-color-foreground-muted);
 }
 
