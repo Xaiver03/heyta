@@ -439,25 +439,34 @@ Windows / macOS / Linux 三平台各出一个能跑起真实同步的桌面应�
 
 这条**推翻了** [ADR-0024](../adr/0024-desktop-shell-and-ui-convergence.md) §2.2 里
 "桌面壳选 Electron"的**权衡前提** —— 那里的论证建立在"UI 复用度最高"上，
-而现在**原生性优先于复用度**。新的决策见
-[ADR-0032：Windows 迁到 react-native-windows 原生](../adr/0032-windows-native-via-rnw.md)。
+而现在**原生性优先于复用度**。
+
+🔴 **同一天又推翻了第一版的结论**：第一版选 react-native-windows（RNW），
+但复核 npm registry 实测 **RNW 最新稳定版就是 0.84.0**（`peerDep: react-native 0.84.1`），
+**没有 0.85 / 0.86 / 0.87 的稳定版**，而 RN 上游已到 **0.87.1**。
+⇒ 选 RNW 等于把整个 monorepo（含旗舰 `apps/mobile`）
+**冻在一个已出上游支持窗口的 RN 上** —— 那是**产品**代价，
+不是"代码量"代价，**不被"哪怕是代码量偏大"覆盖**。
+现决策见 [ADR-0034：Windows 走 WinUI 3 / Windows App SDK 原生](../adr/0034-windows-native-winui3-not-rnw.md)
+（**全部取代** [ADR-0032](../adr/0032-windows-native-via-rnw.md)）。
 
 Electron 骨架**不废弃**，角色变了：它是
 ① 已实测可用的**基线**、② macOS/Linux 在原生路线打通前的**过渡壳**、
-③ RNW 路线的**对照基准**（同一套断言必须两边都过）。
+③ WinUI 3 路线的**对照基准**（同一套断言必须两边都过）。
 
 三端的原生可达性**不一样**，这是本阶段最需要说清的一件事：
 
 | 平台 | 真原生方案 | 可达性 | 卡点 |
 |---|---|---|---|
-| **Windows** | **react-native-windows（RNW）** | ✅ **可行** | RNW 0.84.0 的 peerDependency = `react-native: 0.84.1`，**与 heyta 精确相等**；New Arch（C++/WinAppSDK/Win32/Composition） |
-| **macOS** | `react-native-macos` | 🔴 **现在不可行** | 最新 **0.81.9**，peerDep `react-native: 0.81.6`，官方要求"同一 minor"；heyta 在 **0.84.1** → **硬冲突**。降级移动端到 0.81 不可接受 |
-| **macOS**（备选） | SwiftUI 原生 | ⚠️ 可行但要**另写一整套 UI** | 那是**第四份** UI 实现，与"停止写两遍"直接对立 |
-| **Linux** | 无 RN 目标 | 🔴 **不存在** | RN 系没有 Linux；真原生 = GTK4/Qt，**又一个独立代码库** |
+| **Windows** | **WinUI 3 / Windows App SDK（C#）** | ✅ **本次就做** | 不碰 RN 版本 ⇒ 移动端保持升级自由；`Microsoft.Data.Sqlite` 是 ADO.NET（**同步**，正好合 `SqliteDriver`）；widget provider **有官方 C# 教程** |
+| ~~Windows~~（原选） | `react-native-windows` | 🔴 **本轮出局** | RNW **无 ≥0.85 稳定版** ⇒ 选它 = 把 `apps/mobile` 一起冻在 RN 0.84.1 |
+| **macOS** | SwiftUI / AppKit 原生 | ⚠️ **可达，但排在 Windows 之后** | 与 Windows 卡在**同一个**问题上（跨语言调用 `packages/domain`）；**同一个答案用两次**才划算，先做就是把那问题付两遍 |
+| **macOS**（备选） | `react-native-macos` | 🔴 **现在不可行** | 最新 **0.81.9**，peerDep `react-native: 0.81.6`，官方要求"同一 minor"；heyta 在 **0.84.1** → **硬冲突** |
+| **Linux** | GTK4/Qt | ⏸ **可达，但没有需求证据** | RN 系没有 Linux；且团队那两台是 **CI/部署服务器，不是桌面用户** ⇒ 不启动第四个原生壳 |
 
-⇒ **本阶段的取舍**：Windows **真的迁**（可行且对齐）；
-macOS/Linux **保留 Electron 并如实标注为过渡**，
-不假装它们"也是原生的"。详表见
+⇒ **本阶段的取舍**：Windows **真的迁**（WinUI 3）；
+macOS **排在 Windows 的领域层方案之后**；Linux **等需求证据**；
+三者落地前**保留 Electron 并如实标注为过渡**，不假装它们"也是原生的"。详表见
 [多端原生构建计划](desktop-native-migration.md)。
 
 ### ✅ 已完成的部分（2026-09-27）

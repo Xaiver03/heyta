@@ -8,6 +8,10 @@
 > **接受更大的代码量**（原生性优先于复用度）。⇒ 引用本文时请注意：
 > **"Capacitor 被否决"这一条结论仍然成立**（它没有 Windows 平台，与代码量无关），
 > 但**"因为代码多所以不选"这类论证不再有效**。
+> 🔴 **Windows 一行又被 [ADR-0034](0034-windows-native-winui3-not-rnw.md) 取代**：
+> ADR-0032 选的 react-native-windows **没有 ≥0.85 的稳定版**，选它会把 `apps/mobile`
+> 一起冻在已出上游支持窗口的 RN 0.84.1 上。Windows 现定为
+> **WinUI 3 / Windows App SDK 原生（C#）**。**引用 §3 结论 1 时以 ADR-0034 为准。**
 
 ## 1. 背景与约束
 
