@@ -199,6 +199,46 @@ else
   screen_txt
 fi
 
+step "5b. 写备注（此前移动端**没有**备注输入框）"
+# 🔴 为什么这一条必须在这里、而不是只靠单测：
+#
+# `Task.note` 与 `TaskActions.setNote` 一直都在，但**唯一调用点是 AI**
+# （拆解 checklist / 估时写时长）—— 用户自己写不了备注。
+# 单测能证明 `commitNote` 算得对，证明不了"面板上真的有这个输入框"，
+# 更证明不了**它真的写进 op-log 并同步出去**。后者只能在这里验。
+NOTE_TEXT="note-$TITLE"
+if open_sheet "打开任务：$TITLE"; then
+  dump
+  # 备注紧跟在标题下面，正常在第一屏；找不到才滚（"查不到"不是"不存在"）。
+  XY=$(xy_edit "备注")
+  [ -z "$XY" ] && XY=$(scroll_to_desc "备注")
+  if [ -z "$XY" ]; then bad "详情面板里找不到备注输入框"; screen_txt; else
+    $ADB shell input tap $XY; sleep 1.2
+    clear_and_type "$NOTE_TEXT" "备注"
+    dump
+    VAL=$(edit_value "备注")
+    if [ "$VAL" = "$NOTE_TEXT" ]; then
+      ok "备注已输入：$NOTE_TEXT"
+    else
+      bad "备注框里是 '$VAL'，不是 '$NOTE_TEXT'"
+    fi
+    # 关闭面板时会提交备注（见 TaskDetailSheet 的 close()）。
+    # 只在 onBlur 提交的话，"写完直接关"会丢掉刚打的字 —— 而那是移动端最常见的动作。
+    close_sheet
+  fi
+fi
+# 重新打开，断言**备注真的落库了**（不是只活在输入框里）。
+if open_sheet "打开任务：$TITLE"; then
+  dump
+  VAL=$(edit_value "备注")
+  if [ "$VAL" = "$NOTE_TEXT" ]; then
+    ok "重新打开后备注还在（已经写进 op-log，不是只改本地态）"
+  else
+    bad "重新打开后备注是 '$VAL' —— 没提交成功"
+  fi
+  close_sheet
+fi
+
 step "6. 改标题"
 if open_sheet "打开任务：$TITLE"; then
   dump
@@ -267,7 +307,7 @@ else
   screen_txt
 fi
 
-step "9. 断言：截止日期与优先级同步到了**另一台设备**"
+step "9. 断言：截止日期、优先级与**备注**同步到了另一台设备"
 # 🔴 必须先 sync：`list` 只读**本地**库，而笔记本这份库刚被删掉重建过。
 # 少了这一步，断言会在"笔记本还没有任何数据"的前提下失败 ——
 # 那看起来像"没同步过去"，实际是脚本自己没下载。
@@ -287,7 +327,11 @@ if t.get('dueDate') is None:
     print('NODUE:dueDate 是空的'); raise SystemExit
 if t.get('priority') != 3:
     print('NOPRI:priority=' + repr(t.get('priority'))); raise SystemExit
-print('OK dueDate=%s priority=%s' % (t['dueDate'], t['priority']))
+# 备注：证明**用户自己写的字**进了 op-log 并跨设备到达。
+# 在它之前这条断言不可能成立 —— 移动端根本没有写备注的入口。
+if t.get('note') != '$NOTE_TEXT':
+    print('NONOTE:note=' + repr(t.get('note'))); raise SystemExit
+print('OK dueDate=%s priority=%s note=%s' % (t['dueDate'], t['priority'], t['note']))
 ")
 case "$VERDICT" in
   OK*) ok "笔记本侧拿到同一份数据：$VERDICT" ;;

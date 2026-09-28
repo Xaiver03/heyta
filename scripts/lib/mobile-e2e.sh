@@ -75,8 +75,18 @@ NODE=$(resolve_real_node)
 TOKEN=$(cat /tmp/heyta_mobile_token.txt)
 EMAIL=$(cat /tmp/heyta_mobile_email.txt)
 E2EE=$(cat /tmp/heyta_mobile_e2ee.txt)
-SERVER=http://10.0.2.2:3000
-HOST_SERVER=http://127.0.0.1:3000
+# 🔴 端口**必须**跟 `mobile-e2e-up.sh` 的 `PORT` 走，不能写死 3000。
+#
+# 那个脚本早就支持 `PORT` 了，而这里写死 —— 于是"换个端口起栈"会得到一个
+# **极具误导性**的失败：验收脚本去连 3000 上**别人的进程**（本机实测有一个
+# 别的项目的 vite 占着 3000），拿到的是它的 HTML 而不是 heyta 的 JSON。
+# 症状会分成两层，两层都指向错误的方向：
+#   - 建号失败 → 报"服务端是否以 TEST_MODE 运行？"（而真正的问题是**连错了服务端**）；
+#   - 同步步骤失败 → 看起来像同步协议坏了。
+# `10.0.2.2` 是模拟器眼里的宿主机，所以两处端口必须同时改。
+E2E_PORT="${PORT:-3000}"
+SERVER=http://10.0.2.2:${E2E_PORT}
+HOST_SERVER=http://127.0.0.1:${E2E_PORT}
 
 PASS=0; FAIL=0
 ok()   { echo "   ✅ $1"; PASS=$((PASS+1)); }

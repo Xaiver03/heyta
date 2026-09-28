@@ -54,7 +54,57 @@ const ENTRY_PATTERNS = [
   /startCheckout\s*\(/,
 ];
 
-/** 扫一个目录，返回 [{ file, line, text }]。跳过测试与注释行。 */
+/**
+ * 把一行源码里的**注释**去掉，返回剩下的代码部分。
+ *
+ * 🔴 为什么不是"看这一行是不是以 `//` 或 `*` 开头"就完事。
+ *
+ * 这条门禁**曾经那样写**，于是它对**块注释的续行**完全失效：
+ * 一句写在块注释中间、以中文括号开头的说明
+ * （`（同一条判据见 Pricing.tsx 里为什么不放…）。`）
+ * 既不 startsWith('//') 也不 startsWith('*')，于是被当成**真的付款入口**。
+ *
+ * 后果不是"误报一次"那么轻：一条会对着**注释**变红的门禁，
+ * 迟早会被人用改文案、加白名单、甚至关掉它的方式绕过 ——
+ * 而它守的是一条真实的产品承诺（渠道没接通就不许有购买按钮）。
+ *
+ * 所以改成跨行跟踪 `inBlock` 状态。
+ *
+ * ⚠️ `//` 只有在**不是** `://` 的一部分时才当注释 —— 否则
+ * `'https://example.com'` 会被从中间截断，而**截断之后的文本里
+ * 藏的付款入口就再也查不到了**（假阴性比假阳性危险得多）。
+ */
+function stripCommentsOnLine(line, inBlock) {
+  let code = line;
+  let block = inBlock;
+
+  for (;;) {
+    if (block) {
+      const close = code.indexOf('*/');
+      if (close === -1) return { code: '', inBlock: true };
+      code = code.slice(close + 2);
+      block = false;
+      continue;
+    }
+    const open = code.indexOf('/*');
+    if (open === -1) break;
+    const before = code.slice(0, open);
+    const after = code.slice(open + 2);
+    const close = after.indexOf('*/');
+    if (close === -1) return { code: before, inBlock: true };
+    code = before + after.slice(close + 2);
+  }
+
+  for (let i = 0; i < code.length; i += 1) {
+    if (code[i] === '/' && code[i + 1] === '/' && code[i - 1] !== ':') {
+      code = code.slice(0, i);
+      break;
+    }
+  }
+  return { code, inBlock: false };
+}
+
+/** 扫一个目录，返回 [{ file, line, text }]。**跳过注释**（含块注释续行）。 */
 const scanDir = (dir) => {
   const hits = [];
   const abs = join(ROOT, dir);
@@ -69,12 +119,17 @@ const scanDir = (dir) => {
       }
       if (!/\.(ts|tsx|js|jsx|vue|svelte|html)$/.test(name)) continue;
       const text = readFileSync(p, 'utf8');
+      // 🔴 `inBlock` **按文件**重置，不是按行 —— 块注释跨行，
+      //    逐行重置等于又退回"只看行首"的老写法。
+      let inBlock = false;
       text.split('\n').forEach((line, i) => {
+        const stripped = stripCommentsOnLine(line, inBlock);
+        inBlock = stripped.inBlock;
         // 注释不是入口。否则写一句"这里以后放购买按钮"就会让门禁变红。
-        const trimmed = line.trim();
-        if (trimmed.startsWith('//') || trimmed.startsWith('*') || trimmed.startsWith('/*')) return;
-        if (ENTRY_PATTERNS.some((re) => re.test(line))) {
-          hits.push({ file: relative(ROOT, p), line: i + 1, text: trimmed.slice(0, 120) });
+        const code = stripped.code.trim();
+        if (code === '') return;
+        if (ENTRY_PATTERNS.some((re) => re.test(code))) {
+          hits.push({ file: relative(ROOT, p), line: i + 1, text: code.slice(0, 120) });
         }
       });
     }

@@ -32,9 +32,9 @@ heyta 是一个**本地优先**的任务管理应用，目标是做一个功能�
 | `packages/sync-client/` | 宿主无关的同步编排（上传/下载/冲突上报） | ✅ |
 | `packages/design-system/` | 设计变量唯一事实源 + 三端生成器（Swift / ArkTS / RN） | ✅ |
 | `packages/i18n/` | **中英词条表**（自研零依赖）。🔴 它是**唯一文案事实源** —— 界面里不许出现硬编码文案，由 `check:ui-language` 拦 | ⚠️ 改词条**必须中英同步** |
-| `packages/app-host/` | **宿主无关的应用接线与写入动作**（见下文 §3.5） | ✅ |
+| `packages/app-host/` | **宿主无关的应用接线与写入动作**（见下文 §3.5）。含 **AI 工具路径**：`ai-tool-selection.ts`（自然语言→工具，纯规则）+ `ai-tool-run.ts`（读即执行 / 写**只产出提案**，确认才 `submit`） | ✅ |
 | `packages/ai/` | **出站 AI**：供给模式 / **出境闸门** / provider 端口 / 配置路由 / 健康熔断。🔴 **只产出建议，类型上产生不了 op**；零厂商 SDK | ✅ 零运行时依赖 |
-| `packages/local-api/` | **入站 AI 接口**：本机 API / MCP 的工具契约 + 授权判定 + JSON-RPC 处理器。默认关、只监听回环、逐工具授权；🔴 **不构造 op** | ✅ 零运行时依赖 |
+| `packages/local-api/` | **入站 AI 接口**：本机 API / MCP 的工具契约 + 授权判定 + JSON-RPC 处理器。默认关、只监听回环、逐工具授权；🔴 **不构造 op**。⚠️ 它的**工具目录/授权/执行器与内置 AI 共用**（`isToolGranted` / `runReadTool` / `toWriteIntent`），**不要另建一份**（[ADR-0035](docs/adr/0035-ai-tool-calling-reuses-local-api.md)） | ✅ 零运行时依赖 |
 | `server/` | 同步服务端 + **计费**（Fastify + Prisma + PostgreSQL）。**vendored，MIT** | ✅ 已改造 |
 | `apps/` | 客户端外壳。**只允许放平台差异与 UI 绑定** | ✅ |
 | `apps/web/` | Web 壳（IndexedDB + 浏览器 fetch） | ✅ |
@@ -2325,15 +2325,30 @@ L3 叙事三层**已实现**，**并已落到 `main`**（merge commit `84cc7f5`�
    `navigator.credentials.create()`，本来就不该在 SPA 里。**缺的只是"触发那封邮件"这一步。**
    教训：**只在 `apps/web` 里搜，就会把服务端渲染的流程误判成"没做"。**
    验收：9 条单测 + 变异验证（按钮 `onClick` 换空操作即转红）。
-   ⚠️ 仍然没有的：用户自助**增删凭据**（没有 UI 也没有端点）。
+   🔴 **本条下面那句"仍然没有增删凭据"已经过期（2026-09-28 逐条核过）**：
+   新增 / 列出 / 改名 / 删除**全都有** —— 端点在 `packages/app-host/src/hosted-auth.ts`
+   （`listPasskeys` / `deletePasskey` / 改名走同一条纪律），UI 是设置页的
+   `apps/web/src/features/settings/PasskeyPanel.tsx`（含两段式删除与"最后一条不许删"）。
+   留一行原文是为了让人看清它错在哪：**"没有入口"这句话的保质期取决于别人什么时候补上它**，
+   所以它旁边必须写核对的日期。判据见 [`docs/plans/roadmap.md`](docs/plans/roadmap.md) §5.1.1 那张表。
 3. **导出**：`packages/app-host/src/export-dump.ts`。含**墓碑**与完整 op-log，
    另有可核对的 `counts`（丢掉墓碑的"备份"回放时已删数据会复活）。
-   入口在 Web 设置页与 node-host CLI，**移动端没有**。**只能导出，不能导回。**
+   🔴 **范围已过期（2026-09-28 逐条核过）**：原文写"入口在 Web 设置页与 node-host CLI，
+   **移动端没有**。**只能导出，不能导回。**"—— 两句都不对了。
+   现在的覆盖是：**导出**三端都有（Web `ExportPanel` / CLI `export --out` /
+   移动端「我的 → 导出数据」走系统分享面板）；**导入**只有 Web 与 CLI（只支持还原到空库），
+   **移动端没有导入入口**。两件事的覆盖率不同，所以必须分开写。
+   唯一仍然成立的是那条诚实条款：**在移动端**，拿到的东西确实导不回来 ——
+   那里的文案仍然写着这一点（见 §5.1.1）。
 4. **回收站**：还原 = `UPD { deletedAt: null }`；彻底删除 = 打 `purgedAt` **标记**，
    **不清除 `deletedAt`**（清了会让离线对端把已删数据**复活**）。只有 TASK，不含 PROJECT / TAG。
 5. **移动端成长体系**：共享取数在 `packages/app-host/src/motivation.ts`；
    移动端「我的 → 成长」是**第二层页面**，底部仍是 5 个标签。
-   ⚠️ **没在真机 / 模拟器上验过**，没过 Metro / Release 打包，没实测暗色主题。
+   🔴 **"没在真机 / 模拟器上验过"已经过期（2026-09-28 逐条核过）**：
+   已在 **iOS 模拟器上实跑并截图**（浅色 + 深色两版，深色是 `simctl ui appearance dark`
+   真的切过），验收记录在 [`docs/plans/roadmap.md`](docs/plans/roadmap.md) §5.1.1 的断点 6。
+   唯一**仍然**没验的是"超长习惯名的换行"—— 当时手机上没有习惯数据（移动端没有建习惯入口），
+   只证到代码层。**仍然没上过真机**（需要签名）。
 
 **应用本体的部署**（在此之前它**从来没有被部署过**）：
 `https://heyta.finlaw.cloud/app/`。方式与两个必须记住的坑见

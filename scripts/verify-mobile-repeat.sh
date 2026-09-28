@@ -55,8 +55,20 @@ LAPTOP_DB=/tmp/heyta-repeat-laptop.sqlite
 PHONE_DB=/tmp/heyta-repeat-phone.sqlite
 rm -f "$LAPTOP_DB" "$PHONE_DB"
 
-TAB_TASKS=135
-TAB_PROFILE=945
+# 🔴 坐标**由 tab 数量推导**，不许再手写一个数：底部栏是 **5 个平级 tab**
+# （任务/日历/专注/分类/我的，见 `apps/mobile/src/nav/TabBar.tsx`），
+# 1080 宽均分 ⇒ 中心 = 1080/5 × (i + 0.5) = **108 / 324 / 540 / 756 / 972**。
+# ⚠️ 这里曾经是 135/405/675/945 —— 那是**4 个 tab 时代**的值，
+# 换成 5 tab 之后没人改，于是一整批 E2E 一直在点错位置。
+# 2026-09-28：TAB_FOCUS 被单独修正过（675→540），但同一文件里的
+# TAB_TASKS / TAB_PROFILE 没跟着改 —— "改了一处、漏了其余的"。
+# 2026-09-28 晚：一度新增第 6 个 tab「四象限」（插在「任务」之后），
+# 坐标整体换成 6 tab 的（90/270/450/630/810/990）。
+# 🔴 P10 撤销了那个 tab（它违反 ADR-0015 §4），坐标**回到 5 tab** 的推导值。
+# 见 `docs/plans/multi-platform-adaptation.md` 的 P10。这一步不许省：坐标不改，
+# 脚本会**点错 tab 却照样"通过"或莫名失败**。
+TAB_TASKS=108
+TAB_PROFILE=972
 TAB_Y=2253
 
 # ── 辅助 ────────────────────────────────────────────────────

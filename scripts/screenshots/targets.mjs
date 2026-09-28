@@ -191,7 +191,7 @@ export const SHELL_EVIDENCE = [
     png: 'apps/desktop-macos/evidence/window-first-run.png',
     note: 'apps/desktop-macos/evidence/window-first-run.txt',
     // 窗口截图**必须**交叉验证：存在"应用自己重绘"这条会把 SwiftUI 渲染坏的歧路
-    methods: ['cgs-window-server', 'screencapture-window'],
+    methods: ['screencapturekit', 'screencapture-window'],
     requiresCrosscheck: true,
   },
   {

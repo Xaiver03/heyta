@@ -452,6 +452,47 @@ for (const [label, file] of [
   sweep(block, `${label}（${file}）的 landing.pricing.*`, problems);
 }
 
+/**
+ * 全表扫描：**任何地方**出现的货币金额都必须是被批准的。
+ *
+ * 🔴 为什么需要它，而层 2 那个"只扫价格区"不够 —— 实测（2026-09-28）：
+ *
+ * 站点多页化时，价格被写进了两个**价格区之外**的词条：
+ * `site.pricing.seo.description`（进 `/pricing` 的 `<meta description>`、
+ * `og:description`、`twitter:description` 与 JSON-LD 的 `description`）与
+ * `site.pricing.compare.ai.hosted`（价格对照表里那句"需 ¥12 档"）。
+ *
+ * 层 2 的注释写着"别处的数字不是价格"—— 那个假设**当时是对的，后来不对了**，
+ * 而没有任何东西会来告诉它。实测的后果：把这两条改成 `¥999 / ¥888`
+ * （中英两表同时改），层 1–4 **全部通过**，`check-ui-language` 也通过 ——
+ * 于是"用户看到的价格"与"他要付的价格"可以不一致，而这条门禁是**唯一**
+ * 守这件事的东西（它的文件头写着"落地页写 ¥5 而价目表是 ¥39 → 虚假宣传"）。
+ *
+ * 与层 2 的区别只有一条：**允许零个金额**。层 2 扫的是一个"必须存在价格"的
+ * 区块（零个意味着锚点失效），而全表扫描里零个是正常情况 ——
+ * 沿用层 2 的实现会让这道检查在"没有任何价格词条"时反而报红，
+ * 那是一条会被人关掉的门禁。
+ */
+function sweepNoUnapproved(text, where, found) {
+  for (const t of currencyTokens(text)) {
+    if (!APPROVED.has(t)) {
+      found.push(
+        `出现了不被批准的价格：${where} 里有 ${t}，` +
+          `而价格表只批准 ${[...APPROVED].join(' / ')}。` +
+          `价格区之外的地方也要同一次改 —— 见本函数上方的说明。`,
+      );
+    }
+  }
+}
+
+// 层 2b：**全表**不得出现未批准的金额
+for (const [label, file] of [
+  ['zh catalog', CATALOG_ZH],
+  ['en catalog', CATALOG_EN],
+]) {
+  sweepNoUnapproved(read(file), `${label}（${file}）全表`, problems);
+}
+
 // 层 3：对外怎么承诺（两份都扫）
 for (const [file, text] of legalTexts) {
   sweep(text, file, problems);

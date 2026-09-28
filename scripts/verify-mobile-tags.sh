@@ -258,6 +258,107 @@ else
   bad "任务的 op 里没有 tagIds —— 点选没有真的写进去"; screen_txt
 fi
 
+step "6b. 标签筛选行：点标签 → 只剩带该标签的任务"
+# 🔴 这一条覆盖的是**此前根本不存在的入口**：Web 侧栏点标签能筛，
+#    而移动端连一条筛选行都没有 —— 同一件能力两端不一致。
+#    判据需要一个**不带标签的对照组**，否则"筛完还在"什么都证明不了。
+UNTAGGED="untagged-$(date +%H%M%S)"
+$ADB shell input tap 135 $TAB_Y; sleep 2.5   # 「任务」
+dump
+if [ "$(has_text "${TAG_NAME}")" != "1" ]; then
+  bad "任务视图里没有标签筛选项「${TAG_NAME}」——筛选行没渲染出来"; screen_txt
+else
+  ok "任务视图里出现了标签筛选项「${TAG_NAME}」"
+fi
+
+# 建一条**不带标签**的对照任务
+dump
+XY=$(xy_desc "新建任务")
+if [ -z "$XY" ]; then bad "找不到新建按钮"; screen_txt; else
+  $ADB shell input tap $XY; sleep 2.5
+  dump
+  XY=$(xy_edit_any)
+  if [ -z "$XY" ]; then bad "新建面板里找不到输入框"; else
+    $ADB shell input tap $XY; sleep 1
+    $ADB shell input text "${UNTAGGED}"; sleep 1.5
+    dump
+    XY=$(xy_text "添加")
+    [ -n "$XY" ] && { $ADB shell input tap $XY; sleep 3; }
+  fi
+fi
+dump
+if [ "$(has_desc "打开任务：${UNTAGGED}")" = "1" ]; then
+  ok "对照任务已创建：${UNTAGGED}（不带标签）"
+else
+  bad "对照任务没创建"; screen_txt
+fi
+
+# 点标签筛选
+dump
+XY=$(xy_desc "${TAG_NAME}")
+if [ -z "$XY" ]; then
+  bad "找不到可点的标签筛选项"; screen_txt
+else
+  $ADB shell input tap $XY; sleep 2.5
+  dump
+  # 带标签的那条要在，不带标签的那条要**不在**
+  [ "$(has_desc "打开任务：${TASK_TITLE}")" = "1" ] \
+    && ok "筛选后带该标签的任务仍在" \
+    || bad "筛选后带标签的任务不见了 —— 筛反了"
+  [ "$(has_desc "打开任务：${UNTAGGED}")" = "0" ] \
+    && ok "筛选后不带该标签的任务被排除（${UNTAGGED}）" \
+    || { bad "筛选没生效：不带标签的任务 ${UNTAGGED} 仍在"; screen_txt; }
+fi
+
+# 点「全部」清掉筛选 —— 也要证明**能清掉**（否则用户被卡在空列表里）
+dump
+XY=$(xy_desc "全部")
+if [ -z "$XY" ]; then
+  bad "找不到「全部」——筛过之后没有清除入口，用户会被卡住"; screen_txt
+else
+  $ADB shell input tap $XY; sleep 2.5
+  dump
+  [ "$(has_desc "打开任务：${UNTAGGED}")" = "1" ] \
+    && ok "点「全部」后对照组任务回来了（筛选可清除）" \
+    || bad "点了「全部」但对照任务没回来"
+fi
+# ── 6c. 搜索：此前移动端**根本没有搜索框**（Web 有） ──
+# 判据同样需要一个**不命中**的对照：只搜到"那条在"什么都证明不了。
+dump
+# 🔴 content-desc 的**实际值**是「搜索任务（标题与备注）」（词条 `web.shell.search.aria`），
+# 而 `xy_edit` 要求 `desc == want` **精确相等** —— 写「搜索任务」匹配不到。
+# 第一次跑就栽在这里，而界面上搜索框明明在（dump 里有它）。
+XY=$(xy_edit "搜索任务（标题与备注）")
+if [ -z "${XY}" ]; then
+  bad "任务视图里找不到搜索框 —— 判据在共享层，但移动端没人能用"; screen_txt
+else
+  ok "任务视图里有搜索框"
+  $ADB shell input tap "${XY}"; sleep 1
+  # `${TASK_TITLE}` 里带秒级时间戳，取它做关键词最不容易误命中
+  $ADB shell input text "${TASK_TITLE}"; sleep 2
+  dump
+  [ "$(has_desc "打开任务：${TASK_TITLE}")" = "1" ] \
+    && ok "搜索后命中的任务仍在" \
+    || bad "搜索把该命中的任务也筛掉了 —— 判据可能反了"
+  [ "$(has_desc "打开任务：${UNTAGGED}")" = "0" ] \
+    && ok "搜索后不命中的任务被排除（${UNTAGGED}）" \
+    || { bad "搜索没生效：不命中的 ${UNTAGGED} 仍在"; screen_txt; }
+  # 清除：否则用户只能一个字一个字删
+  dump
+  XY=$(xy_desc "清除搜索")
+  if [ -z "${XY}" ]; then
+    bad "搜索框旁没有「清除搜索」—— 用户只能逐字删"; screen_txt
+  else
+    $ADB shell input tap "${XY}"; sleep 2
+    dump
+    [ "$(has_desc "打开任务：${UNTAGGED}")" = "1" ] \
+      && ok "点「清除搜索」后列表回到全部" \
+      || bad "点了清除但任务没回来"
+  fi
+fi
+
+$ADB shell input tap 945 $TAB_Y; sleep 2.5   # 回「我的」，下一步要同步
+
 step "7. 手机同步（上传 + 下载）"
 $ADB shell input tap 945 $TAB_Y; sleep 3   # 同步按钮在「我的」页
 if phone_sync; then ok "手机同步完成"; else bad "手机同步没成功"; screen_txt; fi
