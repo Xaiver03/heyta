@@ -383,24 +383,39 @@ pnpm build:ios                     # Release, iphonesimulator
 
 | 项 | 值 |
 |---|---|
-| 构建环境 | Windows 打包机 |
-| 状态 | 🔲 **方向未定** |
+| 构建环境 | Windows 打包机（`windows-pc`） |
+| 技术路线 | ✅ **WinUI 3 / Windows App SDK（C#）** —— [ADR-0034](../adr/0034-windows-native-winui3-not-rnw.md) |
+| 状态 | 🟡 **编译这一半已通**（2026-09-28：`dotnet build` 0 警告 0 错误）；⬜ 还没真的开出一个窗口 |
 
-**尚未决定**：桌面端由 **Web（PWA / Tauri）** 还是 **react-native-windows** 覆盖。
-见 [`../plans/phase-2-multi-platform.md`](../plans/phase-2-multi-platform.md) §3.2。
+🔴 **本节此前写的是"方向未定：Web(PWA/Tauri) 还是 react-native-windows"—— 已经过期。**
+2026-09-28 连出两份 ADR 把方向定死了：ADR-0032 选 RNW，随后
+[ADR-0034](../adr/0034-windows-native-winui3-not-rnw.md) **全部取代** ADR-0032，
+改判 **WinUI 3**。理由是一条实测事实：RNW 最新稳定版停在 **0.84.0**，
+没有 0.85+，而 RN 上游已到 0.87.1 —— 选 RNW 等于把**整个 monorepo**
+（含旗舰移动端 `apps/mobile`）冻在一个已经出了上游支持窗口的 RN 版本上。
 
-- 工具链已备（`scripts/windows/setup-build-host.ps1 -Step vs-buildtools` 装
-  VS 2022 Build Tools + C++ 工作负载），但**技术选型没定之前不投入开发**。
-- 若走 Web / Tauri：Windows 打包机只需要 Node，**不需要 VS C++ 工具链**。
+- 🔴 **不再需要 VS 2022 + C++ 工作负载**：实测命令行编译只要
+  `winget install Microsoft.DotNet.SDK.10`（10.0.401）。微软文档写的前置是 VS，
+  但那是 IDE 路径 —— 详见 [`../../research/spikes/winui3-toolchain-probe/`](../../research/spikes/winui3-toolchain-probe/)。
+  这条省掉一个 10~20 GB 的共享机安装。
+- ⚠️ **"能编译" ≠ "能开窗"**：unpackaged 运行还需要机器上装 Windows App SDK 运行时，
+  且**要有一个真实桌面会话**（从 SSH 进来的是无会话环境）。
+- 分阶段任务与验收见 [`../plans/desktop-native-migration.md`](../plans/desktop-native-migration.md) §2。
 
 ---
 
 ## 5. macOS 桌面 / Linux 桌面
 
-| 平台 | 状态 |
-|---|---|
-| macOS 桌面 | 🔲 未规划（可复用 Web / Tauri） |
-| Linux 桌面 | 🔲 未规划（可复用 Web / Tauri） |
+| 平台 | 方向 | 状态 |
+|---|---|---|
+| macOS 桌面 | **SwiftUI / AppKit 原生**（推荐方向） | ⏸ **可达，但本轮不启动** —— 它和 Windows 卡在同一个问题上（跨语言调用 `packages/domain`），先做 macOS 就是**把那个问题付两遍**。触发条件见 §3 of the 迁移计划 |
+| macOS 桌面（备选） | `react-native-macos` | 🔴 **现在不可行**：最新 0.81.9，官方要求"同一 minor"，而 heyta 在 RN **0.84.1** → 硬冲突 |
+| Linux 桌面 | GTK4 / libadwaita（或 Qt） | ⏸ **没有需求证据** —— RN 生态没有 Linux，真原生 = **又一个独立代码库**；而目前没有任何 Linux 桌面用户的证据 |
+
+🔴 **本节此前写的是"未规划（可复用 Web / Tauri）"—— 已过期**：那是"桌面端拿 Web 顶一下"
+的思路，而 ADR-0031 已定"每端都交原生应用"、ADR-0034 把 Windows 定为 WinUI 3 原生。
+**没有原生壳之前，macOS / Linux 继续用 Electron，并在文档里如实标注为过渡形态**
+（不叫"原生"）—— 见 [`../plans/desktop-native-migration.md`](../plans/desktop-native-migration.md) §3/§4。
 
 ---
 

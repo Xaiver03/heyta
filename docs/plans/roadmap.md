@@ -37,11 +37,11 @@ AI **不是 P4**，而是一条与 P2/P3 并行的轨道 —— 理由与排序�
 | 分支 | 内容 | 前置 | 状态 |
 |---|---|---|---|
 | **AI-0 基座** | `packages/ai` 的 provider 端口 + BYOK/自托管后端 + 隐私提示 + 分层门禁 | 两个 spike（浏览器 CORS、RN 端侧运行时） | ✅ **已实现**（`packages/ai/src`：`provider` / `routing` / `egress` / `presets` / `supply` / `health-store`） |
-| **AI-1 捕获** | 一句话 → 结构化任务字段（`chrono-node` 打底，AI 只兜长尾） | AI-0 | ✅ **已实现**（功能 id `capture`；入口 `apps/web/src/features/ai/AiCapture.tsx`，发送前逐步披露） |
+| **AI-1 捕获** | 一句话 → 结构化任务字段。⚠️ **两条路，都不是 `chrono-node`**：① **规则式**（自研正则，`packages/domain/src/capture.ts` 的 `parseCapture`，字段只有 `dueDate` + `priority`）；② **AI 捕获**（`packages/app-host/src/ai-capture.ts`，字段 `title` / `dueDate` / `priority`，解析失败时如实告知而不是静默丢字段）。AI 只兜长尾 | AI-0 | ✅ **已实现**（功能 id `capture`；入口 `apps/web/src/features/ai/AiCapture.tsx`，发送前逐步披露）。🔴 **本条此前写的是「`chrono-node` 打底」—— 那是错的**：全仓没有这个依赖（`packages/domain/package.json` 只有 `shared-schema` + `ical.js`），从未有过。NLP 的真实缺口见 [site-and-parity-alignment.md](site-and-parity-alignment.md) B2-6 |
 | **AI-2 结构化** | 拆解任务（先落 `note` checklist）、逐条象限/优先级建议 | AI-0 | ✅ **已实现**（功能 id `breakdown` / `prioritize`；入口 `AiBreakdown.tsx` / `AiPrioritize.tsx`） |
 | **AI-3 规划** | 今日计划、时间块、AI 排程 | AI-1/AI-2 的真实使用数据 | ⏸ **未实现**（`packages/ai` 与 `apps/web/src/features/ai` 里没有排程功能 id） |
 | **AI-4 复盘** | 周报、习惯趋势叙述 | AI-0 + 端侧推理（受限分支） | ⏸ **未实现**（成长页的周复盘信是**派生纯函数**，不由 AI 生成） |
-| **AI-5 接口 / 数据主权** | 全量导出、本地 API、MCP server | **无**（与 AI-0 解耦，可并行） | 🟡 **部分实现**：本地 API / MCP ✅（`packages/local-api`，6 个工具：`list_tasks` / `get_task` / `list_projects` / `create_task` / `update_task` / `complete_task`）；**全量导出 ❌ 未实现**（没有任何用户可见的导出入口） |
+| **AI-5 接口 / 数据主权** | 全量导出、本地 API、MCP server | **无**（与 AI-0 解耦，可并行） | ✅ **已实现**：本地 API / MCP ✅（`packages/local-api`，6 个工具：`list_tasks` / `get_task` / `list_projects` / `create_task` / `update_task` / `complete_task`）；**全量导出 ✅**（2026-09-27 落地，三端都有入口，见 §5.1.1）。🔴 **本条此前写的是"全量导出 ❌ 未实现（没有任何用户可见的导出入口）"—— 那是错的**，而且它与本文件 §5.3 的同一句话**自相矛盾**（那边早就改成了"已实现"）。同一份进度表里两处说法相反，读到哪一处就得到哪个结论 |
 
 > 表里没有列到的第 5 个已上线功能是 **`duration-estimate`（时长估算）** ——
 > 入口 `apps/web/src/features/ai/AiDuration.tsx`。它是后来加的，原表的三条分支设想里没有它。
@@ -350,10 +350,24 @@ Web 设置页有「导出数据」（JSON 完整保真 / 任务清单 Markdown�
 **墓碑为什么不能丢**：op-log 用 `deletedAt` 表示删除，丢掉墓碑的"备份"回放时已删数据会**复活**。
 只有给人看的那份 Markdown 才过滤墓碑 —— 这个反差有单独用例钉住。
 
-**覆盖率要如实说**：入口目前只在 **Web 设置页**与 **node-host CLI**，**移动端还没有**。
-`README.md` 第 5 条已补上范围说明，避免又把"部分为真"读成"全部为真"。
+**覆盖率要如实说**（三端逐条核过，不是照抄）：
 
-**另一条诚实条款**：这是**导出，不是还原点** —— 还**没有导入**。界面与 Markdown 页脚都写明了。
+| 通道 | 导出 | 导入（只支持还原到空库） |
+|---|---|---|
+| Web 设置页 | ✅ `ExportPanel` | ✅ `ImportPanel` |
+| node-host CLI | ✅ `export --out` | ✅ `import` |
+| 移动端 | ✅ 「我的 → 导出数据」（系统分享面板） | ❌ **没有入口** |
+
+`README.md` 第 5 条已按同一张表补上范围说明，避免又把"部分为真"读成"全部为真"。
+
+⚠️ **本节此前写的是"移动端还没有[导出入口]"与"还**没有导入**"—— 两句都过期了**：
+移动端在 2026-09-28 加了「我的 → 导出数据」；导入则在 Web 与 CLI 都有了。
+**导出的那一套是三端齐全的，导入的那一套缺移动端** —— 两件事的覆盖率不同，
+所以它们必须分开写，不能合成一句"支持导出导入"。
+
+**另一条诚实条款**：拿到的文件**不是还原点**（它是导出，不是备份快照）。
+在**没有导入入口的那一端**（移动端）尤其要说清楚：那里的界面与解释文案仍然写着
+"这不能导回来" —— 因为在他那一端，这句话仍然成立。
 
 ### 5.2 第二段：付费的"交付"半段（详见 [pricing-coupons-handoff.md](pricing-coupons-handoff.md) §11.1 的 11 段表）
 
@@ -370,7 +384,7 @@ Web 设置页有「导出数据」（JSON 完整保真 / 任务清单 Markdown�
 | 轨道 | 下一步 |
 |---|---|
 | **P2 多端** | 鸿蒙**仍未跑起来**：构建链已实测打通（20 MB release HAP、双 ABI），但缺**模拟器系统镜像 + 签名**（产物 unsigned）→ [phase-2-multi-platform.md](phase-2-multi-platform.md) |
-| **AI 线** | AI-0 / AI-1 / AI-2 / 本地 API（MCP）✅ 已上线；**AI-3 规划、AI-4 复盘未实现**。~~全量导出未实现~~ → ✅ **2026-09-27 已实现**（见 §5.1.1；入口在 Web 设置页与 node-host，移动端未做） |
+| **AI 线** | AI-0 / AI-1 / AI-2 / 本地 API（MCP）✅ 已上线；**AI-3 规划、AI-4 复盘未实现**。~~全量导出未实现~~ → ✅ **2026-09-27 已实现**（见 §5.1.1；**入口三端齐全：Web 设置页 / 移动端「我的 → 导出数据」/ node-host CLI** —— 本条此前写「移动端未做」，与同文件 §5.1.1 的三端表矛盾，已按实测更正） |
 | **运营面** | 改价目前等于**服务器 shell 权限**（唯一入口是 `server/scripts/pricing.ts` CLI，无鉴权 / 无角色 / 无 HTTP 面，`--actor` 可伪造）。**在有意引入 admin 路由之前，这条缺口应当保持显式**，而不是被"内网就安全"盖住 |
 | **P3** | 小组件 / 通知 / CalDAV —— 未开工。可行性见 [native-widgets.md](../research/native-widgets.md)，**改造计划见 [multi-platform-widgets.md](multi-platform-widgets.md)**：小组件是**多端适配的输出形态**（不是后续阶段），且 **Windows（PWA provider）与 macOS（Continuity）反而不需要新建壳** |
 
@@ -505,7 +519,7 @@ Web 设置页有「导出数据」（JSON 完整保真 / 任务清单 Markdown�
   📌 **没有为"拒绝删除最后一条凭据"这个新产品决定立 ADR** —— 目前只落在代码注释与测试里；
   它够格单独一份 ADR，但这是需要人来拍的取舍。
 - **回收站的跨设备一致性没有被真正验证**：op 级证明用的是两个真引擎 + 两个真 SQLite，**没有**跑真实的两客户端服务端收敛。
-- ✅ **导入 / 还原已做**（`packages/app-host/src/import-dump.ts`，CLI 与 Web 都有入口）：走**重放导出里的完整 op-log**，
+- ✅ **导入 / 还原已做**（`packages/app-host/src/import-dump.ts`，**CLI 与 Web** 都有入口；🔴 **移动端没有** —— 见 §5.1.1 那张三端表）：走**重放导出里的完整 op-log**，
   所以墓碑语义天然保持（已删数据不复活），并且**只支持还原到空库** —— 目标非空时在写任何东西**之前**就拒绝。
   **"合并到非空库"是被明确拒绝的**，不是排期问题：id 冲突、无共同因果历史（`compareVectorClocks` 只会给 `CONCURRENT`，
   每对都退化成 LWW + 随机 `clientId` 决胜）、"本地是否更新版本"三条判据都没有可信答案，三条路都会**静默丢数据**。

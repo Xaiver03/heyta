@@ -426,3 +426,161 @@ M3 的顺序是"按移动端是否已有对应"排的，而 **landing 不在 M3 
 > **滴答的统一不是"样式表统一了"，是"视图被抽象掉了"** ——
 > 一个列表容器 + 一套类型化 cell，每个视图只是一个**查询**。
 > 我们要做的不是把 30 个前缀族慢慢合并，而是**让"一行"只有一个实现**，然后其余全部推导出来。
+
+---
+
+## 9. 勘误（2026-09-28 —— **不改写上面的原文**）
+
+> 按 `docs/README.md` 的分层规则：`research/` 原则上冻结，**结论有变时新增勘误**。
+
+### 9.1 §8.4 判据 2（「任务行 JSX 全仓只出现在 `packages/ui`」）**有了一条显式豁免**
+
+**触发**：M3 第一刀落地时，这条判据与另一条实测结论**相撞**，两条都对：
+
+| 结论 | 来源 |
+|---|---|
+| 任务行 JSX 只该有一份实现 | 本文 §5 / §8.4 判据 2 |
+| 🔴 **landing 静态引入 `@heyta/ui` 会让首屏 +61.9 kB gzip（+31%）**；懒加载孤岛**也救不了**（`Hero.tsx` 也渲染展厅，1280×800 下展厅 `top=529px` 就在首屏，chunk 在 load 后 ~90 ms 被取回；gzip 按文件做，拆开后**总字节更多**） | M3 第一刀的并行实测（2026-09-28） |
+
+**裁决**：`apps/landing/src/mockup/**` **豁免**该判据。
+一个营销页的首屏体积是**产品取舍**，不能为了统一付 +31%。
+
+**但豁免 ≠ 没人管** —— 换了一条替代约束：
+
+- `packages/design-system/src/task-row-shape.ts` 是「一行用哪些 token」的**唯一登记处**，
+  `packages/ui` 的行与 landing 的复刻件**都从它取值**（契约承重，不是摆设）；
+- `apps/landing/tests/mockup-task-row.spec.tsx` 逐项比对 mockup.css 的 token 与契约，
+  并有一条断言**禁止** `@heyta/ui` 被静态引进 landing（防那 62 kB 静默回潮）；
+- 三种变异实测都会红（契约改而 landing 没跟 / landing 抄回 20px 圆勾选框 / Hero 静态 import）。
+
+**代价要如实说**：`mockup/**` 从此不受判据 2 保护，而**删掉那个替代测试不会让任何门禁变红**。
+这句话已写进 `scripts/check-row-single-source.mjs` 的豁免分支旁边。
+
+**何时撤销豁免**：landing 若变成 SPA、或首屏体积不再敏感时，应让复刻件换成真组件。
+
+### 9.2 `ht-*` 前缀族基线：**30 → 31**（本文 §5/§8.4 记的 30 已过期）
+
+本文写「≤ 基线 30」。实测在 M3 第一刀**之前**是 **31** —— 差值来自
+**2026-09-28 加 web 搜索框时引入的 `.ht-search` / `__input` / `__clear`**：
+也就是说**「只减不增」这条规则刚立起来就被真实违反过一次，而当时没有任何门禁发现**（那道门禁那时还不存在）。
+
+M3 第一刀收编 `.ht-task*` 之后为 **29**。新建的
+`scripts/check-row-single-source.mjs` 以 29 为基线，并在注释里记了这 30→31→29 的来历。
+
+### 9.3 M3 第三刀（`categories`）的一个结论**下早了**：悬停提示其实搬得动
+
+**触发**：第三刀迁移时，web 每一格 / 每段柱子的 `title`（悬停给出**确切数字** ——
+深浅只能看个大概）没了。当时的记录写的是「**共享层装不下它**，最小可行的一步是
+patch RNW 的白名单」，并把它列成"待产品负责人拍板"。
+
+**这个结论只对了一半，另一半是错的**，记下来免得下一个人重走：
+
+| 当时的判断 | 复核结果（2026-09-28，真 `react-dom/server` + 真 RNW 实测） |
+|---|---|
+| `title` 不在 RNW 的 `forwardedProps` 白名单里 → 透传被丢弃 | ✅ **对**（读 `react-native-web@0.21.3` 的 `modules/forwardedProps`，确实没有 `title`） |
+| `dataSet={{ title }}` 只产出 `data-title`，**浏览器不当它是提示** | ✅ 前半句对（实测输出 `data-cell-title="1 小时 30 分"`），❌ **结论下早了** |
+| 所以共享层没有出口，只能 patch 依赖 | ❌ **错** —— `data-*` 本身不是提示，**`data-*` + 宿主 CSS 的 `::after { content: attr(…) }` 才是** |
+
+**正确的裁决**：`dataSet` 是 RNW 白名单里**唯一**能带出任意文本的通道；
+提示是**外观**，归宿主外壳（L3）；共享层只负责**把确切数字放进 DOM**。
+
+- 共享层：`CategoryReportView` 新增可选 `cellTooltip?: (ms) => string`，
+  给了就写 `data-cell-title`，不给（mobile，没有鼠标）**完全不产出该属性**；
+- web 外壳：`app.css` 的 `[data-cell-title]:hover::after` 渲染提示泡，颜色 / 字号 /
+  间距 / 层级**全部走 token**（`check:design` 绿）；
+- 判据：`apps/web/tests/categories.spec.tsx` 断言每一格与每一段柱子都有非空的
+  `data-cell-title`、文案来自**同一个** `labels.duration`、且不同格子说的不是同一句。
+  **故障注入实测**：把 `cellTooltip` 从 web 宿主拿掉 → 该断言变红（`1 failed`），
+  装回去 → 全绿。这是第三刀当时**缺失**的那条哨兵 —— **第一版丢了整个行为，没有任何测试会红。**
+
+**方法论教训（比这个提示本身值钱）**：一件"装不下"的判断，
+要区分**「通道不存在」**与**「通道存在但我没接上下一段」**。
+这次差的就是后半句 —— 而它把"改第三方依赖"变成了"写四行 CSS"。
+
+### 9.4 landing showcase 的四处漂移：已修，且补上了 §6.2 欠的那道门禁
+
+**触发**：[showcase-fidelity-audit.md](showcase-fidelity-audit.md) §6 记录了四处漂移的修复，
+但 §6.2 自己承认「这条门禁还没做」—— 两份定义之间仍然只有一行注释。
+同时那份审计的 **§2 #2 是一个误判**，本次实测更正。
+
+#### 先更正 §2 #2：真应用**确实显示**四象限计数
+
+审计写的「真应用不显示计数（`QUADRANT_NAV` 里没有 count 字段）」**只对了一半**，
+而结论下错了（与 §9.3 同一形状）：
+
+| 审计的判断 | 复核结果（本次读 `apps/web` 源码） |
+|---|---|
+| `QUADRANT_NAV` 的 `NavEntry` 没有 `count` 字段 | ✅ **对** |
+| 所以真应用不显示计数 | ❌ **错** —— 计数**不在元素上**，是渲染时算出来单独传进去的 |
+
+证据链（三处，逐字可查）：
+
+```
+apps/web/src/App.tsx:240   const counts = useTaskStore(useShallow(selectQuadrantCounts));
+apps/web/src/App.tsx:650   count={entry.filter.kind === 'quadrant' ? counts[entry.filter.quadrant] : undefined}
+apps/web/src/App.tsx:1044  {count !== undefined && count > 0 && (<span className="ht-nav__count">{count}</span>)}
+apps/web/src/features/tasks/store.ts:324  selectQuadrantCounts → bucketByQuadrant(...)
+```
+
+审计那张截图里一个数字都没有，是因为**空账号的计数恒为 0，而 `count > 0` 才渲染** ——
+**「位在、值为 0」被读成了「产品没有这个位」**。
+因此 §6 里"删掉四个数字"的修法**方向对、落点错**：对的是"手写 3/5/2/1 是编造"，
+错的是"把它整个删掉" —— 那让复刻**少了一个真有的界面元素**。
+正确的修法是**让它从同一份样例任务派生**。
+
+#### 四处漂移：修成了什么、判据在哪、怎么证伪
+
+判据落在一个新文件 `apps/landing/tests/mockup-shell-shape.spec.tsx`（15 条），
+它把两个**纯数据模块**（都不 import React）与真应用的**源码文本**逐项对账：
+
+| 漂移（审计 §2） | 修后 | 判据 |
+|---|---|---|
+| #1 漏「已完成」 | `SHELL_PRIMARY_NAV` 三项，`AppWindow` 从它渲染 | 登记处 ⟷ `App.tsx` 的 `PRIMARY_NAV` 逐项同 key |
+| #2 编造象限计数 | 计数从 `showcase-data.ts` 的唯一一份样例任务派生 | 渲染值 = **领域层 `bucketByQuadrant()` 实算**；已完成任务不计入 |
+| #4 漏标签区 | `SHELL_PANEL_SECTIONS` 两块（清单 + 标签），同形「输入框 + `+`」 | 登记处 ⟷ `ProjectsPanel.tsx` 的两个 `<section>` |
+| #5 视图 tab 4 vs 8 | `SHELL_VIEW_TABS` 八项 | 登记处 ⟷ `App.tsx` 的 `VIEW_TABS` 逐项同 key、同序 |
+
+两个纯数据模块：`apps/landing/src/mockup/app-shell-shape.ts`（外壳结构）与
+`apps/landing/src/mockup/showcase-data.ts`（唯一一份样例任务 + 派生）。
+**landing 仍然不 import `@heyta/ui` 的 React 组件** —— §9.1 的判决没有被挑战（见下）。
+
+**故障注入（全部实测会红，改后即复原）**：
+
+| 注入 | 红在哪 |
+|---|---|
+| 从登记处删掉「已完成」 | `登记的三项与 PRIMARY_NAV 逐项同 key` × + 渲染断言 ×（2 failed） |
+| 把某任务的登记象限从 q3 改成 q1 | `每条样例任务登记的象限 = 领域层算出来的象限` × + 计数一致性 ×（2 failed） |
+| 从登记处删掉「标签」区块 | `登记的两块区块与 ProjectsPanel 逐项同 key` ×（2 failed） |
+| 登记处只留前 4 个 tab | `真应用的 VIEW_TABS 是 8 项` × + 渲染断言 ×（2 failed） |
+
+**真应用改了的那个方向也证了**（不碰共享工作区的 `apps/web`）：
+spec 支持只读接缝 `HEYTA_MOCKUP_WEB_SRC`（与 `check-l0-no-style.mjs` 的
+`HEYTA_CHECK_ROOT` 同一约定）；把 `apps/web/src` 复制到 `/tmp`、在副本上删掉
+`PRIMARY_NAV` 的「已完成」→ `1 failed`；删掉 `VIEW_TABS` 的一个 tab → `2 failed`。
+
+#### 为什么 `@heyta/domain` 是**相对路径**引进测试的
+
+分工边界不允许本次改 `apps/landing/package.json`（会连带改 `pnpm-lock.yaml`），
+所以那份 spec 用相对路径直取领域层纯源码来重算象限 —— 这是**测试专用**的接缝；
+**生产代码一行也不引它**（首屏不为一个展示件多背字节）。为此把
+`apps/landing/tsconfig.spec.json` 的 `rootDir` 从 `.` 放宽到 `../..`（`noEmit` 下只影响
+"文件必须在其下"这条校验）。若将来 `@heyta/domain` 进了 landing 的依赖，应换回包名 import。
+
+#### 本次的 bundle 实测（§9.1 没有被挑战）
+
+- **没有**再往 landing 静态引 `@heyta/ui`；`mockup-task-row.spec.tsx` 的禁静态引入断言仍然绿。
+- 本次改动后首屏 `main-*.js`：**199,153 → 199,618 B gzip（+465 B / +0.23%）**，
+  raw 643,164 → 644,127 B。增量来自两个纯数据模块，**没有新增任何运行时依赖**。
+- §9.1 的 +61.9 kB 结论**没有被重新实测**（本次没有触碰那条路径）—— 因此也**没有推翻它**。
+
+#### 仍然存在的保真度差距（如实）
+
+1. **截止档位/文案仍是手写的**（`landing.mock.due.*`），不是 `computeCountdown()` 算的 ——
+   `TaskList.tsx` 文件头已登记为残差；共享层当前没有"档位 → 颜色"的单点。
+2. **「今天进度卡」的 2/5 是编的**（真应用由任务算出）—— 那张卡上确有数字位，属"往真有的位置填样例"。
+3. **四象限看板没有拖拽**，只有静态卡；也没有"已完成"任务的独立视图内容。
+4. **复刻画的是**当前 web 外壳的结构**，但 web 的每个视图内容（时间线/成长/回收站/设置）没有复刻** ——
+   tab 是外壳的一部分，点不开。
+5. **`mockup-fidelity.spec.tsx` 里仍各自抄了一份 `APP_VIEW_TABS` / `APP_PRIMARY_NAV`** ——
+   它与真应用**不连接**；真应用漂移时靠的是新的 `mockup-shell-shape.spec.tsx` 变红
+   （已实测），旧文件不再是权威判据。

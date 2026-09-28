@@ -183,6 +183,130 @@
 
 ### A4 · `/help` 帮助中心 + `/changelog` 更新动态（方向 A + B）
 
+> 🔴 **2026-10-05 实测更正：A4 不是「未开始」，而是「骨架在、内容与接线未完成」。**
+>
+> | 实测 | 结果 |
+> |---|---|
+> | `apps/landing/src/pages/HelpPage.tsx` | **存在，34 行（骨架级）** |
+> | `apps/landing/src/pages/ChangelogPage.tsx` | **存在，63 行（骨架级）** |
+> | 路由接线 | ✅ **已接**：`apps/landing/src/pages/index.ts:40-41`（`help: HelpPage` / `changelog: ChangelogPage`）+ `apps/landing/src/site/pages.ts:166`（`path: '/help'`）。⚠️ 真正的路由表**在 `site/pages.ts` + `pages/index.ts`，不在 `App.tsx`/`main.tsx`** —— 我第一次搜错了地方，差点把「已接线」误报成「未接线」|
+>
+> ⇒ **做法更正**：A4 收口 = **补 A4-2 的 10 篇文章内容 + 接线 + 补 A4-6 的应用内入口**；
+> **不要把 A4 当成「从零建页」** —— 照计划字面重做会造出**第二份 `/help` 孤岛**，正是硬约束 2 与 A4-6 要防的东西。
+>
+> ⇒ 这是「**计划与工作区不一致时以实测为准，并回写更正**」的一例：不查工作区就照计划施工，会重复实现已有物。
+> 🔴 **二次实测更正（A4-6 已完成）**：
+>
+> | 实测 | 结果 |
+> |---|---|
+> | `apps/web/src/features/settings/HelpPanel.tsx:89` | `path: '/help'` —— **设置页的应用内入口已在** |
+> | `apps/web/src/features/sync/SyncBar.tsx:160` | **`/help#sync` 深链** —— A4-6 的「同步出错时那句提示」也在 |
+> | `apps/web/src/lib/site-url.ts` | 注释明写「这不叫『还没有帮助中心』，这叫**两个产品**」—— 反孤岛立场已落进代码 |
+>
+> ⇒ **A4-6（应用内入口）已完成，不需要再做。** A4 真正剩下的**只有内容深度**：
+> `HelpPage.tsx` 34 行 / `ChangelogPage.tsx` 63 行是**骨架级**，而 A4-2 要求覆盖**用户最会撞到的 10 个问题**。
+>
+> ⇒ **这一条的教训**：计划里的待办项**可能比实际进度落后**（骨架+接线+入口都已落地，只有内容没写）。
+> **施工前必须在工作区核对该项的每个子项**，否则会把已完成的东西重做一遍 —— 与「照计划从零建页」是同一个坑的两种形态。
+---
+
+## 🧭 配套纪律（硬约束 1 的执行细则）：**计划里的待办项必须逐子项核对，不许按字面施工**
+
+**触发场景**：任何「按计划执行 W/A/B 某项」之前。
+
+**要求**（A4 一例三次踩坑后总结）：
+
+1. 先在工作区**逐子项**核对该项的每个组成部分（**页面存在？路由已接？入口已做？内容多深？**），
+   再决定「做到了哪一步」。**只看计划的措辞就开工，是把已完成的东西重做一遍。**
+2. **核对要用正确的落点**。我曾在 `App.tsx`/`main.tsx` 里搜路由、得出「未接线」，而真正的路由表在
+   `apps/landing/src/site/pages.ts` + `pages/index.ts` ⇒ **误报了一次「未接线」**。
+   ⇒ 找不到某个东西时，**先确认自己搜的是不是它该在的地方**，再下「没有」的结论。
+3. **凡是「计划说待做、工作区看起来已有」的项，一律先登记更正再动手** —— 更正本身也是本计划的交付物。
+
+**A4 的实测三连**（完整的反面教材）：
+
+| 计划的措辞 | 实测 | 我当时的判断 |
+|---|---|---|
+| 「A4 只是新页面」 | `HelpPage.tsx`/`ChangelogPage.tsx` **已存在**（34/63 行） | ❌ 当成「从零建页」 |
+| （未写）路由 | `pages/index.ts:40-41` + `site/pages.ts:166` **已接** | ❌ 搜错落点，报「未接线」 |
+| A4-6「待追加应用内入口」 | `HelpPanel.tsx:89` + `SyncBar.tsx:160` **已做** | ❌ 当成待做 |
+
+⇒ **A4 的真实剩余只有「内容深度」一件事**（骨架/接线/入口都在）。
+⇒ 这条纪律的收益是可量化的：**它一次就避免了三次重复施工**。
+---
+
+## 📌 三项状态实测（2026-10-05，收口后核对）
+
+| 项 | 实测 | 结论 |
+|---|---|---|
+| **A8 `check:site-reachability`** | `package.json` 里**无此脚本**；`scripts/` 下只有 `check-reachability.mjs`（P9 那道） | ✅ **不需要新增门禁** —— 既有 `check:reachability` 已覆盖站点可达性。**A8 按设计关闭。** |
+| **A4 路由 / 接线 / A4-6 入口** | `pages/index.ts:40-41` + `site/pages.ts:166`（路由）· `HelpPanel.tsx:89` + `SyncBar.tsx:160`（入口） | ✅ **全部已完成**，不要再动 |
+| **A4 内容** | `HelpPage.tsx` 里 `title:`/`slug:`/`question:` 命中 **0** | ❌ **确实未开始** —— 34 行只是壳，连「文章清单」结构都没有。**这是 A4 唯一的剩余工作。** |
+
+⇒ **A4 收口的正确定义**："写内容"（补 A4-2 的 10 篇文章 + `/changelog` 正文），**其余三件都不许重做**。
+---
+
+## 🧭 第四条执行细则：委派 agent 必须带**产出判据**（2026-10-05 空转事故）
+
+**事故**：把 `timeline` 整刀与 W4 收口各派给一个 agent。
+连续 **5 轮** `list_agents` 都报 **`[running]`**，但目标文件**零落盘**：
+`packages/ui/src/timeline/` 0 文件 · `IntegrationsPage.tsx` 未建 · `HelpPage.tsx` 仍 34 行；
+工作区近 25 分钟的变更**全是操作者自己**的改动与构建产物。最终两个都被 `interrupt_agent` 停掉，**零产出**。
+
+**结论**：
+
+1. **`running` 只说明「进程活着」，不等于「在产出」。**
+   判活写者要用 `list_agents`（不是 mtime）—— 这条仍然对；但**还需要一条产出判据**。
+2. **规则**：**连续 2–3 轮目标文件零落盘 ⇒ 判空转并停机**，不要等 5 轮。
+3. **派单时就要让产出可观测**：任务书里写明「**第 1 步先落一个最小可验证文件**（例如共享组件的目录与一个骨架文件，或页面的空文件 + 路由项）」，
+   这样「有没有在干活」**从第一轮就能看出来**，而不是靠猜。
+4. 同型事故此前已发生过一次（e2e 修复 agent 连续 3 轮零落盘）。⇒ **这不是偶发，是委派协议的缺口。**
+
+⇒ 与前面 8 次自我纠正同源：**别把「看起来在跑」当成「在进展」**。
+---
+
+## 📦 开工契约包（2026-10-05 侦察所得，**下个会话照此直接开工，无需再查**）
+
+### A7 `/integrations`（五处，缺一处就红）
+
+| # | 文件 | 要做什么 |
+|---|---|---|
+| 1 | `apps/landing/src/site/pages.ts` | 加条目：`{ id:integrations, path:/integrations, group:product, inNav:true, inFooter:true, labelKey, headingKey, ledeKey, titleKey, descriptionKey }`。🔴 **`inNav:true` 就是反孤岛那一项**（硬约束 2） |
+| 2 | `apps/landing/src/site/content.ts` | 加 `INTEGRATION_SECTIONS: readonly SectionSpec[]` + `INTEGRATION_NOTES`。`SectionSpec = { id, titleKey, itemKeys: string[], evidenceKeys?: string[], mockView?: string }` |
+| 3 | `apps/landing/src/pages/IntegrationsPage.tsx`（新建） | 一行：`<SiteSubPage page={page} sections={INTEGRATION_SECTIONS} notes={INTEGRATION_NOTES} />`（`SiteSubPage` 收 `{page, sections, notes?, children?}`） |
+| 4 | `apps/landing/src/pages/index.ts` | `import` + 在 `PAGE_COMPONENTS` 注册 `integrations`（`SitePageId` 是它的键类型） |
+| 5 | `packages/i18n` 的 zh-CN + en | 页头 5 键（`site.nav.integrations` · `site.integrations.{title,lede}` · `site.integrations.seo.{title,description}`）+ 每个 section 的 `section.*` / `item.*` / `evidence`。**zh/en 条数必须相等** |
+
+**内容来源**（A7-1/2/3 的判据）：`docs/research/dida365-feature-benchmark.md` **§5 的 9 条独有能力**；
+要讲**数据主权**（MCP / 本机 API / 自托管 / 导出 / BYOK），每条给**可复现的验证方式**（如 MCP 的 6 个工具名 + 启动命令），
+并与滴答的 URL Scheme 页对照：**我们是默认关 + 逐工具授权**。
+⚠️ 内容纪律：`content.ts` 只收录**已实现**的能力 —— 所以必须先读那份 benchmark §5，**不许凭印象编**。
+**✅ 素材已取全（`docs/research/dida365-feature-benchmark.md` §5，9 条独有能力）—— 照此映射成 A7 的三条判据：**
+
+| A7 判据 | 用哪几条 | 每条要给的**可复现验证**（A7-2） |
+|---|---|---|
+| **A7-1 数据主权** | ① 端到端加密同步 · ② 自建服务器永久免费 · ④ 本机 API + MCP · ⑤ BYOK / 自带推理端点 · ⑥ 导出含墓碑与完整 op-log | ① 服务端**强制密文** ingress，明文一律 `400 E2EE_REQUIRED` · ② `docker compose` 三件套（不需 Redis / S3）· ④ `packages/local-api` 的 **6 个工具**、默认关、只监听回环 · ⑥ `export-dump.ts` 含 `counts` 可核对 |
+| **A7-3 对照滴答** | ④（**默认关 + 逐工具授权**，比滴答 2026-04 才上的 MCP 更严）· ③ 不按功能收费（滴答免费档 9 清单 / 99 任务，我们**没有功能闸门**）· ⑦ 四象限是**派生视图**（不是第四套存储） | ③ `check-pricing-consistency.mjs` 强制 · ⑦ ADR-0015 |
+| **其余可作 section** | ⑧ 习惯韧性（冻结 / 续接 / 修复，且**不发行货币、不卖后悔**）· ⑨ 冲突解决可视化（实体级 LWW + **用户可见的选择**，不是静默丢数据） | ⑧ `habit-resilience.ts` + ADR-0022 · ⑨ `ConflictDialog` / `ConflictSheet`，双端收敛有 e2e |
+
+> benchmark §5 的最后一句就是本页的立项理由：「这 9 条是落地页 `/integrations`（或 `/why`）那一页的**骨架**。现在它们全在 `docs/` 里，只有贡献者看得到。」
+
+⚠️ 写作纪律（两个来源同时约束）：`content.ts` 只收录**已实现**的能力；A4-1 的同类纪律是**不直接暴露 `docs/` 路径** —— 所以要把上面的证据写成**用户能自己复现的动作**，而不是贴 ADR 链接。
+
+
+### A4 收口（**只写内容**；路由/接线/A4-6 入口都已就位，不许重做）
+
+- `apps/landing/src/pages/HelpPage.tsx`（现 34 行，壳）：补 **A4-2 的 10 篇文章** —— 怎么建任务 / 怎么同步 / 忘了口令怎么办 / 怎么导出 / 怎么自建 / 通行密钥怎么用 / 四象限怎么归类 / 重复任务怎么设 / 专注怎么用 / 数据在哪。A4-1 要求按**功能模块**组织、**不直接暴露 `docs/`**。
+- `apps/landing/src/pages/ChangelogPage.tsx`（现 63 行，壳）：补正文。词条表里有 `CHANGELOG_ENTRIES` / `CHANGELOG_NOTES` 可循。
+- ✅ 已就位**不要动**：路由（`pages/index.ts:40-41` + `site/pages.ts:166`）· 应用内入口（`apps/web/src/features/settings/HelpPanel.tsx:89`、`apps/web/src/features/sync/SyncBar.tsx:160` 的 `/help#sync` 深链）
+
+### `timeline` 整刀（四步，工作量与 motivation 同级）
+
+- ✅ 第 0 步已完成：`packages/domain/src/timeline.ts`（排程投影在共享层）
+- ❌ `packages/ui/src/timeline/` **不存在**，需新建：RN 原语、**禁 import `@heyta/i18n`**（文案经 `props.labels`）、**每个要断言的元素给 testID**
+- 待换装的 web 实现：`apps/web/src/features/timeline/{TimelineView,GanttChart}.tsx`（换装后**删除**，并清掉 `app.css` 里对应的旧类；e2e 里按 `.ht-*` 定位的断言**先补共享钩子再换选择器**）
+- mobile 新增时间线屏，复用同一共享组件；landing 同步（**`mk-*` 族已顶格 32/32，只能用修饰类**）
+
 | ID | 任务 | 验收判据 |
 |---|---|---|
 | A4-1 | `/help` 骨架：按**功能模块**组织（D2） | 结构借滴答的结论；内容**另写**，不直接暴露 `docs/` |
@@ -241,7 +365,7 @@
 |---|---|---|---|
 | B1-1 | **提醒系统**：物化 `REMINDER` + 调度 + 本地通知 | ① 物化新实体要动 `EntityModelMap` / `BUCKET_BY_ENTITY` / 编译期断言三处；② **跨端通知**是最大工程坑（移动端连通知库依赖都没有）；③ 时区 | 建一条"10 分钟后提醒"→ 到点**真的有通知**；双端各一条 e2e；调度逻辑有纯函数单测 |
 | B1-2 | **Web 日历视图**（周 / 月 + 拖拽改期） | 拖拽改期 = 写 `dueDate` 的 op；跨天任务；与移动端日历口径一致 | 拖一条任务到别的日期 → 刷新后仍在 → 另一台设备可见；e2e |
-| B1-3 | **子任务** | 🔴 **给 `Task` 加 `parentId` 是加字段，必须可选 + 运行时默认值**（[AGENTS.md](../../AGENTS.md) §3.3）；`- [ ]` 的旧数据要不要迁移是一个产品决定 | 建子任务 → 折叠 → 独立完成状态 → 计入统计；**父任务完成时子任务的语义要有明确定义并测到** |
+| B1-3 | **子任务** | 🔴 **给 `Task` 加 `parentId` 是加字段，必须可选 + 运行时默认值**（[AGENTS.md](../../AGENTS.md) §3.3）；`- [ ]` 的旧数据要不要迁移是一个产品决定 | 建子任务 → 折叠 → 独立完成状态 → 计入统计；**父任务完成时子任务的语义要有明确定义并测到** 🟡 **领域层已落（第十三轮）**：`parentId` + 树构建 / 循环防护 / 上限已做并测到，UI / 宿主接线待做（见下方第十三轮） |
 | B1-4 | **搜索** | 本地优先架构下需要本地索引；不能靠服务端 | 输入即时过滤；中文分词至少做到子串匹配；大数据量（1000 条）下可接受 |
 
 ### B2 · P1（明显不如）
@@ -252,8 +376,8 @@
 | ID | 任务 | 为什么优先 |
 |---|---|---|
 | B2-1 | **从滴答清单 / Todoist 导入** | feature-matrix 称「**最有效的获客手段**」，而它是零 |
-| B2-2 | **客户端接 WebSocket（实时同步）** | 服务端**全做完了**、客户端一行没接 —— 典型的"最后一米" |
-| B2-3 | **重复任务补齐**（Web 入口 + 自定义 RRULE + **「完成后顺延」**） | 「完成后顺延」的实现已在代码里（`nextAfterCompletion`），**只是没接** |
+| B2-2 | **客户端接 WebSocket（实时同步）** | 服务端**全做完了**、客户端一行没接 —— 典型的"最后一米"。<br>🟡 **进行中（2026-10-05）：客户端层分包与宿主接线是两步，别把第一步当成"接好了"。**<br>· **第一步（客户端层，`packages/sync-client/`）**：新增宿主无关的实时连接器。协议已读源核实（`server/src/sync/websocket.routes.ts` + `services/websocket-connection.service.ts`）：`GET /ws?token&clientId`、upgrade 阶段鉴权、非法身份 **4001** 关闭、限流 **429 + `Retry-After`**；服务端下行 `{type:'connected'}` / `{type:'new_ops', latestSeq}` / `{type:'presence_*'}`；协议层 ping 30s（浏览器自动回 pong），应用层另有 `{type:'pong'}`。<br>⚠️ 服务端注释里记着 **18.6.0 之前的 `reconnect-on-close` 风暴** ⇒ **退避 + 抖动 + `dispose()` 后不再重连**不是优化，是硬要求。<br>· **第二步（宿主接线，`apps/web` 或 `apps/mobile`）**：🔴 **尚未做** —— 所以这一步完成之后连接器**仍然没有生产调用点**，而这正是 C-8 那种"最后一米"的形状。**第二步不完成，B2-2 就不算完成。** |
+| B2-3 | **重复任务补齐**（Web 入口 + 自定义 RRULE + **「完成后顺延」**） | ✅ **「完成后顺延」早就接了，而且是有意换了个函数**（2026-10-05 实测更正）：`completeTask`（`packages/app-host/src/actions.ts`）调的是 **`nextOccurrence`**，基准是**当前到期日**而不是完成时刻 —— 文件里写明理由（"一条 9/14 的任务在 9/13 被提前勾掉，从完成时刻往后推算出来的仍然是 9/14，到期日纹丝不动"）。`nextAfterCompletion` 是 `nextOccurrence` 的**语义别名**，**有意不用**。<br>🔴 **真正没接的是另一半**：`rescheduleForRepeat`（提醒跟着新截止走）在生产代码里**零调用点**（只有 `reminder-actions.spec.ts` 的 3 条单测）—— 已于 2026-10-05 接上并在 `repeat-actions.spec.ts` 补了 5 条判据（见 R20 的相邻记录）。<br>⇒ 剩下的是 **Web 入口** 与 **自定义 RRULE** 两项。 |
 | B2-4 | **ICS 订阅 + 导出 ICS** | feature-matrix 判断「成本低、收益高，建议早做」 |
 | B2-5 | **批量操作** | 任务多了就不可用 |
 | B2-6 | **NLP 补齐**（时间点 / `#标签` / `~时长` / 清单 + 移动端入口） | 现状只认 2 个字段 |
@@ -315,6 +439,28 @@ P2 清单见 [feature-benchmark §6.4](../research/dida365-feature-benchmark.md)
 - 对 `TASK` / `HABIT` / `FOCUS_SESSION` **必须通过**；
 - **至少 3 种故障注入能证明它会红**（本仓库对门禁的一贯要求 —— 见
   `license-inventory.mjs` 与 `check-payment-entry.mjs` 的先例）。
+
+**进度（2026-10-01）**：`scripts/check-reachability.mjs` 已落地，注册为
+`pnpm check:reachability`，并接进 `pnpm check` 链（位置在 `check:claims` 之后）。
+四条断言：**A** 锚点自检（`EntityModelMap` / `MODELED_ENTITY_TYPES` / `BUCKET_BY_ENTITY`
+三处登记必须**集合相等**；任何锚点扫不到 → 报错，不是静默通过）、
+**B** 已建模实体必须在 `packages/app-host/src` 里有写路径、
+**C** 有写路径的实体必须在宿主（各 `apps/*` 的 `src/`）里有真实调用点、
+**D** `UNMODELED_ENTITY_TYPES` 里"尚未开始"的项必须有人接（`reason` 自证"决定不用"
+的项豁免，豁免判定**读源码而不是写死在本脚本**）。
+
+验收现状：**门禁在工作区现状下是红的** —— 抓到 `NOTE`（断言 B 红，幻觉 #12「笔记模块」）
+与 `REMINDER`（断言 D 红，幻觉 #1「任务提醒」）；`TASK` / `HABIT` / `FOCUS_SESSION`
+通过，断言 C 也通过（其余 8 个已建模实体都有宿主调用点）。
+⚠️ **这两条红是有效产出，不是门禁坏了**：修 `NOTE` / `REMINDER` 要动
+`packages/app-host`（补 action）与 `apps/*`（补入口），不属于 C-8 的文件所有权范围，
+留给后续排期。
+
+注入实测（跑在 `HEYTA_CHECK_ROOT` 的 `/tmp` 副本上，不动工作区；含旧状态对照）：
+E1 注入"已建模零 action"的新实体 → B 红；E2 删掉真实写路径 → B 红；
+E3 删掉真实宿主调用点 → C 红；E4 改写 `reason` 的"决定不用"措辞 → D 红；
+E5 让三处实体登记出现差异 → A 红。**同一批注入在本门禁不存在时全绿**
+（旧门禁里没有任何一条判据覆盖这个形状）。
 
 ---
 
@@ -626,16 +772,11 @@ JSON-LD 每页一条 `SoftwareApplication` 且 `/pricing` 有 `FAQPage` —— �
 
 | # | 问题 | 说明 |
 |---|---|---|
-| **R1** | `/platforms` **没有状态徽标** | 15 条死词条里 6 条是 `site.platforms.status.*` / `legend.*`，而 `SectionSpec`（`PageSections.tsx`）**没有 `status` 字段** —— 这一页的全部意义就是"各平台到哪了"，却只能读散文。**建议实现**（给 `SectionSpec` 加 `status`，`content.ts` 逐平台声明），而不是删词条 |
-| **R2** | 其余 9 条死词条 | `site.footer.{terms,privacy,license,aria}`（页脚 legal 组是空的，A6-1 待做）、`site.backHome`、`site.appLink.{label,pending,pendingCta}`、`site.signin.cta`。**要么接上，要么删** —— 留着就是"设计了没实现"的味道 |
-| **R3** | 🔴 **ADR 勘误段是一次未被记录的规则变更** | `docs/adr/README.md:29` 与 `docs/README.md:13` 都写 ADR **不可改**、结论变了只能新写取代；"结论有变时新增勘误"这条规则在 `docs/README.md:17` **明确只属于 `research/` 层**。改动前 `git grep 勘误 HEAD -- docs/adr/` **无任何 ADR 有勘误段**。且 ADR-0033 §6 标题「落实记录」= 进度，而 `docs/README.md:22` 把"把当前进度写在 adr/ 里"列为放错层症状。**要么移进本计划（进度层），要么先在 `docs/adr/README.md` 里显式写出"勘误段"机制再使用** |
-| **R4** | `docs/README.md:118` 给 ADR-0033 标 🟡 待确认，ADR 自述 ✅ 已接受 | 状态自相矛盾 |
-| **R5** | 注释引用了**不存在**的门禁 `check:site-reachability` | `apps/landing/src/site/pages.ts:19/73`（**这两处是主 agent 写的**）、`components/Footer.tsx:20`、`render.spec.tsx:18`。ADR-0033 §5 已诚实标注"尚未落地（归 W4/A8）" —— 代码注释应对齐同一口径 |
+| **R2** | 其余 9 条死词条 | `site.footer.{terms,privacy,license,aria}`（页脚 legal 组是空的，A6-1 待做）、`site.backHome`、`site.appLink.{label,pending,pendingCta}`、`site.signin.cta`。**要么接上，要么删** —— 留着就是"设计了没实现"的味道。<br>✅ **已了结（2026-10-05，取"删"）：** 9 条全部删除，词条表 **1623 → 1614**（zh/en 相等）。<br>⚠️ **判据必须排除 `dist/`**：原始 `grep` 每条命中 **4 处**，全部是 `packages/i18n/dist/**` 的构建产物 —— 不排除就会得到"它们还在用"的**假象**。<br>✅ 收口验证（**顺序不能反**）：先 `pnpm --filter @heyta/i18n build`，再 `pnpm --filter @heyta/landing typecheck` 与 `@heyta/web typecheck` —— **都是 exit 0**。若跳过重建，typecheck 读的是**旧 dist**（里面还有那些 key），会给出"没有引用"的假绿。 |
 | **R6** | 🔴 **"说法本身是否成立"没有自动判据** | S1 那类（声称 > 代码）目前只能靠人审。可行方向：要求每个 `site.features.item.*` 的声称必须落在**该 section 的 evidence 能证明的范围内** —— 但"证明范围"是判断题，**不要假装能全自动**；至少把"每次改 evidence 就要重审该 section 的声称"写成规矩 |
 | **R7** | 效率：**主 bundle 同时装中英两份词条**（约 93 KB gz，占 197 KB gz 主包近一半）+ **静态 import 全部 7 个页面组件**（访问 `/signin` 要下载整个首页） | 实测确认。修法在仓库里有先例：`SyncScene` 已经 `lazy()`；语言可按入口分（Vite `input` 已按语言分 HTML） |
 | **R8** | 🔴 **ADR-0033 / W2 把"真静态"说过头了** | 实测生成的 14 份入口 **`#root` 是空的**，正文全靠 JS。兑现的只有"爬虫拿到的 head 是完整的"，**不是**"首屏不用等 JS"。要么改口径，要么真做预渲染 |
 | **R9** | 死代码与重复定义 | `pages.ts` 的 `hrefPath` **零调用**（而同一形状被手写 4 处：`gen-entries.mjs` `urlFor`、`seo-head.spec.ts` `entryPath`/`entryUrl`、`viteInputEntries`）；`lib/locale.ts` 的 `otherLocaleHref` 零调用（只被"自证门面还在"的测试引用）；`['zh-CN','en']` 硬编码 4 处而 `packages/i18n/src/types.ts` 已有 `LOCALES`；`check-claims.mjs` 用正则切 `content.ts` 而 `gen-entries.mjs` 已证明能直接 import |
-| **R10** | `roadmap.md:387` 与同文件 §5.1.1 三端表矛盾（"移动端未做导出" vs "移动端 ✅"） | 同一次改动内新引入 |
 
 #### ⬜ 待做（质量审查第二轮，2026-09-28）
 
@@ -648,9 +789,425 @@ JSON-LD 每页一条 `SoftwareApplication` 且 `/pricing` 有 `FAQPage` —— �
 | **R14** | 🔴 **`og-card.html:106` 硬编码部署域名** | 站点地址的唯一事实源是 `site/origin.ts` + `VITE_SITE_URL`。换域名后分享卡仍印旧域名，且无门禁发现 —— 与 `origin.ts` 文件头"换域名 = 一次构建参数"的设计直接冲突 |
 | **R15** | 🔴 **`og-card.html:54` 的 `#2f6fed` 就是它自己说不该有的"第二种蓝"** | 注释写"与 design tokens 的 primary 同一个色相…不该出现第二种蓝"，而 `tokens.css` 的 primary 是 `#2563eb`。既是硬编码 hex（`check:design` 管不到 `.html`），也与 token 不一致 |
 | **R16** | `en` 的 `site.og.imageAlt` 描述的是英文卡片，而实际 `og:image` 中英共用同一张**中文** PNG | 英文页的无障碍文本与真图不符 |
-| **R17** | `pageById(id: string)` 的签名是裸 `string`，而它的注释声称"写错 id 是编译期错误" | `pageById('hme')` 今天能编译、运行时才抛。改成 `id: SitePageId` 才配得上那句注释 |
 | **R18** | 三处该复用既有类型的裸联合 | `PageSections` 的 `mockView` 抄了 `mockup/AppWindow` 的 `MockView`；`Footer` 抄了 `pages.ts` 的 `SiteGroup`；`SigninPage` 抄了 `SectionSpec` 的形状。另 `Nav.tsx` 与 `paths.ts` 各写了一份 `locale === 'en' ? 'zh-CN' : 'en'` |
+| **R19** | 🔴 **共享 `EmptyState` 只有"页面级"一档，没有"区块级"** —— 于是便签板 / 提醒列表 / 清单列表**各自手写了一个小空态** | `packages/ui` 的 `EmptyState` 是居中、带 `icon`/`detail` 槽位的**页面级**组件；而 `NotesBoard`（便签板，在「我的」页的一段里）、`ReminderList`（提醒，在任务行的 `<details>` 里）、`OrganizerList`（清单，在侧栏一段里）里的空态都是**区块级**：一行小字、不居中、不带大 icon。三处因此各有 `styles.empty` + `<Text>` —— 而 `check:empty-state` 的**渲染**那一半（"空态只有一个实现"）本该覆盖它，只因为那些文件在 `packages/ui` 里而扫描范围不含 `packages/ui/src`（断言 C 只查 `EmptyState` 的**定义处**唯一），所以**不会红**。<br>⇒ 这不是"忘了收编"，是**共享组件的抽象少了一档**。正确的下一步：给 `EmptyState` 加 `size?: 'page' \| 'section'`（或造一个 `SectionEmptyState`），把三处收编进去，**并且**同步把扫描范围扩到 `packages/ui/src` 的这几个组件（否则收编完也没判据）。<br><br>🔴 **实测更正（2026-10-05）：这一条的范围被低估了 3.7 倍。** 用三种 marker（`styles.empty` / `empty:` / `testID=…empty`）扫 `packages/ui/src`，命中的是 **11 个文件**，不是条目里写的 3 个：<br><code>projects/OrganizerList · habits/HabitBoard · task-list/TaskList · notes/NotesBoard · quadrant/QuadrantBoard · categories/CategoryReport · reminders/ReminderList · motivation/{WeeklyReviewCard,MilestoneMap,HabitStreakList,IdentityTagList}</code>。<br>⇒ **第二步（把扫描范围扩到 `packages/ui/src`）的代价因此是 11 处，不是 3 处** —— 这也是它一直没做的真实原因。正确的顺序是：**先给 `EmptyState` 加 section 档、再逐个收编、最后才扩扫描范围**（反过来做会让门禁一次性红 11 条，然后有人去放宽它）。 |
+| **R20** | 🔴 **重复任务顺延时，到期日的"时刻"被归零** | `completeTask`（`packages/app-host/src/actions.ts`）推进到期日时写的是 `parseLocalDate(next).getTime()`，而 `nextOccurrence` 返回的是 `LocalDate`（`'2026-09-21'`）⇒ 新到期日落在**下一个周期的零点**。一条"每周一 12:00"的任务勾掉之后变成"下周一 00:00"，时刻信息丢了。<br>🔴 **以前没有任何判据能发现它**：既有测试（`repeat-actions.spec.ts`）刻意只断言 `toLocalDate(dueDate) === NEXT_MONDAY`（**日期级**）—— 那个粒度正好把这个残差滤掉了。它是本轮写"提醒跟着新截止走"的判据时**被新测试顺手照出来的**（我先按 `noonOf(NEXT_MONDAY)` 断言，红了 12 小时才看见）。<br>⇒ 修它要先回答一个**产品问题**："重复任务的时刻该不该保留？"（保留的话是"顺延一周同一时刻"，还是"下一个周期的某个默认时刻"）。这是产品决定，**不是**提醒接线该顺手改的。<br>⚠️ 提醒那一侧是**对的**：到期日落在哪一刻，`offsetMs` 提醒就跟到那一刻相对的位置。 |
 
+| **R21** | ✅ **已修：`react-native-svg` 的 CJS 文件让 web dev server 白屏** | 上游 `react-native-svg@15.15.5` 的 `lib/module`（**ESM 构建**）里混了 **3 个 CJS 文件**（`lib/extract/transform.js`、`lib/extract/transformToRn.js`、`filter-image/extract/extractFiltersString.js`，都是 PEG.js 生成的解析器，收尾都是 `module.exports = { StartRules, SyntaxError, parse }`），另有 `@react-native/assets-registry/registry.js` 同形。它们被 ESM 文件用**具名导入**引用（`import { parse } from './transform'`），而 `apps/web/vite.config.ts` 为了保证 `.web.*` 后缀偏好把 `react-native-svg` **排除出预打包** ⇒ dev 阶段**没有任何一步做 CJS→ESM interop**（生产有 Rollup 的 commonjs 插件，dev 没有）⇒ 浏览器拿到原样 CJS，整个应用白屏：<br>`The requested module '…/transform.js' does not provide an export named 'parse'`<br>🔴 **它是既有缺口，不是某一刀引入的** —— `apps/web/src/features/capture/CaptureComposer.tsx` 自 M3 第八刀起就在用共享 `CaptureComposer` → `HeytaIcon` → `react-native-svg`。（我先误判为"本轮引入"，核对 import 后更正。）<br>🔴 **14 道静态门禁 + jsdom 单测 + `typecheck` 全都发现不了**，只有真起 dev server 的 `check:web-storage` / `check:web-migration` 会红 —— 而这两道我在此之前**从未跑过**。<br>✅ 修法：`apps/web/vite.config.ts` 新增 `heyta:rns-svg-cjs-interop` 插件，在 transform 阶段把这几个文件的 `module.exports = {…}` 翻成 ESM（`export default` + **别名导出** `export { __rnsE0 as parse }`，避免与文件内已有绑定重名）。另两种修法实测都不行：整包预打包 → esbuild 抓**原生**实现（`Expected "from" but found "{"`）；`optimizeDeps.include` 指深路径 → 相对 import 不经过优化器，报错一字不变。 |
+| **R22** | 🔴 **`CJS_INTEROP_PACKAGES` 是会增长的名单** | 上面那个插件的白名单目前是 `['react-native-svg', '@react-native/assets-registry']`。**每多一个 RNW 生态的共享组件被接进 web 主包，就可能多一个这样的包。** 判断依据很机械：`pnpm check:web-storage` 报 `does not provide an export named …`，**报错 URL 里的包名就是下一个**（实测路径：`react-native-svg` → `@react-native/assets-registry`）。真正的一劳永逸做法是"dev 阶段对所有 RNW 生态的 CJS 做 interop"，但那会改变第三方包的加载语义，需要先有判据证明不会踩到循环引用/延迟求值 —— 本轮**刻意没做**。 |
+| **R23** | ✅ **已修：共享层用对象形态的无障碍属性 ⇒ web 上状态全部丢失** | `react-native-web@0.21.3` **会把对象形态的 `accessibilityState` / `accessibilityValue` 整个丢掉** —— 不是渲染成错值，是**属性根本不出现**。实测（`renderToStaticMarkup`，逐条可复跑）：`<View accessibilityState={{checked:true}} />` → `<div class="css-view-…">`；`<View accessibilityRole="progressbar" accessibilityValue={{min:0,max:100,now:42}} />` → 只剩 `role`，**`aria-valuenow` 消失**；而平铺的 `aria-checked` / `aria-disabled` / `aria-valuenow` **都出现**。源码层面同一个事实：`react-native-web/dist/modules/createDOMProps/index.js` 的 `_excluded` 里有平铺的 `aria-checked`/`accessibilityChecked`/`aria-valuenow`…，而 `grep accessibilityState` 在那个文件里命中 **0 次**。<br>🔴 **为什么它在共享层就是"四个端"的问题**：对象形态是**原生 RN 的写法**（原生一直认），所以同一个组件在 iOS/Android 正常、在 **web 上 `aria-checked`/`aria-disabled`/`aria-valuenow` 全消失**。最要命的一处是 `TaskRow` 的勾选框：**读屏用户在 web 上分不清一条任务是待办还是已完成**（颜色对他们不可见，`aria-checked` 是唯一通道）。<br>🔴 **没有任何判据能发现它**：`apps/web/tests` 里 `aria-checked` 断言数 = **0**。抓到它的是一条**普通断言**（`aria-valuenow === '100'`）在换装后变红，再由一位 agent 用探针锁定根因。<br>✅ **修法**：`packages/ui` 里 **9 处**对象形态全部换成平铺 `aria-*`（RN 0.71+ 与 RNW 0.21 都认）：`Settings`×2 · `CaptureComposer` · `OrganizerList` · `HabitBoard` · **`TaskRow`** · `NotesBoard` · `FocusRing` · `ProgressBar`。<br>✅ **新增门禁 `pnpm check:rn-aria`**（只扫 `packages/ui/src` —— 那是四端共用的一份；`apps/mobile` 用对象形态在原生上是对的，收进来只会产生误报）：断言 B 禁对象形态，断言 A 自检"平铺写法必须扫到 ≥5 处"（扫不到 = 判据失效）。两条故障注入实测：写回对象形态 → 断言 B 红 exit=1；把平铺写法全改名 → 断言 A 报「判据失效」exit=1。<br>⚠️ **为什么以前没发现**：这门禁的价值全在"共享层必须写成两端都认的形态"这一句上 —— 而它此前**根本不存在**，因为仓库既有的 a11y 判据查的是 `role` / `aria-label`（那两个恰好是**平铺就有的**那份）。 |
+| **R24** | 🔴 **`e2e/tests/**` 整套断言在 M3 各刀里从未更新 ⇒ `pnpm check` 长期失败在 e2e 段** | **判据**：`pnpm check > log 2>&1; echo EXIT=$?` → **EXIT=1**；e2e 段 **17 failed / 8 passed / 1 skipped**。失败分布：`smoke.spec.ts`（1）· `ai-*.spec.ts`（7）· `categories.spec.ts`（3）· `motivation.spec.ts`（6）。<br>🔴 **根因不是产品坏了**（这一点必须记清楚，否则会去"修"一个没坏的东西）：`smoke.spec.ts` 失败的上一行断言（`input[placeholder^="添加任务"]` 可见）**是过的**，`task-organize.spec.ts` **2/2 通过**，`[data-testid="ai-settings"]` **仍然存在**（`AiSettings.tsx:560`）。真正的失败断言是 **`getByRole('tab')` Expected 8, Received 9** —— 而 9 正是本轮新增的**便签视图 tab**。<br>⇒ **M3 每加一个视图 tab，这一族 e2e 就静默过期一次，而没有任何东西会提醒**：`pnpm check` 确实包含 `check:ai-e2e`（= `playwright test` 全量），但**在此之前没有人跑过 `pnpm check`**（见上文"第三条流程教训"）。<br>⚠️ **待判定（正在进行）**：那 7 条 AI 失败是"设置 tab 点不到"（⇒ **真回归，P0 级**：用户点不进设置）还是 helper 选择器过期？两者的修法完全相反（一个改产品、一个改判据），**必须先分辨再动手**。<br>⇒ 教训：**"某一刀做完、单测与静态门禁全绿"不等于"这一刀做完了"** —— 还有一层**真浏览器 e2e**，它只在聚合命令里跑，而人不会主动跑聚合命令。**每加一个视图 tab / 每换装一个视图，都要跑一次 `pnpm --dir e2e run test`。** |
+
+#### 🔄 第十三轮：B1-3 子任务 —— **领域层**（2026-09-28，**逻辑层完成；UI / 宿主接线未做**）
+
+B1-3 的领域模型此前是缺的：`Task` **没有** `parentId`，上一轮做滴答导入时只能把子任务
+**拍平成独立任务**并写进 `report.unmapped`（见 `ticktick-import.ts:187`）。本轮把这一层补上。
+
+| 做了什么 | 判据 |
+|---|---|
+| `packages/domain/src/entities.ts`：`Task` 加 **可选** `parentId?: string` | 运行时默认值 `undefined` = 顶级。**不 bump `CURRENT_SCHEMA_VERSION`** —— 证据：`op-log/src/state.ts` 的 reducer 是逐字段合并（`{...existing, ...incoming}`，注释"只覆盖 payload 里出现的字段"），没有按实体类型写死的字段白名单；线协议 `supersync-http-contract.ts` 的 payload schema 全是 `.passthrough()`。与既有 `repeatRule`/`purgedAt` 同形 |
+| 新增 `packages/domain/src/subtasks.ts`：`buildTaskTree` / `validateParentChange` / `isDescendantOf` / `descendantIds` / `compareTaskSiblings` | **30 条单测**（`tests/subtasks.spec.ts`）。上限**单点定义**在该文件的 `MAX_SUBTASK_DEPTH = 3` / `MAX_SUBTASK_CHILDREN = 100` |
+| 循环防护：把 A 的父设成 A 的后代 ⇒ 拒绝，原因 **恰好**是 `cycle` | 断言写的是**完整结果对象**（`{ok:false,reason:'cycle'}`），不是 `ok===false` —— 否则"把环误判成 depth_exceeded"也会绿，而那是两种不同的产品行为 |
+| 上限超限**如实返回失败原因**，读路径**不静默截断** | `depth_exceeded` / `children_exceeded`；`buildTaskTree` 对超限/环/父缺失数据**保留子树**并上报 `limitViolations` / `brokenCycles` / `detached` / `promotedFromDeletedParent` |
+
+**故障注入（9 处，每处实测红过、还原后 md5 一致）**：
+
+| 注入 | 变红的判据 |
+|---|---|
+| 关掉循环校验 `if (false && isDescendantOf(...))` | 3 条 cycle 用例 |
+| 深度判据去掉 `+ movedHeight`（只看被移动节点） | 子树高度用例 —— ⚠️ **第一版用例没抓住它**（新父深度本身已到上限，蒙对了）；重写成"新父深度 1 + 子树高度 2"后才真红 |
+| 深度判据 `>` 改 `>=`（差一层） | 边界用例 |
+| 子任务数量 `>=` 改 `>`（差一个） | children_exceeded 用例 |
+| `limitViolations: []`（静默截断） | 2 条超限用例 |
+| 读时环兜底 `breakCycles` 拆掉 | 环数据 + 自指用例 |
+| 同级组装退回输入顺序（**本轮真实踩过的 bug**） | 同级稳定排序用例 |
+| 「父已删除」并进「父不存在」桶 | promotedFromDeletedParent 用例 |
+| `compareTaskSiblings` 去掉 id 决胜 | 同毫秒排序用例 |
+
+🔴 **两件明确未决、刻意不发明默认值的**（见 `subtasks.ts` 文件头）：
+
+1. **完成态传播**：实测仓库**没有任何 rollup/聚合逻辑**，`Task.completedAt` 只描述它自己。
+   父完成是否带子、子全完成是否带父、统计怎么算 —— **产品决策**。本轮**不提供**
+   `isEffectivelyComplete()` 之类的函数（提供就等于拍了默认值）。
+2. **删除 / 移动级联**：`packages/app-host` 的 `remove` 只写墓碑、不看 `parentId`。
+   删父时子任务级联还是上提、移动是否带子树 —— **产品决策**。本轮只提供 `descendantIds`
+   这种纯查询原语，让决策落地时不必再写第二份遍历。
+
+⚠️ `buildTaskTree` 对"父已删除但子还活着"的**不一致数据**选择提到顶级显示并记进
+`promotedFromDeletedParent` —— 这是**读时安全网（不藏用户还活着的数据）**，
+**不是**上述级联决策的答案。
+
+**未完成（B1-3 保持 open）**：折叠 / 计数 / 进度、`app-host` 的改父 action
+（`parentId: null` = 清除，见 op-log 的 `null` 语义）、`packages/ui` 的树组件、两端接线、e2e。
+
+**验证**：domain **570 passed / 21 files**（新增 30 条）· `@heyta/domain typecheck` 绿 ·
+未改 `shared-schema` / `op-log` / `apps/*` / `packages/ui`。
+
+#### 🔄 第十四轮：W5 / B2-1 —— 导入计划 → **op 批次构造器**（2026-09-29，**未完成**）
+
+第十二轮把滴答导入做到"文件 → 计划 + 报告"，并在 §5 明确留了两件事：
+**"把计划写成 op"** 与 **"同一份文件导两次不重复的端到端证明"**。本轮把这两件做掉，
+落在 `packages/app-host`（判据 AGENTS.md §3.5）。**不碰** `packages/domain` /
+`op-log` / `shared-schema` / `i18n` / `apps/**`，也**一行 UI 都没写**。
+
+##### 1. 实测侦察（三条，都影响"构造器该长什么样"）
+
+| 事实 | 证据 |
+|---|---|
+| op 的 `clientId` / `vectorClock` **不是动作层填的** | `ActionContext.dispatch()` 收的是 `OpIntent`（`packages/op-log/src/engine.ts:40`），里面没有这两个字段；它们在 `OpLogEngine.buildOp()`（同文件 252-286 行）被盖章。`createTaskActions` / `createProjectActions` 同样只构造 `OpIntent` —— 本轮**照抄这个形状**，不另造一份带 `clientId` 的构造器 |
+| 新建实体的 `createdAt` **只由 op 时间戳决定** | `packages/op-log/src/state.ts:270`：`if (existing === undefined) merged['createdAt'] = op.timestamp`；`updatedAt` 在 247 行同样恒被覆盖 ⇒ 计划的 `draft.createdAt` **落不进实体**（见 §5 丢失清单） |
+| 不需要改 schema / op-log / i18n | 复用既有实体 `TASK` / `PROJECT` / `TAG` 与既有 `OpType.Create`；`Project` 无 `order` 字段（见 §5），故**刻意不写未登记键**（§3.3） |
+
+##### 2. 交付
+
+| 文件 | 职责 |
+|---|---|
+| `packages/app-host/src/ticktick-import-actions.ts` | `TickTickImportPlan` → 排序后的 `OpIntent[]` → 派发；引用校验、幂等闸门、报告透传 |
+| `packages/app-host/tests/ticktick-import-actions.spec.ts` | **24 条判据**（真实引擎 + 真实 SQLite `:memory:`） |
+| `packages/app-host/src/index.ts` | 追加 re-export（只追加，不动既有导出行） |
+
+公开 API：`TICKTICK_IMPORT_ORDER` / `createTickTickImportActions(ctx)` /
+`planTickTickImportBatch(plan, state)` / `tickTickTaskPayload(draft)` +
+类型 `TickTickImportActions` / `TickTickImportBatch` / `TickTickImportBatchEntry` /
+`TickTickImportCounts` / `TickTickImportKind` / `TickTickImportResult`。
+
+##### 3. 引用完整性顺序与幂等：各自怎么做的、判据是什么
+
+- **顺序**：单点定义在 `TICKTICK_IMPORT_ORDER = ['project', 'tag', 'task']`。
+  构造器**不依赖 `plan.projects` 的先后**，按该常量重排；清单内部额外保证
+  **父先于子**。判据两条：① 逐类顺序与常量一致；② 每个任务 op 的 `projectId` /
+  `tagIds`（和每个清单的 `parentId`）在 `entries` 里的下标**严格小于**它自己。
+  ②**不依赖顺序常量**，所以常量被改坏时它也红 —— 这是本轮特意补的，因为实测发现
+  只断言"最终状态里引用都能解析"是**不够**的（见 §4 注入 A 的说明）。
+- **幂等**：判据只有一条 —— **目标物化状态里已有该稳定 id ⟹ 不构造 op、不派发**。
+  端到端判据三条：同一份文件第二次导入 ① `opCount === 0`；② `getPendingUpload()`
+  长度不变；③ 实体总数不变。稳定 id 由 domain 的 `stableTickTickId` 派生，
+  构造器**不另生成 id**（有专门用例断言 id 形状 `^tt1-task-[0-9a-f]{16}$`）。
+  ⚠️ "已存在"**含墓碑**：用户删掉某条导入任务后再导同一文件，该 id 被**跳过**，
+  即**不复活用户的删除**（那比"少导一条"更糟）。
+- **不静默丢数据**：`importPlan(plan, report)` 返回的 `report` 就是传入的**同一个对象**
+  （`toBe` 钉住），且派发前后 `JSON.stringify(report)` 不变。派发**之前**先验完整批引用，
+  验不过**抛错、一个 op 都不写**；派发期间引擎抛错**原样上抛**，不 `try/catch` 成"成功"。
+- **特殊字符**：`tickTickTaskPayload` 只**搬运**，不 trim / 不 split / 不 slice。
+  夹具标题是 `Buy milk, eggs\nand 🎉 celebrate`，逐项断言 `,` / `\n` / `🎉` 都在。
+
+##### 4. 🔴 故障注入（7 处，每处实测红，改回即绿）
+
+| 注入 | 结果 |
+|---|---|
+| A `TICKTICK_IMPORT_ORDER` 改成 `['task','project','tag']` | ✅ **2 failed**（顺序 + 下标依赖） |
+| B 去掉任务的 `projectId` 引用校验 | ✅ **2 failed**（孤儿抛错 + 一个 op 都不写） |
+| C 去掉幂等闸门（不再按已存在 id 过滤） | ✅ **2 failed**（导两次 / 墓碑不复活） |
+| D `report` 改写（`unmapped` 清空） | ✅ **2 failed**（`toBe` + 原值） |
+| E 标题按逗号截断 | ✅ **4 failed**（特殊字符 / 纯函数 / 字段落点 / 跨端） |
+| F 吞掉派发异常 | ✅ **1 failed**（rejects） |
+| G 去掉父先于子排序 | ✅ **1 failed**（逆序计划） |
+
+🔴 **注入 A 暴露了一条真测试缺口**：只断言"导入完成后状态里引用都能解析"是**空**的 ——
+即使 task op 先写、project op 后写，**最终**状态里 project 仍然存在（reducer 不做跨实体校验，
+先写任务只是留下**中间态**孤儿）。所以补了**下标依赖**断言（§3 顺序判据②）。
+**这正是"注入必须真做"的价值：不注入就以为顺序被钉住了，其实只钉了一半。**
+
+##### 5. ⚠️ 本轮实测到的**丢失**与需要协调的事（逐条影响 + 最小一步）
+
+1. **`draft.createdAt` / `draft.updatedAt` 落不进实体。** 证据：`state.ts:270` / 247 行。
+   影响：导入后的 `createdAt` 是**导入时刻**，列表按 `(createdAt, id)` 排 ⇒ 导入的一批
+   按导入顺序而非滴答创建时间排。最小一步：`OpIntent` 支持写入时间戳（**动 op-log**），
+   或每条多发一条 `UPD { createdAt }`（**违反 §3.4 一个意图一个 op**）。
+   **两条都要动别的包，本轮不改，写进汇报由父 agent 协调。**
+2. **`TickTickProjectDraft.order` 没有落点。** `Project`（`entities.ts:170`）只有
+   `name` / `parentId` / `color` / `archived`，**没有 `order`**；任务有 `Task.order`。
+   往载荷塞未登记键会绕开 schema 纪律（§3.3），故**刻意不写**。
+   影响：清单顺序按 `(createdAt, id)`。最小一步：给 `Project` 加可选 `order?`（**domain 改动，需协调**）。
+3. **子任务仍被拍平成独立任务。** 第十三轮已给 `Task` 加了 `parentId`，但
+   `TickTickTaskDraft` 没有 `parentId`、`report.unmapped` 仍在记它 —— 这是 **domain 的**
+   导入计划决定的，本轮**不碰 domain**。最小一步：domain 侧把 `parentId` 填进 draft（需与 B1-3 协调）。
+4. **`draft.sourceKey` 不落库** —— 它只是 id 的派生输入，幂等靠 id 不靠它。**有意不写，不是遗漏。**
+
+##### 6. 本轮**明确没做**
+
+- **UI 入口 / 文件选择 / 预览弹窗 / 进度 / 撤销** —— 一行都没写（`previewPlan` 只提供只读批次，供将来 UI 用）。
+- **事务级原子导入**：`ActionContext` 只有 `dispatch` + `getState`，没有批量写入口，
+  一批 op **逐条**落盘，中途崩溃会留下"导了一半"。
+  ⚠️ 但**这一半是幂等可续的**：重跑同一文件时已写实体全进 `skipped`，剩余继续 ——
+  这是稳定 id 换来的恢复能力，不是原子性。真正原子性需要 `OpLogEngine` 级批量入口。
+
+##### 7. 验收（真实输出）
+
+```
+pnpm --filter @heyta/app-host test      → Test Files 29 passed · Tests 622 passed（新增 24）
+                                           （未加本文件时同一命令为 598 passed）
+pnpm --filter @heyta/app-host typecheck → 0 error
+pnpm -r typecheck                       → 全部 Done，0 error
+pnpm check:layering                     → ✅ apps/* 分层边界完好（208 文件，9 条规则）
+pnpm check:docs                         → ✅ 无死链、无失效章节引用、无失效锚点
+```
+
+> ⚠️ 跑 `@heyta/app-host` 测试前需先 `pnpm --filter @heyta/domain build`（app-host 经
+> `dist` 解析 `@heyta/domain`，而 domain 的新文件尚未进 dist）。这与根 `pnpm test`
+> 的 `pnpm -r build && pnpm -r test` 同一条要求。
+
+#### 🔄 第十二轮：W5 / B2-1 —— 滴答清单导入的**逻辑层**（2026-09-29，**未完成**）
+
+B2-1 在本计划里标着「feature-matrix 称这是最有效的获客手段，而它是零」。本轮把
+**领域逻辑**做出来：**文件 → 导入计划 + 报告**，**不含 UI 与 op 接线**（见文末"未完成"）。
+
+##### 1. 先把"滴答到底导出什么"核实清楚（三份独立实现交叉验证）
+
+| 事实 | 依据 | 程度 |
+|---|---|---|
+| CSV 备份 24 列的列名全集 | [ticktickmd](https://github.com/jeffreyparker/ticktickmd) `parser.py` · [DidaTask-Data-Dashboard](https://github.com/WangWaud/DidaTask-Data-Dashboard) `public/app.js` · [Mindwtr](https://github.com/dongdongbh/Mindwtr) `packages/core/src/ticktick-import.ts` | ✅ 三处逐列一致 |
+| 表头**不在第一行**（前面有元数据行），且第几行不固定 | Mindwtr 文件头 + DidaTask 注释「前 6 行为元数据，第 7 行为表头」 | ✅ 两处独立描述；故只搜索表头，不硬编码行号 |
+| 优先级 `0 / 1 / 3 / 5`（**非连续**） | 三处一致 | ✅ |
+| 状态 `0=未完成 / 1=已完成 / 2=已完成或归档` | 三处一致（`2` 的名字不统一） | ✅ |
+| checklist 标记 `▫`(U+25AB)/`▪`(U+25AA)，且项在 `Content` 里**无换行拼接** | ticktickmd `generator.py` + Mindwtr 常量 | ✅ 两处一致 |
+| 时间戳形如 `2025-12-27T03:57:34+0000`（偏移**无冒号**） | ticktickmd `parse_datetime` + Mindwtr 专门补冒号 | ✅ |
+| 重复规则以 `RRULE:` 开头 | ticktickmd README 举例 | ✅ 一处举例 |
+| 官方 Open API 的枚举词表 | `developer.ticktick.com` 本次 404 | ⚠️ **未核实** |
+| `Reminder` 列的语法、`View Mode` 的取值词表、`Status=2` 的确切语义 | 只知列名 | ⚠️ **未核实** |
+
+→ 全部写进 `packages/domain/src/ticktick-format.ts` 文件头的那张表，**未核实的逐条标注**。
+
+##### 2. 交付（只在 `packages/domain`，未碰 `apps/**` / `shared-schema` / `op-log` / `i18n`）
+
+| 文件 | 职责 |
+|---|---|
+| `packages/domain/src/ticktick-format.ts` | **格式与枚举映射的唯一事实源**：24 列列名、表头识别、优先级/状态/类型映射、checklist 标记、`RRULE:` 前缀剥离 |
+| `packages/domain/src/ticktick-import.ts` | CSV 词法 → 解析 → `TickTickImportPlan`（`projects`/`tags`/`tasks` draft）+ `TickTickImportReport`；稳定 id；`mergeTickTickPlans` |
+| `packages/domain/tests/ticktick-import.spec.ts` | 28 条判据（含守恒律与幂等） |
+
+公开 API（`@heyta/domain` 已 re-export）：`parseTickTickCsv` / `mergeTickTickPlans` /
+`emptyTickTickPlan` / `stableTickTickId` / `lexCsv` / `mapTickTickDate` / `mapTickTickTimestamp` /
+`mapTickTickPriority` / `mapTickTickStatus` / `mapTickTickRepeat` / `mapTickTickKind` /
+`parseTickTickContent` / `parseTickTickTags` / `tickTickProjectSourceKey`。
+**报告只回结构化 `reason`/`field`，不含任何文案** —— 词条表仍是唯一文案事实源。
+
+##### 3. 幂等与"不静默丢数据"的判据
+
+- **幂等**：`id = tt1-<kind>-<fnv1a64(namespace+kind+sourceKey)>`，`sourceKey` 只由文件内容派生。
+  判据三条：① 同一份文件解析两次 `JSON.stringify(plan)` 逐字节相同；② `now` 变了 id 不变；
+  ③ `mergeTickTickPlans(plan, plan).added` 全 0、`skipped` 等于总数。
+  ⚠️ **已知弱点并如实上报**：没有 `taskId` 的行只能回落到行序号，行序一变 id 就变 ——
+  每一行都记进报告的 `missingSourceId`，用户导入前能看到，**不假装它稳**。
+- **不静默丢数据**：守恒律 `report.dataRows === report.tasks + report.skipped.length`
+  被直接断言；滴答有、heyta 没有归宿的字段（`Reminder` / `Start Date` / `parentId` /
+  `Is Floating` / 看板三列 / `Timezone` / 归档状态 / 不认识的枚举）**全部带原值**进
+  `report.unmapped`。子任务被**拍平成独立任务**（heyta 的 `Task` 还没有 `parentId`），
+  **不丢行、不假装有父子关系**。
+
+##### 4. 🔴 故障注入（9 处，每处实测红，改回即绿）
+
+| 注入 | 结果 |
+|---|---|
+| A 去掉 `mergeTickTickPlans` 的任务去重 | ✅ 1 failed |
+| B 子任务行直接 `continue`（不记 skipped / 不记报告） | ✅ **6 failed** |
+| C 优先级表 `'5'` 改成 `Priority.Low` | ✅ 1 failed |
+| D checklist 标记 `▫` 改成 `□` | ✅ 1 failed |
+| E 日期型截止从**本地零点**改成 `Date.parse`（UTC 零点） | ✅ 1 failed |
+| F 状态表 `'1'` 从 `completed` 改成 `open` | ⚠️ **第一次绿** —— 见下 |
+| G 不剥 `RRULE:` 前缀 | ✅ 1 failed |
+| H 缺 `taskId` 不报告 `missingSourceId` | ✅ **3 failed** |
+| I 稳定 id 两个哈希种子都忽略 `namespace` | ✅ 1 failed |
+
+🔴 **F 第一次注入是绿的，暴露了一条真测试缺口**：完成状态的唯一信号在夹具里是
+`Completed Time`，而实现里 `completedAt !== undefined || status === done` 是**或**关系 ——
+所以改坏状态表也测不出来。已补一行**只有 `Status=1`、没有 `Completed Time`** 的夹具，
+F 随即变红。**这正是"注入必须真做"的价值：不注入就永远不知道那条断言是空的。**
+
+⚠️ 另一处如实说明：I 的第一版注入只改了哈希的一个种子，而 id 前缀里本来就有 `kind` 段，
+所以没红。**"这条注入没红"不等于"判据是空的"** —— 换成忽略 `namespace`（前缀里没有它）
+才真正命中哈希本身；于是把测试注释改成准确的说法（kind 由前缀区分，namespace/sourceKey 由哈希区分）。
+
+##### 5. 本轮**明确没做**（留给后续刀）
+
+- **UI 入口、文件选择、导入预览弹窗、进度与撤销** —— 一行都没写。
+- **把计划写成 op**：`TickTickImportPlan` 是纯数据，需要 `packages/app-host` 新增一个
+  "plan → `createTaskActions` 形状的 op"的构造器（op 需要 `clientId`/`vectorClock`，
+  按 AGENTS.md §3.5 属于宿主 / `app-host` 层，**domain 不该碰**）。
+- **同一份文件导两次不重复的端到端证明**：目前只证到"计划 id 稳定 + 合并层去重"。
+  真正的判据要在 op 层做出"第二次不写任何 op"。
+- **`Reminder` 导入**：heyta 还没有提醒数据模型（B1-1），本轮只把原值带进报告。
+
+#### 🔄 第十一轮：B1-4 搜索 —— 共享层 + Web 接线（2026-09-28，**未完成**）
+
+前十轮都在清 W2 的收尾与审查发现，**四根柱子一根都没真正开工**。本轮直接开 B1-4。
+
+| 做了什么 | 判据 |
+|---|---|
+| 新增 `packages/domain/src/search.ts`（`matchesQuery` / `searchTasks` / `haystackOf`） | **13 条单测**，钉的是三个**判断题**而不是实现细节：① 匹配哪些字段（只 `title`+`note`，**不做跨字段拼接匹配** —— 那种匹配用户找不到自己在搜哪一段）；② 大小写用 `toLowerCase()`（中日韩恒等，所以"中文要不要分词"是个**假问题**）；③ 多词是 **AND**（多打一个词结果必须**变少**，否则用户以为搜索坏了） |
+| web store 加 `query` + `setQuery`；选择器改成**先筛再搜** | 🔴 顺序是产品语义：搜索在**当前筛选之上收窄**，不替代它。反过来的话"已完成"这类分支会得到不同结果，而用户只会读成"搜索有时候不准" |
+| `App.tsx` 加搜索框（**只在任务视图**）+ 清除按钮 | 习惯/番茄/成长/设置那几屏没有"任务列表"可筛，放一个打不出结果的搜索框比没有更坏 |
+| 词条 `web.shell.search.*`（中英各三） | `check:ui-language` 绿 |
+
+**注入验证**：① 搜索框不渲染 ⇒ 红（接线）；② 把共享层的 `every` 改成 `some`（AND→OR）⇒ 红（判据）。
+还原 ⇒ domain **512** / web **821** 全绿。
+
+🔴 **未完成的部分（B1-4 保持 open）**：
+- **移动端没有任何搜索入口** —— 按 M3，一件能力要逐端验收，所以这条不算完；
+- **没建索引**：现在是每次渲染对全部任务做一次 `filter`。任务上千条时这会是可感的开销，
+  而"怎么建索引"是**平台差异**（浏览器 / SQLite 各一套），属于存储层而非产品语义
+  —— 分工见 `search.ts` 文件头。
+
+**验证**：domain 512 / web 821 · 8 道门禁全绿 · `pnpm -r typecheck` 0 错误 · docs 无死链。
+
+#### ✅ 第十轮：R3 —— ADR「勘误段」是**机制先被用、规则后补**（2026-09-28）
+
+ADR-0018 §6 与 ADR-0021 §6 在 2026-09-28 被加了勘误段，而当时：
+
+- `docs/adr/README.md` 只写着"**不可变**，结论变了就新写一份并互相标注取代"；
+- `docs/README.md` 里"结论有变时新增勘误"那条**只适用于 `research/` 层**。
+
+⇒ **一次无先例、无记录的规则变更**（改动前 `git grep 勘误 HEAD -- docs/adr/` 无任何命中）。
+
+**为什么不是"删掉那两段"**：它们说的是**"决定照做了没有"**，而
+**让一句已知为假的话留在不可变的 ADR 里，比违反不可变更坏** ——
+ADR-0018 §4.1 写着 `expireStaleOrders`「必须作为定时任务运行」，而它**零调用者**；
+照它做决定的人会以为对账在跑。
+
+**修法**：把机制**写进 `docs/adr/README.md` 的规则**（新增 §1a），并划清边界 ——
+其中最关键的一条是 **"决不允许用勘误段悄悄改结论"**（那正是"不可变"要拦的）。
+
+| 判据 | 那两段是否符合 |
+|---|---|
+| 1. 只能追加、**不得修改正文一个字** | ✅ `git diff --numstat`：**新增 35 / 删除 0**（0018）、**新增 33 / 删除 0**（0021） |
+| 2. 只能写三类事实（断言被证伪 / 落地进度 / 已被谁取代） | ✅ 前者是"§4.1 第 1 条没有兑现"；0018 的旧价格用**删除线 + 指向 ADR-0020**，不是悄悄改 |
+| 3. 🔴 不许用勘误段改结论 | ✅ 0018 §6 明写"本 ADR 自己的结论与具体价格无关，因此**没有被取代**" |
+| 4. 必须写明日期与实测 | ✅ `**实测（2026-09-28）**` + `grep -rn "expireStaleOrders(" server/src server/scripts` 无命中 |
+| 5. 加在文末、编号接最后一节 | ✅ 都是 `## 6. 勘误（2026-09-28）` |
+
+**所以这条规则是「追认」，不是「放宽」** —— 我把它逐条对着那两段核过，全部满足。
+写清边界的价值在于：下一个人想改结论时，规则里现在有一句话直接拦住他。
+
+**同轮 R10**：`roadmap.md:387` 写着「入口在 Web 设置页与 node-host，**移动端未做**」，
+与**同一文件** §5.1.1 的三端表（移动端 ✅ 导出）直接矛盾 —— 这正是那次改动声称要修的
+"同一文件两处相反"。已按实测改成三端齐全。
+
+**验证**：8 道门禁全绿 · docs 无死链。
+
+#### ✅ 第九轮：R1 —— `/platforms` 终于有状态了（2026-09-28）
+
+🔴 **这一页叫「平台状态」，而在此之前它没有状态。**
+
+`site.platforms.status.*` 与 `site.platforms.legend.*` 六条词条写好了、门禁也绿 ——
+但 `SectionSpec` 上**没有 `status` 字段**，结构上根本渲染不出来。
+访客只能逐段读散文才知道某个平台到底能不能用，而这一页存在的**全部意义**
+就是让他一眼看出来。这是"看起来有、其实没有"里最贵的一种：**页面在，
+但它要传达的那件事不在。**
+
+| 做了什么 | 判据 |
+|---|---|
+| `SectionSpec` 加 `status?: PlatformStatus`（`available` / `partial` / `blocked`）+ `StatusBadge` 组件；档位→词条映射**只有一份**（`PLATFORM_STATUS_KEYS`） | 徽标用 `data-status` 属性而不是三个 class —— 加一档只改映射表与样式表，不会"新档忘了写 class 于是没颜色" |
+| 六个平台各设档位，**与页面正文的说法逐条对齐**：web `available`；android / ios / desktop / selfhost `partial`；harmony `blocked` | 🔴 测试断言 `9` 个徽标（6 平台 + 3 图例）且三档计数分别是 2 / 5 / 2 |
+| `/platforms` 页末加**状态说明**（渲染那 3 条 legend 词条） | 没有它，三个徽标就是**三个没有定义的词** —— 访客看到「进行中」只能猜 |
+| 顺手消除一处类型抄写：`SectionSpec.mockView` 原来自己写了一遍 `'tasks' \| 'quadrant' \| 'habits' \| 'focus'`，改为 `MockView`（`mockup/AppWindow` 导出） | 加第五种复现件时两处会漂移 |
+
+**死词条 15 → 9**（6 条平台状态词条活了）。剩下 9 条见 R2。
+
+**注入验证**：① 去掉 harmony 的 `status` ⇒ 红（差一个徽标）；② 渲染处不画徽标 ⇒ 红。
+还原 ⇒ 292 全绿。
+
+**验证**：landing **292** 测试 / build 成功 / 8 道门禁全绿 / docs 无死链。
+
+#### ✅ 第八轮：B0-6 完成 —— 移动端标签筛选 + 逐端验收（2026-09-28）
+
+上两轮把"标签筛选"拆成了三步走，这轮一次性把移动端做完。
+
+| 做了什么 | 说明 |
+|---|---|
+| `TasksScreen` 新增**标签筛选行**（横向 chip，复用 `ui/kit` 的 `Chip`） | 此前移动端**连一条筛选行都没有**，而 Web 侧栏能筛 —— 同一件能力两端不一致 |
+| **先按标签筛、再分节**：`filterTasks(tasks, {kind:'tag'}, {now})` → `sectionTasks(...)` | 顺序不能反：`{kind:'tag'}` 的语义是"只看未完成"（与 Web 一致），反过来的话标签视图里会冒出一个"已完成"分组，两端就不一样了。判据仍来自共享层，移动端只做接线（M1） |
+| chip 行渲染在 `view === 'quadrant' ? … : nothing ? …` **之前** | 🔴 否则"筛完一条都没有"时这一行会跟着消失，用户**没有办法清除筛选**，只能杀应用 |
+| 只在列表视图出现 | 四象限那屏的全部价值是四个格子同时在场，叠一层标签筛选会让它读成"筛过之后还剩几条" |
+| 再点同一个标签 = 取消筛选 | 否则用户要先点「全部」才知道能清掉，那是一次没有反馈的摸索 |
+| 词条 `mobile.tasks.tagFilter.all`（中英各一） | `check:ui-language` 绿（1531 条对齐） |
+
+**逐端验收（M3）**：`scripts/verify-mobile-tags.sh` 新增 **step 6b**，真模拟器跑了 5 条断言，**全部通过**：
+
+```
+✅ 任务视图里出现了标签筛选项「tag-e2e-123413」
+✅ 对照任务已创建：untagged-123724（不带标签）
+✅ 筛选后带该标签的任务仍在
+✅ 筛选后不带该标签的任务被排除（untagged-123724）
+✅ 点「全部」后对照组任务回来了（筛选可清除）
+```
+
+判据里**刻意有一条不带标签的对照任务** —— 只有一条任务时，"筛完还在"什么都证明不了。
+
+##### 🔴 脚本整体退出 1：是 step 7 一条**结构性过不去**的既有断言，与本次改动无关
+
+`step "7. 手机同步"` 断言「手机本地库里远端 op 数 ≥ 1」。但：
+
+- `mobile-e2e-up.sh` 每次都建**全新账号**（实测输出：`✅ 全新账号 …`、`账号 client 数 0 < 20`）；
+- step 7 跑在 **step 8（笔记本同步）之前**（脚本 line 327 vs 328+）。
+
+⇒ 那一刻**没有任何别的设备推过数据**，手机不可能拉到远端 op，`REMOTE_OPS = 0` 是**结构上必然**的。
+本次新增的 step 6b 只建了一条对照任务、点了几个 chip，**不可能让远端 op 从有变无**。
+**这条断言在 `mobile-e2e-up.sh` 建的账号上过不去** —— 要么它本来就要配 `HEYTA_E2E_KEEP_ACCOUNT=1` 跑，
+要么它需要一次"先让另一台设备推、再让手机拉"的前置。**记在这里，没有去改它**（不属于本轮范围，且改了要重跑验证）。
+
+##### 一个自己踩的 bash 坑，值得记
+
+新步骤第一次跑直接 `unbound variable`：`"…筛选项「$TAG_NAME」"` —— **`$VAR` 后面紧跟中文字符时，
+bash 会把多字节字符当成变量名的一部分**。12 处全部改成 `${VAR}`。
+（这与本仓库 §7 那类坑同形：报错信的是现象，不是原因。）
+
+#### ✅ 第七轮：分享卡片的两个"没人核对的值"（R14 / R15 的一半）（2026-09-28）
+
+`apps/landing/scripts/og-card.html` 里有两处硬编码值，都不属于任何事实源：
+
+| # | 值 | 为什么是缺陷 | 修法 |
+|---|---|---|---|
+| **R14** | 域名 `heyta.finlaw.cloud` 写死在 HTML 里 | 站点地址的唯一事实源是 `src/site/origin.ts` + `VITE_SITE_URL`（那里写着"换域名 = 一次构建参数"）。写死之后**换域名时卡片仍印旧域名**，且没有门禁会发现 | 模板改成 `{{SITE_HOST}}`，`gen-og-card.mjs` 用 `siteOriginFrom(process.env.VITE_SITE_URL)` 注入 |
+| **R15** | 主色 `#2f6fed`，注释还写着"与 design tokens 的 primary 同一个色相…不该出现第二种蓝" | 而 token 是 `#2563eb`。**那就是第二种蓝**，且是硬编码 hex（`check:design` 管不到 `.html`） | 模板改成 `{{PRIMARY}}`，从 `tokens.css` 的 `--ht-blue-600` 注入；**取不到就抛**，不回落 |
+
+🔴 **注入的验证方式**（比读代码强）：
+`VITE_SITE_URL=https://example.org` 重跑 ⇒ **PNG 字节变了**（域名确实来自环境变量）；
+再用默认地址重跑 ⇒ **与原来逐字节相同**（确定性、可复现）。
+
+⚠️ **R15 只修了一半，剩下一半比审查报的更大**：模板里还有 **4 个不在 `tokens.css` 里**的颜色 ——
+`#fbfaf7`（暖白底）、`#d8d6d1`（暖灰）、`#1a1a1a`、`#5b5b5b`。整套是一套**暖纸色**，
+而设计系统只有 `slate` / `blue` 两族，**没有纸色**。
+所以这不是"改个 hex"，而是要么**补一组 token 并做对比度校验**，要么**明确宣布这张卡是系统外的美术资产**。
+两个都需要设计决策 —— **不擅自发明 token**，记在这里。
+
+#### ✅ 第六轮：清掉三条"会误导下一个人"的缺陷（R17 / R4 / R5）（2026-09-28）
+
+B0-6 的移动端那一半是一块大 UI，本轮剩余预算不足以做完并**逐端验证**，
+所以改为先清掉三条小、但每条都会让人以为"这块有人管着"的缺陷 ——
+它们都属于同一个形状：**注释/状态声明与实物不一致**。
+
+| # | 缺陷 | 修法 | 判据 |
+|---|---|---|---|
+| **R17** | `pageById(id: string)` —— 紧邻的注释却声称"写错 id 是编译期错误"。收 `string` 时 `pageById('hme')` **能通过编译**、只在运行时抛 | 签名收窄为 `SitePageId`，并把这处不一致写进注释 | 🔴 **注入**：`pageById('hme')` ⇒ `error TS2345: '"hme"' is not assignable to '"home" \| "features" \| …'`；还原 ⇒ 绿。**它的注释现在是真的** |
+| **R4** | `docs/README.md` 给 ADR-0033 标 🟡 **待确认**，而 ADR 自述 ✅ **已接受** | 改为与该 ADR 一致 | 两处逐字一致 |
+| **R5** | 4 处注释引用了一个**不存在**的门禁 `check:site-reachability`（其中 `pages.ts` 两处是主 agent 写的）。ADR-0033 §5 早已如实登记"尚未落地（归 W4/A8）"，但代码注释仍按"已有"口气写 | 4 处全部改成如实口径：**说明它尚未落地**，并指出当前真正的判据在 `render.spec.tsx` 的 N2 用例（走渲染出的 DOM）与 `app-mount.spec.tsx`（`apps/web` 那一半） | 全仓 grep 后残留的 3 处**都在说"尚未落地"** |
+
+**为什么先做这三条**：本仓库最贵的失效不是"功能没做"，而是**"看起来有人管、其实没有"** ——
+它让人**停止检查**。这三条正是那个形状，而修它们的成本是分钟级。
+
+**验证**：landing **286** 测试全过 · 8 道门禁全绿 · `docs-link-check` 无死链。
+
+#### ✅ 第五轮：B0-6 第三步 —— 标签筛选在 Web 上真的有入口了（2026-09-28）
+
+前两轮把判据搬进了 `packages/domain` 并让两端都调它 —— 但**侧栏的标签名是一个不可点的 `<span>`**。
+也就是说 `{ kind: 'tag' }` 分支有实现、有单测，**却没有任何用户能切到它**：
+"看起来有、其实没有"的另一种形状（数据与判据都在，缺"用户能不能用它"）。
+
+| 做了什么 | 判据 |
+|---|---|
+| `ProjectsPanel` 的标签名 `<span>` → `<button>`，点击走 `onSelect({ kind: 'tag', tagId })`（与清单同一条路径 —— 直接 `setFilter` 会在别的视图里变成"点了没反应"） | 🔴 新增 `app-mount.spec.tsx` 用例：建两条任务、只给一条打标签 → **点侧栏标签** → 只剩那条，且标题变成标签名。**注入验证**：把 `onClick` 换成空操作 ⇒ 红；还原 ⇒ 绿 |
+| `App.tsx` 标题支持 `tag`：显示**用户自己的标签名**，查不到才回落词条 | 用例里断言标题是「工作」 |
+| 新增词条 `web.shell.nav.tag`（中英各一） | `check:ui-language` 绿（1530 条对齐） |
+
+🔴 **顺带修掉一个测试隔离缺陷**（是这条新用例当场照出来的）：`app-mount.spec.tsx` 的
+`freshDb()` 只换空库、**没有复位 store 的 `filter`**。新用例把筛选留在 `{kind:'tag'}` 上，
+于是**下一条**用例（备注输入框）在一个"只显示某标签任务"的筛选下渲染，
+新建任务一条都不匹配、任务行根本不出现，报的是"没有备注输入框" ——
+**一条用例的残留状态让另一条报了个假故障**，而失败信息完全指不到真因。
+已改成与 `store.spec.ts` 同一形状（同时复位 `entities` / `filter` / `now` / `ready`）。
+
+⚠️ **B0-6 仍未完成**：**移动端还没有标签筛选入口**（它只有按日期的分节 + 详情面板里的标签编辑）。
+按 M3，这件能力要逐端验收 —— 移动端那一半是下一步。
 #### ✅ 第四轮：B0-6 第二步 —— 移动端也改用它（M1 那一半关掉）（2026-09-28）
 
 第三轮把判据搬进了 `packages/domain`，但**移动端仍在用自己的那份分组** ——
@@ -670,6 +1227,18 @@ JSON-LD 每页一条 `SoftwareApplication` 且 `/pricing` 有 `FAQPage` —— �
 所以"分组对不对"只能靠**真模拟器 E2E**（`verify-mobile-task-edit` 会断言
 设了截止日期之后出现「今天」分组）。**这一条不能用"typecheck 过 + 单测过"替代** ——
 那正是 M3 存在的理由。
+
+✅ **已跑**：`PORT=3010 bash scripts/verify-mobile-task-edit.sh` —— **30 项通过 / 0 失败**，
+其中 `✅ 出现了「今天」分组` 正是覆盖这次委派的那条断言。
+
+⚠️ **一处如实说明**：那轮 APK 构建发生在 `pendingCount` 那一步**之前**，
+所以 E2E 覆盖的是 `sectionTasks` 委派，**没有**覆盖 `pendingCount` 的接线。
+后者的依据是：`pendingCount` 在共享层有单测、算术与改前逐字相同、typecheck 通过。
+**要拿到同等级别的证据需要再跑一次模拟器** —— 记在这里，不假装已经覆盖。
+
+**B0-6 仍未完成的部分**：标签筛选的 **UI**（`TaskFilter` 的 `tag` 分支已在共享层
+就位并测到，但没有任何界面能切过去）。下一步：Web 侧栏标签 → `{kind:'tag'}`，
+移动端同源入口，两端各一条验收。
 
 #### ✅ 第三轮：B0-6 的第一步 —— 把筛选语义搬出壳（M1）（2026-09-28）
 
@@ -734,3 +1303,344 @@ A 轨的**架构地基已经完成**，剩下的是往它上面放内容，以�
 > 是**同一件事的两处实现**（那份测试的文件头也写明了）。目前**保留测试那一份**，
 > 因为它渲染真实 DOM、更接近"访客能不能点到"。**不要再加一个静态扫描脚本** ——
 > 两份判据必然漂移，而漂移的判据比没有判据更坏。
+
+### 🔴 更正：P9 的到期条件不是「两者之一」，是「**两者都要**」（2026-09-28，实测）
+
+**Goal 的 objective 里我写的是**：
+> `NOTE` + `REMINDER` —— **两者之一完成即可让 `check:reachability` 转绿**。
+
+**实测证明这句话是错的。** 读门禁的断言 B 输出：
+
+```
+✅ REMINDER   1 处：packages/app-host/src/reminder-actions.ts     ← 已完成
+🔴 NOTE       0 处写路径
+🔴 断言 B 不通过：1 个已建模的实体零写路径 · NOTE
+```
+
+断言 B 的判据是「**每一个已建模的实体**都必须在 app-host 里有一条写路径」——
+**它是全称量化，不是存在量化**。所以 `REMINDER` 做完之后门禁**仍然红**，剩下的唯一缺口是 `NOTE`。
+
+⇒ **正确的到期条件是：`NOTE` 与 `REMINDER` 都接上写路径 + 宿主入口。**
+
+**顺带记下门禁自己给出的两条关键指引（它比我写得更准）**：
+1. **修法**：照 `habit-actions.ts` 的形状在 app-host 补一族 NOTE action，**并在宿主（`apps/web` 或 `apps/mobile`）里接上真实入口**；
+2. 🔴 **禁止的假修法**：**不要把 `NOTE` 从 `EntityModelMap` 里删掉来"修绿"** ——
+   那会让合法的历史 op 变成未知实体而被**静默丢弃**（op-log 对未知实体的处理就是跳过）。
+   ⚠️ 它还点名了一个**假完备陷阱**：`NOTE` 在 `packages/ui/src/sync/model.ts` 里出现过，
+   但那是**实体名标签映射（显示用途）**，把它算作"调用点"会让门禁**假绿**。
+
+**这也修正了我对"有杠杆的门禁"的说法**：`REMINDER` 那一刀**没有**让门禁转绿，
+它的价值是**把红色范围从"两条未接"缩小到"一条未接"**——**缩小缺口与关闭缺口是两件事**。
+
+---
+
+### B1-1 领域层 + app-host 逻辑层已落地（2026-10-02，W3 / B1-1 提醒）
+
+> 本节是**追加**记录，不改上面任何一行。范围**只有两层**：
+> `packages/domain/**` + `packages/app-host/**`（+ `packages/op-log` 的桶登记，因为
+> "已建模"这件事的定义就在那里）。`apps/**`、`packages/ui/**`、`packages/i18n/**`、
+> `scripts/**` **一行未动**。
+
+**① 提醒是独立实体，不是 `Task.dueDate` 的派生视图。依据如下（先查了 ADR）：**
+- 🔴 **没有任何 ADR 管任务提醒**：`grep -rn "提醒\|REMINDER" docs/adr/` 只命中
+  ADR-0020 的**订阅到期提醒**（"到期前提醒，不续则停止托管"），与任务提醒无关。
+  所以这条不是"ADR 已定、照做"，是**新拍的产品决定**——判据在下面两条。
+- **`dueDate` 的语义已被 ADR-0015 §2 占满**：它是象限的**紧迫性轴**（一个瞬间）。
+  提醒是**通知规则**（"截止前 30 分钟"、一条任务挂多条、只看时刻不看截止），
+  塞进同一字段会让它同时表达两件事，而它们必然在一次编辑里漂移。
+- **一个用户意图 = 一个 op**（AGENTS.md §3.4）。做成 `Task.reminders[]` 数组：
+  加一条提醒要重写整条任务 → 与"改标题"在同一实体上 LWW 互斥，
+  且单条提醒的删除/顺延表达不出来。这与 `entities.ts` 用同一条推理**否决**
+  `TASK_REPEAT_CFG`（独立重复规则实体）是同一个判据的两面：
+  `TASK_REPEAT_CFG` 被否决是因为**一个意图要跨两个实体**；
+  `REMINDER` 成立是因为**提醒的增删改本身就是独立意图**，天然一条 op。
+- 计划里也已经登记了"物化 `REMINDER`"（§B1-1 的"关键难点"①）。
+
+**② 落地物（登记三处 + 从 `UNMODELED_ENTITY_TYPES` 移除）**
+| 位置 | 内容 |
+|---|---|
+| `packages/domain/src/entities.ts` | `Reminder` 实体 + `EntityModelMap.REMINDER` + `MODELED_ENTITY_TYPES` 末项 |
+| `packages/op-log/src/state.ts` | `MaterializedState.reminders` + `emptyState()` + `BUCKET_BY_ENTITY.REMINDER = 'reminders'`；**删除 `UNMODELED_ENTITY_TYPES` 里的 `REMINDER` 登记**（`entity-coverage.spec.ts` 的"实现完要移除登记"要求） |
+| `packages/domain/src/reminders.ts` | 纯规则：到期判定 `reminderPhase` / 调度集合 `dueReminders`、提前量 `reminderTriggerFromOffset`、重复顺延 `nextTriggerAfterRepeat`、校验 `reminderRejection`、snooze `snoozeDeadline`、上限常量 |
+| `packages/app-host/src/reminder-actions.ts` | `createReminderActions`：create / createBeforeDue / reschedule / snooze / markFired / dismiss / undoDismiss / remove / listForTask / due / rescheduleForRepeat；id = `${taskId}:${triggerAt}`（同任务同刻只有一条） |
+
+**③ 判据（先红后绿，真实输出）**
+- `packages/domain/tests/reminders.spec.ts` + `packages/app-host/tests/reminder-actions.spec.ts`。
+- 红：把 `payload: { taskId, triggerAt }` 改成 `payload: { taskId, triggeredAt: triggerAt }`
+  → `Tests 4 failed | 19 passed (23)`；绿：改回 → `Tests 23 passed (23)`。
+- 全量：`pnpm --filter @heyta/domain test` **591 passed**（基线 570）、
+  `pnpm --filter @heyta/app-host test` **645 passed**（基线 622）、
+  `pnpm -r test` 全绿（op-log 51、mobile 349、web 861、server 1671…）、
+  `pnpm -r typecheck` 全绿、`check:layering` / `check:docs` 绿。
+
+**④ 🔴 `check:reachability` 改动后的真实状态：仍然红，而且红在**另一条断言上****
+```
+✅ 三处登记相等：…, NOTE, PREFERENCE_CORRECTION, PROJECT, REMINDER, TAG, TASK
+✅ REMINDER   1 处：packages/app-host/src/reminder-actions.ts
+🔴 NOTE       0 处写路径                       ← 断言 B（未动，见下）
+🔴 断言 C 不通过：1 项
+   · REMINDER 有写路径，但 ACTION_FAMILIES 里没有它的宿主 action 家族 —— **无法判定**。
+✅ 断言 D 通过（REMINDER 已从 UNMODELED 清单移除）
+```
+**逐条说清还差什么（不许含糊）：**
+1. **断言 C 需要两样东西，两样都在本轮所有权之外**：
+   ① 在 `scripts/check-reachability.mjs` 的 `ACTION_FAMILIES` 里加
+   `{ entity: 'REMINDER', family: 'createReminderActions' }` —— **`scripts/**` 本轮明令不许碰**；
+   ② 在某个宿主（`apps/web` 或 `apps/mobile`）的 `src/` 里真的调用 `createReminderActions(` ——
+   **`apps/**` 本轮同样不许碰**（另有 agent 在改 `apps/web/src/features/capture/**` 与
+   `packages/ui/src/capture/**`）。**本轮刻意没有伪造调用点** —— 门禁文件头把
+   "把 `ACTION_FAMILIES` 补进去而 action 不写"列为**禁止的假修法**，反过来
+   "写测试/共享层算调用点"同样是假完备。
+2. **断言 B 的 `NOTE` 红与本轮无关**，是另一条（幻觉 #12）缺写路径 + 宿主入口。
+3. ⇒ **上面的更正需要再更正一次**：`REMINDER` 接上写路径后，红色**不是**只剩 `NOTE` 一条 ——
+   它还多了一条 `REMINDER` 的**断言 C**（"有写路径但宿主没接 + 门禁表没登记"）。
+   也就是说 §B1-1 的"物化 `REMINDER`"这一刀把红**从断言 D 挪到断言 C**，
+   而 C 恰恰是**唯一一条必须动 `scripts/**` 与 `apps/**` 才能关的**。
+   计划里的"两者之一完成即可转绿"不成立；"缩小缺口 ≠ 关闭缺口"这句依然成立。
+
+**⑤ 需要协调的下一步（按文件所有权）**
+- `scripts/check-reachability.mjs` 的 `ACTION_FAMILIES` 加一行（只加登记，不改判据、不改 `reason`）；
+- `apps/web`（或 `apps/mobile`）接一个真实入口：`createReminderActions(engine)` +
+  到期时读 `due()` 弹本地通知 + 标记 `markReminderFired`；
+- `apps/*` 里**不要**写 `entityType: 'REMINDER'` 字面量（`check:layering` 会红）。
+
+---
+
+### C-8 / P9 收口：`NOTE` 的写路径已落地（2026-10-05）
+
+> 本节是**追加**记录，不改上面任何一行。上一节 ⑤ 列的"需要协调的下一步"里，
+> 第 1 条（`ACTION_FAMILIES` 加登记）与第 2 条（宿主真实入口）在本轮推进。
+
+**① 先更正一处过期的判断（实测优先）**
+
+上一节写「`REMINDER` 接上写路径后，红色不是只剩 `NOTE` 一条」——**这是对的**。
+但它同时留下了一条**已经过期的话**：`ACTION_FAMILIES` 那段注释写着
+「`NOTE` 刻意不在表里 —— 它在 app-host 里真的没有任何 action」。
+本轮 `NOTE` 的写路径落地后，这句注释就变成了**假的**。
+⇒ 规律（本仓库第 4 次踩到）：**注释不是判据，且状态一变它就变成错误信息**；
+改判据文件时必须**连注释一起改**，否则下一个人会照着一句假话做决定。
+
+**② 落地物（两层，逐条可核）**
+
+| 位置 | 内容 |
+|---|---|
+| `packages/domain/src/notes.ts`（新，约 150 行） | 纯规则：`NOTE_MAX_CONTENT_LENGTH`、`noteRejection`（空白算空）、`aliveNotes`、`sortNotesForDisplay`（钉选 → `updatedAt` 降序 → **id 字典序**）、`isNoteHighlighted`、`noteProjectId`、`notesInGroup`、`noteExcerpt`（取第一段非空行 + `…`） |
+| `packages/app-host/src/note-actions.ts`（新，约 250 行） | `createNoteActions`：createNote / updateNoteContent / setNoteProject / setNotePinnedToToday / removeNote / restoreNote / listNotes / notesOf / highlightedNotes |
+| `packages/app-host/src/index.ts` | 转出 `createNoteActions` 一族（附"`apps/*` 不得出现 `entityType: 'NOTE'` 字面量"的红线） |
+| `scripts/check-reachability.mjs` | `ACTION_FAMILIES` 补 `{ entity: 'NOTE', family: 'createNoteActions' }`；**先 grep 证实定义件存在**（`packages/app-host/src/note-actions.ts:98` 定义 1 处 + `index.ts` 导出 1 处）才补 |
+| `packages/i18n/src/locales/{zh-CN,en}.ts` | `reminder.*`（17 条）与 `notes.*`（14 条）+ `web.shell.views.notes` |
+
+**③ 一个由实测抓出来的类型谎言（值得单独记）**
+
+`Note` 原来声明 `projectId: string | null`（必填）。实测发现 **reducer 把 `null`
+定义为"显式清除这个字段"**（`packages/op-log/src/state.ts`：合并语义下
+"取消完成"这类意图只能靠 `null` 穿过 JSON，然后在 reducer 里翻成 `delete`）。
+于是往 op 载荷里写 `projectId: null`，**物化后读回来是 `undefined` 而不是 `null`**
+—— 类型说有值、运行时没有。
+
+- 抓到它的**不是 review，是一条测试**：`note-actions.spec.ts` 的
+  「未归属永远合法」那条最初写 `expect(...).toBeNull()`，首跑即红。
+- 修法：`Note.projectId` 改成**可选**（与 `Task.projectId` 对齐：缺省 = 未归属），
+  并让领域层 `noteProjectId()` 成为**唯一**把 `undefined` 归一成 `null` 的地方。
+- ⇒ 规律：**"声明"与"reducer 语义"之间没有门禁**，只有断言能发现。
+
+**④ 门禁的真实状态（分两步，两步都留在这里）**
+
+**第一步 —— 只有 `NOTE` 的写路径落地时（当时实测）：**
+
+```
+✅ 三处登记相等：…, NOTE, PREFERENCE_CORRECTION, PROJECT, REMINDER, TAG, TASK
+✅ 断言 B 通过：每一个已建模实体都有写路径。      ← 本轮由红转绿
+   ✅ NOTE      1 处：packages/app-host/src/note-actions.ts
+   ✅ REMINDER  1 处：packages/app-host/src/reminder-actions.ts
+🔴 断言 C 不通过：2 项
+   · NOTE（家族 createNoteActions）在 apps 下各宿主的 src/ 里**零调用点**。
+   · REMINDER（家族 createReminderActions）在 apps 下各宿主的 src/ 里**零调用点**。
+✅ 断言 D 通过
+```
+
+⇒ **到期条件再次确认是"两者都要"**：断言 B 是全称量化，断言 C 也是**逐实体**判定。
+**宿主入口是最后一道，且它必须落在 `apps/web` 或 `apps/mobile`** ——
+`apps/landing` 也在宿主扫描面里，但它是营销站、没有真实任务数据，
+往那里接调用点就是本门禁文末列的**假修法**。
+
+**第二步 —— 宿主入口接上之后（2026-10-05，`check:reachability` 首次转**全绿**，exit 0）：**
+
+```
+✅ 三处登记相等：AI_FEEDBACK, FOCUS_SESSION, HABIT, HABIT_LOG, NOTE,
+                PREFERENCE_CORRECTION, PROJECT, REMINDER, TAG, TASK
+✅ NOTE      createNoteActions：2 处宿主调用点
+     · apps/mobile/src/screens/NotesSection.tsx
+     · apps/web/src/features/notes/store.ts
+✅ REMINDER  createReminderActions：2 处宿主调用点
+     · apps/mobile/src/lib/reminders.ts
+     · apps/web/src/features/reminders/store.ts
+✅ 断言 C 通过：有写路径的实体全部有宿主调用点。
+✅ 断言 D 通过
+✅ 「已建模 ≠ 可达」：四条断言都通过。
+   已建模 10 个实体，每个都有写路径与宿主调用点；未建模清单 5 项都已结清。
+```
+
+⇒ **C-8 到期，且到期条件是"端到端可达"而不是"文件存在"** —— 注意每一族都是
+**两处**调用点（web + mobile），因为两端各自渲染共享组件、各自建 action。
+这也解释了为什么这条判据值得留：它逼出来的不是一行代码，是**两个宿主的完整入口**。
+
+**这一步的判据由三条故障注入守着（都在 `/tmp` 副本上，未动工作区）：**
+
+| 注入 | 结果 |
+|---|---|
+| E1 把 `note-actions.ts` 里**全部 6 处** `entityType: 'NOTE'` 改成 `'BOGUS'` | 🔴 `NOTE 0 处写路径` → 断言 B 红，exit=1 |
+| E2 从脚本的 `ACTION_FAMILIES` 里删掉 `NOTE` 登记 | 🔴 断言 C 报「**无法判定**」（不是静默通过） |
+| E3 在宿主里加一个**带括号的真实调用** `createNoteActions({} as never)` | ✅ 该实体在断言 C 转绿 |
+
+⚠️ **E1 第一遍没红，原因值得记**：`perl -0pi` 不带 `/g` 只替换**第一处**，
+而文件里有 6 处 —— 于是一门禁仍然全绿。这正是「**注入后没红要先怀疑变异没生效**」
+那条纪律的第 N 次应验。另：`createNoteActions` 只被**引用**、不带括号时**不算**
+调用点（E3 第一遍就写了 `= createNoteActions;`，门禁正确地没认它）。
+
+**⑤ 判据（真实数字）**
+
+| 命令 | 结果 |
+|---|---|
+| `pnpm --filter @heyta/domain test` | **609 passed**（基线 591；`notes.spec.ts` 18 条） |
+| `pnpm --filter @heyta/app-host test` | **668 passed**（基线 645；`note-actions.spec.ts` 23 条） |
+| `pnpm -r typecheck` | **exit 0**（20 个包全绿） |
+| 14 道静态门禁 | `layering / ui-provider / design / ui-language / l4 / row-single-source / theme / tokens / empty-state / materialized-reads / entries / docs / mobile-bundle / shell-unicode` **全 ✅** |
+
+**⑥ 刻意没做的（不是遗漏）**
+
+- **`isLock` / `imgUrl` 没有 setter。** 两个字段在 `Note` 上有定义但**没有界面要用**。
+  补一个没有消费者的 setter 恰好就是本门禁在修的那个形状（"最后一米没接"），
+  只是缩小到了一个字段。等真有界面要锁便签 / 放图时一起加 —— 那时才知道语义。
+- **本地通知（OS 级投递）不在本轮。** 本轮做的是"宿主接上 action + 界面可达"，
+  到期提醒的可视化在界面层；真正的系统通知需要移动端通知库依赖（要过
+  AGENTS.md §3.1–3.2 两道门）与 `apps/web` 的 `Notification` 权限路径，
+  是**独立一刀**，已登记在 §B1-1 的剩余项里。
+
+### 更正：W4/A8「`check:site-reachability`」**不需要新建脚本**（2026-10-05，读源实测）
+
+本计划 §9 把 A8 写成一个待建的静态扫描脚本，而**同一份计划的后文**已经判决了它的归宿：
+
+> ⚠️ **一处刻意留下的重叠**：`render.spec.tsx` 的 N2 用例与本计划 §9 的 `check:site-reachability`
+> 是**同一件事的两处实现**（那份测试的文件头也写明了）。目前**保留测试那一份**，
+> 因为它渲染真实 DOM、更接近"访客能不能点到"。**不要再加一个静态扫描脚本** ——
+> 两份判据必然漂移，而漂移的判据比没有判据更坏。
+
+读源核实（`apps/landing/tests/render.spec.tsx`）：
+- `describe('🔴 没有孤立路由（N2）')` 真实存在；它用 `reachablePageIds()` 从**渲染出的 DOM**
+  收集可达页面，再对 `ALL_PAGE_IDS` 求差集报孤立路由；
+- 该文件头**自己写着**：「计划 §9 曾把 `check:site-reachability` 列为一门独立的门禁脚本，
+  **它尚未落地**（归 W4/A8）。所以**本用例就是当前唯一的站点内可达性判据**」。
+
+⇒ **A8 的到期条件是"站点没有孤立路由、且这件事有判据"，不是"存在一个叫
+`check:site-reachability` 的文件"**：前者已满足（N2 存在），后者**被明令禁止**。
+Goal 的 objective 里把 A8 写成"补 `check:site-reachability`"是**抄了计划里被自己推翻的旧说法** ——
+记在这里，免得下一个 agent 真去新建那个脚本。
+
+### 顺带更正：本仓库的 L4 门禁脚本名是 `pnpm check:l4`
+
+（不是 `check:l4-no-style`；后者会 `ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL` 说脚本不存在。）
+文件仍是 `scripts/check-l4-no-style.mjs`，只是 `package.json` 里的脚本名短。执行者踩过一次。
+
+---
+
+## ✅ A7 /integrations 落地（2026-09-28）—— 五处接线一次做完
+
+**先说结论：这一页的到期条件不是"页面存在"，是 A7-1/2/3 三条判据都能被访客自己走一遍。**
+
+| 判据 | 落地 | 可复现验证（页面上印着的值） |
+|---|---|---|
+| **A7-1 数据主权** | `e2ee` / `selfhost` / `local-api` / `byok` / `export` 五节 | 明文上传 400 `E2EE_REQUIRED`（`server/src/sync/sync.routes.payload.ts`）· `docker compose` 三件套（`server/docker-compose.yml`）· 六个工具名（`packages/local-api/src/tools.ts`）· 零厂商 SDK（`packages/ai/src`）· 导出含 `counts`（`packages/app-host/src/export-dump.ts`） |
+| **A7-3 对照滴答** | 逐工具授权写在 `local-api` 正文；`pricing-model` 与 `quadrant` 各一节 | `pnpm check:pricing` · `docs/adr/0015-four-quadrant-as-derived-view.md` |
+| **其余两条** | `resilience` / `conflict` 各一节 | `packages/domain/src/habit-resilience.ts` · `packages/ui/src/sync/ConflictResolutionView.tsx` |
+
+**五处接线**（与 §"开工契约包"逐条对应）：
+
+1. `apps/landing/src/site/pages.ts` —— `integrations` 登记项，`group: product`、
+   🔴 `inNav: true` + `inFooter: true`（N2 反孤岛那一条）；
+2. `apps/landing/src/site/content.ts` —— `INTEGRATION_SECTIONS`（9 节）+ `INTEGRATION_NOTES`；
+3. `apps/landing/src/pages/IntegrationsPage.tsx` —— 一行 `<SiteSubPage … />`；
+4. `apps/landing/src/pages/index.ts` —— import + 注册进 `PAGE_COMPONENTS`；
+5. `packages/i18n` zh/en —— 页头 5 键 + 9 节的 `title/body/item×2/evidence` + 1 条 note，
+   **两表条数相等（50/50）**，7 条 evidence 的**值逐字相同**。
+
+**判据**：`@heyta/landing` 401 passed（新增 1 条：`/integrations` 恰好 9 节、
+每节 1 条可核对 evidence）；`check:entries` 17 份一致；`check:claims` 48 条 evidence
+全部指向真实脚本/路径；`check:ui-language` zh/en 1682 条对齐；`pnpm check` **exit 0**。
+**故障注入**：从 `INTEGRATION_SECTIONS` 删掉 `conflict` 一节 ⇒ 新用例红（`.lp-row` 8 ≠ 9），
+还原后绿。
+
+---
+
+## ✅ A4 收口：HelpPage 10 篇 + ChangelogPage 正文（2026-09-28）
+
+**先更正一处**：施工单说"HelpPage 34 行是壳、内容为 0" —— **该描述已过期**。
+实测：`HELP_QUESTIONS` 已有 8 条、`CHANGELOG_ENTRIES` 已有 5 条。所以本轮做的是
+**补齐 + 组织 + 修掉一条已经变成假话的答案**，不是从零建页（这也是本文档
+「计划里的待办项必须逐子项核对」那条纪律的第 N 次应验）。
+
+| 动作 | 内容 |
+|---|---|
+| 补齐到 A4-2 的 **10 篇** | `create`（怎么建任务）· `sync` · `passphrase`（忘了加密口令）· `passkey` · `privacy` · `quadrant` · `repeat` · `focus` · `export` · `selfhost` |
+| **删掉两条** | `notify`（"为什么没有提醒"）的答案写着"因为**还没做**" —— 而提醒在 2026-10-02 已落地，**那句话已经变成假话**；`helpitself` 让访客"去仓库提 issue"，而仓库是私有的（点了是 404）。两条都移除，不留下"看起来很全"的假条目 |
+| **按功能模块组织**（A4-1 / D2） | `HELP_MODULES`（开始使用 / 同步与账号 / 组织与节奏 / 数据与自建 / 隐私）是**唯一事实源**，`HELP_QUESTIONS` 由它 `flatMap` 派生 —— JSON-LD 与页面用同一份，不会漂移 |
+| ChangelogPage 正文 | 新增 `2026-10-05`（便签与提醒在两端可用）与 `2026-10-02`（提醒从数据模型到动作层）两条，各带日期与正文 |
+| 🔴 两处**如实** | `repeat` 明写"**Web 端还没有重复规则入口**"；`selfhost` 明写"**不是零配置一键**" |
+
+**判据**：`help` 的 FAQPage 从 8 → **10**（`seo-head.spec.ts` 的 `expected.help` 同步改到 10，
+改了内容忘了改它就会红）；`render.spec.tsx` 把 `/help` 的问答数**钉到 10**、
+并断言 ≥5 个模块；`@heyta/landing` 401 passed；`check:claims` / `check:ui-language` 绿。
+
+---
+
+## ✅ 欠账收口（2026-09-28）：R14/R15 · R16 · R18 · R9 · R6 · R7/R8
+
+| # | 做什么 | 判据 |
+|---|---|---|
+| **R14/R15** | 分享卡片的**域名 / 主色 / 纸色四件套**全部从唯一事实源注入；新增 `--ht-paper-50/200/600/900` 进 `tokens.css` | `gen-og-card.mjs` 取不到任何一条就**抛**；`design-system` 新增 4 条纸色对比度断言（正文 4.5:1、装饰分隔线 1.3:1）；`check:tokens` 绿（纸色是内部色阶） |
+| **R16** | 🔴 卡片**分语言生成**：`og-card.png`（zh）/ `og-card-en.png`（en），卡片文案进词条表（`site.og.card.*`） | `seo-head.spec.ts` 断言 `og:image` **按语言**取对应文件、**两张都真的存在**；此前英文页的 `og:image:alt` 描述的是一张不存在的中文图 |
+| **R18** | `Footer` 的分组参数改用注册表的 `SiteGroup`；`Nav` 与 `site/paths.ts` 的"另一种语言"判断收敛到 `@heyta/i18n` 的**新函数 `otherLocale()`** | 两处各写一遍 `locale === 'en' ? …` 消失；typecheck 抓住了一处漏改的 `hrefLang={otherLocale}`（改名后没跟着改） |
+| **R9** | 语言清单 `['zh-CN','en']` 在 `pages.ts` / `gen-entries.mjs` / `seo-head.spec.ts` 三处**收敛到 `LOCALES`**；`hrefPath` 从"零调用"变成 `urlFor` / `entryUrl` 的**唯一实现**；删掉零调用的 `otherLocaleHref`；门面测试从 `toBeTypeOf('function')` 收紧成 `toBe(同一个函数)` | `check:entries` 17 份一致；landing typecheck + 401 passed |
+| **R6** | 「改一条 evidence ⇒ 必须在**同一次改动**里重审该 section 的声称」写成**明文规矩**（`scripts/check-claims.mjs` 文件头，含 S1 反例） | 如实登记为**人工规矩**，不冒充机械判据（语义判断题硬做会假绿） |
+| **R8** | ADR-0033 加 **§7.1 勘误**：`#root` 是空的，「真静态 / 首屏不用等 JS」被实测证伪，兑现的是"静态 head + 独立地址"；`gen-entries.mjs` 文件头同步改口径 | 勘误段逐条满足 `docs/adr/README.md` 里那条「勘误段」规则的五个边界（只追加、不改正文、带日期与实测命令） |
+| **R7** | ⬜ **未做**（本刀没动） | 主 bundle 仍同时装中英两份词条、仍静态 import 全部页面组件；它需要 `lazy()` + 按入口分语言，属独立一刀 —— 如实留在这里，不假装已收口 |
+| 顺带核实 | `showcase-data.ts` 的 `SHOWCASE_TODAY_PROGRESS` | ✅ **早已存在**（含"为什么只能编"的论证 + `mockup-shell-shape.spec.tsx` 的内部一致性断言），施工单里的这一条是**过期待办** |
+
+---
+
+## ✅ flake 治理：本地 retries 与 CI 对齐（2026-09-28）
+
+`e2e/playwright.config.ts` 的 `retries` 从 `process.env.CI ? 1 : 0` 改成**恒为 1**，
+理由写进配置文件：
+
+- 真浏览器里有**负载型 flake**（同一条用例单跑必过、整套跑时被前序拖慢而偶发超时；
+  `ai-duration:36` 已按"单跑 vs 整套 + 前序配对"两步实验定性）；
+- 本地 0 / CI 1 会让同一份代码**本地红、CI 绿**，而两边跑的是同一个门禁 ——
+  **门禁的口径必须是同一个**；
+- 重试**不掩盖**：Playwright 会把重试后通过的用例标成 `flaky`，仍然看得见。
+
+**另一处环境修复（同批）**：`e2e/tests/desktop-window.spec.ts` 的 Electron 启动加
+`--no-sandbox`，并在测试里写明理由 —— 本机实测**不带它时渲染进程直接崩**
+（`sandbox initialization failed: Operation not permitted` → GPU / network service
+反复崩 → `Page crashed`），根因在**运行环境**（沙箱不允许 Chromium 再套一层沙箱），
+不在被测代码；`apps/landing/scripts/gen-og-card.mjs` 的无头 Chrome 早有同样先例。
+修复后打包产物冒烟 **1 passed / 1 skipped**（dev 构建因缺 Electron 二进制而响亮跳过）。
+
+**最终判据**：`pnpm check` **exit 0**（此前基线是 exit 1，唯一红点就是上面那条
+打包产物冒烟）。
+
+---
+
+## ⬜ 剩余（下一刀开工前先逐子项核对，不许按字面施工）
+
+本轮把 A7 / A4 / R14–R16 / R18 / R9 / R6 / R8 / flake 做完了，`pnpm check` 绿。
+**下面这些是本轮明确没做的**，逐条留在这里，免得下一个会话以为"做完了"：
+
+| 项 | 到哪一步了（实测） | 下一步 |
+|---|---|---|
+| **`timeline` 整刀** | 第 0 步已完成（`packages/domain/src/timeline.ts`）；`packages/ui/src/timeline/` **不存在**；`apps/web/src/features/timeline/{TimelineView,GanttChart}.tsx` **仍在 web** | 建共享层目录（RN 原语、禁 import `@heyta/i18n`、每个要断言的元素给 testID）→ 两端换装 → **删** web 两个旧文件并清 `app.css` 旧类（e2e 先补共享钩子再换选择器）→ mobile 新增时间线屏 |
+| **capture `mobile` 尾巴** | 共享 `packages/ui/src/capture/CaptureComposer.tsx` 已在；`apps/mobile/src` 里**没有 capture 入口** | 移动端接共享捕获件 + 一条真模拟器判据（M3：逐端验收） |
+| **`ai` 面板族** | 共享层只有 `packages/ui/src/ai/AiDisclosure.tsx`；四个面板（Breakdown / Capture / Duration / Prioritize）**仍住 `apps/web`** | 按多平台计划里"流程型面板族"那一节落共享层 + 两端接线（mobile 的 AI 此前阻塞在宿主 SecretStore，需先确认） |
+| **R7 bundle** | **未做**：主 bundle 仍同时装中英两份词条、仍静态 import 全部页面组件 | `lazy()` 页面组件 + 按入口分语言；要有判据证明"某入口不再下载别的页" |
+| **B2-1 导入 UI** | 领域层 + `app-host` 的 op 批次构造器**已完成**（第十二 / 十四轮）；**UI 入口零** | Web 文件选择 + 预览 + 报告；移动端同源入口 —— 两端各一条判据 |
+| **B2-3 重复补齐** | 「完成后顺延」已接（基准是原到期日）；`rescheduleForRepeat` 已接；**Web 入口 + 自定义 RRULE 未做** | 手机上有重复规则编辑，Web 端**没有**（help 的 `repeat` 一条已如实写明） |
