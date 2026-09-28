@@ -211,7 +211,22 @@ async function verifyWindow(target: DesktopTarget): Promise<void> {
   const userDataDir = mkdtempSync(join(tmpdir(), 'heyta-desktop-gui-'));
   const app = await electron.launch({
     executablePath: target.executablePath,
-    args: [...target.entry, `--user-data-dir=${userDataDir}`],
+    /**
+     * 🔴 `--no-sandbox` 不能省，且它**不是**为了让用例好过。
+     *
+     * 实测（本机，2026-09-28）：不带这个 flag 时，Electron 的**自己的**沙箱
+     * 初始化就失败 —— 控制台刷满
+     * `sandbox initialization failed: Operation not permitted`，
+     * 随后 GPU / network service 反复崩、最后 `GPU process isn't usable. Goodbye.`
+     * 直接把渲染进程带走，症状是 Playwright 报 **`page.waitForTimeout: Page crashed`**
+     * （不是断言失败，所以看不到任何控制台输出）。
+     *
+     * 根因在**运行环境**（harness / CI 的进程沙箱不允许 Chromium 再套一层沙箱），
+     * 不在被测代码：同一个 `.app` 加上这个 flag 后能正常常驻并画出界面。
+     * 仓库里已有同样的先例（`apps/landing/scripts/gen-og-card.mjs` 的无头 Chrome
+     * 也带 `--no-sandbox`）。它只影响**测试宿主**，被测应用与它的沙箱策略不变。
+     */
+    args: [...target.entry, '--no-sandbox', `--user-data-dir=${userDataDir}`],
     cwd: DESKTOP_DIR,
     /**
      * 🔴 让窗口**不要抢前台**（见 `apps/desktop/src/main.ts` 的 `NO_FOCUS`）。

@@ -214,7 +214,7 @@ test.describe('分类着色：真浏览器契约', () => {
 
     // ② 说明文字的颜色**真的**是那个 token 展开后的值。
     //    这条同时钉住三件事：变量名没写错、tokens.css 被引入了、暗色/亮色解析出的是一个真颜色。
-    const note = await page.locator('.ht-categories__note').evaluate((el) => ({
+    const note = await page.locator('[data-testid="category-note"]').evaluate((el) => ({
       color: getComputedStyle(el).color,
       token: getComputedStyle(document.documentElement)
         .getPropertyValue('--ht-color-foreground-muted')
@@ -252,19 +252,19 @@ test.describe('分类着色：真浏览器契约', () => {
      * 现在**不假装**：宁可少一条，也不要一条测不到真东西的。
      */
     await expect(
-      page.locator('.ht-categories__cell'),
+      page.locator('[data-testid="category-cells"]'),
       '没有分类行时不该有格子（未归类是一句话，不是一行）',
     ).toHaveCount(0);
     await expect(
-      page.locator('.ht-categories__bars'),
+      page.locator('[data-testid="category-bar-track"]'),
       '峰值只从分类行算，未归类不该凭空画出一排柱子',
     ).toHaveCount(0);
 
     // ④ 十二周的范围行仍然要在（它说的是窗口，不依赖有没有分类行）
-    await expect(page.locator('.ht-categories__range')).toContainText('至');
+    await expect(page.locator('[data-testid="category-range"]')).toContainText('至');
 
     // ⑥ 那句话与上面之间有一条分隔线（样式表里的 border-top 真的落了地）
-    const separated = await page.locator('.ht-categories__unassigned').evaluate((el) => {
+    const separated = await page.locator('[data-testid="category-unassigned"]').evaluate((el) => {
       const s = getComputedStyle(el);
       return { width: parseFloat(s.borderTopWidth), style: s.borderTopStyle };
     });

@@ -80,11 +80,14 @@ export async function syncNow(page: Page): Promise<void> {
   await expect(statusBar(page)).toContainText('已同步');
 }
 
-/** 按标题定位任务行（与离线套件同一套选择器）。 */
+/**
+ * 按标题定位任务行（与离线套件同一套选择器）。
+ *
+ * 🔴 `task-item-*` 是共享 `TaskList` 打在外层行上的 testID（整行，含行尾
+ * 插槽）—— web 手写的 `.ht-task` 已随 M3 第一刀删除。
+ */
 export function rowFor(page: Page, title: string) {
-  return page
-    .locator('.ht-task')
-    .filter({ has: page.locator('.ht-task__title', { hasText: title }) });
+  return page.locator('[data-testid^="task-item-"]').filter({ hasText: title });
 }
 
 /** 侧栏「清单与标签」面板。 */

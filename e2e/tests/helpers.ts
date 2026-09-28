@@ -123,7 +123,22 @@ export async function openApp(page: Page): Promise<void> {
 /** 切换顶部视图 tab。 */
 export async function switchView(
   page: Page,
-  label: '任务' | '四象限' | '习惯' | '番茄钟' | '时间线' | '成长' | '设置',
+  /**
+   * 🔴 **这份联合类型必须与 `apps/web/src/App.tsx` 的 `VIEW_TABS` 同步。**
+   *
+   * 它曾经停在 **7 个**标签（没有 `'便签'` / `'回收站'`），而 Playwright 走 esbuild
+   * **只转译、不做类型检查** ⇒ 传 `'便签'` 运行时照跑、类型上却非法，
+   * **没有任何东西会因此变红**。于是"新增一个视图 tab"只改了产品、没改 e2e ——
+   * 直到有人真的跑 `pnpm check`（而它此前长期没人跑）。
+   *
+   * ⚠️ **加视图时要一起改的四处清单**（漏一处就会有静默过期）：
+   *   1. `apps/web/src/App.tsx`：`VIEW_TABS` / `ViewKey` / `VIEW_TITLED_BY_TAB`
+   *   2. **这里**
+   *   3. `e2e/tests/motivation.spec.ts`：`TABS` / `TITLED` / `CARD_ON` / `CARD_OFF`
+   *   4. `apps/landing/src/mockup/app-shell-shape.ts`：`SHELL_VIEW_TABS`
+   *      （那一处有**实时对账判据**，漏了会红 —— 前三处都不会）
+   */
+  label: '任务' | '四象限' | '习惯' | '番茄钟' | '时间线' | '成长' | '便签' | '回收站' | '设置',
 ): Promise<void> {
   await page.getByRole('tab', { name: label }).click();
 }
@@ -141,16 +156,19 @@ export async function addTask(page: Page, title: string): Promise<void> {
  *
  * ⚠️ 用**标题**而不是 taskId 定位：真浏览器里拿不到 id（也不该去拿内部状态），
  * 而"用户看得见的那一行"本来就是断言该挂的地方。
+ *
+ * 🔴 选择器来自共享 `TaskList` 的 testID，不再是 web 手写的 `.ht-task`
+ * （那一族 CSS 已随 M3 第一刀删除）。`task-item-*` 是**整行**，包含行尾
+ * 插槽（备注 / 清单标签 / 删除）—— 用 `task-row-*` 会只匹配到标题体，
+ * 那些控件就不在这一行里了。
  */
 export function rowFor(page: Page, title: string) {
-  return page
-    .locator('.ht-task')
-    .filter({ has: page.locator('.ht-task__title', { hasText: title }) });
+  return page.locator('[data-testid^="task-item-"]').filter({ hasText: title });
 }
 
 /** 任务行右侧的元信息区（截止时间 / 优先级徽标）。 */
 export function metaFor(page: Page, title: string) {
-  return rowFor(page, title).locator('.ht-task__meta');
+  return rowFor(page, title).locator('[data-testid="task-meta"]');
 }
 
 export interface EndpointSetup {

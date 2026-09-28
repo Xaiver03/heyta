@@ -28,15 +28,15 @@ import { openApp, switchView } from './helpers';
 // 漂移过一次：`trash`（回收站）加进 VIEW_TABS 之后这里没跟上，两个用例红了
 // 很久没人发现 —— 因为 e2e 不在 `pnpm check` 的主路径上。
 // 加视图时，**先改这里**，再改 App.tsx。
-const TABS = ['任务', '四象限', '习惯', '番茄钟', '时间线', '成长', '回收站', '设置'] as const;
+const TABS = ['任务', '四象限', '习惯', '番茄钟', '时间线', '成长', '便签', '回收站', '设置'] as const;
 type Tab = (typeof TABS)[number];
 
 /** 居中标题 === 标签本身的视图（其余视图的标题是清单/筛选名） */
-const TITLED = ['习惯', '番茄钟', '时间线', '成长', '设置'] as const satisfies readonly Tab[];
+const TITLED = ['习惯', '番茄钟', '时间线', '成长', '便签', '回收站', '设置'] as const satisfies readonly Tab[];
 
 /** 今日进度卡应当出现的视图 = 全部 − 设置 − 成长 */
-const CARD_ON = ['任务', '四象限', '习惯', '番茄钟', '时间线'] as const satisfies readonly Tab[];
-const CARD_OFF = ['设置', '成长'] as const satisfies readonly Tab[];
+const CARD_ON = ['任务', '四象限', '习惯', '番茄钟', '时间线', '便签'] as const satisfies readonly Tab[];
+const CARD_OFF = ['设置', '成长', '回收站'] as const satisfies readonly Tab[];
 
 /**
  * 已登记的已知缺失：仓库**从来没有** favicon
@@ -48,11 +48,11 @@ const CARD_OFF = ['设置', '成长'] as const satisfies readonly Tab[];
 const KNOWN_MISSING = ['/favicon.ico'] as const;
 
 test.describe('激励体系：真浏览器契约', () => {
-  test('八个视图标签齐全，顺序与文案逐字一致', async ({ page }) => {
+  test('九个视图标签齐全，顺序与文案逐字一致', async ({ page }) => {
     await openApp(page);
 
     const tabs = page.getByRole('tab');
-    await expect(tabs).toHaveCount(8);
+    await expect(tabs).toHaveCount(9);
 
     const labels = (await tabs.allTextContents()).map((t) => t.trim());
     expect(labels, '标签的顺序与文案都必须与 VIEW_TABS 逐字一致').toEqual([...TABS]);
@@ -72,7 +72,18 @@ test.describe('激励体系：真浏览器契约', () => {
 
   test('🔴 今日进度卡常驻做事视图，且不在设置页与成长页', async ({ page }) => {
     await openApp(page);
-    const card = page.locator('section.ht-today');
+    /**
+     * 🔴 选择器**必须是共享组件的 testID**，不能再用 `section.ht-today`。
+     *
+     * `.ht-today` 是 web 手写的 CSS 类，随 M3 motivation 换装**已被删除**
+     * （全仓只剩 `TodayProgressBanner.tsx:42` 一句"迁移前 `.ht-today` 上就有它"的注释）。
+     * 现在渲染它的是共享 `TodayProgressCard`（RN `View` → `<div>`，**不是 `<section>`**），
+     * testID 由宿主注入：`TodayProgressBanner.tsx:45` 的 `testID="today-progress"`。
+     *
+     * ⚠️ 教训：**换装共享组件时，e2e 里按 web 手写类名定位的断言会静默过期**
+     * —— 单测与静态门禁都发现不了，只有真浏览器 e2e 会红。
+     */
+    const card = page.locator('[data-testid="today-progress"]');
 
     for (const tab of CARD_ON) {
       await switchView(page, tab);
@@ -88,7 +99,8 @@ test.describe('激励体系：真浏览器契约', () => {
     await openApp(page);
     await switchView(page, '成长');
 
-    const growth = page.locator('.ht-growth');
+    // 🔴 `.ht-growth` 是 web 手写类，已随换装删除 —— 见 `:75` 的同一条注释。
+    const growth = page.locator('[data-testid="growth-board"]');
     await expect(growth).toHaveCount(1);
     await expect(growth, '周复盘').toContainText('本周');
     await expect(growth, '年度视图').toContainText('这一年');
