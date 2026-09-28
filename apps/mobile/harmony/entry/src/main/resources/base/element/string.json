@@ -1,0 +1,40 @@
+{
+  "string": [
+    {
+      "name": "module_desc",
+      "value": "Heyta 小组件宿主"
+    },
+    {
+      "name": "EntryAbility_desc",
+      "value": "Heyta"
+    },
+    {
+      "name": "EntryAbility_label",
+      "value": "Heyta"
+    },
+    {
+      "name": "form_ability_label",
+      "value": "Heyta 小组件"
+    },
+    {
+      "name": "form_ability_desc",
+      "value": "今日任务、四象限、习惯与专注"
+    },
+    {
+      "name": "form_desc_today",
+      "value": "今日任务"
+    },
+    {
+      "name": "form_desc_quadrant",
+      "value": "四象限"
+    },
+    {
+      "name": "form_desc_habits",
+      "value": "今日习惯"
+    },
+    {
+      "name": "form_desc_focus",
+      "value": "今日专注"
+    }
+  ]
+}

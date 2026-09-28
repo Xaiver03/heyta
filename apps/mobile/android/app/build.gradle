@@ -282,6 +282,24 @@ tasks.configureEach { task ->
     }
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// 小组件：JVM 单测的夹具路径
+// ─────────────────────────────────────────────────────────────────────────────
+//
+// 四端解析器的**锁**是同一份 golden fixture（`packages/widget-core/fixtures/`）。
+// Kotlin 单测必须读**那一份**，不能自己抄一份期望值 —— 抄一份就等于多了一个真源，
+// 而多真源会漂移且**不会报错**。
+//
+// 路径从 Gradle 传进去，不在 Kotlin 里写 `../../../../..`：相对路径依赖
+// "测试进程的工作目录"，而那是 Gradle 的实现细节（改个 AGP 版本就可能变），
+// 失败形态是"文件找不到"或更糟 —— 读到了**另一份**同名文件。
+tasks.withType(Test).configureEach {
+    systemProperty(
+        "heyta.widget.fixtures",
+        new File(rootProject.projectDir, "../../../packages/widget-core/fixtures").canonicalPath
+    )
+}
+
 dependencies {
     // The version of react-native is set by the React Native Gradle Plugin
     implementation("com.facebook.react:react-android")
@@ -291,4 +309,27 @@ dependencies {
     } else {
         implementation jscFlavor
     }
+
+    // ── 单测（`testImplementation` = 只在 JVM 单测的 classpath 上，**不进产物**）──
+    //
+    // 1. `android-json` —— 一个**真实**的 `org.json` 实现。
+    //
+    //    Android 单测跑在**普通 JVM** 上，而 `android.jar` 里的 `org.json` 全是
+    //    **桩**：方法要么抛 `RuntimeException("Stub!")`，要么（开了
+    //    `returnDefaultValues`）返回 null/0。后者更危险 —— 解析会**静默**变成空对象，
+    //    测试"通过"但什么都没验证。
+    //
+    //    `com.vaadin.external.google:android-json` 是同一套 API 的干净实现
+    //    （Robolectric 自己也靠它），**Apache-2.0**（已核对 POM 的 `<licenses>`）。
+    //    于是：生产代码用**平台自带**的 `org.json`（零新增依赖），
+    //    测试里则有一份能真正工作的实现。
+    //
+    // 2. `junit:junit:4.13.2` —— ⚠️ **EPL-1.0，不在 `AGENTS.md` §3.2 的允许清单里。**
+    //    仍然引入的理由与边界写在 `docs/plans/multi-platform-widgets-progress.md`
+    //    的 W1-1 证据段里，要点是：**test 作用域、不进 APK、不改其源码**。
+    //    🔴 同时记下一个真实盲区：`research/tools/license-inventory.mjs` **只扫 pnpm store**，
+    //    根本不看 Gradle 依赖 —— 所以这条许可**门禁看不见**。
+    //    不要因为这个盲区就以为它被审过了。
+    testImplementation("junit:junit:4.13.2")
+    testImplementation("com.vaadin.external.google:android-json:0.0.20131108.vaadin1")
 }

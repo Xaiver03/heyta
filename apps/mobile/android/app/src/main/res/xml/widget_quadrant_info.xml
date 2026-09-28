@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  四象限组件的元数据（W1-5）。
+
+  ## 与 widget_today_info.xml 完全同构，四处不同：
+
+  与 widget_today_info.xml 同构，只有四处不同（`initialLayout` /
+  `previewLayout` / `description` / 尺寸与格位）。那三处对不上的表现是
+  **组件在组件的选择器里直接消失**，或者被加到桌面后是一片空白 ——
+  而在编译期**没有任何提示**。
+
+  ## 🔴 为什么 `updatePeriodMillis` 是 1800000（30 分钟）
+
+  整体设计是「**内容靠应用主动推**，组件不轮询」—— 但这条定时器**不是在取数据**，
+  它只是在**重新判断一次 `now >= validUntil`**：不加它的话，组件在午夜之后
+  **不会自己重画**，于是继续把昨天的内容当成"今天"，直到用户碰巧打开一次应用。
+  而那正是 ADR-0025 §2.1.3 最想避免的情况：**过期数据看起来是对的。**
+
+  `1800000` 是 Android 允许的**最小值**（更小的值会被系统抬到 30 分钟）。
+
+  ## 🔴 `widgetCategory` 只有 `home_screen`
+
+  这就是 D6 的「首版不做锁屏组件」。计划里写的 "not_keyguard" 是 **iOS** 的词；
+  Android 的对应做法是**不声明** `keyguard`（而且 Android 5.0 之后系统本身就移除了锁屏组件）。
+-->
+<appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
+    android:minWidth="180dp"
+    android:minHeight="180dp"
+    android:targetCellWidth="3"
+    android:targetCellHeight="3"
+    android:resizeMode="horizontal|vertical"
+    android:widgetCategory="home_screen"
+    android:updatePeriodMillis="1800000"
+    android:initialLayout="@layout/widget_quadrant"
+    android:previewLayout="@layout/widget_quadrant"
+    android:description="@string/widget_quadrant_description" />

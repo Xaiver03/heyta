@@ -1,0 +1,40 @@
+{
+  "string": [
+    {
+      "name": "module_desc",
+      "value": "Heyta widget host"
+    },
+    {
+      "name": "EntryAbility_desc",
+      "value": "Heyta"
+    },
+    {
+      "name": "EntryAbility_label",
+      "value": "Heyta"
+    },
+    {
+      "name": "form_ability_label",
+      "value": "Heyta widget"
+    },
+    {
+      "name": "form_ability_desc",
+      "value": "Today's tasks, quadrants, habits and focus"
+    },
+    {
+      "name": "form_desc_today",
+      "value": "Today's tasks"
+    },
+    {
+      "name": "form_desc_quadrant",
+      "value": "Quadrants"
+    },
+    {
+      "name": "form_desc_habits",
+      "value": "Today's habits"
+    },
+    {
+      "name": "form_desc_focus",
+      "value": "Today's focus"
+    }
+  ]
+}

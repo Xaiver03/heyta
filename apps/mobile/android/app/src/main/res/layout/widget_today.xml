@@ -1,0 +1,80 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  今天列表组件的布局（W1-3）。
+
+  ## 🔴 为什么是「固定行槽」而不是动态添加
+
+  `RemoteViews` **不能动态添加子视图**（`addView` 在多数启动器上不可靠）。
+  所以这里预置 5 个行槽，渲染时按条数显示/隐藏。行数上限选 5 的理由：
+  再多就得靠更大的网格，而小尺寸组件上塞 7 行会挤成一团；5 行是"看一眼今天"的量级。
+
+  ## 为什么一个颜色都没写
+
+  全部用**系统主题属性**（`?android:attr/...`）：组件是由**启动器**的 Context 充气的，
+  主题属性会跟着启动器的明暗走。写死颜色会让组件在深色启动器上白底黑字地刺眼，
+  也会造出 `check:design` **扫不到**的硬编码 —— 那条门禁的 `SCAN_EXT`
+  只含 `.ts/.tsx/.js/.jsx/.css`，**不含 `.xml`**。
+
+  ⚠️ 主题属性在 `RemoteViews` 里的解析**依赖启动器实现**，所以这一条
+  **必须在真机上验收**（已列进 W1-3 的验收项）。
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:padding="12dp"
+    android:background="?android:attr/colorBackground">
+
+    <!-- 头部：日期 + 完成进度 -->
+    <TextView
+        android:id="@+id/widget_header"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:maxLines="1"
+        android:ellipsize="end"
+        android:textColor="?android:attr/textColorPrimary"
+        android:textSize="13sp"
+        android:textStyle="bold" />
+
+    <!--
+      5 个行槽。渲染时：
+        - 有条目的槽 setViewVisibility(VISIBLE) 并 setTextViewText
+        - 多余的槽 setViewVisibility(GONE)
+      点击：每个槽绑定一个 PendingIntent → provider 的 onReceive
+            → **只写意图队列**，绝不构造 op。
+    -->
+    <TextView
+        android:id="@+id/widget_row_0"
+        style="@style/HeytaWidgetRow" />
+
+    <TextView
+        android:id="@+id/widget_row_1"
+        style="@style/HeytaWidgetRow" />
+
+    <TextView
+        android:id="@+id/widget_row_2"
+        style="@style/HeytaWidgetRow" />
+
+    <TextView
+        android:id="@+id/widget_row_3"
+        style="@style/HeytaWidgetRow" />
+
+    <TextView
+        android:id="@+id/widget_row_4"
+        style="@style/HeytaWidgetRow" />
+
+    <!--
+      占位 / 过期 / 空列表 三种情况共用这一条。
+      为什么共用：它们对用户是**同一类信息**（"现在这里没有可信的任务可看"），
+      而分开做三个视图只会让 RemoteViews 的可见性逻辑更绕、更容易写错。
+      文案由渲染层决定。
+    -->
+    <TextView
+        android:id="@+id/widget_message"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="6dp"
+        android:textColor="?android:attr/textColorSecondary"
+        android:textSize="12sp" />
+
+</LinearLayout>

@@ -1,0 +1,82 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  今日习惯组件的布局（W1-5）。
+
+  ## 🔴 四个布局里的 `widget_row_*` / `widget_header` / `widget_message` **故意同名**
+
+  `RemoteViews` 是按 id 在**它自己那份布局**里查找的，所以不同布局用同名 id 完全合法。
+  换来的是 [WidgetViewParts] 里"行怎么画 / 头部怎么画 / 消息怎么画"**只有一份实现** ——
+  而那里面有若干不报错的坑（可见性、`PendingIntent` 的 data URI、完成/未完成的文案）。
+  这个布局的 id 声明处是 [WidgetViewParts]，别处改了名字这里不会编译失败、只会**画不出来**。
+
+  ## 为什么一个颜色都没写
+
+  全部用**系统主题属性**（`?android:attr/...`）：组件是由**启动器**的 Context 充气的，
+  主题属性会跟着启动器的明暗走。写死颜色会让组件在深色启动器上白底黑字地刺眼，
+  也会造出 `check:design` **扫不到**的硬编码 —— 那条门禁的 `SCAN_EXT`
+  只含 `.ts/.tsx/.js/.jsx/.css`，**不含 `.xml`**。
+
+  ⚠️ 主题属性在 `RemoteViews` 里的解析**依赖启动器实现**，所以这一条
+  **必须在真机上验收**。
+
+  ## 固定槽而不是动态添加
+
+  `RemoteViews` **不能动态添加子视图**（`addView` 在多数启动器上不可靠），所以行槽是预置的。
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:padding="12dp"
+    android:background="?android:attr/colorBackground">
+
+    <TextView
+        android:id="@+id/widget_header"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:maxLines="1"
+        android:ellipsize="end"
+        android:textColor="?android:attr/textColorPrimary"
+        android:textSize="13sp"
+        android:textStyle="bold" />
+
+
+    <!-- 🔴 这些行**只读**（点一下打开应用）。习惯打卡回写不了 —— 见 HabitsWidgetModel 的类注释。 -->
+    <TextView
+        android:id="@+id/widget_row_0"
+        style="@style/HeytaWidgetRow" />
+
+
+    <!-- 🔴 这些行**只读**（点一下打开应用）。习惯打卡回写不了 —— 见 HabitsWidgetModel 的类注释。 -->
+    <TextView
+        android:id="@+id/widget_row_1"
+        style="@style/HeytaWidgetRow" />
+
+
+    <!-- 🔴 这些行**只读**（点一下打开应用）。习惯打卡回写不了 —— 见 HabitsWidgetModel 的类注释。 -->
+    <TextView
+        android:id="@+id/widget_row_2"
+        style="@style/HeytaWidgetRow" />
+
+
+    <!-- 🔴 这些行**只读**（点一下打开应用）。习惯打卡回写不了 —— 见 HabitsWidgetModel 的类注释。 -->
+    <TextView
+        android:id="@+id/widget_row_3"
+        style="@style/HeytaWidgetRow" />
+
+
+    <!-- 🔴 这些行**只读**（点一下打开应用）。习惯打卡回写不了 —— 见 HabitsWidgetModel 的类注释。 -->
+    <TextView
+        android:id="@+id/widget_row_4"
+        style="@style/HeytaWidgetRow" />
+
+
+    <TextView
+        android:id="@+id/widget_message"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="6dp"
+        android:textColor="?android:attr/textColorSecondary"
+        android:textSize="12sp" />
+
+</LinearLayout>

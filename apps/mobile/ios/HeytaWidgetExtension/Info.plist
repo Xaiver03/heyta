@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  ⚠️ 这个文件里的键**一个都不能少**：
+ Xcode 的 Info.plist 处理步骤只替换 `$(...)` 占位符，**不会**补上缺失的标准键。
+ 而 `GENERATE_INFOPLIST_FILE = NO` 意味着"生成"那一步被关掉了。
+
+ 🔴 第一版我只写了 `NSExtension` 一项，症状是：
+ `appintentsnltrainingprocessor` 报 **"Unable to parse Info.plist"**，
+ 而 Swift **编译链接全部成功**、dSYM 也生成了 —— 失败的只有这一个后处理步骤。
+ 如果当时看的是"有没有 error 字样"而不是"BUILD SUCCEEDED"，很容易误判成
+ "差一点就好了"，而去关掉 AppIntents 支持 —— 那会把真正的原因（缺 CFBundle*）藏起来。
+
+ 版本号用 `$(MARKETING_VERSION)` / `$(CURRENT_PROJECT_VERSION)` 而不是写死：
+ 与 app 用同一套变量，改版本号时不会漏掉扩展（而**扩展版本号必须与 app 一致**，
+ 否则 App Store 校验会拒）。
+-->
+<plist version="1.0">
+<dict>
+	<key>CFBundleDevelopmentRegion</key>
+	<string>$(DEVELOPMENT_LANGUAGE)</string>
+	<key>CFBundleDisplayName</key>
+	<string>Heyta</string>
+	<key>CFBundleExecutable</key>
+	<string>$(EXECUTABLE_NAME)</string>
+	<key>CFBundleIdentifier</key>
+	<string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
+	<key>CFBundleInfoDictionaryVersion</key>
+	<string>6.0</string>
+	<key>CFBundleName</key>
+	<string>$(PRODUCT_NAME)</string>
+	<key>CFBundlePackageType</key>
+	<string>$(PRODUCT_BUNDLE_PACKAGE_TYPE)</string>
+	<key>CFBundleShortVersionString</key>
+	<string>$(MARKETING_VERSION)</string>
+	<key>CFBundleVersion</key>
+	<string>$(CURRENT_PROJECT_VERSION)</string>
+	<key>NSExtension</key>
+	<dict>
+		<key>NSExtensionPointIdentifier</key>
+		<string>com.apple.widgetkit-extension</string>
+	</dict>
+</dict>
+</plist>

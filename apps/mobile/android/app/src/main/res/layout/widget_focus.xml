@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  今日专注组件的布局（W1-5）。
+
+  ## 🔴 这里**没有倒计时** —— 不是没做完
+
+  契约里的 `remainingSeconds` 是**发布那一刻**的快照值，没有绝对时间锚点。
+  画出来就是"看起来对、其实是错的"（应用 09:00 发布"剩余 25:00"，
+  用户 09:10 看到的会是"剩余 25:00"）。理由完整版见 [FocusWidgetModel] 的类注释。
+
+  所以这里只有两个 TextView，装的是**不会随时间变**的事实：会话标题 + 目标时长。
+
+  ## 其余注意点与 widget_today.xml 相同
+
+  四个布局的 id 故意同名（见那个文件顶部）；颜色全用系统主题属性（同上）；
+  固定槽而不是动态添加（同上）。
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:padding="12dp"
+    android:background="?android:attr/colorBackground">
+
+    <TextView
+        android:id="@+id/widget_header"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:maxLines="1"
+        android:ellipsize="end"
+        android:textColor="?android:attr/textColorPrimary"
+        android:textSize="13sp"
+        android:textStyle="bold" />
+
+    <!-- 整块可点：打开应用。专注的启停只能在应用里做。 -->
+    <LinearLayout
+        android:id="@+id/widget_focus_body"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:layout_marginTop="4dp">
+
+        <TextView
+            android:id="@+id/widget_focus_title"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:maxLines="2"
+            android:ellipsize="end"
+            android:textColor="?android:attr/textColorPrimary"
+            android:textSize="15sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/widget_focus_target"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:maxLines="1"
+            android:ellipsize="end"
+            android:layout_marginTop="2dp"
+            android:textColor="?android:attr/textColorSecondary"
+            android:textSize="12sp" />
+
+    </LinearLayout>
+
+    <TextView
+        android:id="@+id/widget_message"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="6dp"
+        android:textColor="?android:attr/textColorSecondary"
+        android:textSize="12sp" />
+
+</LinearLayout>

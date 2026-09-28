@@ -23,5 +23,100 @@
             <category android:name="android.intent.category.LAUNCHER" />
         </intent-filter>
       </activity>
+
+      <!--
+        ==========================================================================
+        四款桌面组件（W1-3 今日任务 / W1-5 其余三款）
+        ==========================================================================
+
+        🔴 **四个 receiver 都必须 `android:exported="false"`** —— 这是**安全要求**，
+        不是随手写的。它们都会处理"把某个任务标记为完成"的广播；若 `exported="true"`，
+        **任何**装在同一台设备上的应用都能发一条伪造的 `ACTION_TOGGLE` 广播，
+        等用户下次打开 Heyta 时就把用户的任务改掉了 —— 而用户完全不会知道是谁改的。
+        （Android 12 之后 `android:exported` 变成必须显式声明，就是因为
+          这类"组件被外部触发"的历史漏洞。）
+
+        ⚠️ 那"启动器怎么还能点得动组件？" —— 因为点击是通过
+        **PendingIntent** 发出去的：PendingIntent 的授权来自**创建它的应用**（我们），
+        与 receiver 是否 exported 无关。这正是 PendingIntent 存在的意义。
+        再加上建 PendingIntent 时用了 `FLAG_IMMUTABLE`（见 `WidgetClicks.toggle`），
+        拿到它的第三方**不能改写里面的 extras**。两处缺一都不够。
+
+        🔴 **四个 receiver 的处理逻辑只有一份**（`BaseWidgetProvider`）。
+        四个类只是四个 `ComponentName` —— 平台要求每款组件有独立的
+        `appwidget-provider` 元数据，所以类必须分开；但那段安全敏感的广播处理
+        **绝不能写四遍**（写四遍 = 四倍的机会漏掉上面任何一条）。
+
+        ## `widgetCategory` 里没有 `keyguard`
+
+        这就是 D6 的"首版不做锁屏组件"。注意计划文档里写的 "not_keyguard"
+        是 **iOS** 的词；Android 的对应做法是**不声明** `keyguard`
+        （而且 Android 5.0 之后系统本身就移除了锁屏组件）。详见各 `widget_*_info.xml`。
+      -->
+
+        ## 🔴 `android:exported="false"` 是**安全要求**，不是随手写的
+
+        这个 receiver 会处理"把某个任务标记为完成"的广播。若它 `exported="true"`，
+        **任何**装在同一台设备上的应用都能发一条伪造的 `ACTION_TOGGLE` 广播，
+        等用户下次打开 Heyta 时就把用户的任务改掉了 —— 而用户完全不会知道是谁改的。
+        （Android 12 之后 `android:exported` 变成必须显式声明，就是因为
+          这类"组件被外部触发"的历史漏洞。）
+
+        ⚠️ 那"启动器怎么还能点得动组件？" —— 因为点击是通过
+        **PendingIntent** 发出去的：PendingIntent 的授权来自**创建它的应用**（我们），
+        与 receiver 是否 exported 无关。这正是 PendingIntent 存在的意义。
+        再加上建 PendingIntent 时用了 `FLAG_IMMUTABLE`（见 `TodayWidgetViews.toggle`），
+        拿到它的第三方**不能改写里面的 extras**。两处缺一都不够。
+
+        ## `widgetCategory` 里没有 `keyguard`
+
+        这就是 D6 的"首版不做锁屏组件"。注意计划文档里写的 "not_keyguard"
+        是 **iOS** 的词；Android 的对应做法是**不声明** `keyguard`
+        （而且 Android 5.0 之后系统本身就移除了锁屏组件）。详见 `widget_today_info.xml`。
+      -->
+      <receiver
+        android:name=".widget.TodayWidgetProvider"
+        android:exported="false"
+        android:label="@string/widget_today_description">
+        <intent-filter>
+            <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+        </intent-filter>
+        <meta-data
+            android:name="android.appwidget.provider"
+            android:resource="@xml/widget_today_info" />
+      </receiver>
+      <receiver
+        android:name=".widget.QuadrantWidgetProvider"
+        android:exported="false"
+        android:label="@string/widget_quadrant_description">
+        <intent-filter>
+            <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+        </intent-filter>
+        <meta-data
+            android:name="android.appwidget.provider"
+            android:resource="@xml/widget_quadrant_info" />
+      </receiver>
+      <receiver
+        android:name=".widget.HabitsWidgetProvider"
+        android:exported="false"
+        android:label="@string/widget_habits_description">
+        <intent-filter>
+            <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+        </intent-filter>
+        <meta-data
+            android:name="android.appwidget.provider"
+            android:resource="@xml/widget_habits_info" />
+      </receiver>
+      <receiver
+        android:name=".widget.FocusWidgetProvider"
+        android:exported="false"
+        android:label="@string/widget_focus_description">
+        <intent-filter>
+            <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+        </intent-filter>
+        <meta-data
+            android:name="android.appwidget.provider"
+            android:resource="@xml/widget_focus_info" />
+      </receiver>
     </application>
 </manifest>
