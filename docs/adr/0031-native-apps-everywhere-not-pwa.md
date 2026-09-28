@@ -3,6 +3,11 @@
 > 状态：**待确认**
 > 日期：2026-09-28
 > 取代：无（**确认并收窄** [ADR-0024](0024-desktop-shell-and-ui-convergence.md) §2.5 的表述）
+> ⚠️ **被 [ADR-0032](0032-windows-native-via-rnw.md) 收窄**：本文 §1.3/§3 用
+> **"减少代码量"** 论证否决更原生的桌面方案，而 ADR-0032 明确
+> **接受更大的代码量**（原生性优先于复用度）。⇒ 引用本文时请注意：
+> **"Capacitor 被否决"这一条结论仍然成立**（它没有 Windows 平台，与代码量无关），
+> 但**"因为代码多所以不选"这类论证不再有效**。
 
 ## 1. 背景与约束
 
@@ -29,7 +34,7 @@ Capacitor 官方文档的平台导航只有三项：**iOS / Android / Web(PWA)**
 所以"用 Capacitor 而不用 PWA"在 Windows 上是自相矛盾的：
 Capacitor 在 Windows 上能给的，恰恰就是 PWA 那一份。
 
-### 1.3 硬约束二：iOS / Android 换 Capacitor 会**增加**代码量
+### 1.3 硬约束二：Capacitor 渲染不了系统组件（**能力问题，不是代码量问题**）
 
 heyta 的移动端是 React Native（`apps/mobile`），并且已经落地了**真原生小组件**：
 WidgetKit（iOS）、App Widget（Android）、ArkTS 卡片（鸿蒙）。
@@ -37,12 +42,16 @@ WidgetKit（iOS）、App Widget（Android）、ArkTS 卡片（鸿蒙）。
 Capacitor 是"Web 视图 + 插件"，它**渲染不了**这些平台的系统组件 ——
 要小组件仍然得**手写各端原生代码**（这一点与
 [`../research/desktop-shell-selection.md`](../research/desktop-shell-selection.md) §3 对鸿蒙的判定同构）。
-所以换成 Capacitor 的净效果是：**丢掉已有的 RN 组件工作，
-再额外补回同样多的原生代码** —— 与"减少代码量"的目标相反。
 
-### 1.4 硬约束三：Windows 原生应用**已经存在且有实测证据**
+⚠️ **2026-09-28 更正本条的有效论据。** 这里原本写的是"净效果会增加代码量，
+与'减少代码量'的目标相反"。但 [ADR-0032](0032-windows-native-via-rnw.md)
+已经明确**代码量不作为否决理由**（原生性优先）。所以本条**唯一有效的论据**
+是上面那条**能力事实**：**Capacitor 给不了系统组件** ——
+即便它能让代码变少，也不构成选它的理由。
 
-`apps/desktop` 就是 Windows 桌面应用（Electron）。本轮已有实测：
+### 1.4 硬约束三：Windows 这一端**已经能跑，但当时不是原生的**
+
+`apps/desktop`（Electron）已有实测证据：
 
 | 证据 | 位置 |
 |---|---|
@@ -68,15 +77,24 @@ Capacitor 是"Web 视图 + 插件"，它**渲染不了**这些平台的系统组
 ## 3. 结论
 
 1. **每一端的交付物都是"原生应用"**，不存在"某一端交 PWA 就行"。
-   - Windows / macOS / Linux → `apps/desktop`（Electron）
+   - **Windows → `apps/desktop-windows`（react-native-windows 原生）**
+     —— ⚠️ **2026-09-28 由 [ADR-0032](0032-windows-native-via-rnw.md) 更新**。
+     本条原文写的是"Windows → `apps/desktop`（Electron）"，
+     而 **Electron 不是原生**，与本文自己第 1 句的要求矛盾。
+     Electron 现降级为**过渡壳 / 基线 / 对照基准**。
+   - macOS / Linux → `apps/desktop`（Electron，**如实标注为过渡**，
+     原因见 [多端原生构建计划](../plans/desktop-native-migration.md) §3–§4：
+     RN-macOS 卡在 0.81、RN 生态没有 Linux）
    - iOS / Android → `apps/mobile`（React Native）
    - 鸿蒙 → `apps/mobile/harmony`（RNOH 壳 + ArkTS 卡片）
-2. **Capacitor 被否决**，理由两条且**互相独立**：
-   - Windows 上没有这个平台（1.2）；
-   - iOS/Android 上它会让原生小组件的工作量**增加**（1.3）。
+2. **Capacitor 被否决**，理由**只有一条**（更正见 1.3）：
+   Windows 上没有这个平台，且它渲染不了系统组件。
 3. **"减少代码量"靠共享包实现，不靠换壳实现**：
    `packages/ui`（组件）、`packages/domain`（业务规则）、`packages/sync-core`（协议与加密）
    由各端共用；**换壳只会换掉最外层，换不掉这些**。
+   ⚠️ 但请注意：**"代码量少"在本项目里已经不是决策依据**
+   （[ADR-0032](0032-windows-native-via-rnw.md)：原生性优先）。
+   这一条保留的**唯一**含义是"**别把共享包也复制多份**"。
 4. **PWA 降级为"Web 端的可安装层"，不是任何端的交付形态。**
    ⚠️ 这一条**收窄**了 [ADR-0024](0024-desktop-shell-and-ui-convergence.md) §2.5 里
    "PWA 化价值上升"的表述 —— 那里说的"价值上升"指的是
