@@ -35,16 +35,15 @@ concurrency:
 jobs:
   verify:
     name: 门禁 + 全量测试（干净检出）
-    # 自托管 runner（在 finlaw 上，容器化 + 硬限流 2 核 / 3G）。
+    # GitHub 托管 runner。
     #
-    # 为什么不用 ubuntu-latest：私有仓库的 GitHub 托管 runner 有月度分钟额度，
-    # 而**自托管 runner 是免费无限量的**（GitHub 官方计费文档明说）。
-    #
-    # 🔴🔴 **如果哪天这个仓库要转公开，必须先把这行改回 ubuntu-latest。**
+    # 🔴🔴 **仓库是公开的，这行不许改回自托管 runner。**
     # 自托管 runner + 公开仓库是最危险的组合：任何人都能提 PR，
     # 而 PR 的工作流会在你自己的服务器上执行任意代码。
-    # 两者只能选一个 —— 想公开就回到托管 runner（公开仓库同样免费）。
-    runs-on: [self-hosted, linux, x64, heyta-ci]
+    # 历史上私有时期曾用自托管（finlaw 上，容器化 + 硬限流）省分钟额度；
+    # 2026-09-29 仓库转公开，按当时写下的前置约束改回托管 runner
+    #（公开仓库的托管分钟同样免费）。
+    runs-on: ubuntu-latest
     timeout-minutes: 40
 
     steps:
