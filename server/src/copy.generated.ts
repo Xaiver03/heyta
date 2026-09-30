@@ -1,0 +1,160 @@
+/**
+ * 服务端（邮件 / 凭据页）用的文案快照 —— **自动生成，请勿手改**。
+ *
+ * 唯一事实源：`packages/i18n/src/locales/{zh-CN,en}.ts`（与客户端同一份词条表）
+ * 重新生成：`pnpm --filter @heyta/sync-server gen:server-copy`
+ * 校验漂移：`pnpm check:server-copy`（已接进 `pnpm check`）
+ *
+ * 🔴 只搬 `server.` 前缀的词条。**不要在这里手写第二份文案。**
+ */
+
+export const SERVER_LOCALES = ['zh-CN', 'en'] as const;
+
+export type ServerLocale = (typeof SERVER_LOCALES)[number];
+
+/** 服务端可用词条的 key 联合类型（拼错是编译期错误）。 */
+export type ServerCopyKey =
+  | "server.email.common.autoNote"
+  | "server.email.common.fallbackIntro"
+  | "server.email.common.tagline"
+  | "server.email.login.body"
+  | "server.email.login.button"
+  | "server.email.login.expiry"
+  | "server.email.login.ignore"
+  | "server.email.login.subject"
+  | "server.email.login.title"
+  | "server.email.recover.body"
+  | "server.email.recover.button"
+  | "server.email.recover.expiry"
+  | "server.email.recover.ignore"
+  | "server.email.recover.subject"
+  | "server.email.recover.title"
+  | "server.email.verify.body"
+  | "server.email.verify.button"
+  | "server.email.verify.expiry"
+  | "server.email.verify.subject"
+  | "server.email.verify.title"
+  | "server.page.error.unknown"
+  | "server.page.login.again"
+  | "server.page.login.body"
+  | "server.page.login.busy"
+  | "server.page.login.button"
+  | "server.page.login.error"
+  | "server.page.login.heading"
+  | "server.page.login.success"
+  | "server.page.login.title"
+  | "server.page.recover.body"
+  | "server.page.recover.busy"
+  | "server.page.recover.button"
+  | "server.page.recover.error"
+  | "server.page.recover.heading"
+  | "server.page.recover.success"
+  | "server.page.recover.title"
+  | "server.page.recover.verifying"
+  | "server.page.recover.waiting"
+  | "server.page.tokenRequired"
+  | "server.page.verify.action"
+  | "server.page.verify.body"
+  | "server.page.verify.failedBody"
+  | "server.page.verify.failedTitle"
+  | "server.page.verify.heading"
+  | "server.page.verify.title"
+  ;
+
+/** 按语言分开的词条表。 */
+export const SERVER_COPY: Record<ServerLocale, Record<ServerCopyKey, string>> = {
+  "zh-CN": {
+    "server.email.common.autoNote": "这封邮件由系统自动发送，请勿直接回复。",
+    "server.email.common.fallbackIntro": "如果按钮点不动，请把下面的链接复制到浏览器打开：",
+    "server.email.common.tagline": "本地优先的任务与习惯管理",
+    "server.email.login.body": "点击下面的按钮完成登录。",
+    "server.email.login.button": "登录",
+    "server.email.login.expiry": "这个链接 15 分钟内有效。",
+    "server.email.login.ignore": "如果这不是你本人发起的，忽略这封邮件即可。",
+    "server.email.login.subject": "你的 heyta 登录链接",
+    "server.email.login.title": "登录 heyta",
+    "server.email.recover.body": "你申请了恢复通行密钥。点击下面的按钮，为账号注册一个新的通行密钥——它会替换掉原来那一个。",
+    "server.email.recover.button": "注册新通行密钥",
+    "server.email.recover.expiry": "这个链接 1 小时内有效。",
+    "server.email.recover.ignore": "如果这不是你本人发起的，忽略这封邮件即可，你的账号不会有任何变化。",
+    "server.email.recover.subject": "恢复你的 heyta 通行密钥",
+    "server.email.recover.title": "通行密钥恢复",
+    "server.email.verify.body": "请点击下面的按钮验证你的邮箱，完成账号注册。",
+    "server.email.verify.button": "验证邮箱",
+    "server.email.verify.expiry": "这个链接 24 小时内有效。",
+    "server.email.verify.subject": "验证你的 heyta 账号",
+    "server.email.verify.title": "欢迎使用 heyta",
+    "server.page.error.unknown": "出了点问题，请稍后重试。",
+    "server.page.login.again": "重新申请登录链接",
+    "server.page.login.body": "点击下面的按钮，完成这次登录。",
+    "server.page.login.busy": "正在登录…",
+    "server.page.login.button": "登录",
+    "server.page.login.error": "登录失败，请重新申请一个登录链接。",
+    "server.page.login.heading": "完成登录",
+    "server.page.login.success": "登录成功，正在跳转…",
+    "server.page.login.title": "完成登录",
+    "server.page.recover.body": "点击下面的按钮，为你的账号注册一个新的通行密钥。它会替换掉原来那一个。",
+    "server.page.recover.busy": "正在准备…",
+    "server.page.recover.button": "注册新通行密钥",
+    "server.page.recover.error": "操作失败，请重试。",
+    "server.page.recover.heading": "恢复你的通行密钥",
+    "server.page.recover.success": "通行密钥已重新注册，现在可以回到应用登录了。",
+    "server.page.recover.title": "恢复通行密钥",
+    "server.page.recover.verifying": "正在验证…",
+    "server.page.recover.waiting": "请在系统弹窗中完成验证…",
+    "server.page.tokenRequired": "链接不完整：缺少必要的令牌。",
+    "server.page.verify.action": "返回并登录",
+    "server.page.verify.body": "你的账号已经可以正常使用了。",
+    "server.page.verify.failedBody": "这个验证链接无效或已经过期。请重新注册，或申请一封新的验证邮件。",
+    "server.page.verify.failedTitle": "验证失败",
+    "server.page.verify.heading": "邮箱验证成功",
+    "server.page.verify.title": "邮箱已验证",
+  },
+  "en": {
+    "server.email.common.autoNote": "This email was sent automatically. Please do not reply.",
+    "server.email.common.fallbackIntro": "If the button does not work, copy this link into your browser:",
+    "server.email.common.tagline": "Local-first tasks and habits",
+    "server.email.login.body": "Click the button below to finish signing in.",
+    "server.email.login.button": "Sign in",
+    "server.email.login.expiry": "This link is valid for 15 minutes.",
+    "server.email.login.ignore": "If you did not request this, just ignore this email.",
+    "server.email.login.subject": "Your heyta login link",
+    "server.email.login.title": "Sign in to heyta",
+    "server.email.recover.body": "You asked to recover your passkey. Click the button below to register a new passkey for your account — it replaces the previous one.",
+    "server.email.recover.button": "Register a new passkey",
+    "server.email.recover.expiry": "This link is valid for 1 hour.",
+    "server.email.recover.ignore": "If you did not request this, just ignore this email — nothing about your account will change.",
+    "server.email.recover.subject": "Recover your heyta passkey",
+    "server.email.recover.title": "Passkey recovery",
+    "server.email.verify.body": "Click the button below to verify your email and finish creating your account.",
+    "server.email.verify.button": "Verify email",
+    "server.email.verify.expiry": "This link is valid for 24 hours.",
+    "server.email.verify.subject": "Verify your heyta account",
+    "server.email.verify.title": "Welcome to heyta",
+    "server.page.error.unknown": "Something went wrong. Please try again.",
+    "server.page.login.again": "Request a new login link",
+    "server.page.login.body": "Click the button below to finish this sign-in.",
+    "server.page.login.busy": "Signing in…",
+    "server.page.login.button": "Sign in",
+    "server.page.login.error": "Sign-in failed. Please request a new login link.",
+    "server.page.login.heading": "Finish signing in",
+    "server.page.login.success": "Signed in. Redirecting…",
+    "server.page.login.title": "Finish signing in",
+    "server.page.recover.body": "Click the button below to register a new passkey for your account. It replaces the previous one.",
+    "server.page.recover.busy": "Preparing…",
+    "server.page.recover.button": "Register a new passkey",
+    "server.page.recover.error": "That did not work. Please try again.",
+    "server.page.recover.heading": "Recover your passkey",
+    "server.page.recover.success": "Your passkey has been registered again. You can go back to the app and sign in.",
+    "server.page.recover.title": "Recover passkey",
+    "server.page.recover.verifying": "Verifying…",
+    "server.page.recover.waiting": "Complete the prompt from your system…",
+    "server.page.tokenRequired": "This link is incomplete: the required token is missing.",
+    "server.page.verify.action": "Go back and sign in",
+    "server.page.verify.body": "Your account is ready to use.",
+    "server.page.verify.failedBody": "This verification link is invalid or has expired. Please register again, or request a new verification email.",
+    "server.page.verify.failedTitle": "Verification failed",
+    "server.page.verify.heading": "Your email is verified",
+    "server.page.verify.title": "Email verified",
+  },
+};

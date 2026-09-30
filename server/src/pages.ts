@@ -1,34 +1,51 @@
 import { FastifyInstance } from 'fastify';
 import { verifyEmail } from './auth';
 import { Logger } from './logger';
+import { escapeHtml, renderPage, resolveLocale, t } from './design-html.js';
 
 // Error response helper
 const errorMessage = (err: unknown): string =>
   err instanceof Error ? err.message : 'Unknown error';
 
-// Basic HTML escape
-const escapeHtml = (unsafe: string): string => {
-  return unsafe
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#039;');
-};
-
 interface VerifyEmailQuery {
   token?: string;
+  lang?: string;
 }
 
 interface RecoverPasskeyQuery {
   token?: string;
+  lang?: string;
 }
 
 interface MagicLoginQuery {
   token?: string;
+  lang?: string;
 }
 
+/**
+ * 成功的小对勾。
+ *
+ * 🔴 内联 SVG 而不是 `✓` 字符或 emoji：AGENTS §5 明确禁止 emoji 当图标
+ * （跨平台渲染不一致、不受 token 控制），而字符对勾的字形在不同字体里差别也很大。
+ */
+const OK_ICON =
+  '<svg class="ok-icon" width="32" height="32" viewBox="0 0 24 24" fill="none" ' +
+  'stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" ' +
+  'aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>';
+
 export async function pageRoutes(fastify: FastifyInstance) {
+  /**
+   * 🔴 三张页面都从**同一个**地方取语言：URL 里的 `?lang=` 优先，
+   * 其次 `Accept-Language`，都没有就**中文**（`resolveLocale` 的兜底）。
+   *
+   * 邮件在发信时就把 `lang` 写进了链接，所以点进来的人看到的
+   * 就是收信那一刻该看到的语言（见 `email.ts` 的 `withLocale`）。
+   */
+  const localeOf = (req: { query: { lang?: string }; headers: Record<string, unknown> }) =>
+    resolveLocale(req.query.lang, typeof req.headers['accept-language'] === 'string'
+      ? req.headers['accept-language']
+      : null);
+
   fastify.get<{ Querystring: VerifyEmailQuery }>(
     '/verify-email',
     {
@@ -40,38 +57,44 @@ export async function pageRoutes(fastify: FastifyInstance) {
       },
     },
     async (req, reply) => {
+      const locale = localeOf(req);
+
       try {
         const { token } = req.query;
         if (!token) {
-          return reply.status(400).send('Token is required');
+          return reply.status(400).type('text/html').send(
+            renderPage(locale, {
+              title: t(locale, 'server.page.verify.failedTitle'),
+              heading: t(locale, 'server.page.verify.failedTitle'),
+              body: t(locale, 'server.page.tokenRequired'),
+            }),
+          );
         }
 
         await verifyEmail(token);
-        return reply.type('text/html').send(`
-        <html>
-          <head>
-            <title>Email Verified</title>
-            <style>
-              body { font-family: sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; background: #0f172a; color: white; }
-              .container { text-align: center; padding: 2rem; background: rgba(30, 41, 59, 0.7); border-radius: 1rem; border: 1px solid rgba(255,255,255,0.1); }
-              h1 { color: #10b981; }
-              a { color: #3b82f6; text-decoration: none; margin-top: 1rem; display: inline-block; }
-            </style>
-          </head>
-          <body>
-            <div class="container">
-              <h1>Email Verified!</h1>
-              <p>Your account has been successfully verified.</p>
-              <a href="/">Return to Login</a>
-            </div>
-          </body>
-        </html>
-      `);
+
+        return reply.type('text/html').send(
+          renderPage(locale, {
+            title: t(locale, 'server.page.verify.title'),
+            heading: t(locale, 'server.page.verify.heading'),
+            body: t(locale, 'server.page.verify.body'),
+            extraHtml: OK_ICON,
+            // 登录入口在应用里（`/app/`），不是落地页 —— 落地页没有登录表单。
+            actions: [{ label: t(locale, 'server.page.verify.action'), href: '/app/', primary: true }],
+          }),
+        );
       } catch (err) {
         Logger.error(`Verification error: ${errorMessage(err)}`);
-        // Escape the error message to prevent XSS
-        const safeError = escapeHtml(errorMessage(err));
-        return reply.status(400).send(`Verification failed: ${safeError}`);
+        // 🔴 对外**不回显**服务端的原始错误（`verifyEmail` 的 message 是给日志的）。
+        // 第一版把 `errorMessage(err)` 直接拼进页面，等于把一个内部字符串
+        // 渲染给任何点到过期链接的人看。用户需要知道的只有"这个链接不好使了"。
+        return reply.status(400).type('text/html').send(
+          renderPage(locale, {
+            title: t(locale, 'server.page.verify.failedTitle'),
+            heading: t(locale, 'server.page.verify.failedTitle'),
+            body: t(locale, 'server.page.verify.failedBody'),
+          }),
+        );
       }
     },
   );
@@ -88,43 +111,48 @@ export async function pageRoutes(fastify: FastifyInstance) {
       },
     },
     async (req, reply) => {
+      const locale = localeOf(req);
       const { token } = req.query;
       if (!token) {
-        return reply.status(400).send('Token is required');
+        return reply.status(400).type('text/html').send(
+          renderPage(locale, {
+            title: t(locale, 'server.page.recover.title'),
+            heading: t(locale, 'server.page.recover.heading'),
+            body: t(locale, 'server.page.tokenRequired'),
+          }),
+        );
       }
 
-      // Return HTML page for passkey recovery
-      return reply.type('text/html').send(`
-      <html>
-        <head>
-          <title>Recover Passkey</title>
-          <script src="/simplewebauthn-browser.min.js"></script>
-          <style>
-            body { font-family: sans-serif; display: flex; justify-content: center; align-items: center; min-height: 100vh; background: #0f172a; color: white; margin: 0; }
-            .container { text-align: center; padding: 2rem; background: rgba(30, 41, 59, 0.7); border-radius: 1rem; border: 1px solid rgba(255,255,255,0.1); max-width: 400px; width: 90%; }
-            h1 { color: #3b82f6; margin-bottom: 1.5rem; }
-            p { color: #94a3b8; margin-bottom: 1.5rem; line-height: 1.6; }
-            button { width: 100%; padding: 0.75rem 1.5rem; background: #3b82f6; color: white; border: none; border-radius: 0.5rem; font-size: 1rem; cursor: pointer; margin-top: 1rem; }
-            button:hover { background: #2563eb; }
-            button:disabled { background: #475569; cursor: not-allowed; }
-            .error { color: #ef4444; margin-top: 1rem; display: none; }
-            .success { color: #10b981; margin-top: 1rem; display: none; }
-            .info { font-size: 0.875rem; color: #64748b; margin-top: 1rem; }
-          </style>
-        </head>
-        <body data-token="${escapeHtml(token)}">
-          <div class="container">
-            <h1>Recover Your Passkey</h1>
-            <p>Click the button below to register a new passkey for your account. This will replace your existing passkey.</p>
-            <button id="recoverBtn">Register New Passkey</button>
-            <p class="error" id="error"></p>
-            <p class="success" id="success"></p>
-            <p class="info" id="info"></p>
-          </div>
-          <script src="/recover-passkey.js"></script>
-        </body>
-      </html>
-    `);
+      // 页内脚本（`public/recover-passkey.js`）需要知道 token 与几种状态文案。
+      // 🔴 文案**经 `data-*` 传**给脚本，而不是在脚本里再写一份：
+      //    脚本是静态资源，取不到词条表；若它自己写死中文，
+      //    英文用户在看这一页时会突然读到中文（或者反过来，就是这次的问题）。
+      const bodyAttrs = [
+        `data-token="${escapeHtml(token)}"`,
+        `data-msg-busy="${escapeHtml(t(locale, 'server.page.recover.busy'))}"`,
+        `data-msg-waiting="${escapeHtml(t(locale, 'server.page.recover.waiting'))}"`,
+        `data-msg-verifying="${escapeHtml(t(locale, 'server.page.recover.verifying'))}"`,
+        `data-msg-success="${escapeHtml(t(locale, 'server.page.recover.success'))}"`,
+        `data-msg-error="${escapeHtml(t(locale, 'server.page.recover.error'))}"`,
+        `data-msg-unknown="${escapeHtml(t(locale, 'server.page.error.unknown'))}"`,
+      ].join(' ');
+
+      const page = renderPage(locale, {
+        title: t(locale, 'server.page.recover.title'),
+        heading: t(locale, 'server.page.recover.heading'),
+        body: t(locale, 'server.page.recover.body'),
+        actions: [{ label: t(locale, 'server.page.recover.button'), id: 'recoverBtn', primary: true }],
+        extraHtml:
+          '<p class="status status--err" id="error" hidden></p>' +
+          '<p class="status status--ok" id="success" hidden></p>' +
+          '<p class="hint" id="info" hidden></p>',
+        scripts: ['/simplewebauthn-browser.min.js', '/recover-passkey.js'],
+      });
+
+      // 脚本靠 `document.body.dataset` 取上面那些属性 ⇒ 必须挂在 `<body>` 上。
+      return reply
+        .type('text/html')
+        .send(page.replace('<body>', `<body ${bodyAttrs}>`));
     },
   );
 
@@ -144,44 +172,40 @@ export async function pageRoutes(fastify: FastifyInstance) {
       },
     },
     async (req, reply) => {
+      const locale = localeOf(req);
       const { token } = req.query;
       if (!token) {
-        return reply.status(400).send('Token is required');
+        return reply.status(400).type('text/html').send(
+          renderPage(locale, {
+            title: t(locale, 'server.page.login.title'),
+            heading: t(locale, 'server.page.login.heading'),
+            body: t(locale, 'server.page.tokenRequired'),
+          }),
+        );
       }
 
-      // Render confirmation page — token is passed to the external script
-      // via a data attribute. The script handles verification via POST.
-      return reply.type('text/html').send(`
-        <html>
-          <head>
-            <title>Complete Login</title>
-            <style>
-              body { font-family: sans-serif; display: flex; justify-content: center; align-items: center; min-height: 100vh; background: #0f172a; color: white; margin: 0; }
-              .container { text-align: center; padding: 2rem; background: rgba(30, 41, 59, 0.7); border-radius: 1rem; border: 1px solid rgba(255,255,255,0.1); max-width: 400px; width: 90%; }
-              h1 { color: #3b82f6; margin-bottom: 1rem; }
-              p { color: #94a3b8; margin-bottom: 1.5rem; }
-              button { width: 100%; padding: 0.75rem 1.5rem; background: #3b82f6; color: white; border: none; border-radius: 0.5rem; font-size: 1rem; cursor: pointer; }
-              button:hover { background: #2563eb; }
-              button:disabled { background: #475569; cursor: not-allowed; }
-              .error { color: #ef4444; margin-top: 1rem; display: none; }
-              .success { color: #10b981; margin-top: 1rem; display: none; }
-              a { color: #3b82f6; text-decoration: none; }
-              a:hover { text-decoration: underline; }
-            </style>
-          </head>
-          <body data-token="${escapeHtml(token)}">
-            <div class="container">
-              <h1>Complete Your Login</h1>
-              <p>Click the button below to finish logging in to heyta.</p>
-              <button id="login-btn">Log In</button>
-              <p class="error" id="error"></p>
-              <p class="success" id="success">Login successful! Redirecting...</p>
-              <p style="margin-top: 1.5rem;"><a href="/">Request a new login link</a></p>
-            </div>
-            <script src="/magic-login-confirm.js"></script>
-          </body>
-        </html>
-      `);
+      const bodyAttrs = [
+        `data-token="${escapeHtml(token)}"`,
+        `data-msg-busy="${escapeHtml(t(locale, 'server.page.login.busy'))}"`,
+        `data-msg-success="${escapeHtml(t(locale, 'server.page.login.success'))}"`,
+        `data-msg-error="${escapeHtml(t(locale, 'server.page.login.error'))}"`,
+        `data-msg-unknown="${escapeHtml(t(locale, 'server.page.error.unknown'))}"`,
+      ].join(' ');
+
+      const page = renderPage(locale, {
+        title: t(locale, 'server.page.login.title'),
+        heading: t(locale, 'server.page.login.heading'),
+        body: t(locale, 'server.page.login.body'),
+        actions: [{ label: t(locale, 'server.page.login.button'), id: 'login-btn', primary: true }],
+        extraHtml:
+          '<p class="status status--err" id="error" hidden></p>' +
+          '<p class="status status--ok" id="success" hidden></p>',
+        scripts: ['/magic-login-confirm.js'],
+      });
+
+      return reply
+        .type('text/html')
+        .send(page.replace('<body>', `<body ${bodyAttrs}>`));
     },
   );
 }

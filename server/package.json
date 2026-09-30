@@ -22,6 +22,9 @@
     "delete-user": "ts-node scripts/delete-user.ts",
     "clear-data": "ts-node scripts/clear-data.ts",
     "recover-user": "ts-node --transpile-only scripts/recover-user.ts",
+    "admin:grant": "ts-node scripts/admin.ts grant",
+    "admin:revoke": "ts-node scripts/admin.ts revoke",
+    "admin:list": "ts-node scripts/admin.ts list",
     "monitor": "node dist/scripts/monitor.js",
     "monitor:dev": "tsx scripts/monitor.ts",
     "analyze-storage": "node dist/scripts/analyze-storage.js",
@@ -35,7 +38,9 @@
     "dry-run-old-ops-sweep": "node dist/scripts/dry-run-old-ops-sweep.js",
     "dry-run-old-ops-sweep:dev": "tsx scripts/dry-run-old-ops-sweep.ts",
     "pricing": "node dist/scripts/pricing.js",
-    "pricing:dev": "tsx scripts/pricing.ts"
+    "pricing:dev": "tsx scripts/pricing.ts",
+    "gen:server-copy": "ts-node --transpile-only scripts/gen-server-copy.ts",
+    "gen:server-design": "node scripts/gen-server-design.mjs"
   },
   "dependencies": {
     "@heyta/domain": "*",
