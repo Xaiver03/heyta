@@ -103,6 +103,11 @@ if (new URLSearchParams(window.location.search).has('shell')) {
        * 之后跳回应用，而**此前没有任何应用代码读它** —— 用户在邮件里"登录成功了"，
        * 回到应用仍是未登录，且界面不报任何错。
        *
+       * 🔴 **现在确认页的投递走 URL `fragment`，不走 `sessionStorage`** ——
+       * 后者跨不过 agent cluster（实测：确认页 `pagehide` 时还在、应用启动时已空）。
+       * 原因与 2×2 证据见 `docs/adr/0039-…md` §4 第 5 轮。这里不用改：
+       * `consumePendingLogin()` 自己按 **fragment → 壳交付的会话 → 链接令牌** 的顺序取。
+       *
        * 🔴 **不 `await`、不阻塞渲染**，理由与 `registerWidgetServiceWorker()` 同源：
        * 本地优先下"未登录"是**合法状态**而不是故障。为了登录去推迟首屏，
        * 等于把"能立刻用"换成"等一个网络往返"，而那个往返失败时用户什么也没得到。

@@ -22,12 +22,40 @@
  * ⇒ **结果**：用户在邮件里"登录成功了"，回到应用还是未登录，而且**界面不会报任何错** ——
  * 这是本仓最危险的那类失效（"界面说成功、功能没接上"）。
  *
- * ## 为什么用 sessionStorage 而不是把令牌放进 URL
+ * ## 令牌怎么从确认页走到应用（两版才对，第二版的教训是实测出来的）
  *
- * 令牌放进 URL 会进浏览器历史、`Referer`、以及任何一层访问日志。
- * `sessionStorage` 是**同源、同标签页、随跳转存活**的 —— 服务端确认页与应用同源
- * （同一台主机：确认页在 `/magic-login`，应用在 `/app/`），所以这条通路成立，
- * 且令牌**不会离开浏览器**。
+ * - **第一版：`sessionStorage`**（同源、同标签页、随跳转存活）。
+ *   它在**大多数**跳转下成立，但 2026-09-30 的端到端判据
+ *   （`scripts/verify-email-web-chain.mjs`）当场判红，仪器给出了确凿的读数：
+ *
+ *   ```
+ *   确认页 pagehide 那一刻：sessionKeys = [sessionToken, loginEmail, loginBaseUrl]  ← 写进去了
+ *   应用启动那一刻    ：sessionKeys = []                                            ← 没跟过来
+ *   写入时间线        ：没有任何 removeItem 删过它们，也不是被谁清了
+ *   ```
+ *
+ *   根因是**两个"文档所属 agent cluster"不同**：确认页由同步服务端渲染，
+ *   带着 `@fastify/helmet` 的默认安全头 `Cross-Origin-Opener-Policy: same-origin`
+ *   + `Origin-Agent-Cluster: ?1`；应用（`/app/`，静态产物）两个头都没有。
+ *   ⇒ 从确认页跳到 `/app/` 会**切换 browsing instance**，`sessionStorage`
+ *   不跟着回到原来那一份。**注入验证**：把这两个头从服务端响应里摘掉，
+ *   同一条判据立刻全绿 —— 因果是钉住的，不是猜的。
+ *
+ *   ⚠️ 这条通路**依赖两个独立部署件（服务端 / 反代）的头配置保持一致**。
+ *   自建部署换个反代就可能再坏一次。修法不能建立在那个默契上。
+ *
+ * - **第二版（现在）：URL 的 `fragment`。**
+ *   fragment **不发给服务端**、**不进 `Referer`、不进任何一层访问日志**，
+ *   而且它是 URL 的一部分 —— **跨 agent cluster 一定跟得过来**。
+ *   消费方读完**立刻**用 `history.replaceState` 抹掉，所以它既不留历史、
+ *   也不活在磁盘上（比 localStorage 严格更小：应用若启动失败，
+ *   fragment 随标签页一起消失，不会跨重启留着）。
+ *
+ *   上游的"别把令牌放进 URL"讲的其实是 **query**（`?token=…` 会进日志与 `Referer`）。
+ *   fragment 两类泄漏都没有，所以这条修法与那条原则不冲突。
+ *
+ * ⚠️ **桌面壳仍然走 `sessionStorage`**：它在**同一份文档里**写、再 `load()`，
+ * 不存在 cluster 切换，那条路是绿的、不动它。两条投递、一套键名、一个消费点。
  *
  * ## 为什么这一步**不许阻塞首屏**
  *
@@ -76,6 +104,90 @@ export const PENDING_SESSION_KEY = 'sessionToken';
 
 /** 会话令牌那条路还要邮箱：头像要用它算首字母，而 `useAuthStore` 刷新后是 signed-out。 */
 export const PENDING_EMAIL_KEY = 'loginEmail';
+
+/**
+ * 地址栏 fragment 这条投递通道（`/app/#sessionToken=…&loginBaseUrl=…&loginEmail=…`）。
+ *
+ * 🔴 **注入而不是直接用 `location`/`history`**，理由与存储那条同源：
+ * "读到就抹掉"是本模块的核心行为，而它在真实浏览器里没法断言
+ * （测试跑在 jsdom 里，改 `location.hash` 会真的动全局状态）。
+ */
+export interface PendingLoginFragment {
+  /** 当前 URL 的 fragment，**不含** `#`；没有 fragment 时是空串。 */
+  read(): string;
+  /** 抹掉 fragment —— 必须发生在消费之后、渲染之前。 */
+  clear(): void;
+}
+
+/**
+ * 从 fragment 里取出并**立即抹掉**待消费的会话（ADR-0039 §2.3 的第二条投递通道）。
+ *
+ * 纪律与 `takePendingSession` 完全一致：**先抹再判** —— 即使值不完整，
+ * 令牌也不许继续留在地址栏与历史里。
+ *
+ * ⚠️ **只在自己认得这个 fragment 时才抹**：将来若有人用 hash 存别的状态
+ * （`apps/web` 今天没有 hash 路由，但那是事实不是保证），
+ * 一个无差别清空会把人家的状态吃掉。
+ *
+ * @returns 有效则返回 `{baseUrl, token, email}`；没有 fragment、不是我们的、
+ *   或缺 `sessionToken`/`loginBaseUrl` 则 `null`。
+ */
+export function takePendingSessionFromFragment(
+  fragment: PendingLoginFragment | null = defaultFragment(),
+): PendingSession | null {
+  if (fragment === null) return null;
+
+  let raw = '';
+  try {
+    raw = fragment.read();
+  } catch {
+    // 读也可能抛（沙箱/策略）；按"没有待消费会话"处理，绝不带崩启动路径。
+    return null;
+  }
+  if (raw === '') return null;
+
+  const params = new URLSearchParams(raw);
+  const ours =
+    params.has(PENDING_SESSION_KEY) ||
+    params.has(PENDING_BASE_URL_KEY) ||
+    params.has(PENDING_EMAIL_KEY);
+  if (!ours) return null;
+
+  const token = params.get(PENDING_SESSION_KEY) ?? '';
+  const baseUrl = params.get(PENDING_BASE_URL_KEY) ?? '';
+  const email = params.get(PENDING_EMAIL_KEY) ?? '';
+
+  // **先抹再判**（同上）：不完整的值也不许留在地址栏里。
+  try {
+    fragment.clear();
+  } catch {
+    /* 抹不掉不致命：下面仍会用读到的值，而它本来也是一次性的。 */
+  }
+
+  if (token === '' || baseUrl === '') return null;
+  return { baseUrl, token, email };
+}
+
+/** 拿一个可用的 fragment 通道；拿不到（无 `location`、被策略禁用）返回 `null`。 */
+function defaultFragment(): PendingLoginFragment | null {
+  try {
+    const loc = globalThis.location;
+    if (loc === undefined || loc === null) return null;
+    return {
+      read: () => (loc.hash.startsWith('#') ? loc.hash.slice(1) : loc.hash),
+      clear: () => {
+        /**
+         * 🔴 **`replaceState` 而不是 `location.hash = ''`**：
+         * 后者会**再压一条历史记录**，于是用户按"后退"又回到带令牌的 URL ——
+         * 那正是要消除的东西。前者是原地改写当前这条。
+         */
+        globalThis.history.replaceState(null, '', `${loc.pathname}${loc.search}`);
+      },
+    };
+  } catch {
+    return null;
+  }
+}
 
 /** 读出来的待消费登录。`baseUrl` 为空即视为无效（见上）。 */
 export interface PendingLogin {
@@ -211,9 +323,31 @@ export function takePendingLogin(
  */
 export async function consumePendingLogin(
   storage: PendingLoginStorage | null = defaultStorage(),
+  fragment: PendingLoginFragment | null = defaultFragment(),
 ): Promise<boolean> {
   /**
-   * 🔴 **先看"壳交付的会话"那条**（ADR-0039 §2.3）。
+   * 🔴 **顺序：fragment → 存储里的会话 → 存储里的链接令牌。**
+   *
+   * fragment 排第一，因为它是**邮件确认页**的投递：那个页面刚刚 POST 出了会话，
+   * 正在跳过来，是"最新鲜"的那一份（而且它一走完就会被抹掉，不会赖着）。
+   *
+   * 两条会话通道（fragment / 存储）是**投递方式不同、东西相同**：
+   * fragment 跨 agent cluster（见文件头），存储那条只对桌面壳成立。
+   * 它们后面是**同一条**落地路径 `adoptSession()` —— 不是两份"登录成功后做什么"。
+   *
+   * 链接令牌排最后：它还得再去服务端**换**一次，是三条里唯一有网络往返的。
+   */
+  const fromFragment = takePendingSessionFromFragment(fragment);
+  if (fromFragment !== null) {
+    useAuthStore.getState().adoptSession(fromFragment.baseUrl, {
+      token: fromFragment.token,
+      user: { id: 0, email: fromFragment.email },
+    });
+    return true;
+  }
+
+  /**
+   * 🔴 **再看"壳交付的会话"那条**（ADR-0039 §2.3）。
    *
    * 它与链接令牌是两种东西：会话**已经签发**，直接采用即可；
    * 拿它去 `verify()` 会被服务端按链接令牌那一列查 ⇒ 401（实测）。
