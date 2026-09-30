@@ -230,6 +230,14 @@ const PROVIDER_DEPENDENT = [
    */
   'AiDisclosure',
   /**
+   * `ai` 面板族第一刀：面板头部（`packages/ui/src/ai/AiPanelHead.tsx`）。
+   * 与 `AiDisclosure` 同一条理由 —— 它透过 `useHeytaTokens` / `useHeytaText`
+   * 取 token，所以用它的宿主同样必须挂 `HeytaUiProvider`。
+   */
+  'AiPanelHead',
+  /** `ai` 面板族最后一刀：面板容器（`packages/ui/src/ai/AiPanel.tsx`）。 */
+  'AiPanel',
+  /**
    * M3 第九刀（projects）：`OrganizerList` 透过 `useHeytaTokens` / `useHeytaText`
    * 取 token，所以用了它的宿主同样必须挂 Provider。
    *
@@ -289,6 +297,44 @@ const PROVIDER_DEPENDENT = [
   'ActivityHeatmap',
   'ShareSummarySection',
   'MotivationProgressBar',
+  /**
+   * `timeline` 整刀第 1 步（`packages/ui/src/timeline/`）。
+   *
+   * 🔴 **同一个缺口第十一次出现的场合，也是第五次"登记与写组件同时发生"**
+   * （sync → AI → settings → quadrant → habits → capture → AI 补账 → projects →
+   * notes/reminders → motivation → 本次）。
+   * 根因从未变过：本脚本的消费者扫描只覆盖 `apps/*`，而共享组件内部的
+   * `useHeytaTokens()` 在 `packages/ui` 里、不在扫描范围；宿主侧写的是
+   * `<TimelineView>` / `<GanttChart>` 这种**组件 JSX**，不登记就不是判据认识的符号。
+   * ⇒ 漏登记 = 没有门禁：宿主把 `<HeytaUiProvider>` 拆掉不会红，
+   *    而运行时会抛「useHeytaUiTheme 必须在 <HeytaUiProvider> 内使用」。
+   *
+   * ⚠️ `TimelineView` 是 web 宿主（`features/timeline/TimelinePanel.tsx`）
+   * 直接渲染的符号；`GanttChart` 目前只被 `TimelineView` 内部渲染，
+   * 但它是 `export function`，**宿主可以直接 import 它**（同 `TaskRow` 的理由），
+   * 所以两个都登记。
+   */
+  'TimelineView',
+  'GanttChart',
+  /**
+   * M3 第八刀（calendar）与第九刀（trash）。
+   *
+   * 🔴 **这是同一个缺口第六次出现**（sync → AI → settings → quadrant → habits →
+   * calendar/trash）。根因一次都没变过：本脚本的消费者扫描只覆盖 `apps/*`，
+   * 而共享组件内部的 `useHeytaTokens()` 在 `packages/ui` 里、不在范围内；
+   * 宿主侧写的是 `<CalendarBoard>` / `<TrashBoard>` 这种组件 JSX，
+   * **不登记就不是判据认识的符号** ⇒ **漏登记 = 没有门禁**。
+   *
+   * ⚠️ 这两个是**实测撞出来的**：`TrashBoard` 落地时 `TrashView` 忘了包
+   * `<HeytaUiProvider>`，而 `pnpm check` **全绿** —— 一直到
+   * `apps/web/tests/trash.spec.tsx` 5 条一起报
+   * 「useHeytaUiTheme 必须在 <HeytaUiProvider> 内使用」才暴露。
+   * 也就是说：**在这次事故里，唯一的防线是一条恰好覆盖到的单测**，
+   * 而门禁本该在更早、更便宜的地方拦住它。
+   */
+  'CalendarBoard',
+  'TrashBoard',
+  'SearchPanel',
   'useHeytaTokens',
   'useHeytaText',
   'useHeytaUiTheme',

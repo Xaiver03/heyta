@@ -286,20 +286,14 @@ const EMPTY_SITES = {
     'apps/web/src/App.tsx', // L3 壳层：这就是 web 的"唯一实现"，不是债
     'apps/web/src/features/trash/TrashView.tsx', // 债：手抄了同一套骨架
   ],
-  空槽位类: [
-    'apps/web/src/features/motivation/GrowthView.tsx',
-    'apps/web/src/features/motivation/IdentityTagList.tsx',
-  ],
+  空槽位类: [],
   '空态 testid': [
     'apps/web/src/features/settings/ImportPanel.tsx',
     'apps/web/src/features/settings/MemoryPanel.tsx',
     'apps/web/src/features/settings/PasskeyPanel.tsx',
-    'apps/web/src/features/timeline/GanttChart.tsx',
-    'apps/web/src/features/timeline/TimelineView.tsx',
     'apps/web/src/features/trash/TrashView.tsx',
   ],
   直接渲染空态词条: [
-    'apps/mobile/src/screens/GrowthScreen.tsx',
     'apps/mobile/src/screens/ListsSection.tsx',
     'apps/mobile/src/screens/TagsSection.tsx',
     'apps/mobile/src/screens/TaskDetailSheet.tsx',
@@ -330,13 +324,23 @@ const EMPTY_SITES = {
      */
     'apps/web/src/features/categories/copy.ts',
     'apps/web/src/features/habits/HabitsView.tsx',
+    // ⚠️ 它只从「空槽位类」消失了（那个槽位被收编），**文案站点仍在账上**。
     'apps/web/src/features/motivation/GrowthView.tsx',
-    'apps/web/src/features/motivation/IdentityTagList.tsx',
     'apps/web/src/features/settings/AiSettings.tsx',
     'apps/web/src/features/settings/MemoryPanel.tsx',
     'apps/web/src/features/settings/PasskeyPanel.tsx',
-    'apps/web/src/features/timeline/GanttChart.tsx',
-    'apps/web/src/features/timeline/TimelineView.tsx',
+    /**
+     * `timeline` 整刀第 2 步（web 换装共享 `TimelineView`）。
+     *
+     * 🔴 **这一条与上面 `categories/copy.ts` 是同一形状，不是新增债务。**
+     * 空态的**渲染**已经收编：共享 `GanttChart` / `TimelineView` 用的是
+     * `packages/ui` 的 `EmptyState`（`gantt-empty` / `timeline-view-empty`
+     * 两个 testID 原样传了进去），web 侧不再有手写骨架。
+     * 剩下的 `t('web.timeline.empty')` / `t('web.gantt.empty')` 是**文案**，
+     * 而共享层不许 import `@heyta/i18n`（会拖进第二份 React）——
+     * 模板只能留在宿主侧，于是落在这个装配文件里。
+     */
+    'apps/web/src/features/timeline/labels.ts',
     'apps/web/src/features/trash/TrashView.tsx',
     /**
      * 便签 / 提醒（C-8 的 NOTE + B1-1 的 REMINDER 接上宿主入口那一刀）。
@@ -369,6 +373,35 @@ const EMPTY_SITES = {
      */
     'apps/web/src/features/notes/NotesView.tsx',
     'apps/web/src/features/reminders/ReminderPanel.tsx',
+    /**
+     * 通知中心 + 活动（2026-09-29）。
+     *
+     * 🔴 **这两条与 `notes` / `reminders` 是同一形状，是真真正正的 +2。**
+     * 通知中心与活动在此之前**不存在**，所以这三个空态（"还没有通知"、
+     * "暂时没有活动"、"还没有邀请记录"）是随功能一起新生的，不是搬家。
+     *
+     * **渲染已经收编**：三处都走共享 `EmptyState`（面板正文整体包在
+     * `HeytaUiProvider` 里，`check:ui-provider` 盯着这件事），视图里没有
+     * 手写骨架、也没有空槽位类 —— 所以这两个文件**只**出现在本栏，
+     * 不再出现在「骨架类」/「空槽位类」/「空态 testid」里。
+     *
+     * **为什么文案仍在宿主侧**：与 `timeline/labels.ts`、`categories/copy.ts`
+     * 逐字相同的理由 —— 共享层**不许 import `@heyta/i18n`**（会拖进第二份
+     * React，`check:mobile-bundle` 盯着），模板只能留在有 i18n 的那一侧。
+     *
+     * ⚠️ **仍然不满足的地方，如实写在这里**：共享 `EmptyState` 是**页面级**的
+     * （居中、`paddingVertical: space.16` = 64px），而通知/活动这两个空态是
+     * **面板级**的（一个 24rem 宽的下拉面板里）。
+     *
+     * 这一轮**选择了先收编**（三处都真的用共享组件，而不是各写一份骨架），
+     * 代价是**空态在下拉面板里长得像页面级**（上下各 64px 留白）。
+     * 已用真浏览器截图看过，接受这个外观。剩下的缺口是产品/设计决定：
+     * **"区块级空态"要不要成为共享 `EmptyState` 的一档**
+     * （例如 `size?: 'page' | 'section'`）—— 与 `NotesBoard` / `ReminderList`
+     * 记的是同一个缺口，本仓尚未定。定下来之前不要再新增第二种写法。
+     */
+    'apps/web/src/features/inbox/InboxBell.tsx',
+    'apps/web/src/features/inbox/InviteActivityCard.tsx',
   ],
   '空态文案 prop': [
     /**
