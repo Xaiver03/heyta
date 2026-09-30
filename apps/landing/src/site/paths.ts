@@ -17,12 +17,12 @@
  * 所以语言切换必须**保持当前页面**，只换语言前缀。
  */
 
-import { DEFAULT_LOCALE, otherLocale, type Locale } from '@heyta/i18n';
+import { DEFAULT_LOCALE, otherLocale, type Locale } from '@heyta/i18n/provider';
 
 import { SITE_PAGES, entryDir, type RegisteredSitePage, type SitePage } from './pages.js';
 
 /**
- * 部署基路径。落地页挂在 `heyta.finlaw.cloud` 的根上（`/`），
+ * 部署基路径。落地页挂在 `heyta.waytofuture.cn` 的根上（`/`），
  * 但历史上也用过 `/landing/` 子路径，所以这里从 Vite 的 base 推导，
  * 而不是把 `/` 写死 —— 写死会让子路径部署时所有互链全部 404。
  */
