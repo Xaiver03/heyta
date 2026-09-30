@@ -1,11 +1,43 @@
 # BLOCKED — 待裁决清单
 
-**2 项待裁决**（第 1、2 项不由本次改动造成），外加第 3 项 ——
-**已于 2026-09-30 当场定案并落地了第一半**（见文末，保留原文以便读它的推理）。
+**第 1、2 项已于 2026-09-30 的收尾轮解决并落地**（各自保留原文以便读推理，
+下面写清了"当时的假设哪里错了"）。剩下 **2 项待裁决**：第 3 项
+（**已于 2026-09-30 当场定案并落地了第一半**，见文末）与第 4 项
+（四端重装里两端因**环境**装不上：mac 无图形会话权限、windows 主机不可达）。
 
 ---
 
-## 1. `pnpm check` 的 e2e 段当前是红的：`motivation.spec.ts` 两条
+## 1. ✅ **已解决**（2026-09-30 收尾轮）：`motivation.spec.ts` 两条红
+
+> 🔴 **本条当时的假设是错的，留在这里就是为了看清它错在哪。**
+> 下面第 2 步写着「0 个元素意味着**那条接线断了**，不是选择器过期」—— 实测**两者都不是**：
+> `TodayProgressCard` 的 `testID` 一路透传正常，`任务` 视图恰好渲染 **1 个**
+> `[data-testid="today-progress"]`。真正的原因是**一次已提交的产品改动**
+> （`02fef9a7`，2026-09-30：进度卡从"常驻做事视图"收窄成**只在任务视图**），
+> 而 e2e 契约没跟着改 —— 红的是**契约过期**，不是接线，也不是产品坏了。
+> 症状（0 个元素）在"契约过期"和"接线断了"两种情况下**长得一模一样**，
+> 这就是为什么归因必须靠实测而不是靠读注释。
+
+| 收尾轮做了什么 | 结果 |
+|---|---|
+| 契约改成与产品决定一致 | `CARD_ON = ['任务']`；`CARD_OFF` **由 `TABS` 派生**（加视图不会漏），两个浮层（设置/搜索）单独排除 |
+| 阈值型判据换掉 | 「每个视图都有实质内容」的 `body 文本 > 60` ⇒ 新增 `VIEW_ANCHOR: Record<Tab, string>`，**逐视图断言它自己的那块板 `toHaveCount(1)`**；并加两条对账（锚点表的键 ↔ `TABS` 双向），新视图不登记锚点就直接红 |
+| 顺带修掉一个潜在缺陷 | `e2e/tests/helpers.ts` 的 `switchView` label 联合**漏了 `日历`/`搜索`**，而两处调用点已经在传它们 —— e2e 不在根工作区、没有 typecheck，所以永远不会红（esbuild 只转译）。已补齐 |
+| 全量结果 | `e2e/tests/motivation.spec.ts` **7 passed**；`pnpm check:ai-e2e` 整组 **exit 0** |
+
+**三条变异验证**（证明新判据会红，且红得精确）：
+
+| # | 注入 | 实测 |
+|---|---|---|
+| A | `App.tsx` 渲染门放宽成 `tasks \|\| calendar` | `Error: 日历 不该显示今日进度卡` / Expected `0` / Received `1`（`motivation.spec.ts:165`） |
+| A2 | 渲染门挪到 `growth`（卡片离开任务视图） | `Error: 任务 应当显示今日进度卡` / Expected `1` / Received `0`（`:161`） |
+| B | 在**产品侧**打断锚点（`HabitsView.tsx:260` `testID="habit-board"` 改名） | 白屏检测精确报 `习惯 视图的根锚点 [data-testid="habit-board"] 必须渲染出来` / Expected `1` / Received `0`（`:254`）—— 一次只红一个视图，说明"红了能直接定位到哪个视图的哪个组件" |
+
+没有调大任何数字、没有删任何断言、没有放宽阈值。下面原文照留。
+
+---
+
+### 原始记录（已解决，保留以便读它的推理）
 
 > 记录时间：2026-09-30。**不是本次任务的改动造成的** —— 见下面的对照实验。
 
@@ -50,7 +82,23 @@
 
 ---
 
-## 2. `pnpm verify:i18n-failures`（**不在 `pnpm check` 里**）当前 4/91 红
+## 2. ✅ **已解决**（2026-09-30 收尾轮）：`pnpm verify:i18n-failures` 4 条红
+
+> 逐条查过：**四条全是探针自己的锚点过期，没有一条是产品缺陷**。
+> 修法一条都没降低判据强度（改的是"注入点搬到逻辑现在住的地方"，不是"少注入一处"）。
+
+| 组 / 用例 | 真因（收尾轮实测） | 修法 |
+|---|---|---|
+| `recurrence`「zh 词条『每天』→『每日』」<br>`recurrence`「en 词条漏出中文」 | 锚点写死在 `packages/i18n/dist/index.js`，而 `tsup.config.ts` 多入口 + code-split 后词条各在**独立 chunk** 里：`index.js` 只有 1176 字节 ⇒ **永远不可能命中** | 新增 `i18nDistFileWith(anchor)`：在 `packages/i18n/dist/**/*.js` 里找**真的含这条锚点**的那个文件；0 命中 / 多命中 / 没有 dist 三种情况一律**响亮抛错**（静默跳过 = 这条检查永远通过）。实测 zh 锚点唯一命中 `chunk-E5BUEZYD.js`、en 锚点唯一命中 `chunk-BRR4QWD2.js` |
+| `sync`「web 壳把两种失败指到同一条词条」 | 注入目标 `apps/web/src/features/sync/sync-failure-copy.ts` **已被 M3 第四刀删除**（那张表收进 `packages/ui/src/sync/model.ts`），`readFileSync` 直接 ENOENT | 注入改打**共享层那张表**，跑 `@heyta/ui` 自己的 `tests/sync-model.spec.ts`（它读源码，不受 `dist/` 新鲜度影响；web 壳确实消费这张表仍由本组末尾 `webSyncRun` 的基线绿钉住）。用例改名「共享表把两种失败指到同一条词条」—— 现在两端共用一份，指错就是**两端同时**给错的下一步 |
+| `sync`「移动端不再区分原因」 | 锚点 `": t(SYNC_FAILURE_KEY[status.reason]);"` 随 M3 第四刀消失（本地那张表删了，改成 `syncFailureMessageKey` 的投影） | 锚点换成当前调用点 `const key = syncFailureMessageKey(status.reason);` ⇒ 改成 `const key = undefined;`，移动端套件里「已知失败原因各有各的句子」必红 —— 这条钉的仍是**壳有没有真的去区分** |
+
+**结果**：`node scripts/verify-i18n-failures.mjs` 全量 **91 个用例全部符合预期、exit 0**
+（`recurrence` 10/10、`sync` 5/5 单独也各跑过一次）。用例总数仍是 91，没有靠删用例变绿。
+
+---
+
+### 原始记录（已解决，保留以便读它的推理）
 
 > 记录时间：2026-09-30。**不是本次改动造成的** —— 证据见下。
 
@@ -140,8 +188,30 @@
 >
 > 1. ✅ **OPFS → 壳的一次性导入已经做完并验通**（守卫与 IndexedDB 那条路径**共用一份实现**：只在目标为空时导入 / `appendImported` / 不删来源 / 失败不阻断启动）。判据链与**注入验证**见 [`apps/desktop-windows/evidence/storage-host/`](apps/desktop-windows/evidence/storage-host/README.md) 的 `import-1..5`；
 > 2. ✅ **默认开关已翻**（存储宿主默认开；`HEYTA_SHELL_STORAGE=0` 是逃生门）。⚠️ 自此 `heyta.sqlite` 是**唯一**事实来源（OPFS 只在首次导入时被读一次、且不删）；
-> 3. 🟡 **macOS 壳侧托管已验绿**（JavaScriptCore + libsqlite3，同一条判据，证据在 `apps/desktop-macos/evidence/storage-host/`）。**只剩 WKWebView 接线**（`WKUserScript` + `WKScriptMessageHandler` + `STORAGE=`）。⚠️ WKWebView **没有 CDP** ⇒ 那一格的验证不能照搬 Playwright 附着，要用 macOS 壳已有的**壳内 `evaluateJavaScript` 探针**（`check-macos-window.mjs` 那条路）—— 这与 C 是同一道题；
+> 3. ✅ **macOS 的 WKWebView 接线也做完了**：真应用走壳的 SQLite（`STORAGE=shell`），且**从壳外读到那条经界面写入的数据**（`heyta.sqlite-wal: title=True`）。⚠️ WKWebView **没有 CDP** ⇒ 造数据用的是壳内 `evaluateJavaScript` 的旅程探针（`HEYTA_STORAGE_JOURNEY`）—— 那条机制正是 C 要用的；
 > 4. 两端的回执要求一致：**从壳外读 `.sqlite`** + **重启之后还在** + 人看过的截图。
+>
+> ### 🔴 C 卡住了（2026-09-30 量出，不是猜的）
+>
+> **macOS 壳里通行密钥做不了**：带焦点实测 `isUserVerifyingPlatformAuthenticatorAvailable() === false`
+> ⇒ 走不到 Touch ID（用户看到"没反应/超时"）；不带焦点则是 `NotAllowedError: The document is not focused`
+> （`HEYTA_NO_FOCUS=1` 与本仓取证约定冲突）。硬件已排除（`bioutil -r` 正常，Mac16,5）。
+> 另外产品负责人指出**登录界面不符合正常用户旅程**（不该让用户填服务地址）。
+> ⇒ C 需要先定一个产品选择（壳内通行密钥 / 系统浏览器 `ASWebAuthenticationSession` / magic-link），
+> 三个选项与实测细节见 [`docs/plans/desktop-storage-host-handoff.md`](docs/plans/desktop-storage-host-handoff.md) §6。
+> **在选项定下来之前不要往"壳内通行密钥"加代码**。
+>
+> ✅ **C 的机制已落地并验绿**（第 10 轮）：壳内探针走"请求登录链接 → 粘贴令牌"，
+> `AUTH_STATE=signed-in`；走的是面板**产品已有**的「粘贴登录链接 / 令牌」入口。
+> ✅ **红/绿一对都拿到了**（有效令牌 ⇒ `signed-in`；坏令牌 ⇒ `signed-out` + 面板说出原因）。
+>
+> 🔴 **顺带修掉一起真事故（第 11 轮）**：`packages/i18n/src/locales/*.js` 是两份 **CJS 残渣**
+> （未被跟踪、被 `.gitignore` 忽略 ⇒ `git status` 看不见），而打包器**选中了它们**
+> ⇒ `dist` 里带**裸 `exports`** ⇒ 浏览器首跳就抛 `Can't find variable: exports`，
+> **两个桌面壳与任何打包产物全废**（`vite dev` 看不出来，所以 D 绿而壳全挂）。
+> 修法：删残渣 + 重打 `@heyta/i18n` + 重打 `apps/web/dist`。
+>
+> ✅ **D 已完成**（第 9 轮）：RP ID 从 IP 字面量换成 `localhost`（根因：RP ID 必须是 origin 的域名后缀，而 Chromium 拒收 IP 字面量），`pnpm verify:web-auth` **6/6 绿**且**注入验证**过（翻回 IP 即红）。证据在 `apps/web/evidence/auth-journey/`。
 
 ### 实测到的现状（三条，都是这轮现查的）
 
@@ -171,3 +241,34 @@
 
 **在裁决前我不动 B 的代码**：猜错方向会白改**存储归属**，
 而它落在 AGENTS.md §3「schema 与持久化字段」的硬约束面上，返工代价远大于等一次拍板。
+
+---
+
+## 4. 🔴 四端重装（AGENTS §6.1.1）**跑了，两端因环境装不上** —— 需要用户处置
+
+> 记录时间：2026-09-30 收尾轮。`pnpm reinstall:all` 完整执行，**没有用 `--skip`、没有降级判据**；
+> 失败的两端如实报红（脚本整体 exit 1）。
+
+| 端 | 结果 | 判据行 / 证据 |
+|---|---|---|
+| **android** | ✅ 清旧包 → release APK 重打（63M）→ 模拟器全新安装 `Success` → 截图判据 | `contentRatio 0.068`、**主蓝命中 9279**、`/tmp/heyta-reinstall-android.png`（人已看过：heyta 欢迎页、中文、主蓝按钮） |
+| **ios** | ✅ 模拟器卸旧 → Release 重打 → 全新安装 → **新鲜度判据**（已装的包比源码新）+ 截图 | `contentRatio 0.066`、**主蓝命中 9450**、`/tmp/heyta-reinstall-ios.png`（人已看过，同一面欢迎页） |
+| **mac** | 🔴 `.app` 已重打、已签名（Developer ID 链完整）、已装进 `/Applications`，**卡在这台的启动判据** | `sandbox_extension_issue_file_to_process failed … (Operation not permitted)` + `SCShareableContent 里始终没有窗口 34662` ⇒ 截图判据拿不到图。**根因不在产品**：同一进程树里 `screencapture -x` 直接报 `could not create image from display` —— 这台机器上**发起方没有屏幕录制 / 图形会话权限** |
+| **windows** | 🔴 **拒绝打包**（源码同步没通过就不打，正是 §7 第 82 条要防的"装旧树还报绿"） | `ssh: connect to host 10.111.127.237 port 22: No route to host` ⇒ `scp: Connection closed` ⇒ `源码包送不过去（windows-pc 不可达？）` |
+
+**要用户做的两件事**：
+
+1. **mac**：给发起这些命令的那个应用（这次是 Qoder；平时是 Terminal/iTerm）在
+   「系统设置 → 隐私与安全性 → **屏幕录制**」里打勾并重开它。
+   没有这个权限，`check:macos-window` 与 `reinstall:all` 的 mac 段**必然红**，
+   而那**不是代码坏了**（换一个有权限的父进程就能过）。
+2. **windows**：把打包机 `windows-pc`（`10.111.127.237`）重新接上（开机 / 同网段 / SSH 可达），
+   然后 `pnpm reinstall:desktop`。⚠️ 它**不可达时脚本就是红的**，这是设计 ——
+   别用 `--skip windows` 把它蒙过去。
+
+### 顺带记两类"看起来是故障、其实不是"的红（都实测过）
+
+| 现象 | 真因 | 该怎么读 |
+|---|---|---|
+| `check:journey-coverage` / `check:ai-e2e` / `pnpm -r test` 在同一次批量里**各红一次**，单独重跑**三条全绿** | 与**另一个会话的构建并发**撞上了（`pnpm build` 里 tsup 带 `clean: true`，会先把 `packages/*/dist` 删掉再写）—— 读的一侧正好读到空/半份 | 结构性门禁红了，先**单独重跑那一步**再归因；能单独跑绿 = 不是代码坏了（§7 元规则一：先怀疑探针） |
+| `apps/mobile test` 首跑报 3 条 unhandled rejection：`Flow is not supported`，指向 `react-native/index.js` 的 copyright 头，测试本身 **418 全过** | 冷缓存下某条动态 import 把 `@heyta/ui` 的入口（含 RN）拖进了 node 环境；跑过一次后不再出现 | 这条**已经写在** `apps/mobile/tests/auth-flow.spec.ts` 的文件头注释里（"移动端测试刻意不 import `@heyta/ui`"）。它仍是**一个真实的脆弱点**：判据退出码被一个不影响断言的 rejection 决定。修法要么给 `@heyta/ui` 加纯逻辑子入口（`status-text.ts` 文件头第 1 条早就登记过），要么让 vitest 不把这类转换期 rejection 记成失败 —— **本轮没动**，留给下一条改 mobile 测试线的会话 |
