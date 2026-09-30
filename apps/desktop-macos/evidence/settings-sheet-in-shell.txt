@@ -1,0 +1,16 @@
+# macOS 壳里的设置浮层（goal-settings-ia.md · D1 证据）
+#
+# 采集：2026-09-29（CST，会话时间）
+#   HEYTA_WEB_ROOT=apps/web/dist .build/out/Products/Debug/HeytaMac
+#   screencapture -x -o -l<window-id>（窗口号经 scripts/window-id.swift 取）
+#
+# 图里可见（判据 D1：打开设置后 rail 与下层视图仍可见）：
+#   · 左 rail 全程在（任务/日历/四象限/习惯/时间线/搜索/回收站/通知/帮助）；
+#   · 下层任务视图**透出**（"收集箱是空的 / 在上面输入框里添加一个任务"的残影
+#     从 .ht-sheet 的半透明底（88%）下透出 —— 下层被压暗，没有被替换）；
+#   · 设置内容盖在内容区上（从滴答清单导入 / 通行密钥 / 桌面小组件 / 帮助与关于）。
+#
+# ⚠️ 如实说明：这张图里 app **冷启动即处于设置浮层**（不是本轮点击进去的）——
+#    壳的 WKWebView 数据目录里残留了上一次会话的视图状态。状态如何持久化
+#    不是本判据的对象；判据对象是"设置开着的时候，rail 与下层还在不在"。
+#    DOM 层的可注入判据在 apps/web/tests/settings-sheet-ia.spec.tsx（注入已验红→绿）。

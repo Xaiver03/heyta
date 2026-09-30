@@ -1,0 +1,28 @@
+bundle：/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/packages/app-host/bridge-bundle/native-bridge.js（1291525 字节）
+db：/var/folders/5n/zvn6lsb5265d19khvqwp6fsc0000gn/T/heyta-macos-smoke-B39B5AFF-FD12-4829-A096-8209E012F49B/smoke.sqlite
+
+  ✅ 打开宿主并拿到 clientId（munwz2is…）
+  ✅ 新库列出来是空的
+  ✅ 两条任务拿到不同的 id
+  ✅ 新建后列出 2 条
+  ✅ 展示序：都未完成、都无截止 ⇒ 保持稳定序（与共享 sortTasksForDisplay 一致）
+  ✅ 只有一条被标成完成
+  ✅ 被标完成的是第一条
+  ✅ 完成时间真的写进去了
+  ✅ 已完成沉到最后 —— 与共享 sortTasksForDisplay 一致
+  ✅ 空标题被拒（TaskActions 的既定语义，跨语言之后仍然成立）
+  ✅ 重开后仍然是 2 条（数据真的落盘）
+  ✅ 重开后完成态还在
+  ✅ 软删除后只剩 1 条
+  ✅ 驱动出错时返回信封（而不是抛异常或静默成功）
+  ✅ 正常 SQL 返回空字符串（信封只在出错时出现）
+  ✅ openOpLog 拿到库里给出的 clientId（munwz2l3…）
+  ✅ oplog-hello ⇒ 壳回且只回一条消息
+  ✅ 那条消息是 ready 交握
+  ✅ ready 里的 clientId 与库里那个**逐字相同**
+  ✅ 空库经宿主边界 getAllOps ⇒ ok 且 0 条
+  ✅ appendLocal 经宿主边界 ⇒ 返回 seq [1]（实测响应：{"id":2,"ok":true,"value":[1]}）
+  ✅ 再经宿主边界 getAllOps ⇒ 正是刚写的那条（读回来的形状没被边界改坏）
+  ✅ Swift 独立读壳的 .sqlite ⇒ ops 表里有 1 行（数据真的在壳的库里）
+
+✅ 跨语言那一层 + 落盘 全部通过。

@@ -21,6 +21,7 @@ public struct TaskView: Codable, Sendable, Identifiable {
 private struct TaskListEnvelope: Codable { let tasks: [TaskView] }
 private struct ClientIdEnvelope: Codable { let clientId: String }
 private struct IdEnvelope: Codable { let id: String }
+private struct OutboundEnvelope: Codable { let outboundJson: [String] }
 
 public final class AppApi {
     private let host: ScriptHost
@@ -47,6 +48,27 @@ public final class AppApi {
 
     public func removeTask(_ id: String) throws {
         _ = try host.call("removeTask", json(["id": id]))
+    }
+
+    /// 打开**给页侧真应用用的**那份存储（**无引擎**），返回库里给出的 clientId。
+    ///
+    /// 🔴 与 `open(_:)` 是**两条路，不能同时走**：`open` 会建 `OpLogEngine`，
+    /// 而 `app` 模式里引擎属于**页侧的真应用**。两个引擎同库会各自为政
+    /// （向量时钟与 appliedOpIds 漂移），所以壳在 `app` 模式下只调这一个。
+    /// 与 Windows 的 `AppApi.OpenOpLog` 逐字同构。
+    public func openOpLog() throws -> String {
+        try decode(ClientIdEnvelope.self, from: host.call("openOpLog", json(["dbPath": ""]))).clientId
+    }
+
+    /// 把页侧发来的**一条消息**转给 TS，拿回**要发回去的那些消息**。
+    ///
+    /// 🔴 为什么是"收一条、回多条"：`ready` 交握是**推**给页侧的，而推的时机
+    /// 壳控制不了 —— 所以页侧会反复发 `oplog-hello` 来催，壳每次回一条 ready。
+    /// 把"回什么"交给 TS，Swift 就只需把返回的每一串**原样发出去**，
+    /// 于是它**不必认识任何协议字段**（与 Windows 的 `AppApi.HandleHostMessage` 同构）。
+    public func handleHostMessage(_ messageJson: String) throws -> [String] {
+        let raw = try host.call("handleHostMessage", json(["messageJson": messageJson]))
+        return try decode(OutboundEnvelope.self, from: raw).outboundJson
     }
 
     public func shutdown() { host.shutdown() }

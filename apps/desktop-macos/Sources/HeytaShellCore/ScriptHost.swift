@@ -91,12 +91,16 @@ public final class ScriptHost {
         context.evaluateScript("try { HeytaApp.close(); } catch (e) {}")
     }
 
-    /// 把一个 Swift 字符串安全地嵌成 JS 字面量（JSON 字符串正好是合法 JS 字面量）。
-    private func jsStringLiteral(_ value: String) -> String {
-        guard let data = try? JSONSerialization.data(withJSONObject: [value]),
-              let text = String(data: data, encoding: .utf8) else { return "\"\"" }
-        return String(text.dropFirst().dropLast())
-    }
+}
+
+/// 把一个 Swift 字符串安全地嵌成 JS 字面量（JSON 字符串正好是合法 JS 字面量）。
+///
+/// ⚠️ 公开，是为了让**窗口那一层**（`HeytaMacApp` 回推存储宿主消息时）也用同一份实现。
+/// 两处各写一份转义的症状是"某些字符让脚本语法坏掉"—— 那类 bug 只在特定数据下出现。
+public func jsStringLiteral(_ value: String) -> String {
+    guard let data = try? JSONSerialization.data(withJSONObject: [value]),
+          let text = String(data: data, encoding: .utf8) else { return "\"\"" }
+    return String(text.dropFirst().dropLast())
 }
 
 public enum ScriptHostError: Error, CustomStringConvertible {
