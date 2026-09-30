@@ -55,7 +55,7 @@
 | **A3** | **已登录"再加一条凭据"走另一组端点**（要 Bearer） | `hosted-auth.ts:844-856`、`server/src/api.ts:817, 851` | 已登录用户加凭据**必须**用 `/api/passkeys/registration/*`；复用公开 `/register/passkey/*` 会**静默空操作** |
 | **A4** | **`termsAccepted` 是 `z.literal(true)`** | server 校验 | 注册 UI 必须带**用户自己勾**的同意项；**不得替用户预勾或发明同意** |
 | **A5** | **无 cookie，令牌在响应体** | `pages.ts` + `magic-login-confirm.js:36` | 客户端**必须自己持久化令牌**（见 §4） |
-| **A6** | **邮件链接的 SPA 回跳是断的**：服务端页面把 JWT 写进 `sessionStorage['loginToken']`，而只有旧 `server/public/app.js:623` 读它，**`apps/web` 不读** | `grep -rn loginToken` 只命中这两处 | 🔴 **本次必须修**（见 §5-W1）：web 要能解析回跳的令牌，否则"点邮件链接即完成登录"在各端都是假的 |
+| **A6** | ~~**邮件链接的 SPA 回跳是断的**~~ **✅ 已修**（W1，`pending-login.ts`）。⚠️ 但**投递方式后来还错过一次**：服务端页面写 `sessionStorage` 跨不过 agent cluster ⇒ 已改成 **URL fragment**（`/app/#sessionToken=…`）。根因、2×2 证据与"别再改回去"的理由见 [`ADR-0039`](../adr/0039-email-first-auth-and-desktop-reverse-authorization.md) §4 第 5 轮 | `grep -rn loginToken` 现在只命中旧 `server/public/app.js` | 已兑现：web 能解析回跳令牌 ⇒"点邮件链接即完成登录"在 web 端成立 |
 | **A7** | **`serverUrl` 不传 ≠ 报错**，而是纯本地 + 同步 `not-configured` | `host.ts:91, 270, 305-309` | **不得**把"没配服务器"渲染成阻塞性错误（会破坏本地优先，也会让 e2e `openApp` 变红） |
 | **A8** | **移动端 5 个 tab 是硬约束** | `TabBar.tsx:51-59` + [ADR-0015](../adr/0015-four-quadrant-as-derived-view.md) §4 / P10 | **不得**把"登录"加成第 6 个 tab |
 
@@ -467,6 +467,16 @@ Test Files  1 failed (1)     Tests  1 failed | 10 passed (11)
 | `apps/web/src/features/auth/AuthPanel.tsx` | 加**仅在 `baseUrl` 为空时出现**的服务端地址输入 ⇒ 顶栏一次点击即可到达可用表单；已配置时不渲染该输入（面板与改动前一致）。复用既有词条 `web.sync.serverUrl.label`，**未新增 i18n**（避免与移动端并行改动争 `packages/i18n`） |
 | `apps/web/tests/signin-entry.spec.tsx` | **新建**，5 条断言（J1 判据） |
 
+> 🔴 **投递方式的更正（第四版，2026-09-30）—— 本条上面的描述是历史记录，读的时候必须带上这段。**
+> W1 第一~三版把会话写进 `sessionStorage`（键 `loginToken` → 会话 JWT → 会话 JWT + 三个键）。
+> **前三版都跨不过那一跳**：确认页由同步服务端渲染，带 `@fastify/helmet` 默认的
+> `Cross-Origin-Opener-Policy: same-origin` + `Origin-Agent-Cluster: ?1`，而应用（静态产物）两个都没有
+> ⇒ 跳过去**切换 browsing instance**，`sessionStorage` 不跟回来（实测读数：确认页 `pagehide` 时键还在、
+> 应用启动时已空，且**没有任何 `removeItem`**）。**现在走 URL `fragment`**，应用读完立刻
+> `history.replaceState` 抹掉。完整 2×2 证据与"为什么不是 localStorage"见
+> [`ADR-0039`](../adr/0039-email-first-auth-and-desktop-reverse-authorization.md) §4 第 5 轮
+> 与 `apps/web/evidence/email-chain/README.md`。
+
 > ⚠️ **后续变动（保持本条为历史记录，不改写）**：入口此后搬过两次 ——
 > 2026-09-29 从顶栏搬到 **rail 顶部账号区**（`AccountMenu`）；
 > 2026-09-30 从"头像旁的 pill"收进**头像菜单第一项**（身份入口唯一化）。
@@ -524,7 +534,8 @@ W3（移动端认证，**实现已完成、真机验收待独占模拟器**）·
 | 决定 | 理由 |
 |---|---|
 | **"前置"= 首屏可发现 + ≤1 次点击可达，不做硬登录墙** | 见 §0 三条理由（本地优先是已接受承诺 / 现有 e2e 断言未登录可用 / 加墙 = 离线不可用） |
-| W1 用 `sessionStorage` 而非把令牌放 URL | 放 URL 会进历史、`Referer` 与访问日志；`sessionStorage` 同源同标签页且随跳转存活 |
+| ~~W1 用 `sessionStorage` 而非把令牌放 URL~~ **（已更正，见下）** | 放 **query** 会进历史、`Referer` 与访问日志 —— 这条理由仍然成立；但"`sessionStorage` 随跳转存活"**在跨 agent cluster 时不成立**（实测） |
+| ✅ **更正（2026-09-30）：投递改用 URL `fragment`** | `fragment` 同样**不进** `Referer`、**不进**服务端日志，而且是 URL 的一部分 ⇒ **跨 agent cluster 一定跟得过来**，**不依赖服务端与反代的头配置一致**。它严格**小于** localStorage（应用启动失败时随标签页消失，不跨重启留着）。⚠️ **别改回 `sessionStorage`** —— ADR-0039 §4 第 5 轮 |
 | W1 **不 `await`** 消费 | 登录是增强路径；为它推迟首屏等于用"能立刻用"换一个可能失败的网络往返 |
 | W2 让 `AuthPanel` 自带地址输入（仅未配置时） | 否则顶栏入口在首次使用时无处可填服务端，"前置"变成"前置到一个走不通的表单" |
 | W2 **不新增 i18n 词条** | 移动端子代理正在改 `packages/i18n`；复用 `web.sync.serverUrl.label` 既够用又避免冲突 |

@@ -33,7 +33,7 @@
 | 动作 | 邮件里的链接 | 点开之后 |
 |---|---|---|
 | 注册 `POST /api/register/magic-link` | `${publicUrl}/verify-email?token=…` → `verificationToken` | 页面**只把邮箱标记为已验证**，给一个"去应用"的链接 —— **不签发会话** |
-| 登录 `POST /api/login/magic-link` | `${publicUrl}/magic-login?token=…` → `loginToken` | 确认页 POST `/api/login/magic-link/verify` → 页面把 JWT 写 `sessionStorage` → 跳 `/app/` |
+| 登录 `POST /api/login/magic-link` | `${publicUrl}/magic-login?token=…` → `loginToken` | 确认页 POST `/api/login/magic-link/verify` → 页面把 JWT 写 `sessionStorage` → 跳 `/app/`（⚠️ 这条投递**跨不过 agent cluster**，见 §4 第 5 轮；已改为 fragment） |
 
 ⇒ 一个新用户**必须收两封邮件**（注册一封、登录一封）才能真正进去。
 而 `requestLoginMagicLink` 又**要求 `isVerified=1`**（`server/src/auth.ts:357`），
@@ -83,12 +83,18 @@
 
 | 消费方 | 落地方式 |
 |---|---|
-| **web** | 确认页把 JWT 写 `sessionStorage['loginToken']` 再跳 `/app/`（沿用既有 `apps/web/src/features/auth/pending-login.ts`） |
+| **web** | 确认页把**已签发的会话**放进 **URL fragment**（`/app/#sessionToken=…&loginBaseUrl=…&loginEmail=…`）再跳 `/app/`；应用读完**立刻** `history.replaceState` 抹掉（`apps/web/src/features/auth/pending-login.ts`）。⚠️ **不是 `sessionStorage`** —— 那一条**跨不过 agent cluster**，见 §4 第 5 轮 |
 | **macOS 壳** | **系统浏览器反向授权**：`ASWebAuthenticationSession` 打开同一个确认页，带 `client=desktop` + `state`；成功后回调 `heyta://auth#token=…&state=…`；壳校验 `state` 后把令牌交给**页侧既有**登录路径 |
 | **Windows 壳** | 同上（等价物：系统默认浏览器 + 自定义协议回调），复用**同一个** `state` 校验与端点 |
 
 🔴 壳**不再**自己做通行密钥（§1.2 已量出那条不可行）。壳只做两件事：
 把浏览器打开到我们的站点、把回调里的令牌交出去。
+
+🔴 **web 与桌面壳的投递方式不同，落地路径是同一条**（`adoptSession()`）：
+web 走 **fragment**（跨 agent cluster），壳走 **`sessionStorage`**（它是在**同一份文档里**
+写、再 `load()`，不存在 cluster 切换）。两条投递、**一套键名**、一个消费点 ——
+不要把它们"统一"成其中任意一条：统一到 `sessionStorage` 就是第 5 轮修掉的那个 bug，
+统一到 fragment 则要动已经验绿的壳侧。
 
 **回跳的两条硬约束**（都落在 `apps/web/src/features/auth/desktop-handoff.ts`）：
 
@@ -223,7 +229,7 @@ AUTH_STATE=signed-in        ← 重载之后独立的菜单 IA 断言确认登�
 
 web 套件 1003 通过、服务端 1806 通过、冒烟全绿。
 
-### 第 4 轮：补上「确认页 → 应用」这条腿的判据（**当前红**）
+### 第 4 轮：补上「确认页 → 应用」这条腿的判据（当时：红）
 
 新增 `scripts/verify-email-web-chain.mjs`：真浏览器 + **真邮件**，走**生产同源拓扑**的本地复刻。
 它已经验过：UI 注册 → 真发一封 → 链接 → 确认页 → 点击 → **POST 200** → 落到 `/app/` 且应用挂载。
@@ -238,3 +244,42 @@ web 套件 1003 通过、服务端 1806 通过、冒烟全绿。
 `.catch` 一吞就只剩"(没抓到)" —— 看起来像"根本没发请求"。改成**同步记状态码**才看见 200。
 
 ⚠️ **尚未验**：真实 SMTP（本机走 Ethereal）、**Windows 壳**、手机号通道（预留）。
+
+### 第 5 轮：那条腿**定位并修掉**了，判据转绿
+
+**根因（仪器读数，不是推断）**：
+
+```
+写入时间线      ：确认页 set sessionToken / loginEmail / loginBaseUrl（真的写了）
+确认页 pagehide ：sessionKeys = [sessionToken, loginEmail, loginBaseUrl]   ← 最后一刻还在
+应用启动那一刻  ：sessionKeys = []                                        ← 没跟过来
+                 （时间线里没有任何 removeItem —— 不是被谁清的）
+```
+
+确认页由同步服务端渲染，带 `@fastify/helmet` 的**默认**头
+`Cross-Origin-Opener-Policy: same-origin` + `Origin-Agent-Cluster: ?1`；
+应用（`/app/`，静态产物）两个头都没有 ⇒ 跳过去**切了 browsing instance**，
+`sessionStorage` 不跟回来（`localStorage` 不受影响 —— 时间线正是靠它才活到 `/app/`）。
+
+⇒ **会话改走 URL `fragment`**：不发给服务端、不进 `Referer`/访问日志，
+是 URL 的一部分所以**一定跨得过去**，且**不依赖服务端与反代的头配置一致**
+（自建换个反代不会再坏一次）。`localhost` 与 `::1` 那类"看起来同源、其实不同源"的坑同理。
+
+**修完的 2×2（每格都有落盘文件，见 `apps/web/evidence/email-chain/README.md`）**：
+
+| 投递 \ 响应头 | 带 COOP/OAC（生产真实形状） | 摘掉 COOP/OAC（注入） |
+|---|---|---|
+| `sessionStorage`（修复前） | 结果类 **❌** | 结果类 ✅ / 结构类 ❌ |
+| `fragment`（现在） | **✅ 全绿** | **✅ 全绿** |
+
+左上红 + 右上绿 ⇒ 因果钉死；左下/右下全绿 ⇒ 修法成立且不依赖头配置。
+另一份 `drop-fragment` 注入让结果类与结构类**一起红** ⇒ 那两格判据是活的。
+
+⚠️ **判据分 `outcome` / `structure` 两类并在总结里分开点名**：右上那格是
+"结果类全绿、结构类红"（用户其实能用，红的是**保证**）。混成一句
+"全链路未通过"会让人以为产品坏了。
+
+⚠️ 三个注入都在**反代里改响应体**，不碰工作区文件；改写**失配当场抛** ——
+静默失配会造出假证据（注入没生效 ⇒ 仍然全绿 ⇒ 我却当成"判据是活的"）。
+
+⚠️ **仍未验**：真实 SMTP、**Windows 壳**、手机号通道（预留）。
