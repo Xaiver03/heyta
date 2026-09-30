@@ -50,7 +50,7 @@
  * `mk-btn`），所以这里**不能**新建 `mk-capture*` 这类族名。
  */
 
-import type { MessageKey } from '@heyta/i18n';
+import type { MessageKey } from '@heyta/i18n/provider';
 
 /**
  * 复刻件输入框里的草稿：**空字符串**。

@@ -28,7 +28,7 @@
  * 硬对齐只会让插图变难看。判据里对此有显式说明（不许把它当缺口来"修"）。
  */
 
-import type { MessageKey } from '@heyta/i18n';
+import type { MessageKey } from '@heyta/i18n/provider';
 
 /** 复刻件热力图的列数（周）。**示意图案**，见文件头。 */
 export const MOCK_HABIT_HEAT_WEEKS = 26;

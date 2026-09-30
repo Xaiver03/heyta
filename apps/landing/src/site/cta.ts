@@ -19,7 +19,7 @@
  * 没配就是「开始自建」→ 首页的自建那一节。
  */
 
-import { type Locale, useLocale } from '@heyta/i18n';
+import { type Locale, useLocale } from '@heyta/i18n/provider';
 import { useMemo } from 'react';
 
 import { startCta, type StartCta } from '../lib/app-url.js';

@@ -20,7 +20,7 @@
 
 import type { ReactNode } from 'react';
 
-import { useI18n } from '@heyta/i18n';
+import { useI18n } from '@heyta/i18n/provider';
 
 import { Nav } from '../components/Nav.js';
 import { Footer } from '../components/Footer.js';

@@ -74,7 +74,7 @@
 import { useMemo } from 'react';
 import { Check, Sparkles, Trash2 } from 'lucide-react';
 
-import { useI18n } from '@heyta/i18n';
+import { useI18n } from '@heyta/i18n/provider';
 
 import { SHOWCASE_TASKS, type ShowcaseDueTone } from './showcase-data.js';
 

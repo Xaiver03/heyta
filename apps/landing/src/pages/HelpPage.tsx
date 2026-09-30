@@ -18,7 +18,7 @@
 import { FaqList } from '../site/FaqList.js';
 import { PageHead } from '../site/PageSections.js';
 import { HELP_MODULES } from '../site/content.js';
-import { useI18n } from '@heyta/i18n';
+import { useI18n } from '@heyta/i18n/provider';
 import type { SitePage } from '../site/pages.js';
 
 export function HelpPage({ page }: { page: SitePage }): React.JSX.Element {

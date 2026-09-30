@@ -17,12 +17,12 @@
  * 放在最后才不会打断"怎么进去"这条主线。
  */
 
-import { useI18n } from '@heyta/i18n';
+import { useI18n } from '@heyta/i18n/provider';
 
 import { appPathHref } from '../lib/app-url.js';
 import { KeyText, PageHead, PageSections, RichText } from '../site/PageSections.js';
 import { SIGNIN_METHODS } from '../site/content.js';
-import type { MessageKey } from '@heyta/i18n';
+import type { MessageKey } from '@heyta/i18n/provider';
 import type { SitePage } from '../site/pages.js';
 
 /**

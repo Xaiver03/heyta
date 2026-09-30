@@ -16,15 +16,30 @@
  * 分派之后交给 `SiteLayout`：导航、页脚、主题都只有那一份。
  * 于是**新增页面拿不到"自己画一个导航"的机会**，也拿不到"忘了放页脚"的机会。
  *
- * 入口 HTML 由 `scripts/gen-entries.mjs` 从同一份注册表生成（12 份 =
- * 6 个页面 × 2 种语言 + 首页两版），所以这里的每一页都有一个**真静态地址**：
- * 首屏不用等 JS、爬虫拿到的是完整 head。
+ * 入口 HTML 由 `scripts/gen-entries.mjs` 从同一份注册表生成，所以这里的每一页
+ * 都有一个**独立地址**，且爬虫拿到的 head 是完整的（title / description /
+ * canonical / hreflang / og / JSON-LD 都在静态 HTML 里）。
+ *
+ * ⚠️ **口径更正（2026-09-28，ADR-0033 §7.1）**：这里原先写的是"首屏不用等 JS"
+ * —— **实测证伪**（生成的入口里 `#root` 是空容器，正文仍由 React 挂载）。
+ * 兑现的是"静态 head + 独立地址"，不是"无 JS 首屏"。
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * 🔴 **按语言动态 import 词条表（R7）**
+ *
+ * 在此之前 `@heyta/i18n` 的根入口同时 import 中英两份表（合计约 **93 KB gz**，
+ * 而主包共约 195 KB gz），于是 `/signin/` 要为它永远用不到的英文表付一半体积。
+ * 现在：
+ *   · hooks 从 `@heyta/i18n/provider` 取（**不含任何表**）；
+ *   · 表按当前入口的语言**动态** import —— 另一种语言的 chunk 根本不会被下载；
+ *   · `I18nCatalogProvider` 的 `catalog` 必填，所以"忘了给表"是编译期错误，
+ *     而不是运行时渲染成另一种语言。
  */
 
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 
-import { I18nProvider } from '@heyta/i18n';
+import { I18nCatalogProvider, type Catalog, type Locale } from '@heyta/i18n/provider';
 
 import '@heyta/design-system/tokens.css';
 import '@heyta/design-system/reset.css';
@@ -46,7 +61,7 @@ if (container === null) {
  * 自动跳转 —— 理由写在 `src/lib/locale.ts` 的文件头（一句话：中英两版要能
  * 各自被收录、各自被分享）。组件树一行都不用知道这件事：`useI18n` 从 context 取。
  */
-const locale = localeFromPath(window.location.pathname);
+const locale: Locale = localeFromPath(window.location.pathname);
 
 /**
  * 当前页面。**认不出就回落到首页**（`pageFromPath` 的契约）——
@@ -56,12 +71,27 @@ const locale = localeFromPath(window.location.pathname);
 const page = pageFromPath(window.location.pathname);
 const Page = PAGE_COMPONENTS[page.id];
 
-createRoot(container).render(
-  <StrictMode>
-    <I18nProvider locale={locale}>
-      <SiteLayout page={page}>
-        <Page page={page} />
-      </SiteLayout>
-    </I18nProvider>
-  </StrictMode>,
-);
+/**
+ * 取当前语言的词条表。
+ *
+ * 🔴 **两个 `import()` 都必须是静态字面量** —— 拼成变量会让打包器无法静态
+ * 分析，于是两份表又都进了主包，而症状是**代码看着对了、包一点没小**。
+ */
+async function loadCatalog(target: Locale): Promise<Catalog> {
+  return target === 'en'
+    ? (await import('@heyta/i18n/en')).en
+    : (await import('@heyta/i18n/zh-CN')).zhCN;
+}
+
+void (async () => {
+  const catalog = await loadCatalog(locale);
+  createRoot(container).render(
+    <StrictMode>
+      <I18nCatalogProvider locale={locale} catalog={catalog}>
+        <SiteLayout page={page}>
+          <Page page={page} />
+        </SiteLayout>
+      </I18nCatalogProvider>
+    </StrictMode>,
+  );
+})();

@@ -46,7 +46,7 @@
  * 手写是不可维护的）。
  */
 
-import { LOCALES, type Locale, type MessageKey } from '@heyta/i18n';
+import { LOCALES, type Locale, type MessageKey } from '@heyta/i18n/provider';
 
 /**
  * 页脚/导航里的分组。

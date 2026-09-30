@@ -18,7 +18,7 @@
 
 import { Coffee, Pause, Play, Square, Zap } from 'lucide-react';
 
-import { useI18n } from '@heyta/i18n';
+import { useI18n } from '@heyta/i18n/provider';
 
 /** SVG 用户单位，**不是 px** —— 实际尺寸由 width/height 的 rem 值决定。 */
 const VIEWBOX = 180;

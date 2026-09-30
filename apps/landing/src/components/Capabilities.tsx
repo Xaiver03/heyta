@@ -23,7 +23,7 @@ import { useMemo } from 'react';
 import { motion } from 'motion/react';
 import { CheckCircle2, CloudOff, Repeat, Sparkles, Zap } from 'lucide-react';
 
-import { useI18n } from '@heyta/i18n';
+import { useI18n } from '@heyta/i18n/provider';
 
 import { revealVariants, staggerContainer, useMotionPreset, VIEWPORT } from '../lib/motion.js';
 
