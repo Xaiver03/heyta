@@ -7,9 +7,10 @@
  * 落地页是**最容易被截图传播**的界面，漏掉这句会让人误以为这是官方产品。
  *
  * ⚠️ 这里原本有三组指向 GitHub 的链接（源码 / 贡献指南 / 路线图 / ADR /
- * 第三方许可证 / 文档索引）。仓库当前是**私有的**，那些链接对任何访客
- * 一律 404 —— 一个「看起来能点、点了是 404」的链接比没有链接更坏，
- * 所以整组摘掉了。加回来的完整清单（别只把图标放回来）见 `Nav.tsx` 顶部。
+ * 第三方许可证 / 文档索引）。仓库私有时期它们一律 404，整组被摘掉过；
+ * **2026-09-29 仓库转公开**，恢复为一个「文档」组 + 品牌列的「在 GitHub 上查看」。
+ * 每个链接的目标都在公开仓库 main 上逐一验过 200 —— 死链接比没有链接更坏。
+ * 恢复清单见 `Nav.tsx` 文件头；地址唯一化在 `lib/repo.ts`。
  *
  * ─────────────────────────────────────────────────────────────────────────
  * 🔴 **分组与链接同样来自站点注册表**（`footerGroups()`），与导航同源。
@@ -26,11 +27,30 @@
  * 链接要等**线上真的能打开**再加（404 的法务链接比没有更坏）。
  */
 
-import { useI18n, useLocale, type MessageKey } from '@heyta/i18n';
+import { Github } from 'lucide-react';
 
+import { useI18n, useLocale, type MessageKey } from '@heyta/i18n/provider';
+
+import { GITHUB_URL } from '../lib/repo.js';
 import { footerGroups, pageById, type SiteGroup } from '../site/pages.js';
 import { siteHref } from '../site/paths.js';
 import { BrandMark } from './BrandMark.js';
+
+/**
+ * 「文档」分组：指向**公开仓库**的文档。它与注册表分组（站点页面）分开写 ——
+ * 注册表管的是"站点有哪些页面"，这些是仓库资源，不是页面；混进注册表
+ * 会让 `footerGroups()` 的类型与 N2 可达性判据都要为外链开洞。
+ * 🔴 每条路径在公开仓库 main 上验过 200 才准进这张表（见文件头）。
+ */
+const DOCS_LINKS: readonly { key: MessageKey; path: string }[] = [
+  { key: 'landing.footer.source', path: '' },
+  { key: 'landing.footer.contributing', path: '/blob/main/CONTRIBUTING.md' },
+  { key: 'landing.footer.deployGuide', path: '/blob/main/docs/runbooks/local-server-verification.md' },
+  { key: 'landing.footer.roadmap', path: '/blob/main/docs/plans/roadmap.md' },
+  { key: 'landing.footer.adr', path: '/tree/main/docs/adr' },
+  { key: 'landing.footer.licenses', path: '/blob/main/THIRD_PARTY_LICENSES.md' },
+  { key: 'landing.footer.docsIndex', path: '/blob/main/docs/README.md' },
+];
 
 /**
  * 分组的标题词条。`SiteGroup` 的三个取值与词条表一一对应。
@@ -73,6 +93,14 @@ export function Footer(): React.JSX.Element {
               <BrandMark />
             </a>
             <p className="lp-footer__tagline">{t('landing.footer.tagline')}</p>
+            <a
+              className="lp-footer__link lp-footer__github"
+              href={GITHUB_URL}
+              rel="noopener noreferrer"
+            >
+              <Github size={16} aria-hidden="true" />
+              {t('landing.footer.viewOnGithub')}
+            </a>
           </div>
 
           {footerGroups().map((entry) => {
@@ -92,6 +120,23 @@ export function Footer(): React.JSX.Element {
               </nav>
             );
           })}
+
+          <nav className="lp-footer__group" aria-label={t('landing.footer.group.docs')}>
+            <h3 className="lp-footer__group-title">{t('landing.footer.group.docs')}</h3>
+            <ul className="lp-footer__links">
+              {DOCS_LINKS.map((link) => (
+                <li key={link.key}>
+                  <a
+                    className="lp-footer__link"
+                    href={`${GITHUB_URL}${link.path}`}
+                    rel="noopener noreferrer"
+                  >
+                    {t(link.key)}
+                  </a>
+                </li>
+              ))}
+            </ul>
+          </nav>
         </div>
 
         <div className="lp-footer__bottom">

@@ -29,41 +29,37 @@
  * 这两条都不是"手写文案"：标签同样来自词条表。
  */
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { motion, useMotionValueEvent, useScroll } from 'motion/react';
-import { Menu, Moon, Sun } from 'lucide-react';
+import { Check, Github, Languages, Menu, Moon, Sun } from 'lucide-react';
 
-import { otherLocale, useI18n, useLocale } from '@heyta/i18n';
+import { LOCALES, useI18n, useLocale } from '@heyta/i18n/provider';
 
 import { startCta } from '../lib/app-url.js';
 import { useMotionPreset } from '../lib/motion.js';
 import type { Theme } from '../lib/theme.js';
 import { navPages, pageById, type SitePage } from '../site/pages.js';
-import { otherLocaleHrefFor, siteHref } from '../site/paths.js';
+import { siteHref } from '../site/paths.js';
 import { BrandMark } from './BrandMark.js';
 
 /**
  * 🔴 这里**曾经**导出 `GITHUB_URL`，导航、首屏、收尾 CTA、页脚全都指向它。
- * 仓库目前是**私有**的，那个链接对任何访客都是 404 —— 所以整条链路摘掉了。
+ * 仓库私有时期那个链接对任何访客都是 404，整条链路被摘掉了；
+ * **2026-09-29 仓库转公开**（`github.com/Xaiver03/heyta`），导航的 GitHub
+ * 图标随之恢复。清单里其余各项的进度：
  *
- * ⚠️ 「摘掉」的范围比链接大：自建区的终端里原本有一行可复制的
- * `git clone https://github.com/Xaiver03/heyta.git`，它同样会把访客送到 404。
- * 现在那里是 `git clone <repo-url>` 占位符。所以**判据是整页文本里不该出现
- * `github.com`**，而不是「不该有指向它的链接」—— `tests/render.spec.tsx`
- * 正是照这个判据断言整页文本的。
- *
- * 公开仓库时要一起做的事（别只把图标放回来）：
- *   1. 这个常量 + 导航的 GitHub 图标 + 首屏 `REPO_URL` + 收尾 CTA 的「先看看代码」
- *      + 页脚的 `viewOnGithub` 与那几组文档链接；
- *   2. `SelfHost.tsx` 的 `git clone <repo-url>` 换成真地址，
- *      并去掉 `landing.selfhost.sourcePending` 那句诚实说明
- *      （源码真的公开了，那句话就不成立了）；
- *   3. 中文词条 `landing.cta.lede` 恢复成「代码是开放的」的说法；
- *   4. `tests/render.spec.tsx` 那条「整页不出现私有仓库地址」换回
- *      「外链必须带 `rel=noopener`」—— 它拦的是原来那个风险，不是这个。
- *
- * ⚠️ 公开仓库还有一条**硬约束**：`.github/workflows/ci.yml` 的 `runs-on`
- * 必须先从自托管 runner 改回 `ubuntu-latest`（见该文件里的说明）。
+ *   ✅ 1a. 本常量 + 导航的 GitHub 图标；
+ *   ✅ 2. `SelfHost.tsx` 的 `git clone` 换成真地址，并移除
+ *      `landing.selfhost.sourcePending` 那句「源码尚未公开」的说明
+ *      （源码公开后它就成了假话）；
+ *   ✅ 1b. 首屏 `REPO_URL`、收尾 CTA 的「先看看代码」、页脚的 `viewOnGithub`
+ *      与文档链接 —— 2026-09-29 随转公开一并恢复（地址唯一化到
+ *      `lib/repo.ts`，本文件不再各写一份）；
+ *   ✅ 3. 中文词条 `landing.cta.lede` 恢复「代码是开放的」的说法 —— 同上；
+ *   ✅ 4. `tests/render.spec.tsx` 那条「整页不出现私有仓库地址」已换成
+ *      「GitHub 外链必须带 `rel=noopener`」；
+ *   ✅ 5. `.github/workflows/ci.yml` 的 `runs-on` 已改回 `ubuntu-latest`
+ *      （自托管 runner + 公开仓库 = 任意 PR 可在自家机器执行代码）。
  *
  * 🔴 另一件事不再是"等仓库公开"：**应用本身的入口**。
  *   这里曾经连"应用部署在哪"都没有一个地方记录 —— 整页 CTA 只落到自建区，
@@ -71,6 +67,8 @@ import { BrandMark } from './BrandMark.js';
  *   （`lib/app-url.ts`）：配了就多出「立即使用」并指向应用，没配就逐字退回
  *   今天的行为。所以**换域名/换主机是一次构建参数，不是一次改代码**。
  */
+import { GITHUB_URL } from '../lib/repo.js';
+
 export function Nav({
   page,
   theme,
@@ -120,28 +118,47 @@ export function Nav({
     theme === 'light' ? t('common.a11y.toDarkTheme') : t('common.a11y.toLightTheme');
 
   /**
-   * 语言切换器。
+   * 语言切换器（globe 下拉）。
    *
-   * 🔴 它显示的是**目标语言自己的文字**（`中文` / `English`），不是把"英文"
+   * 🔴 菜单里每个语言显示**自己的文字**（`中文` / `English`），不是把"英文"
    * 翻译成当前语言。看不懂当前语言的用户，恰恰是最需要找到这个入口的人 ——
    * 把入口的名字写成他看不懂的另一种文字，等于没给入口。
    * 所以 `common.lang.*` 这两条在中英两表里**刻意是同一个词**，
    * 门禁为此开了一个按 key 的白名单（见 scripts/check-ui-language.mjs）。
    *
-   * 🔴 落点是 `otherLocaleHrefFor(page, locale)` —— **保持当前页面、只换语言**。
-   * 这里曾经写死 `/` 或 `/en/`：在 `/features` 上点 English 会被丢回英文首页，
-   * 而地址栏看起来完全合理。见 `src/site/paths.ts` 的文件头。
+   * 🔴 每个菜单项的落点是 `siteHref(page, target)` —— **保持当前页面、只换语言**
+   * （与旧的单链接 `otherLocaleHrefFor` 同一判据；两项都给真地址，
+   * 当前语言那一项是自引用，跳过去等于留在原地）。曾经写死 `/` 或 `/en/`：
+   * 在 `/features` 上切语言会被丢回首页，而地址栏看起来完全合理。
+   * 见 `src/site/paths.ts` 的文件头。
    *
-   * 与主题按钮不同，它是 `<a>` 而不是 `<button>`：切换会整页跳到另一个地址
-   * （理由见 src/lib/locale.ts），刷新、复制链接、前进后退都符合浏览器预期。
+   * 🔴 触发钮是 `<button>`（开合菜单），菜单项是 `<a>`（真导航）——
+   * 切换语言会整页跳转（理由见 src/lib/locale.ts），刷新、复制链接、
+   * 前进后退都符合浏览器预期。打开时：外部点击与 Escape 都收起菜单，
+   * Escape 额外把焦点还给触发钮 —— 菜单消失后焦点不能落进虚空。
    */
-  // 🔴 "另一种语言"只有一份定义（`@heyta/i18n` 的 `otherLocale`，见 R18）：
-  // 这里曾经自己写了一遍 `locale === 'en' ? 'zh-CN' : 'en'`，与 `site/paths.ts`
-  // 各写一份。两份写法漂移的表现是"语言切换器指向自己"（点了没反应）。
-  const targetLocale = otherLocale(locale);
-  const langHref = otherLocaleHrefFor(page, locale);
-  const langLabel = targetLocale === 'en' ? t('common.lang.en') : t('common.lang.zh');
-  const langAria = t('landing.nav.switchLanguage', { language: langLabel });
+  const [langOpen, setLangOpen] = useState(false);
+  const langBoxRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!langOpen) return;
+    const onPointerDown = (event: PointerEvent): void => {
+      if (langBoxRef.current !== null && !langBoxRef.current.contains(event.target as Node)) {
+        setLangOpen(false);
+      }
+    };
+    const onKeyDown = (event: KeyboardEvent): void => {
+      if (event.key !== 'Escape') return;
+      setLangOpen(false);
+      langBoxRef.current?.querySelector('button')?.focus();
+    };
+    document.addEventListener('pointerdown', onPointerDown);
+    document.addEventListener('keydown', onKeyDown);
+    return () => {
+      document.removeEventListener('pointerdown', onPointerDown);
+      document.removeEventListener('keydown', onKeyDown);
+    };
+  }, [langOpen]);
 
   // 只在跨过阈值时改变状态；React 对同值 setState 会 bail out，
   // 所以不会每帧重渲染。
@@ -185,6 +202,17 @@ export function Nav({
         </nav>
 
         <div className="lp-nav__actions">
+          {/* GitHub：仓库公开后恢复的入口（历史与清单见文件头）。
+              与登录一样是外链，`rel` 必须带 noopener（render.spec 的负断言管着）。 */}
+          <a
+            className="lp-iconbtn"
+            href={GITHUB_URL}
+            rel="noopener noreferrer"
+            aria-label={t('landing.nav.github')}
+          >
+            <Github size={18} />
+          </a>
+
           <a className="lp-nav__link lp-nav__signin" href={signinHref}>
             {signinLabel}
           </a>
@@ -202,17 +230,59 @@ export function Nav({
           ) : null}
 
           {/*
-            `hrefLang` 告诉辅助技术与搜索引擎这个链接指向**另一种语言**的页面 ——
-            光看链接文字（`English` / `中文`）看不出这一点。
+            语言切换：globe 触发钮 + 两个语言项的下拉。
+            `hrefLang` 告诉辅助技术与搜索引擎该项指向**哪种语言**的页面 ——
+            光看链接文字（`English` / `中文`）未必看得出这一点。
+            当前语言 `aria-current="true"` 并打勾；勾对纯装饰读屏不重复读
+            （可访问名已经是本名 + aria-current）。
           */}
-          <a
-            className="lp-lang"
-            href={langHref}
-            hrefLang={targetLocale}
-            aria-label={langAria}
-          >
-            {langLabel}
-          </a>
+          <div className="lp-lang" ref={langBoxRef}>
+            <button
+              type="button"
+              className="lp-iconbtn"
+              aria-label={t('landing.nav.languageMenu')}
+              aria-haspopup="menu"
+              aria-expanded={langOpen}
+              onClick={() => setLangOpen((open) => !open)}
+            >
+              <Languages size={18} />
+            </button>
+
+            {langOpen ? (
+              <motion.div
+                className="lp-lang__menu"
+                role="menu"
+                aria-label={t('landing.nav.languageMenu')}
+                initial={
+                  preset.reduced
+                    ? { opacity: 0 }
+                    : { opacity: 0, y: '-0.25rem', scale: 0.97 }
+                }
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                transition={preset.ui}
+              >
+                {LOCALES.map((target) => {
+                  const current = target === locale;
+                  // 语言名用本名（两个词条在中英两表刻意同词，见上方注释）。
+                  const label = target === 'en' ? t('common.lang.en') : t('common.lang.zh');
+                  return (
+                    <a
+                      key={target}
+                      role="menuitem"
+                      className="lp-lang__item"
+                      href={siteHref(page, target)}
+                      hrefLang={target}
+                      {...(current ? { 'aria-current': 'true' as const } : {})}
+                      onClick={() => setLangOpen(false)}
+                    >
+                      <span className="lp-lang__name">{label}</span>
+                      {current ? <Check size={14} aria-hidden="true" /> : null}
+                    </a>
+                  );
+                })}
+              </motion.div>
+            ) : null}
+          </div>
 
           <button
             type="button"
