@@ -174,27 +174,40 @@
   ② 在被跟踪文档里加一条指向未跟踪临时文件的链接 ⇒ 红在 `:279`（跑完删掉，回 exit 0）；
   ③ `PATH` 里没有 git ⇒ 红并说明拒绝给出"通过"的结论。
 
-### ④ 四端重装（AGENTS §6.1.1）—— 跑了，两端因环境红
+### ④ 四端重装（AGENTS §6.1.1）—— **23:16–23:32 那一轮：四端全绿、`REINSTALL_EXIT=0`**
 
-`pnpm reinstall:all` 完整执行（**没用 `--skip`、没降判据**）：
+`bash scripts/reinstall-all.sh` 完整执行（**没用 `--skip`、没用 `--only`、没降判据**；
+全量输出 `/tmp/heyta-reinstall3.txt`，四张截图**都真的打开看过**）：
 
 | 端 | 结论 |
 |---|---|
-| android | ✅ APK 重打 63M → 模拟器全新安装 `Success` → 截图 `contentRatio 0.068` / **主蓝 9279** |
-| ios | ✅ Release 重打 → 全新安装 → **已装的包比源码新** → 截图 `contentRatio 0.066` / **主蓝 9450** |
-| mac | 🔴 `.app` 已重打已签名已装进 `/Applications`，卡在启动判据：`SCShareableContent` 拿不到窗口，而同一进程树里 `screencapture -x` 直接报 `could not create image from display` ⇒ **发起方没有屏幕录制权限** |
-| windows | 🔴 `ssh … 10.111.127.237: No route to host` ⇒ 源码同步没通过 ⇒ **脚本按设计拒绝打包**（宁可不装也不装旧产物） |
+| mac | ✅ 重打 → 公证 `Accepted` → `The staple and validate action worked!` → 装进 `/Applications` → 截图 `2124x1508` / 内容 100.0% / **主蓝 62**（门禁判的是那张 WebView 快照） |
+| windows | ✅ 源码包 14M 送过去 + **sha256 新鲜度对账通过**（`web-dist/index.html=4a0761e2c76f7203…`）→ 远端 `ADD_APPX=OK` / `PAYLOAD_WEBDIST=True` / `M2D=OK` / `RESULT=OK` |
+| android | ✅ APK 重打 63M → 模拟器全新安装 → 截图 `1080x2400` / **主蓝 9279** |
+| ios | ✅ Release 重打 → 全新安装 → **已装的包比源码新** → 截图 `1206x2622` / **主蓝 9450** |
 
-两张截图**人都看过了**：都是 heyta 欢迎页（中文、主蓝「注册 / 登录」），不是错误屏。
-两端要用户处置的路径写在 `BLOCKED.md` 第 4 项 —— ⚠️ **那一版本轮没有提交**：
-`BLOCKED.md` 同时带着另一条线（macOS 存储宿主）未提交的改动，按边界不替它提交。
-在它们提交之前，工作树里那份才是完整的。
+⚠️ **这一节此前写的是"两端因环境红"（mac 无屏幕录制权限 / windows 主机不可达）—— 两条都不是终态，
+而且 mac 那条的归因本身就是错的**：那一轮红在 `swift build`（两个**当时未跟踪**的 Swift 文件），
+`reinstall-all.sh` **第一段就失败**，连打包都没走到。那两个文件后来由它们的**所有者提交了**，
+`swift build` 现在报 `Build complete!`；windows 打包机也已接回。
+完整对账（含"§4 与 §7 在同一文件里互相矛盾、用 `heyta-reinstall2.txt:6` 判掉"那条）写在 `BLOCKED.md` §4 / §7。
+
+读上面这张表必须一起读的**两条**限定：
+
+1. **装的是当前工作树，不是 `origin/main`** —— 本轮工作树仍有 24 处未提交，分属另外两条会话
+   （`apps/desktop-macos/**` 的存储宿主线；`apps/landing/**` + `packages/design-system/**` +
+   `packages/i18n/**` + `packages/ui/**` 的文档中心 / 排版线）。
+2. **mac 的"全新安装"只对视图成立，不对数据成立** —— 那张 WebView 快照里仍看得见
+   另一个会话留下的探测任务（`B-mac-*`），它们落在另一条存储路径上，这次清理没覆盖。
 
 ### 这一轮的门禁现状
 
-`pnpm check` 这条链上，除 `check:macos-window`（上面那条环境原因）之外**全部 exit 0** ——
-包括 `check:ai-e2e`、`check:docs`、`pnpm -r test`（`sync-server` 因沙箱里 `prisma generate`
+`pnpm check` **整条链 exit 0**（22:59:17 那一次，46 段全过，含 `check:macos-window`、
+`check:ai-e2e`、`check:docs`、`pnpm -r test`；`sync-server` 因沙箱里 `prisma generate`
 EPERM 排除，它本身只贡献 1 skipped / 0 passed）。
+⚠️ 这里此前写着"**除 `check:macos-window` 之外**全部 exit 0" —— 那是**旧状态**，
+第 20 段后来在整链里跑绿了（判据行 `STORAGE=shell` / `STORAGE_HOST=on`，
+要核的那一行在 `<tmpdir>/heyta-macos-m2-gate-<pid>.txt`，**不在链日志里**）。
 
 ⚠️ 一次批量里 `check:journey-coverage` / `check:ai-e2e` / `pnpm -r test` **各红过一次**，
 **单独重跑三条全绿** —— 与另一个会话的 `pnpm build`（tsup `clean: true` 会先删 dist）并发撞上去了。
