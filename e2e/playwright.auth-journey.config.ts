@@ -45,7 +45,10 @@ export default defineConfig({
   expect: { timeout: 120_000 },
 
   use: {
-    baseURL: `http://127.0.0.1:${PORT}`,
+    // 🔴 **必须是 `localhost`，不能是 `127.0.0.1`**（2026-09-30）：WebAuthn 的 RP ID
+    // 必须是 origin 的**域名后缀**，而 Chromium **拒收 IP 字面量**做 RP ID
+    // ⇒ 页面跑在 `127.0.0.1` 上时那条旅程根本走不到注册成功。
+    baseURL: `http://localhost:${PORT}`,
     trace: 'retain-on-failure',
     screenshot: 'only-on-failure',
     video: 'retain-on-failure',
@@ -55,12 +58,14 @@ export default defineConfig({
 
   webServer: [
     {
-      // 🔴 `--host 127.0.0.1` 不能省：vite 默认绑 `localhost`，macOS 上常先解析到
-      // `::1`，Playwright 轮询 IPv4 就会"服务起了却等 120 秒超时"。
+      // 🔴 **`--host localhost` 与下面的 `url` 必须用同一个名字。**
+      //    2026-09-29 踩过的是**混用**：vite 绑 `localhost`（macOS 上常先解析到 `::1`），
+      //    而 Playwright 轮询 IPv4 `127.0.0.1` ⇒ "服务起了却等 120 秒超时"。
+      //    现在两侧都是 `localhost`：解析结果一致，谁也不会等谁。
       command:
-        `pnpm --filter @heyta/web exec vite --host 127.0.0.1 --port ${String(PORT)} --strictPort`,
+        `pnpm --filter @heyta/web exec vite --host localhost --port ${String(PORT)} --strictPort`,
       cwd: '..',
-      url: `http://127.0.0.1:${String(PORT)}`,
+      url: `http://localhost:${String(PORT)}`,
       reuseExistingServer: false,
       timeout: 120_000,
     },
