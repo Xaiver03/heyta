@@ -96,56 +96,13 @@ describe('remainingText', () => {
   });
 });
 
-describe('formatMonthTitleText', () => {
-  it('中文「2026年9月」/ 英文「9/2026」', () => {
-    expect(formatMonthTitleText('2026-09-01', translate.bind(null, 'zh-CN'))).toBe('2026年9月');
-    expect(formatMonthTitleText('2026-09-01', translate.bind(null, 'en'))).toBe('9/2026');
-  });
-
-  it('12 月不受"月份 +1"影响（1..12，不是 0..11）', () => {
-    expect(formatMonthTitleText('2026-12-01', translate.bind(null, 'zh-CN'))).toBe('2026年12月');
-    expect(formatMonthTitleText('2026-01-01', translate.bind(null, 'zh-CN'))).toBe('2026年1月');
-  });
-});
-
-describe('formatDayTitleText', () => {
-  it('中文「9月25日 星期五」/ 英文「Fri, 9/25」', () => {
-    // 2026-09-25 是周五。
-    expect(formatDayTitleText('2026-09-25', translate.bind(null, 'zh-CN'))).toBe('9月25日 星期五');
-    expect(formatDayTitleText('2026-09-25', translate.bind(null, 'en'))).toBe('Fri, 9/25');
-  });
-
-  it('周日排在一周最后（`isoWeekday` 里 7 才是周日）', () => {
-    // 2026-09-27 是周日；如果误把 0 当周日，这里会错念成周一。
-    expect(formatDayTitleText('2026-09-27', translate.bind(null, 'zh-CN'))).toBe('9月27日 星期日');
-    expect(formatDayTitleText('2026-09-27', translate.bind(null, 'en'))).toBe('Sun, 9/27');
-  });
-});
-
-describe('WEEKDAY_MESSAGE_KEYS', () => {
-  it('列头是**周一到周日**，与领域层 `monthGrid` 的开头一致', () => {
-    // 手写数组写成周日开头的话，整个日历会整体错位一格，
-    // 而错位后的界面看上去仍然像个正常日历 —— 所以顺序必须被钉住。
-    expect(WEEKDAY_MESSAGE_KEYS.map((key) => translate('zh-CN', key))).toEqual([
-      '一',
-      '二',
-      '三',
-      '四',
-      '五',
-      '六',
-      '日',
-    ]);
-    expect(WEEKDAY_MESSAGE_KEYS.map((key) => translate('en', key))).toEqual([
-      'Mon',
-      'Tue',
-      'Wed',
-      'Thu',
-      'Fri',
-      'Sat',
-      'Sun',
-    ]);
-  });
-});
+/**
+ * ⚠️ `formatMonthTitleText` / `formatDayTitleText` / `WEEKDAY_MESSAGE_KEYS`
+ * 的用例**已随实现搬到** `packages/ui/tests/calendar-date-text.spec.ts`。
+ *
+ * 它们不再留在这里：实现搬了而测试不搬，测试会红；而"在两边各留一份"
+ * 会让下一个人以为实现还在 `lib/date.ts`（那个文件头正好在讲这件事）。
+ */
 
 describe('formatStamp', () => {
   it('纯数字（语言无关），9-26 00:31 这种形状', () => {

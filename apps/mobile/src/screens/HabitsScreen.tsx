@@ -60,7 +60,7 @@
 import React, { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import type { AppHost, HabitActions } from '@heyta/app-host';
 import { createHabitActions, habitGrowth } from '@heyta/app-host';
-import type { CategorySlot, Habit, HabitLog } from '@heyta/domain';
+import type { CategorySlot, Habit, HabitGoalType, HabitLog } from '@heyta/domain';
 import { useI18n } from '@heyta/i18n';
 import { HabitBoard } from '@heyta/ui';
 
@@ -69,6 +69,7 @@ import { habitBoardLabels } from '../lib/habits-display';
 import { useToday } from '../lib/use-today';
 import { useMobileSync } from '../sync/store';
 import { Button, Card, EmptyState, Screen, TextField } from '../ui/kit';
+import { HabitGoalSlot } from '../ui/habit-goal-slot';
 import { HabitColorSlot } from '../ui/slot-picker';
 
 export function HabitsScreen({ onBack }: { onBack: () => void }): React.JSX.Element {
@@ -149,11 +150,38 @@ export function HabitsScreen({ onBack }: { onBack: () => void }): React.JSX.Elem
     [actions, runFor],
   );
 
+  const setHabitGoal = useCallback(
+    (habit: Habit, goal: { target?: number; unit?: string; goalType?: HabitGoalType }) => {
+      if (!actions) return Promise.resolve();
+      // 返回 promise 本身：调用方（HabitGoalSlot）要用它显示失败。
+      return actions.setHabitGoal(habit.id, goal).then(refresh);
+    },
+    [actions, refresh],
+  );
+
   const renderColorSlot = useCallback(
     (habit: Habit): ReactNode => (
       <HabitColorSlot habit={habit} onChoose={(slot) => chooseColor(habit, slot)} />
     ),
     [chooseColor],
+  );
+
+  /**
+   * 目标编辑入口（数值 / 单位 / 达成口径）。
+   *
+   * 🔴 与 `renderColorSlot` 同形：**编辑控件留在各端**，共享的 `HabitBoard`
+   * 只负责让出位置（`renderGoalSlot`）。
+   *
+   * ⚠️ 刻意**不包 `runFor()`**：`runFor` 只 `.finally()`，没有 `.catch` ——
+   * 而 `setHabitGoal` 会 reject（非法数值 / 找不到习惯）。
+   * 交给 `HabitGoalSlot` 自己接住，它才显示得出那行错误
+   *（直接交给 `runFor` 会变成一条 unhandled rejection，用户看到的是"点了没反应"）。
+   */
+  const renderGoalSlot = useCallback(
+    (habit: Habit): ReactNode => (
+      <HabitGoalSlot habit={habit} onSetGoal={(goal) => setHabitGoal(habit, goal)} />
+    ),
+    [setHabitGoal],
   );
 
   /**
@@ -255,6 +283,7 @@ export function HabitsScreen({ onBack }: { onBack: () => void }): React.JSX.Elem
         }}
         busyHabitId={busyId}
         renderColorSlot={renderColorSlot}
+        renderGoalSlot={renderGoalSlot}
         testID="habit-board"
       />
     </Screen>

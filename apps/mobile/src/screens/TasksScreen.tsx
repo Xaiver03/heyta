@@ -44,6 +44,10 @@ import {
   toLocalDate,
 } from '@heyta/domain';
 import { useI18n } from '@heyta/i18n';
+// 🔴 共享捕获件：与 web 用的是**同一份**（识别日期/优先级 + 芯片 + 预览）。
+// 在这一刀之前移动端只有一个纯标题输入框 —— 同一句话在两端建出不同的任务。
+import { CaptureComposer, type CaptureSubmitPlan } from '@heyta/ui';
+import { useCaptureLabels } from '../lib/capture-labels';
 import {
   createProjectActions,
   createTaskActions,
@@ -52,7 +56,8 @@ import {
   type TaskActions,
 } from '@heyta/app-host';
 import { useToday } from '../lib/use-today';
-import { formatDayTitleText } from '../lib/date';
+// 🔴 日期措辞已上移到共享层（见 `lib/date.ts` 文件头）：日历要在四端共用。
+import { formatDayTitleText } from '@heyta/ui';
 import { describeRecurrenceText } from '../lib/recurrence-display';
 import { useText, useTheme, useTokens } from '../theme';
 import {
@@ -105,6 +110,9 @@ import { TaskDetailSheet } from './TaskDetailSheet';
 // 🔴 「四象限」那一档的实现（P10 收敛后**唯一**的实现）——
 // 它是共享 `QuadrantBoard` 的移动宿主，不再是第 6 个 tab 的整屏。
 import { QuadrantScreen } from './QuadrantScreen';
+// 🔴 时间线那一档（`timeline` 整刀第 3 步）：**复用 web 那一份共享实现**
+// （`@heyta/ui` 的 `TimelineView`），本文件只负责挂上去。
+import { TimelineScreen } from './TimelineScreen';
 
 // ─────────────────────────────────────────────────────────────
 // 新建任务面板
@@ -117,25 +125,28 @@ function Composer({
 }: {
   visible: boolean;
   onClose: () => void;
-  onSubmit: (title: string) => Promise<void>;
+  /** 🔴 收的是**共享层解析出来的计划**（title + 可选 dueDate / priority），
+   *  不是一句裸标题 —— 这正是"移动端也有捕获能力"的落点。 */
+  onSubmit: (plan: CaptureSubmitPlan) => Promise<void>;
 }): React.JSX.Element {
   const tokens = useTokens();
-  const text = useText();
-  const { native } = useTheme();
   const { t } = useI18n();
-  const [value, setValue] = useState('');
+  const labels = useCaptureLabels();
   const [busy, setBusy] = useState(false);
 
-  const submit = useCallback(() => {
-    if (value.trim() === '' || busy) return;
-    setBusy(true);
-    void onSubmit(value)
-      .then(() => {
-        setValue('');
+  const submit = useCallback(
+    async (plan: CaptureSubmitPlan) => {
+      if (busy) return;
+      setBusy(true);
+      try {
+        await onSubmit(plan);
         onClose();
-      })
-      .finally(() => setBusy(false));
-  }, [value, busy, onSubmit, onClose]);
+      } finally {
+        setBusy(false);
+      }
+    },
+    [busy, onSubmit, onClose],
+  );
 
   return (
     <Modal
@@ -164,47 +175,29 @@ function Composer({
           }}
         >
           <Text variant="section-title">{t('mobile.tasks.new')}</Text>
-          <TextInput
-            value={value}
-            onChangeText={setValue}
-            placeholder={t('mobile.tasks.composer.placeholder')}
-            placeholderTextColor={tokens['color.foreground-muted']}
+          {/*
+            🔴 **共享 `CaptureComposer`**（与 web 同一份源码）。
+            在这一刀之前，这里是一个纯标题输入框：web 上打「明天交周报」会
+            识别出截止日期，而移动端会建出一条**标题里带"明天"**的任务 ——
+            同一句话在两端建出不同的东西，且两边都不报错。
+
+            · `autoFocus`：面板弹出即该打字（web 是内联在列表顶部，**不能**
+              自动抢焦点，所以那是宿主的参数而不是共享层的默认值）；
+            · 提交后的清空由共享组件自己做（`apply` / `submit` 里都清了草稿）。
+          */}
+          <CaptureComposer
+            labels={labels}
+            onSubmit={submit}
             autoFocus
-            returnKeyType="done"
-            onSubmitEditing={submit}
-            style={[
-              text['row-title'],
-              {
-                minHeight: tokens['touch-target.min'],
-                paddingHorizontal: tokens['space.3'],
-                borderRadius: tokens['radius.md'],
-                borderWidth: tokens['border-width.thin'],
-                borderColor: tokens['color.border'],
-                backgroundColor: tokens['color.surface-sunken'],
-                color: tokens['color.foreground'],
-                // ⚠️ 走归一化访问器。直接传 `tokens['font.sans']` 会把整条 CSS 字体栈
-                // 交给 RN，字体解析失败且**不报错**，屏幕上是条纹乱码（已实测）。
-                fontFamily: native.fontSans,
-              },
-            ]}
+            testID="mobile-capture"
           />
-          <View style={{ flexDirection: 'row', gap: tokens['space.2'] }}>
-            <Button
-              label={t('mobile.common.cancel')}
-              tone="ghost"
-              onPress={onClose}
-              style={{ flex: 1 }}
-            />
-            <Button
-              label={t('mobile.common.add')}
-              tone="primary"
-              icon="task.add"
-              loading={busy}
-              disabled={value.trim() === ''}
-              onPress={submit}
-              style={{ flex: 1 }}
-            />
-          </View>
+          {/* 取消留在这里：共享组件只管"添加"，关闭面板是 modal 的事。 */}
+          <Button
+            label={t('mobile.common.cancel')}
+            tone="ghost"
+            onPress={onClose}
+            style={{ flex: 1 }}
+          />
         </View>
       </KeyboardAvoidingView>
     </Modal>
@@ -255,7 +248,7 @@ export function TasksScreen({
    * 移动宿主）。这里以前手写过一份"按象限分组的四段列表"，P10 收敛时已删除 ——
    * 同一件事有两份呈现 = 两份会各自漂移，而且不会有测试变红。
    */
-  const [view, setView] = useState<'list' | 'quadrant'>('list');
+  const [view, setView] = useState<'list' | 'quadrant' | 'timeline'>('list');
   /**
    * 标签筛选。`undefined` = 不筛。
    *
@@ -278,7 +271,10 @@ export function TasksScreen({
   // 原来是 `useMemo(() => Date.now(), [])` —— 它把"跨零点"这件真事一起冻住了：
   // 应用挂后台一夜、或就一直开着到第二天，界面上的"今天"还是昨天，
   // 于是昨晚到期的任务仍然显示"今天到期"。详见 `lib/use-today.ts` 的文件头。
-  const { now } = useToday();
+  // `today` 给时间线用（它要画"今天"这条参考线，并与块的日期比较）——
+  // 🔴 与 `now` **同源**：分开取一次 `Date.now()` 会在跨零点的瞬间让
+  // "今天是哪天"和"现在几点"指向不同的日子（`useToday` 的文件头记着这条）。
+  const { now, today } = useToday();
   // 同步完成 → `dataRevision` 变 → 下面的 effect 重读物化状态。
   const { dataRevision } = useMobileSync();
 
@@ -676,6 +672,16 @@ export function TasksScreen({
               setView('quadrant');
             }}
           />
+          {/* 🔴 时间线不在底部导航里（P10：5 个平级 tab），而是**「任务」页内的第三档**
+              —— 与象限同一个处置（见 ADR-0015 §4）。三档读的是**同一批任务**，
+              只是呈现不同。 */}
+          <Chip
+            label={t('mobile.tasks.view.timeline')}
+            selected={view === 'timeline'}
+            onPress={() => {
+              setView('timeline');
+            }}
+          />
         </View>
 
         {/* 截止时间两种呈现的开关。
@@ -765,6 +771,17 @@ export function TasksScreen({
               setDetailTaskId(id);
             }}
           />
+        ) : view === 'timeline' ? (
+          /*
+           * 🔴 时间线那一档 = **共享 `TimelineView`**（`./TimelineScreen`）。
+           *
+           * `startDate` 与 `today` **都取 `useToday()` 的同一个 `today`**：
+           * 时间线的"起始日"在这一档就是今天（与 web 的
+           * `startDate={toLocalDate(store.now)}` 同一口径 —— 它也是**一个** now 推出来的）。
+           * 分别取两次 `Date.now()` 会在跨零点的瞬间让"今天在哪"和"从哪天开始排"
+           * 指向两天，而那种 bug 只在午夜那一秒出现。
+           */
+          <TimelineScreen tasks={tasks} startDate={today} today={today} now={now} />
         ) : nothing ? (
           <EmptyState
             icon="group.inbox"
@@ -811,6 +828,7 @@ export function TasksScreen({
           projects={projects}
           tags={tags}
           projectActions={projectActions}
+          tasks={tasks}
           onChanged={refresh}
           now={now}
         />
@@ -820,8 +838,14 @@ export function TasksScreen({
       <Composer
         visible={composerOpen}
         onClose={() => setComposerOpen(false)}
-        onSubmit={async (title) => {
-          await actions.create(title);
+        onSubmit={async (plan) => {
+          // 🔴 只把**解析出来的字段**交给动作层 —— "写哪些键"是
+          // `NewTaskFields` 的事（AGENTS.md §3.5），这里不做第二次换算：
+          // `plan.dueDate` 已经是共享层算好的 epoch ms。
+          await actions.create(plan.title, {
+            ...(plan.dueDate === undefined ? {} : { dueDate: plan.dueDate }),
+            ...(plan.priority === undefined ? {} : { priority: plan.priority }),
+          });
           refresh();
         }}
       />
