@@ -21,6 +21,7 @@
 import { IDBFactory, IDBKeyRange } from 'fake-indexeddb';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
+import { enableModules } from './enable-all-modules.js';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 (globalThis as unknown as { indexedDB: IDBFactory }).indexedDB = new IDBFactory();
@@ -84,6 +85,8 @@ async function waitFor(label: string, cond: () => boolean, timeoutMs = 3000): Pr
 }
 
 beforeEach(async () => {
+  // 这些用例要走「成长/番茄钟/便签」——它们默认是关的（见 enable-all-modules.ts）。
+  enableModules(['growth']);
   __resetOpLogForTests();
   await initOpLog(`category-colors-${Math.random().toString(36).slice(2)}`);
 

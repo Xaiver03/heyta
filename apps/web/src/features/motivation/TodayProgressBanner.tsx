@@ -41,7 +41,7 @@ export function TodayProgressBanner() {
         ⚠️ 共享卡片自身**不带**区域名（它不知道自己是"今日进度"还是别的什么），
         所以这层 `aria-label` 由宿主给 —— 迁移前 `.ht-today` 上就有它。
       */}
-      <section aria-label={t('web.progress.aria')}>
+      <section aria-label={t('web.progress.aria')} className="ht-progress-banner">
         <TodayProgressCard progress={progress} labels={labels} testID="today-progress" />
       </section>
     </HeytaUiProvider>

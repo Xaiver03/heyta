@@ -104,9 +104,25 @@ interface TaskState {
    */
   setQuadrantDrop: (id: string, plan: QuadrantDropPlan) => Promise<void>;
   setDueDate: (id: string, dueDate: number | undefined) => Promise<void>;
+  /**
+   * 顺延：把**逾期**任务推到今天、保留时刻（滴答分组「顺延」同款）。
+   *
+   * 🔴 语义（推到哪、保不保留时刻）在 `app-host` 的 `postponeToToday`，
+   * 界面只说"用户要顺延这一条"。幂等边界（已完成/无日期/不逾期不写 op）
+   * 也由动作层钉死 —— 界面按钮会过时，动作层不会。
+   */
+  postponeToToday: (id: string) => Promise<void>;
   /** 写备注。AI 拆解出的清单就是经这里落到 `Task.note` 的。 */
   setNote: (id: string, note: string | undefined) => Promise<void>;
   moveToProject: (id: string, projectId: string | undefined) => Promise<void>;
+  /**
+   * 改任务的父（子任务）。
+   *
+   * `undefined` = 提为顶级。
+   * 🔴 **失败会 `throw`**（环 / 超深 / 超子数 / 找不到）—— 界面要用
+   * `@heyta/ui` 的 `subtaskRejectionMessageKey` 把它翻成人话，**不许吞掉**。
+   */
+  setParent: (id: string, parentId: string | undefined) => Promise<void>;
   /**
    * 覆盖式设置任务的标签集合（**一次调用 = 一条 op**）。
    *
@@ -115,6 +131,14 @@ interface TaskState {
    * 算出"用户想要的那一组"是界面的事。
    */
   setTags: (id: string, tagIds: string[]) => Promise<void>;
+  /**
+   * 设置重复规则（RFC 5545 RRULE 串）；传 `undefined` 取消重复。
+   *
+   * 🔴 **规则串由调用方从 `Recurrence.*` / `repeatPresetRule()` 构造，不要手拼**
+   * （契约见 `packages/app-host/src/actions.ts` 的 `TaskActions.setRepeat`）。
+   * 锚点（`repeatDtstart`）由 app-host 钉一次，界面不许自己算。
+   */
+  setRepeat: (id: string, rule: string | undefined) => Promise<void>;
   /**
    * 记录用户对一次 AI 建议的处置（采用 / 改后采用 / 拒绝）。
    *
@@ -273,6 +297,9 @@ export const useTaskStore = create<TaskState>((set) => ({
     // 于是"清除"在另一端静默失效。
     await taskActions.setDueDate(id, dueDate);
   },
+  postponeToToday: async (id) => {
+    await taskActions.postponeToToday(id);
+  },
 
   recordAiFeedback: async (input) => {
     await aiFeedbackActions.record(input);
@@ -291,8 +318,20 @@ export const useTaskStore = create<TaskState>((set) => ({
     await taskActions.moveToProject(id, projectId);
   },
 
+  setParent: async (id, parentId) => {
+    // 🔴 **不 catch、不吞**：拒绝原因要一路冒到界面去说清楚。
+    // 领域层把"为什么不行"做成了封闭集合（cycle / depth / …），
+    // 在这里降级成静默空操作就等于把它扔了 —— 而症状是
+    // "用户以为移好了，树没变"，本仓吃过这一类。
+    await taskActions.setParent(id, parentId);
+  },
+
   setTags: async (id, tagIds) => {
     await taskActions.setTags(id, tagIds);
+  },
+
+  setRepeat: async (id, rule) => {
+    await taskActions.setRepeat(id, rule);
   },
 
   setFilter: (filter) => set({ filter }),

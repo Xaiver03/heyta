@@ -26,8 +26,9 @@ import type { ConflictInfo } from '@heyta/sync-client';
 
 import { SyncBar } from '../src/features/sync/SyncBar.js';
 import { useSyncStore } from '../src/features/sync/store.js';
-import { GanttChart } from '../src/features/timeline/GanttChart.js';
-import { TimelineView } from '../src/features/timeline/TimelineView.js';
+import { GanttChart, HeytaUiProvider, type GanttChartProps } from '@heyta/ui';
+import { TimelinePanel } from '../src/features/timeline/TimelinePanel.js';
+import { useTimelineLabels } from '../src/features/timeline/labels.js';
 import type { TimelineEntry } from '@heyta/domain';
 
 const zh = (key: Parameters<typeof translate>[1], vars?: Record<string, string | number>): string =>
@@ -164,6 +165,20 @@ function entry(title: string, durationMinutes: number, startOffsetMinutes = 0): 
   return { title, startOffsetMinutes, durationMinutes, durationSource: 'manual' };
 }
 
+/**
+ * 🔴 共享 `GanttChart` 的英文壳：文案由宿主注入，theme 由 Provider 提供。
+ * 标签走**真的** `useTimelineLabels()`（在 `renderEn` 的 en Provider 之内），
+ * 所以这里断的确实是"调用点真的分支了"，不是在测试里重写一份英文。
+ */
+function GanttEn(props: Omit<GanttChartProps, 'labels'>): React.JSX.Element {
+  const labels = useTimelineLabels();
+  return (
+    <HeytaUiProvider>
+      <GanttChart {...props} labels={labels.gantt} />
+    </HeytaUiProvider>
+  );
+}
+
 describe('时间线 / 甘特图的单数兄弟词条', () => {
   it('gantt.span：1 条是 `1 item`，3 条是 `3 items`', () => {
     expect(en('web.gantt.spanOne', { count: 1, total: '1 h' })).toBe('1 item · total 1 h');
@@ -210,7 +225,7 @@ describe('时间线 / 甘特图的单数兄弟词条', () => {
 
 describe('🔴 调用点真的分支了（不只是"有单数词条"）', () => {
   it('甘特图：1 条走单数', () => {
-    const one = renderEn(<GanttChart entries={[entry('A', 60)]} />);
+    const one = renderEn(<GanttEn entries={[entry('A', 60)]} />);
     expect(one.querySelector('[data-testid="gantt-span"]')?.textContent).toBe(
       '1 item · total 1 h',
     );
@@ -221,7 +236,7 @@ describe('🔴 调用点真的分支了（不只是"有单数词条"）', () => 
 
   it('甘特图：3 条走复数', () => {
     const three = renderEn(
-      <GanttChart
+      <GanttEn
         entries={[entry('A', 60, 0), entry('B', 60, 60), entry('C', 60, 120)]}
       />,
     );
@@ -231,7 +246,7 @@ describe('🔴 调用点真的分支了（不只是"有单数词条"）', () => 
   });
 
   it('时间线：1 条任务的分组名是 `1 task`', () => {
-    const el = renderEn(<TimelineView tasks={[{ id: 't1', title: 'A' }]} />);
+    const el = renderEn(<TimelinePanel tasks={[{ id: 't1', title: 'A' }]} />);
     expect(el.querySelector('[data-testid="timeline-view"]')?.getAttribute('aria-label')).toBe(
       'Timeline: 1 task',
     );
