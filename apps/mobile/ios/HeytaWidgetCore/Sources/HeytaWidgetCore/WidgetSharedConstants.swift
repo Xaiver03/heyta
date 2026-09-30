@@ -22,24 +22,24 @@ import Foundation
  所以这些字符串只能有**一处声明** —— 这就是这一处。
 
  ⚠️ 注意：`keychainAccessGroup` 里的前缀是 **`$(AppIdentifierPrefix)`**，
- 在真实工程里由 entitlements 展开成 `TEAMID.com.heyta.mobile.shared`。
+ 在真实工程里由 entitlements 展开成 `TEAMID.com.heyta.shared`。
  这里存的是**不带 TeamID** 的部分，Keychain 查询时**必须**带上完整形式
  （见 `WidgetKeychainQuery`）—— 直接拿这个常量去查会得到 `errSecMissingEntitlement`。
  这是一个很容易在真机上才发现的坑，所以把完整形式的拼法也放在这里。
  */
 public enum WidgetSharedConstants {
 
-    public static let appGroupId = "group.com.heyta.mobile"
+    public static let appGroupId = "group.com.heyta"
 
-    public static let appBundleId = "com.heyta.mobile"
-    public static let widgetExtensionBundleId = "com.heyta.mobile.WidgetExtension"
+    public static let appBundleId = "com.heyta"
+    public static let widgetExtensionBundleId = "com.heyta.WidgetExtension"
 
     /// Keychain 条目的 service / account。
-    public static let keychainService = "com.heyta.mobile.widget-key"
+    public static let keychainService = "com.heyta.widget-key"
     public static let keychainAccount = "widget-snapshot-key"
 
     /// **不带 TeamID** 的访问组后缀。
-    public static let keychainAccessGroupSuffix = "com.heyta.mobile.shared"
+    public static let keychainAccessGroupSuffix = "com.heyta.shared"
 
     /// 完整的访问组 = `$(AppIdentifierPrefix)` + 后缀。
     ///
