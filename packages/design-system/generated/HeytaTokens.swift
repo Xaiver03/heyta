@@ -171,11 +171,16 @@ enum HeytaTokens {
     static let iconXl: Double = 32  // px
     static let touchTargetMin: Double = 44  // px
     static let focusRingWidth: Double = 2  // px
+    static let layoutRailWidth: Double = 176  // px
     static let layoutSidebarWidth: Double = 240  // px
     static let layoutHeaderHeight: Double = 56  // px
     static let layoutContentMax: Double = 1200  // px
     static let layoutProseMax: String = "65ch"
     static let layoutQuadrantMinHeight: Double = 192  // px
+    static let layoutPanelMaxHeight: Double = 384  // px
+    static let layoutTwoColumnMin: Double = 768  // px
+    static let layoutInputMin: Double = 224  // px
+    static let layoutModalMax: Double = 640  // px
     static let borderWidthThin: Double = 1  // px
     static let borderWidthThick: Double = 2  // px
     static let navTabBarHeight: Double = 64  // px

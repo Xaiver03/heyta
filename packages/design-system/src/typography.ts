@@ -117,6 +117,21 @@ export const TEXT_STYLES = {
     tracking: 'tracking.caption',
   },
   /**
+   * 面板小标题（AI 面板的 `ht-ai__head` 那一行）。
+   *
+   * 🔴 它是从 web 的 `.ht-ai__head` 提取共享组件时**补出来的**：
+   * 那条规则是"面板基础字号（xs）+ `font-weight: 600`"，
+   * 而语义样式里最接近的 `row-title` 是 `font-size.base`（16px）——
+   * 直接用会让面板标题明显变大。与其在共享组件里写裸的 `fontWeight`，
+   * 不如把"小标题"这个**角色**命名出来：角色是稳定的，值可以调。
+   */
+  'panel-title': {
+    size: 'font-size.xs',
+    weight: 'font-weight.semibold',
+    leading: 'line-height.tight',
+    tracking: 'tracking.body',
+  },
+  /**
    * 角标数字（标签栏图标右上角的计数）。
    *
    * 与 `caption` **不合并**，尽管只差 1px：`caption` 是正文里的辅助说明，

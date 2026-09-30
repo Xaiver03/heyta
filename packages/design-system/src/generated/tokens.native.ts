@@ -154,12 +154,17 @@ export interface HeytaNativeTokens {
   readonly 'icon.xl': number;
   readonly 'touch-target.min': number;
   readonly 'focus-ring.width': number;
+  readonly 'layout.rail-width': number;
   readonly 'layout.sidebar-width': number;
   readonly 'layout.header-height': number;
   readonly 'layout.content-max': number;
   /** 相对单位依赖当前字号，无法换算为原生数值常量；已原样导出为字符串。 */
   readonly 'layout.prose-max': string;
   readonly 'layout.quadrant-min-height': number;
+  readonly 'layout.panel-max-height': number;
+  readonly 'layout.two-column-min': number;
+  readonly 'layout.input-min': number;
+  readonly 'layout.modal-max': number;
   readonly 'border-width.thin': number;
   readonly 'border-width.thick': number;
   readonly 'nav.tab-bar-height': number;
@@ -355,11 +360,16 @@ export const lightTokens: HeytaNativeTokens = {
   'icon.xl': 32,
   'touch-target.min': 44,
   'focus-ring.width': 2,
+  'layout.rail-width': 176,
   'layout.sidebar-width': 240,
   'layout.header-height': 56,
   'layout.content-max': 1200,
   'layout.prose-max': "65ch",
   'layout.quadrant-min-height': 192,
+  'layout.panel-max-height': 384,
+  'layout.two-column-min': 768,
+  'layout.input-min': 224,
+  'layout.modal-max': 640,
   'border-width.thin': 1,
   'border-width.thick': 2,
   'nav.tab-bar-height': 64,
@@ -551,11 +561,16 @@ export const darkTokens: HeytaNativeTokens = {
   'icon.xl': 32,
   'touch-target.min': 44,
   'focus-ring.width': 2,
+  'layout.rail-width': 176,
   'layout.sidebar-width': 240,
   'layout.header-height': 56,
   'layout.content-max': 1200,
   'layout.prose-max': "65ch",
   'layout.quadrant-min-height': 192,
+  'layout.panel-max-height': 384,
+  'layout.two-column-min': 768,
+  'layout.input-min': 224,
+  'layout.modal-max': 640,
   'border-width.thin': 1,
   'border-width.thick': 2,
   'nav.tab-bar-height': 64,
