@@ -155,7 +155,7 @@
         "name": "How do I take my data with me?",
         "acceptedAnswer": {
           "@type": "Answer",
-          "text": "Settings → export. The JSON is a complete backup (deleted records included, so you can verify nothing was left behind), plus a readable Markdown copy. Export only for now, no import yet — stated both in the interface and in the file."
+          "text": "All three ends can export: on the web under Settings, on mobile under \"Mine\" via the system share sheet, and export on the command line. But only the web and the CLI can import it back, and only into an empty library — mobile has no import entry point. See \"Taking your data with you\"."
         }
       },
       {
@@ -163,7 +163,7 @@
         "name": "How do I run my own server?",
         "acceptedAnswer": {
           "@type": "Answer",
-          "text": "One docker compose command brings up the full stack. You configure your own secrets and database password (there are no defaults); the guide walks through every step."
+          "text": "You can, but this is \"operate a service yourself\", not one command and you are done: no prebuilt image is published (you build it), bringing the service up is not a deployment (the table-structure changes have to be applied explicitly, once), and you cannot register at all without an email service. See \"Running your own sync server\"."
         }
       },
       {

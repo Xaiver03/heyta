@@ -23,6 +23,7 @@ import type { ComponentType } from 'react';
 
 import { Landing } from '../Landing.js';
 import { ChangelogPage } from './ChangelogPage.js';
+import { DocsArticlePage } from './DocsArticlePage.js';
 import { FeaturesPage } from './FeaturesPage.js';
 import { HelpPage } from './HelpPage.js';
 import { IntegrationsPage } from './IntegrationsPage.js';
@@ -42,4 +43,22 @@ export const PAGE_COMPONENTS: Record<SitePageId, PageComponent> = {
   help: HelpPage,
   changelog: ChangelogPage,
   signin: SigninPage,
+  /**
+   * 🔴 **六篇文章 → 同一个组件**是刻意的，不是偷懒。
+   *
+   * 文章之间的差异全部是**数据**（标题、引言、分区的正文 key），住在注册表里
+   * （`src/site/docs.ts`）；如果每篇各有一个组件，"这一篇的排版跟别人不一样"
+   * 就会变成一个可以悄悄发生的选项 —— 而文档中心的全部价值恰恰在于
+   * **每一篇读起来是同一套东西**（N4）。
+   *
+   * 加一篇文章因此只需要在 `docs.ts` 加一条 + 两张词条表加 key：
+   * 这里必须跟着多写一行（`Record<SitePageId, …>` 会拦住不写的人），
+   * 但写的是同一个名字，所以排版不可能分叉。
+   */
+  how: DocsArticlePage,
+  account: DocsArticlePage,
+  passphrase: DocsArticlePage,
+  conflict: DocsArticlePage,
+  selfhost: DocsArticlePage,
+  transfer: DocsArticlePage,
 };
