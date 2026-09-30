@@ -472,7 +472,7 @@ export async function requestMagicLink(
  */
 export async function registerWithMagicLink(
   options: HostedAuthOptions,
-  input: { email: string; termsAccepted?: boolean },
+  input: { email: string; termsAccepted?: boolean; inviteCode?: string },
 ): Promise<HostedAuthOutcome<{ message: string }>> {
   const normalized = normalizedEmail(input.email);
   if (normalized === undefined) return failure('invalid-input');
@@ -480,6 +480,10 @@ export async function registerWithMagicLink(
   const result = await postJson(options, HOSTED_AUTH_PATHS.magicLinkRegister, {
     email: normalized,
     ...(input.termsAccepted === undefined ? {} : { termsAccepted: input.termsAccepted }),
+    // 🔴 邀请码**原样**发出去，不在客户端归一化：归一化只在
+    // `@heyta/domain` 的 `normalizeInviteCode` 与服务端那一处发生。
+    // 客户端多归一化一次的后果是"两端对同一个输入得到不同结论"。
+    ...(input.inviteCode === undefined ? {} : { inviteCode: input.inviteCode }),
   });
   if (!result.ok) return result;
   return { ok: true, message: readServerMessage(result.body) ?? '' };
@@ -565,7 +569,7 @@ export function extractAuthLinkToken(input: string): string | undefined {
 /** 取注册 options。`credential` 由宿主用平台 API 产出，不在本层。 */
 export async function beginPasskeyRegistration(
   options: HostedAuthOptions,
-  input: { email: string; termsAccepted?: boolean },
+  input: { email: string; termsAccepted?: boolean; inviteCode?: string },
 ): Promise<HostedAuthOutcome<{ options: HostedPasskeyOptions }>> {
   const normalized = normalizedEmail(input.email);
   if (normalized === undefined) return failure('invalid-input');
@@ -573,6 +577,7 @@ export async function beginPasskeyRegistration(
   const result = await postJson(options, HOSTED_AUTH_PATHS.passkeyRegisterOptions, {
     email: normalized,
     ...(input.termsAccepted === undefined ? {} : { termsAccepted: input.termsAccepted }),
+    ...(input.inviteCode === undefined ? {} : { inviteCode: input.inviteCode }),
   });
   if (!result.ok) return result;
 
@@ -584,7 +589,7 @@ export async function beginPasskeyRegistration(
 /** 交回宿主产出的注册 credential。成功只表示"账号建好了"，**令牌还要登录拿**。 */
 export async function completePasskeyRegistration(
   options: HostedAuthOptions,
-  input: { email: string; credential: HostedPasskeyCredential },
+  input: { email: string; credential: HostedPasskeyCredential; inviteCode?: string },
 ): Promise<HostedAuthOutcome<{ message: string }>> {
   const normalized = normalizedEmail(input.email);
   if (normalized === undefined) return failure('invalid-input');
@@ -592,6 +597,10 @@ export async function completePasskeyRegistration(
   const result = await postJson(options, HOSTED_AUTH_PATHS.passkeyRegisterVerify, {
     email: normalized,
     credential: input.credential,
+    // 🔴 **两次调用都要带**：服务端在 `verify` 那一步才拿到 User 行、
+    // 也才绑定邀请（options 那次会收下但不用）。只带一次的后果是
+    // "用通行密钥注册的人永远绑不上邀请码"，而那看起来只是"邀请没生效"。
+    ...(input.inviteCode === undefined ? {} : { inviteCode: input.inviteCode }),
   });
   if (!result.ok) return result;
   return { ok: true, message: readServerMessage(result.body) ?? '' };

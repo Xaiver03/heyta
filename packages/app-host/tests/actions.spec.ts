@@ -12,7 +12,7 @@
  *   3. 列表顺序依赖存储返回顺序 → 同一份数据在两台设备上顺序不同
  */
 
-import { Priority } from '@heyta/domain';
+import { Priority, startOfDay } from '@heyta/domain';
 import { OpLogEngine } from '@heyta/op-log';
 import { DbOpLogStore, INDEXEDDB_SCHEMA, SqliteAdapter } from '@heyta/storage';
 import { NodeSqliteDriver } from '@heyta/storage/sqlite/node';
@@ -372,5 +372,57 @@ describe('setNote', () => {
     const id = await actions.create('x', { note: '旧的' });
     await actions.setNote(id, '新的');
     expect(actions.findTask(id)?.note).toBe('新的');
+  });
+});
+
+describe('postponeToToday（分组「顺延」的写路径）', () => {
+  const DAY = 24 * 60 * 60 * 1000;
+  const NINE_AM = 9 * 60 * 60 * 1000;
+
+  it('🔴 逾期任务推到**今天**且**保留时刻**：昨天 09:00 → 今天 09:00', async () => {
+    const id = await actions.create('逾期的');
+    // 昨天 09:00（相对可控时钟的"今天"零点）。
+    const yesterdayNine = startOfDay(clock) - DAY + NINE_AM;
+    await actions.setDueDate(id, yesterdayNine);
+
+    await actions.postponeToToday(id);
+
+    const task = actions.findTask(id);
+    expect(task?.dueDate).toBe(startOfDay(clock) + NINE_AM);
+    const ops = await opsOf(id);
+    const last = ops[ops.length - 1]!;
+    expect(payloadOf(last)['dueDate']).toBe(startOfDay(clock) + NINE_AM);
+  });
+
+  it('🔴 幂等边界不产生 op：已完成 / 无截止 / 今天到期 / 未来 —— 一条都不写', async () => {
+    const done = await actions.create('已完成');
+    await actions.setDueDate(done, startOfDay(clock) - DAY);
+    await actions.setCompleted(done, true);
+    const doneOps = (await opsOf(done)).length;
+
+    const undated = await actions.create('没日期');
+    const undatedOps = (await opsOf(undated)).length;
+
+    const todayTask = await actions.create('今天到期');
+    await actions.setDueDate(todayTask, startOfDay(clock) + NINE_AM);
+    const todayOps = (await opsOf(todayTask)).length;
+
+    const future = await actions.create('未来');
+    await actions.setDueDate(future, startOfDay(clock) + 3 * DAY);
+    const futureOps = (await opsOf(future)).length;
+
+    await actions.postponeToToday(done);
+    await actions.postponeToToday(undated);
+    await actions.postponeToToday(todayTask);
+    await actions.postponeToToday(future);
+
+    expect((await opsOf(done)).length).toBe(doneOps);
+    expect((await opsOf(undated)).length).toBe(undatedOps);
+    expect((await opsOf(todayTask)).length).toBe(todayOps);
+    expect((await opsOf(future)).length).toBe(futureOps);
+  });
+
+  it('任务不存在时 throw（界面接住显示，动作层不吞）', async () => {
+    await expect(actions.postponeToToday('no-such-task')).rejects.toThrow(/找不到任务/);
   });
 });

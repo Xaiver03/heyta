@@ -32,6 +32,7 @@ import {
   toLocalDate,
   type CategorySlot,
   type Habit,
+  type HabitGoalType,
   type HabitLog,
   type LocalDate,
 } from '@heyta/domain';
@@ -45,6 +46,14 @@ import { randomId } from './ids.js';
 export interface NewHabitFields {
   target?: number;
   unit?: string;
+  /**
+   * 达成口径。
+   *
+   * 🔴 **原来这里没有它** —— 于是新建时就**没有任何办法**指定"最多/恰好"，
+   * 只能拿到默认的 `atLeast`。`Habit` 有 `goalType`、`isAchieved` 三种口径
+   * 全实现了，但**入口一个都没有**：这就是"模型有、界面不可达"的第一层。
+   */
+  goalType?: HabitGoalType;
   color?: string;
   backfillDays?: number;
 }
@@ -73,6 +82,25 @@ export interface HabitActions {
    * 因为"杯"换不成时间，而我们**不猜换算**。
    */
   setHabitColor(entityId: string, slot?: CategorySlot): Promise<void>;
+
+  /**
+   * 改一个习惯的**目标**：数值 / 单位 / 达成口径（三者都可单独改）。
+   *
+   * 🔴 这是「习惯计数型 / 时长型」在**写路径**上缺的那一米：
+   * `Habit` 有 `target` / `unit` / `goalType`，`isAchieved` 把三种口径都实现了，
+   * `checkIn` 也收 `value` —— 但**没有任何动作能改一个已建习惯的目标**
+   *（`createHabit` 只能设初始值，而 `NewHabitFields` 连 `goalType` 都没有）。
+   * ⇒ 界面上只能建"每天做一次"的习惯，**计数型与时长型到不了用户手里**。
+   *
+   * `unit` 传空串（或全是空白）表示**清除单位**，写成 `null`
+   *（与 `setHabitColor` / `setDueDate` 同一条"用 null 穿过 JSON 表达清除"的约定）。
+   *
+   * ⚠️ **一个字段都没传时不写 op** —— 否则"点开又点走"会给每个习惯白写一条空 UPD。
+   */
+  setHabitGoal(
+    entityId: string,
+    goal: { target?: number; unit?: string; goalType?: HabitGoalType },
+  ): Promise<void>;
 
   /**
    * 打卡。省略 `date` 表示**今天**。
@@ -163,6 +191,38 @@ export function createHabitActions(
         opType: OpType.Update,
         // 清除写 `null`（穿过 JSON 表达"清除"），不写"不放这个键"。
         payload: { color: clean === undefined ? null : String(clean) },
+      });
+    },
+
+    async setHabitGoal(entityId, goal) {
+      if (habitOf(entityId) === undefined) throw new Error(`找不到习惯「${entityId}」`);
+
+      // 🔴 数值校验不是"看着别扭"，是**判据会失真**：
+      //    `isAchieved` 是 `value >= target` / `<=` / `===` 这类比较，
+      //    一个负数或 NaN 会让"达成"恒真或恒假，而界面上看不出哪里不对。
+      //    `goalType: 'atMost'` 时 `target: 0` 是**合法**的（"一次都不碰"），所以下界是 0 不是 1。
+      if (goal.target !== undefined && (!Number.isFinite(goal.target) || goal.target < 0)) {
+        throw new Error(`习惯目标必须是不小于 0 的有限数，收到「${String(goal.target)}」`);
+      }
+
+      const payload: Record<string, unknown> = {};
+      if (goal.target !== undefined) payload.target = goal.target;
+      if (goal.unit !== undefined) {
+        const trimmed = goal.unit.trim();
+        // 空串 = **清除**（null），不是留一个空单位 ——
+        // 空单位在界面上会渲染成「1 」，看起来像少了个字。
+        payload.unit = trimmed === '' ? null : trimmed;
+      }
+      if (goal.goalType !== undefined) payload.goalType = goal.goalType;
+
+      // 一个字段都没传 ⇒ 不写 op（空 UPD 是纯粹的噪音）。
+      if (Object.keys(payload).length === 0) return;
+
+      await ctx.dispatch({
+        entityType: 'HABIT' as EntityType,
+        entityId,
+        opType: OpType.Update,
+        payload,
       });
     },
 
