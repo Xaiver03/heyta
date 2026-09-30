@@ -43,7 +43,7 @@
  * 补登记：`QuadrantBoard`。别把下面这层 Provider 删掉。
  */
 
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   DndContext,
   DragOverlay,
@@ -147,6 +147,34 @@ export function QuadrantBoard() {
   const [activeId, setActiveId] = useState<string | undefined>();
   const [overQuadrant, setOverQuadrant] = useState<Quadrant | null>(null);
 
+  /**
+   * 🔴 **两列还是单列 —— 断点读 token，判定听窗口**（goal-layout-audit 页 1：
+   * "不能因为窗口的变化而影响到排版"）。
+   *
+   * 断点值从 `tokens.css` 的 CSS 变量里读（`layout.two-column-min`）——
+   * JS 里不抄一份数字，token 才是单源。RNW 的 `useWindowDimensions` 用的是
+   * `window.screen.width`（物理屏）而不是视口宽（实测 660px 视口它报 1728），
+   * 所以这个判定只能在 web 宿主做 —— 移动端不传，共享层默认单列。
+   */
+  const [twoColumns, setTwoColumns] = useState(false);
+  useEffect(() => {
+    const min = getComputedStyle(document.documentElement)
+      .getPropertyValue('--ht-layout-two-column-min')
+      .trim();
+    // token 没加载（理论上不会）：保持单列的安全默认，**不抄一份数字当兜底**
+    //（裸值会被 check:design 拦 —— 而那道门禁是对的）。
+    if (min === '') return;
+    const query = window.matchMedia(`(min-width: ${min})`);
+    const onChange = (): void => {
+      setTwoColumns(query.matches);
+    };
+    onChange();
+    query.addEventListener('change', onChange);
+    return () => {
+      query.removeEventListener('change', onChange);
+    };
+  }, []);
+
   const tasks = useMemo(() => Object.values(store.entities.tasks), [store.entities.tasks]);
   const labels = useMemo(() => quadrantBoardLabels(t), [t]);
   const handleLabel = useMemo(() => dragHandleLabel(t), [t]);
@@ -226,6 +254,7 @@ export function QuadrantBoard() {
           tasks={tasks}
           now={store.now}
           labels={labels}
+          twoColumns={twoColumns}
           onToggleTask={(taskId) => {
             void store.toggleComplete(taskId);
           }}

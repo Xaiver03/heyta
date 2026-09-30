@@ -14,6 +14,8 @@ import { createRoot } from 'react-dom/client';
 import { StorageError } from '@heyta/storage';
 
 import { App } from './App.js';
+import { consumePendingLogin } from './features/auth/pending-login.js';
+import { useSyncStore } from './features/sync/store.js';
 import { ErrorScreen } from './features/shell/ErrorScreen.js';
 import { storageHintKey } from './features/shell/error-hint.js';
 import { initOpLog } from './features/tasks/store.js';
@@ -49,7 +51,22 @@ const root = createRoot(container);
  * ⚠️ 这**不是**一个功能开关，也不该被产品代码引用 ——
  * 它是给 `scripts/verify-universal-slice.sh` 用的确定性挂载点。
  */
-if (new URLSearchParams(window.location.search).has('slice')) {
+if (new URLSearchParams(window.location.search).has('shell')) {
+  /**
+   * 🔴 M2-B 验证入口（`?shell=1`）：共享 UI 渲染**原生壳推过来的真数据**。
+   *
+   * 与 `?slice=1` 的分工：切片用**固定种子**回答"能不能渲染"（M2-A）；
+   * 这个入口回答"壳能不能把它自己的数据交过来"（M2-B）。
+   * 详见 `dev/shell-host.tsx`。
+   */
+  import('./dev/shell-host.js').then(({ ShellHost }) => {
+    root.render(
+      <StrictMode>
+        <ShellHost />
+      </StrictMode>,
+    );
+  });
+} else if (new URLSearchParams(window.location.search).has('slice')) {
   import('./dev/universal-slice.js').then(({ UniversalSlice }) => {
     root.render(
       <StrictMode>
@@ -78,6 +95,37 @@ if (new URLSearchParams(window.location.search).has('slice')) {
        * 它自己吞掉所有失败（见 `pwa/lifecycle.ts`）：组件是增强，不是功能前提。
        */
       startWidgetLifecycle();
+
+      /**
+       * W1：消费**邮件登录链接**带回来的令牌。
+       *
+       * 🔴 它修的是一个静默失效：服务端确认页把 JWT 写进 `sessionStorage['loginToken']`
+       * 之后跳回应用，而**此前没有任何应用代码读它** —— 用户在邮件里"登录成功了"，
+       * 回到应用仍是未登录，且界面不报任何错。
+       *
+       * 🔴 **不 `await`、不阻塞渲染**，理由与 `registerWidgetServiceWorker()` 同源：
+       * 本地优先下"未登录"是**合法状态**而不是故障。为了登录去推迟首屏，
+       * 等于把"能立刻用"换成"等一个网络往返"，而那个往返失败时用户什么也没得到。
+       * 函数内部自己吞掉所有失败（见 `pending-login.ts`），所以这里不需要 catch。
+       *
+       * ⚠️ 顺序：必须在 `initOpLog()` **之后** —— 登录成功会立刻触发同步，
+       * 而同步要在 op-log 就绪后才能安全落盘（与 `startWidgetLifecycle` 同一个理由）。
+       */
+      void consumePendingLogin();
+
+      /**
+       * #10：**实时同步通道**。
+       *
+       * 🔴 必须在 `initOpLog()` 之后 —— 建连要拿 `engine.clientId`。
+       * 冷启动时地址与令牌是从磁盘读回来的，所以这一步是
+       * "刷新之后实时同步还在不在"的唯一保证（少了它，用户重新登录一次才能好，
+       * 而那让缺陷看起来像随机失灵）。
+       *
+       * ⚠️ **不 `await`、不阻塞渲染**：实时通道是**增强** ——
+       * 它没连上时同步仍然会在用户动作时正常发生，只是不会"自动很快"。
+       * 为它推迟首屏不值得。
+       */
+      useSyncStore.getState().startRealtime();
 
       root.render(
         <StrictMode>

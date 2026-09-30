@@ -25,6 +25,7 @@ import { useShallow } from 'zustand/react/shallow';
 import { AlertTriangle, RotateCcw, Trash2, X } from 'lucide-react';
 
 import { useI18n, type Locale } from '@heyta/i18n';
+import { HeytaUiProvider, TrashBoard } from '@heyta/ui';
 
 import { selectTrashedTasks, useTaskStore } from '../tasks/store.js';
 
@@ -81,56 +82,42 @@ export function TrashView(): React.JSX.Element {
 
   return (
     <section className="ht-trash" aria-label={t('web.trash.nav')}>
-      <p className="ht-trash__intro">{t('web.trash.intro')}</p>
-
-      {trashed.length === 0 ? (
-        <div className="ht-empty" data-testid="trash-empty">
-          <Trash2 className="ht-empty__icon" size={40} aria-hidden="true" />
-          <p className="ht-empty__title">{t('web.trash.empty.title')}</p>
-          <p className="ht-empty__hint">{t('web.trash.empty.hint')}</p>
-        </div>
-      ) : (
-        <ul className="ht-trash__list" data-testid="trash-list">
-          {trashed.map((task) => (
-            <li
-              key={task.id}
-              className="ht-trash__item"
-              data-testid={`trash-item-${task.id}`}
-            >
-              {/* 用户自己的字：原样显示、不翻译。 */}
-              <span className="ht-trash__title">{task.title}</span>
-              <span className="ht-trash__time">
-                {t('web.trash.deletedAt', {
-                  date: formatDeletedAt(task.deletedAt ?? task.updatedAt, locale),
-                })}
-              </span>
-              <span className="ht-trash__actions">
-                <button
-                  type="button"
-                  className="ht-btn ht-btn--ghost"
-                  aria-label={t('web.trash.restore', { title: task.title })}
-                  data-testid={`trash-restore-${task.id}`}
-                  onClick={() => {
-                    void restoreTask(task.id);
-                  }}
-                >
-                  <RotateCcw size={16} aria-hidden="true" />
-                </button>
-                {/* 这一下**不删**，只打开确认框 —— 不可逆动作必须二次确认。 */}
-                <button
-                  type="button"
-                  className="ht-btn ht-btn--ghost ht-btn--danger"
-                  aria-label={t('web.trash.purge', { title: task.title })}
-                  data-testid={`trash-purge-${task.id}`}
-                  onClick={() => setConfirmingId(task.id)}
-                >
-                  <Trash2 size={16} aria-hidden="true" />
-                </button>
-              </span>
-            </li>
-          ))}
-        </ul>
-      )}
+      {/*
+        🔴 **列表来自共享 `TrashBoard`**（与移动端同一份）。
+        在此之前两端各写了一份回收站行 —— 而它们的漂移不会报错。
+        ⚠️ 确认弹窗**不共享**：它是真的平台差异（这里是自绘 dialog + 焦点陷阱，
+        移动端是原生 Modal），所以本板只把 `onPurge` 交出去。
+      */}
+      {/*
+        🔴 **必须包 `HeytaUiProvider`**：共享板会 `useHeytaTokens()`，
+        而缺了它会在**运行时**抛「useHeytaUiTheme 必须在 <HeytaUiProvider> 内使用」——
+        报错指向 provider，不指向这里。
+        ⚠️ 这个坑本仓踩过两次（focus 与 quadrant），所以 `check:ui-provider`
+        有一条判据专门扫这个；`TrashBoard` 已在它的登记里。
+      */}
+      <HeytaUiProvider>
+        <TrashBoard
+          items={trashed}
+          labels={{
+            intro: t('web.trash.intro'),
+            emptyTitle: t('web.trash.empty.title'),
+            emptyHint: t('web.trash.empty.hint'),
+            // ⚠️ 收**整条任务**：`deletedAt ?? updatedAt` 那条回退规则两端必须一致。
+            deletedAt: (task) =>
+              t('web.trash.deletedAt', {
+                date: formatDeletedAt(task.deletedAt ?? task.updatedAt, locale),
+              }),
+            restore: (task) => t('web.trash.restore', { title: task.title }),
+            purge: (task) => t('web.trash.purge', { title: task.title }),
+          }}
+          onRestore={(id) => {
+            void restoreTask(id);
+          }}
+          // 🔴 这一下**不删**，只打开确认框 —— 不可逆动作必须二次确认。
+          onPurge={setConfirmingId}
+          testID="trash-board"
+        />
+      </HeytaUiProvider>
 
       {pending !== undefined && (
         <div role="presentation" className="ht-trash__overlay">

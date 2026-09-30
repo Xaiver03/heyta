@@ -100,7 +100,8 @@ describe('根组件', () => {
       e.textContent?.trim(),
     );
     expect(tabs).toContain('任务');
-    expect(tabs).toContain('设置');
+    // ⚠️ 「设置」**不在这组里** —— 它在头像菜单后面（见 `openSettingsViaAvatar`）。
+    expect(tabs, '设置不该再是 rail 上的 tab').not.toContain('设置');
     expect(
       container.querySelector('input[placeholder^="添加任务"]'),
       '空库时捕获框仍然要在，否则用户没有入口开始',
@@ -134,8 +135,10 @@ describe('侧栏导航', () => {
 
   /** 侧栏里按可访问名找一项。找不到就返回 undefined —— 由调用方断言。 */
   function navEntry(el: HTMLElement, label: string): HTMLButtonElement | undefined {
+    // ⚠️ 前缀匹配而不是全等：2026-09-30 起范围列带**计数**（滴答同款，
+    //    "今天 13"），textContent = 标签 + 计数 —— 全等会永远找不到。
     return [...el.querySelectorAll<HTMLButtonElement>('button.ht-nav__item')].find(
-      (b) => b.textContent?.trim() === label,
+      (b) => b.textContent?.trim().startsWith(label),
     );
   }
 
@@ -223,11 +226,23 @@ describe('侧栏导航', () => {
     ).toContain('已归档的那件事');
   });
 
-  it('🔴 在别的视图点侧栏筛选，会切回任务视图（否则看起来是"点了没反应"）', async () => {
+  /**
+   * 🔴 侧栏（范围列）**只属于任务视图** —— 2026-09-29 的 IA 改动。
+   *
+   * 原来这条测试的断言是「在**别的视图**点侧栏筛选会切回任务视图」，
+   * 那预设了"侧栏在所有视图下都渲染"。而那个预设正是 IA 混乱的一部分：
+   * 每个视图左边都挂着一列**跟它无关**的任务筛选
+   *（`dida-view-unification.md` §1.3：滴答的四象限/日历/习惯视图里侧栏是**消失**的）。
+   *
+   * 现在侧栏只在有范围的视图里出现，所以「在别的视图点它」这个场景**不可达** ——
+   * 于是这条测试改成钉**新的正确行为**，而且仍然保留它原本要保护的东西：
+   * 「筛选导航同时也是视图切换」这件事没变。
+   */
+  it('🔴 范围列只属于任务视图，且点它会切回任务视图（"点了没反应"的反面）', async () => {
     await freshDb();
     await mount();
 
-    // 先离开任务视图。视图 tab 是互斥的一组 `role=tab`。
+    // 先离开任务视图。视图在 **rail** 里（不是顶栏 —— 见 IA 那一组断言）。
     const habitsTab = [...container!.querySelectorAll<HTMLButtonElement>('button[role="tab"]')].find(
       (b) => b.textContent?.trim() === '习惯',
     );
@@ -240,16 +255,30 @@ describe('侧栏导航', () => {
       container!.querySelector('.ht-header__title')?.textContent?.trim() ?? '';
     expect(titleEl()).toBe('习惯');
 
-    // 侧栏在所有视图下都渲染，而它的每一项都是**任务筛选**。
+    // 🔴 习惯视图里**没有**范围列（有的话就是"挂着一列跟它无关的东西"）。
+    expect(
+      container!.querySelector('.ht-sidebar'),
+      '习惯视图不该有任务范围列',
+    ).toBeNull();
+    // 也确认「收集箱」确实**不在这一屏**（不只是类名换了）
+    expect(
+      [...container!.querySelectorAll('button')].some((b) => b.textContent?.trim() === '收集箱'),
+      '收集箱不该出现在习惯视图里',
+    ).toBe(false);
+
+    // 回到任务视图 ⇒ 范围列回来，且点它仍然只是"换个筛选"。
+    const tasksTab = [...container!.querySelectorAll<HTMLButtonElement>('button[role="tab"]')].find(
+      (b) => b.textContent?.trim() === '任务',
+    );
+    await act(async () => {
+      tasksTab!.click();
+    });
     const inbox = navEntry(container!, '收集箱');
     expect(inbox).toBeDefined();
     await act(async () => {
       inbox!.click();
     });
-
-    // 判据是**标题**：它跟视图走（见 `VIEW_TITLED_BY_TAB`）。
-    // 修之前这里仍是「习惯」—— 筛选真的变了，但当前视图根本不读它。
-    expect(titleEl(), '点侧栏筛选应当切回任务视图，而不是停在原视图').toBe('收集箱');
+    expect(titleEl(), '点收集箱之后标题应当跟着筛选走').toBe('收集箱');
   });
 
   /**
@@ -407,15 +436,8 @@ describe('应用 → 站点：孤岛的另一半', () => {
   /** 切到设置视图，返回设置页正文里的站内链接。 */
   async function openSettings(): Promise<HTMLAnchorElement[]> {
     await mount();
-
-    const tab = [
-      ...container!.querySelectorAll<HTMLButtonElement>('button[role="tab"]'),
-    ].find((b) => b.textContent?.trim() === '设置');
-    expect(tab, '找不到「设置」视图 tab').toBeDefined();
-
-    await act(async () => {
-      tab!.click();
-    });
+    // 设置收进了头像菜单（见 `openSettingsViaAvatar`）。
+    await openSettingsViaAvatar(container!);
 
     return [...container!.querySelectorAll<HTMLAnchorElement>('[data-testid="about-links"] a')];
   }
@@ -456,5 +478,222 @@ describe('应用 → 站点：孤岛的另一半', () => {
     // 一个点了不会生效的按钮比没有按钮更坏（同 `Pricing.tsx` 不放"立即购买"）。
     const buttons = [...(panel?.querySelectorAll('button') ?? [])];
     expect(buttons.map((b) => b.textContent?.trim())).toEqual([]);
+  });
+
+  /**
+   * 🔴 从滴答清单导入（B2-1）的**接线断言**。
+   *
+   * 与上面那条同一条判据：`TickTickImportPanel` 自己的 5 条测试再全，
+   * 把它从 `App.tsx` 的 settings 分支里删掉，它们**一个都不会红** ——
+   * 而用户就再也找不到这个入口。"零件齐、最后一米没接"是本仓库最高发的形状，
+   * 所以入口的有无必须由**整个 App** 来答。
+   */
+  it('🔴 设置页里真的有「从滴答清单导入」入口（不是只有一个孤立的面板组件）', async () => {
+    await openSettings();
+    expect(
+      container!.querySelector('[data-testid="ticktick-import-panel"]'),
+      '设置页里缺少从滴答清单导入的入口 —— B2-1 的逻辑层因此没有调用点',
+    ).not.toBeNull();
+  });
+});
+
+
+/**
+ * 挂载 `<App />`（用**线上同一个** `LocaleHost`，与上面几条用例一致）。
+ *
+ * ⚠️ 抽成辅助只是为了下面那一组 IA 断言不用把 6 行样板抄四遍；
+ * 挂载方式与上面**逐字相同**，没有第二份接线。
+ */
+/**
+ * 经**头像菜单**进设置页。
+ *
+ * 🔴 2026-09-29 起「设置」**不在 rail 上**了 —— 它收进了左侧顶部的头像
+ *（滴答的做法：rail 是每天点几十次的地方，设置是低频的）。
+ * 所以任何"去设置页"的测试都必须走这条路，而不是找 `role=tab` 里那个「设置」。
+ */
+async function openSettingsViaAvatar(el: HTMLElement): Promise<void> {
+  const avatar = el.querySelector<HTMLButtonElement>('[data-testid="account-menu-avatar"]');
+  expect(avatar, '找不到头像').not.toBeNull();
+  await act(async () => {
+    avatar!.click();
+  });
+  const item = el.querySelector<HTMLButtonElement>('[data-testid="account-menu-settings"]');
+  expect(item, '头像菜单里没有「设置」').not.toBeNull();
+  await act(async () => {
+    item!.click();
+  });
+}
+
+async function mountApp(): Promise<{ container: HTMLDivElement }> {
+  container = document.createElement('div');
+  document.body.appendChild(container);
+  root = createRoot(container);
+  await act(async () => {
+    root?.render(
+      <LocaleHost>
+        <App />
+      </LocaleHost>,
+    );
+  });
+  return { container };
+}
+
+/**
+ * 信息架构：视图在 rail、范围在 sidebar、顶栏只放标题与动作
+ * ===========================================================
+ *
+ * 🔴 这一组钉的是 2026-09-29 那次 IA 改动（`dida-view-unification.md` §4.4），
+ * 而它防的是一类**具体且已经发生过**的退化：
+ *
+ *   1. **视图 tab 被搬回顶栏**。搬回去的直接后果是可测的：
+ *      `showcase-fidelity-audit.md` §6.3 实测 1280px 下 8 个 tab 只完全可见 5 个
+ *      （现在有 9 个）。顶栏是**水平**的，可见宽度有上界；rail 是竖的，没有。
+ *   2. **sidebar 在所有视图都画出来**。它只该出现在**有范围的视图**里
+ *      （目前只有「任务」）—— 滴答也是这样：四象限/日历/习惯视图里侧栏直接消失。
+ *      全都画出来的症状是"每个视图左边都挂着一列跟它无关的东西"。
+ *   3. **「四象限」再次变成两个东西**（视图 + 任务筛选）—— 见下面那条断言。
+ */
+describe('信息架构：rail / sidebar / header 的分工', () => {
+  it('🔴 视图 tab 在 **rail** 里，而**顶栏里一个都没有**', async () => {
+    const { container } = await mountApp();
+
+    const rail = container.querySelector('.ht-rail');
+    expect(rail, '没有 rail').not.toBeNull();
+    // 🔴 **默认 7 个 `role=tab`** = 6 个视图（任务/搜索/日历/四象限/习惯/时间线）+ 1 个工具（回收站）。
+    // 「搜索」是**常驻**的（不是功能模块，不给关）—— ⚠️ 它在 DOM 里排在那 5 个之后，
+    // 所以下面只数个数；顺序由 e2e 的 `TABS` 逐字钉住。
+    // 不是 10 —— 10 是"所有功能模块都打开"时才有的数量（见 `shell/modules.ts`）。
+    //
+    // ⚠️ **「设置」与「帮助」都不在这个数里**：
+    //   · 设置收进了**头像菜单**（滴答的做法）；
+    //   · 帮助是**动作**（它切到设置页），而动作**不该是 `role=tab`** ——
+    //     `role=tab` 的元素必须是"切视图"那一类。
+    // 两者都在 rail 上，只是不是 tab。
+    // 🔴 **逐字对标签**，不只是数个数。
+    //
+    // ⚠️ 这一条原本**只数个数**，于是「搜索」被我**硬编码**进 JSX 时它照样绿 ——
+    // 而那道改动同时让 `apps/landing` 的外壳对账（读的是 `App.tsx` 的常量数组）
+    // 也照样绿。**两条判据都没看见多出来的那个按钮**，是人工比对才发现的。
+    // 把期望写死在这里，是成本最低、又能真正盖住"有人在 rail 上顺手加了个按钮"
+    // 这一失效模式的做法。
+    //
+    // 默认 = 5 个模块视图（任务/日历/四象限/习惯/时间线，顺序同 `MODULE_VIEW_TABS`）
+    //        + 常驻的「搜索」（排在上段最后）+ 下段工具「回收站」。
+    const railLabels = [...rail!.querySelectorAll('button[role="tab"]')].map((b) =>
+      (b.textContent ?? '').trim(),
+    );
+    expect(railLabels, '默认 rail 的标签与顺序').toEqual([
+      '任务',
+      '日历',
+      '四象限',
+      '习惯',
+      '时间线',
+      '搜索',
+      '回收站',
+    ]);
+
+    const header = container.querySelector('.ht-header');
+    expect(header, '没有 header').not.toBeNull();
+    expect(
+      header!.querySelectorAll('button[role="tab"]').length,
+      '顶栏里又出现了视图 tab —— 它们在窄屏上装不下（见这条测试的文件头）',
+    ).toBe(0);
+  });
+
+  it('🔴 「任务」视图有 sidebar（收集箱/今天/已完成…）', async () => {
+    const { container } = await mountApp();
+    const sidebar = container.querySelector('.ht-sidebar');
+    expect(sidebar, '任务视图应当有范围列').not.toBeNull();
+    expect(sidebar!.textContent ?? '').toContain('收集箱');
+  });
+
+  it('🔴 没有范围的视图（设置）**不画 sidebar**', async () => {
+    const { container } = await mountApp();
+    await openSettingsViaAvatar(container);
+
+    expect(
+      container.querySelector('.ht-sidebar'),
+      '设置视图不该有范围列 —— 那列东西与它无关',
+    ).toBeNull();
+  });
+
+  it('侧栏那一节叫「四象限」，且四个象限都在（产品负责人 2026-09-29 定的名字）', async () => {
+    const { container } = await mountApp();
+    const sidebar = container.querySelector('.ht-sidebar');
+    const text = sidebar!.textContent ?? '';
+    // 🔴 名字就应该是「四象限」—— 侧栏列的就是那四个象限，名字直说。
+    //
+    // ⚠️ 我一度改成「按象限筛选」（理由是它与 rail 里的**四象限视图**同名，
+    //    而点它其实会 `setView('tasks')`）。产品负责人否掉了那个改法：
+    //    **同名冲突是真的，但解法不是把用户认得的词从侧栏拿掉。**
+    expect(text, '侧栏那节应当叫「四象限」').toContain('四象限');
+    for (const q of ['重要且紧急', '重要不紧急', '紧急不重要', '不重要不紧急']) {
+      expect(text, `缺少象限「${q}」`).toContain(q);
+    }
+  });
+});
+
+/**
+ * 功能模块开关：**关掉的模块从 rail 上消失**
+ * =============================================
+ *
+ * 🔴 产品负责人 2026-09-29：「左边的侧边栏那个按钮应该尽可能地减少」+
+ * 看完滴答设置页后「就是这样子的自定义也可以」。这一组钉的就是后半句 ——
+ * 默认少（上面那条已经钉住），**而且用户能自己再关**。
+ *
+ * ⚠️ 判据是 **DOM 里有几个 `button[role=tab]`**，不是"有没有被 CSS 藏起来"。
+ * 两者的差别是屏幕阅读器还念不念它、Tab 键还停不停在它上面 ——
+ * 而"视觉上没了、键盘还能摸到"正是最容易被当成"已经删掉"的假象。
+ */
+describe('功能模块：关掉的模块从 rail 消失', () => {
+  const railTabLabels = (el: HTMLElement): string[] =>
+    [...el.querySelectorAll('.ht-rail button[role="tab"]')].map((b) => b.textContent?.trim() ?? '');
+
+  /** 开/关一个模块（设置页里的那个 checkbox）。 */
+  async function toggleModule(el: HTMLElement, key: string): Promise<void> {
+    await openSettingsViaAvatar(el);
+    const box = el.querySelector<HTMLInputElement>(`[data-testid="feature-modules-${key}"]`);
+    expect(box, `设置页里没有 ${key} 的开关`).not.toBeNull();
+    await act(async () => {
+      box!.click();
+    });
+  }
+
+  it('默认开着「四象限」，可以关掉 —— 关掉之后 rail 上就没有它了', async () => {
+    const { container } = await mountApp();
+    expect(railTabLabels(container), '四象限默认应当是开的').toContain('四象限');
+
+    await toggleModule(container, 'quadrant');
+
+    expect(railTabLabels(container), '关掉之后 rail 上不该还有四象限').not.toContain('四象限');
+  });
+
+  it('默认关着「番茄钟」，可以打开 —— 打开之后 rail 上出现它', async () => {
+    const { container } = await mountApp();
+    expect(railTabLabels(container), '番茄钟默认应当是关的').not.toContain('番茄钟');
+
+    await toggleModule(container, 'focus');
+
+    expect(railTabLabels(container), '打开之后 rail 上应当出现番茄钟').toContain('番茄钟');
+  });
+
+  it('🔴 「任务」「回收站」「设置」**不给关**（它们不是功能模块）', async () => {
+    const { container } = await mountApp();
+    await openSettingsViaAvatar(container);
+    for (const key of ['tasks', 'trash', 'settings']) {
+      expect(
+        container.querySelector(`[data-testid="feature-modules-${key}"]`),
+        `${key} 不该出现在功能模块的开关里`,
+      ).toBeNull();
+    }
+  });
+
+  it('🔴 开关写进了设备本地偏好（重开还在）', async () => {
+    const { container } = await mountApp();
+    await toggleModule(container, 'quadrant');
+    // 存的是**显式覆盖**，不是整个集合（见 modules.ts 的说明）。
+    const raw = localStorage.getItem('heyta.shell.modules');
+    expect(raw, '开关没有落盘').not.toBeNull();
+    expect(JSON.parse(raw!)).toMatchObject({ quadrant: false });
   });
 });
