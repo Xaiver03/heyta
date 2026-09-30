@@ -82,6 +82,26 @@ function matchUntrackedOk(relTarget) {
 }
 
 /**
+ * 一条相对链接的**判决表**（纯函数 —— 全部六种结局由本文件末尾的 `assertSelfTest` 逐行钉住）。
+ *
+ * 为什么抽出来：这条判据有**两个输入轴**（本机有没有 × 仓库里有没有）加**三个豁免来源**
+ * （目录 / 未跟踪的文档 / `SKIP_PATHS` / 登记），散在 `if (existsSync) … else …` 两支里
+ * 就是"同一个判断写两遍" —— 而本仓库的漂移全部是从那种形状开始的。
+ *
+ * ⚠️ 一个**刻意的收窄**：`SKIP_PATHS`（`research/upstream/` 那类**刻意不入库**的上游克隆）
+ *    在**两侧都算**。旧代码只在"本机没有"那一支认它，于是"本机恰好有那份克隆"时，
+ *    指向其中文件的链接会掉进新加的 `local-only` —— 那是**误报**，
+ *    而且正是 2026-09-28 那条注释要防的"结论取决于本机恰好有什么"。
+ */
+function classifyLink({ exists, isDirectory, docTracked, targetTracked, inSkipPath, hasExemption }) {
+  if (inSkipPath) return 'skip';
+  if (!exists) return hasExemption ? 'exempted-absent' : 'broken';
+  // 目录不参与跟踪判断（git 跟踪的是文件）；未跟踪文档里的链接不卡别人（本机草稿）。
+  if (isDirectory || !docTracked || targetTracked) return 'ok';
+  return hasExemption ? 'exempted' : 'local-only';
+}
+
+/**
  * 仓库**真正跟踪**的文件集合（`git ls-files`）。
  *
  * 🔴 拿不到就**响亮退出 1**，不静默跳过：那样"检查不到"和"检查过且干净"
@@ -173,6 +193,8 @@ const broken = [];
 const localOnly = [];
 /** 实际被用到的豁免（用于把"登记了但已经没人引用"说出来）。 */
 const exemptedHits = new Map();
+/** 登记过、但**本机也没有**的目标被引用的次数（= 干净检出/CI 看到的样子）。 */
+const absentExempted = new Map();
 let checked = 0;
 let skipped = 0;
 
@@ -202,48 +224,54 @@ for (const file of files) {
       checked++;
       const resolved = resolve(dir, decodeURIComponent(target));
       const relDoc = relative(ROOT, file);
-      if (existsSync(resolved)) {
-        /**
-         * 🔴 **本机有 ≠ 仓库里有。** 只按文件系统判的那一半永远看不见这类死链
-         * （实测：`docs/operations/icp-app-filing.md` 里两条，本机全绿、干净检出全红）。
-         *
-         * 两个刻意不参与的例外：
-         *   · **目录**：git 跟踪的是文件不是目录，`docs/plans/` 这种链接不该红；
-         *   · **没被跟踪的文档里的链接**：那是本机还没提交的草稿，
-         *     它引用了同批未提交的文件是**正常状态**，不该由它决定别人能不能跑门禁。
-         */
-        const relTarget = relative(ROOT, resolved);
-        if (!statSync(resolved).isDirectory() && TRACKED.has(relDoc) && !TRACKED.has(relTarget)) {
-          const ok = matchUntrackedOk(relTarget);
-          if (ok === undefined) {
-            localOnly.push({ file: relDoc, line: i + 1, target: raw, relTarget });
-          } else {
-            exemptedHits.set(ok[0], (exemptedHits.get(ok[0]) ?? 0) + 1);
-            if (verbose) console.log(`  本机  ${relDoc}:${i + 1} -> ${raw}（豁免：${ok[0]}）`);
-          }
-        } else if (verbose) {
-          console.log(`  ok   ${relDoc}:${i + 1} -> ${raw}`);
-        }
-      } else {
-        // 🔴 指向 `SKIP_PATHS`（上游克隆、独立工作副本等）的链接**不是死链**。
-        //
-        // 那些目录是**刻意不进版本控制**的（见 `.gitignore` 的 `research/upstream/`），
-        // 所以在干净检出上必然不存在 —— 而"干净检出"正是 CI 的唯一形态。
-        // 报它等于让 `check:docs` 在 CI 上**永远红**。
-        //
-        // 实测（2026-09-28）：8 条指向 `research/upstream/super-productivity/`
-        // 的链接让 CI 必红，而本机因为那份 185 MB 的克隆在，**永远绿**。
-        // 这和"夹具字节随时区变"是同一类病：**结论取决于本机恰好有什么**。
-        //
-        // `SKIP_PATHS` 原来只用在 `collect()` 里 —— 跳过**扫描**那些目录，
-        // 但**指向**它们的链接照样解析、照样报死。这里补上另一半。
-        const relTarget = relative(ROOT, resolved);
-        if (SKIP_PATHS.some((p) => relTarget === p || relTarget.startsWith(p + '/'))) {
-          skipped++;
-          continue;
-        }
-        broken.push({ file: relative(ROOT, file), line: i + 1, target: raw });
+      const relTarget = relative(ROOT, resolved);
+      const exists = existsSync(resolved);
+      const verdict = classifyLink({
+        exists,
+        isDirectory: exists ? statSync(resolved).isDirectory() : false,
+        docTracked: TRACKED.has(relDoc),
+        targetTracked: TRACKED.has(relTarget),
+        // 🔴 指向 `SKIP_PATHS`（上游克隆、独立工作副本）的链接**不是死链**：那些目录
+        //    **刻意不进版本控制**（见 `.gitignore` 的 `research/upstream/`），在干净检出上
+        //    必然不存在 —— 而"干净检出"正是 CI 的唯一形态。实测（2026-09-28）：8 条这样的
+        //    链接让 CI 必红，而本机因为那份 185 MB 的克隆在，**永远绿**。
+        inSkipPath: SKIP_PATHS.some((p) => relTarget === p || relTarget.startsWith(p + '/')),
+        hasExemption: matchUntrackedOk(relTarget) !== undefined,
+      });
+
+      if (verdict === 'skip') {
+        skipped++;
+        continue;
       }
+      if (verdict === 'broken') {
+        broken.push({ file: relDoc, line: i + 1, target: raw });
+        continue;
+      }
+      if (verdict === 'local-only') {
+        // 🔴 **本机有 ≠ 仓库里有**：只按文件系统判的那一半永远看不见这类死链
+        //    （实测：`docs/operations/icp-app-filing.md` 里两条，本机全绿、干净检出全红）。
+        localOnly.push({ file: relDoc, line: i + 1, target: raw, relTarget });
+        continue;
+      }
+      if (verdict === 'exempted' || verdict === 'exempted-absent') {
+        /**
+         * 登记过 ⇒ 放行，但**两个桶分开计数**，因为它们的代价不一样：
+         *   · `exempted`（本机有、仓库里没有）：本机点得开，干净检出点不开；
+         *   · `exempted-absent`（本机也没有）：这就是 **CI 看到的样子** ——
+         *     不在这里认登记，等于只修了一半：`check:docs` 在 CI 上**永远红**。
+         * 两种都要在收尾时把登记与理由**说出来**，别让它变成一条静默的豁免。
+         */
+        const ok = matchUntrackedOk(relTarget);
+        const bucket = verdict === 'exempted' ? exemptedHits : absentExempted;
+        bucket.set(ok[0], (bucket.get(ok[0]) ?? 0) + 1);
+        if (verbose) {
+          console.log(
+            `  ${verdict === 'exempted' ? '本机' : '缺席'}  ${relDoc}:${i + 1} -> ${raw}（豁免：${ok[0]}）`,
+          );
+        }
+        continue;
+      }
+      if (verbose) console.log(`  ok   ${relDoc}:${i + 1} -> ${raw}`);
     }
   });
 }
@@ -454,6 +482,46 @@ function assertSelfTest() {
   const tbl = sectionNumbers('| 1.2 | 子任务（树形，可折叠） | P0 |\n');
   eq('表格行号要算章节号', tbl.get('1.2'), '子任务（树形，可折叠）');
   eq('标题仍然优先于表格行', sectionNumbers('## 1.2 真标题\n| 1.2 | 表里的 |\n').get('1.2'), '真标题');
+
+  // (6) **链接判决表**：六种结局各钉一行，含四个容易改错的跨界形状。
+  //
+  //     为什么要给一张纯函数做自检：它有两个输入轴（本机有没有 × 仓库里有没有）
+  //     和三个豁免来源，而这一半检查的**两个真缺口恰好都在跨界那一格** ——
+  //     只测"常见的那一支"抓不到它们，而不钉住的话，下一次重构就会把它们改回去。
+  const L = (o) =>
+    classifyLink({
+      exists: true,
+      isDirectory: false,
+      docTracked: true,
+      targetTracked: false,
+      inSkipPath: false,
+      hasExemption: false,
+      ...o,
+    });
+
+  // 本轮要修的那一格：本机有、git 没有、且**没登记** ⇒ 必须红。
+  eq('本机有 + 仓库没有 + 未登记 ⇒ 红', L({}), 'local-only');
+  eq('本机有 + 仓库没有 + 已登记 ⇒ 本机放行', L({ hasExemption: true }), 'exempted');
+  // 🔴 以前只修了上面两格，这一格漏了：登记只覆盖"本机有"的形状，
+  // 而干净检出（= CI 的唯一形态）上那个目标**不存在**，于是照旧掉进 `broken`
+  // —— `check:docs` 在 CI 上**永远红**。这一行钉的是"修好了"这件事。
+  eq('【CI 的形状】本机也没有 + 已登记 ⇒ 不算死链', L({ exists: false, hasExemption: true }), 'exempted-absent');
+  eq('本机也没有 + 未登记 ⇒ 仍是死链（查不到不等于放行）', L({ exists: false }), 'broken');
+  eq('仓库里有但本机没有 ⇒ 死链（别处有 ≠ 这里有）', L({ exists: false, targetTracked: true }), 'broken');
+  // 草稿形状：未跟踪文档引用一个**本机也还没写**的文件，仍是死链 ——
+  // 这一格是**既有行为**（未跟踪豁免只管"本机有"那一支）。钉住它，
+  // 是为了让"顺手把未跟踪文档整体跳过"变成一次显式的、要写理由的改动。
+  eq('未跟踪文档 + 本机也没有 ⇒ 仍按死链报', L({ exists: false, docTracked: false }), 'broken');
+
+  eq('目标已被跟踪 ⇒ ok', L({ targetTracked: true }), 'ok');
+  eq('目录不参与跟踪判断（git 跟踪的是文件）', L({ isDirectory: true }), 'ok');
+  eq('未跟踪的文档不卡别人（本机草稿）', L({ docTracked: false }), 'ok');
+
+  // 🔴 `SKIP_PATHS` 必须**两侧都认**。旧代码只在"本机没有"那一支认它，
+  // 于是"本机恰好 clone 过上游"时，指向其中文件的链接会掉进新加的 `local-only` ——
+  // 那是误报，而误报的代价是别人开始忽略这条门禁。
+  eq('上游克隆本机恰好存在 ⇒ 跳过（不是 local-only）', L({ inSkipPath: true }), 'skip');
+  eq('上游克隆本机也没有 ⇒ 同样跳过', L({ exists: false, inSkipPath: true }), 'skip');
 
   return problems;
 }
@@ -747,14 +815,23 @@ if (hasProblems) process.exit(1);
 console.log(`\n扫描 ${files.length} 个 Markdown 文件，检查 ${checked} 个相对链接。`);
 
 if (UNTRACKED_LINK_OK.size > 0) {
-  const unused = [...UNTRACKED_LINK_OK.keys()].filter((p) => !exemptedHits.has(p));
+  const used = (p) => exemptedHits.has(p) || absentExempted.has(p);
+  const unused = [...UNTRACKED_LINK_OK.keys()].filter((p) => !used(p));
   console.log(
-    `\nℹ️  「本机有、仓库里没有」已登记 ${UNTRACKED_LINK_OK.size} 条豁免（放行 ${exemptedHits.size} 条链接）：`,
+    `\nℹ️  「本机有、仓库里没有」已登记 ${UNTRACKED_LINK_OK.size} 条豁免：` +
+      `本机放行 ${exemptedHits.size} 条链接、干净检出上缺席放行 ${absentExempted.size} 条。`,
   );
   for (const [pattern, reason] of UNTRACKED_LINK_OK) {
-    const hits = exemptedHits.get(pattern) ?? 0;
-    console.log(`   • ${pattern} —— ${reason}（本次命中 ${String(hits)} 次）`);
+    const here = exemptedHits.get(pattern) ?? 0;
+    const absent = absentExempted.get(pattern) ?? 0;
+    console.log(
+      `   • ${pattern} —— ${reason}（本机有 ${String(here)} 次 / 本机也没有 ${String(absent)} 次）`,
+    );
   }
+  console.log(
+    '   ⚠️ 代价说清楚：**登记过的引用在干净检出（CI）上点不开** —— 那是登记的后果，\n' +
+      '      不是漏检。要它真的能点，只有把目标入库或把链接改成纯文字说明两条路。',
+  );
   // 🔴 登记了却没人引用 = 这一半检查的范围在悄悄缩小。说出来，别让它悄悄留着。
   if (unused.length > 0) {
     console.log(
