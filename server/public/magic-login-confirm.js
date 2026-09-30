@@ -90,21 +90,29 @@
           loginBtn.hidden = true;
 
           /**
-           * 🔴 **存的是"链接令牌"，不是 `result.data.token`（那是会话 JWT）**。
+           * 🔴 **存的是"会话"，交给应用直接采用** —— 与桌面壳**同一条通道**。
            *
-           * 应用启动时用 `verifyMagicLink()` 消费 `loginToken` —— 它期待的是
-           * **一次性链接令牌**（服务端按 `loginToken` 那一列查）。
-           * 以前这里存的是上面那个 POST 换回来的 **JWT**，于是应用会拿 JWT 再去
-           * `/api/login/magic-link/verify` 换一次 ⇒ **必然 401**，
-           * 而失败被 `consumePendingLogin` 吞掉 ⇒ 用户看到的是"登录了但还是未登录"。
-           * （2026-09-30 实测挖到；web 的邮件回跳第二腿**一直是坏的**，
-           *   而没有任何测试覆盖它：J1–J7 走通行密钥，`verify:email-auth` 只验服务端。）
+           * 三版才修对，值得记下每一次错在哪：
            *
-           * ⚠️ 保留上面那次 POST：它是**给用户看的**校验（链接无效/过期要当场说出来）。
-           *    令牌在那一跳里已经被消费掉 —— 所以这里必须存**原始令牌**，
-           *    而不是"已经变成会话"的那个值。
+           * 1. 最初存 `result.data.token`（会话 JWT）到 **`loginToken`**，
+           *    而应用把 `loginToken` 当**一次性链接令牌**拿去 `/api/login/magic-link/verify`
+           *    再换一次 ⇒ **必然 401** ⇒ 用户看到"点了邮件里的链接，回来还是未登录"。
+           *    （这是它坏了很久没人发现的那个 bug。）
+           * 2. 改成存**原始链接令牌** —— 更糟：上面那次 POST **已经把它消费掉了**，
+           *    应用拿到的是一张用过的票 ⇒ 还是 401。
+           *    （`scripts/verify-email-web-chain.mjs` 第一次跑就当场判红。）
+           * 3. ✅ **现在**：POST 已经换回了会话，那就把**会话**交给应用（`sessionToken`），
+           *    应用**直接采用**、不再去换。壳从 `heyta://auth#token=…` 拿到的也是会话 ——
+           *    两条消费方从此是**同一条**通道、同一个键。
+           *
+           * ⚠️ 保留上面那次 POST：它是**给用户看的**校验（链接无效/过期当场说出来），
+           *    而且它才是**唯一**的消费点（单次消费）。
            */
-          sessionStorage.setItem('loginToken', token);
+          sessionStorage.setItem('sessionToken', result.data.token);
+          sessionStorage.setItem(
+            'loginEmail',
+            (result.data.user && result.data.user.email) || '',
+          );
           // 🔴 不要把这里写死成某个域名，也不要让应用去"猜自己的 origin"：
           //    应用与同步服务端可能不在同一个 origin（反代、自建、VITE_SYNC_URL 覆盖），
           //    猜错就会把令牌发到错的地方。这里记的是**校验端点所在的那个 origin**。

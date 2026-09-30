@@ -1,0 +1,315 @@
+#!/usr/bin/env node
+/**
+ * 门禁：**web 的邮箱全链路**（ADR-0039 §2.2）—— 真浏览器 + 真邮件
+ * =================================================================
+ *
+ * 它补的是**最大的那个判据缺口**：`verify:email-auth` 只验到服务端，
+ * 而"确认页 → 应用"这一腿**从来没有测试盯着** —— 于是它坏了很久没人发现
+ * （确认页存的是**会话 JWT**，而应用把它当**一次性链接令牌**去换 ⇒ 必然 401，
+ *  失败又被 `consumePendingLogin` 吞掉 ⇒ "点了邮件里的链接，回来还是未登录"）。
+ *
+ * 这条门禁走**生产同源拓扑**（本地复刻）：
+ *
+ * ```
+ *   浏览器 ──► 127.0.0.1:4400（本脚本起的反代）
+ *                 ├── /api/*、/verify-email、/magic-login…  ──► API 服务端 :3231
+ *                 └── 其余                                    ──► apps/web/dist（真产物）
+ * ```
+ *
+ * 于是"确认页跳到 `/app/`"这条真实路径能被验到（服务端**不**服务 `/app/`，
+ * 生产上那一格是反代给的；本地必须复刻，否则跳过去是 404 而不是应用）。
+ *
+ * ## 它断言什么
+ *
+ * 1. UI 注册 → 服务端**真发一封**（本地无 `SMTP_*` ⇒ Ethereal 兜底）；
+ * 2. 脚本把 **preview URL 抓回来**、从渲染后的邮件正文里取出 `/verify-email?token=…`；
+ * 3. 打开那个链接 ⇒ 是**确认页**（不是"已失效"）；
+ * 4. 点确认 ⇒ 跳到 `/app/` ⇒ **应用真的登录了**（身份菜单出现"退出登录"、有邮箱）；
+ * 5. 截图留证（人看）。
+ *
+ * ## 明确**不**验
+ *
+ * - 不验真实 SMTP（本机走 Ethereal）、不验桌面壳（那是 `heyta://` 回调那条，单独验）、
+ * - 不验手机号（预留）。
+ */
+
+import { createServer, request as httpRequest } from 'node:http';
+import { spawn } from 'node:child_process';
+import { existsSync, mkdirSync, readFileSync, writeFileSync, createReadStream, statSync } from 'node:fs';
+import { dirname, extname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+import { chromium } from '@playwright/test';
+
+import {
+  databaseUrlFor,
+  ensureDatabase,
+  ensureServerBuilt,
+  resolveNode,
+} from './lib/auth-journey-server.mjs';
+
+const ROOT = fileURLToPath(new URL('..', import.meta.url));
+const API_PORT = '3231';
+const WEB_PORT = '4400';
+const API = `http://127.0.0.1:${API_PORT}`;
+const WEB = `http://127.0.0.1:${WEB_PORT}`;
+const DB_NAME = 'heyta_email_web_chain';
+const DIST = join(ROOT, 'apps/web/dist');
+const EVIDENCE = join(ROOT, 'apps/web/evidence/email-chain');
+
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+let failed = false;
+function check(ok, what) {
+  console.log(`  ${ok ? '✅' : '❌'} ${what}`);
+  if (!ok) failed = true;
+}
+function bail(why, extra = '') {
+  console.error(`\n❌ ${why}`);
+  if (extra) console.error(extra.split('\n').slice(-15).join('\n'));
+  process.exit(1);
+}
+
+if (!existsSync(join(DIST, 'index.html'))) {
+  bail('apps/web/dist 不存在 —— 先 `pnpm --filter @heyta/web build`（本门禁刻意用**真产物**）');
+}
+
+const node = resolveNode();
+const dbUrl = databaseUrlFor(DB_NAME);
+console.log(`· 库：${DB_NAME}`);
+ensureDatabase({ root: ROOT, dbUrl, dbName: DB_NAME });
+await ensureServerBuilt({ root: ROOT, dbUrl });
+
+// ── API 服务端（**不开 TEST_MODE**：要走真的发信那条路）──────────────────
+console.log('· 启动 API 服务端（无 TEST_MODE）…');
+const api = spawn(node, ['dist/src/index.js'], {
+  cwd: join(ROOT, 'server'),
+  env: {
+    ...process.env,
+    DATABASE_URL: dbUrl,
+    NODE_ENV: 'test',
+    PORT: API_PORT,
+    HOST: '127.0.0.1',
+    // 🔴 邮件里的链接必须指向**反代那个 origin**（页面在那儿），否则点开是 404。
+    PUBLIC_URL: WEB,
+    CORS_ORIGINS: WEB,
+  },
+  stdio: ['ignore', 'pipe', 'pipe'],
+});
+let apiLog = '';
+api.stdout.on('data', (d) => (apiLog += d.toString()));
+api.stderr.on('data', (d) => (apiLog += d.toString()));
+
+// ── 反代：页面/接口 → API，其余 → dist（复刻生产同源拓扑）──────────────
+const MIME = {
+  '.html': 'text/html; charset=utf-8',
+  '.js': 'text/javascript; charset=utf-8',
+  '.mjs': 'text/javascript; charset=utf-8',
+  '.css': 'text/css; charset=utf-8',
+  '.json': 'application/json; charset=utf-8',
+  '.webmanifest': 'application/manifest+json',
+  '.svg': 'image/svg+xml',
+  '.png': 'image/png',
+  '.jpg': 'image/jpeg',
+  '.ico': 'image/x-icon',
+  '.woff2': 'font/woff2',
+  '.wasm': 'application/wasm',
+};
+const toApi = (path) =>
+  path.startsWith('/api/') ||
+  path === '/health' ||
+  path.startsWith('/verify-email') ||
+  path.startsWith('/magic-login') ||
+  path.startsWith('/recover-passkey') ||
+  path === '/magic-login-confirm.js';
+
+const web = createServer((req, res) => {
+  const url = new URL(req.url ?? '/', WEB);
+  if (toApi(url.pathname)) {
+    const proxied = httpRequest(
+      { host: '127.0.0.1', port: API_PORT, path: req.url, method: req.method, headers: req.headers },
+      (upstream) => {
+        res.writeHead(upstream.statusCode ?? 502, upstream.headers);
+        upstream.pipe(res);
+      },
+    );
+    proxied.on('error', () => {
+      res.writeHead(502).end('proxy error');
+    });
+    req.pipe(proxied);
+    return;
+  }
+  // `/app/...` 与 `/` 都由 dist 提供（生产上反代就是这么配的）。
+  const rel = url.pathname.startsWith('/app/')
+    ? url.pathname.slice('/app'.length)
+    : url.pathname;
+  const file = join(DIST, rel === '/' ? 'index.html' : rel);
+  if (!existsSync(file) || statSync(file).isDirectory()) {
+    res.writeHead(404, { 'Content-Type': 'text/plain' }).end('not found');
+    return;
+  }
+  res.writeHead(200, { 'Content-Type': MIME[extname(file)] ?? 'application/octet-stream' });
+  createReadStream(file).pipe(res);
+});
+
+await new Promise((r) => web.listen(Number(WEB_PORT), '127.0.0.1', r));
+console.log(`· 同源反代就绪 ${WEB}（API 在 ${API}）`);
+
+let up = false;
+for (let i = 0; i < 60 && !up; i += 1) {
+  await sleep(500);
+  try {
+    up = (await fetch(`${API}/health`)).ok;
+  } catch {
+    /* 还没起来 */
+  }
+}
+if (!up) bail('API 服务端没起来', apiLog);
+console.log('· API 就绪\n');
+
+const stop = () => {
+  api.kill();
+  web.close();
+};
+process.on('exit', stop);
+
+// ── 浏览器：真 UI 注册 ─────────────────────────────────────────────────
+const browser = await chromium.launch();
+const page = await browser.newPage();
+/**
+ * 🔴 **把浏览器的控制台与页面错误接住**。
+ * 没有它，应用里"登录没成"就只剩下一个 `signed-out` —— 而原因全在控制台里。
+ */
+const consoleLines = [];
+/**
+ * 🔴 **在应用之前装好错误收集**：`main.tsx` 是 `void consumePendingLogin()`，
+ * 所以它内部一旦抛，就变成**未处理的拒绝** —— 而那个默认是**看不见**的。
+ * 这一格不装，症状就只剩"没登上"。
+ */
+await page.addInitScript(() => {
+  window.__errs = [];
+  window.addEventListener('unhandledrejection', (e) => {
+    window.__errs.push('rejection: ' + String(e && e.reason && (e.reason.stack || e.reason)));
+  });
+  window.addEventListener('error', (e) => {
+    window.__errs.push('error: ' + String((e && (e.message || e.error)) || e));
+  });
+});
+page.on('console', (m) => {
+  const line = `[${m.type()}] ${m.text()}`;
+  consoleLines.push(line);
+  // 实时打出来：失败之后再 dump 会漏掉先出现又被清掉的那类信号。
+  if (m.type() === 'error' || m.type() === 'warning') console.log(`  · ${line.slice(0, 160)}`);
+});
+page.on('pageerror', (e) => consoleLines.push(`[pageerror] ${e.message}`));
+/** 记下关键接口的响应体 —— "确认页那一跳到底拿到了什么"必须看得见。 */
+const apiResponses = [];
+page.on('response', (res) => {
+  if (res.url().includes('/api/auth/email/verify')) {
+    // 🔴 **同步记状态码**：确认页成功后会立刻 `location.href` 跳走，而那次导航会让
+    //    "读响应体"失败 —— 第一版写成 `.text()` + catch，于是证据里只剩"(没抓到)"，
+    //    看起来像"根本没发请求"。**状态码不会丢。**
+    apiResponses.push(String(res.status()));
+  }
+});
+const email = `email-web-${String(Date.now())}@example.com`;
+
+try {
+  await page.goto(`${WEB}/`, { waitUntil: 'domcontentloaded' });
+  await page.locator('input[placeholder^="添加任务"]').waitFor({ timeout: 60_000 });
+  check(true, '① 应用在**同源反代**下打开（真产物）');
+
+  await page.getByTestId('account-menu-avatar').click();
+  await page.getByTestId('sync-signin-entry').click();
+  const dialog = page.locator('[role="dialog"]');
+  await dialog.locator('input[type="url"]').fill(WEB);
+  await dialog.locator('input[type="email"]').fill(email);
+  await dialog.getByRole('checkbox').check();
+  await dialog.getByRole('button', { name: /注册新账号|Create account/ }).click();
+  check(true, `① UI 注册已提交（${email}）`);
+
+  // ── 把那封信读回来 ──────────────────────────────────────────────────
+  let preview = '';
+  for (let i = 0; i < 40 && preview === ''; i += 1) {
+    await sleep(500);
+    preview = /Preview URL: (\S+)/.exec(apiLog)?.[1] ?? '';
+  }
+  if (preview === '') bail('没拿到 Ethereal preview URL（没网？还是发信失败？）', apiLog);
+  console.log(`  · 那封信：${preview}`);
+  const raw = await (await fetch(preview)).text();
+  // Ethereal 预览页是外壳页：斜杠 `\u002f`、`&amp;` 都要归一化，否则取不出链接。
+  const html = raw.replace(/\\u002f/gi, '/').replace(/\\\//g, '/').replace(/&amp;/g, '&');
+  const link = /(https?:\/\/[^"'\s]*\/verify-email\?token=[0-9a-f]+)/.exec(html)?.[1] ?? '';
+  if (link === '') bail('信里取不出 /verify-email 链接', html.slice(0, 400));
+  check(link.startsWith(WEB), `② 链接指向**反代那个 origin**（${link.slice(0, 46)}…）`);
+
+  // ── 打开链接 → 确认页 → 点击 ────────────────────────────────────────
+  await page.goto(link, { waitUntil: 'domcontentloaded' });
+  const confirmVisible = await page.locator('#login-btn').isVisible().catch(() => false);
+  check(confirmVisible, '③ 打开链接渲染的是**确认页**（有确认按钮），不是"已失效"页');
+  await page.screenshot({ path: '/tmp/email-web-1-confirm.png' });
+
+  await page.locator('#login-btn').click();
+  // 确认页成功后会跳 `/app/` —— 等应用挂载。
+  await page.locator('input[placeholder^="添加任务"]').waitFor({ timeout: 60_000 });
+  check(true, '④ 点击后跳到了 `/app/` 且应用挂载');
+
+  // 落到 /app/ 之后先把**存储与凭据**看一眼：这一格坏了要知道坏在哪。
+  const afterLanding = await page.evaluate(() => ({
+    sessionKeys: Object.keys(sessionStorage),
+    localKeys: Object.keys(localStorage),
+    errs: (window.__errs ?? []).slice(0, 3),
+  }));
+  console.log(`  · 落到 /app/ 之后的存储：${JSON.stringify(afterLanding)}`);
+  console.log(`  · /api/auth/email/verify 的响应：${apiResponses.join(' | ') || '(没抓到)'}`);
+
+  /**
+   * ── 判据：**应用真的登录了**（不是"界面说成功"）────────────────────
+   *
+   * 🔴 **必须轮询，不能落地就查**：`main.tsx` 是 `void consumePendingLogin()`
+   * —— 它在首屏渲染之后**异步**跑。第一版这里立刻断言，于是判据与它**赛跑**，
+   * 结果是"应用明明是好的、判据却红"（2026-09-30 实测：同一段代码用隔离探针
+   * 多等 2.5 秒就全绿）。**判据自己要等一个"稳定态"，而不是等一个时刻。**
+   */
+  let stored = false;
+  for (let i = 0; i < 40 && !stored; i += 1) {
+    await sleep(500);
+    stored = await page.evaluate(
+      () => window.localStorage.getItem('heyta.sync.credentials') !== null,
+    );
+  }
+  check(stored, '⑤ 落盘凭据出现（刷新之后仍是登录态）');
+
+  await page.getByTestId('account-menu-avatar').click();
+  const signedIn = (await page.getByTestId('account-menu-signout').count()) > 0;
+  check(signedIn, '⑤ 身份菜单出现"退出登录" ⇒ **应用真的登录了**（这一格正是以前坏掉的）');
+  await page.screenshot({ path: '/tmp/email-web-2-signed-in.png' });
+
+  mkdirSync(EVIDENCE, { recursive: true });
+  writeFileSync(
+    join(EVIDENCE, 'web-chain-run.txt'),
+    [
+      `# web 邮箱全链路（真浏览器 + 真邮件）· ${new Date().toISOString()}`,
+      `EMAIL=${email}`,
+      `PREVIEW=${preview}`,
+      `LINK=${link}`,
+      `SIGNED_IN=${String(signedIn)}`,
+      `RESULT=${failed ? 'FAIL' : 'PASS'}`,
+      '',
+    ].join('\n'),
+  );
+} finally {
+  await browser.close();
+  stop();
+}
+
+console.log('');
+if (failed) {
+  console.error('❌ web 邮箱全链路**未通过**');
+  if (consoleLines.length > 0) {
+    console.error('\n— 浏览器控制台 —');
+    for (const line of consoleLines.slice(-20)) console.error(`  ${line}`);
+  }
+  process.exit(1);
+}
+console.log('✅ web 邮箱全链路通过：UI 注册 → 真发一封 → 链接 → 确认页 → **应用真的登录了**。');
+process.exit(0);
