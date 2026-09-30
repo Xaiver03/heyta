@@ -2070,3 +2070,25 @@ tar tzf /tmp/heyta-server-src.tar.gz | grep -E '(^|/)\.env$' && echo '🔴 包�
 
 **兜底**：改 `.env` 之前永远先 `cp .env .env.bak-$(date -u +%Y%m%dT%H%M%SZ)` ——
 这次能几分钟内恢复，靠的就是那个备份。
+
+### 🔴 e2e 套件**不能与自己并发**：固定端口 + 共享 `e2e/test-results/` ⇒ 每次红的是不同 spec
+
+e2e 的 webServer 端口是**写死的**（4317-4319），而所有运行共用同一个 `e2e/test-results/`。
+两个运行叠在一起时，后起的那个会**清掉前一个的 trace 产物**，前一个会把后一个的 dev server
+顶掉 —— 于是两边的失败**都指向不相干的代码**。
+
+2026-09-30 实测（**同一份代码、同一个小时**）：
+
+| 时刻 | 怎么跑的 | 报什么 |
+|---|---|---|
+| 11:16 | `pnpm check:ai-e2e` 单独跑 | **整组 exit 0**（含 `motivation.spec.ts` 7 条） |
+| 11:39 | 全链 `pnpm check`（另一条会话同时在跑 e2e） | `tests/ai-duration.spec.ts` ⇒ `connect ECONNREFUSED 127.0.0.1:4319` / `ERR_CONNECTION_REFUSED at http://127.0.0.1:4318/` |
+| 11:44 | `pnpm check:ai-e2e` 单独重跑（仍有并发） | **换了一条 spec**：`tests/admin-console.spec.ts` 两条 `toBeVisible` 失败 + 60s 超时 + `ENOENT … e2e/test-results/.playwright-artifacts-4/….trace` |
+
+**判据**：结构性门禁红了，**先单独重跑那一步再归因**。同一份代码在两次运行里红在**不同的**
+spec，且报错里出现 `ECONNREFUSED <本机端口>` 或 `.playwright-artifacts-*` 的 `ENOENT`
+⇒ 是并发把对方的产物/服务清掉了，**不是被测代码坏了**（§7 元规则一：先怀疑探针）。
+
+⚠️ 正解是**每次运行用独立端口与独立 `outputDir`**（或把 e2e 串行化）。本轮**没做**：
+`e2e/playwright.*.config.ts` 此刻正被另一条会话改，动它会撞车。
+登记在这里，是为了下一个人不必再花一次"红两轮才知道"的时间。
