@@ -35,7 +35,7 @@
 | [`multi-end-unified-strategy-reflection.md`](multi-end-unified-strategy-reflection.md) | 49 | 复盘 | 🔴 **判断为何失效**：本轮 6 处「判据看起来在工作、其实什么都没判」（其中 4 处是我在修前一处时写出来的）+ 两次「查错对象」得出**反向结论** |
 | [`waytofuture-handoff.md`](waytofuture-handoff.md) | 286 | 已交付 | ✅ **产品第一次跑在自己的域名上**（`heyta.waytofuture.cn` + API 专用 `apiheyta.waytofuture.cn`）；管理后台/邮件/凭据页全部中文化并用设计系统。**交还用户 3 件**（ICP 提交、两处预存在的红）见其 §3 |
 | [`waytofuture-reflection.md`](waytofuture-reflection.md) | 120 | 复盘 | 🔴 **本轮 4 次判断失败**：打包覆盖生产 `.env`、脚本放 `<head>` 致按钮无反应（用户报障）、脱敏正则漏匹配、发明的阈值两次误报。四者共同点：**验的是"我产出的中间物"，不是"用户走的那条路径"** |
-| [`gate-blindspot-handoff.md`](gate-blindspot-handoff.md) | 238 | 交接 | 🟡 **`check:docs` 的 CI 死角：代码写完、自检过、门禁绿，但"从红变绿"至今没有端到端注入证据，且未提交。** 接手只剩三步：三条 A/B 注入 → 提交 → 交还两个**用户本人**的环境前提（屏幕录制权限、Windows 打包机）。**接手先读它 §3 与 §5（归属警告）** |
+| [`gate-blindspot-handoff.md`](gate-blindspot-handoff.md) | 220 | 交接 | 🟢 **已闭合**（本轮四项交付全部处理完）。`check:docs` 的"CI 上永远红"死角有 **5 条端到端注入证据**（§3），门禁代码已提交推送。**本文件转成历史**：它原先写着"注入验证与提交留给下一会话"，而那句已经过期（§开头有更正说明）。只剩两件**要用户本人**的环境动作（屏幕录制权限、Windows 打包机），见它 §4 |
 | [`multi-platform-widgets.md`](multi-platform-widgets.md) | 373 | 规划中 | 🟢 **仍是小组件线的入口**（与主计划正交） |
 | [`multi-platform-widgets-progress.md`](multi-platform-widgets-progress.md) | 5,463 | 实施中 | 🟢 **是进度日志，不是计划**。体量最大，按需查、不要通读 |
 
