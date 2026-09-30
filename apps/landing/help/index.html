@@ -35,10 +35,10 @@
       子页面的 hreflang 指向首页是本类站点最常见的一种错，而它的表现是
       "英文版功能页永远进不了索引"。
     -->
-    <link rel="canonical" href="https://heyta.finlaw.cloud/help/" />
-    <link rel="alternate" hreflang="zh-CN" href="https://heyta.finlaw.cloud/help/" />
-    <link rel="alternate" hreflang="en" href="https://heyta.finlaw.cloud/en/help/" />
-    <link rel="alternate" hreflang="x-default" href="https://heyta.finlaw.cloud/help/" />
+    <link rel="canonical" href="https://heyta.waytofuture.cn/help/" />
+    <link rel="alternate" hreflang="zh-CN" href="https://heyta.waytofuture.cn/help/" />
+    <link rel="alternate" hreflang="en" href="https://heyta.waytofuture.cn/en/help/" />
+    <link rel="alternate" hreflang="x-default" href="https://heyta.waytofuture.cn/help/" />
     <!--
       Open Graph / Twitter 卡片。
 
@@ -59,15 +59,15 @@
     <meta property="og:locale" content="zh_CN" />
     <meta property="og:title" content="帮助中心 —— heyta" />
     <meta property="og:description" content="heyta 帮助中心：怎么建任务、怎么同步、忘了加密口令怎么办、通行密钥怎么用、四象限怎么归类、重复任务怎么设、专注怎么用、怎么导出数据、怎么自建服务器、数据到底放在哪。" />
-    <meta property="og:url" content="https://heyta.finlaw.cloud/help/" />
-    <meta property="og:image" content="https://heyta.finlaw.cloud/og-card.png" />
+    <meta property="og:url" content="https://heyta.waytofuture.cn/help/" />
+    <meta property="og:image" content="https://heyta.waytofuture.cn/og-card.png" />
     <meta property="og:image:width" content="1200" />
     <meta property="og:image:height" content="630" />
     <meta property="og:image:alt" content="heyta 分享卡片：本地优先的任务管理，数据先落你自己的设备；端到端加密同步、可自建自托管、不按功能收费。" />
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:title" content="帮助中心 —— heyta" />
     <meta name="twitter:description" content="heyta 帮助中心：怎么建任务、怎么同步、忘了加密口令怎么办、通行密钥怎么用、四象限怎么归类、重复任务怎么设、专注怎么用、怎么导出数据、怎么自建服务器、数据到底放在哪。" />
-    <meta name="twitter:image" content="https://heyta.finlaw.cloud/og-card.png" />
+    <meta name="twitter:image" content="https://heyta.waytofuture.cn/og-card.png" />
 
     <!--
       结构化数据。由 `scripts/gen-entries.mjs` 的 `jsonLdFor()` 生成：
@@ -83,7 +83,7 @@
     "@context": "https://schema.org",
     "@type": "SoftwareApplication",
     "name": "heyta",
-    "url": "https://heyta.finlaw.cloud",
+    "url": "https://heyta.waytofuture.cn",
     "description": "heyta 帮助中心：怎么建任务、怎么同步、忘了加密口令怎么办、通行密钥怎么用、四象限怎么归类、重复任务怎么设、专注怎么用、怎么导出数据、怎么自建服务器、数据到底放在哪。",
     "applicationCategory": "ProductivityApplication",
     "operatingSystem": "Web, Windows, macOS, Linux, Android, iOS",
@@ -155,7 +155,7 @@
         "name": "怎么把数据带走？",
         "acceptedAnswer": {
           "@type": "Answer",
-          "text": "设置页 →「导出数据」。JSON 含完整操作日志与墓碑（所以能被验证\"导出全了\"），另有一份给人看的 Markdown。目前只能导出，不能导回，界面与文件里都写明了。"
+          "text": "设置页 →「导出数据」。JSON 是完整备份（含已删除记录，所以能核对「导全了没有」），另有一份好读的 Markdown。目前只能导出，不能导回，界面与文件里都写明了。"
         }
       },
       {
@@ -163,7 +163,7 @@
         "name": "怎么自己搭一套？",
         "acceptedAnswer": {
           "@type": "Answer",
-          "text": "docker compose 起应用 + PostgreSQL + Caddy，不需要 Redis 或对象存储。⚠️ 不是零配置一键：密钥与数据库口令必须自己写进 .env（没有默认值），具体步骤在仓库的部署手册里。"
+          "text": "用 Docker Compose 一条命令起全套服务。密钥与数据库口令要自己配（没有默认值），完整步骤见自建指南。"
         }
       },
       {
