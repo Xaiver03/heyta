@@ -24,6 +24,7 @@ import type { ComponentType } from 'react';
 import { Landing } from '../Landing.js';
 import { ChangelogPage } from './ChangelogPage.js';
 import { DocsArticlePage } from './DocsArticlePage.js';
+import { DocsCategoryPage } from './DocsCategoryPage.js';
 import { FeaturesPage } from './FeaturesPage.js';
 import { HelpPage } from './HelpPage.js';
 import { IntegrationsPage } from './IntegrationsPage.js';
@@ -44,7 +45,7 @@ export const PAGE_COMPONENTS: Record<SitePageId, PageComponent> = {
   changelog: ChangelogPage,
   signin: SigninPage,
   /**
-   * 🔴 **六篇文章 → 同一个组件**是刻意的，不是偷懒。
+   * 🔴 **十四篇文章 → 同一个组件**是刻意的，不是偷懒。
    *
    * 文章之间的差异全部是**数据**（标题、引言、分区的正文 key），住在注册表里
    * （`src/site/docs.ts`）；如果每篇各有一个组件，"这一篇的排版跟别人不一样"
@@ -54,11 +55,33 @@ export const PAGE_COMPONENTS: Record<SitePageId, PageComponent> = {
    * 加一篇文章因此只需要在 `docs.ts` 加一条 + 两张词条表加 key：
    * 这里必须跟着多写一行（`Record<SitePageId, …>` 会拦住不写的人），
    * 但写的是同一个名字，所以排版不可能分叉。
+   *
+   * ⚠️ 下面十四行的**顺序跟着注册表**排（start → sync → organize → data → trust），
+   * 不是为了好看：读者在文件里扫一遍，应当和访客在侧栏里扫一遍读到的是同一套 IA。
    */
+  'first-run': DocsArticlePage,
+  concepts: DocsArticlePage,
   how: DocsArticlePage,
   account: DocsArticlePage,
   passphrase: DocsArticlePage,
   conflict: DocsArticlePage,
+  views: DocsArticlePage,
+  repeat: DocsArticlePage,
+  reminders: DocsArticlePage,
   selfhost: DocsArticlePage,
   transfer: DocsArticlePage,
+  trash: DocsArticlePage,
+  privacy: DocsArticlePage,
+  loss: DocsArticlePage,
+  /**
+   * 五个分类页 → 同一个组件，与上面十四行同一个理由：
+   * 分类之间的差异（归属哪个模块、下面挂哪几篇、哪两条速答）全部是**数据**，
+   * 住在 `src/site/docs.ts` 的 `DOCS_CATEGORY_MODULES` 与注册表里。
+   * ⚠️ 只给"有文章"的分类登记 —— 只有速答的分类出不了分类页（它上面没东西可看）。
+   */
+  start: DocsCategoryPage,
+  sync: DocsCategoryPage,
+  organize: DocsCategoryPage,
+  data: DocsCategoryPage,
+  trust: DocsCategoryPage,
 };

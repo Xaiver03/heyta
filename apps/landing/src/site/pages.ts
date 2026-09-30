@@ -116,6 +116,23 @@ export interface SitePage {
    * 找不到就是不高亮，而不会崩。
    */
   readonly navActiveId?: string;
+  /**
+   * 文档中心里这一页是**哪一层** —— `article`（有正文的一篇）还是 `category`
+   * （一个分类的落地页）。非文档中心的页面不写。
+   *
+   * 🔴 **这条判据以前是路径形状，现在形状不够用了。** 文章一直是
+   * 「`/help/` 开头」，而 `docs.ts` 正是用这个形状从注册表**反推**
+   * "哪些页面必须有正文"（`DOCS_ENTRIES` 的键类型由它派生）。分类页
+   * `/help/sync` 同样以 `/help/` 开头，于是它会被那道 `Extract` 一起捞进去，
+   * 被迫配一份它根本不该有的正文 —— 要么编译期红，要么写一个假条目骗过类型。
+   * 加一层显式标记后，"什么算一篇文章"有了唯一来源，而**分类页没有正文**
+   * 这件事在类型上就说清了。
+   *
+   * ⚠️ 它是**可选**的：首页、`/features`、帮助中心 hub 都既不是文章也不是分类。
+   * 于是"忘标"的表现不是静默当成文章，而是**从文章清单里消失** —— 而
+   * `DocsArticlePage` 取不到正文会响亮抛错（见 `docs.ts` 的 `docsArticleById`）。
+   */
+  readonly docsKind?: 'article' | 'category';
   /** 导航/页脚里的标签。 */
   readonly labelKey: MessageKey;
   /**
@@ -264,12 +281,110 @@ export const SITE_PAGES = [
   },
   /**
    * ─────────────────────────────────────────────────────────────────────
-   * 文档中心 —— `/help` 的第二层深度。**六条路由，六条都注册在这里。**
+   * 文档中心的**分类页** —— 一个分类一层深度，`/help/<分类>`，**五个分类五张页**。
    *
-   * 🔴 **判据是路径形状，不是另列一份 id 清单。** "什么算一篇文章"由
-   * `path` 以 `/help/` 开头**决定**（`docs.ts` 用模板字面量类型从 `SITE_PAGES`
-   * 反向取出这个联合），所以加一篇文章 = 在这里加一条 + 在 `docs.ts` 给它写正文，
-   * **不存在第三份清单**。第三份清单是漂移的起点：它会忘记自己已经过时。
+   * 🔴 **只给「有文章的分类」建页。** 这条不是省工：帮助中心那一侧的五条分类
+   * 名共用一份词表（`content.ts` 的 `HELP_MODULES`），如果某个空分类建了页，
+   * 那张就是一页**只有标题没有内容**的入口 —— 而"没有内容就不出现链接"
+   * 是 `/features` 与侧栏共用的那条纪律（`docs.ts` 文件头）。
+   * ⚠️ 顺序也要对上：这五张页的成员与顺序**由 `docs.ts` 的
+   * `DOCS_CATEGORY_MODULES` 在编译期钉住**（少绑一个编译不过），所以这里
+   * 加一张分类页而不写正文，红在编译器而不是红在访客看到的空页上。
+   *
+   * ⚠️ **`labelKey` / `headingKey` 复用 `site.help.module.*`**，不另起一套分类名 ——
+   * 否则「同步与账号」在 hub 上叫这个、在分类页的 `<h1>` 上叫那个，
+   * 而访客要找的是同一件事。这一层只新增引言与 `<title>` 两条文案。
+   *
+   * 🔴 `inNav: false` + `inFooter: false` **不是孤立路由**（N2 会判红那种）：
+   * 分类页被**每一篇文章的侧栏分组标题**链住，也被帮助中心那一节的标题链住 ——
+   * 两处都是从注册表派生的链接，而 N2 判据是从渲染出的 DOM 里走真实 href。
+   */
+  {
+    id: 'start',
+    path: '/help/start',
+    group: 'support',
+    inNav: false,
+    inFooter: false,
+    navActiveId: 'help',
+    docsKind: 'category',
+    labelKey: 'site.help.module.start',
+    headingKey: 'site.help.module.start',
+    ledeKey: 'site.docs.cat.start.sum',
+    titleKey: 'site.docs.cat.start.seo.title',
+    descriptionKey: 'site.docs.cat.start.sum',
+  },
+  {
+    id: 'sync',
+    path: '/help/sync',
+    group: 'support',
+    inNav: false,
+    inFooter: false,
+    navActiveId: 'help',
+    docsKind: 'category',
+    labelKey: 'site.help.module.sync',
+    headingKey: 'site.help.module.sync',
+    ledeKey: 'site.docs.cat.sync.sum',
+    titleKey: 'site.docs.cat.sync.seo.title',
+    descriptionKey: 'site.docs.cat.sync.sum',
+  },
+  {
+    id: 'organize',
+    path: '/help/organize',
+    group: 'support',
+    inNav: false,
+    inFooter: false,
+    navActiveId: 'help',
+    docsKind: 'category',
+    labelKey: 'site.help.module.organize',
+    headingKey: 'site.help.module.organize',
+    ledeKey: 'site.docs.cat.organize.sum',
+    titleKey: 'site.docs.cat.organize.seo.title',
+    descriptionKey: 'site.docs.cat.organize.sum',
+  },
+  {
+    id: 'data',
+    path: '/help/data',
+    group: 'support',
+    inNav: false,
+    inFooter: false,
+    navActiveId: 'help',
+    docsKind: 'category',
+    labelKey: 'site.help.module.data',
+    headingKey: 'site.help.module.data',
+    ledeKey: 'site.docs.cat.data.sum',
+    titleKey: 'site.docs.cat.data.seo.title',
+    descriptionKey: 'site.docs.cat.data.sum',
+  },
+  {
+    id: 'trust',
+    path: '/help/trust',
+    group: 'support',
+    inNav: false,
+    inFooter: false,
+    navActiveId: 'help',
+    docsKind: 'category',
+    labelKey: 'site.help.module.trust',
+    headingKey: 'site.help.module.trust',
+    ledeKey: 'site.docs.cat.trust.sum',
+    titleKey: 'site.docs.cat.trust.seo.title',
+    descriptionKey: 'site.docs.cat.trust.sum',
+  },
+  /**
+   * ─────────────────────────────────────────────────────────────────────
+   * 文档中心 —— `/help` 的第二层深度。**十四条文章路由，十四条都注册在这里**
+   * （start 2 / sync 4 / organize 3 / data 3 / trust 2，每个分类都 ≥ 2 篇）。
+   *
+   * 🔴 **这一段的顺序就是阅读顺序，而且是唯一一份顺序**：侧栏分组里的排列、
+   * 帮助中心卡片组的排列、以及配图图号里的"第几章"（`图 <文章注册序>-<n>`）
+   * 全部从它派生。想调顺序**只改这里**，改一处三处跟着走；
+   * 在别处再排一次就是第二份清单 —— 它会忘记自己已经过时。
+   *
+   * 🔴 **判据是 `docsKind: 'article'`，不是另列一份 id 清单。** "什么算一篇文章"
+   * 由这一层标记**决定**（`docs.ts` 仍用 `Extract` 从 `SITE_PAGES` 反向取出这个联合，
+   * 所以 id 清单**还是只有一份**），加一篇文章 = 在这里加一条 + 在 `docs.ts`
+   * 给它写正文，**不存在第三份清单**。第三份清单是漂移的起点：它会忘记自己已经过时。
+   * ⚠️ 以前这条判据是"`path` 以 `/help/` 开头"，而分类页也是 —— 形状判据会把
+   * 它一起捞进"必须有正文"的那一批。见上面 `SitePage.docsKind`。
    *
    * ⚠️ 这里只写**结构**（路径、五个词条 key、归属哪个分组），
    * 正文（`SectionSpec`）住在 `docs.ts` —— 与 `/features`、`/platforms` 的
@@ -277,7 +392,7 @@ export const SITE_PAGES = [
    *
    * 🔴 `inNav: false` + `inFooter: false` **不是"孤立路由"**（N2 会判红那种）：
    * 文章由帮助中心的**卡片**与文档侧栏**链住**，两处都是从这份注册表派生的。
-   * 不进顶部导航的理由是容量 —— 六条同类链接会把导航挤成一列侧栏，
+   * 不进顶部导航的理由是容量 —— 十四条同类链接会把导航挤成一列侧栏，
    * 而侧栏在这一层是**文章内的地图**，不是站点级的。
    * 代偿是 `navActiveId: 'help'`：顶部导航仍然亮着「帮助」。
    *
@@ -287,12 +402,41 @@ export const SITE_PAGES = [
    * （渲染时回落成 key 本身，中英两版同时变成 `site.docs.how.title`）。
    */
   {
+    id: 'first-run',
+    path: '/help/first-run',
+    group: 'support',
+    inNav: false,
+    inFooter: false,
+    navActiveId: 'help',
+    docsKind: 'article',
+    labelKey: 'site.docs.first-run.title',
+    headingKey: 'site.docs.first-run.title',
+    ledeKey: 'site.docs.first-run.sum',
+    titleKey: 'site.docs.first-run.seo.title',
+    descriptionKey: 'site.docs.first-run.sum',
+  },
+  {
+    id: 'concepts',
+    path: '/help/concepts',
+    group: 'support',
+    inNav: false,
+    inFooter: false,
+    navActiveId: 'help',
+    docsKind: 'article',
+    labelKey: 'site.docs.concepts.title',
+    headingKey: 'site.docs.concepts.title',
+    ledeKey: 'site.docs.concepts.sum',
+    titleKey: 'site.docs.concepts.seo.title',
+    descriptionKey: 'site.docs.concepts.sum',
+  },
+  {
     id: 'how',
     path: '/help/how',
     group: 'support',
     inNav: false,
     inFooter: false,
     navActiveId: 'help',
+    docsKind: 'article',
     labelKey: 'site.docs.how.title',
     headingKey: 'site.docs.how.title',
     ledeKey: 'site.docs.how.sum',
@@ -306,6 +450,7 @@ export const SITE_PAGES = [
     inNav: false,
     inFooter: false,
     navActiveId: 'help',
+    docsKind: 'article',
     labelKey: 'site.docs.account.title',
     headingKey: 'site.docs.account.title',
     ledeKey: 'site.docs.account.sum',
@@ -319,6 +464,7 @@ export const SITE_PAGES = [
     inNav: false,
     inFooter: false,
     navActiveId: 'help',
+    docsKind: 'article',
     labelKey: 'site.docs.passphrase.title',
     headingKey: 'site.docs.passphrase.title',
     ledeKey: 'site.docs.passphrase.sum',
@@ -332,11 +478,54 @@ export const SITE_PAGES = [
     inNav: false,
     inFooter: false,
     navActiveId: 'help',
+    docsKind: 'article',
     labelKey: 'site.docs.conflict.title',
     headingKey: 'site.docs.conflict.title',
     ledeKey: 'site.docs.conflict.sum',
     titleKey: 'site.docs.conflict.seo.title',
     descriptionKey: 'site.docs.conflict.sum',
+  },
+  {
+    id: 'views',
+    path: '/help/views',
+    group: 'support',
+    inNav: false,
+    inFooter: false,
+    navActiveId: 'help',
+    docsKind: 'article',
+    labelKey: 'site.docs.views.title',
+    headingKey: 'site.docs.views.title',
+    ledeKey: 'site.docs.views.sum',
+    titleKey: 'site.docs.views.seo.title',
+    descriptionKey: 'site.docs.views.sum',
+  },
+  {
+    id: 'repeat',
+    path: '/help/repeat',
+    group: 'support',
+    inNav: false,
+    inFooter: false,
+    navActiveId: 'help',
+    docsKind: 'article',
+    labelKey: 'site.docs.repeat.title',
+    headingKey: 'site.docs.repeat.title',
+    ledeKey: 'site.docs.repeat.sum',
+    titleKey: 'site.docs.repeat.seo.title',
+    descriptionKey: 'site.docs.repeat.sum',
+  },
+  {
+    id: 'reminders',
+    path: '/help/reminders',
+    group: 'support',
+    inNav: false,
+    inFooter: false,
+    navActiveId: 'help',
+    docsKind: 'article',
+    labelKey: 'site.docs.reminders.title',
+    headingKey: 'site.docs.reminders.title',
+    ledeKey: 'site.docs.reminders.sum',
+    titleKey: 'site.docs.reminders.seo.title',
+    descriptionKey: 'site.docs.reminders.sum',
   },
   {
     id: 'selfhost',
@@ -345,6 +534,7 @@ export const SITE_PAGES = [
     inNav: false,
     inFooter: false,
     navActiveId: 'help',
+    docsKind: 'article',
     labelKey: 'site.docs.selfhost.title',
     headingKey: 'site.docs.selfhost.title',
     ledeKey: 'site.docs.selfhost.sum',
@@ -358,11 +548,54 @@ export const SITE_PAGES = [
     inNav: false,
     inFooter: false,
     navActiveId: 'help',
+    docsKind: 'article',
     labelKey: 'site.docs.transfer.title',
     headingKey: 'site.docs.transfer.title',
     ledeKey: 'site.docs.transfer.sum',
     titleKey: 'site.docs.transfer.seo.title',
     descriptionKey: 'site.docs.transfer.sum',
+  },
+  {
+    id: 'trash',
+    path: '/help/trash',
+    group: 'support',
+    inNav: false,
+    inFooter: false,
+    navActiveId: 'help',
+    docsKind: 'article',
+    labelKey: 'site.docs.trash.title',
+    headingKey: 'site.docs.trash.title',
+    ledeKey: 'site.docs.trash.sum',
+    titleKey: 'site.docs.trash.seo.title',
+    descriptionKey: 'site.docs.trash.sum',
+  },
+  {
+    id: 'privacy',
+    path: '/help/privacy',
+    group: 'support',
+    inNav: false,
+    inFooter: false,
+    navActiveId: 'help',
+    docsKind: 'article',
+    labelKey: 'site.docs.privacy.title',
+    headingKey: 'site.docs.privacy.title',
+    ledeKey: 'site.docs.privacy.sum',
+    titleKey: 'site.docs.privacy.seo.title',
+    descriptionKey: 'site.docs.privacy.sum',
+  },
+  {
+    id: 'loss',
+    path: '/help/loss',
+    group: 'support',
+    inNav: false,
+    inFooter: false,
+    navActiveId: 'help',
+    docsKind: 'article',
+    labelKey: 'site.docs.loss.title',
+    headingKey: 'site.docs.loss.title',
+    ledeKey: 'site.docs.loss.sum',
+    titleKey: 'site.docs.loss.seo.title',
+    descriptionKey: 'site.docs.loss.sum',
   },
 ] as const satisfies readonly SitePage[];
 

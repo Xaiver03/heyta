@@ -276,18 +276,58 @@ export function PageHead({
   );
 }
 
+/**
+ * 一张文章配图（真界面截图）。
+ *
+ * 🔴 **为什么这里只有"渲染所需的最小五件事"**：图号（`20-1`）必须由**注册表顺序**
+ * 算出来（`docs.ts` 的 `docsFiguresOf()`），手写编号的保质期是下一次插入一节；
+ * 而通用渲染器**不该知道**文档注册表的存在 —— 它接住五件事就能画，
+ * 于是 `/features` 那些没有配图的页面一个字都不用改。
+ *
+ * ⚠️ 与 `mockView` 是两个槽，不是一条：复现件回答"这东西长什么样"（跟着设计系统走，
+ * 永不过期），配图回答"那个界面此刻是什么样"（会随产品过期，所以有生成器与 sha256 闸门）。
+ */
+export interface SectionFigure {
+  readonly sectionId: string;
+  /** 图号的数字部分（`"20-1"`），由注册表顺序算出来，不是手写的。 */
+  readonly number: string;
+  /** 「图」/ "Figure" 前缀用哪条词条。**词条而不是字符串**：拼进 `number` 就等于让英文页显示一个中文「图」字。 */
+  readonly labelKey: MessageKey;
+  readonly src: string;
+  readonly captionKey: MessageKey;
+  readonly altKey: MessageKey;
+}
+
 /** 分区正文。`children` 用来插入页面独有的区块（例如价格对照表）。 */
 export function PageSections({
   sections,
   notes = [],
+  figures = [],
   children,
 }: {
   sections: readonly SectionSpec[];
   /** 页末的提醒/免责说明。渲染成 `.lp-note`：它读起来就不是正文的一部分。 */
   notes?: readonly MessageKey[];
+  /** 文章配图，按 `sectionId` 挂到对应分区末尾。只有文档中心的文章会传。 */
+  figures?: readonly SectionFigure[];
   children?: ReactNode;
 }): React.JSX.Element {
   const { t } = useI18n();
+
+  /**
+   * 配图按分区归组。
+   *
+   * ⚠️ 映射表（`helpFigures.ts`）是**扁平清单**，因为"哪一节配图"是一条一条登记的；
+   * 渲染要的是**按节挂载**。这里做一次分组，而不是让映射表提前按节嵌套 ——
+   * 嵌套版少一层好读，但`docsFiguresOf()` 算图号时必须知道**全篇的顺序**，
+   * 两层结构会让"第几张"取决于遍历顺序而不是登记顺序。
+   */
+  const figuresBySection = new Map<string, SectionFigure[]>();
+  for (const figure of figures) {
+    const bucket = figuresBySection.get(figure.sectionId);
+    if (bucket === undefined) figuresBySection.set(figure.sectionId, [figure]);
+    else bucket.push(figure);
+  }
 
   return (
     <div className="lp-wrap">
@@ -314,6 +354,32 @@ export function PageSections({
                 ))}
               </ul>
             ) : null}
+
+            {(figuresBySection.get(section.id) ?? []).map((figure) => (
+              <figure key={figure.src} className="lp-figure">
+                {/*
+                  🔴 **不写 `width` / `height` 字面量**：那张图的真实尺寸只有一个事实源
+                  （`scripts/screenshots/targets.mjs` 里那组的设备预设，生成器据此逐张比对），
+                  在这里补一份"1440×900"就是第二个源 —— 而截图改分辨率是常事。
+                  画面比例由样式表负责。
+                */}
+                <div className="lp-figure__media">
+                  <img
+                    className="lp-figure__img"
+                    src={figure.src}
+                    alt={t(figure.altKey)}
+                    loading="lazy"
+                    decoding="async"
+                  />
+                </div>
+                <figcaption className="lp-figure__caption">
+                  <span className="lp-figure__number">
+                    {t(figure.labelKey)} {figure.number}
+                  </span>
+                  <KeyText messageKey={figure.captionKey} />
+                </figcaption>
+              </figure>
+            ))}
 
             {section.mockView === undefined ? null : (
               <div className="lp-row__visual">
