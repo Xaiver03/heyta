@@ -23,7 +23,8 @@
  *
  * 🔴 **隔离**：`pricing` / `coupon` 两组改的是 `/tmp` 里的**副本**（见 `prepareProbe`），
  * 真实工作区**一个字都不改**。`recurrence` 的源码副本也是隔离的，但它还会注入
- * `packages/i18n/dist/index.js` —— 那是**未跟踪的构建产物**，不是源码。
+ * `packages/i18n/dist/` 里**真正含那条词条的产物文件**（由 `i18nDistFileWith` 现查，
+ * 不写死文件名）—— 那是**未跟踪的构建产物**，不是源码。
  *
  * 隔离是被实测教出来的：注入会在几十秒内把源码故意改坏，而在共享工作区里，这期间
  * 任何别的进程（`pnpm build` / 另一个 agent）读到的都是**改坏的代码**；一次运行
@@ -42,6 +43,7 @@ import {
   cpSync,
   existsSync,
   mkdirSync,
+  readdirSync,
   readFileSync,
   rmSync,
   symlinkSync,
@@ -58,15 +60,35 @@ const PROBE_ROOT = '/tmp/heyta-i18n-probe';
 const GATE = path.join(ROOT, 'scripts/check-ui-language.mjs');
 const ZH = path.join(ROOT, 'packages/i18n/src/locales/zh-CN.ts');
 const EN = path.join(ROOT, 'packages/i18n/src/locales/en.ts');
-const I18N_DIST = path.join(ROOT, 'packages/i18n/dist/index.js');
+/**
+ * 🔴 i18n 的**构建产物目录**，不是某个写死的产物文件。
+ *
+ * 这里曾经写死 `dist/index.js`，而 `packages/i18n/tsup.config.ts` 是多入口
+ * （R7：根入口 + 单语言子路径）⇒ 词条表被 code-split 进 `chunk-*.js`，
+ * `index.js` 只剩一个 re-export 桩 —— 于是那两条注入**永远找不到锚点**，
+ * 探针抛「锚点不存在」，用例红，而产品一个字都没坏。
+ *
+ * 这正是 §7 那条一般规律的第三种面目：**写死产物文件名会被每一次构建改掉。**
+ * 所以锚点住哪儿由"它真的在里面"决定，见 `i18nDistFileWith`。
+ */
+const I18N_DIST_DIR = path.join(ROOT, 'packages/i18n/dist');
 const MOBILE = path.join(ROOT, 'apps/mobile');
 const MOBILE_PROBE = path.join(PROBE_ROOT, 'recurrence/apps/mobile');
+const UI = path.join(ROOT, 'packages/ui');
 const AI = path.join(ROOT, 'packages/ai');
 const AI_SUPPLY = path.join(AI, 'src/supply.ts');
 const AI_HEALTH = path.join(AI, 'src/health-store.ts');
 const SYNC_CLIENT = path.join(ROOT, 'packages/sync-client');
 const SC_CLIENT = path.join(SYNC_CLIENT, 'src/client.ts');
-const SYNC_FAILURE_COPY = path.join(ROOT, 'apps/web/src/features/sync/sync-failure-copy.ts');
+/**
+ * 🔴 「同步失败原因 → 词条 key」这一张表现在**只有共享层一份**。
+ *
+ * 以前这里是 `apps/web/src/features/sync/sync-failure-copy.ts`，M3 第四刀把
+ * 两端那两份（web 的 `sync-failure-copy.ts` 与移动端的 `status-text.ts`）
+ * 收进了 `packages/ui/src/sync/model.ts`，旧文件被删 —— 探针的常量没跟着改，
+ * 于是那条注入改的是一个**已经不存在的文件**（`readFileSync` 抛 ENOENT）。
+ */
+const UI_SYNC_MODEL = path.join(UI, 'src/sync/model.ts');
 const MOBILE_STATUS_TEXT = path.join(ROOT, 'apps/mobile/src/sync/status-text.ts');
 const DOMAIN = path.join(ROOT, 'packages/domain');
 const PREF_EVIDENCE = path.join(DOMAIN, 'src/preference-evidence.ts');
@@ -177,6 +199,57 @@ function assertCopied(probeRoot, relPaths) {
 /** 副本用完就删。 */
 function dropProbe(group) {
   rmSync(path.join(PROBE_ROOT, group), { recursive: true, force: true });
+}
+
+/** 递归收集目录下的 `.js`（只看产物，`.d.ts` / `.map` 里不会有词条）。 */
+function jsFilesUnder(dir) {
+  const found = [];
+  for (const entry of readdirSync(dir, { withFileTypes: true })) {
+    const full = path.join(dir, entry.name);
+    if (entry.isDirectory()) found.push(...jsFilesUnder(full));
+    else if (entry.isFile() && entry.name.endsWith('.js')) found.push(full);
+  }
+  return found.sort();
+}
+
+/**
+ * 🔴 找出 `packages/i18n/dist` 里**真的含这条锚点**的那个产物文件。
+ *
+ * 移动端那条测试解析的是 `@heyta/i18n` 的 **dist**（不是源码），所以这两条注入
+ * 必须改编译产物 —— 这没有别的选择。要修的只是**"产物里哪个文件"**这件事：
+ * 写死 `dist/index.js` 在 `tsup.config.ts` 变成多入口之后就永远不可能命中，
+ * 因为 code-split 把词条表搬进了 `chunk-*.js`，`index.js` 只剩 re-export 桩。
+ *
+ * 三种"找不到"一律**抛错**，绝不静默跳过：
+ *   · 目录不存在 ⇒ 没构建过，提示先 build（这是环境问题，说清才能自愈）；
+ *   · 零命中 ⇒ 词条被改名/重构，注入点没了 —— 静默跳过就等于这条检查"永远通过"，
+ *     而那正是这道探针存在的理由要防的事；
+ *   · 多命中 ⇒ 构建形状变了，必须由人决定"移动端真正加载的是哪一份"，
+ *     随便挑一个可能会改到一份根本不参与运行的副本，于是"注入成功"是假的。
+ */
+function i18nDistFileWith(anchor) {
+  if (!existsSync(I18N_DIST_DIR)) {
+    throw new Error(
+      `没有 ${path.relative(ROOT, I18N_DIST_DIR)} —— 这两条注入改的是构建产物。` +
+        `先跑 pnpm --filter @heyta/i18n build 再跑本脚本。`,
+    );
+  }
+  const matches = jsFilesUnder(I18N_DIST_DIR).filter((file) => readFileSync(file, 'utf8').includes(anchor));
+  const rel = matches.map((file) => path.relative(ROOT, file));
+  if (matches.length === 0) {
+    throw new Error(
+      `注入失败（锚点在 ${path.relative(ROOT, I18N_DIST_DIR)} 的任何产物里都不存在）：\n  锚点：${anchor}\n` +
+        '  词条表被改名或结构变了 —— 去核对 packages/i18n 的源码与本组锚点，别把它当成"产品坏了"。',
+    );
+  }
+  if (matches.length > 1) {
+    throw new Error(
+      `注入失败（锚点同时出现在 ${String(matches.length)} 个产物里，不知道移动端加载的是哪一份）：\n  ` +
+        rel.join('\n  ') +
+        `\n  锚点：${anchor}\n  构建形状变了（entry / splitting），请先确认哪一份真正参与运行，再把它钉成显式清单。`,
+    );
+  }
+  return matches[0];
 }
 
 /** 跑一条命令，返回退出码与合并输出。**不抛错** —— 非零退出就是被测的结果。 */
@@ -462,18 +535,23 @@ function groupRecurrence() {
    * 移动端测试解析的是 `@heyta/i18n` 的 **dist**，所以改的是编译产物。
    * esbuild 会把中文转义成 `\uXXXX`，锚点必须写转义形式（我第一次用字面「每天」，
    * 一个都没匹配上 —— 于是"注入成功"是假的）。
+   *
+   * 🔴 产物**文件名不写死**：`i18nDistFileWith` 在 `dist/` 里找"真的含这条锚点"的那个
+   * 文件。写死 `dist/index.js` 在多入口 + code-split 之后必然落空（原因见那条常量
+   * 上面的注释），而落空的表现是探针抛异常 ⇒ 用例红 ⇒ 看起来像产品坏了。
    */
   const ZH_DAILY = String.raw`"mobile.recurrence.daily": "\u6BCF\u5929"`;
+  const EN_DAILY = '"mobile.recurrence.daily": "every day"';
   expectRed('recurrence', 'zh 词条「每天」→「每日」（一个字之差）', () =>
-    withMutation(I18N_DIST, ZH_DAILY, String.raw`"mobile.recurrence.daily": "\u6BCF\u65E5"`, mobileRun),
-  );
-  expectRed('recurrence', 'en 词条漏出中文（every day → 每天）', () =>
     withMutation(
-      I18N_DIST,
-      '"mobile.recurrence.daily": "every day"',
-      String.raw`"mobile.recurrence.daily": "\u6BCF\u5929"`,
+      i18nDistFileWith(ZH_DAILY),
+      ZH_DAILY,
+      String.raw`"mobile.recurrence.daily": "\u6BCF\u65E5"`,
       mobileRun,
     ),
+  );
+  expectRed('recurrence', 'en 词条漏出中文（every day → 每天）', () =>
+    withMutation(i18nDistFileWith(EN_DAILY), EN_DAILY, ZH_DAILY, mobileRun),
   );
 
   expectGreen('recurrence', '全部还原后重跑，必须回到绿', mobileRun);
@@ -755,11 +833,26 @@ function groupScene() {
  * 修法分三层，每一层都要能失败：
  *   1. **包里**给出结构化 `reason`（并且它自己有测试钉住 —— 在这之前，
  *      `reason` 改错了是**没有任何测试会红**的）；
- *   2. **web 壳**按 reason 取词条；
- *   3. **移动端壳**同样按 reason 取词条（它原来更糟：整句丢掉，只剩"同步失败"）。
+ *   2. **共享层**给出「原因 → 词条 key」那张表（M3 第四刀起 web 与移动端
+ *      共用 `packages/ui` 的 `syncFailureMessageKey` 一份，见
+ *      `packages/ui/src/sync/model.ts` 文件头记的那次真实漂移）；
+ *   3. **移动端壳**真的去用它（那层原来更糟：整句丢掉，只剩"同步失败"）。
+ *
+ * 🔴 注入点跟着搬家是**必须的**，不是整理：第 2 层的旧锚点
+ * `apps/web/src/features/sync/sync-failure-copy.ts` 已经被删掉了，
+ * `withMutation` 的 `readFileSync` 直接抛 ENOENT ⇒ 用例红在探针自己身上，
+ * 而产品完好。这一组的第 2 层因此改成跑 `@heyta/ui` **自己**的
+ * `tests/sync-model.spec.ts` —— 它读的是源码，不受 `dist/` 是否新鲜影响
+ * （web 壳确实消费这张表，那条仍由本组末尾的 `webSyncRun` 基线绿钉住）。
  */
 function groupSync() {
   const syncRun = () => run(path.join(SYNC_CLIENT, 'node_modules/.bin/vitest'), ['run'], SYNC_CLIENT);
+  const uiModelRun = () =>
+    run(
+      path.join(UI, 'node_modules/.bin/vitest'),
+      ['run', 'tests/sync-model.spec.ts'],
+      path.join(ROOT, 'packages/ui'),
+    );
   const webSyncRun = () =>
     run(
       path.join(ROOT, 'apps/web/node_modules/.bin/vitest'),
@@ -772,9 +865,9 @@ function groupSync() {
       ['run', 'tests/sync-status-text.spec.ts'],
       path.join(ROOT, 'apps/mobile'),
     );
-  /** 三条一起跑：注入点在三个不同的包里，还原后三个都得回绿。 */
+  /** 四条一起跑：注入点在四个不同的包里，还原后四个都得回绿。 */
   const allRun = () => {
-    for (const r of [syncRun, webSyncRun, mobileSyncRun]) {
+    for (const r of [syncRun, uiModelRun, webSyncRun, mobileSyncRun]) {
       const res = r();
       if (res.code !== 0) return res;
     }
@@ -794,27 +887,30 @@ function groupSync() {
     ),
   );
 
-  // ② web 壳：两条不同的失败指到同一条词条 —— 英文界面会给出**错的**下一步。
-  expectRed('sync', 'web 壳把两种失败指到同一条词条', () =>
+  // ② 共享那张表：两条不同的失败指到同一条词条 —— 两端会同时给出**错的**下一步
+  //   （口令错的人被支去"填服务地址"）。这张表只有一份，所以注入也必须只打一处。
+  expectRed('sync', '共享表把两种失败指到同一条词条', () =>
     withMutation(
-      SYNC_FAILURE_COPY,
+      UI_SYNC_MODEL,
       "  'no-encryption-password': 'common.sync.error.noPassword',",
       "  'no-encryption-password': 'common.sync.error.notConfigured',",
-      webSyncRun,
+      uiModelRun,
     ),
   );
 
-  // ③ 移动端壳：不再区分原因，全都退回"同步失败"（迁移前的行为）。
+  // ③ 移动端壳：不再走共享路由，全都退回"同步失败"（迁移前的行为）。
+  //   注入打在**调用点**上 —— 共享表本身坏掉是第 ② 条的事，这条钉的是
+  //   "壳有没有真的去区分"。
   expectRed('sync', '移动端不再区分原因（全退回"同步失败"）', () =>
     withMutation(
       MOBILE_STATUS_TEXT,
-      ": t(SYNC_FAILURE_KEY[status.reason]);",
-      ": t('mobile.sync.error');",
+      '      const key = syncFailureMessageKey(status.reason);',
+      '      const key = undefined;',
       mobileSyncRun,
     ),
   );
 
-  expectGreen('sync', '全部还原后三条一起重跑，必须回到绿', allRun);
+  expectGreen('sync', '全部还原后四条一起重跑，必须回到绿', allRun);
 }
 
 /**
