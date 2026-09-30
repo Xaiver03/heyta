@@ -1,0 +1,378 @@
+/**
+ * 线上站点验收：**真浏览器 + 真域名 + 真 TLS + 真服务端**。
+ * ==========================================================
+ *
+ * 与另三份 e2e 配置的分工见 `playwright.live-site.config.ts` 的文件头。
+ * 这一份只回答一个问题：**部署之后，用户真的能用吗？** —— 而且是用
+ * `curl` 回答不了的那部分：
+ *
+ *   · 落地页上的「立即使用」**点下去**落在哪（`curl` 看不到点击）；
+ *   · 换域名之后页面里**还有没有旧域名的残留**（分享卡、hreflang、canonical）；
+ *   · 应用与同步服务端是不是**真的同源**（WebAuthn 的前提，不同源则 passkey 不可能工作）。
+ *
+ * ## 规矩来自 `AGENTS.md` §6.2（四条，不是建议）
+ *
+ * 1. **先截图，再断言** —— 截图在断言之前落盘，失败时也有图；
+ * 2. 截图放**固定路径**（`test-results/live-*.png`），不随测试名变化；
+ * 3. 抓控制台 `console` 与 `pageerror`，失败时打印出来（白屏的根因只在这里现形）；
+ * 4. **人要打开那张图看一眼** —— 不是"截了就算"。
+ */
+
+import { expect, test, type Page } from '@playwright/test';
+
+const ORIGIN = process.env['HEYTA_LIVE_ORIGIN'] ?? 'https://heyta.waytofuture.cn';
+
+/** 固定截图路径 —— 规定一第 2 条。 */
+const SHOT_DIR = 'test-results';
+
+/**
+ * 控制台 / 页面错误收集器 —— 规定一第 3 条。
+ *
+ * ⚠️ 必须在 `goto` **之前**挂上：挂晚了收不到加载期的错误，
+ * 而白屏的根因 100% 在加载期。输出会显示"控制台无内容"，那是最误导人的结果。
+ */
+function attachLogs(page: Page): string[] {
+  const logs: string[] = [];
+  page.on('console', (message) => {
+    logs.push(`[console.${message.type()}] ${message.text()}`);
+  });
+  page.on('pageerror', (error) => {
+    logs.push(`[pageerror] ${error.message}`);
+  });
+  page.on('requestfailed', (request) => {
+    logs.push(`[requestfailed] ${request.url()} ${request.failure()?.errorText ?? ''}`);
+  });
+  return logs;
+}
+
+/** 未捕获异常与 4xx/5xx 之外的**硬**噪声：`pageerror` 一律算失败。 */
+function hardErrors(logs: readonly string[]): string[] {
+  return logs.filter((line) => line.startsWith('[pageerror]'));
+}
+
+/**
+ * 应用是 SPA —— 但**不要用"字符数 > N"当判据**。
+ *
+ * 🔴 第一次写这条验收时用了 `#root` 的 `textContent.length > 1000`，
+ * 结果应用**完全正常渲染**（失败截图里整页 UI 都在、布局正确），
+ * 只有这个断言红了 —— 红在一个**我自己编的数字**上。
+ * 那个 1000 是照着文档另一处的"14629 字符"猜的，而那一处量的是 `innerHTML`。
+ *
+ * **拿一个编出来的阈值当验收判据，是"看起来在验收"的典型**：
+ * 它既不能证明应用可用，又会在应用完全正常时报警。
+ *
+ * 所以判据换成"**真正属于应用外壳的东西可见**"：看得见任务输入框，
+ * 才叫"应用打开了"。字符数只记进日志，**不做断言**。
+ */
+async function waitForAppRender(page: Page): Promise<number> {
+  await page
+    .locator('input[placeholder*="添加任务"]')
+    .first()
+    .waitFor({ state: 'visible', timeout: 60_000 });
+  // 收件箱标题也要在：只有输入框可能是某个残缺的中间态。
+  // ⚠️ 不要用 `getByRole('button', { name: '任务' })` —— 侧栏导航不是 button，
+  // 那样写会红在一个**选择器猜错**上，而不是应用有问题。
+  await expect(page.getByText('收集箱').first()).toBeVisible({ timeout: 30_000 });
+  return page.evaluate(() => document.querySelector('#root')?.textContent?.length ?? 0);
+}
+
+/**
+ * 落地页是 React 客户端渲染 + `motion` 入场动画。
+ *
+ * 🔴 `waitUntil: 'domcontentloaded'` 只保证**HTML 到了**，React 还没跑。
+ * 第一次写这条验收时就直接在 `domcontentloaded` 后截图，得到的是一张**全白图** ——
+ * 而断言随后仍然是绿的（元素最终渲染出来了）。
+ * 一张空白截图作为"界面正常"的证据，比没有证据更坏：它看起来像证据。
+ *
+ * 所以：先等英雄区标题**可见**，再等网络静默，然后才截图。
+ */
+async function settleLanding(page: Page): Promise<void> {
+  await page.locator('h1').first().waitFor({ state: 'visible', timeout: 30_000 });
+  await page.waitForLoadState('networkidle');
+  // 入场动画（motion）跑完再截，否则拍到的是半透明中间帧。
+  await page.waitForTimeout(1200);
+}
+
+test('中文落地页 →「立即使用」→ 应用：全程新域名，且无旧域名残留', async ({ page }) => {
+  const logs = attachLogs(page);
+  await page.setViewportSize({ width: 1280, height: 900 });
+
+  await page.goto(`${ORIGIN}/`, { waitUntil: 'domcontentloaded' });
+  await settleLanding(page);
+
+  // 规定一第 1 条：**先截图**。
+  await page.screenshot({ path: `${SHOT_DIR}/live-landing-zh.png` });
+  console.log(`📷 中文落地页：${SHOT_DIR}/live-landing-zh.png`);
+
+  // canonical 必须自我声明**新**域名（爬虫看到的正版地址）。
+  await expect(page.locator('link[rel="canonical"]')).toHaveAttribute('href', `${ORIGIN}/`);
+
+  // 旧域名不许以任何形式残留在页面上 —— 这是 R14 那条缺陷的形状：
+  // 换域名后分享卡/hreflang 仍印旧地址，**页面不报错**。
+  const html = await page.content();
+  expect(html, '页面里仍出现旧域名 heyta.finlaw.cloud').not.toContain('heyta.finlaw.cloud');
+
+  /**
+   * 🔴 入口地址**刻意不带尾斜杠**（`apps/landing/src/lib/app-url.ts` 的规范化）：
+   * 写死 `/app/` 会让页面上给出的地址与 nginx 的 `location = /app` 301 规则
+   * 互为冗余。所以这里断言的是设计口径，而不是我一开始以为的 `/app/`。
+   * 它点了之后能落到 `/app/`，由下面的 `waitForURL` 证明。
+   */
+  const cta = page.locator('a.lp-btn--primary').first();
+  await expect(cta).toHaveAttribute('href', `${ORIGIN}/app`);
+
+  await cta.click();
+  // 允许 301：`/app` → `/app/`（nginx `location = /app`）。
+  await page.waitForURL(/\/app\/?(\?|$)/u, { timeout: 60_000 });
+  await expect(page).toHaveTitle('heyta');
+
+  const rootLength = await waitForAppRender(page);
+  await page.waitForTimeout(1000);
+  await page.screenshot({ path: `${SHOT_DIR}/live-app-after-cta.png` });
+  console.log(`📷 点击后落在应用：${SHOT_DIR}/live-app-after-cta.png（#root textContent ${String(rootLength)} 字符）`);
+
+  const hard = hardErrors(logs);
+  console.log(`控制台共 ${String(logs.length)} 条：\n  ${logs.join('\n  ')}`);
+  expect(hard, `页面抛了未捕获异常：\n${hard.join('\n')}`).toEqual([]);
+  // 🔴 这里**故意没有**字符数阈值。
+  //
+  // 我先后试过 `> 1000` 和 `> 200`，两次都在应用**完全正常渲染**时报警
+  // （实测 `#root` textContent 只有 145 字符，而截图里整页 UI 都在）——
+  // 数字是照着文档另一处"14629 字符"猜的，那一处量的是 `innerHTML`。
+  //
+  // 「应用打开了」这件事，上面两条**元素可见**断言（任务输入框 + 收件箱标题）
+  // 是严格更强的证据：它们指向真正属于应用外壳的节点。
+  // 再叠一个自己编的阈值，只会让验收在正确的时候变红。
+});
+
+test('英文落地页的入口带 ?lang=en（否则英文访客进应用看到中文）', async ({ page }) => {
+  const logs = attachLogs(page);
+  await page.setViewportSize({ width: 1280, height: 900 });
+
+  await page.goto(`${ORIGIN}/en/`, { waitUntil: 'domcontentloaded' });
+  await settleLanding(page);
+  await page.screenshot({ path: `${SHOT_DIR}/live-landing-en.png` });
+  console.log(`📷 英文落地页：${SHOT_DIR}/live-landing-en.png`);
+
+  // 同 ZH：不带尾斜杠，英文页额外带 `?lang=en`（否则英文访客进应用看到中文）。
+  const cta = page.locator('a.lp-btn--primary').first();
+  await expect(cta).toHaveAttribute('href', `${ORIGIN}/app?lang=en`);
+
+  const hard = hardErrors(logs);
+  console.log(`控制台共 ${String(logs.length)} 条：\n  ${logs.join('\n  ')}`);
+  expect(hard, `页面抛了未捕获异常：\n${hard.join('\n')}`).toEqual([]);
+});
+
+test('凭据页与 API 与站点同域（同源是 passkey 的前提）', async ({ page }) => {
+  const logs = attachLogs(page);
+  await page.goto(`${ORIGIN}/`, { waitUntil: 'domcontentloaded' });
+
+  // 用**页面内**的 fetch 而不是 Playwright 的 request fixture：
+  // 后者走 Node 的网络栈，验不到 Chromium 的解析与 TLS 路径。
+  const probe = await page.evaluate(async (origin: string) => {
+    const health = (await fetch(`${origin}/health`).then((r) => r.json())) as { status?: string };
+    const verify = await fetch(`${origin}/verify-email`);
+    const verifyText = await verify.text();
+    const options = (await fetch(`${origin}/api/login/passkey/options`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: 'probe@example.com' }),
+    }).then((r) => r.json())) as { rpId?: string };
+    return {
+      healthStatus: health.status,
+      verifyStatus: verify.status,
+      // 凭据页必须是**服务端渲染的页面**。被落地页的 SPA 兜底吞掉时
+      // 返回的是 200 + 落地页 HTML —— 不报错，只是"点登录打开了官网"。
+      verifyIsLandingHtml: verifyText.includes('id="root"'),
+      rpId: options.rpId,
+    };
+  }, ORIGIN);
+
+  console.log(`PROBE: ${JSON.stringify(probe)}`);
+
+  expect(probe.healthStatus, '/health 没代理到同步服务端').toBe('ok');
+  expect(probe.verifyIsLandingHtml, '/verify-email 被落地页 SPA 兜底吞了').toBe(false);
+  expect(probe.verifyStatus, '/verify-email 应当是服务端的诚实失败').not.toBe(200);
+  expect(probe.rpId, 'WebAuthn RP ID 没跟着域名一起换').toBe(new URL(ORIGIN).host);
+
+  const hard = hardErrors(logs);
+  expect(hard, `页面抛了未捕获异常：\n${hard.join('\n')}`).toEqual([]);
+});
+
+/**
+ * 管理后台**已真的部署上去**，而且是**锁着**的（ADR-0038）。
+ *
+ * 这一条验的是部署事实，不是业务逻辑：
+ *   · 路由真的注册了（否则会是 404 —— SPA 兜底也可能给出 200 + HTML）；
+ *   · 没有令牌时是 **401**，不是 200；
+ *   · 而且它返回的是 **JSON**，不是落地页。
+ *
+ * 🔴 "没人有权限"是**设计**：`users.is_admin` 默认 false，
+ * 必须由人在服务器上显式授权（`docker exec … node dist/scripts/admin.js grant <email>`）。
+ * 所以这条断言**在授权之后依然成立** —— 它没有令牌，与谁是不是管理员无关。
+ */
+test('管理后台已部署且默认锁着（无令牌 ⇒ 401 JSON）', async ({ page }) => {
+  await page.goto(`${ORIGIN}/`, { waitUntil: 'domcontentloaded' });
+
+  const probe = await page.evaluate(async (origin: string) => {
+    const response = await fetch(`${origin}/api/admin/overview`);
+    const text = await response.text();
+    return {
+      status: response.status,
+      contentType: response.headers.get('content-type') ?? '',
+      looksLikeLanding: text.includes('id="root"'),
+    };
+  }, ORIGIN);
+
+  console.log(`ADMIN PROBE: ${JSON.stringify(probe)}`);
+
+  // 404 说明路由没注册；200 说明闸门没生效。两者都是红。
+  expect(probe.status, '/api/admin/overview 没有按预期要求身份').toBe(401);
+  expect(probe.looksLikeLanding, '管理端点被落地页的 SPA 兜底吞了').toBe(false);
+  expect(probe.contentType).toContain('application/json');
+});
+
+/**
+ * PWA 在**子路径**下的回归判据。
+ *
+ * 这一条是 2026-09-30 迁移验收时**当场抓到**的真缺陷的守卫：
+ * 应用挂在 `/app/` 下，但 `register.ts` 写死 `'/sw.js'`、`gen-pwa.mjs`
+ * 生成的 manifest 里 `start_url`/`scope`/`icons[].src` 也是 `/…` ——
+ * 于是线上 `/sw.js` 与 `/icons/*.png` 落到站点根（落地页，`text/html`），
+ * SW 注册抛 `SecurityError`，**PWA 装出来的入口是落地页**。
+ *
+ * ⚠️ 它**只能**在这一层验：`vite dev` / `vite preview` 都跑在根路径，
+ * 那里旧代码也是对的。
+ */
+test('PWA 资产在 /app/ 子路径下拿到真身，且 SW 真的注册成功', async ({ page }) => {
+  const logs = attachLogs(page);
+  await page.goto(`${ORIGIN}/app/`, { waitUntil: 'domcontentloaded' });
+
+  /**
+   * 🔴 **必须等应用真的渲染出来再截图** —— 而且这一步本身就是一条判据。
+   *
+   * 第一版这里截完图才发现是**全白**：这条用例直接 `goto('/app/')`
+   * （不像上一条是先点落地页的 CTA），没有等 React 渲染。
+   * 一张标着「应用（PWA 验收）」的全白图，比没有图更坏 —— 它看起来像证据。
+   *
+   * 顺带它把一个**没人验过的入口**补上了：**直接打开 `/app/`**（书签、
+   * PWA 启动、或用户手输地址都是这条路径）。上一条只覆盖了"从落地页点进来"。
+   */
+  const rootLength = await waitForAppRender(page);
+  await page.screenshot({ path: `${SHOT_DIR}/live-app-pwa.png` });
+  console.log(`📷 应用（PWA 验收）：${SHOT_DIR}/live-app-pwa.png（#root textContent ${String(rootLength)} 字符）`);
+
+  const probe = await page.evaluate(async () => {
+    const manifestUrl = new URL('manifest.webmanifest', window.location.href);
+    const response = await fetch(manifestUrl);
+    const manifest = (await response.json()) as {
+      start_url: string;
+      scope: string;
+      icons: { src: string }[];
+    };
+
+    // 相对 URL 必须相对 **manifest 自己** 解析（这正是修法的依据）。
+    const resolve = (value: string): string => new URL(value, manifestUrl).pathname;
+
+    const swResponse = await fetch(new URL('sw.js', manifestUrl));
+
+    // SW 真的注册上了吗 —— 这条比"文件取得回来"更强：
+    // 它要求浏览器**接受**了那份脚本（MIME 与语法都对）。
+    const ready = navigator.serviceWorker.ready.then((registration) => ({
+      scope: registration.scope,
+      script:
+        registration.active?.scriptURL ??
+        registration.installing?.scriptURL ??
+        registration.waiting?.scriptURL ??
+        null,
+    }));
+    const timeout = new Promise<'timeout'>((resolveTimeout) => {
+      setTimeout(() => resolveTimeout('timeout'), 20_000);
+    });
+    const sw = await Promise.race([ready, timeout]);
+
+    return {
+      startUrl: resolve(manifest.start_url),
+      scope: resolve(manifest.scope),
+      iconPath: resolve(manifest.icons[0]?.src ?? ''),
+      swStatus: swResponse.status,
+      swType: swResponse.headers.get('content-type'),
+      manifestType: response.headers.get('content-type'),
+      sw,
+    };
+  });
+
+  console.log(`PWA PROBE: ${JSON.stringify(probe)}`);
+
+  // 装出来的入口必须是**应用**，不是站点根的落地页。
+  expect(probe.startUrl, 'PWA 的 start_url 不是应用 ⇒ 装出来打开的是落地页').toBe('/app/');
+  expect(probe.scope).toBe('/app/');
+  expect(probe.iconPath, '把图标解析到了站点根（落地页会返回 text/html）').toBe(
+    '/app/icons/icon-192.png',
+  );
+
+  // SW 必须是**脚本**而不是落地页 HTML —— 这条正是当初的 SecurityError 来源。
+  expect(probe.swStatus).toBe(200);
+  expect(probe.swType ?? '', `SW 的 Content-Type 是 ${String(probe.swType)}，不是脚本`).toMatch(
+    /javascript/,
+  );
+
+  expect(probe.sw, 'service worker 在 20 秒内没有 ready').not.toBe('timeout');
+  if (probe.sw !== 'timeout') {
+    expect(probe.sw.scope, 'SW 的作用域不是应用所在的 /app/').toContain('/app/');
+    expect(probe.sw.script ?? '', 'SW 的脚本地址不是 /app/sw.js').toContain('/app/sw.js');
+  }
+
+  // 控制台不许再出现注册失败那条（register.ts 的 warn 文案）。
+  const swWarnings = logs.filter((line) => line.includes('service worker 注册失败'));
+  console.log(`控制台共 ${String(logs.length)} 条：\n  ${logs.join('\n  ')}`);
+  expect(swWarnings, `service worker 注册失败：\n${swWarnings.join('\n')}`).toEqual([]);
+
+  const hard = hardErrors(logs);
+  expect(hard, `页面抛了未捕获异常：\n${hard.join('\n')}`).toEqual([]);
+});
+
+/**
+ * 🔴 凭据页在真浏览器里**不许有 JS 报错**，按钮必须真的有反应。
+ *
+ * 这条来自一次**真实报障**（2026-09-30）：用户点邮件里的登录链接，
+ * 页面出来了、按钮**点了完全没反应**，控制台是
+ *
+ * ```
+ * magic-login-confirm.js:15 Uncaught TypeError:
+ *   Cannot read properties of null (reading 'dataset')
+ * ```
+ *
+ * 根因是脚本被渲染在 `<head>` 里且没有 `defer` —— 同步执行时 `<body>` 还没解析，
+ * `document.body` 是 `null`。服务端的单测已经钉住了脚本位置（`server-i18n-design.spec.ts`），
+ * 但**只有真浏览器能证明"没有报错、按钮确实有反应"** —— 所以这里再验一层。
+ *
+ * ⚠️ 用**无效 token**：页面照常渲染，点按钮会走一次注定失败的 POST。
+ *    我们要的是"它有反应"（显示出错状态），而不是"登录成功"。
+ */
+test('凭据页脚本无 JS 报错，且按钮真的有反应', async ({ page }) => {
+  const logs = attachLogs(page);
+
+  await page.goto(`${ORIGIN}/magic-login?token=definitely-invalid-token`, {
+    waitUntil: 'domcontentloaded',
+  });
+
+  // ① 脚本的启动前提成立：body 上有 data-token（也就是脚本没在 body 之前跑）
+  const hasToken = await page.evaluate(() => document.body?.dataset.token !== undefined);
+  expect(hasToken, 'body.dataset.token 取不到 —— 脚本多半又在 <body> 之前就跑了').toBe(true);
+
+  await page.screenshot({ path: `${SHOT_DIR}/live-magic-login.png` });
+  console.log(`📷 魔法登录页：${SHOT_DIR}/live-magic-login.png`);
+
+  // ② 点按钮：必须真的有反应（无效 token ⇒ 出现错误状态），而不是"点了没反应"
+  await page.locator('#login-btn').click();
+  await expect(page.locator('#error')).toBeVisible({ timeout: 20_000 });
+
+  // ③ 全程不许有未捕获异常 —— 这一条就是报障里那个 TypeError 的判据
+  const hard = logs.filter((l) => l.startsWith('[pageerror]'));
+  console.log(`控制台共 ${String(logs.length)} 条：\n  ${logs.join('\n  ')}`);
+  expect(
+    hard,
+    `凭据页抛了未捕获异常（用户看到的就是"按钮点了没反应"）：\n${hard.join('\n')}`,
+  ).toEqual([]);
+});
