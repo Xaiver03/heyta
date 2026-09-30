@@ -25,15 +25,28 @@ guard let list = CGWindowListCopyWindowInfo(options, kCGNullWindowID) as? [[Stri
     exit(1)
 }
 
+// 🔴 **不要按属主名筛**（2026-09-30 实测）：裸 SwiftPM 可执行文件
+//    （`.build/out/Products/Debug/HeytaMac`）被**别的进程树**启动时，
+//    窗口服务器把 `kCGWindowOwnerName` 报成**启动它的那个应用**，而不是 "Heyta"。
+//    本机实测（由 DSH 启动）：
+//
+//        owner=DSH Desktop  title=heyta  bounds=1120x720  onscreen=true
+//
+//    于是 `owner.contains("Heyta")` 会在**标题那道筛之前**把这个窗口丢掉 ⇒
+//    脚本零输出 ⇒ `capture-window.sh` 的交叉验证被跳过（`CROSSCHECK=skipped`）
+//    ⇒ `check:macos-window` **假红**。而标题**是可用的**（上面那行就是证据），
+//    所以判据改成**只认标题**。
+//
+// ⚠️ 顺带纠正一条曾经的推断：过去把零输出归因于"没给屏幕录制权限"。
+//    实测不是 —— 权限受限时 `kCGWindowName` 会是 nil，而这里拿得到 "heyta"。
 for window in list {
-    let owner = window[kCGWindowOwnerName as String] as? String ?? ""
-    guard owner.contains("Heyta") else { continue }
     // 🔴 只认**主窗口**（标题 = "heyta"）：进程里还有别的窗口 ——
     // 实测还有 500x500、无标题的辅助窗口；`.optionAll` 之后它们也会被列出来，
     // `head -1` 拿到它再去 `screencapture -l` 会得到 1000x1000 的占位图
     // （2026-09-30 实测），尺寸比对必红。
     let title = window[kCGWindowName as String] as? String ?? ""
     guard title == "heyta" else { continue }
+    let owner = window[kCGWindowOwnerName as String] as? String ?? ""
     let id = window[kCGWindowNumber as String] as? Int ?? 0
     let bounds = window[kCGWindowBounds as String] as? [String: Any] ?? [:]
     let width = bounds["Width"] ?? "?"
