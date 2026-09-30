@@ -158,6 +158,53 @@ export interface TimelinePlan {
 }
 
 /**
+ * **一条任务**在时间线里的位置（`timeline` 整刀第 1 步）。
+ *
+ * 🔴 为什么它定义在**领域层**、而不是共享 UI 或某个宿主里：
+ * 它是 `planTimelineBlocks()`（app-host）的**返回值**，也是共享
+ * `TimelineView`（`packages/ui`）的**入参** —— 两端都依赖 `@heyta/domain`，
+ * 而 `packages/ui` 与 `packages/app-host` **互不依赖**。
+ * 定义在任何一侧都会逼另一侧抄一份结构类型，而两份类型必然漂移。
+ *
+ * ⚠️ 只有数据，没有行为：**怎么算出来**在 app-host，**怎么画**在 ui。
+ */
+export interface TimelineBlock {
+  readonly taskId: string;
+  readonly title: string;
+  /** 这个任务排好的计划（可能只有一条 —— 没有清单时整条任务自己算一条）。 */
+  readonly plan: TimelinePlan;
+  /**
+   * 备注里 AI 估的分钟数（原样，**未夹到上下限**）。
+   * `undefined` = 没估过；`0` 是"估了 0 分钟" —— 两者不是一回事。
+   */
+  readonly aiMinutes: number | undefined;
+  /** 备注里有没有可排期的清单条目。 */
+  readonly hasChecklist: boolean;
+  /** 参与排程的单元数（没有清单时是 1）。 */
+  readonly unitCount: number;
+  /**
+   * 整条任务的估时**无法分摊**到多个子条目。
+   *
+   * 界面据此如实说明"这个估时是整条的，没有摊到子条目上"，
+   * 而不是按比例编一个用户没给过的工期。
+   */
+  readonly unattributable: boolean;
+}
+
+/**
+ * 所有时间线块共用的一把尺子（分钟）。
+ *
+ * 🔴 每张图各自归一化会让 90 分钟与 30 分钟的条**都占满整行**（各自 100%），
+ * 用户反而看不出谁更长 —— 恰好毁掉时间线要表达的东西。所以横跨所有块的
+ * 最大跨度只有这一处计算。
+ */
+export function sharedTimelineSpan(blocks: readonly TimelineBlock[]): number {
+  let span = 0;
+  for (const block of blocks) span = Math.max(span, block.plan.totalMinutes);
+  return span;
+}
+
+/**
  * 「标题 → 工期」的映射。**单位是分钟**（见 `BuildTimelineOptions.durationsInMinutes`）。
  *
  * 两种形状都收：`Map` 适合任意标题，普通对象适合从 JSON / store 直接拿来。

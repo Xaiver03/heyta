@@ -30,7 +30,7 @@
  *    变多的话他会以为搜索坏了。AND 也是唯一能让人"逐步收窄"的语义。
  */
 
-import type { Task } from './entities.js';
+import type { Note, Task } from './entities.js';
 
 /** 一条任务里**可被搜索**的字段。加字段时这里与 `haystackOf` 一起改。 */
 export interface SearchableText {
@@ -62,6 +62,33 @@ export function matchesQuery(task: SearchableText, query: string): boolean {
   if (terms.length === 0) return true;
   const hay = haystackOf(task);
   return terms.every((term) => hay.includes(term));
+}
+
+/**
+ * 便签 → 可搜索文本。
+ *
+ * 🔴 **便签没有 `title`，正文在 `content`** —— 所以不能把 `Note` 直接传给
+ * `matchesQuery`（它读的是 `title`）。这里把 `content` 放进 `title` 位：
+ * `SearchableText.title` 的语义是"**主要文本**"，不是"标题"。
+ *
+ * ⚠️ 为什么不给便签也加一个 `title` 字段：那是**持久化字段**的变更
+ *（要走 schema 纪律 + 迁移），而这里要的只是"按内容找得到它"。
+ * 为了一处展示需求去改实体形状是本末倒置。
+ */
+export function noteSearchText(note: Note): SearchableText {
+  return { title: note.content };
+}
+
+/**
+ * 按查询串过滤一组便签。
+ *
+ * 与 `searchTasks` 共用 `termsOf` / `matchesQuery` —— 于是
+ * "多词按 AND 收窄"、"空查询匹配一切"这两条语义两端各只有一处定义。
+ */
+export function searchNotes(notes: readonly Note[], query: string): Note[] {
+  const terms = termsOf(query);
+  if (terms.length === 0) return [...notes];
+  return notes.filter((note) => matchesQuery(noteSearchText(note), query));
 }
 
 /** 按查询串过滤一组任务。**顺序不动** —— 排序是调用方的事（见 `task-filter.ts`）。 */

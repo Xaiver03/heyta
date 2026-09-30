@@ -20,11 +20,13 @@ import { describe, expect, it } from 'vitest';
 import { Priority, Quadrant, type Task } from '../src/entities.js';
 import {
   filterTasks,
+  groupTasksByDate,
   isCompleted,
   pendingCount,
   sectionTasks,
   type TaskFilter,
 } from '../src/task-filter.js';
+import { toLocalDate } from '../src/date.js';
 
 /** 本地时间构造，避免测试自身引入时区漂移。 */
 const LOCAL_NOON = new Date(2026, 8, 28, 12, 0, 0).getTime();
@@ -170,5 +172,63 @@ describe('isCompleted', () => {
     expect(isCompleted(task({ id: 'a', completedAt: LOCAL_NOON }))).toBe(true);
     // 0 也是有效的完成时间戳，不能被当作"没有"
     expect(isCompleted(task({ id: 'a', completedAt: 0 }))).toBe(true);
+  });
+});
+
+describe('groupTasksByDate', () => {
+  it('🔴 组序固定：逾期 → 日期升序 → 无截止时间', () => {
+    // 🔴 刻意**乱序**传入（后建的日期更近、无日期的夹在中间）：
+    //    组序是本函数的输出契约，不能跟着输入的运气走。
+    const groups = groupTasksByDate(
+      [
+        task({ id: 'far', dueDate: LOCAL_NOON + 3 * DAY }),
+        task({ id: 'none' }),
+        task({ id: 'tomorrow', dueDate: LOCAL_NOON + DAY }),
+        task({ id: 'over2', dueDate: LOCAL_NOON - 2 * DAY }),
+        task({ id: 'today', dueDate: LOCAL_NOON }),
+        task({ id: 'over1', dueDate: LOCAL_NOON - DAY }),
+      ],
+      ctx,
+    );
+    expect(groups.map((g) => g.kind)).toEqual(['overdue', 'date', 'date', 'date', 'undated']);
+    expect(groups[0]?.tasks.map((t) => t.id)).toEqual(['over2', 'over1']);
+    expect(groups[1]?.date).toBe(toLocalDate(LOCAL_NOON));
+    expect(groups[2]?.date).toBe(toLocalDate(LOCAL_NOON + DAY));
+    expect(groups[3]?.date).toBe(toLocalDate(LOCAL_NOON + 3 * DAY));
+    expect(groups[4]?.tasks.map((t) => t.id)).toEqual(['none']);
+  });
+
+  it('🔴 逾期的日界与 `sectionTasks` 完全一致：今天 00:30 不算逾期', () => {
+    const dawn = new Date(2026, 8, 28, 0, 30, 0).getTime();
+    const groups = groupTasksByDate([task({ id: 'a', dueDate: dawn })], ctx);
+    // 只有一组，且不是 overdue —— "今天清晨"归今天，不是逾期。
+    expect(groups).toHaveLength(1);
+    expect(groups[0]?.kind).toBe('date');
+  });
+
+  it('组内保持传入顺序（顺序规范在 app-host，这里不插手）', () => {
+    const groups = groupTasksByDate(
+      [task({ id: 'b', dueDate: LOCAL_NOON }), task({ id: 'a', dueDate: LOCAL_NOON })],
+      ctx,
+    );
+    expect(groups[0]?.tasks.map((t) => t.id)).toEqual(['b', 'a']);
+  });
+
+  it('已完成的跳过（调用方要展示已完成走 `completed` 筛选平铺）', () => {
+    const groups = groupTasksByDate(
+      [task({ id: 'done', dueDate: LOCAL_NOON, completedAt: LOCAL_NOON }), task({ id: 'a' })],
+      ctx,
+    );
+    expect(groups).toHaveLength(1);
+    expect(groups[0]?.kind).toBe('undated');
+  });
+
+  it('软删除的不进任何组', () => {
+    expect(groupTasksByDate([task({ id: 'x', deletedAt: LOCAL_NOON })], ctx)).toEqual([]);
+  });
+
+  it('全部无逾期、无未来时只剩无截止组；空输入给空数组', () => {
+    expect(groupTasksByDate([task({ id: 'a' })], ctx).map((g) => g.kind)).toEqual(['undated']);
+    expect(groupTasksByDate([], ctx)).toEqual([]);
   });
 });

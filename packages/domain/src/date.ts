@@ -355,3 +355,18 @@ export function formatDayTitle(date: LocalDate): string {
   const weekday = WEEKDAY_FULL[isoWeekday(date) - 1];
   return `${String(d.getMonth() + 1)}月${String(d.getDate())}日 ${String(weekday)}`;
 }
+
+/**
+ * ISO 8601 周数（1–53）。滴答式月历的"周次列"（"31周"）用它 ——
+ * 周一为一周开始，含 1 月 4 日的那周是第 1 周（ISO 8601 定义，
+ * 与 `monthGrid` 的周一开头网格一致：同一行里任何一天算出的周数相同）。
+ */
+export function isoWeek(date: LocalDate): number {
+  const d = parseLocalDate(date);
+  // 周四决定这一周属于哪一年（ISO 8601）：把日期挪到本周的周四。
+  const thursday = new Date(d);
+  thursday.setDate(d.getDate() - (isoWeekday(date) - 1) + 3);
+  const yearStart = new Date(thursday.getFullYear(), 0, 1);
+  const week = Math.ceil(((thursday.getTime() - yearStart.getTime()) / 86_400_000 + 1) / 7);
+  return week;
+}
