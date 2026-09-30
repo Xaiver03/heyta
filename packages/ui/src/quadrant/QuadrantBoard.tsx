@@ -149,6 +149,18 @@ export interface QuadrantBoardProps {
    * 不传就完全不产出这一层 —— mobile 没有鼠标，也就不需要。
    */
   readonly renderCellOverlay?: (card: QuadrantCardModel) => React.ReactNode;
+  /**
+   * 🔴 **摆两列还是单列 —— 由宿主决定，共享层不猜。**
+   *
+   * 桌面壳/web 传"窗口 ≥ 断点"（断点读 token `layout.two-column-min`）；
+   * 移动端不传 → 单列（411dp 上两列的每格放不下一个可读的任务行）。
+   *
+   * ⚠️ 为什么不用 `useWindowDimensions`：RNW 0.21 的 `Dimensions` 取的是
+   * **`window.screen.width`**（物理屏，实测 1728）而不是视口宽 ——
+   * 桌面上它**永远** ≥ 断点，"响应式"就成了摆设（2026-09-29 实测踩过：
+   * 660px 视口下仍然渲染两列）。视口是 web/壳才有的概念，所以判定归宿主。
+   */
+  readonly twoColumns?: boolean;
   readonly testID?: string;
 }
 
@@ -161,19 +173,39 @@ function makeStyles(tokens: HeytaNativeTokens) {
    */
   const strongWeight = String(tokens['font-weight.semibold']) as TextStyle['fontWeight'];
   return StyleSheet.create({
+    /**
+     * 🔴 **2×2 是确定的，不是"wrap 碰运气"。**
+     *
+     * 旧实现（`flexWrap` + `minWidth: '50%'` + `gap`）在 web 上**必然塌成 4 张
+     * 通栏卡**：50% + 50% + gap > 100%，每一格都被挤到下一行（2026-09-29
+     * 产品负责人截图指出，[`docs/plans/goal-layout-audit.md`](docs/plans/goal-layout-audit.md) 页 1）。
+     * 现在按行摆：两行、每行恰好两格、每格 `flex: 1` —— 结构上不可能换行。
+     *
+     * 响应式：容器宽低于 `layout.two-column-min`（平板竖屏 768px）时降为
+     * **单列** —— 手机（RN）一直就是单列，桌面窄窗也一样优雅降级。
+     * "窗口变化不得破坏排版"是本轮 goal 的硬判据。
+     *
+     * 十字坐标系的观感由**间隙**给出：四格之间露出底色，横竖两条"轴线"
+     * 就是那两条缝（与滴答的四象限同构）。
+     */
     board: {
-      // 2×2。用 `flexWrap` + 两列的比例，而不是 CSS grid ——
-      // grid 是 web 专有概念，RN 上没有。
-      flexDirection: 'row',
-      flexWrap: 'wrap',
       gap: tokens['space.3'],
       padding: tokens['space.4'],
     },
+    row: {
+      flexDirection: 'row',
+      gap: tokens['space.3'],
+    },
+    /**
+     * 单列分支的容器。🔴 它**不能复用 `row`**：`rows = [cards]` 时四个格子
+     * 会全部进同一个 `flexDirection: 'row'` 的行里，被压成一行四个 140px 的
+     * 小方块（2026-09-29 实测踩过 —— "单列"渲染成了"最挤的四列"）。
+     */
+    stack: {
+      gap: tokens['space.3'],
+    },
     cell: {
-      // 🔴 `minWidth: '50%'` + `flexGrow`：两列等宽，格子内容不会被挤没。
-      minWidth: '50%',
-      flexGrow: 1,
-      flexBasis: 0,
+      flex: 1,
       flexDirection: 'column',
       minHeight: tokens['layout.quadrant-min-height'],
       padding: tokens['space.3'],
@@ -181,7 +213,7 @@ function makeStyles(tokens: HeytaNativeTokens) {
       backgroundColor: tokens['color.surface'],
       // 用**边框**表达层次与拖拽悬停，不用位移或阴影 ——
       // 阴影只给真正的浮层（这里是平面内容）。
-      borderWidth: tokens['border-width.thick'],
+      borderWidth: tokens['border-width.thin'],
       borderColor: tokens['color.border'],
     },
     /** 拖拽悬停：只换边框色，不动几何（动几何会让整格抖一下）。 */
@@ -250,6 +282,7 @@ export function QuadrantBoard({
   fallbackTitle,
   highlightedQuadrant,
   renderCellOverlay,
+  twoColumns = false,
   testID,
 }: QuadrantBoardProps): React.JSX.Element {
   const tokens = useHeytaTokens();
@@ -260,74 +293,69 @@ export function QuadrantBoard({
   const cards = useMemo(() => toQuadrantCards(tasks, now), [tasks, now]);
   const styles = useMemo(() => makeStyles(tokens), [tokens]);
 
+  /**
+   * 🔴 响应式判定**来自宿主**（`twoColumns` prop，理由见 props 注释）。
+   * 单列是默认值 —— 移动端（411dp）不传就是正确的。
+   */
+  const rows = twoColumns ? [cards.slice(0, 2), cards.slice(2, 4)] : [cards];
+
   const footnote = labels.footnote;
 
   return (
     <View style={styles.board} testID={testID}>
-      {cards.map((card) => {
-        const title = labels.title(card.quadrant);
-        const hint = labels.hint(card.quadrant);
-        const highlighted = highlightedQuadrant === card.quadrant;
-        return (
-          <View
-            key={card.quadrant}
-            style={[styles.cell, highlighted ? styles.cellHighlighted : null]}
-            testID={card.testID}
-            accessibilityRole="summary"
-            accessibilityLabel={labels.cellA11y({
-              quadrant: card.quadrant,
-              title,
-              hint,
-              count: card.count,
-            })}
-          >
-            <View style={styles.header}>
-              <View style={styles.headerRow}>
-                <View style={[styles.swatch, { backgroundColor: tokens[card.token] }]} />
-                <Text style={[text['row-meta'], styles.cellTitle]}>{title}</Text>
+      {rows.map((row, rowIndex) => (
+        <View key={`row-${rowIndex}`} style={twoColumns ? styles.row : styles.stack}>
+          {row.map((card) => {
+            const title = labels.title(card.quadrant);
+            const hint = labels.hint(card.quadrant);
+            const highlighted = highlightedQuadrant === card.quadrant;
+            return (
+              <View
+                key={card.quadrant}
+                style={[styles.cell, highlighted ? styles.cellHighlighted : null]}
+                testID={card.testID}
+                accessibilityRole="summary"
+                accessibilityLabel={labels.cellA11y({
+                  quadrant: card.quadrant,
+                  title,
+                  hint,
+                  count: card.count,
+                })}
+              >
+                <View style={styles.header}>
+                  <View style={styles.headerRow}>
+                    <View style={[styles.swatch, { backgroundColor: tokens[card.token] }]} />
+                    <Text style={[text['row-meta'], styles.cellTitle]}>{title}</Text>
+                  </View>
+                  <Text style={[text.caption, styles.cellHint]}>{hint}</Text>
+                </View>
+
+                {/*
+                  🔴 卡里的行**就是** `TaskList` 渲染的行 —— 见文件头的核心契约。
+                */}
+                <View style={styles.list}>
+                  <TaskList
+                    tasks={card.tasks}
+                    onToggleTask={onToggleTask}
+                    onOpenTask={onOpenTask}
+                    labels={taskLabels}
+                    renderMeta={renderMeta}
+                    renderTrailing={renderTrailing}
+                    busyTaskId={busyTaskId}
+                    fallbackTitle={fallbackTitle}
+                    density="compact"
+                    emptyMessage={labels.empty(card.quadrant)}
+                  />
+                </View>
+
+                {renderCellOverlay === undefined ? null : (
+                  <View style={styles.overlayHost}>{renderCellOverlay(card)}</View>
+                )}
               </View>
-              <Text style={[text.caption, styles.cellHint]}>{hint}</Text>
-            </View>
-
-            {/*
-              🔴 卡里的行**就是** `TaskList` 渲染的行 —— 见文件头的核心契约。
-              这里刻意不写 `<View><Text>{task.title}</Text></View>` 那种"更短的行"：
-              短一行代码换来的是"象限里的行与列表里的行各长一样"，
-              而那件事**没有测试会红**。
-            */}
-            <View style={styles.list}>
-              <TaskList
-                tasks={card.tasks}
-                onToggleTask={onToggleTask}
-                onOpenTask={onOpenTask}
-                labels={taskLabels}
-                renderMeta={renderMeta}
-                renderTrailing={renderTrailing}
-                busyTaskId={busyTaskId}
-                fallbackTitle={fallbackTitle}
-                /**
-                 * 🔴 象限卡用**紧凑档**（`docs/research/dida-view-unification.md` §4.2：
-                 * 四象限卡里的行 = `<TaskRow density="compact" />`）。
-                 *
-                 * 这一行是"容器决定密度"的落点，也是本组件与日历视图的唯一区别 ——
-                 * 行本身**没有**第二份实现（`TaskList` → `TaskRow` 是唯一路径）。
-                 * 差异全在 `task-list/density.ts` 的 `DENSITY_SPEC`，本文件不认识细节。
-                 *
-                 * 判据：`apps/web/tests/quadrant-row-parity.spec.tsx` 的 A/A2 ——
-                 * 同档位（compact）与列表逐字节相同、与默认档必须不同；
-                 * 把本行删掉（退回默认档）会让 A 与 A2 同时红。
-                 */
-                density="compact"
-                emptyMessage={labels.empty(card.quadrant)}
-              />
-            </View>
-
-            {renderCellOverlay === undefined ? null : (
-              <View style={styles.overlayHost}>{renderCellOverlay(card)}</View>
-            )}
-          </View>
-        );
-      })}
+            );
+          })}
+        </View>
+      ))}
 
       {footnote === undefined ? null : (
         <Text style={[text.caption, styles.footnote]}>{footnote}</Text>

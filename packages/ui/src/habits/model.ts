@@ -340,3 +340,41 @@ export function shouldOfferFreshStart(resilience: HabitResilienceView): boolean 
 export function frozenDays(resilience: HabitResilienceView): number {
   return resilience.resilience.frozenInCurrentRun;
 }
+
+
+/* ========================================================================
+ * 目标摘要：口径 → 词条 key
+ * ====================================================================== */
+
+/**
+ * 达成口径 → **摘要词条 key**（"至少 8 杯" / "最多 2 杯" / "恰好 8 杯"）。
+ *
+ * 🔴 收在这里一份的理由：web 与 mobile 各有一个目标编辑器
+ * （`HabitGoalEditor` / `HabitGoalSlot`），而"哪种口径说哪句话"是**同一个判断**。
+ * 各写一份的话，症状是"同一个 `atMost`，web 说『最多』、移动端说『不超过』" ——
+ * 与 `authFailureMessageKey` / `subtaskRejectionMessageKey` 是同一种收编。
+ *
+ * ⚠️ 这里只给 **key**，句子本身在词条表里（本包**不 import `@heyta/i18n`**，
+ * 那会拖进第二份 React —— 见 `capture/model.ts` 等处的说明）。
+ *
+ * ⚠️ 也刻意**不做成一条 `'{type} {target}{unit}'`**：纯占位符的 zh 词条
+ * 在 `check:ui-language` 眼里与"忘了翻译"是同一件事（实测被拦下过）。
+ */
+export type HabitGoalSummaryKey =
+  | 'web.habits.goal.summaryAtLeast'
+  | 'web.habits.goal.summaryAtMost'
+  | 'web.habits.goal.summaryExactly';
+
+export function habitGoalSummaryKey(goalType: string | undefined): HabitGoalSummaryKey {
+  switch (goalType) {
+    case 'atMost':
+      return 'web.habits.goal.summaryAtMost';
+    case 'exactly':
+      return 'web.habits.goal.summaryExactly';
+    // `atLeast` 与**认不出来的值**都落这里：默认口径就是它，
+    // 而"认不出来"时给一句"至少"比给一句"目标"更接近用户看到的东西
+    //（`isAchieved` 本身也是 `habit.goalType ?? 'atLeast'`）。
+    default:
+      return 'web.habits.goal.summaryAtLeast';
+  }
+}

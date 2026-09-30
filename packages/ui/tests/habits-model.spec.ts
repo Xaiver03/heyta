@@ -18,6 +18,7 @@ import {
   HABIT_HEATMAP_DAYS,
   HEATMAP_WEEK_START,
   frozenDays,
+  habitGoalSummaryKey,
   habitHeatLevel,
   habitHeatmap,
   heatmapLevelToken,
@@ -293,5 +294,40 @@ describe('窗口长度是"天"不是"毫秒"的隐式假设', () => {
     expect(days[0]?.date).toBe(
       `${String(first.getFullYear())}-${String(first.getMonth() + 1).padStart(2, '0')}-${String(first.getDate()).padStart(2, '0')}`,
     );
+  });
+});
+
+/**
+ * 目标摘要：口径 → 词条 key
+ * ============================
+ *
+ * 🔴 收在共享层一份的理由：web（`HabitGoalEditor`）与 mobile（`HabitGoalSlot`）
+ * **各有一个目标编辑器**，而"哪种口径说哪句话"是同一个判断。
+ * 各写一份的症状是"同一个 `atMost`，web 说『最多』、移动端说『不超过』"，
+ * 而两边都不报错 —— 与 `authFailureMessageKey` / `subtaskRejectionMessageKey`
+ * 是同一种收编。
+ */
+describe('habitGoalSummaryKey —— 口径 → 摘要词条', () => {
+  it('三种口径各给各的一句', () => {
+    expect(habitGoalSummaryKey('atLeast')).toBe('web.habits.goal.summaryAtLeast');
+    expect(habitGoalSummaryKey('atMost')).toBe('web.habits.goal.summaryAtMost');
+    expect(habitGoalSummaryKey('exactly')).toBe('web.habits.goal.summaryExactly');
+  });
+
+  it('🔴 三条 key 互不相同（合并成一句会让"最多"看起来像"至少"）', () => {
+    const keys = new Set([
+      habitGoalSummaryKey('atLeast'),
+      habitGoalSummaryKey('atMost'),
+      habitGoalSummaryKey('exactly'),
+    ]);
+    expect(keys.size).toBe(3);
+  });
+
+  it('没设口径 ⇒ 默认 atLeast（与 isAchieved 的 ?? atLeast 对齐）', () => {
+    expect(habitGoalSummaryKey(undefined)).toBe('web.habits.goal.summaryAtLeast');
+  });
+
+  it('认不出来的值也落 `atLeast`，不编一句新话', () => {
+    expect(habitGoalSummaryKey('some-future-goal')).toBe('web.habits.goal.summaryAtLeast');
   });
 });
