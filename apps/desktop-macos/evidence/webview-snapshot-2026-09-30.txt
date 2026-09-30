@@ -1,0 +1,36 @@
+# "壳里的共享 UI 真的渲染出来了"这条判据的证据（2026-09-30）
+#
+# 判据落在 **WKWebView 自己的快照**上（`takeSnapshot`）——不走窗口服务器、
+# 不需要录屏权限，所以它**不受"WebView 内容没合成进窗口"那个抖动影响**。
+# 判据取 contentOnModalRatio（"多少像素不是背景色"，比值、与主题无关），阈值 0.02。
+#
+# 两张配套图：
+#   webview-snapshot-real-app-2026-09-30.png  ← 真应用（暗色主题；人已看过）
+#   （注入那次的快照没留：它是空白页，信息量只有下面这个数字）
+#
+# ── 绿：真应用 ────────────────────────────────────────────────
+  ✅ 通过
+  ✅ 尺寸一致（1x/2x 归一后；同一数据源的交叉验证）
+   ✅ CAPTURE_METHOD=screencapturekit
+   ✅ CROSSCHECK=ok(2240x1440)
+   窗口：heyta 1120x720
+   WebView 快照 2240x1306  contentOnModalRatio 0.057（判据阈值 0.02）
+   ✅ 壳里的共享 UI 真的渲染出来了（快照里有成片的内容）
+   WebView 快照：/var/folders/5n/zvn6lsb5265d19khvqwp6fsc0000gn/T/heyta-macos-window-gate-94734.png.webview.png
+   ✅ M2-macOS ✅ 身份入口成立（头像 1 个、采集框 1 个）；**身份菜单合规**（第一项 sync-signin-entry、登录入口 1 个、退出登录 0 个）；**设置里的滴答导入面板可达**（panel=1 file=1）
+✅ macOS 原生壳的窗口：画出来了、非空、不透明、取图方式正确、交叉验证通过，
+
+# ── 红：注入（把首屏换成一张空白页；WebView 仍在、内容为空）────
+  ✅ 通过
+  ✅ 尺寸一致（1x/2x 归一后；同一数据源的交叉验证）
+   ✅ CAPTURE_METHOD=screencapturekit
+   ✅ CROSSCHECK=ok(2240x1440)
+   WebView 快照 2240x1276  contentOnModalRatio 0.000（判据阈值 0.02）
+   🔴 快照里几乎没有内容（contentOnModalRatio 0.000）——
+   🔴 缺：冷启动第一屏的身份入口（头像） / 未登录时头像菜单的 IA（第一项=登录/注册、无退出登录） / 设置里的滴答导入入口
+
+# 三张已知图的对照（同一天实测，判据阈值的由来）：
+#   真应用（暗）              0.057
+#   暗窗口·无应用（没合成）    0.006
+#   过期「找不到共享 UI 产物」 0.004
+#   edgePairs 不能用：三张都是 ~20034（归一的固定分母）
