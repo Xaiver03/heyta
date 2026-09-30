@@ -81,6 +81,20 @@ async function signInOnThisDevice(page: import('@playwright/test').Page): Promis
   await openApp(page);
   const dialog = await openAuthPanel(page);
   await loginWithPasskeyViaUi(page, dialog, journey.email);
+
+  /**
+   * 🔴 **登录成功之后必须把凭据快照读回来更新**（2026-09-30 实测）。
+   *
+   * 虚拟认证器里的 `signCount` **每次认证都会前进**，而 `journey.credential`
+   * 还是 J1 注册那一刻的快照。下一次注入旧快照 ⇒ 计数器**倒退**，
+   * 服务端按 FIDO 规范**拒收**，界面文案是
+   * 「通行密钥验证没有通过，可以再试一次」—— 而密码学上其实什么都没坏。
+   *
+   * ⚠️ 症状与"凭据不存在"很像，别照那个方向查；Windows 侧踩过同一条。
+   */
+  const advanced = await readCredentials(au);
+  if (advanced.length > 0) journey.credential = advanced[0]!;
+
   return au;
 }
 
@@ -216,8 +230,18 @@ test('J5 退出登录：落盘凭据被清掉，身份入口翻回未登录形�
 
   await page.getByTestId('account-menu-signout').click();
 
-  // 未登录形态翻回来：身份区消失、登录/注册回到第一项、退出登录语义上不存在。
+  /**
+   * 🔴 **退出登录会把菜单关掉**（2026-09-30 实测）。
+   *
+   * 所以"退出登录项不存在"在菜单**关闭**时是**空真** —— 那一条判据什么都没判。
+   * 必须重新点开头像，在**打开**的菜单上断言它的内容。
+   * ⚠️ Windows 侧（W5）踩过完全同一条；本仓对"空真"的判据一向要求显式处理。
+   */
   await expect(page.getByTestId('account-menu-email')).toHaveCount(0);
+  await page.getByTestId('account-menu-avatar').click();
+  await expect(page.getByTestId('account-menu-panel')).toBeVisible();
+
+  // 未登录形态翻回来：身份区消失、登录/注册回到第一项、退出登录语义上不存在。
   const items = page.getByTestId('account-menu-panel').getByRole('menuitem');
   await expect(items.first()).toHaveAttribute('data-testid', 'sync-signin-entry');
   await expect(page.getByTestId('account-menu-signout')).toHaveCount(0);

@@ -1,0 +1,228 @@
+Scope: all 20 workspace projects
+Already up to date
+Done in 143ms using pnpm v11.8.0
+$ node scripts/verify-web-auth-journey.mjs
+
+=== Web 认证旅程验收（真浏览器 + 真服务端 + 真 WebAuthn）===
+
+⚠️  检测到环境变量 DATABASE_URL，已用验收库覆盖（避免污染）
+· node: /Users/rocalight/.nvm/versions/node/v22.22.3/bin/node
+· 数据库: heyta_web_auth_smoke
+· 服务端: http://127.0.0.1:3211   Web 应用: http://localhost:4329
+· 验收库已存在
+· 应用迁移…
+· 迁移完成
+· 启动服务端（127.0.0.1:3211，TEST_MODE，rp=127.0.0.1）…
+✅ 服务端就绪
+· 跑认证旅程套件（注册 → 登录 → 同步 → 新设备 → 退出）…
+
+[WebServer] (node:76060) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `DSH Desktop --trace-warnings ...` to show where the warning was created)
+[WebServer] (node:76061) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `DSH Desktop --trace-warnings ...` to show where the warning was created)
+
+Running 6 tests using 1 worker
+
+(node:76226) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `DSH Desktop --trace-warnings ...` to show where the warning was created)
+  ✘  1 [chromium] › auth-journey/auth-journey.spec.ts:101:1 › J1 未登录注册：头像菜单 → 登录/注册 → 用通行密钥注册出一个全新账号 (2.1m)
+(node:78910) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `DSH Desktop --trace-warnings ...` to show where the warning was created)
+  ✘  2 [chromium] › auth-journey/auth-journey.spec.ts:141:1 › J2 登录：同一把通行密钥拿到令牌，身份区出现邮箱且凭据落盘 (142ms)
+(node:78918) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `DSH Desktop --trace-warnings ...` to show where the warning was created)
+  ✘  3 [chromium] › auth-journey/auth-journey.spec.ts:176:1 › J3 数据上行：登录后建任务、补口令同步，服务端必须真的收到 op (147ms)
+(node:78927) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `DSH Desktop --trace-warnings ...` to show where the warning was created)
+  ✘  4 [chromium] › auth-journey/auth-journey.spec.ts:203:1 › J4 新设备恢复：全新 context 登录同账号，那条任务只能来自服务端 (139ms)
+(node:78938) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `DSH Desktop --trace-warnings ...` to show where the warning was created)
+  ✘  5 [chromium] › auth-journey/auth-journey.spec.ts:223:1 › J5 退出登录：落盘凭据被清掉，身份入口翻回未登录形态 (147ms)
+(node:78949) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `DSH Desktop --trace-warnings ...` to show where the warning was created)
+  ✓  6 [chromium] › auth-journey/auth-journey.spec.ts:258:1 › J6 反向：服务端地址错了，界面必须说出失败而不是假装成功 (1.1s)
+
+
+  1) [chromium] › auth-journey/auth-journey.spec.ts:101:1 › J1 未登录注册：头像菜单 → 登录/注册 → 用通行密钥注册出一个全新账号 ─
+
+    Error: expect(locator).toContainText(expected) failed
+
+    Locator: locator('[role="dialog"][aria-label="登录 / 注册"]').locator('[role="status"]').first()
+    Expected substring: "注册申请已提交"
+    Received string:    "这个浏览器或设备不支持通行密钥，改用邮箱登录链接即可。"
+    Timeout: 120000ms
+
+    Call log:
+      - Expect "toContainText" locator('[role="dialog"][aria-label="登录 / 注册"]').locator('[role="status"]').first() with timeout 120000ms
+      - waiting for locator('[role="dialog"][aria-label="登录 / 注册"]').locator('[role="status"]').first()
+        - locator resolved to <div role="status" aria-live="polite">…</div>
+        - unexpected value "还没有凭据同步需要服务端签发的访问令牌。用邮箱登录或注册即可获得，令牌会自动写入下面的同步设置。"
+        241 × locator resolved to <div role="status" aria-live="polite">…</div>
+            - unexpected value "这个浏览器或设备不支持通行密钥，改用邮箱登录链接即可。"
+
+
+      123 |   // 🔴 生产上这句后面是"去邮箱点链接"；TEST_MODE 里账号已验证，
+      124 |   //    所以下一条用例可以直接用通行密钥登录 —— 这正是 J2。
+    > 125 |   await expect(authStatus(dialog)).toContainText('注册申请已提交');
+          |                                    ^
+      126 |
+      127 |   // 判据本体：虚拟认证器里**真的多了一把凭据**（真 WebAuthn，不是 stub）。
+      128 |   const creds = await readCredentials(au);
+        at /Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/e2e/auth-journey/auth-journey.spec.ts:125:36
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/auth-journey-J1-未登录注册：头像菜单-→-登录-注册-→-用通行密钥注册出一个全新账号-chromium/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    test-results/auth-journey-J1-未登录注册：头像菜单-→-登录-注册-→-用通行密钥注册出一个全新账号-chromium/video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results/auth-journey-J1-未登录注册：头像菜单-→-登录-注册-→-用通行密钥注册出一个全新账号-chromium/error-context.md
+
+    attachment #4: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results/auth-journey-J1-未登录注册：头像菜单-→-登录-注册-→-用通行密钥注册出一个全新账号-chromium/trace.zip
+    Usage:
+
+        pnpm exec playwright show-trace test-results/auth-journey-J1-未登录注册：头像菜单-→-登录-注册-→-用通行密钥注册出一个全新账号-chromium/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  2) [chromium] › auth-journey/auth-journey.spec.ts:141:1 › J2 登录：同一把通行密钥拿到令牌，身份区出现邮箱且凭据落盘 ─────────
+
+    Error: 旅程状态里没有通行密钥 —— J1 必须先跑
+
+      77 | async function signInOnThisDevice(page: import('@playwright/test').Page): Promise<VirtualAuthenticator> {
+      78 |   const au = await attachAuthenticator(page);
+    > 79 |   if (journey.credential === null) throw new Error('旅程状态里没有通行密钥 —— J1 必须先跑');
+         |                                          ^
+      80 |   await injectCredential(au, journey.credential);
+      81 |   await openApp(page);
+      82 |   const dialog = await openAuthPanel(page);
+        at signInOnThisDevice (/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/e2e/auth-journey/auth-journey.spec.ts:79:42)
+        at /Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/e2e/auth-journey/auth-journey.spec.ts:147:3
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/auth-journey-J2-登录：同一把通行密钥拿到令牌，身份区出现邮箱且凭据落盘-chromium/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    test-results/auth-journey-J2-登录：同一把通行密钥拿到令牌，身份区出现邮箱且凭据落盘-chromium/video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results/auth-journey-J2-登录：同一把通行密钥拿到令牌，身份区出现邮箱且凭据落盘-chromium/error-context.md
+
+    attachment #4: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results/auth-journey-J2-登录：同一把通行密钥拿到令牌，身份区出现邮箱且凭据落盘-chromium/trace.zip
+    Usage:
+
+        pnpm exec playwright show-trace test-results/auth-journey-J2-登录：同一把通行密钥拿到令牌，身份区出现邮箱且凭据落盘-chromium/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  3) [chromium] › auth-journey/auth-journey.spec.ts:176:1 › J3 数据上行：登录后建任务、补口令同步，服务端必须真的收到 op ──────
+
+    Error: 旅程状态里没有通行密钥 —— J1 必须先跑
+
+      77 | async function signInOnThisDevice(page: import('@playwright/test').Page): Promise<VirtualAuthenticator> {
+      78 |   const au = await attachAuthenticator(page);
+    > 79 |   if (journey.credential === null) throw new Error('旅程状态里没有通行密钥 —— J1 必须先跑');
+         |                                          ^
+      80 |   await injectCredential(au, journey.credential);
+      81 |   await openApp(page);
+      82 |   const dialog = await openAuthPanel(page);
+        at signInOnThisDevice (/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/e2e/auth-journey/auth-journey.spec.ts:79:42)
+        at /Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/e2e/auth-journey/auth-journey.spec.ts:182:3
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/auth-journey-J3-数据上行：登录后建任务、补口令同步，服务端必须真的收到-op-chromium/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    test-results/auth-journey-J3-数据上行：登录后建任务、补口令同步，服务端必须真的收到-op-chromium/video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results/auth-journey-J3-数据上行：登录后建任务、补口令同步，服务端必须真的收到-op-chromium/error-context.md
+
+    attachment #4: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results/auth-journey-J3-数据上行：登录后建任务、补口令同步，服务端必须真的收到-op-chromium/trace.zip
+    Usage:
+
+        pnpm exec playwright show-trace test-results/auth-journey-J3-数据上行：登录后建任务、补口令同步，服务端必须真的收到-op-chromium/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  4) [chromium] › auth-journey/auth-journey.spec.ts:203:1 › J4 新设备恢复：全新 context 登录同账号，那条任务只能来自服务端 ──
+
+    Error: J3 必须先跑（本用例依赖它上传的任务）
+
+      206 | }) => {
+      207 |   await ensureServer(request);
+    > 208 |   if (journey.taskTitle === '') throw new Error('J3 必须先跑（本用例依赖它上传的任务）');
+          |                                       ^
+      209 |
+      210 |   // 新 context = 空 IndexedDB / 空 localStorage = 一台刚装好的设备。
+      211 |   await signInOnThisDevice(page);
+        at /Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/e2e/auth-journey/auth-journey.spec.ts:208:39
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/auth-journey-J4-新设备恢复：全新-context-登录同账号，那条任务只能来自服务端-chromium/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    test-results/auth-journey-J4-新设备恢复：全新-context-登录同账号，那条任务只能来自服务端-chromium/video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results/auth-journey-J4-新设备恢复：全新-context-登录同账号，那条任务只能来自服务端-chromium/error-context.md
+
+    attachment #4: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results/auth-journey-J4-新设备恢复：全新-context-登录同账号，那条任务只能来自服务端-chromium/trace.zip
+    Usage:
+
+        pnpm exec playwright show-trace test-results/auth-journey-J4-新设备恢复：全新-context-登录同账号，那条任务只能来自服务端-chromium/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  5) [chromium] › auth-journey/auth-journey.spec.ts:223:1 › J5 退出登录：落盘凭据被清掉，身份入口翻回未登录形态 ────────────
+
+    Error: 旅程状态里没有通行密钥 —— J1 必须先跑
+
+      77 | async function signInOnThisDevice(page: import('@playwright/test').Page): Promise<VirtualAuthenticator> {
+      78 |   const au = await attachAuthenticator(page);
+    > 79 |   if (journey.credential === null) throw new Error('旅程状态里没有通行密钥 —— J1 必须先跑');
+         |                                          ^
+      80 |   await injectCredential(au, journey.credential);
+      81 |   await openApp(page);
+      82 |   const dialog = await openAuthPanel(page);
+        at signInOnThisDevice (/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/e2e/auth-journey/auth-journey.spec.ts:79:42)
+        at /Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/e2e/auth-journey/auth-journey.spec.ts:226:3
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/auth-journey-J5-退出登录：落盘凭据被清掉，身份入口翻回未登录形态-chromium/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    test-results/auth-journey-J5-退出登录：落盘凭据被清掉，身份入口翻回未登录形态-chromium/video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results/auth-journey-J5-退出登录：落盘凭据被清掉，身份入口翻回未登录形态-chromium/error-context.md
+
+    attachment #4: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results/auth-journey-J5-退出登录：落盘凭据被清掉，身份入口翻回未登录形态-chromium/trace.zip
+    Usage:
+
+        pnpm exec playwright show-trace test-results/auth-journey-J5-退出登录：落盘凭据被清掉，身份入口翻回未登录形态-chromium/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  5 failed
+    [chromium] › auth-journey/auth-journey.spec.ts:101:1 › J1 未登录注册：头像菜单 → 登录/注册 → 用通行密钥注册出一个全新账号 ──
+    [chromium] › auth-journey/auth-journey.spec.ts:141:1 › J2 登录：同一把通行密钥拿到令牌，身份区出现邮箱且凭据落盘 ──────────
+    [chromium] › auth-journey/auth-journey.spec.ts:176:1 › J3 数据上行：登录后建任务、补口令同步，服务端必须真的收到 op ───────
+    [chromium] › auth-journey/auth-journey.spec.ts:203:1 › J4 新设备恢复：全新 context 登录同账号，那条任务只能来自服务端 ───
+    [chromium] › auth-journey/auth-journey.spec.ts:223:1 › J5 退出登录：落盘凭据被清掉，身份入口翻回未登录形态 ─────────────
+  1 passed (2.1m)
+
+❌ 认证旅程验收失败（截图在 e2e/test-results/，trace 已按失败保留）
+
+[ELIFECYCLE] Command failed with exit code 1.

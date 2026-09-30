@@ -64,7 +64,7 @@ if (process.env['DATABASE_URL']) {
 
 console.log(`· node: ${NODE}`);
 console.log(`· 数据库: ${DB_NAME}`);
-console.log(`· 服务端: ${BASE}   Web 应用: http://127.0.0.1:${WEB_PORT}`);
+console.log(`· 服务端: ${BASE}   Web 应用: http://localhost:${WEB_PORT}`);
 
 ensureDatabase({ root: ROOT, dbUrl: DB_URL, dbName: DB_NAME });
 ensureServerBuilt({ root: ROOT, dbUrl: DB_URL });
@@ -77,12 +77,13 @@ const server = await startServer({
   // 🔴 **CORS 默认只放行上游域名**（`DEFAULT_CORS_ORIGINS = ['https://app.super-productivity.com']`）
   // —— 不设这条，浏览器侧的注册请求会被预检拦掉，界面报"连不上服务端"
   // 而服务端日志一片干净（`verify:multi-end` 已记录过同一个坑）。
-  corsOrigins: [`http://127.0.0.1:${WEB_PORT}`],
-  // 🔴 WebAuthn 三元组必须与**浏览器侧的 origin** 一致，否则服务端验签
-  // 必然失败（expectedOrigin 不匹配）。Web 应用跑在 127.0.0.1:4329，
-  // 所以 rpId 只能是 `127.0.0.1`、origin 只能是它的完整形态。
-  rpId: '127.0.0.1',
-  origin: `http://127.0.0.1:${WEB_PORT}`,
+  corsOrigins: [`http://localhost:${WEB_PORT}`],
+  // 🔴 WebAuthn 三元组必须与**浏览器侧的 origin** 一致，否则服务端验签必然失败
+  // （expectedOrigin 不匹配）。Web 应用跑在 **`localhost:4329`** ——
+  // **不能用 `127.0.0.1`**：RP ID 必须是 origin 的域名后缀，而 Chromium
+  // **拒收 IP 字面量**做 RP ID（2026-09-30 实测：那条旅程因此走不到注册成功）。
+  rpId: 'localhost',
+  origin: `http://localhost:${WEB_PORT}`,
 });
 
 installCleanup([server]);
