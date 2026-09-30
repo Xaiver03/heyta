@@ -1,0 +1,213 @@
+/**
+ * 门禁：**macOS 原生壳的窗口真的画出来了** + **壳里的真应用把注册/登录前置了**
+ * （W-⑧ 替换 Electron 的 desktop-window 断言；M2-macOS 的常设验收）
+ *
+ * ## M2 那半段是什么（2026-09-29 加）
+ *
+ * 这个壳现在内嵌 **`apps/web` 的真应用**（经 `WKURLSchemeHandler`，与 Windows 壳同一个架构）。
+ * 所以它同时也是 **macOS 端的"用户旅程"验收**：断言**冷启动第一屏就有注册/登录入口**
+ * —— 那正是产品负责人钉死的那条（"注册/登录一定要前置，不能藏在设置里"）。
+ *
+ * 🔴 判据取的是**组件自己打的 testID**（`account-menu-avatar` 身份入口 /
+ * `sync-signin-entry` 菜单第一项 / `添加任务` 采集框），不是"界面上有字"。
+ * （"窗口出来了" ≠ "真应用画出来了"。）
+ *
+ * 🔴 **2026-09-30 判据改锚点**：产品负责人拍板"应该是点击头像出来注册、登录"
+ * 之后，登录入口不再常驻首屏（它在头像菜单里）。首屏锚点因此改成**身份入口
+ * 头像**，登录入口在**菜单打开后**再验 —— 而且判据变**更严**了：
+ * 未登录时菜单第一项必须是登录/注册，且**不得**出现「退出登录」。
+ *
+ * ## 为什么需要它
+ *
+ * `check-macos-shell.mjs` 验的是**跨语言那一层 + 落盘** —— 它**不开窗**
+ * （所以能在没有图形会话的环境里跑）。那条路证明不了"窗口真的画出来了、
+ * 画的东西是对的"。
+ *
+ * 而 Electron 的 `e2e/tests/desktop-window.spec.ts` 恰恰验的就是那一格，
+ * 它是**退役 Electron 之前唯一需要被替代的覆盖**（见
+ * `docs/plans/multi-end-unified-strategy.md` §6.3-T3 / 执行次序 ⑧⑨）。
+ *
+ * ## 它断言什么（四条，每条都能失败）
+ *
+ * 1. 窗口**真的被截到了**（不是"进程起来了"）；
+ * 2. 图**不是空白**，且**不含实际透明像素**（`looksBlank` / `hasTransparency`）；
+ * 3. 取证记录自述的取图方式是 **`screencapturekit`** —— 那个字段是应用自己写的
+ *    （`HeytaMacApp.swift` 的 `Method.screenCaptureKit`），所以它同时证明了
+ *    "跑的是 ScreenCaptureKit 那条路"，而不是被废弃的 `CGWindowListCreateImage`
+ *    （后者曾长期留在 `capture-window.sh` 的证据说明里，已修正 —— 见本门禁的兄弟教训）；
+ * 4. **交叉验证通过**：自截图与外部 `screencapture -l` 尺寸一致（同一数据源）。
+ *
+ * ## 🔴 拿不到图形会话 / 屏幕录制权限时：**响亮跳过，绝不静默通过**
+ *
+ * 实测踩过的坑：没有屏幕录制权限时，窗口服务器只给一张**桌面背景图** ——
+ * 尺寸对、非空、看起来完全正常。所以 `capture-window.sh` 自己会做交叉验证，
+ * 而本门禁在**它失败且原因是权限/会话**时打印一大段"这一条没有被验过"后退出 0。
+ * 那不是通过，是**如实标注的未覆盖**。
+ */
+
+import { execFileSync, spawnSync } from 'node:child_process';
+import { existsSync, readFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+import { inspectPng, looksBlank } from './screenshots/png-stats.mjs';
+
+const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
+const CAPTURE = join(ROOT, 'apps/desktop-macos/scripts/capture-window.sh');
+
+const skip = (why) => {
+  console.log(`⚠️  macOS 原生壳的**窗口**冒烟**已跳过**：${why}`);
+  console.log('    ⇒ 这一条**没有被验过**。别把这次的"绿"读成"窗口画出来了"。');
+  process.exit(0);
+};
+
+if (process.platform !== 'darwin') {
+  skip(`当前平台是 ${process.platform}（本壳是 SwiftUI / macOS 14+）`);
+}
+try {
+  execFileSync('swift', ['--version'], { stdio: 'ignore' });
+} catch {
+  skip('没有 `swift`');
+}
+
+const OUT = join(tmpdir(), `heyta-macos-window-gate-${process.pid}.png`);
+// M2：共享 UI 的探测结论落在这里（**必须与 OUT 不同路径** —— 截屏脚本会写 `OUT.txt`，
+// 同路径会被它覆盖；实测踩过）。
+const NOTE = join(tmpdir(), `heyta-macos-m2-gate-${process.pid}`);
+
+// ① 跑取证脚本。**继承 stdio** —— 它的输出本身就是证据。
+//
+// 🔴 同时带上 `HEYTA_WEB_ROOT`：那个壳里内嵌的是**共享 UI**（M2），
+//    不带的话 `ShellView` 只会说"未找到共享 UI 产物目录"，本门禁关于
+//    "注册/登录前置"的那几条断言就无从谈起。
+const capture = spawnSync('bash', [CAPTURE, OUT], {
+  stdio: 'inherit',
+  cwd: ROOT,
+  timeout: 10 * 60 * 1000,
+  env: {
+    ...process.env,
+    HEYTA_WEB_ROOT: join(ROOT, 'apps/web/dist'),
+    HEYTA_M2_EVIDENCE: NOTE,
+  },
+});
+
+if (capture.error) {
+  console.error(`❌ 取证脚本没能启动：${capture.error.message}`);
+  process.exit(1);
+}
+
+if (capture.status !== 0 || !existsSync(OUT)) {
+  // 区分"环境不给"与"真的坏了"：前者响亮跳过，后者失败。
+  // 应用在拿不到屏幕录制权限时**显式**这样说（见 HeytaMacApp.swift 的 exit(4)）。
+  console.log('');
+  console.log('⚠️  取证脚本没跑成。判断一下是环境问题还是真故障：');
+  console.log('    · 若上文出现「截图失败（多半是没给屏幕录制权限）」或「没有可见窗口」');
+  console.log('      ⇒ 那是**环境**（无图形会话 / 未授权），不是代码坏了；');
+  console.log('    · 其它情况（编译错、断言错、尺寸不一致）一律是**真故障**。');
+  // 没有图形会话的环境里，这条必然失败 —— 机器可判的判据是
+  // "有没有 Aqua 会话"，用 `launchctl managername` 读。
+  let manager = '';
+  try {
+    manager = execFileSync('launchctl', ['managername'], { encoding: 'utf8' }).trim();
+  } catch {
+    manager = '';
+  }
+  if (manager !== 'Aqua') {
+    skip(`当前不在图形会话里（launchctl managername = ${manager || '读不到'}）`);
+  }
+  console.error('❌ 在图形会话里取证仍然失败 —— 这是真故障，不是环境。');
+  process.exit(1);
+}
+
+// ② 图本身：不能空白、不能带实际透明像素。
+const stats = inspectPng(OUT);
+console.log('');
+console.log(`   ${stats.width}x${stats.height}  colorType=${stats.colorType}  hasAlpha=${stats.hasAlpha}`);
+console.log(`   内容比例 ${(stats.contentRatio * 100).toFixed(1)}%   色阶差 ${stats.colorSpan}`);
+
+let bad = false;
+if (stats.hasTransparency) {
+  console.error('   🔴 含实际透明像素 —— 窗口图应当已合成到不透明底上');
+  bad = true;
+}
+if (looksBlank(stats)) {
+  console.error('   🔴 疑似空白 —— 窗口没画出来（这类失败最阴：它什么错都不报）');
+  bad = true;
+}
+
+// ③ 取证记录自述的取图方式必须是 **screencapturekit**。
+const narrative = `${OUT.replace(/\.png$/, '')}.txt`;
+if (!existsSync(narrative)) {
+  console.error(`   🔴 取证说明不存在：${narrative}（证据必须自述它是怎么来的）`);
+  bad = true;
+} else {
+  const txt = readFileSync(narrative, 'utf8');
+  const method = /CAPTURE_METHOD=(\S+)/.exec(txt)?.[1];
+  if (method !== 'screencapturekit') {
+    console.error(`   🔴 取图方式不是 screencapturekit（读到 ${method ?? '缺失'}）——`);
+    console.error('      应用已从废弃的 CGWindowListCreateImage 迁到 ScreenCaptureKit，');
+    console.error('      这里读到别的值说明跑的不是那条路，或证据说明被改坏了。');
+    bad = true;
+  } else {
+    console.log('   ✅ CAPTURE_METHOD=screencapturekit');
+  }
+
+  // ④ 交叉验证（脚本自己算的，这里只读结果）
+  const cross = /CROSSCHECK=(\S+)/.exec(txt)?.[1];
+  if (!cross?.startsWith('ok')) {
+    console.error(`   🔴 交叉验证没通过（CROSSCHECK=${cross ?? '缺失'}）——`);
+    console.error('      自截图与 `screencapture -l` 尺寸不一致 ⇒ 自截图不可信。');
+    bad = true;
+  } else {
+    console.log(`   ✅ CROSSCHECK=${cross}`);
+  }
+
+  const size = /WINDOW_SIZE=(\S+)/.exec(txt)?.[1];
+  const title = /WINDOW_TITLE=(\S+)/.exec(txt)?.[1];
+  console.log(`   窗口：${title ?? '?'} ${size ?? '?'}`);
+  if (title !== 'heyta') {
+    console.error(`   🔴 窗口标题不是 heyta（读到 ${title ?? '缺失'}）`);
+    bad = true;
+  }
+}
+
+// ⑤ M2：壳里的**真应用**把身份入口做对了吗。
+const notePath = `${NOTE}.txt`;
+if (!existsSync(notePath)) {
+  console.error(`   🔴 没拿到 M2 探测结论（${notePath}）——`);
+  console.error('      壳里没有内嵌共享 UI，或 SHELL 那半边被改坏了。');
+  bad = true;
+} else {
+  const note = readFileSync(notePath, 'utf8');
+  const m2 = /M2_MACOS_NOTE=(.*)/.exec(note)?.[1] ?? '';
+  // 三条都要：① 冷启动第一屏有**身份入口**（头像）与采集框；
+  // ② 打开菜单后**身份菜单合规**（第一项=登录/注册，且没有退出登录）；
+  // ③ 设置里的**滴答导入面板**可达。
+  //
+  // ③ 是 ⑩ 第 7 项（滴答导入三端入口）在桌面端的那一半 ——
+  // 桌面壳加载的**就是 web 的同一份构建**，所以这个入口**不该例外**；
+  // 而「设置点得开、面板在不在」恰恰是加载成功也**照样可能假**的一件事。
+  const NEEDED = [
+    { ok: m2.includes('✅') && m2.includes('身份入口成立'), what: '冷启动第一屏的身份入口（头像）' },
+    { ok: m2.includes('身份菜单合规'), what: '未登录时头像菜单的 IA（第一项=登录/注册、无退出登录）' },
+    { ok: m2.includes('滴答导入面板可达'), what: '设置里的滴答导入入口' },
+  ];
+  const missing = NEEDED.filter((n) => !n.ok);
+  if (missing.length === 0) {
+    console.log(`   ✅ ${m2.trim()}`);
+  } else {
+    console.error(`   🔴 缺：${missing.map((n) => n.what).join(' / ')}`);
+    console.error(`      探测结论：${m2.trim() || '（空）'}`);
+    bad = true;
+  }
+}
+
+if (bad) {
+  console.error('❌ macOS 原生壳的窗口冒烟**未通过**。');
+  process.exit(1);
+}
+
+console.log('');
+console.log('✅ macOS 原生壳的窗口：画出来了、非空、不透明、取图方式正确、交叉验证通过，');
+console.log('   且**壳里的真应用把身份入口做对了**（头像可点开、菜单第一项=登录/注册）（M2-macOS）。');

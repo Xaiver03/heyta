@@ -1,3 +1,15 @@
 # SwiftPM 构建产物
 .build/
+
+# 🔴 受限环境里的 SwiftPM 缓存（2026-09-30 实测）：裸 `swift build` 在受沙箱约束的
+# 环境里编不动 —— 它要写 `~/Library/...` 的缓存，而且它**自己会调 sandbox-exec**。
+# 所以走 `--cache-path/--config-path/--security-path` 指到这三个目录 + `--disable-sandbox`
+# （完整命令见 evidence/storage-host/README.md）。它们是缓存，不入库。
+.swiftpm-cache/
+.swiftpm-config/
+.swiftpm-security/
 *.xcodeproj
+
+# 设计系统 token 的**派生物**（构建期从 tokens.css 的产物同步而来）。
+# 不入库：入库就等于第二份设计变量。同步 + 校验见 scripts/sync-tokens.sh。
+Sources/HeytaMac/Generated/

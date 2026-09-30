@@ -323,6 +323,49 @@ export function looksBlank(stats) {
   return stats.contentRatio < BLANK_CONTENT_RATIO || stats.colorSpan < BLANK_COLOR_SPAN;
 }
 
+// ── UI 特征判据：heyta 主蓝 ─────────────────────────────────────────────
+//
+// 🔴 **"非空白"挡不住"错误屏"。** 2026-09-30 实测：macOS 安装包没把 web-dist
+// 打进包，装出来的 .app 永远渲染"找不到共享 UI 产物"错误屏 —— 而错误屏
+// **有标题有正文**，`looksBlank` = false、contentRatio 不为 0，四轮截图统计
+// 全绿，最后是产品负责人**人眼看窗口**才发现。
+//
+// 真正的 UI 特征：heyta 的界面一定有主蓝（`tokens.css` 的 `--ht-blue-600`，
+// rail 激活项 / 主按钮 / 链接），而错误屏、空白屏、桌面底色**都没有**。
+// 于是"装上的 UI 是真的"有一条结构性判据：截图里数得出主蓝像素。
+
+/** heyta 主蓝 = `#2563EB`（tokens.css `--ht-blue-600`，设计系统唯一事实源）。 */
+export const HEYTA_BLUE = [37, 99, 235];
+
+/** 每个通道允许的偏差：抗锯齿与色彩空间抖动吃掉一点，但不能放过"不是它"的颜色。 */
+export const HEYTA_BLUE_TOLERANCE = 12;
+
+/**
+ * 数一张 PNG 里落在给定颜色 ±tolerance 内的采样点数（与 `inspectPng` 同一套跳采）。
+ * 返回 0 = 一点都没有 ⇒ 大概率不是 heyta 的 UI。
+ */
+export function countColor(filePath, [red, green, blue], tolerance = HEYTA_BLUE_TOLERANCE) {
+  const buffer = readFileSync(filePath);
+  const image = decodePng(buffer);
+  const total = image.width * image.height;
+  // 🔴 采样密度是 inspectPng 的 **10 倍**（20 万点）：主蓝元素往往很小
+  //    （复选框/图标），跳采 2 万点时真 UI 实测只命中 4 个 —— 阈值 20 会把
+  //    **真界面**误杀成"不是 heyta 的 UI"。错误屏仍是 0（命中判据不变）。
+  const sampleStep = Math.max(1, Math.floor(total / 200_000));
+  let hits = 0;
+  for (let pixel = 0; pixel < total; pixel += sampleStep) {
+    const [r, g, b] = pixelAt(image, pixel);
+    if (
+      Math.abs(r - red) <= tolerance &&
+      Math.abs(g - green) <= tolerance &&
+      Math.abs(b - blue) <= tolerance
+    ) {
+      hits += 1;
+    }
+  }
+  return hits;
+}
+
 /** 判定一次横向跃变/一处内容所需的亮度差。24 能滤掉渐变与抗锯齿，只留真正的边。 */
 export const EDGE_DELTA_MIN = 24;
 
