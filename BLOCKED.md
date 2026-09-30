@@ -1093,8 +1093,8 @@ HEAD 起止都是 `f2d5a078` 没动 ⇒ 这 21 个数对这一枚提交有效。
 
 ## 10. ✅ Goal 第 3 项那道新门禁**落地一小时内就抓到一例真的** —— 但它不在我这一轮的地界里
 
-> 记录时间：2026-09-30 23:5x。命令与输出：`node research/tools/docs-link-check.mjs` ⇒ **exit 1**，
-> `/tmp/dl-now.txt`。
+> 记录时间：2026-10-01 00:15（`/tmp/dl-now.txt` 的 mtime，不写跑命令的时刻是因为我只信文件时间）。
+> 命令与输出：`node research/tools/docs-link-check.mjs` ⇒ **exit 1**。
 
 ```
 🔴 发现 1 处**本机有、仓库里没有**的链接 —— 它们在干净检出（CI 的唯一形态）上是死链：
@@ -1104,9 +1104,22 @@ HEAD 起止都是 `f2d5a078` 没动 ⇒ 这 21 个数对这一枚提交有效。
 ```
 
 **归属**：这一例**不是本轮改出来的**，是**另一条会话的在途工作**撞上的
-（`docs/plans/README.md` 与 `docs/plans/help-center-docs-expansion.md` 都在他们那 24 处未提交里）。
-`HEAD` 上这一行不存在（`git show HEAD:docs/plans/README.md | sed -n '16p'` 是另一条表格行），
-所以 **`pnpm check` 在 `origin/main` 上仍然是绿的** —— 红的是工作树。
+（`docs/plans/README.md` 与 `docs/plans/help-center-docs-expansion.md` 都在他们那批未提交里 ——
+本轮开工时工作树 24 处脏，00:23 复测已经是 48 处，**这个数字只会随别人干活变大，别拿它当依据**）。
+`HEAD` 上这一行不存在（`git show HEAD:docs/plans/README.md | sed -n '16p'` 是另一条表格行）。
+
+🔴 **"所以 `origin/main` 上是绿的"这句以前是推断，现在是实测**（2026-10-01 00:23）：
+在 HEAD 拉了一个临时 detached worktree，在里面直接跑同一道门禁 ——
+
+```
+git worktree add --detach /tmp/heyta-head-check HEAD
+cd /tmp/heyta-head-check && node research/tools/docs-link-check.mjs   # ⇒ exit 0
+git worktree remove /tmp/heyta-head-check
+```
+
+它报的是"✅ 无死链、无『本机有仓库里没有』的链接"，并另外印出 8 条指向 `research/upstream/`
+等刻意不入库目录的**跳过**说明。⇒ 门禁在干净检出（= CI 的形态）上绿，红只在工作树。
+**这个方法本身就是这道门禁的用法**：要区分"仓库红"和"我的机器红"，就在 HEAD 的临时 worktree 里跑。
 
 **三条出路里该走哪条**（脚本自己印的三条，逐条判过）：
 ① **`git add docs/plans/help-center-docs-expansion.md`** —— 它是要入库的规格真身，不含私密数据；
@@ -1124,3 +1137,15 @@ HEAD 起止都是 `f2d5a078` 没动 ⇒ 这 21 个数对这一枚提交有效。
 🔴 如果我只看那一行，就会写下"新门禁落地后仍然报绿"这个**完全相反**的结论。
 同一轮里第二条命令把输出重定向到文件后再取 `$?`，才拿到 1。
 **判据是退出码的流程，一律先重定向再取码**（§7 第 45 条的又一次命中，不是新条目）。
+
+### 顺带第二条：`PROGRESS.md` 只能"提交半个文件"，而这条路有个会坑别人的尾巴
+
+`PROGRESS.md` 里同时躺着另一条会话追加的那 22 行（文档中心那一轮）。按边界不能替他们提交，
+也不能把他们的字节从工作树里抹掉 ⇒ 只能走 plumbing：从 `HEAD:PROGRESS.md` 造一份只含我这段的
+临时文件 → `hash-object -w` → 临时索引 `write-tree` → `commit-tree` → `update-ref`（**带旧值 = CAS**）。
+提交与推送都成功了，但 `git status` 随后对这两份文件报 **`MM`** ——
+**plumbing 只移动了 ref，没刷新真实 index**，索引里还是提交前的旧 blob。
+🔴 危险不在我这一侧：这时候别人一次再普通不过的 `git commit -a`
+就会把旧 blob 当"当前内容"提交，**把刚推上去的那条改动静默抵消，一个冲突都不报**。
+✅ 收尾已做（`git update-index --cacheinfo 100644,<新 blob>,<路径>` 两条 + `git diff --cached` 复验为空），
+坑本身登记成 **§7 第 88 条**。

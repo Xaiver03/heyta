@@ -2251,3 +2251,36 @@ spec，且报错里出现 `ECONNREFUSED <本机端口>` 或 `.playwright-artifac
     📌 **可迁移的一般规律**：**判断一个命令能不能在共享工作树上随手跑，看它有没有副作用，
     不看它名字叫不叫 `check`。** 名字里的"检查"不构成只读承诺 ——
     这条链里的"检查"会杀进程、会删共享 `outputDir`、会 `pkill` 同名可执行文件。
+
+88. 🔴 **用 plumbing（`commit-tree` + `update-ref`）提交"半个文件"之后，真实 index 仍然指着
+    提交前的旧 blob —— 这时别人一次普通的整索引提交会把你的内容整个撤回，而且不报任何冲突。**
+
+    共享工作树里要提交一份"别人的改动也躺在里面"的文件时，只能走 plumbing：
+    `git show HEAD:<f>` 拷到临时文件 → 只改自己那一段 → `git hash-object -w` →
+    用 `GIT_INDEX_FILE=/tmp/idx-$$` 建临时索引 → `write-tree` → `commit-tree` →
+    `update-ref refs/heads/main <新> <旧>`（**带旧值就是 CAS**，并发提交时它会失败而不是覆盖别人）。
+
+    这一串都对，但它**只动了 ref，没动 `.git/index`**。实测症状（2026-10-01 00:21）：
+    提交并推送成功后 `git status --porcelain` 对那两份文件报 **`MM`**，
+    `git diff --cached` 显示"索引相对 HEAD 少了 160 行" —— 那正是我这轮刚提交的内容。
+    🔴 此刻任何一次 `git commit -a` / 不带 pathspec 的 `git commit`（**别人很可能就这么提交**）
+    都会把旧 blob 当成"当前内容"提交上去 ⇒ **一条已推送的 commit 会被下一条再普通不过的
+    整索引提交静默抵消，一个冲突都不会报**。
+    而 `git log` 看起来完全正常，所以这个回归不会在任何门禁里现形。
+
+    ✅ 收尾动作是**必须的**，不是可选的：把真实索引里那几条刷成新 HEAD 的 blob ——
+
+    ```
+    git update-index --cacheinfo 100644,<blob>,BLOCKED.md --cacheinfo 100644,<blob2>,PROGRESS.md
+    git status --porcelain -- BLOCKED.md PROGRESS.md   # 期望：M 消失 / 只剩 ` M <f>`
+    git diff --cached --stat                            # 期望：空
+    ```
+
+    另外两处 plumbing 的漏项：它**不会跑 `.git/hooks/`**（本仓库的 post-commit 是 Qoder 的
+    AI 改动登记，漏跑就是这条 commit 不进账），以及 `git hash-object -w` 产生的游离 blob
+    在 gc 前无害、但**不要**指望它等于已提交。
+
+    📌 **可迁移的一般规律**：**绕过高层命令就等于接管它的收尾责任。**
+    `git commit` 之所以安全，是因为它在建完 commit 后**顺手把索引刷新到新 tree** ——
+    plumbing 没有这一步。用 plumbing 之后必须自己核对"索引 vs HEAD"的差，
+    否则你留下的是一个**只对下一次整索引提交有害**的状态，而受害的是别人。
