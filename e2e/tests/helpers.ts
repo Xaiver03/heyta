@@ -143,10 +143,17 @@ export async function enableAllModules(page: Page): Promise<void> {
   });
 }
 
-export async function openApp(page: Page): Promise<void> {
+/**
+ * 打开应用。
+ *
+ * @param path 打开哪个路径 —— 默认 `/`（应用根）。
+ *   桌面壳的反向授权要用 `/?auth=desktop&state=…`（ADR-0039 §2.3），
+ *   而那一步**必须**在应用启动时就在 URL 里，所以它是一个参数而不是"之后再点"。
+ */
+export async function openApp(page: Page, path = '/'): Promise<void> {
   await enableAllModules(page);
   await installMissingProducerShims(page);
-  await page.goto('/');
+  await page.goto(path);
   await expect(page.locator('input[placeholder^="添加任务"]')).toBeVisible();
 }
 

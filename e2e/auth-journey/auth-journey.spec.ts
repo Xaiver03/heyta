@@ -285,3 +285,43 @@ test('J6 反向：服务端地址错了，界面必须说出失败而不是假�
 
   await page.screenshot({ path: 'test-results/auth-journey-7-failure-visible.png' });
 });
+
+/**
+ * J7：桌面壳的**反向授权回跳**（ADR-0039 §2.3）
+ *
+ * 壳里做不了通行密钥（`uvpaa=false`），所以把鉴权交给**系统浏览器**：
+ * 壳打开 `/?auth=desktop&state=…`，用户在浏览器里正常登录，
+ * 应用登录成功后回跳 `heyta://auth#token=…&state=…`，壳校验 `state` 后接管。
+ *
+ * 🔴 这条用例断言的是**回跳地址本身**，不是"某个函数被调了"：
+ *    令牌必须在 fragment 里、`state` 必须原样带回。
+ * ⚠️ 依赖 J1（通行密钥由它建）；与 J2–J5 同一约定。
+ */
+test('J7 桌面壳反向授权：登录后回跳 heyta://auth#token=…&state=…，令牌不进 query', async ({
+  page,
+  request,
+}) => {
+  await ensureServer(request);
+  const state = `st-${String(Date.now())}`;
+
+  await openApp(page, `/?auth=desktop&state=${state}`);
+  const au = await attachAuthenticator(page);
+  if (journey.credential === null) throw new Error('旅程状态里没有通行密钥 —— J1 必须先跑');
+  await injectCredential(au, journey.credential);
+
+  const dialog = await openAuthPanel(page);
+  await loginWithPasskeyViaUi(page, dialog, journey.email);
+
+  // 登录成功 ⇒ 应用应当把令牌 + state 交回壳，并留一个**可点的**兜底入口。
+  const link = page.getByTestId('desktop-handoff-link');
+  await expect(link).toBeVisible();
+  const href = (await link.getAttribute('href')) ?? '';
+
+  expect(href.startsWith('heyta://auth#')).toBe(true);
+  expect(href).toContain('token=');
+  expect(href).toContain(`state=${state}`);
+  // 🔴 令牌**不许**出现在 query 里（那会进 Referer 与沿途每一层日志）。
+  expect(href.split('#')[0]).not.toContain('token=');
+
+  await page.screenshot({ path: 'test-results/auth-journey-8-desktop-handoff.png' });
+});

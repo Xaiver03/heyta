@@ -131,8 +131,8 @@ export async function injectCredential(
  * 打开真应用并等到输入框可见（白屏不算通过）。
  * 转接共享 helper（模块开关全开 + 垫片自动失效），保持一份"打开应用"的实现。
  */
-export async function openApp(page: Page): Promise<void> {
-  await openSharedApp(page);
+export async function openApp(page: Page, path = '/'): Promise<void> {
+  await openSharedApp(page, path);
 }
 
 /**
