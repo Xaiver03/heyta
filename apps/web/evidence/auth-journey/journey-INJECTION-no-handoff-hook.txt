@@ -1,0 +1,96 @@
+Scope: all 20 workspace projects
+Already up to date
+Done in 157ms using pnpm v11.8.0
+$ node scripts/verify-web-auth-journey.mjs
+
+=== Web 认证旅程验收（真浏览器 + 真服务端 + 真 WebAuthn）===
+
+⚠️  检测到环境变量 DATABASE_URL，已用验收库覆盖（避免污染）
+· node: /Users/rocalight/.nvm/versions/node/v22.22.3/bin/node
+· 数据库: heyta_web_auth_smoke
+· 服务端: http://127.0.0.1:3211   Web 应用: http://localhost:4329
+· 验收库已存在
+· 应用迁移…
+· 迁移完成
+· 启动服务端（127.0.0.1:3211，TEST_MODE，rp=localhost）…
+✅ 服务端就绪
+· 跑认证旅程套件（注册 → 登录 → 同步 → 新设备 → 退出）…
+
+[WebServer] (node:88999) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `DSH Desktop --trace-warnings ...` to show where the warning was created)
+[WebServer] (node:89000) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `DSH Desktop --trace-warnings ...` to show where the warning was created)
+
+Running 7 tests using 1 worker
+
+(node:89009) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `DSH Desktop --trace-warnings ...` to show where the warning was created)
+  ✓  1 [chromium] › auth-journey/auth-journey.spec.ts:101:1 › J1 未登录注册：头像菜单 → 登录/注册 → 用通行密钥注册出一个全新账号 (1.9s)
+  ✓  2 [chromium] › auth-journey/auth-journey.spec.ts:141:1 › J2 登录：同一把通行密钥拿到令牌，身份区出现邮箱且凭据落盘 (1.3s)
+  ✓  3 [chromium] › auth-journey/auth-journey.spec.ts:176:1 › J3 数据上行：登录后建任务、补口令同步，服务端必须真的收到 op (2.2s)
+  ✓  4 [chromium] › auth-journey/auth-journey.spec.ts:203:1 › J4 新设备恢复：全新 context 登录同账号，那条任务只能来自服务端 (1.5s)
+  ✓  5 [chromium] › auth-journey/auth-journey.spec.ts:223:1 › J5 退出登录：落盘凭据被清掉，身份入口翻回未登录形态 (1.3s)
+[WebServer] 8:47:57 PM [vite] (client) Pre-transform error: Failed to load url /@fs/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/packages/sync-core/dist/index.mjs (resolved id: /Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/packages/sync-core/dist/index.mjs) in /Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/packages/op-log/dist/index.js. Does the file exist?
+[WebServer] 8:47:57 PM [vite] (client) Pre-transform error: Failed to load url /@fs/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/packages/sync-core/dist/index.mjs (resolved id: /Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/packages/sync-core/dist/index.mjs) in /Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/packages/op-log/dist/index.js. Does the file exist?
+[WebServer] 8:47:57 PM [vite] (client) Pre-transform error: Failed to load url /@fs/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/packages/sync-core/dist/index.mjs (resolved id: /Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/packages/sync-core/dist/index.mjs) in /Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/packages/op-log/dist/index.js. Does the file exist?
+[WebServer] 8:47:57 PM [vite] (client) Pre-transform error: Failed to load url /@fs/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/packages/sync-core/dist/index.mjs (resolved id: /Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/packages/sync-core/dist/index.mjs) in /Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/packages/op-log/dist/index.js. Does the file exist?
+[WebServer] 8:47:57 PM [vite] (client) Pre-transform error: Failed to load url /@fs/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/packages/sync-core/dist/index.mjs (resolved id: /Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/packages/sync-core/dist/index.mjs) in /Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/packages/op-log/dist/index.js. Does the file exist?
+[WebServer] 8:47:57 PM [vite] (client) Pre-transform error: Failed to load url /@fs/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/packages/sync-core/dist/index.mjs (resolved id: /Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/packages/sync-core/dist/index.mjs) in /Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/packages/op-log/dist/index.js. Does the file exist?
+[WebServer] 8:47:57 PM [vite] (client) Pre-transform error: Failed to load url /@fs/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/packages/sync-core/dist/index.mjs (resolved id: /Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/packages/sync-core/dist/index.mjs) in /Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/packages/op-log/dist/index.js. Does the file exist?
+[WebServer] 8:47:57 PM [vite] (client) Pre-transform error: Failed to load url /@fs/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/packages/sync-core/dist/index.mjs (resolved id: /Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/packages/sync-core/dist/index.mjs) in /Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/packages/op-log/dist/index.js. Does the file exist?
+[WebServer] 8:47:57 PM [vite] (client) Pre-transform error: Failed to load url /@fs/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/packages/sync-core/dist/index.mjs (resolved id: /Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/packages/sync-core/dist/index.mjs) in /Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/packages/op-log/dist/index.js. Does the file exist?
+[WebServer] 8:47:57 PM [vite] (client) Pre-transform error: Failed to load url /@fs/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/packages/sync-core/dist/index.mjs (resolved id: /Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/packages/sync-core/dist/index.mjs) in /Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/packages/op-log/dist/index.js. Does the file exist?
+[WebServer] 8:47:57 PM [vite] (client) Pre-transform error: Failed to load url /@fs/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/packages/sync-core/dist/index.mjs (resolved id: /Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/packages/sync-core/dist/index.mjs) in /Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/packages/op-log/dist/index.js. Does the file exist?
+[WebServer] 8:47:57 PM [vite] (client) Pre-transform error: Failed to load url /@fs/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/packages/sync-core/dist/index.mjs (resolved id: /Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/packages/sync-core/dist/index.mjs) in /Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/packages/op-log/dist/index.js. Does the file exist?
+  ✓  6 [chromium] › auth-journey/auth-journey.spec.ts:258:1 › J6 反向：服务端地址错了，界面必须说出失败而不是假装成功 (4.1s)
+  ✘  7 [chromium] › auth-journey/auth-journey.spec.ts:300:1 › J7 桌面壳反向授权：登录后回跳 heyta://auth#token=…&state=…，令牌不进 query (2.1m)
+
+
+  1) [chromium] › auth-journey/auth-journey.spec.ts:300:1 › J7 桌面壳反向授权：登录后回跳 heyta://auth#token=…&state=…，令牌不进 query 
+
+    Error: expect(locator).toBeVisible() failed
+
+    Locator: getByTestId('desktop-handoff-link')
+    Expected: visible
+    Timeout: 120000ms
+    Error: element(s) not found
+
+    Call log:
+      - Expect "toBeVisible" getByTestId('desktop-handoff-link') with timeout 120000ms
+      - waiting for getByTestId('desktop-handoff-link')
+
+
+      315 |   // 登录成功 ⇒ 应用应当把令牌 + state 交回壳，并留一个**可点的**兜底入口。
+      316 |   const link = page.getByTestId('desktop-handoff-link');
+    > 317 |   await expect(link).toBeVisible();
+          |                      ^
+      318 |   const href = (await link.getAttribute('href')) ?? '';
+      319 |
+      320 |   expect(href.startsWith('heyta://auth#')).toBe(true);
+        at /Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/e2e/auth-journey/auth-journey.spec.ts:317:22
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/auth-journey-J7-桌面壳反向授权：登录-3fe63--token-…-state-…，令牌不进-query-chromium/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    test-results/auth-journey-J7-桌面壳反向授权：登录-3fe63--token-…-state-…，令牌不进-query-chromium/video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results/auth-journey-J7-桌面壳反向授权：登录-3fe63--token-…-state-…，令牌不进-query-chromium/error-context.md
+
+    attachment #4: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results/auth-journey-J7-桌面壳反向授权：登录-3fe63--token-…-state-…，令牌不进-query-chromium/trace.zip
+    Usage:
+
+        pnpm exec playwright show-trace test-results/auth-journey-J7-桌面壳反向授权：登录-3fe63--token-…-state-…，令牌不进-query-chromium/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  1 failed
+    [chromium] › auth-journey/auth-journey.spec.ts:300:1 › J7 桌面壳反向授权：登录后回跳 heyta://auth#token=…&state=…，令牌不进 query 
+  6 passed (2.3m)
+
+❌ 认证旅程验收失败（截图在 e2e/test-results/，trace 已按失败保留）
+
+[ELIFECYCLE] Command failed with exit code 1.

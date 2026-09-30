@@ -43,6 +43,7 @@ import {
   type HostedAuthSession,
 } from '@heyta/app-host';
 
+import { maybeHandOffToShell } from './desktop-handoff.js';
 import { useSyncStore } from '../sync/store.js';
 import {
   createPasskeyCredential,
@@ -161,6 +162,17 @@ function applyAuthSession(baseUrl: string, session: HostedAuthSession): void {
   // 邮箱一起交过去：左侧导航顶部的头像要用它算首字母，
   // 而刷新之后 `useAuthStore` 会回到 signed-out —— 头像得能从落盘的凭据里拿到它。
   useSyncStore.getState().applyAuthToken(baseUrl, session.token, session.user.email);
+
+  /**
+   * 🔴 桌面壳的**反向授权回跳**（ADR-0039 §2.3）。
+   *
+   * 这里挂着是刻意的：**所有登录路径都汇聚到这个函数**（通行密钥 / 邮箱链接 / 粘贴令牌），
+   * 所以在它上面加一次判定，就不会漏掉某一条路。
+   * 不是桌面流程时 `maybeHandOffToShell` 直接返回 `null`，什么都不做。
+   */
+  if (typeof window !== 'undefined') {
+    maybeHandOffToShell(session.token, new URL(window.location.href), document);
+  }
 }
 
 export const useAuthStore = create<AuthStoreState>((set) => ({

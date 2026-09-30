@@ -90,6 +90,22 @@
 🔴 壳**不再**自己做通行密钥（§1.2 已量出那条不可行）。壳只做两件事：
 把浏览器打开到我们的站点、把回调里的令牌交出去。
 
+**回跳的两条硬约束**（都落在 `apps/web/src/features/auth/desktop-handoff.ts`）：
+
+1. **令牌放在 URL 的 fragment 里**（`heyta://auth#token=…&state=…`），**不进 query** ——
+   `#` 之后不会发给服务器、不进 `Referer`、也不进任何一层的访问日志。
+2. **没有 `state` 就不算桌面流程**：壳靠它判断"这个回调是不是我这次发起的那一个"。
+   放行空 `state` 等于允许任意网页把令牌塞进壳。
+
+**还要一个看得见的兜底入口**：程序化跳自定义 scheme 会被浏览器**静默拒绝**
+（没装对应应用、或某些策略下），用户看到的是"点了登录，什么都没发生"。
+所以应用在回跳前先挂一个**可点的链接**（「正在返回 heyta…」），再尝试自动跳。
+它同时让"回跳地址对不对"这件事**可被断言**（不是测试钩子，是产品行为）。
+
+**判定点只有一处**：`applyAuthSession`（`apps/web/src/features/auth/store.ts`）——
+所有登录路径（通行密钥 / 邮箱链接 / 粘贴令牌）都汇聚到它，所以在它上面加一次判定
+不会漏掉某一条路。⚠️ 邮件回跳那条也走它：`consumePendingLogin` **委托** `verify()`。
+
 ### 2.4 手机号全链路：**预留**，默认关闭，且"预留"本身可判
 
 | 层 | 预留什么 |
@@ -153,4 +169,22 @@
 第 ④ 步当场 **401**（`email-chain-INJECTION-get-consumes.txt`）。
 ⇒ 同一份判据在两种实现下给出相反结论，证明这次修复是**承重的**。
 
-⚠️ **尚未验**：真实 SMTP（本机走 Ethereal）、桌面壳回调、手机号通道（预留）。
+### 第 2 轮：桌面壳反向授权的 **web 侧**已验
+
+| 落点 | 文件 |
+|---|---|
+| 意图解析 / 回跳地址 / 兜底入口 | `apps/web/src/features/auth/desktop-handoff.ts` |
+| 唯一判定点 | `apps/web/src/features/auth/store.ts` 的 `applyAuthSession` |
+| 单测（8 条） | `apps/web/tests/desktop-handoff.spec.ts` |
+| 真浏览器端到端 | `e2e/auth-journey/auth-journey.spec.ts` 的 **J7** |
+
+**绿**：`pnpm verify:web-auth` **7 passed**（J1–J6 + J7）——J7 打开 `/?auth=desktop&state=…`、
+用通行密钥登录，断言兜底链接的 `href` 是 `heyta://auth#token=…&state=<原 state>`
+且 **query 里没有 token**。人看过的截图：`auth-journey-8-desktop-handoff.png`
+（底部就是那条「正在返回 heyta…」）。
+
+**红（注入）**：① 拿掉 `readDesktopHandoff` 的空 state 守卫 ⇒ 单测"缺 state 不认"红；
+② 拿掉 `applyAuthSession` 里的回跳钩子 ⇒ **J7 红**（兜底入口不出现）而 J1–J6 仍绿。
+
+⚠️ **尚未验**：真实 SMTP（本机走 Ethereal）、**壳侧**（macOS `ASWebAuthenticationSession`
+与 Windows 等价物 + `state` 校验）、手机号通道（预留）。

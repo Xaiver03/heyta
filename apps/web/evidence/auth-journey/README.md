@@ -49,6 +49,17 @@ Received string: "这个浏览器或设备不支持通行密钥，改用邮箱�
 ⇒ 这两条都不是产品缺陷，而是**判据自己在空转**。它们只有在 RP ID 修好、
 旅程第一次真正跑到底之后才**暴露出来** —— 这正是"阻塞被解开"的第一个副作用。
 
+## J7：桌面壳的**反向授权回跳**（ADR-0039 §2.3）
+
+| 文件 | 它证明 |
+|---|---|
+| `journey-pass-with-J7-desktop-handoff.txt` | ✅ **7 passed**：J7 打开 `/?auth=desktop&state=…`、用通行密钥登录，兜底链接的 `href` 是 `heyta://auth#token=…&state=<原 state>`，且 **query 里没有 token** |
+| `auth-journey-8-desktop-handoff.png` | 人看过：应用已登录，底部是「正在返回 heyta…（如果没有自动跳转，点这里）」 |
+| `journey-INJECTION-no-handoff-hook.txt` | 🔴 拿掉 `applyAuthSession` 里的回跳钩子 ⇒ **J7 红**（兜底入口不出现），J1–J6 仍绿 |
+
+⚠️ 这条只验**浏览器侧**"把令牌交回壳"。**壳真的接到并校验 `state`** 还没做
+（macOS 的 `ASWebAuthenticationSession` / Windows 等价物），见 ADR-0039 §2.3。
+
 ## 如实记边界（别读多）
 
 1. **这条旅程跑在 Chromium（Playwright）里，不是桌面壳里。**

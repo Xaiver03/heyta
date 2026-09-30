@@ -1,0 +1,39 @@
+Scope: all 20 workspace projects
+Already up to date
+Done in 148ms using pnpm v11.8.0
+$ node scripts/verify-web-auth-journey.mjs
+
+=== Web 认证旅程验收（真浏览器 + 真服务端 + 真 WebAuthn）===
+
+⚠️  检测到环境变量 DATABASE_URL，已用验收库覆盖（避免污染）
+· node: /Users/rocalight/.nvm/versions/node/v22.22.3/bin/node
+· 数据库: heyta_web_auth_smoke
+· 服务端: http://127.0.0.1:3211   Web 应用: http://localhost:4329
+· 验收库已存在
+· 应用迁移…
+· 迁移完成
+· 启动服务端（127.0.0.1:3211，TEST_MODE，rp=localhost）…
+✅ 服务端就绪
+· 跑认证旅程套件（注册 → 登录 → 同步 → 新设备 → 退出）…
+
+[WebServer] (node:92599) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `DSH Desktop --trace-warnings ...` to show where the warning was created)
+[WebServer] (node:92611) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `DSH Desktop --trace-warnings ...` to show where the warning was created)
+
+Running 7 tests using 1 worker
+
+(node:92619) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `DSH Desktop --trace-warnings ...` to show where the warning was created)
+  ✓  1 [chromium] › auth-journey/auth-journey.spec.ts:101:1 › J1 未登录注册：头像菜单 → 登录/注册 → 用通行密钥注册出一个全新账号 (1.7s)
+  ✓  2 [chromium] › auth-journey/auth-journey.spec.ts:141:1 › J2 登录：同一把通行密钥拿到令牌，身份区出现邮箱且凭据落盘 (1.3s)
+  ✓  3 [chromium] › auth-journey/auth-journey.spec.ts:176:1 › J3 数据上行：登录后建任务、补口令同步，服务端必须真的收到 op (1.5s)
+  ✓  4 [chromium] › auth-journey/auth-journey.spec.ts:203:1 › J4 新设备恢复：全新 context 登录同账号，那条任务只能来自服务端 (1.5s)
+  ✓  5 [chromium] › auth-journey/auth-journey.spec.ts:223:1 › J5 退出登录：落盘凭据被清掉，身份入口翻回未登录形态 (1.3s)
+  ✓  6 [chromium] › auth-journey/auth-journey.spec.ts:258:1 › J6 反向：服务端地址错了，界面必须说出失败而不是假装成功 (975ms)
+  ✓  7 [chromium] › auth-journey/auth-journey.spec.ts:300:1 › J7 桌面壳反向授权：登录后回跳 heyta://auth#token=…&state=…，令牌不进 query (1.2s)
+
+  7 passed (10.8s)
+
+✅ 认证旅程验收通过：注册 → 登录 → 同步 → 新设备恢复 → 退出登录
+
