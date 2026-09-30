@@ -337,3 +337,100 @@ STORAGE=shell
    这里不重复造断言。
 4. 没有截图：这一格是**无头**冒烟（不开窗），所以它证明的是"跨语言 + 真落盘"，
    不证明"界面画出来了"。窗口那一格由 `check:macos-window` 负责。
+
+## 🔴 四格矩阵：macOS 壳「应用起不来」有四种成因，先查这一格再怀疑产品
+
+产品负责人 2026-09-30 报了一屏 **「无法初始化本地存储 / 浏览器可能禁用了本地数据库
+（无痕模式常见）」**，外加诊断行
+`{"identity":0,"capture":0,"backend":"","handler":"undefined",…}`。
+**产品没有坏** —— 那一屏由**取证开关**的组合产生。四格实测如下
+（每一格都有落盘文件 `storage-matrix-*.txt`）：
+
+| 启动方式 \ WebKit 仓 | **持久仓（默认）** | **非持久仓**（`HEYTA_WEBKIT_EPHEMERAL=1`） |
+|---|---|---|
+| **桥在**（打包应用 / 设了 `HEYTA_BRIDGE_BUNDLE`） | ✅ `STORAGE_HOST=on` `STORAGE=shell`<br>`storage-matrix-packaged-app.txt` | ✅ `STORAGE_HOST=on` `STORAGE=shell`<br>`storage-matrix-host-on-ephemeral.txt` |
+| **桥不在**（裸 `.build/…/HeytaMac`、没设 env） | ✅ `STORAGE_HOST=off` 但 **`STORAGE=sqlite`**，应用照常渲染<br>`storage-matrix-host-off-persistent.txt` | 🔴 **就是那一屏**<br>`storage-matrix-host-off-ephemeral.txt` |
+
+**怎么读：**
+
+- 失败**只**发生在"**桥不在** + **非持久仓**"这一格。两个前提都是**诊断开关**，
+  不是产品行为：`HEYTA_WEBKIT_EPHEMERAL` 的代码注释写着"默认**不开**：它是取证用的开关，
+  不是产品行为"；`HEYTA_BRIDGE_BUNDLE` 是**裸 SwiftPM 可执行文件**才需要的
+  （打包后的 `Heyta.app` 把 `native-bridge.js` 放进了 `Contents/Resources`，不用设）。
+- 桥不在**单独**并不会坏事：`decide()` 会退回页侧自己的库（`STORAGE=sqlite`），
+  那条路在这台机器上是**好的**（第一行绿格实测）。
+  所以"桥没找到"不是故障，**它只是让应用失去持久化能力**。
+- 那句"无痕模式常见"其实**是准的** —— 非持久仓就是无痕。不准的是：
+  **没有任何地方告诉用户"是壳自己把仓库设成临时的"**。
+
+**要跑出正常那一屏**（产品负责人的日常用法）：
+
+```bash
+open /Applications/Heyta.app          # 开箱即用：桥在 Resources 里，STORAGE=shell
+```
+
+**要复现故障那一屏**（只在排查时用）：
+
+```bash
+cd apps/desktop-macos
+HEYTA_WEB_ROOT="$PWD/../web/dist" \
+  HEYTA_WEBKIT_EPHEMERAL=1 \
+  .build/out/Products/Debug/HeytaMac        # 不设 HEYTA_BRIDGE_BUNDLE ⇒ 桥不在
+```
+
+⚠️ 顺带：`module-src=/assets/index-*.js` 出现在 `bootErrors` 里时**它不是错误** ——
+那是 `window.load` 时推的一条**面包屑**（"本该跑哪个模块"），见
+`HeytaMacApp.swift` 的 `bootDiagShim`。把面包屑读成"模块取不到"会把人带到错方向。
+
+### 🔴 同一片区域里的一个真缺陷（已修）：取证脚本会把窗口**留在用户屏幕上**
+
+`scripts/capture-window.sh` 是 `set -euo pipefail`，它在交叉校验那里起一个
+**`(nohup … &)` 分离实例**，收尾靠后面一句 `pkill -f HeytaMac`。两条独立的失败路径：
+
+1. 交叉校验的 `node` 结尾是 `process.exit(sameLogical ? 0 : 1)` ⇒ **尺寸不一致时
+   脚本当场死掉**，`pkill` **永远不会执行** ⇒ 分离实例留在屏幕上。
+   用户看到的就是上面那一屏（如果启动时还带着 `HEYTA_WEBKIT_EPHEMERAL`），
+   而它会让人以为**产品坏了**。
+2. `pkill -f HeytaMac` 是**按名字杀**：会顺手杀掉**用户自己正在用的**那个 HeytaMac。
+
+改成**记 PID + `trap … EXIT`**（只收自己起的那个），并加了一个注入开关
+`HEYTA_CAPTURE_INJECT_FAIL_CROSSCHECK=1` —— 它让交叉校验**故意判失败**，
+用来证明"脚本半路死掉也不留窗口"。没有那个开关就没法验：
+交叉校验正常是绿的，而"绿的时候不留窗口"说明不了"红的时候也不留"。
+
+## 🔴 取证链自己的四处缺陷（2026-09-30 一并修掉，否则证据会骗人）
+
+上面那张四格矩阵是**排查的结果**。查的过程中发现"取证链"本身也在制造假象 ——
+四条都已修，每条都有实测读数：
+
+| # | 缺陷 | 实测读数 | 后果 |
+|---|---|---|---|
+| 1 | `scripts/window-id.swift` 按**属主**筛（`owner.contains("Heyta")`） | `owner=DSH Desktop  title=heyta  bounds=1120x720  onscreen=true` | 裸 SwiftPM 可执行文件被别的进程树启动时，属主报成**启动它的应用** ⇒ 窗口在标题那道筛之前被丢掉 ⇒ `CROSSCHECK=skipped` ⇒ `check:macos-window` **假红**。**顺带纠正**：过去把零输出归因于"没给屏幕录制权限"，实测不是（拿得到 `title=heyta`；真没权限时 `kCGWindowName` 会是 nil）。修法：**只认标题** |
+| 2 | `scripts/check-macos-window.mjs` 没给 `HEYTA_BRIDGE_BUNDLE` | 不给桥 ⇒ `STORAGE_HOST=off`，证据走**页侧兜底**（`STORAGE=sqlite`），不是产品的路 | 证据说的不是产品那条路 |
+| 3 | 同上，没给 `HEYTA_WEBKIT_EPHEMERAL=1` | 持久仓里已有会话时：`M2-MACOS ✅ 已登录（退出登录 1 个、登录入口 0 个）` | 门禁判的是"**冷启动未登录**第一屏"，而它读到的是已登录 IA ⇒ **假红**（那是正常状态，不是故障） |
+| 4 | `capture-window.sh` 缺 `HEYTA_WEB_ROOT` / `HEYTA_BRIDGE_BUNDLE` 的默认值 | 不给 web root ⇒ 壳渲染**回退屏**（"未找到共享 UI 产物目录"）；不给桥 ⇒ 走兜底 | 截图看起来"窗口画出来了"，其实**画的不是应用** —— 交接文档里那条"门禁报通过、而图是回退屏"的根因就是这里 |
+
+⇒ 2、3、4 现在都由**脚本内置默认 + 门禁显式传**兜住；并在缺桥/缺产物时**响亮失败**，
+而不是退化成一张"看起来正常"的假证据。**修完两条门禁都真绿**：
+`check:macos-shell`（跨语言 + 落盘）+ `check:macos-window`
+（`✅ CROSSCHECK=ok(2240x1440)`、`✅ 壳里的共享 UI 真的渲染出来了`、`✅ 身份入口成立…未登录 IA 合规`）。
+
+### 这一目录里那份"人要看"的截图现在是可信的
+
+| 文件 | 它是什么 |
+|---|---|
+| `../window-first-run.png` | 壳**真实窗口**的截图（1120×720，2x 出图 2240×1440）：完整应用 + 左上角**未登录**身份入口 + 顶栏"未同步" + 底部诊断行 |
+| `../window-first-run-m2.txt` | 应用**自己写的**自述：`STORAGE_HOST=on` / `STORAGE=shell` / `AUTH_STATE=signed-out` / 探针结论 |
+
+刷新命令（**一条就够**，桥与产物目录都由脚本内置默认）：
+
+```bash
+HEYTA_WEBKIT_EPHEMERAL=1 \
+HEYTA_M2_EVIDENCE="$PWD/apps/desktop-macos/evidence/window-first-run-m2" \
+  bash apps/desktop-macos/scripts/capture-window.sh
+```
+
+⚠️ `HEYTA_WEBKIT_EPHEMERAL=1` 是**调用方**给的（它表示"要冷启动那一屏"），
+脚本自己**不**默认它 —— 因为要截"已登录"那屏时它必须能被关掉。
+⚠️ `HEYTA_M2_EVIDENCE` **不能**与截图同路径：脚本会写 `<OUT>.txt`，
+同路径会把应用的自述**覆盖掉**（门禁的注释里记着这个坑，我本轮又踩了一次）。

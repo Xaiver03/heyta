@@ -1,0 +1,48 @@
+# capture-window.sh「绝不留窗口」红/绿一对（2026-09-30）
+#
+# 背景：产品负责人报了一屏"无法初始化本地存储"的窗口。排查后确认产品是好的
+# （四格矩阵见同目录 storage-matrix-*.txt），但**取证/门禁脚本会把窗口留在屏幕上**，
+# 多会话共用这台机器时就会撞见。本次修掉的是 capture-window.sh 自己那条路径。
+#
+# 改动：把 `(nohup … &)` + 事后 `pkill -f HeytaMac`
+#      换成 记 PID + `trap 'kill "$CROSSCHECK_PID"' EXIT`（只收自己起的那个）。
+
+## ① 机制（最小复现，set -e + 分离子进程）
+
+$ bash /tmp/trap-old.sh        # 旧形状：(nohup sleep 47 &) 之后 false
+exit=1
+➜ 残留进程数：1                 # ← 脚本半路死掉，分离实例活下来
+
+$ bash /tmp/trap-new.sh        # 新形状：sleep 47 & CHILD=$!; trap … EXIT; false
+exit=1
+➜ 残留进程数：0                 # ← 同一条失败路径，收干净了
+
+## ② 真脚本（注入：在分离实例存活时让脚本死掉）
+
+$ HEYTA_WEB_ROOT="$PWD/apps/web/dist" \
+  HEYTA_M2_EVIDENCE=/tmp/heyta-trap-marker \
+  HEYTA_CAPTURE_INJECT_FAIL_CROSSCHECK=1 \
+  bash apps/desktop-macos/scripts/capture-window.sh /tmp/trap-shot.png
+…
+=== 独立复验：与 screencapture -l 比尺寸 ===
+  🔴 注入：在分离实例存活时让脚本死掉（证明收尾不依赖走完全程）
+exit=1
+
+$ pgrep -fl HeytaMac
+（空）                          # ← 没有任何残留
+$ ps eww $(pgrep HeytaMac) | grep -c heyta-trap-marker
+0                               # ← 更没有属于本次运行的
+
+## ③ 注入位置为什么在"交叉校验之前"
+
+本机 `swift window-id.swift` **取不到窗口 id** ⇒ 走 else 分支跳过交叉校验
+⇒ 放在交叉校验里的注入**到不了**。第一版就是这么放错的（跑出来 exit=0，看着像"修复生效"，
+其实是注入根本没执行）。这条本身就是"注入失配会造出假证据"的又一例。
+
+## 边界（如实）
+
+- 只修了 `capture-window.sh` 这条路。`check-macos-window.mjs` 自己那条
+  （`spawnSync` 超时杀 bash）**没有**加 trap —— 本轮实测到一个孤儿实例，
+  `PPID` 已消失、环境是门禁的，说明门禁那条路仍有留窗口的余地。**未做，留给下一轮。**
+- 绿灯那侧是"注入 + 事后查进程表"，不是"关掉修复看它漏"（后者要改已推送的文件）。
+  机制那一步（①）补上了这个对比：同一形状、只差收尾方式，残留 1 vs 0。

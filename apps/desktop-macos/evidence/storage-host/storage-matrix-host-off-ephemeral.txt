@@ -1,0 +1,4 @@
+WINDOW=heyta
+WEB_ROOT=/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/apps/web/dist
+STORAGE_HOST=off（找不到 native-bridge.js（先跑 packages/app-host/scripts/build-native-bridge.mjs，或设 HEYTA_BRIDGE_BUNDLE））
+M2_MACOS_NOTE=M2-macOS 🔴 真应用没画出来（或没有身份入口/采集框）：{"identity":0,"capture":0,"backend":"","handler":"undefined","origin":"heyta-local://app","secure":true,"webauthn":"function","title":"heyta","bootErrors":"module-src=/assets/index-u22pKDxU.js","scripts":1}
