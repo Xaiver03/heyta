@@ -420,6 +420,7 @@ HEYTA_WEB_ROOT="$PWD/../web/dist" \
 | 文件 | 它是什么 |
 |---|---|
 | `../window-first-run.png` | 壳**真实窗口**的截图（1120×720，2x 出图 2240×1440）：完整应用 + 左上角**未登录**身份入口 + 顶栏"未同步" + 底部诊断行 |
+| `../window-first-run.png.webview.png` | **WebView 快照**（没有窗口边框，只有应用内容）—— **`check:macos-window` 判的就是这张**（`contentOnModalRatio`），所以它比窗口截图更接近判据本身 |
 | `../window-first-run-m2.txt` | 应用**自己写的**自述：`STORAGE_HOST=on` / `STORAGE=shell` / `AUTH_STATE=signed-out` / 探针结论 |
 
 刷新命令（**一条就够**，桥与产物目录都由脚本内置默认）：
