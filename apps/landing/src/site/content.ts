@@ -22,7 +22,7 @@
  * 看板、批量操作）**一律不写** —— 它们进「还没做的」那一条，不进能力清单。
  */
 
-import type { MessageKey } from '@heyta/i18n';
+import type { MessageKey } from '@heyta/i18n/provider';
 
 import type { SectionSpec } from './PageSections.js';
 
@@ -38,7 +38,6 @@ export const FEATURE_SECTIONS: readonly SectionSpec[] = [
       'site.features.item.task.trash',
       'site.features.item.task.export',
     ],
-    evidenceKeys: ['site.features.tasks.evidence'],
     mockView: 'tasks',
   },
   {
@@ -49,7 +48,6 @@ export const FEATURE_SECTIONS: readonly SectionSpec[] = [
       'site.features.item.view.timeline',
       'site.features.item.view.today',
     ],
-    evidenceKeys: ['site.features.views.evidence'],
     mockView: 'quadrant',
   },
   {
@@ -60,14 +58,12 @@ export const FEATURE_SECTIONS: readonly SectionSpec[] = [
       'site.features.item.habit.streak',
       'site.features.item.habit.heat',
     ],
-    evidenceKeys: ['site.features.habits.evidence'],
     mockView: 'habits',
   },
   {
     id: 'focus',
     titleKey: 'site.features.section.focus',
     itemKeys: ['site.features.item.focus.timer', 'site.features.item.focus.link'],
-    evidenceKeys: ['site.features.focus.evidence'],
     mockView: 'focus',
   },
   {
@@ -78,7 +74,6 @@ export const FEATURE_SECTIONS: readonly SectionSpec[] = [
       'site.features.item.growth.narrative',
       'site.features.item.growth.colors',
     ],
-    evidenceKeys: ['site.features.growth.evidence'],
   },
   {
     id: 'sync',
@@ -89,7 +84,6 @@ export const FEATURE_SECTIONS: readonly SectionSpec[] = [
       'site.features.item.sync.conflict',
       'site.features.item.sync.selfhost',
     ],
-    evidenceKeys: ['site.features.sync.evidence', 'site.features.privacy.evidence'],
   },
   {
     id: 'ai',
@@ -99,13 +93,11 @@ export const FEATURE_SECTIONS: readonly SectionSpec[] = [
       'site.features.item.ai.gate',
       'site.features.item.ai.features',
     ],
-    evidenceKeys: ['site.features.ai.evidence'],
   },
   {
     id: 'api',
     titleKey: 'site.features.section.api',
     itemKeys: ['site.features.item.api.mcp', 'site.features.item.api.local'],
-    evidenceKeys: ['site.features.api.evidence'],
   },
   /**
    * 🔴 「还没做的」与「明确不做的」属于**同一页**，不是"以后再做"的占位：
@@ -134,42 +126,36 @@ export const PLATFORM_SECTIONS: readonly SectionSpec[] = [
     status: 'available',
     titleKey: 'site.platforms.web.name',
     bodyKeys: ['site.platforms.web.body'],
-    evidenceKeys: ['site.platforms.web.evidence'],
   },
   {
     id: 'android',
     status: 'partial',
     titleKey: 'site.platforms.android.name',
     bodyKeys: ['site.platforms.android.body'],
-    evidenceKeys: ['site.platforms.android.evidence'],
   },
   {
     id: 'ios',
     status: 'partial',
     titleKey: 'site.platforms.ios.name',
     bodyKeys: ['site.platforms.ios.body'],
-    evidenceKeys: ['site.platforms.ios.evidence'],
   },
   {
     id: 'desktop',
     status: 'partial',
     titleKey: 'site.platforms.desktop.name',
     bodyKeys: ['site.platforms.desktop.body'],
-    evidenceKeys: ['site.platforms.desktop.evidence'],
   },
   {
     id: 'harmony',
     status: 'blocked',
     titleKey: 'site.platforms.harmony.name',
     bodyKeys: ['site.platforms.harmony.body'],
-    evidenceKeys: ['site.platforms.harmony.evidence'],
   },
   {
     id: 'selfhost',
     status: 'partial',
     titleKey: 'site.platforms.selfhost.name',
     bodyKeys: ['site.platforms.selfhost.body'],
-    evidenceKeys: ['site.platforms.selfhost.evidence'],
   },
 ];
 
@@ -189,9 +175,11 @@ export const PLATFORM_NOTES: readonly MessageKey[] = ['site.platforms.note'];
  *     不按功能收费（`pricing`）· 四象限是派生视图（`quadrant`）；
  *   · 其余两条独立成节：习惯韧性（`resilience`）· 冲突解决可视化（`conflict`）。
  *
- * ⚠️ **内容纪律**：只收录**已实现**的能力，每条给出可复现的验证方式；
- * **不直接暴露 `docs/` 路径**（A4-1 的同一条纪律）—— 证据写成用户能执行的动作，
- * 而不是贴一份只有贡献者看得懂的 ADR 链接。
+ * ⚠️ **内容纪律**：只收录**已实现**的能力。
+ * 🔴 2026-09-29 起公页**不再渲染「验证方式」**—— `pnpm …` 与仓库路径是
+ * 贡献者语言，对用户就是内部黑话（那次退役的完整缘由写在
+ * `scripts/check-claims.mjs` 的文件头）；**也不出现竞品名**——
+ * 这一页的立意是"数据在你手里"，靠自身成立，不靠对照竞品成立。
  */
 export const INTEGRATION_SECTIONS: readonly SectionSpec[] = [
   {
@@ -199,49 +187,42 @@ export const INTEGRATION_SECTIONS: readonly SectionSpec[] = [
     titleKey: 'site.integrations.e2ee.title',
     bodyKeys: ['site.integrations.e2ee.body'],
     itemKeys: ['site.integrations.e2ee.item.ingress', 'site.integrations.e2ee.item.keys'],
-    evidenceKeys: ['site.integrations.e2ee.evidence'],
   },
   {
     id: 'selfhost',
     titleKey: 'site.integrations.selfhost.title',
     bodyKeys: ['site.integrations.selfhost.body'],
     itemKeys: ['site.integrations.selfhost.item.compose', 'site.integrations.selfhost.item.free'],
-    evidenceKeys: ['site.integrations.selfhost.evidence'],
   },
   {
     id: 'local-api',
     titleKey: 'site.integrations.localApi.title',
     bodyKeys: ['site.integrations.localApi.body'],
     itemKeys: ['site.integrations.localApi.item.tools', 'site.integrations.localApi.item.gate'],
-    evidenceKeys: ['site.integrations.localApi.evidence'],
   },
   {
     id: 'byok',
     titleKey: 'site.integrations.byok.title',
     bodyKeys: ['site.integrations.byok.body'],
     itemKeys: ['site.integrations.byok.item.presets', 'site.integrations.byok.item.nosdk'],
-    evidenceKeys: ['site.integrations.byok.evidence'],
   },
   {
     id: 'export',
     titleKey: 'site.integrations.export.title',
     bodyKeys: ['site.integrations.export.body'],
     itemKeys: ['site.integrations.export.item.json', 'site.integrations.export.item.markdown'],
-    evidenceKeys: ['site.integrations.export.evidence'],
   },
   {
     id: 'pricing-model',
     titleKey: 'site.integrations.pricing.title',
     bodyKeys: ['site.integrations.pricing.body'],
     itemKeys: ['site.integrations.pricing.item.nogate', 'site.integrations.pricing.item.onlytwo'],
-    evidenceKeys: ['site.integrations.pricing.evidence'],
   },
   {
     id: 'quadrant',
     titleKey: 'site.integrations.quadrant.title',
     bodyKeys: ['site.integrations.quadrant.body'],
     itemKeys: ['site.integrations.quadrant.item.derived', 'site.integrations.quadrant.item.nodrift'],
-    evidenceKeys: ['site.integrations.quadrant.evidence'],
   },
   {
     id: 'resilience',
@@ -251,14 +232,12 @@ export const INTEGRATION_SECTIONS: readonly SectionSpec[] = [
       'site.integrations.resilience.item.states',
       'site.integrations.resilience.item.nocurrency',
     ],
-    evidenceKeys: ['site.integrations.resilience.evidence'],
   },
   {
     id: 'conflict',
     titleKey: 'site.integrations.conflict.title',
     bodyKeys: ['site.integrations.conflict.body'],
     itemKeys: ['site.integrations.conflict.item.visible', 'site.integrations.conflict.item.lww'],
-    evidenceKeys: ['site.integrations.conflict.evidence'],
   },
 ];
 
