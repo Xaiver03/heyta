@@ -19,6 +19,7 @@ export {
   type TaskListLabels,
   type TaskListProps,
 } from './task-list/TaskList.js';
+export { TaskGroupHead, type TaskGroupHeadProps } from './task-list/TaskGroupHead.js';
 export { TaskBadges, type TaskBadgesProps } from './task-list/TaskBadges.js';
 export {
   flattenSections,
@@ -41,6 +42,32 @@ export {
   type ToTaskRowOptions,
 } from './task-list/model.js';
 export { HeytaIcon, type HeytaIconData, type HeytaIconProps } from './icon/Icon.js';
+export {
+  TrashBoard,
+  type TrashBoardLabels,
+  type TrashBoardProps,
+} from './trash/TrashBoard.js';
+export {
+  SearchPanel,
+  type SearchPanelLabels,
+  type SearchPanelProps,
+} from './search/SearchPanel.js';
+export { CalendarBoard, type CalendarBoardProps } from './calendar/CalendarBoard.js';
+export {
+  calendarDayTone,
+  groupTasksByDueDate,
+  MAX_CALENDAR_DOTS,
+  type CalendarBoardLabels,
+  type CalendarDayTone,
+} from './calendar/model.js';
+export {
+  formatDayTitleText,
+  weekdayMessageKey,
+  formatMonthTitleText,
+  WEEKDAY_MESSAGE_KEYS,
+  type CalendarDateKey,
+  type CalendarTranslate,
+} from './calendar/date-text.js';
 /**
  * 空态：**唯一权威定义**。
  *
@@ -199,6 +226,15 @@ export {
  * 且状态一变它就变成错误信息**。所以下面这些"已登记"的句子同样有保质期 ——
  * 唯一值得信的是 `PROVIDER_DEPENDENT` 本身。
  */
+export {
+  AiPanelHead,
+  type AiPanelHeadProps,
+} from './ai/AiPanelHead.js';
+export {
+  AiPanel,
+  type AiPanelProps,
+  type AiPanelRole,
+} from './ai/AiPanel.js';
 export {
   AiDisclosure,
   type AiDisclosureInput as AiDisclosureRouteInput,
@@ -658,3 +694,65 @@ export {
   type WeekStatRow,
 } from './motivation/model.js';
 
+export { TimelineView, type TimelineViewProps } from './timeline/TimelineView.js';
+export { GanttChart, type GanttChartProps } from './timeline/GanttChart.js';
+export {
+  MAX_AXIS_MARKS,
+  MINUTES_PER_DAY,
+  MINUTES_PER_HOUR,
+  MULTI_DAY_THRESHOLD_MINUTES,
+  axisTicks,
+  chartSpan,
+  dayBands,
+  formatClock,
+  formatDuration,
+  formatRange,
+  formatRelativeRange,
+  indexByTitle,
+  normalizeClock,
+  safeLocalDate,
+  todayWindow,
+  type GanttLabels,
+  type TimelineViewLabels,
+} from './timeline/model.js';
+
+/**
+ * ── W8：认证的**失败原因 → 词条 key** 收在这里一份 ──
+ *
+ * 🔴 **本块是追加的**（`index.ts` 是多写者共享文件，只许在末尾追加）。
+ *
+ * 收编理由与形状见 `auth/model.ts` 的文件头：这条路此前在
+ * `apps/web/src/features/auth/AuthPanel.tsx` 与
+ * `apps/mobile/src/auth/failure-key.ts` **各写了一份**，
+ * 与仓库此前对"同步失败"做过的收编是**同一个模式**
+ * （那份用 `common.sync.error.*`，这份用 `common.auth.error.*`）。
+ */
+export {
+  AUTH_TERMS_REQUIRED_KEY,
+  STEPS_WITHOUT_TOKEN,
+  authFailureMessageKey,
+  hasTokenAfter,
+  type AuthFailureMessageKey,
+  type AuthJourneyStep,
+} from './auth/model.js';
+
+/**
+ * ── ⑩-2：子任务的**界面语义**（拒绝原因 → 词条 key）收在这里一份 ──
+ *
+ * 🔴 **本块是追加的**（`index.ts` 是多写者共享文件，只许在末尾追加）。
+ * 形状与 `auth/model.ts` 的 `authFailureMessageKey` 一致：
+ * 领域层给封闭集合，这里翻成 key，**句子本身在词条表里**。
+ */
+export {
+  rejectionReasonOf,
+  subtaskRejectionMessageKey,
+  type SubtaskRejectionMessageKey,
+} from './subtasks/model.js';
+
+/**
+ * ── 习惯目标的**口径 → 摘要词条 key** 收在这里一份 ──
+ *
+ * 🔴 **本块是追加的**（`index.ts` 是多写者共享文件，只许在末尾追加）。
+ * web 与 mobile 各有一个目标编辑器，而哪种口径说哪句话是同一个判断。
+ */
+export { habitGoalSummaryKey, type HabitGoalSummaryKey } from './habits/model.js';

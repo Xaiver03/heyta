@@ -184,6 +184,18 @@ export interface HabitBoardProps {
   readonly busyHabitId?: string | null;
   /** 取色入口（web 是 `ColorSlotPicker`，mobile 是 `ui/slot-picker`）。不传就不渲染。 */
   readonly renderColorSlot?: (habit: Habit) => React.ReactNode;
+  /**
+   * **目标编辑入口**（数值 / 单位 / 达成口径）。不传就不渲染。
+   *
+   * 🔴 与 `renderColorSlot` 同一个形状，理由也同一条：**编辑控件留在各端**，
+   * 共享层只负责"把这个位置让出来"。
+   *
+   * 为什么需要它：`Habit` 有 `target` / `unit` / `goalType`，`isAchieved`
+   * 把三种口径都实现了，**但界面上一直没有任何地方能改** ——
+   * 计数型（"每天 8 杯水"）与时长型（"每天 30 分钟"）到不了用户手里，
+   * 而界面上看不出缺了什么（默认 `target: 1` / `atLeast` 长得很正常）。
+   */
+  readonly renderGoalSlot?: (habit: Habit) => React.ReactNode;
   /** 热力图窗口（天）。默认 {@link HABIT_HEATMAP_DAYS}。 */
   readonly heatmapDays?: number;
   readonly testID?: string;
@@ -371,6 +383,7 @@ export function HabitBoard({
   onUndoCheckIn,
   busyHabitId,
   renderColorSlot,
+  renderGoalSlot,
   heatmapDays = HABIT_HEATMAP_DAYS,
   testID,
 }: HabitBoardProps): React.JSX.Element {
@@ -463,6 +476,13 @@ export function HabitBoard({
                     {labels.streakTotal(r.total)}
                   </Text>
                 </View>
+
+                {/*
+                  🔴 目标编辑入口。放在指标块**之后**：目标与那几个数字是一组语义
+                  （"每天 8 杯"是口径，"连续 3 天"是这个口径下的结果），
+                  放到别处会被读成两件无关的事。
+                */}
+                {renderGoalSlot === undefined ? null : renderGoalSlot(row.habit)}
 
                 {/*
                   冻结**必须明说**：悄悄替用户吸收一次中断会偷走他对规则的理解。

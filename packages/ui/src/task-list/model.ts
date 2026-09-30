@@ -14,7 +14,23 @@
  * 组件（`TaskList.tsx`）只负责把这里的输出摆到 RN 原语上，那一段是**没有分支**的。
  */
 
+import { sortTasksForDisplay } from '@heyta/domain';
 import type { Task } from '@heyta/domain';
+
+/**
+ * 🔴 **`sortTasksForDisplay` 的实现在 `@heyta/domain/src/task-order.ts`，这里只是转出。**
+ *
+ * 为什么搬走：`packages/app-host`（桌面壳的窄门面 `native-bridge.ts` 就在那儿）
+ * **够不到 `packages/ui`** —— ui 的 peer 依赖是 `react` / `react-native`，
+ * 让 app-host 依赖它等于把 React 拖进一个今天零框架依赖的包。
+ * 于是 app-host 当时自己写了一份 `(createdAt, id)` 排序，**两份排序并存**，
+ * 结果是"同一个账号在桌面壳与 web/mobile 上任务顺序不同"。
+ *
+ * 放到 `packages/domain`（两个包都已经依赖它、且它零框架依赖）之后，
+ * **只有一份实现**。这里转出是为了不破坏既有消费者
+ * （`toTaskRows` 与各宿主的 `import { sortTasksForDisplay } from '@heyta/ui'`）。
+ */
+export { sortTasksForDisplay };
 
 /** 列表渲染需要的**最小**字段集。刻意不是整个 `Task` 的展开。 */
 export interface TaskRow {
@@ -68,37 +84,6 @@ export function toTaskRow(task: Task, options?: ToTaskRowOptions): TaskRow {
     dueAt: task.dueDate ?? null,
     source: task,
   };
-}
-
-/**
- * 列表展示顺序：**未完成在前，已完成在后；都按截止时间升序，无截止的排最后。**
- *
- * 为什么是这三条：
- *   - 未完成在前 —— 已完成的对"接下来做什么"没有信息量；
- *   - 截止近的在前 —— 这是用户扫这一眼的目的；
- *   - 无截止的排最后 —— 它们没有紧迫性，但**不能丢**（收集箱里就是这类）。
- *
- * ⚠️ 必须是**稳定**排序。同一天到期的任务之间若顺序随机，每次 relayout 都会
- * 抖一下，而"列表会自己换位置"是用户最直接的不信任来源。
- * `Array.prototype.sort` 在 ES2019 起保证稳定，但这里仍显式带上下标兜底 ——
- * 依赖一条"语言规范保证"而没人写下来，下一个读代码的人会以为是巧合。
- */
-export function sortTasksForDisplay(tasks: readonly Task[]): readonly Task[] {
-  const indexed = tasks.map((task, index) => ({ task, index }));
-  indexed.sort((a, b) => {
-    const aDone = a.task.completedAt !== undefined;
-    const bDone = b.task.completedAt !== undefined;
-    if (aDone !== bDone) return aDone ? 1 : -1;
-
-    // `undefined`（无截止）排在有截止的后面。用 Infinity 而不是 0：
-    // 0 是 1970-01-01，会被当成"最紧急"，正好排反。
-    const aDue = a.task.dueDate ?? Number.POSITIVE_INFINITY;
-    const bDue = b.task.dueDate ?? Number.POSITIVE_INFINITY;
-    if (aDue !== bDue) return aDue - bDue;
-
-    return a.index - b.index;
-  });
-  return indexed.map((entry) => entry.task);
 }
 
 /** 一步到位的入口：排序 + 转行模型。 */

@@ -161,6 +161,14 @@ export interface CaptureComposerProps {
    * 显式传入才能让"跨零点/今天是几号"可复现（与 `parseCapture` 同一约定）。
    */
   readonly now?: number;
+  /**
+   * 输入框自动聚焦。
+   *
+   * 🔴 移动端把它放在**新建任务面板**里（一个 modal），弹出即该打字；
+   * 而 web 把它内联在列表顶部 —— 一进页面就抢焦点会打断读屏与滚动。
+   * 所以它是宿主决定的事，不是共享层的默认值。
+   */
+  readonly autoFocus?: boolean;
   readonly testID?: string;
 }
 
@@ -283,6 +291,7 @@ export function CaptureComposer({
   onSubmit,
   renderAssistant,
   now,
+  autoFocus,
   testID,
 }: CaptureComposerProps): React.JSX.Element {
   const tokens = useHeytaTokens();
@@ -350,6 +359,7 @@ export function CaptureComposer({
           onChangeText={onDraftChange}
           onSubmitEditing={submit}
           returnKeyType="done"
+          {...(autoFocus === undefined ? {} : { autoFocus })}
           testID="capture-input"
         />
         <Pressable
