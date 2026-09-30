@@ -92,6 +92,7 @@ pnpm --filter @heyta/server admin:revoke someone@example.com   # 拒绝撤销最
 | 响应是白名单投影（无 `passwordHash` / token） | 同上 | 把投影改成 `...row` 摊平 ⇒ 转红 |
 | 未登录 / 未配服务器**不发请求** | `packages/app-host/tests/admin-client.spec.ts` | 拿掉取令牌的空值短路 ⇒ 2 条转红 |
 | 非管理员界面**什么都不渲染** | `apps/web/tests/admin-panel.spec.tsx` | — |
+| **真浏览器**：六个 Tab 各自按需拉取、动作读回服务端值、403/未登录不渲染 | `e2e/tests/admin-console.spec.ts`（5 条 + 10 张截图，经 `check:ai-e2e` 进 `pnpm check`） | 拿掉 `store.unlockUser` 里那句 `openUser` ⇒ 界面仍显示「已完成。」而 `失败登录` 停在 5 ⇒ 该条转红 |
 
 > 📌 一条教训（已写进测试注释）："未登录不发请求"这条规则**住在 `admin-client` 里**，
 > 不在 web store 里。我一开始把断言记在 store 的一段提前 `return` 上，
@@ -111,3 +112,135 @@ pnpm --filter @heyta/server admin:revoke someone@example.com   # 拒绝撤销最
    但**前端从来不是保密手段** —— 保密由服务端 `requireAdmin` 承担。
 4. 计数与列表是**即时查询**，没有缓存。用户量到十万级时要重新看这一块
    （现在的实现没有任何分页以外的优化，也没打算有）。
+
+---
+
+## 6. 真浏览器契约查出来的两条缺陷（✅ 已修，2026-09-30）
+
+这两条 jsdom 那套全绿时就一直存在，是补 §4 最后一行那张契约**当场**照出来的。
+修完各留下一条回归判据（e2e 与 jsdom 各一处），不是"改完就宣布完事"。
+
+1. **邀请页不渲染邀请码。** `/api/admin/invites` 一个响应带两面（`codes` + `referrals`），
+   `tab === 'invites'` 分支原来只渲染后者 —— 运营者看得见谁被邀请了，
+   看不见码本身、它属于谁、有没有被停用。
+   现在两面都渲染（`admin-codes` / `admin-referrals`，各带小节标题）；
+   服务端用**同一个 `?offset=`** 裁两边 ⇒ 分页器仍然只有一个。
+   判据必须落在 `admin-codes` 这个列表上：referrals 行里也带着同一个 `code`，
+   只断言"面板里出现了 `ABCD2345`"会钉不住。
+2. **解锁之后列表还在说"已锁定"。** 三个动作原来只重拉**详情**，
+   用户列表那一行的徽标不跟着变；而"点两下不重拉"是**有意的**设计（§1「按标签页按需拉取」）
+   ⇒ 界面留下一条已经不成立的事实，而且没有任何动作能把它刷掉。
+   修法是一个共享的 `reloadAfterUserAction(id)`：详情 **和**当前页的列表都重新读回来，
+   带着原 `offset` 与搜索词 —— 重置成第一页会让运营者刚定位到的那一屏凭空跳走。
+   🔴 刻意**不**采用"本地把徽标抹掉"的乐观补丁：服务端是唯一裁决者（ADR-0038），
+   没读回来的状态不该出现在界面上 —— 那与它要修的缺陷是同一类问题。
+
+两条的判据都做过变异验证。第 2 条的证法是**让假服务端自己变**
+（`usersPageBody(fake)` 的 `locked` 跟着 `fake.locked`）：拿掉 `loadUsers` 那一句 ⇒
+徽标仍在 ⇒ 恰好 1 红。如果假服务端不变，一个只改本地副本的实现也能让断言通过
+（AGENTS §7 元规则 2）。
+
+---
+
+## 7. 收尾（2026-09-30）：验证结果、提交范围，与两条环境真相
+
+> 判据与设计理由在 §4 与 §6；这一节只回答"跑到哪儿了、结论是什么"。
+
+### 7.1 提交范围：8 个路径，其中 3 个是**共享文件**
+
+```
+apps/web/src/features/admin/AdminPanel.tsx        邀请页渲染两面
+apps/web/src/features/admin/store.ts              reloadAfterUserAction
+apps/web/tests/admin-panel.spec.tsx               +2 条回归判据（共 10 条）
+packages/i18n/src/locales/zh-CN.ts                ⚠️ 共享：只入 1 个 hunk
+packages/i18n/src/locales/en.ts                   ⚠️ 共享：只入 1 个 hunk
+e2e/tests/admin-console.spec.ts                   新增文件（未跟踪）
+docs/plans/admin-console.md                       本节
+PROGRESS.md                                       ⚠️ 共享：只入 2 个 hunk
+```
+
+🔴 **两个词条文件里绝大部分不是本轮的**：`landing.selfhost.*` 整段重写、
+`landing.footer.licenseNote`、约 120 条 `site.docs.*`（其注释直接指向未跟踪的
+`apps/landing/tests/public-copy-register.spec.tsx`）都是另一条会话的在途活。
+本轮在两边各只有 **3 条** `web.admin.*`。`PROGRESS.md` 的 `@@ -24`（`pnpm check`
+那一行的状态更正，引用了未提交的 `BLOCKED.md §8`）同样不是本轮写的。
+⇒ 这三个文件**不许 `git add`**，只能生成过滤补丁后 `git apply --cached` 只入自己的 hunk。
+判据：`git diff --cached` 里两个 locale 文件各自只该出现 3 行 `+`。
+
+🔴 **同一个工作树里有别的会话在飞**：`apps/web/src/features/auth/**`、
+`apps/web/tests/desktop-handoff.spec.ts`、`e2e/auth-journey/**`、`e2e/tests/helpers.ts`、
+`apps/landing/**`、`apps/web/evidence/email-chain/*`、`server/public/magic-login-confirm.js`。
+**不要动，也不要 `git add -A`** —— 那会把别人未完成的活一起提交。
+
+### 7.2 验证结果（同机同树）
+
+| 命令 | 结果 |
+|---|---|
+| `pnpm check:ai-e2e`（**全量** e2e） | `EXIT=0`：**62 passed / 1 flaky / 2 skipped**，`admin-console.spec.ts` **5/5**（那条 flaky 见 §7.4） |
+| `pnpm --filter @heyta/web test` | **1003 passed / 12 skipped**（含本轮 +2 条） |
+| `pnpm --filter @heyta/i18n test` | 10/10 |
+| `pnpm --filter {web,i18n,app-host,design-system} typecheck` | 全绿 |
+| `pnpm check:ui-language` | 绿，词条 zh 2146 / en 2146（**新词条必须中英同步**） |
+| 变异验证 | 短路 `loadUsers` ⇒ **恰好 1 红**（徽标仍在），已还原 |
+
+截图**已打开看过**（AGENTS §6.2 规定一）：
+`e2e/test-results/admin-invite-codes.png`（邀请码 + 推荐关系两面都在）、
+`admin-user-unlock-list.png`（列表三行分别是「管理员」/ **无徽标** /「未验证」⇒ 已锁定确实消失）。
+
+### 7.3 🔴 全量 `pnpm check` 拿不到绿，而且断点比上一轮登记的更早
+
+`EXIT=1`，断在**整条链的第一道** `check:entries`：13 个生成物
+（`help/{how,account,passphrase,conflict,selfhost,transfer}` + `en/` 同名 + `public/sitemap.xml`）
+与站点注册表不一致 —— 那是另一条会话正在建的文档中心。`check` 是一条 `&&` 链，
+于是**其后约 43 道门禁（含 `check:l4`、`check:ai-e2e`、`pnpm -r test`）一次都没执行**。
+
+单独跑那几道红的，落点**全部在别人的在途文件里**：
+
+| 门禁 | 红点 |
+|---|---|
+| `check:entries` | `apps/landing` 的 13 个生成物（他人未提交） |
+| `check:l4` | 7 处样式字面量，**全在**未跟踪的 `apps/web/src/features/auth/desktop-handoff.ts:97/98/104` |
+| `check:design` | 同一文件同一处裸 `z-index:2147483647` |
+| `pnpm -r typecheck` | 只红在 `apps/landing`（缺 5 个新页面组件 + 一处 `import '….ts'`） |
+
+本轮的做法是**单独跑覆盖这 8 个路径的门禁**（§7.2 那张表），而不是替别人改文件、
+或跑 `gen:entries` 把链刷绿 —— 后者会改写 13 个受版本管理的 HTML，那是别人未完成的活。
+⚠️ 代价要说清楚：**"全量 check 绿"这一条本轮没有证据**，下一个接手的人拿到树的时候
+应该先重跑一次 `pnpm check`，而不是相信这里记的红灯都是别人的。
+
+⚠️ **部署侧不需要动**：两条都在 web 界面/状态层，服务端零改动，线上镜像与迁移无关。
+
+### 7.4 🔴 那条 flaky 的根因：共享工作树 + vite HMR，不是产品、也不是判据
+
+`admin-console.spec.ts:563` 概览用例首次**失败**、重试 17s **通过**。取证（`trace.zip`）：
+
+1. 失败瞬间的 DOM 快照与截图都显示页面停在**任务视图**，设置浮层根本不在 ——
+   而 `openSettingsView` 自带的 `.ht-header__title = 设置` 断言**是通过的**。
+2. 把 trace 里的动作与 console 事件按时间轴交错：那条断言通过之后立刻涌进
+   **约 90 条 `[vite] hot updated`**，其中 `/src/App.tsx` 出现 **8 次**，
+   还有 `/src/features/admin/AdminPanel.tsx`、`AccountMenu.tsx`、`packages/i18n/dist/*`，
+   以及多条 `Could not Fast Refresh … invalidate` —— 不兼容 Fast Refresh 时 vite 会**整页 reload**。
+3. reload 把 SPA 状态清回初始视图 ⇒ 浮层连同后台面板一起没了 ⇒ `admin-panel` 永不出现。
+
+📌 **一般规律**：e2e 的 dev server 服务的是**当前工作树**，所以**任何会话往树里写文件，
+都会打断在飞的 e2e**，而症状长得像"界面整块没实现"。这与"重验证串行跑"是同一件事的两个面：
+光把自己那几轮排开不够，同树并发改文件就会造出假红。
+
+### 7.5 环境：`spawn EBADF`（**更正**此前写错的诊断）
+
+本节原来写着"`cd "带空格的路径" && …` 与 `dir_path` 两种写法都会中"，读起来像**写法**有问题。
+实测把这条推翻了：与写法、路径空格、iCloud、fd/进程/线程 ulimit、磁盘与 inode 余量**都无关**，
+故障在 **Qoder 宿主进程的 spawn 路径**上 —— 同一宿主下的 `Bash`/`Grep`/`Glob` 三个 spawner
+同报 `errno -9, syscall 'spawn'`，且**按句柄**分布：新会话或新 subagent 拿到的是可用的新句柄
+（本轮的全量 e2e 与 web 套件就是这么跑出来的）。单次成功**不能**当恢复判据；
+有效做法是失败就转去做读写文件的活，或把一条批量命令交给一个新 subagent，**不要循环重试**。
+彻底恢复靠重启宿主 app。
+
+### 7.6 别重走的死路
+
+1. 不要为了让 e2e 变绿而把「徽标消失」改成"本地乐观补丁也能过"的断言 —— 它成立
+   恰恰因为假服务端的列表跟着 `fake.locked` 变。
+2. 邀请码的判据必须落在 `admin-codes` 这个列表上（`referrals` 行里也带着同一个 `code`）。
+3. 改完 `packages/i18n` 必须 `pnpm --filter @heyta/i18n build`（AGENTS §7 第 79 条）。
+4. 别把 `store.ts` 里 `loadUsers` 的 `offset`/`query` 省成默认值 —— 那会把用户翻页翻回第一页。
+5. 遇到 e2e 随机红，**先查 trace 里有没有 `[vite] hot updated`**（§7.4），再怀疑产品代码。

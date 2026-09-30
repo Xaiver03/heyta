@@ -133,6 +133,26 @@ function applyFailure(
   set({ errorKey, loading: false });
 }
 
+/**
+ * 动作成功后重新读回服务端状态：**详情和列表都要**。
+ *
+ * 🔴 只重拉详情会留下一张说谎的界面。用户列表那一行有自己的「已锁定」徽标，
+ * 而再点一次「用户」Tab **不会**重拉（数据已在 store 里，那条判据是"点两下不重拉"）——
+ * 于是运营者解完锁，列表上仍写着"已锁定"，而且**没有任何动作能把它刷掉**。
+ *
+ * 修法只能是"再读一遍"，不能是本地把徽标抹掉：服务端是唯一裁决者（ADR-0038），
+ * 乐观补丁会让界面显示一个还没被证实的状态 —— 那与它要修的缺陷是同一类问题。
+ *
+ * 翻页与搜索词必须**照原样**带着：重置成第一页会让运营者刚刚定位到的那一屏凭空跳走。
+ */
+async function reloadAfterUserAction(id: number): Promise<void> {
+  const { openUser, loadUsers, users, query } = useAdminStore.getState();
+  await openUser(id);
+  if (users !== null) {
+    await loadUsers({ q: query, offset: users.offset });
+  }
+}
+
 export const useAdminStore = create<AdminStoreState>((set, get) => ({
   access: 'unknown',
   errorKey: null,
@@ -244,9 +264,7 @@ export const useAdminStore = create<AdminStoreState>((set, get) => ({
       set({ actionNotice: 'failed' });
       return;
     }
-    // 动作改的是服务端状态 ⇒ 必须**重新拉**详情，不能只改本地副本。
-    // 只改本地的话，界面会显示一个"看起来成功了"的状态，而刷新后变回去。
-    await get().openUser(id);
+    await reloadAfterUserAction(id);
     set({ actionNotice: 'done' });
   },
 
@@ -258,7 +276,7 @@ export const useAdminStore = create<AdminStoreState>((set, get) => ({
       set({ actionNotice: 'failed' });
       return;
     }
-    await get().openUser(id);
+    await reloadAfterUserAction(id);
     set({ actionNotice: 'done' });
   },
 
@@ -270,7 +288,7 @@ export const useAdminStore = create<AdminStoreState>((set, get) => ({
       set({ actionNotice: 'failed' });
       return;
     }
-    await get().openUser(id);
+    await reloadAfterUserAction(id);
     set({ actionNotice: 'done' });
   },
 
