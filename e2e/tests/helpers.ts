@@ -114,13 +114,53 @@ export async function expectStubCount(
  * `<body>` 全空、所有用例在"等添加任务的输入框"那一刻超时。
  * 垫片只满足"名字存在"，**一调用就抛**；生产者落地后它自动失效。
  */
+/**
+ * 把**全部功能模块**打开（写进设备本地偏好，`shell/modules.ts` 读它）。
+ *
+ * 🔴 为什么 e2e 默认走"全功能"配置：
+ * 2026-09-29 加了「功能模块」开关，**番茄钟/成长/便签默认是关的、不进 DOM**。
+ * 而这一套 e2e 的主线是"**每个视图都渲染得出来、且不白屏**" ——
+ * 它需要所有视图都在。逐个用例去设置页点开关会把每条测试都变成交互脚本，
+ * 而这里要验的是**视图本身**，不是开关。
+ *
+ * ⚠️ 所以「默认只有 6 个」这件事**必须由另一条专门的用例钉住**
+ *（`motivation.spec.ts` 里那条"默认 rail"），否则它会在这套"全功能"配置下**永远测不到**。
+ */
+export async function enableAllModules(page: Page): Promise<void> {
+  await page.addInitScript(() => {
+    // 存的是**显式覆盖**（见 modules.ts 的 `saveEnabledModules`）。
+    window.localStorage.setItem(
+      'heyta.shell.modules',
+      JSON.stringify({
+        quadrant: true,
+        habits: true,
+        timeline: true,
+        focus: true,
+        growth: true,
+        notes: true,
+      }),
+    );
+  });
+}
+
 export async function openApp(page: Page): Promise<void> {
+  await enableAllModules(page);
   await installMissingProducerShims(page);
   await page.goto('/');
   await expect(page.locator('input[placeholder^="添加任务"]')).toBeVisible();
 }
 
 /** 切换顶部视图 tab。 */
+/**
+ * 🔴 「设置」**不是** rail 上的 tab —— 它收在**头像菜单**里（2026-09-29）。
+ * 所以它必须单独一条路：点头像 → 点菜单里的「设置」。
+ */
+export async function openSettingsView(page: Page): Promise<void> {
+  await page.getByTestId('account-menu-avatar').click();
+  await page.getByTestId('account-menu-settings').click();
+  await expect(page.locator('.ht-header__title').first()).toHaveText('设置');
+}
+
 export async function switchView(
   page: Page,
   /**
@@ -140,6 +180,11 @@ export async function switchView(
    */
   label: '任务' | '四象限' | '习惯' | '番茄钟' | '时间线' | '成长' | '便签' | '回收站' | '设置',
 ): Promise<void> {
+  // 「设置」不在 tablist 里（见 `openSettingsView`）。
+  if (label === '设置') {
+    await openSettingsView(page);
+    return;
+  }
   await page.getByRole('tab', { name: label }).click();
 }
 
@@ -161,9 +206,23 @@ export async function addTask(page: Page, title: string): Promise<void> {
  * （那一族 CSS 已随 M3 第一刀删除）。`task-item-*` 是**整行**，包含行尾
  * 插槽（备注 / 清单标签 / 删除）—— 用 `task-row-*` 会只匹配到标题体，
  * 那些控件就不在这一行里了。
+ *
+ * 🔴🔴 **不能再用 `filter({ hasText: title })`**（2026-09-29 实测踩到）：
+ * 行尾插槽里现在有**「子任务父级」选择器**，它的 `<option>` 会把**别的任务的
+ * 标题**列出来。于是 `hasText: '修登录页错位'` 会同时命中「写周报」那一行
+ * （它的 option 里就有这四个字），Playwright 判 strict mode violation ——
+ * `ai-prioritize` 因此红了，而**产品是对的**（那一行确实不是它）。
+ *
+ * ⇒ 改用**这一行自己的完成勾选框**定位：可访问名是 `完成：<标题>` /
+ * `取消完成：<标题>`（`web.shell.tasks.complete` / `uncomplete`），
+ * 它只属于本行，且**不随行尾插槽增减而漂移**。
+ * 两种前缀都认：已完成分组里的任务标签是「取消完成：」。
  */
 export function rowFor(page: Page, title: string) {
-  return page.locator('[data-testid^="task-item-"]').filter({ hasText: title });
+  const escaped = title.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return page.locator('[data-testid^="task-item-"]').filter({
+    has: page.getByRole('checkbox', { name: new RegExp(`^(?:完成|取消完成)：${escaped}$`) }),
+  });
 }
 
 /** 任务行右侧的元信息区（截止时间 / 优先级徽标）。 */
