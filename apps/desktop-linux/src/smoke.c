@@ -96,7 +96,7 @@ int main(void) {
         bool ordered = tasks.count == 2 &&
                        strcmp(tasks.items[0].title, "第一条") == 0 &&
                        strcmp(tasks.items[1].title, "第二条") == 0;
-        check(ordered, "按 (createdAt, id) 升序 —— 与 TaskActions 文档一致");
+        check(ordered, "展示序：都未完成、都无截止 ⇒ 保持稳定序（与共享 sortTasksForDisplay 一致）");
         heyta_task_list_free(&tasks);
     } else {
         check(false, "新建后列出 2 条");
@@ -113,6 +113,16 @@ int main(void) {
             }
             check(done_count == 1, "只有一条被标成完成");
             check(first_done, "被标完成的是第一条");
+
+            /* 🔴 G5：完成之后顺序**必须变** —— 已完成沉到最后。
+             * 这一条是**能失败**的：把门面改回按 (createdAt, id) 排，
+             * `第一条` 会重新排到最前，于是这里立刻红。
+             * ⚠️ 上面第 3 步那条**抓不到**这个回归 —— 那时两条都未完成，
+             * 两种规则给出同一个顺序（这正是它当时看不出问题的原因）。 */
+            bool sunk = tasks.count == 2 &&
+                        strcmp(tasks.items[0].title, "第二条") == 0 &&
+                        strcmp(tasks.items[1].title, "第一条") == 0;
+            check(sunk, "已完成沉到最后 —— 与共享 sortTasksForDisplay 一致");
             heyta_task_list_free(&tasks);
         } else {
             check(false, "只有一条被标成完成");
