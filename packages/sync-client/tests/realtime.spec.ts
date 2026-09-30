@@ -107,14 +107,14 @@ beforeEach(() => {
 describe('buildRealtimeUrl — 端点推导', () => {
   it('http → ws、https → wss，去掉尾部斜杠，路径是 /ws', () => {
     expect(buildRealtimeUrl('http://10.0.2.2:3000', 't', 'c')).toBe(
-      'ws://10.0.2.2:3000/ws?token=t&clientId=c',
+      'ws://10.0.2.2:3000/api/sync/ws?token=t&clientId=c',
     );
     expect(buildRealtimeUrl('https://sync.example.com/', 't', 'c')).toBe(
-      'wss://sync.example.com/ws?token=t&clientId=c',
+      'wss://sync.example.com/api/sync/ws?token=t&clientId=c',
     );
     // 已经给了 ws/wss 就原样保留。
     expect(buildRealtimeUrl('ws://nas.local:3000', 't', 'c')).toBe(
-      'ws://nas.local:3000/ws?token=t&clientId=c',
+      'ws://nas.local:3000/api/sync/ws?token=t&clientId=c',
     );
   });
 
@@ -141,7 +141,7 @@ describe('createRealtimeClient — 协议', () => {
 
     expect(FakeWebSocket.instances).toHaveLength(1);
     expect(FakeWebSocket.instances[0]?.url).toBe(
-      `ws://10.0.2.2:3000/ws?token=${encodeURIComponent(token)}&clientId=client-A`,
+      `ws://10.0.2.2:3000/api/sync/ws?token=${encodeURIComponent(token)}&clientId=client-A`,
     );
     client.dispose();
   });
