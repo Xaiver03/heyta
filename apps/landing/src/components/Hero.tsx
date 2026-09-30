@@ -23,10 +23,18 @@ import { useMemo, useRef } from 'react';
 import { motion, useMotionValue, useSpring, useTransform } from 'motion/react';
 import { Check, WifiOff } from 'lucide-react';
 
-import { useI18n } from '@heyta/i18n';
+import { useI18n } from '@heyta/i18n/provider';
 
 import { AppWindow } from '../mockup/AppWindow.js';
-import { HERO_ENTRANCE_DELAY, revealVariants, staggerContainer, useMotionPreset, VIEWPORT } from '../lib/motion.js';
+import { Magnetic } from './Magnetic.js';
+import {
+  HERO_ENTRANCE_DELAY,
+  maskedRevealVariants,
+  revealVariants,
+  staggerContainer,
+  useMotionPreset,
+  VIEWPORT,
+} from '../lib/motion.js';
 
 /** 倾斜幅度（度）。刻意小 —— 大角度会让界面文字变形到读不清。 */
 const TILT_Y = 11;
@@ -99,9 +107,20 @@ export function Hero(): React.JSX.Element {
           {t('landing.hero.eyebrow')}
         </motion.span>
 
-        <motion.h1 className="lp-h1" variants={copy}>
-          {t('landing.hero.titleLead')}
-          <em>{t('landing.hero.titleEmphasis')}</em>
+        {/*
+          标题走遮罩式显现（maskedRevealVariants）：外层 h1 是裁剪槽，
+          内层块从槽底升起 —— keynote 的"文字从缝里长出来"。
+          h1 自身的 variants 是空壳，只为占住错峰序列的第二个节拍；
+          视觉完全由内层承担（结构理由见 motion.ts 该函数的注释）。
+        */}
+        <motion.h1 className="lp-h1 lp-mask" variants={{ hidden: {}, visible: {} }}>
+          <motion.span
+            className="lp-mask__inner"
+            variants={maskedRevealVariants(preset.reduced, preset.ui)}
+          >
+            {t('landing.hero.titleLead')}
+            <em>{t('landing.hero.titleEmphasis')}</em>
+          </motion.span>
         </motion.h1>
 
         <motion.p className="lp-lede" variants={copy}>
@@ -112,11 +131,14 @@ export function Hero(): React.JSX.Element {
           主 CTA 指向界面、次 CTA 指向价格 —— 大众先问「好不好用」「多少钱」，
           不会先问「我怎么自建」。自建的入口留在 SelfHost 一节与底部，
           那是愿意往下读的人才到的地方（理由写在 i18n 的 hero 词条上）。
+          磁性只给主 CTA：全页到处都"吸"就不是磁性了，是抖。
         */}
         <motion.div className="lp-hero__ctas" variants={copy}>
-          <a className="lp-btn lp-btn--primary lp-btn--lg" href="#showcase">
-            {t('landing.hero.ctaShowcase')}
-          </a>
+          <Magnetic>
+            <a className="lp-btn lp-btn--primary lp-btn--lg" href="#showcase">
+              {t('landing.hero.ctaShowcase')}
+            </a>
+          </Magnetic>
           <a className="lp-btn lp-btn--secondary lp-btn--lg" href="#pricing">
             {t('landing.hero.ctaPricing')}
           </a>

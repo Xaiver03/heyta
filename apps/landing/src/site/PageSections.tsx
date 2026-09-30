@@ -31,9 +31,18 @@
 
 import type { ReactNode } from 'react';
 
-import { useI18n, useLocale, type MessageKey } from '@heyta/i18n';
+import { motion } from 'motion/react';
+
+import { useI18n, useLocale, type MessageKey } from '@heyta/i18n/provider';
 
 import { AppWindow, type MockView } from '../mockup/AppWindow.js';
+import { Magnetic } from '../components/Magnetic.js';
+import {
+  maskedRevealVariants,
+  revealVariants,
+  staggerContainer,
+  useMotionPreset,
+} from '../lib/motion.js';
 import { siteCta } from './cta.js';
 import type { SitePage } from './pages.js';
 
@@ -91,18 +100,20 @@ export function KeyText({ messageKey }: { messageKey: MessageKey }): React.JSX.E
  * 「帮助 → 怎么同步」这类入口可以直接落到 `/{locale}/help/#sync`，
  * 而不必只是把人丢到帮助页顶部。
  *
- * 三个正文位分开，是为了让**每一条文案都带着自己的语气**：
+ * 两个正文位分开，是为了让**每一条文案都带着自己的语气**：
  *   - `bodyKeys`：成段的说明；
- *   - `itemKeys`：一串并列的能力（词条表里写的就是短句，渲染成列表才读得下去）；
- *   - `evidenceKeys`：验证方式（等宽字体 + 更弱的颜色，因为它不是给人读的
- *     卖点，而是给人**复制去跑**的）。
+ *   - `itemKeys`：一串并列的能力（词条表里写的就是短句，渲染成列表才读得下去）。
+ *
+ * 🔴 **公页不再渲染「验证方式」**（2026-09-29 产品决策）：`pnpm …` 命令与
+ * 仓库路径是贡献者语言，出现在用户页面上就是内部黑话。对应的后端纪律
+ * （声称必须可核实）收缩进 `scripts/check-claims.mjs` 的文件头，那里写明了
+ * 这次退役的缘由。
  */
 export interface SectionSpec {
   readonly id: string;
   readonly titleKey: MessageKey;
   readonly bodyKeys?: readonly MessageKey[];
   readonly itemKeys?: readonly MessageKey[];
-  readonly evidenceKeys?: readonly MessageKey[];
   /**
    * 该分区配的真实界面复现件（`src/mockup/`）。
    *
@@ -164,35 +175,83 @@ export function StatusBadge({ status }: { status: PlatformStatus }): React.JSX.E
  *
  * `headingKey` 与 `ledeKey` 由页面注册表提供（`SitePage`）——
  * 于是"某一页没有 H1"在结构上不可能发生：注册表里那两个字段是必填的。
+ *
+ * 🔴 **2026-09-29 布局修正**：原先页头是「标题 + 引言 + 按钮 + 一大段空白」，
+ * 访客读到的是一次"假地板"（看起来页面已经结束）—— 首页有 3D 场景与指针
+ * 倾斜，子页却全是静态文字，两边的动效人格也是割裂的。现在：
+ *
+ *   - 传入 `visual` 的页面（`/features`）升级为**两栏 hero**：左文右产品件，
+ *     与首页 Hero 同一形态；`AppWindow` 复现件对齐产品语言（展示而非描述）。
+ *   - 动效与首页共用同一套词表（遮罩标题 / 错峰浮现 / 磁性 CTA / 减动效降级），
+ *     参数全部来自 `lib/motion.ts`，不新增任何一种物理。
+ *   - 没传 `visual` 的页面保持单栏（帮助 / 更新动态 / 登录没有合适的产品件，
+ *     硬配一张图就是装饰），只受益于统一后的动效与收紧后的留白。
  */
-export function PageHead({ page }: { page: SitePage }): React.JSX.Element {
+export function PageHead({
+  page,
+  visual,
+}: {
+  page: SitePage;
+  visual?: ReactNode;
+}): React.JSX.Element {
   const { t } = useI18n();
   const locale = useLocale();
+  const preset = useMotionPreset();
   const cta = siteCta(page, locale);
+  const copy = revealVariants(preset.reduced, preset.ui);
 
   return (
-    <header className="lp-page__head">
+    <header
+      className={
+        visual === undefined ? 'lp-page__head' : 'lp-page__head lp-page__head--split'
+      }
+    >
       <div className="lp-wrap">
-        <h1 className="lp-h1">
-          <KeyText messageKey={page.headingKey} />
-        </h1>
-        <p className="lp-lede lp-lede--wide">
-          <KeyText messageKey={page.ledeKey} />
-        </p>
-        {/*
-          🔴 行动点的规则与导航里那条**完全一致**（都走 `siteCta`）：
-          没配 `VITE_APP_URL` 时指向首页的自建那一节，配了就是应用本身。
-          两处各判一次就会出现"导航说能开始用、页头说去自建"的矛盾。
-        */}
-        <p className="lp-page__cta">
-          <a
-            className="lp-btn lp-btn--primary"
-            href={cta.href}
-            {...(cta.external ? { rel: 'noopener noreferrer' } : {})}
+        <motion.div
+          className="lp-page__copy"
+          variants={staggerContainer(preset.reduced)}
+          initial="hidden"
+          animate="visible"
+        >
+          <motion.h1 className="lp-h1 lp-mask" variants={{ hidden: {}, visible: {} }}>
+            <motion.span
+              className="lp-mask__inner"
+              variants={maskedRevealVariants(preset.reduced, preset.ui)}
+            >
+              <KeyText messageKey={page.headingKey} />
+            </motion.span>
+          </motion.h1>
+          <motion.p className="lp-lede lp-lede--wide" variants={copy}>
+            <KeyText messageKey={page.ledeKey} />
+          </motion.p>
+          {/*
+            行动点的规则与导航里那条**完全一致**（都走 `siteCta`）：
+            没配 `VITE_APP_URL` 时指向首页的自建那一节，配了就是应用本身。
+          */}
+          <motion.p className="lp-page__cta" variants={copy}>
+            <Magnetic>
+              <a
+                className="lp-btn lp-btn--primary"
+                href={cta.href}
+                {...(cta.external ? { rel: 'noopener noreferrer' } : {})}
+              >
+                {t(cta.labelKey)}
+              </a>
+            </Magnetic>
+          </motion.p>
+        </motion.div>
+
+        {visual === undefined ? null : (
+          <motion.div
+            className="lp-page__visual"
+            initial={preset.reduced ? { opacity: 0 } : { opacity: 0, y: '2rem', scale: 0.97 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            transition={{ ...preset.sheet, delay: preset.reduced ? 0 : 0.15 }}
+            aria-hidden="true"
           >
-            {t(cta.labelKey)}
-          </a>
-        </p>
+            {visual}
+          </motion.div>
+        )}
       </div>
     </header>
   );
@@ -237,17 +296,6 @@ export function PageSections({
               </ul>
             ) : null}
 
-            {(section.evidenceKeys ?? []).map((key) => (
-              // 🔴 前缀「验证方式」由**一条共享词条**提供，而不是写进每条证据里：
-              // 证据的值只能是命令或路径（不翻译），标签才是要翻译的那部分。
-              // 把标签塞进值里，中英两表就会出现两条除了标签只差命令的串，
-              // 而命令一旦有一条被"顺手翻译"过，它就跑不起来了。
-              <p key={key} className="lp-evidence">
-                <span className="lp-evidence__label">{t('site.evidence.label')}</span>
-                <KeyText messageKey={key} />
-              </p>
-            ))}
-
             {section.mockView === undefined ? null : (
               <div className="lp-row__visual">
                 <AppWindow view={section.mockView} />
@@ -283,16 +331,18 @@ export function SiteSubPage({
   page,
   sections,
   notes,
+  visual,
   children,
 }: {
   page: SitePage;
   sections: readonly SectionSpec[];
   notes?: readonly MessageKey[];
+  visual?: ReactNode;
   children?: ReactNode;
 }): React.JSX.Element {
   return (
     <>
-      <PageHead page={page} />
+      <PageHead page={page} visual={visual} />
       <div className="lp-section">
         <PageSections sections={sections} notes={notes}>
           {children}

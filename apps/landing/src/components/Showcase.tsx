@@ -21,7 +21,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { motion, useMotionValueEvent, useScroll, useTransform, type MotionValue } from 'motion/react';
 
-import { useI18n } from '@heyta/i18n';
+import { useI18n } from '@heyta/i18n/provider';
 
 import { AppWindow, type MockView } from '../mockup/AppWindow.js';
 import { showcaseWindowOpacity, showcaseWindowOpacityReduced, useMotionPreset } from '../lib/motion.js';
@@ -134,6 +134,19 @@ export function Showcase(): React.JSX.Element {
         label: t('landing.feature.focus'),
         title: t('landing.showcase.focus.title'),
         body: t('landing.showcase.focus.body'),
+      },
+      {
+        /*
+          🔴 时间线是**这一刀补上的第四块**（`timeline` 整刀第 4 步）。
+          在此之前 `MockView` 只有 tasks/quadrant/habits/focus，而 `/features`
+          的「视图」一节把时间线**列成了能力之一** —— 站点讲了它，却没有一屏
+          是它。`label` 复用 `web.shell.views.timeline`（应用自己的视图名），
+          与 `apps/landing` 复用 `web.shell.*` 是同一个先例。
+        */
+        view: 'timeline',
+        label: t('web.shell.views.timeline'),
+        title: t('landing.showcase.timeline.title'),
+        body: t('landing.showcase.timeline.body'),
       },
     ],
     [t],

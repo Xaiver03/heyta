@@ -232,6 +232,16 @@
   font-size: var(--ht-font-size-base);
 }
 
+/* 磁性按钮的外层触达区（组件见 components/Magnetic.tsx）。
+   padding 向四周扩出一圈透明光环、负 margin 原样抵回 ——
+   视觉布局不变，但指针在贴上按钮前就先进入监听范围，
+   "隔着一点距离被吸"才有起手余地。 */
+.lp-magnetic {
+  display: inline-flex;
+  padding: var(--ht-space-2);
+  margin: calc(var(--ht-space-2) * -1);
+}
+
 .lp-iconbtn {
   display: grid;
   place-items: center;
@@ -256,38 +266,59 @@
 }
 
 /* ── 语言切换器 ────────────────────────────────────────────
-   显示的是**目标语言自己的文字**（中文 / English），而不是把"英文"
-   翻译成当前语言。看不懂当前语言的用户，恰恰是最需要找到这个入口的人 ——
-   把 "English" 写成「英文」，对他没有任何帮助。
-
-   它是个**链接**而不是按钮：切换会整页跳到另一个地址（理由见 src/lib/locale.ts），
-   所以刷新、复制链接、前进后退都符合浏览器预期。 */
+   语言切换器：globe 触发钮 + 两项下拉（组件见 components/Nav.tsx）。
+   语言名用各自本名（中文 / English）——看不懂当前语言的人要找的就是这个入口，
+   本名是唯一保证读得懂的写法；当前语言打勾并 aria-current（W3C i18n 惯例）。
+   触发钮直接复用 .lp-iconbtn（同尺寸、同反馈时序），这里只管外层定位与菜单。 */
 .lp-lang {
+  position: relative;
   display: grid;
   place-items: center;
-  min-inline-size: var(--ht-touch-target-min);
-  block-size: var(--ht-touch-target-min);
-  padding-inline: var(--ht-space-2);
-  border-radius: var(--ht-radius-full);
+}
+
+/* 菜单本体：贴着触发钮下缘、右对齐（导航右侧区的东西向左展开才不溢出）。
+   浮层四件套：surface 底、边框、真阴影（AGENTS §5：阴影只给真正的浮层）、
+   dropdown 层 z —— 不新造任何取值。 */
+.lp-lang__menu {
+  position: absolute;
+  inset-block-start: calc(100% + var(--ht-space-2));
+  inset-inline-end: 0;
+  z-index: var(--ht-z-dropdown);
+  display: grid;
+  gap: var(--ht-space-1);
+  min-inline-size: calc(var(--ht-space-12) * 2.2);
+  padding: var(--ht-space-2);
+  background: var(--ht-color-surface);
+  border: var(--ht-border-width-thin) solid var(--ht-color-border);
+  border-radius: var(--ht-radius-lg);
+  box-shadow: var(--ht-shadow-lg);
+}
+
+.lp-lang__item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--ht-space-4);
+  padding: var(--ht-space-2) var(--ht-space-3);
+  border-radius: var(--ht-radius-md);
   font-size: var(--ht-font-size-sm);
   font-weight: var(--ht-font-weight-medium);
-  color: var(--ht-color-foreground-muted);
-  /* reset.css 给 a:hover 加了全局下划线，那对胶囊按钮不合适，压掉。 */
-  text-decoration: none;
-  /* 与 .lp-iconbtn 同一套反馈时序：基态 instant（松手脆），按下 press（刻意）。 */
-  transition: background-color var(--ht-duration-fast) var(--ht-ease-standard),
-    color var(--ht-duration-fast) var(--ht-ease-standard),
-    transform var(--ht-duration-instant) var(--ht-ease-standard);
-}
-
-.lp-lang:hover {
-  background: var(--ht-color-hover);
   color: var(--ht-color-foreground);
+  /* 与 .lp-lang 旧链接同一理由：reset 的全局 hover 下划线对菜单项不合适。 */
+  text-decoration: none;
+  transition: background-color var(--ht-duration-fast) var(--ht-ease-standard),
+    color var(--ht-duration-fast) var(--ht-ease-standard);
+}
+
+.lp-lang__item:hover {
+  background: var(--ht-color-hover);
   text-decoration: none;
 }
 
-.lp-lang:active {
-  transform: scale(var(--ht-motion-press-scale));
+/* 当前语言：主色 + 加粗，勾是第二重信号（视觉 + 状态属性双通道）。 */
+.lp-lang__item[aria-current='true'] {
+  color: var(--ht-color-primary);
+  font-weight: var(--ht-font-weight-semibold);
 }
 
 /* ── 英雄区：非对称分栏 ───────────────────────────────────
@@ -346,6 +377,17 @@
      中文没有降部问题，但「你的」这类字在斜体下仍需要一点余量。 */
   line-height: 1.1;
   padding-block-end: 0.08em;
+}
+
+/* 遮罩式标题显现（maskedRevealVariants 的结构面，见 lib/motion.ts）。
+   外层裁剪、内层从槽底升起；内层必须是块级，transform 才会生效。
+   line-height 与 em 的降部余量都在内层自己的盒子里，静止位不新增裁剪。 */
+.lp-mask {
+  overflow: hidden;
+}
+
+.lp-mask__inner {
+  display: block;
 }
 
 .lp-lede {
@@ -1370,6 +1412,16 @@
   color: var(--ht-color-foreground);
 }
 
+/* 品牌列的「在 GitHub 上查看」：图标与文字同行（列表里的链接是纯文字，
+   唯独这一条带图标 —— 内联 flex 对齐，间距用同一个 token 尺度）。 */
+.lp-footer__github {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--ht-space-2);
+  margin-block-start: var(--ht-space-3);
+  width: fit-content;
+}
+
 .lp-footer__bottom {
   display: flex;
   flex-wrap: wrap;
@@ -1565,11 +1617,23 @@
   padding-block-start: calc(var(--ht-layout-header-height) + var(--ht-space-12));
 }
 
+/* 子页页头。padding-block-end 收紧：原先 1.15 倍 space-12 加上正文区的
+   space-16*1.75 顶距，叠出一整屏空白 —— 访客读到的是一次"假地板"
+   （看起来页面已经结束）。现在头部到正文的过渡交给正文区的顶距 alone。 */
 .lp-page__head {
   max-inline-size: var(--ht-layout-content-max);
   margin-inline: auto;
   padding-inline: var(--ht-space-6);
-  padding-block-end: calc(var(--ht-space-12) * 1.15);
+  padding-block-end: var(--ht-space-10);
+}
+
+/* 两栏 hero（`/features`）：左文右产品件，与首页 Hero 同一形态。
+   文字栏窄一点、产品件宽一点 —— 复现件是这一栏的主角。 */
+.lp-page__head--split .lp-wrap {
+  display: grid;
+  grid-template-columns: minmax(0, 5fr) minmax(0, 6fr);
+  align-items: center;
+  gap: var(--ht-space-8);
 }
 
 .lp-page__head .lp-h1 {
@@ -1582,6 +1646,26 @@
 
 .lp-page__cta {
   margin-block-start: var(--ht-space-8);
+}
+
+/* 页头里的产品件只补最小包装：复现件自带外框（`.mk-frame`），
+   这里不加第二层边框 —— 与正文里的 `.lp-row__visual` 同一条纪律。 */
+.lp-page__visual {
+  min-inline-size: 0;
+}
+
+/* 窄屏退回单栏：产品件跟在文字后面，而不是被压扁。 */
+@media (max-width: 960px) {
+  .lp-page__head--split .lp-wrap {
+    grid-template-columns: 1fr;
+    gap: var(--ht-space-6);
+  }
+}
+
+/* 页头到正文的过渡：头部已收紧，正文区自己的顶距（space-16*1.75）
+   在这里就是"下一块内容"的呼吸，不再叠加头部的尾距。 */
+.lp-page__head + .lp-section {
+  padding-block-start: calc(var(--ht-space-12) * 1.15);
 }
 
 /* 引言在子页面上可以放宽：34ch 是给首屏配 3D 场景时的限制，
@@ -1636,15 +1720,6 @@
   block-size: 0.375rem;
   border-radius: var(--ht-radius-full);
   background: var(--ht-color-primary);
-}
-
-/* 验证方式：等宽 + 更弱的颜色。它**不是**卖点，是给人复制去跑的命令。 */
-.lp-evidence {
-  margin-block-start: var(--ht-space-3);
-  font-family: var(--ht-font-mono);
-  font-size: var(--ht-font-size-xs);
-  color: var(--ht-color-foreground-subtle, var(--ht-color-foreground-muted));
-  overflow-wrap: anywhere;
 }
 
 .lp-notes {
@@ -1806,22 +1881,6 @@
   .lp-log__date {
     padding-block-start: 0;
   }
-}
-
-/* 验证方式：标签 + 等宽的值。
-   🔴 标签从词条表来（要翻译），值只能是命令/路径（不翻译）——
-   两者分开是 `PageSections.tsx` 里那条注释说明的同一件事。 */
-.lp-evidence {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  gap: var(--ht-space-2);
-}
-
-.lp-evidence__label {
-  font-size: var(--ht-font-size-xs);
-  color: var(--ht-color-foreground-subtle, var(--ht-color-foreground-muted));
-  opacity: 0.75;
 }
 
 /* 复现件与正文之间的间距。复现件自带外框（`.mk-frame`），

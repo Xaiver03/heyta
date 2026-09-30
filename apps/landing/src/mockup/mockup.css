@@ -805,79 +805,96 @@
   color: var(--ht-color-foreground-muted);
 }
 
-/* ── 移动端复现（窄屏时用）───────────────────────────────── */
+/* ── 时间线（排期）─────────────────────────────────────────
+ *
+ * 复现对象：`apps/web/src/features/timeline/`（共享 `@heyta/ui` 的 `TimelineView`
+ * + `GanttChart`）。这里同样**不引入共享组件**（那会把 RN 与它的 62 kB 拖进首屏，
+ * 见 `mockup-task-row.spec.tsx` 里那条"不许静态 import @heyta/ui"的断言）。
+ *
+ * 🔴 条的宽度**必须按估时的比例**：90 分钟那条一定是 45 分钟那条的两倍宽 ——
+ * 这是真 `GanttChart` 的核心不变量（`timeline-model.spec.ts` 里钉的就是它）。
+ * 宽度用**修饰类**表达（`--w-*`），不写内联 style：`mk-*` 族是"只减不增"的
+ * 预算族，而 `--w-*` 这类修饰类不计入族数（见 `mockup-task-row.spec.tsx`）。
+ */
 
-.mk-mobile {
+.mk-timeline {
   display: flex;
   flex-direction: column;
-  block-size: 100%;
-  background: var(--ht-color-background);
-  color: var(--ht-color-foreground);
-  font-family: var(--ht-font-sans);
+  gap: var(--ht-space-3);
 }
 
-.mk-mobile__bar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  block-size: var(--ht-nav-app-bar-height);
-  padding: 0 var(--ht-screen-gutter);
-  border-block-end: var(--ht-border-width-thin) solid var(--ht-color-border);
-  background: var(--ht-material-chrome-tint);
-  backdrop-filter: blur(var(--ht-blur-chrome));
-  font-size: var(--ht-nav-app-bar-title-size);
-  font-weight: var(--ht-font-weight-semibold);
-}
-
-.mk-mobile__body {
-  flex: 1;
-  padding: var(--ht-screen-gutter);
-  display: flex;
-  flex-direction: column;
-  gap: var(--ht-screen-section-gap);
-  min-block-size: 0;
-  overflow: hidden;
-}
-
-.mk-mobile__tabs {
-  display: flex;
-  justify-content: space-around;
-  align-items: center;
-  block-size: var(--ht-nav-tab-bar-height);
-  border-block-start: var(--ht-border-width-thin) solid var(--ht-color-border);
-  background: var(--ht-material-chrome-tint);
-  backdrop-filter: blur(var(--ht-blur-chrome));
-}
-
-.mk-mobile__tab {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: var(--ht-space-1);
-  min-inline-size: var(--ht-nav-tab-item-min-width);
-  font-size: var(--ht-nav-tab-label-size);
-  font-weight: var(--ht-font-weight-medium);
+.mk-timeline__axis {
+  display: grid;
+  grid-template-columns: 9rem minmax(0, 1fr);
+  gap: var(--ht-space-3);
+  font-size: var(--ht-font-size-2xs);
   color: var(--ht-color-foreground-subtle);
 }
 
-.mk-mobile__tab--active {
-  color: var(--ht-color-primary);
-}
-
-.mk-mobile__fab {
-  position: absolute;
-  inset-inline-end: var(--ht-screen-gutter);
-  inset-block-end: var(--ht-screen-bottom-inset);
+.mk-timeline__axis-days {
   display: grid;
-  place-items: center;
-  inline-size: var(--ht-size-fab);
-  block-size: var(--ht-size-fab);
-  border-radius: var(--ht-radius-full);
-  background: var(--ht-color-primary);
-  color: var(--ht-color-on-primary);
+  grid-template-columns: repeat(4, minmax(0, 1fr));
 }
 
-.mk-mobile__stage {
+.mk-timeline__row {
+  display: grid;
+  grid-template-columns: 9rem minmax(0, 1fr);
+  align-items: center;
+  gap: var(--ht-space-3);
+}
+
+.mk-timeline__label {
+  font-size: var(--ht-font-size-sm);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mk-timeline__track {
   position: relative;
-  block-size: 100%;
+  block-size: var(--ht-space-6);
+  border-radius: var(--ht-radius-md);
+  border: var(--ht-border-width-thin) solid var(--ht-color-border);
+  background: var(--ht-color-surface-sunken);
+}
+
+/* 日界：3 条竖线把轨道分成 4 天。**装饰性**，读屏不看它。 */
+.mk-timeline__grid {
+  position: absolute;
+  inset: 0;
+  background-image: linear-gradient(
+    to right,
+    transparent calc(25% - var(--ht-border-width-thin)),
+    var(--ht-color-border) calc(25% - var(--ht-border-width-thin)),
+    var(--ht-color-border) 25%,
+    transparent 25%
+  );
+  background-size: 25% 100%;
+  pointer-events: none;
+}
+
+.mk-timeline__bar {
+  position: absolute;
+  inset-block: var(--ht-space-1);
+  inset-inline-start: 0;
+  border-radius: var(--ht-radius-sm);
+  background: var(--ht-color-primary);
+}
+
+/* AI 估时：虚线边 —— 与真视图的 `durationAi` 那条语义对应。 */
+.mk-timeline__bar--ai {
+  background: var(--ht-color-primary-subtle);
+  border: var(--ht-border-width-thin) dashed var(--ht-color-primary);
+}
+
+/* ⚠️ 宽度修饰类**只能按真视图算得出来的比例取**（见本节的标题注释）。 */
+.mk-timeline__bar--w-15 { inline-size: 15%; }
+.mk-timeline__bar--w-30 { inline-size: 30%; }
+.mk-timeline__bar--w-45 { inline-size: 45%; }
+.mk-timeline__bar--w-60 { inline-size: 60%; }
+
+.mk-timeline__legend {
+  margin: 0;
+  font-size: var(--ht-font-size-xs);
+  color: var(--ht-color-foreground-muted);
 }

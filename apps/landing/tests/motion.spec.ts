@@ -18,6 +18,7 @@ import { describe, expect, it } from 'vitest';
 import type { Transition } from 'motion/react';
 
 import {
+  maskedRevealVariants,
   revealVariants,
   staggerContainer,
   toSpringOptions,
@@ -91,6 +92,28 @@ describe('revealVariants：减少动效时的降级', () => {
     const variants = revealVariants(false, TEST_TRANSITION);
     const visible = variants['visible'] as { transition?: Transition } | undefined;
     expect(visible?.transition).toBe(TEST_TRANSITION);
+  });
+});
+
+describe('maskedRevealVariants：遮罩式显现', () => {
+  it('正常模式：hidden 在槽外（≥112%，盖住斜体降部余量），visible 归零并挂 transition', () => {
+    const variants = maskedRevealVariants(false, TEST_TRANSITION);
+    expect(variants['hidden']).toEqual({ y: '112%' });
+    const visible = variants['visible'] as { y?: string; transition?: Transition };
+    expect(visible.y).toBe('0%');
+    expect(visible.transition).toBe(TEST_TRANSITION);
+  });
+
+  it('正常模式**不**用 opacity 隐藏 —— 遮罩与淡入的分工：看不见由裁剪表达', () => {
+    const variants = maskedRevealVariants(false, TEST_TRANSITION);
+    expect(variants['hidden']).not.toHaveProperty('opacity');
+  });
+
+  it('减动效：无位移、保留淡入 —— 与 revealVariants 同一条降级规则', () => {
+    const variants = maskedRevealVariants(true, TEST_TRANSITION);
+    expect(variants['hidden']).toEqual({ opacity: 0 });
+    expect(variants['visible']).not.toHaveProperty('y');
+    expect(variants['visible']).toMatchObject({ opacity: 1 });
   });
 });
 

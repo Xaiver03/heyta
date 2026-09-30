@@ -45,11 +45,13 @@
  * 数值在 `showcase-data.ts` 里由同一份样例任务派生。
  */
 
-import type { MessageKey } from '@heyta/i18n';
+import type { MessageKey } from '@heyta/i18n/provider';
 
 /** 外壳里用到的图标 id。真实图标组件在 `AppWindow.tsx` 里映射（纯数据不 import React）。 */
 export type ShellNavIconId =
   | 'inbox'
+  | 'calendar-days'
+  | 'search'
   | 'sun'
   | 'check-circle'
   | 'circle-dot'
@@ -63,6 +65,10 @@ export type ShellNavIconId =
 /** 顶栏视图 key。与 `apps/web/src/App.tsx` 的 `ViewKey` 一致。 */
 export type ShellViewKey =
   | 'tasks'
+  /* 日历：2026-09-29 与 web 壳一起加进 rail（滴答 rail 的「日历」那一格）。 */
+  | 'calendar'
+  /* 搜索：rail 上段最后一个（滴答的 IA 里它常驻）。 */
+  | 'search'
   | 'quadrant'
   | 'habits'
   | 'focus'
@@ -72,8 +78,8 @@ export type ShellViewKey =
   | 'trash'
   | 'settings';
 
-/** 复刻能画内容的那四个视图（其余只是外壳的一部分）。 */
-export type MockView = 'tasks' | 'quadrant' | 'habits' | 'focus';
+/** 复刻能画内容的那五个视图（其余只是外壳的一部分）。 */
+export type MockView = 'tasks' | 'quadrant' | 'habits' | 'focus' | 'timeline';
 
 /** 侧栏主导航的一项。对应 `App.tsx` 的 `PRIMARY_NAV`。 */
 export interface ShellPrimaryNavItem {
@@ -137,18 +143,30 @@ export const SHELL_QUADRANT_NAV: readonly ShellQuadrantNavItem[] = [
  * 🔴 后 5 项（时间线 / 成长 / 便签 / 回收站 / 设置）在这一屏里没有对应内容 ——
  * 它们只是外壳的一部分（复刻刻意不可交互，见 `AppWindow.tsx` 文件头）。
  * 但它们**必须画出来**：复刻只画 4 个 tab 时，访客在页面上看到干净的 4 个标签，
- * 装上应用拿到的是 9 个 —— 一个比真应用好看的界面图就是一句会兑现不了的承诺。
+ * 装上应用拿到的是别的一堆 —— 一个比真应用好看的界面图就是一句会兑现不了的承诺。
+ *
+ * 🔴 **2026-09-29：这里是「默认 rail」而不是"全部视图"。**
+ * 产品负责人要求"左侧按钮尽可能地减少"，于是加了**功能模块开关**：
+ * 关掉的模块**根本不进 DOM**，所以新装用户看到的就是下面这 6 个。
+ * 画"全部 9 个"反而是另一个方向的不实 —— 承诺了默认拿不到的东西。
+ * ⚠️ 对账判据（`tests/mockup-shell-shape.spec.tsx` #5）会读
+ * `apps/web/src/features/shell/modules.ts` 的 `defaultOn` 一起算，别只改这一边。
  */
 export const SHELL_VIEW_TABS: readonly ShellViewTab[] = [
+  // 上段「去哪看」：任务 + **默认开启的模块**。
   { key: 'tasks', labelKey: 'web.shell.nav.tasks', icon: 'inbox' },
+  { key: 'calendar', labelKey: 'web.calendar.title', icon: 'calendar-days' },
   { key: 'quadrant', labelKey: 'web.shell.nav.quadrant', icon: 'circle-dot' },
   { key: 'habits', labelKey: 'web.shell.views.habits', icon: 'check' },
-  { key: 'focus', labelKey: 'web.shell.views.focus', icon: 'sun' },
   { key: 'timeline', labelKey: 'web.shell.views.timeline', icon: 'chart-gantt' },
-  { key: 'growth', labelKey: 'web.shell.views.growth', icon: 'trending-up' },
-  { key: 'notes', labelKey: 'web.shell.views.notes', icon: 'sticky-note' },
+  // 「搜索」在滴答的 rail 上段**最后一个**（它常驻，不给关）。
+  { key: 'search', labelKey: 'web.search.title', icon: 'search' },
+  // 下段「工具」：贴底。
+  //
+  // ⚠️ **没有 `settings`** —— 2026-09-29 按滴答的 IA，设置收进了**顶部的头像菜单**
+  //（rail 是每天点几十次的地方，设置是低频的）。展厅画的既然是"新装用户看到的
+  // 那一屏"，就不该把它画成一个 rail 按钮。
   { key: 'trash', labelKey: 'web.trash.nav', icon: 'trash' },
-  { key: 'settings', labelKey: 'web.shell.views.settings', icon: 'settings' },
 ];
 
 /**

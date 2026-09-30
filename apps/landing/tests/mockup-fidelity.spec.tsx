@@ -46,6 +46,7 @@ import {
   SHELL_VIEW_TABS,
 } from '../src/mockup/app-shell-shape.js';
 import { showcaseQuadrantCounts, SHOWCASE_TODAY_PROGRESS } from '../src/mockup/showcase-data.js';
+import { MOCK_TIMELINE_ROWS } from '../src/mockup/timeline-shape.js';
 
 /**
  * 🔴 **这里曾经各抄了一份 `VIEW_TABS` / `PRIMARY_NAV`**（产品决策 P6）。
@@ -92,7 +93,9 @@ afterEach(() => {
   container = null;
 });
 
-function renderMockup(view: 'tasks' | 'quadrant' | 'habits' | 'focus' = 'quadrant'): HTMLElement {
+function renderMockup(
+  view: 'tasks' | 'quadrant' | 'habits' | 'focus' | 'timeline' = 'quadrant',
+): HTMLElement {
   container = document.createElement('div');
   document.body.append(container);
   root = createRoot(container);
@@ -225,5 +228,19 @@ describe('展厅复刻与应用一致', () => {
     const boxes = [...view.querySelectorAll('.mk-field__box')].map((el) => el.textContent?.trim());
     expect(boxes).toEqual([zhCN['web.projects.newPlaceholder'], zhCN['web.tags.newPlaceholder']]);
     expect(view.querySelectorAll('.mk-field__add')).toHaveLength(2);
+  });
+
+  it('时间线视图真的画出了条 —— 不是白屏', () => {
+    const view = renderMockup('timeline');
+    /*
+      🔴 这一条钉的是**最后一米**：登记处与 CSS 对得上（`mockup-timeline-shape.spec`），
+      不代表 `AppWindow` 真的把它挂上了 —— `{view === 'timeline' && <TimelineBoard />}`
+      漏掉时，页面照样渲染成功，只是那一档**什么都没画**（视图标题还在，
+      看起来像"这个视图本来就是空的"）。条的数必须等于登记处的行数。
+    */
+    expect(view.querySelectorAll('.mk-timeline__bar')).toHaveLength(MOCK_TIMELINE_ROWS.length);
+    // 每条样例的标题也都在（否则是"有条无题"的另一半白屏）。
+    const timelineText = view.querySelector('.mk-timeline')?.textContent ?? '';
+    expect(timelineText).toContain(zhCN['landing.mock.task.q4Draft']);
   });
 });
