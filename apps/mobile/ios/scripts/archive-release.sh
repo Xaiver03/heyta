@@ -9,7 +9,7 @@
 # 任何一条缺了，报错都发生在 xcodebuild 很后面的位置，而且信息零散。
 # 所以这里把前提**前置成一次 preflight**，缺什么就直接说清楚缺什么、去哪儿补。
 #
-# 🔴 **本轮实测卡住的那一条**：App Group `group.com.heyta.mobile` 必须先在
+# 🔴 **本轮实测卡住的那一条**：App Group `group.com.heyta` 必须先在
 #    App Store Connect 网页建出来并勾给两个 App ID。
 #    Apple 的**公开 API 不提供建 App Group 的能力**（签名域只覆盖
 #    bundleIds / capabilities / certificates / profiles / devices），
@@ -20,11 +20,11 @@
 set -uo pipefail
 
 TEAM="V5S2LT9YV8"
-APP_BUNDLE="com.heyta.mobile"
-WIDGET_BUNDLE="com.heyta.mobile.WidgetExtension"
+APP_BUNDLE="com.heyta"
+WIDGET_BUNDLE="com.heyta.WidgetExtension"
 APP_PROFILE="heyta App Store"
 WIDGET_PROFILE="heyta Widget App Store"
-APP_GROUP="group.com.heyta.mobile"
+APP_GROUP="group.com.heyta"
 ARCHIVE_PATH="${1:-/tmp/heyta.xcarchive}"
 
 cd "$(dirname "$0")/.." || exit 1

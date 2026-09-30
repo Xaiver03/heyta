@@ -41,8 +41,8 @@ cat > "$PLIST" <<PLISTEOF
   <key>manageAppVersionAndBuildNumber</key><false/>
   <key>provisioningProfiles</key>
   <dict>
-    <key>com.heyta.mobile</key><string>heyta App Store</string>
-    <key>com.heyta.mobile.WidgetExtension</key><string>heyta Widget App Store</string>
+    <key>com.heyta</key><string>heyta App Store</string>
+    <key>com.heyta.WidgetExtension</key><string>heyta Widget App Store</string>
   </dict>
 </dict>
 </plist>
