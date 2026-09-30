@@ -70,21 +70,44 @@ PNPM="$(resolve_pnpm)"
 #    （contentRatio 99.6%），四轮截图统计全绿，最后是人眼看窗口才发现。
 #    真正的 UI 特征：heyta 界面必带主蓝（rail 激活项/主按钮/链接），
 #    错误屏、空白屏、桌面底色都没有。判据 = 非空白 且 主蓝采样命中 ≥ 20。
-# 用法：shot_ok <png 路径>；输出 ✅/🔴 行。
+# 🔴 2026-09-30 第二轮实测：主蓝**只数浅色的 `#2563EB` 会把正确的安装判成红的**。
+#    mac 段启动前清掉壳的 WebKit 存储（全新安装的一部分），应用回落到**系统外观**，
+#    这台机器晚上是深色 ⇒ `[data-theme='dark']` 的主蓝是 `--ht-blue-400` `#60A5FA`，
+#    截图里人眼看着就是真共享 UI，而旧判据命中 0 ⇒ 🔴。
+#    所以走 `countBrandBlue`（两套主题相加）：错误屏两个值都是 0，阈值 20 不变。
+# 🔴 第三轮实测：**数的是哪张图**同样是判据缺陷。同一秒的两份产物——
+#    窗口截图 48 KB / colorSpan 62 / 主蓝 **0**（人眼看 = 空暗窗口 + 三个交通灯），
+#    WebView 快照 286 KB / 主蓝 **79**（人眼看 = 真共享 UI）。
+#    这不是新发现：壳自己的代码（`HeytaMacApp.swift` 的 `captureAndExit` 注释）写着
+#    "**WebView 的内容没合成进窗口**是这台机器上的**常态**"，并规定两份产物各证一件事：
+#    窗口截图证"有一个真的 macOS 窗口"，`OUT.webview.png` 证"那份共享 UI 真渲染了"。
+#    ⇒ 主蓝必须数**第二个参数**那张（WebView 快照），非空白/透明仍数窗口截图。
+# 用法：shot_ok <窗口 png> [webView png]；输出 ✅/🔴 行。
 shot_ok() {
-  node - "$1" <<'JS'
+  node - "$1" "${2:-}" <<'JS'
 import('./scripts/screenshots/png-stats.mjs').then((m) => {
   const st = m.inspectPng(process.argv[2]);
   let bad = false;
   if (st.hasTransparency) { console.log('  🔴 含实际透明像素'); bad = true; }
   if (m.looksBlank(st)) { console.log('  🔴 疑似空白'); bad = true; }
-  const blue = m.countColor(process.argv[2], m.HEYTA_BLUE);
-  console.log(`  主蓝采样命中 ${blue}`);
+  const brandShot = process.argv[3] || process.argv[2];
+  const blue = m.countBrandBlue(brandShot);
+  console.log(`  主蓝采样命中 ${blue}（数的是 ${brandShot.split('/').pop()}）`);
   if (blue < 20) { console.log('  🔴 截图里没有 heyta 主蓝 —— 是错误屏/别的界面，不是共享 UI'); bad = true; }
   if (bad) process.exit(1);
   console.log(`  ✅ 截图 ${st.width}x${st.height}、内容占比 ${(st.contentRatio * 100).toFixed(1)}%、主蓝命中 ${blue} —— 是共享 UI`);
 }).catch((e) => { console.log(`  🔴 读不了截图：${e.message}`); process.exit(1); });
 JS
+}
+
+# 🔴 上面那层是 `| grep -q "✅"` 用的，**判据数字会被整个吞掉** ——
+#    于是"四端全绿"的日志里一个主蓝命中数都查不到，红了也说不出为什么红。
+#    这层只负责把数字打进日志，退出码原样透传。
+shot_ok_logged() {
+  local out rc=0
+  out="$(shot_ok "$@")" || rc=$?
+  printf '%s\n' "$out"
+  return "$rc"
 }
 
 # ── Windows 源码同步：把**当前工作树**（含未提交改动与未跟踪文件）+ web-dist 送过去 ──
@@ -151,15 +174,19 @@ if printf '%s' "$WANT" | grep -q "mac"; then
       rm -rf "$HOME/Library/WebKit/cloud.finlaw.heyta.desktop" \
              "$HOME/Library/Caches/cloud.finlaw.heyta.desktop" 2>/dev/null || true
       # 判据用**安装副本**本身：能起来、能自截屏、截出来非空白。
+      # 🔴 主蓝数的是 `.webview.png` 那一份（壳自己的规定，见 shot_ok 文件头）。
       MAC_SELFIE="/tmp/heyta-reinstall-mac-installed.png"
-      rm -f "$MAC_SELFIE"
+      MAC_SELFIE_WV="$MAC_SELFIE.webview.png"
+      rm -f "$MAC_SELFIE" "$MAC_SELFIE_WV"
       HEYTA_NO_FOCUS=1 HEYTA_SELF_CAPTURE="$MAC_SELFIE" \
         "$INSTALLED_APP/Contents/MacOS/HeytaMac" >/dev/null 2>&1 || true
-      if [ -f "$MAC_SELFIE" ] && shot_ok "$MAC_SELFIE" | grep -q "✅"; then
-        echo "  截图证据：$MAC_SELFIE"
+      if [ -f "$MAC_SELFIE" ] && shot_ok_logged "$MAC_SELFIE" "$MAC_SELFIE_WV"; then
+        echo "  截图证据：$MAC_SELFIE（窗口）+ $MAC_SELFIE_WV（共享 UI）"
         RESULT_mac=OK
       else
-        echo "  🔴 安装副本没跑起来或截图为空 —— 装上的这个不可信"
+        echo "  🔴 安装副本不可信 —— 窗口没起来，或共享 UI 没渲染"
+        echo "     证据：${MAC_SELFIE}:$([ -f "$MAC_SELFIE" ] && stat -f%z "$MAC_SELFIE" || echo 缺)" \
+             "${MAC_SELFIE_WV}:$([ -f "$MAC_SELFIE_WV" ] && stat -f%z "$MAC_SELFIE_WV" || echo 缺)"
       fi
     else
       echo "  🔴 拷进 /Applications 失败"
@@ -229,7 +256,7 @@ if printf '%s' "$WANT" | grep -q "android"; then
         sleep 8
         ANDROID_SHOT="/tmp/heyta-reinstall-android.png"
         adb -s "$SERIAL" exec-out screencap -p > "$ANDROID_SHOT" 2>/dev/null
-        if [ -s "$ANDROID_SHOT" ] && shot_ok "$ANDROID_SHOT" | grep -q "✅"; then
+        if [ -s "$ANDROID_SHOT" ] && shot_ok_logged "$ANDROID_SHOT"; then
           echo "  截图证据：$ANDROID_SHOT"
           RESULT_android=OK
         else
@@ -293,7 +320,7 @@ if printf '%s' "$WANT" | grep -q "ios"; then
           sleep 10
           IOS_SHOT="/tmp/heyta-reinstall-ios.png"
           xcrun simctl io "$UDID" screenshot "$IOS_SHOT" >/dev/null 2>&1
-          if [ -s "$IOS_SHOT" ] && shot_ok "$IOS_SHOT" | grep -q "✅"; then
+          if [ -s "$IOS_SHOT" ] && shot_ok_logged "$IOS_SHOT"; then
             echo "  截图证据：$IOS_SHOT"
             RESULT_ios=OK
           else
