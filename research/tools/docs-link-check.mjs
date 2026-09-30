@@ -60,16 +60,21 @@ const SKIP_PATHS = ['research/upstream', 'research/standalone', 'research/parts'
  * 已登记的两条（都是本轮实测的既有引用）：
  *   · 备案填报值：证件号 / 手机号 / 邮箱，**私密数据**，由 `.gitignore` 的
  *     `*.local.md` 挡在库外（本仓库的立场是"带私有数据的东西不进仓库"）；
- *   · 本机 agent 工具目录：那是**每台机器自己装的 skill**，仓库里从来不放，
- *     而且它中间经过软链（`git check-ignore` 对它报 "beyond a symbolic link"），
- *     所以只能按"未被跟踪"处理。
+ *   · 指向仓库外的本机 skill 软链：`.gitignore` 里**逐条**列了它（`huawei-agc`
+ *     同形状的另一条也在列），理由是那种软链的目标在**另一个项目**里，
+ *     提交进去对任何克隆者都是死链。
+ *     ⚠️ 别把这一格写成"宽到 `.agents/skills/` 整目录"——实测仓库里
+ *     **确实跟踪了**一个同形状软链 `cac-algorithm-filing`（它自己就在干净检出上
+ *     断链，`.gitignore` 的注释承认了这一点）。"仓库里从来不放"是**假的**，
+ *     而登记的理由必须是**真的**。收窄的后果：以后链接到别的 skill
+ *     要**新登记一条** —— 这正是刻意的成本。
  *
  * ⚠️ 目录豁免以 `/` 结尾，前缀匹配。范围尽量窄 —— 宽到 `docs/` 那种
  *    等于把这一半检查关掉。
  */
 const UNTRACKED_LINK_OK = new Map([
   ['docs/operations/icp-app-filing.values.local.md', '真实填报值含证件号与手机号，刻意不进仓库（.gitignore 的 *.local.md）'],
-  ['.agents/skills/', '每台机器自己安装的本地 agent skill 目录，仓库里从来不放'],
+  ['.agents/skills/tencent-cloud-icp-app-filing/', '指向仓库外（另一个项目）的本机 skill 软链，.gitignore 逐条拦在库外；提交进去对所有克隆者都是死链'],
 ]);
 
 /** 命中豁免则返回**被命中的那条登记** `[pattern, reason]`，否则 `undefined`。 */
