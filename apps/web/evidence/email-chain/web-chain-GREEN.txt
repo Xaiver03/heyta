@@ -1,0 +1,31 @@
+(node:38017) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.
+(Use `node --trace-warnings ...` to show where the warning was created)
+· 库：heyta_email_web_chain
+· 验收库已存在
+· 应用迁移…
+· 迁移完成
+· 启动 API 服务端（无 TEST_MODE）…
+· 同源反代就绪 http://127.0.0.1:4400（API 在 http://127.0.0.1:3231）
+· API 就绪
+
+  · 文档头 200 http://127.0.0.1:4400/ {"content-type":"text/html; charset=utf-8"}
+  ✅ ① 应用在**同源反代**下打开（真产物）
+  ✅ ① UI 注册已提交（email-web-1790776114445@example.com）
+  · 那封信：https://ethereal.email/message/ar0TMwcJu4Jvbmznar0TO2BC2ZnvfZ5tAAAAAfvhnkB8RwAZQO.ax2PJo4I
+  ✅ ② 链接指向**反代那个 origin**（http://127.0.0.1:4400/verify-email?token=34e47…）
+  · 文档头 200 fcfc96739ce83ab6a87311f812b947cfdf {"content-security-policy":"default-src 'self';base-uri 'self';font-src 'self';form-action 'self';frame-ancestors 'none';img-src 'self' data:;object-src 'none';script-src 'self';script-src-attr 'none';style-src 'self' 'unsafe-inline';upgrade-insecure-requests","content-type":"text/html","cross-origin-opener-policy":"same-origin","cross-origin-resource-policy":"same-origin","origin-agent-cluster":"?1","x-frame-options":"SAMEORIGIN"}
+  ✅ ③ 打开链接渲染的是**确认页**（有确认按钮），不是"已失效"页
+  · 文档头 200 http://127.0.0.1:4400/app/ {"content-type":"text/html; charset=utf-8"}
+  ✅ ④ 点击后跳到了 `/app/` 且应用挂载
+  · 落到 /app/ 之后的存储：{"sessionKeys":[],"localKeys":["__prehides","heyta.locale","heyta.theme","__ssw","heyta.sync.credentials"],"errs":[]}
+  · 应用启动那一刻：{"href":"http://127.0.0.1:4400/app/#sessionToken=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOjI4LCJlbWFpbCI6ImVtYWlsLXdlYi0xNzkwNzc2MTE0NDQ1QGV4YW1wbGUuY29tIiwidG9rZW5WZXJzaW9uIjowLCJpYXQiOjE3OTA3NzYxMjYsImV4cCI6MTgyMjMxMjEyNn0.4lLqLBjqykLst2WcndINBGMQmOlhmoMvNBmekeRe_7o&loginEmail=email-web-1790776114445%40example.com&loginBaseUrl=http%3A%2F%2F127.0.0.1%3A4400","sessionKeys":[],"sessionToken":null,"loginBaseUrl":null}
+  ✅ ④ 会话经 **URL fragment** 投递到应用（sessionStorage 跨不过 agent cluster）
+  ✅ ④ 地址栏里的会话 fragment 已被抹掉（一次性凭据不许留在历史里）
+  · /api/auth/email/verify 的响应：200
+  · sessionStorage 写入时间线：[{"at":"http://127.0.0.1:4400/","kind":"remove","key":"loginToken","len":0},{"at":"http://127.0.0.1:4400/","kind":"remove","key":"loginBaseUrl","len":0}]
+  · 浏览器里的页面数：1
+  · 确认页 last instant（pagehide）：{"href":"http://127.0.0.1:4400/verify-email?token=34e47dd2ce1ee8e0a69dd04a66bce4fcfc96739ce83ab6a87311f812b947cfdf","sessionKeys":[],"sessionToken":null}
+  ✅ ⑤ 落盘凭据出现（刷新之后仍是登录态）
+  ✅ ⑤ 身份菜单出现"退出登录" ⇒ **应用真的登录了**（这一格正是以前坏掉的）
+
+✅ web 邮箱全链路通过：UI 注册 → 真发一封 → 链接 → 确认页 → **应用真的登录了**。

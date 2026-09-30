@@ -1,6 +1,6 @@
-# web 邮箱全链路（真浏览器 + 真邮件）· 2026-09-30T13:31:09.099Z
-EMAIL=email-web-1790775038923@example.com
-PREVIEW=https://ethereal.email/message/ar0PAAcJu4Jvbfn1ar0PBmBC2ZnvfZv6AAAAAUGH7kXz0hq0jwq1lAR42vQ
-LINK=http://127.0.0.1:4400/verify-email?token=3ea9b40d1f1a37e9c62931d64104a762de27289ed26b6a82165ae7477cf6258a
-SIGNED_IN=false
-RESULT=FAIL
+# web 邮箱全链路（真浏览器 + 真邮件）· 2026-09-30T13:51:03.302Z
+EMAIL=email-web-1790776252062@example.com
+PREVIEW=https://ethereal.email/message/ar0TvgcJu4Jvbnykar0TxPLvAxtdrTx-AAAAAT292J14.z7mlnc6ytjywU4
+LINK=http://127.0.0.1:4400/verify-email?token=6e7c9675c38f8240ce40be90e9220106813a19437aea3d44407d9b0226a4297a
+SIGNED_IN=true
+RESULT=PASS
