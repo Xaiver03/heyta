@@ -1,0 +1,9 @@
+WINDOW=heyta
+M2A_NOTE=M2-A：共享 UI 已渲染 "{\"slice\":1,\"rows\":4,\"title\":\"heyta\"}"
+PROBE="{\"slice\":1,\"rows\":4,\"title\":\"heyta\"}"
+WEB_ROOT=C:\src\heyta-web-dist\dist
+ALIVE pid=17192
+HWND=4588518
+WINDOW_RECT=52,52,1152x587
+PNG_SAVED=True bytes=45256
+RESULT=WINDOW_OK

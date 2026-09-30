@@ -1,0 +1,9 @@
+WINDOW=heyta
+M2A_NOTE=M2-B：壳推了真数据、共享 UI 渲染了 "{\"host\":1,\"rows\":3,\"note\":\"M2-B：数据来自原生壳（Jint + SQLite），不是种子数据 —— 已收到 3 条（原始 638 字节）\"}"
+PROBE="{\"host\":1,\"rows\":3,\"note\":\"M2-B：数据来自原生壳（Jint + SQLite），不是种子数据 —— 已收到 3 条（原始 638 字节）\"}"
+WEB_ROOT=C:\src\heyta-web-dist\dist
+ALIVE pid=16924
+HWND=4785084
+WINDOW_RECT=156,156,1152x587
+PNG_SAVED=True bytes=62320
+RESULT=WINDOW_OK

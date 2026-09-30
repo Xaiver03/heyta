@@ -305,10 +305,14 @@ Time_NLP 系列（**仓库无 LICENSE**）。
 
 ## 5. 下一步动作（按"用户在哪一步走不下去"排序）
 
-> ⚠️ 本节原先列的是 P0 的 6 步 —— **它们已全部完成**。现在的瓶颈不在工程侧的内部一致性，
-> 而在**用户旅程的断点**上：仓库的门禁已经多到足以证明"代码是对的"，
-> 但**没有任何一道门禁能发现"用户根本没有入口"**。
-> 下面按用户实际会撞到的顺序排，每条都带可复现证据。
+> 🔴 **2026-09-29 口径收敛：本节的「下一步」已由
+> [`multi-end-unified-strategy.md`](multi-end-unified-strategy.md) 全权接管。**
+> 该文件是当前唯一的权威主计划，「下一步动作」只在它 §11 维护；
+> **本节不再复述、也不再作为待办入口**。计划层的完整索引见 [`README.md`](README.md)。
+>
+> ⚠️ **下面 §5.1–§5.4 保留的是 2026-09-27 / 09-28 的断点关闭账** ——
+> 它们是带日期与实测证据的**历史记录**，**不是待办清单**。
+> 判断"现在该做什么"只看主计划 §11。
 
 ### 5.1 ✅ 第一段：新用户到不了产品 —— **2026-09-27 已打通**
 
@@ -381,12 +385,18 @@ Web 设置页有「导出数据」（JSON 完整保真 / 任务清单 Markdown�
 
 ### 5.3 第三段：剩下的工程（按轨道）
 
-| 轨道 | 下一步 |
-|---|---|
-| **P2 多端** | 鸿蒙**仍未跑起来**：构建链已实测打通（20 MB release HAP、双 ABI），但缺**模拟器系统镜像 + 签名**（产物 unsigned）→ [phase-2-multi-platform.md](phase-2-multi-platform.md) |
-| **AI 线** | AI-0 / AI-1 / AI-2 / 本地 API（MCP）✅ 已上线；**AI-3 规划、AI-4 复盘未实现**。~~全量导出未实现~~ → ✅ **2026-09-27 已实现**（见 §5.1.1；**入口三端齐全：Web 设置页 / 移动端「我的 → 导出数据」/ node-host CLI** —— 本条此前写「移动端未做」，与同文件 §5.1.1 的三端表矛盾，已按实测更正） |
-| **运营面** | 改价目前等于**服务器 shell 权限**（唯一入口是 `server/scripts/pricing.ts` CLI，无鉴权 / 无角色 / 无 HTTP 面，`--actor` 可伪造）。**在有意引入 admin 路由之前，这条缺口应当保持显式**，而不是被"内网就安全"盖住 |
-| **P3** | 小组件 / 通知 / CalDAV —— 未开工。可行性见 [native-widgets.md](../research/native-widgets.md)，**改造计划见 [multi-platform-widgets.md](multi-platform-widgets.md)**：小组件是**多端适配的输出形态**（不是后续阶段），且 **Windows（PWA provider）与 macOS（Continuity）反而不需要新建壳** |
+> 🔴 **本节的原「按轨道下一步」口径已于 2026-09-29 收敛** ——
+> 它部分已过期（例如"P2 多端"轨道仍在指向已被收敛的
+> [`phase-2-multi-platform.md`](phase-2-multi-platform.md)）。
+> **当前下一步只在 [`multi-end-unified-strategy.md`](multi-end-unified-strategy.md) §11 维护，本节不复述。**
+> 被替代的表格见本文件的 git 历史；各轨道的当前状态见 [`README.md`](README.md) 索引。
+>
+> 📌 **平台清单（与站点 `/platforms` 的六个条目对应）**：Web · Android · iOS ·
+> 桌面（macOS / Windows / Linux） · **鸿蒙（HarmonyOS）** · 自建服务器。
+> 每一端的**当前状态**由 [`multi-end-unified-strategy.md`](multi-end-unified-strategy.md) §11 维护；
+> 这一行存在的理由是 `check:claims` 的 C2 判据 —— **站点上讲了某个平台，
+> 路线图里就必须找得到它**（否则站点等于在讲一个路线图上不存在的平台）。
+> ⚠️ 收敛掉那张表时漏了这一句，`pnpm check:claims` 因此变红（2026-09-29 修）。
 
 ### 5.4 本轮同时关闭的其它断点（2026-09-27）
 

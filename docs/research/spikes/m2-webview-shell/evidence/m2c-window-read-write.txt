@@ -1,0 +1,13 @@
+WINDOW=heyta
+M2A_NOTE=M2-C ✅ 读+写都成立："{\"host\":1,\"rows\":3,\"note\":\"M2-B：数据来自原生壳（Jint + SQLite），不是种子数据 —— 已收到 3 条（原始 638 字节）\"}"；写处理 1 次，库里已完成 0→1
+PROBE="{\"host\":1,\"rows\":3,\"note\":\"M2-B：数据来自原生壳（Jint + SQLite），不是种子数据 —— 已收到 3 条（原始 638 字节）\"}"
+WEB_ROOT=C:\src\heyta-web-dist\dist
+WRITE_HANDLED=1
+DB_DONE=1
+DB_TOTAL=3
+WRITE_NOTE=M2-C ✅ 读+写都成立："{\"host\":1,\"rows\":3,\"note\":\"M2-B：数据来自原生壳（Jint + SQLite），不是种子数据 —— 已收到 3 条（原始 638 字节）\"}"；写处理 1 次，库里已完成 0→1
+ALIVE pid=11444
+HWND=1575466
+WINDOW_RECT=26,26,1152x587
+PNG_SAVED=True bytes=72949
+RESULT=WINDOW_OK

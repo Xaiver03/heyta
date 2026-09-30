@@ -1,6 +1,15 @@
 # P2：多端补齐
 
-- **状态**：进行中
+> 🔴 **2026-09-28 收敛：本文件已被 [`multi-platform-adaptation.md`](multi-platform-adaptation.md) 与
+> [`desktop-native-migration.md`](desktop-native-migration.md) 取代，二者又由
+> [`multi-end-unified-strategy.md`](multi-end-unified-strategy.md) 收敛。本文件只作历史，不要照它开工。**
+> 🔴 **2026-09-29 追加口径收敛：「下一步」只在
+> [`multi-end-unified-strategy.md`](multi-end-unified-strategy.md) §11 维护** ——
+> 本文件（及 roadmap §5）都不再作为待办入口，也不复述下一步。
+> ⚠️ 本文件的状态行是解不开的口令噪音（不是计划状态）—— 这也是它该被归档的信号。
+> 索引见 [`README.md`](README.md)。
+
+- **状态**：🔴 **已被取代**（原文误写为"进行中"）
 - **上游决策**：[ADR-0003 多端策略](../adr/0003-multi-platform-strategy.md)
 - **前置**：P1 单端闭环 ✅
 

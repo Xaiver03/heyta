@@ -1,0 +1,4 @@
+WINDOW=heyta
+M2A_NOTE=M2-A：等了 20 秒仍没渲染出共享行，最后一次探测="{\"slice\":0,\"rows\":0,\"title\":\"heyta.local\"}"
+PROBE="{\"slice\":0,\"rows\":0,\"title\":\"heyta.local\"}"
+WEB_ROOT=C:\src\empty-web-root

@@ -1,0 +1,4 @@
+# 🔴 原图不入库：含用户真实业务信息（备案/开户/尾款/薪资）与他人昵称。
+# 只入库文本（INTERFACE-NOTES.md / CAPTURE-LOG.md）。
+# 对外使用前必须先脱敏，产物另放 *_redacted/。
+*.png

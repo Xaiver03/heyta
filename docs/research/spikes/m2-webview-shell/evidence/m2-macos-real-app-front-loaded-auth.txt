@@ -1,0 +1,3 @@
+WINDOW=heyta
+WEB_ROOT=/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/apps/web/dist
+M2_MACOS_NOTE=M2-macOS ✅ 桌面壳里的真应用：注册/登录入口 1 个、采集框 1 个 —— **前置成立**

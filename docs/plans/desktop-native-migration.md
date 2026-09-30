@@ -1,5 +1,15 @@
 # 多端原生构建计划：原生优先，代码量不设上限
 
+> 🔴 **2026-09-28 收敛：本文件的"UI 形态"部分已被 [`multi-end-unified-strategy.md`](multi-end-unified-strategy.md) 取代。**
+> **仍然有效**：W0/W1 的全部实测结论（跨语言通道、Jint/JSC 陷阱、编组开销、错误过边界的两种形态）。
+> **已取代**：`packages/ui` 对 Windows「归零」的路线 —— 产品负责人钉死「**UI 组件必须复用**」，见主计划 §3.3 与 §4.3。
+> 🔴 **2026-09-30 追注**：§1/§2 里"桌面端 = 手写原生 UI（WinUI 3 / SwiftUI）"的框架**也已过期**。
+> 现行决定：[**ADR-0037**](../adr/0037-desktop-ui-falls-back-to-webview.md) + 主计划 §4.2/§4.3 ——
+> **桌面端（Windows / macOS / Linux）= 原生壳 + 壳内 WebView 加载共享 UI（M2）**。
+> 所以 §2.1「为什么是 WinUI 3，不是 RNW」只回答"**壳**用什么写"，**不再**回答"UI 谁渲染"；
+> UI 由共享产物渲染。本文件保留为当时的实测证据，**不要按它去手写第二份 UI**。
+> 索引见 [`README.md`](README.md)。
+
 > 状态：**规划中**
 > 决策依据：[ADR-0034](../adr/0034-windows-native-winui3-not-rnw.md)（Windows 走 WinUI 3 / Windows App SDK 原生）
 > 上位计划：[多端适配实施计划](multi-platform-adaptation.md) M2
@@ -103,14 +113,19 @@ RNW 看起来显然，**唯一**理由是"与 RN 0.84.1 版本精确对齐" —�
 
 #### W1 — 最小垂直切片（**verification 优先**）
 
-> 🟡 **进度（2026-09-28）**：骨架与**跨语言那一层**已落地并有门禁；
-> 界面与"同一份断言"还没做。见 [`apps/desktop-windows/README.md`](../../apps/desktop-windows/README.md)。
+> 🟡 **进度（2026-09-28）**：骨架与**跨语言那一层**已落地（`check:crosslang-contract` **已接进** `pnpm check`）；
+> ⚠️ **但壳冒烟那一层没有门禁** —— `check:windows-shell` / `check:macos-shell` / `check:linux-shell`
+> 三个脚本**已于 2026-09-29 接进 `pnpm check`**（`check:macos-shell` / `check:windows-shell` / `check:linux-shell`；
+> 非本机平台**响亮跳过**）。界面：三壳都渲染了，但**各写了一份**。
+> 见 [`apps/desktop-windows/README.md`](../../apps/desktop-windows/README.md) 与
+> [multi-end-unified-strategy.md](multi-end-unified-strategy.md)。
 
 | 任务 | 判据 | 状态 |
 |---|---|---|
 | W1-1 建 `apps/desktop-windows`（WinUI 3） | `dotnet build` + 现有 `pnpm typecheck` 不因它变红 | ✅ **已完成（含"可运行"）**：拆成 `Heyta.Windows.Core`（**net10.0，任意 OS 可构建可测**）+ `HeytaWindows`（WinUI 3，仅 Windows）。真 Windows 上 `dotnet build` **0 警告 0 错误**；🔴 **窗口已在真机交互式桌面会话里启动并截图**（`MAIN_WINDOW_TITLE=heyta`、`1152x587`、库真的建出来）—— **"可构建"与"可运行"都验过了**，见 [evidence](../../apps/desktop-windows/evidence/) 与 [README §7](../../apps/desktop-windows/README.md) |
-| W1-2 接上 W0-4 选定的领域层通道 | 界面能读到**真实**（非硬编码）任务数据 | ✅ **通道已通并有门禁**：`check:windows-shell` 跑无头冒烟 —— 开库/建任务/排序/完成态/**重开仍落盘**/软删除，**12/12 通过**（macOS 与真 Windows 各一遍）。⚠️ 界面本身尚未渲染（见 W1-3） |
-| W1-3 渲染出**同一份** UI 契约 | `data-testid="task-row-*"` 可查（这是 `@heyta/ui` 自己打的锚点，与 Electron/web 一致） | ⬜ **未做**。⚠️ 而且这条判据本身需要重新表述：Windows 壳是 **XAML**，`@heyta/ui` 是 React/RNW —— 两者**不可能共用 DOM testid**。要么改成"同一份**数据契约**"（facade 的 `TaskView`），要么承认 Windows 不复用 `@heyta/ui`（这正是 ADR-0034 §4 已经承认的：`packages/ui` 对 Windows 归零） |
+| W1-2 接上 W0-4 选定的领域层通道 | 界面能读到**真实**（非硬编码）任务数据 | ✅ **通道已通**：`scripts/check-windows-shell.mjs` 跑无头冒烟 —— 开库/建任务/排序/完成态/**重开仍落盘**/软删除，**12/12 通过**（macOS 与真 Windows 各一遍）。🔴 **更正（2026-09-28 实测）**：该脚本当时**存在但从未接进 `pnpm check`** —— 根 `package.json` 里没有 `check:windows-shell`。**"有脚本"≠"有门禁"**。
+✅ **已于 2026-09-29 接线**：`package.json` 新增 `check:macos-shell` / `check:windows-shell` / `check:linux-shell`，并把三者加进 `pnpm check` 链（本机可跑的真跑，其余**响亮跳过**）。实测 macOS `16/16`、Windows 跨语言全过、Linux 在 darwin 上显式跳过。另：先前这里写的"界面本身尚未渲染"**是错的** —— Windows 壳有 `MainWindow.xaml` 并已渲染真实列表（见 W1-3） |
+| W1-3 渲染出**同一份** UI 契约 | ~~`data-testid="task-row-*"` 可查（与 Electron/web 一致）~~ 🔴 **判据已重述** | ⚠️ **原判据不成立**：Windows 壳是 **XAML**，`@heyta/ui` 是 React/RNW —— 两者**不可能共用 DOM testid**。**但"未做"这个状态也已经过期**：`apps/desktop-windows/HeytaWindows/MainWindow.xaml` 有真实界面，且三个桌面壳（SwiftUI / XAML / GTK4）**各自手写了一份同一个薄切片** —— 那恰好违反"UI 组件必须复用"。⇒ 新判据归 [multi-end-unified-strategy.md](multi-end-unified-strategy.md) §4.3 与 §7 |
 | **W1-4** 🔴 **同一份断言** | `e2e/tests/desktop-window.spec.ts` 的断言**照搬**到 Windows 壳（**不许改写断言，只许换 launch 方式**） | ⬜ **未做**，且与 W1-3 同一个问题：Electron 那份断言查的是 DOM。**在动手前必须先决定"哪些断言对两者都成立"**，否则会变成写一套新断言然后声称是同一套 |
 
 🔴 **W1-4 是这一阶段的核心价值**：如果两边必须写**不同的断言**，
@@ -328,7 +343,7 @@ pnpm check                                                          # → exit 0
 | W0-1 装工具链 + 起窗口 | ✅ **已完成（含"可运行"）**（2026-09-28） | .NET SDK **10.0.401**（`winget`）；该机**无 VS** 但 WinUI 3 / WinAppSDK 2.5.1 **`dotnet build` 0 警告 0 错误**；🔴 **窗口已在真机交互式桌面会话里启动并截图**（`MAIN_WINDOW_TITLE=heyta`、`1152x587`、`DB_EXISTS=True`）—— 见 [evidence](../../apps/desktop-windows/evidence/) 与 [README §7](../../apps/desktop-windows/README.md) |
 | **七端原生壳审计** | ✅ **已完成（2026-09-28）** | 逐端实测壳的类型（不是凭印象）：Windows=WinUI 3、macOS=SwiftUI、iOS/Android=RN、鸿蒙=RNOH、Web=定义如此 ⇒ **六端原生**；**Linux 仍是 Electron**（`release/heyta-linux-x64/` 里是 `chrome-sandbox` + `chrome_*.pak`）⇒ 见 §4 |
 | **macOS 原生壳** | ✅ **已完成（2026-09-28）** | `apps/desktop-macos`（SwiftPM）。**JavaScriptCore + libsqlite3 均为 macOS 自带** ⇒ 零第三方依赖；加载**同一个** `native-bridge.js`。冒烟 `swift run heyta-smoke` → **14/14**；窗口自截屏入库（[evidence](../../apps/desktop-macos/evidence/)），库表与其它端一致（`ops`/`ops__mt3`/`state`/`__heyta_seq`） |
-| W1 WinUI 3 渲染最小切片 | 🟡 **数据通道 ✅，界面待长** | 通道有门禁（`check:windows-shell` 12/12）；⚠️ W1-3/W1-4 的判据要重述：Windows 是 XAML，**不可能与 Electron 共用 DOM testid**（见 §2.3） |
+| W1 WinUI 3 渲染最小切片 | 🟡 **数据通道 ✅；界面已渲染但形态待改** | 冒烟 12/12，✅ **`check:windows-shell` 已于 2026-09-29 接进 `pnpm check`**（先前此处写"有门禁"是假的，见 §2.3 W1-2 的更正；现在是真的是门禁了）；🔴 **MSIX 已打包成功且装上能跑**（`evidence/packaged-first-run.txt`：`ADD_APPX=OK` / `RESULT=OK`），先前"卡在安装"的说法已过期；界面形态按 [multi-end-unified-strategy.md](multi-end-unified-strategy.md) §4.3 改为共享 UI |
 | W2 组件 + MSIX | ⬜ 未开始 | — |
 | W3 替换 Windows 端 Electron | ⬜ 未开始 | — |
 | **Linux 原生壳（GTK4）** | ✅ **已完成（2026-09-28）** | `apps/desktop-linux`（C + GTK4 + libjavascriptcoregtk-4.1 + libsqlite3）。`-Werror` 下 0 警告 0 错误；冒烟 **12/12**；窗口在 `sanjiaozhou` 上用 Xvfb 启动并截图（`WINDOW_SIZE=900x560`），库表与其它端一致。见 §4.1 与 [evidence](../../apps/desktop-linux/evidence/) |
@@ -339,3 +354,57 @@ pnpm check                                                          # → exit 0
 | **门禁：干净检出上 `pnpm check`** | ✅ **exit 0**（2026-09-28，137 秒） | 在 `git worktree` 的 HEAD 干净检出上跑完整 `pnpm check`（**并行会话的文件一个都不在**）⇒ 全绿。抓出并修掉两个"本机绿、CI 红"（esbuild 陈旧链接 `1c56439`、4 个死链 `de9b001`），见 §6.1。⚠️ e2e **24 passed / 2 skipped**（干净检出没下 Electron 二进制；那两条在主工作区真跑且通过） |
 | W0-5 决策点 | ✅ **已判：进 W1**（2026-09-28） | W0-1 / W0-2 / W0-4 三条门槛都过；放弃判据仍有效。⚠️ 更正：blob 曾被写成 W1 硬前置，实测**没有一处把二进制写进库** ⇒ 不是在用路径上的缺口 |
 | **W0-4 🔴 领域层单源 spike** | ✅ **bundle 级已证 D2 可行**（2026-09-28） | 同一份 bundle（338445 B / 146 导出）在裸 V8 与 .NET+Jint 上 **22/22 一致、零宿主全局**；复现 `bash research/spikes/domain-single-source/run.sh`。⚠️ 性能/ES 覆盖率未测 |
+
+---
+
+## 10. 2026-09-28 只读调研：**壳的界面为什么这么薄，后端与前端对齐到哪一步**
+
+产品负责人看到 macOS 壳运行起来只有"标题 + 输入框 + 列表 + 库路径"，
+问"是不是后端能力完全没跟前端对齐"。下面是一轮**只读**调研（代码 + 文档对账）的结论，
+增量信息写在这里，不改上面任何一行。
+
+### 10.1 壳现在是什么（逐文件）
+
+- 真实 UI 只有一个 `ShellView`：`apps/desktop-macos/Sources/HeytaMac/HeytaMacApp.swift:186-231`。
+- 能力接线 **5 条**：`open / listTasks / addTask / setTaskDone / removeTask`
+  （`Sources/HeytaShellCore/AppApi.swift:32-50` → `packages/app-host/src/native-bridge.ts:151-224`）。
+- 三端加载**同一个** `packages/app-host/bridge-bundle/native-bridge.js`，而那个 TS 门面
+  **只导出 6 个函数**（`native-bridge.ts:151-224`）。缺口是**门面自己写明的**：
+  `native-bridge.ts:41-43`「已知缺口（不要假装没有）：`TaskView` 目前只覆盖
+  列出来 + 勾完成 + 新建 + 删。象限、清单、标签、重复、备注编辑都还没有门面」。
+
+### 10.2 对齐程度的量化回答
+
+| 层 | 有多少 | 这个壳露了多少 |
+|---|---|---|
+| `packages/app-host` 的 action 家族 | **9 族 / 65 个方法** | **4 个方法**（≈6%），且全在 task 一族（22 个里 4 个 = 18%） |
+| `packages/ui` 共享组件 | **28 个 `.tsx` / 25 个导出符号** | **0**（按 ADR-0034 §4 是**刻意归零**：原生重画，不复用共享 UI） |
+| `packages/design-system/generated/HeytaTokens.swift` | 327 行，专为 Swift 生成 | **0 消费者**（全仓 grep 只命中生成物自身） |
+
+⇒ **一句话**：不是"接线断了"，是**契约只开了 1/9 家族 + 原生重画只画了 1 个视图**。
+"后端没有能力"不成立 —— `host.ts` 的同步（`sync()` / `pendingUploadCount()`）、
+习惯 / 专注 / 便签 / 提醒 / 成长 / 搜索 / 导入导出 / MCP / AI 全都在，
+只是**这个宿主的门面一条都没开**。
+
+### 10.3 文档与代码的对账（**本仓最在意的那类失效**）
+
+| 说法 | 实测 | 结论 |
+|---|---|---|
+| `apps/desktop-windows/README.md:129`「✅ `check:windows-shell` 已接进 `pnpm check`」 | `package.json` 里**没有** `check:windows-shell`；`pnpm check` 与 CI 都不引用它（`scripts/check-windows-shell.mjs` 确实存在） | 🔴 **假声明**，已就地改正 |
+| 本文件 §9 两行引用「通道有门禁（`check:windows-shell` 12/12）」 | 同上：脚本存在、**门禁没接线** | 🔴 同一处失效的两个副本 |
+| `packages/ui` 的集成状态 | 并行会话在 2026-09-28 22:02 仍在改 `packages/ui` | 计划里"最后一次提交 09-27"这类相对时间会腐烂，**别写相对时间** |
+| `AGENTS.md` §2 仓库地图 | **没有** `apps/desktop` / `desktop-macos` / `desktop-windows` / `desktop-linux` 四行；§9 P2 零提及 | 🟡 地图缺一块 —— 下一个人按地图找会以为桌面壳不存在 |
+
+### 10.4 最小路径（按收益排序，供拍板）
+
+1. 🔴 **三个壳冒烟接进门禁**（脚本已在，零依赖）：`package.json` 加
+   `check:macos-shell` / `check:windows-shell` / `check:linux-shell`，并把**能在当前主机跑**的
+   那一个加进 `pnpm check` 链。判据：`pnpm check:macos-shell` exit 0；改坏一条断言即转红。
+   ⚠️ 另外两个要**响亮跳过**（工具链不在时印原因，不静默通过）。
+2. **修完假声明 + 补仓库地图**（本节的 10.3 已顺手修 README；`AGENTS.md` §2 的四行待补）。
+3. **门面扩到 task 家族全量**：`native-bridge.ts` 加
+   `setPriority / setDueDate / setNote / moveToProject / setTags / setRepeat / setQuadrantDrop /
+   listTrashed / restore / purge`，`AppApi.swift` 加同名薄包装。
+   ⚠️ 每加一个先问「原生界面真的渲染它吗」（`native-bridge.ts:41-43` 既定纪律）。
+4. **壳界面长视图**（象限 → 清单/标签 → 任务详情），并让新 Swift target 真的消费 `HeytaTokens.swift`。
+5. **同步接线**：`open()` 加 `serverUrl`，暴露 `sync()` / `pendingUploadCount()`。

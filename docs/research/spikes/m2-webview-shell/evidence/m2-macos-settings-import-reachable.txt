@@ -1,0 +1,3 @@
+WINDOW=heyta
+WEB_ROOT=/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/apps/web/dist
+M2_MACOS_NOTE=M2-macOS ✅ 前置成立（注册/登录入口 1 个、采集框 1 个）；**设置里的滴答导入面板可达**（panel=1 file=1）

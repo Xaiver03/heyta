@@ -1,0 +1,8 @@
+WINDOW=heyta
+M2A_NOTE=M2-D 🔴 真应用没画出来（或没有前置登录入口）："{\"host\":0,\"rows\":0,\"signin\":0,\"capture\":0,\"note\":\"\"}"
+PROBE="{\"host\":0,\"rows\":0,\"signin\":0,\"capture\":0,\"note\":\"\"}"
+WEB_ROOT=C:\src\empty-web-root
+WRITE_HANDLED=0
+DB_DONE=1
+DB_TOTAL=3
+WRITE_NOTE=M2-D 🔴 真应用没画出来（或没有前置登录入口）："{\"host\":0,\"rows\":0,\"signin\":0,\"capture\":0,\"note\":\"\"}"

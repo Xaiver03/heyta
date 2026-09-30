@@ -1,0 +1,10 @@
+WINDOW=heyta
+M2A_NOTE=M2-D ✅ 桌面壳里的真应用：注册/登录入口 1 个、采集框 1 个 —— **前置成立**（冷启动第一屏就可达）
+PROBE="{\"host\":0,\"rows\":0,\"signin\":1,\"capture\":1,\"note\":\"\"}"
+WEB_ROOT=C:\src\heyta-web-dist\dist
+WRITE_HANDLED=0
+DB_DONE=1
+DB_TOTAL=3
+WRITE_NOTE=M2-D ✅ 桌面壳里的真应用：注册/登录入口 1 个、采集框 1 个 —— **前置成立**（冷启动第一屏就可达）
+WINDOW_RECT=130,130,1152x587
+PNG_SAVED=True bytes=65023
