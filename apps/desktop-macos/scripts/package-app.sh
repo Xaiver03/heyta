@@ -101,6 +101,17 @@ cat > "$APP/Contents/Info.plist" <<PLIST
   <key>CFBundlePackageType</key><string>APPL</string>
   <key>CFBundleShortVersionString</key><string>${VERSION}</string>
   <key>CFBundleVersion</key><string>${BUILD_NUM}</string>
+  <!-- 🔴 桌面壳反向授权要用它（ADR-0039 §2.3）：系统浏览器登录完回跳 heyta://auth#token=…
+       ⚠️ 这是壳**第一次**对外承诺一个 URL scheme —— 改它是破坏性变更，
+       且必须与 apps/web/src/features/auth/desktop-handoff.ts 的 DESKTOP_CALLBACK_SCHEME 一致。 -->
+  <key>CFBundleURLTypes</key>
+  <array>
+    <dict>
+      <key>CFBundleURLName</key><string>${BUNDLE_ID}.auth</string>
+      <key>CFBundleURLSchemes</key>
+      <array><string>heyta</string></array>
+    </dict>
+  </array>
   <key>LSMinimumSystemVersion</key><string>14.0</string>
   <key>NSHighResolutionCapable</key><true/>
   <key>NSHumanReadableCopyright</key><string>Xiaoli Creativity Culture Industry Development (beijing) Co., Ltd.</string>

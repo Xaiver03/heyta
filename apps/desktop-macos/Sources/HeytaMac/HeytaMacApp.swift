@@ -491,6 +491,87 @@ struct SharedWebView: NSViewRepresentable {
         private var ranWebauthnProbe = false
         /// C 的鉴权旅程探针只跑一次。
         private var ranAuthJourney = false
+
+        /// 桌面壳反向授权（ADR-0039 §2.3）。
+        private var shellAuth: ShellAuthSession?
+        /// 本次发出去的 `state` —— 回调必须把它**原样带回来**。
+        private var pendingAuthState = ""
+
+        /**
+         起一次反向授权：把鉴权交给**系统浏览器**（壳里做不了通行密钥，见 `ShellAuth` 文件头）。
+
+         ⚠️ 浏览器那一步**由人完成** —— `ASWebAuthenticationSession` 是系统弹的，自动化不了。
+          */
+        func beginShellAuth(site: String) {
+            pendingAuthState = ShellAuth.makeState()
+            onStorageFact("AUTH_STARTED=site=\(site) state=\(pendingAuthState.prefix(8))…")
+            let session = ShellAuthSession { [weak self] callback in
+                Task { @MainActor in
+                    self?.handleAuthCallback(callback, baseUrl: site)
+                }
+            }
+            shellAuth = session
+            if !session.start(site: site, state: pendingAuthState) {
+                onStorageFact("AUTH_START_FAILED=系统浏览器没能启动")
+            }
+        }
+
+        /**
+         回调到达：**先校验 state**，再把令牌交给**页侧既有**登录路径。
+
+         🔴 「页侧既有登录路径」= `apps/web/src/features/auth/pending-login.ts` 消费的那条：
+            往**页面自己 origin** 的 `sessionStorage` 写 `loginToken` + `loginBaseUrl`，然后重载。
+            壳不新写一份"登录后该做什么"。
+         */
+        func handleAuthCallback(_ url: URL, baseUrl: String) {
+            switch ShellAuth.parseCallback(url, expectedState: pendingAuthState) {
+            case let .rejected(reason):
+                // 拒绝必须**说出来**：静默会让"被人塞了个回调"看起来像"什么都没发生"。
+                onStorageFact("AUTH_CALLBACK=rejected: \(reason)")
+            case let .ok(token, _):
+                onStorageFact("AUTH_CALLBACK=ok")
+                /**
+                 ⚠️ **只写存储，不在这里重载**。
+                 实测（2026-09-30）：脚本里 `location.reload()` 之后，新文档的**模块脚本不执行**
+                 ——症状是 `identity:0`、`backend:""`，而 `bootErrors` 为空
+                 （模块加载失败**不**触发 `window.onerror`，所以查不到线索）。
+                 改为**由壳发一次正常的 `load()`**：那是与应用首次加载**同一条**路，
+                 而那条路是好的。
+                 */
+                let js =
+                    "sessionStorage.setItem('loginToken', \(jsStringLiteral(token)));" +
+                    "sessionStorage.setItem('loginBaseUrl', \(jsStringLiteral(baseUrl)));"
+                // ⚠️ **等一拍再写 + 重载**：交付发生在"首屏刚通过探针"那一刻，
+                //    此时 WebView 的资源往往还在飞 —— 立刻 reload 会让新文档的
+                //    模块脚本取不到（实测症状：`identity:0` 且 `bootErrors` 为空，
+                //    因为模块加载失败**不**触发 `window.onerror`）。
+                DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) { [weak self] in
+                self?.webView?.evaluateJavaScript(js) { [weak self] _, error in
+                    guard let self else { return }
+                    if let error {
+                        self.onStorageFact("AUTH_HANDOFF_FAILED=\(error.localizedDescription)")
+                    }
+                    /**
+                     🔴 **交付之后要把那条 IA 断言链叫回来**。
+                     交付是"写 sessionStorage + 重载"，页面会**重新加载** ——
+                     所以要等它起来，再让 M2-D 那条链重新点数菜单 IA，
+                     于是 `AUTH_STATE=signed-in` 这一格才会出现。
+                     没有它，"令牌交出去了"就只是一个动作，不是一个**被断言过的结果**。
+                     */
+                    self.ranSettings = false
+                    // 写完存储后**由壳重新加载**（见上）。用应用入口那个 URL，
+                    // 与首次加载逐字相同。
+                    self.webView?.load(
+                        URLRequest(url: URL(string: "heyta-local://app/index.html")!)
+                    )
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 6.0) {
+                        guard let webView = self.webView else { return }
+                        self.probe(webView)
+                    }
+                }
+                }
+            }
+        }
         /// 🔴 三段探针**放在 Coordinator 上**（不是 `makeNSView` 的局部变量）——
         /// SwiftUI 的 `makeNSView` 与 `Coordinator` 是两个作用域，
         /// 局部 `let` 在委托回调里根本看不到（第一版就是这么编译不过的）。
@@ -718,6 +799,45 @@ struct SharedWebView: NSViewRepresentable {
                     self.onStorageFact("PAGE_ORIGIN=\(Self.text(text, "origin"))")
                     self.onStorageFact("SECURE_CONTEXT=\(Self.field(text, "secure") == 1 ? "yes" : "no")")
                     self.onStorageFact("WEBAUTHN=\(Self.text(text, "webauthn"))")
+
+                    /**
+                     桌面壳反向授权（ADR-0039 §2.3）——两个口子，都按环境变量启用：
+
+                     · `HEYTA_AUTH_START=1` + `HEYTA_AUTH_SITE=<站点>`：起一次真的授权
+                       （系统浏览器那一步**由人完成**）；
+                     · `HEYTA_AUTH_CALLBACK=<完整回调 URL>` + `HEYTA_AUTH_STATE=<本次 state>`：
+                       把一个回调**直接喂进同一条处理函数** —— 于是解析、state 校验、
+                       交付这三步**不需要人**也能验；它跳过的只是"系统浏览器弹没弹出来"。
+                     */
+                    /**
+                     🔬 **诊断口子**（`HEYTA_RELOAD_TEST=1`）：只**重新加载**应用、不写任何存储。
+                     它用来把"第二次加载能不能挂载"与鉴权交付**分开** ——
+                     2026-09-30 实测：交付之后 `identity:0`，而这条能告诉我们
+                     那到底是"交付写坏了"还是"壳本来就加载不了第二次"。
+                     */
+                    if ProcessInfo.processInfo.environment["HEYTA_RELOAD_TEST"] == "1" {
+                        self.onStorageFact("RELOAD_TEST=reloading")
+                        self.ranSettings = false
+                        self.webView?.load(
+                            URLRequest(url: URL(string: "heyta-local://app/index.html")!)
+                        )
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 6.0) {
+                            guard let webView = self.webView else { return }
+                            self.probe(webView)
+                        }
+                        return
+                    }
+
+                    let authEnv = ProcessInfo.processInfo.environment
+                    if let raw = authEnv["HEYTA_AUTH_CALLBACK"], let url = URL(string: raw) {
+                        self.pendingAuthState = authEnv["HEYTA_AUTH_STATE"] ?? ""
+                        self.handleAuthCallback(url, baseUrl: authEnv["HEYTA_AUTH_SITE"] ?? "")
+                        return
+                    }
+                    if authEnv["HEYTA_AUTH_START"] == "1" {
+                        self.beginShellAuth(site: authEnv["HEYTA_AUTH_SITE"] ?? "")
+                        return
+                    }
 
                     // 通行密钥失败原因的实测（只按环境变量启用，且只跑一次）。
                     if ProcessInfo.processInfo.environment["HEYTA_WEBAUTHN_PROBE"] == "1",
