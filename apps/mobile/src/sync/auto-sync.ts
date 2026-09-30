@@ -36,6 +36,7 @@ import {
   type TimerHandle,
 } from './auto-sync-core';
 import { readSyncConfig } from './config';
+import { startRealtime, stopRealtime } from './realtime';
 import { syncNow } from './store';
 import { onLocalWrite } from './write-signal';
 
@@ -150,6 +151,9 @@ export function startAutoSync(): () => void {
   });
 
   return function stopAutoSync(): void {
+    // 🔴 实时通道与自动同步**同一个生命周期**：只停调度器而留着那条连接，
+    // 会让"应用已经不再自动同步了，却还在后台维持一条 WebSocket"。
+    stopRealtime();
     subscription?.remove();
     subscription = undefined;
     unsubscribeWrites?.();
@@ -169,4 +173,17 @@ export function startAutoSync(): () => void {
  */
 export function notifyConfigured(): void {
   scheduler?.notifyConfigured();
+  /**
+   * 🔴 **实时通道在这里起**（不在 `startAutoSync` 里）。
+   *
+   * 原因是一条取舍的后果：移动端的同步凭据**刻意不落盘**
+   *（E2EE 口令落盘就等于把"服务端看不到明文"作废，见 `sync/config.ts`）。
+   * ⇒ 冷启动时 `readSyncConfig()` 必然是 `undefined`，
+   * 在 `startAutoSync` 里起连**永远建不起来**，而且失败是静默的。
+   * 这里才是凭据第一次真的存在的那一刻。
+   *
+   * ⚠️ 不 `await`：起不来只是"暂时靠前台/写入触发同步"，不是功能坏掉；
+   * 而 `notifyConfigured` 的调用点在保存凭据那条路上，不该被一次连接拖住。
+   */
+  void startRealtime();
 }
