@@ -565,7 +565,7 @@ fragment 不发给服务端、不进 `Referer`、不进访问日志，是 URL �
 | 事项 | 状态 |
 |---|---|
 | **Windows 壳侧的反向授权接线**（系统默认浏览器 + 自定义协议回调 + `state` 校验） | 🔴 **未做** |
-| **手机号注册/登录预留**（schema + 接口契约 + 客户端钩子 + `AUTH_PHONE_ENABLED` 默认关 + 契约测试） | 🔴 **未做** |
+| **手机号注册/登录预留**（schema + 接口契约 + 客户端钩子 + `AUTH_PHONE_ENABLED` 默认关 + 契约测试） | 🔴 **未做 —— 产品负责人 2026-09-30 指示推迟**（"手机号后面做，现在还没有验证码供应商"）。定案保留在 ADR-0039 §2.4；重新开工的触发条件 = 有可用短信供应商。⚠️ 另有一条硬约束：`users.email` 是 `NOT NULL UNIQUE`，"只用手机号注册"需要先放开它（影响面 103 处 `.email`），**必须单独拍板** |
 | **真实 SMTP 实跑** | 🔴 **我没跑过**。产品负责人说自建 SMTP 已好，但**本机走 Ethereal 兜底**，这条判据没在真实 SMTP 上实测 |
 | **真系统浏览器的人工那一跑**（`ASWebAuthenticationSession` 弹窗、人在浏览器里完成登录） | 🔴 **从未执行**（需要人）；验过的是**逻辑**与壳内探针 |
 | **Windows 壳端的反向授权真机跑** | 🔴 未做 |
@@ -579,3 +579,49 @@ fragment 不发给服务端、不进 `Referer`、不进访问日志，是 URL �
    而静默失配会造出**假证据**（注入没生效 ⇒ 仍然全绿 ⇒ 我却当成"判据是活的"）。
 3. **诊断要收进失败分支**。那套仪器（写入时间线 / `pagehide` 快照 / 文档响应头）解开了一个
    静默失效，但一组十几行；绿的时候只淹掉"到底判了什么"，所以它们现在**只在红的时候打印**。
+
+### 10.6 macOS 壳「应用起不来」那一屏：**产品是好的**，成因是取证开关（2026-09-30）
+
+产品负责人报了一屏 **「无法初始化本地存储 / 浏览器可能禁用了本地数据库（无痕模式常见）」**
++ 诊断行 `{"identity":0,"capture":0,"backend":"","handler":"undefined",…}`。
+
+**结论：产品没有坏。** 四格实测（每格都有落盘文件，见
+`apps/desktop-macos/evidence/storage-host/README.md` 的"四格矩阵"一节）：
+
+| 启动方式 \ WebKit 仓 | 持久仓（默认） | 非持久仓（`HEYTA_WEBKIT_EPHEMERAL=1`） |
+|---|---|---|
+| **桥在**（打包应用 / 设 `HEYTA_BRIDGE_BUNDLE`） | ✅ `STORAGE=shell` | ✅ `STORAGE=shell` |
+| **桥不在**（裸 `.build/…/HeytaMac`、没设 env） | ✅ `STORAGE=sqlite`（页侧兜底，照常渲染） | 🔴 **就是那一屏** |
+
+两个前提**都是诊断开关**（`HEYTA_WEBKIT_EPHEMERAL` 的代码注释写着"默认不开：
+它是取证用的开关，不是产品行为"）。日常用法是 `open /Applications/Heyta.app` —— 实测
+`STORAGE_HOST=on` / `STORAGE=shell` / 身份入口成立。
+
+**顺带修掉一个真缺陷**（`apps/desktop-macos/scripts/capture-window.sh`）：
+它是 `set -euo pipefail`，在交叉校验那里起一个 `(nohup … &)` **分离实例**，
+收尾靠后面一句 `pkill -f HeytaMac`。两条独立的失败路径 ——
+① 交叉校验的 `node` 会 `exit 1` ⇒ 脚本当场死掉、`pkill` **永不执行** ⇒ 那个实例
+**留在用户屏幕上**（多会话共用这台机器时尤其容易撞见，产品负责人报的那一屏很可能就是它）；
+② `pkill -f HeytaMac` 按**名字**杀，会顺手杀掉**用户自己正在用的**那个。
+改成**记 PID + `trap … EXIT`**（只收自己起的那个），并加注入开关
+`HEYTA_CAPTURE_INJECT_FAIL_CROSSCHECK=1`。
+
+**证据（红/绿）**：
+- 机制：旧形状 ⇒ 残留 **1** 个进程；新形状 ⇒ 残留 **0** 个（`set -e` + 分离子进程的最小复现）。
+- 真脚本：带注入跑 `capture-window.sh` ⇒ 非零退出，且**事后没有任何属于本次运行的实例**。
+
+**同一轮里顺带修掉取证链自己的三处缺陷**（否则"证据"本身会骗人，每处都有实测读数）：
+① `window-id.swift` 按**属主**筛 ⇒ 属主是"启动它的那个应用"（本机实测 `DSH Desktop`）
+⇒ `CROSSCHECK=skipped` ⇒ 门禁**假红**；改成只认标题。
+② `check-macos-window.mjs` 没给 `HEYTA_BRIDGE_BUNDLE` ⇒ 证据走页侧兜底而不是
+产品的壳内 SQLite。③ 也没给 `HEYTA_WEBKIT_EPHEMERAL=1` ⇒ 持久仓里已有会话时门禁读到
+**已登录** IA 而假红（那是正常状态）。④ `capture-window.sh` 缺 `HEYTA_WEB_ROOT` 默认值
+⇒ 壳渲染**回退屏**（"未找到共享 UI 产物"）—— 交接文档里那条"门禁报通过、而图是回退屏"
+的**根因就是这里**。现在四条都修了，两条 macOS 门禁**真绿**
+（`CROSSCHECK=ok` + 冷启动未登录 IA 合规）。
+`apps/desktop-macos/evidence/window-first-run.png` 也因此**换成了一张真应用的图**
+（见 `evidence/storage-host/README.md` 的四格矩阵与刷新命令）。
+
+⚠️ **仍未做的**：`check-macos-window.mjs` 自己那条路径（`spawnSync` 超时杀 bash）
+**没有**加 trap —— 本轮实测到一个孤儿实例（`PPID` 已消失、环境是门禁的），
+说明门禁那条路仍有留窗口的余地。留给下一轮。
