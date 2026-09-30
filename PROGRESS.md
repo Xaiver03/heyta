@@ -571,3 +571,41 @@ trust     loss        zh 12段/ 670字 · en 12段/2221字   → 中文 2 篇 / 
 🔴 §6.2 规定一：`e2e/landing-results/landing-body-selfhost.png` 是本轮**新截图**（03:27），人打开看过 ——
 三个新分区中文正常、页内目录数到 **6 条**、侧栏五组折叠、搜索框在位、页面上没有词条 key 字面量。
 
+## 任务 5 收口：一笔提交 + 干净检出复验（2026-09-30）
+
+提交 `b71546fd`（父 `544c9894`，57 files / +7666 −84，本地一笔，**未 push、未 amend**）。
+
+落笔前三个自查（都针对"共享工作树里别把别人的东西带走"）：
+
+| 自查 | 结果 |
+|---|---|
+| 索引里的路径是否全在本轮白名单内 | `OUT_OF_BOUNDS=none` |
+| 判卷文件指纹（5 份：`png-stats` / `capture` / `verify-artifacts` / `check-ui-language` / `gen-entries`） | 工作树 = HEAD = 索引三处逐字相同 |
+| 那 6 条既有断言 | `HEAD_tests=6 verbatimPresentInStaged=6 changed=none`，`skip`/`todo` 计数 0 |
+
+hunk 过滤从词条表里**丢下** 11 个 key：逐个查过全是 `web.*` 且已提交代码零引用（`LEAKED=none`）；
+反向再查 landing 代码里 507 处字面 `site.*` 引用在暂存词条里**全部有值**。
+按 hunk 而不是按行，是因为冻结判卷器有条硬不变量 `entries.size === entryLikeLines`
+（`scripts/check-ui-language.mjs:440-464`），按行摘会留下"键在值不在"的半条词条 —— 那是必红。
+
+落笔后干净检出复验（`git worktree add --detach /tmp/heyta-clean` 挂在 `b71546fd`）：
+
+```
+C1_ui_language=0   ✅ 文案合规（扫描 246 个文件、304 处文案；词条表 zh 2368 条 / en 2368 条）
+C2_docs=0          ✅ 无死链、无"本机有仓库里没有"的链接、无失效锚点（检查 54 处页内锚点 / 1365 个相对链接）
+C5_shot_verify=0   ✅ 截图校验通过（注册表共 18 个目标；已生成的均尺寸正确、无 alpha、非空白）
+```
+
+🔴 **诚实记录一条**：同一批里 `check:entries` 与 `gen-help-figures --check` **第一次是红的**，
+报 `ERR_MODULE_NOT_FOUND: Cannot find package '@heyta/i18n'`。
+那不是内容失败 —— 干净 worktree 没有 `node_modules`，而 `@heyta/i18n` 的 exports 指向 `./dist/*.js`，
+**裸检出必须先 `pnpm install` 再构建 i18n**（§7 第 79 条的同族）。补做这两步后：
+
+```
+C3_entries=0    入口文件与注册表一致（55 份）。
+C4_figures=0    ✅ 配图产物与映射一致：5 张（sha256 逐张对过）
+```
+
+所以这两条 gate 在**提交物自身**上成立，CI 上不会因为我这台机器的状态而红。
+复验完 `git worktree remove` 摘掉临时 worktree，主检出未受影响。
+
