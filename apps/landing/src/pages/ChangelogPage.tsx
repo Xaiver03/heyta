@@ -15,7 +15,7 @@
  * 而页脚里**一定有一条** —— 那是"没有孤立路由"这条约束的兜底。
  */
 
-import { useI18n } from '@heyta/i18n';
+import { useI18n } from '@heyta/i18n/provider';
 
 import { KeyText, PageHead, RichText } from '../site/PageSections.js';
 import { CHANGELOG_ENTRIES, CHANGELOG_NOTES } from '../site/content.js';

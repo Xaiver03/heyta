@@ -48,7 +48,7 @@
  * `TaskList.tsx` 文件头"残差"一节（那是另一次取舍，不在本次四处漂移内）。
  */
 
-import type { MessageKey } from '@heyta/i18n';
+import type { MessageKey } from '@heyta/i18n/provider';
 
 /** 象限 id。与 `@heyta/domain` 的 `Quadrant` 一一对应（q1=重要且紧急）。 */
 export type ShowcaseQuadrant = 'q1' | 'q2' | 'q3' | 'q4';

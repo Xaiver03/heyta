@@ -29,7 +29,7 @@
  * 所以非 `http(s)` 一律当作"没配置"。
  */
 
-import { DEFAULT_LOCALE, type Locale, type MessageKey } from '@heyta/i18n';
+import { DEFAULT_LOCALE, type Locale, type MessageKey } from '@heyta/i18n/provider';
 
 /**
  * 读到并校验构建期的 `VITE_APP_URL`。

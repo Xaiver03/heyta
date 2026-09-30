@@ -29,7 +29,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useMotionValueEvent, useScroll } from 'motion/react';
 import * as THREE from 'three';
 
-import { useI18n } from '@heyta/i18n';
+import { useI18n } from '@heyta/i18n/provider';
 
 import { useMotionPreset } from '../lib/motion.js';
 import { SyncFallback } from './SyncFallback.js';

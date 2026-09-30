@@ -20,7 +20,7 @@ import { useRef, useState } from 'react';
 import { useMotionValueEvent, useScroll } from 'motion/react';
 import { Server, Smartphone } from 'lucide-react';
 
-import { useI18n } from '@heyta/i18n';
+import { useI18n } from '@heyta/i18n/provider';
 
 const CIPHER_ALPHABET = '0123456789ABCDEF';
 

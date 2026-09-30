@@ -13,7 +13,7 @@
  * 比没有这个按钮更坏 —— 它花掉的是访客对整站其它说法的信任。
  */
 
-import { useI18n, type MessageKey } from '@heyta/i18n';
+import { useI18n, type MessageKey } from '@heyta/i18n/provider';
 
 import {
   SiteSubPage,

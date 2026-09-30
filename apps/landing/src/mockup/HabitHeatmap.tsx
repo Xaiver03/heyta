@@ -14,7 +14,7 @@
 
 import { useMemo } from 'react';
 
-import { useI18n } from '@heyta/i18n';
+import { useI18n } from '@heyta/i18n/provider';
 
 import {
   MOCK_HABIT_HEAT_LEVELS,

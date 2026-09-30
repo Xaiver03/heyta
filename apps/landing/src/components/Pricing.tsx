@@ -29,7 +29,7 @@ import { useMemo } from 'react';
 import { motion } from 'motion/react';
 import { Check, Cloud, Hourglass, Server, Sparkles } from 'lucide-react';
 
-import { useI18n } from '@heyta/i18n';
+import { useI18n } from '@heyta/i18n/provider';
 
 import { revealVariants, staggerContainer, useMotionPreset, VIEWPORT } from '../lib/motion.js';
 import { useSelfHostHref } from '../site/cta.js';

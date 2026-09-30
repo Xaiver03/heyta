@@ -43,7 +43,7 @@
  * · **不放颜色取值** —— 只登记"用哪一族语义 token"，取值在 `tokens.css`。
  */
 
-import type { MessageKey } from '@heyta/i18n';
+import type { MessageKey } from '@heyta/i18n/provider';
 
 import type { ShowcaseQuadrant } from './showcase-data.js';
 

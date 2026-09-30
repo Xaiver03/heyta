@@ -18,7 +18,7 @@
  * 拆成两栏各写一遍，就会出现"措辞不同 → 被读成不一样"的错觉。
  */
 
-import { useI18n } from '@heyta/i18n';
+import { useI18n } from '@heyta/i18n/provider';
 
 import { Pricing } from '../components/Pricing.js';
 import { FaqList } from '../site/FaqList.js';

@@ -35,7 +35,7 @@
 
 import { useMemo } from 'react';
 
-import { useI18n } from '@heyta/i18n';
+import { useI18n } from '@heyta/i18n/provider';
 
 import { MOCK_QUADRANT_KEYS, MOCK_QUADRANT_SHAPE } from './quadrant-shape.js';
 import { showcaseTasksByQuadrant } from './showcase-data.js';
