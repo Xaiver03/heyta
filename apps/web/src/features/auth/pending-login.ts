@@ -61,6 +61,22 @@ export const PENDING_TOKEN_KEY = 'loginToken';
  */
 export const PENDING_BASE_URL_KEY = 'loginBaseUrl';
 
+/**
+ * **已经签发好的会话**令牌 —— 由**桌面壳的反向授权回跳**交进来（ADR-0039 §2.3）。
+ *
+ * 🔴 它和 `loginToken` 是**两种东西**，所以用**两个键**，不靠猜：
+ *   · `loginToken`  = **一次性链接令牌** ⇒ 应用要拿它去服务端**换**会话（`verify()`）；
+ *   · `sessionToken` = **会话本身**（壳从 `heyta://auth#token=…` 拿到的 JWT）
+ *     ⇒ 直接落地，不再去换一次（去换必然 401 —— 服务端按链接令牌那一列查）。
+ *
+ * 两个键不用同一个名字是刻意的：一个"要么换要么直接用"的模糊值，
+ * 迟早会被某一条路按错的方式解释。
+ */
+export const PENDING_SESSION_KEY = 'sessionToken';
+
+/** 会话令牌那条路还要邮箱：头像要用它算首字母，而 `useAuthStore` 刷新后是 signed-out。 */
+export const PENDING_EMAIL_KEY = 'loginEmail';
+
 /** 读出来的待消费登录。`baseUrl` 为空即视为无效（见上）。 */
 export interface PendingLogin {
   readonly baseUrl: string;
@@ -98,6 +114,59 @@ function defaultStorage(): PendingLoginStorage | null {
  *
  * @returns 有效则返回 `{baseUrl, token}`；缺任一、或存储不可用则 `null`。
  */
+/** 壳交付的会话（已签发），与链接令牌区分开。 */
+export interface PendingSession {
+  readonly baseUrl: string;
+  readonly token: string;
+  readonly email: string;
+}
+
+/**
+ * 读出并立即清除**壳交付的会话**（ADR-0039 §2.3）。
+ *
+ * 与 `takePendingLogin` 同一套纪律：**先删再判**，无论后面成不成功都不留在存储里。
+ */
+export function takePendingSession(
+  storage: PendingLoginStorage | null = defaultStorage(),
+): PendingSession | null {
+  if (storage === null) return null;
+
+  let token: string | null = null;
+  try {
+    token = storage.getItem(PENDING_SESSION_KEY);
+  } catch {
+    return null;
+  }
+
+  /**
+   * 🔴 **先判有没有会话，再决定动不动别的键。**
+   *
+   * `loginBaseUrl` 是**两条通道共用**的。第一版这里无条件把三个键全删了，
+   * 于是链接那条路接着取 `loginBaseUrl` 时已经是空 ⇒ 整条登录静默变成
+   * "没登上"（`apps/web/tests/pending-login.spec.ts` 的两条断言当场红 —— 2026-09-30）。
+   * 没有会话时**一个键都不许动**。
+   */
+  if (token === null || token === '') return null;
+
+  let baseUrl: string | null = null;
+  let email: string | null = null;
+  try {
+    baseUrl = storage.getItem(PENDING_BASE_URL_KEY);
+    email = storage.getItem(PENDING_EMAIL_KEY);
+  } catch {
+    return null;
+  }
+  try {
+    storage.removeItem(PENDING_SESSION_KEY);
+    storage.removeItem(PENDING_BASE_URL_KEY);
+    storage.removeItem(PENDING_EMAIL_KEY);
+  } catch {
+    /* 删不掉也按"没有"处理 —— 但下面仍会用读到的值，所以这里什么都不做。 */
+  }
+  if (baseUrl === null || baseUrl === '') return null;
+  return { baseUrl, token, email: email ?? '' };
+}
+
 export function takePendingLogin(
   storage: PendingLoginStorage | null = defaultStorage(),
 ): PendingLogin | null {
@@ -143,6 +212,22 @@ export function takePendingLogin(
 export async function consumePendingLogin(
   storage: PendingLoginStorage | null = defaultStorage(),
 ): Promise<boolean> {
+  /**
+   * 🔴 **先看"壳交付的会话"那条**（ADR-0039 §2.3）。
+   *
+   * 它与链接令牌是两种东西：会话**已经签发**，直接采用即可；
+   * 拿它去 `verify()` 会被服务端按链接令牌那一列查 ⇒ 401（实测）。
+   */
+  const session = takePendingSession(storage);
+  if (session !== null) {
+    useAuthStore.getState().adoptSession(session.baseUrl, {
+      token: session.token,
+      // 壳只知道会话令牌与邮箱（邮箱是它从回调 URL 里带回来的）。
+      user: { id: 0, email: session.email },
+    });
+    return true;
+  }
+
   const pending = takePendingLogin(storage);
   if (pending === null) return false;
 

@@ -89,7 +89,22 @@
           successEl.hidden = false;
           loginBtn.hidden = true;
 
-          sessionStorage.setItem('loginToken', result.data.token);
+          /**
+           * 🔴 **存的是"链接令牌"，不是 `result.data.token`（那是会话 JWT）**。
+           *
+           * 应用启动时用 `verifyMagicLink()` 消费 `loginToken` —— 它期待的是
+           * **一次性链接令牌**（服务端按 `loginToken` 那一列查）。
+           * 以前这里存的是上面那个 POST 换回来的 **JWT**，于是应用会拿 JWT 再去
+           * `/api/login/magic-link/verify` 换一次 ⇒ **必然 401**，
+           * 而失败被 `consumePendingLogin` 吞掉 ⇒ 用户看到的是"登录了但还是未登录"。
+           * （2026-09-30 实测挖到；web 的邮件回跳第二腿**一直是坏的**，
+           *   而没有任何测试覆盖它：J1–J7 走通行密钥，`verify:email-auth` 只验服务端。）
+           *
+           * ⚠️ 保留上面那次 POST：它是**给用户看的**校验（链接无效/过期要当场说出来）。
+           *    令牌在那一跳里已经被消费掉 —— 所以这里必须存**原始令牌**，
+           *    而不是"已经变成会话"的那个值。
+           */
+          sessionStorage.setItem('loginToken', token);
           // 🔴 不要把这里写死成某个域名，也不要让应用去"猜自己的 origin"：
           //    应用与同步服务端可能不在同一个 origin（反代、自建、VITE_SYNC_URL 覆盖），
           //    猜错就会把令牌发到错的地方。这里记的是**校验端点所在的那个 origin**。

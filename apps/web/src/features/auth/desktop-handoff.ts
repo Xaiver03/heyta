@@ -61,11 +61,13 @@ export function readDesktopHandoff(url: URL): DesktopHandoff | null {
 }
 
 /** 拼回跳地址。令牌在 fragment 里（见文件头）。 */
-export function buildDesktopCallback(token: string, state: string): string {
-  return (
+export function buildDesktopCallback(token: string, state: string, email = ''): string {
+  const base =
     `${DESKTOP_CALLBACK_SCHEME}://auth` +
-    `#token=${encodeURIComponent(token)}&state=${encodeURIComponent(state)}`
-  );
+    `#token=${encodeURIComponent(token)}&state=${encodeURIComponent(state)}`;
+  // 邮箱一起带回去：壳拿到会话之后要把它写进页侧存储，
+  // 而头像要用它算首字母（`useAuthStore` 刷新后是 signed-out，只能从落盘凭据里拿）。
+  return email === '' ? base : `${base}&email=${encodeURIComponent(email)}`;
 }
 
 /** 兜底入口的 testID —— 页面与测试两侧都用它，避免各写一份字符串。 */
@@ -76,8 +78,13 @@ export const DESKTOP_HANDOFF_TESTID = 'desktop-handoff-link';
  *
  * @returns 回跳地址（调用方多半不用，测试与日志用得上）。
  */
-export function handOffToShell(token: string, state: string, doc: Document): string {
-  const url = buildDesktopCallback(token, state);
+export function handOffToShell(
+  token: string,
+  state: string,
+  doc: Document,
+  email = '',
+): string {
+  const url = buildDesktopCallback(token, state, email);
 
   const existing = doc.querySelector(`[data-testid="${DESKTOP_HANDOFF_TESTID}"]`);
   if (existing === null) {
@@ -119,9 +126,10 @@ export function maybeHandOffToShell(
   token: string,
   url: URL,
   doc: Document | null,
+  email = '',
 ): string | null {
   const intent = readDesktopHandoff(url);
   if (intent === null) return null;
-  if (doc === null) return buildDesktopCallback(token, intent.state);
-  return handOffToShell(token, intent.state, doc);
+  if (doc === null) return buildDesktopCallback(token, intent.state, email);
+  return handOffToShell(token, intent.state, doc, email);
 }
