@@ -9,8 +9,8 @@
 
 import { describe, expect, it } from 'vitest';
 
-import type { Task } from '../src/entities.js';
-import { haystackOf, matchesQuery, searchTasks } from '../src/search.js';
+import type { Note, Task } from '../src/entities.js';
+import { haystackOf, matchesQuery, noteSearchText, searchNotes, searchTasks } from '../src/search.js';
 
 function task(over: Partial<Task> & { id: string }): Task {
   return { title: over.id, createdAt: 0, updatedAt: 0, ...over } as Task;
@@ -92,5 +92,70 @@ describe('haystackOf', () => {
   it('只摊平 title 与 note，且**都转小写**', () => {
     expect(haystackOf({ title: 'Report', note: 'Weekly' })).toBe('report\nweekly');
     expect(haystackOf({ title: 'Report' })).toBe('report\n');
+  });
+});
+
+/**
+ * 便签搜索 —— **"我记得写过一句话，在哪？"**
+ * ==============================================
+ *
+ * 🔴 这一组存在的理由：便签**没有 `title`**（正文在 `content`），所以
+ * 不能把 `Note` 直接传给 `matchesQuery`。在它之前，"按内容找一条便签"
+ * 在两个宿主里都**没有任何入口** —— 而那不是"少一个按钮"，
+ * 是那一整类查询做不到。
+ *
+ * ⚠️ 这里断言的是**匹配语义**（AND、大小写、空查询）；
+ * "宿主真的把结果画出来了"由 `apps/web/tests/search-panel.spec.tsx` 钉。
+ */
+function note(over: Partial<Note> & { id: string }): Note {
+  return {
+    createdAt: 0,
+    updatedAt: 0,
+    isPinnedToToday: false,
+    content: '',
+    ...over,
+  };
+}
+
+describe('searchNotes', () => {
+  it('按 `content` 匹配（便签没有 title）', () => {
+    const notes = [note({ id: 'a', content: '买咖啡豆' }), note({ id: 'b', content: '季度复盘' })];
+    expect(searchNotes(notes, '咖啡').map((n) => n.id)).toEqual(['a']);
+  });
+
+  it('多词是 AND —— 与 `searchTasks` 同一套语义（只有一处定义）', () => {
+    const notes = [
+      note({ id: 'a', content: '写 周报 的素材' }),
+      note({ id: 'b', content: '写 月报 的素材' }),
+    ];
+    expect(searchNotes(notes, '写 周报').map((n) => n.id)).toEqual(['a']);
+  });
+
+  it('大小写不敏感', () => {
+    expect(searchNotes([note({ id: 'a', content: 'Weekly Report' })], 'weekly').map((n) => n.id))
+      .toEqual(['a']);
+  });
+
+  it('🔴 空查询返回**全部**（与 `searchTasks` 同一条契约）', () => {
+    // 契约统一很重要：让调用方各判各的空，漏写的那一处会表现成
+    // "清空搜索框之后列表空了"。
+    const notes = [note({ id: 'a' }), note({ id: 'b' })];
+    expect(searchNotes(notes, '').map((n) => n.id)).toEqual(['a', 'b']);
+    expect(searchNotes(notes, '   ').map((n) => n.id)).toEqual(['a', 'b']);
+  });
+
+  it('顺序不动（排序是调用方的事）', () => {
+    const notes = [note({ id: 'b', content: '周报' }), note({ id: 'a', content: '周报草稿' })];
+    expect(searchNotes(notes, '周报').map((n) => n.id)).toEqual(['b', 'a']);
+  });
+});
+
+describe('noteSearchText', () => {
+  it('把 `content` 放进 `title` 位 —— `SearchableText.title` 的语义是"主要文本"，不是"标题"', () => {
+    // 这条注释很重要：不写明的话，下一个人看到 `{ title: note.content }`
+    // 会以为这是个 bug（"便签哪来的 title？"）。
+    expect(noteSearchText(note({ id: 'a', content: '正文在这里' }))).toEqual({
+      title: '正文在这里',
+    });
   });
 });

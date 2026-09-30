@@ -166,3 +166,90 @@ export function sectionTasks(
 export function pendingCount(sections: TaskSections): number {
   return sections.overdue.length + sections.dueToday.length + sections.inbox.length;
 }
+
+/**
+ * 任务按截止日期的**逐日分组**（web 任务页的分组头，滴答同款）。
+ *
+ * ## 为什么在领域层（而不在 web）
+ *
+ * "逾期是一组、未来每一天各是一组、没截止时间的垫底" —— 这是产品对
+ * "任务怎么归类"说的话，与上面的 `sectionTasks` 同一层（见那个函数的注释）：
+ * 写在壳里，下一端就要抄第二遍，而"逾期"的日界必然对不上。
+ *
+ * ## 与 `sectionTasks` 的分工
+ *
+ * `sectionTasks` 是**移动端主任务页**的四分节（逾期/今天/收集箱/已完成）——
+ * 它把"未来"整体归进收集箱。本函数是 web 任务页的**逐日**分组：
+ * 未来每一天都是自己的组（组头写「9月30日, 周三」），因为 web 的列表
+ * 通常跨着好几周，"未来"一整坨放一组就失去了日期结构。
+ * 两者的**日界定义完全相同**（都用 `startOfDay` 比本地日历日），只是粒度不同。
+ *
+ * ## 契约
+ *
+ * - 组序固定：**逾期 → 日期升序 → 无截止时间**。组内**保持输入顺序**
+ *  （顺序规范在 `app-host` 的 `listTasks`，见文件头"不排序"）。
+ * - 已完成的任务**不参与分组**（直接跳过）：调用方要展示已完成时走
+ *   `filterTasks({kind:'completed'})` 平铺渲染（滴答的"已完成"也是平铺）。
+ *   这个前提由调用方保证 —— 与 `sectionTasks` 把已完成单列一组不同，
+ *   这里没有"已完成"组可兜底，混进来会被静默丢掉，所以写成跳过并在测试里钉住。
+ * - `now` 显式传入（`FilterContext`），不在函数里读时钟。
+ *
+ * 🔴 **判别联合，不是 `{ kind, date? }` 那种宽形状**（与上面 `TaskFilter`
+ * 同一条理由）：宽形状让消费方拿到的 `date` 永远是 `LocalDate | undefined`，
+ * 每个"逾期组没有日期"的使用点都要再防一次 `undefined` —— 而那种防
+ * 写着写着就变成 `!` 强断言，拼错 kind 也不报错。
+ */
+export type TaskDateGroup =
+  | { readonly kind: 'overdue'; readonly date: undefined; readonly tasks: Task[] }
+  | { readonly kind: 'date'; readonly date: LocalDate; readonly tasks: Task[] }
+  | { readonly kind: 'undated'; readonly date: undefined; readonly tasks: Task[] };
+
+export function groupTasksByDate(
+  tasks: readonly Task[],
+  context: FilterContext,
+): TaskDateGroup[] {
+  const today = startOfDay(context.now);
+  const overdue: Task[] = [];
+  const undated: Task[] = [];
+  const byDate = new Map<LocalDate, Task[]>();
+
+  for (const task of aliveTasks(tasks)) {
+    if (isCompleted(task)) continue;
+    if (task.dueDate === undefined) {
+      undated.push(task);
+      continue;
+    }
+    // 🔴 逾期判据在**入桶前**用时刻比（与 `sectionTasks` 同一条：`startOfDay`
+    //    后早于今天零点 = 逾期）。先按日期分桶再挑逾期，就要把 LocalDate 键
+    //    与毫秒比较混在两处做 —— 那种写法出现过"逾期组排在今天之后"的形状。
+    if (startOfDay(task.dueDate) < today) {
+      overdue.push(task);
+      continue;
+    }
+    const due = toLocalDate(task.dueDate);
+    const bucket = byDate.get(due);
+    if (bucket === undefined) {
+      byDate.set(due, [task]);
+    } else {
+      bucket.push(task);
+    }
+  }
+
+  const groups: TaskDateGroup[] = [];
+  if (overdue.length > 0) {
+    groups.push({ kind: 'overdue', date: undefined, tasks: overdue });
+  }
+  // `Map` 迭代是插入序；日期组必须**日期升序** —— 手输"先建后到期"的任务时
+  // 插入序会把 10 月的组排在 9 月前面。`LocalDate` 是 `YYYY-MM-DD`，
+  // 字典序即日期序。
+  for (const date of [...byDate.keys()].sort()) {
+    const bucket = byDate.get(date);
+    if (bucket !== undefined) {
+      groups.push({ kind: 'date', date, tasks: bucket });
+    }
+  }
+  if (undated.length > 0) {
+    groups.push({ kind: 'undated', date: undefined, tasks: undated });
+  }
+  return groups;
+}

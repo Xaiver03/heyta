@@ -11,6 +11,7 @@
 
 export * from './entities.js';
 export * from './date.js';
+export * from './task-order.js';
 export * from './quadrant.js';
 export * from './task-filter.js';
 export * from './subtasks.js';
@@ -37,5 +38,6 @@ export * from './ai-feedback.js';
 export * from './preference-corrections.js';
 export * from './recall.js';
 export * from './subscription.js';
+export * from './activity.js';
 export * from './ticktick-format.js';
 export * from './ticktick-import.js';
