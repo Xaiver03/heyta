@@ -47,3 +47,16 @@ export * from './sqlite-adapter.js';
  * ✅ 这个文件**没有** wasm 依赖（只定义了消息协议与代理），所以可以进主入口。
  */
 export * from './oplog-worker-bridge.js';
+
+/**
+ * op-log 桥的**线码**（`encodeOpLogWire` / `decodeOpLogWire`）。
+ *
+ * 🔴 它是**宿主传输**（不是 Worker 传输）的必需品：Worker 走结构化克隆，
+ * 而桌面壳的宿主边界（WebView2 `PostWebMessageAsJson` / WKWebView
+ * `evaluateJavaScript`）**只过 JSON**，`Map` 会在那里变成 `{}`。
+ *
+ * 同一个文件也**没有** wasm / Node 依赖（纯计算，不用 `btoa`），
+ * 所以与桥一起进主入口是安全的 —— 与上面那条"子路径导出才是隔离手段"
+ * 是同一个判断。
+ */
+export * from './oplog-wire-codec.js';

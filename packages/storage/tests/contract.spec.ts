@@ -14,6 +14,7 @@ import { DbOpLogStore } from '../src/db-op-log-store.js';
 import { INDEXEDDB_SCHEMA, IndexedDbAdapter } from '../src/indexeddb/indexeddb-adapter.js';
 import { MemoryDbAdapter } from '../src/memory/memory-adapter.js';
 import { createWorkerOpLogStore, serveOpLogWorker } from '../src/sqlite/oplog-worker-bridge.js';
+import { createOpLogWirePort } from '../src/sqlite/oplog-wire-codec.js';
 import { NodeSqliteDriver } from '../src/sqlite/node-sqlite-driver.js';
 import { SqliteAdapter } from '../src/sqlite/sqlite-adapter.js';
 import {
@@ -141,6 +142,58 @@ function inProcessPortPair(): {
   return { mainSide, workerSide };
 }
 
+/**
+ * 与 `inProcessPortPair` 同形，但**每一跳都强制过一次 JSON**。
+ *
+ * 🔴 为什么单独要一份：Worker 端口走的是**结构化克隆**，而桌面端的宿主边界
+ * （WebView2 `PostWebMessageAsJson` / WKWebView `evaluateJavaScript`）**只过 JSON**。
+ * 那条边界更严，且有它自己的失真方式 —— `undefined` 会被丢掉（位置参数会**移位**）、
+ * `NaN`/`Infinity` 变 `null`、`Date` 变字符串。用 Worker 端口测不出这些。
+ *
+ * 这是 **B（桌面端真应用存储接到壳的 SQLite）的架构判据**：
+ * 桌面端不新增任何桥，只把**传输**从 Worker 端口换成宿主端口；
+ * 换完之后行为必须与本地直连**逐条相同**。
+ *
+ * ⚠️ 这条传输**必须带线码**：裸 JSON 过不了 `markUploaded` 的 `ReadonlyMap`
+ * （实测 `serverSeqsByOpId is not iterable`，13 条契约同时红）。
+ * 所以这里刻意用**裸 JSON**（`rawJsonPortPair`）+ **两侧各包一次**
+ * `createOpLogWirePort` —— 与两个桌面壳将要做的**逐字相同**。
+ * 线码遇到没覆盖的类型会**响亮失败**，所以这条契约项同时也是"线码够不够用"的判据。
+ */
+function rawJsonPortPair(): ReturnType<typeof inProcessPortPair> {
+  /** 🔴 **只有 JSON，没有线码** —— 线码由 `createOpLogWirePort` 在两侧各包一次。 */
+  const roundTrip = (message: unknown): unknown => JSON.parse(JSON.stringify(message)) as unknown;
+  const mainListeners: Array<(event: { data: unknown }) => void> = [];
+  let workerOnMessage: ((event: { data: unknown }) => void) | null = null;
+
+  const mainSide = {
+    postMessage(message: unknown): void {
+      const wire = roundTrip(message);
+      queueMicrotask(() => workerOnMessage?.({ data: wire }));
+    },
+    addEventListener(_type: string, listener: (event: { data: unknown }) => void): void {
+      mainListeners.push(listener);
+    },
+  };
+
+  const workerSide = {
+    postMessage(message: unknown): void {
+      const wire = roundTrip(message);
+      queueMicrotask(() => {
+        for (const listener of mainListeners) listener({ data: wire });
+      });
+    },
+    get onmessage(): ((event: { data: unknown }) => void) | null {
+      return workerOnMessage;
+    },
+    set onmessage(value: ((event: { data: unknown }) => void) | null) {
+      workerOnMessage = value;
+    },
+  };
+
+  return { mainSide, workerSide };
+}
+
 describe('DbAdapter 实现一致性', () => {
   runDbAdapterContract({ name: 'MemoryDbAdapter', create: memoryDb });
   runDbAdapterContract({
@@ -198,6 +251,36 @@ describe('DbAdapter 实现一致性', () => {
       // 顺序要紧：先把服务端挂上，再建代理 —— 否则最初的几条消息会丢在空气里。
       serveOpLogWorker(workerSide, Promise.resolve({ store, clientId: 'contract' }));
       return createWorkerOpLogStore(mainSide);
+    },
+  });
+
+  /**
+   * 🔴 **宿主边界（JSON 序列化的 WebView 语义）** —— B 的架构判据。
+   *
+   * 桌面端（Windows 壳的 WebView2 / macOS 壳的 WKWebView）要把**真应用的存储**
+   * 接到**壳自己的 SQLite** 上。做法**不是**新写一座桥：`createWorkerOpLogStore` /
+   * `serveOpLogWorker` 本来就是**传输无关**的（只吃 `postMessage` / `onmessage`，
+   * 见 `oplog-worker-bridge.ts` 的签名）。桌面端换的只是**传输**。
+   *
+   * 而那条传输比 Worker 端口更严：它只过 JSON。所以这里用 `jsonPortPair()` 跑
+   * **同一套契约** —— 若代理在边界上丢了参数、改了返回形状、或假设"响应同步到达"，
+   * 这一行会与上面那些本地直连的实现给出**不同**结论。
+   *
+   * ⚠️ 这一条同时钉住一件容易忘的事：**壳里跑的仍然是同一份 TS 存储栈**
+   *（`DbOpLogStore` + `SqliteAdapter`），C# 侧只做"收字符串、回字符串"的转发，
+   * 不含任何 schema 知识 —— 那是 `apps/desktop-windows/README.md` §1 的硬约束。
+   */
+  runOpLogStoreContract({
+    name: '宿主边界（裸 JSON + 两侧线码 = WebView 传输）',
+    createDb: sqliteDb,
+    create: (db) => {
+      const store = new DbOpLogStore(db);
+      const raw = rawJsonPortPair();
+      // 🔴 两侧**各包一次** —— 与两个桌面壳将要写的代码逐字相同。
+      const pageSide = createOpLogWirePort(raw.mainSide);
+      const shellSide = createOpLogWirePort(raw.workerSide);
+      serveOpLogWorker(shellSide, Promise.resolve({ store, clientId: 'contract-host' }));
+      return createWorkerOpLogStore(pageSide);
     },
   });
 });
