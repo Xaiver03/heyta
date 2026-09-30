@@ -492,6 +492,14 @@ struct SharedWebView: NSViewRepresentable {
         /// C 的鉴权旅程探针只跑一次。
         private var ranAuthJourney = false
 
+        /// 🔴 **这两个口子必须"只跑一次"。**
+        /// 它们都会**重新加载**页面，而重新加载之后首屏探针会**再次成功** ⇒
+        /// 没有这个开关就会变成**无限重载循环**：每次探针采样时页面都在重载，
+        /// 症状是 `identity:0` + 模块在场 + `load` 已触发 + **没有任何错误** ——
+        /// 我一度把它误判成"壳加载不了第二次"（2026-09-30，实测自我纠正）。
+        private var ranReloadTest = false
+        private var ranAuthCallback = false
+
         /// 桌面壳反向授权（ADR-0039 §2.3）。
         private var shellAuth: ShellAuthSession?
         /// 本次发出去的 `state` —— 回调必须把它**原样带回来**。
@@ -528,7 +536,7 @@ struct SharedWebView: NSViewRepresentable {
             case let .rejected(reason):
                 // 拒绝必须**说出来**：静默会让"被人塞了个回调"看起来像"什么都没发生"。
                 onStorageFact("AUTH_CALLBACK=rejected: \(reason)")
-            case let .ok(token, _):
+            case let .ok(token, _, email):
                 onStorageFact("AUTH_CALLBACK=ok")
                 /**
                  ⚠️ **只写存储，不在这里重载**。
@@ -539,7 +547,10 @@ struct SharedWebView: NSViewRepresentable {
                  而那条路是好的。
                  */
                 let js =
-                    "sessionStorage.setItem('loginToken', \(jsStringLiteral(token)));" +
+                    // 🔴 **`sessionToken` 而不是 `loginToken`**：这两者是两种东西
+                    //    （会话本身 vs 一次性链接令牌），用两个键、不许靠猜。
+                    "sessionStorage.setItem('sessionToken', \(jsStringLiteral(token)));" +
+                    "sessionStorage.setItem('loginEmail', \(jsStringLiteral(email)));" +
                     "sessionStorage.setItem('loginBaseUrl', \(jsStringLiteral(baseUrl)));"
                 // ⚠️ **等一拍再写 + 重载**：交付发生在"首屏刚通过探针"那一刻，
                 //    此时 WebView 的资源往往还在飞 —— 立刻 reload 会让新文档的
@@ -815,7 +826,9 @@ struct SharedWebView: NSViewRepresentable {
                      2026-09-30 实测：交付之后 `identity:0`，而这条能告诉我们
                      那到底是"交付写坏了"还是"壳本来就加载不了第二次"。
                      */
-                    if ProcessInfo.processInfo.environment["HEYTA_RELOAD_TEST"] == "1" {
+                    if ProcessInfo.processInfo.environment["HEYTA_RELOAD_TEST"] == "1",
+                       !self.ranReloadTest {
+                        self.ranReloadTest = true
                         self.onStorageFact("RELOAD_TEST=reloading")
                         self.ranSettings = false
                         self.webView?.load(
@@ -829,12 +842,15 @@ struct SharedWebView: NSViewRepresentable {
                     }
 
                     let authEnv = ProcessInfo.processInfo.environment
-                    if let raw = authEnv["HEYTA_AUTH_CALLBACK"], let url = URL(string: raw) {
+                    if let raw = authEnv["HEYTA_AUTH_CALLBACK"], let url = URL(string: raw),
+                       !self.ranAuthCallback {
+                        self.ranAuthCallback = true
                         self.pendingAuthState = authEnv["HEYTA_AUTH_STATE"] ?? ""
                         self.handleAuthCallback(url, baseUrl: authEnv["HEYTA_AUTH_SITE"] ?? "")
                         return
                     }
-                    if authEnv["HEYTA_AUTH_START"] == "1" {
+                    if authEnv["HEYTA_AUTH_START"] == "1", !self.ranAuthCallback {
+                        self.ranAuthCallback = true
                         self.beginShellAuth(site: authEnv["HEYTA_AUTH_SITE"] ?? "")
                         return
                     }
@@ -1075,11 +1091,23 @@ struct SharedWebView: NSViewRepresentable {
          */
         static let bootDiagShim = """
         window.__heytaBootErrors = [];
+        // 🔴 **必须用捕获阶段**：`<script src>` / `<link>` 这类**资源加载失败不冒泡**，
+        //    冒泡阶段的 window 监听器**根本收不到** —— 这正是"模块脚本没执行、
+        //    而 bootErrors 却是空的"那个假象的来源（实测 2026-09-30）。
+        //    捕获阶段能拿到失败元素，于是"哪个 URL 没取到"会自己说出来。
         window.addEventListener('error', function (e) {
-          window.__heytaBootErrors.push(String((e && (e.message || e.error)) || e));
-        });
+          var t = e && e.target;
+          var where = (t && (t.src || t.href)) || '';
+          window.__heytaBootErrors.push(
+            String((e && (e.message || e.error)) || e) + (where ? ' @ ' + where : '')
+          );
+        }, true);
         window.addEventListener('unhandledrejection', function (e) {
           window.__heytaBootErrors.push('rejection: ' + String(e && e.reason));
+        });
+        window.addEventListener('load', function () {
+          var s = document.querySelector('script[type=module][src]');
+          window.__heytaBootErrors.push('module-src=' + (s ? s.getAttribute('src') : 'none'));
         });
         """
 

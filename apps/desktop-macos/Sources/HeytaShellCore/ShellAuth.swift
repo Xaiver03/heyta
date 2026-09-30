@@ -26,7 +26,7 @@ import Foundation
 
 /// 回调解析的结果。**判别式** —— 拒绝时必须带原因，否则排查只能靠猜。
 public enum ShellAuthCallback {
-    case ok(token: String, state: String)
+    case ok(token: String, state: String, email: String)
     case rejected(reason: String)
 }
 
@@ -95,7 +95,7 @@ public enum ShellAuth {
         if token == "" {
             return .rejected(reason: "回调里没有令牌")
         }
-        return .ok(token: token, state: state)
+        return .ok(token: token, state: state, email: items["email"] ?? "")
     }
 }
 
