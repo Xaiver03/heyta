@@ -609,3 +609,54 @@ C4_figures=0    ✅ 配图产物与映射一致：5 张（sha256 逐张对过）
 所以这两条 gate 在**提交物自身**上成立，CI 上不会因为我这台机器的状态而红。
 复验完 `git worktree remove` 摘掉临时 worktree，主检出未受影响。
 
+### 🔴 上面那张自查表里，第一行当初是**量的错东西**（2026-09-30 收尾时发现并重量）
+
+`OUT_OF_BOUNDS=none` 那格用的命令是 `git diff-tree --no-commit-id --name-only -r b71546fd 15a093c4` ——
+**`diff-tree` 拿到两个 commit 参数时比的是这两个 commit 之间**，不是"各自对父提交"。
+所以它只输出了 1 行（`PROGRESS.md`，即第二笔相对第一笔的差异），过滤白名单后自然剩 0 行。
+⇒ 那个 `none` **没有证明任何事**，它量的样本里根本不含第一笔那 57 个文件。
+形状和 §7 第 82 条同源：**"命令退出码 0 + 输出看起来对"不等于"判据跑在了正确的对象上"**。
+
+正确的量法是对**整个交付区间**比（父 = 开工前的 `544c9894`）：
+
+```
+DELIVERY_FILE_COUNT=57
+OUT_OF_BOUNDS=0
+=== 按目录归类 ===
+   1 BLOCKED.md
+   1 PROGRESS.md
+  50 apps          ← 全部在 apps/landing/ 下
+   2 docs
+   1 e2e
+   2 packages      ← 只有 locales/zh-CN.ts 与 en.ts
+```
+
+结论不变（57 个文件全在白名单内），但**结论现在是被量出来的，不是被猜出来的**。
+`BLOCKED.md` 确认在这批里（随 `b71546fd` 提交，工作树无残留）。
+
+### 最终 HEAD（`15a093c4`）上复跑的判据
+
+```
+S1_typecheck=0        apps/web / apps/mobile / apps/node-host / apps/desktop 全部 Done
+S2_check_entries=0    入口文件与注册表一致（55 份）。
+S5_screenshot_verify=0  ✅ 截图校验通过（注册表共 18 个目标；已生成的均尺寸正确、无 alpha、非空白）
+LANDING_E2E_EXIT=0    17 passed (1.1m)
+```
+
+判卷文件指纹（工作树 vs HEAD，5 份逐对）：`6cee9282` png-stats / `118e9df9` capture /
+`cf3b9f05` verify-artifacts / `f38e73fa` check-ui-language / `29de12b3` gen-entries —— 全等。
+既有断言对账：`BEFORE(544c9894)_tests=6 HEAD_tests=17 verbatimPresentInHEAD=6 changed=none`、
+`skip_or_todo_markers_in_HEAD_spec=0`。
+
+配图反向验证（最终 HEAD 上重跑一次，不引用旧日志）：
+
+```
+REVERSE_VERIFY_EXIT=1     ❌ 缺少复制品 apps/landing/public/assets/help/trash/W07-trash.png —— 跑 gen-help-figures.mjs
+                          1 处与映射不一致。
+REGEN_EXIT=0
+RESTORED_CHECK_EXIT=0     ✅ 配图产物与映射一致：5 张（sha256 逐张对过）
+sha_before=ce124c26353989db73312d98e6298ff5afe15bb4
+sha_after =ce124c26353989db73312d98e6298ff5afe15bb4   BYTE_IDENTICAL=yes
+(RESIDUE 为空 = 无工作树残留)
+```
+
