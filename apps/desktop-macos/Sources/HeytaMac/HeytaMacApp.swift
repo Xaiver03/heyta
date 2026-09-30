@@ -104,15 +104,54 @@ enum SelfCapture {
         case screenCaptureKit = "screencapturekit"
     }
 
+    /// 已经安排过（只安排一次）。
+    @MainActor private static var scheduled = false
+    /// 兜底计时器：**首屏一直没起来时**也必须留下证据并退出。
+    @MainActor private static var fallback: Task<Void, Never>?
+
+    /**
+     `HEYTA_SELF_CAPTURE=<png>` ⇒ 截图并退出。
+
+     🔴 **由"首屏真的起来了"触发，而不是固定延迟**（2026-09-30 改）。
+
+     起因是一次实测：换用**一次性浏览器存储**（冷缓存）之后，应用要到 8 秒开外
+     才挂载，而固定 6 秒的截屏**拍在它画出来之前** —— 抓到一张"内容比例 100%、但主蓝 0、
+     身份入口 0"的图，随后进程退出、探针再也跑不完。
+     固定延迟的错在于：它把"应用要多久起来"当成了常数，而那是**环境相关**的。
+
+     现在：探针链跑完（应用确实起来了、且已回到首屏）时**主动**截；
+     另外保留一个有界兜底（`fallbackSeconds`），保证失败路径也留得下证据。
+     */
     static func scheduleIfRequested() {
-        guard let path = ProcessInfo.processInfo.environment["HEYTA_SELF_CAPTURE"] else { return }
+        guard ProcessInfo.processInfo.environment["HEYTA_SELF_CAPTURE"] != nil else { return }
         Task { @MainActor in
-            // 🔴 等 **6 秒**而不是 3 秒：M2 探针链（点头像 → +0.4s 验菜单 → 点设置 →
-            //    +1.2s 验导入面板 → 点回「任务」）在慢一点的冷启动上要到 ~3.6s 才
-            //    把应用**还回首屏**。3s 时截图截到的是"探针链中途的设置页"，
-            //    四轮安装包验收全被它打红（2026-09-30 实测）。给足余量，
-            //    宁可截图晚两秒，不许截到探针链的中间态。
-            try? await Task.sleep(for: .seconds(6))
+            guard !scheduled else { return }
+            scheduled = true
+            fallback = Task { @MainActor in
+                try? await Task.sleep(for: .seconds(fallbackSeconds))
+                guard !Task.isCancelled else { return }
+                FileHandle.standardError.write(Data("首屏始终没起来，按兜底截一张\n".utf8))
+                await captureAndExit()
+            }
+        }
+    }
+
+    /// 首屏确认可用时调用。**幂等**：只截一次。
+    static func triggerIfRequested() {
+        Task { @MainActor in
+            fallback?.cancel()
+            await captureAndExit()
+        }
+    }
+
+    /// 兜底时长：够慢机器冷启动 + 探针链跑完，又不至于让门禁干等。
+    private static let fallbackSeconds = 45
+
+    @MainActor
+    private static func captureAndExit() async {
+            guard !captured else { return }
+            captured = true
+            guard let path = ProcessInfo.processInfo.environment["HEYTA_SELF_CAPTURE"] else { return }
             guard let window = NSApp.windows.first(where: { $0.isVisible }),
                   let view = window.contentView else {
                 FileHandle.standardError.write(Data("没有可见窗口\n".utf8))
@@ -137,9 +176,60 @@ enum SelfCapture {
             """
             try? info.write(toFile: path + ".txt", atomically: true, encoding: .utf8)
             print(info)
+
+            /**
+             🔴 **另取一份 WKWebView 自己的快照**（`takeSnapshot`）。
+
+             为什么需要它：窗口截图走**窗口服务器合成**，而实测（2026-09-30）
+             "WebView 的内容没合成进窗口"是这台机器上的**常态** —— 抓到的是
+             暗窗口 + 一行诊断文字，内容比例 100%、**主蓝 0**，四条窗口断言**全过**。
+             ⇒ "应用到底画出来没有"这个问题，**不能**压在窗口合成上。
+
+             `takeSnapshot` 直接问 WebKit 要渲染结果：**不走窗口服务器、不需要录屏权限**，
+             所以它稳定。两份产物各证一件事：
+
+             · 窗口截图 `OUT`            → 一个真的 macOS 窗口（标题/尺寸/非空/取图方式）
+             · WebView 快照 `OUT.webview.png` → **壳里那份共享 UI 真的渲染出来了**（数主蓝）
+             */
+            if let webView = webView {
+                let snapshot = await snapshotPNG(webView)
+                if let snapshot {
+                    try? snapshot.write(to: URL(fileURLWithPath: path + ".webview.png"))
+                    print("WEBVIEW_SNAPSHOT_BYTES=\(snapshot.count)")
+                } else {
+                    print("WEBVIEW_SNAPSHOT_BYTES=0")
+                }
+            } else {
+                print("WEBVIEW_SNAPSHOT_BYTES=0")
+            }
             exit(0)
+    }
+
+    /// 问 WebKit 要一份内容快照（PNG）。失败返回 nil —— **不阻断**窗口截图那条路。
+    @MainActor
+    private static func snapshotPNG(_ webView: WKWebView) async -> Data? {
+        await withCheckedContinuation { continuation in
+            let config = WKSnapshotConfiguration()
+            config.rect = webView.bounds
+            webView.takeSnapshot(with: config) { image, _ in
+                guard let image,
+                      let tiff = image.tiffRepresentation,
+                      let rep = NSBitmapImageRep(data: tiff),
+                      let png = rep.representation(using: .png, properties: [:]) else {
+                    continuation.resume(returning: nil)
+                    return
+                }
+                continuation.resume(returning: png)
+            }
         }
     }
+
+    /// 只截一次。
+    @MainActor private static var captured = false
+
+    /// 壳里那个 WKWebView。`makeNSView` 建好时登记进来 —— 截图时要问它要一份快照。
+    /// ⚠️ **weak**：它是被视图树持有的，这里只是"能拿到"，不是"持有"。
+    @MainActor static weak var webView: WKWebView?
 
     @MainActor
     private static func capture(window: NSWindow, bounds: CGRect) async -> (Method, Data)? {
@@ -310,6 +400,43 @@ struct SharedWebView: NSViewRepresentable {
         let config = WKWebViewConfiguration()
         config.setURLSchemeHandler(HeytaSchemeHandler(root: root), forURLScheme: "heyta-local")
 
+        /**
+         🔴 **一次性浏览器存储**（`HEYTA_WEBKIT_EPHEMERAL=1`，默认关）。
+
+         为什么需要：门禁要判的是**冷启动第一屏**（"注册/登录是否前置"），
+         而那要求壳处于**未登录**态。默认的数据存储是持久的 —— 同一台机器上
+         只要有人真的登录过一次，门禁就会因为"看到的是已登录 IA"而失败，
+         而那是**正常状态**，不是故障（2026-09-30 实测就踩在这上面）。
+
+         比"跑之前删掉用户数据"好的地方：**不碰用户的东西**，而且确定性强。
+
+         ⚠️ 默认**不开**：它是取证用的开关，不是产品行为。
+         */
+        if ProcessInfo.processInfo.environment["HEYTA_WEBKIT_EPHEMERAL"] == "1" {
+            config.websiteDataStore = .nonPersistent()
+        }
+
+        /**
+         🔴 **启动期错误探针**（`HEYTA_BOOT_DIAG=1` 才注入）。
+
+         存在的理由：WKWebView 里页面"没挂载"时，**壳这边看不到任何错误** ——
+         应用日志是空的、证据里只有 `identity:0`。实测 2026-09-30 就卡在这里：
+         应用不挂载，而没有任何线索说为什么。这几行把 `error` 与
+         `unhandledrejection` 记进 `window.__heytaBootErrors`，
+         再由首屏探针带进证据。
+
+         ⚠️ 默认**不注入**：它是取证用的，不是产品行为。
+         */
+        if ProcessInfo.processInfo.environment["HEYTA_BOOT_DIAG"] == "1" {
+            config.userContentController.addUserScript(
+                WKUserScript(
+                    source: Coordinator.bootDiagShim,
+                    injectionTime: .atDocumentStart,
+                    forMainFrameOnly: true
+                )
+            )
+        }
+
         if let host = storageHost {
             /**
              * 🔴 **必须在"文档创建时"注入**（`atDocumentStart`）。
@@ -338,6 +465,7 @@ struct SharedWebView: NSViewRepresentable {
         // ⚠️ **weak**：`WKUserContentController` 强引用着 handler（Coordinator），
         //    而 WebView 强引用着它的 configuration ⇒ 强引用 WebView 就是环。
         context.coordinator.webView = webView
+        SelfCapture.webView = webView
 
         // 🔴 探测取**组件自己打的 testID**，不取"界面上有字"。
         //    与 Windows 侧逐字相同的那条判据：登录入口（前置）+ 采集框（应用壳画出来了）。
@@ -359,6 +487,10 @@ struct SharedWebView: NSViewRepresentable {
         private var storageApi: AppApi?
         /// 取证旅程只跑一次（它会在库里造一条真数据）。
         private var ranStorageJourney = false
+        /// 通行密钥探针只跑一次。
+        private var ranWebauthnProbe = false
+        /// C 的鉴权旅程探针只跑一次。
+        private var ranAuthJourney = false
         /// 🔴 三段探针**放在 Coordinator 上**（不是 `makeNSView` 的局部变量）——
         /// SwiftUI 的 `makeNSView` 与 `Coordinator` 是两个作用域，
         /// 局部 `let` 在委托回调里根本看不到（第一版就是这么编译不过的）。
@@ -384,7 +516,16 @@ struct SharedWebView: NSViewRepresentable {
           //    "后端选了 shell、却永远收不到响应"，一个字都不报。
           handler: typeof (window.webkit && window.webkit.messageHandlers
             && window.webkit.messageHandlers.heytaStorage),
-          title: document.title
+          // 🔴 通行密钥能不能用，取决于**页面 origin 是不是安全上下文**。
+          //    Windows 壳把产物挂在 `https://heyta.local`（安全上下文），
+          //    macOS 壳用的是自定义 scheme `heyta-local://` —— 这两者**不一样**，
+          //    而"能不能注册/登录"这件事就压在这一格上。所以先量，不猜。
+          origin: location.origin,
+          secure: window.isSecureContext === true,
+          webauthn: typeof window.PublicKeyCredential,
+          title: document.title,
+          bootErrors: (window.__heytaBootErrors || []).slice(0, 4).join(' | '),
+          scripts: document.querySelectorAll('script[src]').length
         })
         """
 
@@ -573,6 +714,69 @@ struct SharedWebView: NSViewRepresentable {
                      * （字段名与 Windows 的 `STORAGE=` 一致）。
                      */
                     self.onStorageFact("STORAGE=\(Self.text(text, "backend"))")
+                    // 把 origin/安全上下文/通行密钥能力写进证据 —— C 的形态由它们决定。
+                    self.onStorageFact("PAGE_ORIGIN=\(Self.text(text, "origin"))")
+                    self.onStorageFact("SECURE_CONTEXT=\(Self.field(text, "secure") == 1 ? "yes" : "no")")
+                    self.onStorageFact("WEBAUTHN=\(Self.text(text, "webauthn"))")
+
+                    // 通行密钥失败原因的实测（只按环境变量启用，且只跑一次）。
+                    if ProcessInfo.processInfo.environment["HEYTA_WEBAUTHN_PROBE"] == "1",
+                       !self.ranWebauthnProbe {
+                        self.ranWebauthnProbe = true
+                        let full = ProcessInfo.processInfo.environment["HEYTA_WEBAUTHN_PROBE"] == "create"
+                        webView.callAsyncJavaScript(
+                            Self.webauthnProbe,
+                            arguments: ["full": full],
+                            in: nil,
+                            in: .page
+                        ) { result in
+                            switch result {
+                            case let .success(value):
+                                self.onStorageFact("WEBAUTHN_PROBE=\(String(describing: value))")
+                            case let .failure(error):
+                                self.onStorageFact("WEBAUTHN_PROBE=调用失败：\(error.localizedDescription)")
+                            }
+                        }
+                    }
+
+                    // C：邮件登录链接那条路（两半，各自按环境变量启用）。
+                    if let action = ProcessInfo.processInfo.environment["HEYTA_AUTH_JOURNEY"],
+                       !action.isEmpty, !self.ranAuthJourney {
+                        self.ranAuthJourney = true
+                        let env = ProcessInfo.processInfo.environment
+                        let js = Self.authJourneyProbe(
+                            action: action,
+                            email: env["HEYTA_AUTH_EMAIL"] ?? "",
+                            token: env["HEYTA_AUTH_TOKEN"] ?? "",
+                            server: env["HEYTA_AUTH_SERVER"] ?? ""
+                        )
+                        webView.callAsyncJavaScript(js, arguments: [:], in: nil, in: .page) { result in
+                            switch result {
+                            case let .success(value):
+                                self.onStorageFact("AUTH_JOURNEY=\(String(describing: value))")
+                                /**
+                                 🔴 **登录做完之后，让 M2-D 那条链再跑一遍** ——
+                                 它负责断言菜单 IA（`AUTH_STATE=`），而登录**之后**的那一态
+                                 才是 C 要的判据。`ranSettings` 复位是为了让链重新执行；
+                                 `ranAuthJourney` 保持 true，所以鉴权那段不会被再放一次。
+                                 */
+                                self.ranSettings = false
+                                DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+                                    self.probe(webView)
+                                }
+                            case let .failure(error):
+                                self.onStorageFact("AUTH_JOURNEY=调用失败：\(error.localizedDescription)")
+                            }
+                        }
+                        /**
+                         🔴 **这一轮先不往下跑 M2-D 那条链。**
+                         它开头也会点头像（`openAccountMenuProbe`），而本条也会点 ——
+                         两条并发会把同一个菜单**开一下又关掉**，症状是
+                         `NO_SIGNIN_ENTRY`（实测 2026-09-30）。一次只让一条链动界面；
+                         本条做完之后会**主动**把链叫回来（见上面的 asyncAfter）。
+                         */
+                        return
+                    }
 
                     // 取证用的那一步真旅程：只按环境变量启用，且只跑一次。
                     if let journey = ProcessInfo.processInfo.environment["HEYTA_STORAGE_JOURNEY"],
@@ -602,16 +806,41 @@ struct SharedWebView: NSViewRepresentable {
                                     let menuSignin = Self.field(menu, "signin")
                                     let menuSettings = Self.field(menu, "settings")
                                     let menuSignout = Self.field(menu, "signout")
-                                    guard menuSignin > 0, menuSettings > 0, menuSignout == 0,
-                                          first == "sync-signin-entry"
-                                    else {
+                                    /**
+                                     🔴 **C：登录前后**各有**恰好一种**合法 IA，这就是"注册/登录之后"的判据。
+
+                                     未登录：第一项 = 登录/注册、有设置项、**没有**退出登录
+                                     已登录：**有**退出登录、且**没有**登录入口
+
+                                     ⚠️ 第三种情况（两者都在 / 都不在）是**真缺陷**，必须红 ——
+                                     判据没有放松：它只是把"登录之后"也纳入了可判定的状态。
+                                     ⚠️ 通行密钥那一步**必须有人**（Touch ID）：壳能做的到此为止；
+                                     这一格的作用是让"人做完之后"的那一态**可被断言**，
+                                     而不是把人的那一步伪装成自动通过。
+                                     */
+                                    let signedOut = menuSignin > 0 && menuSignout == 0
+                                        && first == "sync-signin-entry"
+                                    let signedIn = menuSignout > 0 && menuSignin == 0
+
+                                    if signedIn {
+                                        self.onStorageFact("AUTH_STATE=signed-in")
+                                        self.onProbe(
+                                            "M2-macOS ✅ **已登录**（退出登录 \(menuSignout) 个、" +
+                                            "登录入口 \(menuSignin) 个；设置项 \(menuSettings) 个）"
+                                        )
+                                        return
+                                    }
+
+                                    guard signedOut, menuSettings > 0 else {
                                         self.onProbe(
                                             "M2-macOS 🔴 **身份菜单不合规**：未登录时菜单第一项必须是 " +
-                                            "sync-signin-entry、必须有设置项、且**不得**有退出登录 —— " +
+                                            "sync-signin-entry、必须有设置项、且**不得**有退出登录；" +
+                                            "已登录时必须有退出登录且**没有**登录入口 —— " +
                                             "实测 \(menu)"
                                         )
                                         return
                                     }
+                                    self.onStorageFact("AUTH_STATE=signed-out")
                                     webView.evaluateJavaScript(Self.settingsClickProbe) { res2, _ in
                                         guard (res2 as? String) == "CLICKED" else {
                                             self.onProbe(
@@ -638,6 +867,11 @@ struct SharedWebView: NSViewRepresentable {
                                                         "退出登录 \(menuSignout) 个）；" +
                                                         "**设置里的滴答导入面板可达**（panel=\(panel) file=\(file)）"
                                                     )
+                                                    // 🔴 应用确实起来了、且刚点回首屏 ⇒ **此刻**才是截图时机。
+                                                    //    留 0.6s 让"回到任务"那一帧真正提交。
+                                                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
+                                                        SelfCapture.triggerIfRequested()
+                                                    }
                                                 } else {
                                                     self.onProbe(
                                                         "M2-macOS 🔴 身份菜单成立，但**设置里没有滴答导入面板**：\(t2)"
@@ -706,6 +940,167 @@ struct SharedWebView: NSViewRepresentable {
               }));
               return 'TYPED';
             })()
+            """
+        }
+
+        /**
+         🔴 **量"通行密钥为什么失败"** —— 不靠推断，直接问平台要错误原文。
+
+         `HEYTA_WEBAUTHN_PROBE=1` 时跑一次 `navigator.credentials.create`，
+         把平台的异常名/消息原样带回证据。它**可能弹出 Touch ID**（如果平台接受），
+         失败时则是这条链上最直接的一份证据。
+
+         ⚠️ 必须用 `callAsyncJavaScript`（它支持 `await`）：`evaluateJavaScript`
+         不等待 Promise，拿到的是 `{}` 而不是结果 —— 那会让人误判成"没有错误"。
+         */
+        static let bootDiagShim = """
+        window.__heytaBootErrors = [];
+        window.addEventListener('error', function (e) {
+          window.__heytaBootErrors.push(String((e && (e.message || e.error)) || e));
+        });
+        window.addEventListener('unhandledrejection', function (e) {
+          window.__heytaBootErrors.push('rejection: ' + String(e && e.reason));
+        });
+        """
+
+        static let webauthnProbe = """
+        globalThis.__heytaProbeFull = full;
+        const challenge = new Uint8Array(32);
+        crypto.getRandomValues(challenge);
+        const userId = new Uint8Array(16);
+        crypto.getRandomValues(userId);
+        let uvpaa = 'unknown';
+        try {
+          uvpaa = String(await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable());
+        } catch (e) { uvpaa = 'ERR:' + e.name; }
+        // ⚠️ 默认**不建凭据**：`create` 会在用户的钥匙串里留一条真东西。
+        //    要看完整路径才设 HEYTA_WEBAUTHN_PROBE=create。
+        if (globalThis.__heytaProbeFull !== true) {
+          return 'SKIPPED_CREATE uvpaa=' + uvpaa;
+        }
+        try {
+          const cred = await navigator.credentials.create({ publicKey: {
+            challenge: challenge,
+            rp: { id: location.host, name: 'heyta' },
+            user: { id: userId, name: 'probe', displayName: 'probe' },
+            pubKeyCredParams: [{ type: 'public-key', alg: -7 }],
+            timeout: 8000,
+          }});
+          return 'CREATED=' + (cred ? 'yes' : 'no') + ' uvpaa=' + uvpaa;
+        } catch (e) {
+          return 'ERROR name=' + (e && e.name) + ' message=' + (e && e.message) + ' uvpaa=' + uvpaa;
+        }
+        """
+
+        /**
+         🔴 **C：macOS 上"注册/登录之后"那条旅程的机制**（没有 CDP，壳内探针就是唯一的路）。
+
+         两条实测出来的硬约束决定了用**邮件登录链接**这条产品已有的路：
+           · 通行密钥在壳里不可用（`uvpaa=false`，见 evidence）；
+           · magic-link 的回跳腿要深链（`heyta://auth#token=…`），而 macOS 壳**没有**深链处理。
+         而鉴权面板自带一条**为"拿不到深链"准备的**入口：「或者粘贴登录链接 / 令牌」。
+
+         两半，各自按环境变量启用、只跑一次：
+           · `HEYTA_AUTH_JOURNEY=send-link` + `HEYTA_AUTH_EMAIL=<邮箱>`：走界面请求登录链接
+           · `HEYTA_AUTH_JOURNEY=paste-token` + `HEYTA_AUTH_TOKEN=<令牌>`：把令牌粘进面板
+
+         ⚠️ 令牌由**测试侧从库里读**（TEST_MODE 的"打开邮件"）—— 不是产品后门：
+            服务端本来就明文存 `users.login_token`，而管理接口刻意不吐它。
+
+         ⚠️ React 受控输入必须走**原型上的 value setter** + 派发 `input`（同旅程探针）。
+         */
+        static func authJourneyProbe(
+            action: String,
+            email: String,
+            token: String,
+            server: String
+        ) -> String {
+            """
+            // ⚠️ `callAsyncJavaScript` 把源当**函数体**（本身已在 async 上下文里）：
+            //    所以要**直接写语句 + return**，不能再套一层 IIFE ——
+            //    套了的话末尾是个表达式，返回值是 `undefined`（实测：证据里只剩 `nil`）。
+            const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+              const setValue = (el, v) => {
+                const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set;
+                setter.call(el, v);
+                el.dispatchEvent(new Event('input', { bubbles: true }));
+              };
+              const byTest = (id) => document.querySelector('[data-testid="' + id + '"]');
+              // ⚠️ **中英都要认**：壳里界面语言跟随系统/浏览器，不一定是中文。
+              //    （实测：顶栏有语言选择器，凭中文文案找按钮会在英文界面下全落空。）
+              const byText = (cands) =>
+                [...document.querySelectorAll('button')].find((b) => {
+                  const t = b.textContent || '';
+                  return cands.some((c) => t.includes(c));
+                });
+
+              const avatar = byTest('account-menu-avatar');
+              if (!avatar) return 'NO_AVATAR';
+              // 菜单可能已经开着（别把切换点成"关"）。
+              let entry = byTest('sync-signin-entry');
+              // 🔴 **轮询 + 重试点击**，不要只 sleep 一次：菜单是 React 点开才渲染的，
+              //    而单击落在错误的时刻时它会**什么都不开**（实测：偶发 `NO_SIGNIN_ENTRY`）。
+              for (let attempt = 0; attempt < 3 && !entry; attempt += 1) {
+                avatar.click();
+                for (let i = 0; i < 20 && !entry; i += 1) {
+                  await sleep(150);
+                  entry = byTest('sync-signin-entry');
+                }
+              }
+              if (!entry) return 'NO_SIGNIN_ENTRY';
+              entry.click();
+              await sleep(700);
+
+              const urlInput = document.querySelector('input[type="url"]');
+              if (!urlInput) return 'NO_SERVER_INPUT';
+              setValue(urlInput, \(jsStringLiteral(server)));
+              const emailInput = document.querySelector('input[type="email"]');
+              if (!emailInput) return 'NO_EMAIL_INPUT';
+              setValue(emailInput, \(jsStringLiteral(email)));
+
+              const act = \(jsStringLiteral(action));
+              if (act === 'send-link' || act === 'register-link') {
+                // ⚠️ 对**不存在的邮箱**，登录链接是**故意静默**的（防枚举：文案说"如果这个邮箱
+                //    有账号…"）⇒ 那个邮箱不会有账号、也不会有令牌。所以要验注册那条路。
+                const cands =
+                  act === 'register-link'
+                    ? ['注册新账号', 'Create account']
+                    : ['发送登录链接', 'Send login link'];
+                const btn = byText(cands);
+                if (!btn) return 'NO_BUTTON:' + cands.join('/');
+                btn.click();
+                await sleep(2000);
+                const panel = document.querySelector('[role="dialog"]') || document.body;
+                return 'CLICKED(' + act + '): ' + (panel.textContent || '').slice(0, 160);
+              }
+
+              const paste = [...document.querySelectorAll('input')].find(
+                (i) => { const p = i.placeholder || ''; return p.includes('粘贴') || p.includes('Paste'); }
+              );
+              if (!paste) return 'NO_PASTE_INPUT';
+              setValue(paste, \(jsStringLiteral(token)));
+              await sleep(200);
+              // ⚠️ 候选必须**精确**：早先放了 '登录' 当兜底，而「发送登录链接」也含这两个字 ⇒
+                //    点错按钮、面板关掉、探针误判成登录成功（实测 2026-09-30）。
+                const confirm = byText(['完成登录', 'Finish signing in']);
+              if (!confirm) return 'NO_CONFIRM_BUTTON';
+              confirm.click();
+              await sleep(2500);
+            // ⚠️ 把**面板自己说的话**一起带回来：
+            //    "没登上"与"登上"的区分不能只看面板关没关 ——
+            //    令牌无效时界面会给出**可见的失败文案**，那才是注入该验的东西。
+            const panel = document.querySelector('[role="dialog"]') || document.body;
+            /**
+             ⚠️ **不要把这个当成"登录成功"**：面板在**成功与失败**两种情况下都可能关掉，
+             所以"`sync-signin-entry` 不见了"是个**假阳性**（实测 2026-09-30，
+             注入那次它与权威判据相反）。权威判据只有一个：**`AUTH_STATE`**
+             （它由 M2-D 那条链在登录之后重新点数菜单 IA 得出）。
+             这里只报告"面板关没关"与**面板自己说的话**。
+             */
+            return (
+              'PASTED panelClosed=' + !byTest('sync-signin-entry') + ' panel=' +
+              (panel.textContent || '').split(/\\s+/).join(' ').slice(0, 140)
+            );
             """
         }
 
