@@ -51,14 +51,14 @@ const AUTH_MESSAGE_KEYS = [
   'web.auth.sent.register',
   'web.auth.signedIn.title',
   'web.auth.signedIn.body',
-  'web.auth.error.unconfigured',
-  'web.auth.error.invalidEmail',
-  'web.auth.error.notAllowed',
-  'web.auth.error.unauthorized',
-  'web.auth.error.rateLimited',
-  'web.auth.error.network',
-  'web.auth.error.server',
-  'web.auth.error.unknown',
+  'common.auth.error.unconfigured',
+  'common.auth.error.invalidInput',
+  'common.auth.error.notAllowed',
+  'common.auth.error.unauthorized',
+  'common.auth.error.rateLimited',
+  'common.auth.error.network',
+  'common.auth.error.server',
+  'common.auth.error.unknown',
 ] as const satisfies readonly MessageKey[];
 
 const BASE_URL = 'https://sync.example.com';
@@ -258,7 +258,7 @@ describe('🔴 失败绝不能被当成成功', () => {
     expect(useAuthStore.getState().status).toEqual({ kind: 'failed', reason: 'unauthorized' });
 
     const text = el.textContent ?? '';
-    expect(text).toContain(translate('zh-CN', 'web.auth.error.unauthorized'));
+    expect(text).toContain(translate('zh-CN', 'common.auth.error.unauthorized'));
     expect(text).not.toContain(translate('zh-CN', 'web.auth.signedIn.title'));
   });
 
@@ -303,7 +303,7 @@ describe('🔴 失败绝不能被当成成功', () => {
 
     expect(calls).toHaveLength(0);
     expect(useAuthStore.getState().status).toEqual({ kind: 'failed', reason: 'invalid-input' });
-    expect(el.textContent ?? '').toContain(translate('zh-CN', 'web.auth.error.invalidEmail'));
+    expect(el.textContent ?? '').toContain(translate('zh-CN', 'common.auth.error.invalidInput'));
   });
 });
 
