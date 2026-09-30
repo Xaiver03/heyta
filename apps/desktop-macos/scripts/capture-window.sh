@@ -40,6 +40,43 @@ cd "$SHELL_DIR"
 swift build 2>&1 | grep -E "error:|Build complete" | awk '{print "  " $0}'
 
 echo ""
+# 🔴 **桥的默认值**（2026-09-30 补）：取证跑的通常是**裸 SwiftPM 可执行文件**，
+#    它旁边没有 `native-bridge.js` ⇒ 存储宿主 `decide()` 会退化成 `.off`，
+#    于是这份证据走的是**页侧兜底**那条路（`STORAGE=sqlite`），
+#    而不是**产品真正走的**壳内 SQLite（`STORAGE=shell`）。
+#    两者都能把界面画出来，所以"看起来一样"—— 但证据要说的是产品那条路。
+#
+#    ⚠️ 打包的 `Heyta.app` 不需要这个（桥在 `Contents/Resources` 里）。
+#    ⚠️ 只在文件真的存在时才设：设一个不存在的路径会让 `decide()` 判成"找不到"，
+#       症状与不设一模一样，却会让人以为"已经给过桥了"。
+# 🔴 **共享 UI 产物目录的默认值**（2026-09-30 补，同一个理由）。
+#    裸可执行文件旁边没有 `web-dist`，而 `ShellView` 只在
+#    "env **或** app 包 `Contents/Resources/web-dist`"里找 ⇒ 不给就渲染**回退屏**
+#    （"未找到共享 UI 产物目录"）。那份证据看起来是"窗口画出来了"，
+#    其实画的**不是应用** —— 交接文档里记着这条真实缺陷（"门禁报通过、
+#    而那张图显示的是回退屏"），根因就是这里少了一个 env。
+if [ -z "${HEYTA_WEB_ROOT:-}" ]; then
+  WEB_DEFAULT="$REPO/apps/web/dist"
+  if [ -f "$WEB_DEFAULT/index.html" ]; then
+    export HEYTA_WEB_ROOT="$WEB_DEFAULT"
+    echo "  Web UI：${HEYTA_WEB_ROOT}（脚本内置默认）"
+  else
+    echo "  ⚠️ 共享 UI 产物不存在（${WEB_DEFAULT}）—— 这次截图会是**回退屏**，不是应用。"
+    echo "     先执行：pnpm --filter @heyta/web build"
+  fi
+fi
+
+if [ -z "${HEYTA_BRIDGE_BUNDLE:-}" ]; then
+  BRIDGE_DEFAULT="$REPO/packages/app-host/bridge-bundle/native-bridge.js"
+  if [ -f "$BRIDGE_DEFAULT" ]; then
+    export HEYTA_BRIDGE_BUNDLE="$BRIDGE_DEFAULT"
+    echo "  桥：${HEYTA_BRIDGE_BUNDLE}（脚本内置默认 ⇒ STORAGE 应为 shell）"
+  else
+    echo "  ⚠️ 桥不存在（${BRIDGE_DEFAULT}）—— 这次证据会走页侧兜底（STORAGE=sqlite）。"
+    echo "     要跑产品那条路先执行：node packages/app-host/scripts/build-native-bridge.mjs"
+  fi
+fi
+
 echo "=== 运行 + 自截屏 ==="
 # 🔴 HEYTA_NO_FOCUS=1：取证启动**绝不抢用户前台**（AGENTS §6.2 规定二；
 #    2026-09-29 产品负责人再次投诉后被做成壳级开关，与 Electron 壳同名同义）。
@@ -103,8 +140,47 @@ echo "=== 独立复验：与 screencapture -l 比尺寸 ==="
 #    本轮被误判成"自截图不可信"）。
 rm -f /tmp/heyta-mac-crosscheck.png
 # 🔴 交叉验证的实例同样不抢前台（同上）。
-(nohup env HEYTA_NO_FOCUS=1 "$SHELL_DIR/.build/out/Products/Debug/HeytaMac" >/dev/null 2>&1 &)
+#
+# 🔴 **记下 PID + `trap` 收尾**（2026-09-30 实测改）。这一格原来长这样：
+#
+#     (nohup env HEYTA_NO_FOCUS=1 "…/HeytaMac" >/dev/null 2>&1 &)
+#
+# 一个**分离**的实例，收尾靠下面那句 `pkill -f HeytaMac`。那其实是**两条独立的
+# 失败路径**，各自都会把人坑一次：
+#
+#   1. 本脚本是 `set -euo pipefail`，而交叉校验的 `node` 结尾是
+#      `process.exit(sameLogical ? 0 : 1)` ⇒ **尺寸不一致时脚本当场死掉**，
+#      下面那句 `pkill` **永远不会执行** ⇒ 那个分离实例**留在用户屏幕上**。
+#      用户看到的是"这个应用起不来"（真症状见
+#      `evidence/storage-host/storage-matrix-*.txt` 的四格矩阵），
+#      而它其实是一个**取证实例** —— 产品负责人 2026-09-30 报的就是这一屏。
+#   2. `pkill -f HeytaMac` 是**按名字杀**的：它会顺手杀掉**用户自己正在用的**
+#      那个 HeytaMac。
+#
+# 改成"记 PID + `trap … EXIT`"：不管脚本从哪条路径退出（正常走完、`set -e`
+# 半路死掉、Ctrl-C、门禁超时把 bash 杀掉），这个实例都会被收掉，
+# 而且**只收自己起的那个**。
+HEYTA_NO_FOCUS=1 "$SHELL_DIR/.build/out/Products/Debug/HeytaMac" >/dev/null 2>&1 &
+CROSSCHECK_PID=$!
+# ⚠️ `trap` 必须在 `CROSSCHECK_PID` 赋值**之后**注册 —— 否则 `set -u` 下
+#    引用未定义变量，trap 自己会炸。
+trap 'kill "$CROSSCHECK_PID" 2>/dev/null || true' EXIT
 sleep 6
+
+# 🔴 **注入**：在"分离实例已经起来、脚本还没走完"这一刻**故意让脚本死掉**。
+#
+# 它证明的是上面那段注释：脚本半路退出时，那个实例**必须**被收掉。
+# 没有这个开关就没法验 —— 正常路径是绿的，而"绿的时候不留窗口"说明不了
+# "红的时候也不留"。位置刻意选在**交叉校验之前**：本机 `swift window-id.swift`
+# 取不到窗口 id（会走 else 分支跳过后面的 node），所以注入必须放在这之前才到得了。
+#
+# 用法：`HEYTA_CAPTURE_INJECT_FAIL_CROSSCHECK=1 bash scripts/capture-window.sh <out>`
+# 期望：脚本非零退出，**且事后没有任何属于本次运行的 HeytaMac 留在进程表里**。
+if [ "${HEYTA_CAPTURE_INJECT_FAIL_CROSSCHECK:-}" = "1" ]; then
+  echo "  🔴 注入：在分离实例存活时让脚本死掉（证明收尾不依赖走完全程）"
+  exit 1
+fi
+
 WID=$(cd "$HERE" && swift window-id.swift 2>/dev/null | head -1 | cut -f1 || true)
 if [ -n "${WID:-}" ]; then
   screencapture -x -o -l"$WID" /tmp/heyta-mac-crosscheck.png 2>/dev/null || true
@@ -134,7 +210,9 @@ JS
 else
   echo "  ⚠️ 取不到窗口 ID，跳过交叉验证"
 fi
-pkill -f HeytaMac 2>/dev/null || true
+# 🔴 正常路径显式收掉那个实例（`trap` 也会兜一次）——**按 PID，不按名字**。
+kill "$CROSSCHECK_PID" 2>/dev/null || true
+wait "$CROSSCHECK_PID" 2>/dev/null || true
 
 echo ""
 echo "=== 合成证据说明（避免两份漂移）==="

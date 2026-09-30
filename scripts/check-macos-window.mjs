@@ -76,6 +76,38 @@ const OUT = join(tmpdir(), `heyta-macos-window-gate-${process.pid}.png`);
 // 同路径会被它覆盖；实测踩过）。
 const NOTE = join(tmpdir(), `heyta-macos-m2-gate-${process.pid}`);
 
+/**
+ * 🔴 **壳的存储桥**（2026-09-30 实测，两个 env 缺一不可）。
+ *
+ * 本门禁判的是**冷启动、未登录**的第一屏（"注册/登录是否前置"），于是它需要两件事
+ * 同时成立，而它们各自都会因为"这台机器现在的状态"而不成立：
+ *
+ * 1. `HEYTA_WEBKIT_EPHEMERAL=1` —— **非持久仓**。默认的仓是持久的：
+ *    只要这台机器上有人真的登录过一次（比如跑过壳侧认证旅程），
+ *    门禁就会看到**已登录**的 IA 而失败 —— 那是**正常状态**，不是故障。
+ *    壳里那个开关就是为这件事做的（见 `HeytaMacApp.swift`：它的注释写着
+ *    "它是取证用的开关，不是产品行为"）。**不设它的后果本机实测过**：
+ *    `M2-MACOS ✅ 已登录（退出登录 1 个、登录入口 0 个）` ⇒ 三条断言全红。
+ * 2. `HEYTA_BRIDGE_BUNDLE` —— **桥**。取证跑的是**裸 SwiftPM 可执行文件**，
+ *    它旁边没有 `native-bridge.js`，于是存储宿主会退化成 `.off`；
+ *    而"非持久仓 + 宿主关闭"这个组合**正好是应用起不来的那一格**
+ *    （四格矩阵见 `apps/desktop-macos/evidence/storage-host/README.md`）。
+ *    ⚠️ 打包的 `Heyta.app` **不需要**这个 env（桥在 `Contents/Resources` 里）；
+ *    只有裸可执行文件需要。
+ *
+ * ⇒ 两条一起给：冷启动状态**确定**，而存储走**壳自己的 SQLite**（产品的那条路），
+ *    不依赖页侧兜底。
+ */
+const BRIDGE = join(ROOT, 'packages/app-host/bridge-bundle/native-bridge.js');
+if (!existsSync(BRIDGE)) {
+  // 🔴 **响亮失败，不静默降级**：桥缺失时 `capture-window.sh` 会照常跑出一个
+  //    "看起来是应用起不来"的证据，而那是**取证配置**的毛病、不是产品的 ——
+  //    正是本门禁最该避免的误导。宁可在这一步说清楚怎么修。
+  console.error(`❌ 壳的存储桥不存在：${BRIDGE}`);
+  console.error('   先跑：node packages/app-host/scripts/build-native-bridge.mjs');
+  process.exit(1);
+}
+
 // ① 跑取证脚本。**继承 stdio** —— 它的输出本身就是证据。
 //
 // 🔴 同时带上 `HEYTA_WEB_ROOT`：那个壳里内嵌的是**共享 UI**（M2），
@@ -89,6 +121,8 @@ const capture = spawnSync('bash', [CAPTURE, OUT], {
     ...process.env,
     HEYTA_WEB_ROOT: join(ROOT, 'apps/web/dist'),
     HEYTA_M2_EVIDENCE: NOTE,
+    HEYTA_BRIDGE_BUNDLE: BRIDGE,
+    HEYTA_WEBKIT_EPHEMERAL: '1',
   },
 });
 
