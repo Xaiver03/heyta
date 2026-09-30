@@ -414,14 +414,31 @@ def main():
         #    证据：设了文字之后「添加」按钮 `enabled` 由 false 变 **true** ——
         #    那个 enabled 是 RN 根据输入内容算出来的，只有应用真收到了才会变。
         cx, cy = center(node)
+        # 🔴 **必须留下 idb 自己的退出码与 stderr。**
+        #
+        # 实测（2026-09-29）：同一条 `set-value` **有时 rc=0、有时 rc=1**，
+        # 而 rc=1 时值**根本没变**。第一版把 `capture_output=True` 的结果**丢掉**、
+        # 异常也 `pass` 掉 —— 于是"工具跑失败了"与"写进去了但回读方式不对"
+        # 在调用方看来**完全一样**（都是 `detail=""`）。
+        #
+        # ⚠️ 这是本仓那条"**工具返回成功不等于生效**"的**反面**，而且更坏：
+        #    **工具返回失败，而没有任何人看**。
+        set_rc = None
+        set_err = ""
         try:
-            subprocess.run(
+            r = subprocess.run(
                 [args.idb, "--companion-path", args.companion, "ui", "set-value",
                  str(cx), str(cy), "--value", args.set_value, "--udid", args.udid],
                 capture_output=True, text=True, timeout=60,
             )
-        except (subprocess.TimeoutExpired, OSError):
-            pass
+            set_rc = r.returncode
+            set_err = (r.stderr or "").strip()[:200]
+        except subprocess.TimeoutExpired:
+            set_rc = -1
+            set_err = "timeout"
+        except OSError as e:
+            set_rc = -2
+            set_err = str(e)[:200]
         # 回读必须**重新拉树**，否则读到的是设值前的旧值。
         time.sleep(0.6)
         # 🔴 回读必须锚定**同一个字段**（比 frame），不能取"第一个非空的字段"。
@@ -442,7 +459,12 @@ def main():
                 if is_field(n) and label_of(n) == label_of(node):
                     back = n.get("AXValue")
                     break
-        emit({"detail": "" if back is None else str(back)})
+        emit({
+            "detail": "" if back is None else str(back),
+            # 调用方据此区分"工具失败了"与"写进去了" —— 见上面的说明。
+            "setRc": "" if set_rc is None else str(set_rc),
+            "setErr": set_err,
+        })
         return 0
 
     # 默认就是 --list

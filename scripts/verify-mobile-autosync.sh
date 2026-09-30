@@ -78,7 +78,8 @@ $ADB install -r "$APK" 2>&1 | tail -1 | sed 's/^/   /'
 # 它们会让"这次到底是谁触发的"变得含混。
 $ADB shell pm clear $PKG >/dev/null 2>&1
 $ADB shell am force-stop $PKG; sleep 1
-$ADB shell am start -n $PKG/.MainActivity >/dev/null 2>&1; sleep 12
+launch_app; sleep 12
+dismiss_welcome_if_present   # 首次启动的欢迎页会盖住主界面（规范 §3.1）——先离开它
 [ -n "$($ADB shell pidof $PKG 2>/dev/null | tr -d '\r')" ] && ok "应用已启动" || bad "应用没起来"
 
 heyta_e2e_assert_client_budget || bad "账号 client 数已逼近向量时钟上限（后续断言不可信）"

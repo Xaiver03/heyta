@@ -72,7 +72,7 @@ set -u
 . "$(dirname "$0")/lib/mobile-e2e.sh"
 
 DEVICE_NAME=${IOS_DEVICE_NAME:-iPhone 17 Pro}
-BID=${IOS_BID:-org.reactjs.native.example.HeytaMobile}
+BID=${IOS_BID:-com.heyta}
 
 # 🔴 UDID 默认值是**陈旧**的陷阱：原来写死 691C20D9-FB85-4B81-A3CC-0F5623AEF082，
 #    而这个 UDID 在本机**根本不存在** —— 不显式覆盖就指向一个不存在的设备，
@@ -156,17 +156,180 @@ ax() {
 ax_json() { ax "$@"; }
 jget() { printf '%s' "$1" | python3 -c "import json,sys;print(json.load(sys.stdin).get('$2',''))" 2>/dev/null; }
 
-# 模拟器容器里的真 SQLite（不是内存态、不是 mock）
-phone_db() { echo "$(xcrun simctl get_app_container "$UDID" "$BID" data 2>/dev/null)/Library/heyta.sqlite"; }
+# 🔴🔴 **关掉 iOS 的「保存密码？」系统弹窗 —— 它会盖住整个页面。**
+#
+# 实测（2026-09-29，第 36 轮，**截图才看出来**）：在 `secure` 输入框里填过字之后，
+# iOS 会弹一个系统对话框：
+#
+#     保存密码？
+#     安全储存密码，以便下次需要时自动填充。
+#     [以后]  [保存]
+#
+# 它的两个后果**没有任何一个会在日志里留下痕迹**：
+#   1. 它**盖住整个页面** —— 包括「粘贴邮件里的链接或令牌」那个字段，
+#      于是按坐标写的 `set-value` 报 `found no element at (201.0, 1018.0)`；
+#   2. 它让 **AX 树只剩 `AXApplication` 一个节点** —— 所有查询都 `found: False`，
+#      看起来像"AX 桥断了"或"页面没渲染"。
+#
+# ⇒ 这一条同时解释了本轮追了很久的三件事：**字段够不到、树偶尔全空、以及它为什么时红时绿**
+#   （弹窗只在"填过 secure 字段 + 系统决定要问"时出现）。
+#   ⚠️ 而它**不在**应用的无障碍树里 —— 它是**系统**对话框，只能按标签去点。
+dismiss_ios_save_password() {
+  local _l _r
+  # 先按标签试（万一它哪天进了应用树）
+  for _l in "以后" "Not Now" "Later" "以后再说"; do
+    _r=$(ax "$_l" --pressable --list --json)
+    if [ "$(jget "$_r" found)" = "True" ]; then
+      ax "$_l" --pressable --press --json >/dev/null 2>&1
+      sleep 1.5
+      ok "已关掉 iOS「保存密码？」系统弹窗（标签命中）"
+      return 0
+    fi
+  done
+  # 🔴 **按标签找不到是正常的 —— 它是系统对话框，不在应用的无障碍树里。**
+  #    判据用"树是不是只剩 Application"来认它（那是它的**结构性指纹**），
+  #    然后**按坐标点「以后」**。
+  #
+  #    实测（2026-09-29，第 37 轮）：坐标点 `(125, 537)` 之后，
+  #    `describe-all` 的 label 数从 **1 → 70** —— 这就是它有效的证据。
+  #
+  #    ⚠️ 坐标来自截图量取（设备 402×874；「以后」约在 x=31%、y=61.5%）。
+  #       它是**系统**弹窗的布局，不由我们的代码决定，所以只能这样锚。
+  # 🔴🔴 **守卫不能用「注册 / 登录」当"没有弹窗"的证据 —— 那个标签可能就是当前页的标题！**
+  #
+  # 实测（2026-09-29，第 42 轮）：认证页的**页面标题**正是「注册 / 登录」，
+  # 于是这个守卫在"弹窗盖着"的时候**照样认为没有弹窗** ⇒
+  # **弹窗从来没被关掉** ⇒ 之后整棵树只剩 `AXApplication` ⇒ 所有查询 `found=False`。
+  # 而症状看起来是"按了「我的」没反应""三个框不在树上"——**方向被整体带偏**。
+  #
+  # ⇒ 判据改成"**两个只在真实页面上才有的标签都不在**"：
+  #   · 「任务」是底部标签（主界面必有）；
+  #   · 「我的」也是底部标签（**连认证页上都还在**，因为标签栏画在它下面）。
+  #   弹窗态下这两个**都不在**。
+  local _t _m
+  _t=$(jget "$(ax "任务" --list --json)" found)
+  _m=$(jget "$(ax "我的" --list --json)" found)
+  if [ "$_t" != "True" ] && [ "$_m" != "True" ]; then
+    if true; then
+      # 两个底部标签都不在 ⇒ 树是退化的 ⇒ 几乎可以断定是它盖着。
+      _IW=$(xcrun simctl io "$UDID" screenshot /tmp/_heyta-save-pw.png >/dev/null 2>&1; echo ok)
+      local _sx _sy
+      _sx=$(python3 -c "print(int(402*0.31))" 2>/dev/null || echo 125)
+      _sy=$(python3 -c "print(int(874*0.615))" 2>/dev/null || echo 537)
+      "$IDB_BIN" --companion-path "$IDB_COMPANION" ui tap "$_sx" "$_sy" --udid "$UDID" >/dev/null 2>&1
+      sleep 1.5
+      if [ "$(jget "$(ax "任务" --list --json)" found)" = "True" ] || [ "$(jget "$(ax "注册 / 登录" --list --json)" found)" = "True" ]; then
+        ok "已按坐标关掉 iOS「保存密码？」系统弹窗（它不在应用树里，只能按坐标点）"
+        return 0
+      fi
+    fi
+  fi
+  return 1
+}
 
-apps_count() { sqlite3 "$PHONE_DB" "SELECT COUNT(*) FROM ops;" 2>/dev/null | tr -d ' '; }
+# 🔴🔴 **按一下，然后回读"它到底生效了没有"。**
+#
+# 这是本仓那条最贵的教训（**"工具返回成功不等于生效"**）在**夹具自己**身上的应用：
+# `ax <label> --press` 返回 `result=success` 只说明**系统调用成功了**，
+# 不代表那个控件收到了事件。
+#
+# 实测（2026-09-29，第 41 轮）这一条**反复咬人**，而且每轮咬在不同地方：
+#   · composer：press 走 `success` 分支，而面板**还开着**；
+#   · 认证页：`ax "返回"` 调用过，而**页面没切回去**；
+#   · 欢迎页：`ax "先离线使用"` 调用过，而 app **还停在欢迎页**（第 1 步的 `label 数 6`）。
+#
+# ⇒ 判据必须是**外部的、结构性的**：**点完之后，另一件事真的发生了吗。**
+#   （`AGENTS §7` 的 `tap-blocked-by-keyboard` 就是这种 —— 它查键盘按键的
+#   `KeyboardKey` trait，所以可信；"按坐标点没反应"此前**没有**结构性判据。）
+#
+# 用法：`press_until <要按的> <应出现的> [尝试次数]`
+#   返回 0 = 回读到了；1 = 试满仍未生效（**调用方据此判"夹具不可信"**）
+press_until() {
+  local do_lbl="$1" want_lbl="$2" tries="${3:-3}" i
+  for i in $(seq 1 "${tries}"); do
+    if [ "$(jget "$(ax "${want_lbl}" --list --json)" found)" = "True" ]; then return 0; fi
+    ax "${do_lbl}" --pressable --press --json >/dev/null 2>&1
+    sleep 2
+  done
+  if [ "$(jget "$(ax "${want_lbl}" --list --json)" found)" = "True" ]; then return 0; fi
+  return 1
+}
+
+# 🔴🔴 **"它消失了吗" —— 比"某样东西出现了吗"更可靠。**
+#
+# 实测（2026-09-29，第 41 轮）：`press_until "先离线使用" "任务"` 给出了**假绿** ——
+# 因为它一进来就 `found("任务") = True`：**欢迎页背后就是底部标签栏**，
+# 于是**它一次都没按**就返回成功，app 还停在欢迎页（第 1 步只看到 6 个 label）。
+#
+# ⚠️ 这正是本仓反复出现的那类错：**判据的条件在动作之前就已经成立**。
+# ⇒ 对"离开某个屏"这种动作，判据必须是"**那个屏的标志消失了**"。
+press_until_gone() {  # <要按的> <应消失的> [尝试次数]
+  local do_lbl="$1" gone_lbl="$2" tries="${3:-3}" i
+  for i in $(seq 1 "${tries}"); do
+    if [ "$(jget "$(ax "${gone_lbl}" --list --json)" found)" != "True" ]; then return 0; fi
+    ax "${do_lbl}" --pressable --press --json >/dev/null 2>&1
+    sleep 2
+  done
+  if [ "$(jget "$(ax "${gone_lbl}" --list --json)" found)" != "True" ]; then return 0; fi
+  return 1
+}
+
+# 🔴 **把一个在折线以下的字段滚进可见区。**
+#
+# 实测（2026-09-29，第 37 轮）：认证页的内容比屏幕**高约 260px** ——
+# Application frame 是 402×874，而「粘贴邮件里的链接或令牌」在 **y=1031**、
+# 「验证并登录」在 **y=1090**。按坐标写的 `set-value` 因此够不到它们。
+#
+# ⚠️ 而 `idb ui swipe` **是可用的**（rc=0、返回很快）—— 我前一版结论"它不滚"是错的
+#（那次实验根本没进认证页，字段不在树上，量不出变化）。
+# 但它**滚动的方向与直觉相反**（往上拖会让 y **变大**），所以这里**两个方向都试**，
+# 每次**复测** y —— 判据是"y 真的变小了"，不是"我发出了 swipe"。
+scroll_into_view() {  # <label>
+  local lbl="$1" y i
+  for i in $(seq 1 14); do
+    y=$(ax "${lbl}" --role AXTextField --list --json)
+    if [ "$(jget "${y}" found)" != "True" ]; then return 0; fi   # 不在树上就不用滚
+    local yy; yy=$(jget "${y}" y)
+    [ -z "${yy}" ] && return 0
+    if [ "${yy%.*}" -lt 800 ] 2>/dev/null; then return 0; fi     # 已经在可见区
+    # 🔴 **起点必须是 750，不能是 760。**
+    #    实测（第 37 轮，四个方向各测一遍）：`(200,750)→(200,250)` **有效**
+    #（y 1031 → 997），而 `(200,760)→(200,300)` **完全不动** ——
+    #    760 很可能已经落在 ScrollView 之外（底部标签栏 / Home 指示条那一带），
+    #    于是整条手势没有控件接。
+    #    ⚠️ 每次只挪 **约 34–50px**，所以要把 1031 挪进 800 以内需要**十几次**，
+    #       循环上界因此是 14 而不是 6。
+    # 🔴 **必须打印前后值。** 上一版只打"滚不到"这个结论，于是"手动能滚、脚本不能"
+    #    这件事根本无从查起 —— 而**判据的中间值**才是这里唯一的线索。
+    local _r; _r=$("$IDB_BIN" --companion-path "$IDB_COMPANION" ui swipe 200 750 200 150 --udid "$UDID" 2>&1)
+    sleep 1
+    local y2; y2=$(jget "$(ax "${lbl}" --role AXTextField --list --json)" y)
+    echo "     [滚动 $i] y ${yy} → ${y2}  (idb rc=${?} / out=${_r:0:60})"
+    if [ -n "${y2}" ] && [ "${y2%.*}" -lt "${yy%.*}" ] 2>/dev/null; then continue; fi
+    # 反方向也试一次（万一将来布局翻过来）
+    "$IDB_BIN" --companion-path "$IDB_COMPANION" ui swipe 200 250 200 750 --udid "$UDID" >/dev/null 2>&1
+    sleep 1
+  done
+  y=$(jget "$(ax "${lbl}" --role AXTextField --list --json)" y)
+  if [ -n "${y}" ] && [ "${y%.*}" -lt 800 ] 2>/dev/null; then
+    ok "已把「${lbl}」滚进可见区（y=${y}）"
+  else
+    bad "「${lbl}」滚不到可见区（最后一次 y=${y:-未知}）—— 它下面的判据会按坐标失败"
+  fi
+}
+
+
+# 模拟器容器里的真 SQLite（不是内存态、不是 mock）
+phone_db() { echo "$(xcrun simctl get_app_container "$UDID" "${BID}" data 2>/dev/null)/Library/heyta.sqlite"; }
+
+apps_count() { sqlite3 "${PHONE_DB}" "SELECT COUNT(*) FROM ops;" 2>/dev/null | tr -d ' '; }
 
 # 某条 op 的载荷字段。
 # 🔴 op 的 id 在 **ix0_0**，不是 pk0 —— pk0 是数字主键（实测值形如 `2`、`1.0`）。
 #    按 pk0 去查会查不到，于是 `json_extract` 全部返回空字符串，
 #    症状是"四条断言同时说字段是空的"，看起来像 op 写坏了，其实只是查错了列。
 op_payload() {  # <op_id> <字段名>
-  sqlite3 "$PHONE_DB" \
+  sqlite3 "${PHONE_DB}" \
     "SELECT json_extract(data,'\$.op.payload.$2') FROM ops WHERE ix0_0='$1';" 2>/dev/null
 }
 
@@ -178,6 +341,89 @@ ui_has_task() {  # <标题>
 
 # ── 0. 前置条件 ─────────────────────────────────────────────────────────────
 step "0. 前置条件"
+
+# 🔴🔴 **先构建并安装当前源码 —— 否则这个脚本可能在验一个旧二进制。**
+#
+# 2026-09-29 实测撞到：本脚本**只验证、不构建**（前置写着"该模拟器上已装好
+# Release 版"，而全仓没有一处 `simctl install`）。于是它跑的是模拟器上
+# **上一次打的那个包** —— 我为实时通道改的代码**根本没上设备**，
+# 而脚本照样给出了 36 项结论。这正是本仓自己记过的那条：
+# **"测试全绿 ≠ 这是当前产物"**。
+#
+# ⇒ 默认**构建 + 安装**。`HEYTA_IOS_SKIP_BUILD=1` 可以跳过（改脚本本身时用），
+#    但那时仍然会**断言产物比源码新** —— 旧产物要么被重建，要么**响亮地失败**。
+IOS_APP_DIR="/tmp/heyta-ios-release/Build/Products/Release-iphonesimulator/HeytaMobile.app"
+
+# 源码的最新修改时间（只扫会进 bundle 的地方：宿主 src + 四个共享包 src）
+# ⚠️ **不要写 `-newer /dev/null`。** 第一版那么写，而它在 macOS 上**匹配不到任何文件**：
+#    `/dev/null` 是设备文件，它的 mtime 是**当下**（实测 `stat` 给的是刚才那一刻），
+#    于是 `-newer /dev/null` 恒假 ⇒ `SRC_MTIME=0` ⇒ 新鲜度判据**恒真**。
+#    一个"永远绿"的判据比没有判据更坏，因为它会让人以为这一段被守住了。
+# ⚠️ **必须 `-print0` + `xargs -0`。** 本仓库的路径里有**空格**
+#   （`All in one Data/01_PROJECTS/heyta`），而 `xargs` 默认按空白切分 ——
+#    于是 `stat` 收到一堆不存在的路径、`2>/dev/null` 把错误吞掉、**输出 0 行**。
+#    实测：`find | wc -l` 是 282，而 `find | xargs stat | wc -l` 是 **0**。
+newest_src() {
+  find "$HEYTA_REPO_ROOT/apps/mobile/src" "$HEYTA_REPO_ROOT/packages"/*/src \
+    -type f \( -name '*.ts' -o -name '*.tsx' \) -print0 2>/dev/null \
+    | xargs -0 stat -f '%m' 2>/dev/null | sort -rn | head -1
+}
+
+if [ "${HEYTA_IOS_SKIP_BUILD:-0}" = "1" ]; then
+  echo "   ⏭  跳过构建（HEYTA_IOS_SKIP_BUILD=1）"
+else
+  echo "   正在构建 Release 版（会重新打 JS bundle，数分钟）…"
+  if xcodebuild -workspace "$HEYTA_REPO_ROOT/apps/mobile/ios/HeytaMobile.xcworkspace" \
+      -scheme HeytaMobile -configuration Release -sdk iphonesimulator \
+      -destination "id=$UDID" -derivedDataPath /tmp/heyta-ios-release build \
+      >/tmp/heyta-ios-build.log 2>&1; then
+    ok "xcodebuild Release 构建成功（日志 /tmp/heyta-ios-build.log）"
+  else
+    bad "xcodebuild 失败 —— 先看 /tmp/heyta-ios-build.log（末尾 20 行）"
+    tail -20 /tmp/heyta-ios-build.log | sed 's/^/     /'
+    summary "iOS 输入侧"
+  fi
+  if [ -d "$IOS_APP_DIR" ]; then
+    xcrun simctl install "$UDID" "$IOS_APP_DIR" >/dev/null 2>&1 \
+      && ok "已把**当前源码**构建的 app 装进模拟器" \
+      || bad "simctl install 失败：$IOS_APP_DIR"
+  else
+    bad "找不到构建产物 $IOS_APP_DIR"
+  fi
+fi
+
+# 无论跳不跳过，都断言"**我们验的正是刚装上去的那个包**"。
+#
+# 🔴 这一段是 2026-09-29 那次事故的直接产物，而那次的形状值得完整记下来：
+#
+#   1. 工程的 bundle id 是 **`com.heyta`**，而本脚本的 `BID` 默认值还是 RN 模板的
+#      `org.reactjs.native.example.HeytaMobile`（**过期的默认值**）；
+#   2. 于是 `simctl install` 装的是 `com.heyta`（**exit 0**），
+#      而脚本查的、启动的、读 SQLite 的都是**另一个 app**；
+#   3. 设备上积了**三个**容器（09-27 / 09-28 / 09-29），`get_app_container`
+#      解析到最旧的那个 —— 脚本跑了整整几轮，验的是**两天前的代码**，
+#      而每一轮都报"通过 N 项"。**"测试全绿 ≠ 这是当前产物"** 这条教训，
+#      本仓在 `mobile-e2e-up.sh` 的文件头写过一次，这里是它的第二次。
+#
+# ⇒ 所以判据不是"有没有装"，而是"**解析得到、且比源码新**"。两个条件缺一不可。
+INSTALLED_APP="$(xcrun simctl get_app_container "$UDID" "${BID}" app 2>/dev/null)"
+if [ -z "$INSTALLED_APP" ]; then
+  bad "按 BID=${BID} 解析不到已安装的 app —— 装了别的 bundle id，或没装上。这一轮验的会是别的东西。"
+fi
+BUNDLE_MTIME=0
+[ -n "$INSTALLED_APP" ] && BUNDLE_MTIME=$(stat -f '%m' "$INSTALLED_APP/main.jsbundle" 2>/dev/null || echo 0)
+SRC_MTIME=$(newest_src)
+# 🔴 **判据算不出输入时必须红，不能默默放过。**
+#    上一版就是 `SRC_MTIME` 算成了 0，于是 `BUNDLE_MTIME >= 0` 恒真 —— 一个**永远绿的判据**。
+if [ "${SRC_MTIME:-0}" -le 0 ]; then
+  bad "算不出源码的最新修改时间（newest_src 返回 ${SRC_MTIME:-空}）—— 新鲜度判据**没在运行**，不是通过"
+elif [ "${BUNDLE_MTIME:-0}" -le 0 ]; then
+  bad "读不到已安装 app 的 main.jsbundle（容器为空或没有这个文件）—— 这一轮验的不是当前产物"
+elif [ "$BUNDLE_MTIME" -ge "$SRC_MTIME" ]; then
+  ok "已安装的包（${BID}）比源码新 —— 这一轮验的是当前产物"
+else
+  bad "已安装的包**比源码旧** —— 这一轮验的会是旧代码。先构建。"
+fi
 
 if xcrun simctl list devices 2>/dev/null | grep -q "$UDID.*Booted"; then
   ok "模拟器 $UDID 已启动"
@@ -261,14 +507,143 @@ else
   bad "服务端 $HOST_SERVER 不可达 —— 跨设备那一步会假红，但没有它就不是零 mock"; summary "iOS 输入侧"
 fi
 
-PHONE_DB=$(phone_db)
-if [ -f "$PHONE_DB" ]; then ok "手机真 SQLite：$PHONE_DB"; else bad "手机 SQLite 不存在（App 没装或没启动过）"; summary "iOS 输入侧"; fi
-
 # 启动 App（**不 terminate**：会话内已派生过 Argon2 密钥，terminate 会白白再花 30–40 秒）
-xcrun simctl launch "$UDID" "$BID" >/dev/null 2>&1
+xcrun simctl launch "$UDID" "${BID}" >/dev/null 2>&1
 sleep 5
 
+# 🔴 **SQLite 的存在性必须在"启动之后"查。**
+#    原来这个检查在 `launch` 之前，于是在**全新安装 / erase 过**的设备上必然红 ——
+#    因为库是 app 第一次跑起来时才建的（实测：erase 之后第一轮就报
+#    "App 没装或没启动过"，而 app 装得好好的）。
+#    ⚠️ 这类"检查了不该检查的东西"的失败，本脚本的文件头已经记过一次
+#    （`pgrep -x Simulator` —— 一个根本不需要存在的进程）。
+PHONE_DB=$(phone_db)
+if [ -f "${PHONE_DB}" ]; then
+  ok "手机真 SQLite：${PHONE_DB}"
+else
+  bad "启动之后仍找不到手机 SQLite（${PHONE_DB}）—— app 没跑起来，或 BID 不对"
+  summary "iOS 输入侧"
+fi
+
+# 🔴 **首次启动的欢迎页（规范 §3.1）会盖住整个主界面**，包括 FAB 与标签栏。
+#    它是"装完包的第一次冷启动"才有的一屏，而这一步之后所有断言都假设
+#    主界面在前面 —— 不先离开它，第 1 步会报"找不到「新建任务」按钮，
+#    AX 桥不通或 App 不在任务页"，把方向引到无障碍桥上去。
+#
+# ⚠️ 与"登录墙"无关：这一屏有「先离线使用」这个同级出口，点一下就进主界面。
+#    幂等：不在欢迎页时什么都不做。
+idb_dump
+if idb_has "先离线使用"; then
+  WELCOME_XY=$(idb_label_center "先离线使用" 2>/dev/null)
+  if [ -n "$WELCOME_XY" ]; then
+    idb_ui tap $WELCOME_XY >/dev/null 2>&1
+    echo "     已离开欢迎页（点「先离线使用」@ ${WELCOME_XY}）"
+    sleep 3
+  else
+    echo "     ⚠️ 欢迎页在，但取不到「先离线使用」的坐标" >&2
+  fi
+fi
+
 # ── 1. AX 桥是否通 + App 是否在任务页 ───────────────────────────────────────
+# 🔴🔴 **在共享 lib 的 `summary` 之上包一层：夹具自身不可信时，先把话说清楚。**
+#
+# 理由（第 41 轮的结论，见 handoff §5.1n）：这个脚本的红**不是产品判决** ——
+# 同一份代码连续几轮红在**不同**的地方（第 4 / 第 5 / 第 1 步），
+# 而共同的病是**坐标点击与滑动在这个应用上不可靠**。
+# 一份"看起来像产品判决"的红，比一句"我验不了"更危险 —— 它会让人去改错的东西。
+#
+# ⚠️ **不改共享 lib**：`summary` 被全部移动端脚本用，改它对别人是破坏。
+#    这里用 `declare -f` 把原函数改名保留，再包一层，**只影响本脚本**。
+eval "$(declare -f summary | sed '1s/^summary ()/summary_lib ()/')"
+summary() {
+  if [ "${FIXTURE_UNRELIABLE:-0}" = "1" ]; then
+    echo ""
+    echo "  ⚠️⚠️ **本轮夹具自身不可信** —— 上面的通过/失败都**不是产品判决**。"
+    echo "       触发点：一个'按了却回读不到预期变化'的动作（见 §5.1n 与 press_until）。"
+    echo "       要把它当成产品缺陷之前，先回答：**是产品做不到，还是这套夹具做不到？**"
+  fi
+  summary_lib "$@"
+}
+
+FIXTURE_UNRELIABLE=0
+
+# ── 0.5. 🔴 冷启动**前置性**：全新安装 → 欢迎页第一屏 ─────────────────────
+#
+# 🔴 **为什么必须是"全新安装 + 第一屏"，而不是"在「我的」页找到入口"**
+#
+# 目标那句是：「**每一端冷启动后**都要能先注册/登录再使用，**不能把认证藏在设置里**」。
+# 从「我的」页上找到入口**证明不了前置** —— 它只证明"它在某个地方"。
+#
+# 实测（2026-09-29，第 35 轮）：`simctl terminate` + `launch` 之后，app **直接进任务页** ——
+# 因为欢迎页由**设备本地偏好** `welcome.hasSeen` 门控（`apps/mobile/src/prefs/device-prefs.ts`），
+# 而这台模拟器上早就"看过"了。⇒ 要验它，就必须**全新安装**（清掉那个偏好）。
+# Android 那份 `scripts/verify-mobile-auth.sh` 的 §0 正是这么做的（"全新安装 = 全新设备身份"）。
+#
+# 判据与它 **J1** 对齐，**含反证**：
+#   · 第一屏**看得见**「注册 / 登录」（0 次点击）；
+#   · 第一屏有出口「先离线使用」（不登录也能用 —— 这是同一份规范的另一半）；
+#   · 此刻**还没有**邮箱输入框（否则"点一下才叫出表单"会**自动成立**，什么也没验到）。
+step "0.5 🔴 冷启动前置性：全新安装 → 欢迎页第一屏"
+
+if [ -d "${IOS_APP_DIR}" ]; then
+  xcrun simctl uninstall "$UDID" "${BID}" >/dev/null 2>&1
+  sleep 1
+  xcrun simctl install "$UDID" "${IOS_APP_DIR}" >/dev/null 2>&1
+  ok "已全新安装（清掉 welcome.hasSeen 等设备本地偏好）"
+else
+  bad "没有构建产物可装 —— 0.5 步的判据不可信"
+fi
+xcrun simctl launch "$UDID" "${BID}" >/dev/null 2>&1
+sleep 8
+
+# 🔴 **先清掉上一轮可能残留的系统弹窗。** 它是**系统**对话框，**跨应用重启存活** ——
+#    实测（第 36 轮）：上一轮在认证页填过 `secure` 字段之后 iOS 弹了「保存密码？」，
+#    那一轮结束时它还在，于是**这一轮**一进来 AX 树就只剩 `AXApplication` 一个节点，
+#    而症状看起来像"AX 桥断了"。⇒ 起点必须先清。
+dismiss_ios_save_password || true
+
+W_ENTRY=$(ax "注册 / 登录" --list --json)
+if [ "$(jget "$W_ENTRY" found)" = "True" ]; then
+  ok "🔴 **冷启动第一屏**就有「注册 / 登录」（0 次点击看得见 —— 前置性成立）"
+else
+  bad "冷启动第一屏**看不到**「注册 / 登录」—— 认证没有前置到第一屏"
+fi
+W_OFFLINE=$(ax "先离线使用" --list --json)
+if [ "$(jget "$W_OFFLINE" found)" = "True" ]; then
+  ok "同一屏还有出口「先离线使用」（不登录也能继续用 —— 规范的另一半）"
+else
+  bad "第一屏没有「先离线使用」出口 —— 要么欢迎页没渲染，要么出口被去掉了"
+fi
+W_EMAIL=$(ax "邮箱" --role AXTextField --list --json)
+if [ "$(jget "$W_EMAIL" found)" = "True" ]; then
+  bad "第一屏**已经**有邮箱输入框 —— 后面「点击才叫出表单」那条判据会**自动成立**，什么也没验到"
+else
+  ok "此刻还看不到邮箱输入框（说明「注册 / 登录」那一下点击是真的把表单叫出来的）"
+fi
+
+# 点出口进主界面 —— 后面几步（FAB / Composer / op-log）的前提是"在应用里"。
+# 🔴 **必须回读**：这一下**点了没生效**正是第 1 步 `label 数 6` 那次红的根因。
+# ⚠️ 判据是**「先离线使用」消失**，不是"「任务」出现" ——
+#    后者在欢迎页上就已经成立（标签栏在它背后），会给**假绿**（第 41 轮实测）。
+if press_until_gone "先离线使用" "先离线使用" 4; then
+  ok "「先离线使用」真的把 app 带进了主界面（**判据是欢迎页的标志消失**）"
+else
+  bad "「先离线使用」按了 4 次都没离开欢迎页 —— **以下所有判据都不可信**（夹具问题，不是产品问题）"
+  FIXTURE_UNRELIABLE=1
+fi
+sleep 1
+
+# 🔴 **全新安装换了应用数据容器，`PHONE_DB` 必须重算。**
+# 实测（2026-09-29）：0.5 步插进来之后，第 4 步报 `ops 行数  →`（**两个都空**）——
+# 因为 `PHONE_DB` 是在 `uninstall/install` **之前**算的，指向那个已经不在的容器。
+# 症状（"ops 数读不出来"）看起来像数据库坏了，其实是**路径过期**。
+PHONE_DB=$(phone_db)
+if [ -f "${PHONE_DB}" ]; then
+  ok "全新安装后的数据容器：${PHONE_DB}"
+else
+  bad "全新安装后仍找不到 SQLite（${PHONE_DB}）—— 后面所有基于 ops 的判据都会读空"
+fi
+
 step "1. AX 桥与初始界面"
 
 # 🔴 先切回「任务」标签，再做任何判断。"界面里有没有文本控件"这个判据**只在任务页成立** ——
@@ -276,6 +651,27 @@ step "1. AX 桥与初始界面"
 #    "Composer 开着"的证据会直接假红，而症状是"按了取消但面板还开着"，方向全偏。
 #    同样地，上一次运行会把界面停在「我的」（同步那步切过去），不切回来 FAB 就查不到，
 #    症状却是"AX 桥不通"。
+# 🔴🔴 **先关掉任何开着的 modal，再切标签 —— 否则这个脚本不可重跑。**
+#
+# 实测（2026-09-29，第 34 轮）：上一轮结束时 app 停在**认证页**（那一轮主路径失败、
+# `返回` 没把页面切回来），于是这一轮第 4 步红在「按了『添加』但 Composer 还开着」——
+# **而那一轮我根本没改第 4 步**。app 的状态**跨轮残留**，而模态盖住标签栏时
+# `ax "任务"` 是**点不到的**（它返回 not-found，而症状看起来像"界面不对"）。
+#
+# ⚠️ 脚本刻意**不 terminate**（会话内已派生过 Argon2 密钥，terminate 会白花 30–40 秒），
+#    所以起点是不可控的 —— **必须归一化**。判据是"任务标签点得到"，不是"关掉了几个东西"。
+for _modal in "取消" "关闭新建面板" "返回"; do
+  for _try in 1 2 3; do
+    if [ "$(jget "$(ax "任务" --pressable --list --json)" found)" = "True" ]; then break 3; fi
+    if [ "$(jget "$(ax "$_modal" --pressable --list --json)" found)" = "True" ]; then
+      ax "$_modal" --pressable --press --json >/dev/null 2>&1
+      sleep 1.5
+    else
+      break
+    fi
+  done
+done
+
 ax "任务" --pressable --press --json >/dev/null 2>&1
 sleep 2
 
@@ -340,7 +736,7 @@ if ! ax_ready 20; then
   echo "      ⚠️ App 在跑，但无障碍树是空的（label 数 0）——**模拟器的无障碍注册卡死了**，不是 App 的问题"
   echo "         证据：同一台设备重启前 label 数 0、重启后 42；这期间截屏里界面一直是好的"
   echo "         → 重启模拟器再试（约 30–60 秒）"
-  xcrun simctl terminate "$UDID" "$BID" >/dev/null 2>&1
+  xcrun simctl terminate "$UDID" "${BID}" >/dev/null 2>&1
   xcrun simctl shutdown "$UDID" >/dev/null 2>&1
   pkill -f "idb_companion --udid $UDID" 2>/dev/null
   rm -f "/tmp/idb/${UDID}_companion.sock"
@@ -351,7 +747,7 @@ if ! ax_ready 20; then
   ensure_idb_companion || true
   # ⚠️ 重启后 App 是**全新进程**，会话内的 E2EE 凭据没了 —— 下面还会重新填，
   #    代价是**再付一次约 50 秒的 Argon2id 派生**。这只在卡死这条路上发生。
-  xcrun simctl launch "$UDID" "$BID" >/dev/null 2>&1
+  xcrun simctl launch "$UDID" "${BID}" >/dev/null 2>&1
   sleep 10
   ax "任务" --pressable --press --json >/dev/null 2>&1
   sleep 2
@@ -440,9 +836,9 @@ if [ "$(jget "$FAB" found)" != "True" ]; then
 fi
 if [ "$(jget "$FAB" found)" != "True" ]; then
   echo "      ⚠️ 收键盘重试后仍切不回任务页 —— 重启 App 兜底，会再付一次 Argon2id 派生"
-  xcrun simctl terminate "$UDID" "$BID" >/dev/null 2>&1
+  xcrun simctl terminate "$UDID" "${BID}" >/dev/null 2>&1
   sleep 2
-  xcrun simctl launch "$UDID" "$BID" >/dev/null 2>&1
+  xcrun simctl launch "$UDID" "${BID}" >/dev/null 2>&1
   sleep 8
   FAB=$(ax "新建任务" --pressable --wait 60 --list --json)
 fi
@@ -523,15 +919,34 @@ step "4. 提交并核对 op-log"
 # 🔴 与第 5 步同一条纪律：**看 result，不看"我调用了 tap"**。
 #    实测踩到：这里原来是 `>/dev/null 2>&1` 加一句无条件的 ok，于是
 #    "点击被键盘吞掉"和"提交成功"在报告里长得一模一样。
-ADD_PRESS=$(ax "添加" --pressable --press)
-case "$(jget "$ADD_PRESS" result)" in
-  success) : ;;
-  tap-blocked-by-keyboard)
-    bad "「添加」被键盘挡住，点击**没有到达按钮**（keyboardTop=$(jget "$ADD_PRESS" keyboardTop), cy=$(jget "$ADD_PRESS" cy)）"
-    ;;
-  *) bad "按下「添加」失败：$(jget "$ADD_PRESS" result)" ;;
-esac
-sleep 3
+# 🔴 **按下之后必须回读，而且允许一次重试。**
+#
+# 实测（2026-09-29，第 35 轮）：这一条**时红时绿**（同一份代码，一次过、两次红），
+# 而红的时候走的是 `success` 分支 —— 也就是 **shim 报"点击成功"、而应用没收到**。
+# 那正是本仓那条最贵的教训（"工具返回成功不等于生效"），也是 §7 里
+# `tap-blocked-by-keyboard` 那条判据**没能兜住**的情形。
+#
+# ⇒ 判据从"tap 返回了什么"改成"**composer 真的关了吗**"，关不上就收键盘再试一次。
+ADD_OK=0
+for _try in 1 2; do
+  ADD_PRESS=$(ax "添加" --pressable --press)
+  case "$(jget "$ADD_PRESS" result)" in
+    success) : ;;
+    tap-blocked-by-keyboard)
+      bad "「添加」被键盘挡住，点击**没有到达按钮**（keyboardTop=$(jget "$ADD_PRESS" keyboardTop), cy=$(jget "$ADD_PRESS" cy)）"
+      ;;
+    *) bad "按下「添加」失败：$(jget "$ADD_PRESS" result)" ;;
+  esac
+  sleep 3
+  if ! composer_open; then ADD_OK=1; break; fi
+  # 没关成：先把键盘收掉再来一次（键盘是这一步最主要的干扰源）。
+  ok "第 $_try 次「添加」没让 Composer 关闭 —— 收键盘后重试"
+  for _k in 1 2 3; do
+    if [ "$(jget "$(ax --keyboard)" present)" != "True" ]; then break; fi
+    ax --tap 200 150 >/dev/null 2>&1
+    sleep 1
+  done
+done
 
 if ! composer_open; then
   ok "Composer 已关闭（「添加」按钮消失）"
@@ -546,19 +961,19 @@ else
   bad "ops 行数 $BEFORE_COUNT → ${AFTER_COUNT}，期望恰好 +1"
 fi
 
-OP_ID=$(sqlite3 "$PHONE_DB" "SELECT ix0_0 FROM ops WHERE json_extract(data,'\$.op.payload.title')='$TITLE';" 2>/dev/null | head -1)
+OP_ID=$(sqlite3 "${PHONE_DB}" "SELECT ix0_0 FROM ops WHERE json_extract(data,'\$.op.payload.title')='$TITLE';" 2>/dev/null | head -1)
 if [ -n "$OP_ID" ]; then
   ok "在 ops 里按标题找到了这条 op：$OP_ID"
 else
   bad "ops 里没有任何 op 的 payload.title 等于「${TITLE}」"; summary "iOS 输入侧"
 fi
 
-OP_TYPE=$(sqlite3 "$PHONE_DB" "SELECT json_extract(data,'\$.op.opType') FROM ops WHERE ix0_0='$OP_ID';" 2>/dev/null)
-ACTION=$(sqlite3 "$PHONE_DB" "SELECT json_extract(data,'\$.op.actionType') FROM ops WHERE ix0_0='$OP_ID';" 2>/dev/null)
-ETYPE=$(sqlite3 "$PHONE_DB" "SELECT json_extract(data,'\$.op.entityType') FROM ops WHERE ix0_0='$OP_ID';" 2>/dev/null)
-CLIENT=$(sqlite3 "$PHONE_DB" "SELECT json_extract(data,'\$.op.clientId') FROM ops WHERE ix0_0='$OP_ID';" 2>/dev/null)
-VCLOCK=$(sqlite3 "$PHONE_DB" "SELECT json_extract(data,'\$.op.vectorClock') FROM ops WHERE ix0_0='$OP_ID';" 2>/dev/null)
-USTATUS=$(sqlite3 "$PHONE_DB" "SELECT json_extract(data,'\$.uploadStatus') FROM ops WHERE ix0_0='$OP_ID';" 2>/dev/null)
+OP_TYPE=$(sqlite3 "${PHONE_DB}" "SELECT json_extract(data,'\$.op.opType') FROM ops WHERE ix0_0='$OP_ID';" 2>/dev/null)
+ACTION=$(sqlite3 "${PHONE_DB}" "SELECT json_extract(data,'\$.op.actionType') FROM ops WHERE ix0_0='$OP_ID';" 2>/dev/null)
+ETYPE=$(sqlite3 "${PHONE_DB}" "SELECT json_extract(data,'\$.op.entityType') FROM ops WHERE ix0_0='$OP_ID';" 2>/dev/null)
+CLIENT=$(sqlite3 "${PHONE_DB}" "SELECT json_extract(data,'\$.op.clientId') FROM ops WHERE ix0_0='$OP_ID';" 2>/dev/null)
+VCLOCK=$(sqlite3 "${PHONE_DB}" "SELECT json_extract(data,'\$.op.vectorClock') FROM ops WHERE ix0_0='$OP_ID';" 2>/dev/null)
+USTATUS=$(sqlite3 "${PHONE_DB}" "SELECT json_extract(data,'\$.uploadStatus') FROM ops WHERE ix0_0='$OP_ID';" 2>/dev/null)
 
 [ "$OP_TYPE" = "CRT" ]      && ok "opType=CRT（不是自造的 CREATE）"        || bad "opType=${OP_TYPE}，期望 CRT"
 [ "$ACTION" = "CRT_TASK" ]  && ok "actionType=CRT_TASK"                  || bad "actionType=${ACTION}，期望 CRT_TASK"
@@ -583,6 +998,54 @@ else
 fi
 
 # ── 5. 跨设备（L5）────────────────────────────────────────────────────────
+step "5a. 🔴 **前置的注册/登录入口在真机上可达**（本次目标里的硬要求）"
+#
+# 这一条**从来没被端到端验过**：本脚本一直走的是「手动填写凭据」那条**兜底路径**，
+# 而产品自己的主路径 —— 「注册 / 登录」 —— 只在别处的单测里出现过。
+#
+# 本次目标里写得很明确：「**注册/登录必须前置**：每一端冷启动后都要能先注册/登录再使用，
+# **不能把认证藏在设置里**」。所以它必须有一条**真机上的**判据。
+#
+# 实测（2026-09-29）：「我的」页顶部有 `AXButton '注册 / 登录'`；
+# 点开之后出现 `服务器地址 / 邮箱 / 端到端加密口令 / 注册新账号 /
+# 用通行密钥登录 / 粘贴邮件里的链接或令牌` —— 三条路都在。
+# ⚠️ 这里只验"入口在「我的」页可达"。**真正的"前置性"判据在 0.5 步** ——
+#    它必须在**全新安装后的冷启动第一屏**上判，而不是在导航之后（见 0.5 步的说明）。
+if press_until "我的" "注册 / 登录" 3; then
+  ok "已切到「我的」页（**回读到入口才判成功**）"
+else
+  bad "切不到「我的」页 —— 下面的入口判据不可信"
+  FIXTURE_UNRELIABLE=1
+fi
+
+AUTH_ENTRY=$(ax "注册 / 登录" --pressable --list --json)
+if [ "$(jget "$AUTH_ENTRY" found)" = "True" ]; then
+  ok "「我的」页上有「注册 / 登录」入口（冷启动后一眼可见，不在设置里）"
+else
+  bad "找不到「注册 / 登录」入口 —— 认证被藏起来了，这正是本次目标禁止的形态"
+fi
+
+ax "注册 / 登录" --pressable --press --json >/dev/null 2>&1
+sleep 2.5
+
+# 三条路各自断言一次：它们是**不同的登录方式**，缺一条就是缺一种能力。
+AUTH_OK=0
+for _lbl in "注册新账号" "用通行密钥登录" "粘贴邮件里的链接或令牌" "邮箱"; do
+  _r=$(ax "${_lbl}" --list --json)
+  if [ "$(jget "$_r" found)" = "True" ]; then
+    AUTH_OK=$((AUTH_OK + 1))
+    ok "认证页上有「${_lbl}」"
+  else
+    bad "认证页上缺「${_lbl}」"
+  fi
+done
+if [ "$AUTH_OK" -ge 4 ]; then
+  ok "🔴 前置的认证入口：**邮箱注册 + 通行密钥 + 粘贴令牌**三条路都在真机上可达"
+fi
+# 退回「我的」，下面第 5 步继续用它的凭据表单。
+ax "返回" --pressable --press --json >/dev/null 2>&1
+sleep 2
+
 step "5. 按下「同步」，让另一台设备读到它"
 
 # 🔴 任务页头部那个「同步」按钮**不是网络同步**。实测
@@ -596,8 +1059,53 @@ sleep 3
 
 # 「服务器地址」/「访问令牌」/「端到端加密口令」的 desc 就是它们的 label
 set_field() {  # <label> <值> [--secure]
-  local out; out=$(ax "$1" --role AXTextField --set "$2" --json)
-  local back; back=$(jget "$out" detail)
+  # 🔴 **先确认这个框在不在** —— 不在的话，下面那句 `--set` 会返回空 detail，
+  #    而那个空值会被读成"写失败"。实测（2026-09-29）：设好「访问令牌」之后，
+  #    页面**会把「访问令牌」与「端到端加密口令」两个框一起收起来**，
+  #    于是"写失败"与"写完被收起"在输出上**完全一样**。
+  local pre; pre=$(ax "$1" --role AXTextField --list --json)
+  if [ "$(jget "$pre" found)" != "True" ]; then
+    # ⚠️ **不判红。** 框不在有两种含义：已经设好了（页面收起它），或页面状态不对。
+    #    这里分不开，而**下游有一条真正的判据**（凭据是否够用 → 「立即同步」能不能用 → 同步出不出得去）。
+    #    在这一层猜，只会把"页面状态不对"伪装成"填写失败"，而这一轮我已经被那个伪装
+    #    带偏过好几轮。**报告事实，让端到端判据去判。**
+    ok "「$1」输入框不在树上（可能已经设好、被页面收起）—— 跳过填写，由下游凭据判据裁定"
+    return
+  fi
+  # 🔴 **idb 的 `set-value` 时好时坏，所以这里必须重试。**
+  #
+  # 实测（2026-09-29，同一轮里连测四个字段）：**四次里两次 rc=1**
+  #（「服务器地址」与「粘贴令牌」失败，「邮箱」与「口令」成功）—— 同一个命令、同一个页面。
+  # 而 rc=1 时值**根本没变**。
+  #
+  # ⚠️ 第一版把 `capture_output` 丢掉 ⇒ "工具跑失败了"与"写进去了但回读方式不对"
+  #    **完全一样**（都是 `detail=""`），排查方向被整体带偏了好几轮。
+  #    ⇒ 现在：**看 rc、重试、重试完还不行才报**。
+  local attempt=0 rc="" out="" back=""
+  while [ "${attempt}" -lt 5 ]; do
+    attempt=$((attempt + 1))
+    out=$(ax "$1" --role AXTextField --set "$2" --json)
+    back=$(jget "$out" detail)
+    rc=$(jget "$out" setRc)
+    if [ -z "${rc}" ] || [ "${rc}" = "0" ]; then break; fi
+    sleep 0.6
+  done
+  if [ -n "${rc}" ] && [ "${rc}" != "0" ]; then
+    bad "写「$1」连续 ${attempt} 次都失败（idb rc=${rc}）：$(jget "$out" setErr)"
+    return
+  fi
+  if [ "${attempt}" -gt 1 ]; then
+    ok "「$1」第 ${attempt} 次写入成功（idb 的 set-value 本轮抖了一次）"
+  fi
+  # 🔴 **设完之后框消失 = 成功。**
+  #    判据不能是"回读等于刚写的值"：这个页面会在写成功之后**收起那个字段**
+  #    （孤立实验：设「访问令牌」⇒ rc=0、无 stderr，而它和「口令」一起从树上消失）。
+  #    所以"读不到"有两种含义，必须去问一次框还在不在才能分开。
+  local post; post=$(ax "$1" --role AXTextField --list --json)
+  if [ "${#back}" -eq 0 ] && [ "$(jget "$post" found)" != "True" ]; then
+    ok "已填写「$1」（写成功后页面收起了这个字段 —— 与「写失败」的区分见 set_field 注释）"
+    return
+  fi
   if [ "${3:-}" = "--secure" ]; then
     # 🔴 `secure` 输入框的 AX 回读是**掩码**（一串 •），永远不等于原文。
     #    按逐字比较会报"填写失败"，而它其实成功了 —— 提示词是"回读不符"，
@@ -618,9 +1126,204 @@ set_field() {  # <label> <值> [--secure]
     bad "填写「$1」失败，回读=「${back}」"
   fi
 }
+# 🔴 **先清空凭据，拿到一个确定的初态。**
+#
+# 实测（2026-09-29）：「我的」页**会把已经设好的字段隐藏** —— 令牌设过之后
+# 树里就只剩「服务器地址」一个输入框了。而下面三句 `set_field` **假设三个都在**，
+# 于是在"令牌已经设过"的设备上，第二、三句会报"回读为空"，
+# 而真因是**那个框根本不在** —— 症状（"写不进去"）与病因（"框不存在"）完全不像。
+#
+# ⚠️ 这不是产品缺陷：页面的状态是**诚实**的（它的状态栏会写
+# "还没设置端到端加密口令，同步已停止 —— heyta 不会以明文上传"）。
+# 错的是夹具**假设了一个无状态的表单**。
+#
+# ⇒ 这个按钮本来就在页面上（「清除本机保存的凭据」），点它即可。
+# ── 5b. 🔴 **走产品自己的主路径**：「注册 / 登录」 ────────────────────────────
+#
+# 🔴 **为什么必须搬到这条路上来**
+#
+# 下面那段「手动填写凭据」是页面**自己标注的兜底路径**（原文：「下面是手动填写凭据的
+# 兜底路径」）。实测（2026-09-29，见交接 §3）它**不是为逐字段自动化写的**：
+# 任何一次**写成功**都会把这一段收起，于是"写失败"与"写完被收起"在输出上**完全一样**。
+# 继续修它 = 修错了对象。
+#
+# 而主路径（本步）有三个好处：
+#   1. 它是**产品的主路径**，验它才有意义；
+#   2. 它**正好是本次目标那条硬要求** ——「注册/登录必须前置，不能把认证藏在设置里」；
+#   3. 它的字段**接受写入**（实测 服务器地址/邮箱/口令 rc=0）。
+#
+# 认证页实测形状（点「注册 / 登录」之后）：
+#   返回 / 服务器地址 / 邮箱 / 端到端加密口令 / 注册新账号 /
+#   用通行密钥登录 / 用通行密钥注册 / 粘贴邮件里的链接或令牌
+# 贴了令牌之后出现提交按钮：**「验证并登录」**。
+CREDS_OK=0
+
+# 🔴 **回读"认证页真的出现了吗"**（判据是「邮箱」框，不是 press 的返回值）。
+if press_until "注册 / 登录" "邮箱" 3; then
+  ok "已进入认证页（**回读到「邮箱」才判成功**）"
+else
+  bad "「注册 / 登录」按了 3 次都没进认证页 —— 夹具问题，不是产品问题"
+  FIXTURE_UNRELIABLE=1
+fi
+
+if [ "$(jget "$(ax "验证并登录" --pressable --list --json)" found)" = "True" ] \
+   || [ "$(jget "$(ax "粘贴邮件里的链接或令牌" --list --json)" found)" = "True" ]; then
+  ok "已进入认证页（主路径）"
+  # 🔴 **令牌必须最先填。**
+  #
+  # 实测（2026-09-29）：这个字段在页面的**最下面**，实测 frame `y≈1018`，
+  # 而屏幕只有 **874** 高 —— **它在屏幕外**，所以按坐标写的 `set-value` 报
+  #   `The axbridge backend found no element at (201.0, 1018.0); the point is empty`
+  # 而连写 5 次都一样。
+  #
+  # ⚠️ **不能靠滚动解决**：`idb ui swipe … --duration 400` 实测**挂死**
+  #（90 秒超时都不返回），`idb ui scroll` 则是"报错但什么都不做"（AGENTS §7 记过）。
+  # ⇒ 唯一可行的办法是**抢在键盘弹出与这一段重排之前**填它 —— 也就是**第一个填**。
+  # 写之前再清一次：它是系统弹窗，**会盖住那个字段**，而 `set-value` 是按坐标的。
+  dismiss_ios_save_password || true
+  # 🔴 它在折线以下（实测 y=1031 > 屏幕 874）—— **先滚进可见区**。
+  scroll_into_view "粘贴邮件里的链接或令牌"
+  set_field "粘贴邮件里的链接或令牌" "$TOKEN"
+  set_field "服务器地址" "$HOST_SERVER"
+  set_field "邮箱" "$EMAIL"
+  set_field "端到端加密口令" "$E2EE" --secure
+  # 🔴 填过 secure 字段之后，iOS 可能弹「保存密码？」—— **必须先关掉它**，
+  #    否则它盖住页面、且让 AX 树只剩 Application（见 dismiss_ios_save_password 的说明）。
+  dismiss_ios_save_password || true
+
+  # 收键盘 —— 提交按钮会被键盘盖住（与第 5 步同一套手法）。
+  for _ in 1 2 3; do
+    if [ "$(jget "$(ax --keyboard)" present)" != "True" ]; then break; fi
+    ax --tap 200 150 >/dev/null 2>&1
+    sleep 1
+  done
+
+  SUBMIT=$(ax "验证并登录" --pressable --list --json)
+  if [ "$(jget "$SUBMIT" found)" = "True" ]; then
+    ok "认证页上有提交按钮「验证并登录」"
+    ax "验证并登录" --pressable --press --json >/dev/null 2>&1
+    # 首次同步含纯 JS Argon2id 派生，实测约 50 秒 —— 给足时间，并轮询而不是定长 sleep。
+    for _i in $(seq 1 40); do
+      sleep 3
+      _back=$(ax "立即同步" --pressable --list --json)
+      if [ "$(jget "$_back" found)" = "True" ] && [ "$(jget "$_back" enabled)" = "True" ]; then
+        CREDS_OK=1
+        ok "🔴 主路径走通了：贴令牌 → 验证并登录 → 回到「我的」且「立即同步」已可用（等了 $((_i * 3)) 秒）"
+        break
+      fi
+    done
+    if [ "$CREDS_OK" -ne 1 ]; then
+      bad "主路径没能把凭据带进活配置 —— 退回下面的兜底路径"
+      ax "返回" --pressable --press --json >/dev/null 2>&1
+      sleep 2
+    fi
+  else
+    bad "认证页上找不到「验证并登录」—— 令牌可能没贴进去，退回兜底路径"
+    ax "返回" --pressable --press --json >/dev/null 2>&1
+    sleep 2
+  fi
+else
+  bad "进不了认证页 —— 「注册 / 登录」点了没反应，退回兜底路径"
+fi
+
+# 🔴 **兜底路径之前，必须确认真的回到了「我的」页。**
+#
+# 实测（2026-09-29）：上面那两处 `ax "返回"` 都**调用过**了，而兜底那三句仍报
+# "框不在树上" —— 因为**页面根本没切回去**（停在认证页）。
+# 与 composer 那次「按了『添加』但面板还开着」是**同一类**：
+# **shim 报成功、应用没收到**。⇒ 判据只能是"回读到「我的」页了吗"。
+#
+# ⚠️ 而这一条**很关键**：「我的」页的手动凭据表单三个框实测在 y=488/647/733
+# —— **全部在可见区内**，所以**这条路不需要滚动**（滚动在原语上就驱动不了，见 §5.1l）。
+# 🔴 **判据用"认证页的标志消失"，不是"「我的」的东西出现"。**
+#
+# 实测（2026-09-29，第 41 轮）：上一版查的是"能不能找到「立即同步」" ——
+# 而「立即同步」**只在「我的」页**，认证页上找不到它，看起来是个合格的判据。
+# 但那条路依赖 `ax "返回"` **一次就成功**，而它实测**不可靠**。
+# ⇒ 改用与 0.5 步同一个结构性模式：**按「返回」直到「邮箱」消失**（那才是"离开了认证页"）。
+# 🔴🔴 **判据必须是"离开认证页"**并且**"到了「我的」"—— 两者是两件事。**
+#
+# 实测（2026-09-29，第 41 轮）：只判"「邮箱」消失"时它**绿了**，而兜底那三句
+# 紧接着报"三个框都不在树上" —— 诊断里连「立即同步」都找不到。
+# 也就是说：**它确实离开了认证页，但**没到「我的」**（可能是被丢回任务页）。
+#
+# ⚠️ 同一类错的第三次：**判据只覆盖了"我离开了吗"，没覆盖"我到对地方了吗"。**
+# 🔴🔴 **离开认证页之后必须再清一次系统弹窗。**
+#
+# 实测（2026-09-29，第 42 轮）：上面填完 `secure` 字段时调过一次 `dismiss_ios_save_password`，
+# 而弹窗是**稍后**才出现的（字段失焦/表单提交之后）。于是到这一步时树已经退化，
+# 9 个标签**一个都查不到**（现场 dump 全空），而症状是"按了「我的」没反应"。
+#
+# ⚠️ 判据（树只剩 `AXApplication`）已经在 `dismiss_ios_save_password` 里，
+#    缺的只是**在这一刻再调一次**。
+dismiss_ios_save_password || true
+
+LEFT=0; ARRIVED=0
+press_until_gone "返回" "邮箱" 4 && LEFT=1
+# 手动凭据表单的「服务器地址」框**只在「我的」页**，所以它是"到了"的判据。
+press_until "我的" "服务器地址" 3 && ARRIVED=1
+if [ "${LEFT}" -eq 1 ] && [ "${ARRIVED}" -eq 1 ]; then
+  ok "已离开认证页**并**到达「我的」（判据是「邮箱」消失 **且** 「服务器地址」出现）"
+else
+  bad "没回到「我的」（离开认证页=${LEFT}，到达「我的」=${ARRIVED}）—— 兜底填写一定失败，而它会伪装成「字段写不进去」"
+  # 🔴 **现场必须可归因**：把"当时到底在哪个屏"打出来。
+  #    第 42 轮的实测里，这里既找不到「我的」也找不到「立即同步」，
+  #    而**标签导航本身是可靠的**（同一轮实测按「任务」/「我的」3/3 成功）——
+  #    所以"它现在是什么屏"才是唯一的线索，而当时输出里**没有**它。
+  echo "   ── 现场：当时树上的标签（前 12 个）──"
+  for _l in "任务" "我的" "注册 / 登录" "返回" "立即同步" "新建任务" "先离线使用" "服务器地址" "邮箱"; do
+    [ "$(jget "$(ax "${_l}" --list --json)" found)" = "True" ] && echo "     ✅ ${_l}"
+  done
+  FIXTURE_UNRELIABLE=1
+fi
+
+CLEAR_BTN=$(ax "清除本机保存的凭据" --pressable --list --json)
+if [ "$(jget "$CLEAR_BTN" found)" = "True" ]; then
+  ax "清除本机保存的凭据" --pressable --press --json >/dev/null 2>&1
+  # 🔴 **等三个字段都出现，不要固定 `sleep`。**
+  #
+  # 实测（2026-09-29）：这个页面的三个凭据框在**任何**状态下都在
+  #（连点两次清除、离开再回来，dump 出来都是三个）—— 也就是说
+  # "框不在树上"**不是状态**，而是**时序**：点完清除的那一刻页面在重渲染，
+  # 字段被卸载又挂回，固定 `sleep 2` 会读到中间态。
+  #
+  # ⚠️ 症状极具误导性：读到的中间态是"只有服务器地址"，于是脚本报
+  #    「找不到『访问令牌』输入框」，看起来像"页面把它收起来了"——
+  #    我为此查了两轮状态机（还改过填写顺序），而真相是**读早了**。
+  FIELD_ROUND=0
+  for _i in $(seq 1 15); do
+    _f1=$(ax "服务器地址" --role AXTextField --list --json)
+    _f2=$(ax "访问令牌" --role AXTextField --list --json)
+    _f3=$(ax "端到端加密口令" --role AXTextField --list --json)
+    if [ "$(jget "$_f1" found)" = "True" ] && [ "$(jget "$_f2" found)" = "True" ] && [ "$(jget "$_f3" found)" = "True" ]; then
+      FIELD_ROUND=$_i; break
+    fi
+    sleep 1
+  done
+  if [ "$FIELD_ROUND" -ge 1 ]; then
+    ok "已清除本机凭据，三个字段都就位（等了 $FIELD_ROUND 秒）—— 下面按确定初态填"
+  else
+    bad "15 秒内没有同时看到三个凭据字段 —— 页面状态不对，后面的填写会误报"
+  fi
+else
+  ok "本机没有可清除的凭据（全新设备）—— 直接填"
+fi
+
+if [ "${CREDS_OK}" -eq 1 ]; then
+  ok "主路径已经把凭据配好 —— **跳过兜底路径的手动填写**（下面那三句不再执行）"
+else
 set_field "服务器地址" "$HOST_SERVER"
-set_field "访问令牌" "$TOKEN"
+# 🔴 **口令必须在令牌之前 —— 因为"写成功"会把这两个框一起收起。**
+#
+# 实测（2026-09-29，两次独立探针，互为对照）：
+#   · `set-value` **rc=0（成功）** ⇒ 「访问令牌」与「端到端加密口令」**双双从树上消失**；
+#   · `set-value` **rc=1（失败）** ⇒ 三个框**原样都在**、值也没变。
+# ⇒ 字段消失是**写成功之后**的页面行为，不是状态机、也不是读早了。
+#   所以先填令牌会让后面那句 `set_field "端到端加密口令"` 连框都找不到 ——
+#   顺序在这里是**语义**，不是风格。
 set_field "端到端加密口令" "$E2EE" --secure
+set_field "访问令牌" "$TOKEN"
+fi
 
 # ── 收键盘：**必须先收**，否则下面点的不是按钮 ────────────────────────────
 #
@@ -647,9 +1350,30 @@ else
   ok "软键盘已收起（否则「立即同步」的点击会被键盘吞掉）"
 fi
 
-SYNC_BTN=$(ax "立即同步" --pressable --wait 5 --list --json)
+# 🔴 **等到按钮回到空闲态，而不是只等 5 秒。**
+#
+# 按钮的文案是 `busy ? '正在同步…' : '立即同步'`（`ProfileScreen.tsx`）。
+# 所以**只要有同步在跑，就找不到「立即同步」** —— 而首次同步含纯 JS Argon2id
+# 派生，实测约 50 秒。只等 5 秒会在"刚好有同步在跑"时**假红**。
+#
+# 实测：这一条在 2026-09-29 的一轮里 **3 次红 2 次**，而每次的失败信息都只有
+# "找不到按钮" —— 完全不可归因。等 + 打印现场之后才看清是 busy 态。
+# ⚠️ **等的是 `found && enabled`，不是 `found`。**
+#    这个按钮**一直都在**（`disabled={!configured}`）—— 变的只是 `enabled`。
+#    所以"等它出现"等于没等：第一版就是这么写的，于是它立刻返回、
+#    然后下面那条 `enabled` 断言红掉（`凭据填齐了但「立即同步」仍是禁用`）。
+#    ⇒ 等待的**条件**本身写错了，这类错比超时更难发现 —— 因为它不超时。
+SYNC_BTN='{"found":"False","enabled":"False"}'
+SYNC_WAIT_ROUND=0
+for _i in $(seq 1 40); do
+  SYNC_BTN=$(ax "立即同步" --pressable --list --json)
+  if [ "$(jget "$SYNC_BTN" found)" = "True" ] && [ "$(jget "$SYNC_BTN" enabled)" = "True" ]; then
+    SYNC_WAIT_ROUND=$_i; break
+  fi
+  sleep 3
+done
 if [ "$(jget "$SYNC_BTN" found)" = "True" ]; then
-  ok "找到「立即同步」按钮 @($(jget "$SYNC_BTN" x),$(jget "$SYNC_BTN" y))"
+  ok "找到「立即同步」按钮 @($(jget "$SYNC_BTN" x),$(jget "$SYNC_BTN" y))（等了 $((SYNC_WAIT_ROUND * 3)) 秒）"
   if [ "$(jget "$SYNC_BTN" enabled)" = "True" ]; then
     ok "凭据填齐后「立即同步」已启用"
   else
@@ -671,7 +1395,18 @@ if [ "$(jget "$SYNC_BTN" found)" = "True" ]; then
       ;;
   esac
 else
-  bad "找不到「立即同步」按钮 —— 无法验证跨设备"
+  # 🔴 **失败必须可归因。**
+  # 这一条在 2026-09-29 的一轮里连红了两次，而输出只有"找不到按钮" ——
+  # 既不知道当时界面上有什么，也不知道是树读空了、页面被滚走了、
+  # 还是 app 根本没在前台。把 AX 树打出来，下一次就不用靠猜。
+  bad "120 秒内「立即同步」都没变成可用（凭据没写进活配置）—— 无法验证跨设备"
+  # 🔴 现场必须能回答"按钮在不在、在的话是什么文案"。
+  #    ⚠️ shim **没有 `--dump`**（`ax - --dump` 会走 argparse 报错、静默输出空），
+  #       所以这里改用宽泛 label 去问 —— 找得到就说明它在，只是**正忙**。
+  echo "   ── 现场：按宽泛 label「同步」找 ──"
+  ax "同步" --pressable --list --json 2>/dev/null | sed 's/^/     /' || true
+  echo "   ── 现场：按宽泛 label「正在同步」找 ──"
+  ax "正在同步" --pressable --list --json 2>/dev/null | sed 's/^/     /' || true
   summary "iOS 输入侧"
 fi
 
@@ -729,7 +1464,7 @@ esac
 #       （并进去等于说"它在云上"，而服务端刚拒绝了它）。
 #
 #       ⚠️ 因此下面**恢复断言**：好 op 必须离开待上传队列。
-UPLOADED=$(sqlite3 "$PHONE_DB" "SELECT json_extract(data,'\$.uploadStatus') FROM ops WHERE ix0_0='$OP_ID';" 2>/dev/null)
+UPLOADED=$(sqlite3 "${PHONE_DB}" "SELECT json_extract(data,'\$.uploadStatus') FROM ops WHERE ix0_0='$OP_ID';" 2>/dev/null)
 # 🔴 ADR-0019 之后这是一条**真断言**（原先因为那个缺陷只能"只观察、不断言成功"）：
 #    好 op 必须离开待上传队列。还停在 pending，说明那条"上传失败挡住下载"的链又回来了。
 if [ "$UPLOADED" = "uploaded" ]; then
@@ -810,5 +1545,69 @@ case "$WAIT_RC2" in
   2) bad "笔记本探针**自己**坏了（不是产品问题，不算同步失败）：$ROUND2" ;;
   *) bad "笔记本 150 秒内没读到第二条「${TITLE2}」" ;;
 esac
+
+# ── 7. 🔴 实时通道（**入站**方向）：服务端推，这台**不点也收到** ─────────────
+#
+# 第 6 步验的是**出站**（本地写入 → 上传）。实时通道的另一半从来没在设备上验过：
+# **服务端主动推 → app 不点也收到、并把那条任务落进自己的库**。
+#
+# 🔴 为什么这一条**只能是设备上的端到端**：
+# `buildRealtimeUrl` 的路径曾经是错的（`/ws`，而服务端注册在 `/api/sync/ws`），
+# 而客户端测试用的是**假 WebSocket**（任何 URL 都接受），
+# `packages/sync-client/tests/realtime.spec.ts` 还把那个**错路径逐字断言**了下来
+# ⇒ **测试与实现一起错、14 道门禁全绿**。只有"对着真服务端连一次"才看得见。
+# 协议层那条判据现在在 `scripts/verify-realtime-push.mjs`；**这一条验的是 app 自己**。
+#
+# 🔴 归因是干净的，不是"看起来像"：
+# `auto-sync-core.ts` 的触发只有 `notifyLocalWrite` / `notifyForeground` /
+# `notifyConfigured` 三处，**没有定时轮询**（它的注释写着"等 notifyForeground
+# 或 notifyConfigured 再把它带出去"）。所以 app 在**前台闲置**时库里自己多出
+# 那条任务，**只可能**来自推送。
+step "7. 实时通道入站：app 前台闲置，笔记本上传，这台必须自己收到"
+
+# (a) app 的 WebSocket **真的连上了** —— 由**服务端自己**数。
+#     ⚠️ 不看 app 的内部状态：那只能证明"它以为自己连上了"。
+WS_CONN=0
+for _i in $(seq 1 12); do
+  _raw=$(curl -s --noproxy '*' -m 4 "$HOST_SERVER/health" 2>/dev/null)
+  _n=$(printf '%s' "$_raw" | grep -o '"wsConnections":[0-9]*' | head -1 | cut -d: -f2)
+  if [ "${_n:-0}" -ge 1 ]; then WS_CONN=1; break; fi
+  sleep 2
+done
+if [ "$WS_CONN" -ge 1 ]; then
+  ok "服务端报告 wsConnections≥1 —— **app 的实时通道真的连上了**（那个 404 毁掉的正是这一条）"
+else
+  bad "服务端 wsConnections 一直是 0 —— app 的实时通道没连上（端点 / 令牌 / 订阅时机）"
+fi
+
+# (b) 让**另一台设备**（笔记本）写一条并上传。这段时间 app **一直前台、没人碰它**。
+TITLE3="ios-realtime-$(date +%H%M%S)"
+if laptop_ok add "$TITLE3" >/dev/null; then
+  ok "笔记本建了一条：$TITLE3"
+else
+  bad "笔记本 add 失败 —— 入站这条判据没法继续"
+fi
+if laptop_ok sync >/dev/null; then
+  ok "笔记本 sync 成功（服务端会向**其他客户端**广播 new_ops）"
+else
+  bad "笔记本 sync 失败 —— 服务端不会广播，这条判据会假红"
+fi
+
+# (c) 🔴 最强的那条：**那条任务**必须出现在 app 自己的库里，而没人碰过它。
+#     只数"op 数涨了"是不够的 —— 涨的可能是一条无关的 op。
+#     按 `payload.title` 找（与第 4 步同一个查法，那里的列名踩过坑：op id 在
+#     `ix0_0` 而不是 `pk0`）。
+INBOUND_ROUND=0
+for _i in $(seq 1 30); do
+  sleep 2
+  _hit=$(sqlite3 "${PHONE_DB}" \
+    "SELECT COUNT(*) FROM ops WHERE json_extract(data,'\$.op.payload.title')='$TITLE3';" 2>/dev/null | tr -d ' ')
+  if [ "${_hit:-0}" -ge 1 ]; then INBOUND_ROUND=$_i; break; fi
+done
+if [ "$INBOUND_ROUND" -ge 1 ]; then
+  ok "app 在第 $((INBOUND_ROUND * 2)) 秒**自己**收到了「${TITLE3}」—— 服务端推 → 收到 → 拉取落库，全程没人碰它"
+else
+  bad "60 秒内 app 库里没有「${TITLE3}」—— 推送没到，或到了没触发同步（两个都是真的失效）"
+fi
 
 summary "iOS 输入侧"

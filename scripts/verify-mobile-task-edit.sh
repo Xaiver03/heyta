@@ -85,6 +85,7 @@ $ADB install -r "$APK" 2>&1 | tail -1 | sed 's/^/   /'
 $ADB shell pm clear $PKG >/dev/null 2>&1
 $ADB shell am force-stop $PKG; sleep 1
 $ADB shell monkey -p $PKG -c android.intent.category.LAUNCHER 1 >/dev/null 2>&1; sleep 6
+dismiss_welcome_if_present   # 首次启动的欢迎页会盖住主界面（规范 §3.1）——先离开它
 dump
 if [ "$(has_text "任务")" = "1" ]; then ok "应用已启动"; else bad "应用没起来"; screen_txt; fi
 

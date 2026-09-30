@@ -93,7 +93,7 @@ TAB_Y=2253
 #    所以唯一可行的办法是把库整个拉下来。
 phone_db_pull() {
   $ADB root >/dev/null 2>&1; sleep 2
-  $ADB pull /data/data/com.heytamobile/databases/heyta.sqlite "$PHONE_DB" >/dev/null 2>&1
+  $ADB pull /data/data/com.heyta/databases/heyta.sqlite "$PHONE_DB" >/dev/null 2>&1
   $ADB unroot >/dev/null 2>&1
 }
 
@@ -136,7 +136,8 @@ $ADB install -r "$APK" 2>&1 | tail -1 | sed 's/^/   /'
 # 它们会让本次"落盘了几条"的断言含混。`pm clear` 是唯一能拿到确定初态的办法。
 $ADB shell pm clear $PKG >/dev/null 2>&1
 $ADB shell am force-stop $PKG; sleep 1
-$ADB shell am start -n $PKG/.MainActivity >/dev/null 2>&1; sleep 12
+launch_app; sleep 12
+dismiss_welcome_if_present   # 首次启动的欢迎页会盖住主界面（规范 §3.1）——先离开它
 [ -n "$($ADB shell pidof $PKG 2>/dev/null | tr -d '\r')" ] && ok "应用已启动" || bad "应用没起来"
 
 heyta_e2e_assert_client_budget || bad "账号 client 数已逼近向量时钟上限（后续断言不可信）"

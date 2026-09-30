@@ -21,8 +21,8 @@
 set -u
 export PATH="/opt/homebrew/bin:$PATH"
 
-ADB="adb -s emulator-5554"
-PKG=com.heytamobile
+ADB="adb -s ${HEYTA_E2E_SERIAL:-emulator-5554}"
+PKG=com.heyta
 # 🔴 这两个**必须**是绝对路径，不能是"仓库根相对"。
 #
 #    实测：脚本一旦不是从仓库根跑（例如 `cd scripts && bash verify-mobile-ios.sh`），
@@ -92,6 +92,29 @@ PASS=0; FAIL=0
 ok()   { echo "   ✅ $1"; PASS=$((PASS+1)); }
 bad()  { echo "   ❌ $1"; FAIL=$((FAIL+1)); }
 step() { echo ""; echo "════ $1 ════"; }
+
+# 有没有**别的**移动端验收正在跑（排除自己）。输出那一行进程（没有则输出空）。
+#
+# 🔴 为什么需要它：这些脚本都会 `pm clear` + 装包 + 按坐标点击，
+#    **同一台模拟器上并行跑两个 = 互相把对方的应用状态清掉**。症状是
+#    满屏"找不到按钮""应用没起来" —— 看起来像产品坏了，其实只是撞车。
+#    这种"环境造成的假红"必须能被**说出来**，而不是让人去猜。
+#
+# ⚠️ `$$` 在命令替换的子 shell 里仍是**父 shell 的 pid**（bash 的规定），
+#    但那个子 shell **自己的 pid 却不是** `$$` —— 而它的 argv 与本脚本逐字相同
+#    （`ps` 里就是一行 `bash scripts/verify-mobile-auth.sh`）。所以只排除 `$$`
+#    会把**自己**当成"别人"（实测踩过：脚本刚启动就报"还有别的验收在跑"）。
+#    因此这里同时排除 `$$` 的**直接子进程**（`ppid == me`），并且只认
+#    "直接跑脚本"那一行（`bash -c …` 的包装进程不算：它的 argv 里出现脚本名，
+#    但它并没有驱动设备）。
+another_mobile_e2e_running() {
+  ps -Ao pid=,ppid=,command= > /tmp/_heyta_mobile_e2e_ps.txt 2>/dev/null
+  awk -v me="$$" '
+    $1 == me { next }
+    $2 == me { next }
+    $0 ~ /bash [^ ]*verify-mobile-[a-z-]+\.sh/ && $0 !~ /bash -n/ && $0 !~ /bash -c/ { print; exit }
+  ' /tmp/_heyta_mobile_e2e_ps.txt
+}
 
 # ── UI 辅助 ────────────────────────────────────────────────
 # 抓一次界面快照到 /tmp/ui.xml。
@@ -206,6 +229,14 @@ xy_edit() {
 }
 xy_edit_any() {
   python3 /tmp/_xy.py editany "" 0
+}
+# 🔴 只认**在可点区域里**的输入框（与 `desc-sane` / `text-sane` 同一条理由）：
+#    ScrollView 折叠线以下的节点**仍然在无障碍树里**，但 `bounds` 的 top > bottom
+#    （负高度），它的"中心点"落在键盘或标签栏上 —— 按坐标点下去会点到别的东西，
+#    而调用方看到坐标拿到了、以为点成功了。
+#    注册/登录面板比一屏长（三个字段 + 同意项 + 六个动作），必然会用到它。
+xy_edit_sane() {
+  python3 /tmp/_xy.py edit-sane "$1" 0
 }
 # 读某个输入框**当前实际内容**。
 #
@@ -473,6 +504,19 @@ scroll_to_text() {
   return 1
 }
 
+# 把一个**输入框**滚进可点区域并返回坐标（失败返回空）。
+# 与 `scroll_to_text` 同一形状，只是限定 EditText（标签和输入框的 desc 相同，
+# 不限定就会点到那行标签文字上 —— `xy_edit` 上面那条注释记着这件事）。
+scroll_to_edit() {
+  for _ in 1 2 3 4 5; do
+    dump
+    XY=$(xy_edit_sane "$1")
+    if [ -n "$XY" ]; then printf '%s' "$XY"; return 0; fi
+    $ADB shell input swipe 540 1900 540 1100 250; sleep 1.5
+  done
+  return 1
+}
+
 # 按标签点一个控件，成功时回显点到的坐标（失败返回 1，坐标为空）。
 #
 # 🔴 RN 的 `Button` 到底把标签放在 `text` 还是 `content-desc` 上，
@@ -511,6 +555,32 @@ restore_ime() {
 }
 trap restore_ime EXIT
 
+# 启动应用（冷启动或已经在后台都能用）。
+#
+# 🔴 为什么**不能**写 `am start -n $PKG/.MainActivity`：改名之后
+#    `applicationId`（`com.heyta`）与 `namespace`（`com.heytamobile`）**不是同一个**，
+#    而 `.MainActivity` 会被 `am` 按**命令里给的那个包名**展开 ——
+#    于是它去找 `com.heyta.MainActivity`，真正的类却是
+#    `com.heyta/com.heytamobile.MainActivity`（由 `namespace` 决定）。
+#
+#    后果不是"报错"，而是**更难查的那一种**：`am start` 失败、输出被
+#    `>/dev/null` 吞掉，而模拟器上装过的**改名前的 `com.heytamobile`** 还留在前台 ——
+#    它长得一模一样。于是脚本报"应用没起来"或"找不到新建按钮"，
+#    而截图里明明有一个界面在跑。
+#
+# `launch_app` 让**系统自己**解析启动项，与包名/命名空间无关。
+# ⚠️ 它**不** force-stop：调用方要冷启动时自己先 force-stop（现有脚本都这样做）。
+#    在这里顺手杀进程会把"从后台拉回前台"变成"冷启动"，而后台路径上的
+#    内存凭据会一起没掉（见下面 `ensure_app_foreground` 的注释）。
+launch_app() {
+  local component
+  component=$($ADB shell cmd package resolve-activity --brief "$PKG" 2>/dev/null | tail -1 | tr -d '\r')
+  case "$component" in
+    "$PKG"/*) $ADB shell am start -n "$component" >/dev/null 2>&1 ;;
+    *) $ADB shell monkey -p "$PKG" -c android.intent.category.LAUNCHER 1 >/dev/null 2>&1 ;;
+  esac
+}
+
 # 把 heyta 拉回前台。
 #
 # 🔴 为什么需要它：系统 ANR 弹窗关掉之后，前台**不一定**回到应用 ——
@@ -518,8 +588,8 @@ trap restore_ime EXIT
 #    （日志里口令被重复 7 次，旁边跟着 `• Search Google`）。
 #    脚本报"字段没填进去"，而真相是**在给别的应用打字**。
 #
-# 用 `am start` 而不是 `monkey`：`monkey` 是随机事件流，会顺带乱点；
-# `am start -n` 是确定的。已经在前面时它是无害的（不会重建 Activity 栈）。
+# 用 `launch_app`（它先解析出**真正的组件名**，`am start` 是确定的）——
+# 而不是 `am start -n $PKG/.MainActivity`，后者在改名之后指向一个不存在的类。
 ensure_app_foreground() {
   local cur
   cur=$($ADB shell dumpsys activity activities 2>/dev/null | grep -m1 topResumedActivity | sed 's/.*u0 //;s/ .*//')
@@ -527,8 +597,47 @@ ensure_app_foreground() {
     "$PKG"/*) return 0 ;;
   esac
   echo "   ↻ 前台是 ${cur}，把 $PKG 拉回来" >&2
-  $ADB shell am start -n "$PKG/.MainActivity" >/dev/null 2>&1
+  # 🔴 用 `monkey`（见 `launch_app` 的注释）：`am start -n "$PKG/.MainActivity"`
+  #    在改名之后指向一个不存在的类，会**静默失败**并把前台留在旧包上。
+  launch_app
+
   sleep 2
+  return 0
+}
+
+# 欢迎页（首次启动覆盖层，规范 §3.1）—— 点「先离线使用」离开它。
+#
+# 🔴 为什么每个验收脚本装完包都要先过这一步
+#
+#   `pm clear` 等价于**全新安装**，而全新安装的第一次冷启动会显示欢迎页，
+#   它**盖住整个主界面**（包括底部标签栏）。不点掉的话：
+#
+#     · `input tap 945 $TAB_Y`（点「我的」）点到的是欢迎页 —— 什么都不会发生；
+#     · 于是 `configure_sync_credentials` 报「找不到输入框：服务器地址」，
+#       排查方向被引去怀疑设置页改版；
+#     · 更坏的是有些脚本**看起来是绿的**：欢迎页的说明文字里也含「任务」二字，
+#       于是「应用已启动」那条断言假通过。
+#
+# ⚠️ 这与"加登录墙"是**两件不同的事**（规范 §0 专门澄清过）：欢迎页有两个
+#    同级出口，点「先离线使用」一步就进主界面，未登录的全部本地功能照常。
+#    所以这一步不是绕过被测功能，而是把设备恢复成"用户已经做过首次选择"的初态。
+#
+# 幂等：不在欢迎页时什么都不做（主界面里根本没有这两个按钮）。
+dismiss_welcome_if_present() {
+  dump
+  if [ "$(has_desc "先离线使用")" != "1" ] && [ "$(has_text "先离线使用")" != "1" ]; then
+    return 0
+  fi
+  local xy
+  xy=$(xy_desc "先离线使用")
+  [ -z "$xy" ] && xy=$(xy_text "先离线使用")
+  if [ -z "$xy" ]; then
+    bad "欢迎页在，但取不到「先离线使用」的坐标（按钮文案改了？）"
+    return 1
+  fi
+  $ADB shell input tap $xy
+  sleep 3
+  echo "     已离开欢迎页（点「先离线使用」@ ${xy}）"
   return 0
 }
 
@@ -945,6 +1054,10 @@ for m in re.finditer(r'<node[^>]*?>', s):
         hits.append((cx, cy))
     elif mode == 'edit' and is_edit and desc == want:
         hits.append((cx, cy))
+    elif mode == 'edit-sane' and is_edit and desc == want:
+        # 与 desc-sane 同一条守卫（理由见上面）—— 只是限定在 EditText 上。
+        if y2 > y1 and cy < 2100:
+            hits.append((cx, cy))
     elif mode == 'editany' and is_edit:
         hits.append((cx, cy))
     elif mode == 'text' and text == want:
