@@ -199,3 +199,193 @@ describe('是管理员：渲染面板与概览', () => {
     expect(String(fetchMock.mock.calls[1]?.[0])).toContain('/api/admin/users');
   });
 });
+
+/* ──────────────────────────────────────────────────────────────────────────
+ * 下面两组是真浏览器那一支（`e2e/tests/admin-console.spec.ts`）查出来的
+ * 两条缺陷的回归判据。它们钉的是**修好之后**的行为 —— 拿掉修复就会红，
+ * 而不是把当时的错误行为钉成期望。
+ * ────────────────────────────────────────────────────────────────────────── */
+
+const T0 = Date.UTC(2026, 8, 20, 4, 0, 0);
+
+function json(body: unknown): Response {
+  return { status: 200, ok: true, json: () => Promise.resolve(body) } as unknown as Response;
+}
+
+/**
+ * 一台**带状态**的假服务端：`/users/7/unlock` 真的把 `locked` 改掉。
+ *
+ * 🔴 这是"界面显示的是服务端的新值"唯一可行的证法 —— 如果假服务端自己不变，
+ * 那么一个只改本地副本的实现也能让断言通过（§7 第 50 条）。
+ */
+function stubAdminServer(): { locked: boolean; listFetches: number } {
+  const state = { locked: true, listFetches: 0 };
+  fetchMock = vi.fn((url: string) => {
+    const path = url.replace(/^.*\/api\/admin/, '').split('?')[0];
+    if (path === '/overview') return Promise.resolve(json(OVERVIEW));
+    if (path === '/users') {
+      state.listFetches += 1;
+      return Promise.resolve(
+        json({
+          items: [userRow(state.locked)],
+          total: 1,
+          limit: 50,
+          offset: 0,
+        }),
+      );
+    }
+    if (path === '/users/7') {
+      return Promise.resolve(
+        json({
+          user: { ...userRow(state.locked), failedLoginAttempts: 5, termsAcceptedAt: null, tokenVersion: 3 },
+          counts: { passkeys: 2, operations: 41, notifications: 3 },
+          subscriptions: [],
+          orders: [],
+          devices: [],
+        }),
+      );
+    }
+    if (path === '/users/7/unlock') {
+      state.locked = false;
+      return Promise.resolve(json({ ok: true }));
+    }
+    if (path === '/invites') {
+      return Promise.resolve(
+        json({
+          codes: {
+            items: [
+              {
+                id: 31,
+                code: 'ABCD2345',
+                disabled: false,
+                createdAt: T0,
+                userId: 1,
+                email: 'boss@example.test',
+              },
+            ],
+            total: 4,
+            limit: 50,
+            offset: 0,
+          },
+          referrals: {
+            items: [
+              {
+                id: 41,
+                code: 'ABCD2345',
+                createdAt: T0,
+                activatedAt: T0 + 1,
+                rewardDays: 5,
+                rewardedAt: T0 + 1,
+                inviter: { id: 1, email: 'boss@example.test' },
+                invitee: { id: 9, email: 'newcomer@example.test' },
+              },
+            ],
+            total: 2,
+            limit: 50,
+            offset: 0,
+          },
+        }),
+      );
+    }
+    return Promise.resolve(json({ items: [], total: 0, limit: 50, offset: 0 }));
+  });
+  vi.stubGlobal('fetch', fetchMock);
+  return state;
+}
+
+function userRow(locked: boolean) {
+  return {
+    id: 7,
+    email: 'locked@example.test',
+    isVerified: true,
+    isAdmin: false,
+    locked,
+    lockedUntil: locked ? T0 : null,
+    createdAt: T0,
+    storageUsedBytes: 100,
+    storageQuotaBytes: 104_857_600,
+  };
+}
+
+/** 让 store 里那条 POST → GET → GET 的链子跑完（微任务在 timer 之前清空）。 */
+async function flush(): Promise<void> {
+  await act(async () => {
+    await new Promise((resolve) => {
+      setTimeout(resolve, 0);
+    });
+  });
+}
+
+async function clickByTestId(el: HTMLElement, testId: string, text: string): Promise<void> {
+  const target = [...el.querySelectorAll(`[data-testid="${testId}"] button`)].find((button) =>
+    (button.textContent ?? '').includes(text),
+  );
+  if (target === undefined) throw new Error(`找不到 ${testId} 里的「${text}」`);
+  await act(async () => {
+    (target as HTMLButtonElement).click();
+  });
+  await flush();
+}
+
+async function clickTab(el: HTMLElement, label: string): Promise<void> {
+  const tab = [...el.querySelectorAll('[role="tab"]')].find((entry) => entry.textContent === label);
+  if (tab === undefined) throw new Error(`找不到标签页「${label}」`);
+  await act(async () => {
+    (tab as HTMLButtonElement).click();
+  });
+  await flush();
+}
+
+describe('🔴 邀请页必须把响应的两面都渲染出来', () => {
+  it('codes.items 非空 ⇒ 界面上有邀请码列表（缺陷：拉回来却一块都不渲染）', async () => {
+    stubAdminServer();
+    const el = await renderPanel();
+    await clickTab(el, '邀请');
+
+    const codes = el.querySelector('[data-testid="admin-codes"]');
+    expect(codes).not.toBeNull();
+    expect(codes!.textContent).toContain('ABCD2345');
+    expect(codes!.textContent).toContain('boss@example.test');
+    // 新列表不该把原有那一面挤掉。
+    expect(el.querySelector('[data-testid="admin-referrals"]')!.textContent).toContain(
+      'newcomer@example.test',
+    );
+  });
+});
+
+describe('🔴 动作之后，列表与详情都要重新读回服务端', () => {
+  it('解锁后，用户列表那一行的「已锁定」徽标必须消失', async () => {
+    const state = stubAdminServer();
+    const el = await renderPanel();
+    await clickTab(el, '用户');
+
+    const badge = () =>
+      [...el.querySelectorAll('[data-testid="admin-users"] .ht-settings__admin-badge')].filter(
+        (node) => (node.textContent ?? '').includes('已锁定'),
+      );
+    expect(badge()).toHaveLength(1);
+    expect(state.listFetches).toBe(1);
+
+    await clickByTestId(el, 'admin-users', 'locked@example.test'); // 打开详情
+    const detail = el.querySelector('[data-testid="admin-user-detail"]');
+    expect(detail).not.toBeNull();
+    await clickIn(detail as HTMLElement, '解锁账号');
+
+    // 🔴 判据在这里：徽标消失**只能**来自第二次列表请求（假服务端真的解了锁）。
+    // 拿掉 `reloadAfterUserAction` 里那句 `loadUsers` ⇒ 这里仍是 1 个徽标 ⇒ 红。
+    expect(badge()).toHaveLength(0);
+    expect(state.listFetches, '动作后必须重新拉列表，否则那一行停在旧值').toBe(2);
+  });
+});
+
+/** 在详情面板里按文字找按钮并点它（三个动作的控件都只在详情里）。 */
+async function clickIn(scope: HTMLElement, text: string): Promise<void> {
+  const button = [...scope.querySelectorAll('button')].find((node) =>
+    (node.textContent ?? '').includes(text),
+  );
+  if (button === undefined) throw new Error(`找不到按钮「${text}」`);
+  await act(async () => {
+    (button as HTMLButtonElement).click();
+  });
+  await flush();
+}

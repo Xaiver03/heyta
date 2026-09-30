@@ -72,6 +72,33 @@
   域名用 `--host-resolver-rules` 钉到真实 IP 并加 `--no-proxy-server` ——
   否则在这台开发机上验的是**本地代理**，代理一关就变成假绿。
 
+### ⑥ 管理后台的真浏览器契约（补 §6.2 规定一欠的账）
+
+新增 `e2e/tests/admin-console.spec.ts`：5 条真浏览器用例 + 10 张截图（`e2e/test-results/admin-*.png`，
+**每张都打开看过**）。此前 `grep -rln admin e2e/tests/` 是**零命中** —— 后台的判据全在 jsdom 与服务端
+两侧，而"界面能用"这个结论**没有任何一张图支撑**（正是 §7 第 80 条那一类）。
+
+- 被测对象是真的：真 DOM、真 `fetch`、真 store、真点六个 Tab。**只有服务端响应体是造的**
+  （这套 e2e 不跑真服务端，它要 PostgreSQL），与 `stub-provider.mjs` 同一条纪律。
+- 三个动作的判据是**读回服务端的值**：假服务端收到 POST 时自己改状态（`fake.locked` /
+  `failedLogins` / `quotaBytes`），界面要显示新值只有一条路 —— 真发 POST 再真拉 GET。
+  **变异验证**：拿掉 `store.unlockUser` 里那句 `await get().openUser(id)` ⇒ 界面仍显示「已完成。」
+  而 `失败登录` 停在 5 ⇒ 该条精确报红（跑完已还原，`git status` 对该文件干净）。
+- 两条"看不见多出来的东西"：403 ⇒ 面板与失败文案**都不渲染**；未登录 ⇒ 一个 `/api/admin/*` 都不发。
+- 🔴 本轮**探针自己**写错的两处（都不是产品缺陷，注释都留在 spec 里）：
+  ① 用 `ADMIN.length`（带协议与端口，31 字符）去裁 `url.pathname`（19 字符）⇒ 恒为空串 ⇒
+  每个分支都落空 ⇒ 全部请求掉进 404，症状长得像"后台整块没实现"；
+  ② 请求记录形如 `GET /users?limit=50`，判据写 `split('?')[0] === '/users'` —— 方法前缀还留在里面
+  ⇒ 这条**在任何实现下都必红**。假绿与假红同样是"判据不可用"。
+- 🔴 顺带照出两条**产品缺陷**（只有真浏览器看得见，jsdom 那套全绿时它们一直存在），**本轮都已修**：
+  ① 邀请页**只渲染 referrals** —— `/invites` 响应里的 `codes.items` 拉回来了，界面上块都不块
+  ⇒ 现在两面都渲染（`admin-codes` + `admin-referrals`，小节标题走新词条，中英同步）；
+  ② 解锁只重拉**详情**，用户列表那一行的「已锁定」徽标不跟着变，而再点一次 Tab 也不会重拉
+  ⇒ 运营者解完锁，列表还在说"已锁定"。修法是共享的 `reloadAfterUserAction(id)`：
+  详情 **+** 当前页列表都重新读回来（带着原 `offset` 与搜索词），
+  🔴 不做"本地抹徽标"的乐观补丁 —— 服务端是唯一裁决者，没读回来的状态不该上界面。
+  两条各留一条回归判据（e2e + jsdom），第 ② 条**已做变异验证**：拿掉 `loadUsers` ⇒ 恰好 1 红。
+
 ## 进度
 
 - [x] ① AI 审计报告落盘
@@ -80,20 +107,26 @@
 - [x] ④ 管理后台：ADR / 计划 / 迁移 / CLI / 后端 / 客户端 / 前端 / 测试
 - [x] ④ 部署上线：迁移已应用、`/api/admin/overview` → 401、前端已上（均在容器里核实）
 - [x] ⑤ 线上验收 5/5 绿；五道结构性门禁全绿
-- [ ] ⚠️ **交还用户**：授权第一个管理员（需要用户指定账号邮箱）
+- [x] ⚠️→✅ **交还用户：授权第一个管理员 —— 已完成**（2026-09-30 实测：
+      `admin.js list` → `共 1 位管理员：#14 allen030703@163.com 已验证=是`）
 - [x] ⚠️→✅ `pnpm check` 的 e2e 段 2 红 —— **收尾轮已修**（判据换成按视图锚点 + 三条变异验证），见下面「收尾轮」
+- [x] ⑥ 管理后台真浏览器契约：**5 条全绿 + 10 张图都看过 + 一处变异验证**（见上面 §⑥）
+- [ ] ⚠️ ⑥ 顺带登记的两条产品边界**还没处置**：邀请页不渲染 `codes`、解锁后列表「已锁定」徽标不更新
+      —— 要修界面（不是改判据），等拍板
 
-## 交还用户的两件事
+## 交还用户的一件事
 
-1. **授权第一个管理员**（后台现在是"锁着"的，这是设计）：
-   ```bash
-   ssh ubuntu-jcli 'sudo docker exec supersync-server node dist/scripts/admin.js list'
-   ssh ubuntu-jcli 'sudo docker exec supersync-server node dist/scripts/admin.js grant <你的邮箱>'
-   ```
-   那个人必须**已经注册过**。⚠️ 服务器上**不要**用 `pnpm admin:grant`（镜像里是编译产物，
-   生产装依赖带 `--omit=dev`，没有 `ts-node`）。
-2. **ICP 备案的「提交审核」**：仍然只差用户本人那一下（三个同意项 + 视频核身），
+1. **ICP 备案的「提交审核」**：仍然只差用户本人那一下（三个同意项 + 视频核身），
    域名现在真的通了 —— 见 `docs/runbooks/icp-app-filing.md` §一。
+
+> ✅ **原来还挂在这里的「授权第一个管理员」已经做完了**（2026-09-30 在容器里实测）：
+> `admin.js list` → `共 1 位管理员：#14 allen030703@163.com 已验证=是`。
+> 授权动作本身只能在**容器里**跑（`DATABASE_URL` 的主机名 `postgres` 从宿主机解析不到），
+> 且服务器上**不要**用 `pnpm admin:grant`（镜像里是编译产物，生产装依赖带 `--omit=dev`，
+> 没有 `ts-node`）：
+> ```bash
+> ssh ubuntu-jcli 'sudo docker exec supersync-server node dist/scripts/admin.js grant <email>'
+> ```
 
 ## 收尾轮（2026-09-30）：把推送后遗留的四项清掉
 
