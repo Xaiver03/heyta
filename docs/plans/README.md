@@ -31,10 +31,11 @@
 | [`site-and-parity-alignment.md`](site-and-parity-alignment.md) | 1,739 | 规划中 | 🟡 **A 轨（站点）已交付**；**B 轨（能力 gap）按主计划 §5.5 重排** —— 原排序是 Web 优先的，与"Web 不是主战场"矛盾 |
 | [`desktop-packaging-handoff.md`](desktop-packaging-handoff.md) | 307 | 已交付 | ✅ 三端安装包已交付且实测"装完能起来"；剩余空白见其 §4 |
 | [`multi-end-unified-strategy-handoff.md`](multi-end-unified-strategy-handoff.md) | 257 | 交接 | 🔴 **主计划 ①–⑩ + G0/G4 全部做完并验证**；**唯一没绿的是 iOS 真机验收（34/9）**，根因已钉死（兜底凭据路径的自动化走不通）＋已排除的假设清单。**接手先读它 §5** |
-| [`desktop-storage-host-handoff.md`](desktop-storage-host-handoff.md) | 246 | 交接 | 🟢 **A（macOS 定案 = M2）已完成**；**B 的 Windows 端已验到绿**（页侧 `STORAGE=shell` + 从壳外扫到载荷与 `ops` 表 + **重启之后还在**，证据在 `apps/desktop-windows/evidence/storage-host/`）。**默认开关已翻**；macOS 的**壳侧托管**也已验绿，**只剩 WKWebView 接线**。**接手先读它 §2.4 + §5** |
+| [`desktop-storage-host-handoff.md`](desktop-storage-host-handoff.md) | 246 | 交接 | 🟢 **A（macOS 定案 = M2）已完成**；**B 的 Windows 端已验到绿**（页侧 `STORAGE=shell` + 从壳外扫到载荷与 `ops` 表 + **重启之后还在**，证据在 `apps/desktop-windows/evidence/storage-host/`）。**默认开关已翻**；**macOS 的 WKWebView 接线也已完成**（真应用走壳 SQLite + 从壳外读到数据）。⚠️ **D 也已完成**；macOS 窗口门禁那条缺陷**已修**（判据改到 WebView 快照上）。**四件事 A/B/C/D 全部交付**；唯一待定的是**产品选择**（壳里主鉴权机制，不在四件事内）。**接手先读它 §6** |
 | [`multi-end-unified-strategy-reflection.md`](multi-end-unified-strategy-reflection.md) | 49 | 复盘 | 🔴 **判断为何失效**：本轮 6 处「判据看起来在工作、其实什么都没判」（其中 4 处是我在修前一处时写出来的）+ 两次「查错对象」得出**反向结论** |
 | [`waytofuture-handoff.md`](waytofuture-handoff.md) | 286 | 已交付 | ✅ **产品第一次跑在自己的域名上**（`heyta.waytofuture.cn` + API 专用 `apiheyta.waytofuture.cn`）；管理后台/邮件/凭据页全部中文化并用设计系统。**交还用户 3 件**（ICP 提交、两处预存在的红）见其 §3 |
 | [`waytofuture-reflection.md`](waytofuture-reflection.md) | 120 | 复盘 | 🔴 **本轮 4 次判断失败**：打包覆盖生产 `.env`、脚本放 `<head>` 致按钮无反应（用户报障）、脱敏正则漏匹配、发明的阈值两次误报。四者共同点：**验的是"我产出的中间物"，不是"用户走的那条路径"** |
+| [`gate-blindspot-handoff.md`](gate-blindspot-handoff.md) | 238 | 交接 | 🟡 **`check:docs` 的 CI 死角：代码写完、自检过、门禁绿，但"从红变绿"至今没有端到端注入证据，且未提交。** 接手只剩三步：三条 A/B 注入 → 提交 → 交还两个**用户本人**的环境前提（屏幕录制权限、Windows 打包机）。**接手先读它 §3 与 §5（归属警告）** |
 | [`multi-platform-widgets.md`](multi-platform-widgets.md) | 373 | 规划中 | 🟢 **仍是小组件线的入口**（与主计划正交） |
 | [`multi-platform-widgets-progress.md`](multi-platform-widgets-progress.md) | 5,463 | 实施中 | 🟢 **是进度日志，不是计划**。体量最大，按需查、不要通读 |
 
