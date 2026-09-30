@@ -179,21 +179,13 @@ describe('每一页都能渲染，且外壳完整', () => {
     expect(document.documentElement.dataset['theme']).not.toBe(before);
   });
 
-  it.each(ALL_PAGE_IDS)('%s：整页不出现私有仓库地址，也没有 target=_blank', (pageId) => {
+  it.each(ALL_PAGE_IDS)('%s：GitHub 外链必须带 rel=noopener，也没有 target=_blank', (pageId) => {
     const view = renderPage(pageId);
-    const hrefs = [...view.querySelectorAll<HTMLAnchorElement>('a[href]')].map(
-      (anchor) => anchor.getAttribute('href') ?? '',
-    );
-    expect(hrefs.filter((href) => href.includes('github.com'))).toEqual([]);
 
-    // 🔴 只看 `<a href>` 是不够的：自建那一节的**终端里有可以复制粘贴的命令**，
-    // 一条印着真地址的 `git clone` 和一条链接一样会把访客送到 404。
-    // 所以这里查的是整页文本（含 <code>），而不是链接集合。
-    expect(view.textContent ?? '').not.toContain('github.com');
-
-    // 站内相对链接（`/features/` 这类）既不是外链、也不需要 noopener ——
-    // 它们是**同一个站点内的跳转**，这正是本轮新增的那一类链接。
-    // 真正要拦的是"既不是语言切换、又没有 noopener 的外链"。
+    // 🔴 2026-09-29 仓库转公开，导航的 GitHub 图标回来了 —— 这条测试的判据
+    // 随之更换：私有时期拦的是"出现仓库地址 = 死链接"；现在仓库可达，
+    // 要拦的回归为**外链规范**：非站内链接必须带 `rel=noopener`
+    //（语言切换是同站跳转，豁免）。
     for (const anchor of view.querySelectorAll<HTMLAnchorElement>('a[href]')) {
       const href = anchor.getAttribute('href') ?? '';
       if (href.startsWith('#') || href.startsWith('/')) continue;
@@ -204,6 +196,13 @@ describe('每一页都能渲染，且外壳完整', () => {
         `外链既不是语言切换、也没带 rel=noopener：${href}`,
       ).toBe(true);
     }
+
+    // 每一页的导航都有 GitHub 入口（真地址；rel 由上面的循环统一验过）。
+    // 自建区那行可复制的 `git clone` 是同一条恢复链路的另一端，见 SelfHost.tsx ——
+    // 哪天仓库再转私有，这两处要一起摘（见 Nav.tsx 文件头的清单）。
+    expect(
+      view.querySelector('a[href="https://github.com/Xaiver03/heyta"]'),
+    ).not.toBeNull();
 
     expect([...view.querySelectorAll('a[target="_blank"]')]).toEqual([]);
   });
@@ -268,14 +267,35 @@ describe('🔴 没有孤立路由（N2）', () => {
 });
 
 describe('切语言保持当前页面（子页面上最容易错的一处）', () => {
-  it.each(ALL_PAGE_IDS)('%s：切换器的落点是本页的另一种语言', (pageId) => {
+  /**
+   * 🔴 2026-09-29 语言切换从单链接改成 globe 下拉：菜单默认收起，
+   * 所以先点开触发钮（`act` 驱动真实的 React 状态），再断言菜单内容。
+   * 原有的判据原样保留：英文项必须落在**本页**的英文版上 ——
+   * 写死 `/en/` 时这条对子页面会红。
+   */
+  it.each(ALL_PAGE_IDS)('%s：切换器菜单里英文项落在本页的英文版', (pageId) => {
     const view = renderPage(pageId);
-    const switcher = view.querySelector<HTMLAnchorElement>('a.lp-lang');
-    expect(switcher).not.toBeNull();
-    const href = switcher?.getAttribute('href') ?? '';
-    // 语言变了、页面没变。写死 `/en/` 时这条对子页面会红。
+    const trigger = view.querySelector<HTMLButtonElement>('.lp-lang button');
+    expect(trigger).not.toBeNull();
+    act(() => {
+      trigger!.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+
+    const items = [...view.querySelectorAll<HTMLAnchorElement>('.lp-lang__item')];
+    // 两种语言各一项；落点都是本页，各自带着自己的 hrefLang。
+    expect(items.length).toBe(2);
+    expect(items.map((item) => item.getAttribute('hrefLang')).sort()).toEqual(['en', 'zh-CN']);
+
+    const enItem = items.find((item) => item.getAttribute('hrefLang') === 'en');
+    const href = enItem?.getAttribute('href') ?? '';
+    // 语言变了、页面没变。
     expect(href).toContain('/en/');
     expect(pageFromPath(href).id).toBe(pageId);
+
+    // 当前语言单通道标记：aria-current 必须恰好落在其中一项上。
+    const currents = items.filter((item) => item.getAttribute('aria-current') === 'true');
+    expect(currents.length).toBe(1);
+    expect(currents[0]?.getAttribute('hrefLang')).toBe('zh-CN');
   });
 });
 
@@ -290,13 +310,17 @@ describe('富文本：`**粗**` 与反引号不能被原样显示', () => {
     expect(view.textContent ?? '').not.toContain('**');
   });
 
-  it('首页之后的功能页与平台页有粗体与等宽命令', () => {
+  it('首页之后的功能页有粗体；全部公页都不得再出现「验证方式」命令行', () => {
     const features = renderPage('features');
     expect(features.querySelectorAll('strong').length).toBeGreaterThan(0);
 
-    const platforms = renderPage('platforms');
-    // 验证方式那几行是等宽的 —— 它们不是卖点，是给人复制去跑的。
-    expect(platforms.querySelectorAll('.lp-evidence code, .lp-evidence').length).toBeGreaterThan(0);
+    // 🔴 2026-09-29：`pnpm …` 命令与仓库路径从公页退役（那是贡献者语言，
+    // 对用户就是内部黑话）。这是**负断言**，钉住"不再回来"——
+    // 谁把 `.lp-evidence` 的渲染加回去，这里就红。
+    // 缘由与后续管法见 `scripts/check-claims.mjs` 的文件头。
+    for (const pageId of ALL_PAGE_IDS) {
+      expect(renderPage(pageId).querySelectorAll('.lp-evidence').length).toBe(0);
+    }
   });
 });
 
@@ -369,7 +393,11 @@ describe('首页（原有断言，一个都不放松）', () => {
     const hrefs = [...view.querySelectorAll<HTMLAnchorElement>('a[href]')].map(
       (a) => a.getAttribute('href') ?? '',
     );
-    expect(hrefs.filter((href) => href.startsWith('http'))).toEqual([]);
+    // GitHub 仓库链接（2026-09-29 恢复）与应用部署无关，它**无条件**存在 ——
+    // 这条判据只管"应用入口"，把它排除后再断言没有别的外链。
+    expect(
+      hrefs.filter((href) => href.startsWith('http') && !href.includes('github.com')),
+    ).toEqual([]);
     expect(view.textContent ?? '').not.toContain('立即使用');
   });
 
@@ -427,34 +455,25 @@ describe('子页面的正文真的挂上了', () => {
    */
   it('/features 的能力模块挂着真实界面的 DOM 复现件（不是截图）', () => {
     const view = renderPage('features');
-    // 四种视图各一件：任务 / 四象限 / 习惯 / 专注。
-    expect(view.querySelectorAll('.mk-frame').length).toBe(4);
+    // 正文四种视图各一件（任务 / 四象限 / 习惯 / 专注），页头两栏 hero 另有一件
+    //（四象限，见下一条）—— 共 5。
+    expect(view.querySelectorAll('.mk-frame').length).toBe(5);
     // 一张 `<img>` 都不许有 —— 有图就说明有人贴了截图。
     expect(view.querySelectorAll('img').length).toBe(0);
   });
 
   /**
-   * 🔴 A1-3：每条能力都要有**可核对的出处**，而"强大""智能"这类形容词不能算。
-   *
-   * ⚠️ 出处是**命令或路径的文本，不是链接** —— 仓库当前是私有的，
-   * 做成链接就是 404。这一条同时钉住"标签来自词条表（要翻译）、
-   * 值不翻译"这个分工：标签每一条都在，值是等宽的。
+   * 🔴 2026-09-29：「验证方式」从公页退役（缘由见 `scripts/check-claims.mjs` 文件头）。
+   * 这一条改为钉住页头的**两栏 hero**：/features 必须有真实界面的复现件，
+   * 而不是一段悬空的标题加一片空白 —— 那种形状读起来像"页面到这儿就结束了"
+   * （假地板），也是用户点名要修的布局。
    */
-  it('/features 每个能力模块都给出「验证方式」，且不是形容词', () => {
+  it('/features 页头是两栏 hero：有产品复现件，能力模块一节不少', () => {
     const view = renderPage('features');
-    const evidence = [...view.querySelectorAll('.lp-evidence')];
-    // 八个能力模块各一条（同步那节两条：同步 + 隐私/加密）。
-    expect(evidence.length).toBe(9);
-
-    for (const line of evidence) {
-      // 标签（可翻译）与值（不翻译）都必须在。
-      expect(line.querySelector('.lp-evidence__label')?.textContent).toBe('验证方式');
-      const value = line.textContent?.replace('验证方式', '').trim() ?? '';
-      // 值必须是**能去跑/去看的东西**：命令或路径。
-      expect(value, `「${value}」不是命令也不是路径`).toMatch(
-        /(pnpm |packages\/|apps\/|docs\/|server\/)/,
-      );
-    }
+    expect(view.querySelector('.lp-page__head--split')).not.toBeNull();
+    expect(view.querySelectorAll('.lp-page__visual .mk-frame').length).toBe(1);
+    // 八个能力模块 + 「还没做的」+ 「明确不做的」= 10 节。
+    expect(view.querySelectorAll('.lp-row').length).toBe(10);
   });
 
   it('/signin 在配了应用地址时给出找回通行密钥的入口，未配置时不猜地址', () => {
@@ -470,34 +489,20 @@ describe('子页面的正文真的挂上了', () => {
     expect(link!.getAttribute('href')).toBe('https://heyta.finlaw.cloud/recover-passkey');
   });
 
-  it('/platforms 每一端都给出可复现的验证方式', () => {
+  it('/platforms 六端各一节', () => {
     const view = renderPage('platforms');
     // 六端：Web / Android / iOS / 桌面 / 鸿蒙 / 自建。
     expect(view.querySelectorAll('.lp-row').length).toBe(6);
-    expect(view.querySelectorAll('.lp-evidence').length).toBe(6);
   });
 
   /**
-   * 🔴 A7：`/integrations` 是**数据主权**那一页，判据与 `/features` 同形 ——
-   * 每个能力模块一段，每段一条**可复现**的验证方式（不是形容词）。
-   *
-   * ⚠️ 这里刻意数到 **9**：它是 benchmark §5 的九条独有能力，一条不少。
+   * 🔴 A7：`/integrations` 是**数据主权**那一页。九条能力一节不少 ——
    * 少一条就说明有人把某个能力从页面结构里拿掉了，而那时页面看起来仍然"有内容"。
+   * （「验证方式」已从公页退役，见 `scripts/check-claims.mjs` 文件头。）
    */
-  it('/integrations 九条独有能力各有一节，且各给一条可核对的验证方式', () => {
+  it('/integrations 九条能力各有一节', () => {
     const view = renderPage('integrations');
     expect(view.querySelectorAll('.lp-row').length).toBe(9);
-    const evidence = [...view.querySelectorAll('.lp-evidence')];
-    expect(evidence.length).toBe(9);
-
-    for (const line of evidence) {
-      expect(line.querySelector('.lp-evidence__label')?.textContent).toBe('验证方式');
-      const value = line.textContent?.replace('验证方式', '').trim() ?? '';
-      // 值必须是**能去跑/去看的东西**：命令或仓库内路径。
-      expect(value, `「${value}」不是命令也不是路径`).toMatch(
-        /(pnpm |packages\/|apps\/|docs\/|server\/)/,
-      );
-    }
   });
 
   it('/pricing 有对照表、有 FAQ，而且**没有购买按钮**', () => {
@@ -507,7 +512,10 @@ describe('子页面的正文真的挂上了', () => {
     // 对照表里"功能"与"锁定"两行跨列渲染（同一句话不做两遍）。
     expect(view.querySelectorAll('.lp-compare__cell--same').length).toBe(2);
     expect(view.querySelectorAll('.lp-pricing__card').length).toBe(3);
-    expect(view.querySelectorAll('button').length).toBe(1); // 只剩主题按钮
+    // 两个 button：主题切换 + 语言切换的触发钮（语言菜单项是链接不是按钮，
+    // 所以"没有购买按钮"的判据仍然成立 —— 计数从 1 到 2 是 2026-09-29 语言
+    // 下拉带来的，不是购买入口回来了）。
+    expect(view.querySelectorAll('button').length).toBe(2);
   });
 
   it('/help 的每一条问题都有答案，且答案在页面上（没被折叠起来）', () => {

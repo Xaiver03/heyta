@@ -16,9 +16,9 @@
 
 import { useMemo } from 'react';
 import { motion } from 'motion/react';
-import { AlertTriangle, BookOpen, Container, Database, Terminal } from 'lucide-react';
+import { AlertTriangle, Container, Database, Terminal } from 'lucide-react';
 
-import { useI18n } from '@heyta/i18n';
+import { useI18n } from '@heyta/i18n/provider';
 
 import { revealVariants, staggerContainer, useMotionPreset, VIEWPORT } from '../lib/motion.js';
 
@@ -29,17 +29,12 @@ import { revealVariants, staggerContainer, useMotionPreset, VIEWPORT } from '../
  * 与 pnpm 子命令），不是给人读的句子。把命令"翻译"一遍会让用户复制到一条跑不通的
  * 命令 —— 那不是本地化，是造假。真正的文案（标题、步骤、警告）都已走 `t()`。
  *
- * 🔴 第一行是**占位符**，不是仓库地址。
- *
- * 仓库当前是私有的，在页面上印一个真的 `git clone <真地址>` 等于教访客去撞一个
- * “repository not found” —— 那比不给出地址更坏，因为它看起来是能用的。
- * 所以 `<repo-url>` 是**故意留着不填**的，并紧跟着用
- * `landing.selfhost.sourcePending` 说明为什么 —— 页面下方那条说明不是装饰，
- * 是这段代码诚实的前提。真地址在 `Nav.tsx` 顶部那份「公开后要加回来的清单」里，
- * 公开后替换这一行即可。
+ * ✅ 第一行是**真地址**（2026-09-29 仓库转公开）。私有时期这里曾是占位符
+ * `<repo-url>`，并配有一条「源码尚未公开」的说明 —— 两者都随公开一并撤掉
+ * （占位符在公开的仓库下面就成了假话）。
  */
 const COMMANDS = [
-  'git clone <repo-url>',
+  'git clone https://github.com/Xaiver03/heyta.git',
   'cd heyta && pnpm install && pnpm -r build',
   'cd server && docker compose up -d',
 ];
@@ -178,16 +173,6 @@ export function SelfHost(): React.JSX.Element {
               外链（仓库私有 → 对访客是 404）。**不能只删不补**：上面那三行命令
               现在跑不通，页面上必须有人把这件事说出来。
             */}
-            <motion.div
-              className="lp-note"
-              variants={revealVariants(preset.reduced, preset.ui)}
-              initial="hidden"
-              whileInView="visible"
-              viewport={VIEWPORT}
-            >
-              <BookOpen size={16} aria-hidden="true" />
-              <div>{t('landing.selfhost.sourcePending')}</div>
-            </motion.div>
           </div>
         </div>
       </div>

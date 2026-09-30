@@ -14,17 +14,22 @@
  *   「立即使用」；还没部署 → 指向 `#selfhost` 的「开始自建」。
  *   两种状态各有各的诚实说法，但**意图始终只有一个**。
  *
- * ⚠️ 这里原来还有第二个按钮「先看看代码」指向 GitHub —— 摘掉的原因见
- *   `Nav.tsx` 顶部那段（仓库私有，链接对访客是 404）。
+ * ⚠️ 这里有**两个**按钮，且它们是两个意图：「立即使用」（新访客的主入口）
+ * 与「看源码」（开发者的入口，2026-09-29 仓库公开后恢复 —— 私有时期它是
+ * 404，所以被摘掉过）。两者样式一主一次，标签词条不同 —— 同一意图换标签
+ * 才是错的（见文件头那条单一意图规则），两个意图各用自己的标签没有问题。
+ * 地址的唯一定义在 `lib/repo.ts`。
  */
 
 import { motion } from 'motion/react';
-import { ArrowRight } from 'lucide-react';
+import { ArrowRight, Github } from 'lucide-react';
 
-import { useI18n, useLocale } from '@heyta/i18n';
+import { useI18n, useLocale } from '@heyta/i18n/provider';
 
 import { startCta } from '../lib/app-url.js';
+import { GITHUB_URL } from '../lib/repo.js';
 import { revealVariants, staggerContainer, useMotionPreset, VIEWPORT } from '../lib/motion.js';
+import { Magnetic } from './Magnetic.js';
 
 export function FinalCta(): React.JSX.Element {
   const preset = useMotionPreset();
@@ -52,13 +57,26 @@ export function FinalCta(): React.JSX.Element {
           </motion.p>
 
           <motion.div className="lp-cta__actions" variants={revealVariants(preset.reduced, preset.ui)}>
+            {/* 磁性给收尾的主入口 —— 全页只有英雄区与这里两处（见 Magnetic.tsx）。
+                「看源码」是次按钮：另一个意图（开发者），不抢主行动的戏；
+                外链必须带 rel=noopener（render.spec 的判据）。 */}
+            <Magnetic>
+              <a
+                className="lp-btn lp-btn--primary lp-btn--lg"
+                href={cta.href}
+                {...(cta.external ? { rel: 'noopener noreferrer' } : {})}
+              >
+                {t(cta.labelKey)}
+                <ArrowRight size={18} aria-hidden="true" />
+              </a>
+            </Magnetic>
             <a
-              className="lp-btn lp-btn--primary lp-btn--lg"
-              href={cta.href}
-              {...(cta.external ? { rel: 'noopener noreferrer' } : {})}
+              className="lp-btn lp-btn--secondary lp-btn--lg"
+              href={GITHUB_URL}
+              rel="noopener noreferrer"
             >
-              {t(cta.labelKey)}
-              <ArrowRight size={18} aria-hidden="true" />
+              <Github size={18} aria-hidden="true" />
+              {t('landing.cta.viewCode')}
             </a>
           </motion.div>
         </motion.div>
