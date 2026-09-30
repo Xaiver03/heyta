@@ -181,7 +181,7 @@ if printf '%s' "$WANT" | grep -q "mac"; then
       HEYTA_NO_FOCUS=1 HEYTA_SELF_CAPTURE="$MAC_SELFIE" \
         "$INSTALLED_APP/Contents/MacOS/HeytaMac" >/dev/null 2>&1 || true
       if [ -f "$MAC_SELFIE" ] && shot_ok_logged "$MAC_SELFIE" "$MAC_SELFIE_WV"; then
-        echo "  截图证据：$MAC_SELFIE（窗口）+ $MAC_SELFIE_WV（共享 UI）"
+        echo "  截图证据：${MAC_SELFIE}（窗口）+ ${MAC_SELFIE_WV}（共享 UI）"
         RESULT_mac=OK
       else
         echo "  🔴 安装副本不可信 —— 窗口没起来，或共享 UI 没渲染"
