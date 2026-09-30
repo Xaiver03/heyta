@@ -34,14 +34,22 @@
  * 「多设备」，而访客要找的是同一件事）。现在它们是**同一个 IA 的两层深度**：
  * 速答在前（读完就能用）、深读在后（读完还愿意往下走的人看这个），共用一套分组。
  *
- * ⚠️ **只有两个分类下有文章**（sync 四篇、data 两篇），另外三个只放速答。
+ * ⚠️ **分类页只给"有文章"的分类建**（现在五个都有），其余只放速答。
  * 这不是留空位：`/features` 那条内容纪律同样适用于导航 ——
- * **没有内容就不许出现链接**，所以空分类不渲染卡片，只渲染它自己的问题。
+ * **没有内容就不许出现链接**，所以空分类不渲染卡片、不注册入口。
+ * 而"哪几个分类有文章"是**从注册表算出来的**（`docsCategoryById`），不是这里手数的一份清单 ——
+ * 手数的清单会在下一篇文章落地时过时，而过时的那一面正好是访客看到的那一面。
+ * （正因为这条判据在注册表那一侧，本轮把 start / organize / trust 补满文章之后，
+ * 五个分类页才同时成立；少一篇，对应那个入口就不该存在。）
  */
+
+import type { MessageKey } from '@heyta/i18n/provider';
 
 import type { HelpModule, HelpModuleId } from './content.js';
 import { HELP_MODULES } from './content.js';
+import { HELP_FIGURES, helpFigureSrc, type HelpFigure } from './helpFigures.js';
 import type { SectionSpec } from './PageSections.js';
+import type { SitePage } from './pages.js';
 import { SITE_PAGES } from './pages.js';
 
 /** 文章路由的形状：`/help/<id>`。这一条形状**就是**"什么算一篇文章"的判据。 */
@@ -56,11 +64,31 @@ const DOCS_PATH_PREFIX = '/help/';
  * 顺带两个性质：`'/help'` 本身不匹配（它要求还有一段），
  * 以及 id 保持**字面量联合** —— 所以 `SitePageId` 里那六个新 id 仍在，
  * "注册了页面却没写组件"那道拦截继续有效。
+ *
+ * 🔴 **判据是 `docsKind: 'article'`，路径前缀只是加分项。** 分类页 `/help/sync`
+ * 同样以 `/help/` 开头 —— 只按形状捞，它会被一起拉进"必须有正文"的那一批，
+ * 于是分类页被迫配一份它不该有的 `DOCS_ENTRIES` 条目。形状能区分"文章 vs 其它页"，
+ * 区分不了"文章 vs 分类"，所以这里要的是**意图**而不是形状（见 `pages.ts` 的 `SitePage.docsKind`）。
  */
-type ArticlePage = Extract<(typeof SITE_PAGES)[number], { path: `${typeof DOCS_PATH_PREFIX}${string}` }>;
+type ArticlePage = Extract<
+  (typeof SITE_PAGES)[number],
+  { path: `${typeof DOCS_PATH_PREFIX}${string}`; docsKind: 'article' }
+>;
+
+/**
+ * 注册表里那些"是分类页"的页面。
+ *
+ * ⚠️ 它**不要求**路径前缀：`docsKind: 'category'` 只在文档中心里出现，写错成
+ * `docsKind: 'category'` 的首页会在 `DOCS_CATEGORY_MODULES` 那道 `Record` 上编译不过
+ * —— 一个不存在的模块 id 比一条错误的形状更值得拦。
+ */
+type CategoryPage = Extract<(typeof SITE_PAGES)[number], { docsKind: 'category' }>;
 
 /** 文档中心全部文章的 id —— 从注册表派生，不是这里声明的。 */
 export type DocsArticleId = ArticlePage['id'];
+
+/** 文档中心全部分类页的 id —— 同样从注册表派生。 */
+export type DocsCategoryId = CategoryPage['id'];
 
 /** 一篇文章在文档中心里的那一半信息：归哪个分类、由哪些分区组成。 */
 interface DocsEntry {
@@ -86,9 +114,100 @@ export type DocsArticle = ArticlePage & DocsEntry;
  * 在类型上是 `string`，拼出来的 key 会绕过 `MessageKey` 的检查 —— 而"词条 key 拼错"
  * 恰恰是这套派生结构里唯一会静默失败的地方（渲染时回落成 key 本身）。
  *
- * 顺序从"这是什么原理"排到"我要动手的事"（sync 四篇、data 两篇）。
+ * 阅读顺序**不在这里决定**（在 `pages.ts` 的注册顺序里），这里的 key 顺序只是跟着它排：
+ * start 两篇 → sync 四篇 → organize 三篇 → data 三篇 → trust 两篇。
+ * 每个分类 ≥2 篇，是因为帮助中心那五个卡片若只有一篇有深读，访客点进去就撞上尽头。
  */
 const DOCS_ENTRIES: Record<DocsArticleId, DocsEntry> = {
+  'first-run': {
+    moduleId: 'start',
+    sections: [
+      {
+        id: 'works-without-account',
+        titleKey: 'site.docs.first-run.s1',
+        bodyKeys: [
+          'site.docs.first-run.s1p1',
+          'site.docs.first-run.s1p2',
+          'site.docs.first-run.s1p3',
+        ],
+      },
+      {
+        id: 'sync-is-opt-in',
+        titleKey: 'site.docs.first-run.s2',
+        bodyKeys: [
+          'site.docs.first-run.s2p1',
+          'site.docs.first-run.s2p2',
+          'site.docs.first-run.s2p3',
+          'site.docs.first-run.s2p4',
+        ],
+      },
+      {
+        id: 'device-only-toggles',
+        titleKey: 'site.docs.first-run.s3',
+        bodyKeys: ['site.docs.first-run.s3p1', 'site.docs.first-run.s3p2'],
+        itemKeys: [
+          'site.docs.first-run.s3i1',
+          'site.docs.first-run.s3i2',
+          'site.docs.first-run.s3i3',
+        ],
+      },
+      {
+        id: 'first-screen',
+        titleKey: 'site.docs.first-run.s4',
+        bodyKeys: [
+          'site.docs.first-run.s4p1',
+          'site.docs.first-run.s4p2',
+          'site.docs.first-run.s4p3',
+        ],
+      },
+    ],
+  },
+  concepts: {
+    moduleId: 'start',
+    sections: [
+      {
+        id: 'task-fields',
+        titleKey: 'site.docs.concepts.s1',
+        bodyKeys: [
+          'site.docs.concepts.s1p1',
+          'site.docs.concepts.s1p2',
+          'site.docs.concepts.s1p3',
+        ],
+      },
+      {
+        id: 'lists-one-level',
+        titleKey: 'site.docs.concepts.s2',
+        bodyKeys: ['site.docs.concepts.s2p1', 'site.docs.concepts.s2p2'],
+      },
+      {
+        id: 'tags',
+        titleKey: 'site.docs.concepts.s3',
+        bodyKeys: [
+          'site.docs.concepts.s3p1',
+          'site.docs.concepts.s3p2',
+          'site.docs.concepts.s3p3',
+        ],
+      },
+      {
+        id: 'habits',
+        titleKey: 'site.docs.concepts.s4',
+        bodyKeys: [
+          'site.docs.concepts.s4p1',
+          'site.docs.concepts.s4p2',
+          'site.docs.concepts.s4p3',
+        ],
+      },
+      {
+        id: 'views-are-not-data',
+        titleKey: 'site.docs.concepts.s5',
+        bodyKeys: [
+          'site.docs.concepts.s5p1',
+          'site.docs.concepts.s5p2',
+          'site.docs.concepts.s5p3',
+        ],
+      },
+    ],
+  },
   how: {
     moduleId: 'sync',
     sections: [
@@ -190,6 +309,129 @@ const DOCS_ENTRIES: Record<DocsArticleId, DocsEntry> = {
       },
     ],
   },
+  views: {
+    moduleId: 'organize',
+    sections: [
+      {
+        id: 'quadrant',
+        titleKey: 'site.docs.views.s1',
+        bodyKeys: [
+          'site.docs.views.s1p1',
+          'site.docs.views.s1p2',
+          'site.docs.views.s1p3',
+        ],
+      },
+      {
+        id: 'calendar',
+        titleKey: 'site.docs.views.s2',
+        bodyKeys: ['site.docs.views.s2p1', 'site.docs.views.s2p2'],
+      },
+      {
+        id: 'timeline',
+        titleKey: 'site.docs.views.s3',
+        bodyKeys: [
+          'site.docs.views.s3p1',
+          'site.docs.views.s3p2',
+          'site.docs.views.s3p3',
+        ],
+      },
+      {
+        id: 'search',
+        titleKey: 'site.docs.views.s4',
+        bodyKeys: [
+          'site.docs.views.s4p1',
+          'site.docs.views.s4p2',
+          'site.docs.views.s4p3',
+        ],
+      },
+      {
+        id: 'modules-off-are-gone',
+        titleKey: 'site.docs.views.s5',
+        bodyKeys: ['site.docs.views.s5p1', 'site.docs.views.s5p2'],
+      },
+    ],
+  },
+  repeat: {
+    moduleId: 'organize',
+    sections: [
+      {
+        id: 'standard-rrule',
+        titleKey: 'site.docs.repeat.s1',
+        bodyKeys: [
+          'site.docs.repeat.s1p1',
+          'site.docs.repeat.s1p2',
+          'site.docs.repeat.s1p3',
+        ],
+      },
+      {
+        id: 'advance-baseline',
+        titleKey: 'site.docs.repeat.s2',
+        bodyKeys: [
+          'site.docs.repeat.s2p1',
+          'site.docs.repeat.s2p2',
+          'site.docs.repeat.s2p3',
+          'site.docs.repeat.s2p4',
+        ],
+      },
+      {
+        id: 'when-the-rule-ends',
+        titleKey: 'site.docs.repeat.s3',
+        bodyKeys: ['site.docs.repeat.s3p1', 'site.docs.repeat.s3p2'],
+      },
+      {
+        id: 'which-platforms',
+        titleKey: 'site.docs.repeat.s4',
+        bodyKeys: [
+          'site.docs.repeat.s4p1',
+          'site.docs.repeat.s4p2',
+          'site.docs.repeat.s4w1',
+        ],
+      },
+    ],
+  },
+  reminders: {
+    moduleId: 'organize',
+    sections: [
+      {
+        id: 'not-a-toggle',
+        titleKey: 'site.docs.reminders.s1',
+        bodyKeys: [
+          'site.docs.reminders.s1p1',
+          'site.docs.reminders.s1p2',
+          'site.docs.reminders.s1p3',
+        ],
+      },
+      {
+        id: 'when-it-fires',
+        titleKey: 'site.docs.reminders.s2',
+        bodyKeys: [
+          'site.docs.reminders.s2p1',
+          'site.docs.reminders.s2p2',
+          'site.docs.reminders.s2p3',
+          'site.docs.reminders.s2p4',
+        ],
+        itemKeys: [
+          'site.docs.reminders.s2i1',
+          'site.docs.reminders.s2i2',
+          'site.docs.reminders.s2i3',
+        ],
+      },
+      {
+        id: 'follows-the-repeat',
+        titleKey: 'site.docs.reminders.s3',
+        bodyKeys: [
+          'site.docs.reminders.s3p1',
+          'site.docs.reminders.s3p2',
+          'site.docs.reminders.s3p3',
+        ],
+      },
+      {
+        id: 'the-bell-is-not-a-reminder',
+        titleKey: 'site.docs.reminders.s4',
+        bodyKeys: ['site.docs.reminders.s4p1', 'site.docs.reminders.s4p2'],
+      },
+    ],
+  },
   selfhost: {
     moduleId: 'data',
     sections: [
@@ -219,6 +461,30 @@ const DOCS_ENTRIES: Record<DocsArticleId, DocsEntry> = {
         titleKey: 'site.docs.selfhost.s3',
         bodyKeys: ['site.docs.selfhost.s3p1', 'site.docs.selfhost.s3w1'],
       },
+      {
+        id: 'daily-work',
+        titleKey: 'site.docs.selfhost.s4',
+        bodyKeys: [
+          'site.docs.selfhost.s4p1',
+          'site.docs.selfhost.s4p2',
+          'site.docs.selfhost.s4p3',
+        ],
+      },
+      {
+        id: 'backup-is-ciphertext',
+        titleKey: 'site.docs.selfhost.s5',
+        bodyKeys: [
+          'site.docs.selfhost.s5p1',
+          'site.docs.selfhost.s5p2',
+          'site.docs.selfhost.s5w1',
+        ],
+      },
+      {
+        id: 'why-offline',
+        titleKey: 'site.docs.selfhost.s6',
+        bodyKeys: ['site.docs.selfhost.s6p1', 'site.docs.selfhost.s6p2'],
+        itemKeys: ['site.docs.selfhost.s6i1'],
+      },
     ],
   },
   transfer: {
@@ -244,18 +510,202 @@ const DOCS_ENTRIES: Record<DocsArticleId, DocsEntry> = {
         titleKey: 'site.docs.transfer.s3',
         bodyKeys: ['site.docs.transfer.s3p1'],
       },
+      {
+        id: 'two-routes',
+        titleKey: 'site.docs.transfer.s4',
+        bodyKeys: ['site.docs.transfer.s4p1', 'site.docs.transfer.s4p2'],
+      },
+      {
+        id: 'why-empty-only',
+        titleKey: 'site.docs.transfer.s5',
+        bodyKeys: [
+          'site.docs.transfer.s5p1',
+          'site.docs.transfer.s5p2',
+          'site.docs.transfer.s5w1',
+        ],
+      },
+      {
+        id: 'check-after-restore',
+        titleKey: 'site.docs.transfer.s6',
+        bodyKeys: ['site.docs.transfer.s6p1', 'site.docs.transfer.s6p2'],
+        itemKeys: ['site.docs.transfer.s6i1'],
+      },
+    ],
+  },
+  trash: {
+    moduleId: 'data',
+    sections: [
+      {
+        id: 'tasks-only',
+        titleKey: 'site.docs.trash.s1',
+        bodyKeys: ['site.docs.trash.s1p1', 'site.docs.trash.s1p2'],
+        itemKeys: [
+          'site.docs.trash.s1i1',
+          'site.docs.trash.s1i2',
+          'site.docs.trash.s1i3',
+        ],
+      },
+      {
+        id: 'what-restore-changes',
+        titleKey: 'site.docs.trash.s2',
+        bodyKeys: [
+          'site.docs.trash.s2p1',
+          'site.docs.trash.s2p2',
+          'site.docs.trash.s2p3',
+        ],
+      },
+      {
+        id: 'why-nothing-is-erased',
+        titleKey: 'site.docs.trash.s3',
+        bodyKeys: [
+          'site.docs.trash.s3p1',
+          'site.docs.trash.s3p2',
+          'site.docs.trash.s3p3',
+          'site.docs.trash.s3w1',
+        ],
+      },
+      {
+        id: 'what-it-means-for-backups',
+        titleKey: 'site.docs.trash.s4',
+        bodyKeys: [
+          'site.docs.trash.s4p1',
+          'site.docs.trash.s4p2',
+          'site.docs.trash.s4p3',
+        ],
+      },
+    ],
+  },
+  privacy: {
+    moduleId: 'trust',
+    sections: [
+      {
+        id: 'what-local-first-covers',
+        titleKey: 'site.docs.privacy.s1',
+        bodyKeys: ['site.docs.privacy.s1p1', 'site.docs.privacy.s1p2'],
+      },
+      {
+        id: 'sync-uploads',
+        titleKey: 'site.docs.privacy.s2',
+        bodyKeys: [
+          'site.docs.privacy.s2p1',
+          'site.docs.privacy.s2p2',
+          'site.docs.privacy.s2p3',
+        ],
+      },
+      {
+        id: 'local-api-and-mcp',
+        titleKey: 'site.docs.privacy.s3',
+        bodyKeys: [
+          'site.docs.privacy.s3p1',
+          'site.docs.privacy.s3p2',
+          'site.docs.privacy.s3p3',
+        ],
+      },
+      {
+        id: 'outbound-ai',
+        titleKey: 'site.docs.privacy.s4',
+        bodyKeys: [
+          'site.docs.privacy.s4p1',
+          'site.docs.privacy.s4p2',
+          'site.docs.privacy.s4p3',
+        ],
+      },
+      {
+        id: 'email',
+        titleKey: 'site.docs.privacy.s5',
+        bodyKeys: ['site.docs.privacy.s5p1', 'site.docs.privacy.s5p2'],
+      },
+      {
+        id: 'open-source-is-not-trust',
+        titleKey: 'site.docs.privacy.s6',
+        bodyKeys: ['site.docs.privacy.s6p1'],
+      },
+    ],
+  },
+  loss: {
+    moduleId: 'trust',
+    sections: [
+      {
+        id: 'lost-device',
+        titleKey: 'site.docs.loss.s1',
+        bodyKeys: ['site.docs.loss.s1p1', 'site.docs.loss.s1p2'],
+      },
+      {
+        id: 'lost-passkey',
+        titleKey: 'site.docs.loss.s2',
+        bodyKeys: [
+          'site.docs.loss.s2p1',
+          'site.docs.loss.s2p2',
+          'site.docs.loss.s2p3',
+          'site.docs.loss.s2w1',
+        ],
+      },
+      {
+        id: 'lost-passphrase',
+        titleKey: 'site.docs.loss.s3',
+        bodyKeys: [
+          'site.docs.loss.s3p1',
+          'site.docs.loss.s3p2',
+          'site.docs.loss.s3p3',
+        ],
+      },
+      {
+        id: 'so-the-order-is',
+        titleKey: 'site.docs.loss.s4',
+        bodyKeys: [
+          'site.docs.loss.s4p1',
+          'site.docs.loss.s4p2',
+          'site.docs.loss.s4p3',
+        ],
+      },
     ],
   },
 };
 
-/** 某个路径是不是文章路由。 */
-function isDocsPath(path: string): boolean {
-  return path.startsWith(DOCS_PATH_PREFIX);
-}
+/**
+ * 分类页 ↔ 帮助中心模块的绑定。**每一条 key 都必须出现**（`Record` 的判据）。
+ *
+ * 🔴 它存在的意义是拦下两种"结构上对、意义上错"的分类页：
+ *   1. 在 `pages.ts` 注册了 `/help/<某段>` 但这里忘了绑定 —— 编译不过；
+ *   2. 绑定了一个 `HelpModuleId` 里不存在的分类 —— 编译不过。
+ * 两种的症状都是"页面渲染出来了，但它不属于任何 IA"：侧栏分组与帮助中心的速答
+ * 都对不上它，访客从哪儿进来都回不去。让它编译不过，比让它渲染半页强。
+ *
+ * ⚠️ 这里的 id **必须和文章用的模块一致** —— 一个分类页若绑到自己没有文章的模块上，
+ * `DocsCategoryPage` 会在渲染时抛错（文章为空 = 一页没有正文的入口，那是比红更糟的东西）。
+ */
+const DOCS_CATEGORY_MODULES: Record<DocsCategoryId, HelpModuleId> = {
+  start: 'start',
+  sync: 'sync',
+  organize: 'organize',
+  data: 'data',
+  trust: 'trust',
+};
+
+/**
+ * 注册表，按 `SitePage` 这个**接口**读一遍。
+ *
+ * 🔴 为什么不能直接 `SITE_PAGES.filter(page => page.docsKind === …)`：
+ * `SITE_PAGES` 是 `as const` 的元组，它的元素类型是**逐条字面量对象的联合** ——
+ * 没标这个字段的成员（首页、`/features`、hub）在类型上**根本没有这条属性**，
+ * 点出来就是 TS2339。`SitePage` 上那句 `docsKind?:` 保护不到它们。
+ * （试过把一个"只有可选字段"的参数类型当漏斗用，也不行：TS 的 weak type 检测
+ * 要求源类型至少有一个属性与之重合，缺字段的那些成员直接被拒。）
+ *
+ * 所以走接口：`pages.ts` 末尾那条 `AllPagesAreWellFormed` 编译期兜底已经保证
+ * 每个成员都满足 `SitePage`，于是这里读到的 `docsKind` 是 `'article' | 'category' | undefined`，
+ * "缺字段"回到它应有的语义 —— 既不是文章也不是分类。
+ */
+const ALL_PAGES: readonly SitePage[] = SITE_PAGES;
 
 /** 注册表里的全部文章，**顺序即注册表的顺序**（侧栏与卡片都按它排）。 */
 function articlePages(): readonly ArticlePage[] {
-  return SITE_PAGES.filter((page): page is ArticlePage => isDocsPath(page.path));
+  return ALL_PAGES.filter((page): page is ArticlePage => page.docsKind === 'article');
+}
+
+/** 注册表里的全部分类页，同样按注册表顺序。 */
+function categoryPages(): readonly CategoryPage[] {
+  return ALL_PAGES.filter((page): page is CategoryPage => page.docsKind === 'category');
 }
 
 function toArticle(page: ArticlePage): DocsArticle {
@@ -274,7 +724,7 @@ export function docsArticleById(id: string): DocsArticle {
   const page = articlePages().find((article) => article.id === id);
   if (page === undefined) {
     throw new Error(
-      `"${id}" 不是文档中心的文章。文章要在 src/site/pages.ts 注册且路径以 ${DOCS_PATH_PREFIX} 开头（见该文件头）。`,
+      `"${id}" 不是文档中心的文章。文章要在 src/site/pages.ts 注册且标 docsKind: 'article'，并在 src/site/docs.ts 的 DOCS_ENTRIES 里配正文（见两文件头）。`,
     );
   }
   return toArticle(page);
@@ -283,7 +733,8 @@ export function docsArticleById(id: string): DocsArticle {
 /**
  * 某个分类下的全部文章（侧栏与卡片用）。
  *
- * ⚠️ 空数组是**合法且常见**的结果（五个分类里只有两个有文章）——
+ * ⚠️ 空数组仍然是**合法**结果（判据不在这份数据里，调用方拿到的永远是算出来的），
+ * 只是本轮补满之后五个分类都有文章了 ——
  * 调用方据此不渲染标题与卡片，而不是显示一个空盒子。
  */
 export function docsArticlesOf(moduleId: HelpModuleId): readonly DocsArticle[] {
@@ -304,4 +755,180 @@ export function docsOutline(): readonly {
     module,
     articles: docsArticlesOf(module.id),
   }));
+}
+
+/**
+ * ─────────────────────────────────────────────────────────────────────────
+ * 搜索：把"文档中心里能被找到的东西"摊平成一份命中清单
+ * ─────────────────────────────────────────────────────────────────────────
+ */
+
+/**
+ * 一条可命中的条目：`article` = 那一整篇（跳到页面），`section` = 篇内某一节
+ * （跳到页面 + 锚点）。
+ *
+ * ⚠️ 这里给的是**词条 key**，不是文字 —— 与 `docsOutline()` 同一条纪律：
+ * 这一层管结构，把 key 变成人读的话是渲染层的事。搜索框在中文页搜中文标题、
+ * 在英文页搜英文标题，靠的就是"文字在最后一刻才解析"这一点。
+ */
+export interface DocsSearchHit {
+  readonly kind: 'article' | 'section';
+  /** 命中落在哪一篇（渲染层用它算 href）。 */
+  readonly article: DocsArticle;
+  /** 这一条显示与被匹配的那个标题。 */
+  readonly titleKey: MessageKey;
+  /** 分区级的锚点（就是正文那个 `<section id>`）；文章级没有。 */
+  readonly sectionId?: string;
+}
+
+/**
+ * 全部可命中的条目：**每篇一条 + 每个分区一条**，顺序 = 阅读顺序。
+ *
+ * 🔴 **这份清单是渲染时从注册表推出来的，不是一份生成的 `search-index.json`。**
+ * 生成物要有人重跑才更新，而"新增一篇文章却忘了重跑"的症状是
+ * **搜索静默搜不到那一整篇** —— 段落数、目录、侧栏、sitemap 全都照样对，
+ * 没有任何一层会失败。派生则没有那个时刻：文章一旦进注册表，
+ * 它同时进了侧栏、目录和搜索（`DOCS_ENTRIES` 少配正文会编译不过）。
+ * 代价写进 `BLOCKED.md`：索引随主包发出，而不是一个可缓存的 JSON。
+ *
+ * ⚠️ 每一条只与**它自己的标题**匹配，不带正文、也不带所属分类的名字。
+ * 带上正文会让"搜到一段"和"搜到一篇"分不开；带上分类名会让一个分类下
+ * 的每一个分区都命中 —— 两种都是在结果里造噪音。
+ */
+export function docsSearchHits(): readonly DocsSearchHit[] {
+  const hits: DocsSearchHit[] = [];
+  for (const article of articlePages().map(toArticle)) {
+    hits.push({ kind: 'article', article, titleKey: article.labelKey });
+    for (const section of article.sections) {
+      hits.push({ kind: 'section', article, titleKey: section.titleKey, sectionId: section.id });
+    }
+  }
+  return hits;
+}
+
+/** 一个分类页 = 注册表条目 + 它绑定到哪个模块。 */
+export type DocsCategory = CategoryPage & { readonly moduleId: HelpModuleId };
+
+/**
+ * 分类页要渲染的**全部**信息：它自己、它对应的模块（速答与标题）、它下面的文章。
+ *
+ * 🔴 三样一起给，而不是让组件自己去拼：`DocsCategoryPage` 若自己 `find` 模块，
+ * 一旦 `DOCS_CATEGORY_MODULES` 绑了一个 `HELP_MODULES` 里查不到的 id（类型上可能，
+ * 因为 `HelpModuleId` 是联合而不是 `HELP_MODULES` 的派生），它会静默渲染一张没有速答的页。
+ * 这里把它做成一次显式抛错。
+ */
+export interface DocsCategoryInfo {
+  readonly page: DocsCategory;
+  readonly module: HelpModule;
+  readonly articles: readonly DocsArticle[];
+}
+
+function toCategory(page: CategoryPage): DocsCategory {
+  return { ...page, moduleId: DOCS_CATEGORY_MODULES[page.id] };
+}
+
+function categoryInfo(page: CategoryPage): DocsCategoryInfo {
+  const category = toCategory(page);
+  const module = HELP_MODULES.find((m) => m.id === category.moduleId);
+  if (module === undefined) {
+    throw new Error(
+      `分类页 "${category.id}" 绑定的模块 "${category.moduleId}" 不在 HELP_MODULES 里（见 src/site/content.ts）。`,
+    );
+  }
+  return { page: category, module, articles: docsArticlesOf(category.moduleId) };
+}
+
+/**
+ * 某个模块的分类页。**没有就是 `undefined`** —— 只有速答的分类本来就不该有入口，
+ * 调用方据此把"分类标题"渲染成普通文字，而不是一个指向不存在的地址的链接。
+ */
+export function docsCategoryOfModule(moduleId: HelpModuleId): DocsCategoryInfo | undefined {
+  const page = categoryPages().find((p) => DOCS_CATEGORY_MODULES[p.id] === moduleId);
+  return page === undefined ? undefined : categoryInfo(page);
+}
+
+/**
+ * 按 id 取分类页。**找不到就抛** —— 与 `docsArticleById` 同一条纪律：
+ * 走到这里说明 `PAGE_COMPONENTS` 把一个非分类页渲染成了 `DocsCategoryPage`，
+ * 那是代码写错，静默渲染半页只会让人去查文案。
+ */
+export function docsCategoryById(id: string): DocsCategoryInfo {
+  const page = categoryPages().find((category) => category.id === id);
+  if (page === undefined) {
+    throw new Error(
+      `"${id}" 不是文档中心的分类页。分类页要在 src/site/pages.ts 注册且标 docsKind: 'category'，并在 src/site/docs.ts 的 DOCS_CATEGORY_MODULES 里绑定模块。`,
+    );
+  }
+  return categoryInfo(page);
+}
+
+/**
+ * ─────────────────────────────────────────────────────────────────────────
+ * 配图：把 `helpFigures.ts` 的意图解析成**可以直接渲染的一件**
+ * ─────────────────────────────────────────────────────────────────────────
+ */
+
+/**
+ * 图号前缀用哪条词条。**整站一处**，不是每张图各写一遍 ——
+ * 五处「图」与五处 "Figure" 会在下一次改文案时漏掉一处，而漏掉的那一处
+ * 恰好是访客看到的那个数字前面那个字。
+ */
+const FIGURE_LABEL_KEY: MessageKey = 'site.docs.figure';
+
+/** 一张解析完成的配图：图号、产物路径、三个词条 key。 */
+export interface DocsFigure extends HelpFigure {
+  /**
+   * 图号的数字部分（`"14-1"`），**由注册表顺序算出来**。
+   * 前缀（中文「图」/ 英文 "Figure"）是文案，住在词条里，不拼进这个字符串 ——
+   * 拼进去就等于让英文页显示一个中文「图」字。
+   */
+  readonly number: string;
+  /** 站点内的绝对路径（`public/` 下的复制品）。 */
+  readonly src: string;
+  /** 前缀词条（`图` / `Figure`），与数字分开渲染。 */
+  readonly labelKey: MessageKey;
+}
+
+/**
+ * 一篇文章在注册表里的序号（从 1，**含分类页与其它页面**）—— 图号的"章"。
+ *
+ * 🔴 用注册表序号而不是"第几篇文档"：注册表顺序就是访客的阅读顺序，
+ * 而"章"要能被拿去找上下文（"图 20-1"意味着第 20 个入口那一页）。
+ * 换成文档中心的内部序号，两套编号会在加一篇非文档页时静默分叉。
+ */
+function registryOrdinal(articleId: DocsArticleId): number {
+  const index = ALL_PAGES.findIndex((page) => page.id === articleId);
+  if (index < 0) {
+    throw new Error(
+      `"${articleId}" 不在 src/site/pages.ts 的注册表里，无法计算图号（见该文件的 SITE_PAGES）。`,
+    );
+  }
+  return index + 1;
+}
+
+/**
+ * 一篇文章的配图，按它们在 `HELP_FIGURES` 里写下的顺序编号。
+ *
+ * 🔴 `sectionId` 找不到就**抛**，不静默丢图。这是这套派生结构里唯一会"看起来正常"
+ * 的失败：分区改名后那张图不会报错，只会**从页面上消失**，而配图少一张没有任何
+ * 判据会主动喊出来（段落数、目录、卡片数全都不看它）。抛错 + e2e 那条"图数"断言，
+ * 才是这一处该有的两道闸。
+ */
+export function docsFiguresOf(article: DocsArticle): readonly DocsFigure[] {
+  const figures = HELP_FIGURES[article.id];
+  if (figures.length === 0) return [];
+  const chapter = registryOrdinal(article.id);
+  return figures.map((figure, i) => {
+    if (!article.sections.some((section) => section.id === figure.sectionId)) {
+      throw new Error(
+        `配图 "${figure.targetId}-${figure.slug}" 挂在分区 "${figure.sectionId}" 上，但文章 "${article.id}" 没有这一节（分区清单在 src/site/docs.ts，映射在 src/site/helpFigures.ts）。`,
+      );
+    }
+    return {
+      ...figure,
+      number: `${chapter}-${i + 1}`,
+      src: helpFigureSrc(article.id, figure),
+      labelKey: FIGURE_LABEL_KEY,
+    };
+  });
 }

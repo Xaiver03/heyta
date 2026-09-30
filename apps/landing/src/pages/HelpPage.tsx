@@ -29,57 +29,38 @@
  *
  * 🔴 **模块划分、问答清单在 `src/site/content.ts`，文章清单在 `src/site/docs.ts`。**
  * 这个文件只负责画出来，于是 `FAQPage` 结构化数据与页面用的是同一份清单。
+ *
+ * 🔴 **一个分类的那一块住在 `DocsModuleBlock`，不在这个文件里。**
+ * 分类页（`/help/sync`、`/help/data`）画的是**同一块**（同组速答 + 同组卡片 + 同样顺序）。
+ * 复制一份，"摘要要有一句话""没文章就不出小标题"这些纪律就有了第二个住处，
+ * 而第二个住处最先过期。
+ *
+ * ⚠️ **模块标题就是那一分类的入口**（`lp-help__module-link`）—— 有分类页时它是 `<a>`，
+ * 没有时它还是 `<h3>` 里的纯文字。判据两边同一个：分类页只给"有文章"的分类建，
+ * 所以这里不会出现"点了没反应的分类标题"。
  */
 
-import { useLocale, useI18n } from '@heyta/i18n/provider';
+import { useI18n } from '@heyta/i18n/provider';
 
-import { FaqList } from '../site/FaqList.js';
+import { DocsModuleBlock } from '../site/DocsModule.js';
 import { docsOutline } from '../site/docs.js';
-import { PageHead, RichText } from '../site/PageSections.js';
-import { siteHref } from '../site/paths.js';
+import { DocsSearch } from '../site/DocsSearch.js';
+import { PageHead } from '../site/PageSections.js';
 import type { SitePage } from '../site/pages.js';
 
 export function HelpPage({ page }: { page: SitePage }): React.JSX.Element {
   const { t } = useI18n();
-  const locale = useLocale();
 
   return (
     <>
       <PageHead page={page} />
       <div className="lp-section">
         <div className="lp-wrap">
+          <DocsSearch />
           <h2 className="lp-h2">{t('site.help.topics.title')}</h2>
-          {docsOutline().map(({ module, articles }) => {
-            const hasDeepRead = articles.length > 0;
-            return (
-              <section key={module.id} id={module.id} className="lp-help__module">
-                <h3 className="lp-h3">{t(module.titleKey)}</h3>
-
-                {hasDeepRead ? (
-                  <p className="lp-docs__eyebrow">{t('site.docs.hub.faq')}</p>
-                ) : null}
-                <FaqList pairs={module.pairs} />
-
-                {hasDeepRead ? (
-                  <div className="lp-docs__hub">
-                    <p className="lp-docs__eyebrow">{t('site.docs.hub.articles')}</p>
-                    <ul className="lp-docs__cards">
-                      {articles.map((article) => (
-                        <li key={article.id} className="lp-docs__card">
-                          <a className="lp-docs__card-link" href={siteHref(article, locale)}>
-                            <span className="lp-docs__card-title">{t(article.labelKey)}</span>
-                            <span className="lp-docs__card-sum">
-                              <RichText text={t(article.ledeKey)} />
-                            </span>
-                          </a>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                ) : null}
-              </section>
-            );
-          })}
+          {docsOutline().map(({ module, articles }) => (
+            <DocsModuleBlock key={module.id} module={module} articles={articles} />
+          ))}
         </div>
       </div>
     </>

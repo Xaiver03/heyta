@@ -13,6 +13,7 @@
 | **当前状态 / 下一步做什么** | [`multi-end-unified-strategy.md`](multi-end-unified-strategy.md) | 🔴 **唯一权威主计划**。它同时取代了 roadmap §5 与 4 份多端计划的路线部分 |
 | **本轮 goal：设置的 IA（移动端优先 + 电脑端验证）** | [`goal-settings-ia.md`](goal-settings-ia.md) | ✅ 已完成。§7.1e 的执行 goal。主战场排序由产品负责人拍板：**移动端 + 电脑端，web 不是**；apps/web 的改动算电脑端的（macOS 壳加载共享 UI，`HeytaMacApp.swift:270`） |
 | **本轮 goal：逐页排版对齐设计系统** | [`goal-layout-audit.md`](goal-layout-audit.md) | 🔴 进行中（2026-09-29 产品负责人重启）。四象限改 2×2 十字坐标系、AI 工具行重叠、macOS 标题条融入壳；逐页立**布局判据**（此前门禁只管"值从哪来"，不管"排版怎么排"） |
+| **本轮 goal：帮助中心扩成 SSOS 式文档中心** | [`help-center-docs-expansion.md`](help-center-docs-expansion.md) | 🔴 进行中（2026-09-30）。**规格真身**：SSOS 八项结构对照（四项已有、四项缺口）、五个分类的内容配额、§4 正面能力（逐条带代码证据）与 §5 **25 条公开文案负面清单**、截图方式（复用 `scripts/screenshots/`，不新造流水线）＋图号与注入器约定、双语沿用现有 i18n 机制、门禁与共享工作树碰撞面 |
 | **用户旅程与注册/登录放哪、每端怎么落** |  [`user-journey-and-auth.md`](user-journey-and-auth.md) | 🔴 **各端认证与旅程的唯一事实源**。含"前置"的定义与**为什么不做硬登录墙**、认证的 8 条真实形状（A1–A8，服务端语义与直觉不同）、逐端实施顺序 W0–W8、判据 J1–J7、以及 §10 **认证 UI 共享化的必做收口** |
 | **桌面 UI 走哪条机制、为什么** | 同上 §3.2 / §3.3 / §4.3 / §10-Q1 | 🔴 **2026-09-28 修订过**：由"原生壳 + 内嵌 WebView"改为 **RN 全端（`react-native-windows` 立即 + `react-native-macos` 等 0.84）**。依据是 [`../research/multi-platform-best-practice.md`](../research/multi-platform-best-practice.md)（补上了仓库此前缺失的联网检索） |
 | 阶段总览（P0/P1/P2/P3 与 AI / 激励两条并行轨） | [`roadmap.md`](roadmap.md) | 保留为历史阶段账；**§5「下一步」以主计划为准** |
