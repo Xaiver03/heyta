@@ -156,7 +156,26 @@ export interface RealtimeClient {
  *
  * 规则：去掉尾部斜杠；`https` → `wss`、`http` → `ws`（保留原样大小写之外的主机）；
  * 无 scheme 时按明文 `ws://` 处理（与 `classifyTransportSecurity` 把无 scheme 视为
- * 明文的口径一致）。返回 `ws(s)://host/ws?token=…&clientId=…`。
+ * 明文的口径一致）。返回 `ws(s)://host/api/sync/ws?token=…&clientId=…`。
+ *
+ * ## 🔴 路径是 `/api/sync/ws`，不是 `/ws`（2026-09-29 实测修）
+ *
+ * 服务端把 `wsRoutes` 注册在 **`prefix: '/api/sync'`** 下
+ *（`server/src/server.ts`：`fastifyServer.register(wsRoutes, { prefix: '/api/sync' })`）。
+ * 本函数此前拼的是 `/ws` —— 于是真实服务端上**每一次连接都 404**，
+ * 而客户端只会按退避重试，界面上看不出任何异常。
+ *
+ * 实测（对着本机真服务端，带 WebSocket 升级头）：
+ *
+ * ```
+ *   GET /ws             → 404
+ *   GET /api/sync/ws    → 101 Switching Protocols
+ * ```
+ *
+ * ⚠️ **为什么它长期没被发现**：本包与两个宿主的测试都用**假 WebSocket**
+ *（任何 URL 都接受），而 `tests/realtime.spec.ts` 把 `/ws` 这个**错路径**
+ * 逐字断言了下来 —— 测试与实现一起错，所以一直是绿的。
+ * 真正的判据只能是**对着真服务端连一次**：`scripts/verify-realtime-push.mjs`。
  *
  * 🔴 token **必须 URL 编码**：它是任意字符串，`+` `/` `=` `&` `?` `#` 都会改变 query 的含义。
  */
@@ -178,7 +197,7 @@ export function buildRealtimeUrl(baseUrl: string, token: string, clientId: strin
     origin = `ws://${trimmed}`;
   }
 
-  return `${origin}/ws?token=${encodeURIComponent(token)}&clientId=${encodeURIComponent(clientId)}`;
+  return `${origin}/api/sync/ws?token=${encodeURIComponent(token)}&clientId=${encodeURIComponent(clientId)}`;
 }
 
 /** 这些关闭码代表"同样的输入再来一次还是这个结果"，不重连。 */
