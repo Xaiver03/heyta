@@ -1,0 +1,41 @@
+-- 运营管理后台的准入标记：`users.is_admin`。
+--
+-- 依据：docs/adr/0038-admin-console-scope.md（决策全文与"为什么不照搬 SSOS"）。
+--
+-- ## 为什么是一列布尔，而不是角色表
+--
+-- heyta 目前**只有一位运营者**。三级 RBAC（角色表 → 权限码 → 关联表）
+-- 的成本不在第一张表，而在它带来的全部配套：角色管理界面、"谁能改角色"这个
+-- 自指问题的答案、以及每加一个端点都要想一遍挂哪个权限码 —— 而它现在的收益是 0。
+-- `is_admin` → RBAC 是一次**加法**（见 ADR-0038 §3.1 写的升级触发条件），
+-- 所以先要简单的那一半。
+--
+-- ## 为什么默认 false 且没有自助入口
+--
+-- **没有人生来是管理员。** 授权只能由 CLI（`pnpm admin:grant <email>`，
+-- 在服务器上执行）或已有管理员显式完成。这是 fail-closed：
+-- 一个忘了配置的环境退化成"没有后台"，而不是"人人都是后台"。
+--
+-- ## 为什么是普通 DDL（不带 CONCURRENTLY、不限时锁）
+--
+-- 按 AGENTS.md §4 与 server/prisma/migrations/README.md 的优先级 1：
+-- 表够小就用普通 DDL。`users` 与用户数同阶，永远不大。
+--
+-- 🔴 带**常量**默认值的 `ADD COLUMN` 在 PostgreSQL 11+ 是 **catalog-only** 变更 ——
+-- 默认值存在 `pg_attribute.attmissingval` 里，**不重写表、不必回填**
+-- （对比：`ADD COLUMN ... DEFAULT <易变表达式>` 才会重写）。
+-- 所以这里既不需要 CONCURRENTLY，也不需要 `SET LOCAL lock_timeout`
+-- 那个"恰好两条语句"的可恢复形状 —— 后者是给 `ALTER INDEX` 准备的。
+--
+-- SQL 由
+--   npx prisma migrate diff --from-schema-datamodel <迁移前> \
+--     --to-schema-datamodel prisma/schema.prisma --script
+-- 逐字取出（保证与 schema.prisma 不发生漂移）。
+--
+-- ## 回滚
+--
+-- `ALTER TABLE "users" DROP COLUMN "is_admin";` —— 无损（只是重新变成"没有管理员"）。
+-- 但**不要**把它做成一个迁移文件：迁移是不可逆层，回滚要另开一次有意识的变更。
+--
+-- AlterTable
+ALTER TABLE "users" ADD COLUMN     "is_admin" BOOLEAN NOT NULL DEFAULT false;

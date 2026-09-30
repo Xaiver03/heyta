@@ -1,0 +1,741 @@
+/**
+ * 运营管理后台的 HTTP 面：`/api/admin/*`。
+ * ============================================
+ *
+ * 依据：[`docs/adr/0038-admin-console-scope.md`](../../../docs/adr/0038-admin-console-scope.md)。
+ *
+ * ## 只读为主 + 三个不碰钱的动作
+ *
+ * | 方法 | 路径 | 用途 |
+ * |---|---|---|
+ * | GET  | `/overview`              | 概览统计（用户 / 订阅 / 订单 / 优惠码 / 邀请） |
+ * | GET  | `/users`                 | 用户列表（搜索 + 分页） |
+ * | GET  | `/users/:id`             | 用户详情（订阅 / 订单 / 设备 / 配额） |
+ * | POST | `/users/:id/unlock`      | 解锁被锁账号（清 `lockedUntil` + `failedLoginAttempts`） |
+ * | POST | `/users/:id/quota`       | 调整存储配额 |
+ * | POST | `/users/:id/logout`      | 强制登出（`tokenVersion++`，撤销该账号全部令牌） |
+ * | GET  | `/subscriptions`         | 订阅列表 |
+ * | GET  | `/orders`                | 订单列表 |
+ * | GET  | `/coupons`               | 优惠码 + 核销数 |
+ * | GET  | `/invites`               | 邀请码 + 推荐关系 |
+ *
+ * **不做**：改订阅、退款、发券、群发通知。理由见 ADR-0038 §2 三 / §3.4 ——
+ * 前三个动到钱与权益，各自需要幂等键、审计与回滚；群发自由文本会破坏
+ * "通知只存语义 + 参数、文案归 i18n"这条既有立场（`activity/notifications.ts` 文件头）。
+ *
+ * ## 🔴 响应一律走**白名单投影**
+ *
+ * `passwordHash`、`verificationToken` / `resetPasswordToken` / `passkeyRecoveryToken` /
+ * `loginToken`、`Passkey.credentialId` 与公钥 —— **一个都不出现在响应里**。
+ * 不靠"记得别 select"，而是每个投影函数显式列出要哪些字段。
+ * 这与 `packages/local-api` 的 `projectForTool`（可列举、不可读）是同一条纪律。
+ *
+ * ## `BigInt` 的序列化
+ *
+ * Prisma 的时间戳列都是 `BigInt`，而 `JSON.stringify` **不能**序列化 BigInt
+ * （会抛 `TypeError: Do not know how to serialize a BigInt`）。所以每个出参都
+ * 显式过 `toMs()` / `toMinor()`。漏一个的症状是整个端点 500 —— 响亮，但很浪费时间。
+ */
+
+import { FastifyInstance } from 'fastify';
+import { z } from 'zod';
+
+import { DEFAULT_ENTITLEMENT_POLICY } from '../entitlement';
+import { Logger } from '../logger';
+import { requireAdmin } from './admin.middleware';
+import { prisma } from '../db';
+
+/** epoch 毫秒。`null` 原样返回（"未知"与 0 是两件事）。 */
+const toMs = (value: bigint | null): number | null => (value === null ? null : Number(value));
+
+/** epoch 毫秒，必填列。 */
+const toMsRequired = (value: bigint): number => Number(value);
+
+/**
+ * 金额（最小货币单位）。
+ *
+ * 用 `Number` 是安全的：分单位金额远低于 `Number.MAX_SAFE_INTEGER`（2^53-1）。
+ * 真正会溢出的是纳秒时间戳那一类，这里没有。
+ */
+const toMinor = (value: bigint | number): number => Number(value);
+
+/** 分页参数。上限刻意比通知列表宽（后台是宽屏表格），但仍有上限。 */
+const PageQuerySchema = z.object({
+  limit: z.coerce.number().int().min(1).max(200).optional(),
+  offset: z.coerce.number().int().min(0).optional(),
+});
+const DEFAULT_LIMIT = 50;
+
+/** 用户列表的搜索词。空串等同于不搜索。 */
+const UserListQuerySchema = PageQuerySchema.extend({
+  q: z.string().trim().max(200).optional(),
+});
+
+const QuotaBodySchema = z.object({
+  // 1 MiB 下限：把配额设成 0 会让那台设备**立刻**同步不了，且用户看不懂为什么。
+  // 要停用一个人应该是停用账号，不是把配额调到 0 制造一个"神秘故障"。
+  quotaBytes: z.coerce
+    .number()
+    .int()
+    .min(1024 * 1024)
+    .max(1024 * 1024 * 1024 * 1024),
+});
+
+const IdParamSchema = z.object({ id: z.coerce.number().int().positive() });
+
+/** 分页信封。统一形状 ⇒ 前端一个表格组件能吃所有列表。 */
+interface Page<T> {
+  readonly items: T[];
+  readonly total: number;
+  readonly limit: number;
+  readonly offset: number;
+}
+
+function pageParams(query: { limit?: number; offset?: number }): { take: number; skip: number } {
+  return { take: query.limit ?? DEFAULT_LIMIT, skip: query.offset ?? 0 };
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// 投影（白名单）
+// ─────────────────────────────────────────────────────────────────────
+
+/** 列表里的用户行。**刻意不含**任何 token / 密码哈希。 */
+const USER_LIST_SELECT = {
+  id: true,
+  email: true,
+  isVerified: true,
+  isAdmin: true,
+  lockedUntil: true,
+  createdAt: true,
+  storageUsedBytes: true,
+  storageQuotaBytes: true,
+} as const;
+
+type UserListRow = {
+  id: number;
+  email: string;
+  isVerified: number;
+  isAdmin: boolean;
+  lockedUntil: bigint | null;
+  createdAt: Date;
+  storageUsedBytes: bigint;
+  storageQuotaBytes: bigint;
+};
+
+function projectUserListRow(row: UserListRow, now: number) {
+  return {
+    id: row.id,
+    email: row.email,
+    isVerified: row.isVerified === 1,
+    isAdmin: row.isAdmin,
+    // 🔴 `locked` 是**算出来的**，不是把 `lockedUntil` 原样给出去 ——
+    // 一个过去的时间戳在前端看是"已锁定"，而它其实早就自动解锁了。
+    locked: row.lockedUntil !== null && Number(row.lockedUntil) > now,
+    lockedUntil: toMs(row.lockedUntil),
+    createdAt: row.createdAt.getTime(),
+    storageUsedBytes: toMinor(row.storageUsedBytes),
+    storageQuotaBytes: toMinor(row.storageQuotaBytes),
+  };
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// 路由
+// ─────────────────────────────────────────────────────────────────────
+
+export const adminRoutes = async (fastify: FastifyInstance): Promise<void> => {
+  // 🔴 一个**路由级**的闸门：下面每条路由都继承它。
+  //    用插件级 `addHook` 而不是给每条路由重复写 `preHandler` —— 漏写一条就是一个洞，
+  //    而漏写是**静默**的。认证与判权都在 `requireAdmin` 内部按代码顺序完成。
+  fastify.addHook('preHandler', requireAdmin);
+
+  // ── 概览 ──────────────────────────────────────────────────────────
+  fastify.get('/overview', async (_req, reply) => {
+    try {
+      const now = Date.now();
+      const entitledStatuses = [...DEFAULT_ENTITLEMENT_POLICY.entitledStatuses];
+
+      const [
+        usersTotal,
+        usersVerified,
+        usersAdmins,
+        usersLocked,
+        subscriptionGroups,
+        orderGroups,
+        paidOrders,
+        couponsTotal,
+        couponsEnabled,
+        redemptionsSettled,
+        inviteCodes,
+        inviteCodesDisabled,
+        referralsTotal,
+        referralsActivated,
+        referralsRewarded,
+      ] = await Promise.all([
+        prisma.user.count(),
+        prisma.user.count({ where: { isVerified: 1 } }),
+        prisma.user.count({ where: { isAdmin: true } }),
+        prisma.user.count({ where: { lockedUntil: { gt: BigInt(now) } } }),
+        // 不写死状态词表：按状态分组返回，词表变了这里自动跟着变。
+        prisma.subscription.groupBy({ by: ['status'], _count: { _all: true } }),
+        prisma.checkoutOrder.groupBy({ by: ['status'], _count: { _all: true } }),
+        // 营收按币种分组 —— 混币求和是一个**错得很像真的**数字。
+        prisma.checkoutOrder.groupBy({
+          by: ['currency'],
+          where: { paidAt: { not: null } },
+          _sum: { finalAmountMinor: true },
+          _count: { _all: true },
+        }),
+        prisma.coupon.count(),
+        prisma.coupon.count({ where: { enabled: true } }),
+        prisma.couponRedemption.count({ where: { state: 'settled' } }),
+        prisma.inviteCode.count(),
+        prisma.inviteCode.count({ where: { disabled: true } }),
+        prisma.referral.count(),
+        prisma.referral.count({ where: { activatedAt: { not: null } } }),
+        prisma.referral.count({ where: { rewardedAt: { not: null } } }),
+      ]);
+
+      const activeSubscriptions = subscriptionGroups
+        .filter((group) => group.status !== null && entitledStatuses.includes(group.status))
+        .reduce((sum, group) => sum + group._count._all, 0);
+
+      return reply.send({
+        users: {
+          total: usersTotal,
+          verified: usersVerified,
+          admins: usersAdmins,
+          locked: usersLocked,
+        },
+        subscriptions: {
+          total: subscriptionGroups.reduce((sum, group) => sum + group._count._all, 0),
+          active: activeSubscriptions,
+          entitledStatuses,
+          byStatus: subscriptionGroups.map((group) => ({
+            status: group.status,
+            count: group._count._all,
+          })),
+        },
+        orders: {
+          total: orderGroups.reduce((sum, group) => sum + group._count._all, 0),
+          byStatus: orderGroups.map((group) => ({
+            status: group.status,
+            count: group._count._all,
+          })),
+          paidByCurrency: paidOrders.map((group) => ({
+            currency: group.currency,
+            paidOrders: group._count._all,
+            revenueMinor: toMinor(group._sum.finalAmountMinor ?? 0),
+          })),
+        },
+        coupons: {
+          total: couponsTotal,
+          enabled: couponsEnabled,
+          settledRedemptions: redemptionsSettled,
+        },
+        invites: {
+          codes: inviteCodes,
+          codesDisabled: inviteCodesDisabled,
+          referrals: referralsTotal,
+          referralsActivated,
+          referralsRewarded,
+        },
+      });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Unknown error';
+      Logger.error(`Admin overview error: ${message}`);
+      return reply.status(500).send({ error: 'Failed to load admin overview.' });
+    }
+  });
+
+  // ── 用户 ──────────────────────────────────────────────────────────
+  fastify.get('/users', async (req, reply) => {
+    const parsed = UserListQuerySchema.safeParse(req.query);
+    if (!parsed.success) {
+      return reply.status(400).send({ error: 'Invalid query parameters.' });
+    }
+    const { take, skip } = pageParams(parsed.data);
+    const q = parsed.data.q;
+
+    // 🔴 搜索是 `contains` + `insensitive`：后台最常用的动作就是
+    // "拿一个用户报的邮箱去搜"，而人报邮箱时大小写与空格都不确定。
+    const where =
+      q === undefined || q === ''
+        ? {}
+        : { email: { contains: q, mode: 'insensitive' as const } };
+
+    try {
+      const now = Date.now();
+      const [total, rows] = await Promise.all([
+        prisma.user.count({ where }),
+        prisma.user.findMany({
+          where,
+          select: USER_LIST_SELECT,
+          orderBy: { id: 'desc' },
+          take,
+          skip,
+        }),
+      ]);
+
+      const page: Page<ReturnType<typeof projectUserListRow>> = {
+        items: rows.map((row) => projectUserListRow(row, now)),
+        total,
+        limit: take,
+        offset: skip,
+      };
+      return reply.send(page);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Unknown error';
+      Logger.error(`Admin user list error: ${message}`);
+      return reply.status(500).send({ error: 'Failed to load users.' });
+    }
+  });
+
+  fastify.get('/users/:id', async (req, reply) => {
+    const parsed = IdParamSchema.safeParse(req.params);
+    if (!parsed.success) return reply.status(400).send({ error: 'Invalid user id.' });
+
+    try {
+      const now = Date.now();
+      const user = await prisma.user.findUnique({
+        where: { id: parsed.data.id },
+        select: {
+          ...USER_LIST_SELECT,
+          failedLoginAttempts: true,
+          termsAcceptedAt: true,
+          tokenVersion: true,
+          subscriptions: {
+            select: {
+              id: true,
+              provider: true,
+              priceId: true,
+              status: true,
+              grants: true,
+              currentPeriodEnd: true,
+              createdAt: true,
+              updatedAt: true,
+            },
+            orderBy: { id: 'desc' },
+          },
+          checkoutOrders: {
+            select: {
+              id: true,
+              outTradeNo: true,
+              provider: true,
+              priceId: true,
+              currency: true,
+              finalAmountMinor: true,
+              discountMinor: true,
+              status: true,
+              createdAt: true,
+              paidAt: true,
+            },
+            orderBy: { id: 'desc' },
+            take: 50,
+          },
+          devices: {
+            select: {
+              clientId: true,
+              deviceName: true,
+              appVersion: true,
+              lastSeenAt: true,
+            },
+            orderBy: { lastSeenAt: 'desc' },
+            take: 50,
+          },
+          // 🔴 只数个数，**不取** `credentialId` / 公钥 —— 那是指纹类标识，
+          // 后台不需要它，"顺手带上"只会扩大泄漏面。
+          _count: { select: { passkeys: true, operations: true, notifications: true } },
+        },
+      });
+
+      if (user === null) return reply.status(404).send({ error: 'User not found.' });
+
+      return reply.send({
+        user: {
+          ...projectUserListRow(user, now),
+          failedLoginAttempts: user.failedLoginAttempts,
+          termsAcceptedAt: toMs(user.termsAcceptedAt),
+          tokenVersion: user.tokenVersion,
+        },
+        counts: {
+          passkeys: user._count.passkeys,
+          operations: user._count.operations,
+          notifications: user._count.notifications,
+        },
+        subscriptions: user.subscriptions.map((s) => ({
+          id: s.id,
+          provider: s.provider,
+          priceId: s.priceId,
+          status: s.status,
+          grants: s.grants,
+          currentPeriodEnd: toMs(s.currentPeriodEnd),
+          createdAt: toMsRequired(s.createdAt),
+          updatedAt: toMsRequired(s.updatedAt),
+        })),
+        orders: user.checkoutOrders.map((o) => ({
+          id: o.id,
+          outTradeNo: o.outTradeNo,
+          provider: o.provider,
+          priceId: o.priceId,
+          currency: o.currency,
+          finalAmountMinor: o.finalAmountMinor,
+          discountMinor: o.discountMinor,
+          status: o.status,
+          createdAt: toMsRequired(o.createdAt),
+          paidAt: toMs(o.paidAt),
+        })),
+        devices: user.devices.map((d) => ({
+          clientId: d.clientId,
+          deviceName: d.deviceName,
+          appVersion: d.appVersion,
+          lastSeenAt: toMsRequired(d.lastSeenAt),
+        })),
+      });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Unknown error';
+      Logger.error(`Admin user detail error: ${message}`);
+      return reply.status(500).send({ error: 'Failed to load user.' });
+    }
+  });
+
+  // ── 三个支持动作（都不碰钱，都可逆）────────────────────────────────
+
+  /**
+   * 解锁账号。
+   *
+   * 清 `lockedUntil` **并且**清 `failedLoginAttempts` —— 只清前者会让用户
+   * 再输错一次就**立刻**又被锁上（计数还在阈值附近），而工单会再回来一次。
+   */
+  fastify.post('/users/:id/unlock', async (req, reply) => {
+    const parsed = IdParamSchema.safeParse(req.params);
+    if (!parsed.success) return reply.status(400).send({ error: 'Invalid user id.' });
+
+    try {
+      const user = await prisma.user.update({
+        where: { id: parsed.data.id },
+        data: { lockedUntil: null, failedLoginAttempts: 0 },
+        select: { id: true, email: true },
+      });
+      Logger.info(`Admin unlocked user #${String(user.id)} (${user.email})`);
+      return reply.send({ ok: true, user });
+    } catch (err) {
+      // Prisma 的 P2025 = 记录不存在。这是预期结果（并发删除 / 手输错 id），
+      // 不该报 500。
+      if (typeof err === 'object' && err !== null && (err as { code?: string }).code === 'P2025') {
+        return reply.status(404).send({ error: 'User not found.' });
+      }
+      const message = err instanceof Error ? err.message : 'Unknown error';
+      Logger.error(`Admin unlock error: ${message}`);
+      return reply.status(500).send({ error: 'Failed to unlock user.' });
+    }
+  });
+
+  fastify.post('/users/:id/quota', async (req, reply) => {
+    const params = IdParamSchema.safeParse(req.params);
+    if (!params.success) return reply.status(400).send({ error: 'Invalid user id.' });
+    const body = QuotaBodySchema.safeParse(req.body);
+    if (!body.success) {
+      return reply.status(400).send({
+        error: 'Invalid quota.',
+        details: body.error.issues.map((issue) => issue.message),
+      });
+    }
+
+    try {
+      const user = await prisma.user.update({
+        where: { id: params.data.id },
+        data: { storageQuotaBytes: BigInt(body.data.quotaBytes) },
+        select: { id: true, email: true, storageQuotaBytes: true, storageUsedBytes: true },
+      });
+      Logger.info(
+        `Admin set quota of user #${String(user.id)} to ${String(body.data.quotaBytes)} bytes`,
+      );
+      return reply.send({
+        ok: true,
+        user: {
+          id: user.id,
+          email: user.email,
+          storageQuotaBytes: toMinor(user.storageQuotaBytes),
+          storageUsedBytes: toMinor(user.storageUsedBytes),
+        },
+      });
+    } catch (err) {
+      if (typeof err === 'object' && err !== null && (err as { code?: string }).code === 'P2025') {
+        return reply.status(404).send({ error: 'User not found.' });
+      }
+      const message = err instanceof Error ? err.message : 'Unknown error';
+      Logger.error(`Admin quota error: ${message}`);
+      return reply.status(500).send({ error: 'Failed to update quota.' });
+    }
+  });
+
+  /**
+   * 强制登出：`tokenVersion++` 让该账号**已签发**的全部 JWT 立刻失效
+   * （`auth.ts` 的 `verifyToken` 会比对它）。
+   *
+   * 这是账号被盗时唯一能在服务端一侧立刻止血的动作 —— 但要注意它**不撤销 passkey**：
+   * 通行密钥是设备本地的，撤销它要用户自己在设置里删（见 ADR-0029）。
+   */
+  fastify.post('/users/:id/logout', async (req, reply) => {
+    const parsed = IdParamSchema.safeParse(req.params);
+    if (!parsed.success) return reply.status(400).send({ error: 'Invalid user id.' });
+
+    try {
+      const user = await prisma.user.update({
+        where: { id: parsed.data.id },
+        data: { tokenVersion: { increment: 1 } },
+        select: { id: true, email: true, tokenVersion: true },
+      });
+      Logger.info(`Admin forced logout of user #${String(user.id)} (${user.email})`);
+      return reply.send({ ok: true, user });
+    } catch (err) {
+      if (typeof err === 'object' && err !== null && (err as { code?: string }).code === 'P2025') {
+        return reply.status(404).send({ error: 'User not found.' });
+      }
+      const message = err instanceof Error ? err.message : 'Unknown error';
+      Logger.error(`Admin logout error: ${message}`);
+      return reply.status(500).send({ error: 'Failed to force logout.' });
+    }
+  });
+
+  // ── 订阅 / 订单 / 优惠码 / 邀请 ────────────────────────────────────
+  fastify.get('/subscriptions', async (req, reply) => {
+    const parsed = PageQuerySchema.safeParse(req.query);
+    if (!parsed.success) return reply.status(400).send({ error: 'Invalid query parameters.' });
+    const { take, skip } = pageParams(parsed.data);
+
+    try {
+      const [total, rows] = await Promise.all([
+        prisma.subscription.count(),
+        prisma.subscription.findMany({
+          select: {
+            id: true,
+            userId: true,
+            provider: true,
+            priceId: true,
+            status: true,
+            grants: true,
+            currentPeriodEnd: true,
+            createdAt: true,
+            user: { select: { email: true } },
+          },
+          orderBy: { id: 'desc' },
+          take,
+          skip,
+        }),
+      ]);
+
+      return reply.send({
+        items: rows.map((s) => ({
+          id: s.id,
+          userId: s.userId,
+          email: s.user.email,
+          provider: s.provider,
+          priceId: s.priceId,
+          status: s.status,
+          grants: s.grants,
+          currentPeriodEnd: toMs(s.currentPeriodEnd),
+          createdAt: toMsRequired(s.createdAt),
+        })),
+        total,
+        limit: take,
+        offset: skip,
+      });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Unknown error';
+      Logger.error(`Admin subscriptions error: ${message}`);
+      return reply.status(500).send({ error: 'Failed to load subscriptions.' });
+    }
+  });
+
+  fastify.get('/orders', async (req, reply) => {
+    const parsed = PageQuerySchema.safeParse(req.query);
+    if (!parsed.success) return reply.status(400).send({ error: 'Invalid query parameters.' });
+    const { take, skip } = pageParams(parsed.data);
+
+    try {
+      const [total, rows] = await Promise.all([
+        prisma.checkoutOrder.count(),
+        prisma.checkoutOrder.findMany({
+          select: {
+            id: true,
+            outTradeNo: true,
+            userId: true,
+            provider: true,
+            priceId: true,
+            currency: true,
+            region: true,
+            originalAmountMinor: true,
+            discountMinor: true,
+            finalAmountMinor: true,
+            status: true,
+            createdAt: true,
+            paidAt: true,
+            user: { select: { email: true } },
+          },
+          orderBy: { id: 'desc' },
+          take,
+          skip,
+        }),
+      ]);
+
+      return reply.send({
+        items: rows.map((o) => ({
+          id: o.id,
+          outTradeNo: o.outTradeNo,
+          userId: o.userId,
+          email: o.user.email,
+          provider: o.provider,
+          priceId: o.priceId,
+          currency: o.currency,
+          region: o.region,
+          originalAmountMinor: o.originalAmountMinor,
+          discountMinor: o.discountMinor,
+          finalAmountMinor: o.finalAmountMinor,
+          status: o.status,
+          createdAt: toMsRequired(o.createdAt),
+          paidAt: toMs(o.paidAt),
+        })),
+        total,
+        limit: take,
+        offset: skip,
+      });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Unknown error';
+      Logger.error(`Admin orders error: ${message}`);
+      return reply.status(500).send({ error: 'Failed to load orders.' });
+    }
+  });
+
+  fastify.get('/coupons', async (req, reply) => {
+    const parsed = PageQuerySchema.safeParse(req.query);
+    if (!parsed.success) return reply.status(400).send({ error: 'Invalid query parameters.' });
+    const { take, skip } = pageParams(parsed.data);
+
+    try {
+      const [total, rows] = await Promise.all([
+        prisma.coupon.count(),
+        prisma.coupon.findMany({
+          select: {
+            id: true,
+            code: true,
+            name: true,
+            kind: true,
+            percentOffBp: true,
+            amountOffMinor: true,
+            currency: true,
+            enabled: true,
+            validFrom: true,
+            validUntil: true,
+            maxRedemptions: true,
+            // 核销数用 `_count` 数，不把核销行本身拉出来（那是另一张会长的表）。
+            _count: { select: { redemptions: true } },
+          },
+          orderBy: { createdAt: 'desc' },
+          take,
+          skip,
+        }),
+      ]);
+
+      return reply.send({
+        items: rows.map((c) => ({
+          id: c.id,
+          code: c.code,
+          name: c.name,
+          kind: c.kind,
+          percentOffBp: c.percentOffBp,
+          amountOffMinor: c.amountOffMinor,
+          currency: c.currency,
+          enabled: c.enabled,
+          validFrom: toMsRequired(c.validFrom),
+          validUntil: toMs(c.validUntil),
+          maxRedemptions: c.maxRedemptions,
+          redemptions: c._count.redemptions,
+        })),
+        total,
+        limit: take,
+        offset: skip,
+      });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Unknown error';
+      Logger.error(`Admin coupons error: ${message}`);
+      return reply.status(500).send({ error: 'Failed to load coupons.' });
+    }
+  });
+
+  fastify.get('/invites', async (req, reply) => {
+    const parsed = PageQuerySchema.safeParse(req.query);
+    if (!parsed.success) return reply.status(400).send({ error: 'Invalid query parameters.' });
+    const { take, skip } = pageParams(parsed.data);
+
+    try {
+      const [referralsTotal, codesTotal, codes, referrals] = await Promise.all([
+        prisma.referral.count(),
+        prisma.inviteCode.count(),
+        prisma.inviteCode.findMany({
+          select: {
+            id: true,
+            code: true,
+            disabled: true,
+            createdAt: true,
+            userId: true,
+            user: { select: { email: true } },
+          },
+          orderBy: { id: 'desc' },
+          take,
+          skip,
+        }),
+        prisma.referral.findMany({
+          select: {
+            id: true,
+            code: true,
+            createdAt: true,
+            activatedAt: true,
+            rewardDays: true,
+            rewardedAt: true,
+            inviter: { select: { id: true, email: true } },
+            invitee: { select: { id: true, email: true } },
+          },
+          orderBy: { id: 'desc' },
+          take,
+          skip,
+        }),
+      ]);
+
+      return reply.send({
+        codes: {
+          items: codes.map((c) => ({
+            id: c.id,
+            code: c.code,
+            disabled: c.disabled,
+            createdAt: toMsRequired(c.createdAt),
+            userId: c.userId,
+            email: c.user.email,
+          })),
+          total: codesTotal,
+          limit: take,
+          offset: skip,
+        },
+        referrals: {
+          items: referrals.map((r) => ({
+            id: r.id,
+            code: r.code,
+            createdAt: toMsRequired(r.createdAt),
+            activatedAt: toMs(r.activatedAt),
+            rewardDays: r.rewardDays,
+            rewardedAt: toMs(r.rewardedAt),
+            inviter: r.inviter,
+            invitee: r.invitee,
+          })),
+          total: referralsTotal,
+          limit: take,
+          offset: skip,
+        },
+      });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Unknown error';
+      Logger.error(`Admin invites error: ${message}`);
+      return reply.status(500).send({ error: 'Failed to load invites.' });
+    }
+  });
+};
