@@ -74,7 +74,7 @@ describe('把令牌交回壳', () => {
   it('是桌面流程 ⇒ 返回回跳地址（这一次真的回跳了）', () => {
     const doc = document.implementation.createHTMLDocument('t');
     Object.defineProperty(doc, 'defaultView', { value: { location: { assign: vi.fn() } } });
-    const href = maybeHandOffToShell('jwt', url('?auth=desktop&state=st'), doc);
-    expect(href).toBe(`heyta://auth#token=jwt&state=st`);
+    const href = maybeHandOffToShell('jwt', url('?auth=desktop&state=st'), doc, 'a@b.c');
+    expect(href).toBe(`heyta://auth#token=jwt&state=st&email=a%40b.c`);
   });
 });

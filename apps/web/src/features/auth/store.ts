@@ -101,6 +101,20 @@ export interface AuthStoreState {
    */
   verify: (baseUrl: string, input: string) => Promise<HostedAuthSession | undefined>;
   /**
+   * **直接采用一个已经签发好的会话**（ADR-0039 §2.3）。
+   *
+   * 🔴 它存在的理由：桌面壳的反向授权回跳把**会话本身**（JWT）交进来 ——
+   *    那是**另一种东西**，不是"一次性链接令牌"。拿会话去走 `verify()` 会被
+   *    服务端按链接令牌那一列查 ⇒ 必然 401（2026-09-30 实测）。
+   *
+   * ⚠️ 它**不新写**"登录成功后该做什么"：内部就调同一个 `applyAuthSession`，
+   *    所以落盘凭据、桌面回跳、状态翻转都只有一份实现。
+   */
+  adoptSession: (
+    baseUrl: string,
+    session: HostedAuthSession,
+  ) => void;
+  /**
    * 用通行密钥注册。**与邮件注册是两条路，不是同一条的快捷方式**：
    * 这里多了一步"让系统弹窗创建凭据"，而它**必须发生在浏览器里**。
    *
@@ -171,12 +185,17 @@ function applyAuthSession(baseUrl: string, session: HostedAuthSession): void {
    * 不是桌面流程时 `maybeHandOffToShell` 直接返回 `null`，什么都不做。
    */
   if (typeof window !== 'undefined') {
-    maybeHandOffToShell(session.token, new URL(window.location.href), document);
+    maybeHandOffToShell(session.token, new URL(window.location.href), document, session.user.email);
   }
 }
 
 export const useAuthStore = create<AuthStoreState>((set) => ({
   status: { kind: 'signed-out' },
+
+  adoptSession: (baseUrl, session) => {
+    applyAuthSession(baseUrl, session);
+    set({ status: { kind: 'signed-in', email: session.user.email } });
+  },
 
   sendLoginLink: async (baseUrl, email) => {
     set({ status: { kind: 'busy', action: 'login-link' } });
