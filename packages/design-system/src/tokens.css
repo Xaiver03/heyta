@@ -299,6 +299,9 @@
   --ht-focus-ring-width: 2px;
 
   /* 布局 */
+  /* 视图导航（rail）宽度。11rem 装得下最长的标签「四象限」+ 图标 + 内边距，
+     又不至于把主区挤到 1280 下出现横向滚动（审计基准见 showcase-fidelity-audit.md §6.3）。 */
+  --ht-layout-rail-width: 11rem;      /* 176px */
   --ht-layout-sidebar-width: 15rem;   /* 240px */
   --ht-layout-header-height: 3.5rem;  /* 56px */
   --ht-layout-content-max: 75rem;     /* 1200px */
@@ -308,6 +311,21 @@
   /* 四象限单元的最小高度。它不是间距，是布局约束 ——
      所以属于 layout 而非 space。 */
   --ht-layout-quadrant-min-height: 12rem;
+  /* 浮层里可滚动结果区的最大高度。它不是间距，是布局约束 ——
+     所以属于 layout。24rem 大约是"半屏多一点"：再高浮层就盖住了它
+     透出的那一层（搜索浮层是**透出下层视图**的，不是全屏页）。 */
+  --ht-layout-panel-max-height: 24rem;
+  /* 🔴 响应式断点（2026-09-29）：容器可用宽度低于它时，"两列"布局降为单列。
+     首个消费者是四象限（2×2 十字网格 ↔ 手机单列）。
+     768px ≈ 平板竖屏 —— 它之下两列的每格放不下一个可读的任务行。 */
+  --ht-layout-two-column-min: 768px;
+  /* 行内输入框在 flex 行里的收缩下限。低于它输入框就失去可读性，
+     此刻整行应该换行（按钮去下一行），而不是把按钮文字竖着折断。 */
+  --ht-layout-input-min: 14rem;
+  /* 居中浮层（搜索）的卡片最大宽度。40rem ≈ 640px：够放两列结果摘要，
+     又留出足够的两侧空隙让**下层视图透出**（§11.5：次级表面是浮层，
+     不是把下层替换掉的整页）。 */
+  --ht-layout-modal-max: 40rem;
 
   /* 边框宽度。
      扁平风格**用边框表达层次**（阴影只给真正的浮层），

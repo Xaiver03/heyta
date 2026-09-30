@@ -111,11 +111,22 @@ export const TOKEN_GROUPS = {
   'focus-ring': ['width'],
   /** 布局尺寸。组件布局应消费它们，而不是写死宽度。 */
   layout: [
+    /* 视图导航（rail）。2026-09-29 加：外壳从"顶栏平铺视图 tab"改成
+       "rail 放视图 + sidebar 放当前视图的范围"（`dida-view-unification.md` §4.4）。 */
+    'rail-width',
     'sidebar-width',
     'header-height',
     'content-max',
     'prose-max',
     'quadrant-min-height',
+    'panel-max-height',
+    /* 响应式断点与输入约束。2026-09-29 加：排版此前只管"值从哪来"，
+       不管"窗口变化后排版塌不塌"——这两个值是布局判据的锚点。 */
+    'two-column-min',
+    'input-min',
+    /* 居中浮层（搜索）的卡片最大宽度。2026-09-30 加：搜索从"整页"改回
+       滴答 §11.5 的"居中浮层"——宽度是它的 IA 判据之一（留出透出下层的空隙）。 */
+    'modal-max',
   ],
   'border-width': ['thin', 'thick'],
 
