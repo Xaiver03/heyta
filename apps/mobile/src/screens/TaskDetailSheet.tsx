@@ -44,8 +44,11 @@ import {
 
 import {
   Priority,
+  canSetParent,
   dueDateToEpoch,
   isImportant,
+  // 🔴 自定义 RRULE 的合法性判据 —— 与领域层同一份（B2-3 的移动端尾巴）。
+  isValidRecurrenceRule,
   toLocalDate,
   type Project,
   type Tag,
@@ -60,7 +63,7 @@ import {
   type RepeatPresetId,
   type TaskActions,
 } from '@heyta/app-host';
-import { ReminderList } from '@heyta/ui';
+import { ReminderList, rejectionReasonOf, subtaskRejectionMessageKey } from '@heyta/ui';
 
 import { formatStamp } from '../lib/date';
 import { PRIORITY_ORDER, priorityColorToken, priorityLabel } from '../lib/priority';
@@ -69,7 +72,7 @@ import { reminderListLabels } from '../lib/reminders-display';
 import { useTaskReminders } from '../lib/reminders';
 import { useText, useTheme, useTokens } from '../theme';
 import { DatePicker } from '../ui/DatePicker';
-import { Button, Chip, IconButton, SectionHeader, Text } from '../ui/kit';
+import { Button, Chip, IconButton, SectionHeader, Text, TextField } from '../ui/kit';
 
 /**
  * 重复预设 → 词条 key。
@@ -94,6 +97,7 @@ export function TaskDetailSheet({
   projects,
   tags,
   projectActions,
+  tasks,
   onChanged,
   now,
 }: {
@@ -113,6 +117,14 @@ export function TaskDetailSheet({
   tags: Tag[];
   /** 要新建清单时需要它。为 `null` 时「新建清单」不出现（宿主还没打开）。 */
   projectActions: ProjectActions | null;
+  /**
+   * **全部未删除的任务** —— 子任务的候选父从这里挑。
+   *
+   * 🔴 刻意传**全量**而不是"当前视图里可见的"：父任务可能在任何视图里
+   * （甚至已完成、被筛掉），而"把一个任务挂到某条看不见的任务下"是完全合法的操作。
+   * 用可见列表当选集，会让子任务这个功能**随机地做不成**，且看起来像"没有这个选项"。
+   */
+  tasks: Task[];
   onChanged: () => void;
   now: number;
 }): React.JSX.Element | null {
@@ -127,6 +139,8 @@ export function TaskDetailSheet({
   /** 行内「新建清单」的输入态与草稿名。 */
   const [newListOpen, setNewListOpen] = useState(false);
   const [newListName, setNewListName] = useState('');
+  /** 改父被拒时的**人话**（空串 = 没有错误）。 */
+  const [parentError, setParentError] = useState('');
 
   const taskId = task?.id;
 
@@ -175,6 +189,32 @@ export function TaskDetailSheet({
     setNewListOpen(false);
     setNewListName('');
   }, [taskId, visible]);
+
+  /**
+   * 改父。**必须自己接住拒绝** —— 通用的 `run()` 只 `.then(onChanged)`，
+   * 没有 `.catch`，而 `setParent` 在环 / 超深 / 超子数时**会 throw**
+   * ⇒ 直接交给 `run` 会变成一条 **unhandled rejection**，
+   * 用户看到的是"点了没反应"，控制台里才有原因。
+   *
+   * ⚠️ 显示的是**词条里的人话**，不是 `cause.message` ——
+   * 后者是给开发者的诊断串（含原始 id）。与 web 侧同一条纪律。
+   */
+  const runSetParent = useCallback(
+    (parentId: string | undefined): void => {
+      setParentError('');
+      setBusy(true);
+      void actions
+        .setParent(task?.id ?? '', parentId)
+        .then(onChanged)
+        .catch((cause: unknown) => {
+          setParentError(t(subtaskRejectionMessageKey(rejectionReasonOf(cause)) as MessageKey));
+        })
+        .finally(() => {
+          setBusy(false);
+        });
+    },
+    [actions, onChanged, t, task?.id],
+  );
 
   const run = useCallback(
     (p: Promise<unknown>) => {
@@ -225,6 +265,50 @@ export function TaskDetailSheet({
     commitNote();
     onClose();
   }, [commitTitle, commitNote, onClose]);
+
+  /**
+   * 自定义 RRULE 的输入草稿与错误（B2-3 的移动端尾巴）。
+   *
+   * 🔴 在这一刀之前，**移动端只能选预设**：web 上能填
+   * `FREQ=WEEKLY;INTERVAL=2`，手机上填不了 —— 同一件能力两端不一致
+   * （"每两周"这种规则在手机上只能**看见**、不能**设置**）。
+   *
+   * `customError` 存的是**词条 key**，不是拼好的句子：错误文案必须跟着语言走
+   * （与 `subtaskRejectionMessageKey` 同一个形状）。
+   *
+   * 🔴🔴 **这两个 `useState` 与下面的 `useCallback` 必须待在这一行之上。**
+   * 紧跟着的 `if (task === undefined) return null;` 是一个**提前返回**：
+   * 把 hook 放在它之后，"面板打开"（`task` 从 `undefined` 变成有值）那一次渲染
+   * 就会**多出几个 hook** —— React 直接抛
+   * `Rendered more hooks than during the previous render`。
+   * release 包里没有红屏，表现是**应用凭空消失**（`am_crash` 里只留下
+   * `at TaskDetailSheet`）。这个 bug 是本刀实测崩出来的，不是设想。
+   */
+  const [customDraft, setCustomDraft] = useState('');
+  const [customError, setCustomError] = useState<MessageKey | undefined>(undefined);
+
+  /**
+   * 应用自定义规则。
+   *
+   * 🔴 **非法输入就地报错，且一条 op 都不写** —— 不靠"写失败"来发现串不合法。
+   * 判据是领域层的 `isValidRecurrenceRule`（与 web 的 `TaskRepeat` 同一份）：
+   * 空串与 `FREQ=` 都进不去，而它们能通过"看起来像 RRULE"的粗略检查。
+   */
+  const applyCustomRule = useCallback(() => {
+    // 提前返回之后 `task` 一定有值，但那一条在 hook 之后才成立 —— 这里自己兜一次。
+    if (task === undefined) return;
+    const rule = customDraft.trim();
+    if (rule === '') {
+      setCustomError('mobile.detail.repeat.error.empty');
+      return;
+    }
+    if (!isValidRecurrenceRule(rule)) {
+      setCustomError('mobile.detail.repeat.error.invalid');
+      return;
+    }
+    setCustomError(undefined);
+    run(actions.setRepeat(task.id, rule));
+  }, [customDraft, actions, task, run]);
 
   if (task === undefined) return null;
 
@@ -484,6 +568,46 @@ export function TaskDetailSheet({
                 "点了之后立刻同步"变成"要点保存才同步"，而这一屏的其他字段
                 （截止日、重复、优先级）全是即点即写 —— 不一致的交互更贵。 */}
             <View style={{ gap: tokens['space.2'] }}>
+              {/* ── 子任务（上级任务）──────────────────────────────────────
+                  🔴 在它之前：`packages/domain/src/subtasks.ts`（616 行，建树 + 环防护 +
+                  深度/子数上限）与 `app-host` 的 `setParent` **都已经写好**，
+                  但移动端**一次调用点都没有** —— 于是"模型支持、树能建、
+                  用户没有任何办法造出一个子任务"，且**不报错**。
+                  （Web 端本轮已补，这里是移动端的那一半。） */}
+              <View style={{ gap: tokens['space.2'] }}>
+                <SectionHeader icon="task.project" title={t('mobile.detail.field.parent')} />
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: tokens['space.2'] }}>
+                  <Chip
+                    label={t('mobile.detail.parent.topLevel')}
+                    selected={task.parentId === undefined}
+                    onPress={() => {
+                      runSetParent(undefined);
+                    }}
+                  />
+                  {/* 🔴 候选**预先过滤**：用领域层的 `canSetParent`，不是"id 不等于自己"。
+                      后者会漏掉"后代"这一整类 ⇒ 用户能选出**造出环**的组合，
+                      而环的后果是树构建/折叠/计数**无限递归**。 */}
+                  {tasks
+                    .filter((t2) => t2.deletedAt === undefined)
+                    .filter((t2) => canSetParent(tasks, task.id, t2.id))
+                    .map((t2) => (
+                      <Chip
+                        key={t2.id}
+                        label={t2.title}
+                        selected={task.parentId === t2.id}
+                        onPress={() => {
+                          runSetParent(t2.id);
+                        }}
+                      />
+                    ))}
+                </View>
+                {parentError !== '' && (
+                  <Text variant="row-meta" tone="danger">
+                    {parentError}
+                  </Text>
+                )}
+              </View>
+
               <SectionHeader icon="task.tag" title={t('mobile.detail.field.tags')} />
               {tags.length === 0 ? (
                 <Text variant="caption" tone="subtle">
@@ -574,6 +698,35 @@ export function TaskDetailSheet({
                   })}
                 </Text>
               )}
+              {/*
+                自定义 RRULE（B2-3 的移动端尾巴）。
+
+                🔴 在此之前**移动端只能选预设** —— 用户想要"每两周"就得去网页上设，
+                而手机上那条规则只能看见、不能改。输入框与按钮都用**已有的**
+                `TextField` / `Button`（样式在 `ui/kit.tsx` 里，本文件不新增内联样式：
+                `screens/**` 的内联样式是**只减不增**的棘轮，见 `check:l4-no-style`）。
+
+                ⚠️ 错误文案走 `hint` + `hintTone="danger"`：不额外挂一个错误块，
+                否则"合法但没提交"时那块空白会一直占位。
+              */}
+              <TextField
+                label={t('mobile.detail.repeat.customLabel')}
+                value={customDraft}
+                onChangeText={(next) => {
+                  setCustomDraft(next);
+                  // 用户开始改输入，就把上一次的错误收掉 —— 否则他改对了
+                  // 那句红字还挂着，看起来像"改了也没用"。
+                  if (customError !== undefined) setCustomError(undefined);
+                }}
+                placeholder={t('mobile.detail.repeat.customPlaceholder')}
+                hint={customError === undefined ? t('mobile.detail.repeat.customHint') : t(customError)}
+                hintTone={customError === undefined ? 'subtle' : 'danger'}
+              />
+              <Button
+                label={t('mobile.detail.repeat.customApply')}
+                tone="ghost"
+                onPress={applyCustomRule}
+              />
             </View>
 
             {/*

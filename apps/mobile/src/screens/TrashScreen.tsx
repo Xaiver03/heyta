@@ -44,7 +44,8 @@ import {
 } from '../lib/trash-display';
 import { useMobileSync } from '../sync/store';
 import { useTheme, useTokens } from '../theme';
-import { Button, Card, Divider, EmptyState, Screen, Text } from '../ui/kit';
+import { TrashBoard } from '@heyta/ui';
+import { Button, Screen, Text } from '../ui/kit';
 import { Icon } from '../ui/icons';
 
 export function TrashScreen({ onBack }: { onBack: () => void }): React.JSX.Element {
@@ -115,69 +116,47 @@ export function TrashScreen({ onBack }: { onBack: () => void }): React.JSX.Eleme
       });
   };
 
+  /**
+   * 共享板要的全部文案（本层不许 `import '@heyta/i18n'`）。
+   * ⚠️ `deletedAt` 收**整条任务**而不是时间戳：`deletedAt ?? updatedAt`
+   * 那条回退规则两端必须一致，而它属于展示层。
+   */
+  const labels = {
+    intro: t('mobile.trash.intro'),
+    emptyTitle: t('mobile.trash.empty.title'),
+    emptyHint: t('mobile.trash.empty.hint'),
+    deletedAt: (task: Task) => deletedAtText(task, t),
+    restore: (task: Task) => restoreA11y(task, t),
+    purge: (task: Task) => purgeA11y(task, t),
+  };
+
   return (
     <Screen
       title={t('mobile.trash.title')}
       actions={[{ icon: 'action.back', label: t('mobile.growth.back'), onPress: onBack }]}
     >
-      <Text variant="row-meta" tone="subtle">
-        {t('mobile.trash.intro')}
-      </Text>
-
-      {error !== undefined ? (
-        <Text variant="caption" tone="danger" selectable>
-          {error}
-        </Text>
-      ) : null}
-
-      {items.length === 0 ? (
-        <EmptyState
-          icon="task.delete"
-          title={t('mobile.trash.empty.title')}
-          hint={t('mobile.trash.empty.hint')}
-        />
-      ) : (
-        <Card style={{ gap: tokens['space.4'] }}>
-          {items.map((task, index) => (
-            <View key={task.id} style={{ gap: tokens['space.2'] }}>
-              {index > 0 ? <Divider /> : null}
-              {/* 用户自己的字：原样显示、不翻译。长标题折行而不是截断 —— 
-                  回收站是用户来核对"删掉的是不是这条"的地方，看不全就等于没看见。 */}
-              <Text variant="row-title">{task.title}</Text>
-              <Text variant="numeric-body" tone="subtle">
-                {deletedAtText(task, t)}
-              </Text>
-              <View style={{ flexDirection: 'row', gap: tokens['space.3'] }}>
-                <Button
-                  label={t('mobile.trash.restore')}
-                  accessibilityLabel={restoreA11y(task, t)}
-                  icon="task.reopen"
-                  tone="secondary"
-                  disabled={busy}
-                  onPress={() => {
-                    if (actions === null) return;
-                    run(actions.restore(task.id));
-                  }}
-                  style={{ flex: 1 }}
-                />
-                {/* 🔴 这一下**不删**，只打开确认框 —— 不可逆动作必须二次确认。
-                    真正调用 `purge()` 的地方只有下面 Modal 里的确认按钮。 */}
-                <Button
-                  label={t('mobile.trash.purge')}
-                  accessibilityLabel={purgeA11y(task, t)}
-                  icon="task.delete"
-                  tone="danger"
-                  disabled={busy}
-                  onPress={() => {
-                    setConfirmingId(task.id);
-                  }}
-                  style={{ flex: 1 }}
-                />
-              </View>
-            </View>
-          ))}
-        </Card>
-      )}
+      {/*
+        🔴 **列表本身来自共享 `TrashBoard`**（与 Web 同一份）。
+        在此之前两端各写了一份回收站行 —— 而它们的漂移不会报错，
+        只会让"网页上能还原、手机上找不到那个按钮"变成常态。
+        ⚠️ 确认弹窗**不共享**：它是真的平台差异（这里是原生 `Modal`），
+        而本板只把 `onPurge` 交出来。
+      */}
+      <TrashBoard
+        items={items}
+        labels={labels}
+        onRestore={(id) => {
+          if (actions === null) return;
+          run(actions.restore(id));
+        }}
+        // 🔴 这一下**不删**，只打开确认框 —— 不可逆动作必须二次确认。
+        // 真正调用 `purge()` 的地方只有下面 Modal 里的确认按钮。
+        onPurge={(id) => {
+          setConfirmingId(id);
+        }}
+        busyTaskId={busy ? (confirmingId ?? 'busy') : null}
+        testID="trash-board"
+      />
 
       {pending === undefined ? null : (
         <ConfirmPurge

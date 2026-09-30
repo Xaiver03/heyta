@@ -770,6 +770,15 @@ export interface TextFieldProps {
   /** 字段下方的说明或错误。传了就会占位，所以只在真有时才传。 */
   hint?: string;
   hintTone?: 'subtle' | 'danger';
+  /**
+   * 多行输入（粘贴 CSV、写长备注）。
+   *
+   * ⚠️ 单行输入框贴一大段多行文本时，**看得见的只有最后一行**，
+   * 而用户会以为"粘进去的只有这一点" —— 这正是"导入只进来几条"的经典误判。
+   */
+  multiline?: boolean;
+  /** 多行时的可见行数。只影响**最小高度**；内容更多时仍可滚动。 */
+  lines?: number;
 }
 
 /**
@@ -795,6 +804,8 @@ export function TextField({
   editable = true,
   hint,
   hintTone = 'subtle',
+  multiline = false,
+  lines = 6,
 }: TextFieldProps): React.JSX.Element {
   const t = useTokens();
   const text = useText();
@@ -815,6 +826,9 @@ export function TextField({
         autoCapitalize={autoCapitalize}
         autoCorrect={false}
         editable={editable}
+        multiline={multiline}
+        // 只给多行时传：给单行传 numberOfLines 在 Android 上会把它变成多行。
+        numberOfLines={multiline ? lines : undefined}
         accessibilityLabel={label}
         // cursorColor 是 TextInput 的 **prop**，不是 style —— 放进 style 会被静默忽略。
         cursorColor={t['color.primary']}
@@ -832,8 +846,13 @@ export function TextField({
           // 不是函数调用。
           text['row-title'],
           {
-            minHeight: t['size.field-height'],
+            minHeight: multiline ? t['size.field-height'] * lines : t['size.field-height'],
             paddingHorizontal: t['size.field-padding-x'],
+            // 多行时文字从**顶部**开始，并给一点上内边距；
+            // 不设的话多行内容会在框里垂直居中，长文本看起来像"只有中间那几行"。
+            ...(multiline
+              ? { paddingTop: t['space.2'], textAlignVertical: 'top' as const }
+              : {}),
             borderRadius: t['radius.md'],
             backgroundColor: t['color.surface'],
             color: t['color.foreground'],

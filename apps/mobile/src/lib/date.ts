@@ -20,6 +20,17 @@
  * "剩余天数怎么说"只有一处定义。用例搬去了 `tests/date.spec.ts` 的
  * `remainingText`（边界改为与领域层同一套阈值）。
  *
+ * 🔴 **2026-09-29：`WEEKDAY_MESSAGE_KEYS` / `formatMonthTitleText` / `formatDayTitleText`
+ * 已上移到 `@heyta/ui` 的 `calendar/date-text.ts`。**
+ *
+ * 理由是日历要在四端共用（Web 在此之前**根本没有日历**），而"日期怎么说"
+ * 必须只有一处 —— 两端各写一份的必然结果是同一个日子显示成
+ * 「9月26日 星期五」和「9月26日 周五」，**没人会为此报 bug**。
+ *
+ * 按这个文件自己的老规矩（见上面那段），这里**不转发一层** ——
+ * 转发会让下一个人以为定义处还在这儿。两个消费者
+ *（`screens/CalendarScreen.tsx`、`ui/DatePicker.tsx`）直接从那一边引。
+ *
  * 本文件**不用 `Intl.DateTimeFormat`**：
  * Hermes 上 Intl 是**可选编译进去的**，拿不到时 `new Intl.DateTimeFormat()`
  * 会在渲染中途抛异常 —— 表现为整屏白掉，且错误信息不会指向 Intl 缺失。
@@ -41,61 +52,6 @@ export function formatStamp(ms: number): string {
   const d = new Date(ms);
   const pad = (n: number): string => String(n).padStart(2, '0');
   return `${String(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
-}
-
-/**
- * 周几 → 词条 key。
- *
- * 🔴 用 `switch` 而不是数组下标：`isoWeekday` 的返回类型是 `number`，
- * 而在 `noUncheckedIndexedAccess` 下数组下标访问永远是 `T | undefined` ——
- * 那会逼出一句"兜底到周一"的死代码（实际永远走不到）。
- * `switch` 的 `default` 覆盖的是 7（周日），不是"意外值"。
- */
-function weekdayKey(weekday: number): MessageKey {
-  switch (weekday) {
-    case 1:
-      return 'mobile.weekday.mon';
-    case 2:
-      return 'mobile.weekday.tue';
-    case 3:
-      return 'mobile.weekday.wed';
-    case 4:
-      return 'mobile.weekday.thu';
-    case 5:
-      return 'mobile.weekday.fri';
-    case 6:
-      return 'mobile.weekday.sat';
-    default:
-      return 'mobile.weekday.sun';
-  }
-}
-
-/**
- * 一周列头（周一…周日）的词条 key，下标 0 = 周一。
- *
- * 与领域层的 `WEEKDAY_LABELS` **同序**：`monthGrid` 是周一开头，
- * 只要这里写成周日开头，整个日历会整体错位一格 —— 而错位后的界面
- * 看上去仍然像个正常日历。所以顺序由 `isoWeekday` 的 1..7 生成，
- * 不手写数组。
- */
-export const WEEKDAY_MESSAGE_KEYS: readonly MessageKey[] = [1, 2, 3, 4, 5, 6, 7].map(
-  weekdayKey,
-);
-
-/** 「2026年9月」——年份与月份由领域层的 `LocalDate` 解出，措辞走词条。 */
-export function formatMonthTitleText(date: LocalDate, t: Translate): string {
-  const d = parseLocalDate(date);
-  return t('mobile.calendar.monthTitle', { year: d.getFullYear(), month: d.getMonth() + 1 });
-}
-
-/** 「9月26日 星期五」——某一天的标题只有这一个实现（与领域层同一份日期语义）。 */
-export function formatDayTitleText(date: LocalDate, t: Translate): string {
-  const d = parseLocalDate(date);
-  return t('mobile.calendar.dayTitle', {
-    month: d.getMonth() + 1,
-    day: d.getDate(),
-    weekday: t(weekdayKey(isoWeekday(date))),
-  });
 }
 
 /** 定时器下限（毫秒）。设备时钟被回拨时下一个零点可能算到 `now` 之前。 */

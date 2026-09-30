@@ -29,7 +29,8 @@ import {
 } from '@heyta/domain';
 import { useI18n } from '@heyta/i18n';
 
-import { WEEKDAY_MESSAGE_KEYS, formatMonthTitleText } from '../lib/date';
+// 🔴 日期措辞已上移到共享层（见 `lib/date.ts` 文件头）：日历要在四端共用。
+import { WEEKDAY_MESSAGE_KEYS, formatMonthTitleText } from '@heyta/ui';
 import { quickDatePicks } from '../lib/quick-dates';
 import { useTokens } from '../theme';
 import { Chip, IconButton, Text } from './kit';
