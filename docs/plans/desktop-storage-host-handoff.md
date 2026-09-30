@@ -14,6 +14,12 @@
 > —— 打开**我们自己的站点**做反向授权，回调把会话带回壳（见 §6.6）。
 > 四件事 A/B/C/D 全部交付；§6.6 另附**鉴权机制清点**（邮箱+密码这条路**目前不存在**）。
 > 🔴 另有一条**顺带发现的缺陷**待修（macOS 窗口门禁假绿）——见 §5 末尾。
+> ✅ **当前 Goal（2026-09-30 起）：邮箱全链路 + 桌面鉴权走系统浏览器反向授权 + 手机号预留。**
+> **web 那条腿已经全绿**（`node scripts/verify-email-web-chain.mjs`，9/9）；
+> 本轮把那个长期没人盯的"点了邮件链接回来还是未登录"**定位到根因并修掉了** ——
+> 确认页与应用**分属两个 agent cluster**（服务端 helmet 的 COOP/OAC vs 静态产物没有），
+> `sessionStorage` 跨不过去 ⇒ 会话改走 **URL fragment**。2×2 证据见 §10。
+> 🔴 **未做**：Windows 壳侧的反向授权接线、手机号预留、真实 SMTP 实跑、真系统浏览器的人工那一跑。
 > 交接日期：**2026-09-30**（CST）
 > 给**全新会话**用：不从聊天记录继承任何前提。每条都带可复现命令或实测输出。
 >
@@ -26,15 +32,20 @@
 
 ## 0. 一句话现状
 
-产品负责人钉死「**主战场 = 移动端 + macOS + Windows，Web 不是**」，要求按顺序兑现四件事
-（A 定案 macOS 机制 → B 桌面存储接到壳 SQLite → C 补 macOS 登录后旅程 → D 解 RP-ID 阻塞）。
+产品负责人钉死「**主战场 = 移动端 + macOS + Windows，Web 不是**」，先按顺序兑现了 A/B/C/D
+（A 定案 macOS 机制 → B 桌面存储接到壳 SQLite → C 补 macOS 登录后旅程 → D 解 RP-ID 阻塞），
+**四件全部交付**；随后转入**当前 Goal**（§10）。
 
-- **A ✅ 已完成**：macOS 目标机制 = **M2**（原生壳 + 壳内 WebView 加载共享 UI），
-  并给出**可判定的重开条件**；两份权威文档的冲突已消除。
-- **B 🟢 Windows 端已绿**：壳里的真应用现在**真的**把数据写进壳自己的 `heyta.sqlite`
-  （页侧报 `STORAGE=shell`；从壳外扫那个库能看到载荷与 `CREATE TABLE "ops"`；
-  **杀掉应用重开之后那条任务还在**）。剩 macOS 壳 + OPFS→壳导入 + 翻默认开关（§5）。
-- **C ⬜ / D ⬜ 未开始**。
+| # | 事 | 状态 |
+|---|---|---|
+| **A** | macOS 目标机制 = **M2**（原生壳 + 壳内 WebView 加载共享 UI），并给出可判定的重开条件 | ✅ |
+| **B** | 桌面两端真应用的数据写进**壳自己的 `heyta.sqlite`**（页侧报 `STORAGE=shell`；壳外扫得到载荷与 `ops` 表；重启后还在） | ✅ 两端 |
+| **C** | macOS 登录后旅程（壳内探针：有效令牌 ⇒ `AUTH_STATE=signed-in`；坏令牌 ⇒ 说出失败原因） | ✅ 红/绿一对 |
+| **D** | RP ID 从 IP 字面量换成 `localhost`（Chromium 拒收 IP 字面量）⇒ `verify:web-auth` 6/6 + 注入 | ✅ |
+| **当前 Goal** | 邮箱全链路 + 桌面鉴权**走系统浏览器反向授权** + 手机号**预留** | 🟡 **web 腿已绿；Windows 壳侧与手机号预留未做**（§10） |
+
+⚠️ 两件"看着像问题、其实不是"的：`pnpm check` 不是全绿（§6.5），
+以及 macOS 目标里的"同 shell 的第二个窗口"（§7）。
 
 ---
 
@@ -435,43 +446,136 @@ Error: 假端点应该累计收到 1 次调用，实际：[]
 
 ---
 
-## 8. 已经跑绿的验证（交接时的真实数字）
+## 8. 已经跑绿的验证（交接时的真实数字，2026-09-30 本轮实测）
 
 | 命令 | 结果 |
 |---|---|
-| `pnpm --filter @heyta/storage exec vitest run tests/contract.spec.ts` | **252/252** |
-| `pnpm --filter @heyta/storage test` | **314/314** |
-| `pnpm --filter @heyta/app-host test` | **739/739** |
-| `pnpm --filter @heyta/node-host test` | **139/139** |
-| `cd apps/web && pnpm exec vitest run` | **993 通过**（+3 为本次新增） |
-| `HEYTA_BRIDGE_BUNDLE=… dotnet run -c Release --project apps/desktop-windows/smoke/Smoke.csproj` | **21 项全绿、exit 0** |
-| `node research/tools/docs-link-check.mjs` | **exit 0**（无死链/失效锚点） |
-| `pnpm verify:windows-auth`（上一件工作，与本轮无关） | **6/6、exit 0**（连跑两次） |
-| **`pnpm -r test`（全量，第 12 轮）** | **exit 0**（web 993 / storage 314 / app-host / node-host / server …全绿；日志里的 "failed" 字样都是**用例名与模拟故障日志**） |
-| `pnpm check:macos-shell` | **exit 0**（24 项 ✅） |
-| `pnpm check:macos-window` | **exit 0**（判据已改到 WebView 快照上，见 §5；红/绿一对已验） |
-| `pnpm verify:web-auth`（D） | **6/6、exit 0** + 注入验证 |
+| `pnpm --filter @heyta/web test` | **1011 通过 / 12 跳过**（+8 为本轮新增的 fragment 通道用例） |
+| `pnpm --filter @heyta/web typecheck` | exit 0 |
+| `node scripts/verify-email-web-chain.mjs` | **9/9 ✅**（+ 3 份注入，见 §10.3） |
+| `pnpm verify:email-auth` | **11 ✅** + 注入 |
+| `pnpm verify:web-auth`（J1–J7） | **7/7、exit 0、23.9s**（⚠️ **必须单独跑**：并发时 6.6 分钟且随机红 —— §10.5） |
+| `pnpm check:web-storage` | exit 0（⚠️ 同样只在单独跑时绿） |
+| `pnpm check:journey-coverage` | exit 0（28 passed） |
+| `pnpm check:server-copy` | exit 0 |
+| `pnpm check:docs` | exit 0 |
+| `pnpm verify:windows-auth`（上一件工作，与本轮无关） | 6/6、exit 0 |
 
-**B 的真机判据（§4）也已跑通**：`STORAGE=shell` + 从壳外扫到载荷与 `ops` 表 +
-**重启之后那条任务还在**（`titleCount=1`）。证据见 §2.4 的链接。
-
-⚠️ 仍然**没绿**的是：macOS 壳（同一套存储宿主）、OPFS→壳的一次性导入、
-以及"把默认开关翻过来"。**别把这三件说成已完成。**
+⚠️ **仍然没绿 / 没做**的：Windows 壳侧反向授权接线、手机号预留、真实 SMTP 实跑、
+真系统浏览器的人工那一跑（§10.4）。**别把这几件说成已完成。**
+`pnpm check` 整链不是全绿，原因见 §6.5。
 
 ---
 
 ## 9. 下一轮的开头指令建议
 
-> 读 `docs/plans/desktop-storage-host-handoff.md`。**A、B、D 都已经绿了**，不要再重做。
+> 读 `docs/plans/desktop-storage-host-handoff.md`。**A/B/C/D 与"邮箱链路的 web 腿"都已经绿了，别重做。**
 >
-> 🔴 **唯一挡在路上的还是 C**，而它挡的是**产品选择**，不是工程量：
-> macOS 壳里通行密钥已量出**不可用**（`uvpaa=false`，带焦点也一样；硬件已排除），
-> 且产品负责人指出登录界面不符合正常用户旅程（不该让用户填服务地址）。
-> 三个选项在 §6 —— **定下来之前别往"壳内通行密钥"加代码**。
+> 🔴 **本轮之后剩下的是这三件**（按建议顺序）：
 >
-> ✅ **D 的结论对 C 有直接价值**：`localhost` 那条证明"**只要有正常域名 origin，
-> 通行密钥就是可用的**"（Chromium 里 6/6）。所以 C 的选项 1（把鉴权交给系统浏览器、
-> 用我们站点的真实域名）在技术上是有底的 —— 缺的只是产品点头。
+> 1. **Windows 壳侧的反向授权接线**（系统默认浏览器 + 自定义协议回调 + `state` 校验）。
+>    macOS 那份是**可照抄的模板**：`apps/desktop-macos/Sources/HeytaShellCore/ShellAuth.swift`
+>    是**纯逻辑**（`makeState`/`authorizationURL`/`parseCallback`，含"拒收 query 里的令牌、
+>    拒收 state 不匹配"），壳里的 `HeytaMacApp.swift` 只做接线。
+>    ⚠️ Windows 的协议注册、以及 `CoreWebView2Environment.CreateAsync` 那个 API 在本机
+>    不可用（`CS1501`，已实测）—— 别假设它在那儿。
+>    ⚠️ 复用 `scripts/verify-windows-shell-journey.mjs` 与
+>    `scripts/lib/auth-journey-server.mjs`（两条壳路共用同一份服务端引导）。
 >
-> ⚠️ 若要给 C 之外的任何东西用 macOS 截图作证，**先修 §5 末尾那条假绿**。
-> 回执要求与前几轮一致：**从壳外读 `.sqlite`** + **重启之后还在** + 人看过的截图 + 注入验证。
+> 2. **手机号注册/登录的"预留"**：schema + 接口契约 + 客户端钩子 +
+>    `AUTH_PHONE_ENABLED`（**默认关**）+ **一份能判"预留本身"的契约测试**。
+>    ⚠️ 没有真实短信网关 ⇒ **不许**说它能用；"预留"的判据是**契约**，不是端到端。
+>
+> 3. **真实 SMTP 实跑**：本机是 Ethereal 兜底；要在自建实例上跑一遍
+>    `pnpm verify:email-auth` 与 `node scripts/verify-email-web-chain.mjs`，
+>    把那两处"本机走 Ethereal"的限定**换成实测**。
+>
+> ⚠️ **做任何浏览器验收前先看 §10.5 第 1 条**：并发跑会互相饿死，
+> 红了先单独重跑再归因（`pnpm verify:web-auth` 单独 23.9s / 并发 6.6 分钟且随机红）。
+
+---
+
+## 10. 当前 Goal：邮箱全链路 + 桌面反向授权 + 手机号预留
+
+> 目标原文（产品负责人）：把注册/登录做成**邮箱全链路**（请求 → 真发一封 → 打开链接 → 会话落地；
+> 本地走 Ethereal 兜底、自建/生产走真实 SMTP），把**桌面壳（macOS/Windows）的鉴权改走
+> 系统浏览器反向授权**，并**预留手机号注册/登录的全链路**（schema + 接口契约 + 客户端钩子 +
+> 默认关闭的开关，且"预留"本身有契约测试可判）。每一环都要有能因注入转红的判据、真实证据与
+> 人看过的截图；边界如实记录。
+
+### 10.1 ✅ 已经绿了的（别重做）
+
+| 环 | 证据 | 命令 |
+|---|---|---|
+| **服务端一个校验核心**：`POST /api/auth/email/verify` 同时吃登录令牌与注册令牌；`verifyEmailLink()` 按令牌种类分流 | 11 格 ✅ + 注入（把 `GET /verify-email` 改回"GET 就消费"⇒ 当场 401） | `pnpm verify:email-auth` |
+| **`GET /verify-email` 不再消费令牌**（防邮件客户端链接预取：Outlook SafeLinks / Gmail 预览会在用户点之前抓一遍） | 同上那份注入就是它的红 | 同上 |
+| **web 全链路**：真浏览器 + 真邮件 + 同源反代（`/api`+确认页 → API，其余 → `apps/web/dist`） | **9/9 ✅**；三份注入见 §10.3 | `node scripts/verify-email-web-chain.mjs` |
+| **macOS 壳反向授权**：`ShellAuth.swift` 纯逻辑（`makeState`/`authorizationURL`/`parseCallback`）+ `ASWebAuthenticationSession` + `CFBundleURLTypes` 注册 `heyta` scheme | `AUTH_CALLBACK=ok` + `AUTH_STATE=signed-in`；**坏 state 被拒**（`shell-auth-badstate.txt`） | 见 `apps/desktop-macos/evidence/storage-host/` |
+| **web 侧反向授权**：`desktop-handoff.ts`（`buildDesktopCallback` / `handOffToShell` / `maybeHandOffToShell`） | J7 ✅（回跳 `heyta://auth#token=…&state=…`，**令牌不进 query**） | `pnpm verify:web-auth` |
+
+### 10.2 🔴 本轮定位并修掉的根因：**"点了邮件链接回来还是未登录"**
+
+这条腿**坏了很久没人发现**，因为它以前**没有任何判据**盯着。加判据的当轮就红了，
+仪器（写入时间线 + 每次 `pagehide` 的存储快照）给出：
+
+```
+写入时间线      ：确认页 set sessionToken / loginEmail / loginBaseUrl（真的写了）
+确认页 pagehide ：sessionKeys = [sessionToken, loginEmail, loginBaseUrl]   ← 最后一刻还在
+应用启动那一刻  ：sessionKeys = []                                        ← 没跟过来
+                 （时间线里**没有任何 removeItem** —— 不是被谁清的）
+```
+
+**根因**：确认页由同步服务端渲染，带 `@fastify/helmet` 的**默认**头
+`Cross-Origin-Opener-Policy: same-origin` + `Origin-Agent-Cluster: ?1`；
+应用（`/app/`，静态产物）**两个头都没有** ⇒ 从确认页跳到 `/app/` 会
+**切换 browsing instance**，`sessionStorage` 不跟回来
+（`localStorage` 不受影响 —— 那条时间线正是靠它才活到了 `/app/`）。
+
+**修法**：会话改走 **URL 的 `fragment`**（`/app/#sessionToken=…&loginBaseUrl=…&loginEmail=…`），
+应用读完**立刻** `history.replaceState` 抹掉。理由：
+fragment 不发给服务端、不进 `Referer`、不进访问日志，是 URL 的一部分所以**一定跨得过去**；
+而且它**不依赖服务端与反代的头配置保持一致** —— 自建换个反代不会再坏一次。
+
+> ⚠️ **别把它"简化"回 `sessionStorage`**：那条通路靠的是"两个独立部署件的头恰好一致"这个默契。
+> ⚠️ 上游模块里"别把令牌放进 URL"讲的其实是 **query**（`?token=…` 会进日志与 `Referer`）；
+> fragment 两类泄漏都没有，且严格**小于** localStorage（应用启动失败时随标签页消失）。
+
+**桌面壳仍然走 `sessionStorage`** —— 它在**同一份文档里**写、再 `load()`，不存在 cluster 切换，
+且那条路已经验绿。两条投递、**一套键名**、一个消费点（`consumePendingLogin()` 按
+**fragment → 壳交付的会话 → 链接令牌** 取）。
+
+### 10.3 红/绿 2×2（每一格都有落盘文件）
+
+见 `apps/web/evidence/email-chain/README.md`：
+
+| 投递 \ 响应头 | 带 COOP/OAC（**生产的真实形状**） | 摘掉 COOP/OAC（注入） |
+|---|---|---|
+| `sessionStorage`（修复前） | **结果类 ❌**（真的登不上） | 结果类 ✅ / 结构类 ❌ |
+| **`fragment`（现在）** | **✅ 全绿** | **✅ 全绿** |
+
+左上红 + 右上绿 ⇒ 因果钉死；左下/右下全绿 ⇒ 修法成立且不依赖头配置。
+另有一份 `drop-fragment` 注入（把 fragment 投递也摘掉）让结果类与结构类**一起红**
+⇒ 证明那两格判据**是活的**。
+
+⚠️ 判据分 `outcome` / `structure` 两类并在总结里**分开点名**："结果类全绿、结构类红"
+= **用户其实能用，红的是保证**。混成一句"未通过"会让人以为产品坏了。
+
+### 10.4 🔴 没做 / 没验（不许说成已完成）
+
+| 事项 | 状态 |
+|---|---|
+| **Windows 壳侧的反向授权接线**（系统默认浏览器 + 自定义协议回调 + `state` 校验） | 🔴 **未做** |
+| **手机号注册/登录预留**（schema + 接口契约 + 客户端钩子 + `AUTH_PHONE_ENABLED` 默认关 + 契约测试） | 🔴 **未做** |
+| **真实 SMTP 实跑** | 🔴 **我没跑过**。产品负责人说自建 SMTP 已好，但**本机走 Ethereal 兜底**，这条判据没在真实 SMTP 上实测 |
+| **真系统浏览器的人工那一跑**（`ASWebAuthenticationSession` 弹窗、人在浏览器里完成登录） | 🔴 **从未执行**（需要人）；验过的是**逻辑**与壳内探针 |
+| **Windows 壳端的反向授权真机跑** | 🔴 未做 |
+
+### 10.5 本轮顺带学到的三条（都是实测，别再踩）
+
+1. **并发跑验收会互相饿死**：同一条 `pnpm verify:web-auth` **单独跑 23.9s / 7 绿**，
+   而和另一个浏览器验收并发时是 **6.6 分钟**且随机红（J2 红一次、J3 红一次，两次红的**不是同一条**）。
+   ⇒ 与 `BLOCKED.md` 那条元规则一致：**结构性门禁红了先单独重跑再归因**。
+2. **注入必须在反代里改响应体、且失配要当场抛**。改源文件的注入跑完会留下一个**改坏了的仓库**；
+   而静默失配会造出**假证据**（注入没生效 ⇒ 仍然全绿 ⇒ 我却当成"判据是活的"）。
+3. **诊断要收进失败分支**。那套仪器（写入时间线 / `pagehide` 快照 / 文档响应头）解开了一个
+   静默失效，但一组十几行；绿的时候只淹掉"到底判了什么"，所以它们现在**只在红的时候打印**。
