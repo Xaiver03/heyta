@@ -58,7 +58,7 @@ set -u
 #    验收的失败长相是"模拟器没在启动状态"，看起来像环境问题，其实是我们指向了幽灵。
 #    规则：显式 `IOS_UDID` 优先；否则取**同名且已启动**的那台；只有一台已启动就用它；多台且无同名时**不猜**。
 UDID=${IOS_UDID:-}
-BID=${IOS_BID:-org.reactjs.native.example.HeytaMobile}
+BID=${IOS_BID:-com.heyta}
 DEVICE_NAME=${IOS_DEVICE_NAME:-iPhone 17 Pro}
 PORT=${SERVER_PORT:-3000}
 TOKEN_FILE=/tmp/heyta_mobile_token.txt

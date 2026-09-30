@@ -71,7 +71,7 @@ rm -f "$LAPTOP_DB" "$PHONE_DB"
 # 🔴 用 `adb root` + `pull`，不用 `run-as`：release 包**不可调试**。
 phone_db_pull() {
   $ADB root >/dev/null 2>&1; sleep 2
-  $ADB pull /data/data/com.heytamobile/databases/heyta.sqlite "$PHONE_DB" >/dev/null 2>&1
+  $ADB pull /data/data/com.heyta/databases/heyta.sqlite "$PHONE_DB" >/dev/null 2>&1
   $ADB unroot >/dev/null 2>&1
 }
 
@@ -161,6 +161,7 @@ $ADB install -r "$APK" 2>&1 | tail -1 | sed 's/^/   /'
 $ADB shell pm clear $PKG >/dev/null 2>&1
 $ADB shell am force-stop $PKG; sleep 1
 $ADB shell monkey -p $PKG -c android.intent.category.LAUNCHER 1 >/dev/null 2>&1; sleep 6
+dismiss_welcome_if_present   # 首次启动的欢迎页会盖住主界面（规范 §3.1）——先离开它
 dump
 if [ "$(has_text "任务")" = "1" ]; then ok "应用已启动"; else bad "应用没起来"; screen_txt; fi
 
