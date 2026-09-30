@@ -35,6 +35,8 @@ import { AlertTriangle, Sparkles, X } from 'lucide-react';
 import { useI18n } from '@heyta/i18n';
 
 import { AiDisclosureHost } from './AiDisclosureHost.js';
+import { AiPanelHost } from './AiPanelHost.js';
+import { AiPanelHeadHost } from './AiPanelHeadHost.js';
 
 import {
   Priority,
@@ -305,24 +307,17 @@ export function AiPrioritize(props: AiPrioritizeProps): React.JSX.Element {
   // ── 🔴 披露：只算，不发 ───────────────────────────────────────────────
   if (phase === 'disclosing') {
     return (
-      <div
-        className="ht-ai__panel"
-        role="dialog"
-        aria-label={t('web.ai.prioritize.disclosureAria')}
-        data-testid="prioritize-disclosure"
-      >
-        <div className="ht-ai__head">
-          <span>{t('web.ai.disclosure.heading')}</span>
-          <button
-            type="button"
-            className="ht-btn ht-btn--ghost"
-            aria-label={t('web.ai.action.cancel')}
-            data-testid="prioritize-disclosure-close"
-            onClick={reset}
-          >
-            <X size={12} aria-hidden="true" />
-          </button>
-        </div>
+            <AiPanelHost
+              label={t('web.ai.prioritize.disclosureAria')}
+              testID="prioritize-disclosure"
+              role="dialog"
+            >
+        <AiPanelHeadHost
+          title={t('web.ai.disclosure.heading')}
+          closeLabel={t('web.ai.action.cancel')}
+          closeTestID="prioritize-disclosure-close"
+          onClose={reset}
+        />
 
         {target === undefined ? (
           <RouteUnavailable
@@ -367,33 +362,37 @@ export function AiPrioritize(props: AiPrioritizeProps): React.JSX.Element {
             </div>
           </>
         )}
-      </div>
+            </AiPanelHost>
     );
   }
 
   if (phase === 'loading') {
     return (
-      <div className="ht-ai__panel" data-testid="prioritize-loading">
+            <AiPanelHost
+              label={t('web.ai.loading.waiting')}
+              testID="prioritize-loading"
+              role="status"
+            >
         <span>{t('web.ai.loading.waiting')}</span>
-      </div>
+            </AiPanelHost>
     );
   }
 
   // ── 🔴 提议：AI 的输出不会自己写进去 ──────────────────────────────────
   if (phase === 'proposal' && proposal !== undefined) {
     return (
-      <div
-        className="ht-ai__panel"
-        role="dialog"
-        aria-label={t('web.ai.prioritize.proposalAria')}
-        data-testid="prioritize-proposal"
-      >
-        <div className="ht-ai__head">
-          <span>{t('web.ai.prioritize.proposalHead', { count: proposal.suggestions.length })}</span>
-          <span className="ht-ai__tag" data-testid="prioritize-proposal-source">
-            {proposal.destination === 'none' ? t('web.ai.source.local') : t('web.ai.source.remote')}
-          </span>
-        </div>
+            <AiPanelHost
+              label={t('web.ai.prioritize.proposalAria')}
+              testID="prioritize-proposal"
+              role="dialog"
+            >
+        <AiPanelHeadHost
+          title={t('web.ai.prioritize.proposalHead', { count: proposal.suggestions.length })}
+          tag={{
+          text: proposal.destination === 'none' ? t('web.ai.source.local') : t('web.ai.source.remote'),
+          testID: 'prioritize-proposal-source',
+          }}
+        />
 
         {proposal.truncated && (
           <p className="ht-ai__warn" data-testid="prioritize-truncated">
@@ -453,57 +452,83 @@ export function AiPrioritize(props: AiPrioritizeProps): React.JSX.Element {
             {t('web.ai.action.discard')}
           </button>
         </div>
-      </div>
+            </AiPanelHost>
     );
   }
 
   // ── 失败：给出**具体原因** ────────────────────────────────────────────
   return (
-    <div
-      className="ht-ai__panel"
-      role="dialog"
-      aria-label={t('web.ai.prioritize.failedAria')}
-      data-testid="prioritize-failed"
-    >
-      <div className="ht-ai__head">
-        <span>{t('web.ai.prioritize.failedHead')}</span>
-        <button
-          type="button"
-          className="ht-btn ht-btn--ghost"
-          aria-label={t('web.ai.action.close')}
-          data-testid="prioritize-failed-close"
-          onClick={reset}
+        <AiPanelHost
+          label={t('web.ai.prioritize.failedAria')}
+          
+          testID="prioritize-failed"
+          
+          role="dialog"
+          
         >
-          <X size={12} aria-hidden="true" />
-        </button>
-      </div>
-      <p data-testid="prioritize-failure-message">
-        {failure === null ? '' : t(failure.key)}
-      </p>
-      {/* 技术详情：包 / 端点返回的原文。分类与 ErrorScreen 的 <details> 相同 ——
-          那是诊断**数据**，不是文案（见 ai-failure-copy.ts 的 `showDetail`）。 */}
-      {failure !== null && failure.showDetail && failure.detail !== '' && (
-        <details data-testid="prioritize-failure-message-detail">
-          <summary>{t('web.ai.failure.details')}</summary>
-          <p>{failure.detail}</p>
-        </details>
-      )}
-      {/* 🔴 失败原因能在设置里修 → 给一条真的能点的路（只导航，不代授权）。 */}
-      <FailureSettingsAction
-        settingsTarget={failure?.settingsTarget}
-        onOpenSettings={onOpenSettings}
-        testId="prioritize-failure-settings"
-      />
-      <div className="ht-ai__actions">
-        <button
-          type="button"
-          className="ht-btn ht-btn--ghost"
-          data-testid="prioritize-close"
-          onClick={reset}
+
+        <AiPanelHeadHost
+
+          title={t('web.ai.prioritize.failedHead')}
+
+          closeLabel={t('web.ai.action.close')}
+
+          closeTestID="prioritize-failed-close"
+
+          onClose={reset}
+
+        />
+
+        <p data-testid="prioritize-failure-message">
+
+          {failure === null ? '' : t(failure.key)}
+
+        </p>
+
+        {/* 技术详情：包 / 端点返回的原文。分类与 ErrorScreen 的 <details> 相同 ——
+
+            那是诊断**数据**，不是文案（见 ai-failure-copy.ts 的 `showDetail`）。 */}
+
+        {failure !== null && failure.showDetail && failure.detail !== '' && (
+
+          <details data-testid="prioritize-failure-message-detail">
+
+            <summary>{t('web.ai.failure.details')}</summary>
+
+            <p>{failure.detail}</p>
+
+          </details>
+
+        )}
+
+        {/* 🔴 失败原因能在设置里修 → 给一条真的能点的路（只导航，不代授权）。 */}
+
+        <FailureSettingsAction
+
+          settingsTarget={failure?.settingsTarget}
+
+          onOpenSettings={onOpenSettings}
+
+          testId="prioritize-failure-settings"
+
+        />
+
+        <div className="ht-ai__actions">
+
+          <button
+
+            type="button"
+
+            className="ht-btn ht-btn--ghost"
+
+            data-testid="prioritize-close"
+
+            onClick={reset}
+
         >
           {t('web.ai.action.close')}
         </button>
       </div>
-    </div>
+        </AiPanelHost>
   );
 }

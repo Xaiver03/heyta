@@ -40,6 +40,8 @@ import { breakdownFailureCopy, type AiFailureCopy } from './ai-failure-copy.js';
 import { useI18n } from '@heyta/i18n';
 
 import { AiDisclosureHost } from './AiDisclosureHost.js';
+import { AiPanelHost } from './AiPanelHost.js';
+import { AiPanelHeadHost } from './AiPanelHeadHost.js';
 import { RouteUnavailable, FailureSettingsAction } from './RouteUnavailable.js';
 import { useAiSettingsNavigation } from './ai-settings-navigation.js';
 import {
@@ -357,13 +359,16 @@ export function AiBreakdown(props: AiBreakdownProps): React.JSX.Element {
   // ── 🔴 披露：只算，不发 ───────────────────────────────────────────────
   if (phase === 'disclosing') {
     return (
-      <div className="ht-ai__panel" role="dialog" aria-label={t('web.ai.breakdown.disclosureAria')} data-testid="ai-disclosure">
-        <div className="ht-ai__head">
-          <span>{t('web.ai.disclosure.heading')}</span>
-          <button type="button" className="ht-btn ht-btn--ghost" aria-label={t('web.ai.action.cancel')} onClick={reset}>
-            <X size={12} aria-hidden="true" />
-          </button>
-        </div>
+            <AiPanelHost
+              label={t('web.ai.breakdown.disclosureAria')}
+              testID="ai-disclosure"
+              role="dialog"
+            >
+        <AiPanelHeadHost
+          title={t('web.ai.disclosure.heading')}
+          closeLabel={t('web.ai.action.cancel')}
+          onClose={reset}
+        />
 
         {target === undefined ? (
           <RouteUnavailable
@@ -394,28 +399,37 @@ export function AiBreakdown(props: AiBreakdownProps): React.JSX.Element {
             </div>
           </>
         )}
-      </div>
+            </AiPanelHost>
     );
   }
 
   if (phase === 'loading') {
     return (
-      <div className="ht-ai__panel" data-testid="ai-loading">
+            <AiPanelHost
+              label={t('web.ai.loading.waiting')}
+              testID="ai-loading"
+              role="status"
+            >
         <span>{t('web.ai.loading.waiting')}</span>
-      </div>
+            </AiPanelHost>
     );
   }
 
   // ── 🔴 提议：AI 的输出不会自己写进去 ──────────────────────────────────
   if (phase === 'proposal' && proposal !== undefined) {
     return (
-      <div className="ht-ai__panel" role="dialog" aria-label={t('web.ai.breakdown.proposalAria')} data-testid="ai-proposal">
-        <div className="ht-ai__head">
-          <span>{t('web.ai.breakdown.proposalHead', { count: proposal.items.length })}</span>
-          <span className="ht-ai__tag" data-testid="ai-proposal-source">
-            {proposal.destination === 'none' ? t('web.ai.source.local') : t('web.ai.source.remote')}
-          </span>
-        </div>
+            <AiPanelHost
+              label={t('web.ai.breakdown.proposalAria')}
+              testID="ai-proposal"
+              role="dialog"
+            >
+        <AiPanelHeadHost
+          title={t('web.ai.breakdown.proposalHead', { count: proposal.items.length })}
+          tag={{
+          text: proposal.destination === 'none' ? t('web.ai.source.local') : t('web.ai.source.remote'),
+          testID: 'ai-proposal-source',
+          }}
+        />
 
         {proposal.truncated && (
           <p className="ht-ai__warn" data-testid="ai-truncated">
@@ -467,44 +481,81 @@ export function AiBreakdown(props: AiBreakdownProps): React.JSX.Element {
             {t('web.ai.action.discard')}
           </button>
         </div>
-      </div>
+            </AiPanelHost>
     );
   }
 
   // ── 失败：给出**具体原因**，并提供不依赖 AI 的退路 ─────────────────────
   return (
-    <div className="ht-ai__panel" role="dialog" aria-label={t('web.ai.breakdown.failedAria')} data-testid="ai-failed">
-      <div className="ht-ai__head">
-        <span>{t('web.ai.breakdown.failedHead')}</span>
-        <button type="button" className="ht-btn ht-btn--ghost" aria-label={t('web.ai.action.close')} onClick={reset}>
-          <X size={12} aria-hidden="true" />
-        </button>
-      </div>
-      <p data-testid="ai-failure-message">
-        {failure === null ? '' : t(failure.key)}
-      </p>
-      {/* 技术详情：包 / 端点返回的原文。分类与 ErrorScreen 的 <details> 相同 ——
-          那是诊断**数据**，不是文案（见 ai-failure-copy.ts 的 `showDetail`）。 */}
-      {failure !== null && failure.showDetail && failure.detail !== '' && (
-        <details data-testid="ai-failure-message-detail">
-          <summary>{t('web.ai.failure.details')}</summary>
-          <p>{failure.detail}</p>
-        </details>
-      )}
-      <FailureSettingsAction
-        settingsTarget={failure?.settingsTarget}
-        onOpenSettings={onOpenSettings}
-        testId="ai-failure-settings"
-      />
-      <div className="ht-ai__actions">
-        <button
-          type="button"
-          className="ht-btn ht-btn--ghost"
-          data-testid="ai-manual"
-          onClick={() => {
-            void onApplyNote(mergeChecklistIntoNote(task.note, ['', '', '']));
-            reset();
-          }}
+        <AiPanelHost
+          label={t('web.ai.breakdown.failedAria')}
+          
+          testID="ai-failed"
+          
+          role="dialog"
+          
+        >
+
+        <AiPanelHeadHost
+
+          title={t('web.ai.breakdown.failedHead')}
+
+          closeLabel={t('web.ai.action.close')}
+
+          onClose={reset}
+
+        />
+
+        <p data-testid="ai-failure-message">
+
+          {failure === null ? '' : t(failure.key)}
+
+        </p>
+
+        {/* 技术详情：包 / 端点返回的原文。分类与 ErrorScreen 的 <details> 相同 ——
+
+            那是诊断**数据**，不是文案（见 ai-failure-copy.ts 的 `showDetail`）。 */}
+
+        {failure !== null && failure.showDetail && failure.detail !== '' && (
+
+          <details data-testid="ai-failure-message-detail">
+
+            <summary>{t('web.ai.failure.details')}</summary>
+
+            <p>{failure.detail}</p>
+
+          </details>
+
+        )}
+
+        <FailureSettingsAction
+
+          settingsTarget={failure?.settingsTarget}
+
+          onOpenSettings={onOpenSettings}
+
+          testId="ai-failure-settings"
+
+        />
+
+        <div className="ht-ai__actions">
+
+          <button
+
+            type="button"
+
+            className="ht-btn ht-btn--ghost"
+
+            data-testid="ai-manual"
+
+            onClick={() => {
+
+              void onApplyNote(mergeChecklistIntoNote(task.note, ['', '', '']));
+
+              reset();
+
+            }}
+
         >
           {t('web.ai.breakdown.manual')}
         </button>
@@ -512,7 +563,7 @@ export function AiBreakdown(props: AiBreakdownProps): React.JSX.Element {
           {t('web.ai.action.close')}
         </button>
       </div>
-    </div>
+        </AiPanelHost>
   );
 }
 

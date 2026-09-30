@@ -55,7 +55,12 @@ import type {
 } from '@heyta/local-api';
 
 import { AiDisclosureHost } from './AiDisclosureHost.js';
-import { resolveFeatureRoute } from './route-explanation.js';
+import { AiPanelHost } from './AiPanelHost.js';
+import { AiPanelHeadHost } from './AiPanelHeadHost.js';
+import { toolRunFailureCopy } from './ai-failure-copy.js';
+import { useAiSettingsNavigation } from './ai-settings-navigation.js';
+import { FailureSettingsAction } from './RouteUnavailable.js';
+import { resolveFeatureRoute, type SettingsTarget } from './route-explanation.js';
 import { createAiToolHost } from '../tasks/store.js';
 
 export interface AiToolRunProps {
@@ -73,6 +78,11 @@ export interface AiToolRunProps {
   host?: LocalApiHost;
   /** 网络实现。可注入**只为测试**（与四个既有 AI 面板同一约定）。 */
   fetchImpl?: typeof fetch;
+  /**
+   * 「去设置」的导航。**注入缝，只为测试**（与四个面板的 `onOpenSettings` 同名同义）：
+   * 生产路径上不传，走 `useAiSettingsNavigation()` 那个 context。
+   */
+  onOpenSettings?: ((target: SettingsTarget) => void) | undefined;
 }
 
 type Phase = 'idle' | 'disclose' | 'running' | 'done';
@@ -98,6 +108,12 @@ export function AiToolRun(props: AiToolRunProps): React.JSX.Element {
 
   // 宿主只建一次：它内部只持有几个函数引用，重建没有意义。
   const host = useMemo(() => props.host ?? createAiToolHost(), [props.host]);
+  /**
+   * 「去设置」的导航通道 —— 与另外四个面板同一个 context
+   * （`props.onOpenSettings` 仍然是单测的注入缝，优先于它）。
+   */
+  const settingsNavigation = useAiSettingsNavigation();
+  const onOpenSettings = props.onOpenSettings ?? settingsNavigation;
 
   const health = fromHealthSnapshot(props.healthSnapshot ?? {}, Date.now());
   const { target, explanation } = resolveFeatureRoute(props.routing, 'tool-calling', { health });
@@ -155,11 +171,15 @@ export function AiToolRun(props: AiToolRunProps): React.JSX.Element {
   }
 
   return (
-    <section className="ht-ai" data-testid="ai-tool-run">
-      <div className="ht-ai__head">
-        <Sparkles size={12} aria-hidden="true" />
-        <strong>{t('web.ai.tools.title')}</strong>
-      </div>
+    // 🔴 **块级面板**用 `.ht-ai-panel`，不是 `.ht-ai` —— 那个类是给行内小件
+    // （四个 AI 按钮的 `span`）的 `inline-flex`。误用它曾把标题/说明/输入行
+    // 整体摆成**一行**（截图实测：输入框悬到说明文字右侧、运行折行居中）。
+    <section className="ht-ai-panel" data-testid="ai-tool-run">
+      {/* 工具调用面板的头部带一个装饰图标（`lead`）—— 与四个 AI 面板共用同一个共享头。 */}
+      <AiPanelHeadHost
+        title={t('web.ai.tools.title')}
+        lead={<Sparkles size={12} aria-hidden="true" />}
+      />
       <p className="ht-ai__note">{t('web.ai.tools.hint')}</p>
 
       <div className="ht-ai__actions">
@@ -188,26 +208,19 @@ export function AiToolRun(props: AiToolRunProps): React.JSX.Element {
       </div>
 
       {phase === 'disclose' && (
-        <div
-          className="ht-ai__panel"
-          role="dialog"
-          aria-label={t('web.ai.tools.disclosureAria')}
-          data-testid="ai-tool-disclosure"
-        >
-          <div className="ht-ai__head">
-            <span>{t('web.ai.disclosure.heading')}</span>
-            <button
-              type="button"
-              className="ht-btn ht-btn--ghost"
-              aria-label={t('web.ai.action.cancel')}
-              data-testid="ai-tool-disclosure-close"
-              onClick={() => {
-                setPhase('idle');
-              }}
-            >
-              <X size={12} aria-hidden="true" />
-            </button>
-          </div>
+                <AiPanelHost
+                  label={t('web.ai.tools.disclosureAria')}
+                  testID="ai-tool-disclosure"
+                  role="dialog"
+                >
+          <AiPanelHeadHost
+            title={t('web.ai.disclosure.heading')}
+            closeLabel={t('web.ai.action.cancel')}
+            closeTestID="ai-tool-disclosure-close"
+            onClose={() => {
+              setPhase('idle');
+            }}
+          />
 
           {target === undefined ? (
             <p className="ht-ai__warn" data-testid="ai-tool-no-target">
@@ -239,13 +252,18 @@ export function AiToolRun(props: AiToolRunProps): React.JSX.Element {
               </div>
             </>
           )}
-        </div>
+                </AiPanelHost>
       )}
 
       {phase === 'running' && <p className="ht-ai__note">{t('web.ai.loading.waiting')}</p>}
 
       {phase === 'done' && outcome !== undefined && (
-        <ToolResult outcome={outcome} confirmed={confirmed} onConfirm={() => void confirm()} />
+        <ToolResult
+          outcome={outcome}
+          confirmed={confirmed}
+          onConfirm={() => void confirm()}
+          onOpenSettings={onOpenSettings}
+        />
       )}
     </section>
   );
@@ -256,35 +274,72 @@ function ToolResult(props: {
   outcome: ToolCallOutcome;
   confirmed: LocalApiWriteResult | undefined;
   onConfirm: () => void;
+  onOpenSettings?: ((target: SettingsTarget) => void) | undefined;
 }): React.JSX.Element {
   const { t } = useI18n();
-  const { outcome } = props;
+  const { outcome, onOpenSettings } = props;
 
   if (!outcome.ok) {
+    /*
+      🔴 **主句取词条，原文降级成折叠的技术详情。**
+
+      在这一刀之前这里渲染的是 `outcome.message` —— 那是 `packages/app-host`
+      拼好的**中文**，于是英文界面上"工具调用失败"这一屏**整句是中文**。
+      另外四个面板早就改成"按 `reason` 取词条 + 原文进 `<details>`"了，
+      唯独这第 5 个入口漏了（与披露块那次漂移同一个形状：第 5 份副本没跟上）。
+
+      `outcome.message` 里确实带着词条给不了的信息（端点原文、字数上限……），
+      所以它**不是丢掉**，而是降到诊断详情里 —— 与 `ErrorScreen` 的
+      `error-details` 同一处置：原始错误文本是**数据**，不翻译。
+
+      判据：`ai-tool-run.spec.tsx` 那条"英文界面失败时不许露中文"，
+      以及 `ai-failure-parity.spec.tsx` 的跨面板一致性。
+    */
+    const failure = toolRunFailureCopy(outcome.reason, outcome.message, outcome.cause);
     return (
-      <div className="ht-ai__panel" data-testid="ai-tool-failure">
+            <AiPanelHost
+              label={t('web.ai.tools.failureAria')}
+              testID="ai-tool-failure"
+              role="dialog"
+            >
         <div className="ht-ai__row ht-ai__row--warn">
           <AlertTriangle size={12} aria-hidden="true" />
           <span>{t('web.ai.tools.failedLead')}</span>
-          <strong data-testid="ai-tool-failure-message">{outcome.message}</strong>
+          <strong data-testid="ai-tool-failure-message">{t(failure.key)}</strong>
         </div>
+        {failure.showDetail && failure.detail !== '' && (
+          <details data-testid="ai-tool-failure-message-detail">
+            <summary>{t('web.ai.failure.details')}</summary>
+            <p>{failure.detail}</p>
+          </details>
+        )}
+        {/* 这次失败能在设置里修才渲染（`settingsTarget === undefined` 时组件自己返回 null）。 */}
+        <FailureSettingsAction
+          settingsTarget={failure.settingsTarget}
+          onOpenSettings={onOpenSettings}
+          testId="ai-tool-failure-settings"
+        />
         {outcome.text !== undefined && (
           <p className="ht-ai__note">
             {t('web.ai.tools.modelTextLead')}
             {outcome.text}
           </p>
         )}
-      </div>
+            </AiPanelHost>
     );
   }
 
   return (
-    <div className="ht-ai__panel" data-testid="ai-tool-result">
+        <AiPanelHost
+          label={t('web.ai.tools.resultAria')}
+          testID="ai-tool-result"
+          role="dialog"
+        >
       <p className="ht-ai__note" data-testid="ai-tool-via">
         {outcome.via === 'rule' ? t('web.ai.tools.viaRule') : t('web.ai.tools.viaModel')}
       </p>
       <RunResult run={outcome.result} confirmed={props.confirmed} onConfirm={props.onConfirm} />
-    </div>
+        </AiPanelHost>
   );
 }
 

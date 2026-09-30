@@ -17,9 +17,9 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-import { I18nProvider } from '@heyta/i18n';
+import { I18nProvider, en, zhCN } from '@heyta/i18n';
 import type { AiRoutingConfig } from '@heyta/ai';
-import type { LocalApiHost, LocalApiItem } from '@heyta/local-api';
+import type { LocalApiConfig, LocalApiHost, LocalApiItem } from '@heyta/local-api';
 
 import { AiToolRun } from '../src/features/ai/AiToolRun.js';
 
@@ -63,17 +63,21 @@ let root: Root | undefined;
 async function render(overrides: {
   host: LocalApiHost;
   fetchImpl?: typeof fetch;
+  /** 默认 zh-CN；英文那一组用例专门传 `'en'`（见"不许露中文"那条）。 */
+  locale?: 'zh-CN' | 'en';
+  /** 已授权工具范围。默认 `READ_GRANTS`；传 `{}` 用来走 `no-granted-tools`。 */
+  grants?: LocalApiConfig['grants'];
 }): Promise<HTMLDivElement> {
   container = document.createElement('div');
   document.body.appendChild(container);
   root = createRoot(container);
   await act(async () => {
     root!.render(
-      <I18nProvider locale="zh-CN">
+      <I18nProvider locale={overrides.locale ?? 'zh-CN'}>
         <AiToolRun
           routing={ROUTING}
           consents={[]}
-          grants={READ_GRANTS}
+          grants={overrides.grants ?? READ_GRANTS}
           secrets={secrets}
           host={overrides.host}
           {...(overrides.fetchImpl === undefined ? {} : { fetchImpl: overrides.fetchImpl })}
@@ -214,5 +218,44 @@ describe('模型路径：先披露再发送', () => {
     await click(el, 'ai-tool-confirm');
     expect(host.submits).toBe(1);
     expect(el.querySelector('[data-testid="ai-tool-confirmed"]')).not.toBeNull();
+  });
+});
+
+describe('🔴 第 5 个入口的失败文案（与其他四个面板同一处置）', () => {
+  it('英文界面失败时**一个汉字都不许有**：主句取词条，原文只进折叠的技术详情', async () => {
+    /*
+      这一条钉的是一个**真实存在过的缺陷**：`AiToolRun` 一直把
+      `outcome.message`（`packages/app-host` 拼好的中文）整句渲染成主文案 ——
+      另外四个面板早改成"按 reason 取词条"了，唯独这第 5 个入口漏了。
+      于是**英文界面上工具调用一失败，那一屏整句是中文**。
+
+      `no-granted-tools` 是最好的用例：它**不需要端点、不需要 fetch**，
+      在规则选择那一步就返回（一个工具都没授权）—— 完全确定性。
+    */
+    const el = await render({ host: fakeHost(), locale: 'en', grants: {} });
+    await type(el, '把这段话翻译一下');
+    // 规则没命中 → 先出披露；`no-granted-tools` 是在**真的走一遍**之后才回来的
+    // （`run()` 只负责"要不要出境"，失败判定在 `requestToolCall()` 里）。
+    await click(el, 'ai-tool-run-button');
+    await click(el, 'ai-tool-send');
+
+    const message = el.querySelector('[data-testid="ai-tool-failure-message"]')?.textContent ?? '';
+    // ① 主句必须**逐字**是词条表里那句（不是"能读懂就行"）。
+    expect(message).toBe(en['web.ai.tools.failure.noGrantedTools']);
+    // ② 全屏不许出现汉字 —— 这条比 ① 更宽，抓的是"换了一条中文进来"。
+    const panel = el.querySelector('[data-testid="ai-tool-failure"]')?.textContent ?? '';
+    expect(panel).not.toMatch(/[\u4e00-\u9fff]/u);
+  });
+
+  it('中文界面仍然用中文那条（词条表是唯一事实源）', async () => {
+    const el = await render({ host: fakeHost(), grants: {} });
+    await type(el, '把这段话翻译一下');
+    // 规则没命中 → 先出披露；`no-granted-tools` 是在**真的走一遍**之后才回来的
+    // （`run()` 只负责"要不要出境"，失败判定在 `requestToolCall()` 里）。
+    await click(el, 'ai-tool-run-button');
+    await click(el, 'ai-tool-send');
+    expect(el.querySelector('[data-testid="ai-tool-failure-message"]')?.textContent).toBe(
+      zhCN['web.ai.tools.failure.noGrantedTools'],
+    );
   });
 });

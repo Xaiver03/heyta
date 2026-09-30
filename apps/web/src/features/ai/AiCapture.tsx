@@ -43,6 +43,8 @@ import { useI18n, type I18nValue, type Locale } from '@heyta/i18n';
 
 import { LIST_SEPARATOR } from './locale-punctuation.js';
 import { AiDisclosureHost } from './AiDisclosureHost.js';
+import { AiPanelHost } from './AiPanelHost.js';
+import { AiPanelHeadHost } from './AiPanelHeadHost.js';
 import { FailureSettingsAction, RouteUnavailable } from './RouteUnavailable.js';
 import { useAiSettingsNavigation } from './ai-settings-navigation.js';
 import {
@@ -433,24 +435,17 @@ export function AiCapture(props: AiCaptureProps): React.JSX.Element {
   // ── 🔴 披露：只算，不发 ───────────────────────────────────────────────
   if (phase === 'disclosing') {
     return (
-      <div
-        className="ht-ai__panel"
-        role="dialog"
-        aria-label={t('web.ai.capture.disclosureAria')}
-        data-testid="capture-disclosure"
-      >
-        <div className="ht-ai__head">
-          <span>{t('web.ai.disclosure.heading')}</span>
-          <button
-            type="button"
-            className="ht-btn ht-btn--ghost"
-            aria-label={t('web.ai.action.cancel')}
-            data-testid="capture-dismiss"
-            onClick={reset}
-          >
-            <X size={12} aria-hidden="true" />
-          </button>
-        </div>
+            <AiPanelHost
+              label={t('web.ai.capture.disclosureAria')}
+              testID="capture-disclosure"
+              role="dialog"
+            >
+        <AiPanelHeadHost
+          title={t('web.ai.disclosure.heading')}
+          closeLabel={t('web.ai.action.cancel')}
+          closeTestID="capture-dismiss"
+          onClose={reset}
+        />
 
         {/* 🔴 把"将要发送的那一句"原样显示出来 —— 用户改过输入之后
             仍能确认自己批的是哪一句。 */}
@@ -496,33 +491,37 @@ export function AiCapture(props: AiCaptureProps): React.JSX.Element {
             </div>
           </>
         )}
-      </div>
+            </AiPanelHost>
     );
   }
 
   if (phase === 'loading') {
     return (
-      <div className="ht-ai__panel" data-testid="capture-loading">
+            <AiPanelHost
+              label={t('web.ai.loading.waiting')}
+              testID="capture-loading"
+              role="status"
+            >
         <span>{t('web.ai.loading.waiting')}</span>
-      </div>
+            </AiPanelHost>
     );
   }
 
   // ── 🔴 候选：模型给的东西**必须经用户确认**才可能被写入 ──────────────
   if (phase === 'proposal' && proposal !== undefined) {
     return (
-      <div
-        className="ht-ai__panel"
-        role="dialog"
-        aria-label={t('web.ai.capture.proposalAria')}
-        data-testid="capture-proposal"
-      >
-        <div className="ht-ai__head">
-          <span>{t('web.ai.capture.proposalHead')}</span>
-          <span className="ht-ai__tag" data-testid="capture-proposal-source">
-            {proposal.destination === 'none' ? t('web.ai.source.local') : t('web.ai.source.remote')}
-          </span>
-        </div>
+            <AiPanelHost
+              label={t('web.ai.capture.proposalAria')}
+              testID="capture-proposal"
+              role="dialog"
+            >
+        <AiPanelHeadHost
+          title={t('web.ai.capture.proposalHead')}
+          tag={{
+          text: proposal.destination === 'none' ? t('web.ai.source.local') : t('web.ai.source.remote'),
+          testID: 'capture-proposal-source',
+          }}
+        />
 
         {proposal.dropped.length > 0 && (
           <p className="ht-ai__warn" data-testid="capture-dropped">
@@ -617,53 +616,79 @@ export function AiCapture(props: AiCaptureProps): React.JSX.Element {
             {t('web.ai.action.discard')}
           </button>
         </div>
-      </div>
+            </AiPanelHost>
     );
   }
 
   // ── 失败：给出**具体原因**，并允许重试 ───────────────────────────────
   return (
-    <div
-      className="ht-ai__panel"
-      role="dialog"
-      aria-label={t('web.ai.capture.failedAria')}
-      data-testid="capture-failed"
-    >
-      <div className="ht-ai__head">
-        <span>{t('web.ai.capture.failedHead')}</span>
-        <button
-          type="button"
-          className="ht-btn ht-btn--ghost"
-          aria-label={t('web.ai.action.close')}
-          data-testid="capture-close"
-          onClick={reset}
+        <AiPanelHost
+          label={t('web.ai.capture.failedAria')}
+          
+          testID="capture-failed"
+          
+          role="dialog"
+          
         >
-          <X size={12} aria-hidden="true" />
-        </button>
-      </div>
-      <p data-testid="capture-failure-message">
-        {failure === null ? '' : t(failure.key)}
-      </p>
-      {/* 技术详情：包 / 端点返回的原文。分类与 ErrorScreen 的 <details> 相同 ——
-          那是诊断**数据**，不是文案（见 ai-failure-copy.ts 的 `showDetail`）。 */}
-      {failure !== null && failure.showDetail && failure.detail !== '' && (
-        <details data-testid="capture-failure-message-detail">
-          <summary>{t('web.ai.failure.details')}</summary>
-          <p>{failure.detail}</p>
-        </details>
-      )}
-      {/* 🔴 失败原因能在设置里修 → 给一条真的能点的路（只导航，不代授权）。 */}
-      <FailureSettingsAction
-        settingsTarget={failure?.settingsTarget}
-        onOpenSettings={onOpenSettings}
-        testId="capture-failure-settings"
-      />
-      <div className="ht-ai__actions">
-        <button
-          type="button"
-          className="ht-btn"
-          data-testid="capture-retry"
-          onClick={() => void send()}
+
+        <AiPanelHeadHost
+
+          title={t('web.ai.capture.failedHead')}
+
+          closeLabel={t('web.ai.action.close')}
+
+          closeTestID="capture-close"
+
+          onClose={reset}
+
+        />
+
+        <p data-testid="capture-failure-message">
+
+          {failure === null ? '' : t(failure.key)}
+
+        </p>
+
+        {/* 技术详情：包 / 端点返回的原文。分类与 ErrorScreen 的 <details> 相同 ——
+
+            那是诊断**数据**，不是文案（见 ai-failure-copy.ts 的 `showDetail`）。 */}
+
+        {failure !== null && failure.showDetail && failure.detail !== '' && (
+
+          <details data-testid="capture-failure-message-detail">
+
+            <summary>{t('web.ai.failure.details')}</summary>
+
+            <p>{failure.detail}</p>
+
+          </details>
+
+        )}
+
+        {/* 🔴 失败原因能在设置里修 → 给一条真的能点的路（只导航，不代授权）。 */}
+
+        <FailureSettingsAction
+
+          settingsTarget={failure?.settingsTarget}
+
+          onOpenSettings={onOpenSettings}
+
+          testId="capture-failure-settings"
+
+        />
+
+        <div className="ht-ai__actions">
+
+          <button
+
+            type="button"
+
+            className="ht-btn"
+
+            data-testid="capture-retry"
+
+            onClick={() => void send()}
+
         >
           {t('web.ai.action.retry')}
         </button>
@@ -676,6 +701,6 @@ export function AiCapture(props: AiCaptureProps): React.JSX.Element {
           {t('web.ai.action.close')}
         </button>
       </div>
-    </div>
+        </AiPanelHost>
   );
 }

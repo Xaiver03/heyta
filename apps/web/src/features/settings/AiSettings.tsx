@@ -1060,6 +1060,7 @@ export function AiSettings({ initial, secrets, onChange, memorySlot, focusTarget
         {t('web.ai.settings.keyNotice')}
       </p>
 
+      <div className="ht-settings__actions">
       <button
         type="button"
         className="ht-btn ht-btn--ghost"
@@ -1072,6 +1073,7 @@ export function AiSettings({ initial, secrets, onChange, memorySlot, focusTarget
       >
         {t('web.ai.settings.reset')}
       </button>
+      </div>
     </div>
   );
 }
