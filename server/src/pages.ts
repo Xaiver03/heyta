@@ -1,5 +1,4 @@
 import { FastifyInstance } from 'fastify';
-import { verifyEmail } from './auth';
 import { Logger } from './logger';
 import { escapeHtml, renderPage, resolveLocale, t } from './design-html.js';
 
@@ -71,23 +70,57 @@ export async function pageRoutes(fastify: FastifyInstance) {
           );
         }
 
-        await verifyEmail(token);
+        /**
+         * 🔴 **GET 绝不消费令牌**（2026-09-30 改，ADR-0039 §2.2 / §3.2）。
+         *
+         * 原实现是 `await verifyEmail(token)` —— 于是在**用户点之前**，
+         * 邮件客户端的链接预取（Outlook SafeLinks、Gmail 预览）就能替他把令牌烧掉，
+         * 用户点进来只看到"链接已失效"。`/magic-login` 从一开始就是两步式
+         * （GET 渲染、POST 消费），它的脚本头注释里就写着这条理由 ——
+         * 而 `/verify-email` 一直没有对齐。
+         *
+         * 现在两个页面：**同一个确认脚本、同一个校验端点**（`/api/auth/email/verify`），
+         * 于是"注册那封邮件点一下也直接进去"（ADR-0039 §2.2）。
+         *
+         * ⚠️ 文案暂复用 `verify.*` / `login.*`（贴切度一般：注册链接会说"完成这次登录"）。
+         *    它**不是**漏掉，是明确记在 ADR-0039 §3 的跟进项里 —— 专用 key 属文案改动。
+         */
+        const bodyAttrs = [
+          `data-token="${escapeHtml(token)}"`,
+          `data-msg-busy="${escapeHtml(t(locale, 'server.page.login.busy'))}"`,
+          `data-msg-success="${escapeHtml(t(locale, 'server.page.login.success'))}"`,
+          `data-msg-error="${escapeHtml(t(locale, 'server.page.login.error'))}"`,
+          // 🔴 通行密钥注册那条链接**不发会话** —— 它的话术必须与"登录成功"分开，
+          //    否则界面会对用户说一件没发生的事（ADR-0039 §2.1 的 verified-only）。
+          `data-msg-verified-only="${escapeHtml(t(locale, 'server.page.confirm.verifiedOnly'))}"`,
+          `data-msg-unknown="${escapeHtml(t(locale, 'server.page.error.unknown'))}"`,
+        ].join(' ');
 
-        return reply.type('text/html').send(
-          renderPage(locale, {
-            title: t(locale, 'server.page.verify.title'),
-            heading: t(locale, 'server.page.verify.heading'),
-            body: t(locale, 'server.page.verify.body'),
-            extraHtml: OK_ICON,
-            // 登录入口在应用里（`/app/`），不是落地页 —— 落地页没有登录表单。
-            actions: [{ label: t(locale, 'server.page.verify.action'), href: '/app/', primary: true }],
-          }),
-        );
+        const page = renderPage(locale, {
+          // ⚠️ 用 `confirm.*` 而**不是** `verify.*`：这一页出现在**点击之前**，
+          //    写"邮箱验证成功"是说假话（2026-09-30 实测被测试抓到）。
+          title: t(locale, 'server.page.confirm.title'),
+          heading: t(locale, 'server.page.confirm.heading'),
+          body: t(locale, 'server.page.confirm.body'),
+          actions: [
+            {
+              label: t(locale, 'server.page.confirm.button'),
+              id: 'login-btn',
+              primary: true,
+            },
+          ],
+          extraHtml:
+            '<p class="status status--err" id="error" hidden></p>' +
+            '<p class="status status--ok" id="success" hidden></p>',
+          scripts: ['/magic-login-confirm.js'],
+        });
+
+        return reply
+          .type('text/html')
+          .send(page.replace('<body>', `<body ${bodyAttrs}>`));
       } catch (err) {
-        Logger.error(`Verification error: ${errorMessage(err)}`);
-        // 🔴 对外**不回显**服务端的原始错误（`verifyEmail` 的 message 是给日志的）。
-        // 第一版把 `errorMessage(err)` 直接拼进页面，等于把一个内部字符串
-        // 渲染给任何点到过期链接的人看。用户需要知道的只有"这个链接不好使了"。
+        const errMsg = err instanceof Error ? err.message : 'Unknown error';
+        Logger.error(`Verify email page error: ${errMsg}`);
         return reply.status(400).type('text/html').send(
           renderPage(locale, {
             title: t(locale, 'server.page.verify.failedTitle'),

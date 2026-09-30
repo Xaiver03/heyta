@@ -1,0 +1,23 @@
+(node:47708) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.
+(Use `node --trace-warnings ...` to show where the warning was created)
+· 库：heyta_email_chain
+· 验收库已存在
+· 应用迁移…
+· 迁移完成
+· server/dist 比 server/src 旧，重新构建…
+· 启动服务端（**不开 TEST_MODE** —— 要走真的发信那条路）…
+· 服务端就绪 http://127.0.0.1:3221
+
+  ✅ ① 注册被受理（HTTP 201）
+  · 那封信：https://ethereal.email/message/ar0CYwcJu4JvaGY3ar0CbPLvAxtdrS2kAAAAAYNFhc.-Sn4AHKBEtg.s0nY
+  ✅ ② 信里**确实**带着 /verify-email?token= 链接
+  ✅ ② 链接指向**本次**的服务端（http://127.0.0.1:3221/verify-email?token…）
+  ✅ ③ GET 链接可打开（HTTP 200）
+  ✅ ③ 它渲染的是**确认页**（带确认脚本与令牌），不是"已失效"页
+  ✅ ④ 换到**会话**（kind=session，HTTP 200）—— 注册一次点击就进去
+  ✅ ④ 会话属于刚注册的那个邮箱（email-chain-1790771810621@example.com）
+  ✅ ⑤ 同一个令牌再用一次被拒（HTTP 401）
+  ✅ ⑥ 库里 is_verified=1 且 verification_token 已清（读到 1|t）
+  ✅ ⑦ 注入：伪造令牌被拒（HTTP 401）
+
+✅ 邮箱全链路通过：真发出一封信 → 点开确认页 → 一次点击换到会话 → 令牌一次性。

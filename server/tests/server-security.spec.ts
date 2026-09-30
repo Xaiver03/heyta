@@ -338,17 +338,21 @@ describe('Email Verification Page', () => {
     }
   });
 
-  it('should await verifyEmail before sending response', async () => {
-    // Mock the verifyEmail function to track if it was awaited
-    let verifyEmailCompleted = false;
-    vi.doMock('../src/auth', () => ({
-      verifyEmail: vi.fn().mockImplementation(async () => {
-        // Simulate async work
-        await new Promise((resolve) => setTimeout(resolve, 10));
-        verifyEmailCompleted = true;
-        return true;
-      }),
-    }));
+  /**
+   * 🔴 **判据在 2026-09-30 反过来了**（ADR-0039 §2.2 / §3.2）。
+   *
+   * 原实现是 `await verifyEmail(token)` —— **GET 就消费令牌**，而这一条测试
+   * 当时断言的正是"GET 必须等 verifyEmail 完成"。那是个**危险的契约**：
+   * 邮件客户端的**链接预取**（Outlook SafeLinks、Gmail 预览）会在用户点之前
+   * 就把链接抓一遍 ⇒ 单次令牌被烧掉，用户点进来只看到"链接已失效"，
+   * 而服务端日志一片干净。`/magic-login` 从一开始就是两步式（GET 渲染、POST 消费），
+   * 脚本头注释里写着同一条理由。
+   *
+   * ⇒ 现在断言的是**相反**的性质：**GET 不许消费令牌**，只渲染确认页。
+   */
+  it('GET /verify-email 渲染确认页，且**不消费**令牌', async () => {
+    const verifyEmailSpy = vi.fn().mockResolvedValue(true);
+    vi.doMock('../src/auth', () => ({ verifyEmail: verifyEmailSpy }));
 
     const { pageRoutes } = await import('../src/pages');
 
@@ -361,14 +365,18 @@ describe('Email Verification Page', () => {
       url: '/verify-email?token=valid-token',
     });
 
-    // The response should only be sent after verifyEmail completes
     expect(response.statusCode).toBe(200);
-    expect(verifyEmailCompleted).toBe(true);
-    // 🔴 文案是**中文**（默认语言），见 server/src/design-html.ts 的 resolveLocale。
-    expect(response.body).toContain('邮箱验证成功');
+    // ① 渲染的是**确认页**（带确认脚本 + 令牌），不是"验证成功"页。
+    expect(response.body).toContain('/magic-login-confirm.js');
+    expect(response.body).toContain('data-token="valid-token"');
+    // 🔴 关键：这一页出现在**点击之前**，不许说"验证成功"（那是假话）。
+    expect(response.body).not.toContain('邮箱验证成功');
+    expect(response.body).toContain('完成邮箱验证');
+    // ② 🔴 **这一个断言才是承重的**：GET 一旦消费令牌，预取就会替用户烧掉它。
+    expect(verifyEmailSpy).not.toHaveBeenCalled();
   });
 
-  it('should handle verification errors properly', async () => {
+  it('坏令牌在 GET 上与好令牌**同一条确认页**（不泄露、不消费、不回显内部错误）', async () => {
     vi.doMock('../src/auth', () => ({
       verifyEmail: vi.fn().mockRejectedValue(new Error('Invalid verification token')),
     }));
@@ -384,12 +392,14 @@ describe('Email Verification Page', () => {
       url: '/verify-email?token=invalid-token',
     });
 
-    expect(response.statusCode).toBe(400);
-    expect(response.body).toContain('验证失败');
-    // 🔴 加强：**不许**把服务端的原始错误回显给用户。
-    //    第一版把 `errorMessage(err)` 直接拼进页面 —— 等于把内部字符串
-    //    （令牌无效的具体原因、库的错误文案）渲染给任何点到过期链接的人看。
-    //    用户需要知道的只有"这个链接不好使了"。
+    /**
+     * 🔴 **不再返回 400 / "验证失败"页** —— 那会在 GET 上告诉任何人
+     * "这个令牌好不好"，而一个只拿到链接的预取器正好能据此枚举。
+     * 失效与否由**点击之后**的 POST 揭晓（那条路才是校验点）。
+     */
+    expect(response.statusCode).toBe(200);
+    expect(response.body).toContain('/magic-login-confirm.js');
+    // 仍然**不许**把服务端的原始错误回显给用户。
     expect(response.body).not.toContain('Invalid verification token');
   });
 

@@ -99,7 +99,8 @@
     "screenshot:test": "node --test scripts/screenshots/png-stats.test.mjs",
     "poster": "bash scripts/screenshots/poster.sh",
     "check:server-design": "node server/scripts/gen-server-design.mjs --check",
-    "check:server-copy": "cd server && ./node_modules/.bin/ts-node --transpile-only scripts/gen-server-copy.ts --check"
+    "check:server-copy": "cd server && ./node_modules/.bin/ts-node --transpile-only scripts/gen-server-copy.ts --check",
+    "verify:email-auth": "node scripts/verify-email-auth-chain.mjs"
   },
   "devDependencies": {
     "@heyta/shared-schema": "workspace:*",

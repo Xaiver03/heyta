@@ -401,6 +401,25 @@ export const requestLoginMagicLink = async (
 /**
  * Verify a magic link login token and return a JWT.
  */
+/**
+ * **签发会话** —— 全仓**只有这一处**把 `{userId,email,tokenVersion}` 签成 JWT。
+ *
+ * 🔴 抽出来的理由：邮箱链接这条路现在有**三种令牌**都能换到会话
+ * （登录令牌 / 邮箱注册令牌 / 将来手机号的），若每处各签一遍，
+ * 迟早出现"某种令牌签出来的 JWT 少了 `tokenVersion`"这种极难查的破口 ——
+ * 而 `tokenVersion` 正是**改密/登出全部设备**赖以生效的那一格。
+ */
+export const issueSession = (user: {
+  id: number;
+  email: string;
+  tokenVersion?: number | null;
+}): string =>
+  jwt.sign(
+    { userId: user.id, email: user.email, tokenVersion: user.tokenVersion ?? 0 },
+    JWT_SECRET,
+    { expiresIn: JWT_EXPIRY },
+  );
+
 export const verifyLoginMagicLink = async (
   token: string,
 ): Promise<{ token: string; user: { id: number; email: string } }> => {
@@ -443,16 +462,63 @@ export const verifyLoginMagicLink = async (
     throw new Error('Invalid or expired login link');
   }
 
-  const tokenVersion = user.tokenVersion ?? 0;
-  const jwtToken = jwt.sign(
-    { userId: user.id, email: user.email, tokenVersion },
-    JWT_SECRET,
-    { expiresIn: JWT_EXPIRY },
-  );
+  const jwtToken = issueSession(user);
 
   Logger.info(`User logged in via magic link (ID: ${user.id})`);
 
   return { token: jwtToken, user: { id: user.id, email: user.email } };
+};
+
+/** 邮箱链接换会话的结果。**判别式**：页面据此决定"写会话并跳应用"还是"只提示已确认"。 */
+export type EmailLinkVerifyResult =
+  | { kind: 'session'; token: string; user: { id: number; email: string } }
+  | { kind: 'verified-only'; user: { id: number; email: string } };
+
+/**
+ * **邮箱链接的唯一校验入口**：邮件里那个 `token` 换会话（ADR-0039 §2.1）。
+ *
+ * 按**同一份实现**处理三类令牌：
+ *
+ *  1. `User.loginToken`（登录那封）→ 委托 `verifyLoginMagicLink`；
+ *  2. `User.verificationToken`（**邮箱注册**那封）→ 委托既有 `verifyEmail` 消费令牌，
+ *     然后**签发会话** ⇒ 注册也是"一次点击就进去"（ADR-0039 §2.2，本 ADR 的核心改动）；
+ *  3. `PendingPasskeyRegistration.verificationToken`（通行密钥注册那封）→ 同样委托
+ *     `verifyEmail`（它负责激活那把钥匙），但**不签发会话**：那条路的产品语义是
+ *     "验证完去用你的通行密钥"，本轮不改它。
+ *
+ * ⚠️ 判定顺序刻意：先试登录令牌（最常见），再分流两种验证令牌。
+ * ⚠️ 令牌的**消费**仍然只在 `verifyEmail` / `verifyLoginMagicLink` 里发生 ——
+ *    这里不写第二份消费逻辑，避免"两处各扣一次"的经典竞态。
+ */
+export const verifyEmailLink = async (token: string): Promise<EmailLinkVerifyResult> => {
+  const viaLogin = await verifyLoginMagicLink(token).catch(() => null);
+  if (viaLogin) return { kind: 'session', ...viaLogin };
+
+  const pendingPasskey = await prisma.pendingPasskeyRegistration.findUnique({
+    where: { verificationToken: token },
+    select: { userId: true },
+  });
+  if (pendingPasskey) {
+    await verifyEmail(token);
+    const user = await prisma.user.findUnique({
+      where: { id: pendingPasskey.userId },
+      select: { id: true, email: true },
+    });
+    return {
+      kind: 'verified-only',
+      user: user ?? { id: pendingPasskey.userId, email: '' },
+    };
+  }
+
+  const user = await prisma.user.findFirst({
+    where: { verificationToken: token },
+    select: { id: true, email: true, tokenVersion: true },
+  });
+  if (!user) throw new Error('Invalid or expired link');
+
+  await verifyEmail(token);
+  Logger.info(`User registered and signed in via email link (ID: ${user.id})`);
+  return { kind: 'session', token: issueSession(user), user: { id: user.id, email: user.email } };
 };
 
 /**

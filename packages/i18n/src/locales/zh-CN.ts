@@ -2774,6 +2774,14 @@ export const zhCN = {
   'server.page.verify.heading': '邮箱验证成功',
   'server.page.verify.body': '你的账号已经可以正常使用了。',
   'server.page.verify.action': '返回并登录',
+  // 🔴 邮箱链接的**确认页**（点之前那一页）—— 与"已验证"那一页**必须分开**：
+  //    在用户点之前就写"验证成功"是在说假话（2026-09-30 实测踩过）。
+  'server.page.confirm.title': '完成邮箱验证',
+  'server.page.confirm.heading': '完成邮箱验证',
+  'server.page.confirm.body': '点击下面的按钮完成验证。',
+  'server.page.confirm.button': '完成验证',
+  // 通行密钥注册那条链接：验证成功但**不发会话**（该用你的通行密钥登录）。
+  'server.page.confirm.verifiedOnly': '邮箱已验证。请用你的通行密钥登录。',
   'server.page.verify.failedTitle': '验证失败',
   'server.page.verify.failedBody': '这个验证链接无效或已经过期。请重新注册，或申请一封新的验证邮件。',
   'server.page.recover.title': '恢复通行密钥',

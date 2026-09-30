@@ -34,6 +34,11 @@ export type ServerCopyKey =
   | "server.email.verify.expiry"
   | "server.email.verify.subject"
   | "server.email.verify.title"
+  | "server.page.confirm.body"
+  | "server.page.confirm.button"
+  | "server.page.confirm.heading"
+  | "server.page.confirm.title"
+  | "server.page.confirm.verifiedOnly"
   | "server.page.error.unknown"
   | "server.page.login.again"
   | "server.page.login.body"
@@ -84,6 +89,11 @@ export const SERVER_COPY: Record<ServerLocale, Record<ServerCopyKey, string>> = 
     "server.email.verify.expiry": "这个链接 24 小时内有效。",
     "server.email.verify.subject": "验证你的 heyta 账号",
     "server.email.verify.title": "欢迎使用 heyta",
+    "server.page.confirm.body": "点击下面的按钮完成验证。",
+    "server.page.confirm.button": "完成验证",
+    "server.page.confirm.heading": "完成邮箱验证",
+    "server.page.confirm.title": "完成邮箱验证",
+    "server.page.confirm.verifiedOnly": "邮箱已验证。请用你的通行密钥登录。",
     "server.page.error.unknown": "出了点问题，请稍后重试。",
     "server.page.login.again": "重新申请登录链接",
     "server.page.login.body": "点击下面的按钮，完成这次登录。",
@@ -131,6 +141,11 @@ export const SERVER_COPY: Record<ServerLocale, Record<ServerCopyKey, string>> = 
     "server.email.verify.expiry": "This link is valid for 24 hours.",
     "server.email.verify.subject": "Verify your heyta account",
     "server.email.verify.title": "Welcome to heyta",
+    "server.page.confirm.body": "Click the button below to confirm.",
+    "server.page.confirm.button": "Confirm",
+    "server.page.confirm.heading": "Confirm your email",
+    "server.page.confirm.title": "Confirm your email",
+    "server.page.confirm.verifiedOnly": "Email confirmed. Please sign in with your passkey.",
     "server.page.error.unknown": "Something went wrong. Please try again.",
     "server.page.login.again": "Request a new login link",
     "server.page.login.body": "Click the button below to finish this sign-in.",

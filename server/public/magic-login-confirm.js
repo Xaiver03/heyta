@@ -40,6 +40,8 @@
       busy: body.dataset.msgBusy,
       success: body.dataset.msgSuccess,
       error: body.dataset.msgError,
+      // 通行密钥注册那条链接：验证成功但**不发会话**，所以不能说"登录成功"。
+      verifiedOnly: body.dataset.msgVerifiedOnly,
     };
 
     /** 只在拿到文案时改字；拿不到就保持服务端渲染的那一句。 */
@@ -52,7 +54,10 @@
       say(loginBtn, msg.busy);
       errorEl.hidden = true;
 
-      fetch('/api/login/magic-link/verify', {
+      // 🔴 **统一端点**（ADR-0039 §2.1）：登录令牌 / 邮箱注册令牌 / 通行密钥注册令牌
+      //    都由它一份实现分流。老端点 `/api/login/magic-link/verify` 仍在（老邮件指向它），
+      //    但它内部**委托**到同一个核心 —— 页面这边只认这一个。
+      fetch('/api/auth/email/verify', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ token: token }),
@@ -63,7 +68,21 @@
           });
         })
         .then(function (result) {
-          if (!result.ok || !result.data.token) {
+          if (!result.ok) {
+            throw new Error('magic-link-verify-failed');
+          }
+          /**
+           * `verified-only` = 验证成功、但那条路**不发会话**（通行密钥注册那封邮件）。
+           * ⚠️ 它不是失败：把它当失败会让用户以为链接坏了，而其实是"该用你的通行密钥登录"。
+           * 这里只把按钮换成"去应用"，不写 sessionStorage。
+           */
+          if (result.data.kind === 'verified-only') {
+            say(successEl, msg.verifiedOnly || msg.success);
+            successEl.hidden = false;
+            loginBtn.hidden = true;
+            return;
+          }
+          if (result.data.kind !== 'session' || !result.data.token) {
             throw new Error('magic-link-verify-failed');
           }
           say(successEl, msg.success);
