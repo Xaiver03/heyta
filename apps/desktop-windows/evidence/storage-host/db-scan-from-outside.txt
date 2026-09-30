@@ -1,0 +1,3 @@
+TITLE=B-shell-storage-1790759433473
+MAIN bytes=4096 title=False ops_table=False
+WAL  bytes=168952 title=True ops_table=True

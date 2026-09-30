@@ -10,12 +10,14 @@
 # Pipeline:
 #   1. dotnet publish (self-contained; the project sets WindowsAppSDKSelfContained
 #      so no framework package dependency is needed in the manifest)
+#      + restore the XBF/PRI that publish drops (see the note in step 1)
 #   2. build AppxManifest.xml -- Publisher MUST byte-match the signing cert subject
 #   3. generate the logo assets makeappx requires
 #   4. makeappx pack  -> heyta.msix
 #   5. New-SelfSignedCertificate + signtool sign
-#   6. trust the cert (LocalMachine\TrustedPeople) + Add-AppxPackage
-#   7. launch it and screenshot the window -- installing is not the same as running
+#   6. trust the cert (LocalMachine\TrustedPeople)
+#   7. hand install + launch + screenshot to install-and-capture.ps1, which runs in
+#      the user's INTERACTIVE, NON-ELEVATED desktop session via schtasks /it
 #
 # NOTE: self-signed means "this package is intact and matches the cert", NOT
 # "a publicly trusted publisher". A self-signed MSIX needs the cert trusted on
@@ -57,6 +59,56 @@ $bundle = Join-Path $pubDir 'native-bridge.js'
 $facts += ('  native-bridge.js=' + (Test-Path $bundle))
 if (-not (Test-Path $bundle)) {
   $facts += 'RESULT=BUNDLE_MISSING'
+  $facts | Set-Content $manifestOut -Encoding ASCII; $facts | Write-Output; exit 1
+}
+
+# ---- 1b. web-dist: the REAL shared UI ---------------------------------------
+# The shell serves the real app from `web-dist` next to the exe, and defaults to
+# `app` mode only when that folder exists (see MainWindow.xaml.cs).
+#
+# MEASURED 2026-09-30: the first MSIX produced by `pnpm reinstall:all` carried no
+# web-dist AND was built from a two-day-old C:\src\heyta, so the installed app
+# showed the shell-host spike page ("M2-B real data 1/2/3") while every install
+# criterion stayed green. Assert the payload here so a package that cannot show
+# the product fails at package time instead of passing as "installed".
+$facts += '=== 1b. web-dist (real shared UI) ==='
+$webSrc = Join-Path $repo 'apps\web\dist'
+if (-not (Test-Path (Join-Path $webSrc 'index.html'))) {
+  $facts += 'RESULT=WEB_DIST_MISSING (build it first: pnpm --filter @heyta/web build)'
+  $facts | Set-Content $manifestOut -Encoding ASCII; $facts | Write-Output; exit 1
+}
+$webTarget = Join-Path $pubDir 'web-dist'
+Remove-Item $webTarget -Recurse -Force -EA SilentlyContinue
+Copy-Item $webSrc $webTarget -Recurse -Force
+$facts += ('  web-dist files = ' + (Get-ChildItem $webTarget -Recurse -File | Measure-Object).Count)
+$facts += ('  web-dist index.html = ' + (Get-Item (Join-Path $webTarget 'index.html')).Length + ' bytes')
+
+# MEASURED: `dotnet publish` drops the app's OWN XAML resources. Its output has
+# none of App.xbf / MainWindow.xbf / HeytaWindows.pri, while the build output has
+# all three. A package built from that publish folder starts, then dies inside
+# Microsoft.UI.Xaml.dll with
+#   Exception 0xc000027b (stowed exception), faulting module combase.dll,
+#   exception code 80004005 (E_FAIL)
+# before it can open a window -- because InitializeComponent() cannot load
+# ms-appx:///App.xaml. Copy the missing files in from the build output and assert
+# them here, so the defect surfaces at package time instead of as a silent crash.
+$priSrc = Get-ChildItem (Join-Path $repo 'apps\desktop-windows\HeytaWindows\bin') -Recurse -File -Filter 'HeytaWindows.pri' -EA SilentlyContinue |
+  Sort-Object LastWriteTime -Descending | Select-Object -First 1
+if ($priSrc) {
+  $facts += ('  build output for XAML resources = ' + $priSrc.DirectoryName)
+  $copied = @()
+  foreach ($pat in @('*.xbf', '*.pri')) {
+    Get-ChildItem (Join-Path $priSrc.DirectoryName $pat) -File -EA SilentlyContinue | ForEach-Object {
+      Copy-Item $_.FullName (Join-Path $pubDir $_.Name) -Force
+      $copied += $_.Name
+    }
+  }
+  $facts += ('  restored into publish: ' + (($copied | Sort-Object) -join ', '))
+} else {
+  $facts += '  WARNING: no HeytaWindows.pri found under the build output'
+}
+if (-not (Test-Path (Join-Path $pubDir 'HeytaWindows.pri'))) {
+  $facts += 'RESULT=XAML_RESOURCES_MISSING (publish dropped the app PRI and it was not found in the build output)'
   $facts | Set-Content $manifestOut -Encoding ASCII; $facts | Write-Output; exit 1
 }
 
@@ -166,66 +218,71 @@ Export-PfxCertificate -Cert $cert -FilePath $pfxPath -Password $sec | Out-Null
 $signtool = 'C:\Program Files (x86)\Windows Kits\10\bin\10.0.26100.0\x64\signtool.exe'
 $sign = & $signtool sign /fd SHA256 /a /f $pfxPath /p $pfxPass $msix 2>&1
 $sign | Select-Object -Last 3 | ForEach-Object { $facts += ('  ' + $_) }
+
+# ---- 6. trust the cert ------------------------------------------------------
+# Must happen BEFORE `signtool verify /pa`, otherwise the check reports a
+# meaningless non-zero exit code purely because the chain is not trusted yet.
+$facts += '=== 6. trust the self-signed cert ==='
+$elevated = (New-Object Security.Principal.WindowsPrincipal([Security.Principal.WindowsIdentity]::GetCurrent())).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
+$facts += ('  packager session elevated = ' + $elevated)
+if ($elevated) {
+  Import-Certificate -FilePath $cerPath -CertStoreLocation 'Cert:\LocalMachine\TrustedPeople' | Out-Null
+  $facts += '  cert trusted in LocalMachine\TrustedPeople'
+} else {
+  $facts += '  WARNING: not elevated -- skipped; the cert must already be trusted for the install to work'
+}
 $verify = & $signtool verify /pa /v $msix 2>&1
 $facts += ('  signtool verify exit = ' + $LASTEXITCODE)
 
-# ---- 6. trust + install -----------------------------------------------------
-$facts += '=== 6. install ==='
-Import-Certificate -FilePath $cerPath -CertStoreLocation 'Cert:\LocalMachine\TrustedPeople' | Out-Null
-$facts += '  cert trusted in LocalMachine\TrustedPeople'
+# ---- 7. install + launch + capture, in the interactive session ---------------
+# AppX deployment is PER-USER. Running Add-AppxPackage from the elevated session
+# that SSHD hands us fails with 0x80070005 "access denied" -- measured, and the
+# same command succeeds unchanged in the non-elevated interactive session. So the
+# install, the launch and the screenshot all move into that session; the elevated
+# session only does what genuinely needs admin (trusting the cert above).
+$facts += '=== 7. install + launch + capture (interactive, non-elevated) ==='
+$childFacts = Join-Path $build 'install-capture.txt'
+$childPs1   = 'C:\src\heyta-install-and-capture.ps1'
+$childLog   = Join-Path $build 'install-capture.log'
+Remove-Item $childFacts -Force -EA SilentlyContinue
+Remove-Item $childLog -Force -EA SilentlyContinue
 
-Get-AppxPackage -Name $identityName | Remove-AppxPackage -EA SilentlyContinue
-$add = Add-AppxPackage -Path $msix -ForceApplicationShutdown 2>&1
-$add | ForEach-Object { $facts += ('  ' + $_) }
-$installed = Get-AppxPackage -Name $identityName
-if (-not $installed) {
-  $facts += 'RESULT=INSTALL_FAILED'
+if (-not (Test-Path $childPs1)) {
+  $facts += ('RESULT=CHILD_SCRIPT_MISSING (' + $childPs1 + ')')
   $facts | Set-Content $manifestOut -Encoding ASCII; $facts | Write-Output; exit 1
 }
-$facts += ('  installed version = ' + $installed.Version)
-$facts += ('  install location  = ' + $installed.InstallLocation)
 
-# Installing is NOT the same as running. Launch it and screenshot the window.
-$facts += '=== 7. launch + capture ==='
-$app = Get-StartApps | Where-Object { $_.Name -eq $displayName } | Select-Object -First 1
-if (-not $app) { $facts += '  WARNING: Get-StartApps did not list it'; $appId = $identityName + '!App' } else { $appId = $app.AppID }
-$facts += ('  appId = ' + $appId)
-Start-Process ('shell:appsFolder\' + $appId)
-Start-Sleep -Seconds 18
-
-$proc = Get-Process HeytaWindows -EA SilentlyContinue | Select-Object -First 1
-if (-not $proc) {
-  $facts += 'RESULT=RUN_FAILED (process not found after launch)'
+if ($elevated) {
+  $cmdPath = Join-Path $build 'install-and-capture.cmd'
+  Set-Content -Path $cmdPath -Encoding ASCII -Value @(
+    '@echo off',
+    ('powershell -NoProfile -ExecutionPolicy Bypass -File ' + $childPs1 + ' > ' + $childLog + ' 2>&1')
+  )
+  schtasks /delete /tn heyta-msix-install /f 2>&1 | Out-Null
+  $create = schtasks /create /tn heyta-msix-install /tr $cmdPath /sc once /st 00:00 /ru $env:USERNAME /it /f 2>&1
+  $facts += ('  schtasks create exit = ' + $LASTEXITCODE)
+  $run = schtasks /run /tn heyta-msix-install 2>&1
+  $facts += ('  schtasks run exit = ' + $LASTEXITCODE)
+  for ($i = 0; $i -lt 90; $i++) {
+    Start-Sleep -Seconds 2
+    if (Test-Path $childFacts) {
+      $t = Get-Content $childFacts -Raw -EA SilentlyContinue
+      if ($t -and $t.Contains('DONE')) { break }
+    }
+  }
 } else {
-  $facts += ('  pid = ' + $proc.Id)
-  $proc.Refresh()
-  $h = $proc.MainWindowHandle
-  $facts += ('  MainWindowHandle = ' + $h)
-  if ($h -ne 0 -and $h -ne [IntPtr]::Zero) {
-    $facts += ('  MainWindowTitle = ' + $proc.MainWindowTitle)
-    Add-Type @"
-using System;
-using System.Runtime.InteropServices;
-public class WR {
-  [DllImport("user32.dll")] public static extern bool GetWindowRect(IntPtr h, out RC r);
-  [StructLayout(LayoutKind.Sequential)] public struct RC { public int Left, Top, Right, Bottom; }
+  $facts += '  running the child script directly (already non-elevated)'
+  & powershell -NoProfile -ExecutionPolicy Bypass -File $childPs1 2>&1 | Out-Null
 }
-"@
-    $r = New-Object WR+RC
-    [void][WR]::GetWindowRect($h, [ref]$r)
-    $w = $r.Right - $r.Left; $ht = $r.Bottom - $r.Top
-    $facts += ('  WINDOW_RECT=' + $w + 'x' + $ht)
-    Add-Type -AssemblyName System.Drawing
-    $bmp = New-Object System.Drawing.Bitmap($w, $ht)
-    $g = [System.Drawing.Graphics]::FromImage($bmp)
-    $g.CopyFromScreen($r.Left, $r.Top, 0, 0, $bmp.Size)
-    $shot = Join-Path $build 'packaged-first-run.png'
-    $bmp.Save($shot, [System.Drawing.Imaging.ImageFormat]::Png)
-    $g.Dispose(); $bmp.Dispose()
-    $facts += ('  PNG_SAVED=' + (Test-Path $shot) + ' bytes=' + (Get-Item $shot).Length)
-    $facts += 'RESULT=OK'
-  } else {
-    $facts += 'RESULT=NO_WINDOW (packaged app launched but no window)'
+
+if (Test-Path $childFacts) {
+  $facts += '--- install-and-capture (interactive session) ---'
+  Get-Content $childFacts | Where-Object { $_ -ne 'DONE' } | ForEach-Object { $facts += ('  ' + $_) }
+} else {
+  $facts += 'RESULT=INSTALL_FAILED (no evidence file from the interactive session)'
+  if (Test-Path $childLog) {
+    $facts += '--- child log (tail) ---'
+    Get-Content $childLog -Tail 15 | ForEach-Object { $facts += ('  ' + $_) }
   }
 }
 

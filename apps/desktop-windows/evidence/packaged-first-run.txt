@@ -1,0 +1,65 @@
+# Windows（WinUI 3）**打包产物**窗口取证记录 —— 从 Windows 侧日志逐字抄录
+#
+# 这张图和 window-first-run.png 的区别：后者是 `dotnet build` 产物（开发路径），
+# 这一张是 **装进机器之后的 MSIX**（`Add-AppxPackage` → `shell:appsFolder\...`）。
+# 「装上了」不等于「跑得起来」，所以打包产物必须单独留一份能起来、有真实界面的证据。
+#
+# 采集命令（可复现）：
+#   bash apps/desktop-windows/scripts/package-msix.sh
+#   # 第 7 步把 install-and-capture.ps1 投进交互式会话，产出
+#   #   C:\src\heyta-msix\packaged-first-run.png   ← 这张
+#   #   C:\src\heyta-msix\install-capture.txt
+#   # 第 ③ 段取回到 dist/windows/
+#
+# 采集机制：SSH 打完命令就断，**没有桌面**。所以靠 `schtasks /ru <user> /it`
+#           把安装+启动+截图整段投进用户的**交互式会话**（session 2）里执行，
+#           再用 System.Drawing 的 CopyFromScreen + GetWindowRect
+#           **只截应用窗口**（不是整屏）。
+#
+# 🔴 为什么安装也必须在这个会话里做（本轮的核心结论）：
+#
+#   AppX 部署是**按用户**的。SSHD 给的是提权会话，在那里跑 `Add-AppxPackage`
+#   得到的是：
+#
+#     Add-AppxPackage : 部署失败，HRESULT: 0x80070005, 拒绝访问。
+#     目标卷 C: 执行的 添加 操作失败，错误为 0x80070005
+#
+#   同一段代码、同一个包，换到非提权的交互式桌面会话就成功。
+#   **不要再试「用管理员再跑一次」—— 那是反方向。**
+#   `Add-AppxProvisionedPackage -Online`（面对全机、必须提权）是另一条语义不同的路。
+#
+# 实测（install-capture.txt 逐字）：
+#
+#   CONTEXT IsAdmin=False SessionId=2      ← 判据：False 才是对的会话
+#   MSIX_EXISTS=True
+#   ADD_APPX=OK
+#   INSTALLED_VERSION=1.0.0.0
+#   INSTALL_LOCATION=C:\Program Files\WindowsApps\cloud.finlaw.heyta.desktop_1.0.0.0_x64__d8ndx02bjp3sw
+#   PAYLOAD_PRI=True                       ← 包内确实有应用自己的 PRI
+#   PAYLOAD_XBF=2                          ← 以及 App.xbf / MainWindow.xbf
+#   APP_ID=cloud.finlaw.heyta.desktop_d8ndx02bjp3sw!App
+#   PID=6536
+#   WINDOW_TITLE=heyta
+#   WINDOW_RECT=1152x587
+#   PNG_SAVED=True bytes=34435
+#   RESULT=OK
+#
+# 窗口里那行「还没有任务。上面写一条试试。」不是硬编码 —— 它是 listTasks()
+# 穿过 Jint → app-host → SQLite 之后返回的空列表被渲染出来。
+# **所以这张截图同时证明了整条 D2 链路在打包产物里也是通的。**
+#
+# ── 为什么会先栽一次（留档）────────────────────────────────────────────
+#
+# `dotnet publish` 会丢掉应用**自己的** XAML 资源：publish 目录里
+# `App.xbf` / `MainWindow.xbf` / `HeytaWindows.pri` 一个都没有，而 build 目录三个都有。
+# 用它打出来的 MSIX 会**装得上、进程也起得来**，然后在
+# Microsoft.UI.Xaml.dll 里崩掉（异常代码 0xc000027b + combase.dll 80004005 E_FAIL），
+# 窗口从来没出现过 —— 因为 InitializeComponent() 加载不到 ms-appx:///App.xaml。
+# package-msix.ps1 第 1 步把它们从 build 产物补回 publish 并断言存在。
+#
+# 图里左边缘和顶部那条露出的是相邻窗口透过 DWM 边框区 —— 与已提交的
+# window-first-run.png 完全同形（两张都是 1152x587、字节数只差 363），是既有口径。
+#
+# 采集方式与 window-first-run.png 相同，已列入 targets.mjs 的 SHELL_EVIDENCE 白名单。
+
+CAPTURE_METHOD=winui-schtasks-copyfromscreen
