@@ -5,11 +5,17 @@
  * 为什么需要它：文档一旦开始按目录分层，相对路径就会随文件移动而失效，
  * 而且失效是**静默**的 —— 没人点进去就不会发现。这个工具把它变成可验证的。
  *
+ * 🔴 它同时检查**两件不同的事**，因为它们的失败方式不一样：
+ *   · **本机也不存在** ⇒ 死链（一直都有）；
+ *   · **本机有、仓库里没有** ⇒ 在干净检出（= CI 的唯一形态）上是死链。
+ *     只按文件系统解析看不见后者，所以那一半由 `TRACKED`（`git ls-files`）判定。
+ *
  * 用法：
- *   node research/tools/docs-link-check.mjs           # 检查，死链则退出码 1
+ *   node research/tools/docs-link-check.mjs           # 检查，有问题则退出码 1
  *   node research/tools/docs-link-check.mjs --verbose  # 列出所有检查过的链接
  */
 
+import { execFileSync } from 'node:child_process';
 import { readdirSync, readFileSync, existsSync, statSync } from 'node:fs';
 import { join, dirname, resolve, relative, basename } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -37,6 +43,72 @@ const SKIP_DIRS = new Set([
 
 /** 上游克隆与第三方资料不归我们维护，检查它们的死链没有意义。 */
 const SKIP_PATHS = ['research/upstream', 'research/standalone', 'research/parts'];
+
+/**
+ * 🔴 「本机有、仓库里没有」的**显式豁免登记**。
+ *
+ * 为什么需要它：`existsSync` 只看本机文件系统。一条指向 `.local.md`
+ * （被 `*.local.md` 拦在库外）或指向本机 agent 工具目录的链接，在**这台机器上**
+ * 永远解析成功、门禁永远绿，而在干净检出（CI 的唯一形态）上是**死链**。
+ * 这一类以前一条都抓不到 —— 属于"永远不会失败的检查"。
+ *
+ * 现在的规则：**没有登记 = 判红**。要放行就必须在这里写一条路径 + 一句理由，
+ * 成本是刻意的（与 AGENTS §3.2 的许可证 `REVIEWED_OTHER` 同一个手法）：
+ * 它逼着为这个链接做一次真正的判断 —— 到底是"该入库"、"该改成不链接"，
+ * 还是"确实只该活在本机"。
+ *
+ * 已登记的两条（都是本轮实测的既有引用）：
+ *   · 备案填报值：证件号 / 手机号 / 邮箱，**私密数据**，由 `.gitignore` 的
+ *     `*.local.md` 挡在库外（本仓库的立场是"带私有数据的东西不进仓库"）；
+ *   · 本机 agent 工具目录：那是**每台机器自己装的 skill**，仓库里从来不放，
+ *     而且它中间经过软链（`git check-ignore` 对它报 "beyond a symbolic link"），
+ *     所以只能按"未被跟踪"处理。
+ *
+ * ⚠️ 目录豁免以 `/` 结尾，前缀匹配。范围尽量窄 —— 宽到 `docs/` 那种
+ *    等于把这一半检查关掉。
+ */
+const UNTRACKED_LINK_OK = new Map([
+  ['docs/operations/icp-app-filing.values.local.md', '真实填报值含证件号与手机号，刻意不进仓库（.gitignore 的 *.local.md）'],
+  ['.agents/skills/', '每台机器自己安装的本地 agent skill 目录，仓库里从来不放'],
+]);
+
+/** 命中豁免则返回**被命中的那条登记** `[pattern, reason]`，否则 `undefined`。 */
+function matchUntrackedOk(relTarget) {
+  for (const entry of UNTRACKED_LINK_OK) {
+    const [pattern] = entry;
+    if (pattern.endsWith('/') ? relTarget.startsWith(pattern) : relTarget === pattern) return entry;
+  }
+  return undefined;
+}
+
+/**
+ * 仓库**真正跟踪**的文件集合（`git ls-files`）。
+ *
+ * 🔴 拿不到就**响亮退出 1**，不静默跳过：那样"检查不到"和"检查过且干净"
+ * 会长得一模一样，而后者正是本仓库反复吃过的那类假绿（AGENTS §7 元规则二）。
+ * 在 CI 上这个检出必然是 git 仓库；跑不出来的话是环境坏了，那本来就该红。
+ */
+function trackedFileSet() {
+  let out;
+  try {
+    out = execFileSync('git', ['ls-files', '-z'], {
+      cwd: ROOT,
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'pipe'],
+      maxBuffer: 128 * 1024 * 1024,
+    });
+  } catch (error) {
+    console.error(
+      '🔴 拿不到 `git ls-files` —— 「本机有、仓库里没有」这一半检查无法执行，拒绝给出"通过"的结论。\n' +
+        `   git 报的是：${error instanceof Error ? error.message : String(error)}\n` +
+        '   （不在 git 检出里跑本脚本？请到仓库检出里再跑，或把这一半显式关掉 —— 但别让它悄悄空转。）',
+    );
+    process.exit(1);
+  }
+  return new Set(out.split('\0').filter(Boolean));
+}
+
+const TRACKED = trackedFileSet();
 
 const verbose = process.argv.includes('--verbose');
 
@@ -97,6 +169,10 @@ for (const f of files) {
   else list.push(f);
 }
 const broken = [];
+/** 本机存在、仓库里没有，且**没有登记豁免**的链接 —— 干净检出上是死链。 */
+const localOnly = [];
+/** 实际被用到的豁免（用于把"登记了但已经没人引用"说出来）。 */
+const exemptedHits = new Map();
 let checked = 0;
 let skipped = 0;
 
@@ -125,8 +201,29 @@ for (const file of files) {
 
       checked++;
       const resolved = resolve(dir, decodeURIComponent(target));
+      const relDoc = relative(ROOT, file);
       if (existsSync(resolved)) {
-        if (verbose) console.log(`  ok   ${relative(ROOT, file)}:${i + 1} -> ${raw}`);
+        /**
+         * 🔴 **本机有 ≠ 仓库里有。** 只按文件系统判的那一半永远看不见这类死链
+         * （实测：`docs/operations/icp-app-filing.md` 里两条，本机全绿、干净检出全红）。
+         *
+         * 两个刻意不参与的例外：
+         *   · **目录**：git 跟踪的是文件不是目录，`docs/plans/` 这种链接不该红；
+         *   · **没被跟踪的文档里的链接**：那是本机还没提交的草稿，
+         *     它引用了同批未提交的文件是**正常状态**，不该由它决定别人能不能跑门禁。
+         */
+        const relTarget = relative(ROOT, resolved);
+        if (!statSync(resolved).isDirectory() && TRACKED.has(relDoc) && !TRACKED.has(relTarget)) {
+          const ok = matchUntrackedOk(relTarget);
+          if (ok === undefined) {
+            localOnly.push({ file: relDoc, line: i + 1, target: raw, relTarget });
+          } else {
+            exemptedHits.set(ok[0], (exemptedHits.get(ok[0]) ?? 0) + 1);
+            if (verbose) console.log(`  本机  ${relDoc}:${i + 1} -> ${raw}（豁免：${ok[0]}）`);
+          }
+        } else if (verbose) {
+          console.log(`  ok   ${relDoc}:${i + 1} -> ${raw}`);
+        }
       } else {
         // 🔴 指向 `SKIP_PATHS`（上游克隆、独立工作副本等）的链接**不是死链**。
         //
@@ -593,7 +690,8 @@ for (const file of files) {
 console.log(`检查 ${checkedRefs} 处跨文档章节引用。`);
 console.log(`检查 ${checkedAnchors} 处页内锚点。`);
 
-const hasProblems = badRefs.length > 0 || badAnchors.length > 0 || broken.length > 0;
+const hasProblems =
+  badRefs.length > 0 || badAnchors.length > 0 || broken.length > 0 || localOnly.length > 0;
 
 if (badRefs.length > 0) {
   console.log(`\n🔴 发现 ${badRefs.length} 处**失效的章节引用**（值是错的，但链接是活的）：\n`);
@@ -626,9 +724,45 @@ if (broken.length > 0) {
   console.log('');
 }
 
+if (localOnly.length > 0) {
+  console.log(
+    `\n🔴 发现 ${localOnly.length} 处**本机有、仓库里没有**的链接 —— ` +
+      `它们在干净检出（CI 的唯一形态）上是死链：\n`,
+  );
+  for (const b of localOnly) {
+    console.log(`   ${b.file}:${b.line}`);
+    console.log(`      -> ${b.target}   （解析到 ${b.relTarget}，本机存在，但 git 没有跟踪它）`);
+  }
+  console.log(
+    '\n   三条出路，按情况选一条，别为了让门禁绿而放宽判据：\n' +
+      '     ① 目标**该入库** ⇒ `git add` 它（私密数据不算"该入库"，走 ② 或 ③）；\n' +
+      '     ② 链接**不该存在** ⇒ 改成纯文字说明（不提可点的路径）；\n' +
+      '     ③ 目标**刻意只活在本机** ⇒ 在 `research/tools/docs-link-check.mjs` 的\n' +
+      '        `UNTRACKED_LINK_OK` 里登记路径 + **一句理由**（成本是刻意的，见那里的注释）。\n',
+  );
+}
+
 if (hasProblems) process.exit(1);
 
 console.log(`\n扫描 ${files.length} 个 Markdown 文件，检查 ${checked} 个相对链接。`);
+
+if (UNTRACKED_LINK_OK.size > 0) {
+  const unused = [...UNTRACKED_LINK_OK.keys()].filter((p) => !exemptedHits.has(p));
+  console.log(
+    `\nℹ️  「本机有、仓库里没有」已登记 ${UNTRACKED_LINK_OK.size} 条豁免（放行 ${exemptedHits.size} 条链接）：`,
+  );
+  for (const [pattern, reason] of UNTRACKED_LINK_OK) {
+    const hits = exemptedHits.get(pattern) ?? 0;
+    console.log(`   • ${pattern} —— ${reason}（本次命中 ${String(hits)} 次）`);
+  }
+  // 🔴 登记了却没人引用 = 这一半检查的范围在悄悄缩小。说出来，别让它悄悄留着。
+  if (unused.length > 0) {
+    console.log(
+      `   ⚠️ 其中 ${unused.length} 条**没有任何链接用到**（${unused.join(' / ')}）—— ` +
+        '引用已经删掉的话，请把登记一起删掉。',
+    );
+  }
+}
 
 // 🔴 跳过必须**说出来**。静默跳过会让"没检查"和"检查过且没问题"看起来一样 ——
 //    那正是本仓反复踩的那类病（见 AGENTS.md §7 与 ci-and-runner.md §8.1）。
@@ -642,6 +776,6 @@ if (skipped > 0) {
   );
 }
 
-console.log('\n✅ 无死链、无失效章节引用、无失效锚点。\n');
+console.log('\n✅ 无死链、无"本机有仓库里没有"的链接、无失效章节引用、无失效锚点。\n');
 process.exit(0);
 
