@@ -30,6 +30,8 @@ import {
 import { authenticate, getAuthUser } from './middleware';
 import { Logger } from './logger';
 import { prisma } from './db';
+import { resolveLocale } from './design-html.js';
+import type { ServerLocale } from './copy.generated.js';
 import { authCache } from './auth-cache';
 import { getWsConnectionService } from './sync/services/websocket-connection.service';
 
@@ -57,17 +59,53 @@ const TERMS_REQUIRED_MESSAGE = 'You must accept the linked legal documents to re
  */
 export const buildRegisterBodySchema = (
   requireConsent: boolean,
-): z.ZodType<{ email: string; termsAccepted?: boolean }> =>
+): z.ZodType<{ email: string; termsAccepted?: boolean; inviteCode?: string }> =>
   z.object({
     email: z.string().email('Invalid email format'),
     termsAccepted: requireConsent
       ? z.literal(true, { message: TERMS_REQUIRED_MESSAGE })
       : z.boolean().optional(),
+    // 邀请码。**刻意只校验长度上限，不校验形状** ——
+    // 形状不对时该发生的是"这张码不作数，注册照常成功"，而不是一个 400。
+    // 在注册入口对码做形状校验，等于把"这张码存在但格式不对"这件事
+    // 变成一个可探测的信号；而且用户手里那张码是从别人那里抄来的，
+    // 让他因为抄多了一个空格就注册失败，是拿一个附带福利去挡主流程。
+    //
+    // 上限 64 只是挡明显不像话的输入（真实码 8 位）。归一化在
+    // `@heyta/domain` 的 `normalizeInviteCode`，**不在这里**。
+    inviteCode: z.string().max(64).optional(),
   });
+
+/**
+ * 从请求里解析收件人语言。
+ *
+ * 顺序与 `design-html.ts` 的 `resolveLocale` 一致：
+ *   ① `body.locale`（客户端当前语言，**可选**——客户端不传也完全正常工作）
+ *   ② `Accept-Language`（浏览器自动带，覆盖"系统语言"这一档）
+ *   ③ 默认 `zh-CN`
+ *
+ * 🔴 **刻意不改任何 zod schema**：`body.locale` 是可选字段，zod 的 `z.object()`
+ * 默认会剥掉未声明的键 —— 也就是说这个字段**不会**进 `parseResult.data`，
+ * 但也**不会**让请求失败。加它不需要动 schema，于是也不会与正在改这些
+ * schema 的人撞车。（要让它进 `data` 就得改 schema，代价远大于收益。）
+ */
+const localeFromRequest = (req: {
+  body?: unknown;
+  headers: Record<string, unknown>;
+}): ServerLocale => {
+  const body = req.body as { locale?: unknown } | undefined;
+  const explicit = typeof body?.locale === 'string' ? body.locale : null;
+  const header = req.headers['accept-language'];
+  return resolveLocale(explicit, typeof header === 'string' ? header : null);
+};
 
 const PasskeyRegisterVerifySchema = z.object({
   email: z.string().email('Invalid email format'),
   credential: z.object({}).passthrough(), // WebAuthn credential response
+  // 与 `buildRegisterBodySchema` 同字段、同理由。客户端在 options 与 verify
+  // 两次调用里都带上它（`/register/passkey/options` 那次会被 zod 收下但不使用 ——
+  // 绑定发生在 verify，因为那时才 User 行）。
+  inviteCode: z.string().max(64).optional(),
 });
 
 const PasskeyLoginOptionsSchema = z.object({
@@ -393,7 +431,7 @@ export const apiRoutes = async (
             details: parseResult.error.issues,
           });
         }
-        const { email, credential } = parseResult.data;
+        const { email, credential, inviteCode } = parseResult.data;
 
         if (!isEmailAllowed(email)) {
           return reply
@@ -401,7 +439,12 @@ export const apiRoutes = async (
             .send({ error: 'Registration is not allowed for this email address.' });
         }
 
-        const result = await verifyRegistration(email, credential as any, Date.now());
+        const result = await verifyRegistration(
+          email,
+          credential as any,
+          Date.now(),
+          inviteCode,
+        );
         return reply.status(201).send(result);
       } catch (err) {
         const errMsg = err instanceof Error ? err.message : 'Unknown error';
@@ -566,7 +609,7 @@ export const apiRoutes = async (
         }
         const { email } = parseResult.data;
 
-        const result = await requestPasskeyRecovery(email);
+        const result = await requestPasskeyRecovery(email, localeFromRequest(req));
         return reply.send(result);
       } catch (err) {
         const errMsg = err instanceof Error ? err.message : 'Unknown error';
@@ -924,7 +967,7 @@ export const apiRoutes = async (
             details: parseResult.error.issues,
           });
         }
-        const { email } = parseResult.data;
+        const { email, inviteCode } = parseResult.data;
 
         if (!isEmailAllowed(email)) {
           return reply
@@ -932,7 +975,7 @@ export const apiRoutes = async (
             .send({ error: 'Registration is not allowed for this email address.' });
         }
 
-        const result = await registerWithMagicLink(email, Date.now());
+        const result = await registerWithMagicLink(email, Date.now(), inviteCode, localeFromRequest(req));
         return reply.status(201).send(result);
       } catch (err) {
         const errMsg = err instanceof Error ? err.message : 'Unknown error';
@@ -966,7 +1009,7 @@ export const apiRoutes = async (
         }
         const { email } = parseResult.data;
 
-        const result = await requestLoginMagicLink(email);
+        const result = await requestLoginMagicLink(email, localeFromRequest(req));
         return reply.send(result);
       } catch (err) {
         const errMsg = err instanceof Error ? err.message : 'Unknown error';

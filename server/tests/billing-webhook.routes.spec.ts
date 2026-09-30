@@ -35,6 +35,7 @@ const mocks = vi.hoisted(() => {
     },
     subscription: {
       findFirst: vi.fn(),
+      findMany: vi.fn(),
       create: vi.fn(),
       update: vi.fn(),
     },
@@ -194,7 +195,7 @@ describe('billing webhook routes', () => {
       (args: {
         where: { externalSubscriptionId?: string; userId?: number };
       }) => {
-        // webhook 处理按外部 id 查；entitlement 守卫按 userId 查。
+        // webhook 处理按外部 id 查。
         if (args.where.externalSubscriptionId !== undefined) {
           return Promise.resolve(
             mocks.state.subscriptions.get(args.where.externalSubscriptionId) ?? null,
@@ -207,6 +208,18 @@ describe('billing webhook routes', () => {
           return Promise.resolve(row ?? null);
         }
         return Promise.resolve(null);
+      },
+    );
+    // 🔴 entitlement 守卫走的是 `findMany`（**全部行**，不是最新那一行）：
+    // 权益是多个来源的并集（付费 / 邀请奖励），按最新一行判定会把用户
+    // 已付的时长丢掉。见 `src/entitlement.ts` 的 `evaluateCapabilityAcross`。
+    mocks.prisma.subscription.findMany.mockImplementation(
+      (args: { where: { userId?: number } }) => {
+        const rows = [...mocks.state.subscriptions.values()].filter(
+          (candidate) =>
+            args.where.userId === undefined || candidate.userId === args.where.userId,
+        );
+        return Promise.resolve(rows);
       },
     );
     mocks.prisma.subscription.create.mockImplementation(
@@ -347,15 +360,16 @@ describe('billing webhook routes', () => {
     expect(mocks.prisma.paymentEvent.create).not.toHaveBeenCalled();
 
     // 🔴 与既有 entitlement 的"默认关"一致：gate 关着时不鉴权、不查库。
-    const loadSubscription = vi.fn();
-    const guard = createEntitlementGuard({ loadSubscription });
+    const loadSubscriptions = vi.fn();
+    const guard = createEntitlementGuard({ loadSubscriptions });
     const result = await guard(
       {} as never,
       {} as never,
     );
     expect(result).toBeUndefined();
-    expect(loadSubscription).not.toHaveBeenCalled();
+    expect(loadSubscriptions).not.toHaveBeenCalled();
     expect(mocks.prisma.subscription.findFirst).not.toHaveBeenCalled();
+    expect(mocks.prisma.subscription.findMany).not.toHaveBeenCalled();
   });
 
   it('🔴 不存原始 payload：只落 SHA-256 digest，买家 PII 不出现任何落库字段', async () => {

@@ -14,6 +14,7 @@ import { prisma } from './db';
 import { Logger } from './logger';
 import { randomBytes } from 'crypto';
 import { sendPasskeyRecoveryEmail, sendVerificationEmail } from './email';
+import type { ServerLocale } from './copy.generated.js';
 import { getWsConnectionService } from './sync/services/websocket-connection.service';
 import { Prisma } from '@prisma/client';
 import { loadConfigFromEnv, isConsentRequired } from './config';
@@ -24,6 +25,7 @@ import {
 } from './auth';
 import { authCache } from './auth-cache';
 import { getDefaultStorageQuotaBytes } from './sync/services/storage-quota.service';
+import { attachInviteOnRegister } from './activity/invite';
 
 // Constants
 const CHALLENGE_EXPIRY_MS = 5 * 60 * 1000; // 5 minutes
@@ -214,6 +216,11 @@ export const verifyRegistration = async (
   email: string,
   credential: RegistrationResponseJSON,
   termsAcceptedAt?: number,
+  /**
+   * 邀请码（原样、未归一化）。与 `registerWithMagicLink` 的第三个参数同义：
+   * 这里**只登记**一条待兑现的邀请，发奖要等邮箱验证（见 `activity/invite.ts`）。
+   */
+  inviteCode?: string,
 ): Promise<{ message: string }> => {
   const { rpID, origin } = getWebAuthnConfig();
 
@@ -322,6 +329,27 @@ export const verifyRegistration = async (
             : null,
         },
       });
+
+      // 邀请登记：**先登记、后兑现**。放在这个事务里，是因为 `userId` 只在这里
+      // 才有；而它绝不能抛 —— 与 `auth.ts` 的 `attachInviteSafe` 同一条纪律：
+      // 一个附带的福利功能不该让注册失败。
+      if (inviteCode !== undefined && inviteCode.trim() !== '') {
+        try {
+          await attachInviteOnRegister({
+            inviteeUserId: userId,
+            rawCode: inviteCode,
+            now: Date.now(),
+            db: tx,
+          });
+        } catch (err) {
+          Logger.error(
+            `Invite attach failed (invitee=${userId}): ${
+              err instanceof Error ? err.message : 'unknown'
+            }`,
+          );
+        }
+      }
+
       return true;
     });
     if (!pendingCreated) return { message: REGISTRATION_SUCCESS_MESSAGE };
@@ -639,6 +667,8 @@ export const verifyAuthentication = async (
  */
 export const requestPasskeyRecovery = async (
   email: string,
+  /** 收件人的语言。**可选** —— 见 `auth.ts` 的 `requestLoginMagicLink`。 */
+  locale?: ServerLocale,
 ): Promise<{ message: string }> => {
   const successMessage = {
     message: 'If an account with that email exists, a recovery link has been sent.',
@@ -699,7 +729,7 @@ export const requestPasskeyRecovery = async (
   });
   if (claim.count === 0) return successMessage;
 
-  const emailSent = await sendPasskeyRecoveryEmail(email, recoveryToken);
+  const emailSent = await sendPasskeyRecoveryEmail(email, recoveryToken, locale);
   if (!emailSent) {
     await prisma.user.updateMany({
       where: { id: user.id, passkeyRecoveryToken: recoveryToken },
