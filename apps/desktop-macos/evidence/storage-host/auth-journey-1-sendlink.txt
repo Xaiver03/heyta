@@ -1,0 +1,10 @@
+WINDOW=heyta
+WEB_ROOT=/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/apps/web/dist
+STORAGE_HOST=on
+AUTH_JOURNEY=CLICKED(send-link): 登录 / 注册还没有凭据同步需要服务端签发的访问令牌。用邮箱登录或注册即可获得，令牌会自动写入下面的同步设置。服务端地址邮箱邀请码（选填）我同意该服务端提供的服务条款与隐私政策发送登录链接注册新账号用通行密钥注册用通行密钥登录丢失了通行密钥？发一封找回链接或者粘贴登录链接 / 令牌完成登录
+STORAGE=shell
+PAGE_ORIGIN=heyta-local://app
+SECURE_CONTEXT=yes
+WEBAUTHN=function
+AUTH_STATE=signed-out
+M2_MACOS_NOTE=M2-macOS ✅ 身份入口成立（头像 1 个、采集框 1 个）；**身份菜单合规**（第一项 sync-signin-entry、登录入口 1 个、退出登录 0 个）；**设置里的滴答导入面板可达**（panel=1 file=1）

@@ -1,0 +1,10 @@
+WINDOW=heyta
+WEB_ROOT=/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/apps/web/dist
+STORAGE_HOST=on
+AUTH_JOURNEY=PASTED panelClosed=true panel= Mheyta任务日历四象限习惯时间线搜索回收站通知帮助收集箱3今天已完成四象限重要且紧急重要不紧急紧急不重要不重要不紧急3清单标签收集箱未同步English0/0今天还没有安排添加AI 排优先级AI 工具调用用一句话让 AI 调一个工具。规则能处理的不会离开这台设备。运行无截止
+STORAGE=shell
+PAGE_ORIGIN=heyta-local://app
+SECURE_CONTEXT=yes
+WEBAUTHN=function
+AUTH_STATE=signed-in
+M2_MACOS_NOTE=M2-macOS ✅ **已登录**（退出登录 1 个、登录入口 0 个；设置项 1 个）

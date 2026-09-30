@@ -1,0 +1,8 @@
+WINDOW=heyta
+WEB_ROOT=/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/apps/web/dist
+STORAGE_HOST=on
+STORAGE=shell
+PAGE_ORIGIN=heyta-local://app
+SECURE_CONTEXT=yes
+WEBAUTHN=function
+M2_MACOS_NOTE=M2-macOS ✅ 身份入口成立（头像 1 个、采集框 1 个）；**身份菜单合规**（第一项 sync-signin-entry、登录入口 1 个、退出登录 0 个）；**设置里的滴答导入面板可达**（panel=1 file=1）

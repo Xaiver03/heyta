@@ -1,0 +1,6 @@
+# 从壳外读 macOS 壳的 SQLite（不经 TS 栈、不经应用）
+TITLE=B-mac-final-1790763473
+heyta.sqlite: bytes=73728 title=False ops_table=True
+  mtime=2026-09-28 13:25:02 path=/Users/rocalight/Library/Application Support/heyta/heyta.sqlite
+heyta.sqlite-wal: bytes=123632 title=True ops_table=False
+  mtime=2026-09-30 18:17:54 path=/Users/rocalight/Library/Application Support/heyta/heyta.sqlite-wal

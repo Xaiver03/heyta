@@ -53,13 +53,208 @@ HEYTA_BRIDGE_BUNDLE="$PWD/packages/app-host/bridge-bundle/native-bridge.js" \
 ⇒ 报错信息（`Invalid manifest` + `sandbox_apply`）看起来像"清单写坏了"，
 **实际是环境**。与 Windows 那侧的 PS 5.1 编码坑同一类：症状指向的地方不是原因。
 
+## WKWebView 接线已做（B 的最后一格）
+
+`HeytaMacApp.swift` + `ShellStorageHost.swift`：`WKUserScript`（`atDocumentStart`）注入端口 shim、
+`WKScriptMessageHandler`（`heytaStorage`）收消息转 `AppApi.handleHostMessage`、
+返回的每一串用 `window.postMessage(JSON.parse(...), '*')` 回推。形状与 Windows 那份**逐字同构**。
+
+### 判据（两步，缺一不可）
+
+**① 真应用自己报告走了壳的存储** —— `window-evidence.txt` / `final-evidence.txt`：
+
+```
+STORAGE_HOST=on
+STORAGE=shell
+JOURNEY_TYPED=Optional(TYPED)
+```
+
+**② 🔴 从壳外读那个 `.sqlite`** —— `from-outside-db-read.txt`：
+
+```
+TITLE=B-mac-final-1790763473
+heyta.sqlite-wal: bytes=123632 title=True
+  mtime=2026-09-30 18:17:54   ← 就是那一次运行
+```
+
+⇒ 那条标题是**经界面**打进去的（旅程探针：往采集框打字 + 回车），
+而它出现在**壳自己的库**里，且**从壳外**读到。两次运行、两个不同标题都成立。
+
+### macOS 上"造出那条数据"用的是哪条路（因为没有 CDP）
+
+WKWebView 不暴露 CDP，Playwright 也没有 WebKit 的附着 API ⇒ Windows 那套
+`connectOverCDP` + Playwright 点界面**走不通**。可用的机制是这个壳**本来就在用的**那一种
+（`evaluateJavaScript`，它已经在点头像）：`HEYTA_STORAGE_JOURNEY=<标题>` 时跑一段
+"往采集框打字 + 派发回车"的脚本。
+
+⚠️ 实测要点：React 受控输入必须走**原型上的 value setter** + 派发 `input`
+（直接 `input.value = x` 不会更新 React 的 state，症状是"看起来填了、提交为空"）。
+
+## C 的前置实测：通行密钥在 macOS 壳里**是可用的**
+
+C 的形态压在"自定义 scheme 能不能做 WebAuthn"这一格上（Windows 壳用的是 `https://heyta.local`，
+macOS 壳用的是 `heyta-local://app` —— **不一样**）。实测（`capability-evidence.txt` / `auth-state-evidence.txt`）：
+
+```
+PAGE_ORIGIN=heyta-local://app
+SECURE_CONTEXT=yes
+WEBAUTHN=function
+```
+
+⇒ WKWebView 把自定义 scheme 当**安全上下文**，`PublicKeyCredential` 存在。**通行密钥没有被 origin 挡住**。
+（服务端的 RP ID / origin 都是环境变量：`server/src/passkey.ts:109,115` ⇒
+用 `WEBAUTHN_RP_ID=app` + `WEBAUTHN_ORIGIN=heyta-local://app` 就能配上。
+⚠️ RP ID 会是 `app`（scheme 的 host）—— 这一点尚未在真机上走通，是本条的下一个未知。）
+
+### 🔴 C 的技术结论（量出来的）：**macOS 壳里通行密钥做不了**
+
+两次实测，都在 `webauthn-probe-evidence.txt` / `webauthn-focused-evidence.txt`：
+
+```
+（我为了不抢焦点，按 AGENTS §6.2 用的 HEYTA_NO_FOCUS=1）
+WEBAUTHN_PROBE=ERROR name=NotAllowedError message=The document is not focused. uvpaa=false
+
+（带焦点重测，且**不建凭据**）
+WEBAUTHN_PROBE=SKIPPED_CREATE uvpaa=false
+```
+
+两条独立的事实：
+
+1. 🔴 **`isUserVerifyingPlatformAuthenticatorAvailable() === false`** —— 带焦点也一样。
+   即：**WKWebView 认为平台认证器不可用**，所以注册/登录根本走不到 Touch ID 那一步
+   （用户看到的正是"没有任何反应 / 已取消或超时"）。
+   ⚠️ **不是硬件问题**：这台机器 `bioutil -r` 显示 `Biometrics for unlock: 1`，
+   `ioreg` 有 4 个 `AppleBiometricSensor`，机型 Mac16,5。
+   最可能的原因：WKWebView 的 WebAuthn 要求 app 与 RP ID 的域名**有关联**
+   （`com.apple.developer.associated-domains` 的 `webcredentials:` + 服务端 AASA），
+   而 `apps/desktop-macos` 里**没有任何 associated-domains / webcredentials 配置**，
+   RP ID 又只有 `app` 一个标签。**这一条是推断，不是实测** —— 已验证的是"不可用"。
+2. 🔴 **`HEYTA_NO_FOCUS=1` 会让任何 WebAuthn 调用失败**（`The document is not focused`）。
+   这是本仓取证/截屏脚本的既定约定（`AGENTS §6.2` 规定二：不得抢用户焦点），
+   而它与 WebAuthn 的"要求文档在前台"**直接冲突**。⇒ **跑通行密钥相关的验收时不能带它。**
+
+⇒ 所以 C **不能**只是"补一条登录后的断言"：macOS 壳当前的鉴权路**走不通**，
+要先决定换哪条路（见 handoff §6 的选项）。
+
+### C 的判据机制（已落地）：登录前后**各有恰好一种**合法 IA
+
+`AUTH_STATE=signed-out` / `AUTH_STATE=signed-in` 写进证据，判定在 `menuProbe` 之后：
+
+| 状态 | 必须成立 | 实测 |
+|---|---|---|
+| 未登录 | 第一项 = `sync-signin-entry`、有设置项、**没有**退出登录 | ✅ `AUTH_STATE=signed-out`（回归通过） |
+| 已登录 | **有**退出登录、且**没有**登录入口 | ⏳ 需要人按一次 Touch ID |
+| 其它 | 两者都在 / 都不在 ⇒ **红** | 判据没有放松，只是把"登录之后"也纳入可判定状态 |
+
+⚠️ **通行密钥那一步必须有人**（系统 Touch ID 弹窗）。壳能做的是：
+把所有**可自动**的部分跑到弹窗之前，并让"人做完之后"的那一态**可被断言** ——
+不把人的那一步伪装成自动通过。
+
+## C（macOS「注册/登录之后」）：机制已落地，**绿了**；红（注入）**还没拿到**
+
+`pnpm verify:web-auth` 那条跑在 Chromium 里；macOS 壳里没有 CDP，所以这里用的是**壳内探针**
+（`evaluateJavaScript` / `callAsyncJavaScript`）——这与本目录上半部分验存储时用的是同一条机制。
+
+### 走的是哪条路（以及为什么只能是它）
+
+两条硬约束（都已实测）：
+
+| 路 | 状态 |
+|---|---|
+| 通行密钥 | 🔴 壳里**不可用**（`uvpaa=false`，见本文件上半部分） |
+| magic-link 回跳 | 🔴 需要深链 `heyta://auth#token=…`，而 macOS 壳**没有**深链处理（no `CFBundleURLTypes` / no `application(_:open)`） |
+| ✅ **面板里粘贴链接 / 令牌** | 产品**已有**的功能（`web.auth.paste.label`：「或者粘贴登录链接 / 令牌」）——正是为"拿不到深链"准备的 |
+
+所以 C 的机制 = **两半，都走界面**：
+
+1. `HEYTA_AUTH_JOURNEY=register-link|send-link` + `HEYTA_AUTH_EMAIL=<邮箱>`：
+   头像 → 登录/注册 → 填服务端地址 + 邮箱 → 点「注册新账号」/「发送登录链接」。
+2. `HEYTA_AUTH_JOURNEY=paste-token` + `HEYTA_AUTH_TOKEN=<令牌>`：
+   打开面板 → 把令牌粘进那个输入框 → 点「完成登录」。
+
+⚠️ **令牌由测试侧从库里读**（`users.login_token`，服务端本来就明文存；
+管理接口刻意不吐它）—— 这是 TEST_MODE 语境下的"打开邮件"，不是产品后门。
+
+### 绿的那一次（`auth-journey-2-paste.txt`）
+
+```
+AUTH_JOURNEY=PASTED signedIn=true
+STORAGE=shell
+AUTH_STATE=signed-in
+```
+
+`AUTH_STATE` 是**独立于探针**的那条断言：登录之后重新点开头像、
+菜单里**有退出登录、没有登录入口** ⇒ 才给 `signed-in`。
+
+### ✅ 红也拿到了 —— 同一判据、相反结论
+
+| 输入 | `AUTH_JOURNEY` | 权威判据 |
+|---|---|---|
+| **有效令牌**（`auth-journey-2-paste.txt`） | `panelClosed=true panel=<应用正常界面>` | **`AUTH_STATE=signed-in`** |
+| **坏令牌**（`auth-journey-INJECTION.txt`） | `panel=<「链接无效或已过期，请重新发送一封。」>` | 🔴 **`AUTH_STATE=signed-out`** |
+
+⇒ 判据在"令牌有效 / 无效"两种输入下给出相反结论 —— 这是它能承重的证据。
+（坏令牌那次红得也有信息量：面板**自己说出了**失败原因。）
+
+⚠️ **探针里那个 `panelClosed` 不是判据**：面板在成功与失败两种情况下**都会关掉**，
+所以"`sync-signin-entry` 不见了"是**假阳性**（注入那次它就说成了"成功"）。
+**权威判据只有 `AUTH_STATE`** —— 它由 M2 那条链在事后重新点数菜单 IA 得出。
+
+### 🔴 拿到这条红之前，撞上并修掉了一起**真事故**：dist 在浏览器里根本跑不起来
+
+第一次跑注入时应用**整个不挂载**（`identity:0 / capture:0`），而且**对照实验（不带任何鉴权旅程）
+也一样** —— 说明与鉴权无关。加了 `HEYTA_BOOT_DIAG=1`（把 `error` /
+`unhandledrejection` 记进证据）之后，原因立刻有名有姓：
+
+```
+bootErrors: "ReferenceError: Can't find variable: exports"
+```
+
+链子是这样的：
+
+1. `packages/i18n/src/locales/` 下躺着两份**游离的 CommonJS 文件** `en.js` / `zh-CN.js`
+   （`"use strict"; Object.defineProperty(exports, …)`）—— 是 `tsc` 落下的**残渣**；
+2. 它们**未被 git 跟踪、且被 `.gitignore` 明确忽略**（`packages/i18n/src/locales/*.js`）
+   ⇒ `git status` **看不见它们**，但打包器解析 `./locales/en` 时**选中了 `.js`**
+   （产物注释写着 `// src/locales/en.js`）；
+3. `@heyta/i18n` 的包产物 `dist/index.js` 因此是**混合形态**（开头 ESM、里面内联了 CJS），
+   而 web 打出来的浏览器包里就带着**裸的 `exports`** ⇒ 浏览器里第一跳就抛。
+
+**修法**：删掉那两份残渣 + 重打 `@heyta/i18n` + 重打 `apps/web/dist`。
+验证：裸 `Object.defineProperty(exports` 归 **0**，应用**恢复挂载**。
+
+⚠️ **影响面**：这条打的是**产物**，所以它同时废掉**两个桌面壳**与任何打包产物 ——
+而 `vite dev`（`pnpm verify:web-auth` 用那条）**看不出来**。这也解释了为什么 D 是绿的而壳全挂。
+⚠️ 这是"**被 gitignore 藏起来的构建残渣**"这一类：它不显示在任何 diff 里，却能让产物报废。
+
+### 顺带量到的两件事（都不是缺陷，但会误导人）
+
+1. **TEST_MODE 下注册会自动验证**：`POST /api/register/magic-link` 之后
+   `users.is_verified=1` 且 `verification_token` 已被清 —— 所以"点邮件里的验证链接"这一步
+   在验收里**不需要**（也不要以为它漏了）。
+2. **对不存在的邮箱，"登录链接"是故意静默的**（防枚举）：界面照样说"如果这个邮箱有账号，
+   登录链接已经发出"，而库里**不会有令牌**。第一版探针就是被这条坑到的 ——
+   必须先注册，登录链接才有对象。
+
 ## 如实记边界（别读多）
 
-1. **只验了"壳侧托管"这一半**：`AppApi.openOpLog` / `handleHostMessage` + `heyta-smoke`。
-   **还没做**的是 **WKWebView 的接线**（`WKUserScript` 注入 shim + `WKScriptMessageHandler`
-   转发 + `app` 模式跳过 `open()` + 证据里的 `STORAGE=`）——
-   而它又受一条硬约束：**WKWebView 没有 CDP**，所以"页侧真的选了 shell 后端"这件事
-   不能照搬 Windows 的 Playwright 附着来验（见 handoff §5/§6）。
+1. **`-wal` 还没 checkpoint 回主库**：载荷在 `heyta.sqlite-wal` 里（主库只有 73728 字节的旧内容）。
+   与 Windows 侧同一条边界、同一个原因（进程是被 `pkill` 掉的，没机会跑关闭时的 checkpoint）。
+   `-wal` 是数据库的一部分，结论不受影响；要更强的"主库自带"需要让应用优雅退出后再扫。
+2. **🔴 截图这一格这次**没拿到可用的：`HEYTA_SELF_CAPTURE` 那条路产出的是**空白窗口**
+   （只有标题栏与底部诊断行），而脚本的外部取图（`screencapture -l`）在这台机器上
+   拿不到窗口 id（`swift window-id.swift` 静默返回空）。
+   ⇒ **B/macOS 的判据不依赖截图**：它靠的是上面那两步（页侧自述 + 从壳外读库）。
+   "窗口画出来了"那一格由仓库既有门禁负责 —— 但见下面第 3 条。
+3. **🔴 顺手发现一个真缺陷（不属于本轮改动，但必须记下来）**：
+   `pnpm check:macos-window` **报通过**，而它产出的
+   `apps/desktop-macos/evidence/window-first-run.png`（与 HEAD **逐字节相同**，`6b0c1c5f…`）
+   显示的却是**「找不到共享 UI 产物」的回退屏**。
+   也就是说：那条门禁的"窗口画出来了、且壳里的真应用把身份入口做对了"**没有被那张图证明**。
+   ⚠️ 根因**尚未隔离**（候选：它启动的那次实例没有 `HEYTA_WEB_ROOT`、而 app 包里也没有
+   `web-dist`；或它读到的 M2 说明是**上一轮留下的旧文件**）。
+   本轮的两次实跑是**另起实例 + 显式 `HEYTA_WEB_ROOT`**，那两次真应用确实画出来了
+   （`final-evidence.txt` 里的 M2 说明需要整条探针链成功才写得出）。
 2. **`appendLocal` 的 `args` 是位置参数表**，要套两层（`[[op]]`）。少一层会把单个 op
    当数组用，症状是 `is not iterable` —— 第一版就是这么错的，而这条断言当场抓住了它。
 3. **`markUploaded` 的 `ReadonlyMap` 过不了裸 JSON**，必须有线码；那一格由
