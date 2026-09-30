@@ -25,8 +25,9 @@ import { App } from '../src/App.js';
 import { LocaleHost } from '../src/lib/locale-host.js';
 import { __resetOpLogForTests, initOpLog } from '../src/lib/oplog.js';
 import { buildTimeline, type TimelineEntry } from '@heyta/domain';
-import { GanttChart } from '../src/features/timeline/GanttChart.js';
-import { TimelineView } from '../src/features/timeline/TimelineView.js';
+import { GanttChart, HeytaUiProvider, type GanttChartProps } from '@heyta/ui';
+import { TimelinePanel } from '../src/features/timeline/TimelinePanel.js';
+import { useTimelineLabels } from '../src/features/timeline/labels.js';
 
 let root: Root | undefined;
 let container: HTMLDivElement | undefined;
@@ -48,8 +49,22 @@ function renderElement(node: React.ReactNode): HTMLDivElement {
   return container;
 }
 
-function render(props: Parameters<typeof GanttChart>[0]): HTMLDivElement {
-  return renderElement(<GanttChart {...props} />);
+/**
+ * 🔴 直接渲染**共享** `GanttChart` 要自己补两样：文案（`labels`）与 theme（Provider）。
+ * 文案用**真的** `useTimelineLabels()`，不在测试里抄一份中文字符串 ——
+ * 抄的那份不会跟着词条表变，断言就变成了自证。
+ */
+function GanttHarness(props: Omit<GanttChartProps, 'labels'>): React.JSX.Element {
+  const labels = useTimelineLabels();
+  return (
+    <HeytaUiProvider>
+      <GanttChart {...props} labels={labels.gantt} />
+    </HeytaUiProvider>
+  );
+}
+
+function render(props: Omit<GanttChartProps, 'labels'>): HTMLDivElement {
+  return renderElement(<GanttHarness {...props} />);
 }
 
 afterEach(() => {
@@ -167,9 +182,13 @@ describe('🔴🔴 90 分钟的条必须比 30 分钟的明显宽', () => {
     const long = el.querySelector('[data-testid="gantt-bar-1"]') as HTMLElement;
 
     // 兜底宽度只能是**发丝线**（`border-width.thin` 这个 token）。
-    // 若有人把它换成一个像样的最小宽度，短条会被抬起来，这条测试会红。
-    expect(short.style.minWidth).toBe('var(--ht-border-width-thin)');
-    expect(long.style.minWidth).toBe(short.style.minWidth);
+    // ⚠️ 换装共享组件后 `minWidth` 走 RN 的 StyleSheet（不再内联到 `style`），
+    // 所以判据改成"**计算出来的**最小宽度足够小"（≤ 2px），而不是比对内联字符串 ——
+    // 若有人把它换成一个像样的最小宽度，这里照样会红。
+    const thin = getComputedStyle(short).minWidth;
+    expect(Number.parseFloat(thin === '' ? '0' : thin)).toBeLessThanOrEqual(2);
+    // 静态兜底宽度两条来自同一个 class，必须一致。
+    expect(getComputedStyle(long).minWidth).toBe(thin);
     // 而且两条的宽度确实不同 —— 说明没有一起被下限抬平。
     expect(long.style.width).not.toBe(short.style.width);
   });
@@ -540,12 +559,12 @@ describe('🔴 spanMinutes：多张图对齐到同一个尺度', () => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────
-// 🔴🔴 TimelineView：把 AI 估时接到条上（"AI 自动生成甘特图"真正成立的那一段）
+// 🔴🔴 TimelinePanel：把 AI 估时接到条上（"AI 自动生成甘特图"真正成立的那一段）
 // ─────────────────────────────────────────────────────────────────────────
 
-describe('🔴🔴 TimelineView', () => {
+describe('🔴🔴 TimelinePanel', () => {
   it('没有任务 → 一句人话的空态', () => {
-    const el = renderElement(<TimelineView tasks={[]} />);
+    const el = renderElement(<TimelinePanel tasks={[]} />);
     const empty = el.querySelector('[data-testid="timeline-view-empty"]');
     expect(empty).toBeTruthy();
     expect((empty?.textContent ?? '').length).toBeGreaterThan(10);
@@ -553,7 +572,7 @@ describe('🔴🔴 TimelineView', () => {
 
   it('🔴 每个任务一块（不是全塞进一张图）', () => {
     const el = renderElement(
-      <TimelineView
+      <TimelinePanel
         tasks={[
           { id: 't1', title: '写文案', note: '- [ ] 初稿\n- [ ] 定稿' },
           { id: 't2', title: '做设计' },
@@ -572,7 +591,7 @@ describe('🔴🔴 TimelineView', () => {
   });
 
   it('🔴 没有可排期清单的任务**不静默跳过**，并显式说明', () => {
-    const el = renderElement(<TimelineView tasks={[{ id: 't1', title: '还没拆的任务' }]} />);
+    const el = renderElement(<TimelinePanel tasks={[{ id: 't1', title: '还没拆的任务' }]} />);
     const hint = el.querySelector('[data-testid="timeline-no-checklist-t1"]');
     expect(hint).toBeTruthy();
     expect(hint?.textContent).toContain('还没有可排期的清单');
@@ -583,7 +602,7 @@ describe('🔴🔴 TimelineView', () => {
   it('🔴🔴 验收点：估了 90 分钟的任务，条比估了 30 分钟的**明显宽**', () => {
     // 备注里的那一行就是 `AiDuration` 写进去的格式（`duration-note.ts`）。
     const el = renderElement(
-      <TimelineView
+      <TimelinePanel
         tasks={[
           { id: 'short', title: '写文案', note: '预计耗时：30 分钟' },
           { id: 'long', title: '做设计', note: '预计耗时：90 分钟' },
@@ -616,7 +635,7 @@ describe('🔴🔴 TimelineView', () => {
 
   it('🔴 清单只有 1 条时，整条任务的估时直接落在那一条上', () => {
     const el = renderElement(
-      <TimelineView tasks={[{ id: 't1', title: '上线', note: '- [ ] 全量发布\n预计耗时：90 分钟' }]} />,
+      <TimelinePanel tasks={[{ id: 't1', title: '上线', note: '- [ ] 全量发布\n预计耗时：90 分钟' }]} />,
     );
     expect(el.querySelector('[data-testid="gantt-duration-0"]')?.textContent).toContain(
       '约 1 小时 30 分 · AI 估时',
@@ -626,7 +645,7 @@ describe('🔴🔴 TimelineView', () => {
 
   it('🔴 清单有 N>1 条时，整条任务的估时**不分摊**，并明说摊不了', () => {
     const note = ['- [ ] 甲', '- [ ] 乙', '- [ ] 丙', '预计耗时：90 分钟'].join('\n');
-    const el = renderElement(<TimelineView tasks={[{ id: 't1', title: '多步任务', note }]} />);
+    const el = renderElement(<TimelinePanel tasks={[{ id: 't1', title: '多步任务', note }]} />);
 
     const warning = el.querySelector('[data-testid="timeline-unattributable-t1"]');
     expect(warning).toBeTruthy();
@@ -643,7 +662,7 @@ describe('🔴🔴 TimelineView', () => {
   });
 
   it('🔴 没估过时（undefined）说「未估时」，与"估了 0 分钟"分得开', () => {
-    const never = renderElement(<TimelineView tasks={[{ id: 'a', title: '没估过' }]} />);
+    const never = renderElement(<TimelinePanel tasks={[{ id: 'a', title: '没估过' }]} />);
     expect(never.querySelector('[data-testid="gantt-duration-0"]')?.textContent).toContain(
       '未估时',
     );
@@ -651,7 +670,7 @@ describe('🔴🔴 TimelineView', () => {
 
     // 0 分钟：夹到下限 5 分钟，但仍然算"估过"
     const zero = renderElement(
-      <TimelineView tasks={[{ id: 'b', title: '估了零', note: '预计耗时：0 分钟' }]} />,
+      <TimelinePanel tasks={[{ id: 'b', title: '估了零', note: '预计耗时：0 分钟' }]} />,
     );
     expect(zero.querySelector('[data-testid="timeline-ai-b"]')?.textContent).toContain('0 分钟');
     expect(zero.querySelector('[data-testid="gantt-duration-0"]')?.textContent).toContain(
@@ -660,7 +679,7 @@ describe('🔴🔴 TimelineView', () => {
   });
 
   it('🔴 空标题 / 空备注也不炸', () => {
-    const el = renderElement(<TimelineView tasks={[{ id: 'x', title: '', note: '' }]} />);
+    const el = renderElement(<TimelinePanel tasks={[{ id: 'x', title: '', note: '' }]} />);
     expect(el.querySelector('[data-testid="timeline-block-x"]')).toBeTruthy();
   });
 });
@@ -673,7 +692,7 @@ describe('🔴🔴 TimelineView', () => {
  * 这一组补的是本仓库最高发的失效形状：**能力实现了、单测全绿、生产里零调用点。**
  *
  * 上面所有测试都能在"没人挂载"的情况下全绿 —— 它们只证明组件本身对。
- * 所以这里挂**真的 `App`**（不是单独挂 `TimelineView`），点真的导航按钮。
+ * 所以这里挂**真的 `App`**（不是单独挂 `TimelinePanel`），点真的导航按钮。
  * 一旦有人把 `App.tsx` 里的 `'timeline'` 分支或导航项删掉，这一组立刻红。
  */
 describe('🔴🔴 时间线真的能点到（不是"写好了没人挂载"）', () => {

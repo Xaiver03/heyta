@@ -139,24 +139,24 @@ describe('回收站 store', () => {
 describe('回收站界面', () => {
   it('空回收站显示空状态，不显示列表', () => {
     const el = renderTrash();
-    expect(el.querySelector('[data-testid="trash-empty"]')).not.toBeNull();
-    expect(el.querySelector('[data-testid="trash-list"]')).toBeNull();
+    expect(el.querySelector('[data-testid="trash-board-empty"]')).not.toBeNull();
+    expect(el.querySelector('[data-testid="trash-board-list"]')).toBeNull();
   });
 
   it('显示已删除条目与恢复按钮', async () => {
     const id = await seedTrashed('写文档');
     const el = renderTrash();
 
-    expect(el.querySelector(`[data-testid="trash-item-${id}"]`)).not.toBeNull();
+    expect(el.querySelector(`[data-testid="trash-board-restore-${id}"]`)).not.toBeNull();
     expect(el.textContent).toContain('写文档');
-    expect(el.querySelector(`[data-testid="trash-restore-${id}"]`)).not.toBeNull();
+    expect(el.querySelector(`[data-testid="trash-board-restore-${id}"]`)).not.toBeNull();
   });
 
   it('点恢复按钮：条目离开回收站（真的恢复了）', async () => {
     const id = await seedTrashed('写文档');
     const el = renderTrash();
 
-    click(el.querySelector(`[data-testid="trash-restore-${id}"]`));
+    click(el.querySelector(`[data-testid="trash-board-restore-${id}"]`));
     await waitFor(() => selectTrashedTasks(useTaskStore.getState()).length === 0);
 
     expect(selectTrashedTasks(useTaskStore.getState())).toHaveLength(0);
@@ -167,7 +167,7 @@ describe('回收站界面', () => {
     const id = await seedTrashed('写文档');
     const el = renderTrash();
 
-    click(el.querySelector(`[data-testid="trash-purge-${id}"]`));
+    click(el.querySelector(`[data-testid="trash-board-purge-${id}"]`));
 
     expect(el.querySelector('[data-testid="trash-confirm"]')).not.toBeNull();
     // 还没删 —— 这才是"二次确认"的重点
@@ -183,7 +183,7 @@ describe('回收站界面', () => {
     const id = await seedTrashed('写文档');
     const el = renderTrash();
 
-    click(el.querySelector(`[data-testid="trash-purge-${id}"]`));
+    click(el.querySelector(`[data-testid="trash-board-purge-${id}"]`));
     click(el.querySelector('[data-testid="trash-confirm-submit"]'));
     await waitFor(
       () => useTaskStore.getState().entities.tasks[id]?.purgedAt !== undefined,
