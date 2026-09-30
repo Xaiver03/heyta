@@ -12,7 +12,7 @@
  */
 
 import { execFileSync, spawnSync } from 'node:child_process';
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -53,7 +53,46 @@ if (!existsSync(BUNDLE)) {
   process.exit(1);
 }
 
-// ② 无头冒烟。**继承 stdio**，让每条断言直接出现在门禁输出里。
+// ② 同步设计系统 token 生成物（G3）。
+//
+// 🔴 为什么门禁要负责同步：`Sources/HeytaMac/Generated/HeytaTokens.swift`
+// 是**派生物**（已 gitignore），从 `tokens.css` 的产物复制而来。
+// 让门禁来同步 ⇒ 干净检出也能构建 UI 目标。
+//
+// ⚠️ **"真源一致性"不在这里验** —— 那是 `check:tokens`
+// （`design-system` 的 `generate:check`）的职责，它比对的是**入库的**生成物
+// 与 `tokens.css`。这里若也去比对本机那份派生物，只会得到
+// "报一句 ❌ 然后自己覆盖掉、最后 exit 0" 这种**看着在跑其实没验**的形状
+// （本门禁第一版就是那样，被反假通过当场抓出来）。
+const tokens = spawnSync('bash', [join(PACKAGE_DIR, 'scripts/sync-tokens.sh')], {
+  stdio: 'inherit',
+  cwd: ROOT,
+});
+if (tokens.error || tokens.status !== 0) {
+  console.error('❌ 同步设计系统 token 生成物失败');
+  process.exit(tokens.status ?? 1);
+}
+
+// ②b 🔴 **断言壳真的在消费 token，而不是又写回了裸值。**
+//
+// 这是 G3 的实质判据：`HeytaTokens.swift` 生成出来**没人用**，
+// 和它不存在是一回事（那正是本轮之前的状态 —— 生成 19,331 B、0 消费者）。
+// 所以这里数**消费点**，不数"文件在不在"。
+// ⚠️ 门槛设得低（≥5）是故意的：它防的是"整片写回裸值"，
+//    不是防"少用了两个 token"。设高了会变成一动就红的假门禁。
+const UI_SOURCE = join(PACKAGE_DIR, 'Sources/HeytaMac/HeytaMacApp.swift');
+const TOKEN_USAGES = ['space1', 'space2', 'space3', 'space6', 'fontSize3xl', 'fontSizeSm', 'fontSizeXs'];
+const uiSrc = readFileSync(UI_SOURCE, 'utf8');
+const used = TOKEN_USAGES.filter((name) => uiSrc.includes(`HeytaTokens.Light.${name}`));
+if (used.length < 5) {
+  console.error('❌ macOS 壳没有在消费设计系统生成物 —— 那是 P4（设计变量单源）的违约。');
+  console.error(`   期望至少 5 个 \`HeytaTokens.Light.*\` 消费点，实际命中 ${used.length} 个（${used.join(', ') || '无'}）。`);
+  console.error('   ⇒ 别把尺寸/字号写回裸值；改用生成物，见 apps/desktop-macos/scripts/sync-tokens.sh。');
+  process.exit(1);
+}
+console.log(`✅ macOS 壳消费设计系统生成物：命中 ${used.length}/${TOKEN_USAGES.length} 个断言项。`);
+
+// ③ 无头冒烟。**继承 stdio**，让每条断言直接出现在门禁输出里。
 const smoke = spawnSync('swift', ['run', 'heyta-smoke'], {
   stdio: 'inherit',
   cwd: PACKAGE_DIR,
