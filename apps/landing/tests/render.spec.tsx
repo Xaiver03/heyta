@@ -21,123 +21,31 @@
  * "应用 → 站点"那一半（`apps/web` 里的链接，渲染在另一个 app 里）。
  * 这里管的是"站点内部不自成孤岛"，那条脚本管的是"两个产品不是一个孤岛"。
  *
- * 🔴 **刻意不挂载 WebGL 那一节。**
- * 做法是把 `IntersectionObserver` 换成一个**永不触发**的桩：
- * `<Deferred>` 因此一直不 mount，`SyncScene` 那个 lazy chunk 也就不会被导入。
- * 理由是 jsdom 没有 WebGL，`three` 会抛 "Error creating WebGL context" ——
+ * 🔴 **渲染脚手架不住在本文件**，在 `helpers/render-page.tsx` —— 因为
+ * `public-copy-register.spec.tsx`（公页语域门禁）要跑同一套脚手架。那套东西的
+ * 每一处细节都是踩出来的（重复 `#main`、jsdom 缺 `ResizeObserver`、env 桩没清），
+ * 抄第二份就会有一份过期，而"门禁看起来在跑、跑的却是过期脚手架"是最难查的红。
+ *
+ * 🔴 **刻意不挂载 WebGL 那一节**（由 helper 里那个永不触发的 `IntersectionObserver`
+ * 保证）：jsdom 没有 WebGL，`three` 会抛 "Error creating WebGL context" ——
  * 那是**测试环境**的限制，不是产品缺陷。让它在 jsdom 里"通过"只能靠把
  * WebGL 整个 mock 掉，那种测试验证的是 mock，不是代码。
  * 所以 3D 那一节的验证方式是构建产物 + 真实浏览器。
  */
 
 import { act } from 'react';
-import { createRoot, type Root } from 'react-dom/client';
-import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
-import { I18nProvider } from '@heyta/i18n';
-
-import { PAGE_COMPONENTS } from '../src/pages/index.js';
-import { pageById, SITE_PAGES, type SitePageId } from '../src/site/pages.js';
 import { pageFromPath } from '../src/site/paths.js';
-import { SiteLayout } from '../src/site/SiteLayout.js';
+import { SITE_PAGES } from '../src/site/pages.js';
+import {
+  cleanupPage,
+  installPageRenderer,
+  internalHrefs,
+  renderPage,
+} from './helpers/render-page.js';
 
-/** 永不触发的 IntersectionObserver：让 `Deferred` 保持未挂载。 */
-class NeverIntersectingObserver implements IntersectionObserver {
-  readonly root: Element | Document | null = null;
-  readonly rootMargin: string = '0px';
-  readonly thresholds: readonly number[] = [0];
-  observe(): void {}
-  unobserve(): void {}
-  disconnect(): void {}
-  takeRecords(): IntersectionObserverEntry[] {
-    return [];
-  }
-}
-
-/**
- * 空实现的 ResizeObserver。
- *
- * jsdom **不实现** `ResizeObserver`（它不是 jsdom 覆盖的那部分规范），
- * 而 `mockup/AppWindow.tsx` 用它算缩放比 —— 真实浏览器都有，所以这是
- * **测试环境的缺口**，不是产品缺陷。补一个空实现，让 effect 能跑完。
- */
-class NoopResizeObserver implements ResizeObserver {
-  observe(): void {}
-  unobserve(): void {}
-  disconnect(): void {}
-}
-
-let container: HTMLDivElement | null = null;
-let root: Root | null = null;
-
-beforeAll(() => {
-  // 让 React 认为处在 act 环境里，否则会打印"not wrapped in act"警告
-  (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
-  globalThis.IntersectionObserver =
-    NeverIntersectingObserver as unknown as typeof IntersectionObserver;
-  globalThis.ResizeObserver = NoopResizeObserver as unknown as typeof ResizeObserver;
-});
-
-/** 卸载并移除当前容器。**幂等** —— 已经是干净状态时什么都不做。 */
-function cleanupPage(): void {
-  if (root !== null) {
-    act(() => {
-      root?.unmount();
-    });
-    root = null;
-  }
-  container?.remove();
-  container = null;
-}
-
-afterEach(() => {
-  // 有用例会把 `VITE_APP_URL` 设成"应用已部署"的状态。不清掉的话，
-  // 后面所有用例都会在一个"应用存在"的页面上跑 —— 而那正是默认状态不该有的样子。
-  vi.unstubAllEnvs();
-  cleanupPage();
-});
-
-/**
- * 渲染**一整页**（外壳 + 正文），与 `main.tsx` 的分派走同一条路。
- *
- * 走 `PAGE_COMPONENTS` 而不是直接渲染页面组件是刻意的：这样"注册表里有、
- * 映射表里没有"会在测试里表现成渲染失败，而不是另一个只在线上出现的空白页。
- */
-function renderPage(pageId: SitePageId): HTMLDivElement {
-  // 🔴 先清掉上一棵（同一个用例里可能连渲染多页）。
-  //
-  // 不这么做就会**在一个 document 里留下多个 `id="main"`**，而 jsdom 的
-  // id 选择器（nwsapi）在文档里有重复 id 时会返回"第一个匹配、但不是本作用域
-  // 内的"那个元素 —— 于是 `view.querySelector('#main')` 返回 `null`，
-  // 而 `view.querySelectorAll('[id]')` 明明列得出它。
-  // 那种失败看起来像**产品少了那一节**，实际是测试脚手架自己造成的。
-  // 所以"同一时刻只有一个容器"是这套用例的硬前提，由这一步保证，
-  // 而不是靠每个用例自觉。
-  cleanupPage();
-
-  const page = pageById(pageId);
-  const Page = PAGE_COMPONENTS[page.id];
-  container = document.createElement('div');
-  document.body.appendChild(container);
-  root = createRoot(container);
-  act(() => {
-    root?.render(
-      <I18nProvider locale="zh-CN">
-        <SiteLayout page={page}>
-          <Page page={page} />
-        </SiteLayout>
-      </I18nProvider>,
-    );
-  });
-  return container;
-}
-
-/** 站内链接（以 `/` 开头的相对地址）。锚点与外链都不算。 */
-function internalHrefs(view: HTMLElement): string[] {
-  return [...view.querySelectorAll<HTMLAnchorElement>('a[href]')]
-    .map((anchor) => anchor.getAttribute('href') ?? '')
-    .filter((href) => href.startsWith('/'));
-}
+installPageRenderer();
 
 /**
  * 全部页面 —— 每一个用例都跑一遍。
@@ -310,17 +218,15 @@ describe('富文本：`**粗**` 与反引号不能被原样显示', () => {
     expect(view.textContent ?? '').not.toContain('**');
   });
 
-  it('首页之后的功能页有粗体；全部公页都不得再出现「验证方式」命令行', () => {
+  it('首页之后的功能页有粗体', () => {
     const features = renderPage('features');
     expect(features.querySelectorAll('strong').length).toBeGreaterThan(0);
-
-    // 🔴 2026-09-29：`pnpm …` 命令与仓库路径从公页退役（那是贡献者语言，
-    // 对用户就是内部黑话）。这是**负断言**，钉住"不再回来"——
-    // 谁把 `.lp-evidence` 的渲染加回去，这里就红。
-    // 缘由与后续管法见 `scripts/check-claims.mjs` 的文件头。
-    for (const pageId of ALL_PAGE_IDS) {
-      expect(renderPage(pageId).querySelectorAll('.lp-evidence').length).toBe(0);
-    }
+    // 🔴 这里**曾经**还有一条"公页不许出现 `pnpm …` 命令与仓库路径"的负断言，
+    // 但它数的是 `.lp-evidence` 这个**类名** —— 而 2026-09-30 实际漏出去的
+    // 那段贡献者语言（自建区的终端命令块 + Prisma 迁移警告）用的是别的类名，
+    // 于是它一路绿灯。判据钉在类名上 = 改个类名就能绕过，而文案门禁要管的是
+    // **用户读到的那串字**。该意图现在住在 `public-copy-register.spec.tsx`
+    // （按每一页 × 每一语言渲染出的真实 textContent 执法），这里不再留第二份。
   });
 });
 
