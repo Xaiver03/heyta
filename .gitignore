@@ -120,3 +120,36 @@ apps/mobile/harmony/**/oh_modules/
 # 原生壳共用的 TS 门面产物（构建产物）
 # 生成：node packages/app-host/scripts/build-native-bridge.mjs
 packages/app-host/bridge-bundle/
+
+#
+# 🔴 个人证件与联系方式：仓库计划转公开，这类值**一行都不许进仓库**。
+#
+# 备案与运营后台需要逐字使用的身份证号、手机号、本人邮箱、管理员账号邮箱。
+# 文档要写清「每一栏填什么、为什么这么填」，但那些栏位的**值**属于本人，
+# 一旦提交就永久留在 git 历史里（删掉文件也删不掉历史）。
+# 所以约定：文档里只留结构与占位引用，真实值放在同目录的 `*.local.md`。
+#
+# ⚠️ 忽略规则不会让**已跟踪**的文件消失，这条只防未来。
+# `docs/operations/icp-app-filing.md` 在 HEAD 里已经带有一份证件号与手机号，
+# 那一份要处理得靠历史重写，是独立决定 —— 不要以为加了这条就已经解决。
+*.local.md
+
+#
+# 🔴 指向仓库外的 skill 符号链接：不进仓库。
+#
+# `.agents/skills/*` 里有些是指向 `../../../ssos/…`（**另一个项目**）的软链。
+# 提交进去对任何克隆者都是死链，而且还把另一个项目的目录结构写进了本仓库。
+# ⚠️ `cac-algorithm-filing` 是早先已跟踪的同形状软链，这条规则对它**无效**
+#    （忽略规则不影响已跟踪文件）；要清掉它需要显式 `git rm --cached`。
+.agents/skills/huawei-agc
+.agents/skills/tencent-cloud-icp-app-filing
+
+#
+# 🔴 i18n 多入口构建漏在 `src/` 里的编译产物。
+#
+# `packages/i18n/tsup.config.ts` 的 entry 含 `src/locales/zh-CN.ts` 与 `en.ts`，
+# 而产物路径由**相对 src/ 的目录结构**决定 —— 于是 `src/locales/` 底下长出两份
+# CommonJS `.js`（实测合计约 400 KB），顶部就是 `"use strict"`。
+# 它们不是源码：真正的多入口产物在 `dist/locales/`（已被上面的 `dist/` 兜住）。
+# 两份表同时在仓库里出现副本的后果是"改了 .ts 忘了 .js"，而那**没有任何门禁看得见**。
+packages/i18n/src/locales/*.js
