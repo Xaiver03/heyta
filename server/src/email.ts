@@ -1,6 +1,14 @@
 import * as nodemailer from 'nodemailer';
 import { Logger } from './logger';
-import { DEFAULT_SMTP_FROM, loadConfigFromEnv, PRODUCT_NAME } from './config';
+import { DEFAULT_SMTP_FROM, loadConfigFromEnv } from './config';
+import {
+  DEFAULT_SERVER_LOCALE,
+  renderEmail,
+  renderEmailText,
+  t,
+  type EmailContent,
+} from './design-html.js';
+import type { ServerCopyKey, ServerLocale } from './copy.generated.js';
 
 let transporter: nodemailer.Transporter | null = null;
 
@@ -45,165 +53,134 @@ const getTransporter = async (): Promise<nodemailer.Transporter> => {
   return transporter;
 };
 
-export const sendVerificationEmail = async (
-  to: string,
-  token: string,
-): Promise<boolean> => {
+/** 测试用：丢掉缓存的 transporter（改了 SMTP 配置之后必须重建）。 */
+export const __resetMailTransporterForTests = (): void => {
+  transporter = null;
+};
+
+/**
+ * 把语言写进链接。
+ *
+ * 🔴 **为什么值得单独做这件事**：邮件是**为收件人**渲染的，而收件人点开链接时
+ * 用的浏览器语言未必等于他注册时用的语言（在英文系统里注册的中文用户就是典型）。
+ * 语言随链接一起走，收件人看到的就是**发信那一刻**他该看到的语言。
+ */
+const withLocale = (link: string, locale: ServerLocale): string => {
+  const separator = link.includes('?') ? '&' : '?';
+  return `${link}${separator}lang=${locale}`;
+};
+
+/** 三封邮件共用的发送流程：渲染 → 发信 → 记日志（含 Ethereal 预览地址）。 */
+async function deliver(options: {
+  to: string;
+  locale: ServerLocale;
+  subjectKey: ServerCopyKey;
+  content: Omit<EmailContent, 'title'>;
+  logLabel: string;
+}): Promise<boolean> {
   try {
     const mailTransporter = await getTransporter();
     const config = loadConfigFromEnv();
     const from = config.smtp?.from || DEFAULT_SMTP_FROM;
+    const { locale } = options;
 
-    const verificationLink = `${config.publicUrl}/verify-email?token=${token}`;
+    const subject = t(locale, options.subjectKey);
+    const content: EmailContent = { ...options.content, title: subject };
 
     const info = await mailTransporter.sendMail({
       from,
-      to,
-      subject: `Verify your ${PRODUCT_NAME} account`,
-      text:
-        `Please verify your account by clicking the following link: ${verificationLink}\n\n` +
-        `If clicking the link doesn't work, copy and paste it into your browser.`,
-      html: `
-        <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto;">
-          <h2>Welcome to ${PRODUCT_NAME}!</h2>
-          <p>Please verify your account by clicking the button below:</p>
-          <a
-            href="${verificationLink}"
-            style="display: inline-block; padding: 10px 20px; background-color: #3b82f6; color: white; text-decoration: none; border-radius: 5px;"
-          >
-            Verify Email
-          </a>
-          <p style="margin-top: 20px; font-size: 12px; color: #666;">
-            If the button doesn't work, copy and paste this link into your browser:
-          </p>
-          <p style="font-size: 12px; color: #666;">${verificationLink}</p>
-        </div>
-      `,
+      to: options.to,
+      subject,
+      text: renderEmailText(locale, content),
+      html: renderEmail(locale, content),
     });
 
-    Logger.info(`Verification email sent: ${info.messageId}`);
+    Logger.info(`${options.logLabel} sent [${locale}]: ${info.messageId}`);
 
     // If using Ethereal, log the preview URL
-    if (nodemailer.getTestMessageUrl(info)) {
-      Logger.info(`Preview URL: ${nodemailer.getTestMessageUrl(info)}`);
+    const preview = nodemailer.getTestMessageUrl(info);
+    if (preview) {
+      Logger.info(`Preview URL: ${preview}`);
     }
 
     return true;
   } catch (err) {
-    Logger.error('Failed to send verification email:', err);
+    Logger.error(`Failed to send ${options.logLabel}:`, err);
     return false;
   }
+}
+
+/**
+ * 验证邮件。
+ *
+ * `locale` 由调用方（注册接口）传入 —— 取不到时**默认中文**，
+ * 与 `resolveLocale()` 的兜底一致。
+ */
+export const sendVerificationEmail = async (
+  to: string,
+  token: string,
+  locale: ServerLocale = DEFAULT_SERVER_LOCALE,
+): Promise<boolean> => {
+  const config = loadConfigFromEnv();
+  const url = withLocale(`${config.publicUrl}/verify-email?token=${token}`, locale);
+
+  return deliver({
+    to,
+    locale,
+    subjectKey: 'server.email.verify.subject',
+    logLabel: 'Verification email',
+    content: {
+      heading: t(locale, 'server.email.verify.title'),
+      body: t(locale, 'server.email.verify.body'),
+      buttonLabel: t(locale, 'server.email.verify.button'),
+      url,
+      note: t(locale, 'server.email.verify.expiry'),
+    },
+  });
 };
 
 export const sendPasskeyRecoveryEmail = async (
   to: string,
   token: string,
+  locale: ServerLocale = DEFAULT_SERVER_LOCALE,
 ): Promise<boolean> => {
-  try {
-    const mailTransporter = await getTransporter();
-    const config = loadConfigFromEnv();
-    const from = config.smtp?.from || DEFAULT_SMTP_FROM;
+  const config = loadConfigFromEnv();
+  const url = withLocale(`${config.publicUrl}/recover-passkey?token=${token}`, locale);
 
-    const recoveryLink = `${config.publicUrl}/recover-passkey?token=${token}`;
-
-    const info = await mailTransporter.sendMail({
-      from,
-      to,
-      subject: `Recover your ${PRODUCT_NAME} passkey`,
-      text:
-        `You requested to recover your passkey. Click the following link to register a new passkey: ${recoveryLink}\n\n` +
-        `If you did not request this, please ignore this email.\n\n` +
-        `This link will expire in 1 hour.`,
-      html: `
-        <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto;">
-          <h2>Passkey Recovery Request</h2>
-          <p>You requested to recover your passkey. Click the button below to register a new passkey:</p>
-          <a
-            href="${recoveryLink}"
-            style="display: inline-block; padding: 10px 20px; background-color: #3b82f6; color: white; text-decoration: none; border-radius: 5px;"
-          >
-            Register New Passkey
-          </a>
-          <p style="margin-top: 20px; font-size: 12px; color: #666;">
-            If you did not request this, please ignore this email.
-          </p>
-          <p style="font-size: 12px; color: #666;">
-            This link will expire in 1 hour.
-          </p>
-          <p style="margin-top: 20px; font-size: 12px; color: #666;">
-            If the button doesn't work, copy and paste this link into your browser:
-          </p>
-          <p style="font-size: 12px; color: #666;">${recoveryLink}</p>
-        </div>
-      `,
-    });
-
-    Logger.info(`Passkey recovery email sent: ${info.messageId}`);
-
-    // If using Ethereal, log the preview URL
-    if (nodemailer.getTestMessageUrl(info)) {
-      Logger.info(`Preview URL: ${nodemailer.getTestMessageUrl(info)}`);
-    }
-
-    return true;
-  } catch (err) {
-    Logger.error('Failed to send passkey recovery email:', err);
-    return false;
-  }
+  return deliver({
+    to,
+    locale,
+    subjectKey: 'server.email.recover.subject',
+    logLabel: 'Passkey recovery email',
+    content: {
+      heading: t(locale, 'server.email.recover.title'),
+      body: t(locale, 'server.email.recover.body'),
+      buttonLabel: t(locale, 'server.email.recover.button'),
+      url,
+      note: `${t(locale, 'server.email.recover.ignore')}\n${t(locale, 'server.email.recover.expiry')}`,
+    },
+  });
 };
 
 export const sendLoginMagicLinkEmail = async (
   to: string,
   token: string,
+  locale: ServerLocale = DEFAULT_SERVER_LOCALE,
 ): Promise<boolean> => {
-  try {
-    const mailTransporter = await getTransporter();
-    const config = loadConfigFromEnv();
-    const from = config.smtp?.from || DEFAULT_SMTP_FROM;
+  const config = loadConfigFromEnv();
+  const url = withLocale(`${config.publicUrl}/magic-login?token=${token}`, locale);
 
-    const loginLink = `${config.publicUrl}/magic-login?token=${token}`;
-
-    const info = await mailTransporter.sendMail({
-      from,
-      to,
-      subject: `Your ${PRODUCT_NAME} login link`,
-      text:
-        `Click the following link to log in to ${PRODUCT_NAME}: ${loginLink}\n\n` +
-        `If you did not request this, please ignore this email.\n\n` +
-        `This link will expire in 15 minutes.`,
-      html: `
-        <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto;">
-          <h2>Login to ${PRODUCT_NAME}</h2>
-          <p>Click the button below to log in:</p>
-          <a
-            href="${loginLink}"
-            style="display: inline-block; padding: 10px 20px; background-color: #3b82f6; color: white; text-decoration: none; border-radius: 5px;"
-          >
-            Log In
-          </a>
-          <p style="margin-top: 20px; font-size: 12px; color: #666;">
-            If you did not request this, please ignore this email.
-          </p>
-          <p style="font-size: 12px; color: #666;">
-            This link will expire in 15 minutes.
-          </p>
-          <p style="margin-top: 20px; font-size: 12px; color: #666;">
-            If the button doesn't work, copy and paste this link into your browser:
-          </p>
-          <p style="font-size: 12px; color: #666;">${loginLink}</p>
-        </div>
-      `,
-    });
-
-    Logger.info(`Magic link login email sent: ${info.messageId}`);
-
-    if (nodemailer.getTestMessageUrl(info)) {
-      Logger.info(`Preview URL: ${nodemailer.getTestMessageUrl(info)}`);
-    }
-
-    return true;
-  } catch (err) {
-    Logger.error('Failed to send magic link login email:', err);
-    return false;
-  }
+  return deliver({
+    to,
+    locale,
+    subjectKey: 'server.email.login.subject',
+    logLabel: 'Magic link login email',
+    content: {
+      heading: t(locale, 'server.email.login.title'),
+      body: t(locale, 'server.email.login.body'),
+      buttonLabel: t(locale, 'server.email.login.button'),
+      url,
+      note: `${t(locale, 'server.email.login.ignore')}\n${t(locale, 'server.email.login.expiry')}`,
+    },
+  });
 };

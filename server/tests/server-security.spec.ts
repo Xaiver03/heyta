@@ -364,7 +364,8 @@ describe('Email Verification Page', () => {
     // The response should only be sent after verifyEmail completes
     expect(response.statusCode).toBe(200);
     expect(verifyEmailCompleted).toBe(true);
-    expect(response.body).toContain('Email Verified');
+    // 🔴 文案是**中文**（默认语言），见 server/src/design-html.ts 的 resolveLocale。
+    expect(response.body).toContain('邮箱验证成功');
   });
 
   it('should handle verification errors properly', async () => {
@@ -384,7 +385,12 @@ describe('Email Verification Page', () => {
     });
 
     expect(response.statusCode).toBe(400);
-    expect(response.body).toContain('Verification failed');
+    expect(response.body).toContain('验证失败');
+    // 🔴 加强：**不许**把服务端的原始错误回显给用户。
+    //    第一版把 `errorMessage(err)` 直接拼进页面 —— 等于把内部字符串
+    //    （令牌无效的具体原因、库的错误文案）渲染给任何点到过期链接的人看。
+    //    用户需要知道的只有"这个链接不好使了"。
+    expect(response.body).not.toContain('Invalid verification token');
   });
 
   it('should return 400 when token is missing', async () => {
@@ -400,7 +406,9 @@ describe('Email Verification Page', () => {
     });
 
     expect(response.statusCode).toBe(400);
-    expect(response.body).toBe('Token is required');
+    // 缺令牌时给的是一张**本地化的页面**，不再是那句英文纯文本。
+    expect(response.body).toContain('缺少必要的令牌');
+    expect(response.body).not.toBe('Token is required');
   });
 });
 
