@@ -33,6 +33,8 @@ import {
   resetWsConnectionService,
 } from './sync/services/websocket-connection.service';
 import { testRoutes } from './test-routes';
+import { activityRoutes } from './activity/activity.routes';
+import { adminRoutes } from './admin/admin.routes';
 
 // HTML escape to prevent XSS in generated HTML
 export const escapeHtml = (unsafe: string): string => {
@@ -550,6 +552,22 @@ export const createServer = (
 
       // WebSocket routes for real-time sync notifications
       await fastifyServer.register(wsRoutes, { prefix: '/api/sync' });
+
+      // 通知中心 + 活动（福利中心）。
+      //
+      // 🔴 与计费闸门**无关**，所以它既不带 entitlement guard，也不受
+      //    `entitlements.enabled` 影响：到期用户照样要能看到
+      //    "有人用我的邀请码激活了" —— 那是他的账号事实，不是付费能力。
+      //    把通知也放到闸门后面，会让一个到期的人连"我为什么被降级"都看不到。
+      await fastifyServer.register(activityRoutes, { prefix: '/api' });
+
+      // 运营管理后台（ADR-0038）。**默认没有人是管理员**（`users.is_admin` 默认
+      // false），所以这个前缀对所有人都是 403，直到有人跑过
+      // `pnpm --filter @heyta/server admin:grant <email>`。
+      //
+      // 🔴 闸门在插件内部（`admin.routes.ts` 的 `addHook('preHandler', requireAdmin)`），
+      //    不是在这里 —— 这样"新增一条 admin 路由忘了加鉴权"是不可能的。
+      await fastifyServer.register(adminRoutes, { prefix: '/api/admin' });
 
       // Test Routes (only in test mode)
       if (fullConfig.testMode?.enabled) {
