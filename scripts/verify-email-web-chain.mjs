@@ -59,9 +59,25 @@ const EVIDENCE = join(ROOT, 'apps/web/evidence/email-chain');
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 let failed = false;
-function check(ok, what) {
+/**
+ * 🔴 **两类判据，必须分开点名**（2026-09-30 加）。
+ *
+ * `outcome`：**用户能不能用** —— 点了邮件里的链接，应用是不是真的登录了。
+ * `structure`：**这份实现靠什么成立** —— 会话是不是走的那条不依赖响应头配置的通道。
+ *
+ * 为什么要分：`HEYTA_WEB_CHAIN_LEGACY_STORAGE=1 HEYTA_WEB_CHAIN_STRIP_COOP=1`
+ * 那一轮里**用户结果是好的**（会话经 sessionStorage 到了），但"不依赖头配置"这条
+ * 已经不成立 ⇒ 整轮红。那时若总结只说一句"全链路未通过"，读的人会以为产品坏了 ——
+ * 而真正坏的是**保证**。把两类分开点名，红才有信息量。
+ */
+const failures = { outcome: [], structure: [] };
+
+function check(ok, what, kind = 'outcome') {
   console.log(`  ${ok ? '✅' : '❌'} ${what}`);
-  if (!ok) failed = true;
+  if (!ok) {
+    failed = true;
+    failures[kind].push(what);
+  }
 }
 function bail(why, extra = '') {
   console.error(`\n❌ ${why}`);
@@ -122,13 +138,106 @@ const toApi = (path) =>
   path.startsWith('/recover-passkey') ||
   path === '/magic-login-confirm.js';
 
+/**
+ * 🔴 **注入开关：把控制"文档所属 agent cluster"的两个头从 API 响应里摘掉。**
+ *
+ * 判据红在这一格，那就必须能**因注入转绿** —— 否则我证不出"红是因为它"。
+ * `Cross-Origin-Opener-Policy: same-origin` + `Origin-Agent-Cluster: ?1` 都来自
+ * `@fastify/helmet` 的默认值，只在 API 渲染的页面上出现；应用（dist）那边没有。
+ */
+const STRIP_COOP = process.env.HEYTA_WEB_CHAIN_STRIP_COOP === '1';
+
+/**
+ * 🔴 **第二个注入：把确认页的 fragment 投递摘掉**（`location.replace('/app/#…')` → `'/app/'`）。
+ *
+ * 它证明的是"那两格判据**是活的**"：判据绿了之后，必须还能因**撤销修复**而转红 ——
+ * 否则我证不出它守的是这个修复，只能证明它今天恰好是绿的。
+ *
+ * 这一次改的是**服务端真正发出去的那份脚本**（在反代里改响应体），
+ * 所以走的还是"确认页 → 应用"那条真实路径，不是判据里的假设。
+ */
+const DROP_FRAGMENT = process.env.HEYTA_WEB_CHAIN_DROP_FRAGMENT === '1';
+
+/**
+ * 🔴 **第三个注入：把服务端脚本还原成修复前的 `sessionStorage` 投递。**
+ *
+ * 它让"根因"变成一份**可复现的证据**，而不是一段转述：
+ *
+ * ```
+ *                                       带 COOP/OAC      摘掉 COOP/OAC
+ *   sessionStorage 投递（修复前）         RED  ← 原来的 bug     GREEN
+ *   fragment 投递（修复后）               GREEN              GREEN
+ * ```
+ *
+ * 左上那格红、右上那格绿 ⇒ **"丢"是那两个头造成的**（因果），
+ * 左下那格绿 ⇒ **修法本身成立**，右下那格绿 ⇒ 修法不依赖那两个头的存在。
+ *
+ * 不做这一格的话，半年后有人"顺手把它简化回 sessionStorage"，
+ * 只会看到端到端红了，却再也看不到**为什么** —— 而那个原因非常反直觉。
+ */
+const LEGACY_STORAGE = process.env.HEYTA_WEB_CHAIN_LEGACY_STORAGE === '1';
+
+/**
+ * 反代里对**真正发出去的那份确认页脚本**做的改写。
+ *
+ * 🔴 在反代改而不是改仓库里的文件：注入必须能"撤销修复"却**不许污染工作区** ——
+ * 否则跑完注入就留下一个改坏了的源文件，而那种残留极难被发现。
+ */
+function rewriteConfirmScript(src) {
+  let out = src;
+  const apply = (needle, replacement, label) => {
+    if (!out.includes(needle)) {
+      /**
+       * 🔴 **静默失配是这里最危险的失败模式**：改写没匹配上 ⇒ 注入其实没生效
+       * ⇒ 这一轮仍然全绿 ⇒ 而我却会把它当成"注入证明了判据是活的"。
+       * 那是一条**假证据**。所以失配必须当场炸，不能往下跑。
+       */
+      throw new Error(`注入 ${label} 没匹配上 —— 服务端脚本变了，注入需要同步更新`);
+    }
+    out = out.replace(needle, replacement);
+  };
+
+  if (DROP_FRAGMENT) {
+    apply("'/app/#' + params.toString()", "'/app/'", 'DROP_FRAGMENT');
+  }
+  if (LEGACY_STORAGE) {
+    apply(
+      "window.location.replace('/app/#' + params.toString());",
+      [
+        "sessionStorage.setItem('sessionToken', params.get('sessionToken'));",
+        "sessionStorage.setItem('loginEmail', params.get('loginEmail'));",
+        "sessionStorage.setItem('loginBaseUrl', params.get('loginBaseUrl'));",
+        "window.location.href = '/app/';",
+      ].join('\n          '),
+      'LEGACY_STORAGE',
+    );
+  }
+  return out;
+}
+
 const web = createServer((req, res) => {
   const url = new URL(req.url ?? '/', WEB);
   if (toApi(url.pathname)) {
     const proxied = httpRequest(
       { host: '127.0.0.1', port: API_PORT, path: req.url, method: req.method, headers: req.headers },
       (upstream) => {
-        res.writeHead(upstream.statusCode ?? 502, upstream.headers);
+        const headers = { ...upstream.headers };
+        if (STRIP_COOP) {
+          delete headers['cross-origin-opener-policy'];
+          delete headers['origin-agent-cluster'];
+        }
+        if ((DROP_FRAGMENT || LEGACY_STORAGE) && url.pathname === '/magic-login-confirm.js') {
+          const chunks = [];
+          upstream.on('data', (c) => chunks.push(c));
+          upstream.on('end', () => {
+            const patched = rewriteConfirmScript(Buffer.concat(chunks).toString('utf8'));
+            headers['content-length'] = String(Buffer.byteLength(patched));
+            res.writeHead(upstream.statusCode ?? 502, headers);
+            res.end(patched);
+          });
+          return;
+        }
+        res.writeHead(upstream.statusCode ?? 502, headers);
         upstream.pipe(res);
       },
     );
@@ -186,6 +295,84 @@ const consoleLines = [];
  * 这一格不装，症状就只剩"没登上"。
  */
 await page.addInitScript(() => {
+  /**
+   * 🔴 **记录"每个文档启动那一刻"的存储快照**。
+   *
+   * `addInitScript` 在**每个文档的最开始**执行 —— 于是应用自己还没跑的时候，
+   * 我们就能看见它**将会看到什么**。这正是"确认页写了没写"与"应用读到没有"
+   * 之间那一跳的仪器：没有它，两边都只能靠猜。
+   */
+  try {
+    window.__boot = {
+      href: location.href,
+      sessionKeys: Object.keys(sessionStorage),
+      sessionToken: sessionStorage.getItem('sessionToken') === null ? null : 'present',
+      loginBaseUrl: sessionStorage.getItem('loginBaseUrl'),
+    };
+  } catch (e) {
+    window.__boot = { href: location.href, threw: String(e) };
+  }
+  /**
+   * 🔴 **每次 `sessionStorage.setItem` 的时间线**，落在 `localStorage` 里。
+   *
+   * 为什么非要这一格：`sessionStorage` **随文档走**，脚本切到 `/app/` 之后
+   * 就再也看不见确认页那个文档里的值了。而"写了没有"正是要判的那一跳 ——
+   * 启动快照只能说明"应用没看见"，说明不了"没人写"。
+   *
+   * `localStorage` **跨文档存活**且同源共享，所以把写入追加进去，
+   * 就得到一条跨越两次导航、**无法被事后篡改**的时间线：
+   * 谁写的、写了哪个键、值多长、什么时候。
+   */
+  try {
+    const proto = Object.getPrototypeOf(window.sessionStorage);
+    const origSet = proto.setItem;
+    const origRemove = proto.removeItem;
+    const origClear = proto.clear;
+    const log = (kind, key, val) => {
+      try {
+        const all = JSON.parse(window.localStorage.getItem('__ssw') || '[]');
+        all.push({ at: location.href, kind, key: String(key), len: String(val).length });
+        window.localStorage.setItem('__ssw', JSON.stringify(all));
+      } catch (e) {
+        /* 记录失败不能影响被测代码 */
+      }
+    };
+    proto.setItem = function (k, v) {
+      if (this === window.sessionStorage) log('set', k, v);
+      return origSet.call(this, k, v);
+    };
+    proto.removeItem = function (k) {
+      if (this === window.sessionStorage) log('remove', k, '');
+      return origRemove.call(this, k);
+    };
+    proto.clear = function () {
+      if (this === window.sessionStorage) log('clear', '', '');
+      return origClear.call(this);
+    };
+  } catch (e) {
+    /* 装不上仪器就静默跳过：判据不能因为观测失败而变红 */
+  }
+  /**
+   * 🔴 **确认页"最后一刻"的快照**（`pagehide`），写进 `localStorage`。
+   *
+   * 时间线证明了"写了"，启动快照证明了"应用没看见"。中间只剩**导航本身**。
+   * `pagehide` 是旧文档**还活着**的最后一个时点 —— 它的快照把
+   * "写没写进去"和"跳过去还在不在"彻底劈成两半。
+   */
+  window.addEventListener('pagehide', () => {
+    try {
+      const list = JSON.parse(window.localStorage.getItem('__prehides') || '[]');
+      list.push({
+        href: location.href,
+        sessionKeys: Object.keys(window.sessionStorage),
+        sessionToken:
+          window.sessionStorage.getItem('sessionToken') === null ? null : 'present',
+      });
+      window.localStorage.setItem('__prehides', JSON.stringify(list));
+    } catch (e) {
+      /* 记录失败不能影响被测代码 */
+    }
+  });
   window.__errs = [];
   window.addEventListener('unhandledrejection', (e) => {
     window.__errs.push('rejection: ' + String(e && e.reason && (e.reason.stack || e.reason)));
@@ -193,6 +380,22 @@ await page.addInitScript(() => {
   window.addEventListener('error', (e) => {
     window.__errs.push('error: ' + String((e && (e.message || e.error)) || e));
   });
+});
+/**
+ * 🔴 **每次文档导航的响应头** —— 两个"存储命名空间"的唯一可见差别只可能在头里。
+ * 尤其盯：CSP `sandbox`、`Cross-Origin-Opener-Policy`、`Clear-Site-Data`、
+ * `Content-Type`（非 `text/html` 会让文档变成下载/插件文档）。
+ */
+page.on('response', (r) => {
+  if (r.request().resourceType() !== 'document') return;
+  const h = r.headers();
+  const keep = {};
+  for (const [k, v] of Object.entries(h)) {
+    if (/^(content-type|content-security-policy|cross-origin|clear-site-data|set-cookie|x-frame|origin-agent)/i.test(k)) {
+      keep[k] = v;
+    }
+  }
+  console.log(`  · 文档头 ${r.status()} ${r.url().slice(-34)} ${JSON.stringify(keep)}`);
 });
 page.on('console', (m) => {
   const line = `[${m.type()}] ${m.text()}`;
@@ -260,7 +463,59 @@ try {
     errs: (window.__errs ?? []).slice(0, 3),
   }));
   console.log(`  · 落到 /app/ 之后的存储：${JSON.stringify(afterLanding)}`);
+  // 应用**启动那一刻**看到什么 —— 这一格才是那一跳的判据。
+  const boot = await page.evaluate(() => window.__boot ?? null);
+  console.log(`  · 应用启动那一刻：${JSON.stringify(boot)}`);
+
+  /**
+   * ── 判据：会话是**经 fragment 投递**的，而且**已经被抹掉** ────────────
+   *
+   * 🔴 两格必须成对，缺一格都会变成一个**平凡为真**的判据：
+   *   · 只判"抹掉了" —— 如果投递根本没来（比如退回 sessionStorage），
+   *     地址栏从来就没有 fragment，这一格照样绿。
+   *   · 只判"来了" —— 那正是历史那一版：令牌留在地址栏与历史里。
+   *
+   * 而它守的是一个**实测过的**机制：确认页由同步服务端渲染（带 helmet 默认的
+   * `Cross-Origin-Opener-Policy: same-origin` + `Origin-Agent-Cluster: ?1`），
+   * 应用是静态产物（两个头都没有）⇒ 跳过去会切 browsing instance，
+   * 那边写进 `sessionStorage` 的会话**不会跟过来**（确认页 `pagehide` 时还在、
+   * 应用启动时已空，且没有任何 `removeItem`）。注入摘掉那两个头即转绿 —— 因果钉死。
+   */
+  const bootHref = String(boot?.href ?? '');
+  check(
+    bootHref.includes('/app/#') && bootHref.includes('sessionToken='),
+    '④ 会话经 **URL fragment** 投递到应用（sessionStorage 跨不过 agent cluster）',
+    'structure',
+  );
+  // 应用是 `void consumePendingLogin()`，异步跑 —— 同样要等一个稳定态。
+  let hashCleared = false;
+  for (let i = 0; i < 20 && !hashCleared; i += 1) {
+    await sleep(250);
+    hashCleared = new URL(page.url()).hash === '';
+  }
+  check(
+    hashCleared,
+    '④ 地址栏里的会话 fragment 已被抹掉（一次性凭据不许留在历史里）',
+    'structure',
+  );
   console.log(`  · /api/auth/email/verify 的响应：${apiResponses.join(' | ') || '(没抓到)'}`);
+  const timeline = await page.evaluate(() => {
+    try {
+      return JSON.parse(localStorage.getItem('__ssw') || '[]');
+    } catch {
+      return ['<unparsable>'];
+    }
+  });
+  console.log(`  · sessionStorage 写入时间线：${JSON.stringify(timeline)}`);
+  console.log(`  · 浏览器里的页面数：${page.context().pages().length}`);
+  const prehides = await page.evaluate(() => {
+    try {
+      return JSON.parse(localStorage.getItem('__prehides') || '[]');
+    } catch {
+      return '<unparsable>';
+    }
+  });
+  console.log(`  · 确认页 last instant（pagehide）：${JSON.stringify(prehides[prehides.length - 1])}`);
 
   /**
    * ── 判据：**应用真的登录了**（不是"界面说成功"）────────────────────
@@ -278,6 +533,41 @@ try {
     );
   }
   check(stored, '⑤ 落盘凭据出现（刷新之后仍是登录态）');
+
+  // 末尾再取一次：这时时间线与 pagehide 序列才**覆盖了全部导航**。
+  const finalState = await page.evaluate(() => ({
+    timeline: (() => {
+      try {
+        return JSON.parse(localStorage.getItem('__ssw') || '[]');
+      } catch {
+        return '<unparsable>';
+      }
+    })(),
+    prehides: (() => {
+      try {
+        return JSON.parse(localStorage.getItem('__prehides') || '[]');
+      } catch {
+        return '<unparsable>';
+      }
+    })(),
+    now: Object.keys(sessionStorage),
+  }));
+  /**
+   * 🔴 **冗长诊断只在红的时候打**（2026-09-30 改）。
+   *
+   * 它们是当初把那个静默失效拆开的那套仪器（写入时间线 + 每次 `pagehide` 的存储快照），
+   * 一组要占十几行。绿的时候没人看，还会把"到底判了什么"淹掉；
+   * 红的时候它们是第一手证据 —— 所以整体挪进**失败分支**，一格都不删。
+   */
+  if (failed) {
+    console.log(`  · 末尾存储：${JSON.stringify(finalState.now)}`);
+    for (const h of finalState.prehides) {
+      console.log(`  · pagehide@${h.href.slice(-40)} → ${JSON.stringify(h.sessionKeys)}`);
+    }
+    for (const t of finalState.timeline) {
+      console.log(`  · 写入@${t.at.slice(-40)} ${t.kind} ${t.key}`);
+    }
+  }
 
   await page.getByTestId('account-menu-avatar').click();
   const signedIn = (await page.getByTestId('account-menu-signout').count()) > 0;
@@ -305,6 +595,19 @@ try {
 console.log('');
 if (failed) {
   console.error('❌ web 邮箱全链路**未通过**');
+  if (failures.outcome.length > 0) {
+    console.error('\n— 结果类（用户能不能用）—');
+    for (const what of failures.outcome) console.error(`  · ${what}`);
+  }
+  if (failures.structure.length > 0) {
+    console.error('\n— 结构类（这份实现靠什么成立）—');
+    for (const what of failures.structure) console.error(`  · ${what}`);
+    if (failures.outcome.length === 0) {
+      console.error(
+        '  ⚠️ 结果类全绿：**这一轮用户其实能用**，红的是"保证"而不是"功能" —— 见 README 的 2×2 表。',
+      );
+    }
+  }
   if (consoleLines.length > 0) {
     console.error('\n— 浏览器控制台 —');
     for (const line of consoleLines.slice(-20)) console.error(`  ${line}`);
