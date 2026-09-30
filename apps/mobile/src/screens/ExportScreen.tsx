@@ -21,15 +21,26 @@
  * 文件名/扩展名由接收方决定，不是一次"另存为 heyta-export-….json"。
  * 界面上的 `mobile.export.shareHint` 就是这句实话。
  *
- * 🔴 诚实条款不可省（见 Web 端 `ExportPanel`）：这一轮**不做导入**，
- * 所以必须明说这是导出、不能导回来 —— 否则用户会把它当成还原点，
+ * 🔴 诚实条款不可省（见 Web 端 `ExportPanel`）：**这个导出文件导不回来**，
+ * 所以必须明说它不是还原点 —— 否则用户会把它当备份用，
  * 而一个导不回来的文件当还原点用等于没有备份。
  * 这里直接复用 Web 的同一条词条（`web.export.notRestorePoint`），
  * 两端不可能说出不一样的话。
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * ## 与"导入"的关系（2026-09-29 补）
+ *
+ * 同一屏里现在还有**从滴答清单导入**。两者是**两个不同的承诺**，界面上分开说：
+ *   · **导出**：heyta → 一个文件；**导不回来**（还没有"从 heyta 导出还原"这条路）。
+ *   · **导入**：**滴答清单的 CSV** → heyta；不是还原点，也不覆盖既有数据。
+ *
+ * 🔴 **移动端的输入方式是"粘贴"，不是"选文件"** —— 见 `lib/ticktick-import.ts`
+ * 的文件头（要选文件就得引一个原生依赖，需过两道门；而手机上 CSV 常常就在
+ * 聊天/邮件里，长按复制再粘进来是更短的一条路）。这个差别写在界面上，不假装等价。
  */
 
 import React, { useEffect, useState } from 'react';
-import { Share } from 'react-native';
+import { Share, View } from 'react-native';
 
 import {
   buildTaskExportRows,
@@ -39,13 +50,19 @@ import {
   type AppHost,
   type ExportCounts,
   type ExportFormat,
+  type TickTickImportResult,
 } from '@heyta/app-host';
 import { useI18n } from '@heyta/i18n';
 
 import { openTaskHost } from '../db/open-host';
 import { tasksMarkdownCopy } from '../lib/export-copy';
+import {
+  confirmTickTickImport,
+  previewTickTickImport,
+  type TickTickPreview,
+} from '../lib/ticktick-import';
 import { useTokens } from '../theme';
-import { Button, Card, Screen, Text } from '../ui/kit';
+import { Button, Card, Screen, Text, TextField } from '../ui/kit';
 
 export function ExportScreen({ onBack }: { onBack: () => void }): React.JSX.Element {
   const { t } = useI18n();
@@ -57,6 +74,14 @@ export function ExportScreen({ onBack }: { onBack: () => void }): React.JSX.Elem
   const [failed, setFailed] = useState(false);
   const [shareFailed, setShareFailed] = useState(false);
   const [error, setError] = useState<string | undefined>(undefined);
+
+  /** 导入：粘贴的 CSV 原文。 */
+  const [importText, setImportText] = useState('');
+  /** 预览结果（含解析失败）。`undefined` = 还没预览过。 */
+  const [preview, setPreview] = useState<TickTickPreview | undefined>(undefined);
+  /** 确认后的结果。 */
+  const [importResult, setImportResult] = useState<TickTickImportResult | undefined>(undefined);
+  const [importBusy, setImportBusy] = useState(false);
 
   useEffect(() => {
     let alive = true;
@@ -120,6 +145,50 @@ export function ExportScreen({ onBack }: { onBack: () => void }): React.JSX.Elem
     })();
   };
 
+  /**
+   * 预览：解析 + 算"会写什么"，**一个字都不写**。
+   *
+   * 🔴 与 web 同一套流水线（`previewTickTickImport` → 用户确认 → `confirmTickTickImport`）。
+   * 直接导入（没有预览那一步）会让"这份 CSV 里其实有 3000 条、把库刷满"
+   * 变成一次不可撤的操作 —— 而导入**是一次批量写入**，没有撤销。
+   */
+  const runPreview = (): void => {
+    if (host === null) return;
+    setImportBusy(true);
+    setImportResult(undefined);
+    try {
+      setPreview(previewTickTickImport(importText, host));
+    } finally {
+      setImportBusy(false);
+    }
+  };
+
+  /**
+   * 确认导入。
+   *
+   * 🔴 **不吞异常**：`confirmTickTickImport` 在半途抛错时原样上抛 ——
+   * 见 `lib/ticktick-import.ts` 文件头第 2 条。这里把"失败"说出来并让用户
+   * 重试，而不是把它显示成"成功"（一次半截导入看起来完成是本仓明令禁止的写法）。
+   */
+  const runConfirm = (): void => {
+    if (host === null || preview === undefined || !preview.ok) return;
+    setImportBusy(true);
+    setImportResult(undefined);
+    setError(undefined);
+    void confirmTickTickImport(preview.plan, preview.report, host)
+      .then((result) => {
+        setImportResult(result);
+        setPreview(undefined);
+        setImportText('');
+      })
+      .catch((e: unknown) => {
+        setError(e instanceof Error ? e.message : String(e));
+      })
+      .finally(() => {
+        setImportBusy(false);
+      });
+  };
+
   return (
     <Screen
       title={t('web.export.title')}
@@ -167,6 +236,105 @@ export function ExportScreen({ onBack }: { onBack: () => void }): React.JSX.Elem
             run('markdown');
           }}
         />
+      </Card>
+
+      {/* ── 从滴答清单导入（方案 §5.5 第 7 项的移动端那一半）───────────────
+          🔴 与上面那两张卡是**两个不同的承诺**：导出是 heyta → 文件（导不回来），
+          导入是**滴答清单的 CSV** → heyta。所以下面单独说"只认滴答清单"。 */}
+      <Card style={{ gap: tokens['space.3'] }}>
+        <Text variant="row-title">{t('web.ticktick.title')}</Text>
+        <Text variant="caption" tone="muted">
+          {t('web.ticktick.intro')}
+        </Text>
+        {/* 诚实条款一：只认滴答清单（Todoist 的解析在本仓库不存在）。 */}
+        <Text variant="caption" tone="muted">
+          {t('web.ticktick.ticktickOnly')}
+        </Text>
+
+        <TextField
+          label={t('mobile.import.pasteLabel')}
+          value={importText}
+          onChangeText={(next) => {
+            setImportText(next);
+            // 🔴 文本一改，上一次的预览就**作废**。
+            // 不让它作废的话，用户会对着**旧预览**按确认 ——
+            // 而真正写下去的是那份旧 plan（预览只是给人看的）。
+            setPreview(undefined);
+            setImportResult(undefined);
+          }}
+          placeholder={t('mobile.import.pastePlaceholder')}
+          multiline
+          lines={6}
+        />
+        {/* 诚实条款二：移动端是**粘贴**，不是选文件。 */}
+        <Text variant="caption" tone="muted">
+          {t('mobile.import.pasteNotFile')}
+        </Text>
+
+        <Button
+          label={t('mobile.import.preview')}
+          tone="primary"
+          disabled={host === null || importBusy || importText.trim() === ''}
+          loading={importBusy && preview === undefined && importResult === undefined}
+          onPress={runPreview}
+        />
+
+        {preview === undefined ? null : preview.ok ? (
+          <View style={{ gap: tokens['space.2'] }}>
+            <Text variant="row-meta" tone="muted">
+              {t('web.ticktick.previewTitle')}
+            </Text>
+            <Text variant="caption" tone="muted">
+              {preview.batch.entries.length === 0
+                ? t('web.ticktick.previewNoop')
+                : t('web.ticktick.previewCounts', {
+                    projects: preview.batch.plan.projects.length,
+                    tags: preview.batch.plan.tags.length,
+                    tasks: preview.batch.plan.tasks.length,
+                    ops: preview.batch.entries.length,
+                  })}
+            </Text>
+            {/* 报告明细：告诉用户"文件里还有什么"，而不是只报"将新建几条"。
+                子任务/重复/已完成这几类在滴答里有自己的形态，导入时会有取舍，
+                不说清楚就会被读成"我的数据丢了一半"。 */}
+            <Text variant="caption" tone="muted">
+              {t('web.ticktick.previewRows', {
+                rows: preview.report.dataRows,
+                checklist: preview.report.checklistItems,
+                recurring: preview.report.recurringTasks,
+                completed: preview.report.completedTasks,
+              })}
+            </Text>
+            <Button
+              label={t('web.ticktick.confirm')}
+              tone="primary"
+              disabled={importBusy}
+              loading={importBusy}
+              onPress={runConfirm}
+            />
+          </View>
+        ) : (
+          <Text variant="caption" tone="danger">
+            {t(
+              preview.reason === 'no-header'
+                ? 'web.ticktick.failure.noHeader'
+                : 'web.ticktick.failure.noTasks',
+            )}
+          </Text>
+        )}
+
+        {importResult === undefined ? null : (
+          <Text variant="caption" tone="muted">
+            {importResult.opCount === 0
+              ? t('web.ticktick.doneNoop')
+              : t('web.ticktick.done', {
+                  projects: importResult.added.projects,
+                  tags: importResult.added.tags,
+                  tasks: importResult.added.tasks,
+                  ops: importResult.opCount,
+                })}
+          </Text>
+        )}
       </Card>
 
       {counts === undefined ? null : (

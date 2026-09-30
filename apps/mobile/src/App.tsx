@@ -5,7 +5,8 @@
  * 🔴 这个文件里**没有一行业务逻辑**（AGENTS.md §3.5）：
  * 新建任务该写哪些字段、切换完成该发什么 op、清除日期写 null 还是 undefined ——
  * 全部来自 `@heyta/app-host` 的 `createTaskActions`。
- * 这里只负责：**导航外壳**、主题接线、**自动同步的启动**。
+ * 这里只负责：**导航外壳**、主题接线、**自动同步的启动**、
+ * 以及**首次启动的欢迎页**（规范 `user-journey-and-auth.md` §3.1）。
  *
  * 唯一的平台差异是**注入哪个 SQLite 驱动**，在 `db/open-host.ts` 里。
  *
@@ -14,6 +15,10 @@
  * 导航结构：**5 个 tab —— 任务 / 日历 / 专注 / 分类 / 我的**
  * （`nav/TabBar.tsx` 的 `TABS`）。四象限**不在**导航里：它是「任务」页内的视图切换
  * （ADR-0015 §4），不再是第 6 个 tab（P10 已撤销那一刀）。
+ *
+ * 🔴 **欢迎页也不是 tab**（规范 §2-A8）：它是首次启动时**覆盖**主界面的一屏，
+ * 底部标签仍然是 5 个。两个按钮都是"出去的路"——点「先离线使用」一步进主界面，
+ * 未登录的本地功能照常。这里**没有登录墙**，理由写在规范 §0。
  *
  * 🔴 刻意**不引入导航库**（React Navigation / Expo Router）。
  * 当前需求是"5 个平级 tab、无栈、无深链" —— 这是一段不到 200 行的状态切换。
@@ -42,8 +47,11 @@ import { CalendarScreen } from './screens/CalendarScreen';
 import { FocusScreen } from './screens/FocusScreen';
 import { CategoriesScreen } from './screens/CategoriesScreen';
 import { ProfileScreen } from './screens/ProfileScreen';
+import { WelcomeScreen } from './screens/WelcomeScreen';
 import { startAutoSync } from './sync/auto-sync';
 import { startWidgetLifecycle } from './widgets/lifecycle';
+import { DEFAULT_SERVER_URL, readSyncConfig } from './sync/config';
+import { hasSeenWelcome, markWelcomeSeen } from './prefs/device-prefs';
 
 function Shell(): React.JSX.Element {
   const t = useTokens();
@@ -96,6 +104,51 @@ function Shell(): React.JSX.Element {
    * `auto-sync → open-host → …` 的又一条循环依赖边。
    */
   useEffect(() => startWidgetLifecycle(), []);
+
+  /**
+   * 🔴 **欢迎页（首次启动）—— 规范 §3.1 的落点。**
+   *
+   * 初值**同步**读一次设备本地偏好（`readDevicePref` 走 op-sqlite 的
+   * `executeSync`，是一张小表的单行查询）。异步读会让首帧先画出主界面、
+   * 再盖上欢迎页 —— 那一帧的闪烁在冷启动上非常显眼。
+   *
+   * ⚠️ 它在**所有 hook 之后**：提前 return 会让后面没跑到的 hook 数量在
+   * 两次渲染间变化，React 会直接报错（与 `ProfileScreen` 里那条注释同一条纪律）。
+   * `startAutoSync` / `startWidgetLifecycle` 两个 effect 在它**之前**，
+   * 所以欢迎页显示期间同步与小组件照常工作 —— 这正是"离线可用"的实现方式。
+   *
+   * ⚠️ 服务端地址也只算一次：它在一次会话里不会变（用户改了要重启才生效），
+   * 而放在渲染里会让每次重渲染都读一遍活配置。
+   */
+  const [welcomeDone, setWelcomeDone] = useState<boolean>(() => hasSeenWelcome());
+  const [authServerUrl] = useState<string>(
+    () => readSyncConfig()?.serverUrl ?? DEFAULT_SERVER_URL,
+  );
+
+  const leaveWelcome = (): void => {
+    // 🔴 写不进去要说出来。写失败的后果是"下次打开又弹一次" ——
+    //    可以接受，但**不能静默**：那会变成没人解释得清的现象。
+    if (!markWelcomeSeen()) {
+      console.warn('[welcome] 设备本地偏好写不进去 —— 下次冷启动还会显示欢迎页');
+    }
+    setWelcomeDone(true);
+  };
+
+  if (!welcomeDone) {
+    return (
+      <>
+        <StatusBar
+          barStyle={theme === 'dark' ? 'light-content' : 'dark-content'}
+          backgroundColor={t['color.background']}
+        />
+        <WelcomeScreen
+          initialServerUrl={authServerUrl}
+          onUseOffline={leaveWelcome}
+          onSignedIn={leaveWelcome}
+        />
+      </>
+    );
+  }
 
   return (
     <View style={{ flex: 1, backgroundColor: t['color.background'] }}>
