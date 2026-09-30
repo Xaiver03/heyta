@@ -107,8 +107,12 @@ export type EntitlementDecision =
  * 负数、`NaN`、`Infinity`、字符串、对象一律算"无法确定时间"。
  * 超出 `Number.MAX_SAFE_INTEGER` 的 `bigint` 也返回 `undefined` —— 转成 `number`
  * 会静默丢精度，那比拒绝更坏。
+ *
+ * ⚠️ 导出是给邀请奖励那条路径用的（`activity/invite.ts` 要把库里已有的
+ * `currentPeriodEnd` 喂给 `extendSubscriptionPeriod`）。**不要**在别处再写一份：
+ * 这个转换里有一条"超大 bigint 必须被拒绝"的规则，抄一遍就会漏一遍。
  */
-const toEpochMillis = (value: unknown): number | undefined => {
+export const toEpochMillis = (value: unknown): number | undefined => {
   if (typeof value === 'number') {
     return Number.isFinite(value) && value >= 0 ? value : undefined;
   }
@@ -216,6 +220,63 @@ export const evaluateCapability = (
   return { allowed: true };
 };
 
+/**
+ * 🔴 **跨多行的能力判定**：只要**任何一行**在当下有效且覆盖这项能力，就放行。
+ *
+ * ## 为什么必须有它 —— 这是一个静默丢掉用户已付时长的坑
+ *
+ * 在这个函数出现之前，守卫读订阅用的是
+ * `findFirst({ where: { userId }, orderBy: { id: 'desc' } })`，也就是
+ * **"最新那一行说了算"**。在只有微信一个 provider 时这是对的：
+ * 一个用户最多只有一行。
+ *
+ * 邀请奖励打破了这个前提。奖励写进 `subscriptions` 时用的是
+ * `provider = 'invite'`（见 `activity/invite.ts`），于是库里会出现**两行**：
+ *
+ * ```
+ *   id=7   provider='wechat'  currentPeriodEnd=+20 天   grants=['hosting']
+ *   id=9   provider='invite'  currentPeriodEnd=+5  天   grants=['hosting']   ← 后建的
+ * ```
+ *
+ * "最新那一行"会挑中 id=9，而它的到期日更早 —— 于是用户付了钱的 20 天里有
+ * 15 天**凭空消失**，表现为"我明明还没到期，怎么被降级了"。
+ * 没有任何一层会报错：两行都合法、都 active、grants 都对。
+ *
+ * ## 语义
+ *
+ * 这是"**任一**行满足即可"（OR），不是"所有行都要满足"（AND）。
+ * 每一行代表一个独立的权益来源（付费、邀请、将来的运营赠送），
+ * 它们各自授予自己的能力；用户拥有的能力是这些来源的**并集**。
+ * 按 AND 判会让"买过 hosting + 被邀请拿过 hosting"的人被两道门各拒一次。
+ *
+ * `now` 非法时**每一行都会**拒绝（`INVALID_NOW`），所以整体也拒绝 —— 与单行版一致。
+ */
+export const evaluateCapabilityAcross = (
+  subscriptions: readonly EntitlementSubscription[] | null | undefined,
+  capability: EntitlementCapability,
+  now: number,
+  policy: EntitlementPolicy = DEFAULT_ENTITLEMENT_POLICY,
+): EntitlementDecision => {
+  const rows = Array.isArray(subscriptions) ? subscriptions : [];
+  if (rows.length === 0) {
+    return { allowed: false, reason: 'NO_SUBSCRIPTION' };
+  }
+
+  // 拒绝时返回**第一条有信息量的原因**，而不是笼统的"被拒"。
+  // `NO_SUBSCRIPTION` 不是有信息量的那种（它只说明这一行不是订阅），
+  // 所以它排在后面 —— 否则一个"有一行过期 + 一行不覆盖该能力"的用户
+  // 会拿到 `NO_SUBSCRIPTION`，运维会去找一条并不存在的缺失订阅。
+  let fallback: EntitlementDecision = { allowed: false, reason: 'NO_SUBSCRIPTION' };
+  for (const row of rows) {
+    const decision = evaluateCapability(row, capability, now, policy);
+    if (decision.allowed) return decision;
+    if (fallback.allowed === false && fallback.reason === 'NO_SUBSCRIPTION') {
+      fallback = decision;
+    }
+  }
+  return fallback;
+};
+
 /** 守卫读到的开关形状（`ServerConfig['entitlements']` 的子集）。 */
 export interface EntitlementGateConfig {
   enabled: boolean;
@@ -234,8 +295,13 @@ export interface EntitlementGuardOptions {
   capability?: EntitlementCapability;
   /** 可注入时钟，便于把"到期边界"测成确定场景。默认 `Date.now`。 */
   now?: () => number;
-  /** 可注入订阅读取，便于不碰数据库地单测守卫。默认查 `prisma`。 */
-  loadSubscription?: (userId: number) => Promise<EntitlementSubscription | null>;
+  /**
+   * 订阅读取（**全部行**）。省略时查 `prisma`。
+   *
+   * ⚠️ 名字是复数、返回数组：权益是**多个来源的并集**（付费 / 邀请 / 将来的赠送），
+   * 单数形状会在下一次加来源时被误用成"最新一行说了算"。
+   */
+  loadSubscriptions?: (userId: number) => Promise<EntitlementSubscription[]>;
 }
 
 export type EntitlementGuard = (
@@ -243,10 +309,20 @@ export type EntitlementGuard = (
   reply: FastifyReply,
 ) => Promise<FastifyReply | void>;
 
-const defaultLoadSubscription = async (
+/**
+ * 默认的订阅读取：**取该用户的全部行**，而不是最新那一条。
+ *
+ * 🔴 这个 `findMany`（而不是 `findFirst` + `orderBy id desc`）是邀请奖励的
+ * **必要配套**：奖励行 `provider='invite'` 是在付费行之后建的，
+ * "最新一行说了算"会把用户已付的时长丢掉。完整推演见
+ * `evaluateCapabilityAcross` 的头注释。
+ *
+ * ⚠️ 行数天然有界（同一 provider 按约定复用一行），所以这里不需要 `take`。
+ */
+const defaultLoadSubscriptions = async (
   userId: number,
-): Promise<EntitlementSubscription | null> =>
-  prisma.subscription.findFirst({
+): Promise<EntitlementSubscription[]> =>
+  prisma.subscription.findMany({
     where: { userId },
     orderBy: { id: 'desc' },
   });
@@ -268,7 +344,7 @@ export const createEntitlementGuard = (
   const policy = options.policy ?? DEFAULT_ENTITLEMENT_POLICY;
   const capability = options.capability ?? 'hosting';
   const now = options.now ?? Date.now;
-  const loadSubscription = options.loadSubscription ?? defaultLoadSubscription;
+  const loadSubscriptions = options.loadSubscriptions ?? defaultLoadSubscriptions;
 
   return async (req, reply) => {
     if (!gate.enabled) {
@@ -277,11 +353,11 @@ export const createEntitlementGuard = (
     }
 
     const user = getAuthUser(req);
-    const subscription = await loadSubscription(user.userId);
-    // 🔴 走 `evaluateCapability` 而不是 `evaluateEntitlement`：只有前者的判据里
-    // 包含"这一行到底授予了哪几项能力"。用后者的话，¥5 的用户与 ¥12 的用户
-    // 会被判成同一件事 —— 那正是本轮要修掉的"两档不可分"。
-    const decision = evaluateCapability(subscription, capability, now(), policy);
+    const subscriptions = await loadSubscriptions(user.userId);
+    // 🔴 走 `evaluateCapabilityAcross` 而不是单行版：只有它会把
+    // "付费行 + 邀请行"当成**两个独立的权益来源**取并集。
+    // 用单行版（或"最新一行"）会让邀请行把付费时长盖掉 —— 见该函数的头注释。
+    const decision = evaluateCapabilityAcross(subscriptions, capability, now(), policy);
     if (decision.allowed) {
       return;
     }

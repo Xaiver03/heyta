@@ -4,6 +4,7 @@ const { JsonWebTokenError, TokenExpiredError } = jwt;
 import { Logger } from './logger';
 import { randomBytes } from 'crypto';
 import { sendLoginMagicLinkEmail, sendVerificationEmail } from './email';
+import type { ServerLocale } from './copy.generated.js';
 import { loadConfigFromEnv, isConsentRequired } from './config';
 import { Prisma } from '@prisma/client';
 import { authCache } from './auth-cache';
@@ -39,7 +40,56 @@ export const getJwtSecret = (): string => {
   return secret;
 };
 
+import { attachInviteOnRegister, settleReferralActivation } from './activity/invite';
+
 const JWT_SECRET = getJwtSecret();
+
+/**
+ * 绑定邀请码，**永不抛出**。
+ *
+ * 🔴 注册路径必须对所有"这张码行不行"保持中性，而且**不能因为一个附带的
+ * 福利功能而失败**：用户来注册账号，码是他顺手带的。让注册因为码的问题
+ * 返回一个错误（哪怕措辞是"稍后再试"）都比他成功注册、只是没绑上要坏。
+ *
+ * 所以这里把异常全部吞掉并记日志。`attachInviteOnRegister` 自己也只对
+ * "数据库真的坏了"抛异常 —— 业务性的拒绝是**返回值**，不是异常。
+ */
+const attachInviteSafe = async (
+  inviteeUserId: number,
+  rawCode: string | undefined,
+): Promise<void> => {
+  if (rawCode === undefined || rawCode.trim() === '') return;
+  try {
+    await attachInviteOnRegister({ inviteeUserId, rawCode, now: Date.now() });
+  } catch (err) {
+    Logger.error(
+      `Invite attach failed (invitee=${inviteeUserId}): ${
+        err instanceof Error ? err.message : 'unknown'
+      }`,
+    );
+  }
+};
+
+/**
+ * 结算邀请，**永不抛出**。
+ *
+ * ⚠️ 与 `attachInviteSafe` 不同，**验证路径必须让异常冒出去**：
+ * 结算跑在验证事务里，抛出去会让事务回滚 → 令牌保留 → 用户再点一次邮件
+ * 就能重试（见 `activity/invite.ts` 头注释的三条理由）。吞掉异常会造出
+ * "已验证但奖励永远丢了"的状态，那是用户既看不见也无法自救的。
+ *
+ * 这个包装只做一件事：把"没有待结算的邀请"这种**正常情况**变成静默返回。
+ */
+const settleReferralSafe = async (
+  db: Parameters<typeof settleReferralActivation>[0],
+  inviteeUserId: number,
+): Promise<void> => {
+  const outcome = await settleReferralActivation(db, inviteeUserId, Date.now());
+  if (!outcome.settled && outcome.reason === 'ALREADY_SETTLED') {
+    // 重复验证（令牌重放 / 管理脚本）会走到这里。不是错误。
+    Logger.info(`Referral already settled for invitee=${inviteeUserId}`);
+  }
+};
 
 export const verifyEmail = async (token: string): Promise<boolean> => {
   const pendingPasskey = await prisma.pendingPasskeyRegistration.findUnique({
@@ -78,6 +128,12 @@ export const verifyEmail = async (token: string): Promise<boolean> => {
       await tx.pendingPasskeyRegistration.deleteMany({
         where: { userId: pendingPasskey.userId },
       });
+
+      // 🔴 邀请结算与验证**同一个事务**（见 activity/invite.ts 头注释）：
+      // 要么"账号已验证 + 邀请人拿到奖励 + 通知写好了"三者同时成立，
+      // 要么全都不成立、令牌保留、用户重试。
+      await settleReferralSafe(tx, pendingPasskey.userId);
+
       return true;
     });
 
@@ -119,6 +175,10 @@ export const verifyEmail = async (token: string): Promise<boolean> => {
     // Email ownership does not prove ownership of a separately submitted key.
     await tx.passkey.deleteMany({ where: { userId: user.id } });
     await tx.pendingPasskeyRegistration.deleteMany({ where: { userId: user.id } });
+
+    // 🔴 邀请结算与验证**同一个事务**（见 activity/invite.ts 头注释）。
+    await settleReferralSafe(tx, user.id);
+
     return true;
   });
   if (!verified) throw new Error('Invalid verification token');
@@ -268,6 +328,11 @@ export const verifyToken = async (token: string): Promise<TokenVerificationResul
  */
 export const requestLoginMagicLink = async (
   email: string,
+  /**
+   * 收件人的语言（**可选**，缺省时邮件按默认语言 zh-CN 渲染）。
+   * 由路由层从请求里取（`?lang=` / `Accept-Language`），见 `design-html.ts` 的 `resolveLocale`。
+   */
+  locale?: ServerLocale,
 ): Promise<{ message: string }> => {
   const successMessage = {
     message: 'If an account with that email exists, a login link has been sent.',
@@ -317,7 +382,7 @@ export const requestLoginMagicLink = async (
   });
   if (claim.count === 0) return successMessage;
 
-  const emailSent = await sendLoginMagicLinkEmail(email, loginToken);
+  const emailSent = await sendLoginMagicLinkEmail(email, loginToken, locale);
   if (!emailSent) {
     await prisma.user.updateMany({
       where: { id: user.id, loginToken },
@@ -397,6 +462,13 @@ export const verifyLoginMagicLink = async (
 export const registerWithMagicLink = async (
   email: string,
   termsAcceptedAt?: number,
+  /**
+   * 邀请码（原样，未归一化）。见 `activity/invite.ts`：
+   * 这里**只是登记**一条待兑现的邀请，发奖要等邮箱验证。
+   */
+  inviteCode?: string,
+  /** 收件人的语言。**可选** —— 见 `requestLoginMagicLink` 上的同一条注释。 */
+  locale?: ServerLocale,
 ): Promise<{ message: string }> => {
   const normalizedEmail = email.toLowerCase();
 
@@ -417,6 +489,10 @@ export const registerWithMagicLink = async (
     // In TEST_MODE with autoVerifyUsers, skip email and auto-verify
     const config = loadConfigFromEnv();
 
+    // 这一行账号的 id。两条分支（重发令牌 / 新建）都会给它赋值，
+    // 因为邀请码绑定需要一个明确的"被邀请人"，而它只在这两处拿得到。
+    let registeredUserId: number;
+
     if (existingUser) {
       if (existingUser.verificationResendCount >= MAX_VERIFICATION_RESEND_COUNT) {
         Logger.warn(`Verification resend cap reached (ID: ${existingUser.id})`);
@@ -425,7 +501,7 @@ export const registerWithMagicLink = async (
 
       if (!config.testMode?.autoVerifyUsers) {
         // Send email BEFORE updating DB to avoid invalidating the old token on failure
-        const emailSent = await sendVerificationEmail(normalizedEmail, verificationToken);
+        const emailSent = await sendVerificationEmail(normalizedEmail, verificationToken, locale);
         if (!emailSent) {
           return { message: REGISTRATION_SUCCESS_MESSAGE };
         }
@@ -449,12 +525,14 @@ export const registerWithMagicLink = async (
       });
       if (updated.count !== 1) return { message: REGISTRATION_SUCCESS_MESSAGE };
 
+      registeredUserId = existingUser.id;
+
       Logger.info(
         `Updated verification token for unverified user (ID: ${existingUser.id})`,
       );
     } else {
       // Create new user (no passkey, no password)
-      await prisma.user.create({
+      const createdUser = await prisma.user.create({
         data: {
           email: normalizedEmail,
           passwordHash: null,
@@ -472,15 +550,21 @@ export const registerWithMagicLink = async (
 
       Logger.info(`Created new magic-link user`);
 
+      registeredUserId = createdUser.id;
+
       if (!config.testMode?.autoVerifyUsers) {
         // Keep the unverified row on delivery failure. Deleting it can race a
         // concurrent registration that has already started using the same row.
-        const emailSent = await sendVerificationEmail(normalizedEmail, verificationToken);
+        const emailSent = await sendVerificationEmail(normalizedEmail, verificationToken, locale);
         if (!emailSent) {
           return { message: REGISTRATION_SUCCESS_MESSAGE };
         }
       }
     }
+
+    // 邀请登记：**先登记、后兑现**（发奖要等邮箱验证，见 activity/invite.ts）。
+    // 刻意放在两条分支之外：重发令牌的路径也该把码绑上。
+    await attachInviteSafe(registeredUserId, inviteCode);
 
     if (config.testMode?.autoVerifyUsers) {
       await prisma.user.update({
@@ -491,6 +575,9 @@ export const registerWithMagicLink = async (
           verificationTokenExpiresAt: null,
         },
       });
+      // 🔴 TEST_MODE 也必须结算邀请。少了这一行，所有自动化验收（e2e / verify:*）
+      // 都会对着一个"奖励永远不会发"的账号跑绿 —— 而那正是最需要被验的那条路径。
+      await settleReferralSafe(prisma, registeredUserId);
       Logger.info(`[TEST_MODE] Auto-verified magic-link user`);
       return {
         message: 'Registration successful. Your account has been automatically verified.',

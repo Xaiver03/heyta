@@ -42,7 +42,11 @@ const mocks = vi.hoisted(() => {
       findMany: vi.fn(),
     },
     subscription: {
-      findFirst: vi.fn(),
+      // 🔴 `findMany`（复数）而不是 `findFirst`：权益是**多个来源的并集**
+      // （付费行 + 邀请奖励行），详见 `src/entitlement.ts` 的
+      // `evaluateCapabilityAcross`。这里只有 `findMany` 一个成员，
+      // 是为了让"某处又按最新一行判定"这种回归在测试里也当场炸掉。
+      findMany: vi.fn(),
     },
   };
 
@@ -163,7 +167,7 @@ describe('entitlement gate on sync routes', () => {
     mocks.prisma.operation.findFirst.mockResolvedValue(null);
     mocks.prisma.operation.findUnique.mockResolvedValue(null);
     mocks.prisma.operation.findMany.mockResolvedValue([]);
-    mocks.prisma.subscription.findFirst.mockResolvedValue(null);
+    mocks.prisma.subscription.findMany.mockResolvedValue([]);
 
     auditSpy = vi.spyOn(Logger, 'audit').mockImplementation(() => {});
   });
@@ -181,7 +185,7 @@ describe('entitlement gate on sync routes', () => {
     it('passes a subscription-less user through, and never queries the database', async () => {
       // A query at all would reject the request: the assertion below proves the
       // request returned 200 *without* the guard reading subscriptions.
-      mocks.prisma.subscription.findFirst.mockRejectedValue(
+      mocks.prisma.subscription.findMany.mockRejectedValue(
         new Error('the gate must not query subscriptions while disabled'),
       );
 
@@ -190,7 +194,7 @@ describe('entitlement gate on sync routes', () => {
 
       expect(response.statusCode).toBe(200);
       expect(response.json().results[0].accepted).toBe(true);
-      expect(mocks.prisma.subscription.findFirst).not.toHaveBeenCalled();
+      expect(mocks.prisma.subscription.findMany).not.toHaveBeenCalled();
       expect(mocks.syncService.uploadOps).toHaveBeenCalledOnce();
     });
 
@@ -200,17 +204,17 @@ describe('entitlement gate on sync routes', () => {
         status: 'expired',
         currentPeriodEnd: BigInt(Date.now() - 60_000),
       };
-      mocks.prisma.subscription.findFirst.mockResolvedValue(expired);
+      mocks.prisma.subscription.findMany.mockResolvedValue([expired]);
 
       // Even with an expired row present, an enabled=false gate ignores it.
       const response = await injectOp();
       expect(response.statusCode).toBe(200);
-      expect(mocks.prisma.subscription.findFirst).not.toHaveBeenCalled();
+      expect(mocks.prisma.subscription.findMany).not.toHaveBeenCalled();
     });
 
     it('explicitly setting the env var to false still disables the gate', async () => {
       process.env.ENTITLEMENT_GATE_ENABLED = 'false';
-      mocks.prisma.subscription.findFirst.mockRejectedValue(
+      mocks.prisma.subscription.findMany.mockRejectedValue(
         new Error('the gate must not query subscriptions while disabled'),
       );
 
@@ -218,7 +222,7 @@ describe('entitlement gate on sync routes', () => {
       const response = await injectOp();
 
       expect(response.statusCode).toBe(200);
-      expect(mocks.prisma.subscription.findFirst).not.toHaveBeenCalled();
+      expect(mocks.prisma.subscription.findMany).not.toHaveBeenCalled();
     });
   });
 
@@ -228,7 +232,7 @@ describe('entitlement gate on sync routes', () => {
     });
 
     it('rejects a user with no subscription with a distinguishable error and audits it', async () => {
-      mocks.prisma.subscription.findFirst.mockResolvedValue(null);
+      mocks.prisma.subscription.findMany.mockResolvedValue([]);
 
       await buildApp();
       const response = await injectOp();
@@ -257,13 +261,13 @@ describe('entitlement gate on sync routes', () => {
     });
 
     it('allows a user with an active, unexpired subscription', async () => {
-      mocks.prisma.subscription.findFirst.mockResolvedValue({
+      mocks.prisma.subscription.findMany.mockResolvedValue([{
         status: 'active',
         currentPeriodEnd: BigInt(Date.now() + 86_400_000),
         // 🔴 `grants` 现在是判定的**必要**一维：这条同步闸门守的是 `hosting`，
         // 所以夹具必须声明拥有它。少了这一行就是 `MISSING_GRANTS`（下面有专测）。
         grants: ['hosting'],
-      });
+      }]);
 
       await buildApp();
       const response = await injectOp();
@@ -278,11 +282,11 @@ describe('entitlement gate on sync routes', () => {
       // 这条就是本轮要证明的东西。`hosted-ai-monthly` 的 grants 是
       // `['hosting','ai']`，所以现实里不会出现"只有 ai"—— 但夹具故意造出这个
       // 形状，才说明判定读的**确实是 `grants` 这一维**，而不是"有活跃订阅就放行"。
-      mocks.prisma.subscription.findFirst.mockResolvedValue({
+      mocks.prisma.subscription.findMany.mockResolvedValue([{
         status: 'active',
         currentPeriodEnd: BigInt(Date.now() + 86_400_000),
         grants: ['ai'],
-      });
+      }]);
 
       await buildApp();
       const response = await injectOp();
@@ -293,11 +297,11 @@ describe('entitlement gate on sync routes', () => {
     });
 
     it('🔴 grants 为空 → 拒绝（默认值 `[]` 绝不等于"全部能力"）', async () => {
-      mocks.prisma.subscription.findFirst.mockResolvedValue({
+      mocks.prisma.subscription.findMany.mockResolvedValue([{
         status: 'active',
         currentPeriodEnd: BigInt(Date.now() + 86_400_000),
         grants: [],
-      });
+      }]);
 
       await buildApp();
       const response = await injectOp();
@@ -307,11 +311,11 @@ describe('entitlement gate on sync routes', () => {
     });
 
     it('🔴 读取方没拿到 grants（null）→ MISSING_GRANTS，与"确定没有能力"分开', async () => {
-      mocks.prisma.subscription.findFirst.mockResolvedValue({
+      mocks.prisma.subscription.findMany.mockResolvedValue([{
         status: 'active',
         currentPeriodEnd: BigInt(Date.now() + 86_400_000),
         grants: null,
-      });
+      }]);
 
       await buildApp();
       const response = await injectOp();
@@ -323,10 +327,10 @@ describe('entitlement gate on sync routes', () => {
     });
 
     it('rejects an expired subscription with reason PERIOD_ENDED', async () => {
-      mocks.prisma.subscription.findFirst.mockResolvedValue({
+      mocks.prisma.subscription.findMany.mockResolvedValue([{
         status: 'active',
         currentPeriodEnd: BigInt(Date.now() - 1),
-      });
+      }]);
 
       await buildApp();
       const response = await injectOp();
@@ -342,10 +346,10 @@ describe('entitlement gate on sync routes', () => {
     });
 
     it('rejects a non-entitled status such as past_due', async () => {
-      mocks.prisma.subscription.findFirst.mockResolvedValue({
+      mocks.prisma.subscription.findMany.mockResolvedValue([{
         status: 'past_due',
         currentPeriodEnd: BigInt(Date.now() + 86_400_000),
-      });
+      }]);
 
       await buildApp();
       const response = await injectOp();
@@ -365,7 +369,7 @@ describe('entitlement gate on sync routes', () => {
 
       expect(response.statusCode).toBe(401);
       // The guard never got as far as reading a subscription.
-      expect(mocks.prisma.subscription.findFirst).not.toHaveBeenCalled();
+      expect(mocks.prisma.subscription.findMany).not.toHaveBeenCalled();
     });
   });
 });

@@ -33,6 +33,13 @@ vi.mock('../src/db', () => {
       findUnique: vi.fn(),
       deleteMany: vi.fn(),
     },
+    // 验证事务里会结算邀请（`settleReferralActivation`，见 activity/invite.ts）。
+    // 默认返回 null = "没有待结算的邀请"，也就是绝大多数用例的形状：
+    // 这一条不影响验证本身。
+    referral: {
+      findUnique: vi.fn(),
+      updateMany: vi.fn(),
+    },
     $transaction: vi.fn(),
   };
   return { prisma: mockPrisma };
@@ -116,6 +123,10 @@ describe('Magic Link Registration', () => {
       findUnique: Mock;
       deleteMany: Mock;
     };
+    referral: {
+      findUnique: Mock;
+      updateMany: Mock;
+    };
     $transaction: Mock;
   };
 
@@ -126,6 +137,7 @@ describe('Magic Link Registration', () => {
     vi.clearAllMocks();
     mockPrisma.user.updateMany.mockResolvedValue({ count: 1 });
     mockPrisma.pendingPasskeyRegistration.findUnique.mockResolvedValue(null);
+    mockPrisma.referral.findUnique.mockResolvedValue(null);
     mockPrisma.$transaction.mockImplementation(
       async (callback: (tx: typeof mockPrisma) => Promise<unknown>) =>
         callback(mockPrisma),
@@ -158,6 +170,8 @@ describe('Magic Link Registration', () => {
       expect(mockSendVerificationEmail).toHaveBeenCalledWith(
         testEmail,
         expect.any(String),
+        // 第三个参数是收件人语言。不传时是 `undefined`，由 email.ts 兜底成默认语言。
+        undefined,
       );
     });
 
@@ -272,6 +286,8 @@ describe('Magic Link Registration', () => {
       expect(mockSendVerificationEmail).toHaveBeenCalledWith(
         testEmail,
         expect.any(String),
+        // 第三个参数是收件人语言。不传时是 `undefined`，由 email.ts 兜底成默认语言。
+        undefined,
       );
       expect(mockPrisma.user.updateMany).toHaveBeenCalledWith(
         expect.objectContaining({
