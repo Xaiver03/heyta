@@ -260,25 +260,56 @@ bootErrors: "ReferenceError: Can't find variable: exports"
 | 壳里真喂一个**错 state** 的回调（`shell-auth-badstate.txt`） | ✅ `AUTH_CALLBACK=rejected: state 与本次发起的不一致 —— 拒绝` |
 | 壳里喂一个**对 state** 的回调（`shell-auth-goodstate.txt`） | 🟡 `AUTH_CALLBACK=ok`（交付动作发生了），**但之后应用没挂载**（`identity:0`）⇒ 没法断言"登录成立" |
 
-### 🔴 卡在哪：**壳的第二次加载挂不上应用**（既有缺陷，与鉴权无关）
-
-隔离实验（`HEYTA_RELOAD_TEST=1`，**只重新加载、不写任何存储、不涉及鉴权**）：
+### ✅ 端到端走通了（第 3 轮）—— 而上一轮那条"壳缺陷"是**我搞错的**
 
 ```
-RELOAD_TEST=reloading
-M2_MACOS_NOTE=…{"identity":0,"capture":0,"backend":"","handler":"object",…,"bootErrors":""}
+AUTH_CALLBACK=ok          ← state 校验通过、令牌交给页侧
+AUTH_STATE=signed-in      ← 页面重载之后，独立那条菜单 IA 断言确认**登录成立**
+STORAGE=shell
 ```
+（错 state 的对照仍拒：`AUTH_CALLBACK=rejected: state 与本次发起的不一致`。）
 
-⇒ **不带任何鉴权、不做任何存储写入，单纯第二次 `load()` 就已经挂不上**。
-症状很干净也很误导：HTML 加载了（`title:"heyta"`）、注入的 user script 跑了
-（`handler:"object"`）、但**模块脚本没执行**（`backend:""`），而且 **`bootErrors` 为空**
-—— 因为**模块加载失败不触发 `window.onerror`**。
+#### 🔴 一、我上一轮的结论是错的：那不是壳缺陷，是我自己的**无限重载循环**
 
-**顺带证伪了两种猜想**（都试过、都不行）：`location.reload()` 与由壳发 `load()` **一样**失败；
-加 2 秒延迟再交付也**一样**失败。
+上一轮我加了两个验证口子（`HEYTA_RELOAD_TEST` / `HEYTA_AUTH_CALLBACK`），都**没有"只跑一次"的开关**。
+而它们都会**重新加载**页面 ⇒ 重载之后首屏探针**再次成功** ⇒ **再重载** ⇒ 循环。
+症状与"壳加载不了第二次"**一模一样**：`identity:0`、模块在场、`load` 已触发、**没有任何错误**。
 
-⇒ 这条**不是**我这次改动引入的（它不依赖鉴权），但它是"把令牌交给页侧既有登录路径"
-这条设计**当前走不通**的直接原因。**它没有修**，下一次接手应当从它开始。
+加上一次性开关之后，同一实验立刻变成 `✅ 身份入口成立（头像 1 个、采集框 1 个）…`
+⇒ **壳完全可以加载第二次**。这条教训值得记：**验证口子自己也要能被判据约束**（
+"只跑一次"不是可选项），否则它会把"我没有证据"伪装成"产品有缺陷"。
+
+（顺带：启动探针原来用**冒泡阶段**监听 `error`，而**资源加载失败不冒泡** ⇒
+"模块脚本没执行"这件事在证据里是**空的**。已改成捕获阶段并回传失败的 URL。）
+
+#### 🔴 二、真正挖出来的缺陷：**web 的邮件回跳第二腿一直是坏的**（已修）
+
+链路本该是：确认页 → 把**一次性链接令牌**交给应用 → 应用用 `verifyMagicLink()` 去服务端**换**会话。
+而确认页存进去的是**它自己 POST 换回来的会话 JWT** ⇒ 应用拿 JWT 再去
+`/api/login/magic-link/verify` 换一次 ⇒ **必然 401**（服务端按链接令牌那一列查）。
+失败被 `consumePendingLogin` 按设计吞掉 ⇒ 用户看到的是"点了邮件里的链接，回来还是未登录"。
+
+**没有任何测试覆盖它**：J1–J7 走通行密钥，`verify:email-auth` 只验服务端。
+修法：确认页存**原始链接令牌**（`sessionStorage['loginToken'] = token`）。
+
+#### 🔴 三、壳交付的是**会话**，所以给它一个**独立的键**（已修）
+
+壳从 `heyta://auth#token=…` 拿到的是**会话本身**，不是链接令牌 —— 拿它走 `verify()` 同样是 401。
+所以 `pending-login.ts` 现在有**两条明确分开的通道**：
+
+| 键 | 是什么 | 谁来消费 |
+|---|---|---|
+| `loginToken` | **一次性链接令牌** | 应用拿它去服务端**换**会话（`verify()`） |
+| `sessionToken` | **会话本身**（壳交付） | 直接采用（`adoptSession`，内部复用同一个 `applyAuthSession`） |
+
+⚠️ 两个键不用同一个名字是刻意的：一个"要么换要么直接用"的模糊值，
+迟早会被某一条路按错的方式解释。回跳 URL 现在也带上 `email=…`（头像要用）。
+
+#### 🔴 四、修的过程中又被测试抓到我一个 bug
+
+`takePendingSession` 第一版**无条件删掉了 `loginBaseUrl`** —— 而那是**两条通道共用**的键，
+于是链接那条路取不到 baseUrl ⇒ 整条登录静默变成"没登上"。
+`apps/web/tests/pending-login.spec.ts` 的两条断言当场红。已改成**先读会话键、为空就一个键都不动**。
 
 ## 如实记边界（别读多）
 

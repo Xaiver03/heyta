@@ -1,9 +1,10 @@
 WINDOW=heyta
 WEB_ROOT=/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/apps/web/dist
 STORAGE_HOST=on
+AUTH_CALLBACK=ok
+AUTH_STATE=signed-in
 STORAGE=shell
 PAGE_ORIGIN=heyta-local://app
 SECURE_CONTEXT=yes
 WEBAUTHN=function
-AUTH_CALLBACK=ok
-M2_MACOS_NOTE=M2-macOS 🔴 真应用没画出来（或没有身份入口/采集框）：{"identity":0,"capture":0,"backend":"","handler":"object","origin":"heyta-local://app","secure":true,"webauthn":"function","title":"heyta","bootErrors":"","scripts":1}
+M2_MACOS_NOTE=M2-macOS ✅ **已登录**（退出登录 1 个、登录入口 0 个；设置项 1 个）

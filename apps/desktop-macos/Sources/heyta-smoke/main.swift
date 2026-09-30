@@ -225,7 +225,7 @@ do {
     let expected = "state-from-shell"
     let good = URL(string: "heyta://auth#token=jwt-abc&state=\(expected)")!
     switch ShellAuth.parseCallback(good, expectedState: expected) {
-    case let .ok(token, state):
+    case let .ok(token, state, _):
         check(token == "jwt-abc" && state == expected, "合法回调 ⇒ 接受，并带回令牌与 state")
     case let .rejected(reason):
         check(false, "合法回调被拒了：\(reason)")

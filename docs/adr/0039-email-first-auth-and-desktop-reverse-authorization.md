@@ -197,12 +197,30 @@
 冒烟红「state 不一致竟然被接受了 —— 安全边界失效」。
 壳里真喂错 state 的回调 ⇒ `AUTH_CALLBACK=rejected`（实测）。
 
-🔴 **端到端卡在一个既有缺陷**：交付（写 `sessionStorage`）之后应用**没挂载**
-（`identity:0`）。隔离实验（`HEYTA_RELOAD_TEST=1`，**只重新加载、不写存储、不涉及鉴权**）
-**同样失败** ⇒ **壳的第二次 `load()` 挂不上应用**，与鉴权无关。
-`location.reload()` 与壳发 `load()` 都试过、加延迟也试过，**都不行**；症状是
-HTML 加载、user script 执行，但**模块脚本不执行**且 `bootErrors` 为空
-（模块加载失败**不**触发 `window.onerror`）。**这条没修**，是下一次的起点。
-证据：`apps/desktop-macos/evidence/storage-host/shell-auth-*.txt` 与 `reload-test.txt`。
+#### ✅ 第 3 轮：端到端走通了 —— 并纠正两处
+
+**壳侧反向授权现在端到端成立**（浏览器那一步用注入的回调代替）：
+
+```
+AUTH_CALLBACK=ok            ← state 校验通过、令牌交给页侧
+AUTH_STATE=signed-in        ← 重载之后独立的菜单 IA 断言确认登录成立
+```
+错 state 的对照仍被拒。证据：`apps/desktop-macos/evidence/storage-host/shell-auth-*.txt`。
+
+**纠正一（我上一轮的结论是错的）**：我曾把"`identity:0`"判成"壳的第二次 `load()` 挂不上应用"。
+真因是**我自己**加的两个验证口子**没有"只跑一次"的开关** —— 它们都会重载页面，
+而重载后首屏探针再次成功 ⇒ **无限重载循环**，症状与"壳加载不了第二次"一模一样。
+加上一次性开关后同一实验立刻恢复。⇒ **验证口子自己也要被判据约束**。
+
+**纠正二（真缺陷，已修）**：web 邮件回跳的**第二腿一直是坏的** —— 确认页存的是
+**会话 JWT**，而应用拿它去 `/api/login/magic-link/verify` 当**一次性链接令牌**换 ⇒ **必然 401**，
+失败又被 `consumePendingLogin` 吞掉（"点了链接回来还是未登录"）。修：确认页存原始链接令牌。
+**没有任何测试覆盖它**（J1–J7 走通行密钥、`verify:email-auth` 只验服务端）。
+
+**随之明确的契约**：`pending-login.ts` 现在有**两条分开的通道** ——
+`loginToken`（一次性链接令牌 ⇒ 去服务端换）与 `sessionToken`（**会话本身**，壳交付 ⇒ 直接采用，
+内部仍复用同一个 `applyAuthSession`）。回跳 URL 也带上 `email`。
+
+web 套件 1003 通过、服务端 1806 通过、冒烟全绿。
 
 ⚠️ **尚未验**：真实 SMTP（本机走 Ethereal）、**Windows 壳**、手机号通道（预留）。
