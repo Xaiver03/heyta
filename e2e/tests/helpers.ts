@@ -174,11 +174,23 @@ export async function switchView(
    * ⚠️ **加视图时要一起改的四处清单**（漏一处就会有静默过期）：
    *   1. `apps/web/src/App.tsx`：`VIEW_TABS` / `ViewKey` / `VIEW_TITLED_BY_TAB`
    *   2. **这里**
-   *   3. `e2e/tests/motivation.spec.ts`：`TABS` / `TITLED` / `CARD_ON` / `CARD_OFF`
+   *   3. `e2e/tests/motivation.spec.ts`：`TABS` / `TITLED` / `CARD_ON` / `VIEW_ANCHOR`
+   *      （`CARD_OFF` 不用改 —— 它由 `TABS` 算出来，新视图默认落进"不该有进度卡"那一侧）
    *   4. `apps/landing/src/mockup/app-shell-shape.ts`：`SHELL_VIEW_TABS`
    *      （那一处有**实时对账判据**，漏了会红 —— 前三处都不会）
    */
-  label: '任务' | '四象限' | '习惯' | '番茄钟' | '时间线' | '成长' | '便签' | '回收站' | '设置',
+  label:
+    | '任务'
+    | '日历'
+    | '四象限'
+    | '习惯'
+    | '时间线'
+    | '番茄钟'
+    | '成长'
+    | '便签'
+    | '搜索'
+    | '回收站'
+    | '设置',
 ): Promise<void> {
   // 「设置」不在 tablist 里（见 `openSettingsView`）。
   if (label === '设置') {
