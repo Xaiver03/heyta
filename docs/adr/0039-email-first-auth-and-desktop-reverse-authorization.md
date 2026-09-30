@@ -186,5 +186,23 @@
 **红（注入）**：① 拿掉 `readDesktopHandoff` 的空 state 守卫 ⇒ 单测"缺 state 不认"红；
 ② 拿掉 `applyAuthSession` 里的回跳钩子 ⇒ **J7 红**（兜底入口不出现）而 J1–J6 仍绿。
 
-⚠️ **尚未验**：真实 SMTP（本机走 Ethereal）、**壳侧**（macOS `ASWebAuthenticationSession`
-与 Windows 等价物 + `state` 校验）、手机号通道（预留）。
+### 第 3 轮：桌面壳反向授权的 **macOS 壳侧**（逻辑验通，端到端卡住）
+
+`HeytaShellCore/ShellAuth.swift`（纯逻辑：`state` 生成 / 授权起点 / 回调解析与校验）+
+`HeytaMac/ShellAuthSession.swift`（`ASWebAuthenticationSession` 封装）+
+`package-app.sh` 注册 scheme `heyta`（⚠️ 壳**第一次**对外承诺 URL scheme）。
+
+**判据**：冒烟 6 条（合法回调接受 / **state 不一致拒绝** / 令牌在 query 里拒绝 /
+别的 scheme 拒绝 / state 64 位 / 授权起点形状）；**注入**：拿掉 state 校验 ⇒
+冒烟红「state 不一致竟然被接受了 —— 安全边界失效」。
+壳里真喂错 state 的回调 ⇒ `AUTH_CALLBACK=rejected`（实测）。
+
+🔴 **端到端卡在一个既有缺陷**：交付（写 `sessionStorage`）之后应用**没挂载**
+（`identity:0`）。隔离实验（`HEYTA_RELOAD_TEST=1`，**只重新加载、不写存储、不涉及鉴权**）
+**同样失败** ⇒ **壳的第二次 `load()` 挂不上应用**，与鉴权无关。
+`location.reload()` 与壳发 `load()` 都试过、加延迟也试过，**都不行**；症状是
+HTML 加载、user script 执行，但**模块脚本不执行**且 `bootErrors` 为空
+（模块加载失败**不**触发 `window.onerror`）。**这条没修**，是下一次的起点。
+证据：`apps/desktop-macos/evidence/storage-host/shell-auth-*.txt` 与 `reload-test.txt`。
+
+⚠️ **尚未验**：真实 SMTP（本机走 Ethereal）、**Windows 壳**、手机号通道（预留）。

@@ -236,6 +236,50 @@ bootErrors: "ReferenceError: Can't find variable: exports"
    登录链接已经发出"，而库里**不会有令牌**。第一版探针就是被这条坑到的 ——
    必须先注册，登录链接才有对象。
 
+## 壳侧反向授权（ADR-0039 §2.3，2026-09-30 第 2 轮）：**逻辑验通了，端到端卡在一个壳缺陷**
+
+### 做了什么
+
+- `Sources/HeytaShellCore/ShellAuth.swift`：**纯逻辑** —— 生成 `state`、拼授权起点、
+  **解析并校验回调**（四种拒绝：scheme 不对 / 令牌在 query 里 / 没有令牌 / **state 不一致**）。
+- `Sources/HeytaMac/ShellAuthSession.swift`：`ASWebAuthenticationSession` 的封装
+  （系统浏览器那一步**由人完成**）。
+- `HeytaMacApp.swift`：两个口子（`HEYTA_AUTH_START=1` 起真授权；`HEYTA_AUTH_CALLBACK=<URL>` +
+  `HEYTA_AUTH_STATE=<state>` 把回调直接喂进**同一条**处理函数）；
+  交付动作 = 往**页面自己 origin** 的 `sessionStorage` 写 `loginToken` + `loginBaseUrl`
+  （即 `apps/web/src/features/auth/pending-login.ts` 消费的那条**既有**路径），再由壳重新加载。
+- `scripts/package-app.sh`：注册 `CFBundleURLTypes` / scheme `heyta`
+  （⚠️ 壳**第一次**对外承诺 URL scheme）。
+
+### 验到什么程度
+
+| 判据 | 结果 |
+|---|---|
+| 冒烟（`heyta-smoke` 第 10 节，6 条） | ✅ 合法回调接受、**state 不一致拒绝**、令牌在 query 里拒绝、别的 scheme 拒绝、state 是 64 位随机、授权起点形状正确 |
+| 🔴 注入：拿掉 `state` 校验 | 冒烟当场红：**「state 不一致竟然被接受了 —— 安全边界失效」** |
+| 壳里真喂一个**错 state** 的回调（`shell-auth-badstate.txt`） | ✅ `AUTH_CALLBACK=rejected: state 与本次发起的不一致 —— 拒绝` |
+| 壳里喂一个**对 state** 的回调（`shell-auth-goodstate.txt`） | 🟡 `AUTH_CALLBACK=ok`（交付动作发生了），**但之后应用没挂载**（`identity:0`）⇒ 没法断言"登录成立" |
+
+### 🔴 卡在哪：**壳的第二次加载挂不上应用**（既有缺陷，与鉴权无关）
+
+隔离实验（`HEYTA_RELOAD_TEST=1`，**只重新加载、不写任何存储、不涉及鉴权**）：
+
+```
+RELOAD_TEST=reloading
+M2_MACOS_NOTE=…{"identity":0,"capture":0,"backend":"","handler":"object",…,"bootErrors":""}
+```
+
+⇒ **不带任何鉴权、不做任何存储写入，单纯第二次 `load()` 就已经挂不上**。
+症状很干净也很误导：HTML 加载了（`title:"heyta"`）、注入的 user script 跑了
+（`handler:"object"`）、但**模块脚本没执行**（`backend:""`），而且 **`bootErrors` 为空**
+—— 因为**模块加载失败不触发 `window.onerror`**。
+
+**顺带证伪了两种猜想**（都试过、都不行）：`location.reload()` 与由壳发 `load()` **一样**失败；
+加 2 秒延迟再交付也**一样**失败。
+
+⇒ 这条**不是**我这次改动引入的（它不依赖鉴权），但它是"把令牌交给页侧既有登录路径"
+这条设计**当前走不通**的直接原因。**它没有修**，下一次接手应当从它开始。
+
 ## 如实记边界（别读多）
 
 1. **`-wal` 还没 checkpoint 回主库**：载荷在 `heyta.sqlite-wal` 里（主库只有 73728 字节的旧内容）。

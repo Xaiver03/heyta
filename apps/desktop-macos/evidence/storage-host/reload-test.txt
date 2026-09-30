@@ -1,0 +1,9 @@
+WINDOW=heyta
+WEB_ROOT=/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/apps/web/dist
+STORAGE_HOST=on
+STORAGE=shell
+PAGE_ORIGIN=heyta-local://app
+SECURE_CONTEXT=yes
+WEBAUTHN=function
+RELOAD_TEST=reloading
+M2_MACOS_NOTE=M2-macOS 🔴 真应用没画出来（或没有身份入口/采集框）：{"identity":0,"capture":0,"backend":"","handler":"object","origin":"heyta-local://app","secure":true,"webauthn":"function","title":"heyta","bootErrors":"","scripts":1}

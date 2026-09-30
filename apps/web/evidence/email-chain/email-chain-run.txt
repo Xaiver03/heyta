@@ -1,7 +1,7 @@
-# 邮箱链接全链路（ADR-0039 §2.1/§2.2）· 2026-09-30T12:37:02.774Z
-EMAIL=email-chain-1790771810621@example.com
-PREVIEW=https://ethereal.email/message/ar0CYwcJu4JvaGY3ar0CbPLvAxtdrS2kAAAAAYNFhc.-Sn4AHKBEtg.s0nY
-LINK=http://127.0.0.1:3221/verify-email?token=95a5bbc0ad2091d0da130cf6b87789cfdebe2462f3ec6bf18a75d0a4d8b6b9df
+# 邮箱链接全链路（ADR-0039 §2.1/§2.2）· 2026-09-30T12:42:12.900Z
+EMAIL=email-chain-1790772121448@example.com
+PREVIEW=https://ethereal.email/message/ar0DmgcJu4JvaIxSar0DomBC2ZnvfZH5AAAAAfRd9.28Vd2u.5odROh1MEg
+LINK=http://127.0.0.1:3221/verify-email?token=839b5f1665b37a3dd6b637d18a7d986d91cc3e25c6c96b55eac43d42ec1c1e9a
 VERIFY_KIND=session
 REUSE_STATUS=401
 DB=1|t

@@ -216,6 +216,52 @@ do {
     //    那一格由 `packages/storage/tests/contract.spec.ts` 的「宿主边界」契约项担保。
 }
 
+// ── 10. 桌面壳反向授权：回调解析 + state 校验（ADR-0039 §2.3）────────
+//
+// 这一段验的是**纯函数**：把回调 URL 变成"接受还是拒绝"。它是安全边界 ——
+// 壳靠 `state` 判断"这个回调是不是我这次发起的那一个"，不校验就等于
+// 允许任意网页把令牌塞进壳。
+do {
+    let expected = "state-from-shell"
+    let good = URL(string: "heyta://auth#token=jwt-abc&state=\(expected)")!
+    switch ShellAuth.parseCallback(good, expectedState: expected) {
+    case let .ok(token, state):
+        check(token == "jwt-abc" && state == expected, "合法回调 ⇒ 接受，并带回令牌与 state")
+    case let .rejected(reason):
+        check(false, "合法回调被拒了：\(reason)")
+    }
+
+    // 🔴 **state 不一致必须拒**（这就是那一格安全边界）。
+    let wrongState = URL(string: "heyta://auth#token=jwt-abc&state=someone-else")!
+    if case let .rejected(reason) = ShellAuth.parseCallback(wrongState, expectedState: expected) {
+        check(reason.contains("state"), "state 不一致 ⇒ 拒绝（\(reason.prefix(24))…）")
+    } else {
+        check(false, "state 不一致竟然被接受了 —— 安全边界失效")
+    }
+
+    // 🔴 **令牌出现在 query 里必须拒**：那条通道会进 Referer 与访问日志。
+    let inQuery = URL(string: "heyta://auth?token=jwt-abc&state=\(expected)")!
+    if case .rejected = ShellAuth.parseCallback(inQuery, expectedState: expected) {
+        check(true, "令牌在 query 里 ⇒ 拒绝（只认 fragment）")
+    } else {
+        check(false, "query 里的令牌竟然被接受了 —— 那个通道会漏")
+    }
+
+    let otherScheme = URL(string: "https://evil.example/#token=jwt-abc&state=\(expected)")!
+    if case .rejected = ShellAuth.parseCallback(otherScheme, expectedState: expected) {
+        check(true, "别的 scheme ⇒ 拒绝")
+    } else {
+        check(false, "别的 scheme 竟然被接受了")
+    }
+
+    check(ShellAuth.makeState().count == 64, "state 是 32 字节随机数的十六进制（64 字符）")
+    let url = ShellAuth.authorizationURL(site: "https://heyta.example", state: "s1")
+    check(
+        url?.absoluteString == "https://heyta.example?auth=desktop&state=s1",
+        "授权起点 URL 形状正确（\(url?.absoluteString ?? "nil")）",
+    )
+}
+
 try? FileManager.default.removeItem(at: workDir)
 
 print("")

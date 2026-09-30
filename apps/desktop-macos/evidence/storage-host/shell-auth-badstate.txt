@@ -1,0 +1,9 @@
+WINDOW=heyta
+WEB_ROOT=/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta/apps/web/dist
+STORAGE_HOST=on
+STORAGE=shell
+PAGE_ORIGIN=heyta-local://app
+SECURE_CONTEXT=yes
+WEBAUTHN=function
+AUTH_CALLBACK=rejected: state 与本次发起的不一致 —— 拒绝（可能是别人构造的回调）
+M2_MACOS_NOTE=
