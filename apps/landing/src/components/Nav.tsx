@@ -91,15 +91,26 @@ export function Nav({
   // 「开始使用」该指向哪，全站只有这一个判据（见 `lib/app-url.ts`）。
   const cta = startCta(locale);
 
-  /** 站点链接。顺序、标签、是否出现**全部**由注册表决定（见文件头）。 */
+  /**
+   * 站点链接。顺序、标签、是否出现**全部**由注册表决定（见文件头）。
+   *
+   * 🔴 `current` 有**两个**来源，而且是同一份注册表给的：
+   *   - 这一页本身就是某个导航项（`/platforms`）；
+   *   - 这一页不是导航项，但它声明自己属于哪一项（文档文章 `/help/how` 的
+   *     `navActiveId: 'help'`，见 `pages.ts`）。
+   * 少了第二条，访客在文章页上看到的导航是"哪一项都不是当前"——
+   * 而那一页恰恰是全站最长的一页，人最需要知道自己在哪。
+   * `aria-current="page"` 也从这里派生，所以"高亮"与"读屏软件听到的位置"
+   * 不可能各说一套。
+   */
   const links = useMemo(
     () =>
       navPages().map((target) => ({
         href: siteHref(target, locale),
         label: t(target.labelKey),
-        current: target.id === page.id,
+        current: target.id === page.id || target.id === page.navActiveId,
       })),
-    [t, locale, page.id],
+    [t, locale, page.id, page.navActiveId],
   );
 
   /**

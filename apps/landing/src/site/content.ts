@@ -258,6 +258,22 @@ export interface FaqPair {
 }
 
 /**
+ * 帮助中心的**分类词表**。
+ *
+ * 🔴 **它住在这里而不是 `docs.ts`，因为这一份才是那张被两处读取的表**：
+ * `HELP_MODULES` 定义了速答怎么分组，文档中心要按**同一套**分组挂深读。
+ * 写成 `string` 的话这套分组就没有边界 —— 在 `docs.ts` 里新造一个
+ * `'multidevice'` 编译期不会红，运行时也照样渲染，但访客看到的是两个中心
+ * 各有一套分类名（那正是本轮 IA 改造要根除的形态）。
+ * 收窄成字面量联合后，`HELP_MODULES` 里拼错一个 id、或文档侧引用一个
+ * 不存在的分类，都是**编译期**错误。
+ *
+ * ⚠️ 加一个新分类要同时想清楚它的速答 —— 只有名字没有内容的分类，
+ * 界面上不该出现（见下方 `render.spec.tsx` 对空模块的判据）。
+ */
+export type HelpModuleId = 'start' | 'sync' | 'organize' | 'data' | 'trust';
+
+/**
  * `/help` 的一个**功能模块**：一段小标题 + 它下面的问答（A4-1）。
  *
  * 🔴 组织方式是**按你在做什么**，不是按文档类型 —— 这是滴答清单帮助中心的
@@ -265,7 +281,7 @@ export interface FaqPair {
  * 通行密钥"三问归在同一个模块下，而不是散在三处各写一遍。
  */
 export interface HelpModule {
-  readonly id: string;
+  readonly id: HelpModuleId;
   readonly titleKey: MessageKey;
   readonly pairs: readonly FaqPair[];
 }

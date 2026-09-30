@@ -6,6 +6,7 @@
   "description": "真实浏览器验收（Playwright）。刻意不在根 pnpm 工作区内 —— 见 pnpm-workspace.yaml 的说明。",
   "scripts": {
     "test": "playwright test",
+    "test:landing": "playwright test --config playwright.landing.config.ts",
     "install-browser": "playwright install chromium"
   },
   "devDependencies": {

@@ -190,20 +190,36 @@ export function StatusBadge({ status }: { status: PlatformStatus }): React.JSX.E
 export function PageHead({
   page,
   visual,
+  cta = true,
 }: {
   page: SitePage;
   visual?: ReactNode;
+  /**
+   * 页头要不要那颗主行动按钮。**默认 `true`**（所有子页面照旧）。
+   *
+   * 🔴 文档中心的**文章页**传 `false`，理由是意图不同：读 `/help/passphrase`
+   * 的人正在解决一件具体的事，此刻把他从答案里拔出去按「立即使用」，
+   * 得到的不是转化而是打断。而帮助中心与文章本身已经有出口 ——
+   * 侧栏（文档中心）、导航（每一页都在）、页脚 —— 关掉这一颗不会把人困住。
+   * ⚠️ 这不是"装饰开关"：关掉之后页头就是「标题 + 引言」，
+   * 排版上收紧一份留白（见 `.lp-page__head--no-cta`）。
+   */
+  cta?: boolean;
 }): React.JSX.Element {
   const { t } = useI18n();
   const locale = useLocale();
   const preset = useMotionPreset();
-  const cta = siteCta(page, locale);
+  const start = siteCta(page, locale);
   const copy = revealVariants(preset.reduced, preset.ui);
 
   return (
     <header
       className={
-        visual === undefined ? 'lp-page__head' : 'lp-page__head lp-page__head--split'
+        visual === undefined
+          ? cta
+            ? 'lp-page__head'
+            : 'lp-page__head lp-page__head--no-cta'
+          : 'lp-page__head lp-page__head--split'
       }
     >
       <div className="lp-wrap">
@@ -227,18 +243,21 @@ export function PageHead({
           {/*
             行动点的规则与导航里那条**完全一致**（都走 `siteCta`）：
             没配 `VITE_APP_URL` 时指向首页的自建那一节，配了就是应用本身。
+            文档文章不要这一颗（理由见上面 `cta` 的注释）。
           */}
-          <motion.p className="lp-page__cta" variants={copy}>
-            <Magnetic>
-              <a
-                className="lp-btn lp-btn--primary"
-                href={cta.href}
-                {...(cta.external ? { rel: 'noopener noreferrer' } : {})}
-              >
-                {t(cta.labelKey)}
-              </a>
-            </Magnetic>
-          </motion.p>
+          {cta ? (
+            <motion.p className="lp-page__cta" variants={copy}>
+              <Magnetic>
+                <a
+                  className="lp-btn lp-btn--primary"
+                  href={start.href}
+                  {...(start.external ? { rel: 'noopener noreferrer' } : {})}
+                >
+                  {t(start.labelKey)}
+                </a>
+              </Magnetic>
+            </motion.p>
+          ) : null}
         </motion.div>
 
         {visual === undefined ? null : (

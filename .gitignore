@@ -77,6 +77,9 @@ _cacache/
 # 门禁红了的时候，那份 trace 是唯一能告诉你"浏览器里当时发生了什么"的东西。
 # 正确做法是在 CI 里把它当 **artifact 上传**，而不是提交进仓库。
 test-results/
+# `playwright.landing.config.ts` 的专属取证目录：它不跟上面的共享目录挤，
+# 否则别的套件跑一轮就把人还没看的图删了（理由写在那个 config 里）。
+landing-results/
 playwright-report/
 blob-report/
 e2e/.playwright/

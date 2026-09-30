@@ -1888,3 +1888,177 @@
   align-items: center;
   gap: var(--ht-space-2);
 }
+
+/* ── 帮助中心：模块分块 ─────────────────────────────────── */
+
+/* 语义钩子 `.lp-help__module` 早就在 DOM 里了，但一直没有规则 ——
+   五个模块于是**挤在一起**，只有标题在把它们分开。
+   ⚠️ 只给"相邻的两块"加顶距（`+` 选择器），最后一段不会多出留白。 */
+.lp-help__module + .lp-help__module {
+  margin-block-start: calc(var(--ht-space-12) * 1.15);
+}
+
+/* ── 文档中心 ───────────────────────────────────────────── */
+
+/* 小标题（速答 / 深入阅读）。刻意**不用** `<h4>`：
+   它不是内容层级的一部分（读者不会用它来跳读这一页），而是"这一格是干什么的"
+   的标签 —— 用 `role` 之外的标题会把页面上的标题数量再推高，
+   而排版审计刚刚处理过"一页八个页标题"。 */
+.lp-docs__eyebrow {
+  margin-block-start: var(--ht-space-6);
+  font-size: var(--ht-font-size-2xs);
+  font-weight: var(--ht-font-weight-semibold);
+  letter-spacing: var(--ht-letter-spacing-wide);
+  text-transform: uppercase;
+  color: var(--ht-color-foreground-muted);
+}
+
+/* 枢纽页上那一组文章卡片。 */
+.lp-docs__hub {
+  margin-block-start: var(--ht-space-4);
+}
+
+.lp-docs__cards {
+  margin-block-start: var(--ht-space-3);
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(18rem, 1fr));
+  gap: var(--ht-space-3);
+  list-style: none;
+}
+
+.lp-docs__card-link {
+  display: grid;
+  gap: var(--ht-space-2);
+  padding: var(--ht-space-5);
+  block-size: 100%;
+  border: var(--ht-border-width-thin) solid var(--ht-color-border);
+  border-radius: var(--ht-radius-xl);
+  background: var(--ht-color-surface);
+  text-decoration: none;
+  transition: border-color var(--ht-duration-fast) var(--ht-ease-standard);
+}
+
+/* hover 用**边框**表达层次，不用 translateY —— 与 MASTER.md 那条纪律一致
+   （阴影只留给真正的浮层，卡片是页面的一部分）。 */
+.lp-docs__card-link:hover {
+  border-color: var(--ht-color-primary);
+}
+
+.lp-docs__card-title {
+  font-size: var(--ht-font-size-base);
+  font-weight: var(--ht-font-weight-semibold);
+  line-height: var(--ht-line-height-tight);
+  color: var(--ht-color-foreground);
+}
+
+.lp-docs__card-sum {
+  font-size: var(--ht-font-size-sm);
+  line-height: var(--ht-line-height-normal);
+  color: var(--ht-color-foreground-muted);
+}
+
+/* 文章页：侧栏（文档中心的地图）+ 正文。
+   🔴 宽度与左右留白在**这一层**给完，所以内层那一份 `.lp-wrap`
+   （共享渲染器 `PageSections` 自带的）要摊平 —— 否则正文会在栅格里再居中一次，
+   左边多出一条没人要的沟。 */
+.lp-docs {
+  inline-size: 100%;
+  max-inline-size: var(--ht-layout-content-max);
+  margin-inline: auto;
+  padding-inline: var(--ht-space-6);
+  display: grid;
+  grid-template-columns: var(--ht-layout-sidebar-width) minmax(0, 1fr);
+  gap: calc(var(--ht-space-8) * 1.75);
+  align-items: start;
+}
+
+.lp-docs .lp-wrap {
+  max-inline-size: none;
+  margin-inline: 0;
+  padding-inline: 0;
+}
+
+.lp-docs__nav {
+  position: sticky;
+  inset-block-start: calc(var(--ht-layout-header-height) + var(--ht-space-6));
+  display: grid;
+  gap: var(--ht-space-5);
+}
+
+.lp-docs__back {
+  font-size: var(--ht-font-size-sm);
+  font-weight: var(--ht-font-weight-medium);
+  color: var(--ht-color-foreground-muted);
+  text-decoration: none;
+}
+
+.lp-docs__back:hover {
+  color: var(--ht-color-primary);
+}
+
+.lp-docs__group-title {
+  font-size: var(--ht-font-size-2xs);
+  font-weight: var(--ht-font-weight-semibold);
+  letter-spacing: var(--ht-letter-spacing-wide);
+  text-transform: uppercase;
+  color: var(--ht-color-foreground-muted);
+}
+
+.lp-docs__list {
+  margin-block-start: var(--ht-space-2);
+  display: grid;
+  gap: 1px;
+  list-style: none;
+}
+
+.lp-docs__link {
+  display: block;
+  padding-block: var(--ht-space-2);
+  padding-inline: var(--ht-space-3);
+  border-radius: var(--ht-radius-md);
+  font-size: var(--ht-font-size-sm);
+  line-height: var(--ht-line-height-normal);
+  color: var(--ht-color-foreground-muted);
+  text-decoration: none;
+  transition:
+    color var(--ht-duration-fast) var(--ht-ease-standard),
+    background-color var(--ht-duration-fast) var(--ht-ease-standard);
+}
+
+.lp-docs__link:hover {
+  color: var(--ht-color-foreground);
+  background: var(--ht-color-surface);
+}
+
+/* 当前那一篇：与导航里 `.lp-nav__link[aria-current]` 同一思路 ——
+   **判据在属性上，样式也从属性上取**，所以"高亮的那一条"和
+   "读屏软件报成当前的那一条"永远是同一条。 */
+.lp-docs__link[aria-current='page'] {
+  color: var(--ht-color-primary);
+  background: var(--ht-color-primary-subtle);
+  font-weight: var(--ht-font-weight-medium);
+}
+
+/* 页头没有那颗主按钮时（文章页），把尾距收紧一份 ——
+   按钮自己带 space-8 顶距，去掉它之后原来那份留白会变成一段没有来源的空。 */
+.lp-page__head--no-cta {
+  padding-block-end: var(--ht-space-8);
+}
+
+/* 窄屏退回单栏：侧栏**挪到正文之后**（`order`）。
+   手机上先给答案 —— "接下来读什么"是读完了才需要的事，
+   让它压在标题下面等于把答案往下推一整屏。 */
+@media (max-width: 900px) {
+  .lp-docs {
+    grid-template-columns: 1fr;
+    gap: calc(var(--ht-space-8) * 1.2);
+  }
+
+  .lp-docs__nav {
+    position: static;
+    order: 1;
+    gap: var(--ht-space-3);
+    padding-block-start: var(--ht-space-5);
+    border-block-start: var(--ht-border-width-thin) solid var(--ht-color-border);
+  }
+}

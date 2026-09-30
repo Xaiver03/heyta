@@ -13,7 +13,7 @@
  * 那个报错看起来像门禁坏了，其实只是端口没释放。
  * 实测撞到过一次，特征是**整轮 `ECONNREFUSED`**。
  *
- * 所以这里在跑之前把这两个端口腾出来。
+ * 所以这里在跑之前把**给它的端口**（默认 4318 / 4319）腾出来。
  *
  * 🔴 为什么敢 kill
  * ---------------
@@ -24,14 +24,26 @@
  *
  * ⚠️ 这不解决"两个人同时跑"：并发跑仍会互抢端口。
  * 那种情况下的正确修法是让端口可配置，而不是在这里加锁。
+ *
+ * 🔴 端口现在是**参数**（`node 这个文件.mjs 4320`），不写死就是这里的原因：
+ * 每个真浏览器套件都要一个自己的端口，而残留监听报出来的错
+ * （`already used` / 整轮 `ECONNREFUSED`）长得像门禁坏了。
+ * 默认值仍是主套件的两个端口，所以 `check:ai-e2e` 的调用不用改。
  */
 
 import { execFileSync } from 'node:child_process';
 
 /** 与 `e2e/playwright.config.ts` 里的两个 webServer 端口保持一致。 */
-const PORTS = [4318, 4319];
+const DEFAULT_PORTS = [4318, 4319];
 
-/** 这两个端口归本套件所有，不该有别人长期监听。 */
+const ARGS = process.argv
+  .slice(2)
+  .map((arg) => Number(arg))
+  .filter((port) => Number.isInteger(port) && port > 0);
+
+const PORTS = ARGS.length > 0 ? ARGS : DEFAULT_PORTS;
+
+/** 这些端口归本套件所有，不该有别人长期监听。 */
 function pidsOn(port) {
   try {
     const out = execFileSync('lsof', ['-ti', `tcp:${port}`, '-sTCP:LISTEN'], {
@@ -77,5 +89,5 @@ for (const port of PORTS) {
 }
 
 if (cleaned === 0) {
-  process.stdout.write('  ✅ 4318 / 4319 都是空的\n');
+  process.stdout.write(`  ✅ ${PORTS.join(' / ')} 都是空的\n`);
 }

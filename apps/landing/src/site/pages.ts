@@ -49,6 +49,23 @@
 import { LOCALES, type Locale, type MessageKey } from '@heyta/i18n/provider';
 
 /**
+ * 🔴 **本文件不许有任何相对的运行时导入 —— 这条不是风格，是构建能不能跑的前提。**
+ *
+ * `scripts/gen-entries.mjs` 用 Node 的类型擦除**直接**加载本文件（它是构建**之前**
+ * 的一步，不能先要求一次 tsc）。而 Node 的 ESM 解析器**不会**把仓库惯例的
+ * `./docs.js` 映射回 `./docs.ts` —— 实测 `ERR_MODULE_NOT_FOUND`（2026-09-30，
+ * Node 24.2；Vite 与 vitest 两种写法都认，所以这个差别**只在生成器这条路上**）。
+ *
+ * 于是：`import type { … } from './x.js'` 可以（类型擦除后根本不存在），
+ * `import { VALUE } from './x.js'` 不行。要往注册表加数据，就把数据**写在这里**，
+ * 让别的文件反过来 import 本文件（`docs.ts` / `content.ts` 就是这么做的 ——
+ * 它们不在生成器的运行时图上，`content.ts` 只被生成器读到它自己那份派生值）。
+ *
+ * 好消息是这条漏法**响亮**：它红在 `check:entries`（`pnpm check` 的第一道门禁），
+ * 不会静默生成一份错的入口。
+ */
+
+/**
  * 页脚/导航里的分组。
  *
  * 🔴 **这四组是对标滴答清单站点后定下来的**（见
@@ -84,6 +101,21 @@ export interface SitePage {
   readonly inNav: boolean;
   /** 是否出现在页脚。首页在页脚里用字标表达，不另列。 */
   readonly inFooter: boolean;
+  /**
+   * 顶部导航里**哪一项该被标成"当前"**。
+   *
+   * 🔴 只在"这一页不是导航项本身"时才需要写。文档文章（`/help/passphrase/`）
+   * 不进导航（六条同类链接会把导航挤成一列侧栏），但它语义上属于「帮助」那一节 ——
+   * 不标出来，访客在这一页就看不到自己在哪，而"我在哪"是导航的第二职责
+   * （第一条是"能去哪"）。
+   *
+   * ⚠️ 类型是 `string` 而不是 `SitePageId`：`SitePageId` 由 `SITE_PAGES` 派生，
+   * 而 `SITE_PAGES` 的元素类型是 `SitePage` —— 让接口反过来引用派生类型会构成
+   * 自引用，TS 会把 `SITE_PAGES` 推成隐式 `any`（那等于把这条结构整个取消）。
+   * 值写错的风险由 `Nav.tsx` 的判据承担：它只在 `navPages()` 的结果里找，
+   * 找不到就是不高亮，而不会崩。
+   */
+  readonly navActiveId?: string;
   /** 导航/页脚里的标签。 */
   readonly labelKey: MessageKey;
   /**
@@ -229,6 +261,108 @@ export const SITE_PAGES = [
     ledeKey: 'site.signin.lede',
     titleKey: 'site.signin.seo.title',
     descriptionKey: 'site.signin.seo.description',
+  },
+  /**
+   * ─────────────────────────────────────────────────────────────────────
+   * 文档中心 —— `/help` 的第二层深度。**六条路由，六条都注册在这里。**
+   *
+   * 🔴 **判据是路径形状，不是另列一份 id 清单。** "什么算一篇文章"由
+   * `path` 以 `/help/` 开头**决定**（`docs.ts` 用模板字面量类型从 `SITE_PAGES`
+   * 反向取出这个联合），所以加一篇文章 = 在这里加一条 + 在 `docs.ts` 给它写正文，
+   * **不存在第三份清单**。第三份清单是漂移的起点：它会忘记自己已经过时。
+   *
+   * ⚠️ 这里只写**结构**（路径、五个词条 key、归属哪个分组），
+   * 正文（`SectionSpec`）住在 `docs.ts` —— 与 `/features`、`/platforms` 的
+   * 正文住在 `content.ts` 是同一个分工。
+   *
+   * 🔴 `inNav: false` + `inFooter: false` **不是"孤立路由"**（N2 会判红那种）：
+   * 文章由帮助中心的**卡片**与文档侧栏**链住**，两处都是从这份注册表派生的。
+   * 不进顶部导航的理由是容量 —— 六条同类链接会把导航挤成一列侧栏，
+   * 而侧栏在这一层是**文章内的地图**，不是站点级的。
+   * 代偿是 `navActiveId: 'help'`：顶部导航仍然亮着「帮助」。
+   *
+   * 每条 key 都**逐字写出来**（不拼 `` `site.docs.${id}.title```）：模板字面量
+   * 表达式的类型是 `string`，拼出来的 key 会绕过 `MessageKey` 检查 ——
+   * 而"词条 key 拼错"在这套派生结构里恰恰是唯一会**静默**失败的地方
+   * （渲染时回落成 key 本身，中英两版同时变成 `site.docs.how.title`）。
+   */
+  {
+    id: 'how',
+    path: '/help/how',
+    group: 'support',
+    inNav: false,
+    inFooter: false,
+    navActiveId: 'help',
+    labelKey: 'site.docs.how.title',
+    headingKey: 'site.docs.how.title',
+    ledeKey: 'site.docs.how.sum',
+    titleKey: 'site.docs.how.seo.title',
+    descriptionKey: 'site.docs.how.sum',
+  },
+  {
+    id: 'account',
+    path: '/help/account',
+    group: 'support',
+    inNav: false,
+    inFooter: false,
+    navActiveId: 'help',
+    labelKey: 'site.docs.account.title',
+    headingKey: 'site.docs.account.title',
+    ledeKey: 'site.docs.account.sum',
+    titleKey: 'site.docs.account.seo.title',
+    descriptionKey: 'site.docs.account.sum',
+  },
+  {
+    id: 'passphrase',
+    path: '/help/passphrase',
+    group: 'support',
+    inNav: false,
+    inFooter: false,
+    navActiveId: 'help',
+    labelKey: 'site.docs.passphrase.title',
+    headingKey: 'site.docs.passphrase.title',
+    ledeKey: 'site.docs.passphrase.sum',
+    titleKey: 'site.docs.passphrase.seo.title',
+    descriptionKey: 'site.docs.passphrase.sum',
+  },
+  {
+    id: 'conflict',
+    path: '/help/conflict',
+    group: 'support',
+    inNav: false,
+    inFooter: false,
+    navActiveId: 'help',
+    labelKey: 'site.docs.conflict.title',
+    headingKey: 'site.docs.conflict.title',
+    ledeKey: 'site.docs.conflict.sum',
+    titleKey: 'site.docs.conflict.seo.title',
+    descriptionKey: 'site.docs.conflict.sum',
+  },
+  {
+    id: 'selfhost',
+    path: '/help/selfhost',
+    group: 'support',
+    inNav: false,
+    inFooter: false,
+    navActiveId: 'help',
+    labelKey: 'site.docs.selfhost.title',
+    headingKey: 'site.docs.selfhost.title',
+    ledeKey: 'site.docs.selfhost.sum',
+    titleKey: 'site.docs.selfhost.seo.title',
+    descriptionKey: 'site.docs.selfhost.sum',
+  },
+  {
+    id: 'transfer',
+    path: '/help/transfer',
+    group: 'support',
+    inNav: false,
+    inFooter: false,
+    navActiveId: 'help',
+    labelKey: 'site.docs.transfer.title',
+    headingKey: 'site.docs.transfer.title',
+    ledeKey: 'site.docs.transfer.sum',
+    titleKey: 'site.docs.transfer.seo.title',
+    descriptionKey: 'site.docs.transfer.sum',
   },
 ] as const satisfies readonly SitePage[];
 
