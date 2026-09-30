@@ -19,6 +19,8 @@ import { NodeSqliteDriver } from '@heyta/storage/sqlite/node';
 import { OpType, type Operation } from '@heyta/sync-core';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
+import { isAchieved } from '@heyta/domain';
+
 import { createHabitActions, habitLogId, type HabitActions } from '../src/habit-actions.js';
 
 let adapter: SqliteAdapter;
@@ -277,5 +279,93 @@ describe('分类色槽位', () => {
     expect(habit?.color).toBe('2');
     expect(habit?.target).toBe(30);
     expect(Object.values(engine.getState().habitLogs)).toHaveLength(1);
+  });
+});
+
+/**
+ * 习惯目标：数值 / 单位 / 达成口径
+ * ==================================
+ *
+ * 🔴 这一组钉的是「习惯计数型 / 时长型」**在写路径上缺的那一米**：
+ * `Habit` 有 `target` / `unit` / `goalType`，`isAchieved` 把三种口径都实现了，
+ * `checkIn` 也收 `value` —— 但**没有任何动作能改一个已建习惯的目标**
+ * （`createHabit` 只能设初始值，而 `NewHabitFields` 原来连 `goalType` 都没有）。
+ * ⇒ 界面上只能建"每天做一次"的习惯，**计数型与时长型到不了用户手里**，
+ * 而且不报错 —— 这正是本仓最忌讳的"看起来有其实没有"。
+ */
+describe('习惯目标（setHabitGoal）', () => {
+  it('数值 / 单位 / 口径三者都能改，且都落进同一条 UPD', async () => {
+    const id = await actions.createHabit('喝水');
+
+    await actions.setHabitGoal(id, { target: 8, unit: '杯', goalType: 'exactly' });
+
+    const op = await opOf('HABIT', id);
+    expect(op.opType).toBe(OpType.Update);
+    expect(payloadOf(op).target).toBe(8);
+    expect(payloadOf(op).unit).toBe('杯');
+    expect(payloadOf(op).goalType).toBe('exactly');
+
+    const habit = actions.listHabits()[0]!;
+    expect(habit.target).toBe(8);
+    expect(habit.unit).toBe('杯');
+    expect(habit.goalType).toBe('exactly');
+  });
+
+  it('空单位（或全是空白）= **清除**，写成 `null` 而不是空串', async () => {
+    const id = await actions.createHabit('喝水', { unit: '杯' });
+
+    await actions.setHabitGoal(id, { unit: '   ' });
+
+    // `null` 能穿过 JSON 表达"清除"（与 setHabitColor / setDueDate 同一条约定）。
+    // 留一个空串的话，界面上会渲染成「1 」，看起来像少了个字。
+    expect(payloadOf(await opOf('HABIT', id)).unit).toBeNull();
+    expect(actions.listHabits()[0]!.unit).toBeUndefined();
+  });
+
+  it('🔴 负数 / 非有限数的目标**抛错且不留 op**（不然 `isAchieved` 会恒真或恒假）', async () => {
+    const id = await actions.createHabit('喝水', { target: 8 });
+    const before = (await engine.getOpsForEntity('HABIT', id)).length;
+
+    await expect(actions.setHabitGoal(id, { target: -1 })).rejects.toThrow(/不小于 0/);
+    await expect(actions.setHabitGoal(id, { target: Number.NaN })).rejects.toThrow(/不小于 0/);
+
+    expect((await engine.getOpsForEntity('HABIT', id)).length, '被拒绝的调用写了 op').toBe(before);
+    expect(actions.listHabits()[0]!.target).toBe(8);
+  });
+
+  it('`atMost` + `target: 0` 是**合法**的（"一次都不碰"），不能被当成非法值拦掉', async () => {
+    const id = await actions.createHabit('喝咖啡');
+    await expect(actions.setHabitGoal(id, { target: 0, goalType: 'atMost' })).resolves.toBeUndefined();
+    expect(actions.listHabits()[0]!.target).toBe(0);
+  });
+
+  it('一个字段都没传 ⇒ **不写 op**（空 UPD 是纯噪音）', async () => {
+    const id = await actions.createHabit('喝水');
+    const before = (await engine.getOpsForEntity('HABIT', id)).length;
+
+    await actions.setHabitGoal(id, {});
+
+    expect((await engine.getOpsForEntity('HABIT', id)).length).toBe(before);
+  });
+
+  it('找不到习惯时抛错（不静默空操作）', async () => {
+    await expect(actions.setHabitGoal('no-such-habit', { target: 3 })).rejects.toThrow(/找不到习惯/);
+  });
+
+  it('🔴 改目标之后，**`isAchieved` 的判定真的变了** —— 这才叫"计数型能用"', async () => {
+    const id = await actions.createHabit('喝咖啡');
+    // 默认：target 1 / atLeast ⇒ 打了 1 次就算达成。
+    await actions.checkIn(id, DAY1, 1);
+
+    const habitBefore = actions.listHabits()[0]!;
+    const logBefore = actions.listLogs()[0]!;
+    expect(isAchieved(habitBefore, logBefore), '默认口径下应当达成').toBe(true);
+
+    // 改成"最多 0 次"⇒ 同样的那次打卡**不再算达成**。
+    await actions.setHabitGoal(id, { target: 0, goalType: 'atMost' });
+
+    const habitAfter = actions.listHabits()[0]!;
+    const logAfter = actions.listLogs()[0]!;
+    expect(isAchieved(habitAfter, logAfter), '改成 atMost/0 之后 1 次就不该算达成').toBe(false);
   });
 });

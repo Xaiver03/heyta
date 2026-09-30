@@ -17,6 +17,7 @@
 
 export {
   openAppHost,
+  openOpLogStore,
   resolveClientId,
   materializedState,
   type AppHost,
@@ -105,7 +106,12 @@ export {
  * 🔴 `apps/*` 里**不得出现 `new SyncClient(`**。宿主能决定的只有
  * 地址、令牌、口令、网络实现，以及"应用远端后要不要通知 UI"。
  */
-export { createSyncClient, type SyncWiringOptions } from './sync-wiring.js';
+export {
+  createHostRealtimeClient,
+  createSyncClient,
+  type RealtimeWiringOptions,
+  type SyncWiringOptions,
+} from './sync-wiring.js';
 
 export { newTaskId, randomId, usingRandomIdFallback } from './ids.js';
 
@@ -119,6 +125,61 @@ export {
   fetchHostedEntitlementReading,
   type HostedEntitlementProbeOptions,
 } from './entitlement.js';
+
+/**
+ * 运营管理后台的数据访问（ADR-0038）。**宿主无关**地放在这里，
+ * 与权益探测同一条口径（AGENTS.md §3.5：`apps/*` 只留平台差异）。
+ *
+ * 🔴 这里**不做**权限判断 —— 401/403 只是呈现层的事实，
+ * 真正的授权在 `server/src/admin/admin.middleware.ts`。
+ */
+export {
+  ADMIN_API_PREFIX,
+  adminForceUserLogout,
+  adminSetUserQuota,
+  adminUnlockUser,
+  fetchAdminCoupons,
+  fetchAdminInvites,
+  fetchAdminOrders,
+  fetchAdminOverview,
+  fetchAdminSubscriptions,
+  fetchAdminUser,
+  fetchAdminUsers,
+  type AdminClientOptions,
+  type AdminCouponRow,
+  type AdminFailureReason,
+  type AdminInvites,
+  type AdminOrderRow,
+  type AdminOverview,
+  type AdminPage,
+  type AdminResult,
+  type AdminSubscriptionRow,
+  type AdminUserDetail,
+  type AdminUserRow,
+} from './admin-client.js';
+
+/**
+ * 通知中心 / 活动（福利中心）的读取。**所有宿主共用这一份** ——
+ * 见 `inbox.ts` 文件头：三个请求都不携带任何用户内容（E2EE 硬约束），
+ * 并且都 fail-open（读不到 ≠ 没有通知）。
+ */
+export {
+  ACTIVITY_PATH,
+  NOTIFICATIONS_PATH,
+  NOTIFICATIONS_READ_PATH,
+  fetchAccountNotifications,
+  fetchActivityFeed,
+  markNotificationsRead,
+  type AccountNotificationItem,
+  type ActivityReading,
+  type CampaignItem,
+  type InboxReading,
+  type InboxRequestOptions,
+  type InboxUnavailableCause,
+  type InviteActivity,
+  type ReferralItem,
+  type WriteOutcome,
+} from './inbox.js';
 
 /**
  * 服务端认证客户端。**所有宿主共用这一份** —— 见 `hosted-auth.ts` 文件头：
@@ -292,6 +353,11 @@ export {
   renderDurationLine,
   writeDurationIntoNote,
 } from './duration-note.js';
+export {
+  planTimelineBlock,
+  planTimelineBlocks,
+  type TimelineTaskLike,
+} from './timeline-plan.js';
 export {
   aliveRecords,
   categoryReportFromState,

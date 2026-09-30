@@ -50,7 +50,12 @@ import type { OpLogEngine } from '@heyta/op-log';
 import type { OpLogStore } from '@heyta/storage';
 import type { EntityType } from '@heyta/shared-schema';
 import type { Operation, OpType } from '@heyta/sync-core';
-import { SyncClient } from '@heyta/sync-client';
+import {
+  createRealtimeClient as createRealtimeClientRaw,
+  SyncClient,
+  type RealtimeClient,
+  type WebSocketFactory,
+} from '@heyta/sync-client';
 
 export interface SyncWiringOptions {
   /** op-log 引擎。待上传队列、重新派发、应用远端都从它派生。 */
@@ -121,5 +126,49 @@ export function createSyncClient(options: SyncWiringOptions): SyncClient {
       });
     },
     ...(options.fetchImpl !== undefined ? { fetchImpl: options.fetchImpl } : {}),
+  });
+}
+/**
+ * 实时通道的接线选项。
+ *
+ * 🔴 **它与 `SyncWiringOptions` 是同一件事的两半，所以放在同一个文件里。**
+ *
+ * `realtime.ts`（450 行、指数退避 + 抖动 + 令牌活取值、自带一整套测试）
+ * 在 2026-09 之前**没有任何宿主调用它** —— 于是"在另一台设备上改了，
+ * 这边要等很久才出现，而且看起来像同步坏了"。
+ * 2026-09-29 web 先接上，当时是**在 web 的 store 里内联**建的；
+ * 而那个文件头正好写着"接线只有一份，两套一定会漂移，只是时间问题" ——
+ * 所以这里把它也提到共享层，移动端接的是**同一条**。
+ */
+export interface RealtimeWiringOptions {
+  /** op-log 引擎。`clientId` 从它取 —— **不要再自己造一个**。 */
+  engine: OpLogEngine;
+  /** 自建服务器地址。 */
+  baseUrl: string;
+  /** **活取值器**，不是当下的值：用户是应用起来之后才填地址/令牌的。 */
+  getToken: () => Promise<string | undefined>;
+  /** 收到"有新 op"时调用（宿主据此触发一次普通同步）。参数是服务端的 `latestSeq`。 */
+  onNewOps: (latestSeq: number) => void;
+  /** WebSocket 实现。默认 `globalThis.WebSocket`；原生宿主用它注入平台能力。 */
+  WebSocketImpl?: WebSocketFactory;
+}
+
+/**
+ * 构造实时通道客户端。**所有宿主共用这一条路径。**
+ *
+ * 🔴 **`clientId` 必须来自引擎**（与 `createSyncClient` 同一个来源）：
+ * LWW 的决胜依据是它，两处各造一个会让"本设备"在服务端看起来是两台设备 ——
+ * 实测过一次同形状的事故（两台设备共用 clientId ⇒ 双方都同步不了）。
+ *
+ * ⚠️ 与 `createSyncClient` 一样**不缓存**：地址/令牌变了就要重建，
+ * 而"令牌换过之后实时一直连不上"是最难排查的一类问题。
+ */
+export function createHostRealtimeClient(options: RealtimeWiringOptions): RealtimeClient {
+  return createRealtimeClientRaw({
+    baseUrl: options.baseUrl,
+    getToken: options.getToken,
+    clientId: options.engine.getClientId(),
+    onNewOps: options.onNewOps,
+    ...(options.WebSocketImpl !== undefined ? { WebSocketImpl: options.WebSocketImpl } : {}),
   });
 }

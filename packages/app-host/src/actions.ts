@@ -40,6 +40,7 @@ import {
   startOfDay,
   toLocalDate,
   today,
+  validateParentChange,
   type QuadrantDropPlan,
   type Task,
 } from '@heyta/domain';
@@ -202,6 +203,24 @@ export interface TaskActions {
   /** 传 `undefined` 表示清除截止时间（会写成 `null`，见文件头第 2 条）。 */
   setDueDate(entityId: string, dueDate: number | undefined): Promise<void>;
   /**
+   * 顺延：把**逾期**任务的截止时间推到**今天**，保留原来的时刻
+   * （"昨天 09:00 逾期" → "今天 09:00"）。滴答的分组「顺延」就是这个语义。
+   *
+   * 🔴 **"推到哪、保不保留时刻"是产品语义**，所以它住在这里而不是界面里 ——
+   * 界面只说"用户要顺延这一条"。写成 `setDueDate(id, 今天零点)` 那种
+   * 界面自己算日期的形状，下一端抄第二遍时就会有一端丢掉时刻。
+   *
+   * 幂等边界（都不产生 op，直接 return）：
+   *   - 任务不存在或已删除（`taskOf` 过滤）；
+   *   - 没有截止时间 —— 没有日期就无所谓"延"；
+   *   - 已完成 —— 完成的任务不该被改日期；
+   *   - **不逾期**（截止在今天或未来）—— "顺延到今天"对它们是倒退。
+   *     界面上的按钮只出现在逾期分组头，但动作层不信任这一点：
+   *     按钮会过时（同步刚把任务改成非逾期，列表还没重渲染），
+   *     让动作层把"只能顺延逾期任务"钉死才是真的钉死。
+   */
+  postponeToToday(entityId: string): Promise<void>;
+  /**
    * 改备注（Markdown）。传 `undefined` 表示清除（同样写成 `null`）。
    *
    * 🔴 **为什么必须有这个动作**：`create` 能带 `note`，但改不了 ——
@@ -215,6 +234,20 @@ export interface TaskActions {
   setNote(entityId: string, note: string | undefined): Promise<void>;
   /** 传 `undefined` 表示移出项目（会写成 `null`）。 */
   moveToProject(entityId: string, projectId: string | undefined): Promise<void>;
+
+  /**
+   * 改任务的**父**（子任务语义，B1-3 的写路径）。
+   *
+   * `undefined` = 提为顶级任务（写成 `null`，与 `setDueDate` / `setNote` 同一条约定）。
+   *
+   * 🔴 **失败时 `throw`，且必须在写之前 throw。** 拒绝原因见
+   * `ParentChangeRejection`，其中 `cycle` 最要紧：把 A 的父设成 A 的后代
+   * 会造出一个**环**，后果是树构建/折叠/计数**无限递归**（栈溢出，整屏打不开）。
+   *
+   * ⚠️ 校验用领域层的 `validateParentChange`，**不在这里自己算** ——
+   * 那是四端必须给出一致答案的产品语义（AGENTS.md §3.5）。
+   */
+  setParent(entityId: string, parentId: string | undefined): Promise<void>;
 
   /**
    * 覆盖式设置任务的标签集合（**一次调用 = 一条 op**）。
@@ -483,9 +516,42 @@ export function createTaskActions(
       return update(entityId, { dueDate: dueDate ?? null });
     },
 
+    async postponeToToday(entityId) {
+      const task = taskOf(entityId);
+      if (task === undefined) throw new Error(`找不到任务「${entityId}」`);
+      // 幂等边界见接口注释：这些情况不产生 op。
+      if (
+        task.dueDate === undefined ||
+        task.completedAt !== undefined ||
+        startOfDay(task.dueDate) >= startOfDay(now())
+      ) {
+        return;
+      }
+      const timeOfDay = task.dueDate - startOfDay(task.dueDate);
+      await update(entityId, { dueDate: startOfDay(now()) + timeOfDay });
+    },
+
     setNote(entityId, note) {
       // undefined → null：与 setDueDate 同一个理由，null 能穿过 JSON 表达"清除"。
       return update(entityId, { note: note ?? null });
+    },
+
+    // 🔴 **必须是 `async`**：校验失败时 `throw` 要变成一个被拒绝的 Promise，
+    // 与接口签名一致。非 async 会同步抛出，而调用方 `void actions.setParent(...)`
+    // 接不住（与 `setTags` 同一个坑，那条注释里有完整记录）。
+    async setParent(entityId, parentId) {
+      const verdict = validateParentChange(
+        Object.values(ctx.getState().tasks),
+        entityId,
+        parentId,
+      );
+      if (!verdict.ok) {
+        // 把领域层的封闭集合翻成一句能定位的话。**不吞、不降级成静默空操作** ——
+        // 静默的后果是"用户以为移好了，树没变"，而本仓吃过这一类。
+        throw new Error(`改父被拒绝（${verdict.reason}）：${entityId} → ${parentId ?? '顶级'}`);
+      }
+      // `undefined` → `null`：null 能穿过 JSON 表达"清除"（与 setNote 同）。
+      return update(entityId, { parentId: verdict.parentId ?? null });
     },
 
     moveToProject(entityId, projectId) {

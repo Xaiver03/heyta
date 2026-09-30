@@ -220,15 +220,47 @@ export async function resolveClientId(adapter: DbAdapter): Promise<string> {
  *
  * 🔴 **崩溃恢复在接受任何新写入之前完成**（`engine.recover()`）。
  */
-export async function openAppHost(options: AppHostOptions): Promise<AppHost> {
+/**
+ * 打开**只是存储**的那一半（适配器 + store + clientId），**不建引擎**。
+ *
+ * 🔴 为什么单独要有它：桌面壳（M2：原生壳 + 壳内共享 UI）里**只允许有一个引擎**。
+ * `openAppHost()` 会建 `OpLogEngine` 并 `recover()`；而桌面壳的 `app` 模式里，
+ * 引擎属于**页侧的真应用**（它才有 feature store / 冲突解决 / 实时通道），
+ * 壳的角色是"一个跑在原生 SQLite 上的 store"。
+ *
+ * 两个引擎同库会各自为政 —— 本仓反复记过同一件事：
+ * 各建引擎则 `appliedOpIds` 与向量时钟漂移，冲突判定随即失真。
+ * 所以壳那条路要的是**这一半**，不是 `openAppHost()`。
+ *
+ * ⚠️ 与 `openAppHost()` **共用同一段配方**（adapter → store → clientId），
+ * 不复制第二份：复制会漂移，而漂移的表现是两边的 clientId 或 schema 对不上。
+ */
+export async function openOpLogStore<
+  TOperation extends Operation<string> = Operation<string>,
+>(options: {
+  driverFactory: () => SqliteDriver;
+  clientId?: string;
+}): Promise<{
+  adapter: SqliteAdapter;
+  store: DbOpLogStore<TOperation>;
+  clientId: string;
+}> {
   const adapter = new SqliteAdapter({
     schema: INDEXEDDB_SCHEMA,
     driverFactory: options.driverFactory,
   });
   await adapter.init();
 
-  const store = new DbOpLogStore<Operation<string>>(adapter);
+  const store = new DbOpLogStore<TOperation>(adapter);
   const clientId = options.clientId ?? (await resolveClientId(adapter));
+  return { adapter, store, clientId };
+}
+
+export async function openAppHost(options: AppHostOptions): Promise<AppHost> {
+  const { adapter, store, clientId } = await openOpLogStore({
+    driverFactory: options.driverFactory,
+    ...(options.clientId !== undefined ? { clientId: options.clientId } : {}),
+  });
 
   const engine = new OpLogEngine({
     store,
