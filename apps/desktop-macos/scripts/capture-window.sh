@@ -41,7 +41,9 @@ swift build 2>&1 | grep -E "error:|Build complete" | awk '{print "  " $0}'
 
 echo ""
 echo "=== 运行 + 自截屏 ==="
-HEYTA_SELF_CAPTURE="$OUT" "$SHELL_DIR/.build/out/Products/Debug/HeytaMac" 2>&1 | awk '{print "  " $0}'
+# 🔴 HEYTA_NO_FOCUS=1：取证启动**绝不抢用户前台**（AGENTS §6.2 规定二；
+#    2026-09-29 产品负责人再次投诉后被做成壳级开关，与 Electron 壳同名同义）。
+HEYTA_NO_FOCUS=1 HEYTA_SELF_CAPTURE="$OUT" "$SHELL_DIR/.build/out/Products/Debug/HeytaMac" 2>&1 | awk '{print "  " $0}'
 
 [ -f "$OUT" ] || { echo "🔴 没产出截图"; exit 1; }
 
@@ -63,7 +65,13 @@ JS
 echo ""
 echo "=== 独立复验：与 screencapture -l 比尺寸 ==="
 # 说明：自截图走的是同一个数据源，尺寸必然一致；若不一致，说明权限或窗口状态有问题。
-(nohup "$SHELL_DIR/.build/out/Products/Debug/HeytaMac" >/dev/null 2>&1 &)
+# 🔴 必须先删旧图：下面的 screencapture 失败是被 `|| true` 吞掉的，
+#    而"文件存在"就是参与比较的条件 —— 不删的话，本轮失败会拿**上一轮的旧图**
+#    来比（2026-09-29 实测：上一轮窗口 1485×1014 的旧图让新窗口 1120×720 的
+#    本轮被误判成"自截图不可信"）。
+rm -f /tmp/heyta-mac-crosscheck.png
+# 🔴 交叉验证的实例同样不抢前台（同上）。
+(nohup env HEYTA_NO_FOCUS=1 "$SHELL_DIR/.build/out/Products/Debug/HeytaMac" >/dev/null 2>&1 &)
 sleep 6
 WID=$(cd "$HERE" && swift window-id.swift 2>/dev/null | head -1 | cut -f1 || true)
 if [ -n "${WID:-}" ]; then
@@ -73,11 +81,22 @@ if [ -n "${WID:-}" ]; then
 import { inspectPng } from './scripts/screenshots/png-stats.mjs';
 const a = inspectPng(process.argv[2]);
 const b = inspectPng(process.argv[3]);
-const same = a.width === b.width && a.height === b.height;
+// 🔴 判等必须对 **1x/2x 缩放不敏感**（2026-09-29 实测 2240×1440 vs 1120×720）：
+//    自截图按**自己窗口所在屏**的 scale 出像素（Retina 2x），screencapture -l
+//    按**目标窗口实际落屏**的 scale 出 —— 两个实例可能落在不同屏
+//    （本机有一块 1x 外接屏）。它们证明的是"同一个窗口"，不是"同一块屏"。
+const sameLogical =
+  (a.width === b.width && a.height === b.height) ||
+  (a.width === b.width * 2 && a.height === b.height * 2) ||
+  (b.width === a.width * 2 && b.height === a.height * 2);
 console.log(`  自截图      ${a.width}x${a.height}`);
 console.log(`  screencapture ${b.width}x${b.height}`);
-console.log(same ? '  ✅ 尺寸一致（同一数据源的交叉验证）' : '  🔴 尺寸不一致 —— 自截图不可信');
-process.exit(same ? 0 : 1);
+console.log(
+  sameLogical
+    ? '  ✅ 尺寸一致（1x/2x 归一后；同一数据源的交叉验证）'
+    : '  🔴 尺寸不一致 —— 自截图不可信',
+);
+process.exit(sameLogical ? 0 : 1);
 JS
   fi
 else
@@ -93,11 +112,15 @@ NARRATIVE="${OUT%.png}.txt"
 
 CROSSCHECK="skipped"
 if [ -f /tmp/heyta-mac-crosscheck.png ]; then
+  # 🔴 与上面的交叉验证同一把尺：1x/2x 归一后再判等（两实例可能落在不同屏）。
   CROSSCHECK=$(node -e "
     import('./scripts/screenshots/png-stats.mjs').then(m=>{
       const a = m.inspectPng(process.argv[1]);
       const b = m.inspectPng('/tmp/heyta-mac-crosscheck.png');
-      process.stdout.write((a.width===b.width && a.height===b.height)
+      const same = (a.width===b.width && a.height===b.height) ||
+        (a.width===b.width*2 && a.height===b.height*2) ||
+        (b.width===a.width*2 && b.height===a.height*2);
+      process.stdout.write(same
         ? 'ok(' + a.width + 'x' + a.height + ')'
         : 'MISMATCH(' + a.width + 'x' + a.height + ' vs ' + b.width + 'x' + b.height + ')');
     });" "$OUT" 2>/dev/null || echo "error")
@@ -110,7 +133,7 @@ fi
 #   bash apps/desktop-macos/scripts/capture-window.sh
 #
 # 采集方式：应用**自截屏**（HEYTA_SELF_CAPTURE=<png>），走
-#           CGWindowListCreateImage 取**窗口服务器合成结果**。
+#           **SCScreenshotManager**（ScreenCaptureKit）取**窗口服务器合成结果**。
 #
 # 🔴 为什么不是"应用自己重绘一遍"—— 三条弯路，全部实测证伪：
 #
@@ -127,9 +150,16 @@ fi
 #   3. ImageRenderer（SwiftUI 官方快照 API）
 #      渲染不了 List / TextField / Toggle ⇒ 整片变成"禁止"占位符。
 #
-#   4. ✅ CGWindowListCreateImage
-#      不重绘任何东西，是**问窗口服务器要一份**，所以文字/抗锯齿/深浅色都对，
-#      **被别的窗口遮挡也不影响**。与外部 `screencapture -l<windowID>` 同源。
+#   4. ⚠️ CGWindowListCreateImage
+#      能拿到窗口服务器合成结果，与外部 `screencapture -l<windowID>` 同源 ——
+#      但 **macOS 14 起已废弃**，所以它不再是本项目用的那条。
+#      （保留在本表里是因为"试过什么"这件事本身有价值。）
+#
+#   5. ✅ SCScreenshotManager（ScreenCaptureKit）—— **现在用的就是这条**
+#      同样问窗口服务器要一份，文字/抗锯齿/深浅色都对，
+#      **被别的窗口遮挡也不影响**。它是 CGWindowListCreateImage 的官方替代。
+#      ⚠️ 需要屏幕录制权限；且必须**轮询** `SCShareableContent` ——
+#      刚启动的进程里窗口可能还没登记，查一次会报"找不到窗口"（已实测）。
 #
 # ⚠️ 需要屏幕录制权限。没有权限时窗口服务器只给一张桌面背景图，
 #    应用会**显式判失败**（比对尺寸）—— 绝不写一张"看起来成功其实是空的"图。

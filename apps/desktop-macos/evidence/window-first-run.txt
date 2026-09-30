@@ -4,7 +4,7 @@
 #   bash apps/desktop-macos/scripts/capture-window.sh
 #
 # 采集方式：应用**自截屏**（HEYTA_SELF_CAPTURE=<png>），走
-#           CGWindowListCreateImage 取**窗口服务器合成结果**。
+#           **SCScreenshotManager**（ScreenCaptureKit）取**窗口服务器合成结果**。
 #
 # 🔴 为什么不是"应用自己重绘一遍"—— 三条弯路，全部实测证伪：
 #
@@ -21,9 +21,16 @@
 #   3. ImageRenderer（SwiftUI 官方快照 API）
 #      渲染不了 List / TextField / Toggle ⇒ 整片变成"禁止"占位符。
 #
-#   4. ✅ CGWindowListCreateImage
-#      不重绘任何东西，是**问窗口服务器要一份**，所以文字/抗锯齿/深浅色都对，
-#      **被别的窗口遮挡也不影响**。与外部 `screencapture -l<windowID>` 同源。
+#   4. ⚠️ CGWindowListCreateImage
+#      能拿到窗口服务器合成结果，与外部 `screencapture -l<windowID>` 同源 ——
+#      但 **macOS 14 起已废弃**，所以它不再是本项目用的那条。
+#      （保留在本表里是因为"试过什么"这件事本身有价值。）
+#
+#   5. ✅ SCScreenshotManager（ScreenCaptureKit）—— **现在用的就是这条**
+#      同样问窗口服务器要一份，文字/抗锯齿/深浅色都对，
+#      **被别的窗口遮挡也不影响**。它是 CGWindowListCreateImage 的官方替代。
+#      ⚠️ 需要屏幕录制权限；且必须**轮询** `SCShareableContent` ——
+#      刚启动的进程里窗口可能还没登记，查一次会报"找不到窗口"（已实测）。
 #
 # ⚠️ 需要屏幕录制权限。没有权限时窗口服务器只给一张桌面背景图，
 #    应用会**显式判失败**（比对尺寸）—— 绝不写一张"看起来成功其实是空的"图。
@@ -33,8 +40,8 @@
 #
 # 交叉验证（本脚本自动执行）：自截图与 `screencapture -l` 的尺寸必须一致。
 
-WINDOW_SIZE=900x560
+WINDOW_SIZE=1120x720
 WINDOW_TITLE=heyta
-PNG_BYTES=81700
+PNG_BYTES=71057
 CAPTURE_METHOD=screencapturekit
-CROSSCHECK=ok(1800x1120)
+CROSSCHECK=ok(2240x1440)

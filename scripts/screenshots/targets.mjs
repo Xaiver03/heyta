@@ -210,6 +210,19 @@ export const SHELL_EVIDENCE = [
     requiresCrosscheck: false,
   },
   {
+    // 🔴 这条不是上一条的重复：上面那张是 `dotnet build` 产物（开发路径），
+    //    这张是**装进机器之后的 MSIX**（Add-AppxPackage → shell:appsFolder）。
+    //    「装上了」不等于「跑得起来」—— 本轮实测就栽在这条上：MSIX 装成功、
+    //    进程也拉起来了，但 `dotnet publish` 丢掉了应用自己的 XBF/PRI，
+    //    窗口从来没出现。所以打包产物必须单独留一份"能起来"的证据。
+    //    采集方式同上：schtasks /it 投进交互式会话 + CopyFromScreen 只截窗口。
+    label: 'Windows MSIX 安装包',
+    png: 'apps/desktop-windows/evidence/packaged-first-run.png',
+    note: 'apps/desktop-windows/evidence/packaged-first-run.txt',
+    methods: ['winui-schtasks-copyfromscreen'],
+    requiresCrosscheck: false,
+  },
+  {
     label: '鸿蒙端',
     png: 'apps/mobile/evidence/harmonyos.png',
     note: 'apps/mobile/evidence/harmonyos.txt',
