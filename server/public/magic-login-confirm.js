@@ -1,5 +1,10 @@
 // 魔法登录确认：读 body 上的 data-* 属性，POST 校验令牌，把结果交给应用完成登录。
 //
+// 🔴 交付通道是 **URL 的 `fragment`**（`/app/#sessionToken=…`），不是 sessionStorage。
+//    原因见下面 `window.location.replace` 前那段：这一页与应用的
+//    **agent cluster 不同**（服务端带了 COOP/OAC，静态产物没有），
+//    sessionStorage 跨不过那次跳转 —— 实测过，不是理论。
+//
 // 两步流程（GET 渲染页面、POST 校验令牌）是为了防住**邮件客户端的链接预取**
 // （Outlook SafeLinks、Gmail 链接预览等）—— 它们会在用户点之前就把链接抓一遍，
 // 单次令牌若在 GET 时消费掉，用户点进来就只能是"链接已失效"。
@@ -90,38 +95,48 @@
           loginBtn.hidden = true;
 
           /**
-           * 🔴 **存的是"会话"，交给应用直接采用** —— 与桌面壳**同一条通道**。
+           * 🔴 **投递方式：URL 的 `fragment`**（第四版；前三版错在哪见下）。
            *
-           * 三版才修对，值得记下每一次错在哪：
-           *
-           * 1. 最初存 `result.data.token`（会话 JWT）到 **`loginToken`**，
-           *    而应用把 `loginToken` 当**一次性链接令牌**拿去 `/api/login/magic-link/verify`
-           *    再换一次 ⇒ **必然 401** ⇒ 用户看到"点了邮件里的链接，回来还是未登录"。
+           * 1. 最初把会话 JWT 存进 **`loginToken`**，而应用把 `loginToken` 当
+           *    **一次性链接令牌**拿去再换一次 ⇒ **必然 401** ⇒
+           *    用户看到"点了邮件里的链接，回来还是未登录"。
            *    （这是它坏了很久没人发现的那个 bug。）
            * 2. 改成存**原始链接令牌** —— 更糟：上面那次 POST **已经把它消费掉了**，
            *    应用拿到的是一张用过的票 ⇒ 还是 401。
            *    （`scripts/verify-email-web-chain.mjs` 第一次跑就当场判红。）
-           * 3. ✅ **现在**：POST 已经换回了会话，那就把**会话**交给应用（`sessionToken`），
-           *    应用**直接采用**、不再去换。壳从 `heyta://auth#token=…` 拿到的也是会话 ——
-           *    两条消费方从此是**同一条**通道、同一个键。
+           * 3. 改成把**会话**存进 `sessionStorage`，应用直接采用。
+           *    键与语义都对了，**但投递仍然会丢**：这条判据当场判红，仪器读数如下 ——
+           *      确认页 `pagehide` 那一刻：`[sessionToken, loginEmail, loginBaseUrl]`（写进去了）
+           *      应用启动那一刻        ：`[]`（没跟过来）且**没有任何 `removeItem`**
+           *    根因：这一页由同步服务端渲染，带着 `@fastify/helmet` 的默认头
+           *    `Cross-Origin-Opener-Policy: same-origin` + `Origin-Agent-Cluster: ?1`；
+           *    应用（`/app/`，静态产物）两个头都没有 ⇒ 跳过去时**切了 browsing instance**，
+           *    `sessionStorage` 不跟着回来。**注入摘掉那两个头，判据立刻全绿** —— 因果已钉死。
+           * 4. ✅ **现在**：把会话放进 **fragment** 交给应用。fragment 不发给服务端、
+           *    不进 `Referer`、不进任何访问日志，而且是 URL 的一部分 ⇒ **一定跨得过去**，
+           *    不依赖服务端与反代的头配置保持一致（自建换反代不会再坏一次）。
+           *    应用读完**立刻** `history.replaceState` 抹掉（见
+           *    `apps/web/src/features/auth/pending-login.ts`）。
            *
            * ⚠️ 保留上面那次 POST：它是**给用户看的**校验（链接无效/过期当场说出来），
            *    而且它才是**唯一**的消费点（单次消费）。
            */
-          sessionStorage.setItem('sessionToken', result.data.token);
-          sessionStorage.setItem(
-            'loginEmail',
-            (result.data.user && result.data.user.email) || '',
-          );
+          var params = new URLSearchParams();
+          params.set('sessionToken', result.data.token);
+          params.set('loginEmail', (result.data.user && result.data.user.email) || '');
           // 🔴 不要把这里写死成某个域名，也不要让应用去"猜自己的 origin"：
           //    应用与同步服务端可能不在同一个 origin（反代、自建、VITE_SYNC_URL 覆盖），
           //    猜错就会把令牌发到错的地方。这里记的是**校验端点所在的那个 origin**。
-          sessionStorage.setItem('loginBaseUrl', window.location.origin);
-          // 🔴 跳到**应用**（`/app/`），不是站点根。
-          //    令牌放在 sessionStorage 里，只有应用启动时才会被消费；
-          //    落在站点根（落地页）的话，用户点了"登录"却停在落地页，
-          //    还得自己再点一次"立即使用" —— 那正是这一页要消除的摩擦。
-          window.location.href = '/app/';
+          params.set('loginBaseUrl', window.location.origin);
+          /**
+           * 🔴 跳到**应用**（`/app/`），不是站点根：落在落地页的话，用户点了"登录"
+           *    却停在落地页，还得自己再点一次"立即使用" —— 那正是这一页要消除的摩擦。
+           *
+           * 🔴 **`replace` 而不是 `assign`**：确认页那个 URL 里带着**一次性令牌**，
+           *    让它留在历史里，用户按一次"后退"就会重新打开一个已经用掉的链接
+           *    （看到"链接已失效"，像是坏了）。`replace` 把它整个换掉。
+           */
+          window.location.replace('/app/#' + params.toString());
         })
         .catch(function (err) {
           // 不把 `err.message` 显示给用户：那是服务端的英文或一个内部标识，
