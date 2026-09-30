@@ -32,6 +32,8 @@
  *    这件事**可被断言**（`a[data-testid="desktop-handoff-link"]` 的 `href`）。
  */
 
+import { cssVar } from '@heyta/design-system';
+
 /** 回跳用的 scheme。⚠️ 这是壳**第一次**对外承诺一个 URL scheme —— 改动它是破坏性变更。 */
 export const DESKTOP_CALLBACK_SCHEME = 'heyta';
 
@@ -90,18 +92,35 @@ export function handOffToShell(
   if (existing === null) {
     const box = doc.createElement('div');
     box.setAttribute('data-testid', 'desktop-handoff');
-    // 内联样式而不是引一个样式文件：这一层要在**任何**主题/布局下都能显示，
-    // 而它挂载的时刻应用可能正处于任意状态（登录成功那一瞬）。
+    // 内联样式而不是引一个样式文件：这一层是在 React 树**外面**命令式挂上去的，
+    // 挂载时刻应用可能正处于任意状态（登录成功那一瞬）。
+    // 🔴 取值一律走设计 token：写死 `#111827` 的结果是暗色下凭空一块不协调的深色，
+    // 而 `cssVar` 拼错 token 名在**编译期**就失败。代价是这一层依赖 `tokens.css`
+    // 已加载（`main.tsx` 全局引入，所以成立）。
     box.setAttribute(
       'style',
-      'position:fixed;inset:auto 0 0 0;padding:12px 16px;text-align:center;' +
-        'background:#111827;color:#f9fafb;font-size:14px;z-index:2147483647',
+      [
+        'position:fixed',
+        'inset:auto 0 0 0',
+        'text-align:center',
+        `padding:${cssVar('space.3')} ${cssVar('space.4')}`,
+        `background:${cssVar('color.surface-raised')}`,
+        `color:${cssVar('color.foreground')}`,
+        // 换成主题面之后，原来的"深色块"分隔力没了 —— 用边框 + 投影补回来。
+        `border-top:${cssVar('border-width.thin')} solid ${cssVar('color.border')}`,
+        `box-shadow:${cssVar('shadow.lg')}`,
+        `font-size:${cssVar('font-size.sm')}`,
+        `z-index:${cssVar('z.toast')}`,
+      ].join(';'),
     );
     const link = doc.createElement('a');
     link.setAttribute('data-testid', DESKTOP_HANDOFF_TESTID);
     link.setAttribute('href', url);
     link.textContent = '正在返回 heyta…（如果没有自动跳转，点这里）';
-    link.setAttribute('style', 'color:#93c5fd;text-decoration:underline');
+    link.setAttribute(
+      'style',
+      `color:${cssVar('color.primary')};text-decoration:underline`,
+    );
     box.appendChild(link);
     doc.body.appendChild(box);
   }
