@@ -147,18 +147,20 @@ export const en = {
   // ── Landing · self-host ───────────────────────────────────
   'landing.selfhost.title': 'Your own server, one command away',
   'landing.selfhost.lede': 'No account and no subscription. The server only relays ciphertext and orders concurrent changes: replace it, shut it down, or move it to another machine and your data is unaffected.',
-  'landing.selfhost.terminal': 'Terminal',
-  'landing.selfhost.step1.title': 'Clone and build',
-  'landing.selfhost.step1.body': 'Needs Node 22+ and pnpm 11.8.0. Install dependencies and run a full build once.',
-  'landing.selfhost.step2.title': 'Start the server',
-  'landing.selfhost.step2.body': 'One command brings up the sync service and the database. The server stores only ciphertext; it has no key to decrypt it.',
-  'landing.selfhost.step3.title': 'Point the client at it',
-  'landing.selfhost.step3.body': 'On first launch, pick one: your own server address or the hosted option. You can switch whenever you want.',
-  'landing.selfhost.warnStrong': 'Do not run Prisma migrations directly.',
-  'landing.selfhost.warnBody': 'The project has 9 migrations that build indexes concurrently. Prisma wraps migrations in a transaction, and PostgreSQL does not allow concurrent index creation inside one, so the first such migration fails. Use the repository ',
-  'landing.selfhost.warnCode': 'migration script scripts/migrate-deploy.sh.',
-  // The repository is private today, so the `git clone` command above does not
-  // work for visitors. This is an honest disclosure, not marketing copy.
+  // 🔴 No shell commands, repository paths or database internals in this
+  // section -- the criterion and the reason live in
+  // `apps/landing/tests/public-copy-register.spec.tsx`. What has to be typed
+  // line by line belongs to the runbook the `guide.*` keys link to, because
+  // that file updates with the build while a copy on this page does not.
+  'landing.selfhost.step1.title': 'Start the server',
+  'landing.selfhost.step1.body': 'One docker compose file brings the sync service and the database up on your own machine. The server stores only ciphertext; it has no key to decrypt it.',
+  'landing.selfhost.step2.title': 'Point the client at it',
+  'landing.selfhost.step2.body': 'On first launch, pick one: your own server address or the hosted option. You can switch whenever you want.',
+  'landing.selfhost.step3.title': 'You set the secrets',
+  'landing.selfhost.step3.body': 'There are no default credentials — it is not a zero-thought installer, but every step is documented.',
+  'landing.selfhost.guide.title': 'The full walk-through lives in the repo',
+  'landing.selfhost.guide.body': 'Every command, requirement and config file is in the self-hosting guide; follow it once and it comes up.',
+  'landing.selfhost.guide.link': 'Open the self-host guide',
 
   // ── Landing · pricing ─────────────────────────────────────
   // 🔴 These prices must match the server price list and both legal texts --
@@ -216,7 +218,7 @@ export const en = {
   'landing.footer.privacy': 'Privacy',
   'landing.footer.selfHostServer': 'Self-host the server',
   'landing.footer.disclaimer': 'A personal project, not affiliated with TickTick or its affiliates.',
-  'landing.footer.licenseNote': 'heyta is MIT licensed; third-party attribution is itemised in THIRD_PARTY_LICENSES.md.',
+  'landing.footer.licenseNote': 'heyta is MIT licensed; the license obligations of every third-party component used are fulfilled.',
   'landing.cta.viewCode': 'View source on GitHub',
   'landing.footer.viewOnGithub': 'View on GitHub',
   'landing.footer.group.docs': 'Docs',

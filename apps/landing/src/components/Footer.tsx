@@ -31,7 +31,7 @@ import { Github } from 'lucide-react';
 
 import { useI18n, useLocale, type MessageKey } from '@heyta/i18n/provider';
 
-import { GITHUB_URL } from '../lib/repo.js';
+import { GITHUB_URL, SELF_HOST_GUIDE_URL } from '../lib/repo.js';
 import { footerGroups, pageById, type SiteGroup } from '../site/pages.js';
 import { siteHref } from '../site/paths.js';
 import { BrandMark } from './BrandMark.js';
@@ -41,15 +41,19 @@ import { BrandMark } from './BrandMark.js';
  * 注册表管的是"站点有哪些页面"，这些是仓库资源，不是页面；混进注册表
  * 会让 `footerGroups()` 的类型与 N2 可达性判据都要为外链开洞。
  * 🔴 每条路径在公开仓库 main 上验过 200 才准进这张表（见文件头）。
+ *
+ * ⚠️ 这张表存**完整地址**而不是"仓库根 + 路径片段"：自建指南的路径已有唯一
+ * 事实源 `SELF_HOST_GUIDE_URL`，在这里再抄一遍片段就等于允许"指南搬家"只改一处
+ * —— 而漏掉的那一处表现为链接 404。
  */
-const DOCS_LINKS: readonly { key: MessageKey; path: string }[] = [
-  { key: 'landing.footer.source', path: '' },
-  { key: 'landing.footer.contributing', path: '/blob/main/CONTRIBUTING.md' },
-  { key: 'landing.footer.deployGuide', path: '/blob/main/docs/runbooks/local-server-verification.md' },
-  { key: 'landing.footer.roadmap', path: '/blob/main/docs/plans/roadmap.md' },
-  { key: 'landing.footer.adr', path: '/tree/main/docs/adr' },
-  { key: 'landing.footer.licenses', path: '/blob/main/THIRD_PARTY_LICENSES.md' },
-  { key: 'landing.footer.docsIndex', path: '/blob/main/docs/README.md' },
+const DOCS_LINKS: readonly { key: MessageKey; href: string }[] = [
+  { key: 'landing.footer.source', href: GITHUB_URL },
+  { key: 'landing.footer.contributing', href: `${GITHUB_URL}/blob/main/CONTRIBUTING.md` },
+  { key: 'landing.footer.deployGuide', href: SELF_HOST_GUIDE_URL },
+  { key: 'landing.footer.roadmap', href: `${GITHUB_URL}/blob/main/docs/plans/roadmap.md` },
+  { key: 'landing.footer.adr', href: `${GITHUB_URL}/tree/main/docs/adr` },
+  { key: 'landing.footer.licenses', href: `${GITHUB_URL}/blob/main/THIRD_PARTY_LICENSES.md` },
+  { key: 'landing.footer.docsIndex', href: `${GITHUB_URL}/blob/main/docs/README.md` },
 ];
 
 /**
@@ -128,7 +132,7 @@ export function Footer(): React.JSX.Element {
                 <li key={link.key}>
                   <a
                     className="lp-footer__link"
-                    href={`${GITHUB_URL}${link.path}`}
+                    href={link.href}
                     rel="noopener noreferrer"
                   >
                     {t(link.key)}

@@ -615,12 +615,6 @@
   color: var(--ht-color-foreground);
 }
 
-/* 警告语气**不能只靠颜色**：图标 + 文案本身已经把严重性说清楚了 */
-.lp-note--warn {
-  border-color: var(--ht-color-warning);
-  color: var(--ht-color-warning-strong);
-}
-
 /* ════════════════════════════════════════════════════════════
    能力：bento 网格
    ════════════════════════════════════════════════════════════ */
@@ -1033,83 +1027,48 @@
 }
 
 /* ════════════════════════════════════════════════════════════
-   自建：终端 + 步骤
+   自建：三步 + 指南入口
    ════════════════════════════════════════════════════════════ */
 
 .lp-selfhost__grid {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr);
   gap: var(--ht-space-10);
   align-items: start;
-}
-
-.lp-term {
-  border: var(--ht-border-width-thin) solid var(--ht-color-border);
-  border-radius: var(--ht-radius-xl);
-  overflow: hidden;
-  background: var(--ht-color-surface-sunken);
-}
-
-.lp-term__bar {
-  display: flex;
-  align-items: center;
-  gap: var(--ht-space-2);
-  padding: var(--ht-space-3) var(--ht-space-4);
-  border-block-end: var(--ht-border-width-thin) solid var(--ht-color-border);
-  background: var(--ht-color-surface);
-}
-
-.lp-term__dot {
-  inline-size: var(--ht-space-2);
-  block-size: var(--ht-space-2);
-  border-radius: var(--ht-radius-full);
-  background: var(--ht-color-border-strong);
-}
-
-.lp-term__title {
-  margin-inline-start: var(--ht-space-2);
-  font-size: var(--ht-font-size-xs);
-  color: var(--ht-color-foreground-subtle);
-}
-
-.lp-term__body {
-  display: flex;
-  flex-direction: column;
-  gap: var(--ht-space-3);
-  padding: var(--ht-space-5);
-  font-family: var(--ht-font-mono);
-  font-size: var(--ht-font-size-xs);
-  line-height: var(--ht-line-height-normal);
-}
-
-.lp-term__line {
-  display: flex;
-  gap: var(--ht-space-2);
-  /* 终端是 LTR 内容，即使用户界面是中文 */
-  direction: ltr;
-  text-align: left;
-}
-
-.lp-term__line code {
-  font-family: var(--ht-font-mono);
-  word-break: break-all;
-}
-
-.lp-term__prompt {
-  color: var(--ht-color-primary);
-  flex: none;
-}
-
-.lp-term__caret {
-  inline-size: var(--ht-space-2);
-  block-size: var(--ht-font-size-sm);
-  background: var(--ht-color-primary);
 }
 
 .lp-selfhost__steps {
   display: flex;
   flex-direction: column;
   gap: var(--ht-space-4);
+}
+
+/*
+  指南入口卡：这一节不贴命令，所以右侧的职责只有一个 —— 给出"去哪儿看命令"。
+  它比步骤列安静（无图标、无编号），因为它是出口不是内容。
+*/
+.lp-selfhost__guide {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--ht-space-3);
+  padding: var(--ht-space-6);
+  border: var(--ht-border-width-thin) solid var(--ht-color-border);
+  border-radius: var(--ht-radius-xl);
+  background: var(--ht-color-surface);
+}
+
+.lp-selfhost__guide-title {
+  font-size: var(--ht-font-size-base);
+  font-weight: var(--ht-font-weight-semibold);
+  line-height: var(--ht-line-height-normal);
+  color: var(--ht-color-foreground);
+}
+
+.lp-selfhost__guide-body {
+  font-size: var(--ht-font-size-sm);
+  line-height: var(--ht-line-height-normal);
+  color: var(--ht-color-foreground-muted);
 }
 
 .lp-steps {

@@ -33,8 +33,7 @@ import type { Translate } from '../i18n/translate';
  *
  * 🔴 它一度是一条词条（`mobile.recurrence.listSeparator`），
  * 但 `catalog.spec.ts` 的"中文词条必须含汉字"把它判为违规 —— 而那条规则是对的：
- * 一条只有标点的词条**没办法自查语言**（仓库里对同一个判断已有先例，
- * 见 `landing.selfhost.warnCode` 的注释）。
+ * 一条只有标点的词条**没办法自查语言**。
  *
  * 于是它回到代码里，按语言查表。代价是"再加一种语言"要在两处各改一行
  * （这里 + 词条表）；收益是那条防"用英文占位中文"的规则不被开一个口子。

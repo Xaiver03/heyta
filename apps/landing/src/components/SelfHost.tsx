@@ -1,43 +1,39 @@
 /**
  * 自建
  * ======
- * 分栏：左边是终端，右边是三步说明。**布局族与前两节不同**（前两节是 bento 与
+ * 两栏：左边三步说明，右边自建指南的入口。**布局族与前两节不同**（前两节是 bento 与
  * 滚动固定展厅），避免整页读起来像同一段重复八遍。
  *
- * 🔴 命令是从 `docs/runbooks/local-server-verification.md` 抄的**真实流程**，
- * 不是编的。有几条是踩过坑才写下来的，值得原样保留：
- *   - Node ≥ 22、pnpm 11.8.0（根 `package.json` 的 engines / packageManager）
- *   - PostgreSQL **≥ 16**（compose 里是 `postgres:16-alpine`）
- *   - 迁移**必须走 `sh scripts/migrate-deploy.sh`，不能用 `prisma migrate deploy`**
- *     —— 后者会把每个迁移包进事务，而 PostgreSQL 禁止在事务块里执行
- *     `CREATE INDEX CONCURRENTLY`，项目里有 9 个这样的迁移，会在第一个上失败。
- *   把这条"为什么"留在页面上，比只给一行命令有用。
+ * ─────────────────────────────────────────────────────────────────────────
+ * 🔴 这一节**不写命令行**，也**不写数据库与构建机制**。2026-09-30 之前它是反例：
+ * 左边一块终端贴着 `git clone` / `pnpm install` / `docker compose up -d`，
+ * 右边一段橙色警告讲"Prisma 会把迁移包进事务，而 PostgreSQL 不允许在事务里
+ * 建并发索引"。那句话本身是对的 —— 但它是 [AGENTS.md](../../../AGENTS.md) §4
+ * 里**对贡献者成立的纪律**，被逐字搬到了面向用户的营销页上。
+ *
+ * 为什么会被搬上来：`docs/runbooks/` 里有一段写得很清楚的解释 → 有人觉得
+ * "这条重要，用户也该知道" → 抄过来 → 再写一段注释自我论证它为什么该留在页面上 →
+ * 下一轮改动读到那段注释，把它当成产品决策，于是保留并继续加。
+ * **机制本身是错的**，不是那次抄写错。所以：
+ *
+ * - 判据住在 `tests/public-copy-register.spec.tsx`（每一页 × 每一语言渲染出的
+ *   真实文本 + 读屏会念到的无障碍名），不在这里再写一份；
+ * - 这一节的职责是把"自建起来是什么样"说清楚，**具体命令、依赖、配置一律交回
+ *   `SELF_HOST_GUIDE_URL`** —— runbook 随构建一起更新，页面上的抄本不会。
+ *
+ * ⚠️ 想往这里加"一条命令"或"一个内部路径"之前，先回答：**用户读完这句话，
+ * 下一步动作是什么？** 答案是"打开终端"的，留在指南里；
+ * 答案是"往下读/去仓库看一眼"的，才属于这一页。
  */
 
 import { useMemo } from 'react';
 import { motion } from 'motion/react';
-import { AlertTriangle, Container, Database, Terminal } from 'lucide-react';
+import { ArrowUpRight, Container, Globe, Lock } from 'lucide-react';
 
 import { useI18n } from '@heyta/i18n/provider';
 
+import { SELF_HOST_GUIDE_URL } from '../lib/repo.js';
 import { revealVariants, staggerContainer, useMotionPreset, VIEWPORT } from '../lib/motion.js';
-
-/**
- * 终端里逐行浮现的命令。最后一行是光标行。
- *
- * ⚠️ 这三行**故意不进词条表**：它们是可复制粘贴执行的 shell 命令（含仓库 URL
- * 与 pnpm 子命令），不是给人读的句子。把命令"翻译"一遍会让用户复制到一条跑不通的
- * 命令 —— 那不是本地化，是造假。真正的文案（标题、步骤、警告）都已走 `t()`。
- *
- * ✅ 第一行是**真地址**（2026-09-29 仓库转公开）。私有时期这里曾是占位符
- * `<repo-url>`，并配有一条「源码尚未公开」的说明 —— 两者都随公开一并撤掉
- * （占位符在公开的仓库下面就成了假话）。
- */
-const COMMANDS = [
-  'git clone https://github.com/Xaiver03/heyta.git',
-  'cd heyta && pnpm install && pnpm -r build',
-  'cd server && docker compose up -d',
-];
 
 export function SelfHost(): React.JSX.Element {
   const preset = useMotionPreset();
@@ -47,17 +43,17 @@ export function SelfHost(): React.JSX.Element {
   const steps = useMemo(
     () => [
       {
-        icon: <Terminal size={18} />,
+        icon: <Container size={18} />,
         title: t('landing.selfhost.step1.title'),
         body: t('landing.selfhost.step1.body'),
       },
       {
-        icon: <Container size={18} />,
+        icon: <Globe size={18} />,
         title: t('landing.selfhost.step2.title'),
         body: t('landing.selfhost.step2.body'),
       },
       {
-        icon: <Database size={18} />,
+        icon: <Lock size={18} />,
         title: t('landing.selfhost.step3.title'),
         body: t('landing.selfhost.step3.body'),
       },
@@ -70,66 +66,10 @@ export function SelfHost(): React.JSX.Element {
       <div className="lp-wrap">
         <header className="lp-section__head">
           <h2 className="lp-h2">{t('landing.selfhost.title')}</h2>
-          <p className="lp-section__lede">
-            {t('landing.selfhost.lede')}
-          </p>
+          <p className="lp-section__lede">{t('landing.selfhost.lede')}</p>
         </header>
 
         <div className="lp-selfhost__grid">
-          <motion.div
-            className="lp-term"
-            initial="hidden"
-            whileInView="visible"
-            viewport={VIEWPORT}
-            variants={staggerContainer(preset.reduced)}
-          >
-            <div className="lp-term__bar">
-              <span className="lp-term__dot" />
-              <span className="lp-term__dot" />
-              <span className="lp-term__dot" />
-              <span className="lp-term__title">{t('landing.selfhost.terminal')}</span>
-            </div>
-
-            <div className="lp-term__body">
-              {COMMANDS.map((command) => (
-                <motion.div
-                  key={command}
-                  className="lp-term__line"
-                  variants={revealVariants(preset.reduced, preset.ui, '0.4rem')}
-                >
-                  <span className="lp-term__prompt" aria-hidden="true">
-                    $
-                  </span>
-                  <code>{command}</code>
-                </motion.div>
-              ))}
-
-              <motion.div className="lp-term__line" variants={revealVariants(preset.reduced, preset.ui, '0.4rem')}>
-                <span className="lp-term__prompt" aria-hidden="true">
-                  $
-                </span>
-                {/*
-                  光标闪烁用 Motion 而不是 CSS `@keyframes`。
-                  原因很具体：闪烁周期约 1 秒，而设计系统把 `--ht-duration-*`
-                  全部锁在 300ms 以内（MASTER.md §6，且有测试断言这个区间）。
-                  写 CSS 动画就必须写一个裸的 `1.05s`，那会被 `check:design` 拦下。
-                  Motion 的 duration 是**裸数字**（秒），不触发那条规则，
-                  而且能直接受 `prefers-reduced-motion` 控制。
-                */}
-                <motion.span
-                  className="lp-term__caret"
-                  aria-hidden="true"
-                  animate={preset.reduced ? { opacity: 1 } : { opacity: [1, 1, 0, 0] }}
-                  transition={
-                    preset.reduced
-                      ? { duration: 0 }
-                      : { duration: 1.05, times: [0, 0.5, 0.5, 1], repeat: Infinity, ease: 'linear' }
-                  }
-                />
-              </motion.div>
-            </div>
-          </motion.div>
-
           <div className="lp-selfhost__steps">
             <motion.ol
               className="lp-steps"
@@ -139,7 +79,11 @@ export function SelfHost(): React.JSX.Element {
               viewport={VIEWPORT}
             >
               {steps.map((step, index) => (
-                <motion.li key={step.title} className="lp-step" variants={revealVariants(preset.reduced, preset.ui)}>
+                <motion.li
+                  key={step.title}
+                  className="lp-step"
+                  variants={revealVariants(preset.reduced, preset.ui)}
+                >
                   <span className="lp-step__icon">{step.icon}</span>
                   <span className="lp-step__index">{String(index + 1).padStart(2, '0')}</span>
                   <div>
@@ -149,31 +93,26 @@ export function SelfHost(): React.JSX.Element {
                 </motion.li>
               ))}
             </motion.ol>
-
-            {/* 这条警告是从真实踩坑记录里拿来的，所以值得占一块版面 */}
-            <motion.div
-              className="lp-note lp-note--warn"
-              variants={revealVariants(preset.reduced, preset.ui)}
-              initial="hidden"
-              whileInView="visible"
-              viewport={VIEWPORT}
-            >
-              <AlertTriangle size={16} aria-hidden="true" />
-              <div>
-                <strong>{t('landing.selfhost.warnStrong')}</strong>
-                {t('landing.selfhost.warnBody')}
-                {/* 与 apps/web 的 AiSettings 同一写法：代码元素里带中文前缀。
-                    这不是凑格式 —— 路径本身对用户没有意义，得先说明它是什么。 */}
-                <code>{t('landing.selfhost.warnCode')}</code>
-              </div>
-            </motion.div>
-
-            {/*
-              这条替换掉了原来指向 `docs/runbooks/local-server-verification.md` 的
-              外链（仓库私有 → 对访客是 404）。**不能只删不补**：上面那三行命令
-              现在跑不通，页面上必须有人把这件事说出来。
-            */}
           </div>
+
+          <motion.aside
+            className="lp-selfhost__guide"
+            variants={revealVariants(preset.reduced, preset.ui)}
+            initial="hidden"
+            whileInView="visible"
+            viewport={VIEWPORT}
+          >
+            <h3 className="lp-selfhost__guide-title">{t('landing.selfhost.guide.title')}</h3>
+            <p className="lp-selfhost__guide-body">{t('landing.selfhost.guide.body')}</p>
+            <a
+              className="lp-btn lp-btn--secondary"
+              href={SELF_HOST_GUIDE_URL}
+              rel="noopener noreferrer"
+            >
+              {t('landing.selfhost.guide.link')}
+              <ArrowUpRight size={16} aria-hidden="true" />
+            </a>
+          </motion.aside>
         </div>
       </div>
     </section>

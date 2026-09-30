@@ -162,21 +162,18 @@ export const zhCN = {
   // ── 落地页 · 自建 ─────────────────────────────────────────
   'landing.selfhost.title': '自己的服务器，一条命令的事',
   'landing.selfhost.lede': '不需要注册账号，不需要订阅。服务端只负责转发密文与判并发，换掉它、关掉它、搬到别的机器上，你的数据都不受影响。',
-  'landing.selfhost.terminal': '终端',
-  'landing.selfhost.step1.title': '拉代码并构建',
-  'landing.selfhost.step1.body': '需要 Node 22 以上、pnpm 11.8.0。装完依赖跑一次全量构建。',
-  'landing.selfhost.step2.title': '起服务端',
-  'landing.selfhost.step2.body': '一条命令拉起同步服务与数据库。服务端只存密文，它没有解密的钥匙。',
-  'landing.selfhost.step3.title': '在客户端填地址',
-  'landing.selfhost.step3.body': '首次启动时二选一：填自己的服务器地址，或者用托管。选了随时能换。',
-  'landing.selfhost.warnStrong': '数据库迁移不要直接调 Prisma。',
-  'landing.selfhost.warnBody': '项目里有 9 个并发建索引的迁移，Prisma 会把迁移包进事务，而 PostgreSQL 不允许在事务里建并发索引，跑到第一个这样的迁移就会失败。请用仓库里的',
-  // 句末的「。」并进代码词条里：单独立一条纯标点词条会被
-  // catalog.spec.ts 的"中文词条必须含汉字"判定为违规（它是对的 ——
-  // 一条只有标点的词条没有办法自查语言）。
-  'landing.selfhost.warnCode': '迁移脚本 scripts/migrate-deploy.sh。',
-  // 仓库当前是私有的，上面那条 `git clone` 对访客无效。这一条是**诚实说明**，
-  // 不是营销文案 —— 仓库公开后连同它一起删掉，并把链接恢复（见 ADR-0017 的收尾）。
+  // 🔴 这一节**不许**出现命令行、内部路径或数据库机制（判据与理由见
+  // `apps/landing/tests/public-copy-register.spec.tsx`）。需要逐条执行的东西
+  // 住在下面 `guide.*` 指向的那份 runbook 里 —— 它会随构建一起更新。
+  'landing.selfhost.step1.title': '起服务端',
+  'landing.selfhost.step1.body': '一条 docker compose 把同步服务与数据库跑在自己的机器上。服务端只存密文，它没有解密的钥匙。',
+  'landing.selfhost.step2.title': '在客户端填地址',
+  'landing.selfhost.step2.body': '首次启动时二选一：填自己的服务器地址，或者用托管。选了随时能换。',
+  'landing.selfhost.step3.title': '密钥与口令自己配',
+  'landing.selfhost.step3.body': '没有默认值，要自己设 —— 不是零思考的一键安装，但每一步都有指南。',
+  'landing.selfhost.guide.title': '完整步骤在仓库里',
+  'landing.selfhost.guide.body': '要逐条执行的命令、依赖与配置文件都写在自建指南里，跟着跑一遍就能起来。',
+  'landing.selfhost.guide.link': '打开自建指南',
 
   // ── 落地页 · 价格 ─────────────────────────────────────────
   // 🔴 这里的价格必须与 server 的价目表、两份法务文本一致 ——
@@ -235,7 +232,7 @@ export const zhCN = {
   'landing.footer.privacy': '隐私',
   'landing.footer.selfHostServer': '自建服务端',
   'landing.footer.disclaimer': '个人项目，与滴答清单 / TickTick 及其关联公司无任何关系。',
-  'landing.footer.licenseNote': 'heyta 采用 MIT 许可证；第三方代码归属逐项登记在 THIRD_PARTY_LICENSES.md。',
+  'landing.footer.licenseNote': 'heyta 采用 MIT 许可证；所用第三方代码的授权要求已逐项履行。',
   'landing.cta.viewCode': '在 GitHub 看源码',
   'landing.footer.viewOnGithub': '在 GitHub 上查看',
   'landing.footer.group.docs': '文档',
@@ -1741,8 +1738,7 @@ export const zhCN = {
   // `apps/mobile/src/lib/recurrence-display.ts` 的一张 `Record<Locale, string>` 里。
   // 理由：它是**正字法**，不是文案；而中文侧的值只有一个标点，
   // 会让 `catalog.spec.ts` 的"中文词条必须含汉字"判为违规 ——
-  // 那条规则是**对的**（一条只有标点的词条没办法自查语言，
-  // 同一个判断见上面 `landing.selfhost.warnCode` 的注释）。
+  // 那条规则是**对的**（一条只有标点的词条没办法自查语言）。
   'mobile.recurrence.daily': '每天',
   'mobile.recurrence.dailyEvery': '每 {n} 天',
   'mobile.recurrence.weekly': '每周',
