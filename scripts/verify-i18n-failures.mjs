@@ -78,6 +78,22 @@ const LANDING_ZH = path.join(LANDING, 'index.html');
 const LANDING_EN = path.join(LANDING, 'en/index.html');
 const SCENE_BOUNDARY = path.join(LANDING, 'src/components/SceneBoundary.tsx');
 const SCENE = path.join(LANDING, 'src/components/SyncScene.tsx');
+
+/**
+ * 当前站点 origin —— **从产物里读，不写死**。
+ *
+ * 🔴 2026-09-30：下面三条注入原先硬编码 `https://heyta.finlaw.cloud`。
+ * 域名一换（→ `heyta.waytofuture.cn`），`withMutation` 就抛"锚点不存在"，
+ * 而本脚本**不在 `pnpm check` 里** —— 也就是说它坏掉时**没有任何门禁会说话**，
+ * 下一次真跑它的人才会撞上一个与本次改动无关的报错。
+ *
+ * 这与仓库那条"换域名 = 一次构建参数、不要写死"的纪律是同一件事：
+ * 凡是跟着部署地址走的东西，都从产物里取。
+ */
+const SITE_ORIGIN = /https:\/\/[a-z0-9.-]+/u.exec(readFileSync(LANDING_EN, 'utf8'))?.[0];
+if (SITE_ORIGIN === undefined) {
+  throw new Error(`从 ${LANDING_EN} 里读不到站点 origin —— 模板结构变了？`);
+}
 const STORAGE = path.join(ROOT, 'packages/storage');
 const IDB_ADAPTER = path.join(STORAGE, 'src/indexeddb/indexeddb-adapter.ts');
 const ERROR_HINT = path.join(ROOT, 'apps/web/src/features/shell/error-hint.ts');
@@ -646,8 +662,8 @@ function groupLanding() {
   expectRed('landing', '英文入口的 canonical 指回中文入口', () =>
     withMutation(
       LANDING_EN,
-      '<link rel="canonical" href="https://heyta.finlaw.cloud/en/" />',
-      '<link rel="canonical" href="https://heyta.finlaw.cloud/" />',
+      `<link rel="canonical" href="${SITE_ORIGIN}/en/" />`,
+      `<link rel="canonical" href="${SITE_ORIGIN}/" />`,
       seoRun,
     ),
   );
@@ -656,8 +672,8 @@ function groupLanding() {
   expectRed('landing', 'hreflang 标签写成 en-US（三件套缺一件）', () =>
     withMutation(
       LANDING_ZH,
-      '<link rel="alternate" hreflang="en" href="https://heyta.finlaw.cloud/en/" />',
-      '<link rel="alternate" hreflang="en-US" href="https://heyta.finlaw.cloud/en/" />',
+      `<link rel="alternate" hreflang="en" href="${SITE_ORIGIN}/en/" />`,
+      `<link rel="alternate" hreflang="en-US" href="${SITE_ORIGIN}/en/" />`,
       seoRun,
     ),
   );
