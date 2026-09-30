@@ -178,6 +178,42 @@ export function revealVariants(
 }
 
 /**
+ * 遮罩式标题显现（keynote 风格的"从槽里升起来"）
+ * ================================================
+ *
+ * 模式参考 Amicro（MIT，`registry/ui/text/text-reveal.tsx`）——但物理是**我们的**：
+ * 它用 easeOutExpo 的 tween，这里用设计系统换算出来的弹簧。理由与文件头相同：
+ * 再引一条缓动曲线就是第二个权威，设计系统调参时它会静默留在旧手感上。
+ *
+ * 结构：外层 `overflow: hidden`（遮罩槽）+ 内层块级元素 `y` 从槽底升到 0。
+ * 与 `revealVariants` 的淡入上浮不同，遮罩在位移开始前就把内容**裁掉**了，
+ * 所以正常模式下 hidden 不需要 opacity —— "看不见"由裁剪表达，
+ * "文字是从一条缝里长出来的"由遮罩边缘表达。这正是 keynote 标题的读感。
+ *
+ * 🔴 `hidden` 的 y 是 **112%** 而不是 100%：h1 的行高是 1.08、`em` 还带
+ * `padding-block-end: 0.08em` 的降部余量 —— 内层块的高度比可见字形高出一点，
+ * 100% 只走到"字形完全出槽"的临界点，斜体降部（英文页的 g/j/y）会先露一条头。
+ * ≥112% 保证任何字形都完全在槽外。移动端折成两行时百分比按**整块高度**算，
+ * 一样盖得住 —— 这也是选整块遮罩而不是逐行拆分的原因：行数由视口决定，
+ * 拆行就是要把排版决策抄进组件里。
+ *
+ * 🔴 减动效下降级为**纯淡入**（与 `revealVariants` 同一条 Apple《Materials》规则：
+ * 减少动效不是没有反馈）。此时遮罩仍在，但内容从不位移。
+ */
+export function maskedRevealVariants(reduced: boolean, transition: Transition): Variants {
+  if (reduced) {
+    return {
+      hidden: { opacity: 0 },
+      visible: { opacity: 1, transition: { duration: 0.2 } },
+    };
+  }
+  return {
+    hidden: { y: '112%' },
+    visible: { y: '0%', transition },
+  };
+}
+
+/**
  * 全页统一的错峰步长（秒）。
  *
  * AUDIT §7：组入场用 **30–80ms** 的错峰。更重要的是这个值必须是**唯一**的 ——

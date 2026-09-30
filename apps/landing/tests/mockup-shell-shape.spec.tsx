@@ -107,13 +107,70 @@ function fieldValues(block: string, field: string): string[] {
   );
 }
 
-/** 真应用 `VIEW_TABS` 的 `key` / `labelKey`，按顺序。 */
-function appViewTabs(): { keys: string[]; labelKeys: string[] } {
-  const block = arrayBlock(appSource(), 'const VIEW_TABS');
-  const pairs = [
-    ...block.matchAll(/\{\s*key:\s*'([^']+)',\s*labelKey:\s*'([^']+)'/g),
-  ].map((match) => ({ key: match[1] ?? '', labelKey: match[2] ?? '' }));
-  return { keys: pairs.map((p) => p.key), labelKeys: pairs.map((p) => p.labelKey) };
+/**
+ * 真应用的**默认 rail** 的 `key` / `labelKey`，按 DOM 顺序。
+ *
+ * 🔴 **2026-09-29 起它不再是"`VIEW_TABS` 的全部 9 项"。**
+ * 产品负责人要求"左侧按钮尽可能地减少"，于是加了**功能模块开关**
+ * （`apps/web/src/features/shell/modules.ts`）：关掉的模块**根本不进 DOM**。
+ * 所以访客看到的那张界面图应当画**默认**（新装用户看到的）那一份：
+ *
+ * ```
+ * 上段  任务 + 默认开启的模块（四象限 / 习惯 / 时间线）
+ * 下段  工具（回收站 / 设置）—— 贴底
+ * ```
+ *
+ * ⚠️ **这里必须读第二份源码**（`shell/modules.ts` 的 `defaultOn`）。
+ * 只读 `App.tsx` 的话，"默认开哪几个"这个事实不在这份文件里，
+ * 而对账就会退化成"数一数有几个常量"—— 那正是这条门禁被发明出来要防的东西。
+ */
+function appDefaultRail(): { keys: string[]; labelKeys: string[] } {
+  const source = appSource();
+
+  const pairsOf = (declaration: string): { key: string; labelKey: string }[] =>
+    [
+      ...arrayBlock(source, declaration).matchAll(
+        /\{\s*key:\s*'([^']+)',\s*labelKey:\s*'([^']+)'/g,
+      ),
+    ].map((match) => ({ key: match[1] ?? '', labelKey: match[2] ?? '' }));
+
+  const alwaysOn = pairsOf('const ALWAYS_ON_VIEW_TABS');
+  const modules = pairsOf('const MODULE_VIEW_TABS');
+  // 🔴 「搜索」是**单个对象**（不是一个数组），而且它常驻。
+  // 它一度是硬编码在 JSX 里的按钮，于是这条对账**看不见它** ——
+  // rail 上多了一个 tab 而门禁照样绿。现在它也是常量，必须一起算进来。
+  //
+  // ⚠️ 它**不能**用 `pairsOf`：那个走 `arrayBlock`（找 `];`），而单个对象以 `};` 结尾 ——
+  //    会一路吃到下一个 `];`，把后面的常量全吞进来（实测：算出 8 项而不是 7 项）。
+  const search = ((): { key: string; labelKey: string }[] => {
+    const src = appSource();
+    const start = src.indexOf('const SEARCH_VIEW_TAB');
+    if (start < 0) throw new Error('App.tsx 里找不到 const SEARCH_VIEW_TAB —— 判据锚点已失效');
+    const end = src.indexOf('};', start);
+    if (end < 0) throw new Error('const SEARCH_VIEW_TAB 之后找不到 `};` —— 判据锚点已失效');
+    return [
+      ...src.slice(start, end).matchAll(/\{\s*key:\s*'([^']+)',\s*labelKey:\s*'([^']+)'/g),
+    ].map((m) => ({ key: m[1] ?? '', labelKey: m[2] ?? '' }));
+  })();
+  const tools = pairsOf('const TOOL_VIEW_TABS');
+
+  // 模块的默认开关 —— 从 `modules.ts` 的 registry 里抠（key 与 defaultOn 配对，
+  // 顺序在这份文件里是"先 key 后 defaultOn"）。
+  const modulesSource = readFileSync(
+    resolve(HERE, '../../web/src/features/shell/modules.ts'),
+    'utf8',
+  );
+  const defaults = new Map(
+    [
+      ...arrayBlock(modulesSource, 'const SHELL_MODULES').matchAll(
+        /key:\s*'([^']+)'[\s\S]*?defaultOn:\s*(true|false)/g,
+      ),
+    ].map((match) => [match[1] ?? '', match[2] === 'true']),
+  );
+
+  const enabledModules = modules.filter((m) => defaults.get(m.key) === true);
+  const shown = [...alwaysOn, ...enabledModules, ...search, ...tools];
+  return { keys: shown.map((p) => p.key), labelKeys: shown.map((p) => p.labelKey) };
 }
 
 /**
@@ -294,36 +351,64 @@ describe('#4 标签区：登记处 ⟷ 真应用 `ProjectsPanel`', () => {
   });
 });
 
+/**
+ * 🔴 **"复刻 = 常量 = 渲染"这条链是闭的 —— 而它是靠两边各钉一半关起来的。**
+ *
+ * 本文件读的是 `apps/web/src/App.tsx` 的**常量数组**（跨应用不能 import），
+ * 所以它**看不见真应用多渲染了什么**。那一半在
+ * `apps/web/tests/app-mount.spec.tsx` 里 —— 它断言**渲染出来的 rail 标签与顺序**
+ * 逐字等于一个写死的字面量。
+ *
+ * ```
+ *   渲染 == 字面量        ← apps/web/tests/app-mount.spec.tsx
+ *   常量 == 字面量        ← 本文件（下面第一条断言）
+ *   登记处 == 常量        ← 本文件（下面第二、三条断言）
+ *   ⇒ 登记处 == 渲染
+ * ```
+ *
+ * ⚠️ **两半都做过故障注入**（2026-09-29）：
+ *   · 真应用 rail 里插一个硬编码 `role="tab"` ⇒ `app-mount.spec` **红**
+ *     （`expected [ '顺手加的', '任务', …(4) ] to deeply equal [ Array(7) ]`）；
+ *   · 登记处多一项而常量没有 ⇒ **本文件红**
+ *     （`expected [ 'tasks', 'calendar', …(6) ] to deeply equal […(5) ]`）。
+ *
+ * ⇒ 这一条曾经被记成"残余缺口"（"按常量对账 ≠ 按渲染对账"）。
+ * **它其实已经关掉了**，只是关在另一个文件里 —— 所以那半边的判据不能删，
+ * 删了这条链就断在最看不见的一段上。
+ */
 describe('#5 视图 tab：登记处 ⟷ 真应用 `VIEW_TABS`', () => {
-  it('真应用的 `VIEW_TABS` 是 9 项，登记处逐项同 key、同序', () => {
-    const app = appViewTabs();
+  it('真应用的**默认 rail** 与登记处逐项同 key、同序', () => {
+    const app = appDefaultRail();
+    // 🔴 **默认 rail**（新装用户看到的）= 任务 + 默认开启的模块 + 工具。
+    // 不再是全部 9 个 —— 番茄钟/成长/便签默认关，**不在 DOM 里**。
+    // ⚠️ **不含 `settings`**：它在 `VIEW_TABS` 里（供 `labelKey` 查表）但**不在 rail 上**
+    // —— 设置收进了顶部的头像菜单。所以"在 VIEW_TABS 里"与"在 rail 上"是两回事，
+    // 判据必须按**实际渲染的那几个**算。
     expect(app.keys).toEqual([
       'tasks',
+      'calendar',
       'quadrant',
       'habits',
-      'focus',
       'timeline',
-      'growth',
-      'notes',
+      'search',
       'trash',
-      'settings',
     ]);
     expect(SHELL_VIEW_TABS.map((tab) => tab.key)).toEqual(app.keys);
     expect(SHELL_VIEW_TABS.map((tab) => tab.labelKey)).toEqual(app.labelKeys);
   });
 
-  it('渲染出的顶栏视图 tab 是 9 项，标签逐字等于应用词条', () => {
+  it('渲染出的默认 rail 是 7 项，标签逐字等于应用词条', () => {
     const view = renderMockup();
     const bar = view.querySelectorAll('.mk-header .mk-viewtabs')[0];
     const labels = [...(bar?.querySelectorAll('.mk-viewtab') ?? [])].map(
       (el) => el.textContent?.trim() ?? '',
     );
-    expect(labels).toHaveLength(9);
+    expect(labels).toHaveLength(7);
     // ⚠️ `web.shell.nav.quadrant`（视图 tab）与 `web.shell.nav.quadrantSection`（侧栏分区）
     // 中文逐字相同 —— 所以只比渲染出的文本抓不到"抄错 key"。文本相等 + key 对账两条一起才够。
     expect(labels).toEqual(SHELL_VIEW_TABS.map((tab) => zhCN[tab.labelKey]));
     expect(SHELL_VIEW_TABS.map((tab) => zhCN[tab.labelKey])).toEqual(
-      appViewTabs().labelKeys.map((key) => zhCN[key as keyof typeof zhCN]),
+      appDefaultRail().labelKeys.map((key) => zhCN[key as keyof typeof zhCN]),
     );
   });
 

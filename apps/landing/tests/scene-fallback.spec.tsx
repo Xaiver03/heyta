@@ -27,6 +27,7 @@
  */
 
 import { act, lazy, Suspense } from 'react';
+import { I18nProvider } from '@heyta/i18n';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 
@@ -81,7 +82,13 @@ function mount(node: React.ReactNode): HTMLDivElement {
   document.body.appendChild(container);
   root = createRoot(container);
   act(() => {
-    root?.render(node);
+    /*
+      包 `I18nProvider` 是**贴着线上形状**（`main.tsx` 也包），不是强制要求：
+      根入口的 `useI18n` 在没有 Provider 时会回落到默认全表（宽松版，见
+      `packages/i18n/src/react.tsx`）。所以这两条测的仍然是 WebGL 降级，
+      不掺 i18n 的语义。
+    */
+    root?.render(<I18nProvider locale="zh-CN">{node}</I18nProvider>);
   });
   return container;
 }

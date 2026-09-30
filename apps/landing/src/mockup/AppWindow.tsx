@@ -31,6 +31,7 @@ import {
   Moon,
   Plus,
   RefreshCw,
+  Search,
   Settings,
   StickyNote,
   Sun,
@@ -41,7 +42,7 @@ import {
   type LucideIcon,
 } from 'lucide-react';
 
-import { useI18n, type MessageKey } from '@heyta/i18n';
+import { useI18n, type MessageKey } from '@heyta/i18n/provider';
 
 import './mockup.css';
 
@@ -68,6 +69,7 @@ import { TaskList } from './TaskList.js';
 import { QuadrantGrid } from './QuadrantGrid.js';
 import { HabitHeatmap } from './HabitHeatmap.js';
 import { FocusRing } from './FocusRing.js';
+import { TimelineBoard } from './TimelineBoard.js';
 
 export type { MockView } from './app-shell-shape.js';
 
@@ -77,6 +79,8 @@ const STAGE_WIDTH_REM = 80;
 /** 图标 id → 真实图标组件。纯数据模块不 import React，所以映射放在宿主。 */
 const SHELL_ICONS: Record<ShellNavIconId, LucideIcon> = {
   inbox: Inbox,
+  'calendar-days': CalendarDays,
+  search: Search,
   sun: Sun,
   'check-circle': CheckCircle2,
   'circle-dot': CircleDot,
@@ -191,6 +195,9 @@ export function AppWindow({
       t(byKey.get(key) ?? fallback);
     return {
       tasks: t('web.shell.nav.inbox'),
+      // 日历：与 web 壳同一波加进 rail 的（滴答 rail 的「日历」那一格）。
+      calendar: fromTab('calendar', 'web.calendar.title'),
+      search: fromTab('search', 'web.search.title'),
       quadrant: fromTab('quadrant', 'web.shell.nav.quadrant'),
       habits: fromTab('habits', 'web.shell.views.habits'),
       focus: fromTab('focus', 'web.shell.views.focus'),
@@ -405,6 +412,7 @@ export function AppWindow({
               {view === 'quadrant' && <QuadrantGrid />}
               {view === 'habits' && <HabitHeatmap />}
               {view === 'focus' && <FocusRing />}
+              {view === 'timeline' && <TimelineBoard />}
             </div>
           </main>
         </div>
