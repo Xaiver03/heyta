@@ -26,6 +26,7 @@
 import { IDBFactory, IDBKeyRange } from 'fake-indexeddb';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
+import { enableModules } from './enable-all-modules.js';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { LocaleHost } from '../src/lib/locale-host.js';
@@ -84,6 +85,8 @@ function shellText(el: HTMLElement): string {
 }
 
 beforeEach(async () => {
+  // 这些用例要走「成长/番茄钟/便签」——它们默认是关的（见 enable-all-modules.ts）。
+  enableModules(['focus', 'growth', 'notes']);
   localStorage.clear();
   document.documentElement.lang = '';
   __resetOpLogForTests();
@@ -119,7 +122,12 @@ describe('🔴 点一下：界面上的可见文案真的变（不是只改 stat
   it('侧栏 / 视图 tab / 空状态三处都换成英文，且外壳里不再有汉字', () => {
     const el = mount();
     expect(el.textContent).toContain('收集箱');
-    expect(el.textContent).toContain('设置');
+    // ⚠️ 2026-09-29：这里原本断言的是「设置」——那时它是 rail 上的一个 tab。
+    // 现在设置收进了**头像菜单**（点开才出现），所以改用两个**一直在屏幕上**的：
+    // 「回收站」（rail 工具段的 tab）与「帮助」（rail 底部的**动作**，不在 tablist 里）。
+    // 意图没变：外壳里至少要有几块**不同的**文案一起被翻过去。
+    expect(el.textContent).toContain('回收站');
+    expect(el.textContent).toContain('帮助');
     expect(el.textContent).toContain('收集箱是空的');
 
     act(() => {
@@ -128,11 +136,14 @@ describe('🔴 点一下：界面上的可见文案真的变（不是只改 stat
 
     // 三块**各自**都被断言到，避免"某一块没换语言"从缝里漏过去。
     expect(el.querySelector('.ht-sidebar')?.textContent).toContain('Inbox');
-    expect(el.querySelector('[role="tablist"]')?.textContent).toContain('Settings');
+    expect(el.querySelector('[role="tablist"]')?.textContent).toContain('Trash');
+    // 「帮助」在 tablist **外面**（它是动作）—— 单独断言，正好钉住这一点。
+    expect(el.querySelector('[data-testid="rail-help"]')?.textContent).toContain('Help');
     expect(el.textContent).toContain('Your inbox is empty');
 
     expect(el.textContent).not.toContain('收集箱');
-    expect(el.textContent).not.toContain('设置');
+    expect(el.textContent).not.toContain('回收站');
+    expect(el.textContent).not.toContain('帮助');
     // 外壳自己渲染的那几块里一个汉字都不该剩。
     expect(shellText(el)).not.toMatch(CJK);
 
@@ -177,7 +188,8 @@ describe('🔴 刷新后保持：落盘 + <html lang>', () => {
     const again = mount();
 
     expect(switcher(again).textContent).toBe('中文');
-    expect(again.textContent).toContain('Settings');
+    // 设置已收进头像菜单；用一直在屏幕上的「回收站」代替（意图不变：语言落盘了）。
+    expect(again.textContent).toContain('Trash');
     expect(document.documentElement.lang).toBe('en');
   });
 

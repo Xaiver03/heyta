@@ -5,14 +5,27 @@
  * ⚠️ **全部取值来自 token**，这里一个裸 hex/px/ms 都没有。
  * `pnpm check:design` 只扫 `apps/web/src`（含 .css），所以这个文件同样受检。
  *
- * 布局策略：CSS Grid 两栏（侧栏 + 主区），移动端塌缩成单栏 + 底部导航。
+ * 布局策略：CSS Grid **三层**（rail 视图 / sidebar 范围 / main），
+ * 而 **sidebar 只在有范围的视图里存在** —— 所以列数由修饰类决定，不是固定的。
+ * 移动端塌缩成单栏 + 底部导航。
  */
 
 .ht-app {
   display: grid;
-  grid-template-columns: var(--ht-layout-sidebar-width) 1fr;
+  /* 默认两层：rail + main（四象限/习惯/番茄钟… 这些视图**没有**范围列） */
+  grid-template-columns: var(--ht-layout-rail-width) 1fr;
   min-height: 100dvh;
   background: var(--ht-color-background);
+}
+
+/*
+ * 有范围的视图（目前只有 `tasks`）—— 多一列。
+ *
+ * ⚠️ 用修饰类而不是 `:has(.ht-sidebar)`：`grid-template-columns` 是这一层的
+ * 布局契约，显式写出来才能在 review 时一眼看出"哪几个视图有范围列"。
+ */
+.ht-app--with-sidebar {
+  grid-template-columns: var(--ht-layout-rail-width) var(--ht-layout-sidebar-width) 1fr;
 }
 
 /* ── 侧栏 ───────────────────────────────────────────── */
@@ -158,6 +171,142 @@
   max-inline-size: var(--ht-layout-content-max);
   inline-size: 100%;
   margin-inline: auto;
+  /* `position: relative` 是 `.ht-sheet` 的定位上下文 —— 浮层只盖内容区，
+     所以左侧 rail 与侧栏**仍然可见**（这是它与"应用内一路由"的本质区别）。 */
+  position: relative;
+}
+
+/* ── 今日进度卡的站位 ────────────────────────────────────
+ *
+ * 🔴 `.ht-content` 是**普通块容器，没有 `gap`** —— 卡片之间的距离必须
+ * **由某一方显式声明**，否则两张面贴死。2026-09-29 产品负责人实测指出：
+ * 进度卡与采集条之间近到像连成一张。根因正是"两头都没声明外间距"
+ * （共享进度卡是 RN 组件，外间距归宿主；采集条同样没有）。
+ *
+ * 放在 banner 上而不是下一个组件上：它是跨视图常驻的第一块，
+ * "下面留多少"是它自己的站位，与下一个组件是谁无关。
+ */
+.ht-progress-banner {
+  margin-block-end: var(--ht-space-4);
+}
+
+/* ── 设置浮层（sheet）────────────────────────────────────
+ *
+ * 🔴 **这是信息架构，不是外观。** 对照滴答清单实测：它的设置是**从右侧滑出的浮层**，
+ * 左 rail 与列表明明还在（`docs/research/dida-capture/INTERFACE-NOTES.md` §11.5）。
+ *
+ * 规律：**次级表面（搜索 / 通知 / 设置）里做的事都需要"回头看下面"**，
+ * 所以它们**不离开当前视图**；而主视图（任务/日历/四象限/习惯）之间切换
+ * 不需要这种回头，才留在应用内。
+ *
+ * ⚠️ 所以这里的 `absolute` 与那层半透明**都是语义**：
+ * 它们保证"下层可见"。把它改成 `position: fixed` 盖满全屏、
+ * 或让 `App.tsx` 不再渲染下层视图，都会让 IA 判据变红。
+ */
+.ht-sheet {
+  position: absolute;
+  inset: 0;
+  z-index: var(--ht-z-dropdown);
+  overflow-y: auto;
+  padding: var(--ht-space-6);
+  /* 半透明：下层视图**看得见**但退到后面 —— 不是"关掉它"。
+     ⚠️ 刻意**不用** `backdrop-filter: blur(...)`：那会引入一个裸尺寸值，
+     而"下层可见"靠的是**透明度**，不是模糊 —— 模糊反而让下层更看不清。
+     ⚠️ 不透明度钉在 95%：再低（曾为 88%）时下层深色文字会以可读的浓度
+     透上来，与设置内容叠成"文字压文字"（页8 扫描截图实测）；
+     "下层可见"的判据是 DOM 里下层标记仍在（`settings-sheet-ia.spec`），
+     视觉上退成隐约一层就够。 */
+  background: color-mix(in srgb, var(--ht-color-background) 95%, transparent);
+  animation: ht-sheet-in var(--ht-duration-normal) var(--ht-ease-enter);
+}
+
+/* 设置浮层的退出口（2026-09-30 补）。
+   🔴 在这个按钮之前，设置浮层**没有任何出口**：没 Esc、没 ✕、点空白也不关
+   （它盖满内容区，点哪儿都是它自己）—— 唯一的出路是去点 rail 上的别的视图。
+   定位用 `sticky`：它贴在**滚动容器的可视区**，既不随内容滚走（`.ht-sheet`
+   自己有 `overflow-y: auto`），也不会像 `fixed` 那样在窄壳里停在半空。
+   ⚠️ 只钉 top，不写死尺寸；直径复用触控目标 token。 */
+.ht-sheet__close {
+  position: sticky;
+  top: 0;
+  /* 靠右：块级流里 `margin-inline-start: auto` 不生效，所以它自己是一条
+     flex 行（`display: flex` 把它撑成整行宽度，图标居中）。 */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--ht-touch-target-min);
+  height: var(--ht-touch-target-min);
+  margin-inline-start: auto;
+  /* 只吃掉一行里多出来的空白，不再额外占垂直节奏（面板自己的 padding 在管）。 */
+  margin-block-end: calc(var(--ht-space-2) * -1);
+  padding: 0;
+  cursor: pointer;
+  border: var(--ht-border-width-thin) solid var(--ht-color-border);
+  border-radius: var(--ht-radius-full);
+  background: var(--ht-color-surface);
+  color: var(--ht-color-foreground-muted);
+}
+
+.ht-sheet__close:hover {
+  color: var(--ht-color-foreground);
+  background: var(--ht-color-hover);
+}
+
+.ht-sheet__close:focus-visible {
+  outline: var(--ht-focus-ring-width) solid var(--ht-color-ring);
+  outline-offset: var(--ht-space-1);
+}
+
+@keyframes ht-sheet-in {
+  from {
+    opacity: 0;
+    transform: translateY(var(--ht-space-2));
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ht-sheet {
+    animation: none;
+  }
+}
+
+/* ── 搜索浮层（居中卡片 + scrim）──────────────────────────
+ *
+ * 🔴 同样是 IA，不是外观（滴答 §11.5：搜索是"主列③浮层，
+ * 透出下层视图"）。与 `.ht-sheet` 的差别只在形状：
+ * 设置 = 右侧整面，搜索 = **居中卡片**，四周留空隙让下层看得见。
+ *
+ * ⚠️ scrim 用的是设计系统已有的 `--ht-material-scrim`
+ * （不是 sheet 那种"背景色 88%"）—— 居中卡片周围要露出**更多**下层，
+ * 灰度必须更浅，下层才读得出来。z 轴用 `--ht-z-overlay`：
+ * 它本来就是"浮层"这一层。
+ */
+.ht-search-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: var(--ht-z-overlay);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--ht-space-4);
+  background: var(--ht-material-scrim);
+  animation: ht-sheet-in var(--ht-duration-normal) var(--ht-ease-enter);
+}
+
+/* 卡片宽度钉在 modal-max：短结果时不缩成窄条、长结果时不铺满 ——
+   浮层的宽度是稳定的，变化的只是它的高度。 */
+.ht-search-overlay > * {
+  inline-size: min(100%, var(--ht-layout-modal-max));
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ht-search-overlay {
+    animation: none;
+  }
 }
 
 /* ── 按钮 ───────────────────────────────────────────── */
@@ -172,6 +321,8 @@
   border-radius: var(--ht-radius-md);
   font-size: var(--ht-font-size-sm);
   font-weight: var(--ht-font-weight-medium);
+  /* 按钮文字不随容器收缩竖折 —— 折行的按钮不是按钮，是排版事故。 */
+  white-space: nowrap;
   transition:
     background-color var(--ht-duration-fast) var(--ht-ease-standard),
     color var(--ht-duration-fast) var(--ht-ease-standard),
@@ -358,46 +509,11 @@
 
 /* ── 响应式：移动端塌缩成单栏 ───────────────────────── */
 
-@media (max-width: 768px) {
-  .ht-app {
-    grid-template-columns: 1fr;
-    grid-template-rows: 1fr auto;
-  }
+/* ── 窄屏塌缩：完整规则在**文件末尾**的媒体块 ─────────────
+   必须排在 `.ht-rail` / `.ht-sidebar` 基础规则之后（同特异性、源序后者胜）。
+   2026-09-30：旧块写在这里且多了一个 `}`，rail 塌缩规则被基础规则整块覆盖、
+   sidebar 塌缩规则逃出媒体块变成全局 —— "grid 塌了、rail 没塌"的半成品形态。 */
 
-  /* 侧栏变成底部导航 */
-  .ht-sidebar {
-    order: 2;
-    flex-direction: row;
-    justify-content: space-around;
-    border-right: none;
-    border-top: 1px solid var(--ht-color-border);
-    /* 刘海屏安全区 */
-    padding-block-end: max(var(--ht-space-2), env(safe-area-inset-bottom));
-  }
-
-  .ht-brand,
-  .ht-nav__section,
-  .ht-nav__count {
-    display: none;
-  }
-
-  .ht-nav {
-    flex-direction: row;
-    inline-size: 100%;
-    justify-content: space-around;
-  }
-
-  .ht-nav__item {
-    flex-direction: column;
-    gap: var(--ht-space-1);
-    font-size: var(--ht-font-size-2xs);
-    padding: 0 var(--ht-space-2);
-  }
-
-  .ht-content {
-    padding: var(--ht-space-4);
-  }
-}
 
 /* ── 视图切换条 ─────────────────────────────────────────────
    扁平风格：用边框与背景表达选中态，不用阴影或位移。
@@ -429,6 +545,607 @@
 
 .ht-viewtabs::-webkit-scrollbar {
   display: none;
+}
+
+/*
+ * ═══════════════════════════════════════════════════════════════════════════
+ * 外壳三层：rail（视图）/ sidebar（当前视图的范围）/ main
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * 🔴 为什么 rail 是**固定的窄列**而不是像原来那样把视图 tab 塞进顶栏：
+ * 顶栏是**水平**的，而水平方向上的可见宽度是有限的 ——
+ * `showcase-fidelity-audit.md` §6.3 实测：1280px 下 8 个视图 tab 只能完全看见 5 个
+ * （`1440px` 7/8、`1680px` 才 8/8）。现在有 9 个，只会更挤。
+ *
+ * 竖列没有这个上界：多一个视图就多一行，**永远不会把谁藏起来**。
+ * 这也是为什么这里**不把低频视图折叠进「更多」菜单** ——
+ * 折叠是**为顶栏宽度付的代价**，竖列不需要付。
+ */
+/*
+ * 账号菜单（rail 顶部）。
+ *
+ * ⚠️ 面板 `position: absolute` + 相对头像定位：它必须**浮在导航之上**，
+ * 而不是把下面的按钮挤下去（挤下去会让每次点开菜单都跳一下布局）。
+ */
+.ht-rail__top {
+  display: flex;
+  align-items: center;
+  gap: var(--ht-space-2);
+  padding-inline: var(--ht-space-1);
+}
+
+.ht-brand__name {
+  color: var(--ht-color-foreground);
+  font-family: var(--ht-font-sans);
+  font-size: var(--ht-font-size-base);
+  font-weight: var(--ht-font-weight-semibold);
+}
+
+.ht-accountmenu {
+  position: relative;
+  /* 头像 + 登录/注册 **一行**（见 AccountMenu.tsx 内注释：竖叠曾把 rail 顶
+     的品牌名吊到半空）。面板仍是 absolute，不受布局方式影响。 */
+  display: flex;
+  align-items: center;
+  gap: var(--ht-space-2);
+}
+
+.ht-accountmenu__avatar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--ht-touch-target-min);
+  height: var(--ht-touch-target-min);
+  padding: 0;
+  cursor: pointer;
+  border: var(--ht-border-width-thin) solid var(--ht-color-border);
+  /* 正圆：它是头像，不是一个方形按钮 */
+  border-radius: 50%;
+  background: var(--ht-color-surface);
+  color: var(--ht-color-foreground-muted);
+  font-family: var(--ht-font-sans);
+  font-size: var(--ht-font-size-sm);
+  font-weight: var(--ht-font-weight-semibold);
+}
+
+.ht-accountmenu__avatar:hover {
+  color: var(--ht-color-foreground);
+}
+
+.ht-accountmenu__avatar:focus-visible {
+  outline: var(--ht-focus-ring-width) solid var(--ht-color-ring);
+  outline-offset: var(--ht-space-1);
+}
+
+/* 🔴 2026-09-30 撤掉了「头像旁的登录 pill」。
+   身份入口只能有一个（产品负责人："应该是点击头像出来注册、登录吧？"）——
+   它现在是菜单里的第一项（`.ht-accountmenu__item--primary`），
+   不再是头像旁边第二个长得像账号入口的控件。 */
+
+/* ── macOS 壳（hiddenTitleBar）模式 ───────────────────────
+ *
+ * 壳用 `.windowStyle(.hiddenTitleBar)` 后，红绿灯**浮在应用自己的底色上**
+ * （2026-09-29 产品负责人："那个关闭缩小条应该跟滴答清单保持一致，
+ * 完全融入应用壳，而不是很突兀的一个东西"）。它们落在**左上角 rail 顶部**，
+ * 所以壳模式下 rail 顶部让出一行（32px = space.8）。
+ *
+ * 类由壳注入（WebView 加载完成后 `documentElement.classList.add('heyta-shell')`）；
+ * 浏览器 / PWA 里没有这个类，布局不变。
+ */
+.heyta-shell .ht-rail__top {
+  padding-top: var(--ht-space-8);
+}
+
+/* 账号菜单面板。
+ *
+ * 🔴 `fixed` 而不是 `absolute`：`nav.ht-rail` 是 `overflow-y: auto` 的裁剪容器，
+ * absolute 面板比 rail 宽（12rem vs 11rem）⇒ 右侧一直被切 16px；塌缩态
+ * （≤768px，rail 变底部导航 + `overflow-y: hidden`）更是整块看不见。
+ * 坐标由组件实测锚点后写在 inline style 上（向上/向下弹都在那里判定），
+ * 这里只管外观。 */
+.ht-accountmenu__panel {
+  position: fixed;
+  /* 用 z 轴阶梯里的那一档（tokens.css 明写"禁止在组件里写裸 z-index 数字"）。 */
+  z-index: var(--ht-z-dropdown);
+  display: flex;
+  flex-direction: column;
+  min-width: 12rem;
+  /* 视口很矮时面板自己滚，而不是把最后一项顶出屏幕（退出登录正是最后一项）。 */
+  max-height: calc(100dvh - var(--ht-space-8));
+  overflow-y: auto;
+  padding: var(--ht-space-1);
+  border: var(--ht-border-width-thin) solid var(--ht-color-border);
+  border-radius: var(--ht-radius-md);
+  background: var(--ht-color-surface);
+  /* 浮层用阴影表达层级 —— 布局层用边框、浮层用阴影，两者不混。 */
+  box-shadow: var(--ht-shadow-lg);
+}
+
+.ht-accountmenu__who {
+  padding: var(--ht-space-2);
+  color: var(--ht-color-foreground-subtle);
+  font-family: var(--ht-font-sans);
+  font-size: var(--ht-font-size-xs);
+  /* 长邮箱不许把面板撑宽 */
+  overflow-wrap: anywhere;
+}
+
+.ht-accountmenu__item {
+  display: flex;
+  align-items: center;
+  gap: var(--ht-space-2);
+  min-height: var(--ht-touch-target-min);
+  padding: 0 var(--ht-space-2);
+  cursor: pointer;
+  border: none;
+  border-radius: var(--ht-radius-sm);
+  background: transparent;
+  color: var(--ht-color-foreground);
+  font-family: var(--ht-font-sans);
+  font-size: var(--ht-font-size-sm);
+  text-align: left;
+}
+
+.ht-accountmenu__item:hover {
+  background: var(--ht-color-surface-sunken);
+}
+
+/* 退出登录是这一组里唯一**会清掉本机凭据**的动作 —— 颜色要说清这件事。
+   它永远在最后一项（见 `AccountMenu.tsx` 文件头：破坏性动作在最底、
+   且未登录时**根本不渲染**）。 */
+.ht-accountmenu__item--danger {
+  color: var(--ht-color-danger);
+}
+
+/* 未登录时菜单的第一项「登录 / 注册」是这一组的**主操作** —— 强调样式，
+   与其余无损导航项区分开。它仍然是一个菜单项（不是大按钮）：
+   SaaSUI 的账号面调研要求身份入口在菜单里**一眼可辨**，而不是与
+   「设置 / 统计」同样的视觉分量。 */
+.ht-accountmenu__item--primary {
+  background: var(--ht-color-primary-subtle);
+  color: var(--ht-color-primary);
+  font-weight: var(--ht-font-weight-semibold);
+}
+
+.ht-accountmenu__item--primary:hover {
+  background: var(--ht-color-primary-subtle-hover);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+ * 通知中心 / 活动（福利中心）—— rail 底部的铃铛 + 面板
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * 🔴 面板是 `position: fixed`，**不是** absolute。
+ *
+ * `nav.ht-rail` 有 `overflow-y: auto`，也就是一个裁剪容器 —— 它的子元素
+ * 只要超出边界就会被切掉（`.ht-accountmenu__panel` 曾经是 absolute 的，
+ * 比 rail 还宽 16px，右侧**一直**在被切；2026-09-30 已改为 fixed + 实测锚点）。
+ *
+ * 这个面板宽 24rem，absolute 会被切掉一大半；所以改成 fixed —— 定位由 CSS
+ * 从 rail 宽度算出来，不靠 JS 量尺寸（量尺寸还要处理滚动与 resize，而
+ * "忘了重算"的表现是面板停在半空）。
+ *
+ * ⚠️ 前提是**没有祖先元素带 transform / filter / will-change**：那会让
+ * fixed 退化成相对该祖先定位。`.ht-app`（grid）与 `nav.ht-rail` 都没有
+ * transform，所以这里成立。将来若给外壳加 transform 动画，这一段会坏 ——
+ * 坏的样子是"面板跑到屏幕中间"，而那条规则离这里很远。
+ */
+
+.ht-inbox__badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: var(--ht-touch-target-min);
+  height: var(--ht-font-size-lg);
+  margin-inline-start: auto;
+  padding-inline: var(--ht-space-1);
+  border-radius: var(--ht-radius-full);
+  background: var(--ht-color-primary);
+  color: var(--ht-color-on-primary);
+  font-size: var(--ht-font-size-2xs);
+  font-weight: var(--ht-font-weight-semibold);
+  font-variant-numeric: tabular-nums;
+}
+
+.ht-inbox__panel {
+  position: fixed;
+  left: calc(var(--ht-layout-rail-width) + var(--ht-space-2));
+  bottom: var(--ht-space-3);
+  z-index: var(--ht-z-popover);
+  display: flex;
+  flex-direction: column;
+  width: 24rem;
+  max-height: var(--ht-layout-panel-max-height);
+  overflow: hidden;
+  border: var(--ht-border-width-thin) solid var(--ht-color-border);
+  border-radius: var(--ht-radius-lg);
+  background: var(--ht-color-surface);
+  box-shadow: var(--ht-shadow-lg);
+}
+
+.ht-inbox__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--ht-space-2);
+  padding: var(--ht-space-2);
+  border-bottom: var(--ht-border-width-thin) solid var(--ht-color-border);
+}
+
+.ht-inbox__tabs {
+  display: flex;
+  gap: var(--ht-space-1);
+}
+
+.ht-inbox__tab {
+  min-height: var(--ht-touch-target-min);
+  padding: 0 var(--ht-space-3);
+  cursor: pointer;
+  border: var(--ht-border-width-thin) solid transparent;
+  border-radius: var(--ht-radius-full);
+  background: transparent;
+  color: var(--ht-color-foreground-muted);
+  font-family: var(--ht-font-sans);
+  font-size: var(--ht-font-size-sm);
+  font-weight: var(--ht-font-weight-medium);
+}
+
+.ht-inbox__tab:hover {
+  color: var(--ht-color-foreground);
+}
+
+.ht-inbox__tab--active {
+  background: var(--ht-color-surface-sunken);
+  color: var(--ht-color-foreground);
+  border-color: var(--ht-color-border);
+}
+
+.ht-inbox__tab:focus-visible,
+.ht-inbox__action:focus-visible,
+.ht-inbox__copy:focus-visible {
+  outline: var(--ht-focus-ring-width) solid var(--ht-color-ring);
+  outline-offset: var(--ht-space-1);
+}
+
+.ht-inbox__actions {
+  display: flex;
+  align-items: center;
+  gap: var(--ht-space-1);
+}
+
+.ht-inbox__action {
+  min-height: var(--ht-touch-target-min);
+  padding: 0 var(--ht-space-2);
+  cursor: pointer;
+  border: none;
+  border-radius: var(--ht-radius-sm);
+  background: transparent;
+  color: var(--ht-color-primary);
+  font-family: var(--ht-font-sans);
+  font-size: var(--ht-font-size-xs);
+  font-weight: var(--ht-font-weight-medium);
+  white-space: nowrap;
+}
+
+.ht-inbox__action:hover {
+  background: var(--ht-color-surface-sunken);
+}
+
+.ht-inbox__action--icon {
+  min-width: var(--ht-touch-target-min);
+  padding: 0;
+  color: var(--ht-color-foreground-muted);
+}
+
+.ht-inbox__body {
+  overflow-y: auto;
+  padding: var(--ht-space-2);
+}
+
+.ht-inbox__list {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.ht-inbox__item {
+  display: flex;
+  gap: var(--ht-space-3);
+  padding: var(--ht-space-3) var(--ht-space-2);
+  border-bottom: var(--ht-border-width-thin) solid var(--ht-color-border-subtle);
+}
+
+.ht-inbox__item:last-child {
+  border-bottom: none;
+}
+
+.ht-inbox__item-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: var(--ht-touch-target-min);
+  height: var(--ht-touch-target-min);
+  border-radius: var(--ht-radius-full);
+  background: var(--ht-color-primary-subtle);
+  color: var(--ht-color-primary);
+}
+
+.ht-inbox__item-main {
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.ht-inbox__item-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--ht-space-2);
+}
+
+.ht-inbox__item-title {
+  color: var(--ht-color-foreground);
+  font-size: var(--ht-font-size-sm);
+  font-weight: var(--ht-font-weight-semibold);
+}
+
+/*
+ * 🔴 未读只用**字重 + 一个小圆点**表达，不用背景色块。
+ * 色块会把整条通知变成"一个按钮"，而它其实不可点击（没有详情页）——
+ * 那是一种"看起来能点、点了没反应"的失望。
+ */
+.ht-inbox__item--unread .ht-inbox__item-title::after {
+  content: '';
+  display: inline-block;
+  width: var(--ht-space-1);
+  height: var(--ht-space-1);
+  margin-inline-start: var(--ht-space-1);
+  border-radius: var(--ht-radius-full);
+  background: var(--ht-color-primary);
+  vertical-align: middle;
+}
+
+.ht-inbox__item-date {
+  flex: 0 0 auto;
+  color: var(--ht-color-foreground-subtle);
+  font-size: var(--ht-font-size-xs);
+  font-variant-numeric: tabular-nums;
+}
+
+.ht-inbox__item-body {
+  margin: var(--ht-space-1) 0 0;
+  color: var(--ht-color-foreground-muted);
+  font-size: var(--ht-font-size-sm);
+  line-height: var(--ht-line-height-normal);
+}
+
+.ht-inbox__notice {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--ht-space-2);
+  margin: 0;
+  padding: var(--ht-space-6) var(--ht-space-3);
+  color: var(--ht-color-foreground-subtle);
+  font-size: var(--ht-font-size-sm);
+  text-align: center;
+}
+
+.ht-inbox__card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ht-space-2);
+  padding: var(--ht-space-3);
+  border: var(--ht-border-width-thin) solid var(--ht-color-border);
+  border-radius: var(--ht-radius-md);
+  background: var(--ht-color-surface-raised);
+}
+
+.ht-inbox__card-head {
+  display: flex;
+  align-items: center;
+  gap: var(--ht-space-2);
+  color: var(--ht-color-primary);
+}
+
+.ht-inbox__card-title {
+  margin: 0;
+  color: var(--ht-color-foreground);
+  font-size: var(--ht-font-size-sm);
+  font-weight: var(--ht-font-weight-semibold);
+}
+
+.ht-inbox__card-body {
+  margin: 0;
+  color: var(--ht-color-foreground-muted);
+  font-size: var(--ht-font-size-sm);
+  line-height: var(--ht-line-height-normal);
+}
+
+.ht-inbox__field {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--ht-space-2);
+}
+
+.ht-inbox__field-label {
+  color: var(--ht-color-foreground-subtle);
+  font-size: var(--ht-font-size-xs);
+}
+
+.ht-inbox__field-value {
+  padding: var(--ht-space-1) var(--ht-space-2);
+  border: var(--ht-border-width-thin) dashed var(--ht-color-border-strong);
+  border-radius: var(--ht-radius-sm);
+  background: var(--ht-color-surface);
+  color: var(--ht-color-foreground);
+  font-family: var(--ht-font-mono);
+  font-size: var(--ht-font-size-sm);
+  /* 码是全大写 + 等宽，稍微放松字距更好认（没有 `tracking-wide` 这个 token；
+     `tracking-caption` 是本仓唯一一档正值字距）。 */
+  letter-spacing: var(--ht-tracking-caption);
+  /* 用户要能手动选中它（复制失败时的兜底路径）。 */
+  user-select: all;
+}
+
+.ht-inbox__copy {
+  min-height: var(--ht-touch-target-min);
+  padding: 0 var(--ht-space-2);
+  cursor: pointer;
+  border: var(--ht-border-width-thin) solid var(--ht-color-border);
+  border-radius: var(--ht-radius-sm);
+  background: var(--ht-color-surface);
+  color: var(--ht-color-foreground);
+  font-family: var(--ht-font-sans);
+  font-size: var(--ht-font-size-xs);
+}
+
+.ht-inbox__copy:hover {
+  background: var(--ht-color-surface-sunken);
+}
+
+.ht-inbox__status {
+  color: var(--ht-color-success);
+  font-size: var(--ht-font-size-xs);
+}
+
+.ht-inbox__status--warn {
+  color: var(--ht-color-warning-strong);
+}
+
+.ht-inbox__stats,
+.ht-inbox__muted {
+  margin: 0;
+  color: var(--ht-color-foreground-subtle);
+  font-size: var(--ht-font-size-xs);
+  font-variant-numeric: tabular-nums;
+}
+
+.ht-inbox__sublist-title {
+  margin: var(--ht-space-2) 0 0;
+  color: var(--ht-color-foreground-muted);
+  font-size: var(--ht-font-size-xs);
+  font-weight: var(--ht-font-weight-semibold);
+}
+
+.ht-inbox__sublist {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ht-space-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.ht-inbox__subitem {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--ht-space-2);
+  font-size: var(--ht-font-size-xs);
+}
+
+.ht-inbox__subitem-name {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--ht-color-foreground);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ht-inbox__subitem-status {
+  flex: 0 0 auto;
+  color: var(--ht-color-foreground-subtle);
+}
+
+.ht-inbox__subitem-date {
+  flex: 0 0 auto;
+  color: var(--ht-color-foreground-subtle);
+  font-variant-numeric: tabular-nums;
+}
+
+/*
+ * 窄屏：rail 变成**底部横条**（见 `.ht-rail` 的 `@media`），
+ * 所以面板不能再挂在左边 —— 改成贴着那条横条上方、占满宽度。
+ */
+@media (max-width: 768px) {
+  .ht-inbox__panel {
+    left: var(--ht-space-2);
+    right: var(--ht-space-2);
+    bottom: calc(var(--ht-touch-target-min) + var(--ht-space-4));
+    width: auto;
+  }
+}
+
+/*
+ * 工具段**贴底**（rail 下段）。
+ *
+ * 🔴 用 `margin-top: auto` 而不是插一个 `flex:1` 的 spacer 元素：
+ * 工具按钮仍在**同一个 `role="tablist"`** 里（`role=tab` 跑到 tablist 外面是无效结构），
+ * 而 tablist 里多一个非 tab 的子元素会让"这一组有几项"变得含糊。
+ */
+.ht-rail__tab--tool:first-of-type {
+  margin-top: auto;
+}
+
+.ht-rail {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ht-space-3);
+  padding: var(--ht-space-3) var(--ht-space-2);
+  border-right: var(--ht-border-width-thin) solid var(--ht-color-border);
+  background: var(--ht-color-surface-sunken);
+  /* 视图多起来时**自身滚动**，而不是把 main 挤走 */
+  overflow-y: auto;
+}
+
+.ht-rail__tabs {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ht-space-2);
+}
+
+.ht-rail__tab {
+  display: flex;
+  align-items: center;
+  gap: var(--ht-space-2);
+  /* 44px 最小点击目标（UIX Pro 硬规则 2） */
+  min-height: var(--ht-touch-target-min);
+  padding: 0 var(--ht-space-2);
+  /* 🔴 与原来那条 `flex: 0 0 auto` 同源：不被压扁、标签不折行 */
+  white-space: nowrap;
+  flex: 0 0 auto;
+  cursor: pointer;
+  text-align: left;
+  border: var(--ht-border-width-thin) solid transparent;
+  border-radius: var(--ht-radius-sm);
+  background: transparent;
+  color: var(--ht-color-foreground-muted);
+  font-family: var(--ht-font-sans);
+  font-size: var(--ht-font-size-sm);
+  font-weight: var(--ht-font-weight-medium);
+  transition:
+    background var(--ht-duration-fast) var(--ht-ease-standard),
+    color var(--ht-duration-fast) var(--ht-ease-standard);
+}
+
+.ht-rail__tab:hover {
+  color: var(--ht-color-foreground);
+}
+
+.ht-rail__tab--active {
+  background: var(--ht-color-surface);
+  color: var(--ht-color-primary);
+  border-color: var(--ht-color-border);
+}
+
+/* 焦点环必须可见 —— 抹掉它是最常见的可访问性回归 */
+.ht-rail__tab:focus-visible {
+  outline: var(--ht-focus-ring-width) solid var(--ht-color-ring);
+  outline-offset: var(--ht-space-1);
 }
 
 .ht-viewtab {
@@ -488,10 +1205,47 @@
   font-size: var(--ht-font-size-sm);
 }
 
+/* 🔴 品牌控件色（2026-09-30）：原生复选框/单选默认跟随 **macOS 系统强调色** ——
+   这台机器的强调色是石墨灰，装出来的包里所有勾选框都是灰的（主蓝命中 0）。
+   品牌控件的选中色必须来自设计系统（AGENTS §5：变量来源唯一），
+   不许跟着用户的系统设置漂。 */
+input[type="checkbox"],
+input[type="radio"] {
+  accent-color: var(--ht-color-primary);
+}
+
+/* 设置域里的 ghost 按钮（如“恢复默认”）：透明背景在表单流里读起来像
+   一行游离的文字（安装包审查实测）。设置域内给它可见边界；
+   页头那个图标 ghost 不在此域，不受影响。 */
+.ht-settings .ht-btn--ghost {
+  border: var(--ht-border-width-thin) solid var(--ht-color-border);
+}
+
+/* 设置里的选项组（如“截止时间显示方式”）：每个选项一行，控件与文字对齐。 */
+.ht-settings__options {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ht-space-1);
+}
+
+.ht-settings__option {
+  display: flex;
+  align-items: center;
+  gap: var(--ht-space-2);
+  padding: var(--ht-space-1) 0;
+  cursor: pointer;
+}
+
 .ht-settings__title {
   margin: 0;
-  font-size: var(--ht-font-size-xl);
-  font-weight: var(--ht-font-weight-bold);
+  /* 🔴 区块标题 = **lg + semibold**（`design-system/typography.ts` 的
+     `section-title` 同级同值）。曾经是 xl + bold —— 与页标题
+     （`.ht-header__title`，xl semibold）一般大，一页八个面板就是八个"页标题"，
+     层级全塌（2026-09-30 排版审计：产品负责人"文字排版很乱"）。
+     web 的层级：页标题 xl semibold → 区块标题 lg semibold → 子块/卡片
+     base semibold → 正文 base → 辅助 xs/sm muted。 */
+  font-size: var(--ht-font-size-lg);
+  font-weight: var(--ht-font-weight-semibold);
 }
 
 .ht-settings__section {
@@ -506,8 +1260,19 @@
 
 .ht-settings__h3 {
   margin: 0;
+  /* 🔴 图标 + 文字必须**横排**（flex）。reset.css 把 svg 设成 display:block
+     （杀图片基线空隙的标准做法），块级上下文里的图标会被顶成独立一行 ——
+     安装包审查实测："📄 任务清单（Markdown）"的图标吊在标题上面。
+     消费端（图标+文字的小节标题）声明 flex 才能抵消；svg 不许被压缩。 */
+  display: flex;
+  align-items: center;
+  gap: var(--ht-space-2);
   font-size: var(--ht-font-size-base);
   font-weight: var(--ht-font-weight-semibold);
+}
+
+.ht-settings__h3 svg {
+  flex-shrink: 0;
 }
 
 .ht-settings__subtitle {
@@ -520,11 +1285,55 @@
   font-weight: var(--ht-font-weight-medium);
 }
 
+/*
+ * 功能模块的卡片网格 —— 照滴答设置页那些卡（标题 + 一句说明 + 右侧开关）。
+ *
+ * ⚠️ 用 `auto-fill` + `minmax` 而不是固定列数：设置页的宽度随窗口变，
+ * 固定 2 列在窄窗口会把卡片压到放不下一句话。
+ */
+.ht-settings__cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(16rem, 1fr));
+  gap: var(--ht-space-3);
+  margin-block: var(--ht-space-3);
+}
+
+.ht-settings__card {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--ht-space-2);
+  padding: var(--ht-space-3);
+  border: var(--ht-border-width-thin) solid var(--ht-color-border);
+  border-radius: var(--ht-radius-md);
+  background: var(--ht-color-surface);
+  cursor: pointer;
+}
+
+.ht-settings__cardText {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ht-space-1);
+}
+
+.ht-settings__cardTitle {
+  color: var(--ht-color-foreground);
+  font-family: var(--ht-font-sans);
+  font-size: var(--ht-font-size-base);
+  font-weight: var(--ht-font-weight-medium);
+}
+
+.ht-settings__cardNote {
+  color: var(--ht-color-foreground-muted);
+  font-family: var(--ht-font-sans);
+  font-size: var(--ht-font-size-xs);
+}
+
 .ht-settings__hint {
   margin: 0;
   color: var(--ht-color-foreground-muted);
   font-size: var(--ht-font-size-xs);
-  line-height: 1.5;
+  line-height: var(--ht-line-height-normal);
 }
 
 .ht-settings__danger,
@@ -748,24 +1557,6 @@
   font-size: var(--ht-font-size-2xs);
 }
 
-.ht-ai__panel {
-  display: grid;
-  gap: var(--ht-space-2);
-  padding: var(--ht-space-3);
-  border: 1px solid var(--ht-color-border);
-  border-radius: var(--ht-radius-md);
-  background: var(--ht-color-surface);
-  font-size: var(--ht-font-size-xs);
-}
-
-.ht-ai__head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--ht-space-2);
-  font-weight: 600;
-}
-
 .ht-ai__row {
   display: flex;
   flex-wrap: wrap;
@@ -804,7 +1595,39 @@
 
 .ht-ai__actions {
   display: flex;
+  /* 🔴 窄窗时**整组**换行（输入框收缩到下限后按钮去下一行），
+     而不是把按钮文字竖着折断（2026-09-29 截图实测"运/行"两行）。 */
+  flex-wrap: wrap;
   gap: var(--ht-space-2);
+}
+
+/* ── AI 工具调用面板（块级）────────────────────────────
+ *
+ * 它与 `.ht-ai`（行内小件，`inline-flex`）名字相近但是**两种东西**：
+ * 面板有标题 / 说明 / 操作行三段，纵向排。曾经误用 `.ht-ai`，
+ * 三段被摆成一行（页8 扫描截图实测：输入框悬到说明右侧、"运行"折行）。
+ *
+ * `margin-block-start` 是它与上方块（采集条 / AI 优先级）的**显式间距** ——
+ * `.ht-content` 没有 gap（见文件头），两头都不声明就会贴死。
+ */
+.ht-ai-panel {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: var(--ht-space-2);
+  margin-block-start: var(--ht-space-4);
+}
+
+/* 输入框吃弹性宽度，但收到 `layout.input-min` 为止 —— 到限就换行。
+   `min-width: 0` 是必须的：没有它 flex 项不肯收缩到内容宽度以下。 */
+.ht-ai__actions .ht-input {
+  flex: 1 1 var(--ht-layout-input-min);
+  min-width: 0;
+}
+
+.ht-ai__actions .ht-btn {
+  /* 按钮文字**永不**竖折 —— 两个字折成两行是排版事故。 */
+  white-space: nowrap;
 }
 
 /* 能力缺口提示 —— 能配但跑不起来时必须说出来 */
@@ -1210,4 +2033,375 @@
   color: var(--ht-color-foreground-muted);
   font-size: var(--ht-font-size-lg);
   cursor: pointer;
+}
+
+/* ── 运营管理后台（ADR-0038）──────────────────────────────────
+ * 只给运营者看的一段界面。取值全部来自 design tokens ——
+ * 裸 hex / px 会被 `pnpm check:design` 打回（AGENTS §5 三条硬规则）。
+ *
+ * 🔴 **类名挂在既有的 `.ht-settings` 族下，不新开 `.ht-admin` 族。**
+ * `pnpm check:row-single-source` 的断言 B 钉着"app.css 顶层 `ht-*` 前缀族只减不增"
+ * （基线 28）。第一版我开了一个 `.ht-admin` 族，正好把数字顶到 29 被门禁拦下 ——
+ * 门禁的立场是：**新视图不该长出新前缀族**，该复用的是既有模式层。
+ * 这个面板本来就是设置页里的一节（`ht-settings__section`），
+ * 所以折进 `ht-settings__admin-*` 是它本来该在的位置，不是妥协。
+ *
+ * 形状上刻意**不引入表格**：后台的几个列表都是"一行一个对象、
+ * 左边主体右边元信息"，用 flex 行比 table 更能在窄屏下自然折行，
+ * 也不需要为 table 单独发明一套间距 token。
+ */
+.ht-settings__admin-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--ht-space-1);
+}
+
+.ht-settings__admin-tab {
+  appearance: none;
+  border: var(--ht-border-width-thin) solid var(--ht-color-border);
+  border-radius: var(--ht-radius-full);
+  background: var(--ht-color-surface);
+  color: var(--ht-color-foreground-muted);
+  cursor: pointer;
+  font-family: var(--ht-font-sans);
+  font-size: var(--ht-font-size-sm);
+  font-weight: var(--ht-font-weight-medium);
+  padding: var(--ht-space-1) var(--ht-space-3);
+}
+
+.ht-settings__admin-tab:hover {
+  background: var(--ht-color-hover);
+  color: var(--ht-color-foreground);
+}
+
+/* 🔴 焦点环不许抹掉（AGENTS §5「容易犯的几个错」）。 */
+.ht-settings__admin-tab:focus-visible,
+.ht-settings__admin-btn:focus-visible,
+.ht-settings__admin-row:focus-visible,
+.ht-settings__admin-input:focus-visible {
+  outline: var(--ht-border-width-thick) solid var(--ht-color-ring);
+  outline-offset: var(--ht-space-1);
+}
+
+.ht-settings__admin-tab--active {
+  background: var(--ht-color-primary-subtle);
+  border-color: var(--ht-color-primary);
+  color: var(--ht-color-primary);
+}
+
+.ht-settings__admin-tab--icon {
+  display: inline-flex;
+  align-items: center;
+  margin-inline-start: auto;
+}
+
+.ht-settings__admin-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(9rem, 1fr));
+  gap: var(--ht-space-2);
+}
+
+.ht-settings__admin-stat {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ht-space-1);
+  padding: var(--ht-space-3);
+  border: var(--ht-border-width-thin) solid var(--ht-color-border-subtle);
+  border-radius: var(--ht-radius-md);
+  background: var(--ht-color-surface-raised);
+}
+
+.ht-settings__admin-statValue {
+  color: var(--ht-color-foreground);
+  font-size: var(--ht-font-size-lg);
+  font-weight: var(--ht-font-weight-semibold);
+  /* 数字等宽：统计值增减时宽度不跳（与 `.ht-due` 同一条理由）。 */
+  font-variant-numeric: tabular-nums;
+}
+
+.ht-settings__admin-statLabel {
+  color: var(--ht-color-foreground-muted);
+  font-size: var(--ht-font-size-xs);
+}
+
+.ht-settings__admin-search {
+  display: flex;
+  align-items: center;
+  gap: var(--ht-space-2);
+}
+
+.ht-settings__admin-input {
+  flex: 1;
+  min-inline-size: 0;
+  padding: var(--ht-space-2);
+  border: var(--ht-border-width-thin) solid var(--ht-color-border);
+  border-radius: var(--ht-radius-sm);
+  background: var(--ht-color-background);
+  color: var(--ht-color-foreground);
+  font-family: var(--ht-font-sans);
+  font-size: var(--ht-font-size-sm);
+}
+
+.ht-settings__admin-input--narrow {
+  inline-size: 6rem;
+  flex: none;
+}
+
+.ht-settings__admin-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--ht-space-1);
+  appearance: none;
+  border: var(--ht-border-width-thin) solid var(--ht-color-border);
+  border-radius: var(--ht-radius-sm);
+  background: var(--ht-color-surface);
+  color: var(--ht-color-foreground);
+  cursor: pointer;
+  font-family: var(--ht-font-sans);
+  font-size: var(--ht-font-size-sm);
+  font-weight: var(--ht-font-weight-medium);
+  padding: var(--ht-space-1) var(--ht-space-3);
+  white-space: nowrap;
+}
+
+.ht-settings__admin-btn:hover:not(:disabled) {
+  background: var(--ht-color-hover);
+}
+
+.ht-settings__admin-btn:disabled {
+  background: var(--ht-color-disabled-bg);
+  color: var(--ht-color-disabled-fg);
+  cursor: not-allowed;
+}
+
+.ht-settings__admin-btn--danger {
+  border-color: var(--ht-color-danger);
+  color: var(--ht-color-danger);
+}
+
+.ht-settings__admin-list {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border: var(--ht-border-width-thin) solid var(--ht-color-border-subtle);
+  border-radius: var(--ht-radius-md);
+  overflow: hidden;
+}
+
+.ht-settings__admin-row,
+.ht-settings__admin-staticRow {
+  display: flex;
+  align-items: center;
+  gap: var(--ht-space-2);
+  inline-size: 100%;
+  padding: var(--ht-space-2) var(--ht-space-3);
+  border-block-end: var(--ht-border-width-thin) solid var(--ht-color-border-subtle);
+  background: var(--ht-color-surface);
+  text-align: start;
+}
+
+.ht-settings__admin-list > li:last-child > .ht-settings__admin-row,
+.ht-settings__admin-list > li:last-child > .ht-settings__admin-staticRow {
+  border-block-end: none;
+}
+
+.ht-settings__admin-row {
+  appearance: none;
+  border-inline: none;
+  border-block-start: none;
+  color: inherit;
+  cursor: pointer;
+  font-family: var(--ht-font-sans);
+  font-size: var(--ht-font-size-sm);
+}
+
+.ht-settings__admin-row:hover {
+  background: var(--ht-color-hover);
+}
+
+.ht-settings__admin-staticRow {
+  font-size: var(--ht-font-size-sm);
+}
+
+.ht-settings__admin-rowMain {
+  flex: 1;
+  min-inline-size: 0;
+  color: var(--ht-color-foreground);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ht-settings__admin-rowMeta {
+  color: var(--ht-color-foreground-subtle);
+  font-size: var(--ht-font-size-xs);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.ht-settings__admin-badges {
+  display: inline-flex;
+  gap: var(--ht-space-1);
+}
+
+.ht-settings__admin-badge {
+  border-radius: var(--ht-radius-full);
+  background: var(--ht-color-border-subtle);
+  color: var(--ht-color-foreground-muted);
+  font-size: var(--ht-font-size-2xs);
+  padding: 0 var(--ht-space-2);
+  white-space: nowrap;
+}
+
+.ht-settings__admin-badge--admin {
+  background: var(--ht-color-primary-subtle);
+  color: var(--ht-color-primary);
+}
+
+.ht-settings__admin-badge--danger {
+  background: var(--ht-color-danger-subtle);
+  color: var(--ht-color-danger);
+}
+
+.ht-settings__admin-detail {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ht-space-2);
+  padding: var(--ht-space-3);
+  border: var(--ht-border-width-thin) solid var(--ht-color-primary);
+  border-radius: var(--ht-radius-md);
+  background: var(--ht-color-surface-raised);
+}
+
+.ht-settings__admin-h4 {
+  margin: 0;
+  font-size: var(--ht-font-size-base);
+  font-weight: var(--ht-font-weight-semibold);
+}
+
+.ht-settings__admin-h5 {
+  margin: 0;
+  color: var(--ht-color-foreground-muted);
+  font-size: var(--ht-font-size-sm);
+  font-weight: var(--ht-font-weight-semibold);
+}
+
+.ht-settings__admin-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--ht-space-2);
+}
+
+.ht-settings__admin-quota {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--ht-space-1);
+}
+
+.ht-settings__admin-pager {
+  display: flex;
+  gap: var(--ht-space-2);
+}
+
+
+/* ── 窄屏塌缩（≤768px）────────────────────────────────────
+ * 🔴 本块必须排在**所有基础规则之后**（同特异性、源序后者胜）。
+ * 2026-09-30：塌缩规则曾写在文件前部，被后面的基础规则整块覆盖
+ *（"grid 塌了、rail 没塌"），且一个多余的 `}` 让 sidebar 规则逃出媒体块
+ * 变成全局 —— 都是这次逐页排版审计（goal-layout-audit 页 4）修掉的。
+ */
+@media (max-width: 768px) {
+  /* 单列：main 在上（1fr），底部导航在下（auto）。
+     🔴 高度必须**钉死**在视口（不是 min-height）：`min-height` 之下，
+     内容一长整页就往下长，底部导航被推到文档末尾 —— 日历/四象限这种
+     高页面要滚到最底才能切视图（塌缩态扫描实测，页4 只验过短内容没暴露）。
+     钉死之后改为 **main 内部滚动**，导航常驻贴底。 */
+  .ht-app,
+  .ht-app--with-sidebar {
+    grid-template-columns: 1fr;
+    grid-template-rows: 1fr auto;
+    height: 100dvh;
+  }
+
+  /* 滚动发生在 main（含页头一起滚）—— rail / sidebar 两条导航不动。 */
+  .ht-main {
+    overflow-y: auto;
+  }
+
+  /* rail + sidebar 合成同一条底部导航：rail 视图（order 2）、sidebar 范围（order 3） */
+  .ht-rail {
+    order: 2;
+    flex-direction: row;
+    align-items: center;
+    gap: var(--ht-space-2);
+    padding: var(--ht-space-1) var(--ht-space-2);
+    border-right: none;
+    border-top: var(--ht-border-width-thin) solid var(--ht-color-border);
+    overflow-x: auto;
+    overflow-y: hidden;
+  }
+
+  /* 头像行横排；品牌名在底部导航上没有信息量，隐藏 */
+  .ht-rail__top {
+    flex-direction: row;
+    align-items: center;
+    gap: var(--ht-space-2);
+    padding: 0;
+  }
+
+  .ht-brand__name {
+    display: none;
+  }
+
+  .ht-rail__tabs {
+    flex-direction: row;
+    flex: 1;
+    overflow-x: auto;
+  }
+
+  .ht-rail__tab {
+    padding: 0 var(--ht-space-2);
+  }
+
+  .ht-rail__tab--tool:first-of-type {
+    margin-top: 0;
+  }
+
+  /* sidebar（范围列）并入底部导航 */
+  .ht-sidebar {
+    order: 3;
+    flex-direction: row;
+    justify-content: space-around;
+    border-right: none;
+    border-top: var(--ht-border-width-thin) solid var(--ht-color-border);
+    /* 刘海屏安全区 */
+    padding-block-end: max(var(--ht-space-2), env(safe-area-inset-bottom));
+  }
+
+  .ht-brand,
+  .ht-nav__section,
+  .ht-nav__count {
+    display: none;
+  }
+
+  .ht-nav {
+    flex-direction: row;
+    inline-size: 100%;
+    justify-content: space-around;
+  }
+
+  .ht-nav__item {
+    flex-direction: column;
+    gap: var(--ht-space-1);
+    font-size: var(--ht-font-size-2xs);
+    padding: 0 var(--ht-space-2);
+  }
+
+  .ht-content {
+    padding: var(--ht-space-4);
+  }
 }

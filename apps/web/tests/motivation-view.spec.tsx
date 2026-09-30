@@ -19,6 +19,7 @@
 import { IDBFactory, IDBKeyRange } from 'fake-indexeddb';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
+import { enableModules } from './enable-all-modules.js';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 (globalThis as unknown as { indexedDB: IDBFactory }).indexedDB = new IDBFactory();
@@ -74,6 +75,8 @@ function byText(text: string): HTMLElement | undefined {
 }
 
 beforeEach(async () => {
+  // 这些用例要走「成长/番茄钟/便签」——它们默认是关的（见 enable-all-modules.ts）。
+  enableModules(['focus', 'growth', 'notes']);
   __resetOpLogForTests();
   await initOpLog(`motivation-view-${Math.random().toString(36).slice(2)}`);
 
