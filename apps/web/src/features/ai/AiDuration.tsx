@@ -45,6 +45,8 @@ import { AlertTriangle, Clock, X } from 'lucide-react';
 import { useI18n, type I18nValue } from '@heyta/i18n';
 
 import { AiDisclosureHost } from './AiDisclosureHost.js';
+import { AiPanelHost } from './AiPanelHost.js';
+import { AiPanelHeadHost } from './AiPanelHeadHost.js';
 import { FailureSettingsAction, RouteUnavailable } from './RouteUnavailable.js';
 import { useAiSettingsNavigation } from './ai-settings-navigation.js';
 import {
@@ -379,18 +381,16 @@ export function AiDuration(props: AiDurationProps): React.JSX.Element {
   // ── 🔴 披露：只算，不发 ───────────────────────────────────────────────
   if (phase === 'disclosing') {
     return (
-      <div
-        className="ht-ai__panel"
-        role="dialog"
-        aria-label={t('web.ai.duration.disclosureAria')}
-        data-testid="duration-disclosure"
-      >
-        <div className="ht-ai__head">
-          <span>{t('web.ai.disclosure.heading')}</span>
-          <button type="button" className="ht-btn ht-btn--ghost" aria-label={t('web.ai.action.cancel')} onClick={reset}>
-            <X size={12} aria-hidden="true" />
-          </button>
-        </div>
+            <AiPanelHost
+              label={t('web.ai.duration.disclosureAria')}
+              testID="duration-disclosure"
+              role="dialog"
+            >
+        <AiPanelHeadHost
+          title={t('web.ai.disclosure.heading')}
+          closeLabel={t('web.ai.action.cancel')}
+          onClose={reset}
+        />
 
         {target === undefined ? (
           <RouteUnavailable
@@ -428,36 +428,38 @@ export function AiDuration(props: AiDurationProps): React.JSX.Element {
             </div>
           </>
         )}
-      </div>
+            </AiPanelHost>
     );
   }
 
   if (phase === 'loading') {
     return (
-      <div className="ht-ai__panel" data-testid="duration-loading">
+            <AiPanelHost
+              label={t('web.ai.loading.waiting')}
+              testID="duration-loading"
+              role="status"
+            >
         <span>{t('web.ai.loading.waiting')}</span>
-      </div>
+            </AiPanelHost>
     );
   }
 
   // ── 🔴 提议：AI 的输出不会自己写进去 ──────────────────────────────────
   if (phase === 'proposal' && proposal !== undefined) {
     return (
-      <div
-        className="ht-ai__panel"
-        role="dialog"
-        aria-label={t('web.ai.duration.proposalAria')}
-        data-testid="duration-proposal"
-      >
-        <div className="ht-ai__head">
-          <span>
-            {t('web.ai.duration.proposalLead')} <strong data-testid="duration-proposal-minutes">{proposal.minutes}</strong>{' '}
-            {t('web.ai.duration.proposalRest', { humanized: humanizeMinutes(proposal.minutes, t) })}
-          </span>
-          <span className="ht-ai__tag" data-testid="duration-proposal-source">
-            {proposal.destination === 'none' ? t('web.ai.source.local') : t('web.ai.source.remote')}
-          </span>
-        </div>
+            <AiPanelHost
+              label={t('web.ai.duration.proposalAria')}
+              testID="duration-proposal"
+              role="dialog"
+            >
+        <AiPanelHeadHost
+          title={<>{t('web.ai.duration.proposalLead')} <strong data-testid="duration-proposal-minutes">{proposal.minutes}</strong>{' '}
+            {t('web.ai.duration.proposalRest', { humanized: humanizeMinutes(proposal.minutes, t) })}</>}
+          tag={{
+          text: proposal.destination === 'none' ? t('web.ai.source.local') : t('web.ai.source.remote'),
+          testID: 'duration-proposal-source',
+          }}
+        />
 
         {/* 🔴 夹过就必须说 —— 静默夹取等于让用户以为模型说的就是这个数。 */}
         {proposal.clamped && (
@@ -495,19 +497,22 @@ export function AiDuration(props: AiDurationProps): React.JSX.Element {
             {t('web.ai.action.discard')}
           </button>
         </div>
-      </div>
+            </AiPanelHost>
     );
   }
 
   // ── 失败：给出**具体原因**，并提供不依赖 AI 的退路 ─────────────────────
   return (
-    <div className="ht-ai__panel" role="dialog" aria-label={t('web.ai.duration.failedAria')} data-testid="duration-failed">
-      <div className="ht-ai__head">
-        <span>{t('web.ai.duration.failedHead')}</span>
-        <button type="button" className="ht-btn ht-btn--ghost" aria-label={t('web.ai.action.close')} onClick={reset}>
-          <X size={12} aria-hidden="true" />
-        </button>
-      </div>
+        <AiPanelHost
+          label={t('web.ai.duration.failedAria')}
+          testID="duration-failed"
+          role="dialog"
+        >
+      <AiPanelHeadHost
+        title={t('web.ai.duration.failedHead')}
+        closeLabel={t('web.ai.action.close')}
+        onClose={reset}
+      />
       <p data-testid="duration-failure-message">
         {failure === null ? '' : t(failure.key)}
       </p>
@@ -571,6 +576,6 @@ export function AiDuration(props: AiDurationProps): React.JSX.Element {
           {t('web.ai.action.close')}
         </button>
       </div>
-    </div>
+        </AiPanelHost>
   );
 }

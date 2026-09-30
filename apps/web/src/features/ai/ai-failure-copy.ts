@@ -58,6 +58,7 @@ import type {
   CaptureFailureReason,
   DurationFailureReason,
   PrioritizeFailureReason,
+  ToolCallFailureReason,
 } from '@heyta/app-host';
 import type { AiFailureReason } from '@heyta/ai';
 import type { MessageKey } from '@heyta/i18n';
@@ -102,6 +103,30 @@ const PRIORITIZE_KEY: Record<PrioritizeFailureReason, MessageKey> = {
   'ai-unavailable': 'web.ai.failure.aiUnavailable',
   unparseable: 'web.ai.failure.prioritize.unparseable',
   'empty-tasks': 'web.ai.failure.prioritize.emptyTasks',
+};
+
+/**
+ * 工具调用（第 5 个入口）。
+ *
+ * 🔴 **这一份是补上来的**：另外四个面板改造时漏了 `AiToolRun`，它一直把
+ * `outcome.message`（`packages/app-host` 拼好的**中文**）整句渲染成主文案 ——
+ * 于是**英文界面上工具调用一失败就露中文**。
+ *
+ * 这与披露块那次的漂移是**同一形状**（第 5 份副本没跟上）：四个入口改好了，
+ * 第 5 个没人管，而**没有任何测试会红** —— 每个面板各测各的，谁也没规定
+ * "五个入口必须一样"。
+ *
+ * `ai-unavailable` **复用共享那条**（与另外四个面板同一个 key）：
+ * 路由层的失败原因码由 `causeKey()` 说得更具体，不需要工具自己的说法。
+ */
+const TOOL_RUN_KEY: Record<ToolCallFailureReason, MessageKey> = {
+  'ai-unavailable': 'web.ai.failure.aiUnavailable',
+  'empty-text': 'web.ai.tools.failure.emptyText',
+  'text-too-long': 'web.ai.tools.failure.textTooLong',
+  'no-granted-tools': 'web.ai.tools.failure.noGrantedTools',
+  'model-returned-text': 'web.ai.tools.failure.modelReturnedText',
+  'multiple-tool-calls': 'web.ai.tools.failure.multipleToolCalls',
+  'tool-call-malformed': 'web.ai.tools.failure.toolCallMalformed',
 };
 
 /**
@@ -262,6 +287,26 @@ export function prioritizeFailureCopy(
       reason === 'ai-unavailable'
         ? causeKey(cause)
         : PRIORITIZE_KEY[reason],
+    detail,
+    showDetail: showDetailFor(reason, cause),
+    settingsTarget: settingsTargetFor(reason, cause),
+  };
+}
+
+/**
+ * 工具调用（第 5 个入口）—— 与上面四个**同一个形状**。
+ *
+ * ⚠️ 传进来的 `detail` 是 `outcome.message`：那句话进**折叠的技术详情**，
+ * 不再当主文案（详情里出现中文是**有意的**，与本文件头那条"原始错误文本是
+ * 数据、不翻译"同一处置）。
+ */
+export function toolRunFailureCopy(
+  reason: ToolCallFailureReason,
+  detail: string,
+  cause: AiFailureReason | undefined,
+): AiFailureCopy {
+  return {
+    key: reason === 'ai-unavailable' ? causeKey(cause) : TOOL_RUN_KEY[reason],
     detail,
     showDetail: showDetailFor(reason, cause),
     settingsTarget: settingsTargetFor(reason, cause),
