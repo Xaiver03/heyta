@@ -371,12 +371,17 @@ export const AA_PAIRS: ReadonlyArray<{
 }> = [
   { fg: 'color.foreground', bg: 'color.surface', min: 4.5, why: '正文' },
   { fg: 'color.foreground', bg: 'color.background', min: 4.5, why: '正文（页面底）' },
+  /* 🔴 `surface-raised` 是**浮层**那一族表面（菜单 / popover / 桌面回跳浮条），
+     此前一条配对都没登记过 —— 于是"暗色下把浮层底色调深一点"这种事，
+     整套对比度测试一个字都不会报。缺它不是遗漏，是它从没被点名过。 */
+  { fg: 'color.foreground', bg: 'color.surface-raised', min: 4.5, why: '正文（浮层）' },
   { fg: 'color.foreground-muted', bg: 'color.surface', min: 4.5, why: '次要文字' },
   { fg: 'color.foreground-muted', bg: 'color.background', min: 4.5, why: '次要文字（页面底）' },
   { fg: 'color.on-primary', bg: 'color.primary', min: 4.5, why: '主按钮文字' },
   { fg: 'color.on-primary', bg: 'color.primary-hover', min: 4.5, why: '主按钮 hover' },
   { fg: 'color.primary', bg: 'color.surface', min: 4.5, why: '蓝色文字/链接' },
   { fg: 'color.primary', bg: 'color.background', min: 4.5, why: '蓝色文字（页面底）' },
+  { fg: 'color.primary', bg: 'color.surface-raised', min: 4.5, why: '链接（浮层）' },
   // 状态色作为**文字**使用时必须达标
   { fg: 'color.danger-strong', bg: 'color.surface', min: 4.5, why: '错误文字' },
   { fg: 'color.success-strong', bg: 'color.surface', min: 4.5, why: '成功文字' },
