@@ -7,6 +7,7 @@ import {
   replaceToken,
   requestLoginMagicLink,
   verifyLoginMagicLink,
+  verifyEmailLink,
   registerWithMagicLink,
   getJwtSecret,
   JWT_EXPIRY,
@@ -1043,13 +1044,68 @@ export const apiRoutes = async (
         }
         const { token } = parseResult.data;
 
-        const result = await verifyLoginMagicLink(token);
+        /**
+         * 🔴 **委托给唯一入口**（ADR-0039 §2.1 / §3.2）。
+         *
+         * 这个端点历史上只认登录令牌，而"邮箱链接换会话"现在只有一份实现
+         * （`verifyEmailLink`：登录令牌 / 邮箱注册令牌 / 通行密钥注册令牌）。
+         * 这里保留它是因为**已经发出去的邮件**指向它 —— 但行为必须与新的
+         * 那个端点一致，否则同一封邮件走两条路会得到两种结果。
+         */
+        const result = await verifyEmailLink(token);
+        if (result.kind !== 'session') {
+          // 通行密钥注册那条链接：验证成功但**不该**在这里换会话（产品语义如此）。
+          // 明确说出来，而不是返回一个缺少 token 的 200 —— 后者会让调用方
+          // 以为"登录成功了但没有令牌"。
+          return reply.status(409).send({
+            error: 'This link verifies a passkey registration; please sign in with your passkey.',
+          });
+        }
         return reply.send(result);
       } catch (err) {
         const errMsg = err instanceof Error ? err.message : 'Unknown error';
         Logger.error(`Magic link verify error: ${errMsg}`);
         return reply.status(401).send({
           error: getSafeErrorMessage(err, 'Invalid or expired login link'),
+        });
+      }
+    },
+  );
+
+  // ============================================
+  // 邮箱链接换会话（**唯一入口**，ADR-0039 §2.1）
+  // ============================================
+
+  /**
+   * 邮件里那个 `token` 换会话。三类令牌（登录 / 邮箱注册 / 通行密钥注册）
+   * 由 `verifyEmailLink` 一份实现分流；确认页对三个邮件端点都只调这一个。
+   *
+   * 返回判别式：`{kind:'session',token,user}` 或 `{kind:'verified-only',user}`。
+   * ⚠️ 后者**不是失败** —— 它是"验证成功、但那条路的产品语义不发会话"
+   *    （通行密钥注册）。页面据此显示"已确认，去应用"，而不是报错。
+   */
+  fastify.post<{ Body: { token?: string } }>(
+    '/auth/email/verify',
+    {
+      config: {
+        rateLimit: {
+          max: 50,
+          timeWindow: '15 minutes',
+        },
+      },
+    },
+    async (req, reply) => {
+      try {
+        const token = typeof req.body?.token === 'string' ? req.body.token : '';
+        if (token === '') {
+          return reply.status(400).send({ error: 'Validation failed' });
+        }
+        return reply.send(await verifyEmailLink(token));
+      } catch (err) {
+        const errMsg = err instanceof Error ? err.message : 'Unknown error';
+        Logger.error(`Email link verify error: ${errMsg}`);
+        return reply.status(401).send({
+          error: getSafeErrorMessage(err, 'Invalid or expired link'),
         });
       }
     },

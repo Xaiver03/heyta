@@ -2606,6 +2606,15 @@ export const en = {
   'server.page.verify.heading': 'Your email is verified',
   'server.page.verify.body': 'Your account is ready to use.',
   'server.page.verify.action': 'Go back and sign in',
+  // 🔴 The email-link **confirm** page (the one you see *before* clicking) must be
+  //    separate from the "already verified" page — claiming success before the click
+  //    is simply untrue (measured 2026-09-30).
+  'server.page.confirm.title': 'Confirm your email',
+  'server.page.confirm.heading': 'Confirm your email',
+  'server.page.confirm.body': 'Click the button below to confirm.',
+  'server.page.confirm.button': 'Confirm',
+  // Passkey-registration links verify the email but do **not** issue a session.
+  'server.page.confirm.verifiedOnly': 'Email confirmed. Please sign in with your passkey.',
   'server.page.verify.failedTitle': 'Verification failed',
   'server.page.verify.failedBody': 'This verification link is invalid or has expired. Please register again, or request a new verification email.',
   'server.page.recover.title': 'Recover passkey',
