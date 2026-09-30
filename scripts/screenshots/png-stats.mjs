@@ -337,6 +337,30 @@ export function looksBlank(stats) {
 /** heyta 主蓝 = `#2563EB`（tokens.css `--ht-blue-600`，设计系统唯一事实源）。 */
 export const HEYTA_BLUE = [37, 99, 235];
 
+/**
+ * 🔴 暗色主题的主蓝是**另一个值**：`#60A5FA`
+ * （tokens.css `[data-theme='dark']` → `--ht-color-primary: var(--ht-blue-400)`）。
+ *
+ * 只数浅色那一个的结果是**把正确的安装判成红的**：2026-09-30 `reinstall:all` 的 mac 段
+ * 在启动前刻意清掉壳的 WebKit 存储（那是"全新安装"的一部分），应用于是**回落到系统外观**
+ * —— 晚上十点这台机器是深色 —— 截图里是人眼确认过的真共享 UI，而 `HEYTA_BLUE` 命中 **0** ⇒ 🔴。
+ *
+ * 实测四个样本（同一套 ±12 容差）：
+ *
+ * | 样本 | `#2563EB` | `#60A5FA` |
+ * |---|---|---|
+ * | 错误屏「找不到共享 UI 产物」 | 0 | **0** |
+ * | 装好的真界面（深色） | 0 | **78** |
+ * | 装好的真界面（浅色） | 78 | 0 |
+ * | Android / iOS 真界面 | 9 279 / 9 450 | 0 |
+ *
+ * ⇒ 两个值**相加**不会放过错误屏（错误屏两个都是 0），阈值 20 不用动。
+ */
+export const HEYTA_BLUE_DARK = [96, 165, 250];
+
+/** 两套主题的主蓝。判定"是不是 heyta 的界面"要用**这一组**，不是单个值。 */
+export const HEYTA_BLUES = [HEYTA_BLUE, HEYTA_BLUE_DARK];
+
 /** 每个通道允许的偏差：抗锯齿与色彩空间抖动吃掉一点，但不能放过"不是它"的颜色。 */
 export const HEYTA_BLUE_TOLERANCE = 12;
 
@@ -364,6 +388,16 @@ export function countColor(filePath, [red, green, blue], tolerance = HEYTA_BLUE_
     }
   }
   return hits;
+}
+
+/**
+ * 数一张 PNG 里**任一主题**的 heyta 主蓝（浅色 `#2563EB` + 深色 `#60A5FA`）。
+ *
+ * 这是"截图里是 heyta 的界面"的判据入口 —— 调用方不该自己挑单个 RGB，
+ * 挑了就等于只验了一套主题（见 `HEYTA_BLUE_DARK` 那条实测）。
+ */
+export function countBrandBlue(filePath, tolerance = HEYTA_BLUE_TOLERANCE) {
+  return HEYTA_BLUES.reduce((sum, rgb) => sum + countColor(filePath, rgb, tolerance), 0);
 }
 
 /** 判定一次横向跃变/一处内容所需的亮度差。24 能滤掉渐变与抗锯齿，只留真正的边。 */

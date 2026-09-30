@@ -166,8 +166,9 @@ fi
 [ -f "$SELFIE" ] || { echo "  🔴 打包后的 .app 没能自截屏 —— 它跑不起来或渲染失败"; exit 1; }
 
 cd "$REPO"
-node - "$SELFIE" <<'JS'
-import { inspectPng, looksBlank, looksSmeared, countColor, HEYTA_BLUE } from './scripts/screenshots/png-stats.mjs';
+node - "$SELFIE" "$SELFIE.webview.png" <<'JS'
+import { existsSync } from 'node:fs';
+import { inspectPng, looksBlank, looksSmeared, countBrandBlue } from './scripts/screenshots/png-stats.mjs';
 const st = inspectPng(process.argv[2]);
 console.log(`  ${st.width}x${st.height}  内容 ${(st.contentRatio * 100).toFixed(1)}%  色阶 ${st.colorSpan}  边缘 ${st.edgeOnContent.toFixed(3)}`);
 let bad = false;
@@ -176,8 +177,14 @@ if (looksBlank(st)) { console.error('  🔴 疑似空白'); bad = true; }
 if (looksSmeared(st)) console.error('  ⚠️ 启发式提示疑似渲染坏了 —— 请人眼看一眼');
 // 🔴 UI 特征判据（2026-09-30）：错误屏"非空白"（contentRatio 99.6%），只有
 //    "界面里数得出主蓝"才分得清是真 UI 还是"找不到共享 UI 产物"那张错误屏。
-const blue = countColor(process.argv[2], HEYTA_BLUE);
-console.log(`  主蓝采样命中 ${blue}`);
+//    ⚠️ 必须两套主题都数：应用外观跟随系统，深色下 `--ht-color-primary` 是
+//    `#60A5FA` 而不是 `#2563EB`，只数浅色的会把**真界面判成红的**（同日实测）。
+//    ⚠️ 必须数 **WebView 快照**而不是窗口截图：本文件上面那段壳代码规定了两份产物
+//    各证一件事，而"WebView 内容没合成进窗口"在这台机器上是**常态**（实测同一秒
+//    窗口 48 KB / 主蓝 0，快照 286 KB / 主蓝 79）。窗口截图仍负责"是不是真窗口"。
+const brandShot = existsSync(process.argv[3]) ? process.argv[3] : process.argv[2];
+const blue = countBrandBlue(brandShot);
+console.log(`  主蓝采样命中 ${blue}（数的是 ${brandShot.split('/').pop()}）`);
 if (blue < 20) { console.error('  🔴 截图里没有 heyta 主蓝 —— 这是错误屏/别的界面，不是共享 UI'); bad = true; }
 if (bad) process.exit(1);
 console.log('  ✅ 打包后的 .app 能起来、界面有真实内容（且确实是共享 UI）');
