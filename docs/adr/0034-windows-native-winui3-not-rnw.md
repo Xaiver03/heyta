@@ -1,7 +1,8 @@
 # ADR-0034：Windows 桌面端走 WinUI 3 / Windows App SDK 原生，而不是 react-native-windows
 
-> 状态：**待确认**
-> 日期：2026-09-28
+> 状态：**已被取代** → 🔴 由 [ADR-0036](0036-main-battlefield-and-rn-single-source-ui.md) **全部取代**
+> （**限 UI 机制**；本文关于**跨语言通道**的实测结论 §1.3 / §1.4 / §1.5 / §6 **继续有效并被保留**，见文末 §7）
+> 日期：2026-09-28（状态变更日期：2026-09-29）
 > **全部取代** [ADR-0032](0032-windows-native-via-rnw.md)（该文选 RNW）；
 > **部分取代** [ADR-0031](0031-native-apps-everywhere-not-pwa.md) §3 结论 1 的 Windows 一行
 > （那里经 ADR-0032 改成 RNW，本 ADR 改成 WinUI 3）
@@ -345,3 +346,78 @@ C# 侧还开了一个**新连接**独立复核盘上的库（`__heyta_seq` / `ar
    桌面壳不走它。
 
 细节见 [spike README](../../research/spikes/sqlite-driver-csharp/README.md)。
+
+---
+
+## 7. 勘误 / 取代（2026-09-29）
+
+> 本节按 [`README.md`](README.md) 规则 1a 追加：**正文一个字未改**，只记录三类事实 ——
+> 被谁取代、哪个断言被实测证伪、哪些结论保留。
+
+### 7.1 本文被谁取代
+
+**状态：由「待确认」改为「已被取代」，取代者是
+[ADR-0036](0036-main-battlefield-and-rn-single-source-ui.md)**（主战场定义 + UI 单源 = RN 全端 + 内容岛）。
+
+🔴 **为什么是「已被取代」而不是「已修订」**：本文的**中心结论**是"Windows 用 WinUI 3 原生、不用 RNW"，
+而 ADR-0036 把 Windows 改回 `react-native-windows` —— 这是**结论被反转**，不是正文里的某句断言被补注。
+ADR 状态词表（`docs/README.md` §三）只有 `待确认 / 已接受 / 已取代 / 已废弃`，**没有「已修订」**；
+按规则 6「结论变了就新写一份」，本文的归宿只能是**已被取代**。
+⚠️ 但"取代"**只覆盖 UI 机制**这一层，不覆盖本文的全部内容，见 §7.3。
+
+### 7.2 被证伪的断言（触发本次重开的实测）
+
+本文 §1.2 的**唯一决定性理由**是：
+
+> 「RNW 无 0.85+ 稳定版 ⇒ 选 RNW = 把 `apps/mobile` 一起冻在出了支持窗口的 RN 上。」
+
+**触发它的实测（2026-09-29，两条；详见 [ADR-0036](0036-main-battlefield-and-rn-single-source-ui.md) §1.3 与
+[调研 §3.1 / §3.3](../research/multi-platform-best-practice.md)）：**
+
+1. **"冻结/降级"不成立** —— npm registry 直查 `react-native-windows@0.84.0` 的
+   `peerDependencies = {"react":"^19.2.3","@types/react":"^19.1.1","react-native":"0.84.1"}`，
+   而 `apps/mobile/package.json` 实测就是 `react 19.2.3` + `react-native 0.84.1`
+   ⇒ **接 RNW 零版本改动**，不存在"把移动端冻下去"。
+   ```
+   $ curl -s https://registry.npmjs.org/react-native-windows |
+       python3 -c "import json,sys; d=json.load(sys.stdin); print(d['dist-tags']['latest']);
+                   print(d['versions']['0.84.0']['peerDependencies'])"
+   0.84.0
+   {'react': '^19.2.3', '@types/react': '^19.1.1', 'react-native': '0.84.1'}
+   ```
+2. **"出了支持窗口"这个状态本来就已存在** —— [RN 官方支持矩阵](https://reactnative.dev/releases/overview)：
+   0.87 / 0.86 Active、0.85 End of Cycle、**0.84 Unsupported**。
+   heyta 的 `apps/mobile` 就在 **0.84.1** ⇒ **它本来就在窗口之外，不是 RNW 推进去的**。
+   ⇒ 接 RNW 的边际成本是"**停在原地**"，不是"从受支持跌到不受支持"。
+
+**连带失效的还有 §3.2 的"回到 RNW 的触发条件"**：它写成"RNW 发布 ≥ 0.87 的 stable"，
+这个条件**沿用了同一个被证伪的前提**（以为 RNW 必须对齐一个仍在窗口内的 RN）。
+⇒ 该触发条件**不再作为重开依据**，RNW 是否可用的判据改为**它自身的支持矩阵 + 与 heyta 的 peer 对齐**
+（现为 0.84 = RNW Active，见调研 §3.1）。本文 §3.2 的"在那之前 RNW 不进入候选"**作废**。
+
+### 7.3 🔴 明确保留、继续有效的结论（不要一起否掉）
+
+下列结论是**跨语言通道 / 工具链 / 领域层单源**的证据，**与 Windows 用不用 RNW 无关**，
+ADR-0036 §5.2 已逐条确认保留：
+
+| 本文位置 | 保留的结论 |
+|---|---|
+| §1.3 | 微软有**官方 C# widget provider 教程**；"RNW 只能 C++/WinRT"是**选 RNW 造成的**，不是 Windows 平台性质 |
+| §1.4 | `Microsoft.Data.Sqlite` 是 **ADO.NET 全同步** provider；"同步驱动"是**栈相关**的 |
+| §1.5 | heyta 真实原生依赖是 **4 个库 / 3 个缺口**（不是生态的 2.8%）；`research/tools/windows-native-gaps.mjs` 为证 |
+| §6 | 领域层 spike：**D2 的"同一份字节"成立** —— `@heyta/domain` bundle 338,445 B 在 node vm 与 .NET Jint 上 **22/22 逐条一致** |
+| §6.2 | **C1 结清** —— 未改一行的 `SqliteAdapter` 在 Jint + `Microsoft.Data.Sqlite` 上跑完 `packages/storage` 契约 **50/50**；两个"默认值就是错的"陷阱（`?` 位置占位符翻译、`CatchClrExceptions`） |
+| §6.2 附 | 跨语言编组开销实测、Jint `LimitMemory`（累计分配预算）与进程级失控风险 |
+| §4 | `check:licenses:nuget` 已落地（非 npm 依赖许可证通道） |
+
+⚠️ **唯一口径变化**：换到 RNW 后，Windows 侧**大概率不再需要** Jint / C# SQLite 驱动
+（RNW 自带 JS 引擎）⇒ 上表这些结论从"Windows 的**前置**"降级为"**已测事实与备选通道**"。
+**"不再需要"不等于"被证伪"** —— 它们在 Linux GTK4 壳与既有 Electron 基线上仍可用。
+`research/tools/windows-native-gaps.mjs` 的清单因前提改变**需按 RNW 重跑**（ADR-0036 §6 第 2 条）。
+
+### 7.4 未受影响的部分
+
+本文 §5 的未核实项（.NET 工具链、D1/D2 未拍板、WinUI 3 能否起窗、C# provider 与主应用共存的工程形态等）
+**记录的是当时的真实未知**，其"未核实"属性**不因本勘误改变**；其中与 WinUI 3 绑定的几条
+（能否起窗、provider 与主应用同 solution 的组织）随 Windows 改走 RNW 而**不再阻塞本方向**。
+Windows 打包件可见窗口截图仍未取得这一条**与壳无关**，保持原状。

@@ -1,6 +1,9 @@
 # 运维与部署现状
 
-> **最后实测：2026-09-27（CST）对 §3.7 与应用入口；其余章节仍为 2026-09-26 的实测。**
+> **最后实测：2026-09-30（CST）对 §3.7.2 与线上入口（`heyta.waytofuture.cn`）；
+> §3.7.1 仍是 2026-09-27 的实测；其余章节仍为 2026-09-26 的实测。**
+> 🔴 **对外入口自 2026-09-30 起是 `https://heyta.waytofuture.cn/`**，
+> `heyta.finlaw.cloud` 只作回滚路径（不是入口）。
 > 本文只讲「哪台机器、跑什么、对外地址、怎么核实」，**不讲 heyta 的应用源码**。
 > 应用怎么构建、怎么本地跑，见 [`local-server-verification.md`](local-server-verification.md)；
 > 多端产物见 [`../reference/build-matrix.md`](../reference/build-matrix.md)。
@@ -297,33 +300,43 @@
 
 文件：`ubuntu-jcli:~/heyta/server/.env`（✅ 实测，只列键与非敏感值）。
 
+🔴 **2026-09-30 全部域名相关变量的值已切到 `heyta.waytofuture.cn`**（见 §3.7.2），
+`SMTP_*` 同时切到 `waytofuture.cn` 发信（见 §3.9.1）。改完**必须换容器**才生效
+（`docker compose … up -d --no-build supersync`，三个 `-f` 都要带）。
+
 | 变量 | 值 | 说明 |
 |---|---|---|
 | `NODE_ENV` | `production` | ✅ |
-| `PUBLIC_URL` | `https://heyta.finlaw.cloud` | ✅ 2026-09-27 起（迁移见 §3.7.1） |
-| `CORS_ORIGINS` | `https://heyta.finlaw.cloud` | ✅ 与 `PUBLIC_URL` 同源 |
-| `DOMAIN` | `heyta.finlaw.cloud` | ✅ 供 compose 的 caddy 服务用（当前没起，nginx 直接反代 1900） |
+| `PUBLIC_URL` | `https://heyta.waytofuture.cn` | ✅ 2026-09-30 起（§3.7.2） |
+| `CORS_ORIGINS` | `https://heyta.waytofuture.cn` | ✅ 与 `PUBLIC_URL` 同源 |
+| `DOMAIN` | `heyta.waytofuture.cn` | ✅ 供 compose 的 caddy 服务用（当前没起，nginx 直接反代 1900） |
 | `RUN_MIGRATIONS_ON_STARTUP` | `false` | ✅ 迁移由 `deploy.sh` / `migrate-deploy.sh` 显式跑 |
 | `TEST_MODE` | ~~`true`~~ **已于 2026-09-27 删除** | ✅ **服务端从来不在测试模式**：生产 compose 不转发它，容器里是空的，线上 `/api/test/*` 全是 404。见 §7.4 |
 | `TEST_MODE_CONFIRM` | ~~`yes-i-understand-the-risks`~~ **同时删除** | ✅ 同上；`NODE_ENV=production` 下这两个键只会让服务端起不来 |
-| `WEBAUTHN_RP_ID` | `heyta.finlaw.cloud` | ✅ 🔴 **改它会让旧域名上已注册的 passkey 全部失效**（§3.7.1） |
+| `WEBAUTHN_RP_ID` | `heyta.waytofuture.cn` | ✅ 🔴 **改它会让旧域名上已注册的 passkey 全部失效**（§3.7.1 / §3.7.2） |
 | `WEBAUTHN_RP_NAME` | `heyta` | ✅ |
-| `WEBAUTHN_ORIGIN` | `https://heyta.finlaw.cloud` | ✅ |
+| `WEBAUTHN_ORIGIN` | `https://heyta.waytofuture.cn` | ✅ |
+| `SMTP_HOST` | `gz-smtp.qcloudmail.com` | ✅ 腾讯云 SES 的 SMTP 网关（**不是**企业邮） |
+| `SMTP_PORT` / `SMTP_SECURE` | `465` / `true` | ✅ |
+| `SMTP_USER` | `heyta@waytofuture.cn` | ✅ 2026-09-30 起；SES 发信地址，见 §3.9.1 |
+| `SMTP_FROM` | `heyta <heyta@waytofuture.cn>` | ✅ 同上 |
 | `POSTGRES_USER` | `heyta` | ✅ |
 | `POSTGRES_DB` | `heyta` | ✅ |
 | `JWT_SECRET` | 🔒 **存在，值不抄** | ✅ 键存在 |
 | `POSTGRES_PASSWORD` | 🔒 **存在，值不抄** | ✅ 键存在 |
+| `SMTP_PASS` | 🔒 **存在，值不抄**（SES 发信地址的 SMTP 密码，可在 SES 控制台/tccli 轮换） | ✅ 键存在 |
 
 compose 里还有一批**未在 `.env` 中设置、走默认值**的键（`HOST`、`PRIVACY_*`、`ALLOWED_EMAILS`、
 `SUPERSYNC_DEFAULT_STORAGE_QUOTA_BYTES`、`OLD_OPS_CLEANUP_*`、`POSTGRES_MEM_LIMIT` 等）。
 它们不在 `.env` 里，就**没有生效**，由 `server/docker-compose.yml` 的默认值决定（如 `POSTGRES_MEM_LIMIT=1536m`）。
 
-⚠️ **`SMTP_*` 不在上面这批里** —— 它 2026-09-27 当天就加进 `.env` 了（见 §3.9），
-所以那几封邮件是真发得出去的。
+⚠️ **`PRIVACY_*` 没配**（实测容器日志：
+`No PRIVACY_* configuration set: /privacy.html and the registration consent notice are disabled`）。
+后果是注册接口**不要求**勾选任何同意项。要合规上线得先配这五个键 —— 与 §3.11 是同一件事。
 
 ### 3.6 公网实测结果
 
-**唯一域名 `heyta.finlaw.cloud`（2026-09-27 起）：**
+**唯一域名 `heyta.waytofuture.cn`（2026-09-30 起）：**
 
 | 请求 | 结果 | 来源 |
 |---|---|---|
@@ -388,11 +401,11 @@ location ~ ^/(health|live)$ {
 
 | 项 | 值 |
 |---|---|
-| 公网地址 | `https://heyta.finlaw.cloud/app/`（**2026-09-27 从 tmp 域名迁来**，见 §3.7.1） |
-| 静态根目录 | `/var/www/heyta-app/`（`ubuntu:ubuntu`）—— 迁移**没动**这个目录，换的只是它挂在哪个域名下 |
+| 公网地址 | 🔴 **当前（2026-09-30 起）：`https://heyta.waytofuture.cn/app/`** —— 见 §3.7.2。<br>2026-09-27 → 2026-09-30 期间是 `https://heyta.finlaw.cloud/app/`（见 §3.7.1） |
+| 静态根目录 | `/var/www/heyta-app/`（`ubuntu:ubuntu`）—— 两次迁移**都没动**这个目录，换的只是它挂在哪个域名下 |
 | 为什么放这个域名 | 与同步服务端**同源**：`WEBAUTHN_RP_ID` / `WEBAUTHN_ORIGIN` / `CORS_ORIGINS` 都指向它，passkey 才能用（§3.7.1 解释了为什么不能再挂第二个域名） |
-| nginx 片段 | `/etc/nginx/sites-available/heyta.finlaw.cloud` —— 应用（`/app/`）、同步 API（`/api/`）与三张凭据页都在这里 |
-| 旧地址 | `https://heyta-tmp.litopia.space/app/` 现在是 **`301` → 这里**（站点留着当回滚路径，入口已退休，见 §3.3.2）；即便绕过重定向直连，那里 **passkey 也不可用**（§3.7.1） |
+| nginx 片段 | `/etc/nginx/sites-available/heyta.waytofuture.cn` —— 应用（`/app/`）、同步 API（`/api/`）与三张凭据页都在这里；`heyta.finlaw.cloud` 那份保留但**不是入口** |
+| 旧地址 | `https://heyta-tmp.litopia.space/app/` 与 `https://heyta.finlaw.cloud/app/` 都**不再提供服务**（两者都留作回滚路径，passkey 均不可用：RP ID 只能有一个，见 §3.7.1） |
 
 #### 重新发布的两条命令
 
@@ -578,6 +591,9 @@ ssh ubuntu-jcli 'ls /var/www/heyta-app/assets/'
 - `/etc/nginx/sites-available/heyta-tmp.bak-20260927T124302Z`（tmp 站点加 `/app/` 之前）
 - `/etc/nginx/sites-available/heyta-tmp.bak2-20260927T124707Z`（tmp 站点加 `/app` 重定向之前）
 - `/var/www/heyta-landing.bak-20260927T124628Z`（旧落地页产物）
+- `/var/www/heyta-landing.bak-20260929T035321Z`（动画微交互上线前的落地页产物；本次只发静态文件，nginx/env 未动）
+- `/var/www/heyta-landing.bak-20260929T151330Z`（信息架构与文案改版上线前的落地页产物；只发静态文件，nginx/env 未动）
+- `/var/www/heyta-landing.bak-20260930T022530Z`（导航改造 + 仓库公开后的 GitHub 链路恢复上线前的落地页产物；只发静态文件，nginx/env 未动）
 
 #### 3.7.1 2026-09-27：把测试域名固定到 `heyta.finlaw.cloud`
 
@@ -636,6 +652,43 @@ Playwright 实测：中文页与英文页各两个入口都指向应用地址且
 
 #### 还没做的
 
+- 🔴 **2026-09-30 实测发现：PWA 的两个根绝对路径在 `/app/` 部署下是坏的（本次迁移之前就坏，不是迁移造成的）。**
+  真浏览器验收（`e2e/live-site/live-domain.spec.ts`）抓控制台时现形：
+
+  | 请求 | 实测 |
+  |---|---|
+  | `GET /sw.js` | `200` **`text/html`** ← 落进落地页的 `try_files … /index.html` 兜底 ✗ |
+  | `GET /app/sw.js` | `200 application/javascript` ✓（文件在 `/var/www/heyta-app/sw.js`） |
+
+  控制台原文：
+  `SecurityError: Failed to register a ServiceWorker … script ('https://heyta.waytofuture.cn/sw.js'):
+  The script has an unsupported MIME type ('text/html')`，出自
+  `apps/web/src/pwa/register.ts:23` 的 `const SW_URL = '/sw.js'`。
+
+  **同一个根因还有第二处（用户看得见的那处）**：`apps/web/scripts/gen-pwa.mjs`
+  生成的 `manifest.webmanifest` 里 `start_url` / `scope` / `icons[].src` 全是 `/…`。
+  实测 `GET /icons/icon-192.png` → `200 text/html`（同样是落地页兜底），
+  而 `GET /app/icons/icon-192.png` → `200 image/png`。
+  ⇒ **在这台域名上安装 PWA，装出来的入口是落地页，图标也是坏的。**
+
+  ⚠️ 为什么以前没发现：`vite preview` / 离线 e2e 都跑在**根路径**，
+  那里 `/sw.js` 与 `/manifest.webmanifest` 本来就对。**只有 subpath 部署才露。**
+  ✅ 已经对的一件事：Vite 会重写 `index.html` 里的 assets 引用，
+  所以构建产物里 `<link rel="manifest" href="/app/manifest.webmanifest">` 是**对的** ——
+  坏的只有「manifest **内部**的路径」与「JS 里写死的 `SW_URL`」。
+
+  **建议改法**（与落地页 `VITE_SITE_URL` 同一条设计：把挂载路径变成构建参数，不写死）：
+  1. `register.ts`：`const SW_URL = `${import.meta.env.BASE_URL}sw.js`;`
+     —— `BASE_URL` 正是"应用挂在什么路径下"，两种形态（`/` 与 `/app/`）自动都对；
+  2. `gen-pwa.mjs`：同样从 `BASE_URL`（或新加的 `VITE_BASE`）派生
+     `id` / `start_url` / `scope` / `icons[].src`。
+     ⚠️ 它是**生成物**（`apps/web/public/{sw.js,manifest.webmanifest,icons/}` 已签进仓库），
+     改完要重跑 `pnpm --filter @heyta/web gen:pwa`
+     —— 与落地页 `check:entries` 同一类"提交物必须与生成器一致"的纪律。
+  3. 顺手：`/app/manifest.webmanifest` 的 Content-Type 是 `application/octet-stream`，
+     本机 `mime.types` 里没有 `.webmanifest`。不影响解析（浏览器按 `link` 的 `rel` 认），
+     但值得补一条 `application/manifest+json webmanifest;`。
+
 - 应用产物没走 CDN、没有 SRI、没有构建版本号注入；`/app/` 那段 nginx **不在仓库里**
   （仓库只跟踪 `server/Caddyfile`），只能上机改 —— 改完记得回来更新本节。
 - `heyta-tmp.litopia.space` 那份 nginx 站点仍在（`location /` → 1900 的 Connect 页与 `/api/`、
@@ -655,6 +708,74 @@ Playwright 实测：中文页与英文页各两个入口都指向应用地址且
   `apps/landing/src/lib/app-url.ts` 给外链带 `?lang=en`，应用侧
   `apps/web/src/lib/locale.ts` 在**没有已存偏好**时采纳它（已存偏好优先 ——
   反过来的话，一个陈旧的地址栏参数会覆盖用户在应用里的明确选择）。
+
+#### 3.7.2 2026-09-30：把入口迁到 `heyta.waytofuture.cn`
+
+**为什么迁（这次的动因与上次不同）。** 上次（§3.7.1）是"别把入口挂在临时资产上"，
+纯运维整洁问题。**这次是被备案倒逼的**：
+
+- 腾讯云 ICP APP 备案（订单 `30179057320250614`）三个平台填报的服务域名都是
+  `heyta.waytofuture.cn` —— 它是本主体**已备案主域 `waytofuture.cn`** 的子域，
+  避开了 §四 的"域名实名主体不一致"坑；
+- 而备案要求**填报的域名真的指向那台已备案的腾讯云服务器**
+  （`124.223.13.226`）。填一个只有解析、没有服务的域名，是"服务与填报不一致"。
+
+所以这次迁移不是换个名字，是**让备案填报的那个域名真的成为产品入口**。
+见 [`icp-app-filing.md`](icp-app-filing.md) §一。
+
+**与 §3.7.1 同构的四层改动（缺一不可）：**
+
+| 层 | 改动 |
+|---|---|
+| DNS | `tccli --profile waytofuture dnspod CreateRecord --Domain waytofuture.cn --SubDomain heyta --RecordType A --Value 124.223.13.226 --TTL 600` ⇒ RecordId `2421537933`。⚠️ 本机 `dig` 走本地代理（fake-ip 返回 `198.18.x.x`），**不能用它判断生效** —— 用 DNSPod API 或 DoH 核对 |
+| nginx | 新增 `/etc/nginx/sites-available/heyta.waytofuture.cn`（由 `heyta.finlaw.cloud` 那份逐字改写 `server_name`），`sites-enabled` 软链 + 在 `nginx.conf` 第 **69** 行加一条 `include`（本机 nginx **不**自动加载 `sites-enabled`，必须显式 include；`conf.d/*.conf` 才是自动的） |
+| 证书 | `certbot --nginx -d heyta.waytofuture.cn --redirect` ⇒ 新证书有效至 **2026-12-29**，自动续期任务已建 |
+| 服务端 env | `~/heyta/server/.env` 的 `PUBLIC_URL` / `CORS_ORIGINS` / `DOMAIN` / `WEBAUTHN_RP_ID` / `WEBAUTHN_ORIGIN` 五个值全改；`docker compose -f docker-compose.yml -f docker-compose.monitoring.yml -f docker-compose.build.yml up -d --no-build supersync` 换容器（**三个 `-f` 都要带** —— 容器 label 记的启动组合就是这三份，少一份就是另一份配置） |
+| 落地页 | `VITE_SITE_URL=https://heyta.waytofuture.cn VITE_APP_URL=https://heyta.waytofuture.cn/app/ pnpm exec vite build` ⇒ rsync |
+| 应用本体 | 无域名变量（`site-url.ts` 默认取自身 origin），照 §3.7 重建即可 |
+
+**🔴 这次多出来的一条纪律：`DEFAULT_SITE_ORIGIN` 必须跟着改。**
+
+`apps/landing/src/site/origin.ts` 的 `DEFAULT_SITE_ORIGIN` 此前写着
+"换域名时传 `VITE_SITE_URL`，不要改这个常量" —— **这句话是错的**，
+本次迁移踩到了它的后果。真实约束是：
+
+- `index.html` 与各入口页是**已提交的生成物**；
+- `pnpm check` 的**第一道**门禁 `check:entries` 会用 `DEFAULT_SITE_ORIGIN`
+  重新生成一遍，再与提交物**逐字节比对**。
+
+所以只传 `VITE_SITE_URL` 会让仓库里提交的产物继续自我声明旧域名
+（下一次干净检出的 `pnpm check` 会用旧默认值把新产物判红）；
+只改常量又会让部署漏掉新域名。**两件事必须一起做**，
+然后 `pnpm --filter @heyta/landing gen:entries` 重生成入口页。
+（`gen-og-card.mjs` 生成的 `public/og-card{,-en}.png` 同理 —— 卡片右下角印的就是这个域名。）
+
+**🔴 已知代价（与 §3.7.1 逐字相同，不可两边兼容）：`WEBAUTHN_RP_ID` 只能取一个值，
+旧域名上注册的 passkey 全部失效，测试者要重新注册。** JWT 不受影响（不绑 origin）。
+
+**回滚路径。** `heyta.finlaw.cloud` 的站点文件**保留在 `sites-enabled` 里**，
+但**不是入口**：它的 `.env` 已被改掉，服务端只会给新域名签 challenge，
+所以那个域名上 passkey 不可用。要整体回滚，需同时还原
+`.env.bak-20260930T063250Z` 与两个 `VITE_*` 构建参数。
+
+**验收（2026-09-30 实测）：**
+
+| 请求 | 结果 |
+|---|---|
+| `GET /`、`/en/`、`/features/`、`/pricing/` | `200` `text/html` |
+| 线上 HTML 的 `<link rel="canonical">` | `https://heyta.waytofuture.cn/`（**页面里已无 `heyta.finlaw.cloud`**） |
+| `GET /app/` | `200`，`<title>heyta</title>`，资源走 `/app/assets/…` |
+| `GET /app?lang=en` | `301` → `/app/?lang=en`，**保留查询串** |
+| `GET /health` | `{"status":"ok","db":"connected",…}` |
+| `GET /verify-email` | `400` + `Token is required`（**服务端**响应，不是落地页 HTML ⇒ 代理通了） |
+| `POST /api/login/passkey/options` | `{"rpId":"heyta.waytofuture.cn",…}` —— RP ID 真的换了 |
+| 证书（`openssl s_client`） | `CN=heyta.waytofuture.cn`，`notAfter=Dec 29 05:33:59 2026 GMT` |
+| 真浏览器（`e2e/playwright.live-site.config.ts`） | 落地页渲染 → 点「立即使用」→ `/app/` → 应用外壳可见（输入框 + 主导航），控制台零 `pageerror` |
+
+**验收方式：真浏览器，不是 `curl`。** 见 `e2e/live-site/live-domain.spec.ts` 与
+`e2e/playwright.live-site.config.ts`。那份配置把域名用
+`--host-resolver-rules` 钉到真实 IP 并加 `--no-proxy-server` ——
+否则在这台开发机上验的是**本地代理**（fake-ip），代理一关就变成假绿。
 
 ### 3.8 服务端镜像（`supersync`）的重建 —— 2026-09-27 首次在本机完成
 
@@ -682,6 +803,39 @@ ssh ubuntu-jcli 'cd ~/heyta/server && \
 
 > 第 3 步要**带上和第 2 步一样的两个变量**：`deploy.sh --build` 会再跑一次
 > `docker compose build`，变量不一致就是不同的 ARG ⇒ **缓存全废、重头再建一遍**。
+
+> 🔴 **要带上未提交的改动时，不许把第 1 步换成对工作树打 `tar czf`。**
+> `git archive` 只打**已跟踪**文件，所以 `.env`（gitignored 的本机开发配置）天然不在包里；
+> 而对目录打 `tar` 会**把 `server/.env` 一起带上并就地覆盖生产配置**。
+>
+> **2026-09-30 实测踩到。** 症状绕了一圈才现形：`docker compose` 报
+> `supersync-postgres is unhealthy`、日志刷 `FATAL: role "supersync" does not exist`，
+> 而数据库本身完好（用正确的角色照样查得到 8 个用户）。更阴的是
+> **`JWT_SECRET` 被换成了本机那套** —— 全部已签发令牌与在途的验证 / 魔法登录链接
+> 都会失效，且在容器重启之前**一声不响**。
+>
+> **正确写法**（`-o` 让未跟踪但未忽略的新文件也进包，`--exclude-standard` 排掉 `.env`）：
+>
+> ```bash
+> git ls-files -co --exclude-standard -- \
+>   pnpm-workspace.yaml package.json pnpm-lock.yaml tsconfig.base.json \
+>   packages/sync-core packages/shared-schema packages/domain server \
+>   | tar czf /tmp/heyta-server-src.tar.gz -T -
+> # 解包前先自检：
+> tar tzf /tmp/heyta-server-src.tar.gz | grep -E '(^|/)\.env$' && echo '🔴 包里带了 .env，别用！'
+> ```
+>
+> 完整条目录在 [`../reference/environment-traps.md`](../reference/environment-traps.md)
+> 「用 `tar` 打包工作树会把 `.env` 一起带上服务器」。**改 `.env` 前永远先备份** ——
+> 这次能几分钟恢复靠的就是 `.env.bak-20260930T063250Z`。
+
+> 🔴 **`deploy.sh` 会把整个 compose 栈拉起来，包括 `caddy` —— 而本机 :80 被宿主 nginx 占着。**
+> 实测（2026-09-30）：迁移与 `supersync` 容器**都成功了**，最后卡在
+> `failed to bind host port 0.0.0.0:80/tcp: address already in use`，
+> 于是脚本以"启动失败"收尾，留下一个永远起不来的 `supersync-caddy`（状态 `Created`）。
+> **这不是应用故障** —— `supersync-server` / `supersync-postgres` 都是 `healthy`。
+> 本机对外服务的一直是**宿主 nginx**（§3.7.2），caddy 在这个部署里是多余的。
+> 收尾：`sudo docker rm supersync-caddy`（下一次 `deploy.sh` 还会再造一个，这是 compose 栈的固有形状）。
 
 - 🔴 **`APK_MIRROR` 不设会永久挂住，而且看起来像"在编译"**。这台主机**连不上
   `dl-cdn.alpinelinux.org`**（实测超时无响应；`mirrors.aliyun.com` 0.26s 返回 200），
@@ -793,6 +947,125 @@ ssh ubuntu-jcli 'cd ~/heyta/server && \
 `TEST_MODE` 下有个 `autoVerifyUsers` 开关（`config.ts`）会**跳过**邮箱验证
 （并且在跳过时不发验证邮件）。**不要为了"跑通 E2E"在生产打开它** —— 那等于关掉邮箱验证这道门。
 本次没动它。
+
+#### 3.9.1 2026-09-30：发信地址从 `finlaw.cloud` 切到 `waytofuture.cn`
+
+**动因**：域名整体迁到 `waytofuture.cn`（§3.7.2），发信不该还挂着一个别的域名 ——
+收件人看到 `From: heyta <noreply@finlaw.cloud>` 而站点是 `heyta.waytofuture.cn`，
+既是品牌不一致，也是**送达率的实际风险**（发信域与站点域不一致更容易被判可疑）。
+
+**关键前提（实测）**：`waytofuture.cn` 早就是腾讯云 **SES** 里一个**已验证、可发信**的身份 ——
+`tccli ses GetEmailIdentity --EmailIdentity waytofuture.cn` 显示
+DKIM（`qcloudgz1024._domainkey`）/ MX / SPF / DMARC **四条 DNS 属性全部 `Status: true`**，
+配额 500 封/天。所以**没有新增任何 DNS 记录**，也没有动 SPF。
+
+⚠️ 别把它和**企业邮**搞混：`waytofuture.cn` 的 MX 是 `mxbiz1/2.qq.com`（企业邮，用来**收信**），
+而 heyta 用的是 `gz-smtp.qcloudmail.com`（SES 的 SMTP 网关，用来**发信**）。
+两者共用同一条 SPF `include:qcloudmail.com`，互不冲突。
+
+**做了什么**（全部经 `tccli ses`，profile 用 **`default`** —— SES 身份在那个账号下，
+不是 `waytofuture` 那个，后者只有 DNSPod 域名）：
+
+```bash
+tccli ses CreateEmailAddress --EmailAddress heyta@waytofuture.cn --EmailSenderName heyta
+tccli ses UpdateEmailSmtpPassWord --cli-input-json file:///tmp/ses-pw.json
+```
+
+🔴 `UpdateEmailSmtpPassWord` 有**密码策略**：10–20 位，且**至少 2 位不重复数字 + 小写 + 大写**。
+第一次随便生成的 base64 密码被拒（`InvalidParameterValue.InvalidSmtpPassWord`）。
+密码写进 `.env` 的 `SMTP_PASS`（**不入档**；轮换就用上面第二条命令）。
+
+**验收（2026-09-30 实测）**：
+
+| 证据 | 结果 |
+|---|---|
+| 服务端日志 | `SMTP configured: gz-smtp.qcloudmail.com:465` → `Verification email sent: <…@waytofuture.cn>` |
+| `tccli ses GetSendEmailStatus --RequestDate 2026-09-30` | `ToEmailAddress: <管理员邮箱，见 docs/operations/icp-app-filing.values.local.md>`、`FromEmailAddress: heyta@waytofuture.cn`、`SendStatus: 0`、**`DeliverStatus: 1`（已投递）** |
+| 容器内 env | `SMTP_USER=heyta@waytofuture.cn`、`SMTP_FROM=heyta <heyta@waytofuture.cn>` |
+
+> 📌 `noreply@waytofuture.cn` 这个 SES 发信地址**早就存在**，但它的 `EmailSenderName` 是
+> 「晓黎学习」—— 那是同主体的另一个产品。heyta 用它会以别人的名义出现在收件箱里，
+> 所以**新建了 `heyta@waytofuture.cn`** 而不是复用。
+
+#### 3.9.2 2026-09-30：邮件与凭据页改成「中文优先 + 设计系统 + 零渐变」
+
+**改之前的状态**（产品负责人当场贴出来的那张 `Email Verified!` 就是它）：
+
+| 面 | 改前 |
+|---|---|
+| 三封邮件（`server/src/email.ts`） | 全英文；按钮色硬编码 `#3b82f6`（不是设计系统的主色 `#2563EB`）；只有 `h2` + 一个按钮 |
+| 三张凭据页（`server/src/pages.ts`） | 全英文；**深色主题**（`#0f172a` 底 + `#1e293b` 卡片），与 heyta 的蓝白亮色系完全不是一套；8 个硬编码色值 |
+| 两个页内脚本（`public/*.js`） | 英文状态文案写死在脚本里（`Preparing...` / `Logging in...`） |
+
+**改之后：默认中文，按收件人语言切中英文；颜色/间距/字体全部来自设计系统；零渐变。**
+
+##### 真源只有一份，靠"生成物 + 门禁"搬过来
+
+🔴 `server/Dockerfile` 只打包 `packages/{sync-core,shared-schema,domain}` ——
+**运行时镜像里没有 `@heyta/design-system`、也没有 `@heyta/i18n`**。
+所以不能用"运行时 import"，改用仓库已有的模式（与 `apps/landing` 的
+`gen-og-card.mjs`／`check:entries` 同构）：**脚本生成 → 提交生成物 → 门禁查漂移**。
+
+| 生成物 | 真源 | 生成 | 门禁 |
+|---|---|---|---|
+| `server/src/design.generated.ts`（41 个 token） | `packages/design-system/generated/tokens.json`（它自己由 `tokens.css` 生成） | `pnpm gen:server-design` | `pnpm check:server-design` |
+| `server/src/copy.generated.ts`（2 语言 × 45 条） | `packages/i18n/src/locales/{zh-CN,en}.ts` | `pnpm --filter @heyta/sync-server gen:server-copy` | `pnpm check:server-copy` |
+
+两者都已挂进 `pnpm check`。**改词条或改 token 之后必须重跑生成**，否则门禁红。
+
+- 文案那条**只用 `server.` 前缀**的词条 —— 服务端用不到 `web.*` / `mobile.*`。
+- 生成脚本用 **TypeScript 的解析器**读词条表（不是正则）：词条值里有转义，
+  正则会变成第二套转义规则，必然出错。脚本认不出形状时会**抛**，不会安静地抽到 0 条。
+- 设计那条**只搬 light**：`tokens.json` 的 `dark` 是稀疏覆盖（73 条 vs 198 条），
+  设计系统自己标注了"不适合直接消费"。邮件客户端的暗色模式由收件方决定，
+  我们控制不了 —— 所以邮件与凭据页**只用亮色**。
+- 🔴 **零渐变**：`gen-server-design.mjs` 会在设计系统那一侧**断言**没有 `gradient(`，
+  有就拒绝生成；`server/tests/server-i18n-design.spec.ts` 在产物那一侧再断言一次。
+
+##### 语言怎么定
+
+优先级：**`?lang=`（邮件链接里带）> `Accept-Language` > 默认 `zh-CN`**。
+
+发信时把语言写进链接（`email.ts` 的 `withLocale`）是刻意的：邮件是**为收件人**渲染的，
+而收件人点开链接时的浏览器语言未必等于他注册时用的语言（在英文系统里注册的中文用户就是典型）。
+语言随链接走，收件人看到的就是**发信那一刻**他该看到的语言。
+
+页内脚本的文案**经 `data-*` 下发给静态 JS**（`data-msg-busy` 等）——
+脚本是静态资源，取不到词条表；写死就会出现"页面中文、按钮英文"的半吊子状态。
+取不到 `data-*` 时脚本**保留服务端已渲染的那一句**（降级方向是"什么都不改"，不是"换个语言"）。
+
+##### 顺带修掉的三个真问题
+
+1. **验证失败的页面会回显服务端的原始错误**。第一版把 `errorMessage(err)` 直接拼进页面 ——
+   等于把内部字符串（令牌无效的具体原因、库的错误文案）渲染给任何点到过期链接的人看。
+   现在对外只说"这个链接无效或已过期"，细节进日志。
+   （`server-security.spec.ts` 加了一条 `not.toContain('Invalid verification token')` 钉住它。）
+2. **魔法登录成功后跳到站点根（落地页）**，而令牌放在 `sessionStorage` 里、
+   **只有应用启动时才会被消费** ⇒ 用户点了"登录"却停在落地页，还得自己再点一次"立即使用"。
+   现在跳 `/app/`。
+3. 🔴 **页内脚本被渲染到 `<head>`，导致按钮点了完全没反应**（2026-09-30 **用户实测报障**）。
+   报障原文：控制台
+   `magic-login-confirm.js:15 Uncaught TypeError: Cannot read properties of null (reading 'dataset')`，
+   现象是"页面出来了、按钮点一下没反应"。
+   根因：`renderPage` 把 `<script>` 放进了 `<head>`，而那些脚本**没有 `defer`** ——
+   在 `<head>` 里是**同步执行**的，那一刻 `<body>` 还没被解析，`document.body` 是 `null`，
+   脚本第一行 `document.body.dataset.token` 直接抛错。
+   **修法两件一起做**：① 脚本移回 **`</body>` 之前**；② 脚本里加 `DOMContentLoaded` guard，
+   让"挂在哪"不再承重（放错也不会崩）。
+   **判据**：`server-i18n-design.spec.ts` 断言"脚本必须在 `<body>` 之内且在 `</body>` 之前"
+   （把它挪回 `<head>` ⇒ 2 条转红）；`e2e/live-site` 再在**真浏览器**里断言
+   **无 `pageerror`**、且点按钮**真的会出现错误状态**（无效 token 场景）。
+   ⚠️ 这条也说明：**单测绿不等于用户能用** —— 服务端渲染出来的 HTML 一直是"对的"，
+   坏的是加载时机，只有真浏览器点一下才现形。
+
+##### 验收（2026-09-30）
+
+| 证据 | 结果 |
+|---|---|
+| `pnpm --filter @heyta/sync-server test` | **91 文件 / 1804 passed**（新增 15 条针对这三条硬要求的判据） |
+| 变异验证 | 模板里塞一个裸 hex ⇒ 「色值都来自 token」精确报红（指出 `#123456`）；加一句 `linear-gradient` ⇒ 「严禁渐变」报红；让 `resolveLocale` 忽略显式参数 ⇒ 2 条报红 |
+| 门禁 | `check:server-design` / `check:server-copy` / `check:ui-language` / `check:design` / `check:migrations` 全绿 |
+| 真实发信 | 见 §3.9.1 的同一条链路（`heyta@waytofuture.cn` → 收件箱 `DeliverStatus: 1`） |
 
 ### 3.10 密钥轮换 —— 2026-09-27 已完成
 
@@ -1006,7 +1279,47 @@ location ~ ^/(terms|privacy)\.html$ {
 所以两页**都没有发布**。因此 `/terms.html` 与 `/privacy.html` 现在返回的是
 **诚实的 404 —— 这不是故障，是当前正确的状态**（草稿还没过法务，本来就不该对外）。
 
-### 3.12 nginx 站点文件现在**进了仓库**，并且能查漂移
+### 3.12 运营管理后台 —— 2026-09-30 首次部署
+
+依据 [ADR-0038](../adr/0038-admin-console-scope.md) /
+[`../plans/admin-console.md`](../plans/admin-console.md)。
+
+| 项 | 值 |
+|---|---|
+| 端点 | `https://heyta.waytofuture.cn/api/admin/*`（与站点同源，经 nginx `location /api/`） |
+| 鉴权 | `requireAdmin`：先认证（401），再按 `users.is_admin` 判权（403）。**每次请求都查库** ⇒ 撤销立刻生效 |
+| 迁移 | `20261003000000_add_admin_flag` —— `users.is_admin BOOLEAN NOT NULL DEFAULT false`（**实测已应用**） |
+| 界面 | 挂在 `apps/web` 的设置页里；**非管理员什么都不渲染**（它自己探测一次，403 就返回 null） |
+
+#### 🔴 部署后是"锁着"的，这是设计而不是故障
+
+`is_admin` 默认 `false` ⇒ **没有人生来是管理员**，`/api/admin/overview` 对所有人 403。
+部署完必须显式授权：
+
+```bash
+# 🔴 必须在**容器里**跑：DATABASE_URL 的主机名是 `postgres`，
+#    那是 compose 网络里的名字，从宿主机解析不到。
+ssh ubuntu-jcli 'sudo docker exec supersync-server node dist/scripts/admin.js list'
+ssh ubuntu-jcli 'sudo docker exec supersync-server node dist/scripts/admin.js grant <email>'
+ssh ubuntu-jcli 'sudo docker exec supersync-server node dist/scripts/admin.js revoke <email>'
+```
+
+- 那个人**必须已经注册过**（管理员是账号上的一列，不是一张独立的表）。
+- `revoke` **拒绝撤销最后一个管理员** —— 撤销错了不会报错，只会让后台对所有人关闭。
+- ⚠️ 镜像里是**编译产物** `dist/scripts/admin.js`，不是 `scripts/admin.ts`：
+  生产安装是 `--omit=dev`，没有 `ts-node`。
+  所以在服务器上**不要**用 `pnpm admin:grant`（那条是给本机开发用的）。
+
+#### 验收（2026-09-30 实测）
+
+| 请求 | 结果 |
+|---|---|
+| `GET /api/admin/overview`（无令牌） | `401` `{"error":"Missing or invalid Authorization header"}` |
+| `SELECT column_name, is_nullable, column_default … 'is_admin'` | `is_admin \| NO \| false` |
+| `docker exec … node dist/scripts/admin.js list` | 「当前没有任何管理员 —— 后台对所有人关闭。」（fail-closed 生效） |
+| `supersync-server` / `supersync-postgres` | 均 `Up (healthy)`；`/health` → `{"status":"ok","db":"connected"}` |
+
+### 3.13 nginx 站点文件现在**进了仓库**，并且能查漂移
 
 **问题**：上面 §3.3.1、§3.11 记的这些修复，以及更早的 `/app/`、`/assets/` 迁移，
 **全部只发生在服务器上**。仓库里没有任何一处能回答"线上到底有哪些 location" ——

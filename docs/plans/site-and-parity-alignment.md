@@ -1,6 +1,10 @@
 # 站点补齐与能力对标：任务计划
 
-> 状态：**规划中**
+> 🔴 **2026-09-28 收敛：本文件的 B 轨（能力补齐）排序已被 [`multi-end-unified-strategy.md`](multi-end-unified-strategy.md) §5.5 重排。**
+> **原因**：本文件把「Web 日历」列为 P0-2，理由是"**Web 是主入口**" —— 而产品负责人已钉死"**Web 根本不是主战场**"（主计划 §1 P5）。
+> **A 轨（站点补齐）已交付**，保留作历史。索引见 [`README.md`](README.md)。
+
+> 状态：**规划中**（A 轨已交付；B 轨排序见上）
 > 立项日期：**2026-09-28**。证据基础：
 > [dida365-feature-benchmark.md](../research/dida365-feature-benchmark.md)（能力缺口）、
 > [site-ia-and-landing-audit.md](../research/site-ia-and-landing-audit.md)（站点缺口）、
@@ -1603,7 +1607,7 @@ Goal 的 objective 里把 A8 写成"补 `check:site-reachability`"是**抄了计
 | **R9** | 语言清单 `['zh-CN','en']` 在 `pages.ts` / `gen-entries.mjs` / `seo-head.spec.ts` 三处**收敛到 `LOCALES`**；`hrefPath` 从"零调用"变成 `urlFor` / `entryUrl` 的**唯一实现**；删掉零调用的 `otherLocaleHref`；门面测试从 `toBeTypeOf('function')` 收紧成 `toBe(同一个函数)` | `check:entries` 17 份一致；landing typecheck + 401 passed |
 | **R6** | 「改一条 evidence ⇒ 必须在**同一次改动**里重审该 section 的声称」写成**明文规矩**（`scripts/check-claims.mjs` 文件头，含 S1 反例） | 如实登记为**人工规矩**，不冒充机械判据（语义判断题硬做会假绿） |
 | **R8** | ADR-0033 加 **§7.1 勘误**：`#root` 是空的，「真静态 / 首屏不用等 JS」被实测证伪，兑现的是"静态 head + 独立地址"；`gen-entries.mjs` 文件头同步改口径 | 勘误段逐条满足 `docs/adr/README.md` 里那条「勘误段」规则的五个边界（只追加、不改正文、带日期与实测命令） |
-| **R7** | ⬜ **未做**（本刀没动） | 主 bundle 仍同时装中英两份词条、仍静态 import 全部页面组件；它需要 `lazy()` + 按入口分语言，属独立一刀 —— 如实留在这里，不假装已收口 |
+| **R7** | ✅ **已收口**：词条那一半做了（主包 **205 → 130 KB gz**，按语言再取 36–39 KB，主包 grep 中英标志串 0 命中）；**页面组件那一半经实测判为不做** | —— （决策理由见文末 R7 节：子页面组件都只有几十行，体积全在词条表与 React；为 ≈0 收益引入"页面 → 入口"的映射不划算） |
 | 顺带核实 | `showcase-data.ts` 的 `SHOWCASE_TODAY_PROGRESS` | ✅ **早已存在**（含"为什么只能编"的论证 + `mockup-shell-shape.spec.tsx` 的内部一致性断言），施工单里的这一条是**过期待办** |
 
 ---
@@ -1638,9 +1642,746 @@ Goal 的 objective 里把 A8 写成"补 `check:site-reachability`"是**抄了计
 
 | 项 | 到哪一步了（实测） | 下一步 |
 |---|---|---|
-| **`timeline` 整刀** | 第 0 步已完成（`packages/domain/src/timeline.ts`）；`packages/ui/src/timeline/` **不存在**；`apps/web/src/features/timeline/{TimelineView,GanttChart}.tsx` **仍在 web** | 建共享层目录（RN 原语、禁 import `@heyta/i18n`、每个要断言的元素给 testID）→ 两端换装 → **删** web 两个旧文件并清 `app.css` 旧类（e2e 先补共享钩子再换选择器）→ mobile 新增时间线屏 |
-| **capture `mobile` 尾巴** | 共享 `packages/ui/src/capture/CaptureComposer.tsx` 已在；`apps/mobile/src` 里**没有 capture 入口** | 移动端接共享捕获件 + 一条真模拟器判据（M3：逐端验收） |
-| **`ai` 面板族** | 共享层只有 `packages/ui/src/ai/AiDisclosure.tsx`；四个面板（Breakdown / Capture / Duration / Prioritize）**仍住 `apps/web`** | 按多平台计划里"流程型面板族"那一节落共享层 + 两端接线（mobile 的 AI 此前阻塞在宿主 SecretStore，需先确认） |
-| **R7 bundle** | **未做**：主 bundle 仍同时装中英两份词条、仍静态 import 全部页面组件 | `lazy()` 页面组件 + 按入口分语言；要有判据证明"某入口不再下载别的页" |
-| **B2-1 导入 UI** | 领域层 + `app-host` 的 op 批次构造器**已完成**（第十二 / 十四轮）；**UI 入口零** | Web 文件选择 + 预览 + 报告；移动端同源入口 —— 两端各一条判据 |
-| **B2-3 重复补齐** | 「完成后顺延」已接（基准是原到期日）；`rescheduleForRepeat` 已接；**Web 入口 + 自定义 RRULE 未做** | 手机上有重复规则编辑，Web 端**没有**（help 的 `repeat` 一条已如实写明） |
+| **`timeline` 整刀** | ✅ **四步全部完成**：第 0/1 步（领域 + 共享层）· 第 2 步（web 换装、删两个旧文件）· 第 3 步（mobile，真机 **11/11**）· 第 4 步（landing 展厅第四块，见文末节） | —— |
+| **capture `mobile` 尾巴** | ✅ **完成**：接线 + **真机验收 11/11 通过**（`pnpm verify:mobile-capture`，见文末节）。唯一未覆盖的是"中文日期词"（`adb input text` 打不出中文），由共享层单测 + web e2e 覆盖 | —— |
+| **`ai` 面板族** | ✅ **四块收编完毕**：披露块（早已共享）· 失败态（第 1 刀：补上第 5 个入口 + 跨面板一致性）· 头部（第 2 刀：14 处 → `AiPanelHead`）· 容器（第 4 刀：19 处 → `AiPanel`，含 role/aria-label/testid 与继承字号判据）。**行动行刻意不做**（只剩一行 flex 布局，按钮是全局 `ht-btn`，抽象成本高于收益）—— 理由见文末第 4 刀那节 | —— |
+| **R7 bundle** | ✅ **已收口（含一个"不做"的决定）**：语言那半做了（主包 **205 → 130 KB gz**，见文末 R7 收口节）；**页面组件那半经实测判为不做** —— 子页面组件都只有几十行，体积全在词条表与 React，为 ≈0 收益引入"页面 → 入口"映射不划算 | ——（若哪天某个子页面长成重页面，再回来做那一页） |
+| **B2-1 导入 UI** | ✅ Web 入口 · ✅ 移动端入口（`lib/ticktick-import.ts` + `ExportScreen` 的**粘贴**路径，移动端没有文件选择器）· ✅ **移动端真机判据已补**：`pnpm verify:mobile-ticktick` **15/15**（见文末节） | —— |
+| **B2-3 重复补齐** | ✅ **完成**：Web 入口 + 自定义 RRULE（见文末节）· ✅ **移动端自定义 RRULE 也做了**（`pnpm verify:mobile-repeat-custom` **15/15**，见文末节）；两端能力**对齐** | —— |
+
+---
+
+## ✅ B2-1 的 Web 入口（2026-09-28）—— 逻辑层早就做完了，缺的是"用户点得到"
+
+**这一条的剩余从来不是"实现导入"，是"最后一米"。** 第十二 / 十四轮已经把
+"文件 → 计划 + 报告"与"计划 → op 批次"做完并测到（`packages/domain` +
+`packages/app-host`），但**生产里零调用点** —— 正是本仓库最高发的失效形状。
+
+| 落地物 | 职责 |
+|---|---|
+| `apps/web/src/features/settings/ticktick-import.ts`（新） | 宿主接线：`previewTickTickImport`（只读）/ `confirmTickTickImport`（写）。**零业务判断**，全在 domain / app-host |
+| `apps/web/src/features/settings/TickTickImportPanel.tsx`（新） | 选文件 → **先预览再确认** → 报告；`Record<Union, MessageKey>` 穷举跳过原因与 14 个未映射字段 |
+| `apps/web/src/App.tsx` | 设置页挂载（与「导入 / 还原」并列，**两套承诺分开说**） |
+| `packages/i18n` zh/en | `web.ticktick.*` 36 条，两表条数相等、无 CJK 漏进 en |
+
+**判据**（`apps/web/tests/ticktick-import.spec.tsx` **5 条** + `app-mount.spec.tsx` **1 条接线断言**）：
+
+1. 界面只说它认的那一种来源（**只认滴答清单**，Todoist 不假装支持），
+   并与"还原 heyta 自己的导出"分开说；
+2. 🔴 **预览不写库**：选完文件 op-log 里任务数仍是 **0**；
+3. 确认后真的落进 op-log（2 条任务、**4 条 op**），且"提醒带不进来 / 空标题被跳过"
+   在界面上说出来 —— 报告里的条数不减；
+4. 🔴 **幂等**：同一份文件导第二次，预览说"都已经在本机了"、确认后 **op 数不变**；
+5. 不是滴答的 CSV → 说清"没找到表头"，不静默通过；
+6. 🔴 **接线断言挂在整棵 App 上**：把 `<TickTickImportPanel />` 从 `App.tsx` 摘掉 ⇒
+   该用例**红**（实测），还原即绿 —— 面板自己的 5 条测试对此**无感**。
+
+**验收**：`@heyta/web` **836 passed**（本轮 +6）；`@heyta/i18n` 10 passed；
+`check:ui-language` / `check:layering` / `check:design` / `check:l4` / `check:empty-state` 全绿。
+
+**仍未做（B2-1 保持 open）**：**移动端同源入口** —— 按 M3，一件能力要逐端验收，
+所以这不算完；移动端那一半是下一刀。
+
+---
+
+## ✅ `timeline` 整刀 · **第 1 步：共享层**（2026-09-28）
+
+> ⚠️ 这一步**刻意不换装 web**。四步流程里第 1 步的产出就是"共享层 + 它的判据"，
+> 换装与删除在下一刀（见"剩余"表的 timeline 行）。**现在两套实现并存** ——
+> 这是中间态，不是收口。
+
+| 落地物 | 职责 | 判据 |
+|---|---|---|
+| `packages/app-host/src/timeline-plan.ts`（新） | **规划语义**从 `apps/web/.../TimelineView.tsx` 搬出来：没有清单时整条任务自己算一条、估时能否落到条上、分摊不了就置 `unattributable` | `tests/timeline-plan.spec.ts` **6 条**（含"三条子条目**不许**被平均分成 30 分钟"、"0 分钟是估过、不是没估过"） |
+| `packages/domain/src/timeline.ts`（追加） | `TimelineBlock` 类型 + `sharedTimelineSpan()` —— 放这里是因为 **ui 与 app-host 互不依赖**，两侧抄一份必然漂移 | 类型被 app-host 返回、被 ui 接收，`pnpm -r typecheck` 0 错误 |
+| `packages/ui/src/timeline/model.ts`（新） | 纯函数（`formatDuration` / `dayBands` / `axisTicks` / `chartSpan` / `todayWindow` / `safeLocalDate`…）+ 文案契约 `GanttLabels` / `TimelineViewLabels` | `tests/timeline-model.spec.ts` **21 条**（单位换算、日界落在真实午夜、`chartSpan` 只放宽不截断且空数组不除零） |
+| `packages/ui/src/timeline/GanttChart.tsx`（新） | RN 原语版甘特图：百分比定位（90 分钟**一定**是 30 分钟的 3 倍宽）、文字承载全部信息、条与刻度线是 `aria-hidden` 装饰、testID 与旧实现**逐字相同** | 渲染判据在换装后由 `apps/web` 承担（与仓库既有约定一致：共享层只放 model 测试） |
+| `packages/ui/src/timeline/TimelineView.tsx`（新） | 一个任务一张图；共用一把尺子；三种"如实说明"（无可排期内容 / 摊不了 / AI 估时）保留 | 同上 |
+
+**设计取舍（写下来免得下一刀重新讨论）**：
+
+1. 🔴 **共享组件不 import `@heyta/i18n`**，文案由 `labels` 以**函数**注入
+   （单复数由宿主选词条）。理由同 `TaskList.tsx` 文件头：i18n 会拖进第二份 React。
+2. 🔴 **规划语义住 `app-host`，不住 ui**：`ui` 不依赖 `app-host`，而"整条任务算几条"
+   是产品判断（AGENTS.md §3.5）。
+3. 🔴 **`TimelineBlock` 类型住 `domain`**：它是 app-host 的返回值、ui 的入参，
+   只有领域层是两侧共同依赖。
+4. `DEFAULT_DURATION_MINUTES` 等常量一律从 `@heyta/domain` 取，**不另写一份**。
+
+**验证**：`@heyta/ui` **263 passed**（+21）· `@heyta/app-host` **679 passed**（+6）·
+`pnpm -r typecheck` **0 错误** · `check:{layering,l4,empty-state,rn-aria,ui-language,design,tokens,reachability,ui-provider,row-single-source}` **全绿**。
+
+**仍未做（下一刀）**：web 换装 + 删除两个旧文件 + 迁移 `gantt-chart.spec.tsx` /
+`plural-keys.spec.tsx` 的断言 + 清 `app.css` 旧类 + mobile 时间线屏。
+
+---
+
+## ✅ `timeline` 整刀 · **第 2 步：web 换装 + 删掉两个旧文件**（2026-09-28）
+
+第 1 步留下的中间态（共享层已就位、web 仍跑自己的实现）在本步关闭：
+**同一件事现在只有一份实现**。
+
+| 动作 | 结果 |
+|---|---|
+| 新建 `apps/web/src/features/timeline/TimelinePanel.tsx` | 宿主接线层：`planTimelineBlocks()`（app-host）→ `<TimelineView>`（ui）+ 内联一层 `<HeytaUiProvider>`（App 的 Provider 只包 tasks 那棵树） |
+| 新建 `apps/web/src/features/timeline/labels.ts` | 词条表 → `TimelineViewLabels`。**单复数在这里选**（宿主认识词条表）。抽成独立文件是因为**测试也要用它** —— 在测试里抄一份中文字符串等于自证 |
+| **删除** `apps/web/src/features/timeline/GanttChart.tsx`（683 行）· `TimelineView.tsx`（265 行） | 🔴 换装后立刻删除，不留第二份实现 |
+| `App.tsx` | `TimelineView` → `TimelinePanel`（4 个 prop 不变） |
+| `scripts/check-ui-provider.mjs` | 登记 `TimelineView` / `GanttChart`（**第 11 次出现同一缺口，第 5 次"登记与写组件同时发生"**） |
+| 共享 `GanttChart` / `TimelineView` | 空态改用**共享 `EmptyState`**（共享层空态实现只有一份），并把 `gantt-empty` / `timeline-view-empty` 两个 testID 原样传进去 |
+| `scripts/check-empty-state.mjs` | 删 6 行已消失的登记（timeline 两行 + motivation/mobile 那几行由别刀收编）；新增 1 行 `features/timeline/labels.ts`，**与 `categories/copy.ts` 同形状**：渲染已收编，剩下的只是"宿主侧的文案模板" |
+
+**测试迁移**（不是删判据，而是换落点）：
+
+- `apps/web/tests/gantt-chart.spec.tsx`：直接渲染的对象从 web 实现换成**共享** `GanttChart`，套一个 `GanttHarness`（补 `labels` + Provider）。
+  🔴 **一处判据失去落点**：`min-width` 原来是内联的 `var(--ht-border-width-thin)`，换装后走 RN 的 `StyleSheet`，`style.minWidth` 变空 —— 判据改成"**计算出来的** min-width ≤ 2px"，拦的是同一件事（有人把发丝线换成像样的最小宽度）。
+- `apps/web/tests/plural-keys.spec.tsx`：加 `GanttEn` 壳（en + 真标签），`<TimelineView>` → `<TimelinePanel>`。
+
+**验证**：`apps/web` **836 passed**（timeline 两文件 **56 passed**）· `@heyta/ui` 263 · `@heyta/app-host` 679 · `check:{ui-provider,layering,l4,empty-state,rn-aria,ui-language,design,row-single-source,reachability,tokens}` **全绿**。
+⚠️ 一次 `apps/web test` 全量里 `reminders-panel` 超时失败、**复跑即绿**（load flake，与本刀无关）；单跑该文件 6/6 通过。
+
+**仍未做（第 3/4 步）**：mobile 新增时间线屏（同一共享组件 + 真模拟器判据）· landing 同步。
+
+---
+
+## ✅ B2-3 的 Web 入口 + 自定义 RRULE（2026-09-28）
+
+**这一条此前是"两端不一致"**：`Task.repeatRule` / `repeatDtstart` 有字段、
+`TaskActions.setRepeat` 有动作、`repeat-presets.ts` 有产品语义（"每周"是哪一天、
+"工作日"含哪几天），移动端任务详情也早就能设 —— 而 **Web 一个入口都没有**。
+同一个用户在手机上设的重复，到 Web 上连"看得见"都做不到。
+
+| 落地物 | 职责 |
+|---|---|
+| `apps/web/src/features/tasks/TaskRepeat.tsx`（新） | 当前规则常驻 chip + `<details>` 面板：不重复 / 每天 / 每周 / 工作日 / 每月 + **自定义 RRULE 输入**。**零业务判断** —— 预设有哪几个、锚点怎么钉、非法怎么判全在 app-host / domain |
+| 规则串来源 | 🔴 `repeatPresetRule(id, anchor)`（`@heyta/app-host`）——**不在界面里手拼**；锚点与 `setRepeat` 将要钉的是同一个日期（`dueDate ?? today`），否则「每周」会选中另一天 |
+| `apps/web/src/features/tasks/store.ts` | 新增 `setRepeat(id, rule)`（转发 `taskActions.setRepeat`）—— 此前 Web store 根本没有这个动作 |
+| `packages/i18n` zh/en | `web.repeat.*` 16 条 |
+| `apps/web/src/App.tsx` | 挂进 `renderTaskTrailing`（与备注 / 整理 / 提醒并列） |
+
+**判据**（`apps/web/tests/task-repeat.spec.tsx` **7 条**，真 op-log + 真 store）：
+
+1. 🔴 点「每天」→ 真的落进 op-log（`FREQ=DAILY;INTERVAL=1`，**不是**界面手拼的串）；
+2. 点「不重复」→ 规则被**清掉**（不是留一个空串）；
+3. 🔴 非法自定义规则：就地报错，且**一条 op 都不写**；空输入同理；
+4. 合法自定义规则写进去且与输入逐字相同；
+5. 🔴 不是预设的规则**看得见**（chip 显示原串）—— 否则面板看上去像"不重复"，
+   用户一点「每天」就把另一台设备设的规则悄悄换掉了；
+6. 🔴 **接线断言**：挂真 `App`，任务行上能找到 `task-repeat-summary`。
+   把 `<TaskRepeat />` 从 `App.tsx` 摘掉 ⇒ 该用例**红**（实测），还原即绿。
+
+**验证**：`@heyta/web` **843 passed**（+7）· `@heyta/i18n` 10 passed ·
+`check:{ui-language,layering,l4,empty-state,design,ui-provider,row-single-source}` 全绿。
+
+**剩余（如实）**：**移动端没有自定义 RRULE 输入** —— 它只有预设 + "显示非预设规则"。
+这一刀之后两端能力**反过来了**（Web 多一个入口），下一刀补齐移动端。
+
+---
+
+## ✅ R7 收口（词条那一半）：落地页按语言分表（2026-09-28）
+
+**实测的起点**：`pnpm --filter @heyta/landing build` 后主 chunk **205 KB gz**，
+其中中英两份词条合计约 **93 KB gz**（R7 原文的判断成立）。而落地页是
+**多 HTML 入口**的静态站 —— `/signin/` 永远不需要英文表，`/en/signin/`
+永远不需要中文表。**每个入口都在为另一种语言付一半体积。**
+
+| 改了什么 | 说明 |
+|---|---|
+| `packages/i18n/src/catalog.ts`（新） | `Catalog` 类型 + `translateIn(catalog, …)` —— **不认识任何一份具体表**。🔴 这个文件不许 import `./locales/**`，否则两份表又被拉回来，而症状是"代码看着对了、包一点没小" |
+| `packages/i18n/src/provider.tsx`（新） | `I18nCatalogProvider`（`catalog` **必填**）+ `useI18n` / `useLocale` + 常量与类型的再导出（`DEFAULT_LOCALE` / `LOCALES` / `otherLocale` / `Locale` / `MessageKey`），**整条链不碰词条表** |
+| `packages/i18n/src/react.tsx` | 变成"默认全表版"包装：`I18nProvider` 从 `CATALOGS` 取当前语言的表喂给同一个 Provider。**web / mobile / 测试的 API 逐字不变** |
+| `packages/i18n/package.json` + `tsup.config.ts` | 新增子路径导出 `./provider` · `./zh-CN` · `./en` |
+| `apps/landing/src/main.tsx` | hooks 改从 `@heyta/i18n/provider` 取；词条表按入口语言**动态** import（两个 `import()` 都是静态字面量，拼成变量会让打包器无法静态分析） |
+| `apps/landing/src/**` 32 个文件 | `from '@heyta/i18n'` → `from '@heyta/i18n/provider'`（机械替换） |
+
+**判据（实测，不是估算）**：
+
+| 指标 | 改前 | 改后 |
+|---|---|---|
+| 落地页主 chunk | **205 KB gz** | **130 KB gz** |
+| 每个入口实际下载 | 205 KB gz | 130 + **39 KB gz（zh）** / **36 KB gz（en）** |
+| 主 chunk 里的词条 | 中英都在 | 🔴 **一句都没有**（`grep` 中英标志串均 0 命中） |
+| 语言 chunk 的纯度 | —— | `zh-CN-*.js` 无英文串；`en-*.js` 无中文串 |
+
+⇒ **每个入口少下 36–39 KB gz（约 −18%），另一种语言的表一次都不下载。**
+
+**一处行为差异是刻意保留的：两版 `useI18n`**（都在 `@heyta/i18n`）
+
+| 入口 | 行为 | 给谁用 |
+|---|---|---|
+| `@heyta/i18n/provider` | 缺表**抛错**（不回落） | 落地页 —— 静默回落会把"忘了给表"变成"英文页渲染中文" |
+| `@heyta/i18n`（根） | 缺表**回落到默认全表**（旧行为） | web / mobile / 大量既有测试 |
+
+🔴 这个"两版"不是优柔寡断，是**实测**逼出来的：第一版让根入口也抛错，
+`apps/web` 立刻 **283 条**用例变红 —— 它们**裸渲染**组件（没有 Provider）而依赖
+旧行为，而那与"落地页体积"无关。两版只差"没表时怎么办"，取词逻辑共用
+`catalog.ts` 的 `translateIn`（不会漂移）。
+
+**顺带修掉一颗定时炸弹（与 R7 无关，但同族）**：`apps/web/tests/capture-composer.spec.tsx`
+有一条断言把"明天"算成硬编码的 `09-29`，而**跑过午夜就是 `09-30`** ——
+实测 2026-09-29 00:14 报 `expected '2026-09-30（明天）' to contain '09-29'`。
+已在该文件 `beforeEach` 里把系统时间钉死在 2026-09-28 12:00（`shouldAdvanceTime`
+让真实计时器继续走）。**它不是产品缺陷，是测试自带的时间炸弹** —— 与 flake 同族：
+失败只与"什么时候跑"有关。
+
+**验证**：`@heyta/landing` **401 passed** · `@heyta/web` **843 passed** · `pnpm -r typecheck` **0 错误** ·
+`check:{ui-language,layering,l4,design,claims,entries,empty-state,ui-provider,row-single-source}` 全绿 ·
+`pnpm check` **exit 0**。
+
+**仍未做（如实）**：R7 的另一半 —— **静态 import 全部 7 个页面组件**。
+实测后判断**收益接近零**：子页面组件都只有几十行（`IntegrationsPage` 1 行、
+`FeaturesPage` 20 行…），体积全在词条表与 React；要真做还得给每页生成独立入口，
+而那是架构改动（多一份"页面 → 入口"的映射）。**先不做，等它真的有收益再说。**
+
+---
+
+## ✅ capture `mobile` 尾巴：接线 + **真机验收通过**（2026-09-29）
+
+> 本条先写成"接线完成、真机待跑"，**同一天晚些时候跑绿了** —— 实测输出见本节末尾。
+
+**这一条补的是两端不一致**：web 的捕获框能认「明天」「!1」并显示识别芯片，
+而移动端一直以来只是一个**纯标题输入框** —— 同一句话在两端建出不同的任务，
+且两边都不报错。现在两端共用同一个 `@heyta/ui` 的 `CaptureComposer`。
+
+| 落地物 | 职责 |
+|---|---|
+| `packages/ui/src/capture/CaptureComposer.tsx` | 新增 `autoFocus?: boolean`：移动端把它放在弹层里（弹出即该打字），web 内联在列表顶部（**不能**自动抢焦点）—— 所以那是宿主的参数，不是共享层的默认值 |
+| `apps/mobile/src/lib/capture-labels.ts`（新） | 词条表 → `CaptureComposerLabels`。纯函数版可单测；`useCaptureLabels()` 给组件用 |
+| `apps/mobile/src/screens/TasksScreen.tsx` | 新建面板里的纯标题输入框 → 共享捕获件；提交改成把**解析出来的字段**交给 `actions.create(title, {dueDate?, priority?})` |
+| `packages/i18n` zh/en | `mobile.capture.*` **11 条**（优先级那四条**刻意复用 `web.capture.priority.*`** —— 照抄 `packages/ui/src/capture/model.ts` 里那条已写下的裁决：不为同义键动 i18n lane。它是一笔如实的债） |
+| `scripts/verify-mobile-capture.sh`（新）+ `pnpm verify:mobile-capture` | 真模拟器验收：打开面板 → 输入 `「<title> !1」` → 断言「高优先级」芯片与「实际标题」预览出现 → 提交 → 断言行上的标题**已被清洗**（desc 精确等于 `<title>`，证明 `!1` 没留在标题里） |
+
+⚠️ **`adb shell input text` 打不出中文** ⇒ 真机这一跑只验**优先级那条 ASCII 路径** +
+芯片/预览/提交接线；**中文日期那一半**由共享层单测（`capture-model.spec.ts`）与
+web 的真浏览器 e2e 覆盖。这条边界写在脚本文件头里，不假装它验了日期。
+
+**已验证**：`@heyta/mobile` typecheck **0 错误** · mobile 381 passed · ui 263 passed ·
+i18n 10 passed · web 854 passed · 27 道静态门禁逐条 OK · `bash -n` 通过。
+
+### ✅ 真机验收（2026-09-29 01:09，`pnpm verify:mobile-capture`，**11/11，exit 0**）
+
+```
+════ 0. 装包并启动 ════
+   ✅ 被测应用（com.heyta）已在运行
+   ✅ 应用已启动
+════ 1. 配置同步凭据 ════
+   ✅ 已填 服务器地址 / 访问令牌 / 端到端加密口令 · ✅ 三个凭据字段同时都在 · ✅ 界面认为已配置
+════ 2. 打开「新建任务」面板 —— 里面应当是**共享捕获件** ════
+   ✅ 捕获面板已打开（是捕获件，不是纯标题框）
+════ 3. 输入「cap-e2e-010916 !1」—— 识别芯片必须出现 ════
+   ✅ 识别出「高优先级」芯片
+   ✅ 出现「实际标题」预览
+════ 4. 提交 —— 标题里不许再带 !1 ════
+   ✅ 任务已创建，且标题被清洗为：cap-e2e-010916
+
+  通过 11 项，失败 0 项
+  ✅ 移动端一句话捕获：真机全链路通过
+```
+
+**这一跑抓到的问题全在脚本自己身上，没有一条是产品缺陷** —— 但每一条都长得像产品坏了，
+所以逐条记下来（下一个人会再踩）：
+
+| 症状 | 真因 |
+|---|---|
+| 整个 E2E 驱动的是**旧界面**（输入框 hint 是「要做什么？」，即共享捕获件之前那个纯标题框） | 现场同时装着**改名前的旧包 `com.heytamobile`**，`monkey -p com.heyta` 在旧包占前台时看起来"起来了" ⇒ 修法：先 `force-stop` + `uninstall` 旧包，并用 **`pidof $PKG`** 断言前台就是被测包（界面断言分不清两个应用） |
+| 逐步"找不到按钮" | `pm clear` 后应用回到**欢迎页**，而当时的脚本没先离开它 ⇒ `dismiss_welcome_if_present`；**顺序也不能反**（先离开再断言"起来了"，否则欢迎页上当然没有「任务」） |
+| 输入的文字跑进了**「我的」页的服务器地址框** | `configure_sync_credentials` 把凭据填在「我的」页、填完停在那里，而 FAB 只在「任务」tab ⇒ 必须回切；且用**坐标** 108,2253 而不是 `tap_label "任务"`（页面里「任务」出现多处，命中的第一个不是底部 tab） |
+| `!1: command not found` | `step "… \`!1\`"` 的反引号被 bash 当命令替换 ⇒ 标题里不许出现反引号 |
+| `PKG�: unbound variable` | `"…（$PKG）…"` —— `$PKG` 紧跟全角括号，变量名被吞 ⇒ `${PKG}`（**仓库自己有这道门禁 `check:shell-unicode`，我该先跑它**） |
+| 「实际标题」预览查不到（产品其实是对的） | `has_text` 是**整节点精确匹配**，而预览是拼起来的一句（`实际标题： cap-e2e-…`） ⇒ 用 `has_sub` |
+
+**仍未覆盖（如实）**：中文日期词（「明天」「下周三」）**打不进 `adb shell input text`**，
+所以这一跑只验了 `!1` 这条 ASCII 路径；日期那一半由共享层单测（`packages/ui` 的
+`capture-model.spec.ts`）与 web 真浏览器 e2e 覆盖 —— 边界写在脚本文件头，不假装它验了日期。
+
+### ⚠️ 本轮 `pnpm check` 是红的，但**不是本刀的**（三条都属并行会话的在途改动）
+
+| 门禁 | 报什么 | 文件 | 后来 |
+|---|---|---|---|
+| `check:claims` | `/platforms` 讲了 harmony，而 `roadmap.md` 里**一次都没提到**（实测 `grep -c '鸿蒙\|HarmonyOS'` = **0**） | `docs/plans/roadmap.md` §5.3 被并行会话收敛掉了一张表 | ✅ **本刀修了**：在 §5.3 补一行**平台清单**（Web/Android/iOS/桌面/**鸿蒙（HarmonyOS）**/自建 + 指向 `multi-end-unified-strategy.md` §11）。它正是 C2 要的那句"站点讲了某平台，路线图里就得找得到它"，不重铺那张表 |
+| `check:ui-language` | 硬编码文案 `https://sync.example.com` | `apps/web/src/features/auth/AuthPanel.tsx:268` | ✅ 并行会话自己修好了 |
+| `check:shell-unicode` | `$var` 紧跟非 ASCII | `scripts/lib/mobile-e2e.sh`、`verify-mobile-auth.sh` 等 | ✅ 并行会话自己修好了（**我自己的新脚本也被这条门禁抓到过一次**，见上表） |
+
+⇒ 本刀自己的 27 道门禁 + 四个包的测试全绿；`pnpm -r typecheck` 全绿；
+`check:claims` 与 `check:docs` 现已复绿。**其余文件没替对方改**（它们正在被编辑，
+替改会撞车）—— 只有 `roadmap.md` 那一行是"站点讲了、路线图必须有"的机械补全。
+
+---
+
+## ✅ 全仓门禁复绿 `pnpm check` = 0（2026-09-29 06:5x）
+
+收口这一刀之前，`pnpm check` 是红的 —— 但**红的东西一件都不是施工单的条目**，
+而是三处"并行会话的在途改动 + 一个测试定位器被新功能打穿"。逐条记下来，
+因为每一条的形状都会再出现。
+
+| # | 症状 | 真因 | 处置 |
+|---|---|---|---|
+| 1 | `check:macos-shell` 报 `error: 'desktop-macos': Invalid manifest` + `sandbox-exec: sandbox_apply: Operation not permitted` | SwiftPM 编译 `Package.swift` 时要**自己再套一层 sandbox-exec**，而外层沙箱不允许嵌套。**不是代码问题**：单跑该门禁时命中同一句，放宽沙箱后同一命令 `exit 0` | 环境侧；已确认门禁本身通过（`macOS 壳消费设计系统生成物：命中 7/7`） |
+| 2 | `packages/app-host` typecheck `TS4104` | 并行会话的 `native-bridge.ts` 里 `listTaskEntities()` 声明成 `Promise<{ tasks: unknown[] }>`，而值直接来自领域层的 `sortTasksForDisplay()`（`readonly Task[]`） | 改成 `readonly unknown[]` **并写清为什么**（那是"不透明的 JSON 数组"，不是可变数组） |
+| 3 | e2e `ai-prioritize` **strict mode violation**（`rowFor` 一次命中 2 行） | 🔴 **测试定位器被新功能打穿**：行尾插槽新增的**「子任务父级」选择器**把**别的任务的标题**列成 `<option>` ⇒ `filter({hasText:'修登录页错位'})` 同时命中「写周报」那一行 | 改 `e2e/tests/helpers.ts` 的 `rowFor`：改用**本行自己的完成勾选框**（可访问名 `完成：<标题>` / `取消完成：<标题>`）定位。它只属于本行，且不随行尾插槽漂移 |
+| 4 | `check:claims`：站点讲了 harmony，`roadmap.md` 里 0 次提到 | 并行会话把 roadmap §5.3 那张按平台的表收敛掉了 | 在 §5.3 补一行**平台清单**（含 **鸿蒙（HarmonyOS）** + 指向 `multi-end-unified-strategy.md` §11）——正是 C2 要的那句出处 |
+| 5 | `check:shell-unicode`：`$CLICKS，` 变量名被吞 | 并行会话的 `scripts/verify-mobile-auth.sh:273`（**同一个 bug 我自己也犯过一次**，见上表） | 跑仓库自带的自动修：`python3 research/tools/fix-shell-unicode-vars.py --write`（预演 1 文件 1 处 → 写入 → 门禁绿） |
+
+**最终一次全量（`pnpm check`，exit 0）的读数**：storage 288 · landing 401 ·
+sync-client 80 · widget-core 176 · op-log 51 · **ui 278** · server 1671(+1 skipped) ·
+**app-host 699** · **mobile 411** · node-host 139 · **web 880(+12 skipped)** · desktop 12 ·
+**e2e 24 passed / 2 skipped**；`check:macos-shell` 4 段全过（含跨语言落盘）。
+
+**这一段的口径**：门禁红的时候不要先怀疑产品 —— 这一轮 5 条里有 **2 条是环境**、
+**2 条是测试/文档本身**、只有 **1 条是类型**。而第 3 条最值钱：
+**新功能（子任务父级）没有 bug，是断言先崩的** —— "同一屏上出现了另一个任务的标题"
+本来就是新 UI 的正常形态。
+
+---
+
+## ✅ `timeline` 整刀 · **第 3 步：移动端时间线 + 真机验收**（2026-09-29）
+
+**移动端此前完全没有时间线**（`apps/mobile/src` 里 grep 不到 `timeline`）——
+同一份计划在网页上看得见，在手机上不存在。这一步把它接上，
+**复用 web 那一份共享实现**（`@heyta/ui` 的 `TimelineView` + `GanttChart`），
+所以"两端长得不一样"这件事从根上没有机会发生。
+
+| 落地物 | 职责 |
+|---|---|
+| `apps/mobile/src/lib/timeline-labels.ts`（新） | 词条表 → `TimelineViewLabels`，与 web 的 `features/timeline/labels.ts` **逐条对应**。纯函数版 `timelineLabels(t)` 可单测 |
+| `apps/mobile/src/screens/TimelineScreen.tsx`（新） | 移动宿主：`planTimelineBlocks()`（app-host）→ 共享 `TimelineView`。**零业务判断** |
+| `apps/mobile/src/screens/TasksScreen.tsx` | 视图切换从 `'list' | 'quadrant'` 扩到 **`'list' | 'quadrant' | 'timeline'`** —— 时间线是**「任务」页内的第三档**，不是第 6 个 tab（P10，与象限同一处置；ADR-0015 §4） |
+| `packages/i18n` zh/en | **只加一条** `mobile.tasks.view.timeline`（时间线 / Timeline）—— 见下面那条口径 |
+| `scripts/verify-mobile-timeline.sh`（新）+ `pnpm verify:mobile-timeline` | 真机验收（M3） |
+
+### 🔴 文案：**只加一条 chip 词条，其余 20 余条复用 `web.gantt.*` / `web.timeline.*`**
+
+与 `lib/quadrant-display.ts` 复用 `web.quadrant.*`、`lib/habits-display.ts` 复用
+`web.habits.*` 是**同一个先例**（那两个文件头都写了理由）：`packages/i18n` 不在本刀
+白名单，而同义键会让"两端同一句话"变成两处维护 —— 改一处忘一处，两端开始说不同的话，
+**且没有门禁会红**。它是一笔如实的债，收口方式与 `mobile.growth.*` 那次一样。
+
+### 与 web 的一处**有意不同**：这里不内联 `<HeytaUiProvider>`
+
+web 的 `TimelinePanel` 要内联一层（它的 `App.tsx` 里那个 Provider 只包 tasks 那棵树，
+时间线是兄弟节点）。移动端不需要：`./theme` 的 `ThemeProvider` **本身就是**
+`HeytaUiProvider`（2026-09-28 收敛后删掉了 `UiThemeBridge`，见 `App.tsx` 的说明）。
+照抄 web 会多出**一份 context 实例**。
+
+### 真机验收（`pnpm verify:mobile-timeline`，**11/11，exit 0**）
+
+```
+✅ 被测应用（com.heyta）已在运行 · ✅ 应用已启动
+✅ 已填 服务器地址 / 访问令牌 / 端到端加密口令 · ✅ 界面认为已配置
+✅ 标题已输入 · ✅ 任务已创建：tl-e2e-073834
+✅ 时间线里出现了这条任务的块：tl-e2e-073834
+✅ 条上带着「未估时」的如实说明（是按默认时长排的，不是空图）
+  通过 11 项，失败 0 项 —— ✅ 移动端时间线：真机全链路通过
+```
+
+**两条判据是刻意配对的**：只断言"任务标题出现在时间线里"的话，一个把标题
+原样打在空屏上的实现也能过；第二条钉的是共享 `GanttChart` **真的画出了一条
+按默认时长排的条**（`web.gantt.durationDefault` =「未估时（按 …排）」）。
+
+⚠️ **仍未覆盖（如实）**：**真实估时**（备注里的 `预计耗时：30 分钟`）那条路径 ——
+估时标记是**中文**，而 `adb shell input text` 打不出非 ASCII。那半由 app-host 的
+`timeline-plan.spec.ts`（估时读回来 / 三个人不许被平均分）与 web 真浏览器 e2e 覆盖。
+边界写在脚本文件头，不假装它验了估时。
+
+**下一步**：第 4 步 landing 同步（`mk-*` 族已顶格 32/32，只能用修饰类）。
+
+---
+
+## ✅ B2-3 移动端：自定义重复规则 + 真机验收（2026-09-29）
+
+**这一条补的是上一刀自己造成的不对称**：Web 拿到自定义 RRULE 之后，
+移动端**反而**只剩下预设（每天/每周/工作日/每月）—— 用户想要"每两周的周一"
+得去网页上设，而手机上那条规则**只能看见、不能改**（`customRule` 芯片与
+`describeRecurrenceText` 早就在，缺的是"能写"）。
+
+| 落地物 | 职责 |
+|---|---|
+| `apps/mobile/src/screens/TaskDetailSheet.tsx` | 重复区多一个 `TextField`（自定义规则）+ 「应用规则」按钮。**零新样式**：两者都用 `ui/kit.tsx` 的现成组件，`screens/**` 的内联样式棘轮（`check:l4-no-style`）一行没涨 |
+| 判据 | `@heyta/domain` 的 `isValidRecurrenceRule` —— **与 web 的 `TaskRepeat` 同一份**。空串与 `FREQ=` 都进不去，而它们能通过"看起来像 RRULE"的粗略检查 |
+| 错误文案 | `customError` 存的是**词条 key**（不是拼好的句子）—— 与 `subtaskRejectionMessageKey` 同一形状，这样错误也跟着语言走 |
+| `packages/i18n` zh/en | `mobile.detail.repeat.{customLabel,customPlaceholder,customHint,customApply,error.empty,error.invalid}` 6 条 |
+| `scripts/verify-mobile-repeat-custom.sh`（新）+ `pnpm verify:mobile-repeat-custom` | 真机验收（M3） |
+
+### 🔴🔴 这条 E2E **当场抓到一次真实崩溃**（本刀最值钱的产出）
+
+第一次跑，第 3 步"打开任务详情"直接失败 —— 屏幕上是**桌面启动器**，
+`pidof com.heyta` 为空：应用**凭空消失**了。`adb logcat -b events` 里：
+
+```
+am_crash: [... com.facebook.react.common.JavascriptException,
+           Error: Rendered more hooks than during the previous render.
+  at TaskDetailSheet (index.android.bundle:1:2209109)
+  at TasksScreen → Shell → App → …]
+```
+
+**根因是我自己写的 hook 位置**：`TaskDetailSheet` 里有一个
+`if (task === undefined) return null;` 的**提前返回**，而我把两个 `useState`
+与一个 `useCallback` 放在了它**之后**。面板一打开（`task` 从 `undefined`
+变成有值），那一次渲染就比上一次多出几个 hook ⇒ React 抛错。
+
+**为什么单测抓不到、必须真机跑**：
+- 移动端**没有组件测试台**（`apps/mobile/tests/` 全是纯函数）；
+- `pnpm -r typecheck` **通过**（hook 顺序是运行时约束，不是类型约束）；
+- 所有静态门禁**全绿**；
+- release 包**没有红屏**，表现是应用静默消失 —— 只有 `am_crash` 里留了一行。
+
+⇒ 修法：把三个 hook **移到提前返回之上**（并在 `useCallback` 里自己兜一次
+`task === undefined`），注释里写清"它们必须待在这一行之上"。
+
+⚠️ **仍然没有门禁盯这一类**：仓库里没有 `eslint-plugin-react-hooks`
+（`rules-of-hooks` 正是抓这个的）。**记在这里**：等到有 lint 通道时，
+`react-hooks/rules-of-hooks` 应该是第一条规则。
+
+### 真机验收（`pnpm verify:mobile-repeat-custom`，**15/15，exit 0**）
+
+```
+✅ 被测应用（com.heyta）已在运行 · ✅ 应用已启动
+✅ 已填 服务器地址 / 访问令牌 / 端到端加密口令 · ✅ 界面认为已配置
+✅ 任务已创建：rc-e2e-080151 · ✅ 详情面板已打开
+✅ 找到「自定义规则」输入框 · ✅ 输入框里就是这条规则 · ✅ 点了「应用规则」
+✅ 界面显示了「每 2 周…」—— 规则真的写进去并读回来了
+✅ 「当前」那行也在（规则常驻可见）
+  通过 15 项，失败 0 项 —— ✅ 移动端自定义重复规则：真机全链路通过
+```
+
+用的规则是 `FREQ=WEEKLY;INTERVAL=2;BYDAY=MO`（**全 ASCII，所以 adb 打得进去**），
+且**刻意不属于任何预设** —— 界面上出现「每 2 周」只可能来自这个输入框。
+两条判据是配对的：只断言"输入框里还是那串"的话，一个**没提交**的实现也能过。
+
+**脚本里两个踩过的坑**（都写在文件头）：
+1. 🔴 `;` 在**设备侧** shell 里是命令分隔符：`adb shell input text a;b` 会被切成
+   两条命令，落地半个串 ⇒ 整串必须用设备侧单引号包住（`$ADB shell "input text '…'"`）；
+2. 键盘会盖住下半屏 ⇒ 输入完先 `disable_ime` 再点按钮，否则 `tap_label` 取到的
+   坐标落在键盘上（点了等于没点，却被记成"按钮没生效"）。
+
+**下一步（B2-3 收口后）**：`timeline` 第 4 步（landing 同步）—— 实测 `MockView`
+目前只有 `tasks|quadrant|habits|focus`，而 `mk-*` 族**已顶格 32/32**；
+不过 `.mk-mobile` 那一族在 `apps/landing/src` 里**零引用**（死规则），
+删它换一个时间线族是可行的路子。
+
+---
+
+## ✅ `timeline` 整刀 · **第 4 步：landing 同步**（2026-09-29）—— 四步封口
+
+**这一步补的是"站点讲了、却看不见"**：`/features` 的「视图」一节把时间线**列成了
+能力之一**（`site.features.item.view.timeline`），而展厅里 `MockView` 只有
+`tasks | quadrant | habits | focus` —— **一站都没有它**。站点讲的四件里有一件
+是空的。
+
+| 落地物 | 职责 |
+|---|---|
+| `apps/landing/src/mockup/TimelineBoard.tsx`（新） | 纯 CSS 复现的排期图（**不引入**共享 `@heyta/ui`：那会把 RN 与 62 kB 拖进首屏，`mockup-task-row.spec.tsx` 有断言盯着） |
+| `apps/landing/src/mockup/timeline-shape.ts`（新） | **登记处**：三行样例（复用 `landing.mock.task.*` 的样例任务）、四档宽度、日刻度 key、唯一的类名拼接函数 —— 与 `habit-shape.ts` / `quadrant-shape.ts` 同一形状 |
+| `mockup.css` | 新增 `.mk-timeline*`，**删掉 `.mk-mobile*`**（那一族在 `apps/landing/src` 里**零引用**，是死规则）—— 族数仍是 **32/32**，预算没破 |
+| `app-shell-shape.ts` · `AppWindow.tsx` | `MockView` 加 `'timeline'`；`{view === 'timeline' && <TimelineBoard />}` |
+| `Showcase.tsx` | 展厅第四块。`label` 复用 `web.shell.views.timeline`（应用自己的视图名）—— 与 landing 复用 `web.shell.*` 同一先例 |
+| `packages/i18n` zh/en | 5 条（日刻度后两格 · 图例 · 展厅标题与正文）；前两格复用已有的「今天 / 明天」 |
+
+### 判据（两条，缺一条就是"看着像做完了"）
+
+1. `apps/landing/tests/mockup-timeline-shape.spec.tsx`（新，**8 条**）：
+   登记处说 `w-60`，`mockup.css` 里就**必须**有 `.mk-timeline__bar--w-60` ——
+   否则那个 `inline-size` 没人设、条宽回到 `auto`（≈0），**图上少一条任务**，
+   而 React 不报错、构建不报错、页面照常渲染。另加：宽度必须是百分比
+   （与"四天轨道"同一基准）、刻度条数 = 轨道列数、三条样例宽度**不全相同**
+   （等宽就看不出"按估时排布"，那正是这个复刻件存在的理由）。
+2. `mockup-fidelity.spec.tsx` 加一条**接线**判据：`renderMockup('timeline')` 下
+   `.mk-timeline__bar` 的条数 = 登记处行数。**实测把
+   `{view === 'timeline' && <TimelineBoard />}` 摘掉 ⇒ 该用例红**，还原即绿。
+
+### ⚠️ 顺手修掉一处**真实回归**（不是本刀的，但没有它门禁是红的）
+
+`apps/landing/tests/mockup-shell-shape.spec.tsx` 报"真应用的默认 rail 与登记处
+对不上"。查下去是 web 壳刚做的一版 rail 收敛（2026-09-29，产品要求"侧边栏按钮
+尽可能减少"）里**漏了一行**：
+
+- `visibleToolTabs = VIEW_TABS.filter(v => v.key === 'trash' || v.key === 'settings')`
+  —— 它**要** settings；
+- 而 `TOOL_VIEW_TABS` 当时只写了 `trash`（那一行上方的注释却把 settings 一起说了）
+  ⇒ 上段把 settings 排除、下段又取不到 —— **设置从 rail 上彻底消失，用户没有任何
+  入口进设置页**。
+
+修法：把 `settings` 放回 `TOOL_VIEW_TABS`（它的注释本来就是这个意思）。
+顺带修掉同一文件里硬编码的品牌名 `heyta`（`check:ui-language` 拦下）→ `t('common.brand')`。
+
+⇒ **抓出它的是"登记处 ⟷ 真应用"那条对账断言**：展厅那份 `SHELL_VIEW_TABS`
+一直写着 6 项含设置，于是一旦真应用少了一项，测试立刻红。这正是
+`mockup-*-shape` 这一族存在的意义 —— 它不是"截图对不对"，是**两份清单必须一致**。
+
+**验证**：`apps/landing` **410 passed** · `pnpm check` **exit 0** · 9 道相关门禁全绿。
+
+---
+
+## ✅ `ai` 面板族 · 第 1 刀：**第 5 个入口的失败文案**（2026-09-29）
+
+`ai` 面板族是施工单里最后一项，也是计划自己标的"剩余工作量最大的单点"。
+它不按"第 12 个视图迁移"来排（刺探结论：`ai` 根本不是视图，5 个组件都嵌在
+别的视图里），而是**按共享层能立刻被 web 收益的部分**逐块切。
+
+这一刀切的是**失败态**，因为刺探时发现了一处**以完全相同形状复发**的缺陷。
+
+### 🔴 缺陷：第 5 份副本又漏了
+
+`ai-failure-copy.ts` 的文件头记着上一轮修掉的事：四个面板原来把
+`packages/app-host` 拼好的**中文**整句渲染成失败主文案，于是**英文界面一失败
+就露中文**。那一轮修了四个 —— **漏了第 5 个（`AiToolRun`）**：
+
+```tsx
+// 改造前（AiToolRun.tsx）
+<strong data-testid="ai-tool-failure-message">{outcome.message}</strong>
+```
+
+而 `packages/app-host` 的 `ToolCallOutcome` 上明明白白写着
+`cause?: AiFailureReason` —— 「路由层给的具体原因码，**供壳取词条**」。
+也就是说**设计意图就是取词条**，这个入口没接上。
+
+⇒ 英文界面上，工具调用失败那一屏**整句是中文**。这与披露块那次的漂移
+（第 5 份缺回退链/E2EE 警告）是**同一个形状**：四个入口改好了、第 5 个没人管，
+而**没有任何测试会红** —— 每个面板各测各的，谁也没规定"五个入口必须一样"。
+
+### 改了什么
+
+| 落地物 | 职责 |
+|---|---|
+| `ai-failure-copy.ts` | 新增 `TOOL_RUN_KEY: Record<ToolCallFailureReason, MessageKey>`（**穷尽**：`@heyta/app-host` 加一个 reason 就编译不过）+ `toolRunFailureCopy()`，与另外四个工厂**同一形状**。`ai-unavailable` 复用共享的 `web.ai.failure.cause.*`（更具体） |
+| `AiToolRun.tsx` | 主文案 → `t(failure.key)`；`outcome.message` **降级**进 `<details data-testid="ai-tool-failure-message-detail">`（原始错误文本是**数据**，不翻译 —— 与 `ErrorScreen` 的 `error-details` 同一处置）；补 `<FailureSettingsAction testId="ai-tool-failure-settings">`（只有"能在设置里修"的失败才渲染）；`onOpenSettings` 走**与另外四个同一个** `useAiSettingsNavigation()` context（prop 仍是单测注入缝） |
+| `packages/i18n` zh/en | `web.ai.tools.failure.*` **6 条**（`emptyText` / `textTooLong` / `noGrantedTools` / `modelReturnedText` / `multipleToolCalls` / `toolCallMalformed`） |
+| `apps/web/tests/ai-tool-run.spec.tsx` | 新增 **2 条**：英文界面失败时**主句逐字等于词条**且**整屏一个汉字都没有**；中文界面用中文那条。用例走 `no-granted-tools`（**不需要端点、不需要 fetch**，规则选择那步就返回，完全确定性） |
+| `apps/web/tests/ai-failure-parity.spec.tsx`（新） | **跨面板一致性**（6 条）：五个入口都必须从 `ai-failure-copy.js` 取工厂、主文案必须是 `t(failure.key)`、**原文不许当主文案**、技术详情必须收在 `<details>`，外加一条"清单不能悄悄少一个面板" |
+
+### 判据实测（都做了故障注入）
+
+- 把 `AiToolRun` 的主文案改回 `{outcome.message}` ⇒ `ai-failure-parity` **2 条红**，还原即绿；
+- 英文那条：`no-granted-tools` 下断言主句 === `en['web.ai.tools.failure.noGrantedTools']`，
+  且 `[data-testid="ai-tool-failure"]` 的全文 **不含任何汉字**（`/[\u4e00-\u9fff]/`）。
+
+### 面板族还剩什么（如实）
+
+| 块 | 现状 | 说明 |
+|---|---|---|
+| 披露块 | ✅ 已共享（`packages/ui/src/ai/AiDisclosure.tsx`）+ 一致性断言 | 上一轮的产出 |
+| 失败态 | ✅ **本刀**（第 5 个入口补齐 + 跨面板一致性） | |
+| **面板外壳**（`ht-ai__panel` / `ht-ai__head` / `ht-ai__actions`） | ⬜ **未做** | 实测四个面板各有 4 个 `ht-ai__panel`、3 个 `ht-ai__head`、3 个 `ht-ai__actions`（ToolRun 3/2/3）—— 这是"面板族"的本体，抽成共享 `AiPanelShell` 需要同时搬样式与 14 处 head、15 处 actions，并更新各面板的 testid 契约。**下一刀**再动，切法已定：先 head+close，再 actions，最后 wrapper |
+| 移动端 AI | ⛔ 宿主不具备 | 移动端 SecretStore 尚未实现（`ai` 在 mobile 是 0 行），**不作为本项的前置** |
+
+**验证**：`apps/web` **908 passed**（+14）· `@heyta/i18n` 10 passed · `pnpm -r typecheck` 0 错误 ·
+8 道相关门禁全绿 · `pnpm check` **exit 0**。
+
+### 同一轮里顺手解掉的**并行会话在途红灯**（都不是本刀的，但挡住了门禁）
+
+| # | 门禁 | 症状 | 处置 |
+|---|---|---|---|
+| 1 | `apps/landing build` | `Type '"calendar"' is not assignable to ShellViewKey` | rail 加了「日历」这一格，展厅登记处的联合类型没跟上 ⇒ 补 `'calendar'` + `titles` 映射 |
+| 2 | `apps/landing build` | `AppWindow.tsx` `Duplicate identifier 'CalendarDays'` | 重复的图标导入，删掉一行 |
+| 3 | `apps/landing build` | 同上，`'search'` 那一格 | 补 `'search'` + `titles` 映射（**第三格**了：日历、搜索都是同一形状） |
+| 4 | `check:rn-aria` | `packages/ui/src/calendar/CalendarBoard.tsx:127` 用**对象形态** `accessibilityState={{ selected }}` | 换成平铺 `aria-selected={…}` —— 对象形态在 react-native-web 上会被整个丢掉（门禁的断言 B 就是抓这个） |
+| 5 | `check:ui-language` | 词条表「看起来像词条的行 1901、只解析出 1900」 | `web.search.title` 被**并到了上一行**（`'…notify.body': '…',  'web.search.title': '搜索',`）⇒ 拆成两行。一个静默漏行的解析器会给假绿，所以门禁直接失败是对的 |
+| 6 | `apps/web` typecheck | **我自己**的新用例 `grants: {}` 类型不匹配 | 把 override 的类型从 `typeof READ_GRANTS` 改成 `LocalApiConfig['grants']` |
+
+⚠️ 第 1/3/6 条是**同一个形状**：**展厅登记处是 rail 的镜像**，rail 一变，
+`ShellViewKey`、`titles`、`SHELL_VIEW_TABS` 三处都要跟。这一轮里它连着发生了两次
+（日历、搜索）—— 值得记一笔：**新增一个 rail 视图时，落地页那三处是同一笔改动的一部分**。
+
+**最终一次全量**（`pnpm check`，exit **0**）：web **933** · mobile **406** · ui **283** ·
+landing **410** · domain 659 · app-host 699 · server 1671 · e2e 24 passed/2 skipped。
+
+---
+
+## ✅ `ai` 面板族 · 第 2 刀：**面板头部收编**（2026-09-29）
+
+第 1 刀补的是失败文案；这一刀动**面板外壳**的第一块 —— 头部。
+
+### 收编前：同一行 JSX 手抄了 **14 份**
+
+| 面板 | `ht-ai__head` 处数 |
+|---|---|
+| `AiBreakdown` / `AiCapture` / `AiDuration` / `AiPrioritize` | 各 3（披露 / 提案 / 失败） |
+| `AiToolRun` | 2（面板头 / 披露） |
+
+每一份只差标题与 testid —— 正是"复制 N 份、第 N 份漏一维"最爱的土壤
+（披露块与失败文案已经各栽过一次）。收编后：
+
+| 落地物 | 职责 |
+|---|---|
+| `packages/ui/src/ai/AiPanelHead.tsx`（新） | 共享头：`title` + 可选 `lead`（装饰图标）/ `tag`（右端来源标签）/ 关闭按钮（`onClose` + **`closeLabel`** + `closeTestID`）。文案一律宿主注入（不 import `@heyta/i18n`） |
+| `packages/design-system` | 新增语义样式 **`panel-title`**（`xs` + `semibold`）。🔴 语义样式里原本**没有"小标题"这个角色**：最接近的 `row-title` 是 `font-size.base`（16px），直接用会让面板标题明显变大。与其在共享组件里写裸的 `fontWeight`，不如把角色命名出来 |
+| `apps/web/src/features/ai/AiPanelHeadHost.tsx`（新） | web 适配器（与 `AiDisclosureHost` 同一形状）：内联一层 `HeytaUiProvider` —— 三个面板由 `App.tsx` 直接渲染，**不在** tasks 那棵 Provider 子树里 |
+| 5 个面板 | 14 处手抄 → 14 处 `<AiPanelHeadHost …/>`；顺带删掉不再使用的 `X` 图标导入 |
+| `app.css` | **删掉 `.ht-ai__head`**（收编后全仓零引用）。`.ht-ai__tag` **保留** —— `AiPrioritize` 的优先级徽标还在用它 |
+| `scripts/check-ui-provider.mjs` | `PROVIDER_DEPENDENT` 加 `AiPanelHead`（漏登记 = 没有门禁盯"宿主挂了 Provider 吗"） |
+| `apps/web/tests/ai-panel-chrome.spec.tsx`（新，6 条） | 守卫：面板里**不许**再出现 `ht-ai__head`；旧 CSS 规则必须已删；每个面板都走适配器；🔴 **`closeLabel` 与 `onClose` 必须成对**（没有可访问名的关闭按钮对读屏用户等于不存在）；共享组件必须在 `check-ui-provider` 清单里；适配器自己必须挂 Provider |
+
+**判据实测（故障注入）**：把 `AiToolRun` 的头部改回手写 `ht-ai__head` ⇒ 守卫 **1 条红**，还原即绿。
+
+**验证**：`apps/web` **939 passed**（+6）· `@heyta/ui` 283 · `@heyta/design-system` 全绿 ·
+`check:{ui-provider,design,l4,tokens,ui-language,layering,row-single-source,empty-state,rn-aria}` 全绿 ·
+`pnpm check` **exit 0**。
+
+### 面板族还剩什么
+
+| 块 | 现状 |
+|---|---|
+| 披露块 | ✅ 已共享 |
+| 失败态 | ✅ 第 1 刀 |
+| **头部** | ✅ 本刀（14 处 → 1 个共享组件） |
+| **行动行**（`ht-ai__actions`） | ⬜ 下一个切片：四个面板各 3 处（`AiToolRun` 3 处），形状是"一排按钮"，但各面板按钮不同（重试 / 手动兜底 / 取消 / 确认）——切口是"按钮排布 + 间距"，不是"按钮本身" |
+| **外壳 wrapper**（`ht-ai__panel`） | ⬜ 最后一步：`role="dialog"` + `aria-label` + testid 三件套；抽它的收益最大（5 个面板 × 3–4 屏），但要先把前两块都收完 |
+
+---
+
+## ✅ `ai` 面板族 · 第 3 刀：**面板容器的无障碍语义**（2026-09-29）
+
+第 2 刀收编了头部；这一刀修的是收编时**顺手量出来的漂移**。
+
+### 🔴 19 个面板容器里，6 个没说清"自己是什么"
+
+| 容器 | 改造前 |
+|---|---|
+| 披露（4 个）/ 提案（4 个）/ 失败（4 个，除工具调用外）| ✅ 有 `role="dialog"` + `aria-label` |
+| **加载态 ×4**（拆解/捕获/估时/排序）| 🔴 只有 `data-testid` |
+| **工具调用的失败 / 结果 ×2** | 🔴 只有 `data-testid` |
+
+后果很具体：读屏用户走到**工具调用失败**那一屏，听到的只有
+"没能完成：…" —— **没有任何东西告诉他这是对话框、在讲什么**。四个 AI 面板的
+失败/提案屏都有这一对属性，**唯独第 5 个入口漏了** —— 又是那个形状
+（披露块、失败文案都各栽过一次，这是第三次）。
+
+### 改了什么
+
+| 落地物 | 说明 |
+|---|---|
+| 4 个加载容器 | 补 `role="status"` + `aria-label`（复用已有的「正在等待端点返回…」）。**刻意不是 `dialog`** —— 加载态没有需要用户操作的内容 |
+| `AiToolRun` 的失败/结果 | 补 `role="dialog"` + `aria-label`（新增 `web.ai.tools.failureAria` / `resultAria` 两条词条） |
+| `ai-panel-chrome.spec.tsx` | 新增 **3 条**：① 每个容器都必须有 `role` / `aria-label` / `data-testid`；② 加载态必须是 `status`、其余必须是 `dialog`（角色不是随便挑的）；③ **数一遍**：容器数必须等于 19 —— 加了新的一屏就立刻失配，逼人回来看一眼新屏有没有那三件套 |
+
+**判据实测（故障注入）**：摘掉工具调用失败面板的 `role` ⇒ **2 条红**，还原即绿。
+
+### ⚠️ 这一刀先纠正了自己的一个数错
+
+第一遍用「单行 `<div className=…`」去扫，只找到 **10** 个容器，于是结论写成
+"10 个里 4 个有"。实际上披露/提案那几个容器是**多行**写的 —— 真实数是 **19**。
+教训与仓库里其它人工清单一样：**数是数出来的，不是估出来的**。
+第 ③ 条断言（等值而不是 `>=`）就是让这个数在改动后立刻失配。
+
+### 面板族进度
+
+| 块 | 现状 |
+|---|---|
+| 披露块 / 失败态 / 头部 | ✅ 已收编 |
+| **容器语义**（role / aria-label / testid） | ✅ 本刀（19 处规则化 + 3 条守卫） |
+| **容器样式 + 内容布局**（`ht-ai__panel` 的卡片样式与 `ht-ai__actions` 排布） | ⬜ 剩余。判据已就位：先抽共享 `AiPanel`，**必须原样保留 role/aria/testid 三件套**（本刀的守卫就是它的验收条件） |
+
+**验证**：`apps/web` **942 passed**（+3）· `@heyta/i18n` 10 passed ·
+`check:{ui-language,design,l4,rn-aria,ui-provider,empty-state,layering}` 全绿 ·
+`pnpm check` **exit 0**。
+
+---
+
+## ✅ `ai` 面板族 · 第 4 刀：**面板容器收编**（2026-09-29）
+
+三刀之后，面板文件里还剩 19 处 `<div className="ht-ai__panel" role aria-label data-testid>`。
+这一刀把它收成一份共享实现。
+
+| 落地物 | 职责 |
+|---|---|
+| `packages/ui/src/ai/AiPanel.tsx`（新） | 卡片样式（flex 列 + gap/padding/边框/圆角/底色）+ **`role` / `label`（`aria-label`）/ `testID` 三件套**。🔴 `role` 与 `label` **都是必填、没有默认值** —— 默认值会让"忘了想这件事"静默通过，而这个缺陷上一轮刚发生（工具调用的失败/结果两个容器什么语义都没有） |
+| `apps/web/src/features/ai/AiPanelHost.tsx`（新） | web 适配器（与 `AiDisclosureHost` / `AiPanelHeadHost` 同形）：内联 `HeytaUiProvider`。三件套**逐项透传**，不做默认 |
+| 5 个面板 | 19 处手写容器 → 19 处 `<AiPanelHost …>` |
+| `app.css` | **删掉 `.ht-ai__panel`**（全仓零引用） |
+| `scripts/check-ui-provider.mjs` | `PROVIDER_DEPENDENT` 加 `AiPanel` |
+
+### 🔴 收编时发现一个**真的会掉字号的坑**（本刀最值钱的一点）
+
+web 的 `.ht-ai__panel` 靠 `font-size: var(--ht-font-size-xs)` **继承**给面板里的
+裸文本 —— 例如加载态那句「正在等待端点返回…」用的是裸 `<span>`，它**没有自己的
+字号规则**。一旦容器换成 RN 组件、`ht-ai__panel` 类消失，那些文本会静默掉回
+浏览器默认的 **16px**，而**没有任何其它断言会红**（它们本来就没有字号规则）。
+
+处置：`AiPanel` 在样式里显式给 `fontSize: tokens['font-size.xs']`
+（RNW 会把 View 上的 fontSize 渲染成 CSS，继承链因此成立），并**写成判据**：
+
+```ts
+// ai-panel-chrome.spec.tsx
+expect(getComputedStyle(el).fontSize).toBe('12px');   // 继承基座
+expect(el.getAttribute('role')).toBe('dialog');        // 源码级断言证明不了 RNW 真落到 DOM
+expect(el.getAttribute('aria-label')).toBe('工具调用失败');
+```
+
+⚠️ **如实登记的边界**：RN **原生**会忽略 View 上的 `fontSize`（那是 Text 的样式）。
+今天无影响 —— 移动端还没有 AI 面板（宿主 SecretStore 未实现）；等它有了，
+面板子元素本来就该是 RN `<Text>`、各自带语义样式。
+
+### 判据（全部故障注入过）
+
+| 判据 | 注入后 |
+|---|---|
+| 面板里不再有 `ht-ai__panel`；旧 CSS 规则已删 | 加回一行 ⇒ 红 |
+| 每个 `<AiPanelHost` 都给全 `label` / `testID` / `role` | 删一个 ⇒ 红 |
+| 加载态必须是 `status`、其余必须是 `dialog` | 改一个 ⇒ 红 |
+| 容器数仍是 **19**（加了一屏就回来看） | —— |
+| **DOM 三件套 + 继承字号 12px** | 摘掉共享层的 `aria-label` ⇒ 红 |
+
+### `ai` 面板族：四块收编完毕
+
+| 块 | 现状 |
+|---|---|
+| 披露块 | ✅ 共享 `AiDisclosure` + 一致性断言 |
+| 失败态 | ✅ 第 1 刀（第 5 个入口补齐 + 跨面板一致性） |
+| 头部 | ✅ 第 2 刀（14 处 → `AiPanelHead`） |
+| 容器（样式 + 三件套） | ✅ 第 4 刀（19 处 → `AiPanel`） |
+| **行动行**（`ht-ai__actions`） | ⬜ **刻意不做**，理由如下 |
+
+**为什么停在行动行**：它只剩 `display:flex; gap: 8px` **一行布局**，
+而里面的按钮是**全局的 `ht-btn`**（不属于 AI 面板族，全应用都在用）。
+把它抽成共享组件，收益是一行 CSS，代价是再引入一个"只包一层 flex"的抽象 ——
+**抽象的成本高于它省下的东西**。这一条是**判断**，不是遗漏；若将来移动端要
+AI 面板，那时按钮本来就要换成 RN 的，届时连行动行一起做才对。
+
+**验证**：`apps/web` **945 passed**（+3）· AI 相关的 8 个 spec **187 passed** ·
+`check:{ui-provider,design,l4,tokens,ui-language,layering,empty-state,rn-aria}` 全绿 ·
+`pnpm check` **exit 0**。
+
+---
+
+## ✅ B2-1 · 移动端滴答导入的**真机判据**（2026-09-29）
+
+`B2-1` 的最后一块：移动端入口（`lib/ticktick-import.ts` + `ExportScreen` 的粘贴
+路径）在上一轮就写好了，也有纯函数测试 —— 但按 **M3**，一件能力要**逐端可失败
+验收**。纯函数测试证明不了"在手机上粘进去、按预览、按确认、数据真的落库"。
+
+| 落地物 | 说明 |
+|---|---|
+| `scripts/verify-mobile-ticktick-import.sh`（新）+ `pnpm verify:mobile-ticktick` | 真模拟器零 mock：装包 → 配置凭据 → 「我的 → 导出数据」→ 滚到导入区 → **粘一份真 CSV** → 预览 → 确认 → 回任务列表找那条任务 |
+| 用例的 CSV | `Title,List Name` + 一行 `tt-e2e-<时间>,Inbox` —— 列名与 `packages/domain` 的 `TICKTICK_COLUMNS` 逐字一致 |
+
+### 🔴 脚本里三个坑（都写在文件头，因为它们长得像产品故障）
+
+1. **`adb shell input text` 发不了换行** —— CSV 至少要表头 + 一条。办法是打完表头
+   用 `input keyevent 66`（ENTER）换行。
+2. **空格要写 `%s`**：`List Name` 里的空格不转义会被设备侧 shell 拆成两个参数
+   （`verify-mobile-repeat-custom.sh` 记过同一个 shell 的另一面：`;` 会被当命令分隔符）。
+3. **"预览"既是按钮又是段落标题** ⇒ 断言必须挑**只有它对**的那句
+   （预览计数里的"个清单"），否则等于没断言。
+
+⚠️ 还有一次**假红**值得记：第一次跑，`xy_text "预览"` 拿到的是**过期 dump** 里的
+坐标（`uiautomator` 在界面不空闲时**不覆盖** `/tmp/ui.xml`），那一下点到了底部
+标签栏 —— 于是后面每一步都在"专注"页上跑，而失败信息看起来像"解析失败"。
+修法：点之前先断言**还在导出页**（`has_text "从滴答清单导入"`），并用库里的
+`tap_label`（同时认 `text` 与 `content-desc`，找不到就明确失败）。
+
+### 真机验收（`pnpm verify:mobile-ticktick`，**15/15，exit 0**）
+
+```
+✅ 已切到「我的」· ✅ 已进入「导出数据」· ✅ 页面上有「从滴答清单导入」
+✅ CSV 已粘进去 · ✅ 点了「预览」· ✅ 预览出了计数（解析成功）
+✅ 点了「确认导入」· ✅ 导入完成（写了 op）
+  通过 15 项，失败 0 项 —— ✅ 移动端滴答清单导入：真机全链路通过
+```
+
+**写入证据**是应用自己的完成报告（`web.ticktick.done`：「新增 {projects} 个清单、
+{tags} 个标签、{tasks} 条任务（写了 {ops} 条操作）」）。脚本第 6 步还会回任务列表
+找那条任务，但导入落在**收集箱**、而列表默认停在"今天"那一档 —— 所以那一步
+**只作旁证（ℹ️）**，不当作失败，也不假装它证明了写入。
+
+**验证**：`pnpm check` **exit 0**（web 945 · ui 283 · mobile 416 · landing 410 ·
+server 1671 · e2e 24 passed）· `check:shell-unicode` 绿。

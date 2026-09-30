@@ -336,18 +336,29 @@ pnpm verify:ios-lan-http   # 私有 IP 明文 HTTP 可用性
 当前只验证到**模拟器**。真机需要 Apple Developer 签名 + provisioning profile。
 **iOS ATS 对明文 HTTP 的覆盖范围仍未实测** —— 别假设模拟器通过就等于真机通过。
 
-### 2.6 发布签名（2026-09-28 已配置到"差一个 App Group"）
+### 2.6 发布签名（2026-09-30 ASC 侧已全面同步，出包链路打通）
 
 团队账号：`V5S2LT9YV8`（Xiaoli Creativity Culture Industry Development (beijing) Co., Ltd.）。
 
+> 2026-09-28 产品定名 **heyta**（不带 `mobile`），工程侧改名：
+> Bundle ID `com.heyta.mobile[.WidgetExtension]` → **`com.heyta[.WidgetExtension]`**，
+> App Group `group.com.heyta.mobile` → **`group.com.heyta`**
+> （改的是 `project.pbxproj` 的 `PRODUCT_BUNDLE_IDENTIFIER`、两份 `.entitlements`、
+> `WidgetSharedConstants.swift`、以及 `archive-release.sh` / `export-ipa.sh` 里的常量）。
+> 当时的缺口是 **ASC 未同步**；**2026-09-30 已全部补齐** —— 新 App ID ×2、新 App Group、
+> 新 profile ×2、新 app 记录，下表是**当前实际存在**的资源。
+> 顺带的好消息：**签名证书不随包名变**，证书指纹不用重算，
+> APP 备案已经用它们填完了（见 [`docs/operations/icp-app-filing.md`](../operations/icp-app-filing.md)）。
+
 | 资源 | 值 |
 |---|---|
-| App ID（主 App） | `com.heyta.mobile` = `Z979YYN9FY` |
-| App ID（小组件） | `com.heyta.mobile.WidgetExtension` = `6BZWPRPJ9Z` |
+| App ID（主 App） | `com.heyta` = `N4UC5QM39L`（**2026-09-30 建**；旧 `com.heyta.mobile` = `Z979YYN9FY` 遗留未删） |
+| App ID（小组件） | `com.heyta.WidgetExtension` = `JNYNN25N4C`（**2026-09-30 建**；旧 `com.heyta.mobile.WidgetExtension` = `6BZWPRPJ9Z` 遗留未删） |
 | 分发证书 | `Apple Distribution`，cert id `2R8LJZ6Q36`，2027-06-19 到期 |
-| App Store profile | `heyta App Store` = `9P2RP348X2`（旧 `4Z8AV534TG` 已因 capability 变更作废删除） |
-| App Store profile（小组件） | `heyta Widget App Store` = `QBGYAXY63F`（旧 `KM6K4WWAM2` 同上） |
-| App Group | `group.com.heyta.mobile`（2026-09-28 建成，已挂给两个 App ID） |
+| App Store profile | `heyta App Store` = `CYNAA45DRC`（**2026-09-30 建**；旧 `9P2RP348X2` 已删） |
+| App Store profile（小组件） | `heyta Widget App Store` = `FH2N84MFMX`（**2026-09-30 建**；旧 `QBGYAXY63F` 已删） |
+| App Group | `group.com.heyta` = `KQWUZ2VG3X`（**2026-09-30 建**，已挂给两个**新** App ID；旧 `group.com.heyta.mobile` = `6943GXF577` 遗留） |
+| ASC app 记录 | `heyta` = **`6817635248`**（`com.heyta`，sku `heyta-ios-2026-r2`，2026-09-30 建）；旧记录（`com.heyta.mobile` = `6816869464`）已改名 **`heyta-mobile-legacy`** 腾出名字。app 记录的 bundleId 不可改，只能新建 |
 
 🔴 **证书指纹（备案用）** —— 取自 **Apple 自己的 provisioning profile**（profile 里嵌了且只嵌了这一张）：
 
@@ -367,9 +378,11 @@ MD5    9D:E3:FE:22:16:8A:8C:FE:1B:FF:97:D4:EB:1E:BB:6D
 asc bundle-ids list --paginate
 asc certificates list --paginate                      # certificateType 是 DISTRIBUTION（不是 IOS_DISTRIBUTION）
 asc profiles create --name "heyta App Store" --profile-type IOS_APP_STORE \
-    --bundle Z979YYN9FY --certificate 2R8LJZ6Q36      # ⚠️ --bundle 要**资源 id**，不是 identifier
-asc profiles download --id 4Z8AV534TG --output /tmp/p.mobileprovision
+    --bundle N4UC5QM39L --certificate 2R8LJZ6Q36      # ⚠️ --bundle 要**资源 id**，不是 identifier
+asc profiles download --id CYNAA45DRC --output /tmp/p.mobileprovision
 asc profiles local install --path /tmp/p.mobileprovision
+# ⚠️ 装完检查 ~/Library/MobileDevice/Provisioning Profiles/：同名旧 profile 若还在（授权的是
+#    旧 group），过期时间相同时 preflight 可能取错 —— 按 application-groups 内容删旧留新。
 
 # 出包（**一个命令，带 preflight**）
 bash apps/mobile/ios/scripts/archive-release.sh /tmp/heyta.xcarchive
@@ -379,10 +392,12 @@ bash apps/mobile/ios/scripts/archive-release.sh /tmp/heyta.xcarchive
 前置成一次 preflight，缺哪条就直接说缺哪条、去哪儿补；出包后再从**已签名的 .app** 里
 读回签名证书指纹（备案要的权威值）。
 
-#### ✅ App Group：已解决，以及它为什么只能人在网页上做
+#### ✅ App Group：两代解法（2026-09-30 已全面解决）
 
-**结论**：`group.com.heyta.mobile` 已建成并挂给两个 App ID，Archive 通过。
-但**公开 API 在结构上做不到这件事**，四条独立证据：
+**现状**：`group.com.heyta` 已建成并挂给两个新 App ID，两个新 profile 的 `application-groups`
+里都嵌了它（**权威验证**：profile 内容，不是界面截图）。Archive preflight 通过。
+
+**公开 API 在结构上做不到这件事**，四条独立证据（2026-09-28 实测）：
 
 | # | 证据 |
 |---|---|
@@ -391,22 +406,32 @@ bash apps/mobile/ios/scripts/archive-release.sh /tmp/heyta.xcarchive
 | 3 | `asc web bundle-ids capabilities` 只有 `sync-app-clip` 一个子命令 |
 | 4 | `xcodebuild -allowProvisioningUpdates -authenticationKey*`（Apple 文档说它不需要 Apple ID）在本机四种变体全部 `Authentication failed`，而**同一把 key** 自签 JWT 调 `/v1/bundleIds` 返回 200、`xcrun altool --list-apps` 也成功 ⇒ 这条路不通（Xcode 27.1 beta 或 key 角色不足） |
 
-⇒ 只能在**人工登录的** App Store Connect / 开发者门户网页上做。**用独立 profile 的 Chrome 开调试端口可以自动化**：
-`--user-data-dir=/tmp/asc-chrome --remote-debugging-port=9223`（⚠️ Chrome ≥ v136 禁止在**默认 profile** 上开调试端口，必须给独立 user-data-dir），
-再用 Playwright `connectOverCDP` 附着。唯一的人工步骤是**登录**。
+**但"只能人在网页上做"已经是过时的结论。** 2026-09-30 实测出一条**免 UI 的自动化路线**，
+比上一代的"Playwright 驱动网页"可靠一个量级（不用和 React 弹窗搏斗）：
 
-🔴 **这里有一个极其隐蔽的坑，卡了三轮**：在 App ID 编辑页勾选/取消 capability 后点页面 Save，Apple 会弹一个
-**「Modify App Capabilities」**确认框（文案：*Adding or removing capabilities can invalidate any existing profiles...*）。
-**必须点弹窗里的 `Confirm`**（不是页面的 Save、也不是弹窗里的字面 "Save"）。
-只点页面 Save **不报错、页面看着像保存了，但刷新后改动全部丢失**。
-⇒ 每步之后都要**回读**（重载页面看复选框 / 重开 Configure 弹窗看 `N of M item(s) selected`），
-并用**独立手段**验收（重建 profile 看 `application-groups` 是否非空）。
+1. **登录一次**：独立 profile 的 Chrome 开调试端口
+   `--user-data-dir=/tmp/asc-chrome --remote-debugging-port=9223`（⚠️ Chrome ≥ v136 禁止在
+   **默认 profile** 上开调试端口），人工登录 ASC（SSO 会顺带登录 developer.apple.com）。
+   会话约两天后过期，过期就要重登 —— 这是**唯一**的人工步骤。
+2. **在 `developer.apple.com` 页面的执行上下文里直接 `fetch` 门户后端**
+   （fastlane spaceship 的老端点，多年稳定）：
+   - 列表（兼收获 csrf）：`POST /services-account/QH65B2/account/ios/identifiers/listApplicationGroups.action`，
+     表单编码 `{teamId, pageNumber:1, pageSize:500, sort:'name=asc'}`；
+     **响应头里的 `csrf` 与 `csrf_ts` 要原样带回**给后续写操作（spaceship 同款机制）。
+   - 建：`addApplicationGroup.action` `{name, identifier, teamId}` + csrf 头。
+   - 挂：`assignApplicationGroupToAppId.action`
+     `{teamId, appIdId, displayId, applicationGroups}` + csrf 头
+     （`appIdId` 用 ASC 资源 id；🔴 `displayId` 缺了会 400；`applicationGroups` 数组在表单里就是
+     `applicationGroups=<id>`，**不要**加 `[]`）。
+   - ⚠️ 写操作**必须带 csrf 头**，否则 **HTTP 421**，错误体还是 null，非常误导。
+   - 每步后回读验证；最终用**独立手段**验收（重建 profile 看 `application-groups` 是否非空）。
+3. capability 的启停（`APP_GROUPS` 等）照旧走公开 API（`asc bundle-ids capabilities add`），
+   这部分本来就 API 可及。
 
-⚠️ 另外：改 capability **会让已有 profile 失效**（弹窗自己说的），所以必须**删掉重建**两个 profile。
-
-⚠️ 另一个坑：`-allowProvisioningUpdates`（自动签名）在本机**不可用** ——
-`error: No Accounts: Add a new account in Accounts settings.`，Xcode 没登录 Apple ID。
-所以这里必须走**手动签名 + 显式 profile**。
+> 上一代网页 UI 自动化的坑（2026-09-28，留作参考）：capability 编辑页保存时会弹
+> **「Modify App Capabilities」**确认框，必须点弹窗里的 `Confirm`，只点页面 Save 不报错但
+> 刷新后全部丢失；程序化 `el.click()`（isTrusted=false）触发不了 React 菜单，
+> 要用 Playwright 的受信任点击。走上面第 2 条路线后这些 UI 坑全部绕开。
 
 ---
 
@@ -813,3 +838,85 @@ pnpm build:android:debug
 | `NoSuchFieldError ... IBM_SEMERU` | 机器上没有 JDK 17，Gradle 去问了 foojay 0.5.0 |
 | `WARNING: A restricted method in java.lang.System` 却被报成 task 失败 | 守护进程跑在 JDK 24+（本机是 JBR 25），AGP 把 prefab 的 stderr 逐行当错误 |
 
+
+---
+
+## 6. 桌面原生壳安装包（macOS / Linux / Windows）
+
+三条命令各自独立，都在**本机**发起，产物落到 `dist/<端>/`（`dist/` 不入库）：
+
+```bash
+# macOS：构建 → 组装 .app → Developer ID 签名 → 启动验证 → .dmg → 公证 → 装订
+bash apps/desktop-macos/scripts/package-app.sh
+# → /tmp/heyta-macos-dist/Heyta-1.0.0.dmg
+
+# Linux：rsync 到 sanjiaozhou → -Werror 构建 → 组装 .deb → dpkg -i → Xvfb 启动验证
+bash apps/desktop-linux/scripts/package-deb.sh sanjiaozhou
+# → dist/linux/heyta_1.0.0_amd64.deb
+
+# Windows：publish → manifest → logos → makeappx → 自签名 → 信任证书
+#          → 交互式会话里安装 + 启动 + 截图 → 取回产物
+bash apps/desktop-windows/scripts/package-msix.sh
+# → dist/windows/{heyta.msix,packaged-first-run.png,install-capture.txt}
+```
+
+前置：macOS 需要 `swift`；Linux 走 SSH 到 `sanjiaozhou`（Ubuntu 24.04，有 gtk4/jsc/dpkg-deb）；
+Windows 走 SSH 到 `windows-pc`（Win11，Windows SDK x64 + dotnet 10 + 管理员）。
+
+### 6.1 🔴 Windows：`Add-AppxPackage` 必须在**非提权**的交互式会话里跑
+
+AppX 部署是**按用户**的。SSHD 给的是**提权**会话，在那里跑就会得到：
+
+```
+Add-AppxPackage : 部署失败，HRESULT: 0x80070005, 拒绝访问。
+目标卷 C: 执行的 添加 操作失败，错误为 0x80070005
+```
+
+**同一段代码、同一个包**，换成非提权的交互式桌面会话就成功。所以
+`package-msix.ps1` 只把「信任证书」留在提权会话（那一步真的需要管理员），
+把「安装 + 启动 + 截图」整段交给 `install-and-capture.ps1`，用
+`schtasks /ru <用户> /it` 投进去：
+
+```powershell
+schtasks /create /tn heyta-msix-install /tr C:\src\heyta-msix\install-and-capture.cmd `
+  /sc once /st 00:00 /ru $env:USERNAME /it /f
+schtasks /run /tn heyta-msix-install
+```
+
+被投进去的脚本第一行就打印 `CONTEXT IsAdmin=` —— **这是判据**：
+`IsAdmin=True` 说明投递姿势错了，`False` 才是对的那个会话。
+
+🔴 **不要用「再用管理员跑一次」来试。** 那是**反方向**：提权正是失败的那个上下文。
+`Add-AppxProvisionedPackage -Online`（面向全机、必须提权）是**另一条语义不同的路**，
+不是这条路的加强版。
+
+### 6.2 🔴 `dotnet publish` 会丢掉应用**自己的** XAML 资源
+
+WinUI 3 壳的 `dotnet publish` 产物里**没有** `App.xbf` / `MainWindow.xbf` / `<工程名>.pri`，
+而 `dotnet build` 产物里**三个都有**。用它打出来的 MSIX 会：
+
+1. **装得上**（`Add-AppxPackage` 返回成功、`Get-AppxPackage` 有）；
+2. **起得来**（`shell:appsFolder\...` 真的拉起了进程）；
+3. 然后在 `Microsoft.UI.Xaml.dll` 里崩掉，事件日志形态是
+   `异常代码 0xc000027b`（stowed exception）+ `combase.dll` `80004005`（E_FAIL）
+
+—— 因为 `InitializeComponent()` 加载不到 `ms-appx:///App.xaml`。
+
+`package-msix.ps1` 第 1 步因此会把这几个文件从 build 产物补回 publish 目录并**断言存在**；
+第 7 步的 `install-and-capture.ps1` 再断言一次包内确实有
+`PAYLOAD_PRI=True` / `PAYLOAD_XBF=2`。
+
+> **「装上了」不等于「跑得起来」。** 这条纪律在本仓被代价教育过多次 ——
+> 本轮又教育了一次：安装成功、进程启动、然后窗口从来没出现。
+
+### 6.3 取件路径
+
+Windows 的中间产物在 **`C:\src\heyta-msix\`**（不是 `C:\heyta-msix\`）。
+路径写错时的表现是「取不到 heyta.msix」，看起来像打包失败，其实只是取件地址错了。
+
+### 6.4 采集方式
+
+`dist/windows/packaged-first-run.png` 与
+`apps/desktop-windows/evidence/packaged-first-run.png` 是同一张图
+（**打包产物**的窗口，不是 build 产物的），采集方式
+`winui-schtasks-copyfromscreen`，已登记进 `scripts/screenshots/targets.mjs` 的 `SHELL_EVIDENCE`。

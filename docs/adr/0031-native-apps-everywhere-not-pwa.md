@@ -1,6 +1,6 @@
 # ADR-0031：每一端都交付原生应用；PWA 不是任何端的交付形态
 
-> 状态：**待确认**
+> 状态：**已接受**（2026-09-29 确认；依据见文末 §6）
 > 日期：2026-09-28
 > 取代：无（**确认并收窄** [ADR-0024](0024-desktop-shell-and-ui-convergence.md) §2.5 的表述）
 > ⚠️ **被 [ADR-0032](0032-windows-native-via-rnw.md) 收窄**：本文 §1.3/§3 用
@@ -12,6 +12,10 @@
 > ADR-0032 选的 react-native-windows **没有 ≥0.85 的稳定版**，选它会把 `apps/mobile`
 > 一起冻在已出上游支持窗口的 RN 0.84.1 上。Windows 现定为
 > **WinUI 3 / Windows App SDK 原生（C#）**。**引用 §3 结论 1 时以 ADR-0034 为准。**
+> 🔴 **2026-09-29 再修订**：ADR-0034 又被 [ADR-0036](0036-main-battlefield-and-rn-single-source-ui.md) 取代。
+> Windows 一行最终为 **`react-native-windows`（内容岛）** —— ADR-0034 的否决前提已被两条实测证伪
+> （RNW 0.84.0 的 peer 与 heyta 逐字对齐；heyta 本来就在 RN Unsupported 区，不是 RNW 推进去的）。
+> **引用 §3 结论 1 时以 [ADR-0036](0036-main-battlefield-and-rn-single-source-ui.md) 为准。**
 
 ## 1. 背景与约束
 
@@ -130,3 +134,27 @@ Capacitor 是"Web 视图 + 插件"，它**渲染不了**这些平台的系统组
    缺的是"去做"而不是"没有机器"。
 4. Capacitor 未来是否会新增 Windows 平台 —— 按 §1.2 的抓取时点，**没有**。
    若上游新增，本 ADR 的 §1.2 需要重估（但 §1.3 的结论不受影响）。
+
+---
+
+## 6. 确认（2026-09-29）：状态由「待确认」改为「已接受」
+
+### 6.1 为什么接受
+
+本文的核心结论在 [ADR-0036](0036-main-battlefield-and-rn-single-source-ui.md) 落地后**被完整确认**，
+不再有待决的不确定性：
+
+| 本文结论 | 2026-09-29 的状态 |
+|---|---|
+| 每一端的交付物都是**原生应用** | ✅ **确认**：RN 全端（`react-native-windows` / `react-native-macos` / RN / RNOH）渲成各平台**原生控件**，Web 用 `react-native-web` |
+| **PWA 不是任何端的交付形态** | ✅ **确认**：PWA 仍只作为 Web 端的可安装层与 Windows 小组件的 package identity 路径（§3 结论 4 的收窄仍成立） |
+| **Capacitor 被否决**（没有 Windows 平台 + 渲染不了系统组件） | ✅ **确认**：与 [ADR-0032](0032-windows-native-via-rnw.md) §1.3 一致；ADR-0036 未改变这条 |
+| "减少代码量"**不靠换壳**，靠共享包 | ✅ **确认**：ADR-0036 把 `packages/ui` 变成**字面上同一份代码**，正是这条的强化 |
+| §3 结论 1 **Windows 一行** | 🔄 **三次改写**：0032（RNW）→ 0034（WinUI 3）→ **0036（RNW 内容岛）**。引用时**以 ADR-0036 为准** |
+
+### 6.2 本文还有一处口径要注意
+
+本文 §1.3 与 §3 结论 3 曾用"**减少代码量 / 代码量增加**"论证否决更原生的方案，
+而 [ADR-0032](0032-windows-native-via-rnw.md) 已明确**代码量不是决策依据**（原生性优先）。
+⇒ 引用本文时只采用它的**能力论据**（Capacitor 没有 Windows 平台、渲染不了系统组件），
+**不要**引用它的代码量论据 —— 该口径已被后续 ADR 作废，正文保留不改（ADR 不可变）。
