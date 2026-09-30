@@ -55,7 +55,24 @@ export function resolveNode() {
 
 function run(cmd, args, options = {}) {
   const r = spawnSync(cmd, args, { encoding: 'utf8', ...options });
-  return { ok: r.status === 0, out: `${r.stdout ?? ''}${r.stderr ?? ''}` };
+  const out = `${r.stdout ?? ''}${r.stderr ?? ''}`;
+  // 🔴 spawn **根本没起来**（cwd 不存在、命令不存在…）时，`status` 是 null、
+  //    stdout/stderr 都是空 ⇒ 症状是"失败但一个字都没有"。必须把 r.error 说出来。
+  return { ok: r.status === 0, out: r.error ? `${out}\n[spawn] ${r.error.message}` : out };
+}
+
+/**
+ * 🔴 **把 `root` 归一成"以斜杠结尾"**。
+ *
+ * 这个文件里到处是 `${root}server` 这样的**字符串拼接**，所以调用方传进来的
+ * `root` 必须带尾斜杠。而 `path.join()` / `path.dirname()` **会去掉**它 ——
+ * 于是"另一种同样自然的写法"会让 `cwd` 变成一个不存在的路径，
+ * spawn 失败、输出为空，报出来只有一句「迁移失败：」（2026-09-30 实测，
+ * 我自己的新脚本就踩了这条，而既有调用方因为用了 `new URL('..')` 恰好带尾斜杠）。
+ * ⇒ 与其要求每个调用方记住，不如在这里统一。
+ */
+function normalizedRoot(root) {
+  return root.endsWith('/') ? root : `${root}/`;
 }
 
 function psqlAvailable() {
@@ -94,6 +111,7 @@ export function databaseUrlFor(dbName) {
 
 /** 建库（如果不存在）+ 应用迁移。失败直接退出，不带着半个库往下跑。 */
 export function ensureDatabase({ root, dbUrl, dbName }) {
+  root = normalizedRoot(root);
   if (!psqlAvailable()) {
     console.log('⚠️  找不到 psql，跳过建库 —— 若库不存在，验收会在服务端启动阶段失败');
     return;
@@ -148,6 +166,7 @@ export function ensureDatabase({ root, dbUrl, dbName }) {
  * 而现象看着像"认证坏了"。与 §6.1.1「测试全绿 ≠ 这是当前产物」同源。
  */
 export function ensureServerBuilt({ root, dbUrl }) {
+  root = normalizedRoot(root);
   const entry = `${root}server/dist/src/index.js`;
   if (existsSync(entry) && !serverSourcesNewerThan(root, entry)) return;
 
@@ -207,6 +226,7 @@ export async function startServer({
   origin,
   publicUrl,
 }) {
+  root = normalizedRoot(root);
   console.log(`· 启动服务端（${host}:${port}，TEST_MODE，rp=${rpId}）…`);
   const server = spawn(node, ['dist/src/index.js'], {
     cwd: `${root}server`,
