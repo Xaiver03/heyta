@@ -51,6 +51,7 @@ import { HEATMAP_MONTH_KEYS, HabitBoard, HeytaUiProvider, type HabitBoardLabels 
 import { Plus } from 'lucide-react';
 
 import { ColorSlotPicker } from '../categories/ColorSlotPicker.js';
+import { HabitGoalEditor } from './HabitGoalEditor.js';
 import { useHabitStore } from './store.js';
 
 const NOW_STATE_KEY = 'now';
@@ -168,6 +169,27 @@ export function HabitsView() {
     [store],
   );
 
+  /**
+   * 目标编辑入口。
+   *
+   * 🔴 与 `renderColorSlot` 同一个形状：**编辑控件留在各端**，共享的 `HabitBoard`
+   * 只负责把位置让出来（`renderGoalSlot`）。这里**不判断业务**（合法与否在 action 层）。
+   *
+   * ⚠️ 刻意**不包 `run()`**：`run()` 只 `.finally()`，没有 `.catch` ——
+   * 而 `setHabitGoal` 会 reject（非法数值 / 找不到习惯）。
+   * 交给编辑器自己接住，它才显示得出那行错误（直接交给 `run` 会变成
+   * 一条 unhandled rejection，用户看到的是"点了没反应"）。
+   */
+  const renderGoalSlot = useCallback(
+    (habit: Habit): ReactNode => (
+      <HabitGoalEditor
+        habit={habit}
+        onSetGoal={(goal) => store.setHabitGoal(habit.id, goal)}
+      />
+    ),
+    [store],
+  );
+
   return (
     <div style={{ padding: cssVar('space.4') }}>
       <form
@@ -234,6 +256,7 @@ export function HabitsView() {
           }}
           busyHabitId={busyId}
           renderColorSlot={renderColorSlot}
+          renderGoalSlot={renderGoalSlot}
           testID="habit-board"
         />
       </HeytaUiProvider>

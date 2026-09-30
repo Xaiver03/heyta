@@ -36,7 +36,7 @@ import {
   type ActionContext,
   type NewHabitFields,
 } from '@heyta/app-host';
-import type { CategorySlot, Habit, HabitLog, LocalDate } from '@heyta/domain';
+import type { CategorySlot, Habit, HabitGoalType, HabitLog, LocalDate } from '@heyta/domain';
 import { habitHeatmap, toHabitProgressRows, type HabitProgressRow } from '@heyta/ui';
 import { create } from 'zustand';
 
@@ -55,6 +55,16 @@ interface HabitState {
   deleteHabit: (habitId: string) => Promise<void>;
   /** 分类色槽位（1–8），`undefined` 表示清除。存槽位号，不存颜色本身。 */
   setHabitColor: (habitId: string, slot?: CategorySlot) => Promise<void>;
+  /**
+   * 改习惯的**目标**（数值 / 单位 / 达成口径）。
+   *
+   * 🔴 **失败会 `throw`**（目标非法 / 找不到习惯）—— 由界面接住并说清楚，
+   * 不许吞成静默空操作（症状会是"用户以为改好了，数字没变"）。
+   */
+  setHabitGoal: (
+    habitId: string,
+    goal: { target?: number; unit?: string; goalType?: HabitGoalType },
+  ) => Promise<void>;
 }
 
 /** 与任务 / 专注 / 清单 store 同一个形状。只含两个函数引用，不含任何判断。 */
@@ -92,6 +102,11 @@ export const useHabitStore = create<HabitState>(() => ({
     // 软删除。打卡记录**不**级联删除 —— 撤销删除后历史还在。
     await habitActions.removeHabit(habitId);
     refresh();
+  },
+
+  setHabitGoal: async (habitId, goal) => {
+    // 不 catch：拒绝原因要一路冒到界面去说清楚（见接口注释）。
+    await habitActions.setHabitGoal(habitId, goal);
   },
 
   setHabitColor: async (habitId, slot) => {

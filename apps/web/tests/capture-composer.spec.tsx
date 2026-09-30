@@ -115,10 +115,23 @@ function previewText(el: HTMLDivElement): string {
 }
 
 beforeEach(() => {
+  /*
+    🔴 **把系统时间钉死**（2026-09-28 12:00）。
+
+    这一族断言里有**推算出来的日期**（`明天` → `09-29`）。不钉时钟的话，
+    它写下的那一天是绿的，而**跨过一次午夜就变红** —— 实测 2026-09-29 00:14：
+    `AssertionError: expected '2026-09-30（明天）' to contain '09-29'`。
+
+    ⇒ 这不是产品缺陷，是测试自己带了一颗**定时炸弹**（与 flake 同族：
+    失败与代码无关，只与"什么时候跑"有关）。`shouldAdvanceTime` 让真实计时器
+    继续走，所以 `act` 里的异步链路照常推进。
+  */
+  vi.useFakeTimers({ now: new Date(2026, 8, 28, 12, 0, 0), shouldAdvanceTime: true });
   addTask.mockClear();
 });
 
 afterEach(() => {
+  vi.useRealTimers();
   act(() => {
     root?.unmount();
   });
