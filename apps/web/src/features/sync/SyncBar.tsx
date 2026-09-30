@@ -42,7 +42,7 @@
  * 已补齐，别再把这一层当成"手工保证"。
  */
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { cssVar } from '@heyta/design-system';
 import { useI18n, type I18nValue } from '@heyta/i18n';
 import { useSyncStore } from './store.js';
@@ -119,18 +119,54 @@ export function SyncBar() {
    * 订阅提示的「改用你自己的服务器」也要打开它（见 store 里的注释）。
    */
   const open = useSyncStore((s) => s.settingsOpen);
-  const [baseUrl, setBaseUrl] = useState(sync.baseUrl);
+  const [baseUrl, setBaseUrl] = useState(sync.baseUrl ?? '');
   const [token, setToken] = useState('');
   const [password, setPassword] = useState('');
+
+  /**
+   * 🔴 对话框**打开时**把三个输入框对齐到已保存的配置。
+   *
+   * 这几个 state 的初值只在 SyncBar **挂载那一刻**取一次，而 SyncBar 是常驻的
+   * 顶栏组件 —— 于是它们会长期停在一个过期的快照上：
+   *
+   *   · 冷启动（尤其刚清过存储的新设备）`sync.baseUrl` 还是空的，
+   *     之后登录虽然写进了 store，**这里不会自己更新**；
+   *   · `token` 的初值恒为空串。
+   *
+   * 后果不是"显示不对"这么轻：点「保存并同步」会走
+   * `sync.configure(baseUrl, token, password)`，把**空地址**写进内存配置 ——
+   * 同步当场变成"还没配置"（`configure` 只在两者都非空时才落盘，
+   * 所以磁盘上的凭据还在，刷新一次又能好 —— 这正是最难归因的那种形态）。
+   *
+   * 实测（2026-09-30，Windows 桌面壳旅程验收 W3）：用户能走到的路径正是
+   * 「点头像 → 登录 / 注册 → 打开同步设置 → 补端到端加密口令 → 保存并同步」，
+   * 而口令**从不落盘**，所以每个新会话都要用户再走一次。
+   *
+   * 口令也一起对齐：它只在内存里，而真值就在 store 里。
+   * 不这样，一次"打开设置 → 保存"就会把刚建立的口令抹成空串。
+   *
+   * ⚠️ 只在 `open` 翻转时播种（用 `getState()` 取当下值，不把 store 放进依赖）：
+   *    否则用户在输入框里打字时，任何一次 store 更新都会把他的输入覆盖掉。
+   */
+  useEffect(() => {
+    if (!open) return;
+    const current = useSyncStore.getState();
+    setBaseUrl(current.baseUrl ?? '');
+    setToken(current.token ?? '');
+    setPassword(current.password ?? '');
+  }, [open]);
   /**
    * 认证面板的开合。
    *
    * 🔴 它在**同步设置对话框里面**打开，而不是另做一个更靠前的入口：
    * 认证要用的服务端地址就是这里的地址，两者分开会让用户对着 A 登录、
-   * 把令牌存到 B。状态留成局部 state 是因为**只有一个入口**打开它 ——
-   * 两个入口才需要提到 store 里（见 `store.ts` 里 `settingsOpen` 的注释）。
+   * 把令牌存到 B。
+   *
+   * 🔴 2026-09-29 起**状态在 store 里**（`signInOpen`）：入口搬进了
+   * rail 顶部的账号区（`AccountMenu`），触发者在这里之外 —— 与
+   * `settingsOpen` 同一条搬家理由（两个组件要开同一块面板）。
    */
-  const [authOpen, setAuthOpen] = useState(false);
+  const authOpen = useSyncStore((s) => s.signInOpen);
 
   return (
     <>
@@ -143,6 +179,15 @@ export function SyncBar() {
           testID="sync-status-bar"
           actions={
             <>
+              {/*
+                🔴 W2（注册/登录前置）：入口**搬进了 rail 顶部账号区的头像菜单**
+                （2026-09-29 撤掉顶栏那块大主按钮；2026-09-30 又撤掉头像旁边
+                那个 pill —— 产品负责人："应该是点击头像出来注册、登录吧？"）。
+                `AccountMenu` 在未登录时把「登录 / 注册」渲染成菜单**第一项**
+                （同一个 `sync-signin-entry` testID），开合状态在 store 的
+                `signInOpen`。这里**不再**渲染第二个入口。
+              */}
+
               {/* 冲突需要一个**看得见的入口**：关掉对话框之后，
                   用户还得能再打开它，否则问题就从"没法解决"变成"看不见了" */}
               {affordances.needsResolution ? (
@@ -271,7 +316,7 @@ export function SyncBar() {
               type="button"
               className="ht-btn ht-btn--ghost"
               style={{ alignSelf: 'flex-start' }}
-              onClick={() => setAuthOpen(true)}
+              onClick={() => sync.openSignIn()}
             >
               {t('web.auth.open')}
             </button>
@@ -301,16 +346,16 @@ export function SyncBar() {
             </p>
 
             <div style={{ display: 'flex', gap: cssVar('space.2'), justifyContent: 'flex-end' }}>
-              <button
-                type="button"
-                className="ht-btn ht-btn--ghost"
-                onClick={() => {
-                  sync.clearCredentials();
-                  sync.closeSettings();
-                }}
-              >
-                {t('web.sync.clearCredentials')}
-              </button>
+              {/*
+                🔴 2026-09-30 撤掉了这里的「清除凭据」按钮。
+                它和头像菜单里的「退出登录」是**同一个动作**（都走
+                `sync.clearCredentials()`），却：名字不同、视觉分量不同
+                （ghost 排在主按钮**之前**）、**未登录时也照常渲染**
+                （点了纯空操作 —— 那正是"给一个按不出效果的按钮"）。
+                产品负责人 2026-09-30 拍板的 IA 是**身份入口唯一**：
+                身份动作长在身份区（头像菜单），所以这里不再重复一个。
+                要断开这台设备 → 点头像 → 退出登录。
+              */}
               <button
                 type="button"
                 className="ht-btn ht-btn--primary"
@@ -329,13 +374,21 @@ export function SyncBar() {
 
       {authOpen ? (
         <AuthPanel
-          baseUrl={baseUrl}
-          onClose={() => setAuthOpen(false)}
+          /**
+           * 🔴 地址来源取决于**从哪进来的**（W2）：
+           *   · 对话框开着时用它的输入框 —— 用户可能刚改过地址还没保存，
+           *     认证就该用他眼前那个值（原来的行为，保持不变）；
+           *   · 从**顶栏**进来时用**已保存的** `sync.baseUrl` —— 顶栏不该读到
+           *     对话框里未提交的草稿。若它为空，`AuthPanel` 会自己显示地址输入。
+           * 两种情况都只有**一个**地址来源，认证与同步永远指向同一个服务端。
+           */
+          baseUrl={open ? baseUrl : sync.baseUrl}
+          onClose={() => sync.closeSignIn()}
           onSignedIn={(session: HostedAuthSession) => {
             // 认证 store 已经把令牌写进了同步配置；这里把**这个对话框的输入框**
             // 也对齐，否则用户接着点「保存并同步」会用空输入框把它覆盖掉。
             setToken(session.token);
-            setAuthOpen(false);
+            sync.closeSignIn();
           }}
         />
       ) : null}
