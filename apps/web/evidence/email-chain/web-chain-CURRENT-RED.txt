@@ -1,0 +1,22 @@
+(node:83816) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.
+(Use `node --trace-warnings ...` to show where the warning was created)
+· 库：heyta_email_web_chain
+· 验收库已存在
+· 应用迁移…
+· 迁移完成
+· 启动 API 服务端（无 TEST_MODE）…
+· 同源反代就绪 http://127.0.0.1:4400（API 在 http://127.0.0.1:3231）
+· API 就绪
+
+  ✅ ① 应用在**同源反代**下打开（真产物）
+  ✅ ① UI 注册已提交（email-web-1790775038923@example.com）
+  · 那封信：https://ethereal.email/message/ar0PAAcJu4Jvbfn1ar0PBmBC2ZnvfZv6AAAAAUGH7kXz0hq0jwq1lAR42vQ
+  ✅ ② 链接指向**反代那个 origin**（http://127.0.0.1:4400/verify-email?token=3ea9b…）
+  ✅ ③ 打开链接渲染的是**确认页**（有确认按钮），不是"已失效"页
+  ✅ ④ 点击后跳到了 `/app/` 且应用挂载
+  · 落到 /app/ 之后的存储：{"sessionKeys":[],"localKeys":["heyta.locale","heyta.theme"],"errs":[]}
+  · /api/auth/email/verify 的响应：200
+  ❌ ⑤ 落盘凭据出现（刷新之后仍是登录态）
+  ❌ ⑤ 身份菜单出现"退出登录" ⇒ **应用真的登录了**（这一格正是以前坏掉的）
+
+❌ web 邮箱全链路**未通过**
