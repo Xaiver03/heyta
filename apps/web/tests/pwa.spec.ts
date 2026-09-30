@@ -24,8 +24,9 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { ADAPTIVE_CARD_KINDS } from '@heyta/widget-core';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
+import { serviceWorkerUrl } from '../src/pwa/register.js';
 import {
   SW_CLICK_LOG_MAX,
   appendClick,
@@ -313,6 +314,78 @@ describe('生成物：manifest 与它引用的文件', () => {
     for (const icon of manifest.icons) {
       expect(existsSync(join(PUBLIC, icon.src.replace(/^\//, ''))), `${icon.src} 不存在`).toBe(true);
     }
+  });
+});
+
+/**
+ * 🔴 子路径部署的回归判据。
+ *
+ * ## 这条是线上事故换来的
+ *
+ * 2026-09-30 在 `heyta.waytofuture.cn` 做域名迁移验收时，真浏览器控制台报：
+ *
+ * ```
+ * SecurityError: Failed to register a ServiceWorker …
+ * script ('https://heyta.waytofuture.cn/sw.js'):
+ * The script has an unsupported MIME type ('text/html')
+ * ```
+ *
+ * 根因：应用挂在 `/app/` 下（`vite build --base=/app/`），但
+ * ① `register.ts` 把 SW 地址写死成 `'/sw.js'`；
+ * ② `gen-pwa.mjs` 生成的 manifest 里 `start_url`/`scope`/`icons[].src` 全是 `/…`。
+ * `public/` 是**原样拷贝**进 `dist/` 的，所以线上就是这份 ——
+ * `/sw.js` 与 `/icons/*.png` 都落到**站点根**（落地页），拿回 `text/html`。
+ *
+ * 症状是"不报错就不管"的典型：**组件不出现、PWA 装出来的入口是落地页**，
+ * 而在 `vite dev` / `vite preview`（都跑在根路径）上**一切正常** ——
+ * 所以这一族缺陷**只能在子路径形态下被测到**。
+ *
+ * 下面两条分别在"生成物"与"运行时"两侧钉住同一个约束。
+ */
+describe('🔴 子路径挂载（/app/）：manifest 与 SW 地址都不许写死根绝对路径', () => {
+  const manifest = JSON.parse(readFileSync(join(PUBLIC, 'manifest.webmanifest'), 'utf8')) as {
+    id: string;
+    start_url: string;
+    scope: string;
+    icons: { src: string }[];
+    widgets: { ms_ac_template: string; data: string; icons: { src: string }[] }[];
+  };
+
+  it('manifest 里没有一个是根绝对 URL（全部相对 manifest 自己解析）', () => {
+    const urls: [string, string][] = [
+      ['id', manifest.id],
+      ['start_url', manifest.start_url],
+      ['scope', manifest.scope],
+      ...manifest.icons.map((i, n): [string, string] => [`icons[${String(n)}].src`, i.src]),
+      ...manifest.widgets.flatMap((w, n): [string, string][] => [
+        [`widgets[${String(n)}].ms_ac_template`, w.ms_ac_template],
+        [`widgets[${String(n)}].data`, w.data],
+        ...w.icons.map((i, m): [string, string] => [
+          `widgets[${String(n)}].icons[${String(m)}].src`,
+          i.src,
+        ]),
+      ]),
+    ];
+
+    for (const [field, value] of urls) {
+      expect(
+        value.startsWith('/'),
+        `${field} = ${value} 是**根绝对**地址 —— 应用挂在 /app/ 下时它会落到站点根，` +
+          '而那里是落地页（返回 text/html）。改成相对地址（"." 或 "icons/x.png"）。',
+      ).toBe(false);
+    }
+  });
+
+  it('serviceWorkerUrl() 跟着 BASE_URL 走，两种挂载形态都对', () => {
+    // 这是 register.ts 里那条写死的 `'/sw.js'` 的直接判据。
+    // 变异验证：把实现改回 `return '/sw.js'` ⇒ 第一条断言转红。
+    vi.stubEnv('BASE_URL', '/app/');
+    expect(serviceWorkerUrl()).toBe('/app/sw.js');
+
+    vi.stubEnv('BASE_URL', '/');
+    expect(serviceWorkerUrl()).toBe('/sw.js');
+
+    vi.unstubAllEnvs();
   });
 });
 

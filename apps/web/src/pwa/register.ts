@@ -20,7 +20,28 @@
 
 import type { RawWidgetClick } from './sw-core.js';
 
-const SW_URL = '/sw.js';
+/**
+ * service worker 的 URL —— **必须由 `BASE_URL` 派生，不能写死 `/sw.js`**。
+ *
+ * 🔴 这里原先写的是常量 `'/sw.js'`，在线上是坏的（2026-09-30 真浏览器验收抓到）：
+ * 应用挂在 `https://heyta.waytofuture.cn/app/` 下，而 `/sw.js` 指的是**站点根** ——
+ * 那里服务的是落地页，于是注册请求拿回 `text/html`：
+ *
+ * ```
+ * SecurityError: Failed to register a ServiceWorker … script
+ * ('https://heyta.waytofuture.cn/sw.js'): The script has an unsupported MIME type ('text/html')
+ * ```
+ *
+ * 后果不是"少个功能"：**Edge 上组件根本不出现**，而这是本仓库
+ * `check:widgets` / Adaptive Card 那一整条链的宿主入口。
+ *
+ * `BASE_URL` 正是"应用挂在什么路径下"（构建时由 `vite build --base=` 注入）：
+ * 子路径部署是 `/app/`、根路径是 `/`，两种形态**同一行代码都对**。
+ * 不要改成写死 `/app/` —— `vite dev` / `vite preview` 跑在根路径，那样会把它们弄坏。
+ */
+export function serviceWorkerUrl(): string {
+  return `${import.meta.env.BASE_URL}sw.js`;
+}
 
 export function registerWidgetServiceWorker(): void {
   if (!('serviceWorker' in navigator)) return;
@@ -31,7 +52,7 @@ export function registerWidgetServiceWorker(): void {
   if (new URLSearchParams(window.location.search).has('slice')) return;
 
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register(SW_URL).catch((error: unknown) => {
+    navigator.serviceWorker.register(serviceWorkerUrl()).catch((error: unknown) => {
       // 注册失败**不能影响应用可用性** —— 小组件是增强，不是功能前提。
       // 但要留痕：Windows 上组件不出现的第一个排查点就是这里。
       console.warn('[heyta] service worker 注册失败，小组件将不可用', error);

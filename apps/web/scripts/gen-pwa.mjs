@@ -127,23 +127,43 @@ const WIDGET_COPY = {
   focus: { name: '专注', description: '正在进行的专注会话', update: 1800 },
 };
 
+/**
+ * 🔴 manifest 里所有 URL 一律用**相对地址**，不许写 `/…`。
+ *
+ * 起因是一次线上验收抓到的真缺陷（2026-09-30，`heyta.waytofuture.cn`）：
+ * 应用挂在 `/app/` 下，而这里原先写的是 `start_url: '/'`、`scope: '/'`、
+ * `icons[].src: '/icons/…'`。`public/` 里的文件是**原样拷贝**进 `dist/` 的
+ * （Vite 不处理它们），所以线上的 manifest 就是这份 —— 于是
+ * `GET /icons/icon-192.png` 落到**站点根**，那里是落地页，
+ * 返回 `text/html`；**装出来的 PWA 入口是落地页，图标也是坏的**。
+ *
+ * 为什么相对地址能同时满足两种挂载形态：manifest 的 URL 就是它自己
+ * （`/manifest.webmanifest` 或 `/app/manifest.webmanifest`），
+ * 而规范规定 `start_url` / `scope` / `icons[].src` **都相对 manifest URL 解析**。
+ * 所以 `.` ⇒ 该 manifest 所在目录，`icons/x.png` ⇒ 同目录下的 `icons/x.png`。
+ * 根路径部署与子路径部署**同一份产物**都对 —— 不需要再引入构建参数。
+ *
+ * ⚠️ 别改成写死 `/app/`：`vite dev` 与 `vite preview` 都跑在根路径，
+ * 那样会把它们弄坏，而 W3-1/W3-2 的验收正是在那两种形态上跑的。
+ */
 const manifest = {
   name: 'heyta',
   short_name: 'heyta',
   description: '本地优先、端到端加密的待办与习惯应用',
-  id: '/',
-  start_url: '/',
-  scope: '/',
+  // `.` = manifest 所在目录。见上面那段注释：这是子路径部署能对的唯一写法。
+  id: '.',
+  start_url: '.',
+  scope: '.',
   display: 'standalone',
   background_color: BACKGROUND,
   theme_color: PRIMARY,
   lang: 'zh-CN',
   dir: 'ltr',
   icons: [
-    { src: '/icons/icon-192.png', sizes: '192x192', type: 'image/png', purpose: 'any' },
-    { src: '/icons/icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'any' },
+    { src: 'icons/icon-192.png', sizes: '192x192', type: 'image/png', purpose: 'any' },
+    { src: 'icons/icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'any' },
     {
-      src: '/icons/icon-maskable-512.png',
+      src: 'icons/icon-maskable-512.png',
       sizes: '512x512',
       type: 'image/png',
       purpose: 'maskable',
@@ -160,14 +180,15 @@ const manifest = {
       // ⚠️ tag 必须与 `src/pwa/sw-core.ts` 的 `widgetTag()` 产出**逐字符相同**。
       //    对不上的表现是 `updateByTag` 静默什么都不做 → 组件永远停在那不动。
       tag: `heyta-${kind}`,
-      ms_ac_template: `/widgets/${kind}.json`,
-      data: `/widgets/${kind}.data.json`,
+      // 同样相对 manifest URL 解析（见上面 `manifest` 前那段注释）。
+      ms_ac_template: `widgets/${kind}.json`,
+      data: `widgets/${kind}.data.json`,
       type: 'adaptivecard',
       // `update` 是**最短刷新间隔**（秒）。写 1800（30 分钟）是规范允许的最小值 ——
       // 即使如此它也不解决"当日任务"的实时性问题（PBS 下限 12 小时），
       // 真正的刷新走 Web Push + `widgets.updateByTag`。见 `sw.ts` 文件头。
       update: copy.update,
-      icons: [{ src: '/icons/icon-192.png', sizes: '192x192', type: 'image/png' }],
+      icons: [{ src: 'icons/icon-192.png', sizes: '192x192', type: 'image/png' }],
     };
   }),
 };
