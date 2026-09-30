@@ -11,6 +11,18 @@
     ".": {
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
+    },
+    "./provider": {
+      "types": "./dist/provider.d.ts",
+      "default": "./dist/provider.js"
+    },
+    "./zh-CN": {
+      "types": "./dist/locales/zh-CN.d.ts",
+      "default": "./dist/locales/zh-CN.js"
+    },
+    "./en": {
+      "types": "./dist/locales/en.d.ts",
+      "default": "./dist/locales/en.js"
     }
   },
   "scripts": {
