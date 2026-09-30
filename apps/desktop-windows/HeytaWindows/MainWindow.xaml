@@ -6,22 +6,30 @@
     xmlns:local="using:Heyta.Shell"
     Title="heyta">
 
-    <Grid Padding="24" RowSpacing="12">
+    <Grid x:Name="Root" Padding="24" RowSpacing="12">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
+            <!-- 手写的原生切片：**故意留着**，这样截图里能同时看到
+                 "原生控件"与"共享 UI"，也就是 M2 主张的"并排"。
+                 ⚠️ 但它只是 **shell 模式**（M2-A/B/C 通道试验台）的形态：
+                 app 模式加载的是真应用（自带存储与自己的数据层），原生这一半
+                 既推不了数据也只会显示一行报错，所以那里会被整块收起
+                 （见 `MountSharedUiAsync` 的 `ApplyShellModeChrome`）。 -->
+            <RowDefinition x:Name="NativeRow" Height="110" />
+            <!-- 共享 UI 的宿主（M2-A spike）。 -->
             <RowDefinition Height="*" />
             <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
 
-        <StackPanel Grid.Row="0" Spacing="2">
+        <StackPanel Grid.Row="0" x:Name="ShellTitle" Spacing="2">
             <TextBlock Text="heyta" FontSize="28" FontWeight="SemiBold" />
             <TextBlock Text="Windows 原生壳 · 界面是 WinUI 3，逻辑与存储是与 web / mobile 同一份 TS"
                        Opacity="0.7" TextWrapping="Wrap" />
         </StackPanel>
 
-        <StackPanel Grid.Row="1" Orientation="Horizontal" Spacing="8">
+        <StackPanel Grid.Row="1" x:Name="ShellComposer" Orientation="Horizontal" Spacing="8">
             <TextBox x:Name="NewTaskTitle" Width="360" PlaceholderText="写点什么，回车添加" />
             <Button x:Name="AddButton" Content="添加" Style="{StaticResource AccentButtonStyle}" />
         </StackPanel>
@@ -54,6 +62,15 @@
             </ListView.ItemTemplate>
         </ListView>
 
-        <TextBlock Grid.Row="4" x:Name="FooterText" Opacity="0.6" FontSize="12" TextWrapping="Wrap" />
+        <!--
+          M2-A spike：原生壳里内嵌的 WebView2，承载的是 `packages/ui` 的**同一份**共享 UI
+          （`apps/web` 的 `?slice=1` 入口，经 react-native-web 渲染）。
+
+          🔴 这里不写任何业务逻辑：数据与派生都在 TS 一侧（native-bridge → app-host）。
+          WebView 只是**渲染目标**。
+        -->
+        <WebView2 Grid.Row="4" x:Name="SharedUi" />
+
+        <TextBlock Grid.Row="5" x:Name="FooterText" Opacity="0.6" FontSize="12" TextWrapping="Wrap" />
     </Grid>
 </Window>

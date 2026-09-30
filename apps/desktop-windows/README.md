@@ -126,7 +126,14 @@ HeytaApp.open 失败：'c' is an invalid start of a value. LineNumber: 0
 ## 6. 下一步（按价值排序）
 
 1. ~~在真 Windows 上启动窗口并截图~~ ✅ 已完成，见 §7 与 [`evidence/`](evidence/)。
-2. 把无头冒烟接进门禁：✅ `check:windows-shell` 已接进 `pnpm check`。
+2. 把无头冒烟接进门禁：🔴 **脚本有了，但还没接进 `pnpm check`** ——
+   `scripts/check-windows-shell.mjs` 存在，而全仓 `package.json` 里**没有**
+   `check:windows-shell` 这个 script，`pnpm check` 与 CI 也都没有引用它。
+   ⚠️ 这里原先写的是"✅ `check:windows-shell` 已接进 `pnpm check`"，
+   **2026-09-28 实测为假**（`grep check:windows-shell package.json` 零命中）。
+   已按实测改正：**假声明比没有声明更坏**，它让下一个人以为这块有人守着。
+   真正要做的两件事：加 `check:{macos,windows,linux}-shell` 三个 script，
+   并把能在当前主机上跑的那一个加进 `pnpm check` 的链里。
    **还没做的**：让它在**真 Windows** 上跑（现在 macOS 也跑，但 Windows 上更接近真实）。
 3. 门禁覆盖 C#：`check:licenses:nuget` 已经会扫到本目录的 `*.csproj`（它按仓库遍历）。
    ⚠️ WinUI 工程只在 Windows 上评（macOS 上还原就失败，脚本会**显式跳过并印出来**）。
