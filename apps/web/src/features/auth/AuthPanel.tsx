@@ -33,6 +33,13 @@
 
 import { useState } from 'react';
 import { cssVar } from '@heyta/design-system';
+import {
+  INVITE_QUERY_PARAM,
+  INVITE_CODE_LENGTH,
+  inspectInviteCodeShape,
+  isInviteCodeShape,
+  normalizeInviteCode,
+} from '@heyta/domain';
 import { useI18n, type MessageKey } from '@heyta/i18n';
 import type { HostedAuthFailureReason, HostedAuthSession } from '@heyta/app-host';
 import {
@@ -48,6 +55,7 @@ import {
 
 import { detectPasskeyBrowser } from './passkey-browser.js';
 import { useAuthStore } from './store.js';
+import { authFailureMessageKey } from '@heyta/ui';
 
 export interface AuthPanelProps {
   /** 当前同步设置里的服务端地址 —— 认证与同步必须指向同一个服务端。 */
@@ -58,51 +66,6 @@ export interface AuthPanelProps {
    * 否则用户随后点"保存并同步"会用空的输入框把刚拿到的令牌覆盖掉。
    */
   onSignedIn?: (session: HostedAuthSession) => void;
-}
-
-/**
- * 失败原因 → 词条 key。
- *
- * 🔴 这是**唯一**让 `HostedAuthFailureReason` 这个封闭集合变成句子的地方。
- * 新增一个原因时这里会因 `switch` 不穷尽而由类型系统拦住（默认分支只在
- * "确实说不出更具体的话"时兜底）。
- */
-function authFailureKey(reason: HostedAuthFailureReason): MessageKey {
-  switch (reason) {
-    case 'unconfigured':
-      return 'web.auth.error.unconfigured';
-    case 'invalid-input':
-      return 'web.auth.error.invalidEmail';
-    case 'not-allowed':
-      return 'web.auth.error.notAllowed';
-    case 'unauthorized':
-      return 'web.auth.error.unauthorized';
-    case 'rate-limited':
-      return 'web.auth.error.rateLimited';
-    case 'network':
-      return 'web.auth.error.network';
-    case 'server-error':
-      return 'web.auth.error.server';
-    case 'passkey-unsupported':
-      return 'web.auth.error.passkeyUnsupported';
-    case 'passkey-cancelled':
-      return 'web.auth.error.passkeyCancelled';
-    case 'passkey-already-registered':
-      return 'web.auth.error.passkeyAlreadyRegistered';
-    // 缺口 B：设备上这条旧凭据服务端已经不认了 —— 说"重新注册 / 换登录方式"，
-    // 而不是笼统的"登录没有完成"。
-    case 'passkey-not-found':
-      return 'web.auth.error.passkeyNotFound';
-    // 凭据还在但断言没验过 —— 说"可以再试一次"，与上一条是两句不同的话。
-    case 'passkey-rejected':
-      return 'web.auth.error.passkeyRejected';
-    // 这条原因也会从删除路径冒出来（最后一条被拒绝）。登录面板上不太可能
-    // 出现，但封闭集合里必须有着落，否则类型系统会拦下这个 switch。
-    case 'last-passkey':
-      return 'web.auth.error.lastPasskey';
-    default:
-      return 'web.auth.error.unknown';
-  }
 }
 
 export function AuthPanel({ baseUrl, onClose, onSignedIn }: AuthPanelProps): React.JSX.Element {
@@ -118,10 +81,49 @@ export function AuthPanel({ baseUrl, onClose, onSignedIn }: AuthPanelProps): Rea
   const [email, setEmail] = useState('');
   const [pasted, setPasted] = useState('');
   const [termsAccepted, setTermsAccepted] = useState(false);
+  /**
+   * 邀请码。🔴 **初值来自 URL 上的 `?invite=`** —— 那是邀请链接带来的，
+   * 而邀请链接是"邀请新人"这个机制唯一的入口形态：被邀请人不需要理解
+   * "邀请码"是什么，他只需要点开链接、填邮箱注册。
+   *
+   * 之所以仍然是一个**可见、可编辑**的输入框而不是隐藏参数：
+   * ① 有人是口头/截图拿到码的，没有链接可点；
+   * ② 链接里的码可能被截断，用户得能改；
+   * ③ 用户应该**看得见**自己正在被谁邀请（而不是被静默归因）。
+   */
+  const [inviteCode, setInviteCode] = useState(() => {
+    if (typeof window === 'undefined') return '';
+    const raw = new URLSearchParams(window.location.search).get(INVITE_QUERY_PARAM);
+    return raw === null ? '' : normalizeInviteCode(raw);
+  });
+  /**
+   * 服务端地址的**面板内**输入（W2：让顶栏一次点击就能到达注册/登录）。
+   *
+   * 🔴 为什么需要它：`AuthPanel` 原本只接受外部传入的 `baseUrl`
+   * （来自同步设置对话框的输入框），于是它**只能在那个对话框里打开** ——
+   * 而产品要求"注册/登录前置"，前置就意味着要能从顶栏直接进来。
+   *
+   * 🔴 为什么不是"另做一个入口、各用各的地址"：认证与同步**必须指向同一个服务端**
+   * （见 `AuthPanelProps.baseUrl` 的注释）。所以这里的输入**不是**第二个地址来源 ——
+   * 登录成功后 `applyAuthSession` 就是用它写进同步配置的，仍然是唯一一份。
+   *
+   * 行为：`baseUrl` 非空（已配置）时**不显示**这个输入，面板与原来完全一致。
+   */
+  const [localBaseUrl, setLocalBaseUrl] = useState('');
+  const effectiveBaseUrl = baseUrl === '' ? localBaseUrl : baseUrl;
 
   // 每次渲染都重新探测。缓存成模块级常量会把**第一次**的结果永久钉住，
   // 而它在 jsdom 与真实浏览器里不同，用户中途接上安全密钥时也会变。
   const passkeySupported = detectPasskeyBrowser() !== undefined;
+
+  /**
+   * 形状对不对（空串算"没填"，不是"填错了"）。
+   *
+   * 🔴 判据来自 `@heyta/domain`，与**服务端**用于查表的那一份是同一个函数 ——
+   * 客户端这里只提前说一句，权威判定永远在服务端。
+   */
+  const inviteProblem = inviteCode === '' ? null : inspectInviteCodeShape(inviteCode);
+  const validInviteCode = isInviteCodeShape(inviteCode) ? inviteCode : undefined;
 
   const busy = status.kind === 'busy';
   const signingIn = status.kind === 'signed-in';
@@ -191,7 +193,7 @@ export function AuthPanel({ baseUrl, onClose, onSignedIn }: AuthPanelProps): Rea
               }}
             >
               <AlertTriangle size={16} aria-hidden="true" />
-              {t(authFailureKey(status.reason))}
+              {t(authFailureMessageKey(status.reason))}
             </span>
           ) : (
             <span
@@ -240,6 +242,24 @@ export function AuthPanel({ baseUrl, onClose, onSignedIn }: AuthPanelProps): Rea
           )}
         </div>
 
+        {/* W2：只在**尚未配置服务端**时显示地址输入。
+            已配置时（从同步设置对话框进来）这一块整体不渲染 ——
+            面板与改动前逐像素一致，避免出现"同一个地址两个输入框"。 */}
+        {baseUrl === '' ? (
+          <label style={labelStyle}>
+            {t('web.sync.serverUrl.label')}
+            <input
+              type="url"
+              value={localBaseUrl}
+              onChange={(e) => setLocalBaseUrl(e.target.value)}
+              placeholder={t('web.sync.serverUrl.placeholder')}
+              autoComplete="url"
+              inputMode="url"
+              style={fieldStyle}
+            />
+          </label>
+        ) : null}
+
         <label style={labelStyle}>
           {t('web.auth.email.label')}
           <input
@@ -251,6 +271,30 @@ export function AuthPanel({ baseUrl, onClose, onSignedIn }: AuthPanelProps): Rea
             style={fieldStyle}
           />
         </label>
+
+        {/*
+          邀请码（选填）。
+
+          🔴 **形状不对时不发出去**（下面的按钮会用 `validInviteCode`），
+          而且这时**不禁用注册按钮** —— 用户是来注册账号的，一个抄错的码
+          不该把他挡在门外。他照常注册，只是这次邀请不作数。
+        */}
+        <label style={labelStyle}>
+          {t('web.auth.invite.label')}
+          <input
+            type="text"
+            value={inviteCode}
+            onChange={(e) => setInviteCode(normalizeInviteCode(e.target.value))}
+            placeholder={t('web.auth.invite.placeholder')}
+            autoComplete="off"
+            autoCapitalize="characters"
+            spellCheck={false}
+            style={fieldStyle}
+          />
+        </label>
+        {inviteProblem === null ? null : (
+          <p style={hintStyle}>{t('web.auth.invite.invalid', { length: INVITE_CODE_LENGTH })}</p>
+        )}
 
         <label style={checkboxLabelStyle}>
           <input
@@ -268,7 +312,7 @@ export function AuthPanel({ baseUrl, onClose, onSignedIn }: AuthPanelProps): Rea
             className="ht-btn ht-btn--primary"
             disabled={busy}
             onClick={() => {
-              void sendLoginLink(baseUrl, email);
+              void sendLoginLink(effectiveBaseUrl, email);
             }}
           >
             {status.kind === 'busy' && status.action === 'login-link' ? (
@@ -283,7 +327,7 @@ export function AuthPanel({ baseUrl, onClose, onSignedIn }: AuthPanelProps): Rea
             className="ht-btn ht-btn--ghost"
             disabled={busy}
             onClick={() => {
-              void registerAccount(baseUrl, email, termsAccepted);
+              void registerAccount(effectiveBaseUrl, email, termsAccepted, validInviteCode);
             }}
           >
             {status.kind === 'busy' && status.action === 'register' ? (
@@ -305,7 +349,9 @@ export function AuthPanel({ baseUrl, onClose, onSignedIn }: AuthPanelProps): Rea
             className="ht-btn ht-btn--ghost"
             disabled={busy}
             onClick={() => {
-              void registerPasskey(baseUrl, email, termsAccepted);
+              void registerPasskey(effectiveBaseUrl, email, termsAccepted, {
+                inviteCode: validInviteCode,
+              });
             }}
           >
             {status.kind === 'busy' && status.action === 'passkey-register' ? (
@@ -320,7 +366,7 @@ export function AuthPanel({ baseUrl, onClose, onSignedIn }: AuthPanelProps): Rea
             className="ht-btn ht-btn--ghost"
             disabled={busy}
             onClick={() => {
-              void loginWithPasskey(baseUrl, email).then((session) => {
+              void loginWithPasskey(effectiveBaseUrl, email).then((session) => {
                 if (session !== undefined) onSignedIn?.(session);
               });
             }}
@@ -374,7 +420,7 @@ export function AuthPanel({ baseUrl, onClose, onSignedIn }: AuthPanelProps): Rea
             className="ht-btn ht-btn--ghost"
             disabled={busy}
             onClick={() => {
-              void requestRecovery(baseUrl, email);
+              void requestRecovery(effectiveBaseUrl, email);
             }}
           >
             {status.kind === 'busy' && status.action === 'recovery' ? (
@@ -403,7 +449,7 @@ export function AuthPanel({ baseUrl, onClose, onSignedIn }: AuthPanelProps): Rea
             className="ht-btn ht-btn--primary"
             disabled={busy}
             onClick={() => {
-              void verify(baseUrl, pasted).then((session) => {
+              void verify(effectiveBaseUrl, pasted).then((session) => {
                 if (session !== undefined) {
                   setPasted('');
                   onSignedIn?.(session);
@@ -436,6 +482,13 @@ const checkboxLabelStyle: React.CSSProperties = {
   gap: cssVar('space.2'),
   fontSize: cssVar('font-size.2xs'),
   color: cssVar('color.foreground-muted'),
+};
+
+/** 邀请码那个输入框下面的提示（只在形状不对时出现）。 */
+const hintStyle: React.CSSProperties = {
+  margin: 0,
+  fontSize: cssVar('font-size.2xs'),
+  color: cssVar('color.warning-strong'),
 };
 
 const fieldStyle: React.CSSProperties = {

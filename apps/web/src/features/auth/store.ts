@@ -88,6 +88,8 @@ export interface AuthStoreState {
     baseUrl: string,
     email: string,
     termsAccepted: boolean,
+    /** 邀请码（原样，未归一化）。`undefined` = 用户在邀请链接之外自己注册的。 */
+    inviteCode?: string,
   ) => Promise<void>;
   /**
    * 用邮件里的链接或令牌完成登录。
@@ -110,7 +112,16 @@ export interface AuthStoreState {
     baseUrl: string,
     email: string,
     termsAccepted: boolean,
-    browser?: PasskeyBrowser,
+    /**
+     * 可选的附加项。
+     *
+     * 🔴 **刻意用对象而不是再加一个位置参数**：`registerPasskey` 原来第 4 个
+     * 位置是 `browser`，而测试与调用点都按位置传它。往它前面插一个参数会让
+     * 那些调用点把**浏览器适配器当成邀请码**发出去 —— 类型上恰好都能过
+     * （`inviteCode?: string` 会拒，但如果写成 `unknown` 就完全静默），
+     * 表现为注册请求 400，而排查方向会跑到认证上去。
+     */
+    options?: { inviteCode?: string; browser?: PasskeyBrowser },
   ) => Promise<void>;
   /**
    * 用通行密钥登录。**这是第二个（也是唯一另一个）产出令牌的入口**，
@@ -147,7 +158,9 @@ export interface AuthStoreState {
  * **可以被拿掉、并因此变红**的东西 —— 不改测试就能验证它承重。
  */
 function applyAuthSession(baseUrl: string, session: HostedAuthSession): void {
-  useSyncStore.getState().applyAuthToken(baseUrl, session.token);
+  // 邮箱一起交过去：左侧导航顶部的头像要用它算首字母，
+  // 而刷新之后 `useAuthStore` 会回到 signed-out —— 头像得能从落盘的凭据里拿到它。
+  useSyncStore.getState().applyAuthToken(baseUrl, session.token, session.user.email);
 }
 
 export const useAuthStore = create<AuthStoreState>((set) => ({
@@ -159,11 +172,15 @@ export const useAuthStore = create<AuthStoreState>((set) => ({
     set({ status: outcome.ok ? { kind: 'link-sent' } : { kind: 'failed', reason: outcome.reason } });
   },
 
-  registerAccount: async (baseUrl, email, termsAccepted) => {
+  registerAccount: async (baseUrl, email, termsAccepted, inviteCode) => {
     set({ status: { kind: 'busy', action: 'register' } });
     const outcome = await registerWithMagicLink(
       { baseUrl },
-      termsAccepted ? { email, termsAccepted: true } : { email },
+      {
+        email,
+        ...(termsAccepted ? { termsAccepted: true } : {}),
+        ...(inviteCode === undefined || inviteCode === '' ? {} : { inviteCode }),
+      },
     );
     set({
       status: outcome.ok ? { kind: 'registered' } : { kind: 'failed', reason: outcome.reason },
@@ -190,7 +207,9 @@ export const useAuthStore = create<AuthStoreState>((set) => ({
     return outcome.session;
   },
 
-  registerPasskey: async (baseUrl, email, termsAccepted, browser) => {
+  registerPasskey: async (baseUrl, email, termsAccepted, options) => {
+    const inviteCode = options?.inviteCode;
+    const browser = options?.browser;
     // 🔴 能力探测必须发生在**发任何请求之前**。不支持的设备上先问服务端要
     // options 是白问，而且会把"这台设备不支持"伪装成一次失败的网络请求。
     const resolved = browser ?? detectPasskeyBrowser();
@@ -204,7 +223,11 @@ export const useAuthStore = create<AuthStoreState>((set) => ({
     // ① 取 options（协议在 app-host）
     const begun = await beginPasskeyRegistration(
       { baseUrl },
-      termsAccepted ? { email, termsAccepted: true } : { email },
+      {
+        email,
+        ...(termsAccepted ? { termsAccepted: true } : {}),
+        ...(inviteCode === undefined || inviteCode === '' ? {} : { inviteCode }),
+      },
     );
     if (!begun.ok) {
       set({ status: { kind: 'failed', reason: begun.reason } });
@@ -222,7 +245,13 @@ export const useAuthStore = create<AuthStoreState>((set) => ({
     // ③ 交回服务端回验
     const completed = await completePasskeyRegistration(
       { baseUrl },
-      { email, credential: created.credential },
+      {
+        email,
+        credential: created.credential,
+        // 🔴 options 与 verify 两次都要带：绑定发生在 verify，
+        // 所以只带前一次等于没带（见 hosted-auth.ts 里的同一段注释）。
+        ...(inviteCode === undefined || inviteCode === '' ? {} : { inviteCode }),
+      },
     );
     set({
       status: completed.ok

@@ -130,7 +130,7 @@ describe('用通行密钥注册', () => {
     const browser = browserResolving(registrationCredential());
 
     await act(async () => {
-      await useAuthStore.getState().registerPasskey(BASE_URL, EMAIL, true, browser);
+      await useAuthStore.getState().registerPasskey(BASE_URL, EMAIL, true, { browser });
     });
 
     expect(calls).toHaveLength(2);
@@ -155,7 +155,7 @@ describe('用通行密钥注册', () => {
     const browser = browserResolving(registrationCredential());
 
     await act(async () => {
-      await useAuthStore.getState().registerPasskey(BASE_URL, EMAIL, true, browser);
+      await useAuthStore.getState().registerPasskey(BASE_URL, EMAIL, true, { browser });
     });
 
     expect(browser.create).toHaveBeenCalledTimes(1);
@@ -174,7 +174,7 @@ describe('用通行密钥注册', () => {
     await act(async () => {
       await useAuthStore
         .getState()
-        .registerPasskey(BASE_URL, EMAIL, true, browserResolving(registrationCredential()));
+        .registerPasskey(BASE_URL, EMAIL, true, { browser: browserResolving(registrationCredential()) });
     });
 
     expect(useAuthStore.getState().status.kind).toBe('registered');
@@ -190,7 +190,7 @@ describe('用通行密钥注册', () => {
     };
 
     await act(async () => {
-      await useAuthStore.getState().registerPasskey(BASE_URL, EMAIL, true, browser);
+      await useAuthStore.getState().registerPasskey(BASE_URL, EMAIL, true, { browser });
     });
 
     expect(calls).toHaveLength(1);
@@ -203,7 +203,7 @@ describe('用通行密钥注册', () => {
     const browser: PasskeyBrowser = { supported: false, create: vi.fn(), get: vi.fn() };
 
     await act(async () => {
-      await useAuthStore.getState().registerPasskey(BASE_URL, EMAIL, true, browser);
+      await useAuthStore.getState().registerPasskey(BASE_URL, EMAIL, true, { browser });
     });
 
     expect(calls).toHaveLength(0);
@@ -216,7 +216,7 @@ describe('用通行密钥注册', () => {
     const browser = browserResolving(registrationCredential());
 
     await act(async () => {
-      await useAuthStore.getState().registerPasskey(BASE_URL, EMAIL, true, browser);
+      await useAuthStore.getState().registerPasskey(BASE_URL, EMAIL, true, { browser });
     });
 
     expect(browser.create).not.toHaveBeenCalled();
@@ -314,8 +314,8 @@ describe('用通行密钥登录', () => {
     const status = useAuthStore.getState().status;
     expect(status.kind === 'failed' && status.reason).toBe('passkey-already-registered');
     // 三句不同的话必须真的不同 —— 否则分类等于没做。
-    expect(translate('zh-CN', 'web.auth.error.passkeyAlreadyRegistered')).not.toBe(
-      translate('zh-CN', 'web.auth.error.passkeyCancelled'),
+    expect(translate('zh-CN', 'common.auth.error.passkeyAlreadyRegistered')).not.toBe(
+      translate('zh-CN', 'common.auth.error.passkeyCancelled'),
     );
   });
 });
@@ -326,9 +326,9 @@ describe('词条：新增的通行密钥文案两种语言都真的翻了', () =
     'web.auth.passkey.login',
     'web.auth.passkey.unavailable',
     'web.auth.passkey.waiting',
-    'web.auth.error.passkeyUnsupported',
-    'web.auth.error.passkeyCancelled',
-    'web.auth.error.passkeyAlreadyRegistered',
+    'common.auth.error.passkeyUnsupported',
+    'common.auth.error.passkeyCancelled',
+    'common.auth.error.passkeyAlreadyRegistered',
   ] as const satisfies readonly MessageKey[];
 
   it('zh 里含汉字、en 里不含汉字，且两边都不为空', () => {
