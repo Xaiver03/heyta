@@ -43,9 +43,41 @@ echo ""
 echo "=== 运行 + 自截屏 ==="
 # 🔴 HEYTA_NO_FOCUS=1：取证启动**绝不抢用户前台**（AGENTS §6.2 规定二；
 #    2026-09-29 产品负责人再次投诉后被做成壳级开关，与 Electron 壳同名同义）。
-HEYTA_NO_FOCUS=1 HEYTA_SELF_CAPTURE="$OUT" "$SHELL_DIR/.build/out/Products/Debug/HeytaMac" 2>&1 | awk '{print "  " $0}'
+# 🔴 **对 `-3811` 重试一次**（2026-09-30 实测）。
+#
+# `ScreenCaptureKit` 会偶发：
+#   SCStreamErrorDomain Code=-3811 "音频/视频捕捉失败，无法开始流播放"
+# 它是**瞬时**的（紧接着重跑就过），而门禁的"环境 vs 真故障"启发式会把它判成**真故障**
+# （因为 `launchctl managername` 是 Aqua）⇒ 门禁随机变红一次。
+# 与其让下一个人反复重跑，这里对**这一条明确的瞬时错误**重试一次：
+# 真实的失败（编译错、应用没起来、权限真没给）重试也照样失败，不会被掩盖。
+for attempt in 1 2; do
+  RUN_LOG="/tmp/heyta-mac-capture-run-$attempt.log"
+  HEYTA_NO_FOCUS=1 HEYTA_SELF_CAPTURE="$OUT" \
+    "$SHELL_DIR/.build/out/Products/Debug/HeytaMac" > "$RUN_LOG" 2>&1
+  sed 's/^/  /' "$RUN_LOG"
+  if [ -f "$OUT" ]; then break; fi
+  if grep -q 'SCStreamErrorDomain Code=-3811' "$RUN_LOG" && [ "$attempt" = 1 ]; then
+    echo "  ⚠️  ScreenCaptureKit -3811（已知瞬时错误）—— 停 3 秒重试一次"
+    sleep 3
+    continue
+  fi
+  break
+done
 
-[ -f "$OUT" ] || { echo "🔴 没产出截图"; exit 1; }
+if [ ! -f "$OUT" ]; then
+  # 🔴 **把"取图基础设施坏了"与"应用/编译坏了"分开**（2026-09-30）：
+  #    前者门禁应当**响亮跳过**（这条没被验过），后者才是真故障。
+  #    实测的取图基础设施故障有两种，都发生在**应用之外**：
+  #      · `SCStreamErrorDomain Code=-3811`（流起不来）
+  #      · 截图失败（多半是没给屏幕录制权限）
+  if grep -qE 'SCStreamErrorDomain Code=-3811|截图失败' "$RUN_LOG" 2>/dev/null; then
+    echo "🔴 取图基础设施不可用（不是应用的问题）"
+    exit 4
+  fi
+  echo "🔴 没产出截图"
+  exit 1
+fi
 
 echo ""
 echo "=== 校验（不能有 alpha、不能是空白）==="

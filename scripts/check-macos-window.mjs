@@ -97,6 +97,12 @@ if (capture.error) {
   process.exit(1);
 }
 
+// 🔴 退出码 4 = **取证脚本自述"取图基础设施不可用"**（`-3811` / 没给屏幕录制权限）。
+//    那与应用无关 ⇒ 响亮跳过（"这一条没有被验过"），不判成产品故障。
+if (capture.status === 4) {
+  skip('取图基础设施不可用（ScreenCaptureKit 起不来 / 未授权）——不是应用的问题');
+}
+
 if (capture.status !== 0 || !existsSync(OUT)) {
   // 区分"环境不给"与"真的坏了"：前者响亮跳过，后者失败。
   // 应用在拿不到屏幕录制权限时**显式**这样说（见 HeytaMacApp.swift 的 exit(4)）。
@@ -172,6 +178,64 @@ if (!existsSync(narrative)) {
   }
 }
 
+/**
+ * 🔴 **"应用到底画出来没有"落在这份快照上，不落在窗口截图上。**
+ *
+ * 实测（2026-09-30）：窗口截图走**窗口服务器合成**，而在这台机器上
+ * "WebView 的内容没合成进窗口"是**常态** —— 抓到的是暗窗口 + 一行诊断文字，
+ * 内容比例 100%、色阶差 158、**主蓝 0**，而"非空 / 不透明 / 取图方式 / 交叉验证"
+ * **四条全过**（人眼一看就知道里面没有应用）。
+ *
+ * `takeSnapshot` 直接问 WebKit 要渲染结果：**不走窗口服务器、不需要录屏权限**，
+ * 所以它稳定。于是两份产物各证一件事，谁也不替谁背书：
+ *
+ *   · 窗口截图              → 一个真的 macOS 窗口（标题 / 尺寸 / 非空 / 取图方式 / 尺寸交叉验证）
+ *   · WebView 快照          → **壳里那份共享 UI 真的渲染出来了**（数主蓝）
+ *
+ * ⚠️ 判据取 **主蓝像素**（`--ht-blue-600`）：heyta 的界面一定有它
+ *    （rail 激活项 / 主按钮），而错误屏、空白屏、桌面底色**都没有**。
+ *    这条判据 `png-stats.mjs` 早就导出了，只是这个门禁一直没用它。
+ */
+const snapshot = `${OUT}.webview.png`;  // 应用是**追加**，不是替换扩展名（第一版算错了）
+if (!existsSync(snapshot)) {
+  console.error(`   🔴 没有 WebView 快照：${snapshot}`);
+  console.error('      ⇒ 无法判断"壳里的共享 UI 画出来了没有"（窗口截图担不起这条）。');
+  bad = true;
+} else {
+  /**
+   * 🔴 判据取 **`contentOnModalRatio`**（"有多少像素不是背景色"），阈值 **0.02**。
+   *
+   * 为什么不是主蓝：**壳跟随系统外观**，暗色主题下主蓝几乎不出现 ——
+   * 实测同一张真应用快照只有 **46** 个主蓝像素，拿它判会把**真应用**判死。
+   *
+   * 为什么是它：它是**比值**，与主题无关；而且三张已知图分得很开（2026-09-30 实测）：
+   *
+   *   | 图 | contentOnModalRatio |
+   *   |---|---|
+   *   | 真应用（暗） | **0.057** |
+   *   | 暗窗口·无应用（WebView 没合成进窗口） | 0.006 |
+   *   | 过期的「找不到共享 UI 产物」回退屏 | 0.004 |
+   *
+   * 阈值 0.02：真应用高出 2.8×，两张坏图低 3–5×。
+   * ⚠️ `edgePairs` **不能**用：三张图都是 ~20034（归一的固定分母）。
+   */
+  const snap = inspectPng(snapshot);
+  console.log(
+    `   WebView 快照 ${String(snap.width)}x${String(snap.height)}  ` +
+      `contentOnModalRatio ${snap.contentOnModalRatio.toFixed(3)}（判据阈值 0.02）`,
+  );
+  if (snap.contentOnModalRatio < 0.02) {
+    console.error(
+      `   🔴 快照里几乎没有内容（contentOnModalRatio ${snap.contentOnModalRatio.toFixed(3)}）——\n` +
+        '      壳里画的**不是真应用**。最可能是「找不到共享 UI 产物」那张错误屏，\n' +
+        '      或 WebView 没渲染出内容：它们非空、不透明，窗口那几条全会过。',
+    );
+    bad = true;
+  } else {
+    console.log('   ✅ 壳里的共享 UI 真的渲染出来了（快照里有成片的内容）');
+  }
+}
+
 // ⑤ M2：壳里的**真应用**把身份入口做对了吗。
 const notePath = `${NOTE}.txt`;
 if (!existsSync(notePath)) {
@@ -179,6 +243,7 @@ if (!existsSync(notePath)) {
   console.error('      壳里没有内嵌共享 UI，或 SHELL 那半边被改坏了。');
   bad = true;
 } else {
+  console.log(`   WebView 快照：${snapshot}`);
   const note = readFileSync(notePath, 'utf8');
   const m2 = /M2_MACOS_NOTE=(.*)/.exec(note)?.[1] ?? '';
   // 三条都要：① 冷启动第一屏有**身份入口**（头像）与采集框；
