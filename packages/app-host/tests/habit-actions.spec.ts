@@ -282,6 +282,55 @@ describe('分类色槽位', () => {
   });
 });
 
+describe('习惯图标（setHabitIcon）', () => {
+  it('写 op 的 payload 里带图标 key', async () => {
+    const id = await actions.createHabit('阅读');
+    await actions.setHabitIcon(id, 'book');
+
+    const withIcon = (await engine.getOpsForEntity('HABIT', id)).filter(
+      (op) => 'icon' in payloadOf(op),
+    ).at(-1);
+    expect(withIcon?.opType).toBe(OpType.Update);
+    expect(payloadOf(withIcon!).icon).toBe('book');
+  });
+
+  it('🔴 不认识的值抛错，且**一条 op 都不发出**（落成第一个图标 = 静默改数据）', async () => {
+    const id = await actions.createHabit('阅读');
+    const before = (await engine.getOpsForEntity('HABIT', id)).length;
+
+    await expect(actions.setHabitIcon(id, 'trophy' as never)).rejects.toThrow(/闭集里的 key/);
+
+    const after = await engine.getOpsForEntity('HABIT', id);
+    expect(after).toHaveLength(before);
+    expect(after.some((op) => 'icon' in payloadOf(op))).toBe(false);
+  });
+
+  it('🔴 清除写成显式 null，不是"不放这个键"（不放 = 不改）', async () => {
+    const id = await actions.createHabit('阅读', { icon: 'moon' });
+    expect(engine.getState().habits[id]?.icon).toBe('moon');
+
+    await actions.setHabitIcon(id, undefined);
+    const cleared = (await engine.getOpsForEntity('HABIT', id)).filter(
+      (op) => 'icon' in payloadOf(op),
+    ).at(-1);
+    expect(payloadOf(cleared!).icon).toBeNull();
+    expect(engine.getState().habits[id]?.icon).toBeUndefined();
+  });
+
+  it('找不到的习惯也抛错', async () => {
+    await expect(actions.setHabitIcon('不存在', 'book')).rejects.toThrow(/找不到习惯/);
+  });
+
+  it('改图标不动打卡（图标只是身份，不是状态）', async () => {
+    const id = await actions.createHabit('喝水', { target: 8 });
+    await actions.checkIn(id, DAY1);
+    await actions.setHabitIcon(id, 'drop');
+
+    expect(engine.getState().habits[id]?.target).toBe(8);
+    expect(Object.values(engine.getState().habitLogs)).toHaveLength(1);
+  });
+});
+
 /**
  * 习惯目标：数值 / 单位 / 达成口径
  * ==================================
