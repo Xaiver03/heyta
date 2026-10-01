@@ -25,12 +25,19 @@
  * - 真 `localStorage` 设置存储
  * - 真密钥内存存储
  * - 🔴 **真 `fetch`** —— `AiBreakdown` 的 `fetchImpl` 只在测试注入，
- *   这里**故意不传**，于是走 `globalThis.fetch`，请求真的发到配置的端点
+ *   这里**故意不传**，于是走 `globalThis.fetch`，请求真的发到配置的端点。
+ *   "真的发到"这句话由 `installFetchRecorder` 兜住：它包一层只记录不拦截的壳，
+ *   收尾数出打到该端点的请求 ≥ 1（注释里的声明要有判据，不然它会烂掉）
  *
  * ## 配置与跳过
  *
  * 用 `/tmp/heyta-ai-live/provider.json`（与两个 live 脚本同一个文件）。
  * 没配就**跳过** —— 没配端点不是失败，是"还没配"。
+ *
+ * ⚠️ 那份配置当前指向**本机 Ollama**（`http://127.0.0.1:11434/v1`）。这不影响
+ * "真"：模型是真的、请求真的发出去、响应真的解析；但它顺带把另一条不变量
+ * 变成了断言 —— 本机端点**不要求出境授权**（远端才要求），两支各测各的，
+ * 见 `configureAiThroughUi()` 里那个 `isLoopbackEndpoint` 分支。
  */
 
 import { readFileSync } from 'node:fs';
@@ -40,6 +47,7 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
+import { isLoopbackEndpoint } from '@heyta/ai';
 import { OpType } from '@heyta/sync-core';
 
 import {
@@ -69,6 +77,32 @@ function loadConfig(): LiveConfig | undefined {
 }
 
 const CONFIG = loadConfig();
+
+/**
+ * 🔴 「真 fetch」不能只是文件头的一句注释。
+ *
+ * 这一层**只记录、不拦截**：请求照原样发出去，响应照原样返回，唯一的区别是
+ * 我们数得出"到底有没有一次打到配置的端点"。
+ *
+ * 为什么值得加：这条旅程的每一个断言都可以在**没有任何网络请求**的情况下全绿
+ * —— 只要某处有一条本地兜底/提前返回。而那正是本仓库最高发的失效形状
+ * （§7 第 46 条：没观测到 ≠ 没发生，反过来也成立：断言过了 ≠ 这条路走过了）。
+ */
+const outbound: string[] = [];
+let realFetch = globalThis.fetch;
+
+function installFetchRecorder(): void {
+  outbound.length = 0;
+  realFetch = globalThis.fetch;
+  globalThis.fetch = ((input: RequestInfo | URL, init?: RequestInit) => {
+    outbound.push(typeof input === 'string' ? input : input instanceof URL ? input.href : input.url);
+    return realFetch(input as RequestInfo, init);
+  }) as typeof fetch;
+}
+
+function uninstallFetchRecorder(): void {
+  globalThis.fetch = realFetch;
+}
 
 // ── IndexedDB：真实现（内存版），不是 mock ───────────────────────────────
 (globalThis as unknown as { indexedDB: IDBFactory }).indexedDB = new IDBFactory();
@@ -221,12 +255,14 @@ async function seedHistory(): Promise<void> {
 
 describe.skipIf(CONFIG === undefined)('真实用户旅程：AI 记忆从头到尾', () => {
   beforeEach(async () => {
+    installFetchRecorder();
     localStorage.clear();
     __resetOpLogForTests();
     await initOpLog();
   });
 
   afterEach(() => {
+    uninstallFetchRecorder();
     act(() => {
       root?.unmount();
     });
@@ -299,11 +335,24 @@ describe.skipIf(CONFIG === undefined)('真实用户旅程：AI 记忆从头到�
     click(chip);
     await flush();
 
-    // 授权数据出境（按功能绑定）
-    const consent = byTestId('consent-breakdown');
-    expect(consent, '有远端端点时 breakdown 应该要求授权').not.toBeNull();
-    click(consent?.querySelector('button'));
-    await flush();
+    // 授权数据出境（按功能绑定）—— 🔴 **只有远端端点才有这一步**。
+    //
+    // `needsConsent = enabled && routeTouchesRemote(feature) && !hasConsent(feature)`：
+    // 跑在 `127.0.0.1` 上的模型不产生任何出境请求，于是**问都不该问**。
+    // 这里以前无条件断言"breakdown 应该要求授权"，而仓库默认那份配置是本机
+    // Ollama ⇒ 前提不成立，红的是探针不是产品。两支各断言各的：
+    // 远端必须问，本机必须不问（后者是"数据没离开这台设备"这句话的界面证据）。
+    if (isLoopbackEndpoint(CONFIG?.endpoint ?? '')) {
+      expect(
+        byTestId('consent-breakdown'),
+        '🔴 本机端点不该出现出境授权 —— 数据没离开这台设备，问了就是在撒谎',
+      ).toBeNull();
+    } else {
+      const consent = byTestId('consent-breakdown');
+      expect(consent, '有远端端点时 breakdown 应该要求授权').not.toBeNull();
+      click(consent?.querySelector('button'));
+      await flush();
+    }
   }
 
   it(
@@ -364,6 +413,14 @@ describe.skipIf(CONFIG === undefined)('真实用户旅程：AI 记忆从头到�
 
       const itemCount = container?.querySelectorAll('[data-testid^="ai-item-"]').length ?? 0;
       expect(itemCount, '真模型应该拆出 2 项以上').toBeGreaterThanOrEqual(2);
+
+      // 🔴 上面这一切实实在在**出过一次网络**：打到配置端点的请求至少一条。
+      // 少了这条，"拆出 2 项"也可能来自某条不发请求的兜底路径。
+      const toEndpoint = outbound.filter((u) => u.includes(CONFIG?.endpoint ?? '\0'));
+      expect(
+        toEndpoint.length,
+        `必须真有一次请求打到 ${CONFIG?.endpoint}（记录到的：${outbound.join(', ') || '无'}）`,
+      ).toBeGreaterThanOrEqual(1);
 
       // ══ 5. 逐条取舍：去掉第一项 ═════════════════════════════════════
       click(byTestId('ai-item-0'));
