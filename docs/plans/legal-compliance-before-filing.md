@@ -17,11 +17,14 @@
 > ✅ **剩下的那半边也已闭合**（2026-10-02）：nginx 对未命中的 `/legal/*` 返回**真 404**，
 > 而 `/app/` 的前端路由兜底**没有被牵连**（判据是那条套件的**第 12 条**，两个变异臂精确报红；
 > 取证与回滚命令见 **G-25b**）。
-> 🟡 **链 3 已实现、未入库**（2026-10-01 实现；**2026-10-02 把原判"✅ 已落地"撤回**）：
+> ✅ **链 3 已落地并在生产上生效**（2026-10-01 实现，2026-10-02 进库 + 部署 + 线上复验）：
 > `users.terms_document_version` 可空列 + 唯一判决方 `server/src/legal-consent.ts` +
 > 三个写入口成对落库 + 两道互补门禁（`check:server-legal` / `check:legal-host` 三方对账），
-> 两次变异注入各自精确报红 —— 这些都只在**这台机器的工作树**里：HEAD 里查不到那个迁移、
-> 那个文件和那一列，生产库里该列计数 0、部署镜像 grep 0（取证见 **G-32**，阻塞见 **G-34**）。
+> 两次变异注入各自精确报红。🔴 **它曾经只在**这台机器的工作树**里**（HEAD 里查不到那个迁移、
+> 那个文件和那一列，生产库里该列计数 0、部署镜像 grep 0 —— 当时的原判"✅ 已落地"就是把
+> "本机跑得通"读成"已交付"，2026-10-02 先撤回、再真的交付）：进库 `ad8d9222` + `31b6b1c3`，
+> 部署见 deployment §3.8 第四次重建，判据是 `pnpm verify:consent-trail`（**14/14、退出码 0**）
+> 加一条人工 L4（取证见 **G-32**）。
 > 详见「链 3 —— 同意留痕要能记下"哪一版"」小节。它带出三条新缺口 **G-27 / G-28 / G-29**。
 > 🔴 **§5 已列出 12 条需要拍板的事**（`D-01`–`D-12`）：
 > 它们**不是缺口**，是决定 —— 每条都给了"没人拍就走这条"的默认值，所以本文件不因它们悬空而卡住任何工程。
@@ -222,11 +225,13 @@ M4 单独跑了一次 `pnpm` 重 build：改的是 `src/` 而浏览器加载的�
 所以是**跟着产物过去**的，本轮没有在 Windows 上单独复验（固定收尾见 §6.1.1）；
 macOS 原生壳是手写 UI、**根本没有注册面板**；鸿蒙壳未建。
 
-### 链 3 —— 同意留痕要能记下"哪一版" 🟡 **已实现、未入库**（2026-10-01 实现；2026-10-02 复验改判）
+### 链 3 —— 同意留痕要能记下"哪一版" ✅ **已进 `main`、已上线**（2026-10-01 实现；2026-10-02 交付）
 
-🔴 **下面这一节描述的是工作树里的代码，不是 `main`**：本节引用的文件路径与行号（如 `schema.prisma:54`）
-只有在这个检出上成立 —— HEAD 里查不到那个迁移、`legal-consent.ts` 与那一列（取证与归属见
-**G-32**/**G-34**）。原判"✅ 已落地"是把"本机跑得通"读成"已交付"，2026-10-02 撤回。
+🔴 **本节 2026-10-02 之前写的是"工作树里的代码，不是 `main`"**，那句话当时是对的（HEAD 里查不到
+那个迁移、`legal-consent.ts` 与那一列），现在已不成立：进库 `ad8d9222`（实现 + 迁移 + schema +
+判据）与 `31b6b1c3`（上一笔漏带的迁移数据库层证据），生产侧第四次重建见 deployment §3.8。
+**留这一行是为了让"本机跑得通 ≠ 已交付"这个错法留下名字。** 判据：`pnpm verify:consent-trail`
+四条自动腿 **14/14、退出码 0**，加一条人工 L4（取证见 **G-32**）。
 
 按 `legal-consumer-contract-terms.md` **层 0–层 6** 执行，三处裁决与它们的落地形态：
 
@@ -247,6 +252,12 @@ macOS 原生壳是手写 UI、**根本没有注册面板**；鸿蒙壳未建。
 **三个写入口共用这一个判决方**（漏一条就会出现"某条路上注册的用户没有版本"）：
 `server/src/auth.ts`（magic-link 注册 + 重发）、`server/src/passkey.ts`、
 `server/src/password/service.ts`（委托给 `registerWithMagicLink`，所以自动同规则）。
+🔴 **第三个入口是一个字都没提版本的**：它里面没有任何 `termsDocumentVersion`，
+成对这件事**只由那条委托保证**（实测：`git grep -n consentedLegalSetVersion HEAD -- server/src`
+只有 `auth.ts` 与 `passkey.ts` 两处直接调用）。所以它需要一条自己的判据 ——
+"把委托换成自己建号"这种改动不会碰 `auth.ts` 里被钉住的那两行，
+只有直接打第三个入口才会红（见下面判据那段），并在生产上实跑过一次（**G-32** 的 L4
+走的就是邮箱+口令这条路）。
 🔴 **时刻与版本必须成对**：没有 `termsAcceptedAt` 却单独写一列版本号，
 是一条"没有同意时刻的同意记录"，比两列都空更误导人 —— 判据是那条"重发但没勾 ⇒
 **两个 key 都不出现**"。
@@ -264,21 +275,29 @@ macOS 原生壳是手写 UI、**根本没有注册面板**；鸿蒙壳未建。
 🔴 所以第三份拷贝必须进 `check:legal-host`：只靠前一道闸时，`app-host` 那份改成别的域名
 **两道闸会同时绿**，而那时用户点开的是 A 的文本、留痕里写的是 B 的版本 —— 正是留痕要防的失效。
 
-**判据**：`server/tests/terms-consent-version.spec.ts` 12 条（官方域 ⇒ 指纹 / 别的域与 localhost
+**判据**：`server/tests/terms-consent-version.spec.ts` 14 条（官方域 ⇒ 指纹 / 别的域与 localhost
 与坏 URL ⇒ `null` / 兄弟域名 ⇒ `false` / 大小写与端口与尾斜杠 / 没勾 ⇒ 两列都不写 /
-指纹形状含 `terms@`）+ `passkey.spec.ts` 新增 1 条（passkey 这条路也成对落库）
-+ 上面那 5 条迁移证据。全量服务端 **103 文件 / 1996 passed / 1 skipped**。
+指纹形状含 `terms@` / **第三个注册入口成对** / 同一条入口没勾 ⇒ 两列仍然都空）
++ `passkey.spec.ts` 新增 1 条（passkey 这条路也成对落库）
++ 上面那 5 条迁移证据。全量服务端 **103 文件 / 2007 passed / 1 skipped**（2026-10-02 实测）。
 
-**两次变异（都是当场改源码、跑完立刻按 md5 还原）**：
+**三次变异（都是当场改源码、跑完立刻还原）**：
 
 | 注入 | 结果 |
 |---|---|
 | `isOfficialHostedInstance` 的 `===` 改成 `.includes()` | 🔴 **恰好 1 红**：「兄弟域名不算官方：逐字相等，不是前缀或 includes」 |
 | `consentedLegalSetVersion()` 恒返回指纹（拿掉判决） | 🔴 **3 红**：「别的域名 ⇒ null」「localhost / 缺失 / 坏掉的 URL ⇒ null（fail-closed）」「勾了 + 自建实例 ⇒ 只有时间，版本是 null」 |
+| `registerWithEmailPassword` 委托时**不传**同意时刻 | 🔴 **恰好 1 红**：「第三个注册入口（邮箱+口令）也成对 —— 它靠委托，不靠自己也写一遍」。前两条变异都抓不到这一种失效，因为它们打在 `auth.ts` 与判决方身上，而这条路的问题在**委托断掉** |
 
-后台侧：`admin.routes.ts` 的 `select` 与投影带上这两列，`admin-client` 类型同步，
-界面一行合并显示（`apps/web/src/features/admin/AdminPanel.tsx:334`，
-`data-testid="admin-user-consent"`），中英词条同批。
+⚠️ 变异还原时踩到自己写的坑：`perl -0pi -e 's/    undefined,\n/…/'` 把 6 空格缩进的那行
+当成了匹配目标（`"      undefined,"` 里包含 `"    undefined,"` 这个子串），于是**还原到了
+错误的行** —— 靠"提交前逐文件比对磁盘 blob == HEAD blob"才发现并精确改回。
+判据：**还原要按 md5 验收，不能按"命令退出码 0"验收**（§7 第 105 条）。
+
+后台侧：`admin.routes.ts` 的 `select` 与投影带上这两列（`2e6f87f7`），`admin-client` 类型同步。
+🔴 **界面那一半还没进库**：`apps/web/src/features/admin/AdminPanel.tsx:334` 的
+`data-testid="admin-user-consent"` 与 4 条中英词条此刻与另一批改版的 hunk 混在同一份文件里，
+不拆开提（拆开就是把别人的中间态提交成"已完成"）⇒ 登记为 **G-36**。
 ⚠️ 投影里**不许**出现 `passwordHash` —— 那条白名单判据是后台既有的，本轮没放松。
 
 ### 链 4 —— 投诉举报入口（动作 A3，不是文本）
@@ -326,11 +345,13 @@ macOS 原生壳是手写 UI、**根本没有注册面板**；鸿蒙壳未建。
 | **G-28** | 同意记录里**没有"来自哪个端"**这一项。§6 第 5 条原本把这句话写进了验收标准，实际**九份文本没有任何一处承诺记来源端**（`privacy.ts` 第 12 条逐字只承诺"同意时刻 + 那一套文件的版本号"） | 若将来要按端区分同意（例如移动端与 Web 的勾选文案不同），现有留痕答不了 | 法务（先改文本）→ 工程（再加列） | 判据里那句"来自哪个端"**已从 §6 删掉**（不是没做，是不该按它验收）。🔴 要真记：**先改 `personal-info-list` 表 C 与 `privacy.ts` 第 12 条并 bump 版本**，再按 `privacy.ts:533` 那条"采集**种类**变化必须有一次独立的重新提示"取一次新同意 —— 顺序反了就是先采集后告知 |
 | **G-29** | 链 2 / 链 3 的改动只到**库与产物层**：`packages/app-host/dist` 与 `server/src/*` 是新的，但**四个端的安装包没有重打、没有重装**（AGENTS §6.1.1 的固定收尾没跑） | 手机/桌面里现在装着的仍是**改动前的 JS**，"移动端链接可用"这类结论对旧产物成立与否无从判断 | 本人执行 `pnpm reinstall:all`（会起模拟器与远端 Windows） | 本轮**不跑**：`reinstall:all` 会清掉并重装四端、且会把并行会话在飞的半成品一起装上去（本项目已知碰撞面）。📌 与 §7 第 27 条同一种失效：`packages/` 改了而壳里是旧 bundle，**门禁全绿也照不出来** |
 | **G-30** | 🔴 **Apple 开发者账号的实名主体与备案主体不是同一个法人**：签发苹果发布证书（`2R8LJZ6Q36`）的 Team `V5S2LT9YV8` 主体是「Xiaoli Creativity Culture Industry Development (**beijing**) Co., Ltd.」（= SSOS 那家北京公司），而备案主体是「晓黎（**杭州**）人工智能科技有限公司」。对照：华为侧 heyta 用的是**杭州**账号（§四 已核），安卓签名证书 subject 也是 `L=Hangzhou` —— **三个渠道里只有苹果落在北京主体上** | 苹果中国区提审要求填 App 备案号；备案号的主办者是杭州公司，而渠道运营者是北京公司 —— 若管局或 Apple 核验渠道主体，这是**说不清的那一环** | 产品负责人（要么用杭州主体新注册 Apple 开发者账号并迁 App/重签发布证书，要么确认"渠道主体不必与备案主体一致"后按现状提交） | **不猜、不自己拍**。已核清的是事实部分：表单四个字段（包名/公钥/SHA-1）不收 subject，所以**填表不会因为这条被打回**；未核清的是"管局审核与 Apple 中国区渠道核验会不会看主体一致性" —— 本轮没有查到任何成文依据，而**代办机构的口径不算依据**（D-01 那条裁决同样适用）。取值与四源对账记在 `docs/runbooks/icp-app-filing.md`「苹果备案取值」 |
-| **G-31** ✅ **已闭合**（2026-10-02） | 原事实：`privacy.ts`、`third-parties.ts`、`subscription-refund.ts` 的英文栏都逐字并列着登记中文名「晓黎（杭州）人工智能科技有限公司」，而 `terms.ts` 的英文栏**只有**转写名 `Xiaoli (Hangzhou) Artificial Intelligence Technology Co., Ltd.` —— 九份里**唯一规定合同主体**的那一份恰恰没有它。现在英文栏 s1 与其余三份同口径：登记名在前、转写名在后，并写明"以登记的中文名称为准" | 判据分两层，两层都做过变异：① **库内** —— `structure.spec.ts` 新增一条**按栏取文**的闸门（英文栏凡引用信用代码处必须同时给出登记名称；`allTexts` 是两栏合并的，用它判"某一栏"会得到永远满足的假绿），并断言"至少有一份在引用"否则判据悬空。拿掉登记名称 ⇒ **恰好 1 红**，消息点名 `terms`。② **线上** —— `e2e/live-site/live-legal.spec.ts` 里唯一一条"本地真源 ↔ 线上"对照，参照物取自 `@heyta/legal` 的构建产物而不是抄字面量。两次变异（把线上产物整份复制到本地静态服务器、只改副本）：删登记名 ⇒ 红在①；版本退回 `1.0` ⇒ 红在②；复原后回绿 | 法务口径由产品负责人拍板（"中英两侧都要有登记主体名"）→ 工程改 `terms.ts` 英文栏 + 同批改判据 | 三步落地：`d606e605`（正文 + 按本文件自己的纪律 bump 到 **1.1**、`updatedDate` 2026-10-02、两栏版本记录表各加一行 + 库内闸门 + 自洽的 `LEGAL_SET_VERSION`）→ **增量发布**（`rsync -azc` **不带 `--delete`**，只推 `legal/`、`en/legal/`、`assets/`；那台机器上同时跑着另一条会话的站点产物，整站 `--delete` 会把他们的在制品从生产抹掉）→ `458a0f34`（线上判据，11 passed + 截图人已看过）。⚠️ 这次改版让 `legalSetVersion()` 的指纹变了一次，而生产**还没开始记版本号**（**G-32**）⇒ 没有人被记下"同意过 1.0"，这正是 G-32 要闭合的东西。📌 顺带纠正 `i18n-multilingual.md` §7.15 那行"英文正文残留汉字 1 处"—— 实测 3 处，本次改版后是 4 处且**全部是刻意的** |
-| **G-32** | 🔴 **链 3 的同意留痕在生产上一条都没生效**。🔴 **2026-10-02 复验：本行原先的前提是错的** —— 原写「仓库里有迁移 `20261006000000_add_terms_document_version`…链 3 的代码与判据都在库里，缺的**只有这一步部署**」，实测**不是**：`git ls-tree --name-only HEAD server/prisma/migrations/` 最新一条是 `20261005000000_invalidate_stored_auth_tokens`，**没有** `20261006` 那个目录；HEAD 的 `schema.prisma` 只有 `termsAcceptedAt`（第 43 行）**没有** `terms_document_version`；`git grep -c -i termsDocument HEAD -- server/src/auth.ts server/src/passkey.ts` = **0 命中**。⇒ 缺的不是"跑一次迁移"，而是**那条批次根本没进版本库**（见 **G-34**）。线上四项只读实测（2026-10-02）：`_prisma_migrations` 最新 `20261005000000_invalidate_stored_auth_tokens`（`finished_at` 2026-10-01 13:06:30Z）、`information_schema.columns` 里 `users.terms_document_version` 计数 **0**、部署镜像内 `grep -rl termsDocumentVersion dist | wc -l` = **0**、`select count(*) from users` = **10** | 线上今天这 10 个账号（全部是本仓库自己跑注册旅程留下的测试账号）点过的那个勾选框**没有任何一处记得"同意的是哪一版"** —— 生产仍在记 `termsAcceptedAt` 这个时间戳，但那一列在 HEAD 里根本不存在；§6 第 5 条"任一真实用户能答出版本号 + 确认时间"在生产上**无处可查** | ~~运维~~ → **那条批次的所有者**（先让链 3 进 `main`，见 **G-34**），之后才是 `sh scripts/migrate-deploy.sh` + 重建镜像（[`runbooks/deployment.md`](../runbooks/deployment.md) §3.8） | 🔴 **本轮不部署，且本轮结构上部署不了**：`deploy.sh` 与 `git archive HEAD` 只带**已跟踪**文件，未跟踪的 `legal-consent.ts` 与那个迁移目录**带不出去**；把工作树里别人在飞的半成品送上生产违反既定立场（与 G-25 那次「等那条批次提交后再发」同一条）。⚠️ 但**不能等到转 `effective` 那天再做**：注册页的勾选框今天就在让用户同意一份 draft 文本，而什么都没留下。📌 **探针修正（本轮踩到，是 §7 元规则一的形状）**：查 `_prisma_migrations` 用 `select name …` 会得 `ERROR: column "name" does not exist` —— 真实列名是 **`migration_name`**；那是**探针写错**，不是生产缺列，别把它读成结论。🔴 **2026-10-02：本行的结论从散文变成了一条命令** —— `pnpm verify:consent-trail`（`scripts/verify-consent-trail-production.mjs`）。四条自动腿 L0 版本库 / L1 生产库有列 / L2 已应用迁移 / L3 镜像里有代码，**退出码分五种**：`0`=全绿只剩 L4、**`2`=批次没进库（G-34，运维此刻无事可做）**、`3`=迁移没应用、`4`=镜像没重建、`1`=探针自己坏。本轮实测 **记账 8/14、退出码 2**，L0 三条红；每条判据配**独立于被测值**的阳性对照，实测值 `users.locale`=1、`users.terms_accepted_at`=1、`_prisma_migrations` 共 44 条且 `20261005000000_*` 命中 1、`/app/dist` 有 93 个 `.js`、`requireAdmin` 命中 3 个文件 ⇒ 目标列与目标符号的 **0** 是证据不是探针坏。`--self-test` **9/9 个变异臂会红**，且自检当场抓出我自己写错的三处：① 拿 camelCase 去查 `information_schema` 会**永远**得 0（库里的列是 snake_case，JS 字段才是 camelCase —— 一条永远红的假判据恰好和结论一致，最危险）；② **SQL 的 `case when` 挡不住不存在的列**，PostgreSQL 在解析期就拒绝那个分支，只能用 shell 的 `if` 分两次查；③ 远端 `echo "k\tv"` 在 dash 下不解释 `\t`，按 tab 切分会把整行当噪声 ⇒ 远端一律 `printf`。L4（注册一条真账号、看那一行等于当前 `legalSetVersion()` 的指纹）**不在脚本里冒充绿**：它要动生产数据，脚本只打印该跑的 psql。命令与退出码表在 [`runbooks/deployment.md`](../runbooks/deployment.md) §3.7 |
+| **G-31** ✅ **已闭合**（2026-10-02） | 原事实：`privacy.ts`、`third-parties.ts`、`subscription-refund.ts` 的英文栏都逐字并列着登记中文名「晓黎（杭州）人工智能科技有限公司」，而 `terms.ts` 的英文栏**只有**转写名 `Xiaoli (Hangzhou) Artificial Intelligence Technology Co., Ltd.` —— 九份里**唯一规定合同主体**的那一份恰恰没有它。现在英文栏 s1 与其余三份同口径：登记名在前、转写名在后，并写明"以登记的中文名称为准" | 判据分两层，两层都做过变异：① **库内** —— `structure.spec.ts` 新增一条**按栏取文**的闸门（英文栏凡引用信用代码处必须同时给出登记名称；`allTexts` 是两栏合并的，用它判"某一栏"会得到永远满足的假绿），并断言"至少有一份在引用"否则判据悬空。拿掉登记名称 ⇒ **恰好 1 红**，消息点名 `terms`。② **线上** —— `e2e/live-site/live-legal.spec.ts` 里唯一一条"本地真源 ↔ 线上"对照，参照物取自 `@heyta/legal` 的构建产物而不是抄字面量。两次变异（把线上产物整份复制到本地静态服务器、只改副本）：删登记名 ⇒ 红在①；版本退回 `1.0` ⇒ 红在②；复原后回绿 | 法务口径由产品负责人拍板（"中英两侧都要有登记主体名"）→ 工程改 `terms.ts` 英文栏 + 同批改判据 | 三步落地：`d606e605`（正文 + 按本文件自己的纪律 bump 到 **1.1**、`updatedDate` 2026-10-02、两栏版本记录表各加一行 + 库内闸门 + 自洽的 `LEGAL_SET_VERSION`）→ **增量发布**（`rsync -azc` **不带 `--delete`**，只推 `legal/`、`en/legal/`、`assets/`；那台机器上同时跑着另一条会话的站点产物，整站 `--delete` 会把他们的在制品从生产抹掉）→ `458a0f34`（线上判据，11 passed + 截图人已看过）。⚠️ 这次改版让 `legalSetVersion()` 的指纹变了一次，而生产**还没开始记版本号**（**G-32**）⇒ 没有人被记下"同意过 1.0"，这正是 G-32 要闭合的东西。🔴 **改版先落地、留痕后上线这个先后顺序是有代价的**：等 G-32 闭合（同日），第一条被记下版本的同意记录带的就是 `terms@1.1`，而**改版之前勾过框的那批人一个版本号都没有** —— 那是 G-27 补签要面对的真实对象，不是零。📌 顺带纠正 `i18n-multilingual.md` §7.15 那行"英文正文残留汉字 1 处"—— 实测 3 处，本次改版后是 4 处且**全部是刻意的** |
+| **G-32** ✅ **已闭合**（2026-10-02：四条自动腿 14/14 退出码 0，L4 人工实跑） | 🔴 **链 3 的同意留痕在生产上一条都没生效**。🔴 **2026-10-02 复验：本行原先的前提是错的** —— 原写「仓库里有迁移 `20261006000000_add_terms_document_version`…链 3 的代码与判据都在库里，缺的**只有这一步部署**」，实测**不是**：`git ls-tree --name-only HEAD server/prisma/migrations/` 最新一条是 `20261005000000_invalidate_stored_auth_tokens`，**没有** `20261006` 那个目录；HEAD 的 `schema.prisma` 只有 `termsAcceptedAt`（第 43 行）**没有** `terms_document_version`；`git grep -c -i termsDocument HEAD -- server/src/auth.ts server/src/passkey.ts` = **0 命中**。⇒ 缺的不是"跑一次迁移"，而是**那条批次根本没进版本库**（见 **G-34**）。线上四项只读实测（2026-10-02）：`_prisma_migrations` 最新 `20261005000000_invalidate_stored_auth_tokens`（`finished_at` 2026-10-01 13:06:30Z）、`information_schema.columns` 里 `users.terms_document_version` 计数 **0**、部署镜像内 `grep -rl termsDocumentVersion dist | wc -l` = **0**、`select count(*) from users` = **10** | 线上今天这 10 个账号（全部是本仓库自己跑注册旅程留下的测试账号）点过的那个勾选框**没有任何一处记得"同意的是哪一版"** —— 生产仍在记 `termsAcceptedAt` 这个时间戳，但那一列在 HEAD 里根本不存在；§6 第 5 条"任一真实用户能答出版本号 + 确认时间"在生产上**无处可查** | ~~运维~~ → **那条批次的所有者**（先让链 3 进 `main`，见 **G-34**），之后才是 `sh scripts/migrate-deploy.sh` + 重建镜像（[`runbooks/deployment.md`](../runbooks/deployment.md) §3.8） | 🔴 **本轮不部署，且本轮结构上部署不了**：`deploy.sh` 与 `git archive HEAD` 只带**已跟踪**文件，未跟踪的 `legal-consent.ts` 与那个迁移目录**带不出去**；把工作树里别人在飞的半成品送上生产违反既定立场（与 G-25 那次「等那条批次提交后再发」同一条）。⚠️ 但**不能等到转 `effective` 那天再做**：注册页的勾选框今天就在让用户同意一份 draft 文本，而什么都没留下。📌 **探针修正（本轮踩到，是 §7 元规则一的形状）**：查 `_prisma_migrations` 用 `select name …` 会得 `ERROR: column "name" does not exist` —— 真实列名是 **`migration_name`**；那是**探针写错**，不是生产缺列，别把它读成结论。🔴 **2026-10-02：本行的结论从散文变成了一条命令** —— `pnpm verify:consent-trail`（`scripts/verify-consent-trail-production.mjs`）。四条自动腿 L0 版本库 / L1 生产库有列 / L2 已应用迁移 / L3 镜像里有代码，**退出码分五种**：`0`=全绿只剩 L4、**`2`=批次没进库（G-34，运维此刻无事可做）**、`3`=迁移没应用、`4`=镜像没重建、`1`=探针自己坏。本轮实测 **记账 8/14、退出码 2**，L0 三条红；每条判据配**独立于被测值**的阳性对照，实测值 `users.locale`=1、`users.terms_accepted_at`=1、`_prisma_migrations` 共 44 条且 `20261005000000_*` 命中 1、`/app/dist` 有 93 个 `.js`、`requireAdmin` 命中 3 个文件 ⇒ 目标列与目标符号的 **0** 是证据不是探针坏。`--self-test` **9/9 个变异臂会红**，且自检当场抓出我自己写错的三处：① 拿 camelCase 去查 `information_schema` 会**永远**得 0（库里的列是 snake_case，JS 字段才是 camelCase —— 一条永远红的假判据恰好和结论一致，最危险）；② **SQL 的 `case when` 挡不住不存在的列**，PostgreSQL 在解析期就拒绝那个分支，只能用 shell 的 `if` 分两次查；③ 远端 `echo "k\tv"` 在 dash 下不解释 `\t`，按 tab 切分会把整行当噪声 ⇒ 远端一律 `printf`。L4（注册一条真账号、看那一行等于当前 `legalSetVersion()` 的指纹）**不在脚本里冒充绿**：它要动生产数据，脚本只打印该跑的 psql。命令与退出码表在 [`runbooks/deployment.md`](../runbooks/deployment.md) §3.7。**闭合过程与实测（2026-10-02）**：① 批次进库 `ad8d9222`（实现 + 迁移 + schema + 判据）与 `31b6b1c3`（上一笔漏带的迁移数据库层证据）、`66e2d8e9`（第三个注册入口的判据）、`2e6f87f7`（后台把这一列带出 API）；② 生产侧走 deployment §3.8 **第四次重建** —— 回滚标签 `supersync:rollback-20261002-consent`（`b98b7b4d9d2b`）→ `git archive HEAD` 打包 → 构建（`APK_MIRROR` + `NPM_REGISTRY` 两个镜像变量都带）→ **先迁移后换容器**（`MIGRATE_RC=0`）→ 新容器 `2b0018b113315` `healthy`，`server/.env` 的 sha256 换前换后逐字相同（没有覆盖生产配置）；③ 门禁从**记账 8/14、退出码 2** 走到 **14/14、退出码 0**（本轮重取的实测值：HEAD 迁移命中 1 / schema 声明 1 / server/src 写入点 3 个文件 / 生产列 1 / 对照 `locale`=1、`terms_accepted_at`=1 / `_prisma_migrations` 共 **45** 条且含 `20261006000000` / 镜像 `/app/dist` 有 **95** 个 `.js`、grep `termsDocumentVersion` 命中 **3** 个文件、对照 `requireAdmin` 命中 3）；④ 🔴 **L4 实跑**（脚本刻意不代跑，因为它动生产数据）：`POST /api/register/email-password` 带 `termsAccepted:true` → **201**，那一行读出 `terms_accepted_at=1790878335391`、`terms_document_version=` 与 HEAD 的 `LEGAL_SET_VERSION` **逐字相同** ⇒ 这条同时证明"第三个入口靠委托成对"在生产上成立；再做一次**三方对账**：从线上落地页的 JS 产物（`/assets/main-W06aXnAC.js`）里数出九份 `id:"…",version:"…"`，排序拼出后与那一行**逐字相同**（`terms@1.1`，其余八份 `1.0`）⇒ 记下的版本 = 用户当时点开的那一版，不是构建期的一个巧合；⑤ 收尾：11 张带 `user_id` 的子表逐张计数全 **0** ⇒ `DELETE 1`，`users` 回到 **10**、带指纹行数回到 **0**（这是设计：现在还没有外部用户）。🔴 **换镜像之后把 §3.8.1 那五条线上判据重跑一遍，全绿**（`/health` 200、不存在的账号登录 **401** `invalid_credentials`、注册 201、`magic-login-confirm.js` 里 `sessionToken` ≥1、启动日志有 `Password hashing backend verified`）⇒ 这次重建没有把 ADR-0040 的口令登录、fragment 投递或 Argon2 known-answer 自检碰坏。⚠️ **闭合之后仍然留下的**：G-27 补签流程照旧没做（现在生产开始记版本了，它的前置条件已经满足，只剩"第一次文本改版"这个时点），以及新登记的 **G-36**（后台界面那一半与发布顺序）。 |
 
-| **G-34** | 🔴 **链 3 的实现整体没有进版本库 —— 这是 G-32 唯一的硬前置，且没有任何门禁会自动提醒**。2026-10-02 用 `git status --porcelain -- server packages/legal` 逐条实测：未跟踪（`??`）= `server/prisma/migrations/20261006000000_add_terms_document_version/`、`server/src/legal-consent.ts`、`server/tests/terms-consent-version.spec.ts`、`server/tests/terms-version-migration.pglite.spec.ts`；已跟踪但未提交（`M`）= `server/prisma/schema.prisma`、`server/src/auth.ts`、`server/src/passkey.ts`、`server/src/legal.generated.ts`、`server/src/design.generated.ts`、`server/src/admin/admin.routes.ts`、`packages/legal/src/documents/{privacy,minors,data-rights}.ts`。HEAD 里 `git grep -l legal-consent` 只命中两份**文档**与 `server.ts` 的一句**注释**（不是 import）。📌 **同一次实测顺带查到链 5 也不是提交态**：`packages/app-host/src/privacy-consent.ts` 用 `git ls-tree HEAD` 查同样**不在 HEAD** ⇒ 这不是链 3 单独的漏提交，而是"批次在工作树里推进、提交落后于实现"的通用形状（本行只登记事实，不代提交别人的在制品） | 链 3 目前只活在这台机器上：CI、干净检出、以及**生产镜像的构建归档**里都不存在它。后果不止"生产没生效"（G-32）：`pnpm check` 在这台机器上跑的是**工作树**，所以它绿的时候证明的是"别人在飞的代码没问题"，而不是"`main` 没问题" —— 这是 §7 第 57 条那类"门禁跑的不是版本库里的东西"的又一副面目 | 那条批次的所有者（同一会话）：把这些文件作为一笔提交进 `main`，随后在**干净检出**里跑 `pnpm check` + `pnpm --filter @heyta/server test`，再走 deployment §3.8 重建与迁移 | 🔴 **本轮不代提**：那是别人正在写的批次，且 `packages/legal` 那三份文本此刻**同时**被链 3 与 G-31 的改版碰过（逐条拆 hunk 会把他们的中间态提交成"已完成"）。⚠️ 能不能被门禁抓到：**部分能**。本轮用临时变异实测 —— 把本行里 `server/src/legal-consent.ts` 从内联代码改成指向它的相对链接，`node research/tools/docs-link-check.mjs` **exit=1、恰好报 1 处**，逐字是 `（解析到 server/src/legal-consent.ts，本机存在，但 git 没有跟踪它）`；还原后同一命令 **exit=0**。⇒ 它能拦"**文档链接**指向未入库的产物"，拦不住"未入库的实现本身没被链接"，所以这条缺口要靠人而不是靠闸。**HEAD 里刻意没有留下红灯**：那会让干净检出的 `pnpm check` 因别人未提交的代码而红 |
+| **G-34** | 🔴 **链 3 的实现整体没有进版本库 —— 这是 G-32 唯一的硬前置，且没有任何门禁会自动提醒**。2026-10-02 用 `git status --porcelain -- server packages/legal` 逐条实测：未跟踪（`??`）= `server/prisma/migrations/20261006000000_add_terms_document_version/`、`server/src/legal-consent.ts`、`server/tests/terms-consent-version.spec.ts`、`server/tests/terms-version-migration.pglite.spec.ts`；已跟踪但未提交（`M`）= `server/prisma/schema.prisma`、`server/src/auth.ts`、`server/src/passkey.ts`、`server/src/legal.generated.ts`、`server/src/design.generated.ts`、`server/src/admin/admin.routes.ts`、`packages/legal/src/documents/{privacy,minors,data-rights}.ts`。HEAD 里 `git grep -l legal-consent` 只命中两份**文档**与 `server.ts` 的一句**注释**（不是 import）。📌 **同一次实测顺带查到链 5 也不是提交态**：`packages/app-host/src/privacy-consent.ts` 用 `git ls-tree HEAD` 查同样**不在 HEAD** ⇒ 这不是链 3 单独的漏提交，而是"批次在工作树里推进、提交落后于实现"的通用形状（本行只登记事实，不代提交别人的在制品） | 链 3 目前只活在这台机器上：CI、干净检出、以及**生产镜像的构建归档**里都不存在它。后果不止"生产没生效"（G-32）：`pnpm check` 在这台机器上跑的是**工作树**，所以它绿的时候证明的是"别人在飞的代码没问题"，而不是"`main` 没问题" —— 这是 §7 第 57 条那类"门禁跑的不是版本库里的东西"的又一副面目 | 那条批次的所有者（同一会话）：把这些文件作为一笔提交进 `main`，随后在**干净检出**里跑 `pnpm check` + `pnpm --filter @heyta/server test`，再走 deployment §3.8 重建与迁移 | 🟡 **本行登记的那件"整体没进库"已经按归属拆开放开**（2026-10-02）：链 3 自己的部分进库了（`ad8d9222` + `31b6b1c3` + `66e2d8e9` + `2e6f87f7`），链 5 的生成物与后台界面那一半**仍然不在** —— 见下面这段的实测归属。⚠️ 原来那句"本轮不代提"的理由（"那是别人正在写的批次"）是**整批一刀切**，实测站不住，已按 hunk 逐条改判：归属的实测方法：`git diff -U0 -- <文件> | grep '^+'` —— **只看新增行**（第一版扫了整个 diff 含上下文行，把 `auth.ts` 误判成"含外来标记"，那是探针写错而不是批次混了）。逐文件结论：`server/src/legal-consent.ts`、`auth.ts`、`passkey.ts`、迁移目录、`schema.prisma` 那 11 行、两份 spec 的新增行**全部只谈版本指针** ⇒ 归属明确，已提；`packages/legal/src/documents/{privacy,minors,data-rights}.ts` 与它派生的 `server/src/legal.generated.ts`（工作树是 `privacy@1.1` 那一套）是链 5 的在制品，**故意不带** —— 带上去等于把别人未完成的改版宣告成"已生效"，而线上镜像此刻仍是 `privacy@1.0`（本轮从 `/assets/main-W06aXnAC.js` 里数出来的就是 1.0）；`admin.routes.ts` + `admin-client.ts` 同样只谈版本指针 ⇒ 已提，`AdminPanel.tsx` 的新增行里同时出现 图标尺寸常量（另一批设计 token 改动）⇒ **不拆 hunk**，那半登记为 **G-36**。这道归属判断本身也验过能不能失败：把 `AdminPanel.tsx` 交给它 ⇒ `GATE1_FAIL … 含外来标记`（那个标记名是另一批的图标尺寸常量）、exit 1、HEAD 未动。⚠️ 剩下的那批未入库文件**能不能被门禁抓到：部分能**。本轮用临时变异实测 —— 把本行里 `server/src/legal-consent.ts` 从内联代码改成指向它的相对链接，`node research/tools/docs-link-check.mjs` **exit=1、恰好报 1 处**，逐字是 `（解析到 server/src/legal-consent.ts，本机存在，但 git 没有跟踪它）`；还原后同一命令 **exit=0**。⇒ 它能拦"**文档链接**指向未入库的产物"，拦不住"未入库的实现本身没被链接"，所以这条缺口要靠人而不是靠闸。**HEAD 里刻意没有留下红灯**：那会让干净检出的 `pnpm check` 因别人未提交的代码而红 |
 | **G-35** | 🔴 **未命中的 `/legal/*` 现在诚实 404，但答的是 nginx 的裸默认页** —— 截图 `e2e/live-site-results/live-legal-404.png`（人已看过）里只有 `404 Not Found` 与 `nginx/1.18.0 (Ubuntu)` 两行：没有品牌、没有回首页/回法务清单的入口、**并且把服务器版本暴露给任意外部访客** | G-25b 修的是"说谎"（假成功），这一条是"说了真话但没人接"：备案与 Apple 材料要核对的正是这些政策链接，转错一个字母的人看到的是裸页，等于把可达性验收的最后一公里交给 nginx 默认模板；版本号外露属运维卫生问题 | 运维 + 落地页（**归到国际化主线**：自建 404 页要中英双语，而它现在既不在 `packages/i18n` 词表里、也不在落地页的注册表里） | **本轮不补**：G-25b 的判据只承诺"真 404 且不牵连前端路由"，两样都已复验；把 404 页做成品牌页要新增一份 `404.html` 产物 + `error_page` 指令 + 双语词条，那是落地页的一次功能改动，不该塞进一次 nginx 修复里。**注意它不能靠 `try_files … /404.html` 实现** —— 那会把状态码又变回 200，正是 G-25b 刚修掉的那个坏法；要用 `error_page 404 /404.html;` + 内部跳转 |
+
+| **G-36** | 🔴 **同意留痕"读"的那一半只进库了一半，而"文本改版"与"镜像重建"之间没有任何闸钉住先后**。① `apps/web/src/features/admin/AdminPanel.tsx` 的后台显示行与它需要的 4 条中英词条仍在工作树（与另一批界面改动（图标尺寸常量）的 hunk 混在同一份文件里，本轮不拆 hunk）⇒ 库里和 API 都能答"哪一版"，界面上还没有那一行；② 🔴 更要紧的是顺序：`privacy`/`minors`/`data-rights` 在工作树里已被链 5 bump 到 **1.1** 而未进库、未发布，而此刻线上九份是「`terms@1.1`，其余八份 `1.0`」，与镜像里的 `LEGAL_SET_VERSION` **逐字相同**（本轮实跑到的一次三方对账）。链 5 落地时如果**只发落地页**（用户读到 1.1）而**没有重建服务端镜像**（新注册仍记 1.0），落库那条指纹就指错了文本 —— 而 `check:server-legal` 只比"生成物 ↔ `@heyta/legal` 真源"，**看不见线上部署的是哪一版** ⇒ 两道闸会同时绿 | 顺序一旦错，此后每一条同意记录都是**版本号写错了的证据**，而且没有任何一层会报错 —— 那正是链 3 立起来要防的"读的是 A、记的是 B" | 链 5 的所有者（文本改版必须与 deployment §3.8 的镜像重建同一批）+ 运维 | **建议的钉法（本轮没做，登记）**：给 `verify:consent-trail` 加第五条腿 —— 从线上 `/assets/main-*.js` 数出九份 `id:"…",version:"…"` 排序拼串，与镜像 `/app/dist/src/legal.generated.js` 里的 `LEGAL_SET_VERSION` 逐字对账，不一致即红。⚠️ **它能不能失败尚未验证**（按 AGENTS §8.3 那不算门禁，只算一条待办）；但两侧取值本轮已各实测到一次（线上串 == HEAD 串 == 那一行落库的值），所以这条判据不会空转。另需注意取证形状：🔴 **不能拿页面 HTML 去 grep** —— 那 18 个入口是客户端渲染的外壳（实测 7259 字节、里面一个版本号都没有），必须打 JS 产物 |
 
 ## 5. 需要拍板（agent 不能替产品决定，也不能替法律决定）
 
