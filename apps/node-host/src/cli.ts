@@ -13,6 +13,8 @@
  * 用法：
  *   node dist/cli.js --db heyta.sqlite add "买牛奶"
  *   node dist/cli.js --db heyta.sqlite list
+ *   printf '%s' "$登录口令" | node dist/cli.js auth login \
+ *     --server http://127.0.0.1:3000 --email you@example.cn     # 拿令牌（不需要 --db）
  *   node dist/cli.js --db heyta.sqlite --server http://127.0.0.1:3000 \
  *     --token <jwt> --password <口令> sync
  *
@@ -29,6 +31,7 @@ import {
   type NewTaskFields,
 } from '@heyta/app-host';
 import { openNodeHost } from './host.js';
+import { runAuthCommand } from './cli-auth.js';
 import type { SyncStatus } from '@heyta/sync-client';
 
 const VALUE_FLAGS = new Set([
@@ -149,20 +152,47 @@ function describeRestoreFailure(reason: string, detail?: string): string {
   return detail === undefined ? base : `${base}（${detail}）`;
 }
 
+/**
+ * `auth` 子命令自己的 argv —— 不在 `auth` 上时返回 `undefined`。
+ *
+ * 这里**不**用 `parseArgv`：它会拒绝 `--email` / `--terms`（那是 `auth` 的选项，
+ * 不是全局的），而取值型参数（`--db`）的值必须跳过，否则
+ * `node cli.js --db auth.sqlite sync` 会把库路径当成命令名。
+ */
+function authArgvOf(argv: readonly string[]): string[] | undefined {
+  for (let i = 0; i < argv.length; i += 1) {
+    const arg = argv[i]!;
+    if (arg.startsWith('--')) {
+      const eq = arg.indexOf('=');
+      const name = eq >= 0 ? undefined : arg.slice(2);
+      if (name !== undefined && VALUE_FLAGS.has(name)) i += 1;
+      continue;
+    }
+    return arg === 'auth' ? argv.slice(i + 1) : undefined;
+  }
+  return undefined;
+}
+
 const USAGE = `heyta node-host —— 非 Web 宿主（真实 SQLite + 真实同步）
 
 用法：
   node dist/cli.js [全局参数] <命令> [参数]
 
 全局参数：
-  --db <路径>          SQLite 文件（或 HEYTA_DB）—— 必填
+  --db <路径>          SQLite 文件（或 HEYTA_DB）—— 除 auth 外必填
   --server <url>       同步服务端（或 HEYTA_SERVER_URL）
   --token <jwt>        访问令牌（或 HEYTA_TOKEN）
-  --password <口令>    E2EE 口令（或 HEYTA_PASSWORD）
+  --password <口令>    **端到端加密口令**（或 HEYTA_PASSWORD）—— 与「auth」收的那条登录口令**不是同一个秘密**
   --client-id <id>     覆盖设备 id（或 HEYTA_CLIENT_ID）
   --json               机器可读输出
 
 命令：
+  auth register --server <url> --email <邮箱> --terms [--invite <码>]
+                            注册。**口令从 stdin 读**：printf '%s' "$口令" | …
+                            没给 --terms 时**一个请求都不发**（不替你勾同意）
+  auth login --server <url> --email <邮箱>
+                            登录并**打印令牌**（口令同样从 stdin 读）
+                            🔴 这一步只产出令牌：同步还要**另一个**口令，见 --password
   add <标题> [--due 2026-10-05]  创建一个任务（--due 是**本地日期**）
   list [--all]              列出任务（默认只列未完成）
   trash                     列出回收站里的任务（有墓碑且未彻底删除）
@@ -195,7 +225,22 @@ const USAGE = `heyta node-host —— 非 Web 宿主（真实 SQLite + 真实同
  */
 
 async function main(): Promise<number> {
-  const { command, positionals, flags } = parseArgv(process.argv.slice(2));
+  const rawArgv = process.argv.slice(2);
+
+  // 🔴 `auth` **自己解析参数**，而且**在 `--db` 检查之前**分派。两个理由都是结构性的：
+  //   · 它的合法选项与全局那套不同（`--email` / `--terms` 不是全局参数），
+  //     先过 `parseArgv` 会得到一句「未知参数 --email」；
+  //   · 注册/登录**根本不碰本地库** —— 要求先给一个 SQLite 路径，等于让用户
+  //     在拿到账号之前先决定数据放哪。
+  const authArgv = authArgvOf(rawArgv);
+  if (authArgv !== undefined) {
+    const result = await runAuthCommand(authArgv);
+    if (result.stdout !== '') writeSync(1, result.stdout);
+    if (result.stderr !== '') writeSync(2, result.stderr);
+    return result.code;
+  }
+
+  const { command, positionals, flags } = parseArgv(rawArgv);
   const json = flags['json'] === true;
 
   if (command === undefined || command === 'help' || flags['help'] === true) {
@@ -218,9 +263,15 @@ async function main(): Promise<number> {
     // 抛 TypeError，而 SyncClient 会把它归类成「离线」——看起来像网络问题，
     // 实际是参数没给。诊断方向直接被带偏。
     if (serverUrl === undefined) throw new Error('sync 需要 --server <url>（或 HEYTA_SERVER_URL）');
-    if (token === undefined) throw new Error('sync 需要 --token <jwt>（或 HEYTA_TOKEN）');
+    if (token === undefined) {
+      throw new Error('sync 需要 --token <jwt>（或 HEYTA_TOKEN）—— 没有的话先跑一条命令拿：auth login');
+    }
     if (password === undefined) {
-      throw new Error('sync 需要 --password <口令>（或 HEYTA_PASSWORD）；没有口令不会以明文上传');
+      throw new Error(
+        'sync 需要 --password <端到端加密口令>（或 HEYTA_PASSWORD）；没有口令不会以明文上传。\n' +
+          '🔴 这一个**不是**登录口令（那条在 `auth login` 的 stdin 里）：' +
+          '拿登录口令当加密口令的症状是"能登录、同步却解不开自己的数据"。',
+      );
     }
   }
 
