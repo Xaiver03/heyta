@@ -55,6 +55,33 @@ export function isPrivateHost(host: string): boolean {
 }
 
 /**
+ * 从**用户手填**的服务端地址里取出主机名（小写；取不到时为空串）。
+ *
+ * 🔴 为什么单独导出：这段剥离规则（scheme、userinfo、端口、IPv6 括号、路径、查询）
+ * 原来只埋在 `classifyTransportSecurity` 里面。第二个需要回答"这台服务器是谁"的地方
+ * 是注册勾选框旁边的条款链接（`@heyta/app-host` 的 `legal-links.ts`），它要判断用户连的
+ * 是不是官方托管实例。同一条规则抄第二遍就是漂移点，而漂移的症状（一处认得出官方、
+ * 另一处认不出）**只在地址写得不太标准时出现** —— 那种场景恰恰是手填地址最容易漏测的。
+ *
+ * 规则：
+ * - 任何 scheme 都先剥掉（`https://`、`http://`、别的都一样），没写 scheme 就按原样解析；
+ * - 去掉 userinfo（**最后一个** `@` 之后才是 host）、端口、路径与查询串；
+ * - IPv6 字面量形如 `[::1]:3000`，取括号里的部分；
+ * - 结果统一小写 —— DNS 不区分大小写，而比较一旦区分大小写就会漏。
+ */
+export function hostFromServerUrl(rawUrl: string): string {
+  let rest = rawUrl.trim().replace(/^[a-zA-Z][a-zA-Z\d+\-.]*:\/\//, '');
+  rest = rest.split('/')[0] ?? '';
+  rest = rest.split('?')[0] ?? '';
+  const at = rest.lastIndexOf('@');
+  if (at >= 0) rest = rest.slice(at + 1);
+  const host = rest.startsWith('[')
+    ? (rest.slice(1, rest.indexOf(']')) || rest)
+    : (rest.split(':')[0] ?? '');
+  return host.trim().toLowerCase();
+}
+
+/**
  * 判定一个服务器地址的传输安全等级。
  *
  * 无法解析或没有 scheme 时返回 `'plaintext'` —— **宁可多提醒一次**：
@@ -66,16 +93,5 @@ export function classifyTransportSecurity(rawUrl: string): TransportSecurity {
   if (/^https:\/\//i.test(raw)) return 'secure';
   if (!/^http:\/\//i.test(raw)) return 'plaintext';
 
-  // 去掉 scheme、userinfo、端口、路径、查询，只留 host
-  let rest = raw.replace(/^http:\/\//i, '');
-  rest = rest.split('/')[0] ?? '';
-  rest = rest.split('?')[0] ?? '';
-  const at = rest.lastIndexOf('@');
-  if (at >= 0) rest = rest.slice(at + 1);
-  // IPv6 字面量形如 [::1]:3000
-  const host = rest.startsWith('[')
-    ? (rest.slice(1, rest.indexOf(']')) || rest)
-    : (rest.split(':')[0] ?? '');
-
-  return isPrivateHost(host) ? 'plaintext-local' : 'plaintext';
+  return isPrivateHost(hostFromServerUrl(raw)) ? 'plaintext-local' : 'plaintext';
 }

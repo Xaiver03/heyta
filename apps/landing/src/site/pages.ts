@@ -133,6 +133,20 @@ export interface SitePage {
    * `DocsArticlePage` 取不到正文会响亮抛错（见 `docs.ts` 的 `docsArticleById`）。
    */
   readonly docsKind?: 'article' | 'category';
+  /**
+   * 这一页渲染 `@heyta/legal` 里的**哪一份**对外文本（`/legal/<docId>/`）。
+   *
+   * 🔴 **为什么是字符串而不是 import 那个包的类型**：本文件被
+   * `scripts/gen-entries.mjs` 用 Node 的类型擦除**直接**加载（见文件头那条
+   * "不许有相对的运行时导入"）。写 `import { LEGAL_DOCUMENTS } from '@heyta/legal'`
+   * 会让生成器去要一个**构建产物** `dist/`，而 `pnpm check` 的第一道门禁
+   * 就跑在 `pnpm build` **之前** —— 干净检出上那里是空的，生成器直接红。
+   *
+   * ⚠️ 所以这条字符串的**正确性有闸门，但不在编译期**：
+   * `tests/legal-pages.spec.ts` 对每一个 `legalDocId` 调 `legalDocumentById()`
+   * （取不到就抛），并核对九份文本一份都不许漏挂。
+   */
+  readonly legalDocId?: string;
   /** 导航/页脚里的标签。 */
   readonly labelKey: MessageKey;
   /**
@@ -597,6 +611,123 @@ export const SITE_PAGES = [
     titleKey: 'site.docs.loss.seo.title',
     descriptionKey: 'site.docs.loss.sum',
   },
+  {
+    id: 'legal-terms',
+    path: '/legal/terms',
+    group: 'legal',
+    inNav: false,
+    inFooter: true,
+    legalDocId: 'terms',
+    labelKey: 'site.footer.legal.terms',
+    headingKey: 'site.legal.terms.title',
+    ledeKey: 'site.legal.terms.lede',
+    titleKey: 'site.legal.terms.seo.title',
+    descriptionKey: 'site.legal.terms.seo.description',
+  },
+  {
+    id: 'legal-privacy',
+    path: '/legal/privacy',
+    group: 'legal',
+    inNav: false,
+    inFooter: true,
+    legalDocId: 'privacy',
+    labelKey: 'site.footer.legal.privacy',
+    headingKey: 'site.legal.privacy.title',
+    ledeKey: 'site.legal.privacy.lede',
+    titleKey: 'site.legal.privacy.seo.title',
+    descriptionKey: 'site.legal.privacy.seo.description',
+  },
+  {
+    id: 'legal-personal-info-list',
+    path: '/legal/personal-info-list',
+    group: 'legal',
+    inNav: false,
+    inFooter: true,
+    legalDocId: 'personal-info-list',
+    labelKey: 'site.footer.legal.personal-info-list',
+    headingKey: 'site.legal.personal-info-list.title',
+    ledeKey: 'site.legal.personal-info-list.lede',
+    titleKey: 'site.legal.personal-info-list.seo.title',
+    descriptionKey: 'site.legal.personal-info-list.seo.description',
+  },
+  {
+    id: 'legal-permissions',
+    path: '/legal/permissions',
+    group: 'legal',
+    inNav: false,
+    inFooter: true,
+    legalDocId: 'permissions',
+    labelKey: 'site.footer.legal.permissions',
+    headingKey: 'site.legal.permissions.title',
+    ledeKey: 'site.legal.permissions.lede',
+    titleKey: 'site.legal.permissions.seo.title',
+    descriptionKey: 'site.legal.permissions.seo.description',
+  },
+  {
+    id: 'legal-third-parties',
+    path: '/legal/third-parties',
+    group: 'legal',
+    inNav: false,
+    inFooter: true,
+    legalDocId: 'third-parties',
+    labelKey: 'site.footer.legal.third-parties',
+    headingKey: 'site.legal.third-parties.title',
+    ledeKey: 'site.legal.third-parties.lede',
+    titleKey: 'site.legal.third-parties.seo.title',
+    descriptionKey: 'site.legal.third-parties.seo.description',
+  },
+  {
+    id: 'legal-ai-and-transfer',
+    path: '/legal/ai-and-transfer',
+    group: 'legal',
+    inNav: false,
+    inFooter: true,
+    legalDocId: 'ai-and-transfer',
+    labelKey: 'site.footer.legal.ai-and-transfer',
+    headingKey: 'site.legal.ai-and-transfer.title',
+    ledeKey: 'site.legal.ai-and-transfer.lede',
+    titleKey: 'site.legal.ai-and-transfer.seo.title',
+    descriptionKey: 'site.legal.ai-and-transfer.seo.description',
+  },
+  {
+    id: 'legal-minors',
+    path: '/legal/minors',
+    group: 'legal',
+    inNav: false,
+    inFooter: true,
+    legalDocId: 'minors',
+    labelKey: 'site.footer.legal.minors',
+    headingKey: 'site.legal.minors.title',
+    ledeKey: 'site.legal.minors.lede',
+    titleKey: 'site.legal.minors.seo.title',
+    descriptionKey: 'site.legal.minors.seo.description',
+  },
+  {
+    id: 'legal-subscription-refund',
+    path: '/legal/subscription-refund',
+    group: 'legal',
+    inNav: false,
+    inFooter: true,
+    legalDocId: 'subscription-refund',
+    labelKey: 'site.footer.legal.subscription-refund',
+    headingKey: 'site.legal.subscription-refund.title',
+    ledeKey: 'site.legal.subscription-refund.lede',
+    titleKey: 'site.legal.subscription-refund.seo.title',
+    descriptionKey: 'site.legal.subscription-refund.seo.description',
+  },
+  {
+    id: 'legal-data-rights',
+    path: '/legal/data-rights',
+    group: 'legal',
+    inNav: false,
+    inFooter: true,
+    legalDocId: 'data-rights',
+    labelKey: 'site.footer.legal.data-rights',
+    headingKey: 'site.legal.data-rights.title',
+    ledeKey: 'site.legal.data-rights.lede',
+    titleKey: 'site.legal.data-rights.seo.title',
+    descriptionKey: 'site.legal.data-rights.seo.description',
+  },
 ] as const satisfies readonly SitePage[];
 
 /**
@@ -605,6 +736,36 @@ export const SITE_PAGES = [
  * ⚠️ 这条断言的意义不是"类型安全"那么抽象 —— 它是**加页面时最容易漏的东西**
  * （词条 key 拼错、忘了 `inNav`）在**编译期**而不是"上线后发现导航里没有它"时暴露。
  */
+/**
+ * 九份对外法律文本的页面清单（页脚 legal 组与 `docRef` 解析都从这里取）。
+ *
+ * 🔴 **URL 里那一段就是 `@heyta/legal` 的文档 id，而且它一旦发布就是承诺。**
+ * 这些地址会被写进：应用内「设置 → 关于」的链接、注册时勾选条款的那条链接、
+ * 各应用商店的隐私政策字段、以及工信部备案材料。改版时**只改文档内容
+ * 与 `version`，不改 `path`** —— 换 URL 等于把已经发出去的所有引用作废，
+ * 而商店与备案表格里那一行没有人会替我们回来改。
+ */
+export type LegalSitePage = SitePage & { readonly legalDocId: string };
+
+/**
+ * ⚠️ 过滤前先**拓宽成 `readonly SitePage[]`**，不能直接对 `SITE_PAGES` 用
+ * 类型谓词：注册表是 `as const`，它的元素类型是**三十二条字面量形状**的联合，
+ * 而谓词的类型必须能赋给它 —— `SitePage & {legalDocId}` 里那个 `id: string`
+ * 对不上 `id: 'loss'`，编译期直接报 TS2677（实测）。
+ * 拓宽之后谓词只需要是 `SitePage` 的子型，同时 `filter` 的返回值就是
+ * 精确的 `LegalSitePage[]` —— 不需要任何断言。
+ */
+const ALL_PAGES: readonly SitePage[] = SITE_PAGES;
+
+export const LEGAL_PAGES = ALL_PAGES.filter(
+  (page): page is LegalSitePage => page.legalDocId !== undefined,
+);
+
+/** 「文档 id → 站点页面」。`docRef` 块靠它把引用解析成同语言的站内地址。 */
+export function legalPageByDocId(docId: string): LegalSitePage | undefined {
+  return LEGAL_PAGES.find((page) => page.legalDocId === docId);
+}
+
 type AllPagesAreWellFormed = (typeof SITE_PAGES)[number] extends SitePage ? true : never;
 const allPagesAreWellFormed: AllPagesAreWellFormed = true;
 void allPagesAreWellFormed;

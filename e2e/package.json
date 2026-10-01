@@ -7,6 +7,7 @@
   "scripts": {
     "test": "playwright test",
     "test:landing": "playwright test --config playwright.landing.config.ts",
+    "test:legal-links": "playwright test --config playwright.legal-links.config.ts",
     "install-browser": "playwright install chromium"
   },
   "devDependencies": {

@@ -2402,3 +2402,186 @@
     gap: var(--ht-space-5);
   }
 }
+
+/* ── 对外法律文本（`/legal/*`，九份同一个组件）──────────────────
+   🔴 这一套样式**只许有一份**：九份文本共用 `LegalDocumentPage`，
+   所以"条款的排版"与"隐私政策的排版"在结构上不可能分叉。
+   法律文本的排版目标只有一个：**长文可读**（行宽受控、层级能从字号里读出来、
+   锚点跳过去不会被吸顶导航盖住标题）。
+   ⚠️ 全部取值走 token —— `pnpm check:design` 扫 `.css`。 */
+
+.lp-legal {
+  max-inline-size: var(--ht-layout-prose-max);
+  margin-inline: auto;
+  padding-inline: var(--ht-space-6);
+  /* 页头与正文之间：法律页的页头没有 CTA，留白比营销页收紧一档。 */
+  padding-block-end: calc(var(--ht-space-16) * 1.25);
+}
+
+/* 「版本 X · 更新于 Y」——这一行是**证据**，不是装饰：
+   同意记录里存的就是这个版本号，用户要能在页面上把它读回来。 */
+.lp-legal__meta {
+  margin-block: 0 var(--ht-space-6);
+  font-size: var(--ht-font-size-sm);
+  line-height: var(--ht-line-height-normal);
+  color: var(--ht-color-foreground-subtle);
+}
+
+/* 草案横幅。`--ht-color-warning-*` 而不是 danger：
+   "还没生效"是一个需要知道的状态，不是一件出错了的事。 */
+.lp-legal__banner {
+  margin-block: 0 var(--ht-space-8);
+  padding: var(--ht-space-4);
+  border: 1px solid var(--ht-color-warning);
+  border-radius: var(--ht-radius-md);
+  background: var(--ht-color-warning-subtle);
+  color: var(--ht-color-warning-strong);
+  font-size: var(--ht-font-size-sm);
+  line-height: var(--ht-line-height-normal);
+}
+
+/* 目录：窄屏折叠成一行也不至于吃掉半屏（法律文本的目录常有十几条）。 */
+.lp-legal__toc {
+  margin-block: 0 var(--ht-space-8);
+  padding: var(--ht-space-4) var(--ht-space-6);
+  border: 1px solid var(--ht-color-border);
+  border-radius: var(--ht-radius-md);
+  background: var(--ht-color-surface);
+}
+
+.lp-legal__toc-title {
+  margin: 0;
+  font-size: var(--ht-font-size-xs);
+  font-weight: var(--ht-font-weight-semibold);
+  letter-spacing: var(--ht-tracking-caption);
+  text-transform: uppercase;
+  color: var(--ht-color-foreground-muted);
+}
+
+.lp-legal__toc ol {
+  margin-block-start: var(--ht-space-3);
+  padding-inline-start: var(--ht-space-5);
+  display: grid;
+  gap: var(--ht-space-1);
+  font-size: var(--ht-font-size-sm);
+}
+
+.lp-legal__toc a {
+  color: var(--ht-color-primary);
+  text-decoration: none;
+}
+
+.lp-legal__toc a:hover {
+  text-decoration: underline;
+}
+
+/* 每一条锚点都要能被跳到 —— 吸顶导航的高度必须从滚动落点里扣掉。
+   🔴 少了这一行，点目录跳过去看到的是上一条的最后一行。 */
+.lp-legal__section {
+  scroll-margin-block-start: calc(var(--ht-layout-header-height) + var(--ht-space-6));
+}
+
+.lp-legal__section + .lp-legal__section {
+  margin-block-start: var(--ht-space-10);
+}
+
+.lp-legal__h {
+  margin-block: 0 var(--ht-space-4);
+  line-height: var(--ht-line-height-tight);
+  letter-spacing: var(--ht-tracking-title);
+  color: var(--ht-color-foreground);
+}
+
+/* 层级靠**整条样式**表达（字号 + 字重），不是只调字号 ——
+   见 AGENTS.md「文字层级」：一页只能有一个与页标题同级的字号。
+   这里的页标题是 `PageHead` 的 `h1`，所以顶层小节从 lg 起。 */
+h2.lp-legal__h {
+  font-size: var(--ht-font-size-lg);
+  font-weight: var(--ht-font-weight-semibold);
+}
+
+h3.lp-legal__h {
+  font-size: var(--ht-font-size-base);
+  font-weight: var(--ht-font-weight-semibold);
+}
+
+/* 子小节整体缩进一级：法律文本里"第 3 条第 2 款"的从属关系
+   要能在版式上看出来，只靠字号差在长文里不够。 */
+.lp-legal__section .lp-legal__section {
+  margin-block-start: var(--ht-space-6);
+  padding-inline-start: var(--ht-space-4);
+  border-inline-start: 1px solid var(--ht-color-border);
+}
+
+.lp-legal__p {
+  margin-block: 0 var(--ht-space-4);
+  font-size: var(--ht-font-size-base);
+  line-height: var(--ht-line-height-relaxed);
+  color: var(--ht-color-foreground-muted);
+}
+
+.lp-legal__list {
+  margin-block: 0 var(--ht-space-4);
+  padding-inline-start: var(--ht-space-6);
+  display: grid;
+  gap: var(--ht-space-2);
+  font-size: var(--ht-font-size-base);
+  line-height: var(--ht-line-height-relaxed);
+  color: var(--ht-color-foreground-muted);
+}
+
+/* 「这一条对你意味着什么」。与正文同字号 ——
+   法务提示不是次要信息，缩小它等于让它更难被读到。 */
+.lp-legal__callout {
+  margin-block: 0 var(--ht-space-6);
+  padding: var(--ht-space-4);
+  border-inline-start: 3px solid var(--ht-color-primary);
+  border-radius: var(--ht-radius-sm);
+  background: var(--ht-color-primary-subtle);
+  color: var(--ht-color-foreground);
+  font-size: var(--ht-font-size-base);
+  line-height: var(--ht-line-height-relaxed);
+}
+
+/* 指向另一份法律文本的引用（`docRef` 块）。 */
+.lp-legal__ref {
+  margin-block: 0 var(--ht-space-4);
+  font-size: var(--ht-font-size-base);
+  line-height: var(--ht-line-height-relaxed);
+}
+
+.lp-legal__ref a {
+  color: var(--ht-color-primary);
+}
+
+/* 表格在手机上必须能横滑，而不是把文字压成一列一个字。
+   外层只负责滚动，表格自己保持自然宽度。 */
+.lp-legal__table-wrap {
+  margin-block: 0 var(--ht-space-6);
+  overflow-x: auto;
+  border: 1px solid var(--ht-color-border);
+  border-radius: var(--ht-radius-md);
+}
+
+.lp-legal__table {
+  inline-size: 100%;
+  border-collapse: collapse;
+  font-size: var(--ht-font-size-sm);
+  line-height: var(--ht-line-height-normal);
+}
+
+.lp-legal__table th {
+  text-align: start;
+  padding: var(--ht-space-3);
+  background: var(--ht-color-surface-sunken);
+  color: var(--ht-color-foreground);
+  font-weight: var(--ht-font-weight-semibold);
+  white-space: nowrap;
+}
+
+.lp-legal__table td {
+  padding: var(--ht-space-3);
+  border-block-start: 1px solid var(--ht-color-border-subtle);
+  color: var(--ht-color-foreground-muted);
+  vertical-align: top;
+}

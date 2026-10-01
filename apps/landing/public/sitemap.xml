@@ -388,4 +388,130 @@
     <xhtml:link rel="alternate" hreflang="en" href="https://heyta.waytofuture.cn/en/help/loss/" />
     <xhtml:link rel="alternate" hreflang="x-default" href="https://heyta.waytofuture.cn/help/loss/" />
   </url>
+  <url>
+    <loc>https://heyta.waytofuture.cn/legal/terms/</loc>
+    <changefreq>weekly</changefreq>
+    <xhtml:link rel="alternate" hreflang="zh-CN" href="https://heyta.waytofuture.cn/legal/terms/" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://heyta.waytofuture.cn/en/legal/terms/" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://heyta.waytofuture.cn/legal/terms/" />
+  </url>
+  <url>
+    <loc>https://heyta.waytofuture.cn/en/legal/terms/</loc>
+    <changefreq>weekly</changefreq>
+    <xhtml:link rel="alternate" hreflang="zh-CN" href="https://heyta.waytofuture.cn/legal/terms/" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://heyta.waytofuture.cn/en/legal/terms/" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://heyta.waytofuture.cn/legal/terms/" />
+  </url>
+  <url>
+    <loc>https://heyta.waytofuture.cn/legal/privacy/</loc>
+    <changefreq>weekly</changefreq>
+    <xhtml:link rel="alternate" hreflang="zh-CN" href="https://heyta.waytofuture.cn/legal/privacy/" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://heyta.waytofuture.cn/en/legal/privacy/" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://heyta.waytofuture.cn/legal/privacy/" />
+  </url>
+  <url>
+    <loc>https://heyta.waytofuture.cn/en/legal/privacy/</loc>
+    <changefreq>weekly</changefreq>
+    <xhtml:link rel="alternate" hreflang="zh-CN" href="https://heyta.waytofuture.cn/legal/privacy/" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://heyta.waytofuture.cn/en/legal/privacy/" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://heyta.waytofuture.cn/legal/privacy/" />
+  </url>
+  <url>
+    <loc>https://heyta.waytofuture.cn/legal/personal-info-list/</loc>
+    <changefreq>weekly</changefreq>
+    <xhtml:link rel="alternate" hreflang="zh-CN" href="https://heyta.waytofuture.cn/legal/personal-info-list/" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://heyta.waytofuture.cn/en/legal/personal-info-list/" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://heyta.waytofuture.cn/legal/personal-info-list/" />
+  </url>
+  <url>
+    <loc>https://heyta.waytofuture.cn/en/legal/personal-info-list/</loc>
+    <changefreq>weekly</changefreq>
+    <xhtml:link rel="alternate" hreflang="zh-CN" href="https://heyta.waytofuture.cn/legal/personal-info-list/" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://heyta.waytofuture.cn/en/legal/personal-info-list/" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://heyta.waytofuture.cn/legal/personal-info-list/" />
+  </url>
+  <url>
+    <loc>https://heyta.waytofuture.cn/legal/permissions/</loc>
+    <changefreq>weekly</changefreq>
+    <xhtml:link rel="alternate" hreflang="zh-CN" href="https://heyta.waytofuture.cn/legal/permissions/" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://heyta.waytofuture.cn/en/legal/permissions/" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://heyta.waytofuture.cn/legal/permissions/" />
+  </url>
+  <url>
+    <loc>https://heyta.waytofuture.cn/en/legal/permissions/</loc>
+    <changefreq>weekly</changefreq>
+    <xhtml:link rel="alternate" hreflang="zh-CN" href="https://heyta.waytofuture.cn/legal/permissions/" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://heyta.waytofuture.cn/en/legal/permissions/" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://heyta.waytofuture.cn/legal/permissions/" />
+  </url>
+  <url>
+    <loc>https://heyta.waytofuture.cn/legal/third-parties/</loc>
+    <changefreq>weekly</changefreq>
+    <xhtml:link rel="alternate" hreflang="zh-CN" href="https://heyta.waytofuture.cn/legal/third-parties/" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://heyta.waytofuture.cn/en/legal/third-parties/" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://heyta.waytofuture.cn/legal/third-parties/" />
+  </url>
+  <url>
+    <loc>https://heyta.waytofuture.cn/en/legal/third-parties/</loc>
+    <changefreq>weekly</changefreq>
+    <xhtml:link rel="alternate" hreflang="zh-CN" href="https://heyta.waytofuture.cn/legal/third-parties/" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://heyta.waytofuture.cn/en/legal/third-parties/" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://heyta.waytofuture.cn/legal/third-parties/" />
+  </url>
+  <url>
+    <loc>https://heyta.waytofuture.cn/legal/ai-and-transfer/</loc>
+    <changefreq>weekly</changefreq>
+    <xhtml:link rel="alternate" hreflang="zh-CN" href="https://heyta.waytofuture.cn/legal/ai-and-transfer/" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://heyta.waytofuture.cn/en/legal/ai-and-transfer/" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://heyta.waytofuture.cn/legal/ai-and-transfer/" />
+  </url>
+  <url>
+    <loc>https://heyta.waytofuture.cn/en/legal/ai-and-transfer/</loc>
+    <changefreq>weekly</changefreq>
+    <xhtml:link rel="alternate" hreflang="zh-CN" href="https://heyta.waytofuture.cn/legal/ai-and-transfer/" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://heyta.waytofuture.cn/en/legal/ai-and-transfer/" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://heyta.waytofuture.cn/legal/ai-and-transfer/" />
+  </url>
+  <url>
+    <loc>https://heyta.waytofuture.cn/legal/minors/</loc>
+    <changefreq>weekly</changefreq>
+    <xhtml:link rel="alternate" hreflang="zh-CN" href="https://heyta.waytofuture.cn/legal/minors/" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://heyta.waytofuture.cn/en/legal/minors/" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://heyta.waytofuture.cn/legal/minors/" />
+  </url>
+  <url>
+    <loc>https://heyta.waytofuture.cn/en/legal/minors/</loc>
+    <changefreq>weekly</changefreq>
+    <xhtml:link rel="alternate" hreflang="zh-CN" href="https://heyta.waytofuture.cn/legal/minors/" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://heyta.waytofuture.cn/en/legal/minors/" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://heyta.waytofuture.cn/legal/minors/" />
+  </url>
+  <url>
+    <loc>https://heyta.waytofuture.cn/legal/subscription-refund/</loc>
+    <changefreq>weekly</changefreq>
+    <xhtml:link rel="alternate" hreflang="zh-CN" href="https://heyta.waytofuture.cn/legal/subscription-refund/" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://heyta.waytofuture.cn/en/legal/subscription-refund/" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://heyta.waytofuture.cn/legal/subscription-refund/" />
+  </url>
+  <url>
+    <loc>https://heyta.waytofuture.cn/en/legal/subscription-refund/</loc>
+    <changefreq>weekly</changefreq>
+    <xhtml:link rel="alternate" hreflang="zh-CN" href="https://heyta.waytofuture.cn/legal/subscription-refund/" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://heyta.waytofuture.cn/en/legal/subscription-refund/" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://heyta.waytofuture.cn/legal/subscription-refund/" />
+  </url>
+  <url>
+    <loc>https://heyta.waytofuture.cn/legal/data-rights/</loc>
+    <changefreq>weekly</changefreq>
+    <xhtml:link rel="alternate" hreflang="zh-CN" href="https://heyta.waytofuture.cn/legal/data-rights/" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://heyta.waytofuture.cn/en/legal/data-rights/" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://heyta.waytofuture.cn/legal/data-rights/" />
+  </url>
+  <url>
+    <loc>https://heyta.waytofuture.cn/en/legal/data-rights/</loc>
+    <changefreq>weekly</changefreq>
+    <xhtml:link rel="alternate" hreflang="zh-CN" href="https://heyta.waytofuture.cn/legal/data-rights/" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://heyta.waytofuture.cn/en/legal/data-rights/" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://heyta.waytofuture.cn/legal/data-rights/" />
+  </url>
 </urlset>

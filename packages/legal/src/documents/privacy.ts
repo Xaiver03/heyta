@@ -1,0 +1,1115 @@
+/**
+ * 隐私政策（heyta 官方托管服务）
+ * ==============================
+ *
+ * 法定出处
+ * --------
+ * - 《中华人民共和国个人信息保护法》**第十七条第一款**（处理前须以显著方式、清晰易懂的语言
+ *   真实、准确、完整地告知：处理者名称与联系方式 / 处理目的、方式、种类、保存期限 /
+ *   个人行使权利的方式和程序）、**第十八条**（免告知情形只有"法律、行政法规规定应当保密
+ *   或者不需要告知"，**加密不在其中**）、**第十九条**（保存期限应为实现处理目的所必要的
+ *   最短时间 —— 所以每一类数据都要给期限，写"在法律规定的期限内保存"不合格）。
+ *   另引 **第十四条第三款 / 第二十三条 / 第二十九条 / 第三十一条 / 第三十九条**（同意与
+ *   单独同意）、**第四十四至五十条**（权利与受理机制）、**第五十一条**（措施）、
+ *   **第七十二条第一款**（自然人因个人事务处理个人信息不适用本法 —— 第 1 条与第 8 条的
+ *   "自建服务端"和"你自配的 AI 端点"两条定性靠它）。
+ * - 《App 违法违规收集使用个人信息行为认定方法》（网信办秘书局、工信部办公厅、
+ *   公安部办公厅、市场监管总局办公厅，2019-11-28 印发）**六大类**逐条是本文件的检查表：
+ *   第一类第 1、2、3、4 项（政策存在、首启显著提示、4 次点击内可达、清晰易懂），
+ *   第二类第 1、3、4 项（逐一列出目的方式范围、权限同步告知目的、不得晦涩），
+ *   第三类第 7、9 项（**夸大 E2EE 声明的落点就在这里**），第四类第 2、6 项，
+ *   第六类第 1–5 项（更正/删除/注销入口、不得设不合理条件、**人工处理不超过 15 个工作日**、
+ *   "用户操作已执行完毕但后台并未完成"、投诉举报渠道）。
+ * - 《常见类型移动互联网应用程序必要个人信息范围规定》（国信办秘字〔2021〕14 号）
+ *   第三条、第四条（不得因用户拒绝非必要信息而拒绝基本功能），以及
+ *   《网络数据安全管理条例》第二十一条（集中公开展示；**保存期限难以确定的要写确定方法**）。
+ *
+ * 🔴 为什么"明文／密文"那一段（第 2 条）是全份政策里最容易写成虚假陈述的地方
+ * ------------------------------------------------------------------------
+ * heyta 的产品口号是"本地优先 + 端到端加密"，而这两句话在法务口径上各有一处必须限定的
+ * 边界，两处都写反才会显得自然：
+ *
+ * 1. **端到端加密只覆盖同步通道，不覆盖本地存储。** 加密只发生在上传那一步，磁盘上的
+ *    任务／便签／习惯／专注记录是**明文**（三套存储适配器与 op-log 引擎里没有任何加密
+ *    调用点，移动端 SQLite 也没启用 SQLCipher）。把它写成"你的数据始终以密文保存"，
+ *    就是与代码不符的陈述。
+ * 2. **服务端不是"什么都看不到"。** 明文落库的同步元数据有 **11 项**，其中
+ *    `entityType` + `entityId` + `opType` + `clientTimestamp` + `payloadBytes` 组合起来
+ *    足以刻画"谁、什么时候、对哪一类对象的哪一个、做了什么、多大、从哪台设备"。
+ *    写成"我们完全看不到你的任何数据"，落《认定方法》第三类第 7、9 项（掩饰真实目的 /
+ *    违反其所声明的收集使用规则）—— 而这类声明一旦被写进对外文本，**它就是可被证伪的
+ *    那份承诺本身**，不看数据量大小。
+ *
+ * 还有一条同族的、经常被顺手写歪的：**邮件通道不在端到端加密之内**（收件地址与含一次性
+ * 令牌的正文一定会经过 SMTP 服务商），**导出文件是明文 JSON**（移动端经系统分享面板可以
+ * 流向任意第三方应用），**AI 出境发的是原文、不做摘要或脱敏**。这三句都是"看起来与
+ * E2EE 一致、实际相反"的位置。
+ *
+ * 证据位置（每条断言可回查）
+ * --------------------------
+ * - 服务端存了什么、看到什么、发给谁、留多久：`docs/research/legal-dataflow-server.md`
+ *   （A1 十七张表逐列清点 / A2 密文与 11 项明文元数据 + 入站闸门 / A3 Argon2id 参数、
+ *   pepper、HIBP 前缀 / A4 passkey 字段与 challenge 不落库 / A5 五封邮件与 SMTP /
+ *   A6 邀请关系里的第三人邮箱 / A7 微信支付 `attach` 逐字段 / A8 后台白名单投影 /
+ *   A9 `logger: false`、IP 不落库 / A10 埋点与崩溃上报 14 个关键词零命中 + 出网四类目的地 /
+ *   附：45 天保留期与每日清理、`DELETE /api/account` 的 18 处级联硬删）。
+ * - 各端本地存了什么、明文还是密文、权限清单实际内容：`docs/research/legal-dataflow-client.md`
+ *   （B11 clientId 是随机假名 / **B12 本地存储是明文、E2EE 只覆盖传输** / B13 凭据落盘面 /
+ *   B14 三条通知通路 / B15 小组件加密快照 / B16 导出是明文且三端通道不同 /
+ *   B17 逐字抄的权限清单 / B18 零外发 SDK / E 本地留存与"没有抹掉本地数据入口"）。
+ * - AI 出境路径与用户权利实现到什么程度：`docs/research/legal-dataflow-ai-rights.md`
+ *   （C19 三道闸全部默认关 + 回退不跨隐私边界 / C20 出境逐字段、**发的是原文** /
+ *   C21 端点由用户自填、无服务商清单、无国别判定 / C22 本机接口默认关与逐工具授权 /
+ *   C23 记忆层默认关、推断不持久化 / **D24 权利逐项核对：注销在服务端是真删、界面里没入口；
+ *   邮箱不可更换** / D25 45 天硬编码、备份 14 天且无法定点删除）。
+ * - 条款级必备内容与三清单要放在哪三处：`docs/research/legal-pipl-baseline.md` §1、§2
+ *   （特别是 §2.7「现在就会被判红的 7 条」）、§5.3、§5.4。
+ *
+ * ⚠️ 本文件里的每一句都是**对外承诺**，不是界面文案，因此不受"改文案走 i18n"那条纪律管
+ * （理由见 `../types.ts` 文件头）。写作纪律：每个事实断言要能指回上面三份考古里的一个
+ * `文件:行号`；**能力已就绪但入口未接上**的（例如账号注销），承诺**渠道**而不是承诺自助。
+ * 注释里表达路径一律写完整路径或汉字，不要写那个"星号紧跟斜杠"的通配形式 —— 它会提前
+ * 终止本注释，TypeScript 报出一串离原因很远的错（TS1443 加级联），这是本项目踩过的坑。
+ */
+
+import type { LegalDocument } from '../types.js';
+
+const zh = [
+  {
+    id: 's1',
+    title: '这份政策管什么、不管什么',
+    blocks: [
+      {
+        kind: 'p',
+        text: 'heyta 同时是三样东西：一份**开源软件**、一套**你可以自己架起来的服务**、以及**我们官方运营的托管服务**。这三样的责任人完全不同，而这份政策**只约束第三样**。分清它们不是文字游戏 —— 你在注册时勾选的那句话写的是「同意**该服务端**提供的服务条款与隐私政策」，而"该服务端"可能是任何人架设的机器。',
+      },
+      {
+        kind: 'table',
+        head: ['你拿到的东西', '你的数据由谁处理', '这份政策适用吗'],
+        rows: [
+          [
+            'heyta 应用本体（各端客户端与服务端**源码**，MIT 许可证，免费）',
+            '没有人替你处理。代码跑在你的设备上，数据也留在你的设备上。',
+            '🔴 **不适用**。一份软件不处理任何人的数据，因而它也向你保证不了任何事。',
+          ],
+          [
+            '你自己架设的同步服务器（用我们的源码或任何兼容实现）',
+            '🔴 **你自己**就是个人信息处理者。存什么、存在哪个国家、留多久、谁能看到，全部由你的部署决定。',
+            '🔴 **不适用**。我们接触不到你那台机器，也不替它的行为负责；那份处理规则要你自己发布。',
+          ],
+          [
+            '我们官方运营的托管服务（`heyta.waytofuture.cn`：账号、同步、订阅计费）',
+            '下面这家处理者，也就是本政策里的"我们"。',
+            '✅ **适用**。下面每一条都是对这家公司的约束。',
+          ],
+        ],
+      },
+      {
+        kind: 'p',
+        text: '处理者信息：**晓黎（杭州）人工智能科技有限公司** · 统一社会信用代码 `91330106MAKNJ6DX7M` · 法定代表人 邓湘雷 · 住所 浙江省杭州市西湖区蒋村街道文一西路 830 号蒋村商务中心 3 号楼 210 室 · 联系邮箱 `heyta@waytofuture.cn` · 主域 ICP 备案号 浙ICP备2026081423号。🔴 App 备案号以应用内「关于」页与服务端对外页公布者为准 —— 工信部尚未核准之前，本政策不印任何号码，也不编一个看起来合理的占位。',
+      },
+      {
+        kind: 'callout',
+        text: '一句一定会被问到的话：**我不用你们的服务器，还要不要读这份政策？** 不需要。装上应用、自己架服务端，约束你的是你自己写的规则和你所在地的法律；本政策只对"数据发往 `heyta.waytofuture.cn`"这件事生效。反过来说，如果你架了自己的服务端，那么**对你而言承担处理者义务的是你**，不是 heyta。',
+      },
+    ],
+  },
+  {
+    id: 's2',
+    title: '数据到底存在哪、谁能看到',
+    blocks: [
+      {
+        kind: 'p',
+        text: '这一节放在第二条，因为它是整份政策里最容易被写成假话的地方。heyta 的加密**只覆盖同步通道**：一条改动在离开你的设备之前就被加密，服务器收到的是密文，而它不持有解密所需的密钥（密钥由你的口令在你的设备上派生）。但这**不等于"你的数据全是加密的"** —— 下面三种位置必须分开说。',
+      },
+      {
+        kind: 'table',
+        head: ['位置', '明文还是密文', '谁能读到'],
+        rows: [
+          [
+            '**你自己的设备**（Web 用浏览器自带的本地存储，移动端与桌面端用本机的数据库文件）',
+            '🔴 **明文**。heyta 不加密磁盘上的数据，一个字节都不加。',
+            '拿到这台设备、解开这个账户的人，就能读到你的全部任务、清单、便签、习惯与专注记录。防线是设备自身的锁屏、系统账户与文件权限 —— FileVault、APFS、Android FBE 这些是**操作系统**的能力，不是本应用提供的。',
+          ],
+          [
+            '**我们官方的服务器**',
+            '内容部分是**密文**；结构性元数据是**明文**（下一项逐项列）。',
+            '我们读不到你的任务标题与正文，但能看到下面列出的每一项"形状"。',
+          ],
+          [
+            '**你自己架设的服务器**',
+            '由你的部署决定。我们不参与、也不获知。',
+            '取决于那台机器的运营者 —— 也就是你自己，或你交给谁运维。',
+          ],
+        ],
+      },
+      {
+        kind: 'p',
+        text: '服务器上看不到你任务的**内容**，但每一条改动都带着它的**形状**。明文存在我们数据库里的同步元数据一共 **11 项**：',
+      },
+      {
+        kind: 'ul',
+        items: [
+          '`entityType` —— 这条改动属于**哪一类对象**（任务、清单、标签、习惯、配置……）',
+          '`entityId` 与 `entityIds` —— 改的是**哪一个**对象，以及一次批量操作盖住了哪几个（哪些任务属于同一个清单，从明文 id 直接看得出来）',
+          '`opType` 与 `actionType` —— 是新建、修改还是删除。"这个人删过东西""这个人改过状态"是明文可见的事实',
+          '`vectorClock` —— 这个账号一共出现过几个设备标识，以及各自的逻辑计数（编辑活跃度的轮廓）',
+          '`clientTimestamp` —— 你的设备声称这条改动发生在什么时候',
+          '`receivedAt` —— 我们什么时候收到它',
+          '`serverSeq` —— 它在你的事件序列里排第几位',
+          '`payloadBytes` —— 这条数据有多大（长度本身就是一条侧信道）',
+          '`schemaVersion` —— 发送它的客户端用的是哪一版数据模型',
+          '`clientId` —— 它从哪台设备发来（一个每设备随机生成、不含姓名与邮箱的假名字符串）',
+          '另加**设备面**：你起的设备名、应用版本、最后出现时间、以及落在设备表里的一列 `userAgent`。',
+        ],
+      },
+      {
+        kind: 'p',
+        text: '所以本政策**不写**「服务端完全看不到你的任何数据」这句话。准确的说法是：**端到端加密覆盖内容，不覆盖元数据**（结构、顺序、时间、大小、设备）。另有一条诚实边界要一起给你：那道"只收密文"的闸门检查的是数据的**形状**，不是对密文的**密码学证明** —— 足够长的、恰好像 base64 的明文能过闸。这也是为什么"我们替你验证了数据确为密文"这句话我们不写。',
+      },
+      {
+        kind: 'callout',
+        text: '我们不打「我们什么都看不见」的广告。一句能被代码证伪的承诺，比一句听起来更安全但做不到的承诺有用。',
+      },
+    ],
+  },
+  {
+    id: 's3',
+    title: '我们处理的个人信息，逐项',
+    blocks: [
+      {
+        kind: 'p',
+        text: '按第十七条，这一节必须给出处理目的、方式、种类和保存期限（期限在第 7 条）。下表是**类目级**概览；"在服务器上是不是明文"这一列说的是**我们服务器**上的状态，而你设备上的本地库一律是明文（第 2 条）。',
+      },
+      {
+        kind: 'table',
+        head: ['我们处理什么', '为什么需要它（处理目的）', '存在哪里', '在我们服务器上是明文还是密文'],
+        rows: [
+          [
+            '邮箱地址',
+            '登录账号；发五封功能邮件（验证邮箱、魔法登录、找回通行密钥、重置口令、口令已改通知）。这是库里**唯一的直接标识符** —— 没有姓名、电话、地址、生日、头像、地理位置、通讯录。',
+            '我们的服务器',
+            '明文',
+          ],
+          [
+            '口令的不可逆散列，以及各类一次性令牌的散列',
+            '验证身份。🔴 你的**口令本身从不落库、从不上传、从不写进日志**。',
+            '我们的服务器',
+            '明文（是散列值，不是口令）',
+          ],
+          [
+            '通行密钥（passkey）的公钥、凭据标识、签名计数器、你给它起的名字',
+            '无口令登录。**私钥永远只在你的设备或安全芯片里**；我们不采集认证声明（attestation），因此不持有、也不处理任何生物特征模板。',
+            '我们的服务器',
+            '明文',
+          ],
+          [
+            '设备标识 `clientId`、设备名、应用版本、最后出现时间、`userAgent`',
+            '跨设备并发裁决（同一字段被两台设备同时改时，要有确定性结果）；以及在设置里告诉你"哪台设备同步到哪一步"。',
+            '我们的服务器 + 本地',
+            '明文',
+          ],
+          [
+            '同步事件（你每一条数据改动的内容）',
+            '跨设备同步与冲突合并。这是"同步"这件事本身。',
+            '我们的服务器 + 本地',
+            '🔴 内容**密文** + 形状**明文**（第 2 条那 11 项）',
+          ],
+          [
+            '订阅、订单、优惠码核销记录、金额与法域标记',
+            '计费、对账与开票义务。🔴 **不收集卡号、支付账号或账单地址** —— 支付在你的微信客户端里完成，我们只拿到订单结果。',
+            '我们的服务器',
+            '明文',
+          ],
+          [
+            '邀请关系（谁邀请了谁、当时用的哪个码、什么时候验证、发了几天奖励）',
+            '兑现"邀请好友得会员"。🔴 这里含**第三人数据**：被邀请人的邮箱；结算时我们还会读取它、取其 `@` 之前的部分作为展示名**快照**写进邀请人的通知（此后对方改邮箱也不会改写那条历史）。邀请人能在自己的「活动」页看到这个展示名。',
+            '我们的服务器',
+            '明文',
+          ],
+          [
+            'Web Push 的订阅三要素（推送端点 URL 加两个密钥）',
+            '仅在你主动开启后台推送之后。那个端点 URL 本身是"能往这台设备推东西"的能力地址，我们刻意不把它写进日志。',
+            '我们的服务器',
+            '明文',
+          ],
+          [
+            '账号语言、条款接受时刻与当时那一套文件的版本号、存储用量与配额、登录失败计数与锁定状态',
+            '界面语言、同意留痕、容量闸门、暴力破解防护。',
+            '我们的服务器',
+            '明文',
+          ],
+          [
+            '你在应用里输入与生成的全部内容（任务、清单、标签、便签、习惯、专注记录、提醒）',
+            '待办与笔记这些**基本功能**本身。它们不需要账号、不需要联网、不需要我们。',
+            '🔴 只在你的设备',
+            '不经过我们；本地是明文（第 2 条）',
+          ],
+          [
+            'AI 功能里发出去的那几个字段',
+            '按功能各不同。见第 4 条的反向澄清与第 8 条：这些请求由你的设备**直接**发往**你自己填写**的端点，我们的服务器不是中转。',
+            '不经过我们',
+            '以**原文**发往你指定的端点',
+          ],
+        ],
+      },
+      {
+        kind: 'docRef',
+        docId: 'personal-info-list',
+        text: '逐字段的《个人信息收集清单》—— 收集方式、使用场景、是否必要、保存期限、到期后的处理方式 —— 与这份政策同包发布，应用内「设置 → 隐私与数据」二级菜单可直接打开。这里**不复制**一遍那张表：同一件事手写两处必然漂移，而以哪一处为准说不清。',
+      },
+    ],
+  },
+  {
+    id: 's4',
+    title: '我们不做什么 —— 以及确实发出去的四类请求',
+    blocks: [
+      {
+        kind: 'p',
+        text: '"不做"这一面是这份政策里少数几条能理直气壮写的话，而且有代码级证据：服务端与客户端的**实际依赖树**逐项搜过（连锁文件一起），不是"据我们所知"。',
+      },
+      {
+        kind: 'ul',
+        items: [
+          '**不分析你的任务内容。** 上云的只有密文，我们既不持有解密所需的密钥，也没有任何一条"读取用户明文"的代码路径。',
+          '**不投放广告、不做定向推送、没有内容型 feed。** 因此也不存在"关闭个性化推荐"这种开关的必要。',
+          '**不出售、不出租、不交换**你的数据；没有任何把用户数据当作商品或营销素材的机制。',
+          '🔴 **没有接入任何统计、埋点、广告或崩溃上报 SDK。** 服务端代码里 14 个关键词（analytics、sentry、posthog、mixpanel、amplitude、telemetry、bugsnag、firebase、gtag、logEvent、captureException、crash 等）**逐项零命中**，运行时依赖里没有 APM、没有错误聚合服务；各端打包配置里也没有任何具备外发能力的第三方 SDK，前端没有外部 CDN、没有远端字体。',
+          '**不记录 HTTP 访问日志**（框架自带的访问日志是关的，`logger: false`），**IP 地址不落库** —— 整个数据库里没有一列 IP。',
+          '**不发营销邮件、没有订阅列表、没有群发。** 只有第 3 条列过的那五封纯功能性邮件，其中"口令已改"那封刻意只在成功后发（否则它就同时是骚扰接口和账号存在性探测器）。运营后台也**不能**向用户发送自由文本通知。',
+          '**我们不用你的数据训练任何模型。** 你自选端点那一侧是否训练，由该服务商决定，我们无法控制（第 8 条）。',
+        ],
+      },
+      {
+        kind: 'p',
+        text: '反过来，"第三方"这一面必须写清楚：**确实存在四类离开我们服务器的请求**。所以任何一句「我们不与任何第三方共享你的数据」都与代码不符，我们**不写**那句话。下面是全部四项，逐项给目的地、时机与送出去的具体内容。',
+      },
+      {
+        kind: 'table',
+        head: ['谁收到', '什么时候发', '送出去的是什么'],
+        rows: [
+          [
+            'haveibeenpwned.com（泄露口令检查）',
+            '仅在你**设置口令**的那一刻：注册、改密、重置完成。🔴 **登录时一律不检查。** 查不成按"通过"处理（fail-open），并留一条告警日志。',
+            '你口令的 SHA-1 摘要的**前 5 个十六进制字符**（一段 k-匿名区间查询）。这个前缀反推不出口令，请求里**不带**邮箱、用户 id 或任何身份标识。',
+          ],
+          [
+            'SMTP 邮件服务商（哪一家由部署配置决定，代码里不写死任何服务商）',
+            '发那五封功能邮件时。只要你有一个邮箱地址，它就一定会经过这家服务商。',
+            '收件地址 + 邮件正文。正文是封闭词表的文案加**一条一次性令牌链接**。🔴 **端到端加密不延伸到邮件通道** —— 令牌在邮件里是明文。官方实例所配置的具体服务商名称登记在《第三方与共享清单》里。',
+          ],
+          [
+            '微信支付',
+            '你在网页里下单、生成扫码支付二维码时。',
+            '一个**内部自增数字用户 id**（它同时被编进商户订单号，作为回调里归属兜底的第二次编码），加商品名、金额、币种、回调地址。🔴 不发邮箱、不发姓名、不发任何任务内容。',
+          ],
+          [
+            '浏览器或操作系统的推送服务（`endpoint` 那个 URL 指向的那一家，例如 Firefox、Chrome、Safari 各自的推送服务）',
+            '仅在你开启 Web Push 后台送达之后。',
+            '那个端点 URL（能力地址）+ VAPID 鉴权头里携带的**运营者联系邮箱**。载荷是双层加密（推送传输加密 + 应用层信封），而且内容恒为一个固定串"让小组件去刷新"，**不含任何用户内容**。推送服务能看到的是"某个端点被反复投递"。',
+          ],
+        ],
+      },
+      {
+        kind: 'callout',
+        text: '这四类之外，还有一类不在"我们与第三方"的关系里、但确实会让你的明文离开设备：**你自己主动使用的导出与 AI**。导出的文件是**不设防的明文 JSON**（含完整事件日志与已删除记录），移动端走系统分享面板、可以转给任何第三方应用；AI 功能发出去的是原文。导出面在第 3 条与《个人信息收集清单》里列，AI 出境的完整规则在第 8 条与《AI 与数据出境》里。',
+      },
+    ],
+  },
+  {
+    id: 's5',
+    title: '第三方与共享',
+    blocks: [
+      {
+        kind: 'p',
+        text: '上一条给了四类对外请求的方向，这一条给**定性**。法律上"第三方"其实是三种不同的关系，要求的东西也不同：**委托处理**（对方只按我们的指令存与转，要在处理规则里披露，不需要单独同意）／**向其他个人信息处理者提供**（对方自己决定拿来干什么，须逐项告知接收方名称、联系方式、目的、方式、信息种类并取得**单独同意**）／**你自行向第三方提供**（那不是你与 heyta 之间的事，是你在处分自己的数据）。把它们统称"第三方"是最常见的错误写法。',
+      },
+      {
+        kind: 'docRef',
+        docId: 'third-parties',
+        text: '《第三方与共享个人信息清单》逐家给出：接收方名称、共享方式（委托处理／用户直接发送／用户指示的转移）、信息种类、使用目的、接收方的联系方式与所在国家或地区。',
+      },
+      {
+        kind: 'callout',
+        text: '两处最容易读错的地方：**基础设施供应商（云主机、数据库托管）是按我们的指令存储，属委托处理，不是"把你的数据给出去的第三方"**；而**你自建的那台服务器从来不是我们的第三方** —— 那是你自己的处理活动（第 1 条第三行）。',
+      },
+    ],
+  },
+  {
+    id: 's6',
+    title: '系统权限',
+    blocks: [
+      {
+        kind: 'p',
+        text: 'heyta 不申请位置、通讯录、通话记录、短信、照片、麦克风、相机、健康、日历读写权限，也不读取其他应用的数据。各端实际写进系统清单文件的项目极少，而这份政策**不复述那张表**：它必须与安装在你设备上的清单文件逐字一致，所以只在一份文件里维护、一处修改。',
+      },
+      {
+        kind: 'docRef',
+        docId: 'permissions',
+        text: '《应用权限清单》逐项列出：权限名、对应功能、什么时候申请、拒绝之后哪些功能照常可用（目前 Android 只有 `INTERNET`，iOS 没有任何需要说明的隐私权限申请）。',
+      },
+      {
+        kind: 'callout',
+        text: '对应《常见类型移动互联网应用程序必要个人信息范围规定》第四条与《认定方法》第四类第 2 项的口径：**你不给任何权限、不开同步、不开 AI、不开本机接口，任务、清单、便签、习惯与番茄钟这些功能照常可用。** 这不是客套：所有与隐私有关的开关出厂都是关闭状态，而写入只依赖你设备本地的操作日志。',
+      },
+    ],
+  },
+  {
+    id: 's7',
+    title: '存储地点与期限',
+    blocks: [
+      {
+        kind: 'p',
+        text: '**存储地点**：我们官方托管实例的服务器位于**中华人民共和国境内**，账号与同步数据不存放在境外。你自建实例的存储地由你的部署决定，我们不获知。',
+      },
+      {
+        kind: 'table',
+        head: ['数据', '留存多久', '到期之后怎么处理'],
+        rows: [
+          [
+            '同步事件（密文内容 + 那 11 项明文形状）',
+            '🔴 **45 天**。这是代码里的固定常量，当前**不可由配置改**，配合**每日一次**的自动清理任务。清理任务即使删除条数为 0 也会打一条日志，为的是"保留期真的执行过"这件事可以被证明，而不是只能靠缺失来诊断。',
+            '从数据库删除；已被快照覆盖的旧事件同样在清理范围内。',
+          ],
+          [
+            '设备记录',
+            '同一个 45 天窗口（超过期限仍未出现过的设备行）。',
+            '删除。',
+          ],
+          [
+            '注册后从未验证邮箱的账号',
+            '复用同一个 45 天窗口作为宽限期。',
+            '整行删除。我们刻意不加第二个旋钮 —— 多一个参数就多一处会漂移的地方。',
+          ],
+          [
+            '账号本身（邮箱、口令散列、通行密钥、语言、条款接受时刻）',
+            '到你注销账号为止。',
+            '🔴 注销是**真删除**：账号行连同名下的事件、同步状态、设备、通行密钥、订阅、订单、邀请、通知按数据库级联删除（共 18 处级联），**没有冷静期，也没有回收站**。',
+          ],
+          [
+            '订阅、订单与优惠码核销记录',
+            '账号存续期间；注销时随账号一起级联删除。法律与税务要求保留的凭证，在其法定期限内仅用于履行该义务。',
+            '到期删除。',
+          ],
+          [
+            '数据库备份',
+            '本地保留 **14 天**（每日一份整库快照，可选加密与异地存放）。',
+            '🔴 随保留期自然过期。**备份是整库快照，代码里没有"从既有备份中单独删掉某一个人"的能力** —— 所以注销之后，你的数据仍可能在 14 天内的备份副本里存到该备份过期。这是我们能诚实写出的上限；把它写成"注销后立即彻底销毁"就是假话。',
+          ],
+          [
+            '服务端日志',
+            '默认只输出到进程的标准输出；HTTP 访问日志是关闭的，IP 不入库，`user-agent` 不写日志。开启"另外写盘"时日志为明文，而**当前代码里没有日志轮转与到期删除机制**。',
+            '由运维流程按下面的"确定方法"处置。',
+          ],
+        ],
+      },
+      {
+        kind: 'p',
+        text: '有几类期限我们**给不出一个具体天数**，按《网络数据安全管理条例》第二十一条第（三）项写明**保存期限的确定方法**：安全事件处置与投诉举报的处理记录，按其法定留存期限保存；法律或行政法规另有规定的从其规定；未规定的，以争议解决所必要的最短期间为限。',
+      },
+      {
+        kind: 'callout',
+        text: '⚠️ 「45 天」的诚实边界：每日清扫有一条运维侧的删除预算开关，把它设成 0 会让清扫停摆。我们**按"45 天、每日执行"来设计并监控它**，而不是把它写成一条自然规律 —— 一项可被验证的运维承诺，比一个绝对化的保证更靠得住。',
+      },
+    ],
+  },
+  {
+    id: 's8',
+    title: '跨境：两件事必须分开',
+    blocks: [
+      {
+        kind: 'p',
+        text: '这一节里"出境"指的是两件完全不同的事，把它们合成一句话就会变成假话：**我们的出境**（要由我们履行第三十八、三十九条的手续与告知）与**你自己的出境**（你在处分自己的数据，处理者是你）。下面分别写。',
+      },
+      {
+        kind: 'p',
+        text: '**第一件：同步。** 我们官方托管实例的全部存储与处理都在中华人民共和国境内，同步数据不出境，我们也没有任何把境内数据发往境外服务器的通道。你把自己的数据同步到境外的服务器 —— 那是**你自己的部署行为**，处理者是你，不是 heyta（第 1 条第三行、第五十一条的定性同理）。',
+      },
+      {
+        kind: 'p',
+        text: '**第二件：AI 功能。** heyta 里的 AI 不是"我们提供的 AI 服务"，而是一种**接入能力**：模型端点由**你在设置里自己填写**（内置的两个预设都是你本机的地址，我们刻意不内置任何云端服务商，不维护服务商清单，也不判断某家在哪一个国家）；请求由**你的设备直接发往你填的那个端点**，我们的服务器不是这条链路的中转、不代发、不代持密钥、不从中收费。所以法律上这是「**你自行向第三方提供**」，不是「我们向境外提供」。而它有一个硬前提要一起说清：**发出去的是原文，不做摘要、不做脱敏** —— 任务标题与备注正文会整段照发，已授权工具的名字与参数结构也会作为"这台机器有什么能力"一起发出。AI 的三道闸（总开关、允许远程、逐功能出境授权）**出厂全部关闭**；撤回后不再发新请求，且变更数据接收方后此前的授权**不被继承**；但撤回**不溯及已经发出的那一次请求**。托管的云端 AI（由我们替你调用并计费的形态）目前**根本不存在**，所以我们也不在这里描述它。',
+      },
+      {
+        kind: 'docRef',
+        docId: 'ai-and-transfer',
+        text: '《AI 与数据出境》给出逐功能的出境字段清单、第三十九条要求的七项告知（含最容易被漏掉的"你如何向境外接收方行使权利的方式和程序"）、本机接口与 MCP 的授权模型，以及各项功能默认关闭的完整状态。',
+      },
+      {
+        kind: 'callout',
+        text: '一句要提前说清的提醒：你的任务与便签正文里**可能整段包含健康、行踪、宗教、金融**这类内容。它们只在你设备上是明文，一旦发给某个 AI 端点就离开了你的控制范围，而该端点是否留存、留多久、拿去做什么，我们**无法获知也无法审计**。发与不发由你逐功能判断 —— 我们不替你判断，也不做内容审查。',
+      },
+    ],
+  },
+  {
+    id: 's9',
+    title: '未成年人',
+    blocks: [
+      {
+        kind: 'p',
+        text: 'heyta 是一款效率工具：它不向其他用户展示你的内容（没有社区、没有共享清单、没有评论），不投放广告，也没有内容型推送。🔴 **我们不主动核实注册者的年龄，因此不能声称已经做了年龄核验** —— 这里写清规则，而不是用一句"仅供成年人使用"把自己摘出去。',
+      },
+      {
+        kind: 'docRef',
+        docId: 'minors',
+        text: '不满十四周岁未成年人的个人信息在法律上属于**敏感个人信息**，处理须取得其父母或其他监护人的同意（第三十一条），并且必须**单独制定一份个人信息处理规则**。那份独立文件在同包的《未成年人个人信息处理规则》里。',
+      },
+      {
+        kind: 'callout',
+        text: '如果一位不满十四周岁的使用者正在使用我们官方的托管服务：请监护人直接给我们发信（`heyta@waytofuture.cn`，写清账号邮箱），我们会按请求更正、删除或注销账号，并在 15 个工作日内答复；我们不会因为未成年人或其监护人不同意处理非必要信息，而阻止其使用基本功能。',
+      },
+    ],
+  },
+  {
+    id: 's10',
+    title: '你的权利，以及怎么行使',
+    blocks: [
+      {
+        kind: 'p',
+        text: '第四十四至五十条给你的权利，逐项对照 heyta 的**真实实现程度**来写。下面凡属"目前只能靠邮件办"的，我们**就写成邮件** —— 把一个界面上不存在的按钮写成存在，是把承诺写成假话。',
+      },
+      {
+        kind: 'ul',
+        items: [
+          '**查阅与复制**：✅ 三个端（Web、命令行、移动端）都能导出**全量**数据 —— 你看得见的全部内容、完整的事件日志、已删除记录（墓碑），外加可核对的计数。**导出文件本身是明文 JSON、不加任何保护**，它落在哪里、要不要转给别人，由你负责。',
+          '**更正与补充**：✅ 任务、清单、标签、习惯等业务字段你在任一端改一次，就会同步到其他所有端。⚠️ 服务器上那些事件是密文，我们**无法读取、也无法替你改写**其中某一条 —— 只能由你登录后自行修改。❌ **邮箱不可更换**：产品目前没有换绑邮箱的能力，我们如实写这条限制，而不是摆一个点了没反应的入口。',
+          '**删除**：✅ 应用内的删除在事件模型里是**追加一条删除事件**，不是抹掉记录。它从你的所有设备与界面上消失，但服务器上承载它的加密历史记录会在**保留期（当前 45 天）届满后**被清理掉。🔴 界面里的"彻底删除"**只是一个标记**，它不缩短这个期限，也不等于"已从服务器销毁"。',
+          '**注销账号**：⚠️ 服务端有真正的硬删除能力，但**应用界面里目前没有这个入口**。所以现在的路径是**写信给我们**（`heyta@waytofuture.cn`，从你注册时用的那个邮箱发出，以便我们核验归属），我们在 15 个工作日内完成核查与删除。注销之后仍然存在的副本只有一处：上条那个 14 天的备份窗口。',
+          '**撤回同意**：✅ AI 出境授权、记忆偏好层、推送订阅三处都能撤回，而且关掉之后**下一次调用连输入都不再被读取**（不是只在数据库里标成"已关闭"）。限制：撤回不溯及已经发出的请求。',
+          '**要求解释说明**：✅ 你有权要求我们对这份处理规则作出解释，同样走上面的邮箱。',
+        ],
+      },
+      {
+        kind: 'p',
+        text: '受理与答复：凡需要我们人工处理的请求（查阅、更正、删除、注销、撤回、解释），**我们承诺自收到之日起 15 个工作日内完成核查、处理并答复**。这个时限取自《认定方法》第六类设定的上限（未作承诺时，法定默认就是 15 个工作日）—— 我们把它写成具体天数而不是"尽快"。拒绝任何请求时，我们会说明理由；你也可以向履行个人信息保护职责的部门申诉。',
+      },
+      {
+        kind: 'docRef',
+        docId: 'data-rights',
+        text: '《个人信息权利行使指南》逐条写出：各端的具体入口位置、提交请求时要带的身份核验材料、我们会怎么处理、以及端到端加密之下我们能替你做什么、做不到什么边界。',
+      },
+    ],
+  },
+  {
+    id: 's11',
+    title: '我们用什么措施保护这些数据',
+    blocks: [
+      {
+        kind: 'p',
+        text: '按第五十一条（以及《网络安全法》修正后第二十三条的五项义务）要求列措施。这里给的是**可核验的具体取值** —— 一句"我们采取了严格的安全保护措施"不满足任何一条法定告知义务。',
+      },
+      {
+        kind: 'ul',
+        items: [
+          '**口令存储**：Argon2id，memoryCost **19 MiB**、timeCost **2**、parallelism **1**、输出 32 字节，每个用户独立 16 字节随机盐；再叠加一个**不写进数据库**的服务端秘密参数（pepper，至少 32 字符）—— 它缺失或过短时服务**拒绝启动**，而不是降级运行。库里存的是自描述的散列串，没有明文、也没有可逆形式。',
+          '**口令规则**：长度下限 8 个码点、上限 256（按码点计，不静默截断），**不做**"必须含大写和符号"这类组成规则（这是刻意跟随 NIST 的取向），代之以本地常见口令表 + 第 4 条那类已泄露库前缀检查。下限低于某些更严的建议值是**有意的产品取舍**，补偿控制就是上面两项。',
+          '**同步内容**：上传前用你的口令派生密钥加密，**Argon2id 派生 + AES-256-GCM**，信封形状是「盐 16 字节 + IV 12 字节 + 密文与认证标签」。服务端有一道**入站闸门**：没有加密标记或形状不符的上传**直接拒绝**，且拒绝发生在指纹化、去重、配额记账与落库**之前**，被拒内容不在服务端留痕。',
+          '**传输**：对外服务在 HTTPS（TLS）之下。🔴 端到端加密覆盖的是同步内容，**不覆盖邮件通道**，也**不覆盖你的设备磁盘**（第 2 条）。',
+          '**一次性凭据**：令牌只存 **SHA-256 散列**、一次性、消费即失效；有效期分别是 24 小时（验证邮箱）、15 分钟（魔法登录与重置口令）、1 小时（找回通行密钥）。🔴 重置或修改口令会让**其他设备上的登录立即失效**。找回密码页面对"账号不存在""没设过口令""已有有效链接"三种情况回同一句话 —— 否则它就变成一个账号存在性探测器。',
+          '**通行密钥**：只存公钥、凭据标识与计数器，**不采集认证声明**。生物特征的比对全部在你的设备安全芯片内完成，我们不持有、也无法获取任何指纹或人脸模板。',
+          '**访问控制与数据最小化**：运营后台的每个响应都走**白名单投影**（逐字段列出要返回什么，不靠"记得别 select"）。口令散列、任何一次性令牌、passkey 公钥与凭据标识、同步内容（后台只有条数）、推送端点**都不在其中**。后台也不能改动金额、不能退款、不能向用户群发自由文本通知。准入只有一个布尔标志、默认关闭，且授权只能由运维在服务器上手工执行。',
+          '**运行日志**：HTTP 访问日志关闭（`logger: false`），**IP 不入库**，`user-agent` 不写日志，请求体、口令值、令牌值不打印；给客户端的错误文案不回显被拒的数据内容；同步体积类日志只记字节数。',
+          '**我们不作绝对安全保证。** 本政策里不会出现"绝对安全""百分之百保护"这类表述。发生或可能发生个人信息泄露、篡改、丢失时，我们依法立即采取补救措施，按规定告知你并向有关主管部门报告。',
+        ],
+      },
+      {
+        kind: 'p',
+        text: '最后一条与产品架构有关，因此必须讲明白：**本地库不加密（第 2 条）与"应用里没有一键抹掉全部本地数据的按钮"是同一件事的两面。** 已同步下来的内容在你自己的设备上以明文存在，直到你卸载应用或在浏览器里清除站点数据。这是本地优先架构的固有代价，我们选择把它写出来，而不是用"端到端加密"四个字盖过去。',
+      },
+    ],
+  },
+  {
+    id: 's12',
+    title: '同意，以及这份政策怎么变',
+    blocks: [
+      {
+        kind: 'p',
+        text: '**同意是怎么记录的。** 注册时勾选的那句话指向**你所连接的那台服务端**提供的条款与政策；我们记下同意时刻，以及**当时那一套文件的版本号**（一个按文档标识排序拼出的整套版本指纹，形如 `privacy@1.0` 与其他几份串在一起）。之所以记"一整套"而不是只记隐私政策的版本：你勾选的是**一组**文件，只记一个版本就没法回答"他同意的服务条款是哪一版"。',
+      },
+      {
+        kind: 'ul',
+        items: [
+          '本政策变更时，我们会在**新版本生效之前**通知（应用内与服务端对外页同步更新），并写明改了哪几处。',
+          '🔴 **变更不溯及你已经购买的期间。** 你已付款的订阅期限内，服务与价格规则仍按你购买时那一版执行。',
+          '处理的**目的、方式或种类发生变化**时，重新取得同意是法定要求（第十四条第三款、第十七条第二款），不能靠"更新一下版本号"糊过去 —— 新增一类采集、或把某个默认采集项从关改成开，都必须有一次**独立的重新提示**，而不是随版本静默发布。',
+          '**同意默认是未勾选的**，所有与隐私相关的开关出厂全部关闭：AI 总开关、允许远程、逐功能出境授权、记忆偏好层、本机接口以及其中**每一个工具**。而且这条"默认关"在读取时被严格判定 —— 只认真值 true，字符串、数字 1、字段缺失一律按关闭处理，存储被改坏也不会悄悄打开。',
+          '这份政策有版本号（见上方元信息与第 14 条），它**进同意记录**，所以改版必须 bump 版本，而小节标识符不许改（它们是深链接的落点）。',
+        ],
+      },
+      {
+        kind: 'p',
+        text: '再补一条容易被顺手写错的：**"技术上看不见"不是法定的豁免理由。** 第十八条允许不告知的情形只有"法律、行政法规规定应当保密或者不需要告知"，紧急情况另有其规则 —— 加密不在其中。所以服务器读不到你的明文，**不会**减少上面任何一节应写的内容，这份政策也不会因此省略任何一项。',
+      },
+    ],
+  },
+  {
+    id: 's13',
+    title: '投诉与举报渠道',
+    blocks: [
+      {
+        kind: 'p',
+        text: '这里要分两件事来列：第十七条要求的"处理者联系方式"（第 1 条已经给出完整主体信息），与《认定方法》第六类第 5 项要求的**对外公布的个人信息安全投诉、举报渠道**。它们指向同一个邮箱，但职责不同，因此两条都写，不合并成一句。',
+      },
+      {
+        kind: 'ul',
+        items: [
+          '**隐私专用邮箱**：`heyta@waytofuture.cn`。它同时是权利请求受理入口与投诉举报入口；主题里写「隐私」会更快分流到对应处理人。',
+          '**答复时限**：自收到之日起 **15 个工作日内**完成核查、处理并答复（需要人工处理的事项一律按这个时限承诺）。',
+          '**你也有权向监管投诉举报**：可以直接向履行个人信息保护职责的部门（网信、电信主管部门、公安、市场监管等）投诉或举报。我们不会因为你这样做而改变向你所提供的服务。',
+        ],
+      },
+      {
+        kind: 'p',
+        text: '一句诚实的话：我们目前**只有**上面这一个对外邮箱，没有公布电话、微信公众号、在线客服或客服工作时间。与其列一个不存在或没人值守的渠道，不如只写一个真有人在收的地址。',
+      },
+    ],
+  },
+  {
+    id: 's14',
+    title: '版本记录',
+    blocks: [
+      {
+        kind: 'p',
+        text: '版本号进同意记录（第 12 条），所以每次改版都必须在这里新增一行，写清改了什么、为什么改。小节标识符（本条上面的 `s1` 至 `s14`）是页面上深链接的落点，**改版时不许改动**。',
+      },
+      {
+        kind: 'table',
+        head: ['版本', '日期与变更摘要'],
+        rows: [
+          [
+            '1.0',
+            '`2026-10-01` 首次起草。全文依据三份代码考古（服务端数据流 / 客户端与权限 / AI 出境与权利实现）写成，逐条对照《认定方法》六大类与第十七条的四项必备内容。**状态：草案，尚未经法务复核、尚未生效** —— 页面顶部会显示"尚未生效"横幅，本文中的时限（15 个工作日）、保留期（45 天 / 14 天）与各项承诺在产品负责人核定、法务复核之前仍可能改写。',
+          ],
+        ],
+      },
+    ],
+  },
+] as const;
+
+const en = [
+  {
+    id: 's1',
+    title: 'What this policy covers, and what it does not',
+    blocks: [
+      {
+        kind: 'p',
+        text: 'heyta is three different things at once: **open-source software**, a **server you can run yourself**, and **the hosted service we operate**. Responsibility differs completely across the three, and this policy binds only the third. That distinction is not wordplay: the statement you accept at sign-up reads “I agree to the terms of service and privacy policy **of the server I am connecting to**”, and “that server” may be a machine anyone has put in place.',
+      },
+      {
+        kind: 'table',
+        head: ['What you get', 'Who processes your data', 'Does this policy apply'],
+        rows: [
+          [
+            'The heyta app itself (client code for every platform and the server **source code**, MIT-licensed, free of charge)',
+            'No one processes anything on your behalf. The code runs on your device and your data stays on your device.',
+            '🔴 **It does not apply.** Software does not process anyone’s personal information, and for the same reason it cannot make promises to you.',
+          ],
+          [
+            'A sync server you self-host (from our source code or from any compatible implementation)',
+            '🔴 **You yourself** are the personal information processor. What is stored, in which country, for how long, and who can read it are all determined by your deployment.',
+            '🔴 **It does not apply.** We have no access to that machine and we are not responsible for its behaviour; publishing the processing rules for it is your obligation.',
+          ],
+          [
+            'The hosted service we operate (`heyta.waytofuture.cn`: accounts, sync, subscription billing)',
+            'The processor named below — “we” throughout this policy.',
+            '✅ **It applies.** Every clause below binds this company.',
+          ],
+        ],
+      },
+      {
+        kind: 'p',
+        text: 'Processor details: **晓黎（杭州）人工智能科技有限公司** · unified social credit code `91330106MAKNJ6DX7M` · legal representative 邓湘雷 · registered address 浙江省杭州市西湖区蒋村街道文一西路 830 号蒋村商务中心 3 号楼 210 室 · contact email `heyta@waytofuture.cn` · ICP filing number of the primary domain 浙ICP备2026081423号. 🔴 As for the app filing number, whatever is published on the in-app “About” page and on the server’s outward pages is authoritative — until the MIIT has approved one, this policy prints no number and will not substitute a plausible placeholder.',
+      },
+      {
+        kind: 'callout',
+        text: 'A question that will certainly be asked: **I do not use your server — do I still need to read this policy?** No. Install the app, run your own server, and what binds you is the set of rules you write yourself together with the law of your place; this policy takes effect only once “data is sent to `heyta.waytofuture.cn`”. The converse holds too: if you host your own server, then **the party carrying the processor’s obligations towards you is you**, not heyta.',
+      },
+    ],
+  },
+  {
+    id: 's2',
+    title: 'Where your data actually lives, and who can read it',
+    blocks: [
+      {
+        kind: 'p',
+        text: 'This section comes second because it is where this policy would most easily turn into a false statement. heyta’s encryption **covers the sync channel only**: a change is encrypted before it leaves your device, the server receives ciphertext, and the server does not hold what would be needed to decrypt it (the key is derived from your password, on your device). That is **not** the same as “all of your data is encrypted”, and the three locations below must be kept apart.',
+      },
+      {
+        kind: 'table',
+        head: ['Location', 'Plaintext or ciphertext', 'Who can read it'],
+        rows: [
+          [
+            '**Your own device** (your browser\'s built-in local storage on the web; a database file on the device for mobile and desktop)',
+            '🔴 **Plaintext**. heyta does not encrypt anything on disk, not a single byte.',
+            'Anyone holding this device who unlocks this account can read every task, list, note, habit and focus record you have. The line of defence is the device’s own lock screen, OS account and file permissions — FileVault, APFS and Android FBE are **operating system** capabilities, not features of this app.',
+          ],
+          [
+            '**The servers we operate**',
+            'The content is **ciphertext**; the structural metadata is **plaintext** (itemised immediately below).',
+            'We cannot read your task titles or note bodies, but we can read every “shape” listed below.',
+          ],
+          [
+            '**A server you host yourself**',
+            'Whatever your deployment does. We are not involved and not informed.',
+            'Whoever operates that machine — that is you, or whoever you have handed operations to.',
+          ],
+        ],
+      },
+      {
+        kind: 'p',
+        text: 'The server cannot see the **content** of your tasks, but every change travels with its **shape**. There are exactly **11** sync metadata fields stored in plaintext in our database:',
+      },
+      {
+        kind: 'ul',
+        items: [
+          '`entityType` — **which kind of object** the change concerns (task, list, label, habit, configuration, …)',
+          '`entityId` and `entityIds` — **which** object was changed, and which ones a batch operation covered (which tasks belong to the same list is visible straight from the plaintext ids)',
+          '`opType` and `actionType` — whether it was a creation, a modification or a deletion. “This person deleted something”, “this person changed a status” are facts visible in plaintext',
+          '`vectorClock` — how many device identifiers this account has produced in total, and the logical counter of each (the outline of editing activity)',
+          '`clientTimestamp` — what time your device claims the change happened',
+          '`receivedAt` — when we received it',
+          '`serverSeq` — its position in your event sequence',
+          '`payloadBytes` — how large the record is (length alone is a side channel)',
+          '`schemaVersion` — which revision of the data model the sending client used',
+          '`clientId` — which device sent it (a pseudonymous random per-device string containing no name and no email address)',
+          'plus the **device dimension**: the device name you chose, the app version, the last-seen time, and a `userAgent` column on the device table.',
+        ],
+      },
+      {
+        kind: 'p',
+        text: 'For that reason this policy **does not** say “our servers cannot see any of your data”. The accurate formulation is: **end-to-end encryption covers content, not metadata** (structure, order, time, size, devices). One further honest boundary belongs in the same breath: the “ciphertext only” gate checks the **shape** of a payload; it is not a **cryptographic proof** that the payload is ciphertext — a sufficiently long string that happens to look like base64 will pass. That is also why we do not write “we have verified on your behalf that your data is encrypted”.',
+      },
+      {
+        kind: 'callout',
+        text: 'We do not advertise “we can see nothing”. A promise the code can be checked against is more useful than one that sounds safer and cannot be kept.',
+      },
+    ],
+  },
+  {
+    id: 's3',
+    title: 'The personal information we process, item by item',
+    blocks: [
+      {
+        kind: 'p',
+        text: 'Article 17 requires this section to give the purpose, the method, the categories and the retention period (periods are in section 7). The table below is a **category-level** overview; the column “plaintext or ciphertext on our servers” describes the state **on our servers**, whereas your local database is plaintext in every location (section 2).',
+      },
+      {
+        kind: 'table',
+        head: ['What we process', 'Why we need it (purpose of processing)', 'Where it is stored', 'Plaintext or ciphertext on our servers'],
+        rows: [
+          [
+            'Email address',
+            'Your sign-in identity; delivering the five functional emails (address verification, magic link, passkey recovery, password reset, password-changed notice). It is the **only direct identifier** in the database — there is no name, phone number, postal address, date of birth, avatar, location or contacts.',
+            'Our servers',
+            'Plaintext',
+          ],
+          [
+            'The irreversible hash of your password, and the hashes of the various one-time tokens',
+            'Verifying identity. 🔴 **Your password itself is never stored, never uploaded, never written to a log.**',
+            'Our servers',
+            'Plaintext (a hash value, not the password)',
+          ],
+          [
+            'Passkey public keys, credential identifiers, signature counters and the name you gave a passkey',
+            'Passwordless sign-in. **The private key never leaves your device or secure hardware**; we do not collect attestation statements, so we hold — and could not obtain — no biometric template.',
+            'Our servers',
+            'Plaintext',
+          ],
+          [
+            'Device identifier `clientId`, device name, app version, last-seen time, `userAgent`',
+            'Deterministic cross-device conflict resolution (when two devices change the same field there must be one result), and telling you in settings which device has synced to which point.',
+            'Our servers + locally',
+            'Plaintext',
+          ],
+          [
+            'Sync events (the content of every change you make)',
+            'Cross-device sync and conflict merging. This is what the act of “syncing” is.',
+            'Our servers + locally',
+            '🔴 Content **ciphertext** + shape **plaintext** (those 11 fields from section 2)',
+          ],
+          [
+            'Subscriptions, orders, coupon redemptions, amounts and the jurisdiction flag',
+            'Billing, reconciliation and invoicing obligations. 🔴 **No card number, payment account or billing address is collected** — payment completes inside your WeChat client and we receive only the order result.',
+            'Our servers',
+            'Plaintext',
+          ],
+          [
+            'Referral relationships (who referred whom, which code was used, when it was verified, how many reward days were granted)',
+            'Fulfilling “invite a friend, get membership”. 🔴 This contains **third-party data**: the referred person’s email address. At settlement we also read it and take the part before the `@` as a display-name **snapshot** for the referrer’s notification (a later change of that address does not rewrite the historical record). The referrer can see this display name on their own “activity” page.',
+            'Our servers',
+            'Plaintext',
+          ],
+          [
+            'The three Web Push subscription values (the push endpoint URL plus two keys)',
+            'Only after you deliberately enable background push. That endpoint URL is itself a capability address — “this is where this device can be pushed to” — and we deliberately keep it out of logs.',
+            'Our servers',
+            'Plaintext',
+          ],
+          [
+            'Account language, the moment the terms were accepted together with the version fingerprint of the document set at that moment, storage usage and quota, failed-login counters and lockout state',
+            'Interface language, consent evidence, the storage gate, brute-force protection.',
+            'Our servers',
+            'Plaintext',
+          ],
+          [
+            'Everything you enter and generate inside the app (tasks, lists, labels, notes, habits, focus records, reminders)',
+            'The **core features** themselves — to-dos and notes. They need no account, no network connection and nothing from us.',
+            '🔴 On your device only',
+            'Never passes through us; plaintext locally (section 2)',
+          ],
+          [
+            'The few fields sent out by the AI features',
+            'It varies by feature. See the reverse clarification in section 4 and the whole of section 8: these requests go **directly** from your device to **the endpoint you typed in yourself**; our server is not a relay.',
+            'Never passes through us',
+            'Sent to the endpoint you specify, **verbatim**',
+          ],
+        ],
+      },
+      {
+        kind: 'docRef',
+        docId: 'personal-info-list',
+        text: 'The item-by-item “Personal Information Collection List” — how each field is collected, in which situation it is used, whether it is necessary, how long it is kept and what happens once that period ends — is published in the same package as this policy and opens directly from “Settings → Privacy and data” in the app. We **do not duplicate** that table here: the same fact written down twice will drift, and it then becomes impossible to say which copy governs.',
+      },
+    ],
+  },
+  {
+    id: 's4',
+    title: 'What we do not do — and the four kinds of request that really do leave',
+    blocks: [
+      {
+        kind: 'p',
+        text: 'The negative side is one of the few places in this policy where we can write without qualification, and the evidence is at code level: the **actual dependency trees** of the server and of every client were searched item by item (lockfiles included), which is a different claim from “to the best of our knowledge”.',
+      },
+      {
+        kind: 'ul',
+        items: [
+          '**We do not analyse the content of your tasks.** Only ciphertext reaches the cloud; we hold neither the key that would decrypt it nor any code path that reads user plaintext.',
+          '**No advertising, no targeted push, no content feed.** Which is also why a “turn off personalised recommendations” switch is not needed here.',
+          '**We do not sell, rent or trade** your data; there is no mechanism that treats user data as a commodity or as marketing material.',
+          '🔴 **No analytics, event-tracking, advertising or crash-reporting SDK is integrated at all.** The 14 keywords (analytics, sentry, posthog, mixpanel, amplitude, telemetry, bugsnag, firebase, gtag, logEvent, captureException, crash and similar) return **zero hits** in the server code, the runtime dependencies contain no APM and no error-aggregation service, and no platform bundle includes a third-party SDK capable of outbound traffic — the front end loads no external CDN and no remote fonts.',
+          '**No HTTP access logs** (the framework’s own access logging is disabled, `logger: false`) and **IP addresses are not stored** — there is no IP column anywhere in the database.',
+          '**No marketing email, no subscriber list, no broadcasts.** Only the five purely functional emails listed in section 3, one of which (“password changed”) is deliberately sent only on success — otherwise it would double as a harassment endpoint and as an account-existence probe. The admin console also **cannot** send free-text notices to users.',
+          '**We do not use your data to train any model.** Whether the endpoint you chose does so is that provider’s decision and outside our control (section 8).',
+        ],
+      },
+      {
+        kind: 'p',
+        text: 'In the other direction, the third-party picture must be exact: **four kinds of request really do leave our servers**. Any sentence reading “we never share your data with any third party” would contradict the code, and we **do not** write it. Below are all four, each with its destination, its trigger and the precise content sent.',
+      },
+      {
+        kind: 'table',
+        head: ['Who receives it', 'When it is sent', 'What is sent'],
+        rows: [
+          [
+            'haveibeenpwned.com (breached-password check)',
+            'Only at the moment you **set a password**: sign-up, password change, completed reset. 🔴 **Never on login.** If the lookup cannot be completed it is treated as a pass (fail-open) and a warning is logged.',
+            'The **first 5 hexadecimal characters** of the SHA-1 digest of your password — one k-anonymity range query. The prefix cannot be reversed into the password, and the request carries **no** email address, user id or other identifier.',
+          ],
+          [
+            'Your SMTP provider (which provider is a deployment configuration decision; none is hard-coded in the code)',
+            'Whenever one of the five functional emails is sent. As soon as you have an email address, it necessarily passes through this provider.',
+            'The recipient address plus the message body. The body is copy from a closed set of templates plus **one single-use token link**. 🔴 **End-to-end encryption does not extend to the email channel** — the token travels as plaintext inside the mail. The specific provider configured for the official instance is recorded in the “Third Parties and Data Sharing” list.',
+          ],
+          [
+            'WeChat Pay',
+            'When you place an order in the web app and a scannable payment QR code is generated.',
+            'An **internal auto-incrementing numeric user id** (which is also encoded into the merchant order number, as a second encoding used to attribute the callback), plus the product name, amount, currency and callback URL. 🔴 No email address, no name, no task content.',
+          ],
+          [
+            'The push service of your browser or operating system (whichever the `endpoint` URL points to — for example the push services of Firefox, Chrome and Safari respectively)',
+            'Only after you have enabled Web Push background delivery.',
+            'That endpoint URL (a capability address) plus the **operator contact email** carried in the VAPID `sub` claim. The payload is protected twice (push transport encryption plus an application-level envelope), and its content is always one fixed string meaning “refresh the widget” — **no user content whatsoever**. What a push service can observe is that a given endpoint is being delivered to repeatedly.',
+          ],
+        ],
+      },
+      {
+        kind: 'callout',
+        text: 'Beyond those four there is one more path along which your plaintext leaves the device without being a “between us and a third party” matter: **export and AI, both of which you use deliberately yourself**. An export file is **unguarded plaintext JSON** (the complete event log and the deleted records included); on mobile it goes through the system share sheet and can therefore be handed to any third-party app. The AI features send original text. The export surface is listed in section 3 and in the “Personal Information Collection List”; the full rules for AI egress are in section 8 and in “AI and Data Transfers”.',
+      },
+    ],
+  },
+  {
+    id: 's5',
+    title: 'Third parties and sharing',
+    blocks: [
+      {
+        kind: 'p',
+        text: 'The previous section gave the direction of the four outbound requests; this one gives the **legal characterisation**. In law, “third party” is really three different relationships with three different requirements: **entrusted processing** (the other party stores and forwards strictly on our instructions; it must be disclosed in the processing rules but needs no separate consent) / **provision to another personal information processor** (that party decides for itself what to do with the data, so the recipient’s name, contact details, purpose, method and categories of information must each be disclosed and **separate consent** obtained) / **provision you make yourself** (that is not a matter between you and heyta; you are disposing of your own data). Collapsing all three into the single word “third party” is the most common drafting error in this part of a policy.',
+      },
+      {
+        kind: 'docRef',
+        docId: 'third-parties',
+        text: 'The “Third Parties and Data Sharing List” gives, provider by provider: the recipient’s name, the basis on which data reaches it (entrusted processing / sent directly by you / transferred on your instruction), the categories of information, the purpose of use, and the recipient’s contact details and country or region.',
+      },
+      {
+        kind: 'callout',
+        text: 'Two places are easy to misread: **infrastructure vendors (cloud hosting, managed database) store data on our instructions, which is entrusted processing — they are not “third parties you give your data to”**; and **a server you host yourself is never our third party** — that is your own processing activity (section 1, third row).',
+      },
+    ],
+  },
+  {
+    id: 's6',
+    title: 'System permissions',
+    blocks: [
+      {
+        kind: 'p',
+        text: 'heyta does not request access to location, contacts, call logs, SMS, photos, microphone, camera, health or calendar, and it does not read other applications’ data. The items actually written into the platform manifest files are very few, and this policy **does not restate that table**: it has to match, word for word, the manifest installed on your device, so it is maintained in a single file and changed in a single place.',
+      },
+      {
+        kind: 'docRef',
+        docId: 'permissions',
+        text: 'The “App Permissions List” itemises: the permission name, the feature it serves, when it is requested, and which features keep working if you decline (as of today Android lists `INTERNET` only, and iOS requests no privacy permission that would need explaining).',
+      },
+      {
+        kind: 'callout',
+        text: 'Against Article 4 of the rule on the scope of necessary personal information, and category 4 item 2 of the Method: **decline every permission, keep sync off, keep AI off, keep the local interface off — tasks, lists, notes, habits and the pomodoro timer all remain usable.** This is not a courtesy: every privacy-relevant switch ships in the off state, and writing depends only on the event log held on your own device.',
+      },
+    ],
+  },
+  {
+    id: 's7',
+    title: 'Storage location and retention periods',
+    blocks: [
+      {
+        kind: 'p',
+        text: '**Storage location**: the servers of our official hosted instance are located **within the territory of the People’s Republic of China**, and account and sync data are not stored outside it. The storage location of a self-hosted instance is determined by your deployment and we are not informed of it.',
+      },
+      {
+        kind: 'table',
+        head: ['Data', 'How long it is kept', 'What happens when the period ends'],
+        rows: [
+          [
+            'Sync events (ciphertext content plus those 11 plaintext shape fields)',
+            '🔴 **45 days**. This is a fixed constant in the code, currently **not configurable**, paired with an automatic cleanup job that runs **once a day**. The job writes a log line even when it deletes zero records, so that “the retention period really was enforced” is provable rather than something you can only diagnose from an absence.',
+            'Deleted from the database; superseded older events already covered by a snapshot fall within the same cleanup scope.',
+          ],
+          [
+            'Device records',
+            'The same 45-day window (device rows still absent past it).',
+            'Deleted.',
+          ],
+          [
+            'Accounts that never verified their email address after sign-up',
+            'The same 45-day window is reused as the grace period.',
+            'The whole row is deleted. We deliberately do not add a second knob — one more parameter is one more place that can drift.',
+          ],
+          [
+            'The account itself (email address, password hash, passkeys, language, moment of accepting the terms)',
+            'Until you close the account.',
+            '🔴 Closure is a **genuine hard delete**: the account row and, by database cascade, its events, sync state, devices, passkeys, subscriptions, orders, referrals and notifications are deleted (18 cascades in total). **There is no cooling-off period and no trash bin.**',
+          ],
+          [
+            'Subscriptions, orders and coupon redemptions',
+            'For as long as the account exists; deleted by cascade together with the account. Vouchers that law or tax rules require us to retain are kept for their statutory period and used only to discharge that obligation.',
+            'Deleted at expiry.',
+          ],
+          [
+            'Database backups',
+            'Kept locally for **14 days** (one whole-database snapshot per day, optionally encrypted and stored off-site).',
+            '🔴 They expire with the retention window. **A backup is a whole-database snapshot, and the code has no capability to remove one individual from an existing backup** — so after closure your data may still exist inside a backup copy until that copy falls out of its 14-day window. This is the honest upper bound we are able to state; writing “immediately and completely destroyed upon closure” would be a false statement.',
+          ],
+          [
+            'Server logs',
+            'By default the process writes to standard output only; HTTP access logging is off, IP addresses are not stored and `user-agent` is not logged. If “also write to disk” is enabled, those log files are plaintext, and **the code currently has no rotation and no expiry-deletion mechanism for logs**.',
+            'Handled by operational procedures under the method stated below.',
+          ],
+        ],
+      },
+      {
+        kind: 'p',
+        text: 'For a few categories we **cannot name a concrete number of days**, so in line with Article 21(3) of the Network Data Security Management Regulations we state the **method for determining the retention period**: records of security-incident handling and of complaint handling are kept for their statutory retention period; where a law or administrative regulation provides otherwise, that provision governs; where none does, the limit is the shortest period necessary for dispute resolution.',
+      },
+      {
+        kind: 'callout',
+        text: '⚠️ The honest boundary around “45 days”: the daily sweep has an operator-side deletion-budget switch, and setting it to 0 stops the sweep. We **design for and monitor “45 days, executed daily”** rather than writing it as a law of nature — an operational commitment you can verify is worth more than an absolute assurance.',
+      },
+    ],
+  },
+  {
+    id: 's8',
+    title: 'Cross-border: two things that must not be merged',
+    blocks: [
+      {
+        kind: 'p',
+        text: 'In this section “leaving the country” refers to two entirely different things, and combining them into one sentence would produce a false statement: **transfers we make** (where it is we who must carry out the procedures and disclosures under Articles 38 and 39) and **transfers you make yourself** (you disposing of your own data, with yourself as the processor). Each is stated separately below.',
+      },
+      {
+        kind: 'p',
+        text: '**The first: sync.** All storage and all processing on our official hosted instance take place within the territory of the People’s Republic of China; sync data does not leave the country, and we operate no channel that sends domestic data to an overseas server. If you sync your data to a server abroad, that is **your own deployment decision** — the processor is you, not heyta (the characterisation in section 1, third row, and the one flowing from Article 72(1) and Article 51, applies identically here).',
+      },
+      {
+        kind: 'p',
+        text: '**The second: the AI features.** AI in heyta is not “an AI service we provide” but an **integration capability**: the model endpoint is **typed in by you, in settings** (both built-in presets point at your own machine; we deliberately bundle no cloud provider, maintain no provider list, and make no determination about which country a provider happens to be in); requests go **directly from your device to the endpoint you entered**, and our server is not a relay on that path — it does not forward on your behalf, does not custody your key, and takes no margin on it. In law this is therefore “**provision you make yourself to a third party**”, not “provision abroad by us”. It has one hard premise that must be said in the same breath: **what is sent is the original text — no summarisation, no redaction** — task titles and note bodies are sent in full, and the names and parameter structures of the tools you have authorised go out as well, as “what this machine is capable of”. All three AI gates (the master switch, allow-remote, and the per-feature egress consent) **ship in the off state**; revoking one stops new requests, and a change of destination is **not inherited** by the consent previously given; but revocation **does not reach back into a request already sent**. Hosted cloud AI — the form in which we would call a model for you and bill you for it — **does not exist at all**, which is why it is not described here.',
+      },
+      {
+        kind: 'docRef',
+        docId: 'ai-and-transfer',
+        text: '“AI and Data Transfers” gives the per-feature inventory of which fields leave the device, the seven disclosures required by Article 39 (including the one most often omitted — the manner and procedure for exercising your rights against an overseas recipient), the authorisation model of the local interface and of MCP, and the complete default-off state of every feature.',
+      },
+      {
+        kind: 'callout',
+        text: 'One warning has to be given in advance: the bodies of your tasks and notes **may contain entire passages about health, movements, religion or finances**. They exist as plaintext on your device; once sent to an AI endpoint they leave your control, and whether that endpoint retains them, for how long, and to what use, we **neither know nor are able to audit**. Sending is your judgement, feature by feature — we do not make it for you and we do not review the content.',
+      },
+    ],
+  },
+  {
+    id: 's9',
+    title: 'Minors',
+    blocks: [
+      {
+        kind: 'p',
+        text: 'heyta is a productivity tool: it shows none of your content to other users (there is no community, no shared list and no commenting), it serves no advertising, and it sends no content push. 🔴 **We do not verify the age of a registrant, and therefore we cannot claim that age verification is performed** — what belongs here is the rule we actually follow, not a “for adults only” line that writes us out of the picture.',
+      },
+      {
+        kind: 'docRef',
+        docId: 'minors',
+        text: 'The personal information of a minor under the age of fourteen is **sensitive personal information** at law; processing it requires the consent of a parent or other guardian (Article 31), and it must be governed by **a separate set of processing rules, drawn up on its own**. That independent document is the “Rules for Processing Minors’ Personal Information”, published in this same package.',
+      },
+      {
+        kind: 'callout',
+        text: 'If a user under the age of fourteen is on our official hosted service: a guardian should write to us directly (`heyta@waytofuture.cn`, naming the account’s email address), and we will correct, delete or close the account as requested and reply within 15 working days. We do not block access to the basic features because a minor or a guardian declined to consent to the processing of information that is not necessary.',
+      },
+    ],
+  },
+  {
+    id: 's10',
+    title: 'Your rights, and how to exercise them',
+    blocks: [
+      {
+        kind: 'p',
+        text: 'The rights conferred by Articles 44 to 50 are set out here against heyta’s **actual level of implementation**. Where something can currently be done only by email, we **write email** — describing a button that does not exist as though it did is precisely how a commitment becomes a false statement.',
+      },
+      {
+        kind: 'ul',
+        items: [
+          '**Access and copy**: ✅ all three ends (web, command line, mobile) can export **everything** — the materialised entities, the complete event log and the deleted records (tombstones) — with counts you can check against. **The export file is itself unguarded plaintext JSON**: where it lands, and whether you pass it on, is your responsibility.',
+          '**Correction and completion**: ✅ business fields — tasks, lists, labels, habits — are changed once on any end and propagate to every other end. ⚠️ The events on our server are ciphertext: we **cannot read them and cannot rewrite one of them for you**; only you, once signed in, can. ❌ **The email address cannot be changed**: the product has no re-binding capability today, and we state the limitation plainly rather than mounting a control that does nothing when pressed.',
+          '**Deletion**: ✅ deleting inside the app is, in the event model, **appending a delete event**, not erasing a record. The item disappears from all your devices and from every interface, while the encrypted history carrying it on our server is cleared **once the retention period (currently 45 days) has run out**. 🔴 The “delete permanently” affordance in the interface **is only a marker**: it neither shortens that period nor means “destroyed on the server”.',
+          '**Account closure**: ⚠️ the server does have a genuine hard-delete capability, but **there is currently no entry point for it in the app interface**. The path today is therefore **to write to us** (`heyta@waytofuture.cn`, sent from the address you registered with, so that we can verify ownership), and we complete verification, deletion and our reply within 15 working days. Exactly one copy can still exist afterwards: the 14-day backup window described in section 7.',
+          '**Withdrawal of consent**: ✅ the AI egress consent, the memory preference layer and push subscriptions can all be withdrawn, and after you turn one off **the next call does not even read the input** (this is not a row quietly flagged as “off” while the behaviour continues). Limitation: withdrawal is not retroactive to requests already sent.',
+          '**Requesting an explanation**: ✅ you may ask us to explain these rules of processing, through the same email address.',
+        ],
+      },
+      {
+        kind: 'p',
+        text: 'Intake and reply: for every request that requires human handling (access, correction, deletion, closure, withdrawal, explanation), **we undertake to complete verification, action and a reply within 15 working days of receipt**. That figure is taken from the ceiling set by category 6 of the Method (absent an undertaking, 15 working days is the statutory default), and we state a number of days rather than “as soon as possible”. Where we refuse a request, we give the reason; you may also complain to the department performing personal information protection duties.',
+      },
+      {
+        kind: 'docRef',
+        docId: 'data-rights',
+        text: 'The “Guide to Exercising Personal Information Rights” sets out, item by item: the exact entry point on each platform, the identity material to include with a request, how we process it, and — under end-to-end encryption — precisely what we are able to do on your behalf and where that ability stops.',
+      },
+    ],
+  },
+  {
+    id: 's11',
+    title: 'The measures we use to protect this data',
+    blocks: [
+      {
+        kind: 'p',
+        text: 'Listed as Article 51 requires, together with the five duties of Article 23 of the Cybersecurity Law as amended. What follows are **verifiable concrete values** — a sentence such as “we take strict security measures” discharges no disclosure obligation whatsoever.',
+      },
+      {
+        kind: 'ul',
+        items: [
+          '**Password storage**: Argon2id with memoryCost **19 MiB**, timeCost **2**, parallelism **1** and a 32-byte output, plus an independent 16-byte random salt per user; on top of that, a server-side secret parameter (pepper, at least 32 characters) that is **never written into the database** — if it is missing or too short, the service **refuses to start** rather than running in a degraded mode. What the database holds is a self-describing hash string: no plaintext and no reversible form.',
+          '**Password policy**: a floor of 8 code points and a ceiling of 256 (counted in code points, never silently truncated), with **no** composition requirements such as “must include an uppercase letter and a symbol” (a deliberate alignment with NIST guidance); in their place, a local common-password list plus the breached-database prefix check described in item 4 of section 4. A floor lower than some stricter recommendations is a **deliberate product trade-off**, and those two controls are its compensation.',
+          '**Sync content**: encrypted before upload with a key derived from your password — **Argon2id derivation plus AES-256-GCM** — in an envelope shaped “16-byte salt + 12-byte IV + ciphertext with its authentication tag”. The server runs an **inbound gate**: an upload without the encryption marker, or with a non-conforming shape, is **rejected outright**, and the rejection happens **before** fingerprinting, deduplication, quota accounting and persistence, so a rejected payload leaves no trace on the server.',
+          '**Transport**: the outward-facing service runs over HTTPS (TLS). 🔴 End-to-end encryption covers sync content; it **does not cover the email channel** and **does not cover the disk of your device** (section 2).',
+          '**Single-use credentials**: tokens are stored only as a **SHA-256 hash**, are single-use, and are consumed on use; their lifetimes are 24 hours (email verification), 15 minutes (magic link and password reset) and 1 hour (passkey recovery). 🔴 Resetting or changing your password **invalidates the sessions on every other device immediately**. The recovery page returns one identical sentence for “account does not exist”, “no password was ever set” and “a link is already valid” — otherwise it would become an account-existence probe.',
+          '**Passkeys**: only the public key, the credential identifier and the counter are stored; **no attestation statement is collected**. Biometric matching happens entirely inside the secure hardware of your device; we neither hold nor could obtain any fingerprint or face template.',
+          '**Access control and data minimisation**: every admin console response passes through a **whitelist projection** (the returned fields are enumerated one by one, rather than relying on someone remembering not to select them). Password hashes, any one-time token, passkey public keys and credential identifiers, sync content (the console sees counts only) and push endpoints are **not on that list**. The console also cannot alter amounts, cannot issue refunds and cannot send free-text notices to users. Admission is a single boolean flag, off by default, granted only by an operator manually on the server.',
+          '**Runtime logs**: HTTP access logging is disabled (`logger: false`), **IP addresses are not stored**, `user-agent` is not logged, and request bodies, password values and token values are never printed; error copy returned to clients does not echo the rejected payload; sync size logging records byte counts only.',
+          '**We make no guarantee of absolute security.** This policy contains no wording such as “absolutely secure” or “one hundred percent protection”. Where a leak, alteration or loss of personal information occurs or may occur, we take remedial action immediately as the law requires, notify you as prescribed, and report to the competent authorities.',
+        ],
+      },
+      {
+        kind: 'p',
+        text: 'The final point is architectural and must therefore be made explicit: **an unencrypted local database (section 2) and the absence of a “erase all local data” button are two faces of one fact.** Content that has synced down exists in plaintext on your own device until you uninstall the app or clear site data in the browser. That is the inherent cost of a local-first design, and we choose to state it rather than cover it with the four words “end-to-end encryption”.',
+      },
+    ],
+  },
+  {
+    id: 's12',
+    title: 'Consent, and how this policy changes',
+    blocks: [
+      {
+        kind: 'p',
+        text: '**How consent is recorded.** The statement you tick at sign-up refers to the terms and policies offered by **the server you are connected to**; we record the moment of consent together with **the version numbers of the whole document set as it stood then** — a fingerprint built by sorting the document identifiers and concatenating their versions, which looks like `privacy@1.0` joined with the others. The reason for recording the set rather than the privacy policy alone: what you ticked is a **group** of documents, and a single version number can never answer “which version of the terms of service did this person agree to”.',
+      },
+      {
+        kind: 'ul',
+        items: [
+          'When this policy changes, we notify you **before the new version takes effect** (the app and the server’s outward pages are updated together), and we state which clauses changed.',
+          '🔴 **Changes are not retroactive to a period you have already paid for.** For the duration of a subscription you have paid for, the service and pricing rules continue to be those of the version in force when you bought it.',
+          'Where the **purpose, method or categories** of processing change, obtaining consent again is a statutory requirement (Article 14(3) and Article 17(2)); it cannot be papered over by “bumping a version number”. Adding a category of collection, or moving a default from off to on, requires a **separate, explicit prompt** — not a silent release with a version.',
+          '**Consent is unticked by default** and every privacy-relevant switch ships off: the AI master switch, allow-remote, the per-feature egress consent, the memory preference layer, the local API surface, and **each individual tool** inside it. That default-off is also enforced strictly on read — only a genuine boolean true counts; a string, the number 1, or a missing field is treated as off, so a corrupted row cannot quietly switch something on.',
+          'This policy carries a version number (see the metadata above and section 14), and that number **enters the consent record**; a revision must therefore bump it, while section identifiers may not change, because they are deep-link targets.',
+        ],
+      },
+      {
+        kind: 'p',
+        text: 'One further point that is easy to write wrong: **“being technically blind” is not a statutory exemption.** The only case Article 18 allows for withholding notice is where confidentiality or a waiver is prescribed by a law or an administrative regulation; emergencies have their own rule. Encryption is not among them. So the fact that our servers cannot read your plaintext **reduces nothing** that the sections above are required to disclose, and this policy omits no item on that ground.',
+      },
+    ],
+  },
+  {
+    id: 's13',
+    title: 'Complaints and reports',
+    blocks: [
+      {
+        kind: 'p',
+        text: 'Two distinct duties are listed here: the processor’s contact details required by Article 17 (the full entity information is in section 1), and the **publicly announced channel for complaints and reports concerning personal information security** required by category 6 item 5 of the Method. They resolve to the same mailbox, but they are different obligations, so both are stated and they are not merged into a single line.',
+      },
+      {
+        kind: 'ul',
+        items: [
+          '**Dedicated privacy mailbox**: `heyta@waytofuture.cn`. It is both the intake point for rights requests and the channel for complaints and reports; putting “privacy” in the subject line routes the message to the right person sooner.',
+          '**Reply time**: verification, action and a reply **within 15 working days of receipt** — the same undertaking applies to everything requiring human handling.',
+          '**You may also complain or report to a regulator**: directly to the departments performing personal information protection duties (cyberspace administration, telecommunications, public security, market regulation). We will not change the service you receive because you did so.',
+        ],
+      },
+      {
+        kind: 'p',
+        text: 'To be plain about it: we currently have **only** this one outward email address. We have published no telephone number, no WeChat official account, no live chat and no customer-service hours. One address that someone genuinely monitors is worth more than a channel that does not exist or that no one reads.',
+      },
+    ],
+  },
+  {
+    id: 's14',
+    title: 'Version history',
+    blocks: [
+      {
+        kind: 'p',
+        text: 'The version number enters the consent record (section 12), so every revision must add a line here stating what changed and why. The section identifiers (the range `s1` to `s14` above) are deep-link targets on the rendered page and **must not change across revisions**.',
+      },
+      {
+        kind: 'table',
+        head: ['Version', 'Date and summary of changes'],
+        rows: [
+          [
+            '1.0',
+            '`2026-10-01` First draft. Written clause by clause from three code archaeology reports (server data flow / clients and permissions / AI egress and rights as implemented), checked against all six categories of the Method and against the four mandatory elements of Article 17. **Status: draft — not yet reviewed by counsel, not yet in effect**; the page shows a “not yet in effect” banner, and the time limits (15 working days), retention periods (45 days / 14 days) and every other undertaking in this text may still be rewritten before sign-off by the product owner and legal review.',
+          ],
+        ],
+      },
+    ],
+  },
+] as const;
+
+export const privacy: LegalDocument = {
+  id: 'privacy',
+  version: '1.0',
+  status: 'draft',
+  updatedDate: '2026-10-01',
+  title: {
+    'zh-CN': '隐私政策',
+    en: 'Privacy Policy',
+  },
+  summary: {
+    'zh-CN':
+      'heyta 官方托管服务（账号、同步、订阅）处理哪些个人信息、存在哪里、谁能看到、留多久，以及你怎么行使自己的权利。端到端加密只覆盖同步通道、不覆盖你的设备磁盘，也不覆盖那 11 项明文元数据 —— 这一点本政策写得比多数产品更直白。',
+    en:
+      'What the hosted heyta service (accounts, sync, subscriptions) actually handles: which personal information, where it lives, who can read it, how long it stays, and how you exercise your rights. End-to-end encryption covers the sync channel only — not your device’s disk, and not the 11 plaintext metadata fields.',
+  },
+  sections: { 'zh-CN': zh, en },
+};
