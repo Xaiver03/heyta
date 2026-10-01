@@ -117,3 +117,20 @@ if (typeof window !== 'undefined' && typeof window.matchMedia !== 'function') {
  * 警告本身不致命，但它会淹没真正的报错。
  */
 (globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+
+/**
+ * jsdom 补齐之三：把 `navigator.language` 钉成 `zh-CN`
+ *
+ * 🔴 2026-10-01 起应用读 `navigator.language` 做首启语言（四层解析链，
+ * `src/lib/locale.ts` 文件头）。jsdom 的默认是 `'en-US'`，不钉的话
+ * 所有隐式依赖「无偏好 ⇒ 中文」的既有用例会整体翻成英文 ——
+ * 那些用例测的是各自的界面，不该被解析链的默认值牵着走。
+ *
+ * 要测解析链本身的用例（`tests/locale.spec.ts`）在自己的用例里
+ * `vi.spyOn(navigator, 'language', 'get')` 覆写 —— 覆写后 `mockRestore()`
+ * 还原到的是**本文件钉的这个值**（spy 接管的是当时的现状），用例间不泄漏。
+ */
+Object.defineProperty(window.navigator, 'language', {
+  get: () => 'zh-CN',
+  configurable: true,
+});

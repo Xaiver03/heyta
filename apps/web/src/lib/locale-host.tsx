@@ -22,20 +22,38 @@
  * web 是用户偏好 + 落盘。
  */
 
-import { useEffect, useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 
 import { I18nProvider, type Locale } from '@heyta/i18n';
 
-import { applyLocale, resolveInitialLocale } from './locale.js';
+import { activateLocale, applyLocale, resolveInitialLocale, subscribeLocale } from './locale.js';
 import { LocalePreferenceProvider } from './locale-preference.js';
 
 export function LocaleHost({ children }: { children: ReactNode }): React.JSX.Element {
   const [locale, setLocale] = useState<Locale>(resolveInitialLocale);
 
-  // 与 `App.tsx` 里 `applyTheme(theme)` 同一形状：语言变了才落盘并同步 <html lang>。
+  /**
+   * 🔴 **首启只激活、不落盘**：首启值来自推断（`navigator.language` / `?lang=`），
+   * 不是用户的选择。落了盘，`hasStoredLocalePreference()` 就会把推断误判成
+   * "选过"，登录后的**账号语言采纳**（解析链第 2 层）从此永远不触发 ——
+   * 那正是"新设备首登即得账号语言"要走的门。之后每次真正的变化才 `applyLocale`。
+   */
+  const firstRun = useRef(true);
   useEffect(() => {
+    if (firstRun.current) {
+      firstRun.current = false;
+      activateLocale(locale);
+      return;
+    }
     applyLocale(locale);
   }, [locale]);
+
+  /**
+   * 接住**非 React 侧**触发的切换：登录成功后采纳账号语言走的是
+   * `applyLocale`（auth store，不在组件树里），没有这条订阅界面就不会跟上。
+   * 不会成环：`setLocale(同值)` 被 React 的 Object.is 判定短路。
+   */
+  useEffect(() => subscribeLocale(setLocale), [setLocale]);
 
   return (
     <I18nProvider locale={locale}>
