@@ -186,7 +186,18 @@ function collectSourceFiles(dir) {
   for (const entry of entries) {
     if (SKIP_DIRS.has(entry)) continue;
     const full = path.join(dir, entry);
-    if (statSync(full).isDirectory()) {
+    // 🔴 stat 拿不到就跳过：`apps/mobile/ios/Pods`（gitignored，`pod install` 生成）里有
+    // **断链的符号链接** —— `Headers/Private/ReactAppDependencyProvider/RCTAppDependencyProvider.h`
+    // 指向 `../../../../build/generated/ios/…`，而那个目标不存在。
+    // statSync 对断链抛 ENOENT ⇒ **整道门禁崩溃**，一个判据都印不出来。
+    // 断链本来就无从读取，跳过它不减少覆盖（下面 readFileSync 那条路也是同样的跳过）。
+    let stats;
+    try {
+      stats = statSync(full);
+    } catch {
+      continue;
+    }
+    if (stats.isDirectory()) {
       const rel = path.relative(ROOT, full).split(path.sep).join('/') + '/';
       if (EXEMPT_PREFIXES.some((p) => rel === p || rel.startsWith(p))) continue;
       out.push(...collectSourceFiles(full));
