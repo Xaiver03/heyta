@@ -41,7 +41,8 @@
     "pricing": "node dist/scripts/pricing.js",
     "pricing:dev": "tsx scripts/pricing.ts",
     "gen:server-copy": "ts-node --transpile-only scripts/gen-server-copy.ts",
-    "gen:server-design": "node scripts/gen-server-design.mjs"
+    "gen:server-design": "node scripts/gen-server-design.mjs",
+    "gen:server-legal": "node scripts/gen-server-legal.mjs"
   },
   "dependencies": {
     "@fastify/cors": "^11.1.0",

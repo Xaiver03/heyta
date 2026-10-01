@@ -486,3 +486,15 @@ export {
   type TickTickImportKind,
   type TickTickImportResult,
 } from './ticktick-import-actions.js';
+
+/**
+ * 条款链接的分流（链 2）。**宿主无关**：用户连的是哪台服务端，就该看到那台
+ * 服务端发布的规则 —— 这是协议知识，不是界面知识（AGENTS.md §3.5）。
+ */
+export {
+  LEGAL_SITE_PATHS,
+  OFFICIAL_SITE_ORIGIN,
+  OPERATOR_LEGAL_PATHS,
+  resolveLegalLinks,
+  type LegalLinks,
+} from './legal-links.js';
