@@ -188,21 +188,51 @@ function makeStyles(tokens: HeytaNativeTokens) {
      * 十字坐标系的观感由**间隙**给出：四格之间露出底色，横竖两条"轴线"
      * 就是那两条缝（与滴答的四象限同构）。
      */
+    /**
+     * 🔴 板子**自己声明增长**，但**不许被压**（`flexGrow:1 + flexShrink:0 + flexBasis:'auto'`）。
+     *
+     * 修前这里只有 `gap`/`padding` ⇒ 高度由内容决定 ⇒ 里面 `cell` 那行 `flex: 1`
+     * **一个字都没生效**（弹性盒 §9.7：`flex-grow` 分配的是**剩余**自由空间，
+     * 父高 `auto` 时没有剩余就没有分配 —— 类 C）。实测链条见计划 §3.1。
+     *
+     * 为什么是 `flexShrink: 0` 而不是 `flex: 1`（= `1 1 0%`）：
+     * "铺满"的含义是**至少长到母层给的空间**，不是"被母层裁到那么高"。
+     * 任务多的时候内容比视口高，收缩会让四格互相叠到 `minHeight` 以下 ——
+     * 那是另一种"看不见"。不收缩 ⇒ 母层（宿主的内容列）自己变高、文档滚动，
+     * 只有一个滚动所有者。⚠️ 母层必须**把确定高度传下来**，这一层才拿得到空间：
+     * web 是 `.ht-content`（`app.css`，`display:flex` 列），RN 是 `Screen` 的
+     * `contentContainerStyle`（`apps/mobile/src/ui/kit.tsx`）—— 两边各自缺过，
+     * 只改共享层在两端都还是空转。
+     */
     board: {
       gap: tokens['space.3'],
       padding: tokens['space.4'],
+      flexGrow: 1,
+      flexShrink: 0,
+      flexBasis: 'auto',
     },
+    /** 两行等分板子的剩余高度；同样"只长不缩"（理由见 `board`）。 */
     row: {
       flexDirection: 'row',
       gap: tokens['space.3'],
+      flexGrow: 1,
+      flexShrink: 0,
+      flexBasis: 'auto',
     },
     /**
      * 单列分支的容器。🔴 它**不能复用 `row`**：`rows = [cards]` 时四个格子
      * 会全部进同一个 `flexDirection: 'row'` 的行里，被压成一行四个 140px 的
      * 小方块（2026-09-29 实测踩过 —— "单列"渲染成了"最挤的四列"）。
+     *
+     * ⚠️ 单列下"铺满"这条契约**换了一个分支**：四格各有 `minHeight`，
+     * 加起来通常已经超过一屏 ⇒ 没有剩余空间可分，`flexGrow` 在这里**什么都不做**，
+     * 面板按内容高度排布、由宿主滚动。这不是例外，是同一条"只长不缩"的结果。
      */
     stack: {
       gap: tokens['space.3'],
+      flexGrow: 1,
+      flexShrink: 0,
+      flexBasis: 'auto',
     },
     cell: {
       flex: 1,
