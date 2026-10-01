@@ -30,9 +30,29 @@
  * - 草稿横幅：今天九份的 `status` 全是 `draft`，横幅**必须**在。
  *   ⚠️ 改成 `effective` 那天这条会红 —— 那是提醒"对外文本要生效了，复核一下"，
  *   不是误报，届时连同 §6 那条"律师复核 → 改 status → 发布"一起处理。
+ *
+ * ## 最后那一条是**唯一比较"本地 ↔ 线上"的判据**（G-31 闭合时补的）
+ *
+ * 上面九条比的都是"线上自己两侧对不对等"，所以它们**看不出部署落后**。
+ * 而"服务器上的字节是不是当前构建"这件事，只有拿真源当参照才判得出来 ——
+ * 参照物从 `@heyta/legal` 的构建产物取（`OPERATOR.name` 与 `terms` 的 `version`），
+ * **不在这里抄一份字面量**：抄件一定会漂，而漂了的法务抄件比没有抄件更危险。
+ *
+ * 🔴 前置：`pnpm --filter @heyta/legal build`。它读的是 `dist/` 不是 `src/`，
+ * 没先 build 会拿旧产物当参照，症状是"线上明明是新的而判据报红"
+ * （AGENTS §7 第 27、79 条同族）。
+ *
+ * ⚠️ **只比 `terms`，不比其余八份** —— 这是实测过的取舍，不是偷懒：`dist/` 取自
+ * 当前工作树，而工作树里同时躺着并行会话**尚未发布**的 `privacy@1.1`／`minors@1.1`／
+ * `data-rights@1.1`。拿它们当参照会得出一条"线上落后了"的红，而那条红**不是缺陷**
+ * （改动还没进版本库，本来就不该在线上）。判据一旦会因别人的在制品而红，
+ * 它就不再是信号。
  */
 
 import { expect, test, type Page } from '@playwright/test';
+// 参照物取自**构建产物**（见文件头）。零运行时依赖、无 import，所以 e2e 这份
+// 独立工作区不需要装 @heyta/legal 也能直接相对路径引入。
+import { LEGAL_DOCUMENTS, OPERATOR } from '../../packages/legal/dist/index.js';
 
 const ORIGIN = process.env['HEYTA_LIVE_ORIGIN'] ?? 'https://heyta.waytofuture.cn';
 /**
@@ -212,4 +232,72 @@ for (const docId of LEGAL_DOC_IDS) {
  */
 test('法务清单仍是九份（与 @heyta/legal 注册表同数）', () => {
   expect(LEGAL_DOC_IDS.length).toBe(9);
+});
+
+/**
+ * 🔴 唯一一条"本地真源 ↔ 线上"的对照。设计理由见文件头那一节。
+ *
+ * 为什么必须**渲染**才能比：法务页的 `index.html` 是**外壳**（实测线上那份
+ * `<body>` 里只有 `<div id="root"></div>`，正文全在 JS chunk 里）。
+ * 所以"curl 到的字节里有没有这句话"在这里根本问不出结果 ——
+ * 上面那九条之所以能用字节比，比的只是"是不是首页"，不是"里面写了什么"。
+ */
+test('线上 terms 英文侧 = 本地真源（G-31 的部署级复验）', async ({ page }) => {
+  const logs = attachLogs(page);
+  const source = LEGAL_DOCUMENTS.find((d: { id: string }) => d.id === 'terms');
+
+  // 前提断言：参照物自己必须真的有料。`OPERATOR.name` 若哪天是空串，
+  // 下面的 `toContain('')` 会**永远成立** —— 一条永远通过的判据比没有判据更糟。
+  expect(source, '@heyta/legal 注册表里没有 terms（dist 过期？先 pnpm --filter @heyta/legal build）').toBeDefined();
+  expect(
+    OPERATOR.name.trim().length,
+    '参照物 OPERATOR.name 是空的，这条判据会假绿',
+  ).toBeGreaterThan(0);
+
+  const path = legalPath('terms', 'en');
+  await page.goto(`${ORIGIN}${path}`, { waitUntil: 'domcontentloaded' });
+  const render = await readLegalRender(page);
+
+  // ① 用户看得见的那段里必须有登记名称。
+  const body = await page.evaluate(
+    () => document.querySelector('.lp-legal')?.textContent ?? '',
+  );
+  expect(
+    body,
+    `线上 ${path} 渲染出的正文里没有登记中文主体名「${OPERATOR.name}」⇒ 部署还没跟上（或 dist 落后于源码）`,
+  ).toContain(OPERATOR.name);
+
+  // ② 版本行报出的版本号必须就是源码里的那一个 —— 这是"部署跟上了没"的读数。
+  const liveVersion = render.metaText.match(/\d+\.\d+/u)?.[0];
+  expect(liveVersion, `线上版本行里取不出版本号：「${render.metaText}」`).toBeDefined();
+  expect(
+    liveVersion,
+    `线上 terms 是 ${String(liveVersion)}，@heyta/legal 的 dist 里是 ${String(
+      source?.version,
+    )} ⇒ 两侧不同源。先分清是"没发布"还是"没 build"：` +
+      `pnpm --filter @heyta/legal build 后重跑；仍红就是部署落后`,
+  ).toBe(source?.version);
+
+  // 规定一：截图必须**拍得出被断言的那句话**。整页首屏截图拍的是标题区，
+  // 登记名称在 s1 正文里、在首屏之外 —— 那种图看了等于没看。
+  const namedSection = page
+    .locator('section.lp-legal__section')
+    .filter({ hasText: OPERATOR.name })
+    .first();
+  await expect(
+    namedSection,
+    `线上 ${path} 找不到包含登记名称的那一节，没法截图作证`,
+  ).toBeVisible();
+  await namedSection.evaluate((el: Element) => {
+    // 页头是 sticky 的（约 90px 高）：把这一节的**顶边**停在页头下面，
+    // 而不是 `scrollIntoViewIfNeeded` 那样对齐到 y=0 —— 实测那样第一行会被页头压住，
+    // 而被断言的那句恰好就是第一行。
+    const top = el.getBoundingClientRect().top + window.scrollY - 110;
+    window.scrollTo({ top, behavior: 'instant' as ScrollBehavior });
+  });
+  await page.waitForLoadState('networkidle');
+  await page.screenshot({ path: `${SHOT_DIR}/live-legal-terms-en-operator.png` });
+
+  const hard = hardErrors(logs);
+  expect(hard, `页面抛了未捕获异常：\n${hard.join('\n')}`).toEqual([]);
 });
