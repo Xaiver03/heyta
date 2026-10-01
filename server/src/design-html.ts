@@ -230,8 +230,15 @@ export interface PageContent {
   readonly title: string;
   readonly heading: string;
   readonly body: string;
-  /** 主体里的额外 HTML（已经转义过或由我们生成）。 */
+  /** 主体里的额外 HTML（已经转义过或由我们生成）。渲染在标题**之前**。 */
   readonly extraHtml?: string;
+  /**
+   * 渲染在正文**之后**、动作按钮**之前**的 HTML。
+   *
+   * 只有需要"表单排在说明文字下面"的页面用（目前就是 `/reset-password`）——
+   * `extraHtml` 那个槽在 `<h1>` 上面，把输入框放那儿会得到一个"先填表后看标题"的页面。
+   */
+  readonly formHtml?: string;
   readonly actions?: readonly PageAction[];
   /** 额外脚本（如 `/recover-passkey.js`）。 */
   readonly scripts?: readonly string[];
@@ -337,7 +344,63 @@ export function renderPage(locale: ServerLocale, content: PageContent): string {
   .btn--primary:hover { background: ${EMAIL_COLOR['color.primary-hover']}; }
   .btn:disabled { background: ${EMAIL_COLOR['color.border']}; border-color: ${EMAIL_COLOR['color.border']}; color: ${EMAIL_COLOR['color.foreground-subtle']}; cursor: default; }
   /* 🔴 焦点环不许抹掉（AGENTS §5）。 */
-  .btn:focus-visible, a:focus-visible { outline: 2px solid ${EMAIL_COLOR['color.primary']}; outline-offset: 2px; }
+  .btn:focus-visible,
+  .input:focus-visible,
+  a:focus-visible { outline: 2px solid ${EMAIL_COLOR['color.primary']}; outline-offset: 2px; }
+  /*
+   * 表单（/reset-password）。层次靠 1px 边框表达、不用阴影（AGENTS §5），
+   * 颜色一律取 token —— 这一页和另外三张是同一套蓝白，不是第二套样式系统。
+   * ⚠️ 这段注释在模板字符串**里面**，所以不许出现反引号：一个反引号就会把
+   *    整个 CSS 模板截断，注释变成代码（本次就是这么炸的，已有判据钉住）。
+   */
+  .field { margin: 0 0 ${EMAIL_SIZE['space.4']} 0; }
+  .field > label {
+    display: block;
+    margin-bottom: ${EMAIL_SIZE['space.2']};
+    font-size: ${EMAIL_SIZE['font-size.sm']};
+    font-weight: ${EMAIL_SIZE['font-weight.semibold']};
+    color: ${EMAIL_COLOR['color.foreground-muted']};
+  }
+  .input-row { display: flex; gap: ${EMAIL_SIZE['space.2']}; align-items: stretch; }
+  .input {
+    flex: 1 1 auto;
+    /* 🔴 width: 100% 是给**不在 .input-row 里**的那个输入框的（确认框）。
+     *   没有它，独立存在的 input 用的是浏览器固有宽度（约 20 个字符），
+     *   于是同一张表单里两个框一宽一窄 —— 实测截图里一眼看得出来。
+     *   在 flex 行里它仍然只占按钮剩下的空间（flex-shrink 1 + min-width 0）。
+     *   ⚠️ 这段注释在模板字符串里面：一个反引号就会把整个 CSS 模板截断。 */
+    width: 100%;
+    min-width: 0;
+    padding: ${EMAIL_SIZE['space.3']} ${EMAIL_SIZE['space.4']};
+    border: 1px solid ${EMAIL_COLOR['color.border']};
+    border-radius: ${EMAIL_SIZE['radius.md']};
+    background: ${EMAIL_COLOR['color.surface']};
+    color: ${EMAIL_COLOR['color.foreground']};
+    font-family: inherit;
+    font-size: ${EMAIL_SIZE['font-size.base']};
+  }
+  /* 浏览器"自动强加"的填充底色会把 token 色盖掉，只留文字可读。 */
+  .input:-webkit-autofill { -webkit-text-fill-color: ${EMAIL_COLOR['color.foreground']}; }
+  .input:focus-visible { outline: 2px solid ${EMAIL_COLOR['color.primary']}; outline-offset: 2px; border-color: ${EMAIL_COLOR['color.primary']}; }
+  .btn--ghost {
+    flex: 0 0 auto;
+    width: auto;
+    padding: ${EMAIL_SIZE['space.3']} ${EMAIL_SIZE['space.4']};
+    border-color: ${EMAIL_COLOR['color.border']};
+    background: ${EMAIL_COLOR['color.surface']};
+    color: ${EMAIL_COLOR['color.primary']};
+    font-size: ${EMAIL_SIZE['font-size.sm']};
+  }
+  .input-row .btn { width: auto; }
+  /*
+   * 🔴 [hidden] 必须赢过 .btn 的 display: inline-flex。
+   *   浏览器的 [hidden]{display:none} 是 UA 样式，作者样式表里任何一条 display
+   *   都会盖掉它 —— 于是"成功后才出现的下一步按钮"**从第一帧就在那儿**。
+   *   这一条不是防御性冗余：#goLogin 用的就是 .btn，没有它整个隐藏机制是假的。
+   */
+  [hidden] { display: none !important; }
+  .status + .btn { margin-top: ${EMAIL_SIZE['space.4']}; }
+  form { margin: 0; }
   .status { margin: ${EMAIL_SIZE['space.4']} 0 0 0; font-size: ${EMAIL_SIZE['font-size.sm']}; }
   .status--ok { color: ${EMAIL_COLOR['color.success']}; }
   .status--err { color: ${EMAIL_COLOR['color.danger']}; }
@@ -352,6 +415,7 @@ export function renderPage(locale: ServerLocale, content: PageContent): string {
     ${content.extraHtml ?? ''}
     <h1>${escapeHtml(content.heading)}</h1>
     <p>${escapeHtml(content.body)}</p>
+    ${content.formHtml ?? ''}
     ${actions}
   </main>
 ${scripts}
