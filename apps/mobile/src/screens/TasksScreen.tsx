@@ -27,6 +27,7 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { Project, Tag, Task, TaskSortKey } from '@heyta/domain';
 // `formatDayTitleText` 在壳里把领域层给的 `LocalDate` 说成当前语言：
 // **"某一天的标题"的日期语义（`isoWeekday`、`parseLocalDate`）仍只有领域层一份**，
@@ -142,6 +143,7 @@ function Composer({
   const tokens = useTokens();
   const { t } = useI18n();
   const labels = useCaptureLabels();
+  const insets = useSafeAreaInsets();
   const [busy, setBusy] = useState(false);
 
   const submit = useCallback(
@@ -168,46 +170,95 @@ function Composer({
       // 这正是它能用在 RN 上、而 chrome-tint 不能的原因。
       statusBarTranslucent
     >
+      {/*
+        🔴 遮罩**必须离开 flex 流**（绝对定位铺满），不能写 `flex: 1`。
+
+        这条是被实测逼出来的，不是审美：`flex: 1` 的遮罩和贴底面板在抢同一份高度，
+        于是面板的百分比上限算在**被遮罩挤过之后**的父容器上 —— 上限就不是上限了。
+        1080×2400 / 密度 420 / 字号 3.0 / Composer 输 200 字 实测：
+        遮罩 `[0,0][1080,1582]`、面板 `[0,1582][1080,2318]`（高 736），
+        而面板内容需要 776 ⇒ `maxHeight: '90%'` 把 736 当成了 818 的 90%
+        （818 = 2400 − 1582，正是"遮罩吃掉之后剩下的"），内容被折叠线切掉 40px，
+        「取消」报出来只有 76px 高（下限是 `touch-target.min` = 44dp = 115px）。
+
+        遮罩改成绝对定位后，面板的父容器就是整个视口，`90%` 才真的等于"视口的九成"。
+        与 `SearchScreen` 用的是同一个形状（绝对定位遮罩 + `pointerEvents="box-none"` 容器）。
+      */}
       <Pressable
-        style={{ flex: 1, backgroundColor: tokens['material.scrim'] }}
+        style={{
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: tokens['material.scrim'],
+        }}
         onPress={onClose}
         accessibilityLabel={t('mobile.tasks.composer.close')}
       />
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <KeyboardAvoidingView
+        style={{ flex: 1, justifyContent: 'flex-end' }}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      >
         <View
           style={{
             backgroundColor: tokens['color.surface'],
             borderTopLeftRadius: tokens['radius.xl'],
             borderTopRightRadius: tokens['radius.xl'],
-            padding: tokens['screen.gutter'],
+            paddingTop: tokens['space.4'],
+            paddingHorizontal: tokens['screen.gutter'],
+            // 安全区：**底部内边距必须减掉 home indicator 那一块**（iOS 上非 0）。
+            // 写死常量就是"让系统设置替我们说话"（§7 第 83 条同族）。
+            paddingBottom: insets.bottom + tokens['space.8'],
             gap: tokens['space.3'],
-            paddingBottom: tokens['space.8'],
+            // 🔴 R5：**上限来自视口比例，不来自内容高度**。
+            // 但这一行**单独不成立** —— 它要求上面那块遮罩不在 flex 流里（见遮罩的注释）：
+            // 遮罩还在抢高度时，这个百分比算在"抢完剩下的"上面，实测把面板压在
+            // 比内容矮 40px 的位置，裁切只是从屏幕底边挪到了面板折叠线。
+            // 两者合起来才是完整的修法，与 `TaskDetailSheet` 的形状一致。
+            maxHeight: '90%',
           }}
         >
           <Text variant="section-title">{t('mobile.tasks.new')}</Text>
           {/*
-            🔴 **共享 `CaptureComposer`**（与 web 同一份源码）。
-            在这一刀之前，这里是一个纯标题输入框：web 上打「明天交周报」会
-            识别出截止日期，而移动端会建出一条**标题里带"明天"**的任务 ——
-            同一句话在两端建出不同的东西，且两边都不报错。
-
-            · `autoFocus`：面板弹出即该打字（web 是内联在列表顶部，**不能**
-              自动抢焦点，所以那是宿主的参数而不是共享层的默认值）；
-            · 提交后的清空由共享组件自己做（`apply` / `submit` 里都清了草稿）。
+            🔴 内层滚动而不是外层裁切：`maxHeight` 一到，多出来的高度必须由
+            **一个能缩的孩子**吸收，否则它只是把裁切从屏幕底边挪到面板底边。
           */}
-          <CaptureComposer
-            labels={labels}
-            onSubmit={submit}
-            autoFocus
-            testID="mobile-capture"
-          />
-          {/* 取消留在这里：共享组件只管"添加"，关闭面板是 modal 的事。 */}
-          <Button
-            label={t('mobile.common.cancel')}
-            tone="ghost"
-            onPress={onClose}
-            style={{ flex: 1 }}
-          />
+          <ScrollView
+            keyboardShouldPersistTaps="handled"
+            contentContainerStyle={{ gap: tokens['space.3'] }}
+          >
+            {/*
+              🔴 **共享 `CaptureComposer`**（与 web 同一份源码）。
+              在这一刀之前，这里是一个纯标题输入框：web 上打「明天交周报」会
+              识别出截止日期，而移动端会建出一条**标题里带"明天"**的任务 ——
+              同一句话在两端建出不同的东西，且两边都不报错。
+
+              · `autoFocus`：面板弹出即该打字（web 是内联在列表顶部，**不能**
+                自动抢焦点，所以那是宿主的参数而不是共享层的默认值）；
+              · 提交后的清空由共享组件自己做（`apply` / `submit` 里都清了草稿）。
+            */}
+            <CaptureComposer
+              labels={labels}
+              onSubmit={submit}
+              autoFocus
+              testID="mobile-capture"
+            />
+            {/* 取消留在这里：共享组件只管"添加"，关闭面板是 modal 的事。
+
+                ⚠️ 这里原来写着 `style={{ flex: 1 }}`，我一度以为它就是「取消」被压到
+                76px 高的原因（RN 的 `flex: 1` = `grow:1 + shrink:1 + basis:0`，管的是**纵向**，
+                而这条按钮要的契约是"占满宽度"—— 类 A 的形状）。
+                **实测否掉了这条因果**：拿掉它之后矩形一字不变（仍是 `42,2096,1038,2172`），
+                真因是父容器把高度上限算给了被遮罩挤过的空间（见上面遮罩的注释）。
+                仍然不留着它 —— 宽度由父容器的交叉轴 `stretch` 给（实测已是满宽），
+                一个不改变任何东西的属性只会让下一个人以为宽度靠它。 */}
+            <Button
+              label={t('mobile.common.cancel')}
+              tone="ghost"
+              onPress={onClose}
+            />
+          </ScrollView>
         </View>
       </KeyboardAvoidingView>
     </Modal>
@@ -243,6 +294,7 @@ function SortPicker({
 }): React.JSX.Element {
   const tokens = useTokens();
   const { t } = useI18n();
+  const insets = useSafeAreaInsets();
 
   return (
     <Modal
@@ -252,8 +304,18 @@ function SortPicker({
       onRequestClose={onClose}
       statusBarTranslucent
     >
+      {/* 🔴 遮罩**离开 flex 流**（绝对定位铺满）。`flex: 1` 的遮罩会和贴底面板抢同一份
+          高度，于是面板的百分比上限算在"抢完剩下的"空间上 —— 那不是上限。
+          同屏 `Composer` 的注释里记着这次实测出来的完整数字。 */}
       <Pressable
-        style={{ flex: 1, backgroundColor: tokens['material.scrim'] }}
+        style={{
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: tokens['material.scrim'],
+        }}
         onPress={onClose}
         accessibilityLabel={t('mobile.tasks.sort.close')}
       />
@@ -262,26 +324,46 @@ function SortPicker({
           backgroundColor: tokens['color.surface'],
           borderTopLeftRadius: tokens['radius.xl'],
           borderTopRightRadius: tokens['radius.xl'],
-          padding: tokens['screen.gutter'],
+          paddingTop: tokens['space.4'],
+          paddingHorizontal: tokens['screen.gutter'],
+          paddingBottom: insets.bottom + tokens['space.8'],
           gap: tokens['space.2'],
-          paddingBottom: tokens['space.8'],
+          // 遮罩退出 flex 流之后，面板是唯一的在流孩子 —— 靠 `marginTop: auto` 贴底。
+          marginTop: 'auto',
+          // 🔴 R5 的本体：面板的高度**必须有一个来自视口的上限**。
+          //
+          // 改之前这里没有 `maxHeight` 也没有 `ScrollView`，于是面板高度 = 内容高度，
+          // 而上面那块遮罩是 `flex: 1` —— 它在抢同一份高度。Android 1080×2400 实测：
+          // 遮罩 bounds `[0,0][1080,2134]`，面板从 `y=2176` 起，三个档位里
+          // **第二个只剩 5px、第三个根本不在无障碍树里**
+          // （`apps/mobile/evidence/android-sort-2-picker.png`）。
+          //
+          // ⚠️ 单加这一行**不够**（实测过）：遮罩还在抢高度时，`90%` 算在
+          // "遮罩吃掉之后剩下的"那块空间上，面板会被压在比内容矮的位置，
+          // 裁切只是从屏幕底边挪到面板折叠线。上限 + 能缩的孩子 + 不在流里的遮罩，
+          // 三件事各挡一种坏情况。
+          maxHeight: '90%',
         }}
       >
         <Text variant="section-title">{t('mobile.tasks.sort.choose')}</Text>
-        {TASK_SORT_OPTIONS.map((option) => (
-          <Button
-            key={option}
-            label={taskSortName(t, option)}
-            // 当前档位用实心主色，其余次要 —— 面板打开时"现在选的是哪个"要一眼看出，
-            // 而不是让用户从三个长得一样的按钮里找。
-            tone={option === current ? 'primary' : 'secondary'}
-            onPress={() => {
-              onSelect(option);
-            }}
-            accessibilityLabel={taskSortName(t, option)}
-            style={{ flex: 1 }}
-          />
-        ))}
+        {/* 档位数量由领域层给（`TASK_SORT_OPTIONS`），**不在这个文件里写死**，
+            所以"能不能全看见"不能依赖"现在只有三个" —— 高度不够时滚动，不裁切。 */}
+        <ScrollView contentContainerStyle={{ gap: tokens['space.2'] }}>
+          {TASK_SORT_OPTIONS.map((option) => (
+            <Button
+              key={option}
+              label={taskSortName(t, option)}
+              // 当前档位用实心主色，其余次要 —— 面板打开时"现在选的是哪个"要一眼看出，
+              // 而不是让用户从三个长得一样的按钮里找。
+              tone={option === current ? 'primary' : 'secondary'}
+              onPress={() => {
+                onSelect(option);
+              }}
+              accessibilityLabel={taskSortName(t, option)}
+              style={{ flex: 1 }}
+            />
+          ))}
+        </ScrollView>
       </View>
     </Modal>
   );
@@ -829,7 +911,7 @@ export function TasksScreen({
           它是打开面板的按钮，不是三个并列档位（理由见 `SortPicker` 文件头）。
 
           🔴 只在**列表视图**出现：四象限与时间线读的是同一批任务，但它们各自的
-          分桶/铺陈顺序由领域与共享层决定（`bucketByQuadrant` / `TimelineView`），
+          分桶/铺陈顺序由领域与共享层决定（`bucketByQuadrant` / `TimelineBoard`），
           在这里挂一个"排序"会让用户以为它能改那两个视图的排法 —— 而它不能。
         */}
         {view === 'list' ? (
@@ -911,15 +993,13 @@ export function TasksScreen({
           />
         ) : view === 'timeline' ? (
           /*
-           * 🔴 时间线那一档 = **共享 `TimelineView`**（`./TimelineScreen`）。
+           * 🔴 时间线那一档 = **共享 `TimelineBoard`**（`./TimelineScreen`）。
            *
-           * `startDate` 与 `today` **都取 `useToday()` 的同一个 `today`**：
-           * 时间线的"起始日"在这一档就是今天（与 web 的
-           * `startDate={toLocalDate(store.now)}` 同一口径 —— 它也是**一个** now 推出来的）。
-           * 分别取两次 `Date.now()` 会在跨零点的瞬间让"今天在哪"和"从哪天开始排"
-           * 指向两天，而那种 bug 只在午夜那一秒出现。
+           * `today` 取 `useToday()` 的同一个 `today`：窗口的周锚点与今天线都从它来。
+           * 分别取两次 `Date.now()` 会在跨零点的瞬间让"今天在哪"指向两天，
+           * 而那种 bug 只在午夜那一秒出现。
            */
-          <TimelineScreen tasks={tasks} startDate={today} today={today} now={now} />
+          <TimelineScreen tasks={tasks} today={today} now={now} />
         ) : nothing ? (
           <EmptyState
             icon="group.inbox"
