@@ -407,28 +407,6 @@ export function AuthForm({
         ) : null}
       </View>
 
-      {serverUrl !== undefined && labels.serverUrl !== undefined ? (
-        <View style={styles.field}>
-          <Text style={[text['caption'], styles.muted]}>{labels.serverUrl.label}</Text>
-          <TextInput
-            value={serverUrl.value}
-            onChangeText={serverUrl.onChange}
-            placeholder={labels.serverUrl.placeholder}
-            placeholderTextColor={tokens['color.foreground-subtle']}
-            autoComplete="url"
-            inputMode="url"
-            // 🔴 没有 maxLength（见文件头）。
-            style={[text['row-title'], styles.input]}
-            accessibilityLabel={labels.serverUrl.label}
-            aria-invalid={invalidFor('baseUrl')}
-            testID={`${testID}-server-url`}
-          />
-          {invalidFor('baseUrl') ? (
-            <Text style={[text['caption'], styles.danger]}>{labels.localErrors.baseUrl}</Text>
-          ) : null}
-        </View>
-      ) : null}
-
       {stage === 'identify' ? (
         <View style={styles.field}>
           <Text style={[text['caption'], styles.muted]}>{labels.email}</Text>
@@ -718,6 +696,42 @@ export function AuthForm({
           >
             <Text style={[text['row-meta'], styles.linkText]}>{labels.recovery}</Text>
           </Pressable>
+        </View>
+      ) : null}
+
+      {/*
+        ── 服务端地址：**表格里最后一栏，不是第一栏**（2026-10-01）──
+
+        🔴 它原来在邮箱**上面**。那个位置本身就是产品负责人点名要拆掉的那道墙：
+        「绝对不允许什么用自己正在用的域名才能够注册，不可能是这样子的。」
+        一张表单的第一栏要用户写出同步域名，等于把"你是自建部署的运维吗"当成注册前置条件。
+
+        两条配套纪律，缺一条这道墙就会以另一种形式回来：
+          1. **宿主负责给一个预填好的值**（web 是 `已配置的 > VITE_SYNC_URL > 本机来源`，
+             见 `apps/web/src/lib/auth-endpoint.ts`）。这里不许出现"空着等用户填"的默认态；
+          2. 宿主**可以不传** `serverUrl` —— 那一栏就不存在（`baseUrlMissing` 也就永远不成立）。
+        ⚠️ 位置变了，但 `baseUrlMissing` 的判定与 `firstAuthErrorField` 的顺序**没动**：
+        自建用户把地址清空时仍然会被指到那一栏，只是它现在在下方。
+      */}
+      {serverUrl !== undefined && labels.serverUrl !== undefined ? (
+        <View style={styles.field}>
+          <Text style={[text['caption'], styles.muted]}>{labels.serverUrl.label}</Text>
+          <TextInput
+            value={serverUrl.value}
+            onChangeText={serverUrl.onChange}
+            placeholder={labels.serverUrl.placeholder}
+            placeholderTextColor={tokens['color.foreground-subtle']}
+            autoComplete="url"
+            inputMode="url"
+            // 🔴 没有 maxLength（见文件头）。
+            style={[text['row-title'], styles.input]}
+            accessibilityLabel={labels.serverUrl.label}
+            aria-invalid={invalidFor('baseUrl')}
+            testID={`${testID}-server-url`}
+          />
+          {invalidFor('baseUrl') ? (
+            <Text style={[text['caption'], styles.danger]}>{labels.localErrors.baseUrl}</Text>
+          ) : null}
         </View>
       ) : null}
 
