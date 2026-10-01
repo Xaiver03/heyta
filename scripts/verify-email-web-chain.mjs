@@ -22,7 +22,8 @@
  * ## 它断言什么
  *
  * 1. UI 注册 → 服务端**真发一封**（本地无 `SMTP_*` ⇒ Ethereal 兜底）；
- * 2. 脚本把 **preview URL 抓回来**、从渲染后的邮件正文里取出 `/verify-email?token=…`；
+ * 2. 脚本把 **preview URL 抓回来**、从渲染后的邮件正文里取出 `/verify-email?token=…`
+ *    （**整条查询串**），并核对链接里的 `lang=` 等于提交那一刻的**界面语言**；
  * 3. 打开那个链接 ⇒ 是**确认页**（不是"已失效"）；
  * 4. 点确认 ⇒ 跳到 `/app/` ⇒ **应用真的登录了**（身份菜单出现"退出登录"、有邮箱）；
  * 5. 截图留证（人看）。
@@ -416,19 +417,58 @@ page.on('response', (res) => {
 });
 const email = `email-web-${String(Date.now())}@example.com`;
 
+/**
+ * 首屏锚点用 **testid 而不是 placeholder 文案**。
+ *
+ * 理由不是偏好，是实测：这台机器上 Playwright 起的是 `en-US` 浏览器，而应用现在
+ * **认浏览器语言**（`docs/plans/i18n-*`）⇒ 界面渲染成英文，旧的
+ * `input[placeholder^="添加任务"]` 直接超时，而应用其实**是好的**（真产物手验过：
+ * `#root` 18277 字符、`data-testid="capture-input"` 在）。用文案当锚点等于把
+ * "界面文案改了/语言换了"读成"应用没打开" —— 这正是 §7 第 46 条那类假红。
+ */
+const appOpen = () => page.getByTestId('capture-input').waitFor({ timeout: 60_000 });
+
 try {
   await page.goto(`${WEB}/`, { waitUntil: 'domcontentloaded' });
-  await page.locator('input[placeholder^="添加任务"]').waitFor({ timeout: 60_000 });
+  await appOpen();
   check(true, '① 应用在**同源反代**下打开（真产物）');
 
   await page.getByTestId('account-menu-avatar').click();
   await page.getByTestId('sync-signin-entry').click();
   const dialog = page.locator('[role="dialog"]');
-  await dialog.locator('input[type="url"]').fill(WEB);
+
+  /**
+   * 🔴 **一个地址都不填** —— 这条是这段脚本最重要的改动，也是判据而不是省事。
+   *
+   * 旧版在这里 `fill(WEB)`：注册的前置条件是"先把你连哪台服务端敲出来"。
+   * 那面墙拆掉之后（`AuthPanel.tsx` 文件头 + `auth-endpoint.ts`），未配置时地址
+   * **预填成应用自己的来源**并收进「高级」的 `<details>` 里 —— 折叠着，所以不能用
+   * `fill()`/`inputValue()`（都要可见性），只能直接读 DOM 的 `value`。
+   *
+   * 读它而不是跳过它：**"不用填"和"默认值是对的"是两件事**。只看注册成功，
+   * 可能成功地把请求发去了别处（比如构建期烙进去的旧域名）。
+   */
+  const prefilled = await dialog.evaluate((root) => {
+    const url = root.querySelector('input[type="url"]');
+    return url ? { present: true, value: url.value } : { present: false, value: '' };
+  });
+  check(
+    prefilled.value === WEB,
+    `① 地址框**预填成同源地址**而没人碰过它（实测 value="${prefilled.value}"）`,
+    'structure',
+  );
+
   await dialog.locator('input[type="email"]').fill(email);
   await dialog.getByRole('checkbox').check();
+  /**
+   * 提交**之前**取界面语言。`document.documentElement.lang` 是应用自己写的
+   * （`apps/web/src/lib/locale.ts:92`），所以它就是"用户此刻看着哪种语言"的
+   * 唯一事实源 —— 不用去猜 `navigator.language`，也不拿文案当锚点。
+   */
+  const uiLang = await page.evaluate(() => document.documentElement.lang);
   await dialog.getByRole('button', { name: /注册新账号|Create account/ }).click();
-  check(true, `① UI 注册已提交（${email}）`);
+  check(true, `① UI 注册已提交（${email}，界面语言 ${uiLang}）`);
+
 
   // ── 把那封信读回来 ──────────────────────────────────────────────────
   let preview = '';
@@ -441,9 +481,33 @@ try {
   const raw = await (await fetch(preview)).text();
   // Ethereal 预览页是外壳页：斜杠 `\u002f`、`&amp;` 都要归一化，否则取不出链接。
   const html = raw.replace(/\\u002f/gi, '/').replace(/\\\//g, '/').replace(/&amp;/g, '&');
-  const link = /(https?:\/\/[^"'\s]*\/verify-email\?token=[0-9a-f]+)/.exec(html)?.[1] ?? '';
+  /**
+   * 🔴 取**整条查询串**，不只是 token。
+   *
+   * 旧正则停在 `[0-9a-f]+`，于是 `&lang=en` 被丢掉 —— 后果不是"少打印一段"，
+   * 而是**这一腿从来没验过语言**：浏览器（Playwright 无头 Chromium 实测**不发**
+   * `Accept-Language`）拿不到语言线索，服务端落到 `zh-CN` 兜底，
+   * 于是截图里那张页面对着一个都没选过中文的英文界面**是中文的**。
+   * 症状长得像"产品本地化坏了"，实际是探针把链接截断了（§7 元规则 1）。
+   *
+   * ⚠️ 字符类里那个 `\\` 不是装饰：预览页把链接放在转义过的 `href=\"…\"` 里，
+   * 只排 `"'` 和空白会把结尾那个反斜杠**当成链接的一部分**抓回来
+   * （实测 `lang=en\` ⇒ 新加的那条判据当场红）。判据是对的，抓的是探针。
+   */
+  const link = /(https?:\/\/[^"'\s\\]*\/verify-email\?token=[0-9a-f]+(?:&[^\s"'\\]*)?)/.exec(html)?.[1] ?? '';
   if (link === '') bail('信里取不出 /verify-email 链接', html.slice(0, 400));
   check(link.startsWith(WEB), `② 链接指向**反代那个 origin**（${link.slice(0, 46)}…）`);
+  /**
+   * 语言**随链接走**（`server/src/email.ts` 的 `withLocale`）：收件人点开的语言
+   * 应当等于**发信那一刻他界面用的语言**，而不是"他恰好用什么浏览器"。
+   * 这条串起了三层：客户端 `body.locale` → 服务端解析 → 写进链接。
+   */
+  const linkLang = new URL(link).searchParams.get('lang') ?? '';
+  check(
+    linkLang === uiLang,
+    `② 链接带 \`lang=${linkLang || '(没有)'}\`，与提交时的界面语言（${uiLang}）一致`,
+    'structure',
+  );
 
   // ── 打开链接 → 确认页 → 点击 ────────────────────────────────────────
   await page.goto(link, { waitUntil: 'domcontentloaded' });
@@ -453,7 +517,7 @@ try {
 
   await page.locator('#login-btn').click();
   // 确认页成功后会跳 `/app/` —— 等应用挂载。
-  await page.locator('input[placeholder^="添加任务"]').waitFor({ timeout: 60_000 });
+  await appOpen();
   check(true, '④ 点击后跳到了 `/app/` 且应用挂载');
 
   // 落到 /app/ 之后先把**存储与凭据**看一眼：这一格坏了要知道坏在哪。
@@ -587,6 +651,24 @@ try {
       '',
     ].join('\n'),
   );
+} catch (err) {
+  /**
+   * 🔴 **失败时也要有图**（AGENTS §6.2 规定一第 1 条）。
+   *
+   * `locator.waitFor()` 超时抛在这里，**不走 `check()`** —— 上一次它留下的证据只有
+   * 一行 `TimeoutError`，谁也不知道界面长什么样（而"界面其实是好的、锚点过期了"与
+   * "应用真没起来"在日志上**一模一样**）。现在先落图再报错，并把控制台一起打出来：
+   * 白屏的根因几乎只在控制台里现形。
+   */
+  mkdirSync(EVIDENCE, { recursive: true });
+  await page.screenshot({ path: join(EVIDENCE, 'web-chain-FAIL.png') }).catch(() => {});
+  console.error(`\n❌ 旅程中途抛错：${err}`);
+  if (consoleLines.length > 0) {
+    console.error('— 浏览器控制台（最后 20 条）—');
+    for (const line of consoleLines.slice(-20)) console.error(`  ${line}`);
+  }
+  failed = true;
+  failures.outcome.push(`中途抛错：${String(err).split('\n')[0]}`);
 } finally {
   await browser.close();
   stop();
