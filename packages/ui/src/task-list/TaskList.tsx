@@ -147,11 +147,15 @@ interface TaskListSharedProps {
    */
   readonly keepEmptySections?: boolean;
   /**
-   * 排序口径，默认 `display`。**只在平铺形态生效** —— 分节形态的组内顺序
-   * 属于宿主语义（见 `model.ts` 的 `flattenSections`：它刻意不重排）。
+   * 排序口径。**平铺形态**：整表按这一档排（默认 `display`）；
+   * **分节形态**：每一组**各自**按这一档排，分组之间的顺序仍是宿主的（不重排）。
+   * 分节形态下不传 = 保持宿主给的顺序，老宿主的行为逐字节不变。
+   *
    * 和上面 `keepEmptySections` 同样挂在共有属性上，理由就是那条解构规则。
    *
    * ⚠️ 判据不在这里，在 `@heyta/domain` 的 `sortTasks`。本包只透传。
+   * mobile 任务屏以前自己写 `reverse()`，那是第三份比较规则（见 `model.ts`
+   * 的 `flattenSections`），现在它传档名。
    */
   readonly sort?: TaskSortKey;
 }
@@ -219,7 +223,11 @@ export function TaskList<TMeta = undefined>({
   // 这样下面的 `renderItem` 与 `keyExtractor` 各只有一份。
   const items = useMemo<readonly Item[]>(() => {
     if (sections !== undefined) {
-      return flattenSections(sections, { fallbackTitle, keepEmpty: keepEmptySections === true });
+      return flattenSections(sections, {
+        fallbackTitle,
+        keepEmpty: keepEmptySections === true,
+        sort,
+      });
     }
     return toTaskRows(tasks ?? [], { fallbackTitle, sort }).map((row) => ({
       kind: 'task' as const,

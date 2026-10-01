@@ -8,6 +8,7 @@
  */
 
 import { describe, expect, it } from 'vitest';
+import { Priority } from '@heyta/domain';
 import type { Task } from '@heyta/domain';
 import {
   flattenSections,
@@ -183,13 +184,83 @@ describe('flattenSections', () => {
     expect(header?.kind === 'header' && header.section.meta).toBe('今天');
   });
 
-  it('组内顺序**不**被重排 —— 次序是宿主的语义', () => {
-    // "今天 / 逾期 / 收集箱" 这种分组次序不是按截止时间能推出来的，
-    // 所以这里刻意不调用 sortTasksForDisplay。
+  it('组内顺序**不**被重排 —— 不传 `sort` 时老宿主行为逐字节不变', () => {
+    // "今天 / 逾期 / 收集箱" 这种**分组**次序不是按截止时间能推出来的。
+    // 组内次序在以前也完全由宿主决定（四象限矩阵、日历格都没有排序档位），
+    // 所以"没传 sort 就不动"是它们不被这次改动波及的唯一保证。
     const late = mkTask('late', { dueDate: 900 });
     const early = mkTask('early', { dueDate: 100 });
     const rows = flattenSections([sec('today', [late, early])]);
     expect(rows.slice(1).map((r) => r.key)).toEqual(['late', 'early']);
+  });
+
+  it('🔴 传了 `sort` 就**每一组各自**排，分组之间的次序仍是宿主的', () => {
+    // 排的是组内，不是整表：如果实现把两组拼起来再排，"已完成"组会跑到
+    // "今天"组前面去 —— 而分组次序是这一屏的产品语义，共享层无权决定。
+    const rows = flattenSections(
+      [
+        sec('today', [mkTask('t-late', { dueDate: 900 }), mkTask('t-early', { dueDate: 100 })]),
+        sec('done', [mkTask('d-late', { completedAt: 1, dueDate: 500 })]),
+      ],
+      { sort: 'display' },
+    );
+    expect(rows.map((r) => r.key)).toEqual(['h-today', 't-early', 't-late', 'h-done', 'd-late']);
+  });
+
+  it('🔴 `addedAt` 就是 mobile 原来手写 `reverse()` 的那个语义', () => {
+    // mobile 任务屏以前在屏幕里 `groups.x.reverse()`，而领域给的规范顺序是
+    // `createdAt` 升序 —— 合起来就是"新的在上"。这次把 reverse 删掉、换成传档名，
+    // 所以这条用例钉的是**等价性**：不成立就说明换实现顺带改了行为。
+    const rows = flattenSections(
+      [
+        sec(
+          'inbox',
+          [
+            mkTask('first', { createdAt: 1 }),
+            mkTask('second', { createdAt: 2 }),
+            mkTask('third', { createdAt: 3 }),
+          ],
+        ),
+      ],
+      { sort: 'addedAt' },
+    );
+    expect(rows.slice(1).map((r) => r.key)).toEqual(['third', 'second', 'first']);
+  });
+
+  it('分节形态下已完成仍然沉底（不是某一档的可选项）', () => {
+    // 这一条在 `sort: 'priority'` 下最容易露馅：已完成那条给个 High 就会顶到最上。
+    const rows = flattenSections(
+      [
+        sec(
+          'today',
+          [
+            mkTask('done-high', { completedAt: 1, priority: Priority.High }),
+            mkTask('low', { priority: Priority.Low }),
+          ],
+        ),
+      ],
+      { sort: 'priority' },
+    );
+    expect(rows.slice(1).map((r) => r.key)).toEqual(['low', 'done-high']);
+  });
+
+  it('排完不改动分节头：头的 `section` 仍是宿主那一个', () => {
+    // 组头的计数与色调读的是 `section`。若实现把排好序的数组写回 section，
+    // 头的 meta 就会带着被改过的对象出去（宿主下次渲染拿到不同引用 ⇒ 白重渲染）。
+    const tasks = [mkTask('b', { dueDate: 900 }), mkTask('a', { dueDate: 100 })];
+    const section = sec('today', tasks, '今天');
+    const rows = flattenSections([section], { sort: 'display' });
+    const header = rows[0];
+    expect(header?.kind === 'header' && header.section).toBe(section);
+    expect(section.tasks.map((t) => t.id)).toEqual(['b', 'a']);
+  });
+
+  it('`keepEmpty` 与 `sort` 同时给：空组仍然留头，不因排序被吃掉', () => {
+    const rows = flattenSections([sec('q1', []), sec('q2', [mkTask('a', { dueDate: 1 })])], {
+      keepEmpty: true,
+      sort: 'display',
+    });
+    expect(rows.map((r) => r.key)).toEqual(['h-q1', 'h-q2', 'a']);
   });
 
   it('任务行仍然是 toTaskRow 的产物（fallbackTitle 生效）', () => {

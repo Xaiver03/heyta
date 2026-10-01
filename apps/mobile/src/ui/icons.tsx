@@ -20,6 +20,7 @@
 import React from 'react';
 import {
   ArrowLeft,
+  ArrowUpDown,
   BadgeCheck,
   Bell,
   CalendarDays,
@@ -153,6 +154,12 @@ const ICONS = {
   // 🔴 与共享 `SearchPanel` 输入行里那个放大镜**同一个字形**：入口和它打开的
   // 东西长得不一样，用户就不会把这两个认成同一件事。
   'action.search': Search,
+  /**
+   * 排序档位。`ArrowUpDown` 是"这一列可以换个顺序看"的通用字形，
+   * 而 `ListTodo` / `Inbox` 都已经各自占住了"任务"与"收集箱"的语义 ——
+   * 借用它们会让 chip 读起来像"切换到某个视图"，而它改的是顺序不是内容。
+   */
+  'action.sort': ArrowUpDown,
   'action.sync': RefreshCw,
   /**
    * 导出 / 分享。
