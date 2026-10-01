@@ -156,15 +156,26 @@ export function TaskRow({
           gap: tokens[spec.gap],
         },
         /**
-         * 🔴 负外边距把勾选框的**触控区**拉回来与屏幕留白对齐。
+         * 🔴 命中区**必须是一条真实的尺寸声明**，不能靠 `marginLeft` 借位。
          *
-         * 它按无障碍要求是 `touch-target.min`（44），比**视觉尺寸**
-         * `size.checkbox` 大。⚠️ 这一项**不随密度变**：按容器缩触控区
-         * 是回归，不是紧凑（见 `density.ts` 文件头的边界表）。
+         * 改之前这里只有 `marginLeft: -(44-22)/2 = -11px`，**没有任何 width/height**，
+         * 于是注释里承诺的"44 触控下限"在盒模型上根本不存在 —— 实测命中区就是那个
+         * 22px 的圈（类 A：用一个不存在的属性表达契约）。按无障碍标准量的是
+         * **输入区域**而不是那个视觉标记，所以"圈是 22"不是问题，"命中区也是 22"才是。
+         *
+         * 而那 11px 的负边距同时是**被裁的一半**（类 B）：裁剪祖先是 RNW 的
+         * `ScrollView`（⇒ `overflow-x: hidden`），它的可视左边恰好等于行的左边，
+         * 负边距推出去的部分落在裁剪区里 ⇒ 圈**正好少一半**。
+         *
+         * ⚠️ 这里**刻意没有** `flexShrink: 0`：RN/RNW 的 `View` 默认已经是 0
+         * （实测计算样式 `flex-shrink: 0`，见计划 §2.1 结论 1）。加上去是一行
+         * **不起作用的修法** —— 它不解决任何问题，还会让人以为解决了。
          */
         checkboxHit: {
-          marginLeft:
-            -(tokens[TASK_ROW_SHAPE.touchTarget] - tokens[TASK_ROW_SHAPE.checkboxSize]) / 2,
+          width: tokens[TASK_ROW_SHAPE.touchTarget],
+          height: tokens[TASK_ROW_SHAPE.touchTarget],
+          alignItems: 'center',
+          justifyContent: 'center',
         },
         box: {
           width: tokens[TASK_ROW_SHAPE.checkboxSize],
@@ -184,6 +195,11 @@ export function TaskRow({
         tick: { color: tokens['color.on-primary'] },
         body: {
           flex: 1,
+          // 曾在这里加过 `minWidth: 0`，理由是"弹性盒 §4.5 的自动最小尺寸 = 内容宽，
+          // 长标题不肯换行会把行撑宽"。**这条假设被实测证伪了**：删掉这一行后
+          // body 仍计算为 `min-width: 0px`（RNW 的 `flex: 1` 已经把 min-width 归零），
+          // `scrollWidth == clientWidth`，长标题与不可断行的长 URL 都照常换行。
+          // 留着它 = 一条永远通过的判据 + 一段说错原因的注释，比不写更糟。
           paddingVertical: tokens[spec.bodyPaddingBlock] as DimensionValue,
           gap: tokens[spec.gap],
         } as const,
