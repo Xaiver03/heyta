@@ -574,6 +574,47 @@ describe('D 注册档', () => {
     expect(el.querySelectorAll('a[href]').length).toBe(0);
   });
 
+  /**
+   * 🔴 宿主**给了地址**（`legal.hrefs`）时，web 上必须是真的 `<a href>`。
+   *
+   * 为什么这一条值得单独钉：上一条的 `Pressable role="link"` 在原生上是对的，
+   * 在浏览器里却是"看起来能点、其实是个 div" —— 中键 / ⌘ 点击打不开新标签、
+   * 状态栏没有预览、右键也复制不了地址。而要求用户同意一份政策，
+   * 就必须让他用他习惯的任何方式把它打开（上一行那个 `a[href] === 0` 的断言
+   * 只在没有 `hrefs` 时成立，两者一起才把"什么时候给 `<a>`"钉死）。
+   */
+  it('给了 `hrefs` 之后就是 `<a href target=_blank rel=noopener>`，而且**不再有两份**链接', () => {
+    const hrefs = {
+      terms: 'https://sync.example.com/terms.html',
+      privacy: 'https://sync.example.com/privacy.html',
+    };
+    const el = renderCredential({
+      onOpenLegal: openLegal,
+      labels: { ...LABELS, legal: { ...LABELS.legal!, hrefs } },
+    });
+    toRegister(el);
+
+    const anchors = [...el.querySelectorAll<HTMLAnchorElement>('a[href]')];
+    // 文档序也是判据：条款在前、隐私在后，与勾选那句话的顺序一致。
+    expect(anchors.map((a) => a.getAttribute('href'))).toEqual([hrefs.terms, hrefs.privacy]);
+    expect(anchors.every((a) => a.getAttribute('target') === '_blank')).toBe(true);
+    expect(anchors.every((a) => (a.getAttribute('rel') ?? '').includes('noopener'))).toBe(true);
+    // 同一份链接不许渲染两遍（`Pressable` + `<a>` 并存时这里会数到 4）。
+    expect(el.querySelectorAll('[role="link"]').length).toBe(0);
+    // 原生那套 `testID` 在两个分支里都在，壳级判据不必区分平台。
+    expect(node(el, 'auth-form-legal-terms').tagName).toBe('A');
+  });
+
+  it('`hrefs` 只给在 web：链接落点由宿主决定，组件不拼 URL', () => {
+    // 传进来的就是传出去的 —— 组件里没有任何 `baseUrl + '/terms.html'` 的拼接，
+    // 所以自建实例指向运营者自己发布的文本、官方实例指向落地页，都是宿主一句话的事。
+    const hrefs = { terms: 'https://a.example/t/', privacy: 'https://a.example/p/' };
+    const el = renderCredential({ labels: { ...LABELS, legal: { ...LABELS.legal!, hrefs } } });
+    toRegister(el);
+    expect(el.querySelector('a[href="https://a.example/t/"]')).not.toBeNull();
+    expect(el.querySelector('a[href^="https://sync.example.com"]')).toBeNull();
+  });
+
   it('「忘记密码」只在登录档出现：注册档里它是一句误导', () => {
     const signInEl = renderCredential();
     expect(maybe(signInEl, 'auth-form-forgot')).not.toBeNull();
@@ -698,6 +739,28 @@ describe('F 状态与错误落点', () => {
       status: { tone: 'error', message: LABELS.localErrors.password, field: 'password' },
     });
     expect(inputOf(el, 'auth-form-password').getAttribute('aria-invalid')).toBe('true');
+  });
+
+  /**
+   * `detail` 是**第二句**，不是把两句拼成一行。
+   *
+   * 形状判据而不是内容判据：`web.auth.signedIn.title`（已登录）与它的补充句
+   * （令牌写到了哪个邮箱）混成一条时，眼睛看着差不多，读屏却把"是谁在登录"
+   * 当成状态本身念 —— 而宿主那边要的是两条都能各自被 `toContain` 钉住。
+   */
+  it('`detail` 与 `message` 是状态区里**两个**节点，顺序固定', () => {
+    const title = t('web.auth.signedIn.title');
+    const body = t('web.auth.signedIn.body', { email: 'me@example.com' });
+    const el = renderCredential({ status: { tone: 'success', message: title, detail: body } });
+    const lines = [...node(el, 'auth-form-status').children].map((c) => c.textContent);
+    expect(lines).toEqual([title, body]);
+  });
+
+  it('不给 `detail` 时状态区**只有一句**（不是留一个空行）', () => {
+    const el = renderCredential({ status: { tone: 'info', message: t('common.auth.busy.verify') } });
+    expect([...node(el, 'auth-form-status').children].map((c) => c.textContent)).toEqual([
+      t('common.auth.busy.verify'),
+    ]);
   });
 
   it('成功句与失败句用**不同**的语义（不是同一个红字换内容）', () => {
