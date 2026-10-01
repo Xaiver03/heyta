@@ -85,6 +85,16 @@ export const PASSWORD_POLICY_MESSAGE = 'That password does not meet the requirem
 /** 见 `invalid_reset_link` 上的注释：查不到 / 过期 / 用过 三种情况**共用这一句**。 */
 export const PASSWORD_INVALID_RESET_LINK_MESSAGE =
   'That reset link is invalid or has been used. Request a new one.';
+/**
+ * 已有口令的账号来走"设第一个口令" ⇒ 该改走 `change`。
+ *
+ * 只在**已认证**接口上出现（理由见 `PASSWORD_AUTH_ERROR_CODES` 里那条注释），
+ * 所以它不像 `invalid_credentials` 那样需要中性化。
+ */
+export const PASSWORD_ALREADY_SET_MESSAGE =
+  'This account already has a sign-in password. Use password change instead.';
+/** `/password/set` 成功。与 `change` 不同：**没有**新会话可发（手上那枚仍然有效）。 */
+export const PASSWORD_SET_SUCCESS_MESSAGE = 'Password set';
 
 export class PasswordAuthError extends Error {
   constructor(
@@ -154,6 +164,84 @@ export const registerWithEmailPassword = async (
     input.locale,
     passwordHash,
   );
+};
+
+/**
+ * 给一个**还没有口令**的账号加上第一个登录口令（已认证）。
+ *
+ * ## 为什么必须有这条路
+ *
+ * `passwordHash` 可空是设计（纯通行密钥 / 魔法链接账号）。少了这条路由，那种账号
+ * **永远**加不上登录密码：`change` 要验一个不存在的当前口令（它回 `no_password_set`），
+ * 而 `forgot` 对没有口令认证器的账号**刻意不发信**（反枚举，`recovery.ts:117`）。
+ * 症状是界面上每一句"去设一个登录密码"都指向一条不存在的路。
+ *
+ * ## 与 `change` 的三点不同，每一点都要写清
+ *
+ *   1. **不验当前口令** —— 没有可验的东西。
+ *   2. 🔴 **不 bump `tokenVersion`**：这是**加一个认证器**，不是换一把钥匙。把其余设备
+ *      踢下线在这条路上没有任何安全收益（这个人此刻就登录着），只有成本。
+ *      也因此**不返回新会话** —— 手上那枚仍然有效，客户端不需要换。
+ *   3. 成功后**不发信**：`notifyPasswordChanged` 那封信的语义是"你的口令被改了"，
+ *      用在这里会说谎（这个账号本来没有口令）。而"新增一把认证器要不要通知"
+ *      是一个**还没有答案**的问题 —— 已登录加通行密钥那条路（
+ *      `passkeys/registration/complete`）同样一封都不发，所以这里不发是与现状一致，
+ *      不是新挖的洞。洞本身登记在 `docs/plans/email-password-auth.md` 的缺口清单。
+ *
+ * 已认证就够了，不需要"再证明一次邮箱"：登录态本身就是这把钥匙的授权边界，
+ * 而 E2EE 之下服务端读不到任何明文数据 —— 加一个口令不放大任何人的数据面。
+ * 唯一加的门是**邮箱必须已验证**：否则设出来的口令登不进（`loginWithEmailPassword`
+ * 要求 `isVerified`），那才是真的把人引进死胡同。
+ */
+export const setInitialPassword = async (input: {
+  userId: number;
+  password: string;
+}): Promise<{ message: string }> => {
+  const policy = await checkNewPassword(input.password);
+  if (!policy.ok) {
+    throw new PasswordAuthError(
+      'password_policy_violation',
+      PASSWORD_POLICY_MESSAGE,
+      undefined,
+      policy.code,
+    );
+  }
+
+  const user = await prisma.user.findUnique({
+    where: { id: input.userId },
+    select: { id: true, email: true, isVerified: true, passwordHash: true },
+  });
+
+  if (!user) {
+    // 带着一枚有效令牌却查不到那一行 ⇒ 账号在两次请求之间被删了。
+    // 不新造一个码：`invalid_credentials` 在这一层就是"这次认证不成立"。
+    throw new PasswordAuthError('invalid_credentials', PASSWORD_INVALID_CREDENTIALS_MESSAGE);
+  }
+  if (user.passwordHash !== null) {
+    throw new PasswordAuthError('password_already_set', PASSWORD_ALREADY_SET_MESSAGE);
+  }
+  if (user.isVerified !== 1) {
+    throw new PasswordAuthError(
+      'email_not_verified',
+      PASSWORD_EMAIL_NOT_VERIFIED_MESSAGE,
+    );
+  }
+
+  const passwordHash = await hashFor(policy.normalized);
+
+  // 🔴 条件写（`passwordHash: null` 在 `where` 里）：两次"设第一个口令"并发时，
+  // 只有一个赢，另一个得到 `password_already_set`。无条件 `update` 会让后写的
+  // 那一次**静默覆盖**前一次 —— 而两个人都看到了"成功"。
+  const written = await prisma.user.updateMany({
+    where: { id: user.id, passwordHash: null },
+    data: { passwordHash },
+  });
+  if (written.count !== 1) {
+    throw new PasswordAuthError('password_already_set', PASSWORD_ALREADY_SET_MESSAGE);
+  }
+
+  Logger.info(`Initial password set (ID: ${user.id})`);
+  return { message: PASSWORD_SET_SUCCESS_MESSAGE };
 };
 
 export interface LoginResult {

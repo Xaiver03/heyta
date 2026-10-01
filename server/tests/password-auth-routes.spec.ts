@@ -8,7 +8,7 @@ import * as jwt from 'jsonwebtoken';
  * `password-auth-flow.spec.ts` / `password-recovery.spec.ts` 钉的是"判定对不对"，
  * 这一组钉的是"判定怎么变成响应"：
  *
- * 1. 🔴 **七个错误码各自的状态码**（401 / 403 / 400 / 429 / 503），以及两处
+ * 1. 🔴 **八个错误码各自的状态码**（401 / 403 / 400 / 429 / 503），以及两处
  *    `Retry-After`。选错状态码不是风格问题：429 说"你慢点"、503 说"我这儿满了"，
  *    客户端的退避策略按它决定惩罚谁。
  * 2. **锁定的句子不许泄露内部容量语义** —— `PasswordBackendBusy.message` 描述的是
@@ -19,6 +19,9 @@ import * as jwt from 'jsonwebtoken';
  * 5. 🔴 W3 那三条**在 HTTP 层独有的**两件事：`/forgot` 连**状态码**都不许随账号
  *    存在性变化（文案中性、状态码会漏，是同一件事的另一半）；`/password/change`
  *    的 `preHandler` 真的挂上了（没挂的症状是拿不到身份时 500，而不是 401）。
+ * 6. 🔴 `/password/set` 与 `/password/change` 是**两条协议**，不是同一条的两种写法：
+ *    前者不发会话、**不 bump `tokenVersion`**、写库是**条件写**（并发只许一个赢）。
+ *    三样各自对应一种真实伤害，见那个 describe 的表。
  *
  * 传输上限（`MAX_PASSWORD_CODE_POINTS * 2`）与策略上限**两层都以码点计**（实测 zod 4.6.5
  * 的 `.max()` 数的是码点，不是 UTF-16 单元）。传输线刻意画在策略线**之外**，
@@ -77,9 +80,12 @@ vi.mock('../src/auth', async (importOriginal) => {
 });
 
 import { apiRoutes, passwordAuthResponseOf } from '../src/api';
+import { authCache } from '../src/auth-cache';
 import {
   PASSWORD_ACCOUNT_LOCKED_MESSAGE,
+  PASSWORD_ALREADY_SET_MESSAGE,
   PASSWORD_INVALID_RESET_LINK_MESSAGE,
+  PASSWORD_SET_SUCCESS_MESSAGE,
   PasswordAuthError,
 } from '../src/password/service';
 import {
@@ -639,6 +645,199 @@ describe('POST /password/change：preHandler 真的挂上了（J13 的 HTTP 半�
     expect(res.statusCode).toBe(400);
     expect(res.json().error).toBe('Validation failed');
     expect(hashSpies.verifyPassword).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * `POST /password/set` —— 给**从来没有口令**的账号（纯通行密钥 / 魔法链接注册）
+ * 加上第一个登录口令。
+ *
+ * 这一组钉的是"它和 `/password/change` 是不是**真的两条协议**"。三个形状差异各对应
+ * 一种真实伤害：
+ *
+ *   | 差异 | 少了它会怎样 |
+ *   |---|---|
+ *   | 不验当前口令 | 这个账号根本没有口令可验 ⇒ 客户端只能逼用户打一个他手上没有的东西 |
+ *   | 🔴 **不 bump `tokenVersion`** | 加一个认证器把其余设备全踢下线 —— 而这些设备没有一台是威胁（这个人此刻就登录着） |
+ *   | 不回新会话 | 形状和 `change` 一样的话，客户端那条"换会话"的接线就得写成"可能有可能没有"，而两边都写对的代价是四个宿主各判一次 |
+ *
+ * 🔴 还有一件只有服务端能钉的：**并发**。两次"设第一个口令"同时到达时，无条件 `update`
+ * 让后写的那次**静默覆盖**前一次，而两边都收到 200。症状是"我明明设过密码，登录时却不对"，
+ * 且没有任何一条日志能解释它。判据是 `updateMany` 的 `where` 里带着 `passwordHash: null`
+ * 且 `count !== 1` 时报 `password_already_set`。
+ *
+ * ⚠️ 这里的 URL 是**写死的字面量**，不引 `AUTH_PASSWORD_PATHS.set`：那条常量在
+ * `password-contract.spec.ts` 里已经钉过"注册的正是它"，这一组要钉的是**线上那串字节**。
+ * 两处都引同一份常量 = 谁也不验谁。
+ */
+describe('POST /password/set：加认证器，不是换钥匙', () => {
+  const bearer = (tokenVersion: number): string =>
+    `Bearer ${jwt.sign(
+      { userId: 7, email: EMAIL, tokenVersion },
+      process.env.JWT_SECRET as string,
+      { expiresIn: '1h' },
+    )}`;
+
+  const setWith = (token: string | undefined, payload: unknown) =>
+    app.inject({
+      method: 'POST',
+      url: '/api/password/set',
+      ...(token === undefined ? {} : { headers: { authorization: token } }),
+      payload: payload as Record<string, unknown>,
+    });
+
+  /**
+   * 带**持久化**的假库：`updateMany` 真的把那一行的 `passwordHash` 写上，并且**只在
+   * 它还是 null 时**写（条件写，与真实现同形）。
+   *
+   * 为什么要持久化：不持久就只能靠 `mockResolvedValueOnce` 演出顺序，而"第二次请求
+   * 拿到的是业务答复而不是 401"这条证据要求第一次**真的改变了账号状态**。
+   *
+   * 🔴 `select` 里没有 `passwordHash` 的那次查询是 `verifyToken` 在查身份 —— 它只看
+   * `isVerified` 与 `tokenVersion`，不许看见口令那一格。
+   */
+  const fakeAccount = (overrides: Record<string, unknown> = {}): Record<string, unknown> => {
+    const row = readyRow({ passwordHash: null, ...overrides });
+    mocks.user.findUnique.mockImplementation(async (args: unknown) => {
+      const select = (args as { select?: Record<string, unknown> })?.select ?? {};
+      return 'passwordHash' in select
+        ? { ...row }
+        : { id: 7, tokenVersion: row.tokenVersion, isVerified: row.isVerified };
+    });
+    mocks.user.updateMany.mockImplementation(async () => {
+      if (row.passwordHash !== null) return { count: 0 };
+      row.passwordHash = PHC;
+      return { count: 1 };
+    });
+    return row;
+  };
+
+  beforeEach(() => {
+    // 认证缓存是模块级的，会跨用例留下"这个 userId 的会话有效"。这一组要判的
+    // 恰好包含"令牌在 set 之后还有效"，所以每条都从空缓存开始。
+    authCache.clear();
+  });
+
+  it('🔴 没有 Authorization ⇒ 401：零哈希、零写库，也不许说出账号状态', async () => {
+    await boot();
+    const res = await setWith(undefined, { newPassword: PASSWORD });
+
+    expect(res.statusCode).toBe(401);
+    expect(hashSpies.verifyPassword).not.toHaveBeenCalled();
+    expect(hashSpies.hashPassword).not.toHaveBeenCalled();
+    expect(mocks.user.updateMany).not.toHaveBeenCalled();
+    // `password_already_set` 与 `no_password_set` 都**只在已认证接口**上出现，
+    // 这是它们不违反 anti-enumeration 的前提。未认证的这一次不许漏出任何一个。
+    expect(res.body).not.toContain('password_already_set');
+    expect(res.body).not.toContain('no_password_set');
+  });
+
+  it('成功：200 且响应体**只有**那句 message —— 不发会话、不 bump 版本', async () => {
+    await boot();
+    fakeAccount();
+    const res = await setWith(bearer(3), { newPassword: PASSWORD });
+
+    expect(res.statusCode).toBe(200);
+    // `toEqual` 是逐字比较：`{ token, user, message }` 这种"顺手签一枚"会当场红。
+    expect(res.json()).toEqual({ message: PASSWORD_SET_SUCCESS_MESSAGE });
+    expect(res.body).not.toContain('tokenVersion');
+    // 🔴 不 bump 的直接证据：`tokenVersion` 只能经 `user.update` 写，那条路一次都没走。
+    expect(mocks.user.update).not.toHaveBeenCalled();
+    // 也没有"当前口令"可验：一次 verify 都不该跑。
+    expect(hashSpies.verifyPassword).not.toHaveBeenCalled();
+  });
+
+  it('🔴 写库的形状：`where` 里带着 `passwordHash: null`，`data` 里只有哈希', async () => {
+    await boot();
+    fakeAccount();
+    await setWith(bearer(3), { newPassword: PASSWORD });
+
+    // 少了 `where` 里那一格，条件写就退化成无条件覆盖 ⇒ 并发双写两边都看"成功"。
+    expect(mocks.user.updateMany.mock.calls[0]?.[0]).toEqual({
+      where: { id: 7, passwordHash: null },
+      data: { passwordHash: PHC },
+    });
+  });
+
+  it('🔴 抢输的那一次（count=0）⇒ 400 + password_already_set，**不是** 200', async () => {
+    await boot();
+    fakeAccount();
+    // 读到的时候还是 null，写的时候别人已经抢先 ⇒ 真库里 count 是 0。
+    mocks.user.updateMany.mockImplementationOnce(async () => ({ count: 0 }));
+
+    const res = await setWith(bearer(3), { newPassword: PASSWORD });
+    expect(res.statusCode).toBe(400);
+    expect(res.json()).toEqual({
+      error: PASSWORD_ALREADY_SET_MESSAGE,
+      code: 'password_already_set',
+    });
+  });
+
+  it('账号**已经有**口令 ⇒ 400 + code，且一次哈希都不烧', async () => {
+    await boot();
+    fakeAccount({ passwordHash: PHC });
+    const res = await setWith(bearer(3), { newPassword: PASSWORD });
+
+    expect(res.statusCode).toBe(400);
+    expect(res.json()).toEqual({
+      error: PASSWORD_ALREADY_SET_MESSAGE,
+      code: 'password_already_set',
+    });
+    expect(hashSpies.hashPassword).not.toHaveBeenCalled();
+    expect(mocks.user.updateMany).not.toHaveBeenCalled();
+  });
+
+  it('🔴 设过之后手上那枚令牌**仍然可用**（拿到的是业务答复，不是 401）', async () => {
+    await boot();
+    fakeAccount();
+    const first = await setWith(bearer(3), { newPassword: PASSWORD });
+    expect(first.statusCode).toBe(200);
+
+    // 假库把第一次真的写进去了 ⇒ 第二次的 400 来自业务层。
+    // 如果这条路 bump 了版本，这一次会是 401，而这正是"改一个认证器把别的设备踢下线"的形状。
+    const second = await setWith(bearer(3), { newPassword: PASSWORD });
+    expect(second.statusCode).toBe(400);
+    expect(second.json().code).toBe('password_already_set');
+    expect(mocks.user.update).not.toHaveBeenCalled();
+  });
+
+  it('会话在缓存里还有效、账号却已变成未验证 ⇒ 403，且**一次写库都不发生**', async () => {
+    await boot();
+    const row = fakeAccount();
+    // 先用一次"过了闸、栽在校验"的请求喂上认证缓存（`preHandler` 在 zod 之前）。
+    expect((await setWith(bearer(3), {})).statusCode).toBe(400);
+
+    row.isVerified = 0;
+    const res = await setWith(bearer(3), { newPassword: PASSWORD });
+    // 403 而不是 401：口令认证**没有**失败，是"这个账号还差最后一步"。
+    expect(res.statusCode).toBe(403);
+    expect(res.json().code).toBe('email_not_verified');
+    expect(mocks.user.updateMany).not.toHaveBeenCalled();
+  });
+
+  it('新口令不合格 ⇒ 400 + policyCode，写库一次都不发生', async () => {
+    await boot();
+    fakeAccount();
+    policySpies.checkNewPassword.mockResolvedValueOnce({ ok: false, code: 'too_short' });
+
+    const res = await setWith(bearer(3), { newPassword: 'short' });
+    expect(res.statusCode).toBe(400);
+    expect(res.json()).toEqual({
+      error: 'That password does not meet the requirements.',
+      code: 'password_policy_violation',
+      policyCode: 'too_short',
+    });
+    expect(hashSpies.hashPassword).not.toHaveBeenCalled();
+    expect(mocks.user.updateMany).not.toHaveBeenCalled();
+  });
+
+  it('缺 newPassword / 空串是 400 校验失败，不进服务层', async () => {
+    await boot();
+    fakeAccount();
+    expect((await setWith(bearer(3), {})).statusCode).toBe(400);
+    expect((await setWith(bearer(3), { newPassword: '' })).statusCode).toBe(400);
+    expect(hashSpies.hashPassword).not.toHaveBeenCalled();
+    expect(mocks.user.updateMany).not.toHaveBeenCalled();
   });
 });
 
