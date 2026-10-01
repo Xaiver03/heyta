@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test, type Page } from '@playwright/test';
 
 import { addTask, openApp, rowFor } from './helpers.js';
 
@@ -41,6 +41,16 @@ const LIST = `list-${STAMP}`;
 const TAG = `tag-${STAMP}`;
 
 const SIDEBAR = 'aside[aria-label="清单与标签"]';
+
+/**
+ * 侧栏里**某一行**（清单或标签）。
+ *
+ * 共享 `OrganizerList` 给行的 testID 是 `project-<id>-row` / `tag-<id>-row`，
+ * id 是运行时随机生成的，测试里拿不到 —— 所以按**后缀 + 行内的名字**定位，
+ * 而不是把 id 传进来。（名字是这一条测试自己建的、带时间戳，不会撞。）
+ */
+const organizerRow = (page: Page, name: string) =>
+  page.locator(SIDEBAR).locator('[data-testid$="-row"]').filter({ hasText: name });
 
 test.describe('任务整理：清单归属 + 标签', () => {
   test('建清单与标签 → 挂到任务上 → 刷新后仍在（证明走了 op-log）', async ({ page }) => {
@@ -103,6 +113,25 @@ test.describe('任务整理：清单归属 + 标签', () => {
     await checkbox.click();
     await expect(row.getByTestId('task-chip-tag')).toHaveText(TAG);
 
+    /*
+      🔴 侧栏那一行的**计数**（滴答参照图：侧栏每行右侧都有数字 —— 2026-10-01 R6）。
+
+      为什么浏览器里再钉一次，而不是只留单测：这个数走的是
+      「点复选框 → 派发 op → reducer 物化 → store 通知 → 重渲染」整条链。
+      单测（`projects-panel.spec.tsx`）喂的是**直接塞进 store 的实体**，
+      jsdom 的接线判据（`app-mount.spec.tsx`）也没有真 op-log ——
+      只有这一层抓得到"写进去了、但那一节的数字没重算"。
+
+      ⚠️ 断言的是"挂上**这一条**之后显示 1"，不是"侧栏里有数字"：
+      后者在跑剩的数据下也成立。
+    */
+    await expect(organizerRow(page, TAG).locator('[data-testid$="-count"]')).toHaveText('1');
+    // 规定一：截图放固定路径，失败时也在。
+    await page.screenshot({
+      path: 'test-results/sidebar-tag-count.png',
+      clip: (await sidebar.boundingBox()) ?? { x: 0, y: 0, width: 320, height: 400 },
+    });
+
     // ── 🔴 刷新：从 op-log 重新物化 ──────────────────────────────────
     await page.reload();
     await expect(page.locator('input[placeholder^="添加任务"]')).toBeVisible();
@@ -117,6 +146,8 @@ test.describe('任务整理：清单归属 + 标签', () => {
       afterReload.getByTestId('task-chip-tag'),
       '刷新后标签丢了 —— 同上',
     ).toHaveText(TAG);
+    // 计数位也得是从 op-log **物化出来**的那一个（不是上一次渲染留下的 DOM）。
+    await expect(organizerRow(page, TAG).locator('[data-testid$="-count"]')).toHaveText('1');
 
     // 展开面板里控件的**状态**也要跟着回来（不只是那几个 chip 好看）。
     await afterReload.getByTestId('task-organize-summary').click();
@@ -171,6 +202,8 @@ test.describe('任务整理：清单归属 + 标签', () => {
       stillAssigned.getByTestId('task-chip-tag'),
       '打上标签后刷新就丢了 —— 下面"摘掉之后没有"的断言会因此变得毫无意义',
     ).toHaveText(TAG);
+    // 同一条用例的正向对照：先证明计数位**出现过**，最后那句"消失"才有意义。
+    await expect(organizerRow(page, TAG).locator('[data-testid$="-count"]')).toHaveText('1');
 
     // 摘掉。🔴 这一步验的是"清空写的是 null、物化后字段真的消失"这条链路 ——
     // 写 `[]` 的话 chip 也会消失，但下一次**加**标签的合并结果会不一样
@@ -188,6 +221,16 @@ test.describe('任务整理：清单归属 + 标签', () => {
     await expect(page.locator('input[placeholder^="添加任务"]')).toBeVisible();
     const afterReload = rowFor(page, title);
     await expect(afterReload.getByTestId('task-chip-tag')).toHaveCount(0);
+    /*
+      🔴 计数位跟着**消失**（`OrganizerList` 的那条"只画非零"）。
+
+      这一条是"侧栏标签有计数"这刀的**否定式**：如果实现写成"永远渲染那个
+      `<span>`"（迁移前 web 的 `countIn` 就是这样，空清单顶一个 `0`），
+      上面"挂上后显示 1"照样为真 —— 也就是说那一条测不出计数是**算出来的**。
+      这里把它钉死：这个 1 是"有一条未完成任务挂在这个标签上"，
+      任务摘干净就没有了。
+    */
+    await expect(organizerRow(page, TAG).locator('[data-testid$="-count"]')).toHaveCount(0);
     await afterReload.getByTestId('task-organize-summary').click();
     await expect(
       afterReload.getByRole('checkbox', {
