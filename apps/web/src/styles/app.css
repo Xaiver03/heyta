@@ -673,9 +673,20 @@
  * （不是 sheet 那种"背景色 88%"）—— 卡片周围要露出**更多**下层，
  * 灰度必须更浅，下层才读得出来。z 轴用 `--ht-z-overlay`：
  * 它本来就是"浮层"这一层。
+ *
+ * 🔴 **`fixed` 而不是 `absolute`（2026-10-01 实测）**：这一层挂在内容列里，
+ * 而内容列**和列表一样高**（真浏览器量到 2365px），滚动宿主是 window。
+ * 写成 `absolute` 时 `inset: 0` 撑的是那根 2365px 的柱子 ⇒ 卡片钉在**文档顶部**，
+ * 屏幕滚下去一点再按 ⌘K，卡片在视口上方看不见，而输入框的 `autoFocus`
+ * 让浏览器把整页滚回 0 —— 症状是"一开搜索，列表跳回顶部"（探针量到
+ * 打开前 scrollY=1465、打开后 scrollY=0）。`fixed` 让它钉在**看见的那一屏**，
+ * 跳页与" scrim 只盖住半屏"一起消失。
+ * ⚠️ 这条依赖"祖先没有 transform / filter / backdrop-filter / contain:paint"，
+ * 否则 `fixed` 的包含块会退化成那个祖先 —— 判据钉在 `search-overlay.spec.ts`，
+ * 它会在退化时直接红（不是靠人看图发现）。
  */
 .ht-search-overlay {
-  position: absolute;
+  position: fixed;
   inset: 0;
   z-index: var(--ht-z-overlay);
   display: flex;

@@ -611,11 +611,17 @@ export function App(): React.JSX.Element {
     setView(settingsBaseView);
     const back = sheetReturnFocus.current;
     sheetReturnFocus.current = null;
+    // 🔴 `preventScroll`：还焦点 ≠ 还滚动位置。触发器（顶栏 composer / rail 按钮）住在
+    // 列表**上方**，裸 `focus()` 会让浏览器把它滚进视野 —— 实测症状：从搜索里 ↵ 点开
+    // 第 31 条（那一行确实被滚进来了），再按一次 ⌘K 关掉浮层，列表跳回顶部，
+    // 刚导航到的位置被抹掉。两条出口都是"焦点回去、视图别动"，所以一起加。
     if (back?.isConnected === true) {
-      back.focus();
+      back.focus({ preventScroll: true });
       return;
     }
-    document.querySelector<HTMLElement>('[data-testid="account-menu-avatar"]')?.focus();
+    document
+      .querySelector<HTMLElement>('[data-testid="account-menu-avatar"]')
+      ?.focus({ preventScroll: true });
   }, [settingsBaseView]);
 
   /**
@@ -633,9 +639,18 @@ export function App(): React.JSX.Element {
     if (view !== 'settings' && view !== 'search') return;
     // ⚠️ 别把 `<body>` 记成触发器：它永远 `isConnected`，于是"焦点还给触发器"
     //    会退化成"焦点什么都没发生"（且下一次 Tab 从页首开始）。
+    // 🔴 也别把**浮层自己**记成触发器：搜索面板的输入框是 `autoFocus`，
+    //    effect 跑在它之后 ⇒ 读到的就是它。它随浮层一起卸载，"还回去"等于还到
+    //    一个已经不存在的节点上（实测焦点最后落在 `BODY`）。`goToView` 已经抢在
+    //    `setView` 之前记了真正的触发器，这里只补"没经过 goToView 的那条路"
+    //    （头像菜单里的「设置」直接 `setView`）。
     const active = document.activeElement;
-    sheetReturnFocus.current =
-      active instanceof HTMLElement && active !== document.body ? active : null;
+    const insideSurface =
+      active instanceof Element && active.closest('.ht-search-overlay, .ht-sheet') !== null;
+    if (!insideSurface) {
+      sheetReturnFocus.current =
+        active instanceof HTMLElement && active !== document.body ? active : null;
+    }
     if (view === 'settings') sheetRef.current?.focus();
   }, [view]);
   /**
@@ -1154,6 +1169,15 @@ export function App(): React.JSX.Element {
    */
   const goToView = useCallback(
     (key: ViewKey) => {
+      // 🔴 "从哪儿来"必须**在 setView 之前**记。浮层一挂起来，面板输入框的 `autoFocus`
+      // 就抢走焦点，等到 effect 再读 `activeElement` 读到的是**浮层自己** ——
+      // 于是"焦点还回触发器"这条从来没成立过（2026-10-01 真浏览器量到：Esc 关掉搜索后
+      // `document.activeElement` 是 `BODY`，而那个 effect 记下的触发器正要被卸载）。
+      if (key === 'search' || key === 'settings') {
+        const active = document.activeElement;
+        sheetReturnFocus.current =
+          active instanceof HTMLElement && active !== document.body ? active : null;
+      }
       setSettingsFocus(undefined);
       setView(key);
     },
