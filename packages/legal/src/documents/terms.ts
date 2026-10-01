@@ -336,7 +336,7 @@ const zh = [
       },
       {
         kind: 'p',
-        text: '**同意留痕**：注册时我们记下的不是含糊的"他同意过了"，而是一整套版本指纹 —— 形如 `terms@1.0;…` 的组合，把当时每一份对外文本的版本号一起钉住。它回答的是"此人在什么时刻同意了**哪一版**"，而不依赖任何人的记忆或复述。',
+        text: '**同意留痕**：注册时我们记下的不是含糊的"他同意过了"，而是一整套版本指纹 —— 形如 `terms@<版本>;…` 的组合，把当时每一份对外文本的版本号一起钉住。它回答的是"此人在什么时刻同意了**哪一版**"，而不依赖任何人的记忆或复述。',
       },
       {
         kind: 'p',
@@ -385,7 +385,10 @@ const zh = [
       {
         kind: 'table',
         head: ['版本', '日期与变更摘要'],
-        rows: [['1.0', '2026-10-01 首次起草，尚未经法务复核']],
+        rows: [
+        ['1.0', '2026-10-01 首次起草，尚未经法务复核'],
+        ['1.1', '2026-10-02 英文栏在转写名之外补上登记的中文主体名称（此前该栏只有转写名，而本条款是九份里唯一规定合同主体的那份）；s10 的指纹示例改写成不钉死版本号的形式。'],
+      ],
       },
     ],
   },
@@ -398,7 +401,7 @@ const en = [
     blocks: [
       {
         kind: 'p',
-        text: 'These terms are agreed between you and **Xiaoli (Hangzhou) Artificial Intelligence Technology Co., Ltd.** (Unified Social Credit Code `91330106MAKNJ6DX7M`; legal representative Deng Xianglei; registered address Room 210, Building 3, Jiangcun Business Center, No. 830 Wenyi West Road, Jiangcun Subdistrict, Xihu District, Hangzhou, Zhejiang, China; contact email heyta@waytofuture.cn). The three-way table below decides which matters you bring to us and which you do not. Read it before anything else.',
+        text: 'These terms are agreed between you and **晓黎（杭州）人工智能科技有限公司** (Xiaoli (Hangzhou) Artificial Intelligence Technology Co., Ltd.; the registered Chinese name above is the authoritative one. Unified Social Credit Code `91330106MAKNJ6DX7M`; legal representative Deng Xianglei; registered address Room 210, Building 3, Jiangcun Business Center, No. 830 Wenyi West Road, Jiangcun Subdistrict, Xihu District, Hangzhou, Zhejiang, China; contact email heyta@waytofuture.cn). The three-way table below decides which matters you bring to us and which you do not. Read it before anything else.',
       },
       {
         kind: 'table',
@@ -700,7 +703,7 @@ const en = [
       },
       {
         kind: 'p',
-        text: '**Record of consent.** At registration we do not store a vague "this user agreed"; we store a version fingerprint — a composite of the form `terms@1.0;…` that pins the version number of every public document in force at that moment. It answers the question "at what time did this person agree to **which version**" without relying on anyone\'s memory or account of events.',
+        text: '**Record of consent.** At registration we do not store a vague "this user agreed"; we store a version fingerprint — a composite of the form `terms@<version>;…` that pins the version number of every public document in force at that moment. It answers the question "at what time did this person agree to **which version**" without relying on anyone\'s memory or account of events.',
       },
       {
         kind: 'p',
@@ -749,7 +752,10 @@ const en = [
       {
         kind: 'table',
         head: ['Version', 'Date and summary of the change'],
-        rows: [['1.0', '2026-10-01 first drafted; has not yet been reviewed by counsel']],
+        rows: [
+        ['1.0', '2026-10-01 first drafted; has not yet been reviewed by counsel'],
+        ['1.1', '2026-10-02 the English column now carries the operator’s registered Chinese name next to its transliteration (it previously showed only the transliteration, in the one document of the nine that defines the contracting party); the consent-fingerprint example in s10 is no longer pinned to a version number.'],
+      ],
       },
     ],
   },
@@ -757,9 +763,9 @@ const en = [
 
 export const terms: LegalDocument = {
   id: 'terms',
-  version: '1.0',
+  version: '1.1',
   status: 'draft',
-  updatedDate: '2026-10-01',
+  updatedDate: '2026-10-02',
   title: {
     'zh-CN': 'heyta 服务条款',
     en: 'heyta Terms of Service',

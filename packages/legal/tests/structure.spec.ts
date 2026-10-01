@@ -83,38 +83,55 @@ function blockType(block: LegalBlock): string {
   }
 }
 
-/** 遍历整棵树上的每一段可渲染文字（含标题、摘要、表格单元格）。 */
+/** 把一棵小节树上的每一段可渲染文字推进 `texts`（含小节标题与表格单元格）。 */
+function pushTexts(sections: readonly LegalSection[], texts: string[]): void {
+  for (const section of sections) {
+    texts.push(section.title);
+    for (const block of section.blocks ?? []) {
+      switch (block.kind) {
+        case 'p':
+        case 'callout':
+          texts.push(block.text);
+          break;
+        case 'docRef':
+          texts.push(block.text);
+          break;
+        case 'ul':
+        case 'ol':
+          texts.push(...block.items);
+          break;
+        case 'table':
+          texts.push(...block.head, ...block.rows.flat());
+          break;
+      }
+    }
+    pushTexts(section.subsections ?? [], texts);
+  }
+}
+
+/** 遍历整棵树上的每一段可渲染文字（含标题、摘要、表格单元格）—— **两栏合并**。 */
 function allTexts(document: LegalDocument): readonly string[] {
   const texts: string[] = [
     ...Object.values(document.title),
     ...Object.values(document.summary),
   ];
-  const walk = (sections: readonly LegalSection[]): void => {
-    for (const section of sections) {
-      texts.push(section.title);
-      for (const block of section.blocks ?? []) {
-        switch (block.kind) {
-          case 'p':
-          case 'callout':
-            texts.push(block.text);
-            break;
-          case 'docRef':
-            texts.push(block.text);
-            break;
-          case 'ul':
-          case 'ol':
-            texts.push(...block.items);
-            break;
-          case 'table':
-            texts.push(...block.head, ...block.rows.flat());
-            break;
-        }
-      }
-      walk(section.subsections ?? []);
-    }
-  };
-  walk(document.sections['zh-CN']);
-  walk(document.sections.en);
+  pushTexts(document.sections['zh-CN'], texts);
+  pushTexts(document.sections.en, texts);
+  return texts;
+}
+
+/**
+ * 只取**某一语言栏**的文字。
+ *
+ * 判"英文栏里有没有带登记名称"这类问题必须用这个：`allTexts` 是两栏合并的，
+ * 中文栏天生带着登记名称，用它判会得到"永远满足"的假绿。
+ */
+function columnTexts(
+  document: LegalDocument,
+  locale: (typeof LEGAL_LOCALES)[number],
+): readonly string[] {
+  const texts: string[] = [document.title[locale], document.summary[locale]];
+  pushTexts(document.sections[locale], texts);
   return texts;
 }
 
@@ -312,5 +329,24 @@ describe('对外承诺里的主体不许错', () => {
     for (const email of emails) {
       expect(email, `正文里出现了 OPERATOR 之外的联系邮箱 ${email}`).toBe(OPERATOR.contactEmail);
     }
+  });
+
+  it('英文栏引用了信用代码的文本，必须同时给出登记的中文主体名称', () => {
+    // G-31 的来历：`terms` 的英文栏只有转写名 `Xiaoli (Hangzhou) …`，而主体名称以登记
+    // 文字为准 —— 服务条款是九份里**唯一规定合同主体**的那份，缺它的英文读者只能看到
+    // 一个音译。这条判据**必须按语言栏分别取文**（见 `columnTexts` 的注释）：中文栏天生
+    // 带着登记名称，用两栏合并的 `allTexts` 判会得到一条永远满足的假绿。
+    let citing = 0;
+    for (const document of LEGAL_DOCUMENTS) {
+      const en = columnTexts(document, 'en').join('\n');
+      if (!en.includes(OPERATOR.code)) continue;
+      citing += 1;
+      expect(
+        en,
+        `${document.id}：英文栏引用了信用代码 ${OPERATOR.code}，却没有一处给出登记名称「${OPERATOR.name}」`,
+      ).toContain(OPERATOR.name);
+    }
+    // 反向：这条规则不能退化成"没有任何文本引用信用代码"的空判据。
+    expect(citing, '没有一份文本的英文栏引用信用代码 —— 这条判据已经悬空').toBeGreaterThan(0);
   });
 });
