@@ -35,7 +35,15 @@
 ### 0.3 密钥
 
 文档里**不出现任何密钥明文**。token / 密码 / 私钥一律只写"存在，位于 X"。
-生产 `.env` 里只有 `JWT_SECRET` 和 `POSTGRES_PASSWORD` 是敏感值（✅ 实测，见 [§3.5](#35-生产环境变量清单)）。
+生产 `.env` 里的敏感值**不止一把**，而且**每一条参与运算的秘密都必须备份**
+（✅ 逐条实测，见 [§3.5](#35-生产环境变量清单)）：
+
+| 键 | 它一旦丢了/被换了会怎样 |
+|---|---|
+| `JWT_SECRET` | 全部已签发会话立即失效，用户要重新登录（passkey 不受影响） |
+| `POSTGRES_PASSWORD` | 服务端连不上库（🔴 必须同时 `ALTER USER`，见 §3.10 坑 ①） |
+| `SMTP_PASS` | 发信断掉；由腾讯云 SES 签发，可轮换 |
+| `PASSWORD_PEPPER` | 🔴 **存量口令哈希全部验不过**（`verify` 返回 `false`，不是"降级还能登"）；缺失则**新镜像直接拒绝启动**（见下） |
 
 ---
 
@@ -300,6 +308,9 @@
 
 文件：`ubuntu-jcli:~/heyta/server/.env`（✅ 实测，只列键与非敏感值）。
 
+🔴 **2026-10-01 起是 19 条键**（原先 18 条，新增 `PASSWORD_PEPPER`）。
+`grep -c '^[A-Z]' .env` 是这条清单的**对账判据** —— 少了哪个键，先和下面这张表比。
+
 🔴 **2026-09-30 全部域名相关变量的值已切到 `heyta.waytofuture.cn`**（见 §3.7.2），
 `SMTP_*` 同时切到 `waytofuture.cn` 发信（见 §3.9.1）。改完**必须换容器**才生效
 （`docker compose … up -d --no-build supersync`，三个 `-f` 都要带）。
@@ -325,6 +336,46 @@
 | `JWT_SECRET` | 🔒 **存在，值不抄** | ✅ 键存在 |
 | `POSTGRES_PASSWORD` | 🔒 **存在，值不抄** | ✅ 键存在 |
 | `SMTP_PASS` | 🔒 **存在，值不抄**（SES 发信地址的 SMTP 密码，可在 SES 控制台/tccli 轮换） | ✅ 键存在 |
+| `PASSWORD_PEPPER` | 🔒 **存在，值不抄**（64 hex） | ✅ **2026-10-01 补上的** —— 见下面那条 🔴 |
+
+🔴 **`PASSWORD_PEPPER` 是"新镜像 + 旧 `.env`"的隐藏断点，2026-10-01 实测踩到。**
+邮箱+口令登录（ADR-0040）把 pepper 做成了**参与哈希的秘密**，并且把它设成**启动硬要求**
+（`server/src/password/hash.ts` 的 `getPasswordPepper` 缺失或短于 32 字符就抛，
+`server/src/index.ts` 把它转成"拒绝启动"）。生产 `.env` 里当时**没有这一条** ⇒ 换容器后
+`supersync-server` 进 `Restarting (1)` 循环、`/health` 与 `/api/*` **全部 502** ——
+也就是**整个后端对外消失**，而 compose 只在启动那行给了一句
+`The "PASSWORD_PEPPER" variable is not set. Defaulting to a blank string.`
+
+**补法**（值不上命令行、不进日志；改前先备份，§3.8 那条 `.env` 纪律同样适用）：
+
+```bash
+ssh ubuntu-jcli 'bash -s' <<'REMOTE'
+set -euo pipefail
+cd /home/ubuntu/heyta/server
+cp -p .env ".env.bak-$(date -u +%Y%m%dT%H%M%SZ)"
+umask 077
+grep -q '^PASSWORD_PEPPER=' .env || \
+  node -e 'console.log("PASSWORD_PEPPER="+require("crypto").randomBytes(32).toString("hex"))' >> .env
+chmod 600 .env
+echo "PEPPER_COUNT=$(grep -c '^PASSWORD_PEPPER=' .env) LEN=$(grep '^PASSWORD_PEPPER=' .env | awk -F= '{print length($2)}')"
+REMOTE
+# 只换 server 服务，别把 caddy 一起拉起来（:80 被宿主 nginx 占着，§3.8）
+ssh ubuntu-jcli 'cd /home/ubuntu/heyta/server && sudo docker compose \
+  -f docker-compose.yml -f docker-compose.monitoring.yml -f docker-compose.build.yml \
+  up -d --wait supersync'
+```
+
+判据（2026-10-01 实测）：`supersync-server Up (healthy)`、启动日志
+`🔒 Password hashing backend verified (Argon2id, 173 ms per hash)`（那是 known-answer 自检，
+不只是"读到了变量"）、`/health` 200。
+
+⚠️ **它一旦定了就不能换**：换 pepper ⇒ 存量口令哈希**全部验不过**（`verify` 返回 `false`，
+不是"降级还能登"）。所以它属于 §0.3 那张"必须备份的秘密"表，不属于"随手轮换"那类。
+
+⚠️ **存量 bcrypt 哈希没有升级路径**：库里有一条 `$2b$12$…` 的旧哈希（vendored 上游时代的
+测试账号）。新栈只认 Argon2id PHC 串，`verifyPassword` 解析失败 ⇒ 一律当"密码不对"
+（**不会 500**，因为 `verifyPassword` 把异常吞成 `false`），那个账号因此**登不进口令这条路**。
+要恢复它只能给它重设口令。
 
 compose 里还有一批**未在 `.env` 中设置、走默认值**的键（`HOST`、`PRIVACY_*`、`ALLOWED_EMAILS`、
 `SUPERSYNC_DEFAULT_STORAGE_QUOTA_BYTES`、`OLD_OPS_CLEANUP_*`、`POSTGRES_MEM_LIMIT` 等）。
@@ -879,6 +930,45 @@ ssh ubuntu-jcli 'cd ~/heyta/server && \
   随后按本文自己的告诫做了拓扑清理（见上一条 `docker rm -f supersync-caddy dozzle uptime-kuma`）。
   新的回滚点：`supersync:rollback-20260927-smtp`（上一版是 `supersync:rollback-20260927`）。
   ⚠️ 域名这时已经**不是** `heyta-tmp.litopia.space` 而是 `heyta.finlaw.cloud`（§3.7.1）。
+- ✅ **2026-10-01 第三次重建**（邮箱+口令登录 ADR-0040、令牌改存 SHA-256、`users.locale`）：
+  迁移 `20261004000000_add_user_locale` 与 `20261005000000_invalidate_stored_auth_tokens`
+  在 `13:06:30Z` 应用（`_prisma_migrations.finished_at` 实测）；回滚点 `supersync:rollback-20261001`。
+  🔴 **这一轮重建自带一个新前提：镜像没有 `PASSWORD_PEPPER` 就拒绝启动** ——
+  旧 `.env` 喂不起新镜像，于是换完容器**整个后端 502**。
+  这是"改 `server/` 的代码把秘密变成了启动硬要求，而部署侧的 `.env` 不会自己长出这一条"
+  的形状；补法与判据在 §3.5 的 `PASSWORD_PEPPER` 那一行。
+  ⚠️ 换容器**不必**跑 `deploy.sh`：迁移已经应用时，只需
+  `docker compose -f docker-compose.yml -f docker-compose.monitoring.yml -f docker-compose.build.yml up -d --wait supersync`
+  —— 带上 `deploy.sh` 反而会再造一个起不来的 caddy（见上面那条 🔴）。
+
+### 3.8.1 🔴 换完镜像必须重取的五条**线上**判据（2026-10-01 定）
+
+镜像重建只证明"容器 healthy"，不证明"用户那条旅程通了"。本轮真正闭合 ② 的是这五条，
+它们每一条都对应一段**曾经坏掉而看起来没坏**的链路：
+
+```bash
+curl -sS -o /dev/null -w 'health=%{http_code}\n' https://heyta.waytofuture.cn/health
+curl -sS -o /dev/null -w '%{http_code}\n' -X POST https://heyta.waytofuture.cn/api/login/email-password \
+  -H 'content-type: application/json' -d '{"email":"nobody@example.com","password":"wrong-password-here"}'
+curl -sS -o /dev/null -w '%{http_code}\n' -X POST https://heyta.waytofuture.cn/api/register/email-password \
+  -H 'content-type: application/json' -d '{"email":"<一次性邮箱>","password":"<够长的口令>"}'
+curl -sS https://heyta.waytofuture.cn/magic-login-confirm.js | grep -c sessionToken
+ssh ubuntu-jcli 'sudo docker logs --since 5m supersync-server 2>&1 | grep -i "Password hashing backend"'
+```
+
+| 判据 | 期望 | 为什么是它 |
+|---|---|---|
+| `/health` | `200` | 容器活着（`Restarting` 时这里是 502） |
+| `POST /api/login/email-password`（不存在的账号） | **`401 invalid_credentials`**，不是 404/500 | 404=路由没上线；500=pepper/Argon2 后端坏了。**401 同时证明反枚举那条 dummy verify 真的跑了** |
+| `POST /api/register/email-password` | `201` + 中性文案 + 日志里 `Verification email sent` | 建号与发信是两条独立的腿，201 不代表送达 |
+| `magic-login-confirm.js` 里 `sessionToken` | **≥ 1** | fragment 投递（§3.7 那条"sessionStorage 跨代理集群会丢"的修法）在线上真的在跑 |
+| 启动日志有 `Password hashing backend verified` | 有 | Argon2id **known-answer 逐字节**过了 —— "读到了 pepper"不等于"这台 musl 机器算得对"（AGENTS §7 第 32 条同一形状） |
+
+⚠️ **第二、三条会在生产建出真实账号并发出真实邮件**。跑完要收尾：
+`select id from users where email='…'` → 确认子表零行 → `delete from users where id=… and email=…`
+（2026-10-01 实测：`DELETE 1`、`users` 回到 10）。`_email` 那条验证链接随账号一起消失，
+不需要单独吊销。
+
 
 ### 3.9 ✅ 生产 SMTP —— 2026-09-27 打通，发信已实测**真投递**
 
