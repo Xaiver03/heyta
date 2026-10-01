@@ -26,10 +26,16 @@
  *
  * 🔴 第 2 条是关键，也是这套登记制唯一的价值：**实现后必须把登记移掉**。
  * 少了它，登记表会一年比一年长，而没人知道哪些还成立。
+ *
+ * ⚠️ **第 1 条原来是抓不住的，而本轮亲测**：`ENDPOINTS` 是一张手写清单，
+ * 于是"忘了想旅程的那个端"恰好**不在清单上、也就永远不会红** ——
+ * 它实际漏掉了 `apps/node-host`（此前**根本没有认证命令**）和 `apps/desktop`
+ * （此前**连身份入口都没有**）。修法是把判据钉到文件系统上：见下面
+ * `END_TO_DIR` / `NOT_AN_END` 那段（④），已用"凭空造一个 `apps/fake-end/`"验证会红。
  */
 
 import { execFileSync } from 'node:child_process';
-import { existsSync } from 'node:fs';
+import { existsSync, readdirSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -108,6 +114,45 @@ const ENDPOINTS = [
     shellSpecs: ['scripts/check-linux-shell.mjs'],
     covers: '仅壳能起 + 跨语言通路（且本机平台外会响亮跳过）',
   },
+  {
+    end: 'node-host',
+    /**
+     * 🔴 **2026-10-02：这一端此前根本没有认证命令** —— 不是"没接好"，
+     * 是 `cli.ts` 的 `case` 分支里**一条都没有**。于是它作为"第三个宿主"
+     * （以及所有真 SQLite 取证的操作面）只能靠手工 curl 造凭据，
+     * 而"这台设备能不能自己走完注册/登录"这件事**没有任何验收看得见**。
+     *
+     * 现在走的是 `heyta auth register` / `auth login`（`src/cli-auth.ts`）。
+     * 三条不能弯的规矩，全部有判据：
+     *   · 口令**只从 stdin 读**（写进 argv 会留在 `ps` 与 shell 历史里）；
+     *   · 没给 `--terms` 时**一个请求都不发**（不替用户勾同意）；
+     *   · 失败**只按机器码分类**，绝不把服务端的句子原样印到终端。
+     *
+     * ⚠️ **边界（别读多）**：这条验收是**逻辑层**的 —— 注入的假 fetch 钉住
+     * 分类/闸门/输出，**真服务端那一跑**（注册 → 登录拿令牌 → 令牌喂给 `sync`）
+     * 还在 W9（`verify:email-password-chain`）里，所以 `covers` 写的是"逻辑层"。
+     * 与 windows 那条一样，这条边界**门禁本身看不见**，故写在这里而不是装作没有。
+     */
+    journeySpecs: [
+      'apps/node-host/tests/cli-auth.spec.ts',
+      // 🔴 判据**能失败**的证据（九条变异，逐条还原后 sha256 比对）。
+      'scripts/mutate-node-host-auth.mjs',
+    ],
+    shellSpecs: [],
+    covers:
+      '注册/登录两条路的逻辑层验收（同意闸门前置、四类失败不互相泄漏、四种策略拒绝动作各异、两个秘密不混淆）+ 九条变异验证；真服务端链路待 W9',
+  },
+  {
+    end: 'desktop',
+    /**
+     * ⚠️ 与 macos / linux 同一类：`e2e/tests/desktop-window.spec.ts` 证明的是
+     * **壳能起、窗口画出来**，而壳里渲染的只有 `HeytaUiProvider + TaskList`
+     * —— **一个身份入口都没有**。
+     */
+    journeySpecs: [],
+    shellSpecs: ['e2e/tests/desktop-window.spec.ts'],
+    covers: '仅壳能起 + 窗口渲染（是自动化桌面 GUI 门禁的载体，不是旅程）',
+  },
 ];
 
 /**
@@ -150,9 +195,85 @@ const REGISTERED_GAPS = [
     why: '同上（**ADR-0037**）+ 仍然没有 Linux 桌面用户的证据',
     expiry: '同上',
   },
+  {
+    end: 'desktop',
+    missing: '注册/登录（邮箱+口令、通行密钥）与同步设置 —— 壳里渲染的只有 HeytaUiProvider + TaskList，没有任何身份入口',
+    why: 'ADR-0024 的原选型已降级为**过渡壳**，且**退役时点已定**（AGENTS §2 的仓库地图：等三个原生壳的壳级门禁替换掉 `e2e/tests/desktop-window.spec.ts` 的断言之后，见 multi-end-unified-strategy §6.3-T3）。给一条注定退役的路线补认证界面 = 再养一份与 `apps/web` 平行的表单接线，而它唯一不可替代的价值是当**自动化桌面 GUI 门禁的载体** —— 那个价值不需要登录态',
+    expiry: '两条到期方式，先到先算：① 壳退役 ⇒ 本条连同 `apps/desktop` 一起删掉；② 若结论改成"Electron 要继续当桌面端" ⇒ 必须补身份入口（照 `apps/web/src/features/auth/AuthPanel.tsx` 的薄壳做法，共享的 `AuthForm` 已在 `packages/ui`，代价只有一个文件）',
+  },
 ];
 
+/**
+ * 🔴 失效 ①「有人新增了一个端，忘了想旅程的事」**在这份门禁写完的第一天是抓不住的**，
+ * 而把它抓出来的正是本轮：`ENDPOINTS` 是**手写的清单**，所以它漏掉的不是某个细节，
+ * 而是**整个 `apps/node-host` 与 `apps/desktop`** —— 一个"根本没有认证命令"的宿主
+ * 和一个"连身份入口都没有"的壳，**都既没被列进清单、也就不会被判红**。
+ * 手写清单的失效形状，和它要防的那个失效一模一样。
+ *
+ * 所以这一段把判据**钉到文件系统上**：`apps/*` 里出现的每一个目录，
+ * 要么被某一条 `ENDPOINTS` 认领，要么在 `NOT_AN_END` 里写明"它为什么不是一个端"。
+ *
+ * ⚠️ 这里用**映射表**而不是给 `ENDPOINTS` 加 `dir` 字段，是为了不碰那些正在被
+ * 别的会话改的条目；代价是"端名 → 目录"多了第二处要维护的地方 ——
+ * 而它**漂移了会报红**（下面 ④-b 两条反向检查），不会静默。
+ */
+const END_TO_DIR = {
+  web: 'web',
+  mobile: 'mobile',
+  macos: 'desktop-macos',
+  windows: 'desktop-windows',
+  linux: 'desktop-linux',
+  'node-host': 'node-host',
+  desktop: 'desktop',
+};
+
+/** 明确"不是一个端"的目录 —— 它不认领 `ENDPOINTS`，但理由必须写出来。 */
+const NOT_AN_END = [
+  {
+    dir: 'landing',
+    why: '落地页是**营销面**，不是使用端：它没有登录态，注册/登录的产品入口在 `apps/web`',
+  },
+];
+
+const appDirs = readdirSync(join(ROOT, 'apps'), { withFileTypes: true })
+  .filter((entry) => entry.isDirectory() && !entry.name.startsWith('.'))
+  .map((entry) => entry.name)
+  .sort();
+
 let bad = false;
+const claimed = new Set(Object.values(END_TO_DIR));
+
+for (const { dir, why } of NOT_AN_END) {
+  if (!existsSync(join(ROOT, 'apps', dir))) {
+    console.error(`❌ 门禁自己的登记过期：NOT_AN_END 里的 apps/${dir} **已不存在**。`);
+    console.error(`   （写着的理由是「${why}」）⇒ 目录没了就把这条删掉。`);
+    bad = true;
+  }
+  claimed.add(dir);
+}
+
+// ④-a `apps/` 里有目录没被认领 ⇒ 红（这才能让"新增一个端忘了想旅程"真的变红）
+for (const dir of appDirs) {
+  if (!claimed.has(dir)) {
+    console.error(`❌ **apps/${dir} 既不在 ENDPOINTS、也不在 NOT_AN_END** —— 它是什么？`);
+    console.error('   要么它是一个端：补一条 ENDPOINTS（有旅程验收）或 REGISTERED_GAPS（登记缺口）；');
+    console.error('   要么它不是一个端：在 NOT_AN_END 里写明理由。');
+    bad = true;
+  }
+}
+
+// ④-b 两处清单对不上 ⇒ 红（端被删/改名、或映射写错，都不会静默）
+for (const [end, dir] of Object.entries(END_TO_DIR)) {
+  if (!existsSync(join(ROOT, 'apps', dir))) {
+    console.error(`❌ 门禁自己的登记过期：ENDPOINTS 的 '${end}' 指向 apps/${dir}，而它**不存在**了。`);
+    bad = true;
+  }
+  if (!ENDPOINTS.some((entry) => entry.end === end)) {
+    console.error(`❌ END_TO_DIR 里有 '${end}'，但 ENDPOINTS 里没有这一条 —— 两处对不上。`);
+    bad = true;
+  }
+}
+console.log(`   （apps/ 下 ${String(appDirs.length)} 个目录，全部已被认领或显式排除）`);
 
 for (const { end, journeySpecs, shellSpecs, covers } of ENDPOINTS) {
   const all = [...journeySpecs, ...shellSpecs];
