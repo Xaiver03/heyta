@@ -85,7 +85,7 @@ describe('设置浮层的 IA：下层必须可见', () => {
     //    否则"锚点不在 DOM"会同时伪装成"下层被换掉了"。
     (globalThis as unknown as { indexedDB: IDBFactory }).indexedDB = new IDBFactory();
     __resetOpLogForTests();
-    useTaskStore.setState({ entities: emptyState(), filter: { kind: 'all' }, query: '' });
+    useTaskStore.setState({ entities: emptyState(), filter: { kind: 'all' } });
     await initOpLog(`sheet-ia-${Math.random().toString(36).slice(2)}`);
     await act(async () => {
       await useTaskStore.getState().addTask('设置浮层判据的锚点任务');

@@ -112,6 +112,14 @@ interface TaskListSharedProps {
   readonly renderTrailing?: (row: TaskRowModel) => React.ReactNode;
   /** 正在处理中的行 id —— 用于置灰该行，避免连点发出两条变更。 */
   readonly busyTaskId?: string | null;
+  /**
+   * 键盘光标所在的行 id（"回车会打开哪一条"）。省略或 `null` = 不高亮。
+   *
+   * 🔴 这是**视图态**，不是数据 —— 它不进 op-log、不进 store，
+   * 由宿主的面板本地 state 持有。放在列表这一层而不是让宿主自己找行，
+   * 是因为"哪一行"只有列表知道自己展平成了什么顺序。
+   */
+  readonly activeTaskId?: string | null;
   /** 标题为空时的替代文案（空标题是真实存在的，见 `model.ts`）。 */
   readonly fallbackTitle?: string;
   /** 没有任务时显示什么。省略则不渲染空态。 */
@@ -180,6 +188,7 @@ export function TaskList<TMeta = undefined>({
   renderMeta,
   renderTrailing,
   busyTaskId,
+  activeTaskId,
   fallbackTitle,
   emptyMessage,
   testID,
@@ -251,6 +260,7 @@ export function TaskList<TMeta = undefined>({
           row={row}
           {...(density === undefined ? {} : { density: density })}
           busy={busyTaskId === row.id}
+          {...(activeTaskId === undefined ? {} : { active: activeTaskId === row.id })}
           onToggleTask={onToggleTask}
           {...(onOpenTask === undefined ? {} : { onOpenTask })}
           {...(labels === undefined ? {} : { labels })}
@@ -259,7 +269,7 @@ export function TaskList<TMeta = undefined>({
         />
       );
     },
-    [busyTaskId, labels, onOpenTask, onToggleTask, renderMeta, renderSectionHeader, renderTrailing, density],
+    [busyTaskId, activeTaskId, labels, onOpenTask, onToggleTask, renderMeta, renderSectionHeader, renderTrailing, density],
   );
 
   const keyExtractor = useCallback((item: Item) => item.key, []);

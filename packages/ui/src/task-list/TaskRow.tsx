@@ -104,6 +104,17 @@ export interface TaskRowProps {
   readonly renderTrailing?: (row: TaskRowModel) => React.ReactNode;
   /** 正在处理中的这一行 —— 用于置灰、避免连点发出两条变更。 */
   readonly busy?: boolean;
+  /**
+   * 键盘选中（"高亮光标"）在这一行上。默认 `false`，不传时逐字节等价。
+   *
+   * 🔴 它表达的是**"回车会打开哪一条"**，不是"这条被勾选了"，所以两件事
+   * 必须用不同的视觉通道：勾选框已经被"完成 / 未完成"占了，高亮只能另找。
+   *
+   * 底色用 `color.primary-subtle` 而**不是**实心主色：宿主经 `renderMeta`
+   * 注入的截止徽章 / 优先级徽章是宿主自己上色的（红、蓝都有），
+   * 换成深蓝底会让那些徽章**读不出来**。浅底 + 原字色对所有宿主安全。
+   */
+  readonly active?: boolean;
 }
 
 export function TaskRow({
@@ -115,6 +126,7 @@ export function TaskRow({
   renderMeta,
   renderTrailing,
   busy = false,
+  active = false,
 }: TaskRowProps): React.JSX.Element {
   const tokens = useHeytaTokens();
   const text = useHeytaText();
@@ -187,6 +199,15 @@ export function TaskRow({
           alignItems: 'center',
           gap: tokens[TASK_ROW_SHAPE.metaGap],
         },
+        /**
+         * 键盘选中的高亮（见 `TaskRowProps.active`）。
+         * 只加底色与圆角，**不动任何几何** —— 光标上下移动时行宽、
+         * 勾选框位置、文字基线都不能跳。
+         */
+        rowActive: {
+          backgroundColor: tokens['color.primary-subtle'],
+          borderRadius: tokens['radius.md'],
+        },
       }),
     [spec, tokens],
   );
@@ -214,7 +235,10 @@ export function TaskRow({
      *
      * 这不是样式或行为，而是**"一行"这个容器缺少可寻址的名字**。
      */
-    <View style={styles.row} testID={`task-item-${row.id}`}>
+    <View
+      style={active ? [styles.row, styles.rowActive] : styles.row}
+      testID={`task-item-${row.id}`}
+    >
       <Pressable
         accessibilityRole="checkbox"
         // 无障碍状态必须显式给：读屏用户靠它知道"这条是待办还是已完成"，

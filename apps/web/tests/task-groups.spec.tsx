@@ -106,7 +106,7 @@ async function waitForState(cond: () => boolean): Promise<void> {
 
 describe('任务列表的日期分组头', () => {
   it('🔴 逾期 / 今天 / 无截止时间各成一组，组头带组内计数', async () => {
-    useTaskStore.setState({ entities: emptyState(), filter: { kind: 'all' }, query: '' });
+    useTaskStore.setState({ entities: emptyState(), filter: { kind: 'all' } });
     await act(async () => {
       await useTaskStore
         .getState()
@@ -140,7 +140,7 @@ describe('任务列表的日期分组头', () => {
   });
 
   it('🔴 点「顺延」：逾期任务**真的挪到今天**（DOM 与 store 两层都断）', async () => {
-    useTaskStore.setState({ entities: emptyState(), filter: { kind: 'all' }, query: '' });
+    useTaskStore.setState({ entities: emptyState(), filter: { kind: 'all' } });
     await act(async () => {
       await useTaskStore
         .getState()
@@ -178,7 +178,7 @@ describe('任务列表的日期分组头', () => {
   });
 
   it('「已完成」筛选不分组（完成时间不是截止时间，日期组头对它是误导）', async () => {
-    useTaskStore.setState({ entities: emptyState(), filter: { kind: 'completed' }, query: '' });
+    useTaskStore.setState({ entities: emptyState(), filter: { kind: 'completed' } });
     await act(async () => {
       await useTaskStore.getState().addTask('做完的', { dueDate: startOfDay(Date.now()) });
       const id = Object.keys(useTaskStore.getState().entities.tasks)[0];
