@@ -474,7 +474,6 @@ export const en = {
   'web.sync.settings.title': 'Sync settings',
   'web.sync.settings.close': 'Close sync settings',
   'web.sync.serverUrl.label': 'Server URL',
-  'web.sync.serverUrl.placeholder': 'https://your-sync-server',
   'web.sync.token.label': 'Access token',
   'web.sync.password.label': 'End-to-end encryption passphrase',
   // Three-part split around `<strong>`, same as the landing page's
@@ -508,23 +507,20 @@ export const en = {
   'web.auth.tokenHint': 'Access tokens are issued by the server. Sign in or register with the button above and the token is filled in automatically; if you already have one, paste it directly.',
   'web.auth.empty.title': 'No credentials yet',
   'web.auth.empty.body': 'Syncing needs an access token issued by the server. Register or sign in with your email to get one - syncing picks it up automatically.',
-  // ── Journey restructure (2026-10-01) ──
+  // ── Journey restructure (2026-10-01; narrowed again 2026-10-02 by the shared form) ──
   // 🔴 The panel used to show six parallel buttons, so a first-time visitor could not tell
   // which path was the main one - and the first required field was the **server address**,
   // i.e. "do you know your own sync domain?" became a precondition for registering.
-  // There is now one primary button (register); signing in is a footnote under it, and the
-  // passkey group is demoted to text links.
+  // The first screen now asks for one thing (email); register and sign in are two modes of
+  // the same form, and passkeys plus magic links are demoted to second-level links.
   // ⚠️ The demotion is only visual: none of those actions left the DOM, so keyboard and
   // screen readers still reach every one of them.
-  'web.auth.switchToSignin': 'Already have an account?',
-  'web.auth.passkey.group': 'Or use a passkey',
-  // 「Advanced」holds the three things only people who already know what they want need:
-  // the server address, pasting a link/token, and the recovery fallback. Collapsed by
-  // default - collapsed is not hidden: it stays in the DOM for screen readers and find-in-page.
-  'web.auth.advanced': 'Advanced',
+  // The three lines this block used to introduce («Already have an account?», «Or use a
+  // passkey», «Advanced») went away with the disclosure group - with no group, a label
+  // for it has nothing to point at, and the table keeps no ownerless copy.
   // Without this line a prefilled address field still reads like "check this for me".
   'web.auth.server.prefilled': 'The server address is already filled in from where this app is served - you don\'t have to type it. Self-hosters can change it here.',
-  // The field's own label and placeholder inside "Advanced" (self-hosters must be able
+  // The address field's own label and placeholder (self-hosters must be able
   // to see exactly what they are editing).
   'web.auth.server.label': 'Server address',
   'web.auth.server.placeholder': 'https://sync.example.com',
