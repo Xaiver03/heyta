@@ -2146,11 +2146,16 @@ export const en = {
 
   // ── Mobile · sign-in panel (spec §3.2) ────────────────────
   'mobile.auth.title': 'Sign in or register',
-  'mobile.auth.intro': 'Sign in with an email link or a passkey. Once you are in, the server address, access token and end-to-end passphrase are wired into sync for you.',
+  'mobile.auth.intro': 'Sign in or register with an email and password. Once you are in, the server address, access token and end-to-end passphrase are wired into sync for you.',
   'mobile.auth.email.label': 'Email',
   'mobile.auth.email.placeholder': 'Your email address',
   'mobile.auth.terms.label': 'I accept the terms of service and privacy policy offered by this server',
   'mobile.auth.terms.hint': 'You have to check this yourself - we will not accept on your behalf.',
+  // 🔴 The password path is the **primary** route, listed above "another way".
+  //    Neither label may read "signed up" / "signed in": a tap only **sends the request**;
+  //    the outcome is spoken by the status line above the fields.
+  'mobile.auth.password.register': 'Register with email and password',
+  'mobile.auth.password.login': 'Sign in with email and password',
   'mobile.auth.magicLink.login': 'Sign in with an email link',
   'mobile.auth.magicLink.register': 'Register a new account',
   'mobile.auth.passkey.register': 'Register with a passkey',

@@ -13,14 +13,19 @@
  *     `@heyta/app-host` 的 `hosted-auth.ts`；
  *   - "链接里的哪一段是令牌" → 同处的 `extractAuthLinkToken`；
  *   - "先当登录令牌试、不成立再当验证令牌试" → `src/auth/paste.ts`；
- *   - 失败原因 → 句子 → **`@heyta/ui` 的 `authFailureMessageKey`**（唯一一份，
- *     与 web 共用；命名空间 `common.auth.error.*`）；
+ *   - 失败原因 → 句子（**连同句子里要填的那个数字**）→ **`@heyta/ui` 的
+ *     `authFailureMessage`**（唯一一份，与 web 共用；命名空间 `common.auth.error.*`
+ *     与 `common.auth.policy.*`）。不给"只拿 key 不填 vars"留空间：那样屏幕上
+ *     会印出字面量 `{min}` / `{seconds}`，而这不会报错；
+ *   - 「这一次点击缺的是哪一栏」的**先后** → 同处的 `firstAuthErrorField`。
+ *     顺序与归类都不在这里重写 —— 重写一次就
+ *     多一套规则，而四端不一致的认证判定等于四套账号系统（AGENTS §3.5）；
  *   - 拿到会话之后要做什么 → `src/auth/session.ts`。
  *
  * 本文件只做两件事：**把状态渲染成句子**、**收集用户输入**。
  * 这也是它能在两个宿主（欢迎页 / 「我的」页）里复用的原因。
  *
- * ## 🔴 三条不许违反的口径
+ * ## 🔴 四条不许违反的口径
  *
  *   1. **中性文案**（规范 §2-A2）：注册可能是"假成功"（邮箱已属已验证账号时，
  *      服务端**故意**回成功而不写凭据）。所以这里**不出现**"账号已创建"这类断言。
@@ -29,35 +34,54 @@
  *   3. **通行密钥不支持时要说出来**（规范 §3.2 ②a 那条分支仍然要在）：
  *      这台设备今天没有 WebAuthn 实现（见 `src/auth/passkey-host.ts`），
  *      但按钮**不禁用**：禁用了却不说，用户只会以为界面坏了。
+ *   4. **两个秘密不共用一个字段**：「登录密码」与「端到端加密口令」是两个 state、
+ *      两个输入框。把口令注册/登录发出去的那一份接到 E2EE 那个 state 上，
+ *      等于把**设计上不该离开设备的秘密**发上服务端；反方向接错的症状是
+ *      "能登录、同步却解不开自己的数据"。两条路都必须显式命名，
+ *      判据钉在 `tests/auth-screen-password.spec.ts`。
  */
 
 import React, { useState } from 'react';
-import { View } from 'react-native';
+import { Pressable, View } from 'react-native';
 import {
   beginPasskeyLogin,
   beginPasskeyRegistration,
   completePasskeyLogin,
   completePasskeyRegistration,
+  loginWithEmailPassword,
+  registerWithEmailPassword,
   requestMagicLink,
   registerWithMagicLink,
   verifyEmailAddress,
   verifyMagicLink,
+  type HostedAuthFailure,
   type HostedAuthFailureReason,
   type HostedAuthSession,
   type HostedPasskeyCredential,
 } from '@heyta/app-host';
-import { useI18n, type MessageKey } from '@heyta/i18n';
+import { useI18n, type MessageKey, type MessageVars } from '@heyta/i18n';
 
 import { Button, Card, Checkbox, Screen, SectionHeader, Text, TextField } from '../ui/kit';
 import { useTokens } from '../theme';
 import { syncNow } from '../sync/store';
-import { AUTH_TERMS_REQUIRED_KEY, authFailureMessageKey } from '@heyta/ui';
+import {
+  AUTH_TERMS_REQUIRED_KEY,
+  E2EE_PASSPHRASE_LABEL_KEY,
+  SIGN_IN_PASSWORD_LABEL_KEY,
+  authFailureMessage,
+  defaultPasswordRevealed,
+  firstAuthErrorField,
+  type AuthFormMode,
+  type AuthFormField,
+} from '@heyta/ui';
 import { describePasskeyError, resolvePasskeyProvider } from '../auth/passkey-host';
 import { redeemPastedAuthToken } from '../auth/paste';
 import { saveAuthSession } from '../auth/session';
 
 /** 正在跑的那件事。只为了在按钮上画菊花 + 让"哪一步在忙"可读。 */
 type AuthAction =
+  | 'password-login'
+  | 'password-register'
   | 'magic-login'
   | 'magic-register'
   | 'passkey-login'
@@ -78,7 +102,11 @@ type Phase =
   | { kind: 'busy'; action: AuthAction }
   /** 中性提示：注册/登录链接已发出、邮箱已验证。**不是成功断言**。 */
   | { kind: 'notice'; key: MessageKey }
-  | { kind: 'failed'; key: MessageKey }
+  /**
+   * 失败。`vars` 只为策略那几条存在（「至少要 {min} 个字符」不填数字
+   * 就等于把 `{min}` 印在界面上）。
+   */
+  | { kind: 'failed'; key: MessageKey; vars?: MessageVars }
   | { kind: 'session'; session: HostedAuthSession };
 
 export interface SavedAuthSession {
@@ -104,12 +132,25 @@ export function AuthScreen({
   initialPassword,
   onSignedIn,
 }: AuthScreenProps): React.JSX.Element {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const tokens = useTokens();
 
   const [serverUrl, setServerUrl] = useState(initialServerUrl);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState(initialPassword);
+  /**
+   * 🔴 **登录密码** —— 与上面那个 `password`（端到端加密口令）**是两个秘密**。
+   * 这一个会离开设备（发给服务端验 Argon2id），那一个永远不离开；
+   * 忘了这一个可以点「忘记密码」重置，忘了那一个数据**不可恢复**。
+   * 两者共用一个 state 的代价不是不好看，是**把不该出设备的秘密发上服务端**。
+   */
+  const [loginPassword, setLoginPassword] = useState('');
+  /**
+   * 显隐开关的**默认档**取自共享层（移动默认明文、桌面默认遮住），
+   * 依据是 NNG 与 NIST 的一致结论：手机几乎没有肩窥场景，却有很强的单手错字场景。
+   * ⚠️ 默认值不是能力 —— 开关本身必须在。
+   */
+  const [passwordRevealed, setPasswordRevealed] = useState(defaultPasswordRevealed('mobile'));
   const [pasted, setPasted] = useState('');
   /**
    * 🔴 初值**必须**是 `false`。规范 §2-A4：服务端在 `termsAccepted` 上用的是
@@ -126,7 +167,8 @@ export function AuthScreen({
   const passkeyProvider = resolvePasskeyProvider();
 
   const fail = (reason: HostedAuthFailureReason): void => {
-    setPhase({ kind: 'failed', key: authFailureMessageKey(reason) });
+    const message = authFailureMessage({ reason });
+    failWithKey(message.key, message.vars);
   };
 
   /**
@@ -137,11 +179,97 @@ export function AuthScreen({
    * 它甚至没发出请求。把它塞进协议集合会污染那份封闭清单，
    * 也会让 app-host 对这个纯界面状态负责。
    */
-  const failWithKey = (key: MessageKey): void => {
-    setPhase({ kind: 'failed', key });
+  const failWithKey = (key: MessageKey, vars?: MessageVars): void => {
+    setPhase(vars === undefined ? { kind: 'failed', key } : { kind: 'failed', key, vars });
   };
 
-  const options = { baseUrl: serverUrl };
+  /**
+   * 带**上下文**的失败。
+   *
+   * 🔴 两条不许塌成一条，而这两条**都不在这里判**：
+   *   · `password-policy` 的四种拒绝（太短 / 太长 / 太常见 / 已在泄露库）
+   *     状态码与 `code` **完全相同**，而用户要做的动作四种都不同 ——
+   *     只说"不符合要求"等于没说；
+   *   · `password-locked` 有秒数就说"等 N 秒"，没有就只说换别的路，
+   *     **不能把 `undefined` 当 0** —— 那会显示成"再等 0 秒"。
+   * 两半（句子 + 句子里要填的数）由共享层 `authFailureMessage` **一次交出**：
+   * 分两次拿就有"只拿了句子、忘了填数"的空间，而那不会报错 —— `translateIn`
+   * 在 vars 缺省时原样保留占位符，屏幕上就是字面量 `{min}` / `{seconds}`。
+   * web 的两处面板真实漏过这个形状，所以这里从一开始就不给第二次机会。
+   */
+  const failFrom = (failure: HostedAuthFailure): void => {
+    const message = authFailureMessage(failure);
+    failWithKey(message.key, message.vars);
+  };
+
+  /**
+   * 这一次点击**缺**的是哪一栏（`undefined` = 齐了，可以出门）。
+   *
+   * 🔴 先后顺序取自共享层的 `firstAuthErrorField`，**不在这里重写**：
+   *    重写一次就有了第二套规则，症状是"web 让你前进、移动端不让你"那种两端不一致。
+   * ⚠️ 口令只判**空串**（空串是一次没必要的往返）。长度与常见度归服务端裁决并
+   *    给 `policyCode` —— 客户端提前按长度拒绝一句 20 字符的口令是 NIST 明令禁止的
+   *    组成规则，而且这个屏**没有** `maxLength`，静默截断口令是更糟的错法。
+   * ⚠️ `termsMissing` 只在**注册**这条路成立：登录不需要重新同意一次，
+   *    把同意项挡在登录前面会让老用户以为自己被登出了。
+   */
+  const missingField = (mode: AuthFormMode): AuthFormField | undefined =>
+    firstAuthErrorField({
+      baseUrlMissing: serverUrl.trim() === '',
+      emailMissing: email.trim() === '',
+      // 🔴 这里是 `loginPassword`（要发出去的那一个），不是 `password`（E2EE 口令）。
+      passwordMissing: loginPassword === '',
+      termsMissing: mode === 'register' && !termsAccepted,
+    });
+
+  /** 缺的那一栏怎么说。句子在词条表里，这里只给落点。 */
+  const missingFieldKey = (field: AuthFormField): MessageKey => {
+    if (field === 'baseUrl') return 'common.auth.error.unconfigured';
+    if (field === 'email') return 'common.auth.form.emailRequired';
+    if (field === 'password') return 'common.auth.form.passwordRequired';
+    return AUTH_TERMS_REQUIRED_KEY;
+  };
+
+  const options = { baseUrl: serverUrl, locale };
+
+  /**
+   * 注册（邮箱 + 密码）—— 现在这是**主路**。
+   *
+   * 🔴 未勾同意项时**一个请求都不发**（`missingField('register')` 就把 `terms`
+   *    报出来），而且说清为什么 —— 不是让服务端回一个 400。
+   * ⚠️ 成功后那句是**中性**的：服务端对"邮箱已被占用"回同一句、同一个状态码，
+   *    所以这里不能写"账号已创建"（规范 §2-A2）。
+   */
+  const registerWithPassword = async (): Promise<void> => {
+    const missing = missingField('register');
+    if (missing !== undefined) return failWithKey(missingFieldKey(missing));
+    setPhase({ kind: 'busy', action: 'password-register' });
+    const result = await registerWithEmailPassword(options, {
+      email,
+      password: loginPassword,
+      termsAccepted: true,
+    });
+    if (!result.ok) return failFrom(result);
+    setPhase({ kind: 'notice', key: 'mobile.auth.sent.register' });
+  };
+
+  /**
+   * 登录（邮箱 + 密码）—— **产出会话的第三条路**（另两条是魔法链接与通行密钥）。
+   *
+   * 拿到会话之后仍然**停在** `session` 那一档等端到端加密口令（规范 §3.2 第 ④ 步）：
+   * 登录成功不等于同步可用，那是两件事、两个秘密。
+   */
+  const loginWithPassword = async (): Promise<void> => {
+    const missing = missingField('sign-in');
+    if (missing !== undefined) return failWithKey(missingFieldKey(missing));
+    setPhase({ kind: 'busy', action: 'password-login' });
+    const result = await loginWithEmailPassword(options, {
+      email,
+      password: loginPassword,
+    });
+    if (!result.ok) return failFrom(result);
+    setPhase({ kind: 'session', session: result.session });
+  };
 
   const sendLoginLink = async (): Promise<void> => {
     setPhase({ kind: 'busy', action: 'magic-login' });
@@ -264,7 +392,7 @@ export function AuthScreen({
           否则"链接已发出"和"登录失败"在视觉上分不出来。 */}
       {phase.kind === 'failed' ? (
         <Text variant="caption" tone="danger">
-          {t(phase.key)}
+          {phase.vars === undefined ? t(phase.key) : t(phase.key, phase.vars)}
         </Text>
       ) : null}
       {phase.kind === 'notice' ? (
@@ -289,27 +417,59 @@ export function AuthScreen({
       <Card>
         <View style={{ gap: tokens['space.4'] }}>
           <TextField
-            label={t('mobile.profile.serverUrl.label')}
-            value={serverUrl}
-            onChangeText={setServerUrl}
-            keyboard="url"
-            hint={t('mobile.profile.serverUrl.hint')}
-          />
-          <TextField
             label={t('mobile.auth.email.label')}
             value={email}
             onChangeText={setEmail}
             placeholder={t('mobile.auth.email.placeholder')}
           />
+          {/*
+            🔴 **登录密码** —— 与下面那栏「加密口令」是**两个秘密**、两个 state：
+            这一栏的值要发给服务端验 Argon2id，那一栏的值永远不出这台设备。
+            显隐开关**必须在**（NNG：口令错字主要来自看不见的最后一位），
+            而移动端的默认档是明文 —— 取自共享层
+            `defaultPasswordRevealed('mobile')`，不在这里重新决定。
+          */}
+          <View style={{ gap: tokens['space.1'] }}>
+            <TextField
+              label={t(SIGN_IN_PASSWORD_LABEL_KEY)}
+              value={loginPassword}
+              onChangeText={setLoginPassword}
+              secure={!passwordRevealed}
+              hint={t('common.auth.form.passwordHint')}
+            />
+            <Pressable
+              accessibilityRole="button"
+              hitSlop={tokens['gesture.hit-slop']}
+              onPress={() => {
+                setPasswordRevealed((current) => !current);
+              }}
+            >
+              <Text variant="caption" tone="primary">
+                {t(passwordRevealed ? 'common.auth.form.hidePassword' : 'common.auth.form.showPassword')}
+              </Text>
+            </Pressable>
+          </View>
           {/* 🔴 口令放在**动作按钮之上**：它是规范 §3.2 的第 ④ 步，
               而且登录完之后要停在 `session` 那一档等它 —— 放在屏底会让人以为
               登录已经全部完成了。 */}
           <TextField
-            label={t('mobile.profile.password.label')}
+            label={t(E2EE_PASSPHRASE_LABEL_KEY)}
             value={password}
             onChangeText={setPassword}
             secure
             hint={t('mobile.auth.passwordNeeded')}
+          />
+          {/*
+            🔴 服务端地址是**最后一栏**。放第一栏等于要求用户在开始注册之前
+            先回答"你要连哪台机器" —— 而绝大多数人连的是这项服务默认提供的那台，
+            他们没有自己的地址可填。这不是排序偏好，是产品负责人定的硬约束。
+          */}
+          <TextField
+            label={t('mobile.profile.serverUrl.label')}
+            value={serverUrl}
+            onChangeText={setServerUrl}
+            keyboard="url"
+            hint={t('mobile.profile.serverUrl.hint')}
           />
         </View>
       </Card>
@@ -331,7 +491,33 @@ export function AuthScreen({
         {t('mobile.auth.terms.hint')}
       </Text>
 
-      {/* 邮件链接那条路（规范 §3.2 ②b）。 */}
+      {/*
+        口令这条路（规范 §3.2 的主路）。**登录在前**：它是唯一直接产出会话的按钮，
+        而注册只发一封验证邮件（规范 §2-A1 —— 注册不给令牌）。
+        ⚠️ 按钮文案**不许**写成"已注册 / 已登录"：点下去只是发出请求，
+        结果由状态区那句说，而那句在中性情形下不能断言账号已建（§2-A2）。
+      */}
+      <Button
+        label={t('mobile.auth.password.login')}
+        onPress={() => {
+          void loginWithPassword();
+        }}
+        tone="primary"
+        disabled={busy}
+        loading={action === 'password-login'}
+      />
+      <Button
+        label={t('mobile.auth.password.register')}
+        onPress={() => {
+          void registerWithPassword();
+        }}
+        disabled={busy}
+        loading={action === 'password-register'}
+      />
+
+      {/* 邮件链接与通行密钥现在明确是**第二条路**（规范 §3.2 ②a / ②b）。 */}
+      <SectionHeader icon="action.more" title={t('common.auth.form.otherWays')} />
+      {/* 邮件链接那条路。 */}
       <Button
         label={t('mobile.auth.magicLink.login')}
         onPress={() => {

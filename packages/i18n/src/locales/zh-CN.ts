@@ -2280,13 +2280,17 @@ export const zhCN = {
 
   // ── 移动端 · 注册 / 登录面板（规范 §3.2）────────────────────
   'mobile.auth.title': '注册 / 登录',
-  'mobile.auth.intro': '用邮箱或通行密钥登录。登录成功后，服务器地址、访问令牌与端到端加密口令会自动接上同步。',
+  'mobile.auth.intro': '用邮箱和密码注册或登录。登录成功后，服务器地址、访问令牌与端到端加密口令会自动接上同步。',
   'mobile.auth.email.label': '邮箱',
   'mobile.auth.email.placeholder': '你的邮箱地址',
   'mobile.auth.terms.label': '我同意该服务端提供的服务条款与隐私政策',
   // 🔴 服务端对 `termsAccepted` 用的是 `z.literal(true)`（规范 §2-A4）——
   //    "同意"这件事只能由用户做出。这句话是给用户的交代，不是客套。
   'mobile.auth.terms.hint': '这一项必须由你自己勾选——我们不会替你同意。',
+  // 🔴 口令这条路是**主路**，摆在"别的方式"之上。两句不许写成「注册成功」/
+  //    「登录成功」—— 点击只是**发出请求**，结果由状态区那一句说。
+  'mobile.auth.password.register': '用邮箱和密码注册',
+  'mobile.auth.password.login': '用邮箱和密码登录',
   // 两条并列的路，不是同一条的快捷方式：邮件链接要多一步"去邮箱"。
   'mobile.auth.magicLink.login': '用邮件链接登录',
   'mobile.auth.magicLink.register': '注册新账号',

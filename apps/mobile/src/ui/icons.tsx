@@ -32,6 +32,7 @@ import {
   ChevronRight,
   CircleCheckBig,
   Coffee,
+  Ellipsis,
   Flag,
   Flame,
   Folder,
@@ -161,6 +162,13 @@ const ICONS = {
    */
   'action.sort': ArrowUpDown,
   'action.sync': RefreshCw,
+  /**
+   * 「或者用别的方式」那一组的标题图标。
+   *
+   * 🔴 用 `Ellipsis`（三个点）而不是 `Plus`：这一组**不新增任何东西**，它只是
+   * 把主路之外还剩的路摆出来。`Plus` 会读成"点这里加一条"。
+   */
+  'action.more': Ellipsis,
   /**
    * 导出 / 分享。
    *
