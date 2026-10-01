@@ -953,11 +953,13 @@ export const zhCN = {
   'web.projects.heading': '清单',
   'web.projects.newPlaceholder': '新清单',
   'web.projects.newLabel': '新清单名称',
+  'web.projects.addNew': '新建清单',
   'web.projects.add': '添加清单',
   'web.projects.delete': '删除清单「{name}」',
   'web.tags.heading': '标签',
   'web.tags.newPlaceholder': '新标签',
   'web.tags.newLabel': '新标签名称',
+  'web.tags.addNew': '新建标签',
   'web.tags.add': '添加标签',
   'web.tags.delete': '删除标签「{name}」',
 

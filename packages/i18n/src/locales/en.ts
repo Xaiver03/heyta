@@ -907,11 +907,13 @@ export const en = {
   'web.projects.heading': 'Lists',
   'web.projects.newPlaceholder': 'New list',
   'web.projects.newLabel': 'New list name',
+  'web.projects.addNew': 'Create a list',
   'web.projects.add': 'Add list',
   'web.projects.delete': 'Delete list "{name}"',
   'web.tags.heading': 'Tags',
   'web.tags.newPlaceholder': 'New tag',
   'web.tags.newLabel': 'New tag name',
+  'web.tags.addNew': 'Create a tag',
   'web.tags.add': 'Add tag',
   'web.tags.delete': 'Delete tag "{name}"',
 

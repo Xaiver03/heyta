@@ -259,6 +259,190 @@ describe('取色入口（宿主插槽）逐行挂上', () => {
   });
 });
 
+/**
+ * G 新建入口：图标化
+ * -------------------
+ *
+ * 判据来自产品负责人 2026-09-30 的原话：「「+清单」的 UX 设计应该用 icon
+ * 或者说是小组件的方式，而不是这么一个东西」—— 迁移前输入框**常驻**在侧栏里，
+ * 两个区块各占一行大输入框，把"范围列表"压成了表单页。
+ *
+ * 所以这里钉的是**形态**，不是"能建清单"（建清单由 E2E `task-organize` 验）：
+ *
+ *   1. 默认**没有**输入框（不常驻）；
+ *   2. 标题右侧的 `+` 是唯一入口，且它展开时 `aria-expanded` 必须变 true；
+ *   3. 建完**不收起**（连建几条是常态）；
+ *   4. 收起只有两条路：Esc（连草稿一起丢）/ 点到**面板外**（留着草稿）；
+ *   5. 🔴 展开按钮与提交按钮**不能同名** —— 同名会让读屏和
+ *      `getByRole('button', { name })` 同时命中两个（Playwright strict mode 直接报错）；
+ *   6. 🔴 两个区块**一次只开一个 composer**，且互斥必须写在 disclosure 自己的
+ *      `onClick` 里，**不许**挂在"点到另一个区块"的 `pointerdown` 上。
+ *      真缺陷（2026-09-30 浏览器套件抓到）：清单 composer 开着时点「标签」的 `+`，
+ *      区块级收起在 `pointerdown` 就删掉了上面那 52px ⇒ 标签标题整块**往上跳** ⇒
+ *      `mouseup` 落在别处 ⇒ `click` 根本不派发给那个按钮 ⇒ "第一下白点"。
+ */
+describe('G 新建入口：图标化（输入框默认不出现）', () => {
+  const inputOf = (view: HTMLElement, label: string) =>
+    view.querySelector<HTMLInputElement>(`input[aria-label="${label}"]`);
+  const buttonOf = (view: HTMLElement, label: string) =>
+    view.querySelector<HTMLButtonElement>(`button[aria-label="${label}"]`);
+
+  function type(input: HTMLInputElement, value: string): void {
+    act(() => {
+      const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!;
+      setter.call(input, value);
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+  }
+
+  function submit(view: HTMLElement, label: string): void {
+    const form = buttonOf(view, label)!.closest('form')!;
+    act(() => {
+      form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+    });
+  }
+
+  it('默认只有 `+`，没有输入框', () => {
+    seed();
+    const view = render();
+    expect(inputOf(view, '新清单名称')).toBeNull();
+    expect(inputOf(view, '新标签名称')).toBeNull();
+    expect(buttonOf(view, '新建清单')).not.toBeNull();
+    expect(buttonOf(view, '新建标签')).not.toBeNull();
+    // 🔴 常驻输入框的形态不许回来（placeholder 那一份就是过去的证据）。
+    expect(view.querySelector('input[placeholder="新清单"]')).toBeNull();
+  });
+
+  it('点 `+` 展开、再点一次收起（`aria-expanded` 跟着走）', () => {
+    seed();
+    const view = render();
+    const reveal = buttonOf(view, '新建清单')!;
+    expect(reveal.getAttribute('aria-expanded')).toBe('false');
+
+    click(reveal);
+    expect(inputOf(view, '新清单名称')).not.toBeNull();
+    expect(buttonOf(view, '新建清单')!.getAttribute('aria-expanded')).toBe('true');
+
+    // 🔴 它是 disclosure 控件，不是只会开的按钮：第二次必须关得掉。
+    // （收起不挂在输入框 `blur` 上 —— 点按钮本身就会先 blur，两条逻辑会打架，
+    //  症状是"再点一次没反应"。判据就是这一条：把它改回 blur 会红。）
+    click(buttonOf(view, '新建清单'));
+    expect(inputOf(view, '新清单名称')).toBeNull();
+    expect(buttonOf(view, '新建清单')!.getAttribute('aria-expanded')).toBe('false');
+  });
+
+  it('提交建一条：走宿主 action、清空草稿、**不收起**', () => {
+    seed();
+    const view = render();
+    click(buttonOf(view, '新建清单'));
+    const input = inputOf(view, '新清单名称')!;
+    type(input, '深度工作');
+    submit(view, '添加清单');
+
+    expect(actions.addProject).toHaveBeenCalledWith('深度工作');
+    // 不收起 = 连建几条不用每建一次就重新点开。
+    expect(inputOf(view, '新清单名称')).not.toBeNull();
+    expect(inputOf(view, '新清单名称')!.value).toBe('');
+  });
+
+  it('Esc：清空草稿并收起（这是唯一的显式关闭）', () => {
+    seed();
+    const view = render();
+    click(buttonOf(view, '新建清单'));
+    const input = inputOf(view, '新清单名称')!;
+    type(input, '没想好');
+
+    act(() => {
+      input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    });
+    expect(inputOf(view, '新清单名称')).toBeNull();
+    expect(buttonOf(view, '新建清单')!.getAttribute('aria-expanded')).toBe('false');
+
+    // 🔴 重新展开必须是**空的**：Esc 说"这次不算"。
+    click(buttonOf(view, '新建清单'));
+    expect(inputOf(view, '新清单名称')!.value).toBe('');
+    expect(actions.addProject).not.toHaveBeenCalled();
+  });
+
+  it('点到面板外才收起；草稿不丢', () => {
+    seed();
+    const view = render();
+    click(buttonOf(view, '新建清单'));
+    type(inputOf(view, '新清单名称')!, '深度工作');
+
+    const pointerDown = (target: Node) => {
+      act(() => {
+        target.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }));
+      });
+    };
+
+    // 🔴 同一个面板内（清单行、色槽、输入框自己、**另一个区块的 `+`**）不许收起 ——
+    // 前者会让"给刚建的清单上色"打断表单，后者就是第 6 条判据：区块级收起会把
+    // 下一区块的标题顶走，第一下点击白点。
+    pointerDown(byTestId(view, 'project-p1-select')!);
+    expect(inputOf(view, '新清单名称')).not.toBeNull();
+
+    pointerDown(buttonOf(view, '新建标签')!);
+    expect(inputOf(view, '新清单名称')).not.toBeNull();
+
+    pointerDown(document.body);
+    expect(inputOf(view, '新清单名称')).toBeNull();
+    expect(actions.addProject).not.toHaveBeenCalled();
+
+    // 收起 ≠ 丢弃：重新点开还是那几个字。
+    click(buttonOf(view, '新建清单'));
+    expect(inputOf(view, '新清单名称')!.value).toBe('深度工作');
+  });
+
+  it('一次只开一个 composer：切换在**同一个 click** 里完成', () => {
+    seed();
+    const view = render();
+    click(buttonOf(view, '新建清单'));
+    type(inputOf(view, '新清单名称')!, '深度工作');
+
+    // 点「标签」的 `+` 一下：标签 composer 出来，清单 composer 收起。
+    // 🔴 变异：拿掉 disclosure onClick 里的 `if (next) setAdding…(false)` ⇒ 这里两个都在。
+    click(buttonOf(view, '新建标签'));
+    expect(inputOf(view, '新标签名称')).not.toBeNull();
+    expect(inputOf(view, '新清单名称')).toBeNull();
+    expect(buttonOf(view, '新建清单')!.getAttribute('aria-expanded')).toBe('false');
+    expect(buttonOf(view, '新建标签')!.getAttribute('aria-expanded')).toBe('true');
+
+    // 反向再走一次（互斥是对称的，不是只写了半个）。
+    click(buttonOf(view, '新建清单'));
+    expect(inputOf(view, '新清单名称')).not.toBeNull();
+    expect(inputOf(view, '新标签名称')).toBeNull();
+
+    // 被切走的那个只是**收起**，不是丢弃：草稿还在。
+    click(buttonOf(view, '新建标签'));
+    expect(inputOf(view, '新清单名称')).toBeNull();
+    click(buttonOf(view, '新建清单'));
+    expect(inputOf(view, '新清单名称')!.value).toBe('深度工作');
+  });
+
+  it('标签走同一套形态；可访问名在任何展开态都唯一', () => {
+    seed();
+    const view = render();
+    click(buttonOf(view, '新建标签'));
+    expect(inputOf(view, '新标签名称')).not.toBeNull();
+
+    const names = ['新建清单', '添加清单', '新建标签', '添加标签'];
+    for (const name of names) {
+      expect(view.querySelectorAll(`button[aria-label="${name}"]`).length, name).toBeLessThanOrEqual(
+        1,
+      );
+    }
+    // 🔴 一次只开一个 composer ⇒ 切到清单后，标签的提交按钮**不在 DOM 里**。
+    // 两个 disclosure 按钮始终各一个（它们是常驻入口），提交按钮只有开着的那个有。
+    click(buttonOf(view, '新建清单'));
+    expect(view.querySelectorAll('button[aria-label="添加清单"]').length).toBe(1);
+    expect(view.querySelectorAll('button[aria-label="添加标签"]').length).toBe(0);
+    for (const name of ['新建清单', '新建标签']) {
+      expect(view.querySelectorAll(`button[aria-label="${name}"]`).length, name).toBe(1);
+    }
+  });
+});
+
 describe('F 一份实现：web 侧只剩接线', () => {
   it('web 的 ProjectsPanel 从 `@heyta/ui` 取 `OrganizerList`，自己没有行骨架', () => {
     const source = readFileSync(resolve(WEB_SRC, 'features/projects/ProjectsPanel.tsx'), 'utf8');

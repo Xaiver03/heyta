@@ -145,6 +145,49 @@
   color: var(--ht-color-foreground-subtle);
 }
 
+/*
+  侧栏「清单 / 标签」的区块头：标题 + **一个图标级的新建入口**。
+  这里原来是常驻的空输入框（一整行 + 一个 + 按钮），于是侧栏最贵的空间
+  被用在"用户什么都不想做的时候"，而且两个空框看起来像是**没填完的表单**。
+*/
+.ht-organizer__heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--ht-space-1);
+  padding-inline: var(--ht-space-2);
+}
+
+/* 标题不再自带横向内边距 —— 行的留白已由上面负责，否则 + 与文字不同基线。 */
+.ht-organizer__heading .ht-nav__section {
+  padding-block: var(--ht-space-3) var(--ht-space-1);
+  padding-inline: 0;
+}
+
+.ht-organizer__add {
+  display: inline-grid;
+  place-items: center;
+  inline-size: var(--ht-touch-target-min);
+  block-size: var(--ht-touch-target-min);
+  margin-block: calc(var(--ht-space-2) * -1);
+  flex: none;
+  border: none;
+  border-radius: var(--ht-radius-sm);
+  background: transparent;
+  color: var(--ht-color-foreground-muted);
+  cursor: pointer;
+}
+
+.ht-organizer__add:hover {
+  background: var(--ht-color-hover);
+  color: var(--ht-color-foreground);
+}
+
+.ht-organizer__add:focus-visible {
+  outline: var(--ht-border-width-thick) solid var(--ht-color-ring);
+  outline-offset: var(--ht-space-1);
+}
+
 .ht-nav__item {
   display: flex;
   align-items: center;
