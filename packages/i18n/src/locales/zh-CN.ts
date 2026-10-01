@@ -631,6 +631,20 @@ export const zhCN = {
   'common.auth.form.switchToSignIn': '已经有账号了？直接登录',
   'common.auth.form.otherWays': '或者用别的方式',
   'common.auth.sent.reset': '如果我们认得这个邮箱，重置密码的链接已经发过去了。',
+  // 🔴 **每个动作各有一句"正在…"**，不是一句通用的"正在处理"：
+  // 用户停在表单前最想知道的就是"这一步到底在做什么"，而口令登录要验证 Argon2id、
+  // 可能要等一两秒 —— 一句与动作无关的话会让人以为界面坏了，于是去点第二次。
+  // （重复提交在口令这条路上有真实代价：它会计进失败次数。）
+  'common.auth.busy.signIn': '正在验证密码…',
+  'common.auth.busy.register': '正在创建账号…',
+  'common.auth.busy.forgot': '正在发送重置邮件…',
+  'common.auth.busy.link': '正在发送登录链接…',
+  'common.auth.busy.recovery': '正在发送找回链接…',
+  'common.auth.busy.verify': '正在确认这条链接…',
+  'common.auth.busy.change': '正在修改密码…（其余设备需要重新认证）',
+  // 本地校验的两句话（提交时才算，不逐键算 —— 逐键报错是最劝退的表单形态）。
+  'common.auth.form.emailRequired': '要先填邮箱地址。',
+  'common.auth.form.passwordRequired': '还没有填密码。',
   'common.subtask.reject.taskNotFound': '找不到这个任务（可能已在别的设备上删除）。',
   'common.subtask.reject.parentNotFound': '找不到要移入的那个任务（可能已在别的设备上删除）。',
   'common.subtask.reject.self': '不能把任务移到它自己下面。',

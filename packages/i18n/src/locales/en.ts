@@ -599,6 +599,22 @@ export const en = {
   'common.auth.form.switchToSignIn': 'Already have an account? Sign in',
   'common.auth.form.otherWays': 'Or use another way',
   'common.auth.sent.reset': 'If we recognize that email address, a link to reset your password is on its way.',
+  // 🔴 One "working…" sentence per action, not a generic "processing":
+  // what the user wants to know while a form sits there is what *this* step is doing.
+  // Password verification runs Argon2id and can take a second or two, and a sentence
+  // unrelated to the action reads as a broken UI - so they click again, and on this
+  // path a duplicate submit actually costs (it counts toward the failure budget).
+  'common.auth.busy.signIn': 'Verifying your password…',
+  'common.auth.busy.register': 'Creating your account…',
+  'common.auth.busy.forgot': 'Sending the reset email…',
+  'common.auth.busy.link': 'Sending the login link…',
+  'common.auth.busy.recovery': 'Sending the recovery link…',
+  'common.auth.busy.verify': 'Checking that link…',
+  'common.auth.busy.change': 'Changing your password… (your other devices will need to sign in again)',
+  // Local validation - checked on submit, not per keystroke (per-keystroke errors are
+  // the most discouraging form of form).
+  'common.auth.form.emailRequired': 'Enter the email address first.',
+  'common.auth.form.passwordRequired': 'Password is not filled in yet.',
   'common.subtask.reject.taskNotFound': 'That task could not be found - it may have been deleted on another device.',
   'common.subtask.reject.parentNotFound': 'The task to move it under could not be found - it may have been deleted on another device.',
   'common.subtask.reject.self': 'A task cannot be moved under itself.',
