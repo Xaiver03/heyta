@@ -617,6 +617,10 @@ location /en/legal/ {
 ⚠️ 那条判据是在页面里 `fetch` 相对路径，**必须先 `page.goto(origin)`**：新开的 page 停在
 `about:blank`，相对 URL 没有 base 可解析，报的是 `TypeError: Failed to parse URL from /` ——
 长得像"服务器坏了"，其实是探针没落到目标域。
+🔴 **修完缺陷要回去重跑当初那个变异**，别假定它还会红在同一句上：本次修好软 404 之后，
+套件里那条"字节必须与首页不同"对拼错的路径**再也不红了**（404 页的字节本来就不同），
+失败退化成 `page.goto` 等一个永不出现的元素、30 秒后只报 `TimeoutError`。
+现在 `rawHtml` 先断言 HTTP 200 再返回字节，同一个变异红在「取到 HTTP 404…」那一句。
 
 回滚：`cp /etc/nginx/sites-available/heyta.waytofuture.cn.bak-g25b-20261001T165913Z \`
 换回原文件 → `nginx -t` → `systemctl reload nginx`。

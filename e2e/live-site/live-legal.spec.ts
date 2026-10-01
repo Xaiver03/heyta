@@ -14,6 +14,12 @@
  * 与首页逐字相同。于是"状态码 200"与"curl 拿到了 HTML"都**不是**可达性证据 ——
  * 必须比字节。这条判据因此放在最前，且在**同一台线上服务器**上取参照物（首页）。
  *
+ * ⚠️ **2026-10-02 之后这句话的适用面变了，别照它理解现状**：nginx 已对未命中的
+ * `/legal/*` 返回真 404（缺口 **G-25b** 闭合），所以在这个前缀下状态码**重新变成**证据
+ * —— 由最后那条判据钉住。比字节这条仍然留着，但它现在防的是**兜底被改回去**，
+ * 而不是"当前是不是软 404"。两者都要：只留状态码判据的话，兜底一回来就是 200 + 首页，
+ * 而那条判据恰好也会绿。
+ *
  * ## 为什么断言全部是"对等 / 一致"，没有一条是我编的数字
  *
  * 「至少 N 个字符」「至少 3 段」这类阈值是本仓库明确拒绝过的写法
@@ -104,10 +110,23 @@ function hardErrors(logs: readonly string[]): string[] {
  * 解析路径 —— 那样验的就不是同一台服务器了。
  */
 async function rawHtml(page: Page, path: string): Promise<string> {
-  return page.evaluate(
-    async (p: string) => await fetch(p, { cache: 'no-store' }).then((r) => r.text()),
+  const { status, body } = await page.evaluate(
+    async (p: string): Promise<{ status: number; body: string }> => {
+      const response = await fetch(p, { cache: 'no-store' });
+      return { status: response.status, body: await response.text() };
+    },
     path,
   );
+  // 🔴 先判状态码，再比字节。顺序反了会让"路径拼错"这一类失败**退化**：
+  // nginx 对未命中的 `/legal/*` 返回真 404 之后（G-25b），404 页的字节本来就
+  // 与首页不同，于是"字节不等于首页"这条抓不到拼错的路径，测试会继续往下走
+  // 到 `page.goto` 等一个永远不出现的元素，30 秒后只报 `TimeoutError`。
+  // 实测过这个退化：把 `terms` 换成 `/legal/terms-typo/` ⇒ 红在 `locator.waitFor` 超时。
+  expect(
+    status,
+    `${path} 取到 HTTP ${status}。这里 200 之外只有两种坏法：404 = 那一页没发布或部署没跟上，5xx = 服务器侧坏了`,
+  ).toBe(200);
+  return body;
 }
 
 /** 渲染完一条法务页之后取出的结构事实。 */
