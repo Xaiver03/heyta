@@ -40,7 +40,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync, createReadStream, s
 import { dirname, extname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { chromium } from '@playwright/test';
+import { chromium, expect } from '@playwright/test';
 
 import {
   databaseUrlFor,
@@ -416,6 +416,13 @@ page.on('response', (res) => {
   }
 });
 const email = `email-web-${String(Date.now())}@example.com`;
+/**
+ * 注册用的登录口令。**只存在于本进程**，且必须是 8 个码点以上 ——
+ * 服务端策略（`packages/shared-schema` 的口令策略）会在界面把不足的那几条
+ * 逐条说出来，那种红会被误读成"链路坏了"。
+ * ⚠️ 它**不是**端到端加密口令（那是另一个秘密，登录后才问，且从不落盘）。
+ */
+const PASSWORD = 'email-web-chain-pass';
 
 /**
  * 首屏锚点用 **testid 而不是 placeholder 文案**。
@@ -442,24 +449,46 @@ try {
    *
    * 旧版在这里 `fill(WEB)`：注册的前置条件是"先把你连哪台服务端敲出来"。
    * 那面墙拆掉之后（`AuthPanel.tsx` 文件头 + `auth-endpoint.ts`），未配置时地址
-   * **预填成应用自己的来源**并收进「高级」的 `<details>` 里 —— 折叠着，所以不能用
-   * `fill()`/`inputValue()`（都要可见性），只能直接读 DOM 的 `value`。
+   * **预填成应用自己的来源**，而且它现在是表格里**最后一栏**（曾经过「高级」`<details>`
+   * 里折叠着，2026-10-01 的两步式重构成了一屏一件事）。可见了就可以直接读 `inputValue()`，
+   * 不再需要绕到 DOM 里摸 `value`。
    *
    * 读它而不是跳过它：**"不用填"和"默认值是对的"是两件事**。只看注册成功，
    * 可能成功地把请求发去了别处（比如构建期烙进去的旧域名）。
    */
-  const prefilled = await dialog.evaluate((root) => {
-    const url = root.querySelector('input[type="url"]');
-    return url ? { present: true, value: url.value } : { present: false, value: '' };
-  });
+  const serverField = dialog.getByTestId('auth-form-server-url');
+  await expect(serverField, '未配置服务端时地址栏必须在（它是最后一栏，且预填好）').toBeVisible();
+  const prefilled = await serverField.inputValue();
   check(
-    prefilled.value === WEB,
-    `① 地址框**预填成同源地址**而没人碰过它（实测 value="${prefilled.value}"）`,
+    prefilled === WEB,
+    `① 地址栏**预填成同源地址**而没人碰过它（实测 value="${prefilled}"）`,
     'structure',
   );
 
-  await dialog.locator('input[type="email"]').fill(email);
-  await dialog.getByRole('checkbox').check();
+  /**
+   * ── 注册现在要走两步 + 一档 ──────────────────────────────────────────
+   *
+   * 第一屏**只要邮箱**（这就是"地址不是前置条件"那条硬约束的形状）；
+   * 点「继续」进第二屏，那里默认是**登录档**，而同意项、邀请码、
+   * 以及"注册"这个动作都在**注册档**。所以是四步，不是一步。
+   * ⚠️ 这四步每一步都是真实用户步骤 —— 少任何一步的报错长得像服务端坏了：
+   *   · 没点继续 ⇒ 找不到那个按钮（它还没进 DOM）；
+   *   · 没切注册档 ⇒ 没有同意项，服务端因缺 `termsAccepted` 回 400；
+   *   · 没填口令 ⇒ 表单**在本地**就拦住提交（`firstAuthErrorField`），
+   *     一个请求都不发 —— 那种红最容易被读成"邮件没发出去"。
+   */
+  await dialog.getByTestId('auth-form-email').fill(email);
+  await dialog.getByTestId('auth-form-continue').click();
+  const registerToggle = dialog.getByTestId('auth-form-switch-mode');
+  const terms = dialog.getByTestId('auth-form-terms');
+  await expect(registerToggle, '第二屏必须有"切到注册"那一步').toBeVisible();
+  await registerToggle.click();
+  await expect(terms, '注册档才渲染同意项').toBeVisible();
+  await dialog.getByTestId('auth-form-password').fill(PASSWORD);
+  await terms.click();
+  // 同意项是 `div[role=checkbox][aria-checked]`（共享表单没有原生 input），
+  // 所以断言 aria-checked 而不是"点过了"—— 点到了但状态没变是最典型的空真。
+  await expect(terms).toHaveAttribute('aria-checked', 'true');
   /**
    * 提交**之前**取界面语言。`document.documentElement.lang` 是应用自己写的
    * （`apps/web/src/lib/locale.ts:92`），所以它就是"用户此刻看着哪种语言"的

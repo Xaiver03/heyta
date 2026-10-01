@@ -29,6 +29,7 @@
 import { addTask } from '../tests/helpers';
 import {
   SERVER,
+  acceptTerms,
   authStatus,
   freshEmail,
   injectCredential,
@@ -39,6 +40,7 @@ import {
   serverOpCount,
   setE2eePasswordAndSync,
   statusBar,
+  toRegisterMode,
   userIdFromCredentials,
   type VirtualAuthenticator,
 } from '../auth-journey/helpers';
@@ -118,10 +120,9 @@ test('W1 未登录注册：头像菜单 → 登录/注册 → 用通行密钥注
 
   const dialog = await openAuthPanel(page);
 
-  await dialog.locator('input[type="url"]').fill(SERVER);
-  await dialog.locator('input[type="email"]').fill(journey.email);
-  // 面板里唯一的 checkbox 就是服务条款。
-  await dialog.getByRole('checkbox').check();
+  // 表单现在分两屏、注册是第二屏里再切的一档（同意项只在注册档渲染）。
+  await toRegisterMode(dialog, journey.email);
+  await acceptTerms(dialog);
   await dialog.getByRole('button', { name: '用通行密钥注册' }).click();
 
   // TEST_MODE 自动验证 ⇒ 界面显示的是"注册申请已提交…"那段文案。
@@ -276,9 +277,10 @@ test('W6 反向：服务端地址错了，界面必须说出失败而不是假�
   const dialog = await openAuthPanel(page);
 
   // 127.0.0.1:9 （discard 端口）上没有服务端 —— 注册必须失败且**可见**。
-  await dialog.locator('input[type="url"]').fill('http://127.0.0.1:9');
-  await dialog.locator('input[type="email"]').fill(freshEmail());
-  await dialog.getByRole('checkbox').check();
+  // 先走到注册档（它会预填真实服务端地址），再把地址**改坏**。
+  await toRegisterMode(dialog, freshEmail());
+  await dialog.getByTestId('auth-form-server-url').fill('http://127.0.0.1:9');
+  await acceptTerms(dialog);
   await dialog.getByRole('button', { name: '用通行密钥注册' }).click();
 
   await expect(
