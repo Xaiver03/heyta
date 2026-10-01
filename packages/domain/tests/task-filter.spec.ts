@@ -20,9 +20,12 @@ import { describe, expect, it } from 'vitest';
 import { Priority, Quadrant, type Task } from '../src/entities.js';
 import {
   filterTasks,
+  FULL_SCOPE,
   groupTasksByDate,
   isCompleted,
+  isScopeEmpty,
   pendingCount,
+  scopeTasks,
   sectionTasks,
   type TaskFilter,
 } from '../src/task-filter.js';
@@ -230,5 +233,47 @@ describe('groupTasksByDate', () => {
   it('全部无逾期、无未来时只剩无截止组；空输入给空数组', () => {
     expect(groupTasksByDate([task({ id: 'a' })], ctx).map((g) => g.kind)).toEqual(['undated']);
     expect(groupTasksByDate([], ctx)).toEqual([]);
+  });
+});
+
+/**
+ * 日历侧栏的多选范围（`scopeTasks`）。
+ *
+ * 三条判据各自对应一个**反转了不会报错**的裁决，所以逐条钉：
+ * 空 = 全部（不是空集）、含已完成（与 `filterTasks` 每条分支都相反）、
+ * 清单与标签取并集（取交集会让"勾第二个"经常把结果清成 0 条）。
+ */
+describe('scopeTasks（日历侧栏多选）', () => {
+  const tasks = [
+    task({ id: 'p1', projectId: 'pa' }),
+    task({ id: 'p1-done', projectId: 'pa', completedAt: LOCAL_NOON }),
+    task({ id: 'p2', projectId: 'pb' }),
+    task({ id: 'child', projectId: 'pa-child' }),
+    task({ id: 'tagged', tagIds: ['ta'] }),
+    task({ id: 'both', projectId: 'pb', tagIds: ['tb'] }),
+    task({ id: 'inbox' }),
+    task({ id: 'dead', projectId: 'pa', deletedAt: LOCAL_NOON }),
+  ];
+  const ids = (projectIds: string[], tagIds: string[]) =>
+    scopeTasks(tasks, { projectIds, tagIds }).map((t) => t.id);
+
+  it('空选择 = 全部（「所有」那一行的语义），墓碑仍然不进', () => {
+    expect(isScopeEmpty(FULL_SCOPE)).toBe(true);
+    expect(ids([], [])).toEqual(['p1', 'p1-done', 'p2', 'child', 'tagged', 'both', 'inbox']);
+    expect(ids([], [])).not.toContain('dead');
+  });
+
+  it('🔴 已完成**不**被丢掉 —— 一勾完就从日历格子里消失是不可接受的', () => {
+    expect(ids(['pa'], [])).toEqual(['p1', 'p1-done']);
+  });
+
+  it('清单与标签是**并集**，不是交集', () => {
+    expect(ids(['pb'], ['ta'])).toEqual(['p2', 'tagged', 'both']);
+  });
+
+  it('父清单只匹配自己的任务（子清单要单独勾）；非空选择 `isScopeEmpty` 为 false', () => {
+    expect(ids(['pa'], [])).not.toContain('child');
+    expect(isScopeEmpty({ projectIds: ['pa'], tagIds: [] })).toBe(false);
+    expect(isScopeEmpty({ projectIds: [], tagIds: ['ta'] })).toBe(false);
   });
 });
