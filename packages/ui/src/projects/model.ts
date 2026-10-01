@@ -182,6 +182,29 @@ export function toTagItems(tags: readonly Tag[]): OrganizerItem[] {
 }
 
 /**
+ * 一次遍历算出所有标签的未完成任务数。
+ *
+ * 🔴 **口径必须与 `countsTowardProject` 逐字相同**（未删除 + 未完成），
+ * 否则侧栏两节（清单 / 标签）的同一个数字会长成两种含义 —— 而这两节在同一个
+ * `OrganizerList` 里，用户只会看出"对不上"，说不出哪一层错。
+ * 一条任务可以挂多个标签，所以它给**每个**标签各加一（不是加总数）——
+ * 标签那节的数字是"这个标签下有几件没做完"，不是"这批任务有几件"。
+ *
+ * 返回普通对象而不是 `Map`：理由同 `openTaskCounts`（取不到就是 `undefined`，
+ * 那正是"计数位静默消失"的形状）。
+ */
+export function openTagCounts(tasks: readonly Task[]): Record<string, number> {
+  const counts: Record<string, number> = {};
+  for (const task of tasks) {
+    if (task.deletedAt !== undefined || task.completedAt !== undefined) continue;
+    for (const tagId of task.tagIds ?? []) {
+      counts[tagId] = (counts[tagId] ?? 0) + 1;
+    }
+  }
+  return counts;
+}
+
+/**
  * 平铺的行模型 → 树（每行都没有子级）。
  *
  * 标签用它：`Tag` 没有父子关系，但**必须**与清单走同一个 `OrganizerList`

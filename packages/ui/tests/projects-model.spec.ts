@@ -20,6 +20,7 @@ import type { Project, Tag, Task } from '@heyta/domain';
 import {
   aliveProjects,
   childProjects,
+  openTagCounts,
   openTaskCount,
   openTaskCounts,
   organizerRowKey,
@@ -124,6 +125,40 @@ describe('未完成任务计数：三条条件缺一不可', () => {
 
   it('空输入返回空表（不是 `undefined`）', () => {
     expect(openTaskCounts([])).toEqual({});
+  });
+});
+
+describe('标签计数：口径与清单那节必须一致，一条任务给它的每个标签各加一', () => {
+  const tasks = [
+    task({ id: 't1', tagIds: ['g1'] }),
+    task({ id: 't2', tagIds: ['g1', 'g2'] }),
+    task({ id: 't3', tagIds: ['g1'], completedAt: NOW }),
+    task({ id: 't4', tagIds: ['g1'], deletedAt: NOW }),
+    task({ id: 't5', tagIds: [] }),
+    task({ id: 't6' }),
+  ];
+
+  it('未完成 + 未删除；一条任务挂两个标签 ⇒ 两个标签各 +1（不是给某一个 +2）', () => {
+    expect(openTagCounts(tasks)).toEqual({ g1: 2, g2: 1 });
+  });
+
+  it('没有 tagIds 的任务不进表（收集箱不冒充某个标签）', () => {
+    expect(Object.keys(openTagCounts(tasks)).sort()).toEqual(['g1', 'g2']);
+  });
+
+  it('空输入返回空表', () => {
+    expect(openTagCounts([])).toEqual({});
+  });
+
+  /**
+   * 🔴 这条钉的是**跨节一致性**：侧栏的清单与标签两节画的是同一个组件，
+   * 若两边的"算不算一条"条件漂开，用户只会看出"这两个数对不上"，
+   * 说不出哪一层错 —— 所以判据不能各测各的。
+   */
+  it('与 `countsTowardProject` 同口径：同一批任务，完成/删除的两节都不计', () => {
+    const both = [task({ id: 'x1', projectId: 'p1', tagIds: ['g1'] }), task({ id: 'x2', projectId: 'p1', tagIds: ['g1'], completedAt: NOW })];
+    expect(openTaskCounts(both)).toEqual({ p1: 1 });
+    expect(openTagCounts(both)).toEqual({ g1: 1 });
   });
 });
 

@@ -412,14 +412,18 @@ describe('侧栏导航', () => {
 
     await mount();
 
-    // 侧栏里那个标签必须是**可点**的
-    const tagButton = [...container!.querySelectorAll<HTMLButtonElement>('button')].find(
-      (b) => b.textContent?.trim() === '工作',
-    );
+    // 侧栏里那个标签必须是**可点**的。
+    // ⚠️ 这里以前是「找 `textContent === '工作'` 的 button」—— 标签行现在多了一个
+    // 计数（滴答参照图：侧栏每行右侧都有数字），行的文本变成「工作1」，那个写法
+    // 就再也找不到它了。**按文本内容找可点元素本来就脆**（名字是用户自己起的，
+    // 计数、图标、徽标都可能改它），共享组件已经给了稳定锚点，就用它。
+    const tagButton = container!.querySelector<HTMLElement>(`[data-testid="tag-${tagId}-select"]`);
     expect(
       tagButton,
       '侧栏的标签名不可点 —— `{kind:\'tag\'}` 的判据在共享层，但没人能切过去',
-    ).toBeDefined();
+    ).not.toBeNull();
+    // 计数位真的出现在**接好线的整棵树**里（不只是 `ProjectsPanel` 单测的隔离环境）。
+    expect(container!.querySelector(`[data-testid="tag-${tagId}-count"]`)?.textContent).toBe('1');
 
     await act(async () => {
       tagButton!.click();

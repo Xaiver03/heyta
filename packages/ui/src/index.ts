@@ -528,6 +528,7 @@ export {
 export {
   aliveProjects,
   childProjects,
+  openTagCounts,
   openTaskCount,
   openTaskCounts,
   organizerRowKey,

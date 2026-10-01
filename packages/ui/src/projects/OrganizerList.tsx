@@ -98,8 +98,12 @@ export interface OrganizerListProps {
   /** 顶层行（含一层子级）。由 `toOrganizerTree` / `toOrganizerNodes` 产出。 */
   readonly items: readonly OrganizerNode[];
   /**
-   * 每行的未完成任务数（`openTaskCounts` 的输出）。
-   * 省略 = **不渲染计数位**（标签没有计数，宿主要显式不传）。
+   * 每行的未完成任务数（清单 = `openTaskCounts`，标签 = `openTagCounts`）。
+   *
+   * 省略 = **不渲染计数位**。🔴 这个"可选"不是给标签留的出口（那是当初的理由，
+   * 已被推翻：参照图侧栏**每一行**都有数字，而 per-tag 计数在领域里成立）——
+   * 它留的是"宿主这一屏确实不关心计数"的可能。**口径两节必须一致**，
+   * 否则同一个数字在侧栏上下两节长成两种含义，用户只会看到"这两个数对不上"。
    */
   readonly counts?: Readonly<Record<string, number>>;
   readonly labels: OrganizerListLabels;
