@@ -545,6 +545,12 @@ export const zhCN = {
   'common.subtask.reject.depthExceeded': '子任务最多三层。移过去会让这段层级超过上限。',
   'common.subtask.reject.childrenExceeded': '这个任务的子任务已经到上限了，先整理一些再移。',
   'common.subtask.reject.unknown': '没能移过去，请重试。',
+  // 🔴 这三条是**专注记录写入校验**失败时的句子，两个壳共用（`packages/ui`
+  //    的 `focusLogFailureMessageKey` 按码查这里）。以前这三处直接把中文
+  //    异常消息插进「保存失败：{reason}」，英文界面就会露出半句中文。
+  'common.focus.error.unknownKind': '这条专注记录没有记下来：它的类型不认识。',
+  'common.focus.error.nonPositivePlanned': '这条专注记录没有记下来：计划时长必须大于 0。',
+  'common.focus.error.missingCreatedAt': '这条专注记录没有记下来：缺少这条记录的产生时间。',
   'web.subtask.none': '子任务',
   'web.subtask.under': '属于「{title}」',
   'web.subtask.trigger.aria': '把「{title}」移到别的任务下面',
@@ -624,6 +630,41 @@ export const zhCN = {
   'mobile.widgetJourney.privacyHint': '开启后，锁屏与锁屏相关的小组件只显示任务数量，不显示标题。',
   'mobile.widgetJourney.privacyFailed': '没能保存这个设置，请重试。',
 
+  // PWA 安装面板里那一句（manifest 的 `description`）。
+  // 🔴 manifest 是**构建期单语言产物** —— 打包时按 `DEFAULT_LOCALE` 渲染一次，
+  //    运行时没有换语言的通道（浏览器只在安装时读它）。所以这里的值只能是默认语言，
+  //    但**必须来自词条表**，不许在生成脚本里再抄一份中文。
+  'web.pwa.description': '本地优先、端到端加密的待办与习惯应用',
+
+  // ── 小组件卡片上的文案（iOS / Android / Windows 三端同一份）──────────
+  // 🔴 这一组是**卡片内容**，不是"怎么装小组件"的说明（那是上面两组）。
+  //    Windows 的 Adaptive Card 模板是**静态文件**，宿主自己去取，不经过我们的 JS
+  //    —— 所以模板里不许有一个字的文案，全部由数据绑定（`${titleText}`…）。
+  //    判据在 `packages/widget-core/tests/adaptive-card.spec.ts`："模板里不许出现汉字"。
+  'widget.placeholder.openApp': '打开 Heyta 以显示小组件',
+  'widget.today.title': '今日任务',
+  'widget.today.count': '{count} 项',
+  'widget.today.empty': '今天没有任务',
+  'widget.quadrant.title': '四象限',
+  'widget.quadrant.slotHeading': '{label}（{count} 项）',
+  'widget.quadrant.hint1': '立即做',
+  'widget.quadrant.hint2': '计划做',
+  'widget.quadrant.hint3': '委托或快速处理',
+  'widget.quadrant.hint4': '减少或删除',
+  'widget.habits.title': '习惯',
+  'widget.habits.empty': '还没有习惯',
+  'widget.habits.doneToday': '今天已完成',
+  'widget.focus.title': '专注',
+  'widget.focus.stale': '数据已过期，打开 Heyta 刷新',
+  'widget.focus.idle': '没有进行中的专注',
+  'widget.focus.target': '目标 {duration}',
+  'widget.focus.minutes': '{minutes} 分钟',
+  // 小组件在系统面板/安装列表里露出的那一句（manifest 的 `description`）。
+  'widget.card.desc.today': '今天要做的事，点一下就能完成',
+  'widget.card.desc.quadrant': '按重要与紧急分组的任务',
+  'widget.card.desc.habits': '今天的习惯与连续天数',
+  'widget.card.desc.focus': '正在进行的专注会话',
+
   // ── Windows 小组件的后台刷新（Web Push）────────────────────────────
   // ⚠️ 这些词条只在**能力真的可用**时才会被画出来（`probeWidgetPush`）。
   //    http:// 上、没配 VAPID 的自托管实例上，整个面板都不画 ——
@@ -653,6 +694,25 @@ export const zhCN = {
   'web.widgetPush.status.disabled': '这台服务器没有配置 Web Push，小组件只会在打开 Heyta 时刷新。',
   'web.widgetPush.status.failed': '开启失败：{reason}',
   'web.widgetPush.status.failedOff': '关闭失败：{reason}',
+  // 🔴 下面这组是**原因码**，不是"开启失败"后面那半句的拼接素材 ——
+  //    `apps/web/src/pwa/push-subscribe.ts` 只产出码，句子住在这里。
+  //    新增一个码必须同时补两份词条，否则 `PUSH_REASON_MESSAGE_KEY`
+  //    那份穷尽 Record 编译不过。
+  'web.widgetPush.reason.insecureContext': '当前页面不是安全连接，请用 https 或本机地址打开。',
+  'web.widgetPush.reason.noServiceWorker': '这个浏览器不支持后台推送。',
+  'web.widgetPush.reason.noNotificationApi': '这个浏览器没有通知能力。',
+  'web.widgetPush.reason.permissionDenied': '浏览器已拒绝通知权限。',
+  'web.widgetPush.reason.serverNotConfigured': '这台服务器没有开启推送服务。',
+  'web.widgetPush.reason.needsLogin': '需要先登录。',
+  'web.widgetPush.reason.pushKeyHttp': '向服务器索取推送凭据失败（服务器返回 {status}）。',
+  'web.widgetPush.reason.pushKeyMalformed': '服务器给的推送凭据格式不对。',
+  'web.widgetPush.reason.pushKeyLength': '服务器给的推送凭据长度不对（应为 65 字节，收到 {length}）。',
+  'web.widgetPush.reason.noSubscription': '浏览器没有完成订阅。',
+  'web.widgetPush.reason.incompleteSubscription': '浏览器返回的订阅信息不完整。',
+  'web.widgetPush.reason.registerHttp': '服务器没有收下这条订阅（服务器返回 {status}）。',
+  'web.widgetPush.reason.unregisterHttp': '服务器没有注销这条订阅（服务器返回 {status}）。',
+  'web.widgetPush.reason.probeHttp': '没能问出这台服务器开没开推送（服务器返回 {status}）。',
+  'web.widgetPush.reason.unexpected': '出了没预料到的问题：{detail}',
   'web.widgetPush.note.privacy': '推送内容只有一句“有更新了”，不含你的任何任务内容 —— 服务端没有你的密钥，解密只在这台设备上发生。',
   'web.widgetPush.note.windowsOnly': '这个开关只影响 Windows 上的小组件。手机端的小组件由系统自己按计划刷新。',
   'web.passkeys.error.add': '没能添加这条通行密钥，请重试。',
