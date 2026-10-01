@@ -75,6 +75,12 @@ const CONFIG = loadConfig();
 (globalThis as unknown as { IDBKeyRange: typeof IDBKeyRange }).IDBKeyRange = IDBKeyRange;
 
 const { App } = await import('../src/App.js');
+// 🔴 用**线上同一个**语言壳（`main.tsx` 也用它）。`LanguageSwitcher` 要求
+// `LocalePreferenceProvider`，裸挂 `<App />` 会在 render 里直接抛
+// 「useLocalePreference 必须在 <LocalePreferenceProvider> 内使用」；
+// 而自己在这里拼一遍 `I18nProvider` + `LocalePreferenceProvider` 就是
+// `locale-host.tsx` 文件头点名反对的"第二份接线"。
+const { LocaleHost } = await import('../src/lib/locale-host.js');
 
 let root: Root | undefined;
 let container: HTMLDivElement | undefined;
@@ -141,9 +147,27 @@ const byText = (tag: string, text: string): Element | null =>
   [...(container?.querySelectorAll(tag) ?? [])].find((e) => e.textContent?.trim() === text) ??
   null;
 
-/** 切到某个视图（顶部 tab）。 */
+/** 切到某个视图（rail 里那组 `role="tab"`）。 */
 function switchView(label: string): void {
   click(byText('button[role="tab"]', label));
+}
+
+/**
+ * 打开设置页。
+ *
+ * 🔴 它**不能**用 `switchView('设置')`：2026-09-30 起「设置」不是 rail 上的
+ * tab，而是**头像菜单里的一个动作**（`App.tsx` 里那段"把一个动作塞进 tablist
+ * 会让屏幕阅读器把它念成另一个视图"）。原来那行点的是一个**根本不存在**的
+ * tab，`click()` 静默空转，界面停在任务页，后面每一步都在点空气。
+ * 这条用例从来没红过，因为整块只在
+ * `/tmp/heyta-ai-live/provider.json` 存在时才跑（缺文件 = 静默跳过）——
+ * 一个永远不执行的判据，比没有判据更糟。
+ */
+async function openSettings(): Promise<void> {
+  click(byTestId('account-menu-avatar'));
+  await flush();
+  click(byTestId('account-menu-settings'));
+  await flush();
 }
 
 /**
@@ -216,7 +240,11 @@ describe.skipIf(CONFIG === undefined)('真实用户旅程：AI 记忆从头到�
     document.body.appendChild(container);
     root = createRoot(container);
     await act(async () => {
-      root?.render(<App />);
+      root?.render(
+        <LocaleHost>
+          <App />
+        </LocaleHost>,
+      );
     });
     await flush();
   }
@@ -226,8 +254,7 @@ describe.skipIf(CONFIG === undefined)('真实用户旅程：AI 记忆从头到�
    * **全部点真界面**，没有一处写 localStorage 抄近路。
    */
   async function configureAiThroughUi(): Promise<void> {
-    switchView('设置');
-    await flush();
+    await openSettings();
 
     click(bySelector('#ai-enabled'));
     click(bySelector('#ai-allow-remote'));
@@ -367,7 +394,7 @@ describe.skipIf(CONFIG === undefined)('真实用户旅程：AI 记忆从头到�
       });
 
       // ══ 8. 偏好必须可见（M6 的验收判据）═════════════════════════════
-      switchView('设置');
+      await openSettings();
       await waitFor('记忆面板出现', () => byTestId('memory-panel') !== null);
       await waitFor('推断出偏好', () => byTestId('memory-known') !== null);
       expect(byTestId('memory-panel'), '记忆面板应该出现').not.toBeNull();
@@ -402,7 +429,7 @@ describe.skipIf(CONFIG === undefined)('真实用户旅程：AI 记忆从头到�
       __resetOpLogForTests();
       await initOpLog(); // 从 IndexedDB 真重建
       await mountApp();
-      switchView('设置');
+      await openSettings();
       await flush();
 
       expect(
