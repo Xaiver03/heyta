@@ -185,19 +185,6 @@ export {
 } from './inbox.js';
 
 /**
- * 注册勾选框旁边的条款链接。理由与 `hosted-auth.ts` 同源：**"哪份文本适用于
- * 这个服务端"是协议知识，不是界面知识**，四个壳各写一遍必然漂移
- * （AGENTS.md §3.5）。裁决见 `docs/plans/legal-compliance-before-filing.md` 链 2 与 D-09。
- */
-export {
-  LEGAL_SITE_PATHS,
-  OFFICIAL_SITE_ORIGIN,
-  OPERATOR_LEGAL_PATHS,
-  resolveLegalLinks,
-  type LegalLinks,
-} from './legal-links.js';
-
-/**
  * 服务端认证客户端。**所有宿主共用这一份** —— 见 `hosted-auth.ts` 文件头：
  * 服务端早就有完整认证，而此前**没有任何客户端调用它**（用户只能在同步设置里
  * 手填令牌，没人告诉他令牌从哪来）。
