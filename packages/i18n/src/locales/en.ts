@@ -507,7 +507,29 @@ export const en = {
   'web.auth.open': 'Sign in or register to get a token',
   'web.auth.tokenHint': 'Access tokens are issued by the server. Sign in or register with the button above and the token is filled in automatically; if you already have one, paste it directly.',
   'web.auth.empty.title': 'No credentials yet',
-  'web.auth.empty.body': 'Syncing needs an access token issued by the server. Sign in or register with your email to get one - the token is written into the sync settings below.',
+  'web.auth.empty.body': 'Syncing needs an access token issued by the server. Register or sign in with your email to get one - syncing picks it up automatically.',
+  // ── Journey restructure (2026-10-01) ──
+  // 🔴 The panel used to show six parallel buttons, so a first-time visitor could not tell
+  // which path was the main one - and the first required field was the **server address**,
+  // i.e. "do you know your own sync domain?" became a precondition for registering.
+  // There is now one primary button (register); signing in is a footnote under it, and the
+  // passkey group is demoted to text links.
+  // ⚠️ The demotion is only visual: none of those actions left the DOM, so keyboard and
+  // screen readers still reach every one of them.
+  'web.auth.switchToSignin': 'Already have an account?',
+  'web.auth.passkey.group': 'Or use a passkey',
+  // 「Advanced」holds the three things only people who already know what they want need:
+  // the server address, pasting a link/token, and the recovery fallback. Collapsed by
+  // default - collapsed is not hidden: it stays in the DOM for screen readers and find-in-page.
+  'web.auth.advanced': 'Advanced',
+  // Without this line a prefilled address field still reads like "check this for me".
+  'web.auth.server.prefilled': 'The server address is already filled in from where this app is served - you don\'t have to type it. Self-hosters can change it here.',
+  // The field's own label and placeholder inside "Advanced" (self-hosters must be able
+  // to see exactly what they are editing).
+  'web.auth.server.label': 'Server address',
+  'web.auth.server.placeholder': 'https://sync.example.com',
+  // Transparency: which server an auth call actually goes to must be visible.
+  'web.auth.server.at': 'This will contact {baseUrl}',
   'web.auth.invite.label': 'Invite code (optional)',
   'web.auth.invite.placeholder': 'Invite code from a friend',
   'web.auth.invite.invalid': 'Invite codes are {length} letters or digits. Please check yours.',
@@ -524,8 +546,15 @@ export const en = {
   'web.auth.paste.label': 'Or paste a login link / token',
   'web.auth.paste.placeholder': 'Paste the link from your email, or the token itself',
   'web.auth.verify': 'Finish signing in',
-  'web.auth.sent.login': 'If an account with that email exists, a login link is on its way. Open the link in the email, or paste it into the field above.',
-  'web.auth.sent.register': 'Registration submitted. Check your email and open the verification link; come back here to sign in once verified.',
+  // 🔴 Both lines follow the **mechanism** (changed 2026-10-01): the link in the email brings
+  // you straight back to the app, **already signed in** (`/verify-email` → confirm page →
+  // `/app/#sessionToken=…`, ADR-0039 §2.2). The old wording taught a path that no longer
+  // exists - and that path was exactly the complaint about re-pasting a token.
+  // Pasting stays as a fallback inside "Advanced".
+  // ⚠️ Neither line may assert "this email exists" or "your account was created"
+  // (the server answers neutrally to prevent email enumeration).
+  'web.auth.sent.login': 'If an account with that email exists, a login link is on its way. Open it and you land back here signed in; no email at hand? Paste the link under “Advanced”.',
+  'web.auth.sent.register': 'Registration submitted. Open the verification link in your email - when it lands back here, you will already be signed in.',
   'web.auth.sent.recovery': 'If an account with that email exists, a recovery link has been sent. Open it to register a new passkey for this account (this replaces the old one).',
   'web.auth.signedIn.title': 'Signed in',
   'web.auth.signedIn.body': 'The token has been written into the sync settings ({email}). Set the end-to-end encryption passphrase and syncing can start.',
