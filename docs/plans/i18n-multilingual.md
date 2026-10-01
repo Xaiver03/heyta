@@ -69,11 +69,28 @@
 
 | | 落地页 `apps/landing` | 应用 `apps/web` / `apps/mobile` |
 |---|---|---|
-| 来源 | **URL 路径**：`/` = 中文，`/en/` = 英文 | **运行时偏好** |
+| 来源 | **URL 路径**：`/` = 中文，`/en/` = 英文 | **运行时偏好**（四层解析链，见下） |
 | 为什么 | SEO 是这一版存在的理由：两个地址才能分别被收录，也才能被分享给指定语言的用户 | 应用在登录/本地存储后面，没有 SEO 需求；`apps/web` 也没有路由，用 URL 表达语言会凭空引入一套路由 |
-| 具体做法 | 两个静态 HTML 入口（`index.html` / `en/index.html`），共用同一个 JS bundle；`src/lib/locale.ts` 从 `location.pathname` 判定 | `apps/web`：`localStorage`，与 `src/lib/theme.ts` 同一套「用户已选 > 系统偏好」；`apps/mobile`：设备语言 + **仅内存**的手动覆盖 |
+| 具体做法 | 两个静态 HTML 入口（`index.html` / `en/index.html`），共用同一个 JS bundle；`src/lib/locale.ts` 从 `location.pathname` 判定 | `apps/web`：四层解析链（见下）；`apps/mobile`：设备语言 + **仅内存**的手动覆盖，登录会话内采纳账号语言 |
 
-**刻意不做 `Accept-Language` 自动跳转。** 理由：自动跳转会让"用户分享出去的 URL"和"接收者看到的语言"不一致，
+### 应用的语言解析链（2026-10-01 产品拍板）
+
+> 优先级与 W3C / MDN 的共识一致：**显式选择必须持久化且最高，自动检测只做首启回退，绝不清掉明确选择。**
+
+| 优先级 | 信号 | 说明 |
+|---|---|---|
+| 1 | 本机显式选择（`localStorage['heyta.locale']`） | 用户点过语言切换器。永远最高，登录与自动检测都不覆盖 |
+| 2 | 账号语言（`users.locale`，仅登录后） | 新设备首登、本机无显式选择时采纳；登录态下改语言同时写回账号 |
+| 3 | 系统语言（`navigator.language` / 设备语言） | 未登录首启。web 自 2026-10-01 起读 `navigator.language`（此前刻意不读，当日产品拍板推翻 —— 旧理由「换个浏览器被翻回」只成立于存储被忽略时，四层链下存储永远更高）。桌面壳的 WebView 该值反映系统语言，因此**不需要壳层 `?lang=` 透传** |
+| 4 | `zh-CN` 兜底 | 系统语言不受支持（如 `fr-FR`）时。**产品明确：兜底必须是中文** |
+
+`?lang=`（落地页交接）的位置：高于系统语言、低于已存偏好 —— 那是用户**刚在落地页读着**的语言。
+标签匹配统一走 `packages/i18n` 的 `matchLocale`（BCP 47 主语言前缀 + 逗号列表取首个可识别候选），
+web/mobile 共用一份（此前 mobile 的 `classifyLocale` 与将来 web 各写一份 = 第三次同形状漂移，先收掉）；
+server 的 Accept-Language 解析（带 q 值、多条目）是另一个函数、留在服务端，等第三种语言落地时再决定搬运方式。
+
+**落地页仍然刻意不做 `Accept-Language` 自动跳转**（范围只是落地页，不是应用 —— 应用的第 3 层是本地读
+`navigator.language`，不涉及服务端跳转）。理由：自动跳转会让"用户分享出去的 URL"和"接收者看到的语言"不一致，
 而且搜索引擎抓到的内容会依赖它自己发的头 —— 两边都变成不确定的。语言选择显式放在导航里（落地页）与设置里（应用）。
 
 ### 两个入口的 head 是被测试钉住的，不是靠自觉
@@ -174,15 +191,23 @@ aria-label={label}
 新增代码时不要把它当成"可以放中文的地方"。
 
 **门禁能失败**（`AGENTS.md` 的 §8 工作流第 3 条的硬要求）已用真实违规输入逐条验过 ——
-在一份 `/tmp` 的仓库副本里注入违规、跑门禁、看退出码与诊断，全程不动真实仓库：
+在一份 `/tmp` 的仓库副本里注入违规、跑门禁、看退出码与诊断，全程不动真实仓库。
+**用例的真身是脚本，不是这张表**（`node scripts/verify-i18n-failures.mjs gate` / `catalog` / `readiness`）；
+表里只留"红在哪条判据"，改判据时以脚本输出为准。
 
-| 注入的违规 | 退出码 | 门禁给出的诊断 |
+| 注入的违规 | 退出码 | 门禁给出的诊断（逐字取自当前实现） |
 |---|---|---|
 | 基线（不注入） | `0` | —— |
-| 已迁移应用里写 `aria-label="违规文案"` | `1` | `文案：违规文案` |
-| zh 词条写成纯英文 `Screens` | `1` | `中文词条里一个汉字都没有` · `改法：写成中文。确实是纯拉丁词的（如品牌名），加进 ZH_LATIN_OK 并说明理由。` |
-| en 词条写成中文 `界面` | `1` | `英文词条里出现了汉字 —— 很可能是把中文复制过来当英文` |
-| 从 en 删掉一条（漏翻译） | `1` | `中文词条表里有这条，英文表里没有 —— 漏翻译` · `改法：在 en.ts 补上 '<key>'。` |
+| 已迁移应用里写 `aria-label="违规文案"` | `1` | 规则 1：字面量没走 `t()` |
+| `migratedFiles` 里放一个不存在的路径 | `1` | 路径不存在 —— **拒绝运行**，而不是"找不到就当合规" |
+| zh 词条写成纯英文 | `1` | `zh-CN 词条里没有汉字 —— 很可能是拿别的语言占位` · `改法：写成 zh-CN。确实是逐字不许翻译的（品牌名/平台名/命令），加进 UNTRANSLATABLE_KEYS 并说明理由。` |
+| en 词条写成中文 | `1` | `en 词条里出现了汉字 —— 很可能是把中文复制过来当 en` |
+| 从 en 删掉一条（漏翻译） | `1` | `zh-CN 词条表里有这条，en 表里没有 —— 漏翻译` · `改法：在 en.ts 补上 '<key>'。` |
+
+> ⚠️ 这张表**更新过一次，而且必须更新**：规则 2/3 原来是单语言写法（`ZH_LATIN_OK`、"中文词条里一个汉字都没有"），
+> 2026-10-01 按 locale 泛化后，白名单改名 `UNTRANSLATABLE_KEYS`、诊断文案由 `rules.scriptName` 生成。
+> **文档抄门禁的措辞就会过期** —— 所以每条诊断都由脚本断言（`expectRedFor(name, needle, …)` 里的 `needle`
+> 就是诊断子串；改了文案而没改用例，注入验证会红）。
 
 四条规则各自给出**可操作**的诊断，而不是一句"不合规" —— 这一点很重要：
 门禁红了以后要能直接照着改，否则下一个人会去猜或被逼着读门禁源码。
@@ -208,6 +233,44 @@ aria-label={label}
 细节与两处刻意的措辞偏离见 §7.1。
 
 ---
+
+---
+
+### 7.14 双语这条线的四条**验证边界**（第 19 轮：账号语言 + 日/韩就绪）
+
+这四条都是"事情做了、但判据覆盖不到那一角"，写下来是为了让下一个人不必重新发现，
+也为了**别把它们读成已验证**。
+
+1. 🔴 **jsdom 探针把 `navigator.language` 钉死成 zh-CN ⇒ 英文界面的渲染行为在单测层不可观测。**
+   `apps/web/tests/setup.ts` 这么做是为了保住迁移前那批「无偏好 ⇒ 中文」的用例
+   （第 3 层一上线，那批用例默认就会拿到 en）。代价是：**web 的单测里永远模拟不出
+   "英文浏览器首启"**。目前英文界面的真实渲染证据只有两类 ——
+   词条表门禁（zh/en 逐 key 对齐）+ 本轮一次性真浏览器 Playwright 实测
+   （zh-CN 首启中文 / **en-US 首启英文** / 点 English 后侧栏、`localStorage`、`<html lang>`、
+   当前语言 chip 的主蓝边框全部换过去；截图人看过）。
+   ⚠️ **那轮浏览器验证不是常驻门禁**，跑完就没了。
+   要把它变成常驻的，正确做法是加一条**显式设 `navigator.language`** 的
+   Playwright 用例（`newContext({ locale: 'en-US' })`），而不是去解 `setup.ts` 的钉 ——
+   解钉会让几十条与语言无关的用例集体变红，那是假信号。**登记为缺口，未做。**
+2. **切换器"从 LOCALES 派生"≠"硬编码两种"这一条无法在本工作树内证明。**
+   唯一的变异是把 `ja` 真加进 `packages/i18n/src/types.ts` 的 `LOCALES` 并重建 dist，
+   看 `readiness` / `language-switcher` / `gen-server-copy` 是否按预期反应 ——
+   而这是**多条会话共用的工作树**，改共享词条源会让别人的批次一起红。
+   已做的替代：`language-switcher.spec.tsx` 直接断言节点集合 = `LOCALES.map(...)`
+   （变异 `LOCALES.slice(0,1)` ⇒ 精确 6 条红），以及 `LOCALE_LABEL_KEY` 的
+   `satisfies Record<Locale, MessageKey>` —— **加语言漏登记自称是编译错误**。
+   剩下那一半（真加一种语言）留到真要加的那天验。
+3. **「英文界面跑捕获 → 模型输出英文」这条判据本机不可执行**：需要真 provider 配置，
+   这台机器上 `/tmp/heyta-ai-live` 没有凭据。命令记在 §10 第 7 条
+   （`HEYTA_AI_LOCALE=en pnpm verify:ai-breakdown-live`）。
+   本轮对提示词语言的证据是**28 条单测 + 三处变异**，即"指令段确实带上了界面语言、
+   传错会红"，**不是**"模型真的用英文输出"。
+4. **账号语言 → 英文邮件的端到端没有实跑**（要真发信）。服务端判据是单元级的
+   （解析优先级 `body > 账号 > Accept-Language > zh-CN`，18 条 i18n + server 9/9）。
+   同批还有三条 landing 测试红灯，归因于**并行会话的文档中心改造**
+   （`locale.spec.ts` 的 help→docs 路径、`public-copy-register` 里泄漏的中英贡献者文案，
+   落在他们未完成的 `site/docs.ts` / 词条表改动里），**不是**本轮改动造成的 ——
+   本轮碰到的落地页面（`mockup-fidelity.spec.tsx`）8/8 绿。
 
 ### 7.13 价格是唯一一个「词条表之外还有事实源」的文案（第 17 轮）
 
@@ -406,6 +469,12 @@ node scripts/check-pricing-consistency.mjs
      `document.documentElement.lang`、整树卸载重挂后仍是英文。
    - 注入验证过：把 `setLocale(next)` 改成 `setLocale(locale)`（点了没反应）→ 2 条红；
      只掐掉落盘副作用 → 另外 2 条红（说明持久化断言**独立于**可见文案断言，不是抄了一遍）。
+   🔴 **2026-10-01 形态变更（上面"按钮文字是目标语言的自称"那句随之过期）**：二态 toggle
+   换成 `LOCALES` 派生的**一排 `.ht-chip`**（每个语言一枚，当前那枚 `--on` + `aria-current`），
+   自称 key 登记进 `LOCALE_LABEL_KEY`（加语言漏登记 = 编译错误），点当前语言不写不回传；
+   用例 **6 条 → 8 条**，新增的那条直接断言节点集合 = `LOCALES.map(...)`
+   （变异 `LOCALES.slice(0,1)` ⇒ 精确 6 条红）。落地页复刻改用同一份 `LOCALES`/`LOCALE_LABEL_KEY`。
+   细节与"派生 ≠ 硬编码两种这一条没在本工作树证明"的边界见 §7.14 与 §10 的日/韩清单。
 9. **`packages/sync-client` 的 `describeConflictPayload` 仍是中文，且会吐出内部标识符。**
    它返回一句中文（空载荷 `（空）`），其中一支还会把载荷的**字段名**拼进去（`completedAt: 123`）。
    现在加了一个结构化兄弟函数 `summarizeConflictPayload(payload)` →
@@ -425,6 +494,7 @@ node scripts/check-pricing-consistency.mjs
     | `packages/app-host/src/**` | 165 | **大部分是模型提示词**（`ai-capture` 37 + `ai-prioritize` 37 + `ai-duration` 33 = 107 处里绝大多数）。判据只有一条：**这条字符串会不会被渲染** |
     | `packages/ai/src/**` | 63 | 披露(已结构化)、17 个 `reason` 码的**中文兜底句**、`presets.ts` 的端点 label/note、`health-store`(已结构化) |
     | `packages/sync-client/src/**` | 20 | 同步错误句（`未登录`、`未设置端到端加密口令…`），会流进两个壳的错误条 |
+    | `packages/widget-core/src/**` | ~47（15 真文案 + 32 诊断） | 🔴 **真界面文案**：`adaptive-card.ts` 的 **Windows 组件模板整面单语中文**（无任何语言分支，模板落盘 `apps/web/public/widgets/*.json`）；`contract.ts` 的 32 处是 fail-close 解析诊断，不渲染。**2026-10-01 深度审计才发现这张表漏了它** —— 四平台组件里唯一整面单语的面（iOS/Android/鸿蒙组件都已双语） |
     | `packages/storage/src/**` | 27 | 🔴 **会在启动失败路径上渲染**（见下表后面的「门禁扫不到的一类通道」）：`indexeddb-adapter.ts` 的 8 条是真实用户场景（升级被别的标签页阻塞、隐私模式、配额满），`memory`/`sqlite` 适配器那些「事务访问了未定义的 store」是**编程错误** |
     | `packages/op-log/src/**` | 12 | `engine.ts` 的 3 条是引擎抛出的诊断（写入失败、opId 冲突）；`state.ts` 的 9 条是给文档/内省用的说明文本，**不渲染** |
     | `packages/local-api/src/**` | 48 | 本地 API / MCP 的工具说明（`tools.ts` 20 + `mcp.ts` 15） |
@@ -739,11 +809,17 @@ pnpm --filter @heyta/i18n build
 （同一件事还有第二个后果：`/tmp` 里那批 headless Chrome 脚本也一起没了，
 所以"线上验过 WebGL 降级"这件事同样只剩结论、没有脚本。）
 
-**已经固化的是十四组（91 个用例）**（2026-09-27 实测 `node scripts/verify-i18n-failures.mjs` 的输出行：
-`🔴 1/91 个用例不符合预期` —— 见下面的 🔴 说明）：
+**已经固化的是十七组**（第十四组起是 2026-10-01 这一轮加的）：
+`gate`/`catalog`/…/`coupon` 那十四组共 **91 个用例**（2026-09-27 实测输出行
+`🔴 1/91 个用例不符合预期` —— 见下面的 🔴 说明），本轮新增三组 **23 个用例**
+（`diag` 6 + `e2eecopy` 5 + `readiness` 12），三组各自跑过、条条符合预期。
+⚠️ **114 这个总数没有一次全量跑过**，它是分组计数相加 —— 而且**故意没跑**：
+`gate` / `e2eecopy` 这几组注入的是 `packages/i18n/src/locales/zh-CN.ts` 这类
+**别的批次正在改的文件**（脚本文件头就写了这条告警），在共用工作树上跑全量
+等于在别人改到一半时反复覆写它们。要跑全量请在干净检出上跑。
 
 ```bash
-node scripts/verify-i18n-failures.mjs             # 全部 14 组
+node scripts/verify-i18n-failures.mjs             # 全部 17 组（⚠️ 见上：只在干净检出上跑）
 node research/tools/audit-cjk-strings.mjs         # 跨包中文清单（不是门禁，是排批次的依据）
 node scripts/verify-i18n-failures.mjs gate        # 只跑一组
 node scripts/verify-i18n-failures.mjs disclosure  # AI 披露 + 熔断状态的结构层面守卫
@@ -784,6 +860,9 @@ node scripts/verify-i18n-failures.mjs coupon     # 券的算术 / 判定 / 持�
 | `preference` | 7 | 领域投影与词条表**漂移**（同一个事实两份中文）、偏好名指错词条、把「逾期」说成「提前」（判据写反）、「还不了解」的原因指错偏好、`remaining` 忘了传进句子 |
 | `preset` | 2 | 预设的 id 写错 → 落进回退分支（跨包中文 / 裸 id 直接上屏） |
 | `aifailure` | 2 | 原因码指错词条 → 用户要做的动作（「去逐功能授权」）从界面消失 |
+| `diag` | 6 | 🔴 **把原因码退回整句中文**（web 推送 17 条 + 移动端粘贴失败）、模板字面量里拼中文句子、同样的句子写进 `detail` 字段（换个字段名绕过门禁 —— 规则 5「诊断字段不许装句子」就是为它加的）。含两条正向对照（还原后必须回绿） |
+| `e2eecopy` | 5 | 披露文案 zh 去掉否定（「不受端到端加密保护」→「受端到端加密保护」，**这是法务级错误**）、en 的 key 改名、**把 en 从 `E2EE_COPY_RULES` 里拿掉**（新语言必须登记，不能静默不查） |
+| `readiness` | 12 | 🔴 整组跑在 **`/tmp` 隔离副本**上，真实工作区一个字都不动（这是唯一能在共用工作树上跑的一组）。加一门语言但没登记文字系统判据、加了 `LOCALES` 却没有 `locales/xx.ts`、`locales/` 下躺着没启用的表、**ja 用英文占位**、**ja 全是 CJK 标点/全角（假名判据 ≠ CJK 判据）**、ko 同理、**白名单不是整族放行**、从 `LOCALE_SCRIPT_RULES` 拿掉 ja、**把 `LOCALES` 改名 ⇒ 门禁够不着时必须响亮失败而不给绿**；含三条正向对照 |
 | `landing` | 6 | 英文入口的 `lang`/`canonical` 写回中文、hreflang 少一件、英文页顶着中文标题 |
 | `scene` | 5 | 错误边界不再进入失败态（**白屏复发**）、降级时把整节丢掉、渲染器构造失败后不降级 |
 | `pricing` | 16 | 🔴 价目表与页面不一致（用户看到的价格≠实收）、法务文本**另一处**被改（文档里仍留着一个正确数字 —— 这条正是「扫全量金额」的理由）、`pricing-ssot` 块自己被动过、**偷偷加第二个 SKU**、以及锚点失效时必须报错而不是静默通过 |
@@ -1012,13 +1091,17 @@ case 'ollama': return t('common.ai.preset.ollama.label');
 
 ---
 
-## 十、下一步（按优先级）
+## 十、下一步（按优先级，2026-10-01 定稿）
+
+产品当日拍板三件事：① 应用语言四层解析链（§3，本节第 4 条落地）；
+② 日语/韩语在路线上 —— 做「就绪准备」、不提前翻译（清单见本节末）；
+③ locale 不进 op-log，UI 偏好不做跨设备同步（账号语言已覆盖邮件与登录场景）。
 
 1. ✅ **web AI 批已完成（第 10 轮起，随整根迁移在第 16 轮收口）**：`features/ai/*`（4 面板 + `RouteUnavailable`）、
    `features/settings/AiSettings.tsx`、`features/capture/**`、`features/settings/MemoryPanel.tsx`、
    `aiStore.ts` 那句浏览器密钥提示（已进词条表 `web.ai.settings.keyNotice`，
    渲染点 `AiSettings.tsx:1057`）全部迁完；`apps/web/src` 现在是整根 `migrated: true`（§7.12）。
-   ⚠️ 但仍然**不能说"web 已支持双语"** —— 原因不是"没迁完"，而是下面第 3 条那三处跨包中文。
+   ⚠️ 但仍然**不能说"web 已支持双语"** —— 剩余原因见第 6 条（两处「中文当插值参数」）与第 7 条（AI 提示词语言）。
 2. ✅ **"变量渲染"通道已修完**（§7.10 的「门禁扫不到的一类通道」；最后一条 —— 四个面板的失败态 —— 第 18 轮修完）：
    - 四个面板的 `outcome.message`：第 18 轮由 app-host 把 `cause: AiFailureReason` 带出来
      （`packages/app-host/src/ai-breakdown.ts:248` / `ai-capture.ts:477` / `ai-duration.ts:383` /
@@ -1026,13 +1109,14 @@ case 'ollama': return t('common.ai.preset.ollama.label');
      `message` 降级成 `<details>` 技术详情。
    - ⚠️ 这条通道留下的纪律（修新通道时照做）：**主文案归词条，技术串只做参数或"详情"**，
      别把技术串提成主文案。
-3. 🔴 **唯一还开着的一类"英文界面里会出现中文"：web 直接渲染 `packages/domain` 的中文格式化函数。**
-   `packages/domain` 本身**尚未改造**（§7.1），而 web 仍有三个调用点：
-   - `apps/web/src/features/tasks/DueBadge.tsx:68` —— `formatRemaining(countdown.remainingDays)`；
-   - `apps/web/src/features/capture/CaptureComposer.tsx:192` —— 该处注释自己写着
-     `formatRemainingUntil()` 仍返回中文；`…:197` 把它拼进 `dateWithRemaining()`；
-   - `apps/web/src/features/focus/FocusTimer.tsx:128` —— `formatDuration(remaining)`。
-   处置方式与移动端同一套（§7.1：**语义留 domain，措辞搬壳里**），不要另起一套。
+3. ✅ **web 渲染 `packages/domain` 中文格式化函数的通道已闭合**（2026-10-01 逐点核实 ——
+   此前这条一直是本清单唯一标红项，别再照它派活）：
+   - `DueBadge.tsx:61` 走 `dueText(task, mode, now, t)`（`:40-45` 有显式禁用 `formatRemaining` 的注释）；
+   - `CaptureComposer.tsx:135-141` 走共享层 `captureChipRemainingDays` + `remainingText(days, t)`；
+   - `FocusTimer` 的文案全部由 `@heyta/ui` 的 `FocusPanel` 以 `t()` 注入。
+   `formatRemaining` / `formatRemainingUntil` / `formatFocusDuration` / `formatMonthTitle` /
+   `formatDayTitle` / `WEEKDAY_LABELS` / `describeRecurrence` 的**生产调用方为零**
+   （仅剩 domain 内部互调，与 `ai-capture.ts:62,159` 拼 AI 提示词的 `周X`）。
 
    ⚠️ **其余跨包中文不是"还没迁"，别照老清单去做**：`packages/ai/src/routing.ts`(34) /
    `provider.ts`(11) 那批**已按 §9 的设计降级为兜底句**（壳按 `reason` 取词条）；
@@ -1041,16 +1125,125 @@ case 'ollama': return t('common.ai.preset.ollama.label');
    现在返回结构化原因（`packages/app-host/src/host.ts:279`，`reason: 'not-configured'`，不再是一句中文）；
    `packages/domain/src/preferences.ts` 那 31 处中文**已经不在了**（第 14/15 轮改成
    `preference-evidence.ts`(17) / `preference-hints.ts`(14) 两份**刻意的中文投影** + 词条表）。
-   📋 出清单用 `node research/tools/audit-cjk-strings.mjs`（2026-09-27 实测：`packages/domain/src/**`
-   仍是最大的一块，其次是 `packages/app-host/src/ai-*.ts`）。判据仍然只有一条：
+   📋 出清单用 `node research/tools/audit-cjk-strings.mjs`。判据仍然只有一条：
    **这条字符串会不会被渲染** —— `ai-*.ts` 里绝大多数是模型提示词，**不要翻**。
-4. ✅ **落地页用新词条表重新发布**（第 17 轮做完）——
+4. ✅ **语言解析链落地**（§3，2026-10-01 拍板；`0aa6cb0e` P1-1 + `0d13984b` P1-2）。
+   `matchLocale` 进 `packages/i18n`（消灭 web/mobile 两份标签归一实现）、web `resolveInitialLocale`
+   加 `navigator.language` 第 3 层、mobile `classifyLocale` 收编为 `matchLocale`、
+   解析链测试翻转（`tests/setup.ts` 把 jsdom 的 `navigator.language` 钉成 zh-CN，保住「无偏好 ⇒ 中文」）。
+   账号语言半边同期落地：`users.locale` **可选列** + 登录响应回传 + 本机无显式选择时采纳 +
+   登录态改语言写回账号（`pushLocaleToAccount`）+ `hosted-auth` 三个发信函数带 locale，
+   服务端解析 `body > 账号（按邮箱查）> Accept-Language > zh-CN`。
+   **判据实跑结果**（本轮，真浏览器 Playwright，截图人看过）：
+   zh-CN 浏览器首开 `/app` → 中文；**en-US 浏览器首开 → 英文**（第 3 层直接生效，无需登录）；
+   点「English」→ 侧栏 `Inbox` + `localStorage['heyta.locale']=en` + `<html lang>=en` + 当前语言 chip 换成主蓝边框；
+   显式选择重开仍在（第 1 层高于第 3 层）。账号语言那半边是**服务端单元判据**（18 条 i18n + server 9/9），
+   ⚠️ **端到端"中文浏览器 + 应用切英文 + 魔法登录 → 英文邮件"这条没有实跑**（要真发信），登记为未核实。
+5. ✅ **widget-core 收编**（§7.10；`75b0a07b`）。`adaptive-card.ts` 的模板字符串进 `widget.*` 词条，
+   `apps/web/public/widgets/*.json` 改成**生成物** + `pnpm check:widgets`（`scripts/check-widgets.mjs --check`
+   逐字节对账，照 server-copy 模式）；鸿蒙 `WidgetModels.ts` 的 `QUADRANT_LABELS_EN` 四条补齐，
+   并由 `tests/harmony-widget.spec.ts` 与词条表 `web.shell.nav.q1`–`q4` **逐字对照钉住**
+   —— 之前英文设备上四个象限名是整卡片唯一没翻译的一处。
+   顺带找回一条我自己上一条提交留下的红灯（`39283aaf`：pwa 缓存判据的假记录缺 `placeholder`）。
+6. ✅ **「中文当插值参数」残余 ×2**（§7.10 修了七次的那条通道的尾巴；`75b0a07b` 推送半边 + `c1065e53` 专注半边）：
+   `apps/web/src/pwa/push-subscribe.ts` 的 17 条中文 `reason` 与
+   `packages/app-host/src/focus-actions.ts` 的中文校验异常都改成**结构化 reason 码**，
+   壳层穷尽 `Record<Reason, MessageKey>`（编译期拦新增原因码漏配词条）。
+   同批给门禁加了**规则 5「诊断字段不许装句子」**（`diagnostic: true`），并用
+   `verify-i18n-failures.mjs` 的 `diag` 组证明它真的会红（`20afed13`）—— 这条通道的**上游**从此也有门禁。
+7. ✅ **AI 提示词按界面语言**（`87924f75`）。四个 `app-host/src/ai-*.ts` 的提示词加 locale 段
+   （`OUTPUT_LANGUAGE_DIRECTIVE`：用界面语言输出），否则英文用户确认后会把模型的中文标题/清单
+   **写进数据并同步**（`ai-breakdown` 的 `mergeChecklistIntoNote` 落备注，概率性通道）。
+   判据：28 条单测 + 三处变异（拿掉指令段 / 传错 locale / 只改一份提示词）各自精确报红。
+   🔴 **未跑通的那条**：「英文界面跑捕获 → 模型输出英文」需要真 provider 配置，
+   这台机器上 `/tmp/heyta-ai-live` 没有凭据 ⇒ 命令 `HEYTA_AI_LOCALE=en pnpm verify:ai-breakdown-live`
+   **本轮不可执行**，登记为缺口（不是"已验证"）。
+8. ✅ **`scripts/check-ai-coverage.mjs` 的中文钉子改按词条 key 查两份表**（`8ac9fe8d`）。
+   它原先钉的是一处**界面已经不再渲染**的字符串（第 9 节第 5 条的遗留），所以 en 披露不受保护；
+   现在按 key 同时查 zh/en 两张表。判据 `e2eecopy` 组 5/5，含"往 en 表塞回中文 / 删掉 en 那条"两种注入。
+
+### 日/韩就绪清单（准备、不提前翻译）
+
+> CLDR 实锤：**中、日、韩全部只有 `other` 一个复数类** —— 现有「调用方分支 + `…One` 成对词条」
+> 对 ja/ko 原样可用（成对词条实测仅 23 组）。**复数机制的触发条件 = 真出现有复数形态的语言**
+>（俄/德/波兰/阿拉伯），不是日韩。加第三种语言那天照这张清单走：
+
+- ✅ `types.ts` 的 `Locale` 联合加一项 —— `CATALOGS satisfies Record<Locale,…>` 让缺表直接编译不过
+  （设计好的 forcing function，**不加运行时 fallback**）；
+- ✅ **门禁规则按 locale 泛化**（本轮）：`scripts/check-ui-language.mjs` 的逐条规则换成
+  `LOCALE_SCRIPT_RULES`（`{ mustContain, forbidden }`）—— zh=必须含汉字；en=不许含 CJK/全角；
+  **ja=必须含假名**（防把中文原样交差 —— 真日语几乎必有假名）；ko=必须含谚文。
+  自称白名单从硬编码 `ZH_LATIN_OK` 改成 `UNTRANSLATABLE_KEYS` + **由 `common.lang.X` 词条派生**的
+  外来自称豁免（`endonymSuffixMap`）：加一种语言时它的自称自动被认，不需要再改门禁。
+  🔴 规则 6 是**单一事实源**检查：受门禁约束的文件清单 ↔ `LOCALES` ↔ `LOCALE_SCRIPT_RULES`
+  三者必须一一对应 —— 加 `ja` 忘了写规则，门禁红而不是静默放行。
+  未启用的语言不进规则表、只在门禁输出里印一行
+  `ℹ️ 已登记文字系统规则、尚未启用（准备好但先不做）：ja、ko`。
+  判据：`verify-i18n-failures.mjs` 的 `readiness` 组 **12 条**（/tmp 副本隔离，不动真实仓库），
+  含"塞规则但漏 locale""把 en 的 forbidden 拿掉""已迁移文件里写硬编码文案"等注入。
+- ✅ **web 切换器从二态 toggle 改 `LOCALES` 列表**（本轮）：`LanguageSwitcher.tsx` 渲染
+  `LOCALES.map(…)` 的一排 `.ht-chip`（复用既有 `.ht-chip--on`，零新增 CSS），语言名用**自称**词条
+  `common.lang.*`；自称 key 登记成 `LOCALE_LABEL_KEY`（`satisfies Record<Locale, MessageKey>`）
+  —— **加 `Locale` 忘了登记自称 = 编译错误**，这就是"准备好但先不做"的具体形状。
+  落地页复刻（`AppWindow.tsx`）用同一份 `LOCALES`/`LOCALE_LABEL_KEY`，不再自己列一份。
+  判据：`apps/web/tests/language-switcher.spec.tsx` 8 条，其中一条**直接断言节点集合 =
+  `LOCALES.map(...)`**（不是"有两个按钮"）；变异 `LOCALES.slice(0,1)` ⇒ 精确 6 条红。
+- ✅ **`gen-server-copy` 的 `SOURCES` 从 `LOCALES` 派生**（本轮）：脚本解析
+  `packages/i18n/src/types.ts` 里 `export const LOCALES` 的字面量数组（保持顺序），
+  解析不到就地**带原因抛出**（不是静默回落到双元组）。实跑生成物 diff 恰好 1 行
+  （`SERVER_LOCALES = ["zh-CN","en"]`），`pnpm check:server-copy` 绿、server `tsc --noEmit` 0。
+  ⚠️ **一条无法在本工作树内证明的变异**：真要证"派生 ≠ 硬编码 2"必须往共享 `types.ts` 加 `ja`
+  并重建 dist —— 这是并行会话共用的工作树，**没有做**，登记为未证明。
+- **落地页第三入口 checklist**（加 `ja` 那天照这五行做，缺一处就是"词条有 ja、站点没有 ja"）：
+  1. **前缀解析**：`apps/landing/src/site/paths.ts:153` 的 `localeFromPath` 现在是
+     `rest === '/en' || rest.startsWith('/en/') ? 'en' : DEFAULT_LOCALE` —— 语言前缀**写死了一个**。
+     改成按 `LOCALES` 查前缀表（`{ en: '/en', ja: '/ja' }`），未登记的前缀照旧回落 `DEFAULT_LOCALE`。
+     ⚠️ `src/lib/locale.ts` 只是它的 re-export（理由写在那个文件头），**别在那儿改**。
+     同一文件里 `stripLocalePrefix` 是 `pageFromPath` 的一环，前缀只剥一层这件事也得跟着改
+     —— 那条链上有过两个**静默**失败（只取第一段 / 没剥 `#hash`），改之前先读文件头。
+  2. **hreflang**：`scripts/gen-entries.mjs` + `scripts/entry-template.html` 现在写死三条
+     （`zh-CN` / `en` / `x-default`）。加语言要变成**每 locale 一条 + 一条 `x-default`**，
+     不能只追加 —— 组内有一条不一致搜索引擎会**整组忽略**，而忽略是静默的。
+  3. **判据**：`apps/landing/tests/seo-head.spec.ts` 的 `ENTRIES` 已经是从 `LOCALES` 派生的
+     （`:161`），所以新入口会被自动枚举；但 `:212` 断言的是字面量三元组
+     `['en','x-default','zh-CN']`、`:221-224` 逐条写死两种语言、`:234` 只做中英两两比较 ——
+     **这三处会当场红，是设计好的**（别为了让套件绿把它们改成宽松比较；要改成 `LOCALES` 遍历，
+     同时保留"三条以上也必须齐全"的强度）。
+  4. **入口产物**：`gen:entries` 按 `LOCALES` 多生成一个目录（`check:entries` 会逐字节比对提交物，
+     所以**必须重跑生成再提交**），`og-card{,-en}.png` 这类**每语言一张**的分享图要补 `ja` 那张，
+     `public/sitemap.xml` 同步加项。
+  5. **发布**：§8 尾部「发布方式」写的是**手工 rsync**（仓库里没有落地页部署脚本）——
+     新语言目录必须一起 rsync，否则线上是"词条有 ja、`/ja/` 404"。
+     ⚠️ 这几处文件**文档中心那轮正在动**（`site/paths.ts` / `site/pages.ts` / 帮助→文档），
+     动手前先确认它们不在别人的未完成改动里。
+- ✅ 正字法 `Record<Locale,…>`（`LIST_SEPARATOR` 等）加语言即编译错，已就位无需动作。
+
+### 明确不做（写下来防翻案）
+
+- **运行时逐条 fallback 链**：业界 `fallbackLng` 是给「部分翻译也上线」的库准备的；
+  我们的立场是编译期完整才上线（§2），加了它等于拆掉「漏翻译 = 编译错误」。
+- **复数机制**：见上，触发条件明确。
+- **locale 进 op-log / UI 偏好跨设备同步**：2026-10-01 拍板不做。
+- **壳层 `?lang=` 透传**：被 `navigator.language` 层取代（WebView 该值反映系统语言）。
+- **Geo-IP 判语言**：业界共识视为争议项，排除。
+
+### 这一轮之后仍然要守着的两条
+
+9. ✅ **落地页用新词条表重新发布**（第 17 轮做完）——
    发布方式与线上验收的判据见 §8 尾部的「发布方式」/「线上验收」。
-   ⚠️ 下一次发布前跑一次**完整**的注入验证（`node scripts/verify-i18n-failures.mjs`）。
+   ⚠️ 下一次发布前跑一次**完整**的注入验证（`node scripts/verify-i18n-failures.mjs`），
+   但**必须在干净检出上跑** —— `gate` / `e2eecopy` 那几组改的是 `zh-CN.ts` 这类
+   常有别的批次在改的文件（§8 的 🔴 说明）。
    2026-09-27 第一次跑全量：**91 个用例，1 条不符合预期** —— `coupon` 组的基线
    （原因见 §8，是探针复制清单缺 `server/scripts`，**不是**产品缺陷）。
    🔴 **它意味着那一组 8 条"必须变红"是空转的，别把这次结果当成全绿。**
-5. **交出去之前看一眼产物，不只是门禁**（§7.11 的教训）：`pnpm check` 现在多了一道
+10. **交出去之前看一眼产物，不只是门禁**（§7.11 的教训）：`pnpm check` 现在多了一道
    `check:mobile-bundle`（真的打 android + ios 两份 RN bundle 数 React 份数）。
    i18n 这条线里凡是"加了包 / 动了打包配置"的改动，都要顺带跑它 ——
    **绿色的门禁证明不了应用能启动**，而这道门禁本身也**被升级过一次**才真正有效。
+11. 🔴 **§7 #79「改完 i18n 必须重建 dist」现在管的不只是词条表**：本轮加的是**解析链用的导出**
+   （`LOCALE_LABEL_KEY`、`LOCALES`），而消费方（web / landing）解析到的是 `packages/i18n/dist` ——
+   所以**加导出后不重建，下一个 typecheck 就是在旧产物上报错**。
+   本轮流程：改 `packages/i18n/src` → `pnpm --filter @heyta/i18n build` → 才跑 landing typecheck（绿）。
+   ⚠️ 这一条**没有反证**（没有故意不重建去看它具体怎么红），是照 §7 #79 的既有纪律做的；
+   以后凡是动 `packages/i18n/src` 的**任何**导出（不只是词条），收尾都要带那次 build。
