@@ -32,15 +32,22 @@ import { create } from 'zustand';
 import {
   beginPasskeyLogin,
   beginPasskeyRegistration,
+  changePassword as changePasswordRequest,
   completePasskeyLogin,
   completePasskeyRegistration,
   extractAuthLinkToken,
+  loginWithEmailPassword,
   registerWithMagicLink,
+  registerWithEmailPassword,
   requestMagicLink,
+  requestPasswordReset,
   requestPasskeyRecovery,
+  resetPasswordWithToken,
   verifyMagicLink,
+  type HostedAuthFailure,
   type HostedAuthFailureReason,
   type HostedAuthSession,
+  type HostedPasswordPolicyCode,
 } from '@heyta/app-host';
 
 import { maybeHandOffToShell } from './desktop-handoff.js';
@@ -65,7 +72,17 @@ export type AuthBusyAction =
   | 'verify'
   | 'passkey-register'
   | 'passkey-login'
-  | 'recovery';
+  | 'recovery'
+  /**
+   * 口令这条路。四条各自是一个动作，**不是一个"正在处理"**：
+   * `password-sign-in` 失败可能是"口令错"（要指到口令那一格），
+   * `password-forgot` 成功是"信已发出"（不许说"已发送到你邮箱"那样肯定的话），
+   * `password-change` 成功会让**其余设备全部掉线**（那句话必须在点之前就看到）。
+   */
+  | 'password-sign-in'
+  | 'password-register'
+  | 'password-forgot'
+  | 'password-change';
 
 export type AuthStatus =
   /** 还没有凭据 —— 界面必须给出**明确的空状态**，而不是假装成功。 */
@@ -77,8 +94,40 @@ export type AuthStatus =
   | { kind: 'registered' }
   /** 找回通行密钥的邮件已发出（入口见 `requestRecovery`）。同样不断言邮箱存在。 */
   | { kind: 'recovery-sent' }
+  /**
+   * "重置口令"的邮件已发出（ADR-0040）。
+   *
+   * 🔴 服务端在**这个请求里**永远回 200 + 同一句中性文案，连异常也回 200 ——
+   * 状态码只要随"账号是否存在"变化，它就是一个邮箱存在性预言机。
+   * 所以这一句只能渲染成"如果我们认得这个邮箱，信已经发出去了"。
+   */
+  | { kind: 'reset-sent' }
   | { kind: 'signed-in'; email: string }
-  | { kind: 'failed'; reason: HostedAuthFailureReason };
+  /**
+   * 已登录改口令成功。
+   *
+   * 🔴 与 `signed-in` **分开**：改密的瞬间 `tokenVersion` 已 bump，
+   * 手上那枚旧令牌当场失效，而当前设备拿到的是**新会话**。
+   * 把它渲染成"已登录"会漏掉唯一需要告诉用户的那件事：别的设备要重新认证。
+   */
+  | { kind: 'password-changed'; email: string }
+  /**
+   * 失败。
+   *
+   * 🔴 `policyCode` / `retryAfterSeconds` **必须带出来**：
+   *   · `password-policy` 不带 `policyCode`，界面只能说"口令不合格"，
+   *     而用户要知道是哪一条（太短 / 太长 / 太常见 / 已泄露）——
+   *     那四条的**做法完全不同**（尤其"已泄露"意味着他别处也在用同一个）；
+   *   · `password-locked` 不带秒数，用户会对着一个不知道什么时候能再试的表单反复敲，
+   *     而那正是失败计数设计要避免的行为。
+   * 两者都是服务端给的，这里只搬运，**不自己判**（AGENTS.md §3.5）。
+   */
+  | {
+      kind: 'failed';
+      reason: HostedAuthFailureReason;
+      policyCode?: HostedPasswordPolicyCode;
+      retryAfterSeconds?: number;
+    };
 
 export interface AuthStoreState {
   status: AuthStatus;
@@ -162,6 +211,60 @@ export interface AuthStoreState {
    * 与登录链接一样，服务端用中性文案防邮箱枚举 ⇒ 成功也**不断言邮箱存在**。
    */
   requestRecovery: (baseUrl: string, email: string) => Promise<void>;
+  /**
+   * 用**邮箱 + 口令**登录（产出会话的第三条路）。
+   *
+   * 🔴 口令**原样**交出，不在这里 trim / normalize / 改大小写：
+   * 归一化只在服务端一处发生，客户端多算一次就是第二套规则，
+   * 表现是"同一句口令在两台设备上字节不同"（四端各一套归一化 = 四套账号系统）。
+   *
+   * 成功走**同一个** `applyAuthSession`。
+   */
+  signInWithPassword: (
+    baseUrl: string,
+    email: string,
+    password: string,
+  ) => Promise<HostedAuthSession | undefined>;
+  /**
+   * 用**邮箱 + 口令**注册。
+   *
+   * ⚠️ 成功**不等于已登录**：服务端建号但 `isVerified=0`，仍要去邮箱点验证链接，
+   * 所以状态是 `registered`。邮箱已被占用时服务端给**同一句、同一个状态码**，
+   * 界面也不许在这里说"账号已存在"。
+   */
+  registerWithPassword: (
+    baseUrl: string,
+    email: string,
+    password: string,
+    termsAccepted: boolean,
+    /**
+     * 邀请码（原样，不归一化 —— 形状规则属于签发方）。
+     * 用对象收可选附加项，与 `registerPasskey` 同一条理由：位置参数往前插会
+     * 让既有调用点把别的实参当成邀请码发出去，而那种错在类型上可以是静默的。
+     */
+    options?: { inviteCode?: string },
+  ) => Promise<void>;
+  /**
+   * 申请一封"重置口令"的邮件。
+   *
+   * 🔴 这一条**没有**对应的 SPA 表单：真正填新口令的那张表是服务端渲染的
+   * `/reset-password`（ADR-0040 —— 重置成功**不发会话**）。这里只是**发起**那封信。
+   */
+  forgotPassword: (baseUrl: string, email: string) => Promise<void>;
+  /**
+   * 已登录改口令：`{ kind: 'password-changed' }`，**不是** `signed-in`。
+   *
+   * 🔴 成功后当前设备必须换成服务端给的**新会话**：`tokenVersion` 是全局计数器，
+   * bump 之后手上这枚也失效。只回一句"修改成功"的症状是"改个密码把自己这个
+   * 标签页也踢出去"，而界面刚说完成功。其余设备此时全部需要重新认证 —— 那句话
+   * 要在**点之前**就显示（见 `PasswordPanel`）。
+   */
+  changePassword: (
+    baseUrl: string,
+    token: string | undefined,
+    currentPassword: string,
+    newPassword: string,
+  ) => Promise<HostedAuthSession | undefined>;
   /** 回到空状态（关闭/重开认证面板时用）。 */
   reset: () => void;
 }
@@ -199,6 +302,37 @@ function applyAuthSession(baseUrl: string, session: HostedAuthSession): void {
   }
 }
 
+/**
+ * 失败 → 状态。**唯一的构造点**。
+ *
+ * 🔴 为什么要一个函数而不是就地 `{ kind: 'failed', reason }`：
+ * `policyCode` 与 `retryAfterSeconds` 是**服务端给的**，写在 `HostedAuthFailure` 上，
+ * 而每一处手写的 `failedFrom(outcome)` 都会**静默丢掉**它们 ——
+ * 丢掉的形状是"界面少说一句具体的话"，没有任何一层会报错，测试也不会红
+ * （除非专门钉它）。这类"多字段的结果被单字段的构造点吃掉"是本仓库记过的老形状。
+ *
+ * `undefined` 的字段**不写进对象**（而不是写成 `undefined`）：状态要能被
+ * `toEqual` 逐字段比较，多余的空键会让"没带秒数"和"带了 undefined"长得不一样。
+ */
+function failed(
+  reason: HostedAuthFailureReason,
+  extra?: Pick<HostedAuthFailure, 'policyCode' | 'retryAfterSeconds'>,
+): AuthStatus {
+  return {
+    kind: 'failed',
+    reason,
+    ...(extra?.policyCode === undefined ? {} : { policyCode: extra.policyCode }),
+    ...(extra?.retryAfterSeconds === undefined
+      ? {}
+      : { retryAfterSeconds: extra.retryAfterSeconds }),
+  };
+}
+
+/** 从一次失败的 outcome 里把**全部**结构化信息搬进状态。 */
+function failedFrom(outcome: HostedAuthFailure): AuthStatus {
+  return failed(outcome.reason, outcome);
+}
+
 export const useAuthStore = create<AuthStoreState>((set) => ({
   status: { kind: 'signed-out' },
 
@@ -211,7 +345,7 @@ export const useAuthStore = create<AuthStoreState>((set) => ({
     set({ status: { kind: 'busy', action: 'login-link' } });
     // 带上当前界面语言：在中文浏览器里把应用切成英文的用户，邮件也该是英文。
     const outcome = await requestMagicLink({ baseUrl, locale: currentLocale() }, email);
-    set({ status: outcome.ok ? { kind: 'link-sent' } : { kind: 'failed', reason: outcome.reason } });
+    set({ status: outcome.ok ? { kind: 'link-sent' } : failedFrom(outcome) });
   },
 
   registerAccount: async (baseUrl, email, termsAccepted, inviteCode) => {
@@ -225,7 +359,7 @@ export const useAuthStore = create<AuthStoreState>((set) => ({
       },
     );
     set({
-      status: outcome.ok ? { kind: 'registered' } : { kind: 'failed', reason: outcome.reason },
+      status: outcome.ok ? { kind: 'registered' } : failedFrom(outcome),
     });
   },
 
@@ -233,14 +367,14 @@ export const useAuthStore = create<AuthStoreState>((set) => ({
     // 从"邮件里的链接"或"裸令牌"里取令牌是**协议知识**，在 app-host 里。
     const token = extractAuthLinkToken(input);
     if (token === undefined) {
-      set({ status: { kind: 'failed', reason: 'invalid-input' } });
+      set({ status: failed('invalid-input') });
       return undefined;
     }
 
     set({ status: { kind: 'busy', action: 'verify' } });
     const outcome = await verifyMagicLink({ baseUrl }, token);
     if (!outcome.ok) {
-      set({ status: { kind: 'failed', reason: outcome.reason } });
+      set({ status: failedFrom(outcome) });
       return undefined;
     }
 
@@ -256,7 +390,7 @@ export const useAuthStore = create<AuthStoreState>((set) => ({
     // options 是白问，而且会把"这台设备不支持"伪装成一次失败的网络请求。
     const resolved = browser ?? detectPasskeyBrowser();
     if (resolved === undefined || !resolved.supported) {
-      set({ status: { kind: 'failed', reason: 'passkey-unsupported' } });
+      set({ status: failed('passkey-unsupported') });
       return;
     }
 
@@ -272,7 +406,7 @@ export const useAuthStore = create<AuthStoreState>((set) => ({
       },
     );
     if (!begun.ok) {
-      set({ status: { kind: 'failed', reason: begun.reason } });
+      set({ status: failedFrom(begun) });
       return;
     }
 
@@ -280,7 +414,7 @@ export const useAuthStore = create<AuthStoreState>((set) => ({
     //    所以这里可能停住很久 —— 状态已经是 busy，界面会如实显示"等待系统弹窗…"。
     const created = await createPasskeyCredential(begun.options, resolved);
     if (!created.ok) {
-      set({ status: { kind: 'failed', reason: created.reason } });
+      set({ status: failedFrom(created) });
       return;
     }
 
@@ -298,7 +432,7 @@ export const useAuthStore = create<AuthStoreState>((set) => ({
     set({
       status: completed.ok
         ? { kind: 'registered' }
-        : { kind: 'failed', reason: completed.reason },
+        : failedFrom(completed),
     });
   },
 
@@ -306,7 +440,7 @@ export const useAuthStore = create<AuthStoreState>((set) => ({
     // 同上：不支持的设备一个请求都不发。
     const resolved = browser ?? detectPasskeyBrowser();
     if (resolved === undefined || !resolved.supported) {
-      set({ status: { kind: 'failed', reason: 'passkey-unsupported' } });
+      set({ status: failed('passkey-unsupported') });
       return undefined;
     }
 
@@ -314,13 +448,13 @@ export const useAuthStore = create<AuthStoreState>((set) => ({
 
     const begun = await beginPasskeyLogin({ baseUrl }, email);
     if (!begun.ok) {
-      set({ status: { kind: 'failed', reason: begun.reason } });
+      set({ status: failedFrom(begun) });
       return undefined;
     }
 
     const assertion = await getPasskeyCredential(begun.options, resolved);
     if (!assertion.ok) {
-      set({ status: { kind: 'failed', reason: assertion.reason } });
+      set({ status: failedFrom(assertion) });
       return undefined;
     }
 
@@ -329,7 +463,7 @@ export const useAuthStore = create<AuthStoreState>((set) => ({
       { email, credential: assertion.credential },
     );
     if (!completed.ok) {
-      set({ status: { kind: 'failed', reason: completed.reason } });
+      set({ status: failedFrom(completed) });
       return undefined;
     }
 
@@ -344,8 +478,72 @@ export const useAuthStore = create<AuthStoreState>((set) => ({
     set({ status: { kind: 'busy', action: 'recovery' } });
     const outcome = await requestPasskeyRecovery({ baseUrl, locale: currentLocale() }, email);
     set({
-      status: outcome.ok ? { kind: 'recovery-sent' } : { kind: 'failed', reason: outcome.reason },
+      status: outcome.ok ? { kind: 'recovery-sent' } : failedFrom(outcome),
     });
+  },
+
+  signInWithPassword: async (baseUrl, email, password) => {
+    // 🔴 口令**原样**交出：不 trim、不改大小写、不做 composition 判断。
+    // 一次多余的 trim 会让"句口令末尾有个空格"的用户在别的设备上登不进去，
+    // 而两边的字节确实不同 —— 这类缺陷只会在真用户身上出现，构建期抓不到。
+    set({ status: { kind: 'busy', action: 'password-sign-in' } });
+    const outcome = await loginWithEmailPassword({ baseUrl }, { email, password });
+    if (!outcome.ok) {
+      set({ status: failedFrom(outcome) });
+      return undefined;
+    }
+    // 与 verify / loginWithPasskey **同一个** applyAuthSession。
+    applyAuthSession(baseUrl, outcome.session);
+    set({ status: { kind: 'signed-in', email: outcome.session.user.email } });
+    return outcome.session;
+  },
+
+  registerWithPassword: async (baseUrl, email, password, termsAccepted, options) => {
+    const inviteCode = options?.inviteCode;
+    set({ status: { kind: 'busy', action: 'password-register' } });
+    const outcome = await registerWithEmailPassword(
+      { baseUrl, locale: currentLocale() },
+      {
+        email,
+        password,
+        ...(termsAccepted ? { termsAccepted: true } : {}),
+        ...(inviteCode === undefined || inviteCode === '' ? {} : { inviteCode }),
+      },
+    );
+    // ⚠️ 成功 → `registered`（还要去邮箱点验证链接），**不是** `signed-in`。
+    // 把"号建了"渲染成"登录好了"是本仓库记过的那类"状态对、界面在说谎"。
+    set({
+      status: outcome.ok ? { kind: 'registered' } : failedFrom(outcome),
+    });
+  },
+
+  forgotPassword: async (baseUrl, email) => {
+    set({ status: { kind: 'busy', action: 'password-forgot' } });
+    const outcome = await requestPasswordReset({ baseUrl, locale: currentLocale() }, email);
+    // 🔴 成功 → `reset-sent`：服务端对"有这个账号 / 没有 / 异常"回**同一句 + 200**，
+    // 所以这里拿到 ok 也**不能**说"信已发到你的邮箱"，只能说"如果我们认得这个邮箱…"。
+    // ⚠️ 新口令那张表在服务端渲染的 `/reset-password` 页（ADR-0040），不在这里。
+    set({
+      status: outcome.ok ? { kind: 'reset-sent' } : failedFrom(outcome),
+    });
+  },
+
+  changePassword: async (baseUrl, token, currentPassword, newPassword) => {
+    set({ status: { kind: 'busy', action: 'password-change' } });
+    const outcome = await changePasswordRequest(
+      { baseUrl, locale: currentLocale() },
+      token ?? '',
+      { currentPassword, newPassword },
+    );
+    if (!outcome.ok) {
+      set({ status: failedFrom(outcome) });
+      return undefined;
+    }
+    // 🔴 必须把**新会话**换上：`tokenVersion` 刚 bump，手上那枚旧令牌已经作废。
+    // 少了这一步，症状是"改密成功后当前这个标签页立刻同步失败"。
+    applyAuthSession(baseUrl, outcome.session);
+    set({ status: { kind: 'password-changed', email: outcome.session.user.email } });
+    return outcome.session;
   },
 
   reset: () => {
