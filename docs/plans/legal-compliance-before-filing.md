@@ -15,9 +15,11 @@
 > 那套浏览器判据是承重的，详见「链 2 已落地」小节；✅ **官方域的 `/legal/*` 也已发布**
 >（2026-10-01 晚，九份中英 18 个入口在线上，判据是新增的 `e2e/live-site/live-legal.spec.ts` 10 条），
 > 剩下的那半边（nginx 兜底把不存在的 `/legal/*` 答成首页）单独记为 **G-25b**。
-> ✅ **链 3 已落地**（2026-10-01）：`users.terms_document_version` 可空列 +
-> 唯一判决方 `server/src/legal-consent.ts` + 三个写入口成对落库 + 两道互补门禁
-> （`check:server-legal` / `check:legal-host` 三方对账），两次变异注入各自精确报红，
+> 🟡 **链 3 已实现、未入库**（2026-10-01 实现；**2026-10-02 把原判"✅ 已落地"撤回**）：
+> `users.terms_document_version` 可空列 + 唯一判决方 `server/src/legal-consent.ts` +
+> 三个写入口成对落库 + 两道互补门禁（`check:server-legal` / `check:legal-host` 三方对账），
+> 两次变异注入各自精确报红 —— 这些都只在**这台机器的工作树**里：HEAD 里查不到那个迁移、
+> 那个文件和那一列，生产库里该列计数 0、部署镜像 grep 0（取证见 **G-32**，阻塞见 **G-34**）。
 > 详见「链 3 —— 同意留痕要能记下"哪一版"」小节。它带出三条新缺口 **G-27 / G-28 / G-29**。
 > 🔴 **§5 已列出 12 条需要拍板的事**（`D-01`–`D-12`）：
 > 它们**不是缺口**，是决定 —— 每条都给了"没人拍就走这条"的默认值，所以本文件不因它们悬空而卡住任何工程。
@@ -218,7 +220,11 @@ M4 单独跑了一次 `pnpm` 重 build：改的是 `src/` 而浏览器加载的�
 所以是**跟着产物过去**的，本轮没有在 Windows 上单独复验（固定收尾见 §6.1.1）；
 macOS 原生壳是手写 UI、**根本没有注册面板**；鸿蒙壳未建。
 
-### 链 3 —— 同意留痕要能记下"哪一版" ✅ **已落地**（2026-10-01）
+### 链 3 —— 同意留痕要能记下"哪一版" 🟡 **已实现、未入库**（2026-10-01 实现；2026-10-02 复验改判）
+
+🔴 **下面这一节描述的是工作树里的代码，不是 `main`**：本节引用的文件路径与行号（如 `schema.prisma:54`）
+只有在这个检出上成立 —— HEAD 里查不到那个迁移、`legal-consent.ts` 与那一列（取证与归属见
+**G-32**/**G-34**）。原判"✅ 已落地"是把"本机跑得通"读成"已交付"，2026-10-02 撤回。
 
 按 `legal-consumer-contract-terms.md` **层 0–层 6** 执行，三处裁决与它们的落地形态：
 
@@ -319,7 +325,9 @@ macOS 原生壳是手写 UI、**根本没有注册面板**；鸿蒙壳未建。
 | **G-29** | 链 2 / 链 3 的改动只到**库与产物层**：`packages/app-host/dist` 与 `server/src/*` 是新的，但**四个端的安装包没有重打、没有重装**（AGENTS §6.1.1 的固定收尾没跑） | 手机/桌面里现在装着的仍是**改动前的 JS**，"移动端链接可用"这类结论对旧产物成立与否无从判断 | 本人执行 `pnpm reinstall:all`（会起模拟器与远端 Windows） | 本轮**不跑**：`reinstall:all` 会清掉并重装四端、且会把并行会话在飞的半成品一起装上去（本项目已知碰撞面）。📌 与 §7 第 27 条同一种失效：`packages/` 改了而壳里是旧 bundle，**门禁全绿也照不出来** |
 | **G-30** | 🔴 **Apple 开发者账号的实名主体与备案主体不是同一个法人**：签发苹果发布证书（`2R8LJZ6Q36`）的 Team `V5S2LT9YV8` 主体是「Xiaoli Creativity Culture Industry Development (**beijing**) Co., Ltd.」（= SSOS 那家北京公司），而备案主体是「晓黎（**杭州**）人工智能科技有限公司」。对照：华为侧 heyta 用的是**杭州**账号（§四 已核），安卓签名证书 subject 也是 `L=Hangzhou` —— **三个渠道里只有苹果落在北京主体上** | 苹果中国区提审要求填 App 备案号；备案号的主办者是杭州公司，而渠道运营者是北京公司 —— 若管局或 Apple 核验渠道主体，这是**说不清的那一环** | 产品负责人（要么用杭州主体新注册 Apple 开发者账号并迁 App/重签发布证书，要么确认"渠道主体不必与备案主体一致"后按现状提交） | **不猜、不自己拍**。已核清的是事实部分：表单四个字段（包名/公钥/SHA-1）不收 subject，所以**填表不会因为这条被打回**；未核清的是"管局审核与 Apple 中国区渠道核验会不会看主体一致性" —— 本轮没有查到任何成文依据，而**代办机构的口径不算依据**（D-01 那条裁决同样适用）。取值与四源对账记在 `docs/runbooks/icp-app-filing.md`「苹果备案取值」 |
 | **G-31** ✅ **已闭合**（2026-10-02） | 原事实：`privacy.ts`、`third-parties.ts`、`subscription-refund.ts` 的英文栏都逐字并列着登记中文名「晓黎（杭州）人工智能科技有限公司」，而 `terms.ts` 的英文栏**只有**转写名 `Xiaoli (Hangzhou) Artificial Intelligence Technology Co., Ltd.` —— 九份里**唯一规定合同主体**的那一份恰恰没有它。现在英文栏 s1 与其余三份同口径：登记名在前、转写名在后，并写明"以登记的中文名称为准" | 判据分两层，两层都做过变异：① **库内** —— `structure.spec.ts` 新增一条**按栏取文**的闸门（英文栏凡引用信用代码处必须同时给出登记名称；`allTexts` 是两栏合并的，用它判"某一栏"会得到永远满足的假绿），并断言"至少有一份在引用"否则判据悬空。拿掉登记名称 ⇒ **恰好 1 红**，消息点名 `terms`。② **线上** —— `e2e/live-site/live-legal.spec.ts` 里唯一一条"本地真源 ↔ 线上"对照，参照物取自 `@heyta/legal` 的构建产物而不是抄字面量。两次变异（把线上产物整份复制到本地静态服务器、只改副本）：删登记名 ⇒ 红在①；版本退回 `1.0` ⇒ 红在②；复原后回绿 | 法务口径由产品负责人拍板（"中英两侧都要有登记主体名"）→ 工程改 `terms.ts` 英文栏 + 同批改判据 | 三步落地：`d606e605`（正文 + 按本文件自己的纪律 bump 到 **1.1**、`updatedDate` 2026-10-02、两栏版本记录表各加一行 + 库内闸门 + 自洽的 `LEGAL_SET_VERSION`）→ **增量发布**（`rsync -azc` **不带 `--delete`**，只推 `legal/`、`en/legal/`、`assets/`；那台机器上同时跑着另一条会话的站点产物，整站 `--delete` 会把他们的在制品从生产抹掉）→ `458a0f34`（线上判据，11 passed + 截图人已看过）。⚠️ 这次改版让 `legalSetVersion()` 的指纹变了一次，而生产**还没开始记版本号**（**G-32**）⇒ 没有人被记下"同意过 1.0"，这正是 G-32 要闭合的东西。📌 顺带纠正 `i18n-multilingual.md` §7.15 那行"英文正文残留汉字 1 处"—— 实测 3 处，本次改版后是 4 处且**全部是刻意的** |
-| **G-32** | 🔴 **链 3 的同意留痕在生产上一条都没生效**。仓库里有迁移 `20261006000000_add_terms_document_version`，而线上 `_prisma_migrations` 最新一条实测是 `20261005000000_invalidate_stored_auth_tokens`，`users.terms_document_version` **列不存在**（只读 `psql`：`ERROR: column "terms_document_version" does not exist`）；部署中的镜像 `dist/` 里也 grep 不到 `termsDocumentVersion` ⇒ 生产跑的还是**链 3 之前**的服务端 | 线上今天已有 **10 个账号**（`select count(*) from users` = 10，本仓库自己跑注册旅程留下的），他们点过的那个勾选框**没有任何一处记得"同意的是哪一版"** —— 而这正是链 3 存在的理由；§6 第 5 条"任一真实用户能答出版本号 + 确认时间"在生产上目前**无处可查** | 运维（`cd server && sh scripts/migrate-deploy.sh` + 重建服务端镜像，见 [`runbooks/deployment.md`](../runbooks/deployment.md)） | **本轮不部署**：那是生产库的写操作 + 换容器（共享系统），要产品负责人点头。⚠️ 但**不能等到转 `effective` 那天再做**：注册页的勾选框今天就在让用户同意一份 draft 文本，而什么都没留下。链 3 的代码与判据都在库里（两次变异注入各自精确报红），缺的**只有这一步部署** |
+| **G-32** | 🔴 **链 3 的同意留痕在生产上一条都没生效**。🔴 **2026-10-02 复验：本行原先的前提是错的** —— 原写「仓库里有迁移 `20261006000000_add_terms_document_version`…链 3 的代码与判据都在库里，缺的**只有这一步部署**」，实测**不是**：`git ls-tree --name-only HEAD server/prisma/migrations/` 最新一条是 `20261005000000_invalidate_stored_auth_tokens`，**没有** `20261006` 那个目录；HEAD 的 `schema.prisma` 只有 `termsAcceptedAt`（第 43 行）**没有** `terms_document_version`；`git grep -c -i termsDocument HEAD -- server/src/auth.ts server/src/passkey.ts` = **0 命中**。⇒ 缺的不是"跑一次迁移"，而是**那条批次根本没进版本库**（见 **G-34**）。线上四项只读实测（2026-10-02）：`_prisma_migrations` 最新 `20261005000000_invalidate_stored_auth_tokens`（`finished_at` 2026-10-01 13:06:30Z）、`information_schema.columns` 里 `users.terms_document_version` 计数 **0**、部署镜像内 `grep -rl termsDocumentVersion dist | wc -l` = **0**、`select count(*) from users` = **10** | 线上今天这 10 个账号（全部是本仓库自己跑注册旅程留下的测试账号）点过的那个勾选框**没有任何一处记得"同意的是哪一版"** —— 生产仍在记 `termsAcceptedAt` 这个时间戳，但那一列在 HEAD 里根本不存在；§6 第 5 条"任一真实用户能答出版本号 + 确认时间"在生产上**无处可查** | ~~运维~~ → **那条批次的所有者**（先让链 3 进 `main`，见 **G-34**），之后才是 `sh scripts/migrate-deploy.sh` + 重建镜像（[`runbooks/deployment.md`](../runbooks/deployment.md) §3.8） | 🔴 **本轮不部署，且本轮结构上部署不了**：`deploy.sh` 与 `git archive HEAD` 只带**已跟踪**文件，未跟踪的 `legal-consent.ts` 与那个迁移目录**带不出去**；把工作树里别人在飞的半成品送上生产违反既定立场（与 G-25 那次「等那条批次提交后再发」同一条）。⚠️ 但**不能等到转 `effective` 那天再做**：注册页的勾选框今天就在让用户同意一份 draft 文本，而什么都没留下。📌 **探针修正（本轮踩到，是 §7 元规则一的形状）**：查 `_prisma_migrations` 用 `select name …` 会得 `ERROR: column "name" does not exist` —— 真实列名是 **`migration_name`**；那是**探针写错**，不是生产缺列，别把它读成结论 |
+
+| **G-34** | 🔴 **链 3 的实现整体没有进版本库 —— 这是 G-32 唯一的硬前置，且没有任何门禁会自动提醒**。2026-10-02 用 `git status --porcelain -- server packages/legal` 逐条实测：未跟踪（`??`）= `server/prisma/migrations/20261006000000_add_terms_document_version/`、`server/src/legal-consent.ts`、`server/tests/terms-consent-version.spec.ts`、`server/tests/terms-version-migration.pglite.spec.ts`；已跟踪但未提交（`M`）= `server/prisma/schema.prisma`、`server/src/auth.ts`、`server/src/passkey.ts`、`server/src/legal.generated.ts`、`server/src/design.generated.ts`、`server/src/admin/admin.routes.ts`、`packages/legal/src/documents/{privacy,minors,data-rights}.ts`。HEAD 里 `git grep -l legal-consent` 只命中两份**文档**与 `server.ts` 的一句**注释**（不是 import）。📌 **同一次实测顺带查到链 5 也不是提交态**：`packages/app-host/src/privacy-consent.ts` 用 `git ls-tree HEAD` 查同样**不在 HEAD** ⇒ 这不是链 3 单独的漏提交，而是"批次在工作树里推进、提交落后于实现"的通用形状（本行只登记事实，不代提交别人的在制品） | 链 3 目前只活在这台机器上：CI、干净检出、以及**生产镜像的构建归档**里都不存在它。后果不止"生产没生效"（G-32）：`pnpm check` 在这台机器上跑的是**工作树**，所以它绿的时候证明的是"别人在飞的代码没问题"，而不是"`main` 没问题" —— 这是 §7 第 57 条那类"门禁跑的不是版本库里的东西"的又一副面目 | 那条批次的所有者（同一会话）：把这些文件作为一笔提交进 `main`，随后在**干净检出**里跑 `pnpm check` + `pnpm --filter @heyta/server test`，再走 deployment §3.8 重建与迁移 | 🔴 **本轮不代提**：那是别人正在写的批次，且 `packages/legal` 那三份文本此刻**同时**被链 3 与 G-31 的改版碰过（逐条拆 hunk 会把他们的中间态提交成"已完成"）。⚠️ 能不能被门禁抓到：**部分能**。本轮用临时变异实测 —— 把本行里 `server/src/legal-consent.ts` 从内联代码改成指向它的相对链接，`node research/tools/docs-link-check.mjs` **exit=1、恰好报 1 处**，逐字是 `（解析到 server/src/legal-consent.ts，本机存在，但 git 没有跟踪它）`；还原后同一命令 **exit=0**。⇒ 它能拦"**文档链接**指向未入库的产物"，拦不住"未入库的实现本身没被链接"，所以这条缺口要靠人而不是靠闸。**HEAD 里刻意没有留下红灯**：那会让干净检出的 `pnpm check` 因别人未提交的代码而红 |
 
 ## 5. 需要拍板（agent 不能替产品决定，也不能替法律决定）
 
@@ -396,7 +404,12 @@ G-01 回答"这么做**合法吗**"。送审前先把能拍的拍完，否则律
    两侧分工写死在各自配置头：**这里红了是代码坏，那里红了是部署没跟上。**
 5. **链 3 上线**：任一真实用户能在后台答出"他同意的版本号 + 确认时间"；
    回归断言"客户端没勾 ⇒ 数据库没有同意记录"。
-   ✅ **已满足**（2026-10-01，见「链 3 —— 同意留痕要能记下哪一版」小节）。
+   🟡 **原判"✅ 已满足（2026-10-01）"里只有"代码与判据"那一半成立，"上线"那一半不成立**
+   （2026-10-02 复验后改判，见 **G-32**/**G-34**）：链 3 的实现整体**不在 `main` 上** ——
+   HEAD 里没有那个迁移目录、没有 `legal-consent.ts`、`schema.prisma` 里只有 `termsAcceptedAt`
+   而没有 `terms_document_version`；生产库里该列计数 0、部署镜像 `dist` grep 0。
+   ⇒ 这条**重新变为未满足**，硬前置是那条批次进版本库，之后才是迁移 + 重建镜像。
+   （实现细节在「链 3 —— 同意留痕要能记下哪一版」小节，该小节顶部已标注它描述的是工作树不是 `main`。）
    🔴 **原文里那句"来自哪个端"已经从验收标准中去掉** —— 不是没做，是它压根不是对外文本的承诺：
    `privacy.ts` 第 12 条逐字只承诺"记下同意时刻，以及当时那一套文件的版本号"，
    九份文本没有任何一句说我们会记"这次同意来自哪个端"。把它写进验收标准
