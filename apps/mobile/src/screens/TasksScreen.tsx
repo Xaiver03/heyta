@@ -107,6 +107,7 @@ import { useMobileSync } from '../sync/store';
 import { dueTone, toDueDisplay, type DueDisplayMode } from '../lib/due-display';
 import { priorityBadgeLabel, priorityColorToken } from '../lib/priority';
 import { TaskDetailSheet } from './TaskDetailSheet';
+import { SearchScreen } from './SearchScreen';
 // 🔴 「四象限」那一档的实现（P10 收敛后**唯一**的实现）——
 // 它是共享 `QuadrantBoard` 的移动宿主，不再是第 6 个 tab 的整屏。
 import { QuadrantScreen } from './QuadrantScreen';
@@ -234,6 +235,14 @@ export function TasksScreen({
   /** 打开详情的任务 id。用 id 而不是 Task 对象：列表刷新后对象会换新引用，
       存对象会让面板在每次同步后拿到过期快照。 */
   const [detailTaskId, setDetailTaskId] = useState<string | null>(null);
+  /**
+   * 全局搜索浮层。
+   *
+   * 🔴 它是**跨实体**的（任务 + 便签），与上面那个内联筛选框不是一件事 ——
+   * 那个只在"已经切过一刀的当前列表"里找，而且完全不碰便签。
+   * 两个入口各管一件事，所以两个状态也各留一份。
+   */
+  const [searchOpen, setSearchOpen] = useState(false);
   /** 截止时间的呈现方式。与 Web 端 `DueBadge` 的开关一致，默认 `date`。 */
   const [dueMode, setDueMode] = useState<DueDisplayMode>('date');
   /**
@@ -589,7 +598,12 @@ export function TasksScreen({
     <View style={{ flex: 1 }}>
       <Screen
         title={t('mobile.tasks.title')}
-        actions={[{ icon: 'action.sync', label: t('mobile.common.sync'), onPress: refresh }]}
+        actions={[
+          // 🔴 全局搜索的**唯一**入口（产品负责人 2026-10-01：一个应用只有一个搜索入口）。
+          // 放在「同步」之前 = 靠左，因为它是日常动作、同步是偶发动作。
+          { icon: 'action.search', label: t('mobile.search.open'), onPress: () => setSearchOpen(true) },
+          { icon: 'action.sync', label: t('mobile.common.sync'), onPress: refresh },
+        ]}
       >
         {/* 大标题 + 日期。大标题属于**内容区**（会随内容滚动），不属于顶栏。 */}
         <View style={{ paddingTop: tokens['space.2'], gap: tokens['space.1'] }}>
@@ -833,6 +847,27 @@ export function TasksScreen({
           now={now}
         />
       ) : null}
+
+      {/**
+       * 全局搜索。任务**就地**递给浮层（同一条数据源，不另读一次库），
+       * 点结果里的任务 = 关掉浮层 + 打开详情，与点列表行是同一个目的地。
+       */}
+      <SearchScreen
+        visible={searchOpen}
+        onDismiss={() => {
+          setSearchOpen(false);
+        }}
+        tasks={tasks}
+        taskRowLabels={taskRowLabels}
+        busyTaskId={busyId}
+        onToggleTask={(id) => {
+          runFor(id, actions.toggleCompleted(id));
+        }}
+        onOpenTask={(id) => {
+          setSearchOpen(false);
+          setDetailTaskId(id);
+        }}
+      />
 
       <Fab icon="task.add" label={t('mobile.tasks.new')} onPress={() => setComposerOpen(true)} />
       <Composer

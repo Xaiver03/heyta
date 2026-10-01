@@ -1921,6 +1921,16 @@ export const zhCN = {
   'mobile.tasks.composer.placeholder': '要做什么？',
   'mobile.tasks.composer.close': '关闭新建面板',
 
+  // ── 移动端 · 全局搜索（共享 `SearchPanel` 的第二宿主）───────
+  //    面板本体的文案仍走 `web.search.*`（同一块界面，不另抄一份词条）。
+  //    🔴 这里只放**移动端独有**的三条：入口与出口的无障碍名，以及
+  //    `web.search.noResults` 那句"没有找到匹配的任务、便签或**入口**"——
+  //    移动端没有「快速跳转」那一组（手机上没有可跳转的侧栏目的地），
+  //    沿用那句就是对着用户许诺一个点不出来的东西。
+  'mobile.search.open': '打开搜索',
+  'mobile.search.close': '关闭搜索',
+  'mobile.search.noResults': '没有找到匹配的任务或便签。',
+
   // ── 移动端 · 一句话捕获（`capture` 整刀的尾巴）──────────────
   //    🔴 这些键补的是**两端不一致**：web 的捕获框能认「明天」「!1」并显示
   //    识别芯片，而移动端一直以来只是一个纯标题输入框 —— 同一句话在两端
