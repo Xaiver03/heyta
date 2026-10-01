@@ -36,7 +36,14 @@ import {
   type ActionContext,
   type NewHabitFields,
 } from '@heyta/app-host';
-import type { CategorySlot, Habit, HabitGoalType, HabitLog, LocalDate } from '@heyta/domain';
+import type {
+  CategorySlot,
+  Habit,
+  HabitGoalType,
+  HabitIcon,
+  HabitLog,
+  LocalDate,
+} from '@heyta/domain';
 import { habitHeatmap, toHabitProgressRows, type HabitProgressRow } from '@heyta/ui';
 import { create } from 'zustand';
 
@@ -55,6 +62,11 @@ interface HabitState {
   deleteHabit: (habitId: string) => Promise<void>;
   /** 分类色槽位（1–8），`undefined` 表示清除。存槽位号，不存颜色本身。 */
   setHabitColor: (habitId: string, slot?: CategorySlot) => Promise<void>;
+  /**
+   * 行首图标（闭集 key）。`undefined` 表示清除 = 回到 `deriveHabitIcon(id)` 派生的那个，
+   * **不是**"没有图标"。非法 key 由动作层 `throw`。
+   */
+  setHabitIcon: (habitId: string, icon?: HabitIcon) => Promise<void>;
   /**
    * 改习惯的**目标**（数值 / 单位 / 达成口径）。
    *
@@ -107,6 +119,13 @@ export const useHabitStore = create<HabitState>(() => ({
   setHabitGoal: async (habitId, goal) => {
     // 不 catch：拒绝原因要一路冒到界面去说清楚（见接口注释）。
     await habitActions.setHabitGoal(habitId, goal);
+  },
+
+  setHabitIcon: async (habitId, icon) => {
+    // 闭集校验在动作层：这里不许出现"不认识就当默认"的兜底（那会把用户的
+    // 一次点击悄悄吞掉，症状是"点了没反应"）。
+    await habitActions.setHabitIcon(habitId, icon);
+    refresh();
   },
 
   setHabitColor: async (habitId, slot) => {

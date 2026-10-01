@@ -15,8 +15,19 @@
  *      `@heyta/app-host` 的 `createHabitActions`（建 / 打卡 / 撤销 / 设色）；
  *   2. 文案从哪来 → `lib/habits-display.ts`（见那里的命名残差）；
  *   3. 周边挂什么 → 「新建习惯」的输入框与取色入口。
- *      **打卡按钮 / 三个连续数字 / 冻结说明 / 补打卡 / 重新开始 / 热力图
- *      全部在共享层**（`@heyta/ui` 的 `HabitBoard`），与 web 是同一份实现。
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * 🔴 形态 = **清单 → 详情**（2026-10-01 产品负责人定的两层，本轮补的是移动端）
+ *
+ * 移动端此前是 N 张详情卡**直接堆叠**：没有"扫一眼"的那一列，要看第三条习惯
+ * 得先滚过前两条的热力图。现在与 web 同一个形状 ——
+ *
+ *   · 清单：`@heyta/ui` 的 `HabitProgressList`（图标 + 最近 7 天 + 三个具体数字）；
+ *   · 详情：`@heyta/ui` 的 `HabitBoard`，只是把 `habits` 收成一条。
+ *
+ * **两块本体都在共享层**，本文件只做导航与输入。唯一与 web 不同的地方是**排法**：
+ * 手机屏放不下并排两栏，所以详情是**推进去的一层**，返回走顶栏 ——
+ * 而不是把窗格塞在清单下面逼用户滚。
  *
  * 连续与韧性的**配对**由宿主注入：这里传 `habitGrowth`
  * （`@heyta/app-host` 的 `motivation.ts`）—— 那是"两个数字必须用同一份日志、
@@ -62,13 +73,13 @@ import type { AppHost, HabitActions } from '@heyta/app-host';
 import { createHabitActions, habitGrowth } from '@heyta/app-host';
 import type { CategorySlot, Habit, HabitGoalType, HabitLog } from '@heyta/domain';
 import { useI18n } from '@heyta/i18n';
-import { HabitBoard } from '@heyta/ui';
+import { HabitBoard, HabitProgressList } from '@heyta/ui';
 
 import { openTaskHost } from '../db/open-host';
-import { habitBoardLabels } from '../lib/habits-display';
+import { habitBoardLabels, habitListLabels } from '../lib/habits-display';
 import { useToday } from '../lib/use-today';
 import { useMobileSync } from '../sync/store';
-import { Button, Card, EmptyState, Screen, TextField } from '../ui/kit';
+import { Button, Card, EmptyState, Screen, Text, TextField } from '../ui/kit';
 import { HabitGoalSlot } from '../ui/habit-goal-slot';
 import { HabitColorSlot } from '../ui/slot-picker';
 
@@ -89,6 +100,13 @@ export function HabitsScreen({ onBack }: { onBack: () => void }): React.JSX.Elem
   const [habits, setHabits] = useState<Habit[]>([]);
   const [logs, setLogs] = useState<HabitLog[]>([]);
   const [draft, setDraft] = useState('');
+  /**
+   * 🔴 详情层展开的那一条。`null` = 停在清单。
+   *
+   * 它是**本地导航态**，不是业务数据 —— 不进 op-log、不落盘：手机上的
+   * "我正在看哪一条"换一台设备没有意义，同步过去反而是噪音。
+   */
+  const [selectedId, setSelectedId] = useState<string | null>(null);
   /** 正在落盘的那一条 —— 置灰它，防连点发出两条 op。 */
   const [busyId, setBusyId] = useState<string | null>(null);
 
@@ -141,6 +159,19 @@ export function HabitsScreen({ onBack }: { onBack: () => void }): React.JSX.Elem
   );
 
   const labels = useMemo(() => habitBoardLabels(t), [t]);
+  const listLabels = useMemo(() => habitListLabels(t), [t]);
+
+  /**
+   * 详情层展开的那一条。
+   *
+   * ⚠️ 它被**删掉**时回到清单，而不是像 web 那样 `?? rows[0]` 落到第一条：
+   * 窗格没有历史，落在那儿用户看不出来自己换了对象；手机上是"退回来"，
+   * 层级本身会说话。
+   */
+  const selected = useMemo(
+    () => habits.find((habit) => habit.id === selectedId),
+    [habits, selectedId],
+  );
 
   const chooseColor = useCallback(
     (habit: Habit, slot: CategorySlot | undefined): void => {
@@ -222,6 +253,49 @@ export function HabitsScreen({ onBack }: { onBack: () => void }): React.JSX.Elem
     );
   }
 
+  /**
+   * 🔴 详情层。**提前 return 在所有 hook 之后**（同 `ProfileScreen` 的规矩：
+   * 先 return 后 hook 会让两次的 hook 数量不同 → 整屏白屏）。
+   *
+   * 窗格本体是**共享 `HabitBoard`**，只是把 `habits` 收成一条 ——
+   * 不是另写一个详情组件，所以打卡 / 三个数字 / 冻结 / 补打卡 / 重新开始 /
+   * 热力图与 web 右窗格逐字同一份实现。
+   */
+  if (selected !== undefined) {
+    return (
+      <Screen
+        title={selected.name}
+        actions={[
+          {
+            icon: 'action.back',
+            label: t('mobile.growth.back'),
+            onPress: () => {
+              setSelectedId(null);
+            },
+          },
+        ]}
+      >
+        <HabitBoard
+          habits={[selected]}
+          logs={logs}
+          now={now}
+          growth={habitGrowth}
+          labels={labels}
+          onCheckIn={(habitId, date) => {
+            runFor(habitId, actions.checkIn(habitId, date));
+          }}
+          onUndoCheckIn={(habitId, date) => {
+            runFor(habitId, actions.undoCheckIn(habitId, date));
+          }}
+          busyHabitId={busyId}
+          renderColorSlot={renderColorSlot}
+          renderGoalSlot={renderGoalSlot}
+          testID="habit-detail"
+        />
+      </Screen>
+    );
+  }
+
   return (
     <Screen
       title={t('web.shell.views.habits')}
@@ -264,27 +338,22 @@ export function HabitsScreen({ onBack }: { onBack: () => void }): React.JSX.Elem
       </Card>
 
       {/*
-        🔴 整张卡（打卡 + 三个数字 + 冻结 + 补打卡 / 重新开始 + 热力图）
-        全部由共享 `HabitBoard` 渲染 —— 本文件**不许**自己画一行。
-        一旦画了，移动端与 web 的习惯卡就会开始漂移，而那件事不会有任何
-        测试变红（判据见 `apps/web/tests/habits-board.spec.tsx` 的 E 组）。
+        🔴 清单本体是**共享层**的 `HabitProgressList`，与 web 左列读的是同一批
+        判据（`toHabitProgressRows` + `habitHeatmap` + `heatmapLevelToken`）。
+        本文件**不许**自己数 `logs` 或算连续 —— 那会变成第三份答案。
+        连"还没有习惯"那句话也不在这层：空态由共享清单自己渲染（`labels.empty`），
+        因为"空态只有一个实现"是门禁判据（`check:empty-state` 断言 B）。
       */}
-      <HabitBoard
+      <HabitProgressList
         habits={habits}
         logs={logs}
         now={now}
         growth={habitGrowth}
-        labels={labels}
-        onCheckIn={(habitId, date) => {
-          runFor(habitId, actions.checkIn(habitId, date));
+        labels={listLabels}
+        onSelect={(habitId) => {
+          setSelectedId(habitId);
         }}
-        onUndoCheckIn={(habitId, date) => {
-          runFor(habitId, actions.undoCheckIn(habitId, date));
-        }}
-        busyHabitId={busyId}
-        renderColorSlot={renderColorSlot}
-        renderGoalSlot={renderGoalSlot}
-        testID="habit-board"
+        testID="habit-list"
       />
     </Screen>
   );

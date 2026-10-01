@@ -769,11 +769,11 @@ export const en = {
   'web.habits.a11y.undo': 'Undo check-in for "{name}" today',
   'web.habits.checkedIn': 'Checked in',
   'web.habits.checkIn': 'Check in',
-  'web.habits.freeze': 'Of this streak, {count} days were saved by a freeze',
-  'web.habits.repair': 'You missed {date}. Repair it and the streak becomes {count} days.',
+  'web.habits.freeze': 'Days saved by a freeze in this streak: {count}',
+  'web.habits.repair': 'You missed {date}. Repairing it makes this a {count}-day streak.',
   'web.habits.repairAction': 'Repair',
   'web.habits.a11y.repair': 'Repair "{name}" for {date}',
-  'web.habits.freshStart': 'It has been {days} days since the last check-in. Your longest {longest} days and {total} check-ins are still here — starting again does not erase them.',
+  'web.habits.freshStart': 'A {days}-day gap since your last check-in. Your record stays — a {longest}-day best and {total} logged — so starting again erases nothing.',
   'web.habits.freshStartAction': 'Start again today',
   'web.habits.a11y.freshStart': 'Check in "{name}" again today',
   // The third metric: the one that only ever grows (never reset by a break).
@@ -785,8 +785,40 @@ export const en = {
   // The key above is the *library's* shape (`{{count}}` is
   // react-activity-calendar's own placeholder), so the shared heatmap cannot
   // reuse it — it would render a literal `{5}`. These two use our shape.
-  'web.habits.heatmap.a11y': '"{name}": {count} check-ins in the last {days} days',
+  'web.habits.heatmap.a11y': '"{name}" check-in history: {count} logged in a {days}-day window',
   'web.habits.heatmap.cell': '{date}: {count}',
+
+  // ── Web · habit icon vocabulary (list rows + picker) ──────
+  // Stored values are the *closed-set keys* (`drop`, `moon`); the glyph is a web-side
+  // Lucide mapping. None of these eight names a vice — unlike a colour, an icon
+  // *labels* the slot, so this list is where the "never judge an activity healthy
+  // or unhealthy" redline is actually held.
+  'web.habits.icon.drop': 'Water',
+  'web.habits.icon.activity': 'Exercise',
+  'web.habits.icon.book': 'Reading',
+  'web.habits.icon.moon': 'Sleep',
+  'web.habits.icon.leaf': 'Meals',
+  'web.habits.icon.pencil': 'Writing',
+  'web.habits.icon.sun': 'Morning',
+  'web.habits.icon.music': 'Music',
+  'web.habits.icon.toggle': 'Icon',
+  'web.habits.icon.group': 'Pick an icon',
+  // "Default" does not mean "no icon": with nothing chosen the UI derives a stable one from the id.
+  'web.habits.icon.default': 'Default',
+  'web.habits.icon.a11y': 'Choose an icon for "{name}"',
+  'web.habits.icon.a11yDefault': '"{name}" uses the derived icon',
+
+  // ── Web · habits list + pane ──────────────────────────────
+  'web.habits.list.aria': 'Habits list',
+  'web.habits.pane.aria': 'Check-in history for "{name}"',
+  'web.habits.week.aria': 'Last 7 days',
+  'web.habits.week.done': '{date} checked in',
+  'web.habits.week.missed': '{date} no check-in',
+  // 🔴 **形状是承重的**：词条表没有 ICU 复数。这条必须保持"单数安全"的写法
+  //    （连字符 `{n}-day` 复合词 + `in total`）—— 写成 `{longest} days` /
+  //    `{total} check-ins` 的话，新建的习惯会被读成 "1 days, 1 check-ins"。
+  'web.habits.row.aria': '"{name}": {current}-day streak, longest {longest}-day run, {total} in total',
+  'web.habits.row.selectA11y': 'Show the check-in history for "{name}"',
 
   // ── Web · heatmap copy shared by habits and growth ────────
   'web.heatmap.month.1': 'Jan',

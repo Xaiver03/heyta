@@ -774,3 +774,19 @@ export {
  * web 与 mobile 各有一个目标编辑器，而哪种口径说哪句话是同一个判断。
  */
 export { habitGoalSummaryKey, type HabitGoalSummaryKey } from './habits/model.js';
+
+/**
+ * ── 习惯**清单行**（列表 + 窗格形态里"扫一眼"的那一列）──
+ *
+ * 🔴 **本块是追加的**（`index.ts` 是多写者共享文件，只许在末尾追加）。
+ * 移动端此前没有这一列 —— N 张详情卡直接堆叠，看不到"哪几条今天还没打"。
+ *
+ * `HABIT_LIST_WEEK_DAYS` 单独导出，不并进 `HABIT_HEATMAP_DAYS`：清单要"扫一眼"
+ * （7 天），详情窗格要"看趋势"（90 天）。合成一个常量 = 逼一面放弃自己的读法。
+ */
+export { HABIT_LIST_WEEK_DAYS } from './habits/model.js';
+export {
+  HabitProgressList,
+  type HabitProgressListLabels,
+  type HabitProgressListProps,
+} from './habits/HabitProgressList.js';

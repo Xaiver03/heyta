@@ -827,6 +827,36 @@ export const zhCN = {
   'web.habits.heatmap.a11y': '「{name}」最近 {days} 天共 {count} 次打卡',
   'web.habits.heatmap.cell': '{date}：{count} 次',
 
+  // ── Web · 习惯的图标词表（列表行首 + 选择器）────────────────
+  // 🔴 存的是 `drop` / `moon` 这类**闭集 key**，界面上的字形由 `apps/web` 映射到 Lucide。
+  //    这八个词**没有一个是负面活动**（烟/酒/熬夜/刷手机都不在）—— 图标不像颜色，
+  //    它会把这一格**点名**，所以词表本身就是那条「App 永不判断活动健康/不健康」红线的边界。
+  'web.habits.icon.drop': '水滴',
+  'web.habits.icon.activity': '运动',
+  'web.habits.icon.book': '阅读',
+  'web.habits.icon.moon': '早睡',
+  'web.habits.icon.leaf': '饮食',
+  'web.habits.icon.pencil': '书写',
+  'web.habits.icon.sun': '晨间',
+  'web.habits.icon.music': '音乐',
+  'web.habits.icon.toggle': '图标',
+  'web.habits.icon.group': '选一个图标',
+  // 「默认」不是"没有图标"：不选的时候界面按习惯 id 派生一个稳定的（见 `deriveHabitIcon`）。
+  'web.habits.icon.default': '默认',
+  'web.habits.icon.a11y': '为「{name}」选图标',
+  'web.habits.icon.a11yDefault': '「{name}」用默认图标',
+
+  // ── Web · 习惯的「列表 + 窗格」─────────────────────────────
+  'web.habits.list.aria': '习惯清单',
+  'web.habits.pane.aria': '「{name}」的打卡记录',
+  // 行首的 7 个点：日期本身已经在 `aria-label` 里，这里只说"打没打"。
+  'web.habits.week.aria': '最近 7 天',
+  'web.habits.week.done': '{date} 已打卡',
+  'web.habits.week.missed': '{date} 没打卡',
+  // 整行的读法：**三个数字一次说完**，屏幕阅读器不必逐 chip 猜。
+  'web.habits.row.aria': '「{name}」连续 {current} 天，最长 {longest} 天，累计 {total} 次',
+  'web.habits.row.selectA11y': '查看「{name}」的打卡记录',
+
   // ── Web · 热力图共用文案（习惯页与成长页）─────────────────
   // 月份与图例同样是画在界面上的字，所以同样要走词条表 ——
   // 英文界面上写着「1月」与「少 / 多」是漏翻，不是"库只能这样"。

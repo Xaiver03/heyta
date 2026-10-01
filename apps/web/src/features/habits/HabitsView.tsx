@@ -2,33 +2,40 @@
  * 习惯视图（Web 壳）
  * ==================
  *
- * 🔴 M3 第七刀之后，这个文件**只剩接线**。
+ * 产品负责人 2026-10-01 定的形态：**列表 + 窗格**。
  *
- * 打卡按钮、三个连续数字、冻结说明、补打卡 / 重新开始、近 90 天热力图，
- * 全部由 `@heyta/ui` 的 `HabitBoard` 渲染 —— 与 mobile 是**同一份实现**。
- * 这里只回答 web 自己的三个问题：
+ *   · 左列 `HabitsList` —— 一行一个习惯：行首图标、名字、最近 7 天打没打、
+ *     三个具体数字（连续 / 最长 / 累计）。负责**扫一眼**。
+ *   · 右窗格 —— 选中那个习惯的 `@heyta/ui#HabitBoard`：打卡按钮、冻结说明、
+ *     补打卡 / 重新开始、近 90 天热力图。负责**看细节**。
  *
- *   1. 习惯与打卡记录从哪来 → `useHabitStore`；
- *   2. 「现在」从哪来 → `sessionStorage` 的固定值（见下面 `NOW_STATE_KEY`）；
- *   3. web 特有的交互 → 「新建习惯」的输入框（DOM `<input>`）与取色入口
- *      （`ColorSlotPicker`，DOM 的展开式按钮 + `Esc`）。
- *
- * 连续 / 韧性的**配对**不在这里算：`HabitBoard` 的 `growth` prop 收的是
- * 函数，这里传 `@heyta/app-host#habitGrowth` —— 那是配对的唯一实现。
+ * 为什么要拆成两列而不是把板子从头列到尾：一条习惯的板子很高（热力图 90 格），
+ * N 条纵向排下来，"我今天到底有没有断"要滚三屏才看得完 —— 而那正是这个视图
+ * 唯一要回答的问题。滴答清单 / Streaks 都是同一取向：清单行给状态，展开给历史。
  *
  * ─────────────────────────────────────────────────────────────────────────
- * 🔴 热力图不再用 `react-activity-calendar`
+ * 🔴 M3 第七刀之后，打卡与热力图**仍然只有 `packages/ui` 那一份实现**
  *
- * 它是 **DOM 库**，而共享层必须只用 RN 原语。自绘之后**失去**的是那个库
- * 内置的悬停提示；补回来的方式是 `cellTooltip` 写 `data-cell-title` +
- * `apps/web/src/styles/app.css` 的 `[data-cell-title]::after`
- * （与 `CategoryReportView` 同一条路，那段 CSS 已经在了）。
+ * 拆两列改的是**布局**，不是渲染：右窗格传给 `HabitBoard` 的是
+ * `habits={[选中那一条]}`，共享层对此一无所知（它只看到一个习惯的数组）。
+ * 所以 `apps/web/tests/habits-board.spec.tsx` 的 E 组判据依然成立。
  *
- * ⚠️ 顺带一条**必须记住的**：`web.habits.heatmap` 那条词条用的是
- * `{{count}}`（**库自己的**占位符），我们的插值器只认单层 `{count}` ——
- * 复用它渲染自定义热力图会得到字面的 `{5}`。所以自绘热力图的整块无障碍名
- * 用的是新加的 `web.habits.heatmap.a11y`，每一格的悬停文案是
- * `web.habits.heatmap.cell`。
+ * ⚠️ 全页**只有一块** `HabitBoard`。`e2e/tests/motivation.spec.ts` 的白屏检测
+ * 断言 `[data-testid="habit-board"]` 的数量恰好为 1（`toHaveCount(1)`），
+ * 在左列再渲染一块会当场红 —— 那是对的：两块板会让"哪一块是选中项"变成
+ * 一个由 DOM 顺序而不是由状态决定的问题。
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * 🔴 这个文件里不许出现"什么算打过 / 连续几天"的判断
+ *
+ * 数字全部来自 `selectHabitProgress` / `selectHeatmap`（薄转发到
+ * `@heyta/ui#toHabitProgressRows` 与 `#habitHeatmap`）。连续 / 韧性的**配对**
+ * 也不在这里算：`HabitBoard` 的 `growth` prop 收函数，这里传
+ * `@heyta/app-host#habitGrowth` —— 那是配对的唯一实现。
+ *
+ * 🔴 热力图不再用 `react-activity-calendar`：它是 **DOM 库**，而共享层必须只用
+ * RN 原语。自绘之后失去的是库内置的悬停提示，补回来的方式是 `cellTooltip` 写
+ * `data-cell-title` + `apps/web/src/styles/app.css` 的 `[data-cell-title]::after`。
  *
  * ─────────────────────────────────────────────────────────────────────────
  * 🔴 `HeytaUiProvider` 必须包在**这一处**
@@ -51,45 +58,17 @@ import { HEATMAP_MONTH_KEYS, HabitBoard, HeytaUiProvider, type HabitBoardLabels 
 import { Plus } from 'lucide-react';
 
 import { ColorSlotPicker } from '../categories/ColorSlotPicker.js';
+import { HabitIconPicker } from './HabitIconPicker.js';
+import { HabitsList, HABIT_ROW_WEEK_DAYS, type HabitsListRow } from './HabitsList.js';
+import { checkInLabel, currentStreakText, longestStreakText, totalCheckInText } from './copy.js';
 import { HabitGoalEditor } from './HabitGoalEditor.js';
-import { useHabitStore } from './store.js';
+import {
+  selectHabitProgress,
+  selectHeatmap,
+  useHabitStore,
+} from './store.js';
 
 const NOW_STATE_KEY = 'now';
-
-/**
- * 三个指标各自的一句话。
- *
- * 🔴 词条表没有 ICU：连续 1 天时英文必须走单数兄弟词条
- * （"Streak 1 days" 是一眼可见的坏句子）。三个数字各自分支，
- * 因为它们完全可能一个是 1、另一个不是。
- *
- * 放在组件外、显式收 `t`：这样它既在 JSX 之外拼好句子
- * （门禁只认"字面量紧跟 `t(`"的形状），又不依赖 hook。
- */
-function currentStreakText(count: number, t: I18nValue['t']): string {
-  return count === 1
-    ? t('web.habits.streak.currentOne', { count })
-    : t('web.habits.streak.current', { count });
-}
-
-function longestStreakText(count: number, t: I18nValue['t']): string {
-  return count === 1
-    ? t('web.habits.streak.longestOne', { count })
-    : t('web.habits.streak.longest', { count });
-}
-
-function totalCheckInText(count: number, t: I18nValue['t']): string {
-  return count === 1
-    ? t('web.habits.streak.totalOne', { count })
-    : t('web.habits.streak.total', { count });
-}
-
-/** 打卡按钮的无障碍名："撤销今日打卡" / "为它打卡" 是两句话，各自成词条。 */
-function checkInLabel(name: string, doneToday: boolean, t: I18nValue['t']): string {
-  return doneToday
-    ? t('web.habits.a11y.undo', { name })
-    : t('web.habits.a11y.checkIn', { name });
-}
 
 /**
  * 构造共享 `HabitBoard` 需要的全部文案。
@@ -99,6 +78,9 @@ function checkInLabel(name: string, doneToday: boolean, t: I18nValue['t']): stri
  *
  * ⚠️ 月份 key 的表在共享层（`HEATMAP_MONTH_KEYS`）—— 两端各写一份 12 项的
  * 列表就是漂移的起点（改一处不会红，只会让一个端少一个月）。
+ *
+ * ✅ 三个连续数字的措辞在 `./copy.js`：左列的 chip `title` 要的是同一句话，
+ * 写两份就会漂移（一边"连续 N 天"、一边"连 N 天"没人会红）。
  */
 export function habitBoardLabels(t: I18nValue['t']): HabitBoardLabels {
   return {
@@ -138,10 +120,40 @@ export function HabitsView() {
   const [draft, setDraft] = useState('');
   /** 正在落盘的习惯 —— 置灰它那一行的按钮，防连点发出两条 op。 */
   const [busyId, setBusyId] = useState<string | null>(null);
+  /**
+   * 右窗格展开的那一条。
+   *
+   * 🔴 **存 id，不存对象**：`store.habits` 每次 op 后都是新数组，握住对象会让
+   * 窗格显示一份过期的名字 / 目标。id 只是索引，渲染时从 `rows` 现取。
+   */
+  const [selectedId, setSelectedId] = useState<string | null>(null);
   // 固定"现在"，避免同一次渲染里跨午夜导致不一致
   const now = Number(sessionStorage.getItem(NOW_STATE_KEY) ?? Date.now());
 
   const labels = useMemo(() => habitBoardLabels(t), [t]);
+
+  /**
+   * 左列的数据：进度行 + 它自己的 7 天窗口。
+   *
+   * ⚠️ `week` 与右窗格的 90 天热力图**同一次 `now`、同一份 `habitHeatmap`**，
+   * 只是窗口长度不同 —— 所以列表里那个点说"打过"，窗格里那天必然是深色格。
+   * 另起一条"今天打没打"的判断就会出现两列不同步的第三条路。
+   */
+  const rows = useMemo<HabitsListRow[]>(
+    () =>
+      selectHabitProgress(store, now).map((row) => ({
+        progress: row,
+        week: selectHeatmap(store, row.habit.id, now, HABIT_ROW_WEEK_DAYS),
+      })),
+    [store, now],
+  );
+
+  /**
+   * 选中项。`selectedId` 指向的习惯被删掉时退回第一条 ——
+   * 用**派生**而不是 `useEffect` 补一次 setState：效果会在提交后再渲染一轮，
+   * 那一轮窗格是空的（症状：删掉当前习惯时右半边闪一下）。
+   */
+  const selected = rows.find((r) => r.progress.habit.id === selectedId) ?? rows[0];
 
   async function add(): Promise<void> {
     await store.addHabit(draft);
@@ -191,75 +203,89 @@ export function HabitsView() {
   );
 
   return (
-    <div style={{ padding: cssVar('space.4') }}>
-      <form
-        onSubmit={(e) => {
-          e.preventDefault();
-          void add();
-        }}
-        style={{
-          display: 'flex',
-          gap: cssVar('space.2'),
-          marginBottom: cssVar('space.4'),
-        }}
-      >
-        <input
-          value={draft}
-          onChange={(e) => setDraft(e.target.value)}
-          placeholder={t('web.habits.addPlaceholder')}
-          aria-label={t('web.habits.addLabel')}
-          style={{
-            flex: 1,
-            minHeight: cssVar('touch-target.min'),
-            padding: `${cssVar('space.2')} ${cssVar('space.3')}`,
-            borderRadius: cssVar('radius.md'),
-            border: `${cssVar('border-width.thin')} solid ${cssVar('color.border')}`,
-            background: cssVar('color.background'),
-            color: cssVar('color.foreground'),
-            // 输入框字号必须 ≥16px，否则 iOS Safari 聚焦时会自动放大页面
-            fontSize: cssVar('font-size.base'),
-            fontFamily: cssVar('font.sans'),
-          }}
-        />
-        <button
-          type="submit"
-          aria-label={t('web.habits.add')}
-          style={{
-            minWidth: cssVar('touch-target.min'),
-            minHeight: cssVar('touch-target.min'),
-            display: 'grid',
-            placeItems: 'center',
-            cursor: 'pointer',
-            borderRadius: cssVar('radius.md'),
-            border: 'none',
-            background: cssVar('color.primary'),
-            color: cssVar('color.on-primary'),
+    <div className="ht-habits" data-testid="habits-view">
+      <div className="ht-habits__side">
+        <form
+          className="ht-habits__add"
+          onSubmit={(e) => {
+            e.preventDefault();
+            void add();
           }}
         >
-          <Plus size={18} aria-hidden="true" />
-        </button>
-      </form>
+          <input
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            placeholder={t('web.habits.addPlaceholder')}
+            aria-label={t('web.habits.addLabel')}
+            style={{
+              flex: 1,
+              minHeight: cssVar('touch-target.min'),
+              fontSize: cssVar('font-size.base'),
+            }}
+          />
+          <button
+            type="submit"
+            aria-label={t('web.habits.add')}
+            style={{
+              minWidth: cssVar('touch-target.min'),
+              minHeight: cssVar('touch-target.min'),
+            }}
+          >
+            <Plus size={18} aria-hidden="true" />
+          </button>
+        </form>
 
-      <HeytaUiProvider>
-        <HabitBoard
-          habits={store.habits}
-          logs={store.logs}
-          now={now}
-          // 🔴 配对函数来自 app-host —— 共享层不认识它（见那边的文件头）。
-          growth={habitGrowth}
-          labels={labels}
-          onCheckIn={(habitId, date?: LocalDate) => {
-            run(habitId, store.checkIn(habitId, date));
+        <HabitsList
+          rows={rows}
+          selectedId={selected?.progress.habit.id}
+          onSelect={(habitId) => {
+            setSelectedId(habitId);
           }}
-          onUndoCheckIn={(habitId, date?: LocalDate) => {
-            run(habitId, store.undoCheckIn(habitId, date));
-          }}
-          busyHabitId={busyId}
-          renderColorSlot={renderColorSlot}
-          renderGoalSlot={renderGoalSlot}
-          testID="habit-board"
         />
-      </HeytaUiProvider>
+      </div>
+
+      <div
+        className="ht-habits__pane"
+        aria-label={
+          selected === undefined
+            ? undefined
+            : t('web.habits.pane.aria', { name: selected.progress.habit.name })
+        }
+      >
+        {selected === undefined ? null : (
+          <div className="ht-habits__pane-head">
+            <HabitIconPicker
+              habit={selected.progress.habit}
+              onChange={(icon) => {
+                void store.setHabitIcon(selected.progress.habit.id, icon);
+              }}
+            />
+          </div>
+        )}
+
+        <HeytaUiProvider>
+          <HabitBoard
+            // 🔴 只给选中的那一条（见文件头：全页一块板）。空列表时传 []，
+            //    由共享层渲染它自己的 `labels.empty` —— 不在这里另写一句空态。
+            habits={selected === undefined ? [] : [selected.progress.habit]}
+            logs={store.logs}
+            now={now}
+            // 🔴 配对函数来自 app-host —— 共享层不认识它（见那边的文件头）。
+            growth={habitGrowth}
+            labels={labels}
+            onCheckIn={(habitId, date?: LocalDate) => {
+              run(habitId, store.checkIn(habitId, date));
+            }}
+            onUndoCheckIn={(habitId, date?: LocalDate) => {
+              run(habitId, store.undoCheckIn(habitId, date));
+            }}
+            busyHabitId={busyId}
+            renderColorSlot={renderColorSlot}
+            renderGoalSlot={renderGoalSlot}
+            testID="habit-board"
+          />
+        </HeytaUiProvider>
+      </div>
     </div>
   );
 }
