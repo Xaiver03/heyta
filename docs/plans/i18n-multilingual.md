@@ -446,8 +446,8 @@ aria-label={label}
 | 判据 | 实测 |
 |---|---|
 | 每份都有独立的 `const en = […] as const` | **9/9** |
-| `packages/legal/tests/structure.spec.ts`（中英**结构逐条对应**） | **56 passed**，exit 0 |
-| 英文正文里残留的汉字字面量 | **3 处**（`privacy` / `third-parties` / `subscription-refund` 的英文栏各 1 处，都是主体名称「晓黎（杭州）人工智能科技有限公司」）。⚠️ 本行原先写"1 处"**是少数了** —— 只数了隐私政策那一份。**这是刻意的**（法律主体名称以登记文字为准），但**口径不统一**：`terms` 的英文栏只留了转写名，见 `legal-compliance-before-filing.md` 的 **G-31** |
+| `packages/legal/tests/structure.spec.ts`（中英**结构逐条对应**） | **56 passed**，exit 0（2026-10-02 起 **57** —— G-31 闭合时新增一条按栏取文的闸门） |
+| 英文正文里残留的汉字字面量 | **3 处**（`privacy` / `third-parties` / `subscription-refund` 的英文栏各 1 处，都是主体名称「晓黎（杭州）人工智能科技有限公司」）。⚠️ 本行原先写"1 处"**是少数了** —— 只数了隐私政策那一份。**这是刻意的**（法律主体名称以登记文字为准），但**口径不统一**：`terms` 的英文栏只留了转写名，见 `legal-compliance-before-filing.md` 的 **G-31**。✅ **2026-10-02 口径已统一**：`terms` 的英文栏补上登记名后是 **4 处**，四份全部"登记名 + 转写名"并列，`structure.spec.ts` 里那条新闸门钉住"英文栏凡引用信用代码处必须同时给出登记名称" |
 | `pnpm check:legal-copy`（站点文案 ↔ `@heyta/legal` 逐字节对账） | exit 0 |
 | `pnpm check:legal-host`（托管域名三方对账） | exit 0 |
 | 本地产物 | `apps/landing/dist/legal/<9 份>/` + `dist/en/legal/<9 份>/` = **18 个入口都在** |
@@ -493,6 +493,20 @@ aria-label={label}
 截图两张（`e2e/live-site-results/live-legal-terms-{zh,en}.png`）**人已看过**：
 中文页是「heyta 服务条款 + 版本 1.0 · 更新于 2026-10-01 + 橙色尚未生效横幅 + 目录逐条」，
 英文页整页英文（nav、横幅、CONTENTS）—— 双语是真的双语，不是套了个 `lang="en"`。
+
+🟡 **2026-10-02 复验（G-31 改版之后）**：那十条比的都是"线上自己中英两侧对不对等"，
+所以它们**看不出部署落后** —— 服务器上是三天前那份产物时照样全绿。补了一条
+**"本地真源 ↔ 线上"** 对照（参照物取自 `@heyta/legal` 的构建产物，不抄字面量）：
+线上英文 terms 渲染出的正文必须含登记中文主体名，且版本行的版本号必须等于源码的
+`version`。套件因此是 **11 条，11 passed**；两次变异（把线上产物整份复制到本地静态
+服务器、只改副本）分别精确红在这两条，复原后回绿。截图
+`e2e/live-site-results/live-legal-terms-en-operator.png` **人已看过**：英文 s1 首行即
+「These terms are agreed between you and **晓黎（杭州）人工智能科技有限公司** (Xiaoli
+(Hangzhou) …; the registered Chinese name above is the authoritative one. Unified
+Social Credit Code `91330106MAKNJ6DX7M`; …)」，版本行是 `Version 1.1 - updated 2026-10-02`。
+📌 这条也顺手把上一段那个"SPA 壳"结论钉成了判据：法务页的 `index.html` 里
+`<body>` 只有 `<div id="root"></div>`，正文全在 JS chunk —— 所以**比内容必须渲染**，
+`curl` 到的字节里根本没有那句话。
 
 ⚠️ 这条套件的产物目录同时修了一处会伤到别人的东西：`playwright.live-site.config.ts` 原来用默认
 `outputDir`（= 共享的 `e2e/test-results/`），而 Playwright 每次运行开始**删除并重建** outputDir ——
