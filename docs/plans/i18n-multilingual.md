@@ -333,14 +333,44 @@ aria-label={label}
    **在本轮从"静默跳过"变成"真跑"**。本轮结束已把该文件删除；下次谁要再跑边界③，
    要知道自己同时把这条旅程用例打开了。
 
-4. ⚠️ **仍是边界：账号语言 → 英文邮件的端到端没有实跑**（要真发信）。
-   本轮把"为什么这里跑不了"量清楚了，三条都卡住：
-   ① `server/src/email.ts` 此刻是**另一条会话的未提交改动**，改它等于踩进别人的批次；
-   ② 外发通道 Ethereal 从这台机器**不可达**（`curl` 返回 000），本机也没有任何
-   SMTP catcher 可以接；③ 现有那批服务端用例把 db 和发信调用**都 mock 掉了**，
-   所以它们证明的是"选对了模板"，不是"信真的以英文发出去"。
-   服务端判据因此停在单元级（解析优先级 `body > 账号 > Accept-Language > zh-CN`）。
-   要关这条，需要一台能真发信或能起本地 SMTP 落件环境的机器，**不是**再多写几条单测。
+4. ✅ **已闭合（2026-10-01）：账号语言 → 英文邮件跑到了真发信，而且**读回来了****。
+   原来那三条"为什么这里跑不了"，有两条是**我读错了现场**，一条是真的：
+
+   | 原判断 | 今天实测 |
+   |---|---|
+   | ① `server/src/email.ts` 是别人未提交的改动 | 当时确实是，**现在干净** ⇒ 不再是障碍（改它不需要踩谁的批次） |
+   | ② 外发通道 Ethereal 从这台机器**不可达**（`curl` 返回 000） | **错**。SMTP `smtp.ethereal.email:587` 真把两封信收下了；`createTestAccount()` 也成功。`curl 000` 是我拿错了宿主去试 —— API 宿主是 **`api.nodemailer.com`**（`nodemailer/lib/nodemailer.js:15` 的默认值），`api.ethereal.email` 只是收件域，TLS 根本握不上，所以第一版探针的 `ECONNRESET` 长得像"这台机器读不回来"，实际是探针指错了地址 |
+   | ③ 现有服务端用例把 db 和发信调用**都 mock 掉了** | **真的**，而且这才是这条边界的全部内容：`account-locale.spec.ts` 把 `auth.ts` 整个 mock 掉 ⇒ 只证"路由选出了 `en`"；`email.spec.ts` 把 `createTransport` 换成假对象 ⇒ 只证"传给 transport 的字段对"。**两条各证一半，没有一条把两半接起来** |
+
+   所以闭合也是两半，各自钉住一段路：
+
+   - **落件字节那半**（默认套件里，`server/tests/email-locale-wire.spec.ts`，6 条）：
+     用 `node:net` 在本机回环上起一个**最小 SMTP 收件器**（零新依赖、随机端口、
+     只监听 127.0.0.1、**不外发**，收件地址一律 RFC 2606 保留域），让真 nodemailer
+     走完 EHLO/MAIL FROM/RCPT TO/DATA 交还 `250 OK: queued`，然后对**落件的原始字节**
+     下判据：en 账号 ⇒ 正文 CJK 计数 = 0 且带 `?lang=en`；**对照组** zh 账号走同一条
+     路由 ⇒ 必须出现中文（语言不是常量）；`text/plain` 与 `text/html` 两个 part 都在，
+     纯文本版同样本地化。
+     🔴 写这条时自己的解析器错过两次，症状都和"被测对象坏了"一模一样：
+     quoted-printable 解出来是**字节**，不重新按 UTF-8 读就把中文看成两三个乱码 ⇒
+     CJK 判据会**以通过的方式失效**；nodemailer 把 `Content-Type` 和 `boundary`
+     写在**两行**上，不折行还原就拿不到 boundary ⇒ "两个 part 都在"永远红（**假红**）。
+   - **出站那半**（默认套件不收，`pnpm --filter @heyta/server test:integration:email-live`，
+     实测 1 passed / 12.8s / exit 0）：把信真发到外部收件箱，再用 `deliver()` 打出的
+     预览 URL 把正文**读回来** —— en 那封 `cjk=0 / lang=en`、zh 那封 `cjk=294 / lang=zh-CN`，
+     两封里产品名各出现 18 次。收件人就是这台机器刚建的那个测试账号自己，
+     token 是常量假值、域名是 `heyta.test`，没有任何真人收件。
+
+   **变异验证**三条，各自红在点上（改的都是产品代码，跑完逐字节还原，sha256 已对）：
+   摘掉 `localeForEmail` 的账号分支 ⇒ **3 红**；`deliver()` 按默认语言渲染 ⇒ **3 红**
+   （zh 那条照常绿 —— 正是"永远中文"这种实现只红一半的形状）；`withLocale` 不写 `lang` ⇒ **2 红**。
+   复跑：新那条 6/6、全量 server **100 文件 / 1973 passed / 1 skipped**、`tsc --noEmit` 0。
+
+   ⚠️ **这条边界仍然留着一段不在 i18n 范围内的东西**：真第三方邮箱的**投递质量**
+   （SPF / DKIM / 退信 / 进不进垃圾箱）。它只能拿真域名真收件人验，且和语言无关 ——
+   语言到"外部服务存下来的正文"为止已经钉住。线上那次真发信（§2026-09-30 的部署复验，
+   在部署镜像里核对过中英两版）是它的旁证，不是它的替代。
+
 
 📌 **本轮顺带查出的两件不属于本线的事**（都已入档，都不是 i18n 引入的）：
 
@@ -1247,8 +1277,10 @@ case 'ollama': return t('common.ai.preset.ollama.label');
    **判据实跑结果**（本轮，真浏览器 Playwright，截图人看过）：
    zh-CN 浏览器首开 `/app` → 中文；**en-US 浏览器首开 → 英文**（第 3 层直接生效，无需登录）；
    点「English」→ 侧栏 `Inbox` + `localStorage['heyta.locale']=en` + `<html lang>=en` + 当前语言 chip 换成主蓝边框；
-   显式选择重开仍在（第 1 层高于第 3 层）。账号语言那半边是**服务端单元判据**（18 条 i18n + server 9/9），
-   ⚠️ **端到端"中文浏览器 + 应用切英文 + 魔法登录 → 英文邮件"这条没有实跑**（要真发信），登记为未核实。
+   显式选择重开仍在（第 1 层高于第 3 层）。账号语言那半边：服务端单元判据（18 条 i18n + server 9/9）
+   **+ 端到端已实跑**（2026-10-01 闭合，见 §7.14 第 4 条）—— 本机回环 SMTP 收件器上
+   "落件字节是英文"（`server/tests/email-locale-wire.spec.ts`，三条变异各红在点上），
+   真发到外部测试收件箱后**再读回来**（`pnpm --filter @heyta/server test:integration:email-live`）。
 5. ✅ **widget-core 收编**（§7.10；`75b0a07b`）。`adaptive-card.ts` 的模板字符串进 `widget.*` 词条，
    `apps/web/public/widgets/*.json` 改成**生成物** + `pnpm check:widgets`（`scripts/check-widgets.mjs --check`
    逐字节对账，照 server-copy 模式）；鸿蒙 `WidgetModels.ts` 的 `QUADRANT_LABELS_EN` 四条补齐，
@@ -1265,9 +1297,11 @@ case 'ollama': return t('common.ai.preset.ollama.label');
    （`OUTPUT_LANGUAGE_DIRECTIVE`：用界面语言输出），否则英文用户确认后会把模型的中文标题/清单
    **写进数据并同步**（`ai-breakdown` 的 `mergeChecklistIntoNote` 落备注，概率性通道）。
    判据：28 条单测 + 三处变异（拿掉指令段 / 传错 locale / 只改一份提示词）各自精确报红。
-   🔴 **未跑通的那条**：「英文界面跑捕获 → 模型输出英文」需要真 provider 配置，
-   这台机器上 `/tmp/heyta-ai-live` 没有凭据 ⇒ 命令 `HEYTA_AI_LOCALE=en pnpm verify:ai-breakdown-live`
-   **本轮不可执行**，登记为缺口（不是"已验证"）。
+   ⚠️「英文界面跑捕获 → 模型输出英文」那半条**卡点已更正**（不是"本机不可执行"）：
+   本机 Ollama 可跑通整条链路，`HEYTA_AI_LOCALE=en pnpm verify:ai-breakdown-live`
+   **实测 9 次全部仍输出汉字** —— 而本机唯一在服务的模型是 `qwen2.5:0.5b`，
+   连"只输出 `- ` 条目"都不稳定遵守 ⇒ **探针能力不够，证不了也证不伪**。
+   细节与顺带修掉的三条假红见 §7.14 第 3 条。
 8. ✅ **`scripts/check-ai-coverage.mjs` 的中文钉子改按词条 key 查两份表**（`8ac9fe8d`）。
    它原先钉的是一处**界面已经不再渲染**的字符串（第 9 节第 5 条的遗留），所以 en 披露不受保护；
    现在按 key 同时查 zh/en 两张表。判据 `e2eecopy` 组 5/5，含"往 en 表塞回中文 / 删掉 en 那条"两种注入。
