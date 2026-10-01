@@ -19,6 +19,7 @@
   "dependencies": {
     "@heyta/design-system": "workspace:*",
     "@heyta/domain": "workspace:*",
+    "@heyta/shared-schema": "workspace:*",
     "lucide": "1.48.0"
   },
   "peerDependencies": {

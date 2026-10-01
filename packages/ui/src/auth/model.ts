@@ -31,7 +31,19 @@
  * 所以这里只写**字符串字面量联合**：key 的正确性由**宿主侧的词条表类型系统**校验
  * （宿主 `t()` 的参数是 `MessageKey`，传错一个字面量就编译不过）。
  * 这是既有先例（`SyncFailureMessageKey` 的注释里也写明了这一条）。
+ *
+ * ⚠️ 与上面那条不冲突的一处 import：这个文件**确实** import
+ * `@heyta/shared-schema` 的两个口令长度常量。理由与"为什么不 import i18n"是同一类
+ * 判断 —— 那个包会拖进第二份 React，而 shared-schema 是纯契约（零 React、零平台代码），
+ * 且它已经是 `@heyta/app-host` 的依赖、今天就在 RN 的图里。
+ * 在这里 import 它换来的东西是：**句子里的数字与裁决它的那份数字是同一个**，
+ * 而宿主拿不到"忘了填 `{min}`"这个选项。
  */
+
+import {
+  AUTH_PASSWORD_MAX_CODE_POINTS,
+  AUTH_PASSWORD_MIN_CODE_POINTS,
+} from '@heyta/shared-schema';
 
 /**
  * 已知认证失败原因 → 共用词条 key。
@@ -270,6 +282,62 @@ export function policyMentionsMax(policyCode: string | undefined): boolean {
 
 /**
  * 表单阶段。
+/**
+ * 词条的插值参数。**不 import `@heyta/i18n` 的 `MessageVars`**（理由见文件头），
+ * 与它**同形**（不是 `Readonly` —— 那个是可变索引签名，包一层只会有人再解一次），
+ * 宿主侧 `t(key, vars)` 直接吃得下。
+ */
+export type AuthMessageVars = Record<string, string | number>;
+
+/**
+ * 失败 → **该说的那句话 + 句子里要填的数**。
+ *
+ * 🔴 这个函数存在的理由是 `authFailureMessageKey` 的一个**真实缺陷形态**：
+ * 它只交 key，而三条词条带占位符（`{min}` / `{max}` / `{seconds}`）。
+ * 宿主只拿 key、忘了填数时**不会报错** —— `@heyta/i18n` 缺变量时刻意
+ * **保留原占位符**（那是为了"漏填一眼看得见"的取向，方向正确），
+ * 于是界面上印出"或者等 {seconds} 秒后再试密码"。
+ * 2026-10-01 实测 web 的 `AuthPanel.tsx:370` 与 `PasswordPanel.tsx:130`
+ * **两处都漏了** `{seconds}`。
+ *
+ * ⇒ key 与 vars 由同一个函数交出，宿主就没有"只拿一半"这个选项。
+ * `authFailureMessageKey` 保留：它是纯映射，`packages/ui/tests/auth-model.spec.ts`
+ * 那张原因快照表直接吃它，而且不带占位符的那些原因本来就不需要第二个返回值。
+ *
+ * ⚠️ `password-policy` 只在**带 `policyCode`** 时才走策略那句 ——
+ * 服务端没给码（老服务端 / 未来加了新码）时落回统称，这是
+ * `passwordPolicyMessageKey` 已有的纪律，这里不改变它。
+ */
+export function authFailureMessage(failure: {
+  reason?: string;
+  policyCode?: string;
+  retryAfterSeconds?: number;
+}): { key: AuthFailureMessageKey | AuthPolicyMessageKey; vars?: AuthMessageVars } {
+  const { reason, policyCode, retryAfterSeconds } = failure;
+
+  if (reason === 'password-policy' && policyCode !== undefined) {
+    const key = passwordPolicyMessageKey(policyCode);
+    // 🔴 只有这两条带数字，其余两条（太常见 / 已泄露）说的是动作、不是区间 ——
+    //    给它们塞 `{min}` 会让一句本不需要数字的话开始依赖数字。
+    if (policyCode === 'too_short') {
+      return { key, vars: { min: AUTH_PASSWORD_MIN_CODE_POINTS } };
+    }
+    if (policyCode === 'too_long') {
+      return { key, vars: { max: AUTH_PASSWORD_MAX_CODE_POINTS } };
+    }
+    return { key };
+  }
+
+  if (reason === 'password-locked' && retryAfterSeconds !== undefined && retryAfterSeconds > 0) {
+    return {
+      key: 'common.auth.error.passwordLockedWithWait',
+      vars: { seconds: retryAfterSeconds },
+    };
+  }
+
+  return { key: authFailureMessageKey(reason, { retryAfterSeconds }) };
+}
+
  *
  * 🔴 它**不是** `AuthJourneyStep` 的别名，两件事不同层次：
  * `AuthJourneyStep` 说的是**协议走到了哪一步**（注册不发令牌、验证邮箱也不发令牌…），

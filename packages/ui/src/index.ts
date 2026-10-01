@@ -840,3 +840,19 @@ export {
   type AuthFormProps,
   type AuthFormStatus,
 } from './auth/AuthForm.js';
+
+/**
+ * ── W7：失败句子**连同要填的数字**一起交出 ──
+ *
+ * 🔴 **本块是追加的**（`index.ts` 是多写者共享文件，只许在末尾追加）。
+ *
+ * 为什么不在上面那块 W6 的导出里加一行：那一块正被别的会话改（同一份
+ * `auth/model.ts` 的口令路径），而这里的形状是**这次修 bug 的产物** ——
+ * `authFailureMessageKey` 只交 key，带 `{min}`/`{max}`/`{seconds}` 的三条词条
+ * 于是有"宿主拿到 key、忘了填数"的空间，web 的两处面板真实漏过。
+ * `authFailureMessage` 把两半绑成一次返回，宿主没法只拿一半。
+ */
+export {
+  authFailureMessage,
+  type AuthMessageVars,
+} from './auth/model.js';

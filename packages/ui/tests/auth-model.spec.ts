@@ -20,11 +20,17 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
 import {
+  AUTH_PASSWORD_MAX_CODE_POINTS,
+  AUTH_PASSWORD_MIN_CODE_POINTS,
+} from '@heyta/shared-schema';
+
+import {
   AUTH_EMAIL_AUTOCOMPLETE,
   AUTH_TERMS_REQUIRED_KEY,
   E2EE_PASSPHRASE_LABEL_KEY,
   SIGN_IN_PASSWORD_LABEL_KEY,
   STEPS_WITHOUT_TOKEN,
+  authFailureMessage,
   authFailureMessageKey,
   authFormStageAfterContinue,
   defaultPasswordRevealed,
@@ -48,11 +54,29 @@ const REPO = join(dirname(fileURLToPath(import.meta.url)), '../../..');
  * 匹配的是 `'key':` 这种行首词条形状 —— 与 `check:ui-language` 那个解析器同一形态。
  */
 function localeHasKey(locale: 'zh-CN' | 'en', key: string): boolean {
-  const src = readFileSync(
-    join(REPO, 'packages/i18n/src/locales', `${locale}.ts`),
-    'utf8',
-  );
-  return src.includes(`'${key}':`);
+  return localeSrc(locale).includes(`'${key}':`);
+}
+
+function localeSrc(locale: 'zh-CN' | 'en'): string {
+  return readFileSync(join(REPO, 'packages/i18n/src/locales', `${locale}.ts`), 'utf8');
+}
+
+/**
+ * 取某条词条的**文本本身**。
+ *
+ * 🔴 为什么需要它：`authFailureMessage` 的返回值里有 key 也有 vars，而"这句话里到底
+ * 有没有 `{seconds}`"是**文本**决定的。只测函数返回值会漏掉那一半 —— 改文案的人加一个
+ * 占位符时，谁也不会想到要去改 model.ts。
+ */
+function localeText(locale: 'zh-CN' | 'en', key: string): string {
+  const line = localeSrc(locale)
+    .split('\n')
+    .find((one) => one.trimStart().startsWith(`'${key}':`));
+  if (line === undefined) throw new Error(`${locale} 里没有词条 ${key}`);
+  const value = line.slice(line.indexOf(':', line.indexOf("'") + 1) + 1).trim();
+  const quoted = /^'((?:[^'\\]|\\.)*)'/.exec(value);
+  if (quoted === null) throw new Error(`${locale} 的 ${key} 不是预期的单引号词条形状`);
+  return quoted[1].replace(/\\'/g, "'").replace(/\\\\/g, '\\');
 }
 
 /**
@@ -262,6 +286,76 @@ describe('passwordPolicyMessageKey —— 四种拒绝给四种动作', () => {
 describe('表单的两步与 autofill（FIDO 2023 UX + web.dev 口令管理器）', () => {
   it('🔴 空的邮箱不许前进到口令步 —— 否则口令框不知道属于谁', () => {
     expect(authFormStageAfterContinue({ stage: 'identify', email: '' })).toBe('identify');
+describe('🔴 authFailureMessage —— 句子和它要带的数字**一次交出**', () => {
+  /**
+   * 这一层存在的唯一理由：`translateIn` 在 vars 缺省时**保留占位符原文**，
+   * 所以"只拿 key 不填数"的调用不会报错、不会变红，而是把 `{seconds}` / `{min}`
+   * 这种字面量直接印给用户看。2026-10-01 实测 web 两个面板正是这样。
+   *
+   * 因此这里不测"函数对不对"，测的是**宿主拿不到一半**：每次返回带占位符的 key 时，
+   * vars 必须同时在场，而且数字来自 shared-schema 而不是调用方传的。
+   */
+  it('太短 / 太长把契约数字带在返回值里（宿主没有"忘记传"这个选项）', () => {
+    const short = authFailureMessage({ reason: 'password-policy', policyCode: 'too_short' });
+    expect(short.key).toBe('common.auth.policy.tooShort');
+    expect(short.vars).toEqual({ min: AUTH_PASSWORD_MIN_CODE_POINTS });
+
+    const long = authFailureMessage({ reason: 'password-policy', policyCode: 'too_long' });
+    expect(long.key).toBe('common.auth.policy.tooLong');
+    expect(long.vars).toEqual({ max: AUTH_PASSWORD_MAX_CODE_POINTS });
+  });
+
+  it('🔴 返回值里出现的每个占位符，vars 都得填上（遍历，不点名）', () => {
+    const cases: Array<{ reason?: string; policyCode?: string; retryAfterSeconds?: number }> = [
+      { reason: 'password-policy', policyCode: 'too_short' },
+      { reason: 'password-policy', policyCode: 'too_long' },
+      { reason: 'password-policy', policyCode: 'too_common' },
+      { reason: 'password-policy', policyCode: 'breached' },
+      { reason: 'password-policy' },
+      { reason: 'password-locked', retryAfterSeconds: 900 },
+      { reason: 'password-locked' },
+      { reason: 'invalid-credentials' },
+      { reason: 'server-error' },
+      { reason: 'no-such-reason' },
+    ];
+    for (const one of cases) {
+      const { key, vars } = authFailureMessage(one);
+      for (const locale of ['zh-CN', 'en'] as const) {
+        const placeholders = [...localeText(locale, key).matchAll(/\{\s*(\w+)\s*\}/g)].map(
+          (m) => m[1],
+        );
+        for (const name of placeholders) {
+          // 断言的是**形状**：这句话里写了 `{seconds}`，这次调用就必须给出 seconds。
+          // 两张表都查 —— 翻译时多留或漏掉一个占位符，同样会把字面量印给用户。
+          expect(vars, `${locale} 的 ${key} 带占位符 {${name}} 却没给值`).toBeDefined();
+          expect(vars?.[name], `${locale} 的 ${key} 缺 {${name}}`).toBeDefined();
+        }
+      }
+    }
+  });
+
+  it('锁定有秒数说"等 N 秒"，没秒数只说换路（**不能把 undefined 当 0**）', () => {
+    const withWait = authFailureMessage({ reason: 'password-locked', retryAfterSeconds: 900 });
+    expect(withWait.key).toBe('common.auth.error.passwordLockedWithWait');
+    expect(withWait.vars).toEqual({ seconds: 900 });
+
+    const noWait = authFailureMessage({ reason: 'password-locked' });
+    expect(noWait.key).toBe('common.auth.error.passwordLocked');
+    expect(noWait.vars).toBeUndefined();
+
+    const zero = authFailureMessage({ reason: 'password-locked', retryAfterSeconds: 0 });
+    expect(zero.key).toBe('common.auth.error.passwordLocked');
+    expect(zero.vars).toBeUndefined();
+  });
+
+  it('其余原因照旧落到 authFailureMessageKey（不另起一套）', () => {
+    expect(authFailureMessage({ reason: 'invalid-credentials' }).key).toBe(
+      'common.auth.error.invalidCredentials',
+    );
+    expect(authFailureMessage({}).key).toBe('common.auth.error.unknown');
+  });
+});
+
     expect(authFormStageAfterContinue({ stage: 'identify', email: '   ' })).toBe('identify');
     expect(authFormStageAfterContinue({ stage: 'identify', email: 'a@b.c' })).toBe('credential');
     // 「继续」不许把已经前进过的阶段拉回去（用户从口令步点浏览器后退式重提）。
@@ -414,7 +508,20 @@ describe('🔴 "只有一份"的机器保证（源码级）', () => {
 
   it('web 的 AuthPanel 真的改用了共享的那一份', () => {
     const src = readFileSync(join(REPO, 'apps/web/src/features/auth/AuthPanel.tsx'), 'utf8');
-    expect(src).toContain('authFailureMessageKey');
+    // `authFailureMessage(`（带括号）而不是 `authFailureMessageKey` —— 前者包含后者，
+    // 只写后半截的话"换回只拿 key 的那份"这种回归会照样绿。
+    expect(src).toContain('authFailureMessage(');
     expect(src).toMatch(/from '@heyta\/ui'/);
   });
 });
+  it('🔴 三个消费面板都不许只拿 key 不填数（占位符会原样印出来）', () => {
+    for (const file of [
+      'apps/web/src/features/auth/AuthPanel.tsx',
+      'apps/web/src/features/settings/PasswordPanel.tsx',
+    ]) {
+      const src = readFileSync(join(REPO, file), 'utf8');
+      expect(src, `${file} 还在用只给 key 的那一层`).not.toContain('authFailureMessageKey(');
+      expect(src, `${file} 还在自己拼策略句的数字`).not.toContain('passwordPolicyMessageKey(');
+      expect(src, `${file} 没用共享的 key+vars 一次性出口`).toContain('authFailureMessage(');
+    }
+  });
