@@ -29,7 +29,7 @@
  * **认不出就抛**，而不是安静地抽到 0 条（0 条会让所有邮件变成空字符串）。
  */
 
-import { readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { join, relative } from 'node:path';
 
 // ⚠️ 别名不叫 `ts`：本文件后面还有一个生成 TS 字面量的 helper，
@@ -43,10 +43,53 @@ const TARGET = join(SERVER, 'src/copy.generated.ts');
 /** 服务端前缀。改这里等于改"哪些词条会被搬到服务端"。 */
 const SERVER_PREFIX = 'server.';
 
-const SOURCES = [
-  { locale: 'zh-CN', file: join(REPO, 'packages/i18n/src/locales/zh-CN.ts'), exportName: 'zhCN' },
-  { locale: 'en', file: join(REPO, 'packages/i18n/src/locales/en.ts'), exportName: 'en' },
-];
+/**
+ * 🔴 语言清单**不在这儿写死**，从 `packages/i18n` 的 `LOCALES` 派生。
+ *
+ * 理由和 `check:ui-language` 那条一样：语言列表有两份定义时，加第三门语言的人会
+ * 只改 `types.ts`（那是类型上唯一必填的一处），于是**服务端无声地少一种语言** ——
+ * 邮件对一个已启用的语言渲染成兜底文案，而所有检查都绿。
+ *
+ * 顺序也照 `LOCALES`：`SERVER_LOCALES` 与 `SERVER_COPY` 的键序、以及"以第一种语言
+ * 的键集合为基准"都取决于它。用 `readdir` 排序会得到 `['en','zh-CN']`，
+ * 那会让生成物整篇重排 —— 一次纯粹无意义的 churn。
+ */
+const I18N_TYPES = join(REPO, 'packages/i18n/src/types.ts');
+
+/** `zh-CN` → `zhCN`：词条表的导出名就是它的 camelCase。 */
+const camelCase = (locale: string): string =>
+  locale.replace(/-+([a-zA-Z])/g, (_, c: string) => c.toUpperCase());
+
+function readLocales(): string[] {
+  const decl = /export const LOCALES\s*=\s*\[([^\]]*)\]/.exec(readFileSync(I18N_TYPES, 'utf8'));
+  const locales = decl === null ? [] : [...decl[1].matchAll(/'([^']+)'/g)].map((m) => m[1]);
+  if (locales.length === 0) {
+    throw new Error(
+      `无法从 ${relative(REPO, I18N_TYPES)} 解析 \`export const LOCALES\` —— 它是服务端语言清单的来源。\n` +
+        '   它的形状变了就更新本脚本，不要在这里退回一份写死的清单。',
+    );
+  }
+  return locales;
+}
+
+const SOURCES = readLocales().map((locale) => ({
+  locale,
+  file: join(REPO, `packages/i18n/src/locales/${locale}.ts`),
+  exportName: camelCase(locale),
+}));
+
+// 🔴 词条表缺失要**说清原因**再抛。让它走到 `readFileSync` 的 ENOENT 也会非零退出，
+//    但那条堆栈里没有"该做什么"：加一门语言的人（日/韩就绪清单的第一步就是在
+//    `LOCALES` 里打开它）会对着一个 syscall 报错猜，而这份脚本其余的失败都带答案。
+{
+  const missing = SOURCES.filter(({ file }) => !existsSync(file)).map(({ locale }) => locale);
+  if (missing.length > 0) {
+    throw new Error(
+      `LOCALES 里有 ${missing.join('、')}，但 ${missing.map((l) => `packages/i18n/src/locales/${l}.ts`).join('、')} 不存在。\n` +
+        '   先在 packages/i18n 补齐该语言的词条表（`check:ui-language` 会逐条核对），再生成服务端文案。',
+    );
+  }
+}
 
 /**
  * 用 TypeScript 的解析器读一份词条表，抽 `server.` 前缀的键值。
@@ -117,7 +160,7 @@ const firstLocale = localeKeys[0];
 if (firstLocale === undefined) throw new Error('没有可用的语言');
 const firstKeys = Object.keys(catalogs[firstLocale] ?? {}).sort();
 
-// 两种语言的 key 集合必须一致 —— 服务端按 locale 取词条，缺一条就是运行时空串。
+// 各语言的 key 集合必须一致 —— 服务端按 locale 取词条，缺一条就是运行时空串。
 for (const locale of localeKeys.slice(1)) {
   const keys = Object.keys(catalogs[locale] ?? {}).sort();
   const missing = firstKeys.filter((k) => !keys.includes(k));
@@ -141,14 +184,16 @@ const lines: string[] = [];
 lines.push('/**');
 lines.push(' * 服务端（邮件 / 凭据页）用的文案快照 —— **自动生成，请勿手改**。');
 lines.push(' *');
-lines.push(' * 唯一事实源：`packages/i18n/src/locales/{zh-CN,en}.ts`（与客户端同一份词条表）');
+lines.push(
+  ` * 唯一事实源：\`packages/i18n/src/locales/{${localeKeys.join(',')}}.ts\`（与客户端同一份词条表）`,
+);
 lines.push(' * 重新生成：`pnpm --filter @heyta/sync-server gen:server-copy`');
 lines.push(' * 校验漂移：`pnpm check:server-copy`（已接进 `pnpm check`）');
 lines.push(' *');
 lines.push(' * 🔴 只搬 `server.` 前缀的词条。**不要在这里手写第二份文案。**');
 lines.push(' */');
 lines.push('');
-lines.push("export const SERVER_LOCALES = ['zh-CN', 'en'] as const;");
+lines.push(`export const SERVER_LOCALES = [${localeKeys.map((l) => lit(l)).join(', ')}] as const;`);
 lines.push('');
 lines.push('export type ServerLocale = (typeof SERVER_LOCALES)[number];');
 lines.push('');
