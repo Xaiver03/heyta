@@ -606,7 +606,8 @@ export const zhCN = {
   'common.auth.error.passwordLockedWithWait': '密码登录被临时锁住了（账号本身没有被锁）。可以先用邮箱登录链接或通行密钥进来，或者等 {seconds} 秒后再试密码。',
   'common.auth.error.passwordBackendBusy': '服务器这会儿正忙，这一次没能验证。你写的内容还在，过几秒再试一次。',
   'common.auth.error.invalidResetLink': '这个重置链接已经用过或过期了。回到登录那一步重新申请一封。',
-  'common.auth.error.noPasswordSet': '这个账号还没有设置登录密码（也许一直用通行密钥或邮件链接登录），所以这里没有可改的密码。',
+  'common.auth.error.noPasswordSet': '这个账号还没有登录密码（也许一直用通行密钥或邮件链接登录）。就在这里设一个：设好之后也能用邮箱和密码登录。',
+  'common.auth.error.passwordAlreadySet': '这个账号已经有登录密码了，所以不能再设一个。要换密码请走「修改密码」，那里会先验一次当前密码。',
   'common.auth.error.passwordPolicy': '这个密码不符合要求，请按下面的提示改一下。',
   'common.auth.error.requestRejected': '这个请求没有被接受，请检查一下填写的内容。',
   'common.auth.error.passkeyNameTooLong': '名字最多 {max} 个字，请短一些。',
@@ -710,7 +711,7 @@ export const zhCN = {
   'web.passkeys.error.nameTooLong': '名字太长了（最多 {max} 个字）。',
   'web.passkeys.error.load': '没能加载通行密钥列表。',
   'web.passkeys.error.passkeyNotFound': '这条通行密钥已经不在服务器上了，列表已刷新。',
-  'web.passkeys.error.lastPasskey': '这是账号上最后一条通行密钥，而删掉它就没有任何登录方式了，所以不能删除。先添加一条新的，再删这条。',
+  'web.passkeys.error.lastPasskey': '这是账号上最后一条通行密钥，而删掉它就没有任何登录方式了，所以不能删除。先添加一条新的，或者去设置页设一个登录密码，再删这条。',
   'web.passkeys.error.unauthorized': '登录状态已失效，请重新登录。',
   'web.passkeys.error.network': '连不上服务端，请稍后重试。',
 
@@ -733,7 +734,25 @@ export const zhCN = {
   'web.settings.password.otherDevices': '其它设备上的登录都会失效，要用新密码重新登录；数据不受影响。这个标签页会自动接着用新密码。',
   'web.settings.password.needsSignIn': '先登录，才能修改这个账号的登录密码。',
   'web.settings.password.resetTo': '重置链接会发到 {email}。',
-  'web.settings.password.noPassword': '这个账号还没有登录密码，所以这里没有可改的密码。要继续登录请用通行密钥或邮件链接。',
+  'web.settings.password.noPassword': '这个账号还没有登录密码。在下面设一个：设好之后也可以用邮箱和密码登录，通行密钥和邮件链接照旧能用。',
+  // ── "设第一个密码"这一张表（与上面「修改密码」是两条路，措辞必须不同）────
+  //
+  // 🔴 不复用 `lead` / `submit` / `changed`：那三句说的都是"改"，而这里没有旧密码
+  // 被换掉 —— 界面把"加一个认证器"说成"改密码"，用户就会去找那个并不存在的
+  // "当前密码"框，或者以为别处的登录会被踢掉（这条恰恰不会）。
+  'web.settings.password.setLead': '这个账号现在靠通行密钥或邮件链接登录。设一个登录密码，就多一条路 —— 你的加密口令是另一样东西：不在这里改，这个密码也代替不了它解开数据。',
+  'web.settings.password.setField': '登录密码',
+  'web.settings.password.setSubmit': '设置登录密码',
+  'web.settings.password.setBusy': '正在设置登录密码…',
+  'web.settings.password.setDone': '登录密码已设置。',
+  'web.settings.password.setConsequence': '这不会影响其它设备：加一个密码不会把任何地方踢下线，这个标签页也不用重新登录。',
+  // 服务端在这条路上回 `email_not_verified`。通用那句（"密码是对的，只差最后一步"）
+  // 在这里是假的 —— 这一次没有任何密码被验过，所以这里给一句说得通的。
+  'web.settings.password.setNeedsVerified': '这个邮箱还没有验证，所以密码先设不上（设了也登不进）。先去点那封验证邮件里的链接，再回来设。',
+  // 两张表互指的入口：界面**不知道**这个账号有没有口令（服务端不许界面猜），
+  // 所以这两句都是向用户提问，不是断言。
+  'web.settings.password.switchToSet': '从来没设过登录密码？在这里设一个。',
+  'web.settings.password.switchToChange': '这个密码已经设过了？去改密码。',
 
   // ── 应用内的小组件旅程（把卡片加到桌面）──────────────────────────
   'mobile.widgetJourney.sectionTitle': '桌面小组件',

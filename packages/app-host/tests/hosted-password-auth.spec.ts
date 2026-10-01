@@ -26,6 +26,7 @@ import {
   registerWithEmailPassword,
   requestPasswordReset,
   resetPasswordWithToken,
+  setInitialPassword,
   type HostedAuthOptions,
 } from '../src/hosted-auth.js';
 
@@ -72,16 +73,16 @@ const opts = (over: Partial<HostedAuthOptions> = {}): HostedAuthOptions => ({
 const SESSION = { token: 'jwt-new', user: { id: 7, email: 'a@b.c' } };
 const NEUTRAL = { message: 'If an account with that email exists…' };
 
-/** 五条路的完整 URL（`/api` 前缀 + 契约里的相对形状）。 */
+/** 六条路的完整 URL（`/api` 前缀 + 契约里的相对形状）。 */
 const urlFor = (path: string) => `https://sync.example.com/api${path}`;
 
-describe('五条路的路径就是共享契约那五条', () => {
+describe('六条路的路径就是共享契约那六条', () => {
   /**
    * 🔴 两个方向都钉：请求打出去的 URL 必须等于 `'/api' + 契约`，而 app-host 常量表里
    * 那五条也必须等于同一个串。少了后一半，"app-host 自己另写了一条路径、
    * 而测试用同一个变量去比"就会全绿 —— 那等于没测。
    */
-  it('五条各自对上，且常量表逐项等于契约', async () => {
+  it('六条各自对上，且常量表逐项等于契约', async () => {
     const login = stubFetch(() => ({ status: 200, body: SESSION }));
     await loginWithEmailPassword(opts({ fetchImpl: login.impl }), {
       email: 'a@b.c',
@@ -115,18 +116,27 @@ describe('五条路的路径就是共享契约那五条', () => {
     });
     expect(register.calls[0]!.url).toBe(urlFor(AUTH_PASSWORD_PATHS.register));
 
+    const set = stubFetch(() => ({ status: 200, body: { message: 'Password set' } }));
+    await setInitialPassword(opts({ fetchImpl: set.impl }), 'jwt', {
+      newPassword: 'b'.repeat(9),
+    });
+    expect(set.calls[0]!.url).toBe(urlFor(AUTH_PASSWORD_PATHS.set));
+    expect(set.calls[0]!.init?.method).toBe('POST');
+
     expect({
       emailPasswordRegister: HOSTED_AUTH_PATHS.emailPasswordRegister,
       emailPasswordLogin: HOSTED_AUTH_PATHS.emailPasswordLogin,
       passwordForgot: HOSTED_AUTH_PATHS.passwordForgot,
       passwordReset: HOSTED_AUTH_PATHS.passwordReset,
       passwordChange: HOSTED_AUTH_PATHS.passwordChange,
+      passwordSet: HOSTED_AUTH_PATHS.passwordSet,
     }).toEqual({
       emailPasswordRegister: `/api${AUTH_PASSWORD_PATHS.register}`,
       emailPasswordLogin: `/api${AUTH_PASSWORD_PATHS.login}`,
       passwordForgot: `/api${AUTH_PASSWORD_PATHS.forgot}`,
       passwordReset: `/api${AUTH_PASSWORD_PATHS.reset}`,
       passwordChange: `/api${AUTH_PASSWORD_PATHS.change}`,
+      passwordSet: `/api${AUTH_PASSWORD_PATHS.set}`,
     });
   });
 });
@@ -275,8 +285,8 @@ describe('code → reason：一一对应（这一组是 W5 的全部目的）', 
    * 静默退回"按状态码分类" —— 于是 `account_locked` 会说成"网络繁忙"、
    * `no_password_set` 会说成"链接无效"，两句都是错的。
    */
-  it('七个服务端码逐个都在白名单里，且映射到七个**互不相同**的原因', () => {
-    expect(PASSWORD_AUTH_ERROR_CODES).toHaveLength(7); // 阳性对照：不是对着空表跑
+  it('八个服务端码逐个都在白名单里，且映射到八个**互不相同**的原因', () => {
+    expect(PASSWORD_AUTH_ERROR_CODES).toHaveLength(8); // 阳性对照：不是对着空表跑
     const reasons = new Set<string>();
     for (const code of PASSWORD_AUTH_ERROR_CODES) {
       const reason = FAILURE_REASON_BY_SERVER_CODE[code];
@@ -284,7 +294,7 @@ describe('code → reason：一一对应（这一组是 W5 的全部目的）', 
       // 上面那条已经会抛，这里的收窄只是给类型看。
       if (reason !== undefined) reasons.add(reason);
     }
-    // 七个码 → 七个不同原因。合并任意两个都会让某一半人听到一句对不了动作的话。
+    // 八个码 → 八个不同原因。合并任意两个都会让某一半人听到一句对不了动作的话。
     expect(reasons.size).toBe(PASSWORD_AUTH_ERROR_CODES.length);
   });
 
@@ -297,6 +307,7 @@ describe('code → reason：一一对应（这一组是 W5 的全部目的）', 
     { status: 400, code: 'password_policy_violation', reason: 'password-policy' },
     { status: 400, code: 'invalid_reset_link', reason: 'invalid-reset-link' },
     { status: 400, code: 'no_password_set', reason: 'no-password-set' },
+    { status: 400, code: 'password_already_set', reason: 'password-already-set' },
   ];
 
   for (const { status, code, reason } of cases) {
@@ -551,5 +562,95 @@ describe('响应体不是 JSON 时仍按状态码给结论', () => {
         password: 'p'.repeat(9),
       }),
     ).toMatchObject({ ok: false, reason: 'malformed-response' });
+  });
+});
+
+/**
+ * 「给账号加上**第一个**登录口令」这条路（`/password/set`）。
+ *
+ * 🔴 它存在的理由是真实缺陷：passkey-only / 魔法链接注册的账号，`change` 会回
+ * `no_password_set`，而 `forgot` 对没有口令认证器的账号**刻意不发信**（反枚举）——
+ * 也就是说在补上这条路由之前，这类账号**永远**加不上登录密码，而界面词条
+ * （`common.auth.error.lastPasskey`）早就在建议"或者设一个登录密码"。
+ *
+ * 这一组钉的是它**不是 `change` 的别名**：不验当前口令、不回会话、不换令牌。
+ * 这三样中任何一样"顺手补上"，症状都是"加个密码，手机和笔记本一起掉线"
+ * 或"界面刚说成功，用户这个标签页就被踢出去"。
+ */
+describe('setInitialPassword：加认证器，不是换钥匙', () => {
+  it('请求体只有 newPassword —— 没有 currentPassword，也没有 token', async () => {
+    const { impl, calls } = ok({ message: 'Password set' });
+    await setInitialPassword(opts({ fetchImpl: impl }), 'jwt', { newPassword: 'b'.repeat(9) });
+    expect(calls[0]!.body).toEqual({ newPassword: 'b'.repeat(9) });
+    expect(Object.keys(calls[0]!.body as object)).not.toContain('currentPassword');
+  });
+
+  it('口令原样发出，一个字符都不加工（归一化只在服务端一处）', async () => {
+    const { impl, calls } = ok({ message: 'Password set' });
+    await setInitialPassword(opts({ fetchImpl: impl }), 'jwt', { newPassword: '  P@ss word ' });
+    expect(calls[0]!.body).toEqual({ newPassword: '  P@ss word ' });
+  });
+
+  it('带 locale 时随体发出（它不是发信的路，但账号语言仍然要跟过去）', async () => {
+    const { impl, calls } = ok({ message: 'Password set' });
+    await setInitialPassword({ ...opts({ locale: 'en' }), fetchImpl: impl }, 'jwt', {
+      newPassword: 'b'.repeat(9),
+    });
+    expect((calls[0]!.body as Record<string, unknown>)['locale']).toBe('en');
+  });
+
+  it('🔴 成功**不回会话**：身上不许出现 session / token —— 令牌没被作废，换了才会掉线', async () => {
+    const outcome = (await setInitialPassword(
+      opts({ fetchImpl: ok({ message: 'Password set' }).impl }),
+      'jwt',
+      { newPassword: 'b'.repeat(9) },
+    )) as Record<string, unknown>;
+    expect(outcome.ok).toBe(true);
+    expect(outcome).not.toHaveProperty('session');
+    expect(outcome).not.toHaveProperty('token');
+    expect(outcome.message).toBe('Password set');
+  });
+
+  it('空 token ⇒ unauthorized，**一个字节都不发**', async () => {
+    const { impl, calls } = ok({ message: 'Password set' });
+    const outcome = await setInitialPassword(opts({ fetchImpl: impl }), '   ', {
+      newPassword: 'b'.repeat(9),
+    });
+    expect(outcome).toMatchObject({ ok: false, reason: 'unauthorized' });
+    expect(calls).toHaveLength(0);
+  });
+
+  it('空 newPassword ⇒ invalid-input，**一个字节都不发**', async () => {
+    const { impl, calls } = ok({ message: 'Password set' });
+    const outcome = await setInitialPassword(opts({ fetchImpl: impl }), 'jwt', {
+      newPassword: '',
+    });
+    expect(outcome).toMatchObject({ ok: false, reason: 'invalid-input' });
+    expect(calls).toHaveLength(0);
+  });
+
+  it('Bearer 头就是那枚**旧**令牌（这条路不换它）', async () => {
+    const { impl, calls } = ok({ message: 'Password set' });
+    await setInitialPassword(opts({ fetchImpl: impl }), 'jwt-keep-me', {
+      newPassword: 'b'.repeat(9),
+    });
+    const headers = calls[0]!.init?.headers as Record<string, string>;
+    expect(headers['authorization']).toBe('Bearer jwt-keep-me');
+  });
+
+  /**
+   * 🔴 成功**只看 HTTP 2xx**，message 读不懂就给空串。
+   *
+   * 这条不是洁癖：把"服务端那句问候语解析失败"判成失败，用户会以为密码没设上、
+   * 再点一次 —— 而第二次拿到的是 `password_already_set`。一句"明明成功了却说失败"
+   * 在这条路上会把人推进死循环。
+   */
+  it('200 但 message 读不懂 ⇒ 仍然算成功，message 是空串（不替服务端编话）', async () => {
+    for (const body of [{}, { message: '' }, { message: 42 }, 'not-an-object']) {
+      const outcome = await setInitialPassword(opts({ fetchImpl: ok(body).impl }), 'jwt', {
+        newPassword: 'b'.repeat(9),
+      });
+      expect(outcome).toMatchObject({ ok: true, message: '' });
+    }
   });
 });

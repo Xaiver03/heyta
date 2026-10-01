@@ -193,8 +193,9 @@ export {
  * 失败如何归类）一律在 `packages/app-host`，`apps/*` 只负责
  * 「用什么网络实现」和「把通行密钥 options 交给平台的人机接口」。
  *
- * ⚠️ 邮箱 + 口令那五条（`registerWithEmailPassword` / `loginWithEmailPassword` /
- * `requestPasswordReset` / `resetPasswordWithToken` / `changePassword`）在这一版
+ * ⚠️ 邮箱 + 口令那六条（`registerWithEmailPassword` / `loginWithEmailPassword` /
+ * `requestPasswordReset` / `resetPasswordWithToken` / `changePassword` /
+ * `setInitialPassword`）在这一版
  * 才补上导出：函数与契约测在 W5 就写完了，但**包外一个调用方都没有** ——
  * 症状正是本仓库反复记过的那类"功能做完了、用户做不到"。
  */
@@ -223,6 +224,7 @@ export {
   requestPasskeyRecovery,
   requestPasswordReset,
   resetPasswordWithToken,
+  setInitialPassword,
   updateAccountLocale,
   verifyEmailAddress,
   verifyMagicLink,
