@@ -53,7 +53,28 @@ export type PasswordAuthErrorCode =
   /** 新口令不满足策略（长度 / 常见 / 已泄露）。 */
   | 'password_policy_violation'
   /** 哈希后端过载 ⇒ 503，**不降级**（见 `concurrency.ts`）。 */
-  | 'password_backend_busy';
+  | 'password_backend_busy'
+  /**
+   * 重置链接查不到 / 已过期 / 已被用过 —— 🔴 三者**故意同一个码同一句话**。
+   *
+   * 为什么不像 `invalid_credentials` 那样并进去：那句是"凭证不对"，而这里要说的是
+   * "这条路走不通，回去重新申请一封"，客户端的动作完全不同（重发链接 vs 重打口令）。
+   * 为什么不区分"过期"和"从没有过"：区分它就是给攻击者一个**判断哪些链接正在被广播**的
+   * 预言机，而对合法用户两种情况的处置一模一样。
+   */
+  | 'invalid_reset_link'
+  /**
+   * 这个账号**从来没有设过口令**（纯通行密钥 / 魔法链接注册的）。
+   *
+   * 🔴 为什么不并进 `invalid_reset_link`：那两个码让客户端做的事正好相反 ——
+   * 一个是"回去重新点一次链接"，一个是"去走「忘记密码」把口令设上"。
+   * 共用一个码就意味着界面上一句对一半人来说是错的话。
+   *
+   * 为什么可以单独存在（不违反 anti-enumeration）：它只在**已认证的改密接口**上出现，
+   * 调用者手上已经有一枚有效令牌、账号是谁他已经知道。而未认证的登录那条**没有**
+   * 这个码（`loginWithEmailPassword` 里"没口令"与"口令错"仍是同一句 + 同一次哑校验）。
+   */
+  | 'no_password_set';
 
 /**
  * 口令这条路**面向客户端的句子**（唯一真源在这里）。
@@ -82,6 +103,9 @@ export const PASSWORD_EMAIL_NOT_VERIFIED_MESSAGE =
 export const PASSWORD_ACCOUNT_LOCKED_MESSAGE =
   'Account temporarily locked due to repeated failed sign-in attempts. Sign in with a link, or try again later.';
 export const PASSWORD_POLICY_MESSAGE = 'That password does not meet the requirements.';
+/** 见 `invalid_reset_link` 上的注释：查不到 / 过期 / 用过 三种情况**共用这一句**。 */
+export const PASSWORD_INVALID_RESET_LINK_MESSAGE =
+  'That reset link is invalid or has been used. Request a new one.';
 
 export class PasswordAuthError extends Error {
   constructor(
@@ -102,8 +126,13 @@ export class PasswordAuthError extends Error {
  *
  * 🔴 归一化只发生在这里与 `policy.normalizePassword`，且注册存的就是归一化后的串 ——
  * 存原始输入而验归一化输入（或反之）是"同一口令在两端不一样"的标准生成方式。
+ *
+ * ⚠️ 导出给 `recovery.ts`（重置 / 改密）用。**不要**在别处再写一遍
+ * `withHashSlot(() => hashPassword(…))`：绕过闸门直接算哈希的地方多一处，
+ * "并发有上限"这个前提就少一处成立。
  */
-const hashFor = (normalized: string): Promise<string> => withHashSlot(() => hashPassword(normalized));
+export const hashFor = (normalized: string): Promise<string> =>
+  withHashSlot(() => hashPassword(normalized));
 
 export interface RegisterWithEmailPasswordInput {
   email: string;
@@ -170,7 +199,14 @@ const rehashOnLogin = async (userId: number, normalized: string): Promise<void> 
   }
 };
 
-const recordFailedAttempt = async (userId: number): Promise<void> => {
+/**
+ * 记一次口令失败。
+ *
+ * ⚠️ 登录与**改密**共用这一个计数器是有意的：改密接口校验的也是当前口令，
+ * 如果它不计数，那"输错当前口令"就成了一条**不会被锁**的口令爆破通道 ——
+ * 而它比登录那条更好用，因为它不需要账号存在以外的任何东西（令牌已经带上了）。
+ */
+export const recordFailedAttempt = async (userId: number): Promise<void> => {
   // `increment` 让"计数"是一条语句里的读-改-写。先 find 再 update 的写法在并发爆破下
   // 会丢计数（两个请求各自读到 4、各自写 5）—— 那正是"永远锁不上"的形状。
   const updated = await prisma.user.update({
@@ -189,7 +225,8 @@ const recordFailedAttempt = async (userId: number): Promise<void> => {
   }
 };
 
-const clearFailedAttempts = (userId: number): Promise<unknown> =>
+/** 见 `recordFailedAttempt`：同一条锁，成功的那一次由同一条路解除。 */
+export const clearFailedAttempts = (userId: number): Promise<unknown> =>
   prisma.user.update({
     where: { id: userId },
     data: { failedLoginAttempts: 0, lockedUntil: null },

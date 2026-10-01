@@ -3101,6 +3101,20 @@ export const en = {
   'server.email.login.button': 'Sign in',
   'server.email.login.ignore': 'If you did not request this, just ignore this email.',
   'server.email.login.expiry': 'This link is valid for 15 minutes.',
+  // 「密码 / 口令」这条区分同样适用于英文：登录用的是 password，
+  // 端到端加密那把钥匙在本项目里一直是 passphrase。两者写混一次，
+  // 收件人就会以为这封邮件也能找回加密钥匙 —— 那个承诺不成立。
+  'server.email.reset.subject': 'Reset your heyta sign-in password',
+  'server.email.reset.title': 'Reset your password',
+  'server.email.reset.body': 'You asked to reset your sign-in password. Click the button below to choose a new one — once that succeeds, every other device will be signed out.',
+  'server.email.reset.button': 'Choose a new password',
+  'server.email.reset.ignore': 'If this wasn’t you, just ignore this email — your password will not change.',
+  'server.email.reset.expiry': 'This link is valid for 15 minutes and can be used once.',
+  'server.email.passwordChanged.subject': 'Your heyta sign-in password was changed',
+  'server.email.passwordChanged.title': 'Password changed',
+  'server.email.passwordChanged.body': 'A new sign-in password was just set for your heyta account, and every other device has been signed out.',
+  'server.email.passwordChanged.button': 'Open heyta',
+  'server.email.passwordChanged.notYou': 'If this wasn’t you, take your account back right away with “Forgot password”, and check whether someone else can read your email inbox.',
   'server.page.tokenRequired': 'This link is incomplete: the required token is missing.',
   'server.page.error.unknown': 'Something went wrong. Please try again.',
   'server.page.verify.title': 'Email verified',

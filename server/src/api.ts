@@ -38,9 +38,17 @@ import {
   PASSWORD_ACCOUNT_LOCKED_MESSAGE,
   PASSWORD_EMAIL_NOT_VERIFIED_MESSAGE,
   PASSWORD_INVALID_CREDENTIALS_MESSAGE,
+  PASSWORD_INVALID_RESET_LINK_MESSAGE,
   PASSWORD_POLICY_MESSAGE,
   type PasswordAuthErrorCode,
 } from './password/service';
+import {
+  PASSWORD_RESET_REQUEST_MESSAGE,
+  PASSWORD_NOT_SET_MESSAGE,
+  changePassword,
+  requestPasswordReset,
+  resetPasswordWithToken,
+} from './password/recovery';
 import { MAX_PASSWORD_CODE_POINTS, type PasswordPolicyCode } from './password/policy';
 import { PASSWORD_BACKEND_RETRY_AFTER_SECONDS } from './password/concurrency';
 import { Logger } from './logger';
@@ -119,6 +127,36 @@ const PasswordSchema = z.string().min(1, 'Password is required').max(PASSWORD_TR
 const EmailPasswordLoginSchema = z.object({
   email: z.string().email('Invalid email format'),
   password: PasswordSchema,
+});
+
+/** 申请重置。**只有邮箱** —— 新口令在 `/password/reset` 那一步才出现。 */
+const PasswordForgotSchema = z.object({
+  email: z.string().email('Invalid email format'),
+});
+
+/**
+ * 重置：链接里的令牌 + 新口令。
+ *
+ * `token` 只判"在不在"，**不判形状**（64 位十六进制之类）。理由与 `PasswordSchema`
+ * 那条同源：形状规则属于签发方（`recovery.ts`），写在这里就是第二套事实源；
+ * 而形状不对的最终裁决是"库里查不到这枚哈希" ⇒ 同一句 `invalid_reset_link`。
+ * 在这里加一条正则只会把"将来换了令牌生成方式"变成"两处要同步改"。
+ */
+const PasswordResetSchema = z.object({
+  token: z.string().min(1, 'Token is required'),
+  password: PasswordSchema,
+});
+
+/**
+ * 改密：当前口令 + 新口令。
+ *
+ * 🔴 两个字段都**不**在这里判强度。当前口令是老值（用户当年可能设得比现在松），
+ * 在这里套策略会让**改密这件事本身**变成一条"用新规则拒绝老口令"的路 ——
+ * 正确动作是"接受当前口令、只对**新**口令跑策略"（在 `changePassword` 里）。
+ */
+const PasswordChangeSchema = z.object({
+  currentPassword: PasswordSchema,
+  newPassword: PasswordSchema,
 });
 
 /**
@@ -387,6 +425,21 @@ export const passwordAuthResponseOf = (pwErr: PasswordAuthError): PasswordAuthRe
       return {
         status: 403,
         body: { error: PASSWORD_EMAIL_NOT_VERIFIED_MESSAGE, code: pwErr.code },
+      };
+    case 'invalid_reset_link':
+      // 400，不用 401/403：这不是"你没证明你是谁"，是"这个链接本身不成"。
+      // 报 401 会让通用 HTTP 层把它读成"重新认证一次"（而客户端会重放同一个链接 → 死循环），
+      // 报 403 是在说"你的账号不许做这件事" —— 也不对。
+      return {
+        status: 400,
+        body: { error: PASSWORD_INVALID_RESET_LINK_MESSAGE, code: pwErr.code },
+      };
+    case 'no_password_set':
+      // 与 `invalid_reset_link` 同为 400（都是"这条路走不通"），但**句子与 code 不同** ——
+      // 界面据 code 换 CTA：这句要把人导向「忘记密码」，那句要他回去重新点链接。
+      return {
+        status: 400,
+        body: { error: PASSWORD_NOT_SET_MESSAGE, code: pwErr.code },
       };
     case 'password_policy_violation':
       return {
@@ -1421,6 +1474,186 @@ export const apiRoutes = async (
         Logger.error(`Password login error: ${errMsg}`);
         return reply.status(401).send({
           error: getSafeErrorMessage(err, PASSWORD_INVALID_CREDENTIALS_MESSAGE),
+        });
+      }
+    },
+  );
+
+  // ============================================
+  // 口令找回 / 重置 / 改密（计划 W3）
+  // ============================================
+
+  /**
+   * 申请一封"重置口令"的邮件。
+   *
+   * 🔴 **响应与账号是否存在无关**：见 `password/recovery.ts` 文件头第一条。
+   * 这里连 `Logger` 的级别都不分支（不存在 / 有账号 / 有账号但没口令 三种都走同一条
+   * `Logger.info` 在 service 层发），所以日志也不会从响应侧漏出差别。
+   *
+   * 限流有两层，**都不是**这个端点的主角：
+   * - 按账号：`recovery.ts` 用那一行 `reset_password_token_expires_at` 当计数器
+   *   （15 分钟一封）。选它而不是内存 Map 的理由写在那儿。
+   * - 按 IP：下面这个 `rateLimit`。它拦的是"一个 IP 喷一万个邮箱"（按账号那层
+   *   对每个账号只掉一次计数，拿它防喷洒等于不设防）。
+   * 50/15min 与登录那条同一个数：这条路的边际成本也主要是"发一封邮件"，
+   * 而 SMTP 抖动时更狠的数只会让真实用户重点一次。
+   */
+  fastify.post<{ Body: z.infer<typeof PasswordForgotSchema> }>(
+    '/password/forgot',
+    {
+      config: {
+        rateLimit: {
+          max: 50,
+          timeWindow: '15 minutes',
+        },
+      },
+    },
+    async (req, reply) => {
+      const parseResult = PasswordForgotSchema.safeParse(req.body);
+      if (!parseResult.success) {
+        return reply.status(400).send({
+          error: 'Validation failed',
+          details: parseResult.error.issues,
+        });
+      }
+      const { email } = parseResult.data;
+
+      try {
+        const result = await requestPasswordReset({
+          email,
+          locale: await localeForEmail(req, email),
+        });
+        // 🔴 200 而不是 202/201：这条响应**不描述任何账号事实**，
+        // 用不同的码去区分"发了"和"没发"就是在把它变成预言机。
+        return reply.send(result);
+      } catch (err) {
+        const errMsg = err instanceof Error ? err.message : 'Unknown error';
+        Logger.error(`Password reset request error: ${errMsg}`);
+        // 兜底句**仍然必须是那句中性的话**，不能是 `getSafeErrorMessage(...)`。
+        //
+        // 🔴 状态码也必须是 **200**，不是 500。这一条与另外两条不同：`/reset`、`/change`
+        // 的请求里不含身份，"这次是服务端坏了"那个信息不泄露任何人；**这条含**。
+        // 只要"存在且口令认证器正常"是那条唯一能走到写库的路，一次异常（超长邮箱、
+        // 并发、库抖）就会把响应分成 200 / 500 两堆 —— 而攻击者不需要猜口令，
+        // 只要制造一次失败就能把这条接口变回预言机：**中性设计只看得出文案，
+        // 泄露却发生在状态码上**。错误照样记进日志，那是给我们看的，不是给客户端的。
+        return reply.status(200).send({ message: PASSWORD_RESET_REQUEST_MESSAGE });
+      }
+    },
+  );
+
+  /**
+   * 用邮件链接里的令牌换新口令。
+   *
+   * 🔴 成功**不发会话**（J14，理由在 `recovery.ts` 文件头与 ADR-0040）。
+   * 响应只有"去登录"那句话，客户端据此把界面导向登录页 —— 不许在这里
+   * 顺手签一枚令牌让流程"更顺"。
+   *
+   * 这条是**未认证**的（用户正是进不去才走这条路），但它天然被链接约束：
+   * 没有那枚一次性令牌就什么都做不了，而令牌本身是 256 bit 随机值、
+   * 15 分钟有效、用一次即焚。所以这里不挂 `rateLimit` 的紧数值 ——
+   * 真正的爆破门槛是哈希查询本身（每次 ~35 ms 且过 `withHashSlot` 闸门），
+   * 猜中一枚有效令牌的概率是 2^-256。
+   */
+  fastify.post<{ Body: { token?: string; password?: string } }>(
+    '/password/reset',
+    {
+      config: {
+        rateLimit: {
+          max: 30,
+          timeWindow: '15 minutes',
+        },
+      },
+    },
+    async (req, reply) => {
+      const parseResult = PasswordResetSchema.safeParse(req.body);
+      if (!parseResult.success) {
+        return reply.status(400).send({
+          error: 'Validation failed',
+          details: parseResult.error.issues,
+        });
+      }
+      const { token, password } = parseResult.data;
+
+      try {
+        return reply.send(
+          await resetPasswordWithToken({
+            token,
+            password,
+            // 通知信的语言：这一条没有邮箱可查账号 locale，
+            // 而"正在浏览器前填这张表的人"的手上就有当前语言。
+            locale: localeFromRequest(req),
+          }),
+        );
+      } catch (err) {
+        const pwErr = toPasswordAuthError(err);
+        if (pwErr) {
+          Logger.warn(`Password reset rejected (${pwErr.code})`);
+          return sendPasswordAuthError(reply, pwErr);
+        }
+        const errMsg = err instanceof Error ? err.message : 'Unknown error';
+        Logger.error(`Password reset error: ${errMsg}`);
+        // 兜底句用 `invalid_reset_link` 那句：**任何**没走通的重置都只该有一种读法
+        // （"回去重新点一次链接"）。说"系统错误"是在告诉对方这次是别的原因。
+        return reply.status(500).send({
+          error: PASSWORD_INVALID_RESET_LINK_MESSAGE,
+          code: 'invalid_reset_link' satisfies PasswordAuthErrorCode,
+        });
+      }
+    },
+  );
+
+  /**
+   * 已登录改口令。**当前设备不掉线，其余设备全部掉线**（J13）。
+   *
+   * 响应与 `/login/email-password` **同形**（`{ token, user }`）而不是只有 `{ message }`：
+   * `tokenVersion` 是全局计数器，bump 之后手上这枚也失效了，客户端必须有一枚新的
+   * 才能继续用 —— 否则"改个密码把自己的这个标签页也踢出去"，而它刚刚证明了
+   * 这个人有权改。这条形状由测试钉住（J13 的第二半）。
+   *
+   * 挂在 `preHandler: authenticate` 上：这条路读的是**已认证身份**的 `userId`，
+   * 绝不允许从 body 里取（那会是一条"给任意账号改口令"的路）。
+   */
+  fastify.post<{ Body: { currentPassword?: string; newPassword?: string } }>(
+    '/password/change',
+    {
+      preHandler: authenticate,
+      config: {
+        rateLimit: {
+          max: 10,
+          timeWindow: '15 minutes',
+        },
+      },
+    },
+    async (req, reply) => {
+      const parseResult = PasswordChangeSchema.safeParse(req.body);
+      if (!parseResult.success) {
+        return reply.status(400).send({
+          error: 'Validation failed',
+          details: parseResult.error.issues,
+        });
+      }
+      const { currentPassword, newPassword } = parseResult.data;
+
+      try {
+        return reply.send(
+          await changePassword(
+            getAuthUser(req).userId,
+            currentPassword,
+            newPassword,
+            localeFromRequest(req),
+          ),
+        );
+      } catch (err) {
+        const pwErr = toPasswordAuthError(err);
+        if (pwErr) {
+          Logger.warn(`Password change rejected (${pwErr.code})`);
+          return sendPasswordAuthError(reply, pwErr);
+        }
+        const errMsg = err instanceof Error ? err.message : 'Unknown error';
+        Logger.error(`Password change error: ${errMsg}`);
+        return reply.status(500).send({
+          error: getSafeErrorMessage(err, 'Password change failed. Please try again.'),
         });
       }
     },

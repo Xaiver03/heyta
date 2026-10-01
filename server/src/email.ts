@@ -184,3 +184,63 @@ export const sendLoginMagicLinkEmail = async (
     },
   });
 };
+
+/**
+ * 第 4 封：**口令重置链接**。
+ *
+ * 有效期那句话写"15 分钟"而不是抄 `PASSWORD_RESET_TTL_MS` —— 它是给人读的文案，
+ * 由 i18n 词条钉住；两处不一致时门禁不会红，但用户会按邮件里的时间等。
+ * ⚠️ 改 TTL 记得同时改 `server.email.reset.expiry`。
+ */
+export const sendPasswordResetEmail = async (
+  to: string,
+  token: string,
+  locale: ServerLocale = DEFAULT_SERVER_LOCALE,
+): Promise<boolean> => {
+  const config = loadConfigFromEnv();
+  const url = withLocale(`${config.publicUrl}/reset-password?token=${token}`, locale);
+
+  return deliver({
+    to,
+    locale,
+    subjectKey: 'server.email.reset.subject',
+    logLabel: 'Password reset email',
+    content: {
+      heading: t(locale, 'server.email.reset.title'),
+      body: t(locale, 'server.email.reset.body'),
+      buttonLabel: t(locale, 'server.email.reset.button'),
+      url,
+      note: `${t(locale, 'server.email.reset.ignore')}\n${t(locale, 'server.email.reset.expiry')}`,
+    },
+  });
+};
+
+/**
+ * 第 5 封：**口令已被更改的安全通知**（计划 §3 那条"发安全通知邮件"）。
+ *
+ * 它与前四封唯一的不同是**没有令牌** —— 按钮只是回到应用登录。
+ * 🔴 这封存在的理由不是礼貌：口令被改成功时，如果那不是本人，他唯一能知道的方式
+ * 就是这一封邮件。所以它**只在成功之后发**（失败的尝试不发信 —— 那会让这变成
+ * 一个骚扰他人的接口，也顺带告诉攻击者"这个邮箱有账号"）。
+ */
+export const sendPasswordChangedEmail = async (
+  to: string,
+  locale: ServerLocale = DEFAULT_SERVER_LOCALE,
+): Promise<boolean> => {
+  const config = loadConfigFromEnv();
+  const url = withLocale(`${config.publicUrl}/app/`, locale);
+
+  return deliver({
+    to,
+    locale,
+    subjectKey: 'server.email.passwordChanged.subject',
+    logLabel: 'Password changed notice',
+    content: {
+      heading: t(locale, 'server.email.passwordChanged.title'),
+      body: t(locale, 'server.email.passwordChanged.body'),
+      buttonLabel: t(locale, 'server.email.passwordChanged.button'),
+      url,
+      note: t(locale, 'server.email.passwordChanged.notYou'),
+    },
+  });
+};
