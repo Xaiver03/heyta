@@ -75,9 +75,16 @@
 
 - 参数取 OWASP 最低值 `m=19 MiB, t=2, p=1`（`@node-rs/argon2` 的默认即此，MIT，2026-09 发版）。
 - 存 **PHC 模块化串**（`$argon2id$v=19$m=…$salt$hash`）进已有的 `passwordHash` 列 ⇒ **不需要新列、不需要 bump schema**。算法/成本跟着哈希走，将来升级参数时按前缀分派验证，并在**登录成功时重算**以抬升工作因子。
-- **pepper**（`PASSWORD_PEPPER`，env，不进库）：`HMAC-SHA384(password, pepper)` 后再 Argon2id。
+- **pepper**（`PASSWORD_PEPPER`，env，不进库；缺失即启动失败，与 `JWT_SECRET` 同一纪律）：
+  🔴 **不做 HMAC 预哈希**，而是把它**作为 Argon2 原生的 `secret`（密钥）参数**直接传进 KDF。
+  预哈希存在的理由是绕开 bcrypt 的 72 字节截断，而 Argon2 对输入长度没有限制 —— 绕一步只会多一处能写错的地方。
+  W0 已实测：`@node-rs/argon2`（原生）与 `@noble/hashes`（纯 JS）在**带 `secret` 与固定 salt** 时输出**逐字节相同**，
+  所以 pepper 是**参与哈希的秘密**，不是拼在口令前后的字符串。
 - 🔴 **不用 bcrypt**，也不沿用 TEST_MODE 的 `bcryptjs`：bcrypt 非内存硬、有 72 字节截断（与 NIST "≥64 字符、禁止静默截断"冲突），而绕过截断要先做预哈希 —— OWASP 明确说裸 `bcrypt(H(pw))` 是危险的（空字节碰撞 + password shucking）。**footgun 比直接用 Argon2id 多。**
-- **零依赖兜底**：`node:crypto` 的 `scrypt`（OWASP 排名#2）。W0 探针若在 Docker/node24 里 napi 加载失败，就退回它，**不为此加 WASM 依赖**。
+- 🔴 **不留 scrypt 退路**（原计划的兜底已被 W0 实测作废）：musl 预编译产物在**生产形状**里逐字节正确（见 W0-1）。
+  留两条哈希族意味着同一句口令在两台服务器上可能解不开，而"降级"恰恰发生在运维最忙的时候。
+  替代它的是**启动 known-answer 自检**：用固定口令/salt/pepper 跑一次，PHC 串与裸摘要必须等于钉死的字节，
+  不等或抛错 ⇒ **启动即退出**并打印绑定缺失。宁可起不来，也不要"能起、第一次登录就 500"。
 - **并发闸门**：Argon2 太贵 ⇒ 登录洪水会打成自伤 DoS。哈希并发限制在 `cpus-1`（自写 ~20 行信号量，不引依赖）。
 
 ### D4 SRP / PAKE **本轮不做**（被本仓库自己的门槛拦掉）
@@ -196,19 +203,22 @@ AGENTS §3.1 一票否决。协议的形式化分析 2023 年才补齐（IACR 20
 
 ### W0 探针 —— ✅ 已跑完（2026-10-01），**五条里四条改写了设计**
 
-**1. `@node-rs/argon2` 能不能用 → 能用，但 musl 只能由"启动自检"兜底。**
+**1. `@node-rs/argon2` 能不能用 → ✅ 能，musl 已经**在生产形状里逐字节验过**（不再是"只能靠自检兜底"）。**
 
 | 事实 | 数字 / 证据 |
 |---|---|
 | glibc（本机 Node 24）加载 + 哈希 + verify | **27 ms**，PHC 串 `$argon2id$v=19$m=19456,t=2,p=1$…`；错密码 `verify` 返回 `false` 而非抛错 |
-| musl 产物 | `optionalDependencies` 里有 `@node-rs/argon2-linux-x64-musl` / `-linux-arm64-musl`；生产镜像 `server/Dockerfile` 是 `FROM node:24-alpine`（构建 L2 / 运行 L99） |
-| 纯 JS 对照（`@noble/hashes`，sync-core 已在用） | OWASP 最低参数下 **8 671 ms** ⇒ 🔴 **服务端排除纯 JS**（一次登录 8 秒 = 自我 DoS） |
-| `node:crypto` scrypt 兜底 | **190 ms**（N=2^17, r=8；要显式 `maxmem` 512MB，否则默认 32MB 直接抛）⇒ 零新依赖的退路成立 |
+| 🔴 **生产形状实测**（2026-10-01，生产主机 `124.223.13.226`，`--platform linux/amd64`） | `node:24-alpine` = **musl**（`glibcVersionRuntime` 为空）、`npm i --omit=dev --ignore-scripts`（与 `server/Dockerfile` 运行阶段同一条命令）⇒ 装到的是 `@node-rs/argon2-linux-x64-musl`，**加载成功、哈希 37 ms、verify 对/错 = `true`/`false`** |
+| **三方逐字节一致** | 同一组固定输入（口令 `correct horse battery staple`、salt `fill(7)`×16、pepper `fill(11)`×32、`m=19456,t=2,p=1,len=32`）下，**macOS glibc 原生**、**生产 musl 原生**、**纯 JS `@noble/hashes`** 三家都给出 `8698ebcd…edf2bbc9` ⇒ 这就是启动自检要钉的那个 known-answer |
+| PHC 串（钉死） | `$argon2id$v=19$m=19456,t=2,p=1$BwcHBwcHBwcHBwcHBwcHBw$hpjrzf04FKELqgfB1yCxEOWCsgZFlpjf1FKL7O3yu8k` |
+| pepper 是真的参与哈希 | 同一条 PHC 串用**不带 `secret`** 的 `verify` 返回 **`false`** ⇒ pepper 换掉/丢了，存量密码**全部验不过**（不是"降级还能登"）。这条要写进部署手册与 ADR-0040 的后果说明 |
+| `parseOptions()` | 返回 `{algorithm:2,version:1,memoryCost:19456,timeCost:2,parallelism:1,outputLen:32,saltLen:16}` ⇒ **重哈希判定（needsRehash）不用自己解析字符串** |
+| 纯 JS 对照（`@noble/hashes`，sync-core 已在用） | OWASP 最低参数下 **8 671 ms** ⇒ 🔴 **服务端排除纯 JS**（一次登录 8 秒 = 自我 DoS）。它只作为**本机交叉验证**存在，不进产品依赖 |
+| ~~`node:crypto` scrypt 兜底~~ | 190 ms（N=2^17, r=8；要显式 `maxmem` 512MB）—— **作废，不实现**：见 D3"不留 scrypt 退路" |
 
-⚠️ **musl 里 dlopen 是否成功，本机无法证明**（Docker daemon 不在），生产容器里的 `npm install` 探针在腾讯云上跑了 20 分钟没出结果。
-所以裁决改成：**不赌它，启动就验**。服务进程启动时跑一次 **known-answer 自检**（固定口令 + 固定参数 ⇒ 固定 PHC 串 + verify 必须为真），
-失败就 **启动即退出并打印绑定缺失**，而不是等第一个用户点"登录"时收到一个 500。
-🔴 这条不是防御性冗余：`AGENTS.md` §7 第 32 条（"pod 装了 ≠ 链接了"）与 CI 文件头那段"声明了能力，本体从没被真正装上"讲的正是这个形状。
+启动自检**仍然要**（`AGENTS.md` §7 第 32 条"pod 装了 ≠ 链接了"），但它的角色变了：
+从"弥补探针没跑完的赌注"变成**长期的架构不变量守卫** —— 换基础镜像、换 CPU 架构、依赖漂移时当场响，
+而不是等第一个用户点"登录"收到 500。
 
 **2. HIBP 从生产可达 —— 但 1s 超时的原设计是错的。**
 
