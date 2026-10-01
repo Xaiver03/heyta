@@ -646,6 +646,9 @@ export const zhCN = {
   // 本地校验的两句话（提交时才算，不逐键算 —— 逐键报错是最劝退的表单形态）。
   'common.auth.form.emailRequired': '要先填邮箱地址。',
   'common.auth.form.passwordRequired': '还没有填密码。',
+  // 🔴 这句不许复用 `common.auth.error.unconfigured`（那句写的是"先在上面填好"）：
+  // 服务端地址这一栏现在在表单**最后一栏**，指向上面是在把人往错的地方领。
+  'common.auth.form.serverUrlRequired': '还没有填服务端地址。',
   'common.subtask.reject.taskNotFound': '找不到这个任务（可能已在别的设备上删除）。',
   'common.subtask.reject.parentNotFound': '找不到要移入的那个任务（可能已在别的设备上删除）。',
   'common.subtask.reject.self': '不能把任务移到它自己下面。',

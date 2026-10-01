@@ -616,6 +616,10 @@ export const en = {
   // the most discouraging form of form).
   'common.auth.form.emailRequired': 'Enter the email address first.',
   'common.auth.form.passwordRequired': 'Password is not filled in yet.',
+  // 🔴 This one must not reuse `common.auth.error.unconfigured` (that sentence says
+  // "fill in the server URL **above**"): the server row now sits at the **bottom** of
+  // the form, so pointing up would send people to the wrong place.
+  'common.auth.form.serverUrlRequired': 'Fill in the server address first.',
   'common.subtask.reject.taskNotFound': 'That task could not be found - it may have been deleted on another device.',
   'common.subtask.reject.parentNotFound': 'The task to move it under could not be found - it may have been deleted on another device.',
   'common.subtask.reject.self': 'A task cannot be moved under itself.',

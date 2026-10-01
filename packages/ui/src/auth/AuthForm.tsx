@@ -145,6 +145,15 @@ export interface AuthFormLabels {
   readonly legal?: {
     readonly terms: string;
     readonly privacy: string;
+    /**
+     * 两条链接的**落点地址**。给了并且在 web 上，就渲染真的 `<a href>`；
+     * 不给则退回 `Pressable` + `onOpenLegal`（原生壳那边交给 `Linking.openURL`）。
+     *
+     * 🔴 为什么 web 上必须是真的 `<a>`：一条"看起来能点、其实是个 div"的链接
+     * 拿不到中键/⌘ 点击、没有状态栏预览、右键也复制不了地址。而这里的判据不是审美 ——
+     * 要求用户同意一份政策，就必须让他能用他习惯的任何方式把它打开。
+     */
+    readonly hrefs?: { readonly terms: string; readonly privacy: string };
   };
   /** 本地校验的句子（空地址 / 空邮箱 / 空口令 / 没勾同意项）。 */
   readonly localErrors: {
@@ -175,6 +184,14 @@ export interface AuthFormStatus {
    * （邮箱存在性故意不区分），硬标一个框就是在替服务端猜原因。
    */
   readonly field?: AuthFormField;
+  /**
+   * 跟在 `message` 下面的第二句（**成功态**专用，比如已登录后补一句"是谁在登录"）。
+   *
+   * 为什么要单独一个字段而不是让宿主把两句拼成一条字符串：拼起来的那条会挤掉
+   * `row-meta` 的换行，而"登录成功"与"登录到哪个邮箱"是两件事 ——
+   * 屏幕阅读器读成两句才听得出来第二句是补充信息。
+   */
+  readonly detail?: string;
 }
 
 export interface AuthFormProps {
@@ -382,18 +399,23 @@ export function AuthForm({
             <Text style={[text['row-meta'], styles.muted]}>{labels.emptyBody}</Text>
           </>
         ) : (
-          <Text
-            style={[
-              text['row-meta'],
-              status.tone === 'error'
-                ? styles.danger
-                : status.tone === 'success'
-                  ? styles.success
-                  : styles.muted,
-            ]}
-          >
-            {status.message}
-          </Text>
+          <>
+            <Text
+              style={[
+                text['row-meta'],
+                status.tone === 'error'
+                  ? styles.danger
+                  : status.tone === 'success'
+                    ? styles.success
+                    : styles.muted,
+              ]}
+            >
+              {status.message}
+            </Text>
+            {status.detail === undefined ? null : (
+              <Text style={[text['row-meta'], styles.muted]}>{status.detail}</Text>
+            )}
+          </>
         )}
         {busy && labels.busyText !== undefined ? (
           <View style={styles.busyRow} testID={`${testID}-busy`}>
@@ -576,24 +598,51 @@ export function AuthForm({
                 </Text>
               ) : null}
               {labels.legal !== undefined ? (
-                <View style={styles.legalRow}>
-                  <Pressable
-                    accessibilityRole="link"
-                    onPress={guard(() => onOpenLegal?.('terms'))}
-                    style={({ pressed }) => [styles.link, pressed ? styles.pressed : null]}
-                    testID={`${testID}-legal-terms`}
-                  >
-                    <Text style={[text['row-meta'], styles.linkText]}>{labels.legal.terms}</Text>
-                  </Pressable>
-                  <Pressable
-                    accessibilityRole="link"
-                    onPress={guard(() => onOpenLegal?.('privacy'))}
-                    style={({ pressed }) => [styles.link, pressed ? styles.pressed : null]}
-                    testID={`${testID}-legal-privacy`}
-                  >
-                    <Text style={[text['row-meta'], styles.linkText]}>{labels.legal.privacy}</Text>
-                  </Pressable>
-                </View>
+                labels.legal.hrefs !== undefined && Platform.OS === 'web' ? (
+                  <View style={styles.legalRow} testID={`${testID}-legal`}>
+                    <Text style={[text['row-meta'], styles.linkText]}>
+                      <a
+                        href={labels.legal.hrefs.terms}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        data-testid={`${testID}-legal-terms`}
+                      >
+                        {labels.legal.terms}
+                      </a>
+                    </Text>
+                    <Text style={[text['row-meta'], styles.linkText]}>
+                      <a
+                        href={labels.legal.hrefs.privacy}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        data-testid={`${testID}-legal-privacy`}
+                      >
+                        {labels.legal.privacy}
+                      </a>
+                    </Text>
+                  </View>
+                ) : (
+                  <View style={styles.legalRow} testID={`${testID}-legal`}>
+                    <Pressable
+                      accessibilityRole="link"
+                      onPress={guard(() => onOpenLegal?.('terms'))}
+                      style={({ pressed }) => [styles.link, pressed ? styles.pressed : null]}
+                      testID={`${testID}-legal-terms`}
+                    >
+                      <Text style={[text['row-meta'], styles.linkText]}>{labels.legal.terms}</Text>
+                    </Pressable>
+                    <Pressable
+                      accessibilityRole="link"
+                      onPress={guard(() => onOpenLegal?.('privacy'))}
+                      style={({ pressed }) => [styles.link, pressed ? styles.pressed : null]}
+                      testID={`${testID}-legal-privacy`}
+                    >
+                      <Text style={[text['row-meta'], styles.linkText]}>
+                        {labels.legal.privacy}
+                      </Text>
+                    </Pressable>
+                  </View>
+                )
               ) : null}
             </>
           ) : null}

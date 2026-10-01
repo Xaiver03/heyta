@@ -1232,3 +1232,23 @@ git worktree remove /tmp/heyta-head-check
 已按编号递增追加为 `docs/reference/environment-traps.md` **第 90 条**
 （同批把同一天的姊妹款——hunk 过滤只比对增行、漏判对方"改写自己正文"的 hunk——
 写进了同一条的"一般规律"），AGENTS §7 索引表补了 `86–90` 行。**本条可以销账。**
+## B7. 🔴 `pnpm check:ui-language` 现在红，红的不是口令这一轮 —— 是另一条**未提交**的多行词条
+
+**症状**：`🔴 无法解析词条表：packages/i18n/src/locales/en.ts；看起来像词条的行有 2653 行，只解析出 2652 条`。
+
+**那一条**（`git show HEAD:…` 里**不存在** ⇒ 未提交的新增）：
+
+```ts
+  'web.board.planCaption':
+    "This task's internal checklist plan (order and estimates) — not the same coordinate system as the timeline board.",
+```
+
+`check-ui-language.mjs` 的解析器是**按行**的（文件头写明"一行一条、key 与 value 都用单引号"），
+`ENTRY_LIKE` 命中这一行而 `ENTRY` 不命中 ⇒ 条数不等 ⇒ 按设计失败。双引号 + 折行两处都违形。
+
+**A/B 实测**（就地折成单行 → 跑门禁 → 逐字节复原）：折起来 `exit=0`，词条表报 `zh-CN 2653 条 / en 2653 条`；
+复原后仍然红。⇒ **红只来自这一行**，同批其他人写的中文词条与本轮新增的 `common.auth.form.serverUrlRequired`
+（zh/en 各一条）都解析得到。
+
+**为什么没当场修**：那是别人**尚未提交**的一行，改它等于把别人的工作卷进我的提交。
+**修法（归该轮的所有者）**：折成一行并把 value 里的 `task's` 写成 `\'`，或整条改用不含裸撇号的措辞。
