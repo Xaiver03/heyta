@@ -166,7 +166,7 @@ describe('listUserPasskeys', () => {
 });
 
 describe('deleteUserPasskey — 归属', () => {
-  it('删除谓词同时带 id 与 userId，并要求还存在另一条凭据', async () => {
+  it('删除谓词同时带 id 与 userId，并要求"还有另一条凭据 或 有能用的口令"', async () => {
     mockPrisma.passkey.deleteMany.mockResolvedValue({ count: 1 });
 
     const result = await deleteUserPasskey(1, 'pk_row_1');
@@ -176,9 +176,16 @@ describe('deleteUserPasskey — 归属', () => {
       where: {
         id: 'pk_row_1',
         userId: 1,
-        user: { passkeys: { some: { id: { not: 'pk_row_1' } } } },
+        OR: [
+          { user: { passkeys: { some: { id: { not: 'pk_row_1' } } } } },
+          { user: { passwordHash: { not: null }, isVerified: 1 } },
+        ],
       },
     });
+    // 🔴 放行路径**不许多一次查询**：判据必须整体待在那条 DELETE 里。
+    // 先查口令再删的写法在两次调用之间会漏（口令刚好被别的请求清掉），
+    // 而那正是这条规则唯一要防的形态。
+    expect(mockPrisma.passkey.findFirst).not.toHaveBeenCalled();
   });
 
   it('🔴 删别人的 / 不存在的 → 同一个码（调用方无法区分）', async () => {
@@ -232,7 +239,14 @@ describe('deleteUserPasskey — 归属', () => {
       where: {
         id: 'pk_row_1',
         userId: 1,
-        user: { passkeys: { some: { id: { not: 'pk_row_1' } } } },
+        OR: [
+          { user: { passkeys: { some: { id: { not: 'pk_row_1' } } } } },
+          // 🔴 `isVerified: 1` 是承重的：`loginWithEmailPassword` 在口令**校验通过之后**
+          // 还会因为 `isVerified === 0` 抛 `email_not_verified`（那个顺序是为了不泄露
+          // 邮箱有没有注册过）。只看 `passwordHash` 就会放出一个**谁也进不去**的账号，
+          // 而那正是这条规则唯一要防的东西。
+          { user: { passwordHash: { not: null }, isVerified: 1 } },
+        ],
       },
     });
   });

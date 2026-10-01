@@ -610,7 +610,7 @@ export const zhCN = {
   // 服务端给出 `code: 'passkey_verification_failed'`：凭据还在，但这次断言
   // 没通过。重试是有意义的，所以句子与上面那条刻意不同。
   'common.auth.error.passkeyRejected': '通行密钥验证没有通过，可以再试一次；一直失败就重新注册一条。',
-  'common.auth.error.lastPasskey': '这是账号上最后一条通行密钥，删掉可能让你再也登不进来。先添加一条新的，再删这条。',
+  'common.auth.error.lastPasskey': '这是账号上最后一条通行密钥，而这个账号还没有能用的登录口令，删掉就再也登不进来了。先添加一条新的通行密钥，或者设一个登录口令（邮箱得先验证过）。',
   // ── Web · 通行密钥自助管理 ─────────────────────────────────
   // 服务端此前只有注册 / 登录 / 恢复，用户没有任何"看我自己的凭据 / 删一条"的入口。
   'web.passkeys.title': '通行密钥',
@@ -639,7 +639,7 @@ export const zhCN = {
   'web.passkeys.error.nameTooLong': '名字太长了（最多 {max} 个字）。',
   'web.passkeys.error.load': '没能加载通行密钥列表。',
   'web.passkeys.error.passkeyNotFound': '这条通行密钥已经不在服务器上了，列表已刷新。',
-  'web.passkeys.error.lastPasskey': '这是账号上最后一条通行密钥，不能删除。先添加一条新的。',
+  'web.passkeys.error.lastPasskey': '这是账号上最后一条通行密钥，账号也没有能用的登录口令，所以不能删除。先添加一条新的，或设一个登录口令（邮箱得先验证过）。',
   'web.passkeys.error.unauthorized': '登录状态已失效，请重新登录。',
   'web.passkeys.error.network': '连不上服务端，请稍后重试。',
 

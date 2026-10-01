@@ -994,7 +994,7 @@ export const listUserPasskeys = async (userId: number): Promise<PasskeySummary[]
  * "这条 id 存在但不属于你"和"这条 id 根本不存在"。用 403 就会把前者
  * 变成一个存在性预言机。
  *
- * ## 最后一条：拒绝删除
+ * ## 删掉"唯一的入口"：拒绝
  *
  * 🔴 **产品取舍（这里选的是"拒绝"，理由如下）**：
  *
@@ -1009,22 +1009,40 @@ export const listUserPasskeys = async (userId: number): Promise<PasskeySummary[]
  * 先证明邮件通道可用（服务端目前不检查），而对没配 SMTP 的自托管实例，
  * 这不是"多一步"，是"账号没了"。
  *
- * 所以：删到只剩一条时返回 `last_passkey_required`，界面显示
- * "这是最后一条通行密钥 —— 先添加一条新的，或者走找回流程"。
+ * 所以：删到只剩一条、且账号**没有别的能用的入口**时返回 `last_passkey_required`，
+ * 界面显示"这是最后一条通行密钥 —— 先添加一条新的，或者给账号设一个登录口令"。
  * 用户想换凭据时的正确顺序是**先加后删**，不是先删后加。
  *
- * ⚠️ **这条规则的前提已经只有一半成立**（邮箱 + 密码登录之后）：账号可能同时有口令，
- * 那时"最后一条通行密钥"并不是唯一的入口。这里**故意不放松** —— 放松需要一个新的
- * "该账号有可用口令"信号，而那个信号怎么算（被锁定的口令算不算、未验证的算不算）
- * 必须和显示这句话的客户端一起定，否则界面上的提示会与判定错位。
- * 登记为缺口见计划 `docs/plans/email-password-auth.md` §10 第 10 条。
+ * ⚠️ **"最后一条"从来不是判据，"没有别的能用的入口"才是。** 这条规则写于
+ * 通行密钥是唯一入口的时代（ADR-0029），那时两者恰好等价。邮箱 + 口令登录
+ * 之后它们不等价了：账号有可用口令时删掉最后一条通行密钥**不会**把人锁在门外，
+ * 继续拒绝是一个没有理由的阻碍。现在按那个**真实判据**放行：
+ *
+ * ```ts
+ * { user: { passwordHash: { not: null }, isVerified: 1 } }
+ * ```
+ *
+ * 🔴 `isVerified` 不是可有可加的装饰：`loginWithEmailPassword` 在口令**校验通过之后**
+ * 还会因为 `isVerified === 0` 抛 `email_not_verified`（那条顺序是为了不泄露邮箱
+ * 是否注册过）。所以"有 hash 但邮箱没验证"的账号照样进不去 —— 只看 `passwordHash`
+ * 会放行出一个**谁也进不去**的账号，恰好是这条规则唯一要防的东西。
+ *
+ * 🟡 反过来，**口令被限流（锁 15 分钟）不算"没有入口"**：限流自己会到期，
+ * 而"因为一个会过去的计数器而禁止一个删不掉的凭据"会让界面只能说"过一会儿再来"，
+ * 用户在那一刻反而更容易去试别的破坏性操作。
+ *
+ * 结论变更记录：[ADR-0041](../../docs/adr/0041-last-passkey-guard-keys-on-any-usable-entry.md)
+ * （修订 ADR-0029 的前提，不推翻它的取舍）。
  *
  * ## 原子性
  *
- * 谓词里的 `user: { passkeys: { some: { id: { not: passkeyId } } } }`
- * 让"还有另一条"这个条件与删除发生在**同一条语句**里。先 `count()`
- * 再 `delete()` 的写法在两次调用之间会漏：两个并发请求各自看到 2 条、
+ * 谓词里的 `OR` 两个分支都在**同一条 deleteMany** 里求值：
+ * `user: { passkeys: { some: { id: { not: passkeyId } } } }` 表达"还有另一条"，
+ * `user: { passwordHash: { not: null }, isVerified: 1 }` 表达"有能用的口令"。
+ * 先 `count()` 再 `delete()` 的写法在两次调用之间会漏：两个并发请求各自看到 2 条、
  * 各自删掉一条，最后一条都不剩 —— 正是上面那条注释要防的事。
+ * 口令那个分支天然是稳定的（改口令不是并发于删除的操作），但**不能因为它就
+ * 把另一个分支挪出语句**：两条判据都必须在这一条语句里成立或失败。
  */
 export const deleteUserPasskey = async (
   userId: number,
@@ -1035,8 +1053,12 @@ export const deleteUserPasskey = async (
       where: {
         id: passkeyId,
         userId,
-        // 只有该用户名下还存在**另一条**凭据时才允许命中这一行。
-        user: { passkeys: { some: { id: { not: passkeyId } } } },
+        OR: [
+          // 该用户名下还存在**另一条**凭据。
+          { user: { passkeys: { some: { id: { not: passkeyId } } } } },
+          // 或者账号有一条**真的能用来登录**的口令（设了且邮箱已验证）。
+          { user: { passwordHash: { not: null }, isVerified: 1 } },
+        ],
       },
     });
     if (deleted.count === 1) return 'deleted' as const;

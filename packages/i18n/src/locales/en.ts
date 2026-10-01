@@ -571,7 +571,7 @@ export const en = {
   // Used when the server answers `code: 'passkey_verification_failed'`: the
   // credential is known but this assertion did not verify. Retrying is meaningful.
   'common.auth.error.passkeyRejected': 'The passkey could not be verified. Try once more; if it keeps failing, register a new one.',
-  'common.auth.error.lastPasskey': 'This is the only passkey on the account. Removing it could lock you out — add a new passkey first, then remove this one.',
+  'common.auth.error.lastPasskey': 'This is the account’s only passkey and it has no sign-in password either, so removing it would lock you out. Add a new passkey first, or set a password (your email has to be verified for that to work).',
   // ── Web · self-service passkey management ─────────────────
   // The server had registration / login / recovery only; there was no way for a
   // user to see or remove their own credentials.
@@ -601,7 +601,7 @@ export const en = {
   'web.passkeys.error.nameTooLong': 'That name is too long (up to {max} characters).',
   'web.passkeys.error.load': 'Could not load your passkeys.',
   'web.passkeys.error.passkeyNotFound': 'That passkey is no longer on the server — the list has been refreshed.',
-  'web.passkeys.error.lastPasskey': 'This is the only passkey on the account, so it cannot be removed. Add a new passkey first.',
+  'web.passkeys.error.lastPasskey': 'This is the account’s only passkey and there is no usable password, so it cannot be removed. Add a new passkey, or set a password (verified email required).',
   'web.passkeys.error.unauthorized': 'Your sign-in has expired — sign in again.',
   'web.passkeys.error.network': 'Could not reach the server. Try again later.',
 

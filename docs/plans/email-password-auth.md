@@ -305,7 +305,8 @@ Node 实测 `'café'.normalize('NFC') === 'café'.normalize('NFD')` 为 **`false
 4. `e2e/auth-journey/auth-journey.spec.ts:160`（`parsed.password` 必须 `undefined`）**保持有效** —— 因为 Web 端仍不落盘（D2 的例外）。移动端新增钥匙串判据不冲突。
 5. `scripts/check-mobile-settings.mjs:86-90` 的 `CREDENTIAL_KEYS`（serverUrl/token/password 必须在 SettingsScreen 不在 ProfileScreen）会红。
 6. `research/tools/license-inventory.mjs` 必须逐项登记 `@node-rs/argon2` 与 `expo-secure-store`（🔴 白名单外默认失败，且现在**真的会判失败**）。
-7. `packages/shared-schema` 里那个 `'PASSWORD_CHANGED'` 的 import reason（`supersync-http-contract.ts:26`）今天只有 fixture 在用 —— 本轮要么真正接上（改密后要求客户端带 reason 重传），要么删掉，**不许留着当装饰**。
+7. ✅ `packages/shared-schema` 里那个 `'PASSWORD_CHANGED'` 的 import reason（`supersync-http-contract.ts:26`）今天只有 fixture 在用 —— 本轮要么真正接上（改密后要求客户端带 reason 重传），要么删掉，**不许留着当装饰**。
+   **已删**（2026-10-01）：全仓零生产者，连 vendored 的上游克隆里都搜不到。选"删"而不是"接上"的理由就是 D1 —— 登录口令与 E2EE 口令解耦之后，**改登录口令不需要重传任何东西**（密文不变，`tokenVersion` 前进只作废令牌）；而"轮换 E2EE 口令"这个功能本身还没做，真做时它需要的是跟着那条流程一起设计的标记（要能表达"新口令解不开旧密文"这种中途失败），不是把这个成员捡回来。两个 fixture 改用在册的 `'FORCE_UPLOAD'`（那两条用例判的是状态替换栅栏的时序，与 reason 无关），词表封闭性新增一条断言钉住（变异验证：把成员加回去 ⇒ 恰好 1 红）。
 8. 各链式脚本与 `scripts/lib/*` 用 `/api/test/create-user` 造账号 —— 新增 `J8` 必须走**生产路由**，判据不许踩 TEST_MODE 的路。
 
 ---
@@ -321,11 +322,20 @@ Node 实测 `'café'.normalize('NFC') === 'café'.normalize('NFD')` 为 **`false
 7. **限流仍是单进程内存态** ⇒ 多副本部署前要换共享 store。
 8. `check:docs-voice` 拦算法名进用户文档 ⇒ 帮助页只写行为；机制细节留在 `docs/` 与自托管篇。
 9. 落地页 `VITE_APP_URL` 未配置时整条入口不渲染，这是故意的 —— 验收时别把它当断点。
-10. ⚠️ **`deleteUserPasskey` 的"最后一条不许删"前提只有一半成立了**（`passkey.ts:1022`）。
-    它写于"通行密钥是唯一入口"的时代，文案是"这是最后一条通行密钥"。现在账号可以同时有口令，
-    那时删掉最后一条并不会把自己锁在外面。**本轮故意不放松**：放松需要一个"该账号有可用口令"
-    的信号，而这个信号怎么算（口令被锁 15 分钟算不算可用、邮箱未验证算不算）必须与显示那句提示的
-    客户端同时定 —— 服务端单方面放宽、界面还在吓人是更糟的组合。留给 W5/W6 一并裁决。
+10. ✅ **`deleteUserPasskey` 的"最后一条不许删"前提已经裁决并落地**（2026-10-01，
+    [ADR-0041](../adr/0041-last-passkey-guard-keys-on-any-usable-entry.md)）。
+    它写于"通行密钥是唯一入口"的时代，那时"最后一条"恰好等价于"没有别的入口"。
+    现在不等价，所以判据换成那个**真实**条件：账号有**能用的**登录口令
+    （`passwordHash IS NOT NULL AND is_verified = 1`）时删掉最后一条通行密钥**放行**，
+    否则照旧 409 `last_passkey_required`。ADR-0029 的**取舍**（宁可拒绝，也不把
+    账号可进入性寄托在用户读到一条文案上）一条没动。三条落地时的硬要求：
+    ① `is_verified` 不能省 —— `loginWithEmailPassword` 在校验通过**之后**还会因未验证
+    抛 `email_not_verified`，只看 hash 会放出一个谁也进不去的账号；
+    ② 口令被限流**算**能用（限流自己会到期，用瞬时状态否决一个删不掉的凭据会让界面
+    只能说"过一会儿再来"）；③ 两条判据必须在**同一条 `deleteMany` 谓词**里求值
+    （那是唯一的 TOCTOU 防护），并且**服务端与显示那句提示的客户端同时改** ——
+    词条 `common.auth.error.lastPasskey` / `web.passkeys.error.lastPasskey` 已同时改成
+    给两条出路（再添一条通行密钥 / 设登录口令，并注明邮箱得先验证过）。
 11. ⚠️ **E2EE 口令的 NFC/NFD 缺陷仍在本轮之外**（W0 探针 5）。`packages/sync-core` 派生密钥前
     **不做任何 normalize**，而 `'café'.normalize('NFC') !== 'café'.normalize('NFD')` ⇒ iOS 键盘
     给出 NFD 时同一句口令派生出**不同密钥**，跨设备解不开密文。
