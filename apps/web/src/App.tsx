@@ -157,6 +157,9 @@ import { ImportPanel } from './features/settings/ImportPanel.js';
 import { MemoryPanel } from './features/settings/MemoryPanel.js';
 // 通行密钥自助管理（列 / 删）—— 服务端早就有端点，此前界面没有任何入口。
 import { PasskeyPanel } from './features/settings/PasskeyPanel.js';
+// 改登录密码 —— `/api/password/change` 与 `useAuthStore.changePassword` 都在，
+// 缺的就是这张表（在此之前那条动作**全仓库零调用点**）。见 PasswordPanel 文件头。
+import { PasswordPanel } from './features/settings/PasswordPanel.js';
 // 从滴答清单导入（B2-1）—— 逻辑层早就做完了，这是它的界面入口。
 import { TickTickImportPanel } from './features/settings/TickTickImportPanel.js';
 import { WidgetJourneyPanel } from './features/settings/WidgetJourneyPanel.js';
@@ -2410,6 +2413,8 @@ export function App(): React.JSX.Element {
               <TickTickImportPanel />
               {/* 账号安全：管理自己的通行密钥（列 / 删）。见 PasskeyPanel 文件头。 */}
               <PasskeyPanel />
+              {/* 账号安全：改登录密码（`/api/password/change` 的唯一界面入口）。 */}
+              <PasswordPanel />
               {/*
                 Windows 小组件的后台刷新（Web Push）。
                 🔴 **能力不可用时这个面板自己不画** —— http:// 上、没配 VAPID 的
