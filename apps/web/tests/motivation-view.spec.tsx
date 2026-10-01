@@ -114,45 +114,69 @@ afterEach(() => {
   container = undefined;
 });
 
-describe('今日进度卡（L1）真的渲染出来了', () => {
-  it('打卡 + 完成任务之后，进度条到 100% 且写出"今天的都做完了"', async () => {
-    await waitFor('今日进度卡出现', () =>
-      (container?.textContent ?? '').includes('今天'),
-    );
+describe('🔴 今日进度卡（L1）在 web 的生产路径上已经不存在（R6）', () => {
+  /*
+    2026-10-01 产品负责人看图后拍板：「0/0 今天还没有安排」那块**彻底删掉**，
+    数字属于三个位置 —— 侧栏每行右侧的计数 / 分组头的计数 / 行右侧的元信息
+    （台账 `docs/plans/ui-review-fill-zh-timeline.md` R6）。
 
-    const bar = container?.querySelector('[role="progressbar"]');
-    expect(bar, '界面上应该有一根进度条').not.toBeNull();
-    /*
-      🔴 这一条现在是**红**的，而且它守的是一个真实的回归（不是测试过期）：
-      共享 `packages/ui/src/motivation/ProgressBar.tsx` 用 RN 的
-      `accessibilityValue={{ min, max, now }}` 对象形态，而 **react-native-web
-      0.21.3 不支持它** —— 实测（apps/web probe）：
-        <View accessibilityValue={{min:0,max:100,now:42}} /> → 无 aria-valuenow
-        <View aria-valuenow={42} aria-valuemin={0} aria-valuemax={100} /> → 三个属性都在
-      于是 web 上读屏拿不到百分比（原生端不受影响）。
-      修法在共享层（不在本刀白名单，已上报）：把对象形态换成平铺的
-      `aria-valuemin/aria-valuemax/aria-valuenow`。
-      **刻意不删也不放宽** —— 一条没有数值的进度条对读屏用户等于不存在。
-    */
-    expect(bar?.getAttribute('aria-valuenow')).toBe('100');
+    这个 describe 原先是**肯定**判据（"进度卡真的画出来了、进度条真的会动"）。
+    web 的挂载点现在归零，所以它翻成**否定**判据，两条都要在：
 
-    await waitFor('闭环文案出现', () =>
-      (container?.textContent ?? '').includes('今天的都做完了'),
-    );
+    1. 做事视图不许长出进度条；
+    2. 成长页也不许有（`GrowthView` 一直传 `showToday={false}`；原先那句
+       "卡常驻在做事视图"的理由已随 R6 过期，改注释时写进了那里）。
 
-    // 🔴 这一条抓到过一个真 bug：`beforeEach` 造的场景里，习惯是**今天计划内**的、
-    // 而任务没有截止日期（= 计划外），于是 `done(2) > total(1)`，
-    // 卡片左边打出了「还有 -1 件没做」，右边同时写着「今天的都做完了」。
-    const flat = (container?.textContent ?? '').replace(/\s+/gu, '');
-    expect(flat, '进度卡的文案里绝不能出现负数').not.toMatch(/-\d/u);
-    expect(flat).toContain('计划内都做完了');
+    ⚠️ 共享组件**没删**：mobile 的成长页（`apps/mobile/src/screens/GrowthScreen.tsx`）
+    仍然渲染它。所以"这块卡真的画得出来"那条**肯定**判据没有消失，只是搬家了：
+    组件级在 `apps/web/tests/growth-board.spec.tsx`（默认渲染 / `showToday=false`
+    整块消失，两条都在）。**不要因为这里翻成否定就删那两处。**
+
+    ⚠️ 原先守 `aria-valuenow` 的那条随挂载点一起走了。它当年防的缺陷**已经修掉了**，
+    不是登记成债：共享 `packages/ui/src/motivation/ProgressBar.tsx:153-155` 用的是
+    **平铺** `aria-valuemin/max/now`，文件里注释写着 RNW 0.21 会把对象形态
+    `accessibilityValue` 整个丢掉，判据是 `pnpm check:rn-aria`（已挂在 `pnpm check`）。
+    所以这里**不要**再写"web 读屏拿不到百分比"—— 那句是 2026-09 的账，2026-10-01 核过不成立。
+  */
+  it('做事视图（默认落在任务）里没有进度条、没有今日进度卡', () => {
+    expect(
+      container?.querySelector('[data-testid="task-list"]'),
+      '任务面板本身要在（否则这条是空转的）',
+    ).not.toBeNull();
+    expect(
+      container?.querySelector('[role="progressbar"]'),
+      '做事视图不许出现进度条 —— 它 2026-10-01 已删',
+    ).toBeNull();
+    expect(container?.querySelector('[data-testid="today-progress"]')).toBeNull();
+    // 卡删掉之后，空 inbox 由 `EmptyState` 接住（图标 + 标题 + 下一步动作），
+    // 而不是留一片空白 —— 这一条判的是"删完有没有兜底"。
+    expect(
+      container?.querySelector('[data-testid="empty-state"]'),
+      '这个场景里唯一那条任务已完成，空态必须接住这一屏',
+    ).not.toBeNull();
   });
 
-  it('进度条的可访问名说出了分子与分母（不能只有一根无名的横条）', () => {
-    const bar = container?.querySelector('[role="progressbar"]');
-    const label = bar?.getAttribute('aria-label') ?? '';
-    expect(label).toContain('今日完成');
-    expect(label).toMatch(/\d/);
+  it('成长页也没有今日进度块（web 裁掉的是整块，不是漏接线）', async () => {
+    click(byText('成长'));
+    await flush();
+
+    const board = container?.querySelector('[data-testid="growth-board"]');
+    expect(board, '成长页要能打开（这条判的是"里面没有今日块"，不是白屏）').not.toBeNull();
+    /*
+      🔴 判据**不能**写成"成长页没有 progressbar" —— 实测它有一堆：
+      `MilestoneMap.tsx:206` 每个里程碑维度也画一根 `MotivationProgressBar`。
+      那样写会红，而且红的是我这条判据自己。
+      能区分"哪一根是今日进度"的只有它的可访问名：今日那根的用词来自
+      `web.progress.label.*`（三条都以「今日完成」开头），里程碑那根是
+      `labels.tierA11y(...)`。所以按可访问名筛。
+    */
+    const todayBars = [
+      ...(board?.querySelectorAll('[role="progressbar"]') ?? []),
+    ].filter((el) => (el.getAttribute('aria-label') ?? '').includes('今日完成'));
+    expect(
+      todayBars,
+      'web 的成长页不渲染今日进度（GrowthView 的 showToday={false}）',
+    ).toEqual([]);
   });
 });
 
