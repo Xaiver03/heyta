@@ -88,3 +88,16 @@ export type {
   SuperSyncRestoreSnapshotResponse,
   SuperSyncDeleteAllDataResponse,
 } from './supersync-http-contract';
+
+// Auth HTTP contract（邮箱+口令那条路：路径 / 机器码词表 / 长度界限）
+export {
+  AUTH_PASSWORD_PATHS,
+  PASSWORD_AUTH_ERROR_CODES,
+  PASSWORD_POLICY_CODES,
+  AUTH_PASSWORD_MIN_CODE_POINTS,
+  AUTH_PASSWORD_MAX_CODE_POINTS,
+} from './auth-http-contract';
+export type {
+  PasswordAuthErrorCode,
+  PasswordPolicyCode,
+} from './auth-http-contract';
