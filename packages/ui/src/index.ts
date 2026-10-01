@@ -820,3 +820,22 @@ export {
   type AuthFormStage,
   type AuthPolicyMessageKey,
 } from './auth/model.js';
+
+/**
+ * ── W6：认证**表单组件**（§10 欠的组件那一半）──
+ *
+ * 🔴 **本块是追加的**（`index.ts` 是多写者共享文件，只许在末尾追加）。
+ *
+ * 上面那块是纯逻辑，这一块是**唯一一份表单**。它存在的理由就是
+ * `docs/plans/user-journey-and-auth.md` §10.1 记的那两个数字：web 的
+ * `AuthPanel.tsx` 484 行 + mobile 的 `AuthScreen.tsx` 403 行，同一件事两遍。
+ * 各端从此只做**宿主壳**（把 store 的状态翻成 `status`/`busy`、把 `t()` 的结果
+ * 交进 `labels`、决定条款链接落在哪），**不许**再各写一份字段、显隐开关、
+ * autofill 取值与错误落点。
+ */
+export {
+  AuthForm,
+  type AuthFormLabels,
+  type AuthFormProps,
+  type AuthFormStatus,
+} from './auth/AuthForm.js';
