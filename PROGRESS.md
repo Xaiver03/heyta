@@ -852,3 +852,23 @@ node scripts/check-macos-window.mjs（真实跑）→ 第 5 跑 exit 1 红在「
 四条的裁决分界在实测中的落点：两条**真跑全绿**（比"合法跳过"更强的证据）、
 一条**合法跳过**（平台不符，SKIP 行含原因）、一条**判红分支真实触发过**
 （exit 4 授权指引）且修复环境后**真实全绿**。
+
+### 部署记录（2026-10-01）：文档中心三轮上线生产 ✅
+
+- **范围**：仅落地页（`/var/www/heyta-landing/`）。server 零牵连（`check:server-copy`
+  「2 种语言 × 50 条」/`check:server-design`「41 个」双绿，无需重建镜像）；
+  `apps/web` 无改动，`/app/` 不动。
+- **构建来源 = 干净 detached worktree @ `2b2f1cb8`**：共享工作树里另一条线未提交的
+  changelog 词条改写**不随构建上线**（产物 grep「入口没接上」= 0、HEAD 版词条 = 1）。
+  构建带 `VITE_SITE_URL=https://heyta.waytofuture.cn VITE_APP_URL=https://heyta.waytofuture.cn/app/`
+  （deployment.md §3.7.2 的现值）。
+- **上线**：先备份 `~/heyta-landing-backup-20261001-121659.tar.gz`（488KB，回滚用，保留）
+  ⇒ `rsync -az --delete dist/ ubuntu-jcli:/var/www/heyta-landing/`。
+- **线上验收**：9 条 URL 全 200（含 `/assets/help/first-run/W01-en-tasks.png` 为
+  `image/png`、`/app/` 200、`/health` 200）；主 bundle 与 zh 词条 chunk **线上字节 ==
+  本地构建（cmp 逐字节相同）**；canonical = `heyta.waytofuture.cn`；「立即使用」
+  指向 `/app/` 在 bundle 内；zh chunk 含新分区（要配的环境变量 / 命令行宿主）、
+  旧句「命令行宿主只能」= 0。
+- **真浏览器**：`playwright.live-site.config.ts` **6 passed**；补两发截屏判定 ——
+  `/help/selfhost/` 命中「要配的环境变量」、`/en/help/first-run/` 命中 `Figure 14-1`
+  （英文页真挂英文图）、console/pageerror = 0。
