@@ -181,9 +181,6 @@ describe('侧栏导航', () => {
     useTaskStore.setState({
       entities: emptyState(),
       filter: { kind: 'all' },
-      // 🔴 `query` 也必须复位 —— 它后来才加进来，而"漏复位"正是这个函数
-      // 上一轮踩过的坑（筛泄漏到下一条用例，报的却是别处的假故障）。
-      query: '',
       now: Date.now(),
       ready: false,
     });
@@ -303,9 +300,25 @@ describe('侧栏导航', () => {
    * 🔴 搜索此前**根本不存在**（不是"不好用"，是没有任何入口）。
    *
    * 判据在 `packages/domain/src/search.ts`（匹配哪些字段 / 大小写 /
-   * 多词是 AND），这份用例只钉**接线**：输入框真的在、打字真的收窄了列表。
+   * 多词是 AND），这份用例只钉**接线**：rail 上那个按钮真的能开浮层、
+   * 在浮层里打字真的能筛出结果。
+   *
+   * 🔴 2026-10-01 形态改了，两条断言跟着改：
+   *
+   * - **顶栏那个内联输入框删了。** 产品负责人拍板：一个应用只有**一个**搜索入口。
+   *   同屏放两个都能打字的框，用户必须先回答"我该在哪个里打字"，而这两个框的
+   *   结果还不是一回事（一个筛当前列表、一个跨实体）—— 那是把内部实现的
+   *   不一致摆到界面上。所以下面第一条钉的是它的**不存在**：这东西会以
+   *   "顺手加个快捷搜索框"的形式复活，而那时没有任何测试会拦。
+   * - **查询不再收窄下面的列表**（`selectVisibleTasks` 只看 `filter`）——
+   *   搜索是盖在视图上的一层，关掉之后下面还是原来那一屏。
+   *
+   * ⚠️ 结果断言**全部圈在浮层里面**：`.ht-search-overlay` 是**非模态**的，
+   *    下层任务行一直在 DOM 里（那正是"浮层"与"应用内一路由"的分界，判据在
+   *    `search-overlay-ia.spec.tsx`）。整页查 `task-row-*` 会同时捞到两层，
+   *    "只留下命中那条"就**永远不成立** —— 而失败信息看着像搜索坏了。
    */
-  it('🔴 在搜索框里打字能收窄任务列表（此前没有搜索）', async () => {
+  it('🔴 rail 的「搜索」是唯一入口，浮层里打字能命中；顶栏那个框不许回来', async () => {
     await freshDb();
     await act(async () => {
       await useTaskStore.getState().addTask('给客户写周报');
@@ -314,12 +327,33 @@ describe('侧栏导航', () => {
 
     await mount();
 
-    const box = container!.querySelector<HTMLInputElement>('input[type="search"]');
-    expect(box, '任务视图里没有搜索框 —— `{query}` 判据在共享层，但没人能用').not.toBeNull();
+    // ① 🔴 第二个入口必须不存在（判据圈在**顶栏**，不是整页 ——
+    //    管理后台的用户表自己有一个 `input[type="search"]` 筛选，那是另一个面，
+    //    不该被这条断言管；整页判"不存在"迟早会因它红一次并报个假故障）。
+    expect(
+      container!.querySelector('.ht-search__input'),
+      '顶栏的内联搜索框已删除 —— 一个应用只有一个搜索入口',
+    ).toBeNull();
+    expect(
+      container!.querySelector('.ht-header input'),
+      '顶栏里不该再有输入框 —— 搜索的唯一入口是 rail 上那个按钮',
+    ).toBeNull();
 
-    // 未搜索时两条都在
-    expect(titles(container!).length).toBe(2);
+    // ② 唯一入口在 rail 上。
+    const searchTab = [...container!.querySelectorAll<HTMLButtonElement>('button[role="tab"]')].find(
+      (b) => b.textContent?.trim() === '搜索',
+    );
+    expect(searchTab, 'rail 上没有「搜索」—— 那这个功能就没有入口了').toBeDefined();
+    await act(async () => {
+      searchTab!.click();
+    });
 
+    const surface = container!.querySelector<HTMLElement>('[data-testid="search-overlay-surface"]');
+    expect(surface, '点 rail 的「搜索」应当打开浮层').not.toBeNull();
+
+    // ③ 打字 → 浮层里只剩命中那条。
+    const box = surface!.querySelector<HTMLInputElement>('[data-testid="search-panel-input"]');
+    expect(box, '浮层里没有输入框 —— `SearchPanel` 的接线断了').not.toBeNull();
     await act(async () => {
       const setter = Object.getOwnPropertyDescriptor(
         HTMLInputElement.prototype,
@@ -329,17 +363,31 @@ describe('侧栏导航', () => {
       box!.dispatchEvent(new Event('input', { bubbles: true }));
     });
 
-    const shown = titles(container!);
+    const shown = titles(surface!);
     expect(shown, '搜索应当只留下命中那条').toEqual(['给客户写周报']);
     expect(shown, '不命中的那条要消失').not.toContain('买牛奶');
 
-    // 清除按钮要把查询清掉（否则用户只能一个个删字）
-    const clear = container!.querySelector<HTMLButtonElement>('.ht-search__clear');
-    expect(clear, '搜索框里没有清除按钮').not.toBeNull();
+    // 🔴 上面那条为什么必须圈在浮层里，这里就是答案：整页数出来是 **3** 条
+    //   （下面 2 条一条没少 + 浮层里 1 条命中）。谁把搜索改回"收窄当前列表"，
+    //   这个数字就会变 —— 它是"非模态"这条 IA 的可执行表述，不是仪式。
+    expect(
+      titles(container!).length,
+      '下面那一屏没被搜索改写（2 条）+ 浮层里 1 条命中 ⇒ 整页 3 条',
+    ).toBe(3);
+
+    // ④ 🔴 关掉之后，下面那一屏**从来没被搜索改写过**。
     await act(async () => {
-      clear!.click();
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+      await Promise.resolve();
     });
-    expect(titles(container!).length, '清除后应当回到全部').toBe(2);
+    expect(
+      container!.querySelector('[data-testid="search-overlay-surface"]'),
+      'Esc 之后浮层应当关掉',
+    ).toBeNull();
+    expect(
+      titles(container!).length,
+      '搜索不该收窄下面的列表 —— 它是浮层，不是当前视图的筛选',
+    ).toBe(2);
   });
 
   it('🔴 点侧栏的标签能筛出只带该标签的任务（此前标签名不可点）', async () => {

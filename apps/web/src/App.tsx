@@ -72,6 +72,7 @@ import { writeDurationIntoNote } from '@heyta/app-host';
  */
 import {
   HeytaUiProvider,
+  resolveHeytaUiTheme,
   TaskGroupHead,
   TaskList,
   type TaskRow as SharedTaskRow,
@@ -94,13 +95,31 @@ import { SubtaskPicker } from './features/tasks/SubtaskPicker.js';
 import { CaptureComposer } from './features/capture/CaptureComposer.js';
 import { useProjectStore } from './features/projects/store.js';
 import { ConflictDialog } from './features/sync/ConflictDialog.js';
+import { CalendarSidebar } from './features/calendar/CalendarSidebar.js';
 import { CalendarView } from './features/calendar/CalendarView.js';
 import { useNoteStore } from './features/notes/store.js';
 import { ReminderNotifyPanel } from './features/reminders/ReminderNotifyPanel.js';
 import { useReminderNotifications } from './features/reminders/use-reminder-notifications.js';
 import { AccountMenu } from './features/shell/AccountMenu.js';
 import { InboxBell } from './features/inbox/InboxBell.js';
-import { SearchPanel } from '@heyta/ui';
+/**
+ * 搜索面板的**机制**来自共享层，宿主只提供内容与键盘。
+ *
+ * 🔴 `moveCursor` / `buildResultEntries` / `filterQuickActions` 在这里调用，
+ * 但**判断不在这里写**（AGENTS §3.5）：光标怎么走、跳转项怎么筛，四端必须一样。
+ * 宿主之所以必须监听按键，是因为 RN 的 `TextInput` 没有 `onKeyDown`、
+ * 而 react-native-web 的又在 keydown 里 `stopPropagation()`（§7 第 80 条）——
+ * 平台差异是"谁来听键"，不是"怎么听"。
+ */
+import {
+  buildResultEntries,
+  CURSOR_IN_INPUT,
+  filterQuickActions,
+  moveCursor,
+  SearchPanel,
+  type QuickAction,
+  type SearchResultEntry,
+} from '@heyta/ui';
 import { FeatureModulesPanel } from './features/shell/FeatureModulesPanel.js';
 import {
   SHELL_MODULES,
@@ -109,6 +128,7 @@ import {
   toggleModule,
   type ShellModuleKey,
 } from './features/shell/modules.js';
+import { SidebarResizer } from './features/shell/SidebarResizer.js';
 import { SyncBar } from './features/sync/SyncBar.js';
 import { useSyncStore } from './features/sync/store.js';
 import { SubscriptionNotice } from './features/subscription/SubscriptionNotice.js';
@@ -394,6 +414,27 @@ const VIEW_TITLED_BY_TAB: readonly ViewKey[] = [
   'settings',
 ];
 
+/**
+ * rail 现在是**纯图标**，名字靠 hover / 键盘聚焦时的一条标签显示（`.ht-rail__label`）。
+ * 那条标签是 `position: fixed` 的 —— rail 是 `overflow-y: auto` 的裁剪容器，
+ * `absolute` 会被切掉右侧（铃铛面板与头像菜单都为此改成 fixed，见 `app.css`）。
+ * 而 fixed 元素**不知道自己该贴在第几个图标旁边**，所以纵坐标必须实测。
+ *
+ * 🔴 写成 CSS 自定义属性、而不是 React state：
+ * hover 是每秒可能来好几次的事件，把一个 state 放进根组件会**重渲染整个外壳**
+ * （任务列表、日历、四象限全在内）。这里只有一次 `getBoundingClientRect`
+ * 加一次 inline style 写入，可见性完全交给 `:hover` / `:focus-visible`。
+ *
+ * 写的是**中心**（`top + height / 2`），配合 CSS 里的 `translateY(-50%)` ——
+ * 这样标签永远对齐图标的中线，而不依赖按钮高度。
+ */
+function anchorRailLabel(event: React.SyntheticEvent<HTMLElement>): void {
+  const tab = (event.target as HTMLElement).closest<HTMLElement>('.ht-rail__tab');
+  if (tab === null) return;
+  const rect = tab.getBoundingClientRect();
+  tab.style.setProperty('--ht-rail-label-top', `${Math.round(rect.top + rect.height / 2)}px`);
+}
+
 export function App(): React.JSX.Element {
   const { t } = useI18n();
   const [theme, setTheme] = useState<Theme>(resolveInitialTheme);
@@ -503,11 +544,15 @@ export function App(): React.JSX.Element {
   const [scrollToHelp, setScrollToHelp] = useState(false);
 
   /**
-   * 全局搜索浮层（滴答 rail 的 5 个主菜单之一）。
+   * 全局搜索浮层的查询词。
    *
-   * 🔴 它与**顶栏那个输入框不是一回事**（见 `SearchOverlay` 文件头的分工表）：
-   * 顶栏筛的是"当前任务列表"，这个浮层搜的是**全部任务 + 全部便签**。
-   * 便签在此之前**没有任何搜索入口** —— 那才是它补的缺口。
+   * 🔴 2026-10-01：入口**只剩 rail 上那个放大镜**（产品负责人：「搜索这个地方
+   * 应该有左边那个侧边栏按钮就够了，不需要有另外的按钮了」）。顶栏那个输入框
+   * 已删除 —— 它不是"多一个入口"，是**同屏两个都能打搜索词的框**，用户得先回答
+   * "我该在哪个里打字"，而两个框的结果还不是一回事。
+   *
+   * ⚠️ mobile 任务页那个输入框**不是搜索**，是当前列表的筛选（词不进这个浮层），
+   * 它复用 `web.shell.search.*` 那三条词条 —— 那些词条因此不是死词条，别删。
    */
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -574,23 +619,46 @@ export function App(): React.JSX.Element {
   }, [settingsBaseView]);
 
   /**
-   * 打开设置浮层时：记住触发器、把焦点送进浮层。
+   * 打开次级浮层（设置 / 搜索）时：**记住触发器**；设置那边再把焦点送进浮层。
    *（对话框的键盘起点 —— 否则焦点留在被点掉的菜单项上，Tab 从页首开始。）
+   *
+   * 🔴 搜索**也**要记触发器：`closeSecondarySurface()` 是三种关法（Esc / 点 scrim /
+   * ⌘K）唯一的出口，而它"把焦点还给谁"读的就是这里。以前这个 effect 只认
+   * `settings`，于是从 rail 打开搜索、按 Esc 关掉之后焦点落到**头像**上 ——
+   * 键盘用户下一次 Tab 要从头像重新开始数，而他刚点的是侧栏那个放大镜。
+   * ⚠️ 搜索这边**不**调 `sheetRef`：那个 ref 属于设置 sheet，面板的输入框自带
+   * `autoFocus`（点「搜索」就是要打字）。
    */
   useEffect(() => {
-    if (view !== 'settings') return;
+    if (view !== 'settings' && view !== 'search') return;
     // ⚠️ 别把 `<body>` 记成触发器：它永远 `isConnected`，于是"焦点还给触发器"
     //    会退化成"焦点什么都没发生"（且下一次 Tab 从页首开始）。
     const active = document.activeElement;
     sheetReturnFocus.current =
       active instanceof HTMLElement && active !== document.body ? active : null;
-    sheetRef.current?.focus();
+    if (view === 'settings') sheetRef.current?.focus();
   }, [view]);
   /**
    * 内容区按它渲染：开着次级表面（设置/搜索）时仍是**下层那个视图**
    * （浮层之下"下层可见"，§11.5）。
    */
   const contentView = view === 'settings' || view === 'search' ? settingsBaseView : view;
+
+  /**
+   * 第二列（侧栏）在哪些视图出现。
+   *
+   * 🔴 原来的纪律是"**只有** `tasks` 有范围，其余视图不显示侧栏"。2026-09-30
+   * 产品负责人给的日历参考图把它改了：日历**也是有范围的** —— 左边那一列就是
+   * "这个月看得见哪些清单/标签"。所以判据回到它本来的说法：
+   * **当前视图自己有没有范围**，而不是"只有任务视图"。
+   *
+   * ⚠️ 两个范围**不是同一种东西**，所以没有合成一份状态：
+   * `tasks` 的范围是**单选**筛选（`store.filter`，点一下换一个视图内容），
+   * `calendar` 的范围是**多选**勾选（`features/calendar/store` 的 `scope`，
+   * 勾哪几个决定格子里有没有点）。把多选塞进 `TaskFilter` 会改动四个端共用的
+   * 筛选契约，换来的只是"少一个文件"。
+   */
+  const withSidebar = view === 'tasks' || view === 'calendar';
 
   const [settingsFocus, setSettingsFocus] = useState<SettingsTarget | undefined>(undefined);
   /**
@@ -791,6 +859,25 @@ export function App(): React.JSX.Element {
   useEffect(() => {
     applyTheme(theme);
   }, [theme]);
+
+  /**
+   * 🔴 **同一套开关也要交给共享层**（`packages/ui` 的 RN 组件不吃 CSS 变量）。
+   *
+   * `tokens.css` 的暗色覆盖挂在 `<html data-theme>` 上，web 自己的界面因此是对的；
+   * 但 `<HeytaUiProvider>` 不读那个属性 —— 它调 `useColorScheme()`，
+   * 在 Web 上就是 `prefers-color-scheme`，也就是**操作系统的**配色。
+   * 于是"应用选暗、系统亮"时日历卡片画成纯白（实测 25 个文字元素对比度 < 3:1），
+   * 反过来"应用亮、系统暗"时它画成深夜蓝底 + 黑字。
+   * 症状只出现在用共享组件的那几屏，所以看起来像"某个组件坏了"。
+   *
+   * 这里在**根上**解析一次并传下去，嵌套的 25 层 Provider 会继承它
+   * （见 `packages/ui/src/theme.tsx`）。
+   *
+   * ⚠️ `reducedMotion` 刻意不传（取 `false`）：与改前逐层解析时的实际取值一致，
+   * web 的动效偏好由 `tokens.css` 的 `@media (prefers-reduced-motion)` 负责；
+   * 要让 RN 层也响应它，得单独接 `matchMedia` 并订阅变化，那是另一件事。
+   */
+  const uiTheme = useMemo(() => resolveHeytaUiTheme({ scheme: theme }), [theme]);
 
   // 「今天」视图需要 now 保持新鲜，否则跨过午夜后它不会更新
   useEffect(() => {
@@ -1038,29 +1125,152 @@ export function App(): React.JSX.Element {
   const allNotes = useNoteStore(useShallow((s) => s.notes));
 
   /**
+   * rail 上段「去哪看」= **任务 + 已启用的模块**。
+   *
+   * 🔴 **任务永远在**（它是这个应用本身，不给关）；`settings` / `trash` 归下段工具。
+   * 顺序沿用 `VIEW_TABS`（DOM 顺序的事实源）。
+   *
+   * ⚠️ 它声明在这里而不是下面的 rail 段：搜索浮层的「快速跳转」列的**就是这张表**
+   * （见 `quickActions`），而 `const` 没有提升 —— 放后面会撞 TDZ。
+   */
+  const visibleMainTabs = useMemo(
+    () =>
+      VIEW_TABS.filter(
+        (v) =>
+          v.key !== 'settings' &&
+          v.key !== 'trash' &&
+          // 「任务」与「搜索」常驻（不给关）；其余视图由功能模块开关决定。
+          (v.key === 'tasks' || v.key === 'search' || enabledModules.has(v.key as ShellModuleKey)),
+      ),
+    [enabledModules],
+  );
+
+  /**
+   * 切到一个视图（rail 的 tab、搜索里的「快速跳转」共用）。
+   *
+   * 与 tab 自己的 `onClick` **逐字同形**：先清 `settingsFocus`，再切视图。
+   * "用户自己导航 = 不做定位"这条规则只有一份，多一处就多一处漂移
+   *（漏掉 `setSettingsFocus(undefined)` 的表现是：这次进设置页自己滚了一下）。
+   */
+  const goToView = useCallback(
+    (key: ViewKey) => {
+      setSettingsFocus(undefined);
+      setView(key);
+    },
+    [],
+  );
+
+  /**
+   * 「快速跳转」的候选 = **rail 上真有的目的地 + 用户的清单与标签**。
+   *
+   * 🔴 从 `visibleMainTabs` 派生，**不是**从 `VIEW_TABS`：关掉的功能模块不在 rail 上，
+   * 却能从搜索里跳过去，等于给用户一个"看不见、跳到了也找不到回来"的视图。
+   * ⚠️ 「搜索」自己排掉 —— 人就在搜索浮层里，那是一条按下去什么都没发生的行。
+   *
+   * `keywords` 只给视图：本地化后的名字（「日历」）覆盖不到有人打 `calendar`，
+   * 而 key 本来就是英文的视图标识。清单/标签的名字**是**用户起的，
+   * 补任何通用词都会让"打一个词跳出十几条"，那是筛掉的结果又被捞回来。
+   */
+  const quickActions = useMemo<QuickAction[]>(
+    () => [
+      ...visibleMainTabs
+        .filter((tab) => tab.key !== 'search')
+        .map((tab) => ({
+          id: `view:${tab.key}`,
+          label: t(tab.labelKey),
+          group: 'view' as const,
+          hint: t('web.search.hint.view'),
+          keywords: [tab.key],
+          onSelect: () => goToView(tab.key),
+        })),
+      // 回收站也是 rail 上的目的地（贴底那段），跳过去和点它等价。
+      // ⚠️ 读模块级的 `TOOL_VIEW_TABS` 而不是下面的 `visibleToolTabs`：那个 const
+      //    声明在本 memo **之后**，读它会撞 TDZ。两者本来就是同一张表。
+      ...TOOL_VIEW_TABS.map((tab) => ({
+        id: `view:${tab.key}`,
+        label: t(tab.labelKey),
+        group: 'view' as const,
+        hint: t('web.search.hint.view'),
+        keywords: [tab.key],
+        onSelect: () => goToView(tab.key),
+      })),
+      ...projects.projects.map((project) => ({
+        id: `project:${project.id}`,
+        label: project.name,
+        group: 'project' as const,
+        hint: t('web.search.hint.project'),
+        onSelect: () => goToFilter({ kind: 'project', projectId: project.id }),
+      })),
+      ...projects.tags.map((tag) => ({
+        id: `tag:${tag.id}`,
+        label: tag.name,
+        group: 'tag' as const,
+        hint: t('web.search.hint.tag'),
+        onSelect: () => goToFilter({ kind: 'tag', tagId: tag.id }),
+      })),
+    ],
+    [visibleMainTabs, projects.projects, projects.tags, t, goToView, goToFilter],
+  );
+
+  /**
+   * 键盘光标指着结果里的第几条（{@link CURSOR_IN_INPUT} = 还在输入框里）。
+   *
+   * 🔴 它**只能住在宿主**，不能住进共享面板：RN 0.84.1 的 `TextInput` 类型上
+   * 只有 `onKeyPress`、没有 `onKeyDown`，而 react-native-web 的 `TextInput`
+   * 又在 keydown 里无条件 `stopPropagation()`（§7 第 80 条）——
+   * "面板自己听键"这条路在两端都不成立。所以宿主听键、把光标传进去，
+   * 而**怎么走**（越界、空结果不许有幽灵光标）是 `search/model.ts` 的纯函数。
+   *
+   * ⚠️ 它是**视图态**，不进 store、不进 op-log：换设备不该同步"我上次按了几次下箭头"。
+   */
+  const [searchCursor, setSearchCursor] = useState<number>(CURSOR_IN_INPUT);
+
+  /**
    * 搜索结果 —— **两个域函数各管一半**，不在这里重写匹配逻辑。
    *
    * ⚠️ 输入被 `trim()`：`searchTasks` 对空查询返回"全部"，所以"还没输入"
-   * 这个状态必须在**渲染层**判（见 `SearchOverlay` 的 `prompt`），
+   * 这个状态必须在**渲染层**判（见 `SearchPanel` 的 `prompt`），
    * 否则一打开浮层就会把整个库列出来。
+   *
+   * 🔴 「快速跳转」用的是**另一个**判据（`filterQuickActions`）：它能匹配清单名
+   * 与标签名，而任务搜索**刻意不**匹配（`domain/search.ts` 文件头第 1 条）。
+   * 这不矛盾 —— 那一半给出的替代说法就是"想按清单找就去点清单"，这一组是那个"点"。
    */
   const searchResults = useMemo(() => {
     const q = searchQuery.trim();
-    if (q === '') return { tasks: [], notes: [] };
+    if (q === '') return { tasks: [], notes: [], quick: [] as QuickAction[] };
     return {
       tasks: searchTasks(Object.values(store.entities.tasks), q),
       notes: searchNotes(allNotes, q),
+      quick: filterQuickActions(quickActions, q),
     };
-  }, [searchQuery, store.entities.tasks, allNotes]);
+  }, [searchQuery, store.entities.tasks, allNotes, quickActions]);
+
+  /**
+   * 摊平成**有序**的一维结果 —— 键盘光标数的是这个数组的下标。
+   *
+   * 顺序（任务 → 便签 → 快速跳转）由共享的 `buildResultEntries` 定义，
+   * 面板渲染分组用的是同一条，所以"高亮第 3 条"与"看得见第 3 条"不会分家。
+   */
+  const searchEntries = useMemo(() => buildResultEntries(searchResults), [searchResults]);
+
+  /**
+   * 光标当前指着哪一条。
+   *
+   * ⚠️ `?? null` 不是装饰：边打字边按方向键时结果会**变短**，光标下标可能越界。
+   * 越界就当没有光标（回车什么都不做），下一支方向键会由 `moveCursor` 绕回 0。
+   */
+  const activeSearchEntry =
+    searchCursor === CURSOR_IN_INPUT ? null : (searchEntries[searchCursor] ?? null);
 
   /** 搜索面板要的全部文案（共享层不许 `import '@heyta/i18n'`，所以由宿主注入）。 */
   const searchLabels = useMemo(
     () => ({
       title: t('web.search.title'),
       placeholder: t('web.search.placeholder'),
-      close: t('web.search.close'),
       tasksSection: t('web.search.tasksSection'),
       notesSection: t('web.search.notesSection'),
+      quickSection: t('web.search.quickSection'),
       prompt: t('web.search.prompt'),
       noResults: t('web.search.noResults'),
       count: (n: number) => t('web.search.count', { count: n }),
@@ -1068,16 +1278,154 @@ export function App(): React.JSX.Element {
         toggleOn: (row: { title: string }) => t('web.shell.tasks.complete', { title: row.title }),
         toggleOff: (row: { title: string }) => t('web.shell.tasks.uncomplete', { title: row.title }),
       },
+      // 🔴 只有 web 传这一项：触屏端没有 esc / ↵，面板对没传的形态**不渲染**那排芯片。
+      keyHints: {
+        navigate: t('web.search.keys.navigate'),
+        open: t('web.search.keys.open'),
+        close: t('web.search.keys.close'),
+      },
     }),
     [t],
   );
 
   /**
+   * 输入变了：查询词与光标**一起**归位。
+   *
+   * 🔴 光标不能留在"第 5 条"上。结果集每敲一个字都换一批，旧下标多半指向
+   * 另一条完全不同的行（或越界）—— 症状是"我改了个字，回车打开了一个我没选的东西"。
+   */
+  const onSearchQueryChange = useCallback((next: string) => {
+    setSearchQuery(next);
+    setSearchCursor(CURSOR_IN_INPUT);
+  }, []);
+
+  /**
+   * 打开一条便签结果 = **进便签视图**（浮层挂在 `view` 上，切过去就自然关掉）。
+   * 点与 ↵ 共用这一条，出口才不会漂成两份。
+   */
+  const openNoteFromSearch = useCallback(() => {
+    setSettingsFocus(undefined);
+    setView('notes');
+  }, []);
+
+  /**
+   * 打开光标所指的那一条 —— ↵ 与鼠标点**共用**这一条分派。
+   *
+   * 三类目的地的"打开"是三件事（任务是"跳到它并滚进视野"、便签是"进那一页"、
+   * 跳转项是"跑它自己带的 `onSelect`"），但判据必须只有一个出处。
+   */
+  const openSearchEntry = useCallback(
+    (entry: SearchResultEntry) => {
+      if (entry.kind === 'task') {
+        openTaskFromSearch(entry.id);
+        return;
+      }
+      if (entry.kind === 'note') {
+        openNoteFromSearch();
+        return;
+      }
+      // 跳转项的动作住在宿主给的 `quickActions` 里，这里只按 id 找回它。
+      quickActions.find((action) => action.id === entry.id)?.onSelect();
+    },
+    [openTaskFromSearch, openNoteFromSearch, quickActions],
+  );
+
+  /**
+   * 每次**打开**浮层把光标送回输入框。
+   *
+   * ⚠️ 上一次关浮层时光标可能停在第 3 行，而查询词关掉并不会清空 ——
+   * 不归位的话按一次 ↓ 会跳到第 4 行，用户看到"光标凭空出现在中间"。
+   */
+  useEffect(() => {
+    if (view === 'search') setSearchCursor(CURSOR_IN_INPUT);
+  }, [view]);
+
+  /**
+   * 搜索浮层的键盘导航：↑↓ 在结果里走，↵ 打开光标那一条。
+   *
+   * 🔴 与 Esc 那条一样必须挂**捕获阶段**（§7 第 80 条）：焦点常态就在面板的
+   * `TextInput` 里，而它在 keydown 上无条件 `stopPropagation()` ——
+   * 挂在冒泡阶段的话这套快捷键**从来没被按通过**，而单测全绿。
+   * ⚠️ 带修饰键的先让路：`⌘↑`／`⌥↓` 是系统的；`Shift+↑↓` 是输入框里选文字，
+   *    不是走结果。抢过来的表现不是报错，是"快捷键坏了"。
+   * ⚠️ 回车在**没有光标**时什么都不做（光标还在输入框里 = 用户想接着打字），
+   *    所以这里读的是解析后的 `activeSearchEntry`，不是"有没有结果"。
+   */
+  useEffect(() => {
+    if (view !== 'search') return;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.metaKey || event.ctrlKey || event.altKey) return;
+      if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+        if (event.shiftKey) return;
+        // 不拦的话页面会在浮层后面滚，看起来像"光标跳走了"。
+        event.preventDefault();
+        const delta = event.key === 'ArrowDown' ? 1 : -1;
+        setSearchCursor((current) => moveCursor(current, searchEntries.length, delta));
+        return;
+      }
+      if (event.key === 'Enter' && activeSearchEntry !== null) {
+        openSearchEntry(activeSearchEntry);
+      }
+    };
+    window.addEventListener('keydown', onKey, true);
+    return () => window.removeEventListener('keydown', onKey, true);
+  }, [view, searchEntries, activeSearchEntry, openSearchEntry]);
+
+  /**
+   * ⌘ / Ctrl+K 开合搜索。
+   *
+   * 值得为它加一个界面上没画出来的入口：这是键盘用户找"搜索"的第一反应
+   *（macOS 聚焦、VS Code、Linear 都是这条），而 rail 上那个放大镜要先移动鼠标。
+   * 🔴 监听**不挂在 `view === 'search'` 上** —— 它得能在任何视图里打开，
+   *    也要能在浮层开着时把它关掉。关掉走 `closeSecondarySurface`，与 Esc
+   *    同一个出口，"焦点还回触发器"这条行为才不会三条出口各一份。
+   * ⚠️ 打开时**不**清空查询词：点 rail 那个放大镜也不会清，两条入口必须同形。
+   */
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if (event.altKey || !(event.metaKey || event.ctrlKey)) return;
+      if (event.key.toLowerCase() !== 'k') return;
+      event.preventDefault();
+      if (view === 'search') {
+        closeSecondarySurface();
+        return;
+      }
+      goToView('search');
+    };
+    window.addEventListener('keydown', onKey, true);
+    return () => window.removeEventListener('keydown', onKey, true);
+  }, [view, closeSecondarySurface, goToView]);
+
+  /**
+   * 把光标那一行滚进视野。
+   *
+   * 只能在宿主做：共享层不许碰 DOM（它要跑在 RN 上），而"按 8 次 ↓ 之后
+   * 高亮行滚出面板"在四端是同一个问题。
+   * 🔴 选择器必须限定在面板**里面**：搜索是浮层，下层视图仍在渲染，
+   * 而面板里的任务行与列表里的用的是**同一个** `data-testid="task-item-<id>"` ——
+   * 全局 `querySelector` 命中哪一个取决于 DOM 顺序，症状是"这边按方向键，
+   * 后面那个列表在滚，光标那一行没动"。
+   */
+  useEffect(() => {
+    if (view !== 'search' || activeSearchEntry === null) return;
+    const testID =
+      activeSearchEntry.kind === 'task'
+        ? `task-item-${activeSearchEntry.id}`
+        : `search-panel-${activeSearchEntry.kind}-${activeSearchEntry.id}`;
+    document
+      .querySelector<HTMLElement>('[data-testid="search-panel"]')
+      ?.querySelector<HTMLElement>(`[data-testid="${testID}"]`)?.scrollIntoView({ block: 'nearest' });
+  }, [view, activeSearchEntry]);
+
+
+  /**
    * 次级浮层的标准出口：**Esc 关掉，回到"从哪来"的那个视图**。
    *
    * 搜索与设置共用这一条 —— 它们同形态（`aria-modal=false` 的浮层、下层继续渲染），
-   * 退出口也必须同形。搜索面板的 ✕ 由共享层自带；设置这边由下面那个
-   * `.ht-sheet__close` 提供。
+   * 退出口也必须同形。🔴 搜索面板**没有 ✕**（2026-10-01 改成聚焦搜索形态时删掉了：
+   * 那个位置放一个关闭按钮，与"这一行就是打字的地方"抢注意力），
+   * 出口只有 Esc、点 scrim、⌘K 三条，全部走 `closeSecondarySurface`；
+   * 设置这边由下面那个 `.ht-sheet__close` 提供。
    *
    * 🔴 必须挂在**捕获阶段**（`capture: true`）。面板的输入框是共享层
    * `SearchPanel` 的 RN-web `TextInput`，它在自己的 keydown 处理器里
@@ -1099,25 +1447,11 @@ export function App(): React.JSX.Element {
   }, [view, closeSecondarySurface]);
 
   /**
-   * rail 上段「去哪看」= **任务 + 已启用的模块**。
-   *
-   * 🔴 **任务永远在**（它是这个应用本身，不给关）；`settings` / `trash` 归下段工具。
-   * 顺序沿用 `VIEW_TABS`（DOM 顺序的事实源）。
-   */
-  const visibleMainTabs = useMemo(
-    () =>
-      VIEW_TABS.filter(
-        (v) =>
-          v.key !== 'settings' &&
-          v.key !== 'trash' &&
-          // 「任务」与「搜索」常驻（不给关）；其余视图由功能模块开关决定。
-          (v.key === 'tasks' || v.key === 'search' || enabledModules.has(v.key as ShellModuleKey)),
-      ),
-    [enabledModules],
-  );
-
-  /**
    * rail 下段「工具」= **回收站**。**贴底**，不参与模块开关。
+   *
+   * ⚠️ 上段「去哪看」（`visibleMainTabs`）声明在**上面**的搜索段之前 ——
+   * 「快速跳转」要列的就是 rail 上真有的那些目的地，而 `const` 没有提升，
+   * 放在这里会让下面那个 `quickActions` 在初始化前被读到（TDZ 直接抛错）。
    *
    * ⚠️ **「设置」不在这里** —— 它收进了顶部的**头像菜单**（滴答的做法：
    * rail 是每天点几十次的地方，设置是低频的）。
@@ -1141,15 +1475,21 @@ export function App(): React.JSX.Element {
 
 
   return (
-    /**
-     * 🔴 「去设置」的导航通道。
-     *
-     * 四个 AI 面板里，捕获那个是 `CaptureComposer` 渲染的，而那个文件
-     * 不在本轮的写入白名单里。用 context 让**唯一的新接入点**留在
-     * `App.tsx`（视图切换本来就在这里），而不是为一个导航参数去改别的功能。
-     */
-    <AiSettingsNavigationContext.Provider value={openAiSettings}>
-      <div className={`ht-app${view === 'tasks' ? ' ht-app--with-sidebar' : ''}`}>
+    /*
+      🔴 共享层的主题在**这里**交出去（唯一的 `value`）。
+
+      下面各功能还各自包了一层 `<HeytaUiProvider>`（`check:ui-provider` 要求
+      消费者在 Provider 子树之内），它们没有 `value` ⇒ 会**继承**这一层的值
+      （见 `packages/ui/src/theme.tsx`）。所以宿主只需要在这里说一次。
+
+      🔴 「去设置」的导航通道同理挂在下一层：四个 AI 面板里，捕获那个是
+      `CaptureComposer` 渲染的，而那个文件不在本轮的写入白名单里。
+      用 context 让**唯一的新接入点**留在 `App.tsx`（视图切换本来就在这里），
+      而不是为一个导航参数去改别的功能。
+    */
+    <HeytaUiProvider value={uiTheme}>
+      <AiSettingsNavigationContext.Provider value={openAiSettings}>
+      <div className={`ht-app${withSidebar ? ' ht-app--with-sidebar' : ''}`}>
       {/*
         ═══════════════════════════════════════════════════════════════════════
         🔴 外壳分三层（2026-09-29，落实 `dida-view-unification.md` §1.3 / §4.1 / §4.4）
@@ -1177,14 +1517,25 @@ export function App(): React.JSX.Element {
         · **rail**：上段「去哪看」= **4 个视图 + 1 个「更多」**，下段贴底 = **工具（设置）**；
           ⚠️ 按钮数刻意压到最少（产品负责人 2026-09-29：「左边的侧边栏那个按钮应该尽可能地减少」），
           依据是滴答 rail 的实测清单（见 `MODULE_VIEW_TABS` 上方的说明）；
-        · **sidebar**：**只放"当前视图的范围"**，且**没有范围的视图就不显示它**
-          （滴答也是这样：日历/四象限/习惯视图里 ②直接消失、主区吃满）；
+        · **sidebar**：**只放"当前视图的范围"**，没有范围的视图不显示它。
+          有范围的现在是两个：`tasks`（智能清单 / 按象限筛选 / 清单 / 标签）和
+          `calendar`（迷你月历 + "看得见哪些清单/标签"的勾选）。
+          🔴 后者是 2026-09-30 改的：这里原来写着"日历/四象限/习惯视图里 ②直接消失"，
+          而产品负责人给的日历参考图左边**就有**这一列 —— 判据本来就是
+          "这个视图有没有范围"，不是"只有任务视图有"。
         · **main**：标题 + 工具 + 内容。
 
-        ⚠️ 唯一还共享范围的视图是 `tasks`（收集箱/今天/已完成/四象限/清单/标签）。
-        四象限视图**不显示 sidebar** —— 它的 2×2 网格自己就是完整语义。
+        ⚠️ 四象限视图**仍然不显示 sidebar** —— 它的 2×2 网格自己就是完整语义。
       */}
-      <nav className="ht-rail" aria-label={t('web.shell.nav.aria')}>
+      {/* `onPointerOver` / `onFocus` 在 React 里都会冒泡 ⇒ 挂在 nav 上就覆盖了
+          全部 rail 按钮（视图 tab、工具、铃铛、帮助），不必给每个按钮加 props。
+          见 `anchorRailLabel()`：它只写一个 CSS 自定义属性，不产生 state。 */}
+      <nav
+        className="ht-rail"
+        aria-label={t('web.shell.nav.aria')}
+        onPointerOver={anchorRailLabel}
+        onFocus={anchorRailLabel}
+      >
         {/*
           🔴 顶部是**头像**（点开才是 设置 / 统计 / 退出登录）。
           照滴答：rail 是每天点几十次的地方，而"设置"是低频的 ——
@@ -1211,9 +1562,9 @@ export function App(): React.JSX.Element {
               useSyncStore.getState().clearCredentials();
             }}
           />
-          {/* 🔴 品牌名走词条（`common.brand`）——「heyta」是**用户可见文案**，
-              硬编码会被 `check:ui-language` 拦，而它正是为这一类存在的。 */}
-          <span className="ht-brand__name">{t('common.brand')}</span>
+          {/* 品牌名**不在这里了**：rail 收成纯图标（48px 内容宽放不下「heyta」），
+              滴答的 rail 顶部也只有头像。品牌仍然出现在落地页、设置里的 AI 文案、
+              系统通知标题与移动端欢迎页 —— 不要因为"界面里找不到名字"把它加回来。 */}
         </div>
 
         {/*
@@ -1246,7 +1597,9 @@ export function App(): React.JSX.Element {
               }}
             >
               <v.Icon size={16} aria-hidden="true" />
-              <span>{t(v.labelKey)}</span>
+              {/* 名字必须留在 DOM 里：它就是这个 tab 的 accessible name。
+                  显示规则见 `app.css` 的 `.ht-rail__label`。 */}
+              <span className="ht-rail__label">{t(v.labelKey)}</span>
             </button>
           ))}
 
@@ -1274,7 +1627,9 @@ export function App(): React.JSX.Element {
               }}
             >
               <v.Icon size={16} aria-hidden="true" />
-              <span>{t(v.labelKey)}</span>
+              {/* 名字必须留在 DOM 里：它就是这个 tab 的 accessible name。
+                  显示规则见 `app.css` 的 `.ht-rail__label`。 */}
+              <span className="ht-rail__label">{t(v.labelKey)}</span>
             </button>
           ))}
 
@@ -1311,14 +1666,15 @@ export function App(): React.JSX.Element {
           }}
         >
           <CircleHelp size={16} aria-hidden="true" />
-          <span>{t('web.shell.nav.help')}</span>
+          <span className="ht-rail__label">{t('web.shell.nav.help')}</span>
         </button>
       </nav>
 
       {/*
-        sidebar **只在有范围的视图里出现**。
-        `tasks` 有（智能清单 / 按象限筛选 / 清单 / 标签）；其余视图没有 ——
-        这正是"切视图"与"切筛选"分开之后自然得到的结果。
+        sidebar **只在有范围的视图里出现**，而且每个视图渲染**自己那一列**：
+        `tasks` = 智能清单 / 按象限筛选 / 清单 / 标签（单选筛选）；
+        `calendar` = 迷你月历 + 显示范围（多选勾选，见 `features/calendar/CalendarSidebar`）。
+        其余视图（四象限 / 习惯 / 时间线 / 便签 / 回收站 / 设置…）没有范围，主区吃满。
       */}
       {view === 'tasks' ? (
         <nav className="ht-sidebar" aria-label={t('web.shell.nav.scopeAria')}>
@@ -1369,47 +1725,30 @@ export function App(): React.JSX.Element {
             ))}
           </div>
           <ProjectsPanel onSelect={goToFilter} />
+          {/* 右边缘的拖拽手柄（绝对定位在这一列上，不占布局）。 */}
+          <SidebarResizer />
         </nav>
       ) : null}
+
+      {/* 日历那一列自己带 `SidebarResizer`（同一份宽度状态，所以两端拖哪边都一样）。 */}
+      {view === 'calendar' ? <CalendarSidebar /> : null}
 
       <main className="ht-main">
         <header className="ht-header">
           <h1 className="ht-header__title">{title}</h1>
 
           {/*
-            搜索框。**只在任务视图里出现** —— 它筛的是任务列表，
-            而习惯 / 番茄 / 成长 / 设置那几屏没有"任务列表"可筛，
-            放一个在那里打不出结果的搜索框比没有更坏。
+            🔴 2026-10-01：**这里原来有一个搜索输入框，已删**（产品负责人：
+            "搜索这个地方有左边那个侧边栏按钮就够了，不需要有另外的按钮了"）。
+            删的理由不是"少一个控件"，是同屏两个都能打搜索词的框要求用户先回答
+            "我该在哪个里打字"，而两个框的结果还不是一回事（一个筛当前列表、
+            一个搜全库）—— 那是把内部不一致摆到界面上。
+            唯一入口现在是 rail 的「搜索」→ 下面的聚焦式浮层（`SearchPanel`）。
 
-            🔴 判据（匹配哪些字段 / 大小写 / 多词是 AND）全在
-            `packages/domain/src/search.ts`，这里只负责把字读出来交给 store。
+            ⚠️ 词条 `web.shell.search.*` **没跟着删**：mobile 任务页那个输入框
+            （`apps/mobile/src/screens/TasksScreen.tsx`）还在用它们 —— 那是当前
+            列表的筛选，不是这个搜索面。
           */}
-          {contentView === 'tasks' && (
-            <div className="ht-search">
-              <input
-                type="search"
-                className="ht-search__input"
-                value={store.query}
-                onChange={(e) => {
-                  store.setQuery(e.target.value);
-                }}
-                placeholder={t('web.shell.search.placeholder')}
-                aria-label={t('web.shell.search.aria')}
-              />
-              {store.query !== '' && (
-                <button
-                  type="button"
-                  className="ht-search__clear"
-                  aria-label={t('web.shell.search.clear')}
-                  onClick={() => {
-                    store.setQuery('');
-                  }}
-                >
-                  ×
-                </button>
-              )}
-            </div>
-          )}
           {/*
             🔴 视图切换**曾经在这里**（顶栏一行平铺 9 个 tab）。
             2026-09-29 挪进侧栏 —— 实测 1280px 下只能完全看见 5/8，现在有 9 个只会更挤。
@@ -1668,15 +2007,18 @@ export function App(): React.JSX.Element {
           ))}
 
           {/*
-            全局搜索（跨任务 + 便签）。🔴 它补的缺口是**便签从来没有搜索入口** ——
-            顶栏那个输入框筛的是"当前任务列表"，够不到便签。
-            与顶栏那个的分工写在 `packages/ui/src/search/SearchPanel.tsx` 文件头。
+            全局搜索（跨任务 + 便签 + 快速跳转）。🔴 它补的缺口是**便签从来没有搜索入口**。
+            2026-10-01 起它同时是**唯一**搜索入口 —— 顶栏那个内联框已删：同屏放两个都能
+            打字的框，等于把"两个框结果不是一回事"的内部不一致摆到界面上。
 
-            🔴 **它是居中浮层，不是一路由**（滴答 §11.5，2026-09-30 改）：
-            `view === 'search'` 时 `contentView` 仍是开搜索前的那个视图，
-            `.ht-search-overlay` 只在内容区上盖一层 scrim + 居中卡片 ——
-            **下层视图透出**。判据同设置 sheet：打开搜索时，
-            下层视图的标记必须仍在 DOM 里。改成"替换内容区"就会让判据变红。
+            形态借 macOS 聚焦搜索（Spotlight）：内容区上一层 scrim + **贴顶**的一张卡片
+           （`.ht-search-overlay { align-items: flex-start }`，不是垂直居中 ——
+            居中的话结果少时卡片悬在半屏中间，与"输入法"这个用途不符）。
+
+            🔴 **它是浮层，不是一路由**：`view === 'search'` 时 `contentView` 仍是开搜索前
+            的那个视图，**下层视图透出**（`aria-modal="false"` 说的就是这件事）。
+            判据同设置 sheet：打开搜索时，下层视图的标记必须仍在 DOM 里。
+            改成"替换内容区"就会让判据变红。
           */}
           {view === 'search' && (
             <div
@@ -1694,24 +2036,20 @@ export function App(): React.JSX.Element {
             <HeytaUiProvider>
               <SearchPanel
                 query={searchQuery}
-                onQueryChange={setSearchQuery}
-                onClose={() => {
-                  closeSecondarySurface();
-                }}
+                onQueryChange={onSearchQueryChange}
                 tasks={searchResults.tasks}
                 notes={searchResults.notes}
+                quick={searchResults.quick}
+                activeEntry={activeSearchEntry}
                 onToggleTask={(taskId) => {
                   void store.toggleComplete(taskId);
                 }}
                 onOpenTask={(taskId) => {
-                  // 点结果 → 切到任务视图、筛到「全部」、滚到那一行。
-                  // 见 `openTaskFromSearch`：只切视图是不够的（可能根本不在当前筛选里）。
-                  openTaskFromSearch(taskId);
+                  // 点与 ↵ 走同一条分派（见 `openSearchEntry`）：两条路各自实现"打开"，
+                  // 迟早会出现"鼠标能打开、回车没反应"这类只在一边坏掉的缺陷。
+                  openSearchEntry({ kind: 'task', id: taskId });
                 }}
-                onOpenNote={() => {
-                  setSettingsFocus(undefined);
-                  setView('notes');
-                }}
+                onOpenNote={openNoteFromSearch}
                 labels={searchLabels}
                 testID="search-panel"
               />
@@ -1910,7 +2248,8 @@ export function App(): React.JSX.Element {
         </div>
       </main>
       </div>
-    </AiSettingsNavigationContext.Provider>
+      </AiSettingsNavigationContext.Provider>
+    </HeytaUiProvider>
   );
 }
 
