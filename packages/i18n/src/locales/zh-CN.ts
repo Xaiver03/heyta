@@ -606,7 +606,7 @@ export const zhCN = {
   'common.auth.error.passwordLockedWithWait': '密码登录被临时锁住了（账号本身没有被锁）。可以先用邮箱登录链接或通行密钥进来，或者等 {seconds} 秒后再试密码。',
   'common.auth.error.passwordBackendBusy': '服务器这会儿正忙，这一次没能验证。你写的内容还在，过几秒再试一次。',
   'common.auth.error.invalidResetLink': '这个重置链接已经用过或过期了。回到登录那一步重新申请一封。',
-  'common.auth.error.noPasswordSet': '这个账号还没有设置登录密码（也许一直用通行密钥登录）。走「忘记密码」可以为它设一个。',
+  'common.auth.error.noPasswordSet': '这个账号还没有设置登录密码（也许一直用通行密钥或邮件链接登录），所以这里没有可改的密码。',
   'common.auth.error.passwordPolicy': '这个密码不符合要求，请按下面的提示改一下。',
   'common.auth.error.requestRejected': '这个请求没有被接受，请检查一下填写的内容。',
   'common.auth.error.passkeyNameTooLong': '名字最多 {max} 个字，请短一些。',
@@ -710,9 +710,30 @@ export const zhCN = {
   'web.passkeys.error.nameTooLong': '名字太长了（最多 {max} 个字）。',
   'web.passkeys.error.load': '没能加载通行密钥列表。',
   'web.passkeys.error.passkeyNotFound': '这条通行密钥已经不在服务器上了，列表已刷新。',
-  'web.passkeys.error.lastPasskey': '这是账号上最后一条通行密钥，账号也没有能用的登录口令，所以不能删除。先添加一条新的，或设一个登录口令（邮箱得先验证过）。',
+  'web.passkeys.error.lastPasskey': '这是账号上最后一条通行密钥，而删掉它就没有任何登录方式了，所以不能删除。先添加一条新的，再删这条。',
   'web.passkeys.error.unauthorized': '登录状态已失效，请重新登录。',
   'web.passkeys.error.network': '连不上服务端，请稍后重试。',
+
+  // ── 设置页「修改登录密码」：两个秘密的界线在这里划一次 ──────────────
+  //
+  // 🔴 这批句子唯一的职责是把两件事**分开**：这里的密码只回答"谁能登录这个账号"，
+  // 而"能不能解开数据"是另一样东西（加密口令）。改这里既不碰它，也救不了它 ——
+  // 依据 ADR-0040 §3.2 D1：登录口令点一封邮件就能重置，加密口令**不可恢复**。
+  // 只写一句"修改密码"而不划这条界，会让人以为忘了加密口令也能在这儿找回来。
+  //
+  // ⚠️ 句子里不出现"8"：`{min}` 由调用处从 `AUTH_PASSWORD_MIN_CODE_POINTS` 传入
+  //（唯一真源在 `@heyta/shared-schema`）。把上限写进词条就是第二套取值。
+  'web.settings.password.title': '登录密码',
+  'web.settings.password.lead': '这里改的只是登录这个账号用的密码。你的加密口令是另一样东西：不在这里改，这个密码也代替不了它解开数据。',
+  'web.settings.password.current': '当前密码',
+  'web.settings.password.new': '新密码',
+  'web.settings.password.minLength': '至少 {min} 个字符。',
+  'web.settings.password.submit': '修改密码',
+  'web.settings.password.changed': '登录密码已修改。',
+  'web.settings.password.otherDevices': '其它设备上的登录都会失效，要用新密码重新登录；数据不受影响。这个标签页会自动接着用新密码。',
+  'web.settings.password.needsSignIn': '先登录，才能修改这个账号的登录密码。',
+  'web.settings.password.resetTo': '重置链接会发到 {email}。',
+  'web.settings.password.noPassword': '这个账号还没有登录密码，所以这里没有可改的密码。要继续登录请用通行密钥或邮件链接。',
 
   // ── 应用内的小组件旅程（把卡片加到桌面）──────────────────────────
   'mobile.widgetJourney.sectionTitle': '桌面小组件',

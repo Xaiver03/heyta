@@ -574,7 +574,7 @@ export const en = {
   'common.auth.error.passwordLockedWithWait': 'Password sign-in is temporarily locked (your account itself is not locked). Use the email sign-in link or a passkey, or try the password again in {seconds} seconds.',
   'common.auth.error.passwordBackendBusy': 'The server is busy right now and could not check that. What you typed is still here - try again in a few seconds.',
   'common.auth.error.invalidResetLink': 'That reset link was already used or has expired. Go back to sign-in and request a new one.',
-  'common.auth.error.noPasswordSet': 'This account has no sign-in password yet (it may only use passkeys). “Forgot password?” will set one.',
+  'common.auth.error.noPasswordSet': 'This account has no sign-in password yet (it may only use passkeys or email links), so there is nothing to change here.',
   'common.auth.error.passwordPolicy': 'That password does not meet the requirements - see the hint below.',
   'common.auth.error.requestRejected': 'That request was not accepted. Check what you filled in.',
   'common.auth.error.passkeyNameTooLong': 'Names are at most {max} characters. Please shorten it.',
@@ -679,9 +679,30 @@ export const en = {
   'web.passkeys.error.nameTooLong': 'That name is too long (up to {max} characters).',
   'web.passkeys.error.load': 'Could not load your passkeys.',
   'web.passkeys.error.passkeyNotFound': 'That passkey is no longer on the server — the list has been refreshed.',
-  'web.passkeys.error.lastPasskey': 'This is the account’s only passkey and there is no usable password, so it cannot be removed. Add a new passkey, or set a password (verified email required).',
+  'web.passkeys.error.lastPasskey': 'This is the account’s only passkey, and removing it would leave no way to sign in at all, so it cannot be removed. Add a new passkey first, then delete this one.',
   'web.passkeys.error.unauthorized': 'Your sign-in has expired — sign in again.',
   'web.passkeys.error.network': 'Could not reach the server. Try again later.',
+
+  // ── Settings "sign-in password" panel: where the two secrets are separated ──
+  //
+  // 🔴 These sentences exist to keep two things apart: this password answers "who may
+  // sign in to the account", while "can the data be decrypted" is a different secret (the
+  // encryption passphrase). Changing here neither touches it nor recovers it — ADR-0040
+  // §3.2 D1: the sign-in password is resettable by email, the passphrase is not.
+  //
+  // ⚠️ No "8" in the text: `{min}` is passed in from `AUTH_PASSWORD_MIN_CODE_POINTS`
+  // (single source of truth in `@heyta/shared-schema`).
+  'web.settings.password.title': 'Sign-in password',
+  'web.settings.password.lead': 'This changes only the password that signs in to your account. Your encryption passphrase is a separate secret: it is not changed here, and this password cannot take its place to unlock your data.',
+  'web.settings.password.current': 'Current password',
+  'web.settings.password.new': 'New password',
+  'web.settings.password.minLength': 'At least {min} characters.',
+  'web.settings.password.submit': 'Change password',
+  'web.settings.password.changed': 'Your sign-in password has been changed.',
+  'web.settings.password.otherDevices': 'Sign-ins on your other devices stop working and need the new password; your data is unaffected. This tab keeps using the new one automatically.',
+  'web.settings.password.needsSignIn': 'Sign in first to change this account’s sign-in password.',
+  'web.settings.password.resetTo': 'The reset link goes to {email}.',
+  'web.settings.password.noPassword': 'This account has no sign-in password, so there is nothing to change here. Use a passkey or an email link to sign in.',
 
   // ── In-app widget journey (adding cards to the home screen) ─────────
   'mobile.widgetJourney.sectionTitle': 'Home screen widgets',
