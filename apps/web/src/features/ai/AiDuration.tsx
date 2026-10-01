@@ -217,6 +217,8 @@ export function AiDuration(props: AiDurationProps): React.JSX.Element {
 
   const source = {
     title: task.title,
+    // 🔴 界面语言：它进的是提示词的「输出语言」指令，不是用户数据字段（不进 `fields`）。
+    locale,
     ...(task.note === undefined ? {} : { note: task.note }),
     ...(history === undefined ? {} : { history }),
   };

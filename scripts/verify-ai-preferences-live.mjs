@@ -133,6 +133,10 @@ const prefs = {
 const OFF = { ...prefs, memoryEnabled: false };
 
 const TITLE = '把新版本发到生产环境';
+// 探针所用的界面语言 —— 决定提示词末尾那条「输出语言」指令。
+// 跑英文判据：HEYTA_AI_LOCALE=en pnpm verify:ai-preferences-live
+const SOURCE_LOCALE = process.env['HEYTA_AI_LOCALE'] ?? 'zh-CN';
+
 
 const routing = {
   enabled: true,
@@ -204,7 +208,7 @@ console.log('1) 主开关关着：真实调用里不得出现偏好');
   check('关着时生成了 0 条提示', offHints.length === 0, `实际 ${String(offHints.length)} 条`);
 
   const res = await requestBreakdown(
-    { title: TITLE },
+    { title: TITLE, locale: SOURCE_LOCALE },
     { routing, consents: [CONSENT], routed: { fetchImpl: impl }, preferences: offHints },
   );
   check('真实调用成功', res.ok === true, res.ok ? '' : String(res.reason ?? ''));
@@ -226,7 +230,7 @@ let withoutHintsItems = 0;
   const { bodies, impl } = capturingFetch();
   const res = await attempt(3, '带偏好的调用', () =>
     requestBreakdown(
-      { title: TITLE },
+      { title: TITLE, locale: SOURCE_LOCALE },
       { routing, consents: [CONSENT], routed: { fetchImpl: impl }, preferences: hints },
     ),
   );
@@ -273,7 +277,7 @@ console.log('\n3) 同一任务、不带偏好：对比粒度');
   const { impl } = capturingFetch();
   const res = await attempt(3, '不带偏好的调用', () =>
     requestBreakdown(
-      { title: TITLE },
+      { title: TITLE, locale: SOURCE_LOCALE },
       { routing, consents: [CONSENT], routed: { fetchImpl: impl }, preferences: [] },
     ),
   );
@@ -287,8 +291,8 @@ console.log('\n3) 同一任务、不带偏好：对比粒度');
 // ── 4) 提示词装配：不给偏好时，段落一个字都不该进去 ────────────────────────
 console.log('\n4) 装配层（不发网络请求）');
 {
-  const noPrefs = buildBreakdownInvocation({ title: TITLE }, []);
-  const withPrefs = buildBreakdownInvocation({ title: TITLE }, renderPreferenceHints(prefs, 'breakdown'));
+  const noPrefs = buildBreakdownInvocation({ title: TITLE, locale: SOURCE_LOCALE }, []);
+  const withPrefs = buildBreakdownInvocation({ title: TITLE, locale: SOURCE_LOCALE }, renderPreferenceHints(prefs, 'breakdown'));
   check('不给偏好时，prompt 里没有偏好段落', !noPrefs.user.includes('关于这位用户'));
   check('给偏好时，prompt 里有偏好段落', withPrefs.user.includes('关于这位用户'));
   check('系统提示里写了「不要复述」', withPrefs.system.includes('不要复述'));

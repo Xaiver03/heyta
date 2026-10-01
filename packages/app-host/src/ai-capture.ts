@@ -77,6 +77,10 @@ import {
   type RoutedDeps,
 } from '@heyta/ai';
 import type { AiFailureReason } from '@heyta/ai';
+import {
+  outputLanguageDirective,
+  type AiOutputLocale,
+} from './ai-output-language.js';
 
 /**
  * 一句话输入的字符上限。超出**直接拒绝**（不是截断）。
@@ -107,6 +111,17 @@ export const MAX_CAPTURE_RESPONSE_LENGTH = 4000;
 export interface CaptureSource {
   /** 用户刚敲进去的那一句话。**这就是要出境的数据本身。** */
   text: string;
+  /**
+   * 🔴 **界面语言。必填，而且刻意不给默认值。**
+   *
+   * 提示词本身是中文（那是给模型的指令，不是界面文案），但**输出语言必须跟着界面走** ——
+   * 否则英文界面用户点「确认」后，模型回的那条**中文标题会写进数据并同步**，
+   * 泄漏的不是文案而是存量数据。理由全在 `ai-output-language.ts` 文件头。
+   *
+   * 为什么是必填：`locale?:` 加默认值的失效方向是「忘了传 → 悄悄按中文出」，
+   * 那正是这条要修的 bug 本身。必填把它变成编译错误。
+   */
+  locale: AiOutputLocale;
   /**
    * 时间源（epoch ms）。默认 `Date.now`。
    *
@@ -189,6 +204,8 @@ export function buildCaptureInvocation(
       '- 只能依据上面给出的「今天是」来推算，不许凭印象写一个日期。',
       '- 算不出来、或者用户根本没提时间，就**省略 dueDate**。',
       '- 不确定时宁可省略 —— 一个错的日期比没有日期更糟。',
+      '',
+      outputLanguageDirective(source.locale),
     ].join('\n'),
     user: lines.join('\n'),
     fields,

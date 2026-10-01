@@ -190,24 +190,24 @@ function expectFieldsMatchUser(inv: { user: string; fields: readonly string[] })
 
 describe('buildCaptureInvocation', () => {
   it('功能是 capture', () => {
-    expect(buildCaptureInvocation({ text: '明天下午三点和张总开周会', now: NOW }).feature).toBe(
+    expect(buildCaptureInvocation({ locale: 'zh-CN', text: '明天下午三点和张总开周会', now: NOW }).feature).toBe(
       'capture',
     );
   });
 
   it('🔴🔴 `fields` 必须覆盖 `user` 里出现的每个数据字段（披露的依据）', () => {
-    expectFieldsMatchUser(buildCaptureInvocation({ text: '明天下午三点和张总开周会', now: NOW }));
+    expectFieldsMatchUser(buildCaptureInvocation({ locale: 'zh-CN', text: '明天下午三点和张总开周会', now: NOW }));
   });
 
   it('🔴 `fields` 里不许有 user 里没有的字段（披露不能虚报）', () => {
-    const inv = buildCaptureInvocation({ text: '买牛奶', now: NOW });
+    const inv = buildCaptureInvocation({ locale: 'zh-CN', text: '买牛奶', now: NOW });
     expect([...inv.fields].sort()).toEqual(['text', 'today']);
     // user 里确实有那句话
     expect(inv.user).toContain('买牛奶');
   });
 
   it('🔴 `today` 是一个**真实出境字段**，必须被披露', () => {
-    const inv = buildCaptureInvocation({ text: '买牛奶', now: NOW });
+    const inv = buildCaptureInvocation({ locale: 'zh-CN', text: '买牛奶', now: NOW });
     expect(inv.fields).toContain('today');
     // 固定时钟 → 固定日期（这条同时证明时钟可注入）
     expect(inv.user).toContain('2026-09-25');
@@ -216,14 +216,14 @@ describe('buildCaptureInvocation', () => {
   });
 
   it('同样的输入产生同样的 prompt 字节（可复现）', () => {
-    const a = buildCaptureInvocation({ text: '买牛奶', now: NOW });
-    const b = buildCaptureInvocation({ text: '买牛奶', now: NOW });
+    const a = buildCaptureInvocation({ locale: 'zh-CN', text: '买牛奶', now: NOW });
+    const b = buildCaptureInvocation({ locale: 'zh-CN', text: '买牛奶', now: NOW });
     expect(a.user).toBe(b.user);
     expect(a.system).toBe(b.system);
   });
 
   it('系统提示要求**严格 JSON** 且明确禁止猜日期', () => {
-    const { system } = buildCaptureInvocation({ text: 'x', now: NOW });
+    const { system } = buildCaptureInvocation({ locale: 'zh-CN', text: 'x', now: NOW });
     expect(system).toContain('JSON');
     expect(system).toContain('dueDate');
     // 这条是硬约束：宁可省略，也不要编
@@ -233,6 +233,7 @@ describe('buildCaptureInvocation', () => {
 
   it('🔴 输入过长时在 prompt 层也截断（纵深防御）', () => {
     const inv = buildCaptureInvocation({
+      locale: 'zh-CN',
       text: '啊'.repeat(MAX_CAPTURE_INPUT_LENGTH + 200),
       now: NOW,
     });
@@ -243,7 +244,7 @@ describe('buildCaptureInvocation', () => {
   // ── 记忆层：偏好注入 prompt 与披露 ─────────────────────────────
 
   it('没有偏好时：不出现 preferences 字段，也不出现任何提示段落', () => {
-    const inv = buildCaptureInvocation({ text: '买牛奶', now: NOW });
+    const inv = buildCaptureInvocation({ locale: 'zh-CN', text: '买牛奶', now: NOW });
     expect(inv.fields).not.toContain('preferences');
     expect(inv.user).not.toContain('关于这位用户的历史习惯');
   });
@@ -251,14 +252,14 @@ describe('buildCaptureInvocation', () => {
   it('🔴 传了偏好：`preferences` 必须进 `fields`（否则就是偷偷多发数据）', () => {
     const hints = renderPreferenceHints(withPrefs(), 'capture');
     expect(hints.length).toBeGreaterThan(0);
-    const inv = buildCaptureInvocation({ text: '买牛奶', now: NOW }, hints);
+    const inv = buildCaptureInvocation({ locale: 'zh-CN', text: '买牛奶', now: NOW }, hints);
     expect(inv.fields).toContain('preferences');
     expectFieldsMatchUser(inv);
   });
 
   it('🔴 只发该功能需要的偏好（最小化出境面）：捕获不带粒度/估时/时段', () => {
     const hints = renderPreferenceHints(withPrefs(), 'capture');
-    const inv = buildCaptureInvocation({ text: '买牛奶', now: NOW }, hints);
+    const inv = buildCaptureInvocation({ locale: 'zh-CN', text: '买牛奶', now: NOW }, hints);
     // 捕获只关心标题风格
     expect(inv.user).toContain('任务标题以中文为主');
     expect(inv.user).not.toContain('拆成 6 项');
@@ -271,7 +272,7 @@ describe('buildCaptureInvocation', () => {
     const hints = renderPreferenceHints(off, 'capture');
     expect(hints).toEqual([]);
 
-    const inv = buildCaptureInvocation({ text: '买牛奶', now: NOW }, hints);
+    const inv = buildCaptureInvocation({ locale: 'zh-CN', text: '买牛奶', now: NOW }, hints);
     expect([...inv.fields].sort()).toEqual(['text', 'today']);
     expect(inv.user).not.toContain('关于这位用户的历史习惯');
   });
@@ -436,7 +437,7 @@ describe('🔴🔴 requestCapture —— 出境闸门', () => {
   it('🔴🔴 远端端点但**没有该功能的授权** → 不发任何请求', async () => {
     const { impl, calls } = fetchReturning('{"title":"甲"}');
     const outcome = await requestCapture(
-      { text: '明天开会', now: NOW },
+      { locale: 'zh-CN', text: '明天开会', now: NOW },
       {
         routing: routing([REMOTE_ENDPOINT], { capture: ['remote'] }),
         consents: [], // ← 没有授权
@@ -453,7 +454,7 @@ describe('🔴🔴 requestCapture —— 出境闸门', () => {
   it('🔴 授权绑的是 `(功能, 目的地)` —— 别的功能的授权不算数', async () => {
     const { impl, calls } = fetchReturning('{"title":"甲"}');
     const outcome = await requestCapture(
-      { text: '明天开会', now: NOW },
+      { locale: 'zh-CN', text: '明天开会', now: NOW },
       {
         routing: routing([REMOTE_ENDPOINT], { capture: ['remote'] }),
         // 授权的是 breakdown，不是 capture
@@ -468,7 +469,7 @@ describe('🔴🔴 requestCapture —— 出境闸门', () => {
   it('🔴 授权了但目的地是 heyta-cloud，而路由走的是用户端点 → 不匹配', async () => {
     const { impl, calls } = fetchReturning('{"title":"甲"}');
     const outcome = await requestCapture(
-      { text: '明天开会', now: NOW },
+      { locale: 'zh-CN', text: '明天开会', now: NOW },
       {
         routing: routing([REMOTE_ENDPOINT], { capture: ['remote'] }),
         consents: [{ feature: 'capture', destination: 'heyta-cloud', grantedAt: 1 }],
@@ -482,7 +483,7 @@ describe('🔴🔴 requestCapture —— 出境闸门', () => {
   it('✅ 本机端点不需要授权，直接跑通', async () => {
     const { impl, calls } = fetchReturning('{"title":"和张总开周会","priority":"high"}');
     const outcome = await requestCapture(
-      { text: '明天下午三点和张总开周会', now: NOW },
+      { locale: 'zh-CN', text: '明天下午三点和张总开周会', now: NOW },
       {
         routing: routing([LOCAL_ENDPOINT], { capture: ['local'] }),
         consents: [],
@@ -502,7 +503,7 @@ describe('🔴🔴 requestCapture —— 出境闸门', () => {
   it('✅ 远端端点 + 正确授权 → 跑通，且 destination 如实标为 user-endpoint', async () => {
     const { impl, calls } = fetchReturning('{"title":"甲"}');
     const outcome = await requestCapture(
-      { text: '开会', now: NOW },
+      { locale: 'zh-CN', text: '开会', now: NOW },
       {
         routing: routing([REMOTE_ENDPOINT], { capture: ['remote'] }),
         consents: [CAPTURE_CONSENT],
@@ -517,7 +518,7 @@ describe('🔴🔴 requestCapture —— 出境闸门', () => {
   it('🔴 总开关关着 → 不发请求，且提示去开总开关', async () => {
     const { impl, calls } = fetchReturning('{"title":"甲"}');
     const outcome = await requestCapture(
-      { text: '开会', now: NOW },
+      { locale: 'zh-CN', text: '开会', now: NOW },
       {
         routing: { ...routing([LOCAL_ENDPOINT], { capture: ['local'] }), enabled: false },
         consents: [],
@@ -532,7 +533,7 @@ describe('🔴🔴 requestCapture —— 出境闸门', () => {
   it('🔴 这个功能没有配路由 → 提示要检查端点而不是总开关', async () => {
     const { impl, calls } = fetchReturning('{"title":"甲"}');
     const outcome = await requestCapture(
-      { text: '开会', now: NOW },
+      { locale: 'zh-CN', text: '开会', now: NOW },
       {
         routing: routing([LOCAL_ENDPOINT], {}), // capture 没路由
         consents: [],
@@ -547,7 +548,7 @@ describe('🔴🔴 requestCapture —— 出境闸门', () => {
   it('🔴 空文本直接拒绝，连路由都不走', async () => {
     const { impl, calls } = fetchReturning('{"title":"甲"}');
     const outcome = await requestCapture(
-      { text: '   ', now: NOW },
+      { locale: 'zh-CN', text: '   ', now: NOW },
       {
         routing: routing([LOCAL_ENDPOINT], { capture: ['local'] }),
         consents: [],
@@ -566,7 +567,7 @@ describe('🔴🔴 requestCapture —— 出境闸门', () => {
   it('🔴 超长输入直接拒绝（**不截断**，也不发请求）', async () => {
     const { impl, calls } = fetchReturning('{"title":"甲"}');
     const outcome = await requestCapture(
-      { text: '啊'.repeat(MAX_CAPTURE_INPUT_LENGTH + 1), now: NOW },
+      { locale: 'zh-CN', text: '啊'.repeat(MAX_CAPTURE_INPUT_LENGTH + 1), now: NOW },
       {
         routing: routing([LOCAL_ENDPOINT], { capture: ['local'] }),
         consents: [],
@@ -584,7 +585,7 @@ describe('🔴🔴 requestCapture —— 出境闸门', () => {
   it('🔴 模型返回一坨没用的东西 → `unparseable`，不硬凑', async () => {
     const { impl } = fetchReturning('抱歉，我无法完成这个任务。');
     const outcome = await requestCapture(
-      { text: '开会', now: NOW },
+      { locale: 'zh-CN', text: '开会', now: NOW },
       {
         routing: routing([LOCAL_ENDPOINT], { capture: ['local'] }),
         consents: [],
@@ -598,7 +599,7 @@ describe('🔴🔴 requestCapture —— 出境闸门', () => {
   it('🔴 `capture` 只需要 structured_output —— 不声明 long_context 也能跑', async () => {
     const { impl, calls } = fetchReturning('{"title":"甲"}');
     const outcome = await requestCapture(
-      { text: '开会', now: NOW },
+      { locale: 'zh-CN', text: '开会', now: NOW },
       {
         routing: routing([LOCAL_ENDPOINT], { capture: ['local'] }),
         consents: [],
@@ -621,7 +622,7 @@ describe('🔴🔴 requestCapture —— 出境闸门', () => {
     };
     const { impl, calls } = fetchReturning('{"title":"甲"}');
     const outcome = await requestCapture(
-      { text: '开会', now: NOW },
+      { locale: 'zh-CN', text: '开会', now: NOW },
       {
         routing: routing([noStructured], { capture: ['local'] }),
         consents: [],
@@ -649,7 +650,7 @@ describe('🔴🔴 requestCapture —— 出境闸门', () => {
     expect(hints.length).toBeGreaterThan(0);
 
     await requestCapture(
-      { text: '开会', now: NOW },
+      { locale: 'zh-CN', text: '开会', now: NOW },
       {
         routing: routing([LOCAL_ENDPOINT], { capture: ['local'] }),
         consents: [],
@@ -669,7 +670,7 @@ describe('🔴🔴 requestCapture —— 出境闸门', () => {
   it('🔴 不传 preferences 时，请求体里一个偏好字节都没有', async () => {
     const { impl, calls } = fetchReturning('{"title":"甲"}');
     await requestCapture(
-      { text: '开会', now: NOW },
+      { locale: 'zh-CN', text: '开会', now: NOW },
       {
         routing: routing([LOCAL_ENDPOINT], { capture: ['local'] }),
         consents: [],
@@ -687,7 +688,7 @@ describe('🔴🔴 requestCapture —— 出境闸门', () => {
     const { impl, calls } = fetchReturning('{"title":"甲"}');
 
     await requestCapture(
-      { text: '开会', now: NOW },
+      { locale: 'zh-CN', text: '开会', now: NOW },
       {
         routing: routing([LOCAL_ENDPOINT], { capture: ['local'] }),
         consents: [],
@@ -703,7 +704,7 @@ describe('🔴🔴 requestCapture —— 出境闸门', () => {
   it('🔴 请求体里只有被披露的字段：那句话 + 今天', async () => {
     const { impl, calls } = fetchReturning('{"title":"甲"}');
     await requestCapture(
-      { text: '明天下午三点和张总开周会', now: NOW },
+      { locale: 'zh-CN', text: '明天下午三点和张总开周会', now: NOW },
       {
         routing: routing([LOCAL_ENDPOINT], { capture: ['local'] }),
         consents: [],
@@ -726,7 +727,7 @@ describe('🔴 模型给的日期只是候选', () => {
   it('🔴 请求层：坏日期被丢弃并如实标记，整条仍然可用', async () => {
     const { impl } = fetchReturning('{"title":"开会","dueDate":"明天下午三点"}');
     const outcome = await requestCapture(
-      { text: '明天下午三点开会', now: NOW },
+      { locale: 'zh-CN', text: '明天下午三点开会', now: NOW },
       {
         routing: routing([LOCAL_ENDPOINT], { capture: ['local'] }),
         consents: [],
@@ -744,7 +745,7 @@ describe('🔴 模型给的日期只是候选', () => {
   it('🔴 请求层：模型没提日期时，结果里绝不出现日期', async () => {
     const { impl } = fetchReturning('{"title":"买牛奶"}');
     const outcome = await requestCapture(
-      { text: '买牛奶', now: NOW },
+      { locale: 'zh-CN', text: '买牛奶', now: NOW },
       {
         routing: routing([LOCAL_ENDPOINT], { capture: ['local'] }),
         consents: [],
@@ -779,7 +780,7 @@ describe('🔴🔴 模型输出不会直接写库', () => {
   it('🔴 返回值只有候选值，没有任何"已应用"语义', async () => {
     const { impl } = fetchReturning('{"title":"甲","dueDate":"2026-09-26","priority":"high"}');
     const outcome = await requestCapture(
-      { text: '甲', now: NOW },
+      { locale: 'zh-CN', text: '甲', now: NOW },
       {
         routing: routing([LOCAL_ENDPOINT], { capture: ['local'] }),
         consents: [],
@@ -816,7 +817,7 @@ describe('🔴 两个分支都必须带回熔断状态', () => {
   it('🔴🔴 端点失败时，health 记下了那个端点的失败次数', async () => {
     const routeConfig = routing([LOCAL_ENDPOINT], { capture: ['local'] });
     const outcome = await requestCapture(
-      { text: '开会', now: NOW },
+      { locale: 'zh-CN', text: '开会', now: NOW },
       {
         routing: routeConfig,
         consents: [],
@@ -835,7 +836,7 @@ describe('🔴 两个分支都必须带回熔断状态', () => {
     const failing = (): Promise<never> => Promise.reject(new Error('down'));
 
     const first = await requestCapture(
-      { text: '开会', now: NOW },
+      { locale: 'zh-CN', text: '开会', now: NOW },
       { routing: routeConfig, consents: [], routed: { fetchImpl: failing } },
     );
     expect(first.ok).toBe(false);
@@ -843,7 +844,7 @@ describe('🔴 两个分支都必须带回熔断状态', () => {
 
     // 用上一轮的 health 作为种子 —— 模拟"落盘后重启又读回来"
     const second = await requestCapture(
-      { text: '开会', now: NOW },
+      { locale: 'zh-CN', text: '开会', now: NOW },
       { routing: routeConfig, consents: [], routed: { fetchImpl: failing, healthSeed: first.health } },
     );
     expect(second.ok).toBe(false);
@@ -854,7 +855,7 @@ describe('🔴 两个分支都必须带回熔断状态', () => {
   it('🔴 解析失败（请求成功但内容没法用）也带回 health', async () => {
     const routeConfig = routing([LOCAL_ENDPOINT], { capture: ['local'] });
     const outcome = await requestCapture(
-      { text: '开会', now: NOW },
+      { locale: 'zh-CN', text: '开会', now: NOW },
       {
         routing: routeConfig,
         consents: [],
@@ -871,7 +872,7 @@ describe('🔴 两个分支都必须带回熔断状态', () => {
   it('🔴 成功分支也带 health（形状与失败分支一致）', async () => {
     const { impl } = fetchReturning('{"title":"甲"}');
     const outcome = await requestCapture(
-      { text: '开会', now: NOW },
+      { locale: 'zh-CN', text: '开会', now: NOW },
       {
         routing: routing([LOCAL_ENDPOINT], { capture: ['local'] }),
         consents: [],
@@ -906,7 +907,7 @@ describe('🔴🔴 回退不跨越隐私边界', () => {
     }) as unknown as typeof fetch;
 
     const outcome = await requestCapture(
-      { text: '开会', now: NOW },
+      { locale: 'zh-CN', text: '开会', now: NOW },
       {
         routing: routing([LOCAL_ENDPOINT, REMOTE_ENDPOINT], { capture: ['local', 'remote'] }),
         // 只授权了本机（本机其实不需要授权）—— 云端没授权
@@ -941,7 +942,7 @@ describe('🔴🔴 回退不跨越隐私边界', () => {
     }) as unknown as typeof fetch;
 
     const outcome = await requestCapture(
-      { text: '开会', now: NOW },
+      { locale: 'zh-CN', text: '开会', now: NOW },
       {
         routing: routing([LOCAL_ENDPOINT, REMOTE_ENDPOINT], { capture: ['local', 'remote'] }),
         consents: [CAPTURE_CONSENT],

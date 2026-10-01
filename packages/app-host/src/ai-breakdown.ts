@@ -47,6 +47,10 @@ import {
   type RoutedDeps,
 } from '@heyta/ai';
 import type { AiFailureReason } from '@heyta/ai';
+import {
+  outputLanguageDirective,
+  type AiOutputLocale,
+} from './ai-output-language.js';
 
 /** 一次拆解最多收多少条。超出直接截断并**如实告诉用户**。 */
 export const MAX_BREAKDOWN_ITEMS = 20;
@@ -56,6 +60,13 @@ export const MAX_ITEM_LENGTH = 200;
 
 export interface BreakdownSource {
   title: string;
+  /**
+   * 🔴 **界面语言。必填、无默认值** —— `locale?:` 的失效方向是「忘了传 → 悄悄按中文
+   * 输出」，而那正是这条要修的 bug（模型回的中文文字被用户确认**写进数据并同步**）。
+   * 必填把它变成编译错误。为什么指令是中文而输出语言跟着界面走，
+   * 见 `ai-output-language.ts` 文件头。
+   */
+  locale: AiOutputLocale;
   /** 已有备注。**会一起发出去** —— 所以必须出现在 `fields` 里被披露。 */
   note?: string;
 }
@@ -112,6 +123,8 @@ export function buildBreakdownInvocation(
       '如果给出了用户的历史习惯，请据此调整子项数量与措辞，但不要复述这些习惯。',
       '每个子项一行，用「- 」开头。',
       '不要输出任何解释、前言或结语，只输出这份清单。',
+      '',
+      outputLanguageDirective(source.locale),
     ].join('\n'),
     user: lines.join('\n'),
     fields,

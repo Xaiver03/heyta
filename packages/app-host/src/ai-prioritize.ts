@@ -60,6 +60,10 @@ import {
   type RoutedDeps,
 } from '@heyta/ai';
 import type { AiFailureReason } from '@heyta/ai';
+import {
+  outputLanguageDirective,
+  type AiOutputLocale,
+} from './ai-output-language.js';
 
 /**
  * 一次排序最多带多少条任务。
@@ -99,6 +103,13 @@ export interface PrioritizeTaskInput {
 /** 一次排序的输入。 */
 export interface PrioritizeSource {
   tasks: readonly PrioritizeTaskInput[];
+  /**
+   * 🔴 **界面语言。必填、无默认值** —— `locale?:` 的失效方向是「忘了传 → 悄悄按中文
+   * 输出」，而那正是这条要修的 bug（模型回的中文文字被用户确认**写进数据并同步**）。
+   * 必填把它变成编译错误。为什么指令是中文而输出语言跟着界面走，
+   * 见 `ai-output-language.ts` 文件头。
+   */
+  locale: AiOutputLocale;
 }
 
 /** 一条建议。`id` 必须来自输入集合（由 `parsePrioritizeResult` 核对）。 */
@@ -205,12 +216,14 @@ export function buildPrioritizeInvocation(
     feature: 'prioritize',
     system: [
       '你是一个任务优先级排序助手。用户会给你一批任务（JSON 数组，每项含 id、标题，可能含截止时间 dueDate 与当前优先级 priority）。',
-      '请为**每一条**任务给出优先级建议，并用一两句中文说明理由。',
+      '请为**每一条**任务给出优先级建议，并用界面语言写一两句理由（见末尾「输出语言」）。',
       '优先级只能取这四个值之一："high"、"medium"、"low"、"none"。',
       'id 必须**原样照抄**输入里的值：不许改写、不许补全、不许编造。',
       '如果给出了用户的历史习惯，请据此调整判断，但不要复述这些习惯。',
       '只输出一个 JSON 数组，格式为 [{"id":"...","priority":"high","reason":"..."}]。',
       '不要输出任何解释、前言、结语或代码围栏。',
+      '',
+      outputLanguageDirective(source.locale),
     ].join('\n'),
     user: lines.join('\n'),
     fields,
@@ -384,7 +397,10 @@ export async function requestPrioritize(
     return { ok: false, reason: 'empty-tasks', message: '没有可排序的任务。', health: {} };
   }
 
-  const invocation = buildPrioritizeInvocation({ tasks }, deps.preferences ?? []);
+  const invocation = buildPrioritizeInvocation(
+    { tasks, locale: source.locale },
+    deps.preferences ?? [],
+  );
 
   const outcome = await invokeRouted(
     deps.routing,
