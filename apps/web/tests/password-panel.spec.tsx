@@ -12,9 +12,12 @@
  *      （变异：把那句挪进 `outcome?.kind === 'changed'` 分支 ⇒ 组 2 红。）
  *   4. **忙时再点是空操作**，而按钮**不能**禁用（禁用会把焦点甩掉）。
  *      （变异：拿掉 `submit` 第一行的 guard ⇒ 那条用例会发两次请求。）
- *   5. **没有口令的账号把表单整张收起，且不给"忘记密码"按钮** ——
- *      `requestPasswordReset` 对没有口令认证器的账号刻意不发信（`recovery.ts:117`），
- *      所以那一屏上摆一个不会发信的按钮就是明知是死路还指过去。
+ *   5. **服务端说"这个账号还没有口令" ⇒ 换表，不是留一句红字** ——
+ *      `no_password_set` 不是一种错误落点，而是"这张表摆错了"。收起来让用户干等
+ *      是最初的形状，它唯一的出路是让用户自己想到还有另一张表；现在换过去，
+ *      并且**设密那一屏不给"忘记密码"按钮** —— `requestPasswordReset` 对没有口令
+ *      认证器的账号刻意不发信（`recovery.ts:117`），摆一个不会发信的按钮就是骗人。
+ *      （变异：把 `switchMode('set')` 换回一句红字 ⇒ 组 5.5 红。）
  *   6. **两个秘密每次都划界**：标题说"登录密码"、lead 点名"加密口令不在这里"。
  *   7. 输入框**没有 `maxLength`**（NIST 禁止静默截断口令）、`autocomplete` 两框不同、
  *      长度数字来自 `@heyta/shared-schema` 而**不是写死的 8**。
@@ -90,7 +93,7 @@ function stubPath(path: string, spec: { status: number; body?: unknown }, method
 }
 
 /** 挂起的 fetch：用来观测"在飞"这一段（按钮文案、重复点击）。 */
-function stubPending(): () => void {
+function stubPending(body: unknown = FRESH_SESSION): () => void {
   calls = [];
   let release: ((value: Response) => void) | undefined;
   vi.stubGlobal(
@@ -114,7 +117,7 @@ function stubPending(): () => void {
       status: 200,
       ok: true,
       headers: new Headers(),
-      json: () => Promise.resolve(FRESH_SESSION),
+      json: () => Promise.resolve(body),
     } as unknown as Response);
   };
 }
@@ -362,7 +365,7 @@ describe('5. 失败：话要说对，焦点要落对，输入要留着', () => {
     expect(inputOf('password-new').getAttribute('aria-invalid')).not.toBe('true');
   });
 
-  it('🔴 这个账号从来没有口令 ⇒ 表单整张收起，且**不给**"忘记密码"按钮', async () => {
+  it('🔴 服务端说"这个账号还没有口令" ⇒ **换到设密那张表**，不是留一句红字', async () => {
     stubPath(AUTH_PASSWORD_PATHS.change, {
       status: 400,
       body: { error: 'x', code: 'no_password_set' },
@@ -372,12 +375,16 @@ describe('5. 失败：话要说对，焦点要落对，输入要留着', () => {
     await type('password-new', 'whatever-too');
     await click('password-submit');
 
-    expect(q('password-no-password')).not.toBeNull();
+    // 换过去了：设密那一个框在，改密那两个框整张不在。
+    expect(q('password-set-field')).not.toBeNull();
     expect(q('password-current')).toBeNull();
     expect(q('password-new')).toBeNull();
     expect(q('password-submit')).toBeNull();
     // 没有口令认证器的账号，重置信**不发**（`recovery.ts:117`）⇒ 死按钮不许摆。
     expect(q('password-forgot')).toBeNull();
+    // 🔴 换表必须把草稿一起清掉：把"当前密码"的旧输入摆在"新密码"的位置上，
+    // 等于把一个旧秘密写进新秘密的框。
+    expect(inputOf('password-set-field').value).toBe('');
   });
 });
 
@@ -489,5 +496,239 @@ describe('8. 口令输入框的四条纪律', () => {
     render();
     await click('password-reveal-current');
     expect(inputOf('password-new').type).toBe('password');
+  });
+});
+
+/**
+ * 「给账号加上**第一个**登录密码」那张表。
+ *
+ * 🔴 这一组存在的理由是真实缺陷：passkey-only / 魔法链接注册的账号，
+ * `change` 回 `no_password_set`、`forgot` 对没有口令认证器的账号**不发信** ——
+ * 也就是说这类账号此前**永远**加不上登录密码，而词条
+ * `web.passkeys.error.lastPasskey` 早就在建议"或者去设置页设一个登录密码"。
+ * 那一句当时是**指向一条不存在的路**的谎话。
+ *
+ * 判据分两类：一是**这张表自己的形状**（一个框、没有当前密码、不给忘记密码），
+ * 二是**它与改密那张表的分工**（后果相反、换表时草稿互不带过去、
+ * 同一句失败在两张表上要说不一样的话）。
+ */
+describe('9. 「设第一个密码」那张表', () => {
+  it('从改密那张表点「从来没设过？」就换过来 —— 不必先撞一次墙', async () => {
+    stubPath(AUTH_PASSWORD_PATHS.set, { status: 200, body: { message: 'Password set' } });
+    render();
+    await click('password-switch-to-set');
+
+    expect(q('password-set-field')).not.toBeNull();
+    // 🔴 这张表**没有**"当前密码"：这个账号从来没有过口令，要求他打一个
+    // 不存在的东西，是界面在编造一个前提。
+    expect(q('password-current')).toBeNull();
+    expect(q('password-new')).toBeNull();
+  });
+
+  it('🔴 后果那句与改密**相反**，而且必须在点之前就看得见', async () => {
+    stubPath(AUTH_PASSWORD_PATHS.set, { status: 200, body: { message: 'Password set' } });
+    render();
+    const changeSentence = text('password-consequence');
+    expect(changeSentence).toContain('其它设备');
+
+    await click('password-switch-to-set');
+    // 换表后这句不许还是那句"其余设备都要重新登录"。
+    expect(q('password-consequence')).toBeNull();
+    const setSentence = text('password-set-consequence');
+    expect(setSentence).toContain('不会把任何地方踢下线');
+    // 两张表的句子必须不同（同一条文案摆两张表 = 对一半人说错话）。
+    expect(setSentence).not.toBe(changeSentence);
+  });
+
+  it('🔴 成功：打的是 /password/set、体里只有 newPassword、**令牌不换**、草稿清空', async () => {
+    stubPath(AUTH_PASSWORD_PATHS.set, { status: 200, body: { message: 'Password set' } });
+    render();
+    await click('password-switch-to-set');
+    await type('password-set-field', 'first-real-password');
+    await click('password-set-submit');
+
+    const call = calls.find((c) => c.url.endsWith(`/api${AUTH_PASSWORD_PATHS.set}`));
+    expect(call?.method).toBe('POST');
+    expect(call?.headers['authorization']).toContain(OLD_TOKEN);
+    expect(call?.body).toMatchObject({ newPassword: 'first-real-password' });
+    // 这条不验当前口令 ⇒ 字段表里不该出现 currentPassword（出现了服务端也不看，
+    // 但界面就会有人以为"要填那个"）。
+    expect(Object.keys((call?.body ?? {}) as object)).not.toContain('currentPassword');
+
+    expect(text('password-set-done')).toContain('已设置');
+    expect(inputOf('password-set-field').value).toBe('');
+
+    // 🔴 这条**不换令牌**（不 bump tokenVersion）。照改密那样补一次 applyAuthSession
+    // 会把一枚仍然有效的令牌换成 undefined ⇒ 症状是"加了个密码，这个标签页掉线"。
+    expect(useSyncStore.getState().token).toBe(OLD_TOKEN);
+  });
+
+  it('空框点击 ⇒ 零请求 + 文字错误 + 焦点落在那一个框', async () => {
+    stubPath(AUTH_PASSWORD_PATHS.set, { status: 200, body: { message: 'Password set' } });
+    render();
+    await click('password-switch-to-set');
+    await click('password-set-submit');
+
+    expect(calls.length).toBe(0);
+    expect(q('password-set-local-error')).not.toBeNull();
+    expect(document.activeElement).toBe(inputOf('password-set-field'));
+    expect(inputOf('password-set-field').getAttribute('aria-invalid')).toBe('true');
+  });
+
+  it('服务端说"这个账号已经有口令" ⇒ 换回改密那张表（不是红字）', async () => {
+    stubPath(AUTH_PASSWORD_PATHS.set, {
+      status: 400,
+      body: { error: 'x', code: 'password_already_set' },
+    });
+    render();
+    await click('password-switch-to-set');
+    await type('password-set-field', 'already-in-use-somehow');
+    await click('password-set-submit');
+
+    expect(q('password-current')).not.toBeNull();
+    expect(q('password-new')).not.toBeNull();
+    expect(q('password-set-field')).toBeNull();
+    // 反向也不许把设密那格的内容带过来。
+    expect(inputOf('password-new').value).toBe('');
+    expect(q('password-set-failed')).toBeNull();
+  });
+
+  it('🔴 同一句"邮箱还没验证"，在两张表上说的是**两句话**', async () => {
+    // 改密那张：那一次**确实**验过口令 ⇒ "密码是对的，只差最后一步"是真话。
+    stubPath(AUTH_PASSWORD_PATHS.change, {
+      status: 403,
+      body: { error: 'x', code: 'email_not_verified' },
+    });
+    render();
+    await type('password-current', 'old-one');
+    await type('password-new', 'new-one');
+    await click('password-submit');
+    const onChange = text('password-failed');
+    expect(onChange).toContain('密码是对的');
+
+    // 设密那张：没有任何口令被验过 ⇒ 那句成了假话，必须换一句。
+    stubPath(AUTH_PASSWORD_PATHS.set, {
+      status: 403,
+      body: { error: 'x', code: 'email_not_verified' },
+    });
+    render();
+    await click('password-switch-to-set');
+    await type('password-set-field', 'new-one');
+    await click('password-set-submit');
+    const onSet = text('password-set-failed');
+    expect(onSet).not.toContain('密码是对的');
+    expect(onSet).toContain('还没有验证');
+  });
+
+  it('忙时再点是空操作；在飞那句说"正在设置"，不许带"其余设备要重新认证"', async () => {
+    const release = stubPending({ message: 'Password set' });
+    render();
+    await click('password-switch-to-set');
+    await type('password-set-field', 'first-real-password');
+    await click('password-set-submit');
+
+    const btn = q('password-set-submit') as HTMLButtonElement;
+    expect(btn.disabled).toBe(false);
+    // 🔴 `common.auth.busy.change` 字面带着"（其余设备需要重新认证）"，
+    // 把它摆在这张表上就和它正下方那句"不会把任何地方踢下线"当场打脸。
+    expect(btn.textContent).toContain('正在设置登录密码');
+    expect(btn.textContent).not.toContain('其余设备');
+
+    await click('password-set-submit');
+    expect(calls.filter((c) => c.url.endsWith(`/api${AUTH_PASSWORD_PATHS.set}`))).toHaveLength(1);
+
+    await act(async () => {
+      release();
+      await Promise.resolve();
+    });
+    expect(q('password-set-done')).not.toBeNull();
+  });
+
+  it('设密那个框：没有 maxLength，autocomplete 是 new-password', async () => {
+    stubPath(AUTH_PASSWORD_PATHS.set, { status: 200, body: { message: 'Password set' } });
+    render();
+    await click('password-switch-to-set');
+    const input = inputOf('password-set-field');
+    expect(input.getAttribute('maxLength')).toBeNull();
+    expect(input.getAttribute('autocomplete')).toBe('new-password');
+    expect(input.type).toBe('password');
+  });
+
+  it('显隐只翻这一个框，且按钮文案不变（只翻 aria-pressed）', async () => {
+    stubPath(AUTH_PASSWORD_PATHS.set, { status: 200, body: { message: 'Password set' } });
+    render();
+    await click('password-switch-to-set');
+    const label = text('password-reveal-set');
+
+    await click('password-reveal-set');
+    expect(inputOf('password-set-field').type).toBe('text');
+    expect(text('password-reveal-set')).toBe(label);
+    expect(q('password-reveal-set')?.getAttribute('aria-pressed')).toBe('true');
+  });
+
+  /**
+   * 🔴 换表**来回**都要清草稿。
+   *
+   * 危害不是"看着乱"：在改密表打过"当前密码"，撞出 no_password_set 换到设密表，
+   * 设好之后再切回改密表 —— 那句旧输入此时**已经是当前口令**，留在"新密码"的位置
+   * 上就是界面把一个旧秘密写进了新秘密的框。反向同理（设密打了一半切回来）。
+   */
+  it('换表来回都把草稿清掉（旧秘密不许出现在任何框里）', async () => {
+    stubPath(AUTH_PASSWORD_PATHS.change, { status: 200, body: FRESH_SESSION });
+    stubPath(AUTH_PASSWORD_PATHS.set, { status: 200, body: { message: 'Password set' } });
+    render();
+
+    await type('password-current', 'old-secret');
+    await type('password-new', 'a-new-one');
+    await click('password-switch-to-set');
+    expect(inputOf('password-set-field').value).toBe('');
+
+    await type('password-set-field', 'half-typed');
+    await click('password-switch-to-change');
+    expect(inputOf('password-current').value).toBe('');
+    expect(inputOf('password-new').value).toBe('');
+
+    // 再切过去，那个半截的设密草稿也不许还阴着（它是上一轮的东西）。
+    await click('password-switch-to-set');
+    expect(inputOf('password-set-field').value).toBe('');
+  });
+
+  /**
+   * 设密那句后果**初次渲染就在 DOM**，不是成功后才冒出来。
+   *
+   * ⚠️ 这条断的是"它在不在 DOM 里"，不是"样式可不可见" —— 把一句预告用
+   * `display:none` 藏起来，和事后才通知，对读屏用户是同一件事。
+   */
+  it('设密的后果句在**初次渲染**就在 DOM 里，而结果区还是空的', () => {
+    stubPath(AUTH_PASSWORD_PATHS.set, { status: 200, body: { message: 'Password set' } });
+    render();
+    // 先换到设密表（不点提交）。
+    const switchBtn = q('password-switch-to-set');
+    expect(switchBtn).not.toBeNull();
+    act(() => {
+      switchBtn?.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+    });
+
+    expect(q('password-set-consequence')).not.toBeNull();
+    expect(text('password-set-consequence')).toContain('不会把任何地方踢下线');
+    // 还没点过 ⇒ 没有任何结果。
+    expect(q('password-set-done')).toBeNull();
+    expect(q('password-set-failed')).toBeNull();
+    expect(text('password-set-live')).toBe('');
+  });
+
+  it('🔴 一次别的动作的忙不会串到这张表上（按 action 收窄读）', async () => {
+    stubPath(AUTH_PASSWORD_PATHS.set, { status: 200, body: { message: 'Password set' } });
+    render();
+    await click('password-switch-to-set');
+
+    act(() => {
+      useAuthStore.setState({ status: { kind: 'busy', action: 'password-change' } });
+    });
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(text('password-set-submit')).toContain('设置登录密码');
+    expect(text('password-set-submit')).not.toContain('正在');
   });
 });
