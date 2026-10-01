@@ -30,6 +30,7 @@
 import { readFileSync } from 'node:fs';
 
 import { buildBreakdownInvocation, parseBreakdownItems, requestBreakdown } from '../packages/app-host/dist/index.js';
+import { classifyDestination } from '../packages/ai/dist/index.js';
 import { renderHintBlock, renderPreferenceHints } from '../packages/domain/dist/index.js';
 
 const CONFIG_PATH = process.env['HEYTA_AI_LIVE_CONFIG'] ?? '/tmp/heyta-ai-live/provider.json';
@@ -153,7 +154,13 @@ const routing = {
   routes: { breakdown: [{ endpointId: 'live' }] },
 };
 
-const CONSENT = { feature: 'breakdown', destination: 'user-endpoint', grantedAt: Date.now() };
+// 目的地由端点推导（与 `verify-ai-breakdown-live.mjs` 同一个理由）：本机回环端点的
+// 目的地是 `none`，写死 `user-endpoint` 会让这条授权记录**永远匹配不上**当前目的地。
+const CONSENT = {
+  feature: 'breakdown',
+  destination: classifyDestination({ mode: 'own', endpoint: config.endpoint }),
+  grantedAt: Date.now(),
+};
 
 function authedFetch(url, init) {
   return fetch(url, { ...init, headers: { ...(init?.headers ?? {}), authorization: `Bearer ${config.apiKey}` } });

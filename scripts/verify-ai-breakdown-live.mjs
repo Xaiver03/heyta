@@ -28,6 +28,12 @@ import {
   parseBreakdownItems,
   requestBreakdown,
 } from '../packages/app-host/dist/index.js';
+// 🔴 目的地与"要不要出境授权"由**端点**推导（ADR-0006 / ADR-0010），不许在本脚本里写死：
+// 本机 Ollama（回环）的目的地是 `none`、**不需要**逐功能授权；非回环的用户自建服务才是
+// `user-endpoint` + 必须授权。以前这两条在本脚本里被硬编码成后者的形状，
+// 于是拿本机端点跑会得到「❌ 被拒绝了 / ❌ 网络请求数 = 0 / ❌ 目的地如实标注」——
+// **读起来像出境闸门漏了**，而闸门的行为完全正确。
+import { classifyDestination, requiresEgressConsent } from '../packages/ai/dist/index.js';
 
 const CONFIG_PATH = process.env['HEYTA_AI_LIVE_CONFIG'] ?? '/tmp/heyta-ai-live/provider.json';
 
@@ -106,26 +112,46 @@ const routing = {
   routes: { breakdown: [{ endpointId: 'live' }] },
 };
 
+/** 目的地由端点推导 —— 与产品代码走的是同一个函数，不是本脚本自己的一套判断。 */
+const DESTINATION = classifyDestination({ mode: 'own', endpoint: config.endpoint });
+
 const CONSENT = {
   feature: 'breakdown',
-  destination: 'user-endpoint',
+  destination: DESTINATION,
   grantedAt: Date.now(),
 };
 
+/** 本机端点不需要授权，这一步在该形状下**测的是另一件事**（见 1) 里的分支）。 */
+const NEEDS_CONSENT = requiresEgressConsent(DESTINATION);
+
 console.log('=== 真实端到端拆解验证 ===\n');
+console.log(`端点形状：目的地 = ${DESTINATION}，需要出境授权 = ${NEEDS_CONSENT ? '是' : '否'}\n`);
 
 // ── 1) 闸门 ──────────────────────────────────────────────────────────────
-console.log('1) 未授权时：不发请求');
 {
   const { impl, count } = countingFetch(authedFetch);
-  const outcome = await requestBreakdown(
-    { title: TITLE, locale: SOURCE_LOCALE },
-    { routing, consents: [], routed: { fetchImpl: impl } },
-  );
-  check('被拒绝了', !outcome.ok);
-  check('网络请求数 = 0', count() === 0, `实际 ${String(count())} 次`);
-  if (!outcome.ok) {
-    check('提示指向"逐功能授权"', outcome.message.includes('授权'), outcome.message);
+  if (NEEDS_CONSENT) {
+    console.log('1) 未授权时：不发请求');
+    const outcome = await requestBreakdown(
+      { title: TITLE, locale: SOURCE_LOCALE },
+      { routing, consents: [], routed: { fetchImpl: impl } },
+    );
+    check('被拒绝了', !outcome.ok);
+    check('网络请求数 = 0', count() === 0, `实际 ${String(count())} 次`);
+    if (!outcome.ok) {
+      check('提示指向"逐功能授权"', outcome.message.includes('授权'), outcome.message);
+    }
+  } else {
+    // 本机（回环）端点：明文没离开这台机器 ⇒ ADR-0010 的逐功能出境授权**不适用**。
+    // 这一支不是"跳过"，它钉的是这条规则的另一半：形状判错（把本机当成出境）会当场红，
+    // 而那种错的实际后果是"用户对着自己的 Ollama 被反复要授权"。
+    console.log('1) 本机端点：出境授权不适用（目的地 = none），请求照发');
+    const outcome = await requestBreakdown(
+      { title: TITLE, locale: SOURCE_LOCALE },
+      { routing, consents: [], routed: { fetchImpl: impl } },
+    );
+    check('没有被"缺授权"挡住', outcome.ok || outcome.reason !== 'consent-missing', String(outcome.reason));
+    check('请求数 = 1', count() === 1, `实际 ${String(count())} 次`);
   }
 }
 
@@ -155,7 +181,7 @@ if (!outcome.ok) {
 } else {
   const { proposal } = outcome;
   ok('真实调用成功', `用时 ${String(elapsed)} ms`);
-  check('目的地如实标注', proposal.destination === 'user-endpoint', proposal.destination);
+  check('目的地如实标注', proposal.destination === DESTINATION, proposal.destination);
   check(
     '解析出至少 3 项',
     proposal.items.length >= 3,
