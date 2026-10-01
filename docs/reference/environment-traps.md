@@ -2446,3 +2446,44 @@ spec，且报错里出现 `ECONNREFUSED <本机端口>` 或 `.playwright-artifac
 
 **元判据**：变异验证报"没有转红"时，**先怀疑探针读到的是自己的注释**，
 再怀疑判据是装饰 —— 两者的修法完全不同（前者补剥注释，后者要么删掉要么重写）。
+
+93. 🔴 **手写解析器和写死的外部宿主形状，会让探针把自己的故障报告成被测对象的故障。**
+    四种面目，症状分别是"永远红""以通过的方式绿""读不回来""端点不存在"。
+
+    2026-10-01 给「账号语言 → 英文邮件」补线级判据（`server/tests/email-locale-wire.spec.ts`）
+    和外发判据（`pnpm --filter @heyta/server test:integration:email-live`）时四个全踩到：
+
+    1. **假红指向不存在的宿主**。第一次"读不回来"被记成了环境事实 ——
+       「Ethereal 从这台机器不可达（`curl` 返回 000）」，写进了计划文档，据此判这条边界关不掉。
+       真相：API 宿主是 **`api.nodemailer.com`**（`nodemailer/lib/nodemailer.js:15` 的默认值），
+       `api.ethereal.email` 只是收件域，TLS 根本握不上 ⇒ 000 是**指错地址**。
+       同一条 SMTP 通道 `smtp.ethereal.email:587` 当场收下了两封信。
+    2. **假红来自线协议会折行**。nodemailer 把顶层 `Content-Type` 写成两行
+       （`multipart/alternative;` 换行 + 缩进 + `boundary="…"`），不先 unfold 就取不到 boundary
+       ⇒「两个 part 都在」这条永远红。另一个同款：`^content-type:\s*([^;\r\n]+)$` 带 `$`
+       锚不住 `text/html; charset=utf-8` ⇒ 同一个假红。
+    3. 🔴 **以通过的方式失效**（比假红贵一个数量级）。quoted-printable 的 `=E9\
+       97\200` 解出来是**字节**，不重新按 UTF-8 读，中文看成两三个乱码字符 ⇒
+       CJK 判据算出 0 ⇒「英文邮件里没有中文」在**实现根本没本地化**时也照样绿。
+       修法只有一行：`Buffer.from(v,'binary').toString('utf8')`，
+       但前提是想到"字节 ≠ 字符串"。
+    4. **桩会被当成产品行为**。`server/tests/setup.ts` 全局 mock 了 `../src/db` 与 `../src/auth`，
+       新那条线级用例真打的是 `requestLoginMagicLink` ⇒ 落件恒 0、断言"信发出去了"必红。
+       加 `vi.mock('../src/auth', async (io) => ({ ...(await io()) }))` 把**真实现**装回去。
+       反向的坑在同一批文档里：`server/package.json` 的 `test` 脚本是 `vitest run`（整个 `tests/`），
+       `test:integration:postgres` 那份清单只是**子集** —— 只跑清单会把用例丢掉。
+       而 `tests/integration/` 被默认 vitest 配置整段排除（这些用例需要真库、真外发），
+       放进去=默认套件里真发信；放外面=默认套件根本不跑它 —— 这个二选一要在**放进目录之前**判。
+
+    还有两条同族的"探针 vs 产品"：ESM 模块命名空间**只读** ⇒ 给 `nodemailer.getTestMessageUrl`
+    赋值是静默 no-op（预 URL 列表永远空，看起来像"信没发出去"）；改抓 `Logger.info` 里的
+    `Preview URL:` 才拿得到。而 `api.nodemailer.com` 上**没有**列消息/读消息那两个端点
+    （`/v1/accounts/:user/messages`、`/v1/messages/:id` 全 404），正文只能从
+    `https://ethereal.email/message/<id>` 那个预览页里读回来。
+
+    📌 **可迁移的规律**：外部服务的宿主、端口、URL 形状、响应结构一律取**库里的常量**
+    （或读它自己打印出来的日志），不要按域名的"看起来对"手写。
+    任何新写的判据在宣布"被测对象有缺陷 / 这条验证本机做不了"之前，
+    **先用一个已知正确的输入证明这条判据能给出正确结果** ——
+    上面第 1 条那句假的环境结论，只需要"换个宿主再 curl 一次"就被推翻了，
+    而它让这条边界多活了一轮。这是 §7 元规则 1（先怀疑探针）的具体作案手法。
