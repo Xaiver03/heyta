@@ -54,6 +54,7 @@ import { Check, Folder, Plus, Tag as TagIcon } from 'lucide-react';
 import {
   HeytaUiProvider,
   OrganizerList,
+  openTagCounts,
   openTaskCounts,
   toOrganizerNodes,
   toOrganizerTree,
@@ -115,6 +116,16 @@ export function ProjectsPanel({
   );
   const counts = useMemo(
     () => openTaskCounts(Object.values(tasks.entities.tasks)),
+    [tasks.entities.tasks],
+  );
+  /**
+   * 标签那一节**此前一个计数都没有**（`OrganizerList` 的 `counts` 是可选项，
+   * 清单传了、标签没传）。滴答清单的侧栏每一行右侧都有数字，而我们连取数都不存在 ——
+   * 缺口不在"把数字挪位置"，在"这个数字根本没被算出来"（台账 R6）。
+   * 口径走共享层同一个 `open*Counts`，与清单那节不会漂。
+   */
+  const tagCounts = useMemo(
+    () => openTagCounts(Object.values(tasks.entities.tasks)),
     [tasks.entities.tasks],
   );
 
@@ -269,6 +280,7 @@ export function ProjectsPanel({
           <OrganizerList
             kind="tag"
             items={tagNodes}
+            counts={tagCounts}
             labels={{
               removeLabel: (name) => t('web.tags.delete', { name }),
               empty: t('common.organizer.tags.empty'),

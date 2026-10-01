@@ -21,7 +21,11 @@
  *      不是组件自己改筛选（见 `ProjectsPanel.tsx` 文件头 —— 直接 `setFilter`
  *      会让"人在习惯页点清单"看起来点了没反应）。
  *   D. **删除走宿主 action**：组件不写库。
- *   E. **标签与清单走同一棵骨架**：标签行也有删除、也可点，但**没有计数位**。
+ *   E. **标签与清单走同一棵骨架**：标签行也有删除、也可点，**也有计数位**。
+ *      （2026-10-01 改：这条以前钉的是"标签**没有**计数位"，理由写的是
+ *      "标签没有未完成任务数这个概念" —— 参照图（滴答侧栏）逐行都有数字，
+ *      而那个概念在领域里本来就成立（一条任务挂着 `tagIds`）。
+ *      真正缺的从来不是语义，是**没人算过**。）
  *   F. **web 侧只剩接线**：源码里不再出现行骨架（`ht-nav__item` / `countIn`）。
  *
  * ⚠️ RNW 的 `Pressable` 渲染成 `<div role="button">`（不是 `<button>`），
@@ -230,7 +234,7 @@ describe('C/D 清单：点一行报给宿主，删除走 action', () => {
   });
 });
 
-describe('E 标签：与清单同一棵骨架，但没有计数位', () => {
+describe('E 标签：与清单同一棵骨架，计数口径也是同一套', () => {
   it('标签行渲染、可点、可删', () => {
     seed();
     const view = render();
@@ -243,10 +247,24 @@ describe('E 标签：与清单同一棵骨架，但没有计数位', () => {
     expect(actions.deleteTag).toHaveBeenCalledWith('g1');
   });
 
-  it('标签行**没有**计数位（标签没有"未完成任务数"这个概念）', () => {
-    seed([task({ id: 't1', projectId: 'p1' })]);
+  it('计数 = 挂着这个标签的未完成任务；一条任务挂两个标签则**两边各 +1**', () => {
+    seed([
+      task({ id: 't1', tagIds: ['g1'] }),
+      task({ id: 't2', tagIds: ['g1', 'g2'] }),
+      task({ id: 't3', tagIds: ['g1'], completedAt: NOW }),
+      task({ id: 't4', tagIds: ['g1'], deletedAt: NOW }),
+      task({ id: 't5' }), // 没挂任何标签
+    ]);
     const view = render();
-    expect(byTestId(view, 'tag-g1-count')).toBeNull();
+    expect(byTestId(view, 'tag-g1-count')?.textContent).toBe('2');
+    expect(byTestId(view, 'tag-g2-count')?.textContent).toBe('1');
+  });
+
+  it('没有任务的标签**不渲染计数位**（与清单行同一条 `count > 0`）', () => {
+    seed([task({ id: 't1', tagIds: ['g1'] })]);
+    const view = render();
+    expect(byTestId(view, 'tag-g1-count')?.textContent).toBe('1');
+    expect(byTestId(view, 'tag-g2-count')).toBeNull();
   });
 });
 
