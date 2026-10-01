@@ -208,6 +208,16 @@ export function HeytaUiProvider({
 }: HeytaUiProviderProps): React.JSX.Element {
   const scheme = useColorScheme();
   const reducedMotion = useReducedMotion();
+  // 🔴 **继承外层**：一个宿主里嵌套挂多层 Provider 是既成事实（apps/web 有 25 处
+  // 各自包一棵子树），而每包一层就按**系统配色**重新解析一遍主题。
+  // Web 的应用开关只改 `<html data-theme>`（`apps/web/src/lib/theme.ts`），
+  // 于是嵌套层的色板来自 `prefers-color-scheme` 而**不是用户选的那套** ——
+  // 实测：OS 亮 + 应用暗 ⇒ 日历卡片在暗色界面里画成纯白，25 个文字元素对比度 < 3:1。
+  // 这里改成"外层已有主题就直接沿用"，宿主只需要在**根上**交一次 `value`。
+  //
+  // ⚠️ `packagedFonts` 也参与判断：它是宿主级差异，显式给了就说明这一层
+  //    想说的是"我打包了字体"，此时不能拿外层的值糊过去（那是静默吞掉一个 prop）。
+  const inherited = useContext(ThemeContext);
   // hooks 必须无条件调用，所以即使传了 `value` 也照常订阅 ——
   // 代价是宿主传值时这里多订阅一次；换来的是**调用顺序不会随 props 变化**，
   // 而条件式 hook 是 React 里最典型的一类"有时才崩"。
@@ -215,7 +225,9 @@ export function HeytaUiProvider({
     () => resolveHeytaUiTheme({ scheme, reducedMotion, packagedFonts }),
     [scheme, reducedMotion, packagedFonts],
   );
-  return <ThemeContext.Provider value={value ?? fallback}>{children}</ThemeContext.Provider>;
+  const resolved =
+    value ?? (packagedFonts === undefined && inherited !== null ? inherited : fallback);
+  return <ThemeContext.Provider value={resolved}>{children}</ThemeContext.Provider>;
 }
 
 export function useHeytaUiTheme(): HeytaUiTheme {
