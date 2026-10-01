@@ -8,9 +8,10 @@
  * 全部由 `@heyta/ui` 的 `CaptureComposer` 渲染 —— 与移动端将是**同一份实现**。
  * 这里只回答 web 自己的三个问题：
  *
- *   1. **文案**从哪来 → `@heyta/i18n` 的 `web.capture.*`（**零新增词条**；
- *      芯片的剩余天数由共享层算，措辞在这里说成当前语言）；
- *   2. **提交**到哪去 → `useTaskStore#addTask`（op-log 的唯一写入口，AGENTS.md §3.4）；
+ *   1. **文案**从哪来 → `@heyta/i18n` 的 `web.capture.*`；
+ *      芯片的剩余天数由共享层算，措辞在这里说成当前语言；
+ *   2. **提交**到哪去 → `useTaskStore#addTask`（op-log 的唯一写入口，AGENTS.md §3.4），
+ *      落点由 `destination` 决定 —— **当下面板停在哪个清单，新任务就留在哪个清单**；
  *   3. **AI 一句话捕获面板** → `renderAssistant` 插槽（见下）。
  *
  * 解析一行都不在这里：它仍然是 `@heyta/domain#parseCapture`。判据还是
@@ -107,11 +108,26 @@ export interface CaptureComposerProps {
     proposedCount: number;
     appliedCount: number;
   }) => void) | undefined;
+  /**
+   * 这一条新任务要落进哪个**清单**。没有就是收集箱（`addTask` 不带 `projectId`）。
+   *
+   * 🔴 它是**一个对象而不是两个可选字段**，因为这两件事必须同时成立或同时不成立：
+   * 拆成 `projectId` + `projectName` 之后，调用方可以只传一半，于是
+   * 「写进了清单、占位符却说不写」—— 界面说谎，而且没有任何类型会拦。
+   */
+  destination?: CaptureDestination | undefined;
+}
+
+/** 落点：清单 id + 它在界面上的名字（用户自己的字，不翻译）。 */
+export interface CaptureDestination {
+  readonly projectId: string;
+  readonly name: string;
 }
 
 export function CaptureComposer(props: CaptureComposerProps): React.JSX.Element {
   const addTask = useTaskStore((s) => s.addTask);
   const { t, locale } = useI18n();
+  const destination = props.destination;
 
   /**
    * 文案全部由宿主注入（共享层不 import `@heyta/i18n`）。
@@ -122,7 +138,10 @@ export function CaptureComposer(props: CaptureComposerProps): React.JSX.Element 
    */
   const labels = useMemo<CaptureComposerLabels>(
     () => ({
-      placeholder: t('web.capture.placeholder'),
+      placeholder:
+        destination === undefined
+          ? t('web.capture.placeholder')
+          : t('web.capture.placeholderTo', { list: destination.name }),
       addLabel: t('web.capture.addLabel'),
       add: t('web.capture.add'),
       matchesAria: t('web.capture.matches.aria'),
@@ -140,20 +159,25 @@ export function CaptureComposer(props: CaptureComposerProps): React.JSX.Element 
         return t(capturePriorityLabelKey(chip.priority));
       },
     }),
-    [t, locale],
+    [t, locale, destination],
   );
 
   /**
    * 提交。`plan.dueDate` 已经是 epoch ms（共享层换算完），这里只把它交给
    * op-log 的唯一写入口 —— **不再做第二次时区换算**。
+   *
+   * 🔴 `projectId` 也在这里交：**打开某个清单时新建的任务必须留在清单里**。
+   * 不传的话它会落进收集箱，从这条刚显示过的列表里消失，
+   * 而界面从头到尾没说过"这条不会出现在这里"。
    */
   const onSubmit = useCallback(
     (plan: CaptureSubmitPlan) =>
       addTask(plan.title, {
         ...(plan.dueDate !== undefined ? { dueDate: plan.dueDate } : {}),
         ...(plan.priority !== undefined ? { priority: plan.priority } : {}),
+        ...(destination !== undefined ? { projectId: destination.projectId } : {}),
       }),
-    [addTask],
+    [addTask, destination],
   );
 
   const {
