@@ -218,8 +218,12 @@ export function CalendarBoard({
 
   return (
     <View style={styles.root} testID={testID}>
-      {/* ── 月历 ───────────────────────────────────────────── */}
+      {/* ── 月历 ─────────────────────────────────────────────
+          🔴 这张卡片有**自己的 testID**：宿主需要区分"指针在月历网格上"与
+          "在下面那份当天清单上"。Web 的滚轮翻月只在卡片内接管滚轮，
+          清单那一块仍要能正常滚页（见 `apps/web/.../useWheelMonthNav.ts`）。 */}
       <View
+        testID={`${testID}-month-card`}
         style={[
           {
             gap: tokens['space.2'],

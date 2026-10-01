@@ -18,19 +18,23 @@
  * 1 月 31 日加一个月落到哪天）全集中在那几行 —— 两端各写一份的必然结果
  * 不是"某天崩了"，而是"网页上 3 号是周三、手机上是周四"。
  *
- * ## 这个文件只做三件事
+ * ## 这个文件只做四件事
  *
- * 1. **取数据**：`useTaskStore().entities.tasks`；
+ * 1. **取数据并过一层范围**：`useTaskStore().entities.tasks` → `scopeTasks(…, view.scope)`；
  * 2. **把 i18n 翻成共享板要的 `labels`**（共享层不许 `import '@heyta/i18n'`）；
- * 3. **把动作转交 store**（勾选完成走 `toggleComplete`，不自己构造 op）。
+ * 3. **把动作转交 store**（勾选完成走 `toggleComplete`，不自己构造 op）；
+ * 4. **把滚轮翻月接到同一个 cursor 上**（`useWheelMonthNav`；判据在 `wheel-month.ts`，
+ *    这里只有绑定 —— 手势怎么折算成"一格"不是产品语义，是 DOM 的事）。
  *
- * 状态（当前月 / 选中日）留在这里而不是共享板里：它是**宿主自己的界面状态**
- *（手机上也许是手势翻月、Web 上是两个按钮），而共享板只负责画。
+ * ⚠️ 当前月 / 选中日**不在本文件里**（`useState` 时期已过期）：它们在
+ * `features/calendar/store.ts`。原因是这一屏现在是**两列**——左边的迷你月历与右边的
+ * 月历必须指着同一个地方，而 `useState` 只能被一个组件看见。
+ * 共享板仍然只管画：翻月、选日都是宿主的事（手机上也许是手势翻月）。
  */
 
 import { useCallback, useMemo, useState } from 'react';
 
-import { isoWeek, startOfMonth, toLocalDate, type LocalDate } from '@heyta/domain';
+import { isoWeek, scopeTasks, toLocalDate, addMonths, type LocalDate } from '@heyta/domain';
 import { useI18n } from '@heyta/i18n';
 import {
   CalendarBoard as SharedCalendarBoard,
@@ -41,20 +45,42 @@ import {
 } from '@heyta/ui';
 
 import { useTaskStore } from '../tasks/store.js';
+import { useWheelMonthNav } from './useWheelMonthNav.js';
+import { useCalendarViewStore } from './store.js';
+
+/**
+ * 共享板的 testID 前缀。**提成常量**是因为滚轮的命中判据要写
+ * `[data-testid="…-month-card"]` —— 两处各写一遍，改一处就会静默失效
+ * （症状是"滚轮翻月忽然不灵了"，而选择器拼错不会有任何报错）。
+ */
+const BOARD_TEST_ID = 'calendar-board';
 
 export function CalendarView(): React.JSX.Element {
   const { t } = useI18n();
   const store = useTaskStore();
+  /**
+   * 🔴 月/日与侧栏**共用这一份**，不是本地 `useState`。
+   *
+   * 原来它俩住在这里，于是加侧栏时只有两条路：把状态提到 `App.tsx`（外壳长出一份
+   * 只服务一个视图的状态），或者各存一份（侧栏翻到 11 月、主区还停在 10 月，
+   * 两边的圆点各指各的）。现在它在一个只装日历界面状态的 store 里。
+   */
+  const view = useCalendarViewStore();
 
   const today = toLocalDate(store.now);
-  /** 正在显示的月份（用该月里任意一天表示）。 */
-  const [cursor, setCursor] = useState<LocalDate>(() => startOfMonth(toLocalDate(Date.now())));
-  /** 选中的那一天。 */
-  const [selected, setSelected] = useState<LocalDate>(() => toLocalDate(Date.now()));
   /** 正在写入的任务 id —— 防止连点产生两次 toggle。 */
   const [busyId, setBusyId] = useState<string | null>(null);
 
-  const tasks = useMemo(() => Object.values(store.entities.tasks), [store.entities.tasks]);
+  /**
+   * 主区画的是**范围内**的任务。
+   *
+   * ⚠️ 判据在 `@heyta/domain` 的 `scopeTasks`，这里只负责把它接上：
+   * 「勾了清单 A 就只看 A 的任务」是产品语义，不属于外壳（AGENTS §3.5）。
+   */
+  const tasks = useMemo(
+    () => scopeTasks(Object.values(store.entities.tasks), view.scope),
+    [store.entities.tasks, view.scope],
+  );
 
   const labels = useMemo(
     () => ({
@@ -95,6 +121,22 @@ export function CalendarView(): React.JSX.Element {
     [t],
   );
 
+  /**
+   * 滚轮翻月（产品负责人 2026-10-01：「上下滑动自由无限切换日历」）。
+   *
+   * 🔴 走的是**和侧栏迷你月历同一个** `setCursor` —— 只翻月、不动选中的那天。
+   * 另写一份"翻月"逻辑的结局是滚轮翻完，侧栏还圈着上个月的格子。
+   *
+   * `within` 只圈月历卡片：卡片下面那份当天清单需要正常滚页，
+   * 把它一起吃掉的话指针停在那儿就再也滚不动了。
+   */
+  const wheelHost = useWheelMonthNav(
+    (step) => {
+      view.setCursor(addMonths(view.cursor, step));
+    },
+    { within: `[data-testid="${BOARD_TEST_ID}-month-card"]` },
+  );
+
   const onToggleTask = useCallback(
     (taskId: string) => {
       // 与象限板同一条规矩：忙碌时**直接丢掉**这一次点击，而不是排队 ——
@@ -116,23 +158,24 @@ export function CalendarView(): React.JSX.Element {
 
   return (
     <HeytaUiProvider>
-      <SharedCalendarBoard
-        tasks={tasks}
-        today={today}
-        cursor={cursor}
-        selected={selected}
-        onCursorChange={setCursor}
-        onSelect={setSelected}
-        onToday={() => {
-          // 「今天」跳回：选中今天 + 月份跟过去（与 pickDay 同一条纪律）。
-          setSelected(today);
-          setCursor(startOfMonth(today));
-        }}
-        onToggleTask={onToggleTask}
-        busyTaskId={busyId}
-        labels={labels}
-        testID="calendar-board"
-      />
+      <div ref={wheelHost}>
+        <SharedCalendarBoard
+          tasks={tasks}
+          today={today}
+          cursor={view.cursor}
+          selected={view.selected}
+          onCursorChange={view.setCursor}
+          onSelect={view.selectDay}
+          onToday={() => {
+            // 「今天」跳回：选中今天 + 月份跟过去（与迷你月历的 ○ 同一条路径）。
+            view.goToToday(today);
+          }}
+          onToggleTask={onToggleTask}
+          busyTaskId={busyId}
+          labels={labels}
+          testID={BOARD_TEST_ID}
+        />
+      </div>
     </HeytaUiProvider>
   );
 }

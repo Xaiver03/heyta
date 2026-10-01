@@ -129,6 +129,273 @@
   color: var(--ht-color-foreground-subtle);
 }
 
+/*
+  ── 日历侧栏（迷你月历 + 显示范围）─────────────────────────
+
+  🔴 这一列的每一格**必须与主区月历同色同义**：点由 `calendarDayTone` 决定，
+  今天所在列头由 `isoWeekday` 决定，措辞由 `formatDayTitleText` 决定。
+  这里只负责尺寸与排布 —— 一旦在这里另写一套判断，"侧栏说有 3 件事、
+  点进去只列出 1 件"这种谎就没有任何一层会报错。
+
+  ⚠️ 格子宽度**不写死**：侧栏是用户可拖的（12–26rem），所以列宽用 `1fr`、
+  行高用 `aspect-ratio: 1`。给它一个固定像素宽，最窄时会溢出、最宽时会留白。
+*/
+.ht-calendar-side {
+  /* 🔴 这一列自己是**有界的**（最高一屏）并且钉住；滚动交给里面那一层。
+     以前这里直接写 `overflow-y: auto` 是错的，两处后果都在真浏览器里实测到：
+
+       · 外壳是 `min-height: 100dvh` 而不是固定高 ⇒ grid 项被内容撑到 761px，
+         比视口(720)还高，于是这一层**自己永远不滚** —— 注释里那句
+         "滚动条只出现在侧栏"是假的，实际是整页在滚，主区跟着走。
+       · `overflow-y: auto` 会连带把 `overflow-x` 从 `visible` 变成 `clip`。
+         把手那 8px 命中带有 4px **骑在右边缘之外**（`.ht-resizer` 的
+         `inset-inline-end: -0.5 × space-2`）⇒ 被裁掉一半，对着它自己的
+         几何中心按下去命中的是 `<nav>`，症状是"把手在那儿、拖不动"。 */
+  position: sticky;
+  inset-block-start: 0;
+  max-block-size: 100dvh;
+}
+
+/* 内部这一层才是滚动区；**把手不在里面**，所以裁不到它。 */
+.ht-calendar-side__body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ht-space-2);
+  min-block-size: 0;
+  overflow-y: auto;
+}
+
+/* 子项不许被 flex 压扁：压扁的样子是迷你月历的行高被挤到格子互相叠，
+   而不是出现滚动条。 */
+.ht-calendar-side__body > * {
+  flex: 0 0 auto;
+}
+
+.ht-mini-month {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ht-space-1);
+  padding: var(--ht-space-2);
+  border: 1px solid var(--ht-color-border);
+  border-radius: var(--ht-radius-md);
+  background: var(--ht-color-surface);
+}
+
+.ht-mini-month__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--ht-space-1);
+}
+
+.ht-mini-month__title {
+  font-size: var(--ht-font-size-sm);
+  font-weight: var(--ht-font-weight-semibold);
+  color: var(--ht-color-foreground);
+}
+
+.ht-mini-month__nav {
+  display: flex;
+  align-items: center;
+  /* 翻月按钮组往右边框外探出半个间距：否则右侧留白看起来比左侧大一截。 */
+  margin-inline-end: calc(var(--ht-space-1) * -1);
+}
+
+.ht-mini-month__nav-btn {
+  display: inline-grid;
+  place-items: center;
+  inline-size: var(--ht-space-6);
+  block-size: var(--ht-space-6);
+  border: none;
+  border-radius: var(--ht-radius-sm);
+  background: transparent;
+  color: var(--ht-color-foreground-muted);
+  cursor: pointer;
+}
+
+.ht-mini-month__nav-btn:hover {
+  background: var(--ht-color-hover);
+  color: var(--ht-color-foreground);
+}
+
+.ht-mini-month__nav-btn:focus-visible {
+  outline: var(--ht-border-width-thick) solid var(--ht-color-ring);
+  outline-offset: var(--ht-space-1);
+}
+
+.ht-mini-month__weekdays,
+.ht-mini-month__row {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+}
+
+.ht-mini-month__weekdays {
+  font-size: var(--ht-font-size-2xs);
+  font-weight: var(--ht-font-weight-medium);
+  text-align: center;
+  color: var(--ht-color-foreground-subtle);
+}
+
+.ht-mini-month__weekdays > span {
+  padding-block: var(--ht-space-1);
+}
+
+.ht-mini-day {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--ht-space-0);
+  aspect-ratio: 1;
+  border: 1px solid transparent;
+  border-radius: var(--ht-radius-sm);
+  background: transparent;
+  /* 🔴 `font: inherit`：裸 `<button>` 默认用自己的字体，
+     不给这一行，格里的数字会比界面其他地方小一号且不是我们选的那号。 */
+  font: inherit;
+  color: var(--ht-color-foreground-muted);
+  cursor: pointer;
+}
+
+.ht-mini-day:hover {
+  background: var(--ht-color-hover);
+  color: var(--ht-color-foreground);
+}
+
+.ht-mini-day:focus-visible {
+  outline: var(--ht-border-width-thick) solid var(--ht-color-ring);
+  outline-offset: var(--ht-space-1);
+}
+
+/* 补白格：属于相邻月，看得见、点得着，但要**看得出来不是本月**。 */
+.ht-mini-day--outside {
+  color: var(--ht-color-foreground-subtle);
+}
+
+.ht-mini-day__num {
+  font-size: var(--ht-font-size-2xs);
+  font-variant-numeric: tabular-nums;
+  line-height: var(--ht-line-height-tight);
+}
+
+.ht-mini-day__dots {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--ht-space-1);
+  block-size: var(--ht-size-badge-dot);
+}
+
+.ht-mini-day__dots > i {
+  inline-size: var(--ht-size-badge-dot);
+  block-size: var(--ht-size-badge-dot);
+  border-radius: var(--ht-radius-full);
+}
+
+/* 今天：列头与数字同色（主蓝），圈出一层边 —— 与主区月历同一条表达。 */
+.ht-mini-day--today {
+  color: var(--ht-color-primary);
+}
+
+.ht-mini-day--today .ht-mini-day__num {
+  font-weight: var(--ht-font-weight-bold);
+}
+
+/* 选中：底色 + 描边两个通道都给。**不能只给底色** ——
+   暗色主题下 `--ht-color-primary-subtle` 与 `--ht-color-surface` 差得很小。 */
+.ht-mini-day--selected {
+  background: var(--ht-color-primary-subtle);
+  border-color: var(--ht-color-primary);
+  color: var(--ht-color-primary);
+}
+
+/* ── 显示范围（所有 / 清单 / 标签）────────────────────────── */
+
+.ht-scope {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ht-space-1);
+}
+
+.ht-scope__all {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--ht-space-2);
+  min-block-size: var(--ht-space-8);
+  padding: 0 var(--ht-space-2);
+  border: none;
+  border-radius: var(--ht-radius-md);
+  background: transparent;
+  font: inherit;
+  font-size: var(--ht-font-size-sm);
+  font-weight: var(--ht-font-weight-medium);
+  color: var(--ht-color-foreground-muted);
+  text-align: start;
+  cursor: pointer;
+}
+
+.ht-scope__all:hover {
+  background: var(--ht-color-hover);
+  color: var(--ht-color-foreground);
+}
+
+.ht-scope__all[aria-pressed='true'] {
+  color: var(--ht-color-primary);
+}
+
+.ht-scope__all:focus-visible {
+  outline: var(--ht-border-width-thick) solid var(--ht-color-ring);
+  outline-offset: var(--ht-space-1);
+}
+
+.ht-scope__group {
+  display: flex;
+  flex-direction: column;
+}
+
+.ht-scope__heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--ht-space-2);
+  padding-inline: var(--ht-space-2);
+}
+
+/* 分组头沿用侧栏的小节标题样式，只是把横向留白交给上面这层。 */
+.ht-scope__heading .ht-nav__section {
+  padding-inline: 0;
+}
+
+.ht-scope__row {
+  display: flex;
+  align-items: center;
+  gap: var(--ht-space-2);
+  min-block-size: var(--ht-space-8);
+  padding-inline: var(--ht-space-2);
+  border-radius: var(--ht-radius-sm);
+  font-size: var(--ht-font-size-sm);
+  color: var(--ht-color-foreground-muted);
+  cursor: pointer;
+}
+
+.ht-scope__row:hover {
+  background: var(--ht-color-hover);
+  color: var(--ht-color-foreground);
+}
+
+/* 子清单比父级缩一格 —— 层级是**看着**出来的，不是靠名字猜。 */
+.ht-scope__row--child {
+  padding-inline-start: var(--ht-space-5);
+}
+
+.ht-scope__name {
+  min-inline-size: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 /* ── 主区 ───────────────────────────────────────────── */
 
 .ht-main {
