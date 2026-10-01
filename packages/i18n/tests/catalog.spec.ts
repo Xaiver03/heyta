@@ -128,3 +128,90 @@ describe('translate()', () => {
     expect(() => translate(DEFAULT_LOCALE, missingKey)).toThrow();
   });
 });
+
+/**
+ * 英文复数安全（先只管 `web.habits.*`）
+ * ======================================
+ *
+ * 🔴 **词条表没有 ICU** —— 没有 `plural(one, other)`，所以"`{count} days`"这种形状
+ * 在 `count === 1` 时会渲染出 `1 days`。中文没有单复数，所以这条规则**只对英文成立**，
+ * 症状也只出现在英文界面：新建一个只打过一次卡的习惯，读屏念的是
+ * `"喝水": 1 check-ins in the last 90 days`。
+ *
+ * 两种合规形状，这里都接受：
+ *   1. **有 `…One` 兄弟词条**，调用方按 `count === 1` 分支（`web.habits.streak.*` 三对）；
+ *   2. **句子本身对 1 和 N 都成立** —— 把单位做成连字符复合词（`{count}-day streak`）
+ *      或让数字出现在名词**之后**（`Days saved by a freeze in this streak: {count}`）。
+ *
+ * ⚠️ 为什么先只扫 `web.habits.*`：全表扫会当场报出成长/提醒/AI 那批
+ * （`{minutes} minutes` 等 50 余条），那是另一批面的改写工作，
+ * 混进来会让这批红挡掉这轮的交付。**这是划界，不是"其他面没有这个问题"** ——
+ * 那些 key 同样中招，扩展到它们时应当一次改一面。
+ *
+ * 📌 这一组是 **2026-10-01** 那次的产物：`web.habits.row.aria` 写成
+ * `longest {longest} days, {total} check-ins`，直到移动端清单把这整句拿去当
+ * `aria-label` 才被读出来。当时只有"改那一条"，没有"让这一类不能再写进来"。
+ *
+ * ✅ **变异验证**（2026-10-01，基线 22 passed → 注入 → 按字节恢复 → 22 passed）：
+ *
+ * | 注入 | 红的用例（恰好这些，无多余） |
+ * |---|---|
+ * | `web.habits.freeze` 改回 `'Of this streak, {count} days…'` | 扫那条 ⇒ `web.habits.freeze → Of this streak, 1 days were saved by a freeze`（1 红） |
+ * | 判据前缀改成不存在的命名空间（候选集变空） | 候选集非空 ⇒ `expected 0 to be >= 20`（1 红） |
+ * | `web.habits.row.aria` 改回裸复数名词 | 扫那条 + 连字符形状那条（2 红） |
+ *
+ * ⚠️ **跑这个验证的第一轮报的是"三条变异都不红"，那是假话** —— 探针按位置
+ * 解析 vitest 的汇总行（`Tests N passed | M failed`），而 vitest **不保证顺序**：
+ * 有失败时它先印 failed。取不到数就被当成"零失败"。
+ * 一般规律：**探针读不到数字时必须响亮地失败**，"没读到"和"读到了 0"是两回事
+ * —— 前者会被误播成后者，而后者正是这批判据最想指控的罪名。
+ */
+describe('英文习惯文案在 count=1 时必须仍然成立', () => {
+  // ⚠️ **两个正则不能合成一个**：带 `g` 的 `.test()` 会推进 `lastIndex`，
+  // 于是同一个对象在循环里会**隔条漏检** —— 判据看起来在跑，其实只查了一半。
+  const FILL = /\{[A-Za-z]+\}/g;
+  const HAS_PLACEHOLDER = /\{[A-Za-z]+\}/;
+  const HAZARD =
+    /\b1 (days|weeks|months|years|hours|minutes|check-ins|checks|tasks|items|times|streaks|runs|notes|lists|tags|subtasks|comments|entries)\b/;
+
+  const withOne = (value: string): string => value.replace(FILL, '1');
+  const hasOneSibling = (key: string): boolean => `${key}One` in en;
+
+  const candidates = Object.entries(en).filter(
+    ([key, value]) => key.startsWith('web.habits.') && HAS_PLACEHOLDER.test(value) && !hasOneSibling(key),
+  );
+
+  it('候选集非空（否则这条规则会因为"没东西可查"而永远绿）', () => {
+    expect(candidates.length).toBeGreaterThanOrEqual(20);
+  });
+
+  it('逐条把占位符填成 1 后，不出现 `1 <复数名词>`', () => {
+    const bad = candidates
+      .filter(([, value]) => HAZARD.test(withOne(value)))
+      .map(([key, value]) => `${key} → ${withOne(value)}`);
+    expect(bad).toEqual([]);
+  });
+
+  it('有 `…One` 兄弟的那几条：复数条本身确实危险，单数条才是 1 该走的', () => {
+    // 🔴 这条钉的是"排除规则不是漏洞"。删掉 `.currentOne` 或让调用方不再分支，
+    // 上面那条候选集会把它算进去并变红 —— 这里先把前提本身证一遍。
+    const branched = Object.keys(en).filter(
+      (key) => key.startsWith('web.habits.') && hasOneSibling(key) && HAZARD.test(withOne(en[key as MessageKey])),
+    );
+    expect(branched).toEqual([
+      'web.habits.streak.current',
+      'web.habits.streak.longest',
+      'web.habits.streak.total',
+    ]);
+    for (const key of branched) {
+      expect(HAZARD.test(withOne(en[`${key}One` as MessageKey]))).toBe(false);
+    }
+  });
+
+  it('清单那一整句（`row.aria`）是连字符形状，不是裸复数名词', () => {
+    // 这条 key 同时被 web 的 DOM 清单和共享 RN 清单当 `aria-label` 用，
+    // 两端各渲染一次 —— 形状写坏就是两个端一起说坏句子。
+    expect(en['web.habits.row.aria']).toContain('-day');
+    expect(withOne(en['web.habits.row.aria'])).not.toMatch(HAZARD);
+  });
+});
