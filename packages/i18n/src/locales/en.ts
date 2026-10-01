@@ -1821,6 +1821,17 @@ export const en = {
   'mobile.tasks.composer.placeholder': 'What needs doing?',
   'mobile.tasks.composer.close': 'Close the new-task panel',
 
+  // ── Mobile · global search (the second host of the shared `SearchPanel`) ──
+  //    The panel's own copy still comes from `web.search.*` — same surface,
+  //    so there is no second translation of it.
+  //    🔴 Only three keys are mobile-only: the entry/exit a11y names, and
+  //    `noResults`. The web sentence promises "tasks, notes, **or places to
+  //    go**", and mobile has no quick-jump group — reusing it would advertise
+  //    a result row that cannot exist here.
+  'mobile.search.open': 'Open search',
+  'mobile.search.close': 'Close search',
+  'mobile.search.noResults': 'No matching tasks or notes.',
+
   // ── Mobile · one-line capture (the tail of the `capture` cut) ──
   //    🔴 These keys fix an **inconsistency between the two ends**: the web
   //    composer understands "tomorrow" / "!1" and shows recognition chips,

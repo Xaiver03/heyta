@@ -44,6 +44,7 @@ import {
   RefreshCw,
   Repeat,
   RotateCcw,
+  Search,
   Settings,
   Share2,
   Smartphone,
@@ -149,6 +150,9 @@ const ICONS = {
   'action.back': ArrowLeft,
   'action.close': X,
   'action.settings': Settings,
+  // 🔴 与共享 `SearchPanel` 输入行里那个放大镜**同一个字形**：入口和它打开的
+  // 东西长得不一样，用户就不会把这两个认成同一件事。
+  'action.search': Search,
   'action.sync': RefreshCw,
   /**
    * 导出 / 分享。
