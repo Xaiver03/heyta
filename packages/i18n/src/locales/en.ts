@@ -45,6 +45,12 @@ export const en = {
   'common.sync.error.undecryptableOps': 'Some older data could not be decrypted with the current password (it may have been written under a different one) and was skipped - everything else synced',
   'common.sync.error.undecryptablePage': 'Nothing on this page could be decrypted with the current password, so syncing is paused and no history was skipped - this usually means the end-to-end encryption password does not match the data on the server. Check your password and sync again.',
   'common.sync.error.uploadRejected': 'Some changes were rejected by the server and are not in the cloud — retrying them has stopped. See sync details.',
+  // reason === 'unauthorized': this device's access token was refused (401/403).
+  // Same three things the Chinese sentence has to carry: why it stopped, that the
+  // local data is fine, and that the fix is signing in again - not retrying sync.
+  // Without the second one the first reaction is "did I lose my data?", and people
+  // respond to that by wiping the local store.
+  'common.sync.error.unauthorized': 'This device’s sign-in credential is no longer valid (you may have signed out on another device, or changed your password), so syncing stopped — your local data is intact and still readable; it will continue syncing once you sign in again',
 
   // ── Landing · generic ─────────────────────────────────────
   'landing.skipLink': 'Skip to main content',

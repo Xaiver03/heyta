@@ -142,16 +142,29 @@ describe('syncFailureMessageKey', () => {
       'undecryptable-ops',
       'undecryptable-page',
       'upload-rejected',
+      'unauthorized',
     ] as const;
     const seen = new Set<string>();
     for (const reason of reasons) {
       const key = syncFailureMessageKey(reason);
       expect(key).toMatch(/^common\.sync\.error\./);
-      // 八种原因必须各有各的句子：全都一样就等于没结构。
+      // 每一种原因必须各有各的句子：全都一样就等于没结构。
       expect(seen.has(String(key))).toBe(false);
       seen.add(String(key));
     }
     expect(seen.size).toBe(reasons.length);
+  });
+
+  /**
+   * 🔴 `unauthorized` 与 `not-signed-in` **不许合并**。
+   *
+   * 两个原因下用户手上的东西不同：后者是这台设备**从来没有**凭据（可能压根没配过），
+   * 前者是**有过、现在被服务端拒了**（别处登出、改过口令、令牌过期）。
+   * 合并成一句就等于对第二种人说"你还没登录"，而那人明明登录过 ——
+   * 他会去找那个"从来不存在的登录"，而不是重新证明身份。
+   */
+  it('unauthorized 与 not-signed-in 是**两句不同的话**', () => {
+    expect(syncFailureMessageKey('unauthorized')).not.toBe(syncFailureMessageKey('not-signed-in'));
   });
 
   it('🔴 意外异常与未知原因都返回 undefined（走宿主自己的诊断通道，不编一句）', () => {

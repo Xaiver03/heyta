@@ -250,7 +250,8 @@ export type SyncFailureMessageKey =
   | 'common.sync.error.remoteVersionUnavailable'
   | 'common.sync.error.undecryptableOps'
   | 'common.sync.error.undecryptablePage'
-  | 'common.sync.error.uploadRejected';
+  | 'common.sync.error.uploadRejected'
+  | 'common.sync.error.unauthorized';
 
 const SYNC_FAILURE_MESSAGE_KEY: Record<string, SyncFailureMessageKey> = {
   'not-configured': 'common.sync.error.notConfigured',
@@ -261,6 +262,9 @@ const SYNC_FAILURE_MESSAGE_KEY: Record<string, SyncFailureMessageKey> = {
   'undecryptable-ops': 'common.sync.error.undecryptableOps',
   'undecryptable-page': 'common.sync.error.undecryptablePage',
   'upload-rejected': 'common.sync.error.uploadRejected',
+  // 令牌被服务端拒了：句子必须同时说"为什么停下"和"本地数据没事"，
+  // 否则用户的第一反应是删库重装 —— 而那才是真的会丢东西的动作。
+  'unauthorized': 'common.sync.error.unauthorized',
 };
 
 /**

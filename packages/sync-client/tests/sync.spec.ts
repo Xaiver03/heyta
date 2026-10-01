@@ -883,6 +883,64 @@ describe('同步客户端 — 离线与错误区分', () => {
     if (status.kind === 'error') expect(status.message).toContain('400');
   });
 
+  /**
+   * 🔴 401 必须**单独成类**，不能落进 `'unexpected'` + `retryable: true`。
+   *
+   * 那条通道的后果是实测推出来的（不是推测）：`createRetryScheduler` 见
+   * `retryable: true` 就继续退避重试（上限 60s），于是**拿着一个已作废的令牌
+   * 永远打一个永远不可能成功的请求**，界面上是一句分不清和网络抖动区别的
+   * "同步失败"。而"作废"是这里的常态 —— 在别的设备点「登出所有设备」之后，
+   * 这一台的令牌当场失效。
+   *
+   * 所以这句必须说"重新登录"，而且必须**停下**。
+   */
+  it('401 → reason `unauthorized` 且 retryable: false（不是"稍后重试"）', async () => {
+    for (const status of [401, 403]) {
+      const h = makeHarness(
+        () => new Response('{"error":"Missing or invalid Authorization header"}', { status }),
+      );
+      const result = await h.client.sync();
+      expect(result.kind, String(status)).toBe('error');
+      if (result.kind === 'error') {
+        expect(result.reason, String(status)).toBe('unauthorized');
+        expect(result.retryable, String(status)).toBe(false);
+      }
+    }
+  });
+
+  it('401 不判成 offline（分类顺序：状态码先于 message 正则）', async () => {
+    // 服务端在 401 的 error 文案里写 "network" 是有可能的；
+    // 那不该把"令牌作废"读成"这台设备没网"。
+    const h = makeHarness(
+      () => new Response('{"error":"token rejected by network policy"}', { status: 401 }),
+    );
+    const status = await h.client.sync();
+    expect(status.kind).toBe('error');
+    if (status.kind === 'error') expect(status.reason).toBe('unauthorized');
+  });
+
+  it('🔴 下载段的 401 也算 —— 只有上传段会 401 是不完整的判定', async () => {
+    // 上传 200、下载 401：真实形态是令牌在两次请求之间失效（另一台设备改了口令）。
+    const h = makeHarness((url) =>
+      url.includes('sinceSeq')
+        ? new Response('{"error":"Missing or invalid Authorization header"}', { status: 401 })
+        : okJson({ results: [] }),
+    );
+    const status = await h.client.sync();
+    expect(status.kind).toBe('error');
+    if (status.kind === 'error') expect(status.reason).toBe('unauthorized');
+  });
+
+  it('5xx 仍然可重试（不许把"服务端挂了"说成"请你重新登录"）', async () => {
+    const h = makeHarness(() => new Response('{"error":"boom"}', { status: 503 }));
+    const status = await h.client.sync();
+    expect(status.kind).toBe('error');
+    if (status.kind === 'error') {
+      expect(status.reason).not.toBe('unauthorized');
+      expect(status.retryable).toBe(true);
+    }
+  });
+
   // ────────────────────────────────────────────────────────────────────────
   // 🔴 平台策略拦截 ≠ 离线。
   //
