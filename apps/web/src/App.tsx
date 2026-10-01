@@ -42,7 +42,6 @@ import {
   inferFeedbackPreferences,
   inferPreferences,
   presentPreferenceIds,
-  Priority,
   Quadrant,
   suppressedPreferenceIds,
   toLocalDate,
@@ -88,7 +87,8 @@ import {
   useTaskStore,
   type TaskFilter,
 } from './features/tasks/store.js';
-import { DueBadge, type DueDisplayMode } from './features/tasks/DueBadge.js';
+import { type DueDisplayMode } from './lib/due-display.js';
+import { TaskRowMeta } from './features/tasks/row-meta.js';
 import { loadDueDisplay, saveDueDisplay } from './features/tasks/due-display-pref.js';
 import { loadTaskSort, saveTaskSort } from './features/tasks/sort-pref.js';
 import { TaskOrganizer } from './features/tasks/TaskOrganizer.js';
@@ -972,31 +972,18 @@ export function App(): React.JSX.Element {
    * 行内插槽。**这些是"内容"，本来就该各端各写**，所以留在 App.tsx。
    *
    * ⚠️ 这两个回调是在共享组件的渲染过程中被调用的，**不是组件边界** ——
-   * 所以里面不能调 hook。它们返回的是**组件元素**（`<DueBadge/>`、
+   * 所以里面不能调 hook。它们返回的是**组件元素**（`<TaskRowMeta/>`、
    * `<NoteEditor/>`…），那些组件自己的 hook 在自己的边界里跑，没问题。
    *
-   * ⚠️ 元信息用**内联 token 值**复刻原来 `.ht-task__meta` 的排版
-   *（xs + subtle + tabular-nums），而不是新加一个 CSS 类 ——
-   * 迁移的验收之一就是 `.ht-task*` 那一族消失。
+   * 🔴 元信息这一整条**已经不再是本文件手写的了**（原先这里是
+   * `<span data-testid="task-meta">` + `<DueBadge/>` + `P{数字}`）：
+   * 字形、顺序、逾期变红、无障碍退化全部在共享 `TaskBadges` 一份里，
+   * 与移动端同一份源码。`task-meta` 这个**锚点**也跟着搬到了那边
+   * （`TaskRowMeta` 把 `testID="task-meta"` 传进去），按它定位的判据不用改。
    */
   const renderTaskMeta = useCallback(
     (row: SharedTaskRow): React.ReactNode => (
-      <span
-        data-testid="task-meta"
-        style={{
-          display: 'inline-flex',
-          alignItems: 'center',
-          gap: 'var(--ht-space-2)',
-          fontSize: 'var(--ht-font-size-xs)',
-          color: 'var(--ht-color-foreground-subtle)',
-          fontVariantNumeric: 'tabular-nums',
-        }}
-      >
-        <DueBadge task={row.source} mode={dueDisplay} now={store.now} />
-        {row.source.priority !== undefined && row.source.priority > Priority.None ? (
-          <span>P{row.source.priority}</span>
-        ) : null}
-      </span>
+      <TaskRowMeta row={row} mode={dueDisplay} now={store.now} />
     ),
     [dueDisplay, store.now],
   );
