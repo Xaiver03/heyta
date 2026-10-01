@@ -14,8 +14,8 @@
  * 组件（`TaskList.tsx`）只负责把这里的输出摆到 RN 原语上，那一段是**没有分支**的。
  */
 
-import { sortTasksForDisplay } from '@heyta/domain';
-import type { Task } from '@heyta/domain';
+import { sortTasks, sortTasksForDisplay } from '@heyta/domain';
+import type { Task, TaskSortKey } from '@heyta/domain';
 
 /**
  * 🔴 **`sortTasksForDisplay` 的实现在 `@heyta/domain/src/task-order.ts`，这里只是转出。**
@@ -68,6 +68,14 @@ export interface ToTaskRowOptions {
    * 所以文案必须由宿主给。
    */
   readonly fallbackTitle?: string;
+  /**
+   * 排序口径。**默认 `display`**（未完成在前 + 截止升序），不传就是原来的行为。
+   *
+   * 🔴 它是**宿主的界面偏好**，不是判断：判据（每一档怎么比、已完成永远沉底、
+   * 同档保持原序）全在 `@heyta/domain` 的 `sortTasks`。这里只是把它透进去 ——
+   * 在渲染层再写一遍比较逻辑，就是本文件上面记的那次「两份排序并存」事故。
+   */
+  readonly sort?: TaskSortKey;
 }
 
 /** 单条 `Task` → 渲染用的行模型。 */
@@ -91,7 +99,7 @@ export function toTaskRows(
   tasks: readonly Task[],
   options?: ToTaskRowOptions,
 ): readonly TaskRow[] {
-  return sortTasksForDisplay(tasks).map((task) => toTaskRow(task, options));
+  return sortTasks(tasks, options?.sort).map((task) => toTaskRow(task, options));
 }
 
 /**
