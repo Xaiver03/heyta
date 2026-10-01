@@ -29,10 +29,12 @@
 
 import {
   parseCategorySlot,
+  parseHabitIcon,
   toLocalDate,
   type CategorySlot,
   type Habit,
   type HabitGoalType,
+  type HabitIcon,
   type HabitLog,
   type LocalDate,
 } from '@heyta/domain';
@@ -55,6 +57,11 @@ export interface NewHabitFields {
    */
   goalType?: HabitGoalType;
   color?: string;
+  /**
+   * 图标（闭集 key）。省略 = **没选过**，界面于是用 `deriveHabitIcon(id)` 派生一个 ——
+   * 不是"没有图标"（理由见 `@heyta/domain#habit-icons`）。
+   */
+  icon?: HabitIcon;
   backfillDays?: number;
 }
 
@@ -82,6 +89,17 @@ export interface HabitActions {
    * 因为"杯"换不成时间，而我们**不猜换算**。
    */
   setHabitColor(entityId: string, slot?: CategorySlot): Promise<void>;
+
+  /**
+   * 给习惯指定一个**图标**（闭集 key），或 `undefined` 表示清掉。
+   *
+   * 与 `setHabitColor` 是同一条规则的两件事：存的都是**用户选过的身份标记**，
+   * 校验都在写入侧（不认识的值 `throw`，不悄悄落成第一个），清除都写成 `null`。
+   *
+   * ⚠️ `undefined` **不是**"界面上没有图标" —— 那是"回到派生的那个"。
+   * 习惯永远有图标，所以这个动作改的是"画哪一个"，不是"画不画"。
+   */
+  setHabitIcon(entityId: string, icon?: HabitIcon): Promise<void>;
 
   /**
    * 改一个习惯的**目标**：数值 / 单位 / 达成口径（三者都可单独改）。
@@ -191,6 +209,24 @@ export function createHabitActions(
         opType: OpType.Update,
         // 清除写 `null`（穿过 JSON 表达"清除"），不写"不放这个键"。
         payload: { color: clean === undefined ? null : String(clean) },
+      });
+    },
+
+    async setHabitIcon(entityId, icon) {
+      if (habitOf(entityId) === undefined) throw new Error(`找不到习惯「${entityId}」`);
+      // 与 `setHabitColor` 同一道写入侧校验：不认识的值**抛**，不悄悄存下去。
+      // 存下去的后果是"这条习惯的图标在某个端上画不出来"，而那在任何一层都不报错。
+      const clean = icon === undefined ? undefined : parseHabitIcon(icon);
+      if (icon !== undefined && clean === undefined) {
+        throw new Error(`习惯图标必须是闭集里的 key，收到 ${JSON.stringify(icon)}`);
+      }
+      await ctx.dispatch({
+        entityType: 'HABIT' as EntityType,
+        entityId,
+        opType: OpType.Update,
+        // 清除写 `null`（与 `color` 同一条"用 null 穿过 JSON 表达清除"的约定）：
+        // 不写这个键 = 不改，写 `null` = 回到派生的那个。
+        payload: { icon: clean ?? null },
       });
     },
 
