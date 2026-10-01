@@ -856,3 +856,17 @@ export {
   authFailureMessage,
   type AuthMessageVars,
 } from './auth/model.js';
+
+/**
+ * ── #10 第 ② 步：任务行上的**清单归属**徽章 ──
+ *
+ * 🔴 **本块是追加的**（`index.ts` 是多写者共享文件，只许在末尾追加）。
+ * 上面那块 projects 导出正被别的会话动（`OrganizerList` 那一族），
+ * 在这里追加一行比插进那块更安全。
+ *
+ * 为什么 `TaskBadges` 已经有 `list` 槽、还要转出这个函数：
+ * `TaskBadges` 只认"给了就画"（渲染层不做业务判断），而**"什么算有归属"**
+ * （收集箱 / 悬空 id / 空名字都给 `null`）必须只有一份。两端各自
+ * `projects.find(...)` 就是两份判断 —— 那正是本次要消除的东西。
+ */
+export { listNameFor } from './projects/model.js';

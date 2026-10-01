@@ -1,6 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 
-import { openApp } from './helpers';
+import { metaFor, openApp } from './helpers';
 
 /**
  * 日历侧栏（迷你月历 + 显示范围）—— 真浏览器，零 mock
@@ -99,7 +99,8 @@ async function seed(page: Page): Promise<void> {
   });
   await row.getByTestId('task-organize-summary').click();
   await row.getByLabel(`任务「${IN_LIST}」所属清单`).selectOption({ label: LIST });
-  await expect(row.getByTestId('task-chip-project')).toHaveText(LIST);
+  // 🔴 归属现在只有**一个显示位**：共享 `TaskBadges` 那一槽（清单 chip 已删）。
+  await expect(metaFor(page, IN_LIST)).toContainText(LIST);
 }
 
 async function openCalendar(page: Page): Promise<void> {

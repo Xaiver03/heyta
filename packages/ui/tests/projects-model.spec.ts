@@ -12,6 +12,10 @@
  *      这是最容易漂的一处：一个 for 一个 filter，改了其中一个而另一个没改，
  *      界面上一个数字对、另一个字体不一样（而且只有"四处都显示计数"才看得出来）。
  *   4. `toTagItems` **不**因直觉给它加 `archived` 过滤（`Tag` 没有这个字段）。
+ *   5. `listNameFor`：**什么算"这条任务的归属"**（命中给名字、收集箱给宿主传的
+ *      那个词、悬空 id 与空名字给 `null`，而归档清单**照旧显示**）。这一条原先
+ *      在两个端上各判一次，结果 web 的行上有归属、移动端的行上没有 ——
+ *      同一件信息两种常驻度。
  */
 
 import { describe, expect, it } from 'vitest';
@@ -20,6 +24,7 @@ import type { Project, Tag, Task } from '@heyta/domain';
 import {
   aliveProjects,
   childProjects,
+  listNameFor,
   openTagCounts,
   openTaskCount,
   openTaskCounts,
@@ -185,5 +190,66 @@ describe('行 key：清单与标签不共用同一命名空间', () => {
     expect(organizerRowKey('project', 'x')).toBe('project-x');
     expect(organizerRowKey('tag', 'x')).toBe('tag-x');
     expect(organizerRowKey('project', 'x')).not.toBe(organizerRowKey('tag', 'x'));
+  });
+});
+
+describe('listNameFor：什么才算"这条任务的归属"', () => {
+  const projects = [
+    project({ id: 'p1', name: '工作' }),
+    project({ id: 'p1a', name: '汇报', parentId: 'p1' }),
+    project({ id: 'p9', name: '旧项目', archived: true }),
+    project({ id: 'px', name: '' }),
+  ];
+  const INBOX = '收集箱';
+
+  it('命中就返回那条清单自己的名字（不拼父级）', () => {
+    expect(listNameFor(projects, 'p1', INBOX)).toBe('工作');
+    expect(listNameFor(projects, 'p1a', INBOX)).toBe('汇报');
+  });
+
+  /**
+   * 🔴 这一条**改过一轮**，改的理由值得留着。
+   * 原先这里断言的是 `null`（"收集箱不是一条清单，不该显示归属"），
+   * 而参照图那一行的归属位写的正是「收集箱 · 昨天」—— 归属位回答的是
+   * "这条在哪"，收集箱也是一个答案。
+   */
+  it('没有 projectId（收集箱）→ 显示宿主给的那个词', () => {
+    expect(listNameFor(projects, undefined, INBOX)).toBe(INBOX);
+  });
+
+  /**
+   * 上面那条反转的**前提**在这条里：收集箱与悬空 id 仍然是两种状态 ——
+   * 一个有徽章、一个没有。少了这条，"收集箱也显示"就等于把两种状态合并。
+   */
+  it('悬空 id → null（不编名字），且**不等于**收集箱那条分支', () => {
+    expect(listNameFor(projects, 'gone', INBOX)).toBeNull();
+    expect(listNameFor(projects, 'gone', INBOX)).not.toBe(listNameFor(projects, undefined, INBOX));
+  });
+
+  it('清单名是空串 → null：只剩一个图标等于噪音', () => {
+    expect(listNameFor(projects, 'px', INBOX)).toBeNull();
+  });
+
+  /**
+   * 🔴 这条**故意与 `aliveProjects` 相反**，别"顺手统一"。
+   * `aliveProjects` 管的是"清单列表里要不要出现这一行"，
+   * `listNameFor` 管的是"这条任务属于哪条清单"。归档不改变归属事实，
+   * 把归属徽章一起藏掉会让用户以为任务掉进了收集箱。
+   */
+  it('归档清单仍然显示归属', () => {
+    expect(listNameFor(projects, 'p9', INBOX)).toBe('旧项目');
+  });
+
+  it('空清单表（还没有任何清单）→ null 而不是抛', () => {
+    expect(listNameFor([], 'p1', INBOX)).toBeNull();
+  });
+
+  /**
+   * `@heyta/ui` 的依赖里没有 `@heyta/i18n`（见本包 `package.json`），所以"收集箱"这个
+   * **词**由宿主传。这一条钉住这个边界：换个词就显示那个词，
+   * 而不是共享层里藏了一份中文。（英文端传 `Inbox` 就得到 `Inbox`。）
+   */
+  it('收集箱那个词是传进来的，不是共享层里写死的', () => {
+    expect(listNameFor(projects, undefined, 'Inbox')).toBe('Inbox');
   });
 });

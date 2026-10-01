@@ -14,10 +14,12 @@
  * ─────────────────────────────────────────────────────────────────────────
  * 三个刻意的决定
  *
- * 1. **归属结果常驻可见（chip），编辑控件收进 `<details>`。**
- *    只放进展开面板的话，用户扫一眼列表**看不出**哪些任务已经归了类 ——
- *    而"看清现状"正是整理的前提。反过来，把 `<select>` 和一堆复选框
- *    直接铺在每一行上，列表就没法看了。
+ * 1. **本控件只管"改"，不管"说"。**
+ *    归属结果仍然**常驻可见**，但它现在由共享 `TaskBadges` 的那一槽说出
+ *    （两端同一份实现）；标签 chip 留在本文件里，因为共享层没有标签徽章。
+ *    原来"只放进展开面板"的顾虑没有变 —— 用户扫一眼列表必须**看得出**哪些任务
+ *    已经归了类，那是整理的前提；变的是**由谁来说**。
+ *    反过来，把 `<select>` 和一堆复选框直接铺在每一行上，列表就没法看了。
  *
  * 2. **用原生 `<select>` / `<input type="checkbox">`，不自造下拉。**
  *    原生控件自带键盘操作、读屏语义、移动端适配 —— 自造一个"看起来更漂亮"
@@ -37,7 +39,7 @@
 import { cssVar } from '@heyta/design-system';
 import { useI18n } from '@heyta/i18n';
 import type { Task } from '@heyta/domain';
-import { Folder, SlidersHorizontal, Tag as TagIcon } from 'lucide-react';
+import { SlidersHorizontal, Tag as TagIcon } from 'lucide-react';
 
 import { selectChildProjects, selectTopLevelProjects, useProjectStore } from '../projects/store.js';
 
@@ -60,9 +62,6 @@ export function TaskOrganizer({
   const projectState = useProjectStore();
 
   const tops = selectTopLevelProjects(projectState);
-  const currentProject = projectState.projects.find(
-    (project) => project.id === task.projectId && project.deletedAt === undefined,
-  );
   /**
    * 已挂上的标签。
    *
@@ -104,12 +103,12 @@ export function TaskOrganizer({
         position: 'relative',
       }}
     >
-      {currentProject !== undefined && (
-        <span style={chipStyle} data-testid="task-chip-project">
-          <Folder size={CHIP_ICON_SIZE} aria-hidden="true" />
-          {currentProject.name}
-        </span>
-      )}
+      {/*
+        🔴 这里**不再显示清单归属** —— 归属由共享 `TaskBadges` 的那一槽负责
+        （两端同一份）。此前它在这里也画一枚 chip，于是归属进了元信息槽之后
+        **同一行里出现两遍清单名**。抽取的收尾动作是删掉旧的那份（AGENTS §3.5）。
+        标签 chip 留下：共享层没有标签徽章，这里就是它的唯一显示位。
+      */}
       {assignedTags.map((tag) => (
         <span key={tag.id} style={chipStyle} data-testid="task-chip-tag">
           <TagIcon size={CHIP_ICON_SIZE} aria-hidden="true" />

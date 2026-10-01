@@ -166,6 +166,46 @@ export function openTaskCounts(tasks: readonly Task[]): Record<string, number> {
   return counts;
 }
 
+/**
+ * 这条任务**属于哪条清单**（行内归属徽章的文案）。
+ *
+ * 🔴 判断只有一份：web 原先在 `TaskOrganizer` 的 chip 里自己查一次名字，
+ * 移动端则**根本不显示归属**（要点开详情才看得见）。同一件信息一端常驻、
+ * 一端藏起来，就是 §3.5 那条"两处实现迟早漂移"的形状。
+ *
+ * 三条取值规则，逐条都是**界面上看得出来的**决定：
+ *
+ * - `projectId === undefined` → **`inboxLabel`（照显示徽章）**。
+ *   依据是参照图那一行写的是「收集箱 · 昨天」—— 归属位不是"挂了哪条清单"，
+ *   而是"这条在哪"，收集箱也是答案。
+ *   ⚠️ 这一条**改过一轮**：原先给的是 `null`，理由是"无归属与悬空 id 会看起来
+ *   一样"。那个理由不成立 —— 悬空 id 走下面那条分支给 `null`，两种状态在界面上
+ *   本来就分得开（有徽章 / 没徽章），而"收集箱不出现在行上"却让 web 与移动端
+ *   都和参照图不一致。**记下来是因为它差点被当成显然的事。**
+ * - 查不到（悬空 id）→ `null`：**不猜**。清单被删掉时任务留在收集箱是
+ *   `app-host` 的判断，这里不重复它 —— 所以也不给一个"看起来像收集箱"的徽章。
+ * - 命中但 `name` 是空串 → `null`：一个没有字的徽章只是图标，
+ *   而图标在行内没有无障碍名就是噪音。
+ *
+ * ⚠️ `inboxLabel` 由**宿主**传而不是在这里取词条：`@heyta/ui` 的依赖里没有
+ * `@heyta/i18n`（见本包 `package.json`）。这符合本仓库既有分工 ——
+ * **判断只有一份，说法各端各写**（`apps/web/src/lib/due-display.ts` 先例）：
+ * "该显示什么"仍然只在这里决定，宿主只交一个名词。
+ *
+ * ⚠️ **不在这里过滤 `archived`**："这条属于哪条清单"与"这条清单还在不在列表里"
+ * 是两件事 —— 归档清单里的任务仍然属于它，把徽章藏起来等于抹掉一条真信息。
+ */
+export function listNameFor(
+  projects: readonly Project[],
+  projectId: string | undefined,
+  inboxLabel: string,
+): string | null {
+  if (projectId === undefined) return inboxLabel;
+  const hit = projects.find((project) => project.id === projectId);
+  if (hit === undefined || hit.name === '') return null;
+  return hit.name;
+}
+
 /* ========================================================================
  * 四、标签
  * ====================================================================== */

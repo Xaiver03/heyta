@@ -39,6 +39,14 @@
  *   这张表在 web 是**第二份**。镜像可以，漂移不行：逐档比两边的 key，
  *   任何一边换了词条来源都会红。
  *
+ * **E. 第 ② 步：清单归属。** 参照图那一行的归属位写的是「收集箱 · 昨天」，
+ *   所以"这条在哪"是行上的常驻信息，不是详情里才看得见。这一组钉四件事：
+ *   顺序（归属在截止**之前**）、收集箱也显示、**悬空 id 不许冒充收集箱**、
+ *   以及两端各自喂一次同一个 `listNameFor`（源码级 + 词条对账）。
+ *   🔴 还有一条不在界面上看得见：移动端的 `renderTaskMeta` 是 `useCallback`，
+ *   依赖数组里少了 `projects` 时**界面看起来完全正常**，只有"改了归属"
+ *   那一刻才不刷新 —— 所以它被钉成源码断言（E7）。
+ *
  * ⚠️ 本测试用 `@heyta/ui` 的 **`dist/`**（package exports）。改完 `packages/ui`
  *    源码必须先 `pnpm --filter @heyta/ui build`，否则看到的是上一次构建的结果。
  */
@@ -49,7 +57,18 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, describe, expect, it } from 'vitest';
 
-import { DAY_MS, Priority, type Task } from '@heyta/domain';
+/**
+ * 🔴 `row-meta.tsx` 现在读清单表（归属徽章），于是这条 import 链把
+ * `features/projects/store.js` → `lib/oplog.js` 一起拉进来，而 oplog 在**模块顶层**
+ * 就要 IndexedDB。jsdom 不提供它，所以照 `quadrant-row-parity.spec.tsx` /
+ * `categories.spec.tsx` 的写法先装 `fake-indexeddb` 再动态 import 宿主。
+ */
+import { IDBFactory, IDBKeyRange } from 'fake-indexeddb';
+
+(globalThis as unknown as { indexedDB: IDBFactory }).indexedDB = new IDBFactory();
+(globalThis as unknown as { IDBKeyRange: typeof IDBKeyRange }).IDBKeyRange = IDBKeyRange;
+
+import { DAY_MS, Priority, type Project, type Task } from '@heyta/domain';
 import { I18nProvider, translate } from '@heyta/i18n';
 import {
   HeytaUiProvider,
@@ -64,6 +83,8 @@ const { TaskRowMeta } = await import('../src/features/tasks/row-meta.js');
 const { priorityBadgeText, priorityColorToken } = await import(
   '../src/features/tasks/priority-display.js'
 );
+/** 🔴 必须在 `globalThis.indexedDB` 装好之后 import（理由见上面那段注释）。 */
+const { useProjectStore } = await import('../src/features/projects/store.js');
 
 const zh = translate.bind(null, 'zh-CN');
 const en = translate.bind(null, 'en');
@@ -74,8 +95,21 @@ const THEME = resolveHeytaUiTheme({ scheme: 'light', reducedTransparency: false 
 /** 正午的"现在"：跨零点与夏令时都不会把它挪到别的日子。 */
 const NOW = new Date(2026, 8, 25, 12, 0, 0).getTime();
 
+/** 参照图那一行的归属位用的词（web 侧的词条）；E 组按字面写死，不查词条表。 */
+const INBOX_ZH = '收集箱';
+const INBOX_EN = 'Inbox';
+
 function task(over: Partial<Task> = {}): Task {
   return { id: 't1', title: '写周报', createdAt: 0, updatedAt: 0, ...over };
+}
+
+function project(over: Partial<Project> & { id: string; name: string }): Project {
+  return { createdAt: 0, updatedAt: 0, ...over };
+}
+
+/** 把清单表设成给定内容（默认清空 = 还没有任何清单）。 */
+function setProjects(list: readonly Project[] = []): void {
+  useProjectStore.setState({ projects: [...list] });
 }
 
 function rowOf(t: Task): SharedTaskRow {
@@ -108,6 +142,9 @@ afterEach(() => {
   for (const container of containers) container.remove();
   roots = [];
   containers = [];
+  // 🔴 清单表是**模块级** store：不清就把上一例的归属带到下一例，
+  //    而"收集箱"和"工作"两种归属在界面上长得一样（都是个文件夹图标 + 词）。
+  setProjects();
 });
 
 /** 取元信息槽的 HTML；没有则 `null`（共享 `TaskBadges` 在空槽时返回 null）。 */
@@ -116,9 +153,45 @@ function metaHtml(el: HTMLElement): string | null {
   return node === null ? null : node.outerHTML;
 }
 
+/**
+ * 元信息槽里**每个徽章的文字**，按 DOM 顺序。
+ *
+ * 用在"顺序"那一类判据上（参照图那一行是「收集箱 · 昨天」，归属在截止之前）。
+ * ⚠️ 空串被滤掉 —— 纯图标（没有文字的）不占位，否则一条 `''` 会让
+ *    `toEqual(['工作','明天'])` 因为一个看不见的空槽变红。
+ */
+function badgeTexts(el: HTMLElement): string[] {
+  const meta = el.querySelector('[data-testid="task-meta"]');
+  if (meta === null) return [];
+  return Array.from(meta.children)
+    .map((node) => (node as HTMLElement).textContent ?? '')
+    .filter((text) => text !== '');
+}
+
+/**
+ * 🔴 源码级判据（C 与 E）共用同一个去注释函数。
+ * 这些文件会在注释里**引用**要禁的形态来讲解判据 —— 不剥注释，
+ * 判据会被自己的说明文字弄红（`quadrant-row-parity.spec.tsx` 实测过）。
+ *
+ * 只有一处实现是刻意的：这个判断写第二遍就会漂移（AGENTS §3.5 记过两次）。
+ */
+function stripComments(text: string): string {
+  return text.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '');
+}
+
+/** 读一个源码文件的"纯代码"（去注释）。`process.cwd()` = `apps/web`。 */
+function codeOf(relativeFromRepoRoot: string): string {
+  return stripComments(readFileSync(resolve(process.cwd(), '..', '..', relativeFromRepoRoot), 'utf8'));
+}
+
 // ── A. 逐字节等于共享 TaskBadges ───────────────────────────────
 
 describe('A. web 的行元信息槽渲染出的就是共享 TaskBadges', () => {
+  /**
+   * 🔴 参考侧现在**必须**带 `list`：宿主喂了归属（无 `projectId` = 收集箱，
+   * 参照图那一行就写着「收集箱 · 昨天」）。参考侧把这个词**逐字写死**，
+   * 所以"web 忘了喂归属"会让这一组同时变红，而不是悄悄少一个徽章。
+   */
   it('明天到期 + 高优先级（中文）：与手写 props 的共享徽章逐字节相同', () => {
     const t = task({ dueDate: NOW + DAY_MS, priority: Priority.High });
     const actual = mount(<TaskRowMeta row={rowOf(t)} mode="countdown" now={NOW} />);
@@ -128,6 +201,7 @@ describe('A. web 的行元信息槽渲染出的就是共享 TaskBadges', () => {
     const expected = mount(
       <TaskBadges
         testID="task-meta"
+        list={INBOX_ZH}
         due={{ text: '明天', overdue: false }}
         priority={{ text: '高优先级', color: THEME.tokens['color.priority-high'] }}
       />,
@@ -144,6 +218,7 @@ describe('A. web 的行元信息槽渲染出的就是共享 TaskBadges', () => {
     const expected = mount(
       <TaskBadges
         testID="task-meta"
+        list={INBOX_EN}
         due={{ text: '3 days overdue', overdue: true }}
         priority={{ text: 'Medium priority', color: THEME.tokens['color.priority-medium'] }}
       />,
@@ -155,11 +230,11 @@ describe('A. web 的行元信息槽渲染出的就是共享 TaskBadges', () => {
     expect(THEME.tokens['color.danger']).not.toBe(THEME.tokens['color.foreground-subtle']);
   });
 
-  it('只有截止时间：不产出优先级徽章', () => {
+  it('只有截止时间：不产出优先级徽章，但归属照旧在', () => {
     const t = task({ dueDate: NOW + 5 * DAY_MS });
     const actual = mount(<TaskRowMeta row={rowOf(t)} mode="countdown" now={NOW} />);
     const expected = mount(
-      <TaskBadges testID="task-meta" due={{ text: '还剩 5 天', overdue: false }} />,
+      <TaskBadges testID="task-meta" list={INBOX_ZH} due={{ text: '还剩 5 天', overdue: false }} />,
     );
     expect(metaHtml(actual)).toBe(metaHtml(expected));
   });
@@ -168,15 +243,30 @@ describe('A. web 的行元信息槽渲染出的就是共享 TaskBadges', () => {
     const t = task({ dueDate: NOW + DAY_MS });
     const actual = mount(<TaskRowMeta row={rowOf(t)} mode="date" now={NOW} />);
     const expected = mount(
-      <TaskBadges testID="task-meta" due={{ text: '09-26', overdue: false }} />,
+      <TaskBadges testID="task-meta" list={INBOX_ZH} due={{ text: '09-26', overdue: false }} />,
     );
     expect(metaHtml(actual)).toBe(metaHtml(expected));
   });
 
-  it('🔴 没有截止、没有优先级 ⇒ 这一槽整个不存在（不是渲染一个空 View 占 gap）', () => {
-    const t = task();
-    const el = mount(<TaskRowMeta row={rowOf(t)} mode="countdown" now={NOW} />);
-    expect(metaHtml(el)).toBeNull();
+  /**
+   * 🔴 这条改过：原先断言"没有截止、没有优先级 ⇒ 这一槽整个不存在"。
+   * 加了归属之后那句**不再成立** —— 收集箱也是一个归属，槽里至少还剩一个徽章。
+   * 保留的判据是那条纪律本身：**没有内容的那个徽章不占位**（空 View 会吃掉
+   * `gap`，让这一行比别行高半截），而"整槽为空"只剩一种可达方式：
+   * 归属为 `null`（悬空 id）且没有截止与优先级。
+   */
+  it('空的徽章不占位；整槽为空时返回 null 而不是空 View', () => {
+    // 只有归属：截止与优先级两个徽章都不出现（不是出现两个空的）。
+    const only = mount(<TaskRowMeta row={rowOf(task())} mode="countdown" now={NOW} />);
+    expect(badgeTexts(only)).toEqual([INBOX_ZH]);
+    // 🔴 只有一颗：`children` 里不许有空白 View 占住 gap。
+    expect(only.querySelector('[data-testid="task-meta"]')?.children).toHaveLength(1);
+
+    // 悬空 id + 无截止 + 无优先级 ⇒ 三个维度全空 ⇒ 整槽不存在。
+    const nothing = mount(
+      <TaskRowMeta row={rowOf(task({ projectId: 'gone' }))} mode="countdown" now={NOW} />,
+    );
+    expect(metaHtml(nothing)).toBeNull();
   });
 });
 
@@ -194,14 +284,21 @@ describe('徽章文案是语言，不是数字', () => {
   it('中文界面里高优先级说「高优先级」', () => {
     const t = task({ priority: Priority.High });
     const el = mount(<TaskRowMeta row={rowOf(t)} mode="countdown" now={NOW} />);
-    expect(el.querySelector('[data-testid="task-meta"]')?.textContent).toBe('高优先级');
+    // 🔴 逐徽章比而不是比整段 textContent —— 顺带钉住归属排在优先级**之前**。
+    expect(badgeTexts(el)).toEqual([INBOX_ZH, '高优先级']);
   });
 
   it('「没有优先级」不是信息：None 与 undefined 都不给徽章', () => {
     expect(priorityBadgeText(Priority.None, zh)).toBeNull();
     expect(priorityBadgeText(undefined, zh)).toBeNull();
+    // 归属设成悬空 id（`listNameFor` 给 `null`），这样"整槽为空"才是可达状态；
+    // 用收集箱的话那一槽永远还剩一个徽章，断言的就不再是优先级了。
     const none = mount(
-      <TaskRowMeta row={rowOf(task({ priority: Priority.None }))} mode="countdown" now={NOW} />,
+      <TaskRowMeta
+        row={rowOf(task({ projectId: 'gone', priority: Priority.None }))}
+        mode="countdown"
+        now={NOW}
+      />,
     );
     expect(metaHtml(none)).toBeNull();
   });
@@ -248,11 +345,6 @@ describe('C. 行元信息在 web 只有一份实现（源码级）', () => {
    * 配 `readFileSync` 会报 `The URL must be of scheme file`（实测）。
    */
   const SRC = resolve(process.cwd(), 'src');
-
-  /** 🔴 先去注释：这些文件会在注释里**引用**要禁的形态来讲解判据。 */
-  function stripComments(text: string): string {
-    return text.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '');
-  }
 
   function* walk(dir: string): Generator<string> {
     for (const name of readdirSync(dir)) {
@@ -359,5 +451,131 @@ describe('D. web 的优先级镜像与移动端同一批词条', () => {
     }
     expect(zh('mobile.priority.badge', { level: zh('mobile.priority.high') })).toBe('高优先级');
     expect(en('mobile.priority.badge', { level: en('mobile.priority.high') })).toBe('High priority');
+  });
+});
+
+// ── E. 第 ② 步：清单归属（参照图那一行的「收集箱 · 昨天」）─────────
+
+/**
+ * 归属这一维度的判据。它挡的是四种回归：
+ *
+ *   · 宿主忘了喂（行上少一个徽章，而**没有任何一层会报错**）；
+ *   · 顺序反了（截止排在归属前面，扫列表时先看到时间再看到"在哪"）；
+ *   · 悬空 id 冒充收集箱（把"清单被删了"显示成"本来就在收集箱"）；
+ *   · 两端各写一份判断（web 用 `chip` 里那次 `find`、移动端干脆不显示）。
+ *
+ * 🔴 E6/E7 是**源码级**的：行为级判据看不到"另一端"，而移动端这头不在本套件里跑。
+ */
+describe('E. 行上的清单归属：判断只有一份，两端各喂一次', () => {
+  it('E1. 归属排在截止之前（参照图是「工作 · 昨天」）', () => {
+    setProjects([project({ id: 'p1', name: '工作' })]);
+    const el = mount(
+      <TaskRowMeta
+        row={rowOf(task({ projectId: 'p1', dueDate: NOW + DAY_MS }))}
+        mode="countdown"
+        now={NOW}
+      />,
+    );
+    expect(badgeTexts(el)).toEqual(['工作', '明天']);
+  });
+
+  it('E2. 收集箱也是一个归属：无 projectId 的行显示「收集箱」，英文显示 Inbox', () => {
+    const zhEl = mount(<TaskRowMeta row={rowOf(task())} mode="countdown" now={NOW} />);
+    expect(badgeTexts(zhEl)).toEqual([INBOX_ZH]);
+    const enEl = mount(<TaskRowMeta row={rowOf(task())} mode="countdown" now={NOW} />, 'en');
+    expect(badgeTexts(enEl)).toEqual([INBOX_EN]);
+  });
+
+  /**
+   * 🔴 这条是 E2 的**另一半**，少了它"收集箱也显示"就等于把两种状态合并：
+   * `projectId` 指向一条查不到的清单 ⇒ 归属**整个不出现**，而不是显示收集箱。
+   */
+  it('E3. 悬空 id 不许冒充收集箱', () => {
+    setProjects([project({ id: 'p1', name: '工作' })]);
+    const el = mount(
+      <TaskRowMeta
+        row={rowOf(task({ projectId: 'gone', dueDate: NOW + DAY_MS }))}
+        mode="countdown"
+        now={NOW}
+      />,
+    );
+    const texts = badgeTexts(el);
+    expect(texts).toEqual(['明天']);
+    expect(texts).not.toContain(INBOX_ZH);
+  });
+
+  it('E4. 归档清单里的任务仍然显示归属（归档不改变"这条属于谁"）', () => {
+    setProjects([project({ id: 'p9', name: '旧项目', archived: true })]);
+    const el = mount(
+      <TaskRowMeta row={rowOf(task({ projectId: 'p9' }))} mode="countdown" now={NOW} />,
+    );
+    expect(badgeTexts(el)).toEqual(['旧项目']);
+  });
+
+  it('E5. 有清单名时那一槽仍逐字节等于共享 TaskBadges（A 的归属版）', () => {
+    setProjects([project({ id: 'p1', name: '工作' })]);
+    const t = task({ projectId: 'p1', dueDate: NOW + DAY_MS, priority: Priority.High });
+    const actual = mount(<TaskRowMeta row={rowOf(t)} mode="countdown" now={NOW} />);
+    const expected = mount(
+      <TaskBadges
+        testID="task-meta"
+        list="工作"
+        due={{ text: '明天', overdue: false }}
+        priority={{ text: '高优先级', color: THEME.tokens['color.priority-high'] }}
+      />,
+    );
+    expect(metaHtml(actual)).toBe(metaHtml(expected));
+  });
+
+  /**
+   * E6. 两端**各自喂一次同一个 `listNameFor`**，谁都不许自己查表。
+   *
+   * ⚠️ 断的是"用了共享判断"，不是"import 了它"（`check:row-single-source` 与
+   * `quadrant-row-parity` 都实测过只看 import 会照样绿）。
+   */
+  it('E6. 源码级：两端都调 listNameFor，没有一处自己 find 清单名', () => {
+    const web = codeOf('apps/web/src/features/tasks/row-meta.tsx');
+    const mobile = codeOf('apps/mobile/src/screens/TasksScreen.tsx');
+
+    for (const [end, code] of [
+      ['web', web],
+      ['mobile', mobile],
+    ] as const) {
+      expect(code, `${end} 没有把归属喂进 TaskBadges`).toMatch(/list=\{listNameFor\(/);
+      // 第二份判断的形状：自己 `find` 出来一个名字。
+      expect(code, `${end} 自己查了一遍清单名（判断出现了第二份）`).not.toMatch(/projects\.find\(/);
+    }
+  });
+
+  /**
+   * E7. 🔴 移动端的 `renderTaskMeta` 是 `useCallback` —— 依赖数组少了 `projects`
+   * 时**界面当时看起来完全正常**，只有"把任务移进/移出清单"那一刻行不刷新。
+   * 这类缺陷在截图里是隐形的，所以钉成源码断言。
+   */
+  it('E7. 源码级：移动端的归属进了 renderTaskMeta 的依赖数组', () => {
+    const mobile = codeOf('apps/mobile/src/screens/TasksScreen.tsx');
+    const start = mobile.indexOf('const renderTaskMeta = useCallback(');
+    const end = mobile.indexOf('const renderTaskTrailing');
+    expect(start, '找不到 renderTaskMeta（改名了？那条判据就不在测了）').toBeGreaterThanOrEqual(0);
+    expect(end, '找不到 renderTaskTrailing（区间取不出来）').toBeGreaterThan(start);
+
+    const region = mobile.slice(start, end);
+    const depLines = region.match(/^\s*\[([^\]]*)\],?\s*$/gm) ?? [];
+    // 🔴 先断言"前提确实成立"：区间里一条候选数组都没有 ⇒ 判据什么都没测。
+    expect(depLines.length, '没在 renderTaskMeta 区间里找到依赖数组').toBeGreaterThan(0);
+    const deps = (depLines[depLines.length - 1] ?? '').split(',').map((s) => s.trim());
+    expect(deps, '依赖数组里没有 projects ⇒ 改归属后那一行不会刷新').toContain('projects');
+  });
+
+  /**
+   * E8. 两端给的是**不同 key、同一个词**（`web.organize.inbox` /
+   * `mobile.detail.project.inbox`）。key 不同是各端词条命名空间的既有事实，
+   * 但"同一个含义在两个端上显示成两个词"是界面上看得见的错，所以逐语言对账。
+   */
+  it('E8. 「收集箱」这个词在两端、在中英各自一致', () => {
+    expect(zh('web.organize.inbox')).toBe(zh('mobile.detail.project.inbox'));
+    expect(en('web.organize.inbox')).toBe(en('mobile.detail.project.inbox'));
+    expect(zh('web.organize.inbox')).toBe(INBOX_ZH);
+    expect(en('web.organize.inbox')).toBe(INBOX_EN);
   });
 });

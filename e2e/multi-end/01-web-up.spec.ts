@@ -2,6 +2,7 @@ import { expect, test } from '@playwright/test';
 
 import {
   configureSync,
+  metaFor,
   openApp,
   requireCredentials,
   rowFor,
@@ -67,13 +68,15 @@ test('Web 建清单/标签/任务并上传', async ({ page }) => {
 
   const row = rowFor(page, TITLE);
   await expect(row).toBeVisible();
-  // 挂之前两个 chip 都不该在（让后面的断言**有可能为假**）。
-  await expect(row.getByTestId('task-chip-project')).toHaveCount(0);
+  // 挂之前归属**不该出现在元信息槽里**（让后面的断言**有可能为假**）。
+  // 🔴 选择器跟着迁移换了：行尾那枚清单 chip 已删，归属唯一的显示位
+  // 是共享 `TaskBadges` 那一槽 —— 留着 chip 会让同一行里出现两遍清单名。
+  await expect(metaFor(page, TITLE)).not.toContainText(LIST);
   await expect(row.getByTestId('task-chip-tag')).toHaveCount(0);
 
   await row.locator('summary').click();
   await row.getByLabel(`任务「${TITLE}」所属清单`).selectOption({ label: LIST });
-  await expect(row.getByTestId('task-chip-project')).toHaveText(LIST);
+  await expect(metaFor(page, TITLE), '归属没有出现在行的元信息槽里').toContainText(LIST);
 
   // ⚠️ `click()` 不是 `check()`：复选框是受控的，而 op 派发是异步的，
   // `check()` 会断言"控件当帧已勾选"并因此**假红**。理由见 AGENTS.md 陷阱 49。
