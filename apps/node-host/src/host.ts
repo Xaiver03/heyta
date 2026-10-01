@@ -87,8 +87,34 @@ export interface NodeHost {
   renameTask(entityId: string, title: string): Promise<void>;
   /** 完成 / 取消完成（UPD op）。 */
   setCompleted(entityId: string, completed: boolean): Promise<void>;
+  /**
+   * 软删除（`DEL` op ⇒ 墓碑 `deletedAt`，进回收站）。
+   *
+   * 🔴 这两条动作存在的理由是**取证探针的收尾**。本壳此前只有 create / rename /
+   * complete，于是"探针跑完把自己写进真实库的任务清掉"根本没有通道 ——
+   * 结果就是 R3 里产品负责人看见的那三行 `B-mac-*`：**没有删除通道的宿主，
+   * 探针作者只能让残留留在用户看得见的界面上。**
+   * 处置必须走 op-log（直接 SQL DELETE 只动 `state` 表，而物化状态是每次启动
+   * 从 `ops` 全量回放的 ⇒ 删了会复活，且让日志与状态永久不一致）。
+   */
+  removeTask(entityId: string): Promise<void>;
+  /**
+   * 彻底删除（`purgedAt` 标记）：从回收站消失且不可恢复。
+   *
+   * 只能对**已软删除**的条目用（`purge` 自己拒绝活着的任务）。它**不**抹掉
+   * op-log 里的历史载荷 —— 判据只能落在视图上，不能落在"日志里 grep 不到"上。
+   */
+  purgeTask(entityId: string): Promise<void>;
   /** 未删除的任务，按创建时间排序。 */
   listTasks(): Task[];
+  /**
+   * 回收站里的任务（有 `deletedAt` 且未打 `purgedAt`）。
+   *
+   * 🔴 没有它，"软删除"与"彻底删除"在**这个壳上无法区分** —— 两者都会让
+   * `listTasks()` 变空，于是一条"purge 之后"的判据在只做了 `remove` 时**照样绿**。
+   * 判据要能区分三个状态（列表 / 回收站 / 都看不到），就必须两个视图都读得到。
+   */
+  listTrashed(): Task[];
   /**
    * 未删除的清单，按 (createdAt, id) 升序。
    *
@@ -160,7 +186,10 @@ export async function openNodeHost(options: NodeHostOptions): Promise<NodeHost> 
     addTask: (title, over) => actions.create(title, over),
     renameTask: (entityId, title) => actions.rename(entityId, title),
     setCompleted: (entityId, completed) => actions.setCompleted(entityId, completed),
+    removeTask: (entityId) => actions.remove(entityId),
+    purgeTask: (entityId) => actions.purge(entityId),
     listTasks: () => actions.listTasks(),
+    listTrashed: () => actions.listTrashed(),
     listProjects: () => projectActions.listProjects(),
     listTags: () => projectActions.listTags(),
 
