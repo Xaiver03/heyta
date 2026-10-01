@@ -163,7 +163,6 @@ export function AuthPanel({ baseUrl, onClose, onSignedIn }: AuthPanelProps): Rea
    */
   const effectiveBaseUrl = addressDraft.trim() === '' ? authBaseUrl(baseUrl) : addressDraft.trim();
 
-  /**
   // 每次渲染都重新探测。缓存成模块级常量会把**第一次**的结果永久钉住，
   // 而它在 jsdom 与真实浏览器里不同，用户中途接上安全密钥时也会变。
   const passkeySupported = detectPasskeyBrowser() !== undefined;
