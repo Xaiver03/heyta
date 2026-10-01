@@ -33,7 +33,7 @@
  */
 
 import type { I18nValue, MessageKey } from '@heyta/i18n';
-import type { HabitBoardLabels } from '@heyta/ui';
+import type { HabitBoardLabels, HabitProgressListLabels } from '@heyta/ui';
 
 /**
  * 月份词条 key（1 月 → 12 月，下标 = 月份 − 1）。
@@ -144,5 +144,30 @@ export function habitBoardLabels(t: I18nValue['t']): HabitBoardLabels {
       less: t('web.heatmap.less'),
       more: t('web.heatmap.more'),
     },
+  };
+}
+
+/**
+ * 构造共享 `HabitProgressList`（清单那一层）需要的全部文案。
+ *
+ * 🔴 复用的是 **web 那份 DOM 清单已经在用的同一批 key**
+ * （`web.habits.list.aria` / `.row.aria` / `.row.selectA11y`），一条新键都没加：
+ * 同一句话在两端长成两个样子，是"列表 + 窗格"这形态最容易被悄悄做坏的地方 ——
+ * 而词条表里多一条同义键不会让任何测试变红。
+ *
+ * ⚠️ 三个数字的句子走**同一对单复数分支**（`currentStreakText` 等，与详情板共用），
+ * 因为清单上的 chip 只放数字，完整句子只有这里能给读屏。
+ */
+export function habitListLabels(t: I18nValue['t']): HabitProgressListLabels {
+  return {
+    list: t('web.habits.list.aria'),
+    // 🔴 与详情板同一个既有 key：共享清单自己渲染空态，视图里不留手写空态。
+    empty: t('web.habits.empty'),
+    row: ({ name, current, longest, total }) =>
+      t('web.habits.row.aria', { name, current, longest, total }),
+    selectA11y: (name) => t('web.habits.row.selectA11y', { name }),
+    streakCurrent: (count) => currentStreakText(count, t),
+    streakLongest: (count) => longestStreakText(count, t),
+    streakTotal: (count) => totalCheckInText(count, t),
   };
 }

@@ -16,6 +16,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   HABIT_HEATMAP_DAYS,
+  HABIT_LIST_WEEK_DAYS,
   HEATMAP_WEEK_START,
   frozenDays,
   habitGoalSummaryKey,
@@ -294,6 +295,41 @@ describe('窗口长度是"天"不是"毫秒"的隐式假设', () => {
     expect(days[0]?.date).toBe(
       `${String(first.getFullYear())}-${String(first.getMonth() + 1).padStart(2, '0')}-${String(first.getDate()).padStart(2, '0')}`,
     );
+  });
+});
+
+/**
+ * 清单窗口（2026-10-01：「列表 + 窗格」的左列）
+ * =============================================
+ *
+ * 🔴 **单独一组**，不并进上面的「热力图窗口」：7 与 90 是两个不同的东西 ——
+ * 一个是"扫一眼最近一周打没打"，一个是"这块记录的完整历史"。写在同一组里，
+ * 下次有人"顺手统一成一个常量"就会把右窗格缩成 7 格 —— 而缩完**它看起来仍然
+ * 是一张正常的热力图**，界面上没人会看出少了 83 天。
+ *
+ * 变异验证（2026-10-01）：把 `HABIT_LIST_WEEK_DAYS` 改成 `90` ⇒ **恰好这三条红**
+ * （`expected 90 to be 7` / 首格日期变成 `2026-07-01` / level 数组多 83 项）。
+ * ⚠️ 注入是在**原地**做的（`packages/ui` 是共享工作树，改完立刻还原，
+ * 并用 `diff -q` 确认字节一致）—— 这条判据没有只读接缝可用，
+ * 因为它是值判据，不是源码文本判据。
+ */
+describe('清单窗口 HABIT_LIST_WEEK_DAYS', () => {
+  it('是 7，且**不等于**热力图窗口 —— 两个数各自有名字', () => {
+    expect(HABIT_LIST_WEEK_DAYS).toBe(7);
+    expect(HABIT_LIST_WEEK_DAYS).not.toBe(HABIT_HEATMAP_DAYS);
+  });
+
+  it('取的是以**今天**结尾的连续 7 天，顺序从旧到新', () => {
+    const days = habitHeatmap([], 'h1', NOW, HABIT_LIST_WEEK_DAYS);
+    expect(days).toHaveLength(HABIT_LIST_WEEK_DAYS);
+    // 末格是今天，不是明天（`now` 是 12:00，跨不跨午夜的判据在 `toHabitProgressRows` 那组）。
+    expect(days.at(-1)?.date).toBe('2026-09-28');
+    expect(days[0]?.date).toBe('2026-09-22');
+  });
+
+  it('清单里"打过的那天"是 4 档、没打的是 0 档 —— 那排点的颜色就来自这里', () => {
+    const days = habitHeatmap([log('2026-09-26')], 'h1', NOW, HABIT_LIST_WEEK_DAYS);
+    expect(days.map((day) => day.level)).toEqual([0, 0, 0, 0, 4, 0, 0]);
   });
 });
 

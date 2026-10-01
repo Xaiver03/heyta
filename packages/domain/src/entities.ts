@@ -262,6 +262,15 @@ export interface Habit extends EntityBase {
   frequency?: HabitFrequency;
   color?: string;
   /**
+   * 列表行首的图标，存的是**闭集词表里的 key**（`'drop'`），不是字形名。
+   *
+   * 🔴 一律可选（AGENTS §3.3）：磁盘上已经写下去的习惯没有这个字段，
+   * 必填只会在回放/读取时炸，而构建是绿的。
+   * 没设过时界面用 `deriveHabitIcon(id)` 派生一个 —— 所以这个字段**不是**
+   * "有没有图标"的开关，只记录"用户自己挑过哪个"。
+   */
+  icon?: string;
+  /**
    * 允许补打卡的天数上限。
    *
    * 为什么需要它：完全禁止补打卡对真实用户太苛刻，

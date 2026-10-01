@@ -21,7 +21,7 @@ import { fileURLToPath } from 'node:url';
 import { translate, type MessageKey } from '@heyta/i18n';
 import { describe, expect, it } from 'vitest';
 
-import { MOBILE_HEATMAP_MONTH_KEYS, habitBoardLabels } from '../src/lib/habits-display';
+import { MOBILE_HEATMAP_MONTH_KEYS, habitBoardLabels, habitListLabels } from '../src/lib/habits-display';
 
 /** 与界面同一条路：走真的词条表（缺 key 会**抛**，不是返回空串）。 */
 const zh = (key: MessageKey, vars?: Record<string, string | number>): string =>
@@ -107,6 +107,111 @@ describe('habitBoardLabels：映射到共享层契约', () => {
     const labels = habitBoardLabels(zh);
     expect(labels.heatmap.less).toBe('少');
     expect(labels.heatmap.more).toBe('多');
+  });
+});
+
+/**
+ * 清单（`HabitProgressList`）那一层的文案
+ * ========================================
+ *
+ * 🔴 「列表 + 窗格」把习惯面拆成两块，而**两块各有三个数字**：窗格（`HabitBoard`）
+ * 上是三枚 chip，清单上是一整句 `aria-label`。它们读的是同一个 `row` 的三个字段，
+ * 但**过了两条不同的函数**。症状：详情板说"连续 1 天"，清单那一行读屏说
+ * "Streak 1 days" —— 两句都"是英语/是中文"，没有任何一层会报错。
+ *
+ * 所以这一组钉的不是"话好不好听"，而是**两条路必须走同一对分支**。
+ *
+ * ⚠️ 这条判据只能拿**字符串**比（`assertEquals` 到 `habitBoardLabels` 那几个函数），
+ * 因为移动端测试跑在 vitest/node 里，`@heyta/ui` 的**值** import 不了
+ * （它顶层 import react-native 的 Flow 源码，实测整个 spec 转译失败）——
+ * 类型 `import type` 可以，值不行。同一个理由见上面 `MOBILE_HEATMAP_MONTH_KEYS`。
+ *
+ * ✅ **变异验证**（2026-10-01，基线 14 passed → 每条注入 → 按字节恢复 → 14 passed，
+ * 且恢复后文件与开场**字节一致**）。注入都落在 `habitListLabels` 这一处，红的用例是：
+ *
+ * | 注入 | 结果 |
+ * |---|---|
+ * | M1 `row` 用 `total: current` 顶替第三个数 | 2 红：三个数字各自念 + 走 web 那三条 key |
+ * | M2 `list` 换成 `web.habits.week.aria` | 2 红：清单标题带名字 + 走 web 那三条 key |
+ * | M3 `streakCurrent` 去掉 `count === 1` 分支 | **恰好 1 红**：与详情板同一对分支 |
+ * | M4 `selectA11y` 传空名字 | 2 红：选择提示带名字 + 走 web 那三条 key |
+ * | M5 整句改成手工拼 `longest ${longest} days, ${total} check-ins` | 3 红：三个数字 + 英文 (1,1,1) + 走 web 那三条 key |
+ *
+ * ⚠️ **第一轮跑出来的证据全部作废过**，成因值得留着：harness 被 `| head` 接走，
+ * SIGPIPE 把它杀死 ⇒ bash 的 `trap … EXIT` 没跑 ⇒ M3 的故障**留在了源码里**；
+ * 下一轮开场"备份"是从这份脏文件读的，于是它最后那条 `diff -q 一致` **自证**了。
+ * 一般规律：**变异 harness 不许接管道**，而"恢复已验证"必须比对**开场之前的字节**
+ * （sha256），不能比对"上一轮结束时手上那份"。
+ */
+describe('habitListLabels：清单的整句与三枚 chip 不许各说各话', () => {
+  it('行首整句把三个数字**各自**念出来（不是同一个数复制三遍）', () => {
+    const labels = habitListLabels(zh);
+    const text = labels.row({ name: '喝水', current: 3, longest: 21, total: 40 });
+    expect(text).toContain('喝水');
+    expect(text).toContain('3');
+    expect(text).toContain('21');
+    expect(text).toContain('40');
+    // 只改一个数字，整句必须跟着变 —— 钉住"它是变量插值，不是写死的句子"。
+    expect(labels.row({ name: '喝水', current: 5, longest: 21, total: 40 })).not.toBe(
+      labels.row({ name: '喝水', current: 3, longest: 21, total: 40 }),
+    );
+  });
+
+  it('🔴 英文在 (1, 1, 1) 下不许出现 `1 days` / `1 check-ins`', () => {
+    // 词条表**没有 ICU 复数**，所以整句这条 key 必须写成"单数安全"的形状
+    // （`{n}-day` 复合词 + `in total`）。改成 `longest {longest} days` 会当场红。
+    const text = habitListLabels(en).row({ name: 'Drink', current: 1, longest: 1, total: 1 });
+    expect(text).not.toMatch(/\b1 days\b/);
+    expect(text).not.toContain('1 check-ins');
+    // 但 >1 时得是复数 —— 只钉单数会让它退化成永远 "day"。
+    expect(text).toContain('1-day');
+    const many = habitListLabels(en).row({ name: 'Drink', current: 2, longest: 3, total: 4 });
+    expect(many).toContain('2-day');
+    expect(many).toContain('3-day');
+  });
+
+  it('清单标题与选择提示都带名字（不是空串占位）', () => {
+    const labels = habitListLabels(zh);
+    expect(labels.list).toBe('习惯清单');
+    expect(labels.selectA11y('喝水')).toContain('喝水');
+    expect(labels.selectA11y('喝水')).not.toBe('喝水');
+    expect(habitListLabels(en).list).toBe('Habits list');
+  });
+
+  it('🔴 空态在 labels 里，不在视图里（`check:empty-state` 断言 B）', () => {
+    // 共享清单**自己**渲染"还没有习惯"（`HabitsScreen` 里不再出现这句）。
+    // 少给这一项 → 空库时那一片是**真空**，而 TS 会拦（必填）；
+    // 给成空串 → 拦不住，界面照样空白，所以这里连非空白一起钉。
+    const labels = habitListLabels(zh);
+    expect(labels.empty).toBe(zh('web.habits.empty'));
+    expect(labels.empty.trim()).not.toBe('');
+    expect(habitListLabels(en).empty).toBe(en('web.habits.empty'));
+    // ⚠️ 与详情板同一个 key —— 两条路对"为什么是空的"只许有一个答案。
+    expect(labels.empty).toBe(habitBoardLabels(zh).empty);
+  });
+
+  it('🔴 三个数字的句子与详情板**同一对分支**（清单不许自己再写一份单复数）', () => {
+    const list = habitListLabels(en);
+    const board = habitBoardLabels(en);
+    for (const count of [1, 2, 9]) {
+      expect(list.streakCurrent(count)).toBe(board.streakCurrent(count));
+      expect(list.streakLongest(count)).toBe(board.streakLongest(count));
+      expect(list.streakTotal(count)).toBe(board.streakTotal(count));
+    }
+    // 中文同样共用（无单复数，两句相同）。
+    expect(habitListLabels(zh).streakCurrent(1)).toBe('连续 1 天');
+  });
+
+  it('🔴 走的是 web DOM 清单那三条 key，没有新增同义键', () => {
+    // 同一句话在两端长成两个样子 = 「列表 + 窗格」最容易被悄悄做坏的地方，
+    // 而词条表里多一条同义键**不会**让任何测试变红。所以钉"取到的字符串就是
+    // 那条既有 key 的值"，而不是钉"有个字符串"。
+    const labels = habitListLabels(zh);
+    expect(labels.list).toBe(zh('web.habits.list.aria'));
+    expect(labels.selectA11y('喝水')).toBe(zh('web.habits.row.selectA11y', { name: '喝水' }));
+    expect(labels.row({ name: '喝水', current: 3, longest: 21, total: 40 })).toBe(
+      zh('web.habits.row.aria', { name: '喝水', current: 3, longest: 21, total: 40 }),
+    );
   });
 });
 
