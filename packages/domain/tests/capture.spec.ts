@@ -509,3 +509,57 @@ describe('formatRemaining —— 实际渲染的那一层', () => {
     expect(formatTaskRemaining(task(), { now: FRIDAY })).toBeNull();
   });
 });
+/*
+ * 🔴 「的」是**被删掉那个短语**的语法连接词（2026-10-01 实测撞见）
+ * ================================================================
+ *
+ * 症状不是"少认了一个日期"，是**把用户的句子剪断**：
+ *
+ * | 输入 | 修之前的标题 |
+ * |---|---|
+ * | 明天的会议 | `的会议` |
+ * | 下周三的周报 | `的周报` |
+ * | 另一件不急的事 | `另一件的事` |
+ * | 写一份不急的周报 | `写一份的周报` |
+ *
+ * 这是一个任务应用**每天**都会被喂进去的形状。用户没有做错任何事，
+ * 建出来的任务标题却是个残句，而且没有任何一处提示过他会这样。
+ *
+ * 成因：中文没有词间空格，"标记 + 的 + 名词"是**定语**写法 —— 那个「的」
+ * 挂在被删掉的时间/优先级短语上，删完还留着它，等于把句子从中间剪断。
+ * 英文的 `tomorrow meeting` 不会有这个问题，所以这套规则从英文形状
+ * 直译过来时，只有中文这一侧会咬人。
+ */
+describe('parseCapture —— 认出来的短语后面紧跟的「的」一起带走', () => {
+  it('日期 + 「的」：标题是「会议」，不是「的会议」', () => {
+    const r = parseCapture('明天的会议', { now: FRIDAY });
+    expect(r.dueDate).toBe('2026-09-26');
+    expect(r.title).toBe('会议');
+  });
+
+  it('优先级词 + 「的」：标题读得通，优先级照样认', () => {
+    const r = parseCapture('另一件不急的事', { now: FRIDAY });
+    expect(r.priority).toBe(Priority.Low);
+    expect(r.title).toBe('另一件事');
+    const w = parseCapture('写一份不急的周报', { now: FRIDAY });
+    expect(w.title).toBe('写一份周报');
+  });
+
+  it('🔴 只带走**被采纳**那个短语后面的「的」—— 不变量仍然成立', () => {
+    // 「后天」是同字段的第二条，未被采纳 ⇒ 它和它自己的「的」都得留在标题里。
+    // 把吞「的」写成"见一个吞一个"就会在这里变红：那是第二遍违反
+    // "没被采纳的片段一定留在标题里"。
+    const r = parseCapture('明天开会，后天的高铁', { now: FRIDAY });
+    expect(r.dueDate).toBe('2026-09-26');
+    expect(r.title).toBe('开会，后天的高铁');
+  });
+
+  it('🔴 不是「的」的字一个都不多吃', () => {
+    // 「明天见」：吃掉「明天」是设计（时间短语），但「见」是标题本体。
+    expect(parseCapture('明天见', { now: FRIDAY }).title).toBe('见');
+    // 「这个不着急」：定语之外的谓语写法照旧只吃掉短语本身。
+    const r = parseCapture('这个不着急', { now: FRIDAY });
+    expect(r.priority).toBe(Priority.Low);
+    expect(r.title).toBe('这个');
+  });
+});

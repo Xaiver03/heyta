@@ -508,7 +508,15 @@ export function parseCapture(input: string, options: CaptureOptions = {}): Captu
   // 只移除被采纳的片段，从后往前删以免下标失效。
   let title = input;
   for (const m of [...matches].filter((x) => x.applied).sort((a, b) => b.start - a.start)) {
-    title = title.slice(0, m.start) + title.slice(m.end);
+    // 🔴 紧跟其后的那个「的」**属于这个短语**，不是标题的一部分。
+    // 中文没有词间空格，"标记 + 的 + 名词"是定语写法：「明天的会议」只删
+    // 「明天」会得到「的会议」—— 用户没做错任何事，建出来的标题却是残句。
+    // 英文形状（`tomorrow meeting`）不存在这个连接词，所以这条只有中文侧咬人。
+    // ⚠️ 只多带一个「的」，而且只对**被采纳**的片段做 —— 未采纳的片段
+    //    （同字段第二条、被 exclude 拒掉的）连它自己的「的」一起原样留着，
+    //    那才是"没被采纳的片段一定留在标题里"这条不变量的完整意思。
+    const end = input.charAt(m.end) === '的' ? m.end + 1 : m.end;
+    title = title.slice(0, m.start) + title.slice(end);
   }
   // 合并因移除产生的空白（`明天 开会` → ` 开会` → `开会`）。
   title = title.replace(/\s+/g, ' ').trim();
