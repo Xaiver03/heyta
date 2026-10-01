@@ -260,7 +260,7 @@ export function SearchPanel({
                   accessibilityRole="button"
                   // 读屏时一屏十几行摘要没有意义 —— 每行自带它自己的那句话。
                   accessibilityLabel={row.excerpt}
-                  accessibilityState={{ selected: isRowActive(activeEntry, 'note', row.id) }}
+                  aria-selected={isRowActive(activeEntry, 'note', row.id)}
                   onPress={() => onOpenNote?.(row.id)}
                   disabled={onOpenNote === undefined}
                   style={[
@@ -295,7 +295,7 @@ export function SearchPanel({
                   accessibilityLabel={
                     action.hint === undefined ? action.label : `${action.label} ${action.hint}`
                   }
-                  accessibilityState={{ selected: isRowActive(activeEntry, 'quick', action.id) }}
+                  aria-selected={isRowActive(activeEntry, 'quick', action.id)}
                   onPress={action.onSelect}
                   style={[
                     styles.row,
