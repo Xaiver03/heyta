@@ -122,7 +122,7 @@ describe('store：requestRecovery 真的打服务端的恢复端点', () => {
 
     expect(calls).toHaveLength(1);
     expect(calls[0]!.url).toBe(`${BASE_URL}/api/recover/passkey`);
-    expect(calls[0]!.body).toEqual({ email: EMAIL });
+    expect(calls[0]!.body).toEqual({ email: EMAIL, locale: 'zh-CN' });
     expect(useAuthStore.getState().status).toEqual({ kind: 'recovery-sent' });
   });
 

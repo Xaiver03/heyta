@@ -85,6 +85,8 @@ export const HOSTED_AUTH_PATHS = {
   passkeyEnrollComplete: '/api/passkeys/registration/complete',
   /** 自助管理：列出 / 删除当前账号自己的通行密钥。 */
   passkeys: '/api/passkeys',
+  /** 账号语言（登录态写回；应用语言解析链第 2 层）。 */
+  accountLocale: '/api/account/locale',
 } as const;
 
 /**
@@ -122,7 +124,12 @@ export const HOSTED_PASSKEY_NAME_MAX_LENGTH = 60;
 /** 一次登录得到的会话。`token` 就是要填进同步设置的访问令牌。 */
 export interface HostedAuthSession {
   token: string;
-  user: { id: number; email: string };
+  /**
+   * `locale` 是**账号语言**（服务端 `users.locale`，可空 ⇒ 字段可缺）：
+   * 客户端在本机无显式选择时采纳它（应用语言解析链第 2 层，
+   * docs/plans/i18n-multilingual.md §3，2026-10-01 拍板）。
+   */
+  user: { id: number; email: string; locale?: HostedAuthLocale };
 }
 
 /**
@@ -236,9 +243,25 @@ export interface HostedAuthFailure {
 /** 统一的返回形状：成功分支自己带字段，失败分支永远可判定。 */
 export type HostedAuthOutcome<T> = (T & { ok: true }) | HostedAuthFailure;
 
+/**
+ * 界面语言的封闭集合，随发信请求带给服务端（`body.locale`）。
+ * 与 `@heyta/i18n` 的 `Locale` / 服务端的 `ServerLocale` 是**同一张表** —— 这里
+ * 刻意不引那个包（app-host 的依赖表里没有 i18n，也不为此加）：用结构相同的
+ * 字面量联合，第三种语言落地时 web 侧把新的 `Locale` 传进来会**编译报错**，
+ * 逼着这里同步 —— 漂移不可能静默发生。
+ */
+export type HostedAuthLocale = 'zh-CN' | 'en';
+
 export interface HostedAuthOptions {
   /** 服务端根地址，例如 `http://127.0.0.1:3000`。空串 = 未配置。 */
   baseUrl: string;
+  /**
+   * 当前界面语言。带上时**发信类**请求会把它作为 `body.locale` 发出去 ——
+   * 服务端按「显式 body > 账号语言 > Accept-Language > zh-CN」解析，
+   * 于是在中文浏览器里把应用切成英文的用户，邮件也是英文。
+   * 可选：不传则服务端照旧（老行为）。
+   */
+  locale?: HostedAuthLocale;
   /** 网络实现，宿主注入（浏览器 fetch / RN fetch / 测试替身）。 */
   fetchImpl?: typeof fetch;
 }
@@ -346,7 +369,7 @@ function classifyStatus(status: number): HostedAuthFailureReason {
  */
 async function sendJson(
   options: HostedAuthOptions,
-  method: 'GET' | 'POST' | 'PATCH' | 'DELETE',
+  method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE',
   path: string,
   payload?: unknown,
   token?: string,
@@ -430,7 +453,13 @@ function parseSession(body: unknown): HostedAuthSession | undefined {
   const email = userRecord['email'];
   if (typeof id !== 'number' || typeof email !== 'string') return undefined;
 
-  return { token, user: { id, email } };
+  // 账号语言：可缺（老服务端 / 用户从未设置过）。集合外的值当缺失处理 ——
+  // 它是"采纳建议"，不是必需要素，不值得为它判 malformed。
+  const rawLocale = userRecord['locale'];
+  const locale: HostedAuthLocale | undefined =
+    rawLocale === 'zh-CN' || rawLocale === 'en' ? rawLocale : undefined;
+
+  return { token, user: { id, email, ...(locale === undefined ? {} : { locale }) } };
 }
 
 /** options / credential 这类"宿主负责解释"的 JSON 对象。 */
@@ -456,6 +485,7 @@ export async function requestMagicLink(
 
   const result = await postJson(options, HOSTED_AUTH_PATHS.magicLinkRequest, {
     email: normalized,
+    ...(options.locale === undefined ? {} : { locale: options.locale }),
   });
   if (!result.ok) return result;
   return { ok: true, message: readServerMessage(result.body) ?? '' };
@@ -479,6 +509,7 @@ export async function registerWithMagicLink(
 
   const result = await postJson(options, HOSTED_AUTH_PATHS.magicLinkRegister, {
     email: normalized,
+    ...(options.locale === undefined ? {} : { locale: options.locale }),
     ...(input.termsAccepted === undefined ? {} : { termsAccepted: input.termsAccepted }),
     // 🔴 邀请码**原样**发出去，不在客户端归一化：归一化只在
     // `@heyta/domain` 的 `normalizeInviteCode` 与服务端那一处发生。
@@ -576,6 +607,7 @@ export async function beginPasskeyRegistration(
 
   const result = await postJson(options, HOSTED_AUTH_PATHS.passkeyRegisterOptions, {
     email: normalized,
+    ...(options.locale === undefined ? {} : { locale: options.locale }),
     ...(input.termsAccepted === undefined ? {} : { termsAccepted: input.termsAccepted }),
     ...(input.inviteCode === undefined ? {} : { inviteCode: input.inviteCode }),
   });
@@ -600,6 +632,7 @@ export async function completePasskeyRegistration(
     // 🔴 **两次调用都要带**：服务端在 `verify` 那一步才拿到 User 行、
     // 也才绑定邀请（options 那次会收下但不用）。只带一次的后果是
     // "用通行密钥注册的人永远绑不上邀请码"，而那看起来只是"邀请没生效"。
+    ...(options.locale === undefined ? {} : { locale: options.locale }),
     ...(input.inviteCode === undefined ? {} : { inviteCode: input.inviteCode }),
   });
   if (!result.ok) return result;
@@ -653,9 +686,36 @@ export async function requestPasskeyRecovery(
 
   const result = await postJson(options, HOSTED_AUTH_PATHS.passkeyRecoverRequest, {
     email: normalized,
+    ...(options.locale === undefined ? {} : { locale: options.locale }),
   });
   if (!result.ok) return result;
   return { ok: true, message: readServerMessage(result.body) ?? '' };
+}
+
+/**
+ * 登录态下把当前界面语言写回账号（`users.locale`）。
+ *
+ * 这是解析链第 2 层的**写侧**：登录响应带回 `user.locale` 是读侧。
+ * 由语言切换器调用，**fire-and-forget**：失败不影响本机语言已切换 ——
+ * 账号语言只是"下一次登录 / 下一封邮件"的建议值，不是本机状态的事实源。
+ */
+export async function updateAccountLocale(
+  options: HostedAuthOptions,
+  token: string,
+  locale: HostedAuthLocale,
+): Promise<HostedAuthOutcome<{ locale: HostedAuthLocale }>> {
+  const trimmed = token.trim();
+  if (trimmed === '') return failure('invalid-input');
+
+  const result = await sendJson(
+    options,
+    'PUT',
+    HOSTED_AUTH_PATHS.accountLocale,
+    { locale },
+    trimmed,
+  );
+  if (!result.ok) return result;
+  return { ok: true, locale };
 }
 
 /** 用恢复链接里的令牌取新通行密钥的注册 options。 */

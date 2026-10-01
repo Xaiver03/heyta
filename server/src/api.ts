@@ -31,8 +31,8 @@ import {
 import { authenticate, getAuthUser } from './middleware';
 import { Logger } from './logger';
 import { prisma } from './db';
-import { resolveLocale } from './design-html.js';
-import type { ServerLocale } from './copy.generated.js';
+import { asServerLocale, resolveLocale } from './design-html.js';
+import { SERVER_LOCALES, type ServerLocale } from './copy.generated.js';
 import { authCache } from './auth-cache';
 import { getWsConnectionService } from './sync/services/websocket-connection.service';
 
@@ -98,6 +98,39 @@ const localeFromRequest = (req: {
   const explicit = typeof body?.locale === 'string' ? body.locale : null;
   const header = req.headers['accept-language'];
   return resolveLocale(explicit, typeof header === 'string' ? header : null);
+};
+
+/**
+ * 🔴 **发信端点的语言优先级**（2026-10-01 拍板，docs/plans/i18n-multilingual.md §3）：
+ *
+ *   ① `body.locale` —— 客户端当前界面语言（显式、最新鲜）
+ *   ② **账号语言**（`users.locale`，按收件邮箱查）—— 用户在别的设备登录态下设过
+ *   ③ `Accept-Language`（浏览器自动带）
+ *   ④ 默认 `zh-CN`
+ *
+ * ② 只在 ① 缺失时生效：客户端带上 `locale` 就说明用户此刻看着那种语言的界面，
+ * 比（可能陈旧的）账号行更新鲜。② 高于 ③ 是刻意的：账号语言是一次**明确的
+ * 用户选择**，浏览器语言只是环境噪声 —— 没有它，在中文浏览器里把应用切成
+ * 英文的用户，邮件永远是中文。
+ *
+ * 多一次 `findUnique` 是可接受的：发信端点都是稀疏、限流的用户动作。
+ */
+const localeForEmail = async (
+  req: { body?: unknown; headers: Record<string, unknown> },
+  email: string,
+): Promise<ServerLocale> => {
+  const body = req.body as { locale?: unknown } | undefined;
+  if (typeof body?.locale === 'string' && (SERVER_LOCALES as readonly string[]).includes(body.locale)) {
+    return body.locale as ServerLocale;
+  }
+  const account = await prisma.user.findUnique({
+    where: { email: email.toLowerCase() },
+    select: { locale: true },
+  });
+  const fromAccount = asServerLocale(account?.locale);
+  if (fromAccount !== undefined) return fromAccount;
+  // 尾部与 localeFromRequest 相同（显式无效时它会落到 header / 默认）。
+  return localeFromRequest(req);
 };
 
 const PasskeyRegisterVerifySchema = z.object({
@@ -320,6 +353,53 @@ export const apiRoutes = async (
     },
   );
 
+  // ============================================
+  // 账号语言（应用语言解析链第 2 层，2026-10-01 拍板）
+  // ============================================
+
+  /**
+   * 登录态下把当前界面语言写回账号（`users.locale`，可空列，见那条迁移）。
+   *
+   * 消费方有三：登录响应带回（客户端本机无显式选择时采纳）、发信函数对已知
+   * 账号优先用它、凭据页链接在发信时就把它写成 `?lang=`。归属来自令牌
+   * （`authenticate` → `getAuthUser`），不来自输入。
+   */
+  fastify.put(
+    '/account/locale',
+    {
+      preHandler: authenticate,
+      config: {
+        rateLimit: {
+          max: 20,
+          timeWindow: '15 minutes',
+        },
+      },
+    },
+    async (req, reply) => {
+      try {
+        // 🔴 只认 SERVER_LOCALES —— 这是生成物（copy.generated.ts）里的集合，
+        // 第三种语言落地时它自动长出第三个成员，这里不用跟着改。
+        const parsed = z.object({ locale: z.enum(SERVER_LOCALES) }).safeParse(req.body);
+        if (!parsed.success) {
+          return reply.status(400).send({
+            error: 'Validation failed',
+            details: parsed.error.issues,
+          });
+        }
+        const user = getAuthUser(req);
+        await prisma.user.update({
+          where: { id: user.userId },
+          data: { locale: parsed.data.locale },
+        });
+        return reply.send({ locale: parsed.data.locale });
+      } catch (err) {
+        const errMsg = err instanceof Error ? err.message : 'Unknown error';
+        Logger.error(`Account locale update error: ${errMsg}`);
+        return reply.status(500).send({ error: 'Failed to update locale.' });
+      }
+    },
+  );
+
   // Delete user account (requires authentication)
   // This permanently deletes the user and all associated data (operations, sync state, devices)
   fastify.delete(
@@ -445,6 +525,7 @@ export const apiRoutes = async (
           credential as any,
           Date.now(),
           inviteCode,
+          await localeForEmail(req, email),
         );
         return reply.status(201).send(result);
       } catch (err) {
@@ -521,7 +602,7 @@ export const apiRoutes = async (
         // Get token version for JWT
         const user = await prisma.user.findUnique({
           where: { id: userInfo.userId },
-          select: { tokenVersion: true },
+          select: { tokenVersion: true, locale: true },
         });
         const tokenVersion = user?.tokenVersion ?? 0;
 
@@ -534,7 +615,9 @@ export const apiRoutes = async (
 
         return reply.send({
           token,
-          user: { id: userInfo.userId, email: userInfo.email },
+          // locale = 账号语言（可空）：客户端在本机无显式选择时采纳（解析链第 2 层，
+          // docs/plans/i18n-multilingual.md §3）。magic-link 那两条登录路同样带它。
+          user: { id: userInfo.userId, email: userInfo.email, locale: user?.locale ?? null },
         });
       } catch (err) {
         const errMsg = err instanceof Error ? err.message : 'Unknown error';
@@ -610,7 +693,7 @@ export const apiRoutes = async (
         }
         const { email } = parseResult.data;
 
-        const result = await requestPasskeyRecovery(email, localeFromRequest(req));
+        const result = await requestPasskeyRecovery(email, await localeForEmail(req, email));
         return reply.send(result);
       } catch (err) {
         const errMsg = err instanceof Error ? err.message : 'Unknown error';
@@ -976,7 +1059,7 @@ export const apiRoutes = async (
             .send({ error: 'Registration is not allowed for this email address.' });
         }
 
-        const result = await registerWithMagicLink(email, Date.now(), inviteCode, localeFromRequest(req));
+        const result = await registerWithMagicLink(email, Date.now(), inviteCode, await localeForEmail(req, email));
         return reply.status(201).send(result);
       } catch (err) {
         const errMsg = err instanceof Error ? err.message : 'Unknown error';
@@ -1010,7 +1093,7 @@ export const apiRoutes = async (
         }
         const { email } = parseResult.data;
 
-        const result = await requestLoginMagicLink(email, localeFromRequest(req));
+        const result = await requestLoginMagicLink(email, await localeForEmail(req, email));
         return reply.send(result);
       } catch (err) {
         const errMsg = err instanceof Error ? err.message : 'Unknown error';

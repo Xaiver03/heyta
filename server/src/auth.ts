@@ -422,7 +422,7 @@ export const issueSession = (user: {
 
 export const verifyLoginMagicLink = async (
   token: string,
-): Promise<{ token: string; user: { id: number; email: string } }> => {
+): Promise<{ token: string; user: { id: number; email: string; locale: string | null } }> => {
   const user = await prisma.user.findFirst({
     where: { loginToken: token },
   });
@@ -466,13 +466,18 @@ export const verifyLoginMagicLink = async (
 
   Logger.info(`User logged in via magic link (ID: ${user.id})`);
 
-  return { token: jwtToken, user: { id: user.id, email: user.email } };
+  return { token: jwtToken, user: { id: user.id, email: user.email, locale: user.locale } };
 };
 
 /** 邮箱链接换会话的结果。**判别式**：页面据此决定"写会话并跳应用"还是"只提示已确认"。 */
 export type EmailLinkVerifyResult =
-  | { kind: 'session'; token: string; user: { id: number; email: string } }
-  | { kind: 'verified-only'; user: { id: number; email: string } };
+  | {
+      kind: 'session';
+      token: string;
+      /** `locale` 是账号语言（可空）—— 客户端在本机无显式选择时采纳它（解析链第 2 层）。 */
+      user: { id: number; email: string; locale: string | null };
+    }
+  | { kind: 'verified-only'; user: { id: number; email: string; locale: string | null } };
 
 /**
  * **邮箱链接的唯一校验入口**：邮件里那个 `token` 换会话（ADR-0039 §2.1）。
@@ -502,23 +507,27 @@ export const verifyEmailLink = async (token: string): Promise<EmailLinkVerifyRes
     await verifyEmail(token);
     const user = await prisma.user.findUnique({
       where: { id: pendingPasskey.userId },
-      select: { id: true, email: true },
+      select: { id: true, email: true, locale: true },
     });
     return {
       kind: 'verified-only',
-      user: user ?? { id: pendingPasskey.userId, email: '' },
+      user: user ?? { id: pendingPasskey.userId, email: '', locale: null },
     };
   }
 
   const user = await prisma.user.findFirst({
     where: { verificationToken: token },
-    select: { id: true, email: true, tokenVersion: true },
+    select: { id: true, email: true, tokenVersion: true, locale: true },
   });
   if (!user) throw new Error('Invalid or expired link');
 
   await verifyEmail(token);
   Logger.info(`User registered and signed in via email link (ID: ${user.id})`);
-  return { kind: 'session', token: issueSession(user), user: { id: user.id, email: user.email } };
+  return {
+    kind: 'session',
+    token: issueSession(user),
+    user: { id: user.id, email: user.email, locale: user.locale },
+  };
 };
 
 /**
@@ -602,6 +611,8 @@ export const registerWithMagicLink = async (
         data: {
           email: normalizedEmail,
           passwordHash: null,
+          // 注册语言 = 账号语言的起点（之后登录态改语言会更新它，见 /account/locale）。
+          ...(locale !== undefined ? { locale } : {}),
           verificationToken,
           verificationTokenExpiresAt: tokenExpiresAt,
           // Never invent an acceptance — see the same guard in passkey.ts. An instance
