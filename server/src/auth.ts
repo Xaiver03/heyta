@@ -544,6 +544,18 @@ export const registerWithMagicLink = async (
   inviteCode?: string,
   /** 收件人的语言。**可选** —— 见 `requestLoginMagicLink` 上的同一条注释。 */
   locale?: ServerLocale,
+  /**
+   * 口令哈希（PHC 串）。**可选** —— 只有 `password/service.ts` 的邮箱+口令注册会带。
+   *
+   * 🔴 三条语义，每条都有理由：
+   * 1. **给了就覆盖**：与验证令牌同一条规则 —— "最后一次注册定义这个待激活账号"。
+   *    否则会出现"别人替你的邮箱注册过一次，你的链接却指向他的口令"。
+   * 2. **没给绝不清空**：`/register/magic-link` 的**重发验证邮件**走的是同一个函数，
+   *    它不该顺手把用户设过的口令抹掉（那等于一句"点重发就丢掉口令"）。
+   * 3. **对已验证账号不可达**：上面 `isVerified === 1` 已经 return，所以这条参数
+   *    在任何路径上都**覆盖不了一个活账号的口令**。口令属于验证前的登记动作。
+   */
+  passwordHash?: string,
 ): Promise<{ message: string }> => {
   const normalizedEmail = email.toLowerCase();
 
@@ -596,6 +608,8 @@ export const registerWithMagicLink = async (
           verificationTokenExpiresAt: tokenExpiresAt,
           verificationResendCount: { increment: 1 },
           ...(acceptedAt !== undefined && { termsAcceptedAt: acceptedAt }),
+          // 见参数上的注释 2：undefined = 调用方没提口令这件事，**不是**"把口令清掉"。
+          ...(passwordHash !== undefined && { passwordHash }),
         },
       });
       if (updated.count !== 1) return { message: REGISTRATION_SUCCESS_MESSAGE };
@@ -606,11 +620,11 @@ export const registerWithMagicLink = async (
         `Updated verification token for unverified user (ID: ${existingUser.id})`,
       );
     } else {
-      // Create new user (no passkey, no password)
+      // Create new user (no passkey; a password only when the caller supplied one)
       const createdUser = await prisma.user.create({
         data: {
           email: normalizedEmail,
-          passwordHash: null,
+          passwordHash: passwordHash ?? null,
           // 注册语言 = 账号语言的起点（之后登录态改语言会更新它，见 /account/locale）。
           ...(locale !== undefined ? { locale } : {}),
           verificationToken,
