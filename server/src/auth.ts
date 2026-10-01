@@ -10,6 +10,7 @@ import { Prisma } from '@prisma/client';
 import { authCache } from './auth-cache';
 import { getDefaultStorageQuotaBytes } from './sync/services/storage-quota.service';
 import { hashToken } from './auth-tokens';
+import { consentedLegalSetVersion } from './legal-consent';
 
 // Auth constants
 const MIN_JWT_SECRET_LENGTH = 32;
@@ -610,7 +611,13 @@ export const registerWithMagicLink = async (
           verificationToken: hashToken(verificationToken),
           verificationTokenExpiresAt: tokenExpiresAt,
           verificationResendCount: { increment: 1 },
-          ...(acceptedAt !== undefined && { termsAcceptedAt: acceptedAt }),
+          ...(acceptedAt !== undefined && {
+            termsAcceptedAt: acceptedAt,
+            // 写了同意时刻就必须一起写版本，否则这一行又是一个"有时间、证明不了哪一版"的记录。
+            // 值可能是 null（这台实例发布的不是 heyta 那套文本），判法见 `legal-consent.ts`；
+            // "最后一次注册定义这个待激活账号"这条既有规则同样适用于版本。
+            termsDocumentVersion: consentedLegalSetVersion(),
+          }),
           // 见参数上的注释 2：undefined = 调用方没提口令这件事，**不是**"把口令清掉"。
           ...(passwordHash !== undefined && { passwordHash }),
         },
@@ -624,6 +631,10 @@ export const registerWithMagicLink = async (
       );
     } else {
       // Create new user (no passkey; a password only when the caller supplied one)
+      // Never invent an acceptance — see the same guard in passkey.ts. An instance
+      // with no legal pages has nothing to accept, and the column is nullable.
+      const recordedAcceptedAt =
+        acceptedAt ?? (isConsentRequired(config) ? BigInt(Date.now()) : null);
       const createdUser = await prisma.user.create({
         data: {
           email: normalizedEmail,
@@ -632,10 +643,12 @@ export const registerWithMagicLink = async (
           ...(locale !== undefined ? { locale } : {}),
           verificationToken: hashToken(verificationToken),
           verificationTokenExpiresAt: tokenExpiresAt,
-          // Never invent an acceptance — see the same guard in passkey.ts. An instance
-          // with no legal pages has nothing to accept, and the column is nullable.
-          termsAcceptedAt:
-            acceptedAt ?? (isConsentRequired(config) ? BigInt(Date.now()) : null),
+          termsAcceptedAt: recordedAcceptedAt,
+          // 同意时刻一旦落下，版本就必须跟着判一次 —— 有时间戳却没有版本，
+          // 就是一条对外文本承诺过、库里却答不出"哪一版"的记录。值可以是 null，
+          // 含义与写法见 `legal-consent.ts`。
+          termsDocumentVersion:
+            recordedAcceptedAt === null ? null : consentedLegalSetVersion(),
           // Set explicitly rather than leaning on the column default, so that
           // SUPERSYNC_DEFAULT_STORAGE_QUOTA_BYTES actually reaches new accounts.
           storageQuotaBytes: BigInt(getDefaultStorageQuotaBytes()),

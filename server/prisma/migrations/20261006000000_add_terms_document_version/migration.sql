@@ -1,0 +1,55 @@
+-- 同意留痕的版本指针：`users.terms_document_version`。
+--
+-- 依据：docs/plans/legal-compliance-before-filing.md 的「链 3」，
+-- 技术方案在 docs/research/legal-consumer-contract-terms.md 层 3（过渡形态那一档）。
+--
+-- ## 为什么这条迁移是"补一句已经说出口的话"，不是新功能
+--
+-- 对外文本**已经**承诺了这件事，两处：
+--   · `packages/legal/src/documents/terms.ts` 的「同意留痕」条：
+--     "注册时我们记下的不是含糊的『他同意过了』，而是一整套版本指纹"；
+--   · `packages/legal/src/documents/privacy.ts` 第 12 条：同意怎么记录的。
+-- 而库里此前只有 `terms_accepted_at` 一个时间戳 —— 也就是说这两句话在本迁移之前
+-- **是真的做不到的**。政策写了却没做，比不写更糟（《消保法实施条例》那种
+-- "条款写了却没做 = 更不利"的判断同样适用于对监管的陈述）。
+--
+-- ## 为什么是一列字符串，而不是一行一份文档的表
+--
+-- 承诺的形状是"把当时每一份对外文本的版本号一起钉住"，即
+-- `legalSetVersion()` 那种 `terms@1.0;privacy@1.0;…` 的整套指纹：勾选时用户同意的
+-- 是**一组**文件，逐份建行会让人以为可以只同意其中一份。
+-- 独立 `UserConsent` 表留给"二次同意需要历史"真正落地的那天
+--（层 4 的 A 档阻断确认）；现在建表就得同时决定 kind 词表、通知与比对，
+-- 那是另一件事的形状，不该由一列 ALTER 顺带定下。
+--
+-- ## 为什么可空，且**存量行一律 NULL**
+--
+-- 🔴 **老账号不回填。** `null` 的含义是"只有时间戳、无法证明是哪一版"，
+-- 这批账号要走补签流程。给它填一个版本号就是**发明同意** ——
+-- 与 `docs/plans/user-journey-and-auth.md` 那条"不得替用户预勾或发明同意"
+-- 是同一条纪律。AGENTS.md §3.3 在这里同样成立：新增持久化字段一律可选。
+--
+-- 另一层含义：**非官方托管实例**上新写的记录也是 `null`。那台机器对外发布的
+-- 是运营者自己的 `terms.html` / `PRIVACY_*` 模板（德语法、莱比锡管辖那套上游模板），
+-- 它们的版本我们无权命名；写上 heyta 的版本号就是替别人宣告他发布了什么
+--（同 D-01 里"替别人作出没有依据的承诺"）。判定逻辑在 `src/legal-consent.ts`，
+-- 有单测钉住。
+--
+-- ## 为什么是普通 DDL
+--
+-- 按 AGENTS.md §4 与 server/prisma/migrations/README.md 的优先级 1：表够小就用普通 DDL。
+-- 加**无默认值的可空列**在 PostgreSQL 里是 catalog-only 变更（不重写表、不回填），
+-- 所以既不需要 CONCURRENTLY，也不需要 `SET LOCAL lock_timeout` 那个可恢复形状。
+--
+-- SQL 由
+--   npx prisma migrate diff --from-schema-datamodel <迁移前> \
+--     --to-schema-datamodel prisma/schema.prisma --script
+-- 逐字取出（保证与 schema.prisma 不发生漂移）。
+--
+-- ## 回滚
+--
+-- `ALTER TABLE "users" DROP COLUMN "terms_document_version";` —— 无损（只是重新变成
+-- "版本无法证明"）。但不要把它做成迁移文件：迁移是不可逆层，回滚要另开一次有意识的变更。
+--
+-- AlterTable
+ALTER TABLE "users" ADD COLUMN     "terms_document_version" TEXT;

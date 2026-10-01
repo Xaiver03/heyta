@@ -41,6 +41,17 @@ model User {
   // 默认 false ⇒ **没有人生来是管理员**；授权只能由 CLI 或已有管理员显式做（fail-closed）。
   isAdmin                       Boolean  @default(false) @map("is_admin")
   termsAcceptedAt               BigInt?  @map("terms_accepted_at")
+  // 同意留痕的版本指针：形如 `terms@1.0;privacy@1.0;…` 的**整套**文本版本指纹
+  //（`@heyta/legal` 的 `legalSetVersion()`）。对外文本两处承诺了它
+  //（`terms.ts` 的「同意留痕」条、`privacy.ts` 第 12 条），承诺的形状是
+  // "一整套版本号一起钉住"，所以这里是一列字符串，不是一行一份文档。
+  //
+  // 🔴 **可空，且老账号不回填**：`null` 的含义是"只有时间戳、无法证明是哪一版"，
+  // 这批账号要走补签。回填版本 = 发明同意（AGENTS §3.3 与
+  // `docs/plans/user-journey-and-auth.md` 那条"不得替用户预勾或发明同意"是同一条纪律）。
+  // 另一层含义：非官方托管实例发布的是**运营者自己**的文本，它的版本我们无法命名，
+  // 所以那台实例上的记录同样是 `null`（裁决见 legal-consent.ts）。
+  termsDocumentVersion          String?  @map("terms_document_version")
   createdAt                     DateTime @default(now()) @map("created_at")
   storageQuotaBytes             BigInt   @default(104857600) @map("storage_quota_bytes") // 100MB default
   storageUsedBytes              BigInt   @default(0) @map("storage_used_bytes")
