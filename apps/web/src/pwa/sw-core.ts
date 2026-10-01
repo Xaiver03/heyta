@@ -141,6 +141,15 @@ export interface WidgetDataMessage {
   type: 'heyta:widget-data';
   kind: AdaptiveCardKind;
   data: unknown;
+  /**
+   * 这一款的**占位态**（"打开 Heyta 以显示小组件"），由页面**预先渲染成数据**。
+   *
+   * 🔴 为什么 SW 不自己拼那句话：词条表在 `@heyta/i18n`，把它 import 进 SW
+   * 会把**全部语言的全部界面文案**打进 `public/sw.js`（它是每次 SW 启动都要
+   * 加载的文件）。而"占位文案该是什么语言"这个判断，页面在推数据时**已经做过一次** ——
+   * 存成品保证占位态与数据**同一语言**，不会出现"数据是英文、半夜过期后变中文"。
+   */
+  placeholder: unknown;
   /** 这份数据属于哪一天（应用算的，**不是** SW 推的）。 */
   dayStr: string;
   /** 这份数据什么时候开始不可信 = **下一个本地零点**（应用算的）。 */
@@ -168,6 +177,8 @@ export interface WidgetDataMessage {
 export interface WidgetDataRecord {
   kind: AdaptiveCardKind;
   data: unknown;
+  /** 过期时该显示什么（页面预渲染的占位态，见 `WidgetDataMessage.placeholder`）。 */
+  placeholder: unknown;
   dayStr: string;
   validUntil: number;
   /** 推送时刻。**只用于诊断**，不参与判定。 */
@@ -251,10 +262,17 @@ export function parsePageMessage(raw: unknown): PageToWorkerMessage | null {
       //    "永远显示旧任务"。所以宁可不收这条数据，也不收一条没有期限的。
       if (typeof msg.dayStr !== 'string') return null;
       if (typeof msg.validUntil !== 'number' || !Number.isFinite(msg.validUntil)) return null;
+      // ⚠️ `placeholder` 判据**同上**（必须是对象），但非法时**不能**把整条消息拒了：
+      //    那是次要载荷，拒收的代价是"合法数据没进缓存" ⇒ 组件停在旧任务上直到午夜 ——
+      //    正是这条链路要防的那个缺陷。归一成 `null`，让 SW 在真要用它的那一步
+      //    退回构建期生成的静态占位文件（见 `sw.ts` 的 fetch 分支）。
+      const placeholder =
+        typeof msg.placeholder === 'object' && msg.placeholder !== null ? msg.placeholder : null;
       return {
         type: 'heyta:widget-data',
         kind: kind as AdaptiveCardKind,
         data: msg.data,
+        placeholder,
         dayStr: msg.dayStr,
         validUntil: msg.validUntil,
       };

@@ -4,5 +4,8 @@
   "dayStr": null,
   "sessionTitle": "",
   "targetLabel": "",
+  "placeholderText": "打开 Heyta 以显示小组件",
+  "staleText": "数据已过期，打开 Heyta 刷新",
+  "idleText": "没有进行中的专注",
   "showPlaceholder": true
 }

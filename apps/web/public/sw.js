@@ -4,29 +4,6 @@
   var ADAPTIVE_CARD_KINDS = ["today", "quadrant", "habits", "focus"];
   var ADAPTIVE_CARD_SCHEMA = "http://adaptivecards.io/schemas/adaptive-card.json";
   var ADAPTIVE_CARD_VERSION = "1.5";
-  function buildFocusCardFallback(state) {
-    return {
-      kind: "focus",
-      state,
-      dayStr: null,
-      sessionTitle: "",
-      targetLabel: "",
-      // `stale` 有自己的文案（"数据已过期，打开 Heyta 刷新"），不是占位
-      showPlaceholder: state === "placeholder"
-    };
-  }
-  function buildAdaptiveCardPlaceholder(kind) {
-    switch (kind) {
-      case "today":
-        return { kind: "today", dayStr: "", count: 0, isEmpty: true, rows: [], showPlaceholder: true };
-      case "quadrant":
-        return { kind: "quadrant", dayStr: "", slots: [], showPlaceholder: true };
-      case "habits":
-        return { kind: "habits", dayStr: "", isEmpty: true, rows: [], showPlaceholder: true };
-      case "focus":
-        return buildFocusCardFallback("placeholder");
-    }
-  }
   function taskRowTemplate() {
     return {
       type: "ColumnSet",
@@ -61,10 +38,9 @@
   function textBlock(text, extra = {}) {
     return { type: "TextBlock", text, wrap: true, ...extra };
   }
-  var PLACEHOLDER_TEXT = "\u6253\u5F00 Heyta \u4EE5\u663E\u793A\u5C0F\u7EC4\u4EF6";
   function withPlaceholderGate(realContent) {
     return [
-      textBlock(PLACEHOLDER_TEXT, { isSubtle: true, isVisible: "${showPlaceholder}" }),
+      textBlock("${placeholderText}", { isSubtle: true, isVisible: "${showPlaceholder}" }),
       { type: "Container", isVisible: "${!showPlaceholder}", items: realContent }
     ];
   }
@@ -74,9 +50,9 @@
       type: "AdaptiveCard",
       version: ADAPTIVE_CARD_VERSION,
       body: withPlaceholderGate([
-        textBlock("\u4ECA\u65E5\u4EFB\u52A1", { weight: "Bolder", size: "Medium" }),
-        textBlock("${count} \u9879", { isSubtle: true, spacing: "None" }),
-        textBlock("\u4ECA\u5929\u6CA1\u6709\u4EFB\u52A1", { isSubtle: true, isVisible: "${isEmpty}" }),
+        textBlock("${titleText}", { weight: "Bolder", size: "Medium" }),
+        textBlock("${countText}", { isSubtle: true, spacing: "None" }),
+        textBlock("${emptyText}", { isSubtle: true, isVisible: "${isEmpty}" }),
         { type: "Container", $data: "${rows}", items: [taskRowTemplate()] }
       ])
     },
@@ -85,12 +61,12 @@
       type: "AdaptiveCard",
       version: ADAPTIVE_CARD_VERSION,
       body: withPlaceholderGate([
-        textBlock("\u56DB\u8C61\u9650", { weight: "Bolder", size: "Medium" }),
+        textBlock("${titleText}", { weight: "Bolder", size: "Medium" }),
         {
           type: "Container",
           $data: "${slots}",
           items: [
-            textBlock("${label}\uFF08${count}\uFF09", { weight: "Bolder", spacing: "Medium" }),
+            textBlock("${heading}", { weight: "Bolder", spacing: "Medium" }),
             textBlock("${hint}", { isSubtle: true, spacing: "None" }),
             { type: "Container", $data: "${rows}", items: [taskRowTemplate()] }
           ]
@@ -102,8 +78,8 @@
       type: "AdaptiveCard",
       version: ADAPTIVE_CARD_VERSION,
       body: withPlaceholderGate([
-        textBlock("\u4E60\u60EF", { weight: "Bolder", size: "Medium" }),
-        textBlock("\u8FD8\u6CA1\u6709\u4E60\u60EF", { isSubtle: true, isVisible: "${isEmpty}" }),
+        textBlock("${titleText}", { weight: "Bolder", size: "Medium" }),
+        textBlock("${emptyText}", { isSubtle: true, isVisible: "${isEmpty}" }),
         {
           type: "Container",
           $data: "${rows}",
@@ -137,11 +113,8 @@
         // ⚠️ 这四句是**互斥**的四种状态，不是四条并列的提示。
         //    用一个 `state` 字段而不是四个布尔量，是为了让"同时显示两句"
         //    在数据层面就**不可能**构造出来。
-        textBlock("\u6570\u636E\u5DF2\u8FC7\u671F\uFF0C\u6253\u5F00 Heyta \u5237\u65B0", {
-          isSubtle: true,
-          isVisible: "${state == 'stale'}"
-        }),
-        textBlock("\u6CA1\u6709\u8FDB\u884C\u4E2D\u7684\u4E13\u6CE8", { isSubtle: true, isVisible: "${state == 'idle'}" }),
+        textBlock("${staleText}", { isSubtle: true, isVisible: "${state == 'stale'}" }),
+        textBlock("${idleText}", { isSubtle: true, isVisible: "${state == 'idle'}" }),
         textBlock("${sessionTitle}", {
           weight: "Bolder",
           isVisible: "${state == 'active'}"
@@ -204,10 +177,12 @@
         if (typeof msg.data !== "object" || msg.data === null) return null;
         if (typeof msg.dayStr !== "string") return null;
         if (typeof msg.validUntil !== "number" || !Number.isFinite(msg.validUntil)) return null;
+        const placeholder = typeof msg.placeholder === "object" && msg.placeholder !== null ? msg.placeholder : null;
         return {
           type: "heyta:widget-data",
           kind,
           data: msg.data,
+          placeholder,
           dayStr: msg.dayStr,
           validUntil: msg.validUntil
         };
@@ -308,7 +283,8 @@
       return;
     }
     if (isRecordStale(record, Date.now())) {
-      console.info(`[heyta-sw] ${kind} \u7684\u7F13\u5B58\u5DF2\u8FC7\u671F\uFF08dayStr=${record.dayStr}\uFF09\uFF0C\u4E0D\u63A8\u65E7\u6570\u636E`);
+      console.info(`[heyta-sw] ${kind} \u7684\u7F13\u5B58\u5DF2\u8FC7\u671F\uFF08dayStr=${record.dayStr}\uFF09\uFF0C\u6539\u63A8\u5360\u4F4D\u6001`);
+      if (record.placeholder != null) await pushWidgetData(kind, record.placeholder);
       return;
     }
     await pushWidgetData(kind, record.data);
@@ -333,11 +309,17 @@
       event.respondWith(
         (async () => {
           const record = await getWidgetRecord(kind);
-          if (record === void 0 || isRecordStale(record, Date.now())) {
-            return jsonResponse(buildAdaptiveCardPlaceholder(kind));
+          if (record !== void 0 && !isRecordStale(record, Date.now())) {
+            return jsonResponse(record.data);
           }
-          return jsonResponse(record.data);
-        })().catch(() => jsonResponse(buildAdaptiveCardPlaceholder(kind)))
+          if (record?.placeholder != null) return jsonResponse(record.placeholder);
+          return fetch(event.request);
+        })().catch(
+          // 网络也不可用 ⇒ 给一个明确失败的响应。
+          // ⚠️ 这里**不**回一段中文兜底：SW 里没有词条表，任何现场编出来的句子
+          //    都只有一种语言，而"组件说的话跟着界面语言走"正是这一轮要守住的契约。
+          () => new Response(null, { status: 504 })
+        )
       );
       return;
     }
@@ -408,6 +390,8 @@
       const record = {
         kind: message.kind,
         data: message.data,
+        // 与数据**同一语言**的占位态：SW 没有词条表，只能存页面算好的成品。
+        placeholder: message.placeholder,
         dayStr: message.dayStr,
         validUntil: message.validUntil,
         pushedAt: Date.now()

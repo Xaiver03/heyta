@@ -42,6 +42,7 @@
 
 import type { FocusState, LocalDate } from '@heyta/domain';
 import { addDays, parseLocalDate, toLocalDate } from '@heyta/domain';
+import { translate, type Locale } from '@heyta/i18n';
 import type { MaterializedState } from '@heyta/op-log';
 import {
   ADAPTIVE_CARD_KINDS,
@@ -49,7 +50,14 @@ import {
   buildAdaptiveCardPlaceholder,
   buildWidgetPayload,
 } from '@heyta/widget-core';
-import type { AdaptiveCardData, AdaptiveCardKind, WidgetPayload } from '@heyta/widget-core';
+import type {
+  AdaptiveCardData,
+  AdaptiveCardKind,
+  WidgetPayload,
+  WidgetTranslate,
+} from '@heyta/widget-core';
+
+import { currentLocale } from '../lib/locale.js';
 
 import { pushWidgetData } from './register.js';
 
@@ -63,9 +71,31 @@ export interface WidgetPublishPlan {
   dayStr: LocalDate;
   /** 这份数据什么时候开始不可信 = **下一个本地零点**。 */
   validUntil: number;
+  /** 这一轮文案是用哪门语言渲染的（同时告诉 SW 该按哪门语言存占位态）。 */
+  locale: Locale;
   payload: WidgetPayload;
   /** 每一款组件各自要推的 JSON。 */
   cards: Record<AdaptiveCardKind, AdaptiveCardData>;
+  /**
+   * 每一款的**占位态**（"打开 Heyta 以显示小组件"），与 `cards` 同一语言。
+   *
+   * 🔴 一起算而不是让 SW 到时需要时再算：SW 不 import 词条表 —— 把整份表打进
+   * `public/sw.js` 是每次 SW 启动都要加载的成本，而"过期时该说什么"这句话
+   * 的**语言**必须与数据同源。SW 只需要缓存成品。
+   */
+  placeholders: Record<AdaptiveCardKind, AdaptiveCardData>;
+}
+
+/**
+ * 把一门语言绑成 widget-core 要的翻译口。
+ *
+ * widget-core **一个词条都不 import**（见该包 `adaptive-card.ts` 文件头的"三不"），
+ * 文案由宿主注入。而这条链路的调用方不在 React 里、拿不到 `useI18n()`，
+ * 所以走 `lib/locale.ts` 那个唯一的非 React 读取口 —— 与 auth store 带
+ * `body.locale` 是同一个来源，两处各自读 localStorage 就会漂移。
+ */
+function translateFor(locale: Locale): WidgetTranslate {
+  return (key, vars) => translate(locale, key, vars);
 }
 
 /**
@@ -77,9 +107,10 @@ export interface WidgetPublishPlan {
 export function planWidgetPublish(input: {
   state: WidgetPublishStateSlice;
   focus?: FocusState;
+  locale: Locale;
   now: number;
 }): WidgetPublishPlan {
-  const { state, focus, now } = input;
+  const { state, focus, locale, now } = input;
   const today = toLocalDate(now);
 
   const payload = buildWidgetPayload({
@@ -95,8 +126,11 @@ export function planWidgetPublish(input: {
   });
 
   const cards = {} as Record<AdaptiveCardKind, AdaptiveCardData>;
+  const placeholders = {} as Record<AdaptiveCardKind, AdaptiveCardData>;
+  const t = translateFor(locale);
   for (const kind of ADAPTIVE_CARD_KINDS) {
-    cards[kind] = buildAdaptiveCardData(kind, payload, today);
+    cards[kind] = buildAdaptiveCardData(kind, payload, today, t);
+    placeholders[kind] = buildAdaptiveCardPlaceholder(kind, t);
   }
 
   return {
@@ -105,6 +139,8 @@ export function planWidgetPublish(input: {
     validUntil: parseLocalDate(addDays(today, 1)).getTime(),
     payload,
     cards,
+    placeholders,
+    locale,
   };
 }
 
@@ -121,8 +157,15 @@ export function planWidgetPublish(input: {
 export async function publishWidgetCards(plan: WidgetPublishPlan): Promise<number> {
   let pushed = 0;
   for (const kind of ADAPTIVE_CARD_KINDS) {
-    // 期限一起传：SW 会把它连同数据存下来，并在**应用不在**时用它判过期
-    await pushWidgetData(kind, plan.cards[kind], plan.dayStr, plan.validUntil);
+    // 数据 + 占位态 + 期限一起传：SW 会把这三样**一并**存下来，并在**应用不在**时
+    // 用期限判过期、用占位态决定过期后画什么（见 `sw.ts` 的 fetch 分支）。
+    await pushWidgetData(
+      kind,
+      plan.cards[kind],
+      plan.placeholders[kind],
+      plan.dayStr,
+      plan.validUntil,
+    );
     pushed += 1;
   }
   return pushed;
@@ -136,11 +179,15 @@ export async function publishWidgetCards(plan: WidgetPublishPlan): Promise<numbe
  * 而那是最严重的一类缺陷（决策 D6）。
  */
 export async function publishWidgetPlaceholders(): Promise<number> {
+  const t = translateFor(currentLocale());
   for (const kind of ADAPTIVE_CARD_KINDS) {
+    const placeholder = buildAdaptiveCardPlaceholder(kind, t);
     // 占位态**永远成立**（"打开 Heyta 以显示小组件"不会过期），
     // 所以给它一个无限远的期限 —— 而不是"立刻过期"，
     // 那会让 SW 的拦截逻辑把一条正确的数据判成旧的。
-    await pushWidgetData(kind, buildAdaptiveCardPlaceholder(kind), '', Number.MAX_SAFE_INTEGER);
+    // 同一份占位态也当作"以后过期了画什么"存下去 —— 这条链路没有更新的数据进来，
+    // SW 手里唯一诚实的降级目标就是它自己。
+    await pushWidgetData(kind, placeholder, placeholder, '', Number.MAX_SAFE_INTEGER);
   }
   return ADAPTIVE_CARD_KINDS.length;
 }

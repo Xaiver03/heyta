@@ -24,6 +24,7 @@ import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import { CATALOGS, type MessageKey } from '@heyta/i18n';
 import {
   MAX_EPOCH_MS as CANON_MAX_EPOCH_MS,
   WIDGET_ALG as CANON_ALG,
@@ -37,6 +38,10 @@ import * as M from '../harmony/entry/src/main/ets/widget/WidgetModels.js';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const FIXTURES = join(HERE, '..', '..', '..', 'packages', 'widget-core', 'fixtures');
+const WIDGET_DIR = join(HERE, '..', 'harmony', 'entry', 'src', 'main', 'ets', 'widget');
+
+/** 四象限标签的词条 key（`satisfies` 让 key 打错时编译期就红）。 */
+const QUADRANT_KEYS = ['web.shell.nav.q1', 'web.shell.nav.q2', 'web.shell.nav.q3', 'web.shell.nav.q4'] as const satisfies readonly MessageKey[];
 
 function fixture<T>(name: string): T {
   return JSON.parse(readFileSync(join(FIXTURES, name), 'utf8')) as T;
@@ -245,46 +250,64 @@ describe('四象限卡片', () => {
   it('计数与其它三端相同：[3,1,3,1]', () => {
     const parsed = P.parsePayload(PLAINTEXT);
     if (!parsed.ok) throw new Error('夹具应当能解析');
-    const model = M.buildQuadrantModel(parsed.payload);
+    const model = M.buildQuadrantModel(parsed.payload, true);
     expect(model.slots.map((s) => s.count)).toEqual([3, 1, 3, 1]);
   });
 
   it('🔴 四个槽位全部出现，即使是 0', () => {
     // 只画非空的槽位会让用户以为某个象限不存在 ——
     // 而"我今天没有重要且紧急的事"是**有意义的信息**。
-    const model = M.buildQuadrantModel({ today: [] });
+    const model = M.buildQuadrantModel({ today: [] }, true);
     expect(model.slots.map((s) => s.slot)).toEqual(['1', '2', '3', '4']);
     expect(model.slots.every((s) => s.count === 0)).toBe(true);
   });
 
-  it('标签与真源 `QUADRANT_META` 一致（第 4 处手抄，见 U11）', () => {
-    const model = M.buildQuadrantModel({ today: [] });
-    expect(model.slots.map((s) => s.label)).toEqual([
-      '重要且紧急',
-      '重要不紧急',
-      '紧急不重要',
-      '不重要不紧急',
-    ]);
+  it('🔴 中英标签逐字等于词条表 `web.shell.nav.q1`–`q4`（U11 的第 4 处手抄）', () => {
+    for (const [isZh, locale] of [
+      [true, 'zh-CN'],
+      [false, 'en'],
+    ] as const) {
+      const model = M.buildQuadrantModel({ today: [] }, isZh);
+      expect(model.slots.map((s) => s.label)).toEqual(
+        QUADRANT_KEYS.map((key) => CATALOGS[locale][key]),
+      );
+    }
+    // ⚠️ 断言的是"两处相等"，不是"写死字面量"：词条表改了、这边没跟 → 这里红。
+    // 之前只有中文一份，英文设备上四象限标签是整张卡片唯一没翻译的地方。
+  });
+
+  it('🔴 `.ets` 侧必须把系统语言传给象限模型（源码对账）', () => {
+    // 为什么用文本断言：`.ets` 不在本仓库任何 typecheck 的 `include` 里
+    // （`apps/mobile/tsconfig.json` 只包 `src/**`），而鸿蒙卡片要 DevEco 才编得动。
+    // 于是"参数漏传"这个错误的表现是**英文设备上四象限显示中文**，
+    // 而编译、测试、运行时都没有任何一层会失败 —— 只能拿源码对账。
+    const forms = readFileSync(join(WIDGET_DIR, 'WidgetForms.ets'), 'utf8');
+    const store = readFileSync(join(WIDGET_DIR, 'WidgetStore.ets'), 'utf8');
+    expect(forms).toMatch(/quadrantCard\(snapshot, isZh\)/);
+    expect(store).toMatch(/buildQuadrantModel\(snapshot\.payload, isZh\)/);
   });
 
   it('firstTitle 取**第一条未完成**的，跳过已完成的', () => {
-    const model = M.buildQuadrantModel({
-      today: [],
-      quadrant: {
-        '1': [
-          { id: 'a', title: '已完成', isDone: true },
-          { id: 'b', title: '还没做', isDone: false },
-        ],
+    const model = M.buildQuadrantModel(
+      {
+        today: [],
+        quadrant: {
+          '1': [
+            { id: 'a', title: '已完成', isDone: true },
+            { id: 'b', title: '还没做', isDone: false },
+          ],
+        },
       },
-    });
+      true,
+    );
     expect(model.slots[0]?.firstTitle).toBe('还没做');
   });
 
   it('整槽都完成时 firstTitle 为空（而不是显示已完成的那条）', () => {
-    const model = M.buildQuadrantModel({
-      today: [],
-      quadrant: { '2': [{ id: 'a', title: '做完了', isDone: true }] },
-    });
+    const model = M.buildQuadrantModel(
+      { today: [], quadrant: { '2': [{ id: 'a', title: '做完了', isDone: true }] } },
+      true,
+    );
     expect(model.slots[1]?.firstTitle).toBe('');
     expect(model.slots[1]?.count).toBe(1);
   });

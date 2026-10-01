@@ -20,7 +20,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "fixtures:gen": "UPDATE_FIXTURES=1 vitest run tests/fixtures.spec.ts",
-    "gen:adaptive-cards": "node scripts/emit-adaptive-cards.mjs"
+    "gen:adaptive-cards": "node scripts/emit-adaptive-cards.mjs",
+    "check:adaptive-cards": "node scripts/emit-adaptive-cards.mjs --check"
   },
   "dependencies": {
     "@heyta/design-system": "workspace:*",

@@ -112,6 +112,7 @@ export function drainWidgetClicks(timeoutMs = 2000): Promise<RawWidgetClick[]> {
 export function pushWidgetData(
   kind: 'today' | 'quadrant' | 'habits' | 'focus',
   data: unknown,
+  placeholder: unknown,
   dayStr: string,
   validUntil: number,
 ): Promise<void> {
@@ -128,7 +129,14 @@ export function pushWidgetData(
       //    就永远无法被判为过期 —— 而"永远不过期"在 Windows 上等于
       //    "永远显示旧任务"。SW 那边会**拒绝**没有期限的数据（见 `sw-core.ts`）。
       //    这两个值都由应用算（`planWidgetPublish`），与 iOS/Android 同源。
-      worker?.postMessage({ type: 'heyta:widget-data', kind, data, dayStr, validUntil });
+      worker?.postMessage({
+        type: 'heyta:widget-data',
+        kind,
+        data,
+        placeholder,
+        dayStr,
+        validUntil,
+      });
     })
     .catch(() => {
       // 推不出去不影响应用 —— 组件会显示上一次的数据（由 `validUntil` 判过期）
