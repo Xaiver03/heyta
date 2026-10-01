@@ -194,13 +194,71 @@ AGENTS §3.1 一票否决。协议的形式化分析 2023 年才补齐（IACR 20
 | **W8** | ADR-0040 + §10 的文档勘误清单 + i18n 三处"没有密码"改写（zh/en）+ `gen:entries` | W6 | `check:entries` exit 0 + `docs-link-check` 无死链 + `check:ui-language` |
 | **W9** | 链式验收 + `pnpm reinstall:all` 四端重装 | 全部 | §8 全绿 + 每端"装上的是当前产物"判据（§6.1.1） |
 
-### W0 探针（任何一条红都先改设计，不许硬闯）
+### W0 探针 —— ✅ 已跑完（2026-10-01），**五条里四条改写了设计**
 
-1. `@node-rs/argon2` 在 `server/Dockerfile` 的 node:24 + `--omit=dev` 下能加载、能 verify；不能 → 退 `node:crypto` scrypt。
-2. HIBP range API 从**生产服务器**（腾讯云国内出口）的可达性与耗时；不可达 → 本地常见口令表，并记进 ADR。
-3. 迁移校验器对清理迁移的形状是否放行：`node scripts/check-migrations.mjs`。
-4. **`sync-client` 今天遇到 401 做什么**（是否会清凭据/停队列/界面怎么说）—— 决定 D5 那条"停上传但本地可读"要不要新写。
-5. E2EE 口令在 iOS/macOS 键盘下的 **NFC/NFD** 是否会让同一句口令在两端派生出不同密钥。
+**1. `@node-rs/argon2` 能不能用 → 能用，但 musl 只能由"启动自检"兜底。**
+
+| 事实 | 数字 / 证据 |
+|---|---|
+| glibc（本机 Node 24）加载 + 哈希 + verify | **27 ms**，PHC 串 `$argon2id$v=19$m=19456,t=2,p=1$…`；错密码 `verify` 返回 `false` 而非抛错 |
+| musl 产物 | `optionalDependencies` 里有 `@node-rs/argon2-linux-x64-musl` / `-linux-arm64-musl`；生产镜像 `server/Dockerfile` 是 `FROM node:24-alpine`（构建 L2 / 运行 L99） |
+| 纯 JS 对照（`@noble/hashes`，sync-core 已在用） | OWASP 最低参数下 **8 671 ms** ⇒ 🔴 **服务端排除纯 JS**（一次登录 8 秒 = 自我 DoS） |
+| `node:crypto` scrypt 兜底 | **190 ms**（N=2^17, r=8；要显式 `maxmem` 512MB，否则默认 32MB 直接抛）⇒ 零新依赖的退路成立 |
+
+⚠️ **musl 里 dlopen 是否成功，本机无法证明**（Docker daemon 不在），生产容器里的 `npm install` 探针在腾讯云上跑了 20 分钟没出结果。
+所以裁决改成：**不赌它，启动就验**。服务进程启动时跑一次 **known-answer 自检**（固定口令 + 固定参数 ⇒ 固定 PHC 串 + verify 必须为真），
+失败就 **启动即退出并打印绑定缺失**，而不是等第一个用户点"登录"时收到一个 500。
+🔴 这条不是防御性冗余：`AGENTS.md` §7 第 32 条（"pod 装了 ≠ 链接了"）与 CI 文件头那段"声明了能力，本体从没被真正装上"讲的正是这个形状。
+
+**2. HIBP 从生产可达 —— 但 1s 超时的原设计是错的。**
+
+实测于生产主机 `124.223.13.226`（腾讯云，国内出口）：宿主机 6 次全 **HTTP 200**，
+耗时 **0.94 / 1.03 / 1.41 / 1.83 / 2.05 / 2.71 s**（TLS 握手单独就占 1.17 s）；
+**应用容器 `supersync-server` 内 4 次全 OK**（bridge 网络出网正常）。冷启动第一次探测 `--max-time 4` 直接 **000**。
+
+⇒ 原写的"超时 1s、fail-open"会让**一半以上的查询在有用的结果回来之前被砍掉**，而 fail-open 会把这种超时伪装成"这口令没问题"。
+改成三条，都进 ADR-0040：
+
+- **只在"设密码"的那一刻查**（注册 / 改密 / 重置完成），🔴 **登录路径一律不查** —— 把一个 2 秒的外部依赖挂在认证热路径上是自我 DoS，而 NIST 也不要求在这里查。
+- 超时 **2000 ms**（覆盖实测上界），仍 **fail-open**，但**必须记一条 warn 日志**（"泄露检查未送达"），否则 fail-open 与"检查通过"在事后不可区分。
+- **本地常见口令表是确定性的那一道**（零网络、每次必查），HIBP 只是第二层加分。
+
+**3. 迁移形状**：待 W2 真正写出清理迁移后用 `node scripts/check-migrations.mjs` 验（探针没做完 = 不算通过，登记为 W2 的前置）。
+
+**4. 🔴 `sync-client` 遇到 401 现在做的事，证明 D5 那条不是免费的。**
+
+读码结论（`packages/sync-client/src/client.ts`）：非 2xx 一律经 `toHttpError()`（:1382）抛
+`同步请求失败：HTTP 401 — …`，落到 `sync()` 的 catch（:763-769）：
+
+```ts
+const offline = isNetworkError(error);          // 401 → false（不是 TypeError，也不匹配网络正则）
+return report({ kind: 'error', reason: 'unexpected', message, retryable: true });
+```
+
+而 `apps/mobile/src/sync/auto-sync.ts:100` 是 `case 'error': return !status.retryable;` ——
+`retryable: true` 意味着**这个决定没结算**，退避调度器（`createRetryScheduler`，上限 60s）会
+**拿着一个已作废的令牌永远重试下去**，界面上显示的是「同步失败」。
+
+⇒ 用户"在其他设备登出全部设备"之后，这台设备看到的是一句谎话，而且后台在打一个永远不可能成功的请求。
+**必须新增一个 `SyncFailureReason`：`'unauthorized'` + `retryable: false`**，两个壳的 `switch` 才会被编译器逼着改。
+这条是 D5「停上传、本地数据继续可读、提示重新认证、绝不自动清库」的**唯一落地方式**，列为 W1 的一部分（不是 W3 的）。
+
+**5. 口令归一化 —— 缺陷确认，但不在本工作流里顺手修。**
+
+`grep "normalize("` 覆盖 `packages/sync-core/src`、`packages/app-host/src`、`packages/storage/src`：**零命中**。
+Node 实测 `'café'.normalize('NFC') === 'café'.normalize('NFD')` 为 **`false`** ⇒ 同一句口令在 iOS（可能给 NFD）与 macOS（NFC）下
+派生出**不同密钥**，跨设备解不开密文。这是一条**独立的真缺陷**（涉及已落盘数据的可解性，改它会让"用 NFD 写过 op"的设备当场解不开），
+🔴 **不塞进本轮顺手改**，按 §11 单独立案；本轮只保证**密码这条新路径**自洽：设置与校验**同一个地方、同一次 NFKC**，两处共用一个函数。
+
+**W0 的第六条发现（不在原清单里，但它改变 §1 与 §9）**：
+`server/tests/auth-flows.spec.ts` 是**上游 email+密码的完整契约**（5 次失败锁 15 分钟、成功清零、
+`'Email not verified'`、不存在账号与错密码**同一句** `'Invalid credentials'`），
+它被 `server/vitest.config.ts:25` **排除在运行之外**，而它 import 的 `registerUser` / `loginUser`
+在 `server/src` 里**根本不存在**（`git log -S loginUser -- server/src/auth.ts` 零命中，随 `f3efce04` vendoring 时被删）。
+⇒ 语义**照它移植**（这正是 `AGENTS.md` §3.4 说的"移植语义，不要拷贝代码"），但🔴 **不许把这个死文件重新启用**：
+它绑的是同步 SQLite（`tests/setup.ts` 的 `db.prepare`），与现在的 Prisma/Postgres 不是一回事，
+硬打开只会得到一句 "Cannot find undefined export"。判据在 Prisma 上重写（W1）。
+
 
 ---
 
