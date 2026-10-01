@@ -301,3 +301,96 @@ test('线上 terms 英文侧 = 本地真源（G-31 的部署级复验）', async
   const hard = hardErrors(logs);
   expect(hard, `页面抛了未捕获异常：\n${hard.join('\n')}`).toEqual([]);
 });
+
+/**
+ * G-25b：**未命中的 `/legal/*` 必须是真 404，而不是"200 + 首页字节"**。
+ *
+ * 为什么这条必须判**状态码**而不是判内容：本套件第一条那条"字节必须与首页不同"
+ * 只能证明**已存在的页面**是真页面，它证明不了**不存在的路径**被答成了什么。
+ * 2026-10-01 实测 `/legal/nope-not-a-doc/` 是 200 + 首页 7022 字节 —— 那正是
+ * "看起来像成功"：审核者点开、状态码 200、有标题、有正文（首页的），于是没人会发现
+ * 政策链接其实指到了一个不存在的文档。nginx 的 SPA 兜底对**前端路由**是必要的
+ * （`/app/` 下的深链必须由壳接住），对**磁盘上的多页站点**就是伪装。
+ *
+ * 🔴 同一条测试里必须带**阳性对照**，否则它可能只是"整站都 404"的假绿：
+ *   · 落地页根下的未知路径 `/not-a-page-xyz/` 仍应是 **200**（兜底还在，别人没被我牵连）；
+ *   · `/app/nope-route` 仍应是 **200**（应用的前端路由没被改坏 —— 这是 G-25b
+ *     明确要求"不影响前端路由"的那一半）；
+ *   · 18 份**真实入口**逐条 200（改兜底时把真页面一起干掉是最容易犯的错，
+ *     而九份 × 中英两侧只有逐条数过才知道都在）。
+ * 判据数从 `LEGAL_DOC_IDS`（九）推导，不是抄一个魔数。
+ */
+test('未命中的 /legal/* 是真 404；首页兜底与 /app/ 前端路由都没被牵连', async ({ page }) => {
+  const logs = attachLogs(page);
+
+  // 🔴 必须先落到目标 origin 再 fetch 相对路径：`page.evaluate` 里的相对 URL 按
+  //    **当前文档**解析，而新开的 page 是 `about:blank` —— 那时 `fetch('/')` 直接
+  //    `Failed to parse URL from /`（本轮实测踩过，报错长得像"服务器坏了"，其实是探针没落地）。
+  await page.goto(`${ORIGIN}/`, { waitUntil: 'domcontentloaded' });
+
+  async function probe(path: string): Promise<{ status: number; body: string }> {
+    return page.evaluate(async (p: string) => {
+      const response = await fetch(p, { cache: 'no-store' });
+      return { status: response.status, body: await response.text() };
+    }, path);
+  }
+
+  const home = await probe('/');
+  expect(home.status, `参照物：线上首页本身取不到（${home.status}），后面的对照全部无效`).toBe(200);
+
+  for (const path of ['/legal/nope-not-a-doc/', '/en/legal/nope-not-a-doc/']) {
+    const miss = await probe(path);
+    expect(miss.status, `线上 ${path} 是 ${miss.status}，期望真 404 —— 200 就意味着 nginx 的 SPA 兜底把一个不存在的法务页答成了成功（G-25b）`).toBe(404);
+    expect(
+      miss.body,
+      `${path} 返回 404 但字节却是首页（${home.body.length} 字节的同一份文档）—— 状态码与内容不一致，比单纯 200 更难被发现`,
+    ).not.toContain('<title>heyta：本地优先的任务管理');
+  }
+
+  // 阳性对照一：落地页根下的未知路径**仍然**走兜底（证明 404 只作用在 /legal/ 这一层）。
+  const control = await probe('/not-a-page-xyz/');
+  expect(
+    control.status,
+    `阳性对照失败：/not-a-page-xyz/ 是 ${control.status} 而不是 200 —— 说明刚才那两条 404 不是 /legal/ 的规则生效，而是整站都在 404（探针或服务器坏了）`,
+  ).toBe(200);
+
+  // 阳性对照二：应用的前端路由必须还是壳接住。
+  const appRoute = await probe('/app/nope-route');
+  expect(
+    appRoute.status,
+    `/app/nope-route 是 ${appRoute.status}：改 /legal/ 的兜底时把 /app/ 一起改坏了 —— 深链刷新会白屏`,
+  ).toBe(200);
+
+  const served: string[] = [];
+  for (const docId of LEGAL_DOC_IDS) {
+    for (const locale of ['zh', 'en'] as const) {
+      const path = legalPath(docId, locale);
+      const hit = await probe(path);
+      // 404 之外还要判"不是首页字节"：路径改成兜底目标时状态码可能仍 200。
+      expect(hit.status, `真实入口 ${path} 取到 ${hit.status}（改兜底时把已发布的页面弄没了）`).toBe(200);
+      if (docId === 'terms' && locale === 'zh') {
+        expect(
+          hit.body,
+          `${path} 返回 200 但内容就是首页 —— 兜底目标被写进了 /legal/ 这一层`,
+        ).not.toBe(home.body);
+      }
+      served.push(path);
+    }
+  }
+  // 🔴 这条不是"served 有几条"的自证（那永远成立），而是**本地清单 vs 注册表**的对照：
+  //    注册表多出一份而 `LEGAL_DOC_IDS` 忘了加，逐条遍历就**悄悄少验一份**。
+  const missing = LEGAL_DOCUMENTS.map((d: { id: string }) => d.id).filter(
+    (id) => !served.includes(legalPath(id, 'zh')) || !served.includes(legalPath(id, 'en')),
+  );
+  expect(
+    missing,
+    `注册表里的这些 id 没被逐条取到（清单漂移 ⇒ 这条判据在少验）：${missing.join(', ')}`,
+  ).toEqual([]);
+
+  // 规定一：把那张 404 页面也留下一份图（"状态码是 404"这件事的可见形态）。
+  await page.goto(`${ORIGIN}/legal/nope-not-a-doc/`, { waitUntil: 'domcontentloaded' });
+  await page.screenshot({ path: `${SHOT_DIR}/live-legal-404.png` });
+
+  const hard = hardErrors(logs);
+  expect(hard, `页面抛了未捕获异常：\n${hard.join('\n')}`).toEqual([]);
+});
