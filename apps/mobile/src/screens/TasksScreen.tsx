@@ -27,7 +27,7 @@ import {
   TextInput,
   View,
 } from 'react-native';
-import type { Project, Tag, Task } from '@heyta/domain';
+import type { Project, Tag, Task, TaskSortKey } from '@heyta/domain';
 // `formatDayTitleText` 在壳里把领域层给的 `LocalDate` 说成当前语言：
 // **"某一天的标题"的日期语义（`isoWeekday`、`parseLocalDate`）仍只有领域层一份**，
 // 壳里只负责措辞（见 `apps/mobile/src/lib/date.ts` 文件头）。
@@ -105,6 +105,15 @@ import { openTaskHost } from '../db/open-host';
 import { useMobileSync } from '../sync/store';
 
 import { dueTone, toDueDisplay, type DueDisplayMode } from '../lib/due-display';
+// 🔴 排序档位：比较规则**不在这里**（在 `@heyta/domain` 的 `sortTasks`），
+// 本屏只从这一层拿"当前是哪一档"和"这一档说什么话"。
+import {
+  TASK_SORT_OPTIONS,
+  readTaskSort,
+  taskSortChipLabel,
+  taskSortName,
+  writeTaskSort,
+} from '../lib/task-sort';
 import { priorityBadgeLabel, priorityColorToken } from '../lib/priority';
 import { TaskDetailSheet } from './TaskDetailSheet';
 import { SearchScreen } from './SearchScreen';
@@ -206,6 +215,79 @@ function Composer({
 }
 
 // ─────────────────────────────────────────────────────────────
+// 排序档位选择面板
+// ─────────────────────────────────────────────────────────────
+
+/**
+ * 🔴 为什么是"一颗 chip + 一个面板"，而不是三颗并排的 chip：
+ * 这一屏已经有三行 chip（视图 / 截止呈现 / 标签筛选），再加一行三个档位会把
+ * 任务列表推到首屏之外 —— 而列表才是这一屏的主角。
+ *
+ * chip 上写的是**当前是哪一档**（「排序：按优先级」），不是光一个"排序"。
+ * 这是 2026-09-30 那次「日期|倒计时」裸 chip 被退回之后定下的纪律：
+ * 用户看不出那是什么的控件，等于没有控件。
+ *
+ * ⚠️ 面板只**列出**领域给的档位（`TASK_SORT_OPTIONS`），不在此声明选项，
+ * 也不在此比较任务 —— 那一层的事在 `lib/task-sort.ts` 与 `@heyta/domain`。
+ */
+function SortPicker({
+  visible,
+  current,
+  onSelect,
+  onClose,
+}: {
+  visible: boolean;
+  current: TaskSortKey;
+  onSelect: (sort: TaskSortKey) => void;
+  onClose: () => void;
+}): React.JSX.Element {
+  const tokens = useTokens();
+  const { t } = useI18n();
+
+  return (
+    <Modal
+      visible={visible}
+      transparent
+      animationType="slide"
+      onRequestClose={onClose}
+      statusBarTranslucent
+    >
+      <Pressable
+        style={{ flex: 1, backgroundColor: tokens['material.scrim'] }}
+        onPress={onClose}
+        accessibilityLabel={t('mobile.tasks.sort.close')}
+      />
+      <View
+        style={{
+          backgroundColor: tokens['color.surface'],
+          borderTopLeftRadius: tokens['radius.xl'],
+          borderTopRightRadius: tokens['radius.xl'],
+          padding: tokens['screen.gutter'],
+          gap: tokens['space.2'],
+          paddingBottom: tokens['space.8'],
+        }}
+      >
+        <Text variant="section-title">{t('mobile.tasks.sort.choose')}</Text>
+        {TASK_SORT_OPTIONS.map((option) => (
+          <Button
+            key={option}
+            label={taskSortName(t, option)}
+            // 当前档位用实心主色，其余次要 —— 面板打开时"现在选的是哪个"要一眼看出，
+            // 而不是让用户从三个长得一样的按钮里找。
+            tone={option === current ? 'primary' : 'secondary'}
+            onPress={() => {
+              onSelect(option);
+            }}
+            accessibilityLabel={taskSortName(t, option)}
+            style={{ flex: 1 }}
+          />
+        ))}
+      </View>
+    </Modal>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────
 // 屏幕
 // ─────────────────────────────────────────────────────────────
 
@@ -245,6 +327,26 @@ export function TasksScreen({
   const [searchOpen, setSearchOpen] = useState(false);
   /** 截止时间的呈现方式。与 Web 端 `DueBadge` 的开关一致，默认 `date`。 */
   const [dueMode, setDueMode] = useState<DueDisplayMode>('date');
+  /**
+   * 列表的排序档位。初值从**设备本地偏好**读（`lib/task-sort.ts` → `prefs/device-prefs`），
+   * 所以切走再切回、乃至杀掉应用重开，都还是刚才那一档。
+   *
+   * 🔴 它**不进 op-log**：op-log 存的是用户意图（"这条任务归到明天"），
+   * 而"这列表我怎么看着顺"是这台设备的阅读偏好。写进去会让另一台设备
+   * 被同步改掉它自己的选择 —— Web 端同一处置（`features/tasks/sort-pref.ts`）。
+   */
+  const [taskSort, setTaskSort] = useState<TaskSortKey>(readTaskSort);
+  /** 排序选择面板。 */
+  const [sortPickerOpen, setSortPickerOpen] = useState(false);
+  const chooseTaskSort = useCallback((next: TaskSortKey) => {
+    // `writeTaskSort` 的返回值这里**刻意不消费**：写不进去的唯一后果是
+    // "下次冷启动回到默认档"，而那一天的列表照常可用 —— 为它弹一句
+    // "保存失败"换来的是用户去猜"我的任务是不是也没保存"。
+    // 这条降级在 `lib/task-sort.ts` 里写明，不是这里临时决定。
+    writeTaskSort(next);
+    setTaskSort(next);
+    setSortPickerOpen(false);
+  }, []);
   /**
    * 「任务」页的两种视图：按今天的**列表**，与按艾森豪威尔矩阵的**四象限**。
    *
@@ -377,21 +479,23 @@ export function TasksScreen({
     const searched = searchTasks(scoped, query);
     const sections = sectionTasks(searched, { now });
     const { overdue, dueToday, inbox, completed } = sections;
-    // 🔴 分组内**倒序展示**（新的在上）。
+    // 🔴 **这里不再排顺序**（原来每一组都写了一次 `.reverse()`）。
     //
     // `listTasks()` 给的是 `createdAt` **升序**，那是**跨端一致的规范顺序**
     // （见 `packages/app-host/src/actions.ts`："顺序必须在所有端一致 ——
     // 否则同一份数据在两台设备上显示不同顺序"）。**规范顺序不动。**
     //
-    // 但这一层是**视图**，视图有义务把"我刚加的那条"放在看得见的地方。
-    // 实测代价：升序展示时，新建的任务落到 10 条列表的**最底部、屏幕外**，
-    // 用户唯一的反馈是角标从 9 变成 10 —— 会怀疑"我到底加上了吗"。
-    return {
-      overdue: overdue.reverse(),
-      dueToday: dueToday.reverse(),
-      inbox: inbox.reverse(),
-      completed: completed.reverse(),
-    };
+    // 但"组内怎么展示"**也是**判断，而屏幕里那句 `reverse()` 是它的第三份实现：
+    // 第一份在 web，第二份是 app-host 桌面壳的 `(createdAt, id)` —— 那次事故记在
+    // `packages/ui/src/task-list/model.ts` 文件头（同一账号在不同端看到不同顺序）。
+    // 现在比较规则只有领域层一份，本屏把**档名**交给共享 `TaskList`（`sort` prop），
+    // 默认档 `addedAt` 与原来的 `reverse()` 逐条等价 —— 等价性由
+    // `apps/mobile/tests/task-sort.spec.ts` 钉住，不是这里的一句声明。
+    //
+    // ⚠️ 保留在这一层的仍然只有"哪几组、组的次序"：分组**归属**规则来自领域
+    // （`sectionTasks`），而"已过期 / 今天 / 收集箱 / 已完成"这个**顺序**是本屏的
+    // 语义，共享层刻意不重排它。
+    return { overdue, dueToday, inbox, completed };
   }, [tasks, now, tagFilter, query]);
 
   /**
@@ -721,6 +825,26 @@ export function TasksScreen({
         </View>
 
         {/*
+          排序入口。和上面那行同属"这一列表怎么呈现"，但**单独一行**：
+          它是打开面板的按钮，不是三个并列档位（理由见 `SortPicker` 文件头）。
+
+          🔴 只在**列表视图**出现：四象限与时间线读的是同一批任务，但它们各自的
+          分桶/铺陈顺序由领域与共享层决定（`bucketByQuadrant` / `TimelineView`），
+          在这里挂一个"排序"会让用户以为它能改那两个视图的排法 —— 而它不能。
+        */}
+        {view === 'list' ? (
+          <View style={{ flexDirection: 'row', paddingTop: tokens['space.2'] }}>
+            <Chip
+              icon="action.sort"
+              label={taskSortChipLabel(t, taskSort)}
+              onPress={() => {
+                setSortPickerOpen(true);
+              }}
+            />
+          </View>
+        ) : null}
+
+        {/*
           标签筛选行。
 
           🔴 **它必须在空态时也可见** —— 否则"筛选之后一条都没有"会让这一行
@@ -806,6 +930,11 @@ export function TasksScreen({
           <View style={{ paddingTop: tokens['space.2'] }}>
             <TaskList
               sections={listSections}
+              // 🔴 组内顺序由这一档决定（共享层把它交给领域的 `sortTasks`）。
+              // 这一行就是"删掉屏幕里那句 `reverse()`"之后唯一的顺序来源 ——
+              // 漏传不会报错，只会退回"宿主给的顺序"（即 createdAt 升序），
+              // 于是新建的任务又掉到屏幕外。那条回归由 mobile 的测试钉着。
+              sort={taskSort}
               onToggleTask={(id) => {
                 runFor(id, actions.toggleCompleted(id));
               }}
@@ -870,6 +999,14 @@ export function TasksScreen({
       />
 
       <Fab icon="task.add" label={t('mobile.tasks.new')} onPress={() => setComposerOpen(true)} />
+      <SortPicker
+        visible={sortPickerOpen}
+        current={taskSort}
+        onSelect={chooseTaskSort}
+        onClose={() => {
+          setSortPickerOpen(false);
+        }}
+      />
       <Composer
         visible={composerOpen}
         onClose={() => setComposerOpen(false)}

@@ -2011,6 +2011,12 @@ export const zhCN = {
   'mobile.tasks.group.overdue': '已过期',
   'mobile.tasks.group.inbox': '收集箱',
   'mobile.tasks.group.completed': '已完成',
+  // 排序控件。**档位名复用 `web.shell.sort.*`**（四端同义，不新增同义键 ——
+  // 与 `lib/quadrant-display.ts` 复用 `web.quadrant.*` 是同一个先例）。
+  // 这里只补移动端独有的两句：chip 上"当前是哪一档"的模板，与选择面板的标题/关闭。
+  'mobile.tasks.sort.label': '排序：{sort}',
+  'mobile.tasks.sort.choose': '选择排序方式',
+  'mobile.tasks.sort.close': '关闭排序选择',
   'mobile.tasks.a11y.complete': '完成：{title}',
   'mobile.tasks.a11y.uncomplete': '取消完成：{title}',
   'mobile.tasks.a11y.open': '打开任务：{title}',

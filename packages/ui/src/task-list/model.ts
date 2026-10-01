@@ -147,21 +147,32 @@ export interface FlattenSectionsOptions extends ToTaskRowOptions {
  * mobile 原来的实现里这条是手写的（`if (list.length === 0) return;`），
  * 提上来之后四个端都不会再各写一次、也不会有人忘掉。
  *
- * ⚠️ **不重排 `section.tasks` 的顺序。** 分组顺序与组内顺序都属于宿主的语义
- * （"今天 / 逾期 / 收集箱 / 已完成"这种次序不是按截止时间能推出来的）。
- * 共享层只负责展平、跳空组、给稳定的 key —— 排序的重排是 `sortTasksForDisplay`
- * 的职责，它在无分组的 `toTaskRows` 路径上生效。
+ * ⚠️ **分组顺序永远不重排**（"今天 / 逾期 / 收集箱 / 已完成"这种次序不是
+ * 按截止时间能推出来的），**组内顺序看传没传 `sort`**：
+ *
+ * - 没传 ⇒ 保持宿主给的顺序。老宿主（四象限矩阵、日历格）的行为逐字节不变。
+ * - 传了 ⇒ 每一组各自过领域的 `sortTasks`。
+ *
+ * 为什么要有第二条：mobile 的任务屏原本在屏幕里手写 `groups.x.reverse()`，
+ * 而 `packages/app-host` 曾经还有第三份 `(createdAt, id)` 排序 ——
+ * 本文件头部记的那次「两份排序并存 ⇒ 同一账号在不同端顺序不同」就是同一个形状。
+ * **比较规则只允许在 `@heyta/domain` 一份**，宿主只决定用哪一档、不决定怎么比。
+ *
+ * ⚠️ 排完只影响**行**的顺序；`kind:'header'` 那一条带的仍是宿主原来那个
+ * `section` 对象，所以组头的计数与色调不会因为排序而变化。
  */
 export function flattenSections<TMeta>(
   sections: readonly TaskSection<TMeta>[],
   options?: FlattenSectionsOptions,
 ): readonly SectionRow<TMeta>[] {
   const keepEmpty = options?.keepEmpty === true;
+  const sort = options?.sort;
   const out: SectionRow<TMeta>[] = [];
   for (const section of sections) {
     if (section.tasks.length === 0 && !keepEmpty) continue;
     out.push({ kind: 'header', key: `h-${section.key}`, section });
-    for (const task of section.tasks) {
+    const ordered = sort === undefined ? section.tasks : sortTasks(section.tasks, sort);
+    for (const task of ordered) {
       out.push({ kind: 'task', key: task.id, row: toTaskRow(task, options) });
     }
   }

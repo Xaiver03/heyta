@@ -1895,6 +1895,14 @@ export const en = {
   'mobile.tasks.group.overdue': 'Overdue',
   'mobile.tasks.group.inbox': 'Inbox',
   'mobile.tasks.group.completed': 'Completed',
+  // The sort control. **The option names reuse `web.shell.sort.*`** - the four ends
+  // mean the same thing, so adding a mobile-only synonym would be a second word
+  // table for one concept (same precedent as `lib/quadrant-display.ts` reusing
+  // `web.quadrant.*`). Only the mobile-specific lines live here: the chip template
+  // naming the current option, and the picker sheet's title and close label.
+  'mobile.tasks.sort.label': 'Sort: {sort}',
+  'mobile.tasks.sort.choose': 'Choose sort order',
+  'mobile.tasks.sort.close': 'Close sort picker',
   'mobile.tasks.a11y.complete': 'Complete: {title}',
   'mobile.tasks.a11y.uncomplete': 'Mark as not done: {title}',
   'mobile.tasks.a11y.open': 'Open task: {title}',
