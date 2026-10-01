@@ -58,6 +58,12 @@ export const isOfficialHostedInstance = (publicUrl: string): boolean => {
  * 返回 `null` = 这台实例无法为那份文本命名版本，留痕只留时间。
  * 调用点只在"确实要写时间戳"时调用它：没有时间戳却有一列版本号，
  * 是一条没有同意时刻的同意记录，比两列都空更误导人。
+ *
+ * 三个注册入口里只有两个**直接**调它（`auth.ts`、`passkey.ts`）；邮箱+口令那条
+ * （`password/service.ts` 的 `registerWithEmailPassword`）是一个字都没提版本 ——
+ * 它把 `termsAcceptedAt` 原样交给 `registerWithMagicLink`，成对这件事因此**只由那条委托保证**。
+ * 委托一断就变成"有时间没版本"，所以它钉在 `tests/terms-consent-version.spec.ts`
+ * 里那条"第三个注册入口"上，而不是靠这段注释。
  */
 export const consentedLegalSetVersion = (): string | null =>
   isOfficialHostedInstance(loadConfigFromEnv().publicUrl) ? LEGAL_SET_VERSION : null;
