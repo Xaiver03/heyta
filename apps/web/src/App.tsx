@@ -544,6 +544,26 @@ export function App(): React.JSX.Element {
   const [scrollToHelp, setScrollToHelp] = useState(false);
 
   /**
+   * 组头折叠：**哪些组现在被收起**。
+   *
+   * 🔴 刻意**只在内存里**，不落盘、不进 op-log。组键就是日期
+   * （`date-2026-10-01`），把"今天收起了"写进磁盘等于攒一堆**永远不会再命中**
+   * 的键；而折叠是一屏的阅读偏好，不是一个用户意图（§3.4：op-log 装意图）。
+   * 与「顺延」同理，它也**不跨设备**——两台设备各看各的。
+   */
+  const [collapsedGroups, setCollapsedGroups] = useState<ReadonlySet<string>>(
+    () => new Set(),
+  );
+  const toggleGroupCollapsed = useCallback((key: string) => {
+    setCollapsedGroups((previous) => {
+      const next = new Set(previous);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  }, []);
+
+  /**
    * 全局搜索浮层的查询词。
    *
    * 🔴 2026-10-01：入口**只剩 rail 上那个放大镜**（产品负责人：「搜索这个地方
@@ -2001,9 +2021,12 @@ export function App(): React.JSX.Element {
                     🔴 组头是共享层 `TaskGroupHead`（页7 做的时候曾手写
                     `.ht-task-group` CSS，被 `check:row-single-source` 拦下：
                     "任务列表的实现只长在 packages/ui"——组头是列表的机制，
-                    留在 web 里 mobile 就得抄第二遍）。web 只留两件宿主事：
-                    措辞（`taskGroupTitle`）与动作（逾期组的「顺延」按钮，
-                    走既有 `.ht-btn--ghost`，不长新前缀族）。
+                    留在 web 里 mobile 就得抄第二遍）。web 只留三件宿主事：
+                    措辞（`taskGroupTitle`）、动作（逾期组的「顺延」按钮，
+                    走既有 `.ht-btn--ghost`，不长新前缀族），以及**折叠状态
+                    归谁**（`collapsedGroups`，见上）。
+                    收起时**整条 `TaskList` 不进 DOM**，不是 `display:none`：
+                    留在树里就等于读屏还得逐条念完看不见的那些任务。
                   */
                   <section
                     key={key}
@@ -2014,6 +2037,12 @@ export function App(): React.JSX.Element {
                       <TaskGroupHead
                         title={taskGroupTitle(group, store.now, t)}
                         count={group.tasks.length}
+                        collapse={{
+                          collapsed: collapsedGroups.has(key),
+                          onToggle: () => {
+                            toggleGroupCollapsed(key);
+                          },
+                        }}
                         action={
                           group.kind === 'overdue' ? (
                             <button
@@ -2034,16 +2063,18 @@ export function App(): React.JSX.Element {
                         }
                         testID={`task-group-${key}-head`}
                       />
-                      <TaskList
-                        tasks={group.tasks}
-                        onToggleTask={(taskId) => {
-                          void store.toggleComplete(taskId);
-                        }}
-                        labels={taskRowLabels}
-                        renderMeta={renderTaskMeta}
-                        renderTrailing={renderTaskTrailing}
-                        testID={`task-list-${key}`}
-                      />
+                      {!collapsedGroups.has(key) && (
+                        <TaskList
+                          tasks={group.tasks}
+                          onToggleTask={(taskId) => {
+                            void store.toggleComplete(taskId);
+                          }}
+                          labels={taskRowLabels}
+                          renderMeta={renderTaskMeta}
+                          renderTrailing={renderTaskTrailing}
+                          testID={`task-list-${key}`}
+                        />
+                      )}
                     </HeytaUiProvider>
                   </section>
                 );

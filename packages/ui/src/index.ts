@@ -19,7 +19,11 @@ export {
   type TaskListLabels,
   type TaskListProps,
 } from './task-list/TaskList.js';
-export { TaskGroupHead, type TaskGroupHeadProps } from './task-list/TaskGroupHead.js';
+export {
+  TaskGroupHead,
+  type TaskGroupCollapse,
+  type TaskGroupHeadProps,
+} from './task-list/TaskGroupHead.js';
 export { TaskBadges, type TaskBadgesProps } from './task-list/TaskBadges.js';
 export {
   flattenSections,
