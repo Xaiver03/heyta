@@ -238,15 +238,22 @@ export const loginWithEmailPassword = async (
   }
 
   const now = Date.now();
-  if (user.lockedUntil !== null && user.lockedUntil > BigInt(now)) {
-    const waitSeconds = Math.ceil(
-      Number((user.lockedUntil - BigInt(now)) / BigInt(1000)),
-    );
-    throw new PasswordAuthError(
-      'account_locked',
-      PASSWORD_ACCOUNT_LOCKED_MESSAGE,
-      waitSeconds,
-    );
+  if (user.lockedUntil !== null) {
+    if (user.lockedUntil > BigInt(now)) {
+      const waitSeconds = Math.ceil(
+        Number((user.lockedUntil - BigInt(now)) / BigInt(1000)),
+      );
+      throw new PasswordAuthError(
+        'account_locked',
+        PASSWORD_ACCOUNT_LOCKED_MESSAGE,
+        waitSeconds,
+      );
+    }
+    // 🔴 锁定期**已过** ⇒ 计数一并作废。不作废的话这条路的形状是：用户老老实实等了
+    // 15 分钟，回来打错**一个**字，`recordFailedAttempt` 看到计数仍然 >= 上限，
+    // 当场再锁 15 分钟 —— 而界面上没有任何东西能解释"为什么一次就锁上了"。
+    // 移植自上游的契约是「5 次失败锁 15 分钟」，读起来就是"窗口过后重新数 5 次"。
+    await clearFailedAttempts(user.id);
   }
 
   const matches = await withHashSlot(() => verifyPassword(normalized, user.passwordHash!));
