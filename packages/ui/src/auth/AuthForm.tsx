@@ -219,6 +219,18 @@ export interface AuthFormProps {
   /** 邀请码形状不对时给 `true`（权威判定在服务端，这里只提前说一句）。 */
   readonly inviteInvalid?: boolean;
   readonly inviteCodeLength?: number;
+  /**
+   * 邀请码**改动时**把它交回宿主。
+   *
+   * 🔴 为什么薄壳**必须**拿到这一份：邀请码的归一化规则（大写、去连字符与空格、
+   * 去掉零宽字符）在 `@heyta/domain`，而**形状是否合法**要用归一化**之后**的值去判 ——
+   * 那些都不是这个组件的裁决（它不判格式，见文件头）。不交出去，宿主就只能对着
+   * `initialInviteCode` 那个**挂载时**的旧值算，于是"粘进一个带空格的码"永远判不出对。
+   *
+   * ⚠️ 它是**只出不进**的镜像，不是受控值：受控要连 `value` 一起给，而这里没有那个
+   * 需求 —— 宿主拿它只是为了**提前说一句**（以及决定发不发），不需要改写用户正在打的字。
+   */
+  readonly onInviteCodeChange?: (code: string) => void;
   readonly onSignIn: (input: { email: string; password: string }) => void;
   readonly onRegister: (input: {
     email: string;
@@ -262,6 +274,7 @@ export function AuthForm({
   serverUrl,
   inviteInvalid = false,
   inviteCodeLength,
+  onInviteCodeChange,
   onSignIn,
   onRegister,
   onMagicLink,
@@ -547,7 +560,12 @@ export function AuthForm({
                   <Text style={[text['caption'], styles.muted]}>{labels.invite.label}</Text>
                   <TextInput
                     value={inviteCode}
-                    onChangeText={setInviteCode}
+                    onChangeText={(next) => {
+                      // 内部照旧存着（提交时由 `inviteInvalid` 决定发不发），
+                      // 同时把这一份交回宿主 —— 归一化与形状判定都在宿主那侧。
+                      setInviteCode(next);
+                      onInviteCodeChange?.(next);
+                    }}
                     placeholder={labels.invite.placeholder}
                     placeholderTextColor={tokens['color.foreground-subtle']}
                     autoCapitalize="characters"

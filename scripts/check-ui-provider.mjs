@@ -335,6 +335,21 @@ const PROVIDER_DEPENDENT = [
   'CalendarBoard',
   'TrashBoard',
   'SearchPanel',
+  /**
+   * W4（`packages/ui/src/auth/AuthForm.tsx`）—— 登录/注册表单的**唯一一份实现**。
+   *
+   * 🔴 **第十二个场合，但这一条的代价与前面十一条不同**：前面漏登记的症状是
+   * 运行时抛「useHeytaUiTheme 必须在 \<HeytaUiProvider\> 内使用」—— 那是**当场炸**，
+   * 用户看不到界面，很难被误判成"没问题"。而 `AuthForm` 内部还用了
+   * `useHeytaUiDimensions()`（口令显隐的**默认档**：桌面遮、移动明文），漏挂 Provider 时
+   * 它**不抛**、落 `pointer === 'fine'` 的兜底分支 —— 于是平板/折叠屏展开态会被当成桌面。
+   * **不炸的漏登记才是真危险**：界面看起来完全正常。
+   *
+   * ⚠️ 对账口径同 `motivation` 那段：登记的是**导出符号** `AuthForm`。
+   * 同目录的 `authFailureMessageKey` 是纯函数、不碰主题，**不登记**
+   * （`check:rn-aria` 那种"渲染形状"的判据也不管它）。
+   */
+  'AuthForm',
   'useHeytaTokens',
   'useHeytaText',
   'useHeytaUiTheme',
