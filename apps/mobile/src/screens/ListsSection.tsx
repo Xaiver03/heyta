@@ -157,8 +157,8 @@ export function ListsSection(): React.JSX.Element {
           items={tree}
           labels={{
             removeLabel: (label) => t('mobile.lists.remove', { name: label }),
-            empty: t('mobile.lists.empty'),
-            emptyHint: t('mobile.lists.empty.hint'),
+            empty: t('common.organizer.lists.empty'),
+            emptyHint: t('common.organizer.lists.empty.hint'),
           }}
           onRemove={(item) => {
             if (actions === null) return;

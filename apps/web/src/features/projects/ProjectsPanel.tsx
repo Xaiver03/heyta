@@ -183,7 +183,14 @@ export function ProjectsPanel({
             kind="project"
             items={tree}
             counts={counts}
-            labels={{ removeLabel: (name) => t('web.projects.delete', { name }) }}
+            labels={{
+              removeLabel: (name) => t('web.projects.delete', { name }),
+              // 空态此前**根本没接线**（共享层注释写着"宿主不传就什么都不渲染"），
+              // 于是侧栏里一块空白被当成"这个功能没东西"。词条与移动端同一套
+              // （`common.organizer.*`）—— 同一句话不许有两个端各写一份。
+              empty: t('common.organizer.lists.empty'),
+              emptyHint: t('common.organizer.lists.empty.hint'),
+            }}
             onSelect={(item) => {
               onSelect({ kind: 'project', projectId: item.id });
             }}
@@ -262,7 +269,11 @@ export function ProjectsPanel({
           <OrganizerList
             kind="tag"
             items={tagNodes}
-            labels={{ removeLabel: (name) => t('web.tags.delete', { name }) }}
+            labels={{
+              removeLabel: (name) => t('web.tags.delete', { name }),
+              empty: t('common.organizer.tags.empty'),
+              emptyHint: t('common.organizer.tags.empty.hint'),
+            }}
             onSelect={(item) => {
               onSelect({ kind: 'tag', tagId: item.id });
             }}

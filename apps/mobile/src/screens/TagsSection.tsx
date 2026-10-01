@@ -120,8 +120,8 @@ export function TagsSection(): React.JSX.Element {
           items={nodes}
           labels={{
             removeLabel: (label) => t('mobile.tags.remove', { name: label }),
-            empty: t('mobile.tags.empty'),
-            emptyHint: t('mobile.tags.empty.hint'),
+            empty: t('common.organizer.tags.empty'),
+            emptyHint: t('common.organizer.tags.empty.hint'),
           }}
           onRemove={(item) => {
             if (actions === null) return;

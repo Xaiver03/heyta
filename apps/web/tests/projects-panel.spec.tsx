@@ -250,6 +250,36 @@ describe('E 标签：与清单同一棵骨架，但没有计数位', () => {
   });
 });
 
+/**
+ * E2 空态卡：一条清单/标签都没有时，**这两块不许是空白**。
+ *
+ * 共享层 `OrganizerList` 早就支持 `labels.empty/emptyHint`，但 web 侧栏
+ * 过去只传了 `removeLabel` —— 于是"还没有清单"这个状态在界面上表现为
+ * 一块什么都没有的空白，而移动端同一状态有一句说明。参照图（滴答 macOS 端）
+ * 明确给了一张占位说明卡，所以这一条按**渲染结果**钉，而不是按源码里
+ * 有没有那几个字（源码级断言在 `apps/mobile/tests/projects-sections.spec.ts`）。
+ */
+describe('E2 空态：一块空白不算空态', () => {
+  it('零清单零标签时，两块各给一句标题 + 一句说明', () => {
+    projectsState.projects = [];
+    projectsState.tags = [];
+    const view = render();
+    const text = view.textContent ?? '';
+    // 标题 + hint 都要在：只有标题的话，用户仍然不知道"没清单"意味着什么。
+    expect(text).toContain('还没有清单');
+    expect(text).toContain('还没归类的任务都在「收集箱」里，不会丢。');
+    expect(text).toContain('还没有标签');
+    expect(text).toContain('标签可以跨清单给任务归类');
+  });
+
+  it('有数据时空态不许留着（否则"删光了"和"还有东西"长得一样）', () => {
+    seed();
+    const text = render().textContent ?? '';
+    expect(text).not.toContain('还没有清单');
+    expect(text).not.toContain('还没有标签');
+  });
+});
+
 describe('取色入口（宿主插槽）逐行挂上', () => {
   it('每条清单行都有一个 `ht-slot-picker`（顶层 + 子级各一）', () => {
     seed();

@@ -2077,8 +2077,12 @@ export const zhCN = {
   'mobile.detail.project.inbox': '收集箱',
   'mobile.detail.project.create': '新建清单',
   'mobile.detail.project.newPlaceholder': '清单名称',
-  'mobile.lists.empty': '还没有清单',
-  'mobile.lists.empty.hint': '还没归类的任务都在「收集箱」里，不会丢。',
+  // 🔴 这一族是 `common.`：清单/标签的**空态**在 web 侧栏与移动端清单页是
+  // 同一句话（共享实现 `OrganizerList` 的 `labels.empty/emptyHint`）。
+  // 它原来叫 `mobile.lists.*`，于是 web 那边要么另写一份、要么不接线 ——
+  // 两个结果都不对（web 侧栏空清单时**什么都不显示**就是后者）。
+  'common.organizer.lists.empty': '还没有清单',
+  'common.organizer.lists.empty.hint': '还没归类的任务都在「收集箱」里，不会丢。',
   'mobile.lists.nameLabel': '清单名称',
   'mobile.lists.newPlaceholder': '给新清单起个名字',
   'mobile.lists.add': '新建清单',
@@ -2092,8 +2096,8 @@ export const zhCN = {
   // 清单和标签在数据上是两个实体，在产品上是同一件事的两个面（组织任务）：
   // 清单回答"它属于哪个容器"（一个），标签回答"它还跟什么有关"（多个）。
   'mobile.profile.section.tags': '标签',
-  'mobile.tags.empty': '还没有标签',
-  'mobile.tags.empty.hint': '标签可以跨清单给任务归类，比如「紧急」「等回复」。',
+  'common.organizer.tags.empty': '还没有标签',
+  'common.organizer.tags.empty.hint': '标签可以跨清单给任务归类，比如「紧急」「等回复」。',
   'mobile.tags.nameLabel': '标签名称',
   'mobile.tags.newPlaceholder': '给新标签起个名字',
   'mobile.tags.add': '新建标签',

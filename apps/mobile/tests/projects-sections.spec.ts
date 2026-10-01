@@ -84,12 +84,12 @@ describe('P10：不许新增 tab', () => {
 });
 
 describe('文案复用既有词条（零新增同义键）', () => {
-  it('两段用的还是 `mobile.lists.*` / `mobile.tags.*`', () => {
+  it('两段用的还是 `mobile.lists.*` / `mobile.tags.*`，空态那一族用 `common.organizer.*`', () => {
     const lists = readScreen('ListsSection.tsx');
     for (const key of [
       'mobile.lists.remove',
-      'mobile.lists.empty',
-      'mobile.lists.empty.hint',
+      'common.organizer.lists.empty',
+      'common.organizer.lists.empty.hint',
       'mobile.lists.removeHint',
       'mobile.lists.nameLabel',
       'mobile.lists.newPlaceholder',
@@ -101,14 +101,65 @@ describe('文案复用既有词条（零新增同义键）', () => {
     const tags = readScreen('TagsSection.tsx');
     for (const key of [
       'mobile.tags.remove',
-      'mobile.tags.empty',
-      'mobile.tags.empty.hint',
+      'common.organizer.tags.empty',
+      'common.organizer.tags.empty.hint',
       'mobile.tags.removeHint',
       'mobile.tags.nameLabel',
       'mobile.tags.newPlaceholder',
       'mobile.tags.add',
     ]) {
       expect(tags, `TagsSection 少用了词条 ${key}`).toContain(`t('${key}'`);
+    }
+  });
+});
+
+/**
+ * 空态那一族**跨端只有一份**，而且两端都得**接上线**。
+ *
+ * 这一条是 2026-10-01 对着参照图重做收集箱时补的：共享层 `OrganizerList`
+ * 早就支持 `labels.empty/emptyHint`，可 web 侧栏那份 `labels` 只传了
+ * `removeLabel` —— 于是"一个清单都没有"的时候界面**什么都不显示**，
+ * 而移动端同样的状态下有一句说明。两个端对同一件事给出两种界面，
+ * 且没有任何测试会红，正是本文件存在的理由（判据 A）。
+ *
+ * ⚠️ 源码级断言（不渲染）：本套件跑在 node 环境，`@heyta/ui` 会拖进
+ * `react-native`。这里能钉住的是"接线在不在、词条是不是同一族"。
+ */
+describe('空态词条是 `common.organizer.*`，两个宿主都接了线', () => {
+  const REPO = resolve(HERE, '../../..');
+  const read = (rel: string): string => readFileSync(resolve(REPO, rel), 'utf8');
+
+  it('web 侧栏（`ProjectsPanel`）传了同一套 empty/emptyHint', () => {
+    const panel = read('apps/web/src/features/projects/ProjectsPanel.tsx');
+    for (const key of [
+      'common.organizer.lists.empty',
+      'common.organizer.lists.empty.hint',
+      'common.organizer.tags.empty',
+      'common.organizer.tags.empty.hint',
+    ]) {
+      expect(panel, `web 侧栏没有接线词条 ${key}`).toContain(`t('${key}'`);
+    }
+  });
+
+  it('旧的 `mobile.lists.empty*` / `mobile.tags.empty*` 已经改名，没有留下第二套', () => {
+    for (const locale of ['zh-CN', 'en']) {
+      const table = read(`packages/i18n/src/locales/${locale}.ts`);
+      for (const gone of [
+        "'mobile.lists.empty'",
+        "'mobile.lists.empty.hint'",
+        "'mobile.tags.empty'",
+        "'mobile.tags.empty.hint'",
+      ]) {
+        expect(table, `${locale}.ts 里 ${gone} 还在 —— 改名只做了一半`).not.toContain(gone);
+      }
+      for (const key of [
+        "'common.organizer.lists.empty'",
+        "'common.organizer.lists.empty.hint'",
+        "'common.organizer.tags.empty'",
+        "'common.organizer.tags.empty.hint'",
+      ]) {
+        expect(table, `${locale}.ts 缺词条 ${key}`).toContain(key);
+      }
     }
   });
 });
