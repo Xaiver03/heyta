@@ -655,14 +655,25 @@ pnpm verify:consent-trail --self-test    # 变异门禁：证明每条判据都�
 
 四条自动腿：**L0** 版本库（HEAD 里有那条迁移目录、`schema.prisma` 声明了该列、
 `server/src` 里有写入点）· **L1** 生产库有列 · **L2** `_prisma_migrations` 里已应用 ·
-**L3** 部署镜像 `/app/dist` 里 grep 得到那段代码。每条都配**独立于被测值**的阳性对照，
-今天的实测值：`users.locale`=1、`users.terms_accepted_at`=1、`_prisma_migrations` 共 **44** 条
-且 `20261005000000_invalidate_stored_auth_tokens` 命中 1、`/app/dist` 里 **93** 个 `.js`、
-`requireAdmin` 命中 **3** 个文件 ⇒ 对照全绿，所以目标列/目标符号的 **0** 才是证据而不是探针坏。
-本轮跑出来的结果：**记账 8/14、退出码 2**（L0 三条红）。
+**L3** 部署镜像 `/app/dist` 里 grep 得到那段代码。每条都配**独立于被测值**的阳性对照。
+🔴 **2026-10-02 第四次重建之后重跑：记账 14/14、退出码 0**（同一天早些时候是 **8/14、退出码 2**，
+批次进库后自动变 **退出码 3**，迁移与镜像跟上后才到 0 —— 三个码各对应一次真实的阻塞，
+这正是"退出码分五种"要买的东西）。当次实测值：HEAD 迁移命中 1（HEAD 共 **40** 条迁移）、
+`schema.prisma` 声明 1、`server/src` 写入点 **3** 个文件、生产列 1、对照 `users.locale`=1 /
+`users.terms_accepted_at`=1、`_prisma_migrations` 共 **45** 条且 `20261005000000_*` 与
+`20261006000000_*` 各命中 1、`/app/dist` 里 **95** 个 `.js`、grep `termsDocumentVersion` 命中
+**3** 个文件、对照 `requireAdmin` 命中 3 个文件。
 
 🟡 **L4 不在这条命令里冒充绿**：它要动生产数据（注册一条测试账号，再看那一行是否等于
 当前 `legalSetVersion()` 的指纹），脚本只把该跑的 psql 原样打印出来。
+✅ **2026-10-02 人工实跑过**：`POST /api/register/email-password`（带 `termsAccepted:true`）→ **201**，
+那一行 `terms_accepted_at=1790878335391`、`terms_document_version` **逐字等于镜像里的
+`LEGAL_SET_VERSION`**；再与线上落地页 JS 产物里九份 `id/version` 拼出的串对账 ⇒ 三方相同。
+收尾按 §3.8.1 下面那段：11 张带 `user_id` 的子表逐张计数全 0 ⇒ `DELETE 1`，`users` 回到 10、
+带指纹行数回到 0。
+🔴 **参照物必须是"线上那一侧"的常量，不是工作树的**：工作树里 `legal.generated.ts` 可能已经被
+另一条批次 bump 过（本轮就是：工作树 `privacy@1.1`，线上与镜像仍是 `privacy@1.0`）。
+拿工作树的串去比线上那一行会得到一个**假红**，判据要写 `git show HEAD:server/src/legal.generated.ts`。
 
 📌 写这条命令时踩到两处，都是"探针自己错"那一类，`--self-test` 当场把它们抓出来：
 
@@ -1050,6 +1061,26 @@ ssh ubuntu-jcli 'cd ~/heyta/server && \
   ⚠️ 换容器**不必**跑 `deploy.sh`：迁移已经应用时，只需
   `docker compose -f docker-compose.yml -f docker-compose.monitoring.yml -f docker-compose.build.yml up -d --wait supersync`
   —— 带上 `deploy.sh` 反而会再造一个起不来的 caddy（见上面那条 🔴）。
+- ✅ **2026-10-02 第四次重建**（同意留痕的版本指针 `20261006000000_add_terms_document_version`，台账 G-32）：
+  走的是上面同一套三步，顺序与取值都留了取证：
+  1. **批次先进 `main`**（`ad8d9222` 实现 + 迁移、`31b6b1c3` 补漏带的迁移证据、`66e2d8e9` 第三入口判据、
+     `2e6f87f7` 后台读那一列）。🔴 这一步不是形式：`git archive HEAD` 只带**已跟踪**文件，
+     未进库的代码**打包带不出去** —— 上一轮就是在这里得到"退出码 2"。
+  2. **打回滚标签** `supersync:rollback-20261002-consent`（= 当时在跑的镜像 `b98b7b4d9d2b`）。
+  3. `git archive --format=tar.gz HEAD <§3.8 那张路径清单>` → scp → 构建
+     （`APK_MIRROR=mirrors.aliyun.com` **和** `NPM_REGISTRY=https://registry.npmmirror.com` 两个都要给，
+     缺任何一个这台机器上都会失败或慢到超时）。🔴 归档里**不含** `server/.env`：换完容器后
+     用 sha256 对账证明生产配置**没被覆盖**（本机与工作树那份是两套值，见上面 tar 那条坑）。
+  4. **先迁移、后换容器**：在旧容器里跑镜像自带的 `sh scripts/migrate-deploy.sh` ⇒ `MIGRATE_RC=0`，
+     `_prisma_migrations` 从 44 条变 **45** 条；然后 `up -d --wait supersync`（**不**跑 `deploy.sh`）
+     ⇒ 新容器 `2b0018b113315` `healthy`，两个容器都 `healthy`，`caddy`/`dozzle` 一个都没被造出来。
+  5. 🔴 **换完立刻重取 §3.8.1 那五条线上判据**，全绿 —— 特别是"不存在的账号登录回 **401**
+     `invalid_credentials`"，它同时证明 ADR-0040 的口令链路与反枚举的 dummy verify 在这次重建之后
+     仍然在跑（这次改的代码只碰注册写库，但**判据不推断，只实测**）。
+  6. 数据卫生：L4 用的那条测试账号按 §3.8.1 下面那段流程删掉，`users` 回到 **10**。
+  ⚠️ **这一轮没有覆盖的东西**：链 5 的 `packages/legal/{privacy,minors,data-rights}.ts` 与它派生的
+  `server/src/legal.generated.ts` 不在 HEAD，所以线上九份文本仍是 `privacy@1.0` —— 与镜像里的
+  `LEGAL_SET_VERSION` 一致，这是**刻意的**（把别人在飞的改版发上去，落库的指纹就会替他们宣告版本）。
 
 ### 3.8.1 🔴 换完镜像必须重取的五条**线上**判据（2026-10-01 定）
 
