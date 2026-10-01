@@ -176,14 +176,26 @@ export async function openAuthPanel(page: Page) {
  * ⇒ 正确的判据是**两者之一**：面板关掉（成功的强信号），或面板内出现"已登录"。
  *    另外，失败时界面文案会从空态变成失败原因 —— 那就当场报，
  *    不要让它白等满 120 秒才吐一个超时（超时看不出真正原因）。
+ *
+ * 🔴 **"离开空态"要按前缀判，不能按相等判**（2026-10-02 迁到共享表单时实测的形状）：
+ * 共享表单把**等待提示**（「请在系统弹窗里完成操作…」）渲染成状态区的**子节点**
+ * （`AuthForm.tsx` 的 `auth-form-busy` 那一行就在 `auth-form-status` 里面），
+ * 所以发起请求的那一刻 `textContent()` 就变成「空态文案 + 等待文案」。
+ * 老写法 `last !== emptyCopy` 会把它读成**失败**并当场抛 ——
+ * 症状是"一条正常登录被报成失败"，而服务端日志里登录是成功的。
+ * 空态与错误态在表单里是**三元互斥**的两套节点，错误永远不可能以空态文案开头，
+ * 所以 `startsWith(空态文案)` 正好圈出"仍在等待"，把等待和失败分开。
+ * ⚠️ 代价：空态文案取不到（`emptyCopy === ''`）时这一条判不了失败，只会走超时；
+ *    那属于探针本身没落到东西，超时信息里会带最后一次文案。
  */
 export async function loginWithPasskeyViaUi(
   page: Page,
   dialog: Locator,
   email: string,
 ): Promise<void> {
-  await dialog.locator('input[type="url"]').fill(SERVER);
-  await dialog.locator('input[type="email"]').fill(email);
+  // 第一屏只要邮箱；「用通行密钥登录」在第二屏，所以这一段是**必经之路**，
+  // 不是走捷径（见 `toCredentialStage`）。
+  await toCredentialStage(dialog, email);
 
   const status = authStatus(dialog);
   const emptyCopy = ((await status.textContent().catch(() => '')) ?? '').trim();
@@ -202,8 +214,8 @@ export async function loginWithPasskeyViaUi(
       await expect(status).toContainText(email);
       return;
     }
-    // ③ 文案离开空态 ⇒ 这是**失败**（`busy` 期间渲染的仍是空态，不会误判）。
-    if (last !== '' && last !== emptyCopy) {
+    // ③ 文案不再以空态开头 ⇒ 空态已被**替换**成失败原因（等待只会追加，见文件头）。
+    if (last !== '' && !last.startsWith(emptyCopy)) {
       throw new Error(`通行密钥登录失败，界面文案：${last.slice(0, 200)}`);
     }
     await page.waitForTimeout(250);
@@ -235,13 +247,80 @@ export function statusBar(page: Page) {
 /**
  * 认证面板的**主**状态区。
  *
- * 🔴 面板里有**两个** `role="status"`：这一个（空态/已登录/失败都在这渲染），
- * 加上通行密钥等待期的"请在系统弹窗里完成操作…"提示（`AuthPanel` 的
- * `waitingForPasskey`）。裸取 `[role="status"]` 会撞 strict mode；
- * 主状态区在 DOM 序里**永远在前**（它在表单上方），所以用 `.first()`。
+ * 🔴 取 `data-testid` 而不是 `[role="status"]`：面板现在由**共享表单**
+ * (`packages/ui/src/auth/AuthForm.tsx`) 渲染，状态区是一条 **live region**
+ * （RN 的 `accessibilityLiveRegion="polite"` 在 web 上落 `aria-live`，
+ * **不产生** `role="status"`）。旧写法会一路找不到元素，症状是
+ * "waiting for [role=status]" 超时 —— 那看起来像"界面没状态"，
+ * 实际是状态区换了身份标记。
+ *
+ * ⚠️ 用 testID 的另一个理由：它是**表单自己的契约**，每轮验收都在断言它存在
+ * （`apps/web/tests/auth-panel.spec.tsx`），所以这里的定位不会悄悄和界面脱钩。
  */
 export function authStatus(dialog: Locator) {
-  return dialog.locator('[role="status"]').first();
+  return dialog.getByTestId('auth-form-status');
+}
+
+/**
+ * 把表单走到**第二屏**（口令 / 通行密钥 / 魔法链接那一屏）。
+ *
+ * 🔴 现在第一屏**只要邮箱**，其余一条链都藏在「继续」后面（FIDO 混合登录的
+ * 常规做法，也是"地址不能当第一栏"那条硬约束的连带结果）。所以任何要点
+ * 「用通行密钥登录」的调用方都必须先走这一步 —— 少了它，按钮根本不在 DOM 里。
+ *
+ * 🔴 **幂等**，理由同 `openAuthPanel`：桌面壳是常驻进程，用例之间界面状态会留存，
+ * 可能已经停在第二屏；而地址栏只在 `baseUrl` **未配置**时才渲染
+ * （宿主那边由 `isUnconfigured(baseUrl)` 门控），上一轮配好以后它就不存在了。
+ * 两种"已经点过了"都当成正常路径，不再点第二次。
+ */
+export async function toCredentialStage(dialog: Locator, email: string): Promise<void> {
+  const serverUrl = dialog.getByTestId('auth-form-server-url');
+  if (await serverUrl.isVisible().catch(() => false)) await serverUrl.fill(SERVER);
+
+  const continueButton = dialog.getByTestId('auth-form-continue');
+  if (!(await continueButton.isVisible().catch(() => false))) return;
+
+  await dialog.getByTestId('auth-form-email').fill(email);
+  await continueButton.click();
+  await expect(continueButton).toBeHidden();
+}
+
+/**
+ * 把表单走到**注册档**（服务端地址之后的第二步里再切一档）。
+ *
+ * 🔴 共享表单的 `mode` 默认是 `sign-in`，而**同意项和邀请码只在注册档渲染**
+ * （`AuthForm.tsx` 的 `mode === 'register'` 那一块）。服务端在没有 `termsAccepted`
+ * 时会拒绝注册（`store.ts` 的 `registerPasskey` 只在为真时才把该字段带上），
+ * 所以注册这条路**必须**先点 `auth-form-switch-mode` —— 少这一步的红是 400，
+ * 看起来像服务端坏了。
+ *
+ * 判"是否已经在注册档"用的是**同意项在不在**而不是按钮文案：
+ * 文案是词条（会跟着双语变），同意项是结构（跟着档位变）。
+ */
+export async function toRegisterMode(dialog: Locator, email: string): Promise<void> {
+  await toCredentialStage(dialog, email);
+
+  const terms = dialog.getByTestId('auth-form-terms');
+  if (await terms.isVisible().catch(() => false)) return;
+
+  await dialog.getByTestId('auth-form-switch-mode').click();
+  await expect(terms).toBeVisible();
+}
+
+/**
+ * 勾上服务条款同意项，并**验它真的勾上了**。
+ *
+ * 🔴 不用 `getByRole('checkbox').check()`：共享表单的同意项是
+ * `accessibilityRole="checkbox"` 的 `Pressable`（web 落 `div[role=checkbox][aria-checked]`），
+ * 没有原生 input；`check()` 在那种元素上会不会生效取决于 Playwright 版本对
+ * `aria-checked` 的支持。点 + 断言 `aria-checked="true"` 是版本无关的写法，
+ * 而且顺手把"点到了但状态没变"这种空真排除掉。
+ */
+export async function acceptTerms(dialog: Locator): Promise<void> {
+  const terms = dialog.getByTestId('auth-form-terms');
+  if ((await terms.getAttribute('aria-checked')) === 'true') return;
+  await terms.click();
+  await expect(terms).toHaveAttribute('aria-checked', 'true');
 }
 
 /** 按「立即同步」并等到状态变成「已同步」。 */
