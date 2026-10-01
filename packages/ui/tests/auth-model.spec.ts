@@ -293,7 +293,7 @@ describe('🔴 两个秘密的命名是两条词条（共用一句就是本轮�
 
   it('两条 key 各自在**中英两张表里都真实存在**', () => {
     for (const key of [SIGN_IN_PASSWORD_LABEL_KEY, E2EE_PASSPHRASE_LABEL_KEY]) {
-      for (const locale of ['zh-CN', 'en']) {
+      for (const locale of ['zh-CN', 'en'] as const) {
         expect(localeHasKey(locale, key), `${locale} 缺 ${key}`).toBe(true);
       }
     }
