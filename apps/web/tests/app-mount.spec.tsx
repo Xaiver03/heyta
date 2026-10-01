@@ -449,6 +449,119 @@ describe('侧栏导航', () => {
         '于是用户还是写不了备注 —— 这正是要修的那个洞',
     ).not.toBeNull();
   });
+
+  /**
+   * 把待处理的写入冲干净。
+   *
+   * 🔴 不是仪式。`CaptureComposer` 的提交按钮**不 await** `onSubmit` 的 promise
+   * （用户按回车不该被写库阻塞），而一条 op 落库要过好几个 await。
+   * 不冲干净就读 store，读到的是"还没写进去"，而报出来的断言失败长得
+   * **像字段被丢了** —— 实测就是被它带偏了一次（去查了 reducer）。
+   * 更糟的是：那条在途 promise 会在下一条用例 `freshDb()` 换掉引擎之后才落地，
+   * 变成一条指向别的用例的 unhandled rejection。
+   */
+  async function flush(): Promise<void> {
+    for (let i = 0; i < 50; i++) {
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    }
+  }
+
+  /**
+   * 🔴 在某个清单里新建的任务必须**留在这个清单里**。
+   *
+   * 这一条钉的是"每一段都绿、接起来断"的第 N 次：`addTask` 一直支持
+   * `projectId`（`NewTaskFields` 里就有）、侧栏一直能切到 `{kind:'project'}`、
+   * `filterTasks` 也一直按 `projectId` 筛 —— 三个零件各有测试。缺的是
+   * **捕获框提交时没带那个字段**，于是「在『家庭装修』里回车」建出来的任务
+   * 落进收集箱，从刚显示过的列表里消失。界面上没有任何一处说过这件事。
+   *
+   * 所以这里同时钉两面：**写进去**（真 `projectId`）与**说得出**（占位符点名落点）。
+   * 只钉其中一面，另一面可以漂走而全绿。
+   */
+  it('🔴 停在某个清单时，新建的任务留在该清单，且占位符点名落点', async () => {
+    await freshDb();
+    await act(async () => {
+      await useProjectStore.getState().addProject('家庭装修');
+    });
+    const projectId = useProjectStore.getState().projects[0]?.id;
+    expect(projectId, '清单没建出来').toBeDefined();
+
+    await mount();
+
+    // 真的**点侧栏**切过去（不是往 store 里塞一个 filter —— 那样测不到接线）。
+    // ⚠️ 侧栏的清单行是共享 `OrganizerList` 的 `Pressable`（RNW → 带
+    // `aria-label` 的角色节点），不是 `button.ht-nav__item` —— 上面那条
+    // 标签用例能按 `<button>` 文本命中，是因为它命中的是**任务行上的标签 chip**。
+    const listEntry = container!.querySelector<HTMLElement>(
+      '[data-testid$="-select"][aria-label="家庭装修"]',
+    );
+    expect(listEntry, '侧栏里点不到那条清单').not.toBeNull();
+    await act(async () => {
+      listEntry!.click();
+    });
+
+    // ① 占位符点名落点。用户按回车前就该看见"这条会去哪儿"。
+    const input = container!.querySelector<HTMLElement>('[data-testid="capture-input"]')!;
+    expect(input.getAttribute('placeholder')).toContain('家庭装修');
+
+    // ② 🔴 **从界面里**提交（不是往 store 直接调 `addTask` —— 那绕开了
+    // 真正坏掉的那一步：`CaptureComposer` 的 `onSubmit` 没带 `projectId`，
+    // 而 `addTask` 一直支持它，直接调 store 永远测不出来）。
+    await act(async () => {
+      const setter = Object.getOwnPropertyDescriptor(
+        HTMLInputElement.prototype,
+        'value',
+      )?.set;
+      setter?.call(input, '买两桶漆');
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+    const submitButton = container!.querySelector<HTMLElement>('[data-testid="capture-submit"]')!;
+    await act(async () => {
+      submitButton.click();
+      await flush();
+    });
+
+    // 写进去：落点真的是这条清单
+    const created = Object.values(useTaskStore.getState().entities.tasks).find(
+      (t) => t.title === '买两桶漆',
+    );
+    expect(created?.projectId, '任务没落进当前清单').toBe(projectId);
+    // 而且它出现在眼前这条列表里（不是"写对了但看不见了"）
+    expect(titles(container!)).toContain('买两桶漆');
+  });
+
+  it('🔴 停在收集箱时不点名落点、也不带 projectId（别把默认值写成某个清单）', async () => {
+    await freshDb();
+    await act(async () => {
+      await useProjectStore.getState().addProject('家庭装修');
+    });
+
+    await mount();
+
+    const input = container!.querySelector<HTMLElement>('[data-testid="capture-input"]')!;
+    expect(
+      input.getAttribute('placeholder'),
+      '收集箱里没有"某个清单"可点名，占位符不该出现「到『…』」',
+    ).not.toContain('家庭装修');
+
+    await act(async () => {
+      const setter = Object.getOwnPropertyDescriptor(
+        HTMLInputElement.prototype,
+        'value',
+      )?.set;
+      setter?.call(input, '买牛奶');
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+    await act(async () => {
+      container!.querySelector<HTMLElement>('[data-testid="capture-submit"]')!.click();
+      await flush();
+    });
+
+    const created = Object.values(useTaskStore.getState().entities.tasks).find(
+      (t) => t.title === '买牛奶',
+    );
+    expect(created?.projectId, '收集箱建的任务不该被塞进任何清单').toBeUndefined();
+  });
 });
 
 /**

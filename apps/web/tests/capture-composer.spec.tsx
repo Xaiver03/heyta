@@ -81,6 +81,17 @@ function render(): HTMLDivElement {
   return container;
 }
 
+/** 带**落点**渲染（`destination` 是宿主传进来的，见组件的 props 注释）。 */
+function renderWith(destination: { projectId: string; name: string }): HTMLDivElement {
+  container = document.createElement('div');
+  document.body.appendChild(container);
+  root = createRoot(container);
+  act(() => {
+    root!.render(<CaptureComposer destination={destination} />);
+  });
+  return container;
+}
+
 /** 往受控 input 里输入。必须走原生 setter，否则 React 收不到变更。 */
 function type(el: HTMLDivElement, value: string): void {
   const input = el.querySelector('[data-testid="capture-input"]')! as HTMLInputElement;
@@ -306,6 +317,45 @@ describe('CaptureComposer —— 提交', () => {
       submit(el).click();
     });
     expect(addTask).toHaveBeenCalledWith('交周报', { priority: Priority.Medium });
+  });
+
+  /**
+   * 🔴 `destination` 是**组件的契约**，不是 App 的巧合。
+   *
+   * 端到端那条（`app-mount.spec.tsx`）钉的是"调用点真的传了"；这里钉的是
+   * "传了就一定写进去" —— 两层各管一段，缺任何一层都能被下面这一族的漂移绕过：
+   * 只改共享层的提交签名，App 那条会红；只改 App 的调用点，这一条仍然绿而
+   * 端到端那条红。
+   *
+   * 两个字段**同时**给是这条用例的重点：`dueDate` 与 `projectId` 走的是同一个
+   * 展开对象，谁把 `over` 重写成逐字段赋值，就可能只漏掉后加的那一个。
+   */
+  it('🔴 有落点时：projectId 与解析出的字段一起交给写入动作', () => {
+    const el = renderWith({ projectId: 'p-home', name: '家庭装修' });
+    type(el, '明天买漆 !1');
+    act(() => {
+      submit(el).click();
+    });
+    expect(addTask).toHaveBeenCalledWith('买漆', {
+      dueDate: expect.any(Number),
+      priority: Priority.High,
+      projectId: 'p-home',
+    });
+  });
+
+  it('🔴 有落点时：占位符点名它（用户按回车前就该知道这条会去哪儿）', () => {
+    const el = renderWith({ projectId: 'p-home', name: '家庭装修' });
+    const input = el.querySelector('[data-testid="capture-input"]') as HTMLInputElement;
+    expect(input.getAttribute('placeholder')).toContain('家庭装修');
+  });
+
+  it('没有落点时：一个字段都不多塞（收集箱不是某条清单的别名）', () => {
+    const el = render();
+    type(el, '买牛奶');
+    act(() => {
+      submit(el).click();
+    });
+    expect(addTask).toHaveBeenCalledWith('买牛奶', {});
   });
 
   it('🔴 回车也走同一条提交路（共享 `TextInput` 的 `onSubmitEditing`）', () => {

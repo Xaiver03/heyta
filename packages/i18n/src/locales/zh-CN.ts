@@ -1557,6 +1557,10 @@ export const zhCN = {
   // ✅ 日期那一条里**不再**嵌 `formatRemainingUntil()` 的中文了 ——
   // 剩余天数现在由壳按当前语言说（`web.due.*`，见下）。
   'web.capture.placeholder': '添加任务，回车确认（可写「明天」「下周三」「!1」）',
+  // 🔴 「添加到哪儿」必须出现在占位符里。当下面板停在某个清单时，
+  // 「添加任务」这句话只说了一半 —— 用户按回车后任务落进收集箱、
+  // 从眼前这条列表里消失，而界面上没有任何一处说过这件事。
+  'web.capture.placeholderTo': '添加任务到「{list}」，回车确认（可写「明天」「下周三」「!1」）',
   'web.capture.addLabel': '新任务标题',
   'web.capture.add': '添加',
   'web.capture.matches.aria': '识别出的字段',

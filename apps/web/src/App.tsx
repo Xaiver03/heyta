@@ -1128,6 +1128,26 @@ export function App(): React.JSX.Element {
   }, [store.filter, projects.projects, view, t]);
 
   /**
+   * 快速捕获的**落点**：筛选真的停在某个清单时，新任务就留在那个清单。
+   *
+   * 🔴 这不是锦上添花。在这个面板停在「家庭装修」时按回车，任务以前**一定**
+   * 落进收集箱 —— 于是它刚从眼前这条列表里消失，而界面从头到尾没说过这件事。
+   * 用户能观察到的形态是"我加的任务不见了"，最难归因的那一类。
+   *
+   * `today` / `completed` / `quadrant` / `tag` 都回 `undefined`（= 收集箱）：
+   * 它们是**查看方式**，不是**存放位置**，没有"落到今天"这种操作。
+   * 清单名取不到（被删了）也回 `undefined` —— 宁可不带 `projectId`，
+   * 也不要写进一条已经不存在的清单。
+   */
+  const captureDestination = useMemo(() => {
+    const f = store.filter;
+    if (f.kind !== 'project') return undefined;
+    const name = projects.projects.find((p) => p.id === f.projectId)?.name;
+    // 🔴 名字必须是**用户自己的字**，原样进占位符、不翻译（与 `title` 同源）。
+    return name === undefined ? undefined : { projectId: f.projectId, name };
+  }, [store.filter, projects.projects]);
+
+  /**
    * 🔴 #2「用户可见通知」的接线：把**已到点、还没投递**的提醒真的投出去。
    *
    * 在此之前 `reminders/store.ts` 早就把 `due` 算出来写进 state 了，
@@ -1842,6 +1862,7 @@ export function App(): React.JSX.Element {
           */}
           {contentView === 'tasks' && (
             <CaptureComposer
+              destination={captureDestination}
               routing={aiSettings.routing}
               consents={aiSettings.consents}
               secrets={aiSecrets}

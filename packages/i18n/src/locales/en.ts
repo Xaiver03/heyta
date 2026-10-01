@@ -1472,6 +1472,9 @@ export const en = {
   // ✅ The embedded `formatRemainingUntil()` Chinese is gone: the remaining
   // days are now spoken by the shell in the current language (`web.due.*`).
   'web.capture.placeholder': 'Add a task, press Enter to confirm (you can write "tomorrow", "next Wednesday", "!1")',
+  // The destination belongs in the placeholder: with a list open, "Add a task"
+  // only says half of it — the task lands in Inbox and vanishes from the list.
+  'web.capture.placeholderTo': 'Add a task to "{list}", press Enter to confirm (you can write "tomorrow", "next Wednesday", "!1")',
   'web.capture.addLabel': 'New task title',
   'web.capture.add': 'Add',
   'web.capture.matches.aria': 'Recognized fields',
