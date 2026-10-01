@@ -33,7 +33,7 @@ export const MAX_PASSWORD_CODE_POINTS = 256;
  * normalize** —— 实测 `grep normalize(` 在 sync-core / app-host / storage 零命中，
  * 而 `'café'.normalize('NFC') !== 'café'.normalize('NFD')`，所以 iOS 键盘给出 NFD 时
  * 同一句话会派生出**不同密钥**。那是一条涉及存量密文可解性的**独立缺陷**，
- * 按计划 §11 单独处理，不在这里顺手改（改了会让用 NFD 写过的设备当场解不开）。
+ * 按计划 §10 第 11 条单独处理，不在这里顺手改（改了会让用 NFD 写过的设备当场解不开）。
  */
 export const normalizePassword = (input: string): string => input.normalize('NFC').normalize('NFKC');
 

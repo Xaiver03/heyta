@@ -687,9 +687,14 @@ export const requestPasskeyRecovery = async (
     return successMessage;
   }
 
-  // Only for passkey users (no password)
+  // 🔴 A stored password means the account **already has another way in**, and this whole
+  // path exists for people who would otherwise be locked out. So the early return stays,
+  // but its meaning changed when email+password sign-in landed: `passwordHash != null` used
+  // to read as "legacy password-only account, not a passkey user" and now reads as
+  // "can sign in with a password". Someone who lost **both** goes through password reset,
+  // not passkey recovery.
   if (user.passwordHash) {
-    Logger.debug(`Passkey recovery requested for password user (ID: ${user.id})`);
+    Logger.debug(`Passkey recovery skipped: account can sign in with a password (ID: ${user.id})`);
     return successMessage;
   }
 
@@ -1006,6 +1011,12 @@ export const listUserPasskeys = async (userId: number): Promise<PasskeySummary[]
  * 所以：删到只剩一条时返回 `last_passkey_required`，界面显示
  * "这是最后一条通行密钥 —— 先添加一条新的，或者走找回流程"。
  * 用户想换凭据时的正确顺序是**先加后删**，不是先删后加。
+ *
+ * ⚠️ **这条规则的前提已经只有一半成立**（邮箱 + 密码登录之后）：账号可能同时有口令，
+ * 那时"最后一条通行密钥"并不是唯一的入口。这里**故意不放松** —— 放松需要一个新的
+ * "该账号有可用口令"信号，而那个信号怎么算（被锁定的口令算不算、未验证的算不算）
+ * 必须和显示这句话的客户端一起定，否则界面上的提示会与判定错位。
+ * 登记为缺口见计划 `docs/plans/email-password-auth.md` §10 第 10 条。
  *
  * ## 原子性
  *
