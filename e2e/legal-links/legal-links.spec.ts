@@ -14,7 +14,7 @@
  * |---|---|---|
  * | `https://heyta.waytofuture.cn`（官方托管） | `/legal/terms/`、`/legal/privacy/` | 本地落地页构建（本套件刻意离线；线上字节由 `e2e/live-site/live-legal.spec.ts` 直连真服务器验，两侧不重叠） |
  * | `https://heyta.finlaw.cloud`（另一台真服务端） | `<base>/terms.html`、`<base>/privacy.html` ⇒ **404** | **零转发**，那个 404 是它自己答的 |
- * | 空（还没配地址） | **不渲染链接** | —— |
+ * | 没人碰过地址栏（预填=应用自身来源） | `<origin>/terms.html`、`<origin>/privacy.html` | 同源那台服务端。**这一档 2026-10-02 从"不渲染链接"改成了"必有链接"** —— 见最后那个 describe 的理由 |
  *
  * 🔴 中间那一行的判据不是"打开"，而是"**打开的是那台自己的地址、并且是 404**"。
  * 悄悄退回落地页 = 把 heyta 署名的政策挂在别人的实例上（D-09 明令不许）。
@@ -30,6 +30,10 @@
 import { expect, test, type BrowserContext, type Page } from '@playwright/test';
 
 import { openApp } from '../tests/helpers';
+// 认证面板由共享表单渲染（2026-10-01 起），"走到注册档"这一步因此是**所有**
+// 要在面板里点东西的套件共同的入口 —— 只在 auth-journey 里写一份。
+// ⚠️ 本套件不导出它的 `openApp`：这里的 `openApp` 带 `?lang=zh-CN`（定位符是中文）。
+import { toRegisterMode } from '../auth-journey/helpers';
 
 /** 官方托管域（与 `packages/app-host/src/legal-links.ts` 的常量同一个值）。 */
 const OFFICIAL = 'https://heyta.waytofuture.cn';
@@ -93,13 +97,35 @@ async function openAuthPanel(page: Page): Promise<void> {
   await expect(dialog).toBeVisible();
 }
 
-/** 往地址框里填一台服务端，并等两条链接真的出现。 */
+/**
+ * 走到**注册档**并把服务端地址设成 `url`，然后等两条链接真的出现。
+ *
+ * 🔴 2026-10-02 起这不是"打开面板就有的那一屏"：面板现在是共享表单，
+ * 第一屏只要邮箱，而两条法律链接**住在同意项那一块里**，同意项只在**注册档**渲染
+ * （`AuthForm.tsx` 的 `mode === 'register'`）。所以这一段多了两步真用户步骤
+ * （点「继续」、切「注册」）—— 少一步的紅长得像"链接没渲染"。
+ *
+ * ⚠️ 地址必须在 `toRegisterMode` **之后**填：`toCredentialStage` 会先把
+ * `HEYTA_AUTH_JOURNEY_SERVER` 写进地址栏（未配置时它必然渲染），顺序倒了就被覆盖。
+ */
 async function setBaseUrl(page: Page, url: string): Promise<void> {
   const dialog = page.locator('[role="dialog"][aria-label="登录 / 注册"]');
-  const field = dialog.locator('input[type="url"]').first();
+  await toRegisterMode(dialog, 'legal-links@example.invalid');
+  const field = dialog.getByTestId('auth-form-server-url');
   await expect(field, '未配置服务端时地址框必须在（已配置时整块不渲染）').toBeVisible();
   await field.fill(url);
   await expect(dialog.locator('a[target="_blank"]')).toHaveCount(2);
+}
+
+/**
+ * 同意项本体（共享表单是 `div[role=checkbox][aria-checked]`，**没有**原生 input）。
+ *
+ * 🔴 原来这里取 `input[type="checkbox"]`：那条选择器在旧壳里对得上，在新表单里
+ * 恒为 0 个 —— 于是 `toHaveCount(1)` 会红，但 `expect(await ...count()).toBe(0)`
+ * 那种写法会**假绿**。所以锚点统一走 testID，计数断言才有指代对象。
+ */
+function termsCheckbox(page: Page) {
+  return page.locator('[role="dialog"] [data-testid="auth-form-terms"]');
 }
 
 /** 面板里那两条链接（按 href 后缀取，不按文字 —— 文字由 i18n 决定，不是判据）。 */
@@ -159,7 +185,7 @@ async function clickAndCapture(
 }
 
 test.describe('官方托管域：点开的是落地页 /legal/*', () => {
-  test('两条链接的地址、打开方式、以及**不在勾选框的 label 里**', async ({ page, context }) => {
+  test('两条链接的地址、打开方式、以及**不在同意项的可点区域里**', async ({ page, context }) => {
     await serveOfficialFromLocalBuild(context);
     await openAuthPanel(page);
     await setBaseUrl(page, OFFICIAL);
@@ -181,11 +207,22 @@ test.describe('官方托管域：点开的是落地页 /legal/*', () => {
       expect(rel).toContain('noreferrer');
     }
 
-    // 🔴 链接在 label **外面**：放进 `<label>` 里则点条款会切换勾选，
+    // 🔴 链接在同意项**外面**：嵌进去则点条款会切换勾选，
     // "我想先读条款"变成"我已经同意了"。这是同意留痕上的真缺陷，不是样式问题。
-    expect(await dialog.locator('label a[href]').count(), 'label 里不许有链接').toBe(0);
+    //
+    // ⚠️ 2026-10-02 换了锚点。原来写的是 `label a[href]` 计数，那是**旧壳**的形状 ——
+    // 共享表单里同意项是 `div[role=checkbox]`、整张表单没有 `<label>`，
+    // 于是那条判据**恒为 0**：坏法就在眼前它也不说话（§7：永远通过的判据比没有判据更糟）。
+    // 现在钉的是容器本身，并且带上分母：面板里确实有 2 条 `<a href>`，
+    // 而同意项那一个**都不许有**。
+    const anchorsInDialog = await dialog.locator('a[href]').count();
+    expect(anchorsInDialog, '两条条款链接必须真的在 DOM 里').toBe(2);
+    expect(
+      await dialog.locator('[data-testid="auth-form-terms"] a[href], [data-testid="auth-form-terms"] [role="link"]').count(),
+      '同意项的可点区域里不许嵌链接',
+    ).toBe(0);
     // 而两条路都得还在：勾选框本身没被挪走。
-    await expect(dialog.locator('input[type="checkbox"]')).toHaveCount(1);
+    await expect(termsCheckbox(page)).toHaveCount(1);
 
     await page.screenshot({ path: SHOT('official-panel') });
   });
@@ -200,7 +237,7 @@ test.describe('官方托管域：点开的是落地页 /legal/*', () => {
     attachLogs(page, logs, 'official');
     await setBaseUrl(page, OFFICIAL);
 
-    const checkbox = page.locator('[role="dialog"] input[type="checkbox"]').first();
+    const checkbox = termsCheckbox(page);
     await expect(checkbox).not.toBeChecked();
 
     const { popup } = await clickAndCapture(page, '/legal/terms/', 'official-terms', logs);
@@ -299,12 +336,29 @@ test.describe('另一台服务端：点开的是它自己的 <base>/privacy.html
   });
 });
 
-test.describe('还没配服务端地址：不承诺任何文本', () => {
-  test('两条链接不存在，但勾选框照旧在', async ({ page }) => {
+test.describe('没人碰过地址栏：同意项也**一定有**对应的文本', () => {
+  /**
+   * 🔴 这一组原来断言的是反面的形状 ——「还没配地址 ⇒ 两条链接不存在」。
+   *
+   * 那个状态在 2026-10-01 的两步式重构之后**不存在了**：地址栏不再问用户"你连哪台"，
+   * 而是**预填成应用自己的来源**（`apps/web/src/lib/auth-endpoint.ts`）；
+   * 而且就算用户把它清空，`effectiveBaseUrl` 仍然回落到那个来源
+   * （`AuthPanel.tsx`：`addressDraft.trim() === '' ? authBaseUrl(baseUrl) : …`）。
+   *
+   * 所以这里钉的是**新不变量**，而且比原来更强：注册档里两条政策链接**恒在**，
+   * 并且落在"这个应用是自己来源"那台服务端上。
+   * 原文件头列的坏法 ①「没有链接 ⇒ 要求用户同意一份读不到的政策」
+   * 正是由这一条守着 —— 旧写法是在"没有链接"上打勾，那恰好是坏法 ①。
+   */
+  test('注册档必有两条链接，且地址来自应用自身来源', async ({ page }) => {
     await openAuthPanel(page);
+    await toRegisterMode(page.locator('[role="dialog"][aria-label="登录 / 注册"]'), 'nourl@example.invalid');
+
     const dialog = page.locator('[role="dialog"]');
-    await expect(dialog.locator('a[href]')).toHaveCount(0);
-    await expect(dialog.locator('input[type="checkbox"]')).toHaveCount(1);
+    const origin = new URL(page.url()).origin;
+    await expect(linkByHref(page, '/terms.html')).toHaveAttribute('href', `${origin}/terms.html`);
+    await expect(linkByHref(page, '/privacy.html')).toHaveAttribute('href', `${origin}/privacy.html`);
+    await expect(termsCheckbox(page)).toHaveCount(1);
     await page.screenshot({ path: SHOT('no-base-url') });
   });
 });
