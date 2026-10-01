@@ -51,7 +51,8 @@
  *   - 两条条款链接指向**哪一份文本** → 同处的 `resolveLegalLinks`
  *     （官方实例落落地页，别的 host 落那台自己发布的页面，**不许**悄悄回落到
  *     heyta 的文本 —— 那是替别人作承诺）；
- *   - 失败原因 → 哪一条词条 → `@heyta/ui` 的 `authFailureMessageKey`（四端共用一份）；
+ *   - 失败原因 → 哪一条词条（**连同句子里要填的数字**）→ `@heyta/ui` 的
+ *     `authFailureMessage`（四端共用一份）；
  *   - 状态机 → `./store.ts`。
  * 本文件只做两件事：**把状态渲染成人看得懂的句子**，以及**把输入接到动作上**。
  *
@@ -78,13 +79,11 @@ import {
   normalizeInviteCode,
 } from '@heyta/domain';
 import { useI18n, type MessageKey } from '@heyta/i18n';
-import { AUTH_PASSWORD_MAX_CODE_POINTS, AUTH_PASSWORD_MIN_CODE_POINTS } from '@heyta/shared-schema';
 import { resolveLegalLinks, type HostedAuthSession } from '@heyta/app-host';
 import {
   AuthForm,
   HeytaUiProvider,
-  authFailureMessageKey,
-  passwordPolicyMessageKey,
+  authFailureMessage,
   type AuthFormLabels,
   type AuthFormStatus,
 } from '@heyta/ui';
@@ -353,21 +352,16 @@ export function AuthPanel({ baseUrl, onClose, onSignedIn }: AuthPanelProps): Rea
         };
       case 'failed': {
         // 口令策略：四种拒绝的状态码与 `code` 完全相同，而用户的动作四种都不同，
-        // 所以只说"不符合要求"等于没说。具体哪一条由 `passwordPolicyMessageKey` 给。
-        if (status.reason === 'password-policy' && status.policyCode !== undefined) {
-          const code = status.policyCode;
-          const key = passwordPolicyMessageKey(code);
-          const message =
-            code === 'too_short'
-              ? t(key, { min: AUTH_PASSWORD_MIN_CODE_POINTS })
-              : code === 'too_long'
-                ? t(key, { max: AUTH_PASSWORD_MAX_CODE_POINTS })
-                : t(key);
-          return { tone: 'error', message, field: 'password' };
-        }
+        // 所以只说"不符合要求"等于没说。哪一条、以及句子里那个 `{min}`/`{max}`/
+        // `{seconds}`，由共享层的 `authFailureMessage` **一次交出** —— 分两次拿
+        // 就有"只拿了句子、没填数字"的空间，而那不会报错：界面上印的是
+        // 字面量 `{seconds}`。（本文件与 `PasswordPanel` 两处都真实漏过。）
+        const { key, vars } = authFailureMessage(status);
+        const isPolicy = status.reason === 'password-policy' && status.policyCode !== undefined;
         return {
           tone: 'error',
-          message: t(authFailureMessageKey(status.reason, { retryAfterSeconds: status.retryAfterSeconds })),
+          message: vars === undefined ? t(key) : t(key, vars),
+          ...(isPolicy ? { field: 'password' as const } : {}),
         };
       }
     }

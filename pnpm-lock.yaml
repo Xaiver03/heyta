@@ -639,6 +639,9 @@ importers:
       '@heyta/domain':
         specifier: workspace:*
         version: link:../domain
+      '@heyta/shared-schema':
+        specifier: workspace:*
+        version: link:../shared-schema
       lucide:
         specifier: 1.48.0
         version: 1.48.0

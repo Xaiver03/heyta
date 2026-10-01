@@ -65,12 +65,11 @@
 import { useRef, useState } from 'react';
 
 import { useI18n, type MessageKey, type MessageVars } from '@heyta/i18n';
-import { AUTH_PASSWORD_MAX_CODE_POINTS, AUTH_PASSWORD_MIN_CODE_POINTS } from '@heyta/shared-schema';
+import { AUTH_PASSWORD_MIN_CODE_POINTS } from '@heyta/shared-schema';
 import {
-  authFailureMessageKey,
+  authFailureMessage,
   defaultPasswordRevealed,
   passwordAutocomplete,
-  passwordPolicyMessageKey,
 } from '@heyta/ui';
 import { AlertTriangle, CheckCircle2, Eye, EyeOff, Loader2 } from 'lucide-react';
 
@@ -106,27 +105,26 @@ type Mode = 'change' | 'set';
  * 三个动作（改密 / 设密 / 发重置信）**共用这一份映射** —— 在面板里各写一遍
  * `reason → key` 就是 ADR-0040 §3.7 反对的那个形状。
  *
- * 🔴 `password-policy` 走**下一层**判别：不带 `policyCode` 界面只能说"口令不合格"，
- * 而四种拒绝（太短 / 太长 / 太常见 / 出现在泄露库）用户要做的事各不相同。
+ * 🔴 句子**和它要带的数字**都来自 `@heyta/ui` 的 `authFailureMessage`（一份，与登录
+ * 面板共用）：`password-policy` 那四种拒绝（太短 / 太长 / 太常见 / 出现在泄露库）用户
+ * 要做的事各不相同，而不带数字的"口令不合格"等于什么也没说。
  *
  * ⚠️ `no-password-set` / `password-already-set` **不经过这里** —— 它们不是"一句错误"，
  * 而是"这张表摆错了"，调用处直接换表（换表之后由新表自己的 lead 说话）。
  *
  * `mode` 是**必填**参数，不是装饰：同一句 `email-not-verified` 在改密那张表上说的是
  * "密码是对的，只差最后一步"（真话 —— 那一次确实验过密码），在设密那张表上就是假话
- * （这一次没有任何密码被验过）。所以设密模式给它换一句。
+ * （这一次没有任何密码被验过）。所以设密模式在进共享映射**之前**先把这句换掉。
  */
 function failureOutcome(
   status: Extract<AuthStatus, { kind: 'failed' }>,
   mode: Mode,
 ): Extract<Outcome, { kind: 'failed' }> {
   const isPolicy = status.reason === 'password-policy' && status.policyCode !== undefined;
-  const isUnverifiedOnSet = mode === 'set' && status.reason === 'email-not-verified';
-  const key: MessageKey = isPolicy
-    ? passwordPolicyMessageKey(status.policyCode)
-    : isUnverifiedOnSet
-      ? 'web.settings.password.setNeedsVerified'
-      : authFailureMessageKey(status.reason, { retryAfterSeconds: status.retryAfterSeconds });
+  const message: { key: MessageKey; vars?: MessageVars } =
+    mode === 'set' && status.reason === 'email-not-verified'
+      ? { key: 'web.settings.password.setNeedsVerified' }
+      : authFailureMessage(status);
   // 要改哪个框：策略类与新口令本身有关；`invalid-credentials` 在**改密这张表**上指的是
   // 当前密码打错了（不是"你没登录"）。其余原因两个框都没错，**不动焦点**。
   const field: PanelField | undefined = isPolicy
@@ -136,10 +134,8 @@ function failureOutcome(
       : undefined;
   return {
     kind: 'failed',
-    key,
-    ...(isPolicy
-      ? { vars: { min: AUTH_PASSWORD_MIN_CODE_POINTS, max: AUTH_PASSWORD_MAX_CODE_POINTS } }
-      : {}),
+    key: message.key,
+    ...(message.vars !== undefined ? { vars: message.vars } : {}),
     ...(field !== undefined ? { field } : {}),
   };
 }

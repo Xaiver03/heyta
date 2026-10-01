@@ -112,7 +112,11 @@ interface FetchCall {
 let calls: FetchCall[];
 
 /** 让 fetch 回一个指定响应，并记录调用。 */
-function stubFetch(status: number, body?: unknown): void {
+function stubFetch(
+  status: number,
+  body?: unknown,
+  headers?: Record<string, string>,
+): void {
   calls = [];
   fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
     calls.push({
@@ -126,6 +130,10 @@ function stubFetch(status: number, body?: unknown): void {
       json: () => Promise.resolve(body),
     } as unknown as Response);
   });
+      // 🔴 `headers` 不是可选的装饰：`Retry-After` 就在头上，app-host 只从头上读。
+      // 不给这个字段，"被锁了多久"那句话在任何测试里都永远取不到秒数 ——
+      // 于是"界面印出字面量 `{seconds}`"这种回归可以一路全绿。
+      headers: new Headers(headers),
   vi.stubGlobal('fetch', fetchMock);
 }
 
@@ -498,6 +506,56 @@ describe('邀请码：URL 带码要预填，形状不对不许发出去', () => 
 
   it('🔴 `?invite=` 带来的码预填进邀请栏，并随注册请求一起发出去', async () => {
     setSearch('/?invite=abcd-2345');
+
+  /**
+   * 🔴 屏幕上必须出现**那个数**，而不是 `{seconds}` 这个字面量。
+   *
+   * 2026-10-01 实测到的真缺陷：面板只取 key、不填 vars，而 `translateIn` 在 vars
+   * 缺省时**原样保留占位符** —— 于是用户看到"…或 {seconds} 秒后再试"。
+   * 共享层的不变量（`auth-model.spec.ts`）钉的是"函数拿不到一半"，
+   * 这一条钉的是"这一半真的落到了屏幕上"，两层缺一不可：
+   * 前者改坏会让模型测试红，后者改坏（比如有人又把 `vars` 丢掉）只有这条会红。
+   */
+  it('口令被锁 → 说"再等 37 秒"，不是字面量 {seconds}', async () => {
+    stubFetch(
+      429,
+      { error: 'Too many password attempts', code: 'account_locked' },
+      { 'retry-after': '37' },
+    );
+    const el = await renderPanel('zh-CN');
+
+    await toCredential(el);
+    await typeById(el, 'auth-form-password', 'wrong wrong wrong');
+    await tap(el, 'auth-form-submit');
+
+    expect(useAuthStore.getState().status).toMatchObject({
+      kind: 'failed',
+      reason: 'password-locked',
+      retryAfterSeconds: 37,
+    });
+    const text = el.textContent ?? '';
+    expect(text).not.toContain('{seconds}');
+    expect(text).toContain(
+      translate('zh-CN', 'common.auth.error.passwordLockedWithWait', { seconds: 37 }),
+    );
+  });
+
+  it('同一句在英文下也说得出数字（占位符不是只有中文表要填）', async () => {
+    stubFetch(
+      429,
+      { error: 'Too many password attempts', code: 'account_locked' },
+      { 'retry-after': '90' },
+    );
+    const el = await renderPanel('en');
+
+    await toCredential(el);
+    await typeById(el, 'auth-form-password', 'wrong wrong wrong');
+    await tap(el, 'auth-form-submit');
+
+    const text = el.textContent ?? '';
+    expect(text).not.toContain('{seconds}');
+    expect(text).toContain('90');
+  });
     stubFetch(201, { message: 'ok' });
     const el = await renderPanel('zh-CN');
 
