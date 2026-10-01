@@ -121,14 +121,17 @@ describe('侧栏导航', () => {
    * 页面上渲染出来的任务标题（顺序即 DOM 顺序）。
    *
    * 🔴 选择器跟着迁移换了：以前查 `.ht-task__title`（web 手写的任务行），
-   * 现在查共享 `TaskList` 自己打的 `task-row-*` testID —— 那一族的 CSS
+   * 现在查共享 `TaskList` 自己打的 `task-title-*` —— 那一族的 CSS
    * 已经随迁移删除，`.ht-task__title` 在页面上**不存在了**。
    *
-   * 行体里除了标题还有元信息（截止/优先级），但这几条用例的任务都**没有**
-   * 徽章，所以 `textContent` 就是标题本身。
+   * 🔴🔴 为什么不查行体 `task-row-*` 的 `textContent`（这句注释以前是"这几条用例
+   * 的任务都没有徽章，所以行体文本就是标题" —— **那句现在不成立了**）：
+   * 行内元信息有了常驻的清单归属之后，**每一行**都带徽章，行体文本变成
+   * 「买两桶漆」+「家庭装修」连成一串。当时三条用例就是这么红的。
+   * ⇒ 标题要有自己的可寻址锚点，判据才不会被旁边那槽的内容带着走。
    */
   function titles(el: HTMLElement): string[] {
-    return [...el.querySelectorAll('[data-testid^="task-row-"]')].map(
+    return [...el.querySelectorAll('[data-testid^="task-title-"]')].map(
       (e) => e.textContent?.trim() ?? '',
     );
   }
@@ -565,6 +568,53 @@ describe('侧栏导航', () => {
       (t) => t.title === '买牛奶',
     );
     expect(created?.projectId, '收集箱建的任务不该被塞进任何清单').toBeUndefined();
+  });
+
+  /**
+   * 🔴 抽取的收尾动作是**删掉旧的那份**（AGENTS §3.5）。
+   *
+   * 归属进了共享元信息槽之后，`TaskOrganizer` 上那枚**常驻**的清单 chip
+   * 就成了同一个信息在**同一行里出现两遍**。上面两条用例证明不了这件事 ——
+   * 它们各看一个位置；只有**整行**能。
+   *
+   * ⚠️ 统计范围是"行上**常驻可见**的那部分"：整理面板（`<details>` 里那个清单
+   * `<select>`）本来就要把每条清单列一遍，那是**控件的选项**，不是界面上的
+   * 第二份归属。把它算进来会让这条判据对正确的实现报红 —— 而"失败得不对"
+   * 的判据和没有判据一样糟。
+   */
+  it('🔴 行上常驻可见的部分里，归属只出现一次', async () => {
+    await freshDb();
+    await act(async () => {
+      await useProjectStore.getState().addProject('家庭装修');
+    });
+    const projectId = useProjectStore.getState().projects[0]?.id;
+    expect(projectId, '清单没建出来').toBeDefined();
+    await act(async () => {
+      await useTaskStore.getState().addTask('买两桶漆', { projectId });
+      await useTaskStore.getState().addTask('买牛奶');
+    });
+
+    await mount();
+
+    const visible = (title: string): string => {
+      const rows = [...container!.querySelectorAll<HTMLElement>('[data-testid^="task-item-"]')];
+      const row = rows.find((el) => titles(el).includes(title));
+      expect(row, `没有渲染出「${title}」这一行`).toBeDefined();
+      const clone = row!.cloneNode(true) as HTMLElement;
+      clone.querySelectorAll('details').forEach((d) => d.remove());
+      return clone.textContent ?? '';
+    };
+
+    const count = (text: string, needle: string): number => text.split(needle).length - 1;
+
+    expect(
+      count(visible('买两桶漆'), '家庭装修'),
+      '「家庭装修」在行上出现了不止一次 —— 归属有两份显示',
+    ).toBe(1);
+    expect(
+      count(visible('买牛奶'), '收集箱'),
+      '「收集箱」在行上出现了不止一次',
+    ).toBe(1);
   });
 });
 

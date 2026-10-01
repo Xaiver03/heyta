@@ -18,6 +18,7 @@ import {
   configureEndpoint,
   expectNoStubCall,
   expectStubCount,
+  metaBadgeTexts,
   metaFor,
   openApp,
   resetStub,
@@ -27,12 +28,23 @@ import {
   waitForStubCalls,
 } from './helpers.js';
 
-/** 结果面板里的中文标签 → 任务行上的 `P{n}` 徽标。 */
+/**
+ * 结果面板里的中文标签 → 任务行上的优先级徽章文案。
+ *
+ * 🔴 这一列以前是 `P1/P2/P3`。那正是 web 上被修掉的那个缺陷本身：行内直接渲染
+ * `P{数字}` —— 一个从不解释的数字、且中英都是数字（数字没有语言），而移动端
+ * 显示的是「高优先级」。行元信息收进共享 `TaskBadges` 之后 web 与移动端同一份
+ * 字形，文案来自 `packages/i18n` 的 `mobile.priority.badge`（zh 是 `{level}优先级`）。
+ * ⚠️ 改词条要同时改这里（e2e 是**独立 workspace**，拿不到 `@heyta/i18n`）。
+ */
 const BADGE: Readonly<Record<string, string>> = {
-  高: 'P3',
-  中: 'P2',
-  低: 'P1',
+  高: '高优先级',
+  中: '中优先级',
+  低: '低优先级',
 };
+
+/** 全部优先级徽章文案 —— 用来判"这一行**没有**优先级徽章"。 */
+const PRIORITY_BADGES = new Set<string>(Object.values(BADGE));
 
 test.describe('AI 优先级建议：真浏览器端到端旅程', () => {
   test('配置 → 建 3 条任务 → 披露 → 真请求 → 取舍 → 写回优先级 → 刷新后仍在', async ({
@@ -101,16 +113,25 @@ test.describe('AI 优先级建议：真浏览器端到端旅程', () => {
     await expect(page.locator('[data-testid="prioritize-applied"]')).toHaveText('已应用');
 
     // ══ 6. 断言结果真的落到**界面上看得见**的地方 ══════════════════════
+    //
+    // 🔴 正向判据仍走 locator（有自动重试，子串命中）；否定判据必须**逐徽章**比
+    //（见 `helpers.ts` 的 `metaBadgeTexts`）：旧的 `not.toContainText('P')` 在
+    //「高优先级」这种新文案下根本不含 `P`，会被"永远通过"的判据顶掉。
     for (const pair of kept) {
       await expect(
         metaFor(page, pair.title),
         `「${pair.title}」应该显示 ${pair.badge}`,
       ).toContainText(pair.badge);
     }
-    await expect(
-      metaFor(page, dropped.title),
-      `被取消的「${dropped.title}」不该被写优先级`,
-    ).not.toContainText('P');
+    await expect
+      .poll(
+        async () =>
+          (await metaBadgeTexts(page, dropped.title)).filter((badge) =>
+            PRIORITY_BADGES.has(badge),
+          ).length,
+        { message: `被取消的「${dropped.title}」不该被写优先级` },
+      )
+      .toBe(0);
 
     // ══ 7. 刷新：优先级仍在（不是内存里的一次性状态）═══════════════════
     await page.reload();
@@ -118,7 +139,15 @@ test.describe('AI 优先级建议：真浏览器端到端旅程', () => {
     for (const pair of kept) {
       await expect(metaFor(page, pair.title)).toContainText(pair.badge);
     }
-    await expect(metaFor(page, dropped.title)).not.toContainText('P');
+    await expect
+      .poll(
+        async () =>
+          (await metaBadgeTexts(page, dropped.title)).filter((badge) =>
+            PRIORITY_BADGES.has(badge),
+          ).length,
+        { message: `刷新后被取消的「${dropped.title}」仍然不该有优先级徽章` },
+      )
+      .toBe(0);
     await expectStubCount(request, 1);
   });
 });

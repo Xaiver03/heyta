@@ -233,8 +233,20 @@ export function TaskRow({
     : (labels?.toggleOn?.(row) ?? row.title);
   const openLabel = labels?.open?.(row);
 
+  /**
+   * 🔴 锚点叫 `task-title-*`，**不能**叫 `task-row-title`：`[data-testid^="task-row-"]`
+   * 在别处被当成**行数**来数（`e2e/tests/desktop-window.spec.ts`、
+   * `scripts/verify-universal-slice.browser.mjs`），多一个同前缀的元素会把每一行数两遍。
+   *
+   * 标题必须单独可寻址：行体（`task-row-*`）的 `textContent` 里现在**一定**有元信息
+   *（归属常驻），按行体取"这条叫什么"会把「收集箱」之类的徽章一起吞进去。
+   */
   const title = (
-    <Text style={[text[TASK_ROW_TEXT.title], row.done ? styles.titleDone : null]} numberOfLines={2}>
+    <Text
+      style={[text[TASK_ROW_TEXT.title], row.done ? styles.titleDone : null]}
+      testID={`task-title-${row.id}`}
+      numberOfLines={2}
+    >
       {row.title}
     </Text>
   );

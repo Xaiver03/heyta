@@ -31,7 +31,7 @@ import {
   configureEndpoint,
   expectNoStubCall,
   expectStubCount,
-  metaFor,
+  metaBadgeTexts,
   openApp,
   resetStub,
   rowFor,
@@ -102,10 +102,16 @@ test.describe('AI 一句话捕获：真浏览器端到端旅程', () => {
     await page.locator('[data-testid="capture-apply"]').click();
 
     await expect(rowFor(page, STUB_CAPTURE_TITLE)).toBeVisible();
-    // high = Priority.High = 3 → 列表上的 P3 徽标。
-    // 🔴 用 `toHaveText('P3')` 而不是 `toContainText`：没有 dueDate 时
-    // 元信息区里应当**只有**这个徽标（"不确定就省略"）。
-    await expect(metaFor(page, STUB_CAPTURE_TITLE)).toHaveText('P3');
+    // high = Priority.High → 行内「高优先级」徽章（与移动端同一份字形，不再是 `P3`）。
+    // 🔴 整槽逐徽章钉死：这一槽现在是「清单归属 + 优先级」两枚。假端点故意不给
+    // dueDate，所以**不该有截止徽章** —— 钉整个数组比只盯一枚更能回答"不确定就省略"。
+    // ⚠️ 逐徽章快照没有自动重试，判据必须包在 `expect.poll` 里。
+    const EXPECTED_META = ['收集箱', '高优先级'];
+    await expect
+      .poll(() => metaBadgeTexts(page, STUB_CAPTURE_TITLE), {
+        message: `元信息区应当是 ${JSON.stringify(EXPECTED_META)}`,
+      })
+      .toEqual(EXPECTED_META);
 
     // 应用后输入框被清空 —— 与按回车是同一种结果（否则容易建出重复任务）。
     await expect(composer).toHaveValue('');
@@ -114,7 +120,11 @@ test.describe('AI 一句话捕获：真浏览器端到端旅程', () => {
     // ══ 7. 刷新：任务仍在（落的是 op-log，不是内存状态）═════════════════
     await page.reload();
     await expect(rowFor(page, STUB_CAPTURE_TITLE)).toBeVisible();
-    await expect(metaFor(page, STUB_CAPTURE_TITLE)).toHaveText('P3');
+    await expect
+      .poll(() => metaBadgeTexts(page, STUB_CAPTURE_TITLE), {
+        message: '刷新后元信息区应当还是那两枚徽章',
+      })
+      .toEqual(EXPECTED_META);
     await expectStubCount(request, 1);
   });
 });

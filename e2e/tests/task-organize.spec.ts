@@ -1,6 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 
-import { addTask, openApp, rowFor } from './helpers.js';
+import { addTask, metaFor, openApp, rowFor } from './helpers.js';
 
 /**
  * 任务整理：清单归属 + 标签（真浏览器，零 mock）
@@ -80,15 +80,19 @@ test.describe('任务整理：清单归属 + 标签', () => {
     const row = rowFor(page, TITLE);
     await expect(row).toBeVisible();
 
-    // 挂之前两个 chip 都不该在。**这是让后面断言能为假的前提**：
-    // 如果 chip 从一开始就渲染，那"挂上了"这条断言永远为真。
-    await expect(row.getByTestId('task-chip-project')).toHaveCount(0);
+    // 挂之前归属**不该出现在元信息槽里**。**这是让后面断言能为假的前提**：
+    // 如果它从一开始就在，那"挂上了"这条断言永远为真。
+    //
+    // 🔴 选择器跟着迁移换了：清单 chip 已随"归属进共享槽"删除
+    //（同一行里出现两遍清单名，见 `TaskOrganizer.tsx` 文件头决定 1）。
+    // 归属现在的**唯一显示位**是共享 `TaskBadges` 那一槽。
+    await expect(metaFor(page, TITLE)).not.toContainText(LIST);
     await expect(row.getByTestId('task-chip-tag')).toHaveCount(0);
 
     await row.getByTestId('task-organize-summary').click();
 
     await row.getByLabel(`任务「${TITLE}」所属清单`).selectOption({ label: LIST });
-    await expect(row.getByTestId('task-chip-project')).toHaveText(LIST);
+    await expect(metaFor(page, TITLE), '归属没有出现在行的元信息槽里').toContainText(LIST);
 
     const checkbox = row.getByRole('checkbox', {
       name: `给任务「${TITLE}」加上或去掉标签「${TAG}」`,
@@ -139,9 +143,9 @@ test.describe('任务整理：清单归属 + 标签', () => {
     const afterReload = rowFor(page, TITLE);
     await expect(afterReload).toBeVisible();
     await expect(
-      afterReload.getByTestId('task-chip-project'),
+      metaFor(page, TITLE),
       '刷新后清单归属丢了 —— 说明它只改了内存状态，没有派发 op',
-    ).toHaveText(LIST);
+    ).toContainText(LIST);
     await expect(
       afterReload.getByTestId('task-chip-tag'),
       '刷新后标签丢了 —— 同上',

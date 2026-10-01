@@ -94,3 +94,13 @@ export function rowFor(page: Page, title: string) {
 export function sidebar(page: Page) {
   return page.locator('aside[aria-label="清单与标签"]');
 }
+
+/**
+ * 任务行右侧的元信息区（清单归属 / 截止时间 / 优先级徽标）。
+ *
+ * 🔴 清单归属**只有这一个显示位**：行尾那枚清单 chip 已随"归属进共享槽"删除，
+ * 留着它同一行里会出现两遍清单名（见 `apps/web/src/features/tasks/TaskOrganizer.tsx`）。
+ */
+export function metaFor(page: Page, title: string) {
+  return rowFor(page, title).locator('[data-testid="task-meta"]');
+}

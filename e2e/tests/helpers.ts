@@ -276,9 +276,28 @@ export function rowFor(page: Page, title: string) {
   });
 }
 
-/** 任务行右侧的元信息区（截止时间 / 优先级徽标）。 */
+/** 任务行右侧的元信息区（清单归属 / 截止时间 / 优先级徽标）。 */
 export function metaFor(page: Page, title: string) {
   return rowFor(page, title).locator('[data-testid="task-meta"]');
+}
+
+/**
+ * 元信息区里**每一个徽章**的文字，按 DOM 顺序（一个徽章 = 一个子节点）。
+ *
+ * 🔴 为什么不再直接读 `metaFor(...)` 的文本：行内常驻**清单归属**之后，那一段
+ * 必然是「收集箱高优先级」这样连成一串的（`gap` 是布局间距，不产生空格）。
+ * 于是 `toContainText` 会因拼接而"看起来通过"，而 `not.toContainText('P')`
+ * 这种旧的否定判据会因新文案里根本没有 `P` 而**永远通过** ——
+ * 一条永远通过的判据比没有判据更糟。逐徽章比才回答"这一槽里到底有什么"。
+ *
+ * ⚠️ 它返回的是**已经取到的快照**，没有 locator 的自动重试 —— 用它做判据要包在
+ * `expect.poll(...)` 里，否则"界面还没重渲染"会变成一条假红。
+ */
+export async function metaBadgeTexts(page: Page, title: string): Promise<string[]> {
+  const texts = await metaFor(page, title)
+    .locator('> *')
+    .allTextContents();
+  return texts.map((text) => text.trim());
 }
 
 export interface EndpointSetup {

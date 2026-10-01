@@ -14,6 +14,7 @@
  * | 图标与文字的间距、字号、对齐 | 优先级文案 |
  * | 逾期自动变红 | **优先级的颜色**（由优先级数值决定） |
  * | 无文字时退化成纯图标（仍可读屏） | 重复规则的句子 |
+ * | 四个徽章的**顺序**（归属 → 截止 → 优先级 → 重复） | **清单名**（由 `listNameFor` 解析） |
  *
  * 为什么"优先级的颜色"由宿主给、而"逾期变红"留在共享层：逾期是个**布尔语义**
  * （只有两个状态，且"逾期=危险色"是设计系统的规定），而优先级是**数据驱动的**
@@ -28,7 +29,7 @@
 
 import React, { useMemo } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
-import { CalendarClock, Flag, Repeat, TriangleAlert } from 'lucide';
+import { CalendarClock, Flag, Folder, Repeat, TriangleAlert } from 'lucide';
 import { HeytaIcon, type HeytaIconData } from '../icon/Icon.js';
 import { useHeytaText, useHeytaTokens } from '../theme.js';
 
@@ -38,12 +39,16 @@ import { useHeytaText, useHeytaTokens } from '../theme.js';
  * ⚠️ 这几个选择**必须与各端已有的一致**（mobile 的
  * `apps/mobile/src/ui/icons.tsx` 里就是这样登记的），否则同一个"逾期"
  * 在手机上是个三角、在桌面上是另一种形状 —— 那比没有图标更糟。
+ *
+ * ⚠️ `list` 用的文件夹图标与 web 行尾那个"整理"chip（`TaskOrganizer`）
+ * 是同一个字形：它们说的是同一件事（这条任务归哪条清单）。
  */
 const GLYPHS = {
   due: CalendarClock,
   overdue: TriangleAlert,
   priority: Flag,
   repeat: Repeat,
+  list: Folder,
 } satisfies Record<string, HeytaIconData>;
 
 export interface TaskBadgesProps {
@@ -53,6 +58,18 @@ export interface TaskBadgesProps {
   readonly priority?: { readonly text: string; readonly color: string } | null;
   /** 重复：已本地化的句子。 */
   readonly repeat?: string | null;
+  /**
+   * 清单归属：**已解析好的清单名**。
+   *
+   * 🔴 为什么放在本行**最前面**：参照图（滴答清单）行右那段是
+   * 「收集箱 · 昨天」—— 归属在截止之前。归属是"这条在哪"，截止是"这条什么时候"，
+   * 扫列表时先定位再定时。
+   *
+   * ⚠️ **不在这里判断"有没有归属"**（那是 `@heyta/ui` 的 `listNameFor` 的责任：
+   * 收集箱给"收集箱"这个词、悬空 id 与空名字给 `null`）。这里只认"给了就画" ——
+   * 把判断塞进渲染层，就会出现第二个"什么算有归属"。
+   */
+  readonly list?: string | null;
   /**
    * 没有文字时给图标的无障碍名。
    *
@@ -69,6 +86,7 @@ export function TaskBadges({
   due,
   priority,
   repeat,
+  list,
   iconLabel,
   testID,
 }: TaskBadgesProps): React.JSX.Element | null {
@@ -91,15 +109,28 @@ export function TaskBadges({
   const hasDue = due !== null && due !== undefined;
   const hasPriority = priority !== null && priority !== undefined;
   const hasRepeat = repeat !== null && repeat !== undefined && repeat !== '';
+  const hasList = list !== null && list !== undefined && list !== '';
 
   // 一个都没有时**返回 null**，而不是渲染一个空的 View。
   // 空 View 也会占掉 `gap` 的间距，让没有徽章的行看起来比有徽章的行矮一截。
-  if (!hasDue && !hasPriority && !hasRepeat) return null;
+  if (!hasDue && !hasPriority && !hasRepeat && !hasList) return null;
 
   const dueColor = due?.overdue === true ? tokens['color.danger'] : tokens['color.foreground-subtle'];
 
   return (
     <View style={styles.row} testID={testID}>
+      {hasList ? (
+        <View style={styles.item}>
+          <HeytaIcon data={GLYPHS.list} size={tokens['icon.xs']} color={tokens['color.foreground-subtle']} />
+          <Text
+            style={[text['row-meta'], { color: tokens['color.foreground-muted'] }]}
+            numberOfLines={1}
+          >
+            {list}
+          </Text>
+        </View>
+      ) : null}
+
       {hasDue ? (
         <View style={styles.item}>
           <HeytaIcon

@@ -27,9 +27,10 @@
 import React from 'react';
 import { computeCountdown, Priority } from '@heyta/domain';
 import { useI18n } from '@heyta/i18n';
-import { TaskBadges, useHeytaTokens, type TaskRow as SharedTaskRow } from '@heyta/ui';
+import { TaskBadges, listNameFor, useHeytaTokens, type TaskRow as SharedTaskRow } from '@heyta/ui';
 
 import { dueText, type DueDisplayMode } from '../../lib/due-display.js';
+import { useProjectStore } from '../projects/store.js';
 import { priorityBadgeText, priorityColorToken } from './priority-display.js';
 
 export function TaskRowMeta({
@@ -43,6 +44,10 @@ export function TaskRowMeta({
 }): React.JSX.Element | null {
   const { t } = useI18n();
   const tokens = useHeytaTokens();
+  // 🔴 归属的判断在共享层（`listNameFor`），这里只交"清单表 + 收集箱这个词"。
+  // 原先 web 是在行尾的整理 chip 里自己 `projects.find(...)` 查一次名字 ——
+  // 那是第二份"什么算有归属"（缺口登记在计划文档 §6.6）。
+  const projects = useProjectStore((s) => s.projects);
   const task = row.source;
 
   const due = dueText(task, mode, now, t);
@@ -51,6 +56,7 @@ export function TaskRowMeta({
   return (
     <TaskBadges
       testID="task-meta"
+      list={listNameFor(projects, task.projectId, t('web.organize.inbox'))}
       due={
         due === null ? null : { text: due, overdue: computeCountdown(task, { now }).overdue }
       }

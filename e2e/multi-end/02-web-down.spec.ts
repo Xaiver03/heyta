@@ -2,7 +2,15 @@ import { readFileSync } from 'node:fs';
 
 import { expect, test } from '@playwright/test';
 
-import { configureSync, openApp, requireCredentials, rowFor, sidebar, syncNow } from './helpers.js';
+import {
+  configureSync,
+  metaFor,
+  openApp,
+  requireCredentials,
+  rowFor,
+  sidebar,
+  syncNow,
+} from './helpers.js';
 
 /**
  * 三端验收 · 第 2 相：**全新 Web 安装把两台设备的数据都拉回来**
@@ -95,7 +103,8 @@ test('全新 Web 安装：同步前为空，同步后拉到两台设备的数据
 
   const rowA = rowFor(page, handle.title);
   await expect(rowA).toBeVisible();
-  await expect(rowA.getByTestId('task-chip-project')).toHaveText(handle.list);
+  // 🔴 归属的唯一显示位是共享元信息槽（行尾那枚清单 chip 已删）。
+  await expect(metaFor(page, handle.title)).toContainText(handle.list);
   await expect(rowA.getByTestId('task-chip-tag')).toHaveText(handle.tag);
 
   // 🔴 任务 B：**笔记本**建的，Web 从没见过它。

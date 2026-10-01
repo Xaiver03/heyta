@@ -87,7 +87,13 @@ import { Icon, type IconName } from '../ui/icons';
  * 图标本身通过 `TaskBadges` 共享 —— 字形数据来自框架无关的 `lucide`，
  * 由共享层用自己的 `react-native-svg` 渲染，所以四个端的字形不可能再漂移。
  */
-import { TaskBadges, TaskList, type TaskRow as SharedTaskRow, type TaskSection } from '@heyta/ui';
+import {
+  TaskBadges,
+  TaskList,
+  listNameFor,
+  type TaskRow as SharedTaskRow,
+  type TaskSection,
+} from '@heyta/ui';
 
 /**
  * 分节头要显示什么 —— **本端自己的**透传数据。
@@ -666,6 +672,11 @@ export function TasksScreen({
       const repeat = actions?.repeatOf(task.id);
       return (
         <TaskBadges
+          // 🔴 归属走 `listNameFor`（共享判断，与 web 同一份）：**不许**在这里
+          // 自己 `projects.find(...)`，那会让"什么算有归属"变成两处。
+          // 第三个参数是"收集箱"这个词 —— 宿主只交名词，要不要显示由共享层决定
+          // （`@heyta/ui` 的依赖里没有 `@heyta/i18n`，见该包 package.json）。
+          list={listNameFor(projects, task.projectId, t('mobile.detail.project.inbox'))}
           due={due === null ? null : { text: due.text, overdue: due.overdue }}
           priority={
             badge === null
@@ -676,7 +687,7 @@ export function TasksScreen({
         />
       );
     },
-    [actions, dueMode, locale, now, t, tokens],
+    [actions, dueMode, locale, now, projects, t, tokens],
   );
 
   const renderTaskTrailing = useCallback(
