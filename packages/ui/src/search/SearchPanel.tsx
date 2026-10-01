@@ -54,7 +54,7 @@
  */
 
 import React, { useMemo } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import type { Note, Task } from '@heyta/domain';
 import { CornerDownRight, Folder, Search, StickyNote, Tag } from 'lucide';
@@ -67,6 +67,7 @@ import { toNoteRows } from '../notes/model.js';
 import { TaskList, type TaskListLabels } from '../task-list/TaskList.js';
 import { useHeytaText, useHeytaTokens } from '../theme.js';
 import type { QuickAction, SearchResultEntry } from './model.js';
+import { panelSurfaceColor } from './panel-surface.js';
 
 /**
  * 浮层的全部文案 —— **宿主注入**（本层不许 `import '@heyta/i18n'`，
@@ -171,7 +172,7 @@ export function SearchPanel({
           borderWidth: tokens['border-width.thin'],
           borderColor: tokens['color.border'],
           /**
-           * 🔴 **玻璃 = 半透明底色（这里）+ 背景模糊（宿主的 CSS）**，两半缺一不可。
+           * 🔴 **玻璃 = 半透明底色 + 背景模糊**，两半缺一不可。
            *
            * 为什么底色放在共享层而不由宿主覆盖：RN-web 把 `backgroundColor` 编译成
            * 它自己注入的原子类，宿主的样式表**未必赢得了注入顺序** —— 把材质做在
@@ -180,11 +181,15 @@ export function SearchPanel({
            * （与 `native-values.ts` 里 shadow / cubic-bezier 同一类划分）。
            *
            * ⚠️ 设计系统的材质规则第 2 条写着"禁止把亮色半透明面叠在另一个半透明面上"。
-           * 这里**是**叠在 scrim 上，靠的就是那层模糊：模糊把底下的文字抹成匀质色板，
-           * 于是前景对比不再取决于"下面恰好有什么字"—— 这正是 Apple 材质把 tint 与
-           * blur 配成一对的原因。少了 blur，这条材质就不该用。
+           * web 这一支**是**叠在 scrim 上，靠的就是那层模糊：模糊把底下的文字抹成
+           * 匀质色板，于是前景对比不再取决于"下面恰好有什么字" —— 这正是 Apple 材质
+           * 把 tint 与 blur 配成一对的原因。
+           *
+           * 🔴 RN 原生没有 blur，所以它拿的是**不透明**的浮层面（`surface-raised`）。
+           * 这条以前只写在注释里，于是原生端照着用 web 的材质，实测到的症状是
+           * 顶栏图标与大号日期**穿过卡片**印在前景上（见 `panel-surface.ts` 文件头）。
            */
-          backgroundColor: tokens['material.chrome-tint'],
+          backgroundColor: panelSurfaceColor(tokens, Platform.OS === 'web'),
         },
       ]}
       testID={testID}
