@@ -333,6 +333,19 @@ Node 实测 `'café'.normalize('NFC') === 'café'.normalize('NFD')` 为 **`false
     已经落盘的密文 —— 那是数据不可达，不是登录失败。修它要同时决定"旧密文怎么办"（重派生 +
     全量重加密，或按输入形式双读），是一条独立的 ADR。
     本轮只保证**密码这条新路径**自洽：设置与校验同一个函数、同一次 NFKC。
+12. ⚠️ **`bcryptjs` 现在是"声明了但没人用"的依赖**（`server/package.json`），而摘掉它要单独一个提交。
+    它的两处引用这次都拿掉了：`test-routes.ts` 改用产品的 Argon2id 后端（TEST_MODE 造的号过去写
+    bcrypt 串，产品那条登录路径**永远验不过** —— 只在 E2E 里现形的假账号），
+    `server/tests/auth-flows.spec.ts` 则本来就**是死的**：它 import 的
+    `registerUser / loginUser / initDb / getDb` 在 `server/src` 里一个都不存在，而它一直躺在
+    `vitest.config.ts` 的 exclude 名单里 ⇒ 从没跑过、也从没红过。文件与那条 exclude 一起删了。
+    🔴 **依赖条目没跟着删，是因为删它的代价不在本次改动里**：`pnpm install --lockfile-only`
+    顺带把 `@react-native/*` 的 90 行 peer 后缀（`(supports-color@5.5.0)`）整个重新规范化了 ——
+    那是 pnpm 小版本差异，与口令无关，混进认证提交会让下一位分不清哪些改动是这轮的目的。
+    做这件事的人：命令是 `pnpm install --lockfile-only`，判据是 `grep -c bcryptjs pnpm-lock.yaml` → 0、
+    `cd server && npx tsc --noEmit` exit 0、`pnpm check:licenses` exit 0。
+    ⚠️ 生产镜像走 `pnpm install --frozen-lockfile`（`server/Dockerfile:58`）⇒
+    **package.json 与 pnpm-lock.yaml 必须同一个提交改**，只删前者会让构建直接失败。
 
 ---
 
