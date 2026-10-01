@@ -69,6 +69,7 @@ vi.mock('@simplewebauthn/server', () => ({
 
 // Import mocked modules to get references
 import { prisma } from '../src/db';
+import { hashToken } from '../src/auth-tokens';
 import { sendPasskeyRecoveryEmail, sendVerificationEmail } from '../src/email';
 import * as simplewebauthn from '@simplewebauthn/server';
 
@@ -268,6 +269,9 @@ describe('Passkey Authentication', () => {
           publicKey: expect.any(Buffer),
         }),
       });
+      // ⚠️ 这条用例（TEST_MODE 自动验证）**没有**可对照的发信调用，而 `randomBytes(32)`
+      // 与 SHA-256 **同为 64 个十六进制字符** —— 形态检查区分不了两者。
+      // 真正钉住"落库的是哈希不是令牌"的是下面那条带邮件对照的用例。不能失败的检查没有价值。
     });
 
     it('should return the neutral response without changing an existing verified user', async () => {
@@ -393,6 +397,17 @@ describe('Passkey Authentication', () => {
       });
       expect(mockPrisma.passkey.create).not.toHaveBeenCalled();
       expect(sendVerificationEmail).toHaveBeenCalledOnce();
+
+      // 🔴 这一条才是"库里存哈希、邮件发原文"的判据：把**同一次注册**的两个出口对照。
+      // 光看落库值区分不了（原始令牌和它的 SHA-256 都是 64 个十六进制字符）。
+      const storedPendingToken = (
+        mockPrisma.pendingPasskeyRegistration.create.mock.calls[0][0] as {
+          data: { verificationToken: string };
+        }
+      ).data.verificationToken;
+      const emailedToken = (sendVerificationEmail as Mock).mock.calls[0][1] as string;
+      expect(storedPendingToken).toBe(hashToken(emailedToken));
+      expect(storedPendingToken).not.toBe(emailedToken);
     });
 
     it('should keep a failed-delivery credential pending and inactive', async () => {
@@ -776,6 +791,13 @@ describe('Passkey Authentication', () => {
       expect(result).toEqual(recoveryResponse);
       const claimedToken =
         mockPrisma.user.updateMany.mock.calls[0][0].data.passkeyRecoveryToken;
+      const emailedToken = (sendPasskeyRecoveryEmail as Mock).mock.calls[0][1] as string;
+      // 🔴 库里那一列 = 邮件那一串的 SHA-256，**不是**同一句话；回滚必须按同一形态查。
+      // ⚠️ 光看落库值**区分不了**：原始令牌和它的 SHA-256 都是 64 个十六进制字符。
+      // 判据只能是"同一次请求的两个出口对照" —— 相等就是没哈希，就是这一刀没落地。
+      expect(claimedToken).toMatch(/^[0-9a-f]{64}$/);
+      expect(claimedToken).not.toBe(emailedToken);
+      expect(claimedToken).toBe(hashToken(emailedToken));
       expect(mockPrisma.user.updateMany.mock.calls[1][0]).toEqual({
         where: { id: 1, passkeyRecoveryToken: claimedToken },
         data: {
@@ -869,9 +891,9 @@ describe('Passkey Authentication', () => {
         'Invalid or expired recovery token',
       );
 
-      // Should clear expired token
+      // Should clear expired token —— 按**哈希**清（那一列存的是 SHA-256）
       expect(mockPrisma.user.updateMany).toHaveBeenCalledWith({
-        where: { id: 1, passkeyRecoveryToken: 'expired-token' },
+        where: { id: 1, passkeyRecoveryToken: hashToken('expired-token') },
         data: {
           passkeyRecoveryToken: null,
           passkeyRecoveryTokenExpiresAt: null,
@@ -951,7 +973,7 @@ describe('Passkey Authentication', () => {
       expect(txUserUpdateMany).toHaveBeenCalledWith({
         where: {
           id: 1,
-          passkeyRecoveryToken: recoveryToken,
+          passkeyRecoveryToken: hashToken(recoveryToken),
           OR: [
             { passkeyRecoveryTokenExpiresAt: null },
             { passkeyRecoveryTokenExpiresAt: { gte: expect.any(BigInt) } },

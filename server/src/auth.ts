@@ -9,6 +9,7 @@ import { loadConfigFromEnv, isConsentRequired } from './config';
 import { Prisma } from '@prisma/client';
 import { authCache } from './auth-cache';
 import { getDefaultStorageQuotaBytes } from './sync/services/storage-quota.service';
+import { hashToken } from './auth-tokens';
 
 // Auth constants
 const MIN_JWT_SECRET_LENGTH = 32;
@@ -93,7 +94,7 @@ const settleReferralSafe = async (
 
 export const verifyEmail = async (token: string): Promise<boolean> => {
   const pendingPasskey = await prisma.pendingPasskeyRegistration.findUnique({
-    where: { verificationToken: token },
+    where: { verificationToken: hashToken(token) },
   });
 
   if (pendingPasskey) {
@@ -144,7 +145,7 @@ export const verifyEmail = async (token: string): Promise<boolean> => {
   }
 
   const user = await prisma.user.findFirst({
-    where: { verificationToken: token },
+    where: { verificationToken: hashToken(token) },
   });
 
   if (!user) {
@@ -160,7 +161,7 @@ export const verifyEmail = async (token: string): Promise<boolean> => {
 
   const verified = await prisma.$transaction(async (tx) => {
     const claim = await tx.user.updateMany({
-      where: { id: user.id, isVerified: 0, verificationToken: token },
+      where: { id: user.id, isVerified: 0, verificationToken: hashToken(token) },
       data: {
         isVerified: 1,
         verificationToken: null,
@@ -376,7 +377,7 @@ export const requestLoginMagicLink = async (
       ],
     },
     data: {
-      loginToken,
+      loginToken: hashToken(loginToken),
       loginTokenExpiresAt: expiresAt,
     },
   });
@@ -385,7 +386,7 @@ export const requestLoginMagicLink = async (
   const emailSent = await sendLoginMagicLinkEmail(email, loginToken, locale);
   if (!emailSent) {
     await prisma.user.updateMany({
-      where: { id: user.id, loginToken },
+      where: { id: user.id, loginToken: hashToken(loginToken) },
       data: {
         loginToken: null,
         loginTokenExpiresAt: null,
@@ -423,8 +424,10 @@ export const issueSession = (user: {
 export const verifyLoginMagicLink = async (
   token: string,
 ): Promise<{ token: string; user: { id: number; email: string; locale: string | null } }> => {
+  // 邮件里那句令牌**原样**传进来，库里那一列是它的 SHA-256 ⇒ 每次按哈希查。
+  const tokenHash = hashToken(token);
   const user = await prisma.user.findFirst({
-    where: { loginToken: token },
+    where: { loginToken: tokenHash },
   });
 
   if (!user) {
@@ -434,7 +437,7 @@ export const verifyLoginMagicLink = async (
   const now = BigInt(Date.now());
   if (user.loginTokenExpiresAt && user.loginTokenExpiresAt < now) {
     await prisma.user.updateMany({
-      where: { id: user.id, loginToken: token },
+      where: { id: user.id, loginToken: tokenHash },
       data: {
         loginToken: null,
         loginTokenExpiresAt: null,
@@ -448,7 +451,7 @@ export const verifyLoginMagicLink = async (
   const consume = await prisma.user.updateMany({
     where: {
       id: user.id,
-      loginToken: token,
+      loginToken: tokenHash,
       OR: [{ loginTokenExpiresAt: null }, { loginTokenExpiresAt: { gte: now } }],
     },
     data: {
@@ -500,7 +503,7 @@ export const verifyEmailLink = async (token: string): Promise<EmailLinkVerifyRes
   if (viaLogin) return { kind: 'session', ...viaLogin };
 
   const pendingPasskey = await prisma.pendingPasskeyRegistration.findUnique({
-    where: { verificationToken: token },
+    where: { verificationToken: hashToken(token) },
     select: { userId: true },
   });
   if (pendingPasskey) {
@@ -516,7 +519,7 @@ export const verifyEmailLink = async (token: string): Promise<EmailLinkVerifyRes
   }
 
   const user = await prisma.user.findFirst({
-    where: { verificationToken: token },
+    where: { verificationToken: hashToken(token) },
     select: { id: true, email: true, tokenVersion: true, locale: true },
   });
   if (!user) throw new Error('Invalid or expired link');
@@ -604,7 +607,7 @@ export const registerWithMagicLink = async (
           verificationResendCount: { lt: MAX_VERIFICATION_RESEND_COUNT },
         },
         data: {
-          verificationToken,
+          verificationToken: hashToken(verificationToken),
           verificationTokenExpiresAt: tokenExpiresAt,
           verificationResendCount: { increment: 1 },
           ...(acceptedAt !== undefined && { termsAcceptedAt: acceptedAt }),
@@ -627,7 +630,7 @@ export const registerWithMagicLink = async (
           passwordHash: passwordHash ?? null,
           // 注册语言 = 账号语言的起点（之后登录态改语言会更新它，见 /account/locale）。
           ...(locale !== undefined ? { locale } : {}),
-          verificationToken,
+          verificationToken: hashToken(verificationToken),
           verificationTokenExpiresAt: tokenExpiresAt,
           // Never invent an acceptance — see the same guard in passkey.ts. An instance
           // with no legal pages has nothing to accept, and the column is nullable.

@@ -84,6 +84,7 @@ vi.mock('../src/auth', async (importOriginal) => {
 
 // Import mocked modules to get references
 import { prisma } from '../src/db';
+import { hashToken } from '../src/auth-tokens';
 import { sendLoginMagicLinkEmail, sendVerificationEmail } from '../src/email';
 import { Prisma } from '@prisma/client';
 
@@ -173,6 +174,20 @@ describe('Magic Link Registration', () => {
         // 第三个参数是收件人语言。不传时是 `undefined`，由 email.ts 兜底成默认语言。
         undefined,
       );
+
+      // 🔴 **落库的那一串 = 邮件里那一串的 SHA-256**，不是同一句话。
+      // 上面两条断言对"明文落库"同样放行，而**形态区分不了两者** —— `randomBytes(32)`
+      // 与 SHA-256 都是 64 个十六进制字符。所以判据只能是把同一次注册的**两个出口对照**：
+      // 邮件里那句原样、库里那句是它的哈希且不相等。少了它，"某处忘了包 hashToken"
+      // 的症状（能注册、能验证、库里躺着可直接使用的凭证）在整个套件里无处现形。
+      const storedToken = (
+        mockPrisma.user.create.mock.calls[0][0] as {
+          data: { verificationToken: string };
+        }
+      ).data.verificationToken;
+      const emailedToken = mockSendVerificationEmail.mock.calls[0][1] as string;
+      expect(storedToken).toBe(hashToken(emailedToken));
+      expect(storedToken).not.toBe(emailedToken);
     });
 
     it('should normalize email to lowercase', async () => {
@@ -510,7 +525,9 @@ describe('Magic Link Registration', () => {
       expect(mockPrisma.user.updateMany).toHaveBeenCalledWith({
         where: {
           id: verifiedUser.id,
-          loginToken,
+          // 🔴 消费按**哈希**（库里那一列存的就是 SHA-256）。这条断言同时钉住反面：
+          // 写成 `loginToken` 也能让这条测试通过它原来的形状，所以额外断言下面那句。
+          loginToken: hashToken(loginToken),
           OR: [
             { loginTokenExpiresAt: null },
             { loginTokenExpiresAt: { gte: expect.any(BigInt) } },
@@ -523,6 +540,18 @@ describe('Magic Link Registration', () => {
           lockedUntil: null,
         },
       });
+      // 查询条件里出现的也必须是哈希：`findFirst` 是**读**那一侧，写对了读没换形态
+      // 的症状同样是"链接永远无效"。（不用 JSON.stringify 整个调用做包含判断 ——
+      // 那些字段里有 BigInt，序列化会直接抛错，而那会伪装成一个环境故障。）
+      expect(
+        (mockPrisma.user.findFirst.mock.calls[0][0] as { where: { loginToken: string } }).where
+          .loginToken,
+      ).toBe(hashToken(loginToken));
+      expect(
+        (mockPrisma.user.updateMany.mock.calls[0][0] as {
+          where: { loginToken: string };
+        }).where.loginToken,
+      ).toBe(hashToken(loginToken));
     });
 
     it('should reject a login token already consumed by another request', async () => {
@@ -557,7 +586,7 @@ describe('Magic Link Registration', () => {
       );
 
       expect(mockPrisma.user.updateMany).toHaveBeenCalledWith({
-        where: { id: verifiedUser.id, loginToken: expiredToken },
+        where: { id: verifiedUser.id, loginToken: hashToken(expiredToken) },
         data: { loginToken: null, loginTokenExpiresAt: null },
       });
     });

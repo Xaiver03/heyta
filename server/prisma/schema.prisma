@@ -15,9 +15,17 @@ model User {
   email                         String   @unique
   passwordHash                  String?  @map("password_hash") // Nullable for passkey-only users
   isVerified                    Int      @default(0) @map("is_verified") // 0 or 1
+  // 🔴 下面四对令牌列存的都是**令牌本身的 SHA-256（hex）**，不是发进邮件的那句话。
+  // 理由与"为什么这里不用 Argon2"都在 server/src/auth-tokens.ts；读写必须过
+  // 那一个 `hashToken()`，少包一次的症状不是报错而是"用户点邮件链接说链接已过期"。
+  // 存量明文已由 20261005000000_invalidate_stored_auth_tokens 一并作废。
+  // ⚠️ 这个立场只对**CSPRNG 生成的高熵一次性凭证**成立：若将来某列存的是人抄的
+  // 低熵恢复码，只存 SHA-256 不够（库里那份能当场穷举），要限次 + 短 TTL。
   verificationToken             String?  @map("verification_token")
   verificationTokenExpiresAt    BigInt?  @map("verification_token_expires_at")
   verificationResendCount       Int      @default(0) @map("verification_resend_count")
+  // ⚠️ 目前**没有任何代码写过/读过它** —— 口令找回流程本身还没落地（W3）。
+  // 它在这一批里跟着作废、跟着同一个 `hashToken()`，别让 W3 以为是明文列。
   resetPasswordToken            String?  @map("reset_password_token")
   resetPasswordTokenExpiresAt   BigInt?  @map("reset_password_token_expires_at")
   passkeyRecoveryToken          String?  @map("passkey_recovery_token")
@@ -80,6 +88,9 @@ model Passkey {
 
 model PendingPasskeyRegistration {
   id                         String   @id @default(cuid())
+  // 🔴 同样是 SHA-256 hex（见 User 上面那段与 server/src/auth-tokens.ts）。
+  // @unique 在哈希下仍然成立：令牌是 256 位随机值，哈希只是它的另一个名字。
+  // ⚠️ 这一列 NOT NULL ⇒ 清理迁移对这张表只能 DELETE，不能置 null。
   verificationToken          String   @unique @map("verification_token")
   verificationTokenExpiresAt BigInt   @map("verification_token_expires_at")
   credentialId               Bytes    @map("credential_id")

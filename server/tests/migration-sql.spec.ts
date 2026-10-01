@@ -668,3 +668,114 @@ describe('schema bootstrap and drift (#8187)', () => {
     expect(missing).toEqual([]);
   });
 });
+
+/**
+ * 令牌哈希化（W2）那一切的**清理迁移**判据。
+ *
+ * 这一刀是两条腿：代码改成按 SHA-256 查（由 `scripts/check-token-hashing.mjs` 钉住写法，
+ * `tests/magic-link-registration.spec.ts` / `tests/passkey.spec.ts` 钉住"两个出口对照"），
+ * 库里现存的明文凭证由这条迁移作废（由下面这几条钉住**一条都不能漏**）。
+ *
+ * 🔴 为什么这条测试从 `schema.prisma` **推导**要清的列，而不是把列名抄在这里：
+ * 抄一遍就意味着"以后加第五个令牌列、忘了在这里登记"仍然全绿 —— 而那正是这次改动
+ * 要防的那类事（一个能直接使用的登录凭证悄悄躺在备份里）。从 schema 推出来，
+ * 新增列不配清理就红。
+ */
+describe('auth token hashing cleanup migration', () => {
+  const MIGRATION = '20261005000000_invalidate_stored_auth_tokens';
+  const schema = readFileSync(join(currentDir, '../prisma/schema.prisma'), 'utf8');
+  const sql = readMigration(MIGRATION);
+
+  /** 从 schema 里找出所有 `*_token` 列（不含 `*_token_expires_at`）及其所在表。 */
+  const tokenColumns = (): Array<{ table: string; column: string; nullable: boolean }> => {
+    const found: Array<{ table: string; column: string; nullable: boolean }> = [];
+    for (const block of schema.split(/^model\s+/m).slice(1)) {
+      const tableName = block.match(/@@map\("([^"]+)"\)/)?.[1] ?? block.split('{')[0].trim();
+      for (const line of block.split('\n')) {
+        const mapped = line.match(/@map\("([^"]+_token)"\)/);
+        if (!mapped) continue;
+        // 字段形状固定为 `<字段名> <类型>[?]<空白>@map(...)`；`?` 就是可空。
+        const declaration = line.match(/^\s*\w+\s+([A-Za-z]+)(\?)?\s/);
+        expect(declaration, `解析不出字段声明：${line}`).not.toBeNull();
+        found.push({
+          table: tableName,
+          column: mapped[1],
+          nullable: declaration?.[2] === '?',
+        });
+      }
+    }
+    return found;
+  };
+
+  it('finds the token columns it claims to cover (the guard itself must not be vacuous)', () => {
+    const columns = tokenColumns();
+    // 前提断言：这一族列确实存在。若解析坏掉，下面两条会"零违规"地通过 ——
+    // 那正是 AGENTS §7 里"一条永远通过的判据比没有判据更糟"的形状。
+    expect(columns.map((c) => c.column).sort()).toEqual(
+      ['login_token', 'passkey_recovery_token', 'reset_password_token', 'verification_token', 'verification_token'].sort(),
+    );
+  });
+
+  /**
+   * 取出针对某张表的那条 UPDATE（到第一个 `;` 为止）。
+   *
+   * 为什么不直接对整个文件做正则：`UPDATE "users" … ; DELETE FROM …` 之后，
+   * `UPDATE "users"[\s\S]*?"某列" = NULL` 会**越过那条 UPDATE 的边界**去匹配后面的内容，
+   * 于是"漏清一列"也可能被判成已清。按语句切是这条判据成立的前提。
+   */
+  const updateFor = (table: string): string => {
+    const match = sql.match(new RegExp(`UPDATE\\s+"${table}"[^;]*;`, 'i'));
+    expect(match, `迁移里没有针对 "${table}" 的 UPDATE`).not.toBeNull();
+    return match[0];
+  };
+
+  it('nulls every nullable token column and its expiry, on the same table', () => {
+    for (const { table, column, nullable } of tokenColumns()) {
+      if (!nullable) continue;
+      const statement = updateFor(table);
+      expect(statement).toMatch(new RegExp(`"${column}"\\s*=\\s*NULL`, 'i'));
+      // 过期时间一起清：留着它会让"有令牌"的判读（`loginToken && expires > now`）
+      // 变成对着一个 NULL 令牌做时间比较。
+      expect(statement).toMatch(new RegExp(`"${column}_expires_at"\\s*=\\s*NULL`, 'i'));
+    }
+  });
+
+  it('empties the table whose token column is NOT NULL, because nulling it is impossible', () => {
+    const notNull = tokenColumns().filter((entry) => !entry.nullable);
+    expect(notNull.length).toBeGreaterThan(0);
+    for (const { table } of notNull) {
+      expect(sql).toMatch(new RegExp(`DELETE\\s+FROM\\s+"${table}"`, 'i'));
+    }
+  });
+
+  it('stays a plain two-statement DML migration with no lock or index hazard', () => {
+    // 🔴 判的是**剥掉整行注释之后**的 SQL。迁移文件里的说明会提到
+    // "没有 CONCURRENTLY""不是 ALTER TABLE"这类词，直接对着原文断言会把自己写的
+    // 理由当成违规 —— `scripts/check-migrations.mjs` 就是因为这个才先 strip 的。
+    const statements = sql
+      .split('\n')
+      .filter((line) => !line.trim().startsWith('--'))
+      .join('\n');
+
+    // 见 server/prisma/migrations/README.md 优先级 1：表与用户数同阶 ⇒ 普通 DML。
+    expect(statements).not.toMatch(/CONCURRENTLY/i);
+    expect(statements).not.toMatch(/\bBEGIN\b|\bCOMMIT\b/i);
+    expect(statements).not.toMatch(/DROP\s+(TABLE|INDEX)/i);
+    expect(statements).not.toMatch(/ALTER\s+TABLE/i);
+    // 令牌清干净是靠一条 UPDATE 覆盖**所有**四个可空列；写成四条也可以，
+    // 但必须是一条，否则中途失败会留下"清了三个、第四个还是明文"的状态。
+    expect(statements.match(/UPDATE\s+"users"/gi) ?? []).toHaveLength(1);
+  });
+
+  it('does not touch the password hash while it is at it', () => {
+    // 清理令牌的迁移顺手清 `password_hash` = 把全部账号的口令抹掉。
+    // 这不是假设：同一条 UPDATE 写在同一张表上，最容易犯的错就是多带一列。
+    const statements = sql
+      .split('\n')
+      .filter((line) => !line.trim().startsWith('--'))
+      .join('\n');
+    expect(statements).not.toMatch(/password_hash/i);
+    expect(statements).not.toMatch(/is_verified/i);
+    expect(statements).not.toMatch(/token_version/i);
+  });
+});
