@@ -24,8 +24,10 @@ model User {
   verificationToken             String?  @map("verification_token")
   verificationTokenExpiresAt    BigInt?  @map("verification_token_expires_at")
   verificationResendCount       Int      @default(0) @map("verification_resend_count")
-  // ⚠️ 目前**没有任何代码写过/读过它** —— 口令找回流程本身还没落地（W3）。
-  // 它在这一批里跟着作废、跟着同一个 `hashToken()`，别让 W3 以为是明文列。
+  // 口令找回（W3，`password/recovery.ts`）用的**一次性令牌**：SHA-256 hex，理由同上一列。
+  // ⚠️ 这一列只有普通索引、**没有** `@unique`（上游的 `auth_tokens` 形状，改它要迁移），
+  // 所以"这一枚令牌属于哪一行"由 `recovery.ts` 里那条**带条件的 `updateMany`** 保证，
+  // 不是靠"库里查不到第二条"。
   resetPasswordToken            String?  @map("reset_password_token")
   resetPasswordTokenExpiresAt   BigInt?  @map("reset_password_token_expires_at")
   passkeyRecoveryToken          String?  @map("passkey_recovery_token")

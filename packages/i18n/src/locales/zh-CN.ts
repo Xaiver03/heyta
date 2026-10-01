@@ -3278,6 +3278,20 @@ export const zhCN = {
   'server.email.login.button': '登录',
   'server.email.login.ignore': '如果这不是你本人发起的，忽略这封邮件即可。',
   'server.email.login.expiry': '这个链接 15 分钟内有效。',
+  // 🔴 这里一律说「密码」（登录口令），不说「口令」—— 后者在本项目里专指
+  // 端到端加密那把钥匙（见 `web.sync.password.*`）。两件事在同一种语言里只差一个字，
+  // 混了会让人以为忘了加密密码也能靠这封邮件找回来 —— 那是不成立的承诺。
+  'server.email.reset.subject': '重置你的 heyta 登录密码',
+  'server.email.reset.title': '重置登录密码',
+  'server.email.reset.body': '你申请了重置登录密码。点击下面的按钮设置一个新密码 —— 设置成功后，其他设备上的登录都会失效。',
+  'server.email.reset.button': '设置新密码',
+  'server.email.reset.ignore': '如果这不是你本人发起的，忽略这封邮件即可，你的密码不会有任何变化。',
+  'server.email.reset.expiry': '这个链接 15 分钟内有效，且只能使用一次。',
+  'server.email.passwordChanged.subject': '你的 heyta 登录密码已被更改',
+  'server.email.passwordChanged.title': '登录密码已更改',
+  'server.email.passwordChanged.body': '你的 heyta 账号刚刚设置了新的登录密码，其他设备上的登录都已失效。',
+  'server.email.passwordChanged.button': '打开 heyta',
+  'server.email.passwordChanged.notYou': '如果这不是你本人操作的，请立刻用「忘记密码」重新拿回账号，并确认你的邮箱有没有被别人读到。',
   'server.page.tokenRequired': '链接不完整：缺少必要的令牌。',
   'server.page.error.unknown': '出了点问题，请稍后重试。',
   'server.page.verify.title': '邮箱已验证',
