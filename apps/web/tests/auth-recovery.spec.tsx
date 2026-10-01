@@ -21,6 +21,11 @@
  * 调 `navigator.credentials.create()`，不可能放进这个面板。
  * 所以本文件只钉**触发那封邮件**这一段，并且明确不假装钉了另一端。
  *
+ * ⚠️ 2026-10-02：表单改成两步（邮箱 → 「继续」→ 口令），**恢复入口在第二步**。
+ * 这不是措辞变化，是一条真实的可发现性代价：丢了通行密钥的人必须先走过"填邮箱"
+ * 才看得见找回那一句。所以这一组判据现在**每次都把两步走完** —— 它钉的仍然是
+ * "入口存在"，只是把"存在"定义为"用户真能点到的那个屏幕上存在"。
+ *
  * 全程零联网：`fetch` 一律 stub。
  */
 import { act } from 'react';
@@ -92,6 +97,22 @@ async function typeInto(el: HTMLElement, selector: string, value: string): Promi
   await act(async () => {
     setter.call(input, value);
     input.dispatchEvent(new Event('input', { bubbles: true }));
+    await Promise.resolve();
+  });
+}
+
+/**
+ * 走过第一步（邮箱 → 「继续」）。
+ *
+ * 🔴 2026-10-02：表单改成两步之后，**所有二级入口**（通行密钥 / 邮件链接 / 找回 /
+ * 粘贴兜底）都只在第二屏出现 —— 那是"一次只问一件事"的代价，也是这一组判据
+ * 必须跟着改写的地方。这里的 `auth-form-email` 选择器是**故意**写成共享表单的
+ * testID：它由 `@heyta/ui` 那份实现给出，各端共用，不是 web 自己的一套 DOM。
+ */
+async function toCredentialStage(el: HTMLElement, email = EMAIL): Promise<void> {
+  await typeInto(el, '[data-testid="auth-form-email"]', email);
+  await act(async () => {
+    (el.querySelector('[data-testid="auth-form-continue"]') as HTMLButtonElement).click();
     await Promise.resolve();
   });
 }
@@ -191,12 +212,13 @@ describe('store：requestRecovery 真的打服务端的恢复端点', () => {
 describe('面板：入口按钮真的存在，而且真的接上了 store', () => {
   it('面板里有恢复入口按钮（不是"功能做了但没入口"）', async () => {
     const el = await renderPanel('zh-CN');
+    await toCredentialStage(el);
     expect(button(el, 'web.auth.recovery.request')).toBeTruthy();
   });
 
   it('点它真的会打恢复端点，并在界面上说出"已发出"', async () => {
     const el = await renderPanel('zh-CN');
-    await typeInto(el, 'input[type="email"]', EMAIL);
+    await toCredentialStage(el);
 
     stubFetch(200, { message: 'If an account with that email exists, a recovery link has been sent.' });
     await act(async () => {
@@ -211,6 +233,7 @@ describe('面板：入口按钮真的存在，而且真的接上了 store', () =
 
   it('英文界面下同一个按钮用的是英文文案，不是中文', async () => {
     const el = await renderPanel('en');
+    await toCredentialStage(el, 'me@example.com');
     const label = translate('en', 'web.auth.recovery.request');
     const found = [...el.querySelectorAll('button')].find((b) =>
       b.textContent?.includes(label),
