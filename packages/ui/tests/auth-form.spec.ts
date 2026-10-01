@@ -146,3 +146,25 @@ describe('AuthForm —— 该由 model 决定的取值不许重写', () => {
     expect(code).toMatch(/onChangeText=\{\(next\) => \{\s*setPassword\(next\)/);
   });
 });
+
+describe('AuthForm —— 服务端地址不许当注册的前置条件', () => {
+  /**
+   * 2026-10-01 产品负责人原话：**「绝对不允许什么用自己正在用的域名才能够注册。」**
+   *
+   * 那一栏原来排在邮箱**上面** —— 一张表单的第一栏要人写出同步域名，
+   * 就是"你是自建部署的运维吗"被当成了注册条件。这条判据钉的是**渲染顺序**：
+   * 它必须排在邮箱之后（在共享层里能钉的就是这个，"发得出请求"那一半在宿主侧，
+   * 钉在 `apps/web/tests/auth-journey.spec.tsx`：未配置时注册仍然真的发出去）。
+   *
+   * ⚠️ 用 `testID` 而不是中文句子做锚点：testID 不翻译、也不会因为改文案而漂移。
+   */
+  it('`server-url` 那一栏排在 `email` **之后**', () => {
+    const emailAt = code.indexOf('`${testID}-email`');
+    const serverAt = code.indexOf('`${testID}-server-url`');
+
+    // 两个锚点都必须**在**：把邮箱栏删掉也能让"顺序对"成立，那是空测。
+    expect(emailAt, '邮箱栏不见了').toBeGreaterThanOrEqual(0);
+    expect(serverAt, '服务端地址栏不见了').toBeGreaterThanOrEqual(0);
+    expect(serverAt, '服务端地址栏又跑回邮箱上面了 —— 那道墙就还在').toBeGreaterThan(emailAt);
+  });
+});
