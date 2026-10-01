@@ -33,6 +33,7 @@ import {
   beginPasskeyLogin,
   beginPasskeyRegistration,
   changePassword as changePasswordRequest,
+  setInitialPassword as setInitialPasswordRequest,
   completePasskeyLogin,
   completePasskeyRegistration,
   extractAuthLinkToken,
@@ -82,7 +83,13 @@ export type AuthBusyAction =
   | 'password-sign-in'
   | 'password-register'
   | 'password-forgot'
-  | 'password-change';
+  | 'password-change'
+  /**
+   * 已登录**加第一个**口令。与 `password-change` 分开不是一个措辞问题：
+   * 那条成功会换令牌并把其余设备踢下线，这条**两样都不做**，
+   * 所以界面点之前要说的话是相反的（"其它设备不受影响"）。
+   */
+  | 'password-set';
 
 export type AuthStatus =
   /** 还没有凭据 —— 界面必须给出**明确的空状态**，而不是假装成功。 */
@@ -111,6 +118,14 @@ export type AuthStatus =
    * 把它渲染成"已登录"会漏掉唯一需要告诉用户的那件事：别的设备要重新认证。
    */
   | { kind: 'password-changed'; email: string }
+  /**
+   * 已登录**加上**了第一个口令（纯通行密钥 / 魔法链接账号）。
+   *
+   * 🔴 与 `password-changed` **分开**，因为两句话相反：那条要说"其它设备要重新登录"，
+   * 这条要说"其它设备不受影响"。共用一个 kind 就必然有一半人说错话。
+   * 这里也**没有** `email`：令牌没换、身份没变，界面上没有任何"你现在是谁"要更新。
+   */
+  | { kind: 'password-set' }
   /**
    * 失败。
    *
@@ -265,6 +280,22 @@ export interface AuthStoreState {
     currentPassword: string,
     newPassword: string,
   ) => Promise<HostedAuthSession | undefined>;
+  /**
+   * 已登录给账号**加上第一个**口令：`{ kind: 'password-set' }`。
+   *
+   * 🔴 **不返回会话、也不换令牌**：这条不 bump `tokenVersion`（它是加一个认证器，
+   * 不是换一把钥匙）。如果照 `changePassword` 的样子"顺手"调一次
+   * `applyAuthSession`，手上这枚会被换成 `undefined` —— 症状是"设完密码立刻同步失败"。
+   *
+   * 为什么必须有这条：`changePassword` 对没有口令的账号回 `no_password_set`，
+   * 而"忘记密码"那条对没有口令认证器的账号**刻意不发信**，所以少了它
+   * 一个用通行密钥注册的账号永远加不上登录密码。
+   */
+  setPassword: (
+    baseUrl: string,
+    token: string | undefined,
+    newPassword: string,
+  ) => Promise<void>;
   /** 回到空状态（关闭/重开认证面板时用）。 */
   reset: () => void;
 }
@@ -544,6 +575,19 @@ export const useAuthStore = create<AuthStoreState>((set) => ({
     applyAuthSession(baseUrl, outcome.session);
     set({ status: { kind: 'password-changed', email: outcome.session.user.email } });
     return outcome.session;
+  },
+
+  setPassword: async (baseUrl, token, newPassword) => {
+    set({ status: { kind: 'busy', action: 'password-set' } });
+    const outcome = await setInitialPasswordRequest(
+      { baseUrl, locale: currentLocale() },
+      token ?? '',
+      { newPassword },
+    );
+    // 🔴 成功时**不碰令牌**（这条不 bump `tokenVersion`，服务端也没发新会话）。
+    // 照 `changePassword` 的样子在这里补一次 `applyAuthSession` 会把手上这枚
+    // 有效令牌换成 `undefined` —— 症状是"设完密码，这个标签页立刻同步失败"。
+    set({ status: outcome.ok ? { kind: 'password-set' } : failedFrom(outcome) });
   },
 
   reset: () => {
