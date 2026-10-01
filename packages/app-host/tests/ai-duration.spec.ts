@@ -139,18 +139,18 @@ function row(plannedMinutes: number, actualMinutes: number): DurationHistoryRow 
 
 describe('buildDurationInvocation', () => {
   it('功能是 duration-estimate', () => {
-    expect(buildDurationInvocation({ title: '写周报' }).feature).toBe('duration-estimate');
+    expect(buildDurationInvocation({ locale: 'zh-CN', title: '写周报' }).feature).toBe('duration-estimate');
   });
 
   it('🔴 只给标题时，`fields` 恰好是 [title]（不声明没送的东西）', () => {
-    const inv = buildDurationInvocation({ title: '写周报' });
+    const inv = buildDurationInvocation({ locale: 'zh-CN', title: '写周报' });
     expect(inv.fields).toEqual(['title']);
     expect(inv.user).toContain('写周报');
   });
 
   it('🔴 `fields` 必须覆盖 `user` 里出现的每个数据字段（披露的依据）', () => {
     const inv = buildDurationInvocation(
-      { title: '写周报', note: '别忘附数据', history: [row(30, 54)] },
+      { locale: 'zh-CN', title: '写周报', note: '别忘附数据', history: [row(30, 54)] },
       renderPreferenceHints(withPrefs(), 'duration-estimate'),
     );
     expect(inv.fields).toEqual(['title', 'note', 'history', 'preferences']);
@@ -161,17 +161,18 @@ describe('buildDurationInvocation', () => {
   });
 
   it('空备注不算一个字段（避免披露里出现没送的东西）', () => {
-    expect(buildDurationInvocation({ title: 'x', note: '   ' }).fields).toEqual(['title']);
+    expect(buildDurationInvocation({ locale: 'zh-CN', title: 'x', note: '   ' }).fields).toEqual(['title']);
   });
 
   it('🔴 没有历史时不出现 history 字段，也不出现历史段落', () => {
-    const inv = buildDurationInvocation({ title: 'x' });
+    const inv = buildDurationInvocation({ locale: 'zh-CN', title: 'x' });
     expect(inv.fields).not.toContain('history');
     expect(inv.user).not.toContain('这个任务的历史专注记录');
   });
 
   it('🔴 历史全是脏数据（0 / 负数 / NaN）时，history 字段也不该出现', () => {
     const inv = buildDurationInvocation({
+      locale: 'zh-CN',
       title: 'x',
       history: [
         { plannedMs: 0, actualMs: 60_000 },
@@ -184,13 +185,13 @@ describe('buildDurationInvocation', () => {
   });
 
   it('🔴 历史单位在正文里写死是分钟（模型不会记住系统提示里的单位）', () => {
-    const inv = buildDurationInvocation({ title: 'x', history: [row(30, 54)] });
+    const inv = buildDurationInvocation({ locale: 'zh-CN', title: 'x', history: [row(30, 54)] });
     expect(inv.user).toContain('单位一律是分钟');
     expect(inv.user).toContain('当时估 30 分钟，实际花了 54 分钟');
   });
 
   it('🔴 系统提示显式说明单位与整数要求', () => {
-    const system = buildDurationInvocation({ title: 'x' }).system;
+    const system = buildDurationInvocation({ locale: 'zh-CN', title: 'x' }).system;
     expect(system).toContain('分钟');
     expect(system).toContain('整数');
     // 范围也要写进提示词，否则模型没有理由不返回 1e9
@@ -200,14 +201,14 @@ describe('buildDurationInvocation', () => {
 
   it('🔴 传了偏好：`preferences` 必须进 `fields`（否则就是偷偷多发数据）', () => {
     const hints = renderPreferenceHints(withPrefs(), 'duration-estimate');
-    const inv = buildDurationInvocation({ title: 'x' }, hints);
+    const inv = buildDurationInvocation({ locale: 'zh-CN', title: 'x' }, hints);
     expect(inv.fields).toContain('preferences');
     expect(inv.user).toContain('关于这位用户的历史习惯');
   });
 
   it('🔴 只发该功能需要的偏好（最小化出境面）：估时不带粒度/风格/提前量', () => {
     const inv = buildDurationInvocation(
-      { title: 'x' },
+      { locale: 'zh-CN', title: 'x' },
       renderPreferenceHints(withPrefs(), 'duration-estimate'),
     );
     expect(inv.user).toContain('1.80 倍');
@@ -220,14 +221,14 @@ describe('buildDurationInvocation', () => {
     const off: PreferenceSet = { ...withPrefs(), memoryEnabled: false };
     const hints = renderPreferenceHints(off, 'duration-estimate');
     expect(hints).toEqual([]);
-    const inv = buildDurationInvocation({ title: 'x' }, hints);
+    const inv = buildDurationInvocation({ locale: 'zh-CN', title: 'x' }, hints);
     expect(inv.fields).toEqual(['title']);
     expect(inv.user).not.toContain('关于这位用户的历史习惯');
   });
 
   it('同样的输入必须产生同样的 prompt 字节', () => {
-    const a = buildDurationInvocation({ title: 'x' }, renderPreferenceHints(withPrefs(), 'duration-estimate'));
-    const b = buildDurationInvocation({ title: 'x' }, renderPreferenceHints(withPrefs(), 'duration-estimate'));
+    const a = buildDurationInvocation({ locale: 'zh-CN', title: 'x' }, renderPreferenceHints(withPrefs(), 'duration-estimate'));
+    const b = buildDurationInvocation({ locale: 'zh-CN', title: 'x' }, renderPreferenceHints(withPrefs(), 'duration-estimate'));
     expect(a.user).toBe(b.user);
   });
 });
@@ -365,7 +366,7 @@ describe('🔴🔴 requestDuration —— 出境闸门', () => {
   it('🔴🔴 远端端点但**没有该功能的授权** → 不发任何请求', async () => {
     const { impl, calls } = fetchReturning('90');
     const outcome = await requestDuration(
-      { title: '写周报' },
+      { locale: 'zh-CN', title: '写周报' },
       {
         routing: routing([REMOTE_ENDPOINT], { 'duration-estimate': ['remote'] }),
         consents: [],
@@ -381,7 +382,7 @@ describe('🔴🔴 requestDuration —— 出境闸门', () => {
   it('🔴 授权绑的是 `(功能, 目的地)` —— 别的功能的授权不算数', async () => {
     const { impl, calls } = fetchReturning('90');
     const outcome = await requestDuration(
-      { title: '写周报' },
+      { locale: 'zh-CN', title: '写周报' },
       {
         routing: routing([REMOTE_ENDPOINT], { 'duration-estimate': ['remote'] }),
         // 授权的是 breakdown，不是 duration-estimate
@@ -396,7 +397,7 @@ describe('🔴🔴 requestDuration —— 出境闸门', () => {
   it('✅ 本机端点不需要授权，直接跑通，且带回「标题 → 工期」', async () => {
     const { impl, calls } = fetchReturning('90');
     const outcome = await requestDuration(
-      { title: '写周报' },
+      { locale: 'zh-CN', title: '写周报' },
       {
         routing: routing([LOCAL_ENDPOINT], { 'duration-estimate': ['local'] }),
         consents: [],
@@ -420,7 +421,7 @@ describe('🔴🔴 requestDuration —— 出境闸门', () => {
   it('✅ 远端端点 + 正确授权 → 跑通，destination 如实标为 user-endpoint', async () => {
     const { impl } = fetchReturning('45 分钟');
     const outcome = await requestDuration(
-      { title: '写周报' },
+      { locale: 'zh-CN', title: '写周报' },
       {
         routing: routing([REMOTE_ENDPOINT], { 'duration-estimate': ['remote'] }),
         consents: [CONSENT],
@@ -434,7 +435,7 @@ describe('🔴🔴 requestDuration —— 出境闸门', () => {
   it('🔴 模型回「约两小时」→ `unparseable`，不硬凑', async () => {
     const { impl } = fetchReturning('约两小时');
     const outcome = await requestDuration(
-      { title: 'x' },
+      { locale: 'zh-CN', title: 'x' },
       {
         routing: routing([LOCAL_ENDPOINT], { 'duration-estimate': ['local'] }),
         consents: [],
@@ -451,7 +452,7 @@ describe('🔴🔴 requestDuration —— 出境闸门', () => {
   it('🔴 模型回 1e9 → 夹住，并且**如实标记** clamped', async () => {
     const { impl } = fetchReturning('1e9');
     const outcome = await requestDuration(
-      { title: 'x' },
+      { locale: 'zh-CN', title: 'x' },
       {
         routing: routing([LOCAL_ENDPOINT], { 'duration-estimate': ['local'] }),
         consents: [],
@@ -468,7 +469,7 @@ describe('🔴🔴 requestDuration —— 出境闸门', () => {
   it('🔴 模型回负数 → 判失败（不夹成 MIN）', async () => {
     const { impl } = fetchReturning('-30');
     const outcome = await requestDuration(
-      { title: 'x' },
+      { locale: 'zh-CN', title: 'x' },
       {
         routing: routing([LOCAL_ENDPOINT], { 'duration-estimate': ['local'] }),
         consents: [],
@@ -482,7 +483,7 @@ describe('🔴🔴 requestDuration —— 出境闸门', () => {
   it('🔴 空标题直接拒绝，连路由都不走', async () => {
     const { impl, calls } = fetchReturning('90');
     const outcome = await requestDuration(
-      { title: '   ' },
+      { locale: 'zh-CN', title: '   ' },
       {
         routing: routing([LOCAL_ENDPOINT], { 'duration-estimate': ['local'] }),
         consents: [],
@@ -501,7 +502,7 @@ describe('🔴🔴 requestDuration —— 出境闸门', () => {
   it('🔴 总开关关着 → 不发请求，且提示去开总开关', async () => {
     const { impl, calls } = fetchReturning('90');
     const outcome = await requestDuration(
-      { title: 'x' },
+      { locale: 'zh-CN', title: 'x' },
       {
         routing: { ...routing([LOCAL_ENDPOINT], { 'duration-estimate': ['local'] }), enabled: false },
         consents: [],
@@ -516,7 +517,7 @@ describe('🔴🔴 requestDuration —— 出境闸门', () => {
   it('🔴 这个功能没有配路由 → `no-route`，提示检查端点而不是总开关', async () => {
     const { impl, calls } = fetchReturning('90');
     const outcome = await requestDuration(
-      { title: 'x' },
+      { locale: 'zh-CN', title: 'x' },
       {
         routing: routing([LOCAL_ENDPOINT], {}),
         consents: [],
@@ -538,7 +539,7 @@ describe('🔴🔴 requestDuration —— 出境闸门', () => {
     };
     const { impl, calls } = fetchReturning('90');
     const outcome = await requestDuration(
-      { title: 'x' },
+      { locale: 'zh-CN', title: 'x' },
       {
         routing: routing([noStructuredOutput], { 'duration-estimate': ['local'] }),
         consents: [],
@@ -557,7 +558,7 @@ describe('🔴🔴 requestDuration —— 出境闸门', () => {
     const boom: typeof fetch = () =>
       Promise.reject(new Error('connect ECONNREFUSED 127.0.0.1:11434'));
     const outcome = await requestDuration(
-      { title: 'x' },
+      { locale: 'zh-CN', title: 'x' },
       {
         routing: routing([LOCAL_ENDPOINT], { 'duration-estimate': ['local'] }),
         consents: [],
@@ -579,7 +580,12 @@ describe('🔴🔴 requestDuration —— 出境闸门', () => {
 describe('🔴🔴 出境面：`fields` 必须与实际发送逐字段一致', () => {
   it('🔴🔴 每个声明出去的字段，正文里都必须真有', async () => {
     const { impl, calls } = fetchReturning('90');
-    const source = { title: '写周报', note: '别忘附数据', history: [row(30, 54)] };
+    const source = {
+      title: '写周报',
+      note: '别忘附数据',
+      history: [row(30, 54)],
+      locale: 'zh-CN' as const,
+    };
     const hints = renderPreferenceHints(withPrefs(), 'duration-estimate');
     const inv = buildDurationInvocation(source, hints);
 
@@ -609,7 +615,7 @@ describe('🔴🔴 出境面：`fields` 必须与实际发送逐字段一致', (
   it('🔴🔴 没声明的字段，正文里一个字节都不该有', async () => {
     const { impl, calls } = fetchReturning('90');
     await requestDuration(
-      { title: '写周报' },
+      { locale: 'zh-CN', title: '写周报' },
       {
         routing: routing([LOCAL_ENDPOINT], { 'duration-estimate': ['local'] }),
         consents: [],
@@ -629,7 +635,7 @@ describe('🔴🔴 出境面：`fields` 必须与实际发送逐字段一致', (
     const { impl, calls } = fetchReturning('90');
 
     await requestDuration(
-      { title: '写周报' },
+      { locale: 'zh-CN', title: '写周报' },
       {
         routing: routing([LOCAL_ENDPOINT], { 'duration-estimate': ['local'] }),
         consents: [],
@@ -650,7 +656,7 @@ describe('🔴🔴 出境面：`fields` 必须与实际发送逐字段一致', (
     const { impl, calls } = fetchReturning('90');
 
     const outcome = await requestDuration(
-      { title: '写周报', history: many },
+      { locale: 'zh-CN', title: '写周报', history: many },
       {
         routing: routing([LOCAL_ENDPOINT], { 'duration-estimate': ['local'] }),
         consents: [],
@@ -674,7 +680,7 @@ describe('🔴🔴 出境面：`fields` 必须与实际发送逐字段一致', (
     const { impl, calls } = fetchReturning('90');
 
     await requestDuration(
-      { title: 'x' },
+      { locale: 'zh-CN', title: 'x' },
       {
         routing: routing([LOCAL_ENDPOINT], { 'duration-estimate': ['local'] }),
         consents: [],
@@ -696,7 +702,7 @@ describe('🔴🔴 出境面：`fields` 必须与实际发送逐字段一致', (
 describe('🔴 失败分支必须带回熔断状态', () => {
   it('🔴🔴 端点失败时，health 记下了那个端点的失败次数', async () => {
     const outcome = await requestDuration(
-      { title: '写周报' },
+      { locale: 'zh-CN', title: '写周报' },
       {
         routing: routing([LOCAL_ENDPOINT], { 'duration-estimate': ['local'] }),
         consents: [],
@@ -712,7 +718,7 @@ describe('🔴 失败分支必须带回熔断状态', () => {
 
   it('🔴 解析失败（请求成功但内容没法用）也带回 health', async () => {
     const outcome = await requestDuration(
-      { title: 'x' },
+      { locale: 'zh-CN', title: 'x' },
       {
         routing: routing([LOCAL_ENDPOINT], { 'duration-estimate': ['local'] }),
         consents: [],
@@ -731,14 +737,14 @@ describe('🔴 失败分支必须带回熔断状态', () => {
     const failing = (): Promise<never> => Promise.reject(new Error('down'));
 
     const first = await requestDuration(
-      { title: 'x' },
+      { locale: 'zh-CN', title: 'x' },
       { routing: routeConfig, consents: [], routed: { fetchImpl: failing } },
     );
     expect(first.ok).toBe(false);
     if (first.ok) return;
 
     const second = await requestDuration(
-      { title: 'x' },
+      { locale: 'zh-CN', title: 'x' },
       { routing: routeConfig, consents: [], routed: { fetchImpl: failing, healthSeed: first.health } },
     );
     expect(second.ok).toBe(false);
@@ -770,7 +776,7 @@ describe('🔴🔴 回退不跨越隐私边界', () => {
     }) as unknown as typeof fetch;
 
     const outcome = await requestDuration(
-      { title: '写周报' },
+      { locale: 'zh-CN', title: '写周报' },
       {
         routing: routing([LOCAL_ENDPOINT, REMOTE_ENDPOINT], {
           'duration-estimate': ['local', 'remote'],

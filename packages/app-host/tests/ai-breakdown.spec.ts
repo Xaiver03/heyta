@@ -158,37 +158,37 @@ const withPrefs = (): PreferenceSet => ({
 
 describe('buildBreakdownInvocation', () => {
   it('功能是 breakdown', () => {
-    expect(buildBreakdownInvocation({ title: '做发布' }).feature).toBe('breakdown');
+    expect(buildBreakdownInvocation({ locale: 'zh-CN', title: '做发布' }).feature).toBe('breakdown');
   });
 
   it('🔴 `fields` 必须覆盖 `user` 里出现的每个数据字段（披露的依据）', () => {
-    const withNote = buildBreakdownInvocation({ title: '做发布', note: '别忘灰度' });
+    const withNote = buildBreakdownInvocation({ locale: 'zh-CN', title: '做发布', note: '别忘灰度' });
     expect(withNote.fields).toContain('title');
     expect(withNote.fields).toContain('note');
     // user 里确实出现了备注内容
     expect(withNote.user).toContain('别忘灰度');
 
-    const withoutNote = buildBreakdownInvocation({ title: '做发布' });
+    const withoutNote = buildBreakdownInvocation({ locale: 'zh-CN', title: '做发布' });
     expect(withoutNote.fields).toEqual(['title']);
     expect(withoutNote.user).not.toContain('note');
   });
 
   it('空备注不算一个字段（避免披露里出现没送的东西）', () => {
-    expect(buildBreakdownInvocation({ title: 'x', note: '   ' }).fields).toEqual(['title']);
+    expect(buildBreakdownInvocation({ locale: 'zh-CN', title: 'x', note: '   ' }).fields).toEqual(['title']);
   });
 
   // ── 记忆层：偏好注入 prompt 与披露 ─────────────────────────────
 
 
   it('没有偏好时：不出现 preferences 字段，也不出现任何提示段落', () => {
-    const inv = buildBreakdownInvocation({ title: '做发布' });
+    const inv = buildBreakdownInvocation({ locale: 'zh-CN', title: '做发布' });
     expect(inv.fields).toEqual(['title']);
     expect(inv.user).not.toContain('历史习惯');
   });
 
   it('🔴 传了偏好：`preferences` 必须进 `fields`（否则就是偷偷多发数据）', () => {
     const hints = renderPreferenceHints(withPrefs(), 'breakdown');
-    const inv = buildBreakdownInvocation({ title: '做发布' }, hints);
+    const inv = buildBreakdownInvocation({ locale: 'zh-CN', title: '做发布' }, hints);
     expect(inv.fields).toContain('preferences');
     // 字段声明了，正文里就必须真有 —— 两边的规则是对称的
     expect(inv.user).toContain('历史习惯');
@@ -196,7 +196,7 @@ describe('buildBreakdownInvocation', () => {
 
   it('偏好提示真的进了 prompt，且是给模型的措辞（不复述样本量）', () => {
     const hints = renderPreferenceHints(withPrefs(), 'breakdown');
-    const inv = buildBreakdownInvocation({ title: '做发布' }, hints);
+    const inv = buildBreakdownInvocation({ locale: 'zh-CN', title: '做发布' }, hints);
     expect(inv.user).toContain('拆成 6 项左右');
     expect(inv.user).toContain('中文');
     expect(inv.user).toContain('1.80 倍');
@@ -206,7 +206,7 @@ describe('buildBreakdownInvocation', () => {
 
   it('🔴 只发该功能需要的偏好（最小化出境面）：拆解不带提前量与时段', () => {
     const hints = renderPreferenceHints(withPrefs(), 'breakdown');
-    const inv = buildBreakdownInvocation({ title: '做发布' }, hints);
+    const inv = buildBreakdownInvocation({ locale: 'zh-CN', title: '做发布' }, hints);
     expect(inv.user).not.toContain('高效时段');
     expect(inv.user).toContain('拆成 6 项左右');
   });
@@ -216,7 +216,7 @@ describe('buildBreakdownInvocation', () => {
     const hints = renderPreferenceHints(off, 'breakdown');
     expect(hints).toEqual([]);
 
-    const inv = buildBreakdownInvocation({ title: '做发布' }, hints);
+    const inv = buildBreakdownInvocation({ locale: 'zh-CN', title: '做发布' }, hints);
     expect(inv.fields).toEqual(['title']);
     expect(inv.user).not.toContain('历史习惯');
     expect(inv.user).not.toContain('6 项');
@@ -232,13 +232,13 @@ describe('buildBreakdownInvocation', () => {
   });
 
   it('提示顺序固定（同样的输入必须产生同样的 prompt 字节）', () => {
-    const a = buildBreakdownInvocation({ title: 'x' }, renderPreferenceHints(withPrefs(), 'breakdown'));
-    const b = buildBreakdownInvocation({ title: 'x' }, renderPreferenceHints(withPrefs(), 'breakdown'));
+    const a = buildBreakdownInvocation({ locale: 'zh-CN', title: 'x' }, renderPreferenceHints(withPrefs(), 'breakdown'));
+    const b = buildBreakdownInvocation({ locale: 'zh-CN', title: 'x' }, renderPreferenceHints(withPrefs(), 'breakdown'));
     expect(a.user).toBe(b.user);
   });
 
   it('系统提示要求纯清单输出', () => {
-    expect(buildBreakdownInvocation({ title: 'x' }).system).toContain('不要输出任何解释');
+    expect(buildBreakdownInvocation({ locale: 'zh-CN', title: 'x' }).system).toContain('不要输出任何解释');
   });
 });
 
@@ -361,7 +361,7 @@ describe('🔴🔴 requestBreakdown —— 出境闸门', () => {
   it('🔴🔴 远端端点但**没有该功能的授权** → 不发任何请求', async () => {
     const { impl, calls } = fetchReturning('- 甲\n- 乙');
     const outcome = await requestBreakdown(
-      { title: '做发布' },
+      { locale: 'zh-CN', title: '做发布' },
       {
         routing: routing([REMOTE_ENDPOINT], { breakdown: ['remote'] }),
         consents: [], // ← 没有授权
@@ -378,7 +378,7 @@ describe('🔴🔴 requestBreakdown —— 出境闸门', () => {
   it('🔴 授权绑的是 `(功能, 目的地)` —— 别的功能的授权不算数', async () => {
     const { impl, calls } = fetchReturning('- 甲');
     const outcome = await requestBreakdown(
-      { title: '做发布' },
+      { locale: 'zh-CN', title: '做发布' },
       {
         routing: routing([REMOTE_ENDPOINT], { breakdown: ['remote'] }),
         // 授权的是 prioritize，不是 breakdown
@@ -393,7 +393,7 @@ describe('🔴🔴 requestBreakdown —— 出境闸门', () => {
   it('🔴 授权了但目的地是 heyta-cloud，而路由走的是用户端点 → 不匹配', async () => {
     const { impl, calls } = fetchReturning('- 甲');
     const outcome = await requestBreakdown(
-      { title: '做发布' },
+      { locale: 'zh-CN', title: '做发布' },
       {
         routing: routing([REMOTE_ENDPOINT], { breakdown: ['remote'] }),
         consents: [{ feature: 'breakdown', destination: 'heyta-cloud', grantedAt: 1 }],
@@ -407,7 +407,7 @@ describe('🔴🔴 requestBreakdown —— 出境闸门', () => {
   it('✅ 本机端点不需要授权，直接跑通', async () => {
     const { impl, calls } = fetchReturning('- 甲\n- 乙');
     const outcome = await requestBreakdown(
-      { title: '做发布' },
+      { locale: 'zh-CN', title: '做发布' },
       {
         routing: routing([LOCAL_ENDPOINT], { breakdown: ['local'] }),
         consents: [],
@@ -426,7 +426,7 @@ describe('🔴🔴 requestBreakdown —— 出境闸门', () => {
   it('✅ 远端端点 + 正确授权 → 跑通，且 destination 如实标为 user-endpoint', async () => {
     const { impl, calls } = fetchReturning('1. 甲\n2. 乙');
     const outcome = await requestBreakdown(
-      { title: '做发布' },
+      { locale: 'zh-CN', title: '做发布' },
       {
         routing: routing([REMOTE_ENDPOINT], { breakdown: ['remote'] }),
         consents: [LOCAL_CONSENT],
@@ -450,7 +450,7 @@ describe('🔴🔴 requestBreakdown —— 出境闸门', () => {
     expect(hints.length).toBeGreaterThan(0);
 
     await requestBreakdown(
-      { title: '做发布' },
+      { locale: 'zh-CN', title: '做发布' },
       {
         routing: routing([LOCAL_ENDPOINT], { breakdown: ['local'] }),
         consents: [],
@@ -471,7 +471,7 @@ describe('🔴🔴 requestBreakdown —— 出境闸门', () => {
   it('🔴 不传 preferences 时，请求体里一个偏好字节都没有', async () => {
     const { impl, calls } = fetchReturning('- 甲');
     await requestBreakdown(
-      { title: '做发布' },
+      { locale: 'zh-CN', title: '做发布' },
       {
         routing: routing([LOCAL_ENDPOINT], { breakdown: ['local'] }),
         consents: [],
@@ -489,7 +489,7 @@ describe('🔴🔴 requestBreakdown —— 出境闸门', () => {
     const { impl, calls } = fetchReturning('- 甲');
 
     await requestBreakdown(
-      { title: '做发布' },
+      { locale: 'zh-CN', title: '做发布' },
       {
         routing: routing([LOCAL_ENDPOINT], { breakdown: ['local'] }),
         consents: [],
@@ -506,7 +506,7 @@ describe('🔴🔴 requestBreakdown —— 出境闸门', () => {
   it('🔴 送出的请求体里含标题，但不含没在 `fields` 里声明的东西', async () => {
     const { impl, calls } = fetchReturning('- 甲');
     await requestBreakdown(
-      { title: '做发布', note: '机密备注' },
+      { locale: 'zh-CN', title: '做发布', note: '机密备注' },
       {
         routing: routing([LOCAL_ENDPOINT], { breakdown: ['local'] }),
         consents: [],
@@ -522,7 +522,7 @@ describe('🔴🔴 requestBreakdown —— 出境闸门', () => {
   it('🔴 总开关关着 → 不发请求，且提示去开总开关', async () => {
     const { impl, calls } = fetchReturning('- 甲');
     const outcome = await requestBreakdown(
-      { title: 'x' },
+      { locale: 'zh-CN', title: 'x' },
       {
         routing: { ...routing([LOCAL_ENDPOINT], { breakdown: ['local'] }), enabled: false },
         consents: [],
@@ -537,7 +537,7 @@ describe('🔴🔴 requestBreakdown —— 出境闸门', () => {
   it('🔴 这个功能没有配路由 → `no-route`，提示要检查端点而不是总开关', async () => {
     const { impl, calls } = fetchReturning('- 甲');
     const outcome = await requestBreakdown(
-      { title: 'x' },
+      { locale: 'zh-CN', title: 'x' },
       {
         routing: routing([LOCAL_ENDPOINT], {}), // breakdown 没路由
         consents: [],
@@ -552,7 +552,7 @@ describe('🔴🔴 requestBreakdown —— 出境闸门', () => {
   it('🔴 空标题直接拒绝，连路由都不走', async () => {
     const { impl, calls } = fetchReturning('- 甲');
     const outcome = await requestBreakdown(
-      { title: '   ' },
+      { locale: 'zh-CN', title: '   ' },
       {
         routing: routing([LOCAL_ENDPOINT], { breakdown: ['local'] }),
         consents: [],
@@ -567,7 +567,7 @@ describe('🔴🔴 requestBreakdown —— 出境闸门', () => {
   it('🔴 模型返回一坨没用的东西 → `unparseable`，不硬凑', async () => {
     const { impl } = fetchReturning('抱歉，我无法完成这个任务。');
     const outcome = await requestBreakdown(
-      { title: 'x' },
+      { locale: 'zh-CN', title: 'x' },
       {
         routing: routing([LOCAL_ENDPOINT], { breakdown: ['local'] }),
         consents: [],
@@ -592,7 +592,7 @@ describe('🔴🔴 requestBreakdown —— 出境闸门', () => {
       }) as unknown as typeof fetch;
 
       const outcome = await requestBreakdown(
-        { title: 'x' },
+        { locale: 'zh-CN', title: 'x' },
         {
           routing:
             reason === 'not-configured'
@@ -613,7 +613,7 @@ describe('🔴🔴 requestBreakdown —— 出境闸门', () => {
   it('🔴 返回携带健康状态，供调用方持久化（且它不该进 op-log）', async () => {
     const { impl } = fetchReturning('- 甲');
     const outcome = await requestBreakdown(
-      { title: 'x' },
+      { locale: 'zh-CN', title: 'x' },
       {
         routing: routing([LOCAL_ENDPOINT], { breakdown: ['local'] }),
         consents: [],
@@ -628,7 +628,7 @@ describe('🔴🔴 requestBreakdown —— 出境闸门', () => {
     const many = Array.from({ length: 50 }, (_, i) => `- 条目 ${String(i)}`).join('\n');
     const { impl } = fetchReturning(many);
     const outcome = await requestBreakdown(
-      { title: 'x' },
+      { locale: 'zh-CN', title: 'x' },
       {
         routing: routing([LOCAL_ENDPOINT], { breakdown: ['local'] }),
         consents: [],
@@ -666,7 +666,7 @@ describe('🔴🔴 回退不跨越隐私边界', () => {
     }) as unknown as typeof fetch;
 
     const outcome = await requestBreakdown(
-      { title: '做发布' },
+      { locale: 'zh-CN', title: '做发布' },
       {
         routing: routing([LOCAL_ENDPOINT, REMOTE_ENDPOINT], {
           breakdown: ['local', 'remote'],
@@ -705,7 +705,7 @@ describe('🔴🔴 回退不跨越隐私边界', () => {
     }) as unknown as typeof fetch;
 
     const outcome = await requestBreakdown(
-      { title: '做发布' },
+      { locale: 'zh-CN', title: '做发布' },
       {
         routing: routing([LOCAL_ENDPOINT, REMOTE_ENDPOINT], {
           breakdown: ['local', 'remote'],
@@ -736,7 +736,7 @@ describe('🔴 失败分支必须带回熔断状态', () => {
     // 早先的写法只把 health 放在成功分支上，于是最该记的那次反而丢了。
     const routeConfig = routing([LOCAL_ENDPOINT], { breakdown: ['local'] });
     const outcome = await requestBreakdown(
-      { title: '做一件事' },
+      { locale: 'zh-CN', title: '做一件事' },
       {
         routing: routeConfig,
         consents: [LOCAL_CONSENT],
@@ -755,7 +755,7 @@ describe('🔴 失败分支必须带回熔断状态', () => {
     const routeConfig = routing([LOCAL_ENDPOINT], { breakdown: ['local'] });
     const failing = (): Promise<never> => Promise.reject(new Error('down'));
 
-    const first = await requestBreakdown({ title: 'x' }, {
+    const first = await requestBreakdown({ locale: 'zh-CN', title: 'x' }, {
       routing: routeConfig,
       consents: [LOCAL_CONSENT],
       routed: { fetchImpl: failing },
@@ -764,7 +764,7 @@ describe('🔴 失败分支必须带回熔断状态', () => {
     if (first.ok) return;
 
     // 用上一轮的 health 作为种子 —— 模拟"落盘后重启又读回来"
-    const second = await requestBreakdown({ title: 'x' }, {
+    const second = await requestBreakdown({ locale: 'zh-CN', title: 'x' }, {
       routing: routeConfig,
       consents: [LOCAL_CONSENT],
       routed: { fetchImpl: failing, healthSeed: first.health },
@@ -776,7 +776,7 @@ describe('🔴 失败分支必须带回熔断状态', () => {
 
   it('🔴 标题为空时没有端点被尝试过，health 是空的', async () => {
     const outcome = await requestBreakdown(
-      { title: '   ' },
+      { locale: 'zh-CN', title: '   ' },
       { routing: routing([LOCAL_ENDPOINT], { breakdown: ['local'] }), consents: [LOCAL_CONSENT] },
     );
     expect(outcome.ok).toBe(false);
@@ -787,7 +787,7 @@ describe('🔴 失败分支必须带回熔断状态', () => {
   it('🔴 解析失败（请求成功但内容没法用）也带回 health', async () => {
     const routeConfig = routing([LOCAL_ENDPOINT], { breakdown: ['local'] });
     const outcome = await requestBreakdown(
-      { title: 'x' },
+      { locale: 'zh-CN', title: 'x' },
       {
         routing: routeConfig,
         consents: [LOCAL_CONSENT],
@@ -817,7 +817,7 @@ describe('🔴🔴 失败原因必须**具体**，不能被概括掉', () => {
   it('🔴🔴 缺能力时说的是"缺能力"，不是"检查地址是否合法"', async () => {
     const { impl, calls } = fetchReturning('- 甲');
     const outcome = await requestBreakdown(
-      { title: '做发布' },
+      { locale: 'zh-CN', title: '做发布' },
       {
         routing: routing([NO_LONG_CONTEXT], { breakdown: ['local'] }),
         consents: [LOCAL_CONSENT],
@@ -839,7 +839,7 @@ describe('🔴🔴 失败原因必须**具体**，不能被概括掉', () => {
   it('🔴 远端被禁时说的是"没允许远程"，不是"没有可用端点"', async () => {
     const { impl } = fetchReturning('- 甲');
     const outcome = await requestBreakdown(
-      { title: '做发布' },
+      { locale: 'zh-CN', title: '做发布' },
       {
         // allowRemote: false 由 routing() 之外的构造给出
         routing: { ...routing([REMOTE_ENDPOINT], { breakdown: ['remote'] }), allowRemote: false },
@@ -866,7 +866,7 @@ describe('🔴🔴 失败原因必须**具体**，不能被概括掉', () => {
     };
     const { impl } = fetchReturning('- 甲');
     const outcome = await requestBreakdown(
-      { title: '做发布' },
+      { locale: 'zh-CN', title: '做发布' },
       {
         routing: routing([badUrl], { breakdown: ['bad'] }),
         consents: [LOCAL_CONSENT],
@@ -882,7 +882,7 @@ describe('🔴🔴 失败原因必须**具体**，不能被概括掉', () => {
     const boom: typeof fetch = () =>
       Promise.reject(new Error('connect ECONNREFUSED 127.0.0.1:11434'));
     const outcome = await requestBreakdown(
-      { title: '做发布' },
+      { locale: 'zh-CN', title: '做发布' },
       {
         routing: routing([LOCAL_ENDPOINT], { breakdown: ['local'] }),
         consents: [LOCAL_CONSENT],

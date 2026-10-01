@@ -190,6 +190,8 @@ export function AiPrioritize(props: AiPrioritizeProps): React.JSX.Element {
    * 而是写不进去 —— 与 `ai-breakdown.ts` 的纪律一致。
    */
   const source = {
+    // 🔴 界面语言：理由（reason）是给人看的字，必须跟着界面走。
+    locale,
     tasks: tasks.map((task): PrioritizeTaskInput => ({
       id: task.id,
       title: task.title,

@@ -173,20 +173,20 @@ interface FeatureCase {
 const FEATURES: readonly FeatureCase[] = [
   {
     name: 'capture',
-    run: async (d) => view(await requestCapture({ text: '明天下午三点开会', now: NOW }, requestDeps(d))),
+    run: async (d) => view(await requestCapture({ locale: 'zh-CN', text: '明天下午三点开会', now: NOW }, requestDeps(d))),
   },
   {
     name: 'breakdown',
-    run: async (d) => view(await requestBreakdown({ title: '搬家' }, requestDeps(d))),
+    run: async (d) => view(await requestBreakdown({ locale: 'zh-CN', title: '搬家' }, requestDeps(d))),
   },
   {
     name: 'prioritize',
     run: async (d) =>
-      view(await requestPrioritize({ tasks: [{ id: 't1', title: '搬家' }] }, requestDeps(d))),
+      view(await requestPrioritize({ locale: 'zh-CN', tasks: [{ id: 't1', title: '搬家' }] }, requestDeps(d))),
   },
   {
     name: 'duration-estimate',
-    run: async (d) => view(await requestDuration({ title: '搬家' }, requestDeps(d))),
+    run: async (d) => view(await requestDuration({ locale: 'zh-CN', title: '搬家' }, requestDeps(d))),
   },
 ];
 

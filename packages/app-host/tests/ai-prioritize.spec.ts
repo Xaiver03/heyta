@@ -144,11 +144,11 @@ const withPrefs = (): PreferenceSet => ({
 
 describe('buildPrioritizeInvocation', () => {
   it('功能是 prioritize', () => {
-    expect(buildPrioritizeInvocation({ tasks: TASKS }).feature).toBe('prioritize');
+    expect(buildPrioritizeInvocation({ locale: 'zh-CN', tasks: TASKS }).feature).toBe('prioritize');
   });
 
   it('🔴 `fields` 覆盖 `user` 里出现的每个数据字段（披露的依据）', () => {
-    const inv = buildPrioritizeInvocation({ tasks: TASKS });
+    const inv = buildPrioritizeInvocation({ locale: 'zh-CN', tasks: TASKS });
     expect(inv.fields).toEqual(['tasks']);
     // 字段声明了，正文里就必须真有
     expect(inv.user).toContain('做发布');
@@ -162,7 +162,7 @@ describe('buildPrioritizeInvocation', () => {
     const withNote = [
       { id: 't1', title: '做发布', note: '机密：客户名单' },
     ] as unknown as PrioritizeTaskInput[];
-    const inv = buildPrioritizeInvocation({ tasks: withNote });
+    const inv = buildPrioritizeInvocation({ locale: 'zh-CN', tasks: withNote });
 
     expect(inv.fields).toEqual(['tasks']);
     expect(inv.user).toContain('做发布');
@@ -172,14 +172,14 @@ describe('buildPrioritizeInvocation', () => {
   });
 
   it('缺省字段不出现在 JSON 里（少发就是少泄露）', () => {
-    const inv = buildPrioritizeInvocation({ tasks: [{ id: 't2', title: '写周报' }] });
+    const inv = buildPrioritizeInvocation({ locale: 'zh-CN', tasks: [{ id: 't2', title: '写周报' }] });
     expect(inv.user).not.toContain('dueDate');
     expect(inv.user).not.toContain('priority');
   });
 
   it('🔴 数量封顶发生在**构造调用**这一层（出境面必须在发出去之前收窄）', () => {
     const many = Array.from({ length: 200 }, (_, i) => ({ id: `t${String(i)}`, title: `任务 ${String(i)}` }));
-    const inv = buildPrioritizeInvocation({ tasks: many });
+    const inv = buildPrioritizeInvocation({ locale: 'zh-CN', tasks: many });
     expect(inv.user).toContain('t0');
     expect(inv.user).toContain(`t${String(MAX_PRIORITIZE_TASKS - 1)}`);
     // 第 51 条不该出现
@@ -189,21 +189,21 @@ describe('buildPrioritizeInvocation', () => {
   // ── 记忆层：偏好注入 prompt 与披露 ─────────────────────────────
 
   it('没有偏好时：不出现 preferences 字段，也不出现任何提示段落', () => {
-    const inv = buildPrioritizeInvocation({ tasks: TASKS });
+    const inv = buildPrioritizeInvocation({ locale: 'zh-CN', tasks: TASKS });
     expect(inv.fields).toEqual(['tasks']);
     expect(inv.user).not.toContain('历史习惯');
   });
 
   it('🔴 传了偏好：`preferences` 必须进 `fields`（否则就是偷偷多发数据）', () => {
     const hints = renderPreferenceHints(withPrefs(), 'prioritize');
-    const inv = buildPrioritizeInvocation({ tasks: TASKS }, hints);
+    const inv = buildPrioritizeInvocation({ locale: 'zh-CN', tasks: TASKS }, hints);
     expect(inv.fields).toEqual(['tasks', 'preferences']);
     expect(inv.user).toContain('关于这位用户的历史习惯');
   });
 
   it('🔴 只发该功能需要的偏好（最小化出境面）：排序不带粒度与标题风格', () => {
     const hints = renderPreferenceHints(withPrefs(), 'prioritize');
-    const inv = buildPrioritizeInvocation({ tasks: TASKS }, hints);
+    const inv = buildPrioritizeInvocation({ locale: 'zh-CN', tasks: TASKS }, hints);
     // 需要的两条在
     expect(inv.user).toContain('提前 2 天');
     expect(inv.user).toContain('高效时段');
@@ -216,20 +216,20 @@ describe('buildPrioritizeInvocation', () => {
     const hints = renderPreferenceHints(off, 'prioritize');
     expect(hints).toEqual([]);
 
-    const inv = buildPrioritizeInvocation({ tasks: TASKS }, hints);
+    const inv = buildPrioritizeInvocation({ locale: 'zh-CN', tasks: TASKS }, hints);
     expect(inv.fields).toEqual(['tasks']);
     expect(inv.user).not.toContain('历史习惯');
     expect(inv.user).not.toContain('提前 2 天');
   });
 
   it('提示顺序固定（同样的输入必须产生同样的 prompt 字节）', () => {
-    const a = buildPrioritizeInvocation({ tasks: TASKS }, renderPreferenceHints(withPrefs(), 'prioritize'));
-    const b = buildPrioritizeInvocation({ tasks: TASKS }, renderPreferenceHints(withPrefs(), 'prioritize'));
+    const a = buildPrioritizeInvocation({ locale: 'zh-CN', tasks: TASKS }, renderPreferenceHints(withPrefs(), 'prioritize'));
+    const b = buildPrioritizeInvocation({ locale: 'zh-CN', tasks: TASKS }, renderPreferenceHints(withPrefs(), 'prioritize'));
     expect(a.user).toBe(b.user);
   });
 
   it('系统提示要求 id 原样照抄、且只输出 JSON', () => {
-    const inv = buildPrioritizeInvocation({ tasks: TASKS });
+    const inv = buildPrioritizeInvocation({ locale: 'zh-CN', tasks: TASKS });
     expect(inv.system).toContain('原样照抄');
     expect(inv.system).toContain('只输出一个 JSON 数组');
   });
@@ -367,7 +367,7 @@ describe('🔴🔴 requestPrioritize —— 出境闸门', () => {
   it('🔴🔴 远端端点但没有该功能的授权 → 不发任何请求', async () => {
     const { impl, calls } = fetchReturning(suggestionsJson([{ id: 't1', priority: 'high' }]));
     const outcome = await requestPrioritize(
-      { tasks: TASKS },
+      { locale: 'zh-CN', tasks: TASKS },
       {
         routing: routing([REMOTE_ENDPOINT], { prioritize: ['remote'] }),
         consents: [],
@@ -384,7 +384,7 @@ describe('🔴🔴 requestPrioritize —— 出境闸门', () => {
   it('🔴 授权绑的是 `(功能, 目的地)` —— 别的功能的授权不算数', async () => {
     const { impl, calls } = fetchReturning(suggestionsJson([{ id: 't1', priority: 'high' }]));
     const outcome = await requestPrioritize(
-      { tasks: TASKS },
+      { locale: 'zh-CN', tasks: TASKS },
       {
         routing: routing([REMOTE_ENDPOINT], { prioritize: ['remote'] }),
         consents: [{ feature: 'breakdown', destination: 'user-endpoint', grantedAt: 1 }],
@@ -398,7 +398,7 @@ describe('🔴🔴 requestPrioritize —— 出境闸门', () => {
   it('✅ 本机端点不需要授权，直接跑通', async () => {
     const { impl, calls } = fetchReturning(suggestionsJson([{ id: 't1', priority: 'high' }]));
     const outcome = await requestPrioritize(
-      { tasks: TASKS },
+      { locale: 'zh-CN', tasks: TASKS },
       {
         routing: routing([LOCAL_ENDPOINT], { prioritize: ['local'] }),
         consents: [],
@@ -414,7 +414,7 @@ describe('🔴🔴 requestPrioritize —— 出境闸门', () => {
   it('✅ 远端端点 + 正确授权 → 跑通，destination 如实标为 user-endpoint', async () => {
     const { impl, calls } = fetchReturning(suggestionsJson([{ id: 't1', priority: 'high' }]));
     const outcome = await requestPrioritize(
-      { tasks: TASKS },
+      { locale: 'zh-CN', tasks: TASKS },
       {
         routing: routing([REMOTE_ENDPOINT], { prioritize: ['remote'] }),
         consents: [LOCAL_CONSENT],
@@ -433,7 +433,7 @@ describe('🔴🔴 requestPrioritize —— 出境闸门', () => {
     ] as unknown as PrioritizeTaskInput[];
 
     await requestPrioritize(
-      { tasks: withNote },
+      { locale: 'zh-CN', tasks: withNote },
       {
         routing: routing([LOCAL_ENDPOINT], { prioritize: ['local'] }),
         consents: [],
@@ -452,7 +452,7 @@ describe('🔴🔴 requestPrioritize —— 出境闸门', () => {
     expect(hints.length).toBeGreaterThan(0);
 
     await requestPrioritize(
-      { tasks: TASKS },
+      { locale: 'zh-CN', tasks: TASKS },
       {
         routing: routing([LOCAL_ENDPOINT], { prioritize: ['local'] }),
         consents: [],
@@ -471,7 +471,7 @@ describe('🔴🔴 requestPrioritize —— 出境闸门', () => {
   it('🔴 不传 preferences 时，请求体里一个偏好字节都没有', async () => {
     const { impl, calls } = fetchReturning(suggestionsJson([{ id: 't1', priority: 'high' }]));
     await requestPrioritize(
-      { tasks: TASKS },
+      { locale: 'zh-CN', tasks: TASKS },
       {
         routing: routing([LOCAL_ENDPOINT], { prioritize: ['local'] }),
         consents: [],
@@ -490,7 +490,7 @@ describe('🔴🔴 requestPrioritize —— 出境闸门', () => {
       ]),
     );
     const outcome = await requestPrioritize(
-      { tasks: TASKS },
+      { locale: 'zh-CN', tasks: TASKS },
       {
         routing: routing([LOCAL_ENDPOINT], { prioritize: ['local'] }),
         consents: [],
@@ -506,7 +506,7 @@ describe('🔴🔴 requestPrioritize —— 出境闸门', () => {
   it('🔴 全部 id 都是幻觉 → `unparseable`，不返回一份空提议', async () => {
     const { impl } = fetchReturning(suggestionsJson([{ id: 'ghost', priority: 'high' }]));
     const outcome = await requestPrioritize(
-      { tasks: TASKS },
+      { locale: 'zh-CN', tasks: TASKS },
       {
         routing: routing([LOCAL_ENDPOINT], { prioritize: ['local'] }),
         consents: [],
@@ -525,7 +525,7 @@ describe('🔴🔴 requestPrioritize —— 出境闸门', () => {
       ]),
     );
     const outcome = await requestPrioritize(
-      { tasks: TASKS },
+      { locale: 'zh-CN', tasks: TASKS },
       {
         routing: routing([LOCAL_ENDPOINT], { prioritize: ['local'] }),
         consents: [],
@@ -543,7 +543,7 @@ describe('🔴🔴 requestPrioritize —— 出境闸门', () => {
   it('🔴 一条任务都没有 → 连路由都不走', async () => {
     const { impl, calls } = fetchReturning(suggestionsJson([{ id: 't1', priority: 'high' }]));
     const outcome = await requestPrioritize(
-      { tasks: [] },
+      { locale: 'zh-CN', tasks: [] },
       {
         routing: routing([LOCAL_ENDPOINT], { prioritize: ['local'] }),
         consents: [],
@@ -561,7 +561,7 @@ describe('🔴🔴 requestPrioritize —— 出境闸门', () => {
   it('🔴 总开关关着 → 不发请求，且提示去开总开关', async () => {
     const { impl, calls } = fetchReturning(suggestionsJson([{ id: 't1', priority: 'high' }]));
     const outcome = await requestPrioritize(
-      { tasks: TASKS },
+      { locale: 'zh-CN', tasks: TASKS },
       {
         routing: { ...routing([LOCAL_ENDPOINT], { prioritize: ['local'] }), enabled: false },
         consents: [],
@@ -576,7 +576,7 @@ describe('🔴🔴 requestPrioritize —— 出境闸门', () => {
   it('🔴 这个功能没有配路由 → 提示要检查端点', async () => {
     const { impl, calls } = fetchReturning(suggestionsJson([{ id: 't1', priority: 'high' }]));
     const outcome = await requestPrioritize(
-      { tasks: TASKS },
+      { locale: 'zh-CN', tasks: TASKS },
       {
         routing: routing([LOCAL_ENDPOINT], {}),
         consents: [],
@@ -591,7 +591,7 @@ describe('🔴🔴 requestPrioritize —— 出境闸门', () => {
   it('🔴 模型返回一坨没用的东西 → `unparseable`，不硬凑', async () => {
     const { impl } = fetchReturning('抱歉，我无法完成这个任务。');
     const outcome = await requestPrioritize(
-      { tasks: TASKS },
+      { locale: 'zh-CN', tasks: TASKS },
       {
         routing: routing([LOCAL_ENDPOINT], { prioritize: ['local'] }),
         consents: [],
@@ -611,7 +611,7 @@ describe('🔴🔴 requestPrioritize —— 出境闸门', () => {
       JSON.stringify(many.map((t) => ({ id: t.id, priority: 'low', reason: 'r' }))),
     );
     const outcome = await requestPrioritize(
-      { tasks: many },
+      { locale: 'zh-CN', tasks: many },
       {
         routing: routing([LOCAL_ENDPOINT], { prioritize: ['local'] }),
         consents: [],
@@ -625,7 +625,7 @@ describe('🔴🔴 requestPrioritize —— 出境闸门', () => {
   it('🔴 没超上限时不标记 truncated（不制造噪音）', async () => {
     const { impl } = fetchReturning(suggestionsJson([{ id: 't1', priority: 'high' }]));
     const outcome = await requestPrioritize(
-      { tasks: TASKS },
+      { locale: 'zh-CN', tasks: TASKS },
       {
         routing: routing([LOCAL_ENDPOINT], { prioritize: ['local'] }),
         consents: [],
@@ -639,7 +639,7 @@ describe('🔴🔴 requestPrioritize —— 出境闸门', () => {
   it('🔴 成功分支携带健康状态，供调用方持久化', async () => {
     const { impl } = fetchReturning(suggestionsJson([{ id: 't1', priority: 'high' }]));
     const outcome = await requestPrioritize(
-      { tasks: TASKS },
+      { locale: 'zh-CN', tasks: TASKS },
       {
         routing: routing([LOCAL_ENDPOINT], { prioritize: ['local'] }),
         consents: [],
@@ -653,7 +653,7 @@ describe('🔴🔴 requestPrioritize —— 出境闸门', () => {
   it('🔴🔴 失败分支也要带回熔断状态（最该记的那一次）', async () => {
     const routeConfig = routing([LOCAL_ENDPOINT], { prioritize: ['local'] });
     const outcome = await requestPrioritize(
-      { tasks: TASKS },
+      { locale: 'zh-CN', tasks: TASKS },
       {
         routing: routeConfig,
         consents: [LOCAL_CONSENT],
@@ -670,7 +670,7 @@ describe('🔴🔴 requestPrioritize —— 出境闸门', () => {
   it('🔴 解析失败（请求成功但内容没法用）也带回 health', async () => {
     const routeConfig = routing([LOCAL_ENDPOINT], { prioritize: ['local'] });
     const outcome = await requestPrioritize(
-      { tasks: TASKS },
+      { locale: 'zh-CN', tasks: TASKS },
       {
         routing: routeConfig,
         consents: [LOCAL_CONSENT],
@@ -697,7 +697,7 @@ describe('🔴🔴 requestPrioritize —— 出境闸门', () => {
       }) as unknown as typeof fetch;
 
       const outcome = await requestPrioritize(
-        { tasks: TASKS },
+        { locale: 'zh-CN', tasks: TASKS },
         {
           routing:
             reason === 'not-configured'
@@ -738,7 +738,7 @@ describe('🔴🔴 回退不跨越隐私边界', () => {
     }) as unknown as typeof fetch;
 
     const outcome = await requestPrioritize(
-      { tasks: TASKS },
+      { locale: 'zh-CN', tasks: TASKS },
       {
         routing: routing([LOCAL_ENDPOINT, REMOTE_ENDPOINT], { prioritize: ['local', 'remote'] }),
         consents: [],
@@ -772,7 +772,7 @@ describe('🔴🔴 回退不跨越隐私边界', () => {
     }) as unknown as typeof fetch;
 
     const outcome = await requestPrioritize(
-      { tasks: TASKS },
+      { locale: 'zh-CN', tasks: TASKS },
       {
         routing: routing([LOCAL_ENDPOINT, REMOTE_ENDPOINT], { prioritize: ['local', 'remote'] }),
         consents: [LOCAL_CONSENT],

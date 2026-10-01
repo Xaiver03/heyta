@@ -291,7 +291,14 @@ export function AiCapture(props: AiCaptureProps): React.JSX.Element {
    */
   const hints = preferenceSet === undefined ? [] : renderPreferenceHints(preferenceSet, 'capture');
 
-  const invocation = buildCaptureInvocation({ text: frozenText, now: frozenAt }, hints);
+  /**
+   * 🔴 披露与真正发送共用**同一个 source 对象**。界面语言决定提示词末尾的
+   * 「输出语言」那一段（模型若按指令语言回话，中文标题会被用户确认**写进数据并同步**），
+   * 所以这里不能两处各写一遍字面量 —— 漏改一处的表现是「披露与实发不是同一份」。
+   */
+  const source = { text: frozenText, now: frozenAt, locale };
+
+  const invocation = buildCaptureInvocation(source, hints);
 
   /**
    * 🔴 披露内容由 `packages/ai` 的 `buildDisclosure()` 组装 ——
@@ -317,7 +324,7 @@ export function AiCapture(props: AiCaptureProps): React.JSX.Element {
   async function send(): Promise<void> {
     setPhase('loading');
     const outcome = await requestCapture(
-      { text: frozenText, now: frozenAt },
+      source,
       {
         routing,
         consents,

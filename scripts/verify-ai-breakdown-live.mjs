@@ -62,6 +62,10 @@ if (typeof config.endpoint !== 'string' || typeof config.apiKey !== 'string') {
 }
 
 const TITLE = '上线新版本';
+// 探针所用的界面语言 —— 决定提示词末尾那条「输出语言」指令。
+// 跑英文判据：HEYTA_AI_LOCALE=en pnpm verify:ai-breakdown-live
+const SOURCE_LOCALE = process.env['HEYTA_AI_LOCALE'] ?? 'zh-CN';
+
 const EXISTING_NOTE = '我自己写的备注。';
 
 /**
@@ -115,7 +119,7 @@ console.log('1) 未授权时：不发请求');
 {
   const { impl, count } = countingFetch(authedFetch);
   const outcome = await requestBreakdown(
-    { title: TITLE },
+    { title: TITLE, locale: SOURCE_LOCALE },
     { routing, consents: [], routed: { fetchImpl: impl } },
   );
   check('被拒绝了', !outcome.ok);
@@ -130,7 +134,7 @@ console.log('\n2) 总开关关着时：不发请求');
 {
   const { impl, count } = countingFetch(authedFetch);
   const outcome = await requestBreakdown(
-    { title: TITLE },
+    { title: TITLE, locale: SOURCE_LOCALE },
     { routing: { ...routing, enabled: false }, consents: [CONSENT], routed: { fetchImpl: impl } },
   );
   check('被拒绝了', !outcome.ok);
@@ -141,7 +145,7 @@ console.log('\n2) 总开关关着时：不发请求');
 console.log('\n3) 授权后：真实拆解');
 const started = Date.now();
 const outcome = await requestBreakdown(
-  { title: TITLE, note: '别忘灰度发布和回滚预案' },
+  { title: TITLE, note: '别忘灰度发布和回滚预案', locale: SOURCE_LOCALE },
   { routing, consents: [CONSENT], routed: { fetchImpl: authedFetch } },
 );
 const elapsed = Date.now() - started;
