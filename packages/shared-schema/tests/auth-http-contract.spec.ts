@@ -14,7 +14,7 @@ import {
  * 而且没有任何一层会报错。所以下面每条断言钉的都是**词表的封闭性**，不是拼写。
  */
 describe('口令那条路的机器码词表', () => {
-  it('七个码，逐字锁定（新增一个码要在这里显式承认）', () => {
+  it('八个码，逐字锁定（新增一个码要在这里显式承认）', () => {
     expect(PASSWORD_AUTH_ERROR_CODES).toEqual([
       'invalid_credentials',
       'email_not_verified',
@@ -23,6 +23,7 @@ describe('口令那条路的机器码词表', () => {
       'password_backend_busy',
       'invalid_reset_link',
       'no_password_set',
+      'password_already_set',
     ]);
   });
 
@@ -77,9 +78,9 @@ describe('路径', () => {
    * 服务端注册的是**相对**形状（它挂在 `prefix: '/api'` 下）。这里不许出现 `/api`：
    * 出现了就等于两边各持有一份完整路径，而换挂载点时只有客户端会跟着改。
    */
-  it('五条都是相对路径，不带 /api 前缀、不带结尾斜杠', () => {
+  it('六条都是相对路径，不带 /api 前缀、不带结尾斜杠', () => {
     const values = Object.values(AUTH_PASSWORD_PATHS);
-    expect(values).toHaveLength(5);
+    expect(values).toHaveLength(6);
     for (const path of values) {
       expect(path.startsWith('/api')).toBe(false);
       expect(path.startsWith('/')).toBe(true);
@@ -87,8 +88,23 @@ describe('路径', () => {
     }
   });
 
-  it('五条路径互不相同', () => {
+  it('六条路径互不相同', () => {
     const values = Object.values(AUTH_PASSWORD_PATHS);
     expect(new Set(values).size).toBe(values.length);
+  });
+
+  /**
+   * `set` 与 `change` 必须**是两个不同的值**。
+   *
+   * 这条看起来是废话，它防的是很实际的一种改法：有人觉得"设第一个口令"
+   * 只是 `change` 的一个特例（省一个 currentPassword 字段），于是把两条路径
+   * 合并 —— 而这两条路的后果不同（`change` bump `tokenVersion` 会把其余设备
+   * 全踢下线，`set` 不 bump）。合并的症状不是报错，是"给账号加了个密码，
+   * 手机和笔记本一起掉线"。
+   */
+  it('set 与 change 是两条独立的路由', () => {
+    expect(AUTH_PASSWORD_PATHS.set).not.toBe(AUTH_PASSWORD_PATHS.change);
+    expect(AUTH_PASSWORD_PATHS.set).toBe('/password/set');
+    expect(AUTH_PASSWORD_PATHS.change).toBe('/password/change');
   });
 });

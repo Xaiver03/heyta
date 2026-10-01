@@ -33,6 +33,7 @@ import { authenticate, getAuthUser } from './middleware';
 import {
   loginWithEmailPassword,
   registerWithEmailPassword,
+  setInitialPassword,
   toPasswordAuthError,
   PasswordAuthError,
   LOGIN_LOCKOUT_MS,
@@ -41,6 +42,7 @@ import {
   PASSWORD_INVALID_CREDENTIALS_MESSAGE,
   PASSWORD_INVALID_RESET_LINK_MESSAGE,
   PASSWORD_POLICY_MESSAGE,
+  PASSWORD_ALREADY_SET_MESSAGE,
   type PasswordAuthErrorCode,
 } from './password/service';
 import {
@@ -157,6 +159,16 @@ const PasswordResetSchema = z.object({
  */
 const PasswordChangeSchema = z.object({
   currentPassword: PasswordSchema,
+  newPassword: PasswordSchema,
+});
+
+/**
+ * 设**第一个**口令：只有一个新口令字段 —— 没有"当前口令"可验，那个账号从来没有过口令。
+ *
+ * 与上面那条同样是**不判强度**的：长度/常见/泄露由 `setInitialPassword` 里的
+ * `checkNewPassword` 权威裁决（两套规则迟早给出两个答案）。
+ */
+const PasswordSetSchema = z.object({
   newPassword: PasswordSchema,
 });
 
@@ -437,10 +449,20 @@ export const passwordAuthResponseOf = (pwErr: PasswordAuthError): PasswordAuthRe
       };
     case 'no_password_set':
       // 与 `invalid_reset_link` 同为 400（都是"这条路走不通"），但**句子与 code 不同** ——
-      // 界面据 code 换 CTA：这句要把人导向「忘记密码」，那句要他回去重新点链接。
+      // 界面据 code 换 CTA：这句要把人导向「设置登录密码」（`/password/set`），
+      // 那句要他回去重新点一次链接。
+      // ⚠️ 旧版本这里写的是"导向「忘记密码」" —— 那是一条**不存在的出路**：
+      // `requestPasswordReset` 对没有口令认证器的账号根本不发信。
       return {
         status: 400,
         body: { error: PASSWORD_NOT_SET_MESSAGE, code: pwErr.code },
+      };
+    case 'password_already_set':
+      // 同为 400：也是"这条路走不通"，但方向相反 —— 该走 `change`。
+      // 不给 403 是因为它读的像"你的账号不许做这件事"，而真相是"这个账号已经有口令"。
+      return {
+        status: 400,
+        body: { error: PASSWORD_ALREADY_SET_MESSAGE, code: pwErr.code },
       };
     case 'password_policy_violation':
       return {
@@ -1655,6 +1677,61 @@ export const apiRoutes = async (
         Logger.error(`Password change error: ${errMsg}`);
         return reply.status(500).send({
           error: getSafeErrorMessage(err, 'Password change failed. Please try again.'),
+        });
+      }
+    },
+  );
+
+  /**
+   * 已登录**给账号加上第一个口令**（纯通行密钥 / 魔法链接注册的账号）。
+   *
+   * 🔴 不是 `change` 的语法糖：那条要验一个不存在的当前口令、bump `tokenVersion`
+   * 并回一枚**新会话**，这条三样都没有（它是**加一个认证器**，不是换一把钥匙，
+   * 把其余设备踢下线在这条路上没有任何收益）。所以响应只有 `{ message }`，
+   * 客户端**不需要**换令牌 —— 少一条形状不同的路就多一处"客户端猜哪条对"。
+   *
+   * 为什么不能靠 `forgot` 代劳：那对没有口令认证器的账号**刻意不发信**（反枚举）。
+   * 少了这条路由，`no_password_set` 那句"去设一个登录密码"就是一句指向不存在的路的谎话。
+   *
+   * 同样挂在 `preHandler: authenticate` 上，`userId` **只**取自已认证身份。
+   */
+  fastify.post<{ Body: { newPassword?: string } }>(
+    AUTH_PASSWORD_PATHS.set,
+    {
+      preHandler: authenticate,
+      config: {
+        rateLimit: {
+          max: 10,
+          timeWindow: '15 minutes',
+        },
+      },
+    },
+    async (req, reply) => {
+      const parseResult = PasswordSetSchema.safeParse(req.body);
+      if (!parseResult.success) {
+        return reply.status(400).send({
+          error: 'Validation failed',
+          details: parseResult.error.issues,
+        });
+      }
+
+      try {
+        return reply.send(
+          await setInitialPassword({
+            userId: getAuthUser(req).userId,
+            password: parseResult.data.newPassword,
+          }),
+        );
+      } catch (err) {
+        const pwErr = toPasswordAuthError(err);
+        if (pwErr) {
+          Logger.warn(`Initial password rejected (${pwErr.code})`);
+          return sendPasswordAuthError(reply, pwErr);
+        }
+        const errMsg = err instanceof Error ? err.message : 'Unknown error';
+        Logger.error(`Initial password error: ${errMsg}`);
+        return reply.status(500).send({
+          error: getSafeErrorMessage(err, 'Password setup failed. Please try again.'),
         });
       }
     },

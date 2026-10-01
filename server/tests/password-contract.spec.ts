@@ -21,7 +21,7 @@ import { PasswordAuthError } from '../src/password/service';
  * "新码"在四个宿主上表现成一句笼统的失败，测试全绿。
  */
 describe('共享错误词表的每一项都有 HTTP 表达', () => {
-  it('七个码逐个都映射出一个状态码，且原样回显 code', () => {
+  it('八个码逐个都映射出一个状态码，且原样回显 code', () => {
     for (const code of PASSWORD_AUTH_ERROR_CODES) {
       const res = passwordAuthResponseOf(new PasswordAuthError(code, 'internal detail'));
       // 🔴 没有映射时 switch **返回 undefined**（那条 switch 刻意不写 default）。
@@ -41,8 +41,8 @@ describe('共享错误词表的每一项都有 HTTP 表达', () => {
    * 词表长度单独钉一次：上面那个循环在词表**为空**时会全绿。
    * 这正是 §7 第 33 条说的"永远通过的判据"。
    */
-  it('词表确实有七条（循环不是对着空数组跑的）', () => {
-    expect(PASSWORD_AUTH_ERROR_CODES).toHaveLength(7);
+  it('词表确实有八条（循环不是对着空数组跑的）', () => {
+    expect(PASSWORD_AUTH_ERROR_CODES).toHaveLength(8);
     expect(PASSWORD_POLICY_CODES).toHaveLength(4);
   });
 
@@ -74,13 +74,13 @@ describe('共享错误词表的每一项都有 HTTP 表达', () => {
 
 describe('路径只有一份写法', () => {
   /**
-   * 五条路由的注册现在用 `AUTH_PASSWORD_PATHS.*`（本文件上面那处改动）。这条断言
+   * 六条路由的注册现在用 `AUTH_PASSWORD_PATHS.*`（本文件上面那处改动）。这条断言
    * 防的是**以后有人把某条改回字面量** —— 那在 TypeScript 上完全合法，而且当天不会
    * 有任何症状，直到换挂载点或改名时其中一端漏改。
    *
    * 按字符串字面量匹配，注释里那些 `/api/password/forgot` 之类的叙述不算。
    */
-  it('api.ts 不再用字符串字面量注册这五条路由', () => {
+  it('api.ts 不再用字符串字面量注册这六条路由', () => {
     const source = readFileSync(
       fileURLToPath(new URL('../src/api.ts', import.meta.url)),
       'utf8',
@@ -90,7 +90,7 @@ describe('路径只有一份写法', () => {
       expect(source).not.toContain(`"${path}"`);
     }
     // 🔴 阳性对照：只看"字面量不见了"是不够的 —— 那条路由被删掉时上面同样全绿。
-    // 所以五条必须**各自**以常量形式出现一次。
+    // 所以六条必须**各自**以常量形式出现一次。
     for (const key of Object.keys(AUTH_PASSWORD_PATHS)) {
       expect(source).toContain(`AUTH_PASSWORD_PATHS.${key},`);
     }
