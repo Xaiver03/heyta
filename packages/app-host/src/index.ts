@@ -40,8 +40,11 @@ export {
  */
 export {
   createFocusActions,
+  FOCUS_LOG_FAILURE_CODES,
+  focusLogFailureCode,
   type FocusActions,
   type FocusActionsOptions,
+  type FocusLogFailureCode,
 } from './focus-actions.js';
 
 /**

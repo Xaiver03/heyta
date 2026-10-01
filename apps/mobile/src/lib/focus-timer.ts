@@ -48,7 +48,11 @@ import {
   type FocusSessionKind,
   type FocusState,
 } from '@heyta/domain';
-import { createFocusActions } from '@heyta/app-host';
+import {
+  createFocusActions,
+  focusLogFailureCode,
+  type FocusLogFailureCode,
+} from '@heyta/app-host';
 
 import { openTaskHost } from '../db/open-host';
 
@@ -71,8 +75,12 @@ export interface FocusTimerSnapshot {
    * ⚠️ 这里只带**原因**（底层实现的原始文本，是数据），不带整句文案：
    * 这是个纯 store，拿不到 `t`，句子由 `FocusScreen` 用词条表拼出来。
    * 存成拼好的中文句子会让英文界面漏出一句中文。
+   *
+   * `code` 是给界面的**可辨识部分**：`focus-actions` 的三条校验失败各有一个码，
+   * 界面据此说清"为什么没记上"。认不出来的异常没有码，只能落到那句带
+   * `{reason}` 的通用句（与 Web 端 `features/focus/store.ts` 同形）。
    */
-  error?: { reason: string };
+  error?: { code?: FocusLogFailureCode; reason: string };
   /**
    * 最近一次**成功落盘**的时刻。
    *
@@ -172,7 +180,10 @@ async function persist(session: FocusSession): Promise<void> {
     // 🔴 必须捕获。这段代码在**定时器回调**里跑，未捕获的拒绝在 RN 上
     // 会变成 unhandledRejection —— 存储故障不该让应用崩掉，但也不能静默。
     publish({
-      error: { reason: error instanceof Error ? error.message : String(error) },
+      error: {
+        code: focusLogFailureCode(error),
+        reason: error instanceof Error ? error.message : String(error),
+      },
     });
   } finally {
     persisting = false;
