@@ -703,3 +703,135 @@ landing `tsc --noEmit`；landing e2e 17 条结果见下一条记录。
 —— 界面里就有"自定义 RRULE"输入框、导出的文件就是 JSON、本机 API / MCP 是设置里的
 真实开关。禁它们会误杀正确的产品文案。"开发向"的定义：只在代码/部署里存在、
 访客无法在界面上遇到的东西。
+
+---
+
+## 2026-10-01 文档中心收尾轮（Goal：B1 英文配图全链 / B5 陷阱入档 / 平台门禁裁决落地）
+
+开工状态：main = `c249c618`，工作树带着另一条线 39 处未提交改动（日历侧栏 /
+design-system / 两个 locale / package.json / environment-traps.md）。
+基线门禁全绿：`check:entries` 55 份 · `check:ui-language` zh 2407 = en 2407 ·
+`check:docs-voice` 992 / 120 / 0 · `gen-help-figures --check` 5 张 ·
+`screenshot:verify` 18 目标 · landing e2e 17 passed。
+**18 张既有产物 sha256 清单**存开工快照（任务 1 的"zh 逐字节不变"以此对账）。
+
+### 任务 1：B1 —— 英文配图全链 ✅
+
+**关键实测发现（改了实现形状）**：web 应用**刻意不读 navigator.language**
+（`apps/web/src/lib/locale.ts` 文件头），Playwright 的 `locale: 'en'` 只改浏览器
+协商，**切不动界面语言**。真信号是 `?lang=` 参数（已存偏好 > `?lang=` > 默认中文，
+fresh context 无偏好）。⇒ 采集器对非默认 locale 的目标把 `?lang=` 拼进 URL。
+
+- `targets.mjs`：TARGETS 加 `locale` 字段（默认 zh-CN）+ 5 个英文目标
+  （W01-en/W02-en/W03-en/W05-en/W07-en，readyText 取 en 词条真实值
+  Tasks/Quadrants/Habits/Timeline/Trash，不纳入 appStore）。
+- `capture.mjs`：locale 按目标声明进 newContext + `?lang=` 拼 URL（tab 与 path
+  两条分支都拼）。**既有 18 张 zh 产物 sha256 逐张与基线相同 —— 中文侧零扰动**。
+- 5 张英文截图采集成功；**五张全部人眼核过**（Inbox / Your inbox is empty /
+  Quadrants 的 Do now/Schedule/Delegate/Drop / Habits / Timeline / Trash
+  全是真英文界面）。
+- `helpFigures.ts`：`HelpFigure.locale` 字段；zh 5 条不动、en 5 条成对追加
+  （同 sectionId / 同 slug / 同一对词条 key，targetId 指向 en 目标）；
+  新增 `assertHelpFigurePairs()` —— 每篇的 (sectionId, slug) 必须 zh/en 成对，
+  生成器入口第一个执行它：**映射不成对，一个字节都不写**（这条拦的就是 B1 的
+  形状："只给一种语言加了图" e2e 与 --check 都不会红）。
+- `docs.ts`：`docsFiguresOf(article, locale)` —— 先按 locale 过滤再编号，
+  两语言图号一致（`图 20-1` / `Figure 20-1`）、文件互不串。
+- `DocsArticlePage.tsx`：locale 闸（`locale === 'zh-CN' ? … : []`）删除，
+  改为按 locale 取图。
+- en 词条两处与实测截图不符的修正：first-run 图注 "Done" → "Completed"
+  （英文界面侧栏真实标签）、timeline alt 去掉英文页没有的"当天完成数"。
+- **变异验证**：把 en first-run 的 targetId 指回 `W01`（图源变成中文产物）
+  ⇒ e2e 第 14 条 **1 failed，红在「第 1 张必须是英文界面产物」**；还原后
+  整套 **17 passed**。⚠️ 这条变异 `--check` 抓不到（同名复制品内容一致）——
+  正好证明第 14 条的浏览器判据**有独立的重量**。
+
+### 任务 2：B5 —— diff-tree 陷阱入档 §7 ✅
+
+`docs/reference/environment-traps.md` 追加**第 90 条**（编号取当前最大 89+1；
+89 是另一条线工作树里未提交的条目，已提交最大 88）。内容 = B5 实测
+（diff-tree 两参比 A↔B 不是各自对父 ⇒ 空测量）+ 一般规律"对账命令先证明
+自己量到了该量的样本"，同批把同一天的姊妹款（hunk 过滤只比对增行、漏判对方
+改写自己正文的 hunk）写进同一条。AGENTS §7 索引表补 `86–90` 行。
+BLOCKED.md B5 标记已入档。
+⚠️ 提交纪律：该文件工作树里对方 #89 在我前脚、紧贴文件尾 ⇒ hunk 过滤切不开，
+走 **HEAD + 我的条目**重建式暂存（与 package.json 同法）。
+
+### 任务 3：平台门禁跳过分支 —— 分界落地 ✅
+
+裁决（Goal 采纳任务书 §10 建议案）：**平台不符 / 工具链不存在 ⇒ 合法跳过
+（exit 0 + 响亮 SKIP）；平台与工具都在、取证失败 ⇒ 判红**。
+逐条对过四个脚本：`check-macos-shell`（非 darwin / 无 swift 跳过，其余全硬
+失败）、`check-windows-shell`（无 dotnet 跳过）、`check-linux-shell`（平台 /
+GTK 依赖缺失跳过）—— 三条的跳过本来就全在合法一侧，**未动**。
+唯一违背分界的是 `check-macos-window` 的 **exit 4（ScreenCaptureKit 未授权）
+→ 静默跳过**，改为**判红**并写明修法（系统设置给终端授屏幕录制权限）；
+文件头的跳过/判红分界说明同步改写。
+
+**变异验证**：把 `CAPTURE` 指到 exit 4 的桩 ⇒ 门禁 **exit 1**，红在
+「不再静默跳过（2026-10-01 裁决）」与授权指引上；还原后零残留
+（`git diff` 里 MUTATION 计数 = 0），真实跑一遍见下方退出码。
+**非 darwin / 非 Aqua 分支本机无法实测 ⇒ 未改动、如实记录"未实测"。**
+（"有 Aqua 会话却取不到图"那条本来就是判红，未动。）
+
+**真实门禁第一跑红了 —— 而且红得有价值**：交叉验证尺寸不一致
+（自截图 2240×1440 vs 独立截屏 2124×1508）。排查 = **§7 第 81.3 条的现场重现**：
+机器上常驻**用户自己装的** `/Applications/Heyta.app`（标题同为 "heyta"），
+`window-id.swift` 只按标题筛、`head -1` 撞上用户的窗口 —— 拿**正在使用中的产品**
+的窗口尺寸跟取证实例的自截图比，必红；而这个"僵尸"既不能杀也不该杀。
+修法（取证链内的最小消歧）：`window-id.swift` 加可选 `--pid` 过滤
+（`kCGWindowOwnerPID`；不带参数行为与过去完全一致），
+`capture-window.sh` 传入自己起的实例 PID（`$CROSSCHECK_PID`）。
+**重跑：交叉验证 2240×1440 = 2240×1440 ✓**（退出码见文末）。
+⚠️ 这一处动了 `apps/desktop-macos/scripts/`（超出 Goal §8.3 预告的文件清单）——
+理由：不修它，"取证失败判红"这条裁决在这台**开着 heyta 的主力机**上永远跑不出绿，
+门禁会从"静默跳过"变成"永远假红"，两个方向都不诚实。
+
+### 门禁收尾（最终 HEAD 复跑，退出码见文末清单）
+
+`check:entries` / `check:ui-language` / `check:docs-voice` / `check:docs` /
+`gen-help-figures --check`（**10 张**）/ `screenshot:verify`（**23 目标**）/
+landing `tsc --noEmit` / landing e2e（**17 passed**，含改写后的第 14 条）/
+`check:macos-window` 真实跑。
+
+本轮只动 apps/landing、scripts/screenshots、scripts/check-macos-window.mjs、
+packages/i18n、e2e/landing、docs/、BLOCKED.md、PROGRESS.md、AGENTS.md（§7 表）——
+不产出客户端包，**四端重装不适用**（沿用 b71546fd 先例）。
+
+**真实门禁的完整经过（六跑，每一跑都有结论）**：
+
+| 跑 | 结果 |
+|---|---|
+| 1 | 交叉验证尺寸不一致（2240×1440 vs 2124×1508）⇒ 红 —— §7 #81.3 现场：用户自己装的 Heyta.app 撞进按标题选窗的清单 ⇒ 修：`window-id.swift --pid` 消歧 |
+| 2 | 交叉验证 ✓ 但脚本 10 分钟超时（ETIMEDOUT）⇒ 新问题现形 |
+| 3 | 复现超时；受控实验证明壳对 TERM 正常退出（独立 8 秒起停）⇒ 挂点不在应用 |
+| 4 | 每 15 秒采样进程树：卡的是交叉验证的 `node -`（stdin 模块）—— 打印完「尺寸一致」不退出，`sample` 抓到它在 ESM 求值微任务里 100% CPU 空转 |
+| 5 | 换成脚本文件 `crosscheck-dimensions.mjs` 后首跑：**取证脚本自报 exit 4（ScreenCaptureKit 未授权）⇒ 新分支响亮判红** —— 旧代码这里是静默 exit 0 假绿，正是 §10 要堵的形状；这条红线在真实世界（不经注入）自己触发了 |
+| 6 | **exit 0 全绿**：窗口非空不透明、CAPTURE_METHOD=screencapturekit、交叉验证 2240×1440=2240×1440（PID 消歧）、快照 contentOnModalRatio 达标、M2 身份入口/菜单合规/滴答导入面板全过 |
+
+🔴 顺带把一个潜伏的形状钉死了：交叉验证的比对是 heredoc `node -`（stdin 模块），
+**红了能跑、绿了挂死** —— 失败路径秒退（run 1 之前从没人等它走完成功路径），
+成功路径把 bash 的 `wait` 挂到门禁 10 分钟超时。已改为仓库标准形态
+`crosscheck-dimensions.mjs`（判据逐字保留：1x/2x 归一判等）。
+
+### 收尾验收清单（最终工作树逐条退出码）
+
+```
+pnpm -r typecheck                                → exit 0
+pnpm --filter @heyta/i18n build                  → exit 0
+pnpm --filter @heyta/landing gen:entries         → exit 0（入口 4 份图注/alt 相关更新随提交）
+pnpm check:entries                               → exit 0（55 份）
+node scripts/check-ui-language.mjs               → exit 0（zh 2407 = en 2407）
+node scripts/check-docs-voice.mjs                → exit 0（site.* 992 / 豁免 120 / 命中 0）
+node research/tools/docs-link-check.mjs          → exit 0
+node apps/landing/scripts/gen-help-figures.mjs --check → exit 0（10 张，sha256 逐张）
+node scripts/screenshots/verify-artifacts.mjs    → exit 0（注册表 23 目标）
+pnpm --filter @heyta/landing exec tsc --noEmit   → exit 0
+pnpm check:landing-e2e                           → exit 0（17 passed，含改写后的第 14 条）
+node scripts/check-macos-window.mjs（真实跑）      → exit 0（第 6 跑；第 5 跑按新分界响亮红）
+zh 产物对账：18 张 sha256 与开工基线逐张相同        → BYTE_IDENTICAL=yes
+变异验证：e2e 第 14 条（en 图源指回 zh 产物）        → 1 failed 指到断言；还原 → 17 passed
+变异验证：门禁 exit 4 桩                          → exit 1 红在授权指引；还原 → 零残留
+```
+
+本轮不产出客户端包，四端重装不适用（沿用 b71546fd 先例）。

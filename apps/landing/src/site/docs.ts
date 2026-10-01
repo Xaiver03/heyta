@@ -43,7 +43,7 @@
  * 五个分类页才同时成立；少一篇，对应那个入口就不该存在。）
  */
 
-import type { MessageKey } from '@heyta/i18n/provider';
+import type { Locale, MessageKey } from '@heyta/i18n/provider';
 
 import type { HelpModule, HelpModuleId } from './content.js';
 import { HELP_MODULES } from './content.js';
@@ -959,15 +959,20 @@ function registryOrdinal(articleId: DocsArticleId): number {
 }
 
 /**
- * 一篇文章的配图，按它们在 `HELP_FIGURES` 里写下的顺序编号。
+ * 一篇文章在**指定语言下**的配图，按 `HELP_FIGURES` 里的书写顺序编号。
+ *
+ * 🔴 先按 `locale` 过滤再编号：zh 与 en 各自从 1 数，两边的图号因此一致
+ * （同一篇的第 1 张在两种语言里都叫 `<章>-1`），而文件互不串——
+ * 英文页拿到的 `src` 一定是英文界面那张（成对性由 `assertHelpFigurePairs`
+ * 在生成器入口钉住）。
  *
  * 🔴 `sectionId` 找不到就**抛**，不静默丢图。这是这套派生结构里唯一会"看起来正常"
  * 的失败：分区改名后那张图不会报错，只会**从页面上消失**，而配图少一张没有任何
  * 判据会主动喊出来（段落数、目录、卡片数全都不看它）。抛错 + e2e 那条"图数"断言，
  * 才是这一处该有的两道闸。
  */
-export function docsFiguresOf(article: DocsArticle): readonly DocsFigure[] {
-  const figures = HELP_FIGURES[article.id];
+export function docsFiguresOf(article: DocsArticle, locale: Locale): readonly DocsFigure[] {
+  const figures = HELP_FIGURES[article.id].filter((figure) => figure.locale === locale);
   if (figures.length === 0) return [];
   const chapter = registryOrdinal(article.id);
   return figures.map((figure, i) => {

@@ -125,6 +125,12 @@ export const SITES = {
  *   - `device`     → DEVICES 的键
  *   - `fullPage`   → 是否截整页
  *   - `appStore`   → 是否纳入 App Store 截图集
+ *   - `locale`     → 截图时的界面语言（默认 `zh-CN`）。🔴 web 应用**不读**
+ *     `navigator.language`（见 `apps/web/src/lib/locale.ts` 文件头：刻意不做
+ *     设备语言判断），Playwright 的 `locale:` 只改浏览器侧协商 —— 真正让界面
+ *     切语言的是 `?lang=` 参数（已存偏好 > `?lang=` > 默认中文）。所以
+ *     capture 对非默认 locale 的目标是把 `?lang=` 拼进 URL，`locale` 字段
+ *     同时进 newContext 保持两层一致。
  */
 export const TARGETS = [
   // ── 官网（路径式）────────────────────────────────────────────────
@@ -150,12 +156,24 @@ export const TARGETS = [
   { id: 'MW01', name: '移动端任务', site: 'web', openVia: 'tab', view: 'tasks', device: 'mobile', readyText: '任务', appStore: true },
   { id: 'MW02', name: '移动端四象限', site: 'web', openVia: 'tab', view: 'quadrant', device: 'mobile', readyText: '四象限', appStore: true },
   { id: 'MW03', name: '移动端习惯', site: 'web', openVia: 'tab', view: 'habits', device: 'mobile', readyText: '习惯', appStore: true },
+
+  // ── 英文界面（桌面视口）────────────────────────────────────────
+  // 🔴 readyText 取自 packages/i18n/src/locales/en.ts 的真实词条
+  //    （web.shell.nav.tasks / web.shell.nav.quadrant / web.shell.views.habits /
+  //    web.shell.views.timeline / web.trash.nav），不是编的。
+  // ⚠️ 不纳入 appStore：App Store 那组是中文界面的产物集，不随语言扩。
+  { id: 'W01-en', name: 'Tasks', site: 'web', openVia: 'tab', view: 'tasks', locale: 'en', readyText: 'Tasks' },
+  { id: 'W02-en', name: 'Quadrants', site: 'web', openVia: 'tab', view: 'quadrant', locale: 'en', readyText: 'Quadrants' },
+  { id: 'W03-en', name: 'Habits', site: 'web', openVia: 'tab', view: 'habits', locale: 'en', readyText: 'Habits' },
+  { id: 'W05-en', name: 'Timeline', site: 'web', openVia: 'tab', view: 'timeline', locale: 'en', readyText: 'Timeline' },
+  { id: 'W07-en', name: 'Trash', site: 'web', openVia: 'tab', view: 'trash', locale: 'en', readyText: 'Trash' },
 ].map((target) => ({
   device: 'desktop',
   fullPage: false,
   authRequired: false,
   dismissTexts: [],
   appStore: false,
+  locale: 'zh-CN',
   ...target,
 }));
 

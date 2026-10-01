@@ -31,11 +31,12 @@
  * 属于规格 §5 第 16 条那一类（内部标识）；登录页那张是公开站自己的页面，
  * 拿去给产品文章配图是自我指涉。两条都记在 BLOCKED.md。
  *
- * ⚠️ **英文版不渲染配图**（判据在 `DocsArticlePage.tsx`）。理由不是省事：
- * `screenshots/**` 里的每张图都是**中文界面**（采集器 `locale: 'zh-CN'` 写死在
- * `capture.mjs` 里，而那是判卷文件、本轮不许碰），把中文界面放进英文文章
- * 等于让访客自己去脑补"我那个英文按钮在这儿长什么样"。
- * 缺的是**英文界面的采集能力**，不是配图 —— 补法记在 BLOCKED.md。
+ * ⚠️ **配图按界面语言成对**（zh / en 各一张，见 `HelpFigure.locale`）。
+ * 曾经英文版整片不挂图（BLOCKED.md B1）：不是不想挂，是缺**英文界面的
+ * 采集能力**——`capture.mjs` 把 `locale: 'zh-CN'` 写死。那道闸已解：
+ * 目标注册表支持按目标声明 locale，en 目标走 `?lang=` 参数截英文界面。
+ * 挂中文界面图进英文正文，仍然是错的（访客要脑补"我那个英文按钮在哪儿"），
+ * e2e 的反向对照钉着这一点。
  */
 
 import type { MessageKey } from '@heyta/i18n/provider';
@@ -50,7 +51,11 @@ import type { DocsArticleId } from './docs.js';
  * 再按那套目录与命名约定（`screenshots/<组>/<id>-<中文名>.png`）算出源路径。
  * 在这里抄一遍路径，等于给"截图改名"埋一个只在生成时才炸的雷。
  */
+export type HelpFigureLocale = 'zh-CN' | 'en';
+
 export interface HelpFigure {
+  /** 这张图是哪个界面语言的截图。英文页挂英文界面图，中文页挂中文界面图。 */
+  readonly locale: HelpFigureLocale;
   /** 挂在哪一节（`docs.ts` 里那篇的 `sections[].id`）。 */
   readonly sectionId: string;
   readonly targetId: string;
@@ -66,12 +71,26 @@ export interface HelpFigure {
  * 🔴 之所以要求逐篇表态：新加一篇文章时若这张表是"可选的"，
  * 它就会一直空着 —— 而"这一篇该不该配图"这个问题只有作者能回答，
  * 编译器只能保证**它被问到过**。
+ *
+ * 🔴 每篇文章里 **zh 与 en 成对出现**（同一节、同一对词条 key、同一 slug，
+ * 只有 `locale` 与 `targetId` 不同——英文目标在 `targets.mjs` 里是独立的 id）。
+ * 只加 zh 不加 en，`--check` 不会红，但英文页会回到"整篇没有一张图"的旧缺陷
+ * —— B1 就是这么来的，所以这里写成**结构上看得出来**的成对形状。
  */
 export const HELP_FIGURES: Record<DocsArticleId, readonly HelpFigure[]> = {
   'first-run': [
     {
+      locale: 'zh-CN',
       sectionId: 'first-screen',
       targetId: 'W01',
+      slug: 'tasks',
+      captionKey: 'site.docs.first-run.fig.tasks',
+      altKey: 'site.docs.first-run.fig.tasks.alt',
+    },
+    {
+      locale: 'en',
+      sectionId: 'first-screen',
+      targetId: 'W01-en',
       slug: 'tasks',
       captionKey: 'site.docs.first-run.fig.tasks',
       altKey: 'site.docs.first-run.fig.tasks.alt',
@@ -79,8 +98,17 @@ export const HELP_FIGURES: Record<DocsArticleId, readonly HelpFigure[]> = {
   ],
   concepts: [
     {
+      locale: 'zh-CN',
       sectionId: 'habits',
       targetId: 'W03',
+      slug: 'habits',
+      captionKey: 'site.docs.concepts.fig.habits',
+      altKey: 'site.docs.concepts.fig.habits.alt',
+    },
+    {
+      locale: 'en',
+      sectionId: 'habits',
+      targetId: 'W03-en',
       slug: 'habits',
       captionKey: 'site.docs.concepts.fig.habits',
       altKey: 'site.docs.concepts.fig.habits.alt',
@@ -92,6 +120,7 @@ export const HELP_FIGURES: Record<DocsArticleId, readonly HelpFigure[]> = {
   conflict: [],
   views: [
     {
+      locale: 'zh-CN',
       sectionId: 'quadrant',
       targetId: 'W02',
       slug: 'quadrant',
@@ -99,8 +128,25 @@ export const HELP_FIGURES: Record<DocsArticleId, readonly HelpFigure[]> = {
       altKey: 'site.docs.views.fig.quadrant.alt',
     },
     {
+      locale: 'zh-CN',
       sectionId: 'timeline',
       targetId: 'W05',
+      slug: 'timeline',
+      captionKey: 'site.docs.views.fig.timeline',
+      altKey: 'site.docs.views.fig.timeline.alt',
+    },
+    {
+      locale: 'en',
+      sectionId: 'quadrant',
+      targetId: 'W02-en',
+      slug: 'quadrant',
+      captionKey: 'site.docs.views.fig.quadrant',
+      altKey: 'site.docs.views.fig.quadrant.alt',
+    },
+    {
+      locale: 'en',
+      sectionId: 'timeline',
+      targetId: 'W05-en',
       slug: 'timeline',
       captionKey: 'site.docs.views.fig.timeline',
       altKey: 'site.docs.views.fig.timeline.alt',
@@ -112,8 +158,17 @@ export const HELP_FIGURES: Record<DocsArticleId, readonly HelpFigure[]> = {
   transfer: [],
   trash: [
     {
+      locale: 'zh-CN',
       sectionId: 'tasks-only',
       targetId: 'W07',
+      slug: 'trash',
+      captionKey: 'site.docs.trash.fig.trash',
+      altKey: 'site.docs.trash.fig.trash.alt',
+    },
+    {
+      locale: 'en',
+      sectionId: 'tasks-only',
+      targetId: 'W07-en',
       slug: 'trash',
       captionKey: 'site.docs.trash.fig.trash',
       altKey: 'site.docs.trash.fig.trash.alt',
@@ -122,6 +177,33 @@ export const HELP_FIGURES: Record<DocsArticleId, readonly HelpFigure[]> = {
   privacy: [],
   loss: [],
 };
+
+/**
+ * 成对性判据：每个有图的文章里，zh 与 en 的（sectionId, slug）集合必须相等。
+ * 🔴 这条拦的是"只给一种语言加了图"—— 上面注释里说的那个 B1 形状。
+ * 挂在数据层而不是靠 e2e，是因为生成器与渲染器都从这张表取数：
+ * 表里不成对，两边谁也绕不过去。
+ */
+export function assertHelpFigurePairs(): void {
+  const problems: string[] = [];
+  for (const [articleId, figures] of Object.entries(HELP_FIGURES)) {
+    const bySlug = new Map<string, Set<string>>();
+    for (const figure of figures) {
+      const key = `${figure.sectionId}/${figure.slug}`;
+      const locales = bySlug.get(key) ?? new Set<string>();
+      locales.add(figure.locale);
+      bySlug.set(key, locales);
+    }
+    for (const [key, locales] of bySlug) {
+      if (locales.size !== 2) {
+        problems.push(`${articleId} 的 ${key} 只有 ${[...locales].join('+')}，缺另一种语言`);
+      }
+    }
+  }
+  if (problems.length > 0) {
+    throw new Error(`配图没有成对：\n  ${problems.join('\n  ')}`);
+  }
+}
 
 /** 复制品的文件名（生成器与渲染器共用这一条规则，不各写一遍）。 */
 export function helpFigureFile(figure: HelpFigure): string {

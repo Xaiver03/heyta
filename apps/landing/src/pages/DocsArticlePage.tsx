@@ -20,11 +20,12 @@
  * 和下面渲染出的 `<section id>` 是同一份数据，所以"目录少了新的一节"
  * 这种事结构上发生不了。
  *
- * 🔴 **配图只挂在 `zh-CN`**。这不是省事，是那一层唯一的图**全是中文界面**：
- * 采集脚本把 `locale: 'zh-CN'` 写死在判卷文件里（`scripts/screenshots/capture.mjs`，
- * 本轮不许改），18 张产物都是中文 UI。把中文界面放进英文文章，等于让访客自己
- * 脑补"我那个英文按钮在这儿长什么样"。缺的是**英文界面的采集能力**，不是配图 ——
- * 补法与影响记在 `BLOCKED.md`；判据（哪一版渲染图）就在下面这一行，不在样式表里。
+ * 🔴 **配图按界面语言取**（`docsFiguresOf(article, locale)`）：英文页挂英文
+ * 界面的截图，中文页挂中文界面的截图 —— 把中文界面放进英文文章，等于让访客
+ * 自己脑补"我那个英文按钮在这儿长什么样"。这一版之前只给 zh 挂图（BLOCKED.md
+ * B1：采集器把 locale 写死），现在采集器按目标声明 locale、映射表 zh/en 成对，
+ * 两边都有真界面图。成对性由生成器入口的 `assertHelpFigurePairs` 钉住；
+ * e2e 的反向对照钉着"英文页不许出现中文界面的图"。
  */
 
 import { useLocale } from '@heyta/i18n/provider';
@@ -46,10 +47,7 @@ export function DocsArticlePage({ page }: { page: SitePage }): React.JSX.Element
         <DocsLayout page={page}>
           <div className="lp-docs__body">
             <DocsToc sections={article.sections} />
-            <PageSections
-              sections={article.sections}
-              figures={locale === 'zh-CN' ? docsFiguresOf(article) : []}
-            />
+            <PageSections sections={article.sections} figures={docsFiguresOf(article, locale)} />
           </div>
         </DocsLayout>
       </div>
