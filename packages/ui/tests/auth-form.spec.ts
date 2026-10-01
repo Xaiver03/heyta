@@ -69,6 +69,26 @@ describe('AuthForm —— 不该存在的形状', () => {
     }
   });
 
+  it('🔴 条款链接**不在**同意项的可点区域里（点条款不许等于勾选同意）', () => {
+    /**
+     * 原来这件事钉在真浏览器的 `label a[href]` 计数上 —— 那是**旧壳**的形状。
+     * 共享表单里同意项是 `div[role=checkbox]`、条款是它**后面的兄弟节点**，
+     * 整张表单一个 `<label>` 都没有 ⇒ 那条判据恒为 0，**看起来在保护，其实谁都不管**
+     * （AGENTS §7：一条永远通过的判据比没有判据更糟）。
+     *
+     * 这里钉的是结构本身：同意项从 `accessibilityRole="checkbox"` 到它的闭合标签
+     * 之间**不许出现**条款链接。链进去的表现是"我想先读条款"变成"我已经同意了" ——
+     * 那是同意留痕上的真缺陷，不是样式问题。
+     */
+    const termsAt = code.indexOf('accessibilityRole="checkbox"');
+    const closeAt = code.indexOf('</Pressable>', termsAt);
+    expect(termsAt, '同意项整块不见了 —— 空测也算不到东西').toBeGreaterThanOrEqual(0);
+    expect(closeAt, '同意项没有闭合标签').toBeGreaterThan(termsAt);
+    const inside = code.slice(termsAt, closeAt);
+    expect(inside, '条款链接被搬进了同意项里').not.toContain('legal-terms');
+    expect(inside, '条款链接被搬进了同意项里').not.toContain('legal-privacy');
+  });
+
   it('🔴 不 import 会拖进第二份 React 或跨层的包', () => {
     // `@heyta/i18n` → 第二份 React（本仓为此崩过一次）；
     // `@heyta/app-host` → 共享 UI 依赖宿主层，四端里 RN 端会连不上。
