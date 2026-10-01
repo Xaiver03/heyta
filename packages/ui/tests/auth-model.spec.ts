@@ -518,6 +518,9 @@ describe('🔴 "只有一份"的机器保证（源码级）', () => {
     for (const file of [
       'apps/web/src/features/auth/AuthPanel.tsx',
       'apps/web/src/features/settings/PasswordPanel.tsx',
+      // 移动端那一屏是第三个消费者。它和 web 那两处**坏法相同**（屏幕上印出
+      // `{min}` / `{seconds}`），所以清单必须跟着消费者长，而不是跟着本轮改动长。
+      'apps/mobile/src/screens/AuthScreen.tsx',
     ]) {
       const src = readFileSync(join(REPO, file), 'utf8');
       expect(src, `${file} 还在用只给 key 的那一层`).not.toContain('authFailureMessageKey(');
