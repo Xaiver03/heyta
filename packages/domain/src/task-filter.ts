@@ -253,3 +253,56 @@ export function groupTasksByDate(
   }
   return groups;
 }
+
+/**
+ * 日历侧栏的**多选范围** —— "哪些任务出现在这一页上"。
+ *
+ * ## 为什么在领域层
+ *
+ * 它回答的是与 `filterTasks` 同一个问题（哪些任务属于当前视图），只是形状不同：
+ * 侧栏那一列是**复选框**（可同时勾几条清单 / 几个标签），而 `TaskFilter` 是
+ * 单选判别联合。判断本身（"这条任务算不算在范围内"）是产品语义，写在壳里
+ * 下一端就要抄第二遍（AGENTS §3.5）。
+ *
+ * ## 三条不显然的裁决
+ *
+ * 1. **空选择 = 全部**（界面上那一行「所有」就是这个意思）。
+ *    反过来做（空 = 什么都不显示）会让"刚进日历页"是一片空白。
+ * 2. 🔴 **不判完成态** —— 与 `filterTasks` 的每个分支都不同。
+ *    日历要显示某一天**已完成**的任务，而"在日历上勾掉它"是这一页最常用的动作；
+ *    这里若顺手 `!isCompleted`，症状是**任务一勾完就从格子里消失**。
+ * 3. 清单与标签之间是**并集**（勾了清单 A 又勾了标签 x，看到的是两者的和）。
+ *    交集在"我筛的是范围"这个心智下几乎不可能被想要，而且会让"勾第二个"
+ *    经常把结果清成 0 条 —— 看起来像 bug。
+ *
+ * 父清单**只匹配自己的任务**（与 `filterTasks({kind:'project'})` 和侧栏计数同一条
+ * 等值判据；领域层本来也只支持一层嵌套，"含子清单的任务"是另一件事，没做）。
+ */
+export interface TaskScope {
+  readonly projectIds: readonly string[];
+  readonly tagIds: readonly string[];
+}
+
+/** 空范围 = 全部。宿主用它做初始值，也用它判断「所有」那一行该不该打勾。 */
+export const FULL_SCOPE: TaskScope = { projectIds: [], tagIds: [] };
+
+export function isScopeEmpty(scope: TaskScope): boolean {
+  return scope.projectIds.length === 0 && scope.tagIds.length === 0;
+}
+
+/**
+ * 落在范围内的任务（**含已完成**，见上面第 2 条）。
+ *
+ * 仍然先过 `aliveTasks` 那一道：墓碑不该在任何视图里出现。
+ */
+export function scopeTasks(tasks: readonly Task[], scope: TaskScope): Task[] {
+  const alive = aliveTasks(tasks);
+  if (isScopeEmpty(scope)) return alive;
+  const projects = new Set(scope.projectIds);
+  const tags = new Set(scope.tagIds);
+  return alive.filter(
+    (task) =>
+      (task.projectId !== undefined && projects.has(task.projectId)) ||
+      (task.tagIds ?? []).some((id) => tags.has(id)),
+  );
+}
