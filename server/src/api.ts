@@ -1,4 +1,4 @@
-import { FastifyInstance } from 'fastify';
+import { FastifyInstance, FastifyReply } from 'fastify';
 import { z } from 'zod';
 import { isEmailAllowed } from './email-allowlist';
 import * as jwt from 'jsonwebtoken';
@@ -29,6 +29,20 @@ import {
   PasskeyError,
 } from './passkey';
 import { authenticate, getAuthUser } from './middleware';
+import {
+  loginWithEmailPassword,
+  registerWithEmailPassword,
+  toPasswordAuthError,
+  PasswordAuthError,
+  LOGIN_LOCKOUT_MS,
+  PASSWORD_ACCOUNT_LOCKED_MESSAGE,
+  PASSWORD_EMAIL_NOT_VERIFIED_MESSAGE,
+  PASSWORD_INVALID_CREDENTIALS_MESSAGE,
+  PASSWORD_POLICY_MESSAGE,
+  type PasswordAuthErrorCode,
+} from './password/service';
+import { MAX_PASSWORD_CODE_POINTS, type PasswordPolicyCode } from './password/policy';
+import { PASSWORD_BACKEND_RETRY_AFTER_SECONDS } from './password/concurrency';
 import { Logger } from './logger';
 import { prisma } from './db';
 import { asServerLocale, resolveLocale } from './design-html.js';
@@ -47,6 +61,27 @@ const VerifyEmailSchema = z.object({
 const TERMS_REQUIRED_MESSAGE = 'You must accept the linked legal documents to register';
 
 /**
+ * 注册请求体的**共同字段** —— 通行密钥、魔法链接、邮箱+口令三条路共用一份，
+ * 因为"同意条款"这件事只有一种正确写法（见 `buildRegisterBodySchema` 上那段），
+ * 复制三遍迟早有一遍会写成 `z.boolean().optional()`。
+ */
+const buildRegisterBodyShape = (requireConsent: boolean) => ({
+  email: z.string().email('Invalid email format'),
+  termsAccepted: requireConsent
+    ? z.literal(true, { message: TERMS_REQUIRED_MESSAGE })
+    : z.boolean().optional(),
+  // 邀请码。**刻意只校验长度上限，不校验形状** ——
+  // 形状不对时该发生的是"这张码不作数，注册照常成功"，而不是一个 400。
+  // 在注册入口对码做形状校验，等于把"这张码存在但格式不对"这件事
+  // 变成一个可探测的信号；而且用户手里那张码是从别人那里抄来的，
+  // 让他因为抄多了一个空格就注册失败，是拿一个附带福利去挡主流程。
+  //
+  // 上限 64 只是挡明显不像话的输入（真实码 8 位）。归一化在
+  // `@heyta/domain` 的 `normalizeInviteCode`，**不在这里**。
+  inviteCode: z.string().max(64).optional(),
+});
+
+/**
  * Registration body, with consent required only where legal pages exist. The generic image
  * ships no Terms of Service and publishes no privacy policy until the operator configures
  * `PRIVACY_*`, so an unconfigured instance must not demand agreement to documents it does
@@ -61,21 +96,27 @@ const TERMS_REQUIRED_MESSAGE = 'You must accept the linked legal documents to re
 export const buildRegisterBodySchema = (
   requireConsent: boolean,
 ): z.ZodType<{ email: string; termsAccepted?: boolean; inviteCode?: string }> =>
-  z.object({
-    email: z.string().email('Invalid email format'),
-    termsAccepted: requireConsent
-      ? z.literal(true, { message: TERMS_REQUIRED_MESSAGE })
-      : z.boolean().optional(),
-    // 邀请码。**刻意只校验长度上限，不校验形状** ——
-    // 形状不对时该发生的是"这张码不作数，注册照常成功"，而不是一个 400。
-    // 在注册入口对码做形状校验，等于把"这张码存在但格式不对"这件事
-    // 变成一个可探测的信号；而且用户手里那张码是从别人那里抄来的，
-    // 让他因为抄多了一个空格就注册失败，是拿一个附带福利去挡主流程。
-    //
-    // 上限 64 只是挡明显不像话的输入（真实码 8 位）。归一化在
-    // `@heyta/domain` 的 `normalizeInviteCode`，**不在这里**。
-    inviteCode: z.string().max(64).optional(),
-  });
+  z.object(buildRegisterBodyShape(requireConsent));
+
+/**
+ * 口令在**传输层**的上限，刻意比**策略层**宽，而且是从策略常量推导出来的。
+ *
+ * 策略按 code point 计（`MAX_PASSWORD_CODE_POINTS`），zod 的 `.max()` 按 UTF-16
+ * 单元计 —— 一个 code point 最多占 2 个单元，所以 `×2` 后这条线**永远在策略线之外**。
+ *
+ * 🔴 为什么必须这样：如果两处各写一个字面量，漂移的形状是"界面让输、服务端 400"，
+ * 而且 400 那句是 zod 的 `Validation failed`，用户读不出是自己口令太长。
+ * 长度是否合规**只由 `password/policy.ts` 裁决**，它给出可判别的 `code`。
+ * 这里的 `min(1)` 只负责"这个字段得在"，不判定强度。
+ */
+const PASSWORD_TRANSPORT_MAX = MAX_PASSWORD_CODE_POINTS * 2;
+
+const PasswordSchema = z.string().min(1, 'Password is required').max(PASSWORD_TRANSPORT_MAX);
+
+const EmailPasswordLoginSchema = z.object({
+  email: z.string().email('Invalid email format'),
+  password: PasswordSchema,
+});
 
 /**
  * 从请求里解析收件人语言。
@@ -221,6 +262,8 @@ type PasskeyRecoveryRequestBody = z.infer<typeof PasskeyRecoveryRequestSchema>;
 type PasskeyRecoveryOptionsBody = z.infer<typeof PasskeyRecoveryOptionsSchema>;
 type PasskeyRecoveryCompleteBody = z.infer<typeof PasskeyRecoveryCompleteSchema>;
 type MagicLinkRegisterBody = RegisterBody;
+type EmailPasswordRegisterBody = RegisterBody & { password: string };
+type EmailPasswordLoginBody = z.infer<typeof EmailPasswordLoginSchema>;
 type MagicLinkRequestBody = z.infer<typeof MagicLinkRequestSchema>;
 type MagicLinkVerifyBody = z.infer<typeof MagicLinkVerifySchema>;
 type PasskeyIdParams = z.infer<typeof PasskeyIdParamSchema>;
@@ -244,6 +287,18 @@ const LAST_PASSKEY_MESSAGE =
 const PASSKEY_ALREADY_REGISTERED_MESSAGE =
   'This passkey is already registered on this account.';
 const PASSKEY_NAME_TOO_LONG_MESSAGE = 'Passkey name is too long';
+
+/**
+ * 口令那条路的其余客户端文案**不在这里** —— 唯一真源在
+ * `password/service.ts` 的 `PASSWORD_*_MESSAGE`（路由按 `code` 挑状态码，句子原样发出）。
+ *
+ * 这一句是**例外**，因为它对应的抛出点没有码：`concurrency.ts` 的
+ * `PasswordBackendBusy.message` 是一句技术描述（哪个闸门满了、排了多少），
+ * 而 `toPasswordAuthError` 把它原样带进 `PasswordAuthError.message`。
+ * 直接透传给客户端等于泄露内部容量语义，所以路由层给一句自己的话。
+ */
+const PASSWORD_BACKEND_BUSY_MESSAGE =
+  'Too many sign-in requests are being processed. Please try again.';
 
 // Known safe error messages that can be shown to clients
 const SAFE_ERROR_MESSAGES = new Set([
@@ -269,6 +324,93 @@ const getSafeErrorMessage = (err: unknown, fallback: string): string => {
     return err.message;
   }
   return fallback;
+};
+
+/** 口令认证失败的 HTTP 表达（`passwordAuthResponseOf` 的输出）。 */
+export interface PasswordAuthResponse {
+  status: number;
+  body: {
+    error: string;
+    code: PasswordAuthErrorCode;
+    policyCode?: PasswordPolicyCode;
+  };
+  /** 只在需要 `Retry-After` 的两种失败上出现。 */
+  retryAfterSeconds?: number;
+}
+
+/**
+ * 口令错误的**唯一**映射表 —— 注册与登录两个端点共用一份。
+ *
+ * 🔴 写成一份纯函数（算出状态码 + 响应体）而不是在两处 `catch` 里各摆一串 `if`，
+ * 理由与 `issueSession` 同源：状态码是"锁不锁得对、退避退得对"的承载者，
+ * 两处各写一遍迟早出现"登录路给 429、注册路给 400"这种同码不同命。
+ * 判别信号是 `code`（客户端按它取词条，见 `passkey.ts` 对 `PasskeyErrorCode` 的同款约定）。
+ *
+ * 刻意**不碰 `reply`**：这样五个码的映射能用普通断言逐个钉住，不需要起 Fastify。
+ * 而且 `switch` 覆盖了整个联合类型**且没有 `default`** —— 以后新增一个码而忘了给
+ * 状态码，编译期就红，不会静默落到某个兜底分支上。
+ *
+ * 三个状态码的选择都不是显然，所以逐个写下理由：
+ *
+ * - `account_locked` ⇒ **429 + `Retry-After`**，不用 423。
+ *   423 `Locked` 是 WebDAV 的方法语义，代理与客户端库普遍不认识它，
+ *   而这里的真实语义是"因太多尝试而暂时不行，N 秒后再来" —— 那正好是 429
+ *   与 `Retry-After` 的定义。锁的是**口令这个认证器**，不是账号（魔法链接
+ *   与通行密钥照旧可走），所以也不许读成"账号被封"。
+ * - `password_backend_busy` ⇒ **503**，不用 429。
+ *   闸门满是**我们的容量**问题，不是这个客户端发得太猛。报成 429 会让
+ *   客户端退避策略去惩罚一个无辜用户（"你慢点试"），而正确答案是我们
+ *   降并发或扩容。503 + `Retry-After` 说的是"我这儿满了"。
+ * - `email_not_verified` ⇒ **403**，不用 401。
+ *   口令**已经验对了** —— 凭证没问题，所以 401（"重来一次也许就对了"）
+ *   是错的暗示；缺的是"去收那封验证邮件"这一步。而这句话本身说出了账号状态，
+ *   所以它只允许在校验口令通过之后出现（顺序钉在 `password/service.ts`）。
+ */
+export const passwordAuthResponseOf = (pwErr: PasswordAuthError): PasswordAuthResponse => {
+  switch (pwErr.code) {
+    case 'account_locked':
+      return {
+        status: 429,
+        retryAfterSeconds: pwErr.retryAfterSeconds ?? Math.ceil(LOGIN_LOCKOUT_MS / 1000),
+        body: { error: PASSWORD_ACCOUNT_LOCKED_MESSAGE, code: pwErr.code },
+      };
+    case 'password_backend_busy':
+      return {
+        status: 503,
+        retryAfterSeconds: pwErr.retryAfterSeconds ?? PASSWORD_BACKEND_RETRY_AFTER_SECONDS,
+        body: { error: PASSWORD_BACKEND_BUSY_MESSAGE, code: pwErr.code },
+      };
+    case 'email_not_verified':
+      return {
+        status: 403,
+        body: { error: PASSWORD_EMAIL_NOT_VERIFIED_MESSAGE, code: pwErr.code },
+      };
+    case 'password_policy_violation':
+      return {
+        status: 400,
+        // 具体是哪条规则（太短 / 太常见 / 已泄露）由客户端按 `policyCode` 取词条 ——
+        // 设口令时只说"口令不符合要求"而不给动作，等于没说。
+        body: {
+          error: PASSWORD_POLICY_MESSAGE,
+          code: pwErr.code,
+          policyCode: pwErr.policyCode,
+        },
+      };
+    case 'invalid_credentials':
+      return {
+        status: 401,
+        body: { error: PASSWORD_INVALID_CREDENTIALS_MESSAGE, code: pwErr.code },
+      };
+  }
+};
+
+/** 把上面那份决定施加到响应上。除了 `Retry-After` 的写法，这里不该有判断。 */
+const sendPasswordAuthError = (reply: FastifyReply, pwErr: PasswordAuthError): unknown => {
+  const res = passwordAuthResponseOf(pwErr);
+  if (res.retryAfterSeconds !== undefined) {
+    reply.header('retry-after', String(res.retryAfterSeconds));
+  }
+  return reply.status(res.status).send(res.body);
 };
 
 export interface ApiRoutesOptions {
@@ -1150,6 +1292,132 @@ export const apiRoutes = async (
         Logger.error(`Magic link verify error: ${errMsg}`);
         return reply.status(401).send({
           error: getSafeErrorMessage(err, 'Invalid or expired login link'),
+        });
+      }
+    },
+  );
+
+  // ============================================
+  // EMAIL + PASSWORD ENDPOINTS
+  // ============================================
+
+  /**
+   * 注册（邮箱 + 口令）。**成功语义与魔法链接注册完全一致**：账号要先经邮箱验证。
+   *
+   * 🔴 这里刻意**不**直接给会话。口令设在建账号的那一刻，但"这个邮箱真的是你的"
+   * 只能由那封邮件回答；跳过验证等于让任何人用一个邮箱领走一个账号。
+   * 所以响应是一句中性的"去看你的收件箱"，而口令已经存好了。
+   *
+   * 邮箱已被占用时同样返回这句中性消息（`registerWithMagicLink` 里
+   * `isVerified === 1` 提前 return），所以这个端点**不是**邮箱存在性预言机。
+   */
+  fastify.post<{ Body: EmailPasswordRegisterBody }>(
+    '/register/email-password',
+    {
+      config: {
+        rateLimit: {
+          max: 50,
+          timeWindow: '15 minutes',
+        },
+      },
+    },
+    async (req, reply) => {
+      const schema = z.object({
+        ...buildRegisterBodyShape(opts.requireTermsConsent),
+        password: PasswordSchema,
+      });
+      const parseResult = schema.safeParse(req.body);
+      if (!parseResult.success) {
+        return reply.status(400).send({
+          error: 'Validation failed',
+          details: parseResult.error.issues,
+        });
+      }
+      const { email, password, inviteCode, termsAccepted } = parseResult.data;
+
+      try {
+        if (!isEmailAllowed(email)) {
+          return reply
+            .status(403)
+            .send({ error: 'Registration is not allowed for this email address.' });
+        }
+
+        const result = await registerWithEmailPassword({
+          email,
+          password,
+          // 🔴 **不**照抄魔法链接那条路的 `Date.now()` 无条件传值：
+          // `auth.ts` 里写着"绝不发明一次同意"，而无条件传值恰好就是发明
+          // —— 未配置法务页面的实例上，没点勾选框的请求也会被写入接受时间。
+          // 这里按 zod 的结果走：真的收到 `termsAccepted: true` 才记时间。
+          // 需要同意的实例上 zod 已经保证只有 `true` 能到这里。
+          ...(termsAccepted === true && { termsAcceptedAt: Date.now() }),
+          inviteCode,
+          locale: await localeForEmail(req, email),
+        });
+        return reply.status(201).send(result);
+      } catch (err) {
+        const pwErr = toPasswordAuthError(err);
+        if (pwErr) {
+          const errMsg = err instanceof Error ? err.message : 'Unknown error';
+          Logger.warn(`Email+password registration rejected (${pwErr.code}): ${errMsg}`);
+          return sendPasswordAuthError(reply, pwErr);
+        }
+        const errMsg = err instanceof Error ? err.message : 'Unknown error';
+        Logger.error(`Email+password registration error: ${errMsg}`);
+        return reply.status(400).send({
+          error: getSafeErrorMessage(err, 'Registration failed. Please try again.'),
+        });
+      }
+    },
+  );
+
+  /**
+   * 登录（邮箱 + 口令）。响应与 `/login/passkey/verify` 同形
+   * （`{ token, user: { id, email, locale } }`），客户端不需要为这条路演第二套接线。
+   *
+   * ⚠️ 响应里**永远不含** `passwordHash` —— 令牌由 `issueSession` 签，
+   * 用户对象只挑了三个字段。这条由测试逐字段钉住（计划 J12），不靠 review 眼睛。
+   *
+   * 限流取 50/15min 而不是更狠的数：**承重的防爆破是账号侧的失败计数**
+   * （5 次 / 15 分钟，见 `password/service.ts`）。IP 侧再收紧只会让同一个 NAT
+   * 后面第 6 个人的正常登录，被前 5 个人的拼写失误连带挡掉；而对"拿一句常见口令
+   * 喷一万个邮箱"这种分布式喷洒，每个账号只掉一次计数，IP 限流本来也拦不住。
+   */
+  fastify.post<{ Body: EmailPasswordLoginBody }>(
+    '/login/email-password',
+    {
+      config: {
+        rateLimit: {
+          max: 50,
+          timeWindow: '15 minutes',
+        },
+      },
+    },
+    async (req, reply) => {
+      const parseResult = EmailPasswordLoginSchema.safeParse(req.body);
+      if (!parseResult.success) {
+        return reply.status(400).send({
+          error: 'Validation failed',
+          details: parseResult.error.issues,
+        });
+      }
+      const { email, password } = parseResult.data;
+
+      try {
+        return reply.send(await loginWithEmailPassword(email, password));
+      } catch (err) {
+        const pwErr = toPasswordAuthError(err);
+        if (pwErr) {
+          // 🔴 口令错 / 账号不存在 / 没设口令三者**同一条日志级别**（warn）。
+          // 分级成 error/info 的话，日志本身就成了一个可被读出来的信号，
+          // 而且运维会拿它当"有人在爆破我"的仪表盘 —— 那个判断该由计数做。
+          Logger.warn(`Password login failed (${pwErr.code})`);
+          return sendPasswordAuthError(reply, pwErr);
+        }
+        const errMsg = err instanceof Error ? err.message : 'Unknown error';
+        Logger.error(`Password login error: ${errMsg}`);
+        return reply.status(401).send({
+          error: getSafeErrorMessage(err, PASSWORD_INVALID_CREDENTIALS_MESSAGE),
         });
       }
     },

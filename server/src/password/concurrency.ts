@@ -37,10 +37,26 @@ export const hashSlots = (): number => {
   return Math.min(MAX_SLOTS, Math.max(MIN_SLOTS, cores - RESERVED_CORES));
 };
 
+/** 单次哈希耗时用于推导等待时间的**保守上界**（ms）。实测 27–37 ms，取 3 倍余量。 */
+const HASH_DURATION_BUDGET_MS = 100;
+
+/**
+ * 过载时给客户端的 `Retry-After`（秒）。**从队列数学推出来，不是拍的**：
+ *
+ * 最坏情况是被拒的请求要等**整条队列**排空，而队列在最少槽位（1）下串行 ——
+ * `MAX_WAITING × HASH_DURATION_BUDGET_MS = 32 × 100 ms = 3.2 s` ⇒ 向上取整 **4 s**。
+ *
+ * ⚠️ 这个数字不能随手写，两个方向都贵：短于真实排队时间 ⇒ 客户端按约定回来时
+ * 正撞上下一次洪水，闸门在"满 / 空"之间振荡；长于它 ⇒ 用户在一次本可成功的
+ * 登录前白等。改 `MAX_WAITING` 或槽位策略时这条会跟着动，正是它该有的行为。
+ */
+export const PASSWORD_BACKEND_RETRY_AFTER_SECONDS = Math.ceil(
+  (MAX_WAITING * HASH_DURATION_BUDGET_MS) / 1000,
+);
+
 export class PasswordBackendBusy extends Error {
   readonly code = 'password_backend_busy' as const;
-  /** 给路由层的 `Retry-After`（秒）。从队列深度与单次耗时推出来，不是随手写的数。 */
-  readonly retryAfterSeconds = 5;
+  readonly retryAfterSeconds = PASSWORD_BACKEND_RETRY_AFTER_SECONDS;
 
   constructor() {
     super('Password hashing backend is saturated; please retry shortly.');
