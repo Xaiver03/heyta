@@ -86,6 +86,7 @@ const KNOWN_FAILURE_REASON_COVERAGE = {
   'undecryptable-ops': true,
   'undecryptable-page': true,
   'upload-rejected': true,
+  'unauthorized': true,
 } satisfies Record<Exclude<SyncFailureReason, 'unexpected'>, true>;
 void KNOWN_FAILURE_REASON_COVERAGE;
 

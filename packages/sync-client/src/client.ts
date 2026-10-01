@@ -343,6 +343,28 @@ export type SyncFailureReason =
    *   - 只是暂时被挡（限流、配额）→ `true`，队列还留着，下次会重传。
    */
   | 'upload-rejected'
+  /**
+   * 服务端**拒绝了这枚访问令牌**（401 / 403）。
+   *
+   * 🔴 为什么必须单独一种原因，而不是落进 `'unexpected'`：
+   * `'unexpected'` 那条通道是 `retryable: true`，而 `createRetryScheduler`
+   * 见可重试就继续退避（上限 60s）—— 于是**拿着一枚已经作废的令牌永远重试
+   * 一个永远不可能成功的请求**，界面上是一句和网络抖动无法区分的"同步失败"。
+   *
+   * 而"作废"不是理论情形，是本仓库已有的三个正常功能会产生的**日常状态**：
+   * 在别的设备点「登出所有设备」（`tokenVersion` 前进）、改口令（同样前进）、
+   * 令牌自然过期。用户做完这三件事里的任何一件，这台设备的同步就该**停下**，
+   * 并且说"请重新登录"。
+   *
+   * ⚠️ 它与 `not-signed-in` **不合并**，尽管用户动作相同：后者是**本地**发现
+   * 根本没有令牌（一个请求都没发），这条是**服务端**说这枚令牌不行。
+   * 两句话给用户的信息量不同 —— 后者还可能是"这台设备还没配过账号"，
+   * 前者说明"配过，但凭据过期了"，而后者才是"数据在云上，我需要重新证明身份"。
+   *
+   * 🔴 **绝不清本地数据**，也**绝不静默重新认证**。本地数据仍然是唯一可读的事实源
+   * （D5），这条原因存在的意义就是让界面有得可选。
+   */
+  | 'unauthorized'
   /** 意外异常：只有 `message` 有意义，它里面是技术细节。 */
   | 'unexpected';
 
@@ -761,6 +783,17 @@ export class SyncClient {
         });
       }
       const message = error instanceof Error ? error.message : String(error);
+      /**
+       * 🔴 令牌被拒**先于**离线判定，且**不可重试**。
+       *
+       * 落到下面那条通用通道意味着 `retryable: true` —— 退避调度器会拿着
+       * 一枚服务端已经不认的令牌，每 60 秒敲一次一个永远不可能成功的请求，
+       * 而界面上是一句"同步失败"，与网络抖动长得一模一样。
+       * 详见 `SyncFailureReason` 里 `'unauthorized'` 那一段。
+       */
+      if (isUnauthorizedFailure(error)) {
+        return report({ kind: 'error', reason: 'unauthorized', retryable: false, message });
+      }
       const offline = isNetworkError(error);
       return report(
         offline
@@ -1378,8 +1411,26 @@ export class SyncClient {
   }
 }
 
+/**
+ * 非 2xx 响应，**带着状态码**。
+ *
+ * 🔴 状态码不能只进文案不进类型：`sync()` 的 catch 只有 `message` 可看时，
+ * 想区分"令牌被拒"和"服务端挂了"就只剩对着一句中文做正则 —— 而那句是服务端
+ * 随时会改的文案。实测这类匹配的下场写在 `isNetworkError` 的注释里
+ * （一个裸 `network` 子串把"平台拦明文"读成"设备没网"）。
+ */
+export class SyncHttpError extends Error {
+  readonly status: number;
+
+  constructor(status: number, detail: string) {
+    super(`同步请求失败：HTTP ${String(status)}${detail === '' ? '' : ` — ${detail}`}`);
+    this.name = 'SyncHttpError';
+    this.status = status;
+  }
+}
+
 /** 把非 2xx 响应变成带服务端信息的错误。 */
-async function toHttpError(res: Response): Promise<Error> {
+async function toHttpError(res: Response): Promise<SyncHttpError> {
   let detail = '';
   try {
     const body = (await res.json()) as { error?: string; message?: string };
@@ -1388,9 +1439,22 @@ async function toHttpError(res: Response): Promise<Error> {
     // 响应体不是 JSON —— 不要因为解析失败而丢掉状态码
     detail = '';
   }
-  return new Error(
-    `同步请求失败：HTTP ${String(res.status)}${detail === '' ? '' : ` — ${detail}`}`,
-  );
+  return new SyncHttpError(res.status, detail);
+}
+
+/**
+ * 这次失败是不是"服务端不认这枚令牌"。
+ *
+ * 🔴 只认 401 / 403，**不认整个 4xx**。403 服务端目前留给"该实例不允许这个邮箱"
+ * 这类**授权**判断，同步路径上出现它同样意味着"这枚凭据不被允许继续"；
+ * 而 400（E2EE_REQUIRED、payload 非法）和 429 的处置完全不同 —— 把它们报成
+ * "请重新登录"是让人去做一件解决不了问题的事。
+ *
+ * 导出它是因为宿主/壳可能想在**别**的调用点（手动同步按钮）给同一句话；
+ * 但**分类本身只有一份**，`sync()` 的 catch 是唯一产出该原因的地方。
+ */
+export function isUnauthorizedFailure(error: unknown): boolean {
+  return error instanceof SyncHttpError && (error.status === 401 || error.status === 403);
 }
 
 /**
