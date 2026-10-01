@@ -569,6 +569,65 @@ cd apps/web && VITE_SITE_URL=https://site.example.com pnpm exec tsc -b && \
 **零 `console.error`**。⚠️ 公网第一次测仍是旧的 `octet-stream`，
 是**缓存**；加随机 query 或稍后重测才是真相，别据此改配置。
 
+#### 🔴 同一类坑的第六次：`/legal/*` 未命中被答成 200 + 首页（2026-10-02 修）
+
+上面 ② 的形状是"**资源**掉进 HTML 兜底"，这次是"**页面**掉进 HTML 兜底"，机制完全相同：
+`location /` 与 `location /en/` 各有一条 `try_files $uri $uri/ /index.html`，
+所以把 `/legal/terms/` 转错一个字母 —— 或者随便编一个 `/legal/xxx/` —— 得到的是
+**HTTP 200 + 首页的完整字节**（实测 7022 B，与中文首页逐字相同）。
+对搜索引擎那叫**软 404**，对人那叫"我点开的政策页怎么是首页"。
+
+修法（`/etc/nginx/sites-available/heyta.waytofuture.cn`，插在 `location /en/assets/` 之前）：
+
+```nginx
+location /legal/ {
+    add_header Cache-Control "no-cache" always;
+    try_files $uri $uri/ =404;
+}
+location /en/legal/ {
+    add_header Cache-Control "no-cache" always;
+    try_files $uri $uri/ =404;
+}
+```
+
+三条不能省的细节：
+
+- **`$uri/` 不能删**。那 18 个法务入口在磁盘上是**目录**（`/var/www/heyta-landing/legal/terms/index.html`），
+  只写 `try_files $uri =404` 会把好页一起 404 掉 —— 这是**把修坏的方向**。
+  保留 `$uri/` 还顺带留住了 `/legal/terms` → 301 → `/legal/terms/` 的既有行为（与 canonical 一致）。
+- **必须是 prefix location，不是 regex**。nginx 先按 prefix 最长匹配、之后才按文件顺序判 regex；
+  加 regex 会改变**已有** regex（`/health|live`、`/terms|privacy\.html`、三张凭据页）的判定顺序。
+  逐条核过：那几条 regex 都不匹配 `/legal/` 前缀，所以两条互不干扰。
+- **裸 `/legal/` 仍然是 403**，这是**对的**：那里没有 `index.html` 且目录列表关闭，
+  403 是 nginx 的诚实回答。别为了"好看"把它兜成首页 —— 那正是本次要修的东西。
+
+验证（都实跑过，`curl --noproxy '*' --resolve heyta.waytofuture.cn:443:124.223.13.226`）：
+
+| 地址 | 改前 | 改后 |
+|---|---|---|
+| `/legal/nope-not-a-doc/` | **200** + 7022 B（= 首页） | **404** + 162 B |
+| `/en/legal/nope-not-a-doc/` | **200** + 6976 B（= 英文首页） | **404** + 162 B |
+| 18 份真实入口 | 全 200 | **仍全 200**，title 各异 |
+| `/`、`/en/`、`/app/`、`/app/nope-route`、`/health`、`/robots.txt` | 全 200 | **逐字节未变** |
+
+⚠️ 最后一行才是这条改动的**风险所在**：`/app/` 与 `/app/nope-route` 依赖的正是 SPA 兜底，
+深链刷新必须仍然 200，所以"没牵连前端路由"要和"未命中变 404"**同时**验，缺一条都不算过。
+常驻判据：`e2e/live-site/live-legal.spec.ts` 第 12 条（含阳性对照：同层未知路径
+`/not-a-page-xyz/` 仍须 200 —— 否则那两条 404 可能只是"整站都在 404"）。
+⚠️ 那条判据是在页面里 `fetch` 相对路径，**必须先 `page.goto(origin)`**：新开的 page 停在
+`about:blank`，相对 URL 没有 base 可解析，报的是 `TypeError: Failed to parse URL from /` ——
+长得像"服务器坏了"，其实是探针没落到目标域。
+
+回滚：`cp /etc/nginx/sites-available/heyta.waytofuture.cn.bak-g25b-20261001T165913Z \`
+换回原文件 → `nginx -t` → `systemctl reload nginx`。
+🔴 **改动流程本身也要照这个顺序**：先备份 → 改 → `nginx -t` 通过才 reload → 复验 → 不通过就还原。
+`nginx -t` 闸门是必要的：这台机器上 nginx 同时服务约 34 个容器的入口，语法错会让**别的站点**一起下线。
+
+🟡 修完之后仍然存在的边界：404 现在是真的，但答的是 **nginx 裸默认页**（含 `nginx/1.18.0 (Ubuntu)`），
+无品牌、无返回入口 —— 登记为 **G-35**（见 [`legal-compliance-before-filing.md`](../plans/legal-compliance-before-filing.md) §4）。
+⚠️ 补它时**不要用 `try_files … /404.html`**：那会把状态码又变回 200，等于把本次修复撤销一遍；
+要用 `error_page 404 /404.html;`。
+
 #### 🔴 改了入口的 URL 形状，就**必须**同时重建应用本体
 
 2026-09-27 实测踩到，而且**只有真浏览器看得见**。
@@ -645,6 +704,7 @@ ssh ubuntu-jcli 'ls /var/www/heyta-app/assets/'
 - `/var/www/heyta-landing.bak-20260929T035321Z`（动画微交互上线前的落地页产物；本次只发静态文件，nginx/env 未动）
 - `/var/www/heyta-landing.bak-20260929T151330Z`（信息架构与文案改版上线前的落地页产物；只发静态文件，nginx/env 未动）
 - `/var/www/heyta-landing.bak-20260930T022530Z`（导航改造 + 仓库公开后的 GitHub 链路恢复上线前的落地页产物；只发静态文件，nginx/env 未动）
+- `/etc/nginx/sites-available/heyta.waytofuture.cn.bak-g25b-20261001T165913Z`（**加 `/legal/` 两条 404 location 之前**；回滚见上文那节）
 
 #### 3.7.1 2026-09-27：把测试域名固定到 `heyta.finlaw.cloud`
 
