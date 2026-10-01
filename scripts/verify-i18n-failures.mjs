@@ -30,12 +30,14 @@
  * 任何别的进程（`pnpm build` / 另一个 agent）读到的都是**改坏的代码**；一次运行
  * 还把一批文件的 mtime 全刷新了，差点被当成"别人的未提交改动被抹掉"。
  *
- * ⚠️ **其余 11 组仍然就地改真实文件**（gate / catalog / disclosure / conflict /
- * landing / scene / storage / sync / preference / preset / aifailure），其中 `gate`
- * 改的还是 `zh-CN.ts` 这种常有别人在改的文件。它们有 journal + 信号处理器 +
- * "拒绝覆盖别人的改动"三道防线，但**注入期间工作区里确实是坏的**：别在别的进程
- * 正改同一批文件时跑它们，也别和 `pnpm build` 并行跑。要搬进副本就照
- * `prepareProbe` 的用法改。
+ * ⚠️ **其余 12 组仍然就地改真实文件**（gate / catalog / disclosure / conflict /
+ * landing / scene / storage / sync / preference / preset / aifailure / e2eecopy），其中 `gate`
+ * 改的还是 `zh-CN.ts` 这种常有别人在改的文件，而 `e2eecopy` 改的是
+ * `packages/i18n/dist/` 的**未跟踪产物**（8c 读的就是它，见那组注释）。它们有
+ * journal + 信号处理器 + "拒绝覆盖别人的改动"三道防线，但**注入期间工作区里确实是坏的**：
+ * 别在别的进程正改同一批文件时跑它们，也别和 `pnpm build` 并行跑 —— 与 `e2eecopy`
+ * 并行尤其危险：那一次构建会把探针故意改坏的那条词条**编译回产物**里。
+ * 要搬进副本就照 `prepareProbe` 的用法改。
  */
 
 import { execFileSync } from 'node:child_process';
@@ -78,6 +80,8 @@ const UI = path.join(ROOT, 'packages/ui');
 const AI = path.join(ROOT, 'packages/ai');
 const AI_SUPPLY = path.join(AI, 'src/supply.ts');
 const AI_HEALTH = path.join(AI, 'src/health-store.ts');
+/** AI 端到端可达性门禁（8c 查出境披露那句否定在不在词条表里）。 */
+const AI_COVERAGE = path.join(ROOT, 'scripts/check-ai-coverage.mjs');
 const SYNC_CLIENT = path.join(ROOT, 'packages/sync-client');
 const SC_CLIENT = path.join(SYNC_CLIENT, 'src/client.ts');
 /**
@@ -1463,6 +1467,55 @@ function groupDiag() {
   expectGreen('diag', '全部还原后重跑，必须回到绿', gateRun);
 }
 
+// ── 组 15：出境披露的那句否定，按**词条 key** 查界面真正读的表（P1-6）──
+/**
+ * `check-ai-coverage.mjs` 的 8c 以前查的是 `packages/ai` 里那句中文兼容句 ——
+ * 而它**早就不在任何界面上了**（`AiDisclosure` 渲染的是 `web.ai.disclosure.e2ee*`）。
+ * 于是"把界面上的『不受端到端加密保护』改成『受端到端加密保护』"这件 ADR-0006
+ * 明令禁止的事，旧门禁照样绿。现在它读的是产物里真正被渲染的那两份表。
+ *
+ * 🔴 改坏的必须是被查的对象，不是查它的那段代码，所以两条词条注入打在
+ * `packages/i18n/dist/` 的**产物**上（8c `import()` 的就是它，未跟踪的构建产物）。
+ * 产物文件名不写死（见 `I18N_DIST_DIR` 上面的注释），锚点必须写成 esbuild 的
+ * `\uXXXX` 转义形式，而且**必须带上值** —— 只写 key 会同时命中 en 与 zh 两个
+ * chunk（同一个 key 在两份表里都出现），那会让探针抛「锚点有 2 处」而不是变红。
+ *
+ * 第三条打的是门禁自己的登记表：证明**「新语言必须为这句话做一次真判断」真的会红**。
+ * 这是日/韩就绪的其中半边 —— 没有它，加第三门语言可以什么都不做就通过。
+ */
+function groupE2eeCopy() {
+  const coverageRun = () => run(NODE_BIN, [AI_COVERAGE]);
+
+  expectGreen('e2eecopy', '基线：门禁原样必须绿（两份表都通过）', coverageRun);
+
+  const ZH_STRONG = String.raw`"web.ai.disclosure.e2eeStrong": "\u4E0D\u53D7\u7AEF\u5230\u7AEF\u52A0\u5BC6\u4FDD\u62A4\u3002"`;
+  const ZH_FLIPPED = String.raw`"web.ai.disclosure.e2eeStrong": "\u53D7\u7AEF\u5230\u7AEF\u52A0\u5BC6\u4FDD\u62A4\u3002"`;
+  expectRed('e2eecopy', 'zh 去掉否定：「不受端到端加密保护」→「受端到端加密保护」', () =>
+    withMutation(i18nDistFileWith(ZH_STRONG), ZH_STRONG, ZH_FLIPPED, coverageRun),
+  );
+
+  const EN_STRONG = '"web.ai.disclosure.e2eeStrong": "not protected by end-to-end encryption."';
+  // key 改名 = 词条表里"没有这一条"的产物形状。界面取到 `undefined`，
+  // 那句否定**整条从披露里消失** —— 比改措辞更隐蔽，因为它什么都不说。
+  expectRed('e2eecopy', 'en 的 key 改名（披露里不再有那句否定）', () =>
+    withMutation(
+      i18nDistFileWith(EN_STRONG),
+      EN_STRONG,
+      EN_STRONG.replace('e2eeStrong', 'e2eeStrongRenamed'),
+      coverageRun,
+    ),
+  );
+
+  // 把 `E2EE_COPY_RULES` 里 en 那一行登记拿掉：表还在、词条还在，但没人判断过它。
+  const EN_RULE = String.raw`  en: { term: /end[-\s]?to[-\s]?end encrypt/i, negation: /\b(?:not|never)\b/i },
+`;
+  expectRed('e2eecopy', '把 en 从 `E2EE_COPY_RULES` 里拿掉（新语言必须登记）', () =>
+    withMutation(AI_COVERAGE, EN_RULE, '', coverageRun),
+  );
+
+  expectGreen('e2eecopy', '全部还原后重跑，必须回到绿', coverageRun);
+}
+
 const GROUPS = {
   gate: groupGate,
   catalog: groupCatalog,
@@ -1479,6 +1532,7 @@ const GROUPS = {
   pricing: groupPricing,
   coupon: groupCoupon,
   diag: groupDiag,
+  e2eecopy: groupE2eeCopy,
 };
 const only = process.argv[2];
 const names = only === undefined ? Object.keys(GROUPS) : [only];

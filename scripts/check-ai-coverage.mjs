@@ -48,8 +48,9 @@
  *
  *   7. app-host 里出现的 `feature: 'X'` 必须都是合法的 `AiFeature`
  *      （防止拼写漂移出一个永远不会被路由到的功能）
- *   8. 运行时不变式：**托管云 AI 仍然被挡住**，且「不受端到端加密」的
- *      否定话术仍在（ADR-0006 / ADR-0013 的结论不许被悄悄改掉）
+ *   8. 运行时不变式：**托管云 AI 仍然被挡住**（ADR-0013），且「这一份不受端到端
+ *      加密保护」的明确否定仍在**界面真正渲染的两份词条表**里
+ *      （ADR-0006 的结论不许被悄悄改掉）
  *
  * ## 为什么第 8 条是运行时而不是静态
  *
@@ -86,6 +87,54 @@ const WEB_DIR = join(ROOT, 'apps/web/src');
  * 加进来之前先问：**用户在哪儿用它？**
  */
 const NO_UI_ENTRY = new Set([]);
+
+/**
+ * 出境披露里那句否定的两个**词条 key**（`packages/i18n`）。
+ *
+ * 🔴 按 key 查，不按中文子串查 —— 界面渲染的是这两条拼起来的句子
+ * （`apps/web/src/features/ai/AiDisclosureHost.tsx` 的 `labels`），
+ * 所以不变式必须钉在**用户真能看到的那里**。
+ */
+const E2EE_LEAD_KEY = 'web.ai.disclosure.e2eeLead';
+const E2EE_STRONG_KEY = 'web.ai.disclosure.e2eeStrong';
+
+/**
+ * 每种语言「端到端加密」的**说法**与**否定标记**。
+ *
+ * ⚠️ 新增语言必须在这里加一行，否则 8c 直接红。这是**故意**的：
+ * 「不受端到端加密保护」是 ADR-0006 的基石，一种语言里怎么表达否定
+ * （日语「～ではない」、韩语「～하지 않습니다」）必须由人判断并登记，
+ * 不能让一条没登记的词条自动算"通过"。
+ *
+ * 判据落在 `e2eeStrong` 那一截 —— 强调边界由 `<strong>` 决定，
+ * 否定恰好写在强调里（zh「不受…保护。」/ en「not protected by …」）。
+ */
+const E2EE_COPY_RULES = {
+  'zh-CN': { term: /端到端加密/, negation: /(?:不|未|非|没)/ },
+  en: { term: /end[-\s]?to[-\s]?end encrypt/i, negation: /\b(?:not|never)\b/i },
+};
+
+/**
+ * 读 `packages/i18n` 的**构建产物**里的词条表。
+ *
+ * 为什么取产物而不是再写一个源码解析器：`check:ui-language` 已经有一份按行解析器，
+ * **同一个判断写两遍必然漂移**（AGENTS §3.5 那条教训的形状）。
+ * 产物里的 `CATALOGS` 就是应用运行时真正用到的那张表，比源码正则更贴近事实。
+ *
+ * ⚠️ 依赖 `pnpm build`；`pnpm check` 会先构建，所以正常路径下不会遇到缺失。
+ */
+async function loadCatalogs() {
+  const I18N_DIST = join(ROOT, 'packages/i18n/dist/index.js');
+  if (!exists(I18N_DIST)) {
+    fail(
+      '找不到 `packages/i18n/dist/index.js` —— 出境披露的否定话术无法核对。\n' +
+        '     先跑 `pnpm build`（`pnpm check` 会先构建，所以正常路径下不会遇到这个）。',
+    );
+    return {};
+  }
+  const i18n = await import(I18N_DIST);
+  return i18n.CATALOGS ?? {};
+}
 
 // ───────────────────────────────────────────────────────────────────────────
 // 小工具
@@ -378,15 +427,67 @@ if (!exists(AI_DIST)) {
   }
 
   // 8c. 托管 AI 不得被描述成端到端加密（ADR-0006 的基石）
-  const cloudText = ai.describeDestination('heyta-cloud') ?? '';
-  if (!cloudText.includes('不受端到端加密')) {
+  //
+  // 🔴 **查的是界面真正渲染的那两份词条表**，不再查 `packages/ai` 的中文兼容句。
+  // 原来这里读 `describeDestination('heyta-cloud')` 里的中文投影，而那句
+  // **已经不在任何界面上了**（`AiDisclosure` 渲染的是 `web.ai.disclosure.e2ee*`）。
+  // 于是这条门禁保护的是一个没人看的地方：把界面上的「不受端到端加密保护」
+  // 改成「受端到端加密保护」，旧门禁照样绿 —— 而那恰好是 ADR-0006 禁止的事。
+  //
+  // ⚠️ 也不按中文子串匹配。每个语言在 `E2EE_COPY_RULES` 里登记它**怎么说**
+  // 「端到端加密」和**怎么标记否定**，没登记就红 —— 那是故意的：加一门语言
+  // 必须为这句话做一次真判断，而不是让它悄悄继承"看起来有否定"。
+  const catalogs = await loadCatalogs();
+  const catalogLocales = Object.keys(catalogs).sort();
+  if (catalogLocales.length === 0) {
     fail(
-      `\`describeDestination('heyta-cloud')\` 里**没有了「不受端到端加密」这句否定**。\n` +
-        `     ADR-0006 的基石：托管 AI **永远不能**被描述成端到端加密。\n` +
-        `     实际文案：${JSON.stringify(cloudText)}`,
+      '`packages/i18n` 的 `CATALOGS` 是**空的** —— 8c 无从判定。\n' +
+        '     这不是"没有违规"，这是探针够不着。检查 `packages/i18n/dist` 的导出形状是否变了。',
     );
-  } else {
-    notes.push('托管 AI 的文案仍带「不受端到端加密」的明确否定（ADR-0006）。');
+  }
+  const e2eeChecked = [];
+  for (const locale of catalogLocales) {
+    const rules = E2EE_COPY_RULES[locale];
+    if (rules === undefined) {
+      fail(
+        `\`packages/i18n\` 里有 \`${locale}\` 词条表，但 \`E2EE_COPY_RULES\` 没登记它。\n` +
+          `     这条否定（「这一份不受端到端加密保护」）是 ADR-0006 的基石，\n` +
+          `     每种语言都必须**显式**登记它怎么说「端到端加密」、怎么标记否定，不能默认放过。`,
+      );
+      continue;
+    }
+    const catalog = catalogs[locale];
+    const missing = [E2EE_LEAD_KEY, E2EE_STRONG_KEY].filter(
+      (key) => typeof catalog[key] !== 'string',
+    );
+    if (missing.length > 0) {
+      fail(
+        `\`${locale}\` 词条表里少了出境披露要用到的 key：${missing.join(', ')}。\n` +
+          `     没有这两条，界面上**根本不会出现**那句"不受端到端加密保护"。\n` +
+          `     （键集合一致性由 \`check:ui-language\` 管，这里查的是**这句否定在不在**。）`,
+      );
+      continue;
+    }
+    const strong = catalog[E2EE_STRONG_KEY];
+    const lacksTerm = !rules.term.test(strong);
+    const lacksNegation = !rules.negation.test(strong);
+    if (lacksTerm || lacksNegation) {
+      fail(
+        `\`${locale}\` 的 \`${E2EE_STRONG_KEY}\` 不再是那句否定了。\n` +
+          (lacksTerm ? `     缺「端到端加密」这个说法（应匹配 ${rules.term}）。\n` : '') +
+          (lacksNegation ? `     缺否定标记（应匹配 ${rules.negation}）。\n` : '') +
+          `     实际文案：${JSON.stringify(strong)}\n` +
+          `     ADR-0006 的基石：托管 AI **永远不能**被描述成端到端加密 ——\n` +
+          `     用户在按下"发送"前看到的那句话必须说清这一份是**明文**出境。`,
+      );
+      continue;
+    }
+    e2eeChecked.push(locale);
+  }
+  if (e2eeChecked.length > 0) {
+    notes.push(
+      `出境披露的否定话术在 ${e2eeChecked.length} 份词条表（${e2eeChecked.join(', ')}）里都在（ADR-0006）。`,
+    );
   }
 }
 
