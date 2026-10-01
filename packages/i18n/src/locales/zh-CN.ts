@@ -1641,8 +1641,9 @@ export const zhCN = {
   'common.date.dayTitle': '{month}月{day}日 星期{weekday}',
   // ── 日历（Web）── 取值与 `mobile.calendar.*` **逐字相同**（同一块共享 UI，
   //    两端说法必须一致；key 分两套只是因为命名空间按端划分）。
-  // ── 全局搜索（任务 + 便签）── 与顶栏那个"当前列表筛选"是两件事，
-  //    分工见 packages/ui/src/search/SearchPanel.tsx 文件头。
+  // ── 全局搜索（任务 + 便签 + 快速跳转）── 2026-10-01 起它是**唯一**的搜索入口
+  //    （顶栏那个"当前列表筛选"输入框已删），形态与边界见
+  //    packages/ui/src/search/SearchPanel.tsx 文件头。
   // ── 提醒通知（#2）──
   'web.reminder.notify.title': '提醒通知',
   'web.reminder.notify.intro': '开启后，提醒到点时会发一条系统通知。',
@@ -1653,12 +1654,20 @@ export const zhCN = {
   'web.reminder.notify.body': '该做「{title}」了',
   'web.search.title': '搜索',
   'web.search.placeholder': '搜任务标题、备注、便签正文',
-  'web.search.close': '关闭搜索',
   'web.search.tasksSection': '任务',
   'web.search.notesSection': '便签',
+  'web.search.quickSection': '快速跳转',
+  'web.search.hint.view': '视图',
+  'web.search.hint.project': '清单',
+  'web.search.hint.tag': '标签',
   'web.search.prompt': '输入关键词。多个词之间是「都要包含」。',
-  'web.search.noResults': '没有找到匹配的任务或便签。',
+  'web.search.noResults': '没有找到匹配的任务、便签或入口。',
   'web.search.count': '{count} 条',
+  // 🔴 键位符号与词**一条写完**：拆成"符号 + 词"两段再拼，英文侧就会出现
+  // "Navigate ↑↓" 那种倒装 —— 符号在词前还是词后正是语言差异，不是排版差异。
+  'web.search.keys.navigate': '↑↓ 选择',
+  'web.search.keys.open': '↵ 打开',
+  'web.search.keys.close': 'esc 关闭',
   'web.calendar.title': '日历',
   'web.calendar.prevMonth': '上个月',
   'web.calendar.nextMonth': '下个月',

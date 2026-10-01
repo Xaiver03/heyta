@@ -1563,8 +1563,9 @@ export const en = {
   'common.weekday.sun': 'Sun',
   'common.date.monthTitle': '{month}/{year}',
   'common.date.dayTitle': '{weekday}, {month}/{day}',
-  // Global search (tasks + notes). Distinct from the header's in-list filter;
-  // see packages/ui/src/search/SearchPanel.tsx.
+  // Global search (tasks + notes + quick jumps). Since 2026-10-01 this is the
+  // ONLY search entry - the header's in-list filter box was removed.
+  // Shape and boundaries: packages/ui/src/search/SearchPanel.tsx.
   // Reminder notifications (#2)
   'web.reminder.notify.title': 'Reminder notifications',
   'web.reminder.notify.intro': 'When on, a reminder shows a system notification when it comes due.',
@@ -1575,12 +1576,18 @@ export const en = {
   'web.reminder.notify.body': 'Due: {title}',
   'web.search.title': 'Search',
   'web.search.placeholder': 'Search task titles, notes and note bodies',
-  'web.search.close': 'Close search',
   'web.search.tasksSection': 'Tasks',
   'web.search.notesSection': 'Notes',
+  'web.search.quickSection': 'Go to',
+  'web.search.hint.view': 'View',
+  'web.search.hint.project': 'List',
+  'web.search.hint.tag': 'Tag',
   'web.search.prompt': 'Type a keyword. Multiple words must all match.',
-  'web.search.noResults': 'No matching tasks or notes.',
+  'web.search.noResults': 'No matching tasks, notes, or places to go.',
   'web.search.count': '{count}',
+  'web.search.keys.navigate': '↑↓ Select',
+  'web.search.keys.open': '↵ Open',
+  'web.search.keys.close': 'esc Close',
   'web.calendar.title': 'Calendar',
   'web.calendar.prevMonth': 'Previous month',
   'web.calendar.nextMonth': 'Next month',

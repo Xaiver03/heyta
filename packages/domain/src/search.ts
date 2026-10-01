@@ -103,7 +103,12 @@ export function searchTasks(tasks: readonly Task[], query: string): Task[] {
  *
  * `toLowerCase()` 之后按**连续空白**切，并丢掉空串 ——
  * 于是 `" 写   周报 "` 得到 `['写', '周报']`，而不是四个词里夹两个空。
+ *
+ * 🔴 **已导出**（此前是本模块私有）：`packages/ui` 的搜索面板要用**同一套**
+ * 切词规则去匹配「快速跳转」的入口名。留两份切词实现，就会出现
+ * "任务里『写 周报』是 AND、跳转项里却是 OR" —— 同一个框两种语义，
+ * 而它不报错，只让用户以为搜索时好时坏（AGENTS §3.5 里那类漂移）。
  */
-function termsOf(query: string): string[] {
+export function termsOf(query: string): string[] {
   return query.toLowerCase().split(/\s+/).filter((t) => t !== '');
 }

@@ -35,7 +35,6 @@ import {
   Quadrant,
   bucketByQuadrant,
   filterTasks,
-  searchTasks,
   type QuadrantDropPlan,
   type Task,
   type TaskFilter,
@@ -74,13 +73,6 @@ interface TaskState {
   /** 物化状态快照。**由 op-log 引擎提供，不是自建的真相。** */
   entities: MaterializedState;
   filter: TaskFilter;
-  /**
-   * 搜索串。**它是在筛选之上再收窄**，不是替代筛选。
-   *
-   * 🔴 语义（"筛完之后再搜"）由 `selectVisibleTasks` 定，判据在
-   * `@heyta/domain` 的 `searchTasks` —— 两端共用一份，不在这里重写。
-   */
-  query: string;
   /** 当前时间，供象限归类。显式存下来避免渲染间漂移。 */
   now: number;
   ready: boolean;
@@ -156,7 +148,6 @@ interface TaskState {
   /** 撤销一次「忘掉」。 */
   restorePreference: (correctionId: string) => Promise<void>;
   setFilter: (filter: TaskFilter) => void;
-  setQuery: (query: string) => void;
   refreshNow: () => void;
 }
 
@@ -237,7 +228,6 @@ onEngineChange(() => {
 export const useTaskStore = create<TaskState>((set) => ({
   entities: emptyState(),
   filter: { kind: 'all' },
-  query: '',
   now: Date.now(),
   ready: false,
 
@@ -335,7 +325,6 @@ export const useTaskStore = create<TaskState>((set) => ({
   },
 
   setFilter: (filter) => set({ filter }),
-  setQuery: (query) => set({ query }),
   refreshNow: () => set({ now: Date.now() }),
 }));
 
@@ -351,13 +340,19 @@ export function selectVisibleTasks(state: TaskState): Task[] {
    * 是**两份互不校验的实现**。判据现在只有一份（`@heyta/domain`），
    * 加一个筛选分支（例如 `tag`）时，四端同时拿到它。
    */
-  // 🔴 「先筛再搜」：搜索是在当前筛选之上**收窄**，不替代它。
-  //    反过来（先搜再筛）在"已完成"这类分支上会得到不同结果 ——
-  //    而那种差别用户只会读成"搜索有时候不准"。
   const filtered = filterTasks(Object.values(state.entities.tasks), state.filter, {
     now: state.now,
   });
-  return searchTasks(filtered, state.query);
+  /**
+   * 🔴 2026-10-01：这里**不再"先筛再搜"** —— 列表只按 `filter` 出，
+   * 搜索搬到了跨实体的浮层（`SearchPanel`，宿主用 `searchTasks` 扫**全部**任务）。
+   *
+   * 为什么可以搬走：浮层是"我记得有个东西，去找它"，它不该受"当前正在看哪个视图"
+   * 约束 —— 一个 Spotlight 不会只在你当前打开的文件夹里找。
+   * 顶栏那个内联输入框是另一件事（当前列表收窄），产品负责人拍板删掉，
+   * 一个应用只留**一个**搜索入口。
+   */
+  return filtered;
 }
 
 export function selectQuadrantCounts(state: TaskState): Record<Quadrant, number> {
