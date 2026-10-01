@@ -101,11 +101,14 @@ export const buildRegisterBodySchema = (
 /**
  * 口令在**传输层**的上限，刻意比**策略层**宽，而且是从策略常量推导出来的。
  *
- * 策略按 code point 计（`MAX_PASSWORD_CODE_POINTS`），zod 的 `.max()` 按 UTF-16
- * 单元计 —— 一个 code point 最多占 2 个单元，所以 `×2` 后这条线**永远在策略线之外**。
+ * 两层都以 **code point** 计（实测：zod 4.6.5 的 `.max()` 数的是码点，不是 UTF-16
+ * 单元 —— `z.string().max(8)` 对 5 个 emoji 是放行的）。这里的 `×2` 因此**不是**
+ * 单位换算，而是"把用户能看见的那句话留给策略层"：
  *
- * 🔴 为什么必须这样：如果两处各写一个字面量，漂移的形状是"界面让输、服务端 400"，
- * 而且 400 那句是 zod 的 `Validation failed`，用户读不出是自己口令太长。
+ * 🔴 超过 `MAX_PASSWORD_CODE_POINTS` 的口令应该拿到
+ * `400 + code=password_policy_violation + policyCode=too_long`，而不是 zod 那句
+ * `Validation failed` —— 后者没有 `code`，客户端按词条表翻不出任何有意义的提示。
+ * 所以传输线必须**在策略线之外**，它只负责挡住"拿 10 MB 字符串来哈希"这种体积攻击。
  * 长度是否合规**只由 `password/policy.ts` 裁决**，它给出可判别的 `code`。
  * 这里的 `min(1)` 只负责"这个字段得在"，不判定强度。
  */
