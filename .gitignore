@@ -80,6 +80,12 @@ test-results/
 # `playwright.landing.config.ts` 的专属取证目录：它不跟上面的共享目录挤，
 # 否则别的套件跑一轮就把人还没看的图删了（理由写在那个 config 里）。
 landing-results/
+# 同一条理由的另外两个专属取证目录（`playwright.legal-links.config.ts` 与
+# `playwright.live-site.config.ts` 各一份）。🔴 它们**曾经漏登记**：漏掉的后果不是
+# "脏"，是任何一次 `git add -A` 都会把几 MB 的 PNG/trace 当源码吸进提交 ——
+# 而这两个目录里放的正是"人必须打开看一眼"的那批截图，最容易顺手 add。
+legal-links-results/
+live-site-results/
 playwright-report/
 blob-report/
 e2e/.playwright/

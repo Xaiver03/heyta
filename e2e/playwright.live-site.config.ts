@@ -39,6 +39,14 @@ const LIVE_IP = process.env['HEYTA_LIVE_IP'] ?? '124.223.13.226';
 
 export default defineConfig({
   testDir: './live-site',
+  // 🔴 独立产物目录，**不是**默认的 `test-results/`。
+  //    `live-domain.spec.ts` 把自己那批固定路径截图（`test-results/live-*.png`）写进共享目录，
+  //    而 Playwright 每次运行开始会**删除并重建 outputDir** —— 于是默认的
+  //    `test-results/` 既会被这条套件的每一次运行吃掉别的套件还没看的证据，
+  //    两条会话同时跑线上验收时还会互相删掉对方的 trace，症状是
+  //    `browserContext.close: ENOENT …/.playwright-artifacts-*/…trace`
+  //    （断言其实全过了，用例却判红 —— 2026-10-01 实测吃过一次）。
+  outputDir: './live-site-results',
   fullyParallel: false,
   workers: 1,
 

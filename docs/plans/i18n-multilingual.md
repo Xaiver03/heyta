@@ -435,7 +435,7 @@ aria-label={label}
   文档中心改造（`site/docs.ts` / 词条表）里，**不是**本轮改动造成的；
   本轮碰到的落地页面（`mockup-fidelity.spec.tsx`）仍然全绿。
 
-### 7.15 法务九页：中英双语**已就绪**，线上**还没有**（缺口 G2，2026-10-01）
+### 7.15 法务九页：中英双语已就绪，**并已发布上线**（缺口 G2，2026-10-01 闭合）
 
 产品负责人问「国际化做完了吗」时，我先答"法务九份只有中文"—— **那句是错的，撤回**。
 错因是探针本身：我用 `grep -c "'en'"` 去查英文段的存在，而这份数据的写法是
@@ -447,12 +447,13 @@ aria-label={label}
 |---|---|
 | 每份都有独立的 `const en = […] as const` | **9/9** |
 | `packages/legal/tests/structure.spec.ts`（中英**结构逐条对应**） | **56 passed**，exit 0 |
-| 英文正文里残留的汉字字面量 | **1 处** —— 隐私政策英文版里的主体名称「晓黎（杭州）人工智能科技有限公司」，**这是刻意的**（法律主体名称以登记文字为准） |
+| 英文正文里残留的汉字字面量 | **3 处**（`privacy` / `third-parties` / `subscription-refund` 的英文栏各 1 处，都是主体名称「晓黎（杭州）人工智能科技有限公司」）。⚠️ 本行原先写"1 处"**是少数了** —— 只数了隐私政策那一份。**这是刻意的**（法律主体名称以登记文字为准），但**口径不统一**：`terms` 的英文栏只留了转写名，见 `legal-compliance-before-filing.md` 的 **G-31** |
 | `pnpm check:legal-copy`（站点文案 ↔ `@heyta/legal` 逐字节对账） | exit 0 |
 | `pnpm check:legal-host`（托管域名三方对账） | exit 0 |
 | 本地产物 | `apps/landing/dist/legal/<9 份>/` + `dist/en/legal/<9 份>/` = **18 个入口都在** |
 
-🔴 **所以剩下的不是翻译工作，是发布。** 线上实测（`--resolve` 钉真实 IP + `--noproxy`）：
+🔴 **所以剩下的不是翻译工作，是发布。** 线上实测（`--resolve` 钉真实 IP + `--noproxy`，
+**发布前**的快照，闭合后的复验在下面）：
 
 | 地址 | 结果 | 判读 |
 |---|---|---|
@@ -473,6 +474,31 @@ aria-label={label}
 后在干净检出上重建一次产物（`git archive` / 独立 worktree），确认 `dist/legal/**` 来自提交而非工作树；
 ③ 发布 + **线上判据**：`/legal/privacy/` 与 `/en/legal/privacy/` 必须返回**各自正文**
 （`cmp` 与首页不同、`<h1>` 有内容），而不是 200 的兜底首页 —— 只看状态码会把它读成"已经上线"。
+
+✅ **三步都已做到**（2026-10-01，逐步有据）：
+
+| 步 | 做了什么 | 证据 |
+|---|---|---|
+| ① | 法务批次进版本库：`2dac3fa3`（69 条目 / 56 新增 13 修改），**只提自己的文件** —— 共享工作树里另有 4 条会话在写，走的是 plumbing 逐条拼树 + `update-ref` CAS，收尾刷真实索引 | 提交在 `main` 上；`git diff --cached` 里 legal 命中 0（没把别人的 staged 删除吸进同一笔） |
+| ② | 干净检出重建：`git archive 2dac3fa3 \| tar -x` 到 `/tmp/legal-co`（**不是**工作树），在那里跑 build + 三条法务门禁 + 四套测试 | `build` / `check:legal-copy` / `check:legal-host` / `check:server-legal` / `check:entries` / `@heyta/legal` 测试 / i18n / app-host / `check:ui-language` **全绿** ⇒ 18 份法务入口来自提交 |
+| ③ | 发布 + 线上判据 | 发布前对账：线上 75 份 vs 产物 93 份，只有-live 是 5 个旧 hash chunk，只有-local 是 5 个新 chunk + 18 份 legal；54 份共同 HTML **归一化 hash 后 REAL-DIFF=0** ⇒ 不会回退任何他线内容。发布后：`rsync -azc --dry-run` 全量对账 **0 差异**；服务器侧 `cmp` 五份 legal 页与首页 DIFFERENT-OK |
+
+🔴 **判据没有停在 `curl`**：法务页是 SPA 壳（正文由 bundle 客户端渲染），所以状态码与
+"字节不是首页"都证明不了界面。新增线上验收 **`e2e/live-site/live-legal.spec.ts`**（10 条）：
+九份 × 中英各一次真浏览器渲染，判的是 `<html lang>` 对、每页恰好一个 `h1`、
+顶层小节数 == 目录条目数、**中英小节数相等**、版本行里的版本号与日期两侧相等、
+"尚未生效"横幅在，以及第一条那条**字节必须与首页不同**（拦 nginx 兜底的软 404）。
+**10 passed**；变异验证：把 `terms` 换成 `/legal/terms-typo/` ⇒ 精确红在
+「返回的字节与首页完全相同 ⇒ nginx 兜底把一个不存在的页面答成了 200」，还原后回到全绿。
+截图两张（`e2e/live-site-results/live-legal-terms-{zh,en}.png`）**人已看过**：
+中文页是「heyta 服务条款 + 版本 1.0 · 更新于 2026-10-01 + 橙色尚未生效横幅 + 目录逐条」，
+英文页整页英文（nav、横幅、CONTENTS）—— 双语是真的双语，不是套了个 `lang="en"`。
+
+⚠️ 这条套件的产物目录同时修了一处会伤到别人的东西：`playwright.live-site.config.ts` 原来用默认
+`outputDir`（= 共享的 `e2e/test-results/`），而 Playwright 每次运行开始**删除并重建** outputDir ——
+本轮就是这样把另一条会话还没看的 `live-app-pwa.png` 与自己的 `live-legal-terms-*.png` 各抹掉一次，
+并且两次运行互相删 trace，症状是**断言全过却判红**
+（`browserContext.close: ENOENT …/.playwright-artifacts-*/…trace`）。现已隔离到 `live-site-results/`。
 
 📌 **两条一般规律**（都已入档 §7 第 98、99 条）：**断言"某语言不存在"之前，先看这份数据里
 "存在"长什么语法形状**；**判断"线上是不是当前产物"要把 asset hash 归一化再逐行比**，

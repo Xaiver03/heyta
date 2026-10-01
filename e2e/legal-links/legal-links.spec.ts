@@ -12,7 +12,7 @@
  *
  * | baseUrl | 两条链接必须打开 | 内容来源 |
  * |---|---|---|
- * | `https://heyta.waytofuture.cn`（官方托管） | `/legal/terms/`、`/legal/privacy/` | 本地落地页构建（线上未发布，见配置头） |
+ * | `https://heyta.waytofuture.cn`（官方托管） | `/legal/terms/`、`/legal/privacy/` | 本地落地页构建（本套件刻意离线；线上字节由 `e2e/live-site/live-legal.spec.ts` 直连真服务器验，两侧不重叠） |
  * | `https://heyta.finlaw.cloud`（另一台真服务端） | `<base>/terms.html`、`<base>/privacy.html` ⇒ **404** | **零转发**，那个 404 是它自己答的 |
  * | 空（还没配地址） | **不渲染链接** | —— |
  *

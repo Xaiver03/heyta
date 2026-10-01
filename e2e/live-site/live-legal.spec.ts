@@ -1,0 +1,215 @@
+/**
+ * 线上验收：**九份对外法律文本在中英两侧真的发布出来了**。
+ * ======================================================
+ *
+ * 分工：`e2e/legal-links/` 验的是**产品代码把点击带到哪**（刻意离线，官方那一侧
+ * 由本地构建产物顶替）；这一份验的是**服务器上真的有哪些字节**，也就是
+ * `docs/plans/legal-compliance-before-filing.md` 缺口表里 **G-25** 那一格。
+ * 两者不重叠：前者红了是代码坏，后者红了是**部署没跟上**。
+ *
+ * ## 🔴 第一条判据拦的是"看起来像成功"
+ *
+ * 落地页由 nginx 以 SPA 兜底服务，所以**不存在的路径也会回 200**，而且正文就是
+ * 首页的字节。2026-10-01 实测：`/legal/nope-not-a-doc/` 的 `<title>` 与 `<html lang>`
+ * 与首页逐字相同。于是"状态码 200"与"curl 拿到了 HTML"都**不是**可达性证据 ——
+ * 必须比字节。这条判据因此放在最前，且在**同一台线上服务器**上取参照物（首页）。
+ *
+ * ## 为什么断言全部是"对等 / 一致"，没有一条是我编的数字
+ *
+ * 「至少 N 个字符」「至少 3 段」这类阈值是本仓库明确拒绝过的写法
+ * （见同目录 `live-domain.spec.ts` 里那段 `#root` 注释）。这里用的每条判据都从
+ * 页面自身或另一种语言侧**推导**出来：
+ *
+ * - `lang` 属性：由站点注册表决定，中英两侧必须分别是 `zh-CN` / `en`；
+ * - 顶层小节数 == 目录条目数：`LegalDocumentPage` 的目录就是逐条 `sections.map` 渲染的，
+ *   两者不等只可能是渲染漏了；
+ * - 中大小节总数相等，且版本行里的**版本号与日期**相等
+ *   （整句不相等是对的 —— 标签本地化；`structure.spec.ts` 在库里钉的是同一件事，
+ *   这里钉的是"线上那份产物也真的对等"）；
+ * - 每页恰好一个 `h1`：组件注释写明的层级约定；
+ * - 草稿横幅：今天九份的 `status` 全是 `draft`，横幅**必须**在。
+ *   ⚠️ 改成 `effective` 那天这条会红 —— 那是提醒"对外文本要生效了，复核一下"，
+ *   不是误报，届时连同 §6 那条"律师复核 → 改 status → 发布"一起处理。
+ */
+
+import { expect, test, type Page } from '@playwright/test';
+
+const ORIGIN = process.env['HEYTA_LIVE_ORIGIN'] ?? 'https://heyta.waytofuture.cn';
+/**
+ * 截图落在**本套件自己的产物目录**，不落共享的 `test-results/`。
+ *
+ * 🔴 这不是排版偏好，是实测：`test-results/` 是好几条套件的 outputDir，而
+ * Playwright 在每次运行开始会**删除并重建**它。本目录下的截图先写后删，
+ * 我在 2026-10-01 就是这样把刚拍的 `live-legal-terms-*.png` 弄丢的
+ * （另一条会话随后起跑，把人还没看的证据整片抹掉）。
+ * 与 `playwright.legal-links.config.ts` 里那条同一个家族。
+ */
+const SHOT_DIR = 'live-site-results';
+
+/** 九份文本的 id —— 与 `packages/legal` 的注册表同序，也是页脚的展示顺序。 */
+const LEGAL_DOC_IDS = [
+  'terms',
+  'privacy',
+  'personal-info-list',
+  'permissions',
+  'third-parties',
+  'ai-and-transfer',
+  'minors',
+  'subscription-refund',
+  'data-rights',
+] as const;
+
+/** `<lang>/<docId>` 那一条的站点路径（与 `apps/landing/src/site/pages.ts` 一致）。 */
+function legalPath(docId: string, locale: 'zh' | 'en'): string {
+  return locale === 'zh' ? `/legal/${docId}/` : `/en/legal/${docId}/`;
+}
+
+function attachLogs(page: Page): string[] {
+  const logs: string[] = [];
+  page.on('console', (message) => logs.push(`[console.${message.type()}] ${message.text()}`));
+  page.on('pageerror', (error) => logs.push(`[pageerror] ${error.message}`));
+  page.on('requestfailed', (request) =>
+    logs.push(`[requestfailed] ${request.url()} ${request.failure()?.errorText ?? ''}`),
+  );
+  return logs;
+}
+
+function hardErrors(logs: readonly string[]): string[] {
+  return logs.filter((line) => line.startsWith('[pageerror]'));
+}
+
+/**
+ * 用**页面内**的 fetch 取原始 HTML（不用 Playwright 的 request fixture）：
+ * 后者走 Node 的网络栈，会绕开这份配置用 `--host-resolver-rules` 钉下来的
+ * 解析路径 —— 那样验的就不是同一台服务器了。
+ */
+async function rawHtml(page: Page, path: string): Promise<string> {
+  return page.evaluate(
+    async (p: string) => await fetch(p, { cache: 'no-store' }).then((r) => r.text()),
+    path,
+  );
+}
+
+/** 渲染完一条法务页之后取出的结构事实。 */
+interface LegalRender {
+  lang: string | null;
+  h1Count: number;
+  topLevelSections: number;
+  allSections: number;
+  tocItems: number;
+  metaText: string;
+  hasDraftBanner: boolean;
+}
+
+async function readLegalRender(page: Page): Promise<LegalRender> {
+  // 外壳先到位：`.lp-legal__meta` 是这份页面**最先**渲染的元素，取不到就说明
+  // React 根本没挂上这份文档（白屏与"路径不存在"在这里长得一样）。
+  await page.locator('.lp-legal__meta').first().waitFor({ state: 'visible', timeout: 30_000 });
+  return page.evaluate(() => {
+    const root = document.querySelector('.lp-legal');
+    return {
+      lang: document.documentElement.getAttribute('lang'),
+      h1Count: document.querySelectorAll('h1').length,
+      topLevelSections: document.querySelectorAll('.lp-legal > section.lp-legal__section').length,
+      allSections: document.querySelectorAll('section.lp-legal__section').length,
+      tocItems: document.querySelectorAll('.lp-legal__toc a').length,
+      metaText: (root?.querySelector('.lp-legal__meta')?.textContent ?? '').trim(),
+      hasDraftBanner: Boolean(root?.querySelector('.lp-legal__banner')),
+    };
+  });
+}
+
+for (const docId of LEGAL_DOC_IDS) {
+  test(`${docId}：中英两侧线上都渲染，且与首页字节可区分`, async ({ page }) => {
+    const logs = attachLogs(page);
+
+    // 参照物：首页原始字节。缺路径时 nginx 兜底返回的就是它。
+    await page.goto(`${ORIGIN}/`, { waitUntil: 'domcontentloaded' });
+    const homeHtml = await rawHtml(page, '/');
+
+    const sides = {} as Record<'zh' | 'en', LegalRender>;
+    for (const locale of ['zh', 'en'] as const) {
+      const path = legalPath(docId, locale);
+      const html = await rawHtml(page, path);
+      // 🔴 这条是本套件的存在性判据本体：兜底命中时两者逐字相同。
+      expect(
+        html,
+        `${path} 返回的字节与首页完全相同 ⇒ nginx 兜底把一个不存在的页面答成了 200`,
+      ).not.toBe(homeHtml);
+
+      await page.goto(`${ORIGIN}${path}`, { waitUntil: 'domcontentloaded' });
+      const render = await readLegalRender(page);
+      sides[locale] = render;
+
+      expect(render.lang, `${path} 的 <html lang> 不是 ${locale === 'zh' ? 'zh-CN' : 'en'}`).toBe(
+        locale === 'zh' ? 'zh-CN' : 'en',
+      );
+      expect(render.allSections, `${path} 一节正文都没渲染`).toBeGreaterThan(0);
+      expect(render.h1Count, `${path} 的 h1 数不是 1（组件约定的层级塌了）`).toBe(1);
+      expect(render.metaText, `${path} 没有版本/更新日期行`).not.toBe('');
+      // 目录必须逐条列出顶层小节（`sections.length > 1` 时才渲染目录，所以 1 节时两边都是 0）。
+      expect(
+        render.tocItems,
+        `${path} 的目录条目数（${String(render.tocItems)}）≠ 顶层小节数（${String(render.topLevelSections)}）`,
+      ).toBe(render.topLevelSections);
+      expect(
+        render.hasDraftBanner,
+        `${path} 没有"尚未生效"横幅 —— 九份文本今天全是 draft，缺这条等于把草稿当已生效发布`,
+      ).toBe(true);
+
+      if (docId === 'terms') {
+        // 规定一：先截图再断言之余，把中英各一张落到固定路径，供人**真的打开看**。
+        await page.waitForLoadState('networkidle');
+        await page.screenshot({ path: `${SHOT_DIR}/live-legal-${docId}-${locale}.png` });
+      }
+    }
+
+    // 🔴 中英对等：库里 `structure.spec.ts` 钉的是源码，这里钉的是**线上产物**。
+    expect(
+      sides.en.allSections,
+      `中英小节数不等（zh ${String(sides.zh.allSections)} / en ${String(sides.en.allSections)}）`,
+    ).toBe(sides.zh.allSections);
+
+    /**
+     * 版本行：整句**本来就该不同**（`版本 1.0 · 更新于 2026-10-01` /
+     * `Version 1.0 - updated 2026-10-01`），比整句是我一开始写错的判据 ——
+     * 它红了九次，红在标签上而不是红在事实上。
+     *
+     * 对等的对象是句子里那两个**与语言无关的事实**：版本号与更新日期。
+     * 两个都必须真的解析出来（`match` 为 null 直接红），否则"两侧都没匹配上"
+     * 会在相等断言下变成一次假绿。
+     */
+    const facts = (raw: string): { version: string; date: string } => {
+      const version = raw.match(/\d+\.\d+/u)?.[0];
+      const date = raw.match(/\d{4}-\d{2}-\d{2}/u)?.[0];
+      expect(version, `版本行里取不出版本号：「${raw}」`).toBeDefined();
+      expect(date, `版本行里取不出更新日期：「${raw}」`).toBeDefined();
+      return { version: version ?? '', date: date ?? '' };
+    };
+    const zhFacts = facts(sides.zh.metaText);
+    const enFacts = facts(sides.en.metaText);
+    expect(
+      enFacts.version,
+      `中英版本号不一致（zh ${zhFacts.version} / en ${enFacts.version}）`,
+    ).toBe(zhFacts.version);
+    expect(enFacts.date, `中英更新日期不一致（zh ${zhFacts.date} / en ${enFacts.date}）`).toBe(
+      zhFacts.date,
+    );
+
+    const hard = hardErrors(logs);
+    console.log(`控制台共 ${String(logs.length)} 条：\n  ${logs.join('\n  ')}`);
+    expect(hard, `页面抛了未捕获异常：\n${hard.join('\n')}`).toEqual([]);
+  });
+}
+
+/**
+ * 九条都在注册表里 —— 少一份就是"发布漏了一页"，而漏的那页在线上**看起来**
+ * 只是另一个不存在的链接（兜底首页），没人会去点它。
+ *
+ * 这条不重新下载九份页面，它只做一件事：数出 `LEGAL_DOC_IDS` 有 9 个。
+ * 🔴 数字 9 不是阈值，是 `packages/legal` 注册表的**当前条目数**；
+ * 加第十份文本时必须同时改这里，改测试是**预期动作**（与 structure.spec 同批）。
+ */
+test('法务清单仍是九份（与 @heyta/legal 注册表同数）', () => {
+  expect(LEGAL_DOC_IDS.length).toBe(9);
+});
