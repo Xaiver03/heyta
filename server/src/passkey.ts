@@ -27,6 +27,7 @@ import { authCache } from './auth-cache';
 import { getDefaultStorageQuotaBytes } from './sync/services/storage-quota.service';
 import { attachInviteOnRegister } from './activity/invite';
 import { hashToken } from './auth-tokens';
+import { consentedLegalSetVersion } from './legal-consent';
 
 // Constants
 const CHALLENGE_EXPIRY_MS = 5 * 60 * 1000; // 5 minutes
@@ -311,6 +312,10 @@ export const verifyRegistration = async (
             email: email.toLowerCase(),
             passwordHash: null,
             termsAcceptedAt: acceptedAt,
+            // 同 `auth.ts` 的那处：时刻落了，版本就必须跟着判（null 是合法答案，
+            // 含义见 `legal-consent.ts`）。没有时间戳时不写，避免"有版本没同意时刻"。
+            termsDocumentVersion:
+              acceptedAt === null ? null : consentedLegalSetVersion(),
             // Set explicitly rather than leaning on the column default, so that
             // SUPERSYNC_DEFAULT_STORAGE_QUOTA_BYTES actually reaches new accounts.
             storageQuotaBytes: BigInt(getDefaultStorageQuotaBytes()),
