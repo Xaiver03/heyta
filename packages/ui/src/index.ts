@@ -52,6 +52,22 @@ export {
   type SearchPanelLabels,
   type SearchPanelProps,
 } from './search/SearchPanel.js';
+/**
+ * 搜索面板的**判据层**（宿主算键盘光标要用同一套，不许在 `apps/*` 重写一遍）：
+ * 跳转项怎么过滤、结果怎么摊平成有序数组、光标怎么走。
+ */
+export {
+  buildResultEntries,
+  CURSOR_IN_INPUT,
+  filterQuickActions,
+  MAX_QUICK_ACTIONS,
+  moveCursor,
+  type QuickAction,
+  type QuickActionGroup,
+  type SearchResultEntry,
+  type SearchResultKind,
+  type SearchGroups,
+} from './search/model.js';
 export { CalendarBoard, type CalendarBoardProps } from './calendar/CalendarBoard.js';
 export {
   calendarDayTone,

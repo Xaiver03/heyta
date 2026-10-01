@@ -274,14 +274,21 @@
   }
 }
 
-/* ── 搜索浮层（居中卡片 + scrim）──────────────────────────
+/* ── 搜索浮层（贴顶卡片 + scrim）──────────────────────────
  *
  * 🔴 同样是 IA，不是外观（滴答 §11.5：搜索是"主列③浮层，
  * 透出下层视图"）。与 `.ht-sheet` 的差别只在形状：
- * 设置 = 右侧整面，搜索 = **居中卡片**，四周留空隙让下层看得见。
+ * 设置 = 右侧整面，搜索 = **卡片**，四周留空隙让下层看得见。
+ *
+ * 🔴 2026-10-01：卡片**贴顶**，不悬在正中央 —— 产品负责人给的是 macOS
+ * 聚焦搜索（Spotlight）那张图。借的是**形态**（输入行在最上、结果在下面、
+ * 靠近屏幕上方），不是内容。居中悬着读起来像"对话框"，贴顶读起来才像"输入法"：
+ * 前者等待一个回答，后者等待你继续打字。
+ *
+ * ⚠️ 顶部留白用 `--ht-space-16` × 2（不新增 token、不写裸值）。
  *
  * ⚠️ scrim 用的是设计系统已有的 `--ht-material-scrim`
- * （不是 sheet 那种"背景色 88%"）—— 居中卡片周围要露出**更多**下层，
+ * （不是 sheet 那种"背景色 88%"）—— 卡片周围要露出**更多**下层，
  * 灰度必须更浅，下层才读得出来。z 轴用 `--ht-z-overlay`：
  * 它本来就是"浮层"这一层。
  */
@@ -290,17 +297,43 @@
   inset: 0;
   z-index: var(--ht-z-overlay);
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: center;
-  padding: var(--ht-space-4);
+  padding: calc(var(--ht-space-16) * 2) var(--ht-space-4) var(--ht-space-4);
   background: var(--ht-material-scrim);
   animation: ht-sheet-in var(--ht-duration-normal) var(--ht-ease-enter);
 }
 
-/* 卡片宽度钉在 modal-max：短结果时不缩成窄条、长结果时不铺满 ——
-   浮层的宽度是稳定的，变化的只是它的高度。 */
+/*
+ * 卡片的形：**宽钉在 modal-max，高与宽成比例（16:9）**。
+ * 2026-10-01 产品负责人："组织的组件的宽和高都是成比例的，反正更合适屏幕的尺寸，
+ * 不仅仅是一条" —— 之前它的高度由内容决定，空态就只剩一条输入行的薄片。
+ *
+ * 🔴 定形（而不是随内容伸缩）还带来一条副产品：**打字前后卡片不跳**，
+ * 光标行也不必在结果出现时跟着位移。`max-block-size: 100%` 是矮窗口的让位阀：
+ * 可用高度不足时比例失效，卡片贴满内容区而不溢出（`aspect-ratio` 的固有尺寸
+ * 会被 `max-block-size` 夹住，这正是想要的优先级）。
+ *
+ * ⚠️ 量的是**卡片**（overlay 的子元素），不是 scrim 本身：scrim 是 `inset: 0`
+ * 撑满内容区的，量它永远"超宽"（这个判据第一版就栽在选错元素上）。
+ */
 .ht-search-overlay > * {
   inline-size: min(100%, var(--ht-layout-modal-max));
+  aspect-ratio: 16 / 9;
+  max-block-size: 100%;
+  /* 玻璃的另一半。底色是共享层的 `material.chrome-tint`（见
+     `SearchPanel.tsx`），`backdrop-filter` 只在 CSS 里合法 ⇒ 归宿主。
+     半径复用既有的 `--ht-blur-chrome`，与落地页那两处同一档材质。 */
+  backdrop-filter: blur(var(--ht-blur-chrome)) saturate(180%);
+  -webkit-backdrop-filter: blur(var(--ht-blur-chrome)) saturate(180%);
+}
+
+/* 结果区吃掉卡片的剩余高度。共享层给的 `max-height: layout.panel-max-height`
+   是**上限**，不是高度：卡片定形之后若不让结果区 flex 增长，底部那排键位提示
+   就会浮在一片空白中间。 */
+.ht-search-overlay [data-testid='search-panel-results'] {
+  flex: 1 1 auto;
+  min-block-size: 0;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -2007,33 +2040,10 @@ input[type="radio"] {
   gap: var(--ht-space-2);
 }
 
-/* 任务搜索。宽度用 `clamp` 而不是固定值：窄屏上它要让位给视图标签，
-   宽屏上不该拉成一整行（一个占满宽度、只有一个词的输入框看起来像页面标题）。 */
-.ht-search {
-  position: relative;
-  display: inline-flex;
-  align-items: center;
-}
-.ht-search__input {
-  inline-size: clamp(8rem, 18vw, 16rem);
-  min-block-size: var(--ht-touch-target-min);
-  padding-inline: var(--ht-space-3);
-  border: var(--ht-border-width-thin) solid var(--ht-color-border);
-  border-radius: var(--ht-radius-md);
-  background: var(--ht-color-surface);
-  color: var(--ht-color-foreground);
-  font-family: var(--ht-font-sans);
-  font-size: var(--ht-font-size-sm);
-}
-.ht-search__clear {
-  position: absolute;
-  inset-inline-end: var(--ht-space-1);
-  border: 0;
-  background: none;
-  color: var(--ht-color-foreground-muted);
-  font-size: var(--ht-font-size-lg);
-  cursor: pointer;
-}
+/* 🔴 顶栏那个内联搜索输入框（`.ht-search` / `__input` / `__clear`）已删。
+   2026-10-01 产品负责人拍板：一个应用只有**一个**搜索入口 —— rail 上的「搜索」按钮；
+   浮层的输入样式由共享层 `packages/ui/src/search/SearchPanel.tsx` 自带（`field` + `input`），
+   不在 app.css 里。这里只剩浮层本体的定位规则（`.ht-search-overlay`，见上文）。 */
 
 /* ── 运营管理后台（ADR-0038）──────────────────────────────────
  * 只给运营者看的一段界面。取值全部来自 design tokens ——
