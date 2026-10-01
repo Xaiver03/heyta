@@ -11,6 +11,8 @@
 export { LOCALES, DEFAULT_LOCALE, otherLocale } from './types.js';
 export type { Locale, MessageVars } from './types.js';
 
+export { matchLocale } from './match.js';
+
 export { CATALOGS, translate } from './translate.js';
 export { zhCN } from './locales/zh-CN.js';
 export type { MessageKey } from './locales/zh-CN.js';

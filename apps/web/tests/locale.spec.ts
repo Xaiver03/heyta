@@ -5,13 +5,14 @@
  * 🔴 这个文件存在的理由：**语言偏好读错/写错，用户会看到自己读不懂的界面，
  * 而且没有任何一处会报错。**
  *
- * web 的语言来源是 `localStorage` 里的用户偏好（与 `heyta.theme` 并列的
- * `heyta.locale`），**不是设备语言** —— 后者是移动端的做法，见
- * `apps/mobile/src/i18n/locale.ts`。这两条契约都必须钉住：
+ * web 的语言是四层解析链（2026-10-01 拍板，`src/lib/locale.ts` 文件头）：
  *
- *   - 读：已存偏好 > 落地页带来的 `?lang=` > `DEFAULT_LOCALE`；
+ *   - 读：已存偏好 > 落地页带来的 `?lang=` > `navigator.language` > `DEFAULT_LOCALE`；
  *   - 写：`applyLocale` 必须落到正确的键、并同步 `<html lang>`；
- *   - **不读 `navigator.language`**（web 刻意不做自动判断）。
+ *
+ * `tests/setup.ts` 已把 jsdom 的 `navigator.language` 钉成 `zh-CN`
+ * （保持「无偏好 ⇒ 中文」的既有默认）；本文件测第 3 层的用例逐条覆写它。
+ * 标签匹配本身的用例在 `packages/i18n/tests/match.spec.ts`，不在这里重复。
  */
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -19,6 +20,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { DEFAULT_LOCALE } from '@heyta/i18n';
 
 import { applyLocale, isLocale, resolveInitialLocale } from '../src/lib/locale.js';
+
+/** 覆写系统语言 —— `mockRestore()` 后回到 setup.ts 钉的 `zh-CN`。 */
+function setNavigatorLanguage(value: string) {
+  return vi.spyOn(navigator, 'language', 'get').mockReturnValue(value);
+}
 
 beforeEach(() => {
   localStorage.clear();
@@ -36,10 +42,6 @@ describe('isLocale', () => {
 });
 
 describe('resolveInitialLocale', () => {
-  it('没有存过偏好时回落到默认语言', () => {
-    expect(resolveInitialLocale()).toBe(DEFAULT_LOCALE);
-  });
-
   it('读取已存的有效偏好', () => {
     localStorage.setItem('heyta.locale', 'en');
     expect(resolveInitialLocale()).toBe('en');
@@ -51,13 +53,31 @@ describe('resolveInitialLocale', () => {
     localStorage.setItem('heyta.locale', 'fr-FR');
     expect(resolveInitialLocale()).toBe(DEFAULT_LOCALE);
   });
+});
 
-  it('🔴 不读 navigator.language —— web 刻意不做设备语言自动判断', () => {
-    // 设备语言是英文，但用户没选过：必须仍然是默认语言。
-    // 这条断的是"顺手加一层 navigator 兜底"那种改动 ——
-    // 它会让用户明确选过中文之后、换个浏览器又被翻回英文。
-    const spy = vi.spyOn(navigator, 'language', 'get').mockReturnValue('en-US');
+describe('resolveInitialLocale：系统语言（第 3 层，2026-10-01 拍板新增）', () => {
+  it('没存过偏好、没带参数时，用系统语言做首启语言', () => {
+    const spy = setNavigatorLanguage('en-US');
+    expect(resolveInitialLocale()).toBe('en');
+    spy.mockRestore();
+
+    const spy2 = setNavigatorLanguage('zh-TW');
+    expect(resolveInitialLocale()).toBe('zh-CN');
+    spy2.mockRestore();
+  });
+
+  it('🔴 系统语言不受支持时兜底默认 —— 不猜 fr→en 这类映射', () => {
+    const spy = setNavigatorLanguage('fr-FR');
     expect(resolveInitialLocale()).toBe(DEFAULT_LOCALE);
+    spy.mockRestore();
+  });
+
+  it('🔴 已存偏好胜过系统语言 —— 明确选过的不被自动检测翻回', () => {
+    // 旧决策否掉 navigator 层时担心的正是这个场景；四层链下它必须仍然成立，
+    // 否则"用户明确选了英文之后又被翻回中文"会以新的形式复发。
+    const spy = setNavigatorLanguage('en-US');
+    localStorage.setItem('heyta.locale', 'zh-CN');
+    expect(resolveInitialLocale()).toBe('zh-CN');
     spy.mockRestore();
   });
 });
@@ -77,9 +97,21 @@ describe('resolveInitialLocale：落地页带来的 `?lang=`', () => {
     expect(resolveInitialLocale()).toBe('en');
   });
 
-  it('URL 里是不受支持的语言时回落到默认语言，而不是被它带走', () => {
+  it('🔴 `?lang=` 胜过系统语言 —— 那是用户刚在落地页读着的语言', () => {
+    // 设备语言是英文，但用户刚读完中文落地页点进来 —— 必须是中文。
+    const spy = setNavigatorLanguage('en-US');
+    window.history.replaceState({}, '', '/?lang=zh-CN');
+    expect(resolveInitialLocale()).toBe('zh-CN');
+    spy.mockRestore();
+  });
+
+  it('URL 里是不受支持的语言时**落穿到系统语言**，而不是被它带走', () => {
+    // `?lang=fr-FR` 不受支持 ⇒ 参数作废 ⇒ 走下一层（系统语言），不是默认值。
+    // 2026-10-01 之前这里断言的是「回落到默认语言」—— 第 3 层加入后语义变了。
+    const spy = setNavigatorLanguage('en-US');
     window.history.replaceState({}, '', '/?lang=fr-FR');
-    expect(resolveInitialLocale()).toBe(DEFAULT_LOCALE);
+    expect(resolveInitialLocale()).toBe('en');
+    spy.mockRestore();
   });
 
   it('🔴 已存偏好**胜过** URL 参数 —— 陈旧参数不许覆盖用户的明确选择', () => {
@@ -92,9 +124,14 @@ describe('resolveInitialLocale：落地页带来的 `?lang=`', () => {
     expect(resolveInitialLocale()).toBe('en');
   });
 
-  it('没有参数时行为与从前一致（回归）', () => {
+  it('没有参数时走系统语言（回归）', () => {
+    // setup.ts 把系统语言钉成 zh-CN，与默认语言相同 ——
+    // 这条断言的是"无参数路径不再锁死默认值"，改坏第 3 层（删掉 navigator）
+    // 时它不会红，由上面「用系统语言做首启」那条负责。
+    const spy = setNavigatorLanguage('en-US');
     window.history.replaceState({}, '', '/');
-    expect(resolveInitialLocale()).toBe(DEFAULT_LOCALE);
+    expect(resolveInitialLocale()).toBe('en');
+    spy.mockRestore();
   });
 });
 

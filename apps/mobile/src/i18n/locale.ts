@@ -12,49 +12,26 @@
  * 两个平台给的东西**形状不一样**，这不是可以抹平的：
  *
  *   - iOS：`SettingsManager.settings.AppleLocale`（如 `zh-Hans-CN`），
- *     拿不到时退到 `AppleLanguages[0]`（如 `zh-Hans-CN`）；
+ *     拿不到时退到 `AppleLanguages[0]`；
  *   - Android：`I18nManager.localeIdentifier`（如 `zh_CN`）。
  *
- * 还有的形态是**语言列表**（`zh-Hans-CN,en-US`）—— 所以识别逻辑必须
- * 逐个候选找第一个能认出来的，而不是只切第一段。
+ * 还有的形态是**语言列表**（`zh-Hans-CN,en-US`）。
+ * **「认哪些语言、怎么切子标签」的判定不在本文件** —— 2026-10-01 起统一用
+ * `@heyta/i18n` 的 `matchLocale`：web 的 `navigator.language` 首启层用的是
+ * 同一个函数，此前 mobile 自带的 `classifyLocale` 与它是同一逻辑的两份实现，
+ * 先收掉防漂移。用例整体迁去了 `packages/i18n/tests/match.spec.ts`。
+ * `resolveDeviceLocale`（问哪个原生模块、怎么防御）是平台差异，
+ * 放在 `apps/*` 是对的（AGENTS.md §3.5）。
  * ─────────────────────────────────────────────────────────────────────────
- *
- * ⚠️ `classifyLocale` 是**纯函数**，单独可测（`tests/locale.spec.ts`）。
- * `resolveDeviceLocale` 是平台差异，放在 `apps/*` 是对的（AGENTS.md §3.5）。
- * 两者刻意放在**同一个文件**里：它们是"同一件事的两半"，拆开会让
- * "认哪些语言"这件事看起来有两个定义处。
  *
  * 🔴 `react-native` 用**延迟 require**，不是顶层 `import`。
  * 本仓库的移动端测试全部跑在 node 里、**刻意不加载 react-native**
  * （`tests/date.spec.ts` 文件头写着这条纪律：加载它会直接解析失败）。
- * 顶层 import 会让"只想测 classifyLocale"的用例根本跑不起来；
+ * 顶层 import 会让"只想测语言解析"的用例根本跑不起来；
  * 而 `resolveDeviceLocale` 只在设备上初始化 `App.tsx` 时才会被调用。
  */
 
-import { DEFAULT_LOCALE, type Locale } from '@heyta/i18n';
-
-/**
- * 把系统给的语言串归一成我们支持的语言。
- *
- * 规则（大小写不敏感，`,` / `-` / `_` 都认）：
- *   - 主语言是 `zh` → `'zh-CN'`；
- *   - 主语言是 `en` → `'en'`；
- *   - 其余（含 `undefined` / `'fr-FR'` / `'ja-JP'`）→ `DEFAULT_LOCALE`。
- *
- * ⚠️ 列表形态**取第一个可识别的候选**，不是取第一段：
- * `'zh-Hans-CN,en-US'` 与 `'fr-FR,en-US'` 应该分别落到 `zh-CN` 与 `en`。
- * 只切第一段的话，第二种会错判成默认语言 —— 而那正是用户明明列了英文的场合。
- */
-export function classifyLocale(raw: string | undefined | null): Locale {
-  if (raw === undefined || raw === null) return DEFAULT_LOCALE;
-  for (const candidate of raw.split(',')) {
-    // 只取主语言子标签：`zh-Hans-CN` / `zh_CN` 的主语言都是 `zh`。
-    const primary = candidate.trim().toLowerCase().split(/[-_]/)[0];
-    if (primary === 'zh') return 'zh-CN';
-    if (primary === 'en') return 'en';
-  }
-  return DEFAULT_LOCALE;
-}
+import { DEFAULT_LOCALE, matchLocale, type Locale } from '@heyta/i18n';
 
 /** iOS 的 `SettingsManager.settings` 里我们真正会读的两个字段。 */
 interface AppleSettings {
@@ -88,18 +65,18 @@ export function resolveDeviceLocale(): Locale {
     if (modules !== undefined) {
       const settings = modules.SettingsManager as { settings?: AppleSettings } | undefined;
       const appleLocale = settings?.settings?.AppleLocale;
-      if (typeof appleLocale === 'string' && appleLocale !== '') return classifyLocale(appleLocale);
+      if (typeof appleLocale === 'string' && appleLocale !== '') return matchLocale(appleLocale);
 
       const appleLanguages = settings?.settings?.AppleLanguages;
       if (Array.isArray(appleLanguages)) {
         const first = appleLanguages[0];
-        if (typeof first === 'string' && first !== '') return classifyLocale(first);
+        if (typeof first === 'string' && first !== '') return matchLocale(first);
       }
 
       const i18nManager = modules.I18nManager as { localeIdentifier?: unknown } | undefined;
       const androidLocale = i18nManager?.localeIdentifier;
       if (typeof androidLocale === 'string' && androidLocale !== '') {
-        return classifyLocale(androidLocale);
+        return matchLocale(androidLocale);
       }
     }
   } catch {
