@@ -1,5 +1,6 @@
 import { FastifyInstance, FastifyReply } from 'fastify';
 import { z } from 'zod';
+import { AUTH_PASSWORD_PATHS } from '@heyta/shared-schema';
 import { isEmailAllowed } from './email-allowlist';
 import * as jwt from 'jsonwebtoken';
 import {
@@ -1368,7 +1369,7 @@ export const apiRoutes = async (
    * `isVerified === 1` 提前 return），所以这个端点**不是**邮箱存在性预言机。
    */
   fastify.post<{ Body: EmailPasswordRegisterBody }>(
-    '/register/email-password',
+    AUTH_PASSWORD_PATHS.register,
     {
       config: {
         rateLimit: {
@@ -1440,7 +1441,7 @@ export const apiRoutes = async (
    * 喷一万个邮箱"这种分布式喷洒，每个账号只掉一次计数，IP 限流本来也拦不住。
    */
   fastify.post<{ Body: EmailPasswordLoginBody }>(
-    '/login/email-password',
+    AUTH_PASSWORD_PATHS.login,
     {
       config: {
         rateLimit: {
@@ -1499,7 +1500,7 @@ export const apiRoutes = async (
    * 而 SMTP 抖动时更狠的数只会让真实用户重点一次。
    */
   fastify.post<{ Body: z.infer<typeof PasswordForgotSchema> }>(
-    '/password/forgot',
+    AUTH_PASSWORD_PATHS.forgot,
     {
       config: {
         rateLimit: {
@@ -1556,7 +1557,7 @@ export const apiRoutes = async (
    * 猜中一枚有效令牌的概率是 2^-256。
    */
   fastify.post<{ Body: { token?: string; password?: string } }>(
-    '/password/reset',
+    AUTH_PASSWORD_PATHS.reset,
     {
       config: {
         rateLimit: {
@@ -1615,7 +1616,7 @@ export const apiRoutes = async (
    * 绝不允许从 body 里取（那会是一条"给任意账号改口令"的路）。
    */
   fastify.post<{ Body: { currentPassword?: string; newPassword?: string } }>(
-    '/password/change',
+    AUTH_PASSWORD_PATHS.change,
     {
       preHandler: authenticate,
       config: {

@@ -26,6 +26,7 @@
  * "未验证邮箱"这句话**必须**在校验口令**通过之后**才说 —— 否则它就是最省事的
  * 枚举器（一次请求、零猜测就知道哪些邮箱注册过）。
  */
+import type { PasswordAuthErrorCode } from '@heyta/shared-schema';
 import { prisma } from '../db';
 import { Logger } from '../logger';
 import { issueSession, registerWithMagicLink } from '../auth';
@@ -43,38 +44,16 @@ import { checkNewPassword, normalizePassword, type PasswordPolicyCode } from './
 export const MAX_FAILED_LOGIN_ATTEMPTS = 5;
 export const LOGIN_LOCKOUT_MS = 15 * 60 * 1000;
 
-export type PasswordAuthErrorCode =
-  /** 账号不存在、没设口令、口令不对 —— 🔴 三者**故意同一个码同一句话**。 */
-  | 'invalid_credentials'
-  /** 口令对了但邮箱还没验证。只在口令已验证为真后才可能返回。 */
-  | 'email_not_verified'
-  /** 口令认证器被临时锁定（账号本身仍可用其它方式登录）。 */
-  | 'account_locked'
-  /** 新口令不满足策略（长度 / 常见 / 已泄露）。 */
-  | 'password_policy_violation'
-  /** 哈希后端过载 ⇒ 503，**不降级**（见 `concurrency.ts`）。 */
-  | 'password_backend_busy'
-  /**
-   * 重置链接查不到 / 已过期 / 已被用过 —— 🔴 三者**故意同一个码同一句话**。
-   *
-   * 为什么不像 `invalid_credentials` 那样并进去：那句是"凭证不对"，而这里要说的是
-   * "这条路走不通，回去重新申请一封"，客户端的动作完全不同（重发链接 vs 重打口令）。
-   * 为什么不区分"过期"和"从没有过"：区分它就是给攻击者一个**判断哪些链接正在被广播**的
-   * 预言机，而对合法用户两种情况的处置一模一样。
-   */
-  | 'invalid_reset_link'
-  /**
-   * 这个账号**从来没有设过口令**（纯通行密钥 / 魔法链接注册的）。
-   *
-   * 🔴 为什么不并进 `invalid_reset_link`：那两个码让客户端做的事正好相反 ——
-   * 一个是"回去重新点一次链接"，一个是"去走「忘记密码」把口令设上"。
-   * 共用一个码就意味着界面上一句对一半人来说是错的话。
-   *
-   * 为什么可以单独存在（不违反 anti-enumeration）：它只在**已认证的改密接口**上出现，
-   * 调用者手上已经有一枚有效令牌、账号是谁他已经知道。而未认证的登录那条**没有**
-   * 这个码（`loginWithEmailPassword` 里"没口令"与"口令错"仍是同一句 + 同一次哑校验）。
-   */
-  | 'no_password_set';
+/**
+ * 口令这条路对客户端的判别词表**不在这里定义** —— 唯一真源在
+ * `@heyta/shared-schema` 的 `auth-http-contract.ts`（每条码为什么存在、为什么
+ * 与相邻那条不许合并，理由跟着码一起搬过去了）。
+ *
+ * 这里按**原名再导出**，所以 `api.ts` 的 `satisfies PasswordAuthErrorCode`
+ * 与各测试的导入一个字都不用改。留在服务端单独定义一份，就等于服务端与四个宿主
+ * 各持有一张表 —— 而客户端是按字符串查表的，改名或漏一条不会有任何一层报错。
+ */
+export type { PasswordAuthErrorCode };
 
 /**
  * 口令这条路**面向客户端的句子**（唯一真源在这里）。

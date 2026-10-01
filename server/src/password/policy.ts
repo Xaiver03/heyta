@@ -14,16 +14,24 @@
  *   用 k-匿名范围接口，且**绝不**把它挂在认证热路径上。
  */
 import { createHash } from 'crypto';
+import {
+  AUTH_PASSWORD_MAX_CODE_POINTS,
+  AUTH_PASSWORD_MIN_CODE_POINTS,
+  type PasswordPolicyCode,
+} from '@heyta/shared-schema';
 import { Logger } from '../logger';
 
-/** 产品负责人拍板的下限（NIST 单因子建议 15；偏离的理由见文件头）。 */
-export const MIN_PASSWORD_CODE_POINTS = 8;
 /**
- * 上限按**码点**算（不是 UTF-16 单元），否则一个 emoji 占两个单元，
- * 限额会随输入法悄悄变化。256 足够容纳 passphrase，同时挡住"拿 10 MB 字符串来哈希"
- * —— Argon2 对输入长度不敏感，但内存、日志与 HTTP 体敏感。
+ * 长度界限与策略码**不在这里定义**。
+ *
+ * 🔴 它们是服务端 ↔ 四个宿主的契约（客户端要用同一个数决定提示文案与提交前校验），
+ * 唯一真源在 `@heyta/shared-schema` 的 `auth-http-contract.ts`。这里按**原名再导出**，
+ * 所以既有调用方与测试一个字都不用改 —— 但值只剩一份。
+ * 在这个文件里再写一遍 `= 8` 就是第二套事实源，而漂移不会报错。
  */
-export const MAX_PASSWORD_CODE_POINTS = 256;
+export const MIN_PASSWORD_CODE_POINTS = AUTH_PASSWORD_MIN_CODE_POINTS;
+export const MAX_PASSWORD_CODE_POINTS = AUTH_PASSWORD_MAX_CODE_POINTS;
+export type { PasswordPolicyCode };
 
 /**
  * 口令**唯一**的归一化口径。
@@ -38,8 +46,6 @@ export const MAX_PASSWORD_CODE_POINTS = 256;
 export const normalizePassword = (input: string): string => input.normalize('NFC').normalize('NFKC');
 
 const codePoints = (s: string): number => Array.from(s).length;
-
-export type PasswordPolicyCode = 'too_short' | 'too_long' | 'too_common' | 'breached';
 
 export interface PasswordPolicyRejection {
   ok: false;
