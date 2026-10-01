@@ -472,6 +472,7 @@ describe('🔴 缓存的过期判定（Windows 上唯一"应用不在也能跑"�
   const record: WidgetDataRecord = {
     kind: 'today',
     data: { kind: 'today' },
+    placeholder: { kind: 'today', showPlaceholder: true },
     dayStr: '2026-09-27',
     validUntil: NOW,
     pushedAt: NOW - 1000,
