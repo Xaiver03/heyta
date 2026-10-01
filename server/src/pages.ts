@@ -21,6 +21,11 @@ interface MagicLoginQuery {
   lang?: string;
 }
 
+interface ResetPasswordQuery {
+  token?: string;
+  lang?: string;
+}
+
 /**
  * 成功的小对勾。
  *
@@ -234,6 +239,120 @@ export async function pageRoutes(fastify: FastifyInstance) {
           '<p class="status status--err" id="error" hidden></p>' +
           '<p class="status status--ok" id="success" hidden></p>',
         scripts: ['/magic-login-confirm.js'],
+      });
+
+      return reply
+        .type('text/html')
+        .send(page.replace('<body>', `<body ${bodyAttrs}>`));
+    },
+  );
+
+  /**
+   * 第四张凭据页：**用重置链接设一个新密码**。
+   *
+   * 🔴 GET **不消费令牌** —— 与另外三张同一条纪律（`/verify-email` 那次改的就是它）：
+   * 邮件客户端的链接预取会在用户点之前就把一枚一次性令牌烧掉。令牌什么时候被烧，
+   * 只由页内脚本那一次 `POST /api/password/reset` 决定。
+   *
+   * 🔴 成功后**不发登录态**（ADR-0040）。这一页的终点是登录页，不是自动进场：
+   * 能走完重置流程只证明他持有收件箱，而收件箱是可以被旁观的。
+   *
+   * 为什么这一页必须在**服务端**渲染而不是应用里的一个路由：
+   * 忘记密码的人手上什么会话都没有，`/app/` 那条门要先登录才进得去 ——
+   * 把重置表单放在需要登录的地方才真的是死循环。
+   */
+  fastify.get<{ Querystring: ResetPasswordQuery }>(
+    '/reset-password',
+    {
+      config: {
+        rateLimit: {
+          max: 50,
+          timeWindow: '15 minutes',
+        },
+      },
+    },
+    async (req, reply) => {
+      const locale = localeOf(req);
+      const { token } = req.query;
+      if (!token) {
+        return reply.status(400).type('text/html').send(
+          renderPage(locale, {
+            title: t(locale, 'server.page.reset.title'),
+            heading: t(locale, 'server.page.reset.heading'),
+            body: t(locale, 'server.page.tokenRequired'),
+          }),
+        );
+      }
+
+      // 🔴 状态文案经 `data-*` 下发（与另外三张同一理由：静态脚本取不到词条表，
+      //    自己写一份中文就等于让英文用户突然读到中文）。
+      const bodyAttrs = [
+        `data-token="${escapeHtml(token)}"`,
+        `data-msg-busy="${escapeHtml(t(locale, 'server.page.reset.busy'))}"`,
+        `data-msg-success="${escapeHtml(t(locale, 'server.page.reset.success'))}"`,
+        `data-msg-mismatch="${escapeHtml(t(locale, 'server.page.reset.mismatch'))}"`,
+        `data-msg-invalid-link="${escapeHtml(t(locale, 'server.page.reset.invalidLink'))}"`,
+        // 策略那四个码各自一句 —— "太短"和"已在泄露库里"是两件不同的事，
+        // 合成一句用户就不知道该改哪里。
+        `data-policy-too-short="${escapeHtml(t(locale, 'server.page.reset.tooShort'))}"`,
+        `data-policy-too-long="${escapeHtml(t(locale, 'server.page.reset.tooLong'))}"`,
+        `data-policy-too-common="${escapeHtml(t(locale, 'server.page.reset.tooCommon'))}"`,
+        `data-policy-breached="${escapeHtml(t(locale, 'server.page.reset.breached'))}"`,
+        `data-msg-locked="${escapeHtml(t(locale, 'server.page.reset.locked'))}"`,
+        `data-msg-unavailable="${escapeHtml(t(locale, 'server.page.reset.unavailable'))}"`,
+        `data-msg-unknown="${escapeHtml(t(locale, 'server.page.error.unknown'))}"`,
+        `data-label-reveal="${escapeHtml(t(locale, 'server.page.reset.reveal'))}"`,
+        `data-label-hide="${escapeHtml(t(locale, 'server.page.reset.hide'))}"`,
+      ].join(' ');
+
+      // 🔴 `autocomplete="new-password"`（两个框都是）**不能省，也不能写成 `on`**：
+      //    它告诉密码管理器"这里是**生成**一个新口令的地方"，于是它建议一个强口令
+      //    并把同一份填进两个框。写成 `on` 或留着不管，管理器会把**旧密码**填进来 ——
+      //    用户刚点的"忘记密码"当场变成"把泄露的那个密码再设一遍"。
+      //    这是这一页最常见的真实坑，值得比样式更多的字数。
+      // 🔴 **不加 `novalidate`**：空着提交由浏览器自己拦 —— 那句提示是浏览器给的、
+      //    跟着系统语言，不需要我们再造一个词条。脚本只管"两次输入不一致"这种
+      //    必须用我方文案的情形。
+      const formHtml = [
+        '<form id="reset-form">',
+        '<div class="field">',
+        `<label for="pw">${escapeHtml(t(locale, 'server.page.reset.newLabel'))}</label>`,
+        '<div class="input-row">',
+        // 长度上限**不在这里设**（没有 `maxlength`）：那是浏览器里的第二条规则，
+        // 而它按 UTF-16 计数 —— 含 emoji 的口令会被**静默截断**成另一个口令。
+        // 长度的唯一裁决者是服务端的策略（`too_long` 那句会照实显示）。
+        '<input class="input" id="pw" name="password" type="password" ' +
+          'autocomplete="new-password" required>',
+        `<button type="button" class="btn btn--ghost" id="reveal" aria-controls="pw pw2" aria-pressed="false">` +
+          `${escapeHtml(t(locale, 'server.page.reset.reveal'))}</button>`,
+        '</div>',
+        '</div>',
+        '<div class="field">',
+        `<label for="pw2">${escapeHtml(t(locale, 'server.page.reset.confirmLabel'))}</label>`,
+        '<input class="input" id="pw2" name="password_confirm" type="password" ' +
+          'autocomplete="new-password" required>',
+        '</div>',
+        '<p class="hint">' + escapeHtml(t(locale, 'server.page.reset.hint')) + '</p>',
+        '<button type="submit" class="btn btn--primary" id="resetBtn">' +
+          `${escapeHtml(t(locale, 'server.page.reset.button'))}</button>`,
+        '</form>',
+        // 错误与成功各占一行，脚本只改文本与 `hidden`（不重排 DOM，焦点不乱）。
+        '<p class="status status--err" id="error" role="alert" hidden></p>',
+        '<p class="status status--ok" id="success" role="status" hidden></p>',
+        // 🔴 成功后这一页不能是**死路**。脚本不自动跳转（ADR-0040：持有收件箱不等于
+        //    该拿到会话），但"下一步去哪儿"得由我们说清楚 —— 一个用户自己点的入口。
+        //    `/app/` 与 `magic-login-confirm.js` 跳的是同一个地址（同一个部署假设，
+        //    两处必须一起对，别在这里另造一套）。
+        '<a class="btn btn--primary" id="goLogin" href="/app/" hidden>' +
+          `${escapeHtml(t(locale, 'server.page.reset.goLogin'))}</a>`,
+      ].join('\n    ');
+
+      const page = renderPage(locale, {
+        title: t(locale, 'server.page.reset.title'),
+        heading: t(locale, 'server.page.reset.heading'),
+        body: t(locale, 'server.page.reset.body'),
+        formHtml,
+        scripts: ['/reset-password.js'],
       });
 
       return reply

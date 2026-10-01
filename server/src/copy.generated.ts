@@ -68,6 +68,26 @@ export type ServerCopyKey =
   | "server.page.recover.title"
   | "server.page.recover.verifying"
   | "server.page.recover.waiting"
+  | "server.page.reset.body"
+  | "server.page.reset.breached"
+  | "server.page.reset.busy"
+  | "server.page.reset.button"
+  | "server.page.reset.confirmLabel"
+  | "server.page.reset.goLogin"
+  | "server.page.reset.heading"
+  | "server.page.reset.hide"
+  | "server.page.reset.hint"
+  | "server.page.reset.invalidLink"
+  | "server.page.reset.locked"
+  | "server.page.reset.mismatch"
+  | "server.page.reset.newLabel"
+  | "server.page.reset.reveal"
+  | "server.page.reset.success"
+  | "server.page.reset.title"
+  | "server.page.reset.tooCommon"
+  | "server.page.reset.tooLong"
+  | "server.page.reset.tooShort"
+  | "server.page.reset.unavailable"
   | "server.page.tokenRequired"
   | "server.page.verify.action"
   | "server.page.verify.body"
@@ -134,6 +154,26 @@ export const SERVER_COPY: Record<ServerLocale, Record<ServerCopyKey, string>> = 
     "server.page.recover.title": "恢复通行密钥",
     "server.page.recover.verifying": "正在验证…",
     "server.page.recover.waiting": "请在系统弹窗中完成验证…",
+    "server.page.reset.body": "为你的账号设置一个新密码。设置成功后，其他设备上的登录都会失效，你需要用新密码重新登录。",
+    "server.page.reset.breached": "这个密码出现在已泄露的密码库里，请换一个。",
+    "server.page.reset.busy": "正在保存…",
+    "server.page.reset.button": "保存新密码",
+    "server.page.reset.confirmLabel": "再输一次新密码",
+    "server.page.reset.goLogin": "去登录",
+    "server.page.reset.heading": "设置新登录密码",
+    "server.page.reset.hide": "隐藏",
+    "server.page.reset.hint": "至少 8 个字符。用一句只有你记得住的话，比加符号更难猜。",
+    "server.page.reset.invalidLink": "这个链接无效、已过期，或者已经被用过了。请重新申请一封邮件。",
+    "server.page.reset.locked": "尝试次数太多了，请稍后再试。",
+    "server.page.reset.mismatch": "两次输入的密码不一致。",
+    "server.page.reset.newLabel": "新密码",
+    "server.page.reset.reveal": "显示",
+    "server.page.reset.success": "密码已重置。请用新密码登录。",
+    "server.page.reset.title": "设置新登录密码",
+    "server.page.reset.tooCommon": "这个密码太常见了，请换一个与你不相关的。",
+    "server.page.reset.tooLong": "密码太长了，最多 256 个字符。",
+    "server.page.reset.tooShort": "密码至少要有 8 个字符。",
+    "server.page.reset.unavailable": "服务器正忙，请稍后重试。",
     "server.page.tokenRequired": "链接不完整：缺少必要的令牌。",
     "server.page.verify.action": "返回并登录",
     "server.page.verify.body": "你的账号已经可以正常使用了。",
@@ -197,6 +237,26 @@ export const SERVER_COPY: Record<ServerLocale, Record<ServerCopyKey, string>> = 
     "server.page.recover.title": "Recover passkey",
     "server.page.recover.verifying": "Verifying…",
     "server.page.recover.waiting": "Complete the prompt from your system…",
+    "server.page.reset.body": "Choose a new password for your account. Once it’s set, every other device is signed out and you’ll sign in again with the new password.",
+    "server.page.reset.breached": "This password has appeared in a breach database. Please use a different one.",
+    "server.page.reset.busy": "Saving…",
+    "server.page.reset.button": "Save new password",
+    "server.page.reset.confirmLabel": "Re-enter new password",
+    "server.page.reset.goLogin": "Sign in",
+    "server.page.reset.heading": "Set a new sign-in password",
+    "server.page.reset.hide": "Hide",
+    "server.page.reset.hint": "At least 8 characters. A phrase only you would know beats symbols.",
+    "server.page.reset.invalidLink": "This link is invalid, expired, or has already been used. Request a new email.",
+    "server.page.reset.locked": "Too many attempts. Please try again later.",
+    "server.page.reset.mismatch": "The two passwords don’t match.",
+    "server.page.reset.newLabel": "New password",
+    "server.page.reset.reveal": "Show",
+    "server.page.reset.success": "Your password has been reset. Sign in with your new password.",
+    "server.page.reset.title": "Set a new sign-in password",
+    "server.page.reset.tooCommon": "That password is too common. Pick one unrelated to you.",
+    "server.page.reset.tooLong": "That password is too long — 256 characters at most.",
+    "server.page.reset.tooShort": "Use at least 8 characters.",
+    "server.page.reset.unavailable": "The server is busy right now. Please try again shortly.",
     "server.page.tokenRequired": "This link is incomplete: the required token is missing.",
     "server.page.verify.action": "Go back and sign in",
     "server.page.verify.body": "Your account is ready to use.",
