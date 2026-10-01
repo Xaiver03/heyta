@@ -154,3 +154,60 @@ test('最近 7 天：侧栏计数 == 点进去的行数，逾期那条不在里�
 
   expect(consoleErrors, '控制台不应有异常').toEqual([]);
 });
+
+/**
+ * 页头的排序档位（#10(d)）：**真浏览器里的取证**。
+ *
+ * 🔴 这条必须有图，jsdom 给不了：控件长在 `header.ht-header` 那条 flex 里，
+ * "标签文字有没有被压掉""下拉在暗色底上读不读得出来"都不是 DOM 断言能说的。
+ * 桌面壳（macOS / Windows）渲染的就是这份 `apps/web/dist`，所以这几张图
+ * 同时是**桌面端界面**的证据 —— 壳里那一次脚本化探针仍是登记着的缺口。
+ *
+ * 种的数据全部**不带截止日期**：三条落进同一个「无截止时间」组，
+ * 于是屏上的行序验的就是排序本身，不是分组。
+ */
+test('页头排序：换档位真的换行序，控件带可见标签', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto('/?lang=zh-CN');
+
+  const consoleErrors: string[] = [];
+  page.on('pageerror', (e) => consoleErrors.push(String(e)));
+
+  const composer = page.locator('input[placeholder^="添加任务"]');
+  for (const line of ['先记的第一条', '中间的第二条', '最后记的第三条']) {
+    await composer.fill(line);
+    await composer.press('Enter');
+  }
+
+  const sort = page.locator('[data-testid="task-sort"]');
+  await expect(sort, '有行时页头就该有排序控件').toBeVisible();
+  await expect(sort).toContainText('排序方式');
+  const select = page.locator('[data-testid="task-sort-select"]');
+  const rows = page.locator('[data-testid^="task-group-"] [role="checkbox"]');
+
+  const order = async (): Promise<string[]> =>
+    (await rows.evaluateAll((els) => els.map((e) => e.getAttribute('aria-label') ?? ''))) as string[];
+
+  await expect(page.locator('header.ht-header [data-testid="task-sort"]'), '控件必须长在页头里（滴答参照图第三列）').toBeVisible();
+  const byDefault = await order();
+  await page.screenshot({ path: SHOT('sort-default') });
+
+  await select.selectOption('addedAt');
+  const byAdded = await order();
+  expect(byAdded, '按添加时间 = 新的在前').toEqual([...byDefault].reverse());
+  expect(new Set([byDefault.join('|'), byAdded.join('|')]).size, '两档必须是两个顺序').toBe(2);
+  await page.screenshot({ path: SHOT('sort-addedAt') });
+
+  await select.selectOption('priority');
+  await page.screenshot({ path: SHOT('sort-priority') });
+
+  // 暗色：下拉的底色/边框/文字是否跟着 token 翻（AGENTS §5）。
+  await page.getByRole('button', { name: '切换到暗色主题' }).click();
+  await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
+  // ⚠️ 等动效落位再拍：主题切换带 duration token 的过渡，抢拍会把
+  // 行尾那些按钮拍成"灰底没文字"——那是探针的假象，不是界面的样子（e2e 探针陷阱）。
+  await page.waitForTimeout(600);
+  await page.screenshot({ path: SHOT('sort-dark') });
+
+  expect(consoleErrors, '控制台不应有异常').toEqual([]);
+});

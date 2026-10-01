@@ -315,6 +315,13 @@ export const en = {
   'web.shell.nav.quadrant': 'Quadrants',
   'web.shell.nav.project': 'List',
   'web.shell.nav.tag': 'Tag',
+  // Same discipline as zh: the options come from the domain's `TASK_SORT_KEYS`, and
+  // `display` says "Default" rather than "No sorting" - it does have rules
+  // (open first, due date ascending, undated last).
+  'web.shell.sort.aria': 'Sort order',
+  'web.shell.sort.display': 'Default (due date)',
+  'web.shell.sort.addedAt': 'Date added',
+  'web.shell.sort.priority': 'Priority',
   'web.shell.search.placeholder': 'Search tasks',
   'web.shell.search.aria': 'Search tasks (title and note)',
   'web.shell.search.clear': 'Clear search',

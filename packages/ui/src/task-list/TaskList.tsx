@@ -20,7 +20,7 @@
  *
  * | 共享组件负责（有判断、有测试） | 宿主负责（本地化、平台化） |
  * |---|---|
- * | 排序（未完成在前 / 截止升序 / 无截止垫底） | 截止文案（`t()`） |
+ * | 排序（按 `sort` 口径调领域的 `sortTasks`，判据不在本包） | 截止文案（`t()`） |
  * | `TaskRow` 派生（含 `completedAt` 存在性判断） | 优先级徽章文字与颜色 |
  * | 行骨架、勾选框尺寸与 44 触控区补偿 | 重复规则的句子 |
  * | 无障碍 role / state / busy | 无障碍**文案**（必须整句，见下） |
@@ -66,7 +66,7 @@
 import React, { useCallback, useMemo } from 'react';
 import { FlatList, StyleSheet, Text, View } from 'react-native';
 import { TASK_ROW_SHAPE } from '@heyta/design-system';
-import type { Task } from '@heyta/domain';
+import type { Task, TaskSortKey } from '@heyta/domain';
 import { useHeytaText, useHeytaTokens } from '../theme.js';
 import type { TaskRowDensity } from './density.js';
 import { TaskRow, type TaskRowLabels } from './TaskRow.js';
@@ -146,6 +146,14 @@ interface TaskListSharedProps {
    * 只有"所有成员都有"的属性才可见 —— 放在分支上会让解构直接编译不过。
    */
   readonly keepEmptySections?: boolean;
+  /**
+   * 排序口径，默认 `display`。**只在平铺形态生效** —— 分节形态的组内顺序
+   * 属于宿主语义（见 `model.ts` 的 `flattenSections`：它刻意不重排）。
+   * 和上面 `keepEmptySections` 同样挂在共有属性上，理由就是那条解构规则。
+   *
+   * ⚠️ 判据不在这里，在 `@heyta/domain` 的 `sortTasks`。本包只透传。
+   */
+  readonly sort?: TaskSortKey;
 }
 
 /** 平铺形态：一批任务，**共享层负责排序**。 */
@@ -179,6 +187,7 @@ export type TaskListProps<TMeta = undefined> =
 
 export function TaskList<TMeta = undefined>({
   tasks,
+  sort,
   sections,
   renderSectionHeader,
   keepEmptySections,
@@ -212,12 +221,12 @@ export function TaskList<TMeta = undefined>({
     if (sections !== undefined) {
       return flattenSections(sections, { fallbackTitle, keepEmpty: keepEmptySections === true });
     }
-    return toTaskRows(tasks ?? [], { fallbackTitle }).map((row) => ({
+    return toTaskRows(tasks ?? [], { fallbackTitle, sort }).map((row) => ({
       kind: 'task' as const,
       key: row.id,
       row,
     }));
-  }, [tasks, sections, fallbackTitle, keepEmptySections]);
+  }, [tasks, sort, sections, fallbackTitle, keepEmptySections]);
 
   const styles = useMemo(
     () =>

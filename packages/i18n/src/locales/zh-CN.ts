@@ -344,6 +344,19 @@ export const zhCN = {
   'web.shell.nav.quadrant': '四象限',
   'web.shell.nav.project': '清单',
   'web.shell.nav.tag': '标签',
+  /**
+   * 任务列表的排序口径。档位名与领域的 `TASK_SORT_KEYS` 一一对应
+   * （`apps/web/src/App.tsx` 的 `SORT_LABEL: Record<TaskSortKey, MessageKey>` 是
+   * 穷尽映射：加一档却没有这条词条 ⇒ 那边编译报错，而不是界面上少一个选项）。
+   *
+   * ⚠️ `display` 不叫「无排序」而叫「默认（按截止时间）」：这一档**是有规则的**
+   * （未完成在前 + 截止升序 + 无截止垫底），说"不排序"会让人以为另外两档是
+   * "把顺序弄乱了"。
+   */
+  'web.shell.sort.aria': '排序方式',
+  'web.shell.sort.display': '默认（按截止时间）',
+  'web.shell.sort.addedAt': '按添加时间',
+  'web.shell.sort.priority': '按优先级',
   'web.shell.search.placeholder': '搜索任务',
   'web.shell.search.aria': '搜索任务（标题与备注）',
   'web.shell.search.clear': '清除搜索',

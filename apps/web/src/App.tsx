@@ -47,8 +47,10 @@ import {
   suppressedPreferenceIds,
   toLocalDate,
   filterTasks,
+  TASK_SORT_KEYS,
   type MemoryOp,
   type TaskDateGroup,
+  type TaskSortKey,
 } from '@heyta/domain';
 
 /**
@@ -88,6 +90,7 @@ import {
 } from './features/tasks/store.js';
 import { DueBadge, type DueDisplayMode } from './features/tasks/DueBadge.js';
 import { loadDueDisplay, saveDueDisplay } from './features/tasks/due-display-pref.js';
+import { loadTaskSort, saveTaskSort } from './features/tasks/sort-pref.js';
 import { TaskOrganizer } from './features/tasks/TaskOrganizer.js';
 import { taskGroupKey, taskGroupTitle } from './features/tasks/date-groups.js';
 import { TaskRepeat } from './features/tasks/TaskRepeat.js';
@@ -428,6 +431,20 @@ const VIEW_TITLED_BY_TAB: readonly ViewKey[] = [
 ];
 
 /**
+ * 排序档位 → 词条键。
+ *
+ * 🔴 用 `Record<TaskSortKey, MessageKey>` 而不是一个 `Map`：加一档却没给文案时
+ * **编译期就报错**。词条键拼错也一样 —— `t()` 的入参是 `MessageKey`。
+ * 档位本身来自领域的 `TASK_SORT_KEYS`，这里**不重列一遍选项**（否则界面上
+ * 少一档，而那个键永远排不出序，两头都不报错）。
+ */
+const SORT_LABEL: Record<TaskSortKey, MessageKey> = {
+  display: 'web.shell.sort.display',
+  addedAt: 'web.shell.sort.addedAt',
+  priority: 'web.shell.sort.priority',
+};
+
+/**
  * rail 现在是**纯图标**，名字靠 hover / 键盘聚焦时的一条标签显示（`.ht-rail__label`）。
  * 那条标签是 `position: fixed` 的 —— rail 是 `overflow-y: auto` 的裁剪容器，
  * `absolute` 会被切掉右侧（铃铛面板与头像菜单都为此改成 fixed，见 `app.css`）。
@@ -575,6 +592,19 @@ export function App(): React.JSX.Element {
       else next.add(key);
       return next;
     });
+  }, []);
+
+  /**
+   * 任务列表的**排序口径**（设备本地，见 `features/tasks/sort-pref.ts`）。
+   *
+   * 🔴 这里只存**选哪一档**，不存"怎么排"：判据全在领域的 `sortTasks`，
+   * `TaskList` 把它透传给共享层。壳自己写一条比较函数就是第二套裁决标准
+   * —— mobile 与 web 会排出两个不同的顺序（AGENTS §3.5）。
+   */
+  const [taskSort, setTaskSort] = useState<TaskSortKey>(loadTaskSort);
+  const changeTaskSort = useCallback((next: TaskSortKey) => {
+    setTaskSort(next);
+    saveTaskSort(next);
   }, []);
 
   /**
@@ -1839,6 +1869,61 @@ export function App(): React.JSX.Element {
             **不要把它搬回来。**
           */}
           <div className="ht-header__actions">
+            {/*
+              🔴 排序档位（2026-10-01，#10(d)）。位置按滴答参照图：**页头右端**
+              （页头 = 标题 + 排序 + ⋯），不是列表上方另起一条 —— 列表上方那条
+              会把第一组组头往下推，而组头本身就是这一列的分区标。
+
+              带**可见的文字标签**，不是光秃秃一个下拉：页头上裸 chip 的教训还记在
+              下面「显示偏好」那一段（2026-09-30 产品负责人："用户根本不知道它们
+              是什么"）—— 说不清自己作用范围的控件，加了等于没加。
+
+              选项来自领域的 `TASK_SORT_KEYS`（判据也在那里），这里只渲染、只转交选择；
+              排序**不进 op-log**（§3.4：那是阅读偏好，不是一个用户意图），
+              落盘走设备本地存储（`features/tasks/sort-pref.ts`），刷新后仍在、
+              另一台设备各按各的。
+            */}
+            {contentView === 'tasks' && visible.length > 0 && (
+              <label
+                data-testid="task-sort"
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: cssVar('space.2'),
+                  fontSize: cssVar('font-size.xs'),
+                  color: cssVar('color.foreground-muted'),
+                }}
+              >
+                {t('web.shell.sort.aria')}
+                <select
+                  data-testid="task-sort-select"
+                  aria-label={t('web.shell.sort.aria')}
+                  value={taskSort}
+                  onChange={(event) => {
+                    changeTaskSort(event.target.value as TaskSortKey);
+                  }}
+                  style={{
+                    // 🔴 原生 `<select>` 而不是自制下拉：与 `SubtaskPicker`、
+                    // `TaskOrganizer` 一致，而且暗色下不用自己重画弹层。
+                    minHeight: cssVar('touch-target.min'),
+                    paddingInline: cssVar('space.2'),
+                    borderRadius: cssVar('radius.md'),
+                    borderWidth: cssVar('border-width.thin'),
+                    borderStyle: 'solid',
+                    borderColor: cssVar('color.border'),
+                    background: cssVar('color.background'),
+                    color: cssVar('color.foreground'),
+                    fontSize: cssVar('font-size.sm'),
+                  }}
+                >
+                  {TASK_SORT_KEYS.map((key) => (
+                    <option key={key} value={key}>
+                      {t(SORT_LABEL[key])}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            )}
             {/* 截止时间呈现方式开关。
                 只在任务视图里有意义 —— 其他视图不显示截止时间。
                 🔴 它是**开关**而不是固定行为：倒计时是待验证的 UI 假设，
@@ -2022,6 +2107,7 @@ export function App(): React.JSX.Element {
             <HeytaUiProvider>
               <TaskList
                 tasks={visible}
+                sort={taskSort}
                 onToggleTask={(taskId) => {
                   void store.toggleComplete(taskId);
                 }}
@@ -2085,6 +2171,7 @@ export function App(): React.JSX.Element {
                       {!collapsedGroups.has(key) && (
                         <TaskList
                           tasks={group.tasks}
+                          sort={taskSort}
                           onToggleTask={(taskId) => {
                             void store.toggleComplete(taskId);
                           }}
