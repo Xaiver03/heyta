@@ -13,27 +13,30 @@ import { installMissingProducerShims } from './shims';
  *
  * - 11 个标签与顺序：`apps/web/src/App.tsx` 的 `VIEW_TABS`
  * - 哪 7 个视图的居中标题 === 标签：同文件的 `VIEW_TITLED_BY_TAB`
- * - 进度卡的可见范围：同文件的 `{contentView === 'tasks' && <TodayProgressBanner />}`
  * - 周复盘 / 年度视图 / 中性差值：`apps/web/src/features/motivation/GrowthView.tsx`
- * - `[data-testid="today-progress"]`：共享 `packages/ui/src/motivation/TodayProgressCard.tsx`
- *   的 `testID`，由宿主 `TodayProgressBanner.tsx:45` 注入
  *
- * ## 🔴 为什么进度卡的可见范围值得一条用例
+ * ## 🔴 为什么这里还留着一条"进度卡不许出现"
  *
- * 这条判据在一天之内**换过一次方向**，而两次都是刻意的：
+ * `[data-testid="today-progress"]` 曾经是宿主 `TodayProgressBanner.tsx:45` 注入的，
+ * 2026-10-01 产品负责人看图后拍板**彻底删除**（台账 R6）。
+ *
+ * 这个判据在一天之内换过三次方向，全部是刻意的，所以值得留一行账：
  *
  * - 09-29 的方案：常驻「做事」的视图，但**故意**排除成长页 —— 那一页讲的是更长尺度，
  *   再顶一条"今天 3/5"会把"历史"重新压回"今天"，恰好抵消那个页面存在的意义。
  * - 09-30 拍板（commit `02fef9a7`）：**只在任务视图**。理由更硬 ——
- *   "0/0 今天还没有安排"出现在日历/习惯/番茄钟/便签上是纯噪音；
- *   "跨视图的同一件事"只说明它不该长四份，不说明它该到处出现。
+ *   "0/0 今天还没有安排"出现在日历/习惯/番茄钟/便签上是纯噪音。
+ * - 10-01 拍板：**任务视图也没有**。前两次都在缩小它，第三次发现缩不动了 ——
+ *   问题不是"出现在哪几屏"，是"它是一屏的开头有一块不属于任务的板"。
+ *   对照滴答清单：今日完成数**从来不是一个面板**，而是侧栏每行右侧的计数、
+ *   分组头的计数、行右侧的元信息这三个位置。
  *
- * 值得钉住的从来不是**哪一个**范围，而是"某处故意不显示"这个形状本身：
- * **它最容易被后来的一次重构抹掉，而抹掉之后什么都不报错。**
+ * ⚠️ 判据**不跟着组件一起删**，是因为这个形状被抹掉时什么都不报错：
+ * 前两次改版它就红过一次（那次是产品对、契约过期）。把期望改成 0 之后，
+ * 谁把它加回做事视图，这条会立刻指出来。
  *
- * ⚠️ 这条用例正是那次改版的报警器 —— 它红了，产品是对的、契约过期了。
- * 但它在 `pnpm check` 的主路径上**跑不到**（e2e 要单独 `check:ai-e2e`），
- * 所以它红了约一天没人发现。**红了要读，不要先想"把它改绿"。**
+ * ⚠️ 共享的 `TodayProgressCard` 本身**还在**（成长页 `GrowthBoard` 的 `showToday` 段
+ * 仍在渲染它，只是不带 testID）。这里判的是"做事视图不许有它"，不是"这个组件不存在"。
  */
 
 // ⚠️ 这张表的**顺序**必须与 `apps/web/src/App.tsx` 的 `VIEW_TABS` 逐字一致。
@@ -53,24 +56,42 @@ type Tab = (typeof TABS)[number];
 /** 居中标题 === 标签本身的视图（其余视图的标题是清单/筛选名） */
 const TITLED = ['习惯', '番茄钟', '时间线', '成长', '便签', '回收站', '设置'] as const satisfies readonly Tab[];
 
-/** 今日进度卡应当出现的视图 —— 2026-09-30 起**只有任务**（`App.tsx` 的 `contentView === 'tasks'`）。 */
-const CARD_ON: readonly Tab[] = ['任务'];
+/**
+ * 今日进度卡应当出现的视图 —— **2026-10-01 起为空**（R6：产品负责人拍板彻底删除，
+ * 见文件头那段"换过三次方向"的账）。
+ *
+ * 🔴 这张表**不删**：判据的形状是"算出来的"，加新视图的人只改 `TABS` 就会自动
+ * 落进"不许有卡"那一侧。反过来，想让某个视图有卡必须显式往这里加一行 ——
+ * 那就是一次看得见的改契约，而不是一次静默的重构。
+ */
+const CARD_ON: readonly Tab[] = [];
 
 /**
  * 两个**浮层**：设置与搜索不换内容区（`contentView` 让下层视图继续透出），
  * 所以"这一屏有没有进度卡"取决于**从哪个视图打开的** —— 不能当普通视图断。
- * 下面单独一条用例按"下层不是任务"判它们。
+ *
+ * 🔴 它们**也不能混进下面那条普通视图循环**（2026-10-01 实测）：浮层开着的时候
+ * 会盖住 rail，Playwright 的 `locator.click()` 会一直卡在
+ * "waiting for element to be visible, enabled and stable / … intercepts pointer events"
+ * 直到 90s 超时 —— 症状长得像"下一个视图打不开"，而真原因是**上一轮的浮层没收掉**。
+ * 所以它们单独一条循环，并且**每轮用 Esc 关掉再走下一轮**（见下面那条用例）。
+ *
+ * `surface` 是各浮层自己的根 testID，那条循环用它做**正向对照**。
  */
-const OVERLAYS: readonly Tab[] = ['设置', '搜索'];
+const OVERLAYS = [
+  { tab: '设置', surface: 'settings-sheet' },
+  { tab: '搜索', surface: 'search-overlay-surface' },
+] as const satisfies readonly { tab: Tab; surface: string }[];
 
 /**
  * 不该出现进度卡的视图 = 全部 − 有卡的 − 浮层，**算出来**而不是手抄。
- * 🔴 手抄那份正是这次失效的方式：加视图的人只改了 `TABS`，新视图两边都没进，
+ * 🔴 手抄那份正是它失效的方式：加视图的人只改了 `TABS`，新视图两边都没进，
  * 于是它**静默地不受任何判据约束**。算出来的话，新视图默认落进"不该有卡"这一侧，
  * 想让它有卡必须显式动 `CARD_ON` —— 那就是一次有意的改契约。
  */
+const OVERLAY_TABS: Tab[] = OVERLAYS.map((overlay) => overlay.tab);
 const CARD_OFF: readonly Tab[] = TABS.filter(
-  (tab) => !CARD_ON.includes(tab) && !OVERLAYS.includes(tab),
+  (tab) => !CARD_ON.includes(tab) && !OVERLAY_TABS.includes(tab),
 );
 
 /**
@@ -143,42 +164,59 @@ test.describe('激励体系：真浏览器契约', () => {
     }
   });
 
-  test('🔴 今日进度卡只在任务视图；其余视图（含两个浮层）都没有', async ({ page }) => {
+  test('🔴 今日进度卡在任何视图都不出现（2026-10-01 拍板删除，R6）', async ({ page }) => {
     await openApp(page);
     /**
-     * 🔴 选择器**必须是共享组件的 testID**，不能再用 `section.ht-today`。
+     * 🔴 先钉**表本身**：`CARD_ON` 必须为空。
+     * 这条断言不看界面，看的是"这个决定还成立吗"—— 有人想往回加一张卡，
+     * 必须先让这一行红一次，而不是悄悄把 '任务' 塞回数组里让下面的循环放行。
+     */
+    expect(CARD_ON, '做事视图的进度卡已删除；要恢复请先读文件头那三次转向').toHaveLength(0);
+
+    /**
+     * 选择器**必须是共享组件的 testID**，不能再用 `section.ht-today`。
      *
      * `.ht-today` 是 web 手写的 CSS 类，随 M3 motivation 换装**已被删除**。
-     * 现在渲染它的是共享 `TodayProgressCard`（RN `View` → `<div>`，**不是 `<section>`**），
-     * testID 由宿主注入：`TodayProgressBanner.tsx:45` 的 `testID="today-progress"`。
+     * 注入 testID 的那个宿主接线（`TodayProgressBanner.tsx`）也随 R6 删除了 ——
+     * 也就是说这个选择器现在**在任何视图都不该命中**。
      *
      * ⚠️ 教训：**换装共享组件时，e2e 里按 web 手写类名定位的断言会静默过期**
      * —— 单测与静态门禁都发现不了，只有真浏览器 e2e 会红。
      */
     const card = page.locator('[data-testid="today-progress"]');
 
-    for (const tab of CARD_ON) {
-      await switchView(page, tab);
-      await expect(card, `${tab} 应当显示今日进度卡`).toHaveCount(1);
-    }
     for (const tab of CARD_OFF) {
       await switchView(page, tab);
       await expect(card, `${tab} 不该显示今日进度卡`).toHaveCount(0);
     }
 
     /**
-     * 🔴 浮层必须**先站到一个非任务视图上**再打开，否则这条断言测的是
-     * "上一个视图是什么"而不是"设置页/搜索浮层本身"。
-     * 顺序依赖是这里最容易写错的地方：从任务页直接开设置，
-     * 下层透出的**就是任务页**，卡当然在 —— 那既不是 bug 也不是契约。
-     *（反向那半 —— 下层视图必须继续透出 —— 由 `settings-exit.spec.ts` 钉。）
+     * 浮层单独再走一遍，判的是**顺序**而不是结果：下层视图会透出，
+     * 所以必须先站到一个别的视图上再打开浮层，否则这条测的是
+     * "上一个视图是什么"。（反向那半 —— 下层视图必须继续透出 —— 由
+     * `settings-exit.spec.ts` 钉。）
+     *
+     * 🔴 每轮先断言**浮层真的开了**（`overlay.surface`）再断"没有卡"：
+     * 浮层没开时"卡数量是 0"会一样成立，那条判据就是在空转（§7 元规则二）。
+     * 关掉走真实退出口（Esc，`App.tsx:1553` 的捕获阶段监听），并断言真的收了 ——
+     * 不收就会把上一轮的浮层带进下一轮，撞上 `OVERLAYS` 注释里那条超时。
      */
     for (const overlay of OVERLAYS) {
       await switchView(page, '日历');
-      await switchView(page, overlay);
+      await switchView(page, overlay.tab);
+      const surface = page.getByTestId(overlay.surface);
+      await expect(
+        surface,
+        `${overlay.tab} 浮层要真的打开，否则下面那句"没有卡"是在空转`,
+      ).toBeVisible();
       await expect(
         card,
-        `${overlay} 是浮层，下层是日历时不该有今日进度卡`,
+        `${overlay.tab} 是浮层，下层透出时也不该有今日进度卡`,
+      ).toHaveCount(0);
+      await page.keyboard.press('Escape');
+      await expect(
+        surface,
+        `${overlay.tab} 必须收掉，否则下一轮点 rail 会被它拦住（实测超时形状）`,
       ).toHaveCount(0);
     }
   });
@@ -213,9 +251,14 @@ test.describe('激励体系：真浏览器契约', () => {
    *
    * ⚠️ 番茄钟用共享 `FocusPanel` **内层**的 `focus-ring`：`FocusTimer` 没给根节点
    * 传 testID，而那一圈是计时器本体的结构标记，比外层容器更精确。
+   *
+   * 🔴 任务的锚点**换过**：原先是 `today-progress`（那张常驻进度卡恰好是这一屏
+   * 唯一无条件渲染的面）。2026-10-01 那张卡删掉之后，如果这里还指着它，
+   * 这条白屏检测会**跟着组件一起消失**而没人注意到 —— 现在指向任务面板本体
+   * `task-list`（空 inbox 时它是包着空态的那层容器，见 `App.tsx` 的 R6 注释）。
    */
   const VIEW_ANCHOR: Record<Tab, string> = {
-    任务: 'today-progress',
+    任务: 'task-list',
     日历: 'calendar-board',
     四象限: 'quadrant-board',
     习惯: 'habit-board',

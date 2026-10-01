@@ -168,6 +168,23 @@ export async function openSettingsView(page: Page): Promise<void> {
   await expect(page.locator('.ht-header__title').first()).toHaveText('设置');
 }
 
+/**
+ * 收掉**当前开着**的整屏浮层（搜索 scrim / 设置 sheet），若没开就什么都不做。
+ *
+ * 判据来自 `apps/web/src/App.tsx:1553`：Esc 在**捕获阶段**监听，是浮层的真实退出口
+ * （搜索 scrim 的 `onClick` 也关，但按 Esc 不依赖坐标命中，最稳）。
+ * ⚠️ 只对**真的开着**的那个浮层按 —— 在普通视图里凭空发一个 Esc 会去触发
+ * 别的键位处理（见上面注释里"别在普通视图里凭空发一个 Esc"）。
+ */
+async function dismissFullBleedOverlay(page: Page): Promise<void> {
+  for (const testId of ['search-overlay-surface', 'settings-sheet']) {
+    if (await page.getByTestId(testId).isVisible().catch(() => false)) {
+      await page.keyboard.press('Escape');
+      await expect(page.getByTestId(testId)).toHaveCount(0);
+    }
+  }
+}
+
 export async function switchView(
   page: Page,
   /**
@@ -201,9 +218,24 @@ export async function switchView(
 ): Promise<void> {
   // 「设置」不在 tablist 里（见 `openSettingsView`）。
   if (label === '设置') {
+    await dismissFullBleedOverlay(page);
     await openSettingsView(page);
     return;
   }
+  /**
+   * 🔴 切视图**前**先收掉可能盖住 rail 的整屏浮层（2026-10-01 补）。
+   *
+   * `bcb68354` 把搜索 scrim 从 `absolute`（只盖内容区）改成 `position: fixed; inset: 0`
+   * （整屏，为修"⌘K 把页面弹回顶部"）。副作用：**rail 也在 scrim 底下**，于是
+   * `motivation.spec.ts` 那两条"走一遍全部视图"的循环，一旦轮到「搜索」把浮层打开，
+   * 下一次 `getByRole('tab').click()` 就命中 scrim 而不是 tab —— 症状是 Playwright
+   * 卡在 "…intercepts pointer events" 直到 90s 超时，长得像"下一个视图打不开"。
+   *
+   * 真实用户不会这样导航：他要么点 scrim（关浮层）要么按 Esc，**再**去点别的视图。
+   * 所以这里按 Esc 收掉浮层是**还原人的操作顺序**，不是绕过产品缺陷。
+   * 只在这两个整屏浮层真的开着时才按 —— 别在普通视图里凭空发一个 Esc。
+   */
+  await dismissFullBleedOverlay(page);
   await page.getByRole('tab', { name: label }).click();
 }
 
