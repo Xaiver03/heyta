@@ -152,9 +152,13 @@ export const checkPasswordBreached = async (
   for (const line of body.split('\n')) {
     const colon = line.indexOf(':');
     if (colon < 0) continue;
-    if (line.slice(0, colon).trim() === suffix) {
-      return { breached: true, delivered: true };
-    }
+    if (line.slice(0, colon).trim() !== suffix) continue;
+    // 🔴 **次数要读**。因为我们发了 `Add-Padding: true`，应答里必然混着 `:0` 的填充行
+    // —— 那 0 是接口在说"这条没出现过"。只比 suffix 不看次数，就等于拿一个填充行
+    // 把好口令判成已泄露，症状是"我的口令明明没人用过却被拒"，事后极难归因。
+    const count = Number.parseInt(line.slice(colon + 1).trim(), 10);
+    if (!Number.isFinite(count) || count <= 0) continue;
+    return { breached: true, delivered: true };
   }
   return { breached: false, delivered: true };
 };
