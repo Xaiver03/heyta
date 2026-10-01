@@ -96,7 +96,7 @@ export const HOSTED_AUTH_PATHS = {
 
   // ── 邮箱 + 口令（W5）──────────────────────────────────────
   //
-  // 🔴 这五条**不写字符串**，而是 `'/api'` + `@heyta/shared-schema` 里的相对形状。
+  // 🔴 这几条**不写字符串**，而是 `'/api'` + `@heyta/shared-schema` 里的相对形状。
   // 理由就是那份契约存在的理由：服务端注册的字符串与客户端请求的字符串一旦分家，
   // 症状是 404，而 404 在这里归成 `request-rejected` —— 用户看到的是一句
   // "登录没有完成"，没有人会想到"两端各写了一遍路径"。
@@ -105,6 +105,8 @@ export const HOSTED_AUTH_PATHS = {
   passwordForgot: `/api${AUTH_PASSWORD_PATHS.forgot}`,
   passwordReset: `/api${AUTH_PASSWORD_PATHS.reset}`,
   passwordChange: `/api${AUTH_PASSWORD_PATHS.change}`,
+  /** 已登录**加上第一个**口令（与 `passwordChange` 不是一条路，见共享契约）。 */
+  passwordSet: `/api${AUTH_PASSWORD_PATHS.set}`,
 } as const;
 
 /**
@@ -294,10 +296,23 @@ export type HostedAuthFailureReason =
    * 这个账号**从来没设过口令**（400 + `code: 'no_password_set'`，只出现在已认证的改密）。
    *
    * 🔴 与 `invalid-reset-link` 分开不是为了措辞，是因为两条的 CTA **相反**：
-   * 那条要他"重新点一次链接"，这条要他"去走「忘记密码」把口令设上"。
+   * 那条要他"重新点一次链接"，这条要他"去走「设置登录密码」把口令设上"
+   * （`/password/set` —— 见 {@link setInitialPassword}）。
    * 共用一个码就意味着在一半人面前说错话。
+   *
+   * ⚠️ 旧版本这里写的是"去走「忘记密码」" —— 那是一句**做不到的指引**：
+   * `requestPasswordReset` 对没有口令认证器的账号根本不发信。
    */
   | 'no-password-set'
+  /**
+   * 这个账号**已经有**登录口令（400 + `code: 'password_already_set'`，
+   * 只出现在已认证的"设第一个口令"）。
+   *
+   * 🔴 与上一条互为反面，而界面上摆的是两张不同的表单：一条是"设一个密码"
+   * （单字段），一条是"当前密码 + 新密码"。合并成"这条路不许走"就等于把用户
+   * 引到他走不通的那张表上。
+   */
+  | 'password-already-set'
   /**
    * 新口令不满足策略（400 + `code: 'password_policy_violation'`）。
    *
@@ -447,7 +462,7 @@ function readRetryAfter(headers: Headers | undefined): number | undefined {
  * 悄悄把它当成某一种已知失败 —— 它会退回按状态码分类（最保守的结论），
  * 而不是猜一个可能错的动作。
  *
- * ⚠️ 服务端那七个口令码**每一个都在这里有一行**。这条"一一对应"由
+ * ⚠️ 服务端那些口令码**每一个都在这里有一行**。这条"一一对应"由
  * `packages/app-host/tests/hosted-password-auth.spec.ts` 对着
  * `PASSWORD_AUTH_ERROR_CODES`（共享契约）逐项检查 —— 少一行不会有任何类型错误，
  * 症状只是"一种本来能说清的失败变成了一句笼统的话"，而那正是最难被发现的回归。
@@ -472,7 +487,7 @@ export const FAILURE_REASON_BY_SERVER_CODE: Readonly<Record<string, HostedAuthFa
   // 也是一句正确但没用的话；用户需要知道"最多 60 字"。
   passkey_name_too_long: 'passkey-name-too-long',
 
-  // ── 邮箱 + 口令那条路的七个码（与共享契约一一对应）──────────
+  // ── 邮箱 + 口令那条路的八个码（与共享契约一一对应）──────────
   invalid_credentials: 'invalid-credentials',
   email_not_verified: 'email-not-verified',
   // 🔴 429 在这个码上**不是**"你发得太猛"。状态码分类会给 `rate-limited`，
@@ -485,6 +500,8 @@ export const FAILURE_REASON_BY_SERVER_CODE: Readonly<Record<string, HostedAuthFa
   password_policy_violation: 'password-policy',
   invalid_reset_link: 'invalid-reset-link',
   no_password_set: 'no-password-set',
+  // "设第一个口令"打在已有口令的账号上 ⇒ 该走改密。与上一条相反，两张不同的表单。
+  password_already_set: 'password-already-set',
 };
 
 /** 由服务端 `code` 与 HTTP 状态共同决定原因；只有白名单里的码会覆盖状态分类。 */
@@ -1313,4 +1330,42 @@ export async function changePassword(
   const session = parseSession(result.body);
   if (session === undefined) return failure('malformed-response');
   return { ok: true, session };
+}
+
+/**
+ * 已登录**给账号加上第一个口令**（纯通行密钥 / 魔法链接注册的账号）。
+ *
+ * 🔴 成功时**只有一句"设好了"**，没有会话：这条不 bump `tokenVersion`，
+ * 手上那枚仍然有效。把它写成返回会话的形状会造出一个更糟的对称错误 ——
+ * 调用方以为要换令牌，于是把界面上正在用的令牌换成一枚服务端没发过的，
+ * 下一次同步 401。（`changePassword` 必须换，两条路的差别正在这里。）
+ *
+ * 为什么要有这条而不是"去走忘记密码"：`requestPasswordReset` 对**没有口令认证器**
+ * 的账号刻意不发信（反枚举），所以对这类账号那是死路。少了这条路由，
+ * 设置页里"设一个登录密码"那句话就是一句指向不存在的路的谎话。
+ *
+ * 本地只检查空串（省一次没必要的往返），强度归服务端裁决并给 `policyCode` ——
+ * 与 `changePassword` 同一条纪律。
+ */
+export async function setInitialPassword(
+  options: HostedAuthOptions,
+  token: string,
+  input: { newPassword: string },
+): Promise<HostedAuthOutcome<{ message: string }>> {
+  const trimmedToken = token.trim();
+  if (trimmedToken === '') return failure('unauthorized');
+  if (input.newPassword === '') return failure('invalid-input');
+
+  const result = await sendJson(
+    options,
+    'POST',
+    HOSTED_AUTH_PATHS.passwordSet,
+    {
+      newPassword: input.newPassword,
+      ...(options.locale === undefined ? {} : { locale: options.locale }),
+    },
+    trimmedToken,
+  );
+  if (!result.ok) return result;
+  return { ok: true, message: readServerMessage(result.body) ?? '' };
 }

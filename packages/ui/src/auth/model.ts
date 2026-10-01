@@ -36,8 +36,14 @@
 /**
  * 已知认证失败原因 → 共用词条 key。
  *
- * ⚠️ 这个联合**必须与下面的 `switch` 保持一一对应** —— 少了哪一条，
- * `authFailureMessageKey` 的穷尽性检查会在编译期报错。
+ * ⚠️ 这个联合与下面的 `switch` 要**一一对应**，但编译器**只盯得住一个方向**：
+ * `switch` 返回了一个联合里没有的 key ⇒ 编译不过；反过来（联合里有一条、
+ * `switch` 从不返回它，或某个 reason 掉进 `default` 的 `unknown`）**不会报错**。
+ *
+ * 🔴 所以穷尽性靠的是 `packages/ui/tests/auth-model.spec.ts` 那张**原因快照表**：
+ * 它逐个断言"每一条已知原因落到具体的那一条，不是 `unknown`"。
+ * 原来这里写的是"穷尽性检查会在编译期报错" —— 那句是错的（2026-10-01 核过：
+ * 函数有 `default`，编译期根本不可能不穷尽）。
  */
 export type AuthFailureMessageKey =
   | 'common.auth.error.unconfigured'
@@ -62,6 +68,8 @@ export type AuthFailureMessageKey =
   | 'common.auth.error.passwordBackendBusy'
   | 'common.auth.error.invalidResetLink'
   | 'common.auth.error.noPasswordSet'
+  /** 账号**已有**口令 ⇒ 走「修改密码」，不是「设置登录密码」。与上一条相反。 */
+  | 'common.auth.error.passwordAlreadySet'
   | 'common.auth.error.passwordPolicy'
   | 'common.auth.error.unknown';
 
@@ -144,9 +152,14 @@ export function authFailureMessageKey(
     // 动作是"回去重新申请一封"，不是"重新认证一次"（后者会重放用过的链接）。
     case 'invalid-reset-link':
       return 'common.auth.error.invalidResetLink';
-    // CTA 与上一条**相反**：这条要去走「忘记密码」，而不是再点一次链接。
+    // CTA 与上一条**相反**：这条是"这个账号还没有口令，去设一个"，
+    // 那条是"回去重新点一次链接"。🔴 不许写成"去走忘记密码" —— 那条路对
+    // 没有口令认证器的账号**刻意不发信**，照做只会得到一个"没收到邮件"。
     case 'no-password-set':
       return 'common.auth.error.noPasswordSet';
+    // 与上一条互为反面：这个账号**已经有**口令 ⇒ 该走"修改密码"（两张不同表单）。
+    case 'password-already-set':
+      return 'common.auth.error.passwordAlreadySet';
     // 具体哪一条由 `passwordPolicyMessageKey` 给；这里只兜"服务端没给 policyCode"。
     case 'password-policy':
       return 'common.auth.error.passwordPolicy';

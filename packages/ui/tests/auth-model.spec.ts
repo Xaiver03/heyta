@@ -86,13 +86,15 @@ const ALL_REASONS = [
   'passkey-rejected',
   'last-passkey',
   'passkey-name-too-long',
-  // 邮箱 + 口令这一条路（ADR-0040）带来的七条。
+  // 邮箱 + 口令这一条路（ADR-0040）带来的八条。
   'invalid-credentials',
   'email-not-verified',
   'password-locked',
   'password-backend-busy',
   'invalid-reset-link',
   'no-password-set',
+  // 与上一条互为反面（账号**已经有**口令 ⇒ 该摆"修改密码"那张表）。
+  'password-already-set',
   'password-policy',
 ] as const;
 
@@ -123,6 +125,7 @@ describe('authFailureMessageKey —— 原因 → 词条 key', () => {
       'password-backend-busy': 'common.auth.error.passwordBackendBusy',
       'invalid-reset-link': 'common.auth.error.invalidResetLink',
       'no-password-set': 'common.auth.error.noPasswordSet',
+      'password-already-set': 'common.auth.error.passwordAlreadySet',
       'password-policy': 'common.auth.error.passwordPolicy',
     };
     for (const [reason, key] of Object.entries(expected)) {
@@ -163,6 +166,23 @@ describe('authFailureMessageKey —— 原因 → 词条 key', () => {
     // 合并成一句就会让"该重新注册的人一直重试"。
     expect(authFailureMessageKey('passkey-not-found')).not.toBe(
       authFailureMessageKey('passkey-rejected'),
+    );
+  });
+
+  /**
+   * 🔴 这两条**必须**是两个不同的 key。
+   *
+   * 它们让用户做的事正好相反：一个"设第一个密码"（只有一个框），
+   * 一个"这个账号已经有密码了，去改"（当前密码 + 新密码两个框）。
+   * 合并成一句统称的表现是界面摆错表单 —— 而用户会在那张表里一直打错。
+   */
+  it('「没设过口令」与「已经设过口令」是两个不同的 key（要摆两张不同的表）', () => {
+    expect(authFailureMessageKey('no-password-set')).not.toBe(
+      authFailureMessageKey('password-already-set'),
+    );
+    // 而且两句都不是那句"链接无效"：三条的 CTA 各不相同。
+    expect(authFailureMessageKey('password-already-set')).not.toBe(
+      authFailureMessageKey('invalid-reset-link'),
     );
   });
 
