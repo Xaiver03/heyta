@@ -314,6 +314,7 @@ export const en = {
   'web.shell.nav.q2': 'Important, not urgent',
   'web.shell.nav.q3': 'Urgent, not important',
   'web.shell.nav.q4': 'Not important, not urgent',
+  'web.shell.sidebar.resize': 'Resize the sidebar',
   'web.shell.views.aria': 'Views',
   'web.shell.views.groupMain': 'Main',
   'web.shell.modules.title': 'Feature modules',

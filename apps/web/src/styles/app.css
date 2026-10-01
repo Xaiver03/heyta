@@ -25,7 +25,24 @@
  * 布局契约，显式写出来才能在 review 时一眼看出"哪几个视图有范围列"。
  */
 .ht-app--with-sidebar {
-  grid-template-columns: var(--ht-layout-rail-width) var(--ht-layout-sidebar-width) 1fr;
+  /*
+    中间那一列现在**可由用户拖宽**（`SidebarResizer` 把拖出来的值写成
+    `:root` 上的 `--ht-sidebar-width`）。
+
+    🔴 夹取只在这里做一次判断，两层各有分工：
+      · `clamp()` 的上下界来自 token（12rem / 26rem）—— 改边界改 token，不改组件；
+      · `min(…, 40vw)` 兜住"窗口后来变窄了"：不需要监听 `resize`，
+        浏览器每次布局自己重夹，侧栏永远吃不掉主区。
+    没设 `--ht-sidebar-width` 时回落到 token 默认值，走的也是同一条 clamp。
+  */
+  grid-template-columns:
+    var(--ht-layout-rail-width)
+    clamp(
+      var(--ht-layout-sidebar-min-width),
+      var(--ht-sidebar-width, var(--ht-layout-sidebar-width)),
+      min(var(--ht-layout-sidebar-max-width), 40vw)
+    )
+    1fr;
 }
 
 /* ── 侧栏 ───────────────────────────────────────────── */
@@ -38,6 +55,61 @@
   background: var(--ht-color-surface);
   /* 扁平风格用边框表达层次，不用阴影 */
   border-right: 1px solid var(--ht-color-border);
+  /* 拖拽手柄绝对定位在这一列的右边缘，需要一个定位祖先。 */
+  position: relative;
+}
+
+/*
+ * 右边缘的拖拽条。
+ *
+ * ⚠️ 它**不画自己**：只有 hover / 拖拽中 / 键盘聚焦时才出现一条线 ——
+ * 常驻的手柄条会让侧栏边缘看起来像一道裂缝，而这条边 99% 的时间没人要拖。
+ * 命中区只有 4px 宽 × 整列高：更窄会拖不中，更宽就吃掉主区的第一像素。
+ */
+.ht-resizer {
+  position: absolute;
+  inset-block: 0;
+  /* 骑在边框上：左右各让一半，拖的时候不需要"精确压住那条 1px"。 */
+  inline-size: var(--ht-space-2);
+  inset-inline-end: calc(var(--ht-space-2) * -0.5);
+  cursor: col-resize;
+  background: transparent;
+  /* 🔴 触屏上必须关掉：否则横向拖会被浏览器读成页面滚动，
+     症状是"鼠标能拖、手指拖不动"。 */
+  touch-action: none;
+}
+
+.ht-resizer::after {
+  content: '';
+  position: absolute;
+  inset-block: var(--ht-space-6);
+  inset-inline-start: 50%;
+  inline-size: var(--ht-border-width-thin);
+  transform: translateX(-50%);
+  background: var(--ht-color-border);
+  opacity: 0;
+}
+
+.ht-resizer:hover::after,
+.ht-resizer--dragging::after {
+  opacity: 1;
+  /* 🔴 必须换色换粗：`--ht-color-border` 恰好就是这一列 `border-right` 的值，
+     而 ::after 又落在同一列像素上 —— 同色同位等于**没画**（2026-09-30 实测：
+     hover 与 idle 的两条边带截图逐像素相同）。一个拖不动也看不见的把手，
+     等于这个功能不存在。 */
+  background: var(--ht-color-primary);
+  inline-size: var(--ht-border-width-thick);
+}
+
+/* 键盘：`outline` 而不是 `outline: none`（§5 明确点名的可访问性回归）。 */
+.ht-resizer:focus-visible {
+  outline: var(--ht-border-width-thick) solid var(--ht-color-ring);
+  outline-offset: var(--ht-space-1);
+}
+
+.ht-resizer:focus-visible::after {
+  opacity: 1;
+  background: var(--ht-color-primary);
 }
 
 .ht-brand {
@@ -871,15 +943,15 @@
   display: flex;
   align-items: center;
   gap: var(--ht-space-2);
-  padding-inline: var(--ht-space-1);
+  /* rail 窄到 64px 之后这里**不能再加内边距**：rail 自身已给 8px × 2，
+     剩下的 48px 恰好放 44px 的头像（`--ht-touch-target-min`）。再缩就让不下了。 */
+  padding-inline: 0;
+  justify-content: center;
 }
 
-.ht-brand__name {
-  color: var(--ht-color-foreground);
-  font-family: var(--ht-font-sans);
-  font-size: var(--ht-font-size-base);
-  font-weight: var(--ht-font-weight-semibold);
-}
+/* 🔴 品牌名（`common.brand`）随 rail 收成纯图标一起**撤掉**了，元素不在 DOM 里。
+   滴答的 rail 顶部只有头像；而 48px 的内容宽度也放不下「heyta」。
+   品牌仍然出现在落地页、设置里的 AI 文案、通知标题与移动端欢迎页。 */
 
 .ht-accountmenu {
   position: relative;
@@ -939,14 +1011,20 @@
 /* 账号菜单面板。
  *
  * 🔴 `fixed` 而不是 `absolute`：`nav.ht-rail` 是 `overflow-y: auto` 的裁剪容器，
- * absolute 面板比 rail 宽（12rem vs 11rem）⇒ 右侧一直被切 16px；塌缩态
+ * absolute 面板比 rail 宽（12rem vs 4rem）⇒ 右侧一直被切；塌缩态
  * （≤768px，rail 变底部导航 + `overflow-y: hidden`）更是整块看不见。
  * 坐标由组件实测锚点后写在 inline style 上（向上/向下弹都在那里判定），
  * 这里只管外观。 */
 .ht-accountmenu__panel {
   position: fixed;
-  /* 用 z 轴阶梯里的那一档（tokens.css 明写"禁止在组件里写裸 z-index 数字"）。 */
-  z-index: var(--ht-z-dropdown);
+  /* 🔴 **必须高于 `.ht-sheet`**（设置浮层，同样是浮层但只占 `dropdown` 档）。
+     以前两者同为 `dropdown` 也能用，靠的是**几何运气**：rail 宽 176px 时，
+     main 从 x=176 才开始，而菜单项的命中点落在 x≈160 —— 正好在 rail 那侧，
+     浮层碰不到。rail 收成 64px 之后 main 提前 112px 开始，同一个点落进浮层里，
+     于是 `ai-unavailable.spec.ts` 的「点设置」被 `.ht-settings` 拦下（z 相同 ⇒
+     DOM 后面的赢，而 `main` 在 `nav` 之后）。用 `popover` 档把它压回上层 ——
+     与 `.ht-inbox__panel`（同样锚在 rail 上的浮层）同一档，不是随便挑的数。 */
+  z-index: var(--ht-z-popover);
   display: flex;
   flex-direction: column;
   min-width: 12rem;
@@ -1035,9 +1113,21 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: var(--ht-touch-target-min);
-  height: var(--ht-font-size-lg);
-  margin-inline-start: auto;
+  /* 🔴 rail 收成纯图标之后，徽标**必须浮在图标角上**。它原来是行内元素、
+     `min-width: 44px`（触控目标）—— 在 48px 宽的图标按钮里会把按钮撑爆，
+     而 `.ht-rail` 是 `overflow-y: auto`（= 两个轴都裁），表现是"铃铛那里
+     出现一条横向滚动"而不是报错。尺寸改用徽标 token。 */
+  position: absolute;
+  /* 🔴 偏移必须是 **0**，不能"往里收一点"。算一遍就明白：按钮被 `.ht-rail__tabs`
+     （column flex，默认 stretch）撑成 rail 的内容宽 48px，16px 的图标居中 ⇒ 图标占
+     x 16..32；徽标 18px。用 `--ht-space-1`（8px）内缩时徽标落在 x 22..40，
+     和图标**重叠 10px** —— 铃铛被自己的未读数盖住。贴到 0 只剩 2px 角接触。
+     ⚠️ 按钮再变窄（rail 更窄 / 图标更大）这个结论会翻，届时改成给图标套一层
+     定位容器，而不是把徽标挪回按钮内侧。 */
+  top: 0;
+  right: 0;
+  min-width: var(--ht-size-badge-min-width);
+  height: var(--ht-size-badge-height);
   padding-inline: var(--ht-space-1);
   border-radius: var(--ht-radius-full);
   background: var(--ht-color-primary);
@@ -1411,8 +1501,16 @@
 .ht-rail__tab {
   display: flex;
   align-items: center;
-  gap: var(--ht-space-2);
-  /* 44px 最小点击目标（UIX Pro 硬规则 2） */
+  justify-content: center;
+  /* 徽标（铃铛的未读数）浮在图标右上角 —— 见 `.ht-inbox__badge`。
+     ⚠️ `position: relative` **不会**改变子元素里 `position: fixed` 的包含块
+     （只有 transform / filter / will-change / contain 会），所以标签照样逃出 rail。
+     🔴 将来若给 rail 的按钮加 transform 动画，`.ht-rail__label` 会跟着一起退化
+     成"相对按钮定位"——那正是 `app.css` 里那条浮层警告说的坏法。 */
+  position: relative;
+  /* 44px 最小点击目标（UIX Pro 硬规则 2）。rail 现在是纯图标，
+     这一条同时**定义了** rail 的宽度（token 里 44 + 16 = 64px），
+     所以调小它会同时把 rail 挤窄 —— 而 44px 是可访问性硬下限，不许动。 */
   min-height: var(--ht-touch-target-min);
   padding: 0 var(--ht-space-2);
   /* 🔴 与原来那条 `flex: 0 0 auto` 同源：不被压扁、标签不折行 */
@@ -1430,6 +1528,54 @@
   transition:
     background var(--ht-duration-fast) var(--ht-ease-standard),
     color var(--ht-duration-fast) var(--ht-ease-standard);
+}
+
+/*
+ * ── 名字：只在 hover / 键盘聚焦时出现（`.ht-rail__label`）────────────────
+ *
+ * 2026-09-30 产品负责人：「侧边栏学习这个，只显示 icon，hover 显示真名」
+ * （附滴答截图，那条 tooltip 写的是「番茄专注」）。
+ *
+ * 🔴 三条必须同时成立，缺一条就是另一种坏：
+ *
+ * 1. **标签必须留在无障碍树里。** 它就是这些按钮的 accessible name ——
+ *    `e2e/tests/quadrant-layout.spec.ts` 与 `pages-sweep.spec.ts` 用
+ *    `getByRole('tab', { name: '四象限' })` 定位。所以只能"看不见"，
+ *    不能 `display: none` / `visibility: hidden` / `aria-hidden`
+ *    （那三者会让按钮变成"没有名字的 tab"，而界面看起来"没问题"）。
+ * 2. **必须是 `position: fixed`。** `nav.ht-rail` 有 `overflow-y: auto`，
+ *    是裁剪容器；absolute 的标签会被切掉（`.ht-inbox__panel` 的说明是同一件事）。
+ *    fixed 因此**退出文档流**，正好不再撑宽按钮。
+ * 3. **y 坐标必须由实测给出。** fixed 元素不知道自己贴在哪个按钮旁边，
+ *    所以 `--ht-rail-label-top` 由 `App.tsx` 的 `anchorRailLabel()` 在
+ *    pointerover / focus 时写进按钮（写的是**中心**，配合 `translateY(-50%)`）。
+ *    ⚠️ 不用 React state：那会让整个外壳每次 hover 都重渲染。
+ *
+ * 滚轮滚动时浏览器会对"滚进指针下方"的按钮重新派发 pointerover ⇒ 坐标自动跟手。
+ */
+.ht-rail__label {
+  position: fixed;
+  top: var(--ht-rail-label-top, 0px);
+  left: calc(var(--ht-layout-rail-width) + var(--ht-space-1));
+  transform: translateY(-50%);
+  z-index: var(--ht-z-tooltip);
+  padding: var(--ht-space-1) var(--ht-space-2);
+  border-radius: var(--ht-radius-sm);
+  background: var(--ht-color-foreground);
+  color: var(--ht-color-foreground-inverse);
+  font-size: var(--ht-font-size-xs);
+  font-weight: var(--ht-font-weight-medium);
+  white-space: nowrap;
+  opacity: 0;
+  /* 标签浮在内容上方，绝不能挡住底下的点击（`pointer-events: none` 同时保证
+     它不会因为"被 hover"而把 hover 状态从按钮抢走）。 */
+  pointer-events: none;
+  transition: opacity var(--ht-duration-fast) var(--ht-ease-standard);
+}
+
+.ht-rail__tab:hover > .ht-rail__label,
+.ht-rail__tab:focus-visible > .ht-rail__label {
+  opacity: 1;
 }
 
 .ht-rail__tab:hover {
@@ -2622,16 +2768,12 @@ input[type="radio"] {
     overflow-y: hidden;
   }
 
-  /* 头像行横排；品牌名在底部导航上没有信息量，隐藏 */
+  /* 头像行横排（品牌名在桌面态就已经撤掉了，见 `.ht-rail__top` 上方） */
   .ht-rail__top {
     flex-direction: row;
     align-items: center;
     gap: var(--ht-space-2);
     padding: 0;
-  }
-
-  .ht-brand__name {
-    display: none;
   }
 
   .ht-rail__tabs {
@@ -2642,6 +2784,23 @@ input[type="radio"] {
 
   .ht-rail__tab {
     padding: 0 var(--ht-space-2);
+    /* 图标与名字**都**在流里了（见下面 `.ht-rail__label`），需要间距。
+       桌面态这条 gap 是不生效的 —— 那里名字是 fixed、徽标是 absolute。 */
+    gap: var(--ht-space-2);
+  }
+
+  /* 🔴 「只显示 icon，hover 显示真名」是**桌面**形态 —— 触屏没有 hover，
+     把名字收进 tooltip 等于在手机上根本没有名字。
+     底部导航恢复成"图标 + 常显文字"，所以标签回到文档流里。
+     ⚠️ 用 `position: static` 而不是覆盖 `top/left`：一条属性关掉整组偏移。 */
+  .ht-rail__label {
+    position: static;
+    transform: none;
+    padding: 0;
+    background: none;
+    color: inherit;
+    font-size: inherit;
+    opacity: 1;
   }
 
   .ht-rail__tab--tool:first-of-type {
@@ -2657,6 +2816,24 @@ input[type="radio"] {
     border-top: var(--ht-border-width-thin) solid var(--ht-color-border);
     /* 刘海屏安全区 */
     padding-block-end: max(var(--ht-space-2), env(safe-area-inset-bottom));
+  }
+
+  /* 🔴 塌缩态里侧栏已经是**横着的一条底部导航**，"拖它的右边缘"没有语义。
+     手柄仍挂在 DOM 上（任务页与日历页各有一条侧栏，都带它），所以必须显式关掉，
+     否则它会在底部条的右端留一条能点、能聚焦、拖了没反应的竖线。 */
+  .ht-resizer {
+    display: none;
+  }
+
+  /* 桌面那条列的"钉住 + 一屏封顶 + 内部滚动"三条在底部条里都没有语义：
+     横条不该粘在视口顶部，也不该被一屏高度卡住自己的内容。 */
+  .ht-calendar-side {
+    position: static;
+    max-block-size: none;
+  }
+
+  .ht-calendar-side__body {
+    overflow-y: visible;
   }
 
   .ht-brand,
