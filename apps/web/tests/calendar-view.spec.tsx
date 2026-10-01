@@ -40,7 +40,8 @@ const { App } = await import('../src/App.js');
 const { LocaleHost } = await import('../src/lib/locale-host.js');
 const { __resetOpLogForTests, initOpLog } = await import('../src/lib/oplog.js');
 const { useTaskStore } = await import('../src/features/tasks/store.js');
-const { addDays, toLocalDate } = await import('@heyta/domain');
+const { useCalendarViewStore } = await import('../src/features/calendar/store.js');
+const { addDays, startOfMonth, FULL_SCOPE, toLocalDate } = await import('@heyta/domain');
 
 let root: Root | undefined;
 let container: HTMLDivElement | undefined;
@@ -101,6 +102,16 @@ beforeEach(async () => {
   // 把任务建在"今天"，这样一打开日历就能在选中那天看到它。
   const today = toLocalDate(Date.now());
   useTaskStore.setState({ now: Date.now() });
+  /**
+   * 🔴 日历的**界面状态也是模块级单例**（`features/calendar/store.ts` —— 侧栏与
+   * 主区共用）。不重置的话，上一个用例翻到的月份会漏进下一个用例，
+   * 而症状是"这一轮列出了别的那天的任务"，看起来像日历分错了组。
+   */
+  useCalendarViewStore.setState({
+    cursor: startOfMonth(today),
+    selected: today,
+    scope: FULL_SCOPE,
+  });
   void today;
 });
 
@@ -178,8 +189,11 @@ describe('日历视图（Web）', () => {
 
   it('🔴 「回到今天」把选中框带回今天（跨月之后仍然有效）', async () => {
     const today = toLocalDate(Date.now());
+    const monthOf = (): string =>
+      container!.querySelector('[data-testid="calendar-board-month"]')?.textContent ?? '';
     await mount();
     await openCalendar();
+    const before = monthOf();
 
     // 先翻到下个月。
     const next = [...container!.querySelectorAll<HTMLElement>('[role="button"]')].find(
@@ -190,7 +204,10 @@ describe('日历视图（Web）', () => {
       next!.click();
     });
     await flush();
-    const afterNext = container!.querySelector('[data-testid="calendar-board-month"]')?.textContent;
+    // ⚠️ 这条是**前提**，不是装饰：翻月没真的发生的话，下面那句"月份回来了"
+    //    会因为它从来没走过而永远成立（原来这里写的是 `not.toBe(Number(...) + 1)`，
+    //    而 `Number('2026年10月')` 是 NaN ⇒ 那条判据一次也红不了）。
+    expect(monthOf(), '翻「下个月」之后月份没变，下面就没东西可"回"').not.toBe(before);
 
     // 回到今天。
     const back = container!.querySelector<HTMLElement>('[data-testid="calendar-board-today"]');
@@ -200,8 +217,7 @@ describe('日历视图（Web）', () => {
     });
     await flush();
 
-    const backMonth = container!.querySelector('[data-testid="calendar-board-month"]')?.textContent;
-    expect(backMonth, '「回到今天」之后月份没有回来').not.toBe(Number(afterNext) + 1);
+    expect(monthOf(), '「回到今天」之后月份没有回来').toBe(before);
     // 选中那天应当是今天 —— 标题与今日标题一致。
     const day = container!.querySelector('[data-testid="calendar-board-day-title"]')?.textContent;
     const d = new Date();
