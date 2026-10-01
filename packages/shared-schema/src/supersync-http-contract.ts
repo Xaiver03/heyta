@@ -22,8 +22,24 @@ export const SUPER_SYNC_OP_TYPES = [
   'REPAIR',
 ] as const;
 
+/**
+ * 整体重建类 op（`SYNC_IMPORT` / `BACKUP_IMPORT` / `REPAIR`）的**原因**词表。
+ *
+ * 🔴 **每一个成员都必须有一个真实的生产者。** 这份词表是上传方向的
+ * **校验集**（`syncImportReason: z.enum(...)`），不是一个"以后可能用得上"的
+ * 备案清单：留一个没人发的成员，界面上就永远不会出现它，而读代码的人会
+ * 以为那条流程存在 —— 装饰比缺失更坏，因为它给出的是**假的存在性证据**。
+ *
+ * 已按这条删掉的成员（原注释留在下面，避免有人把它当"漏删"加回来）：
+ * - `'PASSWORD_CHANGED'` —— 全仓**零生产者**（连 vendored 的上游克隆里也没有），
+ *   只有两个服务端 fixture 顺手拿它当 SYNC_IMPORT 的占位值。
+ *   它原本要表达的是"改了端到端口令，所以整库重新加密后再传一遍"。
+ *   **ADR-0040 把登录口令和 E2EE 口令解耦之后，改登录口令不需要重传任何东西**
+ *   （密文不变，`tokenVersion` 前进只作废令牌）；而"轮换 E2EE 口令"这个功能
+ *   本身还没做，真做的时候它需要的是一句跟着那条流程一起设计的标记
+ *   （要能表达"新口令解不开旧密文"这种中途失败），不是把这个成员捡回来。
+ */
 export const SUPER_SYNC_IMPORT_REASONS = [
-  'PASSWORD_CHANGED',
   'FILE_IMPORT',
   'BACKUP_RESTORE',
   'FORCE_UPLOAD',
