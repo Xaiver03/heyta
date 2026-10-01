@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  SUPER_SYNC_IMPORT_REASONS,
   SUPER_SYNC_MAX_ENTITY_IDS_PER_OP,
   SUPER_SYNC_MAX_OPS_PER_UPLOAD,
   SuperSyncDownloadOpsQuerySchema,
@@ -274,6 +275,33 @@ describe('SuperSync HTTP contract schemas', () => {
     // The strict enum still guards the standalone operation schema (request side).
     expect(() =>
       SuperSyncOperationSchema.parse({ ...createValidOperation(), opType: 'FUTURE_OP' }),
+    ).toThrow();
+  });
+
+  it('上传方向的 import reason 词表是封闭的 —— 每个成员都要有真实生产者', () => {
+    // 🔴 这份列表是 `z.enum` 的**校验集**，不是备用词表。加一个成员的成本
+    // 被刻意做成"要同时改这个断言"：一个没人发的 reason 会一直躺在词表里，
+    // 让读代码的人以为那条流程存在（`'PASSWORD_CHANGED'` 就是这么待着的，
+    // 全仓零生产者，只有两个 fixture 拿它当占位值 —— 已删，理由见生产代码注释）。
+    expect([...SUPER_SYNC_IMPORT_REASONS].sort()).toEqual(
+      ['BACKUP_RESTORE', 'FILE_IMPORT', 'FORCE_UPLOAD', 'REPAIR', 'SERVER_MIGRATION'].sort(),
+    );
+    // 删掉的成员不许悄悄回来：它在严格 schema 下必须被拒。
+    // ⚠️ 同形状的**在册成员**必须通过 —— 否则这条只是"这个形状本身不合法"，
+    // 而不是"这个词被拒"。
+    expect(() =>
+      SuperSyncOperationSchema.parse({
+        ...createValidOperation(),
+        opType: 'SYNC_IMPORT',
+        syncImportReason: 'FORCE_UPLOAD',
+      }),
+    ).not.toThrow();
+    expect(() =>
+      SuperSyncOperationSchema.parse({
+        ...createValidOperation(),
+        opType: 'SYNC_IMPORT',
+        syncImportReason: 'PASSWORD_CHANGED',
+      }),
     ).toThrow();
   });
 

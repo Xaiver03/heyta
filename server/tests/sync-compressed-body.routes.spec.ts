@@ -866,7 +866,7 @@ describe('Sync compressed body routes', () => {
         opType: 'SYNC_IMPORT',
         entityType: 'ALL',
         entityId: undefined,
-        syncImportReason: 'PASSWORD_CHANGED',
+        syncImportReason: 'FORCE_UPLOAD',
       },
       receivedAt: Date.now(),
     };
@@ -920,7 +920,7 @@ describe('Sync compressed body routes', () => {
         opType: 'SYNC_IMPORT',
         entityType: 'ALL',
         entityId: undefined,
-        syncImportReason: 'PASSWORD_CHANGED',
+        syncImportReason: 'FORCE_UPLOAD',
       },
       receivedAt: Date.now(),
     };
