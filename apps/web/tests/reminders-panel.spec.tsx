@@ -249,8 +249,8 @@ describe('B. 没有截止时间时只有绝对时刻入口', () => {
     for (let i = 0; i < 8; i += 1) {
       await act(async () => {
         await new Promise((resolve) => setTimeout(resolve, 3));
+        click(view, 'reminder-add-absolute');
       });
-      click(view, 'reminder-add-absolute');
     }
 
     await waitFor('超上限的错误被记下', () => useReminderStore.getState().error !== undefined);
