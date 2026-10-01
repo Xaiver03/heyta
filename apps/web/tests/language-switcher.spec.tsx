@@ -30,14 +30,15 @@
  */
 
 import { IDBFactory, IDBKeyRange } from 'fake-indexeddb';
-import { act } from 'react';
+import { act, StrictMode } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { enableModules } from './enable-all-modules.js';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { LOCALES } from '@heyta/i18n';
 
 import { LocaleHost } from '../src/lib/locale-host.js';
+import { hasStoredLocalePreference } from '../src/lib/locale.js';
 import { __resetOpLogForTests, initOpLog } from '../src/lib/oplog.js';
 
 (globalThis as unknown as { indexedDB: IDBFactory }).indexedDB = new IDBFactory();
@@ -51,16 +52,19 @@ let root: Root | undefined;
 let container: HTMLDivElement | undefined;
 
 /** 挂上和线上 `main.tsx` **同一个**语言宿主 + 真的 App。 */
-function mount(): HTMLDivElement {
+function mount(strict = false): HTMLDivElement {
   container = document.createElement('div');
   document.body.appendChild(container);
   root = createRoot(container);
+  const tree = (
+    <LocaleHost>
+      <App />
+    </LocaleHost>
+  );
   act(() => {
-    root?.render(
-      <LocaleHost>
-        <App />
-      </LocaleHost>,
-    );
+    // `strict` 走的是线上那份壳：`main.tsx` 四处都套着 `<StrictMode>`，
+    // 而它在 dev 下会把 effect（和 updater）**重放一遍** —— 见最后那个 describe。
+    root?.render(strict ? <StrictMode>{tree}</StrictMode> : tree);
   });
   return container;
 }
@@ -245,5 +249,110 @@ describe('🔴 刷新后保持：落盘 + <html lang>', () => {
     expect(localStorage.getItem('heyta.locale')).toBe('zh-CN');
     expect(document.documentElement.lang).toBe('zh-CN');
     expect(el.textContent).toContain('收集箱');
+  });
+});
+
+/**
+ * 🔴 `<StrictMode>` 下的首启：**推断值不许落盘**
+ * ==============================================
+ *
+ * 这批用例是 2026-10-01 真浏览器门禁（`e2e/tests/language-first-launch.spec.ts`）
+ * 抓出的那个缺陷的**单元测试层镜像**。缺陷本身：
+ *
+ * `LocaleHost` 原先把落盘挂在"locale 变了"的 `useEffect` 上，并用一个
+ * `firstRun` ref 跳过第一次。`apps/web/src/main.tsx` 四处都套着 `<StrictMode>`，
+ * 而它在开发构建下会把 effect **重放一遍** —— 第二次跑时 `firstRun` 已经是
+ * `false`，于是"首启只激活、不落盘"这条纪律被 React 自己拆掉了。
+ * 探针打印（真浏览器，同一份代码）：
+ *
+ * ```
+ * effect pass 1 firstRun= true  locale= en
+ * effect pass 2 firstRun= false locale= en
+ * STORED: en            ← localStorage['heyta.locale'] 已经被写成推断值
+ * ```
+ *
+ * 后果不在界面上（界面本来就该是英文），在**解析链第 2 层**：`localStorage` 一有值，
+ * `hasStoredLocalePreference()` 就把"浏览器是英文"误判成"用户选过英文"，
+ * 登录后的**账号语言采纳**从此永远不触发 —— 换设备/换浏览器的用户拿不到
+ * 他在账号里选的语言。
+ *
+ * ⚠️ **为什么上面那批用例没抓到它**：它们挂的是不带 `<StrictMode>` 的树，
+ * 而 jsdom 里也没有 StrictMode 的重放。**不套线上那个壳的"外壳测试"
+ * 测不到壳的启动纪律** —— 所以下面这批唯一的区别就是 `mount(true)`。
+ *
+ * ⚠️ 修法是"落盘挂在**显式动作**上"（`selectLocale` 里 `applyLocale`），
+ * 而不是"effect 里判断值变没变"。所以第二条用例同样重要：它钉住的是
+ * **另一种错法** —— 若改成"只有和初值不同才落盘"，第一条能过，
+ * 但"推断成英文 → 用户明确切中文 → 又明确切回英文"会**不落盘**，
+ * 用户最后那次明确选择照样会被账号语言覆盖。
+ */
+describe('🔴 <StrictMode>：首启推断不落盘，明确选择落盘', () => {
+  /** 把 `navigator.language` 临时改成一门语言（`setup.ts` 把它钉成 zh-CN）。 */
+  function withNavigatorLocale(value: string): void {
+    vi.spyOn(navigator, 'language', 'get').mockImplementation(() => value);
+  }
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('英文浏览器首启：界面是英文，但 localStorage 里没有任何偏好（账号语言那道门还开着）', () => {
+    withNavigatorLocale('en-US');
+
+    const el = mount(true);
+
+    // 界面确实按系统语言翻过去了 —— 否则这条在"根本没读系统语言"时也会绿。
+    expect(el.textContent).toContain('Inbox');
+    expect(el.textContent).not.toContain('收集箱');
+    expect(document.documentElement.lang).toBe('en');
+
+    // 🔴 这一行就是那个缺陷的判据。
+    expect(localStorage.getItem('heyta.locale')).toBeNull();
+    expect(hasStoredLocalePreference()).toBe(false);
+  });
+
+  it('带 ?lang= 进来同样不落盘（参数是一次性带来，不是本机选择）', () => {
+    // setup.ts 钉的 navigator 是 zh-CN，这里让参数赢过它，才能区分"参数"和"系统"。
+    const url = new URL(window.location.href);
+    url.searchParams.set('lang', 'en');
+    window.history.replaceState({}, '', url.toString());
+    try {
+      const el = mount(true);
+      expect(el.textContent).toContain('Inbox');
+      expect(localStorage.getItem('heyta.locale')).toBeNull();
+    } finally {
+      window.history.replaceState({}, '', `${url.pathname}${url.hash}`);
+    }
+  });
+
+  it('推断成英文 → 明确切中文 → 再明确切回英文：最后这次必须落盘', () => {
+    withNavigatorLocale('en-US');
+
+    const el = mount(true);
+    // 前提：首启是推断来的英文，且没落盘。
+    expect(el.textContent).toContain('Inbox');
+    expect(localStorage.getItem('heyta.locale')).toBeNull();
+
+    act(() => {
+      option(el, 'zh-CN').click();
+    });
+    expect(localStorage.getItem('heyta.locale')).toBe('zh-CN');
+
+    act(() => {
+      option(el, 'en').click();
+    });
+    // 🔴 en 此刻**等于初值**。"只在与初值不同时落盘"这种修法会在这里静默不写，
+    // 于是用户明确的最后选择仍然记不下来。
+    expect(localStorage.getItem('heyta.locale')).toBe('en');
+    expect(hasStoredLocalePreference()).toBe(true);
+  });
+
+  it('未受支持的系统语言（ja-JP）落回中文兜底，同样不落盘', () => {
+    withNavigatorLocale('ja-JP');
+
+    const el = mount(true);
+    expect(el.textContent).toContain('收集箱');
+    expect(document.documentElement.lang).toBe('zh-CN');
+    expect(localStorage.getItem('heyta.locale')).toBeNull();
   });
 });
