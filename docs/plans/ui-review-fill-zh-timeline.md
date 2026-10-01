@@ -332,12 +332,25 @@ scrim  content-desc="关闭排序选择"  [0,0][1080,2134]
    文件夹图标 + 清单名），移动端的行上**没有**（`TasksScreen` 只喂 `TaskBadges` 的
    due/priority/repeat，归属要点开 `TaskDetailSheet` 才看得见）。
    同一件信息一端常驻、一端藏进详情，正是 §3.5 与 M3 判据 A 那一类。
-   归到 #10：动的是**共享行**（`TaskBadges` 或新的共享 meta 件），
-   不是在两个宿主各补一份 —— 那样只会把漂移搬到下一层。
+   🔴 **但这一刀有前置**（本轮对着代码核过）：web 的**行元信息整条**
+   都还没迁进共享层 —— `App.tsx:979` 的 `renderTaskMeta` 是自己手写的
+   `<span data-testid="task-meta">` + `<DueBadge/>`，**没有用 `TaskBadges`**。
+   共享 `TaskBadges` 只有移动端在用（`apps/mobile/src/screens/TasksScreen.tsx:586`），
+   web 唯一的消费者是 dev 切片 `apps/web/src/dev/universal-slice.tsx` ——
+   这条**不是本轮新猜的**，`docs/research/dida-view-unification.md:318` 早就记过
+   "共享组件层已被 mobile 采用（M1-4）；**web 尚未**"。
+   所以"把归属收进共享行"如果现在做，结果不是收敛而是**第三种状态**：
+   共享 `TaskBadges` 多一个 `list`、移动端接上、web 仍然走自己那套 + chip。
+   ⇒ 顺序必须是：**先把 web 的 `renderTaskMeta` 换成共享 `TaskBadges`**
+   （due/priority/repeat 三件一起搬，`task-meta` 这个锚点跟着搬），
+   **再**把归属放进去。归到 #10。
 
-下一刀（并进 #10）：把清单归属收进共享行，复用 `.ht-nav__count` 与
-`TaskGroupHead` 的既有关键模式（不新增 token，`check:design` 拦裸值），
-新增文案一律进 `packages/i18n` 且中英同步（`check:ui-language` 拦）。
+下一刀（并进 #10）按两步走，**顺序不能反**：
+① 把 web 的 `renderTaskMeta` 换成共享 `TaskBadges`（due/priority/repeat 一起搬，
+`task-meta` 锚点跟着搬，`apps/web` 那批按 chip 定位的判据同步搬）；
+② 再给 `TaskBadges` 加归属，两端各喂一次 —— 这时它才是"一份实现"。
+两刀都不新增 token（`check:design` 拦裸值），新增文案一律进 `packages/i18n`
+且中英同步（`check:ui-language` 拦）。
 
 ### 本轮顺带撞出来的一个 e2e 缺陷（不是 R6，但同一条循环照出来的）
 
