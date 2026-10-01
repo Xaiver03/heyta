@@ -835,3 +835,20 @@ zh 产物对账：18 张 sha256 与开工基线逐张相同        → BYTE_IDEN
 ```
 
 本轮不产出客户端包，四端重装不适用（沿用 b71546fd 先例）。
+（任务 3 相关）四条平台门禁各自的退出码与 SKIP/FAIL 行 —— 在最终 HEAD（1030a560）实跑补齐：
+
+```
+node scripts/check-macos-shell.mjs   → exit 0（darwin + swift 在 ⇒ 真跑：swift 冒烟 32 项断言全过，
+                                       「跨语言那一层 + 落盘 全部通过」——非跳过，是实测）
+node scripts/check-windows-shell.mjs → exit 0（本机有 dotnet ⇒ 真跑：esbuild 打包门面 + C#↔TS 冒烟
+                                       22 项断言全过，含「C# 独立读壳的 .sqlite」——非跳过，是实测）
+node scripts/check-linux-shell.mjs   → exit 0 + SKIP 行：「当前平台是 darwin —— Linux 原生壳的冒烟
+                                       已跳过（本壳依赖 GTK4 与 libjavascriptcoregtk-4.1，
+                                       装不到 macOS/Windows 上）」—— 合法跳过（平台不符）
+node scripts/check-macos-window.mjs（真实跑）→ 第 5 跑 exit 1 红在「取证 exit 4 ⇒ 不再静默跳过」
+                                       授权指引（新分界在真实世界首次触发）；第 6 跑 exit 0 全绿
+```
+
+四条的裁决分界在实测中的落点：两条**真跑全绿**（比"合法跳过"更强的证据）、
+一条**合法跳过**（平台不符，SKIP 行含原因）、一条**判红分支真实触发过**
+（exit 4 授权指引）且修复环境后**真实全绿**。
