@@ -24,6 +24,26 @@ vi.hoisted(() => {
   process.env.JWT_SECRET = 'test-jwt-secret-that-is-long-enough-for-validation';
 });
 
+/**
+ * 邮箱+口令那个注册入口要先过策略、再哈希，才委托给 `registerWithMagicLink`。
+ * 这两步与"同意留痕"无关（本文件的靶子是留痕），所以把它们换成快的假实现：
+ * 真 Argon2 会让这条用例去依赖 pepper 与后端自检，而那些由 `password-auth-flow.spec.ts`
+ * 与启动自检各自负责。**只换这两个模块，`../src/auth` 仍是真模块**（见下面那条 mock）。
+ */
+const hashSpies = vi.hoisted(() => ({
+  hashPassword: vi.fn(),
+  verifyPassword: vi.fn(),
+  needsRehash: vi.fn(),
+  dummyVerify: vi.fn(),
+}));
+const policySpies = vi.hoisted(() => ({ checkNewPassword: vi.fn() }));
+
+vi.mock('../src/password/hash', () => hashSpies);
+vi.mock('../src/password/policy', async (importOriginal) => {
+  const actual = await importOriginal<Record<string, unknown>>();
+  return { ...actual, ...policySpies };
+});
+
 vi.mock('../src/db', () => {
   const mockPrisma = {
     user: {
@@ -65,6 +85,7 @@ vi.mock('../src/auth', async (importOriginal) => await importOriginal());
 
 import { prisma } from '../src/db';
 import { registerWithMagicLink } from '../src/auth';
+import { registerWithEmailPassword } from '../src/password/service';
 import { consentedLegalSetVersion, isOfficialHostedInstance } from '../src/legal-consent';
 import { LEGAL_SET_VERSION, OFFICIAL_HOSTED_DOMAIN } from '../src/legal.generated';
 
@@ -182,6 +203,51 @@ describe('注册写库：时刻与版本必须成对', () => {
 
     const data = createData();
     expect(data.termsAcceptedAt).toBe(1_700_000_000_000n);
+    expect(data.termsDocumentVersion).toBeNull();
+  });
+
+  it('🔴 第三个注册入口（邮箱+口令）也成对 —— 它靠**委托**，不靠自己也写一遍', async () => {
+    // `registerWithEmailPassword` 里没有一个字提到版本：它校验策略、哈希口令，然后把
+    // `termsAcceptedAt` **原样交给** `registerWithMagicLink`。所以"成对"这件事在这条路上
+    // 成立的唯一理由是那条委托。把委托换成自己建号（service.ts 文件头明令禁止的那种复制）
+    // 时，这条用例会红 —— 这就是它存在的意义。
+    setPublicUrl(`https://${OFFICIAL_HOSTED_DOMAIN}`);
+    policySpies.checkNewPassword.mockImplementation(async (raw: string) => ({
+      ok: true,
+      normalized: raw.normalize('NFC').normalize('NFKC'),
+    }));
+    hashSpies.hashPassword.mockResolvedValue(
+      '$argon2id$v=19$m=19456,t=2,p=1$c2FsdHNhbHRzYWx0c2FsdA$Q2xpZW50U2lnbmF0dXJlT2ZUaGVUZXN0',
+    );
+
+    await registerWithEmailPassword({
+      email: testEmail,
+      password: 'a-passphrase-that-is-long-enough',
+      termsAcceptedAt: 1_700_000_000_000,
+    });
+
+    const data = createData();
+    expect(data.termsAcceptedAt).toBe(1_700_000_000_000n);
+    expect(data.termsDocumentVersion).toBe(LEGAL_SET_VERSION);
+  });
+
+  it('🔴 同一个入口没勾 ⇒ 两列仍然都空（委托没有把"没同意"读成"同意过"）', async () => {
+    setPublicUrl(`https://${OFFICIAL_HOSTED_DOMAIN}`);
+    policySpies.checkNewPassword.mockImplementation(async (raw: string) => ({
+      ok: true,
+      normalized: raw.normalize('NFC').normalize('NFKC'),
+    }));
+    hashSpies.hashPassword.mockResolvedValue(
+      '$argon2id$v=19$m=19456,t=2,p=1$c2FsdHNhbHRzYWx0c2FsdA$Q2xpZW50U2lnbmF0dXJlT2ZUaGVUZXN0',
+    );
+
+    await registerWithEmailPassword({
+      email: testEmail,
+      password: 'a-passphrase-that-is-long-enough',
+    });
+
+    const data = createData();
+    expect(data.termsAcceptedAt).toBeNull();
     expect(data.termsDocumentVersion).toBeNull();
   });
 
