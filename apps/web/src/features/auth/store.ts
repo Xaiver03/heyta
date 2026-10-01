@@ -45,6 +45,7 @@ import {
 
 import { maybeHandOffToShell } from './desktop-handoff.js';
 import { useSyncStore } from '../sync/store.js';
+import { applyLocale, currentLocale, hasStoredLocalePreference } from '../../lib/locale.js';
 import {
   createPasskeyCredential,
   detectPasskeyBrowser,
@@ -178,6 +179,15 @@ function applyAuthSession(baseUrl: string, session: HostedAuthSession): void {
   useSyncStore.getState().applyAuthToken(baseUrl, session.token, session.user.email);
 
   /**
+   * 账号语言（应用语言解析链第 2 层，2026-10-01 拍板）：本机**没有**显式选择时
+   * 采纳它 —— 新设备首登即得账号语言。有显式选择则绝不覆盖（第 1 层永远更高）。
+   * `applyLocale` 会通知 `LocaleHost`，界面当场切换，不用刷新。
+   */
+  if (session.user.locale !== undefined && !hasStoredLocalePreference()) {
+    applyLocale(session.user.locale);
+  }
+
+  /**
    * 🔴 桌面壳的**反向授权回跳**（ADR-0039 §2.3）。
    *
    * 这里挂着是刻意的：**所有登录路径都汇聚到这个函数**（通行密钥 / 邮箱链接 / 粘贴令牌），
@@ -199,14 +209,15 @@ export const useAuthStore = create<AuthStoreState>((set) => ({
 
   sendLoginLink: async (baseUrl, email) => {
     set({ status: { kind: 'busy', action: 'login-link' } });
-    const outcome = await requestMagicLink({ baseUrl }, email);
+    // 带上当前界面语言：在中文浏览器里把应用切成英文的用户，邮件也该是英文。
+    const outcome = await requestMagicLink({ baseUrl, locale: currentLocale() }, email);
     set({ status: outcome.ok ? { kind: 'link-sent' } : { kind: 'failed', reason: outcome.reason } });
   },
 
   registerAccount: async (baseUrl, email, termsAccepted, inviteCode) => {
     set({ status: { kind: 'busy', action: 'register' } });
     const outcome = await registerWithMagicLink(
-      { baseUrl },
+      { baseUrl, locale: currentLocale() },
       {
         email,
         ...(termsAccepted ? { termsAccepted: true } : {}),
@@ -251,9 +262,9 @@ export const useAuthStore = create<AuthStoreState>((set) => ({
 
     set({ status: { kind: 'busy', action: 'passkey-register' } });
 
-    // ① 取 options（协议在 app-host）
+    // ① 取 options（协议在 app-host）。带上界面语言：verify 那步要发验证邮件。
     const begun = await beginPasskeyRegistration(
-      { baseUrl },
+      { baseUrl, locale: currentLocale() },
       {
         email,
         ...(termsAccepted ? { termsAccepted: true } : {}),
@@ -273,9 +284,9 @@ export const useAuthStore = create<AuthStoreState>((set) => ({
       return;
     }
 
-    // ③ 交回服务端回验
+    // ③ 交回服务端回验（语言同样要带：发信发生在这里）
     const completed = await completePasskeyRegistration(
-      { baseUrl },
+      { baseUrl, locale: currentLocale() },
       {
         email,
         credential: created.credential,
@@ -331,7 +342,7 @@ export const useAuthStore = create<AuthStoreState>((set) => ({
 
   requestRecovery: async (baseUrl, email) => {
     set({ status: { kind: 'busy', action: 'recovery' } });
-    const outcome = await requestPasskeyRecovery({ baseUrl }, email);
+    const outcome = await requestPasskeyRecovery({ baseUrl, locale: currentLocale() }, email);
     set({
       status: outcome.ok ? { kind: 'recovery-sent' } : { kind: 'failed', reason: outcome.reason },
     });

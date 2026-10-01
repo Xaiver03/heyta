@@ -36,6 +36,7 @@
 
 import { useI18n } from '@heyta/i18n';
 
+import { pushLocaleToAccount } from '../../lib/locale-account.js';
 import { useLocalePreference } from '../../lib/locale-preference.js';
 
 export function LanguageSwitcher(): React.JSX.Element {
@@ -56,7 +57,11 @@ export function LanguageSwitcher(): React.JSX.Element {
       data-testid="language-switcher"
       // 用目标语言自己的发音规则读这个词，而不是当前界面的语言。
       lang={next}
-      onClick={() => setLocale(next)}
+      onClick={() => {
+        setLocale(next);
+        // 登录态下顺手写回账号（fire-and-forget）：未登录时函数内部直接返回。
+        void pushLocaleToAccount(next);
+      }}
     >
       {label}
     </button>

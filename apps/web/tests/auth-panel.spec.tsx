@@ -191,7 +191,8 @@ describe('发登录链接', () => {
     expect(calls).toHaveLength(1);
     expect(calls[0]!.url).toBe(`${BASE_URL}/api/login/magic-link`);
     expect(calls[0]!.init?.method).toBe('POST');
-    expect(calls[0]!.body).toEqual({ email: 'me@example.com' });
+    // 发信请求带上当前界面语言（邮件按收件人当前语言渲染）；逐字 toEqual 拦住多余字段。
+    expect(calls[0]!.body).toEqual({ email: 'me@example.com', locale: 'zh-CN' });
 
     const text = el.textContent ?? '';
     expect(text).toContain(translate('zh-CN', 'web.auth.sent.login'));
@@ -320,7 +321,7 @@ describe('注册：同意必须由用户自己勾', () => {
     });
 
     expect(calls[0]!.url).toBe(`${BASE_URL}/api/register/magic-link`);
-    expect(calls[0]!.body).toEqual({ email: 'me@example.com' });
+    expect(calls[0]!.body).toEqual({ email: 'me@example.com', locale: 'zh-CN' });
     expect(Object.keys(calls[0]!.body as object)).not.toContain('termsAccepted');
     expect(el.textContent ?? '').toContain(translate('zh-CN', 'web.auth.sent.register'));
   });
@@ -343,7 +344,11 @@ describe('注册：同意必须由用户自己勾', () => {
       await Promise.resolve();
     });
 
-    expect(calls[0]!.body).toEqual({ email: 'me@example.com', termsAccepted: true });
+    expect(calls[0]!.body).toEqual({
+      email: 'me@example.com',
+      termsAccepted: true,
+      locale: 'zh-CN',
+    });
   });
 });
 

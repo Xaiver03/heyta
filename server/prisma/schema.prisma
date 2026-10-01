@@ -34,6 +34,11 @@ model User {
   createdAt                     DateTime @default(now()) @map("created_at")
   storageQuotaBytes             BigInt   @default(104857600) @map("storage_quota_bytes") // 100MB default
   storageUsedBytes              BigInt   @default(0) @map("storage_used_bytes")
+  // 账号语言（可空）：登录态下用户改界面语言时写回；发信对已知账号优先用它。
+  // 依据 docs/plans/i18n-multilingual.md §3 的四层解析链（2026-10-01 拍板）。
+  // AGENTS §3.3：新增持久化字段一律可选 —— null = 用户从未在登录态下改过语言，
+  // 邮件语言照旧走 请求显式 > 账号 > Accept-Language > zh-CN。
+  locale                        String?
 
   operations                  Operation[]
   syncState                   UserSyncState?

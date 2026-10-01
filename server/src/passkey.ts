@@ -221,6 +221,8 @@ export const verifyRegistration = async (
    * 这里**只登记**一条待兑现的邀请，发奖要等邮箱验证（见 `activity/invite.ts`）。
    */
   inviteCode?: string,
+  /** 收件人的语言。**可选** —— 见 `auth.ts` 的 `requestLoginMagicLink`。 */
+  locale?: ServerLocale,
 ): Promise<{ message: string }> => {
   const { rpID, origin } = getWebAuthnConfig();
 
@@ -364,7 +366,7 @@ export const verifyRegistration = async (
     }
 
     // Normal flow: send verification email
-    const emailSent = await sendVerificationEmail(email, verificationToken);
+    const emailSent = await sendVerificationEmail(email, verificationToken, locale);
     if (!emailSent) return { message: REGISTRATION_SUCCESS_MESSAGE };
 
     Logger.info(`Passkey registration initiated`);

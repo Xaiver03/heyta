@@ -56,6 +56,15 @@ const isServerLocale = (value: string): value is ServerLocale =>
   (SERVER_LOCALES as readonly string[]).includes(value);
 
 /**
+ * 账号语言列（`users.locale`，可空文本）→ `ServerLocale | undefined`。
+ *
+ * 列是普通文本：集合外的值（历史行、手写 SQL、失败迁移）当 `undefined` 处理，
+ * 调用方回落到请求解析链 —— 而不是抛错或悄悄当默认语言用。
+ */
+export const asServerLocale = (value: string | null | undefined): ServerLocale | undefined =>
+  value === null || value === undefined ? undefined : isServerLocale(value) ? value : undefined;
+
+/**
  * 解析语言。
  *
  * 优先级：**显式参数**（`?lang=`，发信时就写进链接里）> `Accept-Language` > 默认 `zh-CN`。
