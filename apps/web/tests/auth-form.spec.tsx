@@ -540,6 +540,25 @@ describe('D 注册档', () => {
     expect(register.mock.calls[0]?.[0]).toMatchObject({ inviteCode: ' ab12 ' });
   });
 
+  /**
+   * 🔴 这一条钉的是**薄壳能不能拿到当前那个码**。
+   *
+   * 症状如果缺了它：宿主只能对着**挂载时**的 `initialInviteCode` 算形状，
+   * 于是"把邀请链接里的码粘进那一栏"这个最常见的动作**永远判不出对错** ——
+   * 长度提示不会出现，而发不发的决定权也丢了（上面那条"形状不对就不发"随之变空话）。
+   * 归一化与形状规则在 `@heyta/domain` 与服务端，不在共享层（AGENTS §3.5），
+   * 所以这一份镜像是**唯一**能让宿主继续裁决的接口。
+   */
+  it('邀请码每一次改动都**交回宿主**（宿主用它算"这码发得出去吗"）', () => {
+    const mirrored: string[] = [];
+    const el = renderCredential({ onInviteCodeChange: (code) => mirrored.push(code) });
+    toRegister(el);
+    typeIn(el, 'auth-form-invite', 'AB');
+    typeIn(el, 'auth-form-invite', 'ABCD2345');
+    // 逐键都交回，且交回的是**原样**（宿主自己归一化）。
+    expect(mirrored).toEqual(['AB', 'ABCD2345']);
+  });
+
   it('形状不对时**这一个字段不发**、并说出长度那句：注册本身照发', () => {
     // 这里不发的是一个"注定被拒的码"，不是一笔交易：邀请码错了不该让注册也停住。
     // ⚠️ 判据要**真打进去一个码**：框子是空的时"不发"本来就成立，
