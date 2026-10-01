@@ -42,9 +42,16 @@ const DAY_LIST = '[data-testid="calendar-board-day-list"]';
 const BOARD_MONTH = '[data-testid="calendar-board-month"]';
 const MINI_TITLE = '[data-testid="calendar-mini-title"]';
 
+/**
+ * 🔴 必须带 `?lang=zh-CN`：这一屏的定位符（placeholder「添加任务」、标签「日历」、
+ * aria-label「完成：…」）全是中文，而 2026-10-01 起首启语言第 3 层问
+ * `navigator.language`（Playwright = en-US）⇒ 不钉就是英文界面，定位符全落空。
+ */
+const APP_ZH = '/?lang=zh-CN';
+
 /** 一条到期于今天的任务，把当天清单撑出来（滚轮要有一个"不归月历"的靶子）。 */
 async function seed(page: Page): Promise<void> {
-  await openApp(page);
+  await openApp(page, APP_ZH);
   const composer = page.locator('input[placeholder^="添加任务"]');
   // 6 条：把这一屏撑过视口（A/B 前提之一）。
   for (let i = 0; i < 6; i += 1) {
