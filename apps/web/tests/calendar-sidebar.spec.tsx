@@ -129,12 +129,12 @@ function miniCell(date: string): HTMLElement {
 
 /** 那一格画了几颗点。 */
 function dots(date: string): number {
-  return miniCell(date).querySelectorAll('.ht-mini-day__dots > i').length;
+  return miniCell(date).querySelectorAll('.ht-sidebar__day-dots > i').length;
 }
 
 /** 那一格那颗点的颜色（读回 `cssVar()` 给的 `var(--ht-…)`，不猜十六进制）。 */
 function dotColor(date: string): string {
-  const dot = miniCell(date).querySelector<HTMLElement>('.ht-mini-day__dots > i');
+  const dot = miniCell(date).querySelector<HTMLElement>('.ht-sidebar__day-dots > i');
   return dot?.style.background ?? '';
 }
 
@@ -248,7 +248,7 @@ describe('日历侧栏（Web）', () => {
     // 补白格必须在（它是下一个用例的入口）。
     expect(rendered).toContain(OUTSIDE_PREV);
 
-    const headers = [...container!.querySelectorAll('.ht-mini-month__weekdays > span')].map(
+    const headers = [...container!.querySelectorAll('.ht-sidebar__month-weekdays > span')].map(
       (el) => el.textContent,
     );
     // ⚠️ **故意写死**这个顺序，不从 `WEEKDAY_MESSAGE_KEYS` 推：从它推就是同义反复，
@@ -269,7 +269,7 @@ describe('日历侧栏（Web）', () => {
     await mount();
     await openCalendar();
 
-    const headers = [...container!.querySelectorAll<HTMLElement>('.ht-mini-month__weekdays > span')];
+    const headers = [...container!.querySelectorAll<HTMLElement>('.ht-sidebar__month-weekdays > span')];
     const colored = headers.map((el) => el.style.color);
     expect(colored[0], '今天那一列的列头没有主色').toBe('var(--ht-color-primary)');
     expect(colored.filter((c) => c === 'var(--ht-color-primary)').length, '主色列头不止一个').toBe(1);
@@ -324,10 +324,10 @@ describe('日历侧栏（Web）', () => {
     expect(dots('2026-09-15'), '没安排的日子不该有点').toBe(0);
 
     // 总数：颗数 = **有任务的天数**（4 天：05 / 10 / 20 / 28），不是任务条数。
-    const withDots = miniDays().filter((el) => el.querySelectorAll('.ht-mini-day__dots > i').length > 0);
+    const withDots = miniDays().filter((el) => el.querySelectorAll('.ht-sidebar__day-dots > i').length > 0);
     expect(withDots.length).toBe(4);
     expect(
-      miniDays().every((el) => el.querySelectorAll('.ht-mini-day__dots > i').length <= 1),
+      miniDays().every((el) => el.querySelectorAll('.ht-sidebar__day-dots > i').length <= 1),
       '有格子画了不止一颗点',
     ).toBe(true);
   });
@@ -379,7 +379,7 @@ describe('日历侧栏（Web）', () => {
     expect(dots(TODAY), '这一天空了，格子里不该还有点').toBe(0);
     // 缩进行确实分了层（与任务侧栏同一条"只有一层嵌套"的语义）。
     expect(need(`calendar-scope-${report}`).closest('label')?.className).toContain(
-      'ht-scope__row--child',
+      'ht-sidebar__scope-row--child',
     );
   });
 
@@ -510,7 +510,7 @@ describe('日历侧栏（Web）', () => {
     expect(need('calendar-board-footnote').textContent).toContain('未设截止时间');
     expect(dots(TODAY)).toBe(0);
     expect(hasRow('没设时间的事')).toBe(false);
-    expect(miniDays().every((el) => el.querySelectorAll('.ht-mini-day__dots > i').length === 0)).toBe(
+    expect(miniDays().every((el) => el.querySelectorAll('.ht-sidebar__day-dots > i').length === 0)).toBe(
       true,
     );
   });

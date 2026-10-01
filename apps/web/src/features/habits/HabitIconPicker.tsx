@@ -55,10 +55,10 @@ export function HabitIconPicker({ habit, onChange }: HabitIconPickerProps) {
   const EffectiveGlyph = HABIT_GLYPHS[effective];
 
   return (
-    <span className="ht-icon-picker">
+    <span className="ht-habit__icon-picker">
       <button
         type="button"
-        className="ht-icon-picker__toggle"
+        className="ht-habit__icon-toggle"
         aria-expanded={open}
         aria-label={t('web.habits.icon.a11y', { name: habit.name })}
         onClick={() => {
@@ -66,12 +66,12 @@ export function HabitIconPicker({ habit, onChange }: HabitIconPickerProps) {
         }}
       >
         <EffectiveGlyph size={16} aria-hidden="true" />
-        <span className="ht-icon-picker__word">{t('web.habits.icon.toggle')}</span>
+        <span className="ht-habit__icon-word">{t('web.habits.icon.toggle')}</span>
       </button>
 
       {open && (
         <span
-          className="ht-icon-picker__options"
+          className="ht-habit__icon-options"
           role="group"
           aria-label={t('web.habits.icon.group')}
           onKeyDown={(event) => {
@@ -84,7 +84,7 @@ export function HabitIconPicker({ habit, onChange }: HabitIconPickerProps) {
               <button
                 type="button"
                 key={icon}
-                className="ht-icon-picker__option"
+                className="ht-habit__icon-option"
                 aria-pressed={effective === icon}
                 aria-label={t(HABIT_ICON_LABEL_KEYS[icon])}
                 onClick={() => {
@@ -99,7 +99,7 @@ export function HabitIconPicker({ habit, onChange }: HabitIconPickerProps) {
           })}
           <button
             type="button"
-            className="ht-icon-picker__option ht-icon-picker__option--default"
+            className="ht-habit__icon-option ht-habit__icon-option--default"
             aria-pressed={value === undefined}
             aria-label={t('web.habits.icon.a11yDefault', { name: habit.name })}
             onClick={() => {

@@ -66,7 +66,7 @@
  * 常驻的手柄条会让侧栏边缘看起来像一道裂缝，而这条边 99% 的时间没人要拖。
  * 命中区只有 4px 宽 × 整列高：更窄会拖不中，更宽就吃掉主区的第一像素。
  */
-.ht-resizer {
+.ht-sidebar__resizer {
   position: absolute;
   inset-block: 0;
   /* 骑在边框上：左右各让一半，拖的时候不需要"精确压住那条 1px"。 */
@@ -79,7 +79,7 @@
   touch-action: none;
 }
 
-.ht-resizer::after {
+.ht-sidebar__resizer::after {
   content: '';
   position: absolute;
   inset-block: var(--ht-space-6);
@@ -90,8 +90,8 @@
   opacity: 0;
 }
 
-.ht-resizer:hover::after,
-.ht-resizer--dragging::after {
+.ht-sidebar__resizer:hover::after,
+.ht-sidebar__resizer--dragging::after {
   opacity: 1;
   /* 🔴 必须换色换粗：`--ht-color-border` 恰好就是这一列 `border-right` 的值，
      而 ::after 又落在同一列像素上 —— 同色同位等于**没画**（2026-09-30 实测：
@@ -102,12 +102,12 @@
 }
 
 /* 键盘：`outline` 而不是 `outline: none`（§5 明确点名的可访问性回归）。 */
-.ht-resizer:focus-visible {
+.ht-sidebar__resizer:focus-visible {
   outline: var(--ht-border-width-thick) solid var(--ht-color-ring);
   outline-offset: var(--ht-space-1);
 }
 
-.ht-resizer:focus-visible::after {
+.ht-sidebar__resizer:focus-visible::after {
   opacity: 1;
   background: var(--ht-color-primary);
 }
@@ -150,7 +150,7 @@
   这里原来是常驻的空输入框（一整行 + 一个 + 按钮），于是侧栏最贵的空间
   被用在"用户什么都不想做的时候"，而且两个空框看起来像是**没填完的表单**。
 */
-.ht-organizer__heading {
+.ht-sidebar__organizer-heading {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -159,12 +159,12 @@
 }
 
 /* 标题不再自带横向内边距 —— 行的留白已由上面负责，否则 + 与文字不同基线。 */
-.ht-organizer__heading .ht-nav__section {
+.ht-sidebar__organizer-heading .ht-nav__section {
   padding-block: var(--ht-space-3) var(--ht-space-1);
   padding-inline: 0;
 }
 
-.ht-organizer__add {
+.ht-sidebar__organizer-add {
   display: inline-grid;
   place-items: center;
   inline-size: var(--ht-touch-target-min);
@@ -178,12 +178,12 @@
   cursor: pointer;
 }
 
-.ht-organizer__add:hover {
+.ht-sidebar__organizer-add:hover {
   background: var(--ht-color-hover);
   color: var(--ht-color-foreground);
 }
 
-.ht-organizer__add:focus-visible {
+.ht-sidebar__organizer-add:focus-visible {
   outline: var(--ht-border-width-thick) solid var(--ht-color-ring);
   outline-offset: var(--ht-space-1);
 }
@@ -255,7 +255,7 @@
   ⚠️ 格子宽度**不写死**：侧栏是用户可拖的（12–26rem），所以列宽用 `1fr`、
   行高用 `aspect-ratio: 1`。给它一个固定像素宽，最窄时会溢出、最宽时会留白。
 */
-.ht-calendar-side {
+.ht-sidebar--calendar {
   /* 🔴 这一列自己是**有界的**（最高一屏）并且钉住；滚动交给里面那一层。
      以前这里直接写 `overflow-y: auto` 是错的，两处后果都在真浏览器里实测到：
 
@@ -263,7 +263,7 @@
          比视口(720)还高，于是这一层**自己永远不滚** —— 注释里那句
          "滚动条只出现在侧栏"是假的，实际是整页在滚，主区跟着走。
        · `overflow-y: auto` 会连带把 `overflow-x` 从 `visible` 变成 `clip`。
-         把手那 8px 命中带有 4px **骑在右边缘之外**（`.ht-resizer` 的
+         把手那 8px 命中带有 4px **骑在右边缘之外**（`.ht-sidebar__resizer` 的
          `inset-inline-end: -0.5 × space-2`）⇒ 被裁掉一半，对着它自己的
          几何中心按下去命中的是 `<nav>`，症状是"把手在那儿、拖不动"。 */
   position: sticky;
@@ -272,7 +272,7 @@
 }
 
 /* 内部这一层才是滚动区；**把手不在里面**，所以裁不到它。 */
-.ht-calendar-side__body {
+.ht-sidebar__calendar-body {
   display: flex;
   flex-direction: column;
   gap: var(--ht-space-2);
@@ -282,11 +282,11 @@
 
 /* 子项不许被 flex 压扁：压扁的样子是迷你月历的行高被挤到格子互相叠，
    而不是出现滚动条。 */
-.ht-calendar-side__body > * {
+.ht-sidebar__calendar-body > * {
   flex: 0 0 auto;
 }
 
-.ht-mini-month {
+.ht-sidebar__month {
   display: flex;
   flex-direction: column;
   gap: var(--ht-space-1);
@@ -296,27 +296,27 @@
   background: var(--ht-color-surface);
 }
 
-.ht-mini-month__head {
+.ht-sidebar__month-head {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: var(--ht-space-1);
 }
 
-.ht-mini-month__title {
+.ht-sidebar__month-title {
   font-size: var(--ht-font-size-sm);
   font-weight: var(--ht-font-weight-semibold);
   color: var(--ht-color-foreground);
 }
 
-.ht-mini-month__nav {
+.ht-sidebar__month-nav {
   display: flex;
   align-items: center;
   /* 翻月按钮组往右边框外探出半个间距：否则右侧留白看起来比左侧大一截。 */
   margin-inline-end: calc(var(--ht-space-1) * -1);
 }
 
-.ht-mini-month__nav-btn {
+.ht-sidebar__month-nav-btn {
   display: inline-grid;
   place-items: center;
   inline-size: var(--ht-space-6);
@@ -328,34 +328,34 @@
   cursor: pointer;
 }
 
-.ht-mini-month__nav-btn:hover {
+.ht-sidebar__month-nav-btn:hover {
   background: var(--ht-color-hover);
   color: var(--ht-color-foreground);
 }
 
-.ht-mini-month__nav-btn:focus-visible {
+.ht-sidebar__month-nav-btn:focus-visible {
   outline: var(--ht-border-width-thick) solid var(--ht-color-ring);
   outline-offset: var(--ht-space-1);
 }
 
-.ht-mini-month__weekdays,
-.ht-mini-month__row {
+.ht-sidebar__month-weekdays,
+.ht-sidebar__month-row {
   display: grid;
   grid-template-columns: repeat(7, 1fr);
 }
 
-.ht-mini-month__weekdays {
+.ht-sidebar__month-weekdays {
   font-size: var(--ht-font-size-2xs);
   font-weight: var(--ht-font-weight-medium);
   text-align: center;
   color: var(--ht-color-foreground-subtle);
 }
 
-.ht-mini-month__weekdays > span {
+.ht-sidebar__month-weekdays > span {
   padding-block: var(--ht-space-1);
 }
 
-.ht-mini-day {
+.ht-sidebar__day {
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -372,28 +372,28 @@
   cursor: pointer;
 }
 
-.ht-mini-day:hover {
+.ht-sidebar__day:hover {
   background: var(--ht-color-hover);
   color: var(--ht-color-foreground);
 }
 
-.ht-mini-day:focus-visible {
+.ht-sidebar__day:focus-visible {
   outline: var(--ht-border-width-thick) solid var(--ht-color-ring);
   outline-offset: var(--ht-space-1);
 }
 
 /* 补白格：属于相邻月，看得见、点得着，但要**看得出来不是本月**。 */
-.ht-mini-day--outside {
+.ht-sidebar__day--outside {
   color: var(--ht-color-foreground-subtle);
 }
 
-.ht-mini-day__num {
+.ht-sidebar__day-num {
   font-size: var(--ht-font-size-2xs);
   font-variant-numeric: tabular-nums;
   line-height: var(--ht-line-height-tight);
 }
 
-.ht-mini-day__dots {
+.ht-sidebar__day-dots {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -401,24 +401,24 @@
   block-size: var(--ht-size-badge-dot);
 }
 
-.ht-mini-day__dots > i {
+.ht-sidebar__day-dots > i {
   inline-size: var(--ht-size-badge-dot);
   block-size: var(--ht-size-badge-dot);
   border-radius: var(--ht-radius-full);
 }
 
 /* 今天：列头与数字同色（主蓝），圈出一层边 —— 与主区月历同一条表达。 */
-.ht-mini-day--today {
+.ht-sidebar__day--today {
   color: var(--ht-color-primary);
 }
 
-.ht-mini-day--today .ht-mini-day__num {
+.ht-sidebar__day--today .ht-sidebar__day-num {
   font-weight: var(--ht-font-weight-bold);
 }
 
 /* 选中：底色 + 描边两个通道都给。**不能只给底色** ——
    暗色主题下 `--ht-color-primary-subtle` 与 `--ht-color-surface` 差得很小。 */
-.ht-mini-day--selected {
+.ht-sidebar__day--selected {
   background: var(--ht-color-primary-subtle);
   border-color: var(--ht-color-primary);
   color: var(--ht-color-primary);
@@ -426,13 +426,13 @@
 
 /* ── 显示范围（所有 / 清单 / 标签）────────────────────────── */
 
-.ht-scope {
+.ht-sidebar__scope {
   display: flex;
   flex-direction: column;
   gap: var(--ht-space-1);
 }
 
-.ht-scope__all {
+.ht-sidebar__scope-all {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -450,26 +450,26 @@
   cursor: pointer;
 }
 
-.ht-scope__all:hover {
+.ht-sidebar__scope-all:hover {
   background: var(--ht-color-hover);
   color: var(--ht-color-foreground);
 }
 
-.ht-scope__all[aria-pressed='true'] {
+.ht-sidebar__scope-all[aria-pressed='true'] {
   color: var(--ht-color-primary);
 }
 
-.ht-scope__all:focus-visible {
+.ht-sidebar__scope-all:focus-visible {
   outline: var(--ht-border-width-thick) solid var(--ht-color-ring);
   outline-offset: var(--ht-space-1);
 }
 
-.ht-scope__group {
+.ht-sidebar__scope-group {
   display: flex;
   flex-direction: column;
 }
 
-.ht-scope__heading {
+.ht-sidebar__scope-heading {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -478,11 +478,11 @@
 }
 
 /* 分组头沿用侧栏的小节标题样式，只是把横向留白交给上面这层。 */
-.ht-scope__heading .ht-nav__section {
+.ht-sidebar__scope-heading .ht-nav__section {
   padding-inline: 0;
 }
 
-.ht-scope__row {
+.ht-sidebar__scope-row {
   display: flex;
   align-items: center;
   gap: var(--ht-space-2);
@@ -494,17 +494,17 @@
   cursor: pointer;
 }
 
-.ht-scope__row:hover {
+.ht-sidebar__scope-row:hover {
   background: var(--ht-color-hover);
   color: var(--ht-color-foreground);
 }
 
 /* 子清单比父级缩一格 —— 层级是**看着**出来的，不是靠名字猜。 */
-.ht-scope__row--child {
+.ht-sidebar__scope-row--child {
   padding-inline-start: var(--ht-space-5);
 }
 
-.ht-scope__name {
+.ht-sidebar__scope-name {
   min-inline-size: 0;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -2152,76 +2152,10 @@ input[type="radio"] {
    就是第二套降级策略，两套必然漂移。
    ─────────────────────────────────────────────────────────────────────── */
 
-/* ── L2 习惯卡片：三指标 / 冻结 / 续接 / 重新开始 ───────────────────── */
-
-.ht-habit__name {
-  color: var(--ht-color-foreground);
-}
-
-.ht-habit__metrics {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--ht-space-3);
-  margin-top: var(--ht-space-1);
-  color: var(--ht-color-foreground-muted);
-}
-
-.ht-habit__metric {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--ht-space-1);
-}
-
-.ht-habit__metric--current {
-  color: var(--ht-color-foreground);
-}
-
-/* 冻结**不是**一个奖励徽章，所以不用 success 色（那会读成"你赚到了"）。
-   它是一条中性的事实说明。 */
-.ht-habit__freeze {
-  margin: var(--ht-space-1) 0 0;
-  color: var(--ht-color-foreground-subtle);
-}
-
-/* 续接 / 重新开始。两者形状相同：一句话 + 一个动作，且动作永远在数字之后。 */
-.ht-habit__action {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--ht-space-2);
-  margin-top: var(--ht-space-2);
-  padding: var(--ht-space-2);
-  border: var(--ht-border-width-thin) solid var(--ht-color-border);
-  border-radius: var(--ht-radius-md);
-  background: var(--ht-color-background);
-}
-
-.ht-habit__action-text {
-  margin: 0;
-  flex: 1;
-  color: var(--ht-color-foreground-muted);
-}
-
-.ht-habit__action-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--ht-space-1);
-  white-space: nowrap;
-}
-
-/* 打卡是这套体系里**最高频**的动作，所以它也要有按下反馈。
-   这个按钮的样式是行内的（既有写法），因此规则挂在一个类上。 */
-.ht-habit__checkin:active:not(:disabled) {
-  transform: scale(var(--ht-motion-press-scale));
-}
-
-.ht-habit__title {
-  display: flex;
-  align-items: center;
-  gap: var(--ht-space-2);
-}
+/* ── L2 习惯卡片 ─────────────────────────────────────────────────────
+   这一族原来的十条规则（`__name` / `__metrics` / `__metric--current` / `__freeze`
+   / `__action*` / `__checkin` / `__title`）**零引用**（`git grep "ht-habit__"`
+   只命中本文件），已随 M3 的死规则清理删掉；族名现在给下面的「列表 + 窗格」视图。 */
 
 /* ── 分类时长 ─────────────────────────────────────────────────────── */
 
@@ -2783,7 +2717,7 @@ input[type="radio"] {
  *
  * 🔴 本块必须排在下面的「窄屏塌缩」之前（同特异性、源序后者胜）。
  */
-.ht-habits {
+.ht-habit {
   display: grid;
   /* 右列要装 90 天热力图（十几列方格），所以给它 2 倍权重；
      `minmax(0, …)` 是关键：不写 0，网格项的 `min-width:auto` 会让热力图
@@ -2793,7 +2727,7 @@ input[type="radio"] {
   align-items: start;
 }
 
-.ht-habits__side {
+.ht-habit__side {
   display: flex;
   flex-direction: column;
   gap: var(--ht-space-3);
@@ -2802,12 +2736,12 @@ input[type="radio"] {
 
 /* 新建习惯：一行「输入框 + 图标按钮」。这两件以前是行内样式，
    挪进 CSS 是因为窄屏塌缩要改它们的排布（行内样式改不动）。 */
-.ht-habits__add {
+.ht-habit__add {
   display: flex;
   gap: var(--ht-space-2);
 }
 
-.ht-habits__add input {
+.ht-habit__add input {
   flex: 1;
   min-width: 0;
   padding: 0 var(--ht-space-3);
@@ -2818,12 +2752,12 @@ input[type="radio"] {
   font-family: var(--ht-font-sans);
 }
 
-.ht-habits__add input:focus-visible {
+.ht-habit__add input:focus-visible {
   outline: var(--ht-border-width-thick) solid var(--ht-color-ring);
   outline-offset: var(--ht-space-1);
 }
 
-.ht-habits__add button {
+.ht-habit__add button {
   display: grid;
   place-items: center;
   flex: none;
@@ -2834,12 +2768,12 @@ input[type="radio"] {
   color: var(--ht-color-on-primary);
 }
 
-.ht-habits__add button:focus-visible {
+.ht-habit__add button:focus-visible {
   outline: var(--ht-border-width-thick) solid var(--ht-color-ring);
   outline-offset: var(--ht-space-1);
 }
 
-.ht-habits__list {
+.ht-habit__list {
   display: flex;
   flex-direction: column;
   gap: var(--ht-space-2);
@@ -2848,14 +2782,14 @@ input[type="radio"] {
   list-style: none;
 }
 
-.ht-habits__item {
+.ht-habit__item {
   min-width: 0;
 }
 
 /* 整行是一个 `<button>`（点哪都算选中），所以：
    `text-align: start` 取消按钮默认的居中，`width: 100%` 让它铺满列宽。
    ⚠️ 行内不能再嵌可交互元素 —— 图标选择器因此住在右窗格的页眉，不在这里。 */
-.ht-habits__row {
+.ht-habit__row {
   display: flex;
   flex-direction: column;
   align-items: stretch;
@@ -2873,17 +2807,17 @@ input[type="radio"] {
 
 /* 选中态用**边框**表达（扁平风格里阴影只给真正的浮层），
    再加一层极浅的主色底：两种线索，色觉障碍下仍分得出。 */
-.ht-habits__row[aria-current='true'] {
+.ht-habit__row[aria-current='true'] {
   border-color: var(--ht-color-primary);
   background: var(--ht-color-primary-subtle);
 }
 
-.ht-habits__row:focus-visible {
+.ht-habit__row:focus-visible {
   outline: var(--ht-border-width-thick) solid var(--ht-color-ring);
   outline-offset: var(--ht-space-1);
 }
 
-.ht-habits__head {
+.ht-habit__head {
   display: flex;
   align-items: center;
   gap: var(--ht-space-2);
@@ -2892,7 +2826,7 @@ input[type="radio"] {
 
 /* 图标底盘。颜色由 JSX 给（分类槽位 / 未设色走 `UNSET_CATEGORY_TOKEN`）；
    这里只负责形状与尺寸 —— 尺寸若也交给内联样式，就成了第二套尺度来源。 */
-.ht-habits__disc {
+.ht-habit__disc {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -2903,7 +2837,7 @@ input[type="radio"] {
   border-radius: var(--ht-radius-full);
 }
 
-.ht-habits__name {
+.ht-habit__name {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -2912,7 +2846,7 @@ input[type="radio"] {
   font-weight: var(--ht-font-weight-medium);
 }
 
-.ht-habits__week {
+.ht-habit__week {
   display: flex;
   align-items: center;
   gap: var(--ht-space-1);
@@ -2920,14 +2854,14 @@ input[type="radio"] {
 
 /* 每格 = 一天。空格子**也有边框**：heat-0 在亮色下接近白，
    "没有记录"与"没画这一格"必须是两件看得出来的事。 */
-.ht-habits__dot {
+.ht-habit__dot {
   inline-size: var(--ht-space-2);
   block-size: var(--ht-space-2);
   border: var(--ht-border-width-thin) solid var(--ht-color-border);
   border-radius: var(--ht-radius-full);
 }
 
-.ht-habits__chips {
+.ht-habit__chips {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -2936,7 +2870,7 @@ input[type="radio"] {
 
 /* 🔴 三个 chip **同等样式**：「累计」是唯一只增不减的数字，断链那天
    用户最需要看见它（ADR-0022）。把它做成次要色 = 在视觉上砍掉它。 */
-.ht-habits__chip {
+.ht-habit__chip {
   display: inline-flex;
   align-items: center;
   gap: var(--ht-space-1);
@@ -2944,15 +2878,15 @@ input[type="radio"] {
   font-size: var(--ht-font-size-xs);
 }
 
-.ht-habits__chip-num {
+.ht-habit__chip-num {
   font-variant-numeric: tabular-nums;
 }
 
-.ht-habits__pane {
+.ht-habit__pane {
   min-width: 0;
 }
 
-.ht-habits__pane-head {
+.ht-habit__pane-head {
   display: flex;
   justify-content: flex-end;
   gap: var(--ht-space-2);
@@ -2960,7 +2894,7 @@ input[type="radio"] {
 
 /* 图标选择器：与 `.ht-slot-picker` 同一形状（展开式，不是浮层）。
    差别只有一件 —— 槽位是「色块 + 编号」，这里本来就是字形，不需要编号。 */
-.ht-icon-picker {
+.ht-habit__icon-picker {
   display: inline-flex;
   flex-direction: column;
   align-items: flex-end;
@@ -2968,7 +2902,7 @@ input[type="radio"] {
   flex: none;
 }
 
-.ht-icon-picker__toggle {
+.ht-habit__icon-toggle {
   display: inline-flex;
   align-items: center;
   gap: var(--ht-space-1);
@@ -2983,17 +2917,17 @@ input[type="radio"] {
   font-size: var(--ht-font-size-xs);
 }
 
-.ht-icon-picker__word {
+.ht-habit__icon-word {
   font-size: var(--ht-font-size-xs);
 }
 
-.ht-icon-picker__options {
+.ht-habit__icon-options {
   display: flex;
   flex-wrap: wrap;
   gap: var(--ht-space-1);
 }
 
-.ht-icon-picker__option {
+.ht-habit__icon-option {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -3010,12 +2944,12 @@ input[type="radio"] {
 }
 
 /* 选中态走边框，不靠颜色深浅 —— 八个字形本来就要用户挑。 */
-.ht-icon-picker__option[aria-pressed='true'] {
+.ht-habit__icon-option[aria-pressed='true'] {
   border-color: var(--ht-color-primary);
 }
 
-.ht-icon-picker__toggle:focus-visible,
-.ht-icon-picker__option:focus-visible {
+.ht-habit__icon-toggle:focus-visible,
+.ht-habit__icon-option:focus-visible {
   outline: var(--ht-border-width-thick) solid var(--ht-color-ring);
   outline-offset: var(--ht-space-1);
 }
@@ -3111,18 +3045,18 @@ input[type="radio"] {
   /* 🔴 塌缩态里侧栏已经是**横着的一条底部导航**，"拖它的右边缘"没有语义。
      手柄仍挂在 DOM 上（任务页与日历页各有一条侧栏，都带它），所以必须显式关掉，
      否则它会在底部条的右端留一条能点、能聚焦、拖了没反应的竖线。 */
-  .ht-resizer {
+  .ht-sidebar__resizer {
     display: none;
   }
 
   /* 桌面那条列的"钉住 + 一屏封顶 + 内部滚动"三条在底部条里都没有语义：
      横条不该粘在视口顶部，也不该被一屏高度卡住自己的内容。 */
-  .ht-calendar-side {
+  .ht-sidebar--calendar {
     position: static;
     max-block-size: none;
   }
 
-  .ht-calendar-side__body {
+  .ht-sidebar__calendar-body {
     overflow-y: visible;
   }
 
@@ -3157,12 +3091,12 @@ input[type="radio"] {
    而不是把 chip 收进悬停。
    ⚠️ 这条单独成一个媒体块、写在文件末尾：基础规则在它上面，源序保证覆盖成立。 */
 @media (max-width: 768px) {
-  .ht-habits {
+  .ht-habit {
     grid-template-columns: 1fr;
     gap: var(--ht-space-4);
   }
 
-  .ht-habits__pane {
+  .ht-habit__pane {
     padding-top: var(--ht-space-4);
     border-top: var(--ht-border-width-thin) solid var(--ht-color-border);
   }

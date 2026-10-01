@@ -81,7 +81,7 @@ export function HabitsList({ rows, selectedId, onSelect }: HabitsListProps) {
   const { t } = useI18n();
 
   return (
-    <ul className="ht-habits__list" aria-label={t('web.habits.list.aria')}>
+    <ul className="ht-habit__list" aria-label={t('web.habits.list.aria')}>
       {rows.map(({ progress, week }) => {
         const { habit } = progress;
         const growth = progress.resilience.resilience;
@@ -96,13 +96,13 @@ export function HabitsList({ rows, selectedId, onSelect }: HabitsListProps) {
         const discColor = slot === undefined ? unsetSlotColor() : categorySlotColor(slot);
 
         return (
-          <li key={habit.id} className="ht-habits__item">
+          <li key={habit.id} className="ht-habit__item">
             <button
               type="button"
               // RNW 之外这里是真 `<button>`，但测试仍按 testID 寻址 ——
               // 与共享板同一套约定，改标签名不会让判据集体误红。
               data-testid={`habit-row-${habit.id}`}
-              className="ht-habits__row"
+              className="ht-habit__row"
               aria-current={selected ? 'true' : undefined}
               title={t('web.habits.row.selectA11y', { name: habit.name })}
               aria-label={t('web.habits.row.aria', {
@@ -115,21 +115,21 @@ export function HabitsList({ rows, selectedId, onSelect }: HabitsListProps) {
                 onSelect(habit.id);
               }}
             >
-              <span className="ht-habits__head">
+              <span className="ht-habit__head">
                 <span
-                  className="ht-habits__disc"
+                  className="ht-habit__disc"
                   style={{ color: discColor, borderColor: discColor }}
                 >
                   <Glyph size={16} aria-hidden="true" />
                 </span>
-                <span className="ht-habits__name">{habit.name}</span>
+                <span className="ht-habit__name">{habit.name}</span>
               </span>
 
-              <span className="ht-habits__week" role="group" aria-label={t('web.habits.week.aria')}>
+              <span className="ht-habit__week" role="group" aria-label={t('web.habits.week.aria')}>
                 {week.map((day) => (
                   <span
                     key={day.date}
-                    className="ht-habits__dot"
+                    className="ht-habit__dot"
                     role="img"
                     title={
                       day.count === 0
@@ -150,18 +150,18 @@ export function HabitsList({ rows, selectedId, onSelect }: HabitsListProps) {
                 ))}
               </span>
 
-              <span className="ht-habits__chips">
-                <span className="ht-habits__chip" title={current}>
+              <span className="ht-habit__chips">
+                <span className="ht-habit__chip" title={current}>
                   <Flame size={12} aria-hidden="true" />
-                  <span className="ht-habits__chip-num">{growth.current}</span>
+                  <span className="ht-habit__chip-num">{growth.current}</span>
                 </span>
-                <span className="ht-habits__chip" title={longest}>
+                <span className="ht-habit__chip" title={longest}>
                   <TrendingUp size={12} aria-hidden="true" />
-                  <span className="ht-habits__chip-num">{growth.longest}</span>
+                  <span className="ht-habit__chip-num">{growth.longest}</span>
                 </span>
-                <span className="ht-habits__chip" title={total}>
+                <span className="ht-habit__chip" title={total}>
                   <Check size={12} aria-hidden="true" />
-                  <span className="ht-habits__chip-num">{growth.total}</span>
+                  <span className="ht-habit__chip-num">{growth.total}</span>
                 </span>
               </span>
             </button>

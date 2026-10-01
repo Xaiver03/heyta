@@ -172,7 +172,7 @@ export function SidebarResizer() {
   return (
     <div
       ref={handle}
-      className={`ht-resizer${dragging ? ' ht-resizer--dragging' : ''}`}
+      className={`ht-sidebar__resizer${dragging ? ' ht-sidebar__resizer--dragging' : ''}`}
       role="separator"
       aria-orientation="vertical"
       aria-label={t('web.shell.sidebar.resize')}

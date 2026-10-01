@@ -96,8 +96,8 @@ async function until(label: string, cond: () => boolean, timeoutMs = 8000): Prom
 
 /** 当前在右窗格里展开的那个习惯名（从 DOM 读，不猜 store 的顺序）。 */
 function selectedName(): string {
-  const row = qa<HTMLElement>('.ht-habits__row').find((r) => r.getAttribute('aria-current') === 'true');
-  return row?.querySelector('.ht-habits__name')?.textContent?.trim() ?? '';
+  const row = qa<HTMLElement>('.ht-habit__row').find((r) => r.getAttribute('aria-current') === 'true');
+  return row?.querySelector('.ht-habit__name')?.textContent?.trim() ?? '';
 }
 
 function qa<T extends Element>(selector: string, scope: ParentNode = container ?? document): T[] {
@@ -106,7 +106,7 @@ function qa<T extends Element>(selector: string, scope: ParentNode = container ?
 
 /** 左列的一行（按习惯名找，避免依赖列表顺序）。 */
 function rowOf(name: string): HTMLElement {
-  const el = qa<HTMLElement>('.ht-habits__row').find((r) => r.textContent?.includes(name));
+  const el = qa<HTMLElement>('.ht-habit__row').find((r) => r.textContent?.includes(name));
   if (el === undefined) throw new Error(`找不到习惯行「${name}」`);
   return el;
 }
@@ -134,7 +134,7 @@ function selectRow(name: string): void {
 }
 
 const pane = (): HTMLElement | undefined =>
-  container?.querySelector<HTMLElement>('.ht-habits__pane') ?? undefined;
+  container?.querySelector<HTMLElement>('.ht-habit__pane') ?? undefined;
 
 beforeAll(() => {
   (globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -191,13 +191,13 @@ afterEach(() => {
 
 describe('A. 左列：一行一个习惯，三个具体数字写在行上', () => {
   it('两条习惯 = 两行，行名在 DOM 里读得到', () => {
-    expect(qa('.ht-habits__item')).toHaveLength(2);
+    expect(qa('.ht-habit__item')).toHaveLength(2);
     expect(container?.textContent).toContain('喝水');
     expect(container?.textContent).toContain('阅读');
   });
 
   it('🔴 每行三个数字**都渲染成文字**，不是一个总数（ADR-0022 三数同权）', () => {
-    const nums = qa('.ht-habits__chip-num', rowOf('阅读')).map((el) => el.textContent?.trim());
+    const nums = qa('.ht-habit__chip-num', rowOf('阅读')).map((el) => el.textContent?.trim());
     // 连续 2 / 最长 6 / 累计 8 —— 三个互不相等，所以"渲染错一个数"必红。
     expect(nums).toEqual(['2', '6', '8']);
   });
@@ -207,19 +207,19 @@ describe('A. 左列：一行一个习惯，三个具体数字写在行上', () =
   });
 
   it('行首图标圆盘每行恰好一个，且带一个 svg 字形', () => {
-    for (const row of qa<HTMLElement>('.ht-habits__row')) {
-      expect(qa('svg', row.querySelector('.ht-habits__disc') ?? row)).toHaveLength(1);
+    for (const row of qa<HTMLElement>('.ht-habit__row')) {
+      expect(qa('svg', row.querySelector('.ht-habit__disc') ?? row)).toHaveLength(1);
     }
   });
 });
 
 describe('B. 行首 7 个点：打没打一眼看得出处', () => {
   it('每行 7 个点（列表窗口 = HABIT_ROW_WEEK_DAYS）', () => {
-    expect(qa('.ht-habits__dot', rowOf('喝水'))).toHaveLength(7);
+    expect(qa('.ht-habit__dot', rowOf('喝水'))).toHaveLength(7);
   });
 
   it('🔴 打过的那天是 `heat-4`，没打的是 `heat-0` —— 同一份共享分档表', () => {
-    const dots = qa<HTMLElement>('.ht-habits__dot', rowOf('喝水'));
+    const dots = qa<HTMLElement>('.ht-habit__dot', rowOf('喝水'));
     const today = dots[6];
     // 最后一格就是"今天"：`habitHeatmap` 以 now 结尾，往前推 7 天。
     expect(today?.getAttribute('title')).toBe(`${NOW_DATE} 已打卡`);
@@ -231,7 +231,7 @@ describe('B. 行首 7 个点：打没打一眼看得出处', () => {
 
   it('两点验证：颜色取自共享 token 而不是 web 里另配的一套', () => {
     // 「阅读」昨天与今天都打过 ⇒ 最后两格都是 heat-4，倒数第三格没有。
-    const dots = qa<HTMLElement>('.ht-habits__dot', rowOf('阅读'));
+    const dots = qa<HTMLElement>('.ht-habit__dot', rowOf('阅读'));
     expect(dots[5]?.style.background).toContain('--ht-color-heat-4');
     expect(dots[4]?.style.background).toContain('--ht-color-heat-0');
   });
@@ -243,7 +243,7 @@ describe('C. 右窗格：全页只有一块共享板，且只显示选中那一�
   });
 
   it('默认就恰好一条被选中，窗格说的就是它的名字', () => {
-    const marked = qa<HTMLElement>('.ht-habits__row').filter(
+    const marked = qa<HTMLElement>('.ht-habit__row').filter(
       (r) => r.getAttribute('aria-current') === 'true',
     );
     expect(marked).toHaveLength(1);
@@ -273,7 +273,7 @@ describe('C. 右窗格：全页只有一块共享板，且只显示选中那一�
       await useHabitStore.getState().deleteHabit(habitIdOf(gone));
     });
     await until(`「${keep}」成为选中项`, () => selectedName() === keep);
-    expect(qa('.ht-habits__item')).toHaveLength(1);
+    expect(qa('.ht-habit__item')).toHaveLength(1);
     expect(pane()?.getAttribute('aria-label')).toBe(`「${keep}」的打卡记录`);
     expect(qa('[data-testid="habit-board"]')).toHaveLength(1);
   });
@@ -281,14 +281,14 @@ describe('C. 右窗格：全页只有一块共享板，且只显示选中那一�
 
 describe('D. 图标选择器：存闭集 key，不存字形名', () => {
   function openPicker(): void {
-    const toggle = qa<HTMLElement>('.ht-icon-picker__toggle', pane() ?? document)[0];
+    const toggle = qa<HTMLElement>('.ht-habit__icon-toggle', pane() ?? document)[0];
     expect(toggle).toBeDefined();
     click(toggle);
   }
 
   /** 按**闭集 key** 取那一格 —— 位置来自 `HABIT_ICONS`，不是按字形名猜。 */
   function optionAt(icon: (typeof HABIT_ICONS)[number]): HTMLElement | undefined {
-    return qa<HTMLElement>('.ht-icon-picker__option', pane() ?? document)[HABIT_ICONS.indexOf(icon)];
+    return qa<HTMLElement>('.ht-habit__icon-option', pane() ?? document)[HABIT_ICONS.indexOf(icon)];
   }
 
   const storedIcon = (name: string): string | undefined =>
@@ -296,18 +296,18 @@ describe('D. 图标选择器：存闭集 key，不存字形名', () => {
 
   it('八个字形 + 一个「默认」，一个都不许多（词表是红线）', () => {
     openPicker();
-    const options = qa('.ht-icon-picker__option', pane() ?? document);
+    const options = qa('.ht-habit__icon-option', pane() ?? document);
     expect(options).toHaveLength(HABIT_ICONS.length + 1);
     expect(options[HABIT_ICONS.length]?.textContent).toBe('默认');
   });
 
   it('🔴 选一个字形 → **落库的是 key**，且行首圆盘跟着变', async () => {
     const name = selectedName();
-    const before = rowOf(name).querySelector('.ht-habits__disc svg')?.outerHTML;
+    const before = rowOf(name).querySelector('.ht-habit__disc svg')?.outerHTML;
     openPicker();
     click(optionAt('book'));
     await until(`「${name}」的图标落库为 book`, () => storedIcon(name) === 'book');
-    const after = rowOf(name).querySelector('.ht-habits__disc svg')?.outerHTML;
+    const after = rowOf(name).querySelector('.ht-habit__disc svg')?.outerHTML;
     expect(after).not.toBe(before);
   });
 
@@ -326,7 +326,7 @@ describe('D. 图标选择器：存闭集 key，不存字形名', () => {
   it('🔴 磁盘上是听不懂的历史值时**不炸**，画派生的那个字形', async () => {
     // 直接往 store 塞一个不在闭集里的 key（改名前的旧数据就是这个形状）。
     // 没有 `parseHabitIcon` 的话 `HABIT_GLYPHS['trophy']` 是 undefined 组件 —— 渲染时才炸。
-    const derived = rowOf('喝水').querySelector('.ht-habits__disc svg')?.outerHTML;
+    const derived = rowOf('喝水').querySelector('.ht-habit__disc svg')?.outerHTML;
     const habits = useHabitStore.getState().habits.map((h) =>
       h.name === '喝水' ? { ...h, icon: 'trophy' } : h,
     );
@@ -334,7 +334,7 @@ describe('D. 图标选择器：存闭集 key，不存字形名', () => {
       useHabitStore.setState({ habits });
     });
     await flush();
-    const after = rowOf('喝水').querySelector('.ht-habits__disc svg')?.outerHTML;
+    const after = rowOf('喝水').querySelector('.ht-habit__disc svg')?.outerHTML;
     expect(after).toBe(derived);
     expect(rowOf('喝水').textContent).toContain('喝水');
   });
@@ -348,7 +348,7 @@ describe('E. 一条习惯都没有', () => {
       });
     }
     await flush();
-    expect(qa('.ht-habits__item')).toHaveLength(0);
+    expect(qa('.ht-habit__item')).toHaveLength(0);
     expect(pane()?.textContent).toContain('还没有习惯。添加一个开始打卡。');
     expect(qa('[data-testid="habit-board"]')).toHaveLength(1);
   });

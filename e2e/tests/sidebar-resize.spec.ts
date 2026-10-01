@@ -20,7 +20,13 @@ import { openApp } from './helpers';
  */
 
 const SIDEBAR = '.ht-sidebar';
-const HANDLE = '.ht-resizer';
+const HANDLE = '.ht-sidebar__resizer';
+
+/**
+ * 🔴 必须带 `?lang=zh-CN`：本用例的定位符与 aria-label 全是中文，而 2026-10-01
+ * 起首启语言第 3 层问 `navigator.language`（Playwright = en-US）⇒ 不钉就是英文界面。
+ */
+const APP_ZH = '/?lang=zh-CN';
 
 /** 侧栏列宽（像素，四舍五入）。 */
 async function width(page: Page): Promise<number> {
@@ -68,7 +74,7 @@ async function dragBy(page: Page, dx: number): Promise<number> {
 }
 
 test('侧栏宽度：默认 = token、拖拽生效、刷新仍在、界内夹取、双击复位', async ({ page }) => {
-  await openApp(page);
+  await openApp(page, APP_ZH);
 
   const def = await tokenPx(page, '--ht-layout-sidebar-width');
   const min = await tokenPx(page, '--ht-layout-sidebar-min-width');
@@ -124,7 +130,7 @@ test('侧栏宽度：默认 = token、拖拽生效、刷新仍在、界内夹取
 });
 
 test('把手的可拖性要看得见：idle 不画线，hover 画主蓝且比静态边框粗', async ({ page }) => {
-  await openApp(page);
+  await openApp(page, APP_ZH);
   const handle = page.locator(HANDLE);
 
   const idle = await handle.evaluate((el) => getComputedStyle(el, '::after').opacity);
@@ -162,7 +168,7 @@ test('把手的可拖性要看得见：idle 不画线，hover 画主蓝且比静
 });
 
 test('新建入口是标题右侧的 +：默认无输入框，点开才出现，收起分两种', async ({ page }) => {
-  await openApp(page);
+  await openApp(page, APP_ZH);
   const sidebar = page.locator('aside[aria-label="清单与标签"]');
   const addList = page.getByRole('button', { name: '新建清单' });
   const listInput = page.getByLabel('新清单名称');

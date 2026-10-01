@@ -108,10 +108,10 @@ function MiniDay({
     <button
       type="button"
       className={[
-        'ht-mini-day',
-        inMonth ? '' : ' ht-mini-day--outside',
-        isToday ? ' ht-mini-day--today' : '',
-        isSelected ? ' ht-mini-day--selected' : '',
+        'ht-sidebar__day',
+        inMonth ? '' : ' ht-sidebar__day--outside',
+        isToday ? ' ht-sidebar__day--today' : '',
+        isSelected ? ' ht-sidebar__day--selected' : '',
       ]
         .join('')
         .trim()}
@@ -124,7 +124,7 @@ function MiniDay({
         onPress(date);
       }}
     >
-      <span className="ht-mini-day__num">{Number(date.slice(8, 10))}</span>
+      <span className="ht-sidebar__day-num">{Number(date.slice(8, 10))}</span>
       {/*
         🔴 **一颗点，不是一到三颗**：点只回答"这天有没有事、大致什么状态"。
         侧栏宽度是用户可拖的（`--ht-layout-sidebar-min/max-width`），最窄时一格只有
@@ -132,7 +132,7 @@ function MiniDay({
         用户得到的信息反而更少。点径用的是 `--ht-size-badge-dot`，
         它登记的语义本来就是"只表示「有」、不表示「多少」"。
       */}
-      <span className="ht-mini-day__dots" aria-hidden="true">
+      <span className="ht-sidebar__day-dots" aria-hidden="true">
         {dotToken === null ? null : <i style={{ background: cssVar(dotToken) }} />}
       </span>
     </button>
@@ -163,8 +163,8 @@ function ScopeGroup({
   const allSelected = selectedCount === rows.length;
 
   return (
-    <div className="ht-scope__group">
-      <div className="ht-scope__heading">
+    <div className="ht-sidebar__scope-group">
+      <div className="ht-sidebar__scope-heading">
         <span className="ht-nav__section">{heading}</span>
         <input
           type="checkbox"
@@ -182,7 +182,7 @@ function ScopeGroup({
       {rows.map((row) => (
         <label
           key={row.id}
-          className={`ht-scope__row${row.depth > 0 ? ' ht-scope__row--child' : ''}`}
+          className={`ht-sidebar__scope-row${row.depth > 0 ? ' ht-sidebar__scope-row--child' : ''}`}
         >
           <input
             type="checkbox"
@@ -193,7 +193,7 @@ function ScopeGroup({
             }}
             data-testid={`calendar-scope-${row.id}`}
           />
-          <span className="ht-scope__name">{row.name}</span>
+          <span className="ht-sidebar__scope-name">{row.name}</span>
         </label>
       ))}
     </div>
@@ -261,21 +261,21 @@ export function CalendarSidebar(): React.JSX.Element {
   });
 
   return (
-    <nav className="ht-sidebar ht-calendar-side" aria-label={t('web.calendar.side.aria')}>
+    <nav className="ht-sidebar ht-sidebar--calendar" aria-label={t('web.calendar.side.aria')}>
       {/* 🔴 滚动的是**这一层**，不是 `<nav>` 自己：把手（`SidebarResizer`）必须留在
           滚动区之外。把手有 4px 骑在这一列的右边缘**外面**，而 `overflow-y: auto`
           会连带把横轴裁掉 —— 症状是"把手在那儿、几何中心按下去拖不动"（真浏览器实测）。 */}
-      <div className="ht-calendar-side__body">
+      <div className="ht-sidebar__calendar-body">
         {/* ── 迷你月历 ─────────────────────────────────────────── */}
-        <div className="ht-mini-month" ref={wheelHost}>
-          <div className="ht-mini-month__head">
-            <span className="ht-mini-month__title" data-testid="calendar-mini-title">
+        <div className="ht-sidebar__month" ref={wheelHost}>
+          <div className="ht-sidebar__month-head">
+            <span className="ht-sidebar__month-title" data-testid="calendar-mini-title">
               {formatMonthTitleText(view.cursor, t)}
             </span>
-            <div className="ht-mini-month__nav">
+            <div className="ht-sidebar__month-nav">
               <button
                 type="button"
-                className="ht-mini-month__nav-btn"
+                className="ht-sidebar__month-nav-btn"
                 aria-label={t('web.calendar.prevMonth')}
                 data-testid="calendar-mini-prev"
                 onClick={() => {
@@ -286,7 +286,7 @@ export function CalendarSidebar(): React.JSX.Element {
               </button>
               <button
                 type="button"
-                className="ht-mini-month__nav-btn"
+                className="ht-sidebar__month-nav-btn"
                 aria-label={t('web.calendar.backToToday')}
                 data-testid="calendar-mini-today"
                 onClick={() => {
@@ -297,7 +297,7 @@ export function CalendarSidebar(): React.JSX.Element {
               </button>
               <button
                 type="button"
-                className="ht-mini-month__nav-btn"
+                className="ht-sidebar__month-nav-btn"
                 aria-label={t('web.calendar.nextMonth')}
                 data-testid="calendar-mini-next"
                 onClick={() => {
@@ -309,7 +309,7 @@ export function CalendarSidebar(): React.JSX.Element {
             </div>
           </div>
 
-          <div className="ht-mini-month__weekdays">
+          <div className="ht-sidebar__month-weekdays">
             {WEEKDAY_MESSAGE_KEYS.map((key, i) => (
               <span
                 key={key}
@@ -321,9 +321,9 @@ export function CalendarSidebar(): React.JSX.Element {
             ))}
           </div>
 
-          <div className="ht-mini-month__grid" aria-label={t('web.calendar.mini.aria')}>
+          <div className="ht-sidebar__month-grid" aria-label={t('web.calendar.mini.aria')}>
             {weeks.map((week) => (
-              <div className="ht-mini-month__row" key={week[0]!.date}>
+              <div className="ht-sidebar__month-row" key={week[0]!.date}>
                 {week.map((cell) => {
                   const cellTasks = byDate.get(cell.date) ?? [];
                   return (
@@ -345,10 +345,10 @@ export function CalendarSidebar(): React.JSX.Element {
         </div>
 
         {/* ── 显示范围 ─────────────────────────────────────────── */}
-        <div className="ht-scope">
+        <div className="ht-sidebar__scope">
           <button
             type="button"
-            className={`ht-scope__all${isScopeEmpty(view.scope) ? ' ht-scope__all--on' : ''}`}
+            className={`ht-sidebar__scope-all${isScopeEmpty(view.scope) ? ' ht-sidebar__scope-all--on' : ''}`}
             aria-pressed={isScopeEmpty(view.scope)}
             aria-label={t('web.calendar.scope.allAria')}
             data-testid="calendar-scope-all"

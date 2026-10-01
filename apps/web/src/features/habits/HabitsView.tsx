@@ -203,10 +203,10 @@ export function HabitsView() {
   );
 
   return (
-    <div className="ht-habits" data-testid="habits-view">
-      <div className="ht-habits__side">
+    <div className="ht-habit" data-testid="habits-view">
+      <div className="ht-habit__side">
         <form
-          className="ht-habits__add"
+          className="ht-habit__add"
           onSubmit={(e) => {
             e.preventDefault();
             void add();
@@ -245,7 +245,7 @@ export function HabitsView() {
       </div>
 
       <div
-        className="ht-habits__pane"
+        className="ht-habit__pane"
         aria-label={
           selected === undefined
             ? undefined
@@ -253,7 +253,7 @@ export function HabitsView() {
         }
       >
         {selected === undefined ? null : (
-          <div className="ht-habits__pane-head">
+          <div className="ht-habit__pane-head">
             <HabitIconPicker
               habit={selected.progress.habit}
               onChange={(icon) => {
