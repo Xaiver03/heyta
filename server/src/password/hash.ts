@@ -176,6 +176,21 @@ export const checkPasswordBackend = async (): Promise<PasswordBackendReport> => 
 };
 
 /**
+ * 启动自检的**入口**：两道环节按顺序跑，哪一道挂就报哪一道的原话。
+ *
+ * ① `PASSWORD_PEPPER` 配了且够长（`getPasswordPepper` 自己抛，不在这里重复文案）；
+ * ② Argon2id known-answer 逐字节对得上（`checkPasswordBackend` 自己抛）。
+ *
+ * 🔴 调用点只能在**进程启动路径**上，不能在模块顶层：本仓库的 vitest 没有全局 `env` 块，
+ * 每个 spec 自己设需要的环境变量（`JWT_SECRET` 同理，见 `auth.ts:27`）。放在顶层会让任何
+ * `import` 到口令模块的测试先被环境要求绊倒。
+ */
+export const assertPasswordBackend = async (): Promise<PasswordBackendReport> => {
+  getPasswordPepper();
+  return checkPasswordBackend();
+};
+
+/**
  * 哈希一句口令。
  *
  * 🔴 **必须经 `withHashSlot` 调用**（见 `concurrency.ts`）：一次 ~35 ms 的 19 MiB 内存计算，
