@@ -26,6 +26,7 @@ import {
 import { authCache } from './auth-cache';
 import { getDefaultStorageQuotaBytes } from './sync/services/storage-quota.service';
 import { attachInviteOnRegister } from './activity/invite';
+import { hashToken } from './auth-tokens';
 
 // Constants
 const CHALLENGE_EXPIRY_MS = 5 * 60 * 1000; // 5 minutes
@@ -321,7 +322,7 @@ export const verifyRegistration = async (
       await tx.pendingPasskeyRegistration.create({
         data: {
           userId,
-          verificationToken,
+          verificationToken: hashToken(verificationToken),
           verificationTokenExpiresAt: tokenExpiresAt,
           credentialId: credentialIdRawBytes,
           publicKey: Buffer.from(credentialInfo.publicKey),
@@ -730,7 +731,7 @@ export const requestPasskeyRecovery = async (
       ],
     },
     data: {
-      passkeyRecoveryToken: recoveryToken,
+      passkeyRecoveryToken: hashToken(recoveryToken),
       passkeyRecoveryTokenExpiresAt: expiresAt,
     },
   });
@@ -739,7 +740,7 @@ export const requestPasskeyRecovery = async (
   const emailSent = await sendPasskeyRecoveryEmail(email, recoveryToken, locale);
   if (!emailSent) {
     await prisma.user.updateMany({
-      where: { id: user.id, passkeyRecoveryToken: recoveryToken },
+      where: { id: user.id, passkeyRecoveryToken: hashToken(recoveryToken) },
       data: {
         passkeyRecoveryToken: null,
         passkeyRecoveryTokenExpiresAt: null,
@@ -759,7 +760,7 @@ export const getRecoveryRegistrationOptions = async (
   token: string,
 ): Promise<{ email: string; options: PublicKeyCredentialCreationOptionsJSON }> => {
   const user = await prisma.user.findFirst({
-    where: { passkeyRecoveryToken: token },
+    where: { passkeyRecoveryToken: hashToken(token) },
     include: { passkeys: true },
   });
 
@@ -772,7 +773,7 @@ export const getRecoveryRegistrationOptions = async (
     user.passkeyRecoveryTokenExpiresAt < BigInt(Date.now())
   ) {
     await prisma.user.updateMany({
-      where: { id: user.id, passkeyRecoveryToken: token },
+      where: { id: user.id, passkeyRecoveryToken: hashToken(token) },
       data: {
         passkeyRecoveryToken: null,
         passkeyRecoveryTokenExpiresAt: null,
@@ -814,7 +815,7 @@ export const completePasskeyRecovery = async (
   const { rpID, origin } = getWebAuthnConfig();
 
   const user = await prisma.user.findFirst({
-    where: { passkeyRecoveryToken: token },
+    where: { passkeyRecoveryToken: hashToken(token) },
   });
 
   if (!user) {
@@ -826,7 +827,7 @@ export const completePasskeyRecovery = async (
     user.passkeyRecoveryTokenExpiresAt < BigInt(Date.now())
   ) {
     await prisma.user.updateMany({
-      where: { id: user.id, passkeyRecoveryToken: token },
+      where: { id: user.id, passkeyRecoveryToken: hashToken(token) },
       data: {
         passkeyRecoveryToken: null,
         passkeyRecoveryTokenExpiresAt: null,
@@ -873,7 +874,7 @@ export const completePasskeyRecovery = async (
     const consume = await tx.user.updateMany({
       where: {
         id: user.id,
-        passkeyRecoveryToken: token,
+        passkeyRecoveryToken: hashToken(token),
         OR: [
           { passkeyRecoveryTokenExpiresAt: null },
           { passkeyRecoveryTokenExpiresAt: { gte: BigInt(Date.now()) } },
