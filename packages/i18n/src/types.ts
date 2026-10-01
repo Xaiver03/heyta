@@ -7,6 +7,9 @@
  * 也少一处"写了兜底但其实永远走不到"的死代码。
  */
 
+// 只取**类型**：词条表不反向依赖本文件，所以这条 type-only 边不会成环。
+import type { MessageKey } from './locales/zh-CN.js';
+
 /** 支持的语言。新增语言时**必须**同时在 locales/ 下加词条表，否则编译不过。 */
 export type Locale = 'zh-CN' | 'en';
 
@@ -15,6 +18,23 @@ export const LOCALES = ['zh-CN', 'en'] as const satisfies readonly Locale[];
 
 /** 兜底语言。任何查不到的语言都回落到它。 */
 export const DEFAULT_LOCALE: Locale = 'zh-CN';
+
+/**
+ * 每门语言在**语言切换器**上显示的自称词条 key。
+ *
+ * 🔴 它放在这里而不是各端组件里，是因为消费它的地方**不止一个**：
+ * web 顶栏的 `LanguageSwitcher` 与落地页的界面复刻 `mockup/AppWindow`。
+ * 两边各写一份 `Record<Locale, MessageKey>` 的后果就是本文件里
+ * `otherLocale` 那段记录过的同一类事故 —— 加第三门语言时其中一边没跟上，
+ * 而那**不会报错**，只是那个语言在某个界面上永远点不到。
+ *
+ * `Record<Locale, …>` 是刻意的：往 `LOCALES` 里加一门语言而忘了在这里登记
+ * 自称，**编译期就红**。这是"准备好但先不做"里最省事的一道提醒桩。
+ */
+export const LOCALE_LABEL_KEY = {
+  'zh-CN': 'common.lang.zh',
+  en: 'common.lang.en',
+} as const satisfies Record<Locale, MessageKey>;
 
 /**
  * 另一种语言。

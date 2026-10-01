@@ -42,7 +42,7 @@ import {
   type LucideIcon,
 } from 'lucide-react';
 
-import { useI18n, type MessageKey } from '@heyta/i18n/provider';
+import { LOCALE_LABEL_KEY, LOCALES, useI18n, type MessageKey } from '@heyta/i18n/provider';
 
 import './mockup.css';
 
@@ -170,13 +170,17 @@ export function AppWindow({
   const { t, locale } = useI18n();
 
   /**
-   * 语言切换按钮上的词 = **另一种语言自己的名字**（与 `LanguageSwitcher.tsx`
-   * 同一条规则：用目标语言的发音规则读它，所以中文界面显示 "English"）。
+   * 语言切换那排按钮 = **每种已启用语言自己的名字**（与 `LanguageSwitcher.tsx`
+   * 同一个形态：遍历 `LOCALES`，当前语言标出来）。
    *
-   * ⚠️ 分支写在 `t(...)` **外面** —— `check:ui-language` 只认"字面量紧跟 `t(`"，
-   * `t(cond ? 'a' : 'b')` 那种写法它认不出来（真应用那个组件里也留了同样的注释）。
+   * 原来这里也是二态取反，和真应用一起带着同一个隐患 —— 现在两边都跟着
+   * `LOCALES`，加第三门语言时这张图会**自己多出一格**，而不是悄悄少一格。
    */
-  const otherLangLabel = locale === 'zh-CN' ? t('common.lang.en') : t('common.lang.zh');
+  const langOptions = LOCALES.map((option) => ({
+    option,
+    label: t(LOCALE_LABEL_KEY[option]),
+    active: option === locale,
+  }));
 
   /**
    * 顶部标题。
@@ -338,9 +342,17 @@ export function AppWindow({
                 <div className="mk-iconbtn" role="img" aria-label={t('web.sync.settings.title')}>
                   <Settings size={14} />
                 </div>
-                <div className="mk-lang" lang={locale === 'zh-CN' ? 'en' : 'zh-CN'}>
-                  {otherLangLabel}
-                </div>
+                {/* 当前语言在图上要看得出来（同 `mk-nav__item--active` 的处理）：
+                    一排同样式的格子会被读成"都是当前"。复刻是静态图，不写真控件的 aria。 */}
+                {langOptions.map(({ option, label, active }) => (
+                  <div
+                    key={option}
+                    className={active ? 'mk-lang mk-lang--on' : 'mk-lang'}
+                    lang={option}
+                  >
+                    {label}
+                  </div>
+                ))}
                 <div className="mk-iconbtn">
                   <Moon size={18} />
                 </div>
