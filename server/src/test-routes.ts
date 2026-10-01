@@ -7,15 +7,14 @@
 import { FastifyInstance } from 'fastify';
 import { Prisma } from '@prisma/client';
 import { SuperSyncOperationSchema, type SuperSyncOperation } from '@heyta/shared-schema';
-import * as bcrypt from 'bcryptjs';
-import * as jwt from 'jsonwebtoken';
 import { prisma } from './db';
+import * as jwt from 'jsonwebtoken';
 import { Logger } from './logger';
 import { getJwtSecret, JWT_EXPIRY } from './auth';
 import { authCache } from './auth-cache';
 import { computeOpStorageBytes } from './sync/sync.const';
-
-const BCRYPT_ROUNDS = 12;
+import { hashPassword } from './password/hash';
+import { withHashSlot } from './password/concurrency';
 
 interface CreateUserBody {
   email: string;
@@ -52,7 +51,10 @@ export const testRoutes = async (fastify: FastifyInstance): Promise<void> => {
     async (request, reply) => {
       const { email, password } = request.body;
 
-      const passwordHash = await bcrypt.hash(password, BCRYPT_ROUNDS);
+      // TEST_MODE 造的号要能被**产品那条登录路径**验起来，所以只能用同一个后端。
+      // 这里曾经用 bcrypt：哈希串长得就不一样，`verifyPassword()` 解不开它 ⇒
+      // 测试账号能拿到 JWT、却永远输不进密码 —— 一个只在 E2E 里现形的假账号。
+      const passwordHash = await withHashSlot(() => hashPassword(password));
 
       try {
         // Check if user already exists

@@ -211,3 +211,29 @@ describe('启动自检（checkPasswordBackend / assertPasswordBackend）', () =>
     await expect(assertPasswordBackend()).resolves.toMatchObject({ ok: true });
   });
 });
+
+describe('🔴 口令只有一个哈希真源', () => {
+  // 这一组存在的理由是一条**已经踩到的**缺陷：`server/src/test-routes.ts`（TEST_MODE 造号）
+  // 过去用 bcrypt 写 `password_hash`，而产品那条登录路径只认 Argon2id。两者的串长得都像
+  // 哈希、列类型都是 `string`、写入也不报错 —— 症状是"测试账号能拿到 JWT，却永远输不进密码"，
+  // 只在 E2E 里现形，而且最先被怀疑的总是 E2E 脚本。
+  it('bcrypt 形状的串在这里一律验不过（不是"兼容旧格式"）', async () => {
+    setPepper(GOOD_PEPPER);
+    // bcryptjs 的真实产物形状：$2b$<rounds>$<22 位 salt><31 位摘要>
+    const bcryptShaped =
+      '$2b$12$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy';
+    await expect(verifyPassword('correct-password-123!', bcryptShaped)).resolves.toBe(
+      false,
+    );
+    // 它同时必须被判定为"低于策略" ⇒ 万一真有这种存量数据，登录会就地重洗成 Argon2id，
+    // 而不是把它当成符合当前策略的哈希留在库里。
+    expect(needsRehash(bcryptShaped)).toBe(true);
+  });
+
+  it('本层写出的串一定是 Argon2id PHC（于是任何读写方都只可能遇到这一种格式）', async () => {
+    setPepper(GOOD_PEPPER);
+    const phc = await hashPassword('anything');
+    expect(phc.startsWith('$argon2id$')).toBe(true);
+    expect(phc).not.toMatch(/^\$2[aby]\$/);
+  });
+});

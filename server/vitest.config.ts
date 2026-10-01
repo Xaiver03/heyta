@@ -21,7 +21,6 @@ export default defineConfig({
       // Legacy tests that use synchronous SQLite patterns
       // These tests need to be migrated to async Prisma patterns
       'tests/sync.routes.spec.ts',
-      'tests/auth-flows.spec.ts',
       'tests/registration-api.spec.ts',
       'tests/api.routes.spec.ts',
       // Tests internal impl details that no longer match current service
