@@ -953,6 +953,17 @@ type WithheldPreference =
 —— "还需要 5 次"和"还需要 15 次"都会让它变绿。现在断言的是
 `{ reason: 'not-enough-samples', remaining: 5 }`，精确了。
 
+11. **AI 出境披露的"逐语言规则"住在仓库门禁里，不在 `packages/ai` 的测试里**（第 21 轮登记）。
+    §九 的设计第 4 条原本要求 `packages/ai/tests/egress.spec.ts` 自己断言两种语言，
+    理由是"AI 披露该怎么说"这条规则本来就该由 AI 这个包拥有。实际落点是
+    `scripts/check-ai-coverage.mjs` 的 `E2EE_COPY_RULES` + 8c。
+    后果具体而微：**只跑 `pnpm --filter @heyta/ai test` 的人看不到 en 那条规则** ——
+    `egress.spec.ts` 至今只对 `describeDestination()` 返回的**中文兜底句**做断言。
+    规则本身没失守（`pnpm check` 里就有它，`e2eecopy` 组的三种注入都能红：
+    zh 去掉否定 / en 的 key 改名 / 把 en 从规则表拿掉），所以这是**归属层**问题、不是覆盖问题。
+    要按设计搬到包里，得给 `packages/ai` 加 `@heyta/i18n` 的 dev 依赖 ——
+    那是依赖图决定，不在文案轮里顺手做。
+
 ## 八、验证命令
 
 ```bash
@@ -1143,14 +1154,29 @@ grep -c '只收一台服务器的钱' live.js    # 1 = 新文案真的上线了
 
 ---
 
-## 九、AI 披露文案怎么本地化（第一步已完成，剩下的是切壳）
+## 九、AI 披露文案怎么本地化
 
 这是整个迁移里**唯一一处改错了会造成不可逆信任损失**的地方，所以先把设计写死，别临场发挥。
 
-**当前进度**：下面设计里的第 1、4 条**已经落地**（`packages/ai` 结构化 + 新的注入验证组），
-第 2、3、5 条还没做（要等 web 的 AI 面板那批一起动）。
+**当前进度（2026-10-01 逐条对着代码核过 —— 此前这里写着"第 2、3、5 条还没做"，那三句全部过期）**：
+
+| 设计条 | 状态 | 落点 |
+|---|---|---|
+| 1 结构化目的地 | ✅ | `destinationDisclosure()` / `retentionDisclosure()`；旧 `describe*()` 退化成对新结论 `kind` 的投影 |
+| 2 词条共享 | ✅ **但没进 `common.ai.*`** | 键留在 `web.ai.disclosure.*` —— 实测**移动端没有任何 AI 面**（`grep -r 'AiBreakdown\|aiStore\|requestBreakdown' apps/mobile/src` = 0 命中，`apps/mobile/src` 下无 `features/ai`），渲染方只有 web 的 7 个文件。当初设计成共享是为了防"两个平台对用户许下不同的承诺"，而那个风险面**不存在**；移动端将来接 AI 时必须复用这批键，或把它们整体提级 —— 不许另写一套措辞 |
+| 3 规则逐语言重述 | ✅ | `scripts/check-ai-coverage.mjs` 的 `E2EE_COPY_RULES`：zh `{term:/端到端加密/, negation:/(?:不\|未\|非\|没)/}`、en `{term:/end[-\s]?to[-\s]?end encrypt/i, negation:/\b(?:not\|never)\b/i}`。**词条表里出现一个新 locale 而这里没登记 ⇒ 门禁红**，不默认放过 |
+| 4 双语断言 | ⚠️ **换了层，见下面的缺口** | 逐语言检查住在**仓库门禁**里，不在 `packages/ai/tests/egress.spec.ts` 里 |
+| 5 按 key 查两张表 | ✅ | 本节第 5 条 = §十 第 8 条（`8ac9fe8d`）；判据 `verify-i18n-failures.mjs` 的 `e2eecopy` 组（含"zh 去掉否定 / en 的 key 改名 / 把 en 从规则表拿掉"三种注入） |
+
+🔴 **第 4 条那一行是一条已登记的缺口，正文在 §七 第 11 条**：逐语言的隐私规则现在住在
+`scripts/check-ai-coverage.mjs` 里，而不是设计要求的 `packages/ai/tests/egress.spec.ts` 里
+（后者至今只对 `describeDestination()` 返回的**中文兜底句**做断言）。
+规则没有失守，但**归属层不同**。
 
 ### 现状：这条链是怎么到界面的
+
+⚠️ **下面画的是迁移前的形状**，保留是为了让人看清"为什么不能只迁 JSX"；
+现在的落点看上面那张表，不要照它派活。
 
 ```
 packages/ai/src/supply.ts          describeDestination() / describeRetention()  → 直接返回中文句子
