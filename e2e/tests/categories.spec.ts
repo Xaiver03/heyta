@@ -73,6 +73,8 @@ test.describe('分类着色：真浏览器契约', () => {
     await openApp(page);
 
     // ── 建一条清单（真实侧栏表单，真 op）─────────────────────────────
+    // 🔴 输入框**默认不在 DOM 里**（2026-09-30 起：点标题右侧的 + 才展开）。
+    await page.getByRole('button', { name: '新建清单' }).click();
     const newProject = page.locator('input[placeholder="新清单"]');
     await newProject.fill('深度工作');
     await page.getByRole('button', { name: '添加清单' }).click();

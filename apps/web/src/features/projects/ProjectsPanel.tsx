@@ -46,11 +46,11 @@
  * 同一条规则）。迁移前空清单上会常驻一个 `0` —— 这是**可见的行为变化**。
  */
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { cssVar } from '@heyta/design-system';
 import { useI18n } from '@heyta/i18n';
 import { parseCategorySlot } from '@heyta/domain';
-import { Folder, Plus, Tag as TagIcon } from 'lucide-react';
+import { Check, Folder, Plus, Tag as TagIcon } from 'lucide-react';
 import {
   HeytaUiProvider,
   OrganizerList,
@@ -75,6 +75,37 @@ export function ProjectsPanel({
   const tasks = useTaskStore();
   const [draft, setDraft] = useState('');
   const [tagDraft, setTagDraft] = useState('');
+  // 输入框**默认不出现**（点标题右侧的 + 才展开）。与草稿分开存：
+  // 收起不清草稿，重新点开还能接着打 —— 只有 Esc 才明确丢弃。
+  const [addingProject, setAddingProject] = useState(false);
+  const [addingTag, setAddingTag] = useState(false);
+  const asideRef = useRef<HTMLElement>(null);
+
+  /*
+     🔴 收起挂在**面板外的 pointerdown**上：不是 `blur`（会和标题 `+` 打架 ——
+     点按钮时 `blur` 先收起，`click` 又把 toggle 判成"重新展开"，症状是
+     "再点一次关不掉"），也**不是"另一个区块"**。
+     后者是本轮 e2e 抓出来的真缺陷：两个区块上下排着，点「标签」的 + 时，
+     "清单区块外 ⇒ 收起"在 `pointerdown` 就删掉了上面那 52px，标题整块**往上跳**，
+     `mouseup` 落在别处 ⇒ `click` 根本不派发给那个按钮。用户看到的是
+     "清单输入框消失了，标签输入框没出来" —— 第一下点击白点。
+     所以区块之间的互斥放进各自的 onClick（同一个事件里批量更新，点击已经成立了），
+     这里只管"点到面板以外"。
+   */
+  useEffect(() => {
+    if (!addingProject && !addingTag) return;
+    function onPointerDown(event: PointerEvent) {
+      const target = event.target as Node | null;
+      if (target === null) return;
+      if (asideRef.current?.contains(target)) return;
+      setAddingProject(false);
+      setAddingTag(false);
+    }
+    // 捕获：共享层里若有控件在冒泡阶段 `stopPropagation`（§7 第 80 条同源），
+    // 冒泡监听会收不到，症状又是"点了没反应"。
+    document.addEventListener('pointerdown', onPointerDown, true);
+    return () => document.removeEventListener('pointerdown', onPointerDown, true);
+  }, [addingProject, addingTag]);
 
   // 层级与计数口径都在共享层（`toOrganizerTree` / `openTaskCounts`）。
   const tree = useMemo(() => toOrganizerTree(projects.projects), [projects.projects]);
@@ -97,28 +128,56 @@ export function ProjectsPanel({
 
   return (
     <HeytaUiProvider>
-      <aside aria-label={t('web.projects.ariaLabel')} style={asideStyle}>
+      <aside ref={asideRef} aria-label={t('web.projects.ariaLabel')} style={asideStyle}>
         <section>
-          <h2 className="ht-nav__section">{t('web.projects.heading')}</h2>
-          <form
-            onSubmit={(e) => {
-              e.preventDefault();
-              void projects.addProject(draft);
-              setDraft('');
-            }}
-            style={formStyle}
-          >
-            <input
-              value={draft}
-              onChange={(e) => setDraft(e.target.value)}
-              placeholder={t('web.projects.newPlaceholder')}
-              aria-label={t('web.projects.newLabel')}
-              style={inputStyle}
-            />
-            <button type="submit" aria-label={t('web.projects.add')} style={iconButtonStyle}>
+          <div className="ht-organizer__heading">
+            <h2 className="ht-nav__section">{t('web.projects.heading')}</h2>
+            <button
+              type="button"
+              className="ht-organizer__add"
+              aria-label={t('web.projects.addNew')}
+              aria-expanded={addingProject}
+              onClick={() => {
+                // 互斥放在**这里**而不是 pointerdown 的收起逻辑里：同一个 click
+                // 事件内批量更新，点击已经成立，不会把下一区块的标题顶走。
+                const next = !addingProject;
+                setAddingProject(next);
+                if (next) setAddingTag(false);
+              }}
+            >
               <Plus size={16} aria-hidden="true" />
             </button>
-          </form>
+          </div>
+          {addingProject ? (
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                void projects.addProject(draft);
+                setDraft('');
+                // 建完**不收起**：连建几条清单是常态，收起会逼用户每建一条
+                // 就重新点一次开。收起只有两条路：Esc（连草稿一起丢）或点到面板外（留着草稿）。
+              }}
+              style={formStyle}
+            >
+              <input
+                autoFocus
+                value={draft}
+                onChange={(e) => setDraft(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Escape') {
+                    setDraft('');
+                    setAddingProject(false);
+                  }
+                }}
+                placeholder={t('web.projects.newPlaceholder')}
+                aria-label={t('web.projects.newLabel')}
+                style={inputStyle}
+              />
+              <button type="submit" aria-label={t('web.projects.add')} style={iconButtonStyle}>
+                <Check size={16} aria-hidden="true" />
+              </button>
+            </form>
+          ) : null}
 
           <OrganizerList
             kind="project"
@@ -149,26 +208,50 @@ export function ProjectsPanel({
         </section>
 
         <section>
-          <h2 className="ht-nav__section">{t('web.tags.heading')}</h2>
-          <form
-            onSubmit={(e) => {
-              e.preventDefault();
-              void projects.addTag(tagDraft);
-              setTagDraft('');
-            }}
-            style={formStyle}
-          >
-            <input
-              value={tagDraft}
-              onChange={(e) => setTagDraft(e.target.value)}
-              placeholder={t('web.tags.newPlaceholder')}
-              aria-label={t('web.tags.newLabel')}
-              style={inputStyle}
-            />
-            <button type="submit" aria-label={t('web.tags.add')} style={iconButtonStyle}>
+          <div className="ht-organizer__heading">
+            <h2 className="ht-nav__section">{t('web.tags.heading')}</h2>
+            <button
+              type="button"
+              className="ht-organizer__add"
+              aria-label={t('web.tags.addNew')}
+              aria-expanded={addingTag}
+              onClick={() => {
+                const next = !addingTag;
+                setAddingTag(next);
+                if (next) setAddingProject(false);
+              }}
+            >
               <Plus size={16} aria-hidden="true" />
             </button>
-          </form>
+          </div>
+          {addingTag ? (
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                void projects.addTag(tagDraft);
+                setTagDraft('');
+              }}
+              style={formStyle}
+            >
+              <input
+                autoFocus
+                value={tagDraft}
+                onChange={(e) => setTagDraft(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Escape') {
+                    setTagDraft('');
+                    setAddingTag(false);
+                  }
+                }}
+                placeholder={t('web.tags.newPlaceholder')}
+                aria-label={t('web.tags.newLabel')}
+                style={inputStyle}
+              />
+              <button type="submit" aria-label={t('web.tags.add')} style={iconButtonStyle}>
+                <Check size={16} aria-hidden="true" />
+              </button>
+            </form>
+          ) : null}
 
           {/*
             🔴 标签名此前是一个**不可点的 `<span>`** —— 于是 `TaskFilter` 的
@@ -197,8 +280,14 @@ export function ProjectsPanel({
 
 const asideStyle: React.CSSProperties = {
   padding: cssVar('space.3'),
-  borderRight: `${cssVar('border-width.thin')} solid ${cssVar('color.border')}`,
-  minWidth: cssVar('layout.sidebar-width'),
+  /*
+    🔴 这里**不许**再写 `minWidth: cssVar('layout.sidebar-width')`。
+    那一行把这一列钉死在 15rem —— 2026-09-30 侧栏改成可拖宽之后，它就是
+    "拖不动"的直接原因（子元素的 min-width 会把网格列撑回去）。
+    宽度由列决定，内容只负责填满它（`minWidth: 0` 让长清单名能省略号而不是撑列）。
+  */
+  width: '100%',
+  minWidth: 0,
   display: 'flex',
   flexDirection: 'column',
   gap: cssVar('space.4'),
