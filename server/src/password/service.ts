@@ -55,6 +55,34 @@ export type PasswordAuthErrorCode =
   /** 哈希后端过载 ⇒ 503，**不降级**（见 `concurrency.ts`）。 */
   | 'password_backend_busy';
 
+/**
+ * 口令这条路**面向客户端的句子**（唯一真源在这里）。
+ *
+ * 分工是刻意的：**本模块管句子，`api.ts` 管状态码并按 `code` 原样发出**。
+ * 句子只有一份，所以"服务层改了措辞、路由层还在发旧那句"这种漂移无处发生。
+ *
+ * ⚠️ 这里**不走** `api.ts` 的 `SAFE_ERROR_MESSAGES` 白名单。那套机制服务的是
+ * "错误对象身上没有码"的老路径（`getSafeErrorMessage(err, 兜底)`）；把这几个串
+ * 塞进白名单会顺手改变**通行密钥**那条路的行为 —— `passkey.ts` 也抛
+ * `'Invalid credentials'`，一旦入白名单，它的兜底句 `Authentication failed`
+ * 就被透传句顶掉了。一次改动只碰它该碰的东西。
+ *
+ * 🔴 三条不是措辞偏好的取舍：
+ * 1. `PASSWORD_INVALID_CREDENTIALS_MESSAGE` 覆盖"账号不存在 / 没设口令 / 口令错"
+ *    三种情况，且**只有一个状态码** —— 少一条，秒表或文案就成枚举器。
+ * 2. `PASSWORD_EMAIL_NOT_VERIFIED_MESSAGE` 是这条路上唯一会说出账号状态的一句，
+ *    所以它**只在校验口令通过之后**才可能出现（顺序见 `loginWithEmailPassword`）。
+ * 3. `PASSWORD_ACCOUNT_LOCKED_MESSAGE` 必须给可执行动作（改用链接登录 / 还要等多久），
+ *    而不是只说"不行"。它说"口令这条路被锁"，不说"账号被锁" —— 后者不属实，
+ *    魔法链接与通行密钥照旧可走。
+ */
+export const PASSWORD_INVALID_CREDENTIALS_MESSAGE = 'Invalid credentials';
+export const PASSWORD_EMAIL_NOT_VERIFIED_MESSAGE =
+  'Email not verified. Check your inbox for the verification link.';
+export const PASSWORD_ACCOUNT_LOCKED_MESSAGE =
+  'Account temporarily locked due to repeated failed sign-in attempts. Sign in with a link, or try again later.';
+export const PASSWORD_POLICY_MESSAGE = 'That password does not meet the requirements.';
+
 export class PasswordAuthError extends Error {
   constructor(
     readonly code: PasswordAuthErrorCode,
@@ -103,7 +131,7 @@ export const registerWithEmailPassword = async (
   if (!policy.ok) {
     throw new PasswordAuthError(
       'password_policy_violation',
-      'That password does not meet the requirements.',
+      PASSWORD_POLICY_MESSAGE,
       undefined,
       policy.code,
     );
@@ -190,7 +218,10 @@ export const loginWithEmailPassword = async (
     },
   });
 
-  const invalid = new PasswordAuthError('invalid_credentials', 'Invalid credentials');
+  const invalid = new PasswordAuthError(
+    'invalid_credentials',
+    PASSWORD_INVALID_CREDENTIALS_MESSAGE,
+  );
 
   if (!user) {
     await withHashSlot(() => dummyVerify(normalized));
@@ -213,7 +244,7 @@ export const loginWithEmailPassword = async (
     );
     throw new PasswordAuthError(
       'account_locked',
-      'Account temporarily locked due to repeated failed sign-in attempts. Sign in with a link, or try again later.',
+      PASSWORD_ACCOUNT_LOCKED_MESSAGE,
       waitSeconds,
     );
   }
@@ -230,7 +261,7 @@ export const loginWithEmailPassword = async (
   if (user.isVerified === 0) {
     throw new PasswordAuthError(
       'email_not_verified',
-      'Email not verified. Check your inbox for the verification link.',
+      PASSWORD_EMAIL_NOT_VERIFIED_MESSAGE,
     );
   }
 

@@ -46,7 +46,8 @@
 
 ### D1 登录密码**只用于认证**，不参与 E2EE 密钥派生
 
-服务端存 `Argon2id(pepper ‖ 密码)` 的**校验值**，口令继续由客户端本地派生（`encryption/argon2.ts:203`）。
+服务端存 `Argon2id(口令, salt, secret = pepper)` 的**校验值**（pepper 走 Argon2 原生
+`secret` 参数、参与哈希，**不是拼在口令前后** —— 见 D3 与 W0 实测），口令继续由客户端本地派生（`encryption/argon2.ts:203`）。
 
 **为什么不解成一把**（Proton/Bitwarden 那种"主密码同时是 vault 根"）：那是体验最优解，但**必须同时上恢复码**，
 否则"忘记密码 = 数据永久不可达"（Cryptomator 官方原话："We cannot reset the password of a vault for you in any way"）。
