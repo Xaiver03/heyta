@@ -143,6 +143,13 @@ SSOS 的帮助中心已经跑通了那个形态（hub → 分类 → 文章 → 
 24. 🔴 不许出现"用户数据"字样的截图或示例：产品还在开发阶段、不可能有用户（AGENTS §0），
     示例数据必须明显是演示数据。
 25. 🔴 不许承诺 AI 的结果自动写入：AI 只产出建议，写入必须 `dispatch()` + 用户确认。
+26. 🔴（2026-10-01 产品负责人新增）**文档中心不许出现开发向内容**：内部字段名
+    （`purgedAt` / `repeatRule`）、存储引擎（SQLite）、规范编号（RFC 5545）、
+    同步内核词汇（向量时钟 / LWW / 因果历史）、加密算法名（Argon2id / AES-GCM）、
+    CLI flag（`--due` / `--out`）、部署名词（Docker / JWT / env）—— 一律不行。
+    **唯一豁免 = 自托管相关的文案**（`site.docs.selfhost.*` 与平台页/集成页的
+    selfhost 段）：自托管说明就是写给动手的人看的，那一块反而**要**写详细。
+    执行闸门：`pnpm check:docs-voice`（禁词表 30 项，变异验证见 §11）。
 
 ---
 
@@ -240,3 +247,45 @@ push 只在用户明确要求时做。
 - `check:shell-unicode` 的红来自另一条线未提交的 `scripts/reinstall-all.sh:174` hunk
   （HEAD 干净），归属那条线，本轮不动。
 - `pnpm check` 是 46 段 `&&` 链，**只暴露第一个红**；断点之后的段"没跑过"不等于"过了"。
+
+---
+
+## 11. 整改轮（2026-10-01，代码质量审查的产出）
+
+上一轮交付在任务书自己的标准下全绿（独立复验过），但产品负责人复查后补了一条标准
+（§5 第 26 条），据此对已交付内容做一轮整改：
+
+**内容侧（中英同步）**
+
+| 类别 | 处理 |
+|---|---|
+| 内部字段名见客（`purgedAt` ×2、`repeatRule`） | 改成访客视角说法（「已清除」标记；"界面上自定义规则里写的那种 RRULE"） |
+| 整段实现语义（trash.s4p3 的 schema 演进论证） | 改写成产品语义："标记是无害的，旧版本应用也不会被弄坏" |
+| 同步内核词汇（向量时钟 / 因果历史 / 随机编号 / floating 语义） | 换成行为描述（"各设备之间的先后关系"、"没有可靠依据判断该信哪一边"） |
+| 算法名（Argon2id / AES-GCM） | how 篇只说"端到端加密、服务端拒收明文"；算法细节下沉到自托管篇 |
+| CLI 细节（`export --out` / `--due` / "Node 宿主"） | 从 transfer / repeat 篇摘除，指向自托管篇的命令行一节（命令行入口只在自托管篇教）；hub 速答 `site.help.a.repeat` 同病同修 |
+| SQLite | first-run 篇改"应用自己的本地数据库" |
+| 包/文件头结构（privacy.s6p1） | 改成"四条路各有开关、默认关着" |
+
+**自托管篇扩写（豁免区内，写开发者级）**：6 节 → 11 节。新增：
+怎么装（无版本号镜像 / 钉 `SUPERSYNC_IMAGE` / `docker compose up` 不是部署 /
+`--build` 的内存与缓存代价）、环境变量逐个说（`DOMAIN` / `JWT_SECRET` 换掉的代价 /
+`WEBAUTHN_*` 换域名的代价 / `CORS_ORIGINS` 默认指上游演示站 / SMTP 六件套），
+数据库与迁移（只向前、迁移超时与退出码）、服务端存了什么（Argon2id + AES-GCM、
+明文拒收、元数据落在谁手里）、命令行宿主（十条命令 + `HEYTA_*` 环境变量 +
+"设不了重复规则"的边界）。**每一条都对着 `server/env.example` / `server/README.md` /
+`server/docker-compose.yml` / `apps/node-host/src/cli.ts` 核过。**
+
+**门禁侧**：新增 `scripts/check-docs-voice.mjs`（`pnpm check:docs-voice`，已接入
+`pnpm check` 链，紧跟 `check:ui-language`）。扫描两个 locale 的全部 `site.*` 词条，
+禁词表 30 项，豁免 `isSelfhostKey`（自托管篇 + 平台/集成页 selfhost 段）。
+两条防呆判据：解析出的 `site.*` 词条 < 100 或豁免 < 20 时响亮失败（扫描器坏掉
+不得静默通过）。**变异验证**：往 `site.docs.trash.s3p1` 注入 `purgedAt` + `SQLite`
+⇒ 恰好 2 红且指到同一个 key；往豁免区 `site.docs.selfhost.s9p1` 注入 `Docker`
+⇒ 不误杀；还原后逐字复绿。第一轮真跑还抓到 5 处漏网（含 hub 速答里的
+「命令行宿主」）—— 门禁不是仪式，是真的在拦。
+
+**边界裁决（产品负责人口径的落地）**：RRULE / JSON / Markdown / MCP / API
+**不在**禁词表 —— 界面里就有"自定义 RRULE"输入框、导出的文件就是 JSON、
+本机 API / MCP 是设置里的真实开关。禁它们会把正确的产品文案误杀。
+"开发向"指的是：只在代码/部署里存在、访客无法在界面上遇到的东西。

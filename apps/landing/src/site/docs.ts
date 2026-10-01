@@ -381,11 +381,7 @@ const DOCS_ENTRIES: Record<DocsArticleId, DocsEntry> = {
       {
         id: 'which-platforms',
         titleKey: 'site.docs.repeat.s4',
-        bodyKeys: [
-          'site.docs.repeat.s4p1',
-          'site.docs.repeat.s4p2',
-          'site.docs.repeat.s4w1',
-        ],
+        bodyKeys: ['site.docs.repeat.s4p1', 'site.docs.repeat.s4w1'],
       },
     ],
   },
@@ -457,9 +453,49 @@ const DOCS_ENTRIES: Record<DocsArticleId, DocsEntry> = {
         ],
       },
       {
-        id: 'full-steps',
-        titleKey: 'site.docs.selfhost.s3',
-        bodyKeys: ['site.docs.selfhost.s3p1', 'site.docs.selfhost.s3w1'],
+        id: 'install-and-update',
+        titleKey: 'site.docs.selfhost.s7',
+        bodyKeys: [
+          'site.docs.selfhost.s7p1',
+          'site.docs.selfhost.s7p2',
+          'site.docs.selfhost.s7p3',
+        ],
+        itemKeys: [
+          'site.docs.selfhost.s7i1',
+          'site.docs.selfhost.s7i2',
+        ],
+      },
+      {
+        id: 'environment-variables',
+        titleKey: 'site.docs.selfhost.s8',
+        bodyKeys: ['site.docs.selfhost.s8p1'],
+        itemKeys: [
+          'site.docs.selfhost.s8i1',
+          'site.docs.selfhost.s8i2',
+          'site.docs.selfhost.s8i3',
+          'site.docs.selfhost.s8i4',
+          'site.docs.selfhost.s8i5',
+          'site.docs.selfhost.s8i6',
+          'site.docs.selfhost.s8i7',
+        ],
+      },
+      {
+        id: 'database-and-migrations',
+        titleKey: 'site.docs.selfhost.s9',
+        bodyKeys: [
+          'site.docs.selfhost.s9p1',
+          'site.docs.selfhost.s9p2',
+          'site.docs.selfhost.s9p3',
+        ],
+      },
+      {
+        id: 'what-the-server-stores',
+        titleKey: 'site.docs.selfhost.s10',
+        bodyKeys: [
+          'site.docs.selfhost.s10p1',
+          'site.docs.selfhost.s10p2',
+          'site.docs.selfhost.s10p3',
+        ],
       },
       {
         id: 'daily-work',
@@ -484,6 +520,22 @@ const DOCS_ENTRIES: Record<DocsArticleId, DocsEntry> = {
         titleKey: 'site.docs.selfhost.s6',
         bodyKeys: ['site.docs.selfhost.s6p1', 'site.docs.selfhost.s6p2'],
         itemKeys: ['site.docs.selfhost.s6i1'],
+      },
+      {
+        id: 'command-line-host',
+        titleKey: 'site.docs.selfhost.s11',
+        bodyKeys: ['site.docs.selfhost.s11p1'],
+        itemKeys: [
+          'site.docs.selfhost.s11i1',
+          'site.docs.selfhost.s11i2',
+          'site.docs.selfhost.s11i3',
+          'site.docs.selfhost.s11i4',
+        ],
+      },
+      {
+        id: 'full-steps',
+        titleKey: 'site.docs.selfhost.s3',
+        bodyKeys: ['site.docs.selfhost.s3p1', 'site.docs.selfhost.s3w1'],
       },
     ],
   },

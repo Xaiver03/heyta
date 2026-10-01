@@ -660,3 +660,46 @@ sha_after =ce124c26353989db73312d98e6298ff5afe15bb4   BYTE_IDENTICAL=yes
 (RESIDUE 为空 = 无工作树残留)
 ```
 
+
+---
+
+## 2026-10-01 整改轮：文档中心去开发向 + 自托管篇扩写成开发者级 ✅
+
+起因是产品负责人对上一轮交付的复查指令：「文档中心绝对不能放开发相关的东西。
+除非是自托管的那一块，自托管的那个说明 —— 自托管可以写详细开发者的。」
+上一轮在任务书自己的标准下全绿（含独立复验），但"口音"这条标准当时不在任务书里，
+于是 `purgedAt` / `repeatRule` / `SQLite` / `RFC 5545` / `向量时钟` 全部进了公开正文，
+且没有任何一层报错（`check:ui-language` 的禁词表不扫词条表本身 —— 字典里放什么，
+页面上就说什么）。
+
+**内容侧**（中英同步改写，段落数保持/只增）：
+11 处去开发向（trash 两处 / repeat 三处+删一处 / how 两处 / transfer 两处 /
+first-run / privacy 两处）+ hub 速答 `site.help.a.repeat` 同病同修（门禁第一轮抓到的）。
+自托管篇 6 节 → 11 节：怎么装（镜像钉版本 / `docker compose up` 不是部署 /
+`--build` 的内存与缓存代价）· 环境变量逐个说（`JWT_SECRET` 换掉的代价、
+`WEBAUTHN_*` 换域名的代价、`CORS_ORIGINS` 默认指上游演示站、SMTP 六件套）·
+数据库与迁移（只向前、超时退出码）· 服务端存了什么（Argon2id + AES-GCM、
+明文拒收）· 命令行宿主（十条命令 + `HEYTA_*` 环境变量 + 设不了重复规则的边界）。
+新增的每一条论断都对着 `server/env.example` / `server/README.md` /
+`server/docker-compose.yml` / `apps/node-host/src/cli.ts` 核过 —— 含"部署机构建峰值
+>1.5 GB、缓存每次 ~1.4 GB 不自动清"与"启动迁移默认关，`docker compose up` 单独
+拉起来会跑在没迁移过的表结构上"这两条 README 原文数字。
+
+**门禁侧**：新增 `scripts/check-docs-voice.mjs`（`pnpm check:docs-voice`，已接入
+`check` 链紧跟 `check:ui-language`）。扫两个 locale 的全部 `site.*` 词条（992 条），
+禁词表 30 项，豁免自托管相关 key（`site.docs.selfhost.*` + 平台/集成页 selfhost 段，
+共 120 条）。扫描量与豁免量各有一条防呆底线（解析器坏了必须响红，不许静默通过）。
+
+**变异验证**（观测量，非引用记忆）：往 `site.docs.trash.s3p1` 注入 `purgedAt` +
+`SQLite` ⇒ **恰好 2 红**、逐条指到同一个 key；往豁免区 `site.docs.selfhost.s9p1`
+注入 `Docker` ⇒ **不误杀**（豁免精确）；还原后逐字复绿（992 / 120 / 0 命中）。
+
+**门禁七段全 exit 0**：`check:entries`（55 份）/ `check:ui-language`（zh 2407 = en 2407，
+含另一条线工作树里未提交的 key；提交集自身的数字在提交时按 hunk 过滤后另核）/
+`check:docs-voice` / `check:docs` / `gen-help-figures --check` / `screenshot:verify` /
+landing `tsc --noEmit`；landing e2e 17 条结果见下一条记录。
+
+**边界裁决**（写进了任务书 §11）：RRULE / JSON / Markdown / MCP / API 刻意不进禁词表
+—— 界面里就有"自定义 RRULE"输入框、导出的文件就是 JSON、本机 API / MCP 是设置里的
+真实开关。禁它们会误杀正确的产品文案。"开发向"的定义：只在代码/部署里存在、
+访客无法在界面上遇到的东西。
