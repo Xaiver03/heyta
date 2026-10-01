@@ -2570,3 +2570,66 @@ spec，且报错里出现 `ECONNREFUSED <本机端口>` 或 `.playwright-artifac
     所以"验证语言链路"必须显式带 `?lang=` 或 `body.locale`，不能指望环境头。
     ③ 客户端已经写了 `document.documentElement.lang` 这类**界面自己声明的语言**，
     跨端比对时读它比重新推导浏览器语言强（推导规则一旦有两份就会漂移）。
+
+98. 🔴 **用带引号的键去 grep 不带引号的写法，会把"整种语言没做"当成实测结论 —— 九份文件齐刷刷报 0，
+    而英文正文其实一条不缺。**
+
+    2026-10-01 实测：产品负责人问国际化做完没有，我为了核法务文书有没有英文版，跑了
+    `grep -c "'en'" packages/legal/src/documents/*.ts` ⇒ **九份全是 0**。
+    据此答了一句"法务九份只有中文，约 1300 处"。**这句是错的，已经当面撤回。**
+
+    真实形状是（`packages/legal/src/types.ts` + 任一文档）：
+
+    ```ts
+    readonly sections: Record<Locale, readonly LegalSection[]>;   // 类型要求两把都齐，少一把编译不过
+    …
+    const en = [ … ] as const;                                    // ← 键在这里根本不存在
+    export const minors: LegalDocument = {
+      title: { 'zh-CN': '未成年人保护', en: 'Protection of Minors' },   // ← 写的是 en:，不带引号
+      sections: { 'zh-CN': zh, en },                               // ← 简写属性，没有 'en' 这个字面量
+    };
+    ```
+
+    换成按真实语法形态切片后：九份**都有**独立的 `const en` 数组、
+    `packages/legal/tests/structure.spec.ts` 的**中英逐条结构对账 56 条全过**、
+    英文正文里只剩 **1 处**汉字 —— 隐私政策英文版里的主体名称「晓黎（杭州）人工智能科技有限公司」，
+    那是**刻意保留**的（法律主体以登记文字为准）。
+
+    🟥 **第二层坑在同一把探针里**：第一版切片右边界取了 `sections:`，
+    于是把导出对象里 **zh 的 title/summary** 也算进了"英文正文"，虚报 **196 处汉字**。
+    正确边界是数组自己的结尾 `\n] as const;`。同一份代码改边界后：**196 → 1**。
+
+    📌 **一般规律**：
+    ① **断言"某语言/某字段不存在"之前，先读类型定义和一份实例，看清"存在"长什么语法形状** ——
+    `Record<K,V>` 的键可以写作 `k:`、`'k':`、也可以被简写属性完全吃掉字面量，
+    三种写法里 grep 只认得前两种。
+    ② **批量报同一个数（九份全 0）先怀疑探针**（元规则 1），不要先怀疑被测对象。
+    ③ 切片类探针的**两个边界都要来自被切对象自己的语法**，不能一个是 `const en`、
+    另一个顺手拿"下一节的开头" —— 那会把别人的内容算进来，而且**报出来的方向是"缺陷更多"**。
+
+99. 🔴 **判断"线上是不是当前产物"：只看 sha 会假红，只看状态码会假绿 —— 两种都得换成交对判据。**
+
+    同日实测 `heyta.waytofuture.cn`（`--resolve` 钉真实 IP + `--noproxy`，否则这台机器的代理会给出假 IP）：
+
+    | 做法 | 读数 | 真相 |
+    |---|---|---|
+    | `shasum -a 256` 比线上首页与本地 `dist/index.html` | **不同**（`ff26f1fb…` vs `d62c26de…`） ⇒ 读成"线上是旧构建" | **假红**。两份大小都是 7022 字节；把 `main-<hash>.js` / `index-<hash>.css` 归一化成 `ASSET.js` 后**逐行 diff = 0 行** —— 内容一样，只是构建换了 hash 名 |
+    | `curl -o /dev/null -w "%{http_code}" /legal/privacy/` | **200** ⇒ 读成"法务页已上线" | **假绿**。把返回体与 `/` 的字节做 `cmp`：**IDENTICAL** —— 服务器上没这个文件，nginx 的 `try_files … /index.html` 兜底把首页发了出去 |
+
+    ✅ 两条判据要成对写：
+
+    ```bash
+    # ① 内容是不是当前构建：先归一化 asset hash，再逐行比
+    norm(){ sed -E 's/(main|index|vendor)-[A-Za-z0-9_-]{6,}\.(js|css)/ASSET.\2/g' "$1"; }
+    diff <(norm live.html) <(norm dist/index.html) | grep -c '^[<>]'      # 期望 0
+
+    # ② 这个路径是不是兜底首页：与首页比字节
+    cmp -s legal.html home.html && echo "NOT DEPLOYED（拿到的是兜底首页）" || echo "DEPLOYED"
+    ```
+
+    ⚠️ 静态站点用 catch-all 兜底（为了 SPA 的前端路由）时，**404 永远不会以 404 出现** ——
+    缺失的页面返回 200 + 别的内容。所以"线上验收"里凡是走状态码的判据，
+    都必须再问一句**"这份响应体是不是就是首页"**。
+
+    📌 一般规律：**同一件事的两个失败方向要各配一条判据** —— 只有 hash 比对会误报过期，
+    只有状态码会误报上线；这两条在本次是同一次取证里互相纠正的。
