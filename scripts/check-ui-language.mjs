@@ -14,10 +14,15 @@
  *   1. **不许硬编码文案。** 已迁移的应用里，用户可见的字符串字面量一律违规，
  *      必须写成 `t('key')`。key 由 `@heyta/i18n` 的类型系统校验，
  *      拼错是编译错误，不是运行时的兜底降级。
- *   2. **zh 词条必须含中文** —— 防止用英文占位中文。
- *   3. **en 词条不许含中文** —— 防止把中文复制过去当英文交差。
+ *   2. **每种语言的词条必须含它自己的文字**（zh 含汉字、ja 含假名、ko 含谚文）
+ *      —— 防止用别的语言占位。
+ *   3. **不许把中文复制过去当英文**（en 表不许出现汉字/全角标点）。
  *      这条只能靠机器：人眼扫过两栏相同的文字，很容易以为"还没翻"而不是"翻错了"。
- *   4. **两份词条的 key 集合必须一致** —— 漏翻译必须在门禁上红。
+ *   4. **各语言词条的 key 集合必须与中文表一致** —— 漏翻译必须在门禁上红。
+ *   6. **语言清单只有一个事实源**（`LOCALES`）：`locales/*.ts` 的文件、`LOCALES`、
+ *      文字系统规则表三者必须一一对应，两个方向都对不上就红。
+ *      🔴 加一门语言而不在规则表里登记"它怎么证明自己被翻过" ⇒ 红，
+ *      而不是"新表什么都不查、门禁照样绿"。
  *   5. **诊断字段不许装句子。** 已迁移应用里 `reason:` / `detail:` / `cause:`
  *      的字符串字面量**不能含中文**。它不是给用户看的文案，而是**塞进已翻译句子里的参数**
  *      （`t('…saveFailed', { reason })` → 「Could not save the focus record: 未知的专注类型」）。
@@ -139,23 +144,96 @@ const ROOTS = [
   }
 }
 
-/** 词条表。规则 2/3/4 直接读这两份源文件 —— 不依赖构建产物。 */
+/**
+ * 词条表。规则 2/3/4 直接读源文件 —— 不依赖构建产物。
+ *
+ * 🔴 **语言清单不在这里写死。** 它只有一个事实源：`packages/i18n/src/types.ts`
+ * 的 `export const LOCALES`。原来这里钉着 `CATALOG_ZH` / `CATALOG_EN` 两个常量，
+ * 于是加一门语言要同时改四处（`LOCALES`、`locales/` 下的新表、本门禁、
+ * `gen-server-copy`），而**改了三处的门禁比没有门禁更糟** —— 新语言那份表
+ * 一个字都没被检查，`pnpm check` 却照样绿。这一层现在从 `LOCALES` 派生要查哪些表，
+ * 并把**文件 ↔ LOCALES** 两个方向都钉住（见 `checkCatalogs`）。
+ */
 const CATALOG_DIR = 'packages/i18n/src/locales';
-const CATALOG_ZH = join(ROOT, CATALOG_DIR, 'zh-CN.ts');
-const CATALOG_EN = join(ROOT, CATALOG_DIR, 'en.ts');
+const LOCALES_SOURCE = join(ROOT, 'packages/i18n/src/types.ts');
 
 /**
- * zh 表里允许不含汉字的 key。
+ * key 集合的锚点：中文表是事实源（`MessageKey` 由它派生，其余表
+ * `satisfies Record<MessageKey, string>`）。
+ * ⚠️ 类型层已经会拦"漏一条"，本门禁查的是**不依赖 tsc** 的那一半 ——
+ * 单独跑 `node scripts/check-ui-language.mjs` 时它是唯一在查的东西。
+ */
+const REFERENCE_LOCALE = 'zh-CN';
+
+/**
+ * 从 `types.ts` 读语言清单。
  *
- * 品牌名与语言自称这类纯拉丁词是**真实例外**，显式列出，而不是给整条规则开口子 ——
- * 开口子之后，"用英文占位中文"也能溜过去。
+ * 🔴 解析不出来必须**响亮失败**：空清单在这里等于"没有表要查"，
+ * 而"没有违规"和"够不着"在退出码上长得一模一样。
+ */
+function readLocales() {
+  const src = readFileSync(LOCALES_SOURCE, 'utf8');
+  const decl = /export const LOCALES\s*=\s*\[([^\]]*)\]/.exec(src);
+  const locales =
+    decl === null ? [] : [...decl[1].matchAll(/'([^']+)'/g)].map((match) => match[1]);
+  if (locales.length === 0) {
+    console.error(
+      `🔴 无法从 ${relative(ROOT, LOCALES_SOURCE)} 解析 \`export const LOCALES\`。\n` +
+        '   词条表检查要查哪些语言来自它。解析不出来**不是"没有语言要查"**，\n' +
+        '   而是本门禁够不着 —— 所以直接失败，而不是继续给一个绿。\n' +
+        '   改法：把 LOCALES 保持成 `export const LOCALES = [...] as const` 的形状。',
+    );
+    process.exit(1);
+  }
+  return locales;
+}
+
+/**
+ * 文字系统的判据（按 locale，逐条真判断，不继承）。
+ *
+ * 🔴 为什么**不能**用一条 `CJK` 通吃：`CJK` 含 CJK 标点与全角字符
+ * （`\u3000-\u303F` / `\uFF00-\uFFEF`），所以它不是"是不是中文"的判据。
+ * 日语合法地使用汉字 —— "ja 不许含汉字"会把**正确翻译**判红；
+ * 反过来"ja 必须含 CJK"会把纯拉丁的偷懒（把英文原样复制过去）放过。
+ * **假名**才是"这门语言真的翻过"的信号，韩语同理（谚文）。
+ *
+ * 🔴 加一门语言而不在这里登记 ⇒ 判红（同 `check-ai-coverage` 的 `E2EE_COPY_RULES`）：
+ * 成本是刻意的，它逼人为"这门语言怎么证明自己被翻过"做一次真判断，
+ * 而不是悄悄落到"什么都不检查"那一档。
+ *
+ * `ja` / `ko` 两行**已登记但还没启用**（`LOCALES` 里没有它们，`locales/` 下也没有表）——
+ * 这是"准备好但先不做"里"准备好"的那一半：规则先来，翻译后到。
+ * 它们不会被静默忽略，会打印成一条待办（见 `checkCatalogs` 末尾的 notes）。
+ */
+const HAN = /[\u3400-\u4DBF\u4E00-\u9FFF\uF900-\uFAFF]/;
+const KANA = /[\u3041-\u309F\u30A1-\u30FF]/;
+const HANGUL = /[\uAC00-\uD7A3]/;
+
+/**
+ * 汉字 + CJK 标点 + 全角字符。**规则 3 与规则 5 共用**（原来定义在下面扫描器那一段，
+ * 挪到这里是因为词条表的规则表要在初始化时引用它）。
+ */
+const CJK = /[\u3400-\u4DBF\u4E00-\u9FFF\uF900-\uFAFF\u3000-\u303F\uFF00-\uFFEF]/;
+
+const LOCALE_SCRIPT_RULES = {
+  'zh-CN': { mustContain: HAN, scriptName: '汉字', forbidden: null },
+  // en 的 forbidden 用 CJK 而不是 HAN：全角标点（`，。`）同样是"把中文复制过来"的证据。
+  en: { mustContain: null, forbidden: CJK, forbiddenName: '汉字或全角标点' },
+  // ja 不设 forbidden：汉字是日语的正字法之一，"不许含汉字"是错的判据。
+  ja: { mustContain: KANA, scriptName: '假名', forbidden: null },
+  ko: { mustContain: HANGUL, scriptName: '谚文', forbidden: null },
+};
+
+/**
+ * 任何语言里都**不许翻译**的 key（值逐字相同才是对的）。
+ *
+ * 原来这张表叫 `ZH_LATIN_OK`（"zh 允许不含汉字"）—— 那是同一条判据的单语言写法。
+ * 判据本身与目标语言无关：**把它写成本地语言会让它失去作用**。
  *
  * ── 站点「平台状态」页的两类例外（2026-09-28 加）
  *
- * `/platforms` 里有两类文案**不该被翻译**，逐条登记在这里：
- *
  *   1. **平台名**（`Web` / `Android` / `iOS` / `HarmonyOS`）——
- *      它们在中英两版里**必须逐字相同**。把 Android 写成「安卓」，
+ *      它们在各版里**必须逐字相同**。把 Android 写成「安卓」，
  *      用户拿这个词去搜不到任何东西：官方文档、报错信息、应用商店里
  *      写的都是 Android。这是**产品名，不是普通名词**。
  *   2. **可复现的命令与文件路径**（`pnpm verify:*`、`node scripts/*.mjs`、
@@ -163,13 +241,11 @@ const CATALOG_EN = join(ROOT, CATALOG_DIR, 'en.ts');
  *      翻译它等于把命令改坏：用户复制过去会 `command not found`，
  *      而这恰好是这一页承诺"每条都能自己验"的那部分。
  *
- * 🔴 两类都满足同一条判据：**把它写成本地语言会让它失去作用**
- * （与 `common.lang.en` 必须用当地写法是同一个理由）。
- * 不满足这条的，一律不许进这张表。
+ * 🔴 不满足上面那条判据的，一律不许进这张表。
+ * （`common.lang.*` 原来也逐条登记在这里，现在由自称策略推导，见 `isForeignEndonym`。）
  */
-const ZH_LATIN_OK = new Set([
+const UNTRANSLATABLE_KEYS = new Set([
   'common.brand',
-  'common.lang.en',
   // 平台名（产品名，不是普通名词）
   'site.platforms.web.name',
   'site.platforms.android.name',
@@ -196,15 +272,47 @@ const ZH_LATIN_OK = new Set([
 const EVIDENCE_KEY_SUFFIX = /\.evidence$/;
 
 /**
- * en 表里允许出现汉字的 key —— 只有**语言自称**（endonym）。
+ * 语言**自称**（endonym）：`common.lang.<locale>`。
  *
- * 英文页面上的语言切换器必须显示「中文」：那正是给"看不懂英文"的用户准备的入口，
- * 写成 "Chinese" 对他就没有用了。所以 `common.lang.zh` 在中英两表里**刻意相同**。
+ * 策略（两份表的注释里都写着）：切换器用**目标语言自己的文字**显示那个语言名 ——
+ * 中文界面显示 `English`，英文界面显示 `中文`。理由是看不懂当前语言的人
+ * 恰恰最需要找到这个入口，把"英文"翻译成当前语言会把他挡在门外。
  *
- * 🔴 这是"把中文复制过去当英文交差"的**唯一**正当例外，因此按 key 放行，
- * 而不是放宽规则 3 —— 放宽会让真正的偷懒也一起溜过去。
+ * 🔴 由此得到一条**可推导**的豁免：`common.lang.X` 在**非 X** 的表里必然不是
+ * 本表文字（它就是为了让 X 的用户认出来），所以：
+ *   - 豁免 `mustContain`（ja 表里 `common.lang.en` = `'English'` 没有假名，是对的）；
+ *   - 豁免 `forbidden`（en 表里 `common.lang.ja` = `'日本語'` 含汉字，也是对的）。
+ * 而 **X 自己的表不豁免** —— 那条正好是"自称写对了文字"的判据
+ * （ko 表里 `common.lang.ko` 必须含谚文）。
+ *
+ * 为什么推导而不是逐条列表：逐条列表加一门语言要改 N 张表，忘了就得到**假红**；
+ * 推导只依赖一条 —— "X 必须在 `LOCALES` 里"。
+ * 🔴 所以它**不是**"整族放行"：`common.lang.fr` 不在 LOCALES 里 ⇒ 不豁免，
+ * 一个拼错/还没启用的语言名会红，而不是被放过。
+ *
+ * ⚠️ key 的后缀是**语言**而不是 locale id（`common.lang.zh`，不是 `zh-CN`），
+ * 所以这张表把两种写法都登记上：`zh` 与 `zh-CN` 都指向 `zh-CN`。
+ * 后缀登记不进来的（打错的、或还没进 LOCALES 的）一律不豁免。
  */
-const EN_ENDONYM_OK = new Set(['common.lang.zh']);
+const ENDONYM_KEY = /^common\.lang\.([a-zA-Z-]+)$/;
+
+/** locale → 它自称用的后缀：`['zh-CN','en']` ⇒ `{zh:'zh-CN', 'zh-CN':'zh-CN', en:'en'}`。 */
+function endonymSuffixMap(locales) {
+  const map = new Map();
+  for (const locale of locales) {
+    map.set(locale, locale);
+    const [primary] = locale.split('-');
+    if (!map.has(primary)) map.set(primary, locale);
+  }
+  return map;
+}
+
+function isForeignEndonym(key, locale, suffixMap) {
+  const match = ENDONYM_KEY.exec(key);
+  if (match === null) return false;
+  const target = suffixMap.get(match[1]);
+  return target !== undefined && target !== locale;
+}
 
 const SKIP_DIRS = new Set(['node_modules', 'dist', 'build', 'Pods', '.gradle', '.cxx']);
 
@@ -369,7 +477,7 @@ const FORBIDDEN_TERMS = [
   'null',
 ];
 
-const CJK = /[\u3400-\u4DBF\u4E00-\u9FFF\uF900-\uFAFF\u3000-\u303F\uFF00-\uFFEF]/;
+// `CJK` 在文件上面随词条表规则一起定义（规则 3 与规则 5 共用同一份定义）。
 const LATIN_RUN = /[A-Za-z]{2,}/;
 /** 有任何字母（含汉字）才算"文案"。纯符号/纯数字（`·`、`→`、`3`）不是文案。 */
 const ANY_LETTER = /[A-Za-z\u3400-\u9FFF]/;
@@ -482,65 +590,136 @@ function parseCatalog(file) {
   return entries;
 }
 
-/** 规则 2/3/4：两份词条表互相约束。 */
+/**
+ * 规则 2/3/4：**所有**词条表互相约束。
+ *
+ * 三条子规则，顺序是有意义的 —— 前一条红了就不再假装后一条有意义：
+ *
+ * · **清单对账**（新增）：`locales/*.ts` 的文件集合与 `LOCALES` 必须一一对应，
+ *   且每个启用的 locale 都得在 `LOCALE_SCRIPT_RULES` 里登记文字系统判据。
+ * · 规则 4：key 集合与锚点表一致（双向报，才能看出是漏了还是多了）。
+ * · 规则 2/3：按该 locale 登记的 `mustContain` / `forbidden` 逐条查值。
+ */
 function checkCatalogs() {
   const violations = [];
-  const zh = parseCatalog(CATALOG_ZH);
-  const en = parseCatalog(CATALOG_EN);
-  const relZh = relative(ROOT, CATALOG_ZH);
-  const relEn = relative(ROOT, CATALOG_EN);
+  /** 打印成"待办/说明"用，不参与判定。 */
+  const notes = [];
+  const locales = readLocales();
+  const suffixMap = endonymSuffixMap(locales);
 
-  // 规则 4：key 集合必须一致（双向报，才能看出是漏了还是多了）。
-  for (const key of zh.keys()) {
-    if (!en.has(key)) {
-      violations.push({
-        where: `${relEn}`,
-        text: key,
-        why: '中文词条表里有这条，英文表里没有 —— 漏翻译',
-        fix: `在 en.ts 补上 '${key}'。`,
-      });
-    }
-  }
-  for (const key of en.keys()) {
-    if (!zh.has(key)) {
-      violations.push({
-        where: `${relZh}`,
-        text: key,
-        why: '英文词条表里有这条，中文表里没有 —— 多出来的 key',
-        fix: `删掉它，或先在 zh-CN.ts 里加上 '${key}' 作为事实源。`,
-      });
-    }
+  // ── 清单对账：文件 ↔ LOCALES ↔ 规则表 ────────────────────────
+  const catalogFiles = new Map();
+  for (const name of readdirSync(join(ROOT, CATALOG_DIR))) {
+    if (!name.endsWith('.ts')) continue;
+    catalogFiles.set(name.slice(0, -'.ts'.length), join(ROOT, CATALOG_DIR, name));
   }
 
-  // 规则 2：zh 必须含中文。
-  for (const [key, value] of zh) {
-    if (ZH_LATIN_OK.has(key)) continue;
-    // 见上面那段：值是命令/路径，汉字由 `check:claims.mjs` 反过来禁止。
-    if (EVIDENCE_KEY_SUFFIX.test(key)) continue;
-    if (!CJK.test(value)) {
+  // 有表但没进 LOCALES：这份表**没有任何一层会读到**（运行时读不到、
+  // `gen-server-copy` 也不会搬进服务端），是最安静的一种假绿。
+  for (const locale of catalogFiles.keys()) {
+    if (locales.includes(locale)) continue;
+    violations.push({
+      where: `${CATALOG_DIR}/${locale}.ts`,
+      text: '文件存在，但 LOCALES 里没有它',
+      why: '这份表不会被任何一层读到 —— 写它的人以为自己在加一门语言，其实加了一个没人看的文件',
+      fix: `在 packages/i18n/src/types.ts 的 LOCALES 里加上 '${locale}'（同时要把 Locale 联合类型加上，否则编译不过）。`,
+    });
+  }
+  for (const locale of locales) {
+    const file = catalogFiles.get(locale);
+    if (file === undefined) {
       violations.push({
-        where: `${relZh}`,
-        text: `${key} = ${value}`,
-        why: '中文词条里一个汉字都没有',
-        fix: '写成中文。确实是纯拉丁词的（如品牌名），加进 ZH_LATIN_OK 并说明理由。',
+        where: `${CATALOG_DIR}/${locale}.ts`,
+        text: 'LOCALES 里有它，但没有词条表',
+        why: '切到这门语言时界面上一个字都出不来',
+        fix: `补 ${CATALOG_DIR}/${locale}.ts，或把 '${locale}' 从 LOCALES 里拿掉。`,
       });
     }
-  }
-
-  // 规则 3：en 不许含中文（语言自称除外，见 EN_ENDONYM_OK）。
-  for (const [key, value] of en) {
-    if (EN_ENDONYM_OK.has(key)) continue;
-    if (CJK.test(value)) {
+    if (LOCALE_SCRIPT_RULES[locale] === undefined) {
       violations.push({
-        where: `${relEn}`,
-        text: `${key} = ${value}`,
-        why: '英文词条里出现了汉字 —— 很可能是把中文复制过来当英文',
-        fix: '翻译成英文。',
+        where: 'scripts/check-ui-language.mjs（LOCALE_SCRIPT_RULES）',
+        text: locale,
+        why: '启用了这门语言，却没登记它"怎么证明自己被翻过"',
+        fix: `在 LOCALE_SCRIPT_RULES 里登记 ${locale} 的 mustContain / forbidden（要写清判据的理由，不能照抄别种语言）。`,
       });
     }
   }
 
-  return { violations, zhCount: zh.size, enCount: en.size };
+  // 登记了但还没启用 = "准备好但先不做"的那一半。**打印出来**而不是静默存在：
+  // 一张写错 key 的规则表（`jab`）如果什么都不说，就永远没人发现它没生效。
+  const prepared = Object.keys(LOCALE_SCRIPT_RULES).filter((l) => !locales.includes(l));
+  if (prepared.length > 0) {
+    notes.push(`已登记文字系统规则、尚未启用（准备好但先不做）：${prepared.join('、')}`);
+  }
+
+  // ── 解析每一份启用且有表的词条 ───────────────────────────────
+  const catalogs = new Map();
+  for (const locale of locales) {
+    const file = catalogFiles.get(locale);
+    if (file !== undefined) catalogs.set(locale, parseCatalog(file));
+  }
+
+  // ── 规则 4：与锚点表的 key 集合互查 ──────────────────────────
+  const reference = catalogs.get(REFERENCE_LOCALE);
+  for (const [locale, catalog] of catalogs) {
+    if (locale === REFERENCE_LOCALE || reference === undefined) continue;
+    const rel = relative(ROOT, catalogFiles.get(locale));
+    for (const key of reference.keys()) {
+      if (!catalog.has(key)) {
+        violations.push({
+          where: rel,
+          text: key,
+          why: `${REFERENCE_LOCALE} 词条表里有这条，${locale} 表里没有 —— 漏翻译`,
+          fix: `在 ${locale}.ts 补上 '${key}'。`,
+        });
+      }
+    }
+    for (const key of catalog.keys()) {
+      if (!reference.has(key)) {
+        violations.push({
+          where: rel,
+          text: key,
+          why: `${locale} 词条表里有这条，${REFERENCE_LOCALE} 表里没有 —— 多出来的 key（它不会渲染到界面上，但会一直红着）`,
+          fix: `删掉它，或先在 ${REFERENCE_LOCALE}.ts 里加上 '${key}' 作为事实源。`,
+        });
+      }
+    }
+  }
+
+  // ── 规则 2/3：逐条查文字系统 ─────────────────────────────────
+  for (const [locale, catalog] of catalogs) {
+    const rules = LOCALE_SCRIPT_RULES[locale];
+    if (rules === undefined) continue; // 已经判红，不重复报
+    const rel = relative(ROOT, catalogFiles.get(locale));
+    for (const [key, value] of catalog) {
+      const endonym = isForeignEndonym(key, locale, suffixMap);
+      if (rules.mustContain !== undefined && rules.mustContain !== null) {
+        // 见下面那段：`*.evidence` 的值是命令/路径，汉字由 `check:claims.mjs` 反过来禁止。
+        if (!endonym && !UNTRANSLATABLE_KEYS.has(key) && !EVIDENCE_KEY_SUFFIX.test(key)) {
+          if (!rules.mustContain.test(value)) {
+            violations.push({
+              where: rel,
+              text: `${key} = ${value}`,
+              why: `${locale} 词条里没有${rules.scriptName} —— 很可能是拿别的语言占位`,
+              fix: `写成 ${locale}。确实是逐字不许翻译的（品牌名/平台名/命令），加进 UNTRANSLATABLE_KEYS 并说明理由。`,
+            });
+          }
+        }
+      }
+      if (rules.forbidden !== undefined && rules.forbidden !== null) {
+        if (!endonym && rules.forbidden.test(value)) {
+          violations.push({
+            where: rel,
+            text: `${key} = ${value}`,
+            why: `${locale} 词条里出现了${rules.forbiddenName} —— 很可能是把中文复制过来当${locale}`,
+            fix: '翻译成本语言。语言自称（`common.lang.X`）是唯一正当的例外，它按 key 豁免而不是放宽规则。',
+          });
+        }
+      }
+    }
+  }
+
+  return { violations, notes, counts: catalogs };
 }
 
 const violations = [];
@@ -710,10 +889,14 @@ if (violations.length === 0) {
   if (migratedApps.length > 0) parts.push(`已迁移：${migratedApps.join('、')}`);
   if (stagedFiles.length > 0) parts.push(`逐文件迁移 ${String(stagedFiles.length)} 个（apps/web/src）`);
   const mode = parts.length === 0 ? '全部按旧契约（中文）检查' : `${parts.join('；')}；其余按旧契约（中文）`;
+  const catalogCount = [...catalogResult.counts]
+    .map(([locale, catalog]) => `${locale} ${String(catalog.size)} 条`)
+    .join(' / ');
+  for (const note of catalogResult.notes) console.log(`ℹ️  ${note}`);
   console.log(
     `✅ 文案合规（扫描 ${String(scanned)} 个文件、${String(strings)} 处文案、` +
       `${String(diagStrings)} 处诊断字段；` +
-      `词条表 zh ${String(catalogResult.zhCount)} 条 / en ${String(catalogResult.enCount)} 条；${mode}）。`,
+      `词条表 ${catalogCount}；${mode}）。`,
   );
   process.exit(0);
 }

@@ -432,11 +432,12 @@ function runCase(group, name, body, wantZero) {
       name,
       ok: false,
       code,
+      wantZero,
       out: `探针自己抛了异常（多半是锚点失效）：${error instanceof Error ? error.message : String(error)}`,
     });
     return;
   }
-  results.push({ group, name, ok: wantZero ? code === 0 : code !== 0, code, out });
+  results.push({ group, name, ok: wantZero ? code === 0 : code !== 0, code, out, wantZero });
 }
 
 /** 一个用例：`body()` 返回退出码，期望它非零。 */
@@ -1516,6 +1517,275 @@ function groupE2eeCopy() {
   expectGreen('e2eecopy', '全部还原后重跑，必须回到绿', coverageRun);
 }
 
+// ── 组 16：多语言就绪（语言清单只有一个事实源 + 按 locale 的文字系统判据）──
+//
+// 🔴 整组跑在**隔离副本**上（`/tmp` 里的 `readiness`），真实工作区一个字都不动。
+// 这不是洁癖：这一组的注入要**新建一份 `locales/ja.ts`** 并改 `types.ts` 的 `LOCALES`，
+// 而在共享工作树里，那期间任何一次 `pnpm -r typecheck` / `pnpm build` 都会读到
+// 一份键集合不完整的 ja 表 —— 别人看到的一行红会以为是你写坏了他的代码。
+// 也正因如此，这一组**不复用 `withMutation`**：它只有一个在途槽位（`inflight`），
+// 而这里的场景同时动 2–3 个文件。见 `withProbeScenario`。
+const READINESS_COPIED = [
+  'scripts/check-ui-language.mjs',
+  'scripts/check-pricing-consistency.mjs',
+  'packages/i18n/src/types.ts',
+  'packages/i18n/src/locales/zh-CN.ts',
+  'packages/i18n/src/locales/en.ts',
+];
+
+/**
+ * 一次写**多个**探针文件，跑一段，全部还原。
+ *
+ * 与 `withMutation` 的取舍不同之处只有一个：这里的文件全在 `/tmp` 的副本里，
+ * 不可能有别的进程在写，所以**无条件还原**，不需要 journal 和"内容还是不是我写的那份"。
+ * 真实工作树里绝不能用这个函数。
+ */
+function withProbeScenario(writes, body) {
+  const backups = [];
+  const created = [];
+  try {
+    for (const write of writes) {
+      if (write.create !== undefined) {
+        if (existsSync(write.file)) {
+          throw new Error(`探针拒绝覆盖已存在的文件：${label(write.file)}`);
+        }
+        writeFileSync(write.file, write.create);
+        created.push(write.file);
+        continue;
+      }
+      const before = readFileSync(write.file, 'utf8');
+      if (!before.includes(write.from)) {
+        throw new Error(`注入失败（锚点不存在）：${label(write.file)}\n  锚点：${write.from}`);
+      }
+      const mutated = before.replace(write.from, write.to);
+      if (mutated === before) throw new Error(`注入失败（内容没变）：${write.from}`);
+      writeFileSync(write.file, mutated);
+      backups.push({ file: write.file, original: before });
+    }
+    return body();
+  } finally {
+    for (const backup of backups) writeFileSync(backup.file, backup.original);
+    for (const file of created) rmSync(file, { force: true });
+  }
+}
+
+/**
+ * 从中文表造一份**键集合逐字相同**的临时词条表，值统一换成 `value`。
+ *
+ * 键集合相同是有意的：那样"漏翻译"这条规则天然满足，红了就只可能是
+ * 文字系统那条（下面还会用 `expectRedFor` 再核一遍报错里的那句话）。
+ * `keepKeys` 里的 key 保持中文表的原值（用来测**自称白名单**）。
+ */
+function probeCatalog(sourceFile, value, keepKeys = []) {
+  const keep = new Set(keepKeys);
+  const entry = /^(\s*')([^']+)(':\s*')((?:[^'\\]|\\.)*)(',?\s*)$/;
+  const out = ['/** 探针造的临时表（只在 /tmp 副本里，不进工作区）。 */', 'export const probeCatalog = {'];
+  for (const line of readFileSync(sourceFile, 'utf8').split('\n')) {
+    const match = entry.exec(line);
+    if (match === null) continue;
+    const [, a, key, mid, original, tail] = match;
+    out.push(`${a}${key}${mid}${keep.has(key) ? original : value}${tail}`);
+  }
+  out.push('} as const;');
+  return `${out.join('\n')}\n`;
+}
+
+function groupReadiness() {
+  const probe = prepareProbe('readiness', READINESS_COPIED, {
+    // 门禁还要读这三处（`ROOTS` 扫描与价格那条子检查），用符号链接指回真实文件 ——
+    // 这一组**不改**它们，链接不影响结论。
+    links: [['apps', 'apps'], ['docs', 'docs'], ['server', 'server']],
+  });
+  assertCopied(probe, READINESS_COPIED);
+  const gateInProbe = path.join(probe, 'scripts/check-ui-language.mjs');
+  const typesInProbe = path.join(probe, 'packages/i18n/src/types.ts');
+  const zhInProbe = path.join(probe, 'packages/i18n/src/locales/zh-CN.ts');
+  const localesDir = path.join(probe, 'packages/i18n/src/locales');
+  const gateRun = () => run(NODE_BIN, [gateInProbe]);
+
+  /**
+   * 🔴 "红"还不够，必须红的是**这一条**。
+   *
+   * 一条注入常常同时踩中好几种违规（比如启用一门新语言会既缺表又缺登记），
+   * 只看退出码的话，"红"可以来自任何一条别的规则 —— 那条探针就**没有**证明
+   * 它声称证明的东西。所以这里要求报错里出现那句话；出现了才算红。
+   */
+  function expectRedFor(name, needle, body) {
+    runCase(
+      'readiness',
+      name,
+      () => {
+        const result = body();
+        if (result.code === 0) return result;
+        if (!result.out.includes(needle)) {
+          return {
+            code: 0,
+            out: `是红了，但报错里没有「${needle}」—— 这条探针没有钉住它声称钉住的规则：\n${result.out}`,
+          };
+        }
+        return { code: 1, out: result.out };
+      },
+      false,
+    );
+  }
+
+  expectGreen('readiness', '基线：隔离副本必须与真实工作区一样绿', gateRun);
+
+  const LOCALES_ANCHOR = "export const LOCALES = ['zh-CN', 'en'] as const";
+
+  // ① 语言清单是事实源：LOCALES 里加一门没登记规则、也没有表的 ⇒ 两条都要红。
+  expectRedFor(
+    'LOCALES 里加一门语言但没登记文字系统判据',
+    '却没登记它',
+    () =>
+      withProbeScenario(
+        [{ file: typesInProbe, from: LOCALES_ANCHOR, to: "export const LOCALES = ['zh-CN', 'en', 'fr'] as const" }],
+        gateRun,
+      ),
+  );
+  expectRedFor(
+    'LOCALES 里加了一门语言却没有 locales/fr.ts',
+    '但没有词条表',
+    () =>
+      withProbeScenario(
+        [{ file: typesInProbe, from: LOCALES_ANCHOR, to: "export const LOCALES = ['zh-CN', 'en', 'fr'] as const" }],
+        gateRun,
+      ),
+  );
+
+  // ② 反方向：有表没启用 ⇒ 红。这份表不会被任何一层读到，是最安静的假绿。
+  expectRedFor(
+    'locales/ 下多出一份没在 LOCALES 里启用的表',
+    '文件存在，但 LOCALES 里没有它',
+    () =>
+      withProbeScenario(
+        [{ file: path.join(localesDir, 'fr.ts'), create: probeCatalog(zhInProbe, 'texte') }],
+        gateRun,
+      ),
+  );
+
+  // ③ 规则 2 按 locale 泛化：ja 启用后，纯拉丁的值必须红（"没有假名"）。
+  const withLocale = (locale, files) => [
+    {
+      file: typesInProbe,
+      from: LOCALES_ANCHOR,
+      to: `export const LOCALES = ['zh-CN', 'en', '${locale}'] as const`,
+    },
+    ...files,
+  ];
+  expectRedFor(
+    'ja 表用英文占位（规则 2 对 ja 生效）',
+    '里没有假名',
+    () =>
+      withProbeScenario(
+        withLocale('ja', [{ file: path.join(localesDir, 'ja.ts'), create: probeCatalog(zhInProbe, 'placeholder text') }]),
+        gateRun,
+      ),
+  );
+
+  // ④ 🔴 `CJK` 不是"是不是中文"：全是 CJK 标点/全角字符的值，含假名判据必须照样红。
+  //    这一条证明新判据**比旧的严**，而不是把 `CJK` 改了个名字。
+  expectRedFor(
+    'ja 表全是 CJK 标点/全角字符（假名判据 ≠ CJK 判据）',
+    '里没有假名',
+    () =>
+      withProbeScenario(
+        withLocale('ja', [{ file: path.join(localesDir, 'ja.ts'), create: probeCatalog(zhInProbe, '，。（ｆｕｌｌ）') }]),
+        gateRun,
+      ),
+  );
+
+  // ⑤ 韩语同理：值必须含谚文。
+  expectRedFor(
+    'ko 表用英文占位（规则 2 对 ko 生效）',
+    '里没有谚文',
+    () =>
+      withProbeScenario(
+        withLocale('ko', [{ file: path.join(localesDir, 'ko.ts'), create: probeCatalog(zhInProbe, 'placeholder text') }]),
+        gateRun,
+      ),
+  );
+
+  // ⑥ 正向对照：值真的含假名 ⇒ **绿**。没有这一条，上面三条红的探针
+  //    可能只是"ja 永远红" —— 那和没有检查一样不值钱。
+  expectGreen(
+    'readiness',
+    'ja 表逐条含假名（正向对照，键集合与中文表一致）',
+    () =>
+      withProbeScenario(
+        withLocale('ja', [{ file: path.join(localesDir, 'ja.ts'), create: probeCatalog(zhInProbe, 'もち') }]),
+        gateRun,
+      ),
+  );
+
+  // ⑦ 自称白名单是活的：ja 表里 `common.lang.zh` 保持中文原值 ⇒ 仍然绿。
+  //    （白名单死了的话，这一行会因为"没有假名"而红。）
+  expectGreen(
+    'readiness',
+    'ja 表里 `common.lang.zh` = 中文（自称白名单生效）',
+    () =>
+      withProbeScenario(
+        withLocale('ja', [
+          { file: path.join(localesDir, 'ja.ts'), create: probeCatalog(zhInProbe, 'もち', ['common.lang.zh']) },
+        ]),
+        gateRun,
+      ),
+  );
+
+  // ⑧ 🔴 白名单**没有**放宽成整族放行：`common.lang.fr` 不在 LOCALES 里 ⇒ 不豁免。
+  expectRedFor(
+    'ja 表里出现没在 LOCALES 里的自称 key（白名单不能是整族）',
+    '里没有假名',
+    () =>
+      withProbeScenario(
+        withLocale('ja', [
+          { file: path.join(localesDir, 'ja.ts'), create: probeCatalog(zhInProbe, 'もち') },
+          {
+            file: path.join(localesDir, 'ja.ts'),
+            from: '} as const;',
+            to: "  'common.lang.fr': 'paris',\n} as const;",
+          },
+        ]),
+        gateRun,
+      ),
+  );
+
+  // ⑨ 登记是承重的：把规则表里 ja 那一行拿掉（表还在、词条还在）⇒ 红。
+  const JA_RULE = String.raw`  ja: { mustContain: KANA, scriptName: '假名', forbidden: null },
+`;
+  expectRedFor(
+    '从 LOCALE_SCRIPT_RULES 里拿掉 ja（新语言必须登记）',
+    '却没登记它',
+    () =>
+      withProbeScenario(
+        [
+          { file: gateInProbe, from: JA_RULE, to: '' },
+          ...withLocale('ja', [{ file: path.join(localesDir, 'ja.ts'), create: probeCatalog(zhInProbe, 'placeholder') }]),
+        ],
+        gateRun,
+      ),
+  );
+
+  // ⑩ LOCALES 解析不出来 ⇒ 门禁必须**拒绝运行**，而不是"没有表要查"的绿。
+  expectRedFor(
+    '把 LOCALES 改名（门禁够不着时必须响亮失败，不能给绿）',
+    '无法从 packages/i18n/src/types.ts 解析',
+    () =>
+      withProbeScenario(
+        [
+          {
+            file: typesInProbe,
+            from: LOCALES_ANCHOR,
+            to: "export const LOCALES_LIST = ['zh-CN', 'en'] as const",
+          },
+        ],
+        gateRun,
+      ),
+  );
+
+  dropProbe('readiness');
+}
+
 const GROUPS = {
   gate: groupGate,
   catalog: groupCatalog,
@@ -1533,6 +1803,7 @@ const GROUPS = {
   coupon: groupCoupon,
   diag: groupDiag,
   e2eecopy: groupE2eeCopy,
+  readiness: groupReadiness,
 };
 const only = process.argv[2];
 const names = only === undefined ? Object.keys(GROUPS) : [only];
@@ -1552,7 +1823,7 @@ for (const r of results) {
   console.log(`${r.ok ? '✅' : '❌'} ${r.name}  （退出码 ${String(r.code)}）`);
   if (!r.ok) {
     const tail = r.out.trim().split('\n').slice(-6).join('\n    ');
-    console.log(`    ↑ 期望${r.group === 'recurrence' || r.name.startsWith('基线') ? '0' : '非零'}，实际不是。输出尾部：\n    ${tail}`);
+    console.log(`    ↑ 期望${r.wantZero === true ? '0' : '非零'}，实际不是。输出尾部：\n    ${tail}`);
   }
 }
 const bad = results.filter((r) => !r.ok).length;
