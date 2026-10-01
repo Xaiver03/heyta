@@ -52,6 +52,12 @@
  * `packages/app-host/tests/hosted-auth.spec.ts` 用注入的 `fetch` 把这些逐条钉住。
  */
 
+import {
+  AUTH_PASSWORD_PATHS,
+  PASSWORD_AUTH_ERROR_CODES,
+  PASSWORD_POLICY_CODES,
+  type PasswordPolicyCode,
+} from '@heyta/shared-schema';
 import { joinEndpointUrl } from './endpoint-url.js';
 
 /**
@@ -87,6 +93,18 @@ export const HOSTED_AUTH_PATHS = {
   passkeys: '/api/passkeys',
   /** 账号语言（登录态写回；应用语言解析链第 2 层）。 */
   accountLocale: '/api/account/locale',
+
+  // ── 邮箱 + 口令（W5）──────────────────────────────────────
+  //
+  // 🔴 这五条**不写字符串**，而是 `'/api'` + `@heyta/shared-schema` 里的相对形状。
+  // 理由就是那份契约存在的理由：服务端注册的字符串与客户端请求的字符串一旦分家，
+  // 症状是 404，而 404 在这里归成 `request-rejected` —— 用户看到的是一句
+  // "登录没有完成"，没有人会想到"两端各写了一遍路径"。
+  emailPasswordRegister: `/api${AUTH_PASSWORD_PATHS.register}`,
+  emailPasswordLogin: `/api${AUTH_PASSWORD_PATHS.login}`,
+  passwordForgot: `/api${AUTH_PASSWORD_PATHS.forgot}`,
+  passwordReset: `/api${AUTH_PASSWORD_PATHS.reset}`,
+  passwordChange: `/api${AUTH_PASSWORD_PATHS.change}`,
 } as const;
 
 /**
@@ -222,7 +240,66 @@ export type HostedAuthFailureReason =
    * 所以它出现就说明调用方绕过了界面 —— 但那更该给出准确的话，而不是笼统的
    * "输入不合法"。
    */
-  | 'passkey-name-too-long';
+  | 'passkey-name-too-long'
+  /**
+   * 邮箱或口令不对（401 + `code: 'invalid_credentials'`）。
+   *
+   * 🔴 与 `unauthorized` 分开：那个的契约是"令牌 / 链接无效或已过期"，用户该
+   * **重新发起一次登录**；这个是"重打一遍"。更要紧的是这句话**故意不区分**
+   * 账号不存在 / 没设口令 / 口令错 —— 三种情况在服务端就是同一个码同一句话，
+   * 少一条它就变成邮箱枚举器。
+   */
+  | 'invalid-credentials'
+  /**
+   * 口令**验对了**，但邮箱还没验证（403 + `code: 'email_not_verified'`）。
+   *
+   * 🔴 与 `not-allowed` 分开：那个是"这台实例不允许这个邮箱"，用户什么也做不了；
+   * 这个的动作是**去收件箱点那封邮件**，而且必须说清"口令是对的" —— 否则用户会
+   * 以为自己打错了，于是反复重打同一个正确的口令。
+   */
+  | 'email-not-verified'
+  /**
+   * 口令认证器被临时锁定（429 + `code: 'account_locked'`）。
+   *
+   * 🔴 与 `rate-limited` 分开：那个是 IP 侧限流，句子是"过一会儿再试"；
+   * 这条锁的是**这一个账号的口令这一种认证器**，而魔法链接与通行密钥**照旧能走**，
+   * 所以界面必须给一条**换路**的出口（"用链接登录，或 N 秒后再试"，
+   * 秒数在 `retryAfterSeconds`）。把"账号被锁"说成"网络繁忙"是最误导人的读法，
+   * 而说成"账号被封"则是假话。
+   */
+  | 'password-locked'
+  /**
+   * 服务端**明说**它现在忙不过来（503 + `code: 'password_backend_busy'`）。
+   *
+   * 🔴 与 `server-error` 分开：后者是我们自己都不知道发生了什么；这条是哈希闸门
+   * 过载这个**具体**原因，`retryAfterSeconds` 有值，界面可以老实说"服务器正在忙"
+   * 并保留用户已输入的内容。也**绝不**把它并进 `rate-limited` —— 那是"你发得太猛"，
+   * 而这次是**我们的容量问题**，退避策略不该惩罚这个无辜用户。
+   */
+  | 'password-backend-busy'
+  /**
+   * 重置链接查不到 / 已过期 / 已被用过（400 + `code: 'invalid_reset_link'`）。
+   *
+   * 动作是"回去重新申请一封"。🔴 不许与 `unauthorized` 合并：后者暗示"重新认证一次"，
+   * 而客户端照做就是**重放同一枚已经用过的链接** —— 服务端会一直回同一个码，死循环。
+   */
+  | 'invalid-reset-link'
+  /**
+   * 这个账号**从来没设过口令**（400 + `code: 'no_password_set'`，只出现在已认证的改密）。
+   *
+   * 🔴 与 `invalid-reset-link` 分开不是为了措辞，是因为两条的 CTA **相反**：
+   * 那条要他"重新点一次链接"，这条要他"去走「忘记密码」把口令设上"。
+   * 共用一个码就意味着在一半人面前说错话。
+   */
+  | 'no-password-set'
+  /**
+   * 新口令不满足策略（400 + `code: 'password_policy_violation'`）。
+   *
+   * 🔴 具体是哪条规则（太短 / 太长 / 太常见 / 已泄露）**只**由 `policyCode` 判别 ——
+   * 四种拒绝的状态码和这一层原因都相同，而用户的动作四种都不同。
+   * 只说"口令不符合要求"而不给动作，等于没说。
+   */
+  | 'password-policy';
 
 export interface HostedAuthFailure {
   ok: false;
@@ -238,7 +315,28 @@ export interface HostedAuthFailure {
    * 匹配就悄悄失效，而失败会静默退化成笼统的一类。
    */
   code?: string;
+  /**
+   * `password_policy_violation` 的**下一层**判别（服务端响应体的 `policyCode`）。
+   *
+   * 🔴 类型直接来自 `@heyta/shared-schema`，不在这里重述那四个串 —— 重述就是第二套词表。
+   * 值只从**白名单**里来（见 `readServerPolicyCode`）：服务端以后加一个码，
+   * 这里给 `undefined`，界面落回那句统称，而不是猜一个可能错的动作。
+   */
+  policyCode?: HostedPasswordPolicyCode;
+  /**
+   * 服务端 `Retry-After` 头（秒）。只在 `password-locked` 与 `password-backend-busy`
+   * 上有意义，其他情况**一律缺失** —— 缺失和 0 是两件事：0 会让界面显示"再等 0 秒"。
+   */
+  retryAfterSeconds?: number;
 }
+
+/**
+ * 策略码的**别名**，不是第二份定义。
+ *
+ * 命名跟着本文件的习惯（`HostedAuth*`），实体在 `@heyta/shared-schema` ——
+ * 那里才是服务端与四个宿主共用的那一份。
+ */
+export type HostedPasswordPolicyCode = PasswordPolicyCode;
 
 /** 统一的返回形状：成功分支自己带字段，失败分支永远可判定。 */
 export type HostedAuthOutcome<T> = (T & { ok: true }) | HostedAuthFailure;
@@ -274,12 +372,17 @@ const failure = (
   status?: number,
   message?: string,
   code?: string,
+  extra?: { policyCode?: HostedPasswordPolicyCode; retryAfterSeconds?: number },
 ): HostedAuthFailure => ({
   ok: false,
   reason,
   ...(status === undefined ? {} : { status }),
   ...(message === undefined ? {} : { message }),
   ...(code === undefined ? {} : { code }),
+  ...(extra?.policyCode === undefined ? {} : { policyCode: extra.policyCode }),
+  ...(extra?.retryAfterSeconds === undefined
+    ? {}
+    : { retryAfterSeconds: extra.retryAfterSeconds }),
 });
 
 /** 服务端的错误体形如 `{ error: string, details?: ... }`。只取可展示的那一段。 */
@@ -303,13 +406,49 @@ function readServerMessage(body: unknown): string | undefined {
 }
 
 /**
+ * 服务端 `policyCode` 的**白名单**读取。
+ *
+ * 词表来自 `@heyta/shared-schema`（那四个串唯一的定义处），所以这里不需要重述它们。
+ * 查不到就给 `undefined` —— 界面落回那句"口令不符合要求"。🔴 绝不"照原样透传字符串"：
+ * 那等于让服务端的任何新取值直接决定界面说哪句话，而没人给它写过词条。
+ */
+function readServerPolicyCode(body: unknown): HostedPasswordPolicyCode | undefined {
+  if (body === null || typeof body !== 'object' || Array.isArray(body)) return undefined;
+  const raw = (body as Record<string, unknown>)['policyCode'];
+  return (PASSWORD_POLICY_CODES as readonly unknown[]).includes(raw)
+    ? (raw as HostedPasswordPolicyCode)
+    : undefined;
+}
+
+/**
+ * `Retry-After` 头 → 秒。
+ *
+ * 只接受**正整数**（HTTP 的 delta-seconds 形状）。小数、负数、日期串一律给
+ * `undefined` —— 界面拿不到数就说"稍后再试"，拿到一个 `NaN` 却会显示"再等 NaN 秒"。
+ */
+function readRetryAfter(headers: Headers | undefined): number | undefined {
+  if (headers === undefined) return undefined;
+  const raw = headers.get('retry-after');
+  if (raw === null) return undefined;
+  const seconds = Number.parseInt(raw.trim(), 10);
+  return Number.isFinite(seconds) && seconds > 0 ? seconds : undefined;
+}
+
+/**
  * 服务端的 `code` → 本层的封闭原因。
  *
  * 🔴 白名单，不是"有 code 就用"。服务端以后加一个新码，客户端**不会**
  * 悄悄把它当成某一种已知失败 —— 它会退回按状态码分类（最保守的结论），
  * 而不是猜一个可能错的动作。
+ *
+ * ⚠️ 服务端那七个口令码**每一个都在这里有一行**。这条"一一对应"由
+ * `packages/app-host/tests/hosted-password-auth.spec.ts` 对着
+ * `PASSWORD_AUTH_ERROR_CODES`（共享契约）逐项检查 —— 少一行不会有任何类型错误，
+ * 症状只是"一种本来能说清的失败变成了一句笼统的话"，而那正是最难被发现的回归。
+ *
+ * 导出**只为**那条对账测试；调用方不该拿它当查询表用（该用函数返回的 `reason`）。
  */
-const FAILURE_REASON_BY_SERVER_CODE: Readonly<Record<string, HostedAuthFailureReason>> = {
+export const FAILURE_REASON_BY_SERVER_CODE: Readonly<Record<string, HostedAuthFailureReason>> = {
   // 登录时出示的凭据服务端不认得（缺口 B）。
   passkey_not_found: 'passkey-not-found',
   // 登录时凭据认得但断言没通过（缺口 B 的另一半）。
@@ -326,6 +465,20 @@ const FAILURE_REASON_BY_SERVER_CODE: Readonly<Record<string, HostedAuthFailureRe
   // 改名时名字超过上限。没有这一条它会退回 classifyStatus(400) → 'invalid-input'，
   // 也是一句正确但没用的话；用户需要知道"最多 60 字"。
   passkey_name_too_long: 'passkey-name-too-long',
+
+  // ── 邮箱 + 口令那条路的七个码（与共享契约一一对应）──────────
+  invalid_credentials: 'invalid-credentials',
+  email_not_verified: 'email-not-verified',
+  // 🔴 429 在这个码上**不是**"你发得太猛"。状态码分类会给 `rate-limited`，
+  // 那是一句对一半人错的话（他被锁的是口令这条路，而链接登录现在就能走），
+  // 所以必须用 code 覆盖状态分类。
+  account_locked: 'password-locked',
+  // 同理：503 会被状态码分类成 `server-error`（"我们不知道发生了什么"），
+  // 而服务端其实**明说**了是哈希闸门过载。
+  password_backend_busy: 'password-backend-busy',
+  password_policy_violation: 'password-policy',
+  invalid_reset_link: 'invalid-reset-link',
+  no_password_set: 'no-password-set',
 };
 
 /** 由服务端 `code` 与 HTTP 状态共同决定原因；只有白名单里的码会覆盖状态分类。 */
@@ -407,11 +560,17 @@ async function sendJson(
 
   if (!response.ok) {
     const code = readServerCode(body);
+    const policyCode = readServerPolicyCode(body);
+    const retryAfterSeconds = readRetryAfter(response.headers);
+    const extra: { policyCode?: HostedPasswordPolicyCode; retryAfterSeconds?: number } = {};
+    if (policyCode !== undefined) extra.policyCode = policyCode;
+    if (retryAfterSeconds !== undefined) extra.retryAfterSeconds = retryAfterSeconds;
     return failure(
       classifyFailure(response.status, code),
       response.status,
       readServerError(body),
       code,
+      Object.keys(extra).length === 0 ? undefined : extra,
     );
   }
 
@@ -978,4 +1137,174 @@ export async function completePasskeyEnrollment(
   );
   if (!result.ok) return result;
   return { ok: true, message: readServerMessage(result.body) ?? '' };
+}
+
+// ── 邮箱 + 口令（W5：协议一侧的五个函数）──────────────────────
+//
+// 🔴 这五条路的**判定**都不在这里：长度、常见口令、泄露口令、失败计数与锁定、
+// "账号不存在 / 没设口令 / 口令错"三者同码同句 —— 全部由服务端裁决
+// （`server/src/password/`）。这一层只决定三件事：路径、请求里放哪些字段、
+// 响应怎么归成 `HostedAuthOutcome`。判定写在客户端就是 §3.5 那份"每个宿主一套
+// 业务语义"的复发，而四端不一致的认证判定等于四套账号系统。
+//
+// ⚠️ **这里刻意不跑口令策略**。`policyCode` 是服务端给的，界面按它取词条。
+// 界面**可以**在提交前用共享契约那两个数先挡一下（少一次没必要的往返），
+// 但那必须是**提示**而不是裁决 —— 客户端把一句 20 字符的 passphrase 判成"不合格"
+// 是真实发生过的错法（NIST 禁止组成规则，而长度上限按码点算，UTF-16 数法会截断）。
+
+/**
+ * 注册（邮箱 + 口令）。
+ *
+ * 🔴 成功**不代表已登录**，也不代表"这个邮箱是你的"：服务端建号并把口令存好，
+ * 但账号 `isVerified=0`，要等那封验证邮件。响应是一句中性的"去看收件箱"。
+ * 邮箱已被占用时**同一句、同一个状态码** —— 所以这个端点不是邮箱存在性预言机，
+ * 界面也不许把它渲染成"注册成功，登录好了"。
+ *
+ * `termsAccepted` 只在**用户真的勾了**时才发（服务端 `z.literal(true)`）——
+ * 我们绝不替用户发明一次同意。
+ *
+ * 口令只做"非空"这一条本地检查：空串是一次没必要的往返，而"够不够长"属于裁决，
+ * 归服务端（它给 `policyCode`）。
+ */
+export async function registerWithEmailPassword(
+  options: HostedAuthOptions,
+  input: { email: string; password: string; termsAccepted?: boolean; inviteCode?: string },
+): Promise<HostedAuthOutcome<{ message: string }>> {
+  const normalized = normalizedEmail(input.email);
+  if (normalized === undefined) return failure('invalid-input');
+  if (input.password === '') return failure('invalid-input');
+
+  const result = await postJson(options, HOSTED_AUTH_PATHS.emailPasswordRegister, {
+    email: normalized,
+    password: input.password,
+    ...(options.locale === undefined ? {} : { locale: options.locale }),
+    ...(input.termsAccepted === undefined ? {} : { termsAccepted: input.termsAccepted }),
+    // 与 `registerWithMagicLink` 同一条纪律：邀请码**原样**发出，客户端不归一化。
+    ...(input.inviteCode === undefined ? {} : { inviteCode: input.inviteCode }),
+  });
+  if (!result.ok) return result;
+  return { ok: true, message: readServerMessage(result.body) ?? '' };
+}
+
+/**
+ * 登录（邮箱 + 口令）。**产出会话的第三条路**（另两条是魔法链接与通行密钥）。
+ *
+ * 🔴 响应形状与 `/login/passkey/verify` **同形**，所以这里复用同一个
+ * `parseSession` —— 缺 `token` 或缺 `user.id/email` 都判 `malformed-response`，
+ * **绝不当成功**（一枚空令牌会让同步静默失败，而那正是最难归因的形状）。
+ *
+ * 口令原样送出，**不在这里 normalize**：归一化（NFC + NFKC，按码点）只在服务端
+ * 一处发生，且存的与验的都是它归一化后的串。客户端多归一化一次就是第二套规则，
+ * 而那正是"同一句口令在两端字节不同"的生成方式。
+ */
+export async function loginWithEmailPassword(
+  options: HostedAuthOptions,
+  input: { email: string; password: string },
+): Promise<HostedAuthOutcome<{ session: HostedAuthSession }>> {
+  const normalized = normalizedEmail(input.email);
+  if (normalized === undefined) return failure('invalid-input');
+  if (input.password === '') return failure('invalid-input');
+
+  const result = await postJson(options, HOSTED_AUTH_PATHS.emailPasswordLogin, {
+    email: normalized,
+    password: input.password,
+  });
+  if (!result.ok) return result;
+
+  const session = parseSession(result.body);
+  if (session === undefined) return failure('malformed-response');
+  return { ok: true, session };
+}
+
+/**
+ * 申请一封"重置口令"的邮件。
+ *
+ * 🔴 服务端**永远**回同一句中性文案 + **同一个状态码（200）**，连服务端异常时
+ * 也回 200 —— 因为这条请求里含邮箱，只要状态码随"账号是否存在"变化，
+ * 它就还是预言机（OWASP 点名的是状态码，不只是文案）。所以成功**不代表**
+ * "该邮箱存在"，界面那句话只能是"如果我们认得这个邮箱，信已经发出去了"。
+ *
+ * 不发请求前唯一的本地检查是"邮箱非空"。
+ */
+export async function requestPasswordReset(
+  options: HostedAuthOptions,
+  email: string,
+): Promise<HostedAuthOutcome<{ message: string }>> {
+  const normalized = normalizedEmail(email);
+  if (normalized === undefined) return failure('invalid-input');
+
+  const result = await postJson(options, HOSTED_AUTH_PATHS.passwordForgot, {
+    email: normalized,
+    ...(options.locale === undefined ? {} : { locale: options.locale }),
+  });
+  if (!result.ok) return result;
+  return { ok: true, message: readServerMessage(result.body) ?? '' };
+}
+
+/**
+ * 用邮件链接里的一次性令牌换新口令。
+ *
+ * 🔴 成功**不发会话**（ADR-0040）。响应只有"去登录"那句中性话，界面据此把用户
+ * 导向登录页 —— 不许在这里顺手换一枚令牌让流程"更顺"：重置成功的那一刻正是
+ * 高风险时刻，而"持有收件箱"不等于"该拿到登录态"。
+ *
+ * 令牌原样送出（不 trim 中间、不改大小写）：形状规则属于签发方。
+ * 查不到 / 过期 / 用过三种情况服务端给**同一个** `invalid_reset_link`。
+ */
+export async function resetPasswordWithToken(
+  options: HostedAuthOptions,
+  input: { token: string; password: string },
+): Promise<HostedAuthOutcome<{ message: string }>> {
+  const trimmed = input.token.trim();
+  if (trimmed === '') return failure('invalid-input');
+  if (input.password === '') return failure('invalid-input');
+
+  const result = await postJson(options, HOSTED_AUTH_PATHS.passwordReset, {
+    token: trimmed,
+    password: input.password,
+    // 这条**没有邮箱可查账号语言**，而正在填这张表的人手上就有当前语言。
+    ...(options.locale === undefined ? {} : { locale: options.locale }),
+  });
+  if (!result.ok) return result;
+  return { ok: true, message: readServerMessage(result.body) ?? '' };
+}
+
+/**
+ * 已登录改口令。**当前设备换新会话、其余设备全部掉线**。
+ *
+ * 🔴 成功时**必须**把新会话换出去：`tokenVersion` 是全局计数器，bump 之后
+ * 手上这枚也失效了。如果这里只回 `{message}`，症状就是"改个密码把自己的这个
+ * 标签页也踢出去"，而界面刚说完"修改成功"。
+ *
+ * 两个口令字段都**不**在这里判强度：当前口令是老值（用户当年可能设得比现在松），
+ * 对它套新规则会让"改密这件事本身"变成一条用新规则拒绝老口令的路。
+ * 策略只跑在新口令上，服务端裁决、`policyCode` 给出具体的那一条。
+ *
+ * 空令牌**不发请求**（判 `unauthorized`）—— 与 `listPasskeys` 同一条 fail-safe。
+ */
+export async function changePassword(
+  options: HostedAuthOptions,
+  token: string,
+  input: { currentPassword: string; newPassword: string },
+): Promise<HostedAuthOutcome<{ session: HostedAuthSession }>> {
+  const trimmedToken = token.trim();
+  if (trimmedToken === '') return failure('unauthorized');
+  if (input.currentPassword === '' || input.newPassword === '') return failure('invalid-input');
+
+  const result = await sendJson(
+    options,
+    'POST',
+    HOSTED_AUTH_PATHS.passwordChange,
+    {
+      currentPassword: input.currentPassword,
+      newPassword: input.newPassword,
+      ...(options.locale === undefined ? {} : { locale: options.locale }),
+    },
+    trimmedToken,
+  );
+  if (!result.ok) return result;
+
+  const session = parseSession(result.body);
+  if (session === undefined) return failure('malformed-response');
+  return { ok: true, session };
 }
