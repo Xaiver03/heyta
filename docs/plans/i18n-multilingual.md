@@ -561,12 +561,20 @@ node scripts/check-pricing-consistency.mjs
    门禁也扫不到（门禁只扫 `ROOTS` 列出的应用目录）。
    **处理原则**：语义（"算出来是什么"）留在 domain，措辞（"怎么说出来"）搬到壳里 ——
    壳继续消费 domain 的**结构化**输出（`computeCountdown` / `monthGrid` / 毫秒数），自己用 `t()` 排版。
-   - `apps/mobile` **已经按这个原则搬完**：`lib/due-display.ts`（剩余天数，阈值逐条照抄 `formatRemaining`）、
+   - ✅ **`apps/web` 与 `apps/mobile` 都已经按这个原则搬完**：`lib/due-display.ts`（剩余天数，阈值逐条照抄 `formatRemaining`）、
      `lib/date.ts`（月/日标题、星期）、`lib/focus-display.ts`（时长）。
      `packages/domain/src/date.ts` 的 `formatCompactDate` **刻意没搬** —— 它是纯数字、与语言无关。
-   - ⚠️ **`packages/domain` 本身尚未改造**，函数还在那里、也还有别的调用方（`apps/web` 与 domain 自己的测试）；
-     移动端只是**不再调用** `formatMonthTitle` / `formatDayTitle` / `WEEKDAY_LABELS` / `formatRemaining` /
-     `formatFocusDuration` / `describeRecurrence` 了。**web 还没搬**，所以 web 的英文界面在这些位置仍会出现中文。
+     ⚠️ **这一条本轮（2026-10-01）复测过，因为它曾经写着"web 还没搬，所以 web 的英文界面在这些位置仍会出现中文"**：
+     现在两个壳各自有 `remainingText(days, t)`，日历标题走 `@heyta/ui` 的
+     `formatMonthTitleText` / `formatDayTitleText`，时长走 `features/categories/copy.ts` 的
+     `formatDuration(ms, t)` —— **对 domain 那批中文函数只剩注释里的引用**。
+     实测的调用方（`grep 'describeRecurrence(\|formatRemaining(\|formatMonthTitle('`）：
+     `packages/domain` 自己（`formatRemainingUntil` → `formatRemaining`）+ 两处**当独立参照用的测试**
+     （`packages/domain/tests/recurrence.spec.ts`、`apps/mobile/tests/recurrence-display.spec.ts`）。
+     `packages/app-host/src/motivation.ts` 仍调 `describeHabitResilience`，但它取的是**数值口径**，
+     没有任何界面渲染它返回的那句中文（`resilience.label` 全仓零消费点）。
+   - 🔴 **domain 本身仍然不改，而且这是有意的**：那些函数留着当**措辞参照**与**语义对照**，
+     删掉它们会同时删掉上面那两组测试的独立性。
 
    **重复规则（`describeRecurrence`）用的也是这个套路，但它多一层麻烦**：
    它返回的是**一句话**，而不是一个数字 —— 没有"结构化输出"可以先拿。所以先给域层加了一个
@@ -584,8 +592,16 @@ node scripts/check-pricing-consistency.mjs
    只有导入或别的客户端才会产生），测试里单独钉住、并写明理由：
    - 多月份：`每年 9、10 月` → `每年 9 月、10 月`（词条按"每个月自带单位"组织，英文尤其需要 September）；
    - 年度里的负数日：`每年 9 月 14、-1 日` → `每年 9 月 14 日、最后一天`（`-1` 是内部编码）。
-2. **`localeFromPath` 在非 `/` 的 base 下未验证。** `apps/landing/src/lib/locale.ts` 读
-   `import.meta.env.BASE_URL`，单元测试诚实标注了子路径部署分支**没有覆盖**（当前部署在根路径）。
+2. ✅ **`localeFromPath` 在非 `/` 的 base 下已验证**（本轮补，2026-10-01）。
+   `apps/landing/src/site/paths.ts` 读 `import.meta.env.BASE_URL`，文件头写着
+   "写死会让子路径部署时所有互链全部 404" —— **这句话此前没有任何测试撑着**（当前部署在根路径）。
+   现在由 `apps/landing/tests/locale-base-path.spec.ts` 钉住 5 条：子路径下解析两个方向、
+   英文段必须是完整一段（`/landing/enx/` 不算 en）、**生成侧与解析侧自洽**
+   （`siteHref` 产出的地址要能被 `localeFromPath` 认回来），外加根 base 的对照组。
+   🔴 机制上有个坑值得记：`BASE` 是**模块顶层常量**，先 import 再 `vi.stubEnv` 会得到
+   一个"以为在测子路径、其实测的是根路径"的假判据 —— 必须 `vi.resetModules()` + 动态 import。
+   **变异验证**：把 `BASE` 写死成 `'/'`（正是文件头禁止的形状）⇒ **恰好 2 条红**
+   （两条子路径判据）、根 base 的对照组照常绿、exit 1；跑完逐字节还原（sha 已对）。
 3. **meta 文案（`<title>` / `<meta name="description">`）在两份 HTML 里是手写的**，不走词条表。
    这是刻意的：它们必须在 JS 执行前就存在。代价是改标题要**改两处**（`index.html` 与 `en/index.html`）。
 4. **词条表没有复数/ICU 能力**（§2）。英文里 "1 day left" / "3 days left" 这类靠
