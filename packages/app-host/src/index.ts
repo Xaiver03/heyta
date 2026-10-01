@@ -185,6 +185,19 @@ export {
 } from './inbox.js';
 
 /**
+ * 注册勾选框旁边的条款链接。理由与 `hosted-auth.ts` 同源：**"哪份文本适用于
+ * 这个服务端"是协议知识，不是界面知识**，四个壳各写一遍必然漂移
+ * （AGENTS.md §3.5）。裁决见 `docs/plans/legal-compliance-before-filing.md` 链 2 与 D-09。
+ */
+export {
+  LEGAL_SITE_PATHS,
+  OFFICIAL_SITE_ORIGIN,
+  OPERATOR_LEGAL_PATHS,
+  resolveLegalLinks,
+  type LegalLinks,
+} from './legal-links.js';
+
+/**
  * 服务端认证客户端。**所有宿主共用这一份** —— 见 `hosted-auth.ts` 文件头：
  * 服务端早就有完整认证，而此前**没有任何客户端调用它**（用户只能在同步设置里
  * 手填令牌，没人告诉他令牌从哪来）。
@@ -192,6 +205,11 @@ export {
  * 🔴 协议语义（哪个路径、发什么字段、凭据在响应体里不是 cookie、
  * 失败如何归类）一律在 `packages/app-host`，`apps/*` 只负责
  * 「用什么网络实现」和「把通行密钥 options 交给平台的人机接口」。
+ *
+ * ⚠️ 邮箱 + 口令那五条（`registerWithEmailPassword` / `loginWithEmailPassword` /
+ * `requestPasswordReset` / `resetPasswordWithToken` / `changePassword`）在这一版
+ * 才补上导出：函数与契约测在 W5 就写完了，但**包外一个调用方都没有** ——
+ * 症状正是本仓库反复记过的那类"功能做完了、用户做不到"。
  */
 export {
   HOSTED_AUTH_PATHS,
@@ -199,6 +217,7 @@ export {
   beginPasskeyEnrollment,
   beginPasskeyLogin,
   beginPasskeyRegistration,
+  changePassword,
   completePasskeyEnrollment,
   completePasskeyLogin,
   completePasskeyRecovery,
@@ -207,12 +226,16 @@ export {
   extractAuthLinkToken,
   getPasskeyRecoveryOptions,
   listPasskeys,
+  loginWithEmailPassword,
   passkeyDeletePath,
   passkeyPath,
+  registerWithEmailPassword,
   registerWithMagicLink,
   renamePasskey,
   requestMagicLink,
   requestPasskeyRecovery,
+  requestPasswordReset,
+  resetPasswordWithToken,
   updateAccountLocale,
   verifyEmailAddress,
   verifyMagicLink,
@@ -225,6 +248,7 @@ export {
   type HostedPasskeyCredential,
   type HostedPasskeyOptions,
   type HostedPasskeySummary,
+  type HostedPasswordPolicyCode,
 } from './hosted-auth.js';
 
 /**
