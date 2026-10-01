@@ -2308,3 +2308,52 @@ spec，且报错里出现 `ECONNREFUSED <本机端口>` 或 `.playwright-artifac
     姊妹款——按 hunk 过滤共享文件时只比对增行，结果对方"改写自己 key 正文"
     的 hunk（有删有增）被误判成我的，暂存 blob 悄悄丢了 HEAD 里的旧值；
     判据改为**删行增行都匹配才算对方的**才闭环）。
+
+91. 🔴 **一个未定义的 CSS 自定义属性会让**整条声明**失效，不是只让那一段失效 ——
+    `grid-template-columns` 塌掉时整个应用外壳变成竖排单列，而所有门禁全绿。**
+
+    在隔离检出（`git worktree add --detach HEAD`）里跑首启语言的真浏览器用例，
+    截图出来的界面是：rail、sidebar、header、main **从上到下堆成一列**，
+    每一块都占满 1280px。第一反应是"这个临时检出缺了构建产物"。
+    实测（`getBoundingClientRect` + `getComputedStyle`）：
+
+    ```
+    .ht-app    display=grid  1280x1658      ← display:grid 生效了
+    .ht-rail   1280x548                     ← 但列宽没生效
+    --ht-layout-rail-width = 11rem           ← 变量本身解析得到
+    ```
+
+    真正的原因在 `.ht-app--with-sidebar` 那条 `grid-template-columns` 里：
+    它除了 `--ht-layout-rail-width` 还吃 `--ht-layout-sidebar-min-width` /
+    `--ht-layout-sidebar-max-width`（给 `clamp()` 当上下界），
+    而**HEAD 的 `tokens.css` 里没有这两个** —— 它们此刻正躺在另一条会话
+    未提交的 `packages/design-system/src/tokens.css` 改动里。
+    `var()` 解析到未定义的自定义属性且**没有 fallback** ⇒ 该声明
+    *invalid at computed-value time* ⇒ 整条 `grid-template-columns` 按 `unset`
+    处理 ⇒ 网格退回单列。A/B 实测：把那两个变量补进临时检出，布局立刻恢复三列。
+
+    ⚠️ **为什么没有任何一道门禁抓到**：`check:design` 查的是"组件里不许出现裸值"
+    （方向相反），`check:tokens` 查的是"生成物与 `tokens.css` 同步"（不比消费），
+    类型系统看不见 CSS 字符串里的 `var()`。**"引用了不存在的 token"这条缝，
+    目前整个工具链是空的。**
+
+    📌 **可迁移的规律**：`var()` 的失败单位是**整条声明**，不是那个值 ——
+    所以症状会出现在**离缺陷很远**的地方（这里塌掉的是整个页面布局，
+    而缺的是一个侧栏宽度上下界）。排查时先问"这条声明还在不在"
+    （`getComputedStyle` 看它是不是 `unset`），再问"值对不对"。
+
+92. 🔴 **给隔离检出 `ln -s` 一份 `node_modules`，会让所有"改 dist 再验会红"的注入探针静默失效。**
+
+    `scripts/verify-i18n-failures.mjs` 有一组探针改的是 `packages/i18n/dist/**`
+    （移动端测试解析的是编译产物）。把这套搬到干净检出里跑时，为了省事把
+    主工作树的 `node_modules` 软链过去 ⇒ 第一次跑出 2 条"注入没让测试变红"，
+    看起来像**门禁坏了**。实际是：探针改的是临时检出里的 dist，
+    而 `require('@heyta/i18n')` 顺着软链解析到了**主工作树**那份 dist ——
+    改的和测的不是同一个文件。改成在临时检出里真跑一次
+    `pnpm install --frozen-lockfile --ignore-scripts` 之后，
+    recurrence 组 10/10、全量 114/114 在两处一致。
+
+    📌 **可迁移的规律**：任何"改产物再断言会红"的探针，前提是**解析路径落在
+    被改的那份产物上**。软链、`pnpm` 的 workspace 链接、`exports` 指向 `src`
+    而不是 `dist`，三种都能让它改到空气上 —— 而且失败表现是"探针没生效"，
+    最容易被误读成"判据太松"。
