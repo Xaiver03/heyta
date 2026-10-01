@@ -32,6 +32,7 @@
  */
 
 import {
+  addDays,
   startOfDay,
   type LocalDate,
   toLocalDate,
@@ -49,10 +50,22 @@ import { bucketByQuadrant } from './quadrant.js';
 export type TaskFilter =
   | { kind: 'all' }
   | { kind: 'today' }
+  | { kind: 'next7Days' }
   | { kind: 'completed' }
   | { kind: 'quadrant'; quadrant: Quadrant }
   | { kind: 'project'; projectId: string }
   | { kind: 'tag'; tagId: string };
+
+/**
+ * 「最近 7 天」这条智能清单的天数（含今天，闭区间）。
+ *
+ * 🔴 **这个 7 住在领域层，不下沉成 `{ kind: 'withinDays', days: 7 }` 让壳去传。**
+ * 理由是"清单看几天内的东西"是产品对用户说的一句话，不是某个界面的排版参数：
+ * 侧栏那行写「最近 7 天」，而它背后的窗口必须是同一个数。写成参数就会出现
+ * "侧栏标签写 7 天、壳里传 6"这种**界面上看不出来**的对不上。
+ * 真要加"未来 14 天"是加一个产品概念，不是让调用方随手填一个数字。
+ */
+export const NEXT_SEVEN_DAYS = 7;
 
 /** 筛选需要的环境。`now` 显式传入，不在函数里读时钟 —— 见本文件头。 */
 export interface FilterContext {
@@ -104,6 +117,29 @@ export function filterTasks(
       return alive.filter(
         (t) => !isCompleted(t) && t.dueDate !== undefined && startOfDay(t.dueDate) === today,
       );
+    }
+    case 'next7Days': {
+      /**
+       * 🔴 窗口按**本地日历日**算，不按毫秒滑窗。
+       *
+       * `now + 7 * DAY_MS` 这种写法在跨夏令时的周末会把窗口变成 6 天或 8 天
+       * （那两天一天是 23/25 小时），症状是"某个任务在 7 天清单里消失了"，
+       * 而且**一年只出现两个周末** —— 是最难归因的那类错。
+       * `LocalDate` 是 `YYYY-MM-DD`，字典序即日期序，所以闭区间
+       * `[今天, 今天+6]` 直接用字符串比（与 `groupTasksByDate` 里
+       * "Map 键排序即日期序"同一条性质）。
+       *
+       * ⚠️ **不含逾期**：到得比今天早的那几条属于「逾期」，滴答的"未来 7 天"
+       * 也不把它们混进来 —— 一个清单同时显示逾期和未来时，"最近 7 天"这个名字
+       * 就在撒谎。⚠️ **不含无截止时间**的：它没有日期，不在任何日期窗口里。
+       */
+      const first = toLocalDate(context.now);
+      const last = addDays(first, NEXT_SEVEN_DAYS - 1);
+      return alive.filter((t) => {
+        if (isCompleted(t)) return false;
+        const due = dueLocalDate(t);
+        return due !== undefined && due >= first && due <= last;
+      });
     }
     case 'quadrant':
       return bucketByQuadrant(alive, { now: context.now })[filter.quadrant];

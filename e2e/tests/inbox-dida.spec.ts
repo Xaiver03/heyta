@@ -99,3 +99,58 @@ test('组头折叠：收起后行消失、组头与计数留下', async ({ page 
   page.on('pageerror', (e) => consoleErrors.push(String(e)));
   expect(consoleErrors, '控制台不应有异常').toEqual([]);
 });
+
+/**
+ * 「最近 7 天」这条智能清单（#10(b)）。
+ *
+ * 🔴 窗口的**归属规则**在领域层已经单测钉过（含边界、跨月、逾期不在）。
+ * 这一条判的是**壳**：那一行点得动吗、页头说的是这一列吗、
+ * 侧栏的**计数**与点进去数出来的行数是不是同一个数。
+ *
+ * 最后一条最容易被跳过：计数字段与列表行各读各的判据时，症状是
+ * 「侧栏写 2，点进去 3 条」，而每一层单看都"没错"。
+ *
+ * ⚠️ 种数据全走**真捕获条**（真 op-log、真解析），不写 localStorage 抄近路。
+ */
+test('最近 7 天：侧栏计数 == 点进去的行数，逾期那条不在里面', async ({ page }) => {
+  // 🔴 `pageerror` 监听要**在导航之前**挂：挂晚了收不到加载期异常，
+  //    而"控制台无内容"是最误导人的结果（AGENTS §6.2 规定一第 3 条）。
+  const consoleErrors: string[] = [];
+  page.on('pageerror', (e) => consoleErrors.push(String(e)));
+
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto('/?lang=zh-CN');
+
+  const composer = page.locator('input[placeholder^="添加任务"]');
+  await expect(composer).toBeVisible();
+  // 三条：窗口内两条（今天 / 明天）、窗口外一条（昨天 = 逾期）。
+  for (const line of ['今天要开的会', '明天要交的周报', '昨天要补的账']) {
+    await composer.fill(line);
+    await composer.press('Enter');
+  }
+
+  const row = page.locator('[data-testid="nav-scope-next7Days"]');
+  await expect(row, '侧栏必须有「最近 7 天」这一行').toBeVisible();
+  await expect(row).toContainText('最近 7 天');
+  const count = page.locator('[data-testid="nav-scope-next7Days-count"]');
+  await expect(count, '有任务时计数要出现').toHaveText('2');
+
+  await page.screenshot({ path: SHOT('next7-sidebar') });
+
+  await row.click();
+  await expect(page.locator('.ht-header__title').first()).toHaveText('最近 7 天');
+
+  const boxes = page.locator('[data-testid^="task-group-"] [role="checkbox"]');
+  await expect(boxes, '计数说 2，屏上就必须是 2 行').toHaveCount(2);
+  // 🔴 逾期那条**不在**这一列：它属于「已过期」，混进来"最近 7 天"这个名字就撒谎。
+  await expect(page.locator('[aria-label="完成：昨天要补的账"]')).toHaveCount(0);
+
+  await page.screenshot({ path: SHOT('next7-list') });
+
+  // 暗色：这一列的组头/计数/勾选框在暗底上有没有跟着翻（AGENTS §5）。
+  await page.getByRole('button', { name: '切换到暗色主题' }).click();
+  await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
+  await page.screenshot({ path: SHOT('next7-dark') });
+
+  expect(consoleErrors, '控制台不应有异常').toEqual([]);
+});

@@ -12,6 +12,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import {
   CalendarDays,
+  CalendarRange,
   ChartGantt,
   Check,
   CheckCircle2,
@@ -217,6 +218,18 @@ const QUADRANT_NAV: NavEntry[] = [
 const PRIMARY_NAV: NavEntry[] = [
   { filter: { kind: 'all' }, labelKey: 'web.shell.nav.inbox', icon: Inbox },
   { filter: { kind: 'today' }, labelKey: 'web.shell.nav.today', icon: Sun },
+  /**
+   * 「最近 7 天」—— 滴答那三个智能清单里的中间一个（收集箱 / 今天 / 最近 7 天）。
+   *
+   * 🔴 这一行只是**入口**：窗口的定义（含今天的七个日历日、不含逾期、
+   * 不含无截止、不含已完成）全在领域层的 `filterTasks({kind:'next7Days'})`，
+   * 天数常数 `NEXT_SEVEN_DAYS` 也在那里。这里**不许**再算一遍日期，
+   * 也不许把 7 写成字面量 —— 侧栏标签上的数与该常数的同源关系钉在
+   * `tests/task-groups.spec.tsx`。
+   *
+   * 顺序放在「今天」之后：两条都是"按日期看的未完成"，收集箱垫底看全部。
+   */
+  { filter: { kind: 'next7Days' }, labelKey: 'web.shell.nav.next7Days', icon: CalendarRange },
   /**
    * 「已完成」。
    *
@@ -492,8 +505,9 @@ export function App(): React.JSX.Element {
     return {
       all: count({ kind: 'all' }),
       today: count({ kind: 'today' }),
+      next7Days: count({ kind: 'next7Days' }),
       completed: count({ kind: 'completed' }),
-    } as Record<'all' | 'today' | 'completed', number>;
+    } as Record<'all' | 'today' | 'next7Days' | 'completed', number>;
   }, [store.entities.tasks, store.now]);
 
   /**
@@ -1125,6 +1139,9 @@ export function App(): React.JSX.Element {
     if (view === 'quadrant' && f.kind !== 'quadrant') return t('web.shell.nav.quadrant');
     if (f.kind === 'all') return t('web.shell.nav.inbox');
     if (f.kind === 'today') return t('web.shell.nav.today');
+    // 「最近 7 天」的标题就是那一行侧栏的名字 —— 它是**一条智能清单**，
+    // 不是"某个日期的任务"，所以标题不需要跟着具体日期变。
+    if (f.kind === 'next7Days') return t('web.shell.nav.next7Days');
     if (f.kind === 'completed') return t('web.shell.nav.completed');
     // filter 是判别联合（含 all/today/completed/quadrant/project），
     // **必须显式判 kind** 才能访问各自特有字段 —— 直接取 f.quadrant 编译不过。
@@ -1752,9 +1769,11 @@ export function App(): React.JSX.Element {
                     ? navCounts.all
                     : entry.filter.kind === 'today'
                       ? navCounts.today
-                      : entry.filter.kind === 'completed'
-                        ? navCounts.completed
-                        : undefined
+                      : entry.filter.kind === 'next7Days'
+                        ? navCounts.next7Days
+                        : entry.filter.kind === 'completed'
+                          ? navCounts.completed
+                          : undefined
                 }
                 active={isActive(store.filter, entry.filter)}
                 onClick={() => goToFilter(entry.filter)}
@@ -2342,21 +2361,28 @@ function NavButton({
 }): React.JSX.Element {
   const { t } = useI18n();
   const Icon = entry.icon;
+  /*
+    🔴 testID 从 `filter.kind` **推导**，不是手写的第二份名字。
+    侧栏这些行此前没有任何稳定探针，测试只能去够 CSS class（而这个仓库明确
+    不允许 —— 类名是样式，不是契约）。由 kind 推导意味着：加一条智能清单
+    就自动有探针，不会出现"行存在但没人能点它"。
+    `-label` / `-count` 分开的理由：「最近 7 天」这一行的**名字里就有数字**，
+    整行的 `textContent` 是 `最近 7 天2` —— 拿它判计数会把标签上的 7 读成 2，
+    判天数同源又会把计数读成天数。两个数必须各有自己的探针。
+  */
+  const testID = `nav-scope-${entry.filter.kind}`;
   return (
-    <button
-      type="button"
-      className="ht-nav__item"
-      aria-current={active}
-      onClick={onClick}
-    >
+    <button type="button" className="ht-nav__item" aria-current={active} onClick={onClick} data-testid={testID}>
       {entry.swatch !== undefined ? (
         <span className={`ht-swatch ${entry.swatch}`} aria-hidden="true" />
       ) : (
         <Icon size={16} aria-hidden="true" />
       )}
-      {t(entry.labelKey)}
+      <span data-testid={`${testID}-label`}>{t(entry.labelKey)}</span>
       {count !== undefined && count > 0 && (
-        <span className="ht-nav__count">{count}</span>
+        <span className="ht-nav__count" data-testid={`${testID}-count`}>
+          {count}
+        </span>
       )}
     </button>
   );
@@ -2386,6 +2412,12 @@ function EmptyState({ filter }: { filter: TaskFilter }): React.JSX.Element {
       titleKey: 'web.shell.empty.today.title',
       hintKey: 'web.shell.empty.today.hint',
     },
+    // 不写"今天没有到期"也不写"收集箱是空的"：这一列空下来的意思是
+    // **未来 7 天没有安排**，而那个"下一步"是把截止时间放进这几天里。
+    next7Days: {
+      titleKey: 'web.shell.empty.next7Days.title',
+      hintKey: 'web.shell.empty.next7Days.hint',
+    },
     completed: {
       titleKey: 'web.shell.empty.completed.title',
       hintKey: 'web.shell.empty.completed.hint',
@@ -2398,7 +2430,7 @@ function EmptyState({ filter }: { filter: TaskFilter }): React.JSX.Element {
   const msg = messages[filter.kind] ?? messages['all']!;
 
   return (
-    <div className="ht-empty">
+    <div className="ht-empty" data-testid="empty-state">
       <Inbox className="ht-empty__icon" size={40} aria-hidden="true" />
       <p className="ht-empty__title">{t(msg.titleKey)}</p>
       <p className="ht-empty__hint">{t(msg.hintKey)}</p>
@@ -2427,6 +2459,7 @@ function isActive(current: TaskFilter, target: TaskFilter): boolean {
       return target.kind === 'tag' && current.tagId === target.tagId;
     case 'all':
     case 'today':
+    case 'next7Days':
     case 'completed':
       return true;
   }
