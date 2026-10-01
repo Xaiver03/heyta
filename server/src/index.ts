@@ -3,6 +3,7 @@ import { createServer } from './server';
 import * as path from 'path';
 import { Logger } from './logger';
 import { PRODUCT_NAME } from './config';
+import { assertPasswordBackend } from './password/hash';
 
 // Create server instance with config overrides
 // The server will load additional config from environment variables
@@ -46,8 +47,30 @@ process.on('unhandledRejection', (reason, promise) => {
   Logger.error('❌ Unhandled rejection at:', promise, 'reason:', reason);
 });
 
-// Start the server
-start()
+// Start the server.
+//
+// The password hashing backend is verified **before** the port is bound. Both halves of
+// that check are load-bearing for email+password sign-in: a missing `PASSWORD_PEPPER`
+// means every registration would store a hash that can never be verified again (and
+// rotating it later invalidates them all), and on `node:24-alpine` the Argon2id binary
+// can install without being loadable — or load and compute different bytes. A container
+// that refuses to start is a cheaper failure than a server that reports `healthy` and
+// answers the first person who signs in with a 500.
+const boot = async (): Promise<string> => {
+  try {
+    const report = await assertPasswordBackend();
+    Logger.info(
+      `🔒 Password hashing backend verified (Argon2id, ${report.msPerHash} ms per hash)`,
+    );
+  } catch (err) {
+    Logger.error('❌ Password hashing backend self-check failed — refusing to start.');
+    Logger.error(`   ${err instanceof Error ? err.message : String(err)}`);
+    process.exit(1);
+  }
+  return start();
+};
+
+boot()
   .then((address) => {
     Logger.info('');
     Logger.info(`🚀 ${PRODUCT_NAME} Server is running!`);

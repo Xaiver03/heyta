@@ -54,6 +54,10 @@ ENV TEST_MODE=true
 ENV TEST_MODE_CONFIRM=yes-i-understand-the-risks
 ENV CORS_ORIGINS=*
 ENV JWT_SECRET=e2e-test-secret-minimum-32-chars-long-for-security
+# Required by the boot password-backend check. Deliberately a constant: this image only
+# ever runs in TEST_MODE, and a fixed pepper keeps hashes from one e2e run comparable with
+# the next. Production images never bake a pepper (see env.example).
+ENV PASSWORD_PEPPER=e2e-test-pepper-minimum-32-chars-long-for-security
 
 # Push schema to DB and start server.
 # Retry `prisma db push` for up to ~30s on transient connection failures

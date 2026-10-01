@@ -113,8 +113,12 @@ supersync:
   secret:
     # -- REQUIRED: JWT signing secret (minimum 32 characters)
     jwtSecret: ""
+    # -- REQUIRED: password hashing pepper (minimum 32 characters).
+    # The server verifies it at boot and refuses to start without it.
+    # Rotating it makes every stored password fail to verify.
+    passwordPepper: ""
   # -- Use a pre-existing Kubernetes secret instead of creating one.
-  # The secret must contain a JWT_SECRET key.
+  # The secret must contain JWT_SECRET and PASSWORD_PEPPER keys.
   existingSecret: ""
 
 # -- Built-in PostgreSQL configuration
