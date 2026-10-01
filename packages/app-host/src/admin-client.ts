@@ -119,6 +119,12 @@ export interface AdminUserDetail {
   readonly user: AdminUserRow & {
     readonly failedLoginAttempts: number;
     readonly termsAcceptedAt: number | null;
+    /**
+     * 同意时那一套对外文本的版本指纹。**null ≠ 没同意** —— 它说的是"这条记录只有
+     * 时间戳，证明不了是哪一版"：迁移之前的老账号，或运营者自托管实例（那台机器发布
+     * 的是它自己的文本，版本不由我们命名）。后台要把这两种情况和"没同意"分开显示。
+     */
+    readonly termsDocumentVersion: string | null;
     readonly tokenVersion: number;
   };
   readonly counts: { passkeys: number; operations: number; notifications: number };
