@@ -181,31 +181,20 @@ if [ "${HEYTA_CAPTURE_INJECT_FAIL_CROSSCHECK:-}" = "1" ]; then
   exit 1
 fi
 
-WID=$(cd "$HERE" && swift window-id.swift 2>/dev/null | head -1 | cut -f1 || true)
+# 🔴 `--pid "$CROSSCHECK_PID"`（2026-10-01）：只认**本次起的那一个实例**的窗口。
+#    机器上常驻用户自己装的 Heyta.app（标题同样是 "heyta"），只按标题筛时
+#    `head -1` 会撞上它 —— 拿用户窗口的尺寸跟取证实例的自截图比 ⇒ 交叉验证必红
+#    （实测 2240×1440 vs 2124×1508，正是 §7 第 81.3 条"同名窗口污染清单"的形状，
+#    只是这次的"僵尸"是**正在使用中的产品**，既不能杀也不该杀）。
+WID=$(cd "$HERE" && swift window-id.swift --pid "$CROSSCHECK_PID" 2>/dev/null | head -1 | cut -f1 || true)
 if [ -n "${WID:-}" ]; then
   screencapture -x -o -l"$WID" /tmp/heyta-mac-crosscheck.png 2>/dev/null || true
   if [ -f /tmp/heyta-mac-crosscheck.png ]; then
-    node - "$OUT" /tmp/heyta-mac-crosscheck.png <<'JS'
-import { inspectPng } from './scripts/screenshots/png-stats.mjs';
-const a = inspectPng(process.argv[2]);
-const b = inspectPng(process.argv[3]);
-// 🔴 判等必须对 **1x/2x 缩放不敏感**（2026-09-29 实测 2240×1440 vs 1120×720）：
-//    自截图按**自己窗口所在屏**的 scale 出像素（Retina 2x），screencapture -l
-//    按**目标窗口实际落屏**的 scale 出 —— 两个实例可能落在不同屏
-//    （本机有一块 1x 外接屏）。它们证明的是"同一个窗口"，不是"同一块屏"。
-const sameLogical =
-  (a.width === b.width && a.height === b.height) ||
-  (a.width === b.width * 2 && a.height === b.height * 2) ||
-  (b.width === a.width * 2 && b.height === a.height * 2);
-console.log(`  自截图      ${a.width}x${a.height}`);
-console.log(`  screencapture ${b.width}x${b.height}`);
-console.log(
-  sameLogical
-    ? '  ✅ 尺寸一致（1x/2x 归一后；同一数据源的交叉验证）'
-    : '  🔴 尺寸不一致 —— 自截图不可信',
-);
-process.exit(sameLogical ? 0 : 1);
-JS
+    # 🔴 比对逻辑在 crosscheck-dimensions.mjs（2026-10-01 起）——原来是 heredoc
+    #    `node -`，实测它在**成功路径**上把事件循环转死在 stdin-ESM 求值的微任务里
+    #    （打印完「尺寸一致」不退出 → bash `wait` 挂住 → 门禁 10 分钟超时；
+    #    失败路径反而从不挂，所以"红了能跑、绿了挂死"）。见该文件头。
+    node "$(dirname "$0")/crosscheck-dimensions.mjs" "$OUT" /tmp/heyta-mac-crosscheck.png
   fi
 else
   echo "  ⚠️ 取不到窗口 ID，跳过交叉验证"

@@ -2589,7 +2589,7 @@ export const en = {
   'site.docs.first-run.s4p1': 'On the web you land in the task view with the input box above the list: type a title, press Enter, one task is in the local database.',
   'site.docs.first-run.s4p2': 'To add a due time, priority, list, tags or a repeat rule, expand those entries on the task row; on mobile you do the same in the task detail sheet.',
   'site.docs.first-run.s4p3': 'There is no guided tour and no "welcome" animation — the first screen is the working interface. That is precisely why this page exists: a few differences are invisible in the interface, so someone has to tell you.',
-  'site.docs.first-run.fig.tasks': 'The web first screen: the input sits above the list, and the sidebar already holds Inbox, Today and Done',
+  'site.docs.first-run.fig.tasks': 'The web first screen: the input sits above the list, and the sidebar already holds Inbox, Today and Completed',
   'site.docs.first-run.fig.tasks.alt': 'Web task view with an empty inbox and the add-task input above the list',
 
   // Core concepts
@@ -2656,7 +2656,7 @@ export const en = {
   'site.docs.views.s3p2': 'If the task note contains a checklist, each item is scheduled on its own; if it does not, the whole task counts as one item — otherwise that task would not appear on the timeline at all, and it is exactly the kind that most needs a duration in front of you.',
   'site.docs.views.s3p3': '⚠️ When the estimate belongs to the whole task but the checklist has several items, **it does not split the time proportionally**: the interface says plainly that the estimate cannot be attributed, and the child items are scheduled at a default length. Each bar states where its duration came from — "≈ 1 h" is one you typed, "≈ 1 h · AI estimate" is not, and "not estimated" means nobody ever estimated it.',
   'site.docs.views.fig.timeline': 'With nothing to schedule, the timeline puts the next step — create a task, then write its checklist — right on the screen',
-  'site.docs.views.fig.timeline.alt': 'Web timeline empty state, with today\'s completion count at the top and a hint below about what to do next',
+  'site.docs.views.fig.timeline.alt': 'Web timeline empty state, with a centered hint about creating a task and its checklist first',
   'site.docs.views.s4': 'Search answers "what was that thing called"',
   'site.docs.views.s4p1': 'The web has a cross-content search panel covering tasks and notes. ⚠️ On mobile it is currently a **filter box inside the task list** — both ends call it search, but the reachable scope differs.',
   'site.docs.views.s4p2': 'End-to-end encryption does not block search: what is searched is **the content decrypted locally on this device**. The server never had the plaintext and never gets to answer the query.',

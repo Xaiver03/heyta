@@ -39,6 +39,19 @@ guard let list = CGWindowListCopyWindowInfo(options, kCGNullWindowID) as? [[Stri
 //
 // ⚠️ 顺带纠正一条曾经的推断：过去把零输出归因于"没给屏幕录制权限"。
 //    实测不是 —— 权限受限时 `kCGWindowName` 会是 nil，而这里拿得到 "heyta"。
+//
+// 🔴 可选参数 `--pid <pid>`（2026-10-01）：只列**属于该进程**的窗口。
+//    动机是 §7 第 81.3 条的现场：机器上常驻一个**用户自己装的** Heyta.app
+//    （标题同样是 "heyta"），只按标题筛时 `head -1` 会撞上它 ——
+//    capture-window.sh 拿用户的窗口去跟取证实例的自截图比尺寸 ⇒ 必红，
+//    而这台机器恰恰是产品负责人日常开着 heyta 的机器。调用方传入自己
+//    起的那个实例的 PID，交叉验证就只认**自己的**窗口；不带参数时行为
+//    与过去完全一致（其它调用方不受影响）。
+var pidFilter: Int? = nil
+if let idx = CommandLine.arguments.firstIndex(of: "--pid"), idx + 1 < CommandLine.arguments.count,
+   let parsed = Int(CommandLine.arguments[idx + 1]) {
+    pidFilter = parsed
+}
 for window in list {
     // 🔴 只认**主窗口**（标题 = "heyta"）：进程里还有别的窗口 ——
     // 实测还有 500x500、无标题的辅助窗口；`.optionAll` 之后它们也会被列出来，
@@ -46,6 +59,10 @@ for window in list {
     // （2026-09-30 实测），尺寸比对必红。
     let title = window[kCGWindowName as String] as? String ?? ""
     guard title == "heyta" else { continue }
+    if let pidFilter = pidFilter {
+        let ownerPid = window[kCGWindowOwnerPID as String] as? Int ?? -1
+        guard ownerPid == pidFilter else { continue }
+    }
     let owner = window[kCGWindowOwnerName as String] as? String ?? ""
     let id = window[kCGWindowNumber as String] as? Int ?? 0
     let bounds = window[kCGWindowBounds as String] as? [String: Any] ?? [:]

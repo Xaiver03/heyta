@@ -104,6 +104,11 @@ const failed = [];
 for (const job of jobs) {
   const { target, device, folder } = job;
   const site = SITES[target.site];
+  // 界面语言。🔴 真正让 web 界面切语言的是 URL 上的 `?lang=` 参数，
+  // 不是浏览器协商 —— 应用刻意不读 navigator.language
+  // （apps/web/src/lib/locale.ts 文件头）。两层都设，保持一致。
+  const locale = target.locale ?? 'zh-CN';
+  const langQuery = locale === 'zh-CN' ? '' : `?lang=${locale}`;
   const outPath = join(root, ARTIFACT_ROOT, folder, artifactName(target));
   mkdirSync(dirname(outPath), { recursive: true });
 
@@ -114,7 +119,7 @@ for (const job of jobs) {
     isMobile: device.isMobile ?? false,
     hasTouch: device.hasTouch ?? false,
     userAgent: device.userAgent,
-    locale: 'zh-CN',
+    locale,
   });
   const page = await context.newPage();
 
@@ -131,7 +136,7 @@ for (const job of jobs) {
       //    `goto(domcontentloaded)` 返回时 React 还没挂载完，
       //    立刻 count() 一定是 0 —— 这个坑我实测踩过一次（11 张全挂）。
       //    waitFor 会一直等到元素出现，两件事一次解决。
-      await page.goto(site.baseUrl, { waitUntil: 'domcontentloaded' });
+      await page.goto(site.baseUrl + langQuery, { waitUntil: 'domcontentloaded' });
       const control = page
         .getByRole('tab', { name: target.readyText, exact: false })
         .or(page.getByRole('button', { name: target.readyText, exact: false }))
@@ -172,7 +177,7 @@ for (const job of jobs) {
         );
       }
     } else {
-      await page.goto(new URL(target.path, site.baseUrl).toString(), { waitUntil: 'domcontentloaded' });
+      await page.goto(new URL(target.path + langQuery, site.baseUrl).toString(), { waitUntil: 'domcontentloaded' });
     }
 
     // 就绪门控：等真实文案**可见**。

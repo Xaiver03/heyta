@@ -851,15 +851,23 @@ test('五个分类页都真的可达：卡片恰好是这一组的文章，侧�
  */
 const FIGURES: readonly {
   readonly article: string;
+  readonly locale: 'zh-CN' | 'en';
   readonly sectionId: string;
   readonly number: string;
   readonly file: string;
 }[] = [
-  { article: 'first-run', sectionId: 'first-screen', number: '图 14-1', file: 'W01-tasks.png' },
-  { article: 'concepts', sectionId: 'habits', number: '图 15-1', file: 'W03-habits.png' },
-  { article: 'views', sectionId: 'quadrant', number: '图 20-1', file: 'W02-quadrant.png' },
-  { article: 'views', sectionId: 'timeline', number: '图 20-2', file: 'W05-timeline.png' },
-  { article: 'trash', sectionId: 'tasks-only', number: '图 25-1', file: 'W07-trash.png' },
+  { article: 'first-run', locale: 'zh-CN', sectionId: 'first-screen', number: '图 14-1', file: 'W01-tasks.png' },
+  { article: 'concepts', locale: 'zh-CN', sectionId: 'habits', number: '图 15-1', file: 'W03-habits.png' },
+  { article: 'views', locale: 'zh-CN', sectionId: 'quadrant', number: '图 20-1', file: 'W02-quadrant.png' },
+  { article: 'views', locale: 'zh-CN', sectionId: 'timeline', number: '图 20-2', file: 'W05-timeline.png' },
+  { article: 'trash', locale: 'zh-CN', sectionId: 'tasks-only', number: '图 25-1', file: 'W07-trash.png' },
+  // 🔴 英文版挂**英文界面**的截图（B1 解决后的新产品事实）：同一节、同一图号，
+  //    文件是 `*-en-*.png` 那一批 —— 与 zh 行逐行成对，顺序也一致。
+  { article: 'first-run', locale: 'en', sectionId: 'first-screen', number: 'Figure 14-1', file: 'W01-en-tasks.png' },
+  { article: 'concepts', locale: 'en', sectionId: 'habits', number: 'Figure 15-1', file: 'W03-en-habits.png' },
+  { article: 'views', locale: 'en', sectionId: 'quadrant', number: 'Figure 20-1', file: 'W02-en-quadrant.png' },
+  { article: 'views', locale: 'en', sectionId: 'timeline', number: 'Figure 20-2', file: 'W05-en-timeline.png' },
+  { article: 'trash', locale: 'en', sectionId: 'tasks-only', number: 'Figure 25-1', file: 'W07-en-trash.png' },
 ];
 
 const FIGURED_ARTICLE_IDS = [...new Set(FIGURES.map((figure) => figure.article))];
@@ -924,7 +932,8 @@ test('五张配图真的挂在指定分区上：图号是「图 注册序-序」
 
   for (const id of FIGURED_ARTICLE_IDS) {
     const probe = await readFigures(page, `/help/${id}/`);
-    const expected = FIGURES.filter((figure) => figure.article === id);
+    // 中文页只对 zh 那一半期望：en 行归第 14 条管。
+    const expected = FIGURES.filter((figure) => figure.article === id && figure.locale === 'zh-CN');
 
     // 🔴 元素截图（不是 fullPage），且**先截图再断言**（§6.2 规定一第 1、2 条）：
     // 这一条要看的判据是"那张图在页面上长什么样、压在它上面的图号写了什么"，
@@ -969,7 +978,7 @@ test('五张配图真的挂在指定分区上：图号是「图 注册序-序」
   expectCleanConsole(hits);
 });
 
-test('反向对照：没配图的十篇一张都不许多画，英文版整片不挂中文界面的图', async ({ page }) => {
+test('反向对照：没配图的十篇一张都不许多画，英文版挂的是英文界面的图、一张中文产物都不许出现', async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 900 });
   const hits = watchConsole(page);
 
@@ -985,18 +994,48 @@ test('反向对照：没配图的十篇一张都不许多画，英文版整片�
     expect(probe.helpImgCount, `${id}：正文里也不许出现复制品的地址`).toBe(0);
   }
 
-  // 🔴 下半：英文版**整片不挂配图**。这不是省事 —— 那五张图全是中文界面截图
-  // （采集脚本把 `locale: 'zh-CN'` 写死在判卷文件里），挂在英文正文中间就是错的东西。
-  // 判据必须落在浏览器里：`DocsArticlePage` 那行 locale 判断一旦写反，
-  // 英文页会出现一张中文界面的图 + 中文的「图」字，而段落数、目录、状态码**全都照样绿**。
+  // 🔴 下半：英文版挂的是**英文界面**的截图（B1 解决后的新产品事实 —— 以前
+  // 那五张全是中文界面，本条判的是"整片不挂"；现在采集器支持按目标 locale，
+  // 映射表 zh/en 成对，所以判据改成"必须挂 en 产物、且一张 zh 产物都不许出现"）。
+  // 这一条判据必须落在浏览器里：`docsFiguresOf` 的 locale 过滤一旦写反或漏传，
+  // 英文页要么整片没图、要么出现中文界面的图 + 中文的「图」字，而段落数、
+  // 目录、状态码全都照样绿。
   for (const id of FIGURED_ARTICLE_IDS) {
+    const expected = FIGURES.filter((figure) => figure.article === id && figure.locale === 'en');
     const probe = await readFigures(page, `/en/help/${id}/`);
     await page
       .locator('#main')
       .screenshot({ path: `landing-results/landing-figures-${id}-en.png` });
-    expect(probe.figures, `${id}：英文版不该渲染配图（图全是中文界面）`).toEqual([]);
-    expect(probe.helpImgCount, `${id}：英文版不该引用复制品`).toBe(0);
-    // 图没了，正文不能被一起挡掉：这一条把"locale 判据写反把整段正文吞了"也一并照住。
+
+    expect(
+      probe.figures.length,
+      `${id}：英文版配图张数（页面上：${probe.figures.map((f) => f.number).join(' ')}）`,
+    ).toBe(expected.length);
+    expect(probe.helpImgCount, `${id}：指向复制品的 <img> 数必须等于配图数`).toBe(
+      expected.length,
+    );
+
+    expected.forEach((want, i) => {
+      const got = probe.figures[i];
+      if (got === undefined) return;
+      // src 精确等于 en 产物：zh 产物混进来 = 把中文界面挂进了英文正文，就在这里红。
+      expect(got.src, `${id}：第 ${i + 1} 张必须是英文界面产物`).toBe(`/assets/help/${id}/${want.file}`);
+      expect(got.number, `${id}：第 ${i + 1} 张的图号`).toBe(want.number);
+      expect(got.sectionId, `${id}：第 ${i + 1} 张必须挂在分区 "${want.sectionId}" 里`).toBe(
+        want.sectionId,
+      );
+      // 🔴 真像素 + 图号前缀是英文的 "Figure"：英文页出现中文「图」字 = locale 判据写反。
+      expect(got.naturalWidth, `${id}：第 ${i + 1} 张必须真的解码出像素`).toBeGreaterThan(100);
+      expect(got.alt.length, `${id}：第 ${i + 1} 张必须有 alt 描述：${got.alt}`).toBeGreaterThan(10);
+      expect(got.caption, `${id}：图号前缀必须是英文 Figure：${got.caption}`).toMatch(/^Figure /);
+      expect(got.caption, `${id}：图注不许出现中文「图」字：${got.caption}`).not.toMatch(/图/);
+      expect(
+        got.caption.length,
+        `${id}：第 ${i + 1} 张必须有说明文字：${got.caption}`,
+      ).toBeGreaterThan(want.number.length + 10);
+    });
+
+    // 图挂上了，正文不能被一起挡掉：这一条把"locale 判据写反把整段正文吞了"也一并照住。
     expect(probe.proseCount, `${id}：英文版正文还在`).toBeGreaterThanOrEqual(4);
     expect(probe.leakedKeys, `${id}：英文版同样不许漏 key`).toEqual([]);
   }

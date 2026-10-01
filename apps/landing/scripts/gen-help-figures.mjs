@@ -42,6 +42,7 @@ import {
 } from '../../../scripts/screenshots/targets.mjs';
 import { inspectPng, looksBlank, looksSmeared } from '../../../scripts/screenshots/png-stats.mjs';
 import {
+  assertHelpFigurePairs,
   HELP_FIGURES,
   HELP_FIGURE_ROOT,
   helpFigureDir,
@@ -52,6 +53,10 @@ import { SITE_PAGES } from '../src/site/pages.ts';
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../../..');
 const checkOnly = process.argv.slice(2).includes('--check');
 const GROUPS = expectedGroups();
+
+// 🔴 配图必须 zh/en 成对 —— 这条判据住在数据层（helpFigures.ts），
+//    生成器是它的第一个执行点：映射不成对，一个字节都不许写。
+assertHelpFigurePairs();
 
 /** 注册表里"是文章"的 id。配图只许挂在文章上。 */
 const ARTICLE_IDS = new Set(
