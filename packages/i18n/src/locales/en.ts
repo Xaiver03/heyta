@@ -302,6 +302,9 @@ export const en = {
   'web.shell.nav.scopeAria': 'Scope of the current view',
   'web.shell.nav.inbox': 'Inbox',
   'web.shell.nav.today': 'Today',
+  // 与 zh 同一条：那个 7 与 `@heyta/domain` 的 `NEXT_SEVEN_DAYS` 同源。
+  // ⚠️ 「7 天」= 含今天的**七个日历日**，不含逾期，不含无截止时间。
+  'web.shell.nav.next7Days': 'Next 7 Days',
   'web.shell.nav.completed': 'Completed',
   'web.shell.nav.quadrant': 'Quadrants',
   'web.shell.nav.project': 'List',
@@ -436,6 +439,10 @@ export const en = {
   'web.shell.empty.all.hint': 'Add your first task in the box above',
   'web.shell.empty.today.title': 'Nothing is due today',
   'web.shell.empty.today.hint': 'Give a task a due date and it will show up here',
+  'web.shell.empty.next7Days.title': 'Nothing in the next 7 days',
+  // ⚠️ 一行一条是 `check:ui-language` 解析器的形状要求，且这里**不写数字**：
+  // 天数住在 `NEXT_SEVEN_DAYS`，写进文案就是第二个事实源。
+  'web.shell.empty.next7Days.hint': 'Set a due date within these days and it shows up here',
   'web.shell.empty.completed.title': 'No completed tasks yet',
   'web.shell.empty.completed.hint': 'Try completing a task',
   'web.shell.empty.quadrant.title': 'This quadrant is empty',

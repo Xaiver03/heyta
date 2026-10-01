@@ -320,6 +320,15 @@ export const zhCN = {
   'web.shell.nav.scopeAria': '当前视图的范围',
   'web.shell.nav.inbox': '收集箱',
   'web.shell.nav.today': '今天',
+  /**
+   * 「最近 7 天」—— 滴答那三个智能清单里的中间一个。
+   *
+   * 🔴 天数**不写在这里**以外的地方：窗口的 7 住在 `@heyta/domain` 的
+   * `NEXT_SEVEN_DAYS`，侧栏标签上的这个数必须与它同源（`task-filter.spec.ts`
+   * 钉边界，`task-groups.spec.tsx` 钉"标签上的数 == 那个常数"）。
+   * ⚠️ 「7 天」= 含今天的**七个日历日**，不含逾期 —— 与领域的窗口定义一致。
+   */
+  'web.shell.nav.next7Days': '最近 7 天',
   'web.shell.nav.completed': '已完成',
   'web.shell.nav.quadrant': '四象限',
   'web.shell.nav.project': '清单',
@@ -458,6 +467,8 @@ export const zhCN = {
   'web.shell.empty.all.hint': '在上面输入框添加第一个任务',
   'web.shell.empty.today.title': '今天没有到期任务',
   'web.shell.empty.today.hint': '给任务设个截止时间，它会出现在这里',
+  'web.shell.empty.next7Days.title': '未来 7 天没有安排',
+  'web.shell.empty.next7Days.hint': '给任务设一个这几天内的截止时间，它会出现在这里',
   'web.shell.empty.completed.title': '还没有完成的任务',
   'web.shell.empty.completed.hint': '完成一个任务试试',
   'web.shell.empty.quadrant.title': '这个象限是空的',

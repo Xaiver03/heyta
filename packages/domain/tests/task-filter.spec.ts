@@ -18,6 +18,8 @@
 import { describe, expect, it } from 'vitest';
 
 import { Priority, Quadrant, type Task } from '../src/entities.js';
+import type { LocalDate } from '../src/date.js';
+import { parseLocalDate } from '../src/date.js';
 import {
   filterTasks,
   FULL_SCOPE,
@@ -114,6 +116,86 @@ describe('filterTasks', () => {
     const q1 = filterTasks(tasks, { kind: 'quadrant', quadrant: Quadrant.UrgentImportant }, ctx);
     expect(q1.map((t) => t.id)).toContain('q1');
     expect(q1.map((t) => t.id)).not.toContain('q4');
+  });
+
+  /**
+   * 「最近 7 天」这条智能清单。
+   *
+   * 🔴 这里最值钱的不是"7 条里选 6 条"，是**边界按日历日而不是按经过的毫秒**。
+   * 下面那条边界用例是双向钉的：`now = 28 日 23:00` 时，
+   * 「10-05 00:01」距离 now 只有 6 天零 1 小时 —— **按 `now + 7×24h` 滑窗会把它
+   * 错收进来**（它已经是第 8 天）；而「10-04 23:00」是第 7 天，必须在。
+   * 写成 `now + 7 * DAY_MS` 的实现在跨夏令时的周末还会把窗口变成 6 天或 8 天，
+   * 症状一年只出现两个周末 —— 那是最难归因的一类错。
+   */
+  describe('`next7Days`（最近 7 天）', () => {
+    /**
+     * 本地日期 → 当天某时刻的 epoch ms。
+     *
+     * ⚠️ 走领域自己的 `parseLocalDate`（本地零点）再加小时数，**不在测试里
+     * 重新拼一遍 `new Date(y, m-1, d)`** —— 测试侧另写一份日期换算是这个仓库
+     * 反复踩过的漂移源（判据与被测代码各自理解"本地"）。
+     */
+    const at = (date: LocalDate, hour = 12): number =>
+      parseLocalDate(date).getTime() + hour * 60 * 60 * 1000;
+
+    it('今天到第 7 天都在；第 8 天不在', () => {
+      // now = 2026-09-28（周一）⇒ 窗口 09-28 … 10-04。
+      const tasks = [
+        task({ id: 'd1', dueDate: at('2026-09-28') }),
+        task({ id: 'd7', dueDate: at('2026-10-04') }),
+        task({ id: 'd8', dueDate: at('2026-10-05') }),
+      ];
+      expect(filterTasks(tasks, { kind: 'next7Days' }, ctx).map((t) => t.id)).toEqual(['d1', 'd7']);
+    });
+
+    it('🔴 边界是**日**：第 7 天深夜仍在、第 8 天凌晨不在', () => {
+      // now = 28 日 23:00。「10-05 00:01」距离 now 只有 6 天零 1 小时，
+      // 按 `now + 7×DAY_MS` 滑窗会把它错收进来 —— 它已经是第 8 天。
+      const lateNow = { now: at('2026-09-28', 23) };
+      const early = at('2026-10-05', 0);
+      const tasks = [
+        task({ id: 'last-day-late', dueDate: at('2026-10-04', 23) }),
+        task({ id: 'next-day-early', dueDate: early }),
+      ];
+      expect(early - lateNow.now).toBeLessThan(7 * DAY);
+      expect(filterTasks(tasks, { kind: 'next7Days' }, lateNow).map((t) => t.id)).toEqual([
+        'last-day-late',
+      ]);
+    });
+
+    it('🔴 跨月/跨年正确滚动（窗口不是"本月内"）', () => {
+      const newYear = { now: at('2026-12-30') };
+      const tasks = [
+        task({ id: 'dec-30', dueDate: at('2026-12-30') }),
+        task({ id: 'jan-05', dueDate: at('2027-01-05') }),
+        task({ id: 'jan-06', dueDate: at('2027-01-06') }),
+      ];
+      expect(filterTasks(tasks, { kind: 'next7Days' }, newYear).map((t) => t.id)).toEqual([
+        'dec-30',
+        'jan-05',
+      ]);
+    });
+
+    it('逾期不在这一列（它们属于「逾期」，混进来这个名字就撒谎）', () => {
+      const tasks = [task({ id: 'over', dueDate: at('2026-09-27') })];
+      expect(filterTasks(tasks, { kind: 'next7Days' }, ctx)).toEqual([]);
+    });
+
+    it('无截止时间的任务不在（它没有日期，不属于任何日期窗口）', () => {
+      const tasks = [task({ id: 'undated' })];
+      expect(filterTasks(tasks, { kind: 'next7Days' }, ctx)).toEqual([]);
+    });
+
+    it('已完成不在 —— 与其余未完成分支同一条规矩', () => {
+      const tasks = [task({ id: 'a', dueDate: LOCAL_NOON, completedAt: LOCAL_NOON })];
+      expect(filterTasks(tasks, { kind: 'next7Days' }, ctx)).toEqual([]);
+    });
+
+    it('墓碑不在（每一道筛选都先过 aliveTasks）', () => {
+      const tasks = [task({ id: 'a', dueDate: LOCAL_NOON, deletedAt: LOCAL_NOON })];
+      expect(filterTasks(tasks, { kind: 'next7Days' }, ctx)).toEqual([]);
+    });
   });
 });
 
