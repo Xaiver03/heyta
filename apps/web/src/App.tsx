@@ -140,7 +140,6 @@ import { ProjectsPanel } from './features/projects/ProjectsPanel.js';
 import { QuadrantBoard } from './features/quadrant/QuadrantBoard.js';
 import { HabitsView } from './features/habits/HabitsView.js';
 import { GrowthView } from './features/motivation/GrowthView.js';
-import { TodayProgressBanner } from './features/motivation/TodayProgressBanner.js';
 import { NotesView } from './features/notes/NotesView.js';
 import { ReminderPanel } from './features/reminders/ReminderPanel.js';
 import { TimelinePanel } from './features/timeline/TimelinePanel.js';
@@ -1951,20 +1950,22 @@ export function App(): React.JSX.Element {
 
         <div className="ht-content">
           {/**
-           * 今日进度（激励体系 L1）—— 🔴 **只在任务视图渲染**（2026-09-30 产品负责人
-           * 拍板，推翻 09-29 的"常驻做事视图"方案）："0/0 今天还没有安排"出现在
-           * 日历/习惯/番茄钟/便签上是纯噪音 —— 那些页面各自有自己的主内容，
-           * 顶部再顶一条任务进度，等于每个页面都被任务页的开头占一段。
-           * "跨视图的同一件事"只说明它**不该长四份**，不说明它**该到处出现**。
+           * 这里**曾经**是「今日进度」卡（`0/0 今天还没有安排`）。
+           * 🔴 2026-10-01 产品负责人看图后拍板彻底删除，不是"再挪一次位置"——
+           * 这是它第三次被要求缩小范围（09-29 常驻 → 09-30 只在任务视图 → 现在没有），
+           * 前两次都留着它，所以这次要记清**为什么这次不是再挪一次**：
+           * 对照滴答清单，"今天做了多少"这件事**从来不是一个占位的面板**，
+           * 而是**分散在数字该待的三个位置**（侧栏每行的右侧计数 / 分组头的计数 /
+           * 行右侧的元信息）。把它做成一张卡，等于把三个位置的信息压成一个
+           * 谁都不看的分数，而且 0/0 时它说的还是"你什么都没安排"——
+           * 一个每天开局都给人打 0 分的组件。数字的去处见
+           * [`docs/plans/ui-review-fill-zh-timeline.md`](../../../docs/plans/ui-review-fill-zh-timeline.md) R6。
            *
-           * 🔴 M3 第十一刀之后它来自 `@heyta/ui`（与 mobile 同一份实现），
-           * 接线在 `features/motivation/TodayProgressBanner.tsx`（那里自己包了
-           * `HeytaUiProvider`）—— 它会 `useHeytaUiTheme()`，缺了会在运行时抛错。
-           * 不能复用下面 `tasks` 那棵树的 Provider：它只包住 `TaskList`，
-           * 而进度卡是它的兄弟节点（同样的坑在 focus 那一刀已经踩过一次）。
+           * ⚠️ 共享的 `TodayProgressCard` **没有删**：成长页（`GrowthView` →
+           * `GrowthBoard` 的 `showToday` 段）仍然用它。那一页整页就是讲"尺度"，
+           * 数字在那里是主内容而不是占位面板 —— 这条边界是刻意的，
+           * 要一起删需要另一次拍板。
            */}
-          {contentView === 'tasks' && <TodayProgressBanner />}
-
           {/* 🔴 托管同步到期/被拒时的提示。它**只解释**"哪一件事被限制了"
               （通过官方托管服务的同步；含超出免费额度的新设备），不挡任何功能 ——
               本地任务照常查看 / 编辑 / 导出（subscription-boundary.md §2）。
@@ -2102,7 +2103,17 @@ export function App(): React.JSX.Element {
           */}
           {contentView === 'tasks' &&
             (visible.length === 0 ? (
-            <EmptyState filter={store.filter} />
+            /*
+              🔴 空态**包在 `task-list` 这个锚点里**，而不是另起一个名字。
+              这个 testID 判的是"任务视图渲染出了自己的那块面"，而空 inbox
+              不是白屏 —— 它有自己的图标、标题和下一步动作。
+              原先这一格由常驻的进度卡占着（`today-progress`），所以白屏检测
+              拿它当锚点；卡删掉之后（R6），如果空态没有锚点，
+              **空 inbox 会被判成白屏** —— 一个只在用户什么都没做时才红的假红。
+            */
+            <div data-testid="task-list">
+              <EmptyState filter={store.filter} />
+            </div>
           ) : dateGroups === undefined ? (
             <HeytaUiProvider>
               <TaskList
