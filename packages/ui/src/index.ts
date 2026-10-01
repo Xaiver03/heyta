@@ -794,3 +794,29 @@ export {
   type HabitProgressListLabels,
   type HabitProgressListProps,
 } from './habits/HabitProgressList.js';
+
+/**
+ * ── W6：认证表单的**共享纯逻辑**（口令这条路）──
+ *
+ * 🔴 **本块是追加的**（`index.ts` 是多写者共享文件，只许在末尾追加）。
+ *
+ * 为什么要单独一块而不是并进上面那个 `auth/model.js` 的导出：上面那块是 W8 收编
+ * 「失败原因 → key」时开的，形状只有 `authFailureMessageKey` 一个函数；这一块的
+ * 判据（策略码、两步、autofill 取值、显隐默认档、两个秘密的命名）都是**邮箱+口令**
+ * 这条路带来的，四端要一起用同一份，写在各端 shell 里就是 §3.5 那份漂移的复发。
+ */
+export {
+  AUTH_EMAIL_AUTOCOMPLETE,
+  E2EE_PASSPHRASE_LABEL_KEY,
+  SIGN_IN_PASSWORD_LABEL_KEY,
+  authFormStageAfterContinue,
+  defaultPasswordRevealed,
+  firstAuthErrorField,
+  passwordAutocomplete,
+  passwordPolicyMessageKey,
+  policyMentionsMax,
+  type AuthFormMode,
+  type AuthFormField,
+  type AuthFormStage,
+  type AuthPolicyMessageKey,
+} from './auth/model.js';
