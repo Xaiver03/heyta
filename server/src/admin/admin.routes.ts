@@ -302,6 +302,7 @@ export const adminRoutes = async (fastify: FastifyInstance): Promise<void> => {
           ...USER_LIST_SELECT,
           failedLoginAttempts: true,
           termsAcceptedAt: true,
+          termsDocumentVersion: true,
           tokenVersion: true,
           subscriptions: {
             select: {
@@ -355,6 +356,9 @@ export const adminRoutes = async (fastify: FastifyInstance): Promise<void> => {
           ...projectUserListRow(user, now),
           failedLoginAttempts: user.failedLoginAttempts,
           termsAcceptedAt: toMs(user.termsAcceptedAt),
+          // 同意留痕的版本指针。`null` 不是"没同意"，是"这条记录证明不了哪一版"
+          //（老账号，或运营者自托管实例上的账号）—— 后台要能把这两种情况分开说。
+          termsDocumentVersion: user.termsDocumentVersion,
           tokenVersion: user.tokenVersion,
         },
         counts: {
