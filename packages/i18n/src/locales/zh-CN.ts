@@ -332,6 +332,7 @@ export const zhCN = {
   'web.shell.nav.q2': '重要不紧急',
   'web.shell.nav.q3': '紧急不重要',
   'web.shell.nav.q4': '不重要不紧急',
+  'web.shell.sidebar.resize': '调整侧栏宽度',
   'web.shell.views.aria': '视图',
   'web.shell.views.groupMain': '主要',
   'web.shell.modules.title': '功能模块',

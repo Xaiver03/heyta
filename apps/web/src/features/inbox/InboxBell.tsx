@@ -380,7 +380,9 @@ export function InboxBell({
         }}
       >
         <Bell size={16} aria-hidden="true" />
-        <span>{t('web.inbox.trigger')}</span>
+        {/* rail 是纯图标：这个名字在 hover / 聚焦时才显示（`app.css` 的 `.ht-rail__label`）。
+            未读数走右上角的徽标，accessible name 由上面的 `aria-label` 给出。 */}
+        <span className="ht-rail__label">{t('web.inbox.trigger')}</span>
         {unreadCount > 0 ? (
           <span
             className="ht-inbox__badge"
