@@ -37,7 +37,7 @@ const LIST = `侧栏清单-${STAMP}`;
 const IN_LIST = `侧栏在内-${STAMP}`;
 const OUT_LIST = `侧栏在外-${STAMP}`;
 
-const SIDEBAR = '.ht-calendar-side';
+const SIDEBAR = '.ht-sidebar--calendar';
 const MINI_TITLE = '[data-testid="calendar-mini-title"]';
 const BOARD_MONTH = '[data-testid="calendar-board-month"]';
 const BOARD_DAY = '[data-testid="calendar-board-day-title"]';
@@ -64,6 +64,12 @@ function captureConsole(page: Page): string[] {
 }
 
 /**
+ * 🔴 必须带 `?lang=zh-CN`：本用例的定位符与 aria-label 全是中文，而 2026-10-01
+ * 起首启语言第 3 层问 `navigator.language`（Playwright = en-US）⇒ 不钉就是英文界面。
+ */
+const APP_ZH = '/?lang=zh-CN';
+
+/**
  * 播两条**都到期于今天**的任务：一条挂进新建的清单，一条留在收集箱。
  *
  * ⚠️ 第二条是这条用例的前提，不是点缀：只有一条任务时，"勾清单 = 只看这条清单"
@@ -71,7 +77,7 @@ function captureConsole(page: Page): string[] {
  * 这条判据才能为假。
  */
 async function seed(page: Page): Promise<void> {
-  await openApp(page);
+  await openApp(page, APP_ZH);
 
   const sidebar = page.locator('aside[aria-label="清单与标签"]');
   await sidebar.getByRole('button', { name: '新建清单' }).click();
@@ -120,13 +126,13 @@ test('迷你月历：七列真的对齐、今天那颗点真的有尺寸和主�
 
   // ② 🔴 七列对齐：列头中心 x 必须与**第一行同一列格子**的中心 x 对齐。
   const headerCenters = await page
-    .locator('.ht-mini-month__weekdays > span')
+    .locator('.ht-sidebar__month-weekdays > span')
     .evaluateAll((els) => els.map((el) => (el.getBoundingClientRect().left + el.getBoundingClientRect().right) / 2));
   expect(headerCenters, '列头必须有 7 个').toHaveLength(7);
 
-  const firstRow = page.locator('.ht-mini-month__row').first();
+  const firstRow = page.locator('.ht-sidebar__month-row').first();
   const cellCenters = await firstRow
-    .locator('.ht-mini-day')
+    .locator('.ht-sidebar__day')
     .evaluateAll((els) => els.map((el) => (el.getBoundingClientRect().left + el.getBoundingClientRect().right) / 2));
   expect(cellCenters, '第一行必须有 7 格').toHaveLength(7);
   headerCenters.forEach((center, i) => {
@@ -137,17 +143,17 @@ test('迷你月历：七列真的对齐、今天那颗点真的有尺寸和主�
   });
 
   // ③ 格子总数 = 7 的倍数，且都在侧栏那一列的宽度内（溢出会让整列被裁）。
-  const cellCount = await page.locator('.ht-mini-month__grid .ht-mini-day').count();
+  const cellCount = await page.locator('.ht-sidebar__month-grid .ht-sidebar__day').count();
   expect(cellCount % 7, '月历格子必须是整行（7 的倍数）').toBe(0);
   const sideBox = await page.locator(SIDEBAR).boundingBox();
   expect(sideBox, '侧栏有几何').not.toBeNull();
-  const lastCell = await firstRow.locator('.ht-mini-day').last().boundingBox();
+  const lastCell = await firstRow.locator('.ht-sidebar__day').last().boundingBox();
   expect(lastCell!.x + lastCell!.width, '最后一格不许溢出侧栏').toBeLessThanOrEqual(
     sideBox!.x + sideBox!.width + 1,
   );
 
   // ④ 🔴 今天那颗点：真的有像素尺寸，且 computed background 解析成主色。
-  const dot = page.locator(`[data-testid="calendar-mini-day-${today}"] .ht-mini-day__dots > i`);
+  const dot = page.locator(`[data-testid="calendar-mini-day-${today}"] .ht-sidebar__day-dots > i`);
   await expect(dot, '今天的格子里必须有一颗点').toHaveCount(1);
   const dotBox = await dot.boundingBox();
   expect(dotBox, '那颗点必须有几何（0×0 等于没画）').not.toBeNull();
@@ -169,10 +175,10 @@ test('迷你月历：七列真的对齐、今天那颗点真的有尺寸和主�
   // ⑤ 点侧栏的某一天 ⇒ 主区那一列的日标题**必须说成同一天**。
   // 只在**本月格**里挑（补白格会把月份也带走，那就同时在验 ⑥ 了，一条判据干两件事）。
   const inMonthDates = await page
-    .locator('.ht-mini-day')
+    .locator('.ht-sidebar__day')
     .evaluateAll((els) =>
       els
-        .filter((el) => !el.className.includes('ht-mini-day--outside'))
+        .filter((el) => !el.className.includes('ht-sidebar__day--outside'))
         .map((el) => el.getAttribute('data-testid')!.replace('calendar-mini-day-', '')),
     );
   expect(inMonthDates.length, '本月格子里至少要有两天可挑').toBeGreaterThan(2);
@@ -237,7 +243,7 @@ test('显示范围：勾一个清单就只看它（点与主区同时消失）�
   await expect(scopedRow(IN_LIST), '勾选后本清单的任务仍在').toBeVisible();
   await expect(scopedRow(OUT_LIST), '勾选后别的任务必须消失（只筛主区不筛点 = 界面在说谎）').toHaveCount(0);
   await expect(
-    page.locator(`[data-testid="calendar-mini-day-${today}"] .ht-mini-day__dots > i`),
+    page.locator(`[data-testid="calendar-mini-day-${today}"] .ht-sidebar__day-dots > i`),
     '范围内仍有任务 ⇒ 点还在',
   ).toHaveCount(1);
 
@@ -283,7 +289,7 @@ test('显示范围：勾一个清单就只看它（点与主区同时消失）�
       viewportHeight: window.innerHeight,
       columnOverflowY: getComputedStyle(el).overflowY,
       bodyOverflowY: getComputedStyle(
-        el.querySelector<HTMLElement>('.ht-calendar-side__body')!,
+        el.querySelector<HTMLElement>('.ht-sidebar__calendar-body')!,
       ).overflowY,
     }));
   expect(
@@ -293,7 +299,7 @@ test('显示范围：勾一个清单就只看它（点与主区同时消失）�
   expect(layout.bodyOverflowY, '滚动必须挂在内部那一层').toBe('auto');
   expect(layout.columnOverflowY, '滚动不许挂在列本身（会裁掉骑在边缘外的把手）').not.toBe('auto');
 
-  const handle = page.locator(`${SIDEBAR} .ht-resizer`);
+  const handle = page.locator(`${SIDEBAR} .ht-sidebar__resizer`);
   await expect(handle, '日历侧栏右边缘必须有把手').toHaveCount(1);
   const box = await handle.boundingBox();
   expect(box, '把手有几何').not.toBeNull();
@@ -308,7 +314,7 @@ test('显示范围：勾一个清单就只看它（点与主区同时消失）�
       [box!.x + box!.width / 2, box!.y + box!.height / 2] as [number, number],
     ),
     '对着把手几何中心按下去，命中的必须是把手自己',
-  ).toContain('ht-resizer');
+  ).toContain('ht-sidebar__resizer');
   const before = await page.locator(SIDEBAR).evaluate((el) => el.getBoundingClientRect().width);
   await page.mouse.move(box!.x + box!.width / 2, box!.y + box!.height / 2);
   await page.mouse.down();
@@ -319,9 +325,9 @@ test('显示范围：勾一个清单就只看它（点与主区同时消失）�
   expect(Math.round(after), '往右拖 120px 就宽 120px').toBe(Math.round(before) + 120);
   // 拖宽之后七列仍然对齐（这一条只在窄列成立的话，宽列就是白测）。
   const centers = await page
-    .locator('.ht-mini-month__row')
+    .locator('.ht-sidebar__month-row')
     .first()
-    .locator('.ht-mini-day')
+    .locator('.ht-sidebar__day')
     .evaluateAll((els) => els.map((el) => (el.getBoundingClientRect().left + el.getBoundingClientRect().right) / 2));
   expect(centers).toHaveLength(7);
 

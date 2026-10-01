@@ -130,11 +130,11 @@ export function ProjectsPanel({
     <HeytaUiProvider>
       <aside ref={asideRef} aria-label={t('web.projects.ariaLabel')} style={asideStyle}>
         <section>
-          <div className="ht-organizer__heading">
+          <div className="ht-sidebar__organizer-heading">
             <h2 className="ht-nav__section">{t('web.projects.heading')}</h2>
             <button
               type="button"
-              className="ht-organizer__add"
+              className="ht-sidebar__organizer-add"
               aria-label={t('web.projects.addNew')}
               aria-expanded={addingProject}
               onClick={() => {
@@ -208,11 +208,11 @@ export function ProjectsPanel({
         </section>
 
         <section>
-          <div className="ht-organizer__heading">
+          <div className="ht-sidebar__organizer-heading">
             <h2 className="ht-nav__section">{t('web.tags.heading')}</h2>
             <button
               type="button"
-              className="ht-organizer__add"
+              className="ht-sidebar__organizer-add"
               aria-label={t('web.tags.addNew')}
               aria-expanded={addingTag}
               onClick={() => {

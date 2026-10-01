@@ -34,7 +34,7 @@
  *
  * 为什么这一刀不顺手合并：web 那份带着两列塌缩方向、暗色对比度两组真浏览器
  * 判据（`e2e/tests/habits-pane.spec.ts`），换渲染层等于把那批证据作废重做，
- * 而它不是这次要改的东西。**最小一步**：把 web 的 `.ht-habits__list` 换成消费
+ * 而它不是这次要改的东西。**最小一步**：把 web 的 `.ht-habit__list` 换成消费
  * 本组件，塌缩与对比度判据随之重写到共享层，届时删掉 `HabitsList.tsx`。
  *
  * ─────────────────────────────────────────────────────────────────────────
@@ -152,7 +152,7 @@ function makeStyles(tokens: HeytaNativeTokens) {
       borderColor: tokens['color.border'],
     },
     /* 选中态用**边框**表达（扁平风格里阴影只给真正的浮层），再加一层极浅的
-       主色底：两种线索，色觉差异下仍分得出。与 web 的 `.ht-habits__row[aria-current]` 同一条。 */
+       主色底：两种线索，色觉差异下仍分得出。与 web 的 `.ht-habit__row[aria-current]` 同一条。 */
     rowSelected: {
       borderColor: tokens['color.primary'],
       backgroundColor: tokens['color.primary-subtle'],

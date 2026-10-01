@@ -27,6 +27,12 @@ import { openApp, switchView } from './helpers';
 
 const ADD_PLACEHOLDER = '新习惯，例如「喝水」';
 
+/**
+ * 🔴 必须带 `?lang=zh-CN`：placeholder 与视图标签都是中文定位符，而 2026-10-01
+ * 起首启语言第 3 层问 `navigator.language`（Playwright = en-US）⇒ 不钉就是英文界面。
+ */
+const APP_ZH = '/?lang=zh-CN';
+
 /** 加一条习惯（输入 → 回车提交表单），等它出现在左列。 */
 async function createHabit(page: import('@playwright/test').Page, name: string): Promise<string> {
   const input = page.getByPlaceholder(ADD_PLACEHOLDER);
@@ -98,7 +104,7 @@ async function dotCells(
   return page.evaluate((id) => {
     const row = document.querySelector(`[data-testid="habit-row-${id}"]`);
     if (!row) throw new Error(`找不到习惯行 ${id}`);
-    return Array.from(row.querySelectorAll('.ht-habits__dot')).map((dot) => ({
+    return Array.from(row.querySelectorAll('.ht-habit__dot')).map((dot) => ({
       color: getComputedStyle(dot as Element).backgroundColor,
       title: dot.getAttribute('title') ?? '',
     }));
@@ -123,15 +129,15 @@ test.describe('习惯视图 = 列表 + 窗格（真浏览器）', () => {
     });
     page.on('pageerror', (err) => errors.push(String(err)));
 
-    await openApp(page);
+    await openApp(page, APP_ZH);
     await switchView(page, '习惯');
     await expect(page.getByRole('tab', { name: '习惯' })).toHaveAttribute('aria-selected', 'true');
 
     const first = await createHabit(page, '喝水');
     const second = await createHabit(page, '阅读');
 
-    const side = page.locator('.ht-habits__side');
-    const pane = page.locator('.ht-habits__pane');
+    const side = page.locator('.ht-habit__side');
+    const pane = page.locator('.ht-habit__pane');
     await expect(side).toBeVisible();
     await expect(pane).toBeVisible();
 
@@ -154,7 +160,7 @@ test.describe('习惯视图 = 列表 + 窗格（真浏览器）', () => {
     await expect(page.getByTestId('habit-board')).toHaveCount(1);
 
     // 三个具体数字：同等权重、常驻（ADR-0022 那一条落在布局上的形态）。
-    const nums = page.locator(`[data-testid="habit-row-${first}"] .ht-habits__chip-num`);
+    const nums = page.locator(`[data-testid="habit-row-${first}"] .ht-habit__chip-num`);
     await expect(nums).toHaveCount(3);
     for (let i = 0; i < 3; i += 1) await expect(nums.nth(i)).toHaveText('0');
 
@@ -220,13 +226,13 @@ test.describe('习惯视图 = 列表 + 窗格（真浏览器）', () => {
   });
 
   test('窄屏（≤768px）整列换到窗格上方，三个数字一个都不砍', async ({ page }) => {
-    await openApp(page);
+    await openApp(page, APP_ZH);
     await switchView(page, '习惯');
     const id = await createHabit(page, '喝水');
     await page.setViewportSize({ width: 700, height: 900 });
 
-    const side = page.locator('.ht-habits__side');
-    const pane = page.locator('.ht-habits__pane');
+    const side = page.locator('.ht-habit__side');
+    const pane = page.locator('.ht-habit__pane');
     const sideBox = await side.boundingBox();
     const paneBox = await pane.boundingBox();
     await shot(page, 'habits-list-pane-narrow');
@@ -239,7 +245,7 @@ test.describe('习惯视图 = 列表 + 窗格（真浏览器）', () => {
     expect(paneBox!.y).toBeGreaterThan(sideBox!.y);
 
     // 三个数字仍然在屏上（不是 display:none、不是被 nowrap 挤没）。
-    const nums = page.locator(`[data-testid="habit-row-${id}"] .ht-habits__chip-num`);
+    const nums = page.locator(`[data-testid="habit-row-${id}"] .ht-habit__chip-num`);
     await expect(nums).toHaveCount(3);
     for (let i = 0; i < 3; i += 1) await expect(nums.nth(i)).toBeVisible();
     // 「累计」不许是第一个被砍的 —— 它必须与前两个同等可见。
@@ -249,7 +255,7 @@ test.describe('习惯视图 = 列表 + 窗格（真浏览器）', () => {
   });
 
   test('暗色主题下 chip 数字与习惯名都读得清（对比度真算过）', async ({ page }) => {
-    await openApp(page);
+    await openApp(page, APP_ZH);
     await switchView(page, '习惯');
     const id = await createHabit(page, '喝水');
     await createHabit(page, '阅读');
@@ -282,8 +288,8 @@ test.describe('习惯视图 = 列表 + 窗格（真浏览器）', () => {
       ['选中行', id],
       ['未选中行', plainId],
     ] as const) {
-      const chip = await contrastOf(page, `[data-testid="habit-row-${habitId}"] .ht-habits__chip`);
-      const name = await contrastOf(page, `[data-testid="habit-row-${habitId}"] .ht-habits__name`);
+      const chip = await contrastOf(page, `[data-testid="habit-row-${habitId}"] .ht-habit__chip`);
+      const name = await contrastOf(page, `[data-testid="habit-row-${habitId}"] .ht-habit__name`);
       // 4.5 = WCAG AA 正文。chip 是 xs 字重 regular，够不着"大字 3.0"的豁免。
       expect(chip, `${where}的 chip 数字在暗色下看不清（${chip.toFixed(2)}:1）`).toBeGreaterThanOrEqual(4.5);
       expect(name, `${where}的习惯名在暗色下看不清（${name.toFixed(2)}:1）`).toBeGreaterThanOrEqual(4.5);
