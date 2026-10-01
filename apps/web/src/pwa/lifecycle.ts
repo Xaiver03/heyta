@@ -40,6 +40,7 @@
  * 那会把一个罕见的、自愈的问题换成一把要维护的锁。
  */
 
+import { currentLocale, subscribeLocale } from '../lib/locale.js';
 import { currentState, onEngineChange } from '../lib/oplog.js';
 import { useFocusStore } from '../features/focus/store.js';
 import { widgetDrainTasks } from '../features/tasks/store.js';
@@ -58,6 +59,7 @@ const PUBLISH_DEBOUNCE_MS = 500;
 
 let publishTimer: number | null = null;
 let unsubscribe: (() => void) | null = null;
+let unsubscribeLocale: (() => void) | null = null;
 let onVisibility: (() => void) | null = null;
 let started = false;
 
@@ -72,6 +74,7 @@ export async function publishNow(): Promise<void> {
       //    所以这里不强求：拿不到就传 undefined，让选择器给 active:false，
       //    而**绝不**编造一个会话标题。
       focus: useFocusStore.getState().state,
+      locale: currentLocale(),
       now: Date.now(),
     });
     await publishWidgetCards(plan);
@@ -114,6 +117,14 @@ export function startWidgetLifecycle(): void {
     })();
   };
   document.addEventListener('visibilitychange', onVisibility);
+
+  // 🔴 切语言必须**自己**触发重推。`onEngineChange` 只在 op-log 变化时报，
+  // 而改语言不产生任何 op —— 不订阅的话，用户把界面切成英文后，
+  // 桌面组件会**继续显示中文**直到他下次动一条任务。那不是"延迟"，
+  // 是界面和组件在两种语言里各说各话。
+  unsubscribeLocale = subscribeLocale(() => {
+    void publishNow();
+  });
 }
 
 /** 停生命周期。**只为测试存在** —— 生产上它活到页面关闭。 */
@@ -124,6 +135,8 @@ export function stopWidgetLifecycle(): void {
   }
   unsubscribe?.();
   unsubscribe = null;
+  unsubscribeLocale?.();
+  unsubscribeLocale = null;
   if (onVisibility !== null) document.removeEventListener('visibilitychange', onVisibility);
   onVisibility = null;
   started = false;

@@ -89,7 +89,7 @@ export function buildData(snapshot: SnapshotResult, name: string): formBindingDa
       const model = todayCard(snapshot, false);
       if (typeof model !== 'string') todayRows = JSON.stringify(model.rows);
     } else if (name === 'quadrant') {
-      const model = quadrantCard(snapshot);
+      const model = quadrantCard(snapshot, isZh);
       if (typeof model !== 'string') quadrantSlots = JSON.stringify(model.slots);
     } else if (name === 'habits') {
       const model = habitsCard(snapshot);

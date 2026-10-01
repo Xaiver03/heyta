@@ -2,5 +2,7 @@
   "kind": "quadrant",
   "dayStr": "",
   "slots": [],
-  "showPlaceholder": true
+  "showPlaceholder": true,
+  "placeholderText": "打开 Heyta 以显示小组件",
+  "titleText": "四象限"
 }

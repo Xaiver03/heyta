@@ -5,7 +5,7 @@
   "body": [
     {
       "type": "TextBlock",
-      "text": "打开 Heyta 以显示小组件",
+      "text": "${placeholderText}",
       "wrap": true,
       "isSubtle": true,
       "isVisible": "${showPlaceholder}"
@@ -16,7 +16,7 @@
       "items": [
         {
           "type": "TextBlock",
-          "text": "四象限",
+          "text": "${titleText}",
           "wrap": true,
           "weight": "Bolder",
           "size": "Medium"
@@ -27,7 +27,7 @@
           "items": [
             {
               "type": "TextBlock",
-              "text": "${label}（${count}）",
+              "text": "${heading}",
               "wrap": true,
               "weight": "Bolder",
               "spacing": "Medium"

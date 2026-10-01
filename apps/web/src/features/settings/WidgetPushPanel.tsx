@@ -65,7 +65,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 
-import { useI18n } from '@heyta/i18n';
+import { useI18n, type MessageKey } from '@heyta/i18n';
 import { BellRing, Loader2, RefreshCw } from 'lucide-react';
 import {
   HeytaUiProvider,
@@ -77,10 +77,45 @@ import {
   probeWidgetPush,
   subscribeToWidgetPush,
   unsubscribeFromWidgetPush,
+  type PushFailureReason,
+  type PushReasonVars,
 } from '../../pwa/push-subscribe.js';
 
 /** 面板的可见性。`null` = 还在探测（**不画**）。 */
 type Visibility = null | 'hidden' | 'shown';
+
+/**
+ * 原因码 → 词条 key。
+ *
+ * 🔴 **穷尽的 `Record`，不是查不到就原样打印**：生产原因的那一层
+ * （`apps/web/src/pwa/push-subscribe.ts`）只出码、不出句子，句子住在这里。
+ * 用穷尽 Record 而不是 `Record<string, MessageKey | undefined>` + 兜底，
+ * 是因为「漏一条」的正确发生地点是**编译期**，不是某个用户的界面 ——
+ * 兜底路径等于把「英文界面露出内部码」变成一个正常状态。
+ *
+ * ⚠️ 其中六条（`insecure-context` / `no-service-worker` / `no-notification-api`
+ *    / `permission-denied` / `server-not-configured` / `needs-login`）目前
+ *    **只在探测阶段用**，那条路径下面板整体不画，所以用户看不到它们。
+ *    词条仍然要给：面板消失本身就是一次解释失败，将来要把原因画出来时
+ *    不该再回头补表。
+ */
+const PUSH_REASON_MESSAGE_KEY: Record<PushFailureReason, MessageKey> = {
+  'insecure-context': 'web.widgetPush.reason.insecureContext',
+  'no-service-worker': 'web.widgetPush.reason.noServiceWorker',
+  'no-notification-api': 'web.widgetPush.reason.noNotificationApi',
+  'permission-denied': 'web.widgetPush.reason.permissionDenied',
+  'server-not-configured': 'web.widgetPush.reason.serverNotConfigured',
+  'needs-login': 'web.widgetPush.reason.needsLogin',
+  'vapid-key-http': 'web.widgetPush.reason.pushKeyHttp',
+  'vapid-key-malformed': 'web.widgetPush.reason.pushKeyMalformed',
+  'vapid-key-length': 'web.widgetPush.reason.pushKeyLength',
+  'no-subscription': 'web.widgetPush.reason.noSubscription',
+  'incomplete-subscription': 'web.widgetPush.reason.incompleteSubscription',
+  'register-http': 'web.widgetPush.reason.registerHttp',
+  'unregister-http': 'web.widgetPush.reason.unregisterHttp',
+  'probe-http': 'web.widgetPush.reason.probeHttp',
+  unexpected: 'web.widgetPush.reason.unexpected',
+};
 
 export function WidgetPushPanel(): React.JSX.Element | null {
   const { t } = useI18n();
@@ -88,7 +123,11 @@ export function WidgetPushPanel(): React.JSX.Element | null {
   const [subscribed, setSubscribed] = useState(false);
   const [busy, setBusy] = useState(false);
   /** 上一次操作的结果。`null` = 还没有操作过。 */
-  const [error, setError] = useState<{ key: 'failed' | 'failedOff'; reason: string } | null>(null);
+  const [error, setError] = useState<{
+    key: 'failed' | 'failedOff';
+    reason: PushFailureReason;
+    vars?: PushReasonVars;
+  } | null>(null);
   const [denied, setDenied] = useState(false);
 
   useEffect(() => {
@@ -126,10 +165,13 @@ export function WidgetPushPanel(): React.JSX.Element | null {
         setSubscribed(false);
         return;
       case 'denied':
-        // ⚠️ 权限被拒之后**面板要消失**：能力还在，但用户在我们这里点不出结果，
-        //    该做的是去浏览器设置里改。留一个永远失败的开关只会让人反复点。
+        // ⚠️ 权限被拒之后**开关要收掉**（留一个永远失败的开关只会让人反复点），
+        //    但**面板必须留下来把原因说清楚**。
+        //    原来这里还顺手 `setVisibility('hidden')` —— 于是组件在第 149 行
+        //    就返回 `null`，下面那条 `widget-push-denied` 提示行**从来没被画过**，
+        //    用户看到的只是「开关自己消失了」。而这条纪律恰好写在
+        //    `push-subscribe.ts` 文件头：**一个会静默关掉自己的安全开关比没有更糟**。
         setDenied(true);
-        setVisibility('hidden');
         return;
       case 'disabled':
         setVisibility('hidden');
@@ -140,7 +182,8 @@ export function WidgetPushPanel(): React.JSX.Element | null {
       default:
         setError({
           key: subscribed ? 'failedOff' : 'failed',
-          reason: result.status === 'failed' ? result.reason : '',
+          reason: result.reason,
+          vars: result.vars,
         });
         return;
     }
@@ -166,24 +209,28 @@ export function WidgetPushPanel(): React.JSX.Element | null {
    * `packages/ui/src/settings/Settings.tsx` 的文件头（本面板没有 DOM 级测试，
    * 所以这一条目前不是损失，只是已知边界）。
    */
+  const toggleRow: SettingsRowModel = {
+    kind: 'toggle',
+    testID: 'widget-push-toggle',
+    label: t('web.widgetPush.rowLabel'),
+    // 这一行是**状态**，不是提示：开关的标签永远不变，状态只能靠它传达。
+    // 忙的时候让字形转圈（图标属于外壳，所以由宿主给）。
+    hint: t(statusKey),
+    checked: subscribed,
+    onToggle: () => void toggle(),
+    disabled: busy,
+    busy,
+    leading: busy ? (
+      <Loader2 aria-hidden="true" size={16} className="ht-spin" />
+    ) : (
+      <RefreshCw aria-hidden="true" size={16} />
+    ),
+  };
+
   const rows: readonly SettingsRowModel[] = [
-    {
-      kind: 'toggle',
-      testID: 'widget-push-toggle',
-      label: t('web.widgetPush.rowLabel'),
-      // 这一行是**状态**，不是提示：开关的标签永远不变，状态只能靠它传达。
-      // 忙的时候让字形转圈（图标属于外壳，所以由宿主给）。
-      hint: t(statusKey),
-      checked: subscribed,
-      onToggle: () => void toggle(),
-      disabled: busy,
-      busy,
-      leading: busy ? (
-        <Loader2 aria-hidden="true" size={16} className="ht-spin" />
-      ) : (
-        <RefreshCw aria-hidden="true" size={16} />
-      ),
-    },
+    // 🔴 权限已被拒 ⇒ **不再给开关**（它点了也只会再被拒一次），
+    //    改由下面那条 `widget-push-denied` 说明该去哪儿改。
+    ...(denied ? [] : [toggleRow]),
     ...(error
       ? ([
           {
@@ -191,11 +238,14 @@ export function WidgetPushPanel(): React.JSX.Element | null {
             testID: 'widget-push-error',
             role: 'alert',
             tone: 'danger',
+            // ⚠️ `{reason}` 插进来的是**已经翻译过的那半句**，不是原始码：
+            //    码在 `PUSH_REASON_MESSAGE_KEY` 查词条，数字与浏览器原话作为
+            //    参数跟着词条走。
             text: t(
               error.key === 'failedOff'
                 ? 'web.widgetPush.status.failedOff'
                 : 'web.widgetPush.status.failed',
-              { reason: error.reason },
+              { reason: t(PUSH_REASON_MESSAGE_KEY[error.reason], error.vars) },
             ),
           },
         ] as const)

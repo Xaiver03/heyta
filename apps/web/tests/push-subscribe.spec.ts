@@ -117,8 +117,9 @@ describe('urlBase64ToUint8Array', () => {
   });
 
   it('空串报错（而不是解出一个空数组）', () => {
-    expect(() => urlBase64ToUint8Array('')).toThrow(/非空/);
-    expect(() => urlBase64ToUint8Array(undefined as unknown as string)).toThrow(/非空/);
+    // ⚠️ 这条文本是**诊断串**，永远不进界面 —— 所以它可以是英文的、内部格式。
+    expect(() => urlBase64ToUint8Array('')).toThrow(/non-empty/);
+    expect(() => urlBase64ToUint8Array(undefined as unknown as string)).toThrow(/non-empty/);
   });
 });
 
@@ -127,7 +128,8 @@ describe('🔴 不支持 ≠ 失败', () => {
     const { env, calls } = fakeEnv({ isSecureContext: false });
     const result = await subscribeToWidgetPush(env);
     expect(result).toMatchObject({ status: 'unsupported' });
-    expect(result.status === 'unsupported' && result.reason).toMatch(/安全上下文/);
+    // 🔴 reason 是**码**，不是一句话（句子在 packages/i18n，由面板按当前语言拼）。
+    expect(result.status === 'unsupported' && result.reason).toBe('insecure-context');
     expect(calls).toEqual([]);
   });
 
@@ -154,7 +156,7 @@ describe('🔴 不支持 ≠ 失败', () => {
     });
     const result = await subscribeToWidgetPush(env);
     expect(result).toMatchObject({ status: 'unsupported' });
-    expect(result.status === 'unsupported' && result.reason).toMatch(/登录/);
+    expect(result.status === 'unsupported' && result.reason).toBe('needs-login');
   });
 });
 
@@ -216,7 +218,9 @@ describe('🔴 公钥校验：坏公钥不能拿去 subscribe', () => {
     const { env } = fakeEnv({ fetch: (async () => jsonResponse(500, {})) as typeof fetch });
     const result = await subscribeToWidgetPush(env);
     expect(result).toMatchObject({ status: 'failed' });
-    expect(result.status === 'failed' && result.reason).toMatch(/500/);
+    expect(result.status === 'failed' && result.reason).toBe('vapid-key-http');
+    // 状态码作为**数据**随 vars 一起给，界面把它插进词条的 {status} 里。
+    expect(result.status === 'failed' && result.vars).toEqual({ status: 500 });
   });
 });
 
@@ -300,7 +304,10 @@ describe('🔴 从不抛异常', () => {
     });
     const result = await subscribeToWidgetPush(env);
     expect(result).toMatchObject({ status: 'failed' });
-    expect(result.status === 'failed' && result.reason).toMatch(/userVisibleOnly/);
+    // 浏览器抛的东西我们认不出来 ⇒ 只有 'unexpected' 这一个码，
+    // 原始文本走 vars.detail（是唯一线索），**不**当码用。
+    expect(result.status === 'failed' && result.reason).toBe('unexpected');
+    expect(String(result.status === 'failed' && result.vars?.detail)).toMatch(/userVisibleOnly/);
   });
 
   it('fetch 抛异常（离线）→ failed', async () => {
@@ -422,7 +429,7 @@ describe('🔴 探测：能力不存在时**不画开关**', () => {
     const { env } = fakeEnv({ fetch: (async () => jsonResponse(503, {})) as typeof fetch });
     const probe = await probeWidgetPush(env);
     expect(probe.available).toBe(false);
-    expect(probe.reason).toMatch(/没有配置/);
+    expect(probe.reason).toBe('server-not-configured');
   });
 
   it('🔴 权限已被拒 → available:false（留一个永远失败的开关只会让人反复点）', async () => {

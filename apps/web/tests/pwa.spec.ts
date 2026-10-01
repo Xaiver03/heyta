@@ -24,6 +24,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { ADAPTIVE_CARD_KINDS } from '@heyta/widget-core';
+import { CATALOGS, DEFAULT_LOCALE, translate } from '@heyta/i18n';
 import { describe, expect, it, vi } from 'vitest';
 
 import { serviceWorkerUrl } from '../src/pwa/register.js';
@@ -43,6 +44,30 @@ import { clicksToQueue } from '../src/pwa/widget-drain.js';
 const HERE = dirname(fileURLToPath(import.meta.url));
 const PUBLIC = join(HERE, '..', 'public');
 const NOW = 1_790_000_000_000;
+
+/**
+ * 把一条词条转成匹配器：`{var}` 占位符换成通配，字面部分转义。
+ * 占位符语法与 `packages/i18n/src/catalog.ts` 的 `PLACEHOLDER` 同一条（`{\w+}`）。
+ *
+ * 为什么要通配而不是逐字比：生成物里有插值的结果（`{count} 项` → `0 项`），
+ * 它不是表里任何一个字面值，逐字比会让门禁**假红**。
+ *
+ * ⚠️ 代价：含占位符的词条放宽成通配，"恰好套上某条模板的手写句"可能漏判。
+ *    补这个洞的是模板侧那条**零汉字**门禁（`emit-adaptive-cards --check`）——
+ *    模板里不许有任何一个字的文案，所以漏判只可能发生在数据文件这一侧。
+ */
+function catalogPattern(template: string): RegExp {
+  const source = template
+    .split(/(\{\w+\})/)
+    .map((part) =>
+      /^\{\w+\}$/.test(part) ? '[\\s\\S]+?' : part.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'),
+    )
+    .join('');
+  return new RegExp(`^${source}$`);
+}
+
+/** 汉字 + CJK 标点 + 全角字符（口径同 `check-ui-language` 与 `emit-adaptive-cards`）。 */
+const CJK = /[\u3400-\u4DBF\u4E00-\u9FFF\uF900-\uFAFF\u3000-\u303F\uFF00-\uFFEF]/;
 
 describe('tag ↔ kind 映射', () => {
   it.each(ADAPTIVE_CARD_KINDS)('%s 的 tag 能往返', (kind) => {
@@ -170,6 +195,7 @@ describe('页面 → service worker 消息协议', () => {
     type: 'heyta:widget-data',
     kind: 'today',
     data: { count: 3 },
+    placeholder: { kind: 'today', showPlaceholder: true },
     dayStr: '2026-09-27',
     validUntil: NOW,
   };
@@ -184,6 +210,24 @@ describe('页面 → service worker 消息协议', () => {
     expect(parsePageMessage({ ...DATA_MSG, data: null })).toBeNull();
     expect(parsePageMessage({ ...DATA_MSG, data: 'x' })).toBeNull();
     expect(parsePageMessage({ ...DATA_MSG, data: 7 })).toBeNull();
+  });
+
+  it('🔴 占位态非法时归一为 null，但**不许**连合法的数据一起拒收', () => {
+    // 占位态是"过期之后该说什么"，数据是"现在说什么"。
+    // 因为附属字段非法就把主字段整条拒掉，表现是组件**一次刷新都收不到** ——
+    // 而刷新失败在 Windows 上没有报错、没有日志，只会一直显示旧任务。
+    expect(parsePageMessage({ ...DATA_MSG, placeholder: undefined })).toEqual({
+      ...DATA_MSG,
+      placeholder: null,
+    });
+    expect(parsePageMessage({ ...DATA_MSG, placeholder: null })).toEqual({
+      ...DATA_MSG,
+      placeholder: null,
+    });
+    expect(parsePageMessage({ ...DATA_MSG, placeholder: '中文句子' })).toEqual({
+      ...DATA_MSG,
+      placeholder: null,
+    });
   });
 
   it('🔴 widget-data 必须带期限 —— 没有期限的数据在 Windows 上永远不会过期', () => {
@@ -245,6 +289,8 @@ describe('生成物：manifest 与它引用的文件', () => {
     readFileSync(join(PUBLIC, 'manifest.webmanifest'), 'utf8'),
   ) as {
     name: string;
+    description: string;
+    lang: string;
     start_url: string;
     icons: { src: string; sizes: string; purpose?: string }[];
     widgets: {
@@ -307,6 +353,39 @@ describe('生成物：manifest 与它引用的文件', () => {
       // 数据文件的 kind 必须与 tag 一致（推错款 = 字段全对不上）
       expect(data.kind).toBe(kind);
       expect(data.showPlaceholder, `${widget.tag} 的初始数据不是占位态`).toBe(true);
+    }
+  });
+
+  it('🔴 生成物里的每一句中文都必须能在词条表里找到（P1-3）', () => {
+    // `check:ui-language` 扫的是 `apps/web/src`，**扫不到 `public/`** ——
+    // 生成物在这一族门禁的视野之外。没有这条断言的话，
+    // 在 `gen-pwa.mjs` 里再抄一句中文是完全安静的，而那句话永远不会被翻译。
+    //
+    // ⚠️ 不能只比"逐字等于某个词条值"：插值后的结果（`{count} 项` → `0 项`）
+    //    不是表里的任何一个字面值。所以每条词条转成一个**模式**，
+    //    `{var}` 换成通配 —— 手写的中文仍然一条都对不上。
+    const patterns = Object.values(CATALOGS[DEFAULT_LOCALE]).map(catalogPattern);
+    for (const widget of manifest.widgets) {
+      const data = JSON.parse(
+        readFileSync(join(PUBLIC, widget.data.replace(/^\//, '')), 'utf8'),
+      ) as Record<string, unknown>;
+      for (const [field, value] of Object.entries(data)) {
+        if (typeof value !== 'string' || !CJK.test(value)) continue;
+        expect(
+          patterns.some((p) => p.test(value)),
+          `${widget.tag} 的 ${field}「${value}」不是词条表里的值 —— 这是第二套文案事实源`,
+        ).toBe(true);
+      }
+    }
+  });
+
+  it('🔴 manifest 的组件名/描述逐字等于词条表（不是生成脚本里的手写中文）', () => {
+    expect(manifest.lang).toBe(DEFAULT_LOCALE);
+    expect(manifest.description).toBe(translate(DEFAULT_LOCALE, 'web.pwa.description'));
+    for (const widget of manifest.widgets) {
+      const kind = kindFromTag(widget.tag)!;
+      expect(widget.name).toBe(translate(DEFAULT_LOCALE, `widget.${kind}.title`));
+      expect(widget.description).toBe(translate(DEFAULT_LOCALE, `widget.card.desc.${kind}`));
     }
   });
 

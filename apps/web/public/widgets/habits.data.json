@@ -3,5 +3,8 @@
   "dayStr": "",
   "isEmpty": true,
   "rows": [],
-  "showPlaceholder": true
+  "showPlaceholder": true,
+  "placeholderText": "打开 Heyta 以显示小组件",
+  "titleText": "习惯",
+  "emptyText": "还没有习惯"
 }

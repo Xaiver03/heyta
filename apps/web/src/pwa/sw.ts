@@ -29,7 +29,6 @@
  * 而且 Adaptive Card 宿主只吃明文 —— 详见 `sw-core.ts` 的 `WidgetDataMessage`。
  */
 
-import { buildAdaptiveCardPlaceholder } from '@heyta/widget-core';
 import type { AdaptiveCardKind } from '@heyta/widget-core';
 
 import {
@@ -242,12 +241,13 @@ async function refreshFromCache(kind: AdaptiveCardKind): Promise<void> {
     // 那个状态比空白好得多。
     return;
   }
-  // 🔴 过期就**不推旧数据**。宿主会继续显示它已有的那一份，
-  //    而那正是我们要避免的 —— 但更好的做法在这里做不到：
-  //    `updateByTag` 只能推数据，不能"清空"。真正的兜底是下面的
-  //    `data` 请求拦截（宿主自己会定期重取 `data` URL，见文件头）。
   if (isRecordStale(record, Date.now())) {
-    console.info(`[heyta-sw] ${kind} 的缓存已过期（dayStr=${record.dayStr}），不推旧数据`);
+    // 🔴 过期就**绝不**把旧任务推上去。以前这里只能"什么都不做"，理由是
+    //    `updateByTag` 只能推数据、不能清空 —— 那确实做不到"抹掉"，
+    //    但现在不用抹：页面把**占位态**一起存下来了，推它就是把它换成
+    //    "打开 Heyta 刷新"，组件从此不会再装作今天。
+    console.info(`[heyta-sw] ${kind} 的缓存已过期（dayStr=${record.dayStr}），改推占位态`);
+    if (record.placeholder != null) await pushWidgetData(kind, record.placeholder);
     return;
   }
   await pushWidgetData(kind, record.data);
@@ -300,11 +300,24 @@ sw.addEventListener('fetch', (event: FetchEventLike) => {
     event.respondWith(
       (async () => {
         const record = await getWidgetRecord(kind);
-        if (record === undefined || isRecordStale(record, Date.now())) {
-          return jsonResponse(buildAdaptiveCardPlaceholder(kind));
+        if (record !== undefined && !isRecordStale(record, Date.now())) {
+          return jsonResponse(record.data);
         }
-        return jsonResponse(record.data);
-      })().catch(() => jsonResponse(buildAdaptiveCardPlaceholder(kind))),
+        // 🔴 过期 / 没有数据 → 用**页面推过来一起存的占位态**，而不是旧任务列表。
+        //    为什么不在这里现场拼那句话：词条表在 `@heyta/i18n`，把它 import 进
+        //    service worker 会把**全部语言的全部界面文案**打进 `public/sw.js`
+        //    （每次 SW 启动都要加载一次）。而"过期时该说什么"的**语言**又必须
+        //    和数据同源 —— 所以由页面算好、SW 只缓存成品。
+        if (record?.placeholder != null) return jsonResponse(record.placeholder);
+        // 一个占位态也没有 = 这台设备**从没打开过应用**（或 IndexedDB 被清过）。
+        // 回落到构建期生成的静态初值，与"没有 SW 拦截"时的行为逐字相同。
+        return fetch(event.request);
+      })().catch(
+        // 网络也不可用 ⇒ 给一个明确失败的响应。
+        // ⚠️ 这里**不**回一段中文兜底：SW 里没有词条表，任何现场编出来的句子
+        //    都只有一种语言，而"组件说的话跟着界面语言走"正是这一轮要守住的契约。
+        () => new Response(null, { status: 504 }),
+      ),
     );
     return;
   }
@@ -429,6 +442,8 @@ sw.addEventListener('message', (event: MessageEventLike) => {
     const record: WidgetDataRecord = {
       kind: message.kind,
       data: message.data,
+      // 与数据**同一语言**的占位态：SW 没有词条表，只能存页面算好的成品。
+      placeholder: message.placeholder,
       dayStr: message.dayStr,
       validUntil: message.validUntil,
       pushedAt: Date.now(),

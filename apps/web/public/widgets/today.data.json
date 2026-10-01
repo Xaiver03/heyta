@@ -4,5 +4,9 @@
   "count": 0,
   "isEmpty": true,
   "rows": [],
-  "showPlaceholder": true
+  "showPlaceholder": true,
+  "placeholderText": "打开 Heyta 以显示小组件",
+  "titleText": "今日任务",
+  "countText": "0 项",
+  "emptyText": "今天没有任务"
 }

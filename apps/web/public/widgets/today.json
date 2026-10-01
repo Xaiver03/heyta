@@ -5,7 +5,7 @@
   "body": [
     {
       "type": "TextBlock",
-      "text": "打开 Heyta 以显示小组件",
+      "text": "${placeholderText}",
       "wrap": true,
       "isSubtle": true,
       "isVisible": "${showPlaceholder}"
@@ -16,21 +16,21 @@
       "items": [
         {
           "type": "TextBlock",
-          "text": "今日任务",
+          "text": "${titleText}",
           "wrap": true,
           "weight": "Bolder",
           "size": "Medium"
         },
         {
           "type": "TextBlock",
-          "text": "${count} 项",
+          "text": "${countText}",
           "wrap": true,
           "isSubtle": true,
           "spacing": "None"
         },
         {
           "type": "TextBlock",
-          "text": "今天没有任务",
+          "text": "${emptyText}",
           "wrap": true,
           "isSubtle": true,
           "isVisible": "${isEmpty}"

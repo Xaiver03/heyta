@@ -131,9 +131,9 @@ export function todayCard(snapshot: SnapshotResult, dark: boolean): TodayModel |
   return model;
 }
 
-export function quadrantCard(snapshot: SnapshotResult): QuadrantModel | CardState {
+export function quadrantCard(snapshot: SnapshotResult, isZh: boolean): QuadrantModel | CardState {
   if (snapshot.state !== 'ready' || snapshot.payload === null) return snapshot.state;
-  return buildQuadrantModel(snapshot.payload);
+  return buildQuadrantModel(snapshot.payload, isZh);
 }
 
 export function habitsCard(snapshot: SnapshotResult): HabitsModel | CardState {

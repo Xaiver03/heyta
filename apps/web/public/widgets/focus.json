@@ -5,7 +5,7 @@
   "body": [
     {
       "type": "TextBlock",
-      "text": "打开 Heyta 以显示小组件",
+      "text": "${placeholderText}",
       "wrap": true,
       "isSubtle": true,
       "isVisible": "${showPlaceholder}"
@@ -16,14 +16,14 @@
       "items": [
         {
           "type": "TextBlock",
-          "text": "数据已过期，打开 Heyta 刷新",
+          "text": "${staleText}",
           "wrap": true,
           "isSubtle": true,
           "isVisible": "${state == 'stale'}"
         },
         {
           "type": "TextBlock",
-          "text": "没有进行中的专注",
+          "text": "${idleText}",
           "wrap": true,
           "isSubtle": true,
           "isVisible": "${state == 'idle'}"

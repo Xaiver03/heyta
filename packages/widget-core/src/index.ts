@@ -70,6 +70,7 @@ export {
 } from './adaptive-card.js';
 
 export type {
+  AdaptiveCardCommonData,
   AdaptiveCardData,
   AdaptiveCardFocusData,
   AdaptiveCardFocusState,
@@ -81,6 +82,8 @@ export type {
   AdaptiveCardTaskRow,
   AdaptiveCardTemplate,
   AdaptiveCardTodayData,
+  WidgetCardKey,
+  WidgetTranslate,
 } from './adaptive-card.js';
 
 export {

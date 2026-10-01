@@ -29,23 +29,35 @@ import type { WidgetFocus, WidgetHabit, WidgetPayload, WidgetTask } from './Widg
 export type CardState = 'placeholder' | 'stale' | 'ready';
 
 /**
- * 四象限的显示名。
+ * 四象限的显示名（中 / 英）。
  *
  * ⚠️ **这是手抄的第 4 份。** 真源是 `packages/domain/src/quadrant.ts` 的
  * `QUADRANT_META.label`，Android 的 `values/strings.xml` 与 iOS 的
- * `WidgetStrings` 各有一份。`check:ui-language` 只扫 `apps/…/src` 下的 ts/tsx，
- * **没有任何门禁能发现这四份不一致**（记在进度账本 U11）。
- * 这里不假装它更安全 —— 只是把第 4 处摆在明面上。
+ * `WidgetStrings` 各有一份（进度账本 U11）。
+ * 与词条表的 `web.shell.nav.q1`–`q4` 由 `tests/harmony-widget.spec.ts`
+ * **逐字对照钉住** —— 之前只有中文，英文设备上四个象限是**整卡片唯一没翻译的一处**。
  *
  * 槽位号是 `1..4`（`Quadrant` 是**数字枚举**）。
  * 🔴 不要用 `Object.values(Quadrant)` 那种省略反而出错的方式枚举它。
  */
-export const QUADRANT_LABELS: Record<string, string> = {
+export const QUADRANT_LABELS_ZH: Record<string, string> = {
   '1': '重要且紧急',
   '2': '重要不紧急',
   '3': '紧急不重要',
   '4': '不重要不紧急',
 };
+
+export const QUADRANT_LABELS_EN: Record<string, string> = {
+  '1': 'Important and urgent',
+  '2': 'Important, not urgent',
+  '3': 'Urgent, not important',
+  '4': 'Not important, not urgent',
+};
+
+/** 与 `WidgetStrings.pick` 同一个开关：卡片侧只有一个"是不是中文"的判定。 */
+export function quadrantLabels(isZh: boolean): Record<string, string> {
+  return isZh ? QUADRANT_LABELS_ZH : QUADRANT_LABELS_EN;
+}
 
 // ─────────────────────────────────────────────────────────────
 // 今日任务
@@ -119,8 +131,9 @@ export interface QuadrantModel {
  * 某个象限不存在 —— 而"我今天没有重要且紧急的事"是一个**有意义的信息**，
  * 比"这一格没了"有用得多。
  */
-export function buildQuadrantModel(payload: WidgetPayload): QuadrantModel {
+export function buildQuadrantModel(payload: WidgetPayload, isZh: boolean): QuadrantModel {
   const quadrant = payload.quadrant ?? {};
+  const labels = quadrantLabels(isZh);
   const slots: QuadrantSlot[] = [];
   for (const slot of ['1', '2', '3', '4']) {
     const tasks = quadrant[slot] ?? [];
@@ -133,7 +146,7 @@ export function buildQuadrantModel(payload: WidgetPayload): QuadrantModel {
     }
     slots.push({
       slot,
-      label: QUADRANT_LABELS[slot] ?? '',
+      label: labels[slot] ?? '',
       count: tasks.length,
       firstTitle,
     });

@@ -5,7 +5,7 @@
  * 这是整条链的**最后一个缺口**：服务端（⑬–⑯）已经能"给某个用户的订阅发推送"，
  * 但浏览器还没把订阅**登记上去**，所以订阅表永远是空的。
  *
- * ## 🔴 五个会静默出错的点
+ * ## 🔴 六个会静默出错的点
  *
  * **（1）`userVisibleOnly: true` 是必需的。** Chrome 在没有它时**直接抛异常**
  *（"The push subscription does not support userVisibleOnly"）。这不是可选项 ——
@@ -26,6 +26,16 @@
  *
  * **（5）这个模块从不抛。** 它被 UI 调用（设置页的一个开关），
  * 而"推送订阅失败"绝不该让设置页白屏。
+ *
+ * **（6）`reason` 是码，不是一句话。** 它会被壳层插进**已翻译的**句子里
+ * （`web.widgetPush.status.failed` = 「开启失败：{reason}」）。
+ * 一句话渗进另一句话，翻译就永远做不完整 —— 英文界面上会出现半句中文，
+ * 而门禁看不见（它只扫 JSX 属性与 JSX 文本，这里在 `.ts` 的对象字面量里）。
+ * 所以这里只产出封闭的**原因码**，"怎么说这句话"归壳层的
+ * `Record<PushFailureReason, MessageKey>`；数字（HTTP 状态、字节长度）与
+ * 浏览器原始异常文本作为**参数**跟着码走，不当主文案。
+ * 同一条纪律见 `packages/ui/src/sync/model.ts` 的 `message`：
+ * **诊断数据不翻译，也不映射成词条。**
  */
 
 /** `GET /api/push/vapid-public-key` 的响应。 */
@@ -33,18 +43,48 @@ export interface VapidKeyResponse {
   publicKey: string;
 }
 
+/**
+ * 失败 / 不可用的原因码（封闭集合）。
+ *
+ * 🔴 新增一条**必须**同时给 `WidgetPushPanel.tsx` 的
+ * `PUSH_REASON_MESSAGE_KEY` 加一项 —— 那份 `Record` 是穷尽的，
+ * 忘了就会编译失败。这是刻意的：词条漏一条不该在运行时才发现。
+ */
+export type PushFailureReason =
+  // ── 环境根本不支持（不画开关，只在日志里）
+  | 'insecure-context'
+  | 'no-service-worker'
+  | 'no-notification-api'
+  | 'permission-denied'
+  | 'server-not-configured'
+  | 'needs-login'
+  // ── 订阅/注销/探测过程中的失败
+  | 'vapid-key-http'
+  | 'vapid-key-malformed'
+  | 'vapid-key-length'
+  | 'no-subscription'
+  | 'incomplete-subscription'
+  | 'register-http'
+  | 'unregister-http'
+  | 'probe-http'
+  // ── 没被 `catch` 归类的意外异常（`detail` 是浏览器原话）
+  | 'unexpected';
+
+/** 插进词条的参数。键名必须与 `{...}` 占位符逐字一致。 */
+export type PushReasonVars = Readonly<Record<string, string | number>>;
+
 /** 订阅结果。**区分"不支持"与"失败"**是这里唯一重要的设计。 */
 export type PushSubscribeResult =
   | { status: 'subscribed' }
   | { status: 'unsubscribed' }
   /** 这台设备/浏览器根本不支持（http、旧浏览器、没有 SW）。**不是错误。** */
-  | { status: 'unsupported'; reason: string }
+  | { status: 'unsupported'; reason: PushFailureReason }
   /** 服务端没开这个能力（503）。**也不是错误。** 自托管默认形态。 */
   | { status: 'disabled' }
   /** 用户拒绝了通知权限。**不该反复问。** */
   | { status: 'denied' }
   /** 真的失败了。 */
-  | { status: 'failed'; reason: string };
+  | { status: 'failed'; reason: PushFailureReason; vars?: PushReasonVars };
 
 /**
  * base64url → `Uint8Array`。
@@ -57,7 +97,7 @@ export type PushSubscribeResult =
  */
 export function urlBase64ToUint8Array(base64Url: string): Uint8Array {
   if (typeof base64Url !== 'string' || base64Url === '') {
-    throw new Error('base64url 必须是非空字符串');
+    throw new Error('urlBase64ToUint8Array: expected a non-empty string');
   }
   const padding = '='.repeat((4 - (base64Url.length % 4)) % 4);
   const base64 = (base64Url + padding).replace(/-/g, '+').replace(/_/g, '/');
@@ -98,15 +138,26 @@ function resolveEnvironment(env: PushEnvironment): PushSubscribeResult | null {
   // 🔴 顺序很重要：先判安全上下文。非安全上下文里下面两个都是 undefined，
   //    而直接访问它们抛出的 `TypeError` 完全指不到"你用的是 http"。
   if (env.isSecureContext !== true) {
-    return { status: 'unsupported', reason: '不是安全上下文（https 或 localhost）' };
+    return { status: 'unsupported', reason: 'insecure-context' };
   }
   if (!env.serviceWorker) {
-    return { status: 'unsupported', reason: '这个浏览器没有 Service Worker' };
+    return { status: 'unsupported', reason: 'no-service-worker' };
   }
   if (typeof env.notification === 'undefined') {
-    return { status: 'unsupported', reason: '这个浏览器没有 Notification API' };
+    return { status: 'unsupported', reason: 'no-notification-api' };
   }
   return null;
+}
+
+/**
+ * `unexpected` 那条码的参数：浏览器/运行时自己的那句话。
+ *
+ * 🔴 它是**诊断数据**，不是文案 —— 不翻译、不映射词条，只作为 `{detail}`
+ * 插进壳层那句本地化好的话里（与 `packages/ui/src/sync/model.ts` 的
+ * `message` 同一条纪律）。
+ */
+function exceptionVars(error: unknown): PushReasonVars {
+  return { detail: error instanceof Error ? error.message : String(error) };
 }
 
 /**
@@ -154,24 +205,25 @@ export async function subscribeToWidgetPush(
     if (keyResponse.status === 503) return { status: 'disabled' };
     if (keyResponse.status === 401) {
       // 没登录。**不是失败** —— 是"还没到能订阅的时候"。
-      return { status: 'unsupported', reason: '需要先登录' };
+      return { status: 'unsupported', reason: 'needs-login' };
     }
     if (!keyResponse.ok) {
-      return { status: 'failed', reason: `取 VAPID 公钥失败（HTTP ${keyResponse.status}）` };
+      return { status: 'failed', reason: 'vapid-key-http', vars: { status: keyResponse.status } };
     }
     const body = (await keyResponse.json()) as VapidKeyResponse;
     let applicationServerKey: Uint8Array;
     try {
       applicationServerKey = urlBase64ToUint8Array(body.publicKey);
     } catch {
-      return { status: 'failed', reason: '服务端给的 VAPID 公钥不是合法 base64url' };
+      return { status: 'failed', reason: 'vapid-key-malformed' };
     }
     if (applicationServerKey.length !== 65) {
       // ⚠️ 长度不对时**不要**拿它去 `subscribe` —— 浏览器会抛一个
       //    与真实原因（服务端配置错了）毫无关联的报错。
       return {
         status: 'failed',
-        reason: `VAPID 公钥必须是 65 字节，收到 ${applicationServerKey.length}`,
+        reason: 'vapid-key-length',
+        vars: { length: applicationServerKey.length },
       };
     }
 
@@ -182,7 +234,7 @@ export async function subscribeToWidgetPush(
       applicationServerKey,
     });
     if (subscription === null) {
-      return { status: 'failed', reason: '浏览器没有返回订阅' };
+      return { status: 'failed', reason: 'no-subscription' };
     }
 
     const raw = subscription.toJSON() as {
@@ -190,7 +242,7 @@ export async function subscribeToWidgetPush(
       keys?: { p256dh?: string; auth?: string };
     };
     if (!raw.endpoint || !raw.keys?.p256dh || !raw.keys.auth) {
-      return { status: 'failed', reason: '浏览器返回的订阅缺少 endpoint 或密钥' };
+      return { status: 'failed', reason: 'incomplete-subscription' };
     }
 
     const response = await fetcher('/api/push/subscribe', {
@@ -205,15 +257,12 @@ export async function subscribeToWidgetPush(
     });
     if (response.status === 503) return { status: 'disabled' };
     if (!response.ok) {
-      return { status: 'failed', reason: `登记订阅失败（HTTP ${response.status}）` };
+      return { status: 'failed', reason: 'register-http', vars: { status: response.status } };
     }
     return { status: 'subscribed' };
   } catch (error) {
     // 见文件头（5）：从不抛。
-    return {
-      status: 'failed',
-      reason: error instanceof Error ? error.message : String(error),
-    };
+    return { status: 'failed', reason: 'unexpected', vars: exceptionVars(error) };
   }
 }
 
@@ -229,7 +278,7 @@ export async function unsubscribeFromWidgetPush(
 ): Promise<PushSubscribeResult> {
   try {
     if (env.isSecureContext !== true || !env.serviceWorker) {
-      return { status: 'unsupported', reason: '这个环境没有 Service Worker' };
+      return { status: 'unsupported', reason: 'no-service-worker' };
     }
     const fetcher = env.fetch ?? globalThis.fetch;
     const registration = await env.serviceWorker.ready;
@@ -248,15 +297,12 @@ export async function unsubscribeFromWidgetPush(
     // ⚠️ 服务端说"没这条订阅"（200 + removed: 0）或 503 都**继续**退订：
     //    目标是"让这台设备不再收到推送"，而本地退订就能达到它。
     if (!response.ok && response.status !== 503) {
-      return { status: 'failed', reason: `注销失败（HTTP ${response.status}）` };
+      return { status: 'failed', reason: 'unregister-http', vars: { status: response.status } };
     }
     await subscription.unsubscribe();
     return { status: 'unsubscribed' };
   } catch (error) {
-    return {
-      status: 'failed',
-      reason: error instanceof Error ? error.message : String(error),
-    };
+    return { status: 'failed', reason: 'unexpected', vars: exceptionVars(error) };
   }
 }
 
@@ -266,8 +312,10 @@ export interface WidgetPushProbe {
   available: boolean;
   /** 当前是否已经订阅。 */
   subscribed: boolean;
-  /** 不可用时说明原因（只用于日志 / 排查，不画给用户）。 */
-  reason?: string;
+  /** 不可用时的**原因码**（只用于日志 / 排查，不画给用户；措辞归壳层的词条表）。 */
+  reason?: PushFailureReason;
+  /** 跟着码走的参数（HTTP 状态、字节长度、浏览器原话）。 */
+  vars?: PushReasonVars;
 }
 
 /**
@@ -290,7 +338,13 @@ export async function probeWidgetPush(
   try {
     const blocked = resolveEnvironment(env);
     if (blocked) {
-      return { available: false, subscribed: false, reason: '这个环境不支持 Web Push' };
+      // ⚠️ **把具体原因原样带出去**，不要在这里糊成一句"环境不支持"——
+      //    "没有 SW"和"用的是 http"是两件用户能自己解决、而提示完全不同的事。
+      return {
+        available: false,
+        subscribed: false,
+        reason: blocked.status === 'unsupported' ? blocked.reason : 'unexpected',
+      };
     }
 
     // 已知被拒绝时：能力在，但开关没有意义（点了也只会再被拒）。
@@ -300,7 +354,7 @@ export async function probeWidgetPush(
       try {
         const current = await env.permissions.query({ name: 'notifications' });
         if (current.state === 'denied') {
-          return { available: false, subscribed: false, reason: '通知权限已被拒绝' };
+          return { available: false, subscribed: false, reason: 'permission-denied' };
         }
       } catch {
         // ⚠️ 某些浏览器不支持 `notifications` 这个 descriptor。
@@ -314,10 +368,15 @@ export async function probeWidgetPush(
       credentials: 'same-origin',
     });
     if (response.status === 503) {
-      return { available: false, subscribed: false, reason: '这台服务器没有配置 Web Push' };
+      return { available: false, subscribed: false, reason: 'server-not-configured' };
     }
     if (!response.ok) {
-      return { available: false, subscribed: false, reason: `探测失败（HTTP ${response.status}）` };
+      return {
+        available: false,
+        subscribed: false,
+        reason: 'probe-http',
+        vars: { status: response.status },
+      };
     }
 
     const registration = await env.serviceWorker!.ready;
@@ -328,7 +387,8 @@ export async function probeWidgetPush(
     return {
       available: false,
       subscribed: false,
-      reason: error instanceof Error ? error.message : String(error),
+      reason: 'unexpected',
+      vars: exceptionVars(error),
     };
   }
 }

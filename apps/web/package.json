@@ -9,6 +9,7 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "gen:pwa": "node scripts/gen-pwa.mjs",
+    "check:pwa": "node scripts/gen-pwa.mjs --check",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit -p tsconfig.spec.json",
     "test": "vitest run"
