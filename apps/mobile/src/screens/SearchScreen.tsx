@@ -53,7 +53,7 @@ import { openTaskHost } from '../db/open-host';
 import { searchPanelLabels } from '../lib/search-display';
 import { useMobileSync } from '../sync/store';
 import { useTheme, useTokens } from '../theme';
-import { IconButton, Text } from '../ui/kit';
+import { Button, Text } from '../ui/kit';
 
 export interface SearchScreenProps {
   visible: boolean;
@@ -145,7 +145,7 @@ export function SearchScreen({
     >
       {/**
        * 遮罩。**刻意不进无障碍树** —— 与 `TaskDetailSheet` 同一条理由：
-       * 它只做"点空白处关掉"，而读屏用户已经有右上角那个**有名字的**关闭按钮；
+       * 它只做"点空白处关掉"，而读屏用户已经有卡片下面那个**有名字的**出口；
        * 两个控件共用一个可访问名，念两遍，做的却是同一件事。
        */}
       <Pressable
@@ -168,34 +168,45 @@ export function SearchScreen({
         }}
         pointerEvents="box-none"
       >
-        <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: tokens['space.2'] }}>
-          <View style={{ flex: 1 }}>
-            {error !== null ? (
-              <Text
-                variant="row-meta"
-                tone="danger"
-                selectable
-                style={{ paddingBottom: tokens['space.2'] }}
-              >
-                {error}
-              </Text>
-            ) : null}
-            <SearchPanel
-              query={query}
-              onQueryChange={setQuery}
-              tasks={results.tasks}
-              notes={results.notes}
-              busyTaskId={busyTaskId}
-              onToggleTask={onToggleTask}
-              onOpenTask={onOpenTask}
-              labels={labels}
-              testID="mobile-search-panel"
-            />
-          </View>
-          <IconButton
-            icon="action.close"
-            label={t('mobile.search.close')}
-            color={tokens['color.foreground-muted']}
+        {error !== null ? (
+          <Text variant="row-meta" tone="danger" selectable style={{ paddingBottom: tokens['space.2'] }}>
+            {error}
+          </Text>
+        ) : null}
+        <SearchPanel
+          query={query}
+          onQueryChange={setQuery}
+          tasks={results.tasks}
+          notes={results.notes}
+          busyTaskId={busyTaskId}
+          onToggleTask={onToggleTask}
+          onOpenTask={onOpenTask}
+          labels={labels}
+          testID="mobile-search-panel"
+        />
+        {/**
+         * 出口放在卡片**下方**，不是右上角。
+         *
+         * 🔴 第一版把它做成右上角的 ✕，实测截图（`android-search-2-fixed-empty.png`）
+         * 里它与顶栏那个同步图标**落在同一格**（两者都是 `x∈[923,1038]`）——
+         * 卡片改成不透明之后遮罩底下仍有那半圈灰色图标透出来，
+         * 看上去是"同步被禁用了"。顶栏右半边**已经被占了**，
+         * 所以任何"浮层右上角的图标"都会跟它撞；换成文字出口、挪到卡片下面才不撞。
+         *
+         * ⚠️ 无障碍名仍是「关闭搜索」而不是「取消」：读屏里"取消"不说明取消了什么，
+         * 而这一层唯一可取消的事就是这次搜索。
+         */}
+        <View
+          style={{
+            flexDirection: 'row',
+            justifyContent: 'flex-end',
+            paddingTop: tokens['space.2'],
+          }}
+        >
+          <Button
+            tone="ghost"
+            label={t('mobile.common.cancel')}
+            accessibilityLabel={t('mobile.search.close')}
             onPress={close}
           />
         </View>
