@@ -40,7 +40,7 @@ import {
   type Task,
 } from '@heyta/domain';
 import { useI18n } from '@heyta/i18n';
-import { FocusPanel } from '@heyta/ui';
+import { FocusPanel, focusLogFailureMessageKey } from '@heyta/ui';
 import { createFocusActions, createTaskActions, type AppHost } from '@heyta/app-host';
 
 import { useText, useTokens } from '../theme';
@@ -229,10 +229,16 @@ export function FocusScreen(): React.JSX.Element {
    * `lib/focus-timer.ts` 是纯 store，拿不到 `t`，它只带**原因**（底层实现的
    * 原始文本，是数据）；句子来自词条表。反过来做的话英文界面会漏出中文。
    * 两条失败路径（落盘、打开本地库）各有自己的句子，别合并成一句含糊的。
+   *
+   * 🔴 落盘失败里能**认出码**的那三种（类型不认识 / 时长不是正数 / 缺产生时间）
+   * 走共用词条（`common.focus.error.*`，Web 端用的是同一条）—— 它们自己就说清了
+   * 原因，不该把内部诊断串摆给用户。认不出码的异常才带上 `{reason}`。
    */
+  const saveFailedKey =
+    focusLogFailureMessageKey(timer.error?.code) ?? 'mobile.focus.error.saveFailed';
   const errorText =
     timer.error !== undefined
-      ? t('mobile.focus.error.saveFailed', { reason: timer.error.reason })
+      ? t(saveFailedKey, { reason: timer.error.reason })
       : loadError !== null
         ? t('mobile.focus.error.openFailed', { reason: loadError })
         : undefined;

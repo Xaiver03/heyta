@@ -50,7 +50,12 @@ import {
   type FocusSession,
   type FocusState,
 } from '@heyta/domain';
-import { createFocusActions, type ActionContext } from '@heyta/app-host';
+import {
+  createFocusActions,
+  focusLogFailureCode,
+  type ActionContext,
+  type FocusLogFailureCode,
+} from '@heyta/app-host';
 
 import { currentState, dispatchIntent, onEngineChange } from '../../lib/oplog.js';
 import { loadFocusConfig, saveFocusConfig } from '../../lib/focus-config.js';
@@ -78,8 +83,12 @@ interface FocusStoreState {
    * 这个 store 拿不到 `t`，句子由 `FocusTimer` 用词条表拼出来。
    * 存成拼好的中文句子会让英文界面漏出一句中文
    * （与移动端 `apps/mobile/src/lib/focus-timer.ts` 同形）。
+   *
+   * `code` 是给界面的**可辨识部分**：`focus-actions` 的三条校验失败各有一个码，
+   * 界面据此说清"为什么没记上"（类型不认识 / 时长不是正数 / 缺产生时间）。
+   * 认不出来的异常没有码，只能落到那句带 `{reason}` 的通用句。
    */
-  error?: { reason: string };
+  error?: { code?: FocusLogFailureCode; reason: string };
 
   start: (taskId?: string) => void;
   pause: () => void;
@@ -229,7 +238,10 @@ async function runPersist(
   } catch (error: unknown) {
     stopTicking();
     set({
-      error: { reason: error instanceof Error ? error.message : String(error) },
+      error: {
+        code: focusLogFailureCode(error),
+        reason: error instanceof Error ? error.message : String(error),
+      },
     });
   }
 }

@@ -19,7 +19,12 @@ import { NodeSqliteDriver } from '@heyta/storage/sqlite/node';
 import { OpType, type Operation } from '@heyta/sync-core';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-import { createFocusActions, type FocusActions } from '../src/focus-actions.js';
+import {
+  createFocusActions,
+  FOCUS_LOG_FAILURE_CODES,
+  focusLogFailureCode,
+  type FocusActions,
+} from '../src/focus-actions.js';
 
 let adapter: SqliteAdapter;
 let engine: OpLogEngine;
@@ -146,19 +151,71 @@ describe('记录一次专注', () => {
   });
 });
 
+/**
+ * 取被拒绝的那个异常**本身**。
+ *
+ * 🔴 这里不用 `rejects.toThrow(/中文句子/)`：那种断言把**message 的措辞**钉成了契约，
+ * 于是"包里拼一句中文给人看"反而被测试保护住了。现在契约是**原因码**，
+ * message 只是日志用的诊断串（`code: 收到的值`），它不许进界面，所以也不许被当作文案钉住。
+ */
+async function rejectionOf(promise: Promise<unknown>): Promise<unknown> {
+  return promise.then(
+    () => {
+      throw new Error('预期这条写入被拒绝，但它成功了');
+    },
+    (error: unknown) => error,
+  );
+}
+
 describe('非法输入必须显式报错，不能静默入库', () => {
-  it('未知 kind', async () => {
-    await expect(actions.log(session({ kind: 'nap' as never }))).rejects.toThrow(/未知的专注类型/);
+  it('未知 kind → 原因码 unknown-kind', async () => {
+    const error = await rejectionOf(actions.log(session({ kind: 'nap' as never })));
+    expect(focusLogFailureCode(error)).toBe('unknown-kind');
   });
 
-  it('时长非正数', async () => {
-    await expect(actions.log(session({ plannedMs: 0 }))).rejects.toThrow(/必须为正数/);
-    await expect(actions.log(session({ plannedMs: -1 }))).rejects.toThrow(/必须为正数/);
-    await expect(actions.log(session({ plannedMs: Number.NaN }))).rejects.toThrow(/必须为正数/);
+  it('时长非正数 → 原因码 non-positive-planned-ms', async () => {
+    for (const plannedMs of [0, -1, Number.NaN]) {
+      const error = await rejectionOf(actions.log(session({ plannedMs })));
+      expect(focusLogFailureCode(error), `plannedMs=${String(plannedMs)}`).toBe(
+        'non-positive-planned-ms',
+      );
+    }
   });
 
-  it('缺 createdAt', async () => {
-    await expect(actions.log(session({ createdAt: 0 }))).rejects.toThrow(/createdAt/);
+  it('缺 createdAt → 原因码 missing-created-at', async () => {
+    const error = await rejectionOf(actions.log(session({ createdAt: 0 })));
+    expect(focusLogFailureCode(error)).toBe('missing-created-at');
+  });
+
+  it('🔴 message 里一个汉字都不许有 —— 它是诊断串，不是文案', async () => {
+    const failures = [
+      session({ kind: 'nap' as never }),
+      session({ plannedMs: 0 }),
+      session({ createdAt: 0 }),
+    ];
+    for (const input of failures) {
+      const error = await rejectionOf(actions.log(input));
+      const message = String((error as Error).message);
+      expect(message, `这句会渗进界面：${message}`).not.toMatch(/[\u3400-\u9fff]/u);
+    }
+  });
+
+  it('原因码是封闭集合 —— 加一个码就得同时改 ui 的映射与两份词条', () => {
+    expect([...FOCUS_LOG_FAILURE_CODES].sort()).toEqual([
+      'missing-created-at',
+      'non-positive-planned-ms',
+      'unknown-kind',
+    ]);
+  });
+
+  it('不是校验失败的异常 → undefined，界面走兜底句', () => {
+    // 旧契约的中文整句：必须**认不出来**，否则"永远绿的判据"就回来了
+    expect(focusLogFailureCode(new Error('未知的专注类型: nap'))).toBeUndefined();
+    // name 对但码不在封闭集合里
+    expect(
+      focusLogFailureCode({ name: 'FocusLogValidationError', code: 'made-up' }),
+    ).toBeUndefined();
+    expect(focusLogFailureCode(undefined)).toBeUndefined();
   });
 
   it('报错的那几次**一条 op 都不该留下**', async () => {

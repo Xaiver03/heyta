@@ -18,7 +18,7 @@
 import { useEffect, useState } from 'react';
 import { cssVar } from '@heyta/design-system';
 import { useI18n, type MessageKey } from '@heyta/i18n';
-import { FocusPanel } from '@heyta/ui';
+import { FocusPanel, focusLogFailureMessageKey } from '@heyta/ui';
 
 import { useTaskStore } from '../tasks/store.js';
 import {
@@ -215,6 +215,18 @@ export function FocusTimer() {
       ? t('web.focus.completedTodayOne', { count: focus.completedToday })
       : t('web.focus.completedToday', { count: focus.completedToday });
 
+  /**
+   * 落盘失败要说的句子。
+   *
+   * `focus-actions` 的三条校验失败各有自己的**共用词条**（"类型不认识" /
+   * "计划时长必须大于 0" / "缺少产生时间"），它们自成一句话说清了原因，
+   * 所以不再把内部诊断串（`unknown-kind: nap`）摆给用户看。
+   * 认不出来的异常（派发失败、库写不进去）没有码，只能落到那句带 `{reason}` 的
+   * 通用句 —— 那种情况下原始文本是唯一线索，留着比编一句假话好。
+   */
+  const saveFailedKey =
+    focusLogFailureMessageKey(focus.error?.code) ?? 'web.focus.error.saveFailed';
+
   return (
     <div
       style={{
@@ -249,7 +261,7 @@ export function FocusTimer() {
           completed: completedText,
           ...(focus.error === undefined
             ? {}
-            : { error: t('web.focus.error.saveFailed', { reason: focus.error.reason }) }),
+            : { error: t(saveFailedKey, { reason: focus.error.reason }) }),
         }}
         onStart={() => {
           focus.start(focus.state.taskId);

@@ -112,3 +112,48 @@ export function focusDisplayText(state: FocusState, now: number): string {
 export function focusRoundLengthMs(kind: FocusSessionKind, config: FocusConfig): number {
   return focusDurationMs(kind, config);
 }
+
+/* ========================================================================
+ * 专注记录**写入校验失败**：码 → 共用词条 key
+ * ====================================================================== */
+
+/**
+ * 校验失败码 → 词条 key（**唯一一份**）。
+ *
+ * 形状照 `packages/ui/src/auth/model.ts`：这里**不 import `@heyta/i18n`**
+ * （会拖进第二份 React，见该文件头），也不 import `@heyta/app-host`
+ * （会给 `packages/ui` 加一个它现在没有的依赖）。码按**字符串**收，
+ * key 的正确性由宿主侧 `t()` 的 `MessageKey` 类型在编译期校验。
+ *
+ * 生产者在那一侧：`packages/app-host/src/focus-actions.ts` 的
+ * `FocusLogValidationError` / `focusLogFailureCode()`。
+ * 🔴 两边一起改 —— 那里加一条码，这里必须加一项，否则界面落到兜底句，
+ * 而兜底句不带那条码的具体原因（用户只知道"没保存上"）。
+ */
+export type FocusLogFailureMessageKey =
+  | 'common.focus.error.unknownKind'
+  | 'common.focus.error.nonPositivePlanned'
+  | 'common.focus.error.missingCreatedAt';
+
+/**
+ * 码 → key。
+ *
+ * ⚠️ **查不到回 `undefined` 而不是兜到某一条**：调用方的 `catch` 收到的
+ * 大多数异常**不是**校验失败（派发失败、存储写不进去、计时器给了脏值），
+ * 那些情况该说的是那句通用的「保存失败：{reason}」，而不是硬编成
+ * "类型不认识"。这与 `syncFailureMessageKey` 同形，与
+ * `authFailureMessageKey`（封闭集合、必须有落点）**不同形**，区别就在这里：
+ * 认证那边拿的是一个**已知的**失败原因，这边拿的是一个**未知的**异常。
+ */
+const FOCUS_LOG_FAILURE_MESSAGE_KEY: Record<string, FocusLogFailureMessageKey> = {
+  'unknown-kind': 'common.focus.error.unknownKind',
+  'non-positive-planned-ms': 'common.focus.error.nonPositivePlanned',
+  'missing-created-at': 'common.focus.error.missingCreatedAt',
+};
+
+/** 校验失败码 → 共用词条 key；不是校验失败就回 `undefined`。 */
+export function focusLogFailureMessageKey(
+  code: string | undefined,
+): FocusLogFailureMessageKey | undefined {
+  return code === undefined ? undefined : FOCUS_LOG_FAILURE_MESSAGE_KEY[code];
+}

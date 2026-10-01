@@ -18,6 +18,13 @@
  *   3. **en 词条不许含中文** —— 防止把中文复制过去当英文交差。
  *      这条只能靠机器：人眼扫过两栏相同的文字，很容易以为"还没翻"而不是"翻错了"。
  *   4. **两份词条的 key 集合必须一致** —— 漏翻译必须在门禁上红。
+ *   5. **诊断字段不许装句子。** 已迁移应用里 `reason:` / `detail:` / `cause:`
+ *      的字符串字面量**不能含中文**。它不是给用户看的文案，而是**塞进已翻译句子里的参数**
+ *      （`t('…saveFailed', { reason })` → 「Could not save the focus record: 未知的专注类型」）。
+ *      上面那三条 pass 看不见它：候选只来自 JSX 属性与 JSX 裸文本节点，
+ *      而 `.ts` 里 `return { reason: '不是安全上下文' }` 这种**对象字面量的值**根本不在视野里。
+ *      这正是 P1-4 修掉的那一类泄漏（推送的 17 处 + 专注的校验异常），
+ *      所以规则要钉在**形状**上而不是钉在那两个文件上：下一个壳再写一句中文原因，一样会红。
  *
  * 这不是"放宽"，是"换了个更值钱的契约"：原来只保证"是中文"，
  * 现在保证"没有硬编码"且"两种语言都真翻了"。
@@ -315,6 +322,18 @@ function literalsInBraces(src, openBraceIndex) {
 const JSX_TEXT = /(?<!=)>[ \t]*([^<>{}()[\];=?!|&"'\`\n][^<>{}()[\];=?!|&"'\`\n]*?)[ \t]*</g;
 
 /**
+ * 规则 5 的候选：**诊断字段**的字面量值。
+ *
+ * `reason` / `detail` / `cause` 这三个名字的约定是全仓库统一的：
+ * **码进界面，句子进日志**。反过来说，只要这里出现一句中文，它就一定是**要渗进界面的参数**
+ * —— 壳层那句已经翻译好的「Could not save the record: {reason}」会把它原样插进去。
+ *
+ * 引号用**反向引用**配对（`(["'\`])…\1`），否则 `'它说"不行"'` 会在第一个非引号处提前收尾。
+ * 模板字面量里的 `${...}` 原样收下，交给 `stripTemplateExpressions` 处理（与其余 pass 同一条边界）。
+ */
+const DIAG_PROPS = /\b(?:reason|detail|cause)\s*:\s*(["'`])((?:[^"'`\\]|\\.)*)\1/g;
+
+/**
  * 允许出现在用户文案里的拉丁串。
  *
  * 刻意很短 —— 每加一条都要问"用户真的需要看到这个英文吗"。
@@ -528,6 +547,8 @@ const violations = [];
 let scanned = 0;
 let strings = 0;
 let migratedStrings = 0;
+/** 规则 5 看到的诊断字段字面量数（`reason` / `detail` / `cause`）。 */
+let diagStrings = 0;
 
 // ── 先查词条表本身（规则 2/3/4）────────────────────────────────
 const catalogResult = checkCatalogs();
@@ -654,6 +675,30 @@ for (const { dir: relRoot, migrated, migratedFiles } of ROOTS) {
         fix: '改成中文；或把它迁移到 packages/i18n 的词条表（整个应用迁完就把该根加进 MIGRATED；大应用在被别的分支同时改时，可以先把这一个文件加进该根的 migratedFiles）。',
       });
     }
+
+    // ── 规则 5：诊断字段不许装句子（只在已迁移的文件上跑）────────
+    //
+    // 三种旧 pass 都看不到 `.ts` 里对象字面量的值，而那一整类泄漏的落点就是这里
+    // （`{ reason: '不是安全上下文' }` → 壳层 `t('…', { reason })` → 英文界面露中文）。
+    // 判据与旧契约**方向相反**：旧契约拦"没有汉字"，这条拦"有汉字"。
+    // 未迁移的应用不跑这条 —— 那边整句中文本来就是现状，跑了指向的是同一个
+    // 已经存在的红灯，只会把真正该看的那两条淹掉。
+    if (fileMigrated) {
+      DIAG_PROPS.lastIndex = 0;
+      let diag;
+      while ((diag = DIAG_PROPS.exec(src)) !== null) {
+        diagStrings += 1;
+        const text = stripTemplateExpressions(diag[2]).trim();
+        if (!CJK.test(text)) continue;
+        const line = src.slice(0, diag.index).split('\n').length;
+        violations.push({
+          where: `${rel}:${String(line)}`,
+          text,
+          why: '诊断字段里写了一整句中文 —— 它是 `{reason}` / `{detail}` 的参数，会原样渗进已翻译的句子，英文界面就露出半句中文',
+          fix: '换成封闭集合的原因码（如 `insecure-context`），句子写进 packages/i18n 的中英两份表；确需带出的原始值（HTTP 状态、收到的字符串）当 vars 传，别拼成中文句子。',
+        });
+      }
+    }
   }
 }
 
@@ -666,7 +711,8 @@ if (violations.length === 0) {
   if (stagedFiles.length > 0) parts.push(`逐文件迁移 ${String(stagedFiles.length)} 个（apps/web/src）`);
   const mode = parts.length === 0 ? '全部按旧契约（中文）检查' : `${parts.join('；')}；其余按旧契约（中文）`;
   console.log(
-    `✅ 文案合规（扫描 ${String(scanned)} 个文件、${String(strings)} 处文案；` +
+    `✅ 文案合规（扫描 ${String(scanned)} 个文件、${String(strings)} 处文案、` +
+      `${String(diagStrings)} 处诊断字段；` +
       `词条表 zh ${String(catalogResult.zhCount)} 条 / en ${String(catalogResult.enCount)} 条；${mode}）。`,
   );
   process.exit(0);
