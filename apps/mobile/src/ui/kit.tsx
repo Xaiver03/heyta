@@ -231,7 +231,20 @@ export function Screen({
 }): React.JSX.Element {
   const t = useTokens();
   const body = (
-    <View style={{ paddingHorizontal: t['screen.gutter'], gap: t['space.4'] }}>
+    /**
+     * 🔴 `flexGrow: 1` 是**共享层那条"铺满"契约在这端的落地**（R2 / 类 C）。
+     *
+     * `QuadrantBoard` 自己声明了 `flexGrow`，但 `ScrollView` 的 content container
+     * **高度由内容决定** ⇒ 那一层拿不到剩余空间，`flexGrow` 就什么都分配不到
+     * （和 web 上"内容列是块容器"是同一个断点的 RN 面目）。
+     * 标准解法是**两层都声明**：content container 先长到视口高，body 再长满它。
+     *
+     * ⚠️ 视觉效果对**内容已经比一屏高**的屏是零变化（没有剩余空间可分，
+     * 且 RN 的 `View` 默认 `flexShrink: 0` ⇒ 不会被压），多余空间只会落在
+     * 最后一个子节点之后（`justifyContent` 默认 `flex-start`）—— 所以这不是
+     * "给所有屏加了一条高度约束"，只是把"母层给不给确定高度"这一环补上。
+     */
+    <View style={{ paddingHorizontal: t['screen.gutter'], gap: t['space.4'], flexGrow: 1 }}>
       {children}
       <View style={{ height: t['screen.bottom-inset'] }} />
     </View>
@@ -243,7 +256,7 @@ export function Screen({
       {scroll ? (
         <ScrollView
           style={{ flex: 1 }}
-          contentContainerStyle={{ paddingTop: t['space.4'] }}
+          contentContainerStyle={{ paddingTop: t['space.4'], flexGrow: 1 }}
           keyboardShouldPersistTaps="handled"
         >
           {body}

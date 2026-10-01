@@ -478,6 +478,78 @@ main.ht-main           display:flex   height 720   overflow visible   ← 有确
    这一对专门用来证明**两层都承重** —— 只写一条判据会漏掉其中一层，
    而漏掉的那层正是"下次有人把它改回去时没人报警"的那层。
 
+### 3.2 这一刀的代价：内容列上**九个面**的前后对照（2026-10-01，同一支探针、同一视口 1280×720）
+
+上面那条 ⚠️ 说"必须同时扫一遍内容列上的全部面"，这里就是那张表。
+左边是**改前**实测，右边是**改后**（`.ht-content` 变成 flex 列之后）：
+
+| 面 | 内容列高 改前 → 改后 | 谁在滚（改前 → 改后） | 直接子项高度 改前 → 改后 |
+|---|---|---|---|
+| 任务 | 664 → 664 | document → document | `44 + 91.5 + 229` → 完全相同 |
+| 日历 | 788 → 788 | document → document | `740` → `740` |
+| **四象限** | 664 → 664 | document → document | **`458` → `616`**（板子长起来了，这就是修的目标） |
+| 习惯 | 664 → 664 | document → document | `56` → `56` |
+| 时间线 | 664 → 664 | document → document | `151` → `151` |
+| 回收站 | 664 → 664 | document → document | `265` → `265` |
+| 便签 | 664 → 664 | document → document | `102` → `102` |
+| 成长 | 1494 → 1494 | document → document | `1446` → `1446` |
+| 番茄钟 | 708 → 708 | document → document | `660` → `660` |
+
+⇒ **九格里只有四象限变了**，其余八面一格不差。原来担心的"块间距不再塌陷合并 ⇒ 别的面会变挤"
+没有发生，机制也量清了：**内容列上只有一个面声明过外边距**（`.ht-ai-panel` 的 `margin-top: 16px`），
+它的邻居是 0 ⇒ 块布局下本来就没有可塌陷的东西。
+⚠️ 但这条性质**不再自动成立**（flex 列把相邻外边距**相加**），所以它写进了
+`app.css:575` 那条"距离只由上面那块声明一次"的规则里，而不是留在记忆里。
+
+📌 **顺带记下 R2 没有吃掉的那一格**：任务面的子项之和是 `364.5`，内容列 `664` ——
+下面仍然空着一屏的一半。这一格**不在这里顺手改**，因为"任务列表铺满"要连着
+**空态**一起设计（空列表长满一屏 vs 空态居中是两件事），而那正是 **#10 收集箱重做**的范围。
+把它留在这里是为了让 #10 接手时知道：**传播链已经通了，缺的只是列表自己声明 `flexGrow`**。
+
+### 3.3 已交付的修法（三处，缺一不可）与桌面载荷判据结果
+
+| 层 | 文件 | 那一刀 |
+|---|---|---|
+| 共享层 | `packages/ui/src/quadrant/QuadrantBoard.tsx` `board`/`row`/`stack` | `flexGrow: 1, flexShrink: 0, flexBasis: 'auto'` —— **"只长不缩"** |
+| Web 宿主 | `apps/web/src/styles/app.css` `.ht-content` | `display: flex; flex-direction: column`（把确定高度传成弹性基准） |
+| RN 宿主 | `apps/mobile/src/ui/kit.tsx` `Screen` | 内层 `View` 与 `ScrollView.contentContainerStyle` **两处**都 `flexGrow: 1` |
+
+🔴 为什么是"只长不缩"而不是 `flex: 1`：`flex: 1` 展开成 `1 1 0%`，允许收缩 ⇒ 任务一多，
+格子被压到 `minHeight` 以下，那是**另一种看不见**。`flexShrink: 0` 让内容长过视口时
+**把列撑高、交给唯一的滚动所有者去滚**（宽屏 = 文档，窄窗 = `main`）。
+
+**判据**：`e2e/tests/quadrant-fill.spec.ts`（5 条，桌面载荷，**5/5 绿**）。
+阈值全部从 `:root` 的 token 推导（`--ht-layout-quadrant-min-height` / `--ht-layout-two-column-min`），
+没有一个写死的 192 / 768。
+
+| 判据 | 断言 | 证据（人已看） |
+|---|---|---|
+| 1 传播链 | 内容列 `display:flex` + `flex-direction:column` + `grow≥1`；board/row `grow≥1` 且 **`shrink===0`**；格子 `minHeight>0`；链上任何一层都不许是 `flex:0 0 auto` | `apps/web/evidence/quadrant-fill/chain-800.png` |
+| 2 三档视口 | 板子高 ≥ 内容列内高 **90%**；四格等高（差 ≤1px）；两格宽之和 > 板子内宽 90% | `fill-800/1000/1200.png` |
+| 3 窄窗单列 | 每格 ≥ token 高；**"该滚的能滚" + "滚到底看得见最后一格"** | `narrow-top.png` / `narrow-single-column.png` |
+
+**变异验证（m5/m6）—— 这一对的结果正是本节预言的形状**：
+
+| 变异 | 结果 | 说明 |
+|---|---|---|
+| m5 共享层 `board.flexGrow: 1 → 0` | 判据 1 红 + 判据 2 **三条全红**（占 65.8% / 51.1% / 41.8%）；判据 3 仍绿 | 视口越高漏得越多 = "高度由内容决定"的签名。判据 3 绿是**对的**：单列本来就不靠 grow |
+| m6 宿主删掉 `flex-direction: column` | **只有判据 1 红**，判据 2/3 全绿 | 🔴 这就是"只测板子够不够高会假绿"的实证：`display:flex` 行向 + `align-items:stretch` 仍然把板子拉到满高 —— **宿主那一刀只有传播判据抓得住** |
+
+⚠️ **m5 第一次跑出来是"五条全绿"，那是假的**：变异脚本在 `e2e/` 目录下执行
+`pnpm --filter @heyta/ui build`，而 `e2e/` 刻意不在 pnpm 工作区内 ⇒ pnpm 打印
+"No projects matched the filters" 并**退出 0**，变异根本没进 bundle。
+⇒ 变异脚本现在自带**阳性对照**（改完必须能在 `packages/ui/dist/index.js` 里读到那行 `flexGrow: 0`，
+读不到就报"这次运行不作数"并还原）。**"变异不被判据抓住"和"变异没生效"在输出上长得一模一样**，
+这是元规则"先怀疑探针"的第六种面目。
+
+### 3.4 缺口 G2：R2 的 **RN / Android 载体还没有建**
+
+`kit.tsx` 那一刀目前**只有代码，没有真机判据** —— 桌面载荷的五条绿**不能**代替它
+（AGENTS §6.2 规定一 + 本文"证据的载体"一节）。已登记，下一步补
+`scripts/verify-mobile-quadrant-fill.sh`（判据：四象限屏上最后一格的底边在屏内、
+格子高度 ≥ `quadrant-min-height` 换算 dp、板子底边 ≥ 屏高 ⇒ 说明在滚而不是被裁）。
+在它跑绿之前，R2 的状态是 🟡 而不是 ✅。
+
 ---
 
 ## 4. R3 · 默认中文 + 测试数据不许是 `B-mac-*`
