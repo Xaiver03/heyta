@@ -81,23 +81,30 @@ test('搜索：贴顶浮层透出下层视图 + 顶栏没有第二个框 + 面�
   const card = surface.locator('> *').first();
   const box = await card.boundingBox();
   expect(box, '浮层卡片有几何').not.toBeNull();
-  const contentBox = await page.locator('.ht-content').boundingBox();
-  expect(contentBox, '内容区有几何').not.toBeNull();
+  const surfaceBox = await surface.boundingBox();
+  expect(surfaceBox, '浮层有几何').not.toBeNull();
 
   // ④ 宽度：不得超过 modal-max（640px + 2px 容差）。
   expect(box!.width, '卡片宽度不得超过 modal-max（铺满就是假浮层）').toBeLessThanOrEqual(642);
-  // ⑤ 水平居中基准是**内容区**（rail/侧栏照常透出），不是视口 —— 对视口会差出 rail 宽的一半。
-  const centeredDelta = Math.abs(box!.x + box!.width / 2 - (contentBox!.x + contentBox!.width / 2));
-  expect(centeredDelta, '卡片必须在内容区内水平居中').toBeLessThanOrEqual(8);
+  // ⑤ 水平居中基准是**浮层自己**，不是 `.ht-content`。
+  //    🔴 2026-10-01 契约变更（不是把阈值放宽）：浮层从 `absolute` 改成 `fixed` ——
+  //    它原先嵌在内容列里，而内容列的高度 = 整个列表（量到 2365px），于是
+  //    `autoFocus` 一触发，浏览器就把"卡片顶部"当成目标滚进了视野 ⇒ **⌘K 打开 = 页面跳回顶部**。
+  //    改成 `fixed` 之后浮层的包含块就是视口（这也是 macOS Spotlight / Linear / Notion 的做法：
+  //    聚焦搜索盖在**整屏**上，靠屏幕上方，不是靠某个栏目），基准跟着换是必然的。
+  //    ⚠️ 仍**不写死** 1440 / 视口宽这类数：从浮层自己的盒推，所以换视口宽度不会假红；
+  //    而把 `justify-content: center` 拿掉（flex 默认 `flex-start`）卡片会钉在左边 ⇒ 红。
+  const centeredDelta = Math.abs(box!.x + box!.width / 2 - (surfaceBox!.x + surfaceBox!.width / 2));
+  expect(centeredDelta, `卡片必须在浮层内水平居中（实测偏 ${centeredDelta.toFixed(1)}）`).toBeLessThanOrEqual(8);
 
   // ⑥ 🔴 贴顶。**三条各自独立、且都与卡片的高度无关** ——
   //    第一版把"上隙 < 卡片高"当非空洞化界，结果 `aspect-ratio` 一拿掉它就先红，
   //    比例那条判据根本没被执行到（变异验证把这件事照出来了）。
-  const topGap = box!.y - contentBox!.y;
-  const bottomGap = contentBox!.y + contentBox!.height - (box!.y + box!.height);
+  //    🔴 基准同样从内容区换成浮层：内容列比视口高，拿它算"下隙"会把滚动条以下的
+  //    空白也算进余量 —— 那样"贴顶"在页面跳回顶部时反而更容易成立。
+  const topGap = box!.y - surfaceBox!.y;
+  const bottomGap = surfaceBox!.y + surfaceBox!.height - (box!.y + box!.height);
   const padTop = await surface.evaluate((el) => parseFloat(getComputedStyle(el).paddingTop));
-  const surfaceBox = await surface.boundingBox();
-  expect(surfaceBox, '浮层有几何').not.toBeNull();
   // ⅰ 那条 padding 本身不能把卡片推离顶部（阈值从**浮层自己的高度**推，不看卡片）
   expect(
     padTop,
@@ -229,5 +236,57 @@ test('🔴 真键盘：⌘K 开 → 输入 → ↓ 高亮并滚进视野 → ↵
   await expect(page.getByTestId('search-panel-input')).toBeFocused();
   await page.keyboard.press('Meta+k');
   await expect(surface, '⌘K 关（与 Esc 同一个出口）').toHaveCount(0);
+  // ⑧ 开/关浮层都不许把页面滚走。🔴 探针量出来的因果链不是"焦点"：浮层挂在一根
+  //    **和列表一样高**的内容列里（docScrollHeight 2365），写成 `position: absolute`
+  //    时卡片钉在**文档顶部**而不在看见的那一屏，输入框的 `autoFocus` 于是把整页
+  //    滚回 0（打开前 scrollY=1465 → 打开后 0）。改成 `fixed` 后这一条才成立。
+  await expect(
+    page.locator(`[data-testid="task-item-${targetId}"]`),
+    '⌘K 关掉之后，刚打开的那一行必须**还**在屏幕上',
+  ).toBeInViewport();
   await page.screenshot({ path: 'test-results/search-spotlight-after.png', fullPage: false });
+});
+
+/**
+ * 🔴 焦点归位：关掉浮层后焦点要回到**打开它的那个控件**。
+ *
+ * 这条在真浏览器里此前**从来没成立过**，而 jsdom 那组没有覆盖它：
+ * 记录触发器的那个 effect 跑在面板 `autoFocus` **之后**，读到的 `activeElement`
+ * 是浮层自己的输入框 —— 它随浮层一起卸载，于是"还回去"落在一个不存在的节点上，
+ * 实测 `document.activeElement` 停在 `BODY`（下一次 Tab 从页首重新数）。
+ *
+ * 判据故意把 composer 挤到**屏幕外**：composer 住在列表上方，页面滚下去之后，
+ * 裸 `focus()` 会把它滚回视野 ⇒ 这一条同时钉住"还焦点"和"还焦点不许顺手滚页"。
+ */
+test('关掉搜索后焦点回到开它的那个框，且不许把页面滚回顶部', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto(APP_URL);
+  const composer = page.getByTestId('capture-input');
+  for (let i = 0; i < 30; i += 1) await addTask(page, `焦点归位 ${i + 1}`);
+  // 🔴 真点一下 composer 再滚：探针实测**提交之后焦点不在 composer 上**
+  //（Enter 交完就交出去了），拿那条当"触发器"会测到 null → 兜底，量不到这一支。
+  await composer.click();
+  await page.evaluate(() => window.scrollTo(0, 1200));
+  await page.waitForTimeout(150);
+  await expect(composer, '前提：触发器就是 composer').toBeFocused();
+  await expect(
+    composer,
+    '前提：composer 已经在屏幕外（否则"不许滚页"这条永远通过）',
+  ).not.toBeInViewport();
+
+  await page.keyboard.press('Meta+k');
+  const surface = page.getByTestId('search-overlay-surface');
+  await expect(surface, '⌘K 打开').toBeVisible();
+  await expect(
+    composer,
+    '开着浮层时页面不许跳回顶部（`fixed` 的判据）',
+  ).not.toBeInViewport();
+
+  await page.keyboard.press('Escape');
+  await expect(surface, 'Esc 关掉').toHaveCount(0);
+  await expect(composer, '焦点必须回到开它的那个框，而不是丢在 BODY 上').toBeFocused();
+  await expect(
+    composer,
+    '还焦点不许顺手把页面滚回去（`focus({ preventScroll })` 的判据）',
+  ).not.toBeInViewport();
 });
