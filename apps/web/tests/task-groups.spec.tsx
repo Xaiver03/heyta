@@ -7,7 +7,9 @@
  * 1. **分组真的发生**：逾期 / 今天 / 无截止时间各成一组，组头带组内计数；
  * 2. **「顺延」真的走 op-log**：点它之后逾期任务**挪到今天组** ——
  *    而不是只把组头藏起来（那会让用户以为任务丢了）；
- * 3. **「已完成」不分组**：完成时间不是截止时间，日期组头对它是误导。
+ * 3. **「已完成」不分组**：完成时间不是截止时间，日期组头对它是误导；
+ * 4. **组头折叠接的是宿主的态**：点了真的收起（行离开 DOM、计数留下），
+ *    且点动作槽**不会**连带把组收起（一次点击一件事）。
  *
  * ## 🔴 为什么探针是"数勾选框"，不是"找标题文本"
  *
@@ -191,5 +193,81 @@ describe('任务列表的日期分组头', () => {
       '已完成列表不该出现日期组头',
     ).toBeNull();
     expect(el.querySelector('[data-testid="task-list"]'), '列表本体仍在').not.toBeNull();
+  });
+
+  /*
+   * 组头折叠（滴答参照图 #10(c)）。
+   *
+   * 🔴 这里钉的是**宿主接线**，不是共享组件的皮：`TaskGroupHead` 收不收起
+   * 由 `collapse` 决定，而"点一下到底发生了什么"完全在 `App.tsx` 那一份
+   * `collapsedGroups` 里。只测共享组件的话，宿主传一个常量 `collapsed: false`
+   * 也能让组件级测试全绿 —— 界面上就是"组头有个箭头，点了没反应"。
+   */
+  describe('组头折叠', () => {
+    it('🔴 点组头收起：任务行**离开 DOM**，组头与计数照旧在；再点回来', async () => {
+      useTaskStore.setState({ entities: emptyState(), filter: { kind: 'all' } });
+      await act(async () => {
+        await useTaskStore.getState().addTask('没日期的甲');
+        await useTaskStore.getState().addTask('没日期的乙');
+      });
+
+      const el = await mountApp();
+      const head = el.querySelector<HTMLElement>('[data-testid="task-group-undated-head"]')!;
+      const toggle = el.querySelector<HTMLElement>(
+        '[data-testid="task-group-undated-head-toggle"]',
+      )!;
+      expect(rowsOf(el, 'task-group-undated'), '展开时两条都在').toHaveLength(2);
+      expect(toggle.getAttribute('aria-expanded'), '初始是展开态').toBe('true');
+
+      await act(async () => {
+        toggle.click();
+      });
+      // 🔴 列表**整棵离开 DOM**，不是隐藏：留在树里读屏还得逐条念完看不见的那几行。
+      expect(el.querySelector('[data-testid="task-list-undated"]'), '收起后列表不该还在树里')
+        .toBeNull();
+      expect(rowsOf(el, 'task-group-undated'), '收起后不该数出任务行').toEqual([]);
+      // 组头本身与它的计数**必须留下** —— 那正是"要不要展开来看"的决策依据。
+      expect(head.textContent, '组头不该跟着消失').toContain('无截止时间');
+      expect(head.textContent, '收起时计数照旧（折叠不是掩耳盗铃）').toContain('2');
+      expect(toggle.getAttribute('aria-expanded'), '收起后状态要说得出').toBe('false');
+
+      await act(async () => {
+        toggle.click();
+      });
+      const back = rowsOf(el, 'task-group-undated');
+      expect(back, '再点回来两条都在').toHaveLength(2);
+      expect(back).toContain('完成：没日期的甲');
+      expect(back).toContain('完成：没日期的乙');
+      expect(toggle.getAttribute('aria-expanded')).toBe('true');
+    });
+
+    it('🔴 一次点击一件事：点「顺延」只挪日期，**不会**把这一组连带收起', async () => {
+      useTaskStore.setState({ entities: emptyState(), filter: { kind: 'all' } });
+      await act(async () => {
+        await useTaskStore
+          .getState()
+          .addTask('该顺延的', { dueDate: startOfDay(Date.now()) - DAY + NINE_AM });
+      });
+
+      const el = await mountApp();
+      const toggle = el.querySelector<HTMLElement>(
+        '[data-testid="task-group-overdue-head-toggle"]',
+      )!;
+      const button = el.querySelector<HTMLButtonElement>('[data-testid="task-group-postpone"]')!;
+
+      await act(async () => {
+        button.click();
+      });
+      // 动作槽是组头的**同级**而不是后代 —— 嵌进去时这一次点击会同时命中外层
+      // 按钮，「顺延」就把组收起来了（而收起来的组看着像"任务丢了"）。
+      // ⚠️ 这里必须在 op 落库链走完**之前**判：那条任务挪走后逾期组整个消失，
+      // 节点脱离 DOM，`aria-expanded` 就读不出真话了。
+      expect(toggle.getAttribute('aria-expanded'), '点「顺延」不该连带收起').toBe('true');
+      expect(rowsOf(el, 'task-group-overdue'), '点「顺延」不该连带收起（行还在）').toEqual([
+        '完成：该顺延的',
+      ]);
+
+      await waitForState(() => el.querySelector('[data-testid="task-group-overdue"]') === null);
+    });
   });
 });
