@@ -165,9 +165,17 @@ const USAGE = `heyta node-host —— 非 Web 宿主（真实 SQLite + 真实同
 命令：
   add <标题> [--due 2026-10-05]  创建一个任务（--due 是**本地日期**）
   list [--all]              列出任务（默认只列未完成）
+  trash                     列出回收站里的任务（有墓碑且未彻底删除）
+                            🔴 remove 与 purge 都会让 list 变空，没有这条
+                            就区分不开"进了回收站"和"彻底删掉"——判据会在只做了
+                            前者时照样绿
   rename <id> <标题>        改标题
   complete <id>             标记完成
   reopen <id>               取消完成
+  remove <id>               软删除（DEL op ⇒ 墓碑，进回收站）
+  purge <id>                彻底删除（只能对已软删除的条目；回收站里也不再可见）
+                            🔴 这两条是给**取证探针收尾**用的：没有删除通道，
+                            探针写进真实库的任务就永远留在用户看得见的界面上
   sync                      与真实服务端同步一次
   pending                   打印待上传队列长度
   projects                  列出清单
@@ -297,6 +305,31 @@ async function main(): Promise<number> {
         return 0;
       }
 
+      case 'trash': {
+        const trashed = host.listTrashed();
+        if (json) {
+          out(
+            JSON.stringify({
+              ok: true,
+              command: 'trash',
+              tasks: trashed.map((task) => ({
+                id: task.id,
+                title: task.title,
+                deletedAt: task.deletedAt ?? null,
+                purgedAt: task.purgedAt ?? null,
+              })),
+            }),
+          );
+        } else if (trashed.length === 0) {
+          out('（回收站为空）');
+        } else {
+          for (const task of trashed) {
+            out(`${task.title}  (${task.id})`);
+          }
+        }
+        return 0;
+      }
+
       case 'projects': {
         const projects = host.listProjects();
         if (json) {
@@ -354,6 +387,19 @@ async function main(): Promise<number> {
         await host.setCompleted(id, command === 'complete');
         if (json) out(JSON.stringify({ ok: true, command, id }));
         else out(`${command === 'complete' ? '已完成' : '已重新打开'} ${id}`);
+        return 0;
+      }
+
+      case 'remove':
+      case 'purge': {
+        const id = positionals[0];
+        if (id === undefined) throw new Error(`${command} 需要 <id>`);
+        // 语义全在 `@heyta/app-host`（remove 发 DEL op；purge 只接受已软删除的条目，
+        // 对活着的任务会抛错）—— 本壳不判断，只递参数。
+        if (command === 'remove') await host.removeTask(id);
+        else await host.purgeTask(id);
+        if (json) out(JSON.stringify({ ok: true, command, id }));
+        else out(`${command === 'remove' ? '已软删除（进回收站）' : '已彻底删除'} ${id}`);
         return 0;
       }
 
