@@ -346,6 +346,16 @@ aria-label={label}
    `0.5b` 那 9 次不是被推翻的反例，而是"探针不够格"的样本 ——
    下次复核要挑一个连"只输出 `- ` 条目"都稳定的模型。
 
+   ✅ **上面两组数字不是一个跑完就丢的临时探针**：判据已收进
+   `scripts/verify-ai-output-language.mjs`（第 1 步双向钉 —— en 含汉字必须 = 0、
+   zh-CN 必须全是汉字，**只测一边会被"永远中文"的实现骗过**；第 2 步就是那条线级变异）。
+   复跑：`HEYTA_AI_LIVE_CONFIG=/tmp/heyta-ai-lang/provider.json node scripts/verify-ai-output-language.mjs`
+   ⇒ 实测 **7/7、exit 0**；**它自己也被变异验过**：把 `outputLanguageDirective` 里
+   `OUTPUT_LANGUAGE_DIRECTIVE[locale]` 改成写死的 `["zh-CN"]`（语言与界面脱钩）⇒
+   **恰好 3 条红**（en 那三次）、zh-CN 与对照 4 条照常绿、exit 1；无配置时打印"跳过"并 **exit 0**。
+   ⚠️ **没有登记 pnpm 别名**：根 `package.json` 此刻是另一条会话的未提交批次，
+   为一行别名去 partial-commit 一个热文件不值得 —— 命令照上面这样跑。
+
    ✅ **顺带修掉的**（同一笔提交 `ea7344f7`）：`verify-ai-breakdown-live.mjs` 与
    `verify-ai-preferences-live.mjs` 把目的地写成死的 `'user-endpoint'`，
    现在改成用产品自己的 `classifyDestination` / `requiresEgressConsent` 推导，
@@ -355,7 +365,7 @@ aria-label={label}
    **变异**：把 `NEEDS_CONSENT` 强行改 `true` ⇒ 精确回到那三条红（exit 1）。
    **复跑这条边界**（不需要 ≥7B；3B 就够了，判据是"含汉字的条目数"）：
    `ollama pull qwen2.5:3b` 之后
-   `HEYTA_AI_LIVE_CONFIG=<自己的一份> HEYTA_AI_LOCALE=en pnpm verify:ai-breakdown-live`。
+   `HEYTA_AI_LIVE_CONFIG=<自己的一份> node scripts/verify-ai-output-language.mjs`。
    非回环端点那一支（"需要出境授权"真跑一遍）仍然没有证据 —— 它要**别人家的**凭据，
    本机造不出来，也不该造。
 
