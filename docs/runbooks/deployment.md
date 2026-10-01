@@ -632,6 +632,52 @@ location /en/legal/ {
 ⚠️ 补它时**不要用 `try_files … /404.html`**：那会把状态码又变回 200，等于把本次修复撤销一遍；
 要用 `error_page 404 /404.html;`。
 
+#### 同意留痕到底生效了没有：`pnpm verify:consent-trail`（2026-10-02 增）
+
+G-32 的结论以前**只以散文形式存在**于台账里。散文的问题是它会被读成"这件事已经查过了"，
+而生产状态每周都在变 —— 所以这条现在是一**命令**：`scripts/verify-consent-trail-production.mjs`。
+
+```bash
+pnpm verify:consent-trail                # 四条自动腿 + 一条待办腿，每条打印期望值与实测值
+pnpm verify:consent-trail --self-test    # 变异门禁：证明每条判据都能被改坏（9 个臂）
+```
+
+🔴 **退出码分五种，不是一种"红"** —— 这是它存在的理由：把"批次没进库"和"运维没跑"
+混成一个红，会让人去服务器上找一个根本不存在的迁移目录。
+
+| 码 | 含义 | 下一步归谁 |
+|---|---|---|
+| 0 | L0–L3 全绿 ⇒ 生产开始记版本号 | 只剩 L4（注册一条真账号复验那一行） |
+| 2 | **L0 红：批次根本没进版本库**（台账 **G-34**） | 链 3 批次的所有者；**运维此刻无事可做** |
+| 3 | 代码进了库、生产迁移没应用 | `export PATH="$PWD/research/tools/macos-sed-shim:$PATH"; cd server && sh scripts/migrate-deploy.sh` |
+| 4 | 库改好了、镜像里没这段代码 | 走 `server/scripts/deploy.sh` 重建并替换镜像 |
+| 1 | 探针本身没跑成（ssh 不通 / psql 报错 / 库的阳性对照不成立） | **先修探针再谈结论**（§7 元规则一） |
+
+四条自动腿：**L0** 版本库（HEAD 里有那条迁移目录、`schema.prisma` 声明了该列、
+`server/src` 里有写入点）· **L1** 生产库有列 · **L2** `_prisma_migrations` 里已应用 ·
+**L3** 部署镜像 `/app/dist` 里 grep 得到那段代码。每条都配**独立于被测值**的阳性对照，
+今天的实测值：`users.locale`=1、`users.terms_accepted_at`=1、`_prisma_migrations` 共 **44** 条
+且 `20261005000000_invalidate_stored_auth_tokens` 命中 1、`/app/dist` 里 **93** 个 `.js`、
+`requireAdmin` 命中 **3** 个文件 ⇒ 对照全绿，所以目标列/目标符号的 **0** 才是证据而不是探针坏。
+本轮跑出来的结果：**记账 8/14、退出码 2**（L0 三条红）。
+
+🟡 **L4 不在这条命令里冒充绿**：它要动生产数据（注册一条测试账号，再看那一行是否等于
+当前 `legalSetVersion()` 的指纹），脚本只把该跑的 psql 原样打印出来。
+
+📌 写这条命令时踩到两处，都是"探针自己错"那一类，`--self-test` 当场把它们抓出来：
+
+1. **`information_schema` 只认 snake_case**。库里的列是 `terms_document_version`，
+   JS 里的字段是 `termsDocumentVersion`；拿后者去查前者会**永远**得到 0 ——
+   一条永远红的假判据，看起来恰好和结论一致，因此最危险。
+2. **SQL 的 `case when` 挡不住不存在的列**：PostgreSQL 在**解析期**就拒绝
+   `… where terms_document_version is not null`，哪怕那个分支永远走不到。
+   要用 **shell 的 `if [ "$COL" = "1" ]`** 分两次查询。
+3. 顺带：远端 `echo "k\tv"` 在 dash 下**不解释 `\t`**，按 tab 切分的解析器会把整行当噪声 ⇒
+   远端一律 `printf`。
+
+⚠️ 还有一条已在台账 G-32 里记过的：`_prisma_migrations` 的列名是 **`migration_name`**，
+写成 `name` 会得到 `ERROR: column "name" does not exist` —— 那是探针写错，不是生产缺列。
+
 #### 🔴 改了入口的 URL 形状，就**必须**同时重建应用本体
 
 2026-09-27 实测踩到，而且**只有真浏览器看得见**。

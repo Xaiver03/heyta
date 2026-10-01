@@ -71,6 +71,7 @@
     "verify:web-auth": "node scripts/verify-web-auth-journey.mjs",
     "verify:windows-auth": "node scripts/verify-windows-shell-journey.mjs",
     "verify:sync-recovery": "bash scripts/verify-sync-rejection-recovery.sh",
+    "verify:consent-trail": "node scripts/verify-consent-trail-production.mjs",
     "verify:harmony-toolchain": "bash scripts/verify-harmony-toolchain.sh",
     "verify:harmony-rnoh": "bash scripts/verify-harmony-rnoh.sh",
     "verify:web-sqlite": "node scripts/verify-web-sqlite.mjs",
