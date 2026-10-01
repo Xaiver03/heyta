@@ -256,16 +256,24 @@
   color: var(--ht-color-foreground-muted);
 }
 
-/* 语言切换。真应用里是 `.ht-btn--ghost` —— 与主题按钮同一档的全局控件，
-   不该长成一个醒目的大按钮。 */
+/* 语言切换。真应用里是一排 `.ht-chip`（每个语言一枚，当前那枚带 `--on`）——
+   与主题按钮同一档的全局控件，不该长成醒目的大按钮。 */
 .mk-lang {
   display: inline-flex;
   align-items: center;
   min-block-size: var(--ht-touch-target-min);
   padding: 0 var(--ht-space-3);
+  border: var(--ht-border-width-thin) solid var(--ht-color-border);
   border-radius: var(--ht-radius-md);
   font-size: var(--ht-font-size-sm);
   color: var(--ht-color-foreground-muted);
+}
+
+/* 当前语言：边框与底色用主色，文字回到前景色 —— 与 `.ht-chip--on` 同一套。 */
+.mk-lang--on {
+  border-color: var(--ht-color-primary);
+  background: var(--ht-color-primary-subtle);
+  color: var(--ht-color-foreground);
 }
 
 .mk-content {

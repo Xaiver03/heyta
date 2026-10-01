@@ -106,7 +106,7 @@ export function useI18n(): I18nValue {
 // ── 与语言有关的常量与类型（catalog-free）────────────────────────────
 // 落地页只 import 本文件，所以这些必须从这里也能拿到，否则它会去 import 根入口
 // —— 而根入口 Re-export 了 CATALOGS，两份表就又回来了。
-export { DEFAULT_LOCALE, LOCALES, otherLocale } from './types.js';
+export { DEFAULT_LOCALE, LOCALES, LOCALE_LABEL_KEY, otherLocale } from './types.js';
 export type { Locale, MessageVars } from './types.js';
 export type { MessageKey } from './locales/zh-CN.js';
 export type { Catalog } from './catalog.js';
