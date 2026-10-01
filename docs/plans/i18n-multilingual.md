@@ -236,41 +236,90 @@ aria-label={label}
 
 ---
 
-### 7.14 双语这条线的四条**验证边界**（第 19 轮：账号语言 + 日/韩就绪）
+### 7.14 双语这条线的四条**验证边界**（第 19 轮提出：账号语言 + 日/韩就绪）
 
 这四条都是"事情做了、但判据覆盖不到那一角"，写下来是为了让下一个人不必重新发现，
 也为了**别把它们读成已验证**。
 
-1. 🔴 **jsdom 探针把 `navigator.language` 钉死成 zh-CN ⇒ 英文界面的渲染行为在单测层不可观测。**
-   `apps/web/tests/setup.ts` 这么做是为了保住迁移前那批「无偏好 ⇒ 中文」的用例
-   （第 3 层一上线，那批用例默认就会拿到 en）。代价是：**web 的单测里永远模拟不出
-   "英文浏览器首启"**。目前英文界面的真实渲染证据只有两类 ——
-   词条表门禁（zh/en 逐 key 对齐）+ 本轮一次性真浏览器 Playwright 实测
-   （zh-CN 首启中文 / **en-US 首启英文** / 点 English 后侧栏、`localStorage`、`<html lang>`、
-   当前语言 chip 的主蓝边框全部换过去；截图人看过）。
-   ⚠️ **那轮浏览器验证不是常驻门禁**，跑完就没了。
-   要把它变成常驻的，正确做法是加一条**显式设 `navigator.language`** 的
-   Playwright 用例（`newContext({ locale: 'en-US' })`），而不是去解 `setup.ts` 的钉 ——
-   解钉会让几十条与语言无关的用例集体变红，那是假信号。**登记为缺口，未做。**
-2. **切换器"从 LOCALES 派生"≠"硬编码两种"这一条无法在本工作树内证明。**
-   唯一的变异是把 `ja` 真加进 `packages/i18n/src/types.ts` 的 `LOCALES` 并重建 dist，
-   看 `readiness` / `language-switcher` / `gen-server-copy` 是否按预期反应 ——
-   而这是**多条会话共用的工作树**，改共享词条源会让别人的批次一起红。
-   已做的替代：`language-switcher.spec.tsx` 直接断言节点集合 = `LOCALES.map(...)`
-   （变异 `LOCALES.slice(0,1)` ⇒ 精确 6 条红），以及 `LOCALE_LABEL_KEY` 的
-   `satisfies Record<Locale, MessageKey>` —— **加语言漏登记自称是编译错误**。
-   剩下那一半（真加一种语言）留到真要加的那天验。
-3. **「英文界面跑捕获 → 模型输出英文」这条判据本机不可执行**：需要真 provider 配置，
-   这台机器上 `/tmp/heyta-ai-live` 没有凭据。命令记在 §10 第 7 条
+🟢 **第 20 轮（2026-10-01）把前两条关掉了**，关的方式是**真跑**而不是改写措辞 ——
+所以这一节现在同时记着：原来缺什么、这次实测到什么、以及**实测顺手翻出来的两个
+不属于本线的缺陷**。后两条仍然没关，写清楚卡在哪。
+
+1. ✅ **已闭合：英文浏览器首启现在是常驻门禁。**
+   原来的处境：`apps/web/tests/setup.ts` 把 `navigator.language` 钉成 zh-CN
+   （为的是保住迁移前那批「无偏好 ⇒ 中文」的用例），于是"英文浏览器的首启访客
+   看到的是不是英文"**在单测层不可观测** —— 把解析链第 3 层整个删掉，jsdom 全绿。
+   第 19 轮那次真浏览器实测是**一次性的**，跑完就没了。
+
+   现在按当时写下的"正确做法"补上了：`e2e/tests/language-first-launch.spec.ts`
+   五条，每条都 `newContext({ locale })` **显式设**系统语言（不依赖这台机器的
+   系统语言，否则同一份代码在中文 Mac 与英文 CI 上给出不同结论），
+   `testDir: './tests'` ⇒ `pnpm check:ai-e2e`（在 `pnpm check` 里）自动收。
+   ⚠️ **没有去解 `setup.ts` 的钉** —— 那会让几十条与语言无关的用例集体变红，是假信号。
+
+   🔴 **这条门禁上线当天就抓到一个真缺陷**，而且是判据自己抓的：
+   五条里有三条断言"首启的推断值**不落盘**"（推断值一旦写进 `localStorage`，
+   `hasStoredLocalePreference()` 就把它误判成"用户选过" ⇒ 解析链第 2 层
+   「登录后采纳账号语言」永不触发）。三条全红。根因与修法：
+
+   | | |
+   |---|---|
+   | 缺陷 | `LocaleHost` 用 `useRef(true)` 实现"首启那一遍不落盘"，而 `main.tsx` 四处都套着 `<StrictMode>`，dev 下 effect 同一 dep **跑两遍、同一个 ref** ⇒ 第二遍走了落盘分支 |
+   | 实测打印 | `effect pass 1 firstRun=true locale=en` / `effect pass 2 firstRun=false locale=en` ⇒ `localStorage['heyta.locale']` 已经是 `en` |
+   | 修法 | 落盘挂到**显式动作**（`selectLocale` 里 `applyLocale`）而不是"值变了"的 effect；effect 只留幂等的 `activateLocale`。不把 `applyLocale` 塞进 `setLocale(updater)` —— StrictMode 同样重放 updater |
+   | 为什么单测此前测不到 | 那批用例挂的是**不带 `<StrictMode>`** 的 `LocaleHost`。补上 `mount(true)` 的四条之后：旧写法下**恰好这 4 条红、原有 8 条仍全绿** |
+   | 界面上看得见吗 | 看不见。变异运行里界面语言与 `<html lang>` 的断言**全部照绿**，症状只在存储层 |
+
+   ⚠️ 本轮实跑在**隔离检出**的 4331 端口（仓库标准配置钉 4318，此刻被另一条会话占着，
+   `reuseExistingServer: false` 会直接失败，也不去抢它）。截图 6 张人已看过。
+
+2. ✅ **已闭合（并更正一条写错的数字）：切换器"从 LOCALES 派生"两处都做了真变异。**
+   第 19 轮说这条"无法在本工作树内证明"，理由是改共享词条源会让别人的批次一起红 ——
+   这个顾虑对**主工作树**成立，对**隔离检出**不成立。本轮用
+   `git worktree add --detach /tmp/… HEAD` + 一次真 `pnpm install` 把它证完了：
+
+   | 变异 | 实测 |
+   |---|---|
+   | `LOCALES = ['zh-CN']`（等价于 `slice(0,1)`） | `language-switcher.spec.tsx` **8 条里 5 红 3 绿** |
+   | 还原 | 8/8 绿 |
+   | 全量注入套件（17 组 / 114 条判据） | **114/114 符合预期，exit 0** —— 此前这条线从没整跑过一遍 |
+   | `pnpm -r build`（干净检出、干净 HEAD） | exit 0 |
+
+   🔴 **原文写的"精确 6 条红"是错的**（实际 5 条）。数字错在这里而不被发现，
+   是因为它从来没被复跑过 —— 判据被抄进文档之后就没人再量一遍，正是本仓库最高发的失效形状。
+
+   ⚠️ 剩下那一半（**真**加一种语言、把 `ja` 打开）仍然留到真要加的那天验。
+   `LOCALE_LABEL_KEY` 的 `satisfies Record<Locale, MessageKey>` 保证漏登记自称是编译错误。
+
+3. ⚠️ **仍是边界：「英文界面跑捕获 → 模型输出英文」这条判据本机不可执行。**
+   需要真 provider 配置，这台机器上 `/tmp/heyta-ai-live` 没有凭据。命令记在 §10 第 7 条
    （`HEYTA_AI_LOCALE=en pnpm verify:ai-breakdown-live`）。
-   本轮对提示词语言的证据是**28 条单测 + 三处变异**，即"指令段确实带上了界面语言、
+   目前对提示词语言的证据是**28 条单测 + 三处变异**，即"指令段确实带上了界面语言、
    传错会红"，**不是**"模型真的用英文输出"。
-4. **账号语言 → 英文邮件的端到端没有实跑**（要真发信）。服务端判据是单元级的
-   （解析优先级 `body > 账号 > Accept-Language > zh-CN`，18 条 i18n + server 9/9）。
-   同批还有三条 landing 测试红灯，归因于**并行会话的文档中心改造**
-   （`locale.spec.ts` 的 help→docs 路径、`public-copy-register` 里泄漏的中英贡献者文案，
-   落在他们未完成的 `site/docs.ts` / 词条表改动里），**不是**本轮改动造成的 ——
-   本轮碰到的落地页面（`mockup-fidelity.spec.tsx`）8/8 绿。
+
+4. ⚠️ **仍是边界：账号语言 → 英文邮件的端到端没有实跑**（要真发信）。
+   本轮把"为什么这里跑不了"量清楚了，三条都卡住：
+   ① `server/src/email.ts` 此刻是**另一条会话的未提交改动**，改它等于踩进别人的批次；
+   ② 外发通道 Ethereal 从这台机器**不可达**（`curl` 返回 000），本机也没有任何
+   SMTP catcher 可以接；③ 现有那批服务端用例把 db 和发信调用**都 mock 掉了**，
+   所以它们证明的是"选对了模板"，不是"信真的以英文发出去"。
+   服务端判据因此停在单元级（解析优先级 `body > 账号 > Accept-Language > zh-CN`）。
+   要关这条，需要一台能真发信或能起本地 SMTP 落件环境的机器，**不是**再多写几条单测。
+
+📌 **本轮顺带查出的两件不属于本线的事**（都已入档，都不是 i18n 引入的）：
+
+- 🔴 **HEAD 的界面在真浏览器里是塌的**：`.ht-app--with-sidebar` 的
+  `grid-template-columns` 吃了两个 HEAD 的 `tokens.css` 里不存在的变量
+  （`--ht-layout-sidebar-min/max-width`，它们躺在另一条会话未提交的改动里），
+  未定义 `var()` 让**整条声明**失效 ⇒ rail/sidebar/main 竖排单列。
+  机制、取证与"为什么所有门禁都看不见它"见 §7 第 91 条。
+- **注入探针搬到隔离检出时，软链 `node_modules` 会让"改 dist"的探针静默失效**
+  （改的和测的不是同一份文件），见 §7 第 92 条。
+- **落地页仍有 3 条红灯，归属不变**（第 19 轮也记了三条，但**用例名已经不是那三个**
+  —— 本轮实测：`只取第一段：更深的路径仍落在同一个页面上` + `selfhost` 中/英两条
+  "正文里不许出现内部工具链语言"，其余 1002 条绿）。落在并行会话未完成的
+  文档中心改造（`site/docs.ts` / 词条表）里，**不是**本轮改动造成的；
+  本轮碰到的落地页面（`mockup-fidelity.spec.tsx`）仍然全绿。
 
 ### 7.13 价格是唯一一个「词条表之外还有事实源」的文案（第 17 轮）
 
@@ -473,8 +522,11 @@ node scripts/check-pricing-consistency.mjs
    换成 `LOCALES` 派生的**一排 `.ht-chip`**（每个语言一枚，当前那枚 `--on` + `aria-current`），
    自称 key 登记进 `LOCALE_LABEL_KEY`（加语言漏登记 = 编译错误），点当前语言不写不回传；
    用例 **6 条 → 8 条**，新增的那条直接断言节点集合 = `LOCALES.map(...)`
-   （变异 `LOCALES.slice(0,1)` ⇒ 精确 6 条红）。落地页复刻改用同一份 `LOCALES`/`LOCALE_LABEL_KEY`。
-   细节与"派生 ≠ 硬编码两种这一条没在本工作树证明"的边界见 §7.14 与 §10 的日/韩清单。
+   （变异 `LOCALES.slice(0,1)` ⇒ 8 条里 **5 条红**；这个数字 2026-10-01 在隔离检出里复量过，
+   此前文档写的"精确 6 条"是错的）。2026-10-01 又加了一组 `<StrictMode>` 用例 → **12 条**，
+   理由与它抓出的那个缺陷见 §7.14 第 1 条；"派生 ≠ 硬编码两种"这条也已在
+   **隔离检出**里用真变异证完（见 §7.14 第 2 条），不再是没有证据的边界。
+   落地页复刻改用同一份 `LOCALES`/`LOCALE_LABEL_KEY`。
 9. **`packages/sync-client` 的 `describeConflictPayload` 仍是中文，且会吐出内部标识符。**
    它返回一句中文（空载荷 `（空）`），其中一支还会把载荷的**字段名**拼进去（`completedAt: 123`）。
    现在加了一个结构化兄弟函数 `summarizeConflictPayload(payload)` →
@@ -813,10 +865,18 @@ pnpm --filter @heyta/i18n build
 `gate`/`catalog`/…/`coupon` 那十四组共 **91 个用例**（2026-09-27 实测输出行
 `🔴 1/91 个用例不符合预期` —— 见下面的 🔴 说明），本轮新增三组 **23 个用例**
 （`diag` 6 + `e2eecopy` 5 + `readiness` 12），三组各自跑过、条条符合预期。
-⚠️ **114 这个总数没有一次全量跑过**，它是分组计数相加 —— 而且**故意没跑**：
-`gate` / `e2eecopy` 这几组注入的是 `packages/i18n/src/locales/zh-CN.ts` 这类
-**别的批次正在改的文件**（脚本文件头就写了这条告警），在共用工作树上跑全量
-等于在别人改到一半时反复覆写它们。要跑全量请在干净检出上跑。
+🟢 **114 这个总数已经整跑过了**（2026-10-01，在 `git worktree add --detach HEAD`
++ 一次真 `pnpm install --frozen-lockfile --ignore-scripts` 的**干净检出**里）：
+**114/114 符合预期，exit 0**，同一天同一份检出上 `pnpm -r build` 也是 exit 0。
+⚠️ 仍然**不要在共用工作树上跑全量**：`gate` / `e2eecopy` 这几组注入的是
+`packages/i18n/src/locales/zh-CN.ts` 这类**别的批次正在改的文件**（脚本文件头就写了
+这条告警），在别人改到一半时反复覆写它们不是"慢一点"，是**会写坏别人的批次**。
+
+🔴 **搬到隔离检出时有一条硬前提**（本轮实测，代价是两次假失败）：
+**不能把主工作树的 `node_modules` 软链过去。** `recurrence` 那组改的是
+`packages/i18n/dist/**`，软链会让 `require('@heyta/i18n')` 顺着链解析回**主工作树**
+那份 dist ⇒ 探针改的和测试读的不是同一个文件 ⇒ 表现是"注入没让测试变红"，
+看起来像门禁坏了。机制见 §7 第 92 条。
 
 ```bash
 node scripts/verify-i18n-failures.mjs             # 全部 17 组（⚠️ 见上：只在干净检出上跑）
@@ -835,12 +895,26 @@ node scripts/verify-i18n-failures.mjs pricing    # 价格三处一致（价目�
 node scripts/verify-i18n-failures.mjs coupon     # 券的算术 / 判定 / 持久化（ADR-0018）
 ```
 
-🔴 **`coupon` 组现在是坏的，它那 8 条"必须变红"是空转**（2026-09-27 实测）：
-`prepareProbe('coupon', …)` 的复制清单里没有 `server/scripts`
-（`scripts/verify-i18n-failures.mjs` 的 `groupCoupon`）—— 而 `server/tests/billing-pricing-store.pglite.spec.ts:42`
-要 `import … from '../scripts/pricing'`。副本里那个模块不存在，于是**基线自己就是红的**，
-后面 8 条注入自然条条"变红"—— 这正是 §8 末尾说的"空转注入造成的假绿"。
-修法（不在本次改动范围）：把 `server/scripts` 加进那份复制清单，或让该组的基线只跑不依赖它的两份 spec。
+```bash
+# 首启语言解析链 —— 真浏览器（唯一能观测 navigator.language 那一层的地方）
+pnpm check:ai-e2e                                 # 整个 e2e 套件，含 language-first-launch.spec.ts
+cd e2e && npx playwright test tests/language-first-launch.spec.ts   # 只跑这一条
+```
+
+⚠️ 上面这条 e2e 用 `newContext({ locale })` 真的改 `navigator.language`，
+所以它是**唯一**能测到解析链第 3 层的判据（jsdom 那批被 `setup.ts` 钉成 zh-CN，
+见 §7.14 第 1 条）。截图落在 `e2e/test-results/language-first-launch-*.png`，
+**结论必须以人真的打开那张图为准**（§6.2 规定一）。
+🔴 它同时是本轮那个 `<StrictMode>` 落盘缺陷的发现者 —— 三条"首启不落盘"当场就红。
+
+🟢 **`coupon` 组那 8 条"必须变红"曾经是空转的（2026-09-27 实测），现已修**
+（`2bbf791a`）：`prepareProbe('coupon', …)` 的复制清单缺 `server/scripts`，
+而 `server/tests/billing-pricing-store.pglite.spec.ts:42` 要
+`import … from '../scripts/pricing'` —— 副本里那个模块不存在 ⇒ **基线自己就是红的**
+⇒ 后面 8 条注入条条"变红"通过，一个断言都没跑到。这正是 §8 末尾说的"假绿"。
+今天全量跑 114/114 时这一组是**基线绿 + 8 条注入各自红**，已复核。
+📌 留这段是因为**它过期得很快**：文档里"某组现在是坏的"这种句子的保质期，
+取决于别人什么时候把它修掉 —— 所以引用它之前要重跑，而不是照抄。
 
 它自己会保证两件事：注入前**断言锚点存在**（否则空转的注入会伪装成"验证过了"），
 还原前**确认文件没被别人改过**（这个仓库里同时有多条工作流在改同一个文件，
