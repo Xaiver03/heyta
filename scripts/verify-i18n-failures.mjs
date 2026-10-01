@@ -121,6 +121,10 @@ const IDB_ADAPTER = path.join(STORAGE, 'src/indexeddb/indexeddb-adapter.ts');
 const ERROR_HINT = path.join(ROOT, 'apps/web/src/features/shell/error-hint.ts');
 const ERROR_SCREEN = path.join(ROOT, 'apps/web/src/features/shell/ErrorScreen.tsx');
 const HEALTH_COPY = path.join(ROOT, 'apps/web/src/features/settings/health-copy.ts');
+// 诊断字段（规则 5）：`reason` / `detail` / `cause` 装整句中文会原样渗进已翻译的句子。
+// 两个锚点都取**码的生产者**，这样红的是"形状"而不是某个文件里的某一行。
+const PUSH_SUBSCRIBE = path.join(ROOT, 'apps/web/src/pwa/push-subscribe.ts');
+const MOBILE_PASTE = path.join(ROOT, 'apps/mobile/src/auth/paste.ts');
 // 价格一致性（ADR-0020）：实际收多少 / 对外怎么说 / 对外怎么承诺 —— 四处必须同一个数。
 const PRICING_CHECK = path.join(ROOT, 'scripts/check-pricing-consistency.mjs');
 const PRICING_DOC = path.join(ROOT, 'docs/reference/pricing-and-entitlements.md');
@@ -1405,6 +1409,60 @@ function groupStorage() {
   expectGreen('storage', '全部还原后重跑，必须回到绿', allRun);
 }
 
+// ── 组 15：诊断字段（规则 5）──────────────────────────────────────────
+//
+// 这一组证明的是**规则的形状**，不是那两个文件里曾经写过的两行字：
+// 四种注入分别命中「码退回整句中文」「模板字面量拼中文」「换成 detail 字段名」
+// 「换一个已迁移的壳」，每一条都必须让门禁变红 —— 少红一条，就说明规则
+// 被钉在了某个具体名字或某个具体文件上，下一个壳再写一句中文原因照样会漏。
+function groupDiag() {
+  expectGreen('diag', '基线：门禁原样必须绿（42 处诊断字段全是码）', gateRun);
+
+  // ① P1-4 修掉的那一类：把码退回整句中文。
+  expectRed('diag', 'web 推送：把原因码退回整句中文', () =>
+    withMutation(
+      PUSH_SUBSCRIBE,
+      "reason: 'insecure-context' }",
+      "reason: '当前不是安全上下文，推送不可用' }",
+      gateRun,
+    ),
+  );
+
+  // ② 模板字面量：`${...}` 要被剥掉，但剥完之后剩下的必须是码。
+  //    这条抓的是"用变量拼句子"的写法 —— 它比裸字符串更像真实事故。
+  expectRed('diag', 'web 推送：模板字面量里拼中文句子', () =>
+    withMutation(
+      PUSH_SUBSCRIBE,
+      "reason: 'insecure-context' }",
+      "reason: `当前不是安全上下文（${String(window.location.protocol)}）` }",
+      gateRun,
+    ),
+  );
+
+  // ③ 换一个诊断字段名：证明拦的是 reason/detail/cause **这一类**，不是 reason 这一个词。
+  expectRed('diag', 'web 推送：同样的句子写进 detail 字段', () =>
+    withMutation(
+      PUSH_SUBSCRIBE,
+      "reason: 'insecure-context' }",
+      "detail: '当前不是安全上下文' }",
+      gateRun,
+    ),
+  );
+
+  // ④ 换一个已迁移的壳：证明规则没有钉在 push-subscribe.ts 上。
+  //    移动端这条链路（粘贴凭据）界面同样用 t('…', { reason })，漏一点露一点。
+  expectRed('diag', '移动端：粘贴失败的原因退回整句中文', () =>
+    withMutation(
+      MOBILE_PASTE,
+      "reason: 'invalid-input' }",
+      "reason: '剪贴板里的内容不是有效凭据' }",
+      gateRun,
+    ),
+  );
+
+  expectGreen('diag', '全部还原后重跑，必须回到绿', gateRun);
+}
+
 const GROUPS = {
   gate: groupGate,
   catalog: groupCatalog,
@@ -1420,6 +1478,7 @@ const GROUPS = {
   aifailure: groupAiFailure,
   pricing: groupPricing,
   coupon: groupCoupon,
+  diag: groupDiag,
 };
 const only = process.argv[2];
 const names = only === undefined ? Object.keys(GROUPS) : [only];
