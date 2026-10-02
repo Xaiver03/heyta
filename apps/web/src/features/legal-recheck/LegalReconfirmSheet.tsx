@@ -35,6 +35,8 @@
  * 第二套排版"，而 `sm+regular`/`base+regular` 恰好就是语义档位的取值。
  * ⇒ 排版**不写在 CSS 里**：JSX 成对挂 `.ht-type-section-title` / `-row-title` /
  * `-row-meta`（AGENTS §5 第三条"要新变量先加 token"的同一条纪律，对象是文字档位）。
+ * 第三道是 `check:row-single-source` 断言 B：顶层 `ht-*` 前缀族只减不增（基线 28），
+ * 所以类名挂在既有的 `.ht-sheet` 族下（`.ht-sheet__reconfirm-*`），不自开一族。
  */
 
 import { useEffect, useRef, useState } from 'react';
@@ -95,7 +97,7 @@ export function LegalReconfirmSheet(): React.JSX.Element | null {
           : null;
 
   return (
-    <div role="presentation" className="ht-reconfirm">
+    <div role="presentation" className="ht-sheet__reconfirm">
       <div
         ref={dialogRef}
         tabIndex={-1}
@@ -103,38 +105,38 @@ export function LegalReconfirmSheet(): React.JSX.Element | null {
         data-testid="legal-reconfirm-dialog"
         aria-modal="true"
         aria-labelledby="ht-legal-reconfirm-title"
-        className="ht-reconfirm__dialog"
+        className="ht-sheet__reconfirm-dialog"
       >
-        <div className="ht-reconfirm__head">
-          <span className="ht-reconfirm__icon">
+        <div className="ht-sheet__reconfirm-head">
+          <span className="ht-sheet__reconfirm-icon">
             <ScrollText size={ICON_SIZE.md} aria-hidden="true" />
           </span>
-          <div className="ht-reconfirm__titles">
-            <h2 id="ht-legal-reconfirm-title" className="ht-reconfirm__title ht-type-section-title">
+          <div className="ht-sheet__reconfirm-titles">
+            <h2 id="ht-legal-reconfirm-title" className="ht-sheet__reconfirm-title ht-type-section-title">
               {t('common.legal.reconfirm.title')}
             </h2>
             {reason === 'required-for-action' ? (
               // 用户刚点了同步，界面却拦下来 —— 不解释为什么，那看起来像坏了。
-              <p className="ht-reconfirm__reason ht-type-row-meta">
+              <p className="ht-sheet__reconfirm-reason ht-type-row-meta">
                 {t('common.sync.error.legalReconfirmRequired')}
               </p>
             ) : null}
           </div>
         </div>
 
-        <p className="ht-reconfirm__intro ht-type-row-title">{t('common.legal.reconfirm.intro')}</p>
+        <p className="ht-sheet__reconfirm-intro ht-type-row-title">{t('common.legal.reconfirm.intro')}</p>
 
-        <p className="ht-reconfirm__note ht-type-row-meta">{t('common.legal.reconfirm.localDataSafe')}</p>
+        <p className="ht-sheet__reconfirm-note ht-type-row-meta">{t('common.legal.reconfirm.localDataSafe')}</p>
 
         {links === null ? null : (
-          <div className="ht-reconfirm__links ht-type-row-meta">
-            <span className="ht-reconfirm__links-label">
+          <div className="ht-sheet__reconfirm-links ht-type-row-meta">
+            <span className="ht-sheet__reconfirm-links-label">
               {t('common.legal.reconfirm.readFirst')}
             </span>
             {/* 🔴 链接排在按钮外面：链在按钮里时点链接会顺带触发那个控件（链 2 的 M3 变异抓的就是这个）。 */}
             <a
               data-testid="legal-reconfirm-terms"
-              className="ht-reconfirm__link"
+              className="ht-sheet__reconfirm-link"
               href={links.terms}
               target="_blank"
               rel="noopener noreferrer"
@@ -143,7 +145,7 @@ export function LegalReconfirmSheet(): React.JSX.Element | null {
             </a>
             <a
               data-testid="legal-reconfirm-privacy"
-              className="ht-reconfirm__link"
+              className="ht-sheet__reconfirm-link"
               href={links.privacy}
               target="_blank"
               rel="noopener noreferrer"
@@ -157,13 +159,13 @@ export function LegalReconfirmSheet(): React.JSX.Element | null {
           <p
             role="status"
             data-testid="legal-reconfirm-failure"
-            className="ht-reconfirm__failure ht-type-row-meta"
+            className="ht-sheet__reconfirm-failure ht-type-row-meta"
           >
             {failureLine}
           </p>
         )}
 
-        <div className="ht-reconfirm__actions">
+        <div className="ht-sheet__reconfirm-actions">
           <button
             type="button"
             data-testid="legal-reconfirm-action"

@@ -173,8 +173,13 @@
    🔴 这块走 CSS 类而不是 `style={{…}}`：`check:l4` 的判据是"内联样式只减不增"，
    而它明写"不许为了变绿把基线调高"。取值仍逐条来自 token（`var(--ht-*)`）。
    ⚠️ 但**排版不在这里**：字号+字重成对自拼会被 `check:design` 判成"档位表外的第二套
-   排版"（豁免表只许删不许加），所以四件套由 JSX 成对挂 `.ht-type-*` 提供。 */
-.ht-reconfirm {
+   排版"（豁免表只许删不许加），所以四件套由 JSX 成对挂 `.ht-type-*` 提供。
+   🔴 命名挂在既有的 `.ht-sheet` 族下（`.ht-sheet__reconfirm-*`）而不是自开一个
+   `.ht-reconfirm` 族：`check:row-single-source` 断言 B 钉的是"顶层 `ht-*` 前缀族
+   只减不增"（基线 28），新开一族就是 29。这块本来就是这个族的一员 —— 置顶、遮罩、
+   `role="dialog"` 的浮层，与设置浮层同一族；它**不**带裸 `.ht-sheet` 类，
+   所以不会继承那条规则的样式，只共用命名空间。 */
+.ht-sheet__reconfirm {
   position: fixed;
   inset: 0;
   display: flex;
@@ -185,7 +190,7 @@
   z-index: var(--ht-z-modal);
 }
 
-.ht-reconfirm__dialog {
+.ht-sheet__reconfirm-dialog {
   display: flex;
   flex: 1 1 auto;
   flex-direction: column;
@@ -201,20 +206,20 @@
   color: var(--ht-color-foreground);
 }
 
-.ht-reconfirm__head {
+.ht-sheet__reconfirm-head {
   display: flex;
   align-items: flex-start;
   gap: var(--ht-space-3);
 }
 
-.ht-reconfirm__icon {
+.ht-sheet__reconfirm-icon {
   display: flex;
   padding-top: var(--ht-space-1);
   color: var(--ht-color-primary);
 }
 
 /* 标题区必须能收缩：不写 `min-inline-size: 0` 时，一行长英文会把整块顶出弹窗。 */
-.ht-reconfirm__titles {
+.ht-sheet__reconfirm-titles {
   flex: 1 1 auto;
   min-inline-size: 0;
 }
@@ -223,51 +228,51 @@
    "档位表外的第二套排版"，而这三个组合恰好就是语义档位的取值
    （section-title / row-title / row-meta）—— 所以由 JSX 成对挂 `.ht-type-*`，
    这里只留间距与颜色。取值与改前逐字相同，视觉没有变化。 */
-.ht-reconfirm__title {
+.ht-sheet__reconfirm-title {
   margin: 0;
 }
 
-.ht-reconfirm__reason,
-.ht-reconfirm__note,
-.ht-reconfirm__failure,
-.ht-reconfirm__links {
+.ht-sheet__reconfirm-reason,
+.ht-sheet__reconfirm-note,
+.ht-sheet__reconfirm-failure,
+.ht-sheet__reconfirm-links {
   margin: 0;
 }
 
-.ht-reconfirm__reason {
+.ht-sheet__reconfirm-reason {
   margin-block-start: var(--ht-space-1);
   color: var(--ht-color-foreground-muted);
 }
 
-.ht-reconfirm__intro {
+.ht-sheet__reconfirm-intro {
   margin: 0;
 }
 
-.ht-reconfirm__note,
-.ht-reconfirm__failure {
+.ht-sheet__reconfirm-note,
+.ht-sheet__reconfirm-failure {
   color: var(--ht-color-foreground-muted);
 }
 
-.ht-reconfirm__failure {
+.ht-sheet__reconfirm-failure {
   color: var(--ht-color-warning-strong);
 }
 
-.ht-reconfirm__links {
+.ht-sheet__reconfirm-links {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: var(--ht-space-2);
 }
 
-.ht-reconfirm__links-label {
+.ht-sheet__reconfirm-links-label {
   color: var(--ht-color-foreground-muted);
 }
 
-.ht-reconfirm__link {
+.ht-sheet__reconfirm-link {
   color: var(--ht-color-primary);
 }
 
-.ht-reconfirm__actions {
+.ht-sheet__reconfirm-actions {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
