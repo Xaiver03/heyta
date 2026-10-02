@@ -50,6 +50,7 @@ const MANIFEST = [
   'scripts/verify-mobile-ios.sh',
   'scripts/verify-mobile-lists.sh',
   'scripts/verify-mobile-quadrant-fill.sh',
+  'scripts/verify-mobile-restore.sh',
   'scripts/verify-mobile-repeat-custom.sh',
   'scripts/verify-mobile-repeat.sh',
   'scripts/verify-mobile-schedule.sh',

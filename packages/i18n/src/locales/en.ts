@@ -2600,7 +2600,7 @@ export const en = {
   'mobile.restore.preview': 'Inspect backup',
   'mobile.restore.confirm': 'Confirm restore',
   'mobile.restore.previewCounts': 'Tasks {tasks} · Lists {projects} · Tags {tags} — {entities} records total (incl. {deleted} tombstones), {ops} ops',
-  'mobile.restore.done': 'Restore succeeded: wrote {ops} ops, {entities} records. Configure sync and it will upload automatically.',
+  'mobile.restore.done': 'Restore succeeded: wrote {ops} ops, {entities} records. They live on this device only — the operations inside a backup carry the signature of the device that made them, and the server rejects a second device signing on its behalf, so they never reach your other devices. Anything you write here from now on syncs normally.',
   'mobile.restore.error.invalidJson': 'This is not valid JSON text',
   'mobile.restore.error.invalidDocument': 'This is not a heyta backup file',
   'mobile.restore.error.formatVersion': 'Backup version not supported: {detail}',

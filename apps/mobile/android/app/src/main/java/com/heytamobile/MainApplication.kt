@@ -6,6 +6,7 @@ import com.facebook.react.ReactApplication
 import com.facebook.react.ReactHost
 import com.facebook.react.ReactNativeApplicationEntryPoint.loadReactNative
 import com.facebook.react.defaults.DefaultReactHost.getDefaultReactHost
+import com.heytamobile.fs.LocalFsPackage
 import com.heytamobile.widget.WidgetPackage
 
 class MainApplication : Application(), ReactApplication {
@@ -24,6 +25,10 @@ class MainApplication : Application(), ReactApplication {
           //    而 `widget-bridge.ts` 会**安静地降级**，表现为"小组件永远不更新"，
           //    不会有任何红。
           add(WidgetPackage())
+          // 本机文件读取（备份还原的"选文件"这条路）。同样在 app 工程内，
+          // autolinking 看不到它。⚠️ 忘了这一行时 JS 侧拿到 undefined，
+          // 界面会显示"这台设备读不了本地文件" —— 是响亮的，不会静默。
+          add(LocalFsPackage())
         },
     )
   }

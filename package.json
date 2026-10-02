@@ -65,6 +65,7 @@
     "verify:mobile-focus": "bash scripts/verify-mobile-focus.sh",
     "verify:mobile-calendar": "bash scripts/verify-mobile-calendar.sh",
     "verify:mobile-repeat": "bash scripts/verify-mobile-repeat.sh",
+    "verify:mobile-restore": "bash scripts/verify-mobile-restore.sh",
     "verify:mobile-repeat-custom": "bash scripts/verify-mobile-repeat-custom.sh",
     "verify:mobile-ticktick": "bash scripts/verify-mobile-ticktick-import.sh",
     "verify:mobile-ios": "bash scripts/verify-mobile-ios.sh",
