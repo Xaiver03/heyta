@@ -100,3 +100,32 @@ describe('toEmptyStateViewModel —— 根节点 role 是固定的 summary', () 
     ).toBe('summary');
   });
 });
+
+describe('toEmptyStateViewModel —— size 两档', () => {
+  it('省略 = page，且现有站点该拿到的还拿到（图标不被这一档误伤）', () => {
+    const v = toEmptyStateViewModel({ title: 'x', icon: ICON });
+    expect(v.size).toBe('page');
+    expect(v.icon).toEqual(ICON);
+  });
+
+  it('section 档明确把图标归一成 undefined —— 而不是渲染端静默丢弃入参', () => {
+    const v = toEmptyStateViewModel({ title: 'x', icon: ICON, size: 'section' });
+    expect(v.size).toBe('section');
+    expect(v.icon).toBeUndefined();
+  });
+
+  it('两档只差"图标 + 居中/占高"，其余槽位的归一规则逐字相同', () => {
+    const page = toEmptyStateViewModel({ title: 'x', hint: '  ', detail: '', size: 'page' });
+    const section = toEmptyStateViewModel({ title: 'x', hint: '  ', detail: '', size: 'section' });
+    expect(page.hint).toBeUndefined();
+    expect(page.detail).toBeUndefined();
+    expect(section.hint).toBeUndefined();
+    expect(section.detail).toBeUndefined();
+    expect(section.detailRole).toBe(page.detailRole);
+    expect(section.a11yRole).toBe(page.a11yRole);
+  });
+
+  it('section 档不豁免 title 必填 —— 空白空态仍然当场响', () => {
+    expect(() => toEmptyStateViewModel({ title: '  ', size: 'section' })).toThrow(/title/);
+  });
+});
