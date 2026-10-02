@@ -1,3 +1,4 @@
+import { ICON_SIZE } from '@heyta/design-system';
 /**
  * 习惯图标选择器
  * ================
@@ -65,7 +66,7 @@ export function HabitIconPicker({ habit, onChange }: HabitIconPickerProps) {
           setOpen((was) => !was);
         }}
       >
-        <EffectiveGlyph size={16} aria-hidden="true" />
+        <EffectiveGlyph size={ICON_SIZE.sm} aria-hidden="true" />
         <span className="ht-habit__icon-word">{t('web.habits.icon.toggle')}</span>
       </button>
 
@@ -93,7 +94,7 @@ export function HabitIconPicker({ habit, onChange }: HabitIconPickerProps) {
                   setOpen(false);
                 }}
               >
-                <Glyph size={16} aria-hidden="true" />
+                <Glyph size={ICON_SIZE.sm} aria-hidden="true" />
               </button>
             );
           })}

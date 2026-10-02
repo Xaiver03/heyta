@@ -1,3 +1,4 @@
+import { ICON_SIZE } from '@heyta/design-system';
 /**
  * 习惯左列：清单行（Web 壳）
  * ============================
@@ -120,7 +121,7 @@ export function HabitsList({ rows, selectedId, onSelect }: HabitsListProps) {
                   className="ht-habit__disc"
                   style={{ color: discColor, borderColor: discColor }}
                 >
-                  <Glyph size={16} aria-hidden="true" />
+                  <Glyph size={ICON_SIZE.sm} aria-hidden="true" />
                 </span>
                 <span className="ht-habit__name">{habit.name}</span>
               </span>
@@ -152,15 +153,15 @@ export function HabitsList({ rows, selectedId, onSelect }: HabitsListProps) {
 
               <span className="ht-habit__chips">
                 <span className="ht-habit__chip" title={current}>
-                  <Flame size={12} aria-hidden="true" />
+                  <Flame size={ICON_SIZE.xs} aria-hidden="true" />
                   <span className="ht-habit__chip-num">{growth.current}</span>
                 </span>
                 <span className="ht-habit__chip" title={longest}>
-                  <TrendingUp size={12} aria-hidden="true" />
+                  <TrendingUp size={ICON_SIZE.xs} aria-hidden="true" />
                   <span className="ht-habit__chip-num">{growth.longest}</span>
                 </span>
                 <span className="ht-habit__chip" title={total}>
-                  <Check size={12} aria-hidden="true" />
+                  <Check size={ICON_SIZE.xs} aria-hidden="true" />
                   <span className="ht-habit__chip-num">{growth.total}</span>
                 </span>
               </span>
