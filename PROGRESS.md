@@ -920,3 +920,32 @@ server 侧本轮新增的 `terms-consent-version.spec.ts` **12 passed**（单独
 🟡 **未闭合**：**G-33 只剩移动壳那半**（首启面板的模拟器/实机截图）。它需要
 `pnpm reinstall:mobile` 把当前产物装上设备，而那会把另一条会话的半成品一起装上去（§7 第 82 条），
 所以按「做不了的登记为缺口」处理，不在本轮硬做。转 `effective` 之前必须补。
+
+### 2026-10-02：仓库整理轮（基线审计 → 两个大文件拆分 → repo-cleanup Skill）
+
+**先拿数字再动手**（同口径命令，排除生成物/证据目录）：
+
+| 信号 | 基线 | 结论 |
+|---|---|---|
+| 文件行数 Top | App.tsx **2603**、app.css **3163**、landing.css 2775（i18n/法务/server-spec 属天然聚合，剔除） | 前两个是本轮目标 |
+| >120 列长行 | 1502 行 / 121 文件，**85% 是词条/法条单行字符串** | 不动（手拆字符串零收益、伤 zh/en 同步） |
+| 重复块（jscpd, ui+web） | 31 克隆 / 506 行 / **0.97%** | 不动（反漂移纪律在起作用） |
+| 死代码（knip） | 未配 entry ⇒ 输出全是桶导出误报 | **登记为下轮候选**（先配 entry 再信） |
+
+**执行（两个纯移动提交）**：
+
+1. `App.tsx 2603→2198`：导航/视图登记 + NavButton/EmptyState/isActive 搬进
+   `features/shell/{view-tabs.ts,NavButton.tsx,EmptyState.tsx}`。承重配套：
+   landing 外壳对账按**源码文本**解析声明块 —— 读取路径跟着搬，并修掉一个
+   注释锚点碰撞（新文件注释含 `const ALWAYS_ON_VIEW_TABS` 字面串 ⇒ indexOf
+   先命中注释 ⇒ 对账拿空）。
+2. `app.css 3163→聚合器 30 行 + 14 模块`：@import 顺序 = 原文件顺序 = 级联顺序
+   （narrow.css 媒体块压最后）。两道按路径锚定的门禁跟着搬：排版豁免表
+   **归一化模块路径回聚合器**（组合数一个不多一个不少）、ht-* 族棘轮改扫全部模块。
+
+**判据**：web 1353 / landing 1303 全绿；check:design / check:row-single-source 绿；
+vite build 产物含首尾模块内容；**真浏览器双主题截图人已看**（三栏结构完整、
+深色是深蓝灰非反色、零 pageerror）。
+
+**方法已固化**：`.agents/skills/repo-cleanup/SKILL.md`（审计→计划→执行→收尾四阶段，
+含"按路径/按文本读代码的门禁盘点"这条实测出的收尾清单）。
