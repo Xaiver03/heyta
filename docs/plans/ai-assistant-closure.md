@@ -404,7 +404,7 @@ W8 起**不是可回退的增量**：多步循环一旦放开，出境披露的�
 | W9（能力清单生成器） | ✅ | `scripts/gen-ai-capability-manifest.mjs` → `packages/ai/src/capability-manifest.generated.ts`（424 行，生成物） | 手写**不可能**：清单是产物。`--check` 已作为**规则 7 接进 `check:ai-tools`**（不一致 exit 1），`capability-manifest.spec.ts` 29 条钉形状 |
 | W10（扩工具目录 + "覆盖面"门禁） | ⛔ 未做 | — | 目录仍是 6 个工具（读 3 / 写 3），覆盖面 **2/8** 实体；`EntityModelMap` 每个实体必须有工具的那道门禁**还没写** —— 见 §7.2 第 3 条 |
 | W11（批量写入） | ⛔ 未做 | — | 按本文要求：**先论证**与 AGENTS §3.4 的关系，论证不成立就不做 |
-| W12（chat 外壳） | ✅ | `apps/web/src/features/ai/AssistantPanel.tsx` + `App.tsx`（任务视图内）+ i18n 37 键 ×2 语言 | 单测 19 条（`ai-assistant-panel.spec.tsx`，含"第一次点发送 ⇒ 一个请求都没发"）；**真浏览器** `e2e/tests/ai-assistant.spec.ts` 一条旅程 + **四张**截图（含暗色那张），人已逐张看过。档位选择器在设置里（`ai-assistant-tier.spec.tsx` 14 条） |
+| W12（chat 外壳） | ✅ | `apps/web/src/features/ai/AssistantPanel.tsx` + `App.tsx`（任务视图内）+ i18n 37 键 ×2 语言 | 单测 19 条（`ai-assistant-panel.spec.tsx`，含"第一次点发送 ⇒ 一个请求都没发"）；**真浏览器** `e2e/tests/ai-assistant.spec.ts` 一条旅程 + **四张**截图（含暗色那张）。⚠️ **看图的是本会话的 agent，不是产品负责人** —— 两张有问题的图确实是被"看"出来的（动画中途按快门、两种角色分不出来），但 §6.2 要求的那一眼**还没发生**，四张图在 `apps/web/evidence/assistant/` 等人看。档位选择器在设置里（`ai-assistant-tier.spec.tsx` 14 条） |
 | D-2（授权粒度） | ✅ **已拍并落地**（助手侧） | `apps/web/src/features/settings/{aiStore,AiSettings}.tsx` 的 `assistantTier` | 拍的是**助手这一侧**：读 / 读+提议两档，与入站 MCP 的**逐工具默认关**解耦但共用 `isToolGranted()`。双向不越界已在真浏览器里验（`ai-assistant.spec.ts` 第 7 步）。⚠️ 目录扩到几十个之后仍需重拍（见 §7.2 第 3 条） |
 | D-3（`EVENT` 与 AI 工具同批） | ⛔ 仍未拍 | — | 倒数日尚未立项到可开工的程度（`docs/plans/countdown-anniversary.md` 的 D1/D2/D3 也未拍） |
 
