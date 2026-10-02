@@ -3289,6 +3289,213 @@ spec，且报错里出现 `ECONNREFUSED <本机端口>` 或 `.playwright-artifac
     "我这笔新带的"分开报；既有债**登记、不顺手修**（它有自己的所有者），
     新带的那部分要么消掉、要么在提交信息里明写"这一笔让 X 从 a 涨到 b"。
 
+124. 🔴 **RN 0.84.1 在 Android 上读不出任何本机 URI —— `fetch`、`XHR(responseType:'text')`、
+    `XHR(responseType:'blob')` 三条路全废，而症状长得像"没权限"。**
+
+    `content://` 与 `file://` 一律回 `Network request failed`（fetch）或 XHR onerror。
+    原生侧的原文异常才是依据：logcat 里失败栈顶是
+    `NetworkingModule.sendRequestInternalReal(NetworkingModule.kt:318)` —— 那一段处理
+    "本机 URI 的 `UriHandler`"时，为了造一个假的 `okhttp3.Response` 去调
+    `Request.Builder().url(...)`，而 OkHttp 的 `HttpUrl` 只接受 http/https ⇒ 直接抛。
+    所以 `BlobModule.networkingUriHandler`（它的 `supports()` 要求 `responseType == "blob"`）
+    **永远走不到取字节那一步**。⇒ 这条路上没有"换一种 JS 写法"的解法。
+
+    ✅ 落地：读文件是**平台 API**，落在一行原生里
+    （`apps/mobile/android/app/src/main/java/com/heytamobile/fs/LocalFsModule.kt`，
+    `ContentResolver.openInputStream` + `String(bytes, UTF_8)`，注册同 `WidgetPackage`
+    那条 `BaseReactPackage` 路子）。iOS 侧没有对应原生模块（本工程 Xcode 是经典分组，
+    加 `.m/.swift` 要改 pbxproj），JS 退到 RN 的 blob 通道 —— **该退路未在模拟器验证过**。
+
+    两条归错因的实测教训，都记在这条里：
+    ① 看到 `content://` 失败就怀疑"SAF 没给读权限"是错的 ——
+       `keepLocalCopy` 落成的 `file:///data/user/0/com.heyta/cache/.../heyta-backup.json`
+       **同样失败**才把它排除（自家缓存不可能没权限）。
+    ② 中途那条 `Cannot read property 'readAsText' of null` 是**读取之前**就抛的
+       （模块名写错：spec 里注册名是 `FileReaderModule`，不是 `FileReader`），
+       它挡住的是"blob 通道到底通不通"这个真正的问题 —— 我一度把它读成"字节已经拿到了"。
+       同族小坑：RN 的 `XMLHttpRequest` **没有** `overrideMimeType`，调它就是 Hermes 的
+       `undefined is not a function`，而它冒出来的位置恰好是"读文件失败"那一行。
+
+125. 🔴 **设备探针的三种假红面目（都在备份还原判据上实测过）：**
+
+    1. `xy_text` / `xy_desc` / `has_sub` 读的是 `/tmp/ui.xml`，**自己不会重 dump**。
+       在等待循环里"只等不看"= 拿**上一屏**找节点 ⇒ "入口找不到"必然红，
+       而界面上一切正常（实测报成"选择器里没有 Show roots"）。
+    2. 判断"谁在前台"**不能对整份 `dumpsys window` grep 包名**：系统会把已停止的
+       Activity 窗口记录留在输出里，于是"选择器还开着"在上一轮用过之后**永远为真** ——
+       `pick_file` 据此报"在当前视图里找到了文件"，坐标其实来自一份旧 dump，
+       点击全落在应用界面上。只取 `mCurrentFocus=` 那一行才行。
+       ⚠️ 反过来也别把 `mCurrentFocus` 当"界面已就绪"：本机负载 40+ 时 DocumentsUI
+       冷启动可以超过 15s，等到超时它才出现（实测：判据报"没开到前台"，
+       而同一轮的 `screen_txt` 里选择器节点明明在）。
+    3. 系统选择器占着前台时，后面每一个坐标都点进它 ⇒ 一层红带出五六条
+       "看起来各自独立"的红（实测：判据② 红 → 判据③/④ 报"找不到输入框：服务器地址"）。
+       失败分支必须先把选择器关掉、把应用抢回前台，再让后面的判据各自说话。
+
+126. 🔴 **软键盘开着时，脚本的滚动 swipe 会"打字"。**
+
+    `adb shell input swipe 540 1900 540 1000` 从屏幕下半部分**划过键盘按键**，
+    Android 把它当成输入送进当前聚焦的输入框 —— 实测粘贴框里长出
+    `not-json-garbage GT GT GT … y`，而那正是被划过的键。判据于是把"探针在写字"
+    读成"应用没反应"。⚠️ `disable_ime` 换的是**默认输入法**，**不收已经弹起来的那块键盘**；
+    要按 `mInputShown` 判在不在再 `KEYCODE_BACK` 收（`hide_keyboard`），
+    并且把滚动区间的下界提到键盘上沿以上。
+
+    **第二面目（2026-10-03 实测，比第一面目贵得多）：键盘不只是"会被 swipe 划到"，
+    它还会把 `input tap` 整条吃掉。** 键盘盖住屏幕下 ~45%，而**被盖住的节点
+    照样在无障碍树里、照样给得出中心点** —— 于是探针拿到坐标、以为点中了按钮，
+    实际那一下打在键盘的某个键上：截图里粘贴框多出一个 `v`，而「确认还原」
+    根本没被按下。一条键盘状态连锁出四条各自像产品缺陷的红
+    （②"没看到还原成功" / ②尾"选择器没开到前台" / ③"任务列表 0/3" /
+    ④"找不到输入框：服务器地址" —— 最后那条是因为标签栏也在键盘带里）。
+
+    ✅ 两条一起才收得住：
+    1. **会立键盘的那一步放到这块屏的最后做**（本例把"往粘贴框打字"从判据①
+       拆出来挪到判据② 之后）。顺序本身就是探针的一部分，不是排版问题。
+    2. 其余每一处"点下半屏的节点"之前过一次 `require_keyboard_down`，
+       收不掉就 **exit 3**（探针不成立），而不是继续往下点。
+
+    📌 一般规律：**无障碍树给得出坐标 ≠ 那个坐标点得到**。仓库里 `xy_edit_sane`
+    已经在防"折叠线以下 bounds 负高度"的同一族问题，键盘带是它的另一种面目 ——
+    凡是"节点在树里但被别的东西盖住"的场景（键盘、Modal、悬浮条、系统栏），
+    点击前都要重新问一次"此刻它露出来了吗"。
+
+127. 🔴 **DocumentsUI（系统文件选择器）的三条环境相关事实：**
+
+    1. `adb push` 到 `/sdcard/Download` **不进媒体库** ⇒ Recent 视图里没有它
+       （只列历史上打开过的旧文件）。要么 `content call --uri
+       content://media/external/file --method scan_file --arg <路径>` 登记，
+       要么走 根菜单 → Downloads。
+    2. **根菜单里有没有 "Downloads" 跟着镜像变**：这台 AVD 的根菜单是
+       Images/Audio/Videos/Documents/Recent files，**没有 Downloads**。
+       ⇒ 选择器路线要"当前视图"与"根菜单→Downloads"**都试**，并打出实际走了哪条；
+       假装只有一条 = 换台机器就随机红。
+    3. 焦点在 DocumentsUI 时 `adb shell input tap` 会**抛 Java 异常**
+       （`InputShellCommand.runTap` 的栈），不是静默失败 —— 探针要把"点了没反应"
+       和"点被拒"分开报。
+
+128. 🔴 **依赖裁决要查到"实际装的那个包"，不是"那个仓库还在更新"。**
+
+    批五第一次按"活跃、MIT、peer 覆盖 RN 0.79+"装了旧包名
+    `react-native-document-picker@9.3.1`（末版 2024-08），它在 RN 0.84 上
+    `compileReleaseJavaWithJavac` **编不过**：引用的
+    `com.facebook.react.bridge.GuardedResultAsyncTask` 已被 RN 删除。
+    同项目的活跃后继是 **scoped** 的 `@react-native-documents/picker`，
+    换包名 = API 也换（`pick()` + `keepLocalCopy()`，没有 `pickSingle` / `fileCopyUri`）；
+    ⚠️ 而它的 **podspec 仍叫旧名**（`RNDocumentPicker`），所以 `check:native-deps` 里
+    看到旧名不代表旧包还在。同族：§3.1 的"最后发版时间"必须由那个包回答。
+
+129. 🔴 **移动端首次同步慢到分钟级 —— 服务端命中类判据必须轮询，不能"同步一次就读"。**
+
+    Hermes 上没有 WebAssembly，端到端密钥要**纯 JS 逐批算**，应用自己就写着
+    "首次同步可能要等数十秒到数分钟"。实测：判据报 `0/5 命中` 的那一轮，
+    之后界面自己变成"已全部上传 + 上次成功同步" —— 不是产品没传，是探针读太早
+    （元规则 1）。⇒ 轮询到命中或到时限，并把**等了多久**打出来；
+    同时把"还没设置端到端加密口令"这类**可观察的终止态**单独识别，
+    否则会把"口令没生效"等成"超时"。
+
+135. 🔴 **验收栈是"三份产物"拼起来的：APK、服务端进程、数据库迁移。任何一份旧了，
+    红都落在"产品缺陷"那一侧 —— 而三份都没有任何一处会自己说自己是旧的。**
+
+    2026-10-03 实测（`verify-mobile-restore` 判据④ 报"服务端只命中 0/5 条备份 opId"）：
+
+    | 件 | 当时的实际状态 | 怎么看出来的 |
+    |---|---|---|
+    | APK | 23:57 打的，`ExportScreen.tsx` 00:50 又改过 | 文件 mtime 对比；脚本第 0 步装的就是这个旧包 |
+    | 服务端进程 | `node dist/src/index.js` 是 **18:56** 起的，dist 是 **00:53** 重建的 | 进程里没有 `/api/account/legal-consent`（curl → **404**），源码里有 |
+    | 库 | `heyta_mobile_smoke` 少两条迁移 | 新 dist 起不来就报 `P2022: users.display_name does not exist`；**旧进程反而一切正常** |
+
+    第三条最阴：**旧进程 + 未迁移的库** 是互相掩盖的 —— 旧 Prisma client 不选那一列，
+    所以"服务端健康、建号成功、/health ok"全部为真；一旦换成当前 dist 重建的进程，
+    同一条建号立刻 500。也就是说"我先手动验过服务端是好的"这句话**替旧产物作了证**。
+
+    这次的实际症状是移动端的**账号级补签闸门（G-27）**：新 APK 里有闸门、旧服务端答不了
+    那一问，`syncNow()` 一条 op 都不发，界面写着"数据没有同步出去"。判据读到的
+    "0/5 命中"于是长得像"还原毒化了同步队列"，而真正的原因是栈自己的服务端旧了。
+
+    ✅ 三件都改了：`sh scripts/migrate-deploy.sh`（带 macOS sed 垫片 + 显式 `DATABASE_URL`）、
+    从当前 dist 在**自己的端口**上起重建的服务端（3100，不动别人占用的 3000），
+    并在脚本第 1 步之前加一条**一次不带凭据的探测**：`GET /api/account/legal-consent`
+    回 **401 = 路由存在**（继续）、**404 = 服务端比应用旧**（`exit 3`，并把重建命令打出来）。
+
+    📌 可迁移的规律：**跨进程契约两侧都要有"同代"判据，且要在开局花 1 秒验，
+    不要花 40 分钟之后靠症状反推。** 401 与 404 的差别就是"路由在不在"，
+    它不需要任何凭据就能问出来 —— 便宜的探测该放在最前面。
+    ⚠️ 另一条：`ps eww` 能读到**别的进程**的 `DATABASE_URL`，这很方便复用凭据，
+    但口令因此进了我的 shell —— 只用变量、不打印，脚本里也别这么写。
+
+136. 🔴 **"谁在前台"的探针把组件名截掉了，于是 `focus_is 包名` 恒假；
+    而同一条红里紧挨着的诊断行用的是**另一种解析**，把真相原样打印了出来。**
+
+    `grep -o "mCurrentFocus=Window{[^ ]* [^ ]*"` 取回的是 `Window{174b2bc u0` ——
+    `Window{` 后面两段是**窗口 id 和 userId**，包名/组件在第三段。于是判据②
+    报"系统选择器没开到前台（焦点里没有 documentsui）"，而它自己下一行印的是
+    `mCurrentFocus=Window{ba41dfe u0 com.google.android.documentsui/...PickActivity}`。
+
+    一条坏解析同时打死**三条各自看起来独立的红**：选择器"没开"（其实开着）、
+    还原后"焦点没回到应用"（`focus_is $PKG` 同样恒假）、任务列表 0/3（没点到文件）。
+    另一半是同一类：`hide_keyboard` 定义在第一次**调用之后**，bash 里就是
+    `command not found`，而调用点写成 `hide_keyboard || echo "⚠️ 键盘没能收起"` ——
+    探针自己没跑起来，却报成产品侧的一件事。
+
+    ✅ `focus_is`/`current_focus` 现在共用同一支 `focus_line()`（整行 `grep "mCurrentFocus="`），
+    helper 全部搬到第一次调用之前。
+
+    📌 两条一般规律：**判据和它的诊断输出必须共用同一支取数函数** —— 分家之后
+    "红灯说的话"和"红灯的判断"可以互相矛盾，而人只会信后面那句。
+    **`cmd || echo 警告` 这种形状会把"探针不存在"洗成"产品有一件小毛病"**；
+    bash 里函数定义顺序错误只有运行时才知道，所以 helper 要集中放在脚本开头。
+
+138. 🔴 **一条判据断错了不变量，结果照出了界面上一句假话 —— 修的时候两件事都要修，
+    不能只把判据改绿。**
+
+    `verify-mobile-restore` 判据④a 原来断"备份里的 opId 要出现在服务端"。真机跑出来是
+    `0/5`，而同屏界面写着**「已是最新」+「上次成功同步 02:09」**。
+    两者不可能同时对 —— 一定有一个在说谎。读**被调方本体**之后，说谎的是判据：
+
+    · 还原走 `OpLogStore.appendImported` → `appendBatch(ops, 'import', …)`，
+      而 `uploadStatus: source === 'local' ? 'pending' : 'uploaded'`
+      （`packages/storage/src/db-op-log-store.ts:161`）⇒ 导入的 op **不进上传队列**；
+    · 这是设计，不是疏漏：服务端 `validateOp` 对
+      `op.clientId !== requestClientId` 逐条回 `INVALID_CLIENT_ID`
+      （`server/src/sync/services/validation.service.ts:75`），
+      而备份里的 op 带的是**原设备**的 clientId；
+    · 所以"备份 opId 出现在服务端"在产品里**从来不成立** —— 一条因设计而必红的判据
+      不是判据，它只是把设计说成了缺陷。
+
+    🔴 **但同一次运行也照出了一个真缺陷**：成功语 `mobile.restore.done` 写的是
+    "配置同步后会自动上行" —— 那句话**每个字都是假的**（数据不会上行，
+    其他设备看不到这批还原的数据）。它是我这批写文案时**顺着"还原=恢复"的直觉**
+    写的，没去读 `appendImported`。判据断错，反而把这句假话逼出来了。
+
+    ✅ 两处一起改：① 判据④a 改断真正的不变量（同步**不落失败态、不卡死**：
+    300s 内界面落到「已是最新 / 已全部上传」，出现「同步失败」或一直「正在同步…」才红），
+    备份 opId 命中数**只打印不判定**（将来若改成"按本机 clientId 重签"，数字会变而判据不翻）；
+    ② 文案改成说清边界（"这批数据只在这台设备上…之后你新写的照常同步"），中英同步，
+    并把机制写进 `ExportScreen.tsx` 文件头与 `db-op-log-store` 那条注释互相指。
+
+    📌 一般规律：**"判据红 + 界面说没事"这种组合，必须先判定谁在说谎再动手**，
+    而判定只能靠读被调方本体（不是 grep 符号、不是读注释）。
+    两边都有错的时候，**只修判据就等于把假文案留在了生产里**。
+
+139. 🔴 **"点了入口"不等于"面板开了"**：`input tap` 会抛 Java 异常而退出码仍 0，
+    而"随便找个输入框"这种匹配法会把**上一页**的搜索框当成面板的输入框。
+
+    实测（判据④b）：点 FAB「新建任务」那一次 `adb shell input tap` 打出
+    `InputManagerService.onShellCommand` 的异常栈，面板根本没弹；
+    紧接着 `xy_edit_any` 命中了任务页的**搜索框**（desc「搜索任务（标题与备注）」），
+    标题被打进搜索框，于是后面必然得到"找不到「添加」"——
+    一条看起来像"新建流程坏了"的红，实际是**两次探针失误的叠加**。
+
+    ✅ 两处都补：① 点完入口后**验面板自己的锚点**（`xy_desc "新任务标题"` 在不在），
+    不在就重点，最多 3 次；② 打字之后**先读回再提交**（`edit_value`），
+    读回不符就报"探针无法判定"，而不是报"没上传"。
+
+    📌 一般规律：**每一步点击之后都要有一个"这一步真的发生了"的观测点**，
+    而且那个观测点必须是**目标界面独有的**东西。
+    "任意输入框 / 任意按钮"这类宽松匹配在跨界面时会静默命中上一页的同类控件，
+    把"没打开"伪装成"打开了但没反应"。
+
 140. 🔴 **给出境字段加一道"声明必须覆盖实际发出的键"的对照，它的价值不在拦住未来，
     在于照出已经漏了的现在 —— 它第一跑就抓出一个真的隐私泄漏。**
 

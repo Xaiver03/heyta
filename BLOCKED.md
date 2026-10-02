@@ -1797,3 +1797,133 @@ Error: 待补签却建了实时通道：ws://127.0.0.1:4318/?token=8-cC4f_Ev09e
 `git diff HEAD -- apps/web/src/App.tsx`（或 `git status`），你们看到的会是
 "**干净**"—— 那不是我留下的状态，现在已经是 `1898803d` + 你们的两个 hunk 在工作树里。
 你们的 theme 改动**一行都没丢**，但也**一行都没提交** —— 请按原计划自己提交。
+
+## B15. ✅ **已解除**（2026-10-03 02:51，`/tmp/restore-run23.log`）🔴 批五的设备验收被**宿主机负载**卡住（2026-10-03 00:59–01:10 取证）—— 已把"环境不成立"和"产品红"分成两个退出码，还缺一个低负载窗口
+
+**解除取证**：02:46–02:51 那一轮（run23）负载允许，**24 项全绿 / exit 0**，
+上面"还欠的证据"四条全部补齐：② 后半（截断版走同一条文件路径仍被拒、一个字节没写）、
+④a（还原后同步不落失败态 —— 并在此过程中发现**原判据断错了不变量**，改写见 traps #138）、
+④b（还原后手机自己写的那条 op 20s 内出现在服务端）、以及 M1/M2 两条变异各
+**14 绿 2 红**且红恰好落在被拿掉的那两步上。下面原诊断**逐字保留**，
+因为"负载把 `uiautomator` 打成空文件"这件事仍然对所有设备验收脚本成立。
+
+**现象（不是产品缺陷）**：本机 1 分钟负载在 18~81 之间起伏（16 核）时，
+`uiautomator` 连续 10 次抓不到界面，`dump` 会把 `/tmp/ui.xml` **截成空文件**，
+于是 `scripts/verify-mobile-restore.sh` 一轮报出 6–9 条"看起来各自独立"的红：
+"选择器里没找到文件"、"找不到输入框：服务器地址"、"同步按钮既不空闲也不在忙"。
+同一台机器上另有两条会话在跑重活（`ps` 里能看到别的仓库的 vitest）。
+
+**已落地的机制**（都在 `scripts/verify-mobile-restore.sh` 里，不是"下次注意"）：
+
+1. 开头 `wait_for_quiet_host`：负载 > 核数的 3/4 就等，等不到（默认 900s，
+   可用 `HEYTA_RESTORE_LOAD_WAIT` 放宽）以 **exit 3** 结束 ——
+   与 `require_screen` 同一个约定：**1 = 有断言失败，3 = 这轮在环境上不成立**。
+2. UI 断言前 `require_screen`（判据逐屏找的那条路径）。
+3. "谁在前台"只取 `mCurrentFocus` 一行，并把超时时的实际焦点打出来。
+4. 滚动区间收到 `y ∈ [700, 1250]`：实测软键盘开着时 swipe 划过按键会把
+   `GT GT GT … y` 打进正在聚焦的粘贴框（traps #126）。
+5. 选择器路线"当前视图(Recent)"与"根菜单→Downloads"**两条都试**并打印实际走了哪条，
+   失败分支先 `close_picker` 再报错（traps #125/#127）。
+
+**已经证到的部分**（`/tmp/restore-run13.log`，00:06 那一轮，负载允许时跑的）：
+判据① 三条全绿（入口在、两条路都在、垃圾内容被预检拒绝且说出人话）、
+判据② 前半绿（选文件读出「任务 3 · 清单 1 · 标签 1 —— 共 5 条，5 条操作日志」→
+确认 → "还原成功"）、判据③ 绿（任务列表 3/3）。截图落在
+`apps/mobile/evidence/android-restore-{done,tasks}.png`。
+
+**还欠的证据**（都需要一轮低负载跑，命令已就绪）：
+② 后半（**截断版走选文件路径**同样被拒）、④a（备份 opId 出现在服务端，带分母、
+轮询到命中或超时）、④b（还原后手机还能写还能推：出现备份里没有的新 opId）、
+以及两条变异 M1/M2。⚠️ ④a 在 run13 也报过 `0/5`，那是**读太早**：
+无 WebAssembly 时端到端密钥要纯 JS 逐批算，14 分钟后界面自己变成
+"已全部上传 + 上次成功同步"（traps #129），现在改成轮询 + 打印等待秒数。
+
+**归属（防误提交）**：本条线改动的路径是
+`apps/mobile/src/screens/ExportScreen.tsx`、`apps/mobile/src/lib/local-file-read.ts`（新）、
+`apps/mobile/android/app/src/main/java/com/heytamobile/fs/{LocalFsModule,LocalFsPackage}.kt`（新）、
+`apps/mobile/android/app/src/main/java/com/heytamobile/MainApplication.kt`、
+`apps/mobile/package.json`、`apps/mobile/ios/Podfile.lock` + `Pods/`、
+`packages/i18n/src/locales/{zh-CN,en}.ts`、`packages/op-log/src/engine.ts`、
+`scripts/verify-mobile-restore.sh`（新）、`e2e/restore-export.cjs`（新）、根 `package.json`
+（**只加 `verify:mobile-restore` 那一行** —— 该文件另有别人已暂存的 hunk）。
+
+**落地时的更正**（2026-10-03 提交那一刻逐 hunk 重数过）：上面这份清单里有**两条不是改动**——
+`packages/op-log/src/engine.ts` 只被读过、没被改；`Pods/` 是 gitignore 的产物。
+实际进提交的是：两个新 Kotlin 文件 + `MainApplication.kt`（2 hunk）+ `local-file-read.ts`（新）
++ `ExportScreen.tsx` + `apps/mobile/package.json`（1 行：`@react-native-documents/picker@12.0.2`，
+MIT、未归档、末次提交 2026-07-28 ⇒ §3.1/§3.2 过）+ `Podfile.lock`（32 行纯新增，全属那个 pod）
++ `pnpm-lock.yaml`（14 行纯新增，在 `HEAD + 我的 package.json` 的隔离检出里
+`pnpm install --lockfile-only` 生成，不含别的会话在锁上的 churn）
++ `packages/i18n/src/locales/{zh-CN,en}.ts`（**各只有 `mobile.restore.done` 那 1 行**）
++ `scripts/vite-rnw-resolve.{mjs,d.mts}` + `apps/desktop/vite.config.ts`（B16 第 3 项）
++ 本条线与 traps 的文档。
+
+---
+
+## B16. 两条**对所有会话成立**的验收栈事实 + 一条我顺手修掉但没修完的债（2026-10-03 01:35–01:50 取证）
+
+### 1) 🔴 :3000 上那个 E2E 服务端是 **18:56 起的旧进程**，而 `server/dist` 是 **00:53** 重建的
+
+症状：移动端新 APK 有账号级补签闸门（G-27），旧进程里**没有**
+`/api/account/legal-consent`（实测 curl → 404），于是 `syncNow()` 一条 op 都不发，
+`verify-mobile-restore` 判据④ 轮询满 300s 得到"服务端命中 0/5"——读起来像
+"还原毒化了同步队列"，实际是栈自己的服务端比应用旧。
+当前 dist 起来之后同一条请求回的是
+`{"needsReconfirm":false,"reason":"not-applicable",…}`（本机 `PUBLIC_URL` 非官方域名 ⇒
+不拦人，见 `server/src/legal-consent.ts` 第 3 条排除项）。
+
+### 2) 🔴 E2E 库 `heyta_mobile_smoke` 之前**少两条迁移**，而这件事被旧进程掩盖着
+
+`20261007000000_add_user_consent_history` / `20261008000000_add_account_profile` 未应用。
+旧 Prisma client 不选 `users.display_name` ⇒ "建号成功 /health ok"全为真；
+换成当前 dist 立刻 `P2022: The column users.display_name does not exist`。
+我已用 `sh scripts/migrate-deploy.sh` 应用（两条含 CONCURRENTLY，不能用 `migrate deploy` 直跑；
+需要 `PATH` 带 `research/tools/macos-sed-shim`，且**要显式 export `DATABASE_URL`** ——
+`scripts/migrate-deploy.sh` 不读 `server/.env` 里那套）。
+
+**给后来者**：跑设备验收前先确认这三份产物同代（APK mtime ≥ 源码 mtime、
+服务端进程启动时间 ≥ dist mtime、`prisma migrate status` 无 pending）。
+`verify-mobile-restore.sh` 现在开局自己探第 2 条（401=同代 / 404=旧 ⇒ `exit 3`），
+别的脚本还没有这条。
+
+### 3) 🟡 我修了桌面端构建，但**没把重复的那份删掉**（归属：桌面端那条线）
+
+`scripts/vite-rnw-resolve.mjs` 之前用 `createRequire(import.meta.url)` 把解析锚在
+`scripts/`（那里没有任何 node_modules 通道）⇒ `apps/desktop build` 从引入它那次提交起
+**从来没成功过**（`MODULE_NOT_FOUND`，Vite 连配置都加载不完），而 `pnpm check` 不打包，
+所以没有任何一条命令会因此失败。现在改成由调用方注入 `import.meta.url`，
+`pnpm --filter @heyta/desktop build` 实测绿（`renderer-dist/assets/index-*.js` 出来了）。
+
+🔴 **没收尾的那半**：`apps/web/vite.config.ts` 里仍然是它自己那份**内联副本**
+（同一段别名/后缀/dedupe 逻辑），也就是说这个 helper 文件头承诺的
+"两个 Vite 应用逐字相同"今天是**两份实现**，漂移只是没人去对。
+按 §3.5 的教训，收尾动作是**把 web 那份换成 import 并删掉旧的**，
+不是再写一份更好的。我没顺手做，因为 `apps/web` 那一整片此刻有别的会话未提交的改动。
+
+---
+
+## B17. 🔴 `reminders-panel.spec.tsx` 那条"超过每任务上限"是**全量跑才红**的探针 bug（2026-10-03 03:41 取证，归属：提醒那条线）
+
+**症状**：`pnpm --filter @heyta/web test` 里 1 红，红在
+`tests/reminders-panel.spec.tsx > B. … > 🔴 超过每任务上限时把错误显示出来，不静默吞掉`
+（`waitFor` 超时，界面文本里 6 条提醒都画出来了、就是等不到那句错误）。
+**单跑同一个文件 6/6 全绿。** 本机 `vm.loadavg` 当时 **39**。
+
+**为什么我判定它不是产品红**：同一形状昨天在 R10 那条线上刚被钉死过一次 ——
+`apps/web/tests/profile-panel.spec.tsx` 的两条头像用例用
+"固定刷两次宏任务"去等一条 **≥3 个异步边界**的链，
+load 59 时全量必红、单跑必过；改成"轮询到条件成立"（`waitUntil`，
+等不到就把当前出站请求列出来）之后，load **105** 连跑两趟全绿。
+提醒这条的 `waitFor` 也是"数固定次点击 + 等一个结果"，只是坏在另一处。
+`61536ed3 test(web): 提醒上限用例的 8 次点击移进 act() —— flake 归因落地`
+说明这条已经被归因过一轮，**但归因不等于修完**。
+
+**我没有动它**，两个理由：
+1. 该文件的所有者刚刚提交过一版针对它的改动，此刻很可能还在改（AGENTS 的并行会话纪律：
+   别人在点的那套界面连判据文件都不要顺手改）；
+2. 我的改动会落在**他们的** flake 归因之上，两边合起来看不出谁对。
+
+**给所有者的一步修法**（照 `profile-panel.spec.tsx:87` 那个 `waitUntil` 抄即可）：
+把"点 8 次然后等文本出现"改成"点 8 次 ⇒ `waitUntil('上限错误出现', …)`"，
+超时消息里**打出当前界面文本**（现在这条已经在打了，保持）。
+🔴 别改成"把 `waitFor` 的 timeout 调大"—— 那是把探针 bug 变成永久豁免。

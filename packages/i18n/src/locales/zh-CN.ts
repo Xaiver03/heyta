@@ -2786,7 +2786,7 @@ export const zhCN = {
   'mobile.restore.preview': '预检备份',
   'mobile.restore.confirm': '确认还原',
   'mobile.restore.previewCounts': '任务 {tasks} · 清单 {projects} · 标签 {tags} —— 共 {entities} 条（含墓碑 {deleted}），{ops} 条操作日志',
-  'mobile.restore.done': '还原成功：写入 {ops} 条操作，共 {entities} 条数据。配置同步后会自动上行。',
+  'mobile.restore.done': '还原成功：写入 {ops} 条操作，共 {entities} 条数据。这批数据只在这台设备上 —— 备份里的操作带着原设备的身份，服务端不认第二个设备的署名，所以它们不会同步到你的其他设备；你之后在这台上新写的照常同步。',
   'mobile.restore.error.invalidJson': '这不是有效的 JSON 文本',
   'mobile.restore.error.invalidDocument': '这不是 heyta 的备份文件',
   'mobile.restore.error.formatVersion': '备份版本不受支持：{detail}',

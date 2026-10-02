@@ -48,7 +48,7 @@
 | **通知中心 / 邀请活动** | ✅ 铃铛 + 活动 tab | ✅ 「我的」页「通知」入口行（未读徽标）+ 通知中心两 tab（**批二已修** 2026-10-02） |
 | **AI 全家**（拆解/估时/优先级/捕获/工具/设置） | ✅ 6 入口 | ❌ **零入口** |
 | 导出 | ✅ 下载 | ✅ 系统分享 |
-| **导入（自家 JSON 还原）** | ✅ ImportPanel | ❌ 明示"导不回"（`ExportScreen.tsx:24`） |
+| **导入（自家 JSON 还原）** | ✅ ImportPanel | ✅ 「导出数据」页「从备份还原」卡：选文件 + 粘贴两条路 → 预检 counts → 确认（**批五已修** 2026-10-03；本机文件读取为什么必须走原生模块见 traps #124） |
 | 滴答导入 | ✅ 面板 | ✅ 粘贴（刻意形态） |
 | **改密码 / 通行密钥管理** | ✅ PasswordPanel + PasskeyPanel | ✅ 「账号与安全」入口行 → SecurityScreen（**批四已修** 2026-10-02） |
 | 登出 | ✅ 清凭据 | ✅ 清凭据（等价） |
@@ -70,7 +70,11 @@
 
 **P1-1 账号安全包未上移动端。** ✅ **已修（2026-10-02，goal 批四）**：「我的」页「账号与安全」入口 → SecurityScreen：改密码（`changePassword`，成功返回新会话 ⇒ **落盘轮换令牌并立即重验同步**——变异验证：拿掉落盘 ⇒ 判据以「登录凭据已失效」精确转红，12 绿 1 红）+ 通行密钥列表/改名/删除（409 最后一条如实报错）+ 空态如实说明"这台手机暂不支持注册，去电脑上注册"。判据 = `verify:mobile-account` 真机真服务端 13/0（`/api/test/create-user` 每轮建已知密码账号 → UI 改密 → 同步仍通 → `/api/login/email-password` 新密码换新会话 → 旧令牌 401）。**passkey 注册登记排除**：移动端无 WebAuthn 平台桥（`auth/passkey-host.ts` 是结论不是占位），接原生模块时只改那一个文件。原文：~~改密码（PasswordPanel，App.tsx:2163）、通行密钥增删改名（PasskeyPanel.tsx:150-200）web 全有；移动端只有魔法链接登录做兜底，`changePassword` / `listPasskeys` 等 hosted-auth 十余个函数零 import。~~
 
-**P1-2 自家备份还原未上移动端。** 手机能导出（系统分享），但 heyta 导出的 JSON **在手机上永远导不回**（`ExportScreen.tsx:24-28` 文件头明说）。导入/还原的对称性是数据安全承诺的一部分；`import-dump.ts` 的 `restoreIntoEmptyTarget` 现成。此缺口 AGENTS §5.1.1 已登记过，本审计重申其仍在。
+**P1-2 自家备份还原未上移动端。** ✅ **已修（2026-10-03，goal 批五）**：「导出数据」页新增**「从备份还原」**卡 —— 警示"只支持还原到空库" → 选文件（系统选择器）**或**粘贴 JSON 两条路 → `parseExportDocument` 预检并展示 counts → `restoreIntoEmptyTarget` → 界面数得见还原出的任务。判据 = `verify:mobile-restore` 真模拟器 + 真服务端零 mock，**24 项全绿 / exit 0**（run23，02:46–02:51）：真浏览器导出 → 截断版与垃圾内容**都被预检拒绝且说出人话**（一个字节都不写）→ 选文件读出「任务 3 · 清单 1 · 标签 1，5 条操作日志」→ 确认后任务列表 3/3（截图两张人已看）→ 还原后同步**不落失败态**，且手机自己写的那条 op 20s 内出现在服务端。
+⚠️ **三条边界，都不算已验或不算已修**：
+① **还原回来的数据只在这台设备上** —— `appendImported` 把这些 op 标成"不进上传队列"，因为备份里的 op 带的是**原设备**的 `clientId`，而服务端 `validateOp` 对不匹配的署名逐条回 `INVALID_CLIENT_ID`（`server/src/sync/services/validation.service.ts:75`）。这是既有设计（`packages/storage/src/db-op-log-store.ts:100`/`:161` 明写"不要为了让它也能上传把 source 改成 'local'"），**本轮只把界面文案改对**（原来那句"配置同步后会自动上行"是假的，见 traps #138）；"还原后多端可见"要成立需要一条新裁决（还原时按本机 clientId 重签），**未做**。
+② **iOS 的"选文件"没有原生读取模块**（RN 0.84.1 在 Android 上根本读不出本机 URI，只能自带模块，见 traps #124；iOS 侧退到 RN 的 blob 通道，未在模拟器验证）。
+③ 变异验证的两条臂（M1/M2）记在 goal §7 执行记录里。原文：~~手机能导出（系统分享），但 heyta 导出的 JSON **在手机上永远导不回**（`ExportScreen.tsx:24-28` 文件头明说）。导入/还原的对称性是数据安全承诺的一部分；`import-dump.ts` 的 `restoreIntoEmptyTarget` 现成。此缺口 AGENTS §5.1.1 已登记过，本审计重申其仍在。~~
 
 **P1-3 AI 全家未上移动端。** web 有六个入口（拆解/估时/优先级/AI 捕获/工具调用/AI 设置）；移动端零。**前置裁决**：移动端要不要允许配 provider、出境闸门的"允许远程"在移动语义下是什么 —— 这是 ADR-0010 的延伸问题，不是纯 UI 活。
 
