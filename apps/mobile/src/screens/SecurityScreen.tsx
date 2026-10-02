@@ -31,6 +31,7 @@ import { formatCompactDate } from '@heyta/domain';
 import { useI18n, type MessageKey } from '@heyta/i18n';
 import {
   authFailureMessageKey,
+  EmptyState,
   passwordPolicyMessageKey,
 } from '@heyta/ui';
 import {
@@ -268,9 +269,10 @@ export function SecurityScreen({
               {t('mobile.security.passkeys.loading')}
             </Text>
           ) : passkeys.length === 0 ? (
-            <Text variant="row-meta" tone="subtle">
-              {t('mobile.security.passkeys.empty')}
-            </Text>
+            // 共享空态的 `section` 档：设置卡片里的一行占位。
+            // 🔴 不用页面档 —— 那是"居中 + 上下 64px"，塞进卡片是视觉回归；
+            //    也不往门禁的 EMPTY_SITES 加一行 —— 那等于把这笔债合法化。
+            <EmptyState size="section" title={t('mobile.security.passkeys.empty')} />
           ) : (
             <View style={{ gap: tokens['space.3'] }}>
               {passkeys.map((passkey) => {

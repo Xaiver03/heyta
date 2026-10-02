@@ -69,7 +69,11 @@ import { HeytaIcon } from '../icon/Icon.js';
 import { useHeytaText, useHeytaTokens } from '../theme.js';
 import { toEmptyStateViewModel, type EmptyStateSlots } from './model.js';
 
-export type { EmptyStateDetailTone, EmptyStateSlots } from './model.js';
+export type {
+  EmptyStateDetailTone,
+  EmptyStateSize,
+  EmptyStateSlots,
+} from './model.js';
 
 export interface EmptyStateProps extends EmptyStateSlots {
   /**
@@ -113,14 +117,24 @@ export function EmptyState({
         hint: { color: tokens['color.foreground-subtle'] },
         detailSubtle: { color: tokens['color.foreground-subtle'] },
         detailDanger: { color: tokens['color.danger'] },
+        // 🔴 `section` 档：**不居中、不占页面高度**。它画的是"卡片里的一行占位"，
+        //    所以根节点除了行间距什么都没有 —— 沿用页面档的 `paddingVertical: space.16`
+        //    会把设置页撑出一大块空白，那是视觉回归，不是统一。
+        rootSection: { gap: tokens['space.2'] },
+        // 区块档的标题用 `row-meta` + subtle（调用方原来就是这个形状），
+        // 页面档用 `section-title` + muted。
+        titleSection: { color: tokens['color.foreground-subtle'] },
       }),
     [tokens],
   );
 
+  const section = view.size === 'section';
+
   return (
-    <View style={styles.root} accessibilityRole={view.a11yRole} testID={testID}>
+    <View style={section ? styles.rootSection : styles.root} accessibilityRole={view.a11yRole} testID={testID}>
       {/* 装饰性图标：**不给 label** —— 读屏不该把"这里有个图标"念一遍，
-          它旁边的标题已经说清了一切（与两端既有的 aria-hidden 同义）。 */}
+          它旁边的标题已经说清了一切（与两端既有的 aria-hidden 同义）。
+          `section` 档拿不到图标：那条判断在 `model.ts` 里，不在这里。 */}
       {view.icon === undefined ? null : (
         <HeytaIcon
           data={view.icon}
@@ -130,13 +144,27 @@ export function EmptyState({
         />
       )}
 
-      <Text style={[text['section-title'], styles.centered, styles.title]}>
+      <Text
+        style={
+          section
+            ? [text['row-meta'], styles.titleSection]
+            : [text['section-title'], styles.centered, styles.title]
+        }
+      >
         {view.title}
       </Text>
 
       {/* `hint` 可以整个省略 —— §1.6 的实测形状就是"居中一句"。 */}
       {view.hint === undefined ? null : (
-        <Text style={[text['row-meta'], styles.centered, styles.hint]}>{view.hint}</Text>
+        <Text
+          style={
+            section
+              ? [text['row-meta'], styles.hint]
+              : [text['row-meta'], styles.centered, styles.hint]
+          }
+        >
+          {view.hint}
+        </Text>
       )}
 
       {view.detail === undefined ? null : (
@@ -147,7 +175,7 @@ export function EmptyState({
           selectable={view.detailTone === 'danger'}
           style={[
             text.caption,
-            styles.centered,
+            section ? undefined : styles.centered,
             view.detailTone === 'danger' ? styles.detailDanger : styles.detailSubtle,
           ]}
         >

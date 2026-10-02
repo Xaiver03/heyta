@@ -50,6 +50,24 @@ import type { HeytaIconData } from '../icon/Icon.js';
 export type EmptyStateDetailTone = 'danger' | 'subtle';
 
 /**
+ * 空态**住在多大的地方**。
+ *
+ * 🔴 这一档不是"给样式表起个名字"，它解的是一个**二选一的死结**：
+ * 本组件原来只有页面级一种形状（居中 + 上下 `space.16` + 可选大图标），
+ * 而 `scripts/check-empty-state.mjs` 给的唯一修法是"用共享的 `EmptyState`"。
+ * 于是"设置卡片里的一行占位"（`SecurityScreen` 的通行密钥区）与
+ * "面板/区块没有内容"（web 的 `NotesBoard` / `ReminderList`）想收编成共享实现，
+ * 就**必须**同时把视觉改成一大块居中的东西 —— 那是视觉回归，不是统一。
+ * 结果就是：要么红着，要么把债写进 `EMPTY_SITES`（＝把债合法化）。
+ *
+ * `section` 档把"收编"与"不改视觉"这两件事解耦：左对齐、不占页面高度、
+ * 不放图标（图标那条判断在 `toEmptyStateViewModel` 里，理由见那里）。
+ *
+ * ⚠️ 默认 `page` —— 现有站点一个像素都不变。
+ */
+export type EmptyStateSize = 'page' | 'section';
+
+/**
  * 四个槽位。
  *
  * `icon` / `hint` / `detail` 都是可选的，只有 `title` 必填 —— 理由见文件头。
@@ -70,6 +88,8 @@ export interface EmptyStateSlots {
   readonly detail?: string | undefined;
   /** `detail` 的语义色。省略 = `danger`。 */
   readonly detailTone?: EmptyStateDetailTone | undefined;
+  /** 这块空态有多大。省略 = `page`（现有站点的形状，一个像素都不变）。 */
+  readonly size?: EmptyStateSize | undefined;
 }
 
 /** `EmptyState.tsx` 要摆到屏幕上的全部内容。没有分支可判 —— 判断都在这里做完了。 */
@@ -88,6 +108,10 @@ export interface EmptyStateViewModel {
    * 这一条与 `FocusPanel` 里"落盘失败必须看得见"用的是同一个 role。
    */
   readonly detailRole: 'alert' | undefined;
+  /**
+   * 归一后的尺寸档（省略 = `page`）。组件只按它挑样式，不再自己判断。
+   */
+  readonly size: EmptyStateSize;
   /**
    * 根节点的无障碍 role。
    *
@@ -135,16 +159,26 @@ export function toEmptyStateViewModel(slots: EmptyStateSlots): EmptyStateViewMod
   const icon =
     slots.icon !== undefined && slots.icon.length > 0 ? slots.icon : undefined;
 
+  const size: EmptyStateSize = slots.size ?? 'page';
+
+  // 🔴 `section` 档**不放图标**，这条判断做在这里而不是组件里写 `if`：
+  //    区块级空态住在卡片内部，卡片自己已经有一行标题；再摆一个 `icon.xl`(32)
+  //    的字形会和区块标题争视觉重心 —— 而调用方传了 `icon` 却什么都没画，
+  //    是最难归因的那类"参数被静默丢弃"。所以这里把它明确成 `undefined`，
+  //    组件只负责"有图标就画、没有就不画"。
+  const visibleIcon = size === 'section' ? undefined : icon;
+
   const hint = nonBlank(slots.hint);
   const detail = nonBlank(slots.detail);
   const detailTone = slots.detailTone ?? 'danger';
 
   return {
-    icon,
+    icon: visibleIcon,
     title,
     hint,
     detail,
     detailTone,
+    size,
     // `detail` 不存在时 role 必须是 undefined —— 否则会在一个不渲染的节点上
     // 声明 alert（tone 的默认值不该"借"到这个不存在的节点上）。
     detailRole: detail !== undefined && detailTone === 'danger' ? 'alert' : undefined,
