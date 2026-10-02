@@ -10,19 +10,20 @@
  *
  * 用法：
  *
- *   pnpm verify:consent-trail              # 四条自动腿 + 一条待办腿，打印每条实测值
+ *   pnpm verify:consent-trail              # 五条自动腿 + 一条待办腿，打印每条实测值
  *   pnpm verify:consent-trail --self-test  # 变异门禁：每条腿都必须能被改坏
  *   HEYTA_SSH_HOST=ubuntu-jcli pnpm verify:consent-trail
  *
- * 🔴 **退出码分四种，不是一种"红"**（这是本脚本存在的理由）：
+ * 🔴 **退出码分五种，不是一种"红"**（这是本脚本存在的理由）：
  *
  * | 码 | 含义 | 下一步归谁 |
  * |---|---|---|
- * | 0 | L0–L3 全绿 ⇒ 生产确实开始记版本号了 | 只剩 L4（注册一条真账号复验） |
+ * | 0 | L0–L3 + L5 全绿 ⇒ 生产确实开始记版本号了，且记的就是用户读到的那一套 | 只剩 L4（注册一条真账号复验） |
  * | 2 | **L0 红：那条批次根本没进版本库**（G-34） | 链 3 批次的所有者；**运维此时无事可做** |
  * | 3 | L0 绿但 L1/L2 红 ⇒ 代码进了库、生产迁移没应用 | 跑 `cd server && sh scripts/migrate-deploy.sh` |
  * | 4 | L1/L2 绿但 L3 红 ⇒ 库改好了、镜像里没这段代码 | 重建并替换服务端镜像 |
- * | 1 | 探针本身没跑成（ssh 不通 / psql 报错 / 自检失败） | 先怀疑探针（§7 元规则一） |
+ * | 5 | 前四条绿但 **L5 红：用户读到的那一套 ≠ 服务端记账的那一套**（G-36②） | 把落地页发布与镜像重建收进**同一批**（deployment §3.8）|
+ * | 1 | 探针本身没跑成（ssh 不通 / psql 报错 / 线上取不到 200 / 自检失败） | 先怀疑探针（§7 元规则一） |
  *
  * ⚠️ 为什么区分 2 与 3：`deploy.sh` 与 `git archive HEAD` 只带**已跟踪**文件，
  * 未跟踪的迁移目录与 `legal-consent.ts` 根本带不出本机。把码 2 读成"去跑一次迁移"
@@ -53,6 +54,8 @@
  */
 
 import { execFile } from 'node:child_process';
+import { readFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { promisify } from 'node:util';
 import { fileURLToPath } from 'node:url';
 
@@ -61,6 +64,15 @@ const REPO = fileURLToPath(new URL('..', import.meta.url));
 
 const SSH_HOST = process.env.HEYTA_SSH_HOST ?? 'ubuntu-jcli';
 const SELF_TEST = process.argv.includes('--self-test');
+
+/**
+ * 🔴 线上取证据什么钉 IP：这台机器的解析走本地代理，`dig` 会返回 fake-ip
+ * （`198.18.x.x`），而代理对静态产物可能给缓存 —— 拿一份**缓存的旧 bundle**
+ * 去对**旧镜像**会得到"两边一致"的假绿。所以默认绕开代理、把域名钉到真实 IP，
+ * 与 `e2e/playwright.live-site.config.ts` 同一条纪律（G-31 那次就是这么定的）。
+ */
+const LIVE_IP = process.env.HEYTA_LIVE_IP ?? '124.223.13.226';
+const LIVE_PROBE_PATH = '/legal/privacy/';
 
 const DB_TARGET = { column: 'terms_document_version', migration: '20261006000000_add_terms_document_version' };
 const DB_CONTROL = { columns: ['locale', 'terms_accepted_at'], migration: '20261005000000_invalidate_stored_auth_tokens' };
@@ -103,6 +115,72 @@ async function ssh(script) {
 async function git(args) {
   const { stdout } = await run('git', args, { cwd: REPO, maxBuffer: 8 * 1024 * 1024 });
   return stdout;
+}
+
+/** 同 ssh()，但要**原始**输出（L5 取的是整个生成物文件，不是 KEY\tVALUE 行）。 */
+async function sshRaw(script) {
+  const b64 = Buffer.from(script, 'utf8').toString('base64');
+  const { stdout } = await run(
+    'ssh',
+    ['-n', '-o', 'ConnectTimeout=15', SSH_HOST, `echo ${b64} | base64 -d | bash`],
+    { maxBuffer: 8 * 1024 * 1024, encoding: 'utf8', timeout: 90_000 },
+  ).catch((err) => {
+    throw new Error(`ssh ${SSH_HOST} 失败：${err.message}\n⇒ 退出码 1：探针没跑成，别把它的缺席读成结论。`);
+  });
+  return stdout;
+}
+
+/** 镜像里那份生成物（1.7 KB，直接 cat 原文，两条正则都在本地跑）。 */
+function imageLegalGeneratedFile() {
+  return sshRaw('sudo docker exec supersync-server cat /app/dist/src/legal.generated.js');
+}
+
+/** 取线上产物。绕开本机代理并把域名钉到真实 IP，理由见 LIVE_IP 上面那段注释。 */
+async function httpGet(url) {
+  const host = new URL(url).hostname;
+  const out = `${tmpdir()}/heyta-consent-trail-${process.pid}-${Math.random().toString(36).slice(2)}.body`;
+  let code = NaN;
+  try {
+    const { stdout } = await run('curl', [
+      '-sS', '--max-time', '30', '--noproxy', '*',
+      '--resolve', `${host}:443:${LIVE_IP}`,
+      '-H', 'Cache-Control: no-cache',
+      '-o', out, '-w', '%{http_code}', url,
+    ], { maxBuffer: 1 << 20, encoding: 'utf8', timeout: 45_000 }).catch((err) => {
+      throw new Error(`取 ${url} 失败：${err.message}\n⇒ 退出码 1：线上探针没跑成，别把它的缺席读成结论。`);
+    });
+    code = Number(stdout.trim());
+    return { status: code, body: readFileSync(out, 'utf8') };
+  } finally {
+    rmSync(out, { force: true });
+  }
+}
+
+/**
+ * 从落地页的 JS 产物里数出九份 `id:"…",version:"…"`。
+ *
+ * 🔴 **不能拿页面 HTML 去 grep** —— 那 18 个入口是客户端渲染的外壳（实测 7259 字节、
+ * 里面一个版本号都没有）。指纹只住在 JS 产物里。
+ */
+function extractPairs(jsText) {
+  const found = [];
+  const re = /\bid:"([a-z][a-z-]*)",\s*version:"(\d+\.\d+)"/g;
+  for (let m = re.exec(jsText); m !== null; m = re.exec(jsText)) found.push([m[1], m[2]]);
+  return found;
+}
+
+/** 与 `packages/legal` 的 `legalSetVersion()` 同一算法：`id@version` 排序后以 `;` 连接。 */
+function fingerprint(pairs) {
+  return pairs.map(([id, version]) => `${id}@${version}`).sort().join(';');
+}
+
+function firstDifferences(aFp, bFp) {
+  const a = new Map(aFp.split(';').map((s) => s.split('@')));
+  const b = new Map(bFp.split(';').map((s) => s.split('@')));
+  const ids = [...new Set([...a.keys(), ...b.keys()])].sort();
+  const out = [];
+  for (const id of ids) if (a.get(id) !== b.get(id)) out.push(`${id}: ${a.get(id) ?? '（缺）'} vs ${b.get(id) ?? '（缺）'}`);
+  return out;
 }
 
 // ───────────────────────────── L0：那条批次进没进版本库 ─────────────────────────────
@@ -217,7 +295,92 @@ async function legImage() {
   return { imageOk: files > 0 && ctrl >= 1, target: target >= 1 };
 }
 
+// ─────────────── L5：线上用户读到的那一套 ↔ 镜像里记账的那一套（G-36②） ───────────────
+
+/**
+ * 这条腿判的是**先后顺序**，不是任何一个值本身。
+ *
+ * 注册时写进 `users.terms_document_version` 的是**镜像**里的 `LEGAL_SET_VERSION`，
+ * 而用户勾选项时读到的是**线上落地页**里那份 JS 产物。两边各由一条独立的发布动作
+ * 决定（落地页 rsync / 服务端镜像重建），而 `check:server-legal` 只比"生成物 ↔
+ * `@heyta/legal` 真源"，**看不见线上部署的是哪一版** ⇒ 文本改版与镜像重建一旦分两批，
+ * 两道既有闸会同时绿，而此后每一条同意记录都是**版本号写错了的证据**。
+ */
+async function legLive(headFp) {
+  const headIds = headFp.split(';').map((s) => s.split('@')[0]).sort();
+
+  const imgText = await imageLegalGeneratedFile();
+  // 🔴 必须取引号内整串：镜像那份编译产物里除了赋值行还有一行 `LEGAL_SET_VERSION = void 0`，
+  // 而指纹串**自己含分号** —— 用 `= [^;]*` 会截成 `ai-and-transfer@1.0`（本轮实测踩过）。
+  const quoted = [...imgText.matchAll(/LEGAL_SET_VERSION = "([^"]*)"/g)].map((m) => m[1]);
+  const voidLines = (imgText.match(/LEGAL_SET_VERSION = void 0/g) ?? []).length;
+  const imageOk = quoted.length === 1;
+  record('L5', '镜像里取到恰好一条带引号的 LEGAL_SET_VERSION', imageOk,
+    `命中=${quoted.length}（另有 void 0 占位行 ${voidLines} 条，不计入）`, '命中=1');
+  const imageFp = quoted[0] ?? '';
+  if (!imageOk) {
+    record('L5', '线上 ↔ 镜像 逐字相同', false, `镜像侧取值不成立（${quoted.length} 条），无值可比`, '恰好 1 条时才比');
+    return { liveOk: false, match: false, imageFp, liveFp: '', headFp };
+  }
+
+  const origin = `https://${await officialHost()}`;
+  const page = await httpGet(origin + LIVE_PROBE_PATH);
+  const asset = (page.body.match(/src="(\/assets\/main-[^"]+\.js)"/) ?? [])[1] ?? '';
+  const pageOk = page.status === 200 && asset !== '';
+  record('L5', `线上法务页 200 且数得出 JS 入口（${LIVE_PROBE_PATH}）`, pageOk,
+    `http=${page.status} 入口=${asset || '（没匹配到）'}`, '200 且 /assets/main-*.js');
+  if (!pageOk) {
+    record('L5', '线上 ↔ 镜像 逐字相同', false, '线上侧取值不成立，无值可比', '页面与入口都取得到时才比');
+    return { liveOk: false, match: false, imageFp, liveFp: '', headFp };
+  }
+
+  // 加查询串绕开任何中间层对同一 URL 的缓存副本（静态服务忽略查询串）。
+  const assetRes = await httpGet(`${origin}${asset}?_=${Date.now()}`);
+  const pairs = extractPairs(assetRes.body);
+  const liveIds = [...new Set(pairs.map(([id]) => id))].sort();
+  const shapeOk = assetRes.status === 200 && liveIds.length === headIds.length &&
+    headIds.every((id, i) => id === liveIds[i]);
+  record('L5', '探针形状成立：线上产物里数得出的 id 集合与 HEAD 相同', shapeOk,
+    `http=${assetRes.status} 组数=${pairs.length} 产物字节=${Buffer.byteLength(assetRes.body, 'utf8')}` +
+    (shapeOk ? '' : ` 缺失=[${headIds.filter((i) => !liveIds.includes(i)).join(',')}] 多出=[${liveIds.filter((i) => !headIds.includes(i)).join(',')}]`),
+    `${headIds.length} 组且 id 集合与 HEAD 逐一对上`);
+  if (!shapeOk) {
+    record('L5', '线上 ↔ 镜像 逐字相同', false,
+      '探针形状不成立 ⇒ 这个"不一致"不可信（先怀疑探针，§7 元规则一）', '形状成立时才比');
+    return { liveOk: false, match: false, imageFp, liveFp: fingerprint(pairs), headFp };
+  }
+
+  const liveFp = fingerprint(pairs);
+  const diff = firstDifferences(liveFp, imageFp);
+  record('L5', '线上用户读到的版本 ↔ 镜像记账的版本 逐字相同', liveFp === imageFp,
+    liveFp === imageFp ? `两侧同一串（${liveFp.length} 字符）` : `差异 ${diff.length} 处：${diff.join(' ｜ ')}`,
+    '逐字相同');
+
+  console.log(`      HEAD 的指纹与线上${headFp === liveFp ? '相同' : '不同'}、与镜像${headFp === imageFp ? '相同' : '不同'}。`);
+  if (headFp !== liveFp || headFp !== imageFp) {
+    console.log('      ⚠️ 库已领先于部署两侧 ⇒ 此刻线上与镜像仍然自洽（所以这条腿绿），但**下一次只重建镜像');
+    console.log('      或不只发布落地页**就会把它判红。改版必须与 deployment §3.8 的镜像重建同一批。');
+  }
+  return { liveOk: true, match: liveFp === imageFp, imageFp, liveFp, headFp };
+}
+
+/** 记账域名取自 HEAD 的生成物，不再抄一份字面量（域名的第三份拷贝已有 `check:legal-host` 对账）。 */
+async function officialHost() {
+  const src = await git(['show', 'HEAD:server/src/legal.generated.ts']);
+  const hits = [...src.matchAll(/OFFICIAL_HOSTED_DOMAIN = "([^"]*)"/g)].map((m) => m[1]);
+  if (hits.length !== 1) throw new Error(`HEAD 的 OFFICIAL_HOSTED_DOMAIN 取到 ${hits.length} 条，探针不猜。`);
+  return hits[0];
+}
+
 // ───────────────────────────── 自检：每条腿都要能被改坏 ─────────────────────────────
+
+/** HEAD 里那套文本的指纹 —— L5 拿它当"id 集合的参照"与"库已领先部署"的证据。 */
+async function headSetVersion() {
+  const src = await git(['show', 'HEAD:server/src/legal.generated.ts']);
+  const hits = [...src.matchAll(/LEGAL_SET_VERSION = "([^"]*)"/g)].map((m) => m[1]);
+  if (hits.length !== 1) throw new Error(`HEAD 的 LEGAL_SET_VERSION 取到 ${hits.length} 条，探针不猜。`);
+  return hits[0];
+}
 
 async function selfTest() {
   console.log('🔬 --self-test：把每条判据的期望换成"必然不成立"的形状，验证它会红。\n');
@@ -262,6 +425,39 @@ async function selfTest() {
   record('L3 符号换成不存在的一个', img.map.get('typo')?.trim() === '0');
   record('L3 靶子目录写错时也是 0（所以 js_files 总数那条判据是承重的）', img.map.get('wrong_path')?.trim() === '0');
 
+  // ── L5：五个臂，前两个证明"取值形状"承重，后三个证明比对与对照不空转 ──
+  const headFp = await headSetVersion();
+  const headIds = headFp.split(';').map((s) => s.split('@')[0]).sort();
+  const imgText = await imageLegalGeneratedFile();
+  const quoted = [...imgText.matchAll(/LEGAL_SET_VERSION = "([^"]*)"/g)].map((m) => m[1]);
+  const loose = (imgText.match(/LEGAL_SET_VERSION =/g) ?? []).length;
+  const truncatedHit = imgText.match(/LEGAL_SET_VERSION = [^;]*/)?.[0];
+  record('L5 用截断形状（= [^;]*）取镜像串会少掉后半 ⇒ 带引号的正则是承重的',
+    quoted.length === 1 && truncatedHit !== undefined && truncatedHit !== `LEGAL_SET_VERSION = "${quoted[0]}"`);
+  record('L5 宽松匹配比带引号匹配多命中（镜像里确有 void 0 占位行，所以"恰好 1 条"那条对照不空转）',
+    loose > quoted.length);
+
+  const origin = `https://${await officialHost()}`;
+  const page = await httpGet(origin + LIVE_PROBE_PATH);
+  const asset = (page.body.match(/src="(\/assets\/main-[^"]+\.js)"/) ?? [])[1] ?? '';
+  const assetRes = await httpGet(`${origin}${asset}?_=${Date.now()}`);
+  const pairs = extractPairs(assetRes.body);
+  const liveFp = fingerprint(pairs);
+  const imageFp = quoted[0] ?? '';
+
+  const renamed = assetRes.body.split('id:"minors"').join('id:"zzz-renamed"');
+  const renamedIds = [...new Set(extractPairs(renamed).map(([id]) => id))].sort();
+  record('L5 线上产物里改一份文档的 id ⇒ id 集合对照失配（所以那条对照是承重的）',
+    renamedIds.length !== headIds.length || !headIds.every((id, i) => id === renamedIds[i]));
+  record('L5 打包形状一变（version:" → ver:"）提取器就数不满 ⇒ 会响亮失败，而不是安静比两个空串',
+    extractPairs(assetRes.body.split('version:"').join('ver:"')).length !== pairs.length);
+  const perturbed = fingerprint(pairs.map((p, i) => (i === 0 ? [p[0], p[1] === '9.9' ? '9.8' : '9.9'] : p)));
+  record('L5 线上任意一份的版本号退一位 ⇒ 与镜像不等', perturbed !== imageFp);
+  record('L5 把 HEAD 的指纹当"下一次重建后的镜像值"喂进来 ⇒ 与今天线上不等（库里已领先部署一次）',
+    headFp !== liveFp);
+  console.log(`\n      ℹ️  L5 三侧实测：线上=${liveFp.slice(0, 28)}… 镜像=${imageFp.slice(0, 28)}… HEAD=${headFp.slice(0, 28)}…`);
+  console.log(`      ℹ️  线上==镜像：${liveFp === imageFp ? '是（这条腿此刻绿）' : '否'}；HEAD==镜像：${headFp === imageFp ? '是' : '否（库领先于部署）'}。`);
+
   const bad = arms.filter((a) => !a.wouldFail);
   console.log(`\n自检汇总：${arms.length - bad.length}/${arms.length} 个变异臂会红。`);
   if (bad.length) console.error('❌ 以下判据是空的（改了也不红）：' + bad.map((a) => a.name).join(' / '));
@@ -276,6 +472,7 @@ if (SELF_TEST) {
   const l0 = await leg0();
   const db = await legDb();
   const img = await legImage();
+  const live = await legLive(await headSetVersion());
 
   const failed = rows.filter((r) => !r.ok);
   console.log(`\n记账：${rows.length - failed.length}/${rows.length} 条判据成立。`);
@@ -285,13 +482,16 @@ if (SELF_TEST) {
   else if (!db.controls) code = 1;
   else if (!db.l1 || !db.l2) code = 3;
   else if (!img.target) code = 4;
+  else if (!live.liveOk) code = 1;
+  else if (!live.match) code = 5;
 
   const why = {
-    0: 'G-32 的四条自动腿全绿：生产开始记版本号了。剩下的只有 L4（注册一条真账号复验那一行）。',
+    0: 'G-32 的四条自动腿 + L5（线上 ↔ 镜像同一套文本）全绿：生产开始记版本号了，且记的就是用户读到的那一套。剩下的只有 L4（注册一条真账号复验那一行）。',
     2: `G-32 未闭合，且**此刻修不了**：那条批次没进版本库（G-34）。未跟踪文件 ${DB_TARGET.migration}/ 与写入点带不出本机 —— 运维腿要等 L0 绿。`,
     3: 'G-32 未闭合：代码进了库但生产迁移没应用 ⇒ 跑 `export PATH="$PWD/research/tools/macos-sed-shim:$PATH"; cd server && sh scripts/migrate-deploy.sh`（不能 `prisma migrate deploy`）。',
     4: 'G-32 未闭合：库改好了但镜像里没这段代码 ⇒ 走 `server/scripts/deploy.sh` 重建并替换镜像。',
-    1: 'G-32 判据没跑成（探针侧的问题）：库的阳性对照不成立，先修探针再谈结论。',
+    5: 'G-36② 未闭合：用户读到的那一套 ↔ 服务端记账的那一套**不是同一套** ⇒ 此后每一条同意记录都是版本号写错了的证据。修法只有一种：把落地页发布与镜像重建收进**同一批**（deployment §3.8），而不是把这条判据放宽。',
+    1: 'G-32 判据没跑成（探针侧的问题）：库的阳性对照不成立，或 L5 的线上/镜像取值不成立 —— 先修探针再谈结论。',
   }[code];
   console.log(`\n🔎 结论（退出码 ${code}）：${why}`);
   process.exit(code);
