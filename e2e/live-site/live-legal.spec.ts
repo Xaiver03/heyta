@@ -59,6 +59,10 @@ import { expect, test, type Page } from '@playwright/test';
 // 参照物取自**构建产物**（见文件头）。零运行时依赖、无 import，所以 e2e 这份
 // 独立工作区不需要装 @heyta/legal 也能直接相对路径引入。
 import { LEGAL_DOCUMENTS, OPERATOR } from '../../packages/legal/dist/index.js';
+// 🔴 404 页的期望文案取自**词条表本身**，不在这里抄一遍字面量 ——
+// 抄件一定会漂，而漂了的判据比没有判据更糟（它会绿着放过错的东西）。
+import { zhCN } from '../../packages/i18n/dist/locales/zh-CN.js';
+import { en } from '../../packages/i18n/dist/locales/en.js';
 
 const ORIGIN = process.env['HEYTA_LIVE_ORIGIN'] ?? 'https://heyta.waytofuture.cn';
 /**
@@ -412,4 +416,122 @@ test('未命中的 /legal/* 是真 404；首页兜底与 /app/ 前端路由都�
 
   const hard = hardErrors(logs);
   expect(hard, `页面抛了未捕获异常：\n${hard.join('\n')}`).toEqual([]);
+});
+
+/**
+ * 🔴 G-35：未命中的 `/legal/*` 答的是**我们那一页**，不是 nginx 的裸默认页。
+ *
+ * 上一条判据（G-25b）只承诺"真 404 且不牵连前端路由"。它绿着的时候，访客看到的
+ * 仍然是两行 `404 Not Found` / `nginx/1.18.0 (Ubuntu)` —— 没有品牌、没有任何
+ * 能点的入口、还把服务器版本外露给任意外部访客。**说了真话但没人接**。
+ *
+ * 这一条判的四件事，每件都对应裸默认页的一个缺陷：
+ *
+ * 1. **状态码仍是 404** —— 这是最容易弄丢的一件：把它做成"品牌页"最省事的写法是
+ *    `try_files … /404.html`，而那会把状态码又变回 200，**恰好撤销 G-25b**。
+ *    所以这条必须与"正文是我们的页"**同时**成立 —— 单独任何一条都能绿。
+ * 2. **正文是我们那一页**（期望文案从 `packages/i18n` 的词条表取，不抄字面量）。
+ * 3. **页上每个入口都真的能打开** —— 不是"数出有 4 个链接"（那 4 个全指错也能绿），
+ *    而是逐个 fetch 要求 200。这条会随站点演化自动变严：入口指到一个改过名的路径时
+ *    它就红，不需要有人记得来改这里的期望值。
+ * 4. **服务器版本不再外露**（`Server` 头里数不出数字，正文里也没有 `nginx/`）。
+ *
+ * ⚠️ 还有一条**反向**判据：`/api/` 的 404 必须**仍是 JSON**。nginx 的
+ *    `error_page` 默认不接管上游响应（`proxy_intercept_errors` off），
+ *    但那取决于代理配置有没有别处打开过它 —— 一旦接管，同步客户端拿到的
+ *    就是 404 + 一张 HTML，症状会是"客户端 JSON 解析失败"而不是"路由不存在"。
+ */
+test('未命中的 /legal/* 答的是双语品牌 404 页；状态码仍是 404，且 /api/ 的 404 仍是 JSON', async ({
+  page,
+}) => {
+  const logs = attachLogs(page);
+  const cases = [
+    { path: '/legal/nope-not-a-doc/', locale: 'zh', table: zhCN, lang: 'zh-CN' },
+    { path: '/en/legal/nope-not-a-doc/', locale: 'en', table: en, lang: 'en' },
+  ] as const;
+
+  for (const { path, table, lang } of cases) {
+    const response = await page.goto(`${ORIGIN}${path}`, { waitUntil: 'domcontentloaded' });
+    const status = response?.status() ?? -1;
+    const serverHeader = (response?.headers()['server'] ?? '').trim();
+    const body = await page.content();
+
+    // 1) 状态码：404 而不是 200。
+    expect(
+      status,
+      `${path} 是 ${status}。200 意味着这张 404 页是用 try_files 兜底做的 —— 那会把"不存在"重新写成"存在"，正是 G-25b 刚拆掉的那台机器`,
+    ).toBe(404);
+
+    // 2) 正文是我们那一页。
+    expect(
+      body,
+      `${path} 的正文里没有本站 404 页的标题 —— 答的还是 nginx 的裸默认页（G-35）`,
+    ).toContain(table['site.notfound.heading']);
+    expect(body, `${path} 缺正文那一句`).toContain(table['site.notfound.body']);
+    expect(
+      body,
+      `${path} 的 <html lang> 不是 ${lang}（英文子树漏了 error_page，就会答成中文那页）`,
+    ).toContain(`<html lang="${lang}"`);
+    expect(body, `${path} 没有 noindex —— 404 不该向搜索引擎声明自己是一个页面`).toContain(
+      'name="robots"',
+    );
+
+    // 3) 每个入口逐个真打开。
+    const hrefs = await page.$$eval('nav a, p.alt a', (nodes) =>
+      nodes.map((node) => node.getAttribute('href')),
+    );
+    expect(
+      hrefs.length,
+      `${path} 上一个入口都没有 —— 那正是 G-35 记的"没有回首页／回法务清单的入口"`,
+    ).toBeGreaterThan(0);
+    for (const href of hrefs) {
+      expect(href, `${path} 上有入口取不到 href`).not.toBeNull();
+      const target = new URL(href as string, ORIGIN);
+      const linked = await page.request.get(target.toString(), {
+        headers: { 'cache-control': 'no-cache' },
+      });
+      expect(
+        linked.status(),
+        `${path} 给出的入口 ${href} 自己打不开（${linked.status()}）—— 这张页把人从一扇错门领到另一扇错门`,
+      ).toBe(200);
+    }
+
+    // 4) 服务器版本不外露。
+    expect(body, `${path} 的正文里出现了 nginx 版本`).not.toMatch(/nginx\/\d/);
+    expect(
+      serverHeader,
+      `${path} 的 Server 头是 "${serverHeader}" —— 还带着版本号，说明 server_tokens off 没生效（或没进这份配置）`,
+    ).not.toMatch(/\d/);
+  }
+
+  // 反向判据：/api/ 的 404 仍是上游的 JSON，不是被 error_page 换掉的那张 HTML。
+  const apiMiss = await page.request.get(`${ORIGIN}/api/nope-not-a-route`);
+  const apiType = apiMiss.headers()['content-type'] ?? '';
+  expect(
+    apiType,
+    `/api/ 未命中路由的 content-type 是 "${apiType}" 而不是 JSON —— error_page 接管了上游错误，同步客户端会 JSON 解析失败`,
+  ).toContain('json');
+  expect(
+    await apiMiss.text(),
+    `/api/ 未命中路由的响应体里出现了 404 页的文案`,
+  ).not.toContain(zhCN['site.notfound.heading']);
+
+  // 阳性对照：真实法务页仍 200，且**不是** 404 页的字节。
+  const realPage = await page.goto(`${ORIGIN}/legal/privacy/`, { waitUntil: 'domcontentloaded' });
+  expect(
+    realPage?.status(),
+    `/legal/privacy/ 变成了 ${realPage?.status()} —— 加 error_page 时把真页面一起弄没了`,
+  ).toBe(200);
+  expect(await page.content(), `/legal/privacy/ 答的竟是 404 页`).not.toContain(
+    zhCN['site.notfound.heading'],
+  );
+
+  // 规定一：两侧各留一张图，且**人必须打开看过**。
+  for (const { path, locale } of cases) {
+    await page.goto(`${ORIGIN}${path}`, { waitUntil: 'domcontentloaded' });
+    await page.screenshot({ path: `${SHOT_DIR}/live-notfound-${locale}.png`, fullPage: true });
+  }
+
+  const hard = hardErrors(logs);
+  expect(hard, `404 页抛了未捕获异常：\n${hard.join('\n')}`).toEqual([]);
 });
