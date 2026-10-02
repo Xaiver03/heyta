@@ -200,6 +200,17 @@ export function TaskRow({
           // body 仍计算为 `min-width: 0px`（RNW 的 `flex: 1` 已经把 min-width 归零），
           // `scrollWidth == clientWidth`，长标题与不可断行的长 URL 都照常换行。
           // 留着它 = 一条永远通过的判据 + 一段说错原因的注释，比不写更糟。
+          /**
+           * 🔴 但"**归零**"和"**没有下限**"是两件事：`flex: 1` 在 RNW 上算出
+           * `flex-basis: 0%`，于是 body 只拿"行尾控件要完之后剩下的"。桌面载荷实测
+           * （视口 900）：行尾常驻控件要 496px，body 剩 **0px ⇒ 标题整条消失**，
+           * 用户看得见"这里有一条任务"，看不见它是什么。
+           * 这条**百分比下限**防的就是那个 0：窄窗口下行尾换行让位，
+           * 宽窗口（≥1120）它不生效；移动端行尾只有一个删除键（≈44/390），
+           * body 恒在 70% 以上，所以下限在手机上惰性。
+           * 三档 A/B 与截图见 `docs/plans/ui-review-fill-zh-timeline.md` 的 G9 条目。
+           */
+          minWidth: '30%',
           paddingVertical: tokens[spec.bodyPaddingBlock] as DimensionValue,
           gap: tokens[spec.gap],
         } as const,
