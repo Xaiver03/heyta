@@ -28,6 +28,22 @@
 | 文件 | 线上路径 |
 |---|---|
 | `heyta.finlaw.cloud.conf` | `/etc/nginx/sites-available/heyta.finlaw.cloud` |
+| `heyta.waytofuture.cn.conf` | `/etc/nginx/sites-available/heyta.waytofuture.cn` |
+
+⚠️ **脚本的默认值是 `heyta.finlaw.cloud`**（那台机器上先有的域名）。要核对/应用**当前
+面向用户的那个域名**，必须显式给远端路径，否则比对的是旧域名那份：
+
+```bash
+HEYTA_NGINX_REMOTE_PATH=/etc/nginx/sites-available/heyta.waytofuture.cn \
+  server/scripts/nginx-sync.sh --check
+```
+
+⚠️ **`heyta.waytofuture.cn.conf` 是 2026-10-02 才纳管的**：域名迁移那轮（2026-09-30）
+把配置直接改在服务器上，仓库副本一直没进库 —— 也就是说这个目录存在的理由（"让线上
+有哪些 location 可被 diff"）在**当时正在用的那个域名**上恰好是失效的。纳管前先用
+`--check` 与线上逐字节对过：差异**只有 `-` 行**（仓库有、线上没有），即本轮 G-35 新增的
+那 4 行（`server_tokens off` + 3 处 `error_page`）；线上没有任何一处是仓库不知道的。
+这条判据必须在 `--apply` **之前**成立 —— 否则 `--apply` 会连带把别人的线上修复回滚掉。
 
 ⚠️ **本机是显式 include 白名单**，不是 `sites-enabled/*` 通配：
 `/etc/nginx/nginx.conf` 里逐行写着 `include /etc/nginx/sites-enabled/<name>;`。
