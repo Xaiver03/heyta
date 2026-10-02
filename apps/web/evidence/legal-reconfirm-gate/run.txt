@@ -1,0 +1,18 @@
+# G-27 补签面板真浏览器验收（2026-10-02，生产构建 + Chromium headless，端口 4323）
+# 命令：pnpm --filter @heyta/web build && (cd e2e && npx playwright test --config playwright.legal-reconfirm.config.ts)
+
+[范围对照] 待补签期间仍然出境的账号级请求：GET /api/notifications, GET /api/sync/status
+  ✓  1 [chromium] › tests/legal-reconfirm-gate.spec.ts:168:3 › G-27 · 改版后要重新确认才准同步（真浏览器） › 待补签：面板出现、只有一个肯定动作，op-log 与实时通道两个出口都是零 (493ms)
+  ✓  2 [chromium] › tests/legal-reconfirm-gate.spec.ts:210:3 › G-27 · 改版后要重新确认才准同步（真浏览器） › 两条条款链接指向这台实例自己，而且是链接不是按钮 (323ms)
+  ✓  3 [chromium] › tests/legal-reconfirm-gate.spec.ts:228:3 › G-27 · 改版后要重新确认才准同步（真浏览器） › 点「稍后再说」：面板收起但**不留任何记录**，刷新后还在（推迟不是同意） (1.7s)
+[browser error] WebSocket connection to 'ws://127.0.0.1:4323/api/sync/ws?token=E2E-TOKEN-123&clientId=cf1a5874-86f9-4afb-889d-696b50b2df6a' failed: Error during WebSocket handshake: Unexpected response code: 200
+[browser error] WebSocket connection to 'ws://127.0.0.1:4323/api/sync/ws?token=E2E-TOKEN-123&clientId=cf1a5874-86f9-4afb-889d-696b50b2df6a' failed: Error during WebSocket handshake: Unexpected response code: 200
+  ✓  4 [chromium] › tests/legal-reconfirm-gate.spec.ts:269:3 › G-27 · 改版后要重新确认才准同步（真浏览器） › 点「我已读完并确认」：提交的是刚展示的那一版，随后面板消失 (614ms)
+[browser error] WebSocket connection to 'ws://127.0.0.1:4323/api/sync/ws?token=E2E-TOKEN-123&clientId=659633d5-57af-4b43-9906-1d250110a8f4' failed: Error during WebSocket handshake: Unexpected response code: 200
+[browser error] WebSocket connection to 'ws://127.0.0.1:4323/api/sync/ws?token=E2E-TOKEN-123&clientId=659633d5-57af-4b43-9906-1d250110a8f4' failed: Error during WebSocket handshake: Unexpected response code: 200
+  ✓  5 [chromium] › tests/legal-reconfirm-gate.spec.ts:315:3 › G-27 · 改版后要重新确认才准同步（真浏览器） › 🔴 已同意当前版本的人：一个弹窗都不许看到（防"每次都拦"的误伤） (1.8s)
+  ✓  6 [chromium] › tests/legal-reconfirm-gate.spec.ts:335:3 › G-27 · 改版后要重新确认才准同步（真浏览器） › 英文界面：这句承诺是英文，且不漏汉字 (333ms)
+  6 passed (6.3s)
+
+# 三张没有面板的状态图逐字节相同（md5 已核）：after-confirm-zh.png 与 clear-no-panel.png（原本还有一张 after-defer.png，已删——同一张图当三条证据是凑数）。
+# 这正是这一支的结论所在：闸门拦与放**在界面上看不出差别**，所以判据只能落在请求计数与 localStorage 上（见 spec 文件头）。
