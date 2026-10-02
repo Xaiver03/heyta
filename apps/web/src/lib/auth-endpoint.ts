@@ -1,3 +1,6 @@
+/** 🔴 官方公共服务器的唯一常量（住在 app-host，与法务链接同一份，不抄第二份）。 */
+import { OFFICIAL_SITE_ORIGIN } from '@heyta/app-host';
+
 /**
  * 「这次认证要发给哪台服务端」的唯一判据
  * =======================================
@@ -68,14 +71,51 @@ function configuredSyncUrl(): string | null {
 /**
  * 认证动作的目标服务端地址（**不带尾斜杠**）。
  *
- * 优先级：`VITE_SYNC_URL` → 已保存的同步地址 → 当前来源。
+ * 优先级：`VITE_SYNC_URL` → 已保存的同步地址 → 当前来源 → **官方公共服务**。
  *
  * @param configuredBaseUrl `useSyncStore.baseUrl`（用户已配置的那台）。空串表示没配过。
+ *
+ * 🔴 最后那一档是 2026-10-02 补的，因为它在**原生壳里是坏的**。产品负责人对着
+ * macOS 壳的截图问：「为什么还是默认就是要什么粘贴服务器地址和令牌之类的东西？
+ * 一定是默认是我们提供公共服务的。」截图里那一栏预填的是 `heyta-local://app` ——
+ * 那不是"我们提供公共服务"，那是**一个发不出请求的地址**：
+ * 壳的 WebView 从自定义 scheme 加载共享 UI，`window.location.origin` 就是那个 scheme。
+ * 旧注释说"来源本身就是答案，不是猜一个域名"，这句话在 web 上成立
+ * （官方部署是站点 `/` + 应用 `/app/` + API `/api/` 同一个 origin），
+ * 在壳里恰好相反：**来源根本不是服务端**。
+ *
+ * ⇒ 判据从"取来源"改成"**取一个真的是服务端的来源**"：协议不是 http/https 时
+ * 回落到 `OFFICIAL_SITE_ORIGIN`。那个常量住在 `@heyta/app-host`，
+ * 与法务链接判定官方实例用的是**同一个**（不在这里抄第二份）。
+ *
+ * ⚠️ 这一档**不改变**自建部署的形态：自建者跑的是 web（http/https 来源），
+ * 走的还是"来源就是答案"那条；而他们真的要在壳里自建时，
+ * 入口是表单里那条「我自己部署」（不是默认屏）。
  */
 export function authBaseUrl(configuredBaseUrl = ''): string {
   const configured = configuredBaseUrl.trim().replace(/\/+$/, '');
   if (configured !== '') return configured;
-  return configuredSyncUrl() ?? window.location.origin;
+  const fromBuild = configuredSyncUrl();
+  if (fromBuild !== null) return fromBuild;
+  return httpOriginOrOfficial();
+}
+
+/**
+ * 当前来源只有在"它真的是一台可以用 HTTP 访问的服务端"时才算答案。
+ *
+ * ⚠️ 每次调用都重新读 `window.location.origin`：模块顶层读一次会把**第一次**的
+ * 结果永久钉住，而 jsdom 与真浏览器、壳与 web 的 origin 各不相同，
+ * 测试就覆盖不到三种部署形态。
+ */
+function httpOriginOrOfficial(): string {
+  const origin = typeof window === 'undefined' ? '' : window.location.origin;
+  try {
+    const { protocol } = new URL(origin);
+    if (protocol === 'https:' || protocol === 'http:') return origin;
+  } catch {
+    // 不是绝对 URL（例如 `null` origin 或 about:blank）—— 直接走公共服务。
+  }
+  return OFFICIAL_SITE_ORIGIN;
 }
 
 /**
