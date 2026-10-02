@@ -68,11 +68,20 @@
 
 | 文件 | 说明 |
 |---|---|
-| [`ai-strategy.md`](ai-strategy.md) | 策略入口（被引用最多的一份，13 处） |
+| [`ai-strategy.md`](ai-strategy.md) | 策略入口（被引用最多的一份，13 处）。🔴 **§8 那张"下一步"表已过期**：第 3、4 行（捕获解析、拆解）在 §7.1 里自己标了已完成，只有第 5 行"agent 多步自主 / Pi / 仅桌面"仍有效 |
+| [`ai-assistant-closure.md`](ai-assistant-closure.md) | **规划中**（2026-10-02）：AI 能力面补齐的**执行工单**（W1–W14，缺口编号 `AI-G*`）。🔴 它是 `ai-strategy.md` §8 信任阶梯的拆解，**不是第二份策略** —— 冲突时以 `ai-strategy.md` 为准。分两段：W1–W7 不依赖拍板可直开；W8+ 挂在三处待决（D-1 是否取代 ADR-0005 的"不做聊天助手"禁令、D-1a 多步是否含"末尾一次写提案"、D-2 工具目录共用后的授权粒度）。证据在 [`dida-ai-assistant-gap-analysis.md`](../research/dida-ai-assistant-gap-analysis.md) |
 | [`ai-capability-branches.md`](ai-capability-branches.md) | 能力分支与开发分支策略 |
 | [`ai-memory-system.md`](ai-memory-system.md) | 记忆系统 |
 | [`ai-tier-pricing-rollout.md`](ai-tier-pricing-rollout.md) | 分档与定价 |
 | [`ai-handoff.md`](ai-handoff.md) | 交接（⚠️ 无状态行） |
+
+> 🔴 **两份 AI 审计回答的是两个不同问题，别混**：
+> [`ai-feature-completeness-audit.md`](../research/ai-feature-completeness-audit.md)（2026-09-30）问的是
+> "**已声明的 AI 功能做完了吗**"（答：本地模式代码层完整）；
+> [`dida-ai-assistant-gap-analysis.md`](../research/dida-ai-assistant-gap-analysis.md)（2026-10-02）问的是
+> "**用户能使唤 AI 干活吗、和滴答助手差在哪**"（答：今天连不上，且多步被架构锁死）。
+> 后者对前者追加了 §8 勘误 —— 包括一条会**把工作量估错方向**的误判（那 3 个需要 `entityId` 的工具
+> **已经写好了**，缺的是让它们可达的多步循环，不是再写一遍）。
 
 ---
 
