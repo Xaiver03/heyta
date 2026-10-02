@@ -212,6 +212,134 @@ for (const page of SITE_PAGES) {
   }
 }
 
+/* ── 404 页（G-35）─────────────────────────────────────────── */
+
+/**
+ * 站点自己的 404 页，中英各一份：`public/404.html` 与 `public/en/404.html`。
+ *
+ * 🔴 **为什么它由这个脚本生成，而不是手写两份。** 它是 `error_page 404` 的落点，
+ * 而 `error_page` 是**内部跳转** —— 状态码保持 404（用 `try_files … /404.html`
+ * 会把状态码又变回 200，那正是 G-25b 刚修掉的坏法）。跳转过去的文件本身
+ * 是一份站点产物，它要跟着语言走、跟着导航走、跟着设计 token 走。
+ * 手写的失败方式和其它入口一模一样：**静默**。这份页面上的四个链接此前
+ * 只能抄字面量（`/docs/`、`/en/legal/privacy/`），而改一次页面路径
+ * 只有这一页不会跟着改 —— 它平时根本不出现，出现了也只是一张 404。
+ * 走 `hrefPath()` 之后，路径只有一个事实源。
+ *
+ * 🔴 **色值同样不抄**：`{{T:…}}` 由生成器从 `packages/design-system` 的
+ * `generated/tokens.json`（light 块）取值，与 `server/src/design.generated.ts`
+ * 同一来源。改 token → 产物字节变 → `check:entries` 逐字节比对红。
+ */
+const notfoundTemplate = readFileSync(join(HERE, 'notfound-template.html'), 'utf8');
+
+const TOKEN_LIGHT = JSON.parse(
+  readFileSync(join(HERE, '../../../packages/design-system/generated/tokens.json'), 'utf8'),
+).light;
+
+/**
+ * 取一个 token 并**带单位**输出；取不到就报错，不生成本半截的页面。
+ *
+ * 🔴 单位规则不是这里发明的，是 `server/src/design.generated.ts` 已经在用的那套
+ * （`'font-size.base': '16px'` 与 `'font-weight.semibold': 600` 同时出现在同一个文件里）：
+ * `tokens.json` 把尺寸存成**裸数字**（`16`）、字重与行高也是裸数字（`600` / `1.5`），
+ * 只有尺寸类要补 `px`。字重/行高补单位会直接让 CSS 失效 —— 所以白名单写在这，
+ * 模板里只写裸 `{{T:…}}`，不写 `px`（写了就会变成 `16pxpx`）。
+ */
+const UNITLESS_TOKENS = /^(font-weight|line-height)\./;
+
+function tokenValue(name) {
+  const value = TOKEN_LIGHT[name];
+  if (typeof value !== 'string' && typeof value !== 'number') {
+    throw new Error(
+      `设计 token 里没有 ${name}（tokens.json 的 light 块）—— 去 packages/design-system 加，别在模板里写死`,
+    );
+  }
+  const text = String(value);
+  if (text === '') throw new Error(`token ${name} 是空值`);
+  // 这些值直接进 `<style>`：`<`/`>` 能提前闭合 `</style>`，`{`/`}` 会打乱声明块。
+  // 🔴 引号**不算**违规 —— `font.sans` 逐字就是 `'Plus Jakarta Sans', …`。
+  if (/[<>{}]/.test(text)) throw new Error(`token ${name} 的形状不像 CSS 值：${text}`);
+  if (typeof value === 'number') {
+    if (!Number.isFinite(value)) throw new Error(`token ${name} 不是有限数：${text}`);
+    return UNITLESS_TOKENS.test(name) ? text : `${text}px`;
+  }
+  return text;
+}
+
+/** `{{T:color.primary}}` → 真值。 */
+function fillTokens(html) {
+  return html.replaceAll(/\{\{T:([a-z0-9.-]+)\}\}/g, (_match, name) => tokenValue(name));
+}
+
+/** 按 id 从注册表取页 —— 取不到就红：那意味着 404 页要把人指向一个不存在的东西。 */
+function pageById(id) {
+  const page = SITE_PAGES.find((entry) => entry.id === id);
+  if (page === undefined) {
+    throw new Error(`站点注册表里没有 id 为 ${id} 的页面 —— 404 页那条链接无处可指`);
+  }
+  return page;
+}
+
+const NOTFOUND_TARGETS = {
+  home: pageById('home'),
+  help: pageById('help'),
+  privacy: pageById('legal-privacy'),
+  terms: pageById('legal-terms'),
+};
+
+for (const locale of LOCALES) {
+  const table = TABLES[locale];
+  // 🔴 换语言那条链接的**文案**是按"恰好另一种语言"写的（中文表里写的是英文站、
+  //   英文表里写的是中文站）。加第三种语言时这句话就不成立了，而 `LOCALES.find`
+  //   会安静地选中第一种 —— 症状是日文页上有个"切换到英文站点"但其实该有两个选项。
+  //   所以这里宁可直接炸，也不让它在未来变成一条自我感觉良好的错话。
+  if (LOCALES.length !== 2) {
+    throw new Error(`404 页的换语言链接只在恰好两种语言时成立，现在是 ${LOCALES.length} 种（${LOCALES.join(', ')}）`);
+  }
+  const other = LOCALES.find((entry) => entry !== locale);
+  if (other === undefined) {
+    throw new Error('LOCALES 里只有一种语言，404 页那条换语言链接无处可指');
+  }
+
+  /**
+   * 词条缺失**必须炸**，不能渲染成 `undefined`：这一页一年里几乎不出现，
+   * 而它出现的那一次正是用户在出错的时候。`{{BODY}}` 打成 `undefined`
+   * 没有任何一道闸会因此变红 —— 除了这一行。
+   */
+  const text = (key) => {
+    const value = table[key];
+    if (typeof value !== 'string' || value === '') {
+      throw new Error(`词条表 ${locale} 里没有 ${key}（404 页要用）—— 中英两边都得加`);
+    }
+    return escapeHtml(value);
+  };
+
+  const homeDir = entryDir(NOTFOUND_TARGETS.home, locale);
+  const html = fillTokens(notfoundTemplate)
+    .replaceAll('{{LANG}}', locale)
+    .replaceAll('{{TITLE}}', text('site.notfound.seo.title'))
+    .replaceAll('{{HEADING}}', text('site.notfound.heading'))
+    .replaceAll('{{BODY}}', text('site.notfound.body'))
+    .replaceAll('{{NAV_ARIA}}', text('site.nav.aria'))
+    .replaceAll('{{HOME_TEXT}}', text('site.notfound.home'))
+    .replaceAll('{{HOME_URL}}', hrefPath(NOTFOUND_TARGETS.home, locale))
+    .replaceAll('{{HELP_TEXT}}', text('site.nav.help'))
+    .replaceAll('{{HELP_URL}}', hrefPath(NOTFOUND_TARGETS.help, locale))
+    .replaceAll('{{PRIVACY_TEXT}}', text('site.footer.legal.privacy'))
+    .replaceAll('{{PRIVACY_URL}}', hrefPath(NOTFOUND_TARGETS.privacy, locale))
+    .replaceAll('{{TERMS_TEXT}}', text('site.footer.legal.terms'))
+    .replaceAll('{{TERMS_URL}}', hrefPath(NOTFOUND_TARGETS.terms, locale))
+    .replaceAll('{{OTHER_TEXT}}', text('site.notfound.otherLanguage'))
+    .replaceAll('{{OTHER_URL}}', hrefPath(NOTFOUND_TARGETS.home, other));
+
+  // 🔴 落点是 `public/`，不是包根：`viteInputEntries()` 只从 `SITE_PAGES` 注册表
+  //   取多页入口，注册表里没有"404"这一页（它也不该有 —— ADR-0033 的双向可达性门禁
+  //   会遍历注册表要求每页互相链接，而 404 不是一页）。`public/` 下的东西由 Vite
+  //   原样拷进站点根，同一批里 `public/sitemap.xml` 就是这个形状。
+  //   ⇒ 线上落点正是 nginx `error_page 404 /404.html;` 要跳的那两个路径。
+  artifacts.set(`public/${homeDir === '' ? '' : `${homeDir}/`}404.html`, html);
+}
+
 /* ── sitemap.xml ──────────────────────────────────────────── */
 
 const urlEntries = [];
