@@ -84,6 +84,14 @@ export interface TextProps {
   numberOfLines?: number;
   /** 允许长按选中 —— 给错误详情这类"用户要复制去反馈"的文字用。 */
   selectable?: boolean;
+  /**
+   * 在横向行里占满剩余宽度（`flex: 1`）。
+   *
+   * 🔴 它是 `HStack` 的配套：行里"标题靠左、元信息靠右"是最常见的形状，
+   * 而这件事以前只能写 `style={{ flex: 1 }}` —— 一个纯布局意图，
+   * 却要每处开一条内联样式（`check:l4` 的棘轮数它）。
+   */
+  grow?: boolean;
 }
 
 export function Text({
@@ -93,6 +101,7 @@ export function Text({
   style,
   numberOfLines,
   selectable,
+  grow = false,
 }: TextProps): React.JSX.Element {
   const t = useTokens();
   const text = useText();
@@ -106,6 +115,9 @@ export function Text({
         // 字号 / 字重 / 行高 / 字距 / 等宽**全部**由这一个对象决定。
         text[variant],
         { color: t[TONE_TOKENS[tone]], fontFamily: native.fontSans },
+        // 顺序有意：`grow` 在调用方的 `style` **之前**，
+        // 所以极端情况下显式样式还能覆盖它 —— 反过来就变成组件替调用方做主。
+        grow ? { flex: 1 } : null,
         style,
       ]}
     >
@@ -539,9 +551,10 @@ export function Badge({ count, max = 99, dot, tone = 'danger' }: BadgeProps): Re
  * 可以搬 —— `Card` 只收 `style`，所以视图只能自己写 `{ gap: tokens['space.3'] }`，
  * 于是同一个值在 `ExportScreen` 一个文件里就写了四遍。
  */
-export type GapTier = 'default' | 'loose';
+export type GapTier = 'tight' | 'default' | 'loose';
 
 function gapValue(t: ReturnType<typeof useTokens>, gap: GapTier): number {
+  if (gap === 'tight') return t['space.1'];
   return gap === 'loose' ? t['space.3'] : t['space.2'];
 }
 
@@ -561,6 +574,40 @@ export function Stack({
   const t = useTokens();
   return (
     <View {...rest} style={[{ gap: gapValue(t, gap) }, style]}>
+      {children}
+    </View>
+  );
+}
+
+/**
+ * 横向版 `Stack`：一行里放几样东西（标题 + 元信息、两个按钮并排）。
+ *
+ * 🔴 `align` **默认不给** —— 这很重要：`alignItems` 缺省是 `stretch`，
+ * 而"标题与右侧日期基线对齐"这类行要的是 `center`。把默认值定成
+ * `center` 会让所有没写 `align` 的调用点悄悄改布局，
+ * 而定成 `undefined` 时它和以前的 `<View style={{ flexDirection: 'row' }}>` 逐字节等价。
+ */
+export function HStack({
+  gap = 'default',
+  align,
+  children,
+  style,
+  ...rest
+}: {
+  gap?: GapTier;
+  align?: 'center';
+  children: React.ReactNode;
+} & ViewProps): React.JSX.Element {
+  const t = useTokens();
+  return (
+    <View
+      {...rest}
+      style={[
+        { flexDirection: 'row', gap: gapValue(t, gap) },
+        align === 'center' ? { alignItems: 'center' } : null,
+        style,
+      ]}
+    >
       {children}
     </View>
   );
