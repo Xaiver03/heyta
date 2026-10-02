@@ -25,6 +25,8 @@
 
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
+import { OFFICIAL_SITE_ORIGIN } from '@heyta/app-host';
+
 import { authBaseUrl, isUnconfigured } from '../src/lib/auth-endpoint.js';
 
 afterEach(() => {
@@ -81,5 +83,61 @@ describe('isUnconfigured', () => {
   it('🔴 有了同源默认值之后，"没配过"这个状态**仍然存在** —— 它不能被默认值冒充', () => {
     expect(isUnconfigured('')).toBe(true);
     expect(isUnconfigured(authBaseUrl(''))).toBe(false);
+  });
+});
+
+/**
+ * 🔴 原生壳里"来源"根本不是服务端。
+ *
+ * 2026-10-02 产品负责人对着 macOS 壳的截图问：「为什么还是默认就是要什么粘贴
+ * 服务器地址和令牌之类的东西？……一定是默认是我们提供公共服务的。」
+ * 那张图里预填的是 `heyta-local://app` —— 壳的 WebView 从自定义 scheme 加载共享 UI，
+ * 于是 `window.location.origin` 就是那个 scheme，而它**一个请求都发不出去**。
+ * 上面第 1 条判据（"来源就是答案"）在 web 上成立，在壳里恰好是反的。
+ *
+ * 三条各挡一种错法：
+ *   · 回落必须是**公共服务**，不是空串、不是那个 scheme；
+ *   · `null` / 非 URL 的来源（隐私窗口、about:blank）走同一条，不能抛；
+ *   · 🔴 自建 **web** 的来源必须**原样保留** —— 把这一档做成"永远优先公共服务"
+ *     就是把上一轮拆掉的那道墙换个方向砌回来（自建用户会被默默发到我们服务器上）。
+ */
+describe('authBaseUrl：来源不是 http(s) 时（macOS / Windows 壳）', () => {
+  const withOrigin = (origin: string, run: () => void): void => {
+    const original = window.location;
+    Object.defineProperty(window, 'location', {
+      value: { origin },
+      configurable: true,
+      writable: true,
+    });
+    try {
+      run();
+    } finally {
+      Object.defineProperty(window, 'location', {
+        value: original,
+        configurable: true,
+        writable: true,
+      });
+    }
+  };
+
+  it('自定义 scheme 的来源 ⇒ 官方公共服务，而不是那个发不出请求的地址', () => {
+    withOrigin('heyta-local://app', () => {
+      const url = authBaseUrl('');
+      expect(url).not.toContain('heyta-local');
+      expect(new URL(url).protocol).toBe('https:');
+      expect(url).toBe(OFFICIAL_SITE_ORIGIN);
+    });
+  });
+
+  it('来源是 `null`（不是绝对 URL）⇒ 同一条回落，且不抛', () => {
+    withOrigin('null', () => {
+      expect(authBaseUrl('')).toBe(OFFICIAL_SITE_ORIGIN);
+    });
+  });
+
+  it('🔴 自建 web 的 http(s) 来源**原样保留** —— 不许被公共服务顶掉', () => {
+    withOrigin('https://sync.mycompany.example', () => {
+      expect(authBaseUrl('')).toBe('https://sync.mycompany.example');
+    });
   });
 });
