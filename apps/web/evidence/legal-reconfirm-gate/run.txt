@@ -28,3 +28,31 @@
 #     WebSocket connection to 'ws://127.0.0.1:4323/api/sync/ws?token=E2E-TOKEN-123&clientId=…' failed: … 200
 #   ⇒ "补签完成后实时通道当场重开"这句现在有一条**应用自己的**出站握手作为实物，
 #     不再是"数到一条就算"的恒真对照。
+
+# ── 2026-10-02 追加：面板样式从内联 style 搬进 sheets.css 之后，重跑 + 逐字节比对 ──
+# 起因（本会话自己造的红，两道门禁各抓一次）：
+#   check:l4    apps/web/src/features 内联 style={{ 100 → 115，基线 104（脚本按目录报，
+#               并把 LegalReconfirmSheet.tsx 点名列出：15 处）
+#   check:design sheets.css:232 [sm+regular] / :245 [base+regular] ——
+#               "档位表外的成对自拼排版"，而这正是语义档位 row-meta / row-title 的取值
+# 修法（**没有调高任何基线、没有往 PAIRED_TYPOGRAPHY_ALLOW 加行**）：
+#   排版整条改由 JSX 成对挂 .ht-type-section-title / -row-title / -row-meta，
+#   CSS 里只留 margin / color / flex。
+# 实测（同一台机器、同一份 dist）：
+#   check:design  → ✅ 无硬编码设计变量，exit 0
+#   check:l4      → web 段不再列出该文件；脚本仍整体红，红在 **apps/mobile/src/screens**
+#                   （111 > 基线 90）：origin/main 上按 style={{ 逐文件求和 = 104，
+#                   7faad7a8^（我的移动那笔之前）同为 104 ⇒ 与本会话无关，未动它。
+#                   本机工作树 114 = 104 + 未跟踪的 SecurityScreen.tsx 10 处（别的会话）。
+#   web 套件      → 1397 passed / 12 skipped（102 文件）。
+#                   ⚠️ 第一次跑有 1 条 reminders-panel.spec.tsx:256 失败，单独跑 6/6 过、
+#                   整轮重跑 102 文件全过 ⇒ 记为已知 flake，未改任何判据。
+#   e2e 两套配置  → 主配置（vite dev + 4318）6 passed (15.4s) exit 0
+#                   专用配置（生产构建 + 4323）6 passed (6.9s) exit 0
+# 视觉为零的判据（不是"看起来一样"）：把改前入库的四张图留在 /tmp 逐字节比：
+#   reconfirm-panel-zh.png / reconfirm-panel-en.png / after-confirm-zh.png /
+#   clear-no-panel.png   →  四张全部 **BYTE-IDENTICAL**（cmp -s）
+#   after-defer.png 与上面两张同图（sha256 4a9b17c9…），按第 17 行的口径再次删掉，不入库。
+# 人眼复核：本会话真的打开了 reconfirm-panel-zh.png 与 reconfirm-panel-en.png 两张
+#   （中文：标题「条款文本已经更新」+ 主按钮「我已读完并确认」+ 从属「稍后再说（继续不同步）」；
+#    英文：同层级、零汉字残留）。

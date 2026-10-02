@@ -26,17 +26,25 @@
  *
  * 与隐私面板那句"落盘失败不许静默"同一条纪律：`store.ts` 的 `confirm()` 在闸门仍然
  * 拦着时**保持打开**，并把失败按结构化原因翻成一句人话。收起来就等于"点了没反应"。
+ *
+ * ## 样式为什么在 `styles/app/sheets.css` 里，而排版为什么不在
+ *
+ * `check:l4` 的判据是"features 里的内联样式 `style={{…}}` 只减不增"，且明写不许为了
+ * 变绿把基线调高 —— 所以布局与颜色搬进了 CSS，取值全部来自 token（CSS 变量）。
+ * 搬过去之后 `check:design` 又抓了一道：字号+字重在 CSS 里成对自拼 = "档位表外的
+ * 第二套排版"，而 `sm+regular`/`base+regular` 恰好就是语义档位的取值。
+ * ⇒ 排版**不写在 CSS 里**：JSX 成对挂 `.ht-type-section-title` / `-row-title` /
+ * `-row-meta`（AGENTS §5 第三条"要新变量先加 token"的同一条纪律，对象是文字档位）。
  */
 
 import { useEffect, useRef, useState } from 'react';
 import { ScrollText } from 'lucide-react';
 
-import { cssVar, ICON_SIZE } from '@heyta/design-system';
+import { ICON_SIZE } from '@heyta/design-system';
 import { useI18n } from '@heyta/i18n';
 import { resolveLegalLinks } from '@heyta/app-host';
 
 import { authBaseUrl } from '../../lib/auth-endpoint.js';
-import { text } from '../../lib/text.js';
 import { legalRecheck } from './gate.js';
 import { useLegalReconfirmStore } from './store.js';
 import { useSyncStore } from '../sync/store.js';
@@ -87,19 +95,7 @@ export function LegalReconfirmSheet(): React.JSX.Element | null {
           : null;
 
   return (
-    <div
-      role="presentation"
-      style={{
-        position: 'fixed',
-        inset: 0,
-        background: cssVar('color.overlay'),
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        padding: cssVar('space.4'),
-        zIndex: cssVar('z.modal'),
-      }}
-    >
+    <div role="presentation" className="ht-reconfirm">
       <div
         ref={dialogRef}
         tabIndex={-1}
@@ -107,108 +103,67 @@ export function LegalReconfirmSheet(): React.JSX.Element | null {
         data-testid="legal-reconfirm-dialog"
         aria-modal="true"
         aria-labelledby="ht-legal-reconfirm-title"
-        style={{
-          width: '100%',
-          maxWidth: cssVar('layout.modal-max'),
-          maxHeight: '90vh',
-          overflowY: 'auto',
-          display: 'flex',
-          flexDirection: 'column',
-          gap: cssVar('space.4'),
-          background: cssVar('color.surface-raised'),
-          borderRadius: cssVar('radius.lg'),
-          boxShadow: cssVar('shadow.lg'),
-          padding: cssVar('space.6'),
-          color: cssVar('color.foreground'),
-        }}
+        className="ht-reconfirm__dialog"
       >
-        <div style={{ display: 'flex', alignItems: 'flex-start', gap: cssVar('space.3') }}>
-          <span
-            style={{ display: 'flex', color: cssVar('color.primary'), paddingTop: cssVar('space.1') }}
-          >
+        <div className="ht-reconfirm__head">
+          <span className="ht-reconfirm__icon">
             <ScrollText size={ICON_SIZE.md} aria-hidden="true" />
           </span>
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <h2 id="ht-legal-reconfirm-title" style={{ margin: 0, ...text('section-title') }}>
+          <div className="ht-reconfirm__titles">
+            <h2 id="ht-legal-reconfirm-title" className="ht-reconfirm__title ht-type-section-title">
               {t('common.legal.reconfirm.title')}
             </h2>
             {reason === 'required-for-action' ? (
               // 用户刚点了同步，界面却拦下来 —— 不解释为什么，那看起来像坏了。
-              <p
-                style={{
-                  margin: `${cssVar('space.1')} 0 0`,
-                  ...text('row-meta'),
-                  color: cssVar('color.foreground-muted'),
-                }}
-              >
+              <p className="ht-reconfirm__reason ht-type-row-meta">
                 {t('common.sync.error.legalReconfirmRequired')}
               </p>
             ) : null}
           </div>
         </div>
 
-        <p style={{ margin: 0, ...text('row-title') }}>{t('common.legal.reconfirm.intro')}</p>
+        <p className="ht-reconfirm__intro ht-type-row-title">{t('common.legal.reconfirm.intro')}</p>
 
-        <p
-          style={{
-            margin: 0,
-            ...text('row-meta'),
-            color: cssVar('color.foreground-muted'),
-          }}
-        >
-          {t('common.legal.reconfirm.localDataSafe')}
-        </p>
+        <p className="ht-reconfirm__note ht-type-row-meta">{t('common.legal.reconfirm.localDataSafe')}</p>
 
         {links === null ? null : (
-        <div
-          style={{
-            display: 'flex',
-            flexWrap: 'wrap',
-            alignItems: 'center',
-            gap: cssVar('space.2'),
-            ...text('row-meta'),
-          }}
-        >
-          <span style={{ color: cssVar('color.foreground-muted') }}>
-            {t('common.legal.reconfirm.readFirst')}
-          </span>
-          {/* 🔴 链接排在按钮外面：链在按钮里时点链接会顺带触发那个控件（链 2 的 M3 变异抓的就是这个）。 */}
-          <a
-            data-testid="legal-reconfirm-terms"
-            href={links.terms}
-            target="_blank"
-            rel="noopener noreferrer"
-            style={{ color: cssVar('color.primary') }}
-          >
-            {t('common.privacy.consent.termsLink')}
-          </a>
-          <a
-            data-testid="legal-reconfirm-privacy"
-            href={links.privacy}
-            target="_blank"
-            rel="noopener noreferrer"
-            style={{ color: cssVar('color.primary') }}
-          >
-            {t('common.privacy.consent.privacyLink')}
-          </a>
-        </div>
+          <div className="ht-reconfirm__links ht-type-row-meta">
+            <span className="ht-reconfirm__links-label">
+              {t('common.legal.reconfirm.readFirst')}
+            </span>
+            {/* 🔴 链接排在按钮外面：链在按钮里时点链接会顺带触发那个控件（链 2 的 M3 变异抓的就是这个）。 */}
+            <a
+              data-testid="legal-reconfirm-terms"
+              className="ht-reconfirm__link"
+              href={links.terms}
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              {t('common.privacy.consent.termsLink')}
+            </a>
+            <a
+              data-testid="legal-reconfirm-privacy"
+              className="ht-reconfirm__link"
+              href={links.privacy}
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              {t('common.privacy.consent.privacyLink')}
+            </a>
+          </div>
         )}
 
         {failureLine === null ? null : (
           <p
             role="status"
             data-testid="legal-reconfirm-failure"
-            style={{
-              margin: 0,
-              ...text('row-meta'),
-              color: cssVar('color.warning-strong'),
-            }}
+            className="ht-reconfirm__failure ht-type-row-meta"
           >
             {failureLine}
           </p>
         )}
 
-        <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: cssVar('space.3') }}>
+        <div className="ht-reconfirm__actions">
           <button
             type="button"
             data-testid="legal-reconfirm-action"

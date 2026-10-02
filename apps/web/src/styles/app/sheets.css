@@ -168,3 +168,108 @@
     animation: none;
   }
 }
+
+/* G-27 补签面板（`features/legal-recheck/LegalReconfirmSheet.tsx`）。
+   🔴 这块走 CSS 类而不是 `style={{…}}`：`check:l4` 的判据是"内联样式只减不增"，
+   而它明写"不许为了变绿把基线调高"。取值仍逐条来自 token（`var(--ht-*)`）。
+   ⚠️ 但**排版不在这里**：字号+字重成对自拼会被 `check:design` 判成"档位表外的第二套
+   排版"（豁免表只许删不许加），所以四件套由 JSX 成对挂 `.ht-type-*` 提供。 */
+.ht-reconfirm {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--ht-space-4);
+  background: var(--ht-color-overlay);
+  z-index: var(--ht-z-modal);
+}
+
+.ht-reconfirm__dialog {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: var(--ht-space-4);
+  width: 100%;
+  max-width: var(--ht-layout-modal-max);
+  max-height: 90vh;
+  overflow-y: auto;
+  padding: var(--ht-space-6);
+  border-radius: var(--ht-radius-lg);
+  background: var(--ht-color-surface-raised);
+  box-shadow: var(--ht-shadow-lg);
+  color: var(--ht-color-foreground);
+}
+
+.ht-reconfirm__head {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--ht-space-3);
+}
+
+.ht-reconfirm__icon {
+  display: flex;
+  padding-top: var(--ht-space-1);
+  color: var(--ht-color-primary);
+}
+
+/* 标题区必须能收缩：不写 `min-inline-size: 0` 时，一行长英文会把整块顶出弹窗。 */
+.ht-reconfirm__titles {
+  flex: 1 1 auto;
+  min-inline-size: 0;
+}
+
+/* 🔴 下面三处排版**不在这里写**：字号+字重成对自拼会被 `check:design` 判成
+   "档位表外的第二套排版"，而这三个组合恰好就是语义档位的取值
+   （section-title / row-title / row-meta）—— 所以由 JSX 成对挂 `.ht-type-*`，
+   这里只留间距与颜色。取值与改前逐字相同，视觉没有变化。 */
+.ht-reconfirm__title {
+  margin: 0;
+}
+
+.ht-reconfirm__reason,
+.ht-reconfirm__note,
+.ht-reconfirm__failure,
+.ht-reconfirm__links {
+  margin: 0;
+}
+
+.ht-reconfirm__reason {
+  margin-block-start: var(--ht-space-1);
+  color: var(--ht-color-foreground-muted);
+}
+
+.ht-reconfirm__intro {
+  margin: 0;
+}
+
+.ht-reconfirm__note,
+.ht-reconfirm__failure {
+  color: var(--ht-color-foreground-muted);
+}
+
+.ht-reconfirm__failure {
+  color: var(--ht-color-warning-strong);
+}
+
+.ht-reconfirm__links {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--ht-space-2);
+}
+
+.ht-reconfirm__links-label {
+  color: var(--ht-color-foreground-muted);
+}
+
+.ht-reconfirm__link {
+  color: var(--ht-color-primary);
+}
+
+.ht-reconfirm__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--ht-space-3);
+}
