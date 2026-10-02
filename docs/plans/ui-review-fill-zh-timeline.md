@@ -1478,10 +1478,17 @@ uiautomator 的 bounds **会被父容器视口裁** —— 被折叠线切掉的
   `hidden` 会同时改移动端行高，而移动端此刻在别人手里（模拟器 + adb 正在跑）验不了 ——
   拿不到的证据就不切这一刀。登记为 G9 的下一环。
 
-  ⏭ **其余三端（windows / android / ios）此刻仍未装当前产物**：18:44 实测
-  `emulator-5554` 在线且 `adb` 进程 2 秒前还在动、iPhone 模拟器 booted、gradle daemon 已跑 1h+，
-  而 mac 段之后 `reinstall:all` 的 android 段会 `adb uninstall` 共享设备上的应用 ——
-  那是在别人正在验的流程下拆它的现场。这三端留给两条会话都收工之后那一轮。
+  ⏭ **其余三端（windows / android / ios）本轮没装当前产物 —— 但拦路的已经不是"归属"，是"现场"**：
+  隔离检出这条路已经被 mac 段证明确实成立，所以那三端**随时可以照同一条路跑**，
+  需要等的是设备/主机此刻不在别人手里。18:57 实测三条现场证据：
+  ① `emulator-5554` 在线且 `adb` 进程 2 秒前还在动、gradle daemon 已跑 1h+
+  ⇒ android 段会 `adb uninstall` 共享设备上的应用，等于拆别人正在验的现场；
+  ② iPhone 模拟器 `iPhone Duo heyta` 处于 `Booted`，ios 段要 `simctl uninstall` + 删 DerivedData；
+  ③ 本机有一条**已持续 57 分钟**的 `ssh -N -L 9404:[::1]:9222 windows-pc` 隧道
+  ⇒ 那是别人挂着的 Windows CDP 会话，而 windows 段会覆盖 `C:\src\heyta` 并重装 MSIX，
+  当场把它的附着点抽掉。
+  📌 三条都属"环境"，不是产品故障，也都不由我解决 —— 由**谁先收工**决定，
+  下一轮带 `--only windows` / `--only android,ios` 在隔离检出里跑即可。
 - **G6 · `@heyta/ui` 的 typecheck 存量红**：`pnpm -r typecheck` 只在
   `packages/ui/tests/auth-model.spec.ts:79` 与 `:331` 两处失败，两行与 HEAD **逐字节相同**
   （属另一条会话在飞的 `packages/ui/src/auth/model.ts`）。⇒ 提交 `1d485786` 信息里写的
