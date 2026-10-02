@@ -296,7 +296,10 @@ function ToolResult(props: {
       判据：`ai-tool-run.spec.tsx` 那条"英文界面失败时不许露中文"，
       以及 `ai-failure-parity.spec.tsx` 的跨面板一致性。
     */
-    const failure = toolRunFailureCopy(outcome.reason, outcome.message, outcome.cause);
+    const failure = toolRunFailureCopy(outcome.reason, outcome.message, {
+      cause: outcome.cause,
+      endpointUrl: outcome.endpointUrl,
+    });
     return (
             <AiPanelHost
               label={t('web.ai.tools.failureAria')}
@@ -317,6 +320,7 @@ function ToolResult(props: {
         {/* 这次失败能在设置里修才渲染（`settingsTarget === undefined` 时组件自己返回 null）。 */}
         <FailureSettingsAction
           settingsTarget={failure.settingsTarget}
+          originHint={failure.originHint}
           onOpenSettings={onOpenSettings}
           testId="ai-tool-failure-settings"
         />

@@ -361,6 +361,154 @@ describe('未知方法', () => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────
+// 🔴🔴 `list_tasks` 的日期参数
+// ─────────────────────────────────────────────────────────────────────────
+//
+// 这组用例守的是 `list.today` 那条缺陷（AI-G3 / 计划 W3）的**契约半边**：
+// 日期参数存在、被校验、被如实递给宿主，且**校验不成立时绝不降级**。
+//
+// 🔴 每条拒绝用例都额外断言"宿主一次都没被调用"。这一条才是牙齿：
+// "报错"和"忽略这个参数、照样返回全量前 N 条"在响应上长得几乎一样，
+// 而后者正是原缺陷的形状 —— 只断言 `invalidParams` 的话，
+// 把 `return { ok: false }` 改成 `// 忽略` 照样全绿。
+//
+// 至于"筛出来的到底是不是那几天"，判据在**宿主层**的用例里
+// （`packages/app-host/tests/local-api-host-due-filter.spec.ts`）——
+// 那才是"结果集"，本包的假 host 给不出真结果。
+
+/** 记录收到的查询条件的假 host。 */
+function captureHost(items: readonly LocalApiItem[] = TASKS) {
+  const seen: Parameters<LocalApiHost['listTasks']>[0][] = [];
+  const host: LocalApiHost = {
+    listTasks: (args) => {
+      seen.push(args);
+      return Promise.resolve(items);
+    },
+    getTask: () => Promise.resolve(undefined),
+    listProjects: () => Promise.resolve([]),
+    submit: () => Promise.resolve<LocalApiWriteResult>({ ok: true, taskId: 'x' }),
+  };
+  return { host, seen };
+}
+
+async function callListTasks(args: Record<string, unknown>, host: LocalApiHost) {
+  const { handle } = handler(CONFIG, host);
+  return expectResponse(await handle(req('tools/call', { name: 'list_tasks', arguments: args }), TOKEN));
+}
+
+describe('🔴🔴 list_tasks 的日期参数：校验、透传、不降级', () => {
+  it('dueOn 合法时**原样递给宿主**（不是在这里把日期吃掉）', async () => {
+    const { host, seen } = captureHost();
+    const res = await callListTasks({ dueOn: '2026-03-15' }, host);
+    expect('result' in res).toBe(true);
+    expect(seen).toEqual([{ dueOn: '2026-03-15' }]);
+  });
+
+  it('dueFrom + dueTo 成对递给宿主（闭区间，两端都在）', async () => {
+    const { host, seen } = captureHost();
+    await callListTasks({ dueFrom: '2026-03-15', dueTo: '2026-03-20' }, host);
+    expect(seen).toEqual([{ dueFrom: '2026-03-15', dueTo: '2026-03-20' }]);
+  });
+
+  it('🔴 与 projectId / completed / limit **共存**时一起递过去（不是互斥覆盖）', async () => {
+    const { host, seen } = captureHost();
+    await callListTasks(
+      { projectId: 'p1', completed: false, limit: 10, dueFrom: '2026-03-15', dueTo: '2026-03-16' },
+      host,
+    );
+    expect(seen).toEqual([
+      { projectId: 'p1', completed: false, limit: 10, dueFrom: '2026-03-15', dueTo: '2026-03-16' },
+    ]);
+  });
+
+  it('🔴 不传日期时**不往宿主塞任何日期键**（最常见的调用形态不是错误）', async () => {
+    const { host, seen } = captureHost();
+    const res = await callListTasks({}, host);
+    expect('result' in res).toBe(true);
+    expect(seen).toEqual([{}]);
+    // 而且默认仍然返回全部 —— 挡住"成对校验把空参数判死"这种自我伤害
+    expect(textOf(res)).toContain('交周报');
+  });
+
+  it('🔴 跨度**正好 14 天**（含两端）通过', async () => {
+    const { host, seen } = captureHost();
+    const res = await callListTasks({ dueFrom: '2026-03-01', dueTo: '2026-03-14' }, host);
+    expect('result' in res, JSON.stringify(seen)).toBe(true);
+    expect(seen[0]?.dueFrom).toBe('2026-03-01');
+    expect(seen[0]?.dueTo).toBe('2026-03-14');
+  });
+
+  it('🔴 跨度 15 天被拒，**且一次都没读数据**，消息里说明上限是多少', async () => {
+    const { host, seen } = captureHost();
+    const res = await callListTasks({ dueFrom: '2026-03-01', dueTo: '2026-03-15' }, host);
+    if ('error' in res) {
+      expect(res.error.code).toBe(JSON_RPC_ERRORS.invalidParams);
+      expect(res.error.message).toContain('14');
+      // 上界口径也钉住：报的是**含两端**的 15 天，不是差值 14
+      expect(res.error.message).toContain('15 天');
+    } else throw new Error('15 天的范围必须被拒');
+    expect(seen).toEqual([]);
+  });
+
+  it('🔴 格式不对 / 不存在的一天被拒，**不降级成"这个参数没传"**', async () => {
+    for (const bad of ['2026-3-5', '明天', '2026-02-30', '2026-13-01', '2026-03-15T10:00', 42, null]) {
+      const { host, seen } = captureHost();
+      const res = await callListTasks({ dueOn: bad }, host);
+      if ('error' in res) expect(res.error.code, JSON.stringify(bad)).toBe(JSON_RPC_ERRORS.invalidParams);
+      else throw new Error(`「${String(bad)}」必须被拒，而不是照样列出全量`);
+      // 🔴 这条才是与原缺陷的分界：被拒 ⇒ **没有**返回 2 条全量任务
+      expect(seen, JSON.stringify(bad)).toEqual([]);
+    }
+  });
+
+  it('🔴 2 月 29 日按**闰年**判定（2024 存在、2025 不存在）', async () => {
+    const ok = captureHost();
+    expect('result' in (await callListTasks({ dueOn: '2024-02-29' }, ok.host))).toBe(true);
+    const bad = captureHost();
+    expect('error' in (await callListTasks({ dueOn: '2025-02-29' }, bad.host))).toBe(true);
+    expect(bad.seen).toEqual([]);
+  });
+
+  it('dueOn 与 dueFrom / dueTo **互斥**：同时给被拒', async () => {
+    for (const combo of [
+      { dueOn: '2026-03-15', dueFrom: '2026-03-15', dueTo: '2026-03-16' },
+      { dueOn: '2026-03-15', dueTo: '2026-03-16' },
+    ]) {
+      const { host, seen } = captureHost();
+      const res = await callListTasks(combo, host);
+      if ('error' in res) expect(res.error.message).toContain('二选一');
+      else throw new Error(JSON.stringify(combo));
+      expect(seen).toEqual([]);
+    }
+  });
+
+  it('🔴 只给 dueFrom 或只给 dueTo 被拒（半开 = 没有上界）', async () => {
+    for (const combo of [{ dueFrom: '2026-03-15' }, { dueTo: '2026-03-15' }]) {
+      const { host, seen } = captureHost();
+      const res = await callListTasks(combo, host);
+      if ('error' in res) expect(res.error.message).toContain('一起给');
+      else throw new Error(JSON.stringify(combo));
+      expect(seen).toEqual([]);
+    }
+  });
+
+  it('dueFrom 晚于 dueTo 被拒（**不是**静默返回空）', async () => {
+    const { host, seen } = captureHost();
+    const res = await callListTasks({ dueFrom: '2026-03-20', dueTo: '2026-03-15' }, host);
+    if ('error' in res) expect(res.error.message).toContain('不能晚于');
+    else throw new Error('反向范围必须报错');
+    expect(seen).toEqual([]);
+  });
+
+  it('🔴 日期参数的类型不看：非字符串一律拒（`{ dueOn: {} }` 不许变成"全都算"）', async () => {
+    const { host, seen } = captureHost();
+    const res = await callListTasks({ dueOn: { toString: () => '2026-03-15' } }, host);
+    expect('error' in res).toBe(true);
+    expect(seen).toEqual([]);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────
 
 describe('🔴🔴 通知（notification）不得有响应', () => {
   it('🔴🔴 没有 id 的请求返回 undefined —— 不回任何东西', async () => {

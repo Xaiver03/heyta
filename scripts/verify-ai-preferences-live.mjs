@@ -24,16 +24,16 @@
  * 配置：`/tmp/heyta-ai-live/provider.json`（mode 600，**绝不入库**）
  *   { "mode":"own", "endpoint":"...", "apiKey":"...", "model":"..." }
  *
- * 没配置时**跳过并退出 0** —— 没配端点不是失败，是"还没配"。
+ * 没配置时**退出 2（"这一轮根本没跑"）**，只有显式 `--skip` /
+ * `HEYTA_AI_LIVE_ALLOW_SKIP=1` 才允许跳过（判据在 `scripts/lib/live-provider-config.mjs`）。
+ * ⚠️ 本脚本自己已经有"第三态：没能验证"的纪律（见下面的 `unverified`），
+ * 那条治理的是**跑起来了但前提不成立**；配置缺失是**没跑起来**，两态要分开。
  */
-
-import { readFileSync } from 'node:fs';
 
 import { buildBreakdownInvocation, parseBreakdownItems, requestBreakdown } from '../packages/app-host/dist/index.js';
 import { classifyDestination } from '../packages/ai/dist/index.js';
 import { renderHintBlock, renderPreferenceHints } from '../packages/domain/dist/index.js';
-
-const CONFIG_PATH = process.env['HEYTA_AI_LIVE_CONFIG'] ?? '/tmp/heyta-ai-live/provider.json';
+import { requireLiveProviderConfig } from './lib/live-provider-config.mjs';
 
 let pass = 0;
 let fail = 0;
@@ -78,18 +78,7 @@ async function attempt(times, label, run) {
   return last;
 }
 
-let config;
-try {
-  config = JSON.parse(readFileSync(CONFIG_PATH, 'utf8'));
-} catch {
-  console.log(`⏭  没有找到真实端点配置（${CONFIG_PATH}），跳过。`);
-  console.log('   这不是失败 —— 没配端点只是"还没配"。');
-  process.exit(0);
-}
-if (typeof config.endpoint !== 'string' || typeof config.apiKey !== 'string') {
-  console.log('⏭  配置里缺 endpoint 或 apiKey，跳过。');
-  process.exit(0);
-}
+const config = requireLiveProviderConfig('pnpm verify:ai-preferences-live');
 
 /**
  * 🔴 故意用**极其好认**的取值，这样"复述"是逐字可查的。

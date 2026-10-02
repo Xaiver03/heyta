@@ -247,7 +247,12 @@ export function AiPrioritize(props: AiPrioritizeProps): React.JSX.Element {
       setPhase('proposal');
       return;
     }
-    setFailure(prioritizeFailureCopy(outcome.reason, outcome.message, outcome.cause));
+    setFailure(
+      prioritizeFailureCopy(outcome.reason, outcome.message, {
+        cause: outcome.cause,
+        endpointUrl: outcome.endpointUrl,
+      }),
+    );
     setPhase('failed');
   }
 
@@ -509,6 +514,8 @@ export function AiPrioritize(props: AiPrioritizeProps): React.JSX.Element {
         <FailureSettingsAction
 
           settingsTarget={failure?.settingsTarget}
+
+          originHint={failure?.originHint}
 
           onOpenSettings={onOpenSettings}
 

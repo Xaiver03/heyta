@@ -151,6 +151,12 @@ export type ToolCallOutcome =
       message: string;
       /** 路由层给的具体原因码，供壳取词条。 */
       cause?: AiFailureReason;
+      /**
+       * 这次**实际打到的**端点 URL（来自 `AiFailure.endpointUrl`）。
+       * 壳靠它把 `network` 分成"真连不上"和"本机端点拒绝了你的来源"
+       * （ADR-0045 §4）。**原样透传，不在这里判断。**
+       */
+      endpointUrl?: string;
       /** 模型只回了话时，把它带出来（界面可以照原样显示）。 */
       text?: string;
       health: HealthMap;
@@ -248,6 +254,7 @@ export async function requestToolCall(
       ok: false,
       reason: 'ai-unavailable',
       cause: result.reason,
+      endpointUrl: result.endpointUrl,
       message: result.message,
       health: outcome.health,
     };

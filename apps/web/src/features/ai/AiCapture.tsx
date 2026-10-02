@@ -357,7 +357,12 @@ export function AiCapture(props: AiCaptureProps): React.JSX.Element {
       setPhase('proposal');
       return;
     }
-    setFailure(captureFailureCopy(outcome.reason, outcome.message, outcome.cause));
+    setFailure(
+      captureFailureCopy(outcome.reason, outcome.message, {
+        cause: outcome.cause,
+        endpointUrl: outcome.endpointUrl,
+      }),
+    );
     setPhase('failed');
   }
 
@@ -678,6 +683,8 @@ export function AiCapture(props: AiCaptureProps): React.JSX.Element {
         <FailureSettingsAction
 
           settingsTarget={failure?.settingsTarget}
+
+          originHint={failure?.originHint}
 
           onOpenSettings={onOpenSettings}
 

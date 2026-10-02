@@ -17,7 +17,7 @@
  * 所以这里做一件**可失败、且能证明会失败**的事：**数 `submit(` 出现了几次、
  * 出现在哪个函数里**。故意在错误的位置加一次写，它必须红。
  *
- * ## 五条规则，每条都对应一个真实会被写出来的错
+ * ## 六条规则，每条都对应一个真实会被写出来的错
  *
  * | # | 规则 | 拦住的是 |
  * |---|---|---|
@@ -26,6 +26,7 @@
  * | 3 | 不得构造 op（`entityType: '…'` 字面量） | 在这里自己拼 op，绕过 op-log 语义 |
  * | 4 | 不得直连模型端点 / 不得有 fetch | 绕过 `@heyta/ai` 的出境闸门 |
  * | 5 | 不得 import `@heyta/op-log` | 让"造不出 op"在类型上失效 |
+ * | 6 | W7 删掉的冗余前门不得回来；`describeRoutedFailure()` 只许有一个定义点 | 「同一个判断再写一遍」 |
  *
  * ⚠️ 规则 2 的"恰好一处"是**承重**的，不是洁癖：只检查"有没有在确认函数里"
  * 的话，同时留着另一处直接 `submit` 仍然会绿。
@@ -144,7 +145,7 @@ for (const file of files) {
           lines.findIndex((l) => l.includes('.submit(')) + 1,
           '写调用不在 `confirmAiToolProposal()` 里',
           '在它之外写 = 用户还没确认就落了库，这正是 ADR-0005 §3.1 要防的事。',
-          '把写挪进 `confirmAiToolProposal()`，并让 `runAiTool()` 只产出提案。',
+          '把写挪进 `confirmAiToolProposal()`；执行侧（`runSelectedTool()`）只产出提案。',
         );
       }
     }
@@ -193,6 +194,85 @@ for (const file of files) {
   });
 }
 
+// ── 规则 6：W7 删掉的冗余前门与四份抄件**不得长回来** ──────────────────
+//
+// 为什么这条要进门禁，而不是记在文档里就算完：
+// AGENTS §3.5 那条实测教训的原文是「**抽取的收尾动作是删掉旧的那份并加门禁，
+// 不是写一个更好的新版本**」。2026-10-02 的 AI 审计就是在同一堆文件里查出：
+//   - `runAiTool()` / `grantedToolNames()` 两个零生产调用点的前门（后者还是
+//     `listAuthorizedTools()` 的**第二个投影方向** —— 同一个判断从两个方向各写一遍，
+//     正是漂移的入口）；
+//   - `describeRoutedFailure()` 在 `ai-{breakdown,capture,duration,prioritize}.ts`
+//     里**逐字节抄了四遍**，而其中两处的文件头明写着"本轮不允许改那个文件，
+//     所以只能各留一份" —— 也就是说这个重复是**被决定留下来的**，
+//     没有门禁的话它会在下一次"不方便改"时变成五份。
+// 三处都已收敛（2026-10-03）。这条规则的作用只有一个：让它们**不能再长回来**。
+//
+// ⚠️ 只匹配**声明语法**，且先剥注释 ——
+// 这几个名字现在大量出现在注释里（正是在解释为什么它们没了），
+// 不剥注释的话这条门禁会对**正确的代码**报红（本文件顶部那条立场）。
+const DECL_PATTERN = (name) => new RegExp(`^(?:export\\s+)?(?:async\\s+)?function\\s+${name}\\b`, 'm');
+
+/** 递归列出 `WATCH_DIR` 下所有非测试 `.ts`（覆盖范围打印出来：0 项的检查等于没有检查）。 */
+function listAppHostSourceFiles(dir) {
+  const out = [];
+  for (const entry of readdirSync(dir, { withFileTypes: true })) {
+    const full = path.join(dir, entry.name);
+    if (entry.isDirectory()) {
+      out.push(...listAppHostSourceFiles(full));
+      continue;
+    }
+    if (!entry.name.endsWith('.ts')) continue;
+    if (/\.(spec|test)\.ts$/.test(entry.name)) continue;
+    out.push(full);
+  }
+  return out.sort();
+}
+
+/** 不许再出现的名字（W7 删掉的冗余前门）。 */
+const BANNED_NAMES = ['runAiTool', 'grantedToolNames'];
+/** 必须**只有一个定义点**、且住在 owner 文件里的抄件。 */
+const SINGLE_OWNER = { name: 'describeRoutedFailure', owner: 'ai-failure-fallback.ts' };
+
+const allSourceFiles = listAppHostSourceFiles(WATCH_DIR);
+if (allSourceFiles.length === 0) {
+  console.error(`❌ check:ai-tools 在 ${WATCH_DIR} 递归扫到 0 个 .ts —— 规则 6 无从判断，判红。`);
+  process.exit(1);
+}
+
+const definitionOwners = new Set();
+for (const file of allSourceFiles) {
+  const code = stripComments(readFileSync(file, 'utf8'));
+  const name = path.basename(file);
+  for (const banned of BANNED_NAMES) {
+    if (DECL_PATTERN(banned).test(code)) {
+      violate(
+        path.relative(ROOT, file),
+        1,
+        `又出现了被删掉的冗余前门 \`${banned}()\``,
+        '它零生产调用点，而它做的组合在产品里**已经有另一份**（`requestToolCall` 的规则分支）。' +
+          '同一条组合有两个名字，就会慢慢长出两个版本，而漂移始于"我只改了其中一个"。',
+        '需要"这句话 → 执行一步"就调 `requestToolCall`；需要单独执行就调 `runSelectedTool`。',
+      );
+    }
+  }
+  if (DECL_PATTERN(SINGLE_OWNER.name).test(code)) {
+    definitionOwners.add(name);
+  }
+}
+
+const owners = [...definitionOwners].sort();
+if (owners.length !== 1 || owners[0] !== SINGLE_OWNER.owner) {
+  violate(
+    path.relative(ROOT, path.join(WATCH_DIR, SINGLE_OWNER.owner)),
+    1,
+    `\`${SINGLE_OWNER.name}()\` 的定义点是 ${JSON.stringify(owners)}（必须恰好一个，且在 ${SINGLE_OWNER.owner}）`,
+    '同一句话有两个来源就一定会漂移（那四个文件的注释里就写着上一次漂移的代价：' +
+      '"缺能力被说成检查地址是否合法"，于是用户去查两个根本没问题的地方）。',
+    `只在 ${SINGLE_OWNER.owner} 里定义，其余模块 import 它。`,
+  );
+}
+
 if (violations.length > 0) {
   console.error(`\n❌ AI 工具路径门禁失败：${String(violations.length)} 处\n`);
   for (const v of violations) {
@@ -204,6 +284,8 @@ if (violations.length > 0) {
 }
 
 console.log(
-  `✅ AI 工具路径门禁通过：${String(files.length)} 个文件；` +
-    '写只出现在确认函数里、无 op 构造、无网络调用、未 import op-log。',
+  `✅ AI 工具路径门禁通过：ai-tool-* ${String(files.length)} 个文件；` +
+    `规则 6 扫描范围 ${String(allSourceFiles.length)} 个 .ts；` +
+    '写只出现在确认函数里、无 op 构造、无网络调用、未 import op-log、' +
+    '无冗余前门、`describeRoutedFailure()` 定义点恰好一处。',
 );

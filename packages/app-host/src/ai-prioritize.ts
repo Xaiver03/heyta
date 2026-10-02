@@ -64,6 +64,7 @@ import {
   outputLanguageDirective,
   type AiOutputLocale,
 } from './ai-output-language.js';
+import { describeRoutedFailure } from './ai-failure-fallback.js';
 
 /**
  * 一次排序最多带多少条任务。
@@ -353,6 +354,12 @@ export type PrioritizeOutcome =
       reason: PrioritizeFailureReason;
       /** 路由层给的**原因码**。壳据此取词条 —— 见 §7.10 通道 #5。 */
       cause?: AiFailureReason;
+      /**
+       * 这次**实际打到的**端点 URL（来自 `AiFailure.endpointUrl`）。
+       * 壳靠它把 `network` 分成"真连不上"和"本机端点拒绝了你的来源"
+       * （ADR-0045 §4）。**原样透传，不在这里判断。**
+       */
+      endpointUrl?: string;
       message: string;
       /**
        * 🔴 **失败分支也要带 health** —— 端点失败才会让熔断计数器 +1，
@@ -420,6 +427,7 @@ export async function requestPrioritize(
       ok: false,
       reason: 'ai-unavailable',
       cause: result.reason,
+      endpointUrl: result.endpointUrl,
       message: specific === '' ? describeRoutedFailure(result.reason) : specific,
       // 🔴 失败也要落盘 —— 这通常正是熔断计数器刚 +1 的那一次。
       health: outcome.health,
@@ -451,36 +459,4 @@ export async function requestPrioritize(
     },
     health: outcome.health,
   };
-}
-
-/**
- * 把失败原因翻成用户看得懂的一句话。
- *
- * 🔴 **兜底文案，不是主文案。** 用户看到的那句话应当来自 `packages/ai` ——
- * 那里才知道"为什么没有候选端点"。本函数只处理 `AiFailure.message`
- * **为空**的情况（正常路径不该走到）。
- *
- * ⚠️ 与 `ai-breakdown.ts` 里的同名函数是**有意的重复**：那边的是模块私有，
- * 而本轮不允许改那个文件。这里**不新增任何 `case`** —— 若 `packages/ai`
- * 新增了失败原因，先去那边加说明，再同步这里，否则两边会漂移。
- */
-function describeRoutedFailure(reason: string): string {
-  switch (reason) {
-    case 'not-configured':
-      return 'AI 还没打开。去「设置」里打开总开关，并添加一个端点。';
-    case 'no-route':
-      return '没有可用端点能处理这个功能。检查端点是否启用、地址是否合法。';
-    case 'egress-not-authorized':
-      return '这个功能还没有授权把数据发到所选端点。去「设置」里逐功能授权。';
-    case 'fallback-needs-consent':
-      return '首选端点失败了，而备用端点会把数据发到别处，所以没有自动切换。需要你重新授权。';
-    case 'network':
-      return '连不上端点。检查它是不是在运行。';
-    case 'http-error':
-      return '端点返回了错误。';
-    case 'empty-response':
-      return '端点返回了空内容。';
-    default:
-      return 'AI 暂时不可用。';
-  }
 }

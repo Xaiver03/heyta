@@ -17,7 +17,11 @@
  * 因为它需要一个真实的 API key。把它挂进门禁会造成两种坏结果之一：
  *   ① CI 上没有 key → 要么红（假失败），要么静默跳过（等于没测）；
  *   ② 有人为了让它绿而把 key 塞进仓库。
- * 所以它是**按需运行的手工验收**，没有配置时**明确地说"跳过"并退出 0**。
+ *
+ * ⚠️ 但"不在门禁里"**不等于**"没配置时可以退出 0"。以前正是这么写的，于是这条
+ * 验收可以在**一次都没碰过真模型**的情况下连续报绿 —— §7 元规则第 2 条的现行实例。
+ * 现在默认**退出 2（根本没跑）**，只有显式 `--skip` / `HEYTA_AI_LIVE_ALLOW_SKIP=1`
+ * 才允许跳过（判据在 `scripts/lib/live-provider-config.mjs`，四个脚本共用一份）。
  * ─────────────────────────────────────────────────────────────────────────
  *
  * ## 用法
@@ -25,6 +29,8 @@
  * ```bash
  * # 配置来源优先级：环境变量 > 默认路径
  * HEYTA_AI_LIVE_CONFIG=/path/to/provider.json pnpm verify:ai-live
+ * # 本轮确实没凭据（CI）—— 必须显式声明，否则退出 2：
+ * pnpm verify:ai-live -- --skip
  * ```
  *
  * 配置文件形状（**绝不入库**，默认路径在仓库外的 /tmp）：
@@ -43,12 +49,10 @@
  *    确认被分类成 `http-error` **且带回状态码**，而不是被吞成 `network`。
  */
 
-import { readFileSync } from 'node:fs';
 import process from 'node:process';
 
 import { createProvider, classifyDestination } from '../packages/ai/dist/index.js';
-
-const DEFAULT_CONFIG_PATH = '/tmp/heyta-ai-live/provider.json';
+import { requireLiveProviderConfig } from './lib/live-provider-config.mjs';
 
 /** 极简断言：失败即抛，由 main 统一报。 */
 function check(label, condition, detail) {
@@ -56,28 +60,6 @@ function check(label, condition, detail) {
     throw new Error(`断言失败：${label}${detail === undefined ? '' : ` —— ${detail}`}`);
   }
   console.log(`  ✅ ${label}${detail === undefined ? '' : `  ${detail}`}`);
-}
-
-function loadConfig() {
-  const path = process.env['HEYTA_AI_LIVE_CONFIG'] ?? DEFAULT_CONFIG_PATH;
-  let raw;
-  try {
-    raw = readFileSync(path, 'utf8');
-  } catch {
-    return undefined;
-  }
-  let parsed;
-  try {
-    parsed = JSON.parse(raw);
-  } catch (error) {
-    throw new Error(`配置文件不是合法 JSON：${path} —— ${error.message}`);
-  }
-  for (const field of ['endpoint', 'apiKey', 'model']) {
-    if (typeof parsed[field] !== 'string' || parsed[field] === '') {
-      throw new Error(`配置文件缺少字段 ${field}：${path}`);
-    }
-  }
-  return { path, ...parsed };
 }
 
 /**
@@ -97,14 +79,7 @@ function countingFetch() {
 }
 
 async function main() {
-  const config = loadConfig();
-
-  if (config === undefined) {
-    console.log('⚠️  未找到真实端点配置，跳过（这不是失败）。');
-    console.log(`   期望路径：${process.env['HEYTA_AI_LIVE_CONFIG'] ?? DEFAULT_CONFIG_PATH}`);
-    console.log('   要跑真实链路：HEYTA_AI_LIVE_CONFIG=<path> pnpm verify:ai-live');
-    return 0;
-  }
+  const config = requireLiveProviderConfig('pnpm verify:ai-live');
 
   console.log('AI 自备端点 · 真实供给链路验收');
   console.log(`配置：${config.path}`);

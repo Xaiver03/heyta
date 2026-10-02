@@ -1814,6 +1814,14 @@ export const zhCN = {
   'web.ai.failure.cause.noRoute': '没有可用端点能处理这个功能。检查端点是否启用、地址是否合法。',
   'web.ai.failure.cause.fallbackNeedsConsent': '首选端点失败了，而备用端点会把数据发到别处，所以没有自动切换。需要你重新授权。',
   'web.ai.failure.cause.network': '连不上端点。检查网络，以及端点地址是否可达。',
+  // 🔴 这一条与上面那句**共用同一个传输层原因码**（`network`），分开靠的是诊断：
+  // 端点在你自己机器上、而它拒绝了当前页面所在的来源。浏览器在这一步只会给
+  // `Failed to fetch`，**状态码根本看不见**，所以这句话是推出来的、不是读到的。
+  // 要放行的那个值走 `web.ai.failure.originToAllow` 那块**数据**，不进文案 ——
+  // 多一个斜杠、少一个端口都对不上白名单。
+  'web.ai.failure.cause.networkOriginRejected': '端点在你自己的机器上，但它拒绝了当前页面的来源。这通常不是网络故障：需要你把下面这个来源加进该端点的允许列表（Ollama 对应 OLLAMA_ORIGINS）。',
+  'web.ai.failure.originToAllow': '要放行的来源',
+  'web.ai.failure.originToAllowNote': '这个值是浏览器实际发出去的 Origin，请原样复制。heyta 不会替你改本机端点的设置。',
   'web.ai.failure.cause.httpError': '端点返回了错误状态。检查 API key、余额与模型名。',
   'web.ai.failure.cause.emptyResponse': '端点返回了空内容。可以换一个模型再试。',
   'web.ai.failure.details': '技术详情',

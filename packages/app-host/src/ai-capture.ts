@@ -81,6 +81,7 @@ import {
   outputLanguageDirective,
   type AiOutputLocale,
 } from './ai-output-language.js';
+import { describeRoutedFailure } from './ai-failure-fallback.js';
 
 /**
  * 一句话输入的字符上限。超出**直接拒绝**（不是截断）。
@@ -492,6 +493,13 @@ export type CaptureOutcome =
       reason: CaptureFailureReason;
       /** 路由层给的**原因码**。壳据此取词条 —— 见 §7.10 通道 #5。 */
       cause?: AiFailureReason;
+      /**
+       * 这次**实际打到的**端点 URL（来自 `AiFailure.endpointUrl`）。
+       * `network` 那一档要按"端点是否回环 + 宿主 Origin 是否回环"分叉诊断，
+       * 少了这个字段界面上就只剩"检查网络"那句没用的话。
+       * 🔴 **原样透传，不在这里判断**（判断住在壳那一层，见 ADR-0045 §4）。
+       */
+      endpointUrl?: string;
       message: string;
       /** 没有任何端点被尝试过（比如输入为空）时是 `{}`。 */
       health: HealthMap;
@@ -560,6 +568,7 @@ export async function requestCapture(
       ok: false,
       reason: 'ai-unavailable',
       cause: result.reason,
+      endpointUrl: result.endpointUrl,
       message: specific === '' ? describeRoutedFailure(result.reason) : specific,
       // 🔴 失败也要落盘 —— 这通常正是熔断计数器刚 +1 的那一次。
       health: outcome.health,
@@ -586,36 +595,4 @@ export async function requestCapture(
     // 🔴 两个分支形状一致 —— 调用方不必先判别 `ok` 才能落盘熔断状态。
     health: outcome.health,
   };
-}
-
-/**
- * 🔴 **兜底文案，不是主文案。**
- *
- * 用户看到的那句话应当来自 `packages/ai` —— 那里才知道"为什么没有候选端点"。
- * 这个函数只处理 `AiFailure.message` **为空**的情况（正常路径不该走到）。
- *
- * ⚠️ **不要在这里重新概括已经由 `packages/ai` 说明的原因。**
- * 同一句用户可见的文案有两个来源，就一定会漂移 ——
- * 而漂移的文案比没有文案更危险，因为它会把人引去查错的地方。
- * 如果 `packages/ai` 新增了失败原因，**先去那边加说明**，而不是在这里补 `case`。
- */
-function describeRoutedFailure(reason: string): string {
-  switch (reason) {
-    case 'not-configured':
-      return 'AI 还没打开。去「设置」里打开总开关，并添加一个端点。';
-    case 'no-route':
-      return '没有可用端点能处理这个功能。检查端点是否启用、地址是否合法。';
-    case 'egress-not-authorized':
-      return '这个功能还没有授权把数据发到所选端点。去「设置」里逐功能授权。';
-    case 'fallback-needs-consent':
-      return '首选端点失败了，而备用端点会把数据发到别处，所以没有自动切换。需要你重新授权。';
-    case 'network':
-      return '连不上端点。检查它是不是在运行。';
-    case 'http-error':
-      return '端点返回了错误。';
-    case 'empty-response':
-      return '端点返回了空内容。';
-    default:
-      return 'AI 暂时不可用。';
-  }
 }

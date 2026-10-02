@@ -810,6 +810,7 @@ ADR-0011 的实现。让本机其他程序（Claude Code / Cursor / Raycast / �
 | `MCP_SERVER_NAME` | `'heyta'` |
 | `LOCAL_API_METHODS` | `['initialize', 'tools/list', 'tools/call']` |
 | `JSON_RPC_ERRORS` | `parseError: -32_700` / `invalidRequest: -32_600` / `methodNotFound: -32_601` / `invalidParams: -32_602` / `internalError: -32_603` |
+| `LIST_TASKS_MAX_DUE_SPAN_DAYS` | `14` —— `list_tasks` 按日期查的跨度上限（**含两端**）。形状取自 ADR-0045 §2.5：上限同时是出境数据量的上界与一次确认的认知负荷上界，所以「只给 `dueFrom`」这种没有上界的范围也是被拒的 |
 | stdio 单行上限 | `1 MB`（超长必须**真的关闭连接**，不能只丢缓冲） |
 
 ⚠️ `validateLocalApiConfig` 只在 `enabled === true` 时校验地址与 token；
@@ -826,7 +827,7 @@ ADR-0011 的实现。让本机其他程序（Claude Code / Cursor / Raycast / �
 
 | 名字 | kind | 参数 | 默认 |
 |---|---|---|---|
-| `list_tasks` | read | `projectId?` / `completed?` / `limit?`（描述「默认 50」） | false |
+| `list_tasks` | read | `projectId?` / `completed?` / `limit?`（描述「默认 50」，**在筛完之后才生效**）/ `dueOn?` **或** `dueFrom?` + `dueTo?`（`YYYY-MM-DD` 闭区间，≤ 14 天；两组互斥，范围两端必须成对） | false |
 | `get_task` | read | `taskId`（必填） | false |
 | `list_projects` | read | 无 | false |
 | `create_task` | write | `title`（必填）/ `dueDate?` / `priority?` / `projectId?` | false |
@@ -834,6 +835,16 @@ ADR-0011 的实现。让本机其他程序（Claude Code / Cursor / Raycast / �
 | `complete_task` | write | `taskId`（必填） | false |
 
 ⚠️ `list_tasks` **不返回备注正文** —— 备注要单独用 `get_task` 取。
+每个工具的 `additionalProperties` 一律 `false`。
+
+🔴 `list_tasks` 的**日期过滤分三层，各层判据不同**（这条是 AI-G3「问今天却返回全量前 N 条」
+的直接对策，判据当初只写在最上面一层所以一直没红）：
+规则层 `list.today` 传 `dueOn`（`ai-tool-selection.ts`，用注入的 `ctx.now`）；
+契约层校验形状与 14 天跨度（`tools.ts` 的 `readListTasksDueArgs`，不合法就报 `invalid-args`，
+**绝不降级成"这个参数没传"**）；
+宿主层做过滤（`app-host` 的 `createLocalApiHost`，**先按日期筛、再应用 `limit`** ——
+顺序写在 `LocalApiHost.listTasks` 的契约注释上，因为截断发生在宿主里）。
+判据落在**结果集**上：`packages/app-host/tests/local-api-host-due-filter.spec.ts`。
 每个工具的 `additionalProperties` 一律 `false`。
 测试有**防膨胀断言** `LOCAL_API_TOOLS.length <= 10`（「Joplin 有 11 个，
 那是笔记应用。这里是任务管理，超过 10 个就该先问『真的需要吗』」）。

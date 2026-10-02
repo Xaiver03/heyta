@@ -52,6 +52,12 @@ import {
 } from './supply.js';
 import { authorizeEgress, type AiFeature, type EgressConsent } from './egress.js';
 import {
+  buildChatRequestBody,
+  chatCompletionsUrl,
+  chatRequestHeaders,
+  isEmptyModelResponse,
+} from './wire.js';
+import {
   extractContent,
   extractToolCalls,
   type AiFailure,
@@ -862,35 +868,13 @@ async function attemptOnce(
   }, timeoutMs);
 
   try {
-    const res = await doFetch(`${candidate.endpointConfig.endpoint}/chat/completions`, {
+    const res = await doFetch(chatCompletionsUrl(candidate.endpointConfig.endpoint), {
       method: 'POST',
-      headers: {
-        'content-type': 'application/json',
-        ...(apiKey !== undefined && apiKey !== '' ? { authorization: `Bearer ${apiKey}` } : {}),
-      },
-      // 数据面**恰好**是 system + user（+ 可选 tools）。没有别的字段。
-      body: JSON.stringify({
-        model: candidate.model,
-        messages: [
-          { role: 'system', content: invocation.system },
-          { role: 'user', content: invocation.user },
-        ],
-        // 🔴 `tools` 只在调用方给了工具时才出现 —— 省略时请求体与从前**逐字相同**。
-        // 这保证"给四个既有功能加工具线格式"这件事对它们零影响。
-        ...(invocation.tools === undefined || invocation.tools.length === 0
-          ? {}
-          : {
-              tools: invocation.tools.map((tool) => ({
-                type: 'function',
-                function: {
-                  name: tool.name,
-                  description: tool.description,
-                  parameters: tool.parameters,
-                },
-              })),
-              tool_choice: 'auto',
-            }),
-      }),
+      headers: chatRequestHeaders(apiKey),
+      // 🔴 数据面**恰好**是披露出去的那几项，没有别的字段；线格式与
+      // `createProvider()` 共用同一个组装点（`wire.ts`，工单 W7）——
+      // 以前两边各拼一遍、互相用注释要求一致，那是没有要求。
+      body: JSON.stringify(buildChatRequestBody(candidate.model, invocation)),
       signal: controller.signal,
     });
 
@@ -908,7 +892,7 @@ async function attemptOnce(
     const text = extractContent(json);
     // 🔴 有工具调用时，`content` 允许为空 —— 模型可以"只调工具、不说话"。
     // 反过来（既没文本也没工具调用）才是真的空响应。
-    if (toolCalls === undefined && (text === undefined || text.trim() === '')) {
+    if (isEmptyModelResponse({ text, toolCalls })) {
       return {
         ok: false,
         reason: 'empty-response',
@@ -925,6 +909,9 @@ async function attemptOnce(
     return {
       ok: false,
       reason: 'network',
+      // 🔴 带上**这次真正打到的**那个端点：`diagnoseNetworkFailure()` 要靠它判
+      // "回环端点 + 非回环宿主来源"这一档。多端点路由下用"配置里的第一个"会说错。
+      endpointUrl: candidate.endpointConfig.endpoint,
       message: aborted
         ? `端点「${candidate.endpointConfig.label}」超过 ${String(timeoutMs)} 毫秒未返回。`
         : `无法连接端点「${candidate.endpointConfig.label}」：${

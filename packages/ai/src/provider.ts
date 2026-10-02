@@ -45,6 +45,12 @@ import {
   type EgressConsent,
   type EgressDisclosure,
 } from './egress.js';
+import {
+  buildChatRequestBody,
+  chatCompletionsUrl,
+  chatRequestHeaders,
+  isEmptyModelResponse,
+} from './wire.js';
 
 /**
  * 一个可供模型调用的工具（**中性描述**，与厂商无关）。
@@ -151,6 +157,15 @@ export interface AiFailure {
   message: string;
   /** HTTP 错误时的状态码。 */
   status?: number;
+  /**
+   * 这次**实际打到的**端点 URL（多端点路由下"配置里的第一个"会说错）。
+   *
+   * ⚠️ 它**不是出境数据** —— 失败对象从来不离开本机。它存在的唯一理由是让
+   * `diagnoseNetworkFailure()` 能区分"连不上"与"来源被回环端点拒了"，
+   * 而那件事**只能**由知道具体打了哪个端点的那一层判断。
+   * 见 [ADR-0045](../../../docs/adr/0045-conversational-assistant-split-authorization-from-catalog.md) §4。
+   */
+  endpointUrl?: string;
 }
 
 export type AiResult = { ok: true; suggestion: AiSuggestion } | AiFailure;
@@ -266,28 +281,11 @@ export function createProvider(config: AiProviderConfig, deps: ProviderDeps = {}
       // ── 2. 组装请求。只发 disclosed 的字段，且**没有额外字段**。 ────────
       // 注意这里没有把整个 task 对象序列化进去 —— 出境的数据面
       // 必须**恰好等于**披露出去的那几个字段，不多一个。
-      const body = {
-        model: config.model ?? 'default',
-        messages: [
-          { role: 'system', content: invocation.system },
-          { role: 'user', content: invocation.user },
-        ],
-        // 与 `invokeRouted()` 保持同一形状（见那里的注释）：
-        // 省略 `tools` 时请求体与从前逐字相同。
-        ...(invocation.tools === undefined || invocation.tools.length === 0
-          ? {}
-          : {
-              tools: invocation.tools.map((tool) => ({
-                type: 'function',
-                function: {
-                  name: tool.name,
-                  description: tool.description,
-                  parameters: tool.parameters,
-                },
-              })),
-              tool_choice: 'auto',
-            }),
-      };
+      // 🔴 线格式只有一个组装点：`wire.ts`。这里以前自己拼了一遍，
+      // 并且用注释要求"与 `invokeRouted()` 保持同一形状" —— 用注释要求两边一致
+      // 就是没有要求。工单 W7 把两份删成一份，判据见 `packages/ai/tests/wire.spec.ts`
+      // （两条路打出去的字节必须逐字相同）。
+      const body = buildChatRequestBody(config.model ?? 'default', invocation);
 
       // ── 3. 网络。超时用 AbortController，**不能只靠 fetch 的默认行为**。 ─
       const controller = new AbortController();
@@ -296,14 +294,9 @@ export function createProvider(config: AiProviderConfig, deps: ProviderDeps = {}
       }, timeoutMs);
 
       try {
-        const res = await doFetch(`${config.endpoint ?? ''}/chat/completions`, {
+        const res = await doFetch(chatCompletionsUrl(config.endpoint ?? ''), {
           method: 'POST',
-          headers: {
-            'content-type': 'application/json',
-            ...(config.apiKey !== undefined && config.apiKey !== ''
-              ? { authorization: `Bearer ${config.apiKey}` }
-              : {}),
-          },
+          headers: chatRequestHeaders(config.apiKey),
           body: JSON.stringify(body),
           signal: controller.signal,
         });
@@ -321,7 +314,7 @@ export function createProvider(config: AiProviderConfig, deps: ProviderDeps = {}
         const toolCalls = extractToolCalls(json);
         const text = extractContent(json);
         // 有工具调用时 `content` 可以为空（模型"只调工具、不说话"）。
-        if (toolCalls === undefined && (text === undefined || text.trim() === '')) {
+        if (isEmptyModelResponse({ text, toolCalls })) {
           return {
             ok: false,
             reason: 'empty-response',

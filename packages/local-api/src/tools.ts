@@ -77,6 +77,7 @@ export const LOCAL_API_TOOLS: readonly LocalApiTool[] = [
     name: 'list_tasks',
     description:
       '列出任务。返回标题、截止日期、优先级、完成状态。' +
+      '可按清单、完成状态、截止日期筛；按日期查时范围最多 14 天。' +
       '不返回备注正文 —— 备注要单独用 get_task 取。',
     kind: 'read',
     defaultEnabled: false,
@@ -121,6 +122,190 @@ export function findTool(name: string): LocalApiTool | undefined {
 /** 全部工具名。UI 用它渲染"逐工具开关"列表。 */
 export function toolNames(): readonly string[] {
   return LOCAL_API_TOOLS.map((t) => t.name);
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// `list_tasks` 的日期参数：形状 · 互斥 · **跨度上限**
+// ─────────────────────────────────────────────────────────────────────────
+
+/**
+ * 按日期查任务时的**跨度上限**（含两端）。
+ *
+ * 🔴 这个数字不是性能参数，是**三重上界**（ADR-0045 §2.5，形状参考滴答官方表
+ * 的 `list_undone_tasks_by_date` —— 它同样是 14 天）：
+ *
+ * 1. **出境数据量的上界** —— 没有它，一次调用能读走的条目数只受 `limit` 约束，
+ *    而"哪个 14 天"由模型说了算；
+ * 2. **一次确认的认知负荷上界**；
+ * 3. "**用范围上限代替自由查询**"这个形状本身 —— 自由查询意味着契约无法回答
+ *    "这次最多会带走多少数据"。
+ *
+ * ⚠️ 因此**只给 `dueFrom`（不给 `dueTo`）也是被拒的**：那是一条向未来无限开放的
+ * 范围，上界直接消失。成对要求是从这条理由推出来的，不是随手加的严格。
+ */
+export const LIST_TASKS_MAX_DUE_SPAN_DAYS = 14;
+
+/** `YYYY-MM-DD`：四位数年 + **补零**的月/日。规范形只有一份，所以必须补零。 */
+const CALENDAR_DAY_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+/** 一个日历日的三个字段。 */
+export interface CalendarDay {
+  readonly year: number;
+  readonly month: number;
+  readonly day: number;
+}
+
+/**
+ * 解析 `YYYY-MM-DD` 并**验证这一天真的存在**；不成立返回 `undefined`（不猜、不修正）。
+ *
+ * 🔴 为什么不复用 `@heyta/domain` 的 `parseLocalDate`：本包是**零依赖**的入站契约包
+ * （`@heyta/domain` 会连带把 `ical.js` 拖进来），而且两者**回答的不是同一个问题**：
+ * `parseLocalDate` 决定「这一天在本机是哪一个时刻」，这里只回答
+ * 「这两天之间隔着几个自然日」—— **不产生时刻、不做时区换算**。
+ * "哪个时刻算这一天"的唯一实现仍然只在 `packages/domain/src/date.ts`
+ * 与 `packages/app-host` 的 `fromLocalDateString`。
+ *
+ * 用 `Date.UTC` 而不是本地构造，正是为了**不引入时区**：UTC 没有夏令时，
+ * 相邻两个日历日的日序数恒差 1。
+ *
+ * ⚠️ 已知且**故意接受**的边界：`Date.UTC` 对 0–99 年有两位数字年的特殊映射，
+ * 于是公元 100 年以前的日期会被回读校验判成"不存在"而拒绝。
+ * 误判的方向是**拒绝**，不是猜一个日子。
+ */
+export function parseCalendarDay(text: unknown): CalendarDay | undefined {
+  if (typeof text !== 'string') return undefined;
+  if (!CALENDAR_DAY_RE.test(text)) return undefined;
+
+  const [year, month, day] = text.split('-').map(Number) as [number, number, number];
+  const asUtc = new Date(Date.UTC(year, month - 1, day));
+  // 回读校验：越界的月/日会被**自动进位**而不是报错（2 月 30 日 → 3 月 2 日），
+  // 只看格式挡不住它。同 `parseLocalDate` 的那条纪律。
+  if (
+    asUtc.getUTCFullYear() !== year ||
+    asUtc.getUTCMonth() !== month - 1 ||
+    asUtc.getUTCDate() !== day
+  ) {
+    return undefined;
+  }
+  return { year, month, day };
+}
+
+/** 日序数（自 1970-01-01 起的天数）。只用于**作差**，绝对值没有含义。 */
+function dayOrdinal(d: CalendarDay): number {
+  return Math.floor(Date.UTC(d.year, d.month - 1, d.day) / 86_400_000);
+}
+
+/**
+ * 两个**已验证存在**的日历日之间相差的自然日数（`b - a`；负数 = `b` 早于 `a`）。
+ *
+ * ⚠️ 不做时区、不产生时刻 —— 见 `parseCalendarDay` 的说明。
+ */
+export function calendarDaysBetween(a: CalendarDay, b: CalendarDay): number {
+  return dayOrdinal(b) - dayOrdinal(a);
+}
+
+/** `list_tasks` 的日期参数：通过校验后交给宿主的形状。 */
+export interface ListTasksDueArgs {
+  readonly dueOn?: string;
+  readonly dueFrom?: string;
+  readonly dueTo?: string;
+}
+
+export type ListTasksDueArgsVerdict =
+  | { ok: true; args: ListTasksDueArgs }
+  | { ok: false; message: string };
+
+/**
+ * 校验 `list_tasks` 的三个日期参数，并回答"这次到底按哪几天筛"。
+ *
+ * 规则（每一条都写进给模型看的描述，不让它猜）：
+ *
+ * 1. 三者都必须**存在**（格式 + 真实的一天）；
+ * 2. `dueOn` 与 `dueFrom` / `dueTo` **互斥**；
+ * 3. `dueFrom` 与 `dueTo` **成对**（半开区间 = 没有上界）；
+ * 4. `dueFrom` 不得晚于 `dueTo`；
+ * 5. 闭区间跨度（含两端）不超过 {@link LIST_TASKS_MAX_DUE_SPAN_DAYS} 天。
+ *
+ * 🔴 不合法就返回 `ok: false` —— **不是**"忽略这个参数照样列"。
+ * 后者会让"今天有什么任务"在拼错日期时返回**全量前 N 条**，
+ * 正是本条缺陷的原形（把"筛不出"伪装成"筛出来的是这些"）。
+ */
+export function readListTasksDueArgs(
+  args: Readonly<Record<string, unknown>>,
+): ListTasksDueArgsVerdict {
+  const keys = ['dueOn', 'dueFrom', 'dueTo'] as const;
+
+  // 先把**给出来的**每个键解析掉：任何一个不成立就直接拒，
+  // 不进入后面的组合判断（否则"dueOn 拼错 + dueFrom 拼对"会报成"互斥"，
+  // 把用户指向完全错误的方向）。
+  const days: Partial<Record<(typeof keys)[number], CalendarDay>> = {};
+  for (const key of keys) {
+    const raw = args[key];
+    if (raw === undefined) continue;
+    const parsed = parseCalendarDay(raw);
+    if (parsed === undefined) {
+      return {
+        ok: false,
+        message: `${key} 应为 YYYY-MM-DD（且是真实存在的一天），收到「${formatRejected(raw)}」。`,
+      };
+    }
+    days[key] = parsed;
+  }
+
+  const dueOn = days.dueOn;
+  const dueFrom = days.dueFrom;
+  const dueTo = days.dueTo;
+
+  if (dueOn !== undefined && (dueFrom !== undefined || dueTo !== undefined)) {
+    return { ok: false, message: 'dueOn 与 dueFrom / dueTo 只能二选一（要某一天，或者要一段范围）。' };
+  }
+
+  if (dueOn !== undefined) {
+    return { ok: true, args: { dueOn: formatCalendarDay(dueOn) } };
+  }
+
+  // 三个都没给 = 不按日期筛（这是**最常见的**调用形态，不是错误）。
+  if (dueFrom === undefined && dueTo === undefined) {
+    return { ok: true, args: {} };
+  }
+
+  // 🔴 只给一端 = 拒绝（**不是**"当成开区间"）：半开的那一端没有上界，
+  // 而"这次最多能读走多少条"必须由契约回答（见 `LIST_TASKS_MAX_DUE_SPAN_DAYS`）。
+  if (dueFrom === undefined || dueTo === undefined) {
+    return {
+      ok: false,
+      message: 'dueFrom 与 dueTo 必须一起给 —— 只给一端就是一条没有上界的范围。',
+    };
+  }
+
+  const forward = calendarDaysBetween(dueFrom, dueTo);
+  if (forward < 0) {
+    return { ok: false, message: `dueFrom「${formatCalendarDay(dueFrom)}」不能晚于 dueTo「${formatCalendarDay(dueTo)}」。` };
+  }
+
+  // 🔴 **含两端**：相邻两天是 2 天，不是 1 天。上限的口径必须和描述里写的一致。
+  const span = forward + 1;
+  if (span > LIST_TASKS_MAX_DUE_SPAN_DAYS) {
+    return {
+      ok: false,
+      message:
+        `按日期查任务最多覆盖 ${String(LIST_TASKS_MAX_DUE_SPAN_DAYS)} 天（含两端），` +
+        `「${formatCalendarDay(dueFrom)}」到「${formatCalendarDay(dueTo)}」是 ${String(span)} 天。`,
+    };
+  }
+
+  return { ok: true, args: { dueFrom: formatCalendarDay(dueFrom), dueTo: formatCalendarDay(dueTo) } };
+}
+
+/** 规范化回字符串（校验已保证它是补零的 `YYYY-MM-DD`）。 */
+function formatCalendarDay(day: CalendarDay): string {
+  return `${String(day.year).padStart(4, '0')}-${String(day.month).padStart(2, '0')}-${String(day.day).padStart(2, '0')}`;
+}
+
+/** 把被拒的输入打成**一行**放进错误消息：非字符串只报类型，不让对象把内部结构带出去。 */
+function formatRejected(raw: unknown): string {
+  if (typeof raw === 'string') return raw === '' ? '（空串）' : raw;
+  return typeof raw;
 }
 
 // ─────────────────────────────────────────────────────────────────────────

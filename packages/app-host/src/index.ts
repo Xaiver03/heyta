@@ -367,8 +367,6 @@ export {
 } from './ai-tool-selection.js';
 export {
   confirmAiToolProposal,
-  grantedToolNames,
-  runAiTool,
   runSelectedTool,
   type AiToolProposal,
   type AiToolRunOutcome,

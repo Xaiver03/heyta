@@ -96,6 +96,70 @@ describe('listMcpTools —— 只暴露已授权的工具', () => {
   });
 });
 
+// ─────────────────────────────────────────────────────────────────────────
+// 🔴 `list_tasks` 的**给模型看**的日期参数
+// ─────────────────────────────────────────────────────────────────────────
+//
+// ⚠️ 这一组的判据落在"描述文字"上，不是落在"参数存在"上，理由是一条别的测试
+// 抓不到的约束：`packages/ai/src/provider.ts` 里 `AiInvocation.tools` 的注释明写
+// **"这些工具的名字与说明会进入请求体，所以它们也是出境数据"**。
+// ⇒ 描述写错 = 用户的数据被一段含糊的说明带错方向，而这段说明**离开过本机**。
+// 所以"互斥 / 成对 / 含两端 / 上限多少"必须**写在描述里**，而不是留给模型猜，
+// 也不能写成只有内部人才懂的黑话。
+
+/** 取 `list_tasks` 的参数说明。 */
+function listTasksProperties(): Record<string, { description?: string }> {
+  const tools = listMcpTools({
+    ...CONFIG,
+    grants: { list_tasks: true, create_task: true, get_task: true, list_projects: true },
+  });
+  const list = tools.find((t) => t.name === 'list_tasks');
+  return (list?.inputSchema.properties ?? {}) as Record<string, { description?: string }>;
+}
+
+describe('🔴 list_tasks 的日期参数：schema 与出境描述', () => {
+  it('三个日期参数都在 schema 里（缺一个就等于没有那条能力）', () => {
+    expect(Object.keys(listTasksProperties()).sort()).toEqual(
+      ['completed', 'dueFrom', 'dueTo', 'dueOn', 'limit', 'projectId'].sort(),
+    );
+  });
+
+  it('🔴 每个日期参数的描述都写清格式，并标出互斥 / 成对', () => {
+    const props = listTasksProperties();
+    for (const key of ['dueOn', 'dueFrom', 'dueTo'] as const) {
+      const description = props[key]?.description ?? '';
+      expect(description, key).toContain('YYYY-MM-DD');
+      // 组合关系必须写出来，不留给模型猜
+      expect(description, key).toMatch(/互斥|一起给/);
+    }
+  });
+
+  it('🔴 闭区间的口径写在描述里（含两端），上限也写了', () => {
+    const props = listTasksProperties();
+    const range = `${props.dueFrom?.description ?? ''} ${props.dueTo?.description ?? ''}`;
+    expect(range).toContain('包含这一天');
+    expect(range).toContain('14');
+  });
+
+  it('🔴 描述里没有内部黑话（这是出境数据，模型读不懂的行话会直接变成错调用）', () => {
+    const json = JSON.stringify(listTasksProperties());
+    for (const jargon of ['ADR', 'op-log', 'dispatch', 'W3', 'AI-G3', 'createLocalApiHost', 'LocalApiHost']) {
+      expect(json, jargon).not.toContain(jargon);
+    }
+  });
+
+  it('🔴 limit 的描述说明它作用在筛选**之后**（顺序是这条缺陷的另一半）', () => {
+    const limit = listTasksProperties().limit?.description ?? '';
+    expect(limit).toContain('默认 50');
+    expect(limit).toMatch(/筛完之后|筛完/);
+  });
+
+  it('日期参数**不是必填**（不传就是不按日期筛）', () => {
+    const tools = listMcpTools({ ...CONFIG, grants: { list_tasks: true } });
+    expect(tools.find((t) => t.name === 'list_tasks')?.inputSchema.required).toBeUndefined();
+  });
+});
+
 describe('handleToolsCall —— 授权与协议的交界', () => {
   it('已授权 + token 对 → 放行，并带上参数', () => {
     const out = handleToolsCall(CONFIG, 'list_tasks', { limit: 10 }, TOKEN);

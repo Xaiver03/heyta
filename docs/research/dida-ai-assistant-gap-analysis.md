@@ -398,10 +398,33 @@ ADR-0035 与计划里 P3 的定义是"**多步只读循环**"，写永不进循�
    ⚠️ 还有一条结构性事实：Ollama 默认放行的就是 **loopback 来源** ⇒
    **只有开发机上的 localhost 页面能用本机端点**，生产 Web 壳与两个原生壳必然撞上它。
    这也解释了为什么它至今没被发现：**所有人都在 localhost 上测。**
-3. `verify:ai-live` 等三个**真端点**验收脚本今天全部"**跳过并退出 0**"：
-   配置被 i18n 那轮搬到 `/tmp/heyta-ai-live-provider.json.stashed-by-i18n-round` 后未归位
-   （该文件实测存在，100 B，mtime 2026-10-01 18:19）。
+3. **四个**真端点验收脚本今天全部"**跳过并退出 0**"：
+   `scripts/verify-ai-live.mjs` / `-breakdown-live.mjs` / `-output-language.mjs` /
+   `-preferences-live.mjs` 各自抄了一遍"读不到配置 ⇒ `process.exit(0)`"，
+   而配置被 i18n 那轮搬到 `/tmp/heyta-ai-live-provider.json.stashed-by-i18n-round` 后未归位
+   （该文件实测存在，100 B，mtime 2026-10-01 18:19；键为 `mode/endpoint/apiKey/model`，
+   值是**本机 Ollama** `127.0.0.1:11434` + `qwen2.5:0.5b`）。
    ⇒ 这是"一条永远通过的判据比没有判据更糟"（§7 元规则第 2 条）的**现行实例**。
+
+   🔴 **严重性要按实测说，我初稿把它说高了**（下面两条是核对 `package.json` 与
+   `.github/workflows/ci.yml` 之后的更正）：
+
+   - 这四个脚本**都不在 `pnpm check`、也不在 CI 里**（`ci.yml` 只跑 `pnpm check` 与
+     `pnpm test`，另在第 141 行明确写"想让它真跑，用 `pnpm verify:ai-live` 系列脚本在本地执行"）。
+     所以它们**没有把 CI 变成假绿**，骗到的是**手动运行它的人**。
+   - `verify-ai-output-language.mjs` **连 `verify:` 别名都没有**（`package.json` 里查不到），
+     只能 `node scripts/…` 直接跑 ⇒ 它比另外三个更不可发现。
+   - 另有两处同源的小缺陷：三个脚本**用了 `config.model` 却只校验 `endpoint`/`apiKey`**
+     （⇒ 模型缺失时是 `model: undefined` 发出去，不是"没配"），
+     以及把"JSON 解析失败"和"文件不存在"**都**当成"还没配"。
+
+   ⚠️ **真正在门禁里的那个空转不在 `scripts/`**：
+   `apps/web/tests/journey-ai-memory.integration.spec.tsx:256` 用
+   `describe.skipIf(CONFIG === undefined)` 挂在**同一个** `/tmp/heyta-ai-live/provider.json` 上，
+   而它属于 `pnpm -r test` ⇒ **是 `pnpm check` 的一部分**。
+   它是 web 侧唯一碰真模型的用例，配置文件缺失时整块静默跳过
+   （该文件自己的注释 line 197 已经写下"一个永远不执行的判据，比没有判据更糟"——
+   即前一轮已经看见了这条，但没有改它）。
 4. 拿那份被搬走的配置喂 `verify-ai-live`，第一条断言即炸（它硬要求**远端**端点）；
    喂 `verify-ai-breakdown-live` 则 **12 过 / 1 红**（红在模型只拆出 1 项，链路 97 ms 真通）。
    ⇒ **引擎侧确实接通**，缺的是产品侧那一条腿。
@@ -464,7 +487,7 @@ ADR-0035 与计划里 P3 的定义是"**多步只读循环**"，写永不进循�
 | # | 缺口 | 证据 | 能不能自己修 | 修它之前必须先有什么 |
 |---|---|---|---|---|
 | **AI-G1** | 本机端点被 Origin 403 挡住，且错误被归成通用 `http-error`、界面无解 | §6 | ✅ 纯本仓库 | 无 —— **可立刻修**，且优先级最高 |
-| **AI-G2** | 三个真端点验收脚本"跳过并退出 0"，配置被搬走未归位 | §6 | ✅ | 无 —— 现行"永远通过的判据" |
+| **AI-G2** | 四个真端点验收脚本"跳过并退出 0"（配置被搬走未归位）；**同一份配置还被 `pnpm check` 里的一套 web 旅程用例 `skipIf` 共用** | §6 | ✅ | 无 —— 现行"永远通过的判据"（门禁里那一份才算真危险） |
 | **AI-G3** | `list.today` 返回全量任务前 N 条，正给用户错数据；测试只断言 args | §3.5 | ✅ | `list_tasks` 需要日期参数（改工具契约） |
 | **AI-G4** | 需要 `entityId` 的 3 个工具在 AI 路径上结构性不可达 | §3.4 | ⚠️ 要动架构 | 多步循环（含 ADR-0035 已给的"字段并集前置披露"解法） |
 | **AI-G5** | 没有产品级能力清单 ⇒ 结构上说不出"这个做不到" | §1.2 读法 1、§2 截图 B | ✅ 可从工具目录**生成** | 一条纪律：**只能生成、不能手写**（否则必然漂移，见 §11） |
@@ -539,7 +562,7 @@ ADR-0035 与计划里 P3 的定义是"**多步只读循环**"，写永不进循�
 | §0 表格 `own` 行判据 | "4 个 AI 功能 + 工具调用" | `AiFeature` 现在是 **5 个**（工具调用已是其中之一） |
 | §2.1 | `retention-undecided` 是托管模式的阻塞点 | 仍然成立，但 `AiSupplyMode` 在 `packages/ai` 外**零引用** ⇒ 它**不挡今天的用户**，排序上应让位于 AI-G1 |
 | §4.3 | "工具调用 P3/P4 未开始"；P4 = "需要实体 ID 的工具 `get_task`/`update_task`/`complete_task`" | 🔴 **这 3 个工具已经存在**（`tools.ts:75-114`）。真实状态不是"未开始"，是"**已实现但在 AI 路径上结构性不可达**"（AI-G4）。这个区别决定工作量估算 |
-| §5 | 已知红套件"未发现"，且声明"没有实际运行测试" | 三条 AI 门禁（coverage / quota / tools）本轮**实跑均 exit 0**；但三个 `verify:ai-*live` 脚本"**跳过并退出 0**"（AI-G2）—— 这是比"红"更糟的形态，**它看起来是绿的** |
+| §5 | 已知红套件"未发现"，且声明"没有实际运行测试" | 三条 AI 门禁（coverage / quota / tools）本轮**实跑均 exit 0**；四个 `verify-ai-*-live` 脚本"**跳过并退出 0**"（AI-G2）—— 形态确实坏，但 🔴 **我初稿写"它看起来是绿的、比红更糟"是把严重性说过头了**：那四个脚本**不在 `pnpm check`、也不在 CI**（`ci.yml` 只跑 `check` 与 `test`，并明确让人在本地跑 live 脚本），所以它们**没有掩盖过任何一次 CI 绿**，误导的是手动跑它的人。**门禁里真正的空转是另一处**：`apps/web/tests/journey-ai-memory.integration.spec.tsx:256` 的 `describe.skipIf` 挂在同一份 /tmp 配置上，而它**在** `pnpm check` 里（详见 §6 第 3 条） |
 | §6 门禁总表 | 未涵盖端点可达性 | 无任何门禁检查"预设端点在真实 Origin 下可用"，这是 AI-G1 能存活至今的根因 |
 
 对 [`ai-strategy.md`](../plans/ai-strategy.md) §8 信任阶梯：第 3、4 行（捕获解析、拆解）

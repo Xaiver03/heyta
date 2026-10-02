@@ -103,19 +103,63 @@
 - 界面：真浏览器用例断言**屏幕上出现那个 Origin 的具体值**，不断言"有文案"。
 - **变异**：把推导函数改成恒返回 `transient-network` ⇒ 单测与界面用例**必须红**。
 
-### W2 🔴 三个真端点验收脚本**不许"跳过并退出 0"**（AI-G2）
+### W2 🔴 真端点验收**不许"跳过并退出 0"**（AI-G2）
 
-现状：`verify:ai-live` / `verify:ai-breakdown-live` / `verify:ai-output-language`（及 preferences-live）
-在配置缺失时**跳过并 exit 0**，而配置是被 i18n 那轮搬到 `/tmp/…stashed-by-i18n-round` 后没归位。
-⇒ 这是 §7 元规则第 2 条（"一条永远通过的判据比没有判据更糟"）的**现行实例**。
+> ✅ **2026-10-02 已做完响亮失败那一条**；配置路径归位与门禁里那处 `skipIf` 的反转**未做**，
+> 原因写在下面，不要把它们当成"已完成"。
 
-- 配置归位到一个**固定、非 /tmp、被 `.gitignore` 覆盖**的路径，并写进 runbook（不许提交任何密钥）。
-- 🔴 **缺配置时响亮失败**，照 `scripts/reinstall-all.sh` 的先例做：没有显式 `--skip` 就 exit ≠ 0，
-  且汇总里**大字列出**"这轮没验真端点"。
-- `verify-ai-live` 那条"硬要求远端端点"的断言要重新论证：本机 BYO 端点模式是 heyta 的**默认**形态，
-  一个把默认形态判成不可测的验收脚本，测的不是产品。
+先更正本条初稿的两处失真（都是实测出来的）：
 
-**判据**：拿掉配置 ⇒ 脚本 exit ≠ 0 且打印那句"没验真端点"。这条**必须先跑出红**再改绿。
+- 涉及的是**四个**脚本，不是三个：`verify-ai-live` / `-breakdown-live` /
+  `-output-language` / `-preferences-live`。
+- 它们**不在 `pnpm check`、也不在 CI**（`ci.yml` 只跑 `check` 与 `test`，
+  并在第 141 行明确指引"想真跑请在本地用 `pnpm verify:ai-live` 系列"）。
+  ⇒ 它们**没有掩盖过任何一次 CI 绿**，骗到的是手动运行它的人。
+  本条初稿写的"这比红更糟，它看起来是绿的"**说过头了**，已按实测降级。
+- 🔴 **门禁里确实有一处同形状的空转，而且位置不在 `scripts/`**：
+  `apps/web/tests/journey-ai-memory.integration.spec.tsx:256` 的
+  `describe.skipIf(CONFIG === undefined)` 挂在**同一个** `/tmp/heyta-ai-live/provider.json` 上，
+  而它属于 `pnpm -r test` ⇒ **在 `pnpm check` 里**。它是 web 侧唯一碰真模型的用例。
+
+**已做（判据先跑出红，再改绿）**：
+
+- 跳过判据抽成**单一所有者** `scripts/lib/live-provider-config.mjs`
+  （原来同一个 `exit(0)` 抄了四遍 —— 本仓库"失败判据被抄三遍于是三遍都漏"的老形状）。
+- 默认 **exit 2 =「这一轮根本没跑」**，与 1=「跑了且有红」分开；
+  只有显式 `--skip` 或 `HEYTA_AI_LIVE_ALLOW_SKIP=1` 才回到 0，且**照样打大字警告**。
+- 配置文件存在但 **JSON 解析失败 ⇒ exit 1**，不再伪装成"还没配"。
+- 字段校验补齐：四个脚本**都用了 `config.model`**，而三个只校验 `endpoint`/`apiKey`
+  ⇒ 以前模型缺失是 `model: undefined` 直接发出去。
+- 诊断分两种：期望路径没文件 vs **文件被搬走** —— 后者会把 `/tmp/heyta-ai-live-provider*`
+  列出来并**声明不会自动使用它**（用不用一份凭据必须是显式决定）。
+  本次实测：该分支真的找到 `/tmp/heyta-ai-live-provider.json.stashed-by-i18n-round`。
+- 五条臂**全部实跑取证**：缺文件⇒2；`--skip`⇒0 且打警告；合法配置⇒装载成功并继续跑判据；
+  坏 JSON⇒1 且明说"不是还没配"；缺 `model`⇒2 且点名缺哪个字段。
+- ⚠️ **没有**把那个凭据文件搬回期望路径：它是**另一个会话为 i18n 那轮刻意停批的**，
+  归位动作留给它的所有者。这里的打印只做诊断，不代做决定。
+- ⚠️ `verify-ai-output-language.mjs` **没有 `verify:` 别名**（`package.json` 查不到）。
+  **没有顺手加**：`package.json` 当前被并行会话改着。留作待办。
+
+**未做（要一并改，不能一处一处改）**：
+
+1. 配置归位到**固定、非 /tmp、被 `.gitignore` 覆盖**的路径（/tmp 会被重启清掉，
+   而它的存在与否**还静默控制着一套 `pnpm check` 里的用例** —— 这两件事叠在一起就是
+   "门禁结论取决于本机今天有没有 /tmp 残留"）。
+   🔴 换默认路径要**同批改 6 处**：lib 里的默认值、四个脚本（现在只有一处）、
+   那个 spec 的 `CONFIG_PATH`、runbook、`.gitignore`。**分叉的默认值比 /tmp 更糟。**
+2. 把那个 spec 也翻成"缺配置就红"。⚠️ **刻意没翻**：翻了之后本机与 CI 的每一次
+   `pnpm -r test` 会立刻变红，而这需要**同时在 `ci.yml` 显式声明豁免**
+   （`HEYTA_AI_LIVE_ALLOW_SKIP=1`，让"CI 没有真模型覆盖"变成一个**可读的声明**而不是推断），
+   还要与同一工作树里正在跑门禁的并行会话协调。本轮先做的是让它**跳过时自己说话**
+   （`console.warn` 打清"这一轮没跑 + 缺哪个路径 + 怎么打开"）。
+3. `verify-ai-live` 第一条断言**硬要求远端端点**（它把 `classifyDestination(...)==='user-endpoint'`
+   当成前提），所以拿本机 Ollama 配置跑它会在第 1 步就炸。这条要重新论证：
+   本机 BYO 端点是 heyta 的**默认**形态，一个把默认形态判成不可测的验收脚本测的不是产品。
+   ⚠️ 它可能是**故意的**（"这条就是验远端出境链路"）—— 若是，则缺的是**对偶的那条**
+   （本机端点 ⇒ 目的地必须是 `none` 且**不需要**出境授权）。改法二选一，先读它的意图。
+
+**判据**：拿掉配置 ⇒ 脚本 exit ≠ 0 且打印那句"没验真端点"。这条**必须先跑出红**再改绿
+（✅ 已按此顺序做过，五条臂的输出记录在上面各条里）。
 
 ### W3 🔴 `list.today` 正在给用户错数据（AI-G3）
 
@@ -135,7 +179,28 @@
 **判据**：测试必须**断言结果集**（"给 3 条今天 + 2 条明天，返回恰好 3 条"），不断言 args。
 **变异**：把执行器里的过滤拿掉 ⇒ 必须红。
 
-### W4 时间锚点要有一件**工具**，相对日期解析要留在**代码**（AI-G8）
+### W4 时间锚点：**注入系统提示词，不加 `get_today` 工具**（2026-10-03 实施时改判）
+
+⚠️ **本条偏离初稿，理由要写清，否则下一个会以为漏做了工具。**
+初稿写的是"新增只读工具 `get_today`"。实施时改成**注入**，四条理由：
+
+1. `ToolSelectionContext` **已经有注入的 `now`**（`ai-tool-selection.ts` 的
+   `ToolSelectionContext.now`，注释写明"注入而非读真实时钟：否则测试会过几天变红"）
+   ⇒ 规则侧根本不需要一次工具调用就能拿到今天。
+2. 模型侧要拿到今天，**注入一行比一次工具往返便宜得多**，而且**不扩大出境字段面** ——
+   多步的工具结果回灌是出境的，提示词里的一行日期不是新字段。
+3. `ai-capture.ts` 已经在提示词里注入"今天是"，**这是既有先例**，不是新形状。
+4. 竞品用工具是因为它的 agent loop 是**通用**的；heyta 的封闭词表里"今天"永远是需要的上下文，
+   不是一个可选能力。
+
+⇒ **仍然要做的部分**：把日期 + 星期 + **时区**注入到**拆解 / 排序 / 估时 / 工具调用**四条链路
+（现在只有 capture 有），以及把相对日期（"14号""下周三"）的解析**留在规则内核**
+（`capture.ts` 只有 `X月Y日`，没有裸日规则）。
+🔴 **不许改成"让模型自己算"**：`packages/ai/src/index.ts` 文件头记着实测 ——
+模型曾把"明天"算错**四个半月**。
+
+**判据**：表驱动，至少覆盖跨年、已过本月同日、月末溢出、非 UTC 时区四组。
+**变异**：把时区写死成 UTC ⇒ 至少一条红。
 
 现状："今天是几号"只进了 `ai-capture.ts` 一条 prompt；拆解/估时/排序/**整条工具链**都没有日历锚点，
 **也从不传时区**。"14号"没有任何一层负责解析（规则内核只有 `X月Y日`）。
@@ -199,6 +264,59 @@
 删前门的判据是**全量 `pnpm -r typecheck` 通过 + `check:ai-tools` 通过**，
 不是"grep 不到了"。
 
+#### ✅ 2026-10-03 做完了，三处初稿判断需要更正
+
+| 工单写的 | 实测 | 后果 |
+|---|---|---|
+| "顺带修 `ai-tool-call.ts` 头部那张对照表" | 🔴 **那张表是对的**（它逐行写 `runSelectedTool()` → `findTool()` / `isToolGranted()`，与代码一致）。**过期的是另一张**：`ai-tool-run.ts:32` 把"执行前复查"写成 `runAiTool()` 里的，而 `isToolGranted()` 一直住在 `runSelectedTool()` | 表指向一个**不含该判断**的函数 ⇒ 改错门。同一个包里一张对一张错，说明不是"没人知道"，是**抄件一定会漂** |
+| `grantedToolNames` 只是"未用" | 它是 `listAuthorizedTools()` 的**第二个投影方向**：那边遍历目录按 grants 筛，这边遍历 grants 按 `findTool()` 筛 —— 同一个集合两种写法，且**都过滤目录外**（等价）。所以它不是"没用的便利函数"，是**同一判断的第二份** | 删。需要授权工具名就从 `listAuthorizedTools(grants)` 取 |
+| 判据 = "grep 计数为 1" | grep 判据**改成了行为判据**：`packages/ai/tests/wire.spec.ts` 分别驱动 `createProvider()` 与 `invokeRouted()` 两条真路径，把它们各自交给 `fetchImpl` 的 **url / headers / `JSON.stringify` 之前的原始 body 串**逐字节比对。任何一边单独改形状立刻红 | 文本检查改个函数名就绕过；字节比对绕过不了。已用变异复现：只给 `provider.ts` 那条路的 `system` 加一个空格 ⇒ **恰好 1 红**（`给了工具：url / headers / 请求体原串三样全等`），还原后逐字节哈希相同、复绿 |
+
+**实际做的三件事**：
+
+1. **删冗余前门**：`runAiTool()`（六行薄壳）与 `grantedToolNames()` 从
+   `ai-tool-run.ts` 与 `packages/app-host/src/index.ts` 的导出里删除。
+   `ai-tool-run.spec.ts` 对它的 8 处调用改成本文件内的**局部**组合
+   `runThroughRules()`（`resolveToolSelection` → `runSelectedTool`）——
+   🔴 **断言一条没动**（`git diff -U0 | grep -c 'expect('` = **0**），测试数不变（11）。
+   ⚠️ 刻意**不再抽回产品层**：需要"text → 执行一步"就调 `requestToolCall`，
+   它是唯一前门；`requestToolCall` 的规则分支本来就做着同一件事。
+2. **收敛请求组装**：新建 `packages/ai/src/wire.ts`（`chatCompletionsUrl` /
+   `chatRequestHeaders` / `buildChatRequestBody` / `isEmptyModelResponse`），
+   `provider.ts` 与 `routing.ts` 两处各删一份。
+   ⚠️ **刻意不从 `@heyta/ai` 导出**：线格式是包内接缝，导出去等于邀请包外再拼一份。
+   ⚠️ 抽的是**判断**不是**句子**：`empty-response` 两边措辞不同是**有意的**
+   （路由那份要带端点名，多端点回退时用户必须知道是哪一个），
+   所以共享 `isEmptyModelResponse()`，句子留在各自文件。
+   🔴 顺带修掉一处：`chatRequestHeaders` 把**空串**当成"没有密钥"。
+   两条路原来各自写 `apiKey !== undefined && apiKey !== ''`，
+   这条纪律现在只有一份 —— 空串发 `Bearer ` 头会让某些端点直接 401，
+   症状是"配了地址却连不上"。
+3. **抄件 4 → 1**：新建 `packages/app-host/src/ai-failure-fallback.ts`，
+   四个模块改成 import。两处文件头原本明写着"**本轮不允许改那个文件，所以只能各留一份**"
+   —— 也就是说这份重复是**被决定留下来的**；没有门禁，它会在下一次"不方便改"时变成五份。
+   ⚠️ 入参从 `string` 换成封闭词表 `AiFailureReason`：旧 `switch` + `default` 的组合
+   意味着 `packages/ai` 新增原因时**四份都不报错、静默落 default**。
+   兜底那句 `'AI 暂时不可用。'` **保留**，但它现在由
+   `noUncheckedIndexedAccess` 在类型上**要求**（不是装饰）：同一个包被加载两份时
+   跨模块枚举比较会静默为假，那时拿到的就是词表外的值，而面板对它做 `.includes()`。
+
+**门禁**：`check:ai-tools` 新增**规则 6** —— 扫描 `packages/app-host/src` 全部
+**39 个**非测试 `.ts`：`runAiTool` / `grantedToolNames` 不许再出现（按**声明语法**匹配 +
+先剥注释，因为这几个名字如今大量出现在"解释为什么它们没了"的注释里），
+`describeRoutedFailure()` 的定义点必须**恰好一个**且在 `ai-failure-fallback.ts`。
+两条变异各自实测转红（在 `HEYTA_CHECK_ROOT` 的副本里注入，工作树未动）：
+长回 `runAiTool` ⇒ 红；在 `ai-breakdown.ts` 再定义一份 ⇒ 红并打印两个定义点。
+
+**为什么先还它**：这一批把"两条路各自拼请求体"合成一份，正是**下一批（多轮 `messages`）**
+的前提 —— 形状有两个主人的时候加多轮，得到的是"一条路能多轮、另一条不能"，
+表现是"某些功能忽然又变成单轮了"，而那种 bug 没有编译错误、也没有失败用例。
+
+**登记给后面的**：`apps/web` 五个面板的失败块是**五份复制**（其中三份外层逐字相同），
+本轮只在唯一的共用件 `FailureSettingsAction` 上加了 `originHint`。
+第 6 个面板进来时它就会漂 —— 处理方式与这里相同：先收敛，再加门禁。
+
+
 ---
 
 ## 3. 第二段：依赖拍板（W8–W14，**现在不许开工**）
@@ -252,3 +370,41 @@ W1–W7 每张工单独立可回退（各自一个提交，互不依赖）。
 W8 起**不是可回退的增量**：多步循环一旦放开，出境披露的口径就从"一次调用"变成"一次会话"，
 回退要连带清掉已发放的会话级同意。⇒ **W8 开工前必须先有 D-1a 的 ADR**，
 那份 ADR 要写清回退时同意如何失效。
+
+> ✅ 该前提已在 2026-10-03 满足：[ADR-0045](../adr/0045-conversational-assistant-split-authorization-from-catalog.md)
+> §5 第 4 条把"回退时代际号 +1、旧会话级同意逐条自然失效"写成了硬要求。
+
+---
+
+## 7. 实施进度（2026-10-03 凌晨，产品负责人休息中、授权自主推进）
+
+⚠️ **这一节是过程账，不是完成声明。** 每条都写明"落在哪里、验到什么程度"。
+
+| 工单 | 状态 | 落在哪 | 验到什么程度 |
+|---|---|---|---|
+| 前置：D-1 / D-1a 的 ADR | ✅ 已提交 | `docs/adr/0045-…-from-catalog.md` | 死链检查过；取代关系逐条写明（含**保留**哪些既有条款） |
+| 前置：本审计 + 差距文档 | ✅ 已提交 | `docs/research/dida-ai-assistant-gap-analysis.md` + 旧审计 §8 勘误 | 六路只读审计；其中 **1 条撤回**（`AI-G13`）+ **1 条改判**（`AI-G4` 不是缺接线）都在文档本体里 |
+| W1 第 0 步（实测） | ✅ 已做完 | 结论进 ADR-0045 §4 与本文 W1 | 四探针实测，**推翻了 W1 原计划的修法**（状态码在 JS 侧不可见 ⇒ 不能加新失败原因） |
+| W1 第 1 层（诊断函数） | 🟡 已落盘，未提交 | `packages/ai/src/diagnose.ts` + `AiFailure.endpointUrl` + `routing.ts` 带出端点 | 复用 `supply.ts` 的 `isLoopbackEndpoint`，**没起第二份判断**。单测在写 |
+| W1 第 2 层（界面） | 🟡 进行中 | `ai-failure-copy.ts`（已改）+ 五个面板（接线中）+ i18n 3 键 ×2 语言（已落） | 五个调用点刻意改成**必填上下文对象**，让编译器强制逐个改到 —— 这是本文件 §"第 5 份副本没跟上"教训的直接应用 |
+| W1 第 3 层（手册） | ✅ 已落盘，未提交 | `docs/runbooks/ai-acceptance.md` §9 | 含三条**已实测通过**的 curl 阳性/阴性对照 |
+| 🔴 W1 根因级判据（假端点会拒绝来源） | ✅ 已落盘，未提交 | `e2e/stub-provider.mjs` 的 `STUB_ORIGIN_ALLOWLIST` | **已实测**：白名单内 200+回显来源+`Vary: Origin`；白名单外 **403 且零 CORS 头**；预检走同一闸门；**不设变量则逐字回归旧行为**（既有套件零影响）。闸门放在所有路由**之前**，否则 `/__requests` 会成侧门 |
+| W3 / W4 部分（`list.today` 错数据 + 日期参数） | 🟡 进行中 | `local-api/{mcp,server}.ts`、`ai-tool-selection.ts`、两个宿主实现 | 判据**换层**：从"断言 args"改成"断言结果集"，并专门钉"先过滤再 limit"（那是同一个 bug 的另一种面目） |
+| W4 其余（时间锚点注入四条链路 + 裸日规则） | ⛔ 未开始 | — | 见本文 W4 的改判说明 |
+| W2（live 脚本空转） | 🟡 **响亮失败已做完，归位未做** | `scripts/lib/live-provider-config.mjs`（新增，四个脚本共用）+ 四个 `verify-ai-*-live` + `journey-ai-memory` 的跳过自检 | 缺配置 **exit 2**、坏 JSON **exit 1**、`--skip` 才回 0；五条臂全部实跑取证。**没有**搬别人的凭据文件，**没有**翻转 spec 的默认（理由见本文 W2「未做」三条） |
+| W5 / W6 / W7 | ⛔ 未开始 | — | W6 已撤销；W7 **必须在 W8 之前** |
+| W8–W14 | ⛔ 未开始 | — | W8+ 依赖的 D-1/D-1a 已由 ADR-0045 拍定，**阻塞已解除**；D-2（授权粒度）与 D-3（`EVENT` 同批）仍未拍 |
+
+### 7.1 一条必须记住的提交纪律
+
+本仓库的工作树是**并行**的：`git status` 里同时存在别的会话 staged 的
+`server/src/auth.ts`、`package.json`、`pnpm-lock.yaml`，以及未提交的
+`apps/web/src/App.tsx`、`view-tabs.ts`、`theme.ts`、倒数纪念日那四份文档。
+
+⇒ **`git commit` 提交的是整个索引**，所以：
+- 混合文件（如 `docs/plans/README.md` 同时有我的 §四 与别人的 §六）**不能**用路径提交 ——
+  本次的做法是"从 HEAD 版本构造只含自己改动的 blob → `hash-object -w` → `update-index --cacheinfo`"，
+  工作树一个字不动，索引里只进自己的部分。
+- 新文件用临时索引 + `commit-tree` + `update-ref`，**完全不碰共享索引**。
+- 提交后必须回读 `git diff --cached --name-only HEAD` 确认别人的 staged 条目**还在**（没被带走）。
+依据：`AGENTS.md` §7 与仓库自报事故提交 `2206542c`。

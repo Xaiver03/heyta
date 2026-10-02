@@ -44,6 +44,7 @@
  * 界面要说的话完全不同。
  */
 
+import { today } from '@heyta/domain';
 import { LOCAL_API_TOOLS, isToolGranted, type LocalApiConfig, type LocalApiTool } from '@heyta/local-api';
 
 /** 工具参数。形状由各工具的 `INPUT_SCHEMAS` 决定，本层不解释。 */
@@ -102,7 +103,16 @@ export const DEFAULT_TOOL_SELECTION_RULES: readonly ToolSelectionRule[] = [
     id: 'list.today',
     tool: 'list_tasks',
     pattern: /(今天|今日)[^。！？\n]{0,6}(要做什么|有什么|待办|任务|安排)/,
-    args: () => ({}),
+    // 🔴 这条规则**存在的理由就是带日期参数**。曾经它传的是 `{}` ——
+    // 于是问"今天有什么任务"拿到的是**全量前 N 条**，与问"列出任务"逐字相同：
+    // 界面全绿、答案在说谎。参数现在有了（`list_tasks` 的 `dueOn`，见 `tools.ts`），
+    // 不许再退回空对象。
+    //
+    // ⚠️ `today` 用**注入的 `ctx.now`**，不是 `Date.now()` ——
+    // 后者会让这条用例在几天之后自己变红（`ToolSelectionContext.now` 的注释就是为这个）。
+    // 🔴 也不许在这里读"模型说的今天"：`packages/ai/src/index.ts` 文件头记着实测 ——
+    // 模型曾把"明天"算错四个半月（ADR-0045 关联的 W4 判据）。
+    args: (_match, ctx) => ({ dueOn: today(ctx.now) }),
   },
   {
     id: 'list.completed',

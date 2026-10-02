@@ -203,6 +203,85 @@ pnpm run install-browser   # 下载 Chromium
   （见 [`multi-platform-build.md`](multi-platform-build.md)）。
 - **视觉回归**。没有截图比对，只有"元素可见 / 文本正确"这类断言。
 - **性能**。没有对首屏或交互延迟设阈值。
+- ⚠️ ~~**本机端点的跨源可达性**~~ —— 这一条**曾经是门禁的洞**，见下面 §9。
+  旧版假端点无条件回 `Access-Control-Allow-Origin: *` 且不读 `Origin`，
+  所以它**结构上不可能**复现"端点拒绝了这个来源"这一类失败。
+
+---
+
+## 9. 本机端点的跨源策略：为什么"AI 不可用"多半不是网络问题
+
+### 9.1 事实（2026-10-02 实测，Ollama 0.23.2）
+
+heyta 只有两个内置端点预设，**都是回环地址**：Ollama `http://localhost:11434/v1`、
+LM Studio `http://127.0.0.1:1234/v1`。而它们对**请求来源**是有白名单的：
+
+| 探针 | 结果 |
+|---|---|
+| 无 `Origin`（非浏览器，比如 `curl` 不带该头） | 200 |
+| `Origin: http://127.0.0.1:4321` | 200，且 `Access-Control-Allow-Origin` **回显该来源** + `Vary: Origin` |
+| `Origin: https://heyta.waytofuture.cn` | **403，`Content-Length: 0`，完全没有 `ACAO`** |
+| 该来源下的 `OPTIONS` 预检 | **403，无 `ACAO`** |
+
+🔴 **后果不是"收到 403"，而是"根本收不到 403"**：403 不带 `ACAO` ⇒
+浏览器把它拦成 `TypeError: Failed to fetch` ⇒ heyta 只能归成失败原因 `'network'`。
+**JS 永远看不到那个状态码。** 所以这件事**不可能**靠状态码分类，
+只能靠配置推导（端点是否回环 + 宿主自身来源是否回环），实现在
+`packages/ai/src/diagnose.ts` 的 `diagnoseNetworkFailure()`。
+
+### 9.2 谁会撞上、谁不会
+
+| 宿主 | 页面/壳的 Origin | 用本机端点 |
+|---|---|---|
+| 开发机 `vite dev` | `http://localhost:*` / `http://127.0.0.1:*` | ✅ 能用（**正因如此，开发阶段永远看不见这个缺陷**） |
+| 生产 Web 壳 | `https://heyta.waytofuture.cn` | ❌ 被拒，除非用户自己放宽端点白名单 |
+| macOS 原生壳 | `heyta-local://app` | ❌ 同上 |
+| Windows 原生壳 | `https://heyta.local` | ❌ 同上 |
+
+### 9.3 用户侧怎么修（**由用户决定，heyta 不代做**）
+
+放宽本机端点的来源白名单是一个**由用户做出的安全决定** —— 那是在别人机器上的服务，
+而且放开意味着"该机器上任何页面都可能访问它"。所以产品只负责
+**把该加的那个值原样打出来**（界面上的"要放行的来源"块），不负责替你改。
+
+Ollama 的做法（示例，值要用界面给你的那个）：
+
+```bash
+# 临时（当前 shell）
+OLLAMA_ORIGINS="https://heyta.waytofuture.cn" ollama serve
+
+# 常驻（macOS launchctl / systemd 同理）
+launchctl setenv OLLAMA_ORIGINS "https://heyta.waytofuture.cn"
+```
+
+LM Studio 的对应开关在它自己的设置里（"允许本地服务被局域网/其他来源访问"一类），
+**本轮未实测其选项名** —— 别照这句话给用户下结论，先在自己机器上点一遍。
+
+### 9.4 验收：怎么验这条判据**能红**
+
+`e2e/stub-provider.mjs` 现在支持 `STUB_ORIGIN_ALLOWLIST`，语义照抄 Ollama。
+不设该变量时**逐字保持从前的放行行为**（既有套件零影响）。
+
+```bash
+# 起一个"会拒绝来源"的假端点
+cd e2e && STUB_PORT=4399 STUB_ORIGIN_ALLOWLIST="http://127.0.0.1:4318" node stub-provider.mjs
+
+# 阳性对照：白名单内 ⇒ 200 且回显来源
+curl -s -D - -o /dev/null -H "Origin: http://127.0.0.1:4318" http://127.0.0.1:4399/__requests | grep -i "^HTTP\|allow-origin\|vary"
+# 阴性对照：白名单外 ⇒ 403 且**一个 CORS 头都没有**
+curl -s -D - -o /dev/null -H "Origin: https://heyta.waytofuture.cn" http://127.0.0.1:4399/__requests | grep -i "^HTTP\|access-control"
+# 预检也走同一闸门
+curl -s -D - -o /dev/null -X OPTIONS -H "Origin: https://heyta.waytofuture.cn" http://127.0.0.1:4399/v1/chat/completions | grep -i "^HTTP\|access-control"
+```
+
+🔴 三条都已实测通过（2026-10-02）。**闸门必须在预检与所有路由之前** ——
+若放在后面，`/__requests` 这类诊断路径会变成绕过白名单的侧门，
+那这条判据就又变成"看起来在验、其实验的是别的东西"。
+
+界面侧的判据（真浏览器断言"屏幕上出现那个 Origin 的具体值"）与变异验证
+（把 `diagnoseNetworkFailure` 改成恒返回 `transient-network` 必须红）
+记在 [`../plans/ai-assistant-closure.md`](../plans/ai-assistant-closure.md) W1 与
+[ADR-0045](../adr/0045-conversational-assistant-split-authorization-from-catalog.md) §4。
 
 ---
 

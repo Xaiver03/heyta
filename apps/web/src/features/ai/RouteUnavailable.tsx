@@ -1,4 +1,4 @@
-import { ICON_SIZE } from '@heyta/design-system';
+import { ICON_SIZE, cssVar } from '@heyta/design-system';
 /**
  * 「这个功能现在没有路可走」的统一呈现
  * ======================================
@@ -19,6 +19,8 @@ import { ICON_SIZE } from '@heyta/design-system';
 import { AlertTriangle } from 'lucide-react';
 
 import { useI18n } from '@heyta/i18n';
+
+import { text } from '../../lib/text.js';
 
 import type { RouteExplanation, SettingsTarget } from './route-explanation.js';
 
@@ -94,37 +96,97 @@ export function RouteUnavailable({
 export interface FailureSettingsActionProps {
   /**
    * 来自 `AiFailureCopy.settingsTarget`。`undefined` = 设置里没有能修它的东西
-   * （网络抖动、端点为空的响应……），此时**不渲染任何东西**。
+   * （网络抖动、端点为空的响应……），此时**不渲染按钮**。
    */
   settingsTarget: SettingsTarget | undefined;
   onOpenSettings?: ((target: SettingsTarget) => void) | undefined;
+  /**
+   * 来自 `AiFailureCopy.originHint`：**该加进端点白名单的那个 Origin 原文**。
+   *
+   * 🔴 **必填**（不是可选参数）：这个组件是五个 AI 面板共用的失败态渲染点，
+   * 写成可选就会重演 `ai-failure-copy.ts` 文件头记着的那次漂移 ——
+   * 四个入口改好了、第 5 个没人管，而没有任何测试会红。必填让五个调用点
+   * 必须被编译器逐个改到。
+   *
+   * `undefined` = 这次失败与来源无关（真的网络抖动），此时**一个字都不渲染** ——
+   * 给一次网络抖动附上"去把你的 Origin 加白名单"，是教用户做一个
+   * 不需要做的安全决定。
+   */
+  originHint: string | undefined;
   testId: string;
 }
 
 /**
- * 失败态里的"去设置"。
+ * 失败态里的"下一步"。
  *
  * 与 `RouteUnavailable` 分开，是因为触发条件不同：那个只在"一个候选都没有"
  * 时渲染，这个只在"请求真的失败了、而且失败原因能在设置里修"时渲染。
  * 但两处**共用同一个 `SettingsTarget` 类型与同一份原因→目标的映射**
  * （`ai-failure-copy.ts`），所以它们不可能对同一场故障指向不同的地方。
+ *
+ * 🔴 现在它渲染两件事，顺序是**先给值、再给按钮**：
+ *   1. 端点拒绝了宿主来源时，把**该放行的 Origin 原文**打出来（+ 一行说明）；
+ *   2. "去设置"按钮 —— 落在端点区块，那里才放得下白名单这个控件。
+ * 这两件事由**同一个诊断**触发（`settingsTargetFor` / `originHintFor` 都读
+ * `diagnoseNetworkFailure` 的结果），所以不会出现"有按钮没有值"或反过来。
+ *
+ * ⚠️ 值是**数据不是文案**：原样渲染，不翻译、不去尾斜杠、不转小写 ——
+ * 端点比对的是请求头里那个串，加工过的值复制过去是**用不了的**。
+ * 所以它不进 i18n（标题与说明进），并与 `ErrorScreen` 的原始错误文本同一处置。
  */
 export function FailureSettingsAction({
   settingsTarget,
   onOpenSettings,
+  originHint,
   testId,
 }: FailureSettingsActionProps): React.JSX.Element | null {
   const { t } = useI18n();
-  if (settingsTarget === undefined || onOpenSettings === undefined) return null;
+
+  // 按钮要"有落点"且"宿主给了导航"；值只要诊断成立就该出现 ——
+  // 宿主没接 `onOpenSettings`（例如单测里）时，那句话仍然对用户有用。
+  const showValue = originHint !== undefined;
+  const showButton = settingsTarget !== undefined && onOpenSettings !== undefined;
+  if (!showValue && !showButton) return null;
 
   return (
-    <button
-      type="button"
-      className="ht-btn ht-btn--ghost"
-      data-testid={testId}
-      onClick={() => onOpenSettings(settingsTarget)}
-    >
-      {t('web.ai.action.openSettings')}
-    </button>
+    <>
+      {showValue && (
+        <div
+          className="ht-ai__note"
+          data-testid="ai-failure-origin-hint"
+          style={{ maxWidth: cssVar('layout.prose-max'), width: '100%' }}
+        >
+          <p style={{ ...text('panel-title'), margin: 0 }}>{t('web.ai.failure.originToAllow')}</p>
+          {/* 🔴 原样显示的那个值：等宽 + 可选中（键盘/鼠标都能整段复制）。
+              刻意不放进 `<details>` —— 它是这次失败的**结论**，不是诊断噪音。 */}
+          <p
+            data-testid="ai-failure-origin-value"
+            style={{
+              ...text('row-meta'),
+              margin: 0,
+              marginTop: cssVar('space.1'),
+              fontFamily: cssVar('font.mono'),
+              userSelect: 'text',
+              overflowWrap: 'anywhere',
+            }}
+          >
+            {originHint}
+          </p>
+          <p style={{ ...text('caption'), margin: 0, marginTop: cssVar('space.1') }}>
+            {t('web.ai.failure.originToAllowNote')}
+          </p>
+        </div>
+      )}
+      {showButton && (
+        <button
+          type="button"
+          className="ht-btn ht-btn--ghost"
+          data-testid={testId}
+          onClick={() => onOpenSettings(settingsTarget)}
+        >
+          {t('web.ai.action.openSettings')}
+        </button>
+      )}
+    </>
   );
 }

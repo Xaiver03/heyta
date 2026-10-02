@@ -263,7 +263,12 @@ export function AiDuration(props: AiDurationProps): React.JSX.Element {
       setPhase('proposal');
       return;
     }
-    setFailure(durationFailureCopy(outcome.reason, outcome.message, outcome.cause));
+    setFailure(
+      durationFailureCopy(outcome.reason, outcome.message, {
+        cause: outcome.cause,
+        endpointUrl: outcome.endpointUrl,
+      }),
+    );
     setPhase('failed');
   }
 
@@ -531,6 +536,7 @@ export function AiDuration(props: AiDurationProps): React.JSX.Element {
       {/* 🔴 失败原因能在设置里修 → 给一条真的能点的路（只导航，不代授权）。 */}
       <FailureSettingsAction
         settingsTarget={failure?.settingsTarget}
+        originHint={failure?.originHint}
         onOpenSettings={onOpenSettings}
         testId="duration-failure-settings"
       />
