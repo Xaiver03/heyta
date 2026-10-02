@@ -2092,3 +2092,36 @@ cd e2e && npx playwright test tests/due-date-edit.spec.ts tests/motivation.spec.
 
 **现状**：`check:empty-state` 从 2 处红降到 1 处红，仍红 ⇒ `pnpm check` 仍断不到后面。
 本条不代改别人的屏。
+
+## B24. 🔴 `check:landing-e2e` 那 2 处红是**判据断在一个没人实现过的目录名上**（文档中心那条线；2026-10-03 05:30 取证）
+
+症状（`/tmp/rr-51.log`，15 passed / 2 failed）：`landing/docs-centre.spec.ts:959` 与 `:1013`
+都红在 `first-run：指向复制品的 <img> 数必须等于配图数`，`Expected: 1 / Received: 0`。
+🔴 **同一条用例里前一个断言（页面上 `.lp-figure` 的张数）是过的** —— 图在页面上，
+只是 `<img>` 的 src 前缀对不上。
+
+### 两边各说什么（逐行取证，不是猜）
+
+| 侧 | 事实 |
+|---|---|
+| 判据 | `e2e/landing/docs-centre.spec.ts:950` 数的是 `#main img[src^="/assets/docs/"]`；`:993`/`:1054` 断言 src 逐字等于 `/assets/docs/<id>/<file>` |
+| 产物 | 复制品住在 `apps/landing/public/assets/help/`，由 `apps/landing/scripts/gen-help-figures.mjs` 生成、`apps/landing/src/site/helpFigures.ts` 渲染 ⇒ 页面上是 `/assets/help/…` |
+| 提交态目录 | `git ls-tree -d HEAD apps/landing/public/assets/` **只有 `help`**，没有 `docs` |
+| 来处 | `f82ace65`（10-02 08:46「帮助中心迁到 /docs 文档站形态」）把页面 `apps/landing/help/ → docs/` 整体搬了，**图片目录没跟着搬** |
+
+⇒ 这两条红**不是环境、不是并发、也不是本条线**：判据断的是"目录也叫 docs 了"这个**尚未发生**的布局。
+
+📌 最扎心的是这件事**早就被预言过**：`apps/landing/src/site/helpFigures.ts:217-218` 原文写着
+"`public/assets/help/` 这条规则有四处表达（映射、生成器、渲染器、孤儿检查），
+而'把 `assets/help` 改名'这种活只需要改一处就能让另外三处悄悄断掉"。
+**现在是第五处（e2e 判据）单独改了名** —— 同一条规律的反方向发作。
+
+### 两条正当出路（由那条线选）
+
+1. **搬产物**：`public/assets/help/ → docs/` + 同步那四处表达 + 重跑 `check:entries`
+   （落地页产物是逐字节对账的，75 份入口会变）；
+2. **改判据回到现实**：spec 里的 `/assets/docs/` 前缀改回 `/assets/help/`，
+   并把"页面在 `/docs/` 而图在 `/assets/help/`"这条不一致**显式写进注释**（否则下一次还会有人改一半）。
+
+⚠️ 不要"为了让套件绿"随便挑一条：选 1 会改线上 URL，选 2 要承认布局不一致。
+**本条不代改。**
