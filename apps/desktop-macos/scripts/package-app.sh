@@ -160,7 +160,10 @@ codesign -dvvv "$APP" 2>&1 | grep -E "Identifier|Authority|TeamIdentifier|flags"
 echo ""
 echo "=== ④ 启动验证（.app 里那一个，不是 .build 里那个）==="
 SELFIE="$OUT_DIR/packaged-first-run.png"
-if HEYTA_SELF_CAPTURE="$SELFIE" "$APP/Contents/MacOS/HeytaMac" 2>&1 | awk '{print "  " $0}'; then
+# 🔴 §6.2 规定二：任何会开窗口的验证都必须**不抢前台**。macOS 上光靠"后台启动"不够 ——
+#    窗口只要可聚焦就会被激活，所以壳认 `HEYTA_NO_FOCUS=1`（`reinstall-all.sh` 的启动段
+#    早就带了，这一行漏了；G4 那轮实测过带着它照样能取自截屏）。
+if HEYTA_NO_FOCUS=1 HEYTA_SELF_CAPTURE="$SELFIE" "$APP/Contents/MacOS/HeytaMac" 2>&1 | awk '{print "  " $0}'; then
   :
 fi
 [ -f "$SELFIE" ] || { echo "  🔴 打包后的 .app 没能自截屏 —— 它跑不起来或渲染失败"; exit 1; }
