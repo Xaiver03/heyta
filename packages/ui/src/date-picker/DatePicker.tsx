@@ -102,7 +102,7 @@ export function DatePicker({
                 onChange(pick.date);
               }}
               accessibilityRole="button"
-              accessibilityState={{ selected }}
+              aria-selected={selected}
               style={chipStyle(selected)}
             >
               <Text
@@ -199,7 +199,7 @@ export function DatePicker({
                   onChange(cell.date);
                 }}
                 accessibilityRole="button"
-                accessibilityState={{ selected }}
+                aria-selected={selected}
                 accessibilityLabel={labels.dayLabel(monthOfCell, day)}
                 style={{
                   flex: 1,

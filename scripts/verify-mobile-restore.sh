@@ -114,9 +114,9 @@ wait_for_quiet_host() {
   limit=$((cores * 3 / 4))
   while :; do
     load=$(uptime | sed 's/.*load averages: //' | awk '{print int($1)}')
-    [ "$load" -le "$limit" ] && { echo "   负载 $load ≤ $limit（$cores 核），开始"; return 0; }
+    [ "$load" -le "$limit" ] && { echo "   负载 $load ≤ ${limit}（$cores 核），开始"; return 0; }
     [ "$waited" -ge "${HEYTA_RESTORE_LOAD_WAIT:-900}" ] && { echo "   ❌ 等满 ${HEYTA_RESTORE_LOAD_WAIT:-900}s 负载仍是 $load —— 本轮不跑（环境无效，不是产品失败）" >&2; return 1; }
-    echo "   负载 $load > $limit，等 30s（累计 ${waited}s）"
+    echo "   负载 $load > ${limit}，等 30s（累计 ${waited}s）"
     sleep 30; waited=$((waited + 30))
   done
 }
@@ -158,14 +158,14 @@ step "1. 建测试账号（web 导出与移动端同步共用）"
 # 路由不在 = 404。判不了就不要跑 40 分钟再报一条没主的红。
 LEGAL_CODE=$(curl -s -o /dev/null -w '%{http_code}' -m 8 "$HOST_SERVER/api/account/legal-consent")
 case "$LEGAL_CODE" in
-  401|403) ok "服务端路由与应用同代（legal-consent = $LEGAL_CODE，要鉴权但存在）" ;;
+  401|403) ok "服务端路由与应用同代（legal-consent = ${LEGAL_CODE}，要鉴权但存在）" ;;
   404) echo "   ❌ 服务端进程比被测应用旧：legal-consent 返回 404。" >&2
        echo "      移动端的账号级补签闸门会因此拿不到裁决，同步一条都出不去 —— " >&2
        echo "      判据④ 必然假红。请重建并从当前 dist 重启验收服务端：" >&2
        echo "        pnpm --filter @heyta/server build && PORT=<端口> scripts/mobile-e2e-up.sh" >&2
        echo "      （库还要跟上迁移：cd server && sh scripts/migrate-deploy.sh）" >&2
        summary "移动端备份还原"; exit 3 ;;
-  *) echo "   ❌ 服务端不可达或异常（legal-consent = $LEGAL_CODE）" >&2
+  *) echo "   ❌ 服务端不可达或异常（legal-consent = ${LEGAL_CODE}）" >&2
      summary "移动端备份还原"; exit 3 ;;
 esac
 RESP=$(curl -s -X POST "$HOST_SERVER/api/test/create-user" \
@@ -717,7 +717,7 @@ else
     dump
     GOT=$(edit_value "新任务标题")
     if [ "$GOT" != "$POST_TITLE" ]; then
-      bad "新建任务的标题没落进输入框（读回「${GOT:-空}」，应为「$POST_TITLE」）—— 判据④b 无法判定"; screen_txt
+      bad "新建任务的标题没落进输入框（读回「${GOT:-空}」，应为「${POST_TITLE}」）—— 判据④b 无法判定"; screen_txt
     else
     # 🔴 键盘立着的时候「添加」在键盘带里，那一下 `input tap` 会打在键盘上
     #    （判据② 那一轮实测：坐标拿得到、按钮没按下、反而打出一个字符）。
