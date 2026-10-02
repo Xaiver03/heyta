@@ -1280,6 +1280,7 @@ export const zhCN = {
   'web.repeat.weekly': '每周',
   'web.repeat.weekdays': '工作日',
   'web.repeat.monthly': '每月',
+  'web.repeat.yearly': '每年',
   'web.repeat.optionAria': '把任务「{title}」设为「{label}」',
   'web.repeat.customChip': '自定义：{rule}',
   'web.repeat.customLabel': '自定义规则（RFC 5545 RRULE）',
@@ -2370,6 +2371,7 @@ export const zhCN = {
   'mobile.detail.repeat.weekly': '每周',
   'mobile.detail.repeat.weekdays': '工作日',
   'mobile.detail.repeat.monthly': '每月',
+  'mobile.detail.repeat.yearly': '每年',
   // 自定义 RRULE（B2-3 的移动端尾巴）。在此之前手机只能选预设：
   // 想要"每两周"得去网页上设。错误文案存的是 **key**（见 `TaskDetailSheet`
   // 的 `customError`），所以这里是三条独立词条、不是拼好的句子。
