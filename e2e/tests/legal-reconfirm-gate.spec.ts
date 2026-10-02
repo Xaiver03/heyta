@@ -48,6 +48,12 @@ const RECHECK = '/api/account/legal-consent';
  * 那种范围扩张不该藏在这条判据里（台账 G-27 行按这个口径写边界）。
  */
 const OP_LOG_PATH = '/api/sync/ops';
+/**
+ * 应用**自己的**实时端点（`buildRealtimeUrl`，`packages/sync-client/src/realtime.ts:200`：
+ * `ws://<baseUrl>/api/sync/ws?token=…&clientId=…`）。`sockets` 只数这一条 —— 完整理由写在
+ * {@link stubRecheck}（那一处同时解释"为什么必须数它"和"为什么不能数别的"）。
+ */
+const REALTIME_WS_PATH = '/api/sync/ws';
 const CURRENT = 'terms@1.2;privacy@1.0';
 const RECORDED = 'terms@1.1;privacy@1.0';
 
@@ -86,7 +92,22 @@ async function stubRecheck(
   const sockets: string[] = [];
   let confirmedVersion: string | null = null;
   // 实时通道**不走** `fetch`，漏了它等于没测第二条出口（与链 5 那一支同一条理由）。
-  page.on('websocket', (s) => sockets.push(s.url()));
+  //
+  // 🔴 但**只许数应用自己那条**（路径 = `REALTIME_WS_PATH`），2026-10-02 实测到两个方向各坏一次：
+  //   · 主配置 `playwright.config.ts` 的 webServer 是 `vite --host 127.0.0.1 --port 4318`，
+  //     也就是 **dev** 服务器，Vite 的 HMR 客户端每条页面都会开一条
+  //     `ws://127.0.0.1:4318/?token=<HMR 随机令牌>`（**根路径**、没有 `/api/sync/ws`、没有 clientId）。
+  //     "来者不拒"的计数器于是恒含一条与产品无关的连接 ⇒「待补签时 sockets 为空」**假红**
+  //     （在主配置下跑整条套件时它就是红的，红在探针不是闸）。
+  //   · 更要命的是反方向：确认后那条正向对照 `poll(sockets.length)` 在 dev 下**恒真** ——
+  //     它数到的那条握手就是 HMR，于是"确认之后实时通道真的会重开"这句话**从来没被验过**
+  //     （AGENTS §7 元规则 2）。这一支的文件头原先声称它"不恒真"，靠的是各自那份
+  //     `playwright.legal-reconfirm.config.ts`（端口 4323 + 生产构建 ⇒ 没有 HMR），
+  //     而 spec 同时住在主套件的 `tests/` 里 —— 两套配置跑同一份判据，结论并不一样。
+  // 过滤之后两个方向都在两套配置下诚实：dev 里 HMR 不再冒充，正向对照要真连上 `/api/sync/ws` 才过。
+  page.on('websocket', (s) => {
+    if (new URL(s.url()).pathname === REALTIME_WS_PATH) sockets.push(s.url());
+  });
   page.on('console', (m) => {
     if (m.type() === 'error' || m.type() === 'warning') console.log(`[browser ${m.type()}] ${m.text()}`);
   });
