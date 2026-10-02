@@ -621,6 +621,31 @@ G-01 回答"这么做**合法吗**"。送审前先把能拍的拍完，否则律
   与 `playwright.legal-links.config.ts` 同一模式）；⚠️ **其余套件仍然共用 `test-results/`**，
   谁先撞谁知道 —— 与 §7 第 87 条（门禁 SIGKILL 别人的 dev server）同一家族：**验收载体自带破坏性**。
 
+- 🔴 **2026-10-02（G-35 那轮）：plumbing 提交会静默把别人的并发提交从历史上抹掉。** 症状不是"带上了别人的改动"，
+  而是**反过来**：blob 取自 17:33 那一刻的 `git show HEAD:`，而 17:36 那条会话已经推进了 HEAD ⇒
+  `read-tree <旧 HEAD>` + 我的 blob 建出的 commit 显示 **17 插入 / 98 删除**，那 98 行正是他们刚落地的工作。
+  ⇒ 判据固定成一条，且必须在**每笔** plumbing 提交后跑：`git show --stat` 的**删除数必须为 0**
+  （本轮要删的东西是 0，所以任何删除都是信号）。复原也是本轮实测过的：
+  `git rev-parse <他们的 commit>:<f>` 与索引里被我贴过的 blob **逐字相同** ⇒ 工作树 = 他们的 + 我的，
+  于是 `git hash-object -w <工作树>` 重建、把 commit 重挂到**他们的** commit 之上，再用
+  `git update-ref refs/heads/main <新> <旧>`（CAS）换掉**我自己那一笔**，他们的历史一根毛没动。
+  本条本该进 `docs/reference/environment-traps.md`，但**那一刻那个文件正躺在别人的 index 里是 staged 状态**
+  （往里追加会把对方的暂存与我的追加绑成一次提交）⇒ 先记在这里，编号待补。
+
+- ⚠️ **`pnpm verify:consent-trail` 的 L5 腿没有重试，一次网络抖动就以退出码 1 收尾**（2026-10-02 实测）：
+  `curl: (28) Failed to connect to heyta.waytofuture.cn port 443 after 7780 ms`，而**同一条腿的上一个判据**刚拿到
+  `http=200`。三条直连 curl 随后全部 200 / 811933 B，13/13 线上套件也照常绿 ⇒ 红在探针的可达性，不在事实。
+  这是 §7 元规则一（"没观测到 X" ≠ "X 没发生"）的标准形状。刻意**不给它加重试** —— 加重试会把"这条腿今天够不着"
+  洗成"这条腿绿了"；正确用法是**红了就重跑一次再判**（本轮重跑 **18/18、退出码 0**）。
+
+- ✅ **本轮重测把"别人在飞"这个理由逐条改判了一次**（这是 G-33 那条改写的来源）：`apps/mobile` 与
+  `packages/app-host` 此刻的脏条目实测只有 **2 条**（未跟踪 `screens/SecurityScreen.tsx`、已改 `ProfileScreen.tsx`），
+  两份 `PrivacyConsentSheet.tsx` **都已在 HEAD 且干净** ⇒ "链 5 没提交"不能再当借口用；
+  真正挡住首启截图的是**此刻另一条会话的 Playwright 套件在跑**（`npm exec playwright test` 已 32 分钟）
+  与移动端产物未重装（**G-29**）。全仓脏条目从本轮开工的 47 降到 **26**，而 index 里同时有别人 staged 的
+  **9 个文件** ⇒ 本文件所有提交都走 `git commit -F msg -- <明确路径>`，并在提交后复验
+  `git diff --cached --name-only` 仍是那 9 条（实测确实一条没被带走）。
+
 - 📌 **干净检出（`git archive 2dac3fa3`）上进库时实测到的他线红**，全部**不是**本提交造成的
   （本提交 0 处删除、不含下列文件），列出来是给下一条接手的人省一次归因：
   `apps/web` typecheck 的 `signin-entry.spec.tsx(89,76) 'query'`；`@heyta/landing` 5 条
