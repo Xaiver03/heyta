@@ -46,31 +46,38 @@ idb 版的 iOS 无障碍查询/操作 shim。
 **去掉那条 L3 断言，本 shim 的 `--set` 就会变成一个漂亮的假绿。**
 
 ## 🔴 三个"看起来能用、实际不能用"的动作（都实测过，别再试一遍）
-
-1. **滚动 —— 目前没有可用的办法。** 这直接决定了 iOS 验收**只能覆盖首屏可见内容**；
-   需要滚动才能到达的东西，请到 Android 侧验（`adb shell input swipe` 是好的）
-   或者把元素挪进首屏。
-
-   - `idb ui swipe X1 Y1 X2 Y2 --duration D`：**会滚，但只滚一点点然后挂死。**
-     实测 `ui swipe 201 750 201 150 --duration 800`：60 秒后仍未返回（rc=124），
-     内容只移动了 **30px**（600px 的行程）。不传 `--duration` 时能返回，
-     但**一点都没滚**。
-   - `idb ui scroll down`（不带目标）：`describe-all` 的 y **完全不动**。
-     它先做一次坐标探针，报 `the point is empty` 或 `found no element`，
-     然后什么都不做 —— **退出码还可能是 1**。
-     ⚠️ 我第一次"测出它有效"（y 862→542）是**假的**：那次变化的真正来源是
-     被 `timeout` 杀掉的 `ui swipe` 在 companion 侧继续跑完。**先有机制猜想、
-     再去找证据，就会把巧合读成因果**（AGENTS.md §7 第 38 条同族）。
-   - `idb ui scroll down <坐标>` / `<标记>`：坐标点落在**空白 View** 上时
-     报 `the point is empty`；落在 `TextInput` 上时报
-     `the element had moved by the time the write reached it`。都不滚。
-
-2. **`idb ui set-value` 对滚出屏幕的元素不生效，而且不报错。**
-   元素在 y=1357（屏高 874）时 `--set` 返回 `{"detail": "<placeholder>"}` ——
-   回读是**占位符**，即写入没发生。回读是唯一能发现这件事的判据，别把
-   "命令返回成功"当成"写进去了"。
-
-3. **`idb ui text` 抛异常**（老已知）。
+##
+## ⚠️⚠️ 2026-10-02 实测更新（iPhone Duo 折叠屏 / iOS 27.1，逻辑屏 466×678）：
+##   下面第 1 条"滚动没有可用的办法"**已经被推翻**，但推翻它的方式很讲究，
+##   每一层都得自己踩过才知道：
+##
+##   - 不带 `--duration` 的 swipe：**真的一点都不滚**（这条仍然成立）。
+##     第 5 轮验收的灾难正是它造的：swipe 起点 y=618 落在**底部标签栏里**
+##     （Duo 屏高 678，tab 行在 y=580..644），手势被「专注」tab 吃掉，
+##     **整个认证页被切走** —— 四个字段"不在树上"、全部被容错分支跳过。
+##   - `--duration` 的单位是**秒**（浮点），不是毫秒。`--duration 300`
+##     = 300 秒的慢动作拖拽 —— 这才是"挂死 60 秒只挪 30px"的真因
+##     （那次起点还落在别的控件上）。`--duration 0.3` = 快速甩动（带惯性，
+##     过冲 2~3 倍，0.5 秒返回）；`--duration 1.0` = **直接操纵**（无惯性，
+##     滚动距离 ≈ 拖拽距离，1.2 秒返回，实测 100px 拖拽滚动 90px）。
+##   - swipe 起点**必须落在死区**（不在任何可交互控件上）：起点落在
+##     TextField 上 = 聚焦它并弹键盘（页面重排、下半屏元素从树上消失）；
+##     落在 tab 上 = 切页。⇒ `--scroll-into-view` 在动作前用**树本身**
+##     找死区（叶子节点碰撞检测），而不是猜坐标。
+##
+## 1. **滚动 —— 现在有可用的办法**：`--scroll-into-view`（见下）。
+##    底层是 `ui swipe x y0 x y1 --duration 1.0`（直接操纵、小步多段、每步复测）。
+##    `idb ui scroll down` 仍然不能用的结论**没变**。
+##
+## 2. **`idb ui set-value` 对滚出屏幕的元素不生效，而且不报错。**（没变）
+##    另加实测：marker 形式（`ui set-value <label> --match-key AXLabel`）对
+##    屏外元素稳定报 "the element had moved by the time the write reached it"，
+##    重试 4 次全败 —— 别用它替代滚动。
+##
+## 3. **`idb ui text` 抛异常**（老已知）—— 但 2026-10-02 实测它在
+##    **聚焦的 secure 输入框**上是唯一可靠的写入方式：`set-value` 对
+##    `secureTextEntry` 框 rc=0 却不进 RN 状态（`--secure` 分支见调用方）。
+##    `ui text` 需要 `--udid`（多 companion 时缺它会静默打到别的设备上）。
 """
 
 import argparse
@@ -80,12 +87,29 @@ import sys
 import time
 
 
-def dump_nodes(idb, companion, udid):
-    """拉一次无障碍树，拍平成节点列表。失败返回空列表（调用方据此判 found=False）。"""
+def dump_nodes(idb, companion, udid, attempts=3):
+    """拉一次无障碍树，拍平成节点列表。失败返回空列表（调用方据此判 found=False）。
+
+    🔴 **空树必须先重试再下结论**（2026-10-02 第 6 轮实测）：companion 的
+    axbridge 会**间歇性**返回空树（`guest reader failed: Broken pipe`），
+    症状是"字段上一瞬还在、下一瞬全没了" —— 不重试的话，set-value 的回读、
+    滚动定位、type-text 全部跟着误报，而真伪差一秒。重试 3 次 × 0.5 秒
+    只给真故障（应用死了/系统弹窗盖住）多付 1 秒。
+    """
+    for i in range(attempts):
+        nodes = _dump_nodes_once(idb, companion, udid)
+        if nodes:
+            return nodes
+        if i + 1 < attempts:
+            time.sleep(0.5)
+    return []
+
+
+def _dump_nodes_once(idb, companion, udid):
     try:
         r = subprocess.run(
             [idb, "--companion-path", companion, "ui", "describe-all", "--udid", udid],
-            capture_output=True, text=True, timeout=60,
+            capture_output=True, text=True, timeout=45,
         )
     except (subprocess.TimeoutExpired, OSError):
         return []
@@ -157,13 +181,16 @@ def label_of(n):
     return (n.get("AXLabel") or n.get("title") or "").strip()
 
 
-def find(nodes, label, want_pressable, want_field, role):
+def find(nodes, label, want_pressable, want_field, role, exact_only=False):
     """
     先找**精确标签**，找不到再退化成子串匹配。
 
     🔴 子串匹配会撞车：仓库注释里记着，面板打开时「新建任务」同时是**底部 FAB**
     和**面板标题**，子串匹配会打到标题（370x23）上，却打出一句"按钮可见"——
     一个误导性的绿。所以**精确优先**是刻意的，不是随手写的。
+    `exact_only`（--exact）把退化也关掉：当"精确打不中"本身就是判据时
+    （composer_open / 关闭确认），子串退化会把撞车元素当成命中 —— 恒真判据
+    比没有判据更糟（§7 元规则 2）。
     """
     pool = nodes
     if want_field:
@@ -177,6 +204,8 @@ def find(nodes, label, want_pressable, want_field, role):
         exact = [n for n in pool if label_of(n) == label]
         if exact:
             return exact[0]
+        if exact_only:
+            return None
         sub = [n for n in pool if label in label_of(n)]
         if sub:
             return sub[0]
@@ -305,6 +334,385 @@ def keyboard_top(nodes):
     return top
 
 
+# ============================================================================
+# 滚动 —— 2026-10-02 实测重建（背景见文件头第 1 条）
+# ============================================================================
+# 🔴 **swipe 的起点决定手势的归属**：落在 tab 上 = 切页（第 5 轮的灾难），
+#    落在 TextField 上 = 聚焦 + 弹键盘（页面重排、树上元素消失）。
+#    所以起点必须从**树本身**找死区，不能猜坐标。
+
+# 底部标签栏不再从常数推导：它随设备而变（Duo 678 屏 tab 行在 y=580..644，
+# 17 Pro 874 屏在 y≈776 起）。树里"贴着屏幕底缘的一排可点元素"就是它。
+TAB_BAR_PROBE_COUNT = 5
+
+
+def interactive_kind(n):
+    """这个节点是否会把 touch 吃掉（点它不会变成滚动）。"""
+    t = n.get("type") or ""
+    if t in ("TextField", "Button", "Link", "Switch", "Toggle", "Slider", "SearchField"):
+        return True
+    if "Button" in _traits(n):
+        return True
+    if n.get("custom_actions"):
+        return True
+    return False
+
+
+def leaf_nodes(nodes):
+    """只保留**叶子**节点：容器（ScrollView/Application/Cell）的 frame
+    罩着整屏，按它们做碰撞检测会把所有候选起点全部否掉。"""
+    ids = set()
+    def walk(n):
+        if not isinstance(n, dict):
+            return
+        kids = n.get("children") or []
+        if kids:
+            for c in kids:
+                walk(c)
+        else:
+            ids.add(id(n))
+    for rt in nodes:
+        walk(rt)
+    return [n for n in nodes if id(n) in ids]
+
+
+def tab_bar_top(nodes):
+    """底部标签栏的上缘 y；认不出时返回 None。
+
+    结构性判据：一排（≥3 个）**横向相接、整体贴着屏幕底缘且在屏内**的窄可点叶子。
+    🔴 两个反例都实测过，别放宽：
+      · 内容坐标在折叠线以下的元素（y > 屏高）同样满足"底边贴屏"——
+        必须要求**整个 frame 在屏内**；
+      · 「清单名称」这种全宽输入框 w=432 —— 标签是**窄**的，按屏宽 1/3 过滤。
+    """
+    h = screen_height(nodes)
+    if h is None:
+        return None
+    w_screen = screen_width(nodes)
+    bottom_band_top = h - 110
+    cand = []
+    for n in leaf_nodes(nodes):
+        if not (is_pressable(n) or interactive_kind(n)):
+            continue
+        x, y, w, hh = frame_of(n)
+        if hh <= 0 or w <= 0:
+            continue
+        if w_screen and w > w_screen / 3:
+            continue
+        if not (bottom_band_top <= y and y + hh <= h + 2):
+            continue
+        cand.append((x, y, w, hh))
+    if len(cand) < 3:
+        return None
+    cand.sort(key=lambda f: f[0])
+    # 相邻元素必须横向相接且**同一排**（y 对齐），否则不是标签栏
+    row = [cand[0]]
+    for f in cand[1:]:
+        if f[0] - (row[-1][0] + row[-1][2]) < 30 and abs(f[1] - row[-1][1]) < 20:
+            row.append(f)
+    if len(row) < 3:
+        return None
+    return min(f[1] for f in row)
+
+
+def find_dead_zone(nodes, width, no_go_y, y_from=None, y_to=None):
+    """找一个**不在任何交互叶子内**的 swipe 起点 candidate (x, y)。
+
+    候选顺序：先水平中线，再左右留边。扫描带 [y_to, y_from] 由调用方按
+    **拖拽方向**给：
+      · 向上拖（看下面的内容）：起点要贴近底部（no_go 上方一点），
+        上方留出整段行程；
+      · 向下拖（看上面的内容）：起点要贴近顶部，下方留出整段行程。
+    全找不到时返回 (None, None)（调用方报原因）。
+    """
+    leaves = [n for n in leaf_nodes(nodes) if interactive_kind(n)]
+
+    def free(x, y):
+        for n in leaves:
+            nx, ny, nw, nh = frame_of(n)
+            if nw <= 0 or nh <= 0:
+                continue
+            if nx - 6 <= x <= nx + nw + 6 and ny - 6 <= y <= ny + nh + 6:
+                return False
+        return True
+
+    hi = no_go_y if y_from is None else y_from
+    lo = 170 if y_to is None else y_to
+    if width is not None:
+        cx = width // 2
+        xs = [cx, 10, (width - 10) if width > 20 else cx]
+    else:
+        xs = [200]
+    for x in xs:
+        y = hi
+        while y > lo:
+            if free(x, y):
+                return x, y
+            y -= 15
+    return None, None
+
+
+def idb_swipe(idb, companion, udid, x0, y0, x1, y1, duration):
+    """发一条带 --duration（**秒**）的 swipe。返回 (rc, err)。"""
+    try:
+        r = subprocess.run(
+            [idb, "--companion-path", companion, "ui", "swipe",
+             str(x0), str(y0), str(x1), str(y1),
+             "--duration", str(duration), "--udid", udid],
+            capture_output=True, text=True, timeout=30,
+        )
+        return r.returncode, (r.stderr or "").strip()[:120]
+    except (subprocess.TimeoutExpired, OSError) as e:
+        return -1, str(e)[:120]
+
+
+def scroll_into_view(idb, companion, udid, label, want_pressable, want_field, role):
+    """
+    把 label 指向的元素**真的滚进可见区**。返回 emit 用的 dict。
+
+    判据（每一步都复测，不信任"我发出了手势"）：
+      · 可见 = 元素中心 y < app_h - 120（留出底部标签栏）。
+      · 元素中途从树上消失 ≠ "不用滚"：先往回滚一屏（向下拖）再找，
+        找不到如实报 found=False —— **调用方据此判红**（第 5 轮的教训：
+        "不在树上就跳过"把切页伪装成了"已设好"）。
+    """
+    out = {"found": "False", "x": "0", "y": "0", "width": "0", "height": "0",
+           "visible": "False", "scrollRc": "", "swipes": "0", "detail": ""}
+    nodes = dump_nodes(idb, companion, udid)
+    if not nodes:
+        out["scrollRc"] = "tree-empty"
+        return out
+    w, h = screen_size(nodes)
+    vis_limit = (h - 120) if h else 700
+    if h:
+        no_go = tab_bar_top(nodes) or (h - 100)
+    else:
+        no_go = 700
+
+    def locate_now():
+        # 🔴 返回 (node, nodes)：nodes 为 None = **树读空了**（区别于"树上没有这个
+        #    元素"）。树空时**绝不能**做恢复滚动 —— 第 6 轮实测，恢复拖拽用的
+        #    死区是上一棵树的（甚至完全没有叶子数据可查），起点可能落在键盘
+        #    或控件上，把页面搅乱之后一串后续写入全部误报。
+        for _ in range(5):
+            ns = dump_nodes(idb, companion, udid)
+            if ns:
+                return find(ns, label, want_pressable, want_field, role, False), ns
+            time.sleep(1)
+        return None, None
+
+    node, nodes = locate_now()
+    if node is None and nodes is None:
+        out["scrollRc"] = "tree-empty-repeated"
+        return out
+    swipes = 0
+    recoveries = 0
+    while node is not None and swipes < 10:
+        x, y, ww, hh = frame_of(node)
+        if hh > 0 and (y + hh // 2) < vis_limit and y + hh > 0:
+            out.update({"found": "True", "x": str(x), "y": str(y),
+                        "width": str(ww), "height": str(hh),
+                        "visible": "True", "swipes": str(swipes)})
+            return out
+        if y + hh <= 0:
+            # 元素在视口上方（被滚过头了）：向下拖，让它落回 y≈140 处。
+            # 起点必须在**上部**找（那里才有向下的行程），行程不够就分段。
+            dist = max(140 - y, 80)
+            sx, sy = find_dead_zone(nodes, w, no_go, y_from=min(no_go - 60, 170 + 200), y_to=170)
+            if sx is None:
+                out["scrollRc"] = "no-dead-zone"
+                return out
+            step = min(dist, no_go - 20 - sy)
+            if step < 60:
+                out["scrollRc"] = "no-room-to-drag-down"
+                return out
+            rc, err = idb_swipe(idb, companion, udid, sx, sy, sx, sy + step, 1.0)
+            swipes += 1
+            out["scrollRc"] = f"swipe rc={rc} {err}" if rc != 0 else ""
+            time.sleep(1.4)
+            node, nodes = locate_now()
+            continue
+        if y + hh // 2 >= vis_limit:
+            # 元素在折叠线以下：向上滚（拖拽距离 = 超出量 + 余量，直接操纵无惯性）。
+            # 起点在**底部**找（那里才有向上的行程）。
+            dist = min((y + hh // 2) - vis_limit + 60, max(y - 40, 60))
+            sx, sy = find_dead_zone(nodes, w, no_go, y_from=no_go - 15, y_to=max(no_go - 240, 200))
+            if sx is None:
+                out["scrollRc"] = "no-dead-zone"
+                return out
+            step = min(dist, sy - 80)
+            if step < 40:
+                out["scrollRc"] = "no-room-to-drag-up"
+                return out
+            y1 = sy - step
+            rc, err = idb_swipe(idb, companion, udid, sx, sy, sx, y1, 1.0)
+            swipes += 1
+            out["scrollRc"] = f"swipe rc={rc} {err}" if rc != 0 else ""
+            time.sleep(1.4)
+            node, nodes = locate_now()
+            continue
+        # y < vis_limit 但中心在折叠线上方？不可能到这——防御性兜底
+        break
+
+    if node is None:
+        if nodes is None:
+            # 树连续 5 次读空 —— 这不是"元素被滚走了"，是桥的问题。
+            # **绝不做恢复滚动**（死区选点用的会是坏数据），如实上报给调用方重试。
+            out["scrollRc"] = "tree-empty-repeated"
+            return out
+        # 树健康但元素不在：可能被滚过头了 —— 向下拖一屏再找。
+        while recoveries < 2:
+            recoveries += 1
+            sx, sy = find_dead_zone(nodes, w, no_go, y_from=min(no_go - 60, 370), y_to=170)
+            if sx is None:
+                out["scrollRc"] = "no-dead-zone"
+                return out
+            step = min((h or 600) // 2, no_go - 20 - sy)
+            if step < 60:
+                out["scrollRc"] = "no-room-to-drag-down"
+                return out
+            rc, err = idb_swipe(idb, companion, udid, sx, sy, sx, sy + step, 1.0)
+            time.sleep(1.4)
+            node, nodes = locate_now()
+            if node is not None:
+                out["scrollRc"] = f"recovered-after-{recoveries}"
+                return scroll_into_view(idb, companion, udid, label, want_pressable, want_field, role)
+            if nodes is None:
+                # 恢复拖拽之后树读空了：停手，绝不能拿着坏数据再拖一次。
+                out["scrollRc"] = "tree-empty-repeated"
+                return out
+        out["scrollRc"] = out.get("scrollRc") or "element-left-tree"
+        return out
+
+    x, y, ww, hh = frame_of(node)
+    out.update({"found": "True", "x": str(x), "y": str(y),
+                "width": str(ww), "height": str(hh),
+                "visible": "False", "swipes": str(swipes)})
+    return out
+
+
+RETURN_KEY_LABELS = ("换行", "return", "Return", "done", "Done", "go", "Go",
+                     "next", "Next", "search", "Search", "send", "Send", "完成")
+
+
+def type_text(idb, companion, udid, label, want_pressable, want_field, role, value):
+    """
+    **聚焦输入框 + 模拟键盘输入**。返回 emit 用的 dict。
+
+    🔴 为什么它必须存在（2026-10-02 实测）：`set-value` 对 **secure 输入框**
+    rc=0、AXValue 也回读成掩码，但 **RN 的 onChangeText 没有被触发** ——
+    界面上是一串圆点，表单状态里却还是空字符串（症状：状态栏报
+    "还没设置端到端加密口令"）。`ui text` 走的是 HID 键盘事件，
+    实测能把口令真正写进表单状态。它要求目标已聚焦，所以这里先 tap。
+    """
+    out = {"found": "False", "typedRc": "", "detail": ""}
+    # 🔴 先滚进可见区：tap 对屏外坐标是空操作（不报错）—— 2026-10-02 实测。
+    vis = scroll_into_view(idb, companion, udid, label, want_pressable, want_field, role)
+    if vis.get("visible") != "True":
+        out["typedRc"] = f"not-visible ({vis.get('found')}/{vis.get('scrollRc')})"
+        return out
+    node, nodes = locate(argparse.Namespace(
+        label=label, pressable=want_pressable, field=want_field, role=role,
+        wait=3, exact=False, idb=idb, companion=companion, udid=udid))
+    if node is None:
+        out["typedRc"] = "not-found"
+        return out
+    cx, cy = center(node)
+    try:
+        subprocess.run(
+            [idb, "--companion-path", companion, "ui", "tap",
+             str(cx), str(cy), "--udid", udid],
+            capture_output=True, text=True, timeout=30)
+    except (subprocess.TimeoutExpired, OSError) as e:
+        out["typedRc"] = f"tap-failed {str(e)[:80]}"
+        return out
+    # 等键盘真的弹出来（最多 6 秒）—— 没键盘 = 没聚焦 = 打字会打飞
+    kb_up = False
+    for _ in range(6):
+        time.sleep(1)
+        if keyboard_top(dump_nodes(idb, companion, udid)) is not None:
+            kb_up = True
+            break
+    if not kb_up:
+        out["typedRc"] = "keyboard-did-not-appear"
+        return out
+    try:
+        r = subprocess.run(
+            [idb, "--companion-path", companion, "ui", "text", value, "--udid", udid],
+            capture_output=True, text=True, timeout=60)
+        out["typedRc"] = str(r.returncode)
+        if r.returncode != 0:
+            out["typedRc"] += " " + (r.stderr or "").strip()[:100]
+    except (subprocess.TimeoutExpired, OSError) as e:
+        out["typedRc"] = f"text-failed {str(e)[:80]}"
+        return out
+    time.sleep(0.8)
+    # 🔴 **回读前必须先收键盘** —— 理由同 `--set`：聚焦中的 secure 框在键盘
+    #    弹着时会从 AX 树上消失，回读永远拿不到掩码（第 6 轮实测）。
+    dismiss_keyboard(idb, companion, udid)
+    fresh = dump_nodes(idb, companion, udid)
+    tx, ty, tw, th = frame_of(node)
+    back = None
+    for n in fresh:
+        if is_field(n) and frame_of(n) == (tx, ty, tw, th):
+            back = n.get("AXValue")
+            break
+    if back is None:
+        for n in fresh:
+            if is_field(n) and label_of(n) == label_of(node):
+                back = n.get("AXValue")
+                break
+    out["found"] = "True"
+    out["detail"] = "" if back is None else str(back)
+    return out
+
+
+def dismiss_keyboard(idb, companion, udid):
+    """
+    收起软键盘。返回 emit 用的 dict。
+
+    🔴 2026-10-02 实测的两个坑，都修在这一个动作里：
+      1. 键盘的 return 键标签**随输入法语言变**（中文 = 「换行」，英文 =
+         'return'）——按单一标签找会静默 no-op，然后调用方拿着"已收起"的
+         假设继续跑。所以这里**按 KeyboardKey trait 结构性匹配**一组候选标签。
+      2. `--keyboard` 的 present 判据要用收键后的**复测**收尾：键盘收起是
+         一段动画，敲完立刻查会读到中间态。
+    """
+    for _attempt in range(3):
+        nodes = dump_nodes(idb, companion, udid)
+        if keyboard_top(nodes) is None:
+            return {"present": "False", "key": ""}
+        key = None
+        for lbl in RETURN_KEY_LABELS:
+            for n in nodes:
+                if KEYBOARD_TRAIT not in _traits(n):
+                    continue
+                if label_of(n) == lbl and is_pressable(n):
+                    key = n
+                    break
+            if key is not None:
+                break
+        if key is None:
+            # 兜底：键盘右下角的键（return/done 几乎总在那里）
+            keys = [n for n in nodes if KEYBOARD_TRAIT in _traits(n) and is_pressable(n)]
+            if not keys:
+                return {"present": "True", "key": "no-key-found"}
+            key = max(keys, key=lambda n: (frame_of(n)[0] + frame_of(n)[2], frame_of(n)[1] + frame_of(n)[3]))
+        kx, ky = center(key)
+        try:
+            subprocess.run(
+                [idb, "--companion-path", companion, "ui", "tap",
+                 str(kx), str(ky), "--udid", udid],
+                capture_output=True, text=True, timeout=30,
+            )
+        except (subprocess.TimeoutExpired, OSError):
+            pass
+        time.sleep(1.6)
+        if keyboard_top(dump_nodes(idb, companion, udid)) is None:
+            return {"present": "False", "key": label_of(key)}
+    return {"present": "True", "key": "still-present"}
+
+
 def locate(args):
     """
     带重试地找元素（对应原 `--wait N`）。
@@ -315,7 +723,7 @@ def locate(args):
     deadline = time.time() + max(args.wait, 0)
     while True:
         nodes = dump_nodes(args.idb, args.companion, args.udid)
-        n = find(nodes, args.label, args.pressable, args.field, args.role)
+        n = find(nodes, args.label, args.pressable, args.field, args.role, args.exact)
         if n is not None:
             return n, nodes
         if time.time() >= deadline:
@@ -331,12 +739,24 @@ def main():
     p.add_argument("--companion", required=True)
     p.add_argument("--pressable", action="store_true")
     p.add_argument("--field", action="store_true")
+    # 🔴 只做精确匹配、关掉子串退化（2026-10-02 加）：主界面排序 chip
+    #    「排序：按添加时间」会被「添加」的子串匹配命中，composer_open 因此
+    #    恒真（"按了取消还开着"的假卡住，verify 两轮红在同一处）。
+    #    撞车的通用形态：探针的 label 是某真实元素 label 的**子串**。
+    p.add_argument("--exact", action="store_true")
     p.add_argument("--role")
     p.add_argument("--wait", type=int, default=0)
     p.add_argument("--list", action="store_true")
     p.add_argument("--press", action="store_true")
     p.add_argument("--set", dest="set_value")
     p.add_argument("--keyboard", action="store_true")
+    # 🔴 2026-10-02 新增的三个动作（实现见上）：
+    #   --scroll-into-view  把元素真的滚进可见区（死区起点 + 直接操纵 + 每步复测）
+    #   --dismiss-keyboard  按 KeyboardKey trait 收软键盘（标签随输入法语言变）
+    #   --type-text         聚焦 + HID 键盘输入（secure 框唯一实测能进 RN 状态的路）
+    p.add_argument("--scroll-into-view", dest="scroll_into_view", action="store_true")
+    p.add_argument("--dismiss-keyboard", dest="dismiss_keyboard", action="store_true")
+    p.add_argument("--type-text", dest="type_text", metavar="VALUE")
     p.add_argument("--tap", nargs=2, metavar=("X", "Y"))
     p.add_argument("--json", action="store_true")
     args = p.parse_args()
@@ -347,6 +767,21 @@ def main():
         kt = keyboard_top(nodes)
         emit({"present": bool_str(kt is not None),
               "top": str(int(kt)) if kt is not None else "-1"})
+        return 0
+
+    if args.dismiss_keyboard:
+        emit(dismiss_keyboard(args.idb, args.companion, args.udid))
+        return 0
+
+    if args.scroll_into_view:
+        emit(scroll_into_view(args.idb, args.companion, args.udid,
+                              args.label, args.pressable, args.field, args.role))
+        return 0
+
+    if args.type_text is not None:
+        emit(type_text(args.idb, args.companion, args.udid,
+                       args.label, args.pressable, args.field, args.role,
+                       args.type_text))
         return 0
 
     if args.tap is not None:
@@ -441,6 +876,15 @@ def main():
             set_err = str(e)[:200]
         # 回读必须**重新拉树**，否则读到的是设值前的旧值。
         time.sleep(0.6)
+        # 🔴 **回读前必须先收键盘**（2026-10-02 第 6 轮实测）：`set-value` 会聚焦
+        #    目标框并弹出软键盘，而**聚焦中的 secure 框会连同键盘一起从 AX 树上
+        #    消失**（它的 StaticText 标签还在、TextField 没了）—— 按帧找、按标签
+        #    找都找不到，回读永远是空串。调用方会把它判成"写失败"然后无限重试，
+        #    而其实每一次都写成功了。收掉键盘，框就带着值回到树上了。
+        kb = dismiss_keyboard(args.idb, args.companion, args.udid)
+        if kb.get("present") == "True":
+            # 收了两次还在：不再纠缠，按现状回读（调用方的重试会兜住）。
+            time.sleep(0.5)
         # 🔴 回读必须锚定**同一个字段**（比 frame），不能取"第一个非空的字段"。
         #    实测踩到：「我的」页上「服务器地址」本来就有内容，于是填空「访问令牌」之后
         #    回读拿到的是**服务器地址的值**（http://127.0.0.1:3000）——

@@ -58,6 +58,7 @@
     "verify:mobile-autosync": "bash scripts/verify-mobile-autosync.sh",
     "verify:mobile-edit": "bash scripts/verify-mobile-task-edit.sh",
     "verify:mobile-capture": "bash scripts/verify-mobile-capture.sh",
+    "verify:mobile-schedule": "bash scripts/verify-mobile-schedule.sh",
     "verify:mobile-timeline": "bash scripts/verify-mobile-timeline.sh",
     "verify:mobile-focus": "bash scripts/verify-mobile-focus.sh",
     "verify:mobile-calendar": "bash scripts/verify-mobile-calendar.sh",
