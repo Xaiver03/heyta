@@ -49,6 +49,10 @@ import { CategoriesScreen } from './screens/CategoriesScreen';
 import { ProfileScreen } from './screens/ProfileScreen';
 import { WelcomeScreen } from './screens/WelcomeScreen';
 import { PrivacyConsentSheet } from './screens/PrivacyConsentSheet';
+// 🔴 G-27 的第二块面板：**账号级**补签。与隐私面板挂在**同两处**（欢迎页 + 主界面），
+// 由 `legal-recheck/reconfirm-ui.ts` 的 `open` 裁决 —— 两块同时开着是允许的
+// （它们问的不是同一个决定），但不会出现两层：每一块自己 `!open` 就返回 null。
+import { LegalReconfirmSheet } from './screens/LegalReconfirmSheet';
 import { startPrivacyGate } from './privacy/startup';
 import { startAutoSync } from './sync/auto-sync';
 import { startWidgetLifecycle } from './widgets/lifecycle';
@@ -159,6 +163,13 @@ function Shell(): React.JSX.Element {
    * 不会出现两层）。
    */
   const privacySheet = <PrivacyConsentSheet serverUrl={authServerUrl} />;
+  /**
+   * 🔴 补签面板**不需要**宿主传地址：它显示的是"作出这次裁决的那台服务端"的链接，
+   * 而那个地址在面板**被打开的那一刻**由 `reconfirm-ui.ts` 从活配置里取好
+   * （见那里 `serverUrl` 的注释）。与隐私面板的差别是有理由的：
+   * 那块面板的地址由注册表单决定（一次性的），这块跟着用户随时可改的同步凭据走。
+   */
+  const legalReconfirmSheet = <LegalReconfirmSheet />;
 
   if (!welcomeDone) {
     return (
@@ -173,6 +184,7 @@ function Shell(): React.JSX.Element {
           onSignedIn={leaveWelcome}
         />
         {privacySheet}
+        {legalReconfirmSheet}
       </>
     );
   }
@@ -200,6 +212,7 @@ function Shell(): React.JSX.Element {
         badges={{ tasks: pendingCount }}
       />
       {privacySheet}
+      {legalReconfirmSheet}
     </View>
   );
 }

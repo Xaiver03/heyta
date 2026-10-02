@@ -63,8 +63,38 @@ export function writeSyncConfig(input: {
   };
 }
 
+type ClearedListener = () => void;
+const clearedListeners = new Set<ClearedListener>();
+
+/**
+ * 订阅"本机凭据被清空"。返回退订函数。
+ *
+ * 🔴 **只有清空有信号，写入没有**，这不是偏心：写入的时机是**逐键**的
+ * （`credential-form.ts` 一个字符写一次活配置），在那里挂通知会让补签闸门
+ * 每敲一个字符发一次询问；而清空只有一次，就是登出那一刻。
+ *
+ * 为什么另开这一层而不是让 `legal-recheck/gate.ts` 直接被本模块 import：
+ * 那边要读 `readSyncConfig()`（活取值），反过来引就是模块循环 ——
+ * 与本壳 `write-signal.ts` 处理的是同一个形状。
+ */
+export function onCredentialsCleared(listener: ClearedListener): () => void {
+  clearedListeners.add(listener);
+  return () => {
+    clearedListeners.delete(listener);
+  };
+}
+
 export function clearSyncConfig(): void {
   current = undefined;
+  for (const listener of clearedListeners) {
+    // 🔴 一个订阅者抛错不许把登出的**其余部分**吞掉：清凭据是安全动作，
+    // 它比"通知到位"优先级高（同 `privacy/consent-gate.ts` 里 `notify()` 那条理由）。
+    try {
+      listener();
+    } catch (error: unknown) {
+      console.warn('[sync] 凭据清空的订阅者抛错（凭据本身已经清掉了）：', error);
+    }
+  }
 }
 
 /**
