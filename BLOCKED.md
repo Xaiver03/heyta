@@ -2079,7 +2079,39 @@ cd e2e && npx playwright test tests/due-date-edit.spec.ts tests/motivation.spec.
 
 **仍红**才轮到本条线（共享 `DatePicker` 的弹层放置）负责；在那之前改本批任何代码都是抢别人的活。
 
-## B23. 🔴 `check:empty-state` 的两处红：一处是**判据缺陷**（已修），另一处是**别人那条线的新站点**（登记，不代改）（2026-10-03 05:27 取证）
+## B23. ✅ **两处全部解除**（2026-10-03 06:12，`822dd1f1` 判据缺陷 + `c7f0e33a` 站点收编）🔴 `check:empty-state` 的两处红：一处是**判据缺陷**（已修），另一处**我先前记成"别人那条线的新站点"，那条归属是错的**（见下）（2026-10-03 05:27 取证）
+
+### 🔴 先撤回一条归属结论：那处红**是本 goal 批四的**，不是别人的
+
+本节原来写着"该屏由 `804842be`（「账号与安全」屏）引入，**不属于多端覆盖这五批**" —— 
+**这句是错的**：`804842be` 正是本 goal §7 第四行（批四 · 移动端账号安全包）交付的那一屏，
+证据就写在同一份文档里（那一行列的产物含 `apps/mobile/src/screens/SecurityScreen.tsx`）。
+我把"另一条产品线"和"本 goal 的另一批"混成了一个词，于是把自己线的债登记成了"不代改别人的屏"。
+📌 一般规律：**"不属于本批"和"不属于本条线"是两个判断**，写归属时得分别给证据；
+而一条写错的归属比一条没有归属更贵 —— 它让这笔债看起来有主，于是没人再去看它。
+
+### 解除取证（06:10–06:12 实测）
+
+门禁给的两条出路里，第 2 条（"若确实需要区块级空态，正确动作是先给它加一档"）是正解，
+而它比我当时估的便宜：`size?: 'page' | 'section'` 是**可选** prop、默认 `page`
+⇒ 现有站点一个像素都不变。已按那条做（`c7f0e33a`）：
+
+- `packages/ui/src/empty-state/`：模型多一档（"section 不画图标"这条判断做在模型里，
+  不在组件写 `if` —— 调用方传了 `icon` 却什么都没画，是"参数被静默丢弃"那一类）。
+- `SecurityScreen.tsx`：通行密钥空态改消费 `<EmptyState size="section" … />`。
+- 判据：新增 4 条模型用例；**变异臂**（把 `size === 'section' ? undefined : icon` 换成 `icon`）
+  **恰好 1 红**，三段 sha256 逐字节还原。
+- `check:empty-state` **exit 0**（从 1 处红到零）；`check:design` / `check:rn-aria` /
+  `check:ui-provider` 全 0；`@heyta/ui` 442 passed；`apps/mobile` typecheck 0 + 538 passed；
+  `check:l4` 移动端计数不变（107，没新增内联样式）。
+- 🔴 **设备那一轮把上一笔的"零像素变化"证伪了**：`c7f0e33a` 的组件仍写 `toEmptyStateViewModel({ icon, title, hint, detail, detailTone })`，没转发 `size` ⇒ 模型全对、442 用例全绿、门禁 exit 0，真机上那行却被撑成**居中 + 上方一大片空白**。修法是 `d25161ce`：`toEmptyStateViewModel(props)` 整体转发，把这条缝从设计上消掉。修后重装 + 重跑 `verify-mobile-account` 全绿，截图里那行回到卡片左侧的一行小字。
+  📌 **三段式 props → 模型 → 视图 里，中间那条转发没有任何一层在判**，而 `packages/ui` 的测试跑在 node（不引 DOM 栈）—— 这一层唯一的判据是实际渲染。
+
+原诊断**逐字保留**（含那句错的归属），因为"marker 把收编判成违规"这个形状仍然成立，
+而 `site-and-parity-alignment.md` 上那条"面板级空态长得像页面级"的缺口也**没有**因为
+加了一档就自动闭合 —— 那一档现在存在了，但 web 的 `NotesView` / `ReminderPanel`
+要不要改用它是那条线自己的判断。
+
 
 ### 已修的那处不是产品问题，是门禁把"照它自己的修法做"判成违规
 
@@ -2113,6 +2145,7 @@ cd e2e && npx playwright test tests/due-date-edit.spec.ts tests/motivation.spec.
 `apps/mobile/src/screens/SecurityScreen.tsx:272` 的
 `<Text variant="row-meta" tone="subtle">{t('mobile.security.passkeys.empty')}</Text>`
 —— 该屏由 `804842be`（「账号与安全」屏，2026-10-02 23:28）引入，**不属于多端覆盖这五批**。
+⚠️ **这句是错的，已在上面撤回**：`804842be` 就是本 goal 的批四（§7 第四行的产物清单里有这一屏）。
 两条正当出路（**由那条线选，不要为了变绿加 `EMPTY_SITES` 一行**，那等于把债合法化）：
 
 1. 换成共享 `EmptyState` —— 但它是**设置卡片里的一行占位**，共享实现是页面级
@@ -2120,8 +2153,8 @@ cd e2e && npx playwright test tests/due-date-edit.spec.ts tests/motivation.spec.
 2. 若确实需要"区块级空态"，正确动作是**先给它加一档**（`size?: 'page' | 'section'`，
    与 `NotesBoard` / `ReminderList` 记的是同一个缺口），再让这两处都消费它。
 
-**现状**：`check:empty-state` 从 2 处红降到 1 处红，仍红 ⇒ `pnpm check` 仍断不到后面。
-本条不代改别人的屏。
+**现状**：~~`check:empty-state` 从 2 处红降到 1 处红，仍红~~ ⇒ **06:12 复测 `exit 0`**（见上「解除取证」）。
+~~本条不代改别人的屏。~~ ⇒ 这句也撤回：那一屏是本条线批四的，已改（`c7f0e33a` + `d25161ce`）。
 
 ## B24. 🔴 `check:landing-e2e` 那 2 处红是**判据断在一个没人实现过的目录名上**（文档中心那条线；2026-10-03 05:30 取证）
 
@@ -2155,3 +2188,35 @@ cd e2e && npx playwright test tests/due-date-edit.spec.ts tests/motivation.spec.
 
 ⚠️ 不要"为了让套件绿"随便挑一条：选 1 会改线上 URL，选 2 要承认布局不一致。
 **本条不代改。**
+
+
+## B25. 🔴 本文件（`BLOCKED.md`）在**索引里**的那份是 1508 行的旧版，只到 B10 —— 谁按当前暂存条目提交，会抹掉 HEAD 里已有的 10 段（到 B24，2026-10-03 06:30 取证）
+
+**取证**（三个源各量一次，不看 `git status` 的 `M` 就发现不了）：
+
+| 源 | 行数 | 最后一个 `## B` | 有 `^## B23\.` 吗 |
+|---|---|---|---|
+| `git show HEAD:BLOCKED.md` | 2158 | B24 | ✅ |
+| `git show :BLOCKED.md`（**暂存**） | **1508** | **B10** | ❌ |
+| 工作树 | 2259 | B24 | ✅ |
+
+也就是说：暂存条目比 HEAD 少 **650 行**，而少的恰好是**那次 add 之后陆续提交进来的**段落（别的条线的和本条线的都有）。
+`git status` 只会告诉人"这文件已暂存且改动"（`MM`），**不会**告诉人是往旧方向改。
+一次 `git commit`（不带 `add`）就会把这 14 段从 HEAD 里删掉，而提交信息里不会有任何痕迹。
+
+**成因**（不是谁的错，是共享工作树的结构性形状）：那条会话 `git add BLOCKED.md` 时
+HEAD 里还没有 B11；之后本文件被其他会话推进过多次。`git add` 记的是**那一刻的工作树**，
+而它比对的是**那一刻的 HEAD** —— HEAD 后来动了，暂存条目不会跟着动，也不会报警。
+
+### 该怎么做（本条不代改别人的暂存条目）
+
+1. **提交多人台账前先量三个源**：
+   `for s in "git show HEAD:BLOCKED.md" "git show :BLOCKED.md" "cat BLOCKED.md"; do eval "$s | wc -l"; done`
+   —— 暂存那份**比 HEAD 短**就是信号。
+2. 真有这种情况时**不要 `git add` 整文件再提交**（那等于用旧版覆盖 HEAD）。
+   正确动作是从 HEAD 出发重建 blob、只替换自己那一段（双边界取段），用 plumbing 提交，
+   提交后把别人的暂存条目**原样写回索引**。
+3. 已经造成覆盖时的判据：`git show HEAD~1:BLOCKED.md | grep -c "^## B"` 与新 HEAD 的差 ——    本仓库这条纪律的来源是 traps #146/#151（同一个错的两次发作）。
+
+📌 **一般规律**：共享工作树里"已暂存"不等于"待提交的改动是新增的"。暂存条目是一个**完整文件的快照**，
+它的危险方向恰好和"忘记 add"相反 —— **忘记 add 少一点，add 了旧版少一片**。
