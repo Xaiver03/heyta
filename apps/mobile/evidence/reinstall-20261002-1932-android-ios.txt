@@ -1,0 +1,39 @@
+隔离检出四端重装 —— android / ios 两段判据原文
+================================================
+检出：/tmp/heyta-g5m（git worktree add --detach，HEAD = 6a5f03c8，只含已提交内容）
+命令：pnpm install --prefer-offline → (cd apps/mobile/ios && pod install)
+      → bash scripts/reinstall-all.sh --only android,ios
+退出码：exit_install=0  exit_pod=0  exit_reinstall=0
+时刻：2026-10-02 19:18 起，两端判据行落定 19:32 / 19:35
+
+── android ──────────────────────────────────────────────
+  ✅ release APK 已重打（ 63M；日志 /tmp/heyta-reinstall-apk.log）
+  ✅ 模拟器 emulator-5554 全新安装成功
+  主蓝采样命中 4036（数的是 heyta-reinstall-android.png）
+  ✅ 截图 1080x2400、内容占比 55.3%、主蓝命中 4036 —— 是共享 UI
+  截图证据：/tmp/heyta-reinstall-android.png
+  → 本目录 reinstall-20261002-1932-android-consent.png（md5 a7bf2f39ab870bb8c268b1c203b425b0）
+
+── ios ──────────────────────────────────────────────────
+  模拟器：742A8651-1A31-45AA-B213-8794631B153F
+  ✅ 构建成功（日志 /tmp/heyta-reinstall-ios-build.log）
+  ✅ 已安装进模拟器（全新安装）
+  ✅ 已装的包比源码新 —— 这一轮装的是当前产物
+  主蓝采样命中 5355（数的是 heyta-reinstall-ios.png）
+  ✅ 截图 1398x2034、内容占比 51.6%、主蓝命中 5355 —— 是共享 UI
+  截图证据：/tmp/heyta-reinstall-ios.png
+  → 本目录 reinstall-20261002-1932-ios-consent.png（md5 3b1782b58b1743c924307e6e0263b6bb）
+
+── 汇总（脚本自己打的）────────────────────────────────────
+  ⏭ mac：不在 --only 范围 —— 这端**没有**验证当前产物   （mac 段已在 18:52 那一跑里过，见
+        apps/desktop-macos/evidence/reinstall-20261002-1852-mac-installed.txt）
+  ⏭ windows：不在 --only 范围 —— 这端**没有**验证当前产物（本轮仍未跑，理由见台账 G5）
+  ✅ android：已清旧包、重打、重装、有当前产物判据
+  ✅ ios：已清旧包、重打、重装、有当前产物判据
+
+── 人眼复核（§6.2 规定一）与它的覆盖面 ────────────────────
+两张图都打开看过：内容都是全新安装后的首启「在使用联网功能之前」同意浮层
+（浅色、中英混排正常、无凭据/无令牌/无邮箱）。
+🔴 因此这两条判据证明的是"装上了当前产物且共享 UI 起得来"，
+   **不证明任务列表画对了** —— 行级像素这一轮没拿（那一刻另一条会话的
+   verify-mobile-account.sh 正在同一台 emulator-5554 上跑）。
