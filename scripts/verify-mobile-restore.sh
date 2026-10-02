@@ -122,6 +122,19 @@ wait_for_quiet_host() {
 }
 wait_for_quiet_host || exit 3
 
+# 🔴 web 那半边的前置也要在**开局**判掉。判据②要真浏览器打开 `WEB_BASE` 用 ExportPanel
+#    导出备份，而那个 `vite preview` **不在** `mobile-e2e-up.sh` 里（它只管服务端 + 建号）。
+#    2026-10-03 05:54 实测：没起它就一直跑到第 2 步才 `ERR_CONNECTION_REFUSED` ——
+#    第 0 步已经把设备 `pm clear` 了，白烧一轮，而且红字读起来像产品坏了。
+WEB_BASE_URL="${WEB_BASE:-http://127.0.0.1:4322}"
+if ! curl -s -o /dev/null -m 5 "$WEB_BASE_URL/"; then
+  echo "   ❌ web 载体不可达：$WEB_BASE_URL 没人监听（判据②的输入要从它导出）。" >&2
+  echo "      在被测检出里起它，且 `apps/web/dist` 必须是当前产物：" >&2
+  echo "        (cd apps/web && npx vite preview --host 127.0.0.1 --port 4322 --strictPort) &" >&2
+  summary "移动端备份还原" "" 3
+fi
+ok "web 载体可达（${WEB_BASE_URL}）"
+
 step "0. 装包并启动（pm clear 即判据里的「清数据重装」）"
 $ADB shell am force-stop com.heytamobile >/dev/null 2>&1
 $ADB uninstall com.heytamobile >/dev/null 2>&1
