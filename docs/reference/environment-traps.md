@@ -2807,3 +2807,32 @@ spec，且报错里出现 `ECONNREFUSED <本机端口>` 或 `.playwright-artifac
     📌 一般规律：**"改回去"与"改上去"共用一条判据 —— 按内容验收（md5 / 逐字节 diff），
     不按命令退出码验收。** 未锚定的缩进子串在 `perl` / `sed` 里是常态命中源；
     要么写成 `^…$` 带行首行尾锚点，要么用精确编辑工具而不是流编辑器做还原。
+
+106. 🔴 **清掉 `ios/build` 后的首次 xcodebuild 必撞 Generate Specs 竞态 —— 报的是"文件不存在"，真因是脚本输出未声明；修法是 pod install 预生成，不是重跑构建。**
+
+    2026-10-02 `reinstall:all` 的 iOS 段：12 个错全是
+    `Build input file cannot be found: …/build/generated/ios/ReactCodegen/*.mm|.cpp
+    Did you forget to declare this file as an output of a script phase`。
+    而构建"失败"后那些文件**全部在盘上**、时间戳就是那次构建的 —— Pods 工程的
+    `[CP-User] Generate Specs` 脚本阶段**只声明了 `react-codegen.log` 一个输出**，
+    Xcode 不知道"先跑脚本再编译这些文件"，两者被并行调度，编译输给了生成。
+
+    之前从没暴露，是因为 `ios/build/generated`（gitignored）一直留在盘上；
+    谁清了它（rm -rf / 换机器 / 干净检出），谁的第一次 xcodebuild 就撞。
+    判据：报缺的文件**构建结束后存在** ⇒ 竞态，不是 codegen 坏了。
+    ✅ 修法 = `cd apps/mobile/ios && pod install`（安装期就 `run_codegen!` 预生成，
+    日志见 `[Codegen] Done.`），与 runbook §2.2 一致；重跑构建只会再撞一次。
+
+    🔴 同轮的第二面：**已提交的预编译版 `Podfile.lock` 在本机无法再生。**
+    已提交版用 `ReactNativeDependencies`（预编译聚合 pod）；本机（仓库路径含空格）
+    **不带 flags 的 pod install 必失败**（#30：`React-Core-prebuilt … Missing required
+    attribute source`），无空格符号链接绕法也被 CocoaPods 解析回真实路径。带
+    `RCT_USE_PREBUILT_RNCORE=0 RCT_USE_RN_DEP=0` 跑出来的是**源码构建图**
+    （+boost/DoubleConversion/fast_float/fmt/glog/RCT-Folly/SocketRocket 独立 pod，
+    lock +1115/−260）。`check:native-deps` 对两个形态都绿（对账的是 4 个业务
+    pod 的版本）。一次性代价：切换后首次全量构建明显变慢（RN core 走源码）。
+
+    📌 一般规律：**"文件不存在"类构建错误要先问"它是谁、什么时候生成的"** ——
+    生成物缺失有两类病因（真的没人生成 vs 生成输了竞态），修法相反：
+    前者补生成步骤，后者把生成挪到构建开始前。判据就是上面那句：
+    **构建结束后文件在不在**。
