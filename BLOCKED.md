@@ -1599,6 +1599,16 @@ Does the file exist?`。
   树都读不出），run15–20 的后半程全是它的下游（traps #116）。隔离旋钮已落地
   （`IOS_UDID` / `HEYTA_IOS_DERIVED` / `HEYTA_IOS_LAPTOP_DB` / `HEYTA_IOS_BUILD_LOG`），
   安静窗口一条命令即可补全绿 —— 走不通仍是真红，降级注记已删。
+- **归因判决（21:35，数据库级判据）**：主树 App 的"提交即崩"在**干净 HEAD
+  worktree 构建上不复现**（提交 → ops=1 落真 SQLite → App 存活无崩溃）；
+  主树（含并行会话未提交在途文件）同一操作五份 SIGABRT（TurboModule void
+  调用抛 OC 异常）。⇒ **崩溃源 = 并行会话的在途文件，已提交代码无责**
+  （干净树里就有它们）。等其收口后即可全绿。
+- **iPhone 机型已落地**：iOS 27.1 seed 运行时只认 Duo（iPhone 全系 create
+  即 403）；已下载 **iOS 27.0 全量运行时**并建 `heyta-iphone-17pro`
+  （402×874 标准几何）。剩余适配一件：27.0 上 `set-value` 不触发 RN
+  onChangeText、HID 无中文 keycode（traps #121）—— 中文标题需走剪贴板
+  粘贴或 ASCII 替代，脚本待适配。
 
 **相邻回归**：`magic-link-registration` / `email-locale-wire` / `password-auth-routes` /
 `auth-cache` 共 69 条全绿 —— `auth.ts` 的抽取是行为等价重构。
@@ -1633,3 +1643,108 @@ Does the file exist?`。
   `apps/mobile/evidence/reinstall-20261002-2007-ios-task-row.txt`（`b361f756`），
   台账在 `docs/plans/ui-review-fill-zh-timeline.md` 的 G5 段（`401ff648`）。
   **安卓那台的同一张图我登记为"未实测"**，不再在这台设备上尝试。
+
+## B13. ✅ **已解除**（2026-10-02 20:31）🔴 全量离线套件的最后两条红都不是产品：一条是 **vite dev 的 HMR socket 冒充应用的实时通道**（同一枚硬币的另一面是"确认后真的重连"这条正向对照在 dev 下**恒真**），一条是**在入场动画的中间帧量几何**
+
+**先给结论数字**（三次跑，日志都还在）：
+
+| 时间 | 跑法 | 结果 | 日志 |
+|---|---|---|---|
+| 20:08 | 主配置全量（B12 修完之后） | **98 passed / 2 failed / 2 skipped**，`EXIT=1` | `/tmp/full-after-b12.log` |
+| 20:1x | 只跑被改的两支 | **9 passed (44.9s)** | `/tmp/two-fix.log` |
+| 20:2x | 主配置全量（本条修完之后） | **100 passed / 2 skipped**，`EXIT=0` | `/tmp/full-after-two-fixes.log` |
+
+那 2 条 skip 是 `desktop-window.spec.ts:290/:304`（Electron GUI 两条，本机条件下本来就走跳过分支），
+与本条无关。**这一次 B9 家族的收口终于有一个可信的单一数字了**（B12 那一轮登记过"这轮没给出单一数字"）。
+
+### 红 1 —— `legal-reconfirm-gate.spec.ts:168`「待补签…op-log 与实时通道两个出口都是零」
+
+**症状**（逐字）：
+
+```
+Error: 待补签却建了实时通道：ws://127.0.0.1:4318/?token=8-cC4f_Ev09e
+- Array []
++ Array [ "ws://127.0.0.1:4318/?token=8-cC4f_Ev09e" ]
+```
+
+读起来像"G-27 那道闸没拦住实时通道"，也就是**产品闸门失效**。实测它拦住了：
+
+1. 应用的实时端点由 `buildRealtimeUrl` 生成（`packages/sync-client/src/realtime.ts:200`），
+   形状固定是 `ws://<baseUrl>/api/sync/ws?token=…&clientId=…` —— **有路径、有 clientId**。
+2. 红的那条是**根路径、没有 clientId**、令牌是 12 位随机串。
+3. 主配置 `playwright.config.ts:87-88` 的 webServer 是
+   `pnpm --filter @heyta/web exec vite --host 127.0.0.1 --port 4318` —— **dev 服务器**，
+   它的 HMR 客户端每条页面都会开一条 `ws://127.0.0.1:4318/?token=…`。
+   端口（4318 = 应用自己的 origin）+ 路径（`/`）两条都对得上，与产品无关。
+
+⇒ 判据里的 `sockets` 是**来者不拒**的：`stubRecheck()` 的
+`page.on('websocket', s => sockets.push(s.url()))`（原 `:89`）把 HMR 一起数了进去。
+
+**更要命的是反方向**（这条是本体的收获）：同一个计数器还供着用例 4 的正向对照
+`poll(sockets.length) > 0`（"确认之后实时通道真的重开"）。**在 dev 下它数到的那条握手就是 HMR**
+⇒ 那句"不恒真"的承诺（spec 文件头 `:33-34` 白纸黑字写着「这一支里**不恒真**的出口判据是实时通道」）
+在主配置下**是恒真的**（§7 元规则 2：一条永远通过的判据比没有判据更糟）。
+
+**归属**：不是 B12 那种"别人在途的改动"，而是那条线**落地时自带的 standing 红** ——
+他们的取证是**另一套配置**跑的：`playwright.legal-reconfirm.config.ts`（端口 4323 +
+`pnpm --filter @heyta/web build` + `vite preview`，见文件头 `:11`），preview **没有 HMR**，
+所以 `3503e256`（20:02:04 提交）交付时它是 **6 passed**，证据存在
+`apps/web/evidence/legal-reconfirm-gate/run.txt` —— 那个文件里印的 socket 是
+`ws://127.0.0.1:4323/api/sync/ws?token=E2E-TOKEN-123&clientId=cf1a5874-…`，**形状完全对得上第 1 条**。
+同一份判据、两套配置、两个结论 ⇒ **spec 住在主配置的 `testDir` 里，而它的判据成立与否长在 webServer 上**。
+
+**修法**（只动探针，一行的过滤器 + 常量）：`e2e/tests/legal-reconfirm-gate.spec.ts` 新增
+`const REALTIME_WS_PATH = '/api/sync/ws'`，监听处改成
+`if (new URL(s.url()).pathname === REALTIME_WS_PATH) sockets.push(s.url())`。
+
+**修完这条判据的牙齿靠什么证明**（没有变异产品代码，靠同一个可观测量的两个方向各自成立）：
+待补签时过滤后的计数是 **0**（用例 1 绿），确认之后它是 **>0**（用例 4 绿）——
+同一个量、同一个过滤器，两个方向都数得到，所以两个都不是恒真。
+而"HMR 会不会被误计"这一侧由修前的原始错误信息证明（它确实进过这个数组）。
+
+### 红 2 —— `search-overlay.spec.ts` 贴顶判据 ⅱ 报 `padding-top 128 / 实测上隙 125.31800746917725`（差 2.682 > 容差 2）
+
+**这条是我的**（#25 收口引入的时机变化）：这一组原先是 `page.goto(APP_URL)`，
+收口 B9 家族时改成走共享入口 `openApp()`（它要先做完首启隐私同意、再把界面钉在中文）
+⇒ 量几何的时机从"动画早已落位"挪进了"动画进行中"。
+
+机制（不是猜，是量出来的）：`.ht-search-overlay` 自己挂着 `ht-sheet-in`
+（`apps/web/src/styles/app/sheets.css:123`，`from { transform: translateY(+space-2) }`），
+卡片另挂 `ht-material-in`（同文件 `:154`，`from { transform: translateY(-space-1) }`）。
+**两条位移方向相反、时长与相位不同** ⇒ 中间帧的 `card.y - surface.y`
+= `padding + 卡片位移 − 浮层位移`，与被约束的那个常量不是一个量。落位后差值归 0。
+
+**修法**：新增 `settledGeometry(card, surface)` —— 连续两次取 `boundingBox()`，
+两盒的 `y` 都动不了（< 0.01px）才算落位，40 轮还不停就**响亮地失败**；阈值 `≤ 2` 一个字节没改。
+⚠️ 刻意不用 `document.getAnimations()`：页面上任何一条无关动画（骨架屏、番茄钟）
+都会把等待拖成超时，症状又像"界面坏了"。这里要的可测性定义就是"要量的这两个盒子不动了"。
+
+**变异复验（红→绿双向都跑了）**：把 `sheets.css:119` 的 `align-items: flex-start` 改成 `center` ⇒
+`1 failed / EXIT=1`，错误行 **`padding-top 128 / 实测上隙 326`**（永久缺口，落位之后照样红 ⇒ 牙齿在）；
+`git checkout -- apps/web/src/styles/app/sheets.css` 还原（已核 `:119` 回到 `flex-start`、
+该文件 `git status` 干净）⇒ 再跑为绿。
+
+### 同轮量过之后**没有采纳**的一处改动（写下来，因为它是"顺手改坏判据"的形状）
+
+`privacy-consent-zero-egress.spec.ts:95` 有同一把未过滤的尺子，我一度按红 1 的形状把它也改成
+"只数 `/api/sync/ws`"。量完两处事实之后**改回来了**：
+
+1. 主配置 `playwright.config.ts:28` 有 `testIgnore: /privacy-consent-zero-egress\.spec\.ts/` ——
+   它**不进全量套件**；
+2. 收走它的是 `playwright.privacy-consent.config.ts`，那份用 `vite preview`（端口 4322）⇒ **没有 HMR**，
+   它今天绿不是运气。
+
+而这支判据的对象是**负向**的（"同意之前一个 WebSocket 都不许建"）：把它收成"只数某个路径"，
+将来任何新增的 WS（厂商 SDK、协作通道）都会从计数里**隐身** —— 等于把一条负向判据改成恒真。
+**两个方向需要两种过滤形状**：正向只认真端点（要证的是"那条通道真的重开"），
+负向必须宽（要证的是"一个都不发"），只排掉可识别的开发期客户端。
+
+📌 **可迁移的判据（两条）**：
+1. **e2e 判据的可信度有一部分长在 webServer 上，不长在 spec 里。** 复用别人的 spec 前先问三句：
+   这套 webServer 是 dev 还是 preview；它有没有自己会发网络/WS 的**开发期客户端**；
+   这条判据是正向还是负向（它决定过滤器该宽还是该窄）。
+2. **几何类判据的隐含前提是被测对象静止** —— CSS 入场动画让"元素出现"与"元素就位"是两个时刻，
+   `toBeVisible()` 只保证前者。截图要等（本文件既有条目），量几何同样要等。
+
+细节入档：`docs/reference/environment-traps.md` **#118**（WS 计数 × 配置身份）、
+**#119**（动画中间帧量几何 + 变异复验）。

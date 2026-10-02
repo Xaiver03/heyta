@@ -3070,3 +3070,38 @@ spec，且报错里出现 `ECONNREFUSED <本机端口>` 或 `.playwright-artifac
     必须把这三样各自证伪或证实，并且把逐次计数写进证据（只有最后一轮的结论会掩盖前一轮的环境）。
     （同族：#115、#82"重装了一遍"≠"装的是当前源码"、#46 没复现 ≠ 路径没执行。
     本轮完整取证在 `BLOCKED.md` **B12**。）
+121. 🔴 **iOS 模拟器运行时的行为差：27.0 全量运行时上 `set-value` 不触发 RN 的
+    onChangeText、HID 无中文 keycode —— 与 27.1 Duo seed 完全相反，判据脚本
+    跨运行时不能共用同一套输入原语。**
+
+    2026-10-02 实测（iPhone 17 Pro / iOS 27.0，App 为干净 HEAD 构建）：
+    - `AXSetValue`（idb `set-value`）：rc=0、AXValue 回读正确，但 **RN 表单状态
+      没变**（「添加」仍 disabled）—— 这正是 shim 文件头记录的 **secure 框**
+      行为，在 27.0 上**普通文本框也一样**；而 27.1（Duo seed）上普通框是好的。
+    - `ui text`（HID 键盘）：ASCII 正常进 RN 状态；**中文直接抛
+      `No keycode found`**（HID 按键码没有 CJK）。
+    - 可用组合：tap 聚焦 → 键盘弹出 → HID 打 ASCII。中文标题要过剪贴板/粘贴，
+      或让验收标题可配成 ASCII。
+
+    📌 一般规律：**同为 "iOS 27"，全量运行时与预览 seed 运行时在无障碍/HID
+    这类接缝上的行为不同** —— 换运行时 = 换了一套探针语义，输入原语与判据
+    都要按运行时各自实测一遍，不能因为"版本号差不多"就复用。
+
+122. 🔴 **宿主 macOS beta 的系统守护进程崩循环会把模拟器无障碍桥整机打死 ——
+    症状是"AX 树随机全空、连系统 App 都读不出"，与被测代码零关系。**
+
+    2026-10-02 实测：`intelligencetasksd` 从 20:23 起崩循环约一小时
+    （26 份 .ips，Swift XPC `XPCPeerRequirement.hasEntitlement` 断言 ——
+    macOS 27.2 beta 的系统 bug），同窗 `AppIntentsLiveEntityService` ×11。
+    期间所有 iOS 模拟器（新旧、27.1/27.0、重启与否）的 AX 树**开机即空或
+    跑几步就空**；控制实验：App 进程活着、界面在渲染、无 App 崩溃，树照样空。
+    崩循环自行停止后，重启模拟器 AX 即恢复。
+
+    ✅ 排查顺序（这条的识别特征）：AX 树空时**先看宿主 DiagnosticReports 里
+    有没有系统守护进程在崩循环**（`intelligencetasksd` / `AppIntents*` /
+    `dtdeviceinfod`），再看模拟器，最后才怀疑被测 App。
+
+    📌 一般规律：**模拟器栈的故障域有三层（被测 App / 模拟器运行时 / 宿主 OS），
+    AX 全空且跨设备复现时，先从宿主层查起** —— 越靠下层的病，越长得像
+    "App 坏了"。（同族：#116 把共享资源误判成自己的错 —— 这是它的镜像：
+    把宿主的病误判成模拟器/App 的。）

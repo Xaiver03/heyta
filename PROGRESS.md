@@ -1035,3 +1035,12 @@ WindowServer 94%、simruntime 进程 92% 空转，负载 128）—— iOS 27.1 �
 界面在渲染）。隔离轮 run20（专属模拟器 + 专属 /tmp）证到：**此前 12+ 轮全红的
 输入原语与 op 落库全绿**，主路径 UI 步待安静窗口补。配套落地：模拟器专属实例
 （`simctl create` iPhone-Duo）+ 脚本四个隔离旋钮；ADB 挂死探针加超时（traps #114）。
+
+**21:2x–21:35 第二段（负载回落后的归因战）**：宿主 `intelligencetasksd` 从 20:23
+崩循环约一小时（26 份 Swift XPC entitlement 断言 —— macOS 27.2 beta 系统病），
+期间**所有**模拟器的 AX 桥整机阵亡（App 活着、界面在渲染、树全空；traps #122）；
+崩循环停后重启模拟器即恢复。iOS 27.1 seed 只认 Duo（iPhone 全系 create 403）⇒
+下载 27.0 全量运行时，建 `heyta-iphone-17pro`。**归因判决（数据库级）**：主树 App
+提交即崩 ×5 份 .ips；干净 HEAD worktree 构建同一操作 **ops=1 落库、App 存活** ⇒
+崩溃源是并行会话**未提交的在途文件**，已提交代码无责。27.0 输入原语差入档
+（traps #121：set-value 不进 RN 状态、HID 无中文 keycode，ASCII 全路径实测可用）。
