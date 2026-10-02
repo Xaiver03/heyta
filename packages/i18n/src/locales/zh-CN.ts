@@ -2764,6 +2764,17 @@ export const zhCN = {
   'site.footer.legal.minors': '未成年人保护',
   'site.footer.legal.subscription-refund': '订阅与退款',
   'site.footer.legal.data-rights': '行使你的权利',
+  // 未命中地址时答的那一页（生产 nginx 用 `error_page 404` 内部跳过来取它）。
+  // 🔴 它的消费者不是组件、是 `apps/landing/scripts/gen-entries.mjs`（构建期取数、
+  //   输出静态 HTML），所以全仓库搜不到 `t('site.notfound.…')`。这不是孤儿词条：
+  //   这一页在正常浏览里根本不出现，它出现的那一次正是有人转错了地址。
+  // ⚠️ `otherLanguage` 是**按当前语言写的另一语言**的链接文字（中文表里指英文站、
+  //   英文表里指中文站），所以它只在"恰好两种语言"时成立 —— 生成器对此有硬检查。
+  'site.notfound.seo.title': '页面未找到 —— heyta',
+  'site.notfound.heading': '这个地址下没有页面',
+  'site.notfound.body': '它可能改过名字、已经下线，或者链接里多了一个字符。可以从下面的入口接着走。',
+  'site.notfound.home': '回首页',
+  'site.notfound.otherLanguage': '切换到英文站点',
   // 法律页自己的界面件（不是文本内容，所以不进 `@heyta/legal`）。
   'site.legal.draft.banner': '这一版还在法务复核中，**尚未对用户生效**。正式版本确定后会在应用内公告。',
   'site.legal.meta': '版本 {version} · 更新于 {date}',
