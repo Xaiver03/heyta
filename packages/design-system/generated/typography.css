@@ -18,6 +18,13 @@
   letter-spacing: var(--ht-tracking-title);
 }
 
+.ht-type-group-label {
+  font-size: var(--ht-font-size-sm);
+  font-weight: var(--ht-font-weight-semibold);
+  line-height: var(--ht-line-height-tight);
+  letter-spacing: var(--ht-tracking-caption);
+}
+
 .ht-type-headline {
   font-size: var(--ht-nav-app-bar-title-size);
   font-weight: var(--ht-font-weight-semibold);
