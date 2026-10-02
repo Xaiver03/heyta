@@ -86,6 +86,17 @@ export const zhCN = {
    * 而这里的动作是"去同意"。写错的那一侧会让用户改一遍地址、回来还是不同步。
    */
   'common.sync.error.consentRequired': '还没有同意隐私规则，heyta 不会向任何服务器发出请求 —— 在设置里作出选择后，同步才会开始',
+  'common.sync.error.legalReconfirmRequired': '条款文本已经更新，而这个账号还没有重新确认，所以数据没有同步出去 —— 它完整地留在本机，读完确认后即可恢复',
+  'common.legal.reconfirm.title': '条款文本已经更新',
+  'common.legal.reconfirm.intro': '这套对外文本在你上次确认之后有了新版本。请读完再确认 —— 服务端会记下你确认的正是**现在这一版**。',
+  'common.legal.reconfirm.readFirst': '请先读完：',
+  'common.legal.reconfirm.localDataSafe': '你的数据完整地留在这台设备上，没有被改动，也没有被删。只是在你确认之前不会同步出去 —— 一个字节都不发。',
+  'common.legal.reconfirm.later': '稍后再说（继续不同步）',
+  'common.legal.reconfirm.action': '我已读完并确认',
+  'common.legal.reconfirm.pending': '正在记下你的确认…',
+  'common.legal.reconfirm.failNetwork': '确认没有提交成功（服务端没有回应）。在你确认之前，数据仍然不会同步。',
+  'common.legal.reconfirm.failUnauthorized': '登录状态已经过期，确认没有提交。请重新登录后再确认一次。',
+  'common.legal.reconfirm.failRejected': '服务端没有接受这次确认，数据仍然只留在本机。可以重试一次。',
 
   // ── 隐私同意（首启面板 + 设置页） ─────────────────────────
   // 🔴 这一组词条**两端共用**（web 与移动端说的是同一件事），理由与上面那组相同：

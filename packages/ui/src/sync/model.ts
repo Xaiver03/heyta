@@ -252,7 +252,8 @@ export type SyncFailureMessageKey =
   | 'common.sync.error.undecryptablePage'
   | 'common.sync.error.uploadRejected'
   | 'common.sync.error.unauthorized'
-  | 'common.sync.error.consentRequired';
+  | 'common.sync.error.consentRequired'
+  | 'common.sync.error.legalReconfirmRequired';
 
 const SYNC_FAILURE_MESSAGE_KEY: Record<string, SyncFailureMessageKey> = {
   'not-configured': 'common.sync.error.notConfigured',
@@ -270,6 +271,9 @@ const SYNC_FAILURE_MESSAGE_KEY: Record<string, SyncFailureMessageKey> = {
   // "没配服务端"分开 —— 那两种的用户动作是"检查网络"和"填地址"，而这里的动作是"去同意"。
   // 写成前两者之一会让用户改一遍地址、回来还是不同步。
   'consent-required': 'common.sync.error.consentRequired',
+  // 🔴 G-27：设备早就同意联网了，缺的是**这个账号**对新版文本的确认。
+  // 复用上面那句会变成"请同意隐私规则" —— 对已经同意过的人是重复索取同意。
+  'legal-reconfirm-required': 'common.sync.error.legalReconfirmRequired',
 };
 
 /**

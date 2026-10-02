@@ -65,6 +65,17 @@ export const en = {
   // Do not fold this into "not configured" or "offline": those tell the user to fill in
   // an address or check the network, while the only useful action here is to decide.
   'common.sync.error.consentRequired': 'You have not agreed to the privacy terms yet, so heyta will not send any request to a server - syncing starts once you choose in settings',
+  'common.sync.error.legalReconfirmRequired': 'The terms text was updated and this account has not re-confirmed it, so nothing synced - your data stays intact on this device and resumes once you confirm',
+  'common.legal.reconfirm.title': 'The terms text has been updated',
+  'common.legal.reconfirm.intro': 'This set of published texts has a new version since you last confirmed. Read it and confirm - the server records that what you confirmed is exactly this version.',
+  'common.legal.reconfirm.readFirst': 'Please read first:',
+  'common.legal.reconfirm.localDataSafe': 'Your data stays intact on this device - nothing changed, nothing deleted. It simply does not leave until you confirm: not one byte.',
+  'common.legal.reconfirm.later': 'Not now (nothing syncs)',
+  'common.legal.reconfirm.action': 'I have read and confirm',
+  'common.legal.reconfirm.pending': 'Recording your confirmation...',
+  'common.legal.reconfirm.failNetwork': 'Your confirmation was not submitted (the server did not answer). Until it is recorded, data will not sync.',
+  'common.legal.reconfirm.failUnauthorized': 'Your session expired, so the confirmation was not submitted. Sign in again and confirm once more.',
+  'common.legal.reconfirm.failRejected': 'The server did not accept this confirmation, so your data stays on this device. You can retry once more.',
 
   // ── Privacy consent (first-launch panel + settings) ───────
   // Shared by both shells on purpose, for the same reason as the sync errors above:
@@ -2523,7 +2534,7 @@ export const en = {
   'mobile.inbox.invite.status.activated': 'Activated',
   'mobile.inbox.invite.status.pending': 'Pending',
   'mobile.inbox.invite.unknownName': 'A friend',
-  'mobile.trash.intro': 'Deleted tasks land here. Restore one and it goes back where it was.',
+ 'mobile.trash.intro': 'Deleted tasks land here. Restore one and it goes back where it was.',
   'mobile.trash.empty.title': 'Trash is empty',
   'mobile.trash.empty.hint': 'Tasks you delete show up here first',
   'mobile.trash.deletedAt': 'Deleted {date}',
