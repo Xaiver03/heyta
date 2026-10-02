@@ -54,6 +54,7 @@
  */
 
 import type {
+  AssistantFailureReason,
   BreakdownFailureReason,
   CaptureFailureReason,
   DurationFailureReason,
@@ -262,6 +263,19 @@ function failureKey(ctx: AiFailureContext): MessageKey {
 }
 
 /**
+ * 哪些 `reason` 属于"**路由层给的原文**"那一类。
+ *
+ * 🔴 六个入口共同的一条判据，**不许多写一份**：五个面板叫 `ai-unavailable`，
+ * 对话助手叫 `routing-failed`（它的失败原因码是自己的，不复用 `ai-unavailable`，
+ * 否则"助手专属的失败"会被路由层的措辞盖住）。两类的处置完全相同：
+ * 主文案按 `cause` 取词条、原文进折叠详情、能修的指向设置。
+ *
+ * 把这个判断抽成一个集合，是因为"再加一个入口"以前的做法是
+ * 再抄一遍 `reason === 'ai-unavailable'` —— 而第 5 个入口就是这么漏掉的。
+ */
+const ROUTING_CLASS: ReadonlySet<string> = new Set(['ai-unavailable', 'routing-failed']);
+
+/**
  * 这次失败**能不能**把用户带去设置的某一处。
  *
  * 🔴 `network` 的默认值是 `undefined`（设置里改不动一次网络抖动），
@@ -272,7 +286,7 @@ function settingsTargetFor(
   reason: string,
   ctx: AiFailureContext,
 ): SettingsTarget | undefined {
-  if (reason !== 'ai-unavailable') return undefined;
+  if (!ROUTING_CLASS.has(reason)) return undefined;
   if (ctx.cause === 'network' && networkDiagnosis(ctx) === 'origin-likely-rejected') {
     return 'endpoints';
   }
@@ -294,7 +308,7 @@ function originHintFor(ctx: AiFailureContext): string | undefined {
 /** 这个 `reason` 的 `message` 里有没有词条给不了的信息。 */
 function showDetailFor(reason: string, ctx: AiFailureContext): boolean {
   if (reason === 'text-too-long') return true;
-  if (reason !== 'ai-unavailable') return false;
+  if (!ROUTING_CLASS.has(reason)) return false;
   // 来源被拒时，原文里有 `Failed to fetch` 这句话 —— 它是**证据**，
   // 也是用户去搜"为什么本机端点连不上"时会用到的关键词，所以保留。
   const { cause } = ctx;
@@ -407,6 +421,42 @@ export function toolRunFailureCopy(
     key: reason === 'ai-unavailable' ? failureKey(ctx) : TOOL_RUN_KEY[reason],
     detail,
     showDetail: showDetailFor(reason, ctx),
+    settingsTarget: settingsTargetFor(reason, ctx),
+    originHint: originHintFor(ctx),
+  };
+}
+
+/**
+ * 对话助手（第 6 个入口）。
+ *
+ * 🔴 它的失败原因码是**自己的一套**（`ai-assistant.ts` 的 `AssistantFailureReason`），
+ * 刻意不复用 `ai-unavailable` —— 助手的失败里有一条是"某一步要送披露集合外的字段"，
+ * 那句话和"AI 服务不可用"完全不是一回事，混起来会把用户的注意力引向端点。
+ * 唯一重合的是路由层失败：那里叫 `routing-failed`，处置与 `ai-unavailable` 逐字相同，
+ * 所以它走 `ROUTING_CLASS`，而不是再抄一份判断。
+ *
+ * ⚠️ `egress-outside-disclosed-set` 的原文里带着**具体是哪几个字段**（动态的），
+ * 所以 `showDetail` 必须为真 —— 折叠块是用户唯一能看到越界字段名的地方。
+ */
+const ASSISTANT_KEY: Record<AssistantFailureReason, MessageKey> = {
+  'empty-text': 'web.ai.assistant.failure.emptyText',
+  'text-too-long': 'web.ai.assistant.failure.textTooLong',
+  'no-tools-available': 'web.ai.assistant.failure.noToolsAvailable',
+  'routing-failed': 'web.ai.failure.aiUnavailable',
+  'multiple-tool-calls': 'web.ai.assistant.failure.multipleToolCalls',
+  'arguments-malformed': 'web.ai.assistant.failure.argumentsMalformed',
+  'egress-outside-disclosed-set': 'web.ai.assistant.failure.egressOutsideDisclosedSet',
+};
+
+export function assistantFailureCopy(
+  reason: AssistantFailureReason,
+  detail: string,
+  ctx: AiFailureContext,
+): AiFailureCopy {
+  return {
+    key: reason === 'routing-failed' ? failureKey(ctx) : ASSISTANT_KEY[reason],
+    detail,
+    showDetail: reason === 'egress-outside-disclosed-set' || showDetailFor(reason, ctx),
     settingsTarget: settingsTargetFor(reason, ctx),
     originHint: originHintFor(ctx),
   };

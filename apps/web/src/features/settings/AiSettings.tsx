@@ -92,6 +92,7 @@ function featuresNeeding(capability: AiCapability, t: I18nValue['t'], locale: Lo
   return hit.join(LIST_SEPARATOR[locale]);
 }
 import { LOCAL_API_TOOLS, validateLocalApiConfig } from '@heyta/local-api';
+import { planAssistantEgress, type AssistantTier } from '@heyta/app-host';
 import { AlertTriangle, Check, Lock, Plus, ShieldCheck, Trash2 } from 'lucide-react';
 
 import { useI18n, type I18nValue, type Locale } from '@heyta/i18n';
@@ -159,6 +160,29 @@ const FEATURE_ORDER: readonly AiFeature[] = [
   'duration-estimate',
   'tool-calling',
 ];
+
+/**
+ * 助手能力档位，**按权限从低到高**排。
+ *
+ * ⚠️ 顺序是承重的：界面用 `.map()` 渲染，默认档（`read-only`，见 `aiStore.ts`）
+ * 必须排在第一格，否则"出厂状态"在界面上看起来像第二格那个更高的权限。
+ */
+const ASSISTANT_TIER_ORDER: readonly AssistantTier[] = ['read-only', 'read-and-propose'];
+
+/** 档位的中文名与说明（`Record` 是穷尽的：加一档忘词条 = 编译错误）。 */
+function tierLabels(t: I18nValue['t']): Readonly<Record<AssistantTier, string>> {
+  return {
+    'read-only': t('web.ai.assistant.tier.readOnly.label'),
+    'read-and-propose': t('web.ai.assistant.tier.readAndPropose.label'),
+  };
+}
+
+function tierNotes(t: I18nValue['t']): Readonly<Record<AssistantTier, string>> {
+  return {
+    'read-only': t('web.ai.assistant.tier.readOnly.note'),
+    'read-and-propose': t('web.ai.assistant.tier.readAndPropose.note'),
+  };
+}
 
 /**
  * `validateEndpointUrl()` 拒绝时的 `reason` 码。
@@ -307,6 +331,8 @@ export function AiSettings({ initial, secrets, onChange, memorySlot, focusTarget
   const { t, locale } = useI18n();
   const capabilityLabel = capabilityLabels(t);
   const featureLabel = featureLabels(t);
+  const tierLabel = tierLabels(t);
+  const tierNote = tierNotes(t);
 
   function update(next: PersistedAiSettings): void {
     setSettings(next);
@@ -556,6 +582,15 @@ export function AiSettings({ initial, secrets, onChange, memorySlot, focusTarget
   // 免得同一次渲染里不同端点用了不同的"现在"。
   const now = Date.now();
   const healthMap = fromHealthSnapshot(settings.health, now);
+
+  /**
+   * 助手这一档**最多会送出什么** —— 纯函数，一次请求都不发。
+   *
+   * 🔴 界面必须在这里显示它，而不是等第一次对话时才说：多步循环中途不再逐步
+   * 征求同意（逐步同意 = 用户无脑点下去的疲劳闸门），所以开聊之前必须把**并集**说完。
+   * 字段名来自目录的 `egressFields`，这里不另列一份名单。
+   */
+  const assistantPlan = planAssistantEgress(settings.assistantTier);
 
   return (
     <div className="ht-settings" data-testid="ai-settings">
@@ -967,6 +1002,72 @@ export function AiSettings({ initial, secrets, onChange, memorySlot, focusTarget
                 </div>
               );
             })}
+          </section>
+
+          {/* ── 助手能力档位（ADR-0045 §2.2）：第二个授权前端 ──────────
+              🔴 为什么"又一个开关"不是重复：下面「本机 API」那张逐工具表管的是
+              **外部程序**（MCP / 本机 HTTP）能不能调某个工具（ADR-0011：默认全关）。
+              内置助手如果共用那张表，用户为了"让 AI 帮我看看今天有什么"就得去开
+              一个他并不想开给别的进程的口子。两档最后都汇到同一个判据
+              `isToolGranted()` —— **授权只有一份**（ADR-0035 没变），变的只是谁来勾。
+
+              ⚠️ 这一块必须出现在**任何一次对话之前**，因为它同时是那条
+              "一次性并集披露"：多步循环中途不再逐步征求同意（那会变成用户
+              无脑点下去的疲劳闸门），所以这里说的必须是**这一次最多会送出的全部**。 */}
+          <section className="ht-settings__section" data-testid="ai-assistant-section">
+            <h3 className="ht-settings__h3 ht-type-headline">{t('web.ai.assistant.title')}</h3>
+            <p className="ht-settings__hint">{t('web.ai.assistant.hint')}</p>
+
+            <div
+              className="ht-settings__options"
+              role="radiogroup"
+              aria-label={t('web.ai.assistant.title')}
+              data-testid="assistant-tier-group"
+            >
+              {ASSISTANT_TIER_ORDER.map((tier) => (
+                <label key={tier} className="ht-settings__option" data-testid={`assistant-tier-${tier}`}>
+                  <input
+                    type="radio"
+                    name="assistant-tier"
+                    checked={settings.assistantTier === tier}
+                    onChange={() => update({ ...settings, assistantTier: tier })}
+                  />
+                  <span>
+                    {tierLabel[tier]}
+                    <span className="ht-settings__hint"> {tierNote[tier]}</span>
+                  </span>
+                </label>
+              ))}
+            </div>
+
+            {/* 🔴 披露的字段名**来自目录的 `egressFields`**，不是这里手写一份名单 ——
+                手写的就是抄件，而抄件一定漂（本仓库为这件事付过几次学费）。
+                档位换了，这份集合跟着变：`read-only` 档里写工具根本不进来。 */}
+            <p className="ht-settings__hint" data-testid="assistant-egress-title">
+              {t('web.ai.assistant.egressTitle')}
+            </p>
+            <p className="ht-settings__hint" data-testid="assistant-egress-fields">
+              {assistantPlan.fields.join(LIST_SEPARATOR[locale])}
+            </p>
+            {/* 档位之间**真正**的差别在这一行：写工具只在高一级进模型上下文。
+                （出境字段两档相同 —— 写工具只产出提案、结果不回送模型，
+                所以它们不贡献字段。这句话不写出来，用户会以为"换了档就没送正文"。） */}
+            <p className="ht-settings__hint" data-testid="assistant-tools-title">
+              {t('web.ai.assistant.toolsTitle')}
+            </p>
+            <p className="ht-settings__hint" data-testid="assistant-tools">
+              {assistantPlan.tools.join(LIST_SEPARATOR[locale])}
+            </p>
+            <p className="ht-settings__hint" data-testid="assistant-limits">
+              {t('web.ai.assistant.maxRequests', { n: assistantPlan.maxRequests })}
+              {LIST_SEPARATOR[locale]}
+              {t('web.ai.assistant.maxMessages', { n: assistantPlan.maxMessages })}
+              {LIST_SEPARATOR[locale]}
+              {t('web.ai.assistant.maxBytes', { n: assistantPlan.maxBytesPerRequest })}
+            </p>
+            <p className="ht-settings__hint" data-testid="assistant-mcp-split">
+              {t('web.ai.assistant.mcpSplit')}
+            </p>
           </section>
         </>
       )}

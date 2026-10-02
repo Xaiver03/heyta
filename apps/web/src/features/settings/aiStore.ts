@@ -45,6 +45,7 @@ import {
   type SecretStore,
 } from '@heyta/ai';
 import { DEFAULT_LOCAL_API_CONFIG, type LocalApiConfig } from '@heyta/local-api';
+import type { AssistantTier } from '@heyta/app-host';
 
 export const AI_SETTINGS_STORAGE_KEY = 'heyta.ai.settings';
 
@@ -73,6 +74,25 @@ export interface PersistedAiSettings {
    * 「不用 AI」和「用 AI 但别记我」是两件事。
    */
   memoryEnabled: boolean;
+  /**
+   * 🔴 **对话式助手的能力档位**（ADR-0045 §2.2）。默认 `read-only`。
+   *
+   * 它是**第二个授权前端**，与下面 `localApi.grants` 是两件事，缺一不可：
+   *
+   * | | 管的是什么 | 谁消费 |
+   * |---|---|---|
+   * | `localApi.grants` | **外部程序**（MCP / 本机 HTTP）能不能调某个工具，逐工具、默认关 | `authorizeToolCall()` |
+   * | `assistantTier` | **内置助手**这一次允许看见哪些工具、要不要产出写入提案 | `assistantGrants(tier)` |
+   *
+   * 两者最后都汇到同一个判据 `isToolGranted()` —— 授权**只有一份**（ADR-0035 的立场没变），
+   * 变的是"谁来勾"。把助手挂在 MCP 那逐工具默认关上，等于让用户为了用助手
+   * 去开一个他其实不想给外部程序的能力。
+   *
+   * ⚠️ 这一条**读回来时不做"看起来像真"**：只有字符串逐字等于
+   * `'read-and-propose'` 才算开写。别的值、缺字段、旧版本存的 `undefined`
+   * 一律落回 `read-only` —— 与 `memoryEnabled` 同一条 fail-closed 纪律。
+   */
+  assistantTier: AssistantTier;
 }
 
 /**
@@ -96,6 +116,8 @@ export function defaultAiSettings(): PersistedAiSettings {
     health: { version: HEALTH_SNAPSHOT_VERSION, entries: [] },
     // 🔴 第四道闸，同样默认关。与 ADR-0014 的 fail-closed 要求一致。
     memoryEnabled: false,
+    // 🔴 助手默认**只能读**。要它能提改动，得用户在这里明确切一档。
+    assistantTier: 'read-only',
   };
 }
 
@@ -124,6 +146,10 @@ export function loadAiSettings(): PersistedAiSettings {
       // 隐私闸门不接受"看起来像真"的值（与 `sanitizeRouting` 对
       // `enabled` 的处理同一条规则）。
       memoryEnabled: candidate.memoryEnabled === true,
+      // 🔴 只有逐字等于"开写"那一档才算开。`true` / `"read_and_propose"` /
+      // 缺字段 / 旧版本存的 `undefined` 一律落回 `read-only` ——
+      // 隐私与写入能力的闸门不接受"看起来像真"的值。
+      assistantTier: candidate.assistantTier === 'read-and-propose' ? 'read-and-propose' : 'read-only',
       health: {
         version: HEALTH_SNAPSHOT_VERSION,
         entries: toHealthSnapshot(
