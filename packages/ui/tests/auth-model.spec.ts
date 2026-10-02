@@ -76,7 +76,11 @@ function localeText(locale: 'zh-CN' | 'en', key: string): string {
   const value = line.slice(line.indexOf(':', line.indexOf("'") + 1) + 1).trim();
   const quoted = /^'((?:[^'\\]|\\.)*)'/.exec(value);
   if (quoted === null) throw new Error(`${locale} 的 ${key} 不是预期的单引号词条形状`);
-  return quoted[1].replace(/\\'/g, "'").replace(/\\\\/g, '\\');
+  // `noUncheckedIndexedAccess` 下捕获组是 `string | undefined`；这个正则只有一个
+  // 必选捕获组，匹配成功就一定在场 —— 收窄掉而不是非空断言。
+  const text = quoted[1];
+  if (text === undefined) throw new Error(`${locale} 的 ${key} 没捕获到词条文本`);
+  return text.replace(/\\'/g, "'").replace(/\\\\/g, '\\');
 }
 
 /**
@@ -321,9 +325,11 @@ describe('🔴 authFailureMessage —— 句子和它要带的数字**一次交�
     for (const one of cases) {
       const { key, vars } = authFailureMessage(one);
       for (const locale of ['zh-CN', 'en'] as const) {
-        const placeholders = [...localeText(locale, key).matchAll(/\{\s*(\w+)\s*\}/g)].map(
-          (m) => m[1],
-        );
+        // `\w+` 是必选捕获组，匹配成功必有名字；收窄掉 `noUncheckedIndexedAccess`
+        // 带来的 `undefined`，否则它当不了 `vars` 的索引类型。
+        const placeholders = [...localeText(locale, key).matchAll(/\{\s*(\w+)\s*\}/g)]
+          .map((m) => m[1])
+          .filter((name): name is string => name !== undefined);
         for (const name of placeholders) {
           // 断言的是**形状**：这句话里写了 `{seconds}`，这次调用就必须给出 seconds。
           // 两张表都查 —— 翻译时多留或漏掉一个占位符，同样会把字面量印给用户。
