@@ -67,7 +67,7 @@ EXPECT_SUB="每 2 周"
 
 echo ""
 echo "=== 移动端自定义重复规则验收（真实模拟器，零 mock）==="
-echo "  设备: emulator-5554   服务端: $SERVER"
+echo "  设备: $E2E_SERIAL   服务端: $SERVER"
 echo "  任务: $TITLE"
 echo "  规则: $RULE"
 

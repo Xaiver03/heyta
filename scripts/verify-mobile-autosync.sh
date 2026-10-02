@@ -76,7 +76,7 @@ LAPTOP_ROUNDS="${HEYTA_AUTOSYNC_LAPTOP_ROUNDS:-180}"
 
 echo ""
 echo "=== 移动端自动同步验收（真实模拟器 + 真服务端，零 mock）==="
-echo "  设备: emulator-5554   服务端: $SERVER   库: heyta_mobile_smoke"
+echo "  设备: $E2E_SERIAL   服务端: $SERVER   库: heyta_mobile_smoke"
 echo "  账号: $EMAIL"
 echo "  任务: $TITLE"
 echo "  🔴 本轮**不会**点击任何同步按钮 —— 这是本验收的全部意义"

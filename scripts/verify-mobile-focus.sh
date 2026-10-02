@@ -140,7 +140,7 @@ PY
 # ── 开始 ────────────────────────────────────────────────────
 echo ""
 echo "=== 移动端专注（番茄钟）闭环验收（真实模拟器 + 真服务端，零 mock）==="
-echo "  设备: emulator-5554   服务端: $SERVER   库: heyta_mobile_smoke"
+echo "  设备: $E2E_SERIAL   服务端: $SERVER   库: heyta_mobile_smoke"
 echo "  账号: $EMAIL"
 echo "  任务: $TASK_TITLE"
 

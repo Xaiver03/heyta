@@ -40,7 +40,7 @@ PKG_ACT="$PKG/"
 
 echo ""
 echo "=== 移动端提醒投递验收（真实模拟器，零 mock）==="
-echo "  设备: emulator-5554   任务: $TITLE"
+echo "  设备: $E2E_SERIAL   任务: $TITLE"
 
 dismiss_consent_if_present() {
   local waited=0 xy label
