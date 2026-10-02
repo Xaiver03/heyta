@@ -121,6 +121,32 @@ export function writeDevicePref(key: string, value: string): boolean {
 }
 
 /**
+ * 删掉一个偏好。返回**是否真的删干净了**。
+ *
+ * 🔴 这条不是 `writeDevicePref(key, '')` 的替代品：**"没决定过"与"决定是空串"
+ * 是两件事**。隐私同意的撤回要清回"还没问过"（PIPL 第 15 条要求撤回后还能
+ * 重新给一次选择），而写入空串会让磁盘上留一条记录 —— 读取侧要为此特判，
+ * 而任何"为此特判"的代码都是下一个漂移点。所以这里必须是真 DELETE。
+ *
+ * 与 `writeDevicePref` 同一条纪律：**永不抛**，把失败如实返回给调用方。
+ * 撤回落盘失败的后果是"下次冷启动又带着旧决定"，那必须说出口，不能静默。
+ */
+export function deleteDevicePref(key: string): boolean {
+  const db = openPrefsDb();
+  if (db === null) return false;
+  try {
+    db.executeSync(`DELETE FROM ${TABLE} WHERE key = ?`, [key]);
+    // 验一遍"真的不在了"：与 web 侧 `localStorage` 那条同一纪律 ——
+    // 只有不抛、没生效的写入（这里是删除）不能算成功。
+    const left = db.executeSync(`SELECT value FROM ${TABLE} WHERE key = ?`, [key]);
+    return ((left.rows ?? []) as unknown[]).length === 0;
+  } catch (error) {
+    console.warn(`[prefs] 删偏好 ${key} 失败：`, error);
+    return false;
+  }
+}
+
+/**
  * 欢迎页是否已经被离开过。
  *
  * 🔴 只有 `'1'` 才算"看过"。缺键、库不可用、值被写坏 —— 一律当**没看过**

@@ -102,6 +102,8 @@ const ALL_REASONS = [
   'request-rejected',
   'network',
   'server-error',
+  // G-12：本机闸门拦下的。快照里必须有它，否则新原因掉进 `unknown` 而没人看见。
+  'consent-required',
   'malformed-response',
   'passkey-unsupported',
   'passkey-cancelled',
@@ -136,6 +138,7 @@ describe('authFailureMessageKey —— 原因 → 词条 key', () => {
       'request-rejected': 'common.auth.error.requestRejected',
       network: 'common.auth.error.network',
       'server-error': 'common.auth.error.server',
+      'consent-required': 'common.auth.error.consentRequired',
       'passkey-unsupported': 'common.auth.error.passkeyUnsupported',
       'passkey-cancelled': 'common.auth.error.passkeyCancelled',
       'passkey-already-registered': 'common.auth.error.passkeyAlreadyRegistered',
@@ -283,9 +286,6 @@ describe('passwordPolicyMessageKey —— 四种拒绝给四种动作', () => {
   });
 });
 
-describe('表单的两步与 autofill（FIDO 2023 UX + web.dev 口令管理器）', () => {
-  it('🔴 空的邮箱不许前进到口令步 —— 否则口令框不知道属于谁', () => {
-    expect(authFormStageAfterContinue({ stage: 'identify', email: '' })).toBe('identify');
 describe('🔴 authFailureMessage —— 句子和它要带的数字**一次交出**', () => {
   /**
    * 这一层存在的唯一理由：`translateIn` 在 vars 缺省时**保留占位符原文**，
@@ -356,6 +356,9 @@ describe('🔴 authFailureMessage —— 句子和它要带的数字**一次交�
   });
 });
 
+describe('表单的两步与 autofill（FIDO 2023 UX + web.dev 口令管理器）', () => {
+  it('🔴 空的邮箱不许前进到口令步 —— 否则口令框不知道属于谁', () => {
+    expect(authFormStageAfterContinue({ stage: 'identify', email: '' })).toBe('identify');
     expect(authFormStageAfterContinue({ stage: 'identify', email: '   ' })).toBe('identify');
     expect(authFormStageAfterContinue({ stage: 'identify', email: 'a@b.c' })).toBe('credential');
     // 「继续」不许把已经前进过的阶段拉回去（用户从口令步点浏览器后退式重提）。
@@ -513,7 +516,7 @@ describe('🔴 "只有一份"的机器保证（源码级）', () => {
     expect(src).toContain('authFailureMessage(');
     expect(src).toMatch(/from '@heyta\/ui'/);
   });
-});
+
   it('🔴 三个消费面板都不许只拿 key 不填数（占位符会原样印出来）', () => {
     for (const file of [
       'apps/web/src/features/auth/AuthPanel.tsx',
@@ -528,3 +531,4 @@ describe('🔴 "只有一份"的机器保证（源码级）', () => {
       expect(src, `${file} 没用共享的 key+vars 一次性出口`).toContain('authFailureMessage(');
     }
   });
+});

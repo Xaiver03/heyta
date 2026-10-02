@@ -8,6 +8,7 @@
     "test": "playwright test",
     "test:landing": "playwright test --config playwright.landing.config.ts",
     "test:legal-links": "playwright test --config playwright.legal-links.config.ts",
+    "test:privacy-consent": "playwright test --config playwright.privacy-consent.config.ts",
     "install-browser": "playwright install chromium"
   },
   "devDependencies": {

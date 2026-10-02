@@ -32,6 +32,17 @@ export const zhCN = {
   'common.a11y.toDarkTheme': '切换到暗色主题',
 
   /**
+   * 两份对外文本的**名字**（注册勾选框旁边那两条链接用它）。
+   *
+   * 🔴 为什么不复用 `site.footer.legal.*`：那两条是 `gen-site-copy.mjs` 从
+   * `@heyta/legal` **投影**出来的站点词条，由 `check:legal-copy` 逐字钉住内容 ——
+   * 应用去消费它们，等于让应用界面依赖一次站点构建的投影，而投影改动的原因
+   * 与界面无关。名字这里是界面自己的事。
+   */
+  'common.legal.termsDoc': '《服务条款》',
+  'common.legal.privacyDoc': '《隐私政策》',
+
+  /**
    * 语言**自称**（endonym）：中英两表里**刻意是同一个词**。
    *
    * 语言切换器显示的是**目标语言自己的文字**，而不是把"英文"翻译成当前语言 ——
@@ -68,6 +79,69 @@ export const zhCN = {
    * 后者漏掉②，而②是这台设备最容易被误操作的地方。
    */
   'common.sync.error.unauthorized': '这台设备的登录凭据已失效（可能是在别的设备上退出了登录，或改过口令），同步已停止 —— 本地数据完好、仍可读写，重新登录后会继续同步',
+  /**
+   * 🔴 `reason === 'consent-required'`：**还没同意，所以一个请求都没发**（计划 G-12）。
+   *
+   * 这句不许写成"还没配置同步服务"或"当前离线"：那两种的用户动作是"填地址"和"查网络"，
+   * 而这里的动作是"去同意"。写错的那一侧会让用户改一遍地址、回来还是不同步。
+   */
+  'common.sync.error.consentRequired': '还没有同意隐私规则，heyta 不会向任何服务器发出请求 —— 在设置里作出选择后，同步才会开始',
+
+  // ── 隐私同意（首启面板 + 设置页） ─────────────────────────
+  // 🔴 这一组词条**两端共用**（web 与移动端说的是同一件事），理由与上面那组相同：
+  // 同一个法律决定在两个壳里说成两句不同的话，早晚要有人回答"哪一句才是我们承诺的"。
+  //
+  // ⚠️ 措辞纪律：这里不许出现"为了给你更好的体验"这类**没有信息量**的句子，
+  // 也不许出现"我们将收集……"这类**只声明不解释**的清单。每一条都要回答
+  // "发出去的是什么、发给谁、不同意会少掉什么"—— 那是 PIPL 第 14 条
+  // "充分知情"的最小要求，不是文案风格。
+  'common.privacy.consent.title': '在使用联网功能之前',
+  'common.privacy.consent.intro': 'heyta 是本地优先的：你的任务、清单、笔记与历史先写在这台设备上。这个选择只决定一件事 —— 这台设备能不能与服务器通信。',
+  'common.privacy.consent.localOnlyGuarantee': '选「只用本机」时，所有功能照常可用：新建、编辑、日历、四象限、番茄钟、习惯、导出，一个都不少。只是不会同步、不会登录、不会推送提醒。',
+  'common.privacy.consent.acceptedGuarantee': '选「同意并联网」后，这台设备才会与你配置的那台服务器通信，而且只发端到端加密之后的密文与同步游标 —— 服务器看不到你的明文。',
+  'common.privacy.consent.termsLink': '服务条款',
+  'common.privacy.consent.privacyLink': '隐私政策',
+  'common.privacy.consent.readFirst': '作出选择前，可以先读完整文本：',
+  /**
+   * 面板被**再次**打开时的说明。两种原因说的是两件不同的事，不许合成一句：
+   * 一种是"你刚点了个要联网的功能"，另一种是"你刚撤回过"。
+   * 少了这句，面板看起来就像每次点按钮都弹一下的广告。
+   */
+  'common.privacy.consent.whyRequiredForAction': '刚才那一步需要与服务器通信，而还没有同意隐私规则，所以 heyta 一个请求都没有发。',
+  'common.privacy.consent.whyRevoked': '已撤回同意。现在这台设备不会对外发出任何请求 —— 包括刚才建立的实时连接。',
+  'common.privacy.consent.accept': '同意并联网',
+  'common.privacy.consent.localOnly': '只用本机',
+  /**
+   * 面板右上角那个关闭动作的名字。
+   *
+   * 🔴 不能写成「关闭」，也不能省：移动端用系统返回手势关掉这块面板时，
+   * 用户读到的必须是「现在还没决定」，而不是「我把它拒了」。关掉**不等于同意**，
+   * 闸门保持关闭 —— 所以这句话要自己说清它不是决定。
+   */
+  'common.privacy.consent.close': '以后再说',
+  /**
+   * ⚠️ 这句**必须**能在界面上出现：`localStorage` 在隐私模式下会静默不落地，
+   * 而"点了同意、下次启动又问一遍"如果不说出口，用户只会认为这个应用在骗他。
+   */
+  'common.privacy.consent.notPersisted': '这台设备的本地存储不可用：你的选择只在本次打开有效，下次启动会再问一次。',
+  /**
+   * 决定**没能落盘**时面板不收起来 —— 那句警告必须出现在用户正看着的这一块上。
+   * 于是需要一条明确的出口，而不是让他再点一次「同意」。
+   */
+  'common.privacy.consent.acknowledge': '知道了，继续',
+
+  // 设置页里的那一个入口 —— PIPL 第 15 条要的是"便捷的撤回方式"，
+  // 而一个找不到、看不懂的入口不算便捷。
+  'common.privacy.settings.title': '隐私同意',
+  'common.privacy.settings.accepted': '已同意与服务器通信',
+  'common.privacy.settings.localOnly': '只用本机（未同意联网）',
+  'common.privacy.settings.undecided': '还没有作出选择',
+  'common.privacy.settings.decidedAt': '决定于 {time}',
+  'common.privacy.settings.revoke': '撤回同意',
+  'common.privacy.settings.revokeHint': '撤回后这台设备立刻停止对外请求（包括已经建立的实时连接），并重新询问一次。本地数据不受影响。',
+  // 撤回之后（或从没决定过）界面必须留一条**能重新决定**的路，否则 PIPL 第 15 条
+  // 只做到"能撤回"、没做到"撤回后还能方便地再同意"。
+  'common.privacy.settings.chooseAgain': '重新作出选择',
 
   // ── 落地页 · 通用 ─────────────────────────────────────────
   'landing.skipLink': '跳到主要内容',
@@ -591,6 +665,9 @@ export const zhCN = {
   'common.auth.error.unauthorized': '链接无效或已过期，请重新发送一封。',
   'common.auth.error.rateLimited': '请求太频繁了，请过一会儿再试。',
   'common.auth.error.network': '连不上服务端，检查地址与网络后重试。',
+  // 🔴 这句**不许**与上面那条共用：请求从未离开这台设备，"检查网络"是把一个隐私
+  // 决定伪装成线路故障 —— 用户会去重连 WiFi，而那永远做不对。
+  'common.auth.error.consentRequired': '还没有同意隐私规则，这次操作没有发出任何数据。请先在弹出的面板里作出选择。',
   'common.auth.error.server': '服务端暂时不可用，请稍后重试。',
   'common.auth.error.unknown': '登录没有完成，请重试。',
   // ── 邮箱 + 登录密码这条路（ADR-0040）：失败句子 ──
@@ -1230,44 +1307,6 @@ export const zhCN = {
   'web.gantt.durationManual': '约 {duration}',
   'web.gantt.dependsOn': '依赖：{title}',
   'web.gantt.overlap': '与前置重叠',
-
-  // ── Web · 时间线板（2026-10-01 重画，goal：docs/plans/goal-timeline-rework.md）──
-  // 一根共轴、行=任务、三态降级（条/菱形/未排期泳道）。上面 `web.timeline.*` 的
-  // empty/aria 三条**继续被板复用**；aiEstimate/noChecklist/unattributable 归
-  // 任务详情的清单排程预览。措辞全部由宿主装进 `TimelineBoardLabels`。
-  'web.board.weekday.1': '一',
-  'web.board.weekday.2': '二',
-  'web.board.weekday.3': '三',
-  'web.board.weekday.4': '四',
-  'web.board.weekday.5': '五',
-  'web.board.weekday.6': '六',
-  'web.board.weekday.7': '日',
-  'web.board.month.1': '1月',
-  'web.board.month.2': '2月',
-  'web.board.month.3': '3月',
-  'web.board.month.4': '4月',
-  'web.board.month.5': '5月',
-  'web.board.month.6': '6月',
-  'web.board.month.7': '7月',
-  'web.board.month.8': '8月',
-  'web.board.month.9': '9月',
-  'web.board.month.10': '10月',
-  'web.board.month.11': '11月',
-  'web.board.month.12': '12月',
-  'web.board.today': '今天',
-  // 有名字的泳道（R4 判据 5）：没排期的任务**可见但不落图**——
-  // 静默消失用户会以为视图坏了，画成条就是在编长度。
-  'web.board.unscheduledLane': '未排期（{count}）',
-  // 行头的估时 badge：是**文字**，绝不画成长度（R4 判据 3）。
-  'web.board.aiBadge': 'AI 估 {duration}',
-  // 逾期是文字 + 警示色，不是只有颜色（WCAG 1.4.1）。
-  'web.board.overdue': '逾期',
-  // 详情预览的区块说明：任务内部坐标系与板**必须标明**不是同一个坐标系
-  // （goal §2.1；不标明用户就会拿它和板对位置）。
-  'web.board.planCaption': '这是这条任务内部的清单排程（先后与估时），与时间线板不是同一个坐标系。',
-  // 「点空白建任务」（goal §3.2 手势 4）的默认标题：这是**数据**（一条任务的名字），
-  // 但它来自产品而不是用户 —— 所以仍然走词条表，不硬编码。
-  'web.board.untitledTask': '未命名任务',
 
   // ═══════════════════════════════════════════════════════════
   // Web · AI（拆解 / 捕获 / 估时 / 排序 / 设置 / 记忆）
@@ -2325,6 +2364,9 @@ export const zhCN = {
   // 🔴 服务端对 `termsAccepted` 用的是 `z.literal(true)`（规范 §2-A4）——
   //    "同意"这件事只能由用户做出。这句话是给用户的交代，不是客套。
   'mobile.auth.terms.hint': '这一项必须由你自己勾选——我们不会替你同意。',
+  // 条款链接**点不开**时说的话。设备上没有能打开网页的应用是真会发生的
+  // （桌面 Linux、无浏览器的测试镜像），而"点了没反应"是最容易被当成界面坏了的一种坏法。
+  'mobile.auth.link.unopenable': '这台设备上打不开网页，所以条款没能显示出来。',
   // 🔴 口令这条路是**主路**，摆在"别的方式"之上。两句不许写成「注册成功」/
   //    「登录成功」—— 点击只是**发出请求**，结果由状态区那一句说。
   'mobile.auth.password.register': '用邮箱和密码注册',
@@ -3441,6 +3483,10 @@ export const zhCN = {
   'web.admin.user.passkeys': '通行密钥',
   'web.admin.user.operations': '操作数',
   'web.admin.user.failedLogins': '失败登录',
+  // 同意留痕：对外文本承诺"记下当时那一套的版本指纹"，后台必须能把这句话说实。
+  'web.admin.user.consent': '同意留痕',
+  'web.admin.user.consentNone': '没有同意记录',
+  'web.admin.user.consentNoVersion': '版本无法证明（老账号，或该实例发布的是运营者自己的文本）',
   'web.admin.user.subscriptions': '订阅',
   'web.admin.user.orders': '订单',
   'web.admin.user.none': '无',

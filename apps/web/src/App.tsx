@@ -100,6 +100,8 @@ import { SubtaskPicker } from './features/tasks/SubtaskPicker.js';
 import { CaptureComposer } from './features/capture/CaptureComposer.js';
 import { useProjectStore } from './features/projects/store.js';
 import { ConflictDialog } from './features/sync/ConflictDialog.js';
+import { PrivacyConsentSheet } from './features/privacy/PrivacyConsentSheet.js';
+import { shouldAskOnFirstLaunch, usePrivacyStore } from './features/privacy/store.js';
 import { CalendarSidebar } from './features/calendar/CalendarSidebar.js';
 import { CalendarView } from './features/calendar/CalendarView.js';
 import { useNoteStore } from './features/notes/store.js';
@@ -158,6 +160,9 @@ import { ImportPanel } from './features/settings/ImportPanel.js';
 import { MemoryPanel } from './features/settings/MemoryPanel.js';
 // 通行密钥自助管理（列 / 删）—— 服务端早就有端点，此前界面没有任何入口。
 import { PasskeyPanel } from './features/settings/PasskeyPanel.js';
+// 隐私同意的**撤回**入口（PIPL 第 15 条：撤回要比同意更容易做到）。
+// 同意面板只在首启弹一次，之后用户要改只能从这里改 —— 没有它，一次点击就成了永久决定。
+import { PrivacyPanel } from './features/settings/PrivacyPanel.js';
 // 改登录密码 —— `/api/password/change` 与 `useAuthStore.changePassword` 都在，
 // 缺的就是这张表（在此之前那条动作**全仓库零调用点**）。见 PasswordPanel 文件头。
 import { PasswordPanel } from './features/settings/PasswordPanel.js';
@@ -622,6 +627,23 @@ export function App(): React.JSX.Element {
    * 它复用 `web.shell.search.*` 那三条词条 —— 那些词条因此不是死词条，别删。
    */
   const [searchQuery, setSearchQuery] = useState('');
+
+  /**
+   * G-11：**首启必须问过用户**。
+   *
+   * 🔴 判据是"这台设备从没作过决定"，不是"今天第一次打开"：
+   *   · 点过「同意」的人不该再被打扰；
+   *   · 点过「只用本机」的人**也是作过决定**（那是一条完整的产品选择，不是"没决定"），
+   *     所以同样不再弹 —— 他要改可以去设置页撤回；
+   *   · 撤回之后状态被清回"没问过"，下一次冷启动会重新问 —— 这是 `revoke()` 的
+   *     预期后果，不是 bug（PIPL 第 15 条要求撤回后还能重新给一次选择的机会）。
+   *
+   * ⚠️ 空依赖：每次挂载问一次。`StrictMode` 下 effect 跑两遍，但 `openSheet`
+   *    只是把同一个 `open: true` 写进去，幂等，不会叠两层浮层。
+   */
+  useEffect(() => {
+    if (shouldAskOnFirstLaunch()) usePrivacyStore.getState().openSheet('first-launch');
+  }, []);
 
   /**
    * 切到设置页之后**滚到帮助那一段**。
@@ -1920,6 +1942,10 @@ export function App(): React.JSX.Element {
                 有开关才有对照组，也才能一键回退（见 DueBadge.tsx 文件头）。 */}
             <SyncBar />
             <ConflictDialog />
+            {/* G-11：首启隐私同意面板。与 `ConflictDialog` 同一处挂载 ——
+                两者都是 `position: fixed` + `z.modal` 的顶层浮层，
+                而"同意之前不许发请求"这件事必须在应用之上，不能在某个视图里面。 */}
+            <PrivacyConsentSheet />
             {/* 语言切换。外壳顶栏的全局控件区，与主题切换并列 ——
                 这是**真实用户唯一能把界面切到英文的入口**（见该文件的注释）。 */}
             <LanguageSwitcher />
@@ -2370,6 +2396,14 @@ export function App(): React.JSX.Element {
               <FeatureModulesPanel enabled={enabledModules} onToggle={onToggleModule} />
               {/* 提醒通知（#2）：权限只能由用户手势申请，所以它必须有个按钮。 */}
               <ReminderNotifyPanel />
+              {/*
+                🔴 **隐私同意排在 AI 出境开关之前**：那三道闸（总开关 / 允许远程 /
+                逐功能授权）回答的是"哪一类数据可以出境"，而本面板回答的是
+                "**这台设备准不准出门**" —— 后者是前者的前提，顺序反过来会让人
+                在一个永远不可能生效的开关上花时间。
+                它同时是 PIPL 第 15 条要求的**撤回入口**（同意只在首启弹一次）。
+              */}
+              <PrivacyPanel />
               <AiSettings
                 initial={aiSettings}
                 secrets={aiSecrets}

@@ -36,6 +36,11 @@ import { createHostRealtimeClient, createSyncClient } from '@heyta/app-host';
 // W4：凭据持久化。**只存 baseUrl 与 token，绝不存口令** —— 见该文件头。
 import { clearStoredCredentials, loadCredentials, saveCredentials } from './credential-storage.js';
 
+// 🔴 同意闸门（G-12）。这个文件**只**用它做两件事：给客户端注入带闸的 `fetch`，
+// 以及在闸门关闭时不建实时通道。判定逻辑全在 `@heyta/app-host`。
+import { consentFetch, privacyConsent, subscribePrivacyConsent } from '../privacy/consent-gate.js';
+import { requireNetworkConsent } from '../privacy/store.js';
+
 interface SyncStoreState {
   status: SyncStatus;
   /** 服务端地址。空字符串 = 未配置。 */
@@ -174,6 +179,15 @@ function buildClient(
     // 不通知的话数据到了、界面不动 —— 而原生宿主没有这层订阅，
     // 所以它是**注入项**而不是接线内部的固定行为。
     applyRemote: applyRemoteOps,
+    /**
+     * 🔴 带同意闸门的 `fetch`（G-12）。
+     *
+     * 这里**显式**传它，而不是只靠 `main.tsx` 换掉 `window.fetch`：
+     * `SyncClient` 在构造时做 `options.fetchImpl ?? globalThis.fetch.bind(globalThis)`，
+     * 只换全局的话这一层就变成"靠装配顺序成立"—— 而那正是本仓库反复记过的
+     * "看起来在保护一件事，其实保护的是另一件"。两处都做，判据才能在**这一层**数得出次数。
+     */
+    fetchImpl: consentFetch,
   });
 }
 
@@ -215,6 +229,19 @@ let syncInFlight = false;
 function restartRealtime(get: () => SyncStoreState): void {
   realtime?.dispose();
   realtime = undefined;
+
+  /**
+   * 🔴 **闸门关闭就不连，而且这条必须排在 `dispose()` 之后**（G-12）。
+   *
+   * WebSocket 不经 `window.fetch`，所以带闸的那层 fetch 罩不到它 —— 这一处就是它唯一的闸。
+   * 排在 dispose 之后是为了让**撤回同意**真的把连接断掉：先判后 dispose 的话，
+   * 界面说"已撤回"而那条连接还挂着，那是比不撤回更坏的状态
+   * （`privacy-consent.ts` 的 `revoke()` 写的是同一条纪律）。
+   *
+   * ⚠️ 全仓只有这一个 `createHostRealtimeClient()` 调用点（已 grep 确认），
+   * 所以这一条闸对 WS 是**穷尽**的 —— 新增第二个构造点时必须同样调它。
+   */
+  if (!privacyConsent.networkAllowed()) return;
 
   const { baseUrl, token } = get();
   // 未配置/未登录就**不连**。登录之后再调一次本函数即可 ——
@@ -272,12 +299,49 @@ function restartRealtime(get: () => SyncStoreState): void {
 }
 
 /**
+ * 🔴 同意状态一变，实时通道**当场**按新闸门重建（G-12 的另一半）。
+ *
+ * 少了这一条会出两种静默失效，而且方向相反：
+ *   · 用户在首启面板点「同意」→ 已经跑过的 `startRealtime()` 早就 return 了，
+ *     **不重连的话他要刷新一次才有实时同步**（"这次好了下次又坏了"）；
+ *   · 用户在设置页**撤回**→ 不重连的话那条 WS 会继续带着旧令牌重连，
+ *     而界面上写的是"已撤回"。
+ *
+ * 为什么放在同步 store 而不是隐私面板：`realtime` 这个变量归本文件所有，
+ * 让外部去 `dispose()` 它等于把所有权漏出去（同一个理由见上面的 `restartRealtime`）。
+ */
+subscribePrivacyConsent(() => {
+  restartRealtime(() => useSyncStore.getState());
+});
+
+/**
  * 🔴 W4：冷启动时把**已保存的凭据**读回来。
  *
  * 没有这一步，用户每次刷新都要重新登录一次 —— 而那让"完整旅程"不成立。
  * ⚠️ 只读 `baseUrl` 与 `token`；口令**永远**是 `undefined`（见 credential-storage.ts）。
  */
 const persisted = loadCredentials();
+
+/**
+ * 用户**主动**发起一次出站动作时的那道闸（G-12）。
+ *
+ * 🔴 位置：**在真正会发请求的那一行之前，但在"本地配置齐不齐"那一项之后**。
+ * 两条理由分别是：
+ *   · 排在 `c.sync()` 之前 ⇒ 没同意时一个字节都出不去（这是 G-12 本身）。
+ *   · 排在 `buildClient()` 之后 ⇒ 没配服务端的用户拿到的是 `not-configured`，
+ *     不是 `consent-required`。读 baseUrl/token 是**纯本机**动作，不涉及出境，
+ *     而"你还没配同步服务"对着一个什么都没配的人来说是真话、且可操作；
+ *     反过来让他先去处理隐私面板，是在让他做一件此刻不必要的事。
+ *     ⚠️ 这不等于他没有面板 —— 首启仍然会问（`shouldAskOnFirstLaunch`）。
+ *
+ * 单独一种 `consent-required` 的理由见 `packages/sync-client/src/client.ts`。
+ *
+ * @returns 被拦下时要写进 `status` 的那条错误（同时把面板弹起来）；放行时 `null`。
+ */
+function consentGate(): SyncStatus | null {
+  if (requireNetworkConsent()) return null;
+  return { kind: 'error', reason: 'consent-required', retryable: false };
+}
 
 export const useSyncStore = create<SyncStoreState>((set, get) => ({
   status: { kind: 'idle' },
@@ -383,6 +447,12 @@ export const useSyncStore = create<SyncStoreState>((set, get) => ({
       return s;
     }
 
+    const blocked = consentGate();
+    if (blocked !== null) {
+      set({ status: blocked });
+      return blocked;
+    }
+
     const status = await c.sync((s) => {
       set({ status: s });
     });
@@ -404,6 +474,12 @@ export const useSyncStore = create<SyncStoreState>((set, get) => ({
       };
       set({ status: s });
       return s;
+    }
+
+    const blocked = consentGate();
+    if (blocked !== null) {
+      set({ status: blocked });
+      return blocked;
     }
 
     set({ status: { kind: 'syncing', phase: 'upload' } });

@@ -42,7 +42,7 @@
  */
 
 import React, { useState } from 'react';
-import { Pressable, View } from 'react-native';
+import { Linking, Pressable, View } from 'react-native';
 import {
   beginPasskeyLogin,
   beginPasskeyRegistration,
@@ -52,6 +52,7 @@ import {
   registerWithEmailPassword,
   requestMagicLink,
   registerWithMagicLink,
+  resolveLegalLinks,
   verifyEmailAddress,
   verifyMagicLink,
   type HostedAuthFailure,
@@ -77,6 +78,7 @@ import {
 import { describePasskeyError, resolvePasskeyProvider } from '../auth/passkey-host';
 import { redeemPastedAuthToken } from '../auth/paste';
 import { saveAuthSession } from '../auth/session';
+import { requireNetworkConsent } from '../privacy/consent-ui';
 
 /** 正在跑的那件事。只为了在按钮上画菊花 + 让"哪一步在忙"可读。 */
 type AuthAction =
@@ -166,6 +168,29 @@ export function AuthScreen({
   /** 这台设备有没有通行密钥实现。没有时**如实说**，而不是把按钮藏起来。 */
   const passkeyProvider = resolvePasskeyProvider();
 
+  /**
+   * 勾选框旁边两条条款链接的地址。分流规则在 `@heyta/app-host` 的 `legal-links.ts`
+   * ——「哪份文本适用于这台服务端」是协议知识，四个壳各写一遍必然漂移（AGENTS §3.5）。
+   */
+  const legalLinks = resolveLegalLinks(serverUrl, locale);
+
+  /**
+   * 打开一条外部链接。
+   *
+   * 🔴 用 `Linking` 而不是 RN 内建 `<Text onPress>` 的隐式行为：系统浏览器是唯一
+   * 合理的载体（条款是给读的，而壳里没有第二个渲染器），但**打开失败必须看得见** ——
+   * 没有浏览器 / 被系统拦截时静默什么都不发生，用户会以为界面卡住。
+   * ⚠️ **不**把 `canOpenURL()` 加进来当预检：iOS 13+ 要在 Info.plist 里逐 scheme 登记
+   * `LSApplicationQueriesSchemes` 才查得到，没登记时它恒返回 false，
+   * 于是"能不能打开"这个判断会变成一台设备的 Info.plist 决定的假红 ——
+   * 直接 `openURL()` 失败再说话，才是两端一致的口径。
+   */
+  const openLegalLink = (href: string): void => {
+    Linking.openURL(href).catch(() => {
+      failWithKey('mobile.auth.link.unopenable');
+    });
+  };
+
   const fail = (reason: HostedAuthFailureReason): void => {
     const message = authFailureMessage({ reason });
     failWithKey(message.key, message.vars);
@@ -243,6 +268,7 @@ export function AuthScreen({
   const registerWithPassword = async (): Promise<void> => {
     const missing = missingField('register');
     if (missing !== undefined) return failWithKey(missingFieldKey(missing));
+    if (!requireNetworkConsent()) return;
     setPhase({ kind: 'busy', action: 'password-register' });
     const result = await registerWithEmailPassword(options, {
       email,
@@ -262,6 +288,7 @@ export function AuthScreen({
   const loginWithPassword = async (): Promise<void> => {
     const missing = missingField('sign-in');
     if (missing !== undefined) return failWithKey(missingFieldKey(missing));
+    if (!requireNetworkConsent()) return;
     setPhase({ kind: 'busy', action: 'password-login' });
     const result = await loginWithEmailPassword(options, {
       email,
@@ -271,7 +298,16 @@ export function AuthScreen({
     setPhase({ kind: 'session', session: result.session });
   };
 
+  /**
+   * 🔴 这里的顺序是**口径**，不是风格：`false` 时**不 `setPhase(busy)`**、不发请求，
+   * 面板由 `requireNetworkConsent()` 替用户打开。
+   *
+   * 先进 busy 再判闸门的话，症状是"菊花转起来、什么都没人发"，
+   * 而那块面板被一个"正在登录"的界面盖着 —— 用户看到的是应用卡住，
+   * 不是"我们还不能替你出门"。
+   */
   const sendLoginLink = async (): Promise<void> => {
+    if (!requireNetworkConsent()) return;
     setPhase({ kind: 'busy', action: 'magic-login' });
     const result = await requestMagicLink(options, email);
     if (!result.ok) return fail(result.reason);
@@ -281,6 +317,7 @@ export function AuthScreen({
   const register = async (): Promise<void> => {
     // 🔴 未勾同意项 → **一个请求都不发**，并说清原因。
     if (!termsAccepted) return failWithKey(AUTH_TERMS_REQUIRED_KEY);
+    if (!requireNetworkConsent()) return;
     setPhase({ kind: 'busy', action: 'magic-register' });
     const result = await registerWithMagicLink(options, { email, termsAccepted: true });
     if (!result.ok) return fail(result.reason);
@@ -293,6 +330,8 @@ export function AuthScreen({
     // 🔴 **先判能力，再发请求。** 反过来的话请求已经出去了，
     //    而 `passkey-unsupported` 的契约是"一个请求都没发"（见 hosted-auth.ts）。
     if (passkeyProvider === undefined) return fail('passkey-unsupported');
+    // 能力之后、闸门之前：这两条本地检查都不该被"要不要联网"这个问题打断。
+    if (!requireNetworkConsent()) return;
     setPhase({ kind: 'busy', action: 'passkey-login' });
     const begun = await beginPasskeyLogin(options, email);
     if (!begun.ok) return fail(begun.reason);
@@ -310,6 +349,7 @@ export function AuthScreen({
   const passkeyRegister = async (): Promise<void> => {
     if (!termsAccepted) return failWithKey(AUTH_TERMS_REQUIRED_KEY);
     if (passkeyProvider === undefined) return fail('passkey-unsupported');
+    if (!requireNetworkConsent()) return;
     setPhase({ kind: 'busy', action: 'passkey-register' });
     const begun = await beginPasskeyRegistration(options, { email, termsAccepted: true });
     if (!begun.ok) return fail(begun.reason);
@@ -326,6 +366,7 @@ export function AuthScreen({
   };
 
   const redeemPasted = async (): Promise<void> => {
+    if (!requireNetworkConsent()) return;
     setPhase({ kind: 'busy', action: 'verify' });
     const outcome = await redeemPastedAuthToken(
       {
@@ -487,6 +528,40 @@ export function AuthScreen({
           {t('mobile.auth.terms.label')}
         </Text>
       </View>
+
+      {/*
+        条款的**落点**。这句"我同意该服务端提供的服务条款与隐私政策"长期没有
+        任何地方能读到那份东西 —— 要求同意一份读不到的文本，PIPL 第 17 条的"公开"
+        就没做到。链接放在勾选行**外面**：整行都是 Checkbox 的触控区，
+        嵌进去会让"我想先读条款"变成"我已经同意了"。
+      */}
+      {legalLinks === null ? null : (
+        <View style={{ flexDirection: 'row', gap: tokens['space.4'] }}>
+          <Pressable
+            accessibilityRole="link"
+            hitSlop={tokens['gesture.hit-slop']}
+            onPress={() => {
+              openLegalLink(legalLinks.terms);
+            }}
+          >
+            <Text variant="caption" tone="primary" style={{ textDecorationLine: 'underline' }}>
+              {t('common.legal.termsDoc')}
+            </Text>
+          </Pressable>
+          <Pressable
+            accessibilityRole="link"
+            hitSlop={tokens['gesture.hit-slop']}
+            onPress={() => {
+              openLegalLink(legalLinks.privacy);
+            }}
+          >
+            <Text variant="caption" tone="primary" style={{ textDecorationLine: 'underline' }}>
+              {t('common.legal.privacyDoc')}
+            </Text>
+          </Pressable>
+        </View>
+      )}
+
       <Text variant="caption" tone="subtle">
         {t('mobile.auth.terms.hint')}
       </Text>

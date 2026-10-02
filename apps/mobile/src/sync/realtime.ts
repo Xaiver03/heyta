@@ -40,6 +40,7 @@ import type { RealtimeClient } from '@heyta/sync-client';
 import { createHostRealtimeClient, type RealtimeWiringOptions } from '@heyta/app-host';
 
 import { readSyncConfig } from './config';
+import { privacyConsent } from '../privacy/consent-gate';
 
 /**
  * 可注入的依赖 —— **测试用假实现，生产调用点一个都不传**。
@@ -57,6 +58,16 @@ export interface RealtimeDeps {
   readConfig: () => SyncConfig | undefined;
   makeClient: (options: RealtimeWiringOptions) => RealtimeClient;
   syncNow: () => Promise<unknown>;
+  /**
+   * 🔴 同意闸门（计划 **G-12**）。默认取进程里那一个闸门实例。
+   *
+   * 为什么把它做成**可注入的依赖**而不是在函数里直接读闸门：
+   * 本文件的既有纪律是"测试用假实现、生产调用点一个都不传"（见上面那段），
+   * 而"没同意时不建连"这条判据必须能在**没有 React、没有原生模块**的
+   * 纯 node 进程里被验证 —— 直接读闸门就等于要求每个跑这条用例的人
+   * 先有一套能打开 op-sqlite 的运行时。
+   */
+  networkAllowed: () => boolean;
 }
 
 /**
@@ -81,6 +92,14 @@ function resolveDeps(over: Partial<RealtimeDeps>): RealtimeDeps {
       }),
     readConfig: over.readConfig ?? readSyncConfig,
     makeClient: over.makeClient ?? createHostRealtimeClient,
+    /**
+     * 默认取**进程里那一道闸**（不是"同意与否的一个影子"）。
+     *
+     * ⚠️ 这里必须是**取值器**而不是快照：闸门会在会话中途被改变
+     * （首启面板点「同意」、设置页「撤回」），传死值的那一份
+     * 在第一次建连之后就再也不反映真实决定了 —— 与下面 `getToken` 同一条理由。
+     */
+    networkAllowed: over.networkAllowed ?? (() => privacyConsent.networkAllowed()),
     syncNow:
       over.syncNow ??
       (async () => {
@@ -122,6 +141,20 @@ export function stopRealtime(): void {
 export async function startRealtime(over: Partial<RealtimeDeps> = {}): Promise<void> {
   const deps = resolveDeps(over);
   stopRealtime();
+
+  /**
+   * 🔴 **没同意就不建连**（计划 **G-12**）。
+   *
+   * 位置在 `stopRealtime()` **之后**是刻意的：这个方法同时也是"撤回之后重建"的
+   * 入口，先停旧的再判闸门，才能保证"调用过一次 startRealtime 之后
+   * 手上没有连接"。放在前面会让撤回时留下一条带着旧令牌的 WebSocket，
+   * 而界面上写着「已撤回」—— 那是两个方向都错的一种写法。
+   *
+   * ⚠️ 这条不是多余的：`WebSocket` **不走** `globalThis.fetch`，
+   * 所以进程级那道 `consentFetch` 挡不住它。移动端没有实时通道的那个洞
+   * 只能在这里补。
+   */
+  if (!deps.networkAllowed()) return;
 
   const config = deps.readConfig();
   const token = config?.token;

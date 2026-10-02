@@ -474,7 +474,7 @@ const zh = [
           '**更正与补充**：✅ 任务、清单、标签、习惯等业务字段你在任一端改一次，就会同步到其他所有端。⚠️ 服务器上那些事件是密文，我们**无法读取、也无法替你改写**其中某一条 —— 只能由你登录后自行修改。❌ **邮箱不可更换**：产品目前没有换绑邮箱的能力，我们如实写这条限制，而不是摆一个点了没反应的入口。',
           '**删除**：✅ 应用内的删除在事件模型里是**追加一条删除事件**，不是抹掉记录。它从你的所有设备与界面上消失，但服务器上承载它的加密历史记录会在**保留期（当前 45 天）届满后**被清理掉。🔴 界面里的"彻底删除"**只是一个标记**，它不缩短这个期限，也不等于"已从服务器销毁"。',
           '**注销账号**：⚠️ 服务端有真正的硬删除能力，但**应用界面里目前没有这个入口**。所以现在的路径是**写信给我们**（`heyta@waytofuture.cn`，从你注册时用的那个邮箱发出，以便我们核验归属），我们在 15 个工作日内完成核查与删除。注销之后仍然存在的副本只有一处：上条那个 14 天的备份窗口。',
-          '**撤回同意**：✅ AI 出境授权、记忆偏好层、推送订阅三处都能撤回，而且关掉之后**下一次调用连输入都不再被读取**（不是只在数据库里标成"已关闭"）。限制：撤回不溯及已经发出的请求。',
+          '**撤回同意**：✅ **联网这件事有它自己的撤回入口** —— 设置页里那一项叫「隐私同意」，点「撤回同意」之后这台设备**立刻**停止对外发出任何请求，**已经建立的实时连接当场关掉**，而且状态清回"没问过"：界面会重新问你一次，不是默默换成"你已经拒绝了"。本地数据一条都不动。此外 AI 出境授权、记忆偏好层、推送订阅三处也各自能撤回，关掉之后**下一次调用连输入都不再被读取**（不是只在数据库里标成"已关闭"）。限制：撤回不溯及已经发出的请求。',
           '**要求解释说明**：✅ 你有权要求我们对这份处理规则作出解释，同样走上面的邮箱。',
         ],
       },
@@ -523,7 +523,7 @@ const zh = [
     blocks: [
       {
         kind: 'p',
-        text: '**同意是怎么记录的。** 注册时勾选的那句话指向**你所连接的那台服务端**提供的条款与政策；我们记下同意时刻，以及**当时那一套文件的版本号**（一个按文档标识排序拼出的整套版本指纹，形如 `privacy@1.0` 与其他几份串在一起）。之所以记"一整套"而不是只记隐私政策的版本：你勾选的是**一组**文件，只记一个版本就没法回答"他同意的服务条款是哪一版"。',
+        text: '**同意是怎么记录的。** 这里有**两笔**记录，把它们写成一句会被读成一句假话，所以分开说。**第一笔：这台设备准不准出门。** 首次启动时应用先弹出一张隐私面板，给两个并排、同等可达的动作 ——「同意并联网」与「只用本机」。这个决定连同作出它的时刻记在**你自己的设备上**，它裁决的是"任何出站请求之前那道闸开不开"；**我们没有它的服务器副本**，因而也说不出它对应哪一版文本 —— 文本由你所连接的那台服务端发布，而它可能是任何人架设的机器。面板右上角那一下写的是「以后再说」，它**不是一次决定**：关掉之后状态仍然是"没问过"，下次冷启动会再问一次。**第二笔：账号上的留痕。** 注册时勾选的那句话指向**你所连接的那台服务端**提供的条款与政策；我们记下同意时刻，以及**当时那一套文件的版本号**（一个按文档标识排序拼出的整套版本指纹，形如 `privacy@1.1` 与其他几份串在一起）—— 只有官方托管实例才有权写这个版本号，自建实例留下的那条记录**只有时间戳**，因为替别人宣告他发布了什么文本没有依据。之所以记"一整套"而不是只记隐私政策的版本：你勾选的是**一组**文件，只记一个版本就没法回答"他同意的服务条款是哪一版"。',
       },
       {
         kind: 'ul',
@@ -531,7 +531,7 @@ const zh = [
           '本政策变更时，我们会在**新版本生效之前**通知（应用内与服务端对外页同步更新），并写明改了哪几处。',
           '🔴 **变更不溯及你已经购买的期间。** 你已付款的订阅期限内，服务与价格规则仍按你购买时那一版执行。',
           '处理的**目的、方式或种类发生变化**时，重新取得同意是法定要求（第十四条第三款、第十七条第二款），不能靠"更新一下版本号"糊过去 —— 新增一类采集、或把某个默认采集项从关改成开，都必须有一次**独立的重新提示**，而不是随版本静默发布。',
-          '**同意默认是未勾选的**，所有与隐私相关的开关出厂全部关闭：AI 总开关、允许远程、逐功能出境授权、记忆偏好层、本机接口以及其中**每一个工具**。而且这条"默认关"在读取时被严格判定 —— 只认真值 true，字符串、数字 1、字段缺失一律按关闭处理，存储被改坏也不会悄悄打开。',
+          '**默认没有"同意"这回事**：首次启动时那道联网闸门是关着的，在你作出明确决定之前**一个请求都不发** —— 自动与手动同步、注册与登录、通知未读数的拉取、实时连接、离线缓存（Service Worker）的注册，全部排在它后面。其余与隐私相关的开关也出厂全部关闭：AI 总开关、允许远程、逐功能出境授权、记忆偏好层、本机接口以及其中**每一个工具**。而且这些"默认关"在读取时被严格判定：联网那一侧只认「同意并联网」与「只用本机」两个合法取值，读不到、存的是表外值、存储整个不可用，一律按"没同意"处理；开关那一侧只认真值 true，字符串、数字 1、字段缺失一律按关闭处理 —— 存储被改坏也不会悄悄打开。',
           '这份政策有版本号（见上方元信息与第 14 条），它**进同意记录**，所以改版必须 bump 版本，而小节标识符不许改（它们是深链接的落点）。',
         ],
       },
@@ -578,6 +578,10 @@ const zh = [
           [
             '1.0',
             '`2026-10-01` 首次起草。全文依据三份代码考古（服务端数据流 / 客户端与权限 / AI 出境与权利实现）写成，逐条对照《认定方法》六大类与第十七条的四项必备内容。**状态：草案，尚未经法务复核、尚未生效** —— 页面顶部会显示"尚未生效"横幅，本文中的时限（15 个工作日）、保留期（45 天 / 14 天）与各项承诺在产品负责人核定、法务复核之前仍可能改写。',
+          ],
+          [
+            '1.1',
+            '`2026-10-02` 改的原因不是措辞，是**代码变了**：首启隐私面板与出站请求闸门已经落地。第 10 条补上"联网同意"这一项自己的撤回入口与它撤回时**实际发生的事**（立刻停止出站请求、当场关掉实时连接、状态清回"没问过"并重新询问，本地数据不动）；第 12 条把"同意是怎么记录的"拆成**两笔** —— 面板上那个决定只记在你的设备上、没有服务器副本因而我们无法为它命名文本版本，带整套版本指纹的那笔留痕来自注册时的勾选且只有官方实例写得出来；"默认关"那一条改成"默认没有同意这回事"，并列明决定之前一个请求都不发。**状态：仍是草案，尚未经法务复核、尚未生效。**',
           ],
         ],
       },
@@ -985,7 +989,7 @@ const en = [
           '**Correction and completion**: ✅ business fields — tasks, lists, labels, habits — are changed once on any end and propagate to every other end. ⚠️ The events on our server are ciphertext: we **cannot read them and cannot rewrite one of them for you**; only you, once signed in, can. ❌ **The email address cannot be changed**: the product has no re-binding capability today, and we state the limitation plainly rather than mounting a control that does nothing when pressed.',
           '**Deletion**: ✅ deleting inside the app is, in the event model, **appending a delete event**, not erasing a record. The item disappears from all your devices and from every interface, while the encrypted history carrying it on our server is cleared **once the retention period (currently 45 days) has run out**. 🔴 The “delete permanently” affordance in the interface **is only a marker**: it neither shortens that period nor means “destroyed on the server”.',
           '**Account closure**: ⚠️ the server does have a genuine hard-delete capability, but **there is currently no entry point for it in the app interface**. The path today is therefore **to write to us** (`heyta@waytofuture.cn`, sent from the address you registered with, so that we can verify ownership), and we complete verification, deletion and our reply within 15 working days. Exactly one copy can still exist afterwards: the 14-day backup window described in section 7.',
-          '**Withdrawal of consent**: ✅ the AI egress consent, the memory preference layer and push subscriptions can all be withdrawn, and after you turn one off **the next call does not even read the input** (this is not a row quietly flagged as “off” while the behaviour continues). Limitation: withdrawal is not retroactive to requests already sent.',
+          '**Withdrawal of consent**: ✅ **going online has its own entry point** — the item in Settings is named “Privacy consent”, and pressing “Withdraw consent” makes this device stop sending any outbound request **immediately**, **closes the live sync connection on the spot**, and resets the state to “never asked”: the app asks you again rather than quietly filing your choice as “you declined”. Not one byte of local data moves. Beyond that, the AI egress consent, the memory preference layer and push subscriptions can each be withdrawn as well, and after you turn one off **the next call does not even read the input** (this is not a row quietly flagged as “off” while the behaviour continues). Limitation: withdrawal is not retroactive to requests already sent.',
           '**Requesting an explanation**: ✅ you may ask us to explain these rules of processing, through the same email address.',
         ],
       },
@@ -1034,7 +1038,7 @@ const en = [
     blocks: [
       {
         kind: 'p',
-        text: '**How consent is recorded.** The statement you tick at sign-up refers to the terms and policies offered by **the server you are connected to**; we record the moment of consent together with **the version numbers of the whole document set as it stood then** — a fingerprint built by sorting the document identifiers and concatenating their versions, which looks like `privacy@1.0` joined with the others. The reason for recording the set rather than the privacy policy alone: what you ticked is a **group** of documents, and a single version number can never answer “which version of the terms of service did this person agree to”.',
+        text: '**How consent is recorded.** There are **two records** here, and folding them into one smooth sentence would read as a false one, so they are stated separately. **The first: whether this device is allowed online.** On first launch the app shows a privacy panel carrying two side-by-side, equally reachable actions — “Agree and connect” and “This device only”. That decision, together with the moment it was made, is stored **on your own device**, and what it governs is whether the gate standing in front of every outbound request is open. **We hold no server-side copy of it**, so we cannot name the version of the text it corresponds to: the documents are published by the server you are connected to, and that may be a machine anyone operates. The control in the corner of the panel reads “Decide later”, and it is **not a decision** — after you close the panel the state is still “never asked”, and a later cold start asks again. **The second: the record attached to your account.** The statement you tick at sign-up refers to the terms and policies offered by **the server you are connected to**; we record the moment of consent together with **the version numbers of the whole document set as it stood then** — a fingerprint built by sorting the document identifiers and concatenating their versions, which looks like `privacy@1.1` joined with the others. Only the officially hosted instance may write that fingerprint, and a self-hosted one records **the timestamp alone**, because declaring on someone else’s behalf which text they published has no basis. The reason for recording the set rather than the privacy policy alone: what you ticked is a **group** of documents, and a single version number can never answer “which version of the terms of service did this person agree to”.',
       },
       {
         kind: 'ul',
@@ -1042,7 +1046,7 @@ const en = [
           'When this policy changes, we notify you **before the new version takes effect** (the app and the server’s outward pages are updated together), and we state which clauses changed.',
           '🔴 **Changes are not retroactive to a period you have already paid for.** For the duration of a subscription you have paid for, the service and pricing rules continue to be those of the version in force when you bought it.',
           'Where the **purpose, method or categories** of processing change, obtaining consent again is a statutory requirement (Article 14(3) and Article 17(2)); it cannot be papered over by “bumping a version number”. Adding a category of collection, or moving a default from off to on, requires a **separate, explicit prompt** — not a silent release with a version.',
-          '**Consent is unticked by default** and every privacy-relevant switch ships off: the AI master switch, allow-remote, the per-feature egress consent, the memory preference layer, the local API surface, and **each individual tool** inside it. That default-off is also enforced strictly on read — only a genuine boolean true counts; a string, the number 1, or a missing field is treated as off, so a corrupted row cannot quietly switch something on.',
+          '**There is no such thing as consent by default**: the online gate is closed on first launch and **not one request is sent** until you make an explicit decision — automatic and manual sync, sign-up and sign-in, fetching unread notification counts, the realtime connection and registering the offline cache (Service Worker) all sit behind it. Every other privacy-relevant switch also ships off: the AI master switch, allow-remote, the per-feature egress consent, the memory preference layer, the local API surface, and **each individual tool** inside it. And these defaults are enforced strictly on read: on the online side only the two legal values — “Agree and connect” and “This device only” — count, while an unreadable value, an out-of-vocabulary value, or a storage backend that is unavailable altogether is treated as “not agreed”; on the switch side only a genuine boolean true counts, while a string, the number 1, or a missing field is treated as off. A corrupted store cannot quietly switch anything on.',
           'This policy carries a version number (see the metadata above and section 14), and that number **enters the consent record**; a revision must therefore bump it, while section identifiers may not change, because they are deep-link targets.',
         ],
       },
@@ -1090,6 +1094,10 @@ const en = [
             '1.0',
             '`2026-10-01` First draft. Written clause by clause from three code archaeology reports (server data flow / clients and permissions / AI egress and rights as implemented), checked against all six categories of the Method and against the four mandatory elements of Article 17. **Status: draft — not yet reviewed by counsel, not yet in effect**; the page shows a “not yet in effect” banner, and the time limits (15 working days), retention periods (45 days / 14 days) and every other undertaking in this text may still be rewritten before sign-off by the product owner and legal review.',
           ],
+          [
+            '1.1',
+            '`2026-10-02` The reason for this revision is not wording — **the code changed**: the first-launch privacy panel and the gate in front of outbound requests have landed. Section 10 now names the withdrawal entry point that belongs to the online decision itself and states **what actually happens** when you use it (outbound requests stop at once, the live sync connection is closed on the spot, the state resets to “never asked” and the app asks again, local data untouched). Section 12 splits “how consent is recorded” into **two records** — the panel decision lives only on your device, and because we hold no copy of it we cannot name a text version for it, while the fingerprint of the whole document set comes from the sign-up tick and only an officially hosted instance may write it. The “default off” clause became “there is no such thing as consent by default”, listing that not one request is sent before you decide. **Status: still a draft — not yet reviewed by counsel, not yet in effect.**',
+          ],
         ],
       },
     ],
@@ -1098,9 +1106,9 @@ const en = [
 
 export const privacy: LegalDocument = {
   id: 'privacy',
-  version: '1.0',
+  version: '1.1',
   status: 'draft',
-  updatedDate: '2026-10-01',
+  updatedDate: '2026-10-02',
   title: {
     'zh-CN': '隐私政策',
     en: 'Privacy Policy',

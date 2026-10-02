@@ -2725,6 +2725,61 @@ spec，且报错里出现 `ECONNREFUSED <本机端口>` 或 `.playwright-artifac
     **是谁的构建**（chunk 名 + 服务器 mtime + 归一化 hash，见第 99 条）。
     只做第一层会把别人的一次重发读成"我发的还在"，只做第二层会把"内容早就错了"读成"部署没问题"。
 
+103. 🔴 **把一次副作用从入口顶层推迟到异步链之后，会让它挂在 `load` 上的监听永远不触发 ——
+    生产构建里 service worker 从此不再注册，而且零报错。**
+
+    链 5（首启隐私同意闸门）要求"注册 SW 必须在同意之后"，于是
+    `registerWidgetServiceWorker()` 从 `main.tsx` 顶层搬进了 `startupNetwork.arm()`，
+    而 `arm()` 跑在 `await initOpLog()` **之后** —— 实测那一刻
+    `document.readyState` 已经是 `'complete'`（`load` 早就放完了）。
+    `apps/web/src/pwa/register.ts` 的实现是 `window.addEventListener('load', …)`，
+    于是**监听器挂在一个已经发生过的事件上**：
+
+    | 观测面 | 结果 |
+    |---|---|
+    | `navigator.serviceWorker.getRegistration()` | 恒为 `null` |
+    | 控制台 | **什么都没有**（`register()` 从没被调用，连那句 `console.warn` 都不会响）|
+    | `pnpm -r test`（含 86 条相关单测）| **全绿** —— jsdom 没有 SW，而 dev 构建走 `!PROD` 早退 |
+    | Windows 小组件链（`check:widgets` 的宿主入口）| 静默失效 |
+
+    ✅ 修法不是"把注册搬回顶层"（那正是闸门要拦的事），而是**让注册对调用时刻免疫**：
+    `readyState === 'complete'` 就当场注册，否则才挂 `load`（`{ once: true }`）。
+
+    ✅ 判据补了两层，缺一层都会再漏一次：
+    - `apps/web/tests/pwa-register-readystate.spec.ts`（jsdom，4 条，跑在 `pnpm -r test` 里）
+      —— 钉住"complete 时当场注册 / loading 时仍等 load / `?slice=` 与 dev 两条早退"。
+      三臂变异实测各红一条（改回只挂 `load` ⇒ 第 1 条红；拿掉 `slice` 早退 ⇒ 第 3 条红；
+      拿掉 `PROD` 早退 ⇒ 第 4 条红）。
+    - `e2e/tests/privacy-consent-zero-egress.spec.ts`（**生产构建** + Chromium）——
+      它在修之前**就是红的**（两条正向对照臂报 `Received string: "NONE"`），修之后 7/7。
+
+    📌 一般规律：**改变一段代码的执行时刻，就等于改变它对外部事件的假设。**
+    凡是"挂在某个一次性事件上"的调用被搬到异步链之后，必须当场问一句
+    "那个事件有没有可能已经放完了"。而这一条的根因判据只能来自真浏览器 ——
+    jsdom 里那句"同意之前零出站"是真的，但它**测不到宿主**（第 46 条"没复现 ≠ 路径没执行"的反面：
+    **在假环境里执行过的路径，也不等于在真环境里执行过**）。
+
+104. 🔴 **Chromium 取 service worker 脚本不经过页面的请求流 ——
+    拿 `page.on('request')` 去数 `/sw.js` 得到的是一条恒假断言。**
+
+    写"同意前零出站"的反向判据时，按 §7 元规则 2 必须配一条"同一个量在同意之后不为零"的
+    正向对照。最自然的写法是"清单里出现 `/sw.js`"，而它**永远不可能成立**：
+    实测注册成功（`getRegistration().active` 有值、`scope` 正确）的那一次运行里，
+    `page.on('request')` 一条 `/sw.js` 都没收到 —— service worker 脚本由**浏览器**取回，
+    不在页面的网络管线里（不是 SW 拦截造成的：`sw-core.ts` 根本没有 `fetch` 处理器）。
+
+    症状差别很关键：恒真的判据会让"零"变得没意义而**看不出来**，
+    恒假的判据会**一直红** —— 而红久了的下一条断言往往被删掉，
+    删掉的恰好是唯一那条能证明探针在工作的。
+
+    ✅ 改法：正向对照换成 `getRegistration()`（`NONE` → 匹配 `/installing|waiting|active/`），
+    另外把"请求分类器"本身做成一条**探针自检** —— 由页面**主动**
+    `fetch('/sw.js', {method:'HEAD'})` 与 `fetch('/api/consent-probe')`，
+    断言分类器数得出这两类，于是前面那些"清单为空"只可能是"没发"而不是"看不见"。
+
+    📌 一般规律：**"必须不为零"的那一侧，要先确认这个量在当前观测面上真的可见。**
+    对照臂的价值取决于它测得到；测不到的对照比没有对照更糟，因为它会教人删判据。
+
 105. 🔴 **探针指着"从来不含那个值的载体"，得到的 0 会被读成结论 —— 以及"还原"同样要按内容验收。**
 
     链 3 在生产上收尾（G-32 的 L4）那天，两个"0 命中"都不是结论，而它们的症状与

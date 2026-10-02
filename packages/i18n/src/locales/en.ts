@@ -22,6 +22,16 @@ export const en = {
   'common.a11y.toDarkTheme': 'Switch to dark theme',
 
   /**
+   * Names of the two published documents - the links beside the sign-up consent
+   * checkbox. Not reused from `site.footer.legal.*` on purpose: those are projected
+   * out of `@heyta/legal` by `gen-site-copy.mjs` and pinned verbatim by
+   * `check:legal-copy`, so consuming them in the app would make the app UI depend
+   * on a site build projection.
+   */
+  'common.legal.termsDoc': 'Terms of Service',
+  'common.legal.privacyDoc': 'Privacy Policy',
+
+  /**
    * Language **endonyms** — deliberately the SAME word in both catalogs.
    *
    * The switcher shows each language in its own script, because the user who
@@ -51,6 +61,53 @@ export const en = {
   // Without the second one the first reaction is "did I lose my data?", and people
   // respond to that by wiping the local store.
   'common.sync.error.unauthorized': 'This device’s sign-in credential is no longer valid (you may have signed out on another device, or changed your password), so syncing stopped — your local data is intact and still readable; it will continue syncing once you sign in again',
+  // reason === 'consent-required': no consent yet, so not a single request was sent.
+  // Do not fold this into "not configured" or "offline": those tell the user to fill in
+  // an address or check the network, while the only useful action here is to decide.
+  'common.sync.error.consentRequired': 'You have not agreed to the privacy terms yet, so heyta will not send any request to a server - syncing starts once you choose in settings',
+
+  // ── Privacy consent (first-launch panel + settings) ───────
+  // Shared by both shells on purpose, for the same reason as the sync errors above:
+  // one legal decision must not end up with two different sentences to defend.
+  //
+  // Wording rule: no filler ("for a better experience") and no bare list of things we
+  // "collect". Each sentence answers what leaves the device, to whom, and what you lose
+  // by declining - that is the minimum "fully informed" requires, not a style choice.
+  'common.privacy.consent.title': 'Before any network feature runs',
+  'common.privacy.consent.intro': 'heyta is local-first: your tasks, lists, notes and history are written to this device first. This choice decides one thing only - whether this device may talk to a server.',
+  'common.privacy.consent.localOnlyGuarantee': 'With "This device only", everything still works: creating, editing, calendar, quadrants, focus timer, habits and export. Nothing is synced, no account is used, and no notifications are delivered.',
+  'common.privacy.consent.acceptedGuarantee': 'With "Agree and connect", this device may talk to the server you configured - and it sends only end-to-end encrypted data plus sync cursors, so the server never sees your plaintext.',
+  'common.privacy.consent.termsLink': 'Terms of Service',
+  'common.privacy.consent.privacyLink': 'Privacy Policy',
+  'common.privacy.consent.readFirst': 'Read the full text before deciding:',
+  // Why the panel came back. The two reasons carry different information and must not
+  // collapse into one sentence: "you just pressed a network feature" vs "you just
+  // withdrew". Without it the panel reads like an ad that pops up on every click.
+  'common.privacy.consent.whyRequiredForAction': 'That step needs to talk to the server, and the privacy terms have not been agreed to - so heyta sent nothing.',
+  'common.privacy.consent.whyRevoked': 'Consent withdrawn. This device will not send any request now, including the live sync connection it had opened.',
+  'common.privacy.consent.accept': 'Agree and connect',
+  'common.privacy.consent.localOnly': 'This device only',
+  // The name of the dismiss affordance in the corner of the sheet. It must not read as
+  // a decision: closing the sheet leaves the gate shut and asks again next launch.
+  'common.privacy.consent.close': 'Decide later',
+  // This one has to be reachable in the UI: localStorage can fail silently in private
+  // mode, and "I agreed but it asked me again" reads as a lie unless we say it.
+  'common.privacy.consent.notPersisted': 'This device cannot store the choice, so it applies to this session only and will be asked again next launch.',
+  // When the choice could not be persisted the panel stays open - the warning has to
+  // land on the surface the user is actually looking at. So it needs an explicit exit
+  // instead of making them press "Agree and connect" a second time.
+  'common.privacy.consent.acknowledge': 'Got it, continue',
+
+  // The entry point in settings - Article 15 of PIPL asks for a *convenient* way to
+  // withdraw consent, and an entry nobody can find or read is not convenient.
+  'common.privacy.settings.title': 'Privacy consent',
+  'common.privacy.settings.accepted': 'You allowed this device to talk to the server',
+  'common.privacy.settings.localOnly': 'This device only (network not agreed to)',
+  'common.privacy.settings.undecided': 'You have not chosen yet',
+  'common.privacy.settings.decidedAt': 'Decided on {time}',
+  'common.privacy.settings.revoke': 'Withdraw consent',
+  'common.privacy.settings.revokeHint': 'Withdrawing stops every outbound request from this device immediately (including the live sync connection) and asks you again. Your local data is unaffected.',
+  'common.privacy.settings.chooseAgain': 'Choose again',
 
   // ── Landing · generic ─────────────────────────────────────
   'landing.skipLink': 'Skip to main content',
@@ -560,6 +617,7 @@ export const en = {
   'common.auth.error.unauthorized': 'That link is invalid or has expired. Send yourself a new one.',
   'common.auth.error.rateLimited': 'Too many requests - try again in a little while.',
   'common.auth.error.network': 'Could not reach the server. Check the URL and your connection.',
+  'common.auth.error.consentRequired': 'You have not agreed to the privacy terms yet, so nothing was sent. Choose an option in the panel that just opened.',
   'common.auth.error.server': 'The server is unavailable right now - try again later.',
   'common.auth.error.unknown': 'Signing in did not complete - try again.',
   // ── The email + password path (ADR-0040): failure sentences ──
@@ -1167,42 +1225,6 @@ export const en = {
   'web.gantt.durationManual': 'About {duration}',
   'web.gantt.dependsOn': 'Depends on: {title}',
   'web.gantt.overlap': 'Overlaps its dependency',
-
-  // ── Web · Timeline board (2026-10-01 rework, goal: docs/plans/goal-timeline-rework.md) ──
-  // One shared axis, one row per task, three-state fallback (bar / diamond / unscheduled lane).
-  // Keys mirror zh-CN 1:1 (the i18n gate fails on drift).
-  'web.board.weekday.1': 'Mon',
-  'web.board.weekday.2': 'Tue',
-  'web.board.weekday.3': 'Wed',
-  'web.board.weekday.4': 'Thu',
-  'web.board.weekday.5': 'Fri',
-  'web.board.weekday.6': 'Sat',
-  'web.board.weekday.7': 'Sun',
-  'web.board.month.1': 'Jan',
-  'web.board.month.2': 'Feb',
-  'web.board.month.3': 'Mar',
-  'web.board.month.4': 'Apr',
-  'web.board.month.5': 'May',
-  'web.board.month.6': 'Jun',
-  'web.board.month.7': 'Jul',
-  'web.board.month.8': 'Aug',
-  'web.board.month.9': 'Sep',
-  'web.board.month.10': 'Oct',
-  'web.board.month.11': 'Nov',
-  'web.board.month.12': 'Dec',
-  'web.board.today': 'Today',
-  // The named lane (R4 criterion 5): unscheduled tasks stay visible, never drawn as bars.
-  'web.board.unscheduledLane': 'Unscheduled ({count})',
-  // Row-header estimate badge: text only, never a length (R4 criterion 3).
-  'web.board.aiBadge': 'AI est. {duration}',
-  // Overdue is text + warning color, never color alone (WCAG 1.4.1).
-  'web.board.overdue': 'Overdue',
-  // Detail-preview caption: the task-internal coordinate system MUST be disclosed
-  // (goal §2.1) — otherwise users will line it up against the board axis.
-  'web.board.planCaption': 'Internal checklist plan of this task (order and estimates) — not the same coordinate system as the timeline board.',
-  // Default title for "click empty space to create" (goal §3.2, gesture 4):
-  // data coming from the product, so it still goes through the locale table.
-  'web.board.untitledTask': 'Untitled task',
 
   // ═══════════════════════════════════════════════════════════
   // Web · AI (breakdown / capture / duration / prioritize / settings / memory)
@@ -2187,6 +2209,10 @@ export const en = {
   'mobile.auth.email.placeholder': 'Your email address',
   'mobile.auth.terms.label': 'I accept the terms of service and privacy policy offered by this server',
   'mobile.auth.terms.hint': 'You have to check this yourself - we will not accept on your behalf.',
+  // Spoken when a terms link **cannot be opened**. Having no app able to show a web page
+  // really happens (headless Linux, browser-less test images), and "nothing happened when I
+  // tapped" is the kind of breakage most easily mistaken for a frozen interface.
+  'mobile.auth.link.unopenable': 'This device cannot open a web page, so the terms could not be shown.',
   // 🔴 The password path is the **primary** route, listed above "another way".
   //    Neither label may read "signed up" / "signed in": a tap only **sends the request**;
   //    the outcome is spoken by the status line above the fields.
@@ -3249,6 +3275,13 @@ export const en = {
   'web.admin.user.passkeys': 'Passkeys',
   'web.admin.user.operations': 'Operations',
   'web.admin.user.failedLogins': 'Failed logins',
+  // Consent record: the published terms promise that we keep the version fingerprint of
+  // the whole document set, so the console has to be able to say it out loud.
+  'web.admin.user.consent': 'Consent record',
+  'web.admin.user.consentNone': 'No consent recorded',
+  // 🔴 一行一条是**硬形状**（`scripts/check-ui-language.mjs` 按行解析，且
+  // "看起来像词条的行数"必须等于解析出的条数）。折行不会报错，只会让整道门禁红。
+  'web.admin.user.consentNoVersion': 'Version not provable (legacy account, or this instance publishes the operator’s own text)',
   'web.admin.user.subscriptions': 'Subscriptions',
   'web.admin.user.orders': 'Orders',
   'web.admin.user.none': 'None',

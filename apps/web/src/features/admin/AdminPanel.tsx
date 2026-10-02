@@ -1,3 +1,4 @@
+import { ICON_SIZE } from '@heyta/design-system';
 /**
  * 管理后台面板（web）。
  * =====================
@@ -162,8 +163,8 @@ export function AdminPanel(): React.JSX.Element | null {
 
   return (
     <div className="ht-settings__section" data-testid="admin-panel">
-      <h3 className="ht-settings__h3">
-        <ShieldCheck size={14} aria-hidden="true" /> {t('web.admin.title')}
+      <h3 className="ht-settings__h3 ht-type-headline">
+        <ShieldCheck size={ICON_SIZE.xs} aria-hidden="true" /> {t('web.admin.title')}
       </h3>
       <p className="ht-settings__hint">{t('web.admin.lead')}</p>
 
@@ -193,7 +194,7 @@ export function AdminPanel(): React.JSX.Element | null {
             void store.loadUsers({ offset: 0 });
           }}
         >
-          <RefreshCw size={13} aria-hidden="true" />
+          <RefreshCw size={ICON_SIZE.xs} aria-hidden="true" />
         </button>
       </div>
 
@@ -241,7 +242,7 @@ export function AdminPanel(): React.JSX.Element | null {
       {tab === 'users' && (
         <>
           <form className="ht-settings__admin-search" onSubmit={submitSearch}>
-            <Search size={13} aria-hidden="true" />
+            <Search size={ICON_SIZE.xs} aria-hidden="true" />
             <input
               className="ht-settings__admin-input"
               type="search"
@@ -325,6 +326,18 @@ export function AdminPanel(): React.JSX.Element | null {
                 {t('web.admin.user.passkeys')}: {detail.counts.passkeys} ·{' '}
                 {t('web.admin.user.operations')}: {detail.counts.operations} ·{' '}
                 {t('web.admin.user.devices')}: {detail.devices.length}
+              </p>
+              {/* 同意留痕：对外文本已经承诺"记下当时那一套的版本指纹"，
+                  所以后台必须能一眼答出"什么时候、哪一版"，并把"证明不了版本"
+                  与"根本没同意"分成两种显示 —— 混在一起就是让运营者替数据库说谎。 */}
+              <p className="ht-settings__hint" data-testid="admin-user-consent">
+                {t('web.admin.user.consent')}:{' '}
+                {detail.user.termsAcceptedAt === null
+                  ? t('web.admin.user.consentNone')
+                  : `${formatTime(detail.user.termsAcceptedAt)} · ${
+                      detail.user.termsDocumentVersion ??
+                      t('web.admin.user.consentNoVersion')
+                    }`}
               </p>
 
               {store.actionNotice !== null && (
@@ -601,7 +614,7 @@ function Pager(props: {
         disabled={props.offset === 0}
         onClick={props.onPrev}
       >
-        <ChevronLeft size={13} aria-hidden="true" /> {t('web.admin.prev')}
+        <ChevronLeft size={ICON_SIZE.xs} aria-hidden="true" /> {t('web.admin.prev')}
       </button>
       <button
         type="button"
@@ -609,7 +622,7 @@ function Pager(props: {
         disabled={props.offset + ADMIN_PAGE_SIZE >= props.total}
         onClick={props.onNext}
       >
-        {t('web.admin.next')} <ChevronRight size={13} aria-hidden="true" />
+        {t('web.admin.next')} <ChevronRight size={ICON_SIZE.xs} aria-hidden="true" />
       </button>
     </div>
   );

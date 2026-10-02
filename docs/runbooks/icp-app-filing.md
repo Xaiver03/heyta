@@ -14,10 +14,42 @@
 | 平台 | 包名 | 平台公钥 | 签名指纹 | 状态 |
 |---|---|---|---|---|
 | 鸿蒙 | ✅ `com.heyta.app`（AGC 已注册） | ✅ 已取（AGC 备案信息弹窗三源一致） | ✅ SHA-1 已取 | ✅ 取值齐备，待填表 |
-| 安卓 | 未开始 | — | — | 未开始 |
-| 苹果 | 未开始 | — | — | 未开始 |
+| 安卓 | ✅ `com.heyta`（`apps/mobile/android/app/build.gradle:136` 的 `applicationId`） | ✅ 已取（10 进制模数，由**已签名的产物**算出，双工具一致） | ✅ 证书 **MD5** 已取，并由 `apksigner` 第四工具复核 | ✅ 取值齐备并已入库，见 `docs/operations/icp-app-filing.md` §2.2 |
+| 苹果 | ✅ `com.heyta`（Xcode 工程与 ASC App 记录两侧一致） | ✅ 已取（RSA-2048 模数，**四源**逐字一致） | ✅ SHA-1 已取（四源一致） | ✅ 取值齐备，待填表（见下面「苹果备案取值」） |
 
-### 腾讯云备案草稿状态（2026-09-30 更新）
+🔴 **逐字取值不在本文，本文只写"怎么取"和"取到什么形态"**：
+两个平台的最终值在
+[`docs/operations/icp-app-filing.md`](../operations/icp-app-filing.md) §2（那一份是**这一次填报的记录**，
+已按它把表单填到预览页并逐项核对过），重算入口是
+[`scripts/icp-app-filing-values.mjs`](../../scripts/icp-app-filing-values.mjs) —— 它从**证书本身**算，
+故意用 Node `crypto` 与 `openssl` 两套独立实现比对，不一致就拒绝输出。
+**两份实现 = 下一次漂移**，所以这里不抄一遍。
+
+> ⚠️ **本节曾经错过，而且错法值得记下来**：2026-10-01 本轮一度把安卓写成"❌ 未取，卡在 keystore 口令"。
+> 实情是安卓取值**根本不需要口令** —— 那个脚本从**已签名的产物**里取证书
+> （好处正是"拿到的就是真打进包里的那张"，而不是密钥库里"应该是它"的那张）。
+> 我当时只读了 runbook，没读 `docs/operations/` 那份填报单，也没读脚本文件头 ——
+> **"我以为要用的取法"不是"项目里实际的取法"**，这是 §7 第 46 条（没复现 ≠ 路径没执行）的又一副面孔。
+
+### 🔴 办什么、不办什么（2026-10-01 产品负责人裁决）
+
+| 项 | 办不办 | 依据 |
+|---|---|---|
+| **ICP 备案**（网站，经接入商=腾讯云） | ✅ 办 | 《互联网信息服务管理办法》第四条：**非经营性实行备案制度** |
+| **App 备案**（工信部，本文的主体） | ✅ 办 | 2023-09 起 App 纳入备案范围；Apple 中国区提审必填 |
+| **ICP 经营许可证**（增值电信业务经营许可证，B25 信息服务） | ❌ **不办** | heyta 是**自营软件服务**：卖的是自己产品的功能额度，不采集/不加工/不向用户提供"信息"，服务端因 E2EE 看不到内容 ⇒ 不落在第三条"有偿提供**信息**"的经营性定义里。逐条依据见 [`legal-filing-prerequisites.md`](../research/legal-filing-prerequisites.md) §5 |
+
+⚠️ **"付费 App 基本都需要 ICP 许可证"是代办机构与知乎的说法，不是法规。**
+它流传很广，因为它对代办有商业价值。两个可核对的事实：
+
+1. 《电信业务经营许可管理办法》**第六条**只有四项条件（注册资本 100 万/1000 万、可研报告与技术方案、
+   必要的场地设施、三年内无重大违法），**全文没有"3 名员工近 1 个月社保"** —— 那句话是窗口话术。
+2. 同品类、同样收订阅费的滴答清单中国版页脚公示的是「浙ICP备12005180号-3」，
+   **未公示增值电信业务经营许可证号**（2026-10-01 抓取，需人工复核）。
+
+**什么时候要回来重判**（任一命中即本节作废）：托管 AI 并对用户收费 / 任何内容面向多用户分发
+（公开清单、模板市场、分享广场、社区）/ 加广告 / 卖信息服务性质的内容订阅。
+
 
 - 订单 `30179057320250614`（新增服务，2026-09-28 建），主体=晓黎（杭州）人工智能科技有限公司（浙ICP备2026081423号，与华为账号主体一致 ✅）。
 - 草稿里已有：主体信息（完整）、APP「heyta」服务信息、**安卓平台**（`com.heyta`，域名 `heyta.waytofuture.cn`）、**苹果平台**（同域名）、负责人材料。
@@ -56,6 +88,68 @@
 
 备案四步（腾讯云把一条备案拆成）：① 前置事实核查 → ② 特征信息取值 → ③ 填表 → ④ 人工环节（视频核身等，只能本人）→ ⑤ 预览与提交。
 **绝不自动点「提交初审」** —— 必须用户看完核对结论后明确确认（Skill 硬闸门）。
+
+### ✅ 苹果备案取值（终版，2026-10-01 实测，四源逐字一致）
+
+**四源**：① 本机登录钥匙串里那张 `Apple Distribution`（2026-09-28 由 `icp-app-filing-values.mjs` 算，
+脚本内部就是 Node `crypto` ⟷ `openssl` 双实现比对）；② **ASC 公开 API** 返回的证书 DER
+（2026-10-01 另一次独立取数，与钥匙串不是同一条路）；③ `openssl x509 -inform DER`；④ Node `crypto`。
+两两逐字一致才录入此处。
+
+| 备案字段 | 值 |
+|---|---|
+| Bundle ID（「App包名」栏） | `com.heyta` |
+| 平台公钥（**16 进制**模数，RSA-2048 ⇒ 512 个 hex 字符） | `9614645280AE2E2D80275688420BCA34C67C7CC2C4606DA354EE68BCF92209F3B61E3171D14B5BBD52D83A6E888C137F2E4AB1E2C496F3E00FB94E713F44439EB5DDA6C61211E71C3BF17B683D12AFC2630F0BC51FF63B370501CB96F1E3AA454632DEF25B4B6CF03C98E58606EEA223D085165ADC0CD0430905366EE30B8BEA9AB9AFC306B14A84CAE0C22328F4E7576A16A5C593D42E7A600BA38CA41C60629403B3B8D9B8C289C72ADD2B692F21C716D48579B133C5839FC871C1F44767EA95F4CBABC58146172393555075F1F271D384A24BA9AAE12060A28D1F1CDA4F625F4B3F190C9E9601DB78BB5F28E185DE7BA7FA9BB40EB92D5662A6B5E391449B` |
+| 「签名MD5值」栏（🔴 = 证书 **SHA-1**，40 位，去冒号） | `79515208578A810F82C89E5A3D482437DC2DEF26` |
+| 叶证书 SHA-256（备查，**不填**） | `7099EA74582EA00B1CB6E5787E627672E7AB7A0D2C3712D35761C3CEC2D25472` |
+| 叶证书 MD5（备查 —— **苹果这一栏不用 MD5**） | `9DE3FE22168A8CFE1BFF97D4EB1EBB6D` |
+
+证书身份（公开值；ASC API 与 `openssl x509` 各读一遍一致）：
+
+| 项 | 值 |
+|---|---|
+| ASC 证书 id | `2R8LJZ6Q36` |
+| 类型 | `DISTRIBUTION` —— ⚠️ **不是** `IOS_DISTRIBUTION`（后者是 `asc certificates list --certificate-type` 的 help 示例给的错枚举，传进去返回**空列表且不报错**） |
+| serial | `7CD110C232AF96CC58960AF93B593240` |
+| subject | `UID=V5S2LT9YV8, CN=Apple Distribution: Xiaoli Creativity Culture Industry Development (beijing) Co., Ltd. (V5S2LT9YV8), OU=V5S2LT9YV8, O=…, C=US` |
+| issuer | `Apple Worldwide Developer Relations Certification Authority, OU=G3, O=Apple Inc.` |
+| 有效期 | 2026-06-19 06:25:29 GMT → **2027-06-19 06:25:28 GMT** |
+
+复算命令（ASC ⟶ DER ⟶ 双工具，全程只碰公开值）：
+
+```bash
+asc certificates view --id 2R8LJZ6Q36 --output json \
+  | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>process.stdout.write(
+      Buffer.from(JSON.parse(s).data.attributes.certificateContent,"base64")))' > /tmp/apple-dist.der
+openssl x509 -inform DER -in /tmp/apple-dist.der -noout -fingerprint -sha1 -serial -subject -dates
+openssl x509 -inform DER -in /tmp/apple-dist.der -noout -modulus | sed 's/^Modulus=//'
+node -e 'const {X509Certificate}=require("crypto"),fs=require("fs");
+  const c=new X509Certificate(fs.readFileSync("/tmp/apple-dist.der"));
+  process.stdout.write(Buffer.from(c.publicKey.export({format:"jwk"}).n,"base64url").toString("hex").toUpperCase());'
+echo   # 应为 512 个字符 —— 少一位就是错的
+```
+
+🔴 **别写成 `… | base64 -d | xxd -p`** —— macOS 的 `base64 -d` 不认 base64url 的 `-`/`_`，
+会**静默少解一个字节**，得到 **510** 位模数：位数对不上、其余部分逐字正确，
+而表单只校验"是不是 hex"、**不校验长度**，错误要到管局审核才暴露。
+本轮就是这么错了一次并当场对账出来的（[§7 第 94 条](../reference/environment-traps.md)）。
+**位数是免费的强判据**：512（RSA-2048 模数）/ 40（SHA-1）/ 32（MD5）。
+
+⚠️ **取值有效期**：这些值绑定**当前这张发布证书**。这张 **2027-06-19 到期**（鸿蒙那张到 2029-09-29），
+到期前必须重签 —— 届时公钥与 SHA-1 **全部作废**，备案要改。**备案期间不要动 ASC 里的这张证书。**
+
+🔴 **"当前上传的构建就是这张证书签的"这一条只到推断，没到实证。** 实测到的：账号内 8 张证书里
+`DISTRIBUTION` 类型**只有一张**（其余是 `MAC_APP_DISTRIBUTION`×3 / `MAC_INSTALLER_DISTRIBUTION` /
+`DEVELOPER_ID_APPLICATION` / `DEVELOPMENT`×2），而唯一的构建（`e6abb70d-fd59-4d18-9dcd-f39e85cce03c`，
+version 1，`uploadedDate=2026-09-29T23:00:53-07:00`，`processingState=VALID`，`minOsVersion=17.0`）
+的上传时间落在这张证书的有效期内 ⇒ 签名证书**只能**是它。
+要证到字节，得从 Archive 读 `embedded.mobileprovision` + `codesign -dvv` 的 `Authority`，
+或直接解上传构建的 IPA —— **公开 API 不返回构建的内嵌签名**，本轮没做这一步。
+
+⚠️ **顺带查到的一条不一致（未决，见缺口 G-30）**：这张证书的 subject 主体是
+「Xiaoli Creativity Culture Industry Development (**beijing**) Co., Ltd.」（Team `V5S2LT9YV8`），
+而备案主体是「晓黎（**杭州**）人工智能科技有限公司」。
+表单本身不收 subject 字段，但**管局审核是否会据此质疑没有查证过** —— 不猜，交人工确认。
 
 ---
 

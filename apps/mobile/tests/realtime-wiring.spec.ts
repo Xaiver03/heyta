@@ -31,7 +31,20 @@ import type { AppHost, SyncConfig } from '@heyta/app-host';
 import type { RealtimeClient } from '@heyta/sync-client';
 import type { RealtimeWiringOptions } from '@heyta/app-host';
 
-import { startRealtime, stopRealtime } from '../src/sync/realtime';
+import { startRealtime, stopRealtime, __realtimeForTests } from '../src/sync/realtime';
+
+/**
+ * 🔴 **同意闸门是这一组用例的前置条件，不是被测对象。**
+ *
+ * `startRealtime()` 现在默认要过闸门（`WebSocket` **不走** `globalThis.fetch`，
+ * 所以进程级那道拦不到它 —— 必须自己判）。这些用例要钉的是"接线对不对"，
+ * 于是把 `allowed()` 显式传进去，把前置条件写在**调用点**上：
+ *
+ * · 它比"在文件顶部偷偷 accept 一次同意"诚实 —— 后者会让"闸门失效"这一类
+ *   缺陷在这里全绿（本文件下面那组 `闸门` 用例就是专门验它的）；
+ * · 它是**参数**，不是全局状态 ⇒ 用例之间不会互相残留。
+ */
+const allowed = (): boolean => true;
 
 /** 记账用的假客户端。 */
 function fakeClient(): { client: RealtimeClient; connect: ReturnType<typeof vi.fn>; dispose: ReturnType<typeof vi.fn> } {
@@ -71,6 +84,7 @@ describe('移动端实时通道接线', () => {
     await startRealtime({
       openHost: async () => fakeHost(),
       readConfig: () => config,
+      networkAllowed: allowed,
       makeClient: (o) => {
         options.push(o);
         return client.client;
@@ -86,6 +100,7 @@ describe('移动端实时通道接线', () => {
     await startRealtime({
       openHost: async () => fakeHost('LWW-决胜依据'),
       readConfig: () => ({ serverUrl: 'http://x', token: 't' }),
+      networkAllowed: allowed,
       makeClient: (o) => {
         options.push(o);
         return fakeClient().client;
@@ -100,6 +115,7 @@ describe('移动端实时通道接线', () => {
     await startRealtime({
       openHost: async () => fakeHost(),
       readConfig: () => undefined,
+      networkAllowed: allowed,
       makeClient,
     });
     expect(makeClient).not.toHaveBeenCalled();
@@ -110,11 +126,13 @@ describe('移动端实时通道接线', () => {
     await startRealtime({
       openHost: async () => fakeHost(),
       readConfig: () => ({ serverUrl: '', token: 't' }),
+      networkAllowed: allowed,
       makeClient,
     });
     await startRealtime({
       openHost: async () => fakeHost(),
       readConfig: () => ({ serverUrl: 'http://x' }),
+      networkAllowed: allowed,
       makeClient,
     });
     expect(makeClient).not.toHaveBeenCalled();
@@ -126,6 +144,7 @@ describe('移动端实时通道接线', () => {
     await startRealtime({
       openHost: async () => fakeHost(),
       readConfig: () => config,
+      networkAllowed: allowed,
       makeClient: (o) => {
         options.push(o);
         return fakeClient().client;
@@ -142,6 +161,7 @@ describe('移动端实时通道接线', () => {
     await startRealtime({
       openHost: async () => fakeHost(),
       readConfig: () => ({ serverUrl: 'http://x', token: 't' }),
+      networkAllowed: allowed,
       makeClient: () => client.client,
     });
 
@@ -157,6 +177,7 @@ describe('移动端实时通道接线', () => {
     const deps = {
       openHost: async () => fakeHost(),
       readConfig: () => ({ serverUrl: 'http://x', token: 't' }),
+      networkAllowed: allowed,
       makeClient: () => (n++ === 0 ? first.client : second.client),
     };
 
@@ -172,6 +193,7 @@ describe('移动端实时通道接线', () => {
     await startRealtime({
       openHost: async () => fakeHost(),
       readConfig: () => ({ serverUrl: 'http://x', token: 't' }),
+      networkAllowed: allowed,
       makeClient: (o) => {
         options.push(o);
         return fakeClient().client;
@@ -187,6 +209,108 @@ describe('移动端实时通道接线', () => {
     expect(() => {
       onNewOps?.(1);
     }).not.toThrow();
+  });
+});
+
+/**
+ * 🔴 **闸门本身**（计划 G-12 在移动端实时通道这一侧的判据）
+ * ==========================================================
+ *
+ * ## 为什么实时通道要**单独**一道
+ *
+ * 进程级那道 `consentFetch`（替换 `globalThis.fetch`）覆盖同步与认证的所有请求，
+ * 但 **`WebSocket` 不走 `fetch`**。移动端不给 `@heyta/app-host` 注入
+ * `WebSocketImpl`，实时通道用的就是全局构造器 —— 也就是说
+ * "同意之前发不出去"这句话**默认对实时通道是假的**，而它的症状最阴：
+ * 同步一条都不走，WS 却连着并持续把服务端的改动**拉进本机**。
+ *
+ * ## 为什么判据是"数构造次数"而不是"看有没有连接"
+ *
+ * `makeClient` 是这里唯一的可观察出口，数它等于数"有没有真的尝试出门"。
+ * 反过来"断言没抛异常"永远为真 —— 那条判据不能失败（本仓库的固定纪律）。
+ */
+describe('同意闸门拦得住实时通道（WebSocket 绕开 consentFetch）', () => {
+  /** 凭据齐全 —— 让"没建连"只可能由闸门解释，不可能由"没配置"解释。 */
+  const configured = { serverUrl: 'https://heyta.example/api', token: 'JWT-1' };
+
+  it('🔴 没同意时**一个客户端都不构造**（凭据齐全也一样）', async () => {
+    const makeClient = vi.fn();
+    await startRealtime({
+      openHost: async () => fakeHost(),
+      readConfig: () => configured,
+      networkAllowed: () => false,
+      makeClient,
+    });
+    expect(makeClient, '闸门关闭却仍然建立了实时连接').not.toHaveBeenCalled();
+  });
+
+  it('🔴 「只用本机」与「还没问过」在这里给出**同一个答案**', async () => {
+    // 两者都必须是"不建连"。若这里写成 `record !== null`，
+    // 选过「只用本机」的人会以为界面已经尊重了他的决定，而那条 WS 还在收推送。
+    const neverAsked = vi.fn();
+    await startRealtime({
+      openHost: async () => fakeHost(),
+      readConfig: () => configured,
+      networkAllowed: () => false,
+      makeClient: neverAsked,
+    });
+    expect(neverAsked).not.toHaveBeenCalled();
+  });
+
+  it('🔴 闸门关闭时**先停掉在途的那条连接**（否则"已撤回"与"WS 还活着"同时成立）', async () => {
+    const first = fakeClient();
+    await startRealtime({
+      openHost: async () => fakeHost(),
+      readConfig: () => configured,
+      networkAllowed: allowed,
+      makeClient: () => first.client,
+    });
+    expect(first.connect).toHaveBeenCalledTimes(1);
+
+    // 用户在设置页点了「撤回」⇒ auto-sync 的订阅者会重新走一遍 startRealtime，
+    // 这一次闸门是关的。判据是**旧那条被 dispose**，而不只是"新的没建"。
+    const second = vi.fn();
+    await startRealtime({
+      openHost: async () => fakeHost(),
+      readConfig: () => configured,
+      networkAllowed: () => false,
+      makeClient: second,
+    });
+
+    expect(first.dispose, '闸门关闭时没有停掉已经建立的那条连接').toHaveBeenCalledTimes(1);
+    expect(second, '闸门关闭却还是构造了新客户端').not.toHaveBeenCalled();
+    expect(__realtimeForTests(), '手上还留着一个客户端引用').toBeUndefined();
+  });
+
+  it('🔴 同意之后**能**连上 —— 闸门不是一把单向的锁', async () => {
+    // 只验"关的时候拦住"会漏掉另一半：同意后没人补跑，
+    // 症状是"点了同意，实时永远连不上"（那和本仓库记过的静默失效同形）。
+    const client = fakeClient();
+    await startRealtime({
+      openHost: async () => fakeHost(),
+      readConfig: () => configured,
+      networkAllowed: allowed,
+      makeClient: () => client.client,
+    });
+    expect(client.connect).toHaveBeenCalledTimes(1);
+  });
+
+  it('🔴 **不注入** `networkAllowed` 时默认读那一道真闸门（默认值不能是放行）', async () => {
+    // 这条钉的是 `resolveDeps` 的默认值。把它写成 `() => true`
+    // 会让上面所有用例仍然全绿 —— 而生产路径**根本没有闸门**，
+    // 因为生产调用点一个都不传这个字段（`notifyConfigured()` 里就是 `startRealtime()`）。
+    //
+    // node 里 op-sqlite 打不开 ⇒ 设备偏好读不到 ⇒ 闸门按 fail-closed 判"没同意"。
+    const makeClient = vi.fn();
+    await startRealtime({
+      openHost: async () => fakeHost(),
+      readConfig: () => configured,
+      makeClient,
+    });
+    expect(
+      makeClient,
+      '默认取值器放行了 —— 说明 resolveDeps 里的默认值不是那道闸门',
+    ).not.toHaveBeenCalled();
   });
 });
 

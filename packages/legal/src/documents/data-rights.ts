@@ -48,7 +48,7 @@ const zh = [
           ['更正、补充', '第 46 条', '在界面里直接改，改完经同步到达你的其他设备', '仅账号类信息需要'],
           ['删除', '第 47 条', '应用内删除 + 回收站"彻底删除"', '服务端级需联系'],
           ['注销账号', '第 47 条', '通过邮件申请（界面上目前没有这个按钮）', '需要'],
-          ['撤回同意、拒绝非必要处理', '第 15、44 条', '设置里逐项关闭，关闭即刻生效', '不需要'],
+          ['撤回同意、拒绝非必要处理', '第 15、44 条', '设置里逐项关闭（含「隐私同意」那一项，它管的是这台设备准不准出门），关闭即刻生效', '不需要'],
           ['要求解释说明处理规则', '第 48 条', '邮件提出，我们书面答复', '需要'],
           ['近亲属对死者个人信息的权利', '第 49 条', '邮件提出，我们核验关系后处理', '需要'],
         ],
@@ -209,12 +209,17 @@ const zh = [
     blocks: [
       {
         kind: 'p',
-        text: 'heyta 的隐私开关不是"设置项"而是**真的闸门**：每一个与隐私相关的开关出厂都是关闭的，关掉之后被改变的是**当下正在发生的行为**，不是一份内部记录。这就是撤回同意在这里可以立即生效的原因。',
+        text: 'heyta 的隐私开关不是"设置项"而是**真的闸门**：与隐私相关的每一处，出厂都不是"开着"的 —— 联网那一处出厂是**还没问过**（问过、你没答应，它就一路关着），其余开关出厂是关闭；而关掉之后被改变的是**当下正在发生的行为**，不是一份内部记录。这就是撤回同意在这里可以立即生效的原因。',
       },
       {
         kind: 'table',
         head: ['你关掉的开关', '关掉之后的实际效果', '什么时候生效'],
         rows: [
+          [
+            '联网同意（首启那张面板上作出的决定）',
+            '同步、注册与登录、通知未读数的拉取、实时连接、离线缓存的注册**全部停下来**；撤回后状态清回"还没问过"，界面会重新问一次。本地数据一条都不动',
+            '每一个要出门的动作在动手之前重新检查；已经建立的实时连接当场关掉',
+          ],
           ['AI 功能总开关', '不再向任何外部服务发起请求，连候选端点都不再解析', '下一次调用第一件事就是检查它'],
           ['允许远程端点', '远程端点根本不进入候选列表，因此连授权询问都不再产生', '即时'],
           ['某个功能的出境授权', '该功能不再送出任何内容；本机端点仍按你配的状态使用', '每次调用都在网络动作之前重新检查'],
@@ -289,6 +294,11 @@ const zh = [
         head: ['版本', '日期', '变化'],
         rows: [
           ['1.0', '2026-10-01', '首版草案（尚未生效）：八项权利逐条对照实际代码写成，其中"注销账号"与"邮箱更正"承诺渠道而非自助。'],
+          [
+            '1.1',
+            '2026-10-02',
+            '第六节把「联网同意」列为闸门表的**第一行**（首启隐私面板与出站请求闸门已落地），并写明撤回它时**实际发生的三件事**：全部出站动作停止、已建立的实时连接当场关掉、状态清回"还没问过"并重新询问。第一节那张表的"撤回同意"一行同时点名这一项。',
+          ],
         ],
       },
     ],
@@ -313,7 +323,12 @@ const en = [
           ['Correction and supplementation', 'Article 46', 'Edit it in the interface; the change reaches your other devices through sync', 'Account-level fields only'],
           ['Deletion', 'Article 47', 'In-app delete plus "purge" in the Trash', 'Server-side scope requires contact'],
           ['Account closure', 'Article 47', 'Request it by email (there is no such button in the interface yet)', 'Yes'],
-          ['Withdrawal of consent, refusal of non-essential processing', 'Articles 15 and 44', 'Switch it off per feature in settings; switching off takes effect at once', 'No'],
+          [
+            'Withdrawal of consent, refusal of non-essential processing',
+            'Articles 15 and 44',
+            'Switch it off per feature in settings (including “Privacy consent”, which decides whether this device is allowed to go out at all); switching off takes effect at once',
+            'No',
+          ],
           ['A request to explain our processing rules', 'Article 48', 'Raise it by email; we reply in writing', 'Yes'],
           ['Next-of-kin rights over a deceased person\'s data', 'Article 49', 'Raise it by email; we verify the relationship and then act', 'Yes'],
         ],
@@ -474,12 +489,17 @@ const en = [
     blocks: [
       {
         kind: 'p',
-        text: 'heyta\'s privacy switches are **actual gates**, not settings rows: every privacy-relevant switch ships off, and switching one off changes **what is happening right now**, not a note in our records. That is why withdrawal of consent can take effect immediately.',
+        text: 'heyta\'s privacy switches are **actual gates**, not settings rows: nowhere that touches privacy ships in the "on" state — for the one that governs going online the factory state is **never having asked** (once asked and you did not agree, it stays off), and the remaining switches ship off; switching one off changes **what is happening right now**, not a note in our records. That is why withdrawal of consent can take effect immediately.',
       },
       {
         kind: 'table',
         head: ['The switch you turn off', 'What actually changes', 'When it takes effect'],
         rows: [
+          [
+            'Consent to going online (the decision made on the first-launch panel)',
+            'Synchronisation, sign-up and sign-in, fetching notification unread counts, the realtime connection and the registration of the offline cache **all stop**; after withdrawal the state is cleared back to “never asked”, and the interface asks you again. Not one local record is touched',
+            'Every action that is about to leave the device re-checks it before it acts; a realtime connection already open is closed on the spot',
+          ],
           ['The AI master switch', 'No request is made to any external service; candidate endpoints are not even resolved', 'The next call checks it first thing'],
           ['Allow remote endpoints', 'Remote endpoints never enter the candidate list, so no authorisation prompt is produced either', 'Immediately'],
           ['Egress authorisation for one feature', 'That feature sends nothing out; local endpoints still behave as you configured them', 'Re-checked before every network action'],
@@ -554,6 +574,11 @@ const en = [
         head: ['Version', 'Date', 'Change'],
         rows: [
           ['1.0', '2026-10-01', 'First draft (not yet in force): eight rights checked against the actual code, with account closure and email correction committed as a channel rather than as self-service.'],
+          [
+            '1.1',
+            '2026-10-02',
+            'Section six now lists “consent to going online” as the **first row** of the gate table (the first-launch privacy panel and the outbound-request gate have landed), and states the **three things that actually happen** when you withdraw it: every outbound action stops, a realtime connection already open is closed on the spot, and the state is cleared back to “never asked” so the interface asks again. The “withdrawal of consent” row of the table in section one names the same item.',
+          ],
         ],
       },
     ],
@@ -562,9 +587,9 @@ const en = [
 
 export const dataRights: LegalDocument = {
   id: 'data-rights',
-  version: '1.0',
+  version: '1.1',
   status: 'draft',
-  updatedDate: '2026-10-01',
+  updatedDate: '2026-10-02',
   title: {
     'zh-CN': '个人权利行使与请求响应',
     en: 'Exercising Your Rights: Requests and Responses',

@@ -40,6 +40,7 @@ import {
   resolveSettingAvailability,
   type SettingsRowModel,
 } from '@heyta/ui';
+import { formatPrivacyDecisionTime, type PrivacyConsentRecord } from '@heyta/app-host';
 
 import {
   Button,
@@ -55,6 +56,12 @@ import { useLocalePreference } from '../i18n/locale-preference';
 import { useTokens } from '../theme';
 import type { SyncCredentialForm } from '../sync/credential-form';
 import { DEFAULT_SERVER_URL } from '../sync/config';
+import {
+  privacyConsent,
+  privacyConsentActions,
+  subscribePrivacyConsent,
+} from '../privacy/consent-gate';
+import { openPrivacySheet } from '../privacy/consent-ui';
 import {
   isWidgetBridgeAvailable,
   readWidgetPrivacy,
@@ -107,6 +114,22 @@ export function SettingsScreen({
   const [privacyFailed, setPrivacyFailed] = useState(false);
   const [privacyBusy, setPrivacyBusy] = useState(false);
 
+  /*
+    ── 隐私同意（PIPL 第 15 条那个"便捷的撤回方式"）───────────────
+    🔴 **这里不存第二份"同意了吗"**：状态只有闸门那一份（`privacy/consent-gate.ts`）。
+    本组件**订阅**它，不是挂载时读一次 —— 读一次的症状是"点了撤回、按钮还在那儿、
+    字没改口"，而闸门其实已经关了。界面与事实不一致，正是这一类缺陷最难查的形状。
+
+    ⚠️ `revokeNotPersisted` 是**界面态**（这一次点击有没有落盘），不是同意状态，
+    所以它可以住在这里；落盘失败必须当场说出口，否则用户以为撤回是永久的。
+  */
+  const [consentRecord, setConsentRecord] = useState<PrivacyConsentRecord | null>(() =>
+    privacyConsent.current(),
+  );
+  const [revokeNotPersisted, setRevokeNotPersisted] = useState(false);
+
+  useEffect(() => subscribePrivacyConsent(() => setConsentRecord(privacyConsent.current())), []);
+
   useEffect(() => {
     let alive = true;
     void readWidgetPrivacy().then((value) => {
@@ -136,6 +159,47 @@ export function SettingsScreen({
         setPrivacyBusy(false);
       });
   }, [hideTitles, privacyBusy]);
+
+  /**
+   * 撤回同意。**只用 `secondary`，不用 `danger`。**
+   *
+   * 🔴 把撤回画成危险动作（红底），等于在视觉上劝用户别撤 —— PIPL 第 15 条要的
+   * 是"便捷的撤回方式"，一个红色按钮正好相反。这不是审美选择。
+   *
+   * ⚠️ `persisted` 为 `false` 时**必须说出口**（与同意面板那条同一纪律）：本次会话
+   * 里闸门确实关了，但下次冷启动磁盘上还是旧决定 —— 不说这一句，用户以为撤回是永久的。
+   */
+  const revokeConsent = useCallback((): void => {
+    const { persisted } = privacyConsentActions.revoke();
+    setRevokeNotPersisted(!persisted);
+  }, []);
+
+  /**
+   * 「重新作出选择」：**先收设置面，再开同意面板**，不叠两层。
+   *
+   * 🔴 RN 的 `Modal` 每个开一个**原生窗口**，两个同时挂着时谁能收到触摸由平台决定；
+   * 上面那个关掉后下面那个还在，用户会以为设置面"自己又弹回来了"。
+   * web 那边是同屏叠一层 DOM，所以这一处是**真的平台差异**，不是偷懒。
+   *
+   * ⚠️ 开的是**同一张**面板（`privacy/consent-ui` 那一份），不是第二套"同意界面"
+   * （§3.5）—— 两张面板就是两个裁决者，而它们对"同意长什么样"的理解会漂移。
+   */
+  const chooseAgain = useCallback((): void => {
+    onClose();
+    openPrivacySheet('revoked');
+  }, [onClose]);
+
+  /**
+   * 当前状态那一行的措辞。**三分支而不是一个布尔**：
+   * "明确选了只用本机"与"还没问过"在界面上必须读出不同的话 ——
+   * 前者不该再弹面板（他已经答过了），后者必须弹（G-11）。
+   */
+  const consentStateKey =
+    consentRecord === null
+      ? 'common.privacy.settings.undecided'
+      : consentRecord.decision === 'accepted'
+        ? 'common.privacy.settings.accepted'
+        : 'common.privacy.settings.localOnly';
 
   const widgetRows: readonly SettingsRowModel[] = [
     { kind: 'note', text: t('mobile.widgetJourney.intro') },
@@ -228,6 +292,52 @@ export function SettingsScreen({
               paddingBottom: tokens['screen.gutter'] + insets.bottom,
             }}
           >
+            {/*
+              ── 隐私同意（**撤回的那个入口**）─────────────────────
+              🔴 放在**第一段**，不在同步表单下面。PIPL 第 15 条要"便捷"，
+              而这一面下面是一整张四栏凭据表单 + 清凭据按钮 —— 把它排到下面，
+              在小屏上就是"要点开设置、滚过一整屏才找得到"。
+              排在这里的成本是"改服务器地址要往下滚一格"，撤回的成本是"找不到入口"，
+              后者是合规问题，前者不是。
+            */}
+            <View testID="privacy-consent-section" style={{ gap: tokens['space.3'] }}>
+              <SectionHeader icon="privacy.consent" title={t('common.privacy.settings.title')} />
+              <Card>
+                <View style={{ gap: tokens['space.2'] }}>
+                  <Text variant="row-title">
+                    {t(consentStateKey)}
+                    {consentRecord === null
+                      ? null
+                      : ` · ${t('common.privacy.settings.decidedAt', {
+                          time: formatPrivacyDecisionTime(consentRecord.decidedAt),
+                        })}`}
+                  </Text>
+                  <Text variant="caption" tone="subtle">
+                    {t('common.privacy.settings.revokeHint')}
+                  </Text>
+                </View>
+              </Card>
+              {consentRecord === null ? (
+                // 没决定过（首启跳过了、或刚撤回）：把**同一张**面板再打开一次。
+                <Button
+                  label={t('common.privacy.settings.chooseAgain')}
+                  onPress={chooseAgain}
+                  tone="primary"
+                />
+              ) : (
+                <Button
+                  label={t('common.privacy.settings.revoke')}
+                  onPress={revokeConsent}
+                  tone="secondary"
+                />
+              )}
+              {revokeNotPersisted ? (
+                <Text variant="caption" tone="warning">
+                  {t('common.privacy.consent.notPersisted')}
+                </Text>
+              ) : null}
+            </View>
+
             {/*
               ── 同步凭据（手动兜底路径）───────────────────────────
               🔴 从「我的」搬进设置面的那段表单，一个字没改逻辑 ——

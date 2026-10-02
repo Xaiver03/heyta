@@ -53,6 +53,7 @@ import {
 
 import { maybeHandOffToShell } from './desktop-handoff.js';
 import { useSyncStore } from '../sync/store.js';
+import { usePrivacyStore } from '../privacy/store.js';
 import { applyLocale, currentLocale, hasStoredLocalePreference } from '../../lib/locale.js';
 import {
   createPasskeyCredential,
@@ -349,6 +350,19 @@ function failed(
   reason: HostedAuthFailureReason,
   extra?: Pick<HostedAuthFailure, 'policyCode' | 'retryAfterSeconds'>,
 ): AuthStatus {
+  /**
+   * 🔴 `consent-required` 不只是"换一句话"，它还必须**把面板再弹一次**。
+   *
+   * 场景是真实的：用户在首启面板按 Esc 关掉了（那是合法的：关掉 = 还没决定），
+   * 然后点「登录」。请求被本机闸门拦下 ⇒ 光显示一句"还没同意"而没有出口，
+   * 用户读到的是"这应用坏了"。这一行把那句话变成一次可点的选择。
+   *
+   * 为什么放在 `failed()` 而不是十条动作各写一遍：这里是**所有**认证失败的
+   * 唯一构造点，散落十处就会漂移（AGENTS §3.5 抽 sync 接线时记过的同一条）。
+   */
+  if (reason === 'consent-required') {
+    usePrivacyStore.getState().openSheet('required-for-action');
+  }
   return {
     kind: 'failed',
     reason,

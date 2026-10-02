@@ -124,7 +124,7 @@ const zh = [
           ['同步协议元数据', '每台设备的随机标识 `clientId`、事件的顺序号与时间戳、事件条数与字节长度 —— 内容是密文，但这些结构信息是明文'],
           ['设备信息', '设备记录里的设备名称、应用版本、最近在线时间'],
           ['接入与运维日志', '服务器与接入层（反向代理）的运行日志，其中必然包含 IP 地址、客户端标识（User-Agent）与接入时间。业务数据库里没有 IP 地址列，我们不把访问日志写进业务库；但日志本身按法定要求留存**不少于六个月**（《网络安全法》第二十三条第（三）项，2025 修正版序号）'],
-          ['在线状态', '开启同步后，Web 端会在你的浏览器里注册 Service Worker 并建立实时同步连接，两者都是持久连接 —— 服务器因此能看到"该账号此刻在线"这一事实。我们没有把它做成任何功能，但它是架构的副产品，写出来比略过去诚实'],
+          ['在线状态', '在你于首次启动时的隐私面板上同意联网、并且开启同步之后，Web 端才会在你的浏览器里注册 Service Worker 并建立实时同步连接，两者都是持久连接 —— 服务器因此能看到"该账号此刻在线"这一事实。没有那份同意，这两件事都不会发生。我们没有把在线做成任何功能，但它是架构的副产品，写出来比略过去诚实'],
           ['计费数据', '订单、订阅，以及开具发票与满足税务要求所必需的信息'],
           ['邀请关系', '如果使用"邀请好友得会员"，会生成一条跨账号的关系记录，其中包含被邀请人邮箱的可识别部分，并作为通知内容长期保存'],
         ],
@@ -256,6 +256,11 @@ const zh = [
         head: ['版本', '日期', '变化'],
         rows: [
           ['1.0', '2026-10-01', '首版草案（尚未生效）：作为《个人信息保护法》第 31 条要求的专门处理规则发布；明确不核验年龄；条例义务逐条判适用性，其中第 36 条如实登记一处未落地。'],
+          [
+            '1.1',
+            '2026-10-02',
+            '第四节的"在线状态"一行改了一个前提：Service Worker 注册与实时连接**不是**"开启同步"就发生的，它前面还有一道首启隐私面板上作出的联网同意（这一道闸已经落地）。没有那份同意，服务器看不到任何在线状态 —— 因为一个请求都没发出。',
+          ],
         ],
       },
     ],
@@ -353,7 +358,7 @@ const en = [
           ['Sync protocol metadata', 'A random per-device identifier `clientId`, event sequence numbers and timestamps, event counts and byte lengths — the content is ciphertext, but this structure is plaintext'],
           ['Device information', 'Device name, app version and last-seen time held in the device records'],
           ['Access and operations logs', 'Runtime logs from the server and the access layer (the reverse proxy), which necessarily contain the IP address, the client identifier (User-Agent) and the time of access. The business database has no IP address column and we do not write access logs into it, but the logs themselves are kept for **no less than six months**, which is the statutory floor (Cybersecurity Law, Article 23(3), 2025 revised numbering)'],
-          ['Online presence', 'Once sync is on, the web client registers a Service Worker in your browser and holds a realtime sync connection; both are persistent, so the server can observe the fact that "this account is online right now". We never made that into a feature, but it is a by-product of the architecture, and saying so is more honest than leaving it out'],
+          ['Online presence', 'Only after you agree to going online on the privacy panel shown at first launch, and then turn sync on, does the web client register a Service Worker in your browser and hold a realtime sync connection; both are persistent, so the server can observe the fact that "this account is online right now". Without that consent neither of the two happens. We never made presence into a feature, but it is a by-product of the architecture, and saying so is more honest than leaving it out'],
           ['Billing data', 'Orders, subscriptions, and whatever is required to issue an invoice and satisfy tax obligations'],
           ['Referral relationships', 'If "invite a friend" is used, a cross-account relationship record is created that contains the identifiable part of the invited person\'s email address and is retained permanently inside a notification'],
         ],
@@ -485,6 +490,11 @@ const en = [
         head: ['Version', 'Date', 'Change'],
         rows: [
           ['1.0', '2026-10-01', 'First draft (not yet in force): published as the dedicated processing rules required by Article 31; states that we do not verify age; assesses each article of the Regulations for applicability, and records one unmet point under Article 36.'],
+          [
+            '1.1',
+            '2026-10-02',
+            'One precondition changed in the "Online presence" row of section four: registering the Service Worker and opening the realtime connection do **not** follow from "sync is on" alone — in front of them sits the consent to going online made on the first-launch privacy panel (that gate has landed). Without that consent the server observes no presence at all, because not one request is sent.',
+          ],
         ],
       },
     ],
@@ -493,9 +503,9 @@ const en = [
 
 export const minors: LegalDocument = {
   id: 'minors',
-  version: '1.0',
+  version: '1.1',
   status: 'draft',
-  updatedDate: '2026-10-01',
+  updatedDate: '2026-10-02',
   title: {
     'zh-CN': '未成年人保护',
     en: 'Protection of Minors',

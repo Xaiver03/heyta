@@ -1,3 +1,4 @@
+import { ICON_SIZE } from '@heyta/design-system';
 /**
  * 通知中心 / 活动 的侧栏入口与面板。
  *
@@ -41,7 +42,7 @@
  *    面板是一个对话框，点完一条通知后焦点可能已经不在里面了，
  *    这时 Escape 仍然应该能关掉它。
  */
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 import {
   formatCompactDate,
@@ -56,6 +57,7 @@ import type { AccountNotificationItem, CampaignItem } from '@heyta/app-host';
 
 import { InviteActivityCard } from './InviteActivityCard.js';
 import { useInboxStore } from './store.js';
+import { privacyConsent, subscribePrivacyConsent } from '../privacy/consent-gate.js';
 
 type InboxTab = 'notifications' | 'activity';
 
@@ -119,7 +121,7 @@ function NotificationRow({
       data-read={item.readAt === null ? 'false' : 'true'}
     >
       <span className="ht-inbox__item-icon" aria-hidden="true">
-        <CheckCheck size={18} />
+        <CheckCheck size={ICON_SIZE.md} />
       </span>
       <div className="ht-inbox__item-main">
         <div className="ht-inbox__item-head">
@@ -167,7 +169,7 @@ function LoadNotice({
       <span>{t('web.inbox.error')}</span>
       <button
         type="button"
-        className="ht-inbox__action"
+        className="ht-inbox__action ht-type-caption"
         data-testid={`${testID}-retry`}
         onClick={onRetry}
       >
@@ -298,22 +300,50 @@ export function InboxBell({
   const refreshActivity = useInboxStore((s) => s.refreshActivity);
   const markAllRead = useInboxStore((s) => s.markAllRead);
 
-  // 挂载时拉一次：**徽标在面板关着的时候也要显示未读数**。
-  useEffect(() => {
+  /**
+   * 🔴 所有**自动**拉取之前的一道闸：没同意就一个请求都不发，
+   * 而且**不改状态** —— 让界面停在"还没拉过"，而不是写出一条"读不到内容，请稍后重试"。
+   *
+   * 后者是真实存在的两类坏：
+   *   · `fetchAccountNotifications` 把"被本机拦住"归成 `cause: 'network'`，
+   *     界面因此对着一件**从没发出去**的请求说"稍后重试"—— 而重试永远不会有用；
+   *   · 用户明确选了「只用本机」之后，每次刷新都被记成一次"读取失败"。
+   * 闸门本身（`consentFetch` / 进程级那道）保证发不出去，这一处保证**界面不说谎**。
+   */
+  const pollNotifications = useCallback((): void => {
+    if (!privacyConsent.networkAllowed()) return;
     void refreshNotifications();
   }, [refreshNotifications]);
+
+  // 挂载时拉一次：**徽标在面板关着的时候也要显示未读数**。
+  useEffect(() => {
+    pollNotifications();
+  }, [pollNotifications]);
 
   // 每次打开都刷新一次通知（面板是用户主动打开的，看到旧数据没有意义）。
   useEffect(() => {
     if (!open) return;
-    void refreshNotifications();
-  }, [open, refreshNotifications]);
+    pollNotifications();
+  }, [open, pollNotifications]);
+
+  /**
+   * 同意之后**补拉一次**：首启时这道闸是关的，上面那两个 effect 什么都没做，
+   * 于是徽标会一直空着 —— 那正是本仓库反复记过的"点了同意但没反应"。
+   */
+  useEffect(
+    () =>
+      subscribePrivacyConsent(() => {
+        pollNotifications();
+      }),
+    [pollNotifications],
+  );
 
   // 🔴 活动**只在「活动」Tab 真的被打开时**才拉。服务端那次 GET 会惰性创建
   //    这个账号的邀请码，所以"每个用户每次打开应用都拉一次活动"等于
   //    "给每个用户都写一行邀请码" —— 包括永远不邀请人的人。
   useEffect(() => {
     if (!open || tab !== 'activity') return;
+    if (!privacyConsent.networkAllowed()) return;
     void refreshActivity();
   }, [open, tab, refreshActivity]);
 
@@ -379,13 +409,13 @@ export function InboxBell({
           setOpen((was) => !was);
         }}
       >
-        <Bell size={16} aria-hidden="true" />
+        <Bell size={ICON_SIZE.sm} aria-hidden="true" />
         {/* rail 是纯图标：这个名字在 hover / 聚焦时才显示（`app.css` 的 `.ht-rail__label`）。
             未读数走右上角的徽标，accessible name 由上面的 `aria-label` 给出。 */}
-        <span className="ht-rail__label">{t('web.inbox.trigger')}</span>
+        <span className="ht-rail__label ht-type-caption">{t('web.inbox.trigger')}</span>
         {unreadCount > 0 ? (
           <span
-            className="ht-inbox__badge"
+            className="ht-inbox__badge ht-type-badge"
             data-testid={`${testID}-badge`}
             aria-hidden="true"
           >
@@ -399,7 +429,7 @@ export function InboxBell({
           role="dialog"
           ref={panelRef}
           aria-label={t('web.inbox.aria')}
-          className="ht-inbox__panel"
+          className="ht-inbox__panel ht-material"
           data-testid={`${testID}-panel`}
         >
           <div className="ht-inbox__head">
@@ -431,7 +461,7 @@ export function InboxBell({
               {tab === 'notifications' && unreadCount > 0 ? (
                 <button
                   type="button"
-                  className="ht-inbox__action"
+                  className="ht-inbox__action ht-type-caption"
                   data-testid={`${testID}-mark-all-read`}
                   onClick={() => {
                     void markAllRead();
@@ -449,7 +479,7 @@ export function InboxBell({
                   setOpen(false);
                 }}
               >
-                <X size={14} aria-hidden="true" />
+                <X size={ICON_SIZE.xs} aria-hidden="true" />
               </button>
             </div>
           </div>

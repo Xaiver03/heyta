@@ -49,6 +49,7 @@ import {
   Search,
   Settings,
   Share2,
+  ShieldCheck,
   Smartphone,
   Square,
   StickyNote,
@@ -188,6 +189,15 @@ const ICONS = {
   'growth.week': CalendarRange,
   'growth.milestones': Trophy,
   'growth.identity': BadgeCheck,
+
+  /**
+   * 隐私同意面板。
+   *
+   * 🔴 与 `action.settings`（齿轮）**不同字形**：那里是"改偏好"，这里是
+   * "这台设备能不能对外说话"的法律决定。同一个字形会让用户以为同意是
+   * 一个可以随时改的普通开关，而撤回它需要一条单独的路径（PIPL 第 15 条）。
+   */
+  'privacy.consent': ShieldCheck,
 } as const satisfies Record<string, LucideIcon>;
 
 export type IconName = keyof typeof ICONS;

@@ -164,14 +164,7 @@ describe('表单形状（产品负责人定的硬约束）', () => {
   });
 });
 
-describe('注册的本地闸（顺序错了就是"已经发出去了"）', () => {
-  /*
-    ⚠️ 这里**刻意没有**「两个口令动作先过隐私闸门」那条判据：
-    `requireNetworkConsent()` 与 `src/privacy/` 是另一条尚未落地的线，
-    把判据写在它之前，这条套件在别人那条线合进来之前就是红的。
-    等 `src/privacy/` 落地，把它补回 `AuthScreen` 的两个 handler 与本文件，
-    并同步扩写 `privacy-consent-gate.spec.ts` 的「五个出门动作」。
-  */
+describe('注册的两道本地闸（顺序错了就是"已经发出去了"）', () => {
   it('🔴 未勾同意 → 一个请求都不发：`missingField(\'register\')` 排在请求之前', () => {
     const body = bodyOf(code, 'registerWithPassword');
     assertOrdered(
@@ -187,6 +180,22 @@ describe('注册的本地闸（顺序错了就是"已经发出去了"）', () =>
     ).toBe(true);
     // 登录**不**重新要同意：把同意挡在登录前面，老用户会以为自己被登出了。
     expect(/termsMissing: mode === 'register'/.test(missing), '登录也被同意项挡住').toBe(true);
+  });
+
+  it('🔴 两个口令动作也都先过隐私闸门，再发请求', () => {
+    // 与 `privacy-consent-gate.spec.ts` 那条「五个出门动作」是同一件事的两侧：
+    // 那一份管已有的五条，这一条管本轮新增的两条 —— 两份都不许有人后补动作不登记。
+    for (const [name, egress] of [
+      ['registerWithPassword', /registerWithEmailPassword\(/],
+      ['loginWithPassword', /loginWithEmailPassword\(/],
+    ] as Array<[string, RegExp]>) {
+      assertOrdered(
+        bodyOf(code, name),
+        /requireNetworkConsent\(\)/,
+        egress,
+        `${name} 在未同意时就把请求发出去了`,
+      );
+    }
   });
 
   it('🔴 注册成功后那句是**中性**的，不许断言"账号已创建"', () => {

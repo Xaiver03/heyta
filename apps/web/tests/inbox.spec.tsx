@@ -12,15 +12,19 @@
  * 4. 🔴 **活动只在「活动」Tab 真的被打开时才拉**。服务端那次 GET 会
  *    惰性创建邀请码，所以这条是"不给每个用户都写一行邀请码"的客户端一侧保证。
  * 5. **全部已读失败时不动本地状态**（徽标继续亮着）。
+ * 6. 🔴 **自动拉取挡在同意决定之后**，而且未同意时界面**不说"稍后重试"** ——
+ *    闸门保证发不出去，这一条保证界面不对着从没发出的请求说话。
  */
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { PRIVACY_CONSENT_KEY } from '@heyta/app-host';
 import { I18nProvider, translate, type Locale, type MessageKey } from '@heyta/i18n';
 
 import { InboxBell } from '../src/features/inbox/InboxBell.js';
 import { __resetInboxForTests, useInboxStore } from '../src/features/inbox/store.js';
+import { privacyConsent, privacyConsentActions } from '../src/features/privacy/consent-gate.js';
 import { useSyncStore } from '../src/features/sync/store.js';
 
 const BASE = 'https://sync.example.com';
@@ -170,9 +174,20 @@ const click = async (id: string): Promise<void> => {
   await settle();
 };
 
+/** 把闸门清回「还没问过」—— 与磁盘也断开（本文件末尾那条闸门用例要这个起点）。 */
+function makeUndecided(): void {
+  localStorage.removeItem(PRIVACY_CONSENT_KEY);
+  privacyConsent.__resetSessionForTests();
+}
+
 beforeEach(() => {
   __resetInboxForTests();
   useSyncStore.setState({ baseUrl: BASE, token: 'token-123' });
+  // 🔴 铃铛的**自动**拉取现在挡在同意闸门之后（`InboxBell` 的 `pollNotifications`）。
+  // 本文件验的是"通知界面"，所以同意在这里是**前置条件**，不是被测对象 ——
+  // 被测对象在 `privacy-consent-sheet.spec.tsx`，闸门本身在文件末尾那一条。
+  makeUndecided();
+  privacyConsentActions.accept();
 });
 
 afterEach(() => {
@@ -322,6 +337,82 @@ describe('读不到时的两种提示必须分开', () => {
     expect(testId('inbox-retry')).not.toBeNull();
     // 🔴 列表**不该被清空** —— 清空会让"这次没读到"看起来像"你没有通知"。
     expect(useInboxStore.getState().notifications).toHaveLength(3);
+  });
+});
+
+/**
+ * 🔴 铃铛的**自动**拉取挡在同意决定之后（`InboxBell` 的 `pollNotifications`）。
+ *
+ * 闸门本身（`consentFetch` / 进程级那道）保证"发不出去"，这几条钉的是另一件事：
+ * **界面不许对着一件从没发出去的请求说话**。少了这一层，未同意时的表现是
+ * "加载失败 / 稍后重试"（`fetchAccountNotifications` 把本机拦截归成 `cause: 'network'`），
+ * 而选「只用本机」的人会每次刷新都被记成一次读取失败 —— 那是界面在说谎。
+ */
+describe('同意闸门：没决定就一个请求都不发，而且不说「稍后重试」', () => {
+  it('还没决定 → 挂载与打开面板都零请求，状态停在「还没拉过」', async () => {
+    makeUndecided();
+    const calls = installFetch();
+    await renderBell();
+    await click('inbox-trigger');
+
+    expect(calls).toHaveLength(0);
+    expect(testId('inbox-unconfigured')).toBeNull();
+    expect(testId('inbox-unavailable')).toBeNull();
+    expect(useInboxStore.getState().notificationsState).toBeNull();
+    expect(testId('inbox-badge')).toBeNull();
+  });
+
+  it('选了「只用本机」→ 同样零请求（这是一件正常事，不是一次失败）', async () => {
+    makeUndecided();
+    privacyConsent.decide('local-only');
+    const calls = installFetch();
+    await renderBell();
+    await click('inbox-trigger');
+
+    expect(calls).toHaveLength(0);
+    expect(testId('inbox-unavailable')).toBeNull();
+    expect(useInboxStore.getState().notificationsState).toBeNull();
+  });
+
+  it('🔴 切到「活动」Tab 但还没同意 → 一个活动请求都不发（否则给没同意的用户写一行邀请码）', async () => {
+    makeUndecided();
+    const calls = installFetch();
+    await renderBell();
+    await click('inbox-trigger');
+    await click('inbox-tab-activity');
+
+    expect(calls).toHaveLength(0);
+    expect(testId('inbox-invite-code')).toBeNull();
+  });
+
+  it('同意之后**补拉一次**：徽标当场亮起来，不需要重开面板', async () => {
+    makeUndecided();
+    const calls = installFetch();
+    await renderBell();
+    expect(calls).toHaveLength(0);
+
+    await act(async () => {
+      privacyConsentActions.accept();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(calls.filter((c) => c.url.includes('/api/notifications'))).toHaveLength(1);
+    expect(testId('inbox-badge')?.textContent).toBe('2');
+  });
+
+  it('撤回之后立刻收口：再打开面板不拉（撤回的效力不许等到下次冷启动）', async () => {
+    const calls = installFetch();
+    await renderBell();
+    expect(calls.filter((c) => c.url.includes('/api/notifications'))).toHaveLength(1);
+
+    await act(async () => {
+      privacyConsentActions.revoke();
+    });
+    calls.length = 0;
+
+    await click('inbox-trigger');
+    expect(calls).toHaveLength(0);
   });
 });
 

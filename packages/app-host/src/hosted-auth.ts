@@ -59,6 +59,7 @@ import {
   type PasswordPolicyCode,
 } from '@heyta/shared-schema';
 import { joinEndpointUrl } from './endpoint-url.js';
+import { PrivacyConsentBlockedError } from './privacy-consent.js';
 
 /**
  * 服务端认证端点。
@@ -320,7 +321,22 @@ export type HostedAuthFailureReason =
    * 四种拒绝的状态码和这一层原因都相同，而用户的动作四种都不同。
    * 只说"口令不符合要求"而不给动作，等于没说。
    */
-  | 'password-policy';
+  | 'password-policy'
+  /**
+   * **本机闸门把请求拦下了**（用户还没同意，或选的是「只用本机」）。
+   *
+   * 🔴 与 `network` 分开是这条的唯一存在理由：闸门拦下时抛的是
+   * {@link PrivacyConsentBlockedError}，而 `sendJson` 原来的 `catch` 把所有抛错
+   * 一律归成 `network` ⇒ 界面会说"网络不可用，请检查连接"。那句话**每个字都是假的**：
+   * 网络好好的，是**我们**一个字节都没发。而用户照那句去做（检查 WiFi、换网络）
+   * 永远做不对 —— 他要作的是一个隐私决定。
+   *
+   * 与 `unconfigured` 也不同：那条的动作是"填服务端地址"，
+   * 这条的动作是"在弹出来的面板里选同意 / 只用本机"。
+   *
+   * ⚠️ 它**不代表**服务端拒绝了什么 —— 请求从未离开这台设备。
+   */
+  | 'consent-required';
 
 export interface HostedAuthFailure {
   ok: false;
@@ -569,7 +585,13 @@ async function sendJson(
       headers,
       ...(payload === undefined ? {} : { body: JSON.stringify(payload) }),
     });
-  } catch {
+  } catch (error) {
+    // 🔴 **本机闸门拦下不等于网络故障**。这一条是本轮实测出来的：
+    // 闸门抛的是 `PrivacyConsentBlockedError`，而原来这个 `catch` 把所有抛错
+    // 一律归成 `network` ⇒ 未同意的用户点登录，界面说"网络不可用，请检查连接"。
+    // 那句话每个字都是假的（网络好好的，是我们一个字节都没发），
+    // 而用户照它去做（换网络、重连 WiFi）永远做不对 —— 他要作的是一个隐私决定。
+    if (error instanceof PrivacyConsentBlockedError) return failure('consent-required');
     return failure('network');
   }
 

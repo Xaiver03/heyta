@@ -65,6 +65,12 @@ const ENDPOINTS = [
       //    由 `pnpm verify:web-auth`（scripts/verify-web-auth-journey.mjs）驱动，
       //    刻意不进 `pnpm check`（要本机 Postgres + 真服务端，与 verify:multi-end 同理）。
       'e2e/auth-journey/auth-journey.spec.ts',
+      // 注册旅程里「条款可达」那一步：真浏览器里点注册面板上的两条链接，
+      // 官方域 ⇒ 落地页 `/legal/*`、自建域 ⇒ `<baseUrl>/privacy.html`（没配就是真 404）。
+      // 由 `pnpm verify:legal-links` 驱动（刻意不进 `pnpm check`，理由写在
+      // `e2e/playwright.legal-links.config.ts` 文件头）。⚠️ 官方域那一侧目前由
+      // `context.route()` 顶替到本地构建产物 —— 线上发布后要删掉那条转发（G-25）。
+      'e2e/legal-links/legal-links.spec.ts',
     ],
     shellSpecs: [],
     covers: 'J1–J7 全覆盖（jsdom 逻辑层）+ 真浏览器整条旅程（e2e/auth-journey，verify:web-auth）',
