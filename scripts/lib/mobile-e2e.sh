@@ -21,7 +21,12 @@
 set -u
 export PATH="/opt/homebrew/bin:$PATH"
 
-ADB="adb -s ${HEYTA_E2E_SERIAL:-emulator-5554}"
+# 🔴 设备号**只有一个住处**：`$E2E_SERIAL`。打印它的脚本一律引用这个变量，
+#    不要再抄一遍字面量 —— 实测 9 个 `verify-mobile-*.sh` 的横幅硬编码
+#    `emulator-5554`，而设备换到 5556 时它们照打 5554：跑的是对的机器，
+#    取证输出里写的是另一台（下次换设备时这份输出会把人引去查一台根本没跑的机器）。
+E2E_SERIAL="${HEYTA_E2E_SERIAL:-emulator-5554}"
+ADB="adb -s $E2E_SERIAL"
 PKG=com.heyta
 # 🔴 这两个**必须**是绝对路径，不能是"仓库根相对"。
 #
