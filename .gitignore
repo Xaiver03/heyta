@@ -100,7 +100,7 @@ __pycache__/
 
 #
 # 🔴 Xcode 的 clang 模块缓存，被某个**畸形 `-Xcc` 参数**当成了目录名建在
-# `HeytaMobile.xcodeproj/` 里面。它是构建产物、体积上千个文件，
+# `Heyta.xcodeproj/` 里面。它是构建产物、体积上千个文件，
 # 而且因为落在 `.xcodeproj/` 底下，很容易被当成"工程文件"顺手提交。
 # 正确的 `-Xcc` 用法是给 clang 传参（`-Xcc -fmodule-map-file=...`），
 # 不是一个路径；写错时 Xcode 不报错，而是默默建出这个目录。

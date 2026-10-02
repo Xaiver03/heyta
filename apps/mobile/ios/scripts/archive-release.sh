@@ -33,7 +33,7 @@ fail() { echo "" >&2; echo "🔴 $1" >&2; exit 1; }
 echo "=== preflight ==="
 
 # ① 团队
-grep -q "DEVELOPMENT_TEAM = ${TEAM}" HeytaMobile.xcodeproj/project.pbxproj \
+grep -q "DEVELOPMENT_TEAM = ${TEAM}" Heyta.xcodeproj/project.pbxproj \
   || fail "工程里没有 DEVELOPMENT_TEAM = ${TEAM}"
 echo "  ✅ 团队 ${TEAM}"
 
@@ -106,7 +106,7 @@ echo "  ✅ Apple Distribution 身份在位"
 echo ""
 echo "=== 归档 ==="
 rm -rf "$ARCHIVE_PATH"
-xcodebuild -workspace HeytaMobile.xcworkspace -scheme HeytaMobile -configuration Release \
+xcodebuild -workspace Heyta.xcworkspace -scheme Heyta -configuration Release \
   -destination 'generic/platform=iOS' -archivePath "$ARCHIVE_PATH" archive \
   DEVELOPMENT_TEAM="$TEAM" 2>&1 | grep -E "BUILD SUCCEEDED|BUILD FAILED|error:" | head -10
 [ -d "$ARCHIVE_PATH" ] || fail "归档失败（没有产出 ${ARCHIVE_PATH}）"
@@ -114,8 +114,8 @@ xcodebuild -workspace HeytaMobile.xcworkspace -scheme HeytaMobile -configuration
 echo ""
 echo "=== 从**已签名产物**里读回签名证书（这是备案要的权威值）==="
 
-APP="$ARCHIVE_PATH/Products/Applications/HeytaMobile.app"
-[ -d "$APP" ] || fail "归档里没有 HeytaMobile.app"
+APP="$ARCHIVE_PATH/Products/Applications/Heyta.app"
+[ -d "$APP" ] || fail "归档里没有 Heyta.app"
 
 # 🔴 三个坑叠在一起，所以这段长这样：
 #    ① `codesign -d --extract-certificates <prefix>` **实测不产出文件**（静默失败）；

@@ -30,8 +30,8 @@
 
  这个文件与 `HeytaWidgetModule.swift` **还没有加进 Xcode target**（见账本 W2-2 / U10）：
  需要
- 1. 把两个文件加入 `HeytaMobile` target 的 Compile Sources；
- 2. 让 `HeytaMobile` target 链接本地的 `HeytaWidgetCore` SwiftPM 包；
+ 1. 把两个文件加入 `Heyta` target 的 Compile Sources；
+ 2. 让 `Heyta` target 链接本地的 `HeytaWidgetCore` SwiftPM 包；
  3. 两个 target 都开 App Group 能力，bundle id 改成 `com.heyta.mobile[.WidgetExtension]`。
  */
 

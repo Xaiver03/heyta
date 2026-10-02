@@ -31,7 +31,7 @@ HERE="$(cd "$(dirname "$0")" && pwd)"
 IOS_DIR="$(cd "$HERE/.." && pwd)"
 REPO="$(cd "$IOS_DIR/../../.." && pwd)"
 SRC_SVG="$REPO/apps/web/public/icons/icon.svg"
-ICONSET="$IOS_DIR/HeytaMobile/Images.xcassets/AppIcon.appiconset"
+ICONSET="$IOS_DIR/Heyta/Images.xcassets/AppIcon.appiconset"
 
 [ -f "$SRC_SVG" ] || { echo "🔴 找不到源 SVG: $SRC_SVG"; exit 1; }
 command -v rsvg-convert >/dev/null || { echo "🔴 需要 rsvg-convert（brew install librsvg）"; exit 1; }

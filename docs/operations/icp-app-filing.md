@@ -152,7 +152,7 @@ tccli domain DescribeDomainSimpleInfo --Domain waytofuture.cn  --profile waytofu
 | 安卓 `applicationId` | `com.heytamobile` → `com.heyta` | **这才是备案要的「App包名」** |
 | 安卓 `namespace` / Kotlin `package` | **保持不变** `com.heytamobile` | 内部代码命名空间，不是应用身份；改它要搬 30 个文件、对备案零收益 |
 | iOS `PRODUCT_BUNDLE_IDENTIFIER` | `com.heyta.mobile` → `com.heyta`（含 `.WidgetExtension`） | |
-| iOS Xcode target / 目录名 | **保持不变** `HeytaMobile` | 内部名字，不出现在应用身份里 |
+| iOS Xcode target / 目录名 | ~~保持不变 `HeytaMobile`~~ → **已改名 `Heyta`**（2026-10-02 产品负责人拍板推翻上表当初的"保持不变"；内部名也应与产品同名，Android 侧 rootProject.name 同步改 `Heyta`） | 内部名字不出现在应用身份里，但没理由与产品名不一致 |
 | iOS App Group | `group.com.heyta.mobile` → `group.com.heyta` | entitlements ×2 + `WidgetSharedConstants.swift` |
 | 显示名 | `HeytaMobile` → `heyta` | iOS `CFBundleDisplayName`、安卓 `app_name`、启动页文案、`app.json` |
 | RN 模块名 | `HeytaMobile` → `heyta` | **三处必须同步**：`app.json` 的 `name` / `AppDelegate.swift` / `MainActivity.kt` |

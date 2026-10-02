@@ -289,7 +289,7 @@ pnpm build:ios
 产物：
 
 ```
-apps/mobile/ios/build/Build/Products/Release-iphonesimulator/HeytaMobile.app
+apps/mobile/ios/build/Build/Products/Release-iphonesimulator/Heyta.app
 ```
 
 ### 2.2 `pod install` 的两个环境前提（都实测踩过）

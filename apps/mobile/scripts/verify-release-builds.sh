@@ -57,9 +57,9 @@ verify_ios() {
   echo ""
   echo "=== iOS release ==="
   local app
-  app="$(find /tmp/heyta-ios-release -name 'HeytaMobile.app' -path '*Release-iphonesimulator*' 2>/dev/null | head -1)"
+  app="$(find /tmp/heyta-ios-release -name 'Heyta.app' -path '*Release-iphonesimulator*' 2>/dev/null | head -1)"
   [ -n "$app" ] || { echo "  🔴 找不到 Release 产物。先构建："; \
-    echo "     xcodebuild -workspace apps/mobile/ios/HeytaMobile.xcworkspace -scheme HeytaMobile \\"; \
+    echo "     xcodebuild -workspace apps/mobile/ios/Heyta.xcworkspace -scheme Heyta \\"; \
     echo "       -configuration Release -sdk iphonesimulator -destination 'id=$IOS_UDID' \\"; \
     echo "       -derivedDataPath /tmp/heyta-ios-release build"; exit 1; }
 
@@ -86,8 +86,8 @@ verify_ios() {
 #   debug 包没 Metro 会红屏 "No script URL provided"，而那个红屏
 #   内容比例 98.8%、色阶 255，**空白检测完全通过**，看起来像渲染好了。
 #
-# 构建：xcodebuild -workspace apps/mobile/ios/HeytaMobile.xcworkspace \\
-#         -scheme HeytaMobile -configuration Release -sdk iphonesimulator \\
+# 构建：xcodebuild -workspace apps/mobile/ios/Heyta.xcworkspace \\
+#         -scheme Heyta -configuration Release -sdk iphonesimulator \\
 #         -destination 'id=$IOS_UDID' -derivedDataPath /tmp/heyta-ios-release build
 # 产物内嵌 main.jsbundle = 自足（不依赖 Metro）
 # 设备：iPhone 17 Pro 模拟器（${IOS_UDID}）

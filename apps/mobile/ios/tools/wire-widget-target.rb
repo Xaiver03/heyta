@@ -1,4 +1,4 @@
-# W2-2：把 widget extension target 与本地 SwiftPM 包接进 HeytaMobile.xcodeproj
+# W2-2：把 widget extension target 与本地 SwiftPM 包接进 Heyta.xcodeproj
 #
 # 为什么用 xcodeproj gem 而不是手改 pbxproj：
 # pbxproj 里每个对象都有 24 位十六进制 UUID，且存在 6 种互相引用的关系
@@ -7,11 +7,11 @@
 # gem 负责生成引用一致的 UUID —— 它正是 CocoaPods 自己用的那个库。
 require 'xcodeproj'
 
-PROJECT = 'HeytaMobile.xcodeproj'
-APP_TARGET = 'HeytaMobile'
+PROJECT = 'Heyta.xcodeproj'
+APP_TARGET = 'Heyta'
 EXT_TARGET = 'HeytaWidgetExtension'
 PKG_REL_PATH = 'HeytaWidgetCore'
-APP_GROUP = 'HeytaMobile'
+APP_GROUP = 'Heyta'
 EXT_GROUP = 'HeytaWidgetExtension'
 
 project = Xcodeproj::Project.open(PROJECT)
@@ -26,11 +26,11 @@ PROJECT_DIR = File.expand_path(File.dirname(PROJECT))
 #
 # | group | 它有 path 吗 | 组内文件引用的 path 该写 |
 # |---|---|---|
-# | `HeytaMobile` | ❌ 只有 `name` | `HeytaMobile/AppDelegate.swift`（带目录） |
+# | `Heyta` | ❌ 只有 `name` | `Heyta/AppDelegate.swift`（带目录） |
 # | `HeytaWidgetExtension` | ✅ `path = HeytaWidgetExtension` | `HeytaWidgetBundle.swift`（裸名） |
 #
 # 🔴 我在这里**连续错了两次**，方向相反：
-#   ① 先写裸名 → `HeytaMobile` 组解析成 `<ios>/HeytaWidgetModule.swift`（不存在）；
+#   ① 先写裸名 → `Heyta` 组解析成 `<ios>/HeytaWidgetModule.swift`（不存在）；
 #   ② 改成带目录 → `HeytaWidgetExtension` 组解析成 `<ios>/HeytaWidgetExtension/HeytaWidgetExtension/…`（不存在）。
 #
 # 两次都**不影响 `xcodebuild -list`** —— 它只解析工程结构、不碰文件系统。
@@ -121,8 +121,8 @@ puts "   app group path = #{app_group.path.inspect}"
 
 # 🔴 `path` 必须是**相对 SRCROOT 的完整路径**，不是裸文件名。
 #
-# `HeytaMobile` 这个 group **没有 `path`**（它只有 `name`），所以组内文件引用
-# 必须自己带上目录前缀 —— 对照 `AppDelegate.swift` 的 `path = HeytaMobile/AppDelegate.swift`。
+# `Heyta` 这个 group **没有 `path`**（它只有 `name`），所以组内文件引用
+# 必须自己带上目录前缀 —— 对照 `AppDelegate.swift` 的 `path = Heyta/AppDelegate.swift`。
 #
 # 第一版我写的是 `new_file('HeytaWidgetModule.swift')` → `path = HeytaWidgetModule.swift`
 # → 解析成 `<ios>/HeytaWidgetModule.swift`，**那个文件不存在**。
