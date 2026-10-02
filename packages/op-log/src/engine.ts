@@ -198,6 +198,18 @@ export class OpLogEngine {
     return all.find((r) => r.op.id === opId)?.op;
   }
 
+  /**
+   * 读**完整**本地 op-log（只读，不改任何状态）。
+   *
+   * 备份还原的「目标必须真的是空库」判定要用它
+   * （`app-host` 的 `restoreIntoEmptyTarget` 经宿主的 `ImportTarget.readOpLog`
+   * 到这里）—— 写之前必须知道目标里已有什么，而 pending 只是它的一个子集。
+   */
+  async getAllOps(): Promise<Operation<string>[]> {
+    const all = await this.options.store.getAllOps();
+    return all.map((r) => r.op);
+  }
+
   /** 取某实体的全部本地 op（冲突解决要用它比对时间戳）。 */
   async getOpsForEntity(
     entityType: EntityType,
