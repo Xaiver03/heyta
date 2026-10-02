@@ -1,6 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 
-import { enableAllModules } from './helpers';
+import { decidePrivacyConsent, enableAllModules } from './helpers';
 import { installMissingProducerShims } from './shims';
 
 /**
@@ -35,7 +35,15 @@ async function openAppNeutral(page: Page, path = '/'): Promise<void> {
   await installMissingProducerShims(page);
   await page.goto(path);
   // 判据不能用"添加任务"输入框：`openApp()` 那条中文锚点在英文界面上必然超时。
+  // （这里也不改用英文 placeholder 当锚 —— 那等于把 i18n 文案抄进测试，抄件一定会漂。
+  // `language-option-en` 是 testID，语言中立，且它本身就是"顶栏渲染完了"的证据。）
   await expect(page.getByTestId('language-option-en')).toBeVisible();
+  // 🔴 首启隐私同意必须收掉，但它**不碰这一条判据的地盘**：决定写的是
+  // `heyta.consent.*` 而不是 `heyta.locale`，所以下面"推断语言不落盘"那条
+  // （`getItem(STORAGE_KEY) === null`）测的仍然是纯首启。
+  // 不关掉它，第 5 条用例点语言切换器时会卡在 `div[role="presentation"] …
+  // intercepts pointer events` —— 遮罩是整屏的，顶栏也在它底下。
+  await decidePrivacyConsent(page);
 }
 
 /** 界面上出现的是哪一门语言：正向含对方不含。 */

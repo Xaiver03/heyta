@@ -157,19 +157,12 @@ for (const state of ['light', 'dark', 'reduced-transparency'] as const) {
       });
     }
 
-    // 🔴 走套件的规范启动路径（openApp = 启用全部模块 + 生产者垫片）：
-    //    裸 goto 时模块全关，rail 没有「搜索」tab，而且 main 里的展示层会拦住指针。
+    // 🔴 走套件的规范启动路径（openApp = 启用全部模块 + 中文偏好 + 生产者垫片
+    //    + 做完首启隐私同意，默认「仅本机」= 对本组判据的最小承诺）。
+    //    同意面板本身是模态实卡（ADR-0042 裁决表：模态不改玻璃），
+    //    而且它在 openApp 里就已经关掉 —— 不在本组三态截图的对象里。
     await openApp(page, APP_URL);
 
-    // 🔴 首启隐私同意面板（privacy/consent-gate）会以 z.modal 盖住整个界面，
-    // 不先做决定的话 rail 的 tab 一个都点不了。选「仅本机」：对本组判据而言
-    // 它是最小承诺的决定（不触网、不依赖服务端），且面板本身是模态实卡
-    // （ADR-0042 裁决表：模态不改玻璃）—— 不在本组三态截图的对象里。
-    const consent = page.getByTestId('privacy-consent-dialog');
-    if (await consent.isVisible().catch(() => false)) {
-      await page.getByTestId('privacy-consent-local-only').click();
-      await expect(consent, '做完决定后同意面板必须关掉').toHaveCount(0);
-    }
     // 造一点有色彩的下层内容（玻璃需要可折射的东西；空页面验不出玻璃）。
     await addTask(page, '玻璃三态判据的锚点任务·甲');
     await addTask(page, '玻璃三态判据的锚点任务·乙');

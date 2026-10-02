@@ -16,6 +16,14 @@
  * 地址上（`127.0.0.1`），而回环被 `classifyDestination` 判为"数据不出设备"，
  * 根本不需要授权；而远端明文 http 会被 `validateEndpointUrl` 以
  * `plaintext-remote` 拒绝、https 又接不到这个 stub。这一段如实记为未覆盖。
+ *
+ * 🔴 **首启隐私同意这里必须答 `accepted`，不能沿用共享层的默认档**：
+ * 这四条的判据形态是"假端点计数为 0"（`expectNoStubCall`），而隐私闸门
+ * （`consent-gate.ts` 换掉整个 `window.fetch`）在 `local-only` 下**同样**让计数为 0 ——
+ * 那时候"通过"担保的是"我们没同意联网"，不是"AI 那三道闸拦住了"。
+ * 一条在两种根因下都绿的判据等于没有判据。把隐私闸门先打开，
+ * 剩下唯一能拦住请求的就是**被测的那一道**；而"不同意时一个字节都不出进程"
+ * 由 `privacy-consent-zero-egress.spec.ts` 专门判，它不经过这里。
  */
 
 import { expect, test } from '@playwright/test';
@@ -38,7 +46,7 @@ test.describe('AI 不可用：一次请求都不许发出去', () => {
     request,
   }) => {
     await resetStub(request);
-    await openApp(page);
+    await openApp(page, '/', 'accepted');
 
     // 「优先级建议」只在有任务时出现。
     await addTask(page, '写周报');
@@ -90,7 +98,7 @@ test.describe('AI 不可用：一次请求都不许发出去', () => {
 
   test('有端点但没给功能指定路由：入口说明原因，计数为 0', async ({ page, request }) => {
     await resetStub(request);
-    await openApp(page);
+    await openApp(page, '/', 'accepted');
 
     // 端点加好、能力也勾了，但 `features: []` —— 一个功能都没路由。
     await configureEndpoint(page, {
@@ -114,7 +122,7 @@ test.describe('AI 不可用：一次请求都不许发出去', () => {
     request,
   }) => {
     await resetStub(request);
-    await openApp(page);
+    await openApp(page, '/', 'accepted');
 
     // 只勾基线能力，却把它路由给需要 `long_context` 的拆解。
     await configureEndpoint(page, {
@@ -157,7 +165,7 @@ test.describe('AI 不可用：一次请求都不许发出去', () => {
     request,
   }) => {
     await resetStub(request);
-    await openApp(page);
+    await openApp(page, '/', 'accepted');
 
     // 先完整配好 —— 证明拦住请求的不是"没配置"，而是**网络层那道总闸**。
     await configureEndpoint(page, {

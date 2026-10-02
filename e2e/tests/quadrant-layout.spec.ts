@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { openApp } from './helpers';
 
 /**
  * 四象限的**排版几何**（goal-layout-audit.md 页 1）
@@ -26,7 +27,7 @@ const WIDE = { width: 1280, height: 800 };
 const NARROW = { width: 660, height: 800 };
 
 async function openQuadrant(page: import('@playwright/test').Page): Promise<void> {
-  await page.goto('/');
+  await openApp(page);
   // rail 上的「四象限」视图 tab。
   await page.getByRole('tab', { name: '四象限' }).click();
   await expect(page.locator('[data-testid^="quadrant-cell-"]').first()).toBeVisible();

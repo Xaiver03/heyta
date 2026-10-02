@@ -144,17 +144,144 @@ export async function enableAllModules(page: Page): Promise<void> {
 }
 
 /**
+ * 首启隐私同意面板的真实出路。
+ *
+ * 🔴 **为什么这件事必须住在 `openApp` 里，而不是每条用例自己写一遍**：
+ * 面板（`apps/web/src/features/privacy/PrivacyConsentSheet.tsx`）以 `role="presentation"`
+ * 的遮罩盖住整棵 `main.ht-main`，而它的渲染条件是 `shouldAskOnFirstLaunch()`
+ * = `privacyConsent.undecided()` —— Playwright 每条用例都是**全新的浏览器上下文**，
+ * 于是每一轮启动都是"没问过的设备"。不做完这一步，后面**任何一次点击**都会
+ * 卡在 actionability 上直到测试超时，而症状写的是
+ * "`<div role="presentation">…` intercepts pointer events"，
+ * 看起来像界面坏了（2026-10-02 实测：`pnpm verify:legal-links` 五条全部 120 秒红在这一句）。
+ *
+ * ⚠️ 这里**真点按钮**，不往 `localStorage` 塞记录：
+ * 塞记录要把 `{decision, decidedAt}` 的形状抄一份到测试里，而那份抄件的唯一事实源在
+ * `packages/app-host/src/privacy-consent.ts`（抄件一定会漂）；更坏的是形状一漂移，
+ * 闸门按 fail-closed 判"没同意"，遮罩照旧，测试就退化成"永远在等一个不会来的点击"。
+ * 点按钮只依赖 testID —— 那是界面自己的契约，`privacy-consent-zero-egress.spec.ts`
+ * 也在断言它存在。
+ *
+ * 🔴 默认取 **`local-only`（最小承诺）**，而不是"顺手全同意"：
+ * 这一套件的绝大多数判据只看本机界面，不碰网络；让共享入口默认替用户同意，
+ * 等于把"我们尊重这个决定"变成"我们其实不在乎"——正是 `privacy-consent.ts`
+ * 文件头列为 fail-closed 的那一侧。需要出门的旅程（假端点收调用、管理台拉数据、
+ * 真服务端同步）**在自己的用例里显式传 `accepted`**，于是"这条旅程要出门"
+ * 是一行写在调用点上的事实，而不是共享层里的默认值。
+ *
+ * ⚠️ **必须"等"它，不能"看一眼在不在"**（2026-10-02 实测）：面板是挂载之后的
+ * `useEffect` 打开的，比 `goto` 的 load 事件晚。第一版这里写的是
+ * `if (!(await dialog.isVisible())) return;` —— 那条**恒为假**，于是三条
+ * `account-menu` 用例照旧红在 `div[role="presentation"] … intercepts pointer events`，
+ * 而失败截图里面板明明白白开着。探针跑在了挂载前面（§7 元规则 1）。
+ *
+ * ⚠️ 代价：已经做完决定的上下文（同一浏览器里第二次 `openApp`）要等满这段
+ * 超时才继续。5 秒 × 少数几条，比"面板出现得慢一点就整条套件卡死"便宜。
+ */
+export async function decidePrivacyConsent(
+  page: Page,
+  decision: 'accepted' | 'local-only' = 'local-only',
+): Promise<void> {
+  const dialog = page.getByTestId('privacy-consent-dialog');
+  const shown = await dialog
+    .waitFor({ state: 'visible', timeout: 5_000 })
+    .then(() => true)
+    .catch(() => false);
+  if (!shown) return;
+  await page
+    .getByTestId(decision === 'accepted' ? 'privacy-consent-accept' : 'privacy-consent-local-only')
+    .click();
+  await expect(dialog, '作出决定之后，同意面板必须关掉').toHaveCount(0);
+}
+
+/**
+ * 把界面钉在**中文**（写进本机的语言偏好 = 解析链的第 1 层）。
+ *
+ * 🔴 为什么这一句必须住在共享入口里：2026-10-01 的语言解析链把
+ * "系统语言" 放进了第 3 层（`apps/web/src/lib/locale.ts`，产品拍板），于是
+ * Playwright 默认的 `en-US` 浏览器语言**会决定界面语言**。而这套判据的
+ * 定位符与断言全是中文（`添加任务` 的 placeholder、`登录 / 注册`、`退出登录`）。
+ * 2026-10-02 实测：`account-menu.spec.ts` 三条全红，红在
+ * `waiting for input[placeholder^="添加任务"]` **元素根本不存在** ——
+ * 截图里应用渲染得好好的，只是整片是英文。症状长得像"界面坏了"，
+ * 实际是**探针跟着浏览器语言漂**（§7 元规则 1）。
+ *
+ * ⚠️ 这不是"替用户伪造状态"：写 `heyta.locale` 就是产品里"用户明确选过中文"
+ * 的那个状态（第 1 层，胜过 `?lang=` 与系统语言）。真正测语言协商的是
+ * `language-first-launch.spec.ts`，它**不走** `openApp`。
+ *
+ * ⚠️ 键名是从 `locale.ts` 的 `STORAGE_KEY` 抄的（e2e 刻意不在根工作区内，
+ * 引不到那个包）。抄件会漂，所以这里配了一条**会响的**判据：键一错，
+ * 种子被忽略 → 界面变英文 → `openApp` 那句中文 placeholder 断言当场红，
+ * 而不是让后面 20 条用例各自去猜"为什么找不到元素"。
+ */
+export async function pinChineseUi(page: Page): Promise<void> {
+  await page.addInitScript(() => {
+    window.localStorage.setItem('heyta.locale', 'zh-CN');
+  });
+}
+
+/**
+ * 给"补签"那道读侧闸一个**不需要补签**的应答（`GET /api/account/legal-consent`）。
+ *
+ * 🔴 凡是往 `localStorage['heyta.sync.credentials']` 塞了 `baseUrl` + `token` 的用例
+ * 都需要它，与用例的主题无关：应用一启动就会问一次（`apps/web/src/main.tsx` 把它挂在
+ * `createStartupNetwork` 里，排在 `startRealtime` 之前），而这个假服务端
+ * （`../stub-provider.mjs`）**只实现了 `/v1/chat/completions`**，其余路径一律 404
+ * （`stub-provider.mjs:139-143`）。于是 404 会落进每条用例都挂的那句
+ * 「除已登记缺失外不该有非 2xx」，把真正的失败淹掉 —— 2026-10-02 实测一次红六条
+ * （取证在 `BLOCKED.md` B12 / §7 第 117 条）。
+ *
+ * ⚠️ 应答体是**服务端那个 handler 的字段集**（`server/src/api.ts` GET `/account/legal-consent`：
+ * `needsReconfirm` / `reason` / `currentVersion` / `recordedVersion`），不是随手编的：
+ * 客户端 `parseLegalConsentStatus`（`packages/app-host/src/hosted-auth.ts:963`）逐字段
+ * 校验且 `reason` 必须是闭集词表里的一个，字段少一个就整条判 `malformed-response`。
+ * 这份抄件刻意**只住在这里一处**（调用点按 `inbox.spec.ts` 既有的说法：
+ * "塞了凭据之后它就会发，所以要给这个假服务端补上"）。
+ *
+ * ⚠️ 它**只答读侧**。真要验补签面板与 POST 的是 `legal-reconfirm-gate.spec.ts`，
+ * 它自己装了覆盖整个 `/api` 前缀的带状态路由（后注册的会遮蔽这里）。
+ */
+export async function stubLegalRecheck(page: Page, origin: string = STUB_ORIGIN): Promise<void> {
+  await page.route(`${origin}/api/account/legal-consent**`, async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        needsReconfirm: false,
+        reason: 'current',
+        currentVersion: null,
+        recordedVersion: null,
+      }),
+    });
+  });
+}
+
+/**
  * 打开应用。
  *
  * @param path 打开哪个路径 —— 默认 `/`（应用根）。
  *   桌面壳的反向授权要用 `/?auth=desktop&state=…`（ADR-0039 §2.3），
  *   而那一步**必须**在应用启动时就在 URL 里，所以它是一个参数而不是"之后再点"。
+ * @param consent 首启隐私闸门怎么答（见 {@link decidePrivacyConsent}）。
+ *   默认 `local-only`；**这条旅程要不要出门**只有调用点知道，所以它是个参数，
+ *   不是共享层里的默认值。
+ *
+ * ⚠️ 顺序是**先等界面、再关面板**：同意面板由挂载后的 effect 打开，
+ * 反过来写会让这里等的那个元素被遮罩挡住（判据本身不受影响，
+ * 但后面的点击会红成"元素点不动"而不是"面板没关"）。
  */
-export async function openApp(page: Page, path = '/'): Promise<void> {
+export async function openApp(
+  page: Page,
+  path = '/',
+  consent: 'accepted' | 'local-only' = 'local-only',
+): Promise<void> {
   await enableAllModules(page);
+  await pinChineseUi(page);
   await installMissingProducerShims(page);
   await page.goto(path);
   await expect(page.locator('input[placeholder^="添加任务"]')).toBeVisible();
+  await decidePrivacyConsent(page, consent);
 }
 
 /** 切换顶部视图 tab。 */
@@ -196,7 +323,10 @@ export async function switchView(
    * 直到有人真的跑 `pnpm check`（而它此前长期没人跑）。
    *
    * ⚠️ **加视图时要一起改的四处清单**（漏一处就会有静默过期）：
-   *   1. `apps/web/src/App.tsx`：`VIEW_TABS` / `ViewKey` / `VIEW_TITLED_BY_TAB`
+   *   1. `apps/web/src/App.tsx`：`VIEW_TABS` / `ViewKey`
+   *      （标题**不用登记了** —— R9 把默认改成"标题跟视图走"，只有任务视图读
+   *       `store.filter`。原来那张 `VIEW_TITLED_BY_TAB` 白名单就是漏登记日历造成的
+   *       缺陷本身，已删）
    *   2. **这里**
    *   3. `e2e/tests/motivation.spec.ts`：`TABS` / `TITLED` / `CARD_ON` / `VIEW_ANCHOR`
    *      （`CARD_OFF` 不用改 —— 它由 `TABS` 算出来，新视图默认落进"不该有进度卡"那一侧）

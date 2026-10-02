@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { openApp } from './helpers';
 
 /**
  * 收集箱界面 vs 滴答清单参照图（产品负责人 2026-10-01 附 macOS 截图）
@@ -20,10 +21,11 @@ const SHOT = (name: string) => `test-results/inbox-dida-${name}.png`;
 
 test('收集箱：当前形态取证', async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
-  // 🔴 `?lang=zh-CN` 是**必需**的，不是排版偏好：Playwright 的浏览器默认语言是
-  // en-US，而 `resolveInitialLocale` 第 3 层问 `navigator.language` ⇒ 界面是英文，
-  // `添加任务` 输入框不存在。取证要拍中文界面，就走解析链第 2 层（高于系统语言）。
-  await page.goto('/?lang=zh-CN');
+  // 🔴 中文界面由 `openApp` 钉（解析链第 1 层 `heyta.locale`）。这里以前写的是
+  // 裸 `goto('/?lang=zh-CN')` —— 那走的是第 2 层，能把界面钉住，但**不做完首启
+  // 隐私同意**，于是后面每一次点击都卡在遮罩上。真正必须测"第 3 层跟着系统语言
+  // 漂"的是 `language-first-launch.spec.ts`，它刻意不走 `openApp`。
+  await openApp(page);
 
   const composer = page.locator('input[placeholder^="添加任务"]');
   await expect(composer).toBeVisible();
@@ -58,7 +60,7 @@ test('收集箱：当前形态取证', async ({ page }) => {
  */
 test('组头折叠：收起后行消失、组头与计数留下', async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
-  await page.goto('/?lang=zh-CN');
+  await openApp(page);
 
   const composer = page.locator('input[placeholder^="添加任务"]');
   await expect(composer).toBeVisible();
@@ -119,7 +121,7 @@ test('最近 7 天：侧栏计数 == 点进去的行数，逾期那条不在里�
   page.on('pageerror', (e) => consoleErrors.push(String(e)));
 
   await page.setViewportSize({ width: 1440, height: 900 });
-  await page.goto('/?lang=zh-CN');
+  await openApp(page);
 
   const composer = page.locator('input[placeholder^="添加任务"]');
   await expect(composer).toBeVisible();
@@ -168,7 +170,7 @@ test('最近 7 天：侧栏计数 == 点进去的行数，逾期那条不在里�
  */
 test('页头排序：换档位真的换行序，控件带可见标签', async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
-  await page.goto('/?lang=zh-CN');
+  await openApp(page);
 
   const consoleErrors: string[] = [];
   page.on('pageerror', (e) => consoleErrors.push(String(e)));

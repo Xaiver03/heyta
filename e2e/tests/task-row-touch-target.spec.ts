@@ -123,16 +123,10 @@ test.describe('R1 · 勾选框命中区与不被裁（桌面载荷）', () => {
     });
     page.on('pageerror', (e) => errors.push(String(e)));
 
+    // 首启隐私同意面板由 `openApp` 做完（真点「只用本机」，不塞 localStorage）：
+    // 它是 `position: fixed; inset: 0` 的整屏遮罩，**rail 也在它底下** ——
+    // 不做完这一步，后面每一次 `click()` 都会卡在"…intercepts pointer events"直到超时。
     await openApp(page, '/');
-    // 🔴 首启的隐私同意弹窗（2026-10-01 落地）是一张 `position: fixed; inset: 0` 的整屏
-    // 遮罩，**rail 也在它底下** —— 不先走出口，后面每一次 `click()` 都会卡在
-    // "…intercepts pointer events" 直到超时（实测：症状长得像"四象限打不开"）。
-    // 这里点「只用本机」而不是往 localStorage 塞值：本判据不碰网络，而这条路径
-    // 是产品明确支持的完整模式（`PrivacyConsentSheet` 文件头），不是伪造状态。
-    if (await page.getByTestId('privacy-consent-dialog').isVisible().catch(() => false)) {
-      await page.getByTestId('privacy-consent-local-only').click();
-      await expect(page.getByTestId('privacy-consent-dialog')).toHaveCount(0);
-    }
     const add = async (text: string): Promise<void> => {
       const before = await page.locator('[data-testid^="task-item-"]').count();
       const composer = page.locator('input[placeholder^="添加任务"]');
