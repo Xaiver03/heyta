@@ -5,7 +5,7 @@
 > ①"肯定是需要做成聊天的，而且要做**能够改数据、做实际执行**的助手"；
 > ②"**我们界面当中有的功能都支持通过 AI 去直接改**"；
 > ③"为什么要用 MCP 的？我们在 AI 助手当中直接就改完了，没有必要用 MCP"（本 ADR §2.2 判定这条说对了一半）；
-> ④"倒数日我们就应该支持"（与 [ADR-0044](0044-countdown-anniversary-entity-calendar-data-and-image-tiers.md) 的 `EVENT` 同批，见 §2.6）。
+> ④"倒数日我们就应该支持"（与 ADR-0044（倒数日 / 纪念日实体与图片分层；**该文尚未进仓库**，落地后这里改回链接） 的 `EVENT` 同批，见 §2.6）。
 > 证据基础：[`../research/dida-ai-assistant-gap-analysis.md`](../research/dida-ai-assistant-gap-analysis.md)（2026-10-02 六路审计，缺口编号 `AI-G*`）。
 > 落地工单：[`../plans/ai-assistant-closure.md`](../plans/ai-assistant-closure.md)。
 
@@ -157,7 +157,7 @@ ADR-0005 给的否决理由有三条（隐私面 / 工程面 / **失败模式**�
 - 🔴 **纪律二**：拒绝话术必须区分「**我没有这个工具**」与「**产品做不到**」。
   正确形状："我做不到这件事（没有对应工具），但产品支持它，路径是 Y。"
   ⇒ 这条是**产品行为**要求，落成 §2.7 门禁的一部分。
-- **与 [ADR-0044](0044-countdown-anniversary-entity-calendar-data-and-image-tiers.md) 的咬合**：
+- **与 ADR-0044（倒数日 / 纪念日实体与图片分层；**该文尚未进仓库**，落地后这里改回链接） 的咬合**：
   `EVENT` 实体与其 AI 工具**同批**。这既是产品负责人"倒数日我们就应该支持"的落点，
   也是唯一一处能在同一个功能上**比竞品先做对**的机会。
 

@@ -16,8 +16,11 @@ import { describe, expect, it } from 'vitest';
 
 import type { LocalApiHost, LocalApiItem, LocalApiProject } from '@heyta/local-api';
 
-import { confirmAiToolProposal, runAiTool, runSelectedTool } from '../src/ai-tool-run.js';
-import type { ToolSelectionRule } from '../src/ai-tool-selection.js';
+import { confirmAiToolProposal, runSelectedTool } from '../src/ai-tool-run.js';
+import {
+  resolveToolSelection,
+  type ToolSelectionRule,
+} from '../src/ai-tool-selection.js';
 
 /** 会记账的假宿主。`submits` 就是本文件的核心断言对象。 */
 function fakeHost(items: readonly LocalApiItem[] = []): LocalApiHost & { submits: number } {
@@ -48,10 +51,33 @@ const CREATE_RULE: ToolSelectionRule = {
   },
 };
 
-describe('runAiTool（只读）', () => {
+/**
+ * 测试本地的"规则 → 执行"组合。
+ *
+ * 🔴 它**不是**产品里的一个前门 —— `packages/app-host` 里原来有一个
+ * （`runAiTool()`），零生产调用点，界面走的是 `requestToolCall`（模型前门）与
+ * `resolveToolSelection`（规则前门）那两条。2026-10-03 把那个冗余前门删掉了
+ * （工单 W7），本文件对它的 8 处调用改成这个**局部**组合：
+ * 断言一条没动，只是不再经由一个产品里不该存在的名字。
+ *
+ * ⚠️ 放在测试文件里而不是再抽回产品层，是因为"text → 执行一步"这件事在**产品**里
+ * 已经有两份实现了（`requestToolCall` 的规则分支就是它）。再来第三份就是下一个漂移。
+ */
+async function runThroughRules(
+  text: string,
+  deps: { host: LocalApiHost; grants: Record<string, boolean>; rules?: readonly ToolSelectionRule[] },
+) {
+  const selection = resolveToolSelection(text, {
+    grants: deps.grants,
+    ...(deps.rules === undefined ? {} : { rules: deps.rules }),
+  });
+  return runSelectedTool(selection, deps);
+}
+
+describe('规则 → 执行（只读）', () => {
   it('列出任务 → observation，且**一次都没写**', async () => {
     const host = fakeHost([{ id: 't1', title: '买牛奶', readable: true }]);
-    const outcome = await runAiTool('列出所有任务', { host, grants: READ_GRANTS });
+    const outcome = await runThroughRules('列出所有任务', { host, grants: READ_GRANTS });
     expect(outcome.kind).toBe('observation');
     if (outcome.kind !== 'observation') return;
     expect(outcome.tool).toBe('list_tasks');
@@ -63,7 +89,7 @@ describe('runAiTool（只读）', () => {
       { id: 't1', title: '公开的', body: '正文', readable: true },
       { id: 't2', title: '受保护的', body: '机密正文', readable: false },
     ]);
-    const outcome = await runAiTool('列出所有任务', { host, grants: READ_GRANTS });
+    const outcome = await runThroughRules('列出所有任务', { host, grants: READ_GRANTS });
     expect(outcome.kind).toBe('observation');
     if (outcome.kind !== 'observation') return;
     const rows = outcome.data as readonly LocalApiItem[];
@@ -82,7 +108,7 @@ describe('runAiTool（只读）', () => {
       pattern: /^任务\s+(\S+)$/,
       args: (m) => (m[1] === undefined ? undefined : { taskId: m[1] }),
     };
-    const outcome = await runAiTool('任务 t2', { host, grants: READ_GRANTS, rules: [rule] });
+    const outcome = await runThroughRules('任务 t2', { host, grants: READ_GRANTS, rules: [rule] });
     expect(outcome.kind).toBe('failed');
     if (outcome.kind !== 'failed') return;
     expect(outcome.reason).toBe('not-readable');
@@ -97,7 +123,7 @@ describe('runAiTool（只读）', () => {
       pattern: /^随便读一个$/,
       args: () => ({}),
     };
-    const outcome = await runAiTool('随便读一个', {
+    const outcome = await runThroughRules('随便读一个', {
       host,
       grants: READ_GRANTS,
       rules: [emptyArgs],
@@ -108,10 +134,10 @@ describe('runAiTool（只读）', () => {
   });
 });
 
-describe('runAiTool（写工具只提案）', () => {
+describe('规则 → 执行（写工具只提案）', () => {
   it('🔴 写工具返回 proposal，**submit 次数为 0**', async () => {
     const host = fakeHost();
-    const outcome = await runAiTool('记一下 买牛奶', {
+    const outcome = await runThroughRules('记一下 买牛奶', {
       host,
       grants: { create_task: true },
       rules: [CREATE_RULE],
@@ -124,7 +150,7 @@ describe('runAiTool（写工具只提案）', () => {
 
   it('🔴 确认之后才落库：submit 次数从 0 变 1', async () => {
     const host = fakeHost();
-    const outcome = await runAiTool('记一下 买牛奶', {
+    const outcome = await runThroughRules('记一下 买牛奶', {
       host,
       grants: { create_task: true },
       rules: [CREATE_RULE],
@@ -145,7 +171,7 @@ describe('runAiTool（写工具只提案）', () => {
       pattern: /^新建任务$/,
       args: () => ({ title: '   ' }),
     };
-    const outcome = await runAiTool('新建任务', {
+    const outcome = await runThroughRules('新建任务', {
       host,
       grants: { create_task: true },
       rules: [emptyTitle],
@@ -171,7 +197,7 @@ describe('两道闸', () => {
     });
 
     const host = fakeHost([{ id: 't1', title: 'x', readable: true }]);
-    const outcome = await runAiTool('列出所有任务', { host, grants });
+    const outcome = await runThroughRules('列出所有任务', { host, grants });
     expect(outcome.kind).toBe('denied');
     if (outcome.kind !== 'denied') return;
     expect(outcome.tool).toBe('list_tasks');
@@ -180,7 +206,7 @@ describe('两道闸', () => {
 
   it('未授权 → 选择阶段就 no-tool-granted（不到执行）', async () => {
     const host = fakeHost();
-    const outcome = await runAiTool('列出所有任务', { host, grants: {} });
+    const outcome = await runThroughRules('列出所有任务', { host, grants: {} });
     expect(outcome).toEqual({ kind: 'none', reason: 'no-tool-granted' });
     expect(host.submits).toBe(0);
   });

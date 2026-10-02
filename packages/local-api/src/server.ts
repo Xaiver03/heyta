@@ -36,6 +36,7 @@ import {
   findTool,
   projectAllForTool,
   readItemForTool,
+  readListTasksDueArgs,
   type LocalApiConfig,
   type LocalApiItem,
   type LocalApiWriteIntent,
@@ -63,6 +64,25 @@ export interface LocalApiProject {
 }
 
 /**
+ * `list_tasks` 的查询条件（日期已经过 `readListTasksDueArgs` 校验）。
+ *
+ * ⚠️ 三个日期参数是 `YYYY-MM-DD` 的**日历日字符串**，不是时刻 —— 本包刻意不产生时刻：
+ * "这一天在本机是哪一个时刻"只允许有一处回答（`packages/domain/src/date.ts`
+ * 与宿主侧的 `fromLocalDateString`），否则同一句"今天"会在两层算成两个日子。
+ */
+export interface ListTasksQuery {
+  projectId?: string;
+  completed?: boolean;
+  limit?: number;
+  /** 截止日正好是这一天。与 `dueFrom` / `dueTo` **互斥**。 */
+  dueOn?: string;
+  /** 范围起点（**含**这一天），与 `dueTo` **成对**出现。 */
+  dueFrom?: string;
+  /** 范围终点（**含**这一天），与 `dueFrom` **成对**出现。 */
+  dueTo?: string;
+}
+
+/**
  * 宿主端口 —— 由壳实现。
  *
  * 🔴 `submit` 的注释里写着它必须是 `dispatch()`，但**类型上无法强制**。
@@ -73,8 +93,18 @@ export interface LocalApiProject {
  * `LocalApiWritePort` 直接构造 op 的代码（见 ADR-0011 §5 的待办）。
  */
 export interface LocalApiHost {
-  /** 列任务。**壳负责按 `readable` 标注每条能不能读正文。** */
-  listTasks(args: { projectId?: string; completed?: boolean; limit?: number }): Promise<readonly LocalApiItem[]>;
+  /**
+   * 列任务。**壳负责按 `readable` 标注每条能不能读正文。**
+   *
+   * 🔴🔴 **过滤必须发生在 `limit` 之前** —— 这条顺序是契约的一部分，
+   * 不是实现细节：先截断再筛，"今天的任务"只要排在第 N 条之后就查不到，
+   * 而返回的是一个**空列表**（不是错误）。那与"把全量前 N 条当成今天的任务"
+   * 是同一个 bug 的两副面孔：都在给用户一个**看起来像答案**的东西。
+   *
+   * ⚠️ 顺序只能由**实现**负责（截断发生在实现里，本包看不见也补不回来），
+   * 所以写在这里，让每一个实现者第一眼就看到它。
+   */
+  listTasks(args: ListTasksQuery): Promise<readonly LocalApiItem[]>;
   /** 取单条任务。取不到返回 `undefined`（不是抛错）。 */
   getTask(taskId: string): Promise<LocalApiItem | undefined>;
   /** 列清单。 */
@@ -271,10 +301,12 @@ export type ToolReadOutcome =
 /**
  * 执行一个**只读**工具。
  *
- * 🔴 两条不容商量的规则在这里落地：
+ * 🔴 三条不容商量的规则在这里落地：
  *
  * 1. **读列表时逐条投影** —— 受保护的条目只出元数据（`projectAllForTool`）
  * 2. **读单条时明确拒绝** —— 不是返回空（`readItemForTool`）
+ * 3. **`list_tasks` 的参数不成立就报错** —— 不降级成"当这个参数没传"。
+ *    日期形状与 14 天跨度上限由 `readListTasksDueArgs` 判（契约见 `tools.ts`）。
  *
  * ⚠️ `get_task` 找不到时**不是错误**，而是一个带 `error` 字段的正常结果 ——
  * 这是既有行为，测试钉着它。别顺手改成 `ok: false`。
@@ -288,10 +320,20 @@ export async function runReadTool(
 
   switch (name) {
     case 'list_tasks': {
+      // 🔴 日期参数**先校验再传给宿主**。校验不成立时报 `invalid-args`，
+      // 而不是"忽略这个参数照样列" —— 后者会把拼错的日期伪装成
+      // "今天什么都没有了"，与本文件要修的那条缺陷同源。
+      const due = readListTasksDueArgs(a);
+      if (!due.ok) {
+        return { ok: false, kind: 'invalid-args', message: due.message };
+      }
       const items = await host.listTasks({
         ...(typeof a['projectId'] === 'string' ? { projectId: a['projectId'] } : {}),
         ...(typeof a['completed'] === 'boolean' ? { completed: a['completed'] } : {}),
+        // ⚠️ `limit` 只是**递过去**，截断发生在宿主里，且在过滤**之后**。
+        // 不要把任何过滤挪到这里来配合它（见 `LocalApiHost.listTasks` 的注释）。
         ...(typeof a['limit'] === 'number' ? { limit: a['limit'] } : {}),
+        ...due.args,
       });
       // 🔴 投影：受保护条目只留元数据
       return { ok: true, payload: projectAllForTool(items) };

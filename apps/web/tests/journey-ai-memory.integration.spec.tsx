@@ -78,6 +78,22 @@ function loadConfig(): LiveConfig | undefined {
 
 const CONFIG = loadConfig();
 
+// 🔴 跳过必须**自己说话**。这一套是 `pnpm -r test` 里**唯一碰真模型**的 web 用例，
+// 而 vitest 的汇总只写"skipped N"，不写"哪一套没跑、为什么、后果是什么" ——
+// 于是"全量测试通过"会被读成"真模型链路也验过了"。它没有。
+// ⚠️ 这里**没有**把它改成"缺配置就红"：那会让本机与 CI 的每一次 `pnpm -r test`
+// 立刻变红，而这条决定要连着改 `.github/workflows/ci.yml`（显式声明豁免）并与
+// 同一工作树里的并行会话协调。登记在 `docs/plans/ai-assistant-closure.md` W2。
+if (CONFIG === undefined) {
+  console.warn(
+    [
+      '[journey-ai-memory] ⚠️ 本套用例这一轮**没有跑**（唯一碰真模型的 web 旅程）。',
+      `   缺少真端点配置：${CONFIG_PATH}`,
+      '   要跑：HEYTA_AI_LIVE_CONFIG=<path> pnpm --filter @heyta/web test（需要真模型，本机 Ollama 即可）',
+    ].join('\n'),
+  );
+}
+
 /**
  * 🔴 「真 fetch」不能只是文件头的一句注释。
  *

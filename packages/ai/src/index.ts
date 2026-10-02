@@ -50,6 +50,13 @@ export {
 } from './supply.js';
 
 export {
+  diagnoseNetworkFailure,
+  originToWhitelist,
+  type NetworkFailureDiagnosis,
+  type NetworkFailureSignal,
+} from './diagnose.js';
+
+export {
   authorizeEgress,
   buildDisclosure,
   retainValidConsents,

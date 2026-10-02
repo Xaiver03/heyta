@@ -9,7 +9,7 @@
  * 🔴🔴 全案最重要的一条：**写工具在这里永远不会被执行**
  *
  * 本文件里 `host.submit` 只出现在 `confirmAiToolProposal()` 里，
- * 而那个函数**只能由用户确认之后调用**。`runAiTool()` 对写工具的唯一动作是
+ * 而那个函数**只能由用户确认之后调用**。`runSelectedTool()` 对写工具的唯一动作是
  * 用 `toWriteIntent()` 造一个**提案**（`LocalApiWriteIntent`）然后返回 ——
  * 它和 op 之间还隔着"用户看见、改过、点确认"这三步。
  *
@@ -29,7 +29,14 @@
  * | | 候选过滤（"看不看得见"） | 执行前复查（"调不调得动"） |
  * |---|---|---|
  * | MCP / 本机 API | `listMcpTools()` | `authorizeToolCall()` |
- * | **本模块** | `resolveToolSelection()` 里按 grants 过滤 | `runAiTool()` 里的 `isToolGranted()` |
+ * | **本模块** | `resolveToolSelection()` 里按 grants 过滤 | `runSelectedTool()` 里的 `isToolGranted()` |
+ *
+ * ⚠️ 这一行**以前写的是 `runAiTool()`，那是错的**（不是笔误，是一张会说谎的对照表）：
+ * `isToolGranted()` 一直住在 `runSelectedTool()` 里，而 `runAiTool()` 只是
+ * "规则选择 + 执行"的薄壳且零生产调用点。表指向一个不含该判断的函数，
+ * 后果是"我以为复查在 A 里，改 A 就改了两个闸" —— 而真正承重的那扇门在 B。
+ * 同一个模块里的另一张表（`ai-tool-call.ts` 头部）当时是对的，
+ * 说明这不是"没人知道"，是**抄件一定会漂**。2026-10-03 删掉薄壳并把表改对。
  *
  * 两次不是冗余：候选可能在**选择之后、执行之前**被用户撤销授权，
  * 而这里是进程内调用、没有会话可依赖。只有一条规则：**fail-closed**。
@@ -54,7 +61,6 @@ import {
 } from '@heyta/local-api';
 
 import {
-  resolveToolSelection,
   type ToolArgs,
   type ToolCandidate,
   type ToolSelection,
@@ -99,32 +105,32 @@ export interface AiToolRunnerDeps {
 }
 
 /**
- * 走一步：**选择 → 复查权限 → 执行**。
- *
- * 🔴 本函数**绝不**调 `host.submit`。写工具的下场是 `proposal`。
- */
-export async function runAiTool(text: string, deps: AiToolRunnerDeps): Promise<AiToolRunOutcome> {
-  const selection = resolveToolSelection(text, {
-    grants: deps.grants,
-    ...(deps.rules === undefined ? {} : { rules: deps.rules }),
-    ...(deps.now === undefined ? {} : { now: deps.now }),
-  });
-  return runSelectedTool(selection, deps);
-}
-
-/**
  * 执行一个**已经选好的**工具。
  *
  * 🔴 单独导出有两个理由，都不是洁癖：
  *
  * 1. **P2 的模型路径会直接产出选择结果**（模型给出 `tool` + `args`），
  *    而不是走规则 —— 那时它调的就是本函数，不必伪造一句自然语言去骗规则。
+ *    （已经落地：`ai-tool-call.ts` 的模型分支就是这么调的。）
  * 2. 它让"选择"与"执行"可以**分别**被测试：`no-match` / `ambiguous`
  *    是选择的问题，`not-readable` / `invalid-args` 是执行的问题。
  *
  * ⚠️ 它接受的正是 `resolveToolSelection()` 的返回 —— 调用方**不该**手搓一个
  * 选择结果绕过规则的目录过滤。P2 的模型路径必须先过一个"工具在不在目录里 +
  * 有没有授权"的校验，那个校验函数与 `resolveToolSelection` 共用（见 P2 计划）。
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * 🔴 这里**故意没有**"text → 执行一步"的便利前门。
+ *
+ * 原来有一个 `runAiTool()`（六行：`resolveToolSelection` 再转调本函数）。
+ * 它**零生产调用点** —— 界面走 `requestToolCall`（模型前门）与
+ * `resolveToolSelection`（规则前门）那两条，而 `requestToolCall` 的规则分支
+ * **本来就做着同一件事**。于是产品里有两个名字指向同一条组合，
+ * 测试却只认那个没人用的 —— 这是 AGENTS §3.5 那条教训的形状：
+ * **"抽出了共享实现"不等于"重复被消除了"，收尾动作是删掉旧的那份。**
+ * 2026-10-03 删除（工单 W7），8 处测试调用改成本地组合，断言一条没动。
+ * ⚠️ 不要再加回来：需要"text → 执行"就调 `requestToolCall`，它是唯一的前门。
+ * ─────────────────────────────────────────────────────────────────────────
  */
 export async function runSelectedTool(
   selection: ToolSelection,
@@ -178,22 +184,15 @@ export async function runSelectedTool(
  * 用户确认之后，才把提案落地。
  *
  * 🔴 这是本模块**唯一**调用 `host.submit` 的地方，也是"AI 不能自己改数据"
- * 这条约束的执行点。它必须是**显式的一步**，不能藏在 `runAiTool()` 里。
+ * 这条约束的执行点。它必须是**显式的一步**，不能藏在执行函数里。
+ * ⚠️ `check:ai-tools` 静态钉住"`RUN_FILE` 里 `.submit(` 恰好 1 次且在本函数内"，
+ * 所以这里不是靠注释守着的。
  */
 export async function confirmAiToolProposal(
   host: LocalApiHost,
   proposal: AiToolProposal,
 ): Promise<LocalApiWriteResult> {
   return host.submit(proposal.intent);
-}
-
-/** 只读便利：当前授权的工具名（供未来模型路径拼工具列表用，不另造权限判断）。 */
-export function grantedToolNames(grants: LocalApiConfig['grants']): readonly string[] {
-  return Object.entries(grants ?? {})
-    .filter(([, on]) => on === true)
-    .map(([name]) => name)
-    .filter((name) => findTool(name) !== undefined)
-    .sort();
 }
 
 /** 类型再导出，省得调用方两处 import。 */

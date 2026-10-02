@@ -23,18 +23,17 @@
  * 配置：`HEYTA_AI_LIVE_CONFIG`，默认 `/tmp/heyta-ai-live/provider.json`（mode 600，**绝不入库**）。
  *   ⚠️ 默认路径的存在与否会打开别人那条旅程用例（`apps/web/tests/journey-ai-memory.integration.spec.tsx`）
  *   —— 复跑请用**自己的一份**：`HEYTA_AI_LIVE_CONFIG=/tmp/heyta-ai-lang/provider.json node scripts/verify-ai-output-language.mjs`
- * 没配置时明确打印"跳过"并退出 0 —— 没配端点不是失败，是"还没配"。
+ * 没配置时**退出 2（"这一轮根本没跑"）**，只有显式 `--skip` /
+ * `HEYTA_AI_LIVE_ALLOW_SKIP=1` 才允许跳过（判据在 `scripts/lib/live-provider-config.mjs`）。
  */
-
-import { readFileSync } from 'node:fs';
 
 import {
   parseBreakdownItems,
   requestBreakdown,
 } from '../packages/app-host/dist/index.js';
 import { classifyDestination, requiresEgressConsent } from '../packages/ai/dist/index.js';
+import { requireLiveProviderConfig } from './lib/live-provider-config.mjs';
 
-const CONFIG_PATH = process.env['HEYTA_AI_LIVE_CONFIG'] ?? '/tmp/heyta-ai-live/provider.json';
 const EN_RUNS = 3;
 const ZH_RUNS = 2;
 /** 中日韩汉字 + 扩展 A + 兼容表意区。判据是"数得出个数"，不是人眼印象。 */
@@ -52,18 +51,7 @@ function check(label, condition, detail = '') {
   }
 }
 
-let config;
-try {
-  config = JSON.parse(readFileSync(CONFIG_PATH, 'utf8'));
-} catch {
-  console.log(`⏭  没有找到真实端点配置（${CONFIG_PATH}），跳过。`);
-  console.log('   这不是失败 —— 没配端点只是"还没配"。');
-  process.exit(0);
-}
-if (typeof config.endpoint !== 'string' || typeof config.apiKey !== 'string') {
-  console.log('⏭  配置里缺 endpoint 或 apiKey，跳过。');
-  process.exit(0);
-}
+const config = requireLiveProviderConfig('node scripts/verify-ai-output-language.mjs');
 
 function authedFetch(url, init) {
   // ⚠️ 密钥只进 header，不进命令行、不进日志。

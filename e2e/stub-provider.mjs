@@ -111,19 +111,73 @@ const CORS_HEADERS = {
   'access-control-allow-methods': 'GET, POST, OPTIONS',
 };
 
+/**
+ * 🔴 **来源白名单模式 —— 让假端点会"拒绝"，这条判据才有牙齿。**
+ *
+ * 为什么必须有这一段（实测 2026-10-02，Ollama 0.23.2）：
+ * 本机端点对**非回环来源**回 `403`、`Content-Length: 0`、**且完全不带 `ACAO`**。
+ * 于是浏览器把它拦成 `TypeError: Failed to fetch`，应用侧只能归成 `'network'`，
+ * 而上面那段注释描述的症状**正是用户实际看到的那一句**。
+ *
+ * 原来这个假端点无条件回 `ACAO: *`、根本不读 `Origin` ⇒ 它**结构上不可能复现**
+ * 这一类缺陷 —— 判据只测了放行那一侧，所以缺陷在开发阶段永远看不见
+ * （同理：所有人都在 localhost 上测，而回环来源是被放行的）。
+ *
+ * 用法：`STUB_ORIGIN_ALLOWLIST='http://127.0.0.1:4318,http://localhost:4318'`。
+ * 语义照抄 Ollama：
+ * - **没设这个变量 ⇒ 逐字保持从前的放行行为**（既有套件零影响，这是刻意的）；
+ * - 无 `Origin` 头 ⇒ 放行（那是非浏览器调用，比如测试自己 curl）；
+ * - `Origin` 在白名单里 ⇒ 放行，并**回显该来源**（`Vary: Origin`，与 Ollama 一致）；
+ * - `Origin` 不在白名单里 ⇒ **403 且不带任何 CORS 头** ——
+ *   🔴 少一个"顺手回个 ACAO 让错误更可读"都不行，那样浏览器的拦法就变了，
+ *   测出来的就不再是真症状。
+ */
+const ORIGIN_ALLOWLIST = (process.env['STUB_ORIGIN_ALLOWLIST'] ?? '')
+  .split(',')
+  .map((s) => s.trim())
+  .filter((s) => s !== '');
+
+/** 放行时该回哪些 CORS 头。白名单模式下回显来源，而不是 `*`。 */
+function corsFor(origin) {
+  if (ORIGIN_ALLOWLIST.length === 0) return CORS_HEADERS;
+  if (origin === undefined || !ORIGIN_ALLOWLIST.includes(origin)) return undefined;
+  return {
+    'access-control-allow-origin': origin,
+    'access-control-allow-headers': '*',
+    'access-control-allow-methods': 'GET, POST, OPTIONS',
+    vary: 'Origin',
+  };
+}
+
 const server = createServer((req, res) => {
   const url = req.url ?? '/';
 
+  // 🔴 来源闸门放在**最前面**，先于预检与所有路由 —— 真端点就是这么做的，
+  // 而且若放在后面，`/__requests` 这类诊断路径会变成绕过白名单的侧门。
+  if (ORIGIN_ALLOWLIST.length > 0) {
+    const origin = req.headers['origin'];
+    const allowed =
+      typeof origin !== 'string' || ORIGIN_ALLOWLIST.includes(origin);
+    if (!allowed) {
+      // 403、零 CORS 头、零 body —— 三个都必须，否则浏览器的拦法就不是真形状。
+      res.writeHead(403, { 'content-length': '0' });
+      res.end();
+      return;
+    }
+  }
+  const cors = corsFor(typeof req.headers['origin'] === 'string' ? req.headers['origin'] : undefined)
+    ?? CORS_HEADERS;
+
   // 预检请求：只回头，没有 body。
   if (req.method === 'OPTIONS') {
-    res.writeHead(204, CORS_HEADERS);
+    res.writeHead(204, cors);
     res.end();
     return;
   }
 
   // 测试用它来断言"真的发起了网络请求"。
   if (url.startsWith('/__requests')) {
-    res.writeHead(200, { ...CORS_HEADERS, 'content-type': 'application/json' });
+    res.writeHead(200, { ...cors, 'content-type': 'application/json' });
     res.end(JSON.stringify({ count: calls.length, calls }));
     return;
   }
@@ -131,13 +185,13 @@ const server = createServer((req, res) => {
   // `/__reset` 让每个用例从干净的计数开始。
   if (url.startsWith('/__reset')) {
     calls.length = 0;
-    res.writeHead(200, { ...CORS_HEADERS, 'content-type': 'application/json' });
+    res.writeHead(200, { ...cors, 'content-type': 'application/json' });
     res.end('{"ok":true}');
     return;
   }
 
   if (!url.includes('/chat/completions')) {
-    res.writeHead(404, { ...CORS_HEADERS, 'content-type': 'application/json' });
+    res.writeHead(404, { ...cors, 'content-type': 'application/json' });
     res.end('{"error":"只实现了 /v1/chat/completions"}');
     return;
   }
@@ -151,7 +205,7 @@ const server = createServer((req, res) => {
     try {
       parsed = JSON.parse(body);
     } catch {
-      res.writeHead(400, { ...CORS_HEADERS, 'content-type': 'application/json' });
+      res.writeHead(400, { ...cors, 'content-type': 'application/json' });
       res.end('{"error":"请求体不是 JSON"}');
       return;
     }
@@ -171,7 +225,7 @@ const server = createServer((req, res) => {
     calls.push({ feature, systemHead: system.slice(0, 40) });
 
     const content = respond(feature, user);
-    res.writeHead(200, { ...CORS_HEADERS, 'content-type': 'application/json' });
+    res.writeHead(200, { ...cors, 'content-type': 'application/json' });
     res.end(
       JSON.stringify({
         id: 'stub',

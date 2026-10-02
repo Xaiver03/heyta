@@ -51,6 +51,7 @@ import {
   outputLanguageDirective,
   type AiOutputLocale,
 } from './ai-output-language.js';
+import { describeRoutedFailure } from './ai-failure-fallback.js';
 
 /** 一次拆解最多收多少条。超出直接截断并**如实告诉用户**。 */
 export const MAX_BREAKDOWN_ITEMS = 20;
@@ -259,6 +260,16 @@ export type BreakdownOutcome =
       reason: BreakdownFailureReason;
       /** 路由层给的**原因码**。壳据此取词条 —— 见 §7.10 通道 #5。 */
       cause?: AiFailureReason;
+      /**
+       * 这次**实际打到的**端点 URL（来自 `AiFailure.endpointUrl`）。
+       *
+       * 🔴 它必须透传到壳：`network` 这一档光看原因码分不出"真的连不上"和
+       * "端点在你机器上、但它拒绝了你的来源"，而后者是唯一能在设置里说清楚的
+       * 那一种。诊断是纯函数，输入只有 `(reason, 这个 URL, 宿主 Origin)` ——
+       * 少带这一个字段，界面上就只剩下那句没用的"检查网络"。
+       * 见 [ADR-0045](../../../docs/adr/0045-conversational-assistant-split-authorization-from-catalog.md) §4。
+       */
+      endpointUrl?: string;
       message: string;
       /**
        * 🔴 **失败分支也要带 health。**
@@ -333,6 +344,8 @@ export async function requestBreakdown(
       ok: false,
       reason: 'ai-unavailable',
       cause: result.reason,
+      // 🔴 原样透传，不在这里做任何判断（诊断是壳那一层的事）。
+      endpointUrl: result.endpointUrl,
       message: specific === '' ? describeRoutedFailure(result.reason) : specific,
       // 🔴 失败也要落盘 —— 这通常正是熔断计数器刚 +1 的那一次。
       health: outcome.health,
@@ -360,49 +373,6 @@ export async function requestBreakdown(
     // 🔴 两个分支形状一致 —— 调用方不必先判别 `ok` 才能落盘熔断状态。
     health: outcome.health,
   };
-}
-
-/**
- * 把失败原因翻成用户看得懂的一句话。
- *
- * 🔴 **每一种原因都要有不同的话。** 如果全都说"AI 不可用"，
- * 用户就不知道该去开总开关、还是去加端点、还是去授权。
- */
-/**
- * 🔴 **兜底文案，不是主文案。**
- *
- * 用户看到的那句话应当来自 `packages/ai` —— 那里才知道"为什么没有候选端点"，
- * 而且它区分得细（缺能力 / 熔断 / 地址被拒 / 全部远端 / 端点不存在）。
- *
- * 这个函数只处理 `AiFailure.message` **为空**的情况（正常路径不该走到）。
- *
- * ⚠️ **不要在这里重新概括已经由 `packages/ai` 说明的原因。**
- * 同一句用户可见的文案有两个来源，就一定会漂移 ——
- * 漂移的文案比没有文案更危险，因为它会把人引去查错的地方
- * （本轮修的就是这个：缺能力被说成"检查地址是否合法"）。
- *
- * 如果哪天 `packages/ai` 新增了失败原因，**先去那边加说明**，
- * 而不是在这里补一行 `case`。
- */
-function describeRoutedFailure(reason: string): string {
-  switch (reason) {
-    case 'not-configured':
-      return 'AI 还没打开。去「设置」里打开总开关，并添加一个端点。';
-    case 'no-route':
-      return '没有可用端点能处理这个功能。检查端点是否启用、地址是否合法。';
-    case 'egress-not-authorized':
-      return '这个功能还没有授权把数据发到所选端点。去「设置」里逐功能授权。';
-    case 'fallback-needs-consent':
-      return '首选端点失败了，而备用端点会把数据发到别处，所以没有自动切换。需要你重新授权。';
-    case 'network':
-      return '连不上端点。检查它是不是在运行。';
-    case 'http-error':
-      return '端点返回了错误。';
-    case 'empty-response':
-      return '端点返回了空内容。';
-    default:
-      return 'AI 暂时不可用。';
-  }
 }
 
 /**

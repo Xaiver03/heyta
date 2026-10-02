@@ -83,7 +83,28 @@ const INPUT_SCHEMAS: Readonly<Record<string, McpToolDefinition['inputSchema']>> 
         type: 'boolean',
         description: 'true 只列已完成的，false 只列未完成的，不传则都要。',
       },
-      limit: { type: 'number', description: '最多返回多少条，默认 50。' },
+      dueOn: {
+        type: 'string',
+        description:
+          '只要截止日正好是这一天的任务，格式 YYYY-MM-DD，与返回里的 dueDate 同一口径。' +
+          '与 dueFrom / dueTo 互斥。没有截止日的任务不属于任何一天，不会出现在结果里。',
+      },
+      dueFrom: {
+        type: 'string',
+        description:
+          '日期范围起点（包含这一天），格式 YYYY-MM-DD，必须与 dueTo 一起给。' +
+          '与 dueOn 互斥。范围含两端，最多 14 天。',
+      },
+      dueTo: {
+        type: 'string',
+        description:
+          '日期范围终点（包含这一天），格式 YYYY-MM-DD，必须与 dueFrom 一起给。' +
+          '与 dueOn 互斥。范围含两端，最多 14 天。',
+      },
+      limit: {
+        type: 'number',
+        description: '最多返回多少条，默认 50。在按清单 / 完成状态 / 截止日期筛完之后才生效。',
+      },
     },
     additionalProperties: false,
   },

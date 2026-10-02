@@ -282,7 +282,12 @@ export function AiBreakdown(props: AiBreakdownProps): React.JSX.Element {
       setPhase('proposal');
       return;
     }
-    setFailure(breakdownFailureCopy(outcome.reason, outcome.message, outcome.cause));
+    setFailure(
+      breakdownFailureCopy(outcome.reason, outcome.message, {
+        cause: outcome.cause,
+        endpointUrl: outcome.endpointUrl,
+      }),
+    );
     setPhase('failed');
   }
 
@@ -537,6 +542,8 @@ export function AiBreakdown(props: AiBreakdownProps): React.JSX.Element {
         <FailureSettingsAction
 
           settingsTarget={failure?.settingsTarget}
+
+          originHint={failure?.originHint}
 
           onOpenSettings={onOpenSettings}
 

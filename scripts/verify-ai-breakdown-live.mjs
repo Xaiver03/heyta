@@ -18,10 +18,10 @@
  * 配置：`/tmp/heyta-ai-live/provider.json`（mode 600，**绝不入库**）
  *   { "mode":"own", "endpoint":"...", "apiKey":"...", "model":"..." }
  *
- * 没配置时**跳过并退出 0** —— 没配端点不是失败，是"还没配"。
+ * 没配置时**退出 2（"这一轮根本没跑"）**，只有显式 `--skip` /
+ * `HEYTA_AI_LIVE_ALLOW_SKIP=1` 才允许跳过。判据在 `scripts/lib/live-provider-config.mjs`。
+ * 以前这里写的是"跳过并退出 0"，于是它可以在一次都没碰过真模型的情况下报绿。
  */
-
-import { readFileSync } from 'node:fs';
 
 import {
   mergeChecklistIntoNote,
@@ -34,8 +34,7 @@ import {
 // 于是拿本机端点跑会得到「❌ 被拒绝了 / ❌ 网络请求数 = 0 / ❌ 目的地如实标注」——
 // **读起来像出境闸门漏了**，而闸门的行为完全正确。
 import { classifyDestination, requiresEgressConsent } from '../packages/ai/dist/index.js';
-
-const CONFIG_PATH = process.env['HEYTA_AI_LIVE_CONFIG'] ?? '/tmp/heyta-ai-live/provider.json';
+import { requireLiveProviderConfig } from './lib/live-provider-config.mjs';
 
 let pass = 0;
 let fail = 0;
@@ -53,19 +52,7 @@ function check(label, condition, detail = '') {
   else bad(label, detail);
 }
 
-let config;
-try {
-  config = JSON.parse(readFileSync(CONFIG_PATH, 'utf8'));
-} catch {
-  console.log(`⏭  没有找到真实端点配置（${CONFIG_PATH}），跳过。`);
-  console.log('   这不是失败 —— 没配端点只是"还没配"。');
-  process.exit(0);
-}
-
-if (typeof config.endpoint !== 'string' || typeof config.apiKey !== 'string') {
-  console.log('⏭  配置里缺 endpoint 或 apiKey，跳过。');
-  process.exit(0);
-}
+const config = requireLiveProviderConfig('pnpm verify:ai-breakdown-live');
 
 const TITLE = '上线新版本';
 // 探针所用的界面语言 —— 决定提示词末尾那条「输出语言」指令。

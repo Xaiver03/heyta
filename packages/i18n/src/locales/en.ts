@@ -1688,6 +1688,12 @@ export const en = {
   'web.ai.failure.cause.noRoute': 'No available endpoint can handle this feature. Check that an endpoint is enabled with a valid address.',
   'web.ai.failure.cause.fallbackNeedsConsent': 'The first endpoint failed, and the fallback would send your data elsewhere, so no automatic switch was made. It needs your permission again.',
   'web.ai.failure.cause.network': 'Could not reach the endpoint. Check your network and that the address is reachable.',
+  // Shares the transport-level `network` reason with the line above; the diagnosis is
+  // what separates them. The browser only ever surfaces `Failed to fetch` here — the
+  // status code is invisible, so this sentence is inferred, not observed.
+  'web.ai.failure.cause.networkOriginRejected': 'The endpoint is on your own machine, but it rejected this page’s origin. This is usually not a network failure: add the origin below to that endpoint’s allow-list (for Ollama, OLLAMA_ORIGINS).',
+  'web.ai.failure.originToAllow': 'Origin to allow',
+  'web.ai.failure.originToAllowNote': 'This is the exact Origin your browser sends, so copy it verbatim. heyta will not change your local endpoint’s settings for you.',
   'web.ai.failure.cause.httpError': 'The endpoint returned an error status. Check the API key, balance and model name.',
   'web.ai.failure.cause.emptyResponse': 'The endpoint returned nothing. Try a different model.',
   'web.ai.failure.details': 'Technical details',

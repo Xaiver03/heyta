@@ -157,6 +157,33 @@ export function createLocalApiHost(
       if (args.completed !== undefined) {
         tasks = tasks.filter((t) => (t.completedAt !== undefined) === args.completed);
       }
+
+      // 🔴🔴 日期过滤**必须排在 limit 之前**。这条顺序就是 `list.today` 那条缺陷的
+      // 另一半：先 `slice(0, 50)` 再筛，"今天的任务"只要排在第 50 条之后就查不到，
+      // 而用户拿到的是一个**空列表** —— 那不是"今天没任务"，那是筛错了。
+      // 契约把这件事写在 `LocalApiHost.listTasks` 的注释上（本包看不见截断，
+      // 也补不回来），这里就是它唯一的执行点。
+      //
+      // ⚠️ 过滤发生在**内存里已物化的状态**上，所以它是本地操作 ——
+      // 不该退回协议层再做一遍（那会出现"同一句『今天』两层各筛一次"）。
+      const { dueOn, dueFrom, dueTo } = args;
+      if (dueOn !== undefined || dueFrom !== undefined || dueTo !== undefined) {
+        tasks = tasks.filter((task) => {
+          // 没有截止日的任务**不属于任何一天**（"今天有什么任务"不该把收件箱倒出来）。
+          if (task.dueDate === undefined) return false;
+          // 用的是**投影时同一个**换算（`taskToItem` → `toLocalDateString`），
+          // 所以"拿来比的日子"与"返回里显示的日子"必然是同一个日子 ——
+          // 不会出现"筛 15 号，而返回里写着 15 号的那条被漏掉"。
+          const day = toLocalDateString(task.dueDate);
+          // 🔴 `YYYY-MM-DD` 的字典序就是时间序（四位年 + 补零月日），
+          // 所以闭区间比较不需要再做任何日历算术。两端都**含**。
+          if (dueOn !== undefined) return day === dueOn;
+          if (dueFrom !== undefined && day < dueFrom) return false;
+          if (dueTo !== undefined && day > dueTo) return false;
+          return true;
+        });
+      }
+
       // 上限默认 50：列表是给模型看的，一次几百条会直接吃掉上下文。
       const limit = args.limit ?? 50;
       return Promise.resolve(tasks.slice(0, Math.max(0, limit)).map((t) => taskToItem(t, isReadable(t))));

@@ -12,11 +12,13 @@
  *      （`/g` 正则的 `lastIndex` 泄漏是"第一次对、第二次错"的经典形状）。
  */
 
+import { today } from '@heyta/domain';
 import { describe, expect, it } from 'vitest';
 
 import {
   DEFAULT_TOOL_SELECTION_RULES,
   resolveToolSelection,
+  type ToolArgs,
   type ToolSelectionRule,
 } from '../src/ai-tool-selection.js';
 
@@ -54,6 +56,68 @@ describe('resolveToolSelection', () => {
     expect(result.kind).toBe('tool');
     if (result.kind !== 'tool') return;
     expect(result.tool).toBe('list_tasks');
+  });
+
+  // ─────────────────────────────────────────────────────────────────────
+  // 🔴 `list.today` 必须**带日期参数**（AI-G3 / 计划 W3）
+  //
+  // 这条规则当初传的是 `{}` —— 于是"今天有什么任务"与"列出任务"**逐字相同**，
+  // 拿到的是全量前 N 条。既有测试只断言 `tool`，从不看结果，所以它一直绿。
+  //
+  // ⚠️ 这里的判据是 args（选择层的产出就是 args），**结果集**的判据在
+  // `local-api-host-due-filter.spec.ts`（宿主层）与 `server.spec.ts`（契约层）。
+  // 判据分三层，缺任何一层都能被上面那种"参数对了、执行器没实现"的漂移绕过。
+  // ─────────────────────────────────────────────────────────────────────
+  describe('🔴 list.today 带的是**注入的那一天**，不是空参数', () => {
+    /** 两个相隔一天的固定时钟（不读真实时间，否则过几天自己变红）。 */
+    const DAY_A = 1_700_000_000_000;
+    const DAY_B = DAY_A + 24 * 60 * 60 * 1000;
+
+    function argsFor(nowValue: number): ToolArgs {
+      const result = resolveToolSelection('今天有什么任务', {
+        grants: ALL_READ_GRANTS,
+        now: () => nowValue,
+      });
+      if (result.kind !== 'tool') throw new Error(`应当选中工具，实际 ${JSON.stringify(result)}`);
+      expect(result.ruleId).toBe('list.today');
+      expect(result.tool).toBe('list_tasks');
+      return result.args;
+    }
+
+    it('🔴 传的是 `{ dueOn: <注入的今天> }`，**绝不是**空对象', () => {
+      const args = argsFor(DAY_A);
+      expect(args).toEqual({ dueOn: today(DAY_A) });
+      // 原缺陷的形状：空参数 = 执行器只能返回全量
+      expect(Object.keys(args)).not.toHaveLength(0);
+    });
+
+    it('🔴 换个时钟就换个日子 ⇒ 日期真的来自 `ctx.now`，不是 `Date.now()`', () => {
+      const a = argsFor(DAY_A);
+      const b = argsFor(DAY_B);
+      expect(a).not.toEqual(b);
+      expect(b).toEqual({ dueOn: today(DAY_B) });
+    });
+
+    it('命中"今日…安排"这类同族说法时也带日期', () => {
+      for (const text of ['今天要做什么', '今天有什么任务', '今日安排', '今天有什么待办']) {
+        const result = resolveToolSelection(text, { grants: ALL_READ_GRANTS, now: () => DAY_A });
+        if (result.kind !== 'tool') throw new Error(`${text} 应当命中：${JSON.stringify(result)}`);
+        expect(result.ruleId, text).toBe('list.today');
+        expect(result.args, text).toEqual({ dueOn: today(DAY_A) });
+      }
+    });
+
+    it('🔴 与 `list.tasks` 同时命中时，**今日**那条优先（否则"今天"会被全量覆盖）', () => {
+      // "今天有哪些任务" 同时命中 list.today 与 list.tasks，两者同一个工具
+      // ⇒ 去重保留**首次出现**的规则，而 `list.today` 排在前面。
+      const result = resolveToolSelection('今天有哪些任务', {
+        grants: ALL_READ_GRANTS,
+        now: () => DAY_A,
+      });
+      if (result.kind !== 'tool') throw new Error(JSON.stringify(result));
+      expect(result.ruleId).toBe('list.today');
+      expect(result.args).toEqual({ dueOn: today(DAY_A) });
+    });
   });
 
   it('命中已完成 → list_tasks 带 completed: true', () => {
