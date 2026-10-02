@@ -1,3 +1,4 @@
+import { ICON_SIZE } from '@heyta/design-system';
 /**
  * 导入 / 还原面板（设置页）
  * ============================
@@ -82,12 +83,12 @@ export function ImportPanel(): React.JSX.Element {
 
   return (
     <div className="ht-settings" data-testid="import-panel">
-      <h2 className="ht-settings__title">{t('web.import.title')}</h2>
+      <h2 className="ht-settings__title ht-type-section-title">{t('web.import.title')}</h2>
       <p className="ht-settings__hint">{t('web.import.intro')}</p>
 
       <section className="ht-settings__section">
-        <h3 className="ht-settings__h3">
-          <Upload size={12} aria-hidden="true" /> {t('web.import.fileLabel')}
+        <h3 className="ht-settings__h3 ht-type-headline">
+          <Upload size={ICON_SIZE.xs} aria-hidden="true" /> {t('web.import.fileLabel')}
         </h3>
         <div className="ht-settings__actions">
           <input
@@ -110,7 +111,7 @@ export function ImportPanel(): React.JSX.Element {
             disabled={busy || file === undefined}
             onClick={() => void run()}
           >
-            <Upload size={12} aria-hidden="true" />
+            <Upload size={ICON_SIZE.xs} aria-hidden="true" />
             {busy ? t('web.import.busy') : t('web.import.button')}
           </button>
         </div>
@@ -121,7 +122,7 @@ export function ImportPanel(): React.JSX.Element {
         用户必须知道 (a) 这不是万能导入、(b) 它不会动现有数据。
       */}
       <p className="ht-settings__notice" data-testid="import-empty-only">
-        <Info size={12} aria-hidden="true" /> {t('web.import.emptyOnly')}
+        <Info size={ICON_SIZE.xs} aria-hidden="true" /> {t('web.import.emptyOnly')}
       </p>
 
       {/*
@@ -130,7 +131,7 @@ export function ImportPanel(): React.JSX.Element {
         不说的话，用户会以为"还原完就同步到云上了"。
       */}
       <p className="ht-settings__notice" data-testid="import-local-only">
-        <Info size={12} aria-hidden="true" /> {t('web.import.localOnly')}
+        <Info size={ICON_SIZE.xs} aria-hidden="true" /> {t('web.import.localOnly')}
       </p>
 
       {outcome?.kind === 'restored' && (
@@ -148,13 +149,13 @@ export function ImportPanel(): React.JSX.Element {
 
       {outcome?.kind === 'refused' && (
         <p className="ht-settings__danger" role="alert" data-testid="import-refused">
-          <AlertTriangle size={12} aria-hidden="true" /> {t(REASON_KEYS[outcome.reason])}
+          <AlertTriangle size={ICON_SIZE.xs} aria-hidden="true" /> {t(REASON_KEYS[outcome.reason])}
         </p>
       )}
 
       {failed && (
         <p className="ht-settings__danger" role="alert" data-testid="import-failed">
-          <AlertTriangle size={12} aria-hidden="true" /> {t('web.import.failed')}
+          <AlertTriangle size={ICON_SIZE.xs} aria-hidden="true" /> {t('web.import.failed')}
         </p>
       )}
     </div>

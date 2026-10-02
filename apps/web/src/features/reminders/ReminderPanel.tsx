@@ -159,7 +159,7 @@ export function ReminderPanel({ task }: { task: Task }): React.JSX.Element {
         <span>{reminders.length > 0 ? String(reminders.length) : t('reminder.title')}</span>
       </summary>
 
-      <div className="ht-compose-panel">
+      <div className="ht-compose-panel ht-material">
         <ReminderList
           reminders={reminders}
           now={now}

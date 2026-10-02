@@ -88,7 +88,6 @@ export function TaskOrganizer({
     gap: cssVar('space.1'),
     padding: `${cssVar('space.1')} ${cssVar('space.2')}`,
     borderRadius: cssVar('radius.full'),
-    border: `${cssVar('border-width.thin')} solid ${cssVar('color.border')}`,
     fontSize: cssVar('font-size.xs'),
     color: cssVar('color.foreground-muted'),
     whiteSpace: 'nowrap',
@@ -136,6 +135,7 @@ export function TaskOrganizer({
         </summary>
 
         <div
+          className="ht-material"
           style={{
             position: 'absolute',
             // 浮层层级来自设计系统的 z 刻度。
@@ -149,7 +149,6 @@ export function TaskOrganizer({
             display: 'flex',
             flexDirection: 'column',
             gap: cssVar('space.3'),
-            background: cssVar('color.surface'),
             border: `${cssVar('border-width.thin')} solid ${cssVar('color.border')}`,
             borderRadius: cssVar('radius.lg'),
             boxShadow: cssVar('shadow.lg'),

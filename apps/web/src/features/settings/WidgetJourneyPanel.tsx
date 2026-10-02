@@ -1,3 +1,4 @@
+import { ICON_SIZE } from '@heyta/design-system';
 /**
  * Web/Windows 的小组件旅程（设置页）。
  * ====================================
@@ -95,7 +96,7 @@ export function WidgetJourneyPanel(): React.JSX.Element {
     {
       kind: 'note',
       testID: 'widget-journey-status',
-      leading: <MonitorCheck aria-hidden="true" size={14} />,
+      leading: <MonitorCheck aria-hidden="true" size={ICON_SIZE.xs} />,
       text: standalone
         ? t('web.widgetJourney.status.standalone')
         : t('web.widgetJourney.status.browser'),
@@ -125,7 +126,7 @@ export function WidgetJourneyPanel(): React.JSX.Element {
         testID="widget-journey-panel"
         title={t('web.widgetJourney.sectionTitle')}
         note={t('web.widgetJourney.intro')}
-        leading={<LayoutGrid aria-hidden="true" size={18} />}
+        leading={<LayoutGrid aria-hidden="true" size={ICON_SIZE.md} />}
         rows={rows}
       />
     </HeytaUiProvider>

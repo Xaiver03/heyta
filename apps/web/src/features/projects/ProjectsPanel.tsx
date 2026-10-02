@@ -1,3 +1,4 @@
+import { ICON_SIZE } from '@heyta/design-system';
 /**
  * 清单与标签面板（侧栏）—— **只剩接线**
  * ==========================================
@@ -156,7 +157,7 @@ export function ProjectsPanel({
                 if (next) setAddingTag(false);
               }}
             >
-              <Plus size={16} aria-hidden="true" />
+              <Plus size={ICON_SIZE.sm} aria-hidden="true" />
             </button>
           </div>
           {addingProject ? (
@@ -185,7 +186,7 @@ export function ProjectsPanel({
                 style={inputStyle}
               />
               <button type="submit" aria-label={t('web.projects.add')} style={iconButtonStyle}>
-                <Check size={16} aria-hidden="true" />
+                <Check size={ICON_SIZE.sm} aria-hidden="true" />
               </button>
             </form>
           ) : null}
@@ -210,7 +211,7 @@ export function ProjectsPanel({
             }}
             // 顶层画文件夹、子级不画 —— "层级"的一部分，与缩进一起。
             renderLeading={(_item, context) =>
-              context.isChild ? null : <Folder size={14} aria-hidden="true" />
+              context.isChild ? null : <Folder size={ICON_SIZE.xs} aria-hidden="true" />
             }
             renderItemExtra={(item) => (
               <ColorSlotPicker
@@ -239,7 +240,7 @@ export function ProjectsPanel({
                 if (next) setAddingProject(false);
               }}
             >
-              <Plus size={16} aria-hidden="true" />
+              <Plus size={ICON_SIZE.sm} aria-hidden="true" />
             </button>
           </div>
           {addingTag ? (
@@ -266,7 +267,7 @@ export function ProjectsPanel({
                 style={inputStyle}
               />
               <button type="submit" aria-label={t('web.tags.add')} style={iconButtonStyle}>
-                <Check size={16} aria-hidden="true" />
+                <Check size={ICON_SIZE.sm} aria-hidden="true" />
               </button>
             </form>
           ) : null}
@@ -292,7 +293,7 @@ export function ProjectsPanel({
             onRemove={(item) => {
               void projects.deleteTag(item.id);
             }}
-            renderLeading={() => <TagIcon size={14} aria-hidden="true" />}
+            renderLeading={() => <TagIcon size={ICON_SIZE.xs} aria-hidden="true" />}
             testID="tags-list"
           />
         </section>

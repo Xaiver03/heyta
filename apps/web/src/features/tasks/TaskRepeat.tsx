@@ -103,7 +103,6 @@ export function TaskRepeat({
     gap: cssVar('space.1'),
     padding: `${cssVar('space.1')} ${cssVar('space.2')}`,
     borderRadius: cssVar('radius.full'),
-    border: `${cssVar('border-width.thin')} solid ${cssVar('color.border')}`,
     fontSize: cssVar('font-size.xs'),
     color: cssVar('color.foreground-muted'),
     whiteSpace: 'nowrap',
@@ -151,6 +150,7 @@ export function TaskRepeat({
         </summary>
 
         <div
+          className="ht-material"
           style={{
             position: 'absolute',
             zIndex: cssVar('z.popover'),
@@ -160,7 +160,6 @@ export function TaskRepeat({
             display: 'flex',
             flexDirection: 'column',
             gap: cssVar('space.3'),
-            background: cssVar('color.surface'),
             border: `${cssVar('border-width.thin')} solid ${cssVar('color.border')}`,
             borderRadius: cssVar('radius.lg'),
             boxShadow: cssVar('shadow.lg'),

@@ -1,3 +1,4 @@
+import { ICON_SIZE } from '@heyta/design-system';
 /**
  * 同步状态条（web 外壳）
  * ========================
@@ -228,7 +229,7 @@ export function SyncBar() {
                   void sync.syncNow();
                 }}
               >
-                <RefreshCw size={14} aria-hidden="true" />
+                <RefreshCw size={ICON_SIZE.xs} aria-hidden="true" />
               </button>
 
               <button
@@ -237,7 +238,7 @@ export function SyncBar() {
                 aria-label={t('web.sync.settings.title')}
                 onClick={sync.openSettings}
               >
-                <Settings size={14} aria-hidden="true" />
+                <Settings size={ICON_SIZE.xs} aria-hidden="true" />
               </button>
             </>
           }
@@ -284,7 +285,7 @@ export function SyncBar() {
                 className="ht-btn ht-btn--ghost"
                 style={{ marginLeft: 'auto' }}
               >
-                <X size={16} aria-hidden="true" />
+                <X size={ICON_SIZE.sm} aria-hidden="true" />
               </button>
             </div>
 

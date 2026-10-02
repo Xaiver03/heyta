@@ -1,3 +1,4 @@
+import { ICON_SIZE } from '@heyta/design-system';
 /**
  * 从滴答清单导入（设置页面板）—— B2-1 的界面那一半
  * ======================================================
@@ -134,12 +135,12 @@ export function TickTickImportPanel(): React.JSX.Element {
 
   return (
     <div className="ht-settings" data-testid="ticktick-import-panel">
-      <h2 className="ht-settings__title">{t('web.ticktick.title')}</h2>
+      <h2 className="ht-settings__title ht-type-section-title">{t('web.ticktick.title')}</h2>
       <p className="ht-settings__hint">{t('web.ticktick.intro')}</p>
 
       <section className="ht-settings__section">
-        <h3 className="ht-settings__h3">
-          <Upload size={12} aria-hidden="true" /> {t('web.ticktick.fileLabel')}
+        <h3 className="ht-settings__h3 ht-type-headline">
+          <Upload size={ICON_SIZE.xs} aria-hidden="true" /> {t('web.ticktick.fileLabel')}
         </h3>
         <div className="ht-settings__actions">
           <input
@@ -164,12 +165,12 @@ export function TickTickImportPanel(): React.JSX.Element {
 
       {/* 诚实条款：只认滴答清单 —— Todoist 的解析在本仓库不存在。 */}
       <p className="ht-settings__notice" data-testid="ticktick-ticktick-only">
-        <Info size={12} aria-hidden="true" /> {t('web.ticktick.ticktickOnly')}
+        <Info size={ICON_SIZE.xs} aria-hidden="true" /> {t('web.ticktick.ticktickOnly')}
       </p>
 
       {/* 与"还原自己的导出"是两个不同的承诺，必须在界面上分开说。 */}
       <p className="ht-settings__notice" data-testid="ticktick-coexist">
-        <Info size={12} aria-hidden="true" /> {t('web.ticktick.coexist')}
+        <Info size={ICON_SIZE.xs} aria-hidden="true" /> {t('web.ticktick.coexist')}
       </p>
 
       {busy && (
@@ -180,25 +181,25 @@ export function TickTickImportPanel(): React.JSX.Element {
 
       {stage.kind === 'parse-failed' && (
         <p className="ht-settings__danger" role="alert" data-testid="ticktick-parse-failed">
-          <AlertTriangle size={12} aria-hidden="true" /> {t(FAILURE_KEYS[stage.reason])}
+          <AlertTriangle size={ICON_SIZE.xs} aria-hidden="true" /> {t(FAILURE_KEYS[stage.reason])}
         </p>
       )}
 
       {stage.kind === 'read-failed' && (
         <p className="ht-settings__danger" role="alert" data-testid="ticktick-read-failed">
-          <AlertTriangle size={12} aria-hidden="true" /> {t('web.ticktick.readFailed')}
+          <AlertTriangle size={ICON_SIZE.xs} aria-hidden="true" /> {t('web.ticktick.readFailed')}
         </p>
       )}
 
       {stage.kind === 'import-failed' && (
         <p className="ht-settings__danger" role="alert" data-testid="ticktick-import-failed">
-          <AlertTriangle size={12} aria-hidden="true" /> {t('web.ticktick.importFailed')}
+          <AlertTriangle size={ICON_SIZE.xs} aria-hidden="true" /> {t('web.ticktick.importFailed')}
         </p>
       )}
 
       {stage.kind === 'ready' && (
         <section className="ht-settings__section" data-testid="ticktick-preview">
-          <h3 className="ht-settings__h3">{t('web.ticktick.previewTitle')}</h3>
+          <h3 className="ht-settings__h3 ht-type-headline">{t('web.ticktick.previewTitle')}</h3>
           <p className="ht-settings__hint" data-testid="ticktick-preview-counts">
             {stage.preview.batch.entries.length === 0
               ? t('web.ticktick.previewNoop')
@@ -252,7 +253,7 @@ export function TickTickImportPanel(): React.JSX.Element {
               disabled={busy}
               onClick={() => void confirm(stage.preview.plan, stage.preview.report)}
             >
-              <Upload size={12} aria-hidden="true" />
+              <Upload size={ICON_SIZE.xs} aria-hidden="true" />
               {t('web.ticktick.confirm')}
             </button>
           </div>

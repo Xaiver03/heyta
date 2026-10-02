@@ -1,3 +1,4 @@
+import { ICON_SIZE } from '@heyta/design-system';
 /**
  * AI 耗时估计 —— 面向用户的入口
  * ==================================
@@ -368,7 +369,7 @@ export function AiDuration(props: AiDurationProps): React.JSX.Element {
             setPhase('disclosing');
           }}
         >
-          <Clock size={12} aria-hidden="true" />
+          <Clock size={ICON_SIZE.xs} aria-hidden="true" />
           {t('web.ai.duration.button')}
         </button>
         {applied && (
@@ -466,7 +467,7 @@ export function AiDuration(props: AiDurationProps): React.JSX.Element {
         {/* 🔴 夹过就必须说 —— 静默夹取等于让用户以为模型说的就是这个数。 */}
         {proposal.clamped && (
           <p className="ht-ai__warn" data-testid="duration-clamped">
-            <AlertTriangle size={12} aria-hidden="true" />
+            <AlertTriangle size={ICON_SIZE.xs} aria-hidden="true" />
             {t('web.ai.duration.clamped', {
               min: MIN_DURATION_MINUTES,
               max: MAX_DURATION_MINUTES,

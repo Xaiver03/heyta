@@ -1,3 +1,4 @@
+import { ICON_SIZE } from '@heyta/design-system';
 /**
  * Windows 小组件的后台刷新开关（设置页）。
  * ==========================================
@@ -221,9 +222,9 @@ export function WidgetPushPanel(): React.JSX.Element | null {
     disabled: busy,
     busy,
     leading: busy ? (
-      <Loader2 aria-hidden="true" size={16} className="ht-spin" />
+      <Loader2 aria-hidden="true" size={ICON_SIZE.sm} className="ht-spin" />
     ) : (
-      <RefreshCw aria-hidden="true" size={16} />
+      <RefreshCw aria-hidden="true" size={ICON_SIZE.sm} />
     ),
   };
 
@@ -272,7 +273,7 @@ export function WidgetPushPanel(): React.JSX.Element | null {
         testID="widget-push-panel"
         title={t('web.widgetPush.title')}
         note={t('web.widgetPush.description')}
-        leading={<BellRing aria-hidden="true" size={18} />}
+        leading={<BellRing aria-hidden="true" size={ICON_SIZE.md} />}
         rows={rows}
       />
     </HeytaUiProvider>

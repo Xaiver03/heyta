@@ -1,3 +1,4 @@
+import { ICON_SIZE } from '@heyta/design-system';
 /**
  * 应用外壳。
  *
@@ -1121,7 +1122,7 @@ export function App(): React.JSX.Element {
               void store.deleteTask(task.id);
             }}
           >
-            <Trash2 size={16} aria-hidden="true" />
+            <Trash2 size={ICON_SIZE.sm} aria-hidden="true" />
           </button>
         </div>
       );
@@ -1696,10 +1697,10 @@ export function App(): React.JSX.Element {
                 setView(v.key);
               }}
             >
-              <v.Icon size={16} aria-hidden="true" />
+              <v.Icon size={ICON_SIZE.sm} aria-hidden="true" />
               {/* 名字必须留在 DOM 里：它就是这个 tab 的 accessible name。
                   显示规则见 `app.css` 的 `.ht-rail__label`。 */}
-              <span className="ht-rail__label">{t(v.labelKey)}</span>
+              <span className="ht-rail__label ht-type-caption">{t(v.labelKey)}</span>
             </button>
           ))}
 
@@ -1726,10 +1727,10 @@ export function App(): React.JSX.Element {
                 setView(v.key);
               }}
             >
-              <v.Icon size={16} aria-hidden="true" />
+              <v.Icon size={ICON_SIZE.sm} aria-hidden="true" />
               {/* 名字必须留在 DOM 里：它就是这个 tab 的 accessible name。
                   显示规则见 `app.css` 的 `.ht-rail__label`。 */}
-              <span className="ht-rail__label">{t(v.labelKey)}</span>
+              <span className="ht-rail__label ht-type-caption">{t(v.labelKey)}</span>
             </button>
           ))}
 
@@ -1765,8 +1766,8 @@ export function App(): React.JSX.Element {
             setScrollToHelp(true);
           }}
         >
-          <CircleHelp size={16} aria-hidden="true" />
-          <span className="ht-rail__label">{t('web.shell.nav.help')}</span>
+          <CircleHelp size={ICON_SIZE.sm} aria-hidden="true" />
+          <span className="ht-rail__label ht-type-caption">{t('web.shell.nav.help')}</span>
         </button>
       </nav>
 
@@ -1933,7 +1934,7 @@ export function App(): React.JSX.Element {
               }
               onClick={() => setTheme(theme === 'light' ? 'dark' : 'light')}
             >
-              {theme === 'light' ? <Moon size={18} /> : <Sun size={18} />}
+              {theme === 'light' ? <Moon size={ICON_SIZE.md} /> : <Sun size={ICON_SIZE.md} />}
             </button>
           </div>
         </header>
@@ -2303,7 +2304,7 @@ export function App(): React.JSX.Element {
               设备本地持久化（`due-display-pref.ts`），不进 op-log。
             */}
             <section className="ht-settings" data-testid="display-pref-panel">
-              <h2 className="ht-settings__title">{t('web.settings.display.title')}</h2>
+              <h2 className="ht-settings__title ht-type-section-title">{t('web.settings.display.title')}</h2>
               <p className="ht-settings__hint">{t('web.settings.display.dueNote')}</p>
               <div
                 role="radiogroup"
@@ -2345,7 +2346,7 @@ export function App(): React.JSX.Element {
                 closeSecondarySurface();
               }}
             >
-              <X size={16} aria-hidden="true" />
+              <X size={ICON_SIZE.sm} aria-hidden="true" />
             </button>
             <>
               {/*
@@ -2466,7 +2467,7 @@ function NavButton({
       {entry.swatch !== undefined ? (
         <span className={`ht-swatch ${entry.swatch}`} aria-hidden="true" />
       ) : (
-        <Icon size={16} aria-hidden="true" />
+        <Icon size={ICON_SIZE.sm} aria-hidden="true" />
       )}
       <span data-testid={`${testID}-label`}>{t(entry.labelKey)}</span>
       {count !== undefined && count > 0 && (
@@ -2521,7 +2522,7 @@ function EmptyState({ filter }: { filter: TaskFilter }): React.JSX.Element {
 
   return (
     <div className="ht-empty" data-testid="empty-state">
-      <Inbox className="ht-empty__icon" size={40} aria-hidden="true" />
+      <Inbox className="ht-empty__icon" size={ICON_SIZE.xl} aria-hidden="true" />
       <p className="ht-empty__title">{t(msg.titleKey)}</p>
       <p className="ht-empty__hint">{t(msg.hintKey)}</p>
     </div>

@@ -725,6 +725,14 @@
      半径复用既有的 `--ht-blur-chrome`，与落地页那两处同一档材质。 */
   backdrop-filter: blur(var(--ht-blur-chrome)) saturate(180%);
   -webkit-backdrop-filter: blur(var(--ht-blur-chrome)) saturate(180%);
+  /* 入场时长接**弹簧参数**（P1-3）：`--ht-motion-spring-response-sheet`
+     （0.3s，"抽屉 / 底部面板"的响应档）。🔴 damping = 1.0（临界阻尼，
+     tokens.css §3c 默认）意味着**不过冲** —— `--ht-ease-enter`（ease-out）
+     正是临界阻尼弹簧在 CSS 里的正确形状；`--ht-ease-spring` 的过冲只属于
+     带速度的手势，卡片淡入用它反而错。RN 端将来上 reanimated 时直接
+     消费同一对参数（motion.* 组）。 */
+  animation: ht-material-in calc(var(--ht-motion-spring-response-sheet) * 1s)
+    var(--ht-ease-enter);
 }
 
 /* 结果区吃掉卡片的剩余高度。共享层给的 `max-height: layout.panel-max-height`
@@ -737,6 +745,51 @@
 
 @media (prefers-reduced-motion: reduce) {
   .ht-search-overlay {
+    animation: none;
+  }
+}
+
+/* ── 玻璃材质（ADR-0042）：悬浮功能层的表面 ──────────────────
+ *
+ * 这是共享层 `packages/ui/src/material/material-surface.ts` 在 web 这一侧的
+ * 另一半：tint 与档位来自 token，blur / saturate / rim / 入场在宿主 CSS。
+ * 两个渲染世界、同一配方 —— RN 消费那个（含端能力协商），DOM 消费这个。
+ *
+ * 🔴 只许给悬浮功能层（ADR-0042 逐面裁决表）；内容面永远实色。
+ * 模态刻意不用（scrim + 实卡聚焦，不漏注意力）；设置 sheet 维持 95%
+ * color-mix（88% 有文字透叠事故前科，见 `.ht-sheet`）。
+ *
+ * reduced-transparency 不需要在这里另写：tokens.css 末尾的媒体查询会把
+ * tint 压成实色、模糊半径压成 0，本类的每条声明都跟着 token 走。
+ * 入场动效遵循 §6 动效纪律：200ms ease-out（菜单淡入不过冲 —— 弹簧
+ * 过冲只属于带速度的手势，见 tokens.css §3c），只动 opacity 与 transform。
+ */
+.ht-material {
+  background: var(--ht-material-panel-tint);
+  backdrop-filter: blur(var(--ht-blur-chrome)) saturate(180%);
+  -webkit-backdrop-filter: blur(var(--ht-blur-chrome)) saturate(180%);
+  border: var(--ht-border-width-thin) solid var(--ht-material-edge-highlight);
+  animation: ht-material-in var(--ht-duration-normal) var(--ht-ease-enter);
+}
+
+/* chrome 档：内容从下面滚过的导航面（比 panel 更透）。 */
+.ht-material--chrome {
+  background: var(--ht-material-chrome-tint);
+}
+
+@keyframes ht-material-in {
+  from {
+    opacity: 0;
+    transform: translateY(calc(var(--ht-space-1) * -1));
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ht-material {
     animation: none;
   }
 }
@@ -886,8 +939,7 @@
   /* 浮层宽度与 TaskOrganizer 的下拉同量级；`rem` 随宿主字号缩放，不写死 px。 */
   min-inline-size: 18rem;
   max-inline-size: 24rem;
-  background: var(--ht-color-surface);
-  border: var(--ht-border-width-thin) solid var(--ht-color-border);
+  /* 表面来自 `.ht-material`（ADR-0042：捕获条下拉 = 悬浮功能层 = 玻璃）。 */
   border-radius: var(--ht-radius-lg);
   box-shadow: var(--ht-shadow-lg);
 }
@@ -1092,10 +1144,9 @@
   max-height: calc(100dvh - var(--ht-space-8));
   overflow-y: auto;
   padding: var(--ht-space-1);
-  border: var(--ht-border-width-thin) solid var(--ht-color-border);
   border-radius: var(--ht-radius-md);
-  background: var(--ht-color-surface);
-  /* 浮层用阴影表达层级 —— 布局层用边框、浮层用阴影，两者不混。 */
+  /* 表面来自 `.ht-material`（ADR-0042：锚在 rail 上的悬浮功能层 = 玻璃）。
+     浮层用阴影表达层级 —— 布局层用边框、浮层用阴影，两者不混。 */
   box-shadow: var(--ht-shadow-lg);
 }
 
@@ -1170,6 +1221,7 @@
  */
 
 .ht-inbox__badge {
+  /* 字号/字重/等宽来自语义档位类 `ht-type-badge`（JSX 与本类成对出现）。 */
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -1192,9 +1244,6 @@
   border-radius: var(--ht-radius-full);
   background: var(--ht-color-primary);
   color: var(--ht-color-on-primary);
-  font-size: var(--ht-font-size-2xs);
-  font-weight: var(--ht-font-weight-semibold);
-  font-variant-numeric: tabular-nums;
 }
 
 .ht-inbox__panel {
@@ -1207,9 +1256,8 @@
   width: 24rem;
   max-height: var(--ht-layout-panel-max-height);
   overflow: hidden;
-  border: var(--ht-border-width-thin) solid var(--ht-color-border);
   border-radius: var(--ht-radius-lg);
-  background: var(--ht-color-surface);
+  /* 表面来自 `.ht-material`（ADR-0042：锚在 rail 上的悬浮功能层 = 玻璃）。 */
   box-shadow: var(--ht-shadow-lg);
 }
 
@@ -1264,6 +1312,7 @@
 }
 
 .ht-inbox__action {
+  /* 排版四件套来自语义档位类 `ht-type-caption`（JSX 与本类成对出现）。 */
   min-height: var(--ht-touch-target-min);
   padding: 0 var(--ht-space-2);
   cursor: pointer;
@@ -1272,8 +1321,6 @@
   background: transparent;
   color: var(--ht-color-primary);
   font-family: var(--ht-font-sans);
-  font-size: var(--ht-font-size-xs);
-  font-weight: var(--ht-font-weight-medium);
   white-space: nowrap;
 }
 
@@ -1475,10 +1522,9 @@
 }
 
 .ht-inbox__sublist-title {
+  /* 排版四件套来自语义档位类 `ht-type-panel-title`（JSX 与本类成对出现）。 */
   margin: var(--ht-space-2) 0 0;
   color: var(--ht-color-foreground-muted);
-  font-size: var(--ht-font-size-xs);
-  font-weight: var(--ht-font-weight-semibold);
 }
 
 .ht-inbox__sublist {
@@ -1614,6 +1660,7 @@
  * 滚轮滚动时浏览器会对"滚进指针下方"的按钮重新派发 pointerover ⇒ 坐标自动跟手。
  */
 .ht-rail__label {
+  /* 排版四件套来自语义档位类 `ht-type-caption`（JSX 与本类成对出现）。 */
   position: fixed;
   top: var(--ht-rail-label-top, 0px);
   left: calc(var(--ht-layout-rail-width) + var(--ht-space-1));
@@ -1623,8 +1670,6 @@
   border-radius: var(--ht-radius-sm);
   background: var(--ht-color-foreground);
   color: var(--ht-color-foreground-inverse);
-  font-size: var(--ht-font-size-xs);
-  font-weight: var(--ht-font-weight-medium);
   white-space: nowrap;
   opacity: 0;
   /* 标签浮在内容上方，绝不能挡住底下的点击（`pointer-events: none` 同时保证
@@ -1744,14 +1789,13 @@ input[type="radio"] {
 
 .ht-settings__title {
   margin: 0;
-  /* 🔴 区块标题 = **lg + semibold**（`design-system/typography.ts` 的
-     `section-title` 同级同值）。曾经是 xl + bold —— 与页标题
-     （`.ht-header__title`，xl semibold）一般大，一页八个面板就是八个"页标题"，
-     层级全塌（2026-09-30 排版审计：产品负责人"文字排版很乱"）。
-     web 的层级：页标题 xl semibold → 区块标题 lg semibold → 子块/卡片
-     base semibold → 正文 base → 辅助 xs/sm muted。 */
-  font-size: var(--ht-font-size-lg);
-  font-weight: var(--ht-font-weight-semibold);
+  /* 排版四件套来自语义档位类 `ht-type-section-title`（JSX 与本类成对出现），
+     与共享层 TEXT_STYLES 的 section-title 同源（generated/typography.css）。
+     曾经是 xl + bold —— 与页标题（`.ht-header__title`，xl semibold）一般大，
+     一页八个面板就是八个"页标题"，层级全塌（2026-09-30 排版审计：
+     产品负责人"文字排版很乱"）。web 的层级：页标题 xl semibold →
+     区块标题 lg semibold → 子块/卡片 base semibold → 正文 base →
+     辅助 xs/sm muted。 */
 }
 
 .ht-settings__section {
@@ -1766,6 +1810,7 @@ input[type="radio"] {
 
 .ht-settings__h3 {
   margin: 0;
+  /* 排版四件套来自语义档位类 `ht-type-headline`（JSX 与本类成对出现）。 */
   /* 🔴 图标 + 文字必须**横排**（flex）。reset.css 把 svg 设成 display:block
      （杀图片基线空隙的标准做法），块级上下文里的图标会被顶成独立一行 ——
      安装包审查实测："📄 任务清单（Markdown）"的图标吊在标题上面。
@@ -1773,8 +1818,6 @@ input[type="radio"] {
   display: flex;
   align-items: center;
   gap: var(--ht-space-2);
-  font-size: var(--ht-font-size-base);
-  font-weight: var(--ht-font-weight-semibold);
 }
 
 .ht-settings__h3 svg {

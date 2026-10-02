@@ -1,3 +1,4 @@
+import { ICON_SIZE } from '@heyta/design-system';
 /**
  * 任务行上的「备注」编辑
  * ========================
@@ -82,7 +83,7 @@ export function NoteEditor({
         className={hasNote ? 'ht-chip ht-chip--on' : 'ht-chip'}
         style={{ listStyle: 'none' }}
       >
-        <NotebookPen size={12} aria-hidden="true" />
+        <NotebookPen size={ICON_SIZE.xs} aria-hidden="true" />
         {/*
           chip 上显示的是**用户自己的字**（备注预览），原样呈现、不翻译。
           没有备注时才用词条表里那句「备注」。

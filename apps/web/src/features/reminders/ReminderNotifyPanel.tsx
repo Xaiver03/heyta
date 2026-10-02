@@ -37,7 +37,7 @@ export function ReminderNotifyPanel(): React.JSX.Element {
 
   return (
     <section className="ht-settings" data-testid="reminder-notify-panel">
-      <h2 className="ht-settings__title">{t('web.reminder.notify.title')}</h2>
+      <h2 className="ht-settings__title ht-type-section-title">{t('web.reminder.notify.title')}</h2>
 
       {permission === 'granted' ? (
         <p className="ht-settings__hint" data-testid="reminder-notify-granted">

@@ -92,6 +92,12 @@ export interface HeytaUiNativeAccessors {
 export interface HeytaUiTheme {
   readonly theme: ThemeName;
   readonly reducedMotion: boolean;
+  /**
+   * 系统是否开了「减少透明度」（ADR-0042 §4：材质要能退让）。
+   * web 由本层用 matchMedia 订阅；RN 原生没有等价偏好，恒 false。
+   * 消费方不需要直接读它 —— 合并后的 `tokens` 里材质 tint 已经是实色。
+   */
+  readonly reducedTransparency: boolean;
   readonly tokens: HeytaNativeTokens;
   /**
    * 语义文字样式。**排版一律用它，不要自己拼 fontSize/lineHeight。**
@@ -170,10 +176,69 @@ function useReducedMotion(): boolean {
   return reduced;
 }
 
+/**
+ * 订阅系统的「减少透明度」偏好（web；ADR-0042 §4）。
+ *
+ * 🔴 为什么不用 AccessibilityInfo：RN 没有把 iOS 的
+ * `isReduceTransparencyEnabled` 桥接出来（reduceMotion 有、transparency 没有），
+ * 而 web 上这条偏好恰好只存在于 CSS 媒体查询 —— matchMedia 是唯一通道。
+ * 平台分叉住在**主题基础设施层**（不是业务组件，ADR-0042 的分叉纪律管的是
+ * 材质表面）；原生端恒 false，材质本来也是「诚实不透明」。
+ */
+function useReducedTransparency(): boolean {
+  const [reduced, setReduced] = React.useState(false);
+  React.useEffect(() => {
+    const mq = matchMediaMaybe();
+    if (mq === null) return;
+    const apply = () => setReduced(mq.matches);
+    apply();
+    mq.addEventListener('change', apply);
+    return () => mq.removeEventListener('change', apply);
+  }, []);
+  return reduced;
+}
+
+/** 类型安全的 matchMedia（RN 原生 / SSR 上不存在，返回 null）。 */
+function matchMediaMaybe(): {
+  matches: boolean;
+  addEventListener(type: 'change', fn: () => void): void;
+  removeEventListener(type: 'change', fn: () => void): void;
+} | null {
+  const w = globalThis as unknown as {
+    matchMedia?: (query: string) => {
+      matches: boolean;
+      addEventListener?: (type: 'change', fn: () => void) => void;
+      removeEventListener?: (type: 'change', fn: () => void) => void;
+    };
+  };
+  if (typeof w.matchMedia !== 'function') return null;
+  const mq = w.matchMedia('(prefers-reduced-transparency: reduce)');
+  const { addEventListener: add, removeEventListener: remove } = mq;
+  if (typeof add !== 'function' || typeof remove !== 'function') return null;
+  // 适配器：把「检查过存在的可选方法」收窄成返回类型的必选方法。
+  return {
+    matches: mq.matches,
+    addEventListener: (type, fn) => add.call(mq, type, fn),
+    removeEventListener: (type, fn) => remove.call(mq, type, fn),
+  };
+}
+
+/** 同步读一次（resolveHeytaUiTheme 省略 reducedTransparency 时用）。 */
+function readReducedTransparencyOnce(): boolean {
+  return matchMediaMaybe()?.matches ?? false;
+}
+
 /** 从系统配色方案解析出一套完整主题。`value` 省略时由 Provider 调用。 */
 export function resolveHeytaUiTheme(options?: {
   scheme?: ReturnType<typeof useColorScheme>;
   reducedMotion?: boolean;
+  /**
+   * 系统「减少透明度」。**省略时在 web 上同步读一次 matchMedia** ——
+   * 宿主（如 apps/web 的根）只传 scheme 也能拿到正确材质；代价是不订阅，
+   * 会话中途改系统设置要等下一次重渲染才生效（与 reducedMotion 的
+   * 「web 由 CSS 媒体查询负责」同类的取舍）。需要订阅的走 Provider 的自动解析。
+   */
+  reducedTransparency?: boolean;
   /** 宿主已打包的字体名清单。省略 = 全用系统字体。 */
   packagedFonts?: readonly string[];
 }): HeytaUiTheme {
@@ -182,10 +247,12 @@ export function resolveHeytaUiTheme(options?: {
   // **不报错、只是不渲染** —— "白屏但不崩"是最难查的一类问题。
   const theme = resolveThemeName(options?.scheme ?? null);
   const reducedMotion = options?.reducedMotion ?? false;
-  const tokens = resolveNativeTokens({ theme, reducedMotion });
+  const reducedTransparency = options?.reducedTransparency ?? readReducedTransparencyOnce();
+  const tokens = resolveNativeTokens({ theme, reducedMotion, reducedTransparency });
   return {
     theme,
     reducedMotion,
+    reducedTransparency,
     tokens,
     // 排版与主题无关 —— 换主题只该换颜色，不该让版面重排。
     text: resolveAllTextStyles(tokens),
@@ -208,6 +275,7 @@ export function HeytaUiProvider({
 }: HeytaUiProviderProps): React.JSX.Element {
   const scheme = useColorScheme();
   const reducedMotion = useReducedMotion();
+  const reducedTransparency = useReducedTransparency();
   // 🔴 **继承外层**：一个宿主里嵌套挂多层 Provider 是既成事实（apps/web 有 25 处
   // 各自包一棵子树），而每包一层就按**系统配色**重新解析一遍主题。
   // Web 的应用开关只改 `<html data-theme>`（`apps/web/src/lib/theme.ts`），
@@ -222,8 +290,8 @@ export function HeytaUiProvider({
   // 代价是宿主传值时这里多订阅一次；换来的是**调用顺序不会随 props 变化**，
   // 而条件式 hook 是 React 里最典型的一类"有时才崩"。
   const fallback = useMemo(
-    () => resolveHeytaUiTheme({ scheme, reducedMotion, packagedFonts }),
-    [scheme, reducedMotion, packagedFonts],
+    () => resolveHeytaUiTheme({ scheme, reducedMotion, reducedTransparency, packagedFonts }),
+    [scheme, reducedMotion, reducedTransparency, packagedFonts],
   );
   const resolved =
     value ?? (packagedFonts === undefined && inherited !== null ? inherited : fallback);

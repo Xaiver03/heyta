@@ -71,6 +71,7 @@ import {
   defaultPasswordRevealed,
   passwordAutocomplete,
 } from '@heyta/ui';
+import { ICON_SIZE } from '@heyta/design-system';
 import { AlertTriangle, CheckCircle2, Eye, EyeOff, Loader2 } from 'lucide-react';
 
 import { useAuthStore, type AuthStatus } from '../auth/store.js';
@@ -205,9 +206,9 @@ function PasswordField(props: {
           }}
         >
           {revealed ? (
-            <EyeOff size={12} aria-hidden="true" />
+            <EyeOff size={ICON_SIZE.xs} aria-hidden="true" />
           ) : (
-            <Eye size={12} aria-hidden="true" />
+            <Eye size={ICON_SIZE.xs} aria-hidden="true" />
           )}{' '}
           {/*
             标签**固定**说"显示密码"，状态交给 `aria-pressed`（扁平开关的写法）：
@@ -408,9 +409,9 @@ export function PasswordPanel(): React.JSX.Element {
               }}
             >
               {busySet ? (
-                <Loader2 size={12} aria-hidden="true" />
+                <Loader2 size={ICON_SIZE.xs} aria-hidden="true" />
               ) : (
-                <CheckCircle2 size={12} aria-hidden="true" />
+                <CheckCircle2 size={ICON_SIZE.xs} aria-hidden="true" />
               )}{' '}
               {busySet ? t('web.settings.password.setBusy') : t('web.settings.password.setSubmit')}
             </button>
@@ -440,21 +441,21 @@ export function PasswordPanel(): React.JSX.Element {
           <div aria-live="polite" data-testid="password-set-live">
             {localError !== undefined && (
               <p className="ht-settings__danger" data-testid="password-set-local-error">
-                <AlertTriangle size={12} aria-hidden="true" />{' '}
+                <AlertTriangle size={ICON_SIZE.xs} aria-hidden="true" />{' '}
                 {t('common.auth.form.passwordRequired')}
               </p>
             )}
 
             {outcome?.kind === 'set' && (
               <p className="ht-settings__notice" data-testid="password-set-done">
-                <CheckCircle2 size={12} aria-hidden="true" />{' '}
+                <CheckCircle2 size={ICON_SIZE.xs} aria-hidden="true" />{' '}
                 {t('web.settings.password.setDone')}
               </p>
             )}
 
             {outcome?.kind === 'failed' && (
               <p className="ht-settings__danger" data-testid="password-set-failed">
-                <AlertTriangle size={12} aria-hidden="true" />{' '}
+                <AlertTriangle size={ICON_SIZE.xs} aria-hidden="true" />{' '}
                 {t(outcome.key, outcome.vars)}
               </p>
             )}
@@ -507,9 +508,9 @@ export function PasswordPanel(): React.JSX.Element {
               }}
             >
               {busyChange ? (
-                <Loader2 size={12} aria-hidden="true" />
+                <Loader2 size={ICON_SIZE.xs} aria-hidden="true" />
               ) : (
-                <CheckCircle2 size={12} aria-hidden="true" />
+                <CheckCircle2 size={ICON_SIZE.xs} aria-hidden="true" />
               )}{' '}
               {busyChange ? t('common.auth.busy.change') : t('web.settings.password.submit')}
             </button>
@@ -524,9 +525,9 @@ export function PasswordPanel(): React.JSX.Element {
                 }}
               >
                 {busyForgot ? (
-                  <Loader2 size={12} aria-hidden="true" />
+                  <Loader2 size={ICON_SIZE.xs} aria-hidden="true" />
                 ) : (
-                  <AlertTriangle size={12} aria-hidden="true" />
+                  <AlertTriangle size={ICON_SIZE.xs} aria-hidden="true" />
                 )}{' '}
                 {t('common.auth.form.forgotPassword')}
               </button>
@@ -574,28 +575,28 @@ export function PasswordPanel(): React.JSX.Element {
           <div aria-live="polite" data-testid="password-live">
             {localError !== undefined && (
               <p className="ht-settings__danger" data-testid="password-local-error">
-                <AlertTriangle size={12} aria-hidden="true" />{' '}
+                <AlertTriangle size={ICON_SIZE.xs} aria-hidden="true" />{' '}
                 {t('common.auth.form.passwordRequired')}
               </p>
             )}
 
             {outcome?.kind === 'changed' && (
               <p className="ht-settings__notice" data-testid="password-changed">
-                <CheckCircle2 size={12} aria-hidden="true" />{' '}
+                <CheckCircle2 size={ICON_SIZE.xs} aria-hidden="true" />{' '}
                 {t('web.settings.password.changed')}
               </p>
             )}
 
             {outcome?.kind === 'reset-sent' && (
               <p className="ht-settings__notice" data-testid="password-reset-sent">
-                <CheckCircle2 size={12} aria-hidden="true" />{' '}
+                <CheckCircle2 size={ICON_SIZE.xs} aria-hidden="true" />{' '}
                 {t('common.auth.sent.reset')}
               </p>
             )}
 
             {outcome?.kind === 'failed' && (
               <p className="ht-settings__danger" data-testid="password-failed">
-                <AlertTriangle size={12} aria-hidden="true" />{' '}
+                <AlertTriangle size={ICON_SIZE.xs} aria-hidden="true" />{' '}
                 {t(outcome.key, outcome.vars)}
               </p>
             )}

@@ -1,3 +1,4 @@
+import { ICON_SIZE } from '@heyta/design-system';
 /**
  * 回收站
  * ========
@@ -132,7 +133,7 @@ export function TrashView(): React.JSX.Element {
           >
             <div className="ht-trash__dialog-head">
               <span className="ht-trash__dialog-icon">
-                <AlertTriangle size={20} aria-hidden="true" />
+                <AlertTriangle size={ICON_SIZE.md} aria-hidden="true" />
               </span>
               <div className="ht-trash__dialog-body">
                 <h2 id="ht-trash-confirm-title" className="ht-trash__dialog-title">
@@ -146,7 +147,7 @@ export function TrashView(): React.JSX.Element {
                 aria-label={t('web.trash.confirm.cancel')}
                 onClick={() => setConfirmingId(undefined)}
               >
-                <X size={16} aria-hidden="true" />
+                <X size={ICON_SIZE.sm} aria-hidden="true" />
               </button>
             </div>
 

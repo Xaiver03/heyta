@@ -1,3 +1,4 @@
+import { ICON_SIZE } from '@heyta/design-system';
 /**
  * 日历页的侧栏（Web 壳）—— 迷你月历 + 显示范围
  * ==============================================
@@ -282,7 +283,7 @@ export function CalendarSidebar(): React.JSX.Element {
                   view.setCursor(addMonths(view.cursor, -1));
                 }}
               >
-                <ChevronLeft size={16} aria-hidden="true" />
+                <ChevronLeft size={ICON_SIZE.sm} aria-hidden="true" />
               </button>
               <button
                 type="button"
@@ -293,7 +294,7 @@ export function CalendarSidebar(): React.JSX.Element {
                   view.goToToday(today);
                 }}
               >
-                <Circle size={12} aria-hidden="true" />
+                <Circle size={ICON_SIZE.xs} aria-hidden="true" />
               </button>
               <button
                 type="button"
@@ -304,7 +305,7 @@ export function CalendarSidebar(): React.JSX.Element {
                   view.setCursor(addMonths(view.cursor, 1));
                 }}
               >
-                <ChevronRight size={16} aria-hidden="true" />
+                <ChevronRight size={ICON_SIZE.sm} aria-hidden="true" />
               </button>
             </div>
           </div>
@@ -355,7 +356,7 @@ export function CalendarSidebar(): React.JSX.Element {
             onClick={view.resetScope}
           >
             <span>{t('web.calendar.scope.all')}</span>
-            {isScopeEmpty(view.scope) ? <Check size={16} aria-hidden="true" /> : null}
+            {isScopeEmpty(view.scope) ? <Check size={ICON_SIZE.sm} aria-hidden="true" /> : null}
           </button>
 
           <ScopeGroup

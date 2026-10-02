@@ -1,3 +1,4 @@
+import { ICON_SIZE } from '@heyta/design-system';
 /**
  * 「这个功能现在没有路可走」的统一呈现
  * ======================================
@@ -62,7 +63,7 @@ export function RouteUnavailable({
   return (
     <div className="ht-ai__warn" data-testid={testId} data-route-reason={explanation.reason}>
       <p className="ht-ai__warn-line">
-        <AlertTriangle size={12} aria-hidden="true" />
+        <AlertTriangle size={ICON_SIZE.xs} aria-hidden="true" />
         {t(explanation.key, explanation.params)}
       </p>
       {/* 🔴 只做导航：把用户送到能修它的那个控件前面，**不替他做决定**。 */}

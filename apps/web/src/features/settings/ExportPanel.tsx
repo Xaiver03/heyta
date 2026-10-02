@@ -1,3 +1,4 @@
+import { ICON_SIZE } from '@heyta/design-system';
 /**
  * 导出面板（设置页）
  * ====================
@@ -83,12 +84,12 @@ export function ExportPanel(): React.JSX.Element {
 
   return (
     <div className="ht-settings" data-testid="export-panel">
-      <h2 className="ht-settings__title">{t('web.export.title')}</h2>
+      <h2 className="ht-settings__title ht-type-section-title">{t('web.export.title')}</h2>
       <p className="ht-settings__hint">{t('web.export.intro')}</p>
 
       <section className="ht-settings__section">
-        <h3 className="ht-settings__h3">
-          <FileJson size={12} aria-hidden="true" /> {t('web.export.json.label')}
+        <h3 className="ht-settings__h3 ht-type-headline">
+          <FileJson size={ICON_SIZE.xs} aria-hidden="true" /> {t('web.export.json.label')}
         </h3>
         <p className="ht-settings__hint">{t('web.export.json.note')}</p>
         <div className="ht-settings__actions">
@@ -99,14 +100,14 @@ export function ExportPanel(): React.JSX.Element {
             disabled={busy}
             onClick={() => void run('json')}
           >
-            <Download size={12} aria-hidden="true" /> {t('web.export.json.button')}
+            <Download size={ICON_SIZE.xs} aria-hidden="true" /> {t('web.export.json.button')}
           </button>
         </div>
       </section>
 
       <section className="ht-settings__section">
-        <h3 className="ht-settings__h3">
-          <FileText size={12} aria-hidden="true" /> {t('web.export.markdown.label')}
+        <h3 className="ht-settings__h3 ht-type-headline">
+          <FileText size={ICON_SIZE.xs} aria-hidden="true" /> {t('web.export.markdown.label')}
         </h3>
         <p className="ht-settings__hint">{t('web.export.markdown.note')}</p>
         <div className="ht-settings__actions">
@@ -117,7 +118,7 @@ export function ExportPanel(): React.JSX.Element {
             disabled={busy}
             onClick={() => void run('markdown')}
           >
-            <Download size={12} aria-hidden="true" /> {t('web.export.markdown.button')}
+            <Download size={ICON_SIZE.xs} aria-hidden="true" /> {t('web.export.markdown.button')}
           </button>
         </div>
       </section>
@@ -137,12 +138,12 @@ export function ExportPanel(): React.JSX.Element {
         否则用户会把它当成还原点，而一个导不回来的文件当还原点用等于没有备份。
       */}
       <p className="ht-settings__notice" data-testid="export-not-restore-point">
-        <Info size={12} aria-hidden="true" /> {t('web.export.notRestorePoint')}
+        <Info size={ICON_SIZE.xs} aria-hidden="true" /> {t('web.export.notRestorePoint')}
       </p>
 
       {failed && (
         <p className="ht-settings__danger" role="alert" data-testid="export-failed">
-          <AlertTriangle size={12} aria-hidden="true" /> {t('web.export.failed')}
+          <AlertTriangle size={ICON_SIZE.xs} aria-hidden="true" /> {t('web.export.failed')}
         </p>
       )}
     </div>

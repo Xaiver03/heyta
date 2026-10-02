@@ -7,6 +7,9 @@
  */
 import '@heyta/design-system/tokens.css';
 import '@heyta/design-system/reset.css';
+/* 语义文字档位（.ht-type-*）——从 TEXT_STYLES 生成，与共享层同一套档位。
+   消费方式：JSX 里 `className="ht-xxx ht-type-<档位>"` 成对出现。 */
+import '@heyta/design-system/typography.css';
 
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';

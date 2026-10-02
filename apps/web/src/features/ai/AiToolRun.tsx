@@ -1,3 +1,4 @@
+import { ICON_SIZE } from '@heyta/design-system';
 /**
  * AI 工具调用 —— 面向用户的入口
  * ==================================
@@ -178,7 +179,7 @@ export function AiToolRun(props: AiToolRunProps): React.JSX.Element {
       {/* 工具调用面板的头部带一个装饰图标（`lead`）—— 与四个 AI 面板共用同一个共享头。 */}
       <AiPanelHeadHost
         title={t('web.ai.tools.title')}
-        lead={<Sparkles size={12} aria-hidden="true" />}
+        lead={<Sparkles size={ICON_SIZE.xs} aria-hidden="true" />}
       />
       <p className="ht-ai__note">{t('web.ai.tools.hint')}</p>
 
@@ -303,7 +304,7 @@ function ToolResult(props: {
               role="dialog"
             >
         <div className="ht-ai__row ht-ai__row--warn">
-          <AlertTriangle size={12} aria-hidden="true" />
+          <AlertTriangle size={ICON_SIZE.xs} aria-hidden="true" />
           <span>{t('web.ai.tools.failedLead')}</span>
           <strong data-testid="ai-tool-failure-message">{t(failure.key)}</strong>
         </div>
@@ -411,7 +412,7 @@ function RunResult(props: {
     case 'denied':
       return (
         <p className="ht-ai__row ht-ai__row--warn" data-testid="ai-tool-denied">
-          <AlertTriangle size={12} aria-hidden="true" />
+          <AlertTriangle size={ICON_SIZE.xs} aria-hidden="true" />
           {t('web.ai.tools.deniedLead')}
         </p>
       );

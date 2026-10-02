@@ -1,3 +1,4 @@
+import { ICON_SIZE } from '@heyta/design-system';
 /**
  * 冲突解决界面（web 外壳）
  * ==========================
@@ -186,7 +187,7 @@ export function ConflictDialog(): React.JSX.Element | null {
       }}
       style={{ marginTop: 'auto' }}
     >
-      <Check size={15} aria-hidden="true" />
+      <Check size={ICON_SIZE.sm} aria-hidden="true" />
       {labels.keepThis}
     </button>
   );
@@ -240,7 +241,7 @@ export function ConflictDialog(): React.JSX.Element | null {
               paddingTop: cssVar('space.1'),
             }}
           >
-            <AlertTriangle size={20} aria-hidden="true" />
+            <AlertTriangle size={ICON_SIZE.md} aria-hidden="true" />
           </span>
           <div style={{ flex: 1, minWidth: 0 }}>
             <h2
@@ -268,7 +269,7 @@ export function ConflictDialog(): React.JSX.Element | null {
             className="ht-btn ht-btn--ghost"
             onClick={closeConflictDialog}
           >
-            <X size={16} aria-hidden="true" />
+            <X size={ICON_SIZE.sm} aria-hidden="true" />
           </button>
         </div>
 

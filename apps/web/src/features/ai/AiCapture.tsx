@@ -1,3 +1,4 @@
+import { ICON_SIZE } from '@heyta/design-system';
 /**
  * AI 一句话捕获 —— 面向用户的入口
  * ==================================
@@ -427,7 +428,7 @@ export function AiCapture(props: AiCaptureProps): React.JSX.Element {
           disabled={text.trim() === ''}
           onClick={start}
         >
-          <Sparkles size={12} aria-hidden="true" />
+          <Sparkles size={ICON_SIZE.xs} aria-hidden="true" />
           {t('web.ai.capture.button')}
         </button>
         {applied && (
@@ -532,7 +533,7 @@ export function AiCapture(props: AiCaptureProps): React.JSX.Element {
 
         {proposal.dropped.length > 0 && (
           <p className="ht-ai__warn" data-testid="capture-dropped">
-            <AlertTriangle size={12} aria-hidden="true" />
+            <AlertTriangle size={ICON_SIZE.xs} aria-hidden="true" />
             {t('web.ai.capture.droppedLead')}{droppedLabelText(proposal.dropped, t, locale)}{t('web.ai.capture.droppedTail')}
           </p>
         )}
