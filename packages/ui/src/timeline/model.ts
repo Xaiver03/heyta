@@ -80,20 +80,12 @@ export interface GanttLabels {
   readonly ariaGroup: (count: number, total: string) => string;
 }
 
-/** 时间线块列表（= 一个任务一张图）的文案契约。 */
-export interface TimelineViewLabels {
-  readonly gantt: GanttLabels;
-  /** 没有任务时的空态。 */
-  readonly empty: string;
-  readonly ariaEmpty: string;
-  readonly ariaGroup: (count: number) => string;
-  /** "AI 估时：90 分钟"。 */
-  readonly aiEstimate: (duration: string) => string;
-  /** "还没有可排期的清单"。 */
-  readonly noChecklist: string;
-  /** "整条估时 90 分钟，没有摊到 3 个子条目上"。 */
-  readonly unattributable: (duration: string, count: number) => string;
-}
+/**
+ * 🔴 `TimelineViewLabels` 已随 `TimelineView` 删除（2026-10-01 重画，goal：
+ * `docs/plans/goal-timeline-rework.md`）：板的文案契约是 `board-model.ts` 的
+ * `TimelineBoardLabels`；详情预览的是 `ChecklistPlanPreview.tsx` 的
+ * `ChecklistPlanLabels`。本文件只剩 `GanttLabels`（`GanttChart` ＝ 详情预览的图）。
+ */
 
 /**
  * 分钟数 → 人话（`90 分钟` / `1 小时` / `1 小时 30 分`）。

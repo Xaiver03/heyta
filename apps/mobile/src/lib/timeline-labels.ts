@@ -2,23 +2,19 @@
  * 时间线的文案装配（移动端）
  * ============================
  *
- * 与 `apps/web/src/features/timeline/labels.ts` **逐条对应** —— 同一个共享组件
- * `@heyta/ui` 的 `TimelineView`，两端只是各自把词条表装成 `TimelineViewLabels`。
+ * 与 `apps/web/src/features/timeline/labels.ts` **逐条对应** —— 同一批共享组件
+ * （`@heyta/ui` 的 `TimelineBoard` / `ChecklistPlanPreview`），两端只是各自把
+ * 词条表装成标签对象。
  *
- * ## 🔴 复用的全是 `web.gantt.*` / `web.timeline.*`
+ * ## 🔴 复用的全是 `web.board.*` / `web.timeline.*` / `web.gantt.*`
  *
- * 与 `lib/quadrant-display.ts` 复用 `web.quadrant.*`、`lib/habits-display.ts`
- * 复用 `web.habits.*` 是**同一个先例**（那两个文件头都写了理由）：
- * `packages/i18n` 不在本刀白名单，而同义键会让"两端同一句话"变成两处维护 ——
- * 改了一处、另一处忘改，两端就开始说不同的话，而**没有任何门禁会红**。
- *
- * ⚠️ 它是一笔如实的债：词条表里 `web.*` 被移动端借用。收口方式与
- * `mobile.growth.*` 那次一样 —— 等真有第三端要同一句话时再统一改名。
+ * 与 `lib/quadrant-display.ts` 复用 `web.quadrant.*` 是**同一个先例**：
+ * 同义键会让"两端同一句话"变成两处维护 —— 改了一处、另一处忘改，
+ * 两端就开始说不同的话，而**没有任何门禁会红**。
  *
  * ## 单复数在这里选，不在共享层
  *
- * `span` / `unestimated` / `aiSummary` / `ariaGroup` 每一项都有一个单数分支，
- * 对应词条表里成对的两条 key。共享层只负责"该显示了"，不认识词条表。
+ * `ariaGroup` 的单数分支对应词条表里成对的两条 key。共享层只负责"该显示了"。
  *
  * ⚠️ 纯函数版 `timelineLabels(t)` 是给单测用的（与 `lib/` 里其它 `*-display.ts`
  * 同形状：不依赖 React context 就能被断言）。
@@ -27,12 +23,15 @@
 import { useMemo } from 'react';
 
 import { useI18n } from '@heyta/i18n';
-import type { GanttLabels, TimelineViewLabels } from '@heyta/ui';
+import { formatDuration, type ChecklistPlanLabels, type GanttLabels, type TimelineBoardLabels } from '@heyta/ui';
 
 import type { Translate } from '../i18n/translate';
 
 /** 纯函数版：给一个 `t` 就能建出全部文案。 */
-export function timelineLabels(t: Translate): TimelineViewLabels {
+export function timelineLabels(t: Translate): {
+  board: TimelineBoardLabels;
+  plan: ChecklistPlanLabels;
+} {
   const gantt: GanttLabels = {
     title: t('web.gantt.title'),
     empty: t('web.gantt.empty'),
@@ -63,22 +62,55 @@ export function timelineLabels(t: Translate): TimelineViewLabels {
         : t('web.gantt.aria.group', { count, total }),
   };
 
-  return {
-    gantt,
+  const board: TimelineBoardLabels = {
     empty: t('web.timeline.empty'),
     ariaEmpty: t('web.timeline.aria.empty'),
     ariaGroup: (count) =>
       count === 1
         ? t('web.timeline.aria.groupOne', { count })
         : t('web.timeline.aria.group', { count }),
-    aiEstimate: (duration) => t('web.timeline.aiEstimate', { duration }),
+    weekdayNames: [
+      t('web.board.weekday.1'),
+      t('web.board.weekday.2'),
+      t('web.board.weekday.3'),
+      t('web.board.weekday.4'),
+      t('web.board.weekday.5'),
+      t('web.board.weekday.6'),
+      t('web.board.weekday.7'),
+    ],
+    monthNames: [
+      t('web.board.month.1'),
+      t('web.board.month.2'),
+      t('web.board.month.3'),
+      t('web.board.month.4'),
+      t('web.board.month.5'),
+      t('web.board.month.6'),
+      t('web.board.month.7'),
+      t('web.board.month.8'),
+      t('web.board.month.9'),
+      t('web.board.month.10'),
+      t('web.board.month.11'),
+      t('web.board.month.12'),
+    ],
+    todayWord: t('web.board.today'),
+    unscheduledLane: (count) => t('web.board.unscheduledLane', { count }),
+    aiBadge: (minutes) => t('web.board.aiBadge', { duration: formatDuration(minutes, gantt) }),
+    overdue: t('web.board.overdue'),
+    untitledTask: t('web.board.untitledTask'),
+  };
+
+  const plan: ChecklistPlanLabels = {
+    gantt,
+    caption: t('web.board.planCaption'),
     noChecklist: t('web.timeline.noChecklist'),
     unattributable: (duration, count) => t('web.timeline.unattributable', { duration, count }),
   };
+
+  return { board, plan };
 }
 
 /** 组件里用。`useMemo` 依赖只有 `t`，所以同一次渲染里它是稳定引用。 */
-export function useTimelineLabels(): TimelineViewLabels {
+export function useTimelineLabels(): { board: TimelineBoardLabels; plan: ChecklistPlanLabels } {
   const { t } = useI18n();
   return useMemo(() => timelineLabels(t), [t]);
 }

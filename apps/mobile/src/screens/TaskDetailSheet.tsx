@@ -58,17 +58,19 @@ import type { MessageKey } from '@heyta/i18n';
 import { useI18n } from '@heyta/i18n';
 import {
   REPEAT_PRESET_IDS,
+  planTimelineBlock,
   repeatPresetRule,
   type ProjectActions,
   type RepeatPresetId,
   type TaskActions,
 } from '@heyta/app-host';
-import { ReminderList, rejectionReasonOf, subtaskRejectionMessageKey } from '@heyta/ui';
+import { ChecklistPlanPreview, ReminderList, rejectionReasonOf, subtaskRejectionMessageKey } from '@heyta/ui';
 
 import { formatStamp } from '../lib/date';
 import { PRIORITY_ORDER, priorityColorToken, priorityLabel } from '../lib/priority';
 import { describeRecurrenceText } from '../lib/recurrence-display';
 import { reminderListLabels } from '../lib/reminders-display';
+import { timelineLabels } from '../lib/timeline-labels';
 import { useTaskReminders } from '../lib/reminders';
 import { useText, useTheme, useTokens } from '../theme';
 import { DatePicker } from '../ui/DatePicker';
@@ -167,6 +169,20 @@ export function TaskDetailSheet({
   } = useTaskReminders(taskId);
 
   const reminderLabels = useMemo(() => reminderListLabels(t), [t]);
+
+  /**
+   * 清单排程预览（时间线重画 2026-10-01：板上不再画任务内部的清单甘特图，
+   * 那个能力**降级到这里** ——「点开看」，且共享层会标明它是任务内部坐标系）。
+   * 纯函数；`task` 变了才重算。提前 return 之前调用（hook 顺序纪律）。
+   */
+  const planBlock = useMemo(
+    () =>
+      task === undefined
+        ? null
+        : planTimelineBlock({ id: task.id, title: task.title, note: task.note }),
+    [task],
+  );
+  const planLabels = useMemo(() => timelineLabels(t).plan, [t]);
 
   // 🔴 只按**任务 id 与可见性**重同步，依赖里**刻意没有** `task.title`。
   // 带上它的话，正在打字时只要有一次后台同步回来（或冲突解决改了标题），
@@ -470,6 +486,12 @@ export function TaskDetailSheet({
                 {t('mobile.detail.note.hint')}
               </Text>
             </View>
+
+            {/* 清单排程预览：备注里写了清单（或 AI 拆解过）时才有内容可排。
+                它是任务内部坐标系，与时间线板的关系由预览自己的说明文字标明。 */}
+            {planBlock !== null && (
+              <ChecklistPlanPreview block={planBlock} labels={planLabels} now={now} />
+            )}
 
             <View style={{ gap: tokens['space.2'] }}>
               <SectionHeader icon="task.project" title={t('mobile.detail.field.project')} />

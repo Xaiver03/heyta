@@ -130,6 +130,27 @@ export interface Task extends EntityBase {
   /** 完成时间。存在即表示已完成（不另设 completed 布尔，避免两者不一致）。 */
   completedAt?: number;
   /**
+   * 排期起点（epoch ms）。可选；**运行时默认 `undefined` = 未排期起点**
+   * （AGENTS.md §3.3：已落盘的数据没有这个字段，hydration 不得炸）。
+   *
+   * 🔴 [ADR-0043](../../../docs/adr/0043-timeline-p2-task-start-date-duration.md)：
+   * 时间线 P2 的排期面字段 —— 与 `durationMinutes` 一起推导时间线板上的
+   * `range`（条）。**不 bump `CURRENT_SCHEMA_VERSION`**（纯可加性）。
+   *
+   * ⚠️ 与 `dueDate` 的分工：`dueDate` 是"什么时候到期"（日历/提醒/象限的语义），
+   * `startDate` 是"什么时候开始做"（时间线排期的语义）。两者独立、互不推导。
+   */
+  startDate?: number;
+  /**
+   * 排期时长（**分钟**，正整数）。可选；`undefined` = 时长未知。
+   *
+   * 🔴 [ADR-0043](../../../docs/adr/0043-timeline-p2-task-start-date-duration.md)：
+   * 与 AI 估时（备注里「预计耗时：N 分钟」）**同一个单位**，链路上不需要换算。
+   * 字段存在时它是唯一事实源；缺失时读取侧回退 note 行（旧数据不搬家、不失效）。
+   * 写入走 `setSchedule`（动作层夹到 [MIN, MAX] 并取整）。
+   */
+  durationMinutes?: number;
+  /**
    * 重复规则（RFC 5545 RRULE 串）。不存在即不重复。
    *
    * 🔴 **规则为什么在 `Task` 上，而不是一个 `TASK_REPEAT_CFG` 实体。**

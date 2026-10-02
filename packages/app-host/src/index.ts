@@ -372,8 +372,10 @@ export {
   writeDurationIntoNote,
 } from './duration-note.js';
 export {
+  deriveTaskTimePosition,
   planTimelineBlock,
-  planTimelineBlocks,
+  planTimelineRow,
+  planTimelineRows,
   type TimelineTaskLike,
 } from './timeline-plan.js';
 export {

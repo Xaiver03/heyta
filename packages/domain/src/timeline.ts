@@ -192,17 +192,10 @@ export interface TimelineBlock {
 }
 
 /**
- * 所有时间线块共用的一把尺子（分钟）。
- *
- * 🔴 每张图各自归一化会让 90 分钟与 30 分钟的条**都占满整行**（各自 100%），
- * 用户反而看不出谁更长 —— 恰好毁掉时间线要表达的东西。所以横跨所有块的
- * 最大跨度只有这一处计算。
+ * 🔴 `sharedTimelineSpan` 已删除（2026-10-01 重画）：它是旧「每任务一张图」形态的
+ * 共尺补丁，且**名字比实现大**（只共了长度单位、没共坐标原点 —— R4 §5.1 的判定）。
+ * 新板（`TimelineBoard`）用一根共轴 + 全视图窗口（`boardWindow`）取代了这个问题本身。
  */
-export function sharedTimelineSpan(blocks: readonly TimelineBlock[]): number {
-  let span = 0;
-  for (const block of blocks) span = Math.max(span, block.plan.totalMinutes);
-  return span;
-}
 
 /**
  * 「标题 → 工期」的映射。**单位是分钟**（见 `BuildTimelineOptions.durationsInMinutes`）。

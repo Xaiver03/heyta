@@ -16,7 +16,11 @@ import { describe, expect, it } from 'vitest';
 
 import { MIN_DURATION_MINUTES } from '@heyta/domain';
 
-import { planTimelineBlock, planTimelineBlocks } from '../src/timeline-plan.js';
+import {
+  deriveTaskTimePosition,
+  planTimelineBlock,
+  planTimelineRows,
+} from '../src/timeline-plan.js';
 
 describe('planTimelineBlock：没有清单时整条任务自己算一条', () => {
   it('🔴 不静默消失：标题成为唯一可排单元的 title，工期退回默认值', () => {
@@ -85,14 +89,140 @@ describe('planTimelineBlock：0 与"没估过"是两件事', () => {
   });
 });
 
-describe('planTimelineBlocks：顺序即块序，且每个任务都有块', () => {
+describe('planTimelineBlock：三个任务三种形态，一块都不少', () => {
+  // 🔴 `planTimelineBlocks`（复数版）已删（2026-10-01 重画）：板上走 `planTimelineRows`，
+  // 详情预览逐任务调 `planTimelineBlock` —— 复数包装没有生产消费者，就是 AGENTS §3.5 说的"旧的那份"。
   it('三个任务三种形态，一块都不少', () => {
-    const blocks = planTimelineBlocks([
+    const tasks = [
       { id: 'a', title: '甲' },
       { id: 'b', title: '乙', note: '- [ ] 一\n- [ ] 二\n预计耗时：30 分钟' },
       { id: 'c', title: '丙', note: '预计耗时：45 分钟' },
-    ]);
-    expect(blocks.map((b) => b.taskId)).toEqual(['a', 'b', 'c']);
-    expect(blocks.map((b) => b.unattributable)).toEqual([false, true, false]);
+    ] as const;
+    expect(tasks.map((t) => planTimelineBlock(t).taskId)).toEqual(['a', 'b', 'c']);
+    expect(tasks.map((t) => planTimelineBlock(t).unattributable)).toEqual([false, true, false]);
   });
 });
+
+// ─────────────────────────────────────────────────────────────────────────
+// 🔴🔴 板上的行（2026-10-01 重画）：三态推导 + 绝不编长度
+// ─────────────────────────────────────────────────────────────────────────
+
+describe('deriveTaskTimePosition：三态生产者（P1 point/unscheduled + P2 range，ADR-0043 §3）', () => {
+  it('🔴 有合法 dueDate ⇒ point（atMs 原样），绝不画成条', () => {
+    const at = Date.parse('2026-10-01T15:00:00');
+    const p = deriveTaskTimePosition({ dueDate: at });
+    assertPoint(p, at);
+  });
+
+  it('🔴 没有 / 非法 dueDate ⇒ unscheduled（NaN、0、负数、Infinity 都是"没有"）', () => {
+    for (const bad of [undefined, Number.NaN, 0, -5, Number.POSITIVE_INFINITY] as const) {
+      const p = deriveTaskTimePosition({ dueDate: bad });
+      expect(p.kind).toBe('unscheduled');
+    }
+  });
+
+  // ── P2：range 生产者（ADR-0043 §3 的表）──
+
+  it('🔴 start + duration ⇒ range（end = start + 时长，分钟）', () => {
+    const start = Date.parse('2026-10-02T09:00:00');
+    const p = deriveTaskTimePosition({ startDate: start, durationMinutes: 90 });
+    expect(p).toEqual({ kind: 'range', startMs: start, endMs: start + 90 * 60_000 });
+  });
+
+  it('🔴 start + due（due 在 start 之后）⇒ range（终点 = due）', () => {
+    const start = Date.parse('2026-10-02T09:00:00');
+    const due = Date.parse('2026-10-03T15:00:00');
+    const p = deriveTaskTimePosition({ startDate: start, dueDate: due });
+    expect(p).toEqual({ kind: 'range', startMs: start, endMs: due });
+  });
+
+  it('due 不在起点之后（<= start）⇒ 退化为 point（不画一条倒着的条）', () => {
+    const start = Date.parse('2026-10-02T15:00:00');
+    const p = deriveTaskTimePosition({ startDate: start, dueDate: start });
+    assertPoint(p, start);
+  });
+
+  it('只有 start（无时长无截止）⇒ point 落在起点（"只有时刻 ⇒ 点"，R4 §5.2）', () => {
+    const start = Date.parse('2026-10-02T09:00:00');
+    const p = deriveTaskTimePosition({ startDate: start });
+    assertPoint(p, start);
+  });
+
+  it('🔴 duration 单独存在 ⇒ unscheduled（没有起点就没有位置，绝不编一条）', () => {
+    const p = deriveTaskTimePosition({ durationMinutes: 90 });
+    expect(p.kind).toBe('unscheduled');
+  });
+
+  it('非法 start（NaN / <= 0）按"没有"处理：有合法 due ⇒ point', () => {
+    const at = Date.parse('2026-10-01T15:00:00');
+    assertPoint(deriveTaskTimePosition({ startDate: Number.NaN, dueDate: at }), at);
+    assertPoint(deriveTaskTimePosition({ startDate: -1, dueDate: at }), at);
+  });
+});
+
+describe('planTimelineRows：板上的行（TimelineBoardRow）', () => {
+  it('🔴 dueDate 流到 position；估时只落 badge 字段（aiMinutes）', () => {
+    const at = Date.parse('2026-10-01T15:00:00');
+    const rows = planTimelineRows([
+      { id: 'a', title: '有截止', dueDate: at, note: '预计耗时：90 分钟' },
+    ]);
+    expect(rows).toHaveLength(1);
+    const row = rows[0]!;
+    assertPoint(row.position, at);
+    expect(row.aiMinutes).toBe(90);
+  });
+
+  it('🔴 绝不编长度：只有估时没有日期 ⇒ unscheduled（估时不是排期凭据）', () => {
+    const rows = planTimelineRows([{ id: 'a', title: '只估了时', note: '预计耗时：90 分钟' }]);
+    expect(rows[0]?.position.kind).toBe('unscheduled');
+  });
+
+  it('🔴 行数据在形状上就没有长度字段（想编都没数可用）', () => {
+    const rows = planTimelineRows([{ id: 'a', title: '任意', dueDate: 1 }]);
+    const keys = Object.keys(rows[0] as unknown as Record<string, unknown>).sort();
+    expect(keys).toEqual(['aiMinutes', 'position', 'taskId', 'title']);
+    // position 是判别联合：point 只有 atMs，没有任何 duration/startOffset
+    const p = rows[0]?.position;
+    expect(p?.kind).toBe('point');
+    expect(Object.keys(p as unknown as Record<string, unknown>).sort()).toEqual(['atMs', 'kind']);
+  });
+
+  it('🔴 字段时长是事实源：durationMinutes 在场时几何用字段，badge 也是字段（note 回退被盖住）', () => {
+    const rows = planTimelineRows([
+      {
+        id: 'a',
+        title: '字段赢',
+        dueDate: Date.parse('2026-10-03T15:00:00'),
+        startDate: Date.parse('2026-10-03T09:00:00'),
+        durationMinutes: 120,
+        note: '预计耗时：30 分钟',
+      },
+    ]);
+    const p = rows[0]?.position;
+    expect(p?.kind).toBe('range');
+    if (p?.kind === 'range') {
+      expect(p.endMs - p.startMs).toBe(120 * 60_000);
+    }
+    expect(rows[0]?.aiMinutes).toBe(120);
+  });
+
+  it('🔴 字段缺失时 note 估时行回退成 badge（旧数据不搬家）', () => {
+    const rows = planTimelineRows([{ id: 'a', title: '旧数据', note: '预计耗时：45 分钟' }]);
+    expect(rows[0]?.aiMinutes).toBe(45);
+    expect(rows[0]?.position.kind).toBe('unscheduled');
+  });
+
+  it('顺序 = 输入序（显示序由共享层按时间排）', () => {
+    const rows = planTimelineRows([
+      { id: 'b', title: '乙' },
+      { id: 'a', title: '甲', dueDate: 1 },
+    ]);
+    expect(rows.map((r) => r.taskId)).toEqual(['b', 'a']);
+  });
+});
+
+/** point 形状的窄化断言（避免 `as` 强转把联合判据写弱）。 */
+function assertPoint(p: { kind: string; atMs?: number }, at: number): void {
+  expect(p.kind).toBe('point');
+  expect(p.atMs).toBe(at);
+}

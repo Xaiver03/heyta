@@ -97,6 +97,11 @@ interface TaskState {
   setQuadrantDrop: (id: string, plan: QuadrantDropPlan) => Promise<void>;
   setDueDate: (id: string, dueDate: number | undefined) => Promise<void>;
   /**
+   * 排期（时间线 P2，ADR-0043）。时间线板的拖拽出口：泳道拖上轴 / 拖条移动 /
+   * 拖边改时长都汇到这里 —— 一次调用 = 一条 op（动作层钉死，见 `TaskActions.setSchedule`）。
+   */
+  setSchedule: (id: string, schedule: { startDate?: number; durationMinutes?: number }) => Promise<void>;
+  /**
    * 顺延：把**逾期**任务推到今天、保留时刻（滴答分组「顺延」同款）。
    *
    * 🔴 语义（推到哪、保不保留时刻）在 `app-host` 的 `postponeToToday`，
@@ -286,6 +291,10 @@ export const useTaskStore = create<TaskState>((set) => ({
     // 能穿过 JSON；undefined 会在 `JSON.stringify` 时被丢掉，
     // 于是"清除"在另一端静默失效。
     await taskActions.setDueDate(id, dueDate);
+  },
+  setSchedule: async (id, schedule) => {
+    // 只转交：字段语义（点名才写 / 夹取 / 非法 throw）全部在动作层 —— 本层不复制。
+    await taskActions.setSchedule(id, schedule);
   },
   postponeToToday: async (id) => {
     await taskActions.postponeToToday(id);
