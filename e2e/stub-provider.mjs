@@ -38,6 +38,8 @@ const ROUTES = [
   ['你是一个任务拆解助手', 'breakdown'],
   ['你是一个任务优先级排序助手', 'prioritize'],
   ['你是一个任务耗时估计助手', 'duration-estimate'],
+  // 对话助手（W12）。判据是它系统提示词的首句 —— 与其他四行同一条规则。
+  ['你是 heyta 任务管理器里的助手', 'assistant'],
 ];
 
 /** 每次调用的记录，给测试断言用。 */
@@ -222,16 +224,56 @@ const server = createServer((req, res) => {
 
     const hit = ROUTES.find(([marker]) => system.includes(marker));
     const feature = hit?.[1] ?? 'unknown';
-    calls.push({ feature, systemHead: system.slice(0, 40) });
+    // 🔴 多步循环的形状在这里要看得见：请求里有没有 `role:'tool'` 的结果，
+    // 就是"这是第几步"的判据。测试靠 `/__requests` 里的这个字段自证
+    // "观察结果真的被回送给了模型"，而不是只有界面渲染了个数字。
+    const hasToolResult = messages.some((m) => m?.role === 'tool');
+    const toolStep = messages.filter((m) => m?.role === 'tool').length;
+    calls.push({ feature, systemHead: system.slice(0, 40), hasToolResult, toolStep });
 
-    const content = respond(feature, user);
+    /**
+     * 助手是**唯一**要回 `tool_calls` 的功能（其余四个只要一段文本）。
+     *
+     * 脚本是确定的：没有工具结果 ⇒ 要求调一次 `list_tasks`；
+     * 有工具结果 ⇒ 把结果数说回去并收尾。
+     * ⚠️ 工具名只挑目录里**一定存在**的那个，参数不带任何编造的 id ——
+     * 与上面 `prioritize` 那条同一纪律：假端点编造 id 会让判据白测。
+     */
+    const message =
+      feature === 'assistant' && !hasToolResult
+        ? {
+            role: 'assistant',
+            content: null,
+            tool_calls: [
+              {
+                id: 'stub-call-1',
+                type: 'function',
+                function: { name: 'list_tasks', arguments: '{}' },
+              },
+            ],
+          }
+        : feature === 'assistant'
+          ? {
+              role: 'assistant',
+              // 🔴 句子里**只有**从请求体真实派生的数（`toolStep`）。
+              // 桩不许编造业务事实：一旦它说"你有 3 条任务"，那条断言就再也不证明任何事了。
+              content: `假端点收到 ${String(toolStep)} 条工具结果。`,
+            }
+          : { role: 'assistant', content: respond(feature, user) };
+
     res.writeHead(200, { ...cors, 'content-type': 'application/json' });
     res.end(
       JSON.stringify({
         id: 'stub',
         object: 'chat.completion',
         model: parsed?.model ?? 'stub',
-        choices: [{ index: 0, message: { role: 'assistant', content }, finish_reason: 'stop' }],
+        choices: [
+          {
+            index: 0,
+            message,
+            finish_reason: message.tool_calls === undefined ? 'stop' : 'tool_calls',
+          },
+        ],
         usage: { prompt_tokens: 1, completion_tokens: 1, total_tokens: 2 },
       }),
     );
