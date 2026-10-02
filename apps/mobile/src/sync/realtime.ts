@@ -41,6 +41,7 @@ import { createHostRealtimeClient, type RealtimeWiringOptions } from '@heyta/app
 
 import { readSyncConfig } from './config';
 import { privacyConsent } from '../privacy/consent-gate';
+import { legalRecheck } from '../legal-recheck/gate';
 
 /**
  * 可注入的依赖 —— **测试用假实现，生产调用点一个都不传**。
@@ -68,6 +69,18 @@ export interface RealtimeDeps {
    * 先有一套能打开 op-sqlite 的运行时。
    */
   networkAllowed: () => boolean;
+  /**
+   * 🔴 账号级补签闸门（计划 **G-27**）：这个账号同意的还是不是现在那一版文本。
+   *
+   * 为什么**两道**都要判，而不是把"没补签"并进 `networkAllowed` 里：
+   * 两条问的不是同一件事（这台设备准不准对外说话 / 这个账号签的是哪一版），
+   * 合成一个布尔就丢掉"设备同意了、账号要补签"这个真实存在的状态
+   * （`packages/app-host/src/legal-recheck.ts` 文件头那张对照表）。
+   *
+   * 与 `networkAllowed` 同样的理由做成**可注入依赖**：这条判据必须能在
+   * 没有 React、没有原生模块的纯 node 进程里被验证。
+   */
+  dataEgressAllowed: () => boolean;
 }
 
 /**
@@ -100,6 +113,11 @@ function resolveDeps(over: Partial<RealtimeDeps>): RealtimeDeps {
      * 在第一次建连之后就再也不反映真实决定了 —— 与下面 `getToken` 同一条理由。
      */
     networkAllowed: over.networkAllowed ?? (() => privacyConsent.networkAllowed()),
+    /**
+     * 同样必须是**取值器**：补签状态会在会话中途变（问回来了、用户确认了、登出了），
+     * 传死值的那一份在第一次建连之后就再也不反映真实裁决。
+     */
+    dataEgressAllowed: over.dataEgressAllowed ?? (() => legalRecheck.dataEgressAllowed()),
     syncNow:
       over.syncNow ??
       (async () => {
@@ -155,6 +173,17 @@ export async function startRealtime(over: Partial<RealtimeDeps> = {}): Promise<v
    * 只能在这里补。
    */
   if (!deps.networkAllowed()) return;
+
+  /**
+   * 🔴 **账号没补签就不建连**（计划 **G-27**），排在 `networkAllowed` **之后**：
+   * 设备级同意是更前置的事实（没同意时连"要不要补签"都问不出去）。
+   *
+   * WS 本身只传"有新 op 了"的信号、不传内容，但那个信号会触发 `syncNow()` ——
+   * 而它会被 `reconfirmGate()` 拦下。留一条"连着但每次都不干活"的通道比不建更坏：
+   * 界面上写着"实时同步已开启"，而每一次推送都静默地什么也不发生。
+   * 补签完成后 `sync/auto-sync.ts` 里那个闸门订阅者会按新状态重建。
+   */
+  if (!deps.dataEgressAllowed()) return;
 
   const config = deps.readConfig();
   const token = config?.token;

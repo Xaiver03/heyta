@@ -35,6 +35,7 @@ import {
   type AutoSyncScheduler,
   type TimerHandle,
 } from './auto-sync-core';
+import { askLegalRecheck, legalRecheck } from '../legal-recheck/gate';
 import { privacyConsent, subscribePrivacyConsent } from '../privacy/consent-gate';
 import { readSyncConfig } from './config';
 import { startRealtime, stopRealtime } from './realtime';
@@ -61,6 +62,8 @@ let subscription: { remove(): void } | undefined;
 let unsubscribeWrites: (() => void) | undefined;
 /** 同意状态变化的订阅（`startAutoSync` 里挂、`stopAutoSync` 里摘）。 */
 let unsubscribeConsent: (() => void) | undefined;
+/** 补签闸门状态变化的订阅（同上一条的生命周期，G-27）。 */
+let unsubscribeLegalRecheck: (() => void) | undefined;
 
 /**
  * 现在允许同步吗。
@@ -79,12 +82,20 @@ let unsubscribeConsent: (() => void) | undefined;
  * 「已经登录、也填好了，于是在用户还没点过同意的那一刻悄悄同步了一次」 ——
  * 那是整份合规基线里最贵的一种失败，因为它**不报错、界面也看不出来**。
  *
+ * 🔴 **补签闸门紧随其后**（计划里的 **G-27**），而且排在 `foreground` 与凭据读取**之前**：
+ * 它问的是"这个账号同意的还是不是现在那一版文本"。漏掉这一条的形状是
+ * 「文本改版了，自动同步照跑，而且是在用户根本不知道有改版的时候跑」 ——
+ * 手点那条路由 `syncNow()` 里的 `reconfirmGate()` 兜住，自动这条**只有这里**。
+ * ⚠️ 判据必须是 `dataEgressAllowed()` 而不是 `phase === 'needs-reconfirm'`：
+ * 漏掉 `checking` 就等于把"每次冷启动先推出去、再收到要补签"放回原位。
+ *
  * ⚠️ 这里排在 `foreground` 之前是有意的：`ready()` 是**纯判据**，
  * 后台切回前台时它会读磁盘偏好（同步、廉价），不值得为省一次读
  * 把闸门挪到后面去。
  */
 function ready(): boolean {
   if (!privacyConsent.networkAllowed()) return false;
+  if (!legalRecheck.dataEgressAllowed()) return false;
   if (!foreground) return false;
   const config = readSyncConfig();
   if (config === undefined) return false;
@@ -182,6 +193,34 @@ export function startAutoSync(): () => void {
     else stopRealtime();
   });
 
+  /**
+   * 🔴 补签闸门（G-27）的**另一半**，与上面那条同形：答案回来时要当场重建。
+   *
+   * 少了它会出两种坏，方向相反：
+   *   · 保存凭据那次询问还在路上 ⇒ `startRealtime()` 停在 `checking` 直接 return，
+   *     答案回来后**没人再叫它** ⇒ 这台设备直到下次切前台都没有实时同步；
+   *   · 用户在面板上点「我已读完并确认」⇒ 闸门放开，同样没人重连、也没人把
+   *     拦下期间攒下的那次写入补出去（`fire()` 会把它算成"已结算"，dirty 已清）。
+   *
+   * ⚠️ 通知在 `checking` 这一次也会到达，于是**在途询问会先把连接断掉**。
+   * 这不是浪费，是那条闸的语义：一次"结果还不知道"的重新裁决期间留一条活连接，
+   * 等于留着它去触发一个必然被拦下的 `syncNow()` —— "连着但每次都不干活"那种状态。
+   * 询问一般几百毫秒落定，而触发的几个时机（保存凭据、换地址、点确认）本来就该重建。
+   *
+   * 🔴 这里调的是**调度器的** `scheduler.notifyConfigured()`，**不是**本模块那个同名的
+   * `notifyConfigured()` —— 后者会重问一次补签状态，放进订阅者里就是
+   * `checking → 答案 → 订阅者 → 再问 → checking → …` 的死循环。
+   * 所以这里只做"闸门刚打开"该做的两件事：把攒下的改动补出去、重建实时通道。
+   */
+  unsubscribeLegalRecheck = legalRecheck.subscribe(() => {
+    if (legalRecheck.dataEgressAllowed()) {
+      scheduler?.notifyConfigured();
+      void startRealtime();
+    } else {
+      stopRealtime();
+    }
+  });
+
   return function stopAutoSync(): void {
     // 🔴 实时通道与自动同步**同一个生命周期**：只停调度器而留着那条连接，
     // 会让"应用已经不再自动同步了，却还在后台维持一条 WebSocket"。
@@ -192,6 +231,8 @@ export function startAutoSync(): () => void {
     unsubscribeWrites = undefined;
     unsubscribeConsent?.();
     unsubscribeConsent = undefined;
+    unsubscribeLegalRecheck?.();
+    unsubscribeLegalRecheck = undefined;
     scheduler?.dispose();
     scheduler = undefined;
     foreground = isForeground(AppState.currentState);
@@ -206,6 +247,21 @@ export function startAutoSync(): () => void {
  * （一处改了另一处没改，而表现是"某些改动不同步"）。
  */
 export function notifyConfigured(): void {
+  /**
+   * 🔴 **先问补签状态，再放行任何数据出站**（G-27，与 web
+   * `privacy/startup-network.ts` 那个"第 4 端口排在 `startRealtime` 之前"同一条顺序）。
+   *
+   * 这里就是移动端"凭据第一次真的存在"的那一刻（冷启动没有凭据，问也是白问），
+   * 所以"问"只能挂在这里。顺序反过来写的后果是**每次登录/换凭据**都会先把数据
+   * 推出去、再收到"你要补签" —— 那道闸就只剩下事后弹个窗，而它存在的理由是
+   * "改版与确认之间那段时间里数据不出门"。
+   * `refresh()` 会**同步**把闸门置成 `checking`（拦），所以下面两步都还来不及放行。
+   *
+   * ⚠️ 这一步自己不发用户数据，只发一条"这个账号要不要补签"的询问；
+   * 而设备级同意（G-12）关着时它连这一问都出不去 —— 那时停在 `checking` 的闸门
+   * 不放行，等同意之后由 `subscribePrivacyConsent` 那个订阅者再走一遍这里。
+   */
+  askLegalRecheck();
   scheduler?.notifyConfigured();
   /**
    * 🔴 **实时通道在这里起**（不在 `startAutoSync` 里）。

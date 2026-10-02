@@ -16,6 +16,9 @@ import { useSyncExternalStore } from 'react';
 import type { ConflictInfo, SyncStatus } from '@heyta/sync-client';
 
 import { requireNetworkConsent } from '../privacy/consent-ui';
+// 🔴 G-27 的第二道闸：装配在 `legal-recheck/gate.ts`，界面状态在同目录的 `reconfirm-ui.ts`，
+// 判定本身在 `@heyta/app-host`。这里只用它们，不再长出一份。
+import { requireLegalReconfirm } from '../legal-recheck/reconfirm-ui';
 import { readSyncConfig } from './config';
 import { openTaskHost } from '../db/open-host';
 
@@ -116,6 +119,23 @@ function consentGate(): SyncStatus | null {
 }
 
 /**
+ * 🔴 **第二道闸：账号级补签（G-27）**。与上面那道**串联**，不是它的替身。
+ *
+ * 排在 `consentGate()` **之后**：设备级同意是更前置的事实（没同意时连"要不要补签"
+ * 这一问都发不出去，也就无从裁决），而它的句子是"去作出隐私选择" ——
+ * 让一个从没被问过的人先去处理账号条款，是在让他做一件此刻不必要的事。
+ * 与 web 侧 `reconfirmGate()` 逐字同一条顺序纪律。
+ *
+ * 判据用 `requireLegalReconfirm()`（内部是 `dataEgressAllowed()`），
+ * **不在这里重判 `phase`**：漏掉 `checking` 就是"冷启动先把数据推出去、
+ * 再收到要补签"，那道闸只剩弹个窗。
+ */
+function reconfirmGate(): SyncStatus | null {
+  if (requireLegalReconfirm()) return null;
+  return { kind: 'error', reason: 'legal-reconfirm-required', retryable: false };
+}
+
+/**
  * 同步一次。
  *
  * 🔴 **`busy` 在 `finally` 里复位，不在 `then` 里。**
@@ -146,6 +166,21 @@ export async function syncNow(): Promise<SyncStatus> {
   if (blocked !== null) {
     set({ status: blocked });
     return blocked;
+  }
+
+  /**
+   * 🔴 第二道闸：账号还没补签 ⇒ 这条同步**不出发**（计划 **G-27**）。
+   *
+   * 拦在 `consentGate()` 之后、`set({ busy: true })` 之前：
+   * 排在 busy 之后的话，界面会闪一次"正在同步"然后立刻失败，
+   * 而真正的原因（条款改版了、等他确认）没地方说。
+   * 拦下时 `requireLegalReconfirm()` 会顺手把补签面板弹起来 —— 只写一条错误状态，
+   * 用户读到的是"同步失败了"，而出路界面上没给。
+   */
+  const reconfirmBlocked = reconfirmGate();
+  if (reconfirmBlocked !== null) {
+    set({ status: reconfirmBlocked });
+    return reconfirmBlocked;
   }
 
   set({ busy: true, status: { kind: 'syncing', phase: 'upload' } });
@@ -206,6 +241,22 @@ export async function resolveConflictNow(
   choice: 'keep-local' | 'keep-remote',
 ): Promise<SyncStatus> {
   if (state.busy) return state.status;
+
+  /**
+   * 🔴 第二道闸（G-27）：解决冲突**也是出站动作** —— `SyncClient.resolveConflict`
+   * 会把选定的那一边重新派发成一条本地 op 并 `sync()` 一次。
+   * 与 web 侧同一处口径：两处出站动作都要过，不是只有「立即同步」那个按钮。
+   *
+   * ⚠️ 这里**没有** `consentGate()`（设备级那道，G-12）：那条路仍然被进程级的
+   * `consentFetch` 兜住（`db/open-host.ts` 显式注入的就是它），所以不是"没同意也发得出去"，
+   * 缺的只是"拦下时给出 `consent-required` 这条能看懂的状态"。补它属于 G-12 那一行，
+   * 不在本轮范围 —— 本轮只把 G-27 这第二道闸补到与 web 相同的**两个**出站点上。
+   */
+  const reconfirm = reconfirmGate();
+  if (reconfirm !== null) {
+    set({ status: reconfirm });
+    return reconfirm;
+  }
 
   set({ busy: true });
 
