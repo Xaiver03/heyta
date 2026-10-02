@@ -89,6 +89,7 @@ import { CaptureComposer } from './features/capture/CaptureComposer.js';
 import { useProjectStore } from './features/projects/store.js';
 import { ConflictDialog } from './features/sync/ConflictDialog.js';
 import { PrivacyConsentSheet } from './features/privacy/PrivacyConsentSheet.js';
+import { LegalReconfirmSheet } from './features/legal-recheck/LegalReconfirmSheet.js';
 import { shouldAskOnFirstLaunch, usePrivacyStore } from './features/privacy/store.js';
 import { CalendarSidebar } from './features/calendar/CalendarSidebar.js';
 import { CalendarView } from './features/calendar/CalendarView.js';
@@ -1684,6 +1685,9 @@ export function App(): React.JSX.Element {
                 两者都是 `position: fixed` + `z.modal` 的顶层浮层，
                 而"同意之前不许发请求"这件事必须在应用之上，不能在某个视图里面。 */}
             <PrivacyConsentSheet />
+            {/* 🔴 G-27：账号级补签面板。挂在隐私面板**之后** —— 两道闸同时成立时，
+                "这台设备还没被问过"是更前置的那句话，界面不许同时摆两个模态。 */}
+            <LegalReconfirmSheet />
             {/* 语言切换。外壳顶栏的全局控件区，与主题切换并列 ——
                 这是**真实用户唯一能把界面切到英文的入口**（见该文件的注释）。 */}
             <LanguageSwitcher />

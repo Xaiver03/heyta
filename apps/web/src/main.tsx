@@ -25,6 +25,8 @@ import {
   subscribePrivacyConsent,
 } from './features/privacy/consent-gate.js';
 import { useSyncStore } from './features/sync/store.js';
+// 🔴 G-27：启动那一步要问的"这个账号要不要补签"。装配在 gate.ts，判定在 app-host。
+import { askLegalRecheck } from './features/legal-recheck/gate.js';
 import { ErrorScreen } from './features/shell/ErrorScreen.js';
 import { storageHintKey } from './features/shell/error-hint.js';
 import { initOpLog } from './features/tasks/store.js';
@@ -60,6 +62,9 @@ installConsentGatedFetch();
 const startupNetwork = createStartupNetwork({
   networkAllowed: () => privacyConsent.networkAllowed(),
   registerServiceWorker: registerWidgetServiceWorker,
+  // 🔴 排在 `startRealtime` 之前：这一次询问把闸门置成 `checking`，
+  // 于是"还没问到答案"的窗口里不会先建起实时通道（顺序判据在 startup-network 的测试里）。
+  askLegalRecheck,
   // 未配置/未登录时它自己就是不连（不抛），所以这里无条件调。
   startRealtime: () => useSyncStore.getState().startRealtime(),
   // 🔴 采用一枚登录会**发请求**，所以它只可能在闸门打开之后被调到（判据数得出次数）。

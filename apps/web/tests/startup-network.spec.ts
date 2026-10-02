@@ -37,7 +37,10 @@ function setup(initialAllowed = false) {
   let allowed = initialAllowed;
   const calls = {
     registerServiceWorker: 0,
+    askLegalRecheck: 0,
     startRealtime: 0,
+    /** 调用顺序。G-27 要的判据不是"问没问"，而是**问在建连之前**（见文件头那条注释）。 */
+    order: [] as string[],
     adopted: [] as HeldPendingLogin[],
   };
   const network = createStartupNetwork({
@@ -45,8 +48,13 @@ function setup(initialAllowed = false) {
     registerServiceWorker: () => {
       calls.registerServiceWorker += 1;
     },
+    askLegalRecheck: () => {
+      calls.askLegalRecheck += 1;
+      calls.order.push('ask');
+    },
     startRealtime: () => {
       calls.startRealtime += 1;
+      calls.order.push('realtime');
     },
     adoptPendingLogin: (held) => {
       calls.adopted.push(held);
@@ -80,6 +88,34 @@ describe('startup-network：三步都排在同意之后', () => {
     expect(f.calls.registerServiceWorker, 'SW 注册会向 scope 发一次请求，同意前不许发').toBe(0);
     expect(f.calls.adopted, '采用待消费的登录**本身就是**一个请求').toEqual([]);
     expect(f.calls.startRealtime, '实时通道是带令牌的 WS 握手').toBe(0);
+    // 🔴 G-27：那一步询问**本身也是一个请求**，所以它同样在射程里。
+    expect(f.calls.askLegalRecheck, '"这个账号要不要补签"这一问也是出站请求').toBe(0);
+  });
+
+  it('🔴 问补签必须排在**建实时连接之前**（顺序反了 = 冷启动先把数据推出去）', () => {
+    // 变异：把 `arm()` 里那两行换个顺序 ⇒ 这一条红。
+    // 红的是"闸门在拿到答案前是拦的，但连接已经建起来了"这一整类启动竞态。
+    f.network.hold(null);
+    f.consent();
+    f.network.arm();
+    expect(f.calls.order).toEqual(['ask', 'realtime']);
+  });
+
+  it('每次 arm 都重问一次（与实时通道同理：换令牌之后旧答案不作数）', () => {
+    f.consent();
+    f.network.arm();
+    f.network.arm();
+    expect(f.calls.askLegalRecheck).toBe(2);
+    expect(f.calls.order).toEqual(['ask', 'realtime', 'ask', 'realtime']);
+  });
+
+  it('撤回同意之后再 arm：不许问（那一问本身就是被撤回的那类请求）', () => {
+    f.consent();
+    f.network.arm();
+    f.block();
+    f.network.arm();
+    expect(f.calls.askLegalRecheck, '闸门关了还发询问').toBe(1);
+    expect(f.calls.startRealtime).toBe(1);
   });
 
   it('🔴 点了「同意」当场补跑三步，不需要刷新', () => {

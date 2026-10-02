@@ -33,15 +33,52 @@
  */
 
 import { IDBFactory, IDBKeyRange } from 'fake-indexeddb';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { __resetOpLogForTests, initOpLog } from '../src/lib/oplog.js';
-import { useSyncStore } from '../src/features/sync/store.js';
+/* ═════════════════════════════════════════════════════════════════════════
+ * 🔴 下面三个模块是 **动态** import 的，而且这**不是风格选择**（§7 第 50 条）：
+ * `consent-gate.ts` 在**模块求值期**捕获 pristine `fetch`，而 G-27 之后
+ * 实时通道多了一个前提 —— 建连之前要先问一次"这个账号要不要补签"（那是一问
+ * 真请求）。用静态 import 的话那条请求会打到 127.0.0.1:3000 上，
+ * 什么时候被拒**不确定**，于是本文件每条断言都在跟网络时序赛跑（实测就是 5 条红）。
+ * 装上计数器再 import，才拿得到一个**确定性**的答案。
+ * ═══════════════════════════════════════════════════════════════════════ */
+
+/** 补签询问的回执；`realtime-gate` 那条用例会临时把它翻成"要补签"。 */
+let consentStatus: {
+  needsReconfirm: boolean;
+  reason: string;
+  currentVersion: string;
+  recordedVersion: string | null;
+} = {
+  needsReconfirm: false,
+  reason: 'current',
+  currentVersion: 'terms@1.2;privacy@1.0',
+  recordedVersion: 'terms@1.2;privacy@1.0',
+};
+const asked: string[] = [];
+
+globalThis.fetch = vi.fn(
+  async (input: RequestInfo | URL): Promise<Response> => {
+    const url = typeof input === 'string' ? input : String(input);
+    asked.push(url);
+    return new Response(JSON.stringify(consentStatus), {
+      status: 200,
+      headers: { 'content-type': 'application/json' },
+    });
+  },
+) as unknown as typeof fetch;
+
+const { __resetOpLogForTests, initOpLog } = await import('../src/lib/oplog.js');
+const { useSyncStore } = await import('../src/features/sync/store.js');
 // ⚠️ **不**调 `__resetConsentInstallForTests()` —— 它清的是整个订阅者集合，
 // 而同步 store 在**模块求值期**就订阅了一次（`subscribePrivacyConsent`）。
 // 清了它，撤回同意时没人重建连接，本文件最后那条"撤下要当场断开"就会红，
 // 而红的理由是**测试自己把接线拆了** —— 那种红会把人往生产代码里引。
-import { privacyConsent, privacyConsentActions } from '../src/features/privacy/consent-gate.js';
+const { privacyConsent, privacyConsentActions } = await import(
+  '../src/features/privacy/consent-gate.js'
+);
+const legalRecheckGate = await import('../src/features/legal-recheck/gate.js');
 
 /** 与 `packages/sync-client/tests/realtime.spec.ts` 同形的最小假实现。 */
 class FakeWebSocket {
@@ -89,6 +126,17 @@ beforeEach(async () => {
   g.WebSocket = FakeWebSocket;
   FakeWebSocket.reset();
 
+  // 🔴 G-27 的第二个前提：默认"这个账号同意过现在这一版"，闸门放开。
+  // 不播种这一条，下面那些断言测的是补签闸门，不是接线（与文件头那条同形状的理由）。
+  consentStatus = {
+    needsReconfirm: false,
+    reason: 'current',
+    currentVersion: 'terms@1.2;privacy@1.0',
+    recordedVersion: 'terms@1.2;privacy@1.0',
+  };
+  asked.length = 0;
+  legalRecheckGate.clearLegalRecheckCredentials();
+
   dbName = `realtime-wire-${Math.random().toString(36).slice(2)}`;
   __resetOpLogForTests();
   await initOpLog(dbName);
@@ -106,6 +154,7 @@ afterEach(() => {
   // 把决定清回"没问过"：闸门是**进程级单例**，不清的话下一条用例继承上一条的同意，
   // 那两条"被拦下"的用例就会因为顺序而时红时绿。
   privacyConsent.revoke();
+  legalRecheckGate.clearLegalRecheckCredentials();
   FakeWebSocket.reset();
 });
 
@@ -220,4 +269,42 @@ describe('实时通道在 web 宿主里的接线', () => {
     expect(FakeWebSocket.instances, '点了同意没连上，用户要刷新一次才有实时同步').toHaveLength(1);
     expect(FakeWebSocket.instances[0]!.url).toContain('token=tok-abc');
   });
+});
+
+/* ---------------------------------------------------------------------
+ * 🔴 G-27：实时通道现在也有**第二道**闸（账号级补签）。上面每条都先答了"不用补签"，
+ * 那证明的是"放行之后接得上"；这一条正面钉拦本身。
+ * ------------------------------------------------------------------ */
+it('🔴 待补签时**一个 WS 都不构造**，即使这台设备早就同意联网（G-27）', async () => {
+  consentStatus = {
+    needsReconfirm: true,
+    reason: 'version-changed',
+    currentVersion: 'terms@1.2;privacy@1.0',
+    recordedVersion: 'terms@1.1;privacy@1.0',
+  };
+  useSyncStore.getState().applyAuthToken('http://127.0.0.1:3000', 'tok-abc');
+  await flush();
+
+  // 问了（一次真请求），但连接不建。
+  expect(asked.some((u) => u.endsWith('/api/account/legal-consent')), '没有问过补签状态').toBe(true);
+  expect(FakeWebSocket.instances, '待补签却构造了 WebSocket').toHaveLength(0);
+});
+
+it('🔴 补签完成 ⇒ **当场**建连，不需要刷新（与点「同意」同一条纪律）', async () => {
+  consentStatus = {
+    needsReconfirm: true,
+    reason: 'version-changed',
+    currentVersion: 'terms@1.2;privacy@1.0',
+    recordedVersion: 'terms@1.1;privacy@1.0',
+  };
+  useSyncStore.getState().applyAuthToken('http://127.0.0.1:3000', 'tok-abc');
+  await flush();
+  expect(FakeWebSocket.instances).toHaveLength(0);
+
+  // 用户在面板上点「我已读完并确认」：走生产代码，不手写状态。
+  consentStatus = { ...consentStatus, needsReconfirm: false, reason: 'current' };
+  await legalRecheckGate.legalRecheck.confirm();
+  await flush();
+
+  expect(FakeWebSocket.instances, '确认之后没建连（要等刷新才有实时同步）').toHaveLength(1);
 });
