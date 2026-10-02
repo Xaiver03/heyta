@@ -5,8 +5,6 @@ import ReactAppDependencyProvider
 
 @main
 class AppDelegate: UIResponder, UIApplicationDelegate {
-  var window: UIWindow?
-
   var reactNativeDelegate: ReactNativeDelegate?
   var reactNativeFactory: RCTReactNativeFactory?
 
@@ -21,15 +19,19 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     reactNativeDelegate = delegate
     reactNativeFactory = factory
 
-    window = UIWindow(frame: UIScreen.main.bounds)
-
-    factory.startReactNative(
-      withModuleName: "heyta",
-      in: window,
-      launchOptions: launchOptions
-    )
-
     return true
+  }
+
+  /// 🔴 iOS 26+ SDK 构建强制 UIScene 生命周期（见 SceneDelegate.swift 文件头）。
+  /// 场景配置在这里发，窗口的创建与 RN 的挂载在 SceneDelegate 里做。
+  func application(
+    _ application: UIApplication,
+    configurationForConnecting sceneSession: UISceneSession,
+    options: UIScene.ConnectionOptions
+  ) -> UISceneConfiguration {
+    let config = UISceneConfiguration(name: "Default", sessionRole: sceneSession.role)
+    config.delegateClass = SceneDelegate.self
+    return config
   }
 }
 
