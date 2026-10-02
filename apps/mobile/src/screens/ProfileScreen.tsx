@@ -67,6 +67,7 @@ import { HabitsScreen } from './HabitsScreen';
 import { ListsSection } from './ListsSection';
 import { NotesSection } from './NotesSection';
 import { NotificationsScreen } from './NotificationsScreen';
+import { SecurityScreen } from './SecurityScreen';
 import { SettingsScreen } from './SettingsScreen';
 import { TagsSection } from './TagsSection';
 import { TrashScreen } from './TrashScreen';
@@ -170,6 +171,7 @@ export function ProfileScreen(): React.JSX.Element {
   const [exportOpen, setExportOpen] = useState(false);
   const [habitsOpen, setHabitsOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const [securityOpen, setSecurityOpen] = useState(false);
 
   /**
    * 「通知」入口行的未读徽标（批二，多端覆盖审计 P0-2）。
@@ -302,6 +304,15 @@ export function ProfileScreen(): React.JSX.Element {
     },
     {
       kind: 'action',
+      testID: 'profile-entry-security',
+      label: t('mobile.security.trigger'),
+      hint: t('mobile.security.entry.hint'),
+      onPress: () => {
+        setSecurityOpen(true);
+      },
+    },
+    {
+      kind: 'action',
       testID: 'profile-entry-growth',
       label: t('mobile.growth.entry'),
       hint: t('mobile.growth.entry.hint'),
@@ -342,6 +353,23 @@ export function ProfileScreen(): React.JSX.Element {
    * 🔴 提前 return **必须在所有 hook 之后**（见 `growthOpen` 的注释）。
    * 成长屏自带顶栏返回，所以这里不需要任何导航库。
    */
+  if (securityOpen) {
+    return (
+      <SecurityScreen
+        onBack={() => {
+          setSecurityOpen(false);
+        }}
+        onPasswordChanged={(newToken) => {
+          // 🔴 令牌轮换的落盘（批四变异靶）：不写活配置，下一次同步就 401 ——
+          // "改个密码把自己这台设备也踢出去"（hosted-auth.ts 文件头原话）。
+          // 写完立即重验同步，判据在 verify-mobile-account.sh 的步骤 5。
+          form.setToken(newToken);
+          form.submit();
+        }}
+      />
+    );
+  }
+
   if (notificationsOpen) {
     return (
       <NotificationsScreen
