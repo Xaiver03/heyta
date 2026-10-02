@@ -19,7 +19,7 @@
  */
 
 import { execFileSync, spawn, spawnSync } from 'node:child_process';
-import { existsSync, readdirSync, statSync } from 'node:fs';
+import { appendFile, existsSync, readdirSync, statSync } from 'node:fs';
 import os from 'node:os';
 import { setTimeout as sleep } from 'node:timers/promises';
 
@@ -209,11 +209,19 @@ function serverSourcesNewerThan(root, entry) {
 }
 
 /**
- * 以 TEST_MODE 拉起服务端，并等到 `/health` 真的通（它真的 ping 一次数据库，
- * 比探 TCP 端口严格）。
+ * 拉起服务端并等到 `/health` 真的通（它真的 ping 一次数据库，比探 TCP 端口严格）。
  *
  * `host` 默认 `127.0.0.1`；桌面壳那条路要让**远端 Windows** 访问，
  * 所以传 `0.0.0.0`（或反向隧道到对端 loopback，见运行器）。
+ *
+ * @param testMode 默认 `true`（上游语义：自动验证邮箱、`/api/test/*` 造号）。
+ *   🔴 **要验"那封信真的发出去了"的旅程必须传 `false`** —— TEST_MODE 下
+ *   `sendEmail` 根本不碰网络，于是"抓 preview"那条判据永远等不到东西，
+ *   而**更坏**的失效形态是它等到了一个**上一轮**留在日志里的 preview。
+ * @param logFile 把 stdout+stderr **同时**落到这个文件。跨进程给 Playwright
+ *   用例读的仪器（内存里的 log 只有驱动能读，用例读不到）。
+ * @param rpId / origin 只有走 WebAuthn 的旅程需要；不传就不设那两个变量
+ *   （设了错值比不设更糟 —— 服务端会拿它去验签名）。
  */
 export async function startServer({
   root,
@@ -225,32 +233,41 @@ export async function startServer({
   rpId,
   origin,
   publicUrl,
+  testMode = true,
+  logFile,
 }) {
   root = normalizedRoot(root);
-  console.log(`· 启动服务端（${host}:${port}，TEST_MODE，rp=${rpId}）…`);
+  console.log(
+    `· 启动服务端（${host}:${port}，TEST_MODE=${String(testMode)}${rpId === undefined ? '' : `，rp=${rpId}`}）…`,
+  );
   const server = spawn(node, ['dist/src/index.js'], {
     cwd: `${root}server`,
     env: {
       ...process.env,
       DATABASE_URL: dbUrl,
       NODE_ENV: 'test',
-      TEST_MODE: 'true',
-      TEST_MODE_CONFIRM: 'yes-i-understand-the-risks',
+      ...(testMode
+        ? { TEST_MODE: 'true', TEST_MODE_CONFIRM: 'yes-i-understand-the-risks' }
+        : { TEST_MODE: 'false' }),
       PORT: String(port),
       HOST: host,
       ...(publicUrl === undefined ? {} : { PUBLIC_URL: publicUrl }),
       // 🔴 `CORS_ORIGINS` 不设 ⇒ 预检被拦，界面报"连不上服务端"而日志干净。
       CORS_ORIGINS: corsOrigins.join(','),
       // 🔴 WebAuthn 三元组必须与浏览器侧 origin 逐字一致。
-      WEBAUTHN_RP_ID: rpId,
-      WEBAUTHN_ORIGIN: origin,
+      ...(rpId === undefined ? {} : { WEBAUTHN_RP_ID: rpId }),
+      ...(origin === undefined ? {} : { WEBAUTHN_ORIGIN: origin }),
     },
     stdio: ['ignore', 'pipe', 'pipe'],
   });
 
   let log = '';
-  server.stdout.on('data', (d) => (log += d.toString()));
-  server.stderr.on('data', (d) => (log += d.toString()));
+  const append = (d) => {
+    log += d.toString();
+    if (logFile !== undefined) appendFile(logFile, d.toString(), () => {});
+  };
+  server.stdout.on('data', append);
+  server.stderr.on('data', append);
 
   const base = `http://127.0.0.1:${String(port)}`;
   let ready = false;

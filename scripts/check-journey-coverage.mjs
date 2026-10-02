@@ -71,6 +71,14 @@ const ENDPOINTS = [
       // `e2e/playwright.legal-links.config.ts` 文件头）。⚠️ 官方域那一侧目前由
       // `context.route()` 顶替到本地构建产物 —— 线上发布后要删掉那条转发（G-25）。
       'e2e/legal-links/legal-links.spec.ts',
+      // 🔴 **邮箱 + 口令**这一条路的真浏览器旅程（注册 → 真的那一封信 → 确认页 →
+      //    落到 `/app/` → 退出 → 只用口令再登录 → 暗色下的登录态）。
+      //    与上面 `auth-journey` 的分工：那条走**通行密钥**且服务端 `TEST_MODE` 开
+      //    （邮箱自动验证、不发真信），所以它**判不到**"这一封信真的存在"那一格。
+      //    由 `pnpm verify:password-web` 驱动（服务端 `TEST_MODE` **关** + 同源反代，
+      //    理由写在 `e2e/playwright.password-web.config.ts` 文件头），刻意不进 `pnpm check`。
+      'e2e/password-web/password-journey.spec.ts',
+      'scripts/verify-password-web-journey.mjs',
     ],
     shellSpecs: [],
     covers: 'J1–J7 全覆盖（jsdom 逻辑层）+ 真浏览器整条旅程（e2e/auth-journey，verify:web-auth）',
