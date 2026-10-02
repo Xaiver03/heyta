@@ -627,10 +627,13 @@ location /en/legal/ {
 🔴 **改动流程本身也要照这个顺序**：先备份 → 改 → `nginx -t` 通过才 reload → 复验 → 不通过就还原。
 `nginx -t` 闸门是必要的：这台机器上 nginx 同时服务约 34 个容器的入口，语法错会让**别的站点**一起下线。
 
-🟡 修完之后仍然存在的边界：404 现在是真的，但答的是 **nginx 裸默认页**（含 `nginx/1.18.0 (Ubuntu)`），
-无品牌、无返回入口 —— 登记为 **G-35**（见 [`legal-compliance-before-filing.md`](../plans/legal-compliance-before-filing.md) §4）。
-⚠️ 补它时**不要用 `try_files … /404.html`**：那会把状态码又变回 200，等于把本次修复撤销一遍；
-要用 `error_page 404 /404.html;`。
+✅ 那条边界已经补掉了（2026-10-02，**G-35 闭合**）：未命中的 `/legal/*` 与 `/en/legal/*` 现在答的是**我们自己的双语品牌 404 页**，并且 `server_tokens off` 之后 `Server` 头不再带版本。实现上的两条纪律留在这里，因为它们是**运维事实**而不是台账内容：
+
+- 🔴 **仍然不要用 `try_files … /404.html`** —— 那会把状态码变回 200，等于撤销 G-25b；用的是 `error_page 404 /404.html;`（**不带 `=`**，带 `=` 才是改写状态码的写法）。
+- 🔴 **`error_page` 按 location 继承，不继承 `server` 块以外的那份配置** —— 站点里每一个可能未命中的 `location`（含英文那侧的 `/en/legal/`、`/en/assets/`）都要**各自**一条，漏一处那片就答错语言。`/api/` 不需要，因为 `proxy_intercept_errors` 默认 off，上游自己的 404 JSON 不会被接管（这一点由 `live-legal.spec.ts` 的反向判据钉着）。
+- 页面本身是**构建产物**，不在这里手改：`apps/landing/public/404.html` 由 `gen-entries.mjs` 生成，改文案去 `packages/i18n`、改样式去 design token。
+
+判据、实测取值与回滚备份路径以台账为准：[`legal-compliance-before-filing.md`](../plans/legal-compliance-before-filing.md) §4 **G-35**（不在这里复述，避免两处漂）。
 
 #### 同意留痕到底生效了没有：`pnpm verify:consent-trail`（2026-10-02 增）
 
