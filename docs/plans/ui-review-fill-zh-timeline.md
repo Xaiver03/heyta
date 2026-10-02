@@ -1440,6 +1440,48 @@ uiautomator 的 bounds **会被父容器视口裁** —— 被折叠线切掉的
   📌 所以这一条的正确读法不是"等 R4 提交完就能跑"，而是"**等共享工作树里没有别人的
   未提交源码才能跑**"；前者已满足，后者没有，且**不由我解决**（我不能替别人提交、
   也不能 stash / 丢弃他们的文件）。
+
+  ✅ **同日 18:52：mac 端用一条不依赖归属的路子跑通了** —— 既然"共享工作树"是障碍，
+  就**不在它里面打包**：`git worktree add --detach /tmp/heyta-g5-clean HEAD` 拉一份
+  **只有已提交内容**的隔离检出，`pnpm install` → `pnpm -r build` →
+  `bash scripts/reinstall-all.sh --only mac`。装的是 `HEAD`，别人未提交的源码一个字节都进不去。
+  判据：`REINSTALL_MAC_EXIT=0`、窗口 `1082x716`、内容占比 100.0%、**主蓝命中 1306**
+  （数的是 `.webview.png` 那份），两张图人已看（暗色系统外观 + 首次运行同意浮层，无凭据），
+  入库为 `apps/desktop-macos/evidence/reinstall-20261002-1852-mac-installed.{png,webview.png,txt}`。
+
+  🔴 **这一跑当场照出两个打包路径的缺陷，而且它们在共享工作树里永远照不出来**
+  （各一笔提交）：`package-app.sh` 需要的两个**派生输入**都已 gitignore
+  （`Sources/HeytaMac/Generated/HeytaTokens.swift`、`packages/app-host/bridge-bundle/`），
+  而生成它们的步骤**只有三条壳门禁会跑** —— 于是"本机一直能打包"和"干净检出打不出包"
+  同时为真：第一次死在 `cannot find 'HeytaTokens' in scope`（`a4c4303a` 补 `sync-tokens.sh`），
+  修好后构建过了、可执行 511,928 B 出来了，第二次死在"缺少 bridge bundle"
+  （`a884e24d` 补 `build-native-bridge.mjs`，两处都**复用**既有生成器，不另写一份）。
+  这是 §6.1"门禁绿 ≠ 能打包"的第 4、5 个实例，机制与前几次（产物旧）不同：
+  **打包的输入由门禁隐式提供**。同轮另修一处 `9172d764`：打包脚本的启动验证漏了
+  `HEYTA_NO_FOCUS=1` ⇒ 每跑一次打包就抢一次用户前台（违反 §6.2 规定二）。
+  📌 可迁移的一条：**"在隔离检出里跑一遍固定收尾"本身就是一条判据**，
+  它照出来的是"这台机器因为跑过门禁而假装一切正常"那一类。
+
+  **装机后复验（把 `c1b72261` 那条"装进 .app 之后的复验挂在 G5"的账还掉）**：
+  直接服务 `/Applications/Heyta.app/Contents/Resources/web-dist`（零注入；4326 服务已装的那份、
+  4327 服务从 HEAD 重建的那份），
+  已安装 bundle 里 `minWidth:"30%"` 命中 1，asset 哈希与重建产物一致（`index-D-8KHdam.js`）；
+  四档视口 **1440 题398/461 · 1024 题202 · 900 题164 · 820 题140，全部 tail 可达、`wrap=wrap`、
+  控制台错误 0** —— 与重建产物逐字相同。证据：`apps/web/evidence/row-tail-fold/09…`、`10…`。
+
+  ⚠️ **但人看图抓到一条我的判据没覆盖的新缺陷**（§6.2 规定一又一次起作用）：
+  ≤900 时 body 的 **meta 行**（清单/日期/优先级徽标）`overflowX: visible`，
+  内容溢出到行尾那块 —— 实测 900 溢出 **41px**、820 溢出 **65px**（`scrollWidth` 205 vs
+  `clientWidth` 164/140）。我那条判据量的是 **meta 盒子 vs 行尾盒子**不相交（-4px ⇒ 判"过"），
+  而**绘制出来的内容**越过了盒子边界 65px 压在行尾上。⇒ 判据要补的是"绘制内容 vs 邻块"，
+  不是"盒子 vs 盒子"。**没有顺手改**：`TaskRow` 是共享组件，给 `metaRow` 加 `wrap` 或
+  `hidden` 会同时改移动端行高，而移动端此刻在别人手里（模拟器 + adb 正在跑）验不了 ——
+  拿不到的证据就不切这一刀。登记为 G9 的下一环。
+
+  ⏭ **其余三端（windows / android / ios）此刻仍未装当前产物**：18:44 实测
+  `emulator-5554` 在线且 `adb` 进程 2 秒前还在动、iPhone 模拟器 booted、gradle daemon 已跑 1h+，
+  而 mac 段之后 `reinstall:all` 的 android 段会 `adb uninstall` 共享设备上的应用 ——
+  那是在别人正在验的流程下拆它的现场。这三端留给两条会话都收工之后那一轮。
 - **G6 · `@heyta/ui` 的 typecheck 存量红**：`pnpm -r typecheck` 只在
   `packages/ui/tests/auth-model.spec.ts:79` 与 `:331` 两处失败，两行与 HEAD **逐字节相同**
   （属另一条会话在飞的 `packages/ui/src/auth/model.ts`）。⇒ 提交 `1d485786` 信息里写的
