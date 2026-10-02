@@ -210,15 +210,20 @@ describe('startup-network：三步都排在同意之后', () => {
     // 变成静默降级（本仓库反复记过的那一类）。
     // 这条用例钉的是**形状**：某个端口当场抛错时，异常必须原样冒出来。
     const calls = vi.fn();
+    const asked = vi.fn();
     const throwing = createStartupNetwork({
       networkAllowed: () => true,
       registerServiceWorker: () => {
         throw new Error('端口违约：这个函数按契约不抛');
       },
+      askLegalRecheck: asked,
       startRealtime: calls,
       adoptPendingLogin: () => undefined,
     });
     expect(() => throwing.arm()).toThrow('端口违约');
     expect(calls).not.toHaveBeenCalled();
+    // 排在 `startRealtime` 之前的那一步也一样不许跑（异常之后的端口都不该被叫到，
+    // 否则"闸门置成 checking 却没人回答"这种半截状态会被留在进程里）。
+    expect(asked).not.toHaveBeenCalled();
   });
 });
