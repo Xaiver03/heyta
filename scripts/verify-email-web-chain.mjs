@@ -435,9 +435,34 @@ const PASSWORD = 'email-web-chain-pass';
  */
 const appOpen = () => page.getByTestId('capture-input').waitFor({ timeout: 60_000 });
 
+/**
+ * 🔴 **首启隐私同意必须答「同意并联网」，而且要在这里答**。
+ *
+ * `apps/web/src/features/privacy/consent-gate.ts` 换掉的是**整个** `window.fetch`，
+ * `local-only` 下连回环地址都发不出去。这一条链的每一格都要出门（真注册、真发信、
+ * 真确认页、真 `/app/` 登录），所以同意档不是"走捷径"，它就是这条旅程的前提。
+ *
+ * ⚠️ 不在这里处理的话，症状**完全不像**隐私闸门：点头像会被 `role="presentation"`
+ * 那层遮罩吃掉指针事件（`element intercepts pointer events`），而绕过遮罩去提交
+ * 表单则会在"等 Ethereal preview URL"那一步超时，bail 说的是「没网？还是发信失败？」——
+ * 两句都是假的。离线套件里同一条由 `e2e/tests/helpers.ts` 的 `openApp` 代做；
+ * 这个脚本不走 Playwright test runner，所以自己接一次。
+ */
+async function decidePrivacyConsent() {
+  const sheet = page.getByTestId('privacy-consent-dialog');
+  const shown = await sheet
+    .waitFor({ state: 'visible', timeout: 5_000 })
+    .then(() => true)
+    .catch(() => false);
+  if (!shown) return;
+  await page.getByTestId('privacy-consent-accept').click();
+  await expect(sheet, '作出决定之后同意面板必须关掉').toHaveCount(0);
+}
+
 try {
   await page.goto(`${WEB}/`, { waitUntil: 'domcontentloaded' });
   await appOpen();
+  await decidePrivacyConsent();
   check(true, '① 应用在**同源反代**下打开（真产物）');
 
   await page.getByTestId('account-menu-avatar').click();

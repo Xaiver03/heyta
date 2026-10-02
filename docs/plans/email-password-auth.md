@@ -230,24 +230,94 @@ fail-open 且**必须留一条 warn** —— 没有它，"检查通过"与"根�
 | **W8** | ADR-0040 + §10 的文档勘误清单 + i18n 三处"没有密码"改写（zh/en）+ `gen:entries` | W6 | `check:entries` exit 0 + `docs-link-check` 无死链 + `check:ui-language` |
 | **W9** | 链式验收 + `pnpm reinstall:all` 四端重装 | 全部 | §8 全绿 + 每端"装上的是当前产物"判据（§6.1.1） |
 
-### 进度（2026-10-01 回读代码与 `git log`）
+### 进度（2026-10-02 回读代码；上一版是 2026-10-01，那条"只完成一半"已过期）
 
 - **W0–W5 ✅ 全部落地**（服务端口令核心、四类令牌哈希化 + 清理迁移、找回/改密/全设备登出、
   第 4 张凭据页 `/reset-password`、`shared-schema/auth-http-contract.ts` 契约与 app-host 宿主端口）。
-- **W6 🔴 只完成一半，而且缺的是最后那一米**：`packages/ui/src/auth/AuthForm.tsx` 与它的 DOM 级判据
-  （`apps/web/tests/auth-form.spec.tsx` **41 条 + 12 条变异**）已提交，🔴 **但 `AuthPanel.tsx` 还是它自己一套 DOM、
-  没有任何口令字段** —— 也就是说服务端两条路由已经存在，界面上仍然进不去。这条不是"顺手就能改"的：
-  面板正在被一条并行工单改（`resolveLegalLinks` 的条款落点、`packages/app-host/src/legal-links.ts` 与
-  `packages/legal/` 尚未提交 ⇒ 现在把它换成薄壳，干净检出上 `pnpm check` 会红）。
-  **等那批落地后再接**，接完必须重跑 `pnpm --filter @heyta/ui build`（web 的 spec 消费的是 `dist/`）。
-- **W8 🟡 ADR-0040 已成文**（含对 NIST「≥15 字符」这条有意偏离与它的三道补偿控制，
-  以及"文案不许称符合 NIST 800-63B"那条禁令）。**未做**：i18n 三处"没有密码"改写（zh/en）+ 帮助页新增
-  一页讲「登录密码」与「加密口令」的区别与"口令丢了数据不可达"（§5 第 10 条）+ `gen:entries` ——
-  这三样和上面那条并行工单改的是**同一批落地页产物**，排在它后面做。
-- **W7 / W9 未开始**（四端钥匙串 J16、链式验收 `verify-email-password-chain.mjs`）。
-  🔴 **在钥匙串落地之前，"口令不用每次重输"这句话不许对用户说**（ADR-0040 §7 第 1 条）。
-- **W8 的 ADR 部分已成文**：[ADR-0040](../adr/0040-email-password-auth-decoupled-from-e2ee.md)。
-  未做的是三处"没有密码"的 i18n 改写 + `gen:entries`（同一条并行工单在动落地页，接在它后面做）。
+- **W6 ✅ 整条闭合**：`apps/web/src/features/auth/AuthPanel.tsx` 已变薄壳（它自己那套 DOM 已删，
+  现在渲染 `@heyta/ui` 的 `AuthForm`），口令注册/登录在界面上**可达**；
+  DOM 级判据在 `apps/web/tests/auth-form.spec.tsx`（**48 条**）。
+  真浏览器一腿见下面「W6e 人眼复核记录」。
+- **W7 ✅ 移动端两步表单已接**（`apps/mobile` 的 `AuthScreen` 走同一个共享表单），
+  四端钥匙串（J16）**仍未做** ⇒ 🔴 **"口令不用每次重输"这句话仍然不许对用户说**（ADR-0040 §7 第 1 条）。
+- **W7b ✅ 已判定**：node-host CLI 与 Electron 壳的认证入口按各自结论落地/登记为缺口。
+- **W9 ✅ 链式验收在跑，🔴 但两条入口还没进 `HEAD`**：`pnpm verify:password-chain`
+  （`scripts/verify-email-password-chain.mjs`）与 `pnpm verify:email-auth` 两条**在库里**；
+  `pnpm verify:email-web`、`pnpm verify:password-web` 两条**只在当前工作树里** ——
+  `6a5f03c8`（2026-10-02 19:14）把它们从 `package.json` 摘了出去（上一笔整文件 add 误收了
+  并行会话的在途行，摘出是对的，但那两行的作者是本条线，**还没有自己提交**）；
+  而 `scripts/verify-password-web-journey.mjs` **根本不在 `HEAD` 里**（`git cat-file -e` 实测失败）。
+  ⇒ **干净检出上这两条命令走不通**。落地动作：提交这两行 + 那个脚本 + `e2e/password-web/` 的截图证据。
+  ⚠️ 原句"`check:script-snapshot` 对账过"即将失去依据：那个门禁正被并行会话删除
+  （索引里有 `D scripts/check-script-snapshot.mjs` 与 `package.json` 里从 `check` 链摘掉它）。
+  🔴 同一条"没进库"也适用于 journey 门禁：`scripts/check-journey-coverage.mjs` 里把
+  `e2e/password-web/password-journey.spec.ts` + `scripts/verify-password-web-journey.mjs`
+  登记为**真实入口**那一处**是未提交的改动**（`git status` = ` M`；`HEAD` 版里 `password-web` 0 命中），
+  所以"转正"这件事目前的载体仍是工作树。
+- **W8 🟡 仍缺一半**：ADR-0040 已成文；**未做**的是 i18n 三处"没有密码"改写（zh/en）+ 帮助页
+  新增一页讲「登录密码」与「加密口令」的区别与"口令丢了数据不可达"（§5 第 10 条）+ `gen:entries`。
+  这三样和隐私同意那条并行工单改的是**同一批落地页产物**，排在它后面做。
+
+### W6e 人眼复核记录（2026-10-02，AGENTS §6.2 规定一）
+
+载体：`pnpm verify:password-web`（真服务端 + 真 SMTP 假端点 + 真 Chromium，**2 passed**），
+7 张截图落在 `apps/web/evidence/password-web-journey/`（固定文件名）。**七张全部打开看过**：
+
+| 截图 | 看到了什么 | 结论 |
+|---|---|---|
+| `1-register-revealed` | 注册态、口令**明文可见**（眼睛切换已按下）、策略提示在字段下方 | ✅ 符合 §5（显隐可切 + 就地提示） |
+| `2-register-policy-error` | 弱口令被拒，红色策略提示在**对话框顶部**；口令框里是 `123`，框**下方只有灰色提示**，没有「还没有填密码。」 | ✅ 矛盾 caption 已修（见下「登记 1」的拆分）；🟡 剩下的就是登记 1 那条设计观察 |
+| `3-register-submitted` | 「注册申请已提交。去邮箱点开那条验证链接」+ 邮箱行 + 改邮箱 | ✅ 成功态与可修正入口并存 |
+| `4-email-not-verified` | 「密码是对的，只差最后一步…」 | ✅ 反枚举 + 不指责用户，文案按 D5/§5 落地 |
+| `5-confirm-page` | 服务端渲染的确认页是**英文**（`Confirm your email`） | ✅ **排除，不是缺陷**：`server/src/pages.ts:48` 的 `localeOf` 走 `resolveLocale(?lang, Accept-Language, 默认 zh-CN)`，Playwright 默认发 `en-US` ⇒ 英文是**设计行为**；中英两个方向都由 `server/tests/server-i18n-design.spec.ts` 钉着 |
+| `6-signed-in-light` / `7-signed-in-dark` | 登录后回到收集箱，亮/暗两版都正常，主蓝在位 | ✅ 暗色不是反相（§5 那条） |
+
+**看过之后被推翻的一条怀疑（玻璃面）**：`e2e/test-results/glass-account-menu-light.png` 里我以为
+"侧栏文字在面板盒子里仍然锐利"，即 `backdrop-filter` 只是计算样式上的存在。
+用同一次运行里的三张同区域裁剪图判定（探针为一次性脚本，已删）：
+
+| 读法 | 数字 |
+|---|---|
+| A = 真玻璃（blur 20） | 面板区域内**没有任何**身后导航字 |
+| B = 同一面板、强制 `backdrop-filter: none` | 「最近 7 天」「已完成」与日历图标**锐利地透出来**，A/B 逐像素最大差 **107**（三通道和） |
+| C = 同一面板、强制 `blur(60px)` | 与 A 的最大差只有 **6**，`>8` 的像素 **0 个** |
+| D = 面板未开（纯背景） | 边缘能量 2976；A 2765 / B 2879 |
+
+⇒ **blur 在像素上真的生效**，我先前把**面板自己的**菜单项（登录/注册、设置、成长）误读成了侧栏文字。
+A≈C 不是"没糊"，而是**已经糊到底**：20px 作用在 12px 中文小字上等于**抹平**，不是"看得出模糊"。
+📌 一般规律：**判玻璃要看"身后的字在不在"，不是"看不看得出糊"** —— 小字号 + 高斯模糊的结果是消失，
+而 `blur(20)` 与 `blur(60)` 无差恰好是"已经糊过头"的证据，不是"没生效"的证据。
+（同一轮还排除了三个假设：headless 不渲染 `backdrop-filter`、`fixed` 在 overflow 祖先里失效、入场动画未落位。）
+
+**排除 2（差点登记成幻影缺陷的一条）**：`4-email-not-verified` 里对话框**顶到画面下沿**，
+我以为 `maxHeight` 没生效、底部的「服务端地址」输入框够不着。量了那张图的白色卡片边界才否掉：
+图是 **1280×720**（Playwright 默认视口，不是 800），卡片白色区 y=54…665 ⇒ 高 **611**，
+而 `AuthPanel.tsx:390` 给的是 `maxHeight: '85vh'` = **612**，居中后 top=(720−611)/2=**54.5** —— 两处都对上，
+`overflowY: 'auto'` 在容器上，所以那只是**没滚动时的首屏**。
+📌 判"界面被裁了"之前先量图的尺寸：我这次是按 800 高的假设去读 720 的图，
+差出来的 80px 正好足够编出一个不存在的缺陷。
+
+**这第七张图当场抓到的一条真缺陷，已经修在同一天**：`2-register-policy-error` 那张图**第一次**看的时候，
+口令框里写着 `123`，框下面却印着「还没有填密码。」—— 因为服务端按策略拒绝时把字段指到 `password`
+（`AuthPanel` 的 `isPolicy` 那条），而组件把"宿主说该改哪一格"和"这一格没填"当成了同一件事。
+现拆成两个判据：`errorField`（`aria-invalid` 用，指格子是对的）与 `missingField`
+（**只有本地那次"没填"的判定**才配得上"还没有填 X"这句话），见 `packages/ui/src/auth/AuthForm.tsx:308-326`。
+时间线（`stat` 实测）：源码 18:22:38 改完 ⇒ 19:04:19 这一张就是**改完之后**重跑 `verify:password-web`
+打出来的（该脚本每次运行先从源码重打 `apps/web` 与全部 workspace 依赖），所以这张图**是修好的产物**，
+不是旧包 —— 这就是上面表格里那一行的证据来源。
+📌 反面记一句：jsdom 那批用例当时全都只判"状态区有没有话"，所以这句话在框里明明有内容时也没有任何一条会红
+（§7 元规则 2：**只判"有没有话"的判据，判不出"这句话是不是在撒谎"**）。
+
+**登记 1（本轮不改，理由在文末）**：服务端返回的**字段级**错误只渲染在对话框**顶部**的
+live region（`packages/ui/src/auth/AuthForm.tsx:414-454`），出问题的输入框只拿到
+`aria-invalid`（`:538`），**没有可见标记**，两者相距三行。
+本地校验错误**是**就地渲染的（`:484`、`:563`）—— 所以同一个表单里"错在哪"有两套空间约定。
+组件已经**知道**是哪个字段（`status.field`，`AuthPanel.tsx:366` 对 `password-policy` 就在传它），
+缺的只是把这句话搬到字段下面 + 给无效字段一条可见样式。
+**下一轮的第一件**：把 `status.field !== undefined` 的错误搬到对应字段下（顶部只留无字段的），
+并补一条能失败的判据（断"错误文案出现在该字段之后、且在下一个字段之前"）。
+🔴 本轮不动的理由：它要改 `packages/ui/src` 并重建 `dist/`，而 auth-form 新判据的**变异验证**
+本来就压在同一件事上（B8 的形态：一次失败的 build 会清空共享 `dist/`）—— 两笔该一起做、一起验。
 
 ### W0 探针 —— ✅ 已跑完（2026-10-01），**五条里四条改写了设计**
 
