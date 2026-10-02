@@ -166,7 +166,7 @@ function ScopeGroup({
   return (
     <div className="ht-sidebar__scope-group">
       <div className="ht-sidebar__scope-heading">
-        <span className="ht-nav__section">{heading}</span>
+        <span className="ht-nav__section ht-type-group-label">{heading}</span>
         <input
           type="checkbox"
           aria-label={groupLabel}

@@ -143,7 +143,7 @@ export function ProjectsPanel({
       <aside ref={asideRef} aria-label={t('web.projects.ariaLabel')} style={asideStyle}>
         <section>
           <div className="ht-sidebar__organizer-heading">
-            <h2 className="ht-nav__section">{t('web.projects.heading')}</h2>
+            <h2 className="ht-nav__section ht-type-group-label">{t('web.projects.heading')}</h2>
             <button
               type="button"
               className="ht-sidebar__organizer-add"
@@ -228,7 +228,7 @@ export function ProjectsPanel({
 
         <section>
           <div className="ht-sidebar__organizer-heading">
-            <h2 className="ht-nav__section">{t('web.tags.heading')}</h2>
+            <h2 className="ht-nav__section ht-type-group-label">{t('web.tags.heading')}</h2>
             <button
               type="button"
               className="ht-sidebar__organizer-add"
