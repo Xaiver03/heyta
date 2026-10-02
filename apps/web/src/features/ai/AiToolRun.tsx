@@ -88,8 +88,15 @@ export interface AiToolRunProps {
 
 type Phase = 'idle' | 'disclose' | 'running' | 'done';
 
-/** 写入意图的人话。**只是贴标签**，判断仍在 app-host。 */
-function intentText(intent: LocalApiWriteIntent, t: I18nValue['t']): string {
+/**
+ * 写入意图的人话。**只是贴标签**，判断仍在 app-host。
+ *
+ * 🔴 导出是因为**对话助手面板也要渲染同一种提案卡**。这里留两份 = 两种说法，
+ * 而"同一个提案在两个入口长得不一样"正是本仓库反复付学费的那一类。
+ * 判据：`apps/web/tests/ai-assistant-panel.spec.tsx` 里那条与 `AiToolRun`
+ * 逐字对照的断言。
+ */
+export function intentText(intent: LocalApiWriteIntent, t: I18nValue['t']): string {
   switch (intent.action) {
     case 'create-task':
       return t('web.ai.tools.intentCreate', { title: intent.title });

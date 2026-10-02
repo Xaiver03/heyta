@@ -391,6 +391,46 @@ input[type="radio"] {
   padding-left: var(--ht-space-4);
 }
 
+/* ── 对话记录（助手面板把上面那个列表改成"气泡列"）────────────────
+ *
+ * 🔴 这两组修饰类是**功能**，不是装饰。第一版直接套 `.ht-ai__items`
+ * （那是工具结果列表：整行左对齐、带项目符号），于是"我说的话"和
+ * "助手说的话"在界面上长得一模一样 —— 真浏览器截图里唯一的区别是助手
+ * 那行下面多了一句"用了 N 步工具"。**读不出"谁说的"的对话不是对话，
+ * 是一列输出。**
+ *
+ * 形状走聊天界面的通用约定：用户贴右 + 主色浅底，助手贴左 + 中性面描边。
+ * ⚠️ 角色由**对齐 + 底色 + 边框**三样同时承载，不单靠颜色 ——
+ * 暗色主题下 `--ht-color-primary-subtle` 是半透明蓝，浓度会掉。
+ * ⚠️ 宽度不写百分比：`align-self` 让气泡收到内容宽，
+ * 而一个写死的 `70%` 是裸值（§5 第一条）。
+ */
+.ht-ai__items--chat {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ht-space-2);
+  padding-left: 0;
+  list-style: none;
+}
+
+/* ⚠️ 两种角色各写**一整块**，不写成"两个选择器共用一块"：面板 spec 里那条
+   "class 真的有规则"的判据是按"选择器 + 左花括号"取块的，合并选择器会让它
+   读到共享声明的那一块、把 `align-self` 判成"没有"。两条各自完整也更直接。 */
+.ht-ai__item--user {
+  align-self: flex-end;
+  padding: var(--ht-space-2) var(--ht-space-3);
+  border: var(--ht-border-width-thin) solid var(--ht-color-border-subtle);
+  border-radius: var(--ht-radius-md);
+  background: var(--ht-color-primary-subtle);
+}
+
+.ht-ai__item--assistant {
+  align-self: flex-start;
+  padding: var(--ht-space-2) var(--ht-space-3);
+  border: var(--ht-border-width-thin) solid var(--ht-color-border);
+  border-radius: var(--ht-radius-md);
+  background: var(--ht-color-surface);
+}
 .ht-ai__note {
   margin: 0;
   color: var(--ht-color-foreground-subtle);

@@ -139,6 +139,7 @@ import { AiBreakdown } from './features/ai/AiBreakdown.js';
 import { AiPrioritize } from './features/ai/AiPrioritize.js';
 import { AiDuration } from './features/ai/AiDuration.js';
 import { AiToolRun } from './features/ai/AiToolRun.js';
+import { AssistantPanel } from './features/ai/AssistantPanel.js';
 import { AiSettingsNavigationContext } from './features/ai/ai-settings-navigation.js';
 import type { SettingsTarget } from './features/ai/route-explanation.js';
 import { AiSettings } from './features/settings/AiSettings.js';
@@ -1826,6 +1827,31 @@ export function App(): React.JSX.Element {
               consents={aiSettings.consents}
               // 🔴 工具授权复用设置里那份 `localApi.grants` —— 不另建一套权限。
               grants={aiSettings.localApi.grants}
+              secrets={aiSecrets}
+              healthSnapshot={aiSettings.health}
+              onHealth={(health) => {
+                setAiSettings((previous) => {
+                  const next = {
+                    ...previous,
+                    health: toHealthSnapshot(health, Date.now()),
+                  };
+                  saveAiSettings(next);
+                  return next;
+                });
+              }}
+            />
+          )}
+          {/* 对话式助手（W12 / ADR-0045）。
+              🔴 它的工具范围来自 `assistantTier`（设置里的**第二个授权前端**），
+              **不是** `localApi.grants` —— 那张表管的是外部程序（MCP）能不能调工具。
+              两档最后都汇到同一个 `isToolGranted()` 判据，授权仍只有一份。
+              ⚠️ 与上面单步面板**并存**是刻意的：单步那条有"规则命中零出境"的短路，
+              多轮循环还没有（缺口按编号登记在 `docs/plans/ai-assistant-closure.md` §7.2 第 4 条）。 */}
+          {contentView === 'tasks' && (
+            <AssistantPanel
+              routing={aiSettings.routing}
+              consents={aiSettings.consents}
+              tier={aiSettings.assistantTier}
               secrets={aiSecrets}
               healthSnapshot={aiSettings.health}
               onHealth={(health) => {

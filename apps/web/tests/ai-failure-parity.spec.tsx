@@ -1,5 +1,5 @@
 /**
- * 🔴 跨面板失败文案一致性（第 5 个入口的漂移不许再发生）
+ * 🔴 跨面板失败文案一致性（第 6 个入口也没有漂移）
  * ========================================================
  *
  * ## 这条断言为什么存在
@@ -41,14 +41,21 @@ import { describe, expect, it } from 'vitest';
 const HERE = dirname(fileURLToPath(import.meta.url));
 const AI_DIR = resolve(HERE, '../src/features/ai');
 
-/** 五个会失败、且必须说人话的 AI 入口。 */
-const PANELS = ['AiBreakdown', 'AiCapture', 'AiDuration', 'AiPrioritize', 'AiToolRun'] as const;
+/**
+ * 六个会失败、且必须说人话的 AI 入口。
+ *
+ * 🔴 `AssistantPanel`（对话助手，W12）是**这一条自己抓出来的**：它落地时
+ * 本文件的"清单不能悄悄少一个面板"立刻变红 —— 那正是这条断言存在的理由。
+ * 加进清单之后必须同时满足本文件其余四条（统一工厂 / `t(failure.key)` /
+ * 原文只进 `<details>` / 折叠详情 testid 形状）。
+ */
+const PANELS = ['AiBreakdown', 'AiCapture', 'AiDuration', 'AiPrioritize', 'AiToolRun', 'AssistantPanel'] as const;
 
 function panelSource(name: (typeof PANELS)[number]): string {
   return readFileSync(join(AI_DIR, `${name}.tsx`), 'utf8');
 }
 
-describe('五个 AI 入口的失败文案只有一个来源', () => {
+describe('六个 AI 入口的失败文案只有一个来源', () => {
   it('每个面板都从 `ai-failure-copy.js` 取一份 `*FailureCopy`', () => {
     const offenders = PANELS.filter(
       (name) => !/import \{[^}]*FailureCopy[^}]*\} from '\.\/ai-failure-copy\.js';/u.test(panelSource(name)),
@@ -83,7 +90,7 @@ describe('五个 AI 入口的失败文案只有一个来源', () => {
     expect(offenders, '这些面板的失败态没有折叠的技术详情：').toEqual([]);
   });
 
-  it('`ai-failure-copy.ts` 里五个工厂都在（漏一个就编译不过，这里再钉一次）', () => {
+  it('`ai-failure-copy.ts` 里六个工厂都在（漏一个就编译不过，这里再钉一次）', () => {
     const copy = readFileSync(join(AI_DIR, 'ai-failure-copy.ts'), 'utf8');
     for (const factory of [
       'breakdownFailureCopy',
@@ -91,6 +98,7 @@ describe('五个 AI 入口的失败文案只有一个来源', () => {
       'durationFailureCopy',
       'prioritizeFailureCopy',
       'toolRunFailureCopy',
+      'assistantFailureCopy',
     ]) {
       expect(copy, `ai-failure-copy.ts 里没有 ${factory}`).toContain(`export function ${factory}(`);
     }
