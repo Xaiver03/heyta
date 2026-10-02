@@ -1231,6 +1231,44 @@ export const zhCN = {
   'web.gantt.dependsOn': '依赖：{title}',
   'web.gantt.overlap': '与前置重叠',
 
+  // ── Web · 时间线板（2026-10-01 重画，goal：docs/plans/goal-timeline-rework.md）──
+  // 一根共轴、行=任务、三态降级（条/菱形/未排期泳道）。上面 `web.timeline.*` 的
+  // empty/aria 三条**继续被板复用**；aiEstimate/noChecklist/unattributable 归
+  // 任务详情的清单排程预览。措辞全部由宿主装进 `TimelineBoardLabels`。
+  'web.board.weekday.1': '一',
+  'web.board.weekday.2': '二',
+  'web.board.weekday.3': '三',
+  'web.board.weekday.4': '四',
+  'web.board.weekday.5': '五',
+  'web.board.weekday.6': '六',
+  'web.board.weekday.7': '日',
+  'web.board.month.1': '1月',
+  'web.board.month.2': '2月',
+  'web.board.month.3': '3月',
+  'web.board.month.4': '4月',
+  'web.board.month.5': '5月',
+  'web.board.month.6': '6月',
+  'web.board.month.7': '7月',
+  'web.board.month.8': '8月',
+  'web.board.month.9': '9月',
+  'web.board.month.10': '10月',
+  'web.board.month.11': '11月',
+  'web.board.month.12': '12月',
+  'web.board.today': '今天',
+  // 有名字的泳道（R4 判据 5）：没排期的任务**可见但不落图**——
+  // 静默消失用户会以为视图坏了，画成条就是在编长度。
+  'web.board.unscheduledLane': '未排期（{count}）',
+  // 行头的估时 badge：是**文字**，绝不画成长度（R4 判据 3）。
+  'web.board.aiBadge': 'AI 估 {duration}',
+  // 逾期是文字 + 警示色，不是只有颜色（WCAG 1.4.1）。
+  'web.board.overdue': '逾期',
+  // 详情预览的区块说明：任务内部坐标系与板**必须标明**不是同一个坐标系
+  // （goal §2.1；不标明用户就会拿它和板对位置）。
+  'web.board.planCaption': '这是这条任务内部的清单排程（先后与估时），与时间线板不是同一个坐标系。',
+  // 「点空白建任务」（goal §3.2 手势 4）的默认标题：这是**数据**（一条任务的名字），
+  // 但它来自产品而不是用户 —— 所以仍然走词条表，不硬编码。
+  'web.board.untitledTask': '未命名任务',
+
   // ═══════════════════════════════════════════════════════════
   // Web · AI（拆解 / 捕获 / 估时 / 排序 / 设置 / 记忆）
   // ═══════════════════════════════════════════════════════════

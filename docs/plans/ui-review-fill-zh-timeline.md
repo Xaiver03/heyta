@@ -35,7 +35,7 @@
 | R1 | 列表行左侧的勾选框**像缺了一半**（四象限格内、时间线里都是）。产品负责人两次指出 | 🔬 **已实测**（§2.1）：H2（压扁）**已排除**，H1（被裁）**成立** —— 负边距把 22px 的圈推到 `x=317`，裁剪祖先的可视左边是 `x=328`，**恰好切掉 11px = 一半**。🔴 附带证伪了"要补 `minWidth: 0`"这条推断（§2.2） | ✅ 已修（共享层一份；桌面载荷 + Android 真机两条载体各自跑绿，变异表见 §2.3） |
 | R2 | 页面内组件应当**几乎铺满高和宽**，四象限组件没铺满（下面一大片空白） | 🔬 **已实测**（§3.1）：断在**三层**，不是"board 缺一行 `flex:1`"那么浅 —— 内容列是**块容器**（`display:block`，664px），board 是 `flex:0 0 auto`（458px），行容器也是 `flex:0 0 auto` ⇒ 格子的 `flex:1 1 0%` **整条空转**。🔬 **Android 真机侧另测到一层**（§3.5）：1080px 宽 < `layout.two-column-min` ⇒ 单列 `stack`，4×504=2016px 内容 > 视口 1888px ⇒ **剩余空间为 0**，那条 `flexGrow` 契约在这台机器上**可证明不承重**，判据随之从"铺满"改成「可滚动、不裁切」 | ✅ **两条载体各自跑绿**：桌面载荷 5 条判据 + m5/m6 双层变异（§3.3）、Android 真机 9/9 × 两轮 + 变异 A/B 的**承重表实测**（§3.5）。🟡 未闭合的两条登记为 **G2a**（未注册根 `pnpm verify:mobile-quadrant-fill`）/ **G2b**（iOS 载体未建） |
 | R3 | 应用内文字**默认中文**；**测试数据**不许是 `B-mac-shot-1790762056` 这种东西 | 🔬 **三条各自实测**（§4.1 / §4.2 / §4.3）：① 默认语言这一半由另一条会话 `0aa6cb0e` 修好，但它**钉的次序与我先前记的相反**（实际是 持久 > `?lang=` > 设备 > 默认，§4.3 已更正并补了变异验证）；② 残留的根因**不是"谁忘了删"，是这个壳结构上删不掉** —— `apps/node-host` 从来没有删除通道，已补 `remove`/`purge`/`trash` 三条并在真库上跑完处置（§4.2）；③ 逐屏英文扫：字典侧由 `check:ui-language` 承重（zh 2650 / en 2650），渲染侧只剩"数据本身是英文"；渲染侧那一半**已实测收口**（§4.4：九屏唯一命中 = 语言自称 `English`，阳性对照 48 命中证明探针活着） | 🟡 数据侧 **✅ 处置完**（真库三态实测 + 备份可回退）；**G3** = 手机上语言切换刻意不跨冷启动（要拍板）、**G4** = 渲染侧 ✅ 已收（§4.4），**macOS 壳像素那一半仍未闭合**（拦路条件与闭合条件写在同节末尾） |
-| R4 | 时间线 UI 离谱：**全是文字，没有"线"**。要求先搜别人怎么做 | 🔬 **已实测 + 已外部调研**（§5.1 / §5.2）：**不是件缺失** —— 条（1152×24）、轴（三格刻度）、今天线（2×24）都有真实 rect。坏在**每个任务一把自己的尺子** + **把任务的子条目当条目画** + **没估时编成 1 小时** | 🔴 未修 |
+| R4 | 时间线 UI 离谱：**全是文字，没有"线"**。要求先搜别人怎么做 | 🔬 已实测 + 已外部调研（§5.1 / §5.2），🔴 **已修（P1，2026-10-02，证据落 §5.4）**：重画为一根共轴 + 行=任务 + 三态降级（goal：[`goal-timeline-rework.md`](goal-timeline-rework.md)）；R4 判据 8 条全过 + 变异三种精确红 + 桌面/Android/暗色截图人看；P2 数据模型 ADR 已写（ADR-0043）、代码未开工 | ✅ 已修（P1） |
 | R5 | 移动端排序选择面板**被屏幕底边裁掉**：三个档位只有第一个完整可见 | ✅ **已修 + 机制已测**（§6）：不是"面板被压缩"，是 `View` 默认 `flexShrink: 0` ⇒ **面板按内容高度溢出屏幕底边**。四条变异：`ScrollView`(B) 与"遮罩离开 flex 流"(C) **承重**，`maxHeight`(A) 与 `marginTop:auto`(D) 是**护栏**（今天不承重，测出来的） | ✅ 已修（`scripts/verify-mobile-sort-sheet.sh` 真机 9/0） |
 | R6 | 做事视图开头那张 **`0/0 今天还没有安排`** 进度卡：产品负责人看图后要求**彻底删掉**，并让收集箱的**数字排布对齐滴答清单** | 卡**已删**（宿主接线 `TodayProgressBanner.tsx` 整个移除，共享组件保留给成长页）；数字排布的差距见下面 §6.6 | ✅ **已交付**：卡已删、侧栏两节计数已齐（含 per-tag），行右侧元信息四样（截止/优先级/重复/**清单归属**）**两端同一份共享实现**，web 那份旧的已当场删除（§6.6 第 3 条：11 个变异 + 桌面载荷明暗两张图人看过）。🟡 未闭合的登记为 **G5**（移动端真机像素与四端重装）/ **G7**（清单视图里行上仍重复清单名，待产品拍板）/ **G9**（行尾八个常驻控件把元信息挤到第二行 —— 与参照图剩下的主要差距，两条 hover 路径各有拦路条件、本工作树验不全） |
 
@@ -1008,6 +1008,74 @@ spreadsheet"）—— 说明"共用的那条轴"从来不是无障碍表面。�
 8. 变异验证：① 把 `dueDate` 从入参里拿掉 ⇒ 判据 2/4 红；
    ② 让未估时任务退回按 `DEFAULT_DURATION_MINUTES` 画条 ⇒ 判据 3 红；
    ③ 把每张图各自的 `spanMinutes` 传成各自的 ⇒ 判据 1 红。
+
+### 5.4 已修（P1，2026-10-02）—— 证据（按 §5.3 的判据逐条）
+
+执行载体：goal [`goal-timeline-rework.md`](goal-timeline-rework.md)（产品负责人
+2026-10-01 批准三阶段方案，做序冲突由该指令裁决：**时间线先做**）。
+调研全文：[`../research/timeline-view-deep-dive.md`](../research/timeline-view-deep-dive.md)。
+
+| 判据 | 结果 | 证据 |
+|---|---|---|
+| ① 先红（判据 4 改前必红） | ✅ 两轮红 | `apps/web/tests/timeline-board.spec.tsx` 首版探针：第一轮红在 `not.toContain('0:00 → 1:00')`（当时界面印的就是假时间，与 §5.1 实测一致）；修掉探针自身缺陷（标题含「15:00」替正向断言作答，#86）后第二轮红在 `toContain('15:00')` |
+| ② 一根轴（判据 1） | ✅ | `timeline-axis` 数量 == 1、旧 `gantt-chart` 数量 == 0（组件判据套件同文件）；变异 ③（复制一根轴）**精确 1 红** |
+| ③ 相对位置（判据 2） | ✅ | 截止 14:00 vs 16:00 ⇒ x 差 > 0 且同号、且不都是 0（正向对照）；数学侧 `percentAt` 单调性钉在 `packages/ui/tests/timeline-board-model.spec.ts`；变异 ①（入参拿掉 dueDate）12 红 |
+| ④ 无假长度（判据 3） | ✅ | 有 dueDate 无估时 ⇒ `timeline-point` 在场、`timeline-bar` 缺席、无「按 1 小时排」文案；行数据 `TimelineBoardRow` 在**形状上没有长度字段**；变异 ②（给点编 1 小时假条）精确 2 红 |
+| ⑤ 界面时间来自 dueDate（判据 4） | ✅ 转绿 | 15:00 出现在行头；且落笔点严格落在当天日刻度格内（不是窗口起点） |
+| ⑥ 未排期可见不落图（判据 5） | ✅ | 有名字的「未排期（N）」泳道；混合场景两边都可见；全部未排期时轴与今天线照常；**Android 真机 6/6**（`verify:mobile-timeline` 判据翻新后：轴上今天日期 + 泳道含本轮任务） |
+| ⑦ 无障碍文字面（判据 6） | ✅ | 每行文字含标题+日期；轴/今天线/菱形 aria-hidden；根 aria-label；轴刻度今天格是**文字**「今天 MM-DD」（紧凑档也保留 —— 只剩颜色会违反 1.4.1） |
+| ⑧ 截图人看（判据 7） | ✅ | 桌面载荷浅色 `e2e/test-results/timeline-rework-light.png` + 暗色 `timeline-rework-dark.png`（副本 `apps/web/evidence/timeline-rework/`）；Android `apps/mobile/evidence/android-timeline-board.png`；均人已看，控制台 0 错误 |
+| ⑨ 变异三种（判据 8） | ✅ | ①入参拿掉 dueDate ⇒ 12 红；②给点编假条 ⇒ 恰 2 红（判据 3 两条）；③复制轴 ⇒ 恰 1 红（判据 1）—— 精确性逐个验证后恢复源码复验全绿 |
+
+**重画顺手抓到并修掉的新缺陷**：紧凑刻度（411dp 轨道）放不下 7 个日期标签，
+相邻两两重叠成「09-2829」（Android 截图人眼抓到）⇒ compact 档密度减半 +
+今天的「今天」前缀保留；web 组件判据 18 条含此条。
+
+**结构变化**：删除 `packages/ui/src/timeline/TimelineView.tsx`（每任务一张图的容器）、
+`sharedTimelineSpan`（名字比实现大）、`planTimelineBlocks`（无生产消费者）；
+新增 `TimelineBoard` / `board-model` / `ChecklistPlanPreview`（清单排程降级进详情，
+标明是任务内部坐标系）/ `timeline-position.ts`（三态类型）。
+
+### 5.5 P2 也已交付（2026-10-02）—— 排期面（ADR-0043 §7 清单全落）
+
+| ADR-0043 §7 项 | 交付与证据 |
+|---|---|
+| 字段 | `Task.startDate?: number` / `durationMinutes?: number`（可选 + 运行时默认，**不 bump schema**；`entities.ts` 带 ADR 引用注释） |
+| `setSchedule` | `TaskActions.setSchedule`（**async** + 存在性 throw + 「点名才写」语义 + 时长夹取 [5,480] 整分钟；`dueDate` 明确不在管辖区）。op 形状判据 `packages/app-host/tests/set-schedule.spec.ts`（真实引擎 7 条：三手势形状 / 清除写 null / 空对象零 op / 非法 throw 零残留 / 不存在 throw） |
+| 三态生产者 | `deriveTaskTimePosition` 扩三态（range = start+(duration 或更晚的 due)；**start 单独 ⇒ point**、duration 单独 ⇒ unscheduled —— 绝不编长度）；字段时长是事实源、note 行回退（ADR §4）。三态穷举测试在 `timeline-plan.spec.ts` |
+| 板渲染 | `range` 条渲染（P1 已就位）接上生产者；**点也可拖**（滴答同款：拖点 = 给起点，start+due ⇒ 真 range，不编时长得条的唯一路径） |
+| 拖拽手势 | `TimelineBoard` Responder（泳道拖上轴 / 拖条移动 / 拖右缘改时长）；换算纯函数 `msAtRegionX` / `moveStartMs` / `resizeMinutes`（**除向换算**，22 条 board-model 测试钉死）；组件只算几何，写 op 全在宿主 |
+| 宿主接线 | web `store.setSchedule` → `TaskActions.setSchedule` → `dispatch()`；`TimelinePanel.onScheduleTask` 透传；移动端不传 = 只读板（手势平台适配在 goal §4 P3） |
+| goal §3.3 判据 | 骨架 1（op 形状）：app-host 7 条 + web 出口 `timeline-schedule.spec.tsx` 2 条（真实 op-log：恰好一条形状正确的 UPD + 物化状态到位）。骨架 2（离线）：零网络、op 落本地 SQLite、引擎重放即"刷新后"。骨架 3（变异）：store 出口改成**绕过 dispatch 直改实体** ⇒ 2 红实体化状态/形状双红，恢复后转绿 |
+| 真实拖拽 | Playwright 驱动**真应用**完成手势：`points 2→1、bars=1、RESULT=OK`；截图 `apps/web/evidence/timeline-rework/timeline-p2-drag-{light,dark}.png`（人已看：拖过的任务是一条带右缘手柄的真条，终点=它的截止） |
+
+**手势 4「点空白建任务带日期」（2026-10-02 补齐，goal §3.2 手势表的第四行）**：
+- 出口：`TimelineBoard.onCreateAt?(atMs)` —— **轴（空白标尺）就是点击面**（行区的每一行都属于任务，点行建任务会误触；轴是唯一干净的空白），复用 `msAtRegionX` 换算；移动过（别的手势扫过轴）不算点击；
+- 宿主：`NewTaskFields` 增 `startDate?`，web `App.tsx` 接 `addTask(t('web.board.untitledTask'), { startDate })` —— **既有建任务 op + 日期字段，一次 CRT 不 fan-out**；标题走词条表（`web.board.untitledTask` 中英）；
+- 判据：`timeline-schedule.spec.tsx` 手势 4 条 —— op-log 里**恰好一条 CRT**、载荷 `{title, priority, startDate}`（无第二条「补日期」op）；
+- 实施中新知的坑：`measureInWindow` 回调是**异步**的 —— 只在 grant 时测量的话，「点空白」这种 down→up 一瞬间的手势在 release 时 regionAbs 还是 null，`onCreateAt` 被静默跳过（无任何报错）；修法 = 渲染后 effect 主动测量，手势时只刷新；
+- 真实取证：Playwright 点轴 ⇒ 新点落在点击时刻（`RESULT=OK`，最终截图三形态同屏：点空白建的未命名任务（含**逾期**警示路径）/ 拖成条的 / 未拖的点 —— `timeline-p2-drag-{light,dark}.png` 人已看）。
+
+**实施中新修/新知的**：
+1. **Responder 被滚动态祖先抢占** —— move 正常、release 永远不来，拖拽静默作废；
+   修法 = 三处手势 `onResponderTerminationRequest: () => false`（拖拽期间不许滚动）；
+2. **换算方向反了不报错**：`pxPerMs` 是每毫秒像素数（~1e-6），乘除写反拖一屏只挪几毫秒
+   （整分钟对齐后 = 没动）—— 被"单调/幅度"双断言抓住；
+3. web 的 `storage-backend-shell.spec.ts` 出现过一次**全量顺序 flake**（单跑 3/3、复跑全绿，
+   与本刀文件无交集）—— 如实登记，不假装它不存在。
+
+**已知边界（如实登记）**：
+1. **web 没有任务详情面**（本轮之前就如此）⇒ `ChecklistPlanPreview` 目前只有移动端
+   `TaskDetailSheet` 一个挂载点；web 侧清单排程的可视化随旧板一起消失，等详情面立项；
+2. **P2 未开工**：数据模型 ADR 已写（[ADR-0043](../adr/0043-timeline-p2-task-start-date-duration.md)，
+   `startDate` / `durationMinutes` 可选字段 + 三态生产者规则 + 拖拽 op 纪律），
+   代码（字段 / `setSchedule` / 拖拽手势）未动 —— goal §3 顺序是硬的（先 ADR 后代码）；
+3. **e2e 全套未跑**：另一会话的 vite 在 4321（§7 第 87 条 SIGKILL 禁区），缺口登记；
+   e2e 依赖的 `timeline-view` 白屏锚点已保留（组件根 testID 不变）；
+4. **并行碰撞面**：`verify-mobile-timeline.sh` 适配了并行刀的隐私同意首启面板
+   （desc/text 两张皮：按钮名在 content-desc 上 —— §7 #45 同族再现）与其改过的
+   底部导航（任务|日历|专注|分类|我的）；本工作树 typecheck 的存量红
+   （`privacy-consent-sheet.spec.tsx`、`AuthForm.tsx`）属并行会话在飞改动。
 
 ---
 

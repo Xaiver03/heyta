@@ -167,14 +167,14 @@ function entry(title: string, durationMinutes: number, startOffsetMinutes = 0): 
 
 /**
  * 🔴 共享 `GanttChart` 的英文壳：文案由宿主注入，theme 由 Provider 提供。
- * 标签走**真的** `useTimelineLabels()`（在 `renderEn` 的 en Provider 之内），
+ * 标签走**真的** `useTimelineLabels().plan.gantt`（2026-10-01 重画后甘特图归详情预览组；在 `renderEn` 的 en Provider 之内），
  * 所以这里断的确实是"调用点真的分支了"，不是在测试里重写一份英文。
  */
 function GanttEn(props: Omit<GanttChartProps, 'labels'>): React.JSX.Element {
   const labels = useTimelineLabels();
   return (
     <HeytaUiProvider>
-      <GanttChart {...props} labels={labels.gantt} />
+      <GanttChart {...props} labels={labels.plan.gantt} />
     </HeytaUiProvider>
   );
 }

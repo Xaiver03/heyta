@@ -15,15 +15,20 @@
 #
 # ## 这一跑能证什么、不能证什么
 #
-# 能证：① chip 在、② 点它换档、③ 共享视图**真的渲染了块**（任务标题出现在
-# 时间线里，而列表视图那一档已经不在屏幕上）、④ **未估时那条如实说明也在**
-# （`web.gantt.durationDefault` = 「未估时（按 …排）」）—— 它证明画出来的是
-# 一条**按默认时长排的条**，而不是一张空图的"看起来没报错"。
+# 🔴 2026-10-01 重画（goal：`docs/plans/goal-timeline-rework.md`）后判据翻新：
+# 板 = **一根共轴 + 行=任务 + 三态降级**；本脚本建的任务没有截止时间，
+# 所以它**必然落进「未排期」泳道** —— 判据钉的是这件事，不是巧合。
 #
-# 不能证：**真实估时**（`预计耗时：30 分钟`）那条路径 ——
-# 估时标记是**中文**，而 `adb shell input text` **打不出非 ASCII**。
-# 那半由 app-host 的单测（`timeline-plan.spec.ts`：估时从备注读回来、三人分不摊）
-# 与 web 的真浏览器 e2e 覆盖。边界写在这里，不假装它验了估时。
+# 能证：① chip 在、② 点它换档、③ 共享 `TimelineBoard` **真的渲染了**
+# （轴上出现今天的真实日期 —— 刻度来自领域层，不是装饰）、④ 任务标题
+# 出现在**有名字的「未排期」泳道**里（可见，且**不落图** —— R4 判据 5 的
+# 移动端形态：旧判据「未估时按 1 小时排的条」钉的是一条编出来的长度，已随
+# 重画废除）。
+#
+# 不能证：**有截止时间的点（菱形）落位** —— `adb shell input text` 打不出
+# 非 ASCII，日期选择器也进不去。那半由 web 组件判据
+# （`apps/web/tests/timeline-board.spec.tsx` 判据 2/4：相对位置 + dueDate 时间）
+# 与桌面载荷截图覆盖。边界写在这里，不假装它验了。
 #
 # 用法：
 #   bash scripts/verify-mobile-timeline.sh
@@ -36,6 +41,49 @@ export PATH="/opt/homebrew/bin:$PATH"
 . "$(dirname "$0")/lib/mobile-e2e.sh"
 
 TITLE="tl-e2e-$(date +%H%M%S)"
+
+# 隐私同意面板（2026-10-01 并行刀新增的首启面板）：不点掉它，后面每一步
+# （建任务 / 切 chip）都被面板挡住，症状是"找不到控件"而不是"被面板挡了"。
+dismiss_consent_if_present() {
+  # 🔴 面板带入场动画**延迟出现**：dismiss 后立刻 dump 它往往还不在
+  # （上一轮就是这么漏掉的）。所以这里**轮询等它**出现（≤10s），处理后再验它走了。
+  local waited=0 xy label
+  while [ "$waited" -lt 10 ]; do
+    dump
+    [ "$(has_text "在使用联网功能之前")" = "1" ] && break
+    sleep 1
+    waited=$((waited + 1))
+  done
+  [ "$(has_text "在使用联网功能之前")" = "1" ] || return 0
+
+  # 🔴 按钮（Button）的可辨识名在 **content-desc** 上，不在 text 上（§7 #45 同族：
+  # desc/text 两张皮）—— xy_text 永远取不到它，还会误判成"按钮不存在"。
+  # 「只用本机」再退一层：正文 bullet 里也有同名 text，xy_text 必须取第 2 个匹配。
+  xy=$(xy_desc "以后再说"); label="以后再说"
+  if [ -z "$xy" ]; then
+    xy=$(xy_desc "只用本机"); label="只用本机"
+  fi
+  if [ -z "$xy" ]; then
+    xy=$(xy_text "只用本机" 1); label="只用本机（text 第 2 匹配）"
+  fi
+  if [ -z "$xy" ]; then
+    bad "同意面板在，但取不到按钮坐标（desc/text 都没命中）"
+    return 1
+  fi
+  $ADB shell input tap $xy
+  sleep 2
+  dump
+  if [ "$(has_text "在使用联网功能之前")" = "1" ]; then
+    xy=$(xy_desc "只用本机")
+    [ -z "$xy" ] && xy=$(xy_text "只用本机" 1)
+    if [ -n "$xy" ]; then
+      $ADB shell input tap $xy
+      sleep 2
+      echo "     面板还在：补点了一次按钮位"
+    fi
+  fi
+  echo "     已处理隐私同意面板（${label}，等了 $waited 秒）"
+}
 
 echo ""
 echo "=== 移动端时间线验收（真实模拟器，零 mock）==="
@@ -58,21 +106,44 @@ if [ -n "$($ADB shell pidof "$PKG" 2>/dev/null | tr -d '\r')" ]; then
 else
   bad "被测应用（${PKG}）没有运行 —— 前台可能是别的包"; screen_txt
 fi
-# `pm clear` 之后是欢迎页；且**先离开再断言**（欢迎页上当然没有「任务」）。
-dismiss_welcome_if_present
+# 🔴 首启的两块屏**交替出现**（实测顺序：同意面板 → 欢迎页 → 先离线使用 →
+# 同意面板再弹 → 任务页）：任何"各处理一次"的固定序列都会在换序后整轮作废。
+# 所以这里收敛循环：两块屏都不在场才算稳定（有界，4 轮）。
+settle_first_run_screens() {
+  local i
+  for i in 1 2 3 4; do
+    dismiss_consent_if_present
+    dump
+    if [ "$(has_text "先离线使用")" = "1" ]; then
+      dismiss_welcome_if_present
+    fi
+    dump
+    if [ "$(has_text "在使用联网功能之前")" != "1" ] && [ "$(has_text "先离线使用")" != "1" ]; then
+      return 0
+    fi
+    sleep 1
+  done
+  return 1
+}
+settle_first_run_screens
 dump
-if [ "$(has_text "任务")" = "1" ]; then ok "应用已启动"; else bad "应用没起来"; screen_txt; fi
-
-step "1. 配置同步凭据"
-configure_sync_credentials
-# 凭据填在「我的」页，填完停在那里；「新建任务」的 FAB 只在「任务」tab 上。
-$ADB shell input tap 108 2253; sleep 3
-dump
-if [ "$(has_desc "新建任务")" != "1" ]; then
-  $ADB shell input tap 108 2253; sleep 3
-  dump
+if [ "$(has_text "任务")" = "1" ]; then
+  ok "应用已启动"
+else
+  bad "应用没起来（同意面板处理后的落点见截图）"
+  $ADB exec-out screencap -p > /tmp/heyta-timeline-step0.png 2>/dev/null
+  screen_txt
 fi
 
+step "1. 确保在任务页（无需凭据：本判据全部是本地行为）"
+# 🔴 2026-10-02 起去掉凭据步骤：重画后的两条判据（轴日期 + 未排期泳道）全是
+# **本地**行为，不需要服务端；且凭据页入口所在的底部导航刚被并行刀改过
+# （任务|日历|专注|分类|我的）。挂着它只会让脚本耦合环境，不是判据要钉的东西。
+# （零 mock 的口径不变：真模拟器 + 真本地库，没有 mock。）
+dismiss_consent_if_present
+# 兜底回任务页（底部导航最左档）
+$ADB shell input tap 108 2253; sleep 2
+dump
 step "2. 建一条任务（时间线要有东西可排）"
 XY=$(xy_desc "新建任务")
 if [ -z "$XY" ]; then
@@ -86,6 +157,9 @@ else
   else
     $ADB shell input tap $XY; sleep 1
     $ADB shell input text "$TITLE"; sleep 1.5
+    # 🔴 键盘必须收：弹着的时候「添加」的坐标落在键盘上（此前这一收是凭据
+    # 步骤里的 disable_ime 顺手做的，凭据步骤删掉后它必须在这里显式做）。
+    disable_ime; sleep 1
     dump
     if [ "$(has_sub "$TITLE")" = "1" ]; then ok "标题已输入"; else bad "标题没输进去"; screen_txt; fi
     XY=$(xy_text "添加")
@@ -109,20 +183,20 @@ else
   $ADB shell input tap $XY; sleep 3
 fi
 dump
-# 🔴 判据 1：**任务标题出现在时间线里**。列表那一档已经不在了，所以这个标题
-# 只可能来自共享 `TimelineView` 画的块。
-if [ "$(has_text "$TITLE")" = "1" ]; then
-  ok "时间线里出现了这条任务的块：$TITLE"
+# 🔴 判据 1（轴是真的）：轴刻度上出现**今天的真实日期**（紧凑档 `MM-DD`）。
+# 列表那一档已经不在了；一个"把标题原样打在空屏上"的实现画不出日历日期。
+TODAY_COMPACT="$(date +%m-%d)"
+if [ "$(has_sub "$TODAY_COMPACT")" = "1" ]; then
+  ok "轴上出现了今天的日期：${TODAY_COMPACT}（共享板真的渲染了）"
 else
-  bad "时间线里没有这条任务的块"; screen_txt
+  bad "轴上没有今天的日期（${TODAY_COMPACT}）—— 板可能没画出来"; screen_txt
 fi
-# 🔴 判据 2：**未估时那条如实说明也在**（`web.gantt.durationDefault`）。
-# 只断言"标题在"的话，一个把标题原样打在空屏上的实现也能过；这一条钉的是
-# "真的画出了一条按默认时长排的条"。
-if [ "$(has_sub "未估时")" = "1" ]; then
-  ok "条上带着「未估时」的如实说明（是按默认时长排的，不是空图）"
+# 🔴 判据 2（三态降级）：没截止时间的任务出现在**有名字的「未排期」泳道**里，
+# 且泳道里有任务标题 —— 可见（不静默消失）、不落图（不编长度，R4 判据 5）。
+if [ "$(has_sub "未排期")" = "1" ] && [ "$(has_text "$TITLE")" = "1" ]; then
+  ok "任务落在「未排期」泳道里：${TITLE}（可见、不落图）"
 else
-  bad "没看到「未估时」说明 —— 块可能没画出来"; screen_txt
+  bad "没看到「未排期」泳道或里面的任务（${TITLE}）"; screen_txt
 fi
 
 summary "移动端时间线"

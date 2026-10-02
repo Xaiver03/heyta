@@ -728,8 +728,35 @@ export {
   type WeekStatRow,
 } from './motivation/model.js';
 
-export { TimelineView, type TimelineViewProps } from './timeline/TimelineView.js';
+export { TimelineBoard, type TimelineBoardProps } from './timeline/TimelineBoard.js';
+export {
+  ChecklistPlanPreview,
+  type ChecklistPlanLabels,
+  type ChecklistPlanPreviewProps,
+} from './timeline/ChecklistPlanPreview.js';
 export { GanttChart, type GanttChartProps } from './timeline/GanttChart.js';
+export {
+  BOARD_HEADER_PERCENT,
+  TRACK_FRACTION,
+  axisTicksForWindow,
+  msAtRegionX,
+  moveStartMs,
+  resizeMinutes,
+  boardWindow,
+  dueText,
+  isAllDayMs,
+  isOverdue,
+  markerMs,
+  percentAt,
+  sortRowsForBoard,
+  tickText,
+  todayPercent,
+  type BoardTick,
+  type BoardWindow,
+  type TimelineScheduleChange,
+  type TickGranularity,
+  type TimelineBoardLabels,
+} from './timeline/board-model.js';
 export {
   MAX_AXIS_MARKS,
   MINUTES_PER_DAY,
@@ -747,7 +774,6 @@ export {
   safeLocalDate,
   todayWindow,
   type GanttLabels,
-  type TimelineViewLabels,
 } from './timeline/model.js';
 
 /**

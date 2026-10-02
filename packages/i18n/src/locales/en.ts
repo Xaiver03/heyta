@@ -1168,6 +1168,42 @@ export const en = {
   'web.gantt.dependsOn': 'Depends on: {title}',
   'web.gantt.overlap': 'Overlaps its dependency',
 
+  // ── Web · Timeline board (2026-10-01 rework, goal: docs/plans/goal-timeline-rework.md) ──
+  // One shared axis, one row per task, three-state fallback (bar / diamond / unscheduled lane).
+  // Keys mirror zh-CN 1:1 (the i18n gate fails on drift).
+  'web.board.weekday.1': 'Mon',
+  'web.board.weekday.2': 'Tue',
+  'web.board.weekday.3': 'Wed',
+  'web.board.weekday.4': 'Thu',
+  'web.board.weekday.5': 'Fri',
+  'web.board.weekday.6': 'Sat',
+  'web.board.weekday.7': 'Sun',
+  'web.board.month.1': 'Jan',
+  'web.board.month.2': 'Feb',
+  'web.board.month.3': 'Mar',
+  'web.board.month.4': 'Apr',
+  'web.board.month.5': 'May',
+  'web.board.month.6': 'Jun',
+  'web.board.month.7': 'Jul',
+  'web.board.month.8': 'Aug',
+  'web.board.month.9': 'Sep',
+  'web.board.month.10': 'Oct',
+  'web.board.month.11': 'Nov',
+  'web.board.month.12': 'Dec',
+  'web.board.today': 'Today',
+  // The named lane (R4 criterion 5): unscheduled tasks stay visible, never drawn as bars.
+  'web.board.unscheduledLane': 'Unscheduled ({count})',
+  // Row-header estimate badge: text only, never a length (R4 criterion 3).
+  'web.board.aiBadge': 'AI est. {duration}',
+  // Overdue is text + warning color, never color alone (WCAG 1.4.1).
+  'web.board.overdue': 'Overdue',
+  // Detail-preview caption: the task-internal coordinate system MUST be disclosed
+  // (goal §2.1) — otherwise users will line it up against the board axis.
+  'web.board.planCaption': 'Internal checklist plan of this task (order and estimates) — not the same coordinate system as the timeline board.',
+  // Default title for "click empty space to create" (goal §3.2, gesture 4):
+  // data coming from the product, so it still goes through the locale table.
+  'web.board.untitledTask': 'Untitled task',
+
   // ═══════════════════════════════════════════════════════════
   // Web · AI (breakdown / capture / duration / prioritize / settings / memory)
   // ═══════════════════════════════════════════════════════════

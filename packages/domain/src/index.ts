@@ -17,6 +17,7 @@ export * from './task-filter.js';
 export * from './subtasks.js';
 export * from './reminders.js';
 export * from './timeline.js';
+export * from './timeline-position.js';
 export * from './notes.js';
 export * from './search.js';
 export * from './habit-streak.js';

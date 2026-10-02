@@ -33,6 +33,8 @@
  */
 
 import {
+  MAX_DURATION_MINUTES,
+  MIN_DURATION_MINUTES,
   Priority,
   isValidRecurrenceRule,
   nextOccurrence,
@@ -92,6 +94,11 @@ export interface NewTaskFields {
    * 别把功劳记错 —— 我最初就写成了"测试会红"，实测它是绿的。
    */
   note?: string;
+  /**
+   * 排期起点（epoch ms，ADR-0043）。「点空白建任务带日期」（goal §3.2 手势 4）
+   * 的落点：既有建任务 op **带上日期字段**，一次 CRT 完成、不 fan-out。
+   */
+  startDate?: number;
 }
 
 export interface TaskActionsOptions {
@@ -220,6 +227,34 @@ export interface TaskActions {
    *     让动作层把"只能顺延逾期任务"钉死才是真的钉死。
    */
   postponeToToday(entityId: string): Promise<void>;
+  /**
+   * 排期（时间线 P2，[ADR-0043](../docs/adr/0043-timeline-p2-task-start-date-duration.md)）。
+   *
+   * 🔴 **一次拖放意图 = 一条 op**，与 `setQuadrantDrop` 同一条纪律：
+   * 「泳道拖上轴」「拖条移动」「拖边改时长」在界面上是三种手势，
+   * 但它们都是"写这个任务的时间坐标"这一个意图 —— 拆成多次调用就会产生
+   * 中间态可见的半截排期（那条注释里的"改了一半"事故在排期面上会重演）。
+   *
+   * 🔴 **「字段在不在对象里」是有语义的**（与整组覆盖的 `setTags` 相反）：
+   *   - `{ startDate }` —— 移动：只改起点，**时长不动**；
+   *   - `{ durationMinutes }` —— 改时长：起点不动；
+   *   - `{ startDate, durationMinutes }` —— 从泳道拖上轴：一次定两个；
+   *   - `{ startDate: undefined }` —— 显式清除该字段（写成 `null`，老约定）。
+   *   没有出现在对象里的字段**绝不进 payload**（字段级 LWW 不碰它）。
+   *
+   * 产品语义（住在这里，不在界面里 —— §3.5）：
+   *   - `durationMinutes` **夹取**到 `[MIN, MAX]` 并取整（与 `buildTimeline` 同一档）：
+   *     拖边算出来的像素时长不该原样进库；
+   *   - 非法值（NaN / Infinity / ≤ 0 的起点）**写之前 throw** —— 让动作层把
+   *     "垃圾不进 op-log"钉死，界面算错时不会静默写坏一条排期。
+   *
+   * ⚠️ `dueDate` **不在本动作的管辖区**：它是"什么时候到期"（日历/提醒/象限），
+   * 排期拖拽不碰它 —— 归 `setDueDate` / `setQuadrantDrop`。
+   */
+  setSchedule(
+    entityId: string,
+    schedule: { startDate?: number; durationMinutes?: number },
+  ): Promise<void>;
   /**
    * 改备注（Markdown）。传 `undefined` 表示清除（同样写成 `null`）。
    *
@@ -529,6 +564,39 @@ export function createTaskActions(
       }
       const timeOfDay = task.dueDate - startOfDay(task.dueDate);
       await update(entityId, { dueDate: startOfDay(now()) + timeOfDay });
+    },
+
+    async setSchedule(entityId, schedule) {
+      // 存在性 throw（与 rename 同一条纪律）：静默成功会让用户以为排上了。
+      if (taskOf(entityId) === undefined) throw new Error(`找不到任务「${entityId}」`);
+      const payload: Record<string, unknown> = {};
+      // 「字段在不在」见接口注释：只有调用方**点名**的字段才进 payload。
+      if ('startDate' in schedule) {
+        const v = schedule.startDate;
+        if (v === undefined) {
+          payload.startDate = null; // 显式清除（老约定：null 穿过 JSON）
+        } else if (typeof v !== 'number' || !Number.isFinite(v) || v <= 0) {
+          throw new Error(`非法的排期起点：${String(v)}`);
+        } else {
+          payload.startDate = v;
+        }
+      }
+      if ('durationMinutes' in schedule) {
+        const v = schedule.durationMinutes;
+        if (v === undefined) {
+          payload.durationMinutes = null;
+        } else if (typeof v !== 'number' || !Number.isFinite(v) || v <= 0) {
+          throw new Error(`非法的排期时长：${String(v)}`);
+        } else {
+          // 拖边算出来的像素时长在这里夹取：与 buildTimeline 同一档 [5, 480]。
+          payload.durationMinutes = Math.min(
+            MAX_DURATION_MINUTES,
+            Math.max(MIN_DURATION_MINUTES, Math.round(v)),
+          );
+        }
+      }
+      if (Object.keys(payload).length === 0) return; // 幂等：没点名任何字段就不写
+      return update(entityId, payload);
     },
 
     setNote(entityId, note) {

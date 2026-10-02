@@ -2260,16 +2260,28 @@ export function App(): React.JSX.Element {
           {/**
            * 时间线。排的是**当前视图里的任务**，每个任务一块。
            *
-           * 🔴 起始日取"今天"（`store.now`）—— 时间线总得从某一天起算，
-           * 而从今天起排是唯一不需要问用户、也不会说谎的默认值。
-           * 它只是**展示参数**，不落任何持久化字段。
+           * 🔴 `today` 取 `store.now` 推出的同一个本地日历日：窗口的周锚点与
+           * 今天线都从它来。它只是**展示参数**，不落任何持久化字段。
+           * 2026-10-01 重画：板上任务的三态位置来自 `dueDate`（`planTimelineRows`）。
            */}
           {contentView === 'timeline' && (
             <TimelinePanel
               tasks={visible}
-              startDate={toLocalDate(store.now)}
               today={toLocalDate(store.now)}
               now={store.now}
+              // 排期拖拽出口（P2）：板只算几何，写 op 在 store.setSchedule →
+              // `TaskActions.setSchedule` → `dispatch()`（一次拖放 = 一条 op）。
+              onScheduleTask={(taskId, change) => {
+                void useTaskStore.getState().setSchedule(taskId, change);
+              }}
+              // 「点空白建任务带日期」：既有建任务 op **带上日期字段**，
+              // 一次 CRT 完成、不 fan-out（goal §3.2 手势 4）。
+              onCreateAt={(atMs) => {
+                useTaskStore
+                  .getState()
+                  .addTask(t('web.board.untitledTask'), { startDate: atMs })
+                  .catch((e) => console.error('DBG onCreateAt failed:', e));
+              }}
             />
           )}
           {contentView === 'growth' && <GrowthView />}
