@@ -1,0 +1,151 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <!--
+      由 `scripts/gen-entries.mjs` 生成（模板 = 本文件），**不要手改**。
+      改文案去 `packages/i18n`（`site.notfound.*`），改形状改这个模板，然后跑：
+
+          pnpm --filter @heyta/landing gen:entries
+
+      🔴 **为什么这一页必须自包含。** 它由 nginx 在 `error_page 404` 之后内部跳转
+      送出来，服务的是**任何**没命中的地址。如果它引用构建产物里的
+      `/assets/index-<hash>.css`，那么"构建产物没跟上"与"这一页打不开"就是同一件事，
+      而这一页存在的意义恰恰是**在事情不对的时候还能说话**。所以它零 JS、零外链。
+
+      🔴 **色值不是抄件**：`{{T:color.*}}` 由生成器从
+      `packages/design-system/generated/tokens.json` 的 **light** 块取值，
+      与 `server/src/design.generated.ts`（邮件与凭据页）同一个来源、同一条纪律。
+      改一个 token → 这一页的产物字节变 → `check:entries` 逐字节比对会红，
+      逼着重新生成。**只搬 light 是刻意的**：tokens.json 的 dark 是稀疏覆盖，
+      设计系统自己标注"不适合直接消费"（同一理由见 deployment §3.9.2）。
+
+      ⚠️ 刻意**没有** canonical / hreflang / og:*：404 不是一个"页面"，
+      它不该向搜索引擎声明自己是某个页面的某个语言版本。`noindex` 是这一页唯一的
+      爬虫指令。语言切换那条链接指向**另一语言的主页**（不是另一语言的 404 ——
+      用户本来要找的东西两边都不存在）。
+    -->
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="robots" content="noindex" />
+    <title>Page Not Found — heyta</title>
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <style>
+      /* 品牌值（颜色 / 字号 / 字重 / 行高 / 圆角）一律走 `{{T:…}}`，这里不许出现裸 hex ——
+         与 `check:design` 同一条纪律。
+
+         ⚠️ **说清哪些不是 token，别把这段注释写成做不到的话**：布局尺（`rem` 的
+         padding / max-width / gap）、1–2px 的发丝线与 `120ms` 的过渡时长是本地常量。
+         三条理由：① 它们不是品牌值，token 表里本来也没有"发丝线宽度"这一档；
+         ② `check:design` 的 `SCAN_EXT` **不含 `.html`** —— 这是它的已知范围缺口
+         （范围缺口不报错，只静默失效，所以纪律只能写在这里，见法务台账 G-35 那行）；
+         ③ 焦点环刻意用 `outline` 而不是 `shadow.focus`：强制颜色模式（高对比）下
+         `box-shadow` 会被系统丢弃、`outline` 会被保留，用阴影等于把键盘焦点在
+         最需要它的人面前抹掉。 */
+      :root {
+        color-scheme: light;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        min-height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 2rem 1.25rem;
+        background: #f8fafc;
+        color: #0f172a;
+        font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', 'Noto Sans SC', sans-serif;
+        font-size: 16px;
+        line-height: 1.5;
+        -webkit-text-size-adjust: 100%;
+      }
+      main {
+        width: 100%;
+        max-width: 34rem;
+        padding: 2rem;
+        background: #ffffff;
+        border: 1px solid #e2e8f0;
+        border-radius: 12px;
+      }
+      .code {
+        margin: 0 0 0.5rem;
+        color: #2563eb;
+        font-size: 36px;
+        font-weight: 700;
+        line-height: 1.25;
+        /* 数字必须等宽，否则 404 三个字的重心会随字体加载跳动。 */
+        font-variant-numeric: tabular-nums;
+      }
+      h1 {
+        margin: 0 0 0.75rem;
+        font-size: 20px;
+        font-weight: 600;
+        line-height: 1.25;
+      }
+      p.body {
+        margin: 0 0 1.5rem;
+        color: #475569;
+      }
+      nav {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+      }
+      a {
+        color: #2563eb;
+        text-decoration: none;
+        border: 1px solid #e2e8f0;
+        border-radius: 8px;
+        padding: 0.5rem 0.75rem;
+        font-size: 14px;
+      }
+      a:hover {
+        border-color: #cbd5e1;
+        text-decoration: underline;
+      }
+      /* 🔴 不许 `outline: none`。抹掉焦点环是最常见的可访问性回归。 */
+      a:focus-visible {
+        outline: 2px solid #2563eb;
+        outline-offset: 2px;
+      }
+      a.primary {
+        background: #2563eb;
+        border-color: #2563eb;
+        color: #ffffff;
+        font-weight: 500;
+      }
+      .alt {
+        margin: 1.5rem 0 0;
+        font-size: 14px;
+        color: #64748b;
+      }
+      .alt a {
+        border: 0;
+        padding: 0;
+      }
+      @media (prefers-reduced-motion: no-preference) {
+        a {
+          transition: border-color 120ms linear;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <p class="code">404</p>
+      <h1>There is no page at this address</h1>
+      <p class="body">It may have been renamed or removed, or the link may contain an extra character. Continue from the links below.</p>
+      <nav aria-label="Site navigation">
+        <a class="primary" href="/en/">Back to home</a>
+        <a href="/en/docs/">Help</a>
+        <a href="/en/legal/privacy/">Privacy Policy</a>
+        <a href="/en/legal/terms/">Terms of Service</a>
+      </nav>
+      <p class="alt">
+        <a href="/">Switch to the Chinese site</a>
+      </p>
+    </main>
+  </body>
+</html>
