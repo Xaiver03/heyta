@@ -67,6 +67,9 @@ const EXPECTED: Record<SyncFailureReason, SyncFailureMessageKey | undefined> = {
   // 🔴 G-12：被本机拦下、**一个请求都没发**。这句绝不能复用上面任何一句 ——
   // 它们的用户动作是"检查网络/填地址/重输口令"，而这里的动作是"去作出同意"。
   'consent-required': 'common.sync.error.consentRequired',
+  // 🔴 G-27：设备同意过、账号没补签。这句必须与上一句不同 —— 复用"去同意隐私规则"
+  // 等于对一个已经作出过那个决定的人重复索取同意。
+  'legal-reconfirm-required': 'common.sync.error.legalReconfirmRequired',
   // 唯一"故意没有词条"的那个：它带的是诊断数据，走宿主的兜底句。
   'unexpected': undefined,
 };
@@ -127,7 +130,7 @@ describe('同步失败原因的词条覆盖（compiler + 两份词条表 + 句�
   it('表里登记的成员数与联合的成员数对得上（防止两边各长一半）', () => {
     // 这条断言的**唯一价值**是把"总共数了几个"印出来：上面几条都是循环，
     // 循环体一条没跑也能全绿（§7 第 50 条那一类）。这里给出总数。
-    expect(REASONS.length, 'EXPECTED 表的成员数').toBe(11);
-    expect(WITH_KEY.length).toBe(10);
+    expect(REASONS.length, 'EXPECTED 表的成员数').toBe(12);
+    expect(WITH_KEY.length).toBe(11);
   });
 });

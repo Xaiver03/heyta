@@ -94,6 +94,13 @@ export const HOSTED_AUTH_PATHS = {
   passkeys: '/api/passkeys',
   /** 账号语言（登录态写回；应用语言解析链第 2 层）。 */
   accountLocale: '/api/account/locale',
+  /**
+   * 法务文本的**重新确认**（读状态 GET / 记确认 POST 同一条路径）。
+   *
+   * 挂在 `/api/account/` 下与 `accountLocale` 为伍，而不是新造一套鉴权面：
+   * 归属同样只来自 Bearer 令牌。服务端裁决在 `server/src/legal-recheck.ts`。
+   */
+  accountLegalConsent: '/api/account/legal-consent',
 
   // ── 邮箱 + 口令（W5）──────────────────────────────────────
   //
@@ -920,6 +927,118 @@ export async function updateAccountLocale(
   );
   if (!result.ok) return result;
   return { ok: true, locale };
+}
+
+/**
+ * 读侧带回的那一条判定。四个字段各自回答一个问题，**都不参与本机裁决**：
+ * 本机只照 `needsReconfirm` 办事，`reason` 只决定界面怎么说（以及要不要说）。
+ */
+export const LEGAL_CONSENT_REASONS = [
+  'current',
+  'version-changed',
+  'unprovable',
+  'not-applicable',
+] as const;
+
+export type LegalConsentReason = (typeof LEGAL_CONSENT_REASONS)[number];
+
+export interface LegalConsentStatus {
+  readonly needsReconfirm: boolean;
+  readonly reason: LegalConsentReason;
+  /** 服务端当前那一版；`not-applicable` 时为 `null`（那台实例没有可宣告的版本）。 */
+  readonly currentVersion: string | null;
+  /** 服务端实际据以裁决的那一版；没有记录时 `null`。 */
+  readonly recordedVersion: string | null;
+}
+
+/**
+ * 解析响应形状：**任何不确定的形状都返回 `null`**（→ `malformed-response`，绝不当成功）。
+ *
+ * 🔴 `reason` 按**封闭词表**判，表外取值不认。这一处值得较真：把词表外的串
+ * （服务端以后加的原因码、被反代改写的响应）当成"某种不需要确认的原因"，
+ * 症状是**改版以后一个弹窗都不出现** —— 那正是这条机制存在的理由。
+ * ⚠️ 与 `parsePrivacyConsent` 相反，这里**不接受**多余字段的宽松读法之外的任何东西：
+ * `needsReconfirm` 必须是真布尔，缺字段就是 `null`。
+ */
+export function parseLegalConsentStatus(body: unknown): LegalConsentStatus | null {
+  if (typeof body !== 'object' || body === null || Array.isArray(body)) return null;
+  const { needsReconfirm, reason, currentVersion, recordedVersion } = body as {
+    needsReconfirm?: unknown;
+    reason?: unknown;
+    currentVersion?: unknown;
+    recordedVersion?: unknown;
+  };
+  if (typeof needsReconfirm !== 'boolean') return null;
+  if (typeof reason !== 'string' || !(LEGAL_CONSENT_REASONS as readonly string[]).includes(reason))
+    return null;
+  if (currentVersion !== null && typeof currentVersion !== 'string') return null;
+  if (recordedVersion !== null && typeof recordedVersion !== 'string') return null;
+  return {
+    needsReconfirm,
+    reason: reason as LegalConsentReason,
+    currentVersion: (currentVersion ?? null) as string | null,
+    recordedVersion: (recordedVersion ?? null) as string | null,
+  };
+}
+
+/**
+ * 重新确认的**读侧**：这台服务端问这个账号要"再看一次并确认"吗。
+ *
+ * 🔴 这一层**不做任何判定**。判定的事实源是服务端那一列指针与那张历史表
+ * （`server/src/legal-recheck.ts`），因为客户端说不出服务端发布的是哪一版文本 ——
+ * 它唯一能说的"我本机存过某版"恰恰是不可信的那一半。
+ * `privacy-consent.ts` 文件头对设备级同意立过同一条分工（"版本化留痕由服务端承担"），
+ * 这里是它在账号级的照搬。
+ */
+export async function getLegalConsentStatus(
+  options: HostedAuthOptions,
+  token: string,
+): Promise<HostedAuthOutcome<LegalConsentStatus>> {
+  const trimmed = token.trim();
+  if (trimmed === '') return failure('invalid-input');
+
+  const result = await sendJson(
+    options,
+    'GET',
+    HOSTED_AUTH_PATHS.accountLegalConsent,
+    undefined,
+    trimmed,
+  );
+  if (!result.ok) return result;
+  const status = parseLegalConsentStatus(result.body);
+  if (status === null) return failure('malformed-response');
+  return { ok: true, ...status };
+}
+
+/**
+ * 重新确认的**写侧**：记下"他确认了界面上那一版"。
+ *
+ * `documentVersion` 必须是**服务端刚刚经读侧带回**的那一版，不是界面自己缓存的旧值 ——
+ * 服务端逐字比对，不等就回 409 `version_mismatch`（理由见 `recordLegalReconfirm` 文件头：
+ * 一条版本号写错的历史记录比没有记录更糟，它会被人当证据）。
+ */
+export async function confirmLegalConsent(
+  options: HostedAuthOptions,
+  token: string,
+  documentVersion: string,
+  acceptedAt: number,
+): Promise<HostedAuthOutcome<{ recordedVersion: string }>> {
+  const trimmed = token.trim();
+  if (trimmed === '' || documentVersion === '') return failure('invalid-input');
+
+  const result = await sendJson(
+    options,
+    'POST',
+    HOSTED_AUTH_PATHS.accountLegalConsent,
+    { documentVersion, acceptedAt },
+    trimmed,
+  );
+  if (!result.ok) return result;
+  const body = result.body as { recordedVersion?: unknown };
+  if (typeof body.recordedVersion !== 'string') {
+    return failure('malformed-response');
+  }
+  return { ok: true, recordedVersion: body.recordedVersion };
 }
 
 /** 用恢复链接里的令牌取新通行密钥的注册 options。 */

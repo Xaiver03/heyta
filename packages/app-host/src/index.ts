@@ -210,11 +210,15 @@ export {
   completePasskeyLogin,
   completePasskeyRecovery,
   completePasskeyRegistration,
+  confirmLegalConsent,
   deletePasskey,
   extractAuthLinkToken,
+  getLegalConsentStatus,
   getPasskeyRecoveryOptions,
+  LEGAL_CONSENT_REASONS,
   listPasskeys,
   loginWithEmailPassword,
+  parseLegalConsentStatus,
   passkeyDeletePath,
   passkeyPath,
   registerWithEmailPassword,
@@ -238,7 +242,25 @@ export {
   type HostedPasskeyOptions,
   type HostedPasskeySummary,
   type HostedPasswordPolicyCode,
+  type LegalConsentReason,
+  type LegalConsentStatus,
 } from './hosted-auth.js';
+
+/**
+ * 账号级"重新确认"闸门（G-27）。
+ *
+ * 🔴 与链 5 那道设备级闸**串联、不合并**：判据不同、事实源不同、失败方向也不同
+ * （详见 `legal-recheck.ts` 文件头那张对照表）。宿主只许用
+ * `dataEgressAllowed()` 这一处判断"数据现在能不能出门"，不许在壳里再判一遍 `phase` ——
+ * 漏掉 `checking` 就是"改版后每次冷启动先推一次再拦"，而那正是这道闸存在的理由。
+ */
+export {
+  createLegalRecheckGate,
+  type LegalRecheckGate,
+  type LegalRecheckPhase,
+  type LegalRecheckPorts,
+  type LegalRecheckView,
+} from './legal-recheck.js';
 
 /**
  * 重复规则的预设。**"每周"到底是哪一天是产品语义**，所以在这里而不在界面里
