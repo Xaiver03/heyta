@@ -1540,6 +1540,38 @@ uiautomator 的 bounds **会被父容器视口裁** —— 被折叠线切掉的
   `Remove-AppxPackage`/`Add-AppxPackage` ⇒ 会掀掉对方正在看的东西。
   📌 探针教训（已入用户记忆）：**按 ssh 主机别名 grep 进程**会把别的项目的隧道算成"本条线在用"，
   也会把"隧道活着"读成"隧道断了"（`grep 'ssh -N -L'` 结构上匹配不到带 `-o` 的真实命令行）。
+
+  ✅ **windows 段 19:58 也过了 ⇒ §6.1.1"四端都装上当前源码的产物"这一轮第一次四端齐**
+  （mac 18:52 / android 19:32 / ios 19:35 / windows 19:58，且**四端都来自隔离检出**，主工作树没动过一个字节）。
+  改判"可以跑"的是两条实测，不是感觉：① `ssh windows-pc tasklist` 369 行里
+  **Heyta / dotnet / MSBuild / cl.exe 全 0**（只有 Chrome，属 `/tmp/sd2000` 那条线）⇒ 没有正在运行的
+  heyta 壳会被 `Remove-AppxPackage` 掀掉；② `grep -rn 'remote-debugging-port\|9222' apps/desktop-windows/scripts scripts/windows`
+  只有 `launch-winui-shell-cdp.ps1:147` 用 `__PORT__` 占位，而 windows 段走 `package-msix.sh` + 壳自己的
+  `M2D` 判据 ⇒ **不碰 9222**，抽不掉别人的 CDP 附着点。残留代价（如实写）：`dotnet publish` 给那台机加了
+  约一分钟负载，壳窗口出现在同一个 Console 会话桌面上。
+  判据四条全在：`ADD_APPX=OK` / `RESULT=OK` / `PAYLOAD_WEBDIST=True` / `M2D=OK`，
+  新鲜度对账两个锚点都过（`web-dist/index.html=45002f12bb9d47de…`、`bridge=7d3fb2f8daee2f42…`），
+  产物 `1152x587 内容 47.7%`。图**人已看**：rail + 收集箱(计数 1) + 已完成 + 四象限四档 +
+  「排序方式 默认（按截止时间）」+「未同步」，头像菜单**第一项是「登录 / 注册」且没有「退出登录」**
+  （就是 `M2D` 钉的那条），上面压着同意浮层；无凭据。
+  入库 `apps/desktop-windows/evidence/reinstall-20261002-1958-windows-installed.png`
+  （md5 `3201e26b…`）与同前缀 `-install-capture.txt`。
+
+  🔴 **第 7 个"门禁绿 ≠ 能打包"实例，这一跑当场照出来的，已修（`d486ad26`）**：
+  `sync_windows_sources` 把 `packages/app-host/bridge-bundle/native-bridge.js`
+  **无条件**写进 tar 清单（`scripts/lib/sync-windows-sources.sh:35`），而它是构建产物、不入库，
+  且 `pnpm -r build` **不生成它** ⇒ 隔离检出里 `tar: … Cannot stat: No such file or directory`，
+  windows 段以"源码同步没通过 —— 不打包"收尾。本机永远跑不出这个红（壳门禁早把输入备好了），
+  与 mac 段那两处（`a4c4303a` / `a884e24d`）同形。修法一致：**在这里现生成**，
+  并把两个显式追加的构建输入各验一次存在性（缺了要指名道姓地红，不是留一条 tar 的 errno）。
+  变异测试：把 PATH 上的 `node` 换成 `exit 1` ⇒ `🔴 生成 bridge bundle 失败…` + rc=1，
+  且**在 scp 之前就返回**，不会把半份源码推到打包机。
+
+  📌 **同轮附证（"我这批提交有没有把链弄红"不靠推断）**：另拉一份隔离检出在 **HEAD** 上跑五道，
+  全部 exit 0 —— `check:design`（扫 371 个源文件）、`check:ui-language`（283 文件 / 344 处文案 /
+  词条 zh-CN 2710 = en 2710）、`check:layering`（314 文件 / 9 条规则）、`docs-link-check`（无死链、
+  无失效锚点）、`apps/web/tests/task-row-title-floor.spec.tsx` **8 passed**。
+  这是"工作树绿 ≠ `HEAD` 绿"的反向用法：**在干净检出上量，结论才对得上要发布的东西**。
 - **G6 · `@heyta/ui` 的 typecheck 存量红**：`pnpm -r typecheck` 只在
   `packages/ui/tests/auth-model.spec.ts:79` 与 `:331` 两处失败，两行与 HEAD **逐字节相同**
   （属另一条会话在飞的 `packages/ui/src/auth/model.ts`）。⇒ 提交 `1d485786` 信息里写的
