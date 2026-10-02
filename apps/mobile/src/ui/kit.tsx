@@ -552,6 +552,7 @@ function gapValue(t: ReturnType<typeof useTokens>, gap: GapTier): number {
 export function Stack({
   gap = 'default',
   children,
+  style,
   ...rest
 }: {
   gap?: GapTier;
@@ -559,7 +560,7 @@ export function Stack({
 } & ViewProps): React.JSX.Element {
   const t = useTokens();
   return (
-    <View {...rest} style={{ gap: gapValue(t, gap) }}>
+    <View {...rest} style={[{ gap: gapValue(t, gap) }, style]}>
       {children}
     </View>
   );
