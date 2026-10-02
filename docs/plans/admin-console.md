@@ -231,10 +231,42 @@ PROGRESS.md                                       ⚠️ 共享：只入 2 个 h
 本节原来写着"`cd "带空格的路径" && …` 与 `dir_path` 两种写法都会中"，读起来像**写法**有问题。
 实测把这条推翻了：与写法、路径空格、iCloud、fd/进程/线程 ulimit、磁盘与 inode 余量**都无关**，
 故障在 **Qoder 宿主进程的 spawn 路径**上 —— 同一宿主下的 `Bash`/`Grep`/`Glob` 三个 spawner
-同报 `errno -9, syscall 'spawn'`，且**按句柄**分布：新会话或新 subagent 拿到的是可用的新句柄
-（本轮的全量 e2e 与 web 套件就是这么跑出来的）。单次成功**不能**当恢复判据；
-有效做法是失败就转去做读写文件的活，或把一条批量命令交给一个新 subagent，**不要循环重试**。
-彻底恢复靠重启宿主 app。
+同报 `errno -9, syscall 'spawn'`。单次成功**不能**当恢复判据；
+有效做法是失败就转去做读写文件的活，**不要循环重试**。
+
+🔴 **本轮（同日更晚）把"按句柄分布"这条也推翻了。** 直接从宿主日志取窗口
+（`~/.qoder-cn/logs`，`grep -rIh EBADF`）：`20:03:06 → 20:10:01` 这段里
+**四条互不相干的 spawn 调用点同时**报同一个错 —— `[ShellExecService] execute failed`
+（而且是**另一条会话、另一个项目**的命令，`cwd=/tmp/originx-verify`）、
+`Error during GrepLogic execution`、以及插件的
+`Hook execution failed for event 'UserPromptSubmit' (qoder-context)`；
+栈顶统一落在 `@qoder-ai/qoder-cn-agent-sdk/dist/_worker/qoder-worker-runtime.obf.mjs` 里的
+`ChildProcess.spawn`。所以坏的是**宿主进程的一段时间窗**，不是谁的句柄 ——
+"派给一个新 subagent 就能拿到可用句柄"随之失效（本轮一个 subagent 连 `git diff` 都没发出去）。
+另外三条并发只读 Bash 探针**全部成功且时间戳依次错开** ⇒ 宿主自己就把 Bash 串行了，
+"并发 spawning 调用是触发形状"作为原因**同样不成立**。
+
+**真修（有数字）**：本机装的是 **0.2.3**，
+`https://static.qoder.com.cn/qoder-app/releases/latest-mac.yml` 上是 **0.4.3**（2026-09-26），
+且 0.4.3 的包**已经下载暂存**在 `~/Library/Caches/qoder-cn-updater/pending/Qoder-CN-mac-arm64.zip`，
+本地 sha512 转 base64 后与 feed **逐字相同**（⚠️ 两者编码不同，直接字符串比会误判不一致）。
+✅ **已验证**：版本差、pending 包存在、哈希与 0.4.3 一致。
+✅ **退出即自动安装**（本轮已从产品包里取证，不是靠默认值猜）：
+`app.asar` 里 `this.autoInstallOnAppQuit = true;` 就是实际取值，配套
+`addQuitHandler()` 在 `autoInstallOnAppQuit` 为真时注册 before-quit 安装；
+五种覆盖写法（`= false` / `=false` / `: false` / `: !1` / `= !1`）**各 0 命中**。
+缓存根目录的 `update.zip` 与 `pending/` 里的包同为 **251,645,198 B**，
+与 feed 里 0.4.3 的 `size` 一致（两处都是 15:10 落的盘）。
+⇒ **完全退出 Qoder CN.app 再重开 = 装上 0.4.3**；界面里的"重启以更新"是同一条路的显式版本。
+🟡 剩下唯一没证的：**装上之后 EBADF 是否真的不再成窗出现** —— 那要重开之后才观测得到。
+
+⚠️ **一条差点成立的假证据**：`grep -arl "Update will not be installed on quit" ~/.qoder-cn/logs`
+命中了两个日志文件，看着像 updater 写过这条日志 —— 其实那是**本轮我自己把这句话敲进命令、
+被会话日志原样记下来的回音**（文件名里就是当前 session/宿主 pid `p60129`）。
+在" agent 自己的日志"里 grep 自己刚输入的字符串，永远会命中。
+⚠️ 无论哪条路，重启都会杀掉同机所有在跑的会话（取证当时另有会话在跑 `pnpm reinstall:all`、
+`pnpm verify:web-auth`、`playwright … auth-journey`，其中一条的父进程就是宿主 pid）——
+**时机由产品负责人挑，agent 不自行重启宿主。**
 
 ### 7.6 别重走的死路
 
