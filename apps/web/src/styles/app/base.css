@@ -1,0 +1,46 @@
+/**
+ * 应用布局样式
+ * ==============
+ *
+ * ⚠️ **全部取值来自 token**，这里一个裸 hex/px/ms 都没有。
+ * `pnpm check:design` 只扫 `apps/web/src`（含 .css），所以这个文件同样受检。
+ *
+ * 布局策略：CSS Grid **三层**（rail 视图 / sidebar 范围 / main），
+ * 而 **sidebar 只在有范围的视图里存在** —— 所以列数由修饰类决定，不是固定的。
+ * 移动端塌缩成单栏 + 底部导航。
+ */
+
+.ht-app {
+  display: grid;
+  /* 默认两层：rail + main（四象限/习惯/番茄钟… 这些视图**没有**范围列） */
+  grid-template-columns: var(--ht-layout-rail-width) 1fr;
+  min-height: 100dvh;
+  background: var(--ht-color-background);
+}
+
+/*
+ * 有范围的视图（目前只有 `tasks`）—— 多一列。
+ *
+ * ⚠️ 用修饰类而不是 `:has(.ht-sidebar)`：`grid-template-columns` 是这一层的
+ * 布局契约，显式写出来才能在 review 时一眼看出"哪几个视图有范围列"。
+ */
+.ht-app--with-sidebar {
+  /*
+    中间那一列现在**可由用户拖宽**（`SidebarResizer` 把拖出来的值写成
+    `:root` 上的 `--ht-sidebar-width`）。
+
+    🔴 夹取只在这里做一次判断，两层各有分工：
+      · `clamp()` 的上下界来自 token（12rem / 26rem）—— 改边界改 token，不改组件；
+      · `min(…, 40vw)` 兜住"窗口后来变窄了"：不需要监听 `resize`，
+        浏览器每次布局自己重夹，侧栏永远吃不掉主区。
+    没设 `--ht-sidebar-width` 时回落到 token 默认值，走的也是同一条 clamp。
+  */
+  grid-template-columns:
+    var(--ht-layout-rail-width)
+    clamp(
+      var(--ht-layout-sidebar-min-width),
+      var(--ht-sidebar-width, var(--ht-layout-sidebar-width)),
+      min(var(--ht-layout-sidebar-max-width), 40vw)
+    )
+    1fr;
+}

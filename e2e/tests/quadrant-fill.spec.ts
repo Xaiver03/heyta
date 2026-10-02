@@ -68,7 +68,7 @@ const PROBE = () => {
   /*
     🔴 **滚动所有者必须由探针找出来，不许写死"文档"**（类 D：判据自己选错坐标系）。
     宽屏下 `.ht-app` 是 `min-height:100dvh` ⇒ 整页在文档里滚；
-    ≤768px 分支把它改成 `height:100dvh` + `main{overflow-y:auto}`（`app.css:3030-3040`，
+    ≤768px 分支把它改成 `height:100dvh` + `main{overflow-y:auto}`（`styles/app/narrow.css`，
     为的是底部导航常驻贴底）⇒ **滚动所有者换成 `main`，文档永远不滚**。
     这条判据当初直接断言 `document.scrollHeight > clientHeight`，于是窄窗那一档
     以"内容被裁"的名义红了一次 —— 而实际内容是可滚到的。

@@ -290,6 +290,14 @@ let checked = 0;
  * ⚠️ 只扫 web 壳（apps/web/src）：RN 侧经 useText() 已有档位纪律；
  *   landing 的 mockup 是静态复刻件，有自己的取值纪律。
  */
+/**
+ * 2026-10-02 起 app.css 拆成聚合器 + ./app/*.css 模块（规则逐字未动）。
+ * 豁免表仍锚在聚合器路径上 —— 模块文件在比对前先归一化回去：
+ * 组合数一个不多、一个不少，改的只是"同一份 CSS 换了个文件名"。
+ */
+const canonicalHostCss = (rel) =>
+  rel.startsWith('apps/web/src/styles/app/') ? 'apps/web/src/styles/app.css' : rel;
+
 const PAIRED_TYPOGRAPHY_ALLOW = [
   // app.css —— 档位表外的桌面层级（每个组合一条；说明写在行尾）
   { file: 'apps/web/src/styles/app.css', combo: 'lg+bold', why: '品牌字（ht-brand）：品牌资产，不套语义档位' },
@@ -333,7 +341,7 @@ for (const file of webFiles) {
     for (const m of source.matchAll(/(\.[a-zA-Z][^{\n]*)\{([^}]*)\}/g)) {
       const combo = comboOfCss(m[2]);
       if (!combo) continue;
-      if (PAIRED_TYPOGRAPHY_ALLOW.some((a) => a.file === rel && a.combo === combo)) continue;
+      if (PAIRED_TYPOGRAPHY_ALLOW.some((a) => a.file === canonicalHostCss(rel) && a.combo === combo)) continue;
       pairedProblems.push({ file: rel, line: source.slice(0, m.index).split('\n').length, combo, text: m[1].trim().slice(0, 60) });
     }
   } else {
@@ -346,7 +354,7 @@ for (const file of webFiles) {
       if (!fsMatch || !fwMatch) continue;
       const combo = comboOfTsx(fsMatch[0], fwMatch[0]);
       if (!combo) continue;
-      if (PAIRED_TYPOGRAPHY_ALLOW.some((a) => a.file === rel && a.combo === combo)) continue;
+      if (PAIRED_TYPOGRAPHY_ALLOW.some((a) => a.file === canonicalHostCss(rel) && a.combo === combo)) continue;
       pairedProblems.push({ file: rel, line: i + 1, combo, text: `${fsMatch[0]} … ${fwMatch[0]}` });
       i += 3; // 同一窗口只报一次
     }

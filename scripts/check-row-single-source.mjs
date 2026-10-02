@@ -352,7 +352,15 @@ function collectHtFamilies() {
         `        必须**报错**，而不是"0 ≤ 基线，✅"（那正是一个永远通过的门禁）。`,
     };
   }
-  const lines = readFileSync(abs, 'utf8').split('\n');
+  const cssFiles = [abs];
+  // 2026-10-02 起 app.css 是聚合器，正文按节在 ./app/*.css —— 族清单扫全部模块。
+  const modulesDir = join(ROOT, 'apps', 'web', 'src', 'styles', 'app');
+  if (existsSync(modulesDir)) {
+    for (const name of readdirSync(modulesDir)) {
+      if (name.endsWith('.css')) cssFiles.push(join(modulesDir, name));
+    }
+  }
+  const lines = cssFiles.flatMap((f) => readFileSync(f, 'utf8').split('\n'));
   const families = new Set();
   for (const line of lines) {
     const m = /^\.ht-[a-z]+/.exec(line);
@@ -361,7 +369,7 @@ function collectHtFamilies() {
   if (families.size === 0) {
     return {
       error:
-        `${APP_CSS} 里一个顶层 \`.ht-*\` 族都扫不到。\n` +
+        `${APP_CSS}（含 ./app/ 模块）里一个顶层 \`.ht-*\` 族都扫不到。\n` +
         `      ⇒ 要么命名约定被改了、要么类名不再行首。无论哪种，判据 3 都已失效，\n` +
         `        必须在这里报错（见 check-pricing-consistency.mjs 文件头的同一条纪律）。`,
     };

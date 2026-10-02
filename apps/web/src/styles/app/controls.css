@@ -1,0 +1,203 @@
+/* ── 按钮 ───────────────────────────────────────────── */
+
+.ht-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--ht-space-2);
+  min-block-size: var(--ht-touch-target-min);
+  padding: 0 var(--ht-space-4);
+  border-radius: var(--ht-radius-md);
+  font-size: var(--ht-font-size-sm);
+  font-weight: var(--ht-font-weight-medium);
+  /* 按钮文字不随容器收缩竖折 —— 折行的按钮不是按钮，是排版事故。 */
+  white-space: nowrap;
+  transition:
+    background-color var(--ht-duration-fast) var(--ht-ease-standard),
+    color var(--ht-duration-fast) var(--ht-ease-standard),
+    border-color var(--ht-duration-fast) var(--ht-ease-standard),
+    transform var(--ht-duration-press) var(--ht-ease-standard);
+}
+
+.ht-btn--primary {
+  background: var(--ht-color-primary);
+  color: var(--ht-color-on-primary);
+}
+
+.ht-btn--primary:hover {
+  background: var(--ht-color-primary-hover);
+}
+
+.ht-btn--primary:active {
+  background: var(--ht-color-primary-active);
+}
+
+.ht-btn--ghost {
+  background: transparent;
+  color: var(--ht-color-foreground-muted);
+}
+
+.ht-btn--ghost:hover {
+  background: var(--ht-color-hover);
+  color: var(--ht-color-foreground);
+}
+
+.ht-btn:disabled {
+  opacity: 0.5;
+}
+
+/**
+ * 按下即反馈 —— Apple 的规矩是「回应发生在按下时，不是松手时」。
+ *
+ * 🔴 `--ht-motion-press-scale` 这个 token **移动端一直在用**
+ * （`apps/mobile/src/ui/kit.tsx` 里有 `pressed` 状态 + reduced-motion 判断），
+ * 而 Web 以前只有背景色变化：按下与松手之间**没有任何即时回应**，
+ * 一次点击的第一帧是"什么都没发生"。
+ *
+ * 🔴 只动 `transform`：它由合成器处理，不触发布局 ——
+ * 而按下是**每一次点击**都要付的成本，这里省下的时间最值。
+ * 时长用 `--ht-duration-press`（它存在的意义就是这个）。
+ *
+ * 🔴 `prefers-reduced-motion` 在这里一个字都不写：`tokens.css` 已把
+ * 全部 `--ht-duration-*` 压到 1ms，缩放会立刻完成、不产生动效。
+ * 在这里再写一遍 media query 就是第二套降级策略。
+ */
+.ht-btn:active:not(:disabled) {
+  transform: scale(var(--ht-motion-press-scale));
+}
+
+/* ── 任务列表 ───────────────────────────────────────── */
+/*
+ * 🔴 这里原本是 70 行手写的 `.ht-tasklist` / `.ht-task*`（行骨架、勾选框、
+ * 标题、元信息排版）。M3 第一刀之后**整族删除** —— 那一段现在是
+ * `@heyta/ui` 的 `TaskList`（与 mobile 同一份实现），排版由共享层的
+ * RN 样式与 token 决定，web 不再有第二份。
+ *
+ * 只留"行尾本端控件"的排版（内联 token 值，见 `App.tsx` 的
+ * `renderTaskTrailing`）与 `.ht-due`（本端特有的截止呈现：日期/倒计时两种）。
+ */
+
+/* ── 截止时间徽标 ───────────────────────────────────── */
+
+/* 🔴 tabular-nums 是必须的：「还剩 3 天」→「还剩 12 天」会让整行文字宽度跳动，
+   而它就在任务标题旁边，跳动会把标题挤得晃一下。
+   用 font-variant-numeric 而不是等宽字体，是为了不引入第二套字形。 */
+.ht-due {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--ht-space-1);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* ⚠️ 紧迫度**不能只用颜色表达**（色盲用户 + 暗色主题都得能读）。
+   这里的规则是：颜色只是**冗余通道**，语义信息由文字本身承载
+   （"已逾期 3 天" 这几个字已经说清了一切）。所以下面只给颜色，不加图标差异。 */
+.ht-due--overdue {
+  color: var(--ht-color-danger);
+  font-weight: var(--ht-font-weight-medium);
+}
+
+.ht-due--today {
+  color: var(--ht-color-warning-strong);
+  font-weight: var(--ht-font-weight-medium);
+}
+
+.ht-due--soon {
+  color: var(--ht-color-foreground-muted);
+}
+
+/* ── 输入行 ─────────────────────────────────────────── */
+
+.ht-compose {
+  display: flex;
+  gap: var(--ht-space-2);
+  margin-bottom: var(--ht-space-4);
+}
+
+/**
+ * 任务行上的提醒面板：`<details>` + chip，展开后是一个浮层。
+ *
+ * 🔴 类名刻意挂在 `.ht-compose` 族上（`--popover` / `-panel` 都是它的下游）：
+ * `check-row-single-source.mjs` 的 `HT_FAMILY_BASELINE` 钉死 app.css 的
+ * 顶层 `ht-*` 族**只减不增**，新开一个 `.ht-reminder` 族会让那道门禁变红。
+ *
+ * ⚠️ `.ht-compose` 本体是 flex 行，这里**不能**复用它当详情容器 ——
+ * 所以只挂修饰类，展开面板用 `-panel` 单独定位。
+ */
+.ht-compose--popover {
+  position: relative;
+}
+
+.ht-compose--popover > summary {
+  /* 藏掉 `<summary>` 自带的展开三角：chip 里已经有图标表达同一件事。 */
+  list-style: none;
+}
+
+.ht-compose-panel {
+  position: absolute;
+  z-index: var(--ht-z-popover);
+  inset-inline-end: 0;
+  margin-block-start: var(--ht-space-2);
+  padding: var(--ht-space-3);
+  /* 浮层宽度与 TaskOrganizer 的下拉同量级；`rem` 随宿主字号缩放，不写死 px。 */
+  min-inline-size: 18rem;
+  max-inline-size: 24rem;
+  /* 表面来自 `.ht-material`（ADR-0042：捕获条下拉 = 悬浮功能层 = 玻璃）。 */
+  border-radius: var(--ht-radius-lg);
+  box-shadow: var(--ht-shadow-lg);
+}
+
+.ht-input {
+  flex: 1;
+  min-block-size: var(--ht-touch-target-min);
+  padding: 0 var(--ht-space-4);
+  background: var(--ht-color-surface);
+  border: 1px solid var(--ht-color-border);
+  border-radius: var(--ht-radius-md);
+  font-size: var(--ht-font-size-sm);
+  transition: border-color var(--ht-duration-fast) var(--ht-ease-standard);
+}
+
+.ht-input:hover {
+  border-color: var(--ht-color-border-strong);
+}
+
+/* 焦点用主色边框 + 焦点环。
+   注意**没有** outline:none —— 那是可访问性回归。 */
+.ht-input:focus-visible {
+  border-color: var(--ht-color-primary);
+}
+
+/* ── 空状态 ─────────────────────────────────────────── */
+
+.ht-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--ht-space-3);
+  padding: var(--ht-space-16) var(--ht-space-6);
+  text-align: center;
+  color: var(--ht-color-foreground-subtle);
+}
+
+.ht-empty__icon {
+  color: var(--ht-color-border-strong);
+}
+
+.ht-empty__title {
+  font-size: var(--ht-font-size-base);
+  font-weight: var(--ht-font-weight-medium);
+  color: var(--ht-color-foreground-muted);
+}
+
+.ht-empty__hint {
+  font-size: var(--ht-font-size-sm);
+}
+
+/* ── 响应式：移动端塌缩成单栏 ───────────────────────── */
+
+/* ── 窄屏塌缩：完整规则在模块列表**末尾**的 narrow.css 媒体块 ─────────────
+   必须排在 `.ht-rail` / `.ht-sidebar` 基础规则之后（同特异性、源序后者胜）。
+   2026-09-30：旧块写在这里且多了一个 `}`，rail 塌缩规则被基础规则整块覆盖、
+   sidebar 塌缩规则逃出媒体块变成全局 —— "grid 塌了、rail 没塌"的半成品形态。 */

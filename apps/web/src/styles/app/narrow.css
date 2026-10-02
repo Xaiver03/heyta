@@ -1,0 +1,146 @@
+/* ── 窄屏塌缩（≤768px）────────────────────────────────────
+ * 🔴 本块必须排在**所有基础规则之后**（同特异性、源序后者胜）。
+ * 2026-09-30：塌缩规则曾写在文件前部，被后面的基础规则整块覆盖
+ *（"grid 塌了、rail 没塌"），且一个多余的 `}` 让 sidebar 规则逃出媒体块
+ * 变成全局 —— 都是这次逐页排版审计（goal-layout-audit 页 4）修掉的。
+ */
+@media (max-width: 768px) {
+  /* 单列：main 在上（1fr），底部导航在下（auto）。
+     🔴 高度必须**钉死**在视口（不是 min-height）：`min-height` 之下，
+     内容一长整页就往下长，底部导航被推到文档末尾 —— 日历/四象限这种
+     高页面要滚到最底才能切视图（塌缩态扫描实测，页4 只验过短内容没暴露）。
+     钉死之后改为 **main 内部滚动**，导航常驻贴底。 */
+  .ht-app,
+  .ht-app--with-sidebar {
+    grid-template-columns: 1fr;
+    grid-template-rows: 1fr auto;
+    height: 100dvh;
+  }
+
+  /* 滚动发生在 main（含页头一起滚）—— rail / sidebar 两条导航不动。 */
+  .ht-main {
+    overflow-y: auto;
+  }
+
+  /* rail + sidebar 合成同一条底部导航：rail 视图（order 2）、sidebar 范围（order 3） */
+  .ht-rail {
+    order: 2;
+    flex-direction: row;
+    align-items: center;
+    gap: var(--ht-space-2);
+    padding: var(--ht-space-1) var(--ht-space-2);
+    border-right: none;
+    border-top: var(--ht-border-width-thin) solid var(--ht-color-border);
+    overflow-x: auto;
+    overflow-y: hidden;
+  }
+
+  /* 头像行横排（品牌名在桌面态就已经撤掉了，见 `.ht-rail__top` 上方） */
+  .ht-rail__top {
+    flex-direction: row;
+    align-items: center;
+    gap: var(--ht-space-2);
+    padding: 0;
+  }
+
+  .ht-rail__tabs {
+    flex-direction: row;
+    flex: 1;
+    overflow-x: auto;
+  }
+
+  .ht-rail__tab {
+    padding: 0 var(--ht-space-2);
+    /* 图标与名字**都**在流里了（见下面 `.ht-rail__label`），需要间距。
+       桌面态这条 gap 是不生效的 —— 那里名字是 fixed、徽标是 absolute。 */
+    gap: var(--ht-space-2);
+  }
+
+  /* 🔴 「只显示 icon，hover 显示真名」是**桌面**形态 —— 触屏没有 hover，
+     把名字收进 tooltip 等于在手机上根本没有名字。
+     底部导航恢复成"图标 + 常显文字"，所以标签回到文档流里。
+     ⚠️ 用 `position: static` 而不是覆盖 `top/left`：一条属性关掉整组偏移。 */
+  .ht-rail__label {
+    position: static;
+    transform: none;
+    padding: 0;
+    background: none;
+    color: inherit;
+    font-size: inherit;
+    opacity: 1;
+  }
+
+  .ht-rail__tab--tool:first-of-type {
+    margin-top: 0;
+  }
+
+  /* sidebar（范围列）并入底部导航 */
+  .ht-sidebar {
+    order: 3;
+    flex-direction: row;
+    justify-content: space-around;
+    border-right: none;
+    border-top: var(--ht-border-width-thin) solid var(--ht-color-border);
+    /* 刘海屏安全区 */
+    padding-block-end: max(var(--ht-space-2), env(safe-area-inset-bottom));
+  }
+
+  /* 🔴 塌缩态里侧栏已经是**横着的一条底部导航**，"拖它的右边缘"没有语义。
+     手柄仍挂在 DOM 上（任务页与日历页各有一条侧栏，都带它），所以必须显式关掉，
+     否则它会在底部条的右端留一条能点、能聚焦、拖了没反应的竖线。 */
+  .ht-sidebar__resizer {
+    display: none;
+  }
+
+  /* 桌面那条列的"钉住 + 一屏封顶 + 内部滚动"三条在底部条里都没有语义：
+     横条不该粘在视口顶部，也不该被一屏高度卡住自己的内容。 */
+  .ht-sidebar--calendar {
+    position: static;
+    max-block-size: none;
+  }
+
+  .ht-sidebar__calendar-body {
+    overflow-y: visible;
+  }
+
+  .ht-brand,
+  .ht-nav__section,
+  .ht-nav__count {
+    display: none;
+  }
+
+  .ht-nav {
+    flex-direction: row;
+    inline-size: 100%;
+    justify-content: space-around;
+  }
+
+  .ht-nav__item {
+    flex-direction: column;
+    gap: var(--ht-space-1);
+    font-size: var(--ht-font-size-2xs);
+    padding: 0 var(--ht-space-2);
+  }
+
+  .ht-content {
+    padding: var(--ht-space-4);
+  }
+}
+
+
+/* 习惯「列表 + 窗格」在窄屏塌缩。
+   🔴 塌的是**布局**，不是数字：三个具体数字（连续 / 最长 / 累计）一行都不许砍
+   —— 断链那天用户最需要看见「累计」（ADR-0022）。所以整列换到窗格**上方**，
+   而不是把 chip 收进悬停。
+   ⚠️ 这条单独成一个媒体块、写在文件末尾：基础规则在它上面，源序保证覆盖成立。 */
+@media (max-width: 768px) {
+  .ht-habit {
+    grid-template-columns: 1fr;
+    gap: var(--ht-space-4);
+  }
+
+  .ht-habit__pane {
+    padding-top: var(--ht-space-4);
+    border-top: var(--ht-border-width-thin) solid var(--ht-color-border);
+  }
+}

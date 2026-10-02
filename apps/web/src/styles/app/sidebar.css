@@ -1,0 +1,465 @@
+/* ── 侧栏 ───────────────────────────────────────────── */
+
+.ht-sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ht-space-2);
+  padding: var(--ht-space-4);
+  background: var(--ht-color-surface);
+  /* 扁平风格用边框表达层次，不用阴影 */
+  border-right: 1px solid var(--ht-color-border);
+  /* 拖拽手柄绝对定位在这一列的右边缘，需要一个定位祖先。 */
+  position: relative;
+}
+
+/*
+ * 右边缘的拖拽条。
+ *
+ * ⚠️ 它**不画自己**：只有 hover / 拖拽中 / 键盘聚焦时才出现一条线 ——
+ * 常驻的手柄条会让侧栏边缘看起来像一道裂缝，而这条边 99% 的时间没人要拖。
+ * 命中区只有 4px 宽 × 整列高：更窄会拖不中，更宽就吃掉主区的第一像素。
+ */
+.ht-sidebar__resizer {
+  position: absolute;
+  inset-block: 0;
+  /* 骑在边框上：左右各让一半，拖的时候不需要"精确压住那条 1px"。 */
+  inline-size: var(--ht-space-2);
+  inset-inline-end: calc(var(--ht-space-2) * -0.5);
+  cursor: col-resize;
+  background: transparent;
+  /* 🔴 触屏上必须关掉：否则横向拖会被浏览器读成页面滚动，
+     症状是"鼠标能拖、手指拖不动"。 */
+  touch-action: none;
+}
+
+.ht-sidebar__resizer::after {
+  content: '';
+  position: absolute;
+  inset-block: var(--ht-space-6);
+  inset-inline-start: 50%;
+  inline-size: var(--ht-border-width-thin);
+  transform: translateX(-50%);
+  background: var(--ht-color-border);
+  opacity: 0;
+}
+
+.ht-sidebar__resizer:hover::after,
+.ht-sidebar__resizer--dragging::after {
+  opacity: 1;
+  /* 🔴 必须换色换粗：`--ht-color-border` 恰好就是这一列 `border-right` 的值，
+     而 ::after 又落在同一列像素上 —— 同色同位等于**没画**（2026-09-30 实测：
+     hover 与 idle 的两条边带截图逐像素相同）。一个拖不动也看不见的把手，
+     等于这个功能不存在。 */
+  background: var(--ht-color-primary);
+  inline-size: var(--ht-border-width-thick);
+}
+
+/* 键盘：`outline` 而不是 `outline: none`（§5 明确点名的可访问性回归）。 */
+.ht-sidebar__resizer:focus-visible {
+  outline: var(--ht-border-width-thick) solid var(--ht-color-ring);
+  outline-offset: var(--ht-space-1);
+}
+
+.ht-sidebar__resizer:focus-visible::after {
+  opacity: 1;
+  background: var(--ht-color-primary);
+}
+
+.ht-brand {
+  display: flex;
+  align-items: center;
+  gap: var(--ht-space-2);
+  padding: var(--ht-space-2);
+  margin-bottom: var(--ht-space-4);
+  font-size: var(--ht-font-size-lg);
+  font-weight: var(--ht-font-weight-bold);
+  color: var(--ht-color-foreground);
+}
+
+.ht-brand__dot {
+  inline-size: var(--ht-icon-sm);
+  block-size: var(--ht-icon-sm);
+  border-radius: var(--ht-radius-full);
+  background: var(--ht-color-primary);
+}
+
+.ht-nav {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ht-space-1);
+}
+
+.ht-nav__section {
+  padding: var(--ht-space-3) var(--ht-space-2) var(--ht-space-1);
+  font-size: var(--ht-font-size-2xs);
+  font-weight: var(--ht-font-weight-semibold);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ht-color-foreground-subtle);
+}
+
+/*
+  侧栏「清单 / 标签」的区块头：标题 + **一个图标级的新建入口**。
+  这里原来是常驻的空输入框（一整行 + 一个 + 按钮），于是侧栏最贵的空间
+  被用在"用户什么都不想做的时候"，而且两个空框看起来像是**没填完的表单**。
+*/
+.ht-sidebar__organizer-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--ht-space-1);
+  padding-inline: var(--ht-space-2);
+}
+
+/* 标题不再自带横向内边距 —— 行的留白已由上面负责，否则 + 与文字不同基线。 */
+.ht-sidebar__organizer-heading .ht-nav__section {
+  padding-block: var(--ht-space-3) var(--ht-space-1);
+  padding-inline: 0;
+}
+
+.ht-sidebar__organizer-add {
+  display: inline-grid;
+  place-items: center;
+  inline-size: var(--ht-touch-target-min);
+  block-size: var(--ht-touch-target-min);
+  margin-block: calc(var(--ht-space-2) * -1);
+  flex: none;
+  border: none;
+  border-radius: var(--ht-radius-sm);
+  background: transparent;
+  color: var(--ht-color-foreground-muted);
+  cursor: pointer;
+}
+
+.ht-sidebar__organizer-add:hover {
+  background: var(--ht-color-hover);
+  color: var(--ht-color-foreground);
+}
+
+.ht-sidebar__organizer-add:focus-visible {
+  outline: var(--ht-border-width-thick) solid var(--ht-color-ring);
+  outline-offset: var(--ht-space-1);
+}
+
+.ht-nav__item {
+  display: flex;
+  align-items: center;
+  gap: var(--ht-space-3);
+  /* 44px 触控下限 —— 用 token 而不是写死，测试守着这个值 */
+  min-block-size: var(--ht-touch-target-min);
+  padding: 0 var(--ht-space-3);
+  border-radius: var(--ht-radius-md);
+  font-size: var(--ht-font-size-sm);
+  font-weight: var(--ht-font-weight-medium);
+  color: var(--ht-color-foreground-muted);
+  text-align: left;
+  transition: background-color var(--ht-duration-fast) var(--ht-ease-standard),
+    color var(--ht-duration-fast) var(--ht-ease-standard);
+}
+
+/* hover 只换色，**不做 translateY** —— 位移会让列表项视觉抖动 */
+.ht-nav__item:hover {
+  background: var(--ht-color-hover);
+  color: var(--ht-color-foreground);
+}
+
+.ht-nav__item[aria-current='true'] {
+  background: var(--ht-color-primary-subtle);
+  color: var(--ht-color-primary);
+}
+
+/* 象限前的小色块 */
+.ht-swatch {
+  inline-size: var(--ht-space-2);
+  block-size: var(--ht-space-2);
+  border-radius: var(--ht-radius-full);
+  flex: none;
+}
+
+.ht-swatch--q1 {
+  background: var(--ht-color-quadrant-1);
+}
+.ht-swatch--q2 {
+  background: var(--ht-color-quadrant-2);
+}
+.ht-swatch--q3 {
+  background: var(--ht-color-quadrant-3);
+}
+.ht-swatch--q4 {
+  background: var(--ht-color-quadrant-4);
+}
+
+/* 计数徽标：数字必须等宽，否则增减时宽度跳动 */
+.ht-nav__count {
+  margin-inline-start: auto;
+  font-size: var(--ht-font-size-xs);
+  font-variant-numeric: tabular-nums;
+  color: var(--ht-color-foreground-subtle);
+}
+
+/*
+  ── 日历侧栏（迷你月历 + 显示范围）─────────────────────────
+
+  🔴 这一列的每一格**必须与主区月历同色同义**：点由 `calendarDayTone` 决定，
+  今天所在列头由 `isoWeekday` 决定，措辞由 `formatDayTitleText` 决定。
+  这里只负责尺寸与排布 —— 一旦在这里另写一套判断，"侧栏说有 3 件事、
+  点进去只列出 1 件"这种谎就没有任何一层会报错。
+
+  ⚠️ 格子宽度**不写死**：侧栏是用户可拖的（12–26rem），所以列宽用 `1fr`、
+  行高用 `aspect-ratio: 1`。给它一个固定像素宽，最窄时会溢出、最宽时会留白。
+*/
+.ht-sidebar--calendar {
+  /* 🔴 这一列自己是**有界的**（最高一屏）并且钉住；滚动交给里面那一层。
+     以前这里直接写 `overflow-y: auto` 是错的，两处后果都在真浏览器里实测到：
+
+       · 外壳是 `min-height: 100dvh` 而不是固定高 ⇒ grid 项被内容撑到 761px，
+         比视口(720)还高，于是这一层**自己永远不滚** —— 注释里那句
+         "滚动条只出现在侧栏"是假的，实际是整页在滚，主区跟着走。
+       · `overflow-y: auto` 会连带把 `overflow-x` 从 `visible` 变成 `clip`。
+         把手那 8px 命中带有 4px **骑在右边缘之外**（`.ht-sidebar__resizer` 的
+         `inset-inline-end: -0.5 × space-2`）⇒ 被裁掉一半，对着它自己的
+         几何中心按下去命中的是 `<nav>`，症状是"把手在那儿、拖不动"。 */
+  position: sticky;
+  inset-block-start: 0;
+  max-block-size: 100dvh;
+}
+
+/* 内部这一层才是滚动区；**把手不在里面**，所以裁不到它。 */
+.ht-sidebar__calendar-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ht-space-2);
+  min-block-size: 0;
+  overflow-y: auto;
+}
+
+/* 子项不许被 flex 压扁：压扁的样子是迷你月历的行高被挤到格子互相叠，
+   而不是出现滚动条。 */
+.ht-sidebar__calendar-body > * {
+  flex: 0 0 auto;
+}
+
+.ht-sidebar__month {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ht-space-1);
+  padding: var(--ht-space-2);
+  border: 1px solid var(--ht-color-border);
+  border-radius: var(--ht-radius-md);
+  background: var(--ht-color-surface);
+}
+
+.ht-sidebar__month-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--ht-space-1);
+}
+
+.ht-sidebar__month-title {
+  font-size: var(--ht-font-size-sm);
+  font-weight: var(--ht-font-weight-semibold);
+  color: var(--ht-color-foreground);
+}
+
+.ht-sidebar__month-nav {
+  display: flex;
+  align-items: center;
+  /* 翻月按钮组往右边框外探出半个间距：否则右侧留白看起来比左侧大一截。 */
+  margin-inline-end: calc(var(--ht-space-1) * -1);
+}
+
+.ht-sidebar__month-nav-btn {
+  display: inline-grid;
+  place-items: center;
+  inline-size: var(--ht-space-6);
+  block-size: var(--ht-space-6);
+  border: none;
+  border-radius: var(--ht-radius-sm);
+  background: transparent;
+  color: var(--ht-color-foreground-muted);
+  cursor: pointer;
+}
+
+.ht-sidebar__month-nav-btn:hover {
+  background: var(--ht-color-hover);
+  color: var(--ht-color-foreground);
+}
+
+.ht-sidebar__month-nav-btn:focus-visible {
+  outline: var(--ht-border-width-thick) solid var(--ht-color-ring);
+  outline-offset: var(--ht-space-1);
+}
+
+.ht-sidebar__month-weekdays,
+.ht-sidebar__month-row {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+}
+
+.ht-sidebar__month-weekdays {
+  font-size: var(--ht-font-size-2xs);
+  font-weight: var(--ht-font-weight-medium);
+  text-align: center;
+  color: var(--ht-color-foreground-subtle);
+}
+
+.ht-sidebar__month-weekdays > span {
+  padding-block: var(--ht-space-1);
+}
+
+.ht-sidebar__day {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--ht-space-0);
+  aspect-ratio: 1;
+  border: 1px solid transparent;
+  border-radius: var(--ht-radius-sm);
+  background: transparent;
+  /* 🔴 `font: inherit`：裸 `<button>` 默认用自己的字体，
+     不给这一行，格里的数字会比界面其他地方小一号且不是我们选的那号。 */
+  font: inherit;
+  color: var(--ht-color-foreground-muted);
+  cursor: pointer;
+}
+
+.ht-sidebar__day:hover {
+  background: var(--ht-color-hover);
+  color: var(--ht-color-foreground);
+}
+
+.ht-sidebar__day:focus-visible {
+  outline: var(--ht-border-width-thick) solid var(--ht-color-ring);
+  outline-offset: var(--ht-space-1);
+}
+
+/* 补白格：属于相邻月，看得见、点得着，但要**看得出来不是本月**。 */
+.ht-sidebar__day--outside {
+  color: var(--ht-color-foreground-subtle);
+}
+
+.ht-sidebar__day-num {
+  font-size: var(--ht-font-size-2xs);
+  font-variant-numeric: tabular-nums;
+  line-height: var(--ht-line-height-tight);
+}
+
+.ht-sidebar__day-dots {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--ht-space-1);
+  block-size: var(--ht-size-badge-dot);
+}
+
+.ht-sidebar__day-dots > i {
+  inline-size: var(--ht-size-badge-dot);
+  block-size: var(--ht-size-badge-dot);
+  border-radius: var(--ht-radius-full);
+}
+
+/* 今天：列头与数字同色（主蓝），圈出一层边 —— 与主区月历同一条表达。 */
+.ht-sidebar__day--today {
+  color: var(--ht-color-primary);
+}
+
+.ht-sidebar__day--today .ht-sidebar__day-num {
+  font-weight: var(--ht-font-weight-bold);
+}
+
+/* 选中：底色 + 描边两个通道都给。**不能只给底色** ——
+   暗色主题下 `--ht-color-primary-subtle` 与 `--ht-color-surface` 差得很小。 */
+.ht-sidebar__day--selected {
+  background: var(--ht-color-primary-subtle);
+  border-color: var(--ht-color-primary);
+  color: var(--ht-color-primary);
+}
+
+/* ── 显示范围（所有 / 清单 / 标签）────────────────────────── */
+
+.ht-sidebar__scope {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ht-space-1);
+}
+
+.ht-sidebar__scope-all {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--ht-space-2);
+  min-block-size: var(--ht-space-8);
+  padding: 0 var(--ht-space-2);
+  border: none;
+  border-radius: var(--ht-radius-md);
+  background: transparent;
+  font: inherit;
+  font-size: var(--ht-font-size-sm);
+  font-weight: var(--ht-font-weight-medium);
+  color: var(--ht-color-foreground-muted);
+  text-align: start;
+  cursor: pointer;
+}
+
+.ht-sidebar__scope-all:hover {
+  background: var(--ht-color-hover);
+  color: var(--ht-color-foreground);
+}
+
+.ht-sidebar__scope-all[aria-pressed='true'] {
+  color: var(--ht-color-primary);
+}
+
+.ht-sidebar__scope-all:focus-visible {
+  outline: var(--ht-border-width-thick) solid var(--ht-color-ring);
+  outline-offset: var(--ht-space-1);
+}
+
+.ht-sidebar__scope-group {
+  display: flex;
+  flex-direction: column;
+}
+
+.ht-sidebar__scope-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--ht-space-2);
+  padding-inline: var(--ht-space-2);
+}
+
+/* 分组头沿用侧栏的小节标题样式，只是把横向留白交给上面这层。 */
+.ht-sidebar__scope-heading .ht-nav__section {
+  padding-inline: 0;
+}
+
+.ht-sidebar__scope-row {
+  display: flex;
+  align-items: center;
+  gap: var(--ht-space-2);
+  min-block-size: var(--ht-space-8);
+  padding-inline: var(--ht-space-2);
+  border-radius: var(--ht-radius-sm);
+  font-size: var(--ht-font-size-sm);
+  color: var(--ht-color-foreground-muted);
+  cursor: pointer;
+}
+
+.ht-sidebar__scope-row:hover {
+  background: var(--ht-color-hover);
+  color: var(--ht-color-foreground);
+}
+
+/* 子清单比父级缩一格 —— 层级是**看着**出来的，不是靠名字猜。 */
+.ht-sidebar__scope-row--child {
+  padding-inline-start: var(--ht-space-5);
+}
+
+.ht-sidebar__scope-name {
+  min-inline-size: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

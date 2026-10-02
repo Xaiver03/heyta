@@ -1,0 +1,271 @@
+/* ── 运营管理后台（ADR-0038）──────────────────────────────────
+ * 只给运营者看的一段界面。取值全部来自 design tokens ——
+ * 裸 hex / px 会被 `pnpm check:design` 打回（AGENTS §5 三条硬规则）。
+ *
+ * 🔴 **类名挂在既有的 `.ht-settings` 族下，不新开 `.ht-admin` 族。**
+ * `pnpm check:row-single-source` 的断言 B 钉着"app.css 顶层 `ht-*` 前缀族只减不增"
+ * （基线 28）。第一版我开了一个 `.ht-admin` 族，正好把数字顶到 29 被门禁拦下 ——
+ * 门禁的立场是：**新视图不该长出新前缀族**，该复用的是既有模式层。
+ * 这个面板本来就是设置页里的一节（`ht-settings__section`），
+ * 所以折进 `ht-settings__admin-*` 是它本来该在的位置，不是妥协。
+ *
+ * 形状上刻意**不引入表格**：后台的几个列表都是"一行一个对象、
+ * 左边主体右边元信息"，用 flex 行比 table 更能在窄屏下自然折行，
+ * 也不需要为 table 单独发明一套间距 token。
+ */
+.ht-settings__admin-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--ht-space-1);
+}
+
+.ht-settings__admin-tab {
+  appearance: none;
+  border: var(--ht-border-width-thin) solid var(--ht-color-border);
+  border-radius: var(--ht-radius-full);
+  background: var(--ht-color-surface);
+  color: var(--ht-color-foreground-muted);
+  cursor: pointer;
+  font-family: var(--ht-font-sans);
+  font-size: var(--ht-font-size-sm);
+  font-weight: var(--ht-font-weight-medium);
+  padding: var(--ht-space-1) var(--ht-space-3);
+}
+
+.ht-settings__admin-tab:hover {
+  background: var(--ht-color-hover);
+  color: var(--ht-color-foreground);
+}
+
+/* 🔴 焦点环不许抹掉（AGENTS §5「容易犯的几个错」）。 */
+.ht-settings__admin-tab:focus-visible,
+.ht-settings__admin-btn:focus-visible,
+.ht-settings__admin-row:focus-visible,
+.ht-settings__admin-input:focus-visible {
+  outline: var(--ht-border-width-thick) solid var(--ht-color-ring);
+  outline-offset: var(--ht-space-1);
+}
+
+.ht-settings__admin-tab--active {
+  background: var(--ht-color-primary-subtle);
+  border-color: var(--ht-color-primary);
+  color: var(--ht-color-primary);
+}
+
+.ht-settings__admin-tab--icon {
+  display: inline-flex;
+  align-items: center;
+  margin-inline-start: auto;
+}
+
+.ht-settings__admin-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(9rem, 1fr));
+  gap: var(--ht-space-2);
+}
+
+.ht-settings__admin-stat {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ht-space-1);
+  padding: var(--ht-space-3);
+  border: var(--ht-border-width-thin) solid var(--ht-color-border-subtle);
+  border-radius: var(--ht-radius-md);
+  background: var(--ht-color-surface-raised);
+}
+
+.ht-settings__admin-statValue {
+  color: var(--ht-color-foreground);
+  font-size: var(--ht-font-size-lg);
+  font-weight: var(--ht-font-weight-semibold);
+  /* 数字等宽：统计值增减时宽度不跳（与 `.ht-due` 同一条理由）。 */
+  font-variant-numeric: tabular-nums;
+}
+
+.ht-settings__admin-statLabel {
+  color: var(--ht-color-foreground-muted);
+  font-size: var(--ht-font-size-xs);
+}
+
+.ht-settings__admin-search {
+  display: flex;
+  align-items: center;
+  gap: var(--ht-space-2);
+}
+
+.ht-settings__admin-input {
+  flex: 1;
+  min-inline-size: 0;
+  padding: var(--ht-space-2);
+  border: var(--ht-border-width-thin) solid var(--ht-color-border);
+  border-radius: var(--ht-radius-sm);
+  background: var(--ht-color-background);
+  color: var(--ht-color-foreground);
+  font-family: var(--ht-font-sans);
+  font-size: var(--ht-font-size-sm);
+}
+
+.ht-settings__admin-input--narrow {
+  inline-size: 6rem;
+  flex: none;
+}
+
+.ht-settings__admin-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--ht-space-1);
+  appearance: none;
+  border: var(--ht-border-width-thin) solid var(--ht-color-border);
+  border-radius: var(--ht-radius-sm);
+  background: var(--ht-color-surface);
+  color: var(--ht-color-foreground);
+  cursor: pointer;
+  font-family: var(--ht-font-sans);
+  font-size: var(--ht-font-size-sm);
+  font-weight: var(--ht-font-weight-medium);
+  padding: var(--ht-space-1) var(--ht-space-3);
+  white-space: nowrap;
+}
+
+.ht-settings__admin-btn:hover:not(:disabled) {
+  background: var(--ht-color-hover);
+}
+
+.ht-settings__admin-btn:disabled {
+  background: var(--ht-color-disabled-bg);
+  color: var(--ht-color-disabled-fg);
+  cursor: not-allowed;
+}
+
+.ht-settings__admin-btn--danger {
+  border-color: var(--ht-color-danger);
+  color: var(--ht-color-danger);
+}
+
+.ht-settings__admin-list {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border: var(--ht-border-width-thin) solid var(--ht-color-border-subtle);
+  border-radius: var(--ht-radius-md);
+  overflow: hidden;
+}
+
+.ht-settings__admin-row,
+.ht-settings__admin-staticRow {
+  display: flex;
+  align-items: center;
+  gap: var(--ht-space-2);
+  inline-size: 100%;
+  padding: var(--ht-space-2) var(--ht-space-3);
+  border-block-end: var(--ht-border-width-thin) solid var(--ht-color-border-subtle);
+  background: var(--ht-color-surface);
+  text-align: start;
+}
+
+.ht-settings__admin-list > li:last-child > .ht-settings__admin-row,
+.ht-settings__admin-list > li:last-child > .ht-settings__admin-staticRow {
+  border-block-end: none;
+}
+
+.ht-settings__admin-row {
+  appearance: none;
+  border-inline: none;
+  border-block-start: none;
+  color: inherit;
+  cursor: pointer;
+  font-family: var(--ht-font-sans);
+  font-size: var(--ht-font-size-sm);
+}
+
+.ht-settings__admin-row:hover {
+  background: var(--ht-color-hover);
+}
+
+.ht-settings__admin-staticRow {
+  font-size: var(--ht-font-size-sm);
+}
+
+.ht-settings__admin-rowMain {
+  flex: 1;
+  min-inline-size: 0;
+  color: var(--ht-color-foreground);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ht-settings__admin-rowMeta {
+  color: var(--ht-color-foreground-subtle);
+  font-size: var(--ht-font-size-xs);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.ht-settings__admin-badges {
+  display: inline-flex;
+  gap: var(--ht-space-1);
+}
+
+.ht-settings__admin-badge {
+  border-radius: var(--ht-radius-full);
+  background: var(--ht-color-border-subtle);
+  color: var(--ht-color-foreground-muted);
+  font-size: var(--ht-font-size-2xs);
+  padding: 0 var(--ht-space-2);
+  white-space: nowrap;
+}
+
+.ht-settings__admin-badge--admin {
+  background: var(--ht-color-primary-subtle);
+  color: var(--ht-color-primary);
+}
+
+.ht-settings__admin-badge--danger {
+  background: var(--ht-color-danger-subtle);
+  color: var(--ht-color-danger);
+}
+
+.ht-settings__admin-detail {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ht-space-2);
+  padding: var(--ht-space-3);
+  border: var(--ht-border-width-thin) solid var(--ht-color-primary);
+  border-radius: var(--ht-radius-md);
+  background: var(--ht-color-surface-raised);
+}
+
+.ht-settings__admin-h4 {
+  margin: 0;
+  font-size: var(--ht-font-size-base);
+  font-weight: var(--ht-font-weight-semibold);
+}
+
+.ht-settings__admin-h5 {
+  margin: 0;
+  color: var(--ht-color-foreground-muted);
+  font-size: var(--ht-font-size-sm);
+  font-weight: var(--ht-font-weight-semibold);
+}
+
+.ht-settings__admin-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--ht-space-2);
+}
+
+.ht-settings__admin-quota {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--ht-space-1);
+}
+
+.ht-settings__admin-pager {
+  display: flex;
+  gap: var(--ht-space-2);
+}
