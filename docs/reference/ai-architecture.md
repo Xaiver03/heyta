@@ -77,6 +77,14 @@ heyta 的 AI 是**双向**的，两个方向**在不同的包里、有不同的�
 | `packages/app-host/src/ai-tool-selection.ts` | — | **内置 AI 的工具选择**：自然语言 → 工具（纯规则、grants 过滤、歧义/未授权分开）。⚠️ 不叫 intent（`OpIntent` / `WidgetIntent` 已占用该名） |
 | `packages/app-host/src/ai-tool-run.ts` | — | **内置 AI 的工具执行（单步）**：读即执行 / 写**只产出提案**；`confirmAiToolProposal()` 是唯一写点（[ADR-0035](../adr/0035-ai-tool-calling-reuses-local-api.md)） |
 | `packages/app-host/src/ai-tool-call.ts` | — | **内置 AI 的模型路径**：规则先跑（命中即零出境短路）→ `invokeRouted` 带 `tools` → 校验后复用 `runSelectedTool`。出境字段 = `text` + `tools` |
+| `packages/app-host/src/ai-assistant.ts` | — | 🔴 **对话式助手的多步循环**（[ADR-0045](../adr/0045-conversational-assistant-split-authorization-from-catalog.md)）：档位 → grants 投影、**循环前一次算完的字段并集**（`planAssistantEgress`）、观察回送模型、写只出提案、越界即停。`assistantMessages()` 是 `system`/`user` 的**唯一来源** |
+| `packages/ai/src/assistant-limits.ts` | — | 三个硬上界（步数 / 消息条数 / 单请求字节）+ `egressBytesFor()`。**住在这个包**：上界是出境层的纪律，不是编排层的偏好。单位是**字节**（UTF-8） |
+| `packages/app-host/src/calendar-anchor.ts` | — | 🔴 「今天是 …（周X，UTC±HH:MM）」的**唯一生产者** + 日期硬规则。不用 `Intl`（Hermes 上可选），偏移走纯算术 |
+| `packages/ai/src/capability-manifest.generated.ts` | 424 | **生成物**：给模型看的"哪个实体、哪些字段、可读还是可写"。手写不可能，`--check` 不一致即红 |
+| `scripts/gen-ai-capability-manifest.mjs` | — | 上面那份的生成器（从工具目录 + `EntityModelMap`）。`check:ai-tools` 规则 7 调它的 `--check` |
+| `packages/ai/src/wire.ts` | — | 请求线格式的**唯一实现**（url / headers / body / 空响应判定），`provider.ts` 与 `routing.ts` 共用。⚠️ **刻意不从 `@heyta/ai` 导出**：导出去等于邀请包外再拼一份 |
+| `packages/app-host/src/ai-failure-fallback.ts` | — | `describeRoutedFailure()` 的**唯一**定义点（曾抄了四遍）。入参是封闭词表 `AiFailureReason`，不是 `string` |
+| `packages/ai/src/diagnose.ts` | — | 端点失败的**可诊断性**（W1）：本机端点拒绝来源 vs 其他原因分开，复用 `supply.ts` 的 `isLoopbackEndpoint` |
 | `packages/local-api/src/tools.ts` | 499 | 工具契约 + 授权判定（**唯一实现点**）。`isToolGranted()` 被 MCP 与内置 AI **共用** |
 | `packages/local-api/src/server.ts` | 359 | 传输无关的 JSON-RPC 处理器。`runReadTool()` / `toWriteIntent()` 亦被内置 AI 复用 |
 | `packages/local-api/src/mcp.ts` | 252 | 工具形状：`listAuthorizedTools()`（中性定义，MCP 与内置 AI 共用）+ 错误码 + 会话闸门 |
@@ -87,7 +95,9 @@ heyta 的 AI 是**双向**的，两个方向**在不同的包里、有不同的�
 | `apps/web/src/features/ai/AiCapture.tsx` | — | 捕获界面 |
 | `apps/web/src/features/ai/AiPrioritize.tsx` | — | 优先级界面 |
 | `apps/web/src/features/ai/AiDuration.tsx` | — | 估时界面 |
-| `apps/web/src/features/ai/AiToolRun.tsx` | — | **工具调用面板**：规则命中不出境（并明说）；需模型时先披露再发送；写工具出提案 + 确认 |
+| `apps/web/src/features/ai/AiToolRun.tsx` | — | **工具调用面板（单步）**：规则命中不出境（并明说）；需模型时先披露再发送；写工具出提案 + 确认。🔴 前门只有 `requestToolCall` 一个 —— 旧的薄壳 `runAiTool()` 已删（W7），`check:ai-tools` 规则 6 拦它回来 |
+| `apps/web/src/features/ai/AssistantPanel.tsx` | — | **对话界面**（W12）：一次性披露块（逐字来自 `planAssistantEgress`）、气泡记录（用户贴右 / 助手贴左）、步数轨迹、提案卡 + 确认、免责声明常驻。🔴 自己**不发请求**，也没有 `fetch` |
+| `apps/web/src/features/settings/AiSettings.tsx` 的 `ai-assistant-section` | — | 助手的**第二个授权前端**：`assistantTier` 两档单选 + 该档的字段并集 / 工具 / 上界预览 + "与本机 API 互不影响"那句 |
 | `apps/web/src/features/ai/RouteUnavailable.tsx` | — | "没有可用端点"时的原因解释 + 下一步 |
 | `apps/web/src/features/ai/route-explanation.ts` | 251 | 壳自己的路由解释（`resolveFeatureRoute()`），消费 `resolution.excluded` |
 | `apps/web/src/features/ai/ai-failure-copy.ts` | — | 失败原因码 → 界面词条 |
@@ -970,7 +980,7 @@ interface SecretStore { get(keyRef: string): Promise<string | undefined>; }
 | `check:ai-coverage` | 每个 `AiFeature` 从「实现 → 导出 → 路由声明 → 偏好声明 → 界面」端到端可达，**不许有豁免**；并断言托管 AI 仍被挡住 |
 | `check:ai-e2e` | 真 Chromium 跑用户旅程（假端点，不接真模型） |
 | `check:ai-quota` | 「300 次/月」只有一个数字源；托管 AI 额度未实现的状态被**显式声明**（ADR-0023） |
-| `check:ai-tools` | 内置 AI 工具路径：**写只能出现在 `confirmAiToolProposal()` 里且恰好一处**；无 op 构造、无网络调用、不 import `@heyta/op-log`（ADR-0035；已做 5 类故障注入） |
+| `check:ai-tools` | 内置 AI 工具路径 **7 条规则**：写只能出现在 `confirmAiToolProposal()` 里且恰好一处；无 op 构造、无网络调用、不 import `@heyta/op-log`（ADR-0035；已做 5 类故障注入）。规则 6 = W7 删掉的冗余前门（`runAiTool` / `grantedToolNames`）不许回来 + `describeRoutedFailure()` 定义点恰好一处（两条变异各自实测转红）；🔴 **规则 7 = 能力清单与上游一致**（跑 `gen-ai-capability-manifest.mjs --check`，不一致 exit 1）。⚠️ 它**没有**独立的 `check:ai-capability` 包脚本 —— 因为 `package.json` 此刻有别的会话的未提交改动，加脚本会带走它们；等该文件干净时抽成独立脚本（已登记） |
 | `check:layering` | `no-model-endpoint-in-apps`、`no-vendor-ai-sdk-in-apps`、`no-loopback-classification-in-apps` —— 拦 `apps/*` 直连模型端点、引入厂商 SDK、自己判回环 |
 | `check:licenses` | AI 调研发现一批**许可证地雷**（Nextcloud AI 全家桶 / Immich = AGPL-3.0；Piper 本体 = GPL-3.0）—— **一行代码都不能进** |
 | `check:ui-language` | 用户可见文案的中文规则 |
@@ -1004,6 +1014,16 @@ interface SecretStore { get(keyRef: string): Promise<string | undefined>; }
 18. 🔴 通知**不得有响应**；stdio 的 stdout 是协议专用
 19. 🔴 同一份业务语义只能有**一个实现 / 一个判据 / 一个文案来源**
 20. 🔴 `AiFeature` 不得加入可视化；甘特图与倒计时**不是 AI**
+21. 🔴 **多步循环的出境集合在循环开始前一次算完**（`planAssistantEgress(tier)`）；
+    某一步要发集合外的字段 ⇒ **停**，不是静默放行（[ADR-0045](../adr/0045-conversational-assistant-split-authorization-from-catalog.md)）
+22. 🔴 三个上界（步数 / 消息条数 / 单请求字节）**住在 `packages/ai`**，
+    且**发之前**判、吃的是真要发的那段 JSON；失败的工具调用**照样计入步数**（失败不许免费重试）
+23. 🔴 助手的档位默认 **`read-only`**（fail-closed）；它是**第二个授权前端**，
+    与入站 `localApi.grants` **共用 `isToolGranted()` 但各存各的**，两边互不改对方
+24. 🔴 日历锚点（「今天是 …」）只有**一个生产者**（`calendar-anchor.ts`），
+    且 `today` **必须在出境声明里** —— 注入进提示词的每一项都是出境数据
+25. 🔴 能力清单**只能生成、不许手写**（`scripts/gen-ai-capability-manifest.mjs`），
+    不一致由 `check:ai-tools` 规则 7 判红
 
 ---
 
@@ -1033,11 +1053,13 @@ interface SecretStore { get(keyRef: string): Promise<string | undefined>; }
 | 托管 AI / MaaS | 已定档（ADR-0020/0021：¥12/月 · 300 次/月 · `deepseek-flash`），但**本轮不实现**（ADR-0023）：服务本体端点 / 计量 / 收银台**都不存在**；保留策略未定案，`assertEnableable` 继续抛 `retention-undecided` |
 | AI-3 规划 | 有意推迟（需要真实数据） |
 | AI-4 复盘 | 受限分支，未开工 |
-| **AI 工具调用的 P3–P4** | P0–P2 已落地（[ADR-0035](../adr/0035-ai-tool-calling-reuses-local-api.md)）：规则选择 + 单步执行 + 模型线格式（`tool_calling` 能力已由 `'tool-calling'` 功能消费）+ 面板入口。**只读循环（P3）与需实体 id 的工具（P4）未开工**；托管路径的权益闸门（`capability:'ai'`）也因托管 AI 未实现而未接 |
-| 只读模式 | `grants` 已能表达，但**没有"只读预设"的 UI 引导**（逐工具开关已有） |
+| **AI 工具调用的 P4** | P0–P3 已落地：规则选择 + 单步执行 + 模型线格式 + 面板入口 + **多步读循环与末尾一次写提案**（[ADR-0045](../adr/0045-conversational-assistant-split-authorization-from-catalog.md)，Web 壳）。**需实体 id 的工具（P4）仍未开工** —— 单步入口下它结构性不可达，多步循环把"先查再改"变成可达了，但**目录里仍只有 6 个工具**（覆盖面 2/8 实体，见 `ai-assistant-closure.md` §7.2 第 3 条）；托管路径的权益闸门（`capability:'ai'`）也因托管 AI 未实现而未接 |
+| 只读模式 | `grants` 已能表达，助手侧有 `read-only` 档；**入站 MCP 那侧仍没有"只读预设"的 UI 引导**（逐工具开关已有） |
 | 调用审计 | 未做（考虑过"记录每次调用"，但那本身是一份新的敏感日志） |
 | 「回退披露必须写出整条链」 | ⚠️ 见 §15.3 |
-| `packages/ai` 的"两套实现" | `createProvider()`（单端点/测试/历史）与 `invokeRouted()`（生产）各自组装一次请求；共享 `authorizeEgress`，但"请求怎么拼、失败怎么分类"是两份（见 §4 的说明） |
+| ~~`packages/ai` 的"两套实现"~~ | ✅ **已收敛**（2026-10-03，W7）：`packages/ai/src/wire.ts` 一份线格式，`provider.ts` 与 `routing.ts` 各删自己那份。判据**不是** grep 计数，是 `packages/ai/tests/wire.spec.ts` 把两条路各自交给 `fetchImpl` 的 **url / headers / 原始 body 串逐字节比对**（变异：只给一条路的 `system` 加一个空格 ⇒ 恰好 1 红）。⚠️ 仍**不导出** `wire.ts`：线格式是包内接缝 |
+| 对话历史的持久化 | 🔲 **只活在组件内存里**，刷新即失（ADR-0045 的 D-4 未拍 ⇒ 没写"存哪儿"的代码）。已知代价：刷新丢上下文，而"新会话"按钮与它长得一样 |
+| 非 Web 壳的助手入口 | 🔲 移动端 / Electron / 原生壳**零 AI 入口**（本批只落 Web 壳） |
 | `check:layering` 的第 9 条 | 「`apps/*` 不得绕过 `LocalApiWritePort` 直接改状态」——现在加会是规定一个不存在的违规 |
 
 ### 15.3 未核实

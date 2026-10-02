@@ -1,11 +1,16 @@
 # AI 能力面补齐：从"连不上"到"能使唤"的落地工单
 
-> 状态：**规划中**（§1 三处待拍板未决 ⇒ W8 及之后不得开工；W1–W7 不依赖拍板，可直接进）
+> 状态：**W1–W4、W7–W9、W12 已落地；W5 / W10 / W11 未做**（逐条状态与"为什么没做"在 §7 那张表与 §7.2）。
+> 原稿那句"三处待拍板未决 ⇒ W8 及之后不得开工"**已过期**：D-1 / D-1a 由
+> [ADR-0045](../adr/0045-conversational-assistant-split-authorization-from-catalog.md) 拍定，D-2 在**助手这一侧**
+> 拍成"读 / 读+提议两档"（目录扩到几十个之后要重拍，见 §7.2 第 3 条）。D-3 仍未拍。
 > 证据基础：[`dida-ai-assistant-gap-analysis.md`](../research/dida-ai-assistant-gap-analysis.md)（2026-10-02 审计，
 > 缺口编号 `AI-G1…AI-G14` 全部在那份里取证，**本文不重复取证、只排工单**）
 > 定位纪律：AI 的**策略与顺序**仍以 [`ai-strategy.md`](ai-strategy.md) 为准 —— 本文只是它 §8 信任阶梯的
 > **执行拆解**，不是第二份策略。两者冲突时以 `ai-strategy.md` 为准并回来改本文。
-> 相关决策：[ADR-0005](../adr/0005-ai-data-path.md)（AI 不写 op + "不做聊天助手"禁令）、
+> 相关决策：[ADR-0045](../adr/0045-conversational-assistant-split-authorization-from-catalog.md)（**取代** ADR-0005 的
+> "不做聊天助手"与 ADR-0035 的"共用一份授权前端"，**保留**一份工具目录与"AI 产不出 op"）、
+> [ADR-0005](../adr/0005-ai-data-path.md)（AI 不写 op）、
 > [ADR-0035](../adr/0035-ai-tool-calling-reuses-local-api.md)（工具调用复用 local-api）、
 > [ADR-0010](../adr/0010-ai-config-routing.md)（三道闸与回退边界）、
 > [ADR-0013](../adr/0013-cloud-ai-and-maas.md) / [ADR-0023](../adr/0023-managed-ai-quota-not-implemented.md)（托管 AI 的开放条件）
@@ -385,17 +390,69 @@ W8 起**不是可回退的增量**：多步循环一旦放开，出境披露的�
 | 前置：D-1 / D-1a 的 ADR | ✅ 已提交 | `docs/adr/0045-…-from-catalog.md` | 死链检查过；取代关系逐条写明（含**保留**哪些既有条款） |
 | 前置：本审计 + 差距文档 | ✅ 已提交 | `docs/research/dida-ai-assistant-gap-analysis.md` + 旧审计 §8 勘误 | 六路只读审计；其中 **1 条撤回**（`AI-G13`）+ **1 条改判**（`AI-G4` 不是缺接线）都在文档本体里 |
 | W1 第 0 步（实测） | ✅ 已做完 | 结论进 ADR-0045 §4 与本文 W1 | 四探针实测，**推翻了 W1 原计划的修法**（状态码在 JS 侧不可见 ⇒ 不能加新失败原因） |
-| W1 第 1 层（诊断函数） | 🟡 已落盘，未提交 | `packages/ai/src/diagnose.ts` + `AiFailure.endpointUrl` + `routing.ts` 带出端点 | 复用 `supply.ts` 的 `isLoopbackEndpoint`，**没起第二份判断**。单测在写 |
-| W1 第 2 层（界面） | 🟡 进行中 | `ai-failure-copy.ts`（已改）+ 五个面板（接线中）+ i18n 3 键 ×2 语言（已落） | 五个调用点刻意改成**必填上下文对象**，让编译器强制逐个改到 —— 这是本文件 §"第 5 份副本没跟上"教训的直接应用 |
-| W1 第 3 层（手册） | ✅ 已落盘，未提交 | `docs/runbooks/ai-acceptance.md` §9 | 含三条**已实测通过**的 curl 阳性/阴性对照 |
-| 🔴 W1 根因级判据（假端点会拒绝来源） | ✅ 已落盘，未提交 | `e2e/stub-provider.mjs` 的 `STUB_ORIGIN_ALLOWLIST` | **已实测**：白名单内 200+回显来源+`Vary: Origin`；白名单外 **403 且零 CORS 头**；预检走同一闸门；**不设变量则逐字回归旧行为**（既有套件零影响）。闸门放在所有路由**之前**，否则 `/__requests` 会成侧门 |
-| W3 / W4 部分（`list.today` 错数据 + 日期参数） | 🟡 进行中 | `local-api/{mcp,server}.ts`、`ai-tool-selection.ts`、两个宿主实现 | 判据**换层**：从"断言 args"改成"断言结果集"，并专门钉"先过滤再 limit"（那是同一个 bug 的另一种面目） |
-| W4 其余（时间锚点注入四条链路 + 裸日规则） | ⛔ 未开始 | — | 见本文 W4 的改判说明 |
+| W1 第 1 层（诊断函数） | ✅ | `packages/ai/src/diagnose.ts` + `AiFailure.endpointUrl` + `routing.ts` 带出端点 | 复用 `supply.ts` 的 `isLoopbackEndpoint`，**没起第二份判断**；单测在 `packages/ai/tests` |
+| W1 第 2 层（界面） | ✅ | `ai-failure-copy.ts` + **六个**面板 + i18n 键 ×2 语言 | 五个调用点刻意改成**必填上下文对象**，让编译器强制逐个改到；`ai-failure-parity.spec.tsx` 从五条面板扩到**六条**（新增的 `AssistantPanel` 一进来就把一处 testid 漂移当场照红） |
+| W1 第 3 层（手册） | ✅ | `docs/runbooks/ai-acceptance.md` §9 | 含三条**已实测通过**的 curl 阳性/阴性对照 |
+| 🔴 W1 根因级判据（假端点会拒绝来源） | ✅ | `e2e/stub-provider.mjs` 的 `STUB_ORIGIN_ALLOWLIST` | **已实测**：白名单内 200+回显来源+`Vary: Origin`；白名单外 **403 且零 CORS 头**；预检走同一闸门；**不设变量则逐字回归旧行为**。闸门在所有路由**之前**，否则 `/__requests` 会成侧门 |
+| W3（`list.today` 错数据） | ✅ | `local-api/{tools,server}.ts` 的 `dueOn` / `dueFrom` / `dueTo` + `projectListForTool` | 判据**换层**：从"断言 args"改成"断言结果集"，并钉住"先过滤再 limit"（同一个 bug 的另一种面目）。🔴 **本轮由声明↔实现对照抓出一个真泄漏**：`list_tasks` 把整块 `body` 带进列表项，而列表投影本来就该剥掉它 —— 见 §7.1 与 §7.2 的陷阱登记 |
+| W4（日历锚点） | 🟡 **两条链路已接，三条刻意不接** | `packages/app-host/src/calendar-anchor.ts`（唯一生产者）+ `ai-capture.ts`（改为复用）+ `ai-assistant.ts`（系统提示带锚点，`today` 进出境声明） | `calendar-anchor.spec.ts` 13 条：五个时区 × 两个瞬间的**表驱动**（跨年 / 非 UTC / 夏令时两侧 / 半小时偏移）+ "锚点**一轮算一次**"（把 `Date.now` 换成"每读一次跨一天"的桩；变异：逐步重算 ⇒ 恰好 1 红）。**未做**的部分与理由见 §7.2 第 2 条 |
 | W2（live 脚本空转） | 🟡 **响亮失败已做完，归位未做** | `scripts/lib/live-provider-config.mjs`（新增，四个脚本共用）+ 四个 `verify-ai-*-live` + `journey-ai-memory` 的跳过自检 | 缺配置 **exit 2**、坏 JSON **exit 1**、`--skip` 才回 0；五条臂全部实跑取证。**没有**搬别人的凭据文件，**没有**翻转 spec 的默认（理由见本文 W2「未做」三条） |
-| W5 / W6 / W7 | ⛔ 未开始 | — | W6 已撤销；W7 **必须在 W8 之前** |
-| W8–W14 | ⛔ 未开始 | — | W8+ 依赖的 D-1/D-1a 已由 ADR-0045 拍定，**阻塞已解除**；D-2（授权粒度）与 D-3（`EVENT` 同批）仍未拍 |
+| W5（工具调用面板的真浏览器用例） | ⛔ **未做**（编号不回收） | — | `e2e/tests/` 里 `AiToolRun` 只出现在 `ai-row-layout.spec.ts`（布局判据），没有"一句话 → 真调工具 → 结果卡片"那条旅程。⚠️ 别把 W12 那条 `ai-assistant.spec.ts` 当成它：那是**另一个入口**（多步循环），单步面板依旧没有浏览器证据 |
+| ~~W6~~ | ⛔ 已撤销 | — | `AI-G13` 被证伪（编号不回收） |
+| W7（结构债） | ✅ | 见本文 W7 的"✅ 2026-10-03 做完了"那节 | 冗余前门删除 + 请求组装收成一个 + `describeRoutedFailure()` 定义点恰好一处，全部由 `check-ai-tools.mjs` 规则 6 钉住（**已注入验证会红**） |
+| W8（多步循环 + 一次性并集披露 + 硬上界） | ✅ | `ai-assistant.ts`（循环 / 档位 / 并集 / 计划）+ `packages/ai/src/assistant-limits.ts`（三个上界住在这里，不在 app-host） | `packages/app-host/tests/ai-assistant.spec.ts` 20 条：第二次请求带 `role:'tool'` 的观察、失败也回送且**仍计入步数**、写只出提案（`host.submits === 0`）、提案后**没有第二次调用**、越界字段 ⇒ 停而不是放行。`assistant-limits.spec.ts` 13 条：单位是**字节**、边界取 `>` 不取 `>=`、标签由常量推导 |
+| W9（能力清单生成器） | ✅ | `scripts/gen-ai-capability-manifest.mjs` → `packages/ai/src/capability-manifest.generated.ts`（424 行，生成物） | 手写**不可能**：清单是产物。`--check` 已作为**规则 7 接进 `check:ai-tools`**（不一致 exit 1），`capability-manifest.spec.ts` 29 条钉形状 |
+| W10（扩工具目录 + "覆盖面"门禁） | ⛔ 未做 | — | 目录仍是 6 个工具（读 3 / 写 3），覆盖面 **2/8** 实体；`EntityModelMap` 每个实体必须有工具的那道门禁**还没写** —— 见 §7.2 第 3 条 |
+| W11（批量写入） | ⛔ 未做 | — | 按本文要求：**先论证**与 AGENTS §3.4 的关系，论证不成立就不做 |
+| W12（chat 外壳） | ✅ | `apps/web/src/features/ai/AssistantPanel.tsx` + `App.tsx`（任务视图内）+ i18n 37 键 ×2 语言 | 单测 19 条（`ai-assistant-panel.spec.tsx`，含"第一次点发送 ⇒ 一个请求都没发"）；**真浏览器** `e2e/tests/ai-assistant.spec.ts` 一条旅程 + **四张**截图（含暗色那张），人已逐张看过。档位选择器在设置里（`ai-assistant-tier.spec.tsx` 14 条） |
+| D-2（授权粒度） | ✅ **已拍并落地**（助手侧） | `apps/web/src/features/settings/{aiStore,AiSettings}.tsx` 的 `assistantTier` | 拍的是**助手这一侧**：读 / 读+提议两档，与入站 MCP 的**逐工具默认关**解耦但共用 `isToolGranted()`。双向不越界已在真浏览器里验（`ai-assistant.spec.ts` 第 7 步）。⚠️ 目录扩到几十个之后仍需重拍（见 §7.2 第 3 条） |
+| D-3（`EVENT` 与 AI 工具同批） | ⛔ 仍未拍 | — | 倒数日尚未立项到可开工的程度（`docs/plans/countdown-anniversary.md` 的 D1/D2/D3 也未拍） |
 
-### 7.1 一条必须记住的提交纪律
+### 7.1 🔴 本轮抓到的一个真缺陷（不是重构的副产品）
+
+**`list_tasks` 在列表里带整块 `body`。** 发现方式不是读代码，是新加的那道
+**声明 ↔ 实现**对照：披露集合从目录的 `egressFields` 算，而实际发出去的键从
+真 `runReadTool` 的产物里收，两边一比就红。修法是把列表投影**白名单重建**
+（`projectListForTool`），而不是往声明里补一项 —— 因为"列表里带正文"本身
+就不是这个工具该给的东西（详情工具 `get_task` 才给）。
+
+📌 一般规律：**给出境字段加一道"声明必须覆盖实际发出的键"的对照，
+它的价值不在于拦住未来，而在于照出已经漏了的现在。**
+
+### 7.2 没做完的，各自写明为什么
+
+1. **W5**：`AiToolRun` 单步面板仍没有真浏览器旅程。它现在被 W12 的多步入口
+   比下去了，但"没做"不等于"不需要"——补它的人请从 `e2e/tests/helpers.ts`
+   的 `configureEndpoint` + `waitForStubCalls` 起步，别新搭一套夹具。
+2. **W4 的三条链路（拆解 / 排序 / 估时）与"裸日规则"刻意没做**，理由不是省事：
+   - 给那三条加锚点 = **把 `today` 这项新数据第一次送出境**。那不是"补一致"，
+     是一次出境面扩大，按 ADR-0010 的口径该单独拍一次；
+   - 那三条**没有日期语义**（估"写周报"要多久、把一堆任务排序，都不需要知道今天）；
+   - "14 号"这种**裸日**规则有实打实的误伤面："买 5 号电池"、"37 号楼"
+     都会被吃成到期日。规则内核自己的立场是"宁可让用户看见词还留在标题里"，
+     所以它需要的是一个**产品决定**（要不要接受这类误伤），不是一个待写的正则。
+3. **W10 的覆盖面门禁没写**，因此"AI 覆盖面 = 界面功能面"目前**只是主张**。
+   现状数字：工具目录 6（读 3 / 写 3），实体 8 个里只覆盖 **2 个**，
+   未覆盖 `TAG / NOTE / HABIT / HABIT_LOG / FOCUS_SESSION / REMINDER`。
+   生成器已经把这份差距**印在产物里**（`--check` 会报覆盖面），
+   所以它不会悄悄扩大 —— 但"必须补齐"这件事还没有任何一层会红。
+4. **另外四条已登记的缺口**（都不阻塞使用，但别读成"已做"）：
+   - **循环里没有"规则先跑、命中即零出境"的短路**。单步面板有
+     （`ai-tool-call.ts`：规则命中直接执行，一次请求都不发），助手的多步循环**没有** ——
+     因为一句自然语言在 loop 里可能同时要"查 + 改"，规则层认不出组合意图。
+     代价是：即使用户说的正是"列出所有任务"这种规则能答的话，也照样出境一次。
+     方向是**保守的**（多出境而不是少出境被静默放过），但它是 §5 第 3 条
+     "规则优先"立场在助手侧的一处**未收口**。
+   - **会话历史只在组件内存里**，刷新即失（ADR-0045 的 D-4 未拍）。
+     已知代价：刷新丢上下文，而「新会话」按钮与它长得一模一样。
+   - **档位只存在于 Web 壳**（`apps/web` 的 `aiStore`）。其他壳零 AI 入口，
+     所以这不是"漏配"，是"还没有那个界面"。
+   - **`check:ai-capability` 还没有自己的包脚本**：能力清单的 `--check` 目前挂在
+     `check-ai-tools.mjs` 的规则 7 上（`pnpm check` 会跑到）。之所以不新开一个
+     `package.json` 脚本，是因为该文件此刻有**别的会话的未提交改动**，
+     加脚本会把它们一起带走。等它干净时抽成独立判据。
+
+### 7.3 一条必须记住的提交纪律
 
 本仓库的工作树是**并行**的：`git status` 里同时存在别的会话 staged 的
 `server/src/auth.ts`、`package.json`、`pnpm-lock.yaml`，以及未提交的
