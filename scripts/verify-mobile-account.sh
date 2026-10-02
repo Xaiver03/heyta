@@ -83,7 +83,7 @@ for i in 1 2 3; do
   if in_foreground; then LAUNCHED=1; break; fi
 done
 if [ "$LAUNCHED" = "0" ]; then
-  bad "三次启动都没到前台（模拟器状态？）"; summary "移动端账号安全"; exit 1
+  bad "三次启动都没到前台（模拟器状态？）"; summary "移动端账号安全" "" 1
 fi
 # 同意面板：改密与同步都要联网，选「同意并联网」。
 WAITED=0
@@ -108,7 +108,7 @@ TOKEN=$(echo "$RESP" | python3 -c "import json,sys; print(json.load(sys.stdin).g
 if [ -n "$TOKEN" ]; then
   ok "账号已建（已知密码 ${OLD_PASS}，token 已取得）"
 else
-  bad "create-user 没走通：$RESP"; summary "移动端账号安全"; exit 1
+  bad "create-user 没走通：$RESP"; summary "移动端账号安全" "" 1
 fi
 
 step "2. 配置 app 凭据（用测试账号的令牌）"

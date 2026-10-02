@@ -164,9 +164,9 @@ case "$LEGAL_CODE" in
        echo "      判据④ 必然假红。请重建并从当前 dist 重启验收服务端：" >&2
        echo "        pnpm --filter @heyta/server build && PORT=<端口> scripts/mobile-e2e-up.sh" >&2
        echo "      （库还要跟上迁移：cd server && sh scripts/migrate-deploy.sh）" >&2
-       summary "移动端备份还原"; exit 3 ;;
+       summary "移动端备份还原" "" 3 ;;
   *) echo "   ❌ 服务端不可达或异常（legal-consent = ${LEGAL_CODE}）" >&2
-     summary "移动端备份还原"; exit 3 ;;
+     summary "移动端备份还原" "" 3 ;;
 esac
 RESP=$(curl -s -X POST "$HOST_SERVER/api/test/create-user" \
   -H 'content-type: application/json' \
@@ -176,7 +176,7 @@ RUSERID=$(echo "$RESP" | python3 -c "import json,sys; print(json.load(sys.stdin)
 if [ -n "$TOKEN" ] && [ -n "$RUSERID" ]; then
   ok "账号已建（userId=${RUSERID}）"
 else
-  bad "create-user 没走通：$RESP"; summary "移动端备份还原"; exit 1
+  bad "create-user 没走通：$RESP"; summary "移动端备份还原" "" 1
 fi
 
 step "2. web 端真导出（真浏览器 + 真服务端 → 备份 JSON）"
@@ -188,7 +188,7 @@ SERVER_URL="$SERVER" bash /tmp/run-webexport.sh "$EMAIL" "$RPASS" "$TOKEN" "$BAC
 if [ -f "$BACKUP_JSON" ] && grep -q "formatVersion" "$BACKUP_JSON"; then
   ok "web 导出成功（$(wc -c < "$BACKUP_JSON" | tr -d ' ') 字节）"
 else
-  bad "web 导出失败："; tail -5 /tmp/webexport.log; summary "移动端备份还原"; exit 1
+  bad "web 导出失败："; tail -5 /tmp/webexport.log; summary "移动端备份还原" "" 1
 fi
 # 截断版（判据②的后半）：取前 1/3 字节 —— 就是"下载没下完"的形状。
 HEAD_BYTES=$(($(wc -c < "$BACKUP_JSON" | tr -d ' ') / 3))
