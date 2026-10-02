@@ -1489,6 +1489,57 @@ uiautomator 的 bounds **会被父容器视口裁** —— 被折叠线切掉的
   当场把它的附着点抽掉。
   📌 三条都属"环境"，不是产品故障，也都不由我解决 —— 由**谁先收工**决定，
   下一轮带 `--only windows` / `--only android,ios` 在隔离检出里跑即可。
+
+  ✅ **上面那段"三端没跑"已被 19:18–19:35 那一跑部分推翻（android + ios 两端已跑，windows 仍未跑）**。
+  19:14 重取现场：`pgrep -x xcodebuild` = 0、`ps | grep -F 'adb -s emulator'` = 0
+  ⇒ 移动端两端的前端空了，就在**新拉的隔离检出** `/tmp/heyta-g5m`（detached HEAD `6a5f03c8`）里跑
+  `--only android,ios`。四步 exit 全 0：`pnpm install` → `pod install` → 前置 `pnpm -r build` ✅ → 两段。
+  逐端判据（脚本自己打的，不是我另算的）：
+
+  | 端 | 判据原文 | 图 |
+  |---|---|---|
+  | android | `✅ release APK 已重打（63M）`、`✅ 模拟器 emulator-5554 全新安装成功`、`✅ 截图 1080x2400、内容占比 55.3%、主蓝命中 4036 —— 是共享 UI` | `apps/mobile/evidence/reinstall-20261002-1932-android-consent.png`（md5 `a7bf2f39…`） |
+  | ios | `✅ 构建成功`、`✅ 已安装进模拟器（全新安装）`、`✅ 已装的包比源码新`、`✅ 截图 1398x2034、内容占比 51.6%、主蓝命中 5355 —— 是共享 UI` | `apps/mobile/evidence/reinstall-20261002-1932-ios-consent.png`（md5 `3b1782b5…`） |
+
+  两张图**人都看过**：都是全新安装后的首启**联网同意浮层**（浅色，中英混排正常，无凭据、无令牌）。
+
+  🔴 **但这一跑把两端判据的覆盖面照出来了，它和 §7 第 82 条是同一类**：全新安装后
+  的第一屏是同意门，所以"非空白 + 数得出主蓝"这两条**打在一张同意浮层上就能过** ——
+  它证明的是"装上了当前产物且共享 UI 起得来"，**不证明任务列表画对了**。
+  而这一轮恰恰需要后者：`c1b72261` 动的是**共享** `packages/ui/src/task-list/TaskRow.tsx`
+  （`styles.body` 的 `minWidth:'30%'`），它落在另一条会话 09:56 那次四端重装**之后**
+  （`git log 237d6403..6a5f03c8 -- apps/mobile packages/ui` = 4 笔，含这一笔），
+  所以"移动端有没有被共享行改动带坏"目前只有**源码论证**（RN 上该属性惰性、
+  `flexWrap` 那半边在 `apps/web` 根本到不了移动端），**没有真机行级像素**。
+  行级像素这一轮**没拿**，理由不是懒：19:41 起 `scripts/verify-mobile-account.sh`
+  （账号 `acct-e2e-194043@test.local`）正在这台 `emulator-5554` 上跑，
+  且本机 loadavg 一度 **250–537**（含我这一跑的 gradle + xcodebuild）⇒ 再点下去是拆别人现场。
+
+  🔴 **同轮自报一条我自己造成的干扰**（写给那条会话，别把它当产品红）：19:41 我往
+  `emulator-5554` 发过一次 `input tap 770 1682`（本意是把同意门按到「只用本机」好取行级像素），
+  而那一刻他们的脚本正停在"0. 装包并启动"；随后两条 `adb` 调用超时是**负载**造成的，不是模拟器卡死
+  （`adb devices` 应答正常、`getprop` 在 load 250 下 15 秒不返回）。发现现场有人在跑之后立刻停手。
+
+  🔴 **第 6 个"门禁绿 ≠ 能打包"实例，机制与第 4、5 个不同**：`reinstall-all.sh` 的 ios 段
+  直接 `xcodebuild -workspace "$ROOT/apps/mobile/ios/Heyta.xcworkspace"`（`:311`），
+  而 `ios/Pods/` 与 `ios/*.xcworkspace/` **都被 gitignore**
+  （`apps/mobile/.gitignore:29`、`:39`，实测 `git check-ignore -v` 命中）⇒
+  **干净检出里那个 workspace 根本不存在**，ios 段必红，而脚本里**没有任何一步生成它**。
+  本轮是我手工先跑 `pod install`（exit 0）才跑通的。修法应当是脚本里加一步
+  （缺 `Pods`/workspace 就 `pod install`，或响亮失败），**但没有顺手改**：
+  `scripts/reinstall-all.sh` 此刻正被另一条会话改写（`git diff -U0` 实测未暂存 hunk
+  在文件头 `@@ -1,0 +2,18 @@`，那段 `HEYTA-SNAPSHOT-BOOTSTRAP`），改它就是替他们半成品接管。
+  ⚠️ 另注：`@heyta/mobile` 的 `pods` 脚本写的是 `bundle exec pod install`，而仓库里**没有 Gemfile**
+  （实测 `ls apps/mobile/Gemfile*` 无匹配）⇒ 那条脚本在本机不可用，只能直接 `pod install`。
+
+  ⏭ **windows 仍未跑，而且拦路的理由比 18:57 那条更准确了**：那条隧道**不是 heyta 的** ——
+  仓库里 `grep -rn 9404 scripts e2e apps` 命中 **0 处**，两个活跃 CDP 客户端
+  （`node cdp-capture2.js`、`node /tmp/sd2000/cdp-record.js`）的 cwd 都在 `/private/tmp/sd2000`。
+  但结论不变：`lsof -nP -iTCP:9404` 有 **2 条 ESTABLISHED**，而那条转发的正是
+  `windows-pc` 这台**同一台物理机**，windows 段要在这台机上 `dotnet publish` +
+  `Remove-AppxPackage`/`Add-AppxPackage` ⇒ 会掀掉对方正在看的东西。
+  📌 探针教训（已入用户记忆）：**按 ssh 主机别名 grep 进程**会把别的项目的隧道算成"本条线在用"，
+  也会把"隧道活着"读成"隧道断了"（`grep 'ssh -N -L'` 结构上匹配不到带 `-o` 的真实命令行）。
 - **G6 · `@heyta/ui` 的 typecheck 存量红**：`pnpm -r typecheck` 只在
   `packages/ui/tests/auth-model.spec.ts:79` 与 `:331` 两处失败，两行与 HEAD **逐字节相同**
   （属另一条会话在飞的 `packages/ui/src/auth/model.ts`）。⇒ 提交 `1d485786` 信息里写的
