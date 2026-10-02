@@ -543,15 +543,21 @@ tap_label() {  # <标签>
 # 正确做法是让软键盘根本不出现：`input text` 是把按键事件**直接注入 InputManager** 的，
 # 只要有焦点视图就生效，**不需要 IME 可见**。所以整个验收期间把 IME 关掉，
 # 结束时再打开（`trap` 保证异常退出也会恢复）。
-IMES=$($ADB shell ime list -s 2>/dev/null | tr -d '\r' | grep -v '^$')
+# 🔴 探针必须带超时（traps #114，2026-10-02 实测）：模拟器 adbd 挂死时
+#    `adb shell` 会**无限挂**，而这条在 **source 期**执行 —— 一台卡住的
+#    Android 模拟器能把所有 source 这份 lib 的验收（**包括 iOS 那份**）
+#    都钉死在 0 输出，症状完全不像"模拟器坏了"。超时 ⇒ IMES 为空 ⇒
+#    下面的 disable/restore 对空集是无操作，不放大伤害。
+ADB_TIMEOUT_CMD="$(command -v timeout >/dev/null 2>&1 && echo 'timeout 10' || true)"
+IMES=$(${ADB_TIMEOUT_CMD} $ADB shell ime list -s 2>/dev/null | tr -d '\r' | grep -v '^$')
 disable_ime() {
-  for ime in $IMES; do $ADB shell ime disable "$ime" >/dev/null 2>&1; done
+  for ime in $IMES; do ${ADB_TIMEOUT_CMD} $ADB shell ime disable "$ime" >/dev/null 2>&1; done
   # AVD 带硬件键盘（hw.keyboard=yes），这条让软键盘不再弹出
-  $ADB shell settings put secure show_ime_with_hard_keyboard 0 >/dev/null 2>&1
+  ${ADB_TIMEOUT_CMD} $ADB shell settings put secure show_ime_with_hard_keyboard 0 >/dev/null 2>&1
 }
 restore_ime() {
-  for ime in $IMES; do $ADB shell ime enable "$ime" >/dev/null 2>&1; done
-  $ADB shell settings put secure show_ime_with_hard_keyboard 1 >/dev/null 2>&1
+  for ime in $IMES; do ${ADB_TIMEOUT_CMD} $ADB shell ime enable "$ime" >/dev/null 2>&1; done
+  ${ADB_TIMEOUT_CMD} $ADB shell settings put secure show_ime_with_hard_keyboard 1 >/dev/null 2>&1
 }
 trap restore_ime EXIT
 
