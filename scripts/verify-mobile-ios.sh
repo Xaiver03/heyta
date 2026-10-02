@@ -111,7 +111,12 @@ else
     exit 1
   fi
 fi
-LAPTOP_DB=/tmp/heyta-ios-laptop.sqlite
+# 🔴 可覆盖（traps #116 一族：多会话共享 /tmp 与模拟器会把彼此的验收搅黄）：
+#    HEYTA_IOS_LAPTOP_DB / HEYTA_IOS_DERIVED / HEYTA_IOS_BUILD_LOG。
+#    默认值保持旧路径 —— 单会话行为不变。
+LAPTOP_DB="${HEYTA_IOS_LAPTOP_DB:-/tmp/heyta-ios-laptop.sqlite}"
+HEYTA_IOS_DERIVED="${HEYTA_IOS_DERIVED:-/tmp/heyta-ios-release}"
+HEYTA_IOS_BUILD_LOG="${HEYTA_IOS_BUILD_LOG:-/tmp/heyta-ios-build.log}"
 # 标题带上时间戳：断言必须钉在**这一次**写的那条上，不能靠"列表里有这么一条"。
 TITLE="iOS输入验收$(date +%m%d%H%M%S)"
 
@@ -384,7 +389,7 @@ step "0. 前置条件"
 #
 # ⇒ 默认**构建 + 安装**。`HEYTA_IOS_SKIP_BUILD=1` 可以跳过（改脚本本身时用），
 #    但那时仍然会**断言产物比源码新** —— 旧产物要么被重建，要么**响亮地失败**。
-IOS_APP_DIR="/tmp/heyta-ios-release/Build/Products/Release-iphonesimulator/Heyta.app"
+IOS_APP_DIR="$HEYTA_IOS_DERIVED/Build/Products/Release-iphonesimulator/Heyta.app"
 
 # 源码的最新修改时间（只扫会进 bundle 的地方：宿主 src + 四个共享包 src）
 # ⚠️ **不要写 `-newer /dev/null`。** 第一版那么写，而它在 macOS 上**匹配不到任何文件**：
@@ -407,12 +412,12 @@ else
   echo "   正在构建 Release 版（会重新打 JS bundle，数分钟）…"
   if xcodebuild -workspace "$HEYTA_REPO_ROOT/apps/mobile/ios/Heyta.xcworkspace" \
       -scheme Heyta -configuration Release -sdk iphonesimulator \
-      -destination "id=$UDID" -derivedDataPath /tmp/heyta-ios-release build \
-      >/tmp/heyta-ios-build.log 2>&1; then
-    ok "xcodebuild Release 构建成功（日志 /tmp/heyta-ios-build.log）"
+      -destination "id=$UDID" -derivedDataPath "$HEYTA_IOS_DERIVED" build \
+      >"$HEYTA_IOS_BUILD_LOG" 2>&1; then
+    ok "xcodebuild Release 构建成功（日志 ${HEYTA_IOS_BUILD_LOG}）"
   else
-    bad "xcodebuild 失败 —— 先看 /tmp/heyta-ios-build.log（末尾 20 行）"
-    tail -20 /tmp/heyta-ios-build.log | sed 's/^/     /'
+    bad "xcodebuild 失败 —— 先看 ${HEYTA_IOS_BUILD_LOG}（末尾 20 行）"
+    tail -20 $HEYTA_IOS_BUILD_LOG | sed 's/^/     /'
     summary "iOS 输入侧"
   fi
   if [ -d "$IOS_APP_DIR" ]; then
