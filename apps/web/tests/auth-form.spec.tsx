@@ -819,4 +819,38 @@ describe('F 状态与错误落点', () => {
     expect(texts(el)).toContain('已泄露');
     expect(inputOf(el, 'auth-form-password').getAttribute('aria-invalid')).toBe('true');
   });
+
+  /**
+   * 🔴 服务端**指到**口令框 ≠ 那一格**空着**。
+   *
+   * 实测到的缺陷（2026-10-02 `password-web-journey` 那一轮的第 2 张截图，
+   * 人眼复核时看到的 —— **那张图没有入库**：它把口令框拍成了明文可见态。
+   * 所以这条用例就是这件事在本仓库里唯一的持久记录）：
+   * 注册被口令策略拒绝、`status.field` 指着口令框，
+   * 而框下印的是「还没有填密码。」—— 那一格明明填着东西。
+   *
+   * 两句各有各的来源，共用一个布尔就说谎：
+   *   · `labels.localErrors.*` 只回答**本地校验**的"这一栏你没填"；
+   *   · 服务端指字段时，界面上唯一的句子是 `status.message`（策略那一条具体的话）。
+   * 所以 caption 的守卫看 `localField`，红框的守卫看"谁指了字段" —— 两个问题不同。
+   */
+  it('服务端把错误指到口令框时**不**补一句"还没有填密码。"', () => {
+    const el = renderCredential({
+      status: { tone: 'error', message: t('common.auth.policy.breached'), field: 'password' },
+    });
+    // 真的把口令打进去：截图里那一格不是空的，这才是当时的形态。
+    typeIn(el, 'auth-form-password', 'Str0ng!Passw0rd');
+    expect(texts(el)).toContain('已泄露');
+    expect(texts(el)).not.toContain(LABELS.localErrors.password);
+    // 反向也不放行：字段仍然要标红（WCAG SC 3.3.1 "看得见"那一半还在）。
+    expect(inputOf(el, 'auth-form-password').getAttribute('aria-invalid')).toBe('true');
+  });
+
+  /** 上一条的**阳性对照**：caption 不是永远不出现 —— 本地真的没填时必须出现。 */
+  it('本地校验（口令真的没填）时这句话**照旧**出现', () => {
+    const el = renderCredential();
+    press(el, 'auth-form-submit');
+    expect(texts(el)).toContain(LABELS.localErrors.password);
+    expect(inputOf(el, 'auth-form-password').getAttribute('aria-invalid')).toBe('true');
+  });
 });
