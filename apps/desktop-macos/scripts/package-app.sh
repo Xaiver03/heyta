@@ -52,7 +52,12 @@ echo "  可执行：$BIN ($(stat -f%z "$BIN") 字节)"
 
 # bridge bundle 必须在 .app 里，否则壳起来了但业务逻辑是空的
 BUNDLE="$REPO/packages/app-host/bridge-bundle/native-bridge.js"
-[ -f "$BUNDLE" ] || { echo "🔴 缺少 bridge bundle：${BUNDLE}（先跑 packages/app-host/scripts/build-native-bridge.mjs）"; exit 1; }
+# 🔴 与上面 sync-tokens 同一族：`bridge-bundle/` 已 gitignore（根 `.gitignore:131`），
+#    此前**只有三条壳门禁**会跑这个生成器，打包脚本只检查存在并"报一句让你自己去跑"。
+#    于是干净检出上 `pnpm reinstall:all` 必然停在这里 —— 打包路径要自己把输入备齐，
+#    复用的是同一个生成器（不另写一份），下面那条存在检查保留为**断言**。
+node "$REPO/packages/app-host/scripts/build-native-bridge.mjs" || { echo "🔴 生成 bridge bundle 失败"; exit 1; }
+[ -f "$BUNDLE" ] || { echo "🔴 生成器跑完了但产物不存在：${BUNDLE}"; exit 1; }
 
 # 🔴 共享 UI 产物必须打进 .app 的 **Contents/Resources/web-dist/**
 #    （HeytaMacApp.swift 的 webRoot 解析：环境变量优先，否则就是这里）。
