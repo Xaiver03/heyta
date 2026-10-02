@@ -16,3 +16,15 @@
 
 # 三张没有面板的状态图逐字节相同（md5 已核）：after-confirm-zh.png 与 clear-no-panel.png（原本还有一张 after-defer.png，已删——同一张图当三条证据是凑数）。
 # 这正是这一支的结论所在：闸门拦与放**在界面上看不出差别**，所以判据只能落在请求计数与 localStorage 上（见 spec 文件头）。
+
+# ── 2026-10-02 追加：判据改成"只数应用自己那条 WS"之后，两套配置各实跑一遍 ──
+# 上面那份是第一版（未过滤）在专用配置（生产构建 + 4323）下的输出。
+# 未过滤版在主配置（vite dev + 4318）下的实测复现：把 HEAD 那份 spec 复制成独立文件单跑
+#   → 1 failed / 5 passed，exit 1
+#   → expect(sockets).toEqual([]) received ["ws://127.0.0.1:4318/?token=qJkcZ2Lb_-lX"]（Vite 的 HMR）
+# 过滤后（提交 830261f2）：
+#   主配置      → 6 passed (13.9s)，exit 0
+#   专用配置    → 6 passed (10.7s)，exit 0，且控制台里看得见应用自己那两条握手尝试：
+#     WebSocket connection to 'ws://127.0.0.1:4323/api/sync/ws?token=E2E-TOKEN-123&clientId=…' failed: … 200
+#   ⇒ "补签完成后实时通道当场重开"这句现在有一条**应用自己的**出站握手作为实物，
+#     不再是"数到一条就算"的恒真对照。
