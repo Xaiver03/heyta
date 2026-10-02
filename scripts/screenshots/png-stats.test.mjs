@@ -103,7 +103,7 @@ test('索引色 PNG 能正确解出调色板颜色', { skip: !hasMagick }, () =>
 test('与 magick identify 交叉验证：真实文件的尺寸与色彩类型', { skip: !hasMagick }, () => {
   const candidates = [
     // 本仓库自己生成的 App 图标
-    join(process.cwd(), 'apps/mobile/ios/HeytaMobile/Images.xcassets/AppIcon.appiconset/icon-1024.png'),
+    join(process.cwd(), 'apps/mobile/ios/Heyta/Images.xcassets/AppIcon.appiconset/icon-1024.png'),
     // SSOS 的真实产品截图（异库样本，证明解析器不是只对本仓库的文件成立）
     join(
       process.env.HOME,

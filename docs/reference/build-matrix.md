@@ -338,7 +338,7 @@ pnpm --filter @heyta/mobile run build:android:bundle   # Release AAB（上架用
 | 项 | 值 |
 |---|---|
 | 构建环境 | **仅本地 Mac**（iOS 构建必须 macOS + Xcode） |
-| 产物 | `apps/mobile/ios/build/Build/Products/Release-iphonesimulator/HeytaMobile.app` |
+| 产物 | `apps/mobile/ios/build/Build/Products/Release-iphonesimulator/Heyta.app` |
 | 状态 | ✅ 模拟器构建到交互级 |
 
 ### 3.1 工具链要求
@@ -454,7 +454,7 @@ pnpm build:ios                     # Release, iphonesimulator
 |---|---|---|---|---|
 | Android (Mac) | Mac | `pnpm build:android` | `app-release.apk` | ✅ 实机 |
 | Android (Windows) | Windows 打包机 | `pnpm build:android[:debug]` | `app-release.apk` / `app-debug.apk` | ✅ 两个变体实测 |
-| iOS | 仅 Mac | `pnpm build:ios` | `HeytaMobile.app` | ✅ 模拟器 |
+| iOS | 仅 Mac | `pnpm build:ios` | `Heyta.app` | ✅ 模拟器 |
 | Windows 桌面 | Windows | — | — | 🔲 选型未定 |
 | macOS 桌面 | Mac | — | — | 🔲 未规划 |
 | Linux 桌面 | Linux | — | — | 🔲 未规划 |

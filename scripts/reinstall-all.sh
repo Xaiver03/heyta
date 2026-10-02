@@ -290,12 +290,12 @@ if printf '%s' "$WANT" | grep -q "ios"; then
     xcrun simctl uninstall "$UDID" "$BID" >/dev/null 2>&1 || true
     rm -rf /tmp/heyta-ios-release
     echo "  正在 xcodebuild Release（重打 JS bundle，数分钟）…"
-    if xcodebuild -workspace "$ROOT/apps/mobile/ios/HeytaMobile.xcworkspace" \
-        -scheme HeytaMobile -configuration Release -sdk iphonesimulator \
+    if xcodebuild -workspace "$ROOT/apps/mobile/ios/Heyta.xcworkspace" \
+        -scheme Heyta -configuration Release -sdk iphonesimulator \
         -destination "id=$UDID" -derivedDataPath /tmp/heyta-ios-release build \
         >/tmp/heyta-reinstall-ios-build.log 2>&1; then
       echo "  ✅ 构建成功（日志 /tmp/heyta-reinstall-ios-build.log）"
-      IOS_APP_DIR="/tmp/heyta-ios-release/Build/Products/Release-iphonesimulator/HeytaMobile.app"
+      IOS_APP_DIR="/tmp/heyta-ios-release/Build/Products/Release-iphonesimulator/Heyta.app"
       if xcrun simctl install "$UDID" "$IOS_APP_DIR" >/dev/null 2>&1; then
         echo "  ✅ 已安装进模拟器（全新安装）"
         # 🔴 新鲜度判据（沿用 verify-mobile-ios.sh 那次事故的产物）：

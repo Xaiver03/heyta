@@ -17,7 +17,7 @@
                BlueprintIdentifier = "C0348E846786D05187027EC1"
                BuildableName = "HeytaWidgetExtension.appex"
                BlueprintName = "HeytaWidgetExtension"
-               ReferencedContainer = "container:HeytaMobile.xcodeproj">
+               ReferencedContainer = "container:Heyta.xcodeproj">
             </BuildableReference>
          </BuildActionEntry>
       </BuildActionEntries>
@@ -33,7 +33,7 @@
             BlueprintIdentifier = "C0348E846786D05187027EC1"
             BuildableName = "HeytaWidgetExtension.appex"
             BlueprintName = "HeytaWidgetExtension"
-            ReferencedContainer = "container:HeytaMobile.xcodeproj">
+            ReferencedContainer = "container:Heyta.xcodeproj">
          </BuildableReference>
       </MacroExpansion>
       <Testables>
@@ -56,7 +56,7 @@
             BlueprintIdentifier = "C0348E846786D05187027EC1"
             BuildableName = "HeytaWidgetExtension.appex"
             BlueprintName = "HeytaWidgetExtension"
-            ReferencedContainer = "container:HeytaMobile.xcodeproj">
+            ReferencedContainer = "container:Heyta.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
    </LaunchAction>
@@ -73,7 +73,7 @@
             BlueprintIdentifier = "C0348E846786D05187027EC1"
             BuildableName = "HeytaWidgetExtension.appex"
             BlueprintName = "HeytaWidgetExtension"
-            ReferencedContainer = "container:HeytaMobile.xcodeproj">
+            ReferencedContainer = "container:Heyta.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
    </ProfileAction>

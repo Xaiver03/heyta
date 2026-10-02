@@ -18,7 +18,7 @@
 # **依然成功**，而且用一个**只绑在 `192.168.1.5:3100` 上的监听器**抓到请求：
 #
 #     GET /api/sync/ops?...  client=192.168.1.5:65102  host_header=192.168.1.5:3100
-#                            ua=HeytaMobile/1 CFNetwork/3860.600.12 Darwin
+#                            ua=Heyta/1 CFNetwork/3860.600.12 Darwin
 #
 # 即：**私有 IP 字面量的明文 HTTP 本来就不受 ATS 拦**，与 `NSAllowsLocalNetworking` 取值无关。
 # 那个键对"用 `.local` / link-local 主机名"的场景可能仍然有用 —— 但**没有验证过，不要外推**。
@@ -44,7 +44,7 @@
 # ── 前置条件
 #
 #   - 模拟器已启动（默认 691C20D9-FB85-4B81-A3CC-0F5623AEF082，iPhone 17 Pro）
-#   - 该模拟器上已装好 Release 版 HeytaMobile
+#   - 该模拟器上已装好 Release 版 Heyta
 #   - 宿主机服务端**绑在 0.0.0.0**（不是 127.0.0.1），且能从 LAN IP 访问
 #   - /tmp/heyta_mobile_{token,e2ee}.txt 存在（凭据；口令只在内存里，重启应用后必须重填）
 #   - Xcode 命令行工具（`swiftc`）
@@ -371,11 +371,11 @@ xcrun simctl terminate "$UDID" "$BID" >/dev/null 2>&1 || true
 sleep 2
 xcrun simctl launch "$UDID" "$BID" >/dev/null 2>&1
 sleep 12
-if ! pgrep -f HeytaMobile >/dev/null 2>&1; then
-  bad "HeytaMobile 启动失败（Bundle ID $BID 装在这台模拟器上了吗？）"
+if ! pgrep -f Heyta >/dev/null 2>&1; then
+  bad "Heyta 启动失败（Bundle ID $BID 装在这台模拟器上了吗？）"
   summary "$ACCEPT_NAME"
 fi
-ok "HeytaMobile 已冷启动（凭据只在内存里，所以字段必然是空的）"
+ok "Heyta 已冷启动（凭据只在内存里，所以字段必然是空的）"
 
 # ── 1. 进「我的」页并填齐凭据 ───────────────────────────────────────────────
 

@@ -9,7 +9,7 @@
 /* Begin PBXBuildFile section */
 		008BCDCCEA59400F058F1BF0 /* HeytaWidgetModuleBridge.m in Sources */ = {isa = PBXBuildFile; fileRef = 7CAF7A9B123DBD3433233462 /* HeytaWidgetModuleBridge.m */; };
 		04EB8DC3F84700C94A3FF0D6 /* HeytaWidgetBridge in Frameworks */ = {isa = PBXBuildFile; productRef = B87A3C386AEFCA1AFCD5D49A /* HeytaWidgetBridge */; };
-		0C80B921A6F3F58F76C31292 /* libPods-HeytaMobile.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 5DCACB8F33CDC322A6C60F78 /* libPods-HeytaMobile.a */; };
+		0C80B921A6F3F58F76C31292 /* libPods-Heyta.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 5DCACB8F33CDC322A6C60F78 /* libPods-Heyta.a */; };
 		13B07FBF1A68108700A75B9A /* Images.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 13B07FB51A68108700A75B9A /* Images.xcassets */; };
 		195ABC1159FE613FF7FEB934 /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 62D65AE365254D61DC882AF6 /* Foundation.framework */; };
 		761780ED2CA45674006654EE /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 761780EC2CA45674006654EE /* AppDelegate.swift */; };
@@ -48,20 +48,20 @@
 
 /* Begin PBXFileReference section */
 		043B3AB8A7839FD9E717C737 /* HeytaWidgetBundle.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = HeytaWidgetBundle.swift; path = HeytaWidgetBundle.swift; sourceTree = "<group>"; };
-		12BF9C48323621EFABC924D6 /* Info.plist */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.xml; name = Info.plist; path = HeytaMobile/Info.plist; sourceTree = "<group>"; };
-		13B07F961A680F5B00A75B9A /* HeytaMobile.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = HeytaMobile.app; sourceTree = BUILT_PRODUCTS_DIR; };
-		13B07FB51A68108700A75B9A /* Images.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; name = Images.xcassets; path = HeytaMobile/Images.xcassets; sourceTree = "<group>"; };
-		13B07FB61A68108700A75B9A /* Info.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; name = Info.plist; path = HeytaMobile/Info.plist; sourceTree = "<group>"; };
-		13B07FB81A68108700A75B9A /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; name = PrivacyInfo.xcprivacy; path = HeytaMobile/PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
-		3B4392A12AC88292D35C810B /* Pods-HeytaMobile.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-HeytaMobile.debug.xcconfig"; path = "Target Support Files/Pods-HeytaMobile/Pods-HeytaMobile.debug.xcconfig"; sourceTree = "<group>"; };
-		5709B34CF0A7D63546082F79 /* Pods-HeytaMobile.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-HeytaMobile.release.xcconfig"; path = "Target Support Files/Pods-HeytaMobile/Pods-HeytaMobile.release.xcconfig"; sourceTree = "<group>"; };
-		5DCACB8F33CDC322A6C60F78 /* libPods-HeytaMobile.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = "libPods-HeytaMobile.a"; sourceTree = BUILT_PRODUCTS_DIR; };
+		12BF9C48323621EFABC924D6 /* Info.plist */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.xml; name = Info.plist; path = Heyta/Info.plist; sourceTree = "<group>"; };
+		13B07F961A680F5B00A75B9A /* Heyta.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Heyta.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		13B07FB51A68108700A75B9A /* Images.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; name = Images.xcassets; path = Heyta/Images.xcassets; sourceTree = "<group>"; };
+		13B07FB61A68108700A75B9A /* Info.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; name = Info.plist; path = Heyta/Info.plist; sourceTree = "<group>"; };
+		13B07FB81A68108700A75B9A /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; name = PrivacyInfo.xcprivacy; path = Heyta/PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
+		3B4392A12AC88292D35C810B /* Pods-Heyta.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-Heyta.debug.xcconfig"; path = "Target Support Files/Pods-Heyta/Pods-Heyta.debug.xcconfig"; sourceTree = "<group>"; };
+		5709B34CF0A7D63546082F79 /* Pods-Heyta.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-Heyta.release.xcconfig"; path = "Target Support Files/Pods-Heyta/Pods-Heyta.release.xcconfig"; sourceTree = "<group>"; };
+		5DCACB8F33CDC322A6C60F78 /* libPods-Heyta.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = "libPods-Heyta.a"; sourceTree = BUILT_PRODUCTS_DIR; };
 		62D65AE365254D61DC882AF6 /* Foundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Foundation.framework; path = Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS18.0.sdk/System/Library/Frameworks/Foundation.framework; sourceTree = DEVELOPER_DIR; };
-		761780EC2CA45674006654EE /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = AppDelegate.swift; path = HeytaMobile/AppDelegate.swift; sourceTree = "<group>"; };
-		7A10000C2C0A00010066001A /* SceneDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = SceneDelegate.swift; path = HeytaMobile/SceneDelegate.swift; sourceTree = "<group>"; };
-		7BB312F0DA2AD3E458F74337 /* HeytaWidgetModule.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = HeytaWidgetModule.swift; path = HeytaMobile/HeytaWidgetModule.swift; sourceTree = "<group>"; };
-		7CAF7A9B123DBD3433233462 /* HeytaWidgetModuleBridge.m */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.objc; name = HeytaWidgetModuleBridge.m; path = HeytaMobile/HeytaWidgetModuleBridge.m; sourceTree = "<group>"; };
-		81AB9BB72411601600AC10FF /* LaunchScreen.storyboard */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = file.storyboard; name = LaunchScreen.storyboard; path = HeytaMobile/LaunchScreen.storyboard; sourceTree = "<group>"; };
+		761780EC2CA45674006654EE /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = AppDelegate.swift; path = Heyta/AppDelegate.swift; sourceTree = "<group>"; };
+		7A10000C2C0A00010066001A /* SceneDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = SceneDelegate.swift; path = Heyta/SceneDelegate.swift; sourceTree = "<group>"; };
+		7BB312F0DA2AD3E458F74337 /* HeytaWidgetModule.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = HeytaWidgetModule.swift; path = Heyta/HeytaWidgetModule.swift; sourceTree = "<group>"; };
+		7CAF7A9B123DBD3433233462 /* HeytaWidgetModuleBridge.m */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.objc; name = HeytaWidgetModuleBridge.m; path = Heyta/HeytaWidgetModuleBridge.m; sourceTree = "<group>"; };
+		81AB9BB72411601600AC10FF /* LaunchScreen.storyboard */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = file.storyboard; name = LaunchScreen.storyboard; path = Heyta/LaunchScreen.storyboard; sourceTree = "<group>"; };
 		8D22EB6C565E4257AB4A6650 /* HeytaWidgetExtension.entitlements */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.entitlements; name = HeytaWidgetExtension.entitlements; path = HeytaWidgetExtension.entitlements; sourceTree = "<group>"; };
 		9FDD8A63A9057319E7AF1AC4 /* HeytaWidgetExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = HeytaWidgetExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		ED297162215061F000B7C4FE /* JavaScriptCore.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = JavaScriptCore.framework; path = System/Library/Frameworks/JavaScriptCore.framework; sourceTree = SDKROOT; };
@@ -72,7 +72,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				0C80B921A6F3F58F76C31292 /* libPods-HeytaMobile.a in Frameworks */,
+				0C80B921A6F3F58F76C31292 /* libPods-Heyta.a in Frameworks */,
 				04EB8DC3F84700C94A3FF0D6 /* HeytaWidgetBridge in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -89,7 +89,7 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
-		13B07FAE1A68108700A75B9A /* HeytaMobile */ = {
+		13B07FAE1A68108700A75B9A /* Heyta */ = {
 			isa = PBXGroup;
 			children = (
 				13B07FB51A68108700A75B9A /* Images.xcassets */,
@@ -101,7 +101,7 @@
 				7BB312F0DA2AD3E458F74337 /* HeytaWidgetModule.swift */,
 				7CAF7A9B123DBD3433233462 /* HeytaWidgetModuleBridge.m */,
 			);
-			name = HeytaMobile;
+			name = Heyta;
 			sourceTree = "<group>";
 		};
 		1473EC5830AF99246F64497B /* HeytaWidgetExtension */ = {
@@ -127,7 +127,7 @@
 			isa = PBXGroup;
 			children = (
 				ED297162215061F000B7C4FE /* JavaScriptCore.framework */,
-				5DCACB8F33CDC322A6C60F78 /* libPods-HeytaMobile.a */,
+				5DCACB8F33CDC322A6C60F78 /* libPods-Heyta.a */,
 				18CCCDE8250B68AF5CCD9008 /* iOS */,
 			);
 			name = Frameworks;
@@ -143,7 +143,7 @@
 		83CBB9F61A601CBA00E9B192 = {
 			isa = PBXGroup;
 			children = (
-				13B07FAE1A68108700A75B9A /* HeytaMobile */,
+				13B07FAE1A68108700A75B9A /* Heyta */,
 				832341AE1AAA6A7D00B99B32 /* Libraries */,
 				83CBBA001A601CBA00E9B192 /* Products */,
 				2D16E6871FA4F8E400B85C8A /* Frameworks */,
@@ -158,7 +158,7 @@
 		83CBBA001A601CBA00E9B192 /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				13B07F961A680F5B00A75B9A /* HeytaMobile.app */,
+				13B07F961A680F5B00A75B9A /* Heyta.app */,
 				9FDD8A63A9057319E7AF1AC4 /* HeytaWidgetExtension.appex */,
 			);
 			name = Products;
@@ -167,8 +167,8 @@
 		BBD78D7AC51CEA395F1C20DB /* Pods */ = {
 			isa = PBXGroup;
 			children = (
-				3B4392A12AC88292D35C810B /* Pods-HeytaMobile.debug.xcconfig */,
-				5709B34CF0A7D63546082F79 /* Pods-HeytaMobile.release.xcconfig */,
+				3B4392A12AC88292D35C810B /* Pods-Heyta.debug.xcconfig */,
+				5709B34CF0A7D63546082F79 /* Pods-Heyta.release.xcconfig */,
 			);
 			path = Pods;
 			sourceTree = "<group>";
@@ -176,9 +176,9 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
-		13B07F861A680F5B00A75B9A /* HeytaMobile */ = {
+		13B07F861A680F5B00A75B9A /* Heyta */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = 13B07F931A680F5B00A75B9A /* Build configuration list for PBXNativeTarget "HeytaMobile" */;
+			buildConfigurationList = 13B07F931A680F5B00A75B9A /* Build configuration list for PBXNativeTarget "Heyta" */;
 			buildPhases = (
 				C38B50BA6285516D6DCD4F65 /* [CP] Check Pods Manifest.lock */,
 				13B07F871A680F5B00A75B9A /* Sources */,
@@ -194,12 +194,12 @@
 			dependencies = (
 				78A7E0F893751D6764080E51 /* PBXTargetDependency */,
 			);
-			name = HeytaMobile;
+			name = Heyta;
 			packageProductDependencies = (
 				B87A3C386AEFCA1AFCD5D49A /* HeytaWidgetBridge */,
 			);
-			productName = HeytaMobile;
-			productReference = 13B07F961A680F5B00A75B9A /* HeytaMobile.app */;
+			productName = Heyta;
+			productReference = 13B07F961A680F5B00A75B9A /* Heyta.app */;
 			productType = "com.apple.product-type.application";
 		};
 		C0348E846786D05187027EC1 /* HeytaWidgetExtension */ = {
@@ -235,7 +235,7 @@
 					};
 				};
 			};
-			buildConfigurationList = 83CBB9FA1A601CBA00E9B192 /* Build configuration list for PBXProject "HeytaMobile" */;
+			buildConfigurationList = 83CBB9FA1A601CBA00E9B192 /* Build configuration list for PBXProject "Heyta" */;
 			compatibilityVersion = "Xcode 12.0";
 			developmentRegion = en;
 			hasScannedForEncodings = 0;
@@ -251,7 +251,7 @@
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
-				13B07F861A680F5B00A75B9A /* HeytaMobile */,
+				13B07F861A680F5B00A75B9A /* Heyta */,
 				C0348E846786D05187027EC1 /* HeytaWidgetExtension */,
 			);
 		};
@@ -300,15 +300,15 @@
 			files = (
 			);
 			inputFileListPaths = (
-				"${PODS_ROOT}/Target Support Files/Pods-HeytaMobile/Pods-HeytaMobile-frameworks-${CONFIGURATION}-input-files.xcfilelist",
+				"${PODS_ROOT}/Target Support Files/Pods-Heyta/Pods-Heyta-frameworks-${CONFIGURATION}-input-files.xcfilelist",
 			);
 			name = "[CP] Embed Pods Frameworks";
 			outputFileListPaths = (
-				"${PODS_ROOT}/Target Support Files/Pods-HeytaMobile/Pods-HeytaMobile-frameworks-${CONFIGURATION}-output-files.xcfilelist",
+				"${PODS_ROOT}/Target Support Files/Pods-Heyta/Pods-Heyta-frameworks-${CONFIGURATION}-output-files.xcfilelist",
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "\"${PODS_ROOT}/Target Support Files/Pods-HeytaMobile/Pods-HeytaMobile-frameworks.sh\"\n";
+			shellScript = "\"${PODS_ROOT}/Target Support Files/Pods-Heyta/Pods-Heyta-frameworks.sh\"\n";
 			showEnvVarsInLog = 0;
 		};
 		C38B50BA6285516D6DCD4F65 /* [CP] Check Pods Manifest.lock */ = {
@@ -326,7 +326,7 @@
 			outputFileListPaths = (
 			);
 			outputPaths = (
-				"$(DERIVED_FILE_DIR)/Pods-HeytaMobile-checkManifestLockResult.txt",
+				"$(DERIVED_FILE_DIR)/Pods-Heyta-checkManifestLockResult.txt",
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
@@ -339,15 +339,15 @@
 			files = (
 			);
 			inputFileListPaths = (
-				"${PODS_ROOT}/Target Support Files/Pods-HeytaMobile/Pods-HeytaMobile-resources-${CONFIGURATION}-input-files.xcfilelist",
+				"${PODS_ROOT}/Target Support Files/Pods-Heyta/Pods-Heyta-resources-${CONFIGURATION}-input-files.xcfilelist",
 			);
 			name = "[CP] Copy Pods Resources";
 			outputFileListPaths = (
-				"${PODS_ROOT}/Target Support Files/Pods-HeytaMobile/Pods-HeytaMobile-resources-${CONFIGURATION}-output-files.xcfilelist",
+				"${PODS_ROOT}/Target Support Files/Pods-Heyta/Pods-Heyta-resources-${CONFIGURATION}-output-files.xcfilelist",
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "\"${PODS_ROOT}/Target Support Files/Pods-HeytaMobile/Pods-HeytaMobile-resources.sh\"\n";
+			shellScript = "\"${PODS_ROOT}/Target Support Files/Pods-Heyta/Pods-Heyta-resources.sh\"\n";
 			showEnvVarsInLog = 0;
 		};
 /* End PBXShellScriptBuildPhase section */
@@ -409,15 +409,15 @@
 		};
 		13B07F941A680F5B00A75B9A /* Debug */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = 3B4392A12AC88292D35C810B /* Pods-HeytaMobile.debug.xcconfig */;
+			baseConfigurationReference = 3B4392A12AC88292D35C810B /* Pods-Heyta.debug.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CLANG_ENABLE_MODULES = YES;
-				CODE_SIGN_ENTITLEMENTS = HeytaMobile/HeytaMobile.entitlements;
+				CODE_SIGN_ENTITLEMENTS = Heyta/Heyta.entitlements;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = V5S2LT9YV8;
 				ENABLE_BITCODE = NO;
-				INFOPLIST_FILE = HeytaMobile/Info.plist;
+				INFOPLIST_FILE = Heyta/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -430,7 +430,7 @@
 					"-lc++",
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = com.heyta;
-				PRODUCT_NAME = HeytaMobile;
+				PRODUCT_NAME = Heyta;
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
 				SWIFT_VERSION = 5.0;
@@ -441,16 +441,16 @@
 		};
 		13B07F951A680F5B00A75B9A /* Release */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = 5709B34CF0A7D63546082F79 /* Pods-HeytaMobile.release.xcconfig */;
+			baseConfigurationReference = 5709B34CF0A7D63546082F79 /* Pods-Heyta.release.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CLANG_ENABLE_MODULES = YES;
-				CODE_SIGN_ENTITLEMENTS = HeytaMobile/HeytaMobile.entitlements;
+				CODE_SIGN_ENTITLEMENTS = Heyta/Heyta.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Distribution";
 				CODE_SIGN_STYLE = Manual;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = V5S2LT9YV8;
-				INFOPLIST_FILE = HeytaMobile/Info.plist;
+				INFOPLIST_FILE = Heyta/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -463,7 +463,7 @@
 					"-lc++",
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = com.heyta;
-				PRODUCT_NAME = HeytaMobile;
+				PRODUCT_NAME = Heyta;
 				PROVISIONING_PROFILE_SPECIFIER = "heyta App Store";
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
 				SWIFT_VERSION = 5.0;
@@ -656,7 +656,7 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
-		13B07F931A680F5B00A75B9A /* Build configuration list for PBXNativeTarget "HeytaMobile" */ = {
+		13B07F931A680F5B00A75B9A /* Build configuration list for PBXNativeTarget "Heyta" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				13B07F941A680F5B00A75B9A /* Debug */,
@@ -674,7 +674,7 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		83CBB9FA1A601CBA00E9B192 /* Build configuration list for PBXProject "HeytaMobile" */ = {
+		83CBB9FA1A601CBA00E9B192 /* Build configuration list for PBXProject "Heyta" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				83CBBA201A601CBA00E9B192 /* Debug */,

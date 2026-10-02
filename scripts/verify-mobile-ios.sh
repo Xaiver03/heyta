@@ -62,7 +62,7 @@
 # ── 前置条件
 #
 #   - 模拟器已启动（默认 691C20D9-FB85-4B81-A3CC-0F5623AEF082，iPhone 17 Pro）
-#   - 该模拟器上已装好 Release 版 HeytaMobile，且已配置好服务器地址与令牌
+#   - 该模拟器上已装好 Release 版 Heyta，且已配置好服务器地址与令牌
 #   - 宿主机服务端在 127.0.0.1:3000，且 /tmp/heyta_mobile_{token,email,e2ee}.txt 存在
 #   - Xcode 命令行工具（`swiftc`）—— 用于按需编译 AX 工具
 #
@@ -334,7 +334,7 @@ step "0. 前置条件"
 #
 # ⇒ 默认**构建 + 安装**。`HEYTA_IOS_SKIP_BUILD=1` 可以跳过（改脚本本身时用），
 #    但那时仍然会**断言产物比源码新** —— 旧产物要么被重建，要么**响亮地失败**。
-IOS_APP_DIR="/tmp/heyta-ios-release/Build/Products/Release-iphonesimulator/HeytaMobile.app"
+IOS_APP_DIR="/tmp/heyta-ios-release/Build/Products/Release-iphonesimulator/Heyta.app"
 
 # 源码的最新修改时间（只扫会进 bundle 的地方：宿主 src + 四个共享包 src）
 # ⚠️ **不要写 `-newer /dev/null`。** 第一版那么写，而它在 macOS 上**匹配不到任何文件**：
@@ -355,8 +355,8 @@ if [ "${HEYTA_IOS_SKIP_BUILD:-0}" = "1" ]; then
   echo "   ⏭  跳过构建（HEYTA_IOS_SKIP_BUILD=1）"
 else
   echo "   正在构建 Release 版（会重新打 JS bundle，数分钟）…"
-  if xcodebuild -workspace "$HEYTA_REPO_ROOT/apps/mobile/ios/HeytaMobile.xcworkspace" \
-      -scheme HeytaMobile -configuration Release -sdk iphonesimulator \
+  if xcodebuild -workspace "$HEYTA_REPO_ROOT/apps/mobile/ios/Heyta.xcworkspace" \
+      -scheme Heyta -configuration Release -sdk iphonesimulator \
       -destination "id=$UDID" -derivedDataPath /tmp/heyta-ios-release build \
       >/tmp/heyta-ios-build.log 2>&1; then
     ok "xcodebuild Release 构建成功（日志 /tmp/heyta-ios-build.log）"
@@ -379,7 +379,7 @@ fi
 # 🔴 这一段是 2026-09-29 那次事故的直接产物，而那次的形状值得完整记下来：
 #
 #   1. 工程的 bundle id 是 **`com.heyta`**，而本脚本的 `BID` 默认值还是 RN 模板的
-#      `org.reactjs.native.example.HeytaMobile`（**过期的默认值**）；
+#      `org.reactjs.native.example.Heyta`（**过期的默认值**）；
 #   2. 于是 `simctl install` 装的是 `com.heyta`（**exit 0**），
 #      而脚本查的、启动的、读 SQLite 的都是**另一个 app**；
 #   3. 设备上积了**三个**容器（09-27 / 09-28 / 09-29），`get_app_container`

@@ -13,7 +13,7 @@
     "build:android": "node ../../scripts/run-gradle.mjs assembleRelease",
     "build:android:debug": "node ../../scripts/run-gradle.mjs assembleDebug",
     "build:android:bundle": "node ../../scripts/run-gradle.mjs bundleRelease",
-    "build:ios": "xcodebuild -workspace ios/HeytaMobile.xcworkspace -scheme HeytaMobile -configuration Release -sdk iphonesimulator -derivedDataPath ios/build",
+    "build:ios": "xcodebuild -workspace ios/Heyta.xcworkspace -scheme Heyta -configuration Release -sdk iphonesimulator -derivedDataPath ios/build",
     "clean:android": "node ../../scripts/run-gradle.mjs clean"
   },
   "dependencies": {
