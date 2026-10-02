@@ -1,3 +1,4 @@
+import { ICON_SIZE } from '@heyta/design-system';
 /**
  * 文档中心的外壳（侧栏 + 正文 + 窄屏抽屉）
  * =========================================
@@ -22,10 +23,9 @@
  *      `.lp-docs__nav` 加 `display: none` —— 后者会让栅格只剩一个在流里的
  *      子节点，正文于是掉进**侧栏那一列**（宽度 `--ht-layout-sidebar-width`），
  *      那是手机上最难看的坏法，而且只在抽屉打开的瞬间出现。
- *   4. **搜索框在这一层、但在栅格之外。** 挂在侧栏里等于"想搜东西得先打开抽屉"；
- *      挂在栅格里当第三行则要改 `.lp-docs` 的 `gap` 语义（列距与行距被迫分开）。
- *      所以它是 `.lp-docs` 的**兄弟**，套一层现成的 `.lp-wrap` 取同一份容器宽度 ——
- *      宽度、左右留白的事实源仍然只有一处。
+ *   4. **搜索框在外壳的 topnav 里**（`DocsShell`，SSOS 文档站同位）——
+ *      它是"这个站的全局工具"，不属于某一页的正文；2026-10-01 起
+ *      DocsLayout 不再持有它（原先挂在 `.lp-wrap` 兄弟层）。
  *
  * ⚠️ Esc 关抽屉挂在 `window` 的**冒泡**监听上。落地页没有 react-native-web 的
  * `TextInput`（§7 第 80 条那个吞 keydown 的就是它），所以这里不需要捕获阶段。
@@ -38,14 +38,16 @@ import { useI18n } from '@heyta/i18n/provider';
 import { Menu } from 'lucide-react';
 
 import { DocsNav } from './DocsNav.js';
-import { DocsSearch } from './DocsSearch.js';
 import type { SitePage } from './pages.js';
 
 export function DocsLayout({
   page,
+  toc,
   children,
 }: {
   page: SitePage;
+  /** 右栏的文章内目录（`DocsToc`）。不传 = 两列布局（分类页、无目录的页）。 */
+  readonly toc?: ReactNode;
   children: ReactNode;
 }): React.JSX.Element {
   const { t } = useI18n();
@@ -74,13 +76,10 @@ export function DocsLayout({
 
   return (
     <>
-      <div className="lp-wrap">
-        <DocsSearch />
-      </div>
-
-      <div className="lp-docs">
+      <div className={toc ? 'lp-docs lp-docs--with-toc' : 'lp-docs'}>
         <DocsNav page={page} collapsed={collapsed} onToggle={toggleGroup} />
         {children}
+        {toc}
 
         <button
           type="button"
@@ -90,7 +89,7 @@ export function DocsLayout({
           aria-expanded={drawerOpen}
           onClick={() => setDrawerOpen(true)}
         >
-          <Menu size={16} aria-hidden="true" />
+          <Menu size={ICON_SIZE.sm} aria-hidden="true" />
           <span>{t('site.docs.nav.title')}</span>
         </button>
 

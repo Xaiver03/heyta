@@ -1,3 +1,4 @@
+import { ICON_SIZE } from '@heyta/design-system';
 /**
  * 真实界面复现：番茄钟
  * ======================
@@ -81,7 +82,7 @@ export function FocusRing(): React.JSX.Element {
         <div className="mk-focus__readout">
           <div className="mk-focus__time">{formatClock(REMAINING_SECONDS)}</div>
           <div className="mk-focus__phase">
-            <Zap size={12} />
+            <Zap size={ICON_SIZE.xs} />
             {t('landing.mock.focus.phase')}
           </div>
         </div>
@@ -89,11 +90,11 @@ export function FocusRing(): React.JSX.Element {
 
       <div className="mk-focus__actions">
         <div className="mk-btn-primary">
-          <Pause size={18} />
+          <Pause size={ICON_SIZE.md} />
           {t('landing.mock.focus.pause')}
         </div>
         <div className="mk-viewtab">
-          <Square size={18} />
+          <Square size={ICON_SIZE.md} />
           {t('landing.mock.focus.stop')}
         </div>
       </div>
@@ -106,12 +107,12 @@ export function FocusRing(): React.JSX.Element {
       <div className="mk-focus__stat">
         {t('landing.mock.focus.completedToday')}
         <span style={{ marginInlineStart: 'var(--ht-space-2)' }}>
-          <Coffee size={12} style={{ display: 'inline' }} /> {t('landing.mock.focus.break5')}
+          <Coffee size={ICON_SIZE.xs} style={{ display: 'inline' }} /> {t('landing.mock.focus.break5')}
         </span>
       </div>
 
       <div className="mk-viewtab">
-        <Play size={14} />
+        <Play size={ICON_SIZE.xs} />
         {t('landing.mock.focus.startNext')}
       </div>
     </div>

@@ -548,15 +548,11 @@
   }
 }
 
-/* 减少透明度偏好：材质要变"霜"甚至实心，否则可读性会塌。
-   Apple《Materials》：这也是可访问性要求，不只是审美。 */
-@media (prefers-reduced-transparency: reduce) {
-  .lp-nav__bar {
-    background: var(--ht-color-surface);
-    backdrop-filter: none;
-    -webkit-backdrop-filter: none;
-  }
-}
+/* 减少透明度偏好的降级已**升格为全局策略**：tokens.css 末尾的
+   `@media (prefers-reduced-transparency: reduce)` 会把材质 tint 压成
+   实色 surface、模糊半径压成 0 —— 消费方（含本文件的 lp-nav__bar /
+   lp-sync__legend / lp-docs-topnav）代码零改动。这里不再另写一份局部
+   覆盖，双份会在取值漂移时打架。 */
 
 /* ════════════════════════════════════════════════════════════
    区块节奏与通用件
@@ -2002,6 +1998,13 @@
    🔴 宽度与左右留白在**这一层**给完，所以内层那一份 `.lp-wrap`
    （共享渲染器 `PageSections` 自带的）要摊平 —— 否则正文会在栅格里再居中一次，
    左边多出一条没人要的沟。 */
+/* 文章页三列（SSOS 文档站同构）：左＝全站文章目录，中＝文章，右＝本页目录。
+   右栏宽度是文档站自己的局部 token（rem，随根字号缩放）；
+   不占用 --ht-layout-*（那是设计系统那条线的地界）。 */
+.lp-docs {
+  --lp-docs-toc-w: 13.75rem;
+}
+
 .lp-docs {
   inline-size: 100%;
   max-inline-size: var(--ht-layout-content-max);
@@ -2011,6 +2014,11 @@
   grid-template-columns: var(--ht-layout-sidebar-width) minmax(0, 1fr);
   gap: calc(var(--ht-space-8) * 1.75);
   align-items: start;
+}
+
+.lp-docs--with-toc {
+  grid-template-columns: var(--ht-layout-sidebar-width) minmax(0, 1fr) var(--lp-docs-toc-w);
+  gap: var(--ht-space-7);
 }
 
 .lp-docs .lp-wrap {
@@ -2260,13 +2268,15 @@
   color: var(--ht-color-foreground-muted);
 }
 
-/* 页内目录。⚠️ 它是**正文列里的一块**，不是第三栏 ——
-   再加一栏要新的布局 token，而那是设计系统那条线的地界。 */
+/* 页内目录：右栏独立一列（SSOS 文档站同位）——sticky、可滚、滚动跟随高亮。
+   ⚠️ 2026-10-01 前它是正文顶部的一个盒子；IA 对齐裁决后挪到第三栏。 */
 .lp-docs__toc {
-  padding: var(--ht-space-4) var(--ht-space-5);
-  border: var(--ht-border-width-thin) solid var(--ht-color-border);
-  border-radius: var(--ht-radius-lg);
-  background: var(--ht-color-surface);
+  position: sticky;
+  top: calc(var(--ht-space-8) + var(--ht-space-4));
+  max-block-size: calc(100vh - var(--ht-space-8) * 2);
+  overflow-block: auto;
+  padding: var(--ht-space-4) var(--ht-space-4) var(--ht-space-4) var(--ht-space-5);
+  border-inline-start: var(--ht-border-width-thin) solid var(--ht-color-border);
 }
 
 .lp-docs__toc-title {
@@ -2294,8 +2304,21 @@
   transition: color var(--ht-duration-fast) var(--ht-ease-standard);
 }
 
+.lp-docs__toc-link {
+  border-inline-start: var(--ht-border-width-thin) solid transparent;
+  margin-inline-start: calc(-1 * var(--ht-space-4) - var(--ht-border-width-thin));
+  padding-inline-start: var(--ht-space-4);
+}
+
 .lp-docs__toc-link:hover {
   color: var(--ht-color-primary);
+}
+
+/* 滚动跟随高亮：正在读的那一节。aria-current="location" 与它同源。 */
+.lp-docs__toc-link--active {
+  color: var(--ht-color-primary);
+  border-inline-start-color: var(--ht-color-primary);
+  font-weight: var(--ht-font-weight-medium);
 }
 
 /* 帮助中心模块标题 → 分类页。**整块可点**而不是标题旁边再挂一个"查看全部"：
@@ -2329,6 +2352,16 @@
 /* 窄屏退回单栏：侧栏**挪到正文之后**（`order`）。
    手机上先给答案 —— "接下来读什么"是读完了才需要的事，
    让它压在标题下面等于把答案往下推一整屏。 */
+@media (max-width: 1024px) {
+  .lp-docs--with-toc {
+    grid-template-columns: var(--ht-layout-sidebar-width) minmax(0, 1fr);
+  }
+
+  .lp-docs__toc {
+    display: none;
+  }
+}
+
 @media (max-width: 900px) {
   .lp-docs {
     grid-template-columns: 1fr;
@@ -2400,6 +2433,161 @@
     padding-block-start: var(--ht-space-0);
     border-block-start: none;
     gap: var(--ht-space-5);
+  }
+}
+
+/* ── 文档中心独立外壳（SSOS 文档站同构，2026-10-01）────────────────────── */
+
+/* topnav：sticky + 毛玻璃。logo 与站名靠左，搜索居中占余量，主题/CTA 靠右。 */
+.lp-docs-topnav {
+  position: sticky;
+  top: 0;
+  z-index: var(--ht-z-sticky);
+  background: color-mix(in srgb, var(--ht-color-surface) 88%, transparent);
+  backdrop-filter: blur(var(--ht-blur-chrome)) saturate(180%);
+  border-block-end: var(--ht-border-width-thin) solid var(--ht-color-border);
+}
+
+.lp-docs-topnav__inner {
+  max-inline-size: var(--ht-layout-content-max);
+  margin-inline: auto;
+  padding-inline: var(--ht-space-6);
+  min-block-size: calc(var(--ht-space-8) + var(--ht-space-2));
+  display: flex;
+  align-items: center;
+  gap: var(--ht-space-6);
+}
+
+.lp-docs-topnav__logo {
+  display: flex;
+  align-items: baseline;
+  gap: var(--ht-space-3);
+  text-decoration: none;
+  color: var(--ht-color-foreground);
+  flex: none;
+}
+
+.lp-docs-topnav__brand {
+  font-size: var(--ht-font-size-lg);
+  font-weight: var(--ht-font-weight-bold);
+  letter-spacing: var(--ht-letter-spacing-tight);
+  color: var(--ht-color-primary);
+}
+
+.lp-docs-topnav__site {
+  font-size: var(--ht-font-size-sm);
+  color: var(--ht-color-foreground-muted);
+}
+
+/* 搜索占 topnav 的余量；结果从"往下推内容"改成"浮层下拉"——
+   topnav 是 sticky 的，把内容推下去会把整站推抖。 */
+.lp-docs-topnav .lp-docs__search {
+  position: relative;
+  flex: 1 1 auto;
+  margin-block: var(--ht-space-2);
+  inline-size: auto;
+  max-inline-size: 26rem;
+}
+
+.lp-docs-topnav .lp-docs__search-field {
+  max-inline-size: none;
+  background: var(--ht-color-background);
+}
+
+.lp-docs-topnav .lp-docs__search-results {
+  position: absolute;
+  inset-inline: 0;
+  top: calc(100% + var(--ht-space-2));
+  z-index: var(--ht-z-dropdown);
+  box-shadow: var(--ht-shadow-lg);
+}
+
+.lp-docs-topnav__actions {
+  display: flex;
+  align-items: center;
+  gap: var(--ht-space-4);
+  margin-inline-start: auto;
+  flex: none;
+}
+
+.lp-docs-topnav__theme {
+  display: inline-flex;
+  padding: var(--ht-space-2);
+  border: none;
+  border-radius: var(--ht-radius-sm);
+  background: transparent;
+  color: var(--ht-color-foreground-muted);
+  cursor: pointer;
+}
+
+.lp-docs-topnav__theme:hover {
+  color: var(--ht-color-foreground);
+}
+
+.lp-docs-topnav__cta {
+  padding-block: var(--ht-space-2);
+  padding-inline: var(--ht-space-4);
+  border: var(--ht-border-width-thin) solid var(--ht-color-primary);
+  border-radius: var(--ht-radius-md);
+  color: var(--ht-color-primary);
+  font-size: var(--ht-font-size-sm);
+  text-decoration: none;
+  white-space: nowrap;
+  transition:
+    color var(--ht-duration-fast) var(--ht-ease-standard),
+    background-color var(--ht-duration-fast) var(--ht-ease-standard);
+}
+
+.lp-docs-topnav__cta:hover {
+  color: var(--ht-color-surface);
+  background: var(--ht-color-primary);
+}
+
+/* 文档站自己的页脚：一条式的极简（品牌 + 许可 + GitHub）。
+   营销站的整套页脚（导航/法务）属于营销站 —— 文档站不替它背。 */
+.lp-docs-footer {
+  margin-block-start: var(--ht-space-8);
+  border-block-start: var(--ht-border-width-thin) solid var(--ht-color-border);
+  padding-block: var(--ht-space-6);
+  padding-inline: var(--ht-space-6);
+}
+
+.lp-docs-footer__inner {
+  max-inline-size: var(--ht-layout-content-max);
+  margin-inline: auto;
+  display: flex;
+  align-items: baseline;
+  gap: var(--ht-space-5);
+}
+
+.lp-docs-footer__brand {
+  font-weight: var(--ht-font-weight-semibold);
+  color: var(--ht-color-foreground);
+}
+
+.lp-docs-footer__meta {
+  color: var(--ht-color-foreground-muted);
+  font-size: var(--ht-font-size-sm);
+}
+
+.lp-docs-footer__link {
+  margin-inline-start: auto;
+  color: var(--ht-color-foreground-muted);
+  font-size: var(--ht-font-size-sm);
+  text-decoration: none;
+}
+
+.lp-docs-footer__link:hover {
+  color: var(--ht-color-primary);
+}
+
+@media (max-width: 640px) {
+  .lp-docs-topnav__inner {
+    gap: var(--ht-space-3);
+  }
+
+  .lp-docs-topnav__site {
+    display: none;
   }
 }
 

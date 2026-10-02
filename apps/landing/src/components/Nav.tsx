@@ -1,3 +1,4 @@
+import { ICON_SIZE } from '@heyta/design-system';
 /**
  * 悬浮导航
  * ==========
@@ -221,7 +222,7 @@ export function Nav({
             rel="noopener noreferrer"
             aria-label={t('landing.nav.github')}
           >
-            <Github size={18} />
+            <Github size={ICON_SIZE.md} />
           </a>
 
           <a className="lp-nav__link lp-nav__signin" href={signinHref}>
@@ -256,7 +257,7 @@ export function Nav({
               aria-expanded={langOpen}
               onClick={() => setLangOpen((open) => !open)}
             >
-              <Languages size={18} />
+              <Languages size={ICON_SIZE.md} />
             </button>
 
             {langOpen ? (
@@ -287,7 +288,7 @@ export function Nav({
                       onClick={() => setLangOpen(false)}
                     >
                       <span className="lp-lang__name">{label}</span>
-                      {current ? <Check size={14} aria-hidden="true" /> : null}
+                      {current ? <Check size={ICON_SIZE.xs} aria-hidden="true" /> : null}
                     </a>
                   );
                 })}
@@ -313,7 +314,7 @@ export function Nav({
               transition={preset.rotation}
               style={{ display: 'grid', placeItems: 'center' }}
             >
-              {theme === 'light' ? <Moon size={18} /> : <Sun size={18} />}
+              {theme === 'light' ? <Moon size={ICON_SIZE.md} /> : <Sun size={ICON_SIZE.md} />}
             </motion.span>
           </button>
 
@@ -328,7 +329,7 @@ export function Nav({
           */}
           <details className="lp-nav__menu">
             <summary className="lp-iconbtn" aria-label={t('site.nav.aria')}>
-              <Menu size={18} />
+              <Menu size={ICON_SIZE.md} />
             </summary>
             <nav className="lp-nav__menu-panel" aria-label={t('landing.nav.ariaLabel')}>
               {links.map((link) => (

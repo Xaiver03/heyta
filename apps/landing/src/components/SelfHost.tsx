@@ -1,3 +1,4 @@
+import { ICON_SIZE } from '@heyta/design-system';
 /**
  * 自建
  * ======
@@ -43,17 +44,17 @@ export function SelfHost(): React.JSX.Element {
   const steps = useMemo(
     () => [
       {
-        icon: <Container size={18} />,
+        icon: <Container size={ICON_SIZE.md} />,
         title: t('landing.selfhost.step1.title'),
         body: t('landing.selfhost.step1.body'),
       },
       {
-        icon: <Globe size={18} />,
+        icon: <Globe size={ICON_SIZE.md} />,
         title: t('landing.selfhost.step2.title'),
         body: t('landing.selfhost.step2.body'),
       },
       {
-        icon: <Lock size={18} />,
+        icon: <Lock size={ICON_SIZE.md} />,
         title: t('landing.selfhost.step3.title'),
         body: t('landing.selfhost.step3.body'),
       },
@@ -110,7 +111,7 @@ export function SelfHost(): React.JSX.Element {
               rel="noopener noreferrer"
             >
               {t('landing.selfhost.guide.link')}
-              <ArrowUpRight size={16} aria-hidden="true" />
+              <ArrowUpRight size={ICON_SIZE.sm} aria-hidden="true" />
             </a>
           </motion.aside>
         </div>

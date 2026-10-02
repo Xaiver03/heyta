@@ -1226,6 +1226,42 @@ export const en = {
   'web.gantt.dependsOn': 'Depends on: {title}',
   'web.gantt.overlap': 'Overlaps its dependency',
 
+  // ── Web · Timeline board (2026-10-01 rework, goal: docs/plans/goal-timeline-rework.md) ──
+  // One shared axis, one row per task, three-state fallback (bar / diamond / unscheduled lane).
+  // Keys mirror zh-CN 1:1 (the i18n gate fails on drift).
+  'web.board.weekday.1': 'Mon',
+  'web.board.weekday.2': 'Tue',
+  'web.board.weekday.3': 'Wed',
+  'web.board.weekday.4': 'Thu',
+  'web.board.weekday.5': 'Fri',
+  'web.board.weekday.6': 'Sat',
+  'web.board.weekday.7': 'Sun',
+  'web.board.month.1': 'Jan',
+  'web.board.month.2': 'Feb',
+  'web.board.month.3': 'Mar',
+  'web.board.month.4': 'Apr',
+  'web.board.month.5': 'May',
+  'web.board.month.6': 'Jun',
+  'web.board.month.7': 'Jul',
+  'web.board.month.8': 'Aug',
+  'web.board.month.9': 'Sep',
+  'web.board.month.10': 'Oct',
+  'web.board.month.11': 'Nov',
+  'web.board.month.12': 'Dec',
+  'web.board.today': 'Today',
+  // The named lane (R4 criterion 5): unscheduled tasks stay visible, never drawn as bars.
+  'web.board.unscheduledLane': 'Unscheduled ({count})',
+  // Row-header estimate badge: text only, never a length (R4 criterion 3).
+  'web.board.aiBadge': 'AI est. {duration}',
+  // Overdue is text + warning color, never color alone (WCAG 1.4.1).
+  'web.board.overdue': 'Overdue',
+  // Detail-preview caption: the task-internal coordinate system MUST be disclosed
+  // (goal §2.1) — otherwise users will line it up against the board axis.
+  'web.board.planCaption': 'Internal checklist plan of this task (order and estimates) — not the same coordinate system as the timeline board.',
+  // Default title for "click empty space to create" (goal §3.2, gesture 4):
+  // data coming from the product, so it still goes through the locale table.
+  'web.board.untitledTask': 'Untitled task',
+
   // ═══════════════════════════════════════════════════════════
   // Web · AI (breakdown / capture / duration / prioritize / settings / memory)
   // ═══════════════════════════════════════════════════════════
@@ -2722,6 +2758,7 @@ export const en = {
   'site.docs.nav.close': 'Close documentation menu',
   // Top search in the docs centre. It matches **titles only** (never body text) and
   // jumps to that section's anchor — the placeholder must not promise "search content".
+  'site.docs.shell.title': 'Help centre',
   'site.docs.search.label': 'Search the docs',
   'site.docs.search.placeholder': 'Search titles. Multiple words must all match.',
   'site.docs.search.clear': 'Clear search',
@@ -3098,7 +3135,7 @@ export const en = {
   'site.changelog.title': 'What\'s new',
   'site.changelog.lede': 'Newest first, and only things that **actually happened**. Items we decided against are in here too — a roadmap that only grows is not worth trusting.',
   'site.changelog.20261005.title': 'Notes and reminders work on both hosts',
-  'site.changelog.20261005.body': 'Notes and reminders — two entities that had a data model but no entry point — gained their domain rules, an action layer, and real entry points in **both hosts**. The same pass took the "modeled but never called" reachability gate from a long-standing red to fully green; that gate exists precisely to catch "all the parts are there, the last metre is not wired".',
+  'site.changelog.20261005.body': 'Notes and reminders were features you could not reach: they existed, but nothing on screen opened them. This pass added the entry points in both the web app and the mobile app — create, view and edit.',
   'site.changelog.20261002.title': 'Task reminders, from data model to action layer',
   'site.changelog.20261002.body': 'Reminders landed as an **entity of their own** rather than an array field on a task: scheduling rules, lead times, repeat roll-forward and snooze live in the domain layer, with create/update/delete in the action layer. Before this, reminders were a single line on the roadmap.',
   'site.changelog.20260928.title': 'The site and the app became one product',

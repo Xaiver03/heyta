@@ -81,10 +81,14 @@ describe('pageFromPath', () => {
     expect(pageFromPath('/en').id).toBe('home');
   });
 
-  it('只取第一段：更深的路径仍落在同一个页面上', () => {
-    // 帮助页的问题锚点是 `#id`，不是子路由；这里确认将来加文章路由时
-    // 不会意外落到首页。
-    expect(pageFromPath('/help/some-article/').id).toBe('help');
+  it('更深但**未注册**的路径落到父级枢纽，而不是弹回首页', () => {
+    // `pageFromPath` 认的是整条注册路径（深度优先），所以 `/docs/xxx/` 这种
+    // 「枢纽下面一篇不存在的文章」会落在枢纽 `help` 上 —— 人还在文档中心里，
+    // 只是那一篇不存在。这比弹回首页好，也比"只取第一段"准：
+    // 只取第一段时 `/docs/passphrase/` 会被解析成枢纽，访客点开文章链接看到目录。
+    // ⚠️ 这里写的是 `help` 而不是 `docs`：`id` 是注册表里那个**稳定**的名字，
+    //    改名只动 `path`（见 `src/site/pages.ts`）。
+    expect(pageFromPath('/docs/some-article/').id).toBe('help');
   });
 
   it('🔴 认不出的路径回落到首页，而不是抛错', () => {

@@ -1308,6 +1308,44 @@ export const zhCN = {
   'web.gantt.dependsOn': '依赖：{title}',
   'web.gantt.overlap': '与前置重叠',
 
+  // ── Web · 时间线板（2026-10-01 重画，goal：docs/plans/goal-timeline-rework.md）──
+  // 一根共轴、行=任务、三态降级（条/菱形/未排期泳道）。上面 `web.timeline.*` 的
+  // empty/aria 三条**继续被板复用**；aiEstimate/noChecklist/unattributable 归
+  // 任务详情的清单排程预览。措辞全部由宿主装进 `TimelineBoardLabels`。
+  'web.board.weekday.1': '一',
+  'web.board.weekday.2': '二',
+  'web.board.weekday.3': '三',
+  'web.board.weekday.4': '四',
+  'web.board.weekday.5': '五',
+  'web.board.weekday.6': '六',
+  'web.board.weekday.7': '日',
+  'web.board.month.1': '1月',
+  'web.board.month.2': '2月',
+  'web.board.month.3': '3月',
+  'web.board.month.4': '4月',
+  'web.board.month.5': '5月',
+  'web.board.month.6': '6月',
+  'web.board.month.7': '7月',
+  'web.board.month.8': '8月',
+  'web.board.month.9': '9月',
+  'web.board.month.10': '10月',
+  'web.board.month.11': '11月',
+  'web.board.month.12': '12月',
+  'web.board.today': '今天',
+  // 有名字的泳道（R4 判据 5）：没排期的任务**可见但不落图**——
+  // 静默消失用户会以为视图坏了，画成条就是在编长度。
+  'web.board.unscheduledLane': '未排期（{count}）',
+  // 行头的估时 badge：是**文字**，绝不画成长度（R4 判据 3）。
+  'web.board.aiBadge': 'AI 估 {duration}',
+  // 逾期是文字 + 警示色，不是只有颜色（WCAG 1.4.1）。
+  'web.board.overdue': '逾期',
+  // 详情预览的区块说明：任务内部坐标系与板**必须标明**不是同一个坐标系
+  // （goal §2.1；不标明用户就会拿它和板对位置）。
+  'web.board.planCaption': '这是这条任务内部的清单排程（先后与估时），与时间线板不是同一个坐标系。',
+  // 「点空白建任务」（goal §3.2 手势 4）的默认标题：这是**数据**（一条任务的名字），
+  // 但它来自产品而不是用户 —— 所以仍然走词条表，不硬编码。
+  'web.board.untitledTask': '未命名任务',
+
   // ═══════════════════════════════════════════════════════════
   // Web · AI（拆解 / 捕获 / 估时 / 排序 / 设置 / 记忆）
   // ═══════════════════════════════════════════════════════════
@@ -2891,6 +2929,7 @@ export const zhCN = {
   'site.docs.nav.close': '关闭文档目录',
   // 文档中心顶栏的搜索。它匹配的**只有**文章标题与小节标题（不搜正文），
   // 命中之后跳那一节的锚点 —— 所以占位文案不许承诺"搜内容"。
+  'site.docs.shell.title': '帮助中心',
   'site.docs.search.label': '搜索文档',
   'site.docs.search.placeholder': '搜标题里的关键词，多个词之间是「都要包含」',
   'site.docs.search.clear': '清除搜索',
@@ -3266,7 +3305,7 @@ export const zhCN = {
   'site.changelog.title': '更新动态',
   'site.changelog.lede': '按日期倒序，只记**真的发生了什么**。包含被判定「不做」的条目 —— 一个只长功能不做减法的路线图不值得相信。',
   'site.changelog.20261005.title': '便签与提醒在两端都可用了',
-  'site.changelog.20261005.body': '便签与提醒这两个此前"建了模型、没有入口"的实体，补齐了领域规则、动作层与**两个宿主**的真实入口。同一批把「已建模但零调用点」的可达性门禁从长期红转为全绿 —— 它抓的正是这种"零件齐、最后一米没接"的形状。',
+  'site.changelog.20261005.body': '便签与提醒此前在界面上点不到 —— 东西做了，入口没接上。这一批把 Web 与移动端的入口都补齐了：现在能新建、能查看、能改。',
   'site.changelog.20261002.title': '任务提醒从数据模型做到动作层',
   'site.changelog.20261002.body': '提醒作为**独立实体**落地（而不是任务上的一个数组字段）：调度规则、提前量、顺延与稍后提醒进领域层，增删改查进动作层。此前提醒只是路线图上的一句话。',
   'site.changelog.20260928.title': '站点与应用接成同一个产品',

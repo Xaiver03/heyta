@@ -44,6 +44,23 @@
  * - 裸 `版本`：`landing.sync.ledeLead` 用"版本信息"讲向量时钟，
  *   那正是**该上公页**的写法（用户能懂）。只拦"工具名 + 版本号"这个形状。
  *
+ * ## 🔴 唯一豁免：自托管那篇文章页（2026-10-01 产品负责人裁定）
+ *
+ * 「文档中心绝对不能放开发相关的东西；**唯一例外是自托管那块** ——
+ * 自托管说明反而要写给动手的人看（可以详细到开发者级）。」
+ *
+ * 这道闸 2026-09-30 立、那条裁定 2026-10-01 下，而裁定只写进了**词条表**那道闸
+ * （`scripts/check-docs-voice.mjs`）。结果同一天里：自托管篇按裁定扩到 11 节开发者级
+ * 内容，本闸把 `selfhost / zh-CN` 与 `selfhost / en` 判红，两道"内容合规"门禁
+ * 互相指认对方有误，而 `pnpm check` 带着整条链一起红。
+ *
+ *  ⇒ 豁免判据现在住在一个中立模块里（`scripts/selfhost-voice.mjs`），**两套观测面共用一份**：
+ * 那边按词条 key 判、这里按渲染出的页面判，形状不同、规则同一份。理由是本仓库
+ * 已经吃过的那个形状：同一个判断写两遍 → 改一处、另一处过期 → 而过期那处**看起来仍在执法**。
+ *
+ * ⚠️ 豁免只放开"没有内部工具链语言"这一条；**观测面那条（每页 × 每语言 ≥500 字符）
+ * 对豁免页照样生效**，否则摘掉一条判据会顺带把"这页是不是空的"也摘掉。
+ *
  * ## 为什么判据钉在**渲染出的文本**上，而不是源码或类名
  *
  * 这条纪律 2026-09-29 就立过一次（见 `scripts/check-claims.mjs` 文件头：
@@ -78,6 +95,8 @@ import { LOCALES, type Locale } from '@heyta/i18n/provider';
 
 import { SITE_PAGES } from '../src/site/pages.js';
 import { renderPage } from './helpers/render-page.js';
+// 🔴 豁免判据与 `scripts/check-docs-voice.mjs` **共用一份**（分裂的成因与代价写在那个文件头）。
+import { SELFHOST_EXEMPT_PAGE_IDS } from '../../../scripts/selfhost-voice.mjs';
 
 /* ══════════════════════════════════════════════════════════════════════
  * 词表与形状（唯一的判据来源；下面的自检与真实扫描共用它）
@@ -327,22 +346,57 @@ describe('🔴 公页不许说贡献者语言', () => {
     },
   );
 
-  /** 真实判据：每一页 × 每一语言。 */
-  it.each(PAGE_IDS.flatMap((pageId) => LOCALES.map((locale) => [pageId, locale] as const)))(
-    '%s / %s：正文与无障碍名里没有内部工具链语言',
-    (pageId, locale) => {
-      const view = renderPage(pageId, locale);
-      const violations = findViolations(collectRenderedText(view));
-      expect(
-        violations,
-        `${pageId} / ${locale} 上贡献者语言泄漏：\n` +
-          violations
-            .map((v) => `  · [${v.rule}]「${v.hit}」—— ${v.why}\n    上下文：…${v.context}…`)
-            .join('\n') +
-          '\n\n  ⇒ 改法：换成用户能据此行动的说法；开发细节留在 docs/runbooks 与仓库 README。',
-      ).toEqual([]);
-    },
-  );
+  /**
+   * 真实判据：每一页 × 每一语言。
+   *
+   * 🔴 **唯一豁免 = 自托管那篇文章页**（`SELFHOST_EXEMPT_PAGE_IDS`），依据是产品负责人
+   * 2026-10-01 的裁定：「文档中心绝对不能放开发相关的东西；唯一例外是自托管那块 ——
+   * 自托管说明就是写给动手的人看的，可以详细到开发者级。」
+   *
+   * 这条豁免以前**只写在词条表那道闸里**（`scripts/check-docs-voice.mjs`），本闸不知道，
+   * 于是同一天里出现"一篇被裁定为合规的内容被另一道合规门禁判红"，而两道的理由互相
+   * 指认对方有误。现在判据从 `scripts/selfhost-voice.mjs` 取，两份观测面共用一条规则。
+   *
+   * ⚠️ 豁免**只放开这一条断言**（B）。上面那条 A（每一页 × 每一语言必须渲染出 ≥500 字符）
+   * 对豁免页同样生效 —— 否则"把整页从判据里摘出去"就会顺带把"这页是不是空的"
+   * 也摘出去，而空页面恰恰是这一轮法务页面最贵的那种事故。
+   */
+  it.each(
+    PAGE_IDS.flatMap((pageId) =>
+      SELFHOST_EXEMPT_PAGE_IDS.includes(pageId)
+        ? []
+        : LOCALES.map((locale) => [pageId, locale] as const),
+    ),
+  )('%s / %s：正文与无障碍名里没有内部工具链语言', (pageId, locale) => {
+    const view = renderPage(pageId, locale);
+    const violations = findViolations(collectRenderedText(view));
+    expect(
+      violations,
+      `${pageId} / ${locale} 上贡献者语言泄漏：\n` +
+        violations
+          .map((v) => `  · [${v.rule}]「${v.hit}」—— ${v.why}\n    上下文：…${v.context}…`)
+          .join('\n') +
+        '\n\n  ⇒ 改法：换成用户能据此行动的说法；开发细节留在 docs/runbooks 与仓库 README。',
+    ).toEqual([]);
+  });
+
+  /**
+   * 豁免区自身的防呆 —— 没有这一条，"豁免"就是一种可以悄悄变质的东西。
+   *
+   * 拦的三件事：
+   *   1. **豁免了一个不存在的页面 id**（改名时会发生：`/help` → `/docs` 那一轮
+   *      就把一条断言留在了旧地址上）。后果是豁免圈不住任何内容，而它看起来仍在生效。
+   *   2. **豁免范围扩大**。这一条不是"越少越好"的洁癖：判定线是产品负责人拍的，
+   *      只有自托管那一篇在例外里。多加一个 id 就是有人在没有裁定的情况下放开了一个面。
+   *   3. **豁免页变成空页**（由上面的断言 A 兜住，这里再钉一次它是**注册表里的文章页**）。
+   */
+  it('豁免区恰好是自托管那篇文章页，而且它在注册表里真实存在', () => {
+    expect(SELFHOST_EXEMPT_PAGE_IDS).toEqual(['selfhost']);
+    for (const pageId of SELFHOST_EXEMPT_PAGE_IDS) {
+      const page = SITE_PAGES.find((candidate) => candidate.id === pageId);
+      expect(page, `豁免区里的 "${pageId}" 在站点注册表里不存在 —— 这条豁免圈不住任何东西`).toBeDefined();
+    }
+  });
 });
 
 describe('自检 B（反证）：探测器对真实漏出去过的原文必须报红', () => {

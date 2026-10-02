@@ -32,6 +32,9 @@ import { readFileSync } from 'node:fs';
 import { dirname, join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+// 豁免判据只有一份（2026-10-01 两套门禁打架的成因与理由写在那个文件头）。
+import { isSelfhostCopyKey as isSelfhostKey } from './selfhost-voice.mjs';
+
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), '..');
 
 const LOCALES = [
@@ -39,11 +42,6 @@ const LOCALES = [
   { file: 'packages/i18n/src/locales/en.ts', label: 'en' },
 ];
 
-/** 自托管相关 key 的豁免判据 —— 唯一可以出现开发向内容的区域。 */
-const isSelfhostKey = (key) =>
-  key.startsWith('site.docs.selfhost.') ||
-  key === 'site.platforms.selfhost.body' ||
-  key === 'site.integrations.selfhost.body';
 
 /**
  * 禁词表。判据：这个词出现在面向访客的文案里，只可能是开发视角漏出来了。

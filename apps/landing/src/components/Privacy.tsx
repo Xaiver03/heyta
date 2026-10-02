@@ -1,3 +1,4 @@
+import { ICON_SIZE } from '@heyta/design-system';
 /**
  * 隐私（滚动驱动的逐字加密）
  * ============================
@@ -75,7 +76,7 @@ export function Privacy(): React.JSX.Element {
         <div className="lp-privacy__panels">
           <div className="lp-privacy__panel">
             <div className="lp-privacy__panel-head">
-              <Smartphone size={16} aria-hidden="true" />
+              <Smartphone size={ICON_SIZE.sm} aria-hidden="true" />
               {t('landing.privacy.yourDevice')}
             </div>
             <p className="lp-privacy__text">{plaintext}</p>
@@ -84,7 +85,7 @@ export function Privacy(): React.JSX.Element {
 
           <div className="lp-privacy__panel lp-privacy__panel--server">
             <div className="lp-privacy__panel-head">
-              <Server size={16} aria-hidden="true" />
+              <Server size={ICON_SIZE.sm} aria-hidden="true" />
               {t('landing.privacy.server')}
             </div>
             <p className="lp-privacy__text lp-privacy__text--cipher">

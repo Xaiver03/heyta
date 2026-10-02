@@ -139,7 +139,7 @@ test('帮助中心是两层的共同入口：五个分类、十条速答、六�
   await page.setViewportSize({ width: 1280, height: 900 });
   const hits = watchConsole(page);
 
-  await page.goto('/help/');
+  await page.goto('/docs/');
   await page.locator('#main .lp-help__module').first().waitFor();
   // ① 先落证据，再打分。
   await waitHeadRevealed(page);
@@ -200,7 +200,7 @@ test('文章页：侧栏是整个文档中心的地图，当前篇只高亮一�
   await page.setViewportSize({ width: 1280, height: 900 });
   const hits = watchConsole(page);
 
-  await page.goto('/help/how/');
+  await page.goto('/docs/how/');
   await page.locator('#main .lp-docs__nav').first().waitFor();
   await waitHeadRevealed(page);
   await page.screenshot({ path: 'landing-results/landing-docs-article.png', fullPage: true });
@@ -223,9 +223,11 @@ test('文章页：侧栏是整个文档中心的地图，当前篇只高亮一�
         .filter((a) => a.getAttribute('aria-current') === 'page')
         .map((a) => a.getAttribute('href') ?? ''),
       backHref: document.querySelector('#main .lp-docs__back')?.getAttribute('href') ?? '',
-      topNavCurrent: [
-        ...document.querySelectorAll<HTMLAnchorElement>('.lp-nav__links a[aria-current="page"]'),
-      ].map((a) => a.getAttribute('href') ?? ''),
+      shell: {
+        marketingNavPresent: document.querySelector('.lp-nav') !== null,
+        docsTopnavPresent: document.querySelector('.lp-docs-topnav') !== null,
+        docsLogoHref: document.querySelector('.lp-docs-topnav__logo')?.getAttribute('href') ?? '',
+      },
       ctaCount: document.querySelectorAll('#main .lp-page__cta').length,
     };
   });
@@ -248,9 +250,13 @@ test('文章页：侧栏是整个文档中心的地图，当前篇只高亮一�
     '侧栏必须列出全部六篇（它是地图，不是本页目录）',
   ).toEqual([...ARTICLE_IDS].sort());
   // 🔴 恰好一条当前项，而且是这一篇自己。零条=人不知道在哪；两条=高亮没有意义。
-  expect(probe.navCurrent, '侧栏当前项必须恰好一条且是本页').toEqual(['/help/how/']);
-  expect(probe.backHref, '侧栏顶部那条回到帮助中心').toBe('/help/');
-  expect(probe.topNavCurrent, '文章不进导航，但顶部导航要亮着「帮助」').toEqual(['/help/']);
+  expect(probe.navCurrent, '侧栏当前项必须恰好一条且是本页').toEqual(['/docs/how/']);
+  expect(probe.backHref, '侧栏顶部那条回到帮助中心').toBe('/docs/');
+  // 🔴 2026-10-01 IA 对齐：文档页是独立外壳 —— 营销站的导航不得出现，
+  // 自己的 topnav 必须在，logo 回到文档中心枢纽。
+  expect(probe.shell.marketingNavPresent, '文档页不得渲染营销站的导航').toBe(false);
+  expect(probe.shell.docsTopnavPresent, '文档页有自己的 topnav（帮助中心外壳）').toBe(true);
+  expect(probe.shell.docsLogoHref, '文档站 logo 回到文档中心枢纽').toBe('/docs/');
   // 文章页不给收尾 CTA：读的人正在解决一件具体的事，不该被拔出去（见 PageHead 的 cta）。
   expect(probe.ctaCount, '文章页不渲染「立即使用」那颗按钮').toBe(0);
 
@@ -261,12 +267,12 @@ test('侧栏跳转是真路由：从「同步原理」点到「冲突」，当�
   await page.setViewportSize({ width: 1280, height: 900 });
   const hits = watchConsole(page);
 
-  await page.goto('/help/how/');
+  await page.goto('/docs/how/');
   await page.locator('#main .lp-docs__nav').first().waitFor();
 
   // 🔴 按 **href** 点而不是按文字点：文案会改，而"侧栏那条链接指向哪"才是要验的事。
-  await page.locator('#main .lp-docs__link[href="/help/conflict/"]').click();
-  await page.waitForURL('**/help/conflict/');
+  await page.locator('#main .lp-docs__link[href="/docs/conflict/"]').click();
+  await page.waitForURL('**/docs/conflict/');
   await page.locator('h1').first().waitFor();
   await waitHeadRevealed(page);
   await page.screenshot({ path: 'landing-results/landing-docs-jumped.png', fullPage: true });
@@ -280,19 +286,21 @@ test('侧栏跳转是真路由：从「同步原理」点到「冲突」，当�
         '#main .lp-docs__nav .lp-docs__link[aria-current="page"]',
       ),
     ].map((a) => a.getAttribute('href') ?? ''),
-    topNavCurrent: [
-      ...document.querySelectorAll<HTMLAnchorElement>('.lp-nav__links a[aria-current="page"]'),
-    ].map((a) => a.getAttribute('href') ?? ''),
+    shell: {
+      marketingNavPresent: document.querySelector('.lp-nav') !== null,
+      docsTopnavPresent: document.querySelector('.lp-docs-topnav') !== null,
+    },
   }));
 
-  expect(after.path, '地址真的换到冲突那一篇').toBe('/help/conflict/');
+  expect(after.path, '地址真的换到冲突那一篇').toBe('/docs/conflict/');
   expect(after.sectionIds, '正文换成冲突的三节').toEqual([
     'why-they-exist',
     'how-it-decides',
     'what-you-see',
   ]);
-  expect(after.current, '高亮搬到新页面自己').toEqual(['/help/conflict/']);
-  expect(after.topNavCurrent, '顶部导航仍然亮着「帮助」').toEqual(['/help/']);
+  expect(after.current, '高亮搬到新页面自己').toEqual(['/docs/conflict/']);
+  expect(after.shell.marketingNavPresent, '跳转之后仍在文档外壳里（无营销导航）').toBe(false);
+  expect(after.shell.docsTopnavPresent, '跳转之后文档 topnav 还在').toBe(true);
 
   expectCleanConsole(hits);
 });
@@ -318,9 +326,9 @@ test('英文版文章用的是英文条目，且 canonical / hreflang 指向自�
     }));
   };
 
-  const zh = await read('/help/passphrase/');
+  const zh = await read('/docs/passphrase/');
   await page.screenshot({ path: 'landing-results/landing-docs-passphrase-zh.png', fullPage: true });
-  const en = await read('/en/help/passphrase/');
+  const en = await read('/en/docs/passphrase/');
   await page.screenshot({ path: 'landing-results/landing-docs-passphrase-en.png', fullPage: true });
 
   expect(zh.lang, '中文版 lang').toBe('zh-CN');
@@ -331,7 +339,7 @@ test('英文版文章用的是英文条目，且 canonical / hreflang 指向自�
   expect(/[一-鿿]/.test(en.h1), `英文页 H1 不该含中文：${en.h1}`).toBe(false);
   expect(en.h1, '两版标题必须不同（相同=语言回落）').not.toBe(zh.h1);
 
-  expect(en.canonical, '英文版 canonical 指向英文版自己').toMatch(/\/en\/help\/passphrase\/$/);
+  expect(en.canonical, '英文版 canonical 指向英文版自己').toMatch(/\/en\/docs\/passphrase\/$/);
   expect(en.alternates.join(' '), 'hreflang 必须成对给出中英两版').toContain('zh-CN');
   expect(en.alternates.join(' ')).toContain('en');
   expect(en.xDefault, 'x-default 落中文版').toBe(zh.canonical);
@@ -351,7 +359,7 @@ test('暗色主题不是反相：同一篇文章在暗色下真的走暗色 toke
   // （AGENTS §7 第 83 条的同一个形状：探针是被测系统的一段真实操作）。
   await page.addInitScript(() => window.localStorage.setItem('heyta.theme', 'dark'));
 
-  await page.goto('/help/how/');
+  await page.goto('/docs/how/');
   await page.locator('#main .lp-docs__nav').first().waitFor();
   await waitHeadRevealed(page);
   await page.screenshot({ path: 'landing-results/landing-docs-article-dark.png', fullPage: true });
@@ -379,7 +387,7 @@ test('暗色主题不是反相：同一篇文章在暗色下真的走暗色 toke
   });
   const lightPage = await lightCtx.newPage();
   const lightHits = watchConsole(lightPage);
-  await lightPage.goto(`${origin}/help/how/`);
+  await lightPage.goto(`${origin}/docs/how/`);
   await lightPage.locator('#main .lp-docs__nav').first().waitFor();
   await waitHeadRevealed(lightPage);
   await lightPage.screenshot({
@@ -408,7 +416,7 @@ test('窄屏（390×844）塌缩成单列，侧栏退到正文之后', async ({ 
   await page.setViewportSize({ width: 390, height: 844 });
   const hits = watchConsole(page);
 
-  await page.goto('/help/selfhost/');
+  await page.goto('/docs/selfhost/');
   await page.locator('#main .lp-docs__nav').first().waitFor();
   await waitHeadRevealed(page);
   await page.screenshot({ path: 'landing-results/landing-docs-narrow.png', fullPage: true });
@@ -442,7 +450,7 @@ test('分类页是这一组的入口：卡片恰好等于侧栏这一组的链�
   await page.setViewportSize({ width: 1280, height: 900 });
   const hits = watchConsole(page);
 
-  await page.goto('/help/sync/');
+  await page.goto('/docs/sync/');
   await page.locator('#main .lp-docs__nav').first().waitFor();
   await waitHeadRevealed(page);
   await page.screenshot({ path: 'landing-results/landing-docs-category.png', fullPage: true });
@@ -476,9 +484,11 @@ test('分类页是这一组的入口：卡片恰好等于侧栏这一组的链�
       eyebrowCount: document.querySelectorAll('#main .lp-docs__eyebrow').length,
       navLinkTotal: document.querySelectorAll('#main .lp-docs__link').length,
       backHref: document.querySelector('#main .lp-docs__back')?.getAttribute('href') ?? '',
-      topNavCurrent: [
-        ...document.querySelectorAll<HTMLAnchorElement>('.lp-nav__links a[aria-current="page"]'),
-      ].map((a) => a.getAttribute('href') ?? ''),
+      shell: {
+        marketingNavPresent: document.querySelector('.lp-nav') !== null,
+        docsTopnavPresent: document.querySelector('.lp-docs-topnav') !== null,
+        docsLogoHref: document.querySelector('.lp-docs-topnav__logo')?.getAttribute('href') ?? '',
+      },
       ctaCount: document.querySelectorAll('#main .lp-page__cta').length,
     };
   });
@@ -487,7 +497,7 @@ test('分类页是这一组的入口：卡片恰好等于侧栏这一组的链�
   // 🔴 恰好一个当前分组，而且指向本页。零个=人不知道自己在哪一组；
   // 两个=高亮没有意义。走的是 `aria-current="true"`，与文章的 `"page"` 分开（见 DocsNav）。
   expect(probe.currentGroupCount, '侧栏当前分组必须恰好一个').toBe(1);
-  expect(probe.currentGroupHref, '当前分组指向本页').toBe('/help/sync/');
+  expect(probe.currentGroupHref, '当前分组指向本页').toBe('/docs/sync/');
   expect(probe.articleCurrentCount, '分类页不是文章，侧栏不该有当前文章项').toBe(0);
   // 页头 h1 与侧栏亮着的那一项是同一个词 —— 两处各自 `t(module.titleKey)`，对不上就是有一处写错。
   expect(probe.currentGroupText, '侧栏高亮的分组名必须就是页标题').toBe(probe.h1);
@@ -508,8 +518,10 @@ test('分类页是这一组的入口：卡片恰好等于侧栏这一组的链�
   // 分类页 = 速答 + 深读卡片（同一块 `DocsModuleBlock`，与 `/help` 上那块逐字同源）。
   expect(probe.faqCount, '分类页保留这一组的速答').toBeGreaterThan(0);
   expect(probe.eyebrowCount, '速答 + 深入阅读两个小标题').toBe(2);
-  expect(probe.backHref, '侧栏顶部那条回到帮助中心').toBe('/help/');
-  expect(probe.topNavCurrent, '分类页不进导航，顶部仍亮着「帮助」').toEqual(['/help/']);
+  expect(probe.backHref, '侧栏顶部那条回到帮助中心').toBe('/docs/');
+  expect(probe.shell.marketingNavPresent, '分类页不得渲染营销站的导航').toBe(false);
+  expect(probe.shell.docsTopnavPresent, '分类页有自己的 topnav').toBe(true);
+  expect(probe.shell.docsLogoHref, '分类页的 logo 同样回到枢纽').toBe('/docs/');
   expect(probe.ctaCount, '分类页不给收尾 CTA').toBe(0);
 
   expectCleanConsole(hits);
@@ -519,7 +531,7 @@ test('侧栏分组能收能开：收起是「看不见」而不是「不存在�
   await page.setViewportSize({ width: 1280, height: 900 });
   const hits = watchConsole(page);
 
-  await page.goto('/help/how/');
+  await page.goto('/docs/how/');
   await page.locator('#main .lp-docs__nav').first().waitFor();
   await waitHeadRevealed(page);
   await page.screenshot({ path: 'landing-results/landing-docs-groups-open.png' });
@@ -593,7 +605,7 @@ test('页内目录从渲染出的分区生成，点最后一条就滚到那一�
   await page.setViewportSize({ width: 1280, height: 900 });
   const hits = watchConsole(page);
 
-  await page.goto('/help/how/');
+  await page.goto('/docs/how/');
   await page.locator('#main .lp-docs__toc').first().waitFor();
   await waitHeadRevealed(page);
 
@@ -642,7 +654,7 @@ test('页内目录从渲染出的分区生成，点最后一条就滚到那一�
   const after = await page.evaluate(
     (sel) => {
       const section = document.querySelector<HTMLElement>(sel);
-      const header = document.querySelector('.lp-nav')?.getBoundingClientRect();
+      const header = document.querySelector('.lp-docs-topnav')?.getBoundingClientRect();
       return {
         path: location.pathname,
         hash: location.hash,
@@ -656,7 +668,7 @@ test('页内目录从渲染出的分区生成，点最后一条就滚到那一�
     target,
   );
 
-  expect(after.path, '跳转不许换页（目录是页内锚点，不是路由）').toBe('/help/how/');
+  expect(after.path, '跳转不许换页（目录是页内锚点，不是路由）').toBe('/docs/how/');
   expect(after.hash, '地址栏带上这一节的锚点（这才叫"可分享的深链"）').toBe(target);
   expect(after.scrollY, '页面真的滚动了').toBeGreaterThan(0);
   // 🔴 两条几何判据，方向各一：不能顶到 sticky 页头**底下**（被盖住=看着没反应），
@@ -664,6 +676,18 @@ test('页内目录从渲染出的分区生成，点最后一条就滚到那一�
   expect(after.top, '目标分区不被顶部导航盖住').toBeGreaterThanOrEqual(after.headerBottom - 2);
   expect(after.top, '目标分区进入视口').toBeLessThan(after.innerHeight);
   expect(after.h2, '滚到的正是目录里那一条').toBe(before.sectionTitles[before.sectionTitles.length - 1]);
+
+  // 🔴 滚动跟随高亮（IntersectionObserver）：读到最后一节，右栏点亮的必须恰好是
+  // 最后一节（href 与 aria-current 同源）。没有它，右栏只是一张静态小目录 ——
+  // SSOS 那种"读到哪、目录亮到哪"的引导就不存在。
+  await expect
+    .poll(() => page.locator('.lp-docs__toc-link--active').getAttribute('href'), { timeout: 5_000 })
+    .toBe(target);
+  expect(
+    await page.locator('.lp-docs__toc-link--active').getAttribute('aria-current'),
+    '高亮项带 aria-current="location"（高亮与可访问名同源）',
+  ).toBe('location');
+  expect(await page.locator('.lp-docs__toc-link--active').count(), '高亮恰好一条').toBe(1);
 
   await page.screenshot({ path: 'landing-results/landing-docs-toc-scrolled.png' });
 
@@ -681,6 +705,14 @@ async function readArticle(page: Page, path: string) {
   await page.goto(path);
   await page.locator('#main .lp-docs__nav').first().waitFor();
   await waitHeadRevealed(page);
+  const dbg = await page.evaluate(() => ({
+    path: location.pathname,
+    figSrc: document.querySelector('.lp-figure img')?.getAttribute('src') ?? '(none)',
+    mainImgs: document.querySelectorAll('#main img').length,
+    mains: document.querySelectorAll('main').length,
+  }));
+  console.log('DBG ' + JSON.stringify(dbg));
+
   return page.evaluate(() => {
     const main = document.querySelector('#main')?.textContent ?? '';
     const sections = [...document.querySelectorAll<HTMLElement>('#main section.lp-row')];
@@ -718,7 +750,7 @@ test('补进来的八篇中文文章每篇都有真正文：段落 ≥ 8、目�
   const hits = watchConsole(page);
 
   for (const id of NEW_ARTICLE_IDS) {
-    const probe = await readArticle(page, `/help/${id}/`);
+    const probe = await readArticle(page, `/docs/${id}/`);
     // 🔴 元素截图（不是 fullPage）：这一条要看的判据是"正文有没有字数"，
     // 而 fullPage 拍不进内部滚动容器（本轮已实测过一次），`#main` 恰好是能整张拍下来的那个。
     await page.locator('#main').screenshot({ path: `landing-results/landing-article-${id}.png` });
@@ -750,8 +782,8 @@ test('同八篇的英文版不是中文回落：标题没有汉字、段落数�
   const hits = watchConsole(page);
 
   for (const id of NEW_ARTICLE_IDS) {
-    const zh = await readArticle(page, `/help/${id}/`);
-    const en = await readArticle(page, `/en/help/${id}/`);
+    const zh = await readArticle(page, `/docs/${id}/`);
+    const en = await readArticle(page, `/en/docs/${id}/`);
     await page.locator('#main').screenshot({ path: `landing-results/landing-article-${id}-en.png` });
 
     expect(en.lang, `${id}：英文版 lang`).toBe('en');
@@ -772,7 +804,7 @@ test('五个分类页都真的可达：卡片恰好是这一组的文章，侧�
   const hits = watchConsole(page);
 
   for (const id of CATEGORY_IDS) {
-    await page.goto(`/help/${id}/`);
+    await page.goto(`/docs/${id}/`);
     await page.locator('#main .lp-docs__nav').first().waitFor();
     await waitHeadRevealed(page);
     await page.locator('#main').screenshot({ path: `landing-results/landing-category-${id}.png` });
@@ -813,7 +845,7 @@ test('五个分类页都真的可达：卡片恰好是这一组的文章，侧�
 
     expect(probe.h1.length, `${id}：分类页必须有 H1`).toBeGreaterThan(0);
     expect(probe.currentCount, `${id}：当前分组必须恰好一个`).toBe(1);
-    expect(probe.currentHref, `${id}：当前分组指向本页`).toBe(`/help/${id}/`);
+    expect(probe.currentHref, `${id}：当前分组指向本页`).toBe(`/docs/${id}/`);
     // 页标题与侧栏亮着的那一项是同一个词：两处各自 `t(module.titleKey)`，对不上就是有一处写错。
     expect(probe.currentText, `${id}：侧栏高亮的分组名必须就是页标题`).toBe(probe.h1);
     expect(probe.articleCurrentCount, `${id}：分类页不是文章，不该有当前文章项`).toBe(0);
@@ -915,7 +947,7 @@ async function readFigures(page: Page, path: string) {
       figures,
       // 页面上所有指向复制品的 `<img>`：与 `.lp-figure img` 数量不等，
       // 就说明有一张图挂在正文里（不是配图槽）或者复制品被别处引用了。
-      helpImgCount: document.querySelectorAll('#main img[src^="/assets/help/"]').length,
+      helpImgCount: document.querySelectorAll('#main img[src^="/assets/docs/"]').length,
       proseCount: document.querySelectorAll('#main .lp-prose').length,
       leakedKeys: (document.querySelector('#main')?.textContent ?? '').match(
         /\bsite\.[\w-]+\.[\w-]+/g,
@@ -931,7 +963,7 @@ test('五张配图真的挂在指定分区上：图号是「图 注册序-序」
   const hits = watchConsole(page);
 
   for (const id of FIGURED_ARTICLE_IDS) {
-    const probe = await readFigures(page, `/help/${id}/`);
+    const probe = await readFigures(page, `/docs/${id}/`);
     // 中文页只对 zh 那一半期望：en 行归第 14 条管。
     const expected = FIGURES.filter((figure) => figure.article === id && figure.locale === 'zh-CN');
 
@@ -958,7 +990,7 @@ test('五张配图真的挂在指定分区上：图号是「图 注册序-序」
       expect(got.sectionId, `${id}：第 ${i + 1} 张必须挂在分区 "${want.sectionId}" 里`).toBe(
         want.sectionId,
       );
-      expect(got.src, `${id}：第 ${i + 1} 张的地址`).toBe(`/assets/help/${id}/${want.file}`);
+      expect(got.src, `${id}：第 ${i + 1} 张的地址`).toBe(`/assets/docs/${id}/${want.file}`);
       // 🔴 真像素：`naturalWidth` 为 0 的 <img> 是"有标签没内容"，
       // 而 src 写对、alt 写对、图号写对 —— 断言全绿而访客看到一块空框。
       expect(got.naturalWidth, `${id}：第 ${i + 1} 张必须真的解码出像素`).toBeGreaterThan(100);
@@ -986,7 +1018,7 @@ test('反向对照：没配图的十篇一张都不许多画，英文版挂的�
   // 这一条管的是"图挂错文章"：映射表的 key 写错、或渲染器把整张表都倒给每一篇，
   // 上面那条"该有的有"照样全绿。
   for (const id of ARTICLE_IDS.filter((a) => !FIGURED_ARTICLE_IDS.includes(a))) {
-    const probe = await readFigures(page, `/help/${id}/`);
+    const probe = await readFigures(page, `/docs/${id}/`);
     expect(
       probe.figures.map((f) => f.number),
       `${id}：这一篇不该有配图，画出来了就是挂错地方`,
@@ -1002,7 +1034,7 @@ test('反向对照：没配图的十篇一张都不许多画，英文版挂的�
   // 目录、状态码全都照样绿。
   for (const id of FIGURED_ARTICLE_IDS) {
     const expected = FIGURES.filter((figure) => figure.article === id && figure.locale === 'en');
-    const probe = await readFigures(page, `/en/help/${id}/`);
+    const probe = await readFigures(page, `/en/docs/${id}/`);
     await page
       .locator('#main')
       .screenshot({ path: `landing-results/landing-figures-${id}-en.png` });
@@ -1019,7 +1051,7 @@ test('反向对照：没配图的十篇一张都不许多画，英文版挂的�
       const got = probe.figures[i];
       if (got === undefined) return;
       // src 精确等于 en 产物：zh 产物混进来 = 把中文界面挂进了英文正文，就在这里红。
-      expect(got.src, `${id}：第 ${i + 1} 张必须是英文界面产物`).toBe(`/assets/help/${id}/${want.file}`);
+      expect(got.src, `${id}：第 ${i + 1} 张必须是英文界面产物`).toBe(`/assets/docs/${id}/${want.file}`);
       expect(got.number, `${id}：第 ${i + 1} 张的图号`).toBe(want.number);
       expect(got.sectionId, `${id}：第 ${i + 1} 张必须挂在分区 "${want.sectionId}" 里`).toBe(
         want.sectionId,
@@ -1062,9 +1094,9 @@ async function readSearchRows(page: Page): Promise<{
 }> {
   return page.evaluate(() => {
     const links = [
-      ...document.querySelectorAll<HTMLAnchorElement>('#main .lp-docs__search-link'),
+      ...document.querySelectorAll<HTMLAnchorElement>('.lp-docs-topnav .lp-docs__search-link'),
     ];
-    const box = document.querySelector('#main .lp-docs__search');
+    const box = document.querySelector('.lp-docs-topnav .lp-docs__search');
     return {
       rows: links.map((a) => ({
         href: a.getAttribute('href') ?? '',
@@ -1072,11 +1104,11 @@ async function readSearchRows(page: Page): Promise<{
         from: a.querySelector('.lp-docs__search-from')?.textContent?.trim() ?? '',
         section: a.getAttribute('data-section') === 'true',
       })),
-      resultsMounted: document.querySelector('#main .lp-docs__search-results') !== null,
-      emptyText: document.querySelector('#main .lp-docs__search-empty')?.textContent?.trim() ?? '',
-      moreText: document.querySelector('#main .lp-docs__search-more')?.textContent?.trim() ?? '',
+      resultsMounted: document.querySelector('.lp-docs-topnav .lp-docs__search-results') !== null,
+      emptyText: document.querySelector('.lp-docs-topnav .lp-docs__search-empty')?.textContent?.trim() ?? '',
+      moreText: document.querySelector('.lp-docs-topnav .lp-docs__search-more')?.textContent?.trim() ?? '',
       inputValue:
-        document.querySelector<HTMLInputElement>('#main .lp-docs__search-input')?.value ?? '',
+        document.querySelector<HTMLInputElement>('.lp-docs-topnav .lp-docs__search-input')?.value ?? '',
       blockText: box?.textContent?.trim() ?? '',
     };
   });
@@ -1094,7 +1126,7 @@ async function readSections(page: Page, path: string): Promise<{ id: string; tit
   );
 }
 
-/** 去掉锚点，取页面那一段（`/help/passphrase/#what-it-is` → `/help/passphrase/`）。 */
+/** 去掉锚点，取页面那一段（`/docs/passphrase/#what-it-is` → `/docs/passphrase/`）。 */
 function pathOfHref(href: string): string {
   const i = href.indexOf('#');
   return i < 0 ? href : href.slice(0, i);
@@ -1141,12 +1173,12 @@ test('搜索搜的是当前语言的标题，命中分区就带锚点，且那�
   await page.setViewportSize({ width: 1280, height: 900 });
   const hits = watchConsole(page);
 
-  await page.goto('/help/');
-  await page.locator('#main .lp-docs__search-input').first().waitFor();
+  await page.goto('/docs/');
+  await page.locator('.lp-docs-topnav .lp-docs__search-input').first().waitFor();
   await waitHeadRevealed(page);
 
-  await page.fill('#main .lp-docs__search-input', '口令');
-  await page.locator('#main .lp-docs__search-link').first().waitFor();
+  await page.fill('.lp-docs-topnav .lp-docs__search-input', '口令');
+  await page.locator('.lp-docs-topnav .lp-docs__search-link').first().waitFor();
   // ① 先落证据，再打分（§6.2 规定一）。
   await page.screenshot({ path: 'landing-results/landing-docs-search.png', fullPage: true });
 
@@ -1160,7 +1192,7 @@ test('搜索搜的是当前语言的标题，命中分区就带锚点，且那�
     `结果标题必须都含这个词：${zh.rows.map((r) => r.title).join(' / ')}`,
   ).toBe(true);
   expect(
-    zh.rows.some((r) => r.href === '/help/passphrase/' && !r.section),
+    zh.rows.some((r) => r.href === '/docs/passphrase/' && !r.section),
     '文章级命中：href 就是那一页，不带锚点',
   ).toBe(true);
   // `data-section` 与 href 里的 `#` 必须同进同退：一个是给读者看的形状，一个是给判据的。
@@ -1188,18 +1220,18 @@ test('搜索搜的是当前语言的标题，命中分区就带锚点，且那�
   }
 
   // 清除：输入清空之后结果区**整块下架**（常驻空列表会让侧栏那类计数判据数出一堆空条目）。
-  await page.goto('/help/');
-  await page.locator('#main .lp-docs__search-input').first().waitFor();
-  await page.fill('#main .lp-docs__search-input', '口令');
-  await page.locator('#main .lp-docs__search-clear').waitFor();
-  await page.locator('#main .lp-docs__search-clear').click();
-  await expect(page.locator('#main .lp-docs__search-results')).toHaveCount(0);
+  await page.goto('/docs/');
+  await page.locator('.lp-docs-topnav .lp-docs__search-input').first().waitFor();
+  await page.fill('.lp-docs-topnav .lp-docs__search-input', '口令');
+  await page.locator('.lp-docs-topnav .lp-docs__search-clear').waitFor();
+  await page.locator('.lp-docs-topnav .lp-docs__search-clear').click();
+  await expect(page.locator('.lp-docs-topnav .lp-docs__search-results')).toHaveCount(0);
   const cleared = await readSearchRows(page);
   expect(cleared.inputValue, '清除按钮把输入框真的清空').toBe('');
 
   // 没命中要给一句话，不能一片空白 —— 空白读起来像"坏了"。
-  await page.fill('#main .lp-docs__search-input', 'zzzqqq');
-  await page.locator('#main .lp-docs__search-empty').waitFor();
+  await page.fill('.lp-docs-topnav .lp-docs__search-input', 'zzzqqq');
+  await page.locator('.lp-docs-topnav .lp-docs__search-empty').waitFor();
   const none = await readSearchRows(page);
   expect(none.rows, '不该有命中却出了条目').toEqual([]);
   expect(none.emptyText.length, '没命中时那句提示要有字').toBeGreaterThan(0);
@@ -1207,10 +1239,10 @@ test('搜索搜的是当前语言的标题，命中分区就带锚点，且那�
 
   // 🔴 英文页搜英文标题：这条管的是"索引跟着语言走"。若索引是在 Node 侧按中文解析好的，
   // 英文页会出现中文标题的结果 —— 而入口存在、状态 200、段落数全照样绿。
-  await page.goto('/en/help/');
-  await page.locator('#main .lp-docs__search-input').first().waitFor();
-  await page.fill('#main .lp-docs__search-input', 'passphrase');
-  await page.locator('#main .lp-docs__search-link').first().waitFor();
+  await page.goto('/en/docs/');
+  await page.locator('.lp-docs-topnav .lp-docs__search-input').first().waitFor();
+  await page.fill('.lp-docs-topnav .lp-docs__search-input', 'passphrase');
+  await page.locator('.lp-docs-topnav .lp-docs__search-link').first().waitFor();
   const en = await readSearchRows(page);
   expect(en.rows.length, `英文搜 passphrase 该有命中：${JSON.stringify(en.rows)}`).toBeGreaterThanOrEqual(
     2,
@@ -1228,10 +1260,10 @@ test('搜索搜的是当前语言的标题，命中分区就带锚点，且那�
   }
 
   // 截断：上限是代码里的常量，而那一句要把数字带给读者（一个高频词能命中二十几条）。
-  await page.goto('/en/help/');
-  await page.locator('#main .lp-docs__search-input').first().waitFor();
-  await page.fill('#main .lp-docs__search-input', 'the');
-  await page.locator('#main .lp-docs__search-link').first().waitFor();
+  await page.goto('/en/docs/');
+  await page.locator('.lp-docs-topnav .lp-docs__search-input').first().waitFor();
+  await page.fill('.lp-docs-topnav .lp-docs__search-input', 'the');
+  await page.locator('.lp-docs-topnav .lp-docs__search-link').first().waitFor();
   const many = await readSearchRows(page);
   expect(many.rows.length, '结果必须截断在上限 8 条').toBe(8);
   expect(many.moreText, '截断必须说出来，那句里的数字就是上限').toContain('8');
@@ -1243,16 +1275,16 @@ test('窄屏上搜索框不靠抽屉就能用，且全页只有一个', async ({
   await page.setViewportSize({ width: 390, height: 844 });
   const hits = watchConsole(page);
 
-  await page.goto('/help/sync/');
-  await page.locator('#main .lp-docs__search-input').first().waitFor();
+  await page.goto('/docs/sync/');
+  await page.locator('.lp-docs-topnav .lp-docs__search-input').first().waitFor();
   await waitHeadRevealed(page);
 
   const narrow = await page.evaluate(() => {
     const box = document
-      .querySelector('#main .lp-docs__search-input')
+      .querySelector('.lp-docs-topnav .lp-docs__search-input')
       ?.getBoundingClientRect();
     return {
-      inputCount: document.querySelectorAll('#main .lp-docs__search-input').length,
+      inputCount: document.querySelectorAll('.lp-docs-topnav .lp-docs__search-input').length,
       height: box?.height ?? 0,
       left: box?.left ?? -1,
       right: box?.right ?? -1,
@@ -1272,8 +1304,8 @@ test('窄屏上搜索框不靠抽屉就能用，且全页只有一个', async ({
   expect(narrow.overflowX, '不该出现横向溢出').toBe(false);
 
   // 真在手机上搜一次：能输入、能出结果，抽屉不参与。
-  await page.fill('#main .lp-docs__search-input', '口令');
-  await page.locator('#main .lp-docs__search-link').first().waitFor();
+  await page.fill('.lp-docs-topnav .lp-docs__search-input', '口令');
+  await page.locator('.lp-docs-topnav .lp-docs__search-link').first().waitFor();
   await page.screenshot({ path: 'landing-results/landing-docs-search-narrow.png', fullPage: true });
   const rows = await readSearchRows(page);
   expect(rows.rows.every((r) => r.title.includes('口令')), '窄屏出的是同一份结果').toBe(true);
@@ -1309,9 +1341,9 @@ test('五个分类每个都有 ≥2 篇有正文的文章：十四篇 × 中英�
     const rows: string[] = [];
 
     for (const id of ids) {
-      const zh = await readArticle(page, `/help/${id}/`);
+      const zh = await readArticle(page, `/docs/${id}/`);
       await page.locator('#main').screenshot({ path: `landing-results/landing-body-${id}.png` });
-      const en = await readArticle(page, `/en/help/${id}/`);
+      const en = await readArticle(page, `/en/docs/${id}/`);
 
       expect(zh.lang, `${id}：中文版 lang`).toBe('zh-CN');
       expect(en.lang, `${id}：英文版 lang`).toBe('en');

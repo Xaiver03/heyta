@@ -1,3 +1,4 @@
+import { ICON_SIZE } from '@heyta/design-system';
 /**
  * 文档中心的搜索
  * ================
@@ -98,7 +99,7 @@ export function DocsSearch(): React.JSX.Element {
   return (
     <div className="lp-docs__search" role="search">
       <div className="lp-docs__search-field">
-        <Search className="lp-docs__search-icon" size={15} aria-hidden="true" />
+        <Search className="lp-docs__search-icon" size={ICON_SIZE.sm} aria-hidden="true" />
         <input
           className="lp-docs__search-input"
           type="search"
@@ -114,7 +115,7 @@ export function DocsSearch(): React.JSX.Element {
             aria-label={t('site.docs.search.clear')}
             onClick={() => setQuery('')}
           >
-            <X size={14} aria-hidden="true" />
+            <X size={ICON_SIZE.xs} aria-hidden="true" />
           </button>
         ) : null}
       </div>

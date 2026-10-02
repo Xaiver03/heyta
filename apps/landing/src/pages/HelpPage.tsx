@@ -44,7 +44,6 @@ import { useI18n } from '@heyta/i18n/provider';
 
 import { DocsModuleBlock } from '../site/DocsModule.js';
 import { docsOutline } from '../site/docs.js';
-import { DocsSearch } from '../site/DocsSearch.js';
 import { PageHead } from '../site/PageSections.js';
 import type { SitePage } from '../site/pages.js';
 
@@ -56,7 +55,6 @@ export function HelpPage({ page }: { page: SitePage }): React.JSX.Element {
       <PageHead page={page} />
       <div className="lp-section">
         <div className="lp-wrap">
-          <DocsSearch />
           <h2 className="lp-h2">{t('site.help.topics.title')}</h2>
           {docsOutline().map(({ module, articles }) => (
             <DocsModuleBlock key={module.id} module={module} articles={articles} />
