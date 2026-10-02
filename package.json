@@ -116,9 +116,7 @@
     "check:server-copy": "cd server && ./node_modules/.bin/ts-node --transpile-only scripts/gen-server-copy.ts --check",
     "check:server-legal": "node server/scripts/gen-server-legal.mjs --check",
     "verify:email-auth": "node scripts/verify-email-auth-chain.mjs",
-    "verify:email-web": "node scripts/verify-email-web-chain.mjs",
     "verify:password-chain": "node scripts/verify-email-password-chain.mjs",
-    "verify:password-web": "node scripts/verify-password-web-journey.mjs",
     "verify:legal-links": "pnpm --dir e2e run test:legal-links"
   },
   "devDependencies": {
