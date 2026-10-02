@@ -136,3 +136,54 @@ CocoaPods 的 "path name contains null byte"，最后是在**同 commit 的新�
 `840effb1`，当前 HEAD 是 `9359ba41`，两者之间 `git diff --name-only` 命中
 **1 个文件、其中 apps/packages/server/e2e 为 0**（本脚本对此有硬判据，非代码变更
 才允许把结论写成"装的是当前产物"）。🔴 这一轮之后，"四端装的是当前产物"这句话才是当前状态。
+
+### 7.2 🔴 收尾的最终一轮：改完移动端 UI 后在 `6834b4ae` 上重证 + 4 道红的逐条归因（2026-10-03 07:2x–07:3x）
+
+B27 那笔还账（`bb41e9fe`：`Stack` 补 `gap="tight"`、新增 `HStack`、`Text` 补 `grow`，`SecurityScreen` 清掉 9/10 处内联样式）
+动的是 `apps/mobile/src/**` ⇒ 按 §6.1.1，**装过当前产物**这句话只对没被它影响的端继续成立。所以本轮做了三件事：
+
+**（1）重装范围按"输入有没有变"划，不靠感觉**
+
+`git diff --name-only d25161ce..HEAD` 共 26 个文件，其中
+`apps/web/` `apps/desktop*` `packages/` 命中 **0**（mac 与 windows 装的是 `apps/web/dist` + 各自壳源码）
+⇒ 这两端 §7.1 的判据（mac 主蓝 1137 / windows 四条 + sha 对账）**仍然是当前状态**，不需要重跑，
+而 `apps/mobile/src/` 命中 2 个 ⇒ android 与 ios **必须**重跑。这一条是"哪端可以继承上一轮结论"的判据，
+不是"应该没事"。
+
+**（2）两端重跑结果**（隔离检出 `/Users/rocalight/heyta-ios-ri`，detached 在 `6834b4ae`；主工作树此刻有并行会话未提交的
+`AuthScreen.tsx` / `CalendarScreen.tsx` / `apps/web/src/**`，在里面跑会把他们的代码装进包）
+
+| 端 | 判据（现抽） |
+|---|---|
+| android | 汇总判词 `✅ android：已清旧包、重打、重装、有当前产物判据`；release APK 重打 → `emulator-5556` 全新安装 `Success`；
+  启动截图 1080x2400、内容占比 55.4%、**主蓝命中 4036** —— 三个数与 `d25161ce` 那轮**逐项相同** |
+| ios | 汇总判词 `✅ ios：已清旧包、重打、重装、有当前产物判据`；模拟器 `heyta-iphone-17pro`（`FE195661-B021-4A71-AAD1-1F2F7AE3A102`）；
+  Pods 沙盒不一致 ⇒ **兜底真的触发了一次**（`pod install` 改 lock 4 行后 `Manifest.lock == Podfile.lock`）；
+  1206x2622、内容占比 61.5%、主蓝命中 **4136**（与 §7.1 那轮的 4136 / 61.5% 逐项相同）；✅ 已装的包比源码新 |
+| 这一屏 | `verify-mobile-account` 在重装后的包上 **通过 13 项 / 失败 0 项**；两张证据图聚合值与仓库里那两张逐项相同
+  （通行密钥屏 主蓝 8425 / 内容 8.1%，改密成功态 主蓝 9254 / 内容 9.2%），**人都看过** |
+
+⚠️ 覆盖边界（同 B27）：`HStack` / `Text grow` 只活在通行密钥**列表行**里，而移动端无 WebAuthn ⇒ 设备上这一屏永远空态，
+那两样**没有像素级证据**，只有代码级等价 + typecheck + `@heyta/mobile` 测试。
+
+**（3）`pnpm check` 的 4 道红：逐段循环实测 + 逐条归因**
+
+链断在第一红后其余不跑，所以把 57 段逐段跑了一遍（`/tmp/g5-segloop2.log`，隔离检出）。红的是这 4 段：
+
+| 段 | 名字 | 实测内容 | 归因 |
+|---|---|---|---|
+| 12 | `check:l4` | screens 内联样式 98 > 基线 90（多 8） | 本条线欠的 10 处已清 9 处（`bb41e9fe`），剩 8 处按 B27 的 blame 属 M3 那条线。**门禁绿在本条线不可达** |
+| 49 | `check:ai-e2e` | 3 failed / 98 passed（`due-date-edit`、`motivation` R9 标题、`narrow-sweep` 日历） | B22 已取证：**提交态落后于别人未提交的工作**，不是这三条用例坏了 |
+| 51 | `check:landing-e2e` | 2 failed / 15 passed（`docs-centre.spec.ts` 配图张数 / 反向对照） | B24 已取证：**判据断在一个没人实现过的目录名上** |
+| 57 | `pnpm -r test` | server 4 个文件加载失败：`JWT_SECRET environment variable is required`（其余 103 文件 / 2005 条全过） | 🔴 **环境红，不是产品红**，而且反证做了两半：机制上 `server/.env` 被 `server/.gitignore:5` 忽略 ⇒ 任何干净克隆都没有它；行为上补一个随机 `JWT_SECRET` 后那 4 个文件 **4 passed / 43 tests passed**（`/tmp/g5-jwt-proof.log`，`rc=0`）。主工作树有 `server/.env`，所以这一条在主线上是绿的 |
+
+⇒ **"pnpm check 全量绿"在本轮不可达**，而且不可达的原因一条都不是"本条线留了坏东西"：
+1 条是别人的棘轮账（本条线的账已清）、2 条已由 B22/B24 归因、1 条是取证环境的 gitignored 配置。
+把这条写在这里而不是删掉那 4 行，是因为"我全量绿了"如果被读成一句假话，下一位会照着它建判据。
+
+**（4）本轮顺手修掉的两件**（都不属于批五，撞见了就修完）
+
+- `6997592c` + `6834b4ae`：验收横幅自报的设备号是 17 个脚本各抄一份的字面量 ⇒ 收成 lib 的 `$E2E_SERIAL`，
+  改后 `git grep '设备: emulator-5554'` 命中 **0**。上一笔提交信息里写"其余 9 个"是**读了截断样本数错的**，实测 16，
+  更正写在这里（提交信息不改历史）。
+- B28 / traps #156：HEAD 基 blob 提交让磁盘永久落后 ⇒ 现在每次提交后把同一段追加回磁盘。
