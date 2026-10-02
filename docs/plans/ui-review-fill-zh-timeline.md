@@ -895,6 +895,12 @@ HEYTA_NO_FOCUS=1 HEYTA_SELF_CAPTURE=/tmp/heyta-g4/mac-first-screen.png \
   /Applications/Heyta.app/Contents/MacOS/HeytaMac
 ```
 
+🔴 上面那行是**当时真的跑过的命令**（`/tmp` 只是取图的落点），而**图本身不能只活在 /tmp** ——
+一份"人眼看过"的 UI 证据如果只在临时目录里，它和没有等价。已把三件产物入库并登记：
+`apps/desktop-macos/evidence/consent-gate-first-screen-2026-10-02.png`（窗口图，md5 `4d4ec9f1…`）、
+`.webview.png`（WebKit 快照，md5 `e4909bf4…`）、`.txt`（取图自述：`1082x716` / `CAPTURE_METHOD=screencapturekit`），
+清单行在 `apps/desktop-macos/evidence/README.md`。
+
 **判据两条，各管一件事**：
 
 | 判据 | 实测 | 管的是 |

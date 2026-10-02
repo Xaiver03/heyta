@@ -7,6 +7,7 @@
 | `window-first-run.png` / `.txt` | 壳窗口的截图 + 取图自述 |
 | `settings-sheet-in-shell.png` / `.txt` | 设置面板在壳里的截图 |
 | `window-gate-accepted-2026-09-30.png` / `.txt` | 🔴 **门禁"通过"那一次它接受并据以判"画出来了"的图** —— 见下 |
+| `consent-gate-first-screen-2026-10-02.png` / `.webview.png` / `.txt` | **安装包冷启动的第一屏**：共享 UI 已渲染（侧栏/收集箱/清单/标签都在），但**列表区被隐私联网同意浮层挡着**。是台账 G4(a) 那一轮的现场（`docs/plans/ui-review-fill-zh-timeline.md` §4.5），窗口 1082x716、主蓝命中 1298 |
 | `storage-host/` | B/C 那条线的证据（另有自己的 README） |
 
 ## 🔴 `window-first-run.png` 是**过期的**，别拿它当"窗口画出来了"的证据
