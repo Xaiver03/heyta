@@ -34,6 +34,7 @@ import {
   View,
   type StyleProp,
   type TextStyle,
+  type ViewProps,
   type ViewStyle,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -530,12 +531,47 @@ export function Badge({ count, max = 99, dot, tone = 'danger' }: BadgeProps): Re
 // 卡片与按钮
 // ─────────────────────────────────────────────────────────────
 
+/**
+ * 间距档位（L4 视图里唯一该出现的"间距决定"是**选哪一档**，不是写数值）。
+ *
+ * 🔴 为什么要有这一档：`check:l4-no-style` 的断言 C 把视图里每一处 `style={{…}}`
+ * 记成一笔债，而它给出的修法原文是"这个值该搬到 L1/L2"。在此之前移动端没有地方
+ * 可以搬 —— `Card` 只收 `style`，所以视图只能自己写 `{ gap: tokens['space.3'] }`，
+ * 于是同一个值在 `ExportScreen` 一个文件里就写了四遍。
+ */
+export type GapTier = 'default' | 'loose';
+
+function gapValue(t: ReturnType<typeof useTokens>, gap: GapTier): number {
+  return gap === 'loose' ? t['space.3'] : t['space.2'];
+}
+
+/**
+ * 只负责纵向排间距的容器。给那些**不在卡片里**、却需要一档间距的片段用
+ * （比如浮层里"说明 + 按钮"两行）。卡片内请直接依赖 `Card` 自己的 `gap`。
+ */
+export function Stack({
+  gap = 'default',
+  children,
+  ...rest
+}: {
+  gap?: GapTier;
+  children: React.ReactNode;
+} & ViewProps): React.JSX.Element {
+  const t = useTokens();
+  return (
+    <View {...rest} style={{ gap: gapValue(t, gap) }}>
+      {children}
+    </View>
+  );
+}
+
 export interface CardProps {
   children: React.ReactNode;
   style?: StyleProp<ViewStyle>;
+  gap?: GapTier;
 }
 
-export function Card({ children, style }: CardProps): React.JSX.Element {
+export function Card({ children, style, gap = 'default' }: CardProps): React.JSX.Element {
   const t = useTokens();
   return (
     <View
@@ -547,7 +583,7 @@ export function Card({ children, style }: CardProps): React.JSX.Element {
           // 扁平风格用边框表达层次，阴影只给真正的浮层（AGENTS.md §5）。
           borderColor: t['color.border'],
           padding: t['space.4'],
-          gap: t['space.2'],
+          gap: gapValue(t, gap),
         },
         style,
       ]}

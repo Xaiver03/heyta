@@ -63,7 +63,7 @@
  */
 
 import React, { useCallback, useEffect, useState } from 'react';
-import { Share, View } from 'react-native';
+import { Share } from 'react-native';
 import { keepLocalCopy, pick } from '@react-native-documents/picker';
 
 import {
@@ -90,8 +90,7 @@ import {
   previewTickTickImport,
   type TickTickPreview,
 } from '../lib/ticktick-import';
-import { useTokens } from '../theme';
-import { Button, Card, Screen, Text, TextField } from '../ui/kit';
+import { Button, Card, Screen, Stack, Text, TextField } from '../ui/kit';
 
 /** 一句待渲染的文案：词条键 + 插值，措辞全在词条表里（AGENTS §5）。 */
 interface FailureMessage {
@@ -154,7 +153,6 @@ async function readPickedBackup(contentUri: string, fileName: string): Promise<s
 
 export function ExportScreen({ onBack }: { onBack: () => void }): React.JSX.Element {
   const { t } = useI18n();
-  const tokens = useTokens();
 
   const [host, setHost] = useState<AppHost | null>(null);
   const [busy, setBusy] = useState<ExportFormat | undefined>(undefined);
@@ -411,7 +409,7 @@ export function ExportScreen({ onBack }: { onBack: () => void }): React.JSX.Elem
         </Text>
       ) : null}
 
-      <Card style={{ gap: tokens['space.3'] }}>
+      <Card gap="loose">
         <Text variant="row-title">{t('web.export.json.label')}</Text>
         <Text variant="caption" tone="muted">
           {t('web.export.json.note')}
@@ -428,7 +426,7 @@ export function ExportScreen({ onBack }: { onBack: () => void }): React.JSX.Elem
         />
       </Card>
 
-      <Card style={{ gap: tokens['space.3'] }}>
+      <Card gap="loose">
         <Text variant="row-title">{t('web.export.markdown.label')}</Text>
         <Text variant="caption" tone="muted">
           {t('web.export.markdown.note')}
@@ -449,7 +447,7 @@ export function ExportScreen({ onBack }: { onBack: () => void }): React.JSX.Elem
           🔴 它是**导出**的逆操作，不是"滴答导入"的另一半：认的是 heyta 自己
           导出的 JSON，而且**只进空库**。所以警示句（lead）与两条入口
           （选文件 / 粘贴）都常驻，不做"看起来能覆盖"的暗示。 */}
-      <Card style={{ gap: tokens['space.3'] }}>
+      <Card gap="loose">
         <Text variant="row-title">{t('mobile.restore.title')}</Text>
         <Text variant="caption" tone="muted">
           {t('mobile.restore.lead')}
@@ -494,7 +492,7 @@ export function ExportScreen({ onBack }: { onBack: () => void }): React.JSX.Elem
         )}
 
         {restorePreview === undefined ? null : (
-          <View style={{ gap: tokens['space.2'] }}>
+          <Stack>
             <Text variant="caption" tone="muted">
               {t('mobile.restore.previewCounts', {
                 tasks: restorePreview.counts.entities.TASK?.total ?? 0,
@@ -512,7 +510,7 @@ export function ExportScreen({ onBack }: { onBack: () => void }): React.JSX.Elem
               loading={restoreBusy}
               onPress={confirmRestore}
             />
-          </View>
+          </Stack>
         )}
 
         {restoreResult === undefined ? null : (
@@ -528,7 +526,7 @@ export function ExportScreen({ onBack }: { onBack: () => void }): React.JSX.Elem
       {/* ── 从滴答清单导入（方案 §5.5 第 7 项的移动端那一半）───────────────
           🔴 与上面那几张卡是**不同的承诺**：还原认的是 heyta 自己的 JSON，
           导入认的是**滴答清单的 CSV**。所以下面单独说"只认滴答清单"。 */}
-      <Card style={{ gap: tokens['space.3'] }}>
+      <Card gap="loose">
         <Text variant="row-title">{t('web.ticktick.title')}</Text>
         <Text variant="caption" tone="muted">
           {t('web.ticktick.intro')}
@@ -567,7 +565,7 @@ export function ExportScreen({ onBack }: { onBack: () => void }): React.JSX.Elem
         />
 
         {preview === undefined ? null : preview.ok ? (
-          <View style={{ gap: tokens['space.2'] }}>
+          <Stack>
             <Text variant="row-meta" tone="muted">
               {t('web.ticktick.previewTitle')}
             </Text>
@@ -599,7 +597,7 @@ export function ExportScreen({ onBack }: { onBack: () => void }): React.JSX.Elem
               loading={importBusy}
               onPress={runConfirm}
             />
-          </View>
+          </Stack>
         ) : (
           <Text variant="caption" tone="danger">
             {t(
