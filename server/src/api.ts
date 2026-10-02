@@ -30,6 +30,7 @@ import {
   PasskeyError,
 } from './passkey';
 import { authenticate, getAuthUser } from './middleware';
+import { evaluateLegalRecheck, recordLegalReconfirm } from './legal-recheck';
 import {
   loginWithEmailPassword,
   registerWithEmailPassword,
@@ -617,6 +618,95 @@ export const apiRoutes = async (
         const errMsg = err instanceof Error ? err.message : 'Unknown error';
         Logger.error(`Account locale update error: ${errMsg}`);
         return reply.status(500).send({ error: 'Failed to update locale.' });
+      }
+    },
+  );
+
+  // 重新确认（补签）：G-27。两条都挂 `preHandler: authenticate` —— 读写的都是
+  // **令牌主人自己**的同意记录，`userId` 一律来自 `getAuthUser(req)`，不来自输入。
+  // 判据、为什么只有注册以外这一条写入路径、为什么不在非官方实例上拦人：`legal-recheck.ts`。
+
+  /**
+   * 这个账号现在需不需要被拦一次去重新确认。
+   *
+   * 客户端在登录之后、放行同步之前问一次。返回的是**结构化原因码**，
+   * 文案归 `packages/i18n`（服务端从来说不出人话，这条纪律与凭据页同一套）。
+   */
+  fastify.get(
+    '/account/legal-consent',
+    {
+      preHandler: authenticate,
+      config: {
+        rateLimit: {
+          // 每次启动问一次。60/15min 是"一个人反复重开也打不满"的量级，
+          // 不是"攻击者会被限住"的量级 —— 这条路只读，不值得为它设计防滥用。
+          max: 60,
+          timeWindow: '15 minutes',
+        },
+      },
+    },
+    async (req, reply) => {
+      try {
+        const decision = await evaluateLegalRecheck(getAuthUser(req).userId);
+        return reply.send({
+          needsReconfirm: decision.needsReconfirm,
+          reason: decision.reason,
+          currentVersion: decision.currentVersion,
+          recordedVersion: decision.recordedVersion,
+        });
+      } catch (err) {
+        const errMsg = err instanceof Error ? err.message : 'Unknown error';
+        Logger.error(`Legal consent status error: ${errMsg}`);
+        return reply.status(500).send({ error: 'Failed to read consent status.' });
+      }
+    },
+  );
+
+  /**
+   * 记下"他确认了**现在这一版**"。
+   *
+   * 🔴 `documentVersion` 必须是界面上真的展示过的那一版，且要逐字等于服务端当前指纹
+   * —— 拿旧版来确认新版会写出一条版本号写错的历史记录，那比没有记录更糟
+   *（这正是链 3 立起来要防的"读的是 A、记的是 B"）。
+   */
+  fastify.post(
+    '/account/legal-consent',
+    {
+      preHandler: authenticate,
+      config: {
+        rateLimit: {
+          max: 20,
+          timeWindow: '15 minutes',
+        },
+      },
+    },
+    async (req, reply) => {
+      try {
+        const parsed = z
+          .object({
+            documentVersion: z.string().min(1),
+            acceptedAt: z.number().int().nonnegative(),
+          })
+          .safeParse(req.body);
+        if (!parsed.success) {
+          return reply.status(400).send({ error: 'Validation failed', details: parsed.error.issues });
+        }
+        const result = await recordLegalReconfirm({
+          userId: getAuthUser(req).userId,
+          clientVersion: parsed.data.documentVersion,
+          acceptedAt: parsed.data.acceptedAt,
+        });
+        if (!result.ok) {
+          // 409：请求本身合法，但它要写的那件事在当前状态下不成立（不是客户端写错了字段）。
+          return reply
+            .status(409)
+            .send({ error: result.error === 'not-applicable' ? 'instance_cannot_name_text' : 'version_mismatch' });
+        }
+        return reply.send({ ok: true, recordedVersion: result.recordedVersion });
+      } catch (err) {
+        const errMsg = err instanceof Error ? err.message : 'Unknown error';
+        Logger.error(`Legal consent record error: ${errMsg}`);
+        return reply.status(500).send({ error: 'Failed to record consent.' });
       }
     },
   );
