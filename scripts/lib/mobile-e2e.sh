@@ -112,7 +112,11 @@ another_mobile_e2e_running() {
   awk -v me="$$" '
     $1 == me { next }
     $2 == me { next }
-    $0 ~ /bash [^ ]*verify-mobile-[a-z-]+\.sh/ && $0 !~ /bash -n/ && $0 !~ /bash -c/ { print; exit }
+    # `zsh -c` / `bash -c` 的包装进程 argv 里可能内嵌脚本名文本（上游用 printf
+    # 写启动器再执行、或工具链把整条命令记进 argv），它们不是真正的运行者 ——
+    # 真正的运行者永远是直接 `bash scripts/verify-….sh` 的那个进程，会被单独匹配到。
+    $0 ~ /(zsh|bash) -c/ { next }
+    $0 ~ /bash [^ ]*verify-mobile-[a-z-]+\.sh/ && $0 !~ /bash -n/ { print; exit }
   ' /tmp/_heyta_mobile_e2e_ps.txt
 }
 
