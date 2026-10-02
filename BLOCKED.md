@@ -2220,3 +2220,31 @@ HEAD 里还没有 B11；之后本文件被其他会话推进过多次。`git add
 
 📌 **一般规律**：共享工作树里"已暂存"不等于"待提交的改动是新增的"。暂存条目是一个**完整文件的快照**，
 它的危险方向恰好和"忘记 add"相反 —— **忘记 add 少一点，add 了旧版少一片**。
+
+## B26. 🔴 ios 段在**长活的隔离检出**上重装不出来：兜底补好后，旧树里 `pod install` 自己崩 —— 换新克隆 4.9 秒解决（2026-10-03 06:45–06:58 实测）
+
+**发生了什么**：`c7f0e33a` + `d25161ce` 改了 `packages/ui` ⇒ 按 §6.1.1 三端要重打重装。
+`bash scripts/reinstall-all.sh --only mac,ios,windows`（`/tmp/heyta-g5`）结果 mac ✅ / windows ✅ / **ios 🔴**。
+
+**为什么以前不红**：ios 段以前**一个字都没提 pod**（`grep -n 'pod ' scripts/reinstall-all.sh` 命中 0），
+它默认沙盒是好的。而 `apps/mobile/ios/Pods/` 是 gitignored 的 —— 隔离检出换一次 HEAD，
+`Pods/Manifest.lock` 与 `Podfile.lock` 就对不上（实测差 `hermes-engine` + `ReactCodegen` 两行 `SPEC CHECKSUMS`），
+xcodebuild 第一步 `[CP] Check Pods Manifest.lock` 就死。**失败信息只说"构建失败 + 日志末尾"**，
+读起来像产品坏了，实际缺的是构建输入。
+
+**已修的部分**（`840effb1`）：进 xcodebuild 前比两个 lock 的 sha256，不一致就跑 `pod install`，
+装完再验一次；仍不同步就**跳过 xcodebuild** 并且**不再 tail 上一轮的构建日志**。
+这条兜底"能红"的证据是现场跑出来的（`/tmp/g5-ri-ios2.log`）：它打印了中止原因，
+而不是给人一份旧日志的尾巴。
+
+**没修的部分（本条登记的债）**：旧树里 `pod install` 本身崩在 CocoaPods 1.17.0 + Ruby 4.0.7 的
+`ArgumentError - path name contains null byte`（`project.rb:452`，崩在 "Generating Pods project"）。
+`rm -rf Pods` 无效；`node scripts/check-native-deps.mjs` ✅（不是 lock 与 package.json 不一致）。
+**A/B 排除了路径**：同一个 commit `840effb1` 现开新克隆，`/tmp/heyta-ios-ab` 与
+`/Users/rocalight/heyta-ios-ri` 两处 `pod install` **都 exit 0**（`git clone` + `pnpm install` 只要 4.4–4.9 秒）
+⇒ 变量是那棵**长活的旧树**，不是 `/tmp`。ios 判据最后在新克隆上取的：
+`REINSTALL_EXIT=0`、新鲜度 ✅、主蓝 **4136**（与改动前同一个数），截图人看过（首启隐私同意面板 + 真中文）。
+
+⚠️ **未定位**：具体哪个路径让 `realdirpath` 拿到 NUL 没查到（要扫 1.9 GB 的文件名）。
+上游 CocoaPods #12798 / #12866 都还 open。**别照"旧检出重试一次"行动** —— 直接换新克隆。
+一般规律与"包管理器自己的 up-to-date 不能当排除证据"写在 traps **#154**。
