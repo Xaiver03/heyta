@@ -1192,6 +1192,7 @@ export const en = {
   'web.repeat.weekly': 'Weekly',
   'web.repeat.weekdays': 'Weekdays',
   'web.repeat.monthly': 'Monthly',
+  'web.repeat.yearly': 'Yearly',
   'web.repeat.optionAria': 'Set task "{title}" to "{label}"',
   'web.repeat.customChip': 'Custom: {rule}',
   'web.repeat.customLabel': 'Custom rule (RFC 5545 RRULE)',
@@ -2228,6 +2229,7 @@ export const en = {
   'mobile.detail.repeat.weekly': 'Weekly',
   'mobile.detail.repeat.weekdays': 'Weekdays',
   'mobile.detail.repeat.monthly': 'Monthly',
+  'mobile.detail.repeat.yearly': 'Yearly',
   // Custom RRULE (the mobile tail of B2-3). Before this, the phone could only
   // pick presets: "every two weeks" meant going to the web app. The error copy
   // is stored as **keys** (see `customError` in `TaskDetailSheet`), so these are
