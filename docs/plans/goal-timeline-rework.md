@@ -168,6 +168,12 @@ ADR 必须写清：
 实施坑：`measureInWindow` 异步回调让瞬时的 down→up 手势拿到 null 布局 —— 渲染后
 effect 主动测量修掉（详见 R-doc §5.5）。
 
-**已知边界（如实）**：移动端不传 `onScheduleTask` = 只读板（手势平台适配 = goal §4 P3）；
+**多端不同入口（2026-10-02，产品负责人指令后补交付）**：
+触屏端的排期入口 = **详情表单**（`TaskDetailSheet` 排期段：开始 DatePicker + 时长档位
+chips → `setSchedule`）+ 板上点行开详情（`TimelineBoard.onOpenTask`）；web 载荷 =
+拖拽 + 点空白。移动端验收 `verify:mobile-schedule` **7/7**（详情设排期 → 板上真条，
+轴自适应延伸到 10-18；截图人看）。拖拽手势在触屏上的适配仍按 §4 留在 P3。
+
+**已知边界（如实）**：移动端不传 `onScheduleTask` = 板上拖拽关闭（排期走详情表单入口）；
 `storage-backend-shell` 出现过一次与本刀无关的全量顺序 flake（单跑/复跑均绿，已登记）；
 桌面截图证据为**桌面载荷**口径（web 壳同源），Android 侧本轮只验读路径（P1 判据 6/6 仍绿）。

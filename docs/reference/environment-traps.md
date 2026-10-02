@@ -2936,6 +2936,79 @@ spec，且报错里出现 `ECONNREFUSED <本机端口>` 或 `.playwright-artifac
 
     📌 一般规律：**"正在被执行的文件"与"正在被阅读的文件"是两种东西** ——
     前者的修改是写进运行时语义的，任何"顺手改一下"都要先问一句它现在是否正在跑。
+
+95. 🔴 **Expo 原生模块装不进 pnpm monorepo 的 bare RN 工程 —— `install-expo-modules`
+    直接断言崩溃，expo 自己的源码注释写明 includeBuild 不吃 symlink。**
+
+    批三依赖裁决选中 `expo-notifications@57` 后实测：`npx install-expo-modules@latest
+    --non-interactive` 以 `ERR_ASSERTION`（actual: null）崩溃，settings.gradle 一字未动；
+    手动接线也不可靠——`expo-modules-autolinking` 的 android.ts:49 注释：
+    「The plugin source dir ends up in Gradle's `includeBuild`, which must not receive a
+    symlink - Android Studio's Tooling API fails to import symlinked included builds」，
+    而 **pnpm 的 node_modules 全是 symlink**。 Expo 官方对 pnpm 的建议是
+    `node-linker=hoisted`——那是**仓库级** lockfile 布局改判，不是某个批能顺手做的。
+    另：pnpm 移除依赖后 `.pnpm` 里会残留孤儿目录（无任何 lockfile 引用），
+    `license-inventory`（扫整个 store）会把它们当真依赖报红 —— `rm -rf` 对应目录即绿
+    （2026-10-02 node-forge@1.4.0 实测）。
+
+    📌 一般规律：**给 monorepo 选型原生依赖前，先确认它的工具链对包管理器布局的假设**
+    —— "npm 里一行装好"的东西，在 pnpm 的 symlink 布局下可能整条 gradle 接线都不成立。
+
+111. 🔴 **同源开第二个标签页去点那条验证链接，那张页面永远启动不完 ——
+    OPFS 的 SAH Pool VFS 一个文件只允许一个 access handle。**
+
+    2026-10-02 实测（`e2e/password-web/password-journey.spec.ts` 第 ④ 步）：
+    第一张标签页注册完还开着面板与库，用 `context.newPage()` 去点信里的验证链接，
+    新页面控制台刷成串的
+    `NoModificationAllowedError: Failed to execute 'createSyncAccessHandle' … there is another open Access Handle`，
+    而**判据红的是"找不到 `account-menu-avatar`"** —— 读起来像"确认页跳转坏了"。
+
+    根因在存储层：web 用的是 `@sqlite.org/sqlite-wasm` + **SAH Pool VFS，跑在 worker 里**
+    （驱动文件头 `packages/storage/src/sqlite/` 警告的就是这件事）。同一份 SQLite 文件
+    在浏览器里只能有一个同步 access handle，第一张页面还活着 ⇒ 第二张必然拿不到存储 ⇒
+    应用卡在启动，不崩、不报错到界面、日志里只有控制台那串。
+
+    ✅ 修法是**形态问题不是技术问题**：同一个标签页 `page.goto(verifyLink)`。
+    那恰好是真实用户的路径 —— 他在邮件客户端里点链接，浏览器把**当前这一页**带到确认页，
+    确认之后落到 `/app/`。`scripts/verify-email-web-chain.mjs` 用的也是这一种。
+
+    📌 一般规律：**"再多开一个标签页"在本地优先 + OPFS 的架构下不是免费的夹具**，
+    它是一个产品从未支持过的形态。e2e 的载体要选**用户真会走的那条路**；
+    当"换一张页面"看起来能让测试更好写时，先问它是不是一个运行时结构性不允许的状态。
+
+112. 🔴 **一个全局开关落进应用，会把所有"要点界面"的套件同时变成红的 —— 而两种红的
+    症状都不是产品坏了：整屏遮罩吃指针事件，界面跟着浏览器语言漂成英文。**
+
+    2026-10-01 两件独立的事同时落地：① 首启隐私同意面板（`role="presentation"`、
+    `position: fixed; inset: 0`，盖住整棵 `main.ht-main`，rail 也在底下）；
+    ② 语言解析链第 3 层 = `navigator.language`。Playwright **每条用例一个新 context**，
+    于是每轮都是"没问过的设备"+ Chromium 默认 `en-US` ⇒ 离线套件一次跑出 **46 条红**，
+    错误分别是 `… intercepts pointer events`（231 × retrying click）和
+    `waiting for input[placeholder^="添加任务"] —— 元素根本不存在`。
+    截图里应用渲染得好好的，只是整片是英文。
+
+    ✅ 修在**共享入口**一次（`e2e/tests/helpers.ts` 的 `openApp` = 全模块 + 钉中文 +
+    垫片 + `goto` + 等锚 + 真点同意按钮），不逐条补 —— 逐条补的下一批一定会漏。
+    三条裁决当时都要想清楚：
+
+    1. **默认 `local-only`，要出门的调用点显式传 `accepted`**：`local-only` 对绝大多数
+       判据是最小承诺；而闸门换掉的是**整个** `window.fetch`，回环地址也不例外 ——
+       所以 `page.route()` 桩的假服务端**一次都不会被调用**，症状是"面板/后台空着"。
+    2. 🔴 **"计数为 0"这类反向判据必须显式 `accepted`**（`ai-unavailable`、
+       `admin-console` 的"没登录不发请求"、`inbox` 的空态）：隐私闸门自己就能让
+       计数为 0，于是"通过"担保的是"我们没同意联网"，不是被测的那道闸 ——
+       **一条在两种根因下都绿的判据等于没有判据**。
+    3. **不走 `openApp` 的那两条例外要逐件补，不能整体豁免**：
+       `language-first-launch`（判的就是语言协商，绝不能钉中文）与
+       `motivation` 的"默认 rail 只有 7 个 tab"（`openApp` 会开全模块，
+       "默认几个"在那套配置下永远测不到）—— 但钉语言之外的**遮罩仍然要关**，
+       否则前者点语言切换器时卡在同一个 `intercepts pointer events`。
+
+    📌 一般规律：**"这个套件以前是绿的"不构成"它不依赖环境"**。`windows-shell` 那套
+    此前一直命中中文锚点，只是因为打包机恰好是中文 Windows；语言假设没人写进判据，
+    换一台英文宿主它就在第一行红，而红的是探针。环境假设要么由共享入口显式制造，
+    要么由一条断言钉住 —— 不能靠"这台机器恰好如此"。
+
 113. 🔴 **#110 的结构性收口 —— 长跑验收脚本入口"自快照 + exec"：让"运行中被编辑"
     从纪律问题变成不可能事件，靠的是机制不是自觉。**
 
@@ -3070,6 +3143,91 @@ spec，且报错里出现 `ECONNREFUSED <本机端口>` 或 `.playwright-artifac
     必须把这三样各自证伪或证实，并且把逐次计数写进证据（只有最后一轮的结论会掩盖前一轮的环境）。
     （同族：#115、#82"重装了一遍"≠"装的是当前源码"、#46 没复现 ≠ 路径没执行。
     本轮完整取证在 `BLOCKED.md` **B12**。）
+
+118. 🔴 **同一份判据被两套 Playwright 配置收走，结论可以相反 —— 差别在 webServer 是
+    `vite`（dev）还是 `vite preview`（生产构建）。dev 下 Vite 自己会开一条 HMR WebSocket，
+    它同时把「零出站」弄成**假红**、把「真的重连了」弄成**恒真**。**
+
+    2026-10-02 实测（G-27 补签那条闸门判据）：`e2e/tests/legal-reconfirm-gate.spec.ts`
+    在 `stubRecheck()` 里 `page.on('websocket', s => sockets.push(s.url()))` **来者不拒**，
+    然后用同一个计数器判两个方向：
+
+    | 用例 | 断言 | dev（主配置 4318）下的真值 |
+    |---|---|---|
+    | 待补签 | `sockets` 必须为空 | **红**：里面是 `ws://127.0.0.1:4318/?token=8-cC4f_Ev09e` |
+    | 确认之后 | `poll(sockets.length)` > 0 | **绿，但绿得没有意义**：数到的那条就是上面那条 HMR |
+
+    应用的实时端点由 `buildRealtimeUrl` 生成（`packages/sync-client/src/realtime.ts:200`），
+    形状是 `ws://<baseUrl>/api/sync/ws?token=…&clientId=…` —— **有路径、有 clientId**。
+    HMR 那条是**根路径、无 clientId、令牌是随机 12 位**。所以"是不是应用建的连接"这件事
+    在 URL 上写得明明白白，红的纯粹是探针没过滤。
+
+    为什么他们自己看不见这个红：那条线用**专用配置**
+    （`playwright.legal-reconfirm.config.ts`：端口 4323 + `vite preview` + 生产构建），
+    preview 服务器**没有 HMR**，于是同一份判据 6 passed，取证就存在
+    `apps/web/evidence/legal-reconfirm-gate/run.txt`（里面印的正是
+    `ws://127.0.0.1:4323/api/sync/ws?token=E2E-TOKEN-123&clientId=…`）。
+    而 spec 住在主配置的 `testDir` 里 ⇒ **谁跑 `pnpm check:ai-e2e` 谁就收到一个假红，
+    并且那支用例的正向对照在他脚下是恒真的。**
+
+    ✅ 修法：过滤器形状**跟着判据的方向走**，不是一把尺子量两边 ——
+    - **正向判据**（"确认之后实时通道真的重开"）⇒ 只认真端点：
+      `if (new URL(s.url()).pathname === '/api/sync/ws') sockets.push(...)`。
+    - **负向判据**（"同意之前一个 WebSocket 都不许建"，如 `privacy-consent-zero-egress.spec.ts:95`）
+      ⇒ **只排掉 HMR 那一条**（同 origin + 根路径），其余一律计入。收成"只数 `/api/sync/ws`"
+      会把负向判据变成恒真：将来任何新增的 WS（厂商 SDK、协作通道）都从计数里隐身，
+      而那类判据的对象恰恰是"一个都不发"。
+
+    ⚠️ 本轮我一度把负向那支也照正向的形状改了，量过之后**改回来**：它被主配置
+    `testIgnore`（`e2e/playwright.config.ts:28`）排除，只由
+    `playwright.privacy-consent.config.ts` 收走，而那份配置是 `vite preview` ⇒ 危险当前不成立，
+    改了等于用一条更弱的判据换一个不存在的问题。
+
+    同一条"配置决定判据死活"的机制在这一支还有第二个证人：`apps/web/src/pwa/register.ts:48`
+    是 `if (!import.meta.env.PROD) return;` —— **dev 下根本不注册 SW**，所以"没有 `/sw.js` 请求"
+    这条判据在 dev 里恒真。那支配置的文件头（`:6-11`）写的就是这件事。
+
+    📌 一般规律：**e2e 判据的可信度有一部分长在 webServer 上，不长在 spec 里。**
+    复用别人的 spec 前先问三句：① 这套 webServer 是 dev 还是 preview；② 它有没有自己会发
+    网络/WS 的**开发期客户端**；③ 这条判据是正向还是负向（它决定过滤器该宽还是该窄）。
+    （同族：#46 没复现 ≠ 路径没执行、#50"状态对"在"没生效"时也绿、元规则 2、#117 脚下地面被换过。
+    本轮完整取证在 `BLOCKED.md` **B13**。）
+
+119. 🔴 **量几何要等"被量的那两个盒子"停止位移 —— 两条方向相反的入场 transform 会让
+    `子.y - 父.y` 不等于 `padding-top`，报出一个 2.68px 的"布局回归"。**
+
+    2026-10-02 实测：`e2e/tests/search-overlay.spec.ts` 的贴顶判据（ⅰ 那条 padding 不吃高度、
+    ⅱ `|上隙 − padding-top| ≤ 2`、ⅲ 上隙 < 下隙）报
+    **`padding-top 128 / 实测上隙 125.31800746917725`** —— 差 2.682，恰好在容差外面。
+    界面没坏：`.ht-search-overlay` 自己挂着 `ht-sheet-in`
+    （`apps/web/src/styles/app/sheets.css:123`，`from { transform: translateY(+space-2) }`），
+    卡片另挂 `ht-material-in`（同文件 `:154`，`from { transform: translateY(-space-1) }`，
+    时长取弹簧参数 `--ht-motion-spring-response-sheet`）。**两条位移方向相反、时长与相位也不同** ⇒
+    动画中间帧量到的上隙 = `padding + 卡片位移 − 浮层位移`，与那个被约束的常量根本不是一个量。
+    落位之后差值归 0。
+
+    为什么会突然照出来：这一支原先是 `page.goto()`，收口 B9 家族时改成走共享入口
+    `openApp()`（它要先把首启隐私同意做完、再把界面钉在中文）⇒ 前面几步的耗时变了，
+    量取时机**恰好**从"动画已落位"挪进"动画进行中"。**这不是新缺陷，是新时机把一个一直存在的
+    探针脆弱性照出来了**（同一个红在昨天的机器上就是绿的 —— 那种"绿"也不是判据）。
+
+    ✅ 修法（两层，缺一不可）：
+    1. **等的是这两个盒子，不是全站动画**。别用 `document.getAnimations()` 判落位 ——
+       页面上任何一条无关动画（骨架屏、番茄钟）都会把等待拖成超时，症状又像"界面坏了"。
+       这里写一个 `settledGeometry()`：连续两次取 `boundingBox()`，`y` 差 < 0.01 才算落位，
+       40 次还不停就**响亮地失败**（那说明界面真的在抖，判据本来就不该过）。
+    2. **不动阈值**。`≤ 2` 那条一个字节没改 —— 这条修复的合法性判据是"改的时机不改的牙齿"：
+       把 `align-items: center` 塞回去造成的缺口是**永久性**的，落位后照样红（变异方向不变）。
+
+    ⚠️ 反面做法（本轮没采纳，登记在这里因为它看起来很省力）：把容差从 2 放宽到 3。
+    那会让 ⅱ 这条**同时**失去抓 `align-items: center` 之外的能力，而且下次弹簧参数一改
+    又红 —— 用放宽阈值来掩盖"量早了"，等于把判据改成"跟着我的探针走"。
+
+    📌 一般规律：**几何类判据的隐含前提是被测对象处于静止态**，而 CSS 入场动画让"元素出现"
+    与"元素就位"是两个时刻。`toBeVisible()` 只保证前者（`opacity` 从 0 开始时就已经可见）。
+    同族：#63（无障碍树为空要先重启）、本文件"等动画落位再截图"那条 e2e 探针陷阱 ——
+    **截图要等，量几何同样要等**。
+
 121. 🔴 **iOS 模拟器运行时的行为差：27.0 全量运行时上 `set-value` 不触发 RN 的
     onChangeText、HID 无中文 keycode —— 与 27.1 Duo seed 完全相反，判据脚本
     跨运行时不能共用同一套输入原语。**
