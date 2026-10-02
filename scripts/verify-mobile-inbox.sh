@@ -189,8 +189,7 @@ step "5. 判据①触发：账号 B 用 A 的邀请码注册（真产品端点�
 if [ -z "$CODE" ]; then
   bad "CODE 为空 —— B 注册不会带邀请，服务端不会发奖励；判据①/③必然红。先修②再重跑。"
   cp /tmp/heyta-inbox-activity.png "$PWD/apps/mobile/evidence/android-inbox-activity.png" 2>/dev/null
-  summary "移动端通知中心"
-  exit 1
+  summary "移动端通知中心" "" 1
 fi
 B_EMAIL="inbox-e2e-$(date +%H%M%S)@test.local"
 RESP=$(curl -s -X POST "$HOST_SERVER/api/register/magic-link" \

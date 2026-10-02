@@ -132,7 +132,7 @@ step "1. 打开排序面板"
 # chip 的标签是「排序：<当前档位>」—— 它是**打开面板的按钮**，不是三个并列档位。
 CHIP=$($BOUNDS clickable-below 0 | grep '排序' | head -1)
 if [ -z "$CHIP" ]; then
-  bad "找不到排序 chip"; screen_txt; summary "移动端排序面板"; exit 1
+  bad "找不到排序 chip"; screen_txt; summary "移动端排序面板" "" 1
 fi
 $ADB shell input tap $(center_of "$CHIP"); sleep 2
 dump
@@ -140,7 +140,7 @@ require_screen
 TITLE_LINE=$($BOUNDS sub "选择排序方式" | head -1)
 if [ -z "$TITLE_LINE" ]; then
   bad "面板没打开（无障碍树里没有「选择排序方式」）"; screen_txt
-  summary "移动端排序面板"; exit 1
+  summary "移动端排序面板" "" 1
 fi
 ok "面板已打开"
 

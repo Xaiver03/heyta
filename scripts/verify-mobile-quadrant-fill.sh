@@ -269,7 +269,7 @@ for attempt in 1 2 3 4; do
 done
 if [ "$ON_BOARD" != "1" ]; then
   bad "走不到「四象限」那一档（板子不在树上）"; screen_txt
-  summary "移动端四象限铺满"; exit 1
+  summary "移动端四象限铺满" "" 1
 fi
 ok "已到四象限档"
 

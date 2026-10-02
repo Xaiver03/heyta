@@ -133,7 +133,7 @@ $ADB shell pm clear $PKG >/dev/null 2>&1
 $ADB shell am force-stop $PKG; sleep 1
 $ADB shell monkey -p $PKG -c android.intent.category.LAUNCHER 1 >/dev/null 2>&1; sleep 6
 dismiss_welcome_if_present
-dismiss_privacy_consent_if_present || { screen_txt; summary "移动端任务行勾选框"; exit 1; }
+dismiss_privacy_consent_if_present || { screen_txt; summary "移动端任务行勾选框" "" 1; }
 # 🔴 实测的首启顺序是 **同意页在欢迎页底下先出现**：点掉「只用本机」之后，
 # 「先离线使用」那张才露出来。只按一种顺序写，第二次跑就会卡在欢迎页上，
 # 而症状又是一句"首屏没有新建任务"。两道闸门各自都是"在场才点"，所以再走一遍欢迎页。
@@ -162,7 +162,7 @@ if [ "$ON_TASKS" = "1" ]; then
   ok "应用已启动，落在能找到「新建任务」的任务屏"
 else
   bad "走完首启闸门后仍到不了任务屏（屏上内容见下）"; screen_txt
-  summary "移动端任务行勾选框"; exit 1
+  summary "移动端任务行勾选框" "" 1
 fi
 
 step "1. 建一条长标题任务（走真实 Composer → 真实 op）"
@@ -187,7 +187,7 @@ for attempt in 1 2 3; do
 done
 if [ -z "$EDIT" ]; then
   bad "三次都没能打开新建面板"
-  screen_txt; summary "移动端任务行勾选框"; exit 1
+  screen_txt; summary "移动端任务行勾选框" "" 1
 fi
 XY="$EDIT"
 $ADB shell input tap $XY; sleep 1
@@ -195,7 +195,7 @@ $ADB shell input text "$TITLE" >/dev/null 2>&1; sleep 1
 dump; require_screen
 ADD=$(center_of "$($BOUNDS text "添加" | head -1)")
 if [ -z "$ADD" ] || [ "$ADD" = "0 0" ]; then
-  bad "找不到「添加」按钮"; screen_txt; summary "移动端任务行勾选框"; exit 1
+  bad "找不到「添加」按钮"; screen_txt; summary "移动端任务行勾选框" "" 1
 fi
 $ADB shell input tap $ADD; sleep 3
 dump
@@ -204,7 +204,7 @@ if [ "$(has_sub "$TITLE")" = "1" ]; then
   ok "任务已落库并出现在列表里"
 else
   bad "任务没出现在列表里（后面的判据都没有意义了）"; screen_txt
-  summary "移动端任务行勾选框"; exit 1
+  summary "移动端任务行勾选框" "" 1
 fi
 
 # ── 判据 ① ──────────────────────────────────────────────
@@ -213,7 +213,7 @@ read -r SW SH <<< "$(screen_size)"
 T=$(toggles | head -1)
 if [ -z "$T" ]; then
   bad "列表里没有勾选框那颗可点节点（标签应是「完成：<标题>」）"; screen_txt
-  summary "移动端任务行勾选框"; exit 1
+  summary "移动端任务行勾选框" "" 1
 fi
 echo "   勾选框矩形: $T"
 L=$(cut -f1 <<< "$T" | awk -F, '{print $1}')
