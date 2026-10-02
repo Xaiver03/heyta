@@ -2048,3 +2048,47 @@ cd e2e && npx playwright test tests/due-date-edit.spec.ts tests/motivation.spec.
 ```
 
 **仍红**才轮到本条线（共享 `DatePicker` 的弹层放置）负责；在那之前改本批任何代码都是抢别人的活。
+
+## B23. 🔴 `check:empty-state` 的两处红：一处是**判据缺陷**（已修），另一处是**别人那条线的新站点**（登记，不代改）（2026-10-03 05:27 取证）
+
+### 已修的那处不是产品问题，是门禁把"照它自己的修法做"判成违规
+
+`apps/mobile/src/screens/NotificationsScreen.tsx` 被记成"新的手写空态"，但它第 34 行
+`import { EmptyState } from '@heyta/ui'`、第 194/252 行都是
+`<EmptyState title={t('mobile.inbox.empty')} testID=… />` —— **这正是门禁自己给出的修法**
+（报告原文："用共享的 `EmptyState`"）。marker 原来按"文件里出现过空态词条"记账，
+于是"收编后的样子"和"又手写一份"在判据上长得一模一样，而红字指着共享组件那一行。
+**一条让正确做法必然变红的判据，教的是别用共享组件。**
+
+✅ 收紧：只数落在 `<EmptyState …>` 元素**之外**的空态词条渲染（按位置判，不按文件判）。
+三份探针在 `HEYTA_CHECK_ROOT` 副本上实测（脚本文件头的 E4/E5/E6）：
+
+| 探针 | 结果 |
+|---|---|
+| 手写 `<Text>{t('probe.list.empty')}</Text>` | **点名该文件**，新站点 1→2 ✅ 会红 |
+| 只用 `<EmptyState title={t('probe.shared.empty')} … />` | **不点名**，新站点仍是基线数 ✅ 修法可达 |
+| 同一文件里"共享组件 + 另写一处" | **点名该文件**，1→2 ✅ 没被整文件豁免 |
+
+### 顺手按门禁自己的提示做了对账：登记表 26 → 24
+
+收紧后门禁打印"有 2 个登记站点已消失 ⇒ 建议从 `EMPTY_SITES` 删掉"。
+🔴 **删之前逐行看过渲染形状**，不是"看起来没问题"：
+`apps/web/src/features/inbox/InboxBell.tsx:223` 与 `InviteActivityCard.tsx:145` 都是
+共享 `EmptyState`（且该段登记注释**早就写着**"渲染已经收编"）—— 是 marker 太宽把它们错记着。
+与文件里 `ListsSection` / `TagsSection` 那次移除是同一个动作。
+⚠️ **债没有消失**：面板级空态"长得像页面级"那个缺口仍挂在 `site-and-parity-alignment.md` 的欠账上。
+
+### 剩下的那处不是本条线的
+
+`apps/mobile/src/screens/SecurityScreen.tsx:272` 的
+`<Text variant="row-meta" tone="subtle">{t('mobile.security.passkeys.empty')}</Text>`
+—— 该屏由 `804842be`（「账号与安全」屏，2026-10-02 23:28）引入，**不属于多端覆盖这五批**。
+两条正当出路（**由那条线选，不要为了变绿加 `EMPTY_SITES` 一行**，那等于把债合法化）：
+
+1. 换成共享 `EmptyState` —— 但它是**设置卡片里的一行占位**，共享实现是页面级
+   （居中 + 上下 64px），换过去是**视觉回归**；
+2. 若确实需要"区块级空态"，正确动作是**先给它加一档**（`size?: 'page' | 'section'`，
+   与 `NotesBoard` / `ReminderList` 记的是同一个缺口），再让这两处都消费它。
+
+**现状**：`check:empty-state` 从 2 处红降到 1 处红，仍红 ⇒ `pnpm check` 仍断不到后面。
+本条不代改别人的屏。

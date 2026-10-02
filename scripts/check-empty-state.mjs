@@ -132,6 +132,11 @@
  *   E1  把 `App.tsx` 的 `ht-empty` 改名（判据锚点失效）        → 断言 A 红
  *   E2  新建 `features/foo/FooView.tsx` 手写一个 `ht-empty` 块 → 断言 B 红
  *   E3  在 `features` 里再加一个 `function EmptyState(`       → 断言 C 红
+ *   E4  新建屏里手写 `<Text>{t('probe.list.empty')}</Text>`    → 断言 B 红（点名该文件）
+ *   E5  新建屏里**只**用 `<EmptyState title={t('probe.shared.empty')} … />`
+ *       → 不再点名（这就是本门禁给出的修法；把它判红等于教人别用共享组件）
+ *   E6  同一个文件里"共享组件 + 另写一处空态词条"              → 仍红（按位置判，不按文件判）
+ *       （E4/E5/E6 于 2026-10-03 在 `HEYTA_CHECK_ROOT` 副本上实测，三份探针各自验证）
  *   E4  删掉 `apps/mobile/src/ui/kit.tsx` 的 `EmptyState`     → 断言 A 红
  *   E5  删掉共享权威定义（`packages/ui/src/empty-state/…`）    → 断言 A + 断言 C 红
  *   E6  把权威定义改成 import `@heyta/i18n`                    → 断言 C 红
@@ -255,6 +260,29 @@ const NOT_AN_EMPTY_STATE = new Map([
   ['web.export.markdown.empty', '导出到 Markdown 文件里的「（没有任务）」标签，不在页面上'],
 ]);
 
+/**
+ * 🔴 这条 marker 原来对"文件里出现 `t('….empty')`"**一律**记成新站点 ——
+ * 但那恰好是本门禁自己给出的修法（"用共享的 `EmptyState`"）会写出来的形状：
+ * 词条作为 prop 交给权威实现。于是"照修法做了"和"又手写了一份"在判据上
+ * **长得一模一样**，红字还指着共享组件那一行 —— 一条让正确做法必然变红的判据，
+ * 教的是"别用共享组件"。
+ *
+ * 现在只数**落在 `<EmptyState …>` 元素之外**的空态词条渲染：
+ *   · `<EmptyState title={t('x.empty')} />`      → 不算站点（这就是收编后的样子）
+ *   · `<Text>{t('x.empty')}</Text>`              → 仍然算（故障注入 E4/E5 实测）
+ *   · 同一文件里两者都有                          → 仍然算（按出现位置判，不按文件判）
+ *
+ * ⚠️ 只认自闭合形状：共享实现的契约就是"props 进、骨架出"（它不收 children），
+ *    写成 `<EmptyState>…</EmptyState>` 会被 React 忽略，不构成豁免面。
+ */
+function sharedEmptyStateRanges(src) {
+  const ranges = [];
+  for (const m of src.matchAll(/<EmptyState\b[\s\S]*?\/>/g)) {
+    ranges.push([m.index, m.index + m[0].length]);
+  }
+  return ranges;
+}
+
 const SITE_MARKERS = [
   { kind: '骨架类', test: (src) => /ht-empty/.test(src) },
   { kind: '空槽位类', test: (src) => /__empty\b/.test(src) },
@@ -262,9 +290,11 @@ const SITE_MARKERS = [
   {
     kind: '直接渲染空态词条',
     test: (src) => {
+      const shared = sharedEmptyStateRanges(src);
       for (const m of src.matchAll(EMPTY_KEY_CALL)) {
         if (!EMPTY_KEY_SEGMENT.test(m[1])) continue;
         if (NOT_AN_EMPTY_STATE.has(m[1])) continue;
+        if (shared.some(([a, b]) => m.index >= a && m.index < b)) continue;
         return true;
       }
       return false;
@@ -414,8 +444,24 @@ const EMPTY_SITES = {
      * （例如 `size?: 'page' | 'section'`）—— 与 `NotesBoard` / `ReminderList`
      * 记的是同一个缺口，本仓尚未定。定下来之前不要再新增第二种写法。
      */
-    'apps/web/src/features/inbox/InboxBell.tsx',
-    'apps/web/src/features/inbox/InviteActivityCard.tsx',
+    // ⚠️ `InboxBell.tsx` / `InviteActivityCard.tsx` 曾登记在这里，**已移除**
+    // （2026-10-03，按本门禁自己打印的"已消失"提示做的对账；与上面
+    // `ListsSection` / `TagsSection` 那次是同一个动作）。
+    //
+    // 🔴 移除的**依据不是"它看起来没问题"，是逐行看过渲染形状**：
+    //   · `apps/web/src/features/inbox/InboxBell.tsx:223`
+    //     ⇒ `<EmptyState title={t('web.inbox.notifications.empty')} testID={…} />`
+    //   · `apps/web/src/features/inbox/InviteActivityCard.tsx:145`
+    //     ⇒ 同一个共享 `EmptyState`（`import { EmptyState } from '@heyta/ui'`）
+    // 也就是这段注释自己早就写明的那件事（"渲染已经收编"）**一直是真的**，
+    // 是**marker 太宽**：它按"文件里出现过空态词条"记账，把"词条作为 prop 交给
+    // 权威实现"也算成了手写站点。收紧成"只数落在 `<EmptyState …>` 之外的渲染"之后，
+    // 这两条自然不再匹配。
+    //
+    // ⚠️ 这**不是**把债抹掉：面板级空态"长得像页面级"那个缺口（见下面那段）
+    // 仍然成立，仍然挂在 `site-and-parity-alignment.md` 的欠账上。
+    // 判据也没松：故障注入实测 —— 新文件里手写 `<Text>{t('x.empty')}</Text>` 仍然红，
+    // 同一个文件里"共享组件 + 另写一处"仍然红，只有纯共享组件用法不再点名。
   ],
   '空态文案 prop': [
     /**
