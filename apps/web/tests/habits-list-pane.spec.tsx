@@ -48,7 +48,7 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 (globalThis as unknown as { indexedDB: IDBFactory }).indexedDB = new IDBFactory();
 (globalThis as unknown as { IDBKeyRange: typeof IDBKeyRange }).IDBKeyRange = IDBKeyRange;
 
-const { HABIT_ICONS } = await import('@heyta/domain');
+const { HABIT_ICONS, habitIconOf } = await import('@heyta/domain');
 const { I18nProvider } = await import('@heyta/i18n');
 const { HabitsView } = await import('../src/features/habits/HabitsView.js');
 const { __resetOpLogForTests, initOpLog } = await import('../src/lib/oplog.js');
@@ -294,6 +294,13 @@ describe('D. 图标选择器：存闭集 key，不存字形名', () => {
   const storedIcon = (name: string): string | undefined =>
     useHabitStore.getState().habits.find((h) => h.name === name)?.icon;
 
+  /** 这条习惯**当前实际画着**的图标 key（选过用选的，没选过用派生）。 */
+  const effectiveIconOf = (name: string): (typeof HABIT_ICONS)[number] => {
+    const h = useHabitStore.getState().habits.find((x) => x.name === name);
+    if (h === undefined) throw new Error(`store 里没有习惯「${name}」`);
+    return habitIconOf(h);
+  };
+
   it('八个字形 + 一个「默认」，一个都不许多（词表是红线）', () => {
     openPicker();
     const options = qa('.ht-habit__icon-option', pane() ?? document);
@@ -303,10 +310,16 @@ describe('D. 图标选择器：存闭集 key，不存字形名', () => {
 
   it('🔴 选一个字形 → **落库的是 key**，且行首圆盘跟着变', async () => {
     const name = selectedName();
+    // 🔴 挑的字形必须**一定不同于**这条习惯当前画着的那个（BLOCKED.md B9）：
+    // 派生字形由 id 哈希决定，而 id 每次运行都是新随机 UUID ⇒ 约 1/8 的运行
+    // 恰好派生出 `book`。写死 'book' 时，在那 1/8 的运行里"圆盘跟着变"会假红 ——
+    // 落库断言过了，而字形本来就长一样。动态挑一个不同的 key，
+    // "换图标必须看得见"这条判据才在**每一次**运行里都真的被检验。
+    const chosen = HABIT_ICONS.find((icon) => icon !== effectiveIconOf(name))!;
     const before = rowOf(name).querySelector('.ht-habit__disc svg')?.outerHTML;
     openPicker();
-    click(optionAt('book'));
-    await until(`「${name}」的图标落库为 book`, () => storedIcon(name) === 'book');
+    click(optionAt(chosen));
+    await until(`「${name}」的图标落库为 ${chosen}`, () => storedIcon(name) === chosen);
     const after = rowOf(name).querySelector('.ht-habit__disc svg')?.outerHTML;
     expect(after).not.toBe(before);
   });

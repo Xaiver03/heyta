@@ -1,3 +1,4 @@
+import { ICON_SIZE } from '@heyta/design-system';
 /**
  * 习惯目标编辑器（数值 / 单位 / 达成口径）
  * ==========================================
@@ -145,7 +146,7 @@ export function HabitGoalEditor({ habit, onSetGoal }: HabitGoalEditorProps): Rea
           fontSize: cssVar('font-size.xs'),
         }}
       >
-        <Target size={12} aria-hidden="true" />
+        <Target size={ICON_SIZE.xs} aria-hidden="true" />
         {/* 摘要**常驻可见**：只放进展开面板的话，扫一眼列表看不出每个习惯的目标，
             而"看清现状"正是改它的前提。 */}
         <span data-testid={`habit-goal-summary-${habit.id}`}>

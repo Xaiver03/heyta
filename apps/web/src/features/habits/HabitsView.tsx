@@ -1,3 +1,4 @@
+import { ICON_SIZE } from '@heyta/design-system';
 /**
  * 习惯视图（Web 壳）
  * ==================
@@ -231,7 +232,7 @@ export function HabitsView() {
               minHeight: cssVar('touch-target.min'),
             }}
           >
-            <Plus size={18} aria-hidden="true" />
+            <Plus size={ICON_SIZE.md} aria-hidden="true" />
           </button>
         </form>
 
