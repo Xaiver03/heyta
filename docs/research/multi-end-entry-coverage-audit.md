@@ -50,7 +50,7 @@
 | 导出 | ✅ 下载 | ✅ 系统分享 |
 | **导入（自家 JSON 还原）** | ✅ ImportPanel | ❌ 明示"导不回"（`ExportScreen.tsx:24`） |
 | 滴答导入 | ✅ 面板 | ✅ 粘贴（刻意形态） |
-| **改密码 / 通行密钥管理** | ✅ PasswordPanel + PasskeyPanel | ❌（仅魔法链接登录兜底） |
+| **改密码 / 通行密钥管理** | ✅ PasswordPanel + PasskeyPanel | ✅ 「账号与安全」入口行 → SecurityScreen（**批四已修** 2026-10-02） |
 | 登出 | ✅ 清凭据 | ✅ 清凭据（等价） |
 | 模块开关 | ✅ 7 模块 | ❌ 固定 5 tab（立场差异） |
 | 订阅/权益可见 | ✅ 到期条 | ❌ |
@@ -60,7 +60,7 @@
 
 ### P0 —— 核心闭环的洞，建议下一轮就做
 
-**P0-1 移动端提醒永远不会响。** 提醒在两端都能建（数据层完整），web 有到点投递（`use-reminder-notifications`，App.tsx:948）+ 通知权限面板；移动端是纯数据 op，package.json 无任何通知调度库 —— 用户在手机上设了提醒，**什么都不会发生**。任务管理应用的核心承诺在主战场一端名不副实。**依赖**：引本地通知库（如 notifee）必须先过 §3.1 可维护性 + §3.2 许可证两道门，这是一次显式依赖裁决。
+**P0-1 移动端提醒永远不会响。** ⛔ **批三停批（2026-10-02，依赖裁决不过）**：四个候选逐一裁决无一可用——notifee 归档（§3.1 不过）、push-notification 停在 2021（§3.1 不过）、wix 过门禁但 v5 已无本地调度 API、expo-notifications 过门禁但被 pnpm monorepo 布局卡死集成。按 goal 硬规则终止本批并上报，未手搓绕行；判据脚本与触发链设计已先行落地（`scripts/verify-mobile-reminder-ring.sh`），解锁条件见 goal §7。原文：~~提醒在两端都能建（数据层完整），web 有到点投递（Notification API + 权限面板）；移动端是纯数据 op，package.json 无任何通知调度库 —— 用户在手机上设了提醒，**什么都不会发生**。~~
 
 **P0-2 通知中心 + 邀请活动，移动端零入口。** ✅ **已修（2026-10-02，goal 批二）**：「我的」页「通知」入口行（未读徽标）→ 通知中心两 tab（通知/活动），消费 inbox 三函数（打开即自动已读；活动 tab 惰性拉取，与 web 同守"不瞎建邀请码"）；邀请卡经 `Share.share` 分享码。判据 = `verify:mobile-inbox` 真机零 mock（双账号真通知：B 走产品注册端点带码、TEST_MODE 自动结算 → A 徽标 ≥1 → 打开后清零；活动 tab 读到自己码 + chooser 出现）+ 截图人看 + 变异（拿掉自动已读 ⇒ 徽标清零判据转红）。原文：~~app-host 的 `inbox.ts` 三函数（index.ts:169-185）在 `apps/mobile/src` **零 import**：没有铃铛、没有活动页。~~
 
@@ -68,7 +68,7 @@
 
 ### P1 —— 安全与数据对称
 
-**P1-1 账号安全包未上移动端。** 改密码（PasswordPanel，App.tsx:2163）、通行密钥增删改名（PasskeyPanel.tsx:150-200）web 全有；移动端只有魔法链接登录做兜底，`changePassword` / `listPasskeys` 等 hosted-auth 十余个函数零 import。尖锐场景：在手机上用魔法链接注册的账号，**没有任何端外途径管理自己的凭据**；共享层全部现成。
+**P1-1 账号安全包未上移动端。** ✅ **已修（2026-10-02，goal 批四）**：「我的」页「账号与安全」入口 → SecurityScreen：改密码（`changePassword`，成功返回新会话 ⇒ **落盘轮换令牌并立即重验同步**——变异验证：拿掉落盘 ⇒ 判据以「登录凭据已失效」精确转红，12 绿 1 红）+ 通行密钥列表/改名/删除（409 最后一条如实报错）+ 空态如实说明"这台手机暂不支持注册，去电脑上注册"。判据 = `verify:mobile-account` 真机真服务端 13/0（`/api/test/create-user` 每轮建已知密码账号 → UI 改密 → 同步仍通 → `/api/login/email-password` 新密码换新会话 → 旧令牌 401）。**passkey 注册登记排除**：移动端无 WebAuthn 平台桥（`auth/passkey-host.ts` 是结论不是占位），接原生模块时只改那一个文件。原文：~~改密码（PasswordPanel，App.tsx:2163）、通行密钥增删改名（PasskeyPanel.tsx:150-200）web 全有；移动端只有魔法链接登录做兜底，`changePassword` / `listPasskeys` 等 hosted-auth 十余个函数零 import。~~
 
 **P1-2 自家备份还原未上移动端。** 手机能导出（系统分享），但 heyta 导出的 JSON **在手机上永远导不回**（`ExportScreen.tsx:24-28` 文件头明说）。导入/还原的对称性是数据安全承诺的一部分；`import-dump.ts` 的 `restoreIntoEmptyTarget` 现成。此缺口 AGENTS §5.1.1 已登记过，本审计重申其仍在。
 
