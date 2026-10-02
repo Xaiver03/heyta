@@ -1232,6 +1232,38 @@ git worktree remove /tmp/heyta-head-check
 已按编号递增追加为 `docs/reference/environment-traps.md` **第 90 条**
 （同批把同一天的姊妹款——hunk 过滤只比对增行、漏判对方"改写自己正文"的 hunk——
 写进了同一条的"一般规律"），AGENTS §7 索引表补了 `86–90` 行。**本条可以销账。**
+
+## B6. 🔴 `pnpm --filter @heyta/mobile test` 退出 1 而 28 个文件全过 —— 既有的测试基础设施红，**不是 i18n 这轮改出来的**
+
+i18n 实施轮撞见并当场归因，登记在这里防止下一轮把它当成国际化改动的回归。
+
+**症状**：`Test Files 28 passed (28) / Tests 418 passed (418) / Errors 3 errors`，**exit 1**。
+三条 `Unhandled Rejection` 全是同一个：`RolldownError: Parse failure … Flow is not supported`，
+对象是 `node_modules/.../react-native/index.js:1:0`（RN 的 copyright 头），
+文本都写着 `This error originated in "tests/auth-flow.spec.ts"`。
+调用链 `vite@8.3.1 ssrTransformScript → rolldown@1.2.11 parseAstAsync` —— 即**node 侧的
+`require('react-native')` / `require('@op-engineering/op-sqlite')` 被 vite 拦去做了 SSR 变换**，
+同步抛错被 `try/catch` 吃掉（界面上的"[prefs] 设备本地偏好库不可用"就是它），
+但**异步那一半没人接** ⇒ vitest 记成 unhandled rejection ⇒ 进程非零退出。
+
+**归属证据（三条，都是实测）**：
+
+| 实验 | 结果 | 说明 |
+|---|---|---|
+| 把本轮改过的两个 spec 从命令里**排除**再跑全量 | `26 passed / 381 passed / Errors 3`，exit 1 | 与本轮改动无关，红照旧 |
+| 单独跑 `auth-flow` / `locale` / `widget-bridge` / `sync-status-text` | 各自 exit 0，无 Parse failure | 归因行是**时机**不是**因果**（§7 元规则一"先怀疑探针"）|
+| `git log -1` 那批触发模块 | `src/prefs/device-prefs.ts` + `tests/auth-flow.spec.ts` 同为 `72dd32fc`（2026-09-30，别的会话） | 红来自那一次提交，本轮没碰这两个文件 |
+
+**为什么没当场修**：候选修法（给 `apps/mobile` 加一份 `vitest.config.ts` 把 `react-native` /
+`op-sqlite` 排除在 SSR 变换外）会同时改**这 28 个文件共同的**模块解析行为，
+而它必须靠"跑全量才知道有没有弄坏别的用例"来验证 —— 和本轮 i18n 的七步没有交集。
+**它挡的是 `pnpm check` 末尾的 `pnpm -r test`，不挡任何一条 i18n 门禁。**
+
+**复现**：`cd apps/mobile && npx vitest run`（并行或 `--no-file-parallelism` 都复现；单文件不复现）。
+**建议改法**（下一轮）：要么在 `apps/mobile` 加 vitest 配置外置这两个包，
+要么把 `device-prefs.ts` / `locale.ts` / `widget-bridge.ts` 三处 `require` 前加一个
+零 import 的运行时判定（如 `globalThis.HermesInternal` / JSI 存在性），让 node 侧根本不进加载器。
+
 ## B7. 🔴 `pnpm check:ui-language` 现在红，红的不是口令这一轮 —— 是另一条**未提交**的多行词条
 
 **症状**：`🔴 无法解析词条表：packages/i18n/src/locales/en.ts；看起来像词条的行有 2653 行，只解析出 2652 条`。
@@ -1252,3 +1284,124 @@ git worktree remove /tmp/heyta-head-check
 
 **为什么没当场修**：那是别人**尚未提交**的一行，改它等于把别人的工作卷进我的提交。
 **修法（归该轮的所有者）**：折成一行并把 value 里的 `task's` 写成 `\'`，或整条改用不含裸撇号的措辞。
+
+## B8. 🔴 `apps/web` 全量测试一次红 63 个文件 —— 共享的 `packages/ui/dist` 被一次**失败的 build** 清空了
+
+**症状**（2026-10-02 00:43）：`npx vitest run` 报 `Test Files 63 failed | 33 passed`，
+每一条的错误都是同一句：
+
+```
+Error: Failed to resolve entry for package "@heyta/ui".
+The package may have incorrect main/module/exports specified in its package.json.
+```
+
+**实测原因**：`packages/ui/dist` 目录**空的**（`ls` 无输出，mtime 00:43）。
+手动跑 `pnpm --filter @heyta/ui build` 以 **exit 1** 失败，因为并行会话正在写的
+`packages/ui/src/timeline/TimelineBoard.tsx` **连解析都不过**：
+
+```
+src/timeline/TimelineBoard.tsx(598,15): error TS1005: ')' expected.
+src/timeline/TimelineBoard.tsx(598,16): error TS2552: Cannot find name 'row'. Did you mean 'rows'?
+```
+
+`stat -f %m` 显示那个文件在 **00:44:03** 刚被写过 ⇒ 它是"写了一半"，不是"写坏了没人管"。
+
+**归属**：不是本会话那两笔（`2ef48b76` 认证面板变薄壳 / `0cbcf3e5` 门禁注释更正）造成的。
+反证是同一条命令在 00:35 的两次运行：那一刻 dist 完好，
+`auth-journey / auth-panel / auth-recovery / auth-form / signin-entry` **100 passed**，
+而我这两笔只动 `AuthPanel.tsx` + 三份 auth spec + `scripts/check-ui-provider.mjs`。
+
+**为什么没当场修**：那是别人未提交、且正在写的文件，补它 = 替他们决定时间线板的设计，
+而我没有他们的意图（`row` vs `rows` 只是语法层表象）。
+
+**修法（归该轮的所有者）**：`TimelineBoard.tsx` 写完后重新 `pnpm --filter @heyta/ui build`；
+在那之前 `apps/web` 的任何**全量**测试结论都不可信（只有不 import `@heyta/ui` 的文件能跑）。
+
+📌 **可迁移的判据**：共享工作树里，`packages/*/dist` 是**所有会话共用的单点产物** ——
+谁的那次 build 失败，就把别人的验证窗口一起关掉。所以"红一片"的第一动作是
+`ls packages/*/dist` + 看错误是不是 `Failed to resolve entry`，**不是**翻自己的 diff。
+
+## B9. 🟡 `apps/web` 全量测试剩 **1 条红**：习惯图标选择器 —— 被测文件是并行会话**未提交**的改动
+
+**症状**（2026-10-02 01:15，`pnpm -r --filter '!@heyta/sync-server' test`）：只有这一个失败，
+其余 17 个包全绿（app-host 42 文件、mobile 31、legal 57、landing 1303、ui 22）。
+
+```
+FAIL tests/habits-list-pane.spec.tsx > D. 图标选择器：存闭集 key，不存字形名
+     > 🔴 选一个字形 → **落库的是 key**，且行首圆盘跟着变
+AssertionError: expected '<svg …' not to be '<svg …'   // habits-list-pane.spec.tsx:311
+```
+
+第 309 行**过了**（`storedIcon(name) === 'book'` ⇒ key 确实落库），红的是第 311 行
+`expect(after).not.toBe(before)` —— 选了 `book` 之后，行首圆盘的 `<svg>` outerHTML **一字未变**。
+
+**归属**：这条断言管的四个文件在本工作树里是**别人未提交**的状态，本会话一行都没碰：
+
+| 状态 | 文件 |
+|---|---|
+| `M` | `apps/web/src/features/habits/HabitIconPicker.tsx` |
+| `M` | `apps/web/src/features/habits/HabitsList.tsx` |
+| `M` | `apps/web/src/features/habits/HabitsView.tsx` |
+| `M` | `apps/web/src/features/habits/HabitGoalEditor.tsx` |
+| `??` | `packages/design-system/src/icon-size.ts`（新文件，图标尺寸的统一） |
+
+本会话那两链（隐私同意闸门 + 法务文本）动的是 `apps/web/src/{main.tsx,pwa/register.ts}`、
+`apps/web/src/features/privacy/`、`packages/app-host/src/privacy-consent.ts`、
+`packages/legal` 与它的生成物 —— **与习惯/图标没有交集**，而且 i18n 侧只改了 `site.legal.*` 词条。
+
+**为什么没当场修**：那是别人**正在写、还没提交**的图标选择器。第 311 行要的是
+"换图标要看得见"，而它红的可能有三种根因（默认字形恰好就是 `book`、picker 写了 key 但
+圆盘仍从旧字段取字形、`icon-size.ts` 那次统一把外层 `<svg>` 变成常量），
+**选哪个等于替他们决定这个组件的行为**，我没有他们的意图。
+
+**修法（归该轮的所有者）**：先分清是**产品**还是**契约** ——
+`cd apps/web && npx vitest run tests/habits-list-pane.spec.tsx` 里把 `before` 与 `after`
+两个字符串打出来；相同 ⇒ 圆盘没有从落库的 key 取字形（产品），
+或测试选的那个字形本来就是该习惯的默认字形（契约，改成选一个**一定不同**的）。
+
+📌 **这一条对下一轮的含义**：本轮"全量单测绿"这句话**不能这么写** ——
+准确口径是 **1322 passed / 1 failed，而那 1 条属于图标选择器那一轮**。
+不要把它当成自己的红灯去翻自己的 diff，也不要为了让汇总变绿去动别人的文件。
+
+## B9. 🔴 四条 legal-links 全红在**同一个与本轮无关的动作**上 —— 未提交的隐私同意面板把整个界面盖住了
+
+**症状**（2026-10-02 01:13）：`npx playwright test --config=playwright.legal-links.config.ts`
+里已完成的 4 条**全部** `Test timeout of 120000ms exceeded`，而失败点都在
+`openAuthPanel()` 的**第一下点击**，不是我迁移的那批锚点：
+
+```
+Error: locator.click: waiting for getByTestId('account-menu-avatar')
+  - element is visible, enabled and stable
+  - <div role="presentation">…</div> from <main class="ht-main">…</main> subtree intercepts pointer events
+  - 231 × retrying click action
+```
+
+**实测原因**：工作树里多了一个**未跟踪**的 `apps/web/src/features/privacy/`
+（隐私同意面板），而 `apps/web/src/App.tsx`（已修改，未提交）在 1961 行把它挂进了渲染树。
+`shouldAskOnFirstLaunch()` = `privacyConsent.undecided()` ⇒ **全新浏览器上下文必然为真**
+（Playwright 每条用例一个新 context，localStorage 是空的），
+面板以一个 `role="presentation"` 的遮罩铺满 `<main class="ht-main">`，
+于是**任何**需要点 UI 的 e2e 都被它先拦住。
+
+**归属**：整条隐私同意线（`packages/app-host/src/privacy-consent.ts`、
+`apps/web/src/features/privacy/`、`apps/mobile/.../AuthScreen.tsx` 里那些
+`requireNetworkConsent()`、`e2e/tests/privacy-consent-zero-egress.spec.ts`）
+都在别人的 diff 里，`git cat-file -e HEAD:packages/app-host/src/privacy-consent.ts`
+报 "not in HEAD"。本会话这一轮只动了 `e2e/**` 的锚点。
+
+**为什么没当场修**：这不是"界面在说谎"那一类缺陷 —— 面板**应该**盖住首启界面。
+要在别的套件里跑下去，只有两条路，都不该由我来定：
+① 各 e2e 套件统一在 `openApp()` 里先作一个同意决定（那要选「同意并联网」还是「只用本机」，
+   是一个**产品语义**的选择，而且认证旅程需要联网，选错了整批红）；
+② 让遮罩只覆盖内容区而不吃 rail 的指针事件（那是那个功能自己的设计问题）。
+两条都归该轮的所有者。
+
+**恢复验证的动作**（等那轮提交后重跑，判据本身不用改）：
+`cd e2e && npx playwright test --config=playwright.legal-links.config.ts`（5 条），
+以及 `pnpm verify:email-web-chain`。**在那之前，本工作树里任何"真浏览器"结论都不可信** ——
+与 B8（`packages/*/dist` 被一次失败的 build 清空）同形状：单点状态被并行会话占着，
+红的不是我的 diff。
+
+📌 **可迁移的判据**：一条 e2e 失败**先定位它红在第几步**，再看那一步是不是自己改过的代码。
+四条同时红在**同一个 `click()`**、而错误里写着"别的元素 intercepts pointer events"，
+那个"别的元素"就是探针环境的变量 —— 它属于**谁的工作树状态**，不属于被测契约。

@@ -872,3 +872,51 @@ node scripts/check-macos-window.mjs（真实跑）→ 第 5 跑 exit 1 红在「
 - **真浏览器**：`playwright.live-site.config.ts` **6 passed**；补两发截屏判定 ——
   `/help/selfhost/` 命中「要配的环境变量」、`/en/help/first-run/` 命中 `Figure 14-1`
   （英文页真挂英文图）、console/pageerror = 0。
+
+### 链 5（2026-10-02，Goal「同意先于任何请求」G-11 / G-12）：真浏览器判据补上，并抓出一条**只在生产构建里存在**的缺陷
+
+**这一轮的净结论**：`apps/web` 的"未同意零出站"从**单测级**升级为**真浏览器 + 生产构建**级，
+而正是这条新判据把我自己在同一轮里引入的产品缺陷照了出来 —— 当时在场的 **95 条单测级判据**（还没有下面那 4 条）对它全绿。
+
+| 层 | 判据 | 变异验证 |
+|---|---|---|
+| `packages/app-host`（闸门本体） | 26 条 | 30 个臂逐个红 |
+| `apps/web`（启动序列 + 面板 + 读态） | 38 条 = 8 + 17 + 9 + 4 | 每个关键断言各一臂 |
+| `apps/mobile`（同一道闸） | 35 条 | 拿掉闸门即红 |
+| 🔴 **真浏览器（生产构建）** | **7 条**：未同意 ⇒ 出站清单为空 **且** `getRegistration()` 为 `null`；同意 ⇒ **同一个量翻过来** | `networkAllowed: () => true` ⇒ **恰好 3 红**，还原后 7 绿 |
+| 合计 | **99 条单测级 + 7 条真浏览器 = 106 条** | — |
+
+**照出来的真缺陷（§7 第 103 条）**：把 `registerWidgetServiceWorker()` 从 `main.tsx` 顶层
+挪进 `startupNetwork.arm()`（= `await initOpLog()` **之后**）之后，它内部那句
+`window.addEventListener('load', …)` **挂在 `load` 已经放完之后 ⇒ 永远不触发**，
+症状是**生产构建里 Service Worker 从来不注册**，而且**控制台零输出**。
+dev 构建（`import.meta.env.PROD` 为假）与 jsdom（没有 SW）都看不见它 ⇒ 单层判据永远绿。
+修法：调用时按 `document.readyState` 分流（已 `complete` 就直接注册），
+新单测 `apps/web/tests/pwa-register-readystate.spec.ts` 4 条钉住四种形状。
+
+**第二条入档的取证教训（§7 第 104 条）**：我原先写的正向对照「同意之后出站清单里出现
+`/sw.js`」**永远不可能满足** —— Chromium 取 SW 脚本不经过页面的请求流，
+`page.on('request')` 收不到它（注册明明成功，请求事件 0 条）。
+换成 `navigator.serviceWorker.getRegistration()` 做对照 + 一次分类器自检（页面自己
+`fetch('/sw.js')` 必须数得出），否则"零出站"那条是恒真。
+
+**接进门禁**：根 `package.json` 新增 `check:privacy-consent-e2e`（**先重建 `apps/web/dist`**
+再跑，§7 元规则 3），已插在 `check:ai-e2e` 之后进入 `pnpm check`。
+本轮复跑：**7 passed**（改法务文案之后重跑，仍是 7 绿）。
+
+**法务文本跟着事实改（不留假话）**：privacy / data-rights / minors 三份的"修订记录"
+去掉过期承诺；⚠️ 我改的时候把**内部缺口编号与仓库路径写进了对外正文**，
+`public-copy-register` 的「公页不许说贡献者语言」两条当场判红 ⇒ 在**源**上修掉六处，
+重跑两个生成器 + `@heyta/i18n` build，`check:legal-copy` / `check:server-legal` /
+`check:legal-host` / `check:entries` / `check:ui-language`（zh 2650 = en 2650）/
+`check:docs` / `check:claims` / `check:docs-voice` 全绿，legal **57** / landing **1303** 全绿。
+
+**全量单测**：18 个包跑完 —— app-host 42 文件、mobile 31、ui 22、landing 22、web 95 通过 /
+2 跳过，**只剩 1 条红**：`apps/web/tests/habits-list-pane.spec.tsx:311`（习惯图标选择器），
+归属**并行会话未提交**的 `HabitIconPicker/HabitsList/HabitsView` + 新文件
+`packages/design-system/src/icon-size.ts`，本轮一行没碰 ⇒ 取证与修法登记在 `BLOCKED.md` **B9**。
+server 侧本轮新增的 `terms-consent-version.spec.ts` **12 passed**（单独跑，pglite）。
+
+🟡 **未闭合**：**G-33 只剩移动壳那半**（首启面板的模拟器/实机截图）。它需要
+`pnpm reinstall:mobile` 把当前产物装上设备，而那会把另一条会话的半成品一起装上去（§7 第 82 条），
+所以按「做不了的登记为缺口」处理，不在本轮硬做。转 `effective` 之前必须补。
