@@ -138,7 +138,7 @@ docs/research/<kebab-case>.md     例：reuse-plan.md
 | 🔴 [desktop-native-migration.md](plans/desktop-native-migration.md) | **多端原生构建计划**：W0/W1 的**实测结论仍有效**（跨语言通道、Jint/JSC 陷阱、编组开销、错误过边界两种形态）。⚠️ **"RNW 出局"已被推翻** —— [最佳实践调研](research/multi-platform-best-practice.md) §3 用 npm registry 直查证明 `react-native-windows@0.84.0` 的 peer 就是 `react-native 0.84.1`（与 heyta 逐字相同），且 heyta 的移动端**本来就在** RN 不受支持区。**UI 形态以主计划 §4.3 为准** |
 | [phase-1-single-client-loop.md](plans/phase-1-single-client-loop.md) | ⭐ **P1 详细计划**：单端（Web）闭环 |
 | [phase-2-multi-platform.md](plans/phase-2-multi-platform.md) | **P2 详细计划**：多端补齐（存储契约 / SQLite / RN / 鸿蒙） |
-| 📅 [countdown-anniversary.md](plans/countdown-anniversary.md) | **倒数纪念日实施计划**：W0–W10 + L 系列工单分解、每条判据的变异验证形状、已知边界与后置。🔴 决策以 [ADR-0044](adr/0044-countdown-anniversary-entity-calendar-data-and-image-tiers.md) 为准；§3.5 是**批次一落地记录**（W1 历法 / W3 每年 / W4 节假日 + bundle 闸门，含 26 例变异验证与合入时必须做的四件事）。它同时**推翻**了 [goal-layout-audit.md](plans/goal-layout-audit.md) §4 那条"节日标注无数据源 ⇒ 不做"的理由 |
+| 📅 [countdown-anniversary.md](plans/countdown-anniversary.md) | **倒数纪念日实施计划**：W0–W10 + L 系列工单分解、每条判据的变异验证形状、已知边界与后置。🔴 决策以 [ADR-0044](adr/0044-countdown-anniversary-entity-calendar-data-and-image-tiers.md) 为准；§3.5 是**批次一落地记录**（W1 历法 / W3 每年 / W4 节假日 + bundle 闸门，含 26 例变异验证，以及合入时要做的事一件一条列在 §3.5）。它同时**推翻**了 [goal-layout-audit.md](plans/goal-layout-audit.md) §4 那条"节日标注无数据源 ⇒ 不做"的理由 |
 | [ai-memory-necessity.md](research/ai-memory-necessity.md) | ⭐ **要不要向量数据库**：用重复检测做可证伪实验得出的结论（难档召回 0%） |
 | 🔴 [ai-memory-system.md](plans/ai-memory-system.md) | **AI 记忆系统实施计划**：该记住什么偏好、怎么验证、分几阶段做 |
 | [ai-strategy.md](plans/ai-strategy.md) | ⭐⭐ **AI 入口文档**：读这一份就够（定位 / 三档结构 / 护城河 / 现状 / 下一步） |

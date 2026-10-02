@@ -203,7 +203,29 @@ i18n **中英同步**（唯一文案事实源，`check:ui-language` 拦）；`SH
 4. **W4 判据②的界面半段**（"数据只到 2026 时 2027 显示节、不显示休/班"）：本批不做 UI，所以落的是**数据层**那半 —— 2027 有节无休、不抛错、非法日期响亮失败，都有单测与变异。界面上那条随 W5。
 5. **W0 / W2 / W5 / W6 / W7 / W8 / W9 / W10、W4b、L 系列**：按排期未开工。W2 未动 = `shared-schema`、服务端、迁移一个字节都没改（批次二的部署顺序风险留在那里处理）。
 
-### 合入时必须做的三件事（现在做不了，各有硬理由）
+### 合入时必须做的事（现在做不了，每件都有硬理由）
+
+0. 🔴 **主检出里还留着本批文档的"上一版"**，直接 `git merge` 会被它自己拦下：
+   - 未跟踪的 `docs/adr/0044-…md`、`docs/plans/countdown-anniversary.md`、
+     `docs/research/countdown-anniversary-data-and-images.md` —— 分支里带的是**更新过的版本**
+     （§5b / §3.5 / §6），git 遇到"未跟踪文件会被覆盖"是**整个合并中止**，而且报错里不会
+     说明这三份的内容其实已经有人接手了。
+   - 未提交的一行 `docs/plans/README.md` 与 11 行 `docs/plans/goal-layout-audit.md`（都是
+     本会话写的，现已随分支落地）—— 对**已跟踪**文件的本地改动，merge 同样会拒绝。
+   ✅ 正确动作（一次做完，先验证再动）：
+   ```bash
+   cd heyta
+   git diff --stat docs/plans/README.md docs/plans/goal-layout-audit.md   # 应当只有本批那几行
+   mkdir -p /tmp/heyta-pre-merge && git ls-files -co --exclude-standard -- docs \
+     | grep -E "countdown|0044" | tar czf /tmp/heyta-pre-merge/docs.tgz -T -
+   mv docs/adr/0044-countdown-anniversary-entity-calendar-data-and-image-tiers.md \
+      docs/plans/countdown-anniversary.md \
+      docs/research/countdown-anniversary-data-and-images.md /tmp/heyta-pre-merge/
+   git checkout -- docs/plans/README.md docs/plans/goal-layout-audit.md
+   ```
+   ⚠️ 这一步**故意不在本批执行**：主检出是并行会话正在用的工作树
+   （2026-10-03 02:02 它的 `verify-mobile-restore.sh` 正在跑，`docs/` 下还有别人
+   未提交的改动，包括一个已经 staged 的文件）。改它的跟踪文件 = 动别人的现场。
 
 1. **`research/licenses-inventory.generated.md` 要全量重渲染**：渲染器扫的是**当前检装的依赖树**，在隔离 worktree 里跑会把并行会话工作树才装着的包判成不存在并写掉。实测本 worktree 跑一次是 **962 → 957**：掉 10 条（`@floating-ui/*` 五条、Playwright 三条、`react-activity-calendar`、`tabbable`），多 5 条（argon2 两条、`@zxcvbn-ts/*` 两条，以及本批真正的 `lunar-typescript`）——**只有最后那条是应该进登记的，前 14 条是工作树差异造成的假象**。⇒ 已逐字节还原，并把要求登记在 `THIRD_PARTY_LICENSES.md` §2 那条 ⚠️ 里。**在主检出合入本批 lockfile 之后跑。**
 2. **traps 编号可能撞号**：本批新增的 §7 条目从 **137** 起编，而主检出工作树里已有一条正在写到的 **136**（并行会话未提交）。合入时若 137–140 已被占用，**顺延编号、内容不改**。
