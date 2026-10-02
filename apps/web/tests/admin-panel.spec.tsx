@@ -212,13 +212,30 @@ function json(body: unknown): Response {
   return { status: 200, ok: true, json: () => Promise.resolve(body) } as unknown as Response;
 }
 
+/** 那一行有三种可读出来的状态，假服务端必须每一种都能扮演。 */
+const NO_CONSENT = { termsAcceptedAt: null, termsDocumentVersion: null };
+/** 2026-10-02 生产上真实落库的那一枚指纹（L4 实跑从那一行读回来的形状）。 */
+const FINGERPRINT = [
+  'ai-and-transfer@1.0',
+  'data-rights@1.1',
+  'minors@1.1',
+  'permissions@1.0',
+  'personal-info-list@1.0',
+  'privacy@1.1',
+  'subscription-refund@1.0',
+  'terms@1.1',
+  'third-parties@1.0',
+].join(';');
+
 /**
  * 一台**带状态**的假服务端：`/users/7/unlock` 真的把 `locked` 改掉。
  *
  * 🔴 这是"界面显示的是服务端的新值"唯一可行的证法 —— 如果假服务端自己不变，
  * 那么一个只改本地副本的实现也能让断言通过（§7 第 50 条）。
  */
-function stubAdminServer(): { locked: boolean; listFetches: number } {
+function stubAdminServer(
+  consent: { termsAcceptedAt: number | null; termsDocumentVersion: string | null } = NO_CONSENT,
+): { locked: boolean; listFetches: number } {
   const state = { locked: true, listFetches: 0 };
   fetchMock = vi.fn((url: string) => {
     const path = url.replace(/^.*\/api\/admin/, '').split('?')[0];
@@ -237,7 +254,12 @@ function stubAdminServer(): { locked: boolean; listFetches: number } {
     if (path === '/users/7') {
       return Promise.resolve(
         json({
-          user: { ...userRow(state.locked), failedLoginAttempts: 5, termsAcceptedAt: null, tokenVersion: 3 },
+          user: {
+            ...userRow(state.locked),
+            failedLoginAttempts: 5,
+            tokenVersion: 3,
+            ...consent,
+          },
           counts: { passkeys: 2, operations: 41, notifications: 3 },
           subscriptions: [],
           orders: [],
@@ -375,6 +397,53 @@ describe('🔴 动作之后，列表与详情都要重新读回服务端', () =>
     // 拿掉 `reloadAfterUserAction` 里那句 `loadUsers` ⇒ 这里仍是 1 个徽标 ⇒ 红。
     expect(badge()).toHaveLength(0);
     expect(state.listFetches, '动作后必须重新拉列表，否则那一行停在旧值').toBe(2);
+  });
+});
+
+/**
+ * 🔴 G-36①：同意留痕那一行**必须被钉住**。
+ *
+ * 对外文本（`terms.ts`）承诺"注册时记下的是一整套版本指纹"，而这一行是那句
+ * 承诺**唯一面向运营者的出口**。库里和 API 都能答"哪一版"，界面上没有那一行
+ * 就等于没有 —— 而"没有那一行"这件事**没有任何一层会报错**，除非有人钉住它。
+ *
+ * 三条用例各钉一种可读出来的状态，关键在**后两条必须互不相同**：
+ * "根本没同意"与"同意了但证明不了版本"混成一句，就是让运营者替数据库说谎。
+ */
+describe('🔴 同意留痕那一行', () => {
+  async function openDetail(
+    consent: { termsAcceptedAt: number | null; termsDocumentVersion: string | null },
+  ): Promise<string | null> {
+    stubAdminServer(consent);
+    const el = await renderPanel();
+    await clickTab(el, '用户');
+    await clickByTestId(el, 'admin-users', 'locked@example.test');
+    const row = el.querySelector('[data-testid="admin-user-consent"]');
+    return row?.textContent ?? null;
+  }
+
+  it('没有同意记录 ⇒ 说"没有"，且不许出现"版本无法证明"', async () => {
+    const text = await openDetail(NO_CONSENT);
+    expect(text).not.toBeNull();
+    expect(text).toContain('同意留痕');
+    expect(text).toContain('没有同意记录');
+    expect(text).not.toContain('版本无法证明');
+  });
+
+  it('有时间也有指纹 ⇒ 两个值逐字出现在同一行（这就是那条证据）', async () => {
+    const text = await openDetail({ termsAcceptedAt: T0, termsDocumentVersion: FINGERPRINT });
+    expect(text).toContain(FINGERPRINT);
+    expect(text).not.toContain('没有同意记录');
+    expect(text).not.toContain('版本无法证明');
+  });
+
+  it('有时间但没有指纹 ⇒ 单独一句"版本无法证明"，且不冒充成没同意', async () => {
+    const text = await openDetail({ termsAcceptedAt: T0, termsDocumentVersion: null });
+    expect(text).toContain('版本无法证明');
+    expect(text).not.toContain('没有同意记录');
+    // 不许把空指纹渲染成一个假的版本号（`undefined` 漏进模板也是这一类）。
+    expect(text).not.toMatch(/@1\.\d/);
+    expect(text).not.toContain('undefined');
   });
 });
 
