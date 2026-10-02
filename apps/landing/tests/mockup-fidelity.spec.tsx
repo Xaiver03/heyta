@@ -190,7 +190,7 @@ describe('展厅复刻与应用一致', () => {
     expect(tabs).toHaveLength(APP_VIEW_TABS.length + 2);
   });
 
-  it('侧栏主导航是三项，含「已完成」', () => {
+  it('侧栏主导航把登记的每一项都画出来了，含「已完成」', () => {
     const view = renderMockup();
     const items = [...view.querySelectorAll('.mk-sidebar .mk-nav__item')].map(
       (el) => el.textContent?.trim() ?? '',

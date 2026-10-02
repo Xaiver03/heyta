@@ -132,7 +132,13 @@ export interface SitePage {
    * 于是"忘标"的表现不是静默当成文章，而是**从文章清单里消失** —— 而
    * `DocsArticlePage` 取不到正文会响亮抛错（见 `docs.ts` 的 `docsArticleById`）。
    */
-  readonly docsKind?: 'article' | 'category';
+  /**
+   * 🔴 'hub' = 文档中心的枢纽（/docs）。它与其余落地页走**不同的外壳**：
+   * `main.tsx` 按「有没有 docsKind」选择 `DocsShell`（帮助中心自己的
+   * topnav/搜索/页脚，SSOS 文档站同构）或营销站的 `SiteLayout`。
+   */
+
+  readonly docsKind?: 'hub' | 'article' | 'category';
   /**
    * 这一页渲染 `@heyta/legal` 里的**哪一份**对外文本（`/legal/<docId>/`）。
    *
@@ -161,6 +167,15 @@ export interface SitePage {
   readonly titleKey: MessageKey;
   /** 该页 `<meta name="description">` 的词条 key。 */
   readonly descriptionKey: MessageKey;
+}
+
+/**
+ * 文档中心外壳判据（`main.tsx` 用它选 `DocsShell` 还是营销站的 `SiteLayout`）。
+ * 🔴 用 `in` 而不是取属性：注册表是字面量联合，没有 docsKind 的成员
+ * 根本不存在这个键，直接点属性是编译错误。
+ */
+export function isDocsShellPage(page: SitePage): boolean {
+  return 'docsKind' in page;
 }
 
 /**
@@ -243,10 +258,11 @@ export const SITE_PAGES = [
   },
   {
     id: 'help',
-    path: '/help',
+    path: '/docs',
     group: 'support',
     inNav: true,
     inFooter: true,
+    docsKind: 'hub',
     labelKey: 'site.nav.help',
     headingKey: 'site.help.title',
     ledeKey: 'site.help.lede',
@@ -315,7 +331,7 @@ export const SITE_PAGES = [
    */
   {
     id: 'start',
-    path: '/help/start',
+    path: '/docs/start',
     group: 'support',
     inNav: false,
     inFooter: false,
@@ -329,7 +345,7 @@ export const SITE_PAGES = [
   },
   {
     id: 'sync',
-    path: '/help/sync',
+    path: '/docs/sync',
     group: 'support',
     inNav: false,
     inFooter: false,
@@ -343,7 +359,7 @@ export const SITE_PAGES = [
   },
   {
     id: 'organize',
-    path: '/help/organize',
+    path: '/docs/organize',
     group: 'support',
     inNav: false,
     inFooter: false,
@@ -357,7 +373,7 @@ export const SITE_PAGES = [
   },
   {
     id: 'data',
-    path: '/help/data',
+    path: '/docs/data',
     group: 'support',
     inNav: false,
     inFooter: false,
@@ -371,7 +387,7 @@ export const SITE_PAGES = [
   },
   {
     id: 'trust',
-    path: '/help/trust',
+    path: '/docs/trust',
     group: 'support',
     inNav: false,
     inFooter: false,
@@ -417,7 +433,7 @@ export const SITE_PAGES = [
    */
   {
     id: 'first-run',
-    path: '/help/first-run',
+    path: '/docs/first-run',
     group: 'support',
     inNav: false,
     inFooter: false,
@@ -431,7 +447,7 @@ export const SITE_PAGES = [
   },
   {
     id: 'concepts',
-    path: '/help/concepts',
+    path: '/docs/concepts',
     group: 'support',
     inNav: false,
     inFooter: false,
@@ -445,7 +461,7 @@ export const SITE_PAGES = [
   },
   {
     id: 'how',
-    path: '/help/how',
+    path: '/docs/how',
     group: 'support',
     inNav: false,
     inFooter: false,
@@ -459,7 +475,7 @@ export const SITE_PAGES = [
   },
   {
     id: 'account',
-    path: '/help/account',
+    path: '/docs/account',
     group: 'support',
     inNav: false,
     inFooter: false,
@@ -473,7 +489,7 @@ export const SITE_PAGES = [
   },
   {
     id: 'passphrase',
-    path: '/help/passphrase',
+    path: '/docs/passphrase',
     group: 'support',
     inNav: false,
     inFooter: false,
@@ -487,7 +503,7 @@ export const SITE_PAGES = [
   },
   {
     id: 'conflict',
-    path: '/help/conflict',
+    path: '/docs/conflict',
     group: 'support',
     inNav: false,
     inFooter: false,
@@ -501,7 +517,7 @@ export const SITE_PAGES = [
   },
   {
     id: 'views',
-    path: '/help/views',
+    path: '/docs/views',
     group: 'support',
     inNav: false,
     inFooter: false,
@@ -515,7 +531,7 @@ export const SITE_PAGES = [
   },
   {
     id: 'repeat',
-    path: '/help/repeat',
+    path: '/docs/repeat',
     group: 'support',
     inNav: false,
     inFooter: false,
@@ -529,7 +545,7 @@ export const SITE_PAGES = [
   },
   {
     id: 'reminders',
-    path: '/help/reminders',
+    path: '/docs/reminders',
     group: 'support',
     inNav: false,
     inFooter: false,
@@ -543,7 +559,7 @@ export const SITE_PAGES = [
   },
   {
     id: 'selfhost',
-    path: '/help/selfhost',
+    path: '/docs/selfhost',
     group: 'support',
     inNav: false,
     inFooter: false,
@@ -557,7 +573,7 @@ export const SITE_PAGES = [
   },
   {
     id: 'transfer',
-    path: '/help/transfer',
+    path: '/docs/transfer',
     group: 'support',
     inNav: false,
     inFooter: false,
@@ -571,7 +587,7 @@ export const SITE_PAGES = [
   },
   {
     id: 'trash',
-    path: '/help/trash',
+    path: '/docs/trash',
     group: 'support',
     inNav: false,
     inFooter: false,
@@ -585,7 +601,7 @@ export const SITE_PAGES = [
   },
   {
     id: 'privacy',
-    path: '/help/privacy',
+    path: '/docs/privacy',
     group: 'support',
     inNav: false,
     inFooter: false,
@@ -599,7 +615,7 @@ export const SITE_PAGES = [
   },
   {
     id: 'loss',
-    path: '/help/loss',
+    path: '/docs/loss',
     group: 'support',
     inNav: false,
     inFooter: false,
@@ -731,12 +747,6 @@ export const SITE_PAGES = [
 ] as const satisfies readonly SitePage[];
 
 /**
- * 编译期兜底：`SITE_PAGES` 里漏了 `SitePage` 的字段、或写错类型，这里会报错。
- *
- * ⚠️ 这条断言的意义不是"类型安全"那么抽象 —— 它是**加页面时最容易漏的东西**
- * （词条 key 拼错、忘了 `inNav`）在**编译期**而不是"上线后发现导航里没有它"时暴露。
- */
-/**
  * 九份对外法律文本的页面清单（页脚 legal 组与 `docRef` 解析都从这里取）。
  *
  * 🔴 **URL 里那一段就是 `@heyta/legal` 的文档 id，而且它一旦发布就是承诺。**
@@ -766,6 +776,12 @@ export function legalPageByDocId(docId: string): LegalSitePage | undefined {
   return LEGAL_PAGES.find((page) => page.legalDocId === docId);
 }
 
+/**
+ * 编译期兜底：`SITE_PAGES` 里漏了 `SitePage` 的字段、或写错类型，这里会报错。
+ *
+ * ⚠️ 这条断言的意义不是"类型安全"那么抽象 —— 它是**加页面时最容易漏的东西**
+ * （词条 key 拼错、忘了 `inNav`）在**编译期**而不是"上线后发现导航里没有它"时暴露。
+ */
 type AllPagesAreWellFormed = (typeof SITE_PAGES)[number] extends SitePage ? true : never;
 const allPagesAreWellFormed: AllPagesAreWellFormed = true;
 void allPagesAreWellFormed;

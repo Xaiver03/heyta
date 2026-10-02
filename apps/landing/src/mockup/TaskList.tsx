@@ -1,3 +1,4 @@
+import { ICON_SIZE } from '@heyta/design-system';
 /**
  * 真实界面复现：任务列表
  * =========================
@@ -120,7 +121,7 @@ export function TaskList(): React.JSX.Element {
           className={`mk-task${demo.done === true ? ' mk-task--done' : ''}`}
         >
           <span className="mk-task__check">
-            <Check size={12} />
+            <Check size={ICON_SIZE.xs} />
           </span>
 
           <span className="mk-task__body">
@@ -146,12 +147,12 @@ export function TaskList(): React.JSX.Element {
               "找不到入口"和"入口说为什么不可用"是两件事。 */}
           {demo.ai === true ? (
             <span className="mk-iconbtn">
-              <Sparkles size={16} />
+              <Sparkles size={ICON_SIZE.sm} />
             </span>
           ) : null}
 
           <span className="mk-iconbtn">
-            <Trash2 size={16} />
+            <Trash2 size={ICON_SIZE.sm} />
           </span>
         </div>
       ))}

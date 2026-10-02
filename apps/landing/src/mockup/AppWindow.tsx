@@ -1,3 +1,4 @@
+import { ICON_SIZE } from '@heyta/design-system';
 /**
  * 真实界面复现：桌面外壳
  * =========================
@@ -23,6 +24,7 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from 'react';
 import {
   CalendarDays,
+  CalendarRange,
   ChartGantt,
   Check,
   CheckCircle2,
@@ -80,6 +82,7 @@ const STAGE_WIDTH_REM = 80;
 const SHELL_ICONS: Record<ShellNavIconId, LucideIcon> = {
   inbox: Inbox,
   'calendar-days': CalendarDays,
+  'calendar-range': CalendarRange,
   search: Search,
   sun: Sun,
   'check-circle': CheckCircle2,
@@ -233,7 +236,7 @@ export function AppWindow({
             </div>
 
             {/*
-              🔴 主导航三项（收集箱 / 今天 / 已完成），从 `SHELL_PRIMARY_NAV` 派生。
+              🔴 主导航四项（收集箱 / 今天 / 最近 7 天 / 已完成），从 `SHELL_PRIMARY_NAV` 派生。
               「已完成」原来是漏的（§2 #1）—— 少画一个入口是"不完整"。
             */}
             <div className="mk-nav">
@@ -242,7 +245,7 @@ export function AppWindow({
                 return (
                   <NavItem
                     key={item.labelKey}
-                    icon={<ItemIcon size={16} />}
+                    icon={<ItemIcon size={ICON_SIZE.sm} />}
                     label={t(item.labelKey)}
                     active={item.labelKey === 'web.shell.nav.inbox' && view === 'tasks'}
                   />
@@ -279,7 +282,7 @@ export function AppWindow({
                 <div className="mk-field">
                   <span className="mk-field__box">{t(section.newPlaceholderKey)}</span>
                   <span className="mk-field__add">
-                    <Plus size={14} />
+                    <Plus size={ICON_SIZE.xs} />
                   </span>
                 </div>
               </div>
@@ -307,7 +310,7 @@ export function AppWindow({
                         tab.key === view ? ' mk-viewtab--active' : ''
                       }`}
                     >
-                      <TabIcon size={14} />
+                      <TabIcon size={ICON_SIZE.xs} />
                       {t(tab.labelKey)}
                     </div>
                   );
@@ -321,13 +324,13 @@ export function AppWindow({
                       key={tab.labelKey}
                       className={`mk-viewtab${index === 0 ? ' mk-viewtab--active' : ''}`}
                     >
-                      {index === 0 ? <CalendarDays size={14} /> : <Timer size={14} />}
+                      {index === 0 ? <CalendarDays size={ICON_SIZE.xs} /> : <Timer size={ICON_SIZE.xs} />}
                       {t(tab.labelKey)}
                     </div>
                   ))}
                 </div>
                 <div className="mk-sync mk-sync--ok">
-                  <Zap size={12} />
+                  <Zap size={ICON_SIZE.xs} />
                   {t('web.sync.status.synced')}
                 </div>
                 {/*
@@ -337,10 +340,10 @@ export function AppWindow({
                   文案用应用自己的 key，图标与真应用同一套（lucide）。
                 */}
                 <div className="mk-iconbtn" role="img" aria-label={t('web.sync.a11y.syncNow')}>
-                  <RefreshCw size={14} />
+                  <RefreshCw size={ICON_SIZE.xs} />
                 </div>
                 <div className="mk-iconbtn" role="img" aria-label={t('web.sync.settings.title')}>
-                  <Settings size={14} />
+                  <Settings size={ICON_SIZE.xs} />
                 </div>
                 {/* 当前语言在图上要看得出来（同 `mk-nav__item--active` 的处理）：
                     一排同样式的格子会被读成"都是当前"。复刻是静态图，不写真控件的 aria。 */}
@@ -354,7 +357,7 @@ export function AppWindow({
                   </div>
                 ))}
                 <div className="mk-iconbtn">
-                  <Moon size={18} />
+                  <Moon size={ICON_SIZE.md} />
                 </div>
               </div>
             </header>

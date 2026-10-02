@@ -16,7 +16,8 @@
  * 读 `/help/passphrase` 的人正在解决一件具体的事 —— 把"立即使用"塞在答案前面
  * 是打断，不是导流（理由写在 `PageHead` 的 `cta` 注释里）。
  *
- * ⚠️ 正文上方那一排是 `DocsToc`：条目**直接从 `article.sections` 推出来**，
+ * ⚠️ **右栏那一列是 `DocsToc`**（2026-10-01 起从正文顶部挪到右栏，SSOS 文档站
+ * 同位，sticky + 滚动跟随高亮）：条目**直接从 `article.sections` 推出来**，
  * 和下面渲染出的 `<section id>` 是同一份数据，所以"目录少了新的一节"
  * 这种事结构上发生不了。
  *
@@ -44,9 +45,8 @@ export function DocsArticlePage({ page }: { page: SitePage }): React.JSX.Element
     <>
       <PageHead page={page} cta={false} />
       <div className="lp-section">
-        <DocsLayout page={page}>
+        <DocsLayout page={page} toc={<DocsToc sections={article.sections} />}>
           <div className="lp-docs__body">
-            <DocsToc sections={article.sections} />
             <PageSections sections={article.sections} figures={docsFiguresOf(article, locale)} />
           </div>
         </DocsLayout>

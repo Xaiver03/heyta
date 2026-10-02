@@ -81,18 +81,18 @@
     <xhtml:link rel="alternate" hreflang="x-default" href="https://heyta.waytofuture.cn/integrations/" />
   </url>
   <url>
-    <loc>https://heyta.waytofuture.cn/help/</loc>
+    <loc>https://heyta.waytofuture.cn/docs/</loc>
     <changefreq>weekly</changefreq>
-    <xhtml:link rel="alternate" hreflang="zh-CN" href="https://heyta.waytofuture.cn/help/" />
-    <xhtml:link rel="alternate" hreflang="en" href="https://heyta.waytofuture.cn/en/help/" />
-    <xhtml:link rel="alternate" hreflang="x-default" href="https://heyta.waytofuture.cn/help/" />
+    <xhtml:link rel="alternate" hreflang="zh-CN" href="https://heyta.waytofuture.cn/docs/" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://heyta.waytofuture.cn/en/docs/" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://heyta.waytofuture.cn/docs/" />
   </url>
   <url>
-    <loc>https://heyta.waytofuture.cn/en/help/</loc>
+    <loc>https://heyta.waytofuture.cn/en/docs/</loc>
     <changefreq>weekly</changefreq>
-    <xhtml:link rel="alternate" hreflang="zh-CN" href="https://heyta.waytofuture.cn/help/" />
-    <xhtml:link rel="alternate" hreflang="en" href="https://heyta.waytofuture.cn/en/help/" />
-    <xhtml:link rel="alternate" hreflang="x-default" href="https://heyta.waytofuture.cn/help/" />
+    <xhtml:link rel="alternate" hreflang="zh-CN" href="https://heyta.waytofuture.cn/docs/" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://heyta.waytofuture.cn/en/docs/" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://heyta.waytofuture.cn/docs/" />
   </url>
   <url>
     <loc>https://heyta.waytofuture.cn/changelog/</loc>
@@ -123,270 +123,270 @@
     <xhtml:link rel="alternate" hreflang="x-default" href="https://heyta.waytofuture.cn/signin/" />
   </url>
   <url>
-    <loc>https://heyta.waytofuture.cn/help/start/</loc>
+    <loc>https://heyta.waytofuture.cn/docs/start/</loc>
     <changefreq>weekly</changefreq>
-    <xhtml:link rel="alternate" hreflang="zh-CN" href="https://heyta.waytofuture.cn/help/start/" />
-    <xhtml:link rel="alternate" hreflang="en" href="https://heyta.waytofuture.cn/en/help/start/" />
-    <xhtml:link rel="alternate" hreflang="x-default" href="https://heyta.waytofuture.cn/help/start/" />
+    <xhtml:link rel="alternate" hreflang="zh-CN" href="https://heyta.waytofuture.cn/docs/start/" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://heyta.waytofuture.cn/en/docs/start/" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://heyta.waytofuture.cn/docs/start/" />
   </url>
   <url>
-    <loc>https://heyta.waytofuture.cn/en/help/start/</loc>
+    <loc>https://heyta.waytofuture.cn/en/docs/start/</loc>
     <changefreq>weekly</changefreq>
-    <xhtml:link rel="alternate" hreflang="zh-CN" href="https://heyta.waytofuture.cn/help/start/" />
-    <xhtml:link rel="alternate" hreflang="en" href="https://heyta.waytofuture.cn/en/help/start/" />
-    <xhtml:link rel="alternate" hreflang="x-default" href="https://heyta.waytofuture.cn/help/start/" />
+    <xhtml:link rel="alternate" hreflang="zh-CN" href="https://heyta.waytofuture.cn/docs/start/" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://heyta.waytofuture.cn/en/docs/start/" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://heyta.waytofuture.cn/docs/start/" />
   </url>
   <url>
-    <loc>https://heyta.waytofuture.cn/help/sync/</loc>
+    <loc>https://heyta.waytofuture.cn/docs/sync/</loc>
     <changefreq>weekly</changefreq>
-    <xhtml:link rel="alternate" hreflang="zh-CN" href="https://heyta.waytofuture.cn/help/sync/" />
-    <xhtml:link rel="alternate" hreflang="en" href="https://heyta.waytofuture.cn/en/help/sync/" />
-    <xhtml:link rel="alternate" hreflang="x-default" href="https://heyta.waytofuture.cn/help/sync/" />
+    <xhtml:link rel="alternate" hreflang="zh-CN" href="https://heyta.waytofuture.cn/docs/sync/" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://heyta.waytofuture.cn/en/docs/sync/" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://heyta.waytofuture.cn/docs/sync/" />
   </url>
   <url>
-    <loc>https://heyta.waytofuture.cn/en/help/sync/</loc>
+    <loc>https://heyta.waytofuture.cn/en/docs/sync/</loc>
     <changefreq>weekly</changefreq>
-    <xhtml:link rel="alternate" hreflang="zh-CN" href="https://heyta.waytofuture.cn/help/sync/" />
-    <xhtml:link rel="alternate" hreflang="en" href="https://heyta.waytofuture.cn/en/help/sync/" />
-    <xhtml:link rel="alternate" hreflang="x-default" href="https://heyta.waytofuture.cn/help/sync/" />
+    <xhtml:link rel="alternate" hreflang="zh-CN" href="https://heyta.waytofuture.cn/docs/sync/" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://heyta.waytofuture.cn/en/docs/sync/" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://heyta.waytofuture.cn/docs/sync/" />
   </url>
   <url>
-    <loc>https://heyta.waytofuture.cn/help/organize/</loc>
+    <loc>https://heyta.waytofuture.cn/docs/organize/</loc>
     <changefreq>weekly</changefreq>
-    <xhtml:link rel="alternate" hreflang="zh-CN" href="https://heyta.waytofuture.cn/help/organize/" />
-    <xhtml:link rel="alternate" hreflang="en" href="https://heyta.waytofuture.cn/en/help/organize/" />
-    <xhtml:link rel="alternate" hreflang="x-default" href="https://heyta.waytofuture.cn/help/organize/" />
+    <xhtml:link rel="alternate" hreflang="zh-CN" href="https://heyta.waytofuture.cn/docs/organize/" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://heyta.waytofuture.cn/en/docs/organize/" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://heyta.waytofuture.cn/docs/organize/" />
   </url>
   <url>
-    <loc>https://heyta.waytofuture.cn/en/help/organize/</loc>
+    <loc>https://heyta.waytofuture.cn/en/docs/organize/</loc>
     <changefreq>weekly</changefreq>
-    <xhtml:link rel="alternate" hreflang="zh-CN" href="https://heyta.waytofuture.cn/help/organize/" />
-    <xhtml:link rel="alternate" hreflang="en" href="https://heyta.waytofuture.cn/en/help/organize/" />
-    <xhtml:link rel="alternate" hreflang="x-default" href="https://heyta.waytofuture.cn/help/organize/" />
+    <xhtml:link rel="alternate" hreflang="zh-CN" href="https://heyta.waytofuture.cn/docs/organize/" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://heyta.waytofuture.cn/en/docs/organize/" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://heyta.waytofuture.cn/docs/organize/" />
   </url>
   <url>
-    <loc>https://heyta.waytofuture.cn/help/data/</loc>
+    <loc>https://heyta.waytofuture.cn/docs/data/</loc>
     <changefreq>weekly</changefreq>
-    <xhtml:link rel="alternate" hreflang="zh-CN" href="https://heyta.waytofuture.cn/help/data/" />
-    <xhtml:link rel="alternate" hreflang="en" href="https://heyta.waytofuture.cn/en/help/data/" />
-    <xhtml:link rel="alternate" hreflang="x-default" href="https://heyta.waytofuture.cn/help/data/" />
+    <xhtml:link rel="alternate" hreflang="zh-CN" href="https://heyta.waytofuture.cn/docs/data/" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://heyta.waytofuture.cn/en/docs/data/" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://heyta.waytofuture.cn/docs/data/" />
   </url>
   <url>
-    <loc>https://heyta.waytofuture.cn/en/help/data/</loc>
+    <loc>https://heyta.waytofuture.cn/en/docs/data/</loc>
     <changefreq>weekly</changefreq>
-    <xhtml:link rel="alternate" hreflang="zh-CN" href="https://heyta.waytofuture.cn/help/data/" />
-    <xhtml:link rel="alternate" hreflang="en" href="https://heyta.waytofuture.cn/en/help/data/" />
-    <xhtml:link rel="alternate" hreflang="x-default" href="https://heyta.waytofuture.cn/help/data/" />
+    <xhtml:link rel="alternate" hreflang="zh-CN" href="https://heyta.waytofuture.cn/docs/data/" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://heyta.waytofuture.cn/en/docs/data/" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://heyta.waytofuture.cn/docs/data/" />
   </url>
   <url>
-    <loc>https://heyta.waytofuture.cn/help/trust/</loc>
+    <loc>https://heyta.waytofuture.cn/docs/trust/</loc>
     <changefreq>weekly</changefreq>
-    <xhtml:link rel="alternate" hreflang="zh-CN" href="https://heyta.waytofuture.cn/help/trust/" />
-    <xhtml:link rel="alternate" hreflang="en" href="https://heyta.waytofuture.cn/en/help/trust/" />
-    <xhtml:link rel="alternate" hreflang="x-default" href="https://heyta.waytofuture.cn/help/trust/" />
+    <xhtml:link rel="alternate" hreflang="zh-CN" href="https://heyta.waytofuture.cn/docs/trust/" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://heyta.waytofuture.cn/en/docs/trust/" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://heyta.waytofuture.cn/docs/trust/" />
   </url>
   <url>
-    <loc>https://heyta.waytofuture.cn/en/help/trust/</loc>
+    <loc>https://heyta.waytofuture.cn/en/docs/trust/</loc>
     <changefreq>weekly</changefreq>
-    <xhtml:link rel="alternate" hreflang="zh-CN" href="https://heyta.waytofuture.cn/help/trust/" />
-    <xhtml:link rel="alternate" hreflang="en" href="https://heyta.waytofuture.cn/en/help/trust/" />
-    <xhtml:link rel="alternate" hreflang="x-default" href="https://heyta.waytofuture.cn/help/trust/" />
+    <xhtml:link rel="alternate" hreflang="zh-CN" href="https://heyta.waytofuture.cn/docs/trust/" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://heyta.waytofuture.cn/en/docs/trust/" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://heyta.waytofuture.cn/docs/trust/" />
   </url>
   <url>
-    <loc>https://heyta.waytofuture.cn/help/first-run/</loc>
+    <loc>https://heyta.waytofuture.cn/docs/first-run/</loc>
     <changefreq>weekly</changefreq>
-    <xhtml:link rel="alternate" hreflang="zh-CN" href="https://heyta.waytofuture.cn/help/first-run/" />
-    <xhtml:link rel="alternate" hreflang="en" href="https://heyta.waytofuture.cn/en/help/first-run/" />
-    <xhtml:link rel="alternate" hreflang="x-default" href="https://heyta.waytofuture.cn/help/first-run/" />
+    <xhtml:link rel="alternate" hreflang="zh-CN" href="https://heyta.waytofuture.cn/docs/first-run/" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://heyta.waytofuture.cn/en/docs/first-run/" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://heyta.waytofuture.cn/docs/first-run/" />
   </url>
   <url>
-    <loc>https://heyta.waytofuture.cn/en/help/first-run/</loc>
+    <loc>https://heyta.waytofuture.cn/en/docs/first-run/</loc>
     <changefreq>weekly</changefreq>
-    <xhtml:link rel="alternate" hreflang="zh-CN" href="https://heyta.waytofuture.cn/help/first-run/" />
-    <xhtml:link rel="alternate" hreflang="en" href="https://heyta.waytofuture.cn/en/help/first-run/" />
-    <xhtml:link rel="alternate" hreflang="x-default" href="https://heyta.waytofuture.cn/help/first-run/" />
+    <xhtml:link rel="alternate" hreflang="zh-CN" href="https://heyta.waytofuture.cn/docs/first-run/" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://heyta.waytofuture.cn/en/docs/first-run/" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://heyta.waytofuture.cn/docs/first-run/" />
   </url>
   <url>
-    <loc>https://heyta.waytofuture.cn/help/concepts/</loc>
+    <loc>https://heyta.waytofuture.cn/docs/concepts/</loc>
     <changefreq>weekly</changefreq>
-    <xhtml:link rel="alternate" hreflang="zh-CN" href="https://heyta.waytofuture.cn/help/concepts/" />
-    <xhtml:link rel="alternate" hreflang="en" href="https://heyta.waytofuture.cn/en/help/concepts/" />
-    <xhtml:link rel="alternate" hreflang="x-default" href="https://heyta.waytofuture.cn/help/concepts/" />
+    <xhtml:link rel="alternate" hreflang="zh-CN" href="https://heyta.waytofuture.cn/docs/concepts/" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://heyta.waytofuture.cn/en/docs/concepts/" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://heyta.waytofuture.cn/docs/concepts/" />
   </url>
   <url>
-    <loc>https://heyta.waytofuture.cn/en/help/concepts/</loc>
+    <loc>https://heyta.waytofuture.cn/en/docs/concepts/</loc>
     <changefreq>weekly</changefreq>
-    <xhtml:link rel="alternate" hreflang="zh-CN" href="https://heyta.waytofuture.cn/help/concepts/" />
-    <xhtml:link rel="alternate" hreflang="en" href="https://heyta.waytofuture.cn/en/help/concepts/" />
-    <xhtml:link rel="alternate" hreflang="x-default" href="https://heyta.waytofuture.cn/help/concepts/" />
+    <xhtml:link rel="alternate" hreflang="zh-CN" href="https://heyta.waytofuture.cn/docs/concepts/" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://heyta.waytofuture.cn/en/docs/concepts/" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://heyta.waytofuture.cn/docs/concepts/" />
   </url>
   <url>
-    <loc>https://heyta.waytofuture.cn/help/how/</loc>
+    <loc>https://heyta.waytofuture.cn/docs/how/</loc>
     <changefreq>weekly</changefreq>
-    <xhtml:link rel="alternate" hreflang="zh-CN" href="https://heyta.waytofuture.cn/help/how/" />
-    <xhtml:link rel="alternate" hreflang="en" href="https://heyta.waytofuture.cn/en/help/how/" />
-    <xhtml:link rel="alternate" hreflang="x-default" href="https://heyta.waytofuture.cn/help/how/" />
+    <xhtml:link rel="alternate" hreflang="zh-CN" href="https://heyta.waytofuture.cn/docs/how/" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://heyta.waytofuture.cn/en/docs/how/" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://heyta.waytofuture.cn/docs/how/" />
   </url>
   <url>
-    <loc>https://heyta.waytofuture.cn/en/help/how/</loc>
+    <loc>https://heyta.waytofuture.cn/en/docs/how/</loc>
     <changefreq>weekly</changefreq>
-    <xhtml:link rel="alternate" hreflang="zh-CN" href="https://heyta.waytofuture.cn/help/how/" />
-    <xhtml:link rel="alternate" hreflang="en" href="https://heyta.waytofuture.cn/en/help/how/" />
-    <xhtml:link rel="alternate" hreflang="x-default" href="https://heyta.waytofuture.cn/help/how/" />
+    <xhtml:link rel="alternate" hreflang="zh-CN" href="https://heyta.waytofuture.cn/docs/how/" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://heyta.waytofuture.cn/en/docs/how/" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://heyta.waytofuture.cn/docs/how/" />
   </url>
   <url>
-    <loc>https://heyta.waytofuture.cn/help/account/</loc>
+    <loc>https://heyta.waytofuture.cn/docs/account/</loc>
     <changefreq>weekly</changefreq>
-    <xhtml:link rel="alternate" hreflang="zh-CN" href="https://heyta.waytofuture.cn/help/account/" />
-    <xhtml:link rel="alternate" hreflang="en" href="https://heyta.waytofuture.cn/en/help/account/" />
-    <xhtml:link rel="alternate" hreflang="x-default" href="https://heyta.waytofuture.cn/help/account/" />
+    <xhtml:link rel="alternate" hreflang="zh-CN" href="https://heyta.waytofuture.cn/docs/account/" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://heyta.waytofuture.cn/en/docs/account/" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://heyta.waytofuture.cn/docs/account/" />
   </url>
   <url>
-    <loc>https://heyta.waytofuture.cn/en/help/account/</loc>
+    <loc>https://heyta.waytofuture.cn/en/docs/account/</loc>
     <changefreq>weekly</changefreq>
-    <xhtml:link rel="alternate" hreflang="zh-CN" href="https://heyta.waytofuture.cn/help/account/" />
-    <xhtml:link rel="alternate" hreflang="en" href="https://heyta.waytofuture.cn/en/help/account/" />
-    <xhtml:link rel="alternate" hreflang="x-default" href="https://heyta.waytofuture.cn/help/account/" />
+    <xhtml:link rel="alternate" hreflang="zh-CN" href="https://heyta.waytofuture.cn/docs/account/" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://heyta.waytofuture.cn/en/docs/account/" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://heyta.waytofuture.cn/docs/account/" />
   </url>
   <url>
-    <loc>https://heyta.waytofuture.cn/help/passphrase/</loc>
+    <loc>https://heyta.waytofuture.cn/docs/passphrase/</loc>
     <changefreq>weekly</changefreq>
-    <xhtml:link rel="alternate" hreflang="zh-CN" href="https://heyta.waytofuture.cn/help/passphrase/" />
-    <xhtml:link rel="alternate" hreflang="en" href="https://heyta.waytofuture.cn/en/help/passphrase/" />
-    <xhtml:link rel="alternate" hreflang="x-default" href="https://heyta.waytofuture.cn/help/passphrase/" />
+    <xhtml:link rel="alternate" hreflang="zh-CN" href="https://heyta.waytofuture.cn/docs/passphrase/" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://heyta.waytofuture.cn/en/docs/passphrase/" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://heyta.waytofuture.cn/docs/passphrase/" />
   </url>
   <url>
-    <loc>https://heyta.waytofuture.cn/en/help/passphrase/</loc>
+    <loc>https://heyta.waytofuture.cn/en/docs/passphrase/</loc>
     <changefreq>weekly</changefreq>
-    <xhtml:link rel="alternate" hreflang="zh-CN" href="https://heyta.waytofuture.cn/help/passphrase/" />
-    <xhtml:link rel="alternate" hreflang="en" href="https://heyta.waytofuture.cn/en/help/passphrase/" />
-    <xhtml:link rel="alternate" hreflang="x-default" href="https://heyta.waytofuture.cn/help/passphrase/" />
+    <xhtml:link rel="alternate" hreflang="zh-CN" href="https://heyta.waytofuture.cn/docs/passphrase/" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://heyta.waytofuture.cn/en/docs/passphrase/" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://heyta.waytofuture.cn/docs/passphrase/" />
   </url>
   <url>
-    <loc>https://heyta.waytofuture.cn/help/conflict/</loc>
+    <loc>https://heyta.waytofuture.cn/docs/conflict/</loc>
     <changefreq>weekly</changefreq>
-    <xhtml:link rel="alternate" hreflang="zh-CN" href="https://heyta.waytofuture.cn/help/conflict/" />
-    <xhtml:link rel="alternate" hreflang="en" href="https://heyta.waytofuture.cn/en/help/conflict/" />
-    <xhtml:link rel="alternate" hreflang="x-default" href="https://heyta.waytofuture.cn/help/conflict/" />
+    <xhtml:link rel="alternate" hreflang="zh-CN" href="https://heyta.waytofuture.cn/docs/conflict/" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://heyta.waytofuture.cn/en/docs/conflict/" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://heyta.waytofuture.cn/docs/conflict/" />
   </url>
   <url>
-    <loc>https://heyta.waytofuture.cn/en/help/conflict/</loc>
+    <loc>https://heyta.waytofuture.cn/en/docs/conflict/</loc>
     <changefreq>weekly</changefreq>
-    <xhtml:link rel="alternate" hreflang="zh-CN" href="https://heyta.waytofuture.cn/help/conflict/" />
-    <xhtml:link rel="alternate" hreflang="en" href="https://heyta.waytofuture.cn/en/help/conflict/" />
-    <xhtml:link rel="alternate" hreflang="x-default" href="https://heyta.waytofuture.cn/help/conflict/" />
+    <xhtml:link rel="alternate" hreflang="zh-CN" href="https://heyta.waytofuture.cn/docs/conflict/" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://heyta.waytofuture.cn/en/docs/conflict/" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://heyta.waytofuture.cn/docs/conflict/" />
   </url>
   <url>
-    <loc>https://heyta.waytofuture.cn/help/views/</loc>
+    <loc>https://heyta.waytofuture.cn/docs/views/</loc>
     <changefreq>weekly</changefreq>
-    <xhtml:link rel="alternate" hreflang="zh-CN" href="https://heyta.waytofuture.cn/help/views/" />
-    <xhtml:link rel="alternate" hreflang="en" href="https://heyta.waytofuture.cn/en/help/views/" />
-    <xhtml:link rel="alternate" hreflang="x-default" href="https://heyta.waytofuture.cn/help/views/" />
+    <xhtml:link rel="alternate" hreflang="zh-CN" href="https://heyta.waytofuture.cn/docs/views/" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://heyta.waytofuture.cn/en/docs/views/" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://heyta.waytofuture.cn/docs/views/" />
   </url>
   <url>
-    <loc>https://heyta.waytofuture.cn/en/help/views/</loc>
+    <loc>https://heyta.waytofuture.cn/en/docs/views/</loc>
     <changefreq>weekly</changefreq>
-    <xhtml:link rel="alternate" hreflang="zh-CN" href="https://heyta.waytofuture.cn/help/views/" />
-    <xhtml:link rel="alternate" hreflang="en" href="https://heyta.waytofuture.cn/en/help/views/" />
-    <xhtml:link rel="alternate" hreflang="x-default" href="https://heyta.waytofuture.cn/help/views/" />
+    <xhtml:link rel="alternate" hreflang="zh-CN" href="https://heyta.waytofuture.cn/docs/views/" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://heyta.waytofuture.cn/en/docs/views/" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://heyta.waytofuture.cn/docs/views/" />
   </url>
   <url>
-    <loc>https://heyta.waytofuture.cn/help/repeat/</loc>
+    <loc>https://heyta.waytofuture.cn/docs/repeat/</loc>
     <changefreq>weekly</changefreq>
-    <xhtml:link rel="alternate" hreflang="zh-CN" href="https://heyta.waytofuture.cn/help/repeat/" />
-    <xhtml:link rel="alternate" hreflang="en" href="https://heyta.waytofuture.cn/en/help/repeat/" />
-    <xhtml:link rel="alternate" hreflang="x-default" href="https://heyta.waytofuture.cn/help/repeat/" />
+    <xhtml:link rel="alternate" hreflang="zh-CN" href="https://heyta.waytofuture.cn/docs/repeat/" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://heyta.waytofuture.cn/en/docs/repeat/" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://heyta.waytofuture.cn/docs/repeat/" />
   </url>
   <url>
-    <loc>https://heyta.waytofuture.cn/en/help/repeat/</loc>
+    <loc>https://heyta.waytofuture.cn/en/docs/repeat/</loc>
     <changefreq>weekly</changefreq>
-    <xhtml:link rel="alternate" hreflang="zh-CN" href="https://heyta.waytofuture.cn/help/repeat/" />
-    <xhtml:link rel="alternate" hreflang="en" href="https://heyta.waytofuture.cn/en/help/repeat/" />
-    <xhtml:link rel="alternate" hreflang="x-default" href="https://heyta.waytofuture.cn/help/repeat/" />
+    <xhtml:link rel="alternate" hreflang="zh-CN" href="https://heyta.waytofuture.cn/docs/repeat/" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://heyta.waytofuture.cn/en/docs/repeat/" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://heyta.waytofuture.cn/docs/repeat/" />
   </url>
   <url>
-    <loc>https://heyta.waytofuture.cn/help/reminders/</loc>
+    <loc>https://heyta.waytofuture.cn/docs/reminders/</loc>
     <changefreq>weekly</changefreq>
-    <xhtml:link rel="alternate" hreflang="zh-CN" href="https://heyta.waytofuture.cn/help/reminders/" />
-    <xhtml:link rel="alternate" hreflang="en" href="https://heyta.waytofuture.cn/en/help/reminders/" />
-    <xhtml:link rel="alternate" hreflang="x-default" href="https://heyta.waytofuture.cn/help/reminders/" />
+    <xhtml:link rel="alternate" hreflang="zh-CN" href="https://heyta.waytofuture.cn/docs/reminders/" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://heyta.waytofuture.cn/en/docs/reminders/" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://heyta.waytofuture.cn/docs/reminders/" />
   </url>
   <url>
-    <loc>https://heyta.waytofuture.cn/en/help/reminders/</loc>
+    <loc>https://heyta.waytofuture.cn/en/docs/reminders/</loc>
     <changefreq>weekly</changefreq>
-    <xhtml:link rel="alternate" hreflang="zh-CN" href="https://heyta.waytofuture.cn/help/reminders/" />
-    <xhtml:link rel="alternate" hreflang="en" href="https://heyta.waytofuture.cn/en/help/reminders/" />
-    <xhtml:link rel="alternate" hreflang="x-default" href="https://heyta.waytofuture.cn/help/reminders/" />
+    <xhtml:link rel="alternate" hreflang="zh-CN" href="https://heyta.waytofuture.cn/docs/reminders/" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://heyta.waytofuture.cn/en/docs/reminders/" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://heyta.waytofuture.cn/docs/reminders/" />
   </url>
   <url>
-    <loc>https://heyta.waytofuture.cn/help/selfhost/</loc>
+    <loc>https://heyta.waytofuture.cn/docs/selfhost/</loc>
     <changefreq>weekly</changefreq>
-    <xhtml:link rel="alternate" hreflang="zh-CN" href="https://heyta.waytofuture.cn/help/selfhost/" />
-    <xhtml:link rel="alternate" hreflang="en" href="https://heyta.waytofuture.cn/en/help/selfhost/" />
-    <xhtml:link rel="alternate" hreflang="x-default" href="https://heyta.waytofuture.cn/help/selfhost/" />
+    <xhtml:link rel="alternate" hreflang="zh-CN" href="https://heyta.waytofuture.cn/docs/selfhost/" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://heyta.waytofuture.cn/en/docs/selfhost/" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://heyta.waytofuture.cn/docs/selfhost/" />
   </url>
   <url>
-    <loc>https://heyta.waytofuture.cn/en/help/selfhost/</loc>
+    <loc>https://heyta.waytofuture.cn/en/docs/selfhost/</loc>
     <changefreq>weekly</changefreq>
-    <xhtml:link rel="alternate" hreflang="zh-CN" href="https://heyta.waytofuture.cn/help/selfhost/" />
-    <xhtml:link rel="alternate" hreflang="en" href="https://heyta.waytofuture.cn/en/help/selfhost/" />
-    <xhtml:link rel="alternate" hreflang="x-default" href="https://heyta.waytofuture.cn/help/selfhost/" />
+    <xhtml:link rel="alternate" hreflang="zh-CN" href="https://heyta.waytofuture.cn/docs/selfhost/" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://heyta.waytofuture.cn/en/docs/selfhost/" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://heyta.waytofuture.cn/docs/selfhost/" />
   </url>
   <url>
-    <loc>https://heyta.waytofuture.cn/help/transfer/</loc>
+    <loc>https://heyta.waytofuture.cn/docs/transfer/</loc>
     <changefreq>weekly</changefreq>
-    <xhtml:link rel="alternate" hreflang="zh-CN" href="https://heyta.waytofuture.cn/help/transfer/" />
-    <xhtml:link rel="alternate" hreflang="en" href="https://heyta.waytofuture.cn/en/help/transfer/" />
-    <xhtml:link rel="alternate" hreflang="x-default" href="https://heyta.waytofuture.cn/help/transfer/" />
+    <xhtml:link rel="alternate" hreflang="zh-CN" href="https://heyta.waytofuture.cn/docs/transfer/" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://heyta.waytofuture.cn/en/docs/transfer/" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://heyta.waytofuture.cn/docs/transfer/" />
   </url>
   <url>
-    <loc>https://heyta.waytofuture.cn/en/help/transfer/</loc>
+    <loc>https://heyta.waytofuture.cn/en/docs/transfer/</loc>
     <changefreq>weekly</changefreq>
-    <xhtml:link rel="alternate" hreflang="zh-CN" href="https://heyta.waytofuture.cn/help/transfer/" />
-    <xhtml:link rel="alternate" hreflang="en" href="https://heyta.waytofuture.cn/en/help/transfer/" />
-    <xhtml:link rel="alternate" hreflang="x-default" href="https://heyta.waytofuture.cn/help/transfer/" />
+    <xhtml:link rel="alternate" hreflang="zh-CN" href="https://heyta.waytofuture.cn/docs/transfer/" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://heyta.waytofuture.cn/en/docs/transfer/" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://heyta.waytofuture.cn/docs/transfer/" />
   </url>
   <url>
-    <loc>https://heyta.waytofuture.cn/help/trash/</loc>
+    <loc>https://heyta.waytofuture.cn/docs/trash/</loc>
     <changefreq>weekly</changefreq>
-    <xhtml:link rel="alternate" hreflang="zh-CN" href="https://heyta.waytofuture.cn/help/trash/" />
-    <xhtml:link rel="alternate" hreflang="en" href="https://heyta.waytofuture.cn/en/help/trash/" />
-    <xhtml:link rel="alternate" hreflang="x-default" href="https://heyta.waytofuture.cn/help/trash/" />
+    <xhtml:link rel="alternate" hreflang="zh-CN" href="https://heyta.waytofuture.cn/docs/trash/" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://heyta.waytofuture.cn/en/docs/trash/" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://heyta.waytofuture.cn/docs/trash/" />
   </url>
   <url>
-    <loc>https://heyta.waytofuture.cn/en/help/trash/</loc>
+    <loc>https://heyta.waytofuture.cn/en/docs/trash/</loc>
     <changefreq>weekly</changefreq>
-    <xhtml:link rel="alternate" hreflang="zh-CN" href="https://heyta.waytofuture.cn/help/trash/" />
-    <xhtml:link rel="alternate" hreflang="en" href="https://heyta.waytofuture.cn/en/help/trash/" />
-    <xhtml:link rel="alternate" hreflang="x-default" href="https://heyta.waytofuture.cn/help/trash/" />
+    <xhtml:link rel="alternate" hreflang="zh-CN" href="https://heyta.waytofuture.cn/docs/trash/" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://heyta.waytofuture.cn/en/docs/trash/" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://heyta.waytofuture.cn/docs/trash/" />
   </url>
   <url>
-    <loc>https://heyta.waytofuture.cn/help/privacy/</loc>
+    <loc>https://heyta.waytofuture.cn/docs/privacy/</loc>
     <changefreq>weekly</changefreq>
-    <xhtml:link rel="alternate" hreflang="zh-CN" href="https://heyta.waytofuture.cn/help/privacy/" />
-    <xhtml:link rel="alternate" hreflang="en" href="https://heyta.waytofuture.cn/en/help/privacy/" />
-    <xhtml:link rel="alternate" hreflang="x-default" href="https://heyta.waytofuture.cn/help/privacy/" />
+    <xhtml:link rel="alternate" hreflang="zh-CN" href="https://heyta.waytofuture.cn/docs/privacy/" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://heyta.waytofuture.cn/en/docs/privacy/" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://heyta.waytofuture.cn/docs/privacy/" />
   </url>
   <url>
-    <loc>https://heyta.waytofuture.cn/en/help/privacy/</loc>
+    <loc>https://heyta.waytofuture.cn/en/docs/privacy/</loc>
     <changefreq>weekly</changefreq>
-    <xhtml:link rel="alternate" hreflang="zh-CN" href="https://heyta.waytofuture.cn/help/privacy/" />
-    <xhtml:link rel="alternate" hreflang="en" href="https://heyta.waytofuture.cn/en/help/privacy/" />
-    <xhtml:link rel="alternate" hreflang="x-default" href="https://heyta.waytofuture.cn/help/privacy/" />
+    <xhtml:link rel="alternate" hreflang="zh-CN" href="https://heyta.waytofuture.cn/docs/privacy/" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://heyta.waytofuture.cn/en/docs/privacy/" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://heyta.waytofuture.cn/docs/privacy/" />
   </url>
   <url>
-    <loc>https://heyta.waytofuture.cn/help/loss/</loc>
+    <loc>https://heyta.waytofuture.cn/docs/loss/</loc>
     <changefreq>weekly</changefreq>
-    <xhtml:link rel="alternate" hreflang="zh-CN" href="https://heyta.waytofuture.cn/help/loss/" />
-    <xhtml:link rel="alternate" hreflang="en" href="https://heyta.waytofuture.cn/en/help/loss/" />
-    <xhtml:link rel="alternate" hreflang="x-default" href="https://heyta.waytofuture.cn/help/loss/" />
+    <xhtml:link rel="alternate" hreflang="zh-CN" href="https://heyta.waytofuture.cn/docs/loss/" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://heyta.waytofuture.cn/en/docs/loss/" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://heyta.waytofuture.cn/docs/loss/" />
   </url>
   <url>
-    <loc>https://heyta.waytofuture.cn/en/help/loss/</loc>
+    <loc>https://heyta.waytofuture.cn/en/docs/loss/</loc>
     <changefreq>weekly</changefreq>
-    <xhtml:link rel="alternate" hreflang="zh-CN" href="https://heyta.waytofuture.cn/help/loss/" />
-    <xhtml:link rel="alternate" hreflang="en" href="https://heyta.waytofuture.cn/en/help/loss/" />
-    <xhtml:link rel="alternate" hreflang="x-default" href="https://heyta.waytofuture.cn/help/loss/" />
+    <xhtml:link rel="alternate" hreflang="zh-CN" href="https://heyta.waytofuture.cn/docs/loss/" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://heyta.waytofuture.cn/en/docs/loss/" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://heyta.waytofuture.cn/docs/loss/" />
   </url>
   <url>
     <loc>https://heyta.waytofuture.cn/legal/terms/</loc>

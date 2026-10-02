@@ -46,6 +46,8 @@ import '@heyta/design-system/reset.css';
 import './styles/landing.css';
 
 import { PAGE_COMPONENTS } from './pages/index.js';
+import { DocsShell } from './site/DocsShell.js';
+import { isDocsShellPage } from './site/pages.js';
 import { SiteLayout } from './site/SiteLayout.js';
 import { localeFromPath, pageFromPath } from './site/paths.js';
 
@@ -88,9 +90,15 @@ void (async () => {
   createRoot(container).render(
     <StrictMode>
       <I18nCatalogProvider locale={locale} catalog={catalog}>
-        <SiteLayout page={page}>
-          <Page page={page} />
-        </SiteLayout>
+        {isDocsShellPage(page) ? (
+          <DocsShell>
+            <Page page={page} />
+          </DocsShell>
+        ) : (
+          <SiteLayout page={page}>
+            <Page page={page} />
+          </SiteLayout>
+        )}
       </I18nCatalogProvider>
     </StrictMode>,
   );

@@ -1,3 +1,4 @@
+import { ICON_SIZE } from '@heyta/design-system';
 /**
  * 英雄区
  * ========
@@ -182,14 +183,14 @@ export function Hero(): React.JSX.Element {
               className="lp-float lp-float--sync"
               style={{ '--lp-float-z': '4rem' } as React.CSSProperties}
             >
-              <Check className="lp-float__icon--ok" size={14} aria-hidden="true" />
+              <Check className="lp-float__icon--ok" size={ICON_SIZE.xs} aria-hidden="true" />
               {t('landing.hero.floatSynced')}
             </div>
             <div
               className="lp-float lp-float--offline"
               style={{ '--lp-float-z': '7rem' } as React.CSSProperties}
             >
-              <WifiOff className="lp-float__icon--info" size={14} aria-hidden="true" />
+              <WifiOff className="lp-float__icon--info" size={ICON_SIZE.xs} aria-hidden="true" />
               {t('landing.hero.floatOffline')}
             </div>
           </motion.div>

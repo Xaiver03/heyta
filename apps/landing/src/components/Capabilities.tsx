@@ -1,3 +1,4 @@
+import { ICON_SIZE } from '@heyta/design-system';
 /**
  * 能力（bento 网格）
  * ===================
@@ -141,19 +142,19 @@ export function Capabilities(): React.JSX.Element {
         title: t('landing.capabilities.breakdown.title'),
         body: t('landing.capabilities.breakdown.body'),
         span: '',
-        icon: <Sparkles size={18} />,
+        icon: <Sparkles size={ICON_SIZE.md} />,
       },
       {
         title: t('landing.capabilities.repeat.title'),
         body: t('landing.capabilities.repeat.body'),
         span: 'lp-bento__cell--half',
-        icon: <Repeat size={18} />,
+        icon: <Repeat size={ICON_SIZE.md} />,
       },
       {
         title: t('landing.capabilities.offline.title'),
         body: t('landing.capabilities.offline.body'),
         span: 'lp-bento__cell--half',
-        icon: <CloudOff size={18} />,
+        icon: <CloudOff size={ICON_SIZE.md} />,
       },
     ],
     [t],

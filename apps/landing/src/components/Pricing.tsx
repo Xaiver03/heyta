@@ -1,3 +1,4 @@
+import { ICON_SIZE } from '@heyta/design-system';
 /**
  * 价格
  * =======
@@ -88,7 +89,7 @@ function PaidCard({
       <ul className="lp-pricing__features">
         {features.map((feature) => (
           <li key={feature} className="lp-pricing__feature">
-            <Check size={16} aria-hidden="true" />
+            <Check size={ICON_SIZE.sm} aria-hidden="true" />
             {feature}
           </li>
         ))}
@@ -96,7 +97,7 @@ function PaidCard({
 
       {/* 没有按钮，只有一个状态说明 —— 见文件头 */}
       <p className="lp-pricing__pending">
-        <Hourglass size={16} aria-hidden="true" />
+        <Hourglass size={ICON_SIZE.sm} aria-hidden="true" />
         {t(`${keyPrefix}.cta`)}
       </p>
     </motion.article>
@@ -147,7 +148,7 @@ export function Pricing(): React.JSX.Element {
           >
             <h3 className="lp-pricing__name">
               <span className="lp-pricing__icon">
-                <Server size={18} aria-hidden="true" />
+                <Server size={ICON_SIZE.md} aria-hidden="true" />
               </span>
               {t('landing.pricing.free.name')}
             </h3>
@@ -162,7 +163,7 @@ export function Pricing(): React.JSX.Element {
             <ul className="lp-pricing__features">
               {free.map((feature) => (
                 <li key={feature} className="lp-pricing__feature">
-                  <Check size={16} aria-hidden="true" />
+                  <Check size={ICON_SIZE.sm} aria-hidden="true" />
                   {feature}
                 </li>
               ))}
@@ -180,14 +181,14 @@ export function Pricing(): React.JSX.Element {
           {/* ── 托管：我们替你运维服务器，不含我们的 AI ───────────────── */}
           <PaidCard
             keyPrefix="landing.pricing.hosted"
-            icon={<Cloud size={18} aria-hidden="true" />}
+            icon={<Cloud size={ICON_SIZE.md} aria-hidden="true" />}
             preset={preset}
           />
 
           {/* ── 托管 + 云端 AI：唯一一个我们卡得住的能力 ──────────────── */}
           <PaidCard
             keyPrefix="landing.pricing.hostedAi"
-            icon={<Sparkles size={18} aria-hidden="true" />}
+            icon={<Sparkles size={ICON_SIZE.md} aria-hidden="true" />}
             preset={preset}
           />
         </motion.div>

@@ -31,7 +31,7 @@
  *
  * | 漂移（审计 §2） | 这里怎么红 |
  * |---|---|
- * | #1 漏「已完成」 | 登记处与 `PRIMARY_NAV` 的三项对不上 → 红 |
+ * | #1 漏「已完成」/ 漏「最近 7 天」 | 登记处与 `PRIMARY_NAV` 逐项对不上 → 红 |
  * | #2 编造象限计数 | 渲染出的计数 ≠ `bucketByQuadrant(SHOWCASE_TASKS)` → 红 |
  * | #4 漏标签区 | 登记处与 `ProjectsPanel` 的两块区块对不上 → 红 |
  * | #5 视图 tab 4 vs 9 | 登记处与 `VIEW_TABS` 的九项对不上 → 红 |
@@ -236,20 +236,27 @@ function toDomainTask(task: (typeof SHOWCASE_TASKS)[number]): Task {
 }
 
 describe('#1 主导航：登记处 ⟷ 真应用 `PRIMARY_NAV`', () => {
-  it('登记的三项与 `App.tsx` 的 `PRIMARY_NAV` 逐项同 key、同序', () => {
+  it('登记的四项与 `App.tsx` 的 `PRIMARY_NAV` 逐项同 key、同序', () => {
     const appKeys = fieldValues(arrayBlock(appSource(), 'const PRIMARY_NAV'), 'labelKey');
-    expect(appKeys).toEqual(['web.shell.nav.inbox', 'web.shell.nav.today', 'web.shell.nav.completed']);
+    expect(appKeys).toEqual([
+      'web.shell.nav.inbox',
+      'web.shell.nav.today',
+      'web.shell.nav.next7Days',
+      'web.shell.nav.completed',
+    ]);
     expect(SHELL_PRIMARY_NAV.map((item) => item.labelKey)).toEqual(appKeys);
   });
 
-  it('渲染出的侧栏主导航含「已完成」，且三项都在', () => {
+  it('渲染出的侧栏主导航含「已完成」，且登记的每一项都在', () => {
     const view = renderMockup();
     // 只取第一组 `.mk-nav`（主导航）—— 第二组是四象限。
     const navItems = [...view.querySelectorAll('.mk-sidebar .mk-nav')][0]?.querySelectorAll(
       '.mk-nav__item',
     );
     const labels = [...(navItems ?? [])].map((el) => el.textContent?.trim() ?? '');
-    expect(labels).toHaveLength(3);
+    // 数量从登记处推导，不写死 —— 写死的数字就是下一次加导航项时的第三个漂移点。
+    // "登记本身对不对"由上面那条与 `App.tsx` 逐字对账负责，这里只管"画全了没有"。
+    expect(labels).toHaveLength(SHELL_PRIMARY_NAV.length);
     for (const item of SHELL_PRIMARY_NAV) {
       expect(labels.some((label) => label.startsWith(zhCN[item.labelKey]))).toBe(true);
     }

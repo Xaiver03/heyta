@@ -1,3 +1,4 @@
+import { ICON_SIZE } from '@heyta/design-system';
 /**
  * 文档中心的侧栏
  * ================
@@ -100,7 +101,7 @@ export function DocsNav({
                 aria-label={t('site.docs.nav.toggle')}
                 onClick={() => onToggle(module.id)}
               >
-                <ChevronDown size={14} aria-hidden="true" />
+                <ChevronDown size={ICON_SIZE.xs} aria-hidden="true" />
               </button>
             </div>
             <ul className="lp-docs__list" id={listId} hidden={!open}>

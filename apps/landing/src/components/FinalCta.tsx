@@ -1,3 +1,4 @@
+import { ICON_SIZE } from '@heyta/design-system';
 /**
  * 收尾 CTA
  * ==========
@@ -67,7 +68,7 @@ export function FinalCta(): React.JSX.Element {
                 {...(cta.external ? { rel: 'noopener noreferrer' } : {})}
               >
                 {t(cta.labelKey)}
-                <ArrowRight size={18} aria-hidden="true" />
+                <ArrowRight size={ICON_SIZE.md} aria-hidden="true" />
               </a>
             </Magnetic>
             <a
@@ -75,7 +76,7 @@ export function FinalCta(): React.JSX.Element {
               href={GITHUB_URL}
               rel="noopener noreferrer"
             >
-              <Github size={18} aria-hidden="true" />
+              <Github size={ICON_SIZE.md} aria-hidden="true" />
               {t('landing.cta.viewCode')}
             </a>
           </motion.div>

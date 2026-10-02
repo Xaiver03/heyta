@@ -1,3 +1,4 @@
+import { ICON_SIZE } from '@heyta/design-system';
 /**
  * 页脚
  * =======
@@ -102,7 +103,7 @@ export function Footer(): React.JSX.Element {
               href={GITHUB_URL}
               rel="noopener noreferrer"
             >
-              <Github size={16} aria-hidden="true" />
+              <Github size={ICON_SIZE.sm} aria-hidden="true" />
               {t('landing.footer.viewOnGithub')}
             </a>
           </div>

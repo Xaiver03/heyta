@@ -1,0 +1,209 @@
+<!doctype html>
+<!--
+  由 `scripts/gen-entries.mjs` 生成，**不要手改**。
+  改站点结构去 `src/site/pages.ts`，改这一页的文案去 `packages/i18n`，
+  改头部形状改 `scripts/entry-template.html`，然后跑：
+
+      pnpm --filter @heyta/landing gen:entries
+
+  🔴 为什么是"生成"而不是"每页手写一份 HTML"：
+  站点有 7 个页面 × 2 种语言 = 14 份入口。手写的话，每一份都要自己写对
+  `<html lang>`、`<title>`、`<meta description>`、canonical、hreflang 三件套、
+  主题引导脚本 —— 六处 × 14 份 = 84 处可以漂移的地方，而**任何一处漂移都不是
+  报错，是静默地少收一份流量**（比如某页忘了 hreflang，那页的中英两版就会
+  互相抢排名）。生成之后这些地方各自只有一份，且 `seo-head.spec.ts` 会逐入口查。
+-->
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, viewport-fit=cover"
+    />
+    <meta name="color-scheme" content="light dark" />
+    <!-- favicon 来源见 public/favicon.svg 的文件头：由品牌自己的蓝点 + 字标首字母构成 -->
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <title>Help — heyta</title>
+    <meta name="description" content="heyta help: creating tasks, syncing, what to do when the encryption passphrase is lost, how passkeys work, how quadrants are classified, how repeats are set, how focus works, exporting your data, self-hosting, and where your data actually lives." />
+
+    <!--
+      hreflang 三件套：告诉搜索引擎这一页的**两个语言版本**是同一个页面，
+      而不是两份互相重复的内容。少了它，两版会互相抢排名。
+      x-default 指向中文版（主站），用于语言未匹配时的兜底。
+
+      ⚠️ 三件套里的每一条都**指向本页**的对应语言版本（不是首页）——
+      子页面的 hreflang 指向首页是本类站点最常见的一种错，而它的表现是
+      "英文版功能页永远进不了索引"。
+    -->
+    <link rel="canonical" href="https://heyta.waytofuture.cn/en/docs/" />
+    <link rel="alternate" hreflang="zh-CN" href="https://heyta.waytofuture.cn/docs/" />
+    <link rel="alternate" hreflang="en" href="https://heyta.waytofuture.cn/en/docs/" />
+    <link rel="alternate" hreflang="x-default" href="https://heyta.waytofuture.cn/docs/" />
+    <!--
+      Open Graph / Twitter 卡片。
+
+      🔴 `og:url` 必须**等于 canonical**（同一个事实源算出来，不另写一遍）：
+      两者不一致时平台会抓一个、搜索引擎认另一个，而分享出去的链接
+      指的其实是第三个。所以它们都从 `urlFor(page, locale)` 来。
+
+      🔴 `og:image` 必须是**绝对地址 + 位图**（1200×630）：
+      SVG 在微信 / X / Slack 的卡片里普遍不渲染，声明了等于没声明；
+      相对地址则会让平台抓不到。图由 `pnpm --filter @heyta/landing gen:og`
+      从 `scripts/og-card.html` 生成，产物签进仓库。
+
+      🔴 这里**没有** `aggregateRating` 与任何评分/评论数据：我们还没有真实用户，
+      编一个会被结构化数据校验逮住，也会在搜索结果里显示一个假星级。
+    -->
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="heyta" />
+    <meta property="og:locale" content="en_US" />
+    <meta property="og:title" content="Help — heyta" />
+    <meta property="og:description" content="heyta help: creating tasks, syncing, what to do when the encryption passphrase is lost, how passkeys work, how quadrants are classified, how repeats are set, how focus works, exporting your data, self-hosting, and where your data actually lives." />
+    <meta property="og:url" content="https://heyta.waytofuture.cn/en/docs/" />
+    <meta property="og:image" content="https://heyta.waytofuture.cn/og-card-en.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="heyta share card: local-first task management where your data lands on your own device first; end-to-end encrypted sync, self-hostable, no feature gating." />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Help — heyta" />
+    <meta name="twitter:description" content="heyta help: creating tasks, syncing, what to do when the encryption passphrase is lost, how passkeys work, how quadrants are classified, how repeats are set, how focus works, exporting your data, self-hosting, and where your data actually lives." />
+    <meta name="twitter:image" content="https://heyta.waytofuture.cn/og-card-en.png" />
+
+    <!--
+      结构化数据。由 `scripts/gen-entries.mjs` 的 `jsonLdFor()` 生成：
+      每个页面都有一条 `SoftwareApplication`（产品是什么），
+      而 `/pricing` 与 `/help` 额外带一条 `FAQPage`（页面上的问答就是真问答）。
+
+      🔴 **没有价格**：价格只在词条表里写一次，而 `check:pricing` 核对的是那四处。
+      在 JSON-LD 里再写一遍价格，就是第五处 —— 而它在生成的 HTML 里，
+      门禁扫不到，漂移了也没人知道。
+    -->
+    <script type="application/ld+json">[
+  {
+    "@context": "https://schema.org",
+    "@type": "SoftwareApplication",
+    "name": "heyta",
+    "url": "https://heyta.waytofuture.cn",
+    "description": "heyta help: creating tasks, syncing, what to do when the encryption passphrase is lost, how passkeys work, how quadrants are classified, how repeats are set, how focus works, exporting your data, self-hosting, and where your data actually lives.",
+    "applicationCategory": "ProductivityApplication",
+    "operatingSystem": "Web, Windows, macOS, Linux, Android, iOS",
+    "inLanguage": "en"
+  },
+  {
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    "inLanguage": "en",
+    "mainEntity": [
+      {
+        "@type": "Question",
+        "name": "How do I create a task?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "Type one line into the capture box at the top of the app and press Enter. Dates and priorities can be written inside the sentence (for example \"submit the report tomorrow at 3pm\"); whatever it recognises appears as a chip you can undo. A bare title is fine too — you can add a note later on the task row."
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "I have a new device — how does my data get there?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "Enter the sync server address and an access token in settings. Data is uploaded encrypted, so the passphrase must match — data encrypted under a different passphrase cannot be decrypted. That is the cost of end-to-end encryption, not a bug."
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "I forgot my encryption passphrase. What now?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "There is no recovery, and that is by design, not an oversight. End-to-end encryption means the server holds only ciphertext and has no passphrase that unlocks it — any \"recovery\" would mean the server could read your data. What you can do: export your data from an old device that can still unlock, then start fresh with a new passphrase on the new one. So keep the passphrase safe."
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "How do passkeys work?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "Choose \"passkey\" when signing in and confirm with your device's face / fingerprint / system PIN. There is no password to remember and none to breach. If you lose it, the sign-in page offers \"Lost your passkey?\", which emails a recovery link where you register a new one. ⚠️ The last remaining credential cannot be deleted — delete it and you are locked out."
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "How are the four quadrants classified?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "Quadrants are computed on the spot, not labels you attach to a task: \"urgent\" depends on whether the due date falls inside the near-term window, and \"important\" comes from the flag you set yourself (falling back to priority when you never set it). Change the due date or priority and the task changes cell — so the quadrants can never disagree with your tasks."
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "How do I set up a repeating task?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "Both the web and mobile can set it: open the task details and pick a common preset (daily / weekly / weekdays / monthly) or write a custom rule directly. When you tick off a repeating task, its next due date advances by the rule, measured from the original due date rather than from the moment you ticked it. The advancing algorithm and the differences between the ends are in \"Repeating tasks: what \"next time\" really means\"."
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "How does focus (the pomodoro timer) work?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "Pick a task on the focus screen and start the timer; when it finishes the session is recorded and feeds your growth stats. You can change the durations yourself (25 minutes focus / 5 minutes break by default) and they are remembered — a page refresh keeps the new values."
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "How do I take my data with me?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "All three ends can export: on the web under Settings, on mobile under \"Mine\" via the system share sheet, and export on the command line. But only the web and the CLI can import it back, and only into an empty library — mobile has no import entry point. See \"Taking your data with you\"."
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "How do I run my own server?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "You can, but this is \"operate a service yourself\", not one command and you are done: no prebuilt image is published (you build it), bringing the service up is not a deployment (the table-structure changes have to be applied explicitly, once), and you cannot register at all without an email service. See \"Running your own sync server\"."
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "Where does my data actually live?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "On your own device first; once sync is on, the cloud holds ciphertext only — the server rejects plaintext outright. Metadata is not encrypted, though — sync times, device identifiers, and the fact that a task changed are visible to it. We do not advertise \"we can see nothing\"."
+        }
+      }
+    ]
+  }
+]</script>
+    <!--
+      主题引导：在样式表之前同步执行，避免暗色用户看到一帧亮色（FOUC）。
+      与 `src/lib/theme.ts` 共用同一个 storage key —— 两处不一致会让
+      刷新后主题闪一下，而那种闪烁很容易被当成"渲染 bug"去查错方向。
+
+      语言**不在这里**引导，与主题刻意不同：主题是纯偏好（无 URL 语义），
+      语言有 URL 语义（`/x` 与 `/en/x`），由路径决定，见 `src/site/paths.ts`。
+    -->
+    <script>
+      (function () {
+        try {
+          var stored = localStorage.getItem('heyta.theme');
+          var theme =
+            stored === 'light' || stored === 'dark'
+              ? stored
+              : window.matchMedia('(prefers-color-scheme: dark)').matches
+                ? 'dark'
+                : 'light';
+          document.documentElement.dataset.theme = theme;
+        } catch (e) {
+          document.documentElement.dataset.theme = 'light';
+        }
+      })();
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
