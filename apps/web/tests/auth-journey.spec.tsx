@@ -21,7 +21,21 @@
  * | `ht-btn--primary` 类名里只有一个注册 | identify 阶段**只有「继续」一个主按钮**，且此时**没有口令栏** | 主路现在是一次问一件事；视觉权重是共享层的实现，类名不该由 web 判据钉住 |
  * | 「发送登录链接」是文字链（`className` 不含 `ht-btn`） | 它**仍在 DOM 里**且排在口令之后 | "降级"的实质是**次序与发现成本**，不是某个 CSS 类 |
  * | 通行密钥**三条**都在 | 一个 passkey 入口（随档位说"注册/登录"）+ 找回 + 邮件链接都在 | FIDO 的结论就是一个 affordance 管两档，见 §5 第 1 条 |
- * | 「高级」是原生 `<details>`、默认折叠 | 地址/粘贴**始终在 DOM**，地址是**最后一栏** | 折叠只是"降级"的一种实现；真正不许退让的是"不是前置条件"和"没有藏起来" |
+ * | 「高级」是原生 `<details>`、默认折叠 | 地址/粘贴**在展开之后完整存在**，地址是**最后一栏** | 见下面那条 🔴：2026-10-02 这一行**又换了一次写法** |
+ *
+ * 🔴 **上面那一行的第二次改动（2026-10-02 晚，产品负责人）**：
+ * 「为什么还是默认就是要什么粘贴服务器地址和令牌之类的东西？……一定是默认是
+ * 我们提供公共服务的，如果他自建的话再说。」
+ * 于是地址与粘贴兜底从"始终在 DOM"改成**默认收起 + 一个展开入口**。
+ * 这一行不是把上一轮的裁决推翻着玩：上一轮拆的是**"地址是注册的前置条件"**，
+ * 拆完之后它仍然常驻在表单末尾 —— 而"在末尾"和"是第一个看到的"是两件事，
+ * 第一屏里出现"服务端地址""粘贴令牌"两栏，对普通用户仍然是"这不是给我用的"。
+ * ⇒ 不许退让的东西**没变**，变的是它的实现：
+ *   · 「不是前置条件」→ 仍然由"地址是最后一栏 + 预填好 + 未配置也发得出请求"钉着；
+ *   · 「降级不是删掉」→ 现在钉的是"**展开之后那条路完整可用**"（能敲地址、
+ *     能点完成登录），而不是"节点必须一直挂在 DOM 上"。
+ *     后者被前者取代，是因为 `aria-expanded` 的展开入口本身就是一条**可达**的路 ——
+ *     键盘与读屏用户点的是那个按钮，与 `<details>` 的行为一致。
  *
  * ⚠️ 两条**没有**随写法消失的取向，仍然逐条钉着：**未配置也发得出请求**（把
  * `lib/auth-endpoint.ts` 的默认值拿掉，第 1 条立刻红 —— 空地址在 app-host 里
@@ -161,6 +175,9 @@ describe('墙一：注册不许依赖"你知道自己的同步域名吗"', () =>
 
   it('🔴 地址是**最后一栏**，不是第一栏（那句原话最直接的钉法）', async () => {
     const el = await renderPanelAtBaseUrl('');
+    // 默认收起（2026-10-02 晚）：先展开，再判它在哪一栏 —— 顺序判据与折叠无关，
+    // 但"它得先在场"才能量出顺序。收起本身由 `auth-entry-default.spec.tsx` 钉。
+    await tap(el, 'auth-form-self-host-toggle');
     const inputs = [...el.querySelectorAll('input')] as HTMLInputElement[];
     const indexes = new Map(inputs.map((i, n) => [i.getAttribute('data-testid'), n]));
 
@@ -189,6 +206,8 @@ describe('墙一：注册不许依赖"你知道自己的同步域名吗"', () =>
 
   it('改过地址之后，注册就发往改后的那台（自建部署是一条真的走得通的路）', async () => {
     const el = await renderPanelAtBaseUrl('');
+    // 自建这条路现在藏在展开之后 —— 但走通它的成本仍然只有"点开 + 敲字"。
+    await tap(el, 'auth-form-self-host-toggle');
     await typeById(el, 'auth-form-server-url', `${BASE_URL}/`);
     await toRegisterAndSubmit(el, 'me@example.com', 'correct horse battery');
 
@@ -244,9 +263,17 @@ describe('墙二：六个并列按钮 → 一条主路', () => {
     expect(el.textContent ?? '').toContain(translate('zh-CN', 'common.auth.form.otherWays'));
   });
 
-  it('粘贴兜底**始终在 DOM 里**（降级不是藏起来）', async () => {
+  it('粘贴兜底**展开之后完整可用**（降级不是删掉 —— 2026-10-02 晚改的判断标准）', async () => {
     const el = await renderPanelAtBaseUrl(BASE_URL);
 
+    // 原来这条钉的是"节点一直挂在 DOM 上"。产品负责人把两栏收进展开入口之后，
+    // 那个写法已经不再是"没藏起来"的定义 —— 现在钉的是**能力还在**：
+    // 输入框与「完成登录」在展开后都在，而且用的是界面上那一个入口，不是 store。
+    expect(
+      el.querySelector('[data-testid="auth-form-have-token-toggle"]'),
+      '没有展开入口 = 这条路真的没了',
+    ).not.toBeNull();
+    await tap(el, 'auth-form-have-token-toggle');
     expect(el.querySelector('[data-testid="auth-form-paste"]')).not.toBeNull();
     expect(el.querySelector('[data-testid="auth-form-verify"]')).not.toBeNull();
     expect(el.textContent ?? '').toContain(translate('zh-CN', 'web.auth.paste.label'));

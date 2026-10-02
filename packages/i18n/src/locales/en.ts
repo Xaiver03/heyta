@@ -571,10 +571,16 @@ export const en = {
   // placeholder only shows the shape.
   'web.auth.title': 'Sign in or register',
   'web.auth.close': 'Close',
-  'web.auth.open': 'Sign in or register to get a token',
+  'web.auth.open': 'Sign in or register',
   'web.auth.tokenHint': 'Access tokens are issued by the server. Sign in or register with the button above and the token is filled in automatically; if you already have one, paste it directly.',
-  'web.auth.empty.title': 'No credentials yet',
-  'web.auth.empty.body': 'Syncing needs an access token issued by the server. Register or sign in with your email to get one - syncing picks it up automatically.',
+  // 🔴 Reframed 2026-10-02. The product owner's words: "why is the default pasting a server
+  // address and a token? … that shuts ordinary users out at the door." Neither old line was
+  // *false* - both described an implementation detail as if it were the user's goal. A visitor
+  // reading "credentials", "issued by the server" and "access token" on the first screen
+  // concludes "this isn't for me". The word "token" is gone from the first screen; it stays in
+  // sync settings (`web.auth.tokenHint`), where it is the right thing to talk about.
+  'web.auth.empty.title': 'Sign in or register with your email',
+  'web.auth.empty.body': 'The next step asks for a password. No account yet - pick one and register; already have one - type your password. Tasks are stored on this device first, and syncing connects after you sign in.',
   // ── Journey restructure (2026-10-01; narrowed again 2026-10-02 by the shared form) ──
   // 🔴 The panel used to show six parallel buttons, so a first-time visitor could not tell
   // which path was the main one - and the first required field was the **server address**,
@@ -586,8 +592,16 @@ export const en = {
   // The three lines this block used to introduce («Already have an account?», «Or use a
   // passkey», «Advanced») went away with the disclosure group - with no group, a label
   // for it has nothing to point at, and the table keeps no ownerless copy.
-  // Without this line a prefilled address field still reads like "check this for me".
-  'web.auth.server.prefilled': 'The server address is already filled in from where this app is served - you don\'t have to type it. Self-hosters can change it here.',
+  // ⚠️ Since 2026-10-02 the address field is **collapsed by default**, so this line points at
+  // the disclosure below rather than at a field on screen.
+  'web.auth.server.prefilled': 'This connects to the official heyta service by default - no address to type. Running your own server? Expand “I self-host” below.',
+  // 🔴 One disclosure each for self-hosting and for "I already have a token": they face
+  // **different people**, and a single switch would make self-hosters think pasting a token
+  // is part of setting up their own server.
+  'web.auth.selfHost.open': 'I self-host (enter a server address)',
+  'web.auth.selfHost.close': 'Hide the server address',
+  'web.auth.haveToken.open': 'Already have a login link or token?',
+  'web.auth.haveToken.close': 'Hide the login link / token',
   // The address field's own label and placeholder (self-hosters must be able
   // to see exactly what they are editing).
   'web.auth.server.label': 'Server address',
@@ -607,7 +621,7 @@ export const en = {
   'web.auth.passkey.waiting': 'Complete the passkey step in the system prompt…',
   'web.auth.recovery.request': 'Lost your passkey? Email me a recovery link',
   'web.auth.terms.label': 'I agree to the terms of service and privacy policy published by this server',
-  'web.auth.paste.label': 'Or paste a login link / token',
+  'web.auth.paste.label': 'Paste a login link / token',
   'web.auth.paste.placeholder': 'Paste the link from your email, or the token itself',
   'web.auth.verify': 'Finish signing in',
   // 🔴 Both lines follow the **mechanism** (changed 2026-10-01): the link in the email brings

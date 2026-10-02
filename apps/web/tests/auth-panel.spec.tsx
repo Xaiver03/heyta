@@ -403,6 +403,9 @@ describe('🔴 拿到令牌之后必须真的接上同步配置', () => {
     stubFetch(200, SESSION);
     const el = await renderPanel('zh-CN');
 
+    // 兜底那栏默认收起（2026-10-02 晚），先展开 —— 判的还是「走界面上那个按钮」，
+    // 而不是「节点必须一直挂着」。
+    await tap(el, 'auth-form-have-token-toggle');
     await typeById(el, 'auth-form-paste', 'https://sync.example.com/magic-login?token=tok-123');
     await tap(el, 'auth-form-verify');
 
@@ -724,6 +727,7 @@ describe('条款链接：按连的那台服务端分流', () => {
 
   it('在面板里现敲一个官方地址，链接跟着换过去（分流读的是 `effectiveBaseUrl`）', async () => {
     const el = await renderPanelAtBaseUrl('');
+    await tap(el, 'auth-form-self-host-toggle');
     await typeInto(el, 'input[inputmode="url"]', `${OFFICIAL}/`);
     await toRegister(el);
 

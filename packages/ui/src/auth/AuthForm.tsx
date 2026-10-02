@@ -141,6 +141,26 @@ export interface AuthFormLabels {
     readonly placeholder: string;
     readonly verify: string;
   };
+  /**
+   * 「自建部署」那一栏的展开入口。
+   *
+   * 🔴 **不给 = 那一栏常驻**（移动壳现状）。这不是偷懒的兼容分支，是刻意的：
+   * 折叠是**信息架构**裁决，而移动端「我的 › 登录」那一屏本来就只有一个入口，
+   * 把 web 的折叠抄过去会让自建用户多点一次才能到地址栏 —— 两端可以不一样，
+   * 但必须**各自是因为一个理由**不一样，不是因为"共享层没管"。
+   *
+   * 判据（`AuthForm.self-host` 那组）钉的是：给了 toggle 就默认收起，
+   * 且**地址为空报错时必须自己展开** —— 否则错误指向一个界面上不存在的东西。
+   */
+  readonly selfHostToggle?: {
+    readonly open: string;
+    readonly close: string;
+  };
+  /** 「已经有登录链接 / 令牌」的展开入口。语义同上，两者各自独立开合。 */
+  readonly haveTokenToggle?: {
+    readonly open: string;
+    readonly close: string;
+  };
   /** 条款两条链接的**文字**（地址由宿主的 `legalLinks` 决定，这里不拼 URL）。 */
   readonly legal?: {
     readonly terms: string;
@@ -292,6 +312,14 @@ export function AuthForm({
   const resolvedPlatform = platform ?? (Platform.OS === 'web' ? 'desktop' : 'mobile');
 
   const [stage, setStage] = useState<AuthFormStage>('identify');
+  /**
+   * 两条逃生门各自的开合。**默认收起**（宿主给了 toggle 才折叠，见 labels 上那段）。
+   *
+   * ⚠️ 用 `|| 报错` 而不是"报错时 effect 里 setTrue"：effect 会多渲染一帧，
+   * 而那一帧里用户看到的是"红字说地址没填，但地址栏不在"。
+   */
+  const [selfHostOpen, setSelfHostOpen] = useState(false);
+  const [haveTokenOpen, setHaveTokenOpen] = useState(false);
   const [mode, setMode] = useState<AuthFormMode>('sign-in');
   const [email, setEmail] = useState(initialEmail);
   const [password, setPassword] = useState('');
@@ -365,6 +393,17 @@ export function AuthForm({
       });
     });
   };
+
+  /*
+    🔴 两条逃生门的可见性（2026-10-02）。宿主给了 toggle 就默认收起；
+    **但地址被判为没填时必须强制露出** —— 否则"服务端地址还没填"这句红字
+    指向的是界面上不存在的东西，而 `aria-invalid` 也已经挂在一个未渲染的输入框上。
+    这一条不是防御性写法：`onSubmit` 的第一个判据就是 `baseUrlMissing`，
+    收起之后它依然会成立（用户清空过、或宿主传了空值），那时没有下面这半句就是死路。
+  */
+  const selfHostShown =
+    labels.selfHostToggle === undefined || selfHostOpen || invalidFor('baseUrl');
+  const haveTokenShown = labels.haveTokenToggle === undefined || haveTokenOpen;
 
   /**
    * 「继续」之后邮箱框**收起来**，身份以一行的形式回执。
@@ -781,54 +820,88 @@ export function AuthForm({
         自建用户把地址清空时仍然会被指到那一栏，只是它现在在下方。
       */}
       {serverUrl !== undefined && labels.serverUrl !== undefined ? (
-        <View style={styles.field}>
-          <Text style={[text['caption'], styles.muted]}>{labels.serverUrl.label}</Text>
-          <TextInput
-            value={serverUrl.value}
-            onChangeText={serverUrl.onChange}
-            placeholder={labels.serverUrl.placeholder}
-            placeholderTextColor={tokens['color.foreground-subtle']}
-            autoComplete="url"
-            inputMode="url"
-            // 🔴 没有 maxLength（见文件头）。
-            style={[text['row-title'], styles.input]}
-            accessibilityLabel={labels.serverUrl.label}
-            aria-invalid={invalidFor('baseUrl')}
-            testID={`${testID}-server-url`}
-          />
-          {invalidFor('baseUrl') ? (
-            <Text style={[text['caption'], styles.danger]}>{labels.localErrors.baseUrl}</Text>
+        <>
+          {labels.selfHostToggle === undefined ? null : (
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => setSelfHostOpen((v) => !v)}
+              aria-expanded={selfHostShown}
+              style={({ pressed }) => [styles.textAction, pressed ? styles.pressed : null]}
+              testID={`${testID}-self-host-toggle`}
+            >
+              <Text style={[text['row-meta'], styles.linkText]}>
+                {selfHostOpen ? labels.selfHostToggle.close : labels.selfHostToggle.open}
+              </Text>
+            </Pressable>
+          )}
+          {selfHostShown ? (
+            <View style={styles.field}>
+              <Text style={[text['caption'], styles.muted]}>{labels.serverUrl.label}</Text>
+              <TextInput
+                value={serverUrl.value}
+                onChangeText={serverUrl.onChange}
+                placeholder={labels.serverUrl.placeholder}
+                placeholderTextColor={tokens['color.foreground-subtle']}
+                autoComplete="url"
+                inputMode="url"
+                // 🔴 没有 maxLength（见文件头）。
+                style={[text['row-title'], styles.input]}
+                accessibilityLabel={labels.serverUrl.label}
+                aria-invalid={invalidFor('baseUrl')}
+                testID={`${testID}-server-url`}
+              />
+              {invalidFor('baseUrl') ? (
+                <Text style={[text['caption'], styles.danger]}>{labels.localErrors.baseUrl}</Text>
+              ) : null}
+            </View>
           ) : null}
-        </View>
+        </>
       ) : null}
 
       {labels.paste !== undefined && onVerifyToken !== undefined ? (
-        <View style={styles.field}>
-          <Text style={[text['caption'], styles.muted]}>{labels.paste.label}</Text>
-          <TextInput
-            value={token}
-            onChangeText={setToken}
-            placeholder={labels.paste.placeholder}
-            placeholderTextColor={tokens['color.foreground-subtle']}
-            autoComplete="off"
-            autoCapitalize="none"
-            autoCorrect={false}
-            style={[text['row-title'], styles.input]}
-            accessibilityLabel={labels.paste.label}
-            testID={`${testID}-paste`}
-          />
-          <Pressable
-            accessibilityRole="button"
-            onPress={guard(() => {
-              onVerifyToken(token);
-              setToken('');
-            })}
-            style={({ pressed }) => [styles.ghost, pressed ? styles.pressed : null]}
-            testID={`${testID}-verify`}
-          >
-            <Text style={[text['row-title'], styles.ghostText]}>{labels.paste.verify}</Text>
-          </Pressable>
-        </View>
+        <>
+          {labels.haveTokenToggle === undefined ? null : (
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => setHaveTokenOpen((v) => !v)}
+              aria-expanded={haveTokenShown}
+              style={({ pressed }) => [styles.textAction, pressed ? styles.pressed : null]}
+              testID={`${testID}-have-token-toggle`}
+            >
+              <Text style={[text['row-meta'], styles.linkText]}>
+                {haveTokenOpen ? labels.haveTokenToggle.close : labels.haveTokenToggle.open}
+              </Text>
+            </Pressable>
+          )}
+          {haveTokenShown ? (
+            <View style={styles.field}>
+              <Text style={[text['caption'], styles.muted]}>{labels.paste.label}</Text>
+              <TextInput
+                value={token}
+                onChangeText={setToken}
+                placeholder={labels.paste.placeholder}
+                placeholderTextColor={tokens['color.foreground-subtle']}
+                autoComplete="off"
+                autoCapitalize="none"
+                autoCorrect={false}
+                style={[text['row-title'], styles.input]}
+                accessibilityLabel={labels.paste.label}
+                testID={`${testID}-paste`}
+              />
+              <Pressable
+                accessibilityRole="button"
+                onPress={guard(() => {
+                  onVerifyToken(token);
+                  setToken('');
+                })}
+                style={({ pressed }) => [styles.ghost, pressed ? styles.pressed : null]}
+                testID={`${testID}-verify`}
+              >
+                <Text style={[text['row-title'], styles.ghostText]}>{labels.paste.verify}</Text>
+              </Pressable>
+            </View>
+          ) : null}
+        </>
       ) : null}
     </View>
   );
@@ -922,6 +995,19 @@ function makeStyles(tokens: HeytaNativeTokens) {
       alignItems: 'center',
       justifyContent: 'center',
       gap: tokens['space.1'],
+      /*
+        🔴 「继续」离上面的邮箱框只有 **4px**（2026-10-02 真浏览器量出来的：
+        输入框底 367 → 按钮顶 371）。产品负责人当场问过：「这两个继续这个按钮
+        怎么跟上面那个框隔得那么近呢？难道设计系统没有规范好吗？」
+        —— 规范有，是这条没走规范：按钮和输入框挤在同一个 `field` 容器里，
+        而那个容器的 `gap` 是 `space.1`，**那是"一个控件内部"的节奏**
+        （标签 ↔ 输入框 ↔ 错误提示，4px 是对的）。
+        提交按钮不是这个控件的一部分，它是表单里的**下一个控件**，
+        该吃 `root` 的节奏 `space.3`（12px）。
+        ⇒ 这里补 `space.2`：容器已经给了 4，再加 8 正好落在 12 那条格子上，
+          而不是新造一个"16px 表单间距"这种档位外的值。
+      */
+      marginTop: tokens['space.2'],
       minHeight: tokens['touch-target.min'],
       paddingHorizontal: tokens['space.4'],
       borderRadius: tokens['radius.md'],
