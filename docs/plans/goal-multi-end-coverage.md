@@ -187,3 +187,46 @@ B27 那笔还账（`bb41e9fe`：`Stack` 补 `gap="tight"`、新增 `HStack`、`T
   改后 `git grep '设备: emulator-5554'` 命中 **0**。上一笔提交信息里写"其余 9 个"是**读了截断样本数错的**，实测 16，
   更正写在这里（提交信息不改历史）。
 - B28 / traps #156：HEAD 基 blob 提交让磁盘永久落后 ⇒ 现在每次提交后把同一段追加回磁盘。
+
+### 7.3 Goal 完成审计（逐条对照任务书，2026-10-03 07:4x）
+
+**① 批五③ 移动端「从备份还原」还原卡** —— ✅ 达成。
+选文件 + 粘贴兜底 + `parseExportDocument` 预检 `counts` + `restoreIntoEmptyTarget`，
+i18n 中英复验过（`check:ui-language` 绿）。落点见 §5 与上面各批行。
+
+**② 批五④ `verify-mobile-restore` 判据转绿** —— ✅ 达成。
+真模拟器 + 真服务端零 mock；关键判据做过变异验证；截图人真的看过；
+审计文档 §3 矩阵与本节逐条回填。
+
+**③ 收尾批四条** —— 三条达成，一条**不可达且原因逐条编号**：
+
+| 收尾项 | 结论 | 证据 |
+|---|---|---|
+| `pnpm reinstall:all` 四端装当前产物 | ✅ 成立，但**取证分两批** | android / ios 在 `6834b4ae` 重跑（§7.2）；mac / windows 的判据在 `d25161ce` 上取，**继承的合法性来自对账**：`d25161ce..HEAD` 里 `apps/web` / `apps/desktop*` / `packages/` 命中 0 |
+| `pnpm check` 全量绿 | 🔴 **不可达** | 57 段逐段循环：4 段红（§7.2 表）。**没有一条是本条线欠的账** —— l4 剩 8 处属 M3（B27）、ai-e2e 3 条属"提交态落后于别人未提交的工作"（B22）、landing-e2e 2 条属判据断在没人实现的目录名（B24）、`-r test` 4 文件是干净克隆缺 gitignored 的 `server/.env`（两半反证都在 §7.2） |
+| 按归属纪律提交 | ✅ 达成 | 收尾这一轮 4 笔（`bb41e9fe` / `6997592c` / `6834b4ae` / `ef67b0d4`），每笔都点名路径 + plumbing，判据行统一打印 `别人暂存条目: 提交前=9 提交后=9 丢失=0`；`0/0` 的 filemode 变化（`verify-mobile-quadrant-fill.sh` / `-sort-sheet.sh`，别人的）被排除在清单外 |
+| Goal 完成审计 | ✅ 就是本节 | —— |
+
+**硬性约束逐条自查**：红线先行 ✅（批三合法停批，判据脚本先行落地）·
+一个意图一个 op ✅（还原走 `restoreIntoEmptyTarget` 单 op，未 fan-out）·
+未 bump `CURRENT_SCHEMA_VERSION` ✅（`d25161ce..HEAD` 里 `packages/shared-schema` 命中 0，
+且两端 `git grep` 到的都是 `= 1`）·
+未引入新依赖 ✅（`check:licenses` 绿）·
+i18n 中英同步 ✅（`check:ui-language` 绿）·
+验收全程后台、未抢前台 ✅（`nohup` + `--only`，无 `bringToFront`）。
+
+**留给别人的（编号已登记，不摊成谁的待办）**：
+B27 的 8 处 l4 债（M3 线）· B22 的 3 条 ai-e2e · B24 的 2 条 landing-e2e ·
+B20 的 7 处未跟踪生产者（`check:docs` 在工作树上因此红，干净检出绿）·
+`HStack` / `Text grow` 的设备像素证据（要先在 web 端给同一账号注册一枚通行密钥）·
+`-r test` 在干净克隆必红（要么给 verify 流程补一份测试用 `.env`，要么把 `JWT_SECRET`
+变成测试自己的 fixture —— 属服务端那条线，本条线只登记）。
+
+**取证现场处置**（都不删，删了下一位就没法复跑）：
+隔离克隆 `/Users/rocalight/heyta-ios-ri`（android + ios 两段的重证环境，
+B26/#154 的结论就是从这里来的）、`/tmp/heyta-ios-ab`（57 段逐段循环 + A/B 的现场）、
+`/tmp/heyta-g5`（§7.1 那三端）；日志 `/tmp/g5-ri-android-b27.log`、
+`/tmp/g5-ri-ios-b27.log`、`/tmp/g5-account-b27.log`、`/tmp/g5-jwt-proof.log`、
+`/tmp/g5-segloop2.log` + `/tmp/seg2-*.log`。要腾空间就先删 `/tmp/heyta-ios-ab`
+（1.1 G node_modules，它的结论已全部落进文档），**别删 `heyta-ios-ri`** ——
+ios 段只在**新克隆**上跑得动（#154），删了下次要重新 clone + install。
