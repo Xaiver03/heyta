@@ -75,6 +75,39 @@ MIT 许可证的合规义务：**保留版权声明与许可声明**。本仓库
 
 ---
 
+### `scripts/vendor/holiday-cn/` — 国务院节假日公告的机器可读整理件
+
+| 项 | 值 |
+|---|---|
+| 来源 | [NateScarlet/holiday-cn](https://github.com/NateScarlet/holiday-cn) |
+| 原路径 | 仓库根下按年命名的 `YYYY.json`（2007–2026 共 20 份） |
+| **上游 commit** | `159faa58969f6a89ecc671dc04001837c4dca13e`（master，2026-09-27） |
+| **取数日期** | 2026-10-03 |
+| **License** | **MIT** |
+| **版权** | Copyright (c) 2019 NateScarlet |
+| 许可全文 | [`scripts/vendor/holiday-cn/LICENSE`](scripts/vendor/holiday-cn/LICENSE) |
+| 读取入口 | [`scripts/vendor/holiday-cn/load.mjs`](scripts/vendor/holiday-cn/load.mjs)（唯一解析者） |
+
+**两道门都过**：
+
+- **可维护性**：上游每日自动抓取国务院公告，最后提交 **2026-09-27**，最新数据发布
+  2026-01-01，2.2k★，未归档。
+- **许可**：MIT，且它的内容本身是**政府公文**（放假安排公告），不构成受版权保护的
+  独创性表达 —— 项目里**没有任何一端运行时读这些 JSON**。
+
+🔴 **它在产品里的角色必须说清，否则这条登记会被读成"产品依赖第三方数据源"。**
+这些 JSON 是**构建期反证材料**：`scripts/gen-calendar-tables.mjs --verify` 用它核对
+算出来的节日是否落进"那几天放假"的集合。随包交付的是
+`packages/domain/src/generated/holiday-cn.generated.ts`（**只含休/班日期与公告链接**，
+不含上游的文件结构与任何代码），因此**它不是运行时依赖，也就不需要随产物署名**。
+保留 LICENSE 的理由是另一条：MIT 要求"保留版权声明与许可声明"，而派生件与原件
+在同一条复制路径上（构建期），一并留着成本为零。
+
+⚠️ **这些 JSON 不进任何客户端包，也不进服务端** —— 由
+`scripts/gen-calendar-tables.mjs --bundle` 的"随包只有表"判据盯住。
+
+---
+
 ## 2. 通过包管理器引入的依赖
 
 所有第三方依赖的许可证必须**逐项登记**，准入规则有两条硬门槛：
@@ -85,7 +118,29 @@ MIT 许可证的合规义务：**保留版权声明与许可声明**。本仓库
 ### 逐项清单
 
 📋 **[`research/licenses-inventory.generated.md`](research/licenses-inventory.generated.md)**
-—— 由工具生成，**当前 910 个包：宽松许可 909，受限 0，无许可证 0，白名单外已登记 1**。
+—— 由工具生成（`node research/tools/render-license-inventory.mjs`）。
+🔴 **包数与分布只在那份产物里，本文件不复述数字** —— 这里曾抄着一句「当前 910 个包」，
+而产物同期已经是 962 个。**登记册的摘要与明细不一致，读的人就无法判断该信哪一半。**
+
+> 📌 **2026-10-03 因「倒数纪念日」历法层（ADR-0044 批次一 W1）新增 1 个包**：
+> `lunar-typescript@1.8.6`（**MIT**，零运行时依赖），**且它是 devDependency**。
+>
+> 两道门都过：
+> * **可维护性**：`6tail/lunar-typescript` 最后提交 **2026-08-13**、最新发版
+>   **v1.8.6（2025-11-05）**，372★，未归档。
+> * **许可**：`package.json` 的 `license` 字段为 `MIT`，仓库带 LICENSE 全文。
+>
+> 🔴 **它只在构建期用一次**（把 1900–2100 的农历表编码成数据随包交付），
+> **一个字节都不进任何端的产物**。这条不是靠声明保证的，是由
+> `pnpm check:calendar` 里的 **bundle 闸门**（`scripts/gen-calendar-tables.mjs --bundle`）
+> 钉住的三条判据：产品源码里 0 处引用、它只许出现在根 `devDependencies`（子包自己声明
+> 也算违规）、随包数据合计不超过库入口的 1/4。三条各自做过变异验证。
+>
+> ⚠️ **`research/licenses-inventory.generated.md` 需要一次全量重渲染**（本次没动它）：
+> 渲染器扫的是**当前检装的依赖树**，而在隔离 worktree 里跑它会把**别人工作树才装着的包**
+> （Playwright、`@floating-ui/*` 等）判成"不存在"并写掉。
+> **正确做法是在装了完整树的主检出上、合入本批 lockfile 之后重跑。**
+> 这正是本文件上面那条"门禁绿 ≠ 登记全"的同一个形状。
 
 > 📌 **2026-09-26 因真实浏览器验收（`e2e/`）新增 3 个包**：
 > `@playwright/test@1.63.0` + `playwright@1.63.0` + `playwright-core@1.63.0`，
