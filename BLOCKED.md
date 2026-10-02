@@ -1959,3 +1959,79 @@ load 59 时全量必红、单跑必过；改成"轮询到条件成立"（`waitUn
 （`<Card style={{ gap: tokens['space.3'] }}>`，文件里原有 4 处一模一样），
 `Card` 内部默认 `gap: space.2`，所以去掉会改视觉。为不改视觉而消掉这 2 处需要把
 `tokens` 从 hook 作用域搬到模块级 StyleSheet —— 那是 M3 的形状，留给那条线一次做完。
+
+## B21. 🔴 多端覆盖批五**给 `check:l4` 的棘轮添了 2 处内联样式**（114 → 116，基线 90）—— 记账，不在收尾里顺手做（2026-10-03 05:04 实测）
+
+`check:l4` 断言 C 数的是"含 `style={{` 的**行数**"（`scripts/check-l4-no-style.mjs:242`，
+基线写在文件头，单位已钉死为行）。逐口径实测：
+
+| 参照 | 门禁打印（跑出来的数） | `git grep -c -F 'style={{'` 原样 |
+|---|---|---|
+| `ccd3cd83` / `51d828c5^`（本批开工前） | **111**（B18 实跑） | **114** |
+| HEAD `9a0ea6d5`（本批四笔之后） | **113**（`/tmp/rr-12.log`） | **116** |
+| 门禁基线 | 90 | — |
+
+🔴 **两个口径差 2–3 行，原因已定位**：门禁在数之前先 `stripComments()`
+（`scripts/check-l4-no-style.mjs:378`），**注释里出现的 `style={{` 不算账** —— 纯 grep 会把它算进
+116。所以**引用数字必须写明是哪个口径**：本条下面一律用**门禁打印的 111 → 113**，
+delta 与 grep 口径的 114 → 116 **同为 +2**，结论不受口径影响。
+
+🔴 门禁在本批开工**之前就是红的**（111 > 90，M3 那条线的账），但**本批确实又添了 2 处**：
+`ExportScreen.tsx` 还原卡的 `<Card style={{ gap: tokens['space.3'] }}>`（与上方两张导出卡对齐）
+和预览块的 `<View style={{ gap: tokens['space.2'] }}>`。
+
+**为什么不顺手做掉**（三条都成立才停手，不是嫌麻烦）：
+
+1. 消掉净增的**唯一零视觉代价**做法是把重复的 gap 字面量收成组件内命名常量 ——
+   那只是把 `style={{` 从这一行挪到那一行，**棘轮数字变好而"视图不写样式"没有推进**，
+   属于给判据化妆。
+2. 真修法在**共享层**：`Card` 的默认 `gap` 已经是 `space.2`（`apps/mobile/src/ui/kit.tsx:550`），
+   要么让视图不再传 `style`，要么给 `Card` 一个 `gap` 档位。那会动到**所有屏共用的**组件，
+   改完必须重跑移动端截图判据 —— 不是收尾批该带的大小。
+3. 现在动 `ExportScreen.tsx` 的布局，等于让已交付的 run23/run24 设备验收**测的是旧产物**
+   （traps #27 的原形状），要补一次 `pnpm reinstall:mobile` + 一次 `verify:mobile-restore`。
+
+**下一步（谁做都行，成本已量化）**：给 `Card` 加 `gap` 档位 → 把 `ExportScreen.tsx` 的 6 处
+（本批 2 + 既有 4）全部换成 prop → 门禁打印的数从 **113** 降到 ≤109（一次消掉 4 处）。
+**不许**改基线数字。
+
+## B22. 🔴 `check:ai-e2e` 在提交态上 **98 passed / 3 failed**：两条已被**另一条会话的反证**证伪，第三条还欠一次低负载复跑（2026-10-03 04:29 取证）
+
+跑的是隔离检出 `/tmp/heyta-g5`（HEAD `9a0ea6d5`，装完 dist、装完 `e2e` 依赖），
+日志 `/tmp/rr-49.log`。三条红：
+
+| spec | 失败形态 |
+|---|---|
+| `tests/due-date-edit.spec.ts:49` | `locator.click` 重试 60s 超时，`element is outside of the viewport`（`10月18日` 那一格） |
+| `tests/motivation.spec.ts:184` | 视图标题对照 |
+| `tests/narrow-sweep.spec.ts:33` | 塌缩态扫描：日历 |
+
+**为什么没算到提交态头上**（三条独立证据，不是"我觉得是环境"）：
+
+1. 后两条在**两分钟之后**被另一条会话跑绿：它的 **B19** 记的现场里，04:21:35 占着
+   4318/4319 的进程正是我这条 `playwright test`；它 04:31 释放后复跑
+   `narrow-sweep` + `motivation` ⇒ **17/17 全绿**。
+2. `due-date-edit` 在 `/tmp/e2e-full-r11b.log`（04:58）**5.1s 通过**。
+3. 端口是写死的（4318/4319）且 `reuseExistingServer: false`，`check:ai-e2e` 的 preflight
+   （`scripts/check-ai-e2e-preflight.mjs:83`）还会 **SIGKILL** 别人的 webServer ——
+   我量到 04:57 时 `:4319` 又被 pid 95629 占着。**这台机器上 e2e 是串行的共享资源**，
+   同一时刻多个会话跑它，红的是"谁被谁顶了"，不是产品。
+
+🔴 **但也没证伪**：`element is outside of the viewport` 是**几何**症状而不是超时抖动，
+共享 `DatePicker` 弹层在小视口下溢出是一条**真实存在的可能性**，而它恰好是本条线
+（批一把 DatePicker 上提成共享组件）碰过的东西。
+**先把宿主窗口下限量掉**（免得下一条会话又从头查）：`e2e/playwright.config.ts` 里
+**没有** `viewport` 覆盖，`tests/due-date-edit.spec.ts` 也没有 `use:` / `setViewportSize`
+⇒ 跑的是 Playwright 默认 **1280×720**，这条红**不是**"档位低于壳的最小宽度所以不可能存在"那一类，
+它是真实窗口尺寸下的读数。
+
+**欠的一步**（不许用"改天"结掉，命令写死）：
+
+```bash
+# 先确认 4318/4319 的持有者不是别人（B19 的判据）
+lsof -nP -iTCP:4319 -sTCP:LISTEN
+cd e2e && npx playwright test tests/due-date-edit.spec.ts --reporter=list --retries=0
+```
+
+若仍红在 `outside of the viewport` ⇒ 那是共享 DatePicker 的真缺陷，归批一那条线修，
+**不要**改这条 spec 的等待条件让它过。
