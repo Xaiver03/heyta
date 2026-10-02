@@ -29,6 +29,8 @@ import {
   darkTokens,
   lightTokens,
   reducedMotionTokens,
+  reducedTransparencyDarkTokens,
+  reducedTransparencyLightTokens,
   resolveNativeTokens,
   resolveThemeName,
   THEME_NAMES,
@@ -283,5 +285,44 @@ describe('RN 产物的对比度（Dark，用 RN 拿到的值重算）', () => {
       Number(r.toFixed(2)),
       `RN Dark ${fg} on ${bg}（${why}）实测 ${r.toFixed(2)}:1`,
     ).toBeGreaterThanOrEqual(min);
+  });
+});
+
+describe('「减少透明度」覆盖层（ADR-0042 §4：材质要能退让）', () => {
+  const TINTS = [
+    'material.chrome-tint',
+    'material.chrome-tint-strong',
+    'material.panel-tint',
+    'material.sheet-tint',
+  ] as const;
+
+  it('两个主题的覆盖层都把 tint 压成不透明 hex（8 位带 alpha 的形态不许出现）', () => {
+    for (const [name, table] of [
+      ['light', reducedTransparencyLightTokens],
+      ['dark', reducedTransparencyDarkTokens],
+    ] as const) {
+      for (const tint of TINTS) {
+        const value = table[tint];
+        expect(value, `${name} 覆盖层缺 ${tint}`).toBeDefined();
+        expect(String(value), `${name} ${tint} 必须是 6 位不透明 hex`).toMatch(/^#[0-9a-f]{6}$/i);
+      }
+    }
+  });
+
+  it('模糊半径压成 0（backdrop-filter 的合成开销随值一起消失）', () => {
+    expect(reducedTransparencyLightTokens['blur.chrome']).toBe(0);
+    expect(reducedTransparencyLightTokens['blur.sheet']).toBe(0);
+  });
+
+  it('resolveNativeTokens 按主题合并正确的 surface（亮=白、暗=深蓝，不许串档）', () => {
+    const light = resolveNativeTokens({ theme: 'light', reducedTransparency: true });
+    const dark = resolveNativeTokens({ theme: 'dark', reducedTransparency: true });
+    expect(light['material.panel-tint']).toBe(lightTokens['color.surface']);
+    expect(dark['material.panel-tint']).toBe(darkTokens['color.surface']);
+    expect(light['material.panel-tint']).not.toBe(dark['material.panel-tint']);
+    // 不开偏好时原样保留（半透明 tint 不许被静默压掉）
+    expect(resolveNativeTokens({ theme: 'light' })['material.panel-tint']).toBe(
+      lightTokens['material.panel-tint'],
+    );
   });
 });

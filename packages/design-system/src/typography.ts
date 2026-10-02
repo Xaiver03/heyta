@@ -8,9 +8,10 @@
  * 而没有任何一处会报错。
  *
  * 做法：像 Apple 的 semantic text styles 那样，把**字号 + 字重 + 行高 + 字距**
- * 作为一个不可分割的整体命名。组件只说"这是 row-title"，不说四个数字。
+ * （外加一个**默认前景色**）作为一个不可分割的整体命名。
+ * 组件只说"这是 row-title"，不说四个数字，也不说"这条要不要自己写颜色"。
  *
- * 🔴 三条设计约束：
+ * 🔴 四条设计约束：
  *
  *   1. **不引入新取值。** 这里只**组合** tokens.css 里已有的 token。
  *      所以它不构成第二个事实源 —— 改 tokens.css 的值，这里跟着变。
@@ -21,6 +22,16 @@
  *
  *   3. **数字必须等宽。** 计时器与统计数字不加 `tabular-nums` 时，
  *      每跳一秒整个版面都会横向抖动。这不是审美问题，是缺陷。
+ *
+ *   4. **默认颜色也属于语义样式。** 这一条是 2026-09-30 暗色审计补的：
+ *      RN 与 react-native-web 的 `Text` **默认色是纯黑**，而不是"继承容器色"
+ *      （RNW 的 `css-text-*` 基类里就写着 `color: rgb(0,0,0)`）。
+ *      于是"这条文字没写颜色"在亮色下什么都看不出来，在暗色下是
+ *      **1.04:1 的隐形文字** —— 日历的月份标题与分组头就是实测抓到的两处。
+ *      把默认色收进这一层，是为了让"忘了写颜色"不再是**每个新组件都要
+ *      记得处理一次**的事情（同一个理由见 `apps/web/src/lib/theme.ts` 的
+ *      "不做逐组件换色"）。需要别的颜色照旧在消费点覆盖 ——
+ *      数组里后面的样式优先。
  *
  * ⚠️ 行高与字距在原生端要**乘字号**（见 native-values.ts）：
  *      CSS 的 `line-height: 1.5` 是无单位倍数，RN 的 `lineHeight` 是点值。
@@ -188,15 +199,28 @@ export interface RnTextStyle {
    * 一开始我写成 readonly，`tsc` 在四个文件里同时报出来。
    */
   readonly fontVariant?: ['tabular-nums'];
+  /**
+   * 默认前景色。**这是这一层唯一随主题变的字段**（排版四件套不随主题变，
+   * 见文件头约束 4 与 `tests/typography.spec.ts` 那条拆开的断言）。
+   *
+   * 🔴 它不是"锦上添花"，是**缺省即隐形**的修补：RN / RNW 的 `Text` 不写颜色时
+   * 用的是自己的纯黑基类，**不会**继承宿主的 `body { color }`（实测：
+   * `packages/design-system/src/reset.css` 给 body 设了 `--ht-color-foreground`，
+   * 而日历月份标题在暗色下仍然计算成 `rgb(0, 0, 0)` = 1.15:1）。
+   *
+   * ⚠️ 需要别的颜色在消费点覆盖即可 —— style 数组里后面的胜出。
+   */
+  readonly color: string;
 }
 
 /**
  * 把语义样式解析成 RN 可直接消费的**具体数值**。
  *
- * 做三件事，每件都对应一个"不报错的失败"：
+ * 做四件事，每件都对应一个"不报错的失败"：
  *   1. 行高倍数 → 绝对点值（否则行高塌成 1.5pt）
  *   2. 字距 em 比例 → 点值（否则字距小到等于没有）
  *   3. 字重数字 → 字符串（否则可能被静默忽略）
+ *   4. 补默认前景色（否则暗色下是**黑字黑底**，见约束 4）
  */
 export function resolveTextStyle(
   name: TextStyleName,
@@ -223,6 +247,7 @@ export function resolveTextStyle(
     fontWeight,
     lineHeight: resolveLineHeight(tokens[spec.leading] as number, fontSize),
     letterSpacing: resolveTracking(tokens[spec.tracking] as number, fontSize),
+    color: tokens['color.foreground'],
     ...(spec.tabularNums === true ? { fontVariant: ['tabular-nums'] as ['tabular-nums'] } : {}),
   };
 }

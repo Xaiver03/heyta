@@ -70,6 +70,10 @@ node design-system/heyta/check-hardcoded.mjs   # 非零退出 = 有裸值
 
 **风格**：Flat Design / Touch-First。**内容面**不用玻璃拟态、重投影、渐变装饰。
 
+> 🔑 本节边界的**决策记录**是 [ADR-0042](../../docs/adr/0042-glass-material-boundary.md)
+> （玻璃只给悬浮功能层与导航；逐面裁决表在
+> [UI 审计 §3.4](../../docs/research/ui-aesthetic-and-design-system-coverage-audit.md)）。
+
 ### ⚠️ 作用域（2026-09 补写：原文与 §12 自相矛盾）
 
 原文在这里写的是「**不用**玻璃拟态、重投影、渐变装饰」，而 §12 又定义了一整套

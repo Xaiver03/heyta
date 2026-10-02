@@ -43,6 +43,8 @@ import {
   allTokenNames,
   cssVarName,
 } from '../src/tokens.js';
+import { TEXT_STYLES } from '../src/typography.js';
+import type { TextStyleSpec } from '../src/typography.js';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const CSS = readFileSync(resolve(HERE, '../src/tokens.css'), 'utf8');
@@ -54,6 +56,10 @@ const bundle = generateAll(CSS);
 const swiftText = readGen('HeytaTokens.swift');
 const arktsText = readGen('HeytaTokens.ets');
 const jsonText = readGen('tokens.json');
+const typographyCssText = readGen('typography.css');
+const xamlText = readGen('HeytaTokens.xaml');
+const gtkCssText = readGen('heyta.gtk.css');
+const gtkHeaderText = readGen('heyta-tokens.h');
 
 /** 复现生成器里的空白压缩，保证 round-trip 比较的是同一形状。 */
 const collapse = (s: string): string => s.replace(/\s+/g, ' ').trim();
@@ -141,6 +147,68 @@ describe('产物与 tokens.css 同步', () => {
     expect(jsonText, '产物已过期，跑 `pnpm --filter @heyta/design-system run generate`').toBe(
       bundle.json,
     );
+  });
+
+  it('提交的 typography.css 与 TEXT_STYLES 一致，且只引用 var() 不写死数值', () => {
+    expect(
+      typographyCssText,
+      '产物已过期，跑 `pnpm --filter @heyta/design-system run generate`',
+    ).toBe(bundle.typographyCss);
+    // 每个语义档位都有对应的类；数字类必须带 tabular-nums
+    for (const [name, spec] of Object.entries(TEXT_STYLES) as [string, TextStyleSpec][]) {
+      expect(typographyCssText, `缺 .ht-type-${name}`).toContain(`.ht-type-${name} {`);
+      if (spec.tabularNums === true) {
+        expect(typographyCssText, `${name} 必须带 tabular-nums`).toMatch(
+          new RegExp(`\\.ht-type-${name} \\{[^}]*tabular-nums`),
+        );
+      }
+    }
+    // 🔴 数值只许以 var() 引用出现 —— 一旦手写进数值就是第二事实源
+    expect(typographyCssText).not.toMatch(/font-size:\s*[\d.]/);
+    expect(typographyCssText).not.toMatch(/font-weight:\s*[\d.]/);
+  });
+
+  it('提交的 HeytaTokens.xaml 一致：颜色全是 #AARRGGBB、键覆盖全部 token', () => {
+    expect(xamlText, '产物已过期，跑 `pnpm --filter @heyta/design-system run generate`').toBe(
+      bundle.xaml,
+    );
+    // XAML 的字节序是 alpha 在头 —— 换错端会得到全透明或全黑
+    expect(xamlText).not.toMatch(/Color="#[0-9a-f]{6}"/);
+    expect(xamlText).toMatch(/Color="#FF2563EB"/); // color.primary = blue-600
+    const keys = [...xamlText.matchAll(/x:Key="(\w+)"/g)].map((m) => m[1]!);
+    expect(keys.length, 'XAML 至少覆盖全部 token（一个 token 一个 key）').toBeGreaterThanOrEqual(
+      allTokenNames().length,
+    );
+    // XML 注释里禁止连续连字符（XML 规范硬性限制，第一版就栽在这）。
+    // 注意只查注释**内容**：终结符 --> 自带两个连字符，把它先剥掉再查。
+    for (const m of xamlText.matchAll(/<!--([\s\S]*?)-->/g)) {
+      expect(m[1], 'XML 注释内容里不许出现 --（XML 规范）').not.toContain('--');
+    }
+  });
+
+  it('提交的 heyta.gtk.css / heyta-tokens.h 一致：色板全量 + 三个样式类 + 头内嵌同一份 CSS', () => {
+    expect(gtkCssText, '产物已过期，跑 `pnpm --filter @heyta/design-system run generate`').toBe(
+      bundle.gtkCss,
+    );
+    expect(gtkHeaderText).toBe(bundle.gtkHeader);
+    const palette = [...gtkCssText.matchAll(/@define-color (\w+) /g)];
+    expect(palette.length).toBeGreaterThanOrEqual(
+      allTokenNames().filter((t) => t.startsWith('color.')).length,
+    );
+    for (const cls of ['.heyta-window', '.heyta-title', '.heyta-dim']) {
+      expect(gtkCssText, `Linux 壳消费的样式类 ${cls} 必须存在`).toContain(`${cls} {`);
+    }
+    // GTK CSS 不认 border/background 简写 —— 写成简写会被静默丢掉
+    expect(gtkCssText).not.toMatch(/^\s*(border|background):/m);
+    // 头里的 CSS 必须与 .css 文件同源（换算成 C 字符串后能对上色板首行）
+    expect(gtkHeaderText).toContain('@define-color ht_color_primary ');
+    expect(gtkHeaderText).toMatch(/static const char HEYTA_TOKENS_CSS\[\]/);
+  });
+
+  it('Swift 产物带 Color(hex:) 桥（P0-8：颜色 token 从「可读不可用」变可用）', () => {
+    expect(swiftText).toContain('static func color(_ hex: String) -> Color');
+    // 8 位 hex 的注释必须写明 alpha 在尾 —— 与 normalizeColor 的产物一致
+    expect(swiftText).toContain('#rrggbbaa');
   });
 });
 

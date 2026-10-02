@@ -24,7 +24,7 @@
         </Grid.RowDefinitions>
 
         <StackPanel Grid.Row="0" x:Name="ShellTitle" Spacing="2">
-            <TextBlock Text="heyta" FontSize="28" FontWeight="SemiBold" />
+            <TextBlock Text="heyta" FontSize="{ThemeResource HeytaFontSize2xl}" FontWeight="SemiBold" />
             <TextBlock Text="Windows 原生壳 · 界面是 WinUI 3，逻辑与存储是与 web / mobile 同一份 TS"
                        Opacity="0.7" TextWrapping="Wrap" />
         </StackPanel>
@@ -34,7 +34,7 @@
             <Button x:Name="AddButton" Content="添加" Style="{StaticResource AccentButtonStyle}" />
         </StackPanel>
 
-        <TextBlock Grid.Row="2" x:Name="StatusText" Opacity="0.75" TextWrapping="Wrap" />
+        <TextBlock Grid.Row="2" x:Name="StatusText" Foreground="{ThemeResource HeytaColorForegroundMuted}" Opacity="0.75" TextWrapping="Wrap" />
 
         <ListView Grid.Row="3" x:Name="TaskList" SelectionMode="None">
             <ListView.ItemTemplate>
@@ -71,6 +71,6 @@
         -->
         <WebView2 Grid.Row="4" x:Name="SharedUi" />
 
-        <TextBlock Grid.Row="5" x:Name="FooterText" Opacity="0.6" FontSize="12" TextWrapping="Wrap" />
+        <TextBlock Grid.Row="5" x:Name="FooterText" Opacity="0.6" FontSize="{ThemeResource HeytaFontSizeXs}" TextWrapping="Wrap" />
     </Grid>
 </Window>

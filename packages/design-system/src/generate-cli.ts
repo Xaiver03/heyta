@@ -36,13 +36,17 @@ const SRC_GENERATED_DIR = join(PACKAGE_ROOT, 'src', 'generated');
 const checkOnly = process.argv.includes('--check');
 
 const css = readFileSync(SOURCE, 'utf8');
-const { swift, arkts, json, native, tokens } = generateAll(css);
+const { swift, arkts, json, native, typographyCss, xaml, gtkCss, gtkHeader, tokens } = generateAll(css);
 
 /** [写入目录, 文件名, 内容, 展示用相对路径] */
 const targets: Array<[string, string, string, string]> = [
   [OUT_DIR, 'HeytaTokens.swift', swift, 'generated/HeytaTokens.swift'],
   [OUT_DIR, 'HeytaTokens.ets', arkts, 'generated/HeytaTokens.ets'],
   [OUT_DIR, 'tokens.json', json, 'generated/tokens.json'],
+  [OUT_DIR, 'typography.css', typographyCss, 'generated/typography.css'],
+  [OUT_DIR, 'HeytaTokens.xaml', xaml, 'generated/HeytaTokens.xaml'],
+  [OUT_DIR, 'heyta.gtk.css', gtkCss, 'generated/heyta.gtk.css'],
+  [OUT_DIR, 'heyta-tokens.h', gtkHeader, 'generated/heyta-tokens.h'],
   [SRC_GENERATED_DIR, 'tokens.native.ts', native, 'src/generated/tokens.native.ts'],
 ];
 

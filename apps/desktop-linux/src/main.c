@@ -10,6 +10,10 @@
  */
 
 #include "heyta_api.h"
+/* 设计系统 token（P0-7）：GTK CSS 的内嵌形态（packages/design-system 生成，
+ * Makefile 用 -I 指到 generated/）。此前这个壳零 token 接入 —— 界面外观
+ * 完全跟随 Adwaita 系统主题，与 heyta 的设计语言无关。 */
+#include "heyta-tokens.h"
 
 #include <gtk/gtk.h>
 #include <stdio.h>
@@ -160,10 +164,31 @@ static gboolean quit_cb(gpointer user_data) {
     return G_SOURCE_REMOVE;
 }
 
+/* 设计系统 token（P0-7）：把生成的 CSS 挂到默认 display。
+ * 版本分流：4.12 起 load_from_data 进了废弃序列（本壳 -Werror，废弃警告
+ * 即失败），load_from_string 从 4.12 起可用；更老的 GTK 走 data + 长度。
+ * 失败不静默：GTK 解析不了的规则只会打日志，样式类挂不上时窗口仍是
+ * 可用的 —— 但 @define-color 全量色板在这里一次性挂好。 */
+static void load_design_tokens(void) {
+    GtkCssProvider *provider = gtk_css_provider_new();
+#if GTK_CHECK_VERSION(4, 12, 0)
+    gtk_css_provider_load_from_string(provider, HEYTA_TOKENS_CSS);
+#else
+    gtk_css_provider_load_from_data(provider, (const guint8 *)HEYTA_TOKENS_CSS, -1);
+#endif
+    gtk_style_context_add_provider_for_display(
+        gdk_display_get_default(), GTK_STYLE_PROVIDER(provider),
+        GTK_STYLE_PROVIDER_PRIORITY_APPLICATION);
+    g_object_unref(provider);
+}
+
 static void activate(GtkApplication *app, gpointer user_data) {
     Shell *shell = user_data;
 
+    load_design_tokens();
+
     shell->window = gtk_application_window_new(app);
+    gtk_widget_add_css_class(shell->window, "heyta-window");
     gtk_window_set_title(GTK_WINDOW(shell->window), "heyta");
     gtk_window_set_default_size(GTK_WINDOW(shell->window), 900, 560);
 
@@ -177,11 +202,13 @@ static void activate(GtkApplication *app, gpointer user_data) {
     GtkWidget *title = gtk_label_new("heyta");
     gtk_label_set_xalign(GTK_LABEL(title), 0.0f);
     gtk_widget_add_css_class(title, "title-1");
+    gtk_widget_add_css_class(title, "heyta-title");
     gtk_box_append(GTK_BOX(root), title);
 
     GtkWidget *subtitle = gtk_label_new("Linux 原生壳 · 界面是 GTK4，逻辑与存储是与 web / mobile 同一份 TS");
     gtk_label_set_xalign(GTK_LABEL(subtitle), 0.0f);
     gtk_widget_add_css_class(subtitle, "dim-label");
+    gtk_widget_add_css_class(subtitle, "heyta-dim");
     gtk_box_append(GTK_BOX(root), subtitle);
 
     GtkWidget *input_row = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 8);
@@ -211,6 +238,7 @@ static void activate(GtkApplication *app, gpointer user_data) {
     shell->footer = gtk_label_new("");
     gtk_label_set_xalign(GTK_LABEL(shell->footer), 0.0f);
     gtk_widget_add_css_class(shell->footer, "dim-label");
+    gtk_widget_add_css_class(shell->footer, "heyta-dim");
     gtk_box_append(GTK_BOX(root), shell->footer);
 
     /* ── 初始化：失败必须显示出来（空白窗口是最难排查的失败形态）── */

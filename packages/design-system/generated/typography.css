@@ -1,0 +1,85 @@
+/**
+ * 语义文字档位（.ht-type-*）—— 由 packages/design-system 的
+ * `generate` 从 TEXT_STYLES 生成，**不要手改**（`--check` 会判红）。
+ * 排版四件套（字号/字重/行高/字距）整体消费；数字类样式自带 tabular-nums。
+ */
+
+.ht-type-screen-title {
+  font-size: var(--ht-font-size-3xl);
+  font-weight: var(--ht-font-weight-bold);
+  line-height: var(--ht-line-height-tight);
+  letter-spacing: var(--ht-tracking-display);
+}
+
+.ht-type-section-title {
+  font-size: var(--ht-font-size-lg);
+  font-weight: var(--ht-font-weight-semibold);
+  line-height: var(--ht-line-height-tight);
+  letter-spacing: var(--ht-tracking-title);
+}
+
+.ht-type-headline {
+  font-size: var(--ht-nav-app-bar-title-size);
+  font-weight: var(--ht-font-weight-semibold);
+  line-height: var(--ht-line-height-tight);
+  letter-spacing: var(--ht-tracking-body);
+}
+
+.ht-type-row-title {
+  font-size: var(--ht-font-size-base);
+  font-weight: var(--ht-font-weight-regular);
+  line-height: var(--ht-line-height-normal);
+  letter-spacing: var(--ht-tracking-body);
+}
+
+.ht-type-row-meta {
+  font-size: var(--ht-font-size-sm);
+  font-weight: var(--ht-font-weight-regular);
+  line-height: var(--ht-line-height-normal);
+  letter-spacing: var(--ht-tracking-body);
+}
+
+.ht-type-caption {
+  font-size: var(--ht-font-size-xs);
+  font-weight: var(--ht-font-weight-medium);
+  line-height: var(--ht-line-height-normal);
+  letter-spacing: var(--ht-tracking-caption);
+}
+
+.ht-type-tab-label {
+  font-size: var(--ht-nav-tab-label-size);
+  font-weight: var(--ht-font-weight-medium);
+  line-height: var(--ht-line-height-tight);
+  letter-spacing: var(--ht-tracking-caption);
+}
+
+.ht-type-panel-title {
+  font-size: var(--ht-font-size-xs);
+  font-weight: var(--ht-font-weight-semibold);
+  line-height: var(--ht-line-height-tight);
+  letter-spacing: var(--ht-tracking-body);
+}
+
+.ht-type-badge {
+  font-size: var(--ht-nav-tab-label-size);
+  font-weight: var(--ht-font-weight-semibold);
+  line-height: var(--ht-line-height-tight);
+  letter-spacing: var(--ht-tracking-caption);
+  font-variant-numeric: tabular-nums;
+}
+
+.ht-type-numeric-display {
+  font-size: var(--ht-font-size-4xl);
+  font-weight: var(--ht-font-weight-bold);
+  line-height: var(--ht-line-height-tight);
+  letter-spacing: var(--ht-tracking-display);
+  font-variant-numeric: tabular-nums;
+}
+
+.ht-type-numeric-body {
+  font-size: var(--ht-font-size-base);
+  font-weight: var(--ht-font-weight-medium);
+  line-height: var(--ht-line-height-normal);
+  letter-spacing: var(--ht-tracking-body);
+  font-variant-numeric: tabular-nums;
+}

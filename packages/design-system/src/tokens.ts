@@ -115,6 +115,11 @@ export const TOKEN_GROUPS = {
        "rail 放视图 + sidebar 放当前视图的范围"（`dida-view-unification.md` §4.4）。 */
     'rail-width',
     'sidebar-width',
+    /* 侧栏可拖宽的上下限。2026-09-30 加：侧栏宽度改成可拖拽（产品负责人
+       「侧边栏那个应该是可以自由的去拖拽的…然后自适应」）。下限保证清单名
+       不被压成一字一行，上限保证主区不吃空。 */
+    'sidebar-min-width',
+    'sidebar-max-width',
     'header-height',
     'content-max',
     'prose-max',
@@ -210,6 +215,7 @@ export const TOKEN_GROUPS = {
   material: [
     'chrome-tint',
     'chrome-tint-strong',
+    'panel-tint',
     'edge-highlight',
     'sheet-tint',
     'scrim',
@@ -377,6 +383,20 @@ export const AA_PAIRS: ReadonlyArray<{
   { fg: 'color.foreground', bg: 'color.surface-raised', min: 4.5, why: '正文（浮层）' },
   { fg: 'color.foreground-muted', bg: 'color.surface', min: 4.5, why: '次要文字' },
   { fg: 'color.foreground-muted', bg: 'color.background', min: 4.5, why: '次要文字（页面底）' },
+  { fg: 'color.foreground-muted', bg: 'color.surface-raised', min: 4.5, why: '次要文字（浮层）' },
+  /*
+    🔴 `color.foreground-subtle` 此前**一条都没登记** —— 于是整套对比度测试
+    对它的值一个字都不报，而它承载的是**真文字**：日历列头「一二三四五六日」、
+    周次「36周」、脚注「未设截止时间的任务不在日历上」。
+    2026-09-30 实测它是白底 2.56:1 / 暗底 3.83:1，而门禁全绿。
+    这组配对就是那次的产出：**没被点名的 token 等于没被检查**。
+    ⚠️ 边界（刻意）：`color.surface-sunken` **没有**登记 —— 亮色下 subtle
+    在那一层是 4.34:1，够不到 4.5。所以「subtle 文字放在 sunken 底上」
+    这一条不是"已过 AA"，是"没过、也没人管"。要放就得换成 muted。
+  */
+  { fg: 'color.foreground-subtle', bg: 'color.surface', min: 4.5, why: '三级文字' },
+  { fg: 'color.foreground-subtle', bg: 'color.background', min: 4.5, why: '三级文字（页面底）' },
+  { fg: 'color.foreground-subtle', bg: 'color.surface-raised', min: 4.5, why: '三级文字（浮层）' },
   { fg: 'color.on-primary', bg: 'color.primary', min: 4.5, why: '主按钮文字' },
   { fg: 'color.on-primary', bg: 'color.primary-hover', min: 4.5, why: '主按钮 hover' },
   { fg: 'color.primary', bg: 'color.surface', min: 4.5, why: '蓝色文字/链接' },

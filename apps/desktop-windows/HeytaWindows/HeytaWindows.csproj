@@ -44,6 +44,10 @@
          packages/app-host/bridge-bundle/native-bridge.js（由 packages/app-host/scripts/build-native-bridge.mjs 生成）。
          Windows 壳与 macOS 壳加载的是同一个文件；这里把它拷到 exe 旁边。 -->
     <None Include="../../../packages/app-host/bridge-bundle/native-bridge.js" Link="native-bridge.js" CopyToOutputDirectory="PreserveNewest" />
+    <!-- 设计系统 token（P0-6，2026-10-01 UI 审计 G1）：与 native-bridge 同一个
+         "仓库唯一一份、拷到 exe 旁边"模式。App.xaml 以 ms-appx:///Assets/ 引用它，
+         页面里 {ThemeResource HeytaXxx} 消费。缺了会在构建期明确报错。 -->
+    <None Include="../../../packages/design-system/generated/HeytaTokens.xaml" Link="Assets/HeytaTokens.xaml" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
   <!--
@@ -53,6 +57,12 @@
   <Target Name="RequireBridgeBundle" BeforeTargets="Build">
     <Error Condition="!Exists('$(MSBuildProjectDirectory)/../../../packages/app-host/bridge-bundle/native-bridge.js')"
            Text="缺少 bridge-bundle/native-bridge.js。先在仓库根跑：node packages/app-host/scripts/build-native-bridge.mjs" />
+  </Target>
+
+  <!-- 同款判据：缺 token 字典 ⇒ 构建期报错，而不是运行期白窗口 + 全部回退默认色。 -->
+  <Target Name="RequireHeytaTokensXaml" BeforeTargets="Build">
+    <Error Condition="!Exists('$(MSBuildProjectDirectory)/../../../packages/design-system/generated/HeytaTokens.xaml')"
+           Text="缺少 packages/design-system/generated/HeytaTokens.xaml。先跑：pnpm --filter @heyta/design-system run generate" />
   </Target>
 
 </Project>

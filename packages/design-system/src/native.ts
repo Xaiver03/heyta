@@ -22,12 +22,14 @@ import {
   darkTokens,
   lightTokens,
   reducedMotionTokens,
+  reducedTransparencyLightTokens,
+  reducedTransparencyDarkTokens,
   THEME_NAMES,
   type HeytaNativeTokens,
   type ThemeName,
 } from './generated/tokens.native.js';
 
-export { darkTokens, lightTokens, reducedMotionTokens, THEME_NAMES };
+export { darkTokens, lightTokens, reducedMotionTokens, reducedTransparencyLightTokens, reducedTransparencyDarkTokens, THEME_NAMES };
 export type { HeytaNativeTokens, ThemeName };
 
 /**
@@ -60,6 +62,12 @@ export interface ResolveOptions {
   theme: ThemeName;
   /** 系统是否开启「减少动效」。 */
   reducedMotion?: boolean;
+  /**
+   * 系统是否开启「减少透明度」（ADR-0042 §4：材质要能退让）。
+   * web 上由共享层 theme 用 `matchMedia` 检测；RN 原生没有等价系统偏好，
+   * 保持 false（原生端材质本来就是「诚实不透明」，见 material-surface.ts）。
+   */
+  reducedTransparency?: boolean;
 }
 
 /**
@@ -70,6 +78,17 @@ export interface ResolveOptions {
  */
 export function resolveNativeTokens(options: ResolveOptions): HeytaNativeTokens {
   const base = tokensForTheme(options.theme);
-  if (!options.reducedMotion) return base;
-  return { ...base, ...reducedMotionTokens };
+  let tokens = base;
+  if (options.reducedMotion) {
+    tokens = { ...tokens, ...reducedMotionTokens };
+  }
+  if (options.reducedTransparency) {
+    // 覆盖层是 per-theme 的：tint 压成的是 var(--ht-color-surface)，
+    // 亮暗各解析各的（生成时已展开）。
+    tokens = {
+      ...tokens,
+      ...(options.theme === 'dark' ? reducedTransparencyDarkTokens : reducedTransparencyLightTokens),
+    };
+  }
+  return tokens;
 }

@@ -137,6 +137,29 @@ export function extractReducedMotion(css: string): Map<string, string> {
 }
 
 /**
+ * 抽取 `@media (prefers-reduced-transparency: reduce)` 块里的 `:root` 覆盖。
+ *
+ * 与 reducedMotion 同款理由（ADR-0042 §4：材质要能退让）：CSS 驱动的表面
+ * 由这条媒体查询直接压值；**RN 侧的 token 表看不见 CSS 媒体查询**，生成器
+ * 把这一块导出成 per-theme 覆盖层，由共享层在 web 上用 `matchMedia` 检测后
+ * 合并（原生端无此系统偏好可查，保持不动）。
+ *
+ * ⚠️ 值大多是 `var(--ht-color-surface)` 这类**随主题变**的引用 —— 解析时
+ * 必须分别对亮/暗两张表展开，这也是它导出成两份 partial 的原因。
+ */
+export function extractReducedTransparency(css: string): Map<string, string> {
+  const out = new Map<string, string>();
+  for (const [selector, body] of topLevelBlocks(css)) {
+    if (!selector.includes('prefers-reduced-transparency')) continue;
+    for (const [innerSelector, innerBody] of topLevelBlocks(body)) {
+      if (innerSelector !== ':root') continue;
+      for (const [name, value] of varsIn(innerBody)) out.set(name, value);
+    }
+  }
+  return out;
+}
+
+/**
  * 把值里的 var(--x) 递归展开成原始值。
  *
  * 必须递归：语义层引用原始色阶（--ht-color-primary → var(--ht-blue-600) → #2563eb），
