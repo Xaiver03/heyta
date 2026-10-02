@@ -1,4 +1,5 @@
-import { expect, test } from '@playwright/test';
+import { expect, test, type Locator } from '@playwright/test';
+import { openApp } from './helpers';
 
 /**
  * 搜索的**聚焦搜索（Spotlight）形态** —— 只有真浏览器能证的那一半
@@ -43,6 +44,10 @@ import { expect, test } from '@playwright/test';
  *
  * `?lang=` 在链上排在系统语言**之前**（`apps/web/src/lib/locale.ts`），且首启
  * 只激活不落盘 ⇒ 它是"把语言钉住"最轻的手段，不改动任何产品代码。
+ *
+ * 🔴 但**光有它是跑不动这一组的**：导航必须走 `openApp`，因为它还要做完
+ * 首启隐私同意 —— 那一层是 `position: fixed; inset: 0` 的整屏遮罩，
+ * 而这一组的每一次 `click()` 与 `keyboard.press()` 都要过它。
  */
 const APP_URL = '/?lang=zh-CN';
 
@@ -55,9 +60,43 @@ async function addTask(page: import('@playwright/test').Page, title: string): Pr
   await composer.press('Enter');
 }
 
+/**
+ * 等**这两个盒子**停止位移，然后一次性返回它们的几何。
+ *
+ * 🔴 为什么必须先等：`.ht-search-overlay` 挂着 `ht-sheet-in`
+ * （`apps/web/src/styles/app/sheets.css:123`，`from { transform: translateY(+space-2) }`），
+ * 卡片自己还挂着 `ht-material-in`（同文件 `:154`，`from { transform: translateY(-space-1) }`，
+ * 时长取弹簧参数）。两条的**位移方向相反、时长与相位也不同** ⇒ 动画中间帧量到的
+ * `card.y - surface.y` 是"两条 transform 之差 + padding"，与 `padding-top` 这个被约束的
+ * 常量不再相等（2026-10-02 主套件实测：padding-top 128 / 上隙 125.318，差 2.682 > 容差 2）。
+ * 落位之后差值是 0 —— 所以这不是"把容差放宽"，是把量取时机挪到可测的时刻。
+ *
+ * ⚠️ 刻意**不用** `document.getAnimations()`：页面上任何一条与本题无关的动画
+ * （骨架屏、番茄钟）都会把等待拖成超时，症状又像"界面坏了"。这里的可测性定义就是
+ * "要量的这两个盒子不动了"，40 次还没停就响亮地失败（那说明界面真的在抖）。
+ */
+async function settledGeometry(card: Locator, surface: Locator): Promise<{
+  box: { x: number; y: number; width: number; height: number };
+  surfaceBox: { x: number; y: number; width: number; height: number };
+}> {
+  let prev: { y: number; sy: number } | null = null;
+  for (let attempt = 0; attempt < 40; attempt += 1) {
+    const box = await card.boundingBox();
+    const surfaceBox = await surface.boundingBox();
+    expect(box, '浮层卡片有几何').not.toBeNull();
+    expect(surfaceBox, '浮层有几何').not.toBeNull();
+    if (prev && Math.abs(box!.y - prev.y) < 0.01 && Math.abs(surfaceBox!.y - prev.sy) < 0.01) {
+      return { box: box!, surfaceBox: surfaceBox! };
+    }
+    prev = { y: box!.y, sy: surfaceBox!.y };
+    await new Promise((resolve) => setTimeout(resolve, 50));
+  }
+  throw new Error('卡片一直在位移：入场动画没落位（或界面在抖）—— 几何判据没法成立');
+}
+
 test('搜索：贴顶浮层透出下层视图 + 顶栏没有第二个框 + 面板里没有 ✕', async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
-  await page.goto(APP_URL);
+  await openApp(page, APP_URL);
   await addTask(page, '搜索浮层判据的锚点任务');
   await expect(page.locator('[data-testid="task-list"]'), '任务先建出来').toBeVisible();
 
@@ -79,10 +118,8 @@ test('搜索：贴顶浮层透出下层视图 + 顶栏没有第二个框 + 面�
   ).toHaveCount(0);
 
   const card = surface.locator('> *').first();
-  const box = await card.boundingBox();
-  expect(box, '浮层卡片有几何').not.toBeNull();
-  const surfaceBox = await surface.boundingBox();
-  expect(surfaceBox, '浮层有几何').not.toBeNull();
+  // 🔴 先落位再量（理由与实测数字写在 {@link settledGeometry}）。
+  const { box, surfaceBox } = await settledGeometry(card, surface);
 
   // ④ 宽度：不得超过 modal-max（640px + 2px 容差）。
   expect(box!.width, '卡片宽度不得超过 modal-max（铺满就是假浮层）').toBeLessThanOrEqual(642);
@@ -171,7 +208,7 @@ test('🔴 真键盘：⌘K 开 → 输入 → ↓ 高亮并滚进视野 → ↵
   page,
 }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
-  await page.goto(APP_URL);
+  await openApp(page, APP_URL);
 
   for (let i = 0; i < 30; i += 1) await addTask(page, `填充任务 ${i + 1}`);
   await addTask(page, '搜索滚动锚点 甲');
@@ -260,7 +297,7 @@ test('🔴 真键盘：⌘K 开 → 输入 → ↓ 高亮并滚进视野 → ↵
  */
 test('关掉搜索后焦点回到开它的那个框，且不许把页面滚回顶部', async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
-  await page.goto(APP_URL);
+  await openApp(page, APP_URL);
   const composer = page.getByTestId('capture-input');
   for (let i = 0; i < 30; i += 1) await addTask(page, `焦点归位 ${i + 1}`);
   // 🔴 真点一下 composer 再滚：探针实测**提交之后焦点不在 composer 上**

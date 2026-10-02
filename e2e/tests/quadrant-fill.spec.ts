@@ -140,10 +140,6 @@ async function probe(page: import('@playwright/test').Page): Promise<Probe> {
 test.describe('R2 · 四象限铺满剩余高度（桌面载荷）', () => {
   test.beforeEach(async ({ page }) => {
     await openApp(page, '/');
-    if (await page.getByTestId('privacy-consent-dialog').isVisible().catch(() => false)) {
-      await page.getByTestId('privacy-consent-local-only').click();
-      await expect(page.getByTestId('privacy-consent-dialog')).toHaveCount(0);
-    }
     // 建两条任务，让格子里有内容（空格的 minHeight 会让"长满"和"没长"难以区分）
     const add = async (text: string): Promise<void> => {
       const before = await page.locator('[data-testid^="task-item-"]').count();

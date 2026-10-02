@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { openApp } from './helpers';
 
 /**
  * 塌缩态（≤768px）的**逐页**扫描（goal-layout-audit.md 页 4 / 收尾）
@@ -12,10 +13,11 @@ import { expect, test } from '@playwright/test';
  *   · **底部导航在**（`.ht-rail__tabs` 在视口内）—— 塌缩形态的锚；
  *   · 截图落固定路径，**人看**（AGENTS §6.2 规定一）。
  *
- * 专注 / 成长 / 便签默认关 —— 同宽窗扫描，用 localStorage 显式覆盖打开。
+ * 🔴 启动走 `openApp`（同 `pages-sweep`）：模块开关由共享层那份全开覆盖，
+ * 中文偏好钉住"tab 名 / 页标题"这些定位符，首启隐私同意收掉整屏遮罩 ——
+ * 这里每一处 `click()` 都要过它。
  */
 
-const MODULES_ON = JSON.stringify({ focus: true, growth: true, notes: true });
 const NARROW = { width: 660, height: 800 };
 
 for (const [tab, file] of [
@@ -29,18 +31,20 @@ for (const [tab, file] of [
   ['回收站', 'narrow-trash'],
 ] as const) {
   test(`塌缩态扫描：${tab}`, async ({ page }) => {
-    await page.addInitScript((modules) => {
-      localStorage.setItem('heyta.shell.modules', modules);
-    }, MODULES_ON);
     await page.setViewportSize(NARROW);
-    await page.goto('/');
+    await openApp(page);
     await page.getByRole('tab', { name: tab }).click();
-    // ⚠️ 标题锚不通用：日历视图的标题沿用当前筛选名（「收集箱」——
-    // `VIEW_TITLED_BY_TAB` 不含 calendar，既有行为），所以日历锚它自己的月份板。
+    // 🔴 每个视图的页头标题都必须等于它自己的名字。
+    //
+    // 这里**曾经**写着"日历跳过标题断言"，理由是「`VIEW_TITLED_BY_TAB` 不含
+    // calendar，既有行为」。那不是既有行为 —— 那是 R9 那个缺陷被原样抄成了注释，
+    // 于是这条用例从"能抓到它"变成了"替它作证"。判据把缺陷合法化，比没有判据更糟。
+    //
+    // 月份板的可见性**另外**保留：它判的是"日历真渲染出来了"，
+    // 和"标题对不对"是两件事，不该互相顶替。
+    await expect(page.locator('.ht-header__title')).toContainText(tab);
     if (tab === '日历') {
       await expect(page.getByTestId('calendar-board')).toBeVisible();
-    } else {
-      await expect(page.locator('.ht-header__title')).toContainText(tab);
     }
 
     // 🔴 塌缩形态的锚：底部导航必须还在视口里（塌塌就没导航 = 半成品）。
@@ -60,7 +64,7 @@ for (const [tab, file] of [
 
 test('塌缩态扫描：搜索浮层', async ({ page }) => {
   await page.setViewportSize(NARROW);
-  await page.goto('/');
+  await openApp(page);
   const composer = page.locator('input[placeholder^="添加任务"]');
   await composer.fill('塌缩态的锚点任务');
   await composer.press('Enter');
@@ -92,7 +96,7 @@ test('塌缩态扫描：搜索浮层', async ({ page }) => {
 
 test('塌缩态扫描：设置浮层', async ({ page }) => {
   await page.setViewportSize(NARROW);
-  await page.goto('/');
+  await openApp(page);
   await page.getByTestId('account-menu-avatar').click();
   await page.getByTestId('account-menu-settings').click();
   await expect(page.getByTestId('settings-sheet')).toBeVisible();

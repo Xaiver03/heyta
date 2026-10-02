@@ -130,9 +130,17 @@ export async function injectCredential(
 /**
  * 打开真应用并等到输入框可见（白屏不算通过）。
  * 转接共享 helper（模块开关全开 + 垫片自动失效），保持一份"打开应用"的实现。
+ *
+ * 🔴 这里的同意决定**必须是 `accepted`**，不是共享层的默认档：这条套件的每一件
+ * 事都要出门（真注册、真令牌、真 op 上传、真 `/api/test/*` 交叉验证），而
+ * `apps/web/src/features/privacy/consent-gate.ts` 把 `window.fetch` **整体**换成了
+ * 同意闸门后的版本 —— `local-only` 下连 `127.0.0.1` 的请求都发不出去。
+ * 症状长得很骗人：界面报"连不上服务端"，而服务端日志一条请求都没有（§7 的 CORS
+ * 那一坑是同一个形状）。选 `accepted` 不是"测试走捷径"：这条旅程判的就是
+ * **同意联网之后**该发生的事。
  */
 export async function openApp(page: Page, path = '/'): Promise<void> {
-  await openSharedApp(page, path);
+  await openSharedApp(page, path, 'accepted');
 }
 
 /**

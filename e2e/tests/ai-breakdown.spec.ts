@@ -36,7 +36,7 @@ test.describe('AI 拆解：真浏览器端到端旅程', () => {
     request,
   }) => {
     await resetStub(request);
-    await openApp(page);
+    await openApp(page, '/', 'accepted');
 
     // ══ 1. 通过设置界面配置端点 ════════════════════════════════════════
     // 🔴 拆解需要 `structured_output` **和** `long_context`

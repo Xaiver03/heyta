@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { openApp, switchView } from './helpers';
+import { decidePrivacyConsent, openApp, pinChineseUi, switchView } from './helpers';
 import { installMissingProducerShims } from './shims';
 
 /**
@@ -12,7 +12,11 @@ import { installMissingProducerShims } from './shims';
  * ## 判据来自哪些源码
  *
  * - 11 个标签与顺序：`apps/web/src/App.tsx` 的 `VIEW_TABS`
- * - 哪 7 个视图的居中标题 === 标签：同文件的 `VIEW_TITLED_BY_TAB`
+ * - 哪些视图的居中标题 === 标签：下面本文件的 `TITLED`。
+ *   🔴 标题的**默认**就是跟视图走（R9 起）：`App.tsx` 的 `title` 只在任务视图
+ *   （和四象限页真的落在某个象限时）才读 `store.filter`。原来那 7 个是靠一张
+ *   `VIEW_TITLED_BY_TAB` 白名单挑出来的，**漏登记日历就是 R9 那个缺陷本身**，
+ *   白名单已删 —— 所以下面这张表现在是"断言的覆盖面"，不再是"行为的开关"。
  * - 周复盘 / 年度视图 / 中性差值：`apps/web/src/features/motivation/GrowthView.tsx`
  *
  * ## 🔴 为什么这里还留着一条"进度卡不许出现"
@@ -53,8 +57,26 @@ import { installMissingProducerShims } from './shims';
 const TABS = ['任务', '日历', '四象限', '习惯', '时间线', '番茄钟', '成长', '便签', '搜索', '回收站', '设置'] as const;
 type Tab = (typeof TABS)[number];
 
-/** 居中标题 === 标签本身的视图（其余视图的标题是清单/筛选名） */
-const TITLED = ['习惯', '番茄钟', '时间线', '成长', '便签', '回收站', '设置'] as const satisfies readonly Tab[];
+/**
+ * 居中标题 === 标签本身的视图。
+ *
+ * 🔴 R9 起这张表**只缺「任务」一项**：任务视图的标题是清单/筛选名（「收集箱」、
+ * 「重要不紧急」、用户自己的清单名），那是它该有的样子。其余每个视图都必须由
+ * 自己的 tab 命名 —— 日历以前不在这里，而它不在的原因**就是**那个缺陷
+ * （标题回落到读上一个视图残留的 filter）。
+ */
+const TITLED = [
+  '日历',
+  '四象限',
+  '习惯',
+  '番茄钟',
+  '时间线',
+  '成长',
+  '便签',
+  '搜索',
+  '回收站',
+  '设置',
+] as const satisfies readonly Tab[];
 
 /**
  * 今日进度卡应当出现的视图 —— **2026-10-01 起为空**（R6：产品负责人拍板彻底删除，
@@ -124,11 +146,18 @@ test.describe('激励体系：真浏览器契约', () => {
    * ⚠️ 它**必须单独一条、且不走 `openApp`**：`openApp` 会打开全部模块，
    * 于是"默认几个"这件事在那套配置下**永远测不到**。
    * 这条用的是裸 `page.goto` —— 新装用户看到的就应该是这个。
+   *
+   * ⚠️ 但"不走共享入口"**不等于**"不修探针"：下面仍然要钉中文（那些标签是
+   * 中文文案，浏览器默认 en-US 会让整片变英文）并做完首启隐私同意
+   * （`role="presentation"` 的整屏遮罩）。这两件事都**不碰模块默认值**，
+   * 所以"默认 7 个 tab"这条判据测的还是新装用户那一屏。
    */
   test('🔴 默认 rail 只有 7 个 tab（6 个视图 + 回收站）', async ({ page }) => {
     await installMissingProducerShims(page);
+    await pinChineseUi(page);
     await page.goto('/');
     await expect(page.locator('input[placeholder^="添加任务"]')).toBeVisible();
+    await decidePrivacyConsent(page);
 
     const labels = (await page.getByRole('tab').allTextContents()).map((t) => t.trim());
     // 默认：6 个视图（任务/日历/四象限/习惯/时间线/**搜索**）+ 1 个工具 tab（回收站）。
@@ -152,7 +181,7 @@ test.describe('激励体系：真浏览器契约', () => {
     }
   });
 
-  test('有居中标题的五个视图，标题等于标签本身', async ({ page }) => {
+  test('除任务视图外，每个视图的居中标题都等于标签本身（R9）', async ({ page }) => {
     await openApp(page);
 
     for (const tab of TITLED) {

@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { openApp } from './helpers';
 
 /**
  * 页 8 逐页排版扫描（goal-layout-audit.md 页 8）
@@ -8,12 +9,12 @@ import { expect, test } from '@playwright/test';
  * 每页一张截图（固定路径），**人看**。排版缺陷（重叠/挤压/裸缝）靠图找，
  * 断言只负责"页面真的渲染出来了"（每页锚一个该页特有的标记）。
  *
- * 🔴 专注 / 成长 / 便签默认关（模块开关）—— 用 localStorage 显式覆盖打开
- * （`features/shell/modules.ts`：存的是 `{focus: true}` 这种**覆盖**）。
- * 这是验收环境的选择，不是改产品默认。
+ * 🔴 模块开关 / 中文偏好 / 首启隐私同意**全部由 `openApp` 做完**：
+ * 这一组判据的定位符（tab 名、`.ht-header__title` 的中文页名、`通知` 按钮名）
+ * 在英文界面上一个都找不到，而整屏遮罩会让 `click()` 卡到超时。
+ * 以前这里自己 `addInitScript` 写 `heyta.shell.modules`（只开 3 个模块的一份抄件），
+ * 现在走共享层那一份（6 个全开 = 它的超集）—— 抄件一定会漂。
  */
-
-const MODULES_ON = JSON.stringify({ focus: true, growth: true, notes: true });
 
 async function open(page: import('@playwright/test').Page, tabName: string): Promise<void> {
   await page.getByRole('tab', { name: tabName }).click();
@@ -29,11 +30,8 @@ for (const [tab, file] of [
   ['回收站', 'sweep-trash'],
 ] as const) {
   test(`页8 扫描：${tab}`, async ({ page }) => {
-    await page.addInitScript((modules) => {
-      localStorage.setItem('heyta.shell.modules', modules);
-    }, MODULES_ON);
     await page.setViewportSize({ width: 1280, height: 800 });
-    await page.goto('/');
+    await openApp(page);
     await open(page, tab);
     // 每页一个锚：能切过去且内容区标题对上，就说明渲染完成。
     // 标题锚：回收站/便签/番茄钟等标题跟着 tab 走（`VIEW_TITLED_BY_TAB`）。
@@ -44,7 +42,7 @@ for (const [tab, file] of [
 
 test('页8 扫描：设置浮层', async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 800 });
-  await page.goto('/');
+  await openApp(page);
   await page.getByTestId('account-menu-avatar').click();
   await page.getByTestId('account-menu-settings').click();
   await expect(page.getByTestId('settings-sheet')).toBeVisible();
@@ -57,7 +55,7 @@ test('页8 扫描：设置浮层', async ({ page }) => {
 
 test('页8 扫描：账号菜单与通知面板', async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 800 });
-  await page.goto('/');
+  await openApp(page);
   await page.getByTestId('account-menu-avatar').click();
   await expect(page.getByTestId('account-menu-panel')).toBeVisible();
   await page.screenshot({ path: 'test-results/sweep-account.png', fullPage: false });

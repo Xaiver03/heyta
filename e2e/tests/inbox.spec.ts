@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { installMissingProducerShims } from './shims';
+import { openApp, stubLegalRecheck } from './helpers';
 
 /**
  * 通知中心 + 活动（福利中心）：真浏览器契约。
@@ -95,15 +95,18 @@ const ACTIVITY_BODY = {
 };
 
 async function seedServerAndStubRoutes(page: import('@playwright/test').Page): Promise<void> {
-  await installMissingProducerShims(page);
-
   // 在应用脚本执行**之前**把凭据塞进 localStorage（`addInitScript` 就是这个时机）。
+  // ⚠️ 生产者垫片不在这里装 —— `openApp` 那一步会装（同一个 `page.route`，
+  // 注册两次会让后一份把前一份**静默遮掉**，`ACTIVE_SHIMS` 的报告因此会失真）。
   await page.addInitScript((server: string) => {
     localStorage.setItem(
       'heyta.sync.credentials',
       JSON.stringify({ baseUrl: server, token: 'e2e-token', email: 'me@example.com' }),
     );
   }, SERVER);
+
+  // 🔴 补签那道读侧闸：塞了凭据应用一启动就会问一次，与通知这个主题无关。
+  await stubLegalRecheck(page, SERVER);
 
   await page.route(`${SERVER}/api/notifications**`, async (route) => {
     if (route.request().method() === 'POST') {
@@ -230,8 +233,11 @@ test.describe('通知中心 + 活动', () => {
     });
 
     await seedServerAndStubRoutes(page);
-    await page.goto('/');
-    await expect(page.locator('input[placeholder^="添加任务"]')).toBeVisible();
+    // 🔴 `accepted`：这三条的"数据真的进了面板"依赖 `page.route` 接住的那些
+    // 请求 —— 而隐私闸门换掉的是**整个** `window.fetch`，`local-only` 下
+    // 一个字节都不出门，路由处理器一次都不会被调用，症状是"面板空着"，
+    // 长得像产品坏了。首启同意不是本主题的判据（那是 `privacy-consent-zero-egress`）。
+    await openApp(page, '/', 'accepted');
 
     // ── 面板关着：铃铛在 rail 底部，带未读徽标 ────────────────────────────
     const trigger = page.getByTestId('inbox-trigger');
@@ -300,13 +306,15 @@ test.describe('通知中心 + 活动', () => {
 
   test('🔴 空态走共享实现（截图为证：它在面板里长什么样）', async ({ page }) => {
     const problems = captureProblems(page);
-    await installMissingProducerShims(page);
     await page.addInitScript((server: string) => {
       localStorage.setItem(
         'heyta.sync.credentials',
         JSON.stringify({ baseUrl: server, token: 'e2e-token', email: 'me@example.com' }),
       );
     }, SERVER);
+
+    // 🔴 同上：这一条也塞了凭据，启动时必然问一次补签状态。
+    await stubLegalRecheck(page, SERVER);
 
     // 通知与活动都空。
     await page.route(`${SERVER}/api/notifications**`, async (route) => {
@@ -334,8 +342,10 @@ test.describe('通知中心 + 活动', () => {
       // 保持打开即可。
     });
 
-    await page.goto('/');
-    await expect(page.locator('input[placeholder^="添加任务"]')).toBeVisible();
+    // 🔴 `accepted` 是这条判据的**前提**：它要的是"请求真的发出去了、服务端真的
+    // 回了空列表"，不是"请求被隐私闸门拦下、面板于是空着"。两种空在界面上
+    // 长得一样，而后者会让这一条永远通过。
+    await openApp(page, '/', 'accepted');
 
     await page.getByTestId('inbox-trigger').click();
     await expect(page.getByTestId('inbox-empty')).toBeVisible();
@@ -353,10 +363,20 @@ test.describe('通知中心 + 活动', () => {
 
   test('没配同步服务器时，面板说"先配置服务器"而不是"加载失败"', async ({ page }) => {
     const problems = captureProblems(page);
-    await installMissingProducerShims(page);
-    // 刻意**不**塞凭据。
-    await page.goto('/');
-    await expect(page.locator('input[placeholder^="添加任务"]')).toBeVisible();
+    // 刻意**不**塞凭据（`baseUrl` 留在空 = 没配服务器）。
+    //
+    // 🔴 但同意档必须是 `accepted`，共享层的默认档在这里会测到**另一个分支** ——
+    // 2026-10-02 实测：用 `local-only` 时面板渲染的是空态「还没有通知」，
+    // `inbox-unconfigured` 根本不在 DOM 里。机制在 `InboxBell.tsx:313` 的
+    // `pollNotifications()`：`networkAllowed()` 为假时它**提前 return、不改状态**，
+    // 于是界面停在"还没拉过"（那是刻意的 —— 见那里的注释："闸门保证发不出去，
+    // 这一处保证界面不说谎"）。而 `unconfigured` 是**拉了之后**由
+    // `fetchAccountNotifications` 返回的读态（`store.ts:115`：地址为空时它自己就
+    // 归成 `unconfigured`，一个字节都不发）。
+    //
+    // 所以这一条的判据形态要求"允许出门"与"没有地址"**同时成立**：
+    // `local-only` 下两者都成立的是空态，不是这条要钉的那句话。
+    await openApp(page, '/', 'accepted');
 
     await page.getByTestId('inbox-trigger').click();
     await expect(page.getByTestId('inbox-unconfigured')).toBeVisible();

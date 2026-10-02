@@ -38,7 +38,7 @@ test.describe('AI 耗时估计：真浏览器端到端旅程', () => {
     request,
   }) => {
     await resetStub(request);
-    await openApp(page);
+    await openApp(page, '/', 'accepted');
 
     await configureEndpoint(page, {
       capabilities: [CAP_STRUCTURED_OUTPUT],
@@ -91,7 +91,7 @@ test.describe('AI 耗时估计：真浏览器端到端旅程', () => {
 
   test('端点连不上：给出失败原因 + 手动兜底，兜底结果也落库', async ({ page, request }) => {
     await resetStub(request);
-    await openApp(page);
+    await openApp(page, '/', 'accepted');
 
     await configureEndpoint(page, {
       capabilities: [CAP_STRUCTURED_OUTPUT],

@@ -52,7 +52,7 @@ test.describe('AI 优先级建议：真浏览器端到端旅程', () => {
     request,
   }) => {
     await resetStub(request);
-    await openApp(page);
+    await openApp(page, '/', 'accepted');
 
     await configureEndpoint(page, {
       capabilities: [CAP_STRUCTURED_OUTPUT],

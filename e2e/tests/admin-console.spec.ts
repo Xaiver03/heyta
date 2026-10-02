@@ -1,6 +1,5 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
-import { openSettingsView } from './helpers';
-import { installMissingProducerShims } from './shims';
+import { openApp, openSettingsView, stubLegalRecheck } from './helpers';
 
 /**
  * 运营管理后台：真浏览器契约（截图为判据）。
@@ -211,14 +210,17 @@ async function seed({
   overviewStatus?: number;
   fake?: FakeServerState;
 }): Promise<{ adminCalls: string[] }> {
-  await installMissingProducerShims(page);
-
+  // ⚠️ 生产者垫片由 `openApp` 装（同 `inbox.spec.ts`：`page.route` 注册两次会让
+  // 后一份把前一份静默遮掉）。
   await page.addInitScript((server: string) => {
     localStorage.setItem(
       'heyta.sync.credentials',
       JSON.stringify({ baseUrl: server, token: 'e2e-admin-token', email: 'boss@example.test' }),
     );
   }, SERVER);
+
+  // 🔴 补签那道读侧闸：塞了凭据应用一启动就会问一次，与后台这个主题无关。
+  await stubLegalRecheck(page, SERVER);
 
   // 实时同步的 WS 与权益探测：塞了凭据应用就会真发，对端得补上，
   // 否则无关的 404 会淹掉真正的失败（同 `inbox.spec.ts` 的理由）。
@@ -476,8 +478,10 @@ async function seed({
     await route.fulfill({ status: 404, contentType: 'application/json', body: '{}' });
   });
 
-  await page.goto('/');
-  await expect(page.locator('input[placeholder^="添加任务"]')).toBeVisible();
+  // 🔴 `accepted` 是这套判据的前提：后台的每一格都是**从 `/api/admin/*` 读回来**的，
+  // 而隐私闸门换掉的是整个 `window.fetch`。`local-only` 下那些 route 一次都不会
+  // 被调用 —— 面板空着，症状长得像"后台坏了"。
+  await openApp(page, '/', 'accepted');
   await openSettingsView(page);
 
   return { adminCalls };
@@ -769,9 +773,12 @@ test.describe('运营管理后台（真浏览器）', () => {
     });
 
     // 刻意**不**塞凭据：`baseUrl` 为空时客户端一个请求都不发（AGENTS §3.5 那道闸）。
-    await installMissingProducerShims(page);
-    await page.goto('/');
-    await expect(page.locator('input[placeholder^="添加任务"]')).toBeVisible();
+    //
+    // 🔴 这一条**必须**答 `accepted`，否则它是个永远通过的判据：隐私闸门在
+    // `local-only` 下同样让 `adminCalls` 为空，于是"没登录不发请求"这件事
+    // 到底是谁拦住的看不出来 —— 而它判的是**那道闸**，不是隐私同意。
+    // 把闸门打开，唯一还能拦住请求的就只剩"没有配置"。
+    await openApp(page, '/', 'accepted');
     await openSettingsView(page);
     await page.waitForTimeout(500); // 给"该发而没发"的请求一点时间冒出来
 

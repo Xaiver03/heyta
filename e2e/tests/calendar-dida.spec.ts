@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { openApp } from './helpers';
 
 /**
  * 日历的**滴答式形态**（goal-layout-audit.md 页 5）
@@ -13,7 +14,7 @@ import { expect, test } from '@playwright/test';
  */
 
 test('日历：周次列 + 今天跳回 + 今天列头高亮', async ({ page }) => {
-  await page.goto('/');
+  await openApp(page);
   await page.getByRole('tab', { name: '日历' }).click();
 
   // ① 「今天」跳回按钮在头部（⚠️ 页脚本来就有一个回今天 —— 用 -header 这个 ID）

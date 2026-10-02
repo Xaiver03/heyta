@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { openApp } from './helpers';
 
 /**
  * AI 工具行的**排版几何**（goal-layout-audit.md 页 2）
@@ -53,7 +54,7 @@ async function assertLayout(page: import('@playwright/test').Page, label: string
 
 test('常规宽度：AI 工具行单行、不与采集条重叠', async ({ page }) => {
   await page.setViewportSize(WIDE);
-  await page.goto('/');
+  await openApp(page);
   await expect(page.getByTestId('ai-tool-run')).toBeVisible();
   await assertLayout(page, '常规宽');
   await page.screenshot({ path: 'test-results/ai-row-wide.png', fullPage: false });
@@ -61,7 +62,7 @@ test('常规宽度：AI 工具行单行、不与采集条重叠', async ({ page 
 
 test('窄窗：按钮换行而不是折断，仍不重叠', async ({ page }) => {
   await page.setViewportSize(NARROW);
-  await page.goto('/');
+  await openApp(page);
   await expect(page.getByTestId('ai-tool-run')).toBeVisible();
   await assertLayout(page, '窄窗');
   await page.screenshot({ path: 'test-results/ai-row-narrow.png', fullPage: false });

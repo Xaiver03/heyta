@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { openApp } from './helpers';
 
 /**
  * 任务页的**日期分组头 + 顺延**（goal-layout-audit.md 页 7）
@@ -18,7 +19,7 @@ import { expect, test } from '@playwright/test';
 
 test('任务页：日期分组头 + 逾期组「顺延」', async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 800 });
-  await page.goto('/');
+  await openApp(page);
 
   // 种三条：昨天（逾期）、今天、无日期 —— 走真捕获条（解析器认「昨天/今天」）。
   const composer = page.locator('input[placeholder^="添加任务"]');

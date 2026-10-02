@@ -12,6 +12,7 @@
  */
 
 import { expect, type Page } from '@playwright/test';
+import { openApp as openSharedApp } from '../tests/helpers';
 
 export const SERVER = process.env['HEYTA_SYNC_SERVER'] ?? '';
 export const TOKEN = process.env['HEYTA_SYNC_TOKEN'] ?? '';
@@ -35,10 +36,21 @@ export function requireCredentials(): void {
   }
 }
 
-/** 打开真应用，等输入框真的可见（白屏不算通过）。 */
+/**
+ * 打开真应用，等输入框真的可见（白屏不算通过）。
+ *
+ * 🔴 转接 `e2e/tests/helpers` 那一份共享入口，为的是两件**探针**的事：
+ *   · **钉中文**：这一套的定位符（`添加任务` 的 placeholder、`同步设置`、
+ *     `服务端地址`）全是中文，而 Playwright 的 Chromium 报 `en-US` ⇒ 界面变英文，
+ *     红的是"找不到元素"，长得像产品坏了；
+ *   · **做完首启隐私同意**：`consent-gate.ts` 换掉的是整个 `window.fetch`，
+ *     `local-only` 之下连自建服务器的请求都发不出去 —— 而这套件判的就是
+ *     "真的同步上去了"。所以这里**必须**答 `accepted`：那条旅程测的是
+ *     同意联网之后的行为，不是"不同意时一个字节都不出进程"（那由
+ *     `privacy-consent-zero-egress.spec.ts` 专门判）。
+ */
 export async function openApp(page: Page): Promise<void> {
-  await page.goto('/');
-  await expect(page.locator('input[placeholder^="添加任务"]')).toBeVisible();
+  await openSharedApp(page, '/', 'accepted');
 }
 
 /**

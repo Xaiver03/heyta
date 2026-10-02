@@ -26,7 +26,7 @@
 import { expect, test as base, chromium, type Browser, type CDPSession, type Page } from '@playwright/test';
 
 import { addVirtualAuthenticator, type VirtualAuthenticator } from '../auth-journey/helpers';
-import { enableAllModules } from '../tests/helpers';
+import { decidePrivacyConsent, enableAllModules, pinChineseUi } from '../tests/helpers';
 import { installMissingProducerShims } from '../tests/shims';
 
 /** 壳里真应用的 origin（`SetVirtualHostNameToFolderMapping` 的虚拟主机名）。 */
@@ -88,12 +88,26 @@ function resVersionUnreachable(res: Response | null): boolean {
   return res === null || !res.ok;
 }
 
-/** 打开壳里的真应用（模块开关 + 生产模块垫片 + 显式入口 + 非空白判据）。 */
+/**
+ * 打开壳里的真应用（模块开关 + 生产模块垫片 + 显式入口 + 非空白判据）。
+ *
+ * 🔴 语言与首启隐私同意都得在这里做完，两条都是**实测**：
+ *   · 中文偏好以前**没有**钉，那条 `添加任务` 锚点之所以能命中，是因为这台打包机
+ *     恰好是中文 Windows —— 探针跟着宿主系统语言漂（§7 元规则 1）。换一台英文宿主
+ *     它会在第一行就红，而红的是探针不是产品。现在显式写 `heyta.locale`；
+ *   · 隐私同意面板（2026-10-01 落地）是一张 `position: fixed; inset: 0` 的整屏遮罩，
+ *     rail 也在它底下。W1–W6 每一条都要点界面，不做完这一步就全部卡在
+ *     "`<div role=\"presentation\">` … intercepts pointer events" 直到超时。
+ *     这里必须答 `accepted`：这套件判的是**真注册、真令牌、真 op 上传**，
+ *     而闸门在 `local-only` 下连自建服务器的请求都不放行。
+ */
 export async function openShellApp(page: Page): Promise<void> {
   await enableAllModules(page);
+  await pinChineseUi(page);
   await installMissingProducerShims(page);
   await page.goto(SHELL_URL);
   await expect(page.locator('input[placeholder^="添加任务"]')).toBeVisible();
+  await decidePrivacyConsent(page, 'accepted');
 }
 
 /**
@@ -115,6 +129,11 @@ export async function resetDevice(page: Page, cdp: CDPSession): Promise<void> {
   });
   await page.reload({ waitUntil: 'domcontentloaded' });
   await expect(page.locator('input[placeholder^="添加任务"]')).toBeVisible({ timeout: 90_000 });
+  // 🔴 `clearDataForOrigin` 抹的是**全部**存储，里面包括刚才那次隐私同意 ——
+  // 所以重置之后面板必然回来。不收掉它，下一条用例的第一次 `click()` 就卡在遮罩上，
+  // 而症状写的是"新设备登录不上"。语言偏好同理（`pinChineseUi` 是 init script，
+  // 每次导航都会重放，因此它不需要在这里再写一次）。
+  await decidePrivacyConsent(page, 'accepted');
 
   const after = await page.evaluate(() => ({
     credentials: window.localStorage.getItem('heyta.sync.credentials'),
