@@ -33,7 +33,10 @@
  *      而且地址被判"没填"时那一栏**必须自己出现** ——
  *      否则红字指向一个界面上不存在的东西，那是比常驻更坏的状态。
  *
- * 🔴 每条都做过变异（记录在 `docs/plans/ui-review-fill-zh-timeline.md` 的 G-28 行）。
+ * 🔴 每条都做过变异（记录在 `docs/plans/ui-review-fill-zh-timeline.md` 的 **R8** 行。
+ * ⚠️ 本刀起初写作 G-28，与 `docs/plans/legal-compliance-before-filing.md` 里
+ * 那条已存在的 **G-28（同意留痕缺来源端）**撞号 —— 那两笔提交的信息里还留着旧号，
+ * 不回改（改已提交的说明等于制造第二个事实源），以这行为准。）
  *
  * ⚠️ **本文件读的是 `@heyta/ui` 的 `dist/`**（package exports）。改完
  * `packages/ui/src` 不重新 build 的话，这里看到的仍是**上一次构建**的组件 ——
