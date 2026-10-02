@@ -39,7 +39,16 @@ import { clearStoredCredentials, loadCredentials, saveCredentials } from './cred
 // 🔴 同意闸门（G-12）。这个文件**只**用它做两件事：给客户端注入带闸的 `fetch`，
 // 以及在闸门关闭时不建实时通道。判定逻辑全在 `@heyta/app-host`。
 import { consentFetch, privacyConsent, subscribePrivacyConsent } from '../privacy/consent-gate.js';
+import {
+  bindLegalRecheckCredentials,
+  clearLegalRecheckCredentials,
+  legalRecheck,
+  syncLegalRecheckCredentials,
+} from '../legal-recheck/gate.js';
+import { requireLegalReconfirm } from '../legal-recheck/store.js';
 import { requireNetworkConsent } from '../privacy/store.js';
+// 🔴 G-27 的第二道闸：装配在 `legal-recheck/gate.ts`，界面状态在同目录的 `store.ts`，
+// 判定本身在 `@heyta/app-host`。这里只用它们，不再长出一份。
 
 interface SyncStoreState {
   status: SyncStatus;
@@ -243,6 +252,12 @@ function restartRealtime(get: () => SyncStoreState): void {
    */
   if (!privacyConsent.networkAllowed()) return;
 
+  // 🔴 G-27：账号还没补签 ⇒ 实时通道也不连。WS 本身只传"有新 op 了"的信号，
+  // 但那个信号会触发 `syncNow()`，而它会被 `reconfirmGate()` 拦下 ——
+  // 与其留一条"连着但每次都不干活"的通道，不如当场不建。
+  // 补签完成后 `legalRecheck.subscribe()` 那个订阅者会按新状态重建。
+  if (!legalRecheck.dataEgressAllowed()) return;
+
   const { baseUrl, token } = get();
   // 未配置/未登录就**不连**。登录之后再调一次本函数即可 ——
   // 这正是 `configure` / `applyAuthToken` 里两处调用的意义。
@@ -315,12 +330,39 @@ subscribePrivacyConsent(() => {
 });
 
 /**
+ * 🔴 补签闸门（G-27）的**另一半**，与上面那条同形：答案回来时要当场重建。
+ *
+ * 少了它会出两种坏，方向相反：
+ *   · 登录后那次询问还在路上 ⇒ `restartRealtime()` 停在 `checking` 直接 return，
+ *     答案回来后**没人再叫它** ⇒ 这个账号直到刷新前都没有实时同步；
+ *   · 用户在面板上点「我已读完并确认」⇒ 闸门放开，同样没人重连。
+ *
+ * ⚠️ 通知在 `checking` 这一次也会到达，于是**在途询问会先把连接断掉**。
+ * 这不是浪费，是那条闸的语义：一次"结果还不知道"的重新裁决期间留一条活连接，
+ * 等于留着它去触发一个必然被 `reconfirmGate()` 拦下的 `syncNow()` ——
+ * 那正是上面注释里"连着但每次都不干活"的状态。询问一般在几百毫秒内落定，
+ * 而触发的四个时机（冷启动、换地址、换令牌、点确认）本来就该重建连接。
+ */
+legalRecheck.subscribe(() => {
+  restartRealtime(() => useSyncStore.getState());
+});
+
+/**
  * 🔴 W4：冷启动时把**已保存的凭据**读回来。
  *
  * 没有这一步，用户每次刷新都要重新登录一次 —— 而那让"完整旅程"不成立。
  * ⚠️ 只读 `baseUrl` 与 `token`；口令**永远**是 `undefined`（见 credential-storage.ts）。
  */
 const persisted = loadCredentials();
+
+// 🔴 G-27：冷启动就把落盘回来的凭据交给第二道闸（**只交值、不问**）。
+// 问的时机在启动序列的 `arm()` —— 那之前设备级闸门多半还是关的，问了也是白问
+// （而且那一问本身就是一个出站请求，正被 G-12 拦着）。
+// 不交值则是另一种坏：`arm()` 来问的时候闸门手里没有令牌，直接判成 `anonymous`。
+bindLegalRecheckCredentials({
+  token: persisted?.token,
+  baseUrl: persisted?.baseUrl ?? '',
+});
 
 /**
  * 用户**主动**发起一次出站动作时的那道闸（G-12）。
@@ -341,6 +383,21 @@ const persisted = loadCredentials();
 function consentGate(): SyncStatus | null {
   if (requireNetworkConsent()) return null;
   return { kind: 'error', reason: 'consent-required', retryable: false };
+}
+
+/**
+ * 🔴 **第二道闸：账号级补签（G-27）**。与上面那道**串联**，不是它的替身。
+ *
+ * 排在 `consentGate()` **之后**：设备级同意是更前置的事实（没同意时连这个请求
+ * 都不该发出去，也就无从知道要不要补签），而且它的句子是"去作出隐私选择" ——
+ * 让一个从没被问过的人先去处理账号条款，是在让他做一件此刻不必要的事。
+ *
+ * 判据用 `dataEgressAllowed()`，**不在这里重判 `phase`**：漏掉 `checking` 就是
+ * "冷启动先把数据推出去、再收到要补签"，那道闸只剩弹个窗。
+ */
+function reconfirmGate(): SyncStatus | null {
+  if (requireLegalReconfirm()) return null;
+  return { kind: 'error', reason: 'legal-reconfirm-required', retryable: false };
 }
 
 export const useSyncStore = create<SyncStoreState>((set, get) => ({
@@ -385,6 +442,8 @@ export const useSyncStore = create<SyncStoreState>((set, get) => ({
     if (baseUrl !== '' && token !== '') {
       saveCredentials({ baseUrl, token, email: get().email });
     }
+    // 🔴 凭据变了 ⇒ 补签状态必须**重问**（上一个账号的答案不属于这个账号）。
+    syncLegalRecheckCredentials({ token, baseUrl });
     // 地址/令牌变了 ⇒ 实时连接必须跟着重建（见 restartRealtime 的说明）。
     restartRealtime(get);
   },
@@ -397,6 +456,10 @@ export const useSyncStore = create<SyncStoreState>((set, get) => ({
     set({ baseUrl, token, email: email ?? get().email, status: { kind: 'idle' } });
     // 🔴 W4：登录成功即落盘 ⇒ "登录后重开还在"。
     saveCredentials({ baseUrl, token, email: email ?? get().email });
+    // 🔴 登录后**先问补签状态，再**建实时连接（顺序有意义：`refresh()` 同步把闸门
+    // 置成 `checking`，于是新连接不会在"还没问到答案"的窗口里建立起来）。
+    // 答案回来后由 `legalRecheck.subscribe()` 重建，不需要这里等它。
+    syncLegalRecheckCredentials({ token, baseUrl });
     // 🔴 登录之后才**开始**实时连接 —— 这是"实时同步"对用户真正生效的那一刻。
     restartRealtime(get);
   },
@@ -412,6 +475,9 @@ export const useSyncStore = create<SyncStoreState>((set, get) => ({
     // 而 realtime.ts 的退避会让它在后台一直撞（服务端的重连冷却正是为这种客户端准备的）。
     realtime?.dispose();
     realtime = undefined;
+    // 🔴 G-27：登出要把补签状态一起清掉 —— 不许留着**上一个人**的版本与答案，
+    // 否则下一个人（可能是另一次登录的另一个账号）会看到不相干的面板。
+    clearLegalRecheckCredentials();
     set({ token: undefined, email: undefined, password: undefined, status: { kind: 'idle' } });
     // 🔴 W4：登出必须把**落盘的那份**也清掉。
     // 只清内存的话，刷新一次令牌就"活"回来了 —— 用户以为登出了，其实没有。
@@ -453,6 +519,13 @@ export const useSyncStore = create<SyncStoreState>((set, get) => ({
       return blocked;
     }
 
+    // 🔴 第二道闸（G-27）。两处出站动作都要过，一处理由见 `reconfirmGate()`。
+    const reconfirm = reconfirmGate();
+    if (reconfirm !== null) {
+      set({ status: reconfirm });
+      return reconfirm;
+    }
+
     const status = await c.sync((s) => {
       set({ status: s });
     });
@@ -480,6 +553,13 @@ export const useSyncStore = create<SyncStoreState>((set, get) => ({
     if (blocked !== null) {
       set({ status: blocked });
       return blocked;
+    }
+
+    // 🔴 第二道闸（G-27）。两处出站动作都要过，一处理由见 `reconfirmGate()`。
+    const reconfirm = reconfirmGate();
+    if (reconfirm !== null) {
+      set({ status: reconfirm });
+      return reconfirm;
     }
 
     set({ status: { kind: 'syncing', phase: 'upload' } });

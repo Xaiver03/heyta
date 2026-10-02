@@ -1,5 +1,5 @@
 /**
- * 启动序列里那三步「同意之后才准做的事」（G-12）
+ * 启动序列里那几步「同意之后才准做的事」（G-12 / G-27）
  * ==============================================
  *
  * ## 为什么这个文件存在
@@ -28,6 +28,8 @@
  *   · **采用待消费的登录**会立刻触发同步，op-log 没就绪时落盘不安全
  *     （`main.tsx` 里 `startWidgetLifecycle` 同一个理由）；
  *   · **建实时连接**要拿 `engine.clientId`（LWW 的决胜依据，协议要求每条消息带上）。
+ * 第四步（`askLegalRecheck`）排在建连之前，理由见那个端口上的注释 —— 它不是第五道闸，
+ * 而是**让第二道闸在冷启动真的拦得住**的那一次询问。
  * ⚠️ `main.tsx` 里那一步原本的注释写着"放在 `initOpLog()` 之前、而且不等它"，
  * 那个顺序在三步被并成一束之后**已经不成立**，也不该恢复：
  * 小组件是增强，晚几百毫秒注册不改变任何用户可见行为，
@@ -47,6 +49,15 @@ export interface StartupNetworkPorts {
   networkAllowed(): boolean;
   /** 注册小组件的 service worker（这一步自己会发一次 `scope` 下的请求）。 */
   registerServiceWorker(): void;
+  /**
+   * 问一次"这个账号要不要重新确认条款"（G-27）。
+   *
+   * 🔴 必须排在 `startRealtime` **之前**：闸门在拿到答案前是 `checking`，而 `checking`
+   * 是拦的。反过来写就成了"每次冷启动先把数据推出去、再收到要补签"，
+   * 那道闸只剩事后弹个窗 —— 顺序本身就是判据（见 `tests/startup-network.spec.ts`）。
+   * 它自己**不发数据**，只发一条"这个账号要不要补签"的询问。
+   */
+  askLegalRecheck(): void;
   /** 建立/重建实时通道。未配置或未登录时它自己就是空操作。 */
   startRealtime(): void;
   /** 采用一枚已经收下的登录（**会发请求**，所以必须在同意之后）。 */
@@ -93,6 +104,7 @@ export function createStartupNetwork(ports: StartupNetworkPorts): StartupNetwork
         ports.adoptPendingLogin(held);
       }
 
+      ports.askLegalRecheck();
       ports.startRealtime();
     },
   };
