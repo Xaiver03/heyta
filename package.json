@@ -37,6 +37,7 @@
     "check:adaptive-cards": "pnpm --filter @heyta/widget-core check:adaptive-cards",
     "check:pwa": "pnpm --filter @heyta/web check:pwa",
     "check:ui-language": "node scripts/check-ui-language.mjs",
+    "check:script-snapshot": "node scripts/check-script-snapshot.mjs",
     "check:docs-voice": "node scripts/check-docs-voice.mjs",
     "check:legal-copy": "node packages/legal/scripts/gen-site-copy.mjs --check",
     "check:legal-host": "node scripts/check-legal-host.mjs",
@@ -47,7 +48,7 @@
     "check:ai-tools": "node scripts/check-ai-tools.mjs",
     "check:payment-entry": "node scripts/check-payment-entry.mjs",
     "check:reachability": "node scripts/check-reachability.mjs",
-    "check": "pnpm --filter @heyta/landing check:entries && pnpm build && pnpm typecheck && pnpm check:claims && pnpm check:reachability && pnpm check:migrations && pnpm check:token-hashing && pnpm check:layering && pnpm check:ui-provider && pnpm check:theme && pnpm check:row-single-source && pnpm check:l4 && pnpm check:empty-state && pnpm check:widgets && pnpm check:arkts-widgets && pnpm check:adaptive-cards && pnpm check:pwa && pnpm check:ui-language && pnpm check:docs-voice && pnpm check:legal-copy && pnpm check:legal-host && pnpm check:licenses && pnpm check:licenses:nuget && pnpm check:crosslang-contract && pnpm check:macos-shell && pnpm check:macos-window && pnpm check:journey-coverage && pnpm check:mobile-settings && pnpm check:windows-shell && pnpm check:linux-shell && pnpm check:native-bare && pnpm check:docs && pnpm check:pricing && pnpm check:ai-quota && pnpm check:ai-tools && pnpm check:payment-entry && pnpm check:design && pnpm check:text-color && pnpm check:server-design && pnpm check:server-copy && pnpm check:server-legal && pnpm check:tokens && pnpm check:arkts && pnpm check:native-deps && pnpm check:mobile-bundle && pnpm check:rn-aria && pnpm check:materialized-reads && pnpm check:ai-coverage && pnpm check:ai-e2e && pnpm check:privacy-consent-e2e && pnpm check:landing-e2e && pnpm check:shell-unicode && pnpm check:web-storage && pnpm check:web-migration && pnpm screenshot:verify && pnpm -r test",
+    "check": "pnpm --filter @heyta/landing check:entries && pnpm build && pnpm typecheck && pnpm check:claims && pnpm check:reachability && pnpm check:migrations && pnpm check:token-hashing && pnpm check:layering && pnpm check:ui-provider && pnpm check:theme && pnpm check:row-single-source && pnpm check:l4 && pnpm check:empty-state && pnpm check:widgets && pnpm check:arkts-widgets && pnpm check:adaptive-cards && pnpm check:pwa && pnpm check:ui-language && pnpm check:docs-voice && pnpm check:legal-copy && pnpm check:legal-host && pnpm check:licenses && pnpm check:licenses:nuget && pnpm check:crosslang-contract && pnpm check:macos-shell && pnpm check:macos-window && pnpm check:journey-coverage && pnpm check:mobile-settings && pnpm check:windows-shell && pnpm check:linux-shell && pnpm check:native-bare && pnpm check:docs && pnpm check:pricing && pnpm check:ai-quota && pnpm check:ai-tools && pnpm check:payment-entry && pnpm check:design && pnpm check:text-color && pnpm check:server-design && pnpm check:server-copy && pnpm check:server-legal && pnpm check:tokens && pnpm check:arkts && pnpm check:native-deps && pnpm check:mobile-bundle && pnpm check:rn-aria && pnpm check:materialized-reads && pnpm check:ai-coverage && pnpm check:ai-e2e && pnpm check:privacy-consent-e2e && pnpm check:landing-e2e && pnpm check:shell-unicode && pnpm check:web-storage && pnpm check:web-migration && pnpm check:script-snapshot && pnpm screenshot:verify && pnpm -r test",
     "check:materialized-reads": "node scripts/check-materialized-reads.mjs",
     "check:design": "node design-system/heyta/check-hardcoded.mjs",
     "check:text-color": "node scripts/check-text-color.mjs",
@@ -115,7 +116,9 @@
     "check:server-copy": "cd server && ./node_modules/.bin/ts-node --transpile-only scripts/gen-server-copy.ts --check",
     "check:server-legal": "node server/scripts/gen-server-legal.mjs --check",
     "verify:email-auth": "node scripts/verify-email-auth-chain.mjs",
+    "verify:email-web": "node scripts/verify-email-web-chain.mjs",
     "verify:password-chain": "node scripts/verify-email-password-chain.mjs",
+    "verify:password-web": "node scripts/verify-password-web-journey.mjs",
     "verify:legal-links": "pnpm --dir e2e run test:legal-links"
   },
   "devDependencies": {

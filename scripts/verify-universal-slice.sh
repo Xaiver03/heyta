@@ -1,4 +1,22 @@
 #!/usr/bin/env bash
+
+# 🔴 HEYTA-SNAPSHOT-BOOTSTRAP v1（traps #110/#113）—— bash 对脚本是按字节偏移
+#    增量读取的：运行中被编辑，后半段就从错位字节开始解析，炸出假语法错误。
+#    入口先把整份脚本拷成同目录隐藏快照再 exec 副本 —— 之后对源文件的任何
+#    编辑都影响不到本次运行；$0 的 dirname 不变，lib/tools 定位照旧。
+#    快照名 .原名.snap.PID（进 .gitignore）；trap 尽力清理，被 kill -9 留下的
+#    由下一次运行按 mmin +240 顺带扫掉。
+case "$(basename "$0")" in
+  .*.snap.*) ;; # 已是快照：正常往下跑
+  *)
+    _snap_dir="$(cd "$(dirname "$0")" && pwd)" || exit 1
+    find "$_snap_dir" -maxdepth 1 -name ".$(basename "$0").snap.*" -mmin +240 -delete 2>/dev/null || true
+    _snap="${_snap_dir}/.$(basename "$0").snap.$$"
+    cat "$_snap_dir/$(basename "$0")" > "$_snap" || exit 1
+    exec bash "$_snap" "$@"
+    ;;
+esac
+trap 'rm -f -- "$0"' EXIT
 # M1 垂直切片验证 —— 一条命令跑完，并**如实报告哪些没验**
 # ========================================================
 #

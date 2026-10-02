@@ -179,3 +179,6 @@ packages/i18n/src/locales/*.js
 # 这批文件曾以跟踪态提交并推送过（2026-09-28），已用 `git rm -r --cached` 取消跟踪，
 # **文件仍留在本地磁盘上**；git 历史里那几份要处理得靠历史重写，是独立决定。
 docs/operations/cac-algorithm-filing/
+
+# 运行中验收脚本的自快照（traps #110/#113）：bootstrap 拷贝 + exec 的隐藏副本
+scripts/.*.snap.*
