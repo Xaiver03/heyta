@@ -304,11 +304,51 @@ if printf '%s' "$WANT" | grep -q "ios"; then
     echo "  🔴 没有已启动的模拟器 —— 先 xcrun simctl boot \"$DEVICE_NAME\""
   else
     echo "  模拟器：$UDID"
+    # 🔴 Pods 沙盒必须先与**提交态的 Podfile.lock** 同步，否则 xcodebuild 第一步就死在
+    #    "[CP] Check Pods Manifest.lock"：`error: The sandbox is not in sync with the Podfile.lock.`
+    #    这一步以前**不在流程里** —— `ios/Pods/` 是 gitignored 的，隔离检出里换一次 HEAD
+    #    沙盒就对不上了，而脚本原来只会打印"xcodebuild 失败 + 日志末尾"，
+    #    读起来像产品坏了（实际缺的是构建输入）。
+    #    env 那一串与 `scripts/check-native-deps.mjs` 打印的修法同源，**改一处要改两处**。
+    IOS_IOS_DIR="$ROOT/apps/mobile/ios"
+    PODS_SYNC=OK
+    LOCK_SHA="$(shasum -a 256 "$IOS_IOS_DIR/Podfile.lock" 2>/dev/null | cut -d' ' -f1)"
+    MANI_SHA="$(shasum -a 256 "$IOS_IOS_DIR/Pods/Manifest.lock" 2>/dev/null | cut -d' ' -f1)"
+    if [ -z "$LOCK_SHA" ]; then
+      echo "  🔴 读不到 apps/mobile/ios/Podfile.lock —— 无法判断沙盒该不该装"
+      PODS_SYNC=FAIL
+    elif [ "$LOCK_SHA" != "$MANI_SHA" ]; then
+      echo "  Pods 沙盒与 Podfile.lock 不一致（或缺 Manifest.lock）→ 跑 pod install…"
+      if (cd "$IOS_IOS_DIR" && env -u NODE_USE_ENV_PROXY LANG=en_US.UTF-8 \
+          RCT_USE_PREBUILT_RNCORE=0 RCT_USE_RN_DEP=0 pod install) \
+          >/tmp/heyta-reinstall-pod.log 2>&1; then
+        MANI_SHA="$(shasum -a 256 "$IOS_IOS_DIR/Pods/Manifest.lock" 2>/dev/null | cut -d' ' -f1)"
+        NEW_LOCK_SHA="$(shasum -a 256 "$IOS_IOS_DIR/Podfile.lock" 2>/dev/null | cut -d' ' -f1)"
+        if [ "$NEW_LOCK_SHA" != "$LOCK_SHA" ]; then
+          # 不判红：提交态的 lock 能不能复现由 `check:native-deps` 管（traps #150 已实测
+          # 提交态**是**可复现的）。这里只把差异如实打出来，不静默。
+          DIFFN=$(diff <(git -C "$ROOT" show HEAD:apps/mobile/ios/Podfile.lock 2>/dev/null) \
+                      "$IOS_IOS_DIR/Podfile.lock" 2>/dev/null | grep -c '^[<>]')
+          echo "  ⚠️ pod install 改动了 Podfile.lock（与 HEAD 差 ${DIFFN} 行）—— 见 /tmp/heyta-reinstall-pod.log"
+        fi
+        if [ -n "$MANI_SHA" ] && [ "$MANI_SHA" = "$NEW_LOCK_SHA" ]; then
+          echo "  ✅ 沙盒已同步（Manifest.lock == Podfile.lock）"
+        else
+          echo "  🔴 pod install 之后 Manifest.lock 仍与 Podfile.lock 不一致"
+          tail -10 /tmp/heyta-reinstall-pod.log | sed 's/^/     /'
+          PODS_SYNC=FAIL
+        fi
+      else
+        echo "  🔴 pod install 失败（日志末尾：）"
+        tail -10 /tmp/heyta-reinstall-pod.log | sed 's/^/     /'
+        PODS_SYNC=FAIL
+      fi
+    fi
     # 清两样：模拟器里的旧 app + 旧构建产物
     xcrun simctl uninstall "$UDID" "$BID" >/dev/null 2>&1 || true
     rm -rf /tmp/heyta-ios-release
     echo "  正在 xcodebuild Release（重打 JS bundle，数分钟）…"
-    if xcodebuild -workspace "$ROOT/apps/mobile/ios/Heyta.xcworkspace" \
+    if [ "$PODS_SYNC" = OK ] && xcodebuild -workspace "$ROOT/apps/mobile/ios/Heyta.xcworkspace" \
         -scheme Heyta -configuration Release -sdk iphonesimulator \
         -destination "id=$UDID" -derivedDataPath /tmp/heyta-ios-release build \
         >/tmp/heyta-reinstall-ios-build.log 2>&1; then
@@ -349,7 +389,13 @@ if printf '%s' "$WANT" | grep -q "ios"; then
         echo "  🔴 simctl install 失败：$IOS_APP_DIR"
       fi
     else
-      echo "  🔴 xcodebuild 失败（日志末尾：）"; tail -10 /tmp/heyta-reinstall-ios-build.log | sed 's/^/     /'
+      if [ "$PODS_SYNC" != OK ]; then
+        # 🔴 不许 tail 那份**上一轮**的构建日志 —— 沙盒没同步时 xcodebuild 根本没跑，
+        #    打出旧日志的尾巴会把人引向一个不存在的产品故障。
+        echo "  🔴 沙盒未同步 ⇒ 这一轮**没有跑** xcodebuild（原因见上面的 pod 段）"
+      else
+        echo "  🔴 xcodebuild 失败（日志末尾：）"; tail -10 /tmp/heyta-reinstall-ios-build.log | sed 's/^/     /'
+      fi
     fi
   fi
 fi
