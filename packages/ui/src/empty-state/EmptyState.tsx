@@ -88,18 +88,18 @@ export interface EmptyStateProps extends EmptyStateSlots {
   readonly testID?: string | undefined;
 }
 
-export function EmptyState({
-  icon,
-  title,
-  hint,
-  detail,
-  detailTone,
-  testID,
-}: EmptyStateProps): React.JSX.Element {
+export function EmptyState(props: EmptyStateProps): React.JSX.Element {
+  const { testID } = props;
   const tokens = useHeytaTokens();
   const text = useHeytaText();
 
-  const view = toEmptyStateViewModel({ icon, title, hint, detail, detailTone });
+  // 🔴 **整个 props 对象交给模型**，不是逐个挑字段。
+  //    原来这里写的是 `toEmptyStateViewModel({ icon, title, hint, detail, detailTone })`
+  //    —— 新加 `size` 档时忘了往里加一个，于是**模型完全正确、组件永远画页面档**：
+  //    442 条用例全绿（它们测的是模型），而真机截图上那行"还没有通行密钥"被撑成
+  //    居中的一大块。"props → 模型"这条缝只有实际渲染能判，所以这里从设计上
+  //    把它消掉：加新槽位时不可能再漏传。
+  const view = toEmptyStateViewModel(props);
 
   const styles = useMemo(
     () =>
