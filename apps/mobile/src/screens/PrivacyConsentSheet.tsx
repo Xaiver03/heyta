@@ -50,11 +50,12 @@
  *   打开失败再如实说出来。
  */
 
-import React from 'react';
-import { Linking, Modal, Pressable, ScrollView, View } from 'react-native';
+import React, { useMemo } from 'react';
+import { Linking, Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 
 import { useI18n } from '@heyta/i18n';
 import { resolveLegalLinks } from '@heyta/app-host';
+import type { HeytaNativeTokens } from '@heyta/design-system';
 
 import { useTheme, useTokens } from '../theme';
 import { Button, IconButton, Text } from '../ui/kit';
@@ -66,6 +67,78 @@ import {
   closePrivacySheet,
   usePrivacySheet,
 } from '../privacy/consent-ui';
+
+/**
+ * 面板样式：模块级工厂 + `useMemo`（与 `packages/ui/src/settings/Settings.tsx`
+ * 同一惯用法）。🔴 静态样式不写 `style={{…}}` 内联 —— 内联对象每次渲染
+ * 都是新建的（RN 官方样式指南与社区共识：`StyleSheet.create` 让样式以
+ * ID 引用并进原生优化路径，内联只留给真动态值）；而取值经 tokens 表，
+ * 不写裸数字（`check:design` 与 `check:l4` 双门禁盯）。
+ */
+function makeStyles(tokens: HeytaNativeTokens) {
+  return StyleSheet.create({
+    scrim: {
+      flex: 1,
+      justifyContent: 'center',
+      padding: tokens['screen.gutter'],
+      backgroundColor: tokens['color.overlay'],
+    },
+    card: {
+      maxHeight: '90%',
+      gap: tokens['space.4'],
+      padding: tokens['space.5'],
+      borderRadius: tokens['radius.lg'],
+      backgroundColor: tokens['color.surface-raised'],
+    },
+    headRow: {
+      flexDirection: 'row',
+      alignItems: 'flex-start',
+      gap: tokens['space.2'],
+    },
+    headText: {
+      flex: 1,
+      minWidth: 0,
+      gap: tokens['space.1'],
+    },
+    scrollContent: {
+      gap: tokens['space.4'],
+    },
+    bulletList: {
+      gap: tokens['space.2'],
+    },
+    bulletRow: {
+      flexDirection: 'row',
+      gap: tokens['space.2'],
+    },
+    bulletDot: {
+      width: tokens['size.badge-dot'],
+      height: tokens['size.badge-dot'],
+      borderRadius: tokens['radius.full'],
+      backgroundColor: tokens['color.foreground-muted'],
+      marginTop: tokens['space.2'],
+    },
+    bulletText: {
+      flex: 1,
+    },
+    linksBlock: {
+      gap: tokens['space.2'],
+    },
+    linksRow: {
+      flexDirection: 'row',
+      gap: tokens['space.4'],
+    },
+    linkText: {
+      textDecorationLine: 'underline',
+    },
+    actionsRow: {
+      flexDirection: 'row',
+      gap: tokens['space.2'],
+    },
+    action: {
+      flex: 1,
+    },
+  });
+}
 
 export interface PrivacyConsentSheetProps {
   /**
@@ -86,6 +159,7 @@ export function PrivacyConsentSheet({
   const tokens = useTokens();
   const { native } = useTheme();
   const shadow = native.shadow('shadow.lg');
+  const styles = useMemo(() => makeStyles(tokens), [tokens]);
   const { open, reason, notPersisted } = usePrivacySheet();
 
   const links = resolveLegalLinks(serverUrl, locale);
@@ -120,29 +194,11 @@ export function PrivacyConsentSheet({
       onRequestClose={closePrivacySheet}
       accessibilityViewIsModal
     >
-      <View
-        style={{
-          flex: 1,
-          justifyContent: 'center',
-          padding: tokens['screen.gutter'],
-          backgroundColor: tokens['color.overlay'],
-        }}
-      >
-        <View
-          style={[
-            {
-              maxHeight: '90%',
-              gap: tokens['space.4'],
-              padding: tokens['space.5'],
-              borderRadius: tokens['radius.lg'],
-              backgroundColor: tokens['color.surface-raised'],
-            },
-            shadow ?? undefined,
-          ]}
-        >
-          <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: tokens['space.2'] }}>
+      <View style={styles.scrim}>
+        <View style={[styles.card, shadow ?? undefined]}>
+          <View style={styles.headRow}>
             <Icon name="privacy.consent" size="md" color={tokens['color.primary']} />
-            <View style={{ flex: 1, minWidth: 0, gap: tokens['space.1'] }}>
+            <View style={styles.headText}>
               <Text variant="section-title">{t('common.privacy.consent.title')}</Text>
               {whyNow === null ? null : (
                 <Text variant="caption" tone="muted">
@@ -157,30 +213,21 @@ export function PrivacyConsentSheet({
             />
           </View>
 
-          <ScrollView contentContainerStyle={{ gap: tokens['space.4'] }}>
+          <ScrollView contentContainerStyle={styles.scrollContent}>
             <Text variant="row-title">{t('common.privacy.consent.intro')}</Text>
 
             {/* 两条对照着摆：不同意保住什么、同意才会发出什么。
                 分成两段而不是合成一句，是因为用户要比较的是两个选项，不是一段说明。
                 RN 没有 `<ul>`，所以每行前面摆一个圆点 —— 圆点是装饰，
                 不进无障碍朗读（`importantForAccessibility="no"`）。 */}
-            <View style={{ gap: tokens['space.2'] }}>
+            <View style={styles.bulletList}>
               {[
                 t('common.privacy.consent.localOnlyGuarantee'),
                 t('common.privacy.consent.acceptedGuarantee'),
               ].map((line) => (
-                <View key={line} style={{ flexDirection: 'row', gap: tokens['space.2'] }}>
-                  <View
-                    importantForAccessibility="no"
-                    style={{
-                      width: tokens['size.badge-dot'],
-                      height: tokens['size.badge-dot'],
-                      borderRadius: tokens['radius.full'],
-                      backgroundColor: tokens['color.foreground-muted'],
-                      marginTop: tokens['space.2'],
-                    }}
-                  />
-                  <Text variant="caption" tone="muted" style={{ flex: 1 }}>
+                <View key={line} style={styles.bulletRow}>
+                  <View importantForAccessibility="no" style={styles.bulletDot} />
+                  <Text variant="caption" tone="muted" style={styles.bulletText}>
                     {line}
                   </Text>
                 </View>
@@ -188,13 +235,13 @@ export function PrivacyConsentSheet({
             </View>
 
             {links === null ? null : (
-              <View style={{ gap: tokens['space.2'] }}>
+              <View style={styles.linksBlock}>
                 <Text variant="caption" tone="muted">
                   {t('common.privacy.consent.readFirst')}
                 </Text>
                 {/* 🔴 与决定按钮**分开的一行**：链接落在按钮/勾选行的触控区里时，
                     「我想先读条款」会变成「我已经同意了」（web 的 M3 变异抓的就是这个）。 */}
-                <View style={{ flexDirection: 'row', gap: tokens['space.4'] }}>
+                <View style={styles.linksRow}>
                   <Pressable
                     accessibilityRole="link"
                     hitSlop={tokens['gesture.hit-slop']}
@@ -202,7 +249,7 @@ export function PrivacyConsentSheet({
                       openLegalLink(links.terms);
                     }}
                   >
-                    <Text variant="caption" tone="primary" style={{ textDecorationLine: 'underline' }}>
+                    <Text variant="caption" tone="primary" style={styles.linkText}>
                       {t('common.privacy.consent.termsLink')}
                     </Text>
                   </Pressable>
@@ -213,7 +260,7 @@ export function PrivacyConsentSheet({
                       openLegalLink(links.privacy);
                     }}
                   >
-                    <Text variant="caption" tone="primary" style={{ textDecorationLine: 'underline' }}>
+                    <Text variant="caption" tone="primary" style={styles.linkText}>
                       {t('common.privacy.consent.privacyLink')}
                     </Text>
                   </Pressable>
@@ -238,16 +285,16 @@ export function PrivacyConsentSheet({
               tone="primary"
             />
           ) : (
-            <View style={{ flexDirection: 'row', gap: tokens['space.2'] }}>
+            <View style={styles.actionsRow}>
               {/* 等宽（`flex: 1`）而不是"主按钮撑满、次按钮一行小字"。 */}
-              <View style={{ flex: 1 }}>
+              <View style={styles.action}>
                 <Button
                   label={t('common.privacy.consent.accept')}
                   onPress={acceptNetworkConsent}
                   tone="primary"
                 />
               </View>
-              <View style={{ flex: 1 }}>
+              <View style={styles.action}>
                 <Button
                   label={t('common.privacy.consent.localOnly')}
                   onPress={chooseLocalOnly}

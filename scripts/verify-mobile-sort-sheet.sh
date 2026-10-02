@@ -162,7 +162,7 @@ LAST_LABEL=$(cut -f2 <<< "$LAST")
 if [ -z "$LAST" ] || [ -z "$LAST_LABEL" ]; then
   bad "拿不到最后一个档位"; screen_txt
 else
-  echo "   档位「$LAST_LABEL」矩形: $(cut -f1 <<< "$LAST")"
+  echo "   档位「${LAST_LABEL}」矩形: $(cut -f1 <<< "$LAST")"
   $ADB shell input tap $(center_of "$LAST"); sleep 3
   dump
   require_screen
@@ -170,9 +170,9 @@ else
   if [ -z "$NEW_CHIP" ]; then
     bad "换档后找不到排序 chip"; screen_txt
   elif printf '%s' "$NEW_CHIP" | grep -q "$LAST_LABEL"; then
-    ok "chip 文字跟着变成了「$LAST_LABEL」"
+    ok "chip 文字跟着变成了「${LAST_LABEL}」"
   else
-    bad "点了「$LAST_LABEL」但 chip 没跟着变: $(cut -f2 <<< "$NEW_CHIP")"
+    bad "点了「${LAST_LABEL}」但 chip 没跟着变: $(cut -f2 <<< "$NEW_CHIP")"
   fi
 fi
 

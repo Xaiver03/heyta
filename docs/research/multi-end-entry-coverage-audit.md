@@ -28,7 +28,7 @@
 | 功能 | web（=三桌面） | 移动 |
 |---|---|---|
 | 任务 建/改/删/完成 | ✅ | ✅ |
-| **due 事后编辑** | ❌ 仅 postponeToToday + AI 捕获间接 | ✅ DatePicker（`TaskDetailSheet.tsx:677`） |
+| **due 事后编辑** | ✅ 行尾「截止」+ 共享 DatePicker（**批一已修** 2026-10-02） | ✅ DatePicker（`TaskDetailSheet.tsx:677`） |
 | 排期 startDate/时长 | ✅ 拖拽 + 点空白 | ✅ 详情表单（`TaskDetailSheet.tsx:688`） |
 | 子任务 / 优先级 / 重复规则 / 提醒数据 | ✅ | ✅ |
 | **提醒投递** | ✅ Notification API + 权限面板 | ❌ **永不响** |
@@ -45,7 +45,7 @@
 | 搜索 | ✅ 可打开便签 | ✅ 不可打开便签（刻意） |
 | 回收站 | ✅ 仅任务 | ✅ 仅任务 |
 | 成长统计 | ✅ 全量 | 🟡 缺热力图/分享/补打卡（刻意） |
-| **通知中心 / 邀请活动** | ✅ 铃铛 + 活动 tab | ❌ **零入口** |
+| **通知中心 / 邀请活动** | ✅ 铃铛 + 活动 tab | ✅ 「我的」页「通知」入口行（未读徽标）+ 通知中心两 tab（**批二已修** 2026-10-02） |
 | **AI 全家**（拆解/估时/优先级/捕获/工具/设置） | ✅ 6 入口 | ❌ **零入口** |
 | 导出 | ✅ 下载 | ✅ 系统分享 |
 | **导入（自家 JSON 还原）** | ✅ ImportPanel | ❌ 明示"导不回"（`ExportScreen.tsx:24`） |
@@ -62,9 +62,9 @@
 
 **P0-1 移动端提醒永远不会响。** 提醒在两端都能建（数据层完整），web 有到点投递（`use-reminder-notifications`，App.tsx:948）+ 通知权限面板；移动端是纯数据 op，package.json 无任何通知调度库 —— 用户在手机上设了提醒，**什么都不会发生**。任务管理应用的核心承诺在主战场一端名不副实。**依赖**：引本地通知库（如 notifee）必须先过 §3.1 可维护性 + §3.2 许可证两道门，这是一次显式依赖裁决。
 
-**P0-2 通知中心 + 邀请活动，移动端零入口。** app-host 的 `inbox.ts` 三函数（`fetchAccountNotifications` / `fetchActivityFeed` / `markNotificationsRead`，index.ts:169-185）在 `apps/mobile/src` **零 import**：没有铃铛、没有活动页。邀请得会员是**已上线的运营功能**，移动端登录用户完全不可见。共享层现成，缺的只是壳层挂载 —— 与本次排期多端适配完全同形状。
+**P0-2 通知中心 + 邀请活动，移动端零入口。** ✅ **已修（2026-10-02，goal 批二）**：「我的」页「通知」入口行（未读徽标）→ 通知中心两 tab（通知/活动），消费 inbox 三函数（打开即自动已读；活动 tab 惰性拉取，与 web 同守"不瞎建邀请码"）；邀请卡经 `Share.share` 分享码。判据 = `verify:mobile-inbox` 真机零 mock（双账号真通知：B 走产品注册端点带码、TEST_MODE 自动结算 → A 徽标 ≥1 → 打开后清零；活动 tab 读到自己码 + chooser 出现）+ 截图人看 + 变异（拿掉自动已读 ⇒ 徽标清零判据转红）。原文：~~app-host 的 `inbox.ts` 三函数（index.ts:169-185）在 `apps/mobile/src` **零 import**：没有铃铛、没有活动页。~~
 
-**P0-3 due 的事后编辑，web 侧（即三桌面）没有入口。** 移动端详情有 DatePicker；web 的 `setDueDate`（tasks/store.ts:98,289）**零 UI 调用点**，唯一相关动作是推到今天（App.tsx:285）。想给任务设"周五截止"，web 用户没有任何直接办法（间接路径只有 AI 捕获的确认框）。桌面三壳继承同一份载荷，**主战场的 macOS/Windows 同样改不了 due**。改法小：任务行/详情面板加一个日期控件接既有 `setDueDate`。
+**P0-3 due 的事后编辑，web 侧（即三桌面）没有入口。** ✅ **已修（2026-10-02，goal 批一）**：行尾「截止」控件 + 共享 `DatePicker`（自 mobile 上提，两端同一只），判据 = jsdom op 形状 5 条 + 变异（恰好 3 红）+ 真浏览器 e2e（选日 → 徽章 → 刷新仍在）+ `verify:mobile-schedule` 7/7 回归。原文：~~移动端详情有 DatePicker；web 的 `setDueDate`（tasks/store.ts:98,289）**零 UI 调用点**，唯一相关动作是推到今天（App.tsx:285）。~~
 
 ### P1 —— 安全与数据对称
 
@@ -87,6 +87,10 @@
 | P2-7 | **订阅权益可见性**（移动端）：无任何权益 UI；**触发条件**：计费上线前必须补（ADR-0023 红线的配套可见性） | app-host `entitlement.ts` 零消费 |
 
 小项杂记：移动端成长屏缺年度热力图/分享/补打卡按钮（`GrowthScreen.tsx:59-75` 明示未传 props）；移动端设置无帮助面板；`updateAccountLocale`（账号级语言）两端都没接（web 语言切换写设备层）。
+
+### 审计追加发现（2026-10-02，批一实施中实测）
+
+**行内 absolute 弹层会被任务列表的滚动容器裁掉**（同族于头像菜单当年被 rail 裁掉那一条）。批一给 web 补 due 编辑时实测：行容器是滚动容器（`overflow: hidden auto`）**且带 transform**（transform 祖先会成为 `fixed` 的包含块）——`position: absolute` 的面板几何正常（boundingBox 正确、点击可中），**但画不出来**，只剩一条白边；`fixed` 不 Portal 也一样被裁。DueEditor 的修法：**Portal 到 body + fixed + 实测锚点 + 滚动即关**（`apps/web/src/features/tasks/DueEditor.tsx`，取证探针 `e2e/due-editor-probe.cjs`）。同构的 **`TaskOrganizer` 弹层经探针实测同病**（中心点 `elementFromPoint` 命中的不是面板）——既有缺陷，本 goal 范围外，待独立立项修（修法同款，需它自己的判据与验收）。
 
 ## 5. 刻意取舍登记（合法，不动）
 

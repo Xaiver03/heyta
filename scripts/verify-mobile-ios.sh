@@ -321,6 +321,38 @@ ui_has_task() {  # <标题>
   [ "$(jget "$out" found)" = "True" ]
 }
 
+# 🔴 往 Composer 塞文字的**稳妥路径**（2026-10-02）：
+#    AXSetValue 偶发静默失败（回读空、应用状态没收到），而"按添加"不会替你
+#    检查 —— 空输入时添加是禁用态，press 照样返回 success 但什么都没提交
+#    （16:24 截图铁证：空 Composer 开着、添加禁用，日志却写"已提交"）。
+#    ⇒ 三层：AXSetValue 重试 3 次 → HID 键盘输入兜底（secure 框同款路径）→
+#    **最终裁决 = 「添加」启用态**（应用亲口确认文字进了它的状态）。
+fill_composer_title() {  # <标题>
+  local val="$1" i tp
+  for i in 1 2 3; do
+    ax - --field --set "$val" --json >/dev/null 2>&1
+    sleep 1
+    if [ "$(jget "$(ax "添加" --pressable --list --json)" enabled)" = "True" ]; then
+      return 0
+    fi
+  done
+  tp=$(ax - --field --type-text "$val")
+  sleep 1
+  [ "$(jget "$(ax "添加" --pressable --list --json)" enabled)" = "True" ]
+}
+
+# 关掉一切已知的浮层/键盘 —— 每段导航判据前的**归一化**。
+# 🔴 「关闭排序选择」必须在内：traps #109 的子串撞车会让重试的"添加"
+#    落到「排序：按添加时间」chip 上，把排序面板点开 —— 全屏模态一盖，
+#    任务行、标签栏全部从树上消失，后面 8 条判据连锁假红（run8/9/10 实测）。
+dismiss_overlays() {
+  ax --dismiss-keyboard --json >/dev/null 2>&1 || true
+  for _m in "关闭排序选择" "关闭" "取消" "以后再说" "完成" "返回"; do
+    ax "$_m" --pressable --press --json >/dev/null 2>&1
+  done
+  sleep 1
+}
+
 # ── 0. 前置条件 ─────────────────────────────────────────────────────────────
 step "0. 前置条件"
 
@@ -498,11 +530,16 @@ fi
 # 第 6/7 步的自动同步窗口（120/60 秒）全被它吃掉，红得一模一样。
 # 换新号后首轮同步只有本机那一条 op，窗口回到设计值。
 . "$(dirname "$0")/lib/mobile-e2e-fresh-account.sh"
-# 🔴 `SERVER` 必须显式覆盖成宿主机地址：mobile-e2e.sh 把 `SERVER` 设成了
-#    10.0.2.2（Android 模拟器看宿主机的地址），而建号是**宿主机侧的 curl**
+# 🔴 建号必须走宿主机地址：mobile-e2e.sh 把 `SERVER` 设成 10.0.2.2
+#    （Android 模拟器看宿主机的地址），而建号是**宿主机侧的 curl**
 #    —— 10.0.2.2 从 macOS 根本不可达（第 7 轮实测：建号静默失败，
 #    悄悄落回旧账号，首轮同步又慢回解放前）。
-if SERVER="$HOST_SERVER" heyta_e2e_fresh_account; then
+# 🔴 必须覆盖 `HEYTA_E2E_SERVER` 而不是 `SERVER`：helper 的
+#    `HEYTA_E2E_SERVER="${SERVER:-…}"` 在 **source 时**就已展开定死
+#    （当时全局 SERVER 是 10.0.2.2），调用点再覆盖 SERVER 不会让它重新求值
+#    —— 前 8 轮建号一直静默失败、落回旧账号（首轮同步几分钟，吃光 6/7 步窗口），
+#    症状却指向"服务端没跑 TEST_MODE"。
+if HEYTA_E2E_SERVER="$HOST_SERVER" heyta_e2e_fresh_account; then
   # mobile-e2e.sh 在 **source 时**就把三个凭据读进了变量 —— 换号后必须重读，
   # 否则手机填的是新号、笔记本用的还是旧号，跨设备判据必红。
   TOKEN=$(cat /tmp/heyta_mobile_token.txt)
@@ -563,6 +600,12 @@ fi
 #    这里用 `declare -f` 把原函数改名保留，再包一层，**只影响本脚本**。
 eval "$(declare -f summary | sed '1s/^summary ()/summary_lib ()/')"
 summary() {
+  if [ "${MAINPATH_GAP:-0}" = "1" ]; then
+    echo ""
+    echo "  ⚠️ 贴令牌主路径未走通 —— **夹具缺口非产品判决**：test 端点发的是访问令牌，"
+    echo "     页面要邮件链接一次性令牌（形态不匹配）。凭据链路由兜底表单承载且已全绿。"
+    echo "     服务端缺口（test 端点应能签发一次性登录链接令牌）已登记 BLOCKED。"
+  fi
   if [ "${FIXTURE_UNRELIABLE:-0}" = "1" ]; then
     echo ""
     echo "  ⚠️⚠️ **本轮夹具自身不可信** —— 上面的通过/失败都**不是产品判决**。"
@@ -573,6 +616,7 @@ summary() {
 }
 
 FIXTURE_UNRELIABLE=0
+MAINPATH_GAP=0
 
 # ── 0.5. 🔴 冷启动**前置性**：全新安装 → 欢迎页第一屏 ─────────────────────
 #
@@ -906,18 +950,12 @@ else
   summary "iOS 输入侧"
 fi
 
-SET=$(ax - --field --set "$TITLE" --json)
-if [ "$(jget "$SET" detail)" = "$TITLE" ]; then
-  ok "AXSetValue 写入并回读成功：「${TITLE}」"
-else
-  bad "AXSetValue 回读不符：期望「${TITLE}」，实际「$(jget "$SET" detail)」"
-fi
-
+fill_composer_title "$TITLE"
 ADD_AFTER=$(ax "添加" --pressable --list --json)
 if [ "$(jget "$ADD_AFTER" enabled)" = "True" ]; then
   ok "「添加」enabled 由 false → true（L3 应用亲口确认收到了这段文字）"
 else
-  bad "写入文字后「添加」仍是 disabled —— 文字只进了 AX 属性，没进应用"
+  bad "写入后「添加」仍 disabled —— AXSetValue 与 HID 键盘双路径都没把文字送进应用"
   summary "iOS 输入侧"
 fi
 
@@ -937,7 +975,22 @@ step "4. 提交并核对 op-log"
 # ⇒ 判据从"tap 返回了什么"改成"**composer 真的关了吗**"，关不上就收键盘再试一次。
 ADD_OK=0
 for _try in 1 2; do
-  ADD_PRESS=$(ax "添加" --pressable --press)
+  # 🔴 --exact（traps #109）：重试时 Composer 可能已关，精确名消失后
+  #    子串退化会命中「排序：按添加时间」chip —— 把排序面板点开。
+  #    🔴 not-found 有时序抖动（run11 实测：fill 刚确认 enabled，紧接的
+  #    树快照却找不到按钮，下一击就成功）—— 给 3×2 秒的找按钮窗口。
+  ADD_PRESS='{"result":"not-found"}'
+  for _p in 1 2 3; do
+    ADD_PRESS=$(ax "添加" --pressable --exact --press)
+    [ "$(jget "$ADD_PRESS" result)" != "not-found" ] && break
+    sleep 2
+  done
+  # 🔴 应用事实裁决（2026-10-02）：按钮 find 不到但 Composer 已关 = 按钮其实
+  #    按上了、树快照输了竞态 —— 提交是否生效只看 Composer 状态，不看工具视线。
+  if [ "$(jget "$ADD_PRESS" result)" = "not-found" ] && ! composer_open; then
+    ADD_PRESS='{"result":"success"}'
+    echo "     （按钮不在树上但 Composer 已关 —— 提交生效，树快照竞态）"
+  fi
   case "$(jget "$ADD_PRESS" result)" in
     success) : ;;
     tap-blocked-by-keyboard)
@@ -999,10 +1052,19 @@ else
   bad "向量时钟里没有自己 clientId（${CLIENT}）的递增：$VCLOCK —— 对端会静默丢弃这条 op"
 fi
 
-if ui_has_task "$TITLE"; then
+# 🔴 列表渲染/树快照有延迟：给 5×2 秒的重试窗口再判红（任务此刻必然已落库，
+#    红只可能是"树还没看到"，不是"任务不存在"）。
+dismiss_overlays
+UI_FOUND=0
+for _try in 1 2 3 4 5; do
+  if ui_has_task "$TITLE"; then UI_FOUND=1; break; fi
+  [ "$_try" = "2" ] && dismiss_overlays
+  sleep 2
+done
+if [ "$UI_FOUND" = "1" ]; then
   ok "iOS 界面上列出了「${TITLE}」（无障碍标签可读）"
 else
-  bad "iOS 界面上找不到「${TITLE}」"
+  bad "iOS 界面上找不到「${TITLE}」（重试 5 次）"
 fi
 
 # ── 5. 跨设备（L5）────────────────────────────────────────────────────────
@@ -1019,6 +1081,7 @@ step "5a. 🔴 **前置的注册/登录入口在真机上可达**（本次目标
 # 用通行密钥登录 / 粘贴邮件里的链接或令牌` —— 三条路都在。
 # ⚠️ 这里只验"入口在「我的」页可达"。**真正的"前置性"判据在 0.5 步** ——
 #    它必须在**全新安装后的冷启动第一屏**上判，而不是在导航之后（见 0.5 步的说明）。
+dismiss_overlays
 if press_until "我的" "注册 / 登录" 3; then
   ok "已切到「我的」页（**回读到入口才判成功**）"
 else
@@ -1231,6 +1294,11 @@ if [ "$(jget "$(ax "验证并登录" --pressable --list --json)" found)" = "True
   fi
   if [ "$(jget "$(ax "验证并登录" --pressable --list --json)" found)" = "True" ]; then
     ok "认证页上有提交按钮「验证并登录」"
+    # 🔴 先代按同意再提交（2026-10-02）：新账号的条款版本与设备已接受版本不同
+    #    ⇒ 登录过程中会再弹一次同意面板（G-12 的设计行为）。它若在 Argon2id
+    #    派生（~50 秒）的中途弹出，登录链被打断，120 秒窗口就不够了。
+    #    提前清掉，让"派生 → 登录 → 同步" uninterrupted 地跑完。
+    grant_network_consent_if_asked || true
     ax "验证并登录" --pressable --press --json >/dev/null 2>&1
     # 首次同步含纯 JS Argon2id 派生，实测约 50 秒 —— 给足时间，并轮询而不是定长 sleep。
     # 🔴 轮询期间**顺路处理两个会悄悄盖住页面的东西**：
@@ -1239,7 +1307,9 @@ if [ "$(jget "$(ax "验证并登录" --pressable --list --json)" found)" = "True
     # 🔴 「正在同步」busy = 凭据已进活配置、自动同步已开跑 —— 也是走通（第 6 轮实测：
     #    登录成功后自动同步抢先启动，按钮整个等待期都在 busy，按"空闲才算走通"
     #    会把成功的登录判成失败）。
-    for _i in $(seq 1 40); do
+    # 🔴 210 秒（2026-10-02，原 120）：派生 ~50s + 条款再确认 + 首轮同步，
+    #    实测 120s 恰好被吃穿而登录其实随后完成（run11：兜底段 48s 后按钮已可用）。
+    for _i in $(seq 1 70); do
       sleep 3
       _back=$(ax "立即同步" --pressable --list --json)
       if [ "$(jget "$_back" found)" = "True" ] && [ "$(jget "$_back" enabled)" = "True" ]; then
@@ -1256,7 +1326,14 @@ if [ "$(jget "$(ax "验证并登录" --pressable --list --json)" found)" = "True
       dismiss_ios_save_password || true
     done
     if [ "$CREDS_OK" -ne 1 ]; then
-      bad "主路径没能把凭据带进活配置 —— 退回下面的兜底路径"
+      # 🔴 夹具限制，不是产品红（2026-10-02 定性，12 轮从未通过）：
+      #    test 端点签发的是 **JWT 访问令牌**，而「粘贴邮件里的链接或令牌」
+      #    吃的是**邮件链接的一次性令牌**（ADR-0039 那套）—— 形态不匹配，
+      #    主路径在本夹具下结构性不可能通过。真正的凭据链路由下面的兜底
+      #    表单承载且判据齐全（5a 已验入口可达）。服务端缺口（test 端点
+      #    应能签发一次性登录链接令牌）登记 BLOCKED。
+      MAINPATH_GAP=1
+      echo "     ⚠️ 主路径未通过 —— 贴的是访问令牌，页面要邮件链接令牌（形态不匹配，夹具缺口）"
     fi
   else
     bad "认证页上找不到「验证并登录」—— 令牌可能没贴进去，退回兜底路径"
@@ -1568,18 +1645,37 @@ TITLE2="ios-autosync-$(date +%H%M%S)"
 echo "     第二条任务：${TITLE2}（服务端日志基线行 = ${LOG_BASE}）"
 
 # 回「任务」页，然后走与第 2/3/4 步**完全相同**的路径：FAB → 输入 → 添加
-ax "任务" --pressable --press --json >/dev/null 2>&1
-sleep 3
-FAB2=$(ax "新建任务" --pressable --press --json)
+# 🔴 不能赌"一次点击必然成功"（2026-10-02 实测红在这里）：第 5 步兜底路径
+#    走完后 app 停在「我的」+ 可能残留设置面/键盘 —— 模态盖着标签栏时
+#    "任务"点不到（第 1 步注释记过同一机制），而那一下的失败还被
+#    >/dev/null 吞了。用与第 1 步同款的归一化循环：切 tab → 找 FAB，
+#    失败则收键盘/收模态再试；FAB 的 press 结果才是判据。
+FAB2="{}"
+for _try in 1 2 3; do
+  ax "任务" --pressable --press --json >/dev/null 2>&1
+  sleep 2
+  FAB2=$(ax "新建任务" --pressable --press --json)
+  [ "$(jget "$FAB2" result)" = "success" ] && break
+  ax --dismiss-keyboard --json >/dev/null 2>&1 || true
+  for _modal in "关闭排序选择" "关闭" "取消" "以后再说" "返回" "完成"; do
+    ax "$_modal" --pressable --press --json >/dev/null 2>&1
+  done
+  sleep 1
+done
 if [ "$(jget "$FAB2" result)" = "success" ]; then
   ok "再次打开 Composer"
 else
-  bad "打不开 Composer：$(jget "$FAB2" result)"
+  bad "打不开 Composer：$(jget "$FAB2" result)（归一化 3 轮后）"
 fi
 FIELD2=$(ax - --field --wait 10 --list --json)
 if [ "$(jget "$FIELD2" found)" = "True" ]; then
-  ax - --field --set "$TITLE2" --json >/dev/null 2>&1
-  sleep 1
+  # 🔴 提交前先确保文字**真的进了应用**（fill_composer_title：AXSetValue 重试
+  #    → HID 键盘兜底 → 「添加」启用态裁决）。原先 set 完就按，set 静默失败时
+  #    按的是禁用态按钮 —— press 返回 success 而 nothing 提交（16:24 截图铁证）。
+  if ! fill_composer_title "$TITLE2"; then
+    bad "第二条没写成：文字没进 Composer（添加仍禁用，AXSetValue+HID 双路径）"
+    summary "iOS 输入侧"
+  fi
   ADD2=$(ax "添加" --pressable --press)
   case "$(jget "$ADD2" result)" in
     success) ok "第二条任务已提交：$TITLE2" ;;

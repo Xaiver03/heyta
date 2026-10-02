@@ -82,6 +82,7 @@ import { loadTaskSort, saveTaskSort } from './features/tasks/sort-pref.js';
 import { TaskOrganizer } from './features/tasks/TaskOrganizer.js';
 import { taskGroupKey, taskGroupTitle } from './features/tasks/date-groups.js';
 import { TaskRepeat } from './features/tasks/TaskRepeat.js';
+import { DueEditor } from './features/tasks/DueEditor.js';
 import { NoteEditor } from './features/tasks/NoteEditor.js';
 import { SubtaskPicker } from './features/tasks/SubtaskPicker.js';
 import { CaptureComposer } from './features/capture/CaptureComposer.js';
@@ -776,6 +777,18 @@ export function App(): React.JSX.Element {
             now={store.now}
             onSetRepeat={(rule) => {
               void store.setRepeat(task.id, rule);
+            }}
+          />
+
+          {/* 截止。🔴 多端覆盖审计 P0-3：`setDueDate` 的语义早就完整，
+              但 Web 上**没有任何调用点** —— 想给任务定"周五截止"没有直接入口
+              （唯一沾边的是 AI 捕获，那是建任务时）。移动端早就能改；
+              这里补上后两端共用同一只共享 `DatePicker`。 */}
+          <DueEditor
+            task={task}
+            now={store.now}
+            onSetDueDate={(due) => {
+              void store.setDueDate(task.id, due);
             }}
           />
 

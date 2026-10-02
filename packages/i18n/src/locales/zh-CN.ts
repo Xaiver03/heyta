@@ -1225,6 +1225,18 @@ export const zhCN = {
   'web.organize.tagsLegend': '标签',
   'web.organize.tagToggle': '给任务「{title}」加上或去掉标签「{name}」',
   'web.organize.noTags': '还没有标签 —— 在左侧「标签」里新建一个。',
+  // ── Web · 行尾「截止」控件（批一，多端入口覆盖 goal §2）──────────────
+  //    日期措辞本身复用 common.date.* / common.weekday.*（共享 DatePicker
+  //    的 monthTitle/dayLabel 由宿主拼），这里只有控件自己的话。
+  'web.due.trigger': '截止',
+  'web.due.summaryAria': '设置任务「{title}」的截止日期',
+  // today / tomorrow 已有（上面 DueBadge 的剩余天数词组），直接复用不重定义。
+  'web.due.weekend': '本周末',
+  'web.due.nextWeek': '下周一',
+  'web.due.clear': '清除',
+  'web.due.prevMonth': '上个月',
+  'web.due.nextMonth': '下个月',
+  'web.due.dayLabel': '{month}月{day}日',
 
   // ── Web · 重复（B2-3）───────────────────────────────────────
   //    🔴 这一族补的是**两端不一致**：移动端任务详情早就能设重复，Web 一个入口都没有。
@@ -1345,6 +1357,13 @@ export const zhCN = {
   // 「点空白建任务」（goal §3.2 手势 4）的默认标题：这是**数据**（一条任务的名字），
   // 但它来自产品而不是用户 —— 所以仍然走词条表，不硬编码。
   'web.board.untitledTask': '未命名任务',
+
+  // ── Mobile · 详情面排期段（时间线 P2 的触屏入口；web 载荷用拖拽）──
+  'mobile.detail.field.schedule': '排期',
+  'mobile.detail.schedule.hint': '开始 + 时长决定这条任务在时间线板上的条；截止（上一段）是另一件事。没有开始时，只有时长不会上板。',
+  'mobile.detail.schedule.start': '开始',
+  'mobile.detail.schedule.duration': '时长',
+  'mobile.detail.schedule.none': '无时长',
 
   // ═══════════════════════════════════════════════════════════
   // Web · AI（拆解 / 捕获 / 估时 / 排序 / 设置 / 记忆）
@@ -2644,6 +2663,38 @@ export const zhCN = {
   'mobile.trash.title': '回收站',
   'mobile.trash.entry': '回收站',
   'mobile.trash.entry.hint': '已删除的任务可以在这里恢复',
+  // ── 通知中心 / 活动（批二，多端覆盖审计 P0-2）────────────────────
+  //    通知 kind 是封闭词表（referral-activated），措辞与 web 的
+  //    web.inbox.* 同口径；服务端只存 kind + payload，话在这里说。
+  'mobile.inbox.title': '通知中心',
+  'mobile.inbox.back': '返回',
+  'mobile.inbox.trigger': '通知',
+  'mobile.inbox.entry.hint': '系统消息与邀请好友活动',
+  'mobile.inbox.badge.aria': '{count} 条未读',
+  'mobile.inbox.tab.notifications': '通知',
+  'mobile.inbox.tab.activity': '活动',
+  'mobile.inbox.unconfigured': '配置服务器并登录后，这里会显示账号通知。',
+  'mobile.inbox.error': '读不到通知 —— 检查网络后重试。',
+  'mobile.inbox.retry': '重试',
+  'mobile.inbox.loading': '正在加载…',
+  'mobile.inbox.empty': '还没有通知',
+  'mobile.inbox.notification.referral.title': '邀请奖励已发放',
+  'mobile.inbox.notification.referral.body': '{name} 用你的邀请码成功激活，你的会员延长 {days} 天。',
+  'mobile.inbox.notification.referral.bodyUnknownActor': '有好友用你的邀请码成功激活，你的会员延长 {days} 天。',
+  'mobile.inbox.activity.empty': '还没有进行中的活动',
+  'mobile.inbox.invite.title': '邀请好友',
+  'mobile.inbox.invite.body': '好友用你的邀请码注册并验证邮箱，你们都得 {days} 天会员。',
+  'mobile.inbox.invite.codeLabel': '邀请码',
+  'mobile.inbox.invite.codeAria': '邀请码 {code}',
+  'mobile.inbox.invite.share': '分享邀请码',
+  'mobile.inbox.invite.shareMessage': '我的 heyta 邀请码：{code}',
+  'mobile.inbox.invite.shareFailed': '分享不可用 —— 邀请码就在上方，可以手动复制。',
+  'mobile.inbox.invite.stats': '已邀请 {invited} · 已激活 {activated} · 已得 {days} 天',
+  'mobile.inbox.invite.remaining': '本窗口还可邀请 {count} 人',
+  'mobile.inbox.invite.listTitle': '邀请记录',
+  'mobile.inbox.invite.status.activated': '已激活',
+  'mobile.inbox.invite.status.pending': '待验证',
+  'mobile.inbox.invite.unknownName': '好友',
   'mobile.trash.intro': '这里放着已删除的任务。恢复后它会回到原来的位置。',
   'mobile.trash.empty.title': '回收站是空的',
   'mobile.trash.empty.hint': '在任务页删除的任务会先放到这里',

@@ -1144,6 +1144,16 @@ export const en = {
   'web.organize.tagsLegend': 'Tags',
   'web.organize.tagToggle': 'Add or remove tag "{name}" on task "{title}"',
   'web.organize.noTags': 'No tags yet — create one under "Tags" on the left.',
+  // ── Web · per-row "due" editor (batch 1, multi-end coverage goal §2) ──
+  'web.due.trigger': 'Due',
+  'web.due.summaryAria': 'Set due date for task "{title}"',
+  // today / tomorrow already exist above (DueBadge remaining-text group); reuse them.
+  'web.due.weekend': 'This weekend',
+  'web.due.nextWeek': 'Next Monday',
+  'web.due.clear': 'Clear',
+  'web.due.prevMonth': 'Previous month',
+  'web.due.nextMonth': 'Next month',
+  'web.due.dayLabel': '{month}/{day}',
 
   // ── Web · repeat (B2-3) ───────────────────────────────────
   //    🔴 This family fixes an **inconsistency between the two ends**: mobile has
@@ -1261,6 +1271,13 @@ export const en = {
   // Default title for "click empty space to create" (goal §3.2, gesture 4):
   // data coming from the product, so it still goes through the locale table.
   'web.board.untitledTask': 'Untitled task',
+
+  // ── Mobile · detail-sheet schedule section (timeline P2 touch entry) ──
+  'mobile.detail.field.schedule': 'Schedule',
+  'mobile.detail.schedule.hint': 'Start + duration decide this task\'s bar on the timeline board; the due date above is a different thing. Duration alone never lands on the board.',
+  'mobile.detail.schedule.start': 'Starts',
+  'mobile.detail.schedule.duration': 'Duration',
+  'mobile.detail.schedule.none': 'None',
 
   // ═══════════════════════════════════════════════════════════
   // Web · AI (breakdown / capture / duration / prioritize / settings / memory)
@@ -2476,6 +2493,36 @@ export const en = {
   'mobile.trash.title': 'Trash',
   'mobile.trash.entry': 'Trash',
   'mobile.trash.entry.hint': 'Restore tasks you deleted',
+  // ── Notification center / activity (batch 2, multi-end coverage audit P0-2) ──
+  'mobile.inbox.title': 'Notifications',
+  'mobile.inbox.back': 'Back',
+  'mobile.inbox.trigger': 'Notifications',
+  'mobile.inbox.entry.hint': 'Account notices and the referral program',
+  'mobile.inbox.badge.aria': '{count} unread',
+  'mobile.inbox.tab.notifications': 'Notifications',
+  'mobile.inbox.tab.activity': 'Activity',
+  'mobile.inbox.unconfigured': 'Set up a server and sign in to see account notices.',
+  'mobile.inbox.error': 'Could not load notifications — check your network and retry.',
+  'mobile.inbox.retry': 'Retry',
+  'mobile.inbox.loading': 'Loading…',
+  'mobile.inbox.empty': 'No notifications yet',
+  'mobile.inbox.notification.referral.title': 'Invite reward granted',
+  'mobile.inbox.notification.referral.body': '{name} activated with your code — your membership was extended by {days} days.',
+  'mobile.inbox.notification.referral.bodyUnknownActor': 'A friend activated with your code — your membership was extended by {days} days.',
+  'mobile.inbox.activity.empty': 'No campaigns right now',
+  'mobile.inbox.invite.title': 'Invite friends',
+  'mobile.inbox.invite.body': 'Friends who register with your code and verify their email earn you both {days} days of membership.',
+  'mobile.inbox.invite.codeLabel': 'Invite code',
+  'mobile.inbox.invite.codeAria': 'Invite code {code}',
+  'mobile.inbox.invite.share': 'Share invite code',
+  'mobile.inbox.invite.shareMessage': 'My heyta invite code: {code}',
+  'mobile.inbox.invite.shareFailed': 'Sharing is unavailable — the code is shown above, copy it manually.',
+  'mobile.inbox.invite.stats': 'Invited {invited} · Activated {activated} · {days} days earned',
+  'mobile.inbox.invite.remaining': '{count} invites left in this window',
+  'mobile.inbox.invite.listTitle': 'Referral history',
+  'mobile.inbox.invite.status.activated': 'Activated',
+  'mobile.inbox.invite.status.pending': 'Pending',
+  'mobile.inbox.invite.unknownName': 'A friend',
   'mobile.trash.intro': 'Deleted tasks land here. Restore one and it goes back where it was.',
   'mobile.trash.empty.title': 'Trash is empty',
   'mobile.trash.empty.hint': 'Tasks you delete show up here first',
