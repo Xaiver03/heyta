@@ -43,7 +43,7 @@ import {
   type HostedPasskeySummary,
 } from '@heyta/app-host';
 
-import { Button, Card, Chip, Screen, Text, TextField } from '../ui/kit';
+import { Button, Card, Chip, HStack, Screen, Stack, Text, TextField } from '../ui/kit';
 import { readSyncConfig } from '../sync/config';
 import { useTokens } from '../theme';
 
@@ -200,7 +200,7 @@ export function SecurityScreen({
     >
       {/* ── 改登录密码 ──────────────────────────────────────── */}
       <Card>
-        <View style={{ gap: tokens['space.3'] }}>
+        <Stack gap="loose">
           <Text variant="row-title" tone="default">
             {t('mobile.security.password.title')}
           </Text>
@@ -208,14 +208,14 @@ export function SecurityScreen({
             {t('mobile.security.password.lead')}
           </Text>
           {done ? (
-            <View style={{ gap: tokens['space.1'] }}>
+            <Stack gap="tight">
               <Text variant="row-meta" tone="default">
                 {t('mobile.security.password.done')}
               </Text>
               <Text variant="caption" tone="subtle">
                 {t('mobile.security.password.doneDetail')}
               </Text>
-            </View>
+            </Stack>
           ) : null}
           {changeError !== null ? (
             <Text variant="row-meta" tone="danger">
@@ -242,12 +242,12 @@ export function SecurityScreen({
             tone="primary"
             loading={changing}
           />
-        </View>
+        </Stack>
       </Card>
 
       {/* ── 通行密钥管理（注册在移动端排除，见文件头） ────────── */}
       <Card>
-        <View style={{ gap: tokens['space.3'] }}>
+        <Stack gap="loose">
           <Text variant="row-title" tone="default">
             {t('mobile.security.passkeys.title')}
           </Text>
@@ -274,7 +274,7 @@ export function SecurityScreen({
             //    也不往门禁的 EMPTY_SITES 加一行 —— 那等于把这笔债合法化。
             <EmptyState size="section" title={t('mobile.security.passkeys.empty')} />
           ) : (
-            <View style={{ gap: tokens['space.3'] }}>
+            <Stack gap="loose">
               {passkeys.map((passkey) => {
                 const label =
                   passkey.name ?? t('mobile.security.passkeys.unnamed');
@@ -290,8 +290,8 @@ export function SecurityScreen({
                       padding: tokens['space.3'],
                     }}
                   >
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: tokens['space.2'] }}>
-                      <Text variant="row-meta" tone="default" style={{ flex: 1 }}>
+                    <HStack align="center">
+                      <Text variant="row-meta" tone="default" grow={true}>
                         {label}
                       </Text>
                       <Text variant="caption" tone="subtle">
@@ -300,15 +300,15 @@ export function SecurityScreen({
                           Date.now(),
                         )}
                       </Text>
-                    </View>
+                    </HStack>
                     {isRenaming ? (
-                      <View style={{ gap: tokens['space.2'] }}>
+                      <Stack>
                         <TextField
                           label={t('mobile.security.passkeys.renameHint')}
                           value={renameDraft}
                           onChangeText={setRenameDraft}
                         />
-                        <View style={{ flexDirection: 'row', gap: tokens['space.2'] }}>
+                        <HStack>
                           <Chip
                             label={t('mobile.security.passkeys.renameSave')}
                             selected={true}
@@ -324,10 +324,10 @@ export function SecurityScreen({
                               setRenameDraft('');
                             }}
                           />
-                        </View>
-                      </View>
+                        </HStack>
+                      </Stack>
                     ) : (
-                      <View style={{ flexDirection: 'row', gap: tokens['space.2'] }}>
+                      <HStack>
                         <Chip
                           label={t('mobile.security.passkeys.rename')}
                           selected={false}
@@ -353,14 +353,14 @@ export function SecurityScreen({
                             }}
                           />
                         )}
-                      </View>
+                      </HStack>
                     )}
                   </View>
                 );
               })}
-            </View>
+            </Stack>
           )}
-        </View>
+        </Stack>
       </Card>
     </Screen>
   );
