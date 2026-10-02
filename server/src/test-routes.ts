@@ -10,7 +10,7 @@ import { SuperSyncOperationSchema, type SuperSyncOperation } from '@heyta/shared
 import { prisma } from './db';
 import * as jwt from 'jsonwebtoken';
 import { Logger } from './logger';
-import { getJwtSecret, JWT_EXPIRY } from './auth';
+import { getJwtSecret, JWT_EXPIRY, mintLoginMagicLinkToken } from './auth';
 import { authCache } from './auth-cache';
 import { computeOpStorageBytes } from './sync/sync.const';
 import { hashPassword } from './password/hash';
@@ -23,6 +23,10 @@ interface CreateUserBody {
 
 interface SeedLegacyPlaintextOperationBody {
   op: unknown;
+}
+
+interface MintLoginLinkBody {
+  email: string;
 }
 
 export const testRoutes = async (fastify: FastifyInstance): Promise<void> => {
@@ -115,6 +119,65 @@ export const testRoutes = async (fastify: FastifyInstance): Promise<void> => {
           message: (err as Error).message,
         });
       }
+    },
+  );
+
+  /**
+   * 🔴 为既有邮箱**签发一枚邮件链接形态的一次性登录令牌**（不发邮件）。
+   *
+   * 为什么必须存在（BLOCKED B10，2026-10-02）：`/create-user` 返回的是 JWT
+   * 访问令牌，而应用「粘贴邮件里的链接或令牌」吃的是登录那封信里的一次性
+   * 令牌（`POST /api/login/magic-link/verify` 消费）—— 形态不匹配时
+   * E2E 主路径**结构性走不通**，12+ 轮全红却被误读成产品问题。
+   *
+   * 语义对齐生产路径：走 `auth.ts` 的 `mintLoginMagicLinkToken`（同一哈希、
+   * 同一过期窗口），只是把"发邮件"换成"直接返回令牌"。与生产的差异只有
+   * 一处：**先清旧令牌、强制新签** —— 生产对未过期令牌是静默复用，那对
+   * 测试是抖动源（上一轮消费掉一半的令牌会让这一轮拿到 401）。
+   */
+  fastify.post<{ Body: MintLoginLinkBody }>(
+    '/mint-login-link',
+    {
+      schema: {
+        body: {
+          type: 'object',
+          required: ['email'],
+          properties: {
+            email: { type: 'string', format: 'email' },
+          },
+        },
+      },
+      config: {
+        rateLimit: false,
+      },
+    },
+    async (request, reply) => {
+      const { email } = request.body;
+
+      const user = await prisma.user.findUnique({
+        where: { email: email.toLowerCase() },
+      });
+      if (!user) {
+        return reply.status(404).send({ error: 'user-not-found' });
+      }
+      if (user.isVerified === 0) {
+        return reply.status(409).send({ error: 'email-not-verified' });
+      }
+
+      // 强制新签：清掉可能存在的旧令牌（含未过期的），让每次调用都拿到确定的一枚。
+      await prisma.user.updateMany({
+        where: { id: user.id },
+        data: { loginToken: null, loginTokenExpiresAt: null },
+      });
+
+      const loginToken = await mintLoginMagicLinkToken(user);
+      if (loginToken === null) {
+        Logger.error(`[TEST] Failed to mint login link (ID: ${user.id})`);
+        return reply.status(503).send({ error: 'mint-conflict' });
+      }
+
+      Logger.info(`[TEST] Minted login link token (ID: ${user.id})`);
+      return reply.send({ token: loginToken, email: user.email });
     },
   );
 

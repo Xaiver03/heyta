@@ -324,6 +324,43 @@ export const verifyToken = async (token: string): Promise<TokenVerificationResul
 };
 
 /**
+ * 🔴 **签发一枚一次性登录令牌**（32 字节随机十六进制；库里只存 SHA-256，15 分钟过期）。
+ *
+ * 生产唯一调用方是 `requestLoginMagicLink`（随后发邮件）；TEST_MODE 的
+ * `/api/test/mint-login-link` 也走**这同一个函数** —— E2E 要贴进
+ * 「粘贴邮件里的链接或令牌」的东西，必须与邮件里那枚**同一个形态**。
+ * 这里曾经抽不出去：test 端点只能拿 JWT 访问令牌，而应用贴令牌页吃的是
+ * 这种一次性令牌 —— 形态不匹配，主路径 12 轮从未通过（BLOCKED B10）。
+ *
+ * 返回 `null` = 没抢到槽位（另一并发请求刚轮换出一枚未过期的）。
+ */
+export const mintLoginMagicLinkToken = async (
+  user: { id: number },
+  now = Date.now(),
+): Promise<string | null> => {
+  const loginToken = randomBytes(32).toString('hex');
+  const expiresAt = BigInt(now + LOGIN_MAGIC_LINK_EXPIRY_MS);
+
+  // Claim the expired/empty token slot atomically. Concurrent requests for the
+  // same account must not each rotate the token and send another email.
+  const claim = await prisma.user.updateMany({
+    where: {
+      id: user.id,
+      OR: [
+        { loginToken: null },
+        { loginTokenExpiresAt: null },
+        { loginTokenExpiresAt: { lte: BigInt(now) } },
+      ],
+    },
+    data: {
+      loginToken: hashToken(loginToken),
+      loginTokenExpiresAt: expiresAt,
+    },
+  });
+  return claim.count === 0 ? null : loginToken;
+};
+
+/**
  * Request a magic link for passwordless login.
  * Generates a login token, stores it in the database, and sends an email.
  * Always returns success message to prevent email enumeration.
@@ -363,26 +400,8 @@ export const requestLoginMagicLink = async (
     return successMessage;
   }
 
-  const loginToken = randomBytes(32).toString('hex');
-  const expiresAt = BigInt(now + LOGIN_MAGIC_LINK_EXPIRY_MS);
-
-  // Claim the expired/empty token slot atomically. Concurrent requests for the
-  // same account must not each rotate the token and send another email.
-  const claim = await prisma.user.updateMany({
-    where: {
-      id: user.id,
-      OR: [
-        { loginToken: null },
-        { loginTokenExpiresAt: null },
-        { loginTokenExpiresAt: { lte: BigInt(now) } },
-      ],
-    },
-    data: {
-      loginToken: hashToken(loginToken),
-      loginTokenExpiresAt: expiresAt,
-    },
-  });
-  if (claim.count === 0) return successMessage;
+  const loginToken = await mintLoginMagicLinkToken(user, now);
+  if (loginToken === null) return successMessage;
 
   const emailSent = await sendLoginMagicLinkEmail(email, loginToken, locale);
   if (!emailSent) {

@@ -1,4 +1,22 @@
 #!/bin/bash
+
+# 🔴 HEYTA-SNAPSHOT-BOOTSTRAP v1（traps #110/#113）—— bash 对脚本是按字节偏移
+#    增量读取的：运行中被编辑，后半段就从错位字节开始解析，炸出假语法错误。
+#    入口先把整份脚本拷成同目录隐藏快照再 exec 副本 —— 之后对源文件的任何
+#    编辑都影响不到本次运行；$0 的 dirname 不变，lib/tools 定位照旧。
+#    快照名 .原名.snap.PID（进 .gitignore）；trap 尽力清理，被 kill -9 留下的
+#    由下一次运行按 mmin +240 顺带扫掉。
+case "$(basename "$0")" in
+  .*.snap.*) ;; # 已是快照：正常往下跑
+  *)
+    _snap_dir="$(cd "$(dirname "$0")" && pwd)" || exit 1
+    find "$_snap_dir" -maxdepth 1 -name ".$(basename "$0").snap.*" -mmin +240 -delete 2>/dev/null || true
+    _snap="${_snap_dir}/.$(basename "$0").snap.$$"
+    cat "$_snap_dir/$(basename "$0")" > "$_snap" || exit 1
+    exec bash "$_snap" "$@"
+    ;;
+esac
+trap 'rm -f -- "$0"' EXIT
 #
 # iOS 输入侧验收（真模拟器 + 真服务端 + 真笔记本设备，零 mock）
 # ==================================================================
@@ -551,6 +569,23 @@ else
   bad "建不了新号（服务端没跑 TEST_MODE？）—— 沿用旧凭据继续：首轮同步会很慢，第 6/7 步的窗口可能不够"
 fi
 
+# 🔴 B10 收口（2026-10-02）：主路径贴的必须是**邮件链接形态的一次性令牌**，
+#    不是 JWT 访问令牌 —— 服务端 test 端点已补上签发能力
+#    （POST /api/test/mint-login-link，与生产走同一个 mintLoginMagicLinkToken，
+#    仅把"发邮件"换成"直接返回令牌"）。拿不到就如实报红：主路径从此
+#    **没有**"夹具缺口"这层降级借口 —— 前面 12+ 轮的红就是这个缺口造的。
+ONETIME_TOKEN=""
+if [ -n "${EMAIL:-}" ]; then
+  _mint=$(curl -sf -X POST "$HOST_SERVER/api/test/mint-login-link" \
+    -H 'content-type: application/json' -d "{\"email\":\"${EMAIL}\"}" 2>/dev/null || true)
+  ONETIME_TOKEN=$(jget "$_mint" token)
+fi
+if [ -n "$ONETIME_TOKEN" ]; then
+  ok "已为 ${EMAIL} 签发一次性登录链接令牌（贴令牌主路径专用，64 hex）"
+else
+  bad "签发不了一次性登录令牌（/api/test/mint-login-link）—— 主路径会真红：查服务端 TEST_MODE 与账号新鲜度"
+fi
+
 # 启动 App（**不 terminate**：会话内已派生过 Argon2 密钥，terminate 会白白再花 30–40 秒）
 xcrun simctl launch "$UDID" "${BID}" >/dev/null 2>&1
 sleep 5
@@ -600,12 +635,6 @@ fi
 #    这里用 `declare -f` 把原函数改名保留，再包一层，**只影响本脚本**。
 eval "$(declare -f summary | sed '1s/^summary ()/summary_lib ()/')"
 summary() {
-  if [ "${MAINPATH_GAP:-0}" = "1" ]; then
-    echo ""
-    echo "  ⚠️ 贴令牌主路径未走通 —— **夹具缺口非产品判决**：test 端点发的是访问令牌，"
-    echo "     页面要邮件链接一次性令牌（形态不匹配）。凭据链路由兜底表单承载且已全绿。"
-    echo "     服务端缺口（test 端点应能签发一次性登录链接令牌）已登记 BLOCKED。"
-  fi
   if [ "${FIXTURE_UNRELIABLE:-0}" = "1" ]; then
     echo ""
     echo "  ⚠️⚠️ **本轮夹具自身不可信** —— 上面的通过/失败都**不是产品判决**。"
@@ -616,7 +645,6 @@ summary() {
 }
 
 FIXTURE_UNRELIABLE=0
-MAINPATH_GAP=0
 
 # ── 0.5. 🔴 冷启动**前置性**：全新安装 → 欢迎页第一屏 ─────────────────────
 #
@@ -1282,7 +1310,7 @@ if [ "$(jget "$(ax "验证并登录" --pressable --list --json)" found)" = "True
   SR=$(ax "粘贴邮件里的链接或令牌" --role AXTextField --scroll-into-view)
   if [ "$(jget "$SR" visible)" = "True" ]; then
     ok "「粘贴邮件里的链接或令牌」已滚进可见区（y=$(jget "$SR" y)，滚了 $(jget "$SR" swipes) 次）"
-    set_field "粘贴邮件里的链接或令牌" "$TOKEN"
+    set_field "粘贴邮件里的链接或令牌" "$ONETIME_TOKEN"
     dismiss_ios_save_password || true
     ax --dismiss-keyboard --json >/dev/null 2>&1
     SUB=$(ax "验证并登录" --pressable --scroll-into-view)
@@ -1326,14 +1354,11 @@ if [ "$(jget "$(ax "验证并登录" --pressable --list --json)" found)" = "True
       dismiss_ios_save_password || true
     done
     if [ "$CREDS_OK" -ne 1 ]; then
-      # 🔴 夹具限制，不是产品红（2026-10-02 定性，12 轮从未通过）：
-      #    test 端点签发的是 **JWT 访问令牌**，而「粘贴邮件里的链接或令牌」
-      #    吃的是**邮件链接的一次性令牌**（ADR-0039 那套）—— 形态不匹配，
-      #    主路径在本夹具下结构性不可能通过。真正的凭据链路由下面的兜底
-      #    表单承载且判据齐全（5a 已验入口可达）。服务端缺口（test 端点
-      #    应能签发一次性登录链接令牌）登记 BLOCKED。
-      MAINPATH_GAP=1
-      echo "     ⚠️ 主路径未通过 —— 贴的是访问令牌，页面要邮件链接令牌（形态不匹配，夹具缺口）"
+      # 🔴 真红（B10 已收口，2026-10-02）：现在贴的是真·邮件链接形态的一次性
+      #    令牌（/api/test/mint-login-link 签发），走不通就是产品/夹具的真问题，
+      #    不再有"令牌形态不匹配"这层降级借口。兜底路径仍会继续，凭据链路
+      #    的判据不丢，但 summary 的失败计数里会如实记下这一条。
+      bad "主路径未走通：贴一次性令牌 → 「验证并登录」后 210 秒内没回到可用状态 —— 真红，不是夹具缺口"
     fi
   else
     bad "认证页上找不到「验证并登录」—— 令牌可能没贴进去，退回兜底路径"
