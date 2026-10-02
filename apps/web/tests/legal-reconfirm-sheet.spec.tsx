@@ -146,6 +146,10 @@ describe('界面上有没有这一问', () => {
     expect(box!.textContent).not.toContain(translate('zh-CN', 'common.privacy.consent.localOnly'));
     // 没有 X 关闭按钮：这一问不是"以后再说"能打发掉的偏好设置。
     expect(box!.querySelector('[data-testid="privacy-consent-close"]')).toBeNull();
+    // 🔴 这一块上的字就是**用户正在确认的内容**，所以词条里不许留任何标记语法。
+    // 它是被真浏览器截图抓出来的（§6.2 规定一）：中文 intro 写着 `**现在这一版**`，
+    // 界面原样渲染出两个星号，而英文那版没有 —— 只看不数没人会报，只在 jsdom 里断言也照样漏。
+    expect(box!.textContent, `界面露出了标记语法：${box!.textContent}`).not.toMatch(/\*\*|__/);
   });
 
   it('🔴 已同意当前版本 ⇒ 面板不出现、闸门不拦（防"每次都拦"的误伤）', async () => {
