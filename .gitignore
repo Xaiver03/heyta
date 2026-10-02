@@ -182,3 +182,11 @@ docs/operations/cac-algorithm-filing/
 
 # 运行中验收脚本的自快照（traps #110/#113）：bootstrap 拷贝 + exec 的隐藏副本
 scripts/.*.snap.*
+
+# 并行 agent 在本项目里落的本机记忆目录（WorkBuddy）。它记的是**别的会话的待办与
+# 现场判断**，不是本仓库的产物；一旦以跟踪态进来，就会被当成项目文档引用。
+.workbuddy/
+
+# `e2e/playwright.password-web.config.ts` 的 outputDir。第 66 行那条 `test-results/`
+# 挡不住它 —— Playwright 的跑批输出跟着 outputDir 改名，每改一次就要在这里多一行。
+e2e/password-web-results/
