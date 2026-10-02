@@ -301,7 +301,10 @@ const canonicalHostCss = (rel) =>
 const PAIRED_TYPOGRAPHY_ALLOW = [
   // app.css —— 档位表外的桌面层级（每个组合一条；说明写在行尾）
   { file: 'apps/web/src/styles/app.css', combo: 'lg+bold', why: '品牌字（ht-brand）：品牌资产，不套语义档位' },
-  { file: 'apps/web/src/styles/app.css', combo: '2xs+semibold', why: '侧栏分组头：档位表无 2xs 档' },
+  // `2xs+semibold` 这一行已于 2026-10-02 **删掉**：它是侧栏分组头
+  // （`.ht-nav__section`）的三条手写排版值，理由是"档位表无 2xs 档"。
+  // 现在档位表有了 `group-label`（sm+semibold），四件套搬进 JSX 的
+  // `.ht-type-group-label` —— 这正是本表"只许删不许加"要的那个删。
   { file: 'apps/web/src/styles/app.css', combo: '2xs+medium', why: '日历迷你月的周次头（一二三四五六日）：2xs 微标签，档位表无 2xs 档' },
   { file: 'apps/web/src/styles/app.css', combo: 'xl+semibold', why: '页标题（AGENTS §5 层级表）：移动 screen-title 是 30/700，不等值' },
   { file: 'apps/web/src/styles/app.css', combo: 'sm+medium', why: '按钮/导航项/Tab 的桌面基准：档位表无 sm 档' },

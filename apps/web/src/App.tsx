@@ -1572,7 +1572,7 @@ export function App(): React.JSX.Element {
             真要动，动的是**行为**（或者让 rail 的那个视图换个名字），
             而不是把用户认得的词从侧栏拿掉。
           */}
-          <div className="ht-nav__section">{t('web.shell.nav.quadrantSection')}</div>
+          <div className="ht-nav__section ht-type-group-label">{t('web.shell.nav.quadrantSection')}</div>
           <div className="ht-nav">
             {QUADRANT_NAV.map((entry) => (
               <NavButton

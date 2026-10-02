@@ -303,7 +303,24 @@ export function OrganizerList({
     }
     return (
       <View style={styles.empty} testID={testID ?? 'organizer-empty'}>
-        <Text style={[text['row-title'], { color: tokens['color.foreground-muted'] }]}>
+        {/*
+          🔴 这两句是**组标题的下属**，不是列表项 —— 它们以前接的是 `row-title`
+          （16px，全应用最高频的正文档），于是 web 侧栏里出现过一次实测的倒挂：
+          分组头「清单」11px，而它下面的「还没有清单」16px，说明比标题大 1.45 倍。
+          产品负责人原话：「那为什么这个标题那么小，反而是下面说明的文本那么大呢？」
+
+          现在整条往下挪一档：主句 `row-meta`（14 regular）、补充 `caption`（12 medium），
+          与新的 `group-label`（14 semibold）之间**字号与字重两条轴都单调下降**。
+          那条层级关系钉在 `packages/design-system/tests/typography.spec.ts`
+          （"组标题档压得住它管辖的每一档说明"），所以这里换回 row-title 会红 ——
+          而那才是它该有的样子：一次改版的顺手，不该靠人记得。
+
+          ⚠️ 为什么用 `row-meta` 而不是新增一个"空态标题"档：档位表刻意只有
+          十来个（"每多一个样式就多一处该用哪个的模糊"），而 14+regular 这一条
+          已经存在。它的名字是从最高频用途（任务行次要信息）留下的，
+          **值是"组内次要文字"** —— 复用它，不是挪用。
+        */}
+        <Text style={[text['row-meta'], { color: tokens['color.foreground-muted'] }]}>
           {labels.empty}
         </Text>
         {labels.emptyHint === undefined ? null : (

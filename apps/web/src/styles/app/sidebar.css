@@ -89,13 +89,27 @@
   gap: var(--ht-space-1);
 }
 
+/*
+  侧栏分组头（「清单」「标签」「四象限」）。
+
+  🔴 这里**不再写排版四件套** —— 它整条消费语义档位 `.ht-type-group-label`
+  （由 `TEXT_STYLES` 生成），与 `ht-nav__section` **成对挂在 JSX 上**。
+  原来这里是 `2xs + semibold + letter-spacing: 0.06em` 三条手写值，
+  而那个组合在档位表里根本不存在，只登记在 `check:design` 的豁免表里，
+  理由原文是"档位表无 2xs 档" —— 债一直挂在那儿，谁都能接着往上加。
+
+  后果是产品负责人实测出来的那次倒挂：标题 11px，而它管辖的空态说明接的是
+  `row-title`（16px）。
+
+  ⚠️ 同时**去掉了 `text-transform: uppercase`**：拉丁文侧栏敢把分组头做到
+  11px，靠的是"大写 + 宽字距"这两条与字号无关的线索；**中文没有大小写**，
+  `uppercase` 对「清单」是一个空操作，宽字距对汉字只是把两个字推开。
+  线索对一半用户不存在，层级就不能建在它上面 —— 现在字重与颜色负责。
+  （英文界面因此从 `LISTS` 变成 `Lists`，与 Notion / Linear 的分组头一致。）
+*/
 .ht-nav__section {
   padding: var(--ht-space-3) var(--ht-space-2) var(--ht-space-1);
-  font-size: var(--ht-font-size-2xs);
-  font-weight: var(--ht-font-weight-semibold);
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--ht-color-foreground-subtle);
+  color: var(--ht-color-foreground-muted);
 }
 
 /*

@@ -36,7 +36,7 @@
  * 否则看到的是**上一次构建**的结果。
  */
 
-import { readFileSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -295,6 +295,101 @@ describe('E2 空态：一块空白不算空态', () => {
     const text = render().textContent ?? '';
     expect(text).not.toContain('还没有清单');
     expect(text).not.toContain('还没有标签');
+  });
+});
+
+describe('E3 层级：组标题必须压得住它管辖的说明', () => {
+  /**
+   * 出处：产品负责人 2026-10-02 对着 macOS 壳的侧栏问的
+   * 「清单跟标签这两个字应该分别都是标题…那为什么这个标题那么小，
+   * 反而是下面说明的文本那么大呢？我们 UI 和 UX 还有设计系统难道没有
+   * 定义这种信息的层级的表示吗？」
+   *
+   * 她那一句里的"难道没有定义"是**问对了的**：侧栏分组头这个角色
+   * 在 `TEXT_STYLES` 里从来没有条目，它住在 `sidebar.css` 的三条手写值里
+   * （`2xs + semibold + letter-spacing: 0.06em`），而那条组合登记在
+   * `check:design` 的豁免表上，理由原文是"档位表无 2xs 档"。
+   * 于是"标题"是 11px，"说明"接的是全应用最高频的正文档 `row-title`（16px）。
+   *
+   * 🔴 三条判据各挡一种回潮：
+   *   1. **档位之间存在层级关系** —— 在 `packages/design-system/tests/typography.spec.ts`
+   *      （`group-label` 对 `row-meta` / `caption` 必须字号 ≥ 且字重 >）。
+   *      没有这条，下一次有人"为了紧凑"把档位调小，界面这边什么都不会红。
+   *   2. **DOM 上真的挂着那一档**（下面第一条 it）—— CSS 类已经不自带排版了，
+   *      忘挂 `.ht-type-*` 不是"样式没生效"，是**静默回落到继承的 16px 正文**。
+   *   3. **每一个用到这个角色的地方都挂了**（遍历那条 it）—— 只测侧栏这一块，
+   *      顶栏与日历侧栏就可以各自漏掉，而它们是同一条 CSS 规则。
+   */
+  it('侧栏的「清单」「标签」标题元素挂着语义档位（CSS 类已不再自带排版）', () => {
+    projectsState.projects = [];
+    projectsState.tags = [];
+    const view = render();
+    const headings = [...view.querySelectorAll('h2.ht-nav__section')];
+    // 两条，不是一条：「清单」与「标签」必须走同一个角色。
+    expect(headings).toHaveLength(2);
+    for (const h of headings) {
+      expect(h.className, '分组头必须整条消费 .ht-type-* 档位').toContain('ht-type-group-label');
+    }
+  });
+
+  it('🔴 全 web 壳没有一处 `.ht-nav__section` 漏挂档位（遍历，含顶栏与日历侧栏）', () => {
+    /**
+     * 为什么遍历而不是逐个点名：漏挂的**症状是静默的** —— 排版从 14/600
+     * 变成继承来的 16/400，不报错、不空白，只是层级没了。
+     * 而"以后还会有人加一个分组头"是必然的，逐点断言对必然的事没有覆盖力。
+     */
+    const tsx: string[] = [];
+    const walk = (dir: string): void => {
+      for (const entry of readdirSync(dir, { withFileTypes: true })) {
+        const p = resolve(dir, entry.name);
+        if (entry.isDirectory()) walk(p);
+        // ⚠️ 交替里把长的放前面：`.tsx` 先于 `.ts`，否则 `.ts` 会先吃掉 `.tsx`
+        //    的前缀，把 .tsx 文件整个漏掉（这条判据就会永远通过）。
+        else if (/\.tsx?$/.test(entry.name)) tsx.push(p);
+      }
+    };
+    walk(WEB_SRC);
+
+    const hits: string[] = [];
+    const missing: string[] = [];
+    for (const file of tsx) {
+      const lines = readFileSync(file, 'utf8').split('\n');
+      lines.forEach((line, i) => {
+        if (!line.includes('ht-nav__section')) return;
+        hits.push(`${file}:${i + 1}`);
+        if (!line.includes('ht-type-')) missing.push(`${file.replace(WEB_SRC, '')}:${i + 1}`);
+      });
+    }
+    // 前提必须成立：一条都没扫到 = 判据不可用（多半是遍历本身坏了）。
+    expect(hits.length, '一个 .ht-nav__section 都没扫到 —— 遍历坏了，这条判据不可用').toBeGreaterThan(
+      0,
+    );
+    expect(missing, `漏挂档位的分组头：${missing.join(', ')}`).toEqual([]);
+  });
+
+  it('共享空态接的是说明档，不是正文档（`row-title` 不许回来）', () => {
+    const component = readFileSync(resolve(UI_SRC, 'projects/OrganizerList.tsx'), 'utf8');
+    const emptyBlock = component.slice(
+      component.indexOf('if (items.length === 0)'),
+      component.indexOf('return (\n    <View style={styles.list}'),
+    );
+    expect(emptyBlock, '空态主句必须用 row-meta（14），不是 row-title（16）').toContain(
+      "text['row-meta']",
+    );
+    expect(emptyBlock).not.toContain("text['row-title']");
+    // 补充句再低一档：caption（12）。三档之间必须仍是单调下降的。
+    expect(emptyBlock).toContain('text.caption');
+
+    /*
+      🔴 这半条是**本刀自己造出来的**：上面那次变异（把空态换回 row-title）我用的是
+      全局字符串替换，它顺手把**行名**的 `row-title` 一起改成了 `row-meta`，
+      而 24 条判据**一条都没红** —— 侧栏的清单名当场小一档，没有任何东西拦住。
+      "档位被全局替换误伤"不是假想敌，是我十分钟前亲手演示的那件事。
+    */
+    expect(
+      component,
+      '行名（清单 / 标签的名字）必须是正文档 row-title',
+    ).toContain("text['row-title'], styles.name");
   });
 });
 
