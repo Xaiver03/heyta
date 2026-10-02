@@ -21,6 +21,22 @@ sync_windows_sources() {
   local host="$1"
   local tarball=/tmp/heyta-src.tar.gz
   local list=/tmp/heyta-src-files.txt
+  # 🔴 桥的 bundle 是**构建产物、不入库**，而 `pnpm -r build` 不生成它 ⇒ 干净检出里
+  #    它不存在，下面那句 `printf` 把它无条件写进清单，tar 直接
+  #    `Cannot stat: No such file or directory`（2026-10-02 在隔离检出里实测）。
+  #    与 mac 段 `package-app.sh` 同一处置：在这里现生成，不指望"本机跑过壳门禁"。
+  local repo_root
+  repo_root="$(git rev-parse --show-toplevel)" || return 1
+  if ! node "$repo_root/packages/app-host/scripts/build-native-bridge.mjs"; then
+    echo "  🔴 生成 bridge bundle 失败（packages/app-host/scripts/build-native-bridge.mjs）"
+    return 1
+  fi
+  # 两个显式追加的构建输入**不过**上面那道"实际存在"过滤，所以单独验一次：
+  # 缺了要指名道姓地红，而不是留一条 tar 的 errno。
+  local p
+  for p in apps/web/dist packages/app-host/bridge-bundle/native-bridge.js; do
+    [ -e "$p" ] || { echo "  🔴 构建输入不存在：$p —— 不打包（宁可不装，也不装旧产物）"; return 1; }
+  done
   # tar 读的是**工作树内容**（不是 git 对象），所以未提交改动、未跟踪的新文件都在。
   # ⚠️ 被删掉的跟踪文件不能进清单（tar 会直接失败）—— 过滤成"实际存在"的路径。
   {
