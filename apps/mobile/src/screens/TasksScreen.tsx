@@ -1010,7 +1010,15 @@ export function TasksScreen({
            * 分别取两次 `Date.now()` 会在跨零点的瞬间让"今天在哪"指向两天，
            * 而那种 bug 只在午夜那一秒出现。
            */
-          <TimelineScreen tasks={tasks} today={today} now={now} />
+          <TimelineScreen
+            tasks={tasks}
+            today={today}
+            now={now}
+            // 触屏端的排期入口：点行 → 详情表单（横向拖拽与滚动冲突，不搬鼠标手势）。
+            onOpenTask={(id) => {
+              setDetailTaskId(id);
+            }}
+          />
         ) : nothing ? (
           <EmptyState
             icon="group.inbox"

@@ -2885,3 +2885,54 @@ spec，且报错里出现 `ECONNREFUSED <本机端口>` 或 `.playwright-artifac
     📌 一般规律：**探针查询词是某真实元素 label 的子串时，"查不到"永远不可能
     为真** —— 这类恒真判据不会自己报错，要等它第一次被依赖才爆。新增界面
     元素（chip/徽标/标题）时，回头 grep 一遍验收脚本里的 label 探针。
+
+93. 🔴 **Google Prefab CLI 2.1.0 在 JDK 24 下把受限方法告警打上 stderr，而 AGP 的
+    prefab 胶水把任何 stderr 行都当错误抛 —— Android 原生构建一旦"全量重配"必挂。**
+
+    症状：`:app:configureCMakeRelWithDebInfo[arm64-v8a]` 失败，异常消息就是一行
+    `WARNING: A restricted method in java.lang.System has been called` —— 真身在
+    `app/build/intermediates/cxx/RelWithDebInfo/<hash>/logs/arm64-v8a/prefab_stderr.txt`：
+    Prefab CLI 的 JNA 调 `System::load`，JDK 24 对未声明 native access 的调用打告警。
+    增量构建时该任务 up-to-date 不执行，所以**平时是绿的**；任何让 CMake 缓存失效的
+    改动都会让它现形（2026-10-02，批二重建时实测）。`JDK_JAVA_OPTIONS=
+    --enable-native-access=ALL-UNNAMED` 治不了 —— "Picked up JDK_JAVA_OPTIONS" 这行
+    NOTE 自己也写 stderr，照样被抛（实测）。
+    ✅ 修法：装 JDK 21 LTS 到用户目录（brew cask 要 sudo，走 Adoptium tarball 解到
+    `~/jdks/`），在**用户级** `~/.gradle/gradle.properties` 钉
+    `org.gradle.java.home=…`（机器本地配置，不进仓库），`./gradlew --stop` 后重建。
+
+    📌 一般规律：**"增量构建是绿的"不等于"工具链没坏"** —— 只验增量产物的流程会把
+    全量重配的雷留到下一次缓存失效。升级 JDK 这类环境变更，必须触发一次全量原生
+    构建才算验过。
+
+94. 🔴 **共享验收助手的假设会过时：IA 把凭据表单搬进设置 Modal 之后，
+    `configure_sync_credentials`（`scripts/lib/mobile-e2e.sh`）还在「我的」页找
+    输入框 —— 三个字段全部"找不到"，而页面明明就在。**
+
+    症状极难归因：字段不是被折叠，是**真的不在树上**；dump 里唯一的"服务器地址"
+    出现在未配置提示语的文案里 —— 一条文案子串。于是脚本红了一大片，看起来像
+    "产品没配好"，其实是助手对旧 IA 的记忆（2026-10-02 verify-mobile-inbox 立判据
+    时实测；此前未爆只因最近的 schedule 验收全程不需要凭据）。
+    ✅ 修法：助手按**稳定锚点**（resource-id `profile-entry-settings`，不走文字）
+    先开设置 Modal、填完 keyevent 关回「我的」—— 修一处，所有 `verify:mobile-*`
+    受益。
+
+    📌 一般规律：**产品 IA 每挪一次，共享验收助手对屏幕的每个假设都要重对一遍**
+    —— 助手不会自己报"我找的东西搬家了"，它只会红给你看。另一个同族坑在
+    RN 安卓侧：普通 `View` 加 `accessible` + accessibilityLabel **仍不会**变成
+    content-desc，要 `Pressable` 才行（同一天第三坑，一并记此）。
+
+110. 🔴 **运行中的 bash 脚本是被增量读取的 —— 边跑边改它，后半段按字节错位炸出假语法错误。**
+
+    2026-10-02 实测：验收脚本跑到第 6 步时，我在另一个工具调用里"顺手"编辑了
+    同一个文件（加个循环），几分钟后运行方炸出
+    `line 1610: syntax error near unexpected token ')'` / "` 72); do`" ——
+    文件本身 `bash -n` 全绿。bash 按字节偏移**惰性读取**脚本，编辑使偏移整体
+    位移，运行中的副本从被改处开始解析的是错位字节。
+
+    ✅ 纪律：长跑脚本**运行期间零编辑** —— 修复排队，等 `pgrep` 确认进程退出
+    再动文件；要"立即生效"就重启轮次。同族：`tail -f` 的日志文件可以随便看，
+    被执行的脚本不行。
+
+    📌 一般规律：**"正在被执行的文件"与"正在被阅读的文件"是两种东西** ——
+    前者的修改是写进运行时语义的，任何"顺手改一下"都要先问一句它现在是否正在跑。

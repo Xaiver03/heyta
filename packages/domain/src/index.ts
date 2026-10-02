@@ -43,3 +43,4 @@ export * from './subscription.js';
 export * from './activity.js';
 export * from './ticktick-format.js';
 export * from './ticktick-import.js';
+export * from './quick-due-picks.js';

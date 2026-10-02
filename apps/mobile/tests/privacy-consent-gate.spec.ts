@@ -571,24 +571,29 @@ describe('调用点与顺序（源码级：删掉或挪晚都会红）', () => {
 describe('首启面板的界面纪律（不同意必须是同等可达的一条路）', () => {
   const code = codeOf('screens/PrivacyConsentSheet.tsx');
 
-  it('🔴 「同意并联网」与「只用本机」**并排且等宽**（同一个 flex 行、各占一个 flex:1 槽位）', () => {
+  it('🔴 「同意并联网」与「只用本机」**并排且等宽**（同一行、两个槽位共用同一个等宽样式）', () => {
     const acceptAt = code.indexOf("t('common.privacy.consent.accept')");
     const localAt = code.indexOf("t('common.privacy.consent.localOnly')");
-    // ⚠️ 必须是 `lastIndexOf`：文件里上面还有别的 `flexDirection: 'row'`（标题那一行），
-    // 从它切起会把**整块面板**当成"那一行"，于是 `flex: 1` 数出 4 个、判据当场假红。
-    const rowAt = code.lastIndexOf("flexDirection: 'row'", acceptAt);
     expect(acceptAt, '没有「同意」按钮').toBeGreaterThanOrEqual(0);
     expect(localAt, '没有「只用本机」按钮').toBeGreaterThanOrEqual(0);
-    expect(rowAt, '两个按钮不在同一个 row 里 —— 上下堆叠会把"二选一"读成"先主后次"').toBeGreaterThanOrEqual(
-      0,
-    );
-    // 行 → 两个 label 之间：这一段就是那**一行**按钮。
-    const row = code.slice(rowAt, localAt);
     expect(acceptAt < localAt, '「只用本机」排在「同意」之前（读屏顺序会决定第一下命中谁）').toBe(true);
+    // 2026-10-02 样式迁移（L4）：内联对象改为模块级 StyleSheet（makeStyles 惯用法），
+    // 判据跟着换形态、**意图不变**：两个槽位必须引用**同一个** `styles.action`
+    // （共享一个等宽定义比两份内联各写一遍更不会漂），且该样式确实是 flex:1、
+    // 所在行确实是横向 row —— 把"不同意"做窄一点就是《认定方法》里的诱导同意。
     expect(
-      (row.match(/flex:\s*1[,\s}]/g) ?? []).length,
-      '两个选项不等宽 —— 把"不同意"做窄一点就是《认定方法》里的诱导同意',
+      (code.match(/style=\{styles\.action\}/g) ?? []).length,
+      '两个选项没有共用同一个等宽槽位样式',
     ).toBe(2);
+    const actionStyleAt = code.indexOf('action: {');
+    expect(
+      code.slice(actionStyleAt, actionStyleAt + 60),
+      '等宽槽位样式丢了 flex:1',
+    ).toMatch(/flex:\s*1/);
+    expect(
+      code,
+      '两个决定按钮不在同一个横向 row 里 —— 上下堆叠会把"二选一"读成"先主后次"',
+    ).toMatch(/actionsRow: \{\s*flexDirection: 'row'/);
   });
 
   it('🔴 「只用本机」是**中性**的（danger 色 = 把拒绝画成惩罚）', () => {

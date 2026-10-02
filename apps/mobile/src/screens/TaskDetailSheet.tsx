@@ -64,7 +64,13 @@ import {
   type RepeatPresetId,
   type TaskActions,
 } from '@heyta/app-host';
-import { ChecklistPlanPreview, ReminderList, rejectionReasonOf, subtaskRejectionMessageKey } from '@heyta/ui';
+import {
+  ChecklistPlanPreview,
+  ReminderList,
+  formatDuration,
+  rejectionReasonOf,
+  subtaskRejectionMessageKey,
+} from '@heyta/ui';
 
 import { formatStamp } from '../lib/date';
 import { PRIORITY_ORDER, priorityColorToken, priorityLabel } from '../lib/priority';
@@ -73,7 +79,12 @@ import { reminderListLabels } from '../lib/reminders-display';
 import { timelineLabels } from '../lib/timeline-labels';
 import { useTaskReminders } from '../lib/reminders';
 import { useText, useTheme, useTokens } from '../theme';
-import { DatePicker } from '../ui/DatePicker';
+// 🔴 DatePicker 已上提到共享层（批一，多端入口覆盖 goal §2）：
+// web 补 due 编辑时两端要同一只选择器。本地的 `ui/DatePicker.tsx` 已删 ——
+// 消费共享份，不留第二份（AGENTS §3.5 的收尾纪律）。
+import { DatePicker } from '@heyta/ui';
+import { datePickerLabels } from '../lib/date-picker-labels';
+import { quickDatePicks } from '../lib/quick-dates';
 import { Button, Chip, IconButton, SectionHeader, Text, TextField } from '../ui/kit';
 
 /**
@@ -183,6 +194,12 @@ export function TaskDetailSheet({
     [task],
   );
   const planLabels = useMemo(() => timelineLabels(t).plan, [t]);
+  // 排期段（多端不同入口：触屏端在详情表单里排期，web 载荷用拖拽 —— ADR-0043 §5）。
+  const startLocal = task?.startDate === undefined ? undefined : toLocalDate(task.startDate);
+  /** 时长档位（分钟）。与 `setSchedule` 的夹取档一致，全落在 [5, 480] 内。 */
+  const DURATION_CHIPS: readonly number[] = [30, 60, 120, 240];
+  const durationChipLabel = (minutes: number): string =>
+    formatDuration(minutes, planLabels.gantt);
 
   // 🔴 只按**任务 id 与可见性**重同步，依赖里**刻意没有** `task.title`。
   // 带上它的话，正在打字时只要有一次后台同步回来（或冲突解决改了标题），
@@ -330,6 +347,9 @@ export function TaskDetailSheet({
 
   const dueLocal = task.dueDate === undefined ? undefined : toLocalDate(task.dueDate);
   const todayLocal = toLocalDate(now);
+  // 共享 DatePicker 的注入物（快捷项日期数学在 domain，措辞在这里）。
+  const datePicks = quickDatePicks(todayLocal, t);
+  const datePickerText = datePickerLabels(t);
   const done = task.completedAt !== undefined;
   /**
    * 当前是否"重要"。
@@ -665,12 +685,63 @@ export function TaskDetailSheet({
               <DatePicker
                 value={dueLocal}
                 today={todayLocal}
+                quickPicks={datePicks}
+                labels={datePickerText}
                 onChange={(date) => {
                   // 🔴 清除传 `undefined`，由 app-host 写成 `null`
                   // （见 `TaskActions.setDueDate` 的注释）。
                   run(actions.setDueDate(task.id, date === undefined ? undefined : dueDateToEpoch(date)));
                 }}
               />
+            </View>
+
+            {/* 排期段（时间线 P2 的触屏入口）：开始 + 时长决定这条任务在时间线板上的条。
+                与截止是两件事 —— 截止是"什么时候到期"，排期是"什么时候做"。 */}
+            <View style={{ gap: tokens['space.2'] }}>
+              <SectionHeader icon="task.due" title={t('mobile.detail.field.schedule')} />
+              <Text variant="row-meta" tone="muted">
+                {t('mobile.detail.schedule.hint')}
+              </Text>
+              <Text variant="row-meta" tone="muted">
+                {t('mobile.detail.schedule.start')}
+              </Text>
+              <DatePicker
+                value={startLocal}
+                today={todayLocal}
+                quickPicks={datePicks}
+                labels={datePickerText}
+                onChange={(date) => {
+                  // 显式 `undefined` ⇒ 动作层写成 `null`（清除排期起点）。
+                  run(
+                    actions.setSchedule(
+                      task.id,
+                      date === undefined ? { startDate: undefined } : { startDate: dueDateToEpoch(date) },
+                    ),
+                  );
+                }}
+              />
+              <Text variant="row-meta" tone="muted">
+                {t('mobile.detail.schedule.duration')}
+              </Text>
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: tokens['space.2'] }}>
+                <Chip
+                  label={t('mobile.detail.schedule.none')}
+                  selected={task.durationMinutes === undefined}
+                  onPress={() => {
+                    run(actions.setSchedule(task.id, { durationMinutes: undefined }));
+                  }}
+                />
+                {DURATION_CHIPS.map((minutes) => (
+                  <Chip
+                    key={minutes}
+                    label={durationChipLabel(minutes)}
+                    selected={task.durationMinutes === minutes}
+                    onPress={() => {
+                      run(actions.setSchedule(task.id, { durationMinutes: minutes }));
+                    }}
+                  />
+                ))}
+              </View>
             </View>
 
             <View style={{ gap: tokens['space.2'] }}>

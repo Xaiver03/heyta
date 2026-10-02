@@ -82,7 +82,9 @@
  *
  *   1. **文件级近似**：只要一个文件可达，就认为它里面的消费者都被覆盖 ——
  *      不区分同一文件内的条件分支（`{cond ? <A/> : null}`）与代码路径。
- *      这**只会漏报、不会误报**。要精确到"哪条渲染路径"得上真正的语法树。
+ *      近似**只会漏报**；而"组件体插槽工厂"（useCallback / 箭头返回 JSX、
+ *      工厂标识符在 Provider range 内被引用）曾是它的**误报源**，
+ *      已按运行时嵌套补齐（2026-10-02）。要精确到"哪条渲染路径"得上真正的语法树。
  *   2. **经第三方/workspace 包转手的间接渲染**：`<X/>` 来自 `@heyta/xxx`
  *      （非 `@heyta/ui`）而我们又看不到它的源码时，跟不下去。
  *   3. **运行时才决定的组件**：`React.createElement` / 字符串变量拿到的组件 /
@@ -792,6 +794,50 @@ for (const hostDir of HOST_DIRS) {
     }
   }
 
+  // ---- 插槽工厂（2026-10-02 补）--------------------------------------------
+  // 组件体的 `const renderX = useCallback((…) => <Consumer …/>)` 在**运行时**
+  // 是正确的：回调在共享组件的渲染过程中被调用，而共享组件挂在 Provider 之内
+  //（App.tsx 的 renderTaskMeta / renderTrailing 正是此形态）。上面的判据看
+  // **词法位置**，会把这类消费者误判成"在子树之外"（false positive）。
+  // 规则：消费者所在的**工厂标识符**（包含它的、组件体缩进两格的
+  // `const <name> = useCallback(…)` / `const <name> = (…) => …`）
+  // 只要在某个 Provider 的 range 之内被**引用**过（如 `renderMeta={renderX}`），
+  // 就按运行时嵌套判为"之内"。
+  const providerRanges = providers.map((p) => ({
+    file: p.file,
+    start: p.node.start,
+    end: p.node.end,
+  }));
+  // 插槽工厂扩展**可达性根集**：工厂定义在组件体（App.tsx:721 一类），
+  // 消费者在工厂返回的组件文件里 —— 运行时它们经共享组件（Provider 之内）
+  // 被调用，词法上却落在 Provider range 之外。凡工厂标识符在自己宿主文件的
+  // 某个 Provider range 之内被引用，其声明区间（到下一个同缩进 const 为止）
+  // 里渲染出的本地组件都按"Provider 之内"计。
+  const slotRoots = [];
+  for (const file of hostFiles) {
+    const declRe = /\n  const (\w+)\s*=\s*(?:useCallback\(|\(|async)/g;
+    const decls = [];
+    let dm;
+    while ((dm = declRe.exec(file.structural)) !== null) {
+      decls.push({ name: dm[1], start: dm.index });
+    }
+    for (let i = 0; i < decls.length; i++) {
+      const end = i + 1 < decls.length ? decls[i + 1].start : file.structural.length;
+      const referenced = providerRanges.some(
+        (r) =>
+          r.file === file &&
+          new RegExp(`\\b${decls[i].name}\\b`).test(file.structural.slice(r.start, r.end)),
+      );
+      if (referenced) slotRoots.push({ file, start: decls[i].start, end });
+    }
+  }
+  for (const s of slotRoots) {
+    for (const tag of renderedTags(s.file, s.start, s.end)) {
+      const r = resolveName(s.file, tag.name);
+      if (r.kind === 'local' && !reachable.has(r.file)) reachable.add(r.file);
+    }
+  }
+
   const uncovered = [];
   for (const u of usages) {
     const directlyInside = providers.some(
@@ -852,8 +898,11 @@ console.log(`✅ 用了共享 UI 的宿主都挂了 HeytaUiProvider，且消费�
 console.log('');
 console.log('ℹ️ 覆盖边界（如实说明 —— 诚实的不完备 > 假的完备）：');
 console.log('   · 覆盖：同一宿主内经相对 import 连接的组件渲染图，跟到**组件所在文件**为止。');
+console.log('   · 覆盖②：插槽工厂 —— 组件体 const 工厂（useCallback / 箭头）里渲染的消费者，');
+console.log('     只要工厂标识符在某个 Provider range 内被引用，按运行时嵌套判为之内');
+console.log('     （2026-10-02 补：此前把 App.tsx 的 renderTaskMeta 形态误报成子树之外）。');
 console.log('   · 不覆盖①：文件级近似 —— 文件可达即认为其消费者被覆盖，');
-console.log('     不区分同一文件内的条件分支；只会漏报、不会误报。');
+console.log('     不区分同一文件内的条件分支；近似只会漏报，插槽工厂规则消除了一类误报。');
 console.log('   · 不覆盖②：经非 @heyta/ui 的 workspace 包再转手渲染共享组件的间接路径。');
 console.log('   · 不覆盖③：React.createElement / 变量组件 / 动态 import 等运行时才决定的挂法。');
 console.log('   · 不覆盖④：packages/ui 内部自身的消费者（它是 Provider 的定义处）。');

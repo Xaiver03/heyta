@@ -194,7 +194,9 @@ const IMPLEMENTATIONS = [
       '两者不能各写一份路径字面量，否则改一处漏一处且不报错。',
   },
   {
-    file: 'apps/web/src/App.tsx',
+    // 2026-10-02 外壳重构把骨架从 App.tsx 抽到 features/shell/（逻辑逐字未动），
+    // 锚点跟着搬 —— 旧位置已不存在，留着就是"锚点失效"假红。
+    file: 'apps/web/src/features/shell/EmptyState.tsx',
     label: 'web 壳的空态骨架（待转发）',
     must: /function\s+EmptyState\s*\(/,
     also: /ht-empty/,
@@ -283,15 +285,19 @@ const SITE_MARKERS = [
  */
 const EMPTY_SITES = {
   骨架类: [
-    'apps/web/src/App.tsx', // L3 壳层：这就是 web 的"唯一实现"，不是债
-    'apps/web/src/features/trash/TrashView.tsx', // 债：手抄了同一套骨架
+    // 2026-10-02：从 App.tsx 抽到 features/shell/（外壳重构，逻辑逐字未动）——
+    // L3 壳层跟着搬家：这就是 web 的"唯一实现"，不是债。
+    'apps/web/src/features/shell/EmptyState.tsx',
+    // 2026-10-02：TrashView 的手抄骨架已被上面的壳层组件收编（登记站点消失，删账）。
   ],
   空槽位类: [],
   '空态 testid': [
     'apps/web/src/features/settings/ImportPanel.tsx',
     'apps/web/src/features/settings/MemoryPanel.tsx',
     'apps/web/src/features/settings/PasskeyPanel.tsx',
-    'apps/web/src/features/trash/TrashView.tsx',
+    // 2026-10-02：TrashView 的手抄 testid 已随骨架一起被壳层组件收编（删账）；
+    // 壳层组件自身带 empty testid —— 与骨架类同一处"非债"位置，登记以免误报。
+    'apps/web/src/features/shell/EmptyState.tsx',
   ],
   直接渲染空态词条: [
     'apps/mobile/src/screens/ListsSection.tsx',
@@ -301,6 +307,14 @@ const EMPTY_SITES = {
     'apps/mobile/src/screens/TrashScreen.tsx',
     'apps/web/src/features/ai/AiToolRun.tsx',
     'apps/web/src/features/auth/AuthPanel.tsx',
+    /**
+     * 2026-10-02 登记（新债入账）：`ProjectsPanel` 把清单/标签的空态文案作为
+     * `empty` / `emptyHint` 标签传给共享 `OrganizerList` —— 共享层不许
+     * import i18n，宿主侧构造文案是与 `features/categories/copy.ts` 同一条
+     * 纪律（"同一句话不许两个端各写一份"，词条就是同一套
+     * `common.organizer.*`）。**渲染**仍在共享 Board 里，这里只是文案来源。
+     */
+    'apps/web/src/features/projects/ProjectsPanel.tsx',
     /**
      * M3 第三刀（categories）：`CategoryBreakdown.tsx` 那一处**已收编** ——
      * 泳道 / 空态 / 区间 / 未归类全部搬进 `@heyta/ui` 的 `CategoryReportView`
@@ -474,7 +488,9 @@ const FORBIDDEN_SHARED_IMPORT = /from\s+['"]@heyta\/i18n(?:\/[^'"]*)?['"]/;
  */
 const PENDING_THIN_FORWARD = [
   {
-    file: 'apps/web/src/App.tsx',
+    // 2026-10-02 外壳重构：实现从 App.tsx 整体抽到 features/shell/（逐字未动），
+    // 待转发登记跟着搬家。
+    file: 'apps/web/src/features/shell/EmptyState.tsx',
     host: 'web 壳',
     /** 收编后这一处应当只剩：从 `@heyta/ui` 导入 `EmptyState` + 把 4 个槽位传进去。 */
     becomesAt: '把 `ht-empty` 三件套换成 `<EmptyState …/>`（`web.shell.empty.*` 仍在宿主侧取）',
@@ -557,10 +573,12 @@ for (const impl of IMPLEMENTATIONS) {
  * 而"集体消失"如果只是"没有违规"，这道门禁就永远绿了。
  */
 {
-  const appSrc = readIfExists('apps/web/src/App.tsx') ?? '';
-  if (!/ht-empty/.test(appSrc)) {
+  // 2026-10-02 外壳重构：骨架（含 `ht-empty` 三件套）从 App.tsx 抽到
+  // features/shell/EmptyState.tsx —— 锚点跟着搬，判据不变（marker 失效即红）。
+  const shellSrc = readIfExists('apps/web/src/features/shell/EmptyState.tsx') ?? '';
+  if (!/ht-empty/.test(shellSrc)) {
     anchorErrors.push(
-      'apps/web/src/App.tsx 里已经没有 `ht-empty` 骨架类 —— 站点的 marker 失效了',
+      'apps/web/src/features/shell/EmptyState.tsx 里已经没有 `ht-empty` 骨架类 —— 站点的 marker 失效了',
     );
   }
 }

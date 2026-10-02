@@ -38,6 +38,8 @@ const COMPACT_BELOW_DP = 480;
 export interface TimelineScreenProps {
   /** 要排的任务。顺序 = 输入序（板上的显示序由共享层按时间排序）。 */
   readonly tasks: readonly TimelineTaskLike[];
+  /** 点任务行 / 泳道条目 ⇒ 打开详情（触屏端的排期入口，见板注释）。 */
+  readonly onOpenTask?: (taskId: string) => void;
   /** 今天的本地日历日（窗口的周锚点 + 今天线）。 */
   readonly today?: LocalDate;
   /** 用于日期格式化的时间戳。默认 `Date.now()`。 */
@@ -45,7 +47,7 @@ export interface TimelineScreenProps {
 }
 
 export function TimelineScreen(props: TimelineScreenProps): React.JSX.Element {
-  const { tasks, today, now } = props;
+  const { tasks, today, now, onOpenTask } = props;
   const labels = useTimelineLabels();
   const { width } = useWindowDimensions();
   // 规划是纯函数，但没必要每帧重算 —— `tasks` 变了才重排（与 web 同一条做法）。
@@ -55,6 +57,7 @@ export function TimelineScreen(props: TimelineScreenProps): React.JSX.Element {
     <TimelineBoard
       rows={rows}
       labels={labels.board}
+      onOpenTask={onOpenTask}
       compactTicks={width < COMPACT_BELOW_DP}
       {...(today === undefined ? {} : { today })}
       {...(now === undefined ? {} : { now })}

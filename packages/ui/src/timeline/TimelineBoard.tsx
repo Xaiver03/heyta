@@ -30,7 +30,7 @@
  */
 
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { StyleSheet, Text, View, type DimensionValue } from 'react-native';
+import { Pressable, StyleSheet, Text, View, type DimensionValue } from 'react-native';
 import {
   toLocalDate,
   type LocalDate,
@@ -93,10 +93,26 @@ export interface TimelineBoardProps {
    * 不给 = 手势关闭。组件只换算时间戳，标题与写 op 全在宿主。
    */
   readonly onCreateAt?: (atMs: number) => void;
+  /**
+   * 点任务行 / 泳道条目 ⇒ 打开该任务（**多端不同入口**：web 的排期入口是拖拽，
+   * 触屏端的入口是「点行 → 详情表单」—— 横向拖拽与纵向滚动在触摸上冲突，
+   * 硬搬鼠标手势不是触屏的最佳实践）。不给 = 行不可点。
+   */
+  readonly onOpenTask?: (taskId: string) => void;
 }
 
 export function TimelineBoard(props: TimelineBoardProps): React.JSX.Element {
-  const { rows, today, now, compactTicks = false, labels, testID, onScheduleTask, onCreateAt } = props;
+  const {
+    rows,
+    today,
+    now,
+    compactTicks = false,
+    labels,
+    testID,
+    onScheduleTask,
+    onCreateAt,
+    onOpenTask,
+  } = props;
   const tokens = useHeytaTokens();
   const text = useHeytaText();
   const clock = now ?? Date.now();
@@ -278,15 +294,7 @@ export function TimelineBoard(props: TimelineBoardProps): React.JSX.Element {
           width: tokens['border-width.thick'],
           backgroundColor: tokens['color.primary'],
         },
-        resizeHandle: {
-          position: 'absolute',
-          top: 0,
-          bottom: 0,
-          width: tokens['space.2'],
-          backgroundColor: tokens['color.primary'],
-          opacity: 0.45,
-          borderRadius: tokens['radius.sm'],
-        },
+
         row: { flexDirection: 'row', alignItems: 'center' },
         rowHead: {
           width: pct(BOARD_HEADER_PERCENT),
@@ -316,6 +324,9 @@ export function TimelineBoard(props: TimelineBoardProps): React.JSX.Element {
           borderRadius: tokens['radius.sm'],
           backgroundColor: tokens['color.primary'],
           transform: [{ rotate: '45deg' }],
+          // 光标可供性：RN 类型只认 'auto'|'pointer'（原生无光标概念），RNW 透传
+          // 完整 CSS 集 —— 断言过类型、运行时给浏览器真实关键词，原生侧被忽略。
+          cursor: 'grab' as unknown as 'pointer',
         },
         pointOverdue: { backgroundColor: tokens['color.warning'] },
         rangeBar: {
@@ -326,7 +337,28 @@ export function TimelineBoard(props: TimelineBoardProps): React.JSX.Element {
           borderWidth: tokens['border-width.thin'],
           borderColor: tokens['color.primary'],
           borderRadius: tokens['radius.sm'],
+          cursor: 'grab' as unknown as 'pointer',
         },
+        // 🔴 resize 手柄的**触控目标是真实的 24×24 盒子**（R1 类 A 的正解形状：
+        // 命中区是盒子，不是负边距借位）—— 视觉条纹只有 space.2 宽，居中在内。
+        // 第一版把手柄做成 8px 宽的可点盒子，低于本仓自己取的 24px 地板。
+        resizeHit: {
+          position: 'absolute',
+          top: 0,
+          bottom: 0,
+          width: tokens['space.6'],
+          alignItems: 'center',
+          justifyContent: 'center',
+          cursor: 'col-resize' as unknown as 'pointer',
+        },
+        resizeStripe: {
+          width: tokens['space.2'],
+          height: tokens['space.6'],
+          backgroundColor: tokens['color.primary'],
+          opacity: 0.45,
+          borderRadius: tokens['radius.sm'],
+        },
+        axisClickable: { cursor: 'pointer' },
         lane: {
           backgroundColor: tokens['color.surface-sunken'],
           borderRadius: tokens['radius.sm'],
@@ -397,7 +429,7 @@ export function TimelineBoard(props: TimelineBoardProps): React.JSX.Element {
         <View style={styles.headerCol} />
         <View
           testID="timeline-axis"
-          style={styles.axis}
+          style={[styles.axis, onScheduleTask !== undefined ? styles.axisClickable : undefined]}
           aria-hidden
           {...(onCreateAt === undefined
             ? {}
@@ -467,7 +499,14 @@ export function TimelineBoard(props: TimelineBoardProps): React.JSX.Element {
             ? tokens['color.warning']
             : tokens['color.foreground-subtle'];
           return (
-            <View key={row.taskId} testID={`timeline-row-${row.taskId}`} role="listitem" style={styles.row}>
+            <Pressable
+              key={row.taskId}
+              testID={`timeline-row-${row.taskId}`}
+              role="listitem"
+              style={styles.row}
+              onPress={onOpenTask === undefined ? undefined : () => onOpenTask(row.taskId)}
+              accessibilityRole={onOpenTask === undefined ? undefined : 'button'}
+            >
               {/* 行头：标题 + 截止文字（只来自 dueDate）+ 逾期/估时 badge */}
               <View style={styles.rowHead}>
                 <Text
@@ -556,7 +595,7 @@ export function TimelineBoard(props: TimelineBoardProps): React.JSX.Element {
                         {
                           left: pct(percentAt(startMs, window)),
                           width: pct(Math.max(0, percentAt(endMs, window) - percentAt(startMs, window))),
-                          ...(isDraggingThis ? styles.resizeHandle : {}),
+                          ...(isDraggingThis ? styles.resizeStripe : {}),
                         },
                       ]}
                       {...(onScheduleTask === undefined
@@ -569,10 +608,10 @@ export function TimelineBoard(props: TimelineBoardProps): React.JSX.Element {
                   <View
                     testID={`timeline-resize-${row.taskId}`}
                     style={[
-                      styles.resizeHandle,
+                      styles.resizeHit,
                       {
                         left: pct(percentAt(position.endMs, window)),
-                        marginLeft: -(Number(tokens['space.2']) / 2),
+                        marginLeft: -(Number(tokens['space.6']) / 2),
                       },
                     ]}
                     {...(onScheduleTask === undefined
@@ -581,10 +620,12 @@ export function TimelineBoard(props: TimelineBoardProps): React.JSX.Element {
                           row.taskId,
                           (position.endMs - position.startMs) / 60_000,
                         ))}
-                  />
+                  >
+                    <View style={styles.resizeStripe} />
+                  </View>
                 )}
               </View>
-            </View>
+            </Pressable>
           );
         })}
         {todayLinePct !== undefined && (
@@ -627,10 +668,12 @@ export function TimelineBoard(props: TimelineBoardProps): React.JSX.Element {
             {labels.unscheduledLane(unscheduled.length)}
           </Text>
           {unscheduled.map((row) => (
-            <View
+            <Pressable
               key={row.taskId}
               testID={`timeline-lane-item-${row.taskId}`}
               style={styles.laneItem}
+              onPress={onOpenTask === undefined ? undefined : () => onOpenTask(row.taskId)}
+              accessibilityRole={onOpenTask === undefined ? undefined : 'button'}
               {...(onScheduleTask === undefined ? {} : laneResponderProps(row))}
             >
               <Text
@@ -648,7 +691,7 @@ export function TimelineBoard(props: TimelineBoardProps): React.JSX.Element {
                   {labels.aiBadge(row.aiMinutes)}
                 </Text>
               )}
-            </View>
+            </Pressable>
           ))}
         </View>
       )}

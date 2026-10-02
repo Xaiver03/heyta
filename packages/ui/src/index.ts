@@ -907,3 +907,15 @@ export {
  * `projects.find(...)` 就是两份判断 —— 那正是本次要消除的东西。
  */
 export { listNameFor } from './projects/model.js';
+
+/**
+ * ── 批一（多端入口覆盖）：四端共用的月历日期选择器 ──
+ *
+ * 从 mobile 的 `ui/DatePicker.tsx` 上提（web 补 due 事后编辑，两端同一只）。
+ * 文案走 `DatePickerLabels` 宿主注入；日期数学走 `@heyta/domain`。
+ */
+export {
+  DatePicker,
+  type DatePickerLabels,
+  type DatePickerQuickPick,
+} from './date-picker/DatePicker.js';

@@ -45,11 +45,12 @@
  *    不是"盖在当前上下文上的浮层"，与 §11.5 的规律不冲突。
  */
 
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { View } from 'react-native';
 import type { SyncStatus } from '@heyta/sync-client';
 import { useI18n } from '@heyta/i18n';
 import { isArgon2SlowBackend } from '@heyta/sync-core';
+import { fetchAccountNotifications } from '@heyta/app-host';
 import {
   SettingsRow,
   resolvePendingUploadPresentation,
@@ -65,16 +66,18 @@ import { GrowthScreen } from './GrowthScreen';
 import { HabitsScreen } from './HabitsScreen';
 import { ListsSection } from './ListsSection';
 import { NotesSection } from './NotesSection';
+import { NotificationsScreen } from './NotificationsScreen';
 import { SettingsScreen } from './SettingsScreen';
 import { TagsSection } from './TagsSection';
 import { TrashScreen } from './TrashScreen';
 import { formatStamp } from '../lib/date';
 import { useTokens } from '../theme';
 import { useSyncCredentialForm } from '../sync/credential-form';
-import { clearSyncConfig } from '../sync/config';
+import { clearSyncConfig, readSyncConfig } from '../sync/config';
 import { describeSyncStatus, statusTone } from '../sync/status-text';
 import { useMobileSync, refreshPendingUpload } from '../sync/store';
 import { currentSignedInEmail, forgetSignedInUser } from '../auth/session';
+import { privacyConsent, subscribePrivacyConsent } from '../privacy/consent-gate';
 import { wipeCredentialsAndWidgets } from '../widgets/credential-wipe';
 import { clearWidgetState } from '../widgets/widget-bridge';
 
@@ -166,6 +169,33 @@ export function ProfileScreen(): React.JSX.Element {
   const [trashOpen, setTrashOpen] = useState(false);
   const [exportOpen, setExportOpen] = useState(false);
   const [habitsOpen, setHabitsOpen] = useState(false);
+  const [notificationsOpen, setNotificationsOpen] = useState(false);
+
+  /**
+   * 「通知」入口行的未读徽标（批二，多端覆盖审计 P0-2）。
+   *
+   * 数据源只有 inbox 的 `GET /api/notification`（未配置/未同意时**连请求都不发**
+   * —— 出口闸的语义），读取时机三处：本屏挂载、从通知中心返回、同意状态变化
+   * （首启点了同意之后徽标才可能出现 —— 不订阅就会记下"点了同意但没反应"）。
+   */
+  const [inboxUnread, setInboxUnread] = useState(0);
+  const fetchInboxUnread = useCallback((): Promise<void> => {
+    if (!privacyConsent.networkAllowed()) return Promise.resolve();
+    const config = readSyncConfig();
+    if (config === undefined || (config.token ?? '') === '') return Promise.resolve();
+    return fetchAccountNotifications({
+      baseUrl: config.serverUrl,
+      getToken: async () => config.token,
+    }).then((reading) => {
+      if (reading.kind === 'ready') setInboxUnread(reading.unreadCount);
+    });
+  }, []);
+  useEffect(() => {
+    void fetchInboxUnread();
+    return subscribePrivacyConsent(() => {
+      void fetchInboxUnread();
+    });
+  }, [fetchInboxUnread]);
 
   /**
    * 本会话内登录过的账号邮箱（**只放内存**，见 `auth/session.ts`）。
@@ -245,6 +275,33 @@ export function ProfileScreen(): React.JSX.Element {
     },
     {
       kind: 'action',
+      testID: 'profile-entry-notifications',
+      label: t('mobile.inbox.trigger'),
+      hint: t('mobile.inbox.entry.hint'),
+      onPress: () => {
+        setNotificationsOpen(true);
+      },
+      leading:
+        inboxUnread > 0 ? (
+          <View
+            accessibilityLabel={t('mobile.inbox.badge.aria', { count: inboxUnread })}
+            style={{
+              minWidth: tokens['space.6'],
+              paddingHorizontal: tokens['space.2'],
+              paddingVertical: tokens['space.1'],
+              borderRadius: tokens['radius.full'],
+              backgroundColor: tokens['color.primary'],
+              alignItems: 'center',
+            }}
+          >
+            <Text variant="caption" style={{ color: tokens['color.on-primary'] }}>
+              {inboxUnread}
+            </Text>
+          </View>
+        ) : undefined,
+    },
+    {
+      kind: 'action',
       testID: 'profile-entry-growth',
       label: t('mobile.growth.entry'),
       hint: t('mobile.growth.entry.hint'),
@@ -285,6 +342,19 @@ export function ProfileScreen(): React.JSX.Element {
    * 🔴 提前 return **必须在所有 hook 之后**（见 `growthOpen` 的注释）。
    * 成长屏自带顶栏返回，所以这里不需要任何导航库。
    */
+  if (notificationsOpen) {
+    return (
+      <NotificationsScreen
+        onBack={() => {
+          setNotificationsOpen(false);
+          // 返回即重读未读数：自动已读发生在通知中心里，徽标在这里清零。
+          void fetchInboxUnread();
+        }}
+        onUnreadCountChange={setInboxUnread}
+      />
+    );
+  }
+
   if (trashOpen) {
     return (
       <TrashScreen

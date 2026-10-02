@@ -1090,6 +1090,28 @@ PY
 configure_sync_credentials() {
   disable_ime; sleep 2
   $ADB shell input tap 945 2253; sleep 3   # 「我的」
+  # 🔴 凭据表单在「设置」Modal 里，不在「我的」滚动流上（设置 IA 收进
+  #    `SettingsScreen` 那一刀搬进去的）。旧写法直接在我的页找输入框，
+  #    三个字段全部"找不到"，而页面明明就在 —— 实测卡过 verify-mobile-inbox
+  #    的每一轮。先按**稳定锚点**（resource-id，不走文字）打开 Modal 再填。
+  dump
+  local settings_xy
+  settings_xy=$(python3 - <<'PY'
+import re, sys
+try:
+    s = open('/tmp/ui.xml').read()
+except OSError:
+    sys.exit(0)
+m = re.search(r'resource-id="profile-entry-settings"[^>]*bounds="\[(\d+),(\d+)\]\[(\d+),(\d+)\]"', s)
+if m:
+    print((int(m.group(1)) + int(m.group(3))) // 2, (int(m.group(2)) + int(m.group(4))) // 2)
+PY
+)
+  if [ -n "$settings_xy" ]; then
+    $ADB shell input tap $settings_xy; sleep 3
+  else
+    echo "   ⚠️ 没找到「设置」入口（profile-entry-settings）—— 若凭据表单已在本页可见则继续"
+  fi
   dump
   # 🔴 每填完一个字段**立刻收起键盘**，理由有两条，都实测踩过：
   #
@@ -1130,6 +1152,8 @@ configure_sync_credentials() {
   else bad "这些字段丢了：$MISSING"; fi
   [ "$(has_text "填好服务器地址与访问令牌后才能同步。")" = "1" ] \
     && bad "界面仍认为未配置（凭据没生效）" || ok "界面认为已配置"
+  # 关掉设置 Modal，回到「我的」—— 调用方的下一步（建任务/点入口）都从这页出发。
+  $ADB shell input keyevent 4; sleep 2
 }
 
 # ── 收尾 ────────────────────────────────────────────────────
