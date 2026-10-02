@@ -74,6 +74,7 @@ model User {
   referralsMade               Referral[]            @relation("ReferralInviter")
   referralReceived            Referral?             @relation("ReferralInvitee")
   notifications               AccountNotification[]
+  consents                    UserConsent[]
 
   @@index([verificationToken])
   @@index([resetPasswordToken])
@@ -765,6 +766,74 @@ model Referral {
   /// 给"我邀请了谁"这个列表用（按时间倒序）。
   @@index([inviterUserId, createdAt])
   @@map("referrals")
+}
+
+/// 同意历史（**只追加**的账）：一个人先后同意过哪几版对外文本。
+///
+/// ## 为什么这张表现在才建
+///
+/// `users.terms_document_version` 是一列**指针**，它只能回答"最后一次同意的是哪一版"。
+/// 而对外文本承诺的是"重新确认"（`terms.ts` s10），一次重新确认会产生**第二条**事实
+/// —— "先同意过 1.0、改版后又同意过 1.1"。一列存不下两件事，所以历史在表里、指针留在列上。
+/// 那条迁移文件的注释（`20261006000000_add_terms_document_version/migration.sql:21-23`）
+/// 当时写的就是"独立 `UserConsent` 表留给『二次同意需要历史』真正落地的那天" —— 本模型是那天。
+///
+/// ## 🔴 `kind` 今天只有一个值：`legal_set`
+///
+/// `docs/research/legal-consumer-contract-terms.md` 层 2 词表里那五项
+/// （`terms` / `privacy` / `auto_renew` / `e2ee_risk` / `age_declaration`）假设的是
+/// **逐项独立勾选**的界面。今天的界面不是那样：注册时是一个勾覆盖整套文本
+/// （`web.auth.terms.label` 逐字是"我同意该服务端提供的服务条款与隐私政策"），
+/// 钉住的值是 `legalSetVersion()` 那种**整套**指纹。把一次勾选拆成 `terms` 与 `privacy`
+/// 两行，等于**发明**两个用户并没有分别作出的决定 —— 与"不得替用户预勾或发明同意"
+/// （`docs/plans/user-journey-and-auth.md`）是同一条纪律。
+/// ⇒ 加一个新的 `kind` 的前提是**界面上先有那个独立的勾**，不是反过来。
+/// （D-06 的年龄声明、§7.1 的 `ai_disclosure` 都在等各自的勾选项。）
+///
+/// ## 为什么**不**存 `documentHash`，也不存 `surface`
+///
+/// 对外文本承诺记录的是"**同意时刻 + 那一套文件的版本号**"（`privacy.ts` 第 12 条）。
+/// 哈希与"来自哪个端"都不在那句话里。未经宣告就写进数据库，是先采集后告知 ——
+/// 那条立场在 G-28 上专门裁决过：**要记就先改文本，顺序不能反**。
+///
+/// ## 两个时间戳，但**判据不比时间**
+///
+/// `acceptedAt` 是客户端声明的点击时刻，`serverReceivedAt` 是服务端收到的时刻。
+/// 两列都留是因为它们是对方的证据（客户端时钟不可信，§7 第 19 条：墙上时钟不能裁决因果）。
+/// 🔴 而"要不要拦"这件事**只比版本字符串**，绝不比这两个数 —— 比时间会把一个时钟慢了
+/// 几秒的新账号读成"同意过旧版的人"，那是一条会自己制造假阳性的判据。
+///
+/// ## 谁是裁决者
+///
+/// `kind='legal_set'` 下**最新的一条**记录是裁决依据；一行历史都没有时
+/// （这张表之前注册的人）退回 `users.terms_document_version` 那列。
+/// ⇒ 写第一笔历史时**必须**与指针在同一个事务里更新，否则会出现
+/// "表里有 1.1、指针还写着 1.0" —— 那种不一致的方向是**多拦一次**（fail-closed），
+/// 不是漏拦。
+model UserConsent {
+  id Int @id @default(autoincrement())
+
+  userId Int @map("user_id")
+
+  /// 同意事项词表（见上面那段）。今天只有 `legal_set`。
+  kind String
+
+  /// 那一次同意钉住的**整套**文本版本指纹，与 `legalSetVersion()` 同形（`terms@1.1;…`）。
+  documentVersion String @map("document_version")
+
+  /// 客户端声明的点击时刻（epoch ms）。
+  acceptedAt BigInt @map("accepted_at")
+
+  /// 服务端收到这条确认的时刻（epoch ms）。`0` = 由迁移/内部写入补的、没有服务端收据。
+  serverReceivedAt BigInt @default(0) @map("server_received_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  /// 同一个人对同一版只有一条事实。重复点确认不会长出第二行，
+  /// 因此"已确认过当前版本"这件事是幂等的（判据据此就不会反复拦同一个人）。
+  @@unique([userId, kind, documentVersion])
+  @@index([userId, acceptedAt])
+  @@map("user_consents")
 }
 
 /// 账号级通知（应用内通知中心的一条）。
