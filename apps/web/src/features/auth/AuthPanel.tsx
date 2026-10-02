@@ -330,9 +330,11 @@ export function AuthPanel({ baseUrl, onClose, onSignedIn }: AuthPanelProps): Rea
    *   · **只有 `signed-in` 用 `success`**（那是唯一真的有令牌的落点）；
    *   · **服务端失败不指 `field`** —— 那类失败没有"哪个框错了"的答案
    *     （邮箱存在性故意不区分），硬标一个框就是在替服务端猜原因。
-   *     例外是口令这条路的两类**能指**的失败：策略不合格（指到口令框）与
-   *     口令错（`invalid-credentials` 由服务端刻意不区分账号存在性，但仍然指口令框，
-   *     因为用户能做的动作就是重打那一格）。
+   *     唯一的例外是**口令策略不合格**：它指到口令框，因为那一格确实是错的。
+   *     ⚠️ 这句注释以前把 `invalid-credentials` 也算进"能指"的那一类，**那是错的**
+   *     （2026-10-02 对着 `isPolicy` 那一行核过）：口令错与"邮箱没注册 / 没设口令"
+   *     在服务端是**同一句话同一个码**，指框就等于猜其中一种；而且登录档的口令框
+   *     是用户刚自己填完的那格，红框在这里不提供任何信息。
    */
   const formStatus = (): AuthFormStatus | null => {
     switch (status.kind) {

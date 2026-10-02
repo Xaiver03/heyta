@@ -334,13 +334,25 @@ export function AuthForm({
   const passwordInput = useRef<TextInput | null>(null);
 
   /**
-   * 此刻该报错的字段：本地校验的，或宿主指明的（`status.field`）。
-   * 两者互斥出现 —— 服务端失败刻意不标字段（见 `AuthFormStatus.field`）。
+   * 此刻该标红的字段：本地校验指的那个，或宿主指明的（`status.field`）。
+   *
+   * 🔴 但**标红 ≠ 可以说的那句话**。下面那几句 caption 说的是"这一格没填"，
+   * 而宿主指字段说的是"要改的是这一格"——两件事在口令这条路上会**同时成立且互相矛盾**：
+   * 服务端按口令策略拒绝时会指 `password`（`AuthPanel` 的 `isPolicy` 那一条），
+   * 于是框里明明写着 `123`，框下面却印出「还没有填密码。」。
+   * 2026-10-02 真浏览器实测到的（当时看的是 `password-web-journey` 那轮截图里
+   * "策略报错"那一张；**那张图没有入库** —— 它拍到了明文口令，重拍时把显隐关掉），
+   * 而 jsdom 那批用例当时全都只判"状态区有没有话"，所以没人红。
+   * caption 因此只认 `missingField`，`aria-invalid` 仍认 `errorField`（指格子是对的）。
    */
   const errorField: AuthFormField | undefined =
     status?.tone === 'error' ? status.field : localField;
+  /** 只有**本地**那次"没填"的判定才配得上"还没有填 X"这句话。 */
+  const missingField: AuthFormField | undefined =
+    status?.tone === 'error' ? undefined : localField;
 
   const invalidFor = (field: AuthFormField): boolean => errorField === field;
+  const missing = (field: AuthFormField): boolean => missingField === field;
 
   /**
    * in-flight guard：有请求在路上就**不响应**。
@@ -508,7 +520,7 @@ export function AuthForm({
             aria-invalid={invalidFor('email')}
             testID={`${testID}-email`}
           />
-          {invalidFor('email') ? (
+          {missing('email') ? (
             <Text style={[text['caption'], styles.danger]}>{labels.localErrors.email}</Text>
           ) : null}
           <Pressable
@@ -587,7 +599,7 @@ export function AuthForm({
               />
             </Pressable>
           </View>
-          {invalidFor('password') ? (
+          {missing('password') ? (
             <Text style={[text['caption'], styles.danger]}>{labels.localErrors.password}</Text>
           ) : null}
           <Text style={[text['caption'], styles.muted]}>{labels.passwordHint}</Text>
@@ -649,7 +661,7 @@ export function AuthForm({
                 </View>
                 <Text style={[text['caption'], styles.termsText]}>{labels.terms}</Text>
               </Pressable>
-              {invalidFor('terms') ? (
+              {missing('terms') ? (
                 <Text style={[text['caption'], styles.danger]}>
                   {labels.localErrors.terms(AUTH_TERMS_REQUIRED_KEY)}
                 </Text>
@@ -850,7 +862,7 @@ export function AuthForm({
                 aria-invalid={invalidFor('baseUrl')}
                 testID={`${testID}-server-url`}
               />
-              {invalidFor('baseUrl') ? (
+              {missing('baseUrl') ? (
                 <Text style={[text['caption'], styles.danger]}>{labels.localErrors.baseUrl}</Text>
               ) : null}
             </View>

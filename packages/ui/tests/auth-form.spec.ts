@@ -119,13 +119,34 @@ describe('AuthForm —— 承重的无障碍通道确实在', () => {
   });
 
   it('错误是**文字**，不是只有红框（WCAG SC 3.3.1）', () => {
-    // 每个 `invalidFor(...)` 都必须旁边挂一条 `<Text>`，否则"报错"只剩颜色。
-    const blocks = code.match(/invalidFor\('(\w+)'\) \?\s*\(/g) ?? [];
-    expect(blocks.length).toBeGreaterThanOrEqual(3);
-    for (const block of code.match(
-      /invalidFor\('\w+'\) \? \(\s*<Text[^>]*>\{labels\.localErrors\.\w+/g,
-    ) ?? []) {
-      expect(block).toContain('<Text');
+    /**
+     * 🔴 这条在 2026-10-02 跟着 `AuthForm` 一起换了形。原来"能标红"和"该说一句
+     * 这一格没填"是同一个布尔（`invalidFor`），于是服务端把错误指到口令框时，
+     * 框里明明写着 `123`、框下却印出「还没有填密码。」。现在两半分开：
+     *   · **指格子** = `aria-invalid={invalidFor(...)}`（上一条用例钉的就是它）；
+     *   · **说话** = `missing(...)` 旁边那条 `<Text>{labels.localErrors...}`，
+     *     服务端指字段时那句具体的话住在状态区（live region，也已钉）。
+     * 不变量没变，只是换了形状：**每一格能标红，就必须有一句话，而且那句话
+     * 得是这一格的**。所以这里同时数两侧并把它们对齐 —— 只数 caption 会退化成
+     * "有人把 `invalidFor` 改名成别的就悄悄红/悄悄绿"。
+     */
+    const redFlags = [...code.matchAll(/aria-invalid=\{invalidFor\('(\w+)'\)\}/g)].map(
+      (m) => m[1] as string,
+    );
+    const captions = [
+      ...code.matchAll(/missing\('(\w+)'\)\s*\?\s*\(\s*<Text\b[\s\S]{0,200}?\{labels\.localErrors\.(\w+)/g),
+    ];
+    // 前提必须成立：两侧都空着的时候下面两个循环都恒真，那这条判据就只是装饰。
+    expect(redFlags.length, '一条 aria-invalid 都没数到 —— 空判据比没有判据更糟').toBeGreaterThanOrEqual(
+      3,
+    );
+    expect(captions.length, '一条 caption 都没数到 —— 空判据比没有判据更糟').toBeGreaterThanOrEqual(3);
+    const spoken = new Set(captions.map((m) => m[1] as string));
+    for (const field of redFlags) {
+      expect(spoken.has(field), `字段 ${field} 能标红，界面上却没有属于它的那句话（只剩颜色）`).toBe(true);
+    }
+    for (const [, field, key] of captions) {
+      expect(key, `missing('${field}') 旁边挂的是 localErrors.${key} —— 说的话不是这一格的`).toBe(field);
     }
   });
 });
