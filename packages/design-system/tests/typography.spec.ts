@@ -93,6 +93,41 @@ describe('语义文字样式：不变量', () => {
       expect(resolveTextStyle(name, lightTokens).fontVariant, name).toBeUndefined();
     }
   });
+
+  it('🔴 组标题档压得住它管辖的每一档说明 —— 中文没有大小写线索，只能靠字号与字重', () => {
+    /**
+     * 这条断言是 2026-10-02 那次"侧栏标题比下面的说明还小"的**回归钉**。
+     *
+     * 为什么必须钉在**档位之间**而不是钉在某个界面上：界面可以今天换一档、
+     * 明天换一档，而"标题不许小于它下面的说明"是一条与界面无关的层级关系。
+     * 反过来，只要有一条路径能"合法地"把分组头写成 2xs，下一次做紧凑侧栏的人
+     * 就会再犯一次 —— 而那不会有任何测试变红。
+     *
+     * 🔴 范围只圈**说明类**档，不圈 `row-title` / `section-title`：
+     * 组标题与"被分组的内容行"**不在同一根层级轴上** —— 内容行比组标题大是
+     * 所有源列表（macOS 源列表 / TickTick / Notion）的正常形态，
+     * 因为组标题是**寻路**、内容是**阅读对象**。
+     * 但"还没有清单 / 还没归类的任务都在收集箱里"这类**说明**是组标题的下属，
+     * 它们比标题大就是真倒挂。`panel-title` 也不在集合里：它自己就是一个
+     * 标题角色（面板小标题），不是任何标题的下属。
+     *
+     * ⚠️ 判据是**两条**，缺一不可：
+     *   · 字号 ≥ —— 标题可以同字号，但不能更小；
+     *   · 字重 > —— 同字号时字重必须赢，否则两者在视觉上就是平级。
+     */
+    const label = resolveTextStyle('group-label', lightTokens);
+    for (const below of ['row-meta', 'caption'] as const) {
+      const body = resolveTextStyle(below, lightTokens);
+      expect(
+        label.fontSize,
+        `group-label (${label.fontSize}px) 比它管辖的 ${below} (${body.fontSize}px) 还小`,
+      ).toBeGreaterThanOrEqual(body.fontSize);
+      expect(
+        Number(label.fontWeight),
+        `group-label (${label.fontWeight}) 与 ${below} (${body.fontWeight}) 同字重 —— 分不出层级`,
+      ).toBeGreaterThan(Number(body.fontWeight));
+    }
+  });
 });
 
 describe('语义文字样式：主题', () => {
