@@ -95,13 +95,49 @@ describe('语义文字样式：不变量', () => {
   });
 });
 
-describe('语义文字样式：主题无关性', () => {
-  it('🔴 亮暗主题下排版完全一致 —— 换主题只该换颜色', () => {
-    // 若哪天有人把字号放进暗色块（"暗色下字小一点"），这条会红。
-    // 排版随主题变是错的方向：用户切换主题不该看到版面重排。
+describe('语义文字样式：主题', () => {
+  /**
+   * 🔴 这条断言原来写成 `expect(dark).toEqual(light)`（整条对象相等），
+   * 而 `RnTextStyle` 从 2026-09-30 起带**默认前景色** —— 颜色**就该**随主题变。
+   * 所以拆成两半，各自钉住真正的那件事：
+   *
+   *   · **排版**不随主题变 —— 换主题看到版面重排是错的；
+   *   · **颜色**必须随主题变 —— 不跟着变就是暗色下的黑字（实测 1.15:1）。
+   */
+  it('排版四件套在亮暗主题下逐字段一致 —— 换主题不该重排', () => {
     const light = resolveAllTextStyles(lightTokens);
     const dark = resolveAllTextStyles(darkTokens);
-    expect(dark).toEqual(light);
+    for (const name of STYLE_NAMES) {
+      const l = light[name];
+      const d = dark[name];
+      expect(
+        {
+          fontSize: d.fontSize,
+          fontWeight: d.fontWeight,
+          lineHeight: d.lineHeight,
+          letterSpacing: d.letterSpacing,
+        },
+        `${name} 的排版随主题变了`,
+      ).toEqual({
+        fontSize: l.fontSize,
+        fontWeight: l.fontWeight,
+        lineHeight: l.lineHeight,
+        letterSpacing: l.letterSpacing,
+      });
+    }
+  });
+
+  it('🔴 默认前景色随主题变，而且两个主题下都不是纯黑', () => {
+    // 「不是纯黑」是这条断言的**实际判据**：RN / RNW 的 Text 缺省就是纯黑，
+    // 一旦哪天有人把 color 从这一层拿掉，暗色下立刻回到"黑字黑底看不见"。
+    const light = resolveAllTextStyles(lightTokens);
+    const dark = resolveAllTextStyles(darkTokens);
+    for (const name of STYLE_NAMES) {
+      expect(typeof dark[name].color, name).toBe('string');
+      expect(dark[name].color.length, `${name} 颜色为空`).toBeGreaterThan(0);
+      expect(dark[name].color, `${name} 暗色下仍是纯黑`).not.toBe('#000000');
+      expect(dark[name].color, `${name} 暗色色值没有随主题变`).not.toBe(light[name].color);
+    }
   });
 });
 

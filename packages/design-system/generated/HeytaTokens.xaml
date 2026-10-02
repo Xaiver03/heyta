@@ -1,0 +1,211 @@
+<!--
+  HeytaTokens.xaml —— WinUI 3 ResourceDictionary，由 packages/design-system
+  的 `generate` 从 tokens.css 生成，**不要手改**（generate 的校验模式会判红）。
+  消费：App.xaml MergedDictionaries；页面里 {ThemeResource HeytaXxx}。
+  （本注释里不许出现连续连字符：XML 注释的硬性限制。）
+  -->
+<ResourceDictionary
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <SolidColorBrush x:Key="HeytaColorPrimary" Color="#FF2563EB" />
+    <SolidColorBrush x:Key="HeytaColorPrimaryHover" Color="#FF1D4ED8" />
+    <SolidColorBrush x:Key="HeytaColorPrimaryActive" Color="#FF1E40AF" />
+    <SolidColorBrush x:Key="HeytaColorPrimarySubtle" Color="#FFEFF6FF" />
+    <SolidColorBrush x:Key="HeytaColorPrimarySubtleHover" Color="#FFDBEAFE" />
+    <SolidColorBrush x:Key="HeytaColorOnPrimary" Color="#FFFFFFFF" />
+    <SolidColorBrush x:Key="HeytaColorBackground" Color="#FFF8FAFC" />
+    <SolidColorBrush x:Key="HeytaColorSurface" Color="#FFFFFFFF" />
+    <SolidColorBrush x:Key="HeytaColorSurfaceRaised" Color="#FFFFFFFF" />
+    <SolidColorBrush x:Key="HeytaColorSurfaceSunken" Color="#FFF1F5F9" />
+    <SolidColorBrush x:Key="HeytaColorForeground" Color="#FF0F172A" />
+    <SolidColorBrush x:Key="HeytaColorForegroundMuted" Color="#FF475569" />
+    <SolidColorBrush x:Key="HeytaColorForegroundSubtle" Color="#FF64748B" />
+    <SolidColorBrush x:Key="HeytaColorForegroundInverse" Color="#FFFFFFFF" />
+    <SolidColorBrush x:Key="HeytaColorBorder" Color="#FFE2E8F0" />
+    <SolidColorBrush x:Key="HeytaColorBorderStrong" Color="#FFCBD5E1" />
+    <SolidColorBrush x:Key="HeytaColorBorderSubtle" Color="#FFF1F5F9" />
+    <SolidColorBrush x:Key="HeytaColorRing" Color="#FF2563EB" />
+    <SolidColorBrush x:Key="HeytaColorHover" Color="#FFF1F5F9" />
+    <SolidColorBrush x:Key="HeytaColorActive" Color="#FFE2E8F0" />
+    <SolidColorBrush x:Key="HeytaColorDisabledBg" Color="#FFF1F5F9" />
+    <SolidColorBrush x:Key="HeytaColorDisabledFg" Color="#FF94A3B8" />
+    <SolidColorBrush x:Key="HeytaColorSuccess" Color="#FF059669" />
+    <SolidColorBrush x:Key="HeytaColorSuccessStrong" Color="#FF047857" />
+    <SolidColorBrush x:Key="HeytaColorSuccessSubtle" Color="#FFECFDF5" />
+    <SolidColorBrush x:Key="HeytaColorWarning" Color="#FFD97706" />
+    <SolidColorBrush x:Key="HeytaColorWarningStrong" Color="#FFB45309" />
+    <SolidColorBrush x:Key="HeytaColorWarningSubtle" Color="#FFFFFBEB" />
+    <SolidColorBrush x:Key="HeytaColorDanger" Color="#FFDC2626" />
+    <SolidColorBrush x:Key="HeytaColorDangerStrong" Color="#FFB91C1C" />
+    <SolidColorBrush x:Key="HeytaColorDangerSubtle" Color="#FFFEF2F2" />
+    <SolidColorBrush x:Key="HeytaColorInfo" Color="#FF0284C7" />
+    <SolidColorBrush x:Key="HeytaColorInfoStrong" Color="#FF0369A1" />
+    <SolidColorBrush x:Key="HeytaColorInfoSubtle" Color="#FFF0F9FF" />
+    <SolidColorBrush x:Key="HeytaColorQuadrant1" Color="#FFDC2626" />
+    <SolidColorBrush x:Key="HeytaColorQuadrant1Subtle" Color="#FFFEF2F2" />
+    <SolidColorBrush x:Key="HeytaColorQuadrant2" Color="#FF2563EB" />
+    <SolidColorBrush x:Key="HeytaColorQuadrant2Subtle" Color="#FFEFF6FF" />
+    <SolidColorBrush x:Key="HeytaColorQuadrant3" Color="#FFB45309" />
+    <SolidColorBrush x:Key="HeytaColorQuadrant3Subtle" Color="#FFFFFBEB" />
+    <SolidColorBrush x:Key="HeytaColorQuadrant4" Color="#FF64748B" />
+    <SolidColorBrush x:Key="HeytaColorQuadrant4Subtle" Color="#FFF1F5F9" />
+    <SolidColorBrush x:Key="HeytaColorPriorityHigh" Color="#FFDC2626" />
+    <SolidColorBrush x:Key="HeytaColorPriorityMedium" Color="#FFB45309" />
+    <SolidColorBrush x:Key="HeytaColorPriorityLow" Color="#FF0284C7" />
+    <SolidColorBrush x:Key="HeytaColorPriorityNone" Color="#FF94A3B8" />
+    <SolidColorBrush x:Key="HeytaColorHeat0" Color="#FFF1F5F9" />
+    <SolidColorBrush x:Key="HeytaColorHeat1" Color="#FFBFDBFE" />
+    <SolidColorBrush x:Key="HeytaColorHeat2" Color="#FF93C5FD" />
+    <SolidColorBrush x:Key="HeytaColorHeat3" Color="#FF3B82F6" />
+    <SolidColorBrush x:Key="HeytaColorHeat4" Color="#FF1D4ED8" />
+    <SolidColorBrush x:Key="HeytaColorCategory1" Color="#FF991B1B" />
+    <SolidColorBrush x:Key="HeytaColorCategory2" Color="#FFEA580C" />
+    <SolidColorBrush x:Key="HeytaColorCategory3" Color="#FF16A34A" />
+    <SolidColorBrush x:Key="HeytaColorCategory4" Color="#FF0D9488" />
+    <SolidColorBrush x:Key="HeytaColorCategory5" Color="#FF0E7490" />
+    <SolidColorBrush x:Key="HeytaColorCategory6" Color="#FF1D4ED8" />
+    <SolidColorBrush x:Key="HeytaColorCategory7" Color="#FFA21CAF" />
+    <SolidColorBrush x:Key="HeytaColorCategory8" Color="#FFBE185D" />
+    <SolidColorBrush x:Key="HeytaColorFocusWork" Color="#FF2563EB" />
+    <SolidColorBrush x:Key="HeytaColorFocusBreak" Color="#FF059669" />
+    <SolidColorBrush x:Key="HeytaColorOverlay" Color="#800F172A" />
+    <x:Double x:Key="HeytaSpace0">0</x:Double>
+    <x:Double x:Key="HeytaSpace1">4</x:Double>
+    <x:Double x:Key="HeytaSpace2">8</x:Double>
+    <x:Double x:Key="HeytaSpace3">12</x:Double>
+    <x:Double x:Key="HeytaSpace4">16</x:Double>
+    <x:Double x:Key="HeytaSpace5">20</x:Double>
+    <x:Double x:Key="HeytaSpace6">24</x:Double>
+    <x:Double x:Key="HeytaSpace8">32</x:Double>
+    <x:Double x:Key="HeytaSpace10">40</x:Double>
+    <x:Double x:Key="HeytaSpace12">48</x:Double>
+    <x:Double x:Key="HeytaSpace16">64</x:Double>
+    <x:Double x:Key="HeytaFontSize2xs">11</x:Double>
+    <x:Double x:Key="HeytaFontSizeXs">12</x:Double>
+    <x:Double x:Key="HeytaFontSizeSm">14</x:Double>
+    <x:Double x:Key="HeytaFontSizeBase">16</x:Double>
+    <x:Double x:Key="HeytaFontSizeLg">18</x:Double>
+    <x:Double x:Key="HeytaFontSizeXl">20</x:Double>
+    <x:Double x:Key="HeytaFontSize2xl">24</x:Double>
+    <x:Double x:Key="HeytaFontSize3xl">30</x:Double>
+    <x:Double x:Key="HeytaFontSize4xl">36</x:Double>
+    <x:Double x:Key="HeytaFontWeightRegular">400</x:Double>
+    <x:Double x:Key="HeytaFontWeightMedium">500</x:Double>
+    <x:Double x:Key="HeytaFontWeightSemibold">600</x:Double>
+    <x:Double x:Key="HeytaFontWeightBold">700</x:Double>
+    <x:Double x:Key="HeytaLineHeightTight">1.25</x:Double>
+    <x:Double x:Key="HeytaLineHeightNormal">1.5</x:Double>
+    <x:Double x:Key="HeytaLineHeightRelaxed">1.75</x:Double>
+    <x:String x:Key="HeytaFontSans">'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', 'Noto Sans SC', sans-serif</x:String>
+    <x:String x:Key="HeytaFontMono">'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace</x:String>
+    <x:Double x:Key="HeytaRadiusNone">0</x:Double>
+    <x:Double x:Key="HeytaRadiusSm">4</x:Double>
+    <x:Double x:Key="HeytaRadiusMd">8</x:Double>
+    <x:Double x:Key="HeytaRadiusLg">12</x:Double>
+    <x:Double x:Key="HeytaRadiusXl">16</x:Double>
+    <x:Double x:Key="HeytaRadiusFull">9999</x:Double>
+    <x:String x:Key="HeytaShadowNone">none</x:String>
+    <x:String x:Key="HeytaShadowSm">0 1px 2px rgb(15 23 42 / 0.05)</x:String>
+    <x:String x:Key="HeytaShadowMd">0 2px 8px rgb(15 23 42 / 0.08)</x:String>
+    <x:String x:Key="HeytaShadowLg">0 8px 24px rgb(15 23 42 / 0.12)</x:String>
+    <x:String x:Key="HeytaShadowXl">0 16px 48px rgb(15 23 42 / 0.16)</x:String>
+    <x:String x:Key="HeytaShadowFocus">0 0 0 3px rgb(37 99 235 / 0.25)</x:String>
+    <x:Double x:Key="HeytaDurationInstant">80</x:Double>
+    <x:Double x:Key="HeytaDurationFast">150</x:Double>
+    <x:Double x:Key="HeytaDurationNormal">200</x:Double>
+    <x:Double x:Key="HeytaDurationSlow">300</x:Double>
+    <x:Double x:Key="HeytaDurationExit">140</x:Double>
+    <x:Double x:Key="HeytaDurationPress">100</x:Double>
+    <x:String x:Key="HeytaEaseStandard">cubic-bezier(0.2, 0, 0.2, 1)</x:String>
+    <x:String x:Key="HeytaEaseEnter">cubic-bezier(0, 0, 0.2, 1)</x:String>
+    <x:String x:Key="HeytaEaseExit">cubic-bezier(0.4, 0, 1, 1)</x:String>
+    <x:String x:Key="HeytaEaseSpring">cubic-bezier(0.34, 1.56, 0.64, 1)</x:String>
+    <x:Double x:Key="HeytaZBase">0</x:Double>
+    <x:Double x:Key="HeytaZSticky">100</x:Double>
+    <x:Double x:Key="HeytaZDropdown">200</x:Double>
+    <x:Double x:Key="HeytaZOverlay">300</x:Double>
+    <x:Double x:Key="HeytaZModal">400</x:Double>
+    <x:Double x:Key="HeytaZPopover">500</x:Double>
+    <x:Double x:Key="HeytaZToast">600</x:Double>
+    <x:Double x:Key="HeytaZTooltip">700</x:Double>
+    <x:Double x:Key="HeytaIconXs">14</x:Double>
+    <x:Double x:Key="HeytaIconSm">16</x:Double>
+    <x:Double x:Key="HeytaIconMd">20</x:Double>
+    <x:Double x:Key="HeytaIconLg">24</x:Double>
+    <x:Double x:Key="HeytaIconXl">32</x:Double>
+    <x:Double x:Key="HeytaTouchTargetMin">44</x:Double>
+    <x:Double x:Key="HeytaFocusRingWidth">2</x:Double>
+    <x:Double x:Key="HeytaLayoutRailWidth">64</x:Double>
+    <x:Double x:Key="HeytaLayoutSidebarWidth">240</x:Double>
+    <x:Double x:Key="HeytaLayoutSidebarMinWidth">192</x:Double>
+    <x:Double x:Key="HeytaLayoutSidebarMaxWidth">416</x:Double>
+    <x:Double x:Key="HeytaLayoutHeaderHeight">56</x:Double>
+    <x:Double x:Key="HeytaLayoutContentMax">1200</x:Double>
+    <x:String x:Key="HeytaLayoutProseMax">65ch</x:String>
+    <x:Double x:Key="HeytaLayoutQuadrantMinHeight">192</x:Double>
+    <x:Double x:Key="HeytaLayoutPanelMaxHeight">384</x:Double>
+    <x:Double x:Key="HeytaLayoutTwoColumnMin">768</x:Double>
+    <x:Double x:Key="HeytaLayoutInputMin">224</x:Double>
+    <x:Double x:Key="HeytaLayoutModalMax">640</x:Double>
+    <x:Double x:Key="HeytaBorderWidthThin">1</x:Double>
+    <x:Double x:Key="HeytaBorderWidthThick">2</x:Double>
+    <x:Double x:Key="HeytaNavTabBarHeight">64</x:Double>
+    <x:Double x:Key="HeytaNavTabIconSize">24</x:Double>
+    <x:Double x:Key="HeytaNavTabLabelSize">11</x:Double>
+    <x:Double x:Key="HeytaNavTabItemMinWidth">64</x:Double>
+    <x:Double x:Key="HeytaNavTabIndicatorInset">4</x:Double>
+    <x:Double x:Key="HeytaNavTabIndicatorWidth">20</x:Double>
+    <x:Double x:Key="HeytaNavTabIndicatorHeight">3</x:Double>
+    <x:Double x:Key="HeytaNavAppBarHeight">56</x:Double>
+    <x:Double x:Key="HeytaNavAppBarTitleSize">16</x:Double>
+    <x:Double x:Key="HeytaNavSafeTopMin">20</x:Double>
+    <x:Double x:Key="HeytaNavSafeBottomMin">8</x:Double>
+    <x:Double x:Key="HeytaScreenGutter">16</x:Double>
+    <x:Double x:Key="HeytaScreenSectionGap">24</x:Double>
+    <x:Double x:Key="HeytaScreenBottomInset">88</x:Double>
+    <x:Double x:Key="HeytaSizeCheckbox">22</x:Double>
+    <x:Double x:Key="HeytaSizeRowMinHeight">56</x:Double>
+    <x:Double x:Key="HeytaSizeSwipeAction">72</x:Double>
+    <x:Double x:Key="HeytaSizeAvatarSm">24</x:Double>
+    <x:Double x:Key="HeytaSizeAvatarMd">32</x:Double>
+    <x:Double x:Key="HeytaSizeAvatarLg">40</x:Double>
+    <x:Double x:Key="HeytaSizeFab">56</x:Double>
+    <x:Double x:Key="HeytaSizeChipHeight">28</x:Double>
+    <x:Double x:Key="HeytaSizeChipPaddingX">10</x:Double>
+    <x:Double x:Key="HeytaSizeDividerInset">52</x:Double>
+    <x:Double x:Key="HeytaSizeBadgeMinWidth">18</x:Double>
+    <x:Double x:Key="HeytaSizeBadgeHeight">18</x:Double>
+    <x:Double x:Key="HeytaSizeBadgeDot">8</x:Double>
+    <x:Double x:Key="HeytaSizeBadgeRing">2</x:Double>
+    <x:Double x:Key="HeytaSizeFieldHeight">44</x:Double>
+    <x:Double x:Key="HeytaSizeFieldPaddingX">12</x:Double>
+    <x:Double x:Key="HeytaSizeProgressHeight">6</x:Double>
+    <x:Double x:Key="HeytaSizeFocusRing">180</x:Double>
+    <x:Double x:Key="HeytaSizeFocusRingStroke">10</x:Double>
+    <x:Double x:Key="HeytaTrackingDisplay">-0.022</x:Double>
+    <x:Double x:Key="HeytaTrackingTitle">-0.019</x:Double>
+    <x:Double x:Key="HeytaTrackingBody">-0.011</x:Double>
+    <x:Double x:Key="HeytaTrackingCaption">0.006</x:Double>
+    <x:Double x:Key="HeytaMotionSpringDampingDefault">1</x:Double>
+    <x:Double x:Key="HeytaMotionSpringDampingMomentum">0.8</x:Double>
+    <x:Double x:Key="HeytaMotionSpringResponseMove">0.4</x:Double>
+    <x:Double x:Key="HeytaMotionSpringResponseSheet">0.3</x:Double>
+    <x:Double x:Key="HeytaMotionSpringResponseRotation">0.4</x:Double>
+    <x:Double x:Key="HeytaMotionPressScale">0.97</x:Double>
+    <x:Double x:Key="HeytaMotionDecelerationRate">0.998</x:Double>
+    <x:Double x:Key="HeytaMotionRubberBandConstant">0.55</x:Double>
+    <x:Double x:Key="HeytaGestureHysteresis">10</x:Double>
+    <x:Double x:Key="HeytaGestureHitSlop">10</x:Double>
+    <x:Double x:Key="HeytaStatePressedOpacity">0.08</x:Double>
+    <x:Double x:Key="HeytaStateHoverOpacity">0.04</x:Double>
+    <x:Double x:Key="HeytaStateDisabledOpacity">0.38</x:Double>
+    <x:Double x:Key="HeytaBlurChrome">20</x:Double>
+    <x:Double x:Key="HeytaBlurSheet">30</x:Double>
+    <SolidColorBrush x:Key="HeytaMaterialChromeTint" Color="#9EFFFFFF" />
+    <SolidColorBrush x:Key="HeytaMaterialChromeTintStrong" Color="#D9FFFFFF" />
+    <SolidColorBrush x:Key="HeytaMaterialPanelTint" Color="#C7FFFFFF" />
+    <SolidColorBrush x:Key="HeytaMaterialEdgeHighlight" Color="#80FFFFFF" />
+    <SolidColorBrush x:Key="HeytaMaterialSheetTint" Color="#EBFFFFFF" />
+    <SolidColorBrush x:Key="HeytaMaterialScrim" Color="#520F172A" />
+    <SolidColorBrush x:Key="HeytaMaterialScrimStrong" Color="#800F172A" />
+</ResourceDictionary>

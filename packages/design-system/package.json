@@ -16,6 +16,7 @@
     },
     "./tokens.css": "./src/tokens.css",
     "./reset.css": "./src/reset.css",
+    "./typography.css": "./generated/typography.css",
     "./native": {
       "types": "./dist/native.d.ts",
       "import": "./dist/native.js",

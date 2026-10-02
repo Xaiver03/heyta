@@ -44,6 +44,8 @@ export {
   lightTokens,
   darkTokens,
   reducedMotionTokens,
+  reducedTransparencyLightTokens,
+  reducedTransparencyDarkTokens,
   resolveThemeName,
   tokensForTheme,
   resolveNativeTokens,
@@ -70,6 +72,10 @@ export type { RnShadow, CubicBezier } from './native-values.js';
 // 不说四个数字 —— 否则同一段文字在不同界面必然漂移，且没有任何一处会报错。
 // 它只**组合**已有 token，不引入新取值，因此不构成第二个事实源。
 export { TEXT_STYLES, resolveTextStyle, resolveAllTextStyles } from './typography.js';
+
+// 图标尺寸的数值形态（lucide 的 size prop 需要 SVG 属性数字，CSS 变量帮不上）。
+// 视图住在 L0 内部（宿主直接拿表建视图被 check:theme 的 R3 禁止）。
+export { ICON_SIZE, type IconSizeName } from './icon-size.js';
 export type { TextStyleName, TextStyleSpec, RnTextStyle } from './typography.js';
 
 // 任务行的**形状契约**（一行用哪些 token / 哪条语义文字样式）。

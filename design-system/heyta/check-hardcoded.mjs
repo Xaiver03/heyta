@@ -12,6 +12,8 @@
  *   3. 裸 ms/s 时长       → 必须用 var(--ht-duration-*)
  *   4. 裸 z-index 数字    → 必须用 var(--ht-z-*)
  *   5. 裸 rgb()/rgba()    → 例外见 ALLOW
+ *   6. 裸 rem 设计尺度    → 只查有 token 组的属性（间距/字号/圆角/字距）
+ *   7. 裸 blur( 模糊半径  → 必须用 var(--ht-blur-*)
  *
  * 设计原则：**宁可少报，不可误报。**
  * 上一轮我写死链检查器时，因误报（把文档里作为示例的链接当真链接）
@@ -110,6 +112,10 @@ const LINE_ALLOW = [
   { re: /(viewBox|points|transform)=/, why: 'SVG 图形数据不是样式' },
   { re: /--ht-/, why: 'token 定义/引用' },
   { re: /^\s*(\/\/|\*|\/\*)/, why: '纯注释行' },
+  {
+    re: /clamp\(/,
+    why: '流式排版的插值上下限随视口策略变化，不是单一设计尺度',
+  },
 ];
 
 const CHECKS = [
@@ -179,6 +185,54 @@ const CHECKS = [
     re: /rgba?\(\s*\d+\s*[\s,]\s*\d+\s*[\s,]\s*\d+/g,
     hint: '用 var(--ht-color-*)，半透明色也要登记为 token',
   },
+  {
+    name: '裸 rem 设计尺度',
+    /**
+     * 🔴 rem 是 px 的替身（1rem = 16px），px 被拦之后 rem 就是下一个绕行口。
+     * 实证（2026-10-01 UI 审计 G3）：`blur(0.25rem)` 从这条缝里漏过 ——
+     * 4px 与 20px 是两种完全不同的模糊度，视觉 bug 级漂移。
+     *
+     * ⚠️ 属性集**刻意收窄**到「有 token 组的设计尺度」：间距（space.*）、
+     * 字号（font-size.*）、圆角（radius.*）、字距（tracking.*）。
+     * 被**有意排除**的属性（width/height/inline-size/block-size/网格列宽/
+     * perspective/动效位移）是**布局尺寸**，设计系统没有对应 token 组，
+     * 全禁会立刻制造约 40 处误报（2026-10-01 实测全仓命中分布）——
+     * 与 RN 无单位规则排除 width/height 是同一条理由。
+     * 收窄版上线时实测命中：**0 处**（零误报起步，只拦未来漂移）。
+     *
+     * `clamp(` 走 LINE_ALLOW：流式排版的插值上下限不是单一尺度。
+     */
+    re: /(?:padding|margin|gap|font-size|border-radius|letter-spacing)[\w-]*\s*:\s*[^;{}]*?[\d.]+rem/g,
+    hint: '用 var(--ht-space-* / --ht-font-size-* / --ht-radius-* / --ht-tracking-*)；rem 与 px 同罪',
+  },
+  {
+    name: '裸 blur( 模糊半径',
+    /**
+     * 模糊半径是设计系统里少数「单位即语义」的 token（--ht-blur-chrome 20px /
+     * --ht-blur-sheet 30px），字面半径意味着出现第二套模糊档位 ——
+     * 4px 与 20px 肉眼可辨，玻璃质感会从此对不齐（2026-10-01 P0-2 修掉的那处
+     * `blur(0.25rem)` 就是实例）。只认字面数字；blur(var(...)) 不在本规则眼里。
+     */
+    re: /blur\(\s*[\d.]+[a-z%]*/g,
+    hint: '用 var(--ht-blur-chrome / --ht-blur-sheet)；新档位先加进 tokens.css',
+  },
+  {
+    name: '裸 icon size prop',
+    /**
+     * 🔴 lucide 的 `size` prop 走 SVG 的 width/height **属性**，属性值不解析
+     * `var()` —— 所以 CSS 值规则管不到它，图标尺寸在 prop 上长出了第二套
+     * 随手值。2026-10-01 UI 审计 G4 实测：全仓 **207 处**（web 157 + landing 49
+     * + helper 自述 1），其中 85 处 12px **低于设计系统的图标下限 icon-xs=14**。
+     *
+     * 修法不是回 CSS 变量（做不到），而是**数值常量**：
+     *   web    → `import { ICON_SIZE } from '<相对路径>/lib/icon-size'`
+     *   landing → 同名助手（apps/landing/src/lib/icon-size.ts）
+     * 两份都从 `lightTokens`（tokens.css 生成物）取值，不构成第二事实源。
+     * 上线时全仓已收敛到阶梯（12/13→xs、15→sm、18→md、40→xl），命中 0。
+     */
+    re: /size=\{[\d.]+\}/g,
+    hint: '用 ICON_SIZE.xs/sm/md/lg/xl（lib/icon-size）；12px 低于设计系统图标下限 14',
+  },
 ];
 
 const SCAN_EXT = new Set(['.ts', '.tsx', '.js', '.jsx', '.css']);
@@ -216,6 +270,88 @@ function allowed(line, match) {
 const files = SCAN_ROOTS.flatMap((r) => collect(r.path));
 const problems = [];
 let checked = 0;
+
+/**
+ * 🔴 web 壳的「成对自拼排版」登记表（P0-5，2026-10-02）。
+ *
+ * 排版纪律（MASTER.md §13）：字号+字重+行高+字距应当**整条**消费语义档位
+ * （`.ht-type-*`，由 TEXT_STYLES 生成）；在规则里单独拼 font-size + font-weight
+ * 就是"有 token、无档位"——行高与字距不随行携带，漂移无判据。
+ *
+ * 但档位表**刻意只有 11 个**（"每多一个样式就多一个模糊地带"），而 web 壳的
+ * 真实层级是它的超集（页标题 xl+semibold、按钮 sm+medium、品牌 lg+bold……）。
+ * 逐点实测（2026-10-02）：27 个成对 CSS 规则里只有 5 个能**无损**映射到现有
+ * 档位（已迁，见 ht-type-caption/panel-title/badge 的 JSX 成对用法）；其余的
+ * 取值组合在档位表里**不存在**——强行迁移=改视觉（违反 P0"不动视觉风格"），
+ * 给表加 22 档=摧毁"刻意不多"原则。
+ *
+ * ⇒ 裁决：现存组合**登记在册**（本表），新增组合即红。本表**只许删不许加**——
+ *   哪天档位表扩了或元素改用了语义档位，就从这里删一行。
+ * ⚠️ 只扫 web 壳（apps/web/src）：RN 侧经 useText() 已有档位纪律；
+ *   landing 的 mockup 是静态复刻件，有自己的取值纪律。
+ */
+const PAIRED_TYPOGRAPHY_ALLOW = [
+  // app.css —— 档位表外的桌面层级（每个组合一条；说明写在行尾）
+  { file: 'apps/web/src/styles/app.css', combo: 'lg+bold', why: '品牌字（ht-brand）：品牌资产，不套语义档位' },
+  { file: 'apps/web/src/styles/app.css', combo: '2xs+semibold', why: '侧栏分组头：档位表无 2xs 档' },
+  { file: 'apps/web/src/styles/app.css', combo: '2xs+medium', why: '日历迷你月的周次头（一二三四五六日）：2xs 微标签，档位表无 2xs 档' },
+  { file: 'apps/web/src/styles/app.css', combo: 'xl+semibold', why: '页标题（AGENTS §5 层级表）：移动 screen-title 是 30/700，不等值' },
+  { file: 'apps/web/src/styles/app.css', combo: 'sm+medium', why: '按钮/导航项/Tab 的桌面基准：档位表无 sm 档' },
+  { file: 'apps/web/src/styles/app.css', combo: 'sm+semibold', why: '卡片内小标题（sm 级）：档位表无 sm 档' },
+  { file: 'apps/web/src/styles/app.css', combo: 'base+medium', why: '空态标题/卡片标题：档位表无 base+medium（numeric-body 带 tabular 语义不合）' },
+  { file: 'apps/web/src/styles/app.css', combo: 'base+semibold', why: '管理台 h4：与 headline 同值，元素是 CSS 类不是 JSX，暂留' },
+  { file: 'apps/web/src/styles/app.css', combo: 'lg+semibold', why: '管理台统计值：语义上是数字档（numeric-display 为 4xl，不等值）' },
+  { file: 'apps/web/src/styles/app.css', combo: 'xs+medium', why: 'ht-viewtab：全仓当前零消费者（疑似 IA 重构遗留），迁移无 JSX 可配' },
+];
+
+/** 从 CSS 规则体与 TSX 窗口里提取「取值组合」的 key。 */
+function comboOfCss(body) {
+  const size = /font-size:\s*var\(--ht-font-size-([a-z0-9]+)\)/.exec(body)?.[1];
+  const weight = /font-weight:\s*var\(--ht-font-weight-(\w+)\)/.exec(body)?.[1];
+  if (!size || !weight) return null;
+  return `${size}+${weight}`;
+}
+
+function comboOfTsx(size, weight) {
+  const s = /--ht-font-size-([a-z0-9]+)/.exec(size)?.[1];
+  const w = /--ht-font-weight-(\w+)/.exec(weight)?.[1];
+  if (!s || !w) return null;
+  return `${s}+${w}`;
+}
+
+const pairedProblems = [];
+const webFiles = files.filter((f) => relative(ROOT, f).replaceAll('\\', '/').startsWith('apps/web/src/'));
+
+for (const file of webFiles) {
+  const rel = relative(ROOT, file);
+  if (rel.includes('tokens.css') || rel.includes('tokens.generated')) continue;
+  const raw = readFileSync(file, 'utf8');
+  const source = raw.replace(/\/\*[\s\S]*?\*\//g, (m) => m.replace(/[^\n]/g, ' '));
+
+  if (file.endsWith('.css')) {
+    // 规则级精确配对
+    for (const m of source.matchAll(/(\.[a-zA-Z][^{\n]*)\{([^}]*)\}/g)) {
+      const combo = comboOfCss(m[2]);
+      if (!combo) continue;
+      if (PAIRED_TYPOGRAPHY_ALLOW.some((a) => a.file === rel && a.combo === combo)) continue;
+      pairedProblems.push({ file: rel, line: source.slice(0, m.index).split('\n').length, combo, text: m[1].trim().slice(0, 60) });
+    }
+  } else {
+    // TSX：4 行窗口近似（同对象里 fontSize 与 fontWeight 相邻出现）
+    const lines = source.split('\n');
+    for (let i = 0; i < lines.length; i++) {
+      const win = lines.slice(i, i + 4).join('\n');
+      const fsMatch = /fontSize:\s*[^,\n]+/.exec(win);
+      const fwMatch = /fontWeight:\s*[^,\n]+/.exec(win);
+      if (!fsMatch || !fwMatch) continue;
+      const combo = comboOfTsx(fsMatch[0], fwMatch[0]);
+      if (!combo) continue;
+      if (PAIRED_TYPOGRAPHY_ALLOW.some((a) => a.file === rel && a.combo === combo)) continue;
+      pairedProblems.push({ file: rel, line: i + 1, combo, text: `${fsMatch[0]} … ${fwMatch[0]}` });
+      i += 3; // 同一窗口只报一次
+    }
+  }
+}
 
 for (const file of files) {
   // token 定义文件是产地，不检查；生成的类型文件同理
@@ -284,6 +420,21 @@ if (problems.length) {
   }
   console.log(`\n   修法：${CHECKS[0].hint}`);
   console.log(`   若确属合理例外，把理由加进 check-hardcoded.mjs 的 ALLOW（必须写 why）。\n`);
+  process.exit(1);
+}
+
+if (pairedProblems.length > 0) {
+  console.log(`\n🔴 web 壳出现 ${pairedProblems.length} 处**档位表外的成对自拼排版**（字号+字重同写）：\n`);
+  for (const p of pairedProblems.slice(0, 12)) {
+    console.log(`   ${p.file}:${p.line}  [${p.combo}]  ${p.text}`);
+  }
+  if (pairedProblems.length > 12) console.log(`   …还有 ${pairedProblems.length - 12} 处`);
+  console.log(`
+   规则：web 壳的排版应整条消费语义档位（JSX 加 .ht-type-*，与 .ht-* 类成对）。
+   若取值确实与 11 个档位都不等值（桌面层级超集），把
+   { file: '${pairedProblems[0].file}', combo: '${pairedProblems[0].combo}', why: '…' }
+   加进本文件顶部 PAIRED_TYPOGRAPHY_ALLOW（必须写 why；**表只许删不许加** ——
+   加行 = 档位表外的第二套排版又繁殖了一个）。`);
   process.exit(1);
 }
 

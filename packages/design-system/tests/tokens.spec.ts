@@ -29,6 +29,7 @@ import {
   contrast,
   colorOf,
   extractVars,
+  normalizeColor,
   parseColor,
   resolveVar,
 } from '../src/css-tokens.js';
@@ -112,6 +113,141 @@ describe('暗色主题对比度（必须独立验证，不能从亮色推断）'
       Number(ratio.toFixed(2)),
       `暗色 ${fg} on ${bg} 实测 ${ratio.toFixed(2)}:1，要求 ≥ ${min}:1`,
     ).toBeGreaterThanOrEqual(min);
+  });
+});
+
+describe('玻璃材质：tint 合成在最坏背景上的对比度（ADR-0042 §4）', () => {
+  /**
+   * 🔴 静态 AA_PAIRS 覆盖不了半透明面：玻璃的实际底色是
+   * `composite = α·tint + (1−α)·下层内容`，而下层内容**不可控**。
+   * 所以这里的判据是「最坏情况下限」：把 token 表里最亮与最暗的两个
+   * 色值当作玻璃下方可能出现的极端内容，实算合成后的对比度。
+   *
+   * 档位契约（与 material-surface.ts 的档位表互为判据）：
+   *   · panel / sheet（菜单、下拉、底部面板 —— 承载密集文字）：
+   *     主前景色**与次要文字**都必须过 4.5:1；
+   *   · chrome（导航条 / 命令面板 —— 只有主前景色）：
+   *     只对主前景色把关。
+   *
+   * ⚠️ 最后一条**反向断言**：muted 在 chrome 上过不了 4.5:1 —— 它不是
+   * 失败，是「chrome 不承载次要文字」这条契约的**证据**。哪天有人把
+   * chrome-tint 调厚到让这条反向断言翻红（muted 反而过线了），说明
+   * chrome 已经厚到可以放开这条限制，应连同 material-surface.ts 的
+   * 档位注释一起重审，而不是删掉这条断言。
+   */
+  const light = extractVars(CSS);
+  const dark = extractVars(CSS, 'dark');
+
+  /** 把 token 值拆成 {通道, alpha}。只认 normalizeColor 能产的 hex 形态。 */
+  function rgbaOf(value: string): { rgb: [number, number, number]; a: number } {
+    const hex = normalizeColor(value);
+    if (!/^#[0-9a-f]{6}([0-9a-f]{2})?$/i.test(hex)) {
+      throw new Error(`不认识的颜色形态：${value} → ${hex}`);
+    }
+    return {
+      rgb: parseColor(hex.slice(0, 7)),
+      a: hex.length === 9 ? parseInt(hex.slice(7, 9), 16) / 255 : 1,
+    };
+  }
+
+  /** α 合成：tint 盖在 bg 上之后实际呈现的颜色。 */
+  function blend(tintValue: string, bgValue: string): [number, number, number] {
+    const t = rgbaOf(tintValue);
+    const b = rgbaOf(bgValue);
+    const mix = (i: 0 | 1 | 2): number => Math.round(t.rgb[i] * t.a + b.rgb[i] * (1 - t.a));
+    return [mix(0), mix(1), mix(2)];
+  }
+
+  type Vars = Map<string, string>;
+  const tintOf = (vars: Vars, name: string): string => {
+    const v = vars.get(name);
+    if (v === undefined) throw new Error(`tokens.css 缺 ${name}`);
+    return resolveVar(v, vars);
+  };
+  const fgOf = (vars: Vars, name: string): [number, number, number] =>
+    parseColor(resolveVar(vars.get(name)!, vars));
+
+  interface GlassCase {
+    theme: string;
+    vars: Vars;
+    fg: string;
+    tier: string;
+    tint: string;
+    /** 玻璃下方的极端内容色（token 表里的最亮/最暗）。 */
+    bg: string;
+    bgValue: string;
+  }
+
+  const LIGHT_BGS: Array<[string, string]> = [
+    ['--ht-white', '页面最亮内容'],
+    ['--ht-slate-900', '页面最暗内容'],
+  ];
+  const DARK_BGS: Array<[string, string]> = [
+    ['--ht-slate-50', '下方最亮内容（亮色截图/卡片)'],
+    ['--ht-slate-950', '下方最暗内容'],
+  ];
+
+  const CASES: GlassCase[] = [];
+  for (const [theme, vars, bgs] of [
+    ['亮色', light, LIGHT_BGS],
+    ['暗色', dark, DARK_BGS],
+  ] as Array<[string, Vars, Array<[string, string]>]>) {
+    for (const [bgToken, bgWhy] of bgs) {
+      const bgValue = tintOf(vars, bgToken);
+      const tints: Array<[string, string]> = [
+        ['panel', '--ht-material-panel-tint'],
+        ['sheet', '--ht-material-sheet-tint'],
+      ];
+      for (const [tier, tintToken] of tints) {
+        CASES.push({
+          theme,
+          vars,
+          fg: '--ht-color-foreground',
+          tier,
+          tint: tintOf(vars, tintToken),
+          bg: `${bgToken}（${bgWhy}）`,
+          bgValue,
+        });
+        CASES.push({
+          theme,
+          vars,
+          fg: '--ht-color-foreground-muted',
+          tier,
+          tint: tintOf(vars, tintToken),
+          bg: `${bgToken}（${bgWhy}）`,
+          bgValue,
+        });
+      }
+      // chrome 档只对主前景色把关（契约见 describe 头）。
+      CASES.push({
+        theme,
+        vars,
+        fg: '--ht-color-foreground',
+        tier: 'chrome',
+        tint: tintOf(vars, '--ht-material-chrome-tint'),
+        bg: `${bgToken}（${bgWhy}）`,
+        bgValue,
+      });
+    }
+  }
+
+  it.each(CASES)(
+    '$theme $tier 档：$fg 盖在「$bg」上 ≥ 4.5:1',
+    ({ theme, vars, fg, tier, tint, bg, bgValue }) => {
+      const ratio = contrast(fgOf(vars, fg), blend(tint, bgValue));
+      expect(
+        Number(ratio.toFixed(2)),
+        `${theme} ${tier} 档 ${fg} × ${bg} 实测 ${ratio.toFixed(2)}:1`,
+      ).toBeGreaterThanOrEqual(4.5);
+    },
+  );
+
+  it('反向证据：muted 在 chrome 档上过不了 4.5:1 —— 这正是「chrome 不承载次要文字」契约的理由', () => {
+    // 只找一个足以证明契约存在的取值：亮色 chrome × 最暗内容。
+    const tint = tintOf(light, '--ht-material-chrome-tint');
+    const bgValue = tintOf(light, '--ht-slate-900');
+    const ratio = contrast(fgOf(light, '--ht-color-foreground-muted'), blend(tint, bgValue));
+    expect(Number(ratio.toFixed(2)), `实测 ${ratio.toFixed(2)}:1`).toBeLessThan(4.5);
   });
 });
 

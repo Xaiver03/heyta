@@ -116,8 +116,16 @@
 
   /* 文字 */
   --ht-color-foreground: var(--ht-slate-900);
-  --ht-color-foreground-muted: var(--ht-slate-500);
-  --ht-color-foreground-subtle: var(--ht-slate-400);
+  /*
+    🔴 2026-09-30 暗色审计：整条次要文字梯子**下移一级**。
+    `foreground-subtle` 原为 slate-400 —— 白底上 **2.56:1**、页面底 2.45:1，
+    而它承载的是**真文字**（日历列头「一二三四五六日」、周次「36周」、
+    「未设截止时间的任务不在日历上」那句脚注），不是装饰。
+    整条一起动而不是只动 subtle，是因为只动它会让 subtle == muted。
+    现在：muted slate-600 = 7.58，subtle slate-500 = 4.76，层级仍在，字也看得见了。
+  */
+  --ht-color-foreground-muted: var(--ht-slate-600);
+  --ht-color-foreground-subtle: var(--ht-slate-500);
   --ht-color-foreground-inverse: var(--ht-white);
 
   /* 边框与分隔 */
@@ -299,10 +307,27 @@
   --ht-focus-ring-width: 2px;
 
   /* 布局 */
-  /* 视图导航（rail）宽度。11rem 装得下最长的标签「四象限」+ 图标 + 内边距，
-     又不至于把主区挤到 1280 下出现横向滚动（审计基准见 showcase-fidelity-audit.md §6.3）。 */
-  --ht-layout-rail-width: 11rem;      /* 176px */
+  /* 视图导航（rail）宽度。
+     🔴 **纯图标**（2026-09-30 产品负责人：「只显示 icon，hover 显示真名」，照滴答清单）。
+     所以这个值不再由"最长的标签「四象限」"推导，而是由**触控目标**推导：
+     图标按钮要保持 44px 的方形命中区（`--ht-touch-target-min`，可访问性硬下限），
+     加上 rail 自身的左右内边距（`--ht-space-2` × 2 = 16px）= 60px，取整到 4rem。
+     名字并没有消失 —— 它在 hover / 键盘聚焦时以一条 `position: fixed` 的标签出现
+     （`.ht-rail__label`，见 `app.css`：rail 是 `overflow-y: auto` 的裁剪容器，
+     absolute 会被切掉，这与 `.ht-inbox__panel` / `.ht-accountmenu__panel` 同一个理由）。
+     ⚠️ 改窄会连带移动**两条从它算出坐标的浮层**（`.ht-inbox__panel` 的 left、
+     `.ht-rail__label` 的 left）—— 它们都读这个变量，所以不需要跟着改。
+     头像菜单不在内：它用 `getBoundingClientRect` 实测锚点（塌缩态 rail 不在左边，
+     硬算不出来）。 */
+  --ht-layout-rail-width: 4rem;      /* 64px */
+  /* 侧栏宽度的**默认值**（不是最终值）—— 2026-09-30 起用户可拖拽，
+     拖完的结果落在下面两条界内并记在本设备上。 */
   --ht-layout-sidebar-width: 15rem;   /* 240px */
+  /* 可拖区间。下限 12rem：再窄的话「深度工作」这类清单名会一字一行，
+     而计数位与取色入口会挤出容器；上限 26rem：再宽主区（任务列表）就被吃空，
+     而侧栏只是"范围"，不该比内容还大。 */
+  --ht-layout-sidebar-min-width: 12rem;   /* 192px */
+  --ht-layout-sidebar-max-width: 26rem;   /* 416px */
   --ht-layout-header-height: 3.5rem;  /* 56px */
   --ht-layout-content-max: 75rem;     /* 1200px */
   /* 正文最大宽度。用 ch 而不是 rem：它随字号缩放，
@@ -504,8 +529,16 @@
   --ht-blur-chrome: 20px;  /* 导航条 / 标签栏 */
   --ht-blur-sheet: 30px;   /* 底部面板：更大的面要更厚 */
 
-  --ht-material-chrome-tint: rgb(255 255 255 / 0.72);
+  --ht-material-chrome-tint: rgb(255 255 255 / 0.62);
+  /* 🔴 chrome 档 0.62 是**降过 tint 的**（2026-10-02，P1-3）：0.72 盖在浅色
+     列表上合成后≈白，玻璃"隐形"（UI 审计核心发现：玻璃是关系不是属性）。
+     0.62 由对比度矩阵反解：主前景 × 最暗背景 = 6.99:1，距 4.5 有充足余量，
+     透出感肉眼可辨。再降必须先过 tests/tokens.spec.ts 的玻璃动态对。 */
   --ht-material-chrome-tint-strong: rgb(255 255 255 / 0.85);
+  /* 浮层（菜单 / 下拉 / 命令面板）专用档：比 chrome 厚一点（浮层要承载
+     密集文字，锚定在内容上方），比 sheet 薄（它仍是"透出下层"的悬浮层，
+     不是表单）。ADR-0042 的逐面裁决表里 P1-4 的五个浮层都走这一档。 */
+  --ht-material-panel-tint: rgb(255 255 255 / 0.78);
   /* 亮色顶边 = 光打在材料上。没有它，半透明面会显得像"没画完"。 */
   --ht-material-edge-highlight: rgb(255 255 255 / 0.5);
   --ht-material-sheet-tint: rgb(255 255 255 / 0.92);
@@ -534,8 +567,11 @@
   --ht-color-overlay: rgb(2 6 23 / 0.7);
 
   --ht-color-foreground: var(--ht-slate-100);
-  --ht-color-foreground-muted: var(--ht-slate-400);
-  --ht-color-foreground-subtle: var(--ht-slate-500);
+  /* 暗色同一条梯子**上移一级**：subtle 原为 slate-500，在 `color.surface`
+     (#0d1526) 上只有 **3.83:1**、页面底 4.24:1 —— 同样过不了 4.5。
+     现在 muted slate-300 = 12.27，subtle slate-400 = 7.11。 */
+  --ht-color-foreground-muted: var(--ht-slate-300);
+  --ht-color-foreground-subtle: var(--ht-slate-400);
   --ht-color-foreground-inverse: var(--ht-slate-950);
 
   --ht-color-border: #1e2b45;
@@ -608,9 +644,11 @@
   /* 材质：暗色的半透明**不是亮色的反相**。
      亮色用"白色提升"，暗色要用"深蓝提升" —— 用纯黑会让浮层与背景糊成一片，
      用白色会过曝。这里沿用 surface 那套 #0d1526 家族，保持同一色相。
-     顶边高光在暗色下要更弱：亮色下它是"光"，暗色下只是"边缘"。 */
-  --ht-material-chrome-tint: rgb(13 21 38 / 0.78);
+     顶边高光在暗色下要更弱：亮色下它是"光"，暗色下只是"边缘"。
+     panel 档同理：比 chrome 厚、比 sheet 薄，暗色整体抬高不透明度。 */
+  --ht-material-chrome-tint: rgb(13 21 38 / 0.72);
   --ht-material-chrome-tint-strong: rgb(13 21 38 / 0.9);
+  --ht-material-panel-tint: rgb(13 21 38 / 0.86);
   --ht-material-edge-highlight: rgb(255 255 255 / 0.12);
   --ht-material-sheet-tint: rgb(13 21 38 / 0.94);
   --ht-material-scrim: rgb(2 6 23 / 0.5);
@@ -643,5 +681,29 @@
     /* 压到 1ms 而不是删掉 duration —— 删掉会让依赖 transitionend 的逻辑
        永远不触发。按下反馈同理：仍要有"瞬间发生"，只是不再可见。 */
     --ht-duration-press: 1ms;
+  }
+}
+
+/**
+ * 尊重系统"减少透明度"设置（ADR-0042 §4）。
+ * 做法：**压值，不删属性** —— 消费材质的组件代码零改动；
+ * tint 压成对应主题的实色 surface（var() 在使用点解析，亮暗自动成立），
+ * 模糊半径压成 0（backdrop-filter 的合成开销也随之消失）。
+ * scrim 刻意保留：它不是"透明装饰"，是模态的聚焦压暗。
+ *
+ * ⚠️ 必须放在文件**末尾**：本块与 [data-theme='dark'] 都用 (0,1,0) 特异性
+ * 改同名变量，后者在文件里更早出现 —— 同特异性下后来者胜，
+ * 放前面会被暗色块整个盖掉（恰好只剩暗色失效，最难发现的形态）。
+ */
+@media (prefers-reduced-transparency: reduce) {
+  :root {
+    --ht-blur-chrome: 0px;
+    --ht-blur-sheet: 0px;
+
+    --ht-material-chrome-tint: var(--ht-color-surface);
+    --ht-material-chrome-tint-strong: var(--ht-color-surface);
+    --ht-material-panel-tint: var(--ht-color-surface);
+    --ht-material-sheet-tint: var(--ht-color-surface);
+    --ht-material-edge-highlight: var(--ht-color-border);
   }
 }

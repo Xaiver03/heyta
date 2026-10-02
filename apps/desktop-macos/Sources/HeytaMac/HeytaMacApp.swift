@@ -1359,15 +1359,35 @@ struct ShellView: View {
                 )
                 // 撑满窗口：这是壳里**唯一**的内容。
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
+                /**
+                 🔴 **必须吃掉顶部 safe area，否则窗口顶上永远有一条带**
+                 （2026-09-30 产品负责人："把这一条隐藏掉，跟滴答清单一样融入应用壳"）。
+
+                 `.windowStyle(.hiddenTitleBar)` 做的事是**把标题条透明化 + 隐藏标题文字**，
+                 它**不**把标题条从布局里拿掉 —— SwiftUI 仍然把它的 **28pt** 报成
+                 `safeAreaInsets.top`，于是内容整体被顶下去一截，
+                 空出来的那条露出 `NSWindow.backgroundColor`。
+
+                 实测（`screencapture -l` 逐行取色，2x）：
+                 第 0–55 px（= 0–28pt）是 `#282828`（窗口底色），第 56 px 起才是
+                 应用自己的 `#1e1e1e` —— 色差 10 级，**浅底下深**，一眼就是"贴了一条"。
+
+                 让 WebView 延伸到标题条之下，红绿灯就落在**应用的底色**上
+                 （rail 顶部那 32px 让位由 `.heyta-shell .ht-rail__top` 负责，见 app.css）。
+                 */
+                .ignoresSafeArea(.all, edges: .top)
             } else {
                 // 🔴 找不到产物时**必须说出来**，不能给一个空白窗口 ——
                 // "窗口打开了但什么都没有"是这类壳最难排查的失败形态。
+                // 文字颜色走 token（HeytaTokens.color 桥，P0-8）：此前颜色 token
+                // 只导出 hex 字符串，壳里没有解析器，只能用系统色 `.secondary` ——
+                // token 发了等于没发（2026-10-01 UI 审计 G1）。
                 VStack(spacing: HeytaTokens.Light.space3) {
                     Text("找不到共享 UI 产物")
                         .font(.system(size: HeytaTokens.Light.fontSizeLg, weight: .semibold))
                     Text("设置 HEYTA_WEB_ROOT 指向 apps/web/dist，或把 web-dist 放进 app 包的 Contents/Resources。")
                         .font(.system(size: HeytaTokens.Light.fontSizeSm))
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(HeytaTokens.color(HeytaTokens.Light.colorForegroundMuted))
                 }
                 .padding(HeytaTokens.Light.space6)
             }
@@ -1377,7 +1397,7 @@ struct ShellView: View {
             if !webNote.isEmpty, ProcessInfo.processInfo.environment["HEYTA_M2_EVIDENCE"] != nil {
                 Text(webNote)
                     .font(.system(size: HeytaTokens.Light.fontSizeXs))
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(HeytaTokens.color(HeytaTokens.Light.colorForegroundSubtle))
                     .padding(HeytaTokens.Light.space2)
                     .frame(maxWidth: .infinity, alignment: .leading)
             }

@@ -54,8 +54,8 @@ enum HeytaTokens {
     static let colorSurfaceRaised: String = "#ffffff"
     static let colorSurfaceSunken: String = "#f1f5f9"
     static let colorForeground: String = "#0f172a"
-    static let colorForegroundMuted: String = "#64748b"
-    static let colorForegroundSubtle: String = "#94a3b8"
+    static let colorForegroundMuted: String = "#475569"
+    static let colorForegroundSubtle: String = "#64748b"
     static let colorForegroundInverse: String = "#ffffff"
     static let colorBorder: String = "#e2e8f0"
     static let colorBorderStrong: String = "#cbd5e1"
@@ -171,8 +171,10 @@ enum HeytaTokens {
     static let iconXl: Double = 32  // px
     static let touchTargetMin: Double = 44  // px
     static let focusRingWidth: Double = 2  // px
-    static let layoutRailWidth: Double = 176  // px
+    static let layoutRailWidth: Double = 64  // px
     static let layoutSidebarWidth: Double = 240  // px
+    static let layoutSidebarMinWidth: Double = 192  // px
+    static let layoutSidebarMaxWidth: Double = 416  // px
     static let layoutHeaderHeight: Double = 56  // px
     static let layoutContentMax: Double = 1200  // px
     static let layoutProseMax: String = "65ch"
@@ -235,8 +237,9 @@ enum HeytaTokens {
     static let stateDisabledOpacity: Double = 0.38
     static let blurChrome: Double = 20  // px
     static let blurSheet: Double = 30  // px
-    static let materialChromeTint: String = "#ffffffb8"
+    static let materialChromeTint: String = "#ffffff9e"
     static let materialChromeTintStrong: String = "#ffffffd9"
+    static let materialPanelTint: String = "#ffffffc7"
     static let materialEdgeHighlight: String = "#ffffff80"
     static let materialSheetTint: String = "#ffffffeb"
     static let materialScrim: String = "#0f172a52"
@@ -256,8 +259,8 @@ enum HeytaTokens {
     static let colorSurfaceRaised: String = "#131e33"
     static let colorSurfaceSunken: String = "#080e1a"
     static let colorForeground: String = "#f1f5f9"
-    static let colorForegroundMuted: String = "#94a3b8"
-    static let colorForegroundSubtle: String = "#64748b"
+    static let colorForegroundMuted: String = "#cbd5e1"
+    static let colorForegroundSubtle: String = "#94a3b8"
     static let colorForegroundInverse: String = "#020617"
     static let colorBorder: String = "#1e2b45"
     static let colorBorderStrong: String = "#2b3b5c"
@@ -312,8 +315,9 @@ enum HeytaTokens {
     static let shadowLg: String = "0 8px 24px rgb(0 0 0 / 0.6)"
     static let shadowXl: String = "0 16px 48px rgb(0 0 0 / 0.7)"
     static let shadowFocus: String = "0 0 0 3px rgb(96 165 250 / 0.35)"
-    static let materialChromeTint: String = "#0d1526c7"
+    static let materialChromeTint: String = "#0d1526b8"
     static let materialChromeTintStrong: String = "#0d1526e6"
+    static let materialPanelTint: String = "#0d1526db"
     static let materialEdgeHighlight: String = "#ffffff1f"
     static let materialSheetTint: String = "#0d1526f0"
     static let materialScrim: String = "#02061780"
@@ -330,3 +334,30 @@ enum HeytaTokens {
     static let durationPress: Double = 1  // ms
   }
 }
+
+#if canImport(SwiftUI)
+import Foundation
+import SwiftUI
+
+extension HeytaTokens {
+  /// 设计系统 hex token → SwiftUI Color。6 位 = #rrggbb（不透明），
+  /// 8 位 = #rrggbbaa（alpha 在尾部，与 tokens.css 生成物一致）。
+  static func color(_ hex: String) -> Color {
+    var value: UInt64 = 0
+    Scanner(string: String(hex.dropFirst())).scanHexInt64(&value)
+    let r: Double, g: Double, b: Double, a: Double
+    if hex.count == 9 {
+      r = Double((value >> 24) & 0xff) / 255
+      g = Double((value >> 16) & 0xff) / 255
+      b = Double((value >> 8) & 0xff) / 255
+      a = Double(value & 0xff) / 255
+    } else {
+      r = Double((value >> 16) & 0xff) / 255
+      g = Double((value >> 8) & 0xff) / 255
+      b = Double(value & 0xff) / 255
+      a = 1
+    }
+    return Color(red: r, green: g, blue: b, opacity: a)
+  }
+}
+#endif

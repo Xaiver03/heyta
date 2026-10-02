@@ -156,6 +156,8 @@ export interface HeytaNativeTokens {
   readonly 'focus-ring.width': number;
   readonly 'layout.rail-width': number;
   readonly 'layout.sidebar-width': number;
+  readonly 'layout.sidebar-min-width': number;
+  readonly 'layout.sidebar-max-width': number;
   readonly 'layout.header-height': number;
   readonly 'layout.content-max': number;
   /** 相对单位依赖当前字号，无法换算为原生数值常量；已原样导出为字符串。 */
@@ -225,6 +227,7 @@ export interface HeytaNativeTokens {
   readonly 'blur.sheet': number;
   readonly 'material.chrome-tint': string;
   readonly 'material.chrome-tint-strong': string;
+  readonly 'material.panel-tint': string;
   readonly 'material.edge-highlight': string;
   readonly 'material.sheet-tint': string;
   readonly 'material.scrim': string;
@@ -243,8 +246,8 @@ export const lightTokens: HeytaNativeTokens = {
   'color.surface-raised': "#ffffff",
   'color.surface-sunken': "#f1f5f9",
   'color.foreground': "#0f172a",
-  'color.foreground-muted': "#64748b",
-  'color.foreground-subtle': "#94a3b8",
+  'color.foreground-muted': "#475569",
+  'color.foreground-subtle': "#64748b",
   'color.foreground-inverse': "#ffffff",
   'color.border': "#e2e8f0",
   'color.border-strong': "#cbd5e1",
@@ -360,8 +363,10 @@ export const lightTokens: HeytaNativeTokens = {
   'icon.xl': 32,
   'touch-target.min': 44,
   'focus-ring.width': 2,
-  'layout.rail-width': 176,
+  'layout.rail-width': 64,
   'layout.sidebar-width': 240,
+  'layout.sidebar-min-width': 192,
+  'layout.sidebar-max-width': 416,
   'layout.header-height': 56,
   'layout.content-max': 1200,
   'layout.prose-max': "65ch",
@@ -424,8 +429,9 @@ export const lightTokens: HeytaNativeTokens = {
   'state.disabled-opacity': 0.38,
   'blur.chrome': 20,
   'blur.sheet': 30,
-  'material.chrome-tint': "#ffffffb8",
+  'material.chrome-tint': "#ffffff9e",
   'material.chrome-tint-strong': "#ffffffd9",
+  'material.panel-tint': "#ffffffc7",
   'material.edge-highlight': "#ffffff80",
   'material.sheet-tint': "#ffffffeb",
   'material.scrim': "#0f172a52",
@@ -444,8 +450,8 @@ export const darkTokens: HeytaNativeTokens = {
   'color.surface-raised': "#131e33",
   'color.surface-sunken': "#080e1a",
   'color.foreground': "#f1f5f9",
-  'color.foreground-muted': "#94a3b8",
-  'color.foreground-subtle': "#64748b",
+  'color.foreground-muted': "#cbd5e1",
+  'color.foreground-subtle': "#94a3b8",
   'color.foreground-inverse': "#020617",
   'color.border': "#1e2b45",
   'color.border-strong': "#2b3b5c",
@@ -561,8 +567,10 @@ export const darkTokens: HeytaNativeTokens = {
   'icon.xl': 32,
   'touch-target.min': 44,
   'focus-ring.width': 2,
-  'layout.rail-width': 176,
+  'layout.rail-width': 64,
   'layout.sidebar-width': 240,
+  'layout.sidebar-min-width': 192,
+  'layout.sidebar-max-width': 416,
   'layout.header-height': 56,
   'layout.content-max': 1200,
   'layout.prose-max': "65ch",
@@ -625,8 +633,9 @@ export const darkTokens: HeytaNativeTokens = {
   'state.disabled-opacity': 0.38,
   'blur.chrome': 20,
   'blur.sheet': 30,
-  'material.chrome-tint': "#0d1526c7",
+  'material.chrome-tint': "#0d1526b8",
   'material.chrome-tint-strong': "#0d1526e6",
+  'material.panel-tint': "#0d1526db",
   'material.edge-highlight': "#ffffff1f",
   'material.sheet-tint': "#0d1526f0",
   'material.scrim': "#02061780",
@@ -641,6 +650,28 @@ export const reducedMotionTokens: Partial<HeytaNativeTokens> = {
   'duration.slow': 1,
   'duration.exit': 1,
   'duration.press': 1,
+};
+
+/** `prefers-reduced-transparency` 的覆盖层（亮色解析；ADR-0042 §4）。 */
+export const reducedTransparencyLightTokens: Partial<HeytaNativeTokens> = {
+  'blur.chrome': 0,
+  'blur.sheet': 0,
+  'material.chrome-tint': "#ffffff",
+  'material.chrome-tint-strong': "#ffffff",
+  'material.panel-tint': "#ffffff",
+  'material.edge-highlight': "#e2e8f0",
+  'material.sheet-tint': "#ffffff",
+};
+
+/** `prefers-reduced-transparency` 的覆盖层（暗色解析）。 */
+export const reducedTransparencyDarkTokens: Partial<HeytaNativeTokens> = {
+  'blur.chrome': 0,
+  'blur.sheet': 0,
+  'material.chrome-tint': "#0d1526",
+  'material.chrome-tint-strong': "#0d1526",
+  'material.panel-tint': "#0d1526",
+  'material.edge-highlight': "#1e2b45",
+  'material.sheet-tint': "#0d1526",
 };
 
 export const THEME_NAMES: readonly ThemeName[] = ['light', 'dark'];

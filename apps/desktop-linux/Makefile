@@ -21,12 +21,16 @@ CORE := src/heyta_driver.c src/heyta_host.c src/heyta_api.c
 # 与 Windows / macOS 两个壳加载的是**同一个文件**。
 BUNDLE := ../../packages/app-host/bridge-bundle/native-bridge.js
 
-.PHONY: all clean smoke check-bundle
+# 设计系统 token（P0-7，2026-10-01 UI 审计 G1）：GTK CSS 的 C 内嵌形态。
+# 此前这个壳界面上没有任何一个像素来自设计系统，也没有任何门禁管它。
+GTK_TOKENS := ../../packages/design-system/generated/heyta-tokens.h
+
+.PHONY: all clean smoke check-bundle check-tokens
 
 all: heyta-linux heyta-smoke
 
-heyta-linux: $(CORE) src/main.c | check-bundle
-	$(CC) $(CFLAGS) -o $@ $^ $(LDLIBS)
+heyta-linux: $(CORE) src/main.c $(GTK_TOKENS) | check-bundle check-tokens
+	$(CC) $(CFLAGS) -I../../packages/design-system/generated -o $@ $(CORE) src/main.c $(LDLIBS)
 
 heyta-smoke: $(CORE) src/smoke.c | check-bundle
 	$(CC) $(CFLAGS) -o $@ $^ $(LDLIBS)
@@ -36,6 +40,13 @@ check-bundle:
 	@test -f $(BUNDLE) || { \
 	  echo "❌ 缺少 $(BUNDLE)"; \
 	  echo "   先在仓库根跑：node packages/app-host/scripts/build-native-bridge.mjs"; \
+	  exit 1; }
+
+# 缺 token 头就**明确报错**：否则会是"能编但样式全丢"的静默失败。
+check-tokens:
+	@test -f $(GTK_TOKENS) || { \
+	  echo "❌ 缺少 $(GTK_TOKENS)"; \
+	  echo "   先跑：pnpm --filter @heyta/design-system run generate"; \
 	  exit 1; }
 
 smoke: heyta-smoke

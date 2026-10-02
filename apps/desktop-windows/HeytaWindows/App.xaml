@@ -7,6 +7,10 @@
         <ResourceDictionary>
             <ResourceDictionary.MergedDictionaries>
                 <XamlControlsResources xmlns="using:Microsoft.UI.Xaml.Controls" />
+                <!-- 设计系统 token（P0-6）：packages/design-system/generated/HeytaTokens.xaml
+                     的仓库唯一一份拷贝，由 csproj 拷到 Assets/。颜色是 HeytaXxx 的
+                     SolidColorBrush，尺寸是 x:Double；页面用 {ThemeResource HeytaXxx} 消费。 -->
+                <ResourceDictionary Source="ms-appx:///Assets/HeytaTokens.xaml" />
             </ResourceDictionary.MergedDictionaries>
         </ResourceDictionary>
     </Application.Resources>
