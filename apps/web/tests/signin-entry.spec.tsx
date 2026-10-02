@@ -205,6 +205,12 @@ describe('J1：注册/登录在冷启动后可达，且身份入口唯一', () =
 
     // 面板里必须有一个地址输入，否则用户在点开之后无处可填服务端，
     // "前置"就变成了"前置到一个走不通的表单"。
+    // 🔴 2026-10-02 晚：地址栏改成**默认收起**（产品负责人：第一屏不该是服务器地址
+    // 与粘贴令牌），所以这条判的是「一次展开之内到得了」—— 而不是"节点必须一直挂着"。
+    // 原来那两句（"无处可填服务端"）的理由**完全没变**，变的只是到达它的成本。
+    const toggle = el.querySelector('[data-testid="auth-form-self-host-toggle"]');
+    expect(toggle, '既没有常驻的地址栏，也没有展开入口 = 这条路真的没了').not.toBeNull();
+    click(toggle!);
     const inputs = Array.from(el.querySelectorAll('input'));
     expect(inputs.some((i) => i.getAttribute('type') === 'url')).toBe(true);
   });

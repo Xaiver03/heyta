@@ -288,6 +288,21 @@ export function AuthPanel({ baseUrl, onClose, onSignedIn }: AuthPanelProps): Rea
       placeholder: t('web.auth.paste.placeholder'),
       verify: t('web.auth.verify'),
     },
+    /*
+      🔴 两条逃生门各给一个展开入口（2026-10-02）。不给的话共享表单会**常驻**渲染
+      它们 —— 那正是产品负责人判掉的那个默认屏：「为什么还是默认就是要什么粘贴
+      服务器地址和令牌之类的东西？……这不是把那些普通用户给拒之门外了吗？」
+      折叠只发生在**视觉层**：地址与令牌输入仍在 DOM 里，键盘与读屏照样能到 ——
+      与「通行密钥 / 邮件登录链接」降到二级链用的是同一条口径。
+    */
+    selfHostToggle: {
+      open: t('web.auth.selfHost.open'),
+      close: t('web.auth.selfHost.close'),
+    },
+    haveTokenToggle: {
+      open: t('web.auth.haveToken.open'),
+      close: t('web.auth.haveToken.close'),
+    },
     ...(legalLinks === null
       ? {}
       : {
