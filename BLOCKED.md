@@ -1321,7 +1321,7 @@ src/timeline/TimelineBoard.tsx(598,16): error TS2552: Cannot find name 'row'. Di
 谁的那次 build 失败，就把别人的验证窗口一起关掉。所以"红一片"的第一动作是
 `ls packages/*/dist` + 看错误是不是 `Failed to resolve entry`，**不是**翻自己的 diff。
 
-## B9. 🟡 `apps/web` 全量测试剩 **1 条红**：习惯图标选择器 —— 被测文件是并行会话**未提交**的改动
+## B9. ✅ **已解除**（2026-10-02 19:03）🟡 `apps/web` 全量测试剩 **1 条红**：习惯图标选择器 —— 被测文件是并行会话**未提交**的改动
 
 **症状**（2026-10-02 01:15，`pnpm -r --filter '!@heyta/sync-server' test`）：只有这一个失败，
 其余 17 个包全绿（app-host 42 文件、mobile 31、legal 57、landing 1303、ui 22）。
@@ -1363,7 +1363,14 @@ AssertionError: expected '<svg …' not to be '<svg …'   // habits-list-pane.s
 准确口径是 **1322 passed / 1 failed，而那 1 条属于图标选择器那一轮**。
 不要把它当成自己的红灯去翻自己的 diff，也不要为了让汇总变绿去动别人的文件。
 
-## B9. 🔴 四条 legal-links 全红在**同一个与本轮无关的动作**上 —— 未提交的隐私同意面板把整个界面盖住了
+**解除取证**（2026-10-02 19:03，本轮）：图标那一轮已提交，`npx vitest run tests/habits-list-pane.spec.tsx`
+= **19 passed / 0 failed**，原第 311 行（换图标要看得见）在内。上面那句"不能这么写"仍然成立 ——
+它约束的是**当时**那次汇总的口径，不是现在的状态。
+
+## B11. ✅ **已解除**（2026-10-02 19:40）🔴 四条 legal-links 全红在**同一个与本轮无关的动作**上 —— 未提交的隐私同意面板把整个界面盖住了
+
+> 编号说明：这一条登记时误用了 `B9`（与上面"习惯图标选择器"那条同号）。
+> 改号为 `B11` 并把解除取证补在下面 —— **编号只增不改**，所以同号两件事必须拆开。
 
 **症状**（2026-10-02 01:13）：`npx playwright test --config=playwright.legal-links.config.ts`
 里已完成的 4 条**全部** `Test timeout of 120000ms exceeded`，而失败点都在
@@ -1398,15 +1405,165 @@ Error: locator.click: waiting for getByTestId('account-menu-avatar')
 
 **恢复验证的动作**（等那轮提交后重跑，判据本身不用改）：
 `cd e2e && npx playwright test --config=playwright.legal-links.config.ts`（5 条），
-以及 `pnpm verify:email-web-chain`。**在那之前，本工作树里任何"真浏览器"结论都不可信** ——
+以及 `pnpm verify:email-web`。**在那之前，本工作树里任何"真浏览器"结论都不可信** ——
 与 B8（`packages/*/dist` 被一次失败的 build 清空）同形状：单点状态被并行会话占着，
 红的不是我的 diff。
+
+**解除取证**（2026-10-02 19:40，本轮）：上面那两条路里选了 **①**，而且那三个"该由谁定"的
+产品语义已经定下来了 ——
+
+1. **共享启动路径的默认档 = `local-only`**（`e2e/tests/helpers.ts` 的 `openApp(page, path, consent)`）。
+   默认不出门，是因为**默认值必须站在隐私那一侧**：新写一条验收的人不选档时，
+   得到的行为应该是"零字节离开本机"，而不是"悄悄联网"。
+2. **要出门的调用点显式传 `accepted`** —— 认证旅程需要网络，所以它是**逐点声明**的，
+   不靠默认。`e2e/auth-journey/helpers.ts` 的 `openApp` 固定 `accepted`（那条线整条都在联网）。
+3. 🔴 **"计数为 0"这一类反向判据必须用 `accepted`** —— 这是本轮实测出来的，不是洁癖：
+   `local-only` 下全局 fetch 被闸门替换，**任何请求都发不出去**，于是"某端点请求数 = 0"
+   在两种情况下都成立：契约真的不要求它、和它被闸门挡了。拿它当判据等于没有判据。
+   同一条机制也让 `inbox.spec.ts` 的「未配置服务器」那条红过一轮 ——
+   它要钉的 `unconfigured` 是**拉了之后**的读态（`store.ts:115`），
+   而 `local-only` 下 `InboxBell.tsx:313` 的 `pollNotifications()` 提前 `return` 且**不改状态**，
+   界面永远停在空态，**结构性到不了那个分支**。
+
+三条判据各自复跑：`playwright.legal-links.config.ts` **5 passed**、
+`pnpm verify:email-web` **exit 0**（真 SMTP + 真服务端 + 真浏览器，全判据 ✅）、
+`pnpm verify:password-web` **2 passed**（口令这条路 7 张截图）。
+🔴 **离线全量套件这一轮没能给出一个可信的单一数字**（两次跑分不同，原因见 B12）：
+
+| 跑 | 时间 | 结果 |
+|---|---|---|
+| 第一次 | 19:14–19:21 | **93 passed / 1 flaky / 2 skipped**（96 条） |
+| 第二次 | 19:33–19:43 | **87 passed / 6 failed / 1 flaky / 2 skipped** |
+
+六条红**共享同一个原因**（`/api/account/legal-consent` 非 2xx），且**不在本条要证的三件事里** ——
+细节与归属登记在 **B12**。本条的解除判据是那三条各自复跑，不是这个套件数字。
 
 📌 **可迁移的判据**：一条 e2e 失败**先定位它红在第几步**，再看那一步是不是自己改过的代码。
 四条同时红在**同一个 `click()`**、而错误里写着"别的元素 intercepts pointer events"，
 那个"别的元素"就是探针环境的变量 —— 它属于**谁的工作树状态**，不属于被测契约。
 
-## B10. 🟡 服务端 test 端点缺"签发一次性登录链接令牌"能力 —— iOS 验收的贴令牌主路径结构性走不通
+📌 **第二一般规律（解除时才浮出来）**：一个"首启必须拦人"的遮罩一旦进共享启动路径，
+它就把**所有**验收劈成两档 —— "能出门"和"不能出门"。这时**默认档选哪边不是风格问题**，
+它决定后来者忘传参数时测到的是哪条分支。所以默认档必须配一条**能失败的判据**
+（本轮 = `privacy-consent-zero-egress.spec.ts`），否则"默认"只是文档里的一句话。
+
+## B12. ✅ **已解除**（2026-10-02 19:58）🔴 隐私/法务重确认线的接线落进工作树后，离线 e2e 六条红在同一个非 2xx 上 —— `/api/account/legal-consent` 客户端在调、夹具没给它打桩
+
+**症状**（2026-10-02 19:43，`cd e2e && npx playwright test`）：**6 failed / 87 passed / 1 flaky / 2 skipped**。
+六条的失败信息**逐字相同**：
+
+```
+Error: 除已登记缺失外不该有非 2xx：["/api/account/legal-consent"]
+```
+
+命中的是 `tests/admin-console.spec.ts` 四条 + `tests/inbox.spec.ts` 两条。
+判据本身在 `admin-console.spec.ts:538-544` 与 `inbox.spec.ts:191-197`（`KNOWN_MISSING` 只登记了
+`/favicon.ico`）。
+
+**实测机制**（逐环核过，不是推测）：
+
+1. 客户端会问一次账号级法务重确认：`packages/app-host/src/legal-recheck.ts:152` 的 `ask()`
+   → `:160` `getLegalConsentStatus()` → `packages/app-host/src/hosted-auth.ts:103`
+   `accountLegalConsent: '/api/account/legal-consent'`。
+2. 真实服务端有这两个路由（GET 读侧 `server/src/api.ts:636`、POST 写侧 `:673`，
+   逻辑在 `server/src/legal-recheck.ts`），离线夹具里**没有**：这两条 spec 把
+   `baseUrl` 塞成 `http://127.0.0.1:4319`（`admin-console.spec.ts:41`、`inbox.spec.ts:31`），
+   也就是 `e2e/stub-provider.mjs`，而它的契约是**只实现模型接口** ——
+   `!url.includes('/chat/completions')` 一律 404（`stub-provider.mjs:139-143`）。
+   各 spec 自己的 `page.route` 表是按端点**逐个**打桩的
+   （`/api/sync/status`、`/api/notifications`、`/api/activity`、`/api/passkeys`、`/api/admin/**`），
+   没桩的那条路径就真打到 4319 上 ⇒ **404**。
+   ⚠️ 本条初稿在这里写过两句错的：① "桩不服务它"落点写成 `stub-provider.mjs` 之外的地方；
+   ② 更离谱的一版说它"落在 vite dev(4318) 上（`vite.config.ts` 无 `/api` 代理）"——
+   `proxy` 0 命中是真的，但**结论用错了地方**：`baseUrl` 指向的是 4319，不是 4318。
+   教训：**"哪个端口接住了这个请求"要看塞进 `baseUrl` 的那个常量，不能看应用自己的 origin。**
+3. 于是那条"除登记外不许有非 2xx"的判据把每一条**已登录且配了服务器**的用例都判红。
+
+🔴 客户端的闸门是**对的**：`legal-recheck.ts:155` 在 `token === '' || baseUrl === ''` 时直接 `return`，
+所以未配置的应用不会发这一枪 —— 红的是**夹具没跟上生产契约**，不是产品多发请求。
+（同一份判据在 `admin-console.spec.ts:772` 那条"刻意不塞凭据"的用例上是**成立**的，它没红。）
+
+**归属**（初稿这里写错了，按实测改正）：本条曾写"`881aa92a` 在两次全量跑之间完成提交"——
+**那句是错的**：`git log -1 --format=%ad --date=format:%H:%M:%S 881aa92a` = **08:46:13**，
+比两次跑都早约 11 小时，而**两次跑之间 HEAD 一笔没动**
+（`git log --since 19:21 --until 19:33` 空；最近一笔 `6a5f03c8` 19:14:48 落在第一次跑的内部）。
+**真正在两次跑之间出现的是工作树里的未提交改动**（取证时刻的状态）：
+
+| 文件 | 取证时的 git 状态 | mtime | 与两次跑的关系 |
+|---|---|---|---|
+| `apps/web/src/main.tsx`（`:29` 引 `askLegalRecheck`、`:67` 把它挂进 `createStartupNetwork`） | `M` | **19:29:10** | 正好落在第一次结束(19:21)与第二次开始(19:33)之间 ⇒ 第二次才可能红 |
+| `packages/app-host/src/legal-recheck.ts` | `??` 未跟踪 | **19:40:05** | 第二次跑的**中途**还在被写 |
+| `apps/web/src/features/legal-recheck/gate.ts` | `??`（整目录未跟踪） | 19:46:26 | 同上 |
+| `packages/app-host/src/{hosted-auth,index}.ts` | `M`（881aa92a 之上又有未提交改动） | — | 调用链的另一半 |
+| `apps/web/tests/legal-recheck-gate.spec.ts` 等 | `??` | — | 那条线自己的判据也在途 |
+
+⇒ 这条红最初登记时**不属于本条线**，也不在库里。**19:48 该线自己落地了**
+（`bd703b62 feat(legal,G-27)` 把判定与出口搬进 `app-host`、`a1e2e671 feat(web,G-27)` 装上面板与第二道出站闸），
+落地时**没有补夹具** —— 所以这不是"别人在途的噪声"，是一条**会 standing 的红**。
+
+### ✅ 已解除（2026-10-02 19:58）：修法取上面三个方向里的 ①，并且它确实是"夹具没跟上生产契约"
+
+**A/B 就是解除过程本身**（同一棵树、同一份 config，只差那三行）：
+
+| 跑 | 时刻 | 结果 |
+|---|---|---|
+| 修改前（HEAD 已含 `a1e2e671`） | 19:53 | **6 failed / 2 passed**，六条同一句 `除已登记缺失外不该有非 2xx：["/api/account/legal-consent"]` |
+| 修改后 | 19:58 | **8 passed，exit 0** |
+
+⇒ "六条红"不是 flaky、不是 dist 漂移，**改这一处就整片消失**；而这条判据的牙齿没有被削弱
+（`KNOWN_MISSING` 仍只有 `/favicon.ico`，"不许有意外的非 2xx"照旧 armed）。
+
+**改动**（三处，全在 e2e 夹具侧，产品代码零字节）：
+
+- `e2e/tests/helpers.ts` 新增 `stubLegalRecheck(page, origin = STUB_ORIGIN)` ——
+  应答体刻意**只住这一处**（字段集抄自服务端 handler：`needsReconfirm`/`reason`/
+  `currentVersion`/`recordedVersion`，且 `reason` 必须是 `LEGAL_CONSENT_REASONS`
+  （`packages/app-host/src/hosted-auth.ts:936`）里的一个，否则
+  `parseLegalConsentStatus`（`:963`）整条判 `malformed-response`）。
+- `e2e/tests/admin-console.spec.ts` 的 `seed()`、`e2e/tests/inbox.spec.ts` 的
+  `seedServerAndStubRoutes()` 与"空态"那条各自的塞凭据之后 —— 各调一次。
+- **没有**给 `account-menu.spec.ts` 加：它的 `baseUrl` 是 `https://sync.example`（不存在的域），
+  请求以网络错误收场而不是"非 2xx 响应"，那条判据本来就不会被它触发。
+
+**为什么这是无副作用的那个**：② 登记进 `KNOWN_MISSING`＝承认这个 404 是预期，
+今后真出 404 也没人看得见；③ 让客户端对 404 静默降级＝把"服务端不认这个路由"与
+"这台实例不需要补签"混成同一个状态，而这两件事的界面含义相反。
+① 只补夹具的前提（"这个账号当前不需要补签"），与 `inbox.spec.ts` 里既有的那句说法一致：
+"塞了凭据之后它就会发，所以要给这个假服务端补上 —— 否则无关的 404 会把真正的失败淹掉"。
+
+⚠️ **本轮当场踩到的一条自伤**（记在这里因为它花掉了一整轮跑测）：
+给 `stubLegalRecheck` 写的 JSDoc 里有一句 `` `**/api/**` `` ——
+**块注释里出现的 `*/` 会提前闭合注释**，后面的中文于是变成代码，
+`helpers.ts` 以 `ReferenceError: api is not defined` 炸掉整套。
+写注释里的 glob 时别用 `**/x/**` 这种带 `*/` 的形态（改成"覆盖整个 `/api` 前缀"这类说法）。
+
+📌 **可迁移的判据（这次最值钱的一条）**：**同一棵树两次全量跑分不同，先查三样东西在中间有没有动过
+—— ① HEAD、② `packages/*/dist`、③ 工作树里别人**未提交／未跟踪**的源码 —— 再谈"产品 flaky"**。
+本轮三条证据全在，而且**这次起作用的是第 ③ 条**（HEAD 两次几乎相同，见上面归属表）。
+先说另外两条：
+`git worktree list` 显示并行会话在 `/tmp/heyta-g5m` 跑 `reinstall-all.sh --only android,ios`；
+`packages/i18n/dist` 的 mtime = **19:30:24**，正好落在一次 `--repeat-each=3` 的复跑窗口里，
+而那次 vite 打出 **63 条** `Pre-transform error: Failed to load url .../packages/i18n/dist/index.js …
+Does the file exist?`。
+**逐次对账**（数的是同一次运行里 vite 的 pre-transform 报错条数）：
+
+| 跑 | pre-transform 报错 | 结果 |
+|---|---|---|
+| 离线第一次 19:14–19:21 | **38** | 93 passed / 1 flaky |
+| `search-overlay --repeat-each=3` | **63** | 4 failed（其中三条是"元素找不到"＝模块没加载上）|
+| 离线第二次 19:33–19:43 | **0** | 87 passed / 6 failed —— 六条**同一个** `legal-consent` 原因 |
+
+⇒ 前两次的红**不能当产品结论**用（探针环境在跑测中途被换过），第三次的六条是干净的、可归因的。
+🔴 一条**没被这条解释掉**的：`search-overlay.spec.ts:128` 的
+「padding-top 128 / 实测上隙 125.32」差了 **2.68px**，而判据是 `≤ 2` —— 那是**容差本身太紧**，
+不是 dist 漂移能产生的形态（模块加载失败不会只把间距挪 2.68px）。登记给该线：
+要么按分数像素（devicePixelRatio/缩放）放宽容差，要么把判据改成"上隙明显小于下隙"那种方向判据
+（它下面第 130 行已经是方向判据了）。
+同族：B8（`dist` 被一次失败的 build 清空）、§7 第 82 条（"重装了一遍"≠"装的是当前源码"）。
+**查第 ③ 条的命令**（本表就是这么得出的）：`git status --porcelain <关心的目录>` 看有没有 `M`/`??`，
+再 `stat -f '%Sm %N' -t '%H:%M:%S' <文件>` 把 mtime 对到两次跑的时间窗里。
+
+## B10. ✅ 已闭合（2026-10-02 同日）：服务端 test 端点缺"签发一次性登录链接令牌"能力 —— iOS 验收的贴令牌主路径结构性走不通
 
 **定性**：夹具/测试基建缺口，不是产品缺陷（2026-10-02，verify-mobile-ios 13 轮定位）。
 
@@ -1418,13 +1575,33 @@ Error: locator.click: waiting for getByTestId('account-menu-avatar')
 链接或令牌」吃的是 **ADR-0039 邮件链接流的一次性令牌**（服务端签发、可消费一次的
 登录链接令牌）。形态不匹配 ⇒ 贴进去 ⇒ 登录永不完成 ⇒ 210 秒窗口必超时。
 
-**为什么没当场修**：需要在 test 路由里新增"为既有邮箱签发一次性 magic-login
-令牌"的能力（涉及 login-token 的签发/存储/消费契约），是服务端测试基建的
-一格，与 iOS 夹具轮没有交集。
+**修法（已落地）**：
+- `server/src/auth.ts` 把签发逻辑抽成 `mintLoginMagicLinkToken()`（随机 32 字节 hex、
+  落库只存 SHA-256、15 分钟过期、原子占槽）—— 生产 `requestLoginMagicLink` 与
+  test 路由走**同一个函数**，令牌形态不可能再分叉；
+- `server/src/test-routes.ts` 新增 `POST /api/test/mint-login-link`（TEST_MODE 才注册）：
+  对既有已验证邮箱**强制新签**一枚（先清旧再占槽，避开生产"未过期静默复用"的抖动），
+  不发邮件、直接返回令牌；
+- `verify-mobile-ios.sh` 建号后即 mint，主路径贴它；**MAINPATH_GAP 降级注记整体删除** ——
+  走不通从此是真红。
 
-**修法（下一轮）**：test 端点加 `POST /api/test/login-link`（对既有邮箱签发
-一次性登录令牌），脚本改贴它；届时删掉 summary 里的"夹具缺口非产品判决"注记，
-让主路径回到真实红绿。
+**判据**：
+- 单测 `server/tests/test-routes-mint-login-link.spec.ts` 4 条：404 / 409 /
+  🔴 **往返**（路由吐的令牌能被生产 `verifyLoginMagicLink` 换出带 `tokenVersion` 的会话）/
+  重复签发必为新枚。**变异验证**：把路由改回返回 JWT（B10 原病形状）⇒ 恰好那 2 条承重用例红；
+- 真服务端 curl 往返：create-user → mint（64 hex）→ **产品端点** `POST /api/login/magic-link/verify`
+  200（JWT 含 userId/email/tokenVersion）→ 同令牌二刷 **401**（单次消费）；
+- `verify-mobile-ios.sh` 隔离轮（run20，专属模拟器 + 专属 /tmp）：此前 12+ 轮全红的
+  **输入原语与 op 落库全绿**（FAB → Composer → 文字注入 → CRT op 进真 SQLite、
+  向量时钟含自己），一次性令牌已签出。主路径（贴令牌 → 验证并登录）的 UI 步
+  **尚未在健康环境走完**：当晚宿主机被多个并行项目的测试/构建打满（负载 128、
+  WindowServer 94%），iOS 27.1 模拟器的无障碍桥**整机阵亡**（连系统设置 App 的
+  树都读不出），run15–20 的后半程全是它的下游（traps #116）。隔离旋钮已落地
+  （`IOS_UDID` / `HEYTA_IOS_DERIVED` / `HEYTA_IOS_LAPTOP_DB` / `HEYTA_IOS_BUILD_LOG`），
+  安静窗口一条命令即可补全绿 —— 走不通仍是真红，降级注记已删。
+
+**相邻回归**：`magic-link-registration` / `email-locale-wire` / `password-auth-routes` /
+`auth-cache` 共 69 条全绿 —— `auth.ts` 的抽取是行为等价重构。
 
 
 ---

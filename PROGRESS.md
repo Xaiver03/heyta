@@ -1002,3 +1002,36 @@ URL** 去做分析、还被**带引导词的提问**骗出过一次"确认"—�
   （Android 同判据绿）——**若复现稳定，这是产品线索不是夹具线索**
   （§7 元规则一：先怀疑探针，已怀疑过两轮，剩下的要按产品查）。
   下轮从「Automerge 上行去抖在 iOS 前台/后台态的判定」查起。
+
+### 2026-10-02（晚）：B10 当日闭合 + traps #110 机制化收口（#113）
+
+两件同日收口，都是"把借口删掉、让红绿回到真实"：
+
+**① B10：服务端补上一次性登录链接令牌的签发能力**（`POST /api/test/mint-login-link`，
+TEST_MODE 才注册）。根因：`/create-user` 给的是 JWT 访问令牌，而应用「粘贴邮件里的
+链接或令牌」吃的是 ADR-0039 邮件链接流的一次性令牌 —— 形态不匹配，主路径 12+ 轮
+结构性走不通。修法：`auth.ts` 抽出 `mintLoginMagicLinkToken()`（生产发信与 test 路由
+**同一个函数**，形态不可能分叉），test 路由对已验证邮箱强制新签一枚、不发邮件直接返回。
+判据三层：单测 4 条（含 🔴 **往返**：路由吐的令牌被生产 `verifyLoginMagicLink` 换出带
+`tokenVersion` 的会话；变异 = 路由改回返 JWT ⇒ 恰好 2 条承重红）；真服务端 curl 往返
+（mint 64hex → 产品端点 verify 200 → 同令牌二刷 401）；run14 主路径真实走通。
+相邻 4 个 spec 共 69 条全绿（行为等价重构）。`verify-mobile-ios.sh` 的
+**MAINPATH_GAP 降级注记整体删除** —— 主路径走不通从此是真红。
+
+**② traps #110（脚本运行中被编辑炸假语法错误）机制化**：27 个长跑
+verify/reinstall 脚本入口加**自快照 bootstrap**（同目录 `.原名.snap.PID` 拷贝 +
+`exec` 副本；守卫用 `$0` basename 而非 env，避免漏给子脚本），`.gitignore` 收快照名，
+新门禁 `check:script-snapshot` 进 `pnpm check`（标记须在前 15 行 —— 挪到尾部等于没有；
+删块/挪位两种变异都实测红）。**A/B 实验证据**：无 bootstrap 的脚本被运行中编辑后，
+**注释行的内容被执行成命令**（`command not found` on a comment line —— 错位铁证）；
+有 bootstrap 的同一编辑零影响、快照自清。本轮 run14 就是活例：它跑在快照上，
+期间我改了源文件的注释，运行实例无感。详见 traps #113。
+
+**run14–run20 经过（同晚，环境战）**：run14 折在构建 —— 并行会话 `pnpm install`
+使 Pods 工程失配（traps #115，`pod install` 9 秒对账即愈）；run15–17 三连同死在
+"文字送不进"，重启模拟器无效，最终定性为**宿主机被打满**（另一项目的 vitest×4、
+WindowServer 94%、simruntime 进程 92% 空转，负载 128）—— iOS 27.1 模拟器的
+无障碍桥**整机阵亡**（对照实验：系统设置 App 的树也读不出；App 进程活着、
+界面在渲染）。隔离轮 run20（专属模拟器 + 专属 /tmp）证到：**此前 12+ 轮全红的
+输入原语与 op 落库全绿**，主路径 UI 步待安静窗口补。配套落地：模拟器专属实例
+（`simctl create` iPhone-Duo）+ 脚本四个隔离旋钮；ADB 挂死探针加超时（traps #114）。
