@@ -2079,6 +2079,21 @@ cd e2e && npx playwright test tests/due-date-edit.spec.ts tests/motivation.spec.
 
 **仍红**才轮到本条线（共享 `DatePicker` 的弹层放置）负责；在那之前改本批任何代码都是抢别人的活。
 
+
+**🔴 07:5x 在当前 HEAD（`8b41648a`）的干净检出上复跑：仍然 3 failed / 98 passed，但归因可以从"提交态落后"升级到"点到文件"**
+
+复跑环境：`/tmp/heyta-ios-ab` detached 到 `8b41648a`，先 `pnpm -r build`（`BUILD_EXIT=0`）再跑两段。
+三条失败逐条对上了主工作树里**别人未提交**的文件（`git status --porcelain -- apps/web`）：
+
+| 失败 | 断言的实际形态 | 正在被修的那个文件（未提交） |
+|---|---|---|
+| `due-date-edit.spec.ts:49` | `locator.click` 超时：日期格 `aria-label="10月18日"` **解析得到、但永远不"visible, enabled and stable"** ⇒ 弹层放置问题 | `apps/web/src/features/tasks/DueEditor.tsx`（未提交的那版在重写弹层放置几何，注释里**点名**这条 spec） |
+| `motivation.spec.ts:184`（R9） | `.ht-header__title` 期望「日历」收到**「收集箱」** | `apps/web/src/App.tsx` + `features/shell/view-tabs.ts`（未提交 diff 里自己写着：日历是后加进 `MODULE_VIEW_TABS` 的、**没登记进那张标题回落表**） |
+| `narrow-sweep.spec.ts:33`（日历） | 同上，同一个根因的第二处表现 | 同上 |
+| `check:landing-e2e` | 仍然 **2 failed / 15 passed**（`docs-centre.spec.ts` 配图张数 / 反向对照） | B24 那条判据缺陷，未提交侧没有对应文件 —— 归因不变 |
+
+📌 这条更新的价值在**把"等别人提交"变成可核对的三枚文件名**：下一位复跑时只要 `git status` 里这三枚不再脏，就应该期待 `check:ai-e2e` 转绿；如果它们已经提交而这条仍红，那 B22 的归因就被证伪，要重新查。
+⚠️ 顺带一条**产品事实**（不是本条线的账，但值得被看见）：日历页页头会挂着上一个视图的象限名，这个缺陷在**已提交的 main** 上就存在，两位读者别把它读成"测试太挑"。
 ## B23. ✅ **两处全部解除**（2026-10-03 06:12，`822dd1f1` 判据缺陷 + `c7f0e33a` 站点收编）🔴 `check:empty-state` 的两处红：一处是**判据缺陷**（已修），另一处**我先前记成"别人那条线的新站点"，那条归属是错的**（见下）（2026-10-03 05:27 取证）
 
 ### 🔴 先撤回一条归属结论：那处红**是本 goal 批四的**，不是别人的

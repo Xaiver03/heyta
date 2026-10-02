@@ -173,8 +173,8 @@ B27 那笔还账（`bb41e9fe`：`Stack` 补 `gap="tight"`、新增 `HStack`、`T
 | 段 | 名字 | 实测内容 | 归因 |
 |---|---|---|---|
 | 12 | `check:l4` | screens 内联样式 98 > 基线 90（多 8） | 本条线欠的 10 处已清 9 处（`bb41e9fe`），剩 8 处按 B27 的 blame 属 M3 那条线。**门禁绿在本条线不可达** |
-| 49 | `check:ai-e2e` | 3 failed / 98 passed（`due-date-edit`、`motivation` R9 标题、`narrow-sweep` 日历） | B22 已取证：**提交态落后于别人未提交的工作**，不是这三条用例坏了 |
-| 51 | `check:landing-e2e` | 2 failed / 15 passed（`docs-centre.spec.ts` 配图张数 / 反向对照） | B24 已取证：**判据断在一个没人实现过的目录名上** |
+| 49 | `check:ai-e2e` | **3 failed / 98 passed**（`8b41648a` 干净检出 07:5x 复跑，与逐段循环同数） | B22 已把归因点到**三枚未提交文件**：`DueEditor.tsx`（弹层永不 stable）、`App.tsx` + `view-tabs.ts`（日历没登记进标题回落表 ⇒ 页头挂着「收集箱」）。**不是本条线欠的，也不是用例坏了** |
+| 51 | `check:landing-e2e` | **2 failed / 15 passed**（同一轮复跑，未变） | B24 已取证：**判据断在一个没人实现过的目录名上**；未提交侧没有对应修复文件，归因不变 |
 | 57 | `pnpm -r test` | server 4 个文件加载失败：`JWT_SECRET environment variable is required`（其余 103 文件 / 2005 条全过） | 🔴 **环境红，不是产品红**，而且反证做了两半：机制上 `server/.env` 被 `server/.gitignore:5` 忽略 ⇒ 任何干净克隆都没有它；行为上补一个随机 `JWT_SECRET` 后那 4 个文件 **4 passed / 43 tests passed**（`/tmp/g5-jwt-proof.log`，`rc=0`）。主工作树有 `server/.env`，所以这一条在主线上是绿的 |
 
 ⇒ **"pnpm check 全量绿"在本轮不可达**，而且不可达的原因一条都不是"本条线留了坏东西"：
