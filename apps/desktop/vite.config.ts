@@ -11,6 +11,10 @@ import { rnwOptimizeDeps, rnwResolve } from '../../scripts/vite-rnw-resolve.mjs'
  * 因为它们消费的是同一个 `@heyta/ui`，而共享包写的是 `from 'react-native'`。
  * 所以那套规则抽在 `scripts/vite-rnw-resolve.mjs` 里只留一份，这里 import 它。
  *
+ * ⚠️ 但**共享目前只覆盖到这一端**：`apps/web/vite.config.ts` 里还留着它自己那份
+ * 内联副本（抽取时只迁了桌面端，旧的一份没删）。也就是说"逐字相同"这件事
+ * 现在靠人记着，而不是靠代码 —— 见 BLOCKED.md 里登记的收尾项。
+ *
  * ⚠️ `root` 指向 `renderer/`，产物出到 **`renderer-dist/`**。
  * 不把产物放进 `renderer/` 内部，是为了让"源码目录"和"构建产物"不混在一起 ——
  * `check:design` 之类的门禁扫源码时不会去读压缩过的 bundle。
@@ -27,7 +31,7 @@ export default defineConfig({
    * 但里面永远是白的。改成相对路径就与协议无关了。
    */
   base: './',
-  resolve: rnwResolve(),
+  resolve: rnwResolve(import.meta.url),
   optimizeDeps: rnwOptimizeDeps(),
   build: {
     outDir: '../renderer-dist',

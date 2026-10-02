@@ -25,10 +25,12 @@ import type { UserConfig } from 'vite';
  * 其实是 `string | RegExp`，而 readonly 数组也不等于可变数组）。
  * 引用真类型就不会有这种"看起来一样、其实不兼容"的偏差。
  *
- * ⚠️ 调用方必须保证 `react-native-web` 与 `react-native-svg` 是**自己的**直接依赖，
- * 否则解析到的是别人家的副本（或直接抛错）。
+ * ⚠️ `callerUrl` 是**调用方自己**的 `import.meta.url`：解析从它所在的位置开始走，
+ * 而 `react-native-web` / `react-native-svg` 必须是那个 app 的直接依赖。
+ * 传本 helper 自己的 URL 会解析失败 —— `scripts/` 下没有任何 node_modules 通道
+ * （这正是把桌面端构建造成"配置都加载不完"的原因，见 `.mjs` 里那段）。
  */
-export function rnwResolve(): UserConfig['resolve'];
+export function rnwResolve(callerUrl: string): UserConfig['resolve'];
 
 /**
  * 两个 Vite 应用共用的 `optimizeDeps`。
