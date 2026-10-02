@@ -366,6 +366,31 @@ export {
   type ToolSelectionRule,
 } from './ai-tool-selection.js';
 export {
+  ASSISTANT_BASE_EGRESS_FIELDS,
+  assistantEgressFields,
+  assistantGrants,
+  assistantMessages,
+  assistantSystemPrompt,
+  declaredFieldNames,
+  observedFieldNames,
+  planAssistantEgress,
+  requestAssistantTurn,
+  type AssistantEgressPlan,
+  type AssistantFailureReason,
+  type AssistantMessage,
+  type AssistantOutcome,
+  type AssistantStep,
+  type AssistantTier,
+  type AssistantTurnDeps,
+} from './ai-assistant.js';
+export {
+  CALENDAR_ANCHOR_RULES,
+  calendarAnchor,
+  calendarAnchorLine,
+  utcOffsetLabel,
+  type CalendarAnchor,
+} from './calendar-anchor.js';
+export {
   confirmAiToolProposal,
   runSelectedTool,
   type AiToolProposal,

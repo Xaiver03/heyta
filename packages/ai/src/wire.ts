@@ -26,10 +26,18 @@
 
 import type { AiInvocation } from './provider.js';
 
-/** 一条对话消息。线格式的形状（`role` + `content`），不是领域概念。 */
+/**
+ * 一条对话消息。线格式的形状（`role` + `content`），不是领域概念。
+ *
+ * ⚠️ `toolCallId` 只在 `role === 'tool'` 有意义（OpenAI 兼容格式要求工具观察结果
+ * 回填它对应的那次调用 id）。刻意**不**做"role 不是 tool 时禁止带它"这种精细类型：
+ * 那需要 discriminated union，而这里的真实约束是"端点会怎么读它"，
+ * 多带一个字段不会改变字节形状（省略时**不发**，见组装器）。
+ */
 export interface ChatMessage {
   readonly role: 'system' | 'user' | 'assistant' | 'tool';
   readonly content: string;
+  readonly toolCallId?: string;
 }
 
 /** 一个工具声明在线上的包装形状（OpenAI 兼容）。 */
@@ -78,20 +86,22 @@ export function chatRequestHeaders(apiKey: string | undefined): Record<string, s
  */
 export function buildChatRequestBody(
   model: string,
-  invocation: Pick<AiInvocation, 'system' | 'user' | 'tools'>,
+  invocation: Pick<AiInvocation, 'system' | 'user' | 'tools' | 'messages'>,
 ): {
   model: string;
-  messages: readonly { role: 'system' | 'user'; content: string }[];
+  messages: readonly Record<string, unknown>[];
   tools?: readonly WireTool[];
   tool_choice?: 'auto';
 } {
   const withTools = invocation.tools !== undefined && invocation.tools.length > 0;
   return {
     model,
-    messages: [
+    // 🔴 给了 `messages` 就以它为准（对话式助手的多轮）；否则退回写死两条
+    // `[system, user]` —— 那五个既有调用点的字节形状**一个字都不许变**。
+    messages: (invocation.messages ?? [
       { role: 'system', content: invocation.system },
       { role: 'user', content: invocation.user },
-    ],
+    ]).map(toWireMessage),
     ...(withTools
       ? {
           tools: (invocation.tools ?? []).map(
@@ -125,4 +135,31 @@ export function isEmptyModelResponse(parts: {
   toolCalls: readonly unknown[] | undefined;
 }): boolean {
   return parts.toolCalls === undefined && (parts.text === undefined || parts.text.trim() === '');
+}
+
+/**
+ * `toolCallId` → 线上的 `tool_call_id`；**没有就整个键不发**。
+ *
+ * 🔴 这个"省略时逐字相同"的纪律是承重的：四个既有面板 + 单步工具调用的请求体
+ * 形状不许因为多轮支持而改变（有测试按 `Object.keys()` 与原始串比对钉住）。
+ */
+function toWireMessage(message: ChatMessage): Record<string, unknown> {
+  return {
+    role: message.role,
+    content: message.content,
+    ...(message.toolCallId === undefined ? {} : { tool_call_id: message.toolCallId }),
+  };
+}
+
+/**
+ * 这次调用**实际会发出去多少字节**。
+ *
+ * 🔴 存在的唯一理由：`MAX_ASSISTANT_EGRESS_BYTES` 要在**发送之前**判，
+ * 而判据必须吃"真要发的那段 JSON"，不能吃任何估计值 —— 估算是第二份事实源，会漂。
+ *
+ * ⚠️ 它**不返回请求体**，只返回长度：线格式组装器仍然不出包
+ * （工单 W7 刚删掉过两份各自拼请求体的实现）。
+ */
+export function egressBytesFor(model: string, invocation: Pick<AiInvocation, 'system' | 'user' | 'tools' | 'messages'>): number {
+  return new TextEncoder().encode(JSON.stringify(buildChatRequestBody(model, invocation))).length;
 }

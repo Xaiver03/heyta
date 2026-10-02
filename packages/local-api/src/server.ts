@@ -34,7 +34,7 @@ import {
   LOCAL_API_TOOLS,
   authorizeToolCall,
   findTool,
-  projectAllForTool,
+  projectListForTool,
   readItemForTool,
   readListTasksDueArgs,
   type LocalApiConfig,
@@ -303,7 +303,7 @@ export type ToolReadOutcome =
  *
  * 🔴 三条不容商量的规则在这里落地：
  *
- * 1. **读列表时逐条投影** —— 受保护的条目只出元数据（`projectAllForTool`）
+ * 1. **读列表时逐条投影** —— 受保护的条目只出元数据，且**列表里正文一律不出**（`projectListForTool`）
  * 2. **读单条时明确拒绝** —— 不是返回空（`readItemForTool`）
  * 3. **`list_tasks` 的参数不成立就报错** —— 不降级成"当这个参数没传"。
  *    日期形状与 14 天跨度上限由 `readListTasksDueArgs` 判（契约见 `tools.ts`）。
@@ -335,8 +335,9 @@ export async function runReadTool(
         ...(typeof a['limit'] === 'number' ? { limit: a['limit'] } : {}),
         ...due.args,
       });
-      // 🔴 投影：受保护条目只留元数据
-      return { ok: true, payload: projectAllForTool(items) };
+      // 🔴 投影：受保护条目只留元数据，而且**列表里正文一律不出**
+      // （`projectListForTool` —— 目录描述与 `egressFields` 都这么承诺）。
+      return { ok: true, payload: projectListForTool(items) };
     }
 
     case 'get_task': {

@@ -85,6 +85,25 @@ export {
   type ProviderDeps,
 } from './provider.js';
 
+// 🔴 三个硬上界的家在这里（出境层），不在循环那一层 —— 理由见文件头：
+// 它们约束的是"离开设备的东西"，与谁在驱动循环无关；放进调用方就等于各家一套。
+// ⚠️ 只导出**类型**，不导出 `buildChatRequestBody` 那组函数：线格式是包内接缝，
+// 导出组装器就等于邀请包外再拼一份请求体（工单 W7 刚删掉过两份）。
+// 但 `AiInvocation.messages` 的类型在包外必须能写，所以类型单独放行。
+export type { ChatMessage } from './wire.js';
+// 只有**测量**函数放行（它不返回请求体，见 `wire.ts` 的注释）。
+export { egressBytesFor } from './wire.js';
+
+export {
+  MAX_ASSISTANT_EGRESS_BYTES,
+  MAX_ASSISTANT_MESSAGES,
+  MAX_ASSISTANT_TOOL_STEPS,
+  assistantLimitLabel,
+  exceedsEgressBudget,
+  utf8ByteLength,
+  type AssistantLimit,
+} from './assistant-limits.js';
+
 export {
   AI_ENDPOINT_PRESETS,
   findPreset,

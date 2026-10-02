@@ -59,11 +59,8 @@
 
 import {
   Priority,
-  WEEKDAY_LABELS,
-  isoWeekday,
   parseLocalDate,
   renderHintBlock,
-  today,
   type PreferenceHint,
 } from '@heyta/domain';
 import {
@@ -82,6 +79,7 @@ import {
   type AiOutputLocale,
 } from './ai-output-language.js';
 import { describeRoutedFailure } from './ai-failure-fallback.js';
+import { calendarAnchor, calendarAnchorLine } from './calendar-anchor.js';
 
 /**
  * 一句话输入的字符上限。超出**直接拒绝**（不是截断）。
@@ -169,10 +167,10 @@ export function buildCaptureInvocation(
 } {
   const fields: string[] = ['today', 'text'];
 
-  const day = today(source.now);
-  // `WEEKDAY_LABELS` 是 1..7（ISO 星期几）顺序的；`noUncheckedIndexedAccess` 下
-  // 下标访问可能是 undefined，所以给一个空串兜底（宁可少写星期，也不要写 undefined）。
-  const weekday = WEEKDAY_LABELS[isoWeekday(day) - 1] ?? '';
+  // 🔴 锚点由 `calendar-anchor.ts` **唯一**生产（原来这里自己算 day/weekday，
+  //    是"每条链路各写一句"的第一份）。多出来的时区不是装饰：
+  //    `dueDate` 要按本地时间写，没有偏移就没有"本地"。
+  const anchor = calendarAnchorLine(calendarAnchor(source.now));
 
   // ⚠️ 输入截断只是**纵深防御**：正常路径上 `requestCapture` 会先拒绝超长输入。
   // 万一有人直接调本函数，也不能让一个几兆字节的字符串进 prompt。
@@ -180,7 +178,7 @@ export function buildCaptureInvocation(
   const text =
     raw.length > MAX_CAPTURE_INPUT_LENGTH ? raw.slice(0, MAX_CAPTURE_INPUT_LENGTH) : raw;
 
-  const lines = [`今天是：${day}（周${weekday}）`, `要捕获的一句话：${text}`];
+  const lines = [anchor, `要捕获的一句话：${text}`];
 
   // 🔴 偏好看成**一个字段**（`preferences`），不是每项一个。
   // 理由：出境授权与披露是按字段名绑定的（见文件头），

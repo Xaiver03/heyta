@@ -207,7 +207,14 @@ describe('🔴🔴 读操作：受保护条目', () => {
     expect(text).toContain('体检报告'); // 存在可见
     expect(text).not.toContain('身份证号'); // 内容不可见
     expect(text).toContain('交周报');
-    expect(text).toContain('附上图表'); // 可读条目的正文正常
+    // 🔴 2026-10-03 更正：这里原本是 `expect(text).toContain('附上图表')`，
+    // 注释写着"可读条目的正文正常"。那句**与工具自己的契约相反** ——
+    // `list_tasks` 的目录描述是"不返回备注正文 —— 备注要单独用 get_task 取"，
+    // 它的 `egressFields` 里也**没有** `task.body`（那份声明是给用户看、
+    // 并且是助手出境复查的唯一依据）。实现跟着宿主侧那个"列表与详情共用
+    // `taskToItem`"走了，测试又跟着实现走了，于是承诺和现实各说各话。
+    // 现在按**承诺**钉：列表里正文不出现，正文只在 `get_task` 出（下一条测试）。
+    expect(text).not.toContain('附上图表');
   });
 
   it('🔴 get_task 对受保护条目**报错**，不是返回空结果', async () => {
