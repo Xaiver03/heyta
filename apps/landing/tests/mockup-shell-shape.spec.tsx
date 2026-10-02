@@ -7,7 +7,7 @@
  * 但它把 `APP_VIEW_TABS` / `APP_PRIMARY_NAV` **又抄了一份**在测试里 ——
  * 于是真应用改了、复刻没改时，它**照样全绿**。§6.2 要的正是那一步：
  *
- * > 从 `apps/web/src/App.tsx` 读出 `PRIMARY_NAV` / `QUADRANT_NAV` / `VIEW_TABS`
+ * > 从 `apps/web/src/features/shell/view-tabs.ts` 读出 `PRIMARY_NAV` / `QUADRANT_NAV` / `VIEW_TABS`（2026-10-02 前在 App.tsx）
  * > 的**项数与标签 key**，与 `apps/landing/src/mockup/AppWindow.tsx` 里引用的
  * > key 集合比对，不等就红。
  *
@@ -83,6 +83,16 @@ function appSource(): string {
   return readFileSync(join(WEB_SRC, 'App.tsx'), 'utf8');
 }
 
+/** 视图/导航登记（2026-10-02 起从 App.tsx 抽到独立文件，声明逐字未动）。 */
+function viewTabsSource(): string {
+  return readFileSync(join(WEB_SRC, 'features/shell/view-tabs.ts'), 'utf8');
+}
+
+/** NavButton（计数位的 `count > 0` / `ht-nav__count` 在这份文件里）。 */
+function navButtonSource(): string {
+  return readFileSync(join(WEB_SRC, 'features/shell/NavButton.tsx'), 'utf8');
+}
+
 function projectsPanelSource(): string {
   return readFileSync(join(WEB_SRC, 'features/projects/ProjectsPanel.tsx'), 'utf8');
 }
@@ -94,7 +104,7 @@ function taskStoreSource(): string {
 /** 从源码里切出一个 `const X = [ … ];` 数组登记块。切不到 = 报错，不是"跳过"。 */
 function arrayBlock(source: string, declaration: string): string {
   const start = source.indexOf(declaration);
-  if (start < 0) throw new Error(`App.tsx 里找不到 ${declaration} —— 判据锚点已失效`);
+  if (start < 0) throw new Error(`源码里找不到 ${declaration} —— 判据锚点已失效`);
   const end = source.indexOf('];', start);
   if (end < 0) throw new Error(`${declaration} 之后找不到 \`];\` —— 判据锚点已失效`);
   return source.slice(start, end);
@@ -125,7 +135,7 @@ function fieldValues(block: string, field: string): string[] {
  * 而对账就会退化成"数一数有几个常量"—— 那正是这条门禁被发明出来要防的东西。
  */
 function appDefaultRail(): { keys: string[]; labelKeys: string[] } {
-  const source = appSource();
+  const source = viewTabsSource();
 
   const pairsOf = (declaration: string): { key: string; labelKey: string }[] =>
     [
@@ -143,9 +153,9 @@ function appDefaultRail(): { keys: string[]; labelKeys: string[] } {
   // ⚠️ 它**不能**用 `pairsOf`：那个走 `arrayBlock`（找 `];`），而单个对象以 `};` 结尾 ——
   //    会一路吃到下一个 `];`，把后面的常量全吞进来（实测：算出 8 项而不是 7 项）。
   const search = ((): { key: string; labelKey: string }[] => {
-    const src = appSource();
+    const src = viewTabsSource();
     const start = src.indexOf('const SEARCH_VIEW_TAB');
-    if (start < 0) throw new Error('App.tsx 里找不到 const SEARCH_VIEW_TAB —— 判据锚点已失效');
+    if (start < 0) throw new Error('view-tabs.ts 里找不到 const SEARCH_VIEW_TAB —— 判据锚点已失效');
     const end = src.indexOf('};', start);
     if (end < 0) throw new Error('const SEARCH_VIEW_TAB 之后找不到 `};` —— 判据锚点已失效');
     return [
@@ -237,7 +247,7 @@ function toDomainTask(task: (typeof SHOWCASE_TASKS)[number]): Task {
 
 describe('#1 主导航：登记处 ⟷ 真应用 `PRIMARY_NAV`', () => {
   it('登记的四项与 `App.tsx` 的 `PRIMARY_NAV` 逐项同 key、同序', () => {
-    const appKeys = fieldValues(arrayBlock(appSource(), 'const PRIMARY_NAV'), 'labelKey');
+    const appKeys = fieldValues(arrayBlock(viewTabsSource(), 'const PRIMARY_NAV'), 'labelKey');
     expect(appKeys).toEqual([
       'web.shell.nav.inbox',
       'web.shell.nav.today',
@@ -273,8 +283,10 @@ describe('#2 四象限计数：登记值 ⟷ 领域层 `bucketByQuadrant` 实算
     expect(app).toContain('selectQuadrantCounts');
     expect(app).toContain('counts[entry.filter.quadrant]');
     // `NavButton` 只在 > 0 时渲染计数位 —— 空账号的截图里因此一个数字都没有。
-    expect(app).toContain('count > 0');
-    expect(app).toContain('ht-nav__count');
+    //（2026-10-02 起它在 features/shell/NavButton.tsx，对账跟着读那份文件。）
+    const navButton = navButtonSource();
+    expect(navButton).toContain('count > 0');
+    expect(navButton).toContain('ht-nav__count');
   });
 
   it('每条样例任务登记的象限 = 领域层算出来的象限', () => {
