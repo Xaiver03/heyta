@@ -54,6 +54,23 @@ export interface LocalApiTool {
   description: string;
   kind: ToolKind;
   /**
+   * 🔴 这个工具的**返回值**里，哪些字段可能被送上模型（对话式助手的多步循环用）。
+   *
+   * 为什么必须在目录里声明，而不是在循环里现算：多步循环把工具观察结果**回送给模型**，
+   * 而那些观察结果是用户数据 —— 用户按下"我同意"时看到的披露，必须**已经**包含它们。
+   * 靠运行时拼披露就是"先发出去再解释"。（ADR-0045 §2.3 第 1 步：
+   * 循环开始前按可达工具集算字段并集，**一次性**披露。）
+   *
+   * ⚠️ 声明**只多不少**是安全的（披露会更宽），**少了**才是事故：
+   * 投影层将来给结果加一个字段而这里没写，披露就说谎了。
+   * 所以有一条判据把两边钉在一起 —— 见 `readToolResultFields()`：
+   * 它从执行器的**真实投影**取字段，与这里的声明逐项比对，不一致就报错。
+   *
+   * ⚠️ 命名口径：`<实体>.<字段>`，与 `packages/shared-schema` 的字段名一致。
+   * 这不是 zod schema 路径，是**给人和模型看的出境清单**，所以刻意不带类型信息。
+   */
+  egressFields: readonly string[];
+  /**
    * 🔴 **默认值永远是 `false`。**
    *
    * 这不是"暂时没空写默认值"，是**刻意的**：本机工具访问一旦默认打开，
@@ -75,6 +92,7 @@ export interface LocalApiTool {
 export const LOCAL_API_TOOLS: readonly LocalApiTool[] = [
   {
     name: 'list_tasks',
+    egressFields: ['task.id', 'task.title', 'task.dueDate', 'task.priority', 'task.completed', 'task.readable'],
     description:
       '列出任务。返回标题、截止日期、优先级、完成状态。' +
       '可按清单、完成状态、截止日期筛；按日期查时范围最多 14 天。' +
@@ -84,35 +102,58 @@ export const LOCAL_API_TOOLS: readonly LocalApiTool[] = [
   },
   {
     name: 'get_task',
+    // 🔴 含正文（`LocalApiItem.body`）—— 这是目录里**出境面最大**的一个工具，
+    // 披露必须把它单独说出来：多步循环会把这份正文回送给模型。
+    egressFields: ['task.id', 'task.title', 'task.dueDate', 'task.priority', 'task.completed', 'task.readable', 'task.body'],
     description: '读取单个任务的完整内容（含备注正文）。',
     kind: 'read',
     defaultEnabled: false,
   },
   {
     name: 'list_projects',
+    egressFields: ['project.id', 'project.name', 'project.taskCount'],
     description: '列出清单/项目及其任务数量。',
     kind: 'read',
     defaultEnabled: false,
   },
   {
     name: 'create_task',
+    // 写工具只产出提案、结果不回送模型 ⇒ 出境面是**提案里那几个字段**。
+    // 写工具的结果**不回送模型**（循环在提案那一刻就停了），所以它不贡献出境字段。
+    // 它产出的是待确认提案，那是本地渲染给用户看的东西，不在出境集合里。
+    egressFields: [],
     description: '新建一个任务。必须走 heyta 的正常写入路径（op-log）。',
     kind: 'write',
     defaultEnabled: false,
   },
   {
     name: 'update_task',
+    egressFields: [],
     description: '修改任务字段（标题、截止日期、优先级）。只能改显式给定的字段。',
     kind: 'write',
     defaultEnabled: false,
   },
   {
     name: 'complete_task',
+    egressFields: [],
     description: '把任务标记为完成。',
     kind: 'write',
     defaultEnabled: false,
   },
 ];
+
+/**
+ * 工具层的**信封字段**：不属于任何实体，但确实会出现在观察结果里、
+ * 因而会被多步循环回送给模型。
+ *
+ * 🔴 这条是被**运行时判据抓出来的**，不是设计时想到的：`get_task` 找不到任务时
+ * 回的是 `{ ok: true, payload: { error: '没有找到这个任务。' } }`
+ * （`server.ts:347`），而 `error` 不在任何 `egressFields` 里 ⇒
+ * 助手的"披露集合外就停"那道复查在第一轮运行时就把它拦下来了。
+ * 把它单独列成信封而不是塞进每个工具，是因为**每个工具**都可能带它 ——
+ * 逐工具声明会变成六份抄件。
+ */
+export const TOOL_ENVELOPE_EGRESS_FIELDS = ['tool.error'] as const;
 
 /** 按名字取工具。 */
 export function findTool(name: string): LocalApiTool | undefined {
@@ -375,6 +416,38 @@ export function projectForTool(item: LocalApiItem): LocalApiItem {
 /** 批量投影。**所有返回数据的地方都必须经过它。** */
 export function projectAllForTool(items: readonly LocalApiItem[]): readonly LocalApiItem[] {
   return items.map(projectForTool);
+}
+
+/**
+ * `list_tasks` 专用的**再窄一层**投影：连可读条目的正文也不出。
+ *
+ * 🔴 这不是新规则，是把目录里已经写着的两句承诺落到唯一执行点：
+ * - 工具描述："不返回备注正文 —— 备注要单独用 `get_task` 取"
+ * - `egressFields`：`list_tasks` 里**没有** `task.body`
+ *
+ * 而这两句以前**没人执行**：宿主侧 `listTasks` 与 `getTask` 用的是同一个
+ * `taskToItem`（`packages/app-host/src/local-api-host.ts:128` 只在不可读时剥正文），
+ * 所以只要任务有备注，正文就会跟着列表一起出去。
+ * 助手的"披露集合外就停"那道复查是它**唯一的观测点** —— 单步路径不看载荷形状，
+ * MCP 客户端也不会抱怨"多给了"。2026-10-03 由多步循环的第一次真实运行抓出。
+ *
+ * ⚠️ 为什么不直接改 `projectForTool`：那条路径 `get_task` 也在用，
+ * 而 `get_task` 的**存在理由就是取正文**。两个视图两种形状，分开表达。
+ */
+export function projectListForTool(items: readonly LocalApiItem[]): readonly LocalApiItem[] {
+  return projectAllForTool(items).map((item) => {
+    if (item.body === undefined) return item;
+    // 白名单重建（同 `projectForTool` 的纪律）：将来新增的字段默认不出现。
+    const listShaped: LocalApiItem = {
+      id: item.id,
+      title: item.title,
+      readable: item.readable,
+    };
+    if (item.dueDate !== undefined) listShaped.dueDate = item.dueDate;
+    if (item.priority !== undefined) listShaped.priority = item.priority;
+    if (item.completed !== undefined) listShaped.completed = item.completed;
+    return listShaped;
+  });
 }
 
 /**

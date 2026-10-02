@@ -50,6 +50,7 @@ import {
   chatCompletionsUrl,
   chatRequestHeaders,
   isEmptyModelResponse,
+  type ChatMessage,
 } from './wire.js';
 
 /**
@@ -106,6 +107,19 @@ export interface AiInvocation {
    * 一个工具名本身就可能泄露能力范围（对照 `mcp.ts` 里"未授权即不可见"的立场）。
    */
   tools?: readonly AiToolDescriptor[];
+  /**
+   * 多轮消息。**给了它，它就是这次出境的唯一事实源** —— `system` / `user`
+   * 仍然要写（类型上必填、五个既有调用点都在写），但请求体里发的是这个数组。
+   *
+   * 🔴 为什么两者会同时存在而不是改成 union：对话式助手要把
+   * 「系统提示 + 历史 + 这一句 + 若干工具观察结果」发出去，而那**恰好**是
+   * `messages`；`system` / `user` 是它的第 0 条与最后一条，
+   * 由调用方**从同一个数组派生**（`packages/app-host` 的 `assistantMessages()`），
+   * 所以两个字段不可能互相矛盾 —— 派生而不是手抄，这是本仓库对"两份事实源"的标准解法。
+   *
+   * ⚠️ 省略时请求体与从前**逐字相同**（既有四个面板 + 工具调用零影响，有测试钉住）。
+   */
+  messages?: readonly ChatMessage[];
 }
 
 /**

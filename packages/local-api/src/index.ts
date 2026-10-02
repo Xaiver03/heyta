@@ -41,11 +41,13 @@
 export {
   DEFAULT_LOCAL_API_CONFIG,
   LOCAL_API_TOOLS,
+  TOOL_ENVELOPE_EGRESS_FIELDS,
   authorizeToolCall,
   findTool,
   isLoopbackAddress,
   isToolGranted,
   projectAllForTool,
+  projectListForTool,
   projectForTool,
   readItemForTool,
   toolNames,

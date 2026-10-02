@@ -1,0 +1,174 @@
+/**
+ * 工具"出境字段声明"与真实投影的对账
+ * ======================================
+ *
+ * `LocalApiTool.egressFields` 是**给用户看的承诺**（ADR-0010 §3 的字段级披露）。
+ * 承诺写在声明里，真实载荷却由另一处代码决定（`projectForTool` 的白名单、
+ * `projectListForTool` 的再窄一层、`LocalApiProject` 的形状、`get_task` 的 `{error}` 信封），
+ * 两者就一定会漂 —— 漂了还没有人报错：界面照常显示"我会送出这些字段"，实际多送了一个。
+ *
+ * 🔴🔴 所以这里断言的不是"字段名对不对"，而是**每一个真实会出去的键都必须被声明过**。
+ * 判据是"实际跑一遍 `runReadTool`、收集载荷里出现的键"，不是"读代码列表" ——
+ * 后者会跟着代码一起漂。
+ *
+ * 本文件不是纯新增的洁癖：`list_tasks` 那条（"正文不出现在列表里"）**就是它抓出来的**。
+ * 宿主侧 `listTasks` 与 `getTask` 共用一个 `taskToItem`，所以只要任务有备注，
+ * 正文就会跟着列表一起出去，而目录描述与声明都说不会 ——
+ * 单步路径不看载荷形状、MCP 客户端也不会抱怨"多给了"，只有字段级复查会响。
+ */
+
+import { describe, expect, it } from 'vitest';
+
+import {
+  TOOL_ENVELOPE_EGRESS_FIELDS,
+  findTool,
+  runReadTool,
+  type LocalApiHost,
+  type LocalApiItem,
+  type LocalApiProject,
+} from '../src/index.js';
+
+/** 每个字段都填满的样本：漏声明最容易发生在"这个字段平时是 undefined"的时候。 */
+const ITEM: LocalApiItem = {
+  id: 't1',
+  title: '买牛奶',
+  dueDate: '2026-10-03',
+  priority: 'high',
+  completed: false,
+  body: '两盒',
+  readable: true,
+};
+const PROTECTED_ITEM: LocalApiItem = { ...ITEM, id: 't2', title: '受保护的', body: '机密', readable: false };
+const PROJECT: LocalApiProject = { id: 'p1', name: '工作', taskCount: 2 };
+
+function host(
+  items: readonly LocalApiItem[] = [ITEM, PROTECTED_ITEM],
+  projects: readonly LocalApiProject[] = [PROJECT],
+): LocalApiHost {
+  return {
+    listTasks: async () => items,
+    getTask: async (taskId: string) => items.find((x) => x.id === taskId),
+    listProjects: async () => projects,
+    submit: async () => ({ ok: true, taskId: 'created-1' }),
+  };
+}
+
+/** 收集载荷里出现过的**所有**键（含数组元素与嵌套一层）。 */
+function keysIn(value: unknown, depth = 0): Set<string> {
+  const out = new Set<string>();
+  if (depth > 3 || value === null || typeof value !== 'object') return out;
+  if (Array.isArray(value)) {
+    for (const x of value) {
+      for (const k of keysIn(x, depth + 1)) out.add(k);
+    }
+    return out;
+  }
+  for (const [k, v] of Object.entries(value)) {
+    out.add(k);
+    for (const nested of keysIn(v, depth + 1)) out.add(nested);
+  }
+  return out;
+}
+
+/**
+ * 某个工具声明的**键名**（去掉 `task.` / `project.` 这类分组前缀）。
+ *
+ * ⚠️ 前缀是有意的：披露给用户看的是"哪一类数据的哪个字段"，
+ * 而载荷是扁平对象，所以比对时取最后一段。这里刻意写成 `.at(-1)` 而不是
+ * 逐工具硬编码 —— 声明与键名之间只允许有一条换算规则。
+ */
+function declaredKeys(toolName: string): Set<string> {
+  const tool = findTool(toolName);
+  expect(tool, `目录里没有工具「${toolName}」`).toBeDefined();
+  const fields = tool?.egressFields ?? [];
+  expect(fields.length, `工具「${toolName}」没有声明 egressFields`).toBeGreaterThan(0);
+  return new Set(fields.map((f) => f.split('.').at(-1) ?? f));
+}
+
+/** 信封字段（`tool.error` → `error`）任何工具都可能带出来，单独一份。 */
+const envelopeKeys = new Set<string>(
+  TOOL_ENVELOPE_EGRESS_FIELDS.map((f) => f.split('.').at(-1) ?? f),
+);
+
+describe('egressFields 声明 == 真实投影', () => {
+  it('list_tasks：可读与受保护两种条目，实际出去的键都在声明里', async () => {
+    const readable = await runReadTool(host([ITEM]), 'list_tasks', {});
+    const protectedRun = await runReadTool(host([PROTECTED_ITEM]), 'list_tasks', {});
+    expect(readable.ok).toBe(true);
+    expect(protectedRun.ok).toBe(true);
+    if (!readable.ok || !protectedRun.ok) return;
+
+    const declared = declaredKeys('list_tasks');
+    const actual = new Set([...keysIn(readable.payload), ...keysIn(protectedRun.payload)]);
+    const outside = [...actual].filter((k) => !declared.has(k) && !envelopeKeys.has(k));
+    expect(outside, `实际送出但没声明：${outside.join('、')}`).toEqual([]);
+  });
+
+  it('🔴 list_tasks 不返回正文 —— 目录描述与声明都这么承诺', async () => {
+    // 宿主给列表带上了 `body`（真实宿主就是这么做的：与 `getTask` 共用投影函数），
+    // 列表层必须把它剥掉。去掉 `projectListForTool` ⇒ 这条红。
+    const run = await runReadTool(host([ITEM]), 'list_tasks', {});
+    expect(run.ok).toBe(true);
+    if (!run.ok) return;
+    expect(JSON.stringify(run.payload)).not.toContain('两盒');
+    expect(keysIn(run.payload).has('body')).toBe(false);
+    // 但正文**没有丢失**：同一个条目用 `get_task` 取得到。
+    const detail = await runReadTool(host([ITEM]), 'get_task', { taskId: 't1' });
+    expect(detail.ok).toBe(true);
+    if (!detail.ok) return;
+    expect(JSON.stringify(detail.payload)).toContain('两盒');
+  });
+
+  it('get_task：命中的条目 + 没命中的 `{error}` 信封都在声明里', async () => {
+    const found = await runReadTool(host([ITEM]), 'get_task', { taskId: 't1' });
+    const missing = await runReadTool(host([ITEM]), 'get_task', { taskId: 'nope' });
+    expect(found.ok).toBe(true);
+    expect(missing.ok).toBe(true);
+    if (!found.ok || !missing.ok) return;
+
+    const declared = declaredKeys('get_task');
+    const actual = new Set([...keysIn(found.payload), ...keysIn(missing.payload)]);
+    const outside = [...actual].filter((k) => !declared.has(k) && !envelopeKeys.has(k));
+    expect(outside, `实际送出但没声明：${outside.join('、')}`).toEqual([]);
+    // 🔴 信封是**单独声明的一份**，不是塞进某个工具的字段表 —— 每个工具都可能带它，
+    // 逐工具声明会变成六份抄件。
+    expect(TOOL_ENVELOPE_EGRESS_FIELDS).toContain('tool.error');
+  });
+
+  it('list_projects：`LocalApiProject` 的每个键都被声明', async () => {
+    const run = await runReadTool(host(), 'list_projects', {});
+    expect(run.ok).toBe(true);
+    if (!run.ok) return;
+    const declared = declaredKeys('list_projects');
+    const outside = [...keysIn(run.payload)].filter((k) => !declared.has(k));
+    expect(outside, `实际送出但没声明：${outside.join('、')}`).toEqual([]);
+  });
+
+  it('🔴 判据有牙齿：多一个没声明的键就会被点出来', async () => {
+    // 模拟"以后有人往宿主返回的条目上挂了 `ownerPhone`"。
+    // `get_task` 对可读条目是**原样返回**（`projectForTool`），所以这个键会真的出去 ——
+    // 而声明里没有它 ⇒ 下游的字段级复查必须能点出来。这条断言就是这个"点出来"。
+    const leaky = { ...ITEM, ownerPhone: '13900000000' } as unknown as LocalApiItem;
+    const run = await runReadTool(host([leaky]), 'get_task', { taskId: 't1' });
+    expect(run.ok).toBe(true);
+    if (!run.ok) return;
+    const declared = declaredKeys('get_task');
+    expect([...keysIn(run.payload)].filter((k) => !declared.has(k))).toEqual(['ownerPhone']);
+
+    // 列表那一侧走白名单重建，所以同一个键**根本出不去** ——
+    // 两处的差别要在账上写清楚，否则下一个人会以为两边同一形状。
+    const listRun = await runReadTool(host([leaky]), 'list_tasks', {});
+    expect(listRun.ok).toBe(true);
+    if (!listRun.ok) return;
+    expect([...keysIn(listRun.payload)].filter((k) => !declaredKeys('list_tasks').has(k))).toEqual([]);
+  });
+
+  it('写工具不出境任何数据字段：`egressFields` 必须是空表', () => {
+    for (const name of ['create_task', 'update_task', 'complete_task']) {
+      const tool = findTool(name);
+      expect(tool, `目录里没有工具「${name}」`).toBeDefined();
+      // 写工具只产出提案、结果不回送模型 ⇒ 它不贡献出境字段。
+      expect(tool?.egressFields, `${name} 的出境字段必须是空表`).toEqual([]);
+    }
+  });
+});

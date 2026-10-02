@@ -17,7 +17,7 @@
  * 所以这里做一件**可失败、且能证明会失败**的事：**数 `submit(` 出现了几次、
  * 出现在哪个函数里**。故意在错误的位置加一次写，它必须红。
  *
- * ## 六条规则，每条都对应一个真实会被写出来的错
+ * ## 七条规则，每条都对应一个真实会被写出来的错
  *
  * | # | 规则 | 拦住的是 |
  * |---|---|---|
@@ -27,12 +27,14 @@
  * | 4 | 不得直连模型端点 / 不得有 fetch | 绕过 `@heyta/ai` 的出境闸门 |
  * | 5 | 不得 import `@heyta/op-log` | 让"造不出 op"在类型上失效 |
  * | 6 | W7 删掉的冗余前门不得回来；`describeRoutedFailure()` 只许有一个定义点 | 「同一个判断再写一遍」 |
+ * | 7 | 能力清单产物必须与上游一致（调生成器的 `--check`） | 给模型看的语料和真实目录漂了 |
  *
  * ⚠️ 规则 2 的"恰好一处"是**承重**的，不是洁癖：只检查"有没有在确认函数里"
  * 的话，同时留着另一处直接 `submit` 仍然会绿。
  */
 
-import { readFileSync, readdirSync } from 'node:fs';
+import { readFileSync, readdirSync, existsSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -273,6 +275,42 @@ if (owners.length !== 1 || owners[0] !== SINGLE_OWNER.owner) {
   );
 }
 
+// ── 规则 7：能力清单必须与工具目录一致 ────────────────────────────────
+//
+// 🔴 为什么挂在这里而不是新开一条 `check:ai-capability`：
+// 根 `package.json` 现在有别的会话的未提交改动，往那条链里插一行会在下一次
+// 他们的提交里被带走。判据本身是一样的 —— 而"有守卫没接线"是这个仓库
+// 反复付学费的形状（一个只能手动跑的 `--check` 等于没有）。
+// 等 `package.json` 空闲时把它提成独立门禁更干净，已登记在
+// `docs/plans/ai-assistant-closure.md` 的缺口清单里。
+const MANIFEST_GENERATOR = path.join(ROOT, 'scripts/gen-ai-capability-manifest.mjs');
+if (existsSync(MANIFEST_GENERATOR)) {
+  const checked = spawnSync(process.execPath, [MANIFEST_GENERATOR, '--check'], {
+    cwd: ROOT,
+    encoding: 'utf8',
+  });
+  if (checked.status !== 0) {
+    violate(
+      path.relative(ROOT, path.join('packages/ai/src/capability-manifest.generated.ts')),
+      1,
+      '能力清单与上游（工具目录 + 实体清单）不一致',
+      '那份清单是**给模型看的语料**。它一旦和真实目录漂了，模型就会说"我做不到"于一个' +
+        '其实做得到的动作，或者反过来编造一个不存在的工具 —— 而两种都不会编译报错。',
+      '跑 `node scripts/gen-ai-capability-manifest.mjs` 重新生成，别手改产物。',
+    );
+    process.stderr.write(checked.stdout ?? '');
+    process.stderr.write(checked.stderr ?? '');
+  }
+} else {
+  violate(
+    'scripts/gen-ai-capability-manifest.mjs',
+    1,
+    '能力清单生成器不存在',
+    'W9 的裁决是"清单只能生成、不许手写"。生成器没了，产物就会被人手改，而那正是它要防的。',
+    '恢复生成器，或把这条判据连同 W9 一起撤销 —— 不要留一个不会被跑的产物。',
+  );
+}
+
 if (violations.length > 0) {
   console.error(`\n❌ AI 工具路径门禁失败：${String(violations.length)} 处\n`);
   for (const v of violations) {
@@ -287,5 +325,5 @@ console.log(
   `✅ AI 工具路径门禁通过：ai-tool-* ${String(files.length)} 个文件；` +
     `规则 6 扫描范围 ${String(allSourceFiles.length)} 个 .ts；` +
     '写只出现在确认函数里、无 op 构造、无网络调用、未 import op-log、' +
-    '无冗余前门、`describeRoutedFailure()` 定义点恰好一处。',
+    '无冗余前门、`describeRoutedFailure()` 定义点恰好一处、能力清单与上游一致。',
 );
