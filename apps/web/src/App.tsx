@@ -735,7 +735,20 @@ export function App(): React.JSX.Element {
     (row: SharedTaskRow): React.ReactNode => {
       const task = row.source;
       return (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--ht-space-2)' }}>
+        // 🔴 `flexWrap` 不是装饰：这一坨常驻控件在 1440 视口下要 517px（整行的 48%），
+        // 视口到 900 时要 496px，而行的可用宽只有 548 —— 不换行就会把共享行的标题
+        // 挤到 0 宽（实测"标题整条消失"）。配合 `TaskRow` 里 body 的百分比下限，
+        // 窄窗口下行尾自己折行，标题与控件都还在。三档 A/B 见台账 G9。
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            alignContent: 'center',
+            justifyContent: 'flex-end',
+            flexWrap: 'wrap',
+            gap: 'var(--ht-space-2)',
+          }}
+        >
           {/* 备注。🔴 在它之前 Web 上**没有备注输入框** ——
               `Task.note` 与 `setNote` 都在，但唯一调用点是 AI 拆解与 AI 估时，
               于是"我自己能不能在任务上写点东西"的答案是"不能"。 */}
