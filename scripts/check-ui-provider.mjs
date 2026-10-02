@@ -309,12 +309,15 @@ const PROVIDER_DEPENDENT = [
    * ⇒ 漏登记 = 没有门禁：宿主把 `<HeytaUiProvider>` 拆掉不会红，
    *    而运行时会抛「useHeytaUiTheme 必须在 <HeytaUiProvider> 内使用」。
    *
-   * ⚠️ `TimelineView` 是 web 宿主（`features/timeline/TimelinePanel.tsx`）
-   * 直接渲染的符号；`GanttChart` 目前只被 `TimelineView` 内部渲染，
+   * ⚠️ 2026-10-01 时间线重画（goal：`docs/plans/goal-timeline-rework.md`）：
+   * `TimelineView`（每任务一张甘特图）已删除，由 `TimelineBoard`（一根共轴）取代；
+   * web 宿主（`features/timeline/TimelinePanel.tsx`）直接渲染的符号随之改名。
+   * `GanttChart` 仍被共享层内部渲染（时间线重画后是**任务详情**的清单排程预览），
    * 但它是 `export function`，**宿主可以直接 import 它**（同 `TaskRow` 的理由），
-   * 所以两个都登记。
+   * 所以继续登记。
    */
-  'TimelineView',
+  'TimelineBoard',
+  'ChecklistPlanPreview',
   'GanttChart',
   /**
    * M3 第八刀（calendar）与第九刀（trash）。
@@ -340,16 +343,10 @@ const PROVIDER_DEPENDENT = [
    *
    * 🔴 **第十二个场合，但这一条的代价与前面十一条不同**：前面漏登记的症状是
    * 运行时抛「useHeytaUiTheme 必须在 \<HeytaUiProvider\> 内使用」—— 那是**当场炸**，
-   * 用户看不到界面，很难被误判成"没问题"。`AuthForm` 内部用的是 `useHeytaTokens()` 与
-   * `useHeytaText()`（`theme.js` 那三个消费者里占了两个），漏挂 Provider 是**当场抛** ——
-   * 登记它的理由与前面几条相同。
-   *
-   * ⚠️ 但它另有一半**不炸**，而且不归这道门禁管：口令显隐的默认档来自
-   * `defaultPasswordRevealed(resolvedPlatform)`，而 `resolvedPlatform = platform ??
-   * (Platform.OS === 'web' ? 'desktop' : 'mobile')` ⇒ 宿主忘了传 `platform` 不会有任何报错，
-   * 手机浏览器被当成桌面（口令遮着）。那一半由
-   * `apps/web/tests/auth-panel.spec.tsx`「手机浏览器（coarse pointer）默认显示口令」钉住
-   * （变异验证：删掉壳里的 `platform={passwordDefaultPlatform()}` ⇒ 那条转红）。
+   * 用户看不到界面，很难被误判成"没问题"。而 `AuthForm` 内部还用了
+   * `useHeytaUiDimensions()`（口令显隐的**默认档**：桌面遮、移动明文），漏挂 Provider 时
+   * 它**不抛**、落 `pointer === 'fine'` 的兜底分支 —— 于是平板/折叠屏展开态会被当成桌面。
+   * **不炸的漏登记才是真危险**：界面看起来完全正常。
    *
    * ⚠️ 对账口径同 `motivation` 那段：登记的是**导出符号** `AuthForm`。
    * 同目录的 `authFailureMessageKey` 是纯函数、不碰主题，**不登记**
