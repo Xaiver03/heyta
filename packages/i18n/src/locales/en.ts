@@ -2587,6 +2587,12 @@ export const en = {
   'site.footer.legal.minors': 'Protection of Minors',
   'site.footer.legal.subscription-refund': 'Billing & Refunds',
   'site.footer.legal.data-rights': 'Your Rights',
+  // 与 zh-CN 表同一组：未命中地址时答的那一页（见 zh-CN 表里的同名注释）。
+  'site.notfound.seo.title': 'Page Not Found — heyta',
+  'site.notfound.heading': 'There is no page at this address',
+  'site.notfound.body': 'It may have been renamed or removed, or the link may contain an extra character. Continue from the links below.',
+  'site.notfound.home': 'Back to home',
+  'site.notfound.otherLanguage': 'Switch to the Chinese site',
   // Chrome of the legal pages themselves (not document content, so not in @heyta/legal).
   'site.legal.draft.banner': 'This text is still under legal review and **is not in effect yet**. We will announce the released version in the app.',
   'site.legal.meta': 'Version {version} - updated {date}',
