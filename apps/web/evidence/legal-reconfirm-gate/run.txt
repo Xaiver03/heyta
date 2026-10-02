@@ -56,3 +56,25 @@
 # 人眼复核：本会话真的打开了 reconfirm-panel-zh.png 与 reconfirm-panel-en.png 两张
 #   （中文：标题「条款文本已经更新」+ 主按钮「我已读完并确认」+ 从属「稍后再说（继续不同步）」；
 #    英文：同层级、零汉字残留）。
+
+# ── 2026-10-02 追加：第三道红（ht-* 前缀族基线）与"搬样式"的完整连锁 ──
+# 上面那次修完 check:l4 + check:design 之后，逐段跑 check 链第 1–11 段又抓出一道：
+#   check:row-single-source 断言 B —— 顶层 `ht-*` 前缀族 29 > 基线 28，
+#   多出来的那个就是我新起的 `.ht-reconfirm` 族（脚本按行首 /^\.ht-[a-z]+/ 归族）。
+# 修法同样是"消掉净增"而不是调常量：类名收进既有的 `.ht-sheet` 族
+#   （`.ht-reconfirm__dialog` → `.ht-sheet__reconfirm-dialog` 等，34 处一起换）。
+#   这块本来就是该族的一员（置顶、遮罩、role=dialog 的浮层），且**不**带裸 `.ht-sheet`
+#   类 ⇒ 不继承那条规则的样式，只共用命名空间。
+# 实测（改后）：
+#   check:row-single-source → exit 0，"ht-* 前缀族 28 个，恰在基线 28（未新增）"
+#   check:design            → exit 0
+#   check:l4                → web 段 `94 ≤ 104` ✅（整体仍红在 mobile 段，见上一节归因）
+#   web 套件                → exit 0
+#   pnpm --filter @heyta/web build → exit 0
+#   e2e 专用配置（4323）    → 6 passed (8.2s)；主配置（dev + 4318）→ 6 passed
+#   四张图与改前 **BYTE-IDENTICAL**（cmp -s）⇒ 换族名没动一个像素，
+#   同时反过来证明新选择器**确实命中**了（没命中就是无样式渲染，像素必变）。
+# 链上另两处（如实记，一条已排除）：第 1 段 `check:entries` 在循环里报 exit 1，
+#   随后**单独重跑两次都是 exit 0**（"入口文件与注册表一致（75 份）"）⇒ 那一次是瞬时的，
+#   不复现；不在本条线范围内（landing 那条线的产物门禁），未据此改任何东西。
+#   第 11 段 `check:row-single-source` 的那道红**是我的**，本节即其修法。
