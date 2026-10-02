@@ -1,0 +1,44 @@
+/* ── 玻璃材质（ADR-0042）：悬浮功能层的表面 ──────────────────
+ *
+ * 这是共享层 `packages/ui/src/material/material-surface.ts` 在 web 这一侧的
+ * 另一半：tint 与档位来自 token，blur / saturate / rim / 入场在宿主 CSS。
+ * 两个渲染世界、同一配方 —— RN 消费那个（含端能力协商），DOM 消费这个。
+ *
+ * 🔴 只许给悬浮功能层（ADR-0042 逐面裁决表）；内容面永远实色。
+ * 模态刻意不用（scrim + 实卡聚焦，不漏注意力）；设置 sheet 维持 95%
+ * color-mix（88% 有文字透叠事故前科，见 `.ht-sheet`）。
+ *
+ * reduced-transparency 不需要在这里另写：tokens.css 末尾的媒体查询会把
+ * tint 压成实色、模糊半径压成 0，本类的每条声明都跟着 token 走。
+ * 入场动效遵循 §6 动效纪律：200ms ease-out（菜单淡入不过冲 —— 弹簧
+ * 过冲只属于带速度的手势，见 tokens.css §3c），只动 opacity 与 transform。
+ */
+.ht-material {
+  background: var(--ht-material-panel-tint);
+  backdrop-filter: blur(var(--ht-blur-chrome)) saturate(180%);
+  -webkit-backdrop-filter: blur(var(--ht-blur-chrome)) saturate(180%);
+  border: var(--ht-border-width-thin) solid var(--ht-material-edge-highlight);
+  animation: ht-material-in var(--ht-duration-normal) var(--ht-ease-enter);
+}
+
+/* chrome 档：内容从下面滚过的导航面（比 panel 更透）。 */
+.ht-material--chrome {
+  background: var(--ht-material-chrome-tint);
+}
+
+@keyframes ht-material-in {
+  from {
+    opacity: 0;
+    transform: translateY(calc(var(--ht-space-1) * -1));
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ht-material {
+    animation: none;
+  }
+}

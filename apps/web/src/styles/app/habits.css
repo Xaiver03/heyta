@@ -1,0 +1,245 @@
+/* ── 习惯：列表 + 窗格 ──────────────────────────────────────
+ * 产品负责人 2026-10-01 定的形态。左列"扫一眼"，右窗格"看细节"。
+ *
+ * ⚠️ 两列的比例**不复用 shell 的侧栏宽度**：那条是可拖拽的"范围列"（导航），
+ * 这里是同一个视图内部的主从两栏。拖它没有意义，共享它的持久化值更有意义 ——
+ * 会互相写脏。
+ *
+ * 🔴 本块必须排在下面的「窄屏塌缩」之前（同特异性、源序后者胜）。
+ */
+.ht-habit {
+  display: grid;
+  /* 右列要装 90 天热力图（十几列方格），所以给它 2 倍权重；
+     `minmax(0, …)` 是关键：不写 0，网格项的 `min-width:auto` 会让热力图
+     把整列撑到内容宽度，于是横向滚动条从"某一习惯名很长"开始。 */
+  grid-template-columns: minmax(16rem, 2fr) minmax(0, 5fr);
+  gap: var(--ht-space-6);
+  align-items: start;
+}
+
+.ht-habit__side {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ht-space-3);
+  min-width: 0;
+}
+
+/* 新建习惯：一行「输入框 + 图标按钮」。这两件以前是行内样式，
+   挪进 CSS 是因为窄屏塌缩要改它们的排布（行内样式改不动）。 */
+.ht-habit__add {
+  display: flex;
+  gap: var(--ht-space-2);
+}
+
+.ht-habit__add input {
+  flex: 1;
+  min-width: 0;
+  padding: 0 var(--ht-space-3);
+  border: var(--ht-border-width-thin) solid var(--ht-color-border);
+  border-radius: var(--ht-radius-md);
+  background: var(--ht-color-surface);
+  color: var(--ht-color-foreground);
+  font-family: var(--ht-font-sans);
+}
+
+.ht-habit__add input:focus-visible {
+  outline: var(--ht-border-width-thick) solid var(--ht-color-ring);
+  outline-offset: var(--ht-space-1);
+}
+
+.ht-habit__add button {
+  display: grid;
+  place-items: center;
+  flex: none;
+  cursor: pointer;
+  border: none;
+  border-radius: var(--ht-radius-md);
+  background: var(--ht-color-primary);
+  color: var(--ht-color-on-primary);
+}
+
+.ht-habit__add button:focus-visible {
+  outline: var(--ht-border-width-thick) solid var(--ht-color-ring);
+  outline-offset: var(--ht-space-1);
+}
+
+.ht-habit__list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ht-space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.ht-habit__item {
+  min-width: 0;
+}
+
+/* 整行是一个 `<button>`（点哪都算选中），所以：
+   `text-align: start` 取消按钮默认的居中，`width: 100%` 让它铺满列宽。
+   ⚠️ 行内不能再嵌可交互元素 —— 图标选择器因此住在右窗格的页眉，不在这里。 */
+.ht-habit__row {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: var(--ht-space-2);
+  width: 100%;
+  padding: var(--ht-space-3);
+  cursor: pointer;
+  text-align: start;
+  font-family: var(--ht-font-sans);
+  color: var(--ht-color-foreground);
+  background: var(--ht-color-surface);
+  border: var(--ht-border-width-thin) solid var(--ht-color-border);
+  border-radius: var(--ht-radius-lg);
+}
+
+/* 选中态用**边框**表达（扁平风格里阴影只给真正的浮层），
+   再加一层极浅的主色底：两种线索，色觉障碍下仍分得出。 */
+.ht-habit__row[aria-current='true'] {
+  border-color: var(--ht-color-primary);
+  background: var(--ht-color-primary-subtle);
+}
+
+.ht-habit__row:focus-visible {
+  outline: var(--ht-border-width-thick) solid var(--ht-color-ring);
+  outline-offset: var(--ht-space-1);
+}
+
+.ht-habit__head {
+  display: flex;
+  align-items: center;
+  gap: var(--ht-space-2);
+  min-width: 0;
+}
+
+/* 图标底盘。颜色由 JSX 给（分类槽位 / 未设色走 `UNSET_CATEGORY_TOKEN`）；
+   这里只负责形状与尺寸 —— 尺寸若也交给内联样式，就成了第二套尺度来源。 */
+.ht-habit__disc {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  inline-size: var(--ht-space-6);
+  block-size: var(--ht-space-6);
+  border: var(--ht-border-width-thin) solid currentColor;
+  border-radius: var(--ht-radius-full);
+}
+
+.ht-habit__name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--ht-font-size-sm);
+  font-weight: var(--ht-font-weight-medium);
+}
+
+.ht-habit__week {
+  display: flex;
+  align-items: center;
+  gap: var(--ht-space-1);
+}
+
+/* 每格 = 一天。空格子**也有边框**：heat-0 在亮色下接近白，
+   "没有记录"与"没画这一格"必须是两件看得出来的事。 */
+.ht-habit__dot {
+  inline-size: var(--ht-space-2);
+  block-size: var(--ht-space-2);
+  border: var(--ht-border-width-thin) solid var(--ht-color-border);
+  border-radius: var(--ht-radius-full);
+}
+
+.ht-habit__chips {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--ht-space-3);
+}
+
+/* 🔴 三个 chip **同等样式**：「累计」是唯一只增不减的数字，断链那天
+   用户最需要看见它（ADR-0022）。把它做成次要色 = 在视觉上砍掉它。 */
+.ht-habit__chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--ht-space-1);
+  color: var(--ht-color-foreground-muted);
+  font-size: var(--ht-font-size-xs);
+}
+
+.ht-habit__chip-num {
+  font-variant-numeric: tabular-nums;
+}
+
+.ht-habit__pane {
+  min-width: 0;
+}
+
+.ht-habit__pane-head {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--ht-space-2);
+}
+
+/* 图标选择器：与 `.ht-slot-picker` 同一形状（展开式，不是浮层）。
+   差别只有一件 —— 槽位是「色块 + 编号」，这里本来就是字形，不需要编号。 */
+.ht-habit__icon-picker {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: var(--ht-space-1);
+  flex: none;
+}
+
+.ht-habit__icon-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--ht-space-1);
+  min-height: var(--ht-touch-target-min);
+  padding: 0 var(--ht-space-2);
+  cursor: pointer;
+  border: var(--ht-border-width-thin) solid var(--ht-color-border);
+  border-radius: var(--ht-radius-md);
+  background: var(--ht-color-surface);
+  color: var(--ht-color-foreground-muted);
+  font-family: var(--ht-font-sans);
+  font-size: var(--ht-font-size-xs);
+}
+
+.ht-habit__icon-word {
+  font-size: var(--ht-font-size-xs);
+}
+
+.ht-habit__icon-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--ht-space-1);
+}
+
+.ht-habit__icon-option {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: var(--ht-touch-target-min);
+  min-height: var(--ht-touch-target-min);
+  padding: 0 var(--ht-space-2);
+  cursor: pointer;
+  border: var(--ht-border-width-thin) solid transparent;
+  border-radius: var(--ht-radius-md);
+  background: var(--ht-color-surface);
+  color: var(--ht-color-foreground);
+  font-family: var(--ht-font-sans);
+  font-size: var(--ht-font-size-xs);
+}
+
+/* 选中态走边框，不靠颜色深浅 —— 八个字形本来就要用户挑。 */
+.ht-habit__icon-option[aria-pressed='true'] {
+  border-color: var(--ht-color-primary);
+}
+
+.ht-habit__icon-toggle:focus-visible,
+.ht-habit__icon-option:focus-visible {
+  outline: var(--ht-border-width-thick) solid var(--ht-color-ring);
+  outline-offset: var(--ht-space-1);
+}

@@ -1,0 +1,200 @@
+/* ── 视图切换条 ─────────────────────────────────────────────
+   扁平风格：用边框与背景表达选中态，不用阴影或位移。
+
+   🔴 2026-09-28 实测修：**8 个视图 tab 的标签在 ≤1440px 会全部折成两行**。
+   栏本身**不溢出**（1280 实测 `scrollWidth == clientWidth == 524`），原因是
+   `.ht-viewtabs` 是 flex、`.ht-viewtab` 是 inline-flex，而两处都没有
+   `white-space: nowrap` 与 `flex: 0 0 auto` —— 于是宽度不够时 flex 不是
+   "放不下就溢出"，而是**把每个 tab 压到内容宽度以下**，标签就在
+   `min-height: 44px` 的盒子里折成两行。
+
+   ⚠️ 正因如此，**`min-height: 44px` 这条最常用的不变量在这里是骗人的**：
+   量 tab 高度永远是 44px（8 个全过），只有量标签的**行盒数**才看得见
+   （1280/1440 = 10/10 折行，1680 = 0/10）。别用高度去验这一条。
+
+   修法：标签不折行、tab 不被压窄，放不下就让**这一条**横向滚动。
+   隐藏滚动条是刻意的 —— 否则滚动条会占掉高度，header 会随视口宽跳一下
+   （那是 CLS）；tab 在获得焦点时浏览器会自动把它滚进视野。 */
+.ht-viewtabs {
+  display: flex;
+  gap: var(--ht-space-1);
+  padding: var(--ht-space-1);
+  border-radius: var(--ht-radius-md);
+  background: var(--ht-color-surface-sunken);
+  margin-right: auto;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.ht-viewtabs::-webkit-scrollbar {
+  display: none;
+}
+
+/*
+ * ═══════════════════════════════════════════════════════════════════════════
+ * 外壳三层：rail（视图）/ sidebar（当前视图的范围）/ main
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * 🔴 为什么 rail 是**固定的窄列**而不是像原来那样把视图 tab 塞进顶栏：
+ * 顶栏是**水平**的，而水平方向上的可见宽度是有限的 ——
+ * `showcase-fidelity-audit.md` §6.3 实测：1280px 下 8 个视图 tab 只能完全看见 5 个
+ * （`1440px` 7/8、`1680px` 才 8/8）。现在有 9 个，只会更挤。
+ *
+ * 竖列没有这个上界：多一个视图就多一行，**永远不会把谁藏起来**。
+ * 这也是为什么这里**不把低频视图折叠进「更多」菜单** ——
+ * 折叠是**为顶栏宽度付的代价**，竖列不需要付。
+ */
+/*
+ * 账号菜单（rail 顶部）。
+ *
+ * ⚠️ 面板 `position: absolute` + 相对头像定位：它必须**浮在导航之上**，
+ * 而不是把下面的按钮挤下去（挤下去会让每次点开菜单都跳一下布局）。
+ */
+.ht-rail__top {
+  display: flex;
+  align-items: center;
+  gap: var(--ht-space-2);
+  /* rail 窄到 64px 之后这里**不能再加内边距**：rail 自身已给 8px × 2，
+     剩下的 48px 恰好放 44px 的头像（`--ht-touch-target-min`）。再缩就让不下了。 */
+  padding-inline: 0;
+  justify-content: center;
+}
+
+/* 🔴 品牌名（`common.brand`）随 rail 收成纯图标一起**撤掉**了，元素不在 DOM 里。
+   滴答的 rail 顶部只有头像；而 48px 的内容宽度也放不下「heyta」。
+   品牌仍然出现在落地页、设置里的 AI 文案、通知标题与移动端欢迎页。 */
+
+.ht-accountmenu {
+  position: relative;
+  /* 头像 + 登录/注册 **一行**（见 AccountMenu.tsx 内注释：竖叠曾把 rail 顶
+     的品牌名吊到半空）。面板仍是 absolute，不受布局方式影响。 */
+  display: flex;
+  align-items: center;
+  gap: var(--ht-space-2);
+}
+
+.ht-accountmenu__avatar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--ht-touch-target-min);
+  height: var(--ht-touch-target-min);
+  padding: 0;
+  cursor: pointer;
+  border: var(--ht-border-width-thin) solid var(--ht-color-border);
+  /* 正圆：它是头像，不是一个方形按钮 */
+  border-radius: 50%;
+  background: var(--ht-color-surface);
+  color: var(--ht-color-foreground-muted);
+  font-family: var(--ht-font-sans);
+  font-size: var(--ht-font-size-sm);
+  font-weight: var(--ht-font-weight-semibold);
+}
+
+.ht-accountmenu__avatar:hover {
+  color: var(--ht-color-foreground);
+}
+
+.ht-accountmenu__avatar:focus-visible {
+  outline: var(--ht-focus-ring-width) solid var(--ht-color-ring);
+  outline-offset: var(--ht-space-1);
+}
+
+/* 🔴 2026-09-30 撤掉了「头像旁的登录 pill」。
+   身份入口只能有一个（产品负责人："应该是点击头像出来注册、登录吧？"）——
+   它现在是菜单里的第一项（`.ht-accountmenu__item--primary`），
+   不再是头像旁边第二个长得像账号入口的控件。 */
+
+/* ── macOS 壳（hiddenTitleBar）模式 ───────────────────────
+ *
+ * 壳用 `.windowStyle(.hiddenTitleBar)` 后，红绿灯**浮在应用自己的底色上**
+ * （2026-09-29 产品负责人："那个关闭缩小条应该跟滴答清单保持一致，
+ * 完全融入应用壳，而不是很突兀的一个东西"）。它们落在**左上角 rail 顶部**，
+ * 所以壳模式下 rail 顶部让出一行（32px = space.8）。
+ *
+ * 类由壳注入（WebView 加载完成后 `documentElement.classList.add('heyta-shell')`）；
+ * 浏览器 / PWA 里没有这个类，布局不变。
+ */
+.heyta-shell .ht-rail__top {
+  padding-top: var(--ht-space-8);
+}
+
+/* 账号菜单面板。
+ *
+ * 🔴 `fixed` 而不是 `absolute`：`nav.ht-rail` 是 `overflow-y: auto` 的裁剪容器，
+ * absolute 面板比 rail 宽（12rem vs 4rem）⇒ 右侧一直被切；塌缩态
+ * （≤768px，rail 变底部导航 + `overflow-y: hidden`）更是整块看不见。
+ * 坐标由组件实测锚点后写在 inline style 上（向上/向下弹都在那里判定），
+ * 这里只管外观。 */
+.ht-accountmenu__panel {
+  position: fixed;
+  /* 🔴 **必须高于 `.ht-sheet`**（设置浮层，同样是浮层但只占 `dropdown` 档）。
+     以前两者同为 `dropdown` 也能用，靠的是**几何运气**：rail 宽 176px 时，
+     main 从 x=176 才开始，而菜单项的命中点落在 x≈160 —— 正好在 rail 那侧，
+     浮层碰不到。rail 收成 64px 之后 main 提前 112px 开始，同一个点落进浮层里，
+     于是 `ai-unavailable.spec.ts` 的「点设置」被 `.ht-settings` 拦下（z 相同 ⇒
+     DOM 后面的赢，而 `main` 在 `nav` 之后）。用 `popover` 档把它压回上层 ——
+     与 `.ht-inbox__panel`（同样锚在 rail 上的浮层）同一档，不是随便挑的数。 */
+  z-index: var(--ht-z-popover);
+  display: flex;
+  flex-direction: column;
+  min-width: 12rem;
+  /* 视口很矮时面板自己滚，而不是把最后一项顶出屏幕（退出登录正是最后一项）。 */
+  max-height: calc(100dvh - var(--ht-space-8));
+  overflow-y: auto;
+  padding: var(--ht-space-1);
+  border-radius: var(--ht-radius-md);
+  /* 表面来自 `.ht-material`（ADR-0042：锚在 rail 上的悬浮功能层 = 玻璃）。
+     浮层用阴影表达层级 —— 布局层用边框、浮层用阴影，两者不混。 */
+  box-shadow: var(--ht-shadow-lg);
+}
+
+.ht-accountmenu__who {
+  padding: var(--ht-space-2);
+  color: var(--ht-color-foreground-subtle);
+  font-family: var(--ht-font-sans);
+  font-size: var(--ht-font-size-xs);
+  /* 长邮箱不许把面板撑宽 */
+  overflow-wrap: anywhere;
+}
+
+.ht-accountmenu__item {
+  display: flex;
+  align-items: center;
+  gap: var(--ht-space-2);
+  min-height: var(--ht-touch-target-min);
+  padding: 0 var(--ht-space-2);
+  cursor: pointer;
+  border: none;
+  border-radius: var(--ht-radius-sm);
+  background: transparent;
+  color: var(--ht-color-foreground);
+  font-family: var(--ht-font-sans);
+  font-size: var(--ht-font-size-sm);
+  text-align: left;
+}
+
+.ht-accountmenu__item:hover {
+  background: var(--ht-color-surface-sunken);
+}
+
+/* 退出登录是这一组里唯一**会清掉本机凭据**的动作 —— 颜色要说清这件事。
+   它永远在最后一项（见 `AccountMenu.tsx` 文件头：破坏性动作在最底、
+   且未登录时**根本不渲染**）。 */
+.ht-accountmenu__item--danger {
+  color: var(--ht-color-danger);
+}
+
+/* 未登录时菜单的第一项「登录 / 注册」是这一组的**主操作** —— 强调样式，
+   与其余无损导航项区分开。它仍然是一个菜单项（不是大按钮）：
+   SaaSUI 的账号面调研要求身份入口在菜单里**一眼可辨**，而不是与
+   「设置 / 统计」同样的视觉分量。 */
+.ht-accountmenu__item--primary {
+  background: var(--ht-color-primary-subtle);
+  color: var(--ht-color-primary);
+  font-weight: var(--ht-font-weight-semibold);
+}
+
+.ht-accountmenu__item--primary:hover {
+  background: var(--ht-color-primary-subtle-hover);
+}

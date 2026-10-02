@@ -1,0 +1,542 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+ * 通知中心 / 活动（福利中心）—— rail 底部的铃铛 + 面板
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * 🔴 面板是 `position: fixed`，**不是** absolute。
+ *
+ * `nav.ht-rail` 有 `overflow-y: auto`，也就是一个裁剪容器 —— 它的子元素
+ * 只要超出边界就会被切掉（`.ht-accountmenu__panel` 曾经是 absolute 的，
+ * 比 rail 还宽 16px，右侧**一直**在被切；2026-09-30 已改为 fixed + 实测锚点）。
+ *
+ * 这个面板宽 24rem，absolute 会被切掉一大半；所以改成 fixed —— 定位由 CSS
+ * 从 rail 宽度算出来，不靠 JS 量尺寸（量尺寸还要处理滚动与 resize，而
+ * "忘了重算"的表现是面板停在半空）。
+ *
+ * ⚠️ 前提是**没有祖先元素带 transform / filter / will-change**：那会让
+ * fixed 退化成相对该祖先定位。`.ht-app`（grid）与 `nav.ht-rail` 都没有
+ * transform，所以这里成立。将来若给外壳加 transform 动画，这一段会坏 ——
+ * 坏的样子是"面板跑到屏幕中间"，而那条规则离这里很远。
+ */
+
+.ht-inbox__badge {
+  /* 字号/字重/等宽来自语义档位类 `ht-type-badge`（JSX 与本类成对出现）。 */
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  /* 🔴 rail 收成纯图标之后，徽标**必须浮在图标角上**。它原来是行内元素、
+     `min-width: 44px`（触控目标）—— 在 48px 宽的图标按钮里会把按钮撑爆，
+     而 `.ht-rail` 是 `overflow-y: auto`（= 两个轴都裁），表现是"铃铛那里
+     出现一条横向滚动"而不是报错。尺寸改用徽标 token。 */
+  position: absolute;
+  /* 🔴 偏移必须是 **0**，不能"往里收一点"。算一遍就明白：按钮被 `.ht-rail__tabs`
+     （column flex，默认 stretch）撑成 rail 的内容宽 48px，16px 的图标居中 ⇒ 图标占
+     x 16..32；徽标 18px。用 `--ht-space-1`（8px）内缩时徽标落在 x 22..40，
+     和图标**重叠 10px** —— 铃铛被自己的未读数盖住。贴到 0 只剩 2px 角接触。
+     ⚠️ 按钮再变窄（rail 更窄 / 图标更大）这个结论会翻，届时改成给图标套一层
+     定位容器，而不是把徽标挪回按钮内侧。 */
+  top: 0;
+  right: 0;
+  min-width: var(--ht-size-badge-min-width);
+  height: var(--ht-size-badge-height);
+  padding-inline: var(--ht-space-1);
+  border-radius: var(--ht-radius-full);
+  background: var(--ht-color-primary);
+  color: var(--ht-color-on-primary);
+}
+
+.ht-inbox__panel {
+  position: fixed;
+  left: calc(var(--ht-layout-rail-width) + var(--ht-space-2));
+  bottom: var(--ht-space-3);
+  z-index: var(--ht-z-popover);
+  display: flex;
+  flex-direction: column;
+  width: 24rem;
+  max-height: var(--ht-layout-panel-max-height);
+  overflow: hidden;
+  border-radius: var(--ht-radius-lg);
+  /* 表面来自 `.ht-material`（ADR-0042：锚在 rail 上的悬浮功能层 = 玻璃）。 */
+  box-shadow: var(--ht-shadow-lg);
+}
+
+.ht-inbox__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--ht-space-2);
+  padding: var(--ht-space-2);
+  border-bottom: var(--ht-border-width-thin) solid var(--ht-color-border);
+}
+
+.ht-inbox__tabs {
+  display: flex;
+  gap: var(--ht-space-1);
+}
+
+.ht-inbox__tab {
+  min-height: var(--ht-touch-target-min);
+  padding: 0 var(--ht-space-3);
+  cursor: pointer;
+  border: var(--ht-border-width-thin) solid transparent;
+  border-radius: var(--ht-radius-full);
+  background: transparent;
+  color: var(--ht-color-foreground-muted);
+  font-family: var(--ht-font-sans);
+  font-size: var(--ht-font-size-sm);
+  font-weight: var(--ht-font-weight-medium);
+}
+
+.ht-inbox__tab:hover {
+  color: var(--ht-color-foreground);
+}
+
+.ht-inbox__tab--active {
+  background: var(--ht-color-surface-sunken);
+  color: var(--ht-color-foreground);
+  border-color: var(--ht-color-border);
+}
+
+.ht-inbox__tab:focus-visible,
+.ht-inbox__action:focus-visible,
+.ht-inbox__copy:focus-visible {
+  outline: var(--ht-focus-ring-width) solid var(--ht-color-ring);
+  outline-offset: var(--ht-space-1);
+}
+
+.ht-inbox__actions {
+  display: flex;
+  align-items: center;
+  gap: var(--ht-space-1);
+}
+
+.ht-inbox__action {
+  /* 排版四件套来自语义档位类 `ht-type-caption`（JSX 与本类成对出现）。 */
+  min-height: var(--ht-touch-target-min);
+  padding: 0 var(--ht-space-2);
+  cursor: pointer;
+  border: none;
+  border-radius: var(--ht-radius-sm);
+  background: transparent;
+  color: var(--ht-color-primary);
+  font-family: var(--ht-font-sans);
+  white-space: nowrap;
+}
+
+.ht-inbox__action:hover {
+  background: var(--ht-color-surface-sunken);
+}
+
+.ht-inbox__action--icon {
+  min-width: var(--ht-touch-target-min);
+  padding: 0;
+  color: var(--ht-color-foreground-muted);
+}
+
+.ht-inbox__body {
+  overflow-y: auto;
+  padding: var(--ht-space-2);
+}
+
+.ht-inbox__list {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.ht-inbox__item {
+  display: flex;
+  gap: var(--ht-space-3);
+  padding: var(--ht-space-3) var(--ht-space-2);
+  border-bottom: var(--ht-border-width-thin) solid var(--ht-color-border-subtle);
+}
+
+.ht-inbox__item:last-child {
+  border-bottom: none;
+}
+
+.ht-inbox__item-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: var(--ht-touch-target-min);
+  height: var(--ht-touch-target-min);
+  border-radius: var(--ht-radius-full);
+  background: var(--ht-color-primary-subtle);
+  color: var(--ht-color-primary);
+}
+
+.ht-inbox__item-main {
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.ht-inbox__item-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--ht-space-2);
+}
+
+.ht-inbox__item-title {
+  color: var(--ht-color-foreground);
+  font-size: var(--ht-font-size-sm);
+  font-weight: var(--ht-font-weight-semibold);
+}
+
+/*
+ * 🔴 未读只用**字重 + 一个小圆点**表达，不用背景色块。
+ * 色块会把整条通知变成"一个按钮"，而它其实不可点击（没有详情页）——
+ * 那是一种"看起来能点、点了没反应"的失望。
+ */
+.ht-inbox__item--unread .ht-inbox__item-title::after {
+  content: '';
+  display: inline-block;
+  width: var(--ht-space-1);
+  height: var(--ht-space-1);
+  margin-inline-start: var(--ht-space-1);
+  border-radius: var(--ht-radius-full);
+  background: var(--ht-color-primary);
+  vertical-align: middle;
+}
+
+.ht-inbox__item-date {
+  flex: 0 0 auto;
+  color: var(--ht-color-foreground-subtle);
+  font-size: var(--ht-font-size-xs);
+  font-variant-numeric: tabular-nums;
+}
+
+.ht-inbox__item-body {
+  margin: var(--ht-space-1) 0 0;
+  color: var(--ht-color-foreground-muted);
+  font-size: var(--ht-font-size-sm);
+  line-height: var(--ht-line-height-normal);
+}
+
+.ht-inbox__notice {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--ht-space-2);
+  margin: 0;
+  padding: var(--ht-space-6) var(--ht-space-3);
+  color: var(--ht-color-foreground-subtle);
+  font-size: var(--ht-font-size-sm);
+  text-align: center;
+}
+
+.ht-inbox__card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ht-space-2);
+  padding: var(--ht-space-3);
+  border: var(--ht-border-width-thin) solid var(--ht-color-border);
+  border-radius: var(--ht-radius-md);
+  background: var(--ht-color-surface-raised);
+}
+
+.ht-inbox__card-head {
+  display: flex;
+  align-items: center;
+  gap: var(--ht-space-2);
+  color: var(--ht-color-primary);
+}
+
+.ht-inbox__card-title {
+  margin: 0;
+  color: var(--ht-color-foreground);
+  font-size: var(--ht-font-size-sm);
+  font-weight: var(--ht-font-weight-semibold);
+}
+
+.ht-inbox__card-body {
+  margin: 0;
+  color: var(--ht-color-foreground-muted);
+  font-size: var(--ht-font-size-sm);
+  line-height: var(--ht-line-height-normal);
+}
+
+.ht-inbox__field {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--ht-space-2);
+}
+
+.ht-inbox__field-label {
+  color: var(--ht-color-foreground-subtle);
+  font-size: var(--ht-font-size-xs);
+}
+
+.ht-inbox__field-value {
+  padding: var(--ht-space-1) var(--ht-space-2);
+  border: var(--ht-border-width-thin) dashed var(--ht-color-border-strong);
+  border-radius: var(--ht-radius-sm);
+  background: var(--ht-color-surface);
+  color: var(--ht-color-foreground);
+  font-family: var(--ht-font-mono);
+  font-size: var(--ht-font-size-sm);
+  /* 码是全大写 + 等宽，稍微放松字距更好认（没有 `tracking-wide` 这个 token；
+     `tracking-caption` 是本仓唯一一档正值字距）。 */
+  letter-spacing: var(--ht-tracking-caption);
+  /* 用户要能手动选中它（复制失败时的兜底路径）。 */
+  user-select: all;
+}
+
+.ht-inbox__copy {
+  min-height: var(--ht-touch-target-min);
+  padding: 0 var(--ht-space-2);
+  cursor: pointer;
+  border: var(--ht-border-width-thin) solid var(--ht-color-border);
+  border-radius: var(--ht-radius-sm);
+  background: var(--ht-color-surface);
+  color: var(--ht-color-foreground);
+  font-family: var(--ht-font-sans);
+  font-size: var(--ht-font-size-xs);
+}
+
+.ht-inbox__copy:hover {
+  background: var(--ht-color-surface-sunken);
+}
+
+.ht-inbox__status {
+  color: var(--ht-color-success);
+  font-size: var(--ht-font-size-xs);
+}
+
+.ht-inbox__status--warn {
+  color: var(--ht-color-warning-strong);
+}
+
+.ht-inbox__stats,
+.ht-inbox__muted {
+  margin: 0;
+  color: var(--ht-color-foreground-subtle);
+  font-size: var(--ht-font-size-xs);
+  font-variant-numeric: tabular-nums;
+}
+
+.ht-inbox__sublist-title {
+  /* 排版四件套来自语义档位类 `ht-type-panel-title`（JSX 与本类成对出现）。 */
+  margin: var(--ht-space-2) 0 0;
+  color: var(--ht-color-foreground-muted);
+}
+
+.ht-inbox__sublist {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ht-space-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.ht-inbox__subitem {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--ht-space-2);
+  font-size: var(--ht-font-size-xs);
+}
+
+.ht-inbox__subitem-name {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--ht-color-foreground);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ht-inbox__subitem-status {
+  flex: 0 0 auto;
+  color: var(--ht-color-foreground-subtle);
+}
+
+.ht-inbox__subitem-date {
+  flex: 0 0 auto;
+  color: var(--ht-color-foreground-subtle);
+  font-variant-numeric: tabular-nums;
+}
+
+/*
+ * 窄屏：rail 变成**底部横条**（见 `.ht-rail` 的 `@media`），
+ * 所以面板不能再挂在左边 —— 改成贴着那条横条上方、占满宽度。
+ */
+@media (max-width: 768px) {
+  .ht-inbox__panel {
+    left: var(--ht-space-2);
+    right: var(--ht-space-2);
+    bottom: calc(var(--ht-touch-target-min) + var(--ht-space-4));
+    width: auto;
+  }
+}
+
+/*
+ * 工具段**贴底**（rail 下段）。
+ *
+ * 🔴 用 `margin-top: auto` 而不是插一个 `flex:1` 的 spacer 元素：
+ * 工具按钮仍在**同一个 `role="tablist"`** 里（`role=tab` 跑到 tablist 外面是无效结构），
+ * 而 tablist 里多一个非 tab 的子元素会让"这一组有几项"变得含糊。
+ */
+.ht-rail__tab--tool:first-of-type {
+  margin-top: auto;
+}
+
+.ht-rail {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ht-space-3);
+  padding: var(--ht-space-3) var(--ht-space-2);
+  border-right: var(--ht-border-width-thin) solid var(--ht-color-border);
+  background: var(--ht-color-surface-sunken);
+  /* 视图多起来时**自身滚动**，而不是把 main 挤走 */
+  overflow-y: auto;
+}
+
+.ht-rail__tabs {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ht-space-2);
+}
+
+.ht-rail__tab {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  /* 徽标（铃铛的未读数）浮在图标右上角 —— 见 `.ht-inbox__badge`。
+     ⚠️ `position: relative` **不会**改变子元素里 `position: fixed` 的包含块
+     （只有 transform / filter / will-change / contain 会），所以标签照样逃出 rail。
+     🔴 将来若给 rail 的按钮加 transform 动画，`.ht-rail__label` 会跟着一起退化
+     成"相对按钮定位"——那正是 `app.css` 里那条浮层警告说的坏法。 */
+  position: relative;
+  /* 44px 最小点击目标（UIX Pro 硬规则 2）。rail 现在是纯图标，
+     这一条同时**定义了** rail 的宽度（token 里 44 + 16 = 64px），
+     所以调小它会同时把 rail 挤窄 —— 而 44px 是可访问性硬下限，不许动。 */
+  min-height: var(--ht-touch-target-min);
+  padding: 0 var(--ht-space-2);
+  /* 🔴 与原来那条 `flex: 0 0 auto` 同源：不被压扁、标签不折行 */
+  white-space: nowrap;
+  flex: 0 0 auto;
+  cursor: pointer;
+  text-align: left;
+  border: var(--ht-border-width-thin) solid transparent;
+  border-radius: var(--ht-radius-sm);
+  background: transparent;
+  color: var(--ht-color-foreground-muted);
+  font-family: var(--ht-font-sans);
+  font-size: var(--ht-font-size-sm);
+  font-weight: var(--ht-font-weight-medium);
+  transition:
+    background var(--ht-duration-fast) var(--ht-ease-standard),
+    color var(--ht-duration-fast) var(--ht-ease-standard);
+}
+
+/*
+ * ── 名字：只在 hover / 键盘聚焦时出现（`.ht-rail__label`）────────────────
+ *
+ * 2026-09-30 产品负责人：「侧边栏学习这个，只显示 icon，hover 显示真名」
+ * （附滴答截图，那条 tooltip 写的是「番茄专注」）。
+ *
+ * 🔴 三条必须同时成立，缺一条就是另一种坏：
+ *
+ * 1. **标签必须留在无障碍树里。** 它就是这些按钮的 accessible name ——
+ *    `e2e/tests/quadrant-layout.spec.ts` 与 `pages-sweep.spec.ts` 用
+ *    `getByRole('tab', { name: '四象限' })` 定位。所以只能"看不见"，
+ *    不能 `display: none` / `visibility: hidden` / `aria-hidden`
+ *    （那三者会让按钮变成"没有名字的 tab"，而界面看起来"没问题"）。
+ * 2. **必须是 `position: fixed`。** `nav.ht-rail` 有 `overflow-y: auto`，
+ *    是裁剪容器；absolute 的标签会被切掉（`.ht-inbox__panel` 的说明是同一件事）。
+ *    fixed 因此**退出文档流**，正好不再撑宽按钮。
+ * 3. **y 坐标必须由实测给出。** fixed 元素不知道自己贴在哪个按钮旁边，
+ *    所以 `--ht-rail-label-top` 由 `App.tsx` 的 `anchorRailLabel()` 在
+ *    pointerover / focus 时写进按钮（写的是**中心**，配合 `translateY(-50%)`）。
+ *    ⚠️ 不用 React state：那会让整个外壳每次 hover 都重渲染。
+ *
+ * 滚轮滚动时浏览器会对"滚进指针下方"的按钮重新派发 pointerover ⇒ 坐标自动跟手。
+ */
+.ht-rail__label {
+  /* 排版四件套来自语义档位类 `ht-type-caption`（JSX 与本类成对出现）。 */
+  position: fixed;
+  top: var(--ht-rail-label-top, 0px);
+  left: calc(var(--ht-layout-rail-width) + var(--ht-space-1));
+  transform: translateY(-50%);
+  z-index: var(--ht-z-tooltip);
+  padding: var(--ht-space-1) var(--ht-space-2);
+  border-radius: var(--ht-radius-sm);
+  background: var(--ht-color-foreground);
+  color: var(--ht-color-foreground-inverse);
+  white-space: nowrap;
+  opacity: 0;
+  /* 标签浮在内容上方，绝不能挡住底下的点击（`pointer-events: none` 同时保证
+     它不会因为"被 hover"而把 hover 状态从按钮抢走）。 */
+  pointer-events: none;
+  transition: opacity var(--ht-duration-fast) var(--ht-ease-standard);
+}
+
+.ht-rail__tab:hover > .ht-rail__label,
+.ht-rail__tab:focus-visible > .ht-rail__label {
+  opacity: 1;
+}
+
+.ht-rail__tab:hover {
+  color: var(--ht-color-foreground);
+}
+
+.ht-rail__tab--active {
+  background: var(--ht-color-surface);
+  color: var(--ht-color-primary);
+  border-color: var(--ht-color-border);
+}
+
+/* 焦点环必须可见 —— 抹掉它是最常见的可访问性回归 */
+.ht-rail__tab:focus-visible {
+  outline: var(--ht-focus-ring-width) solid var(--ht-color-ring);
+  outline-offset: var(--ht-space-1);
+}
+
+.ht-viewtab {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--ht-space-1);
+  /* 44px 最小点击目标（UIX Pro 硬规则 2） */
+  min-height: var(--ht-touch-target-min);
+  padding: 0 var(--ht-space-3);
+  /* 🔴 与上面那段注释成对：不折行、不被压窄 */
+  white-space: nowrap;
+  flex: 0 0 auto;
+  cursor: pointer;
+  border: var(--ht-border-width-thin) solid transparent;
+  border-radius: var(--ht-radius-sm);
+  background: transparent;
+  color: var(--ht-color-foreground-muted);
+  font-family: var(--ht-font-sans);
+  font-size: var(--ht-font-size-xs);
+  font-weight: var(--ht-font-weight-medium);
+  transition:
+    background var(--ht-duration-fast) var(--ht-ease-standard),
+    color var(--ht-duration-fast) var(--ht-ease-standard);
+}
+
+.ht-viewtab:hover {
+  color: var(--ht-color-foreground);
+}
+
+.ht-viewtab--active {
+  background: var(--ht-color-surface);
+  color: var(--ht-color-primary);
+  border-color: var(--ht-color-border);
+}
+
+/* 焦点环必须可见 —— 抹掉它是最常见的可访问性回归 */
+.ht-viewtab:focus-visible {
+  outline: var(--ht-focus-ring-width) solid var(--ht-color-ring);
+  outline-offset: var(--ht-space-1);
+}
+
+/* ⚠️ 这里**不要**再写 prefers-reduced-motion 覆盖。
+   设计系统已在 tokens.css 的媒体查询里把所有 --ht-duration-* 压成 1ms，
+   组件只要用 token 就自动获得降低动效行为。
+   我第一版又写了一遍，既是冗余，也引入了裸值 1ms。 */

@@ -1,0 +1,170 @@
+/* ── 设置浮层（sheet）────────────────────────────────────
+ *
+ * 🔴 **这是信息架构，不是外观。** 对照滴答清单实测：它的设置是**从右侧滑出的浮层**，
+ * 左 rail 与列表明明还在（`docs/research/dida-capture/INTERFACE-NOTES.md` §11.5）。
+ *
+ * 规律：**次级表面（搜索 / 通知 / 设置）里做的事都需要"回头看下面"**，
+ * 所以它们**不离开当前视图**；而主视图（任务/日历/四象限/习惯）之间切换
+ * 不需要这种回头，才留在应用内。
+ *
+ * ⚠️ 所以这里的 `absolute` 与那层半透明**都是语义**：
+ * 它们保证"下层可见"。把它改成 `position: fixed` 盖满全屏、
+ * 或让 `App.tsx` 不再渲染下层视图，都会让 IA 判据变红。
+ */
+.ht-sheet {
+  position: absolute;
+  inset: 0;
+  z-index: var(--ht-z-dropdown);
+  overflow-y: auto;
+  padding: var(--ht-space-6);
+  /* 半透明：下层视图**看得见**但退到后面 —— 不是"关掉它"。
+     ⚠️ 刻意**不用** `backdrop-filter: blur(...)`：那会引入一个裸尺寸值，
+     而"下层可见"靠的是**透明度**，不是模糊 —— 模糊反而让下层更看不清。
+     ⚠️ 不透明度钉在 95%：再低（曾为 88%）时下层深色文字会以可读的浓度
+     透上来，与设置内容叠成"文字压文字"（页8 扫描截图实测）；
+     "下层可见"的判据是 DOM 里下层标记仍在（`settings-sheet-ia.spec`），
+     视觉上退成隐约一层就够。 */
+  background: color-mix(in srgb, var(--ht-color-background) 95%, transparent);
+  animation: ht-sheet-in var(--ht-duration-normal) var(--ht-ease-enter);
+}
+
+/* 设置浮层的退出口（2026-09-30 补）。
+   🔴 在这个按钮之前，设置浮层**没有任何出口**：没 Esc、没 ✕、点空白也不关
+   （它盖满内容区，点哪儿都是它自己）—— 唯一的出路是去点 rail 上的别的视图。
+   定位用 `sticky`：它贴在**滚动容器的可视区**，既不随内容滚走（`.ht-sheet`
+   自己有 `overflow-y: auto`），也不会像 `fixed` 那样在窄壳里停在半空。
+   ⚠️ 只钉 top，不写死尺寸；直径复用触控目标 token。 */
+.ht-sheet__close {
+  position: sticky;
+  top: 0;
+  /* 靠右：块级流里 `margin-inline-start: auto` 不生效，所以它自己是一条
+     flex 行（`display: flex` 把它撑成整行宽度，图标居中）。 */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--ht-touch-target-min);
+  height: var(--ht-touch-target-min);
+  margin-inline-start: auto;
+  /* 只吃掉一行里多出来的空白，不再额外占垂直节奏（面板自己的 padding 在管）。 */
+  margin-block-end: calc(var(--ht-space-2) * -1);
+  padding: 0;
+  cursor: pointer;
+  border: var(--ht-border-width-thin) solid var(--ht-color-border);
+  border-radius: var(--ht-radius-full);
+  background: var(--ht-color-surface);
+  color: var(--ht-color-foreground-muted);
+}
+
+.ht-sheet__close:hover {
+  color: var(--ht-color-foreground);
+  background: var(--ht-color-hover);
+}
+
+.ht-sheet__close:focus-visible {
+  outline: var(--ht-focus-ring-width) solid var(--ht-color-ring);
+  outline-offset: var(--ht-space-1);
+}
+
+@keyframes ht-sheet-in {
+  from {
+    opacity: 0;
+    transform: translateY(var(--ht-space-2));
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ht-sheet {
+    animation: none;
+  }
+}
+
+/* ── 搜索浮层（贴顶卡片 + scrim）──────────────────────────
+ *
+ * 🔴 同样是 IA，不是外观（滴答 §11.5：搜索是"主列③浮层，
+ * 透出下层视图"）。与 `.ht-sheet` 的差别只在形状：
+ * 设置 = 右侧整面，搜索 = **卡片**，四周留空隙让下层看得见。
+ *
+ * 🔴 2026-10-01：卡片**贴顶**，不悬在正中央 —— 产品负责人给的是 macOS
+ * 聚焦搜索（Spotlight）那张图。借的是**形态**（输入行在最上、结果在下面、
+ * 靠近屏幕上方），不是内容。居中悬着读起来像"对话框"，贴顶读起来才像"输入法"：
+ * 前者等待一个回答，后者等待你继续打字。
+ *
+ * ⚠️ 顶部留白用 `--ht-space-16` × 2（不新增 token、不写裸值）。
+ *
+ * ⚠️ scrim 用的是设计系统已有的 `--ht-material-scrim`
+ * （不是 sheet 那种"背景色 88%"）—— 卡片周围要露出**更多**下层，
+ * 灰度必须更浅，下层才读得出来。z 轴用 `--ht-z-overlay`：
+ * 它本来就是"浮层"这一层。
+ *
+ * 🔴 **`fixed` 而不是 `absolute`（2026-10-01 实测）**：这一层挂在内容列里，
+ * 而内容列**和列表一样高**（真浏览器量到 2365px），滚动宿主是 window。
+ * 写成 `absolute` 时 `inset: 0` 撑的是那根 2365px 的柱子 ⇒ 卡片钉在**文档顶部**，
+ * 屏幕滚下去一点再按 ⌘K，卡片在视口上方看不见，而输入框的 `autoFocus`
+ * 让浏览器把整页滚回 0 —— 症状是"一开搜索，列表跳回顶部"（探针量到
+ * 打开前 scrollY=1465、打开后 scrollY=0）。`fixed` 让它钉在**看见的那一屏**，
+ * 跳页与" scrim 只盖住半屏"一起消失。
+ * ⚠️ 这条依赖"祖先没有 transform / filter / backdrop-filter / contain:paint"，
+ * 否则 `fixed` 的包含块会退化成那个祖先 —— 判据钉在 `search-overlay.spec.ts`，
+ * 它会在退化时直接红（不是靠人看图发现）。
+ */
+.ht-search-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: var(--ht-z-overlay);
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: calc(var(--ht-space-16) * 2) var(--ht-space-4) var(--ht-space-4);
+  background: var(--ht-material-scrim);
+  animation: ht-sheet-in var(--ht-duration-normal) var(--ht-ease-enter);
+}
+
+/*
+ * 卡片的形：**宽钉在 modal-max，高与宽成比例（16:9）**。
+ * 2026-10-01 产品负责人："组织的组件的宽和高都是成比例的，反正更合适屏幕的尺寸，
+ * 不仅仅是一条" —— 之前它的高度由内容决定，空态就只剩一条输入行的薄片。
+ *
+ * 🔴 定形（而不是随内容伸缩）还带来一条副产品：**打字前后卡片不跳**，
+ * 光标行也不必在结果出现时跟着位移。`max-block-size: 100%` 是矮窗口的让位阀：
+ * 可用高度不足时比例失效，卡片贴满内容区而不溢出（`aspect-ratio` 的固有尺寸
+ * 会被 `max-block-size` 夹住，这正是想要的优先级）。
+ *
+ * ⚠️ 量的是**卡片**（overlay 的子元素），不是 scrim 本身：scrim 是 `inset: 0`
+ * 撑满内容区的，量它永远"超宽"（这个判据第一版就栽在选错元素上）。
+ */
+.ht-search-overlay > * {
+  inline-size: min(100%, var(--ht-layout-modal-max));
+  aspect-ratio: 16 / 9;
+  max-block-size: 100%;
+  /* 玻璃的另一半。底色是共享层的 `material.chrome-tint`（见
+     `SearchPanel.tsx`），`backdrop-filter` 只在 CSS 里合法 ⇒ 归宿主。
+     半径复用既有的 `--ht-blur-chrome`，与落地页那两处同一档材质。 */
+  backdrop-filter: blur(var(--ht-blur-chrome)) saturate(180%);
+  -webkit-backdrop-filter: blur(var(--ht-blur-chrome)) saturate(180%);
+  /* 入场时长接**弹簧参数**（P1-3）：`--ht-motion-spring-response-sheet`
+     （0.3s，"抽屉 / 底部面板"的响应档）。🔴 damping = 1.0（临界阻尼，
+     tokens.css §3c 默认）意味着**不过冲** —— `--ht-ease-enter`（ease-out）
+     正是临界阻尼弹簧在 CSS 里的正确形状；`--ht-ease-spring` 的过冲只属于
+     带速度的手势，卡片淡入用它反而错。RN 端将来上 reanimated 时直接
+     消费同一对参数（motion.* 组）。 */
+  animation: ht-material-in calc(var(--ht-motion-spring-response-sheet) * 1s)
+    var(--ht-ease-enter);
+}
+
+/* 结果区吃掉卡片的剩余高度。共享层给的 `max-height: layout.panel-max-height`
+   是**上限**，不是高度：卡片定形之后若不让结果区 flex 增长，底部那排键位提示
+   就会浮在一片空白中间。 */
+.ht-search-overlay [data-testid='search-panel-results'] {
+  flex: 1 1 auto;
+  min-block-size: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ht-search-overlay {
+    animation: none;
+  }
+}
