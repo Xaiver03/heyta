@@ -3740,3 +3740,45 @@ const view = toEmptyStateViewModel(props);   // 整包转发 ⇒ 以后加槽位
 否则要给它加一条"props 的键集合 == 模型入参的键集合"的判据 —— 二选一，**不许什么都不做**。
 与 #145（"抽取的收尾动作是删掉旧的那份并加门禁，不是写一个更好的新版本"）同族：
 都是"新实现正确"被当成了"旧缺陷已消除"。
+
+154. 🔴 长活的隔离检出里 `pod install` 崩在 CocoaPods 的 "path name contains null byte" ——
+    而 `pnpm install --frozen-lockfile` 打印 "Already up to date"。**"依赖树没问题"这句话
+    不能由包管理器自己说。**
+
+症状（2026-10-03 06:45，隔离检出 `/tmp/heyta-g5`，HEAD=`840effb1`）：
+`bash scripts/reinstall-all.sh --only ios` 在 `pod install` 阶段崩，退出码 1：
+
+```
+ArgumentError - path name contains null byte
+  cocoapods-1.17.0/lib/cocoapods/project.rb:452  Pathname#realdirpath   # base_path.realdirpath
+  cocoapods-1.17.0/lib/cocoapods/project.rb:452  Pod::Project#group_for_path_in_group
+  …/file_references_installer.rb:228             add_file_accessors_paths_to_pods_group
+  … 崩在 "Generating Pods project"，前面 5 个 pod 全部 Installing 成功
+```
+
+### 三条臂，两条是假的"已排除"
+
+| 臂 | 结果 | 当时能得出什么结论 |
+|---|---|---|
+| `rm -rf Pods` 后重装 | ❌ 同一处崩溃 | 不是沙盒残留 |
+| `pnpm install --frozen-lockfile` | 打印 **Already up to date**（176 ms） | ⚠️ **我据此写下"节点树不是变量"—— 这句是错的** |
+| `node scripts/check-native-deps.mjs` | ✅ 5 个 pod 全命中 | 不是 lock 与 package.json 不一致 |
+
+真正把它分开的是 **A/B**：同一个 commit `840effb1` 现开新克隆（`git clone --no-hardlinks` +
+`pnpm install`，热 store 下 **4.4–4.9 秒**），`pod install` **两次都 exit 0**
+（一次放 `/Users/…/heyta-ios-ri`、一次放 `/tmp/heyta-ios-ab`）。
+🔴 **路径不是变量**（`/tmp` 那一次也成功），变量是**这棵长活的树本身**。
+
+📌 **一般规律（这条比 bug 本身值钱）**：`pnpm install --frozen-lockfile` 的
+"Already up to date" 只拿 lockfile 和**它自己那份状态文件**比，**不扫树**。所以它既不能证明
+树是好的，也不能作为"排除依赖树这个变量"的证据 —— 我当时正是拿它做的排除，结论写反了。
+**判"这棵树可用"要用下游消费者能不能跑来判**（这里是 `pod install`），
+或者干脆换一棵新的 —— 本仓库的克隆 + 安装只要 5 秒，**没有理由在旧树上重试**。
+
+⚠️ **未证实的部分**（别照它行动）：具体是哪个路径让 Ruby 4.0.7 的 `realdirpath` 拿到 NUL，
+没有定位到（要扫 `node_modules` 里 1.9 GB 的文件名）。已排除的只有：路径前缀、
+`Pods/` 残留、lock 与 package.json 不一致、codegen 产物缺失（两边都**没有**
+`build/generated/ios`）。上游对应 CocoaPods #12798 / #12866（都还 open）。
+
+同族：#27（"测试全绿 ≠ 这是当前产物"）、#46（没复现 ≠ 路径没执行）、#146（索引说"已暂存"不等于
+待提交的是新增）—— 都是**把工具自己的自检当成了外部真相**。
