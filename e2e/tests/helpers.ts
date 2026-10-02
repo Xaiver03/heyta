@@ -48,6 +48,15 @@ export const CAP_LONG_CONTEXT = 'long_context';
 export interface StubCall {
   readonly feature: string;
   readonly systemHead: string;
+  /**
+   * 🔴 只有对话助手那条旅程用得上：**这一次请求里有没有 `role:'tool'` 的结果**。
+   *
+   * 它是"多步循环真的把观察回送给了模型"的浏览器级证据。界面上写着
+   * "用了 1 步工具"而请求体里什么都没有 —— 只有这个字段能区分这两种情况。
+   */
+  readonly hasToolResult?: boolean;
+  /** 这一次请求里带着几条工具结果（`role:'tool'` 的消息数）。 */
+  readonly toolStep?: number;
 }
 
 export interface StubLog {
@@ -293,6 +302,32 @@ export async function openSettingsView(page: Page): Promise<void> {
   await page.getByTestId('account-menu-avatar').click();
   await page.getByTestId('account-menu-settings').click();
   await expect(page.locator('.ht-header__title').first()).toHaveText('设置');
+  await waitForOverlaySettled(page, 'settings-sheet');
+}
+
+/**
+ * 等**整屏浮层的入场动画落位**再返回。
+ *
+ * 为什么这是判据而不是等待技巧：`.ht-sheet` 的 `background` 是
+ * `color-mix(… 95%, transparent)` —— 它**故意**让下层视图透出来（IA：设置是浮层不是路由）。
+ * 而入场动画 `ht-sheet-in` 把**整块**的 `opacity` 从 0 跑到 1，时长 `--ht-duration-normal`。
+ * 于是"点完设置立刻截图"拍到的是**动画中途**：下层以接近同等的浓度叠上来，
+ * 看起来像"文字压文字的排版事故"，而它既不是事故也不是稳态。
+ * 第一轮的 `3-settings-tier.png` 就是这样拍坏的 —— 人已看图，但看的是过渡帧。
+ *
+ * ⚠️ 判据取的是**元素自己的动画**（不是 `document.getAnimations()`）：后者会把
+ * 页面上其它在跑的动画算进来，那会让这一条永远等不完。
+ * `prefers-reduced-motion` 下 `.ht-sheet { animation: none }` ⇒ 集合为空、立刻返回，
+ * 所以它不是"睡 300ms"那种假等待。
+ */
+export async function waitForOverlaySettled(page: Page, testId: string): Promise<void> {
+  const overlay = page.getByTestId(testId);
+  await expect(overlay, `浮层 ${testId} 必须真的在 DOM 里`).toHaveCount(1);
+  await overlay.evaluate(async (el) => {
+    await Promise.all(
+      el.getAnimations().map((animation) => animation.finished.catch(() => undefined)),
+    );
+  });
 }
 
 /**
