@@ -39,6 +39,12 @@ mkdir -p "$OUT_DIR"
 # ── ① 构建 ──────────────────────────────────────────────────────────────
 echo "=== ① 构建 release ==="
 cd "$SHELL_DIR"
+# 🔴 构建期同步设计系统生成物 —— `Sources/HeytaMac/Generated/HeytaTokens.swift` 是
+#    **派生物且已 gitignore**，SwiftPM 只编译目标目录内的源码，所以缺了它就报
+#    `cannot find 'HeytaTokens' in scope`。此前**只有门禁** `check-macos-shell.mjs` 调这条
+#    同步，于是"跑过 pnpm check 的机器能打包、干净检出打不出包"（实测：隔离 worktree
+#    从 HEAD 直接跑本脚本 ⇒ 构建失败）。打包路径必须自带这一步，不能依赖别人先跑过门禁。
+bash "$SHELL_DIR/scripts/sync-tokens.sh" || { echo "🔴 同步设计系统生成物失败"; exit 1; }
 swift build -c release --product HeytaMac 2>&1 | grep -E "error:|warning:|Build complete" | awk '{print "  " $0}'
 BIN="$(swift build -c release --product HeytaMac --show-bin-path)/HeytaMac"
 [ -x "$BIN" ] || { echo "🔴 找不到 release 可执行：$BIN"; exit 1; }
