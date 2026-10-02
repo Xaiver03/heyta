@@ -66,6 +66,8 @@ export type AuthFailureMessageKey =
   | 'common.auth.error.requestRejected'
   | 'common.auth.error.network'
   | 'common.auth.error.server'
+  /** 本机闸门拦下的（**一个字节都没发出去**）—— 与 `network` 是两句相反的话。 */
+  | 'common.auth.error.consentRequired'
   | 'common.auth.error.passkeyUnsupported'
   | 'common.auth.error.passkeyCancelled'
   | 'common.auth.error.passkeyAlreadyRegistered'
@@ -125,6 +127,10 @@ export function authFailureMessageKey(
       return 'common.auth.error.network';
     case 'server-error':
       return 'common.auth.error.server';
+    // 🔴 **绝不能落到 `network`**：请求从未离开这台设备，说"检查网络"是把
+    // 一个隐私决定伪装成一次线路故障 —— 用户会去重连 WiFi，而那永远做不对。
+    case 'consent-required':
+      return 'common.auth.error.consentRequired';
     case 'passkey-unsupported':
       return 'common.auth.error.passkeyUnsupported';
     case 'passkey-cancelled':
@@ -276,12 +282,6 @@ export function policyMentionsMax(policyCode: string | undefined): boolean {
   return policyCode === 'too_long';
 }
 
-/* ========================================================================
- * 四、表单的**两步**（一个邮箱框 + 「继续」，口令紧随其后）
- * ====================================================================== */
-
-/**
- * 表单阶段。
 /**
  * 词条的插值参数。**不 import `@heyta/i18n` 的 `MessageVars`**（理由见文件头），
  * 与它**同形**（不是 `Readonly` —— 那个是可变索引签名，包一层只会有人再解一次），
@@ -338,6 +338,12 @@ export function authFailureMessage(failure: {
   return { key: authFailureMessageKey(reason, { retryAfterSeconds }) };
 }
 
+/* ========================================================================
+ * 四、表单的**两步**（一个邮箱框 + 「继续」，口令紧随其后）
+ * ====================================================================== */
+
+/**
+ * 表单阶段。
  *
  * 🔴 它**不是** `AuthJourneyStep` 的别名，两件事不同层次：
  * `AuthJourneyStep` 说的是**协议走到了哪一步**（注册不发令牌、验证邮箱也不发令牌…），

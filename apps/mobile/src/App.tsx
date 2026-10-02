@@ -48,10 +48,25 @@ import { FocusScreen } from './screens/FocusScreen';
 import { CategoriesScreen } from './screens/CategoriesScreen';
 import { ProfileScreen } from './screens/ProfileScreen';
 import { WelcomeScreen } from './screens/WelcomeScreen';
+import { PrivacyConsentSheet } from './screens/PrivacyConsentSheet';
+import { startPrivacyGate } from './privacy/startup';
 import { startAutoSync } from './sync/auto-sync';
 import { startWidgetLifecycle } from './widgets/lifecycle';
 import { DEFAULT_SERVER_URL, readSyncConfig } from './sync/config';
 import { hasSeenWelcome, markWelcomeSeen } from './prefs/device-prefs';
+
+/**
+ * 🔴 **隐私闸门必须在任何一次渲染之前装好**（G-12）。
+ *
+ * 放在模块顶层而不是 `useEffect` 里，理由是一条实测出来的时序：
+ * 首启时面板要弹（G-11），而 `fetch` 要在那之前就已经换成带闸门的那个 ——
+ * effect 要等首帧提交完才跑，而 `openTaskHost()` 在启动的 await 链里就会发出
+ * 第一个同步请求。**差一个 tick 就是"同意之前发过请求"**，
+ * 而这件事在界面上完全看不出来。
+ *
+ * ⚠️ 它必须在 `Shell` 之前求值，也就是**不能**塞进任何组件里。
+ */
+startPrivacyGate();
 
 function Shell(): React.JSX.Element {
   const t = useTokens();
@@ -134,6 +149,17 @@ function Shell(): React.JSX.Element {
     setWelcomeDone(true);
   };
 
+  /**
+   * 面板挂在**两个分支**上（欢迎页 + 主界面）。
+   *
+   * 为什么不是只挂主界面：首启时用户看到的第一屏是欢迎页，而隐私决定
+   * **必须**比"要不要登录"更早征求 —— 欢迎页上那个「注册 / 登录」按钮
+   * 一按就会发请求。RN 的 `Modal` 在自己的原生层里渲染，放在树的哪一层
+   * 不影响它盖住谁，所以两处各挂一份是安全的（面板由 store 的 `open` 裁决，
+   * 不会出现两层）。
+   */
+  const privacySheet = <PrivacyConsentSheet serverUrl={authServerUrl} />;
+
   if (!welcomeDone) {
     return (
       <>
@@ -146,6 +172,7 @@ function Shell(): React.JSX.Element {
           onUseOffline={leaveWelcome}
           onSignedIn={leaveWelcome}
         />
+        {privacySheet}
       </>
     );
   }
@@ -172,6 +199,7 @@ function Shell(): React.JSX.Element {
         onChange={setTab}
         badges={{ tasks: pendingCount }}
       />
+      {privacySheet}
     </View>
   );
 }

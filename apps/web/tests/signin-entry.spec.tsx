@@ -32,6 +32,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { __resetAuthForTests } from '../src/features/auth/store.js';
 import { __resetOpLogForTests, initOpLog } from '../src/lib/oplog.js';
+import { privacyConsentActions } from '../src/features/privacy/consent-gate.js';
 import { useSyncStore } from '../src/features/sync/store.js';
 import { useTaskStore } from '../src/features/tasks/store.js';
 import { emptyState } from '@heyta/op-log';
@@ -86,7 +87,7 @@ beforeEach(async () => {
   //（app-mount.spec.tsx 的 `freshDb` 记过同一条教训）。
   (globalThis as unknown as { indexedDB: IDBFactory }).indexedDB = new IDBFactory();
   __resetOpLogForTests();
-  useTaskStore.setState({ entities: emptyState(), filter: { kind: 'all' }, query: '' });
+  useTaskStore.setState({ entities: emptyState(), filter: { kind: 'all' } });
   await initOpLog(`signin-entry-${Math.random().toString(36).slice(2)}`);
   useSyncStore.setState({
     baseUrl: '',
@@ -95,6 +96,13 @@ beforeEach(async () => {
     settingsOpen: false,
     signInOpen: false,
   });
+  // 🔴 G-12（2026-10-01）：冷启动现在会弹首启隐私面板（`App.tsx` 的
+  // `shouldAskOnFirstLaunch()`）。本文件钉的是**身份菜单**，它的隐含前提是
+  // "这台设备已经做过隐私决定" —— 不先替用户点掉，第 3 条那句
+  // 「点击之前还没有任何对话框」测的就是隐私面板而不是菜单。
+  // 面板自己的判据在 `tests/privacy-consent-sheet.spec.tsx`。
+  // ⚠️ 走生产代码 `privacyConsentActions.accept()`，不往 localStorage 手写自造串。
+  privacyConsentActions.accept();
 });
 
 afterEach(() => {

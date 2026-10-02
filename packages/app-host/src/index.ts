@@ -500,3 +500,31 @@ export {
   resolveLegalLinks,
   type LegalLinks,
 } from './legal-links.js';
+
+/**
+ * 隐私同意闸门（链 5，计划里的 **G-11 / G-12**）。
+ *
+ * 🔴 「同意之前不得发起任何请求」是**产品语义**而不是平台差异，所以判定住在这里：
+ * 四个壳只能注入自己的存储端口（`localStorage` / op-sqlite / 内存）并把
+ * {@link createConsentGatedFetch} 套在自己的 `fetchImpl` 上。
+ * 宿主里出现"没同意也照发"的判断，就是把这条合规前提交回给约定 ——
+ * 而约定挡不住"新加一个调用点忘了传"。
+ */
+export {
+  PRIVACY_CONSENT_BLOCKED_MARKER,
+  PRIVACY_CONSENT_KEY,
+  PRIVACY_DECISIONS,
+  PrivacyConsentBlockedError,
+  UNAVAILABLE_PRIVACY_CONSENT_PORT,
+  createConsentGatedFetch,
+  createPrivacyConsentGate,
+  formatPrivacyDecisionTime,
+  parsePrivacyConsent,
+  privacyNetworkAllowed,
+  serializePrivacyConsent,
+  type PrivacyConsentGate,
+  type PrivacyConsentPort,
+  type PrivacyConsentReadout,
+  type PrivacyConsentRecord,
+  type PrivacyDecision,
+} from './privacy-consent.js';

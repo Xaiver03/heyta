@@ -83,6 +83,7 @@ import {
   getRecoveryRegistrationOptions,
   completePasskeyRecovery,
 } from '../src/passkey';
+import { LEGAL_SET_VERSION, OFFICIAL_HOSTED_DOMAIN } from '../src/legal.generated';
 
 describe('Passkey Authentication', () => {
   const testEmail = 'test@example.com';
@@ -261,6 +262,15 @@ describe('Passkey Authentication', () => {
           result.message.includes('automatically verified'),
       ).toBe(true);
       expect(mockPrisma.user.create).toHaveBeenCalled();
+      // 🔴 同意留痕的两列必须成对（链 3）。这条用例**没有**传同意时刻，所以版本也必须是空 ——
+      // "有版本没时间戳"是一条比两列都空更误导人的记录：它看起来像证据，其实不是。
+      // （测试环境的 `PUBLIC_URL` 不是官方托管域，所以即便这台实例要求同意，
+      //  版本列同样是 null —— 判法见 `src/legal-consent.ts`。）
+      expect(mockPrisma.user.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ termsDocumentVersion: null }),
+        }),
+      );
       expect(mockPrisma.pendingPasskeyRegistration.create).toHaveBeenCalledWith({
         data: expect.objectContaining({
           userId: 1,
@@ -272,6 +282,59 @@ describe('Passkey Authentication', () => {
       // ⚠️ 这条用例（TEST_MODE 自动验证）**没有**可对照的发信调用，而 `randomBytes(32)`
       // 与 SHA-256 **同为 64 个十六进制字符** —— 形态检查区分不了两者。
       // 真正钉住"落库的是哈希不是令牌"的是下面那条带邮件对照的用例。不能失败的检查没有价值。
+    });
+
+    it('带同意时刻 + 官方托管域注册 ⇒ 版本与时刻成对落库（passkey 这条路也要写）', async () => {
+      // 三条注册入口（passkey / 魔法链接 / 邮箱+口令）都必须盖同一个版本，
+      // 否则"用户在后台答得出他同意的是哪一版"取决于他从哪个门进来 ——
+      // 那是留痕最没用的形状：只在一条路上成立等于不成立。
+      mockPrisma.user.findUnique.mockResolvedValue(null);
+      mockPrisma.user.create.mockResolvedValue({ id: 1, email: testEmail, isVerified: 0 });
+      mockVerifyRegistration.mockResolvedValue({
+        verified: true,
+        registrationInfo: {
+          credential: {
+            id: new Uint8Array([1, 2, 3, 4]),
+            publicKey: new Uint8Array([5, 6, 7, 8]),
+            counter: 0,
+          },
+          credentialDeviceType: 'multiDevice',
+          credentialBackedUp: true,
+        },
+      });
+      await generateRegistrationOptions(testEmail);
+
+      const previousPublicUrl = process.env.PUBLIC_URL;
+      process.env.PUBLIC_URL = `https://${OFFICIAL_HOSTED_DOMAIN}`;
+      try {
+        await verifyRegistration(
+          testEmail,
+          {
+            id: 'credential-id-base64',
+            rawId: 'raw-id',
+            type: 'public-key',
+            response: {
+              clientDataJSON: 'client-data',
+              attestationObject: 'attestation',
+              transports: ['internal'],
+            },
+            clientExtensionResults: {},
+          } as never,
+          1_700_000_000_000,
+        );
+      } finally {
+        if (previousPublicUrl === undefined) delete process.env.PUBLIC_URL;
+        else process.env.PUBLIC_URL = previousPublicUrl;
+      }
+
+      expect(mockPrisma.user.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            termsAcceptedAt: 1_700_000_000_000n,
+            termsDocumentVersion: LEGAL_SET_VERSION,
+          }),
+        }),
+      );
     });
 
     it('should return the neutral response without changing an existing verified user', async () => {

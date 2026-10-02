@@ -35,6 +35,7 @@ import {
   type AutoSyncScheduler,
   type TimerHandle,
 } from './auto-sync-core';
+import { privacyConsent, subscribePrivacyConsent } from '../privacy/consent-gate';
 import { readSyncConfig } from './config';
 import { startRealtime, stopRealtime } from './realtime';
 import { syncNow } from './store';
@@ -58,6 +59,8 @@ function isForeground(state: AppStateStatus | null | undefined): boolean {
 let scheduler: AutoSyncScheduler | undefined;
 let subscription: { remove(): void } | undefined;
 let unsubscribeWrites: (() => void) | undefined;
+/** 同意状态变化的订阅（`startAutoSync` 里挂、`stopAutoSync` 里摘）。 */
+let unsubscribeConsent: (() => void) | undefined;
 
 /**
  * 现在允许同步吗。
@@ -70,8 +73,18 @@ let unsubscribeWrites: (() => void) | undefined;
  * 而不是"配置对象存在"：用户在表单里是**一个字段一个字段**填的，
  * 只填了地址的那一刻 `readSyncConfig()` 就已经不是 `undefined` 了。
  * 拿它当"已配置"，回到前台就会报一次 `not-signed-in`。
+ *
+ * 🔴 **同意排在最前面**（计划里的 **G-12**）：这一条是"这台设备能不能对外说话"，
+ * 另两条是"这台设备有没有可说话的对象"。顺序反了就会出现
+ * 「已经登录、也填好了，于是在用户还没点过同意的那一刻悄悄同步了一次」 ——
+ * 那是整份合规基线里最贵的一种失败，因为它**不报错、界面也看不出来**。
+ *
+ * ⚠️ 这里排在 `foreground` 之前是有意的：`ready()` 是**纯判据**，
+ * 后台切回前台时它会读磁盘偏好（同步、廉价），不值得为省一次读
+ * 把闸门挪到后面去。
  */
 function ready(): boolean {
+  if (!privacyConsent.networkAllowed()) return false;
   if (!foreground) return false;
   const config = readSyncConfig();
   if (config === undefined) return false;
@@ -150,6 +163,25 @@ export function startAutoSync(): () => void {
     if (cameBack) scheduler?.notifyForeground();
   });
 
+  /**
+   * 🔴 同意状态一变，同步机器**当场**跟着重建（G-12 的另一半）。
+   *
+   * 少了这一条会出两种静默失效，方向正好相反：
+   *   · 用户在首启面板点「同意」→ `startAutoSync` 早就跑完了，
+   *     不补一次的话他要**等到下一次切前台**才同步得上，
+   *     而实时通道更是**永远不会**连上（它只在 `notifyConfigured` 里起）。
+   *   · 用户在设置页**撤回** → 不关掉的话那条 WebSocket 会带着旧令牌继续推，
+   *     而界面上写的是「已撤回」。
+   *
+   * ⚠️ 放行时调的是**已有的** `notifyConfigured()`，不是新写一段：
+   * "凭据刚出现"和"闸门刚打开"是同一件事 —— 那一刻调度器与实时通道都该醒一次。
+   * 抄第二遍就是 AGENTS.md §3.5 记过的那个形状。
+   */
+  unsubscribeConsent = subscribePrivacyConsent(() => {
+    if (privacyConsent.networkAllowed()) notifyConfigured();
+    else stopRealtime();
+  });
+
   return function stopAutoSync(): void {
     // 🔴 实时通道与自动同步**同一个生命周期**：只停调度器而留着那条连接，
     // 会让"应用已经不再自动同步了，却还在后台维持一条 WebSocket"。
@@ -158,6 +190,8 @@ export function startAutoSync(): () => void {
     subscription = undefined;
     unsubscribeWrites?.();
     unsubscribeWrites = undefined;
+    unsubscribeConsent?.();
+    unsubscribeConsent = undefined;
     scheduler?.dispose();
     scheduler = undefined;
     foreground = isForeground(AppState.currentState);

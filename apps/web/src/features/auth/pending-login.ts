@@ -196,6 +196,17 @@ export interface PendingLogin {
 }
 
 /**
+ * **收下但还没采用**的登录。两条通道里至多命中一条（顺序见 {@link holdPendingLogin}）。
+ *
+ * 用两个可选字段而不是一个联合类型，是因为两条通道的**后续动作根本不同**：
+ * 会话那条直接落地，链接令牌那条还得去服务端换一次（要发请求）。
+ */
+export interface HeldPendingLogin {
+  readonly session?: PendingSession;
+  readonly linkToken?: PendingLogin;
+}
+
+/**
  * 存储的最小接口。
  *
  * 🔴 **注入而不是直接用 `sessionStorage`**，理由有两条：
@@ -237,6 +248,9 @@ export interface PendingSession {
  * 读出并立即清除**壳交付的会话**（ADR-0039 §2.3）。
  *
  * 与 `takePendingLogin` 同一套纪律：**先删再判**，无论后面成不成功都不留在存储里。
+ *
+ * 🔴 它与链接令牌是**两种东西**：会话已经签发，直接采用即可；
+ * 拿它去 `verify()` 会被服务端按链接令牌那一列查 ⇒ 401（实测）。
  */
 export function takePendingSession(
   storage: PendingLoginStorage | null = defaultStorage(),
@@ -310,6 +324,72 @@ export function takePendingLogin(
 }
 
 /**
+ * 读出**待消费的登录**，但**不采用**（隐私闸门关闭时用）。
+ *
+ * 🔴 为什么必须把"收"和"用"分开：
+ *   · "收"里含**立刻抹掉 fragment / 删掉存储键** —— 那一步与安全有关，
+ *     跟同意无关，**不许推迟**（一枚活令牌赖在地址栏和这条标签页的历史里，
+ *     正是本文件头花两轮才修好的那个泄漏面）。
+ *   · "用"里含**发消息给服务端**（`verify()`）与**建立实时通道**（`adoptSession`
+ *     之后会触发 `applyAuthToken` → `restartRealtime`）—— 那一步在同意之前不许发生。
+ * 合成一个函数就只能选一边：要么推迟抹除（泄漏），要么抹了不用（登录静默丢失）。
+ *
+ * @returns 收到了一份待消费登录；什么都没有时 `null`。
+ */
+export function holdPendingLogin(
+  storage: PendingLoginStorage | null = defaultStorage(),
+  fragment: PendingLoginFragment | null = defaultFragment(),
+): HeldPendingLogin | null {
+  const fromFragment = takePendingSessionFromFragment(fragment);
+  if (fromFragment !== null) return { session: fromFragment };
+
+  const session = takePendingSession(storage);
+  if (session !== null) return { session };
+
+  const pending = takePendingLogin(storage);
+  if (pending === null) return null;
+  return { linkToken: pending };
+}
+
+/**
+ * 采用之前**收下**的那份登录。与 `consumePendingLogin` 走**同一条**落地路径
+ * （见 {@link adopt}），所以"同意之后补上"与"启动时立刻"不会有第二种行为。
+ */
+export function releasePendingLogin(held: HeldPendingLogin): Promise<boolean> {
+  return adopt(held);
+}
+
+/**
+ * "登录成功后该做什么"只有这一处实现。
+ *
+ * ⚠️ 顺序纪律（与历史版本一致）：fragment / 会话那两条**不再去服务端换**一次
+ * （已签发的 JWT 拿去 `verify()` 必然 401，实测）；只有链接令牌那条才要换。
+ */
+async function adopt(held: HeldPendingLogin): Promise<boolean> {
+  if (held.session !== undefined) {
+    useAuthStore.getState().adoptSession(held.session.baseUrl, {
+      token: held.session.token,
+      // 壳与确认页都只交回会话令牌与邮箱（邮箱是它从回调 URL 里带回来的）。
+      user: { id: 0, email: held.session.email },
+    });
+    return true;
+  }
+
+  if (held.linkToken === undefined) return false;
+
+  try {
+    const session = await useAuthStore
+      .getState()
+      .verify(held.linkToken.baseUrl, held.linkToken.token);
+    return session !== undefined;
+  } catch {
+    // 网络不可达、服务端 5xx、响应畸形 —— 全部按"这次没登上"处理。
+    // **不抛、不渲染错误屏**：本地优先下，未登录是正常状态，不是故障。
+    return false;
+  }
+}
+
+/**
  * 消费待登录：走**既有的** `useAuthStore.verify()`（不新写一条登录路径）。
  *
  * 🔴 复用而不新写，理由是可维护性：`verify()` 内部已经处理了
@@ -333,44 +413,11 @@ export async function consumePendingLogin(
    *
    * 两条会话通道（fragment / 存储）是**投递方式不同、东西相同**：
    * fragment 跨 agent cluster（见文件头），存储那条只对桌面壳成立。
-   * 它们后面是**同一条**落地路径 `adoptSession()` —— 不是两份"登录成功后做什么"。
+   * 它们后面是**同一条**落地路径 `adopt()` —— 不是两份"登录成功后做什么"。
    *
    * 链接令牌排最后：它还得再去服务端**换**一次，是三条里唯一有网络往返的。
    */
-  const fromFragment = takePendingSessionFromFragment(fragment);
-  if (fromFragment !== null) {
-    useAuthStore.getState().adoptSession(fromFragment.baseUrl, {
-      token: fromFragment.token,
-      user: { id: 0, email: fromFragment.email },
-    });
-    return true;
-  }
-
-  /**
-   * 🔴 **再看"壳交付的会话"那条**（ADR-0039 §2.3）。
-   *
-   * 它与链接令牌是两种东西：会话**已经签发**，直接采用即可；
-   * 拿它去 `verify()` 会被服务端按链接令牌那一列查 ⇒ 401（实测）。
-   */
-  const session = takePendingSession(storage);
-  if (session !== null) {
-    useAuthStore.getState().adoptSession(session.baseUrl, {
-      token: session.token,
-      // 壳只知道会话令牌与邮箱（邮箱是它从回调 URL 里带回来的）。
-      user: { id: 0, email: session.email },
-    });
-    return true;
-  }
-
-  const pending = takePendingLogin(storage);
-  if (pending === null) return false;
-
-  try {
-    const session = await useAuthStore.getState().verify(pending.baseUrl, pending.token);
-    return session !== undefined;
-  } catch {
-    // 网络不可达、服务端 5xx、响应畸形 —— 全部按"这次没登上"处理。
-    // **不抛、不渲染错误屏**：本地优先下，未登录是正常状态，不是故障。
-    return false;
-  }
+  const held = holdPendingLogin(storage, fragment);
+  if (held === null) return false;
+  return adopt(held);
 }

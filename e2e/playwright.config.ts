@@ -20,6 +20,12 @@ import { defineConfig, devices } from '@playwright/test';
  */
 export default defineConfig({
   testDir: './tests',
+  // 🔴 这一支**不能**在主配置里跑：它测的是"同意之前不注册 Service Worker"，
+  // 而 `register.ts` 在 `!import.meta.env.PROD` 时直接 return ——
+  // 在 `vite dev`（本配置起的 4318）下那条正向对照永远拿不到非零，
+  // 于是整套"零出站"会变成**恒真的判据**（§7 元规则 2）。
+  // 它需要生产构建，跑法：`npx playwright test -c playwright.privacy-consent.config.ts`。
+  testIgnore: /privacy-consent-zero-egress\.spec\.ts/,
   fullyParallel: false,
 
   // 🔴 不许 `.only` 混进主分支：它会让整个套件悄悄退化成"只跑一条"。

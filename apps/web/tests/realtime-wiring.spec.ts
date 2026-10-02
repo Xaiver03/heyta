@@ -17,6 +17,19 @@
  *   2. 🔴 地址/令牌变了要**重建**（缓存旧值的症状是"令牌换过之后实时一直连不上"）；
  *   3. 🔴 登出要**断开**（否则那个连接会带着失效令牌在后台一直重连）；
  *   4. 未配置/未登录时**不连**（本地优先下"未登录"是合法状态，不是故障）。
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * 🔴 为什么每条用例都要先播种一次「同意」（G-12 把前提改了）
+ *
+ * WS **不经** `window.fetch`，带闸的那层罩不到它 —— `restartRealtime()` 里那一条
+ * `privacyConsent.networkAllowed()` 是它唯一的闸（全仓只有这一个构造点）。
+ * 于是本文件的既有四条断言"登录后真的建了连接"**隐含了一个新前提**：
+ * 这台设备已经同意过联网。不播种的话它们测的是"没同意所以没连"，
+ * 而那正好把这条接线真正要钉的东西（URL 带 token、变了要重建）测丢了。
+ *
+ * ⚠️ 播种走 `privacyConsentActions.accept()` —— 就是用户点那个按钮走的**同一份**生产代码，
+ * 不是往 localStorage 里手写一个自造字符串（那会让测试和真实决定格式各跑各的）。
+ * 闸门被拦下的那一半由文件末尾那两条用例正面覆盖，不要因为这里播种了就删它们。
  */
 
 import { IDBFactory, IDBKeyRange } from 'fake-indexeddb';
@@ -24,6 +37,11 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { __resetOpLogForTests, initOpLog } from '../src/lib/oplog.js';
 import { useSyncStore } from '../src/features/sync/store.js';
+// ⚠️ **不**调 `__resetConsentInstallForTests()` —— 它清的是整个订阅者集合，
+// 而同步 store 在**模块求值期**就订阅了一次（`subscribePrivacyConsent`）。
+// 清了它，撤回同意时没人重建连接，本文件最后那条"撤下要当场断开"就会红，
+// 而红的理由是**测试自己把接线拆了** —— 那种红会把人往生产代码里引。
+import { privacyConsent, privacyConsentActions } from '../src/features/privacy/consent-gate.js';
 
 /** 与 `packages/sync-client/tests/realtime.spec.ts` 同形的最小假实现。 */
 class FakeWebSocket {
@@ -76,10 +94,18 @@ beforeEach(async () => {
   await initOpLog(dbName);
   // 每条用例从"干净、未配置"开始。
   useSyncStore.setState({ baseUrl: '', token: undefined, status: { kind: 'idle' } });
+  // 🔴 先替用户把「同意并联网」点掉（见文件头）：不这么做，下面四条断言测的是闸门，
+  // 不是接线。放在 setState 之后是故意的 —— 播种会通知订阅者重建连接，
+  // 而此刻凭据必须是空的，这样那一次通知不会留下连接。
+  expect(privacyConsentActions.accept().persisted, '测试环境里 localStorage 不可用').toBe(true);
+  expect(privacyConsent.networkAllowed()).toBe(true);
 });
 
 afterEach(() => {
   useSyncStore.getState().clearCredentials();
+  // 把决定清回"没问过"：闸门是**进程级单例**，不清的话下一条用例继承上一条的同意，
+  // 那两条"被拦下"的用例就会因为顺序而时红时绿。
+  privacyConsent.revoke();
   FakeWebSocket.reset();
 });
 
@@ -149,5 +175,49 @@ describe('实时通道在 web 宿主里的接线', () => {
     // 但**活着的只应该有一条**。这里断言"旧的那条确实被关了"。
     const alive = FakeWebSocket.instances.filter((s) => s.closeCalls.length === 0);
     expect(alive, '同时有不止一条活着的连接').toHaveLength(1);
+  });
+
+  /* ---------------------------------------------------------------------
+   * 🔴 G-12：WS 是**唯一一个不经带闸 fetch 的出口**，所以它必须有自己的一道。
+   * 上面每条都播种了同意，那只证明"放行之后接得上"；下面三条正面钉闸本身。
+   * ------------------------------------------------------------------ */
+
+  it('🔴 没同意时**一个 WS 都不构造**，凭据齐全也一样（G-12）', async () => {
+    privacyConsent.revoke();
+    expect(privacyConsent.networkAllowed()).toBe(false);
+
+    useSyncStore.getState().applyAuthToken('http://127.0.0.1:3000', 'tok-abc');
+    await flush();
+
+    // 判据是**构造次数 = 0**，不是"连接没成功"。
+    // 后者挡不住"先连上再断开"那种实现 —— 对端已经收到过一次带令牌的握手了。
+    expect(FakeWebSocket.instances, '没同意就构造了 WebSocket（令牌已经出境）').toHaveLength(0);
+  });
+
+  it('🔴 撤回同意要**当场断开**那条连接（界面说"已撤回"而连接还挂着是更坏的状态）', async () => {
+    useSyncStore.getState().applyAuthToken('http://127.0.0.1:3000', 'tok-abc');
+    await flush();
+    expect(FakeWebSocket.instances).toHaveLength(1);
+    const socket = FakeWebSocket.instances[0]!;
+
+    privacyConsentActions.revoke();
+    await flush();
+
+    expect(socket.closeCalls.length, '撤回同意没有关闭实时连接').toBeGreaterThan(0);
+    // 而且不是"关了又连"—— 闸门关闭后不许再构造第二条。
+    expect(FakeWebSocket.instances, '撤回之后又重连了一条').toHaveLength(1);
+  });
+
+  it('🔴 在面板上点「同意」要**当场**建连，不需要刷新（否则"这次好了下次又坏了"）', async () => {
+    privacyConsent.revoke();
+    useSyncStore.getState().applyAuthToken('http://127.0.0.1:3000', 'tok-abc');
+    await flush();
+    expect(FakeWebSocket.instances).toHaveLength(0);
+
+    privacyConsentActions.accept();
+    await flush();
+
+    expect(FakeWebSocket.instances, '点了同意没连上，用户要刷新一次才有实时同步').toHaveLength(1);
+    expect(FakeWebSocket.instances[0]!.url).toContain('token=tok-abc');
   });
 });

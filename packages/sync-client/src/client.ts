@@ -291,8 +291,24 @@ export type SyncStatus =
  * `Sync error: 未设置端到端加密口令，已停止同步（不会以明文上传）` —— 中英混排。
  * 门禁永远扫不到：壳渲染的是**变量**，不是字面量。
  *
- * ⚠️ 加一个新原因，两个壳都要跟着改 —— 而且是**编译器盯着你改**：
- * 两边都用 `switch (status.reason)` 穷尽，漏一个就编译不过。
+ * ⚠️ 加一个新原因，**界面上的句子必须跟着加**，否则它显示成空白或退化成通用那句。
+ *
+ * 🔴 这里原本写着"两边都用 `switch (status.reason)` 穷尽，漏一个就编译不过" ——
+ * **那句是错的**（2026-10-01 逐条核过）：壳里没有任何 `switch (status.reason)`，
+ * 词条映射是一张查表 `SYNC_FAILURE_MESSAGE_KEY`（`packages/ui/src/sync/model.ts`），
+ * 而它的类型是 `Record<string, SyncFailureMessageKey>` —— **用字符串索引，
+ * 漏一个成员编译器不会说话**（`packages/ui` 刻意不 import 本包，所以它看不见这个联合）。
+ *
+ * ⚠️ 说"完全没有强制力"也不准确，得说清**哪一侧有**：
+ *   · `apps/mobile/src/sync/status-text.ts` 有一份
+ *     `KNOWN_FAILURE_REASON_COVERAGE ... satisfies Record<Exclude<SyncFailureReason,'unexpected'>, true>`
+ *     —— 新增成员**会**让移动端编译报错，但它只保证"被意识到一次"，**不登记句子**。
+ *     加 `'consent-required'` 时它就是靠这条被抓出来的（漏登记 ⇒ tsc 红）。
+ *   · `apps/web` 此前**什么都没有**。
+ *
+ * ✅ 现在 web 侧补上了显式断言：`apps/web/tests/sync-reason-coverage.spec.ts`
+ * 用一张 `Record<SyncFailureReason, SyncFailureMessageKey | undefined>` 的**对象字面量**
+ * 要求每个成员都表态（给 key 或明确写 `undefined`），并逐条查两份词条表里真有那句中英。
  */
 export type SyncFailureReason =
   /** 还没配同步服务。由宿主/壳判断，不是这个包。 */
@@ -365,6 +381,22 @@ export type SyncFailureReason =
    * （D5），这条原因存在的意义就是让界面有得可选。
    */
   | 'unauthorized'
+  /**
+   * 🔴 **用户还没有同意隐私规则，所以一个请求都不许发**（计划 G-12）。
+   *
+   * 由宿主判断，不是这个包 —— 与 `'not-configured'` 同一类。
+   *
+   * 为什么必须单独一种原因，而不是复用 `'not-configured'` 或 `'offline'`：
+   * 那两种都让用户去做**错的那件事**。
+   *   · `'not-configured'` 的句子是"去填服务端地址"，可他配得好好的，
+   *     缺的是同意 —— 按那句改一遍地址，回来还是不同步。
+   *   · `'offline'` 的句子暗示网络坏了，而这里**一个字节都没发出去**，
+   *     那是"界面在说谎"（本仓库记过多次的那一类）。
+   *
+   * ⚠️ `retryable: false`：重试不会让同意出现。界面对这条唯一正确的反应是
+   * **把隐私面板再打开一次**，不是"再试一次"。
+   */
+  | 'consent-required'
   /** 意外异常：只有 `message` 有意义，它里面是技术细节。 */
   | 'unexpected';
 

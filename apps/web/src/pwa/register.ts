@@ -51,12 +51,20 @@ export function registerWidgetServiceWorker(): void {
   // 混进 SW 只会让切片验证的失败原因变模糊。
   if (new URLSearchParams(window.location.search).has('slice')) return;
 
-  window.addEventListener('load', () => {
-    navigator.serviceWorker.register(serviceWorkerUrl()).catch((error: unknown) => {
-      // 注册失败**不能影响应用可用性** —— 小组件是增强，不是功能前提。
-      // 但要留痕：Windows 上组件不出现的第一个排查点就是这里。
-      console.warn('[heyta] service worker 注册失败，小组件将不可用', error);
-    });
+  // 🔴 **不能只挂在 `load` 上**：这个调用现在由隐私同意闸门驱动（链 5 / G-12），
+  // 而闸门是在 `await initOpLog()` **之后**才补跑的 —— 那一刻 `load` 早就放完了，
+  // 监听器永远不会触发，症状是**生产构建里 SW 从来不注册**（真浏览器实测：
+  // `getRegistration()` 恒为 `null`，而**没有任何报错**）。
+  // 保留等 `load` 的本意（不和小组件首屏抢带宽）不变，只补上"已经 load 完"这一支。
+  if (document.readyState === 'complete') register();
+  else window.addEventListener('load', register, { once: true });
+}
+
+function register(): void {
+  navigator.serviceWorker.register(serviceWorkerUrl()).catch((error: unknown) => {
+    // 注册失败**不能影响应用可用性** —— 小组件是增强，不是功能前提。
+    // 但要留痕：Windows 上组件不出现的第一个排查点就是这里。
+    console.warn('[heyta] service worker 注册失败，小组件将不可用', error);
   });
 }
 

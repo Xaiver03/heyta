@@ -1,0 +1,112 @@
+import { ICON_SIZE } from '@heyta/design-system';
+/**
+ * 设置页的「隐私同意」面板 —— **撤回同意的那个入口**
+ * ====================================================
+ *
+ * ## 它补的是哪一条
+ *
+ * PIPL 第 15 条：个人有权撤回同意，且"**应当提供便捷的撤回同意的方式**"。
+ * 同意面板（`features/privacy/PrivacyConsentSheet.tsx`）解决的是"要问"，
+ * 本面板解决的是"要能改回来"。只做前半件事等于把用户的一次点击变成永久决定 ——
+ * 那种同意在法务上站不住（撤回比同意难做 = 默认项被锁死了）。
+ *
+ * ## 🔴 为什么这里**不复制**一套同意状态
+ *
+ * 状态只有一份，在 `privacyConsent` 那道闸里（`consent-gate.ts`）。
+ * 本面板读它、订阅它，**不往 store 里再存一份"同意了吗"**：
+ * 存了就出现第二个事实源，而两处不一致时的症状恰好是
+ * "界面上说已撤回、请求照发"（那是比不撤回更坏的状态）。
+ *
+ * ## 撤回之后为什么还留一个「重新作出选择」
+ *
+ * `revoke()` 把状态清回"没问过"，界面上那条**闸门关闭的说明**不能变成死胡同：
+ * 用户改主意的动作也得有一个入口，否则第 15 条只满足了前半句。
+ */
+
+import { useEffect, useState } from 'react';
+import { ShieldCheck, ShieldX } from 'lucide-react';
+
+import { useI18n } from '@heyta/i18n';
+import { formatPrivacyDecisionTime, type PrivacyConsentRecord } from '@heyta/app-host';
+
+import { privacyConsent, privacyConsentActions, subscribePrivacyConsent } from '../privacy/consent-gate.js';
+import { usePrivacyStore } from '../privacy/store.js';
+
+export function PrivacyPanel(): React.JSX.Element {
+  const { t } = useI18n();
+
+  /**
+   * 订阅那道闸，而不是挂载时读一次。
+   *
+   * 🔴 为什么必须订阅：点「撤回」之后本面板要**当场**改口。
+   * 只读一次的话，症状是"按钮按下去了、字没变"，而闸门其实已经关了 ——
+   * 界面与事实不一致，正是这一类缺陷最难查的形状。
+   */
+  const [record, setRecord] = useState<PrivacyConsentRecord | null>(() => privacyConsent.current());
+  const [revokeNotPersisted, setRevokeNotPersisted] = useState(false);
+
+  useEffect(() => subscribePrivacyConsent(() => setRecord(privacyConsent.current())), []);
+
+  const stateKey =
+    record === null
+      ? 'common.privacy.settings.undecided'
+      : record.decision === 'accepted'
+        ? 'common.privacy.settings.accepted'
+        : 'common.privacy.settings.localOnly';
+
+  return (
+    <div className="ht-settings" data-testid="privacy-panel">
+      <h2 className="ht-settings__title ht-type-section-title">{t('common.privacy.settings.title')}</h2>
+
+      <p className="ht-settings__hint" data-testid="privacy-state">
+        {record === null ? (
+          <ShieldX size={ICON_SIZE.xs} aria-hidden="true" />
+        ) : (
+          <ShieldCheck size={ICON_SIZE.xs} aria-hidden="true" />
+        )}{' '}
+        {t(stateKey)}
+        {record === null ? null : `（${t('common.privacy.settings.decidedAt', {
+          time: formatPrivacyDecisionTime(record.decidedAt),
+        })}）`}
+      </p>
+
+      <p className="ht-settings__hint">{t('common.privacy.settings.revokeHint')}</p>
+
+      <div className="ht-settings__actions">
+        {record === null ? (
+          // 没决定过（首次装、或刚撤回）：把同意面板再打开一次。
+          // ⚠️ 这里开的是**同一张**面板，不是第二份"同意界面"（AGENTS §3.5）。
+          <button
+            type="button"
+            className="ht-btn ht-btn--primary"
+            data-testid="privacy-choose-again"
+            onClick={() => usePrivacyStore.getState().openSheet('revoked')}
+          >
+            {t('common.privacy.settings.chooseAgain')}
+          </button>
+        ) : (
+          <button
+            type="button"
+            className="ht-btn ht-btn--ghost"
+            data-testid="privacy-revoke"
+            onClick={() => {
+              const { persisted } = privacyConsentActions.revoke();
+              setRevokeNotPersisted(!persisted);
+            }}
+          >
+            {t('common.privacy.settings.revoke')}
+          </button>
+        )}
+      </div>
+
+      {/* 撤回没能落盘时**必须说出口**（与同意面板那条同一纪律）：
+          本次会话里闸门确实关了，但下次冷启动磁盘上还是旧决定 ——
+          不说这一句，用户以为撤回是永久的。 */}
+      {revokeNotPersisted ? (
+        <p className="ht-settings__hint" role="status" data-testid="privacy-revoke-not-persisted">
+          {t('common.privacy.consent.notPersisted')}
+        </p>
+      ) : null}
+    </div>
+  );
+}

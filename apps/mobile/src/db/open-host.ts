@@ -16,6 +16,7 @@
 
 import { openAppHost, type AppHost } from '@heyta/app-host';
 import { readSyncConfig } from '../sync/config';
+import { consentFetch } from '../privacy/consent-gate';
 import { emitLocalWrite } from '../sync/write-signal';
 import { hostPublishSource } from '../widgets/publish-source';
 import { publishWidgetSnapshot } from '../widgets/publish';
@@ -94,6 +95,22 @@ export function openTaskHost(): Promise<AppHost> {
        * 立刻生效，不需要重启应用。
        */
       getSyncConfig: readSyncConfig,
+      /**
+       * 🔴 **显式注入闸门，而不是靠"全局那个 `fetch` 已经被换掉了"。**
+       *
+       * `SyncClient` 是在**构造函数里**取走的（`client.ts:670`
+       * `this.fetchImpl = options.fetchImpl ?? globalThis.fetch.bind(globalThis)`），
+       * 不是每次调用时现取。所以全局替换只覆盖**替换之后**建起来的客户端 ——
+       * 移动端确实满足这个顺序（`startPrivacyGate()` 在 `App.tsx` 模块顶层，
+       * 而 `openTaskHost()` 最早也要等到第一帧之后的 effect），
+       * 但"合规前提成立"这件事**不该依赖一个模块求值顺序**：
+       * 把 `startPrivacyGate()` 挪进 effect、或者哪天在 import 期就开宿主，
+       * 症状是"同意之前发了一次请求"，而**没有任何一层会报错**。
+       *
+       * 全局那道（`installConsentGatedFetch()`）继续留着，它管的是另一半：
+       * **以后新加的调用点忘了传 `fetchImpl`**。两半各拦一类失效，都要在。
+       */
+      fetchImpl: consentFetch,
     }).then(withWriteSignal);
   }
   return pending;

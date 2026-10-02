@@ -60,6 +60,9 @@ const AUTH_MESSAGE_KEYS = [
   'web.auth.sendLoginLink',
   'web.auth.register',
   'web.auth.terms.label',
+  // 两条链接的文字本身也是文案，也得两种语言都真翻了。
+  'common.legal.termsDoc',
+  'common.legal.privacyDoc',
   'web.auth.paste.label',
   'web.auth.paste.placeholder',
   'web.auth.verify',
@@ -127,13 +130,13 @@ function stubFetch(
     return Promise.resolve({
       status,
       ok: status >= 200 && status < 300,
-      json: () => Promise.resolve(body),
-    } as unknown as Response);
-  });
       // 🔴 `headers` 不是可选的装饰：`Retry-After` 就在头上，app-host 只从头上读。
       // 不给这个字段，"被锁了多久"那句话在任何测试里都永远取不到秒数 ——
       // 于是"界面印出字面量 `{seconds}`"这种回归可以一路全绿。
       headers: new Headers(headers),
+      json: () => Promise.resolve(body),
+    } as unknown as Response);
+  });
   vi.stubGlobal('fetch', fetchMock);
 }
 
@@ -142,8 +145,10 @@ async function renderPanel(locale: Locale = 'zh-CN'): Promise<HTMLDivElement> {
 }
 
 /**
- * 同上，但**服务端地址由参数给** —— 面板把服务端地址当 prop 读，
- * 所以"已配置"与"未配置"两种形状都得能渲染同一个面板。
+ * 同上，但**服务端地址由参数给**。
+ *
+ * 条款链接的分流判的就是这个地址，所以必须能在三种形状下渲染同一个面板：
+ * 官方域、别的 host、还没填。
  */
 async function renderPanelAtBaseUrl(
   baseUrl: string,
@@ -161,6 +166,11 @@ async function renderPanelAtBaseUrl(
     await Promise.resolve();
   });
   return container;
+}
+
+/** 面板里的条款链接，按文档顺序返回 `[《服务条款》, 《隐私政策》]`。 */
+function legalAnchors(el: HTMLElement): HTMLAnchorElement[] {
+  return [...el.querySelectorAll('a[href]')] as HTMLAnchorElement[];
 }
 
 function button(el: HTMLElement, key: MessageKey): HTMLButtonElement {
@@ -496,16 +506,6 @@ describe('🔴 失败绝不能被当成成功', () => {
     expect(text).toContain(translate('zh-CN', 'common.auth.error.invalidCredentials'));
     expect(text).not.toContain('不存在');
   });
-});
-
-describe('邀请码：URL 带码要预填，形状不对不许发出去', () => {
-  /** 上一条用例改过地址栏，这一条要一个干净的 URL。 */
-  function setSearch(search: string): void {
-    window.history.replaceState({}, '', `${search}`);
-  }
-
-  it('🔴 `?invite=` 带来的码预填进邀请栏，并随注册请求一起发出去', async () => {
-    setSearch('/?invite=abcd-2345');
 
   /**
    * 🔴 屏幕上必须出现**那个数**，而不是 `{seconds}` 这个字面量。
@@ -556,6 +556,16 @@ describe('邀请码：URL 带码要预填，形状不对不许发出去', () => 
     expect(text).not.toContain('{seconds}');
     expect(text).toContain('90');
   });
+});
+
+describe('邀请码：URL 带码要预填，形状不对不许发出去', () => {
+  /** 上一条用例改过地址栏，这一条要一个干净的 URL。 */
+  function setSearch(search: string): void {
+    window.history.replaceState({}, '', `${search}`);
+  }
+
+  it('🔴 `?invite=` 带来的码预填进邀请栏，并随注册请求一起发出去', async () => {
+    setSearch('/?invite=abcd-2345');
     stubFetch(201, { message: 'ok' });
     const el = await renderPanel('zh-CN');
 
@@ -636,6 +646,104 @@ describe('显隐默认档由**壳**覆盖（共享层只能按 Platform 判）',
 
     expect((byTestId(el, 'auth-form-password') as HTMLInputElement).type).toBe('text');
     matches.mockRestore();
+  });
+});
+
+/**
+ * 链 2：勾选框旁边那两条链接**点得开，且指向正确的那一份文本**。
+ *
+ * 钉的是三种坏法，每一种都对应一次真实的合规失败：
+ *
+ *   1. **没有链接** —— 要求用户同意一份读不到的政策（PIPL 第 17 条的"公开"没做到）。
+ *      这一条在整个块被删掉时红。
+ *   2. **指向错的那一份** —— 连别人的服务端却打开 heyta 的政策，
+ *      等于替那位运营者作承诺；反过来在官方域上打开 `<baseUrl>/privacy.html`
+ *      得到的是 404（生产没配 `PRIVACY_*`）。
+ *   3. **链接嵌进了同意项那一行** —— 点同意区会切换同意，
+ *      于是"我想先读条款"这个动作**本身就构成了同意**。这个形状在 DOM 上
+ *      只差一层嵌套，肉眼看不出来，只能这样钉。
+ *
+ * ⚠️ 2026-10-02：这两条链接现在由**共享表单**渲染（`labels.legal.hrefs` 给出地址 ⇒
+ * web 上落真的 `<a href target=_blank rel=noopener>`）。三条坏法一条没放松，
+ * 只是每一轮都要先走到**注册档**（同意项在那一档，链接跟着它）。
+ */
+describe('条款链接：按连的那台服务端分流', () => {
+  const OFFICIAL = 'https://heyta.waytofuture.cn';
+
+  it('连别的 host 时，两条链接落在那台服务端自己发布的 `/terms.html` 与 `/privacy.html`', async () => {
+    const el = await renderPanelAtBaseUrl(BASE_URL);
+    await toRegister(el);
+    const anchors = legalAnchors(el);
+
+    expect(anchors.map((a) => a.getAttribute('href'))).toEqual([
+      `${BASE_URL}/terms.html`,
+      `${BASE_URL}/privacy.html`,
+    ]);
+    // 新标签打开（离开面板会丢掉已填的邮箱），而 `noopener` 不是装饰：
+    // 目标页拿到 `window.opener` 就能回头改我们这一页。
+    expect(anchors.every((a) => a.getAttribute('target') === '_blank')).toBe(true);
+    expect(anchors.every((a) => a.rel.includes('noopener'))).toBe(true);
+  });
+
+  it('连官方域时落在落地页 `/legal/*`，**不是** `<baseUrl>/privacy.html`（那条是 404）', async () => {
+    const el = await renderPanelAtBaseUrl(OFFICIAL);
+    await toRegister(el);
+    expect(legalAnchors(el).map((a) => a.getAttribute('href'))).toEqual([
+      `${OFFICIAL}/legal/terms/`,
+      `${OFFICIAL}/legal/privacy/`,
+    ]);
+  });
+
+  it('英文界面落到 `/en/legal/*`', async () => {
+    const el = await renderPanelAtBaseUrl(OFFICIAL, 'en');
+    await toRegister(el);
+    expect(legalAnchors(el)[0]!.getAttribute('href')).toBe(`${OFFICIAL}/en/legal/terms/`);
+  });
+
+  /**
+   * 🔴 这一条在 2026-10-01 被**换掉**了，换它的不是别人是那道墙被拆掉这件事本身。
+   *
+   * 原文是「地址还没填时**不渲染链接**」—— 它当时的世界里"没填地址"是一个**停留状态**
+   * （面板上挂着一个空的必填框，所以确实没有任何一台服务端可以解析条款）。
+   * 现在那个状态不存在了：未配置时地址解析成**本机来源**（`lib/auth-endpoint.ts`），
+   * 于是"没有链接"变成了"明明有目标却不给"，正好是这条链第 1 种坏法要拦的东西。
+   *
+   * 所以判据换形而**意图更严**：未配置时链接必须落在**当前来源**上，
+   * 而且在官方托管的部署里那个来源就是官方域 ⇒ 落 `/legal/*`（下一条钉住它）。
+   * 勾选框照常存在那一半**原样保留**。
+   */
+  it('未配置时链接落在**当前来源**（不再有"没有地址"这个停留状态）', async () => {
+    const el = await renderPanelAtBaseUrl('');
+    await toRegister(el);
+    expect(legalAnchors(el).map((a) => a.getAttribute('href'))).toEqual([
+      `${window.location.origin}/terms.html`,
+      `${window.location.origin}/privacy.html`,
+    ]);
+    expect(el.querySelector('[role="checkbox"]')).not.toBeNull();
+  });
+
+  it('在面板里现敲一个官方地址，链接跟着换过去（分流读的是 `effectiveBaseUrl`）', async () => {
+    const el = await renderPanelAtBaseUrl('');
+    await typeInto(el, 'input[inputmode="url"]', `${OFFICIAL}/`);
+    await toRegister(el);
+
+    expect(legalAnchors(el)[0]!.getAttribute('href')).toBe(`${OFFICIAL}/legal/terms/`);
+  });
+
+  it('🔴 链接不在同意项里面 —— 点链接不能切换同意', async () => {
+    const el = await renderPanelAtBaseUrl(BASE_URL);
+    await toRegister(el);
+
+    const terms = byTestId(el, 'auth-form-terms');
+    for (const anchor of legalAnchors(el)) {
+      expect(terms.contains(anchor), '条款链接嵌进了同意项里').toBe(false);
+      await act(async () => {
+        // 用 `dispatchEvent` 而不是 `.click()`：后者会让 jsdom 去实现 `_blank` 导航，
+        // 除了噪声没有任何判据价值，而这里要验的只是"事件冒泡上去会不会把勾选切了"。
+        anchor.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+      });
+    }
+    expect(termsChecked(el)).toBe('false');
   });
 });
 

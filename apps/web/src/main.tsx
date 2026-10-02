@@ -17,7 +17,13 @@ import { createRoot } from 'react-dom/client';
 import { StorageError } from '@heyta/storage';
 
 import { App } from './App.js';
-import { consumePendingLogin } from './features/auth/pending-login.js';
+import { holdPendingLogin, releasePendingLogin } from './features/auth/pending-login.js';
+import { createStartupNetwork } from './features/privacy/startup-network.js';
+import {
+  installConsentGatedFetch,
+  privacyConsent,
+  subscribePrivacyConsent,
+} from './features/privacy/consent-gate.js';
 import { useSyncStore } from './features/sync/store.js';
 import { ErrorScreen } from './features/shell/ErrorScreen.js';
 import { storageHintKey } from './features/shell/error-hint.js';
@@ -27,14 +33,40 @@ import { startWidgetLifecycle } from './pwa/lifecycle.js';
 import { registerWidgetServiceWorker } from './pwa/register.js';
 
 /**
+ * 🔴 **同意之前，一个字节都不许出这个进程**（计划 G-12）。
+ *
+ * 这一行必须是**函数体的第一条语句**，而且要早于下面任何一次网络动作。
+ * 它把 `window.fetch` 换成带闸的那一份，于是"新加一个调用点忘了传 `fetchImpl`"
+ * 不再等于"合规前提悄悄失效"。
+ *
+ * ⚠️ 它**拦不住** `import()` / `<script src>` / `WebSocket` / `serviceWorker.register()`
+ * —— 那四类各有各的闸（分别见下面的注释与 `restartRealtime`）。
+ * 之所以仍然要做这一层：`fetch` 是全仓**唯一**会承载用户数据的 HTTP 出口，
+ * 而其余三类都是本站自己的东西。
+ */
+installConsentGatedFetch();
+
+/**
  * W3-1：注册 service worker（Windows 的 PWA 组件靠它接事件）。
  *
- * ⚠️ **放在 `initOpLog()` 之前、而且不等它**：小组件是增强而不是功能前提，
- * 它注册失败不该让应用起不来；反过来，等 op-log 初始化完再注册会白白推后
- * `widgetinstall` 的就绪时间（用户装完组件到能看到数据的那段空窗）。
- * 函数内部自己吞掉所有失败（见 `pwa/register.ts`）。
+ * 🔴 **收到同意之后才注册**（G-12 点名的正是这一条）：注册本身会向
+ * `scope` 发一次请求，而那时用户还没有对"这台应用会不会跟服务端说话"作出过决定。
+ *
+ * 这三步（注册 SW / 采用待消费的登录 / 建实时连接）现在在
+ * `features/privacy/startup-network.ts` 里 —— 抽出去的**唯一理由是判据**：
+ * 入口有顶层副作用、要 `#root`、会拉起 op-log，写死在这里就等于
+ * "把注册搬回同意之前，全仓没有任何东西会失败"。顺序与三步各自的闸见那个文件头。
  */
-registerWidgetServiceWorker();
+const startupNetwork = createStartupNetwork({
+  networkAllowed: () => privacyConsent.networkAllowed(),
+  registerServiceWorker: registerWidgetServiceWorker,
+  // 未配置/未登录时它自己就是不连（不抛），所以这里无条件调。
+  startRealtime: () => useSyncStore.getState().startRealtime(),
+  // 🔴 采用一枚登录会**发请求**，所以它只可能在闸门打开之后被调到（判据数得出次数）。
+  adoptPendingLogin: (held) => {
+    void releasePendingLogin(held);
+  },
+});
 
 const container = document.getElementById('root');
 if (container === null) {
@@ -102,38 +134,49 @@ if (new URLSearchParams(window.location.search).has('shell')) {
       /**
        * W1：消费**邮件登录链接**带回来的令牌。
        *
-       * 🔴 它修的是一个静默失效：服务端确认页把 JWT 写进 `sessionStorage['loginToken']`
-       * 之后跳回应用，而**此前没有任何应用代码读它** —— 用户在邮件里"登录成功了"，
-       * 回到应用仍是未登录，且界面不报任何错。
+       * 🔴 它修的是一个静默失效：服务端确认页把会话交进来之后跳回应用，而**此前没有
+       * 任何应用代码读它** —— 用户在邮件里"登录成功了"，回到应用仍是未登录，
+       * 且界面不报任何错。
        *
        * 🔴 **现在确认页的投递走 URL `fragment`，不走 `sessionStorage`** ——
        * 后者跨不过 agent cluster（实测：确认页 `pagehide` 时还在、应用启动时已空）。
        * 原因与 2×2 证据见 `docs/adr/0039-…md` §4 第 5 轮。这里不用改：
-       * `consumePendingLogin()` 自己按 **fragment → 壳交付的会话 → 链接令牌** 的顺序取。
+       * 取用顺序仍是 **fragment → 壳交付的会话 → 链接令牌**。
        *
-       * 🔴 **不 `await`、不阻塞渲染**，理由与 `registerWidgetServiceWorker()` 同源：
-       * 本地优先下"未登录"是**合法状态**而不是故障。为了登录去推迟首屏，
-       * 等于把"能立刻用"换成"等一个网络往返"，而那个往返失败时用户什么也没得到。
-       * 函数内部自己吞掉所有失败（见 `pending-login.ts`），所以这里不需要 catch。
+       * 🔴 **闸门关闭时只做"收下"，不做"采用"**（`holdPendingLogin` 的文件头写着
+       * 为什么这两步必须能分开）：收下的那一步会把令牌从地址栏与存储里**立刻抹掉**，
+       * 那是安全动作、与同意无关；采用那一步会**发请求**，必须等到同意之后。
+       * 少了这个区分就只有两种坏法 —— 要么让一枚活令牌赖在历史里，
+       * 要么用户点了同意之后登录状态悄悄丢了。
        *
        * ⚠️ 顺序：必须在 `initOpLog()` **之后** —— 登录成功会立刻触发同步，
        * 而同步要在 op-log 就绪后才能安全落盘（与 `startWidgetLifecycle` 同一个理由）。
        */
-      void consumePendingLogin();
+      const held = holdPendingLogin();
+      startupNetwork.hold(held);
+      if (held !== null && !privacyConsent.networkAllowed()) {
+        // ⚠️ 不能静默：这条路径下用户"在邮件里已经登录成功了"，而应用里还是未登录。
+        // 首屏会立刻弹隐私面板，所以他能自己走完；留痕是为了将来排查。
+        console.warn('[privacy] 收到待消费的登录，但还没有同意 → 已收下并抹掉投递，同意之后才采用');
+      }
+      /**
+       * 🔴 **无论有没有待消费的登录，都要走这一次**：它自己会判闸门，
+       * 关闭时什么都不做。这样"已经同意过（冷启动）"与"刚刚点了同意"
+       * 走的是同一条补跑路径，而不是两套行为。
+       */
+      startupNetwork.arm();
 
       /**
-       * #10：**实时同步通道**。
+       * 用户在同一次会话里点了「同意」（首启面板）之后，上面那几步要**补跑一遍**。
        *
-       * 🔴 必须在 `initOpLog()` 之后 —— 建连要拿 `engine.clientId`。
-       * 冷启动时地址与令牌是从磁盘读回来的，所以这一步是
-       * "刷新之后实时同步还在不在"的唯一保证（少了它，用户重新登录一次才能好，
-       * 而那让缺陷看起来像随机失灵）。
-       *
-       * ⚠️ **不 `await`、不阻塞渲染**：实时通道是**增强** ——
-       * 它没连上时同步仍然会在用户动作时正常发生，只是不会"自动很快"。
-       * 为它推迟首屏不值得。
+       * 🔴 订阅而不是让面板直接调：同意这个决定有三个来源（首启面板、设置页撤回、
+       * 将来的深链），而"实时通道连着没有"只有一个所有者。让每个来源都记得踢一次
+       * 同步，就是"新加一个入口忘了踢"的开始。
+       * ⚠️ 这个订阅**不必**取消 —— 它就是本进程的生命周期。
        */
-      useSyncStore.getState().startRealtime();
+      subscribePrivacyConsent(() => {
+        startupNetwork.arm();
+      });
 
       root.render(
         <StrictMode>

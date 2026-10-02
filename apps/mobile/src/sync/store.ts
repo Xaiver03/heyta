@@ -15,6 +15,8 @@
 import { useSyncExternalStore } from 'react';
 import type { ConflictInfo, SyncStatus } from '@heyta/sync-client';
 
+import { requireNetworkConsent } from '../privacy/consent-ui';
+import { readSyncConfig } from './config';
 import { openTaskHost } from '../db/open-host';
 
 export interface MobileSyncState {
@@ -89,6 +91,30 @@ export async function refreshPendingUpload(): Promise<void> {
   set({ pendingUpload: await host.pendingUploadCount() });
 }
 
+/** 这台设备**配好了**同步（地址 + 令牌都齐）。纯本机判断，不发任何请求。 */
+function isConfigured(): boolean {
+  const config = readSyncConfig();
+  return (
+    config !== undefined && config.serverUrl !== '' && (config.token ?? '') !== ''
+  );
+}
+
+/**
+ * 用户**主动**发起同步时的那道同意闸（计划 **G-12**）。
+ *
+ * @returns 被拦下时要写进 `status` 的那条错误（同时把面板弹起来）；放行时 `null`。
+ *
+ * 🔴 顺序是**先"配没配"、后"同没同意"**，与 web 侧 `consentGate()` 逐字同一条纪律：
+ * 没配服务端的用户拿到 `not-signed-in`（真话、可操作），
+ * 而不是让他先去处理一件此刻不必要的事。未配置时**不会**走到出站代码，
+ * `SyncClient` 在发第一个请求之前就返回那条状态。
+ */
+function consentGate(): SyncStatus | null {
+  if (!isConfigured()) return null;
+  if (requireNetworkConsent()) return null;
+  return { kind: 'error', reason: 'consent-required', retryable: false };
+}
+
 /**
  * 同步一次。
  *
@@ -98,6 +124,29 @@ export async function refreshPendingUpload(): Promise<void> {
  */
 export async function syncNow(): Promise<SyncStatus> {
   if (state.busy) return state.status;
+
+  /**
+   * 🔴 用户主动点「同步」时的那道同意闸（计划 **G-12**）。
+   *
+   * 拦在这里而不是只拦在 `auto-sync.ts` 的 `ready()` 里，是因为这两条路
+   * 触发的是**同一个** `syncNow()`：自动那条有 `ready()` 挡着，
+   * 手点这条**没有**任何东西挡 —— 少这一句，症状就是
+   * 「没同意的人在『我的』页按一下，数据就出去了」，而且**不报错**。
+   *
+   * 拦下时把面板**一起**弹起来（`requireNetworkConsent` 内部做的事）：
+   * 只写一条错误状态的话，用户读到的是"同步失败了"，
+   * 而真正的出路（去作那个决定）界面上没有给。
+   *
+   * ⚠️ 排在**本地配置判断之后**（与 web 侧 `consentGate()` 同一条顺序纪律）：
+   * 没配服务端的用户拿到的是 `not-signed-in`，不是 `consent-required`。
+   * "你还没配同步服务"对着一个什么都没配的人是真话、且可操作；
+   * 让他先去处理隐私面板，是在让他做一件此刻不必要的事。
+   */
+  const blocked = consentGate();
+  if (blocked !== null) {
+    set({ status: blocked });
+    return blocked;
+  }
 
   set({ busy: true, status: { kind: 'syncing', phase: 'upload' } });
 
