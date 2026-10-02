@@ -1995,7 +1995,7 @@ delta 与 grep 口径的 114 → 116 **同为 +2**，结论不受口径影响。
 （本批 2 + 既有 4）全部换成 prop → 门禁打印的数从 **113** 降到 ≤109（一次消掉 4 处）。
 **不许**改基线数字。
 
-## B22. 🔴 `check:ai-e2e` 在提交态上 **98 passed / 3 failed**：两条已被**另一条会话的反证**证伪，第三条还欠一次低负载复跑（2026-10-03 04:29 取证）
+## B22. 🔴 `check:ai-e2e` 在提交态上 **3 failed / 98 passed**：我先前归因成"并发干扰"，**那条归因是错的，这里撤回** —— 真身是提交态落后于别人**未提交**的工作（2026-10-03 04:29 取证，05:16–05:19 低负载复跑）
 
 跑的是隔离检出 `/tmp/heyta-g5`（HEAD `9a0ea6d5`，装完 dist、装完 `e2e` 依赖），
 日志 `/tmp/rr-49.log`。三条红：
@@ -2003,35 +2003,48 @@ delta 与 grep 口径的 114 → 116 **同为 +2**，结论不受口径影响。
 | spec | 失败形态 |
 |---|---|
 | `tests/due-date-edit.spec.ts:49` | `locator.click` 重试 60s 超时，`element is outside of the viewport`（`10月18日` 那一格） |
-| `tests/motivation.spec.ts:184` | 视图标题对照 |
-| `tests/narrow-sweep.spec.ts:33` | 塌缩态扫描：日历 |
+| `tests/motivation.spec.ts:184` | `日历 页的居中标题应当就是「日历」` —— 34 次重试读到的都是 `<h1>收集箱</h1>` |
+| `tests/narrow-sweep.spec.ts:33` | 塌缩态扫描：日历（同一条视图切换） |
 
-**为什么没算到提交态头上**（三条独立证据，不是"我觉得是环境"）：
+### ⚠️ 撤回：不是并发
 
-1. 后两条在**两分钟之后**被另一条会话跑绿：它的 **B19** 记的现场里，04:21:35 占着
-   4318/4319 的进程正是我这条 `playwright test`；它 04:31 释放后复跑
-   `narrow-sweep` + `motivation` ⇒ **17/17 全绿**。
-2. `due-date-edit` 在 `/tmp/e2e-full-r11b.log`（04:58）**5.1s 通过**。
-3. 端口是写死的（4318/4319）且 `reuseExistingServer: false`，`check:ai-e2e` 的 preflight
-   （`scripts/check-ai-e2e-preflight.mjs:83`）还会 **SIGKILL** 别人的 webServer ——
-   我量到 04:57 时 `:4319` 又被 pid 95629 占着。**这台机器上 e2e 是串行的共享资源**，
-   同一时刻多个会话跑它，红的是"谁被谁顶了"，不是产品。
+我原本写"两条在两分钟后被另一条会话跑绿 ⇒ 是端口争用"。**低负载复跑把它证伪了**：
+05:16–05:19，`--workers=1`、`:4318`/`:4319` **无监听者**、`loadavg 7.17 / 16 核（45%）`
+—— **三条全部复现**（`15 passed / 3 failed`，`/tmp/g5-e2e-lowload.log`）。
+并发确实存在（B19 记的那次是真的），但它**不是这三条红的原因**。
 
-🔴 **但也没证伪**：`element is outside of the viewport` 是**几何**症状而不是超时抖动，
-共享 `DatePicker` 弹层在小视口下溢出是一条**真实存在的可能性**，而它恰好是本条线
-（批一把 DatePicker 上提成共享组件）碰过的东西。
-**先把宿主窗口下限量掉**（免得下一条会话又从头查）：`e2e/playwright.config.ts` 里
-**没有** `viewport` 覆盖，`tests/due-date-edit.spec.ts` 也没有 `use:` / `setViewportSize`
-⇒ 跑的是 Playwright 默认 **1280×720**，这条红**不是**"档位低于壳的最小宽度所以不可能存在"那一类，
-它是真实窗口尺寸下的读数。
+### 真身：提交态缺了别人工作树里还没提交的改动
 
-**欠的一步**（不许用"改天"结掉，命令写死）：
+同一批 spec 在**主树**（脏）跑绿：04:31 对方 B19 记的 `narrow-sweep` + `motivation` **17/17**、
+04:58 `/tmp/e2e-full-r11b.log` 的 `due-date-edit` **5.1s 通过**。
+而主树 `git status` 里恰好是这三条红的**责任面**全是 `M`（未提交）：
+
+| 未提交文件 | numstat | 对应哪条红 |
+|---|---|---|
+| `apps/web/src/features/shell/view-tabs.ts` | +25 / −11 | 点 tab 不换视图（motivation:184、narrow-sweep 日历） |
+| `apps/web/src/App.tsx` | +108 / −36 | 同上（视图切换的接线） |
+| `apps/web/src/features/calendar/CalendarView.tsx` | +40 / −49 | 同上 |
+| `apps/web/src/features/tasks/DueEditor.tsx` | +39 / −10 | `due-date-edit` 的弹层放置（对方 traps `150` 正是这条的判据） |
+
+📌 与 traps **#147**（本机 `dist/` 掩护未提交的生产者）、**B20**（未跟踪的生产者被已跟踪的消费者
+importing）同族，只是这次藏的是**行为**而不是文件：**"干净检出上红"不等于"红的那条线缺东西"，
+也可能是别人已经修好但还没提交** —— 判据是去主树看那批文件是不是 `M`，一条 `git status` 就够。
+
+### 不是本批引入的（已排除）
+
+本批在 web 侧只改了 `packages/ui/src/date-picker/DatePicker.tsx` 的无障碍属性写法
+（`accessibilityState` → `aria-selected`）。失败日志里那一行元素上
+`aria-label="10月18日" aria-selected="false"` **两个属性都在** ⇒ 我的改动生效了，
+而红的是它的**几何位置**，与属性写法无关。
+
+### 欠的一步（命令写死，别用"改天"结掉）
+
+等那条线把 `view-tabs.ts` / `App.tsx` / `DueEditor.tsx` 提交之后，在**干净检出**重跑：
 
 ```bash
-# 先确认 4318/4319 的持有者不是别人（B19 的判据）
-lsof -nP -iTCP:4319 -sTCP:LISTEN
-cd e2e && npx playwright test tests/due-date-edit.spec.ts --reporter=list --retries=0
+lsof -nP -iTCP:4319 -sTCP:LISTEN        # 先确认端口持有者不是别人（B19 的判据）
+cd e2e && npx playwright test tests/due-date-edit.spec.ts tests/motivation.spec.ts \
+  tests/narrow-sweep.spec.ts --reporter=list --retries=0 --workers=1
 ```
 
-若仍红在 `outside of the viewport` ⇒ 那是共享 DatePicker 的真缺陷，归批一那条线修，
-**不要**改这条 spec 的等待条件让它过。
+**仍红**才轮到本条线（共享 `DatePicker` 的弹层放置）负责；在那之前改本批任何代码都是抢别人的活。
