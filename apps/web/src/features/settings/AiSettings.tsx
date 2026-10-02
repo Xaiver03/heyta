@@ -1,3 +1,4 @@
+import { ICON_SIZE } from '@heyta/design-system';
 /**
  * AI 设置面板
  * =============
@@ -558,7 +559,7 @@ export function AiSettings({ initial, secrets, onChange, memorySlot, focusTarget
 
   return (
     <div className="ht-settings" data-testid="ai-settings">
-      <h2 className="ht-settings__title">{t('web.ai.settings.title')}</h2>
+      <h2 className="ht-settings__title ht-type-section-title">{t('web.ai.settings.title')}</h2>
 
       {/* ── 闸 1：总开关 ─────────────────────────────────────────── */}
       <Toggle
@@ -605,7 +606,7 @@ export function AiSettings({ initial, secrets, onChange, memorySlot, focusTarget
 
           {routing.allowRemote && (
             <p className="ht-settings__danger" role="note" data-testid="remote-warning">
-              <AlertTriangle size={14} aria-hidden="true" />
+              <AlertTriangle size={ICON_SIZE.xs} aria-hidden="true" />
               <span>
                 {t('web.ai.settings.remote.lead')}<strong>{t('web.ai.settings.remote.strong')}</strong>{t('web.ai.settings.remote.tail')}
               </span>
@@ -619,7 +620,7 @@ export function AiSettings({ initial, secrets, onChange, memorySlot, focusTarget
             data-testid="ai-endpoints-section"
             data-focused={focused === 'endpoints' ? 'true' : undefined}
           >
-            <h3 className="ht-settings__h3">{t('web.ai.settings.endpoints.title')}</h3>
+            <h3 className="ht-settings__h3 ht-type-headline">{t('web.ai.settings.endpoints.title')}</h3>
 
             {/* 🔴🔴 **这一段曾经写的是"我们没有提供托管 AI"，那是错的。**
                 产品负责人已明确：heyta **会**提供统一云端 AI 服务并按此收费，
@@ -666,7 +667,7 @@ export function AiSettings({ initial, secrets, onChange, memorySlot, focusTarget
                   <li key={endpoint.id} className="ht-settings__item" data-testid={`endpoint-${endpoint.id}`}>
                     {healthCopy !== undefined && !healthy && (
                       <p className="ht-settings__warn" data-testid={`endpoint-unhealthy-${endpoint.id}`}>
-                        <AlertTriangle size={12} aria-hidden="true" />
+                        <AlertTriangle size={ICON_SIZE.xs} aria-hidden="true" />
                         {t(healthCopy.key, healthCopy.params)}
                       </p>
                     )}
@@ -766,7 +767,7 @@ export function AiSettings({ initial, secrets, onChange, memorySlot, focusTarget
                       </fieldset>
                       {urlVerdict !== undefined && !urlVerdict.ok && (
                         <span className="ht-settings__tag--remote" data-testid={`endpoint-invalid-${endpoint.id}`}>
-                          <AlertTriangle size={12} aria-hidden="true" />
+                          <AlertTriangle size={ICON_SIZE.xs} aria-hidden="true" />
                           {endpointRejectionText(urlVerdict.reason, endpoint.endpoint, t)}
                         </span>
                       )}
@@ -775,18 +776,18 @@ export function AiSettings({ initial, secrets, onChange, memorySlot, focusTarget
                       >
                         {isLocal ? (
                           <>
-                            <ShieldCheck size={12} aria-hidden="true" /> {t('web.ai.settings.tag.local')}
+                            <ShieldCheck size={ICON_SIZE.xs} aria-hidden="true" /> {t('web.ai.settings.tag.local')}
                           </>
                         ) : (
                           <>
-                            <AlertTriangle size={12} aria-hidden="true" /> {t('web.ai.settings.tag.remote')}
+                            <AlertTriangle size={ICON_SIZE.xs} aria-hidden="true" /> {t('web.ai.settings.tag.remote')}
                           </>
                         )}
                       </span>
 
                       {endpoint.keyRef !== undefined && (
                         <span className="ht-settings__key">
-                          <Lock size={12} aria-hidden="true" />
+                          <Lock size={ICON_SIZE.xs} aria-hidden="true" />
                           <input
                             type="password"
                             aria-label={t('web.ai.settings.keyAria', { name: endpoint.label })}
@@ -818,7 +819,7 @@ export function AiSettings({ initial, secrets, onChange, memorySlot, focusTarget
                       aria-label={t('web.ai.settings.deleteAria', { name: endpoint.label })}
                       onClick={() => removeEndpoint(endpoint.id)}
                     >
-                      <Trash2 size={14} aria-hidden="true" />
+                      <Trash2 size={ICON_SIZE.xs} aria-hidden="true" />
                     </button>
                   </li>
                 );
@@ -839,7 +840,7 @@ export function AiSettings({ initial, secrets, onChange, memorySlot, focusTarget
                     title={copy.prerequisite}
                     onClick={() => addEndpoint({ ...preset.config, label: copy.label })}
                   >
-                    <Plus size={14} aria-hidden="true" />
+                    <Plus size={ICON_SIZE.xs} aria-hidden="true" />
                     {added
                       ? t('web.ai.settings.presetAdded', { name: copy.label })
                       : t('web.ai.settings.presetAdd', { name: copy.label })}
@@ -852,7 +853,7 @@ export function AiSettings({ initial, secrets, onChange, memorySlot, focusTarget
                 data-testid="add-custom-endpoint"
                 onClick={addCustomEndpoint}
               >
-                <Plus size={14} aria-hidden="true" />
+                <Plus size={ICON_SIZE.xs} aria-hidden="true" />
                 {t('web.ai.settings.addCustom')}
               </button>
             </div>
@@ -861,7 +862,7 @@ export function AiSettings({ initial, secrets, onChange, memorySlot, focusTarget
               <ul className="ht-settings__errors" data-testid="rejected-endpoints">
                 {rejected.map((r) => (
                   <li key={r.endpoint}>
-                    <AlertTriangle size={12} aria-hidden="true" />
+                    <AlertTriangle size={ICON_SIZE.xs} aria-hidden="true" />
                     {endpointRejectionText(r.reason, r.endpoint, t)}
                   </li>
                 ))}
@@ -878,7 +879,7 @@ export function AiSettings({ initial, secrets, onChange, memorySlot, focusTarget
               focused === 'capability' || focused === 'consent' ? 'true' : undefined
             }
           >
-            <h3 className="ht-settings__h3">{t('web.ai.settings.features.title')}</h3>
+            <h3 className="ht-settings__h3 ht-type-headline">{t('web.ai.settings.features.title')}</h3>
             <p className="ht-settings__hint">
               {t('web.ai.settings.features.hintLead')}<strong>{t('web.ai.settings.features.hintStrong')}</strong>{t('web.ai.settings.features.hintTail')}
             </p>
@@ -902,7 +903,7 @@ export function AiSettings({ initial, secrets, onChange, memorySlot, focusTarget
                           aria-pressed={on}
                           onClick={() => toggleRoute(feature, endpoint.id)}
                         >
-                          {on && <Check size={12} aria-hidden="true" />}
+                          {on && <Check size={ICON_SIZE.xs} aria-hidden="true" />}
                           {endpoint.label}
                         </button>
                       );
@@ -956,7 +957,7 @@ export function AiSettings({ initial, secrets, onChange, memorySlot, focusTarget
                   {enabled && hasConsent(feature) && (
                     <div className="ht-settings__consent" data-testid={`granted-${feature}`}>
                       <span>
-                        <ShieldCheck size={12} aria-hidden="true" /> {t('web.ai.settings.granted')}
+                        <ShieldCheck size={ICON_SIZE.xs} aria-hidden="true" /> {t('web.ai.settings.granted')}
                       </span>
                       <button type="button" className="ht-btn ht-btn--ghost" onClick={() => revoke(feature)}>
                         {t('web.ai.settings.revoke')}
@@ -972,7 +973,7 @@ export function AiSettings({ initial, secrets, onChange, memorySlot, focusTarget
 
       {/* ── 闸 3（入站）：本机 API ───────────────────────────────── */}
       <section className="ht-settings__section">
-        <h3 className="ht-settings__h3">{t('web.ai.settings.localApi.title')}</h3>
+        <h3 className="ht-settings__h3 ht-type-headline">{t('web.ai.settings.localApi.title')}</h3>
         <p className="ht-settings__hint">
           {t('web.ai.settings.localApi.hintLead')}<strong>{t('web.ai.settings.localApi.hintStrong')}</strong>
         </p>
@@ -983,7 +984,7 @@ export function AiSettings({ initial, secrets, onChange, memorySlot, focusTarget
             不写清楚的话，用户会以为"我在这里打开了，它就生效了" ——
             而实际上什么都不会发生，也不会有任何报错。 */}
         <p className="ht-settings__warn" data-testid="local-api-source-note">
-          <AlertTriangle size={12} aria-hidden="true" />
+          <AlertTriangle size={ICON_SIZE.xs} aria-hidden="true" />
           {t('web.ai.settings.localApi.source.part1')}
           <code>{t('web.ai.settings.localApi.source.file')}</code>{t('web.ai.settings.localApi.source.part2')}
           <code>{t('web.ai.settings.localApi.source.command')}</code>
@@ -1015,7 +1016,7 @@ export function AiSettings({ initial, secrets, onChange, memorySlot, focusTarget
 
             {!localApiVerdict.ok && (
               <p className="ht-settings__danger" role="alert" data-testid="local-api-error">
-                <AlertTriangle size={14} aria-hidden="true" />
+                <AlertTriangle size={ICON_SIZE.xs} aria-hidden="true" />
                 <span>{localApiErrorText(localApiVerdict.reason, localApi, t)}</span>
               </p>
             )}
@@ -1056,7 +1057,7 @@ export function AiSettings({ initial, secrets, onChange, memorySlot, focusTarget
       </section>
 
       <p className="ht-settings__notice" data-testid="key-notice">
-        <Lock size={12} aria-hidden="true" />
+        <Lock size={ICON_SIZE.xs} aria-hidden="true" />
         {t('web.ai.settings.keyNotice')}
       </p>
 

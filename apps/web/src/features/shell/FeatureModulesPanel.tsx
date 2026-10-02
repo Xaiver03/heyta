@@ -55,7 +55,7 @@ export function FeatureModulesPanel({
 
   return (
     <section className="ht-settings" data-testid={testID}>
-      <h2 className="ht-settings__title">{t('web.shell.modules.title')}</h2>
+      <h2 className="ht-settings__title ht-type-section-title">{t('web.shell.modules.title')}</h2>
       <p className="ht-settings__hint">{t('web.shell.modules.intro')}</p>
 
       <div className="ht-settings__cards" data-testid={`${testID}-cards`}>

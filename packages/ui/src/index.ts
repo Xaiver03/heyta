@@ -57,6 +57,17 @@ export {
   type SearchPanelProps,
 } from './search/SearchPanel.js';
 /**
+ * 玻璃材质表面（ADR-0042）：档位（chrome/panel/sheet）× 端能力协商的
+ * **唯一合法居所** —— 业务组件不得散写 `Platform.OS` 材质分叉。
+ * web 的另一半（blur + saturate + rim）在宿主 CSS 的 `.ht-material`。
+ */
+export {
+  materialSurface,
+  type MaterialSurfaceStyle,
+  type MaterialTier,
+  type MaterialTokens,
+} from './material/material-surface.js';
+/**
  * 搜索面板的**判据层**（宿主算键盘光标要用同一套，不许在 `apps/*` 重写一遍）：
  * 跳转项怎么过滤、结果怎么摊平成有序数组、光标怎么走。
  */

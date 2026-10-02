@@ -1,3 +1,4 @@
+import { ICON_SIZE } from '@heyta/design-system';
 /**
  * 通行密钥自助管理面板（设置页）
  * ==============================
@@ -173,7 +174,7 @@ export function PasskeyPanel(): React.JSX.Element {
 
   return (
     <div className="ht-settings" data-testid="passkeys-panel">
-      <h2 className="ht-settings__title">{t('web.passkeys.title')}</h2>
+      <h2 className="ht-settings__title ht-type-section-title">{t('web.passkeys.title')}</h2>
       <p className="ht-settings__hint">{t('web.passkeys.lead')}</p>
 
       {!signedIn ? (
@@ -200,9 +201,9 @@ export function PasskeyPanel(): React.JSX.Element {
               }}
             >
               {adding ? (
-                <Loader2 size={12} aria-hidden="true" />
+                <Loader2 size={ICON_SIZE.xs} aria-hidden="true" />
               ) : (
-                <Plus size={12} aria-hidden="true" />
+                <Plus size={ICON_SIZE.xs} aria-hidden="true" />
               )}{' '}
               {adding ? t('web.passkeys.adding') : t('web.passkeys.add')}
             </button>
@@ -218,9 +219,9 @@ export function PasskeyPanel(): React.JSX.Element {
               }}
             >
               {status.kind === 'loading' ? (
-                <Loader2 size={12} aria-hidden="true" />
+                <Loader2 size={ICON_SIZE.xs} aria-hidden="true" />
               ) : (
-                <RefreshCw size={12} aria-hidden="true" />
+                <RefreshCw size={ICON_SIZE.xs} aria-hidden="true" />
               )}{' '}
               {t('web.passkeys.refresh')}
             </button>
@@ -234,25 +235,25 @@ export function PasskeyPanel(): React.JSX.Element {
 
           {justAdded && (
             <p className="ht-settings__notice" role="status" data-testid="passkeys-added">
-              <CheckCircle2 size={12} aria-hidden="true" /> {t('web.passkeys.added')}
+              <CheckCircle2 size={ICON_SIZE.xs} aria-hidden="true" /> {t('web.passkeys.added')}
             </p>
           )}
 
           {addFailure !== undefined && (
             <p className="ht-settings__danger" role="alert" data-testid="passkeys-add-failed">
-              <AlertTriangle size={12} aria-hidden="true" /> {t(addFailureKey(addFailure))}
+              <AlertTriangle size={ICON_SIZE.xs} aria-hidden="true" /> {t(addFailureKey(addFailure))}
             </p>
           )}
 
           {justRenamed && (
             <p className="ht-settings__notice" role="status" data-testid="passkeys-renamed">
-              <CheckCircle2 size={12} aria-hidden="true" /> {t('web.passkeys.renamed')}
+              <CheckCircle2 size={ICON_SIZE.xs} aria-hidden="true" /> {t('web.passkeys.renamed')}
             </p>
           )}
 
           {renameFailure !== undefined && (
             <p className="ht-settings__danger" role="alert" data-testid="passkeys-rename-failed">
-              <AlertTriangle size={12} aria-hidden="true" />{' '}
+              <AlertTriangle size={ICON_SIZE.xs} aria-hidden="true" />{' '}
               {t(renameFailureKey(renameFailure), { max: HOSTED_PASSKEY_NAME_MAX_LENGTH })}
             </p>
           )}
@@ -269,7 +270,7 @@ export function PasskeyPanel(): React.JSX.Element {
           */}
           {status.kind === 'failed' && (
             <p className="ht-settings__danger" role="alert" data-testid="passkeys-load-failed">
-              <AlertTriangle size={12} aria-hidden="true" />{' '}
+              <AlertTriangle size={ICON_SIZE.xs} aria-hidden="true" />{' '}
               {t(loadFailureKey(status.reason))}
             </p>
           )}
@@ -339,9 +340,9 @@ export function PasskeyPanel(): React.JSX.Element {
                         }}
                       >
                         {renaming ? (
-                          <Loader2 size={12} aria-hidden="true" />
+                          <Loader2 size={ICON_SIZE.xs} aria-hidden="true" />
                         ) : (
-                          <CheckCircle2 size={12} aria-hidden="true" />
+                          <CheckCircle2 size={ICON_SIZE.xs} aria-hidden="true" />
                         )}{' '}
                         {t('web.passkeys.save')}
                       </button>
@@ -370,9 +371,9 @@ export function PasskeyPanel(): React.JSX.Element {
                             }}
                           >
                             {deleting ? (
-                              <Loader2 size={12} aria-hidden="true" />
+                              <Loader2 size={ICON_SIZE.xs} aria-hidden="true" />
                             ) : (
-                              <Trash2 size={12} aria-hidden="true" />
+                              <Trash2 size={ICON_SIZE.xs} aria-hidden="true" />
                             )}{' '}
                             {t('web.passkeys.confirmDelete')}
                           </button>
@@ -400,7 +401,7 @@ export function PasskeyPanel(): React.JSX.Element {
                               setEditingId(passkey.id);
                             }}
                           >
-                            <Pencil size={12} aria-hidden="true" /> {t('web.passkeys.rename')}
+                            <Pencil size={ICON_SIZE.xs} aria-hidden="true" /> {t('web.passkeys.rename')}
                           </button>
                           <button
                             type="button"
@@ -414,9 +415,9 @@ export function PasskeyPanel(): React.JSX.Element {
                             }}
                           >
                             {deleting ? (
-                              <Loader2 size={12} aria-hidden="true" />
+                              <Loader2 size={ICON_SIZE.xs} aria-hidden="true" />
                             ) : (
-                              <Trash2 size={12} aria-hidden="true" />
+                              <Trash2 size={ICON_SIZE.xs} aria-hidden="true" />
                             )}{' '}
                             {deleting ? t('web.passkeys.deleting') : t('web.passkeys.delete')}
                           </button>
@@ -430,13 +431,13 @@ export function PasskeyPanel(): React.JSX.Element {
 
           {justDeleted && (
             <p className="ht-settings__notice" role="status" data-testid="passkeys-deleted">
-              <CheckCircle2 size={12} aria-hidden="true" /> {t('web.passkeys.deleted')}
+              <CheckCircle2 size={ICON_SIZE.xs} aria-hidden="true" /> {t('web.passkeys.deleted')}
             </p>
           )}
 
           {deleteFailure !== undefined && (
             <p className="ht-settings__danger" role="alert" data-testid="passkeys-delete-failed">
-              <AlertTriangle size={12} aria-hidden="true" /> {t(deleteFailureKey(deleteFailure))}
+              <AlertTriangle size={ICON_SIZE.xs} aria-hidden="true" /> {t(deleteFailureKey(deleteFailure))}
             </p>
           )}
         </>

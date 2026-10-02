@@ -1,3 +1,4 @@
+import { ICON_SIZE } from '@heyta/design-system';
 /**
  * 托管同步到期 / 被拒时的**克制**提示。
  *
@@ -101,7 +102,7 @@ export function SubscriptionNotice(): React.JSX.Element | null {
       }}
     >
       <CloudOff
-        size={18}
+        size={ICON_SIZE.md}
         aria-hidden="true"
         style={{ color: cssVar('color.warning-strong'), flexShrink: 0 }}
       />
@@ -119,7 +120,7 @@ export function SubscriptionNotice(): React.JSX.Element | null {
         <p style={bodyStyle}>{localData}</p>
         <div className="ht-settings__actions">
           <button type="button" className="ht-btn ht-btn--ghost" onClick={openSettings}>
-            <Server size={14} aria-hidden="true" />
+            <Server size={ICON_SIZE.xs} aria-hidden="true" />
             {selfHost}
           </button>
           {/*

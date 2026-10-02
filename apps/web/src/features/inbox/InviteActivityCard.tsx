@@ -1,3 +1,4 @@
+import { ICON_SIZE } from '@heyta/design-system';
 /**
  * 「邀请好友」活动卡（活动 Tab 里的第一张，也是目前唯一一张）。
  *
@@ -65,7 +66,7 @@ export function InviteActivityCard({
   return (
     <section className="ht-inbox__card" data-testid={testID}>
       <header className="ht-inbox__card-head">
-        <Gift size={16} aria-hidden="true" />
+        <Gift size={ICON_SIZE.sm} aria-hidden="true" />
         <h3 className="ht-inbox__card-title">
           {t('web.inbox.activity.invite.title')}
         </h3>
@@ -135,7 +136,7 @@ export function InviteActivityCard({
         </p>
       ) : null}
 
-      <h4 className="ht-inbox__sublist-title">
+      <h4 className="ht-inbox__sublist-title ht-type-panel-title">
         {t('web.inbox.activity.invite.listTitle')}
       </h4>
 

@@ -1,3 +1,4 @@
+import { ICON_SIZE } from '@heyta/design-system';
 /**
  * 分类色槽位选择器
  * ==================
@@ -60,7 +61,7 @@ export function ColorSlotPicker({ value, onChange, targetName }: ColorSlotPicker
           setOpen((was) => !was);
         }}
       >
-        <Palette size={14} aria-hidden="true" />
+        <Palette size={ICON_SIZE.xs} aria-hidden="true" />
         <span
           className="ht-slot-picker__current"
           style={{ background: value === undefined ? cssVar('color.border') : categorySlotColor(value) }}

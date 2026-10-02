@@ -1,3 +1,4 @@
+import { ICON_SIZE } from '@heyta/design-system';
 /**
  * 记忆面板：「我了解到的你」+ 还不了解 + 你已忘记
  * ==================================================
@@ -122,7 +123,7 @@ function PreferenceRow({
         aria-label={t('web.memory.forgetAria', { name: preferenceLabelText(id, t) })}
         onClick={() => onSuppress(id)}
       >
-        <EyeOff size={12} aria-hidden="true" />
+        <EyeOff size={ICON_SIZE.xs} aria-hidden="true" />
         {t('web.memory.forget')}
       </button>
     </li>
@@ -189,7 +190,7 @@ export function MemoryPanel(props: MemoryPanelProps): React.JSX.Element {
     <div className="ht-settings__section" data-testid="memory-panel">
       {/* ── 我了解到的你 ─────────────────────────────────────── */}
       <h3 className="ht-settings__subtitle">
-        <Sparkles size={12} aria-hidden="true" /> {t('web.memory.known.title')}
+        <Sparkles size={ICON_SIZE.xs} aria-hidden="true" /> {t('web.memory.known.title')}
       </h3>
 
       {known.length === 0 ? (
@@ -331,7 +332,7 @@ export function MemoryPanel(props: MemoryPanelProps): React.JSX.Element {
                     if (cid !== undefined) onRestore(cid);
                   }}
                 >
-                  <RotateCcw size={12} aria-hidden="true" />
+                  <RotateCcw size={ICON_SIZE.xs} aria-hidden="true" />
                   {t('web.memory.restore')}
                 </button>
               </li>
@@ -341,7 +342,7 @@ export function MemoryPanel(props: MemoryPanelProps): React.JSX.Element {
       )}
 
       <p className="ht-settings__hint">
-        <X size={12} aria-hidden="true" /> {t('web.memory.footer')}
+        <X size={ICON_SIZE.xs} aria-hidden="true" /> {t('web.memory.footer')}
       </p>
     </div>
   );

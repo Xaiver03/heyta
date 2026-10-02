@@ -1,3 +1,4 @@
+import { ICON_SIZE } from '@heyta/design-system';
 /**
  * 四象限矩阵（Web 壳）
  * ======================
@@ -118,7 +119,7 @@ function DragHandle({ taskId, label }: { taskId: string; label: string }) {
         touchAction: 'none',
       }}
     >
-      <GripVertical size={16} aria-hidden="true" />
+      <GripVertical size={ICON_SIZE.sm} aria-hidden="true" />
     </button>
   );
 }

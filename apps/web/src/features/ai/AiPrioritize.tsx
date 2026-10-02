@@ -1,3 +1,4 @@
+import { ICON_SIZE } from '@heyta/design-system';
 /**
  * AI 优先级排序 —— 面向用户的入口
  * ====================================
@@ -294,7 +295,7 @@ export function AiPrioritize(props: AiPrioritizeProps): React.JSX.Element {
             setPhase('disclosing');
           }}
         >
-          <Sparkles size={12} aria-hidden="true" />
+          <Sparkles size={ICON_SIZE.xs} aria-hidden="true" />
           {t('web.ai.prioritize.button')}
         </button>
         {applied && (
@@ -398,7 +399,7 @@ export function AiPrioritize(props: AiPrioritizeProps): React.JSX.Element {
 
         {proposal.truncated && (
           <p className="ht-ai__warn" data-testid="prioritize-truncated">
-            <AlertTriangle size={12} aria-hidden="true" />
+            <AlertTriangle size={ICON_SIZE.xs} aria-hidden="true" />
             {t('web.ai.prioritize.truncated', { max: MAX_PRIORITIZE_TASKS })}
           </p>
         )}

@@ -1,3 +1,4 @@
+import { ICON_SIZE } from '@heyta/design-system';
 /**
  * AI 拆解 —— 面向用户的入口
  * ============================
@@ -349,7 +350,7 @@ export function AiBreakdown(props: AiBreakdownProps): React.JSX.Element {
             setPhase('disclosing');
           }}
         >
-          <Sparkles size={12} aria-hidden="true" />
+          <Sparkles size={ICON_SIZE.xs} aria-hidden="true" />
           {t('web.ai.breakdown.button')}
         </button>
         {applied && (
@@ -438,7 +439,7 @@ export function AiBreakdown(props: AiBreakdownProps): React.JSX.Element {
 
         {proposal.truncated && (
           <p className="ht-ai__warn" data-testid="ai-truncated">
-            <AlertTriangle size={12} aria-hidden="true" />
+            <AlertTriangle size={ICON_SIZE.xs} aria-hidden="true" />
             {t('web.ai.breakdown.truncated', { count: proposal.items.length })}
           </p>
         )}

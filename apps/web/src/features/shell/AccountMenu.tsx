@@ -1,3 +1,4 @@
+import { ICON_SIZE } from '@heyta/design-system';
 /**
  * 账号菜单（左侧导航顶部）
  * ========================
@@ -259,7 +260,7 @@ export function AccountMenu({
         onClick();
       }}
     >
-      <Icon size={14} aria-hidden="true" />
+      <Icon size={ICON_SIZE.xs} aria-hidden="true" />
       {label}
     </button>
   );
@@ -292,7 +293,7 @@ export function AccountMenu({
         }}
       >
         {initial === undefined ? (
-          <CircleUser size={20} aria-hidden="true" />
+          <CircleUser size={ICON_SIZE.md} aria-hidden="true" />
         ) : (
           <span aria-hidden="true">{initial}</span>
         )}
@@ -303,7 +304,7 @@ export function AccountMenu({
           role="menu"
           ref={panelRef}
           aria-label={t('web.shell.account.aria')}
-          className="ht-accountmenu__panel"
+          className="ht-accountmenu__panel ht-material"
           data-testid={`${testID}-panel`}
           style={pos === undefined ? { visibility: 'hidden' } : { top: pos.top, left: pos.left }}
           onKeyDown={onMenuKeyDown}

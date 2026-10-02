@@ -1,3 +1,4 @@
+import { ICON_SIZE } from '@heyta/design-system';
 /**
  * 「帮助与关于」面板（设置页）
  * ==============================
@@ -122,7 +123,7 @@ export function HelpPanel(): React.JSX.Element {
       label: t(entry.labelKey),
       hint: t(entry.hintKey),
       href: siteLink(entry.path),
-      leading: <Glyph size={14} aria-hidden="true" />,
+      leading: <Glyph size={ICON_SIZE.xs} aria-hidden="true" />,
     };
   });
 
@@ -147,7 +148,7 @@ export function HelpPanel(): React.JSX.Element {
             kind: 'note',
             testID: 'about-update-note',
             text: t('web.about.updateNote'),
-            leading: <BookOpen size={12} aria-hidden="true" />,
+            leading: <BookOpen size={ICON_SIZE.xs} aria-hidden="true" />,
           }}
         />
       </SettingsSection>

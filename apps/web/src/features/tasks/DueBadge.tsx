@@ -1,3 +1,4 @@
+import { ICON_SIZE } from '@heyta/design-system';
 /**
  * 截止时间徽标（两种呈现）
  * ==========================
@@ -62,7 +63,7 @@ export function DueBadge({
 
   return (
     <span className={`ht-due${URGENCY_CLASS[countdown.urgency]}`}>
-      <Icon size={12} aria-hidden="true" />
+      <Icon size={ICON_SIZE.xs} aria-hidden="true" />
       {/* tabular-nums 已由 .ht-due 提供：倒计时数字宽度不跳 */}
       {text}
     </span>
