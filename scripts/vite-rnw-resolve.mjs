@@ -14,7 +14,34 @@
 import { createRequire } from 'node:module';
 import { dirname } from 'node:path';
 
-const require = createRequire(import.meta.url);
+/**
+ * 🔴 解析锚点**必须是调用方（那个 app 的 vite.config）的 URL**，不能是本文件。
+ *
+ * 上一版在模块顶层写 `createRequire(import.meta.url)` —— 那个 URL 是
+ * `<repo>/scripts/vite-rnw-resolve.mjs`，而 pnpm 的隔离布局里
+ * `scripts/` **没有任何 node_modules 通道**（根 `node_modules` 也不会有
+ * `react-native-web`，它只装在各 app 自己的 `node_modules/` 下）。
+ * 于是 `require.resolve('react-native-web/package.json')` 在**求值期**就抛
+ * `MODULE_NOT_FOUND`，Vite 连配置都加载不完：
+ *
+ *     Require stack: .../scripts/vite-rnw-resolve.mjs
+ *
+ * 而 `pnpm -r build` 里 `apps/web` 那一段**照样绿** —— 因为它用的还是自己那份
+ * 内联副本（这个 helper 当初只搬了桌面端）。也就是说"抽一份共享"之后，
+ * **唯一消费它的那一端从来没构建成功过**，而仓库里没有任何一条命令会因此失败
+ * （`pnpm check` 不做打包）。
+ *
+ * ⚠️ 本文件所在的 `scripts/` 不是包，没有 `package.json` 可以锚，
+ * 所以锚点只能由调用方给 —— 传错（例如传本文件自己的 URL）就是上面那个症状，
+ * 这里不替调用方兜底：让它响亮地失败，比静默解析到别人家的副本好。
+ */
+function resolveFrom(callerUrl) {
+  const require = createRequire(callerUrl);
+  return {
+    webDir: dirname(require.resolve('react-native-web/package.json')),
+    svgWeb: require.resolve('react-native-svg/lib/module/ReactNativeSVG.web.js'),
+  };
+}
 
 /**
  * 🔴 别名要指向**绝对路径**，不能直接写 `'react-native-web'`。
@@ -31,29 +58,21 @@ const require = createRequire(import.meta.url);
  *
  * 换成绝对路径就绕开了"从谁的位置找"这个变量。
  *
- * ⚠️ 调用方必须保证 `react-native-web` 与 `react-native-svg` 是**自己的**直接依赖，
- * 否则这里解析的是别人家的副本（或直接抛错）。
- */
-const reactNativeWebDir = dirname(require.resolve('react-native-web/package.json'));
-
-/**
+ * ⚠️ `react-native-web` **没有 `exports` 字段**，所以可以解析
+ * `react-native-web/package.json` 来定位包根。哪天它加了 `exports` 而没放行
+ * `./package.json`，这里要换成解析入口再取 dirname。
+ *
  * 🔴 `react-native-svg` 也要指向它的 **web 实现**（M1 徽章）。
  *
  * 共享组件 `@heyta/ui` 用 `react-native-svg` 画图标（图标数据来自框架无关的
  * `lucide` 包，见 `packages/ui/src/icon/Icon.tsx`）。`react-native-svg` 的
  * `main` 是**原生**实现，web 端必须走它自带的 `ReactNativeSVG.web.js`，
  * 否则会在 import 阶段就崩在原生桥接上。
- */
-const reactNativeSvgWeb = require.resolve(
-  'react-native-svg/lib/module/ReactNativeSVG.web.js',
-);
-
-/**
- * 两个 Vite 应用共用的 `resolve` 配置。
  *
- * @returns {import('vite').ResolveOptions}
+ * @param {string} callerUrl 调用方 vite.config 的 `import.meta.url`
  */
-export function rnwResolve() {
+export function rnwResolve(callerUrl) {
+  const { webDir, svgWeb } = resolveFrom(callerUrl);
   return {
     /**
      * 🔴 `.web.*` 必须排在普通后缀**前面** —— 这是 `react-native-svg` 能跑起来的必要条件。
@@ -98,8 +117,8 @@ export function rnwResolve() {
        * 字符串 key 是**前缀**匹配，写成 `'react-native/'` 会把所有
        * `react-native-` 开头的包一起改写。
        */
-      { find: /^react-native$/, replacement: reactNativeWebDir },
-      { find: /^react-native-svg$/, replacement: reactNativeSvgWeb },
+      { find: /^react-native$/, replacement: webDir },
+      { find: /^react-native-svg$/, replacement: svgWeb },
     ],
     /**
      * 🔴 `dedupe` 是**防第二份 React 的那道闸**（M1 判据第 3 条）。
