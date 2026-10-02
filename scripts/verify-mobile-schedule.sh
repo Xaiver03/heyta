@@ -45,7 +45,7 @@ TITLE="sched-e2e-$(date +%H%M%S)"
 
 echo ""
 echo "=== 移动端排期入口验收（真实模拟器，零 mock）==="
-echo "  设备: emulator-5554"
+echo "  设备: $E2E_SERIAL"
 echo "  任务: $TITLE"
 
 dismiss_consent_if_present() {

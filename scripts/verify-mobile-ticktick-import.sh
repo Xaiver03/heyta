@@ -59,7 +59,7 @@ ROW="tt-e2e-$(date +%H%M%S),Inbox"
 
 echo ""
 echo "=== 移动端滴答清单导入验收（真实模拟器，零 mock）==="
-echo "  设备: emulator-5554   服务端: $SERVER"
+echo "  设备: $E2E_SERIAL   服务端: $SERVER"
 echo "  账号: $EMAIL"
 echo "  CSV : $HEADER / $ROW"
 

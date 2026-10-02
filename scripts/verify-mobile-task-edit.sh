@@ -67,7 +67,7 @@ MMDD=$($ADB shell date +%m-%d 2>/dev/null | tr -d '\r')
 
 echo ""
 echo "=== 移动端任务编辑验收（真实模拟器，零 mock）==="
-echo "  设备: emulator-5554   服务端: $SERVER"
+echo "  设备: $E2E_SERIAL   服务端: $SERVER"
 echo "  账号: $EMAIL"
 echo "  任务: $TITLE → $RENAMED"
 echo "  设备日期: $MMDD"

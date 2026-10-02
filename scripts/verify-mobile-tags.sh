@@ -76,7 +76,7 @@ TASK_TITLE="tagtask-e2e-$(date +%H%M%S)"
 
 echo ""
 echo "=== 移动端标签验收（真实模拟器，零 mock）==="
-echo "  设备: emulator-5554   服务端: $SERVER"
+echo "  设备: $E2E_SERIAL   服务端: $SERVER"
 echo "  标签: $TAG_NAME"
 echo "  任务: $TASK_TITLE"
 

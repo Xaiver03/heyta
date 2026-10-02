@@ -52,7 +52,7 @@ TITLE="cap-e2e-$(date +%H%M%S)"
 
 echo ""
 echo "=== 移动端一句话捕获验收（真实模拟器，零 mock）==="
-echo "  设备: emulator-5554   服务端: $SERVER"
+echo "  设备: $E2E_SERIAL   服务端: $SERVER"
 echo "  账号: $EMAIL"
 echo "  句子: 「$TITLE !1」——「!1」是**确定性的优先级标记**（ASCII，能打进去）"
 

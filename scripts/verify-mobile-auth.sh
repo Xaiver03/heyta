@@ -119,7 +119,7 @@ fi
 
 echo ""
 echo "=== 移动端注册 / 登录旅程验收（真实模拟器 + 真服务端，零 mock）==="
-echo "  设备: emulator-5554   服务端: $SERVER   库: $PG_DB"
+echo "  设备: $E2E_SERIAL   服务端: $SERVER   库: $PG_DB"
 echo "  账号: ${EMAIL}（手机将**自己登录**这个账号，不是用手填令牌）"
 echo "  任务: $TITLE"
 
