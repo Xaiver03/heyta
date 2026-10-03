@@ -141,10 +141,15 @@ describe('清单改名与归档的落库形状', () => {
     const archived = state().projects[id] as Project;
     expect(archived.archived).toBe(true);
     expect(archived.deletedAt).toBeUndefined();
-    // 🔴 归档后**仍然列得出来**（`listProjects` 只滤删除）。把它滤掉的是
-    // 共享层的 `includeArchived`，不是动作层——动作层一滤，移动端那个
-    // 「显示已归档」开关就永远读不到数据了。
-    expect(projects.listProjects().map((p) => p.id)).toContain(id);
+    // 🔴 归档后：可见那路不含它、归档那路只含它（W9 / P-9：归档不进任何出口，
+    // 隐藏由**动作层**负责而不是由调用点记得）。
+    // ⚠️ 这条判据原先写的是"归档后仍然列得出来"，理由是"动作层一滤，
+    // 移动端那个「显示已归档」开关就永远读不到数据了" —— 那个前提由
+    // `listAllProjects()`（两路合并）兑现：开关的数据源现在就是它，
+    // 见下面 '接线：入口在两端都真的连着' 里新增的那把锁。
+    expect(projects.listProjects().map((p) => p.id)).not.toContain(id);
+    expect(projects.listArchivedProjects().map((p) => p.id)).toEqual([id]);
+    expect(projects.listAllProjects().map((p) => p.id)).toContain(id);
 
     clock += 1_000;
     await projects.archiveProject(id, false);
@@ -286,6 +291,11 @@ describe('接线：入口在两端都真的连着', () => {
     // 用户按了归档就再也找不回来。三条必须同时在场。
     expect(file).toContain('includeArchived: showArchived');
     expect(file).toContain("t('common.organizer.showArchived')");
+    // 🔴 第四把锁（W9 之后才有意义）：开关与 `includeArchived` 在，**不代表有数据可放出来**。
+    // 动作层的 `listProjects()` 从 W9 起不含归档，所以本屏必须读 `listAllProjects()` ——
+    // 读错那一路的症状不是报错，是"开关按了什么都没出现"（单向门换了个方向）。
+    expect(file).toContain('actions.listAllProjects()');
+    expect(file).not.toContain('actions.listProjects()');
     // 动作层之外不许自己拼 op（AGENTS §3.5）。
     expect(file).not.toContain("entityType: 'PROJECT'");
     // 棘轮：移动端 screens 的内联样式恰在基线 90，新代码的净增必须是 0。

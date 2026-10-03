@@ -202,6 +202,7 @@ vi.mock('../src/db', () => {
     $transaction: vi.fn().mockImplementation(async (callback: any) => {
       // Create a transaction context
       const tx = {
+        vaultKeyPackage: { findUnique: vi.fn().mockResolvedValue(null) },
         operation: {
           create: vi.fn().mockImplementation(async (args: any) => {
             serverSeqCounter++;
@@ -324,6 +325,9 @@ vi.mock('../src/db', () => {
           }),
           update: vi.fn().mockResolvedValue({}),
         },
+        vaultKeyMigration: {
+          aggregate: vi.fn().mockResolvedValue({ _sum: { reservedStorageBytes: 0n } }),
+        },
         // Every raw query issued inside the transaction must be recognised here and
         // anything unknown must THROW. A tolerant default is how the array branch
         // stayed silently stubbed out: conflict.ts reads an unrecognised row via
@@ -375,6 +379,9 @@ vi.mock('../src/db', () => {
     user: {
       findUnique: vi.fn(),
       update: vi.fn(),
+    },
+    vaultKeyMigration: {
+      aggregate: vi.fn().mockResolvedValue({ _sum: { reservedStorageBytes: 0n } }),
     },
     $queryRaw: vi.fn().mockResolvedValue([{ total: BigInt(0) }]),
     $executeRaw: vi.fn().mockResolvedValue(0),

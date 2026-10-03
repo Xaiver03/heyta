@@ -659,6 +659,20 @@ export class WebSocketConnectionService {
     }
   }
 
+  /** Close connections currently claiming this clientId. Not an authentication
+   * boundary: clientId is self-reported. Security revocation uses tokenVersion
+   * and closeForUser; a clientId tombstone alone cannot prevent reconnects. */
+  closeForClient(userId: number, clientId: string): void {
+    const userSet = this.connections.get(userId);
+    const client = [...(userSet ?? [])].find((entry) => entry.clientId === clientId);
+    if (client) {
+      this.removeConnection(userId, client, {
+        code: WebSocketConnectionService.TOKEN_REVOKED_CLOSE_CODE,
+        reason: 'Device revoked',
+      });
+    }
+  }
+
   /** Close all connections gracefully */
   closeAll(): void {
     for (const [, userSet] of this.connections) {

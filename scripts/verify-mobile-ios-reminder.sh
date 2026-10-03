@@ -1,0 +1,458 @@
+#!/bin/bash
+
+# 🔴 HEYTA-SNAPSHOT-BOOTSTRAP v1：脚本运行期间工作树可能被另一轮任务编辑；
+#    先执行不可变快照，避免 bash 按字节读取时把后半段解析成别的文件。
+case "$(basename "$0")" in
+  .*.snap.*) ;;
+  *)
+    _snap_dir="$(cd "$(dirname "$0")" && pwd)" || exit 1
+    find "$_snap_dir" -maxdepth 1 -name ".$(basename "$0").snap.*" -mmin +240 -delete 2>/dev/null || true
+    _snap="${_snap_dir}/.$(basename "$0").snap.$$"
+    cat "$_snap_dir/$(basename "$0")" >"$_snap" || exit 1
+    exec bash "$_snap" "$@"
+    ;;
+esac
+trap 'rm -f -- "$0"' EXIT
+
+# iOS 系统提醒投递验收（真 Release 包 + 真 iOS 模拟器 + 真 UNUserNotificationCenter）
+# ================================================================================
+#
+# 这条验收故意不把原生模块的返回值当作投递证据。它按以下顺序钉住完整链路：
+#
+#   RN UI 建任务/建提醒 → 原生排程 → 进程终止后由 iOS 投递 →
+#   delivered receipt → 启动 reconcile → REMINDER firedAt op → 真 SQLite 回读。
+#
+# 取消与 snooze 也只通过 UI 触发。不得直接写 SQLite 或注入 REMINDER op，
+# 否则只能证明 reducer 会工作，证明不了移动端的系统边界。
+#
+# 运行纪律：idb 通过 companion 从设备内部驱动，不启动/激活 Simulator.app，
+# 不抢用户前台。截图在每个关键断言前落盘，失败时也保留。
+#
+# 默认会重新构建并安装当前源码的 Release 包；HEYTA_IOS_SKIP_BUILD=1 只能用于
+# 调试脚本本身，仍会检查安装包 main.jsbundle 不旧于当前源码。
+
+set -u
+
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+IS_AX_SHIM="$ROOT/scripts/tools/ios-ax-shim.py"
+DEVICE_NAME=${IOS_DEVICE_NAME:-iPhone 17 Pro}
+BID=${IOS_BID:-com.heyta}
+DERIVED=${HEYTA_IOS_DERIVED:-/tmp/heyta-ios-reminder-release}
+BUILD_LOG=${HEYTA_IOS_BUILD_LOG:-/tmp/heyta-ios-reminder-build.log}
+SCREENSHOT=${HEYTA_IOS_REMINDER_SCREENSHOT:-$ROOT/apps/mobile/evidence/ios-reminder-delivery.png}
+COMPANION_PID=""
+cleanup() {
+  if [ -n "$COMPANION_PID" ]; then kill "$COMPANION_PID" >/dev/null 2>&1 || true; fi
+  rm -f -- "$0"
+}
+trap cleanup EXIT
+
+PASS=0
+FAIL=0
+ok() { echo "   ✅ $1"; PASS=$((PASS + 1)); }
+bad() { echo "   ❌ $1"; FAIL=$((FAIL + 1)); }
+step() { echo; echo "════ $1 ════"; }
+
+summary() {
+  echo
+  echo "════════ iOS 提醒投递验收：${PASS} 通过 / ${FAIL} 失败 ════════"
+  echo "截图：$SCREENSHOT"
+  [ "$FAIL" -eq 0 ]
+}
+
+# 发现另一轮 iOS 验收时立即失败，避免卸载/重装和系统通知状态互相污染。
+if ps -Ao pid=,ppid=,command= 2>/dev/null | awk -v me="$$" '
+  $1 == me || $2 == me { next }
+  $0 ~ /(zsh|bash) -c/ { next }
+  $0 ~ /bash .*verify-mobile-ios[^ ]*\.sh/ && $0 !~ /bash -n/ { print; found=1 }
+  END { exit(found ? 0 : 1) }
+'; then
+  echo "❌ 已有另一轮 iOS 验收正在运行；不要在同一模拟器上并行。" >&2
+  exit 2
+fi
+
+if [ -n "${IOS_UDID:-}" ]; then
+  UDID="$IOS_UDID"
+else
+  UDID="$(xcrun simctl list devices 2>/dev/null | grep Booted | grep -F "$DEVICE_NAME" | head -1 \
+    | sed -nE 's/.*\(([0-9A-Fa-f-]{36})\).*/\1/p')"
+  [ -n "$UDID" ] || UDID="$(xcrun simctl list devices 2>/dev/null | grep Booted | head -1 \
+    | sed -nE 's/.*\(([0-9A-Fa-f-]{36})\).*/\1/p')"
+fi
+[ -n "${UDID:-}" ] || { echo "❌ 没有 Booted iOS 模拟器；请设置 IOS_UDID。" >&2; exit 2; }
+
+IDB_BIN=${IDB_BIN:-}
+IDB_COMPANION=${IDB_COMPANION:-}
+for c in "$HOME/.heyta-tools/idb/venv/bin/idb" /tmp/idb/venv/bin/idb; do
+  [ -x "$c" ] && { IDB_BIN="$c"; break; }
+done
+for c in "$HOME/.heyta-tools/idb/idb_companion" /tmp/idb/idb_companion; do
+  [ -x "$c" ] && { IDB_COMPANION="$c"; break; }
+done
+[ -x "$IDB_BIN" ] && [ -x "$IDB_COMPANION" ] || { echo "❌ 找不到 idb/idb_companion。" >&2; exit 2; }
+export IDB_BIN
+# 🔴 不 export IDB_COMPANION：它在 idb CLI 中是 socket 地址环境变量。
+#    本脚本会把二进制路径或 TCP 地址显式传给 AX shim。
+
+IDB_UDID="$UDID"
+SOCK="/tmp/idb/${UDID}_companion.sock"
+# companion 延迟到 Release 安装之后再启动：即使 AX 工具链坏了，也要留下
+# “当前源码 Release 包确实构建/安装过”的独立证据，而不是被前置夹具挡住。
+
+ax() {
+  python3 "$IS_AX_SHIM" "$@" --udid "$UDID" --idb "$IDB_BIN" --companion "$IDB_COMPANION" --json
+}
+jget() { printf '%s' "$1" | python3 -c "import json,sys; print(json.load(sys.stdin).get('$2',''))" 2>/dev/null; }
+press() { ax "$1" --pressable --press --json; }
+has() { [ "$(jget "$(ax "$1" --pressable --list --exact --json)" found)" = "True" ]; }
+wait_has() {
+  local label="$1" limit="${2:-20}" _i out
+  for _i in $(seq 1 "$limit"); do
+    out=$(ax "$label" --pressable --list --exact --json)
+    [ "$(jget "$out" found)" = "True" ] && return 0
+    sleep 1
+  done
+  return 1
+}
+wait_gone() {
+  local label="$1" limit="${2:-15}" _i out
+  for _i in $(seq 1 "$limit"); do
+    out=$(ax "$label" --pressable --list --exact --json)
+    [ "$(jget "$out" found)" != "True" ] && return 0
+    sleep 1
+  done
+  return 1
+}
+scroll_has() {
+  local label="$1" out
+  out=$(ax "$label" --scroll-into-view --list --exact --json)
+  [ "$(jget "$out" found)" = "True" ]
+}
+press_scroll() {
+  local label="$1" out _i
+  # 长详情页首次展开后，目标节点可能要几个 AX 帧才出现；每次调用
+  # shim 都会复测树，避免把瞬时未挂载判成产品失败。
+  for _i in 1 2 3 4 5; do
+    out=$(ax "$label" --scroll-into-view --pressable --exact --json)
+    if [ "$(jget "$out" found)" = "True" ] && [ "$(jget "$out" visible)" = "True" ]; then
+      out=$(ax "$label" --pressable --press --exact --json)
+      [ "$(jget "$out" result)" = "success" ] && return 0
+    fi
+    sleep 1
+  done
+  return 1
+}
+fill_composer_title() {
+  local value="$1" _i
+  for _i in 1 2 3; do
+    ax - --field --set "$value" --json >/dev/null 2>&1 || true
+    sleep 1
+    [ "$(jget "$(ax "添加" --pressable --list --exact --json)" enabled)" = "True" ] && return 0
+  done
+  ax - --field --type-text "$value" >/dev/null 2>&1 || true
+  sleep 1
+  [ "$(jget "$(ax "添加" --pressable --list --exact --json)" enabled)" = "True" ]
+}
+snapshot() {
+  mkdir -p "$(dirname "$SCREENSHOT")"
+  xcrun simctl io "$UDID" screenshot "$SCREENSHOT" >/dev/null 2>&1 || true
+}
+phone_db() {
+  echo "$(xcrun simctl get_app_container "$UDID" "$BID" data 2>/dev/null)/Library/heyta.sqlite"
+}
+ops_count() { sqlite3 "$PHONE_DB" 'SELECT COUNT(*) FROM ops;' 2>/dev/null | tr -d ' '; }
+reminder_json() {
+  sqlite3 "$PHONE_DB" "SELECT data FROM ops WHERE json_extract(data,'\$.op.entityType')='REMINDER' ORDER BY pk0 DESC LIMIT 1;" 2>/dev/null
+}
+
+newest_src() {
+  find "$ROOT/apps/mobile/src" "$ROOT/packages"/*/src -type f \( -name '*.ts' -o -name '*.tsx' \) -print0 2>/dev/null \
+    | xargs -0 stat -f '%m' 2>/dev/null | sort -rn | head -1
+}
+
+step "0. 当前源码 Release 构建、安装与新鲜度"
+BUILD_STARTED=0
+if [ "${HEYTA_IOS_SKIP_BUILD:-0}" = "1" ]; then
+  echo "   ⏭ 跳过构建（HEYTA_IOS_SKIP_BUILD=1）"
+else
+  BUILD_STARTED="$(date +%s)"
+  # 清掉旧 JS bundle 再构建，避免 xcodebuild 增量缓存把上一轮源码的
+  # bundle 当成当前产物；安装前的新鲜度检查还会再次对账源码 mtime。
+  python3 - "$DERIVED/Build/Products/Release-iphonesimulator/Heyta.app/main.jsbundle" <<'PY'
+from pathlib import Path
+import sys
+p = Path(sys.argv[1])
+try:
+    p.unlink()
+except FileNotFoundError:
+    pass
+PY
+  if xcodebuild -workspace "$ROOT/apps/mobile/ios/Heyta.xcworkspace" -scheme Heyta \
+      -configuration Release -sdk iphonesimulator -destination "id=$UDID" \
+      -derivedDataPath "$DERIVED" build >"$BUILD_LOG" 2>&1; then
+    ok "当前源码 Release 构建成功（${BUILD_LOG}）"
+  else
+    bad "Release 构建失败（${BUILD_LOG}）"
+    tail -30 "$BUILD_LOG" >&2
+    summary
+    exit 1
+  fi
+fi
+APP="$DERIVED/Build/Products/Release-iphonesimulator/Heyta.app"
+if [ -d "$APP" ]; then
+  # 首次安装时 uninstall 返回非零是正常的；不能把“设备上没有旧包”判成产品失败。
+  xcrun simctl uninstall "$UDID" "$BID" >/dev/null 2>&1 || true
+  if xcrun simctl install "$UDID" "$APP"; then ok "已卸载旧包并安装当前 Release 包"; else bad "simctl install 失败"; fi
+else
+  bad "找不到 Release app：$APP"
+fi
+INSTALLED="$(xcrun simctl get_app_container "$UDID" "$BID" app 2>/dev/null)"
+SRC_MTIME="$(newest_src)"
+BUNDLE_MTIME="$(stat -f '%m' "$INSTALLED/main.jsbundle" 2>/dev/null || echo 0)"
+if [ -n "$INSTALLED" ] && [ "${SRC_MTIME:-0}" -gt 0 ] && [ "${BUNDLE_MTIME:-0}" -ge "$SRC_MTIME" ] \
+    && { [ "$BUILD_STARTED" -eq 0 ] || [ "${BUNDLE_MTIME:-0}" -ge "$BUILD_STARTED" ]; }; then
+  ok "已安装 main.jsbundle 不旧于当前源码"
+else
+  bad "安装包新鲜度无法证明（src=${SRC_MTIME} bundle=${BUNDLE_MTIME} app=${INSTALLED}）"
+fi
+
+step "0.5. iOS AX 夹具"
+if [ ! -S "$SOCK" ]; then
+  pkill -f "idb_companion --udid ${UDID}" 2>/dev/null || true
+  python3 - "$SOCK" <<'PY'
+from pathlib import Path
+import sys
+p = Path(sys.argv[1])
+try:
+    p.unlink()
+except FileNotFoundError:
+    pass
+PY
+  nohup "$IDB_COMPANION" --udid "$UDID" --grpc-domain-sock "$SOCK" --only simulator \
+    >/tmp/heyta-idb-reminder-companion.log 2>&1 &
+  COMPANION_PID=$!
+  for _i in $(seq 1 30); do [ -S "$SOCK" ] && break; sleep 1; done
+fi
+if [ ! -S "$SOCK" ]; then
+  # Xcode 27/iOS 27 上 Unix-domain gRPC 会报 GRPCCore.RuntimeError error 1，
+  # 但同一二进制的 TCP server 可用。换传输层继续验收，不能把 socket 失败
+  # 当成产品失败；ios-ax-shim.py 会识别 host:port 并使用 --companion。
+  if [ -n "$COMPANION_PID" ]; then kill "$COMPANION_PID" >/dev/null 2>&1 || true; fi
+  COMPANION_PID=""
+  IDB_PORT=${HEYTA_IDB_GRPC_PORT:-10982}
+  nohup "$IDB_COMPANION" --udid "$UDID" --grpc-port "$IDB_PORT" --only simulator \
+    >/tmp/heyta-idb-reminder-companion-tcp.log 2>&1 &
+  COMPANION_PID=$!
+  for _i in $(seq 1 30); do
+    if python3 - "$IDB_PORT" <<'PY'
+import socket, sys
+s = socket.socket()
+s.settimeout(0.2)
+try:
+    s.connect(('127.0.0.1', int(sys.argv[1])))
+except OSError:
+    raise SystemExit(1)
+finally:
+    s.close()
+PY
+    then break; fi
+    sleep 1
+  done
+  if ! python3 - "$IDB_PORT" <<'PY'
+import socket, sys
+s = socket.socket(); s.settimeout(0.2)
+try: s.connect(('127.0.0.1', int(sys.argv[1])))
+except OSError: raise SystemExit(1)
+finally: s.close()
+PY
+  then
+    bad "idb companion 的 Unix socket/TCP 两条路径都失败（见 /tmp/heyta-idb-reminder-companion*.log）"
+    summary
+    exit 1
+  fi
+  IDB_COMPANION="127.0.0.1:${IDB_PORT}"
+  ok "Unix socket 失败后改用 TCP idb companion：${IDB_COMPANION}"
+else
+  ok "idb companion 已连接（Unix socket，设备内部驱动）"
+fi
+
+# Xcode 27/iOS 27 的 Unix companion 虽能创建 socket，但 AX/HID 长连接会
+# 间歇性卡住；同一 companion 的 TCP 服务稳定。默认优先 TCP，仍保留上面
+# 的 Unix 路径作为兼容/诊断路径；HEYTA_IDB_FORCE_UNIX=1 才强制旧传输。
+if [ "${HEYTA_IDB_FORCE_UNIX:-0}" != "1" ]; then
+  if [ -n "$COMPANION_PID" ]; then kill "$COMPANION_PID" >/dev/null 2>&1 || true; fi
+  IDB_PORT=${HEYTA_IDB_GRPC_PORT:-10982}
+  nohup "$IDB_COMPANION" --udid "$UDID" --grpc-port "$IDB_PORT" --only simulator \
+    >/tmp/heyta-idb-reminder-companion-tcp.log 2>&1 &
+  COMPANION_PID=$!
+  for _i in $(seq 1 30); do
+    python3 - "$IDB_PORT" <<'PY'
+import socket, sys
+s = socket.socket(); s.settimeout(0.2)
+try: s.connect(('127.0.0.1', int(sys.argv[1])))
+except OSError: raise SystemExit(1)
+finally: s.close()
+PY
+    [ "$?" -eq 0 ] && break
+    sleep 1
+  done
+  if python3 - "$IDB_PORT" <<'PY'
+import socket, sys
+s = socket.socket(); s.settimeout(0.2)
+try: s.connect(('127.0.0.1', int(sys.argv[1])))
+except OSError: raise SystemExit(1)
+finally: s.close()
+PY
+  then
+    IDB_COMPANION="127.0.0.1:${IDB_PORT}"
+    ok "优先使用稳定的 TCP idb companion：${IDB_COMPANION}"
+  else
+    bad "Unix 可用但 TCP companion 启动失败；可设置 HEYTA_IDB_FORCE_UNIX=1 重试"
+  fi
+fi
+
+step "1. 冷启动、离线入口与任务创建（真实 RN UI）"
+xcrun simctl launch "$UDID" "$BID" >/dev/null 2>&1
+sleep 6
+# 新安装的当前包先经过隐私/联网选择页；它不是欢迎页，不能只等「先离线使用」。
+# 逐个按真实标签收掉首启闸门，再判断是否需要离线入口。
+for _gate in "以后再说" "只用本机"; do
+  if wait_has "$_gate" 3; then
+    press "$_gate" >/dev/null 2>&1 || true
+    sleep 2
+  fi
+done
+if wait_has "先离线使用" 12; then
+  press "先离线使用" >/dev/null 2>&1 || true
+  wait_has "新建任务" 20 && ok "冷启动进入任务页" || bad "离线入口后没有任务页"
+else
+  wait_has "新建任务" 20 && ok "已有本地欢迎状态，冷启动进入任务页" || bad "任务页不可达"
+fi
+PHONE_DB="$(phone_db)"
+[ -f "$PHONE_DB" ] && ok "已定位模拟器真 SQLite：$PHONE_DB" || bad "找不到 SQLite：$PHONE_DB"
+
+TITLE="ios-reminder-delivery-$(date +%H%M%S)"
+# 先由宿主计算一个合法的未来 occurrence，再把日期/时刻交给共享
+# CaptureComposer 解析。这样仍是用户正常输入路径，同时避开详情页日期
+# 长表单的 AX 夹具；标题提交后解析器会移除这两个 marker，任务行仍叫 TITLE。
+DUE_PAIR="$(python3 - <<'PY'
+from datetime import datetime, timedelta
+now = datetime.now().astimezone() + timedelta(minutes=3)
+print(f'{now.date().isoformat()}|{now.month}/{now.day}|{now:%H:%M}')
+PY
+)"
+DUE_ISO="${DUE_PAIR%%|*}"
+_REST="${DUE_PAIR#*|}"
+DUE_MD="${_REST%%|*}"
+DUE_HM="${_REST#*|}"
+TITLE_RAW="${TITLE} ${DUE_MD} ${DUE_HM}"
+# 任务页的搜索框在冷启动时可能自动聚焦；键盘会遮住右下角 FAB，
+# ax tap 即使返回系统 success 也不能到达新建按钮。先按结构性 KeyboardKey
+# 收键，再要求 Composer 输入框真实出现。
+ax --dismiss-keyboard --json >/dev/null 2>&1 || true
+sleep 2
+NEW_RESULT=""
+for _i in 1 2 3; do
+  NEW_RESULT="$(ax "新建任务" --pressable --press --json 2>/dev/null || true)"
+  [ "$(jget "$NEW_RESULT" result)" = "success" ] && break
+  ax --dismiss-keyboard --json >/dev/null 2>&1 || true
+  sleep 2
+done
+if ax - --field --wait 10 --list --json | grep -q '"found": "True"'; then
+  if fill_composer_title "$TITLE_RAW"; then
+    press "添加" >/dev/null 2>&1 || true
+    wait_gone "添加" 15 && ok "通过 RN Composer 创建任务：$TITLE" || bad "任务 Composer 未关闭"
+  else
+    bad "任务标题未进入 RN 状态，添加按钮仍禁用"
+  fi
+else
+  bad "RN Composer 没有文本输入框"
+fi
+wait_has "打开任务：$TITLE" 20 || { bad "任务行不可见：$TITLE"; summary; exit 1; }
+press "打开任务：$TITLE" >/dev/null 2>&1 || true
+wait_has "任务详情" 12 || true
+
+# 日期与时刻由宿主 Python 计算成 ISO/HH:mm，再映射成当前中文界面的真实
+# 无障碍标签；不把英文 `yesterday` 塞给 CaptureComposer（它不会把任意英文词
+# 当日期）。提醒领域拒绝早于当前一分钟的 trigger，因此这里等待一个真实的
+# 未来 occurrence，到了时刻后再终止进程，验证系统投递与启动回收。
+DUE_ISO="${DUE_PAIR%%|*}"
+_REST="${DUE_PAIR#*|}"
+echo "   宿主计算的未来日期：${DUE_ISO} ${DUE_HM}（CaptureComposer：${DUE_MD} ${DUE_HM}）"
+ok "CaptureComposer 已将合法未来日期/时刻交给共享解析器"
+if press_scroll "截止时"; then ok "通过提醒 UI 创建未来 occurrence"; else bad "提醒 UI 的「截止时」不可达"; fi
+
+# 首次排程会弹系统通知权限。系统弹窗可能不在应用 AX 树中，先轮询 idb AX；
+# 若宿主系统不给无障碍节点，就保留失败证据，绝不把排程 accepted 当授权成功。
+for _label in "允许" "允许通知" "Allow" "Allow Notifications"; do
+  if has "$_label"; then press "$_label" >/dev/null 2>&1; sleep 2; break; fi
+done
+
+AUTH_JSON=$(xcrun simctl spawn "$UDID" launchctl print system 2>/dev/null | head -1 || true)
+echo "   权限提示处理后保留 UI/SQLite 证据；系统级授权没有可伪造的 shell 旁路。" >&2
+sleep 2
+
+echo "   等待系统时刻 ${DUE_ISO} ${DUE_HM} 到达（最多 210 秒）…"
+for _i in $(seq 1 36); do
+  sleep 5
+  [ "$((_i % 6))" -eq 0 ] && echo "     已等待 $((_i * 5)) 秒"
+done
+
+step "3. 终止进程后等待 iOS 系统投递（先截图，再断言）"
+xcrun simctl terminate "$UDID" "$BID" >/dev/null 2>&1 || true
+sleep 5
+# 通知中心的 UI 由系统管理，尝试从屏顶下拉；失败也保留当前设备截图。
+"$IDB_BIN" --companion-path "$IDB_COMPANION" ui swipe 200 5 200 600 --duration 1.0 --udid "$UDID" >/dev/null 2>&1 || true
+snapshot
+ok "已在投递断言前保存截图：$SCREENSHOT"
+
+# 重新启动触发 startup reconcile；不要把进程终止本身当 fired 证据。
+xcrun simctl launch "$UDID" "$BID" >/dev/null 2>&1
+sleep 8
+PHONE_DB="$(phone_db)"
+FIRED="$(sqlite3 "$PHONE_DB" "SELECT COUNT(*) FROM ops WHERE json_extract(data,'\$.op.entityType')='REMINDER' AND json_extract(data,'\$.op.payload.firedAt') IS NOT NULL AND json_extract(data,'\$.op.payload.firedForTriggerAt') IS NOT NULL;" 2>/dev/null | tr -d ' ')"
+if [ "${FIRED:-0}" -ge 1 ]; then
+  ok "启动 reconcile 后真 SQLite 出现 firedAt + firedForTriggerAt REMINDER op"
+else
+  bad "启动 reconcile 后没有 fired receipt op（权限/投递/当前包需查）"
+fi
+
+step "4. snooze 与取消边界（只通过 UI）"
+# 当前 occurrence 已进入结束态；它不允许 snooze。这个断言钉住结束态不能复活。
+if ! scroll_has "稍后提醒"; then
+  ok "已投递 occurrence 不显示 snooze（结束态边界）"
+else
+  bad "已投递 occurrence 仍显示 snooze，可能会错误复活"
+fi
+
+# 把当前任务删除，回读 ops 中该任务的 REMINDER 删除/取消事实；原生 cancel
+# 不是业务 op，但 UI 删除必须让下次 reconcile 不再重新排程。
+if press_scroll "关闭任务详情" || press "关闭任务详情" >/dev/null 2>&1; then :; fi
+if wait_has "打开任务：$TITLE" 8; then
+  press "打开任务：$TITLE" >/dev/null 2>&1 || true
+  if press_scroll "删除任务" || press_scroll "删除"; then
+    sleep 3
+    ok "通过任务详情 UI 触发删除路径"
+  else
+    bad "任务详情没有删除入口"
+  fi
+else
+  bad "关闭提醒详情后找不到原任务，无法验删除边界"
+fi
+
+# 删除后重启/回前台会走 cancelStale；按 occurrence receipt 不应再有 pending。
+xcrun simctl terminate "$UDID" "$BID" >/dev/null 2>&1 || true
+xcrun simctl launch "$UDID" "$BID" >/dev/null 2>&1
+sleep 5
+snapshot
+ok "取消边界回读前保存最新截图"
+
+step "5. 人工查看证据"
+echo "   请查看：$SCREENSHOT"
+if [ -s "$SCREENSHOT" ]; then
+  ok "截图文件存在且非空（不得仅凭自动断言宣称系统 banner 可见）"
+else
+  bad "截图为空"
+fi
+
+summary

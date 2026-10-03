@@ -13,7 +13,7 @@
  * 本模型的价值就是"把领域层的输出投影正确"，手捏数据会把投影与解析的接缝测丢。
  */
 
-import { Priority, localDateTimeToEpoch, parseCapture } from '@heyta/domain';
+import { Priority, dueDateToEpoch, localDateTimeToEpoch, parseCapture } from '@heyta/domain';
 import { describe, expect, it } from 'vitest';
 
 import {
@@ -21,6 +21,7 @@ import {
   captureChipAction,
   captureChipKey,
   captureChipRemainingDays,
+  captureChipTimeLabel,
   capturePriorityLabelKey,
   parseCaptureDraft,
   shouldResetCaptureIgnore,
@@ -208,6 +209,35 @@ describe('D. 剩余天数：由共享层算（措辞归宿主）', () => {
   });
 });
 
+describe('R14 时刻芯片：`captureChipTimeLabel` 是宿主唯一的那道口子', () => {
+  it('🔴 时刻芯片念 `HH:MM` 本身，**不掉进优先级兜底念成「不设置」**', () => {
+    const chips = toCaptureChips(parsed('明天16:00 交周报'));
+    expect(chips.map((c) => c.field)).toEqual(['dueDate', 'dueTime']);
+    expect(captureChipTimeLabel(chips[1]!)).toBe('16:00');
+    expect(chips[1]!.dueTime).toBe('16:00');
+    // 另外两类芯片必须返回 `undefined`，否则宿主那条 `if` 会把日期/优先级也吃掉。
+    expect(captureChipTimeLabel(chips[0]!)).toBeUndefined();
+    const priority = toCaptureChips(parsed('交周报 !1'))[0]!;
+    expect(priority.field).toBe('priority');
+    expect(captureChipTimeLabel(priority)).toBeUndefined();
+  });
+
+  it('归一化后的值进标签，原文进 `raw`：`明天9:05` 念成 `09:05`', () => {
+    const chip = toCaptureChips(parsed('明天9:05 打卡'))[1]!;
+    expect(chip.raw).toBe('9:05');
+    expect(captureChipTimeLabel(chip)).toBe('09:05');
+  });
+
+  it('未采纳的第二条时刻也是芯片（它**还在标题里**，标签照样念得出值）', () => {
+    const chips = toCaptureChips(parsed('明天 09:30-10:30 对齐'));
+    expect(chips.filter((c) => c.field === 'dueTime').map((c) => c.action)).toEqual([
+      'ignore',
+      'unused',
+    ]);
+    expect(captureChipTimeLabel(chips[2]!)).toBe('10:30');
+  });
+});
+
 describe('E. 提交计划：本地日期 → Task 约定（epoch ms，本地零点）', () => {
   it('规则解析：标题 + 优先级 + 本地零点', () => {
     const plan = toCaptureSubmitPlan(parsed('明天交周报 !1'));
@@ -225,6 +255,24 @@ describe('E. 提交计划：本地日期 → Task 约定（epoch ms，本地零�
     const plan = toCaptureSubmitPlan(parsed('交周报 !1'));
     expect(plan).not.toBeUndefined();
     expect(Object.prototype.hasOwnProperty.call(plan, 'dueDate')).toBe(false);
+  });
+
+  it('🔴 R14：`明天16:00` 的 epoch 落在**本地 16:00**，不是零点', () => {
+    const plan = toCaptureSubmitPlan(parsed('明天16:00 交周报'));
+    const due = new Date(plan!.dueDate!);
+    expect([due.getFullYear(), due.getMonth() + 1, due.getDate()]).toEqual([2026, 9, 29]);
+    expect([due.getHours(), due.getMinutes()]).toEqual([16, 0]);
+    // 反向对照：同一天不带时刻**确实**是零点。少了这一条，上面那条可能只是
+    // "epoch 恰好不等于零点"在打分。
+    expect(new Date(dueDateToEpoch('2026-09-29')).getHours()).toBe(0);
+  });
+
+  it('🔴 R14：裸时刻不许借锚点成立（锚点补的是日期，不是"日期 + 时刻"的许可）', () => {
+    const plan = toCaptureSubmitPlan(parsed('16:00 交周报'), '2026-10-08');
+    const due = new Date(plan!.dueDate!);
+    expect([due.getFullYear(), due.getMonth() + 1, due.getDate()]).toEqual([2026, 10, 8]);
+    expect(due.getHours(), '时刻没被采纳，锚点那天必须还是零点').toBe(0);
+    expect(plan!.title).toBe('16:00 交周报');
   });
 
   it('标题为空 → `undefined`（调用方据此不提交）', () => {

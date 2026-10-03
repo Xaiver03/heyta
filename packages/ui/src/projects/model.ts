@@ -56,13 +56,18 @@
  *    留原文是为了让后来者认得出"零件都在、没人接线"这个形状。
  *
  * 4. **`archived` 的显示开关**：本文件的 `aliveProjects` 一律**隐藏**归档清单
- *    （与迁移前的 web 选择器逐字一致）。
+ *    （与迁移前的 web 选择器逐字一致）。判据本身在 `@heyta/domain` 的 `isArchived`，
+ *    这里不写第二份 —— W9 之后动作层也要判同一件事（`listProjects()` 藏归档、
+ *    `listArchivedProjects()` 只留归档），两份字面量迟早分叉。
+ *    ⚠️ 正因为动作层从 W9 起会滤掉归档，宿主喂给本文件的必须是
+ *    `listAllProjects()`（两路合并）而不是 `listProjects()` —— 只喂一路的话，
+ *    这里的 `includeArchived` 就没有数据可放出来，开关按了什么都不出现。
  *    ✅ "显示已归档"这一刀**已做**（2026-10-03）：`toOrganizerTree(projects,
  *    { includeArchived })` + `archivedProjects()`，两端的开关都在
  *    `archivedCount > 0` 时才画出来 —— 没有已归档清单时不占一行。
  */
 
-import type { Project, Tag, Task } from '@heyta/domain';
+import { isArchived, type Project, type Tag, type Task } from '@heyta/domain';
 
 /* ========================================================================
  * 一、行模型
@@ -112,7 +117,7 @@ export function aliveProjects(
   includeArchived = false,
 ): Project[] {
   if (includeArchived) return [...projects];
-  return projects.filter((project) => project.archived !== true);
+  return projects.filter((project) => !isArchived(project));
 }
 
 /**
@@ -124,7 +129,7 @@ export function aliveProjects(
  * 在 `archived?: boolean` 上眼下等价，将来加第三种状态时只会有一边跟着变。
  */
 export function archivedProjects(projects: readonly Project[]): Project[] {
-  return projects.filter((project) => project.archived === true);
+  return projects.filter(isArchived);
 }
 
 /** 顶层清单（无 `parentId`）。 */

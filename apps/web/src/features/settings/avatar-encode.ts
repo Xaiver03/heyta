@@ -15,10 +15,12 @@
  */
 
 import {
-  ACCOUNT_AVATAR_CONTENT_TYPES,
   ACCOUNT_AVATAR_EDGE_PX,
-  ACCOUNT_AVATAR_MAX_SOURCE_BYTES,
+  avatarOutputContentType,
+  isAvatarContentType,
+  planAvatarUpload,
   type AvatarPayload,
+  type AvatarRejectReason,
 } from '@heyta/shared-schema';
 
 /** 失败原因分类。**每种对应界面上一句不同的话**，所以不许合并。 */
@@ -34,17 +36,20 @@ export type EncodedAvatar =
   | { ok: true; image: AvatarPayload }
   | { ok: false; error: AvatarFileError };
 
-/** 抽出 `data:` URL 的 base64 段。 */
-function base64Of(dataUrl: string): string {
-  const comma = dataUrl.indexOf(',');
-  return comma === -1 ? '' : dataUrl.slice(comma + 1);
-}
-
-/** base64 字符串还原成字节数（不实际解码：尾部 `=` 才是唯一需要小心的地方）。 */
-function decodedBytes(base64: string): number {
-  const padding = base64.endsWith('==') ? 2 : base64.endsWith('=') ? 1 : 0;
-  return Math.floor((base64.length * 3) / 4) - padding;
-}
+/**
+ * 共享裁决的三种拒绝 → 界面那三句话。
+ *
+ * ⚠️ `empty` 归到 `undecodable` 那句，**不是**新加一句文案：编码结果为空串在
+ * 浏览器这一侧只可能是"画布没画出东西"，与解不开图是同一件对用户来说的事。
+ * 而"上限是多少、白名单里有哪几种格式"这两条判断**不在这里** —— 它们在
+ * `planAvatarUpload`，与移动端共用（原来 `decodedBytes` 住在本文件，
+ * 等于把一条产品规格的实现留在了一个壳里，见 AGENTS §3.5）。
+ */
+const reasonToError: Record<AvatarRejectReason, AvatarFileError> = {
+  'bad-type': 'bad-type',
+  'too-big': 'too-big',
+  empty: 'undecodable',
+};
 
 /**
  * 读一张文件并压成 `{ contentType, dataBase64 }`。
@@ -53,7 +58,9 @@ function decodedBytes(base64: string): number {
  * 判据用 `alpha` 是否存在，而不是文件后缀。原图是 PNG 就继续输出 PNG。
  */
 export async function loadAvatarImage(file: File): Promise<EncodedAvatar> {
-  if (!(ACCOUNT_AVATAR_CONTENT_TYPES as readonly string[]).includes(file.type)) {
+  // 白名单在**动手解码之前**问一句（`isAvatarContentType` 与 `planAvatarUpload`
+  // 内部是同一个判法，这里只是把它提前到花画布时间之前）。
+  if (!isAvatarContentType(file.type)) {
     return { ok: false, error: 'bad-type' };
   }
 
@@ -81,16 +88,13 @@ export async function loadAvatarImage(file: File): Promise<EncodedAvatar> {
     if (ctx === null) return { ok: false, error: 'undecodable' };
     ctx.drawImage(image, sx, sy, side, side, 0, 0, ACCOUNT_AVATAR_EDGE_PX, ACCOUNT_AVATAR_EDGE_PX);
 
-    const contentType = file.type === 'image/png' ? 'image/png' : 'image/jpeg';
+    const contentType = avatarOutputContentType(file.type);
     const dataUrl = canvas.toDataURL(contentType, contentType === 'image/jpeg' ? 0.86 : undefined);
-    const dataBase64 = base64Of(dataUrl);
-    if (dataBase64 === '') return { ok: false, error: 'undecodable' };
-    // 🔴 上限判的是**压缩之后**的字节 —— 原图多大不是我们能选的（一张 4 MB 的截图
-    // 压完可能 60 KB），而"原图超了所以拒绝"会把绝大多数手机相册里的照片挡在门外。
-    if (decodedBytes(dataBase64) > ACCOUNT_AVATAR_MAX_SOURCE_BYTES) {
-      return { ok: false, error: 'too-big' };
-    }
-    return { ok: true, image: { contentType, dataBase64 } };
+    const comma = dataUrl.indexOf(',');
+    const dataBase64 = comma === -1 ? '' : dataUrl.slice(comma + 1);
+    const plan = planAvatarUpload({ contentType: file.type, dataBase64 });
+    if (plan.action === 'reject') return { ok: false, error: reasonToError[plan.reason] };
+    return { ok: true, image: plan.payload };
   } finally {
     // 不 revoke 会一直占着这张图的内存直到页面卸载 —— 用户连选三次就是三张原图。
     URL.revokeObjectURL(url);

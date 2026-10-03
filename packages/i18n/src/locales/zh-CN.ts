@@ -536,28 +536,38 @@ export const zhCN = {
   // "按别人身份查资料"的端点，所以措辞里不许出现"其他用户会看到"。
   // 规格（32 个码点 / 图片格式与原图上限）的唯一来源是
   // `packages/shared-schema/src/account-profile-contract.ts`，措辞在这里。
-  'web.settings.profile.title': '个人信息',
-  'web.settings.profile.nickname.label': '昵称',
-  'web.settings.profile.nickname.placeholder': '留空则显示邮箱',
-  'web.settings.profile.nickname.hint': '最多 {max} 个字。昵称只是显示名，不是你的真实姓名；登录标识始终是邮箱。',
-  'web.settings.profile.nickname.toolong': '昵称最多 {max} 个字，现在有 {count} 个。',
-  'web.settings.profile.nickname.save': '保存昵称',
-  'web.settings.profile.nickname.saved': '昵称已保存',
-  'web.settings.profile.nickname.cleared': '已清除昵称',
-  'web.settings.profile.avatar.label': '头像',
-  'web.settings.profile.avatar.change': '换一张',
-  'web.settings.profile.avatar.remove': '移除头像',
-  'web.settings.profile.avatar.removed': '头像已移除',
-  'web.settings.profile.avatar.uploading': '正在上传…',
+  'common.profile.title': '个人信息',
+  'common.profile.nickname.label': '昵称',
+  'common.profile.nickname.placeholder': '留空则显示邮箱',
+  'common.profile.nickname.hint': '最多 {max} 个字。昵称只是显示名，不是你的真实姓名；登录标识始终是邮箱。',
+  'common.profile.nickname.toolong': '昵称最多 {max} 个字，现在有 {count} 个。',
+  'common.profile.nickname.save': '保存昵称',
+  'common.profile.nickname.saved': '昵称已保存',
+  'common.profile.nickname.cleared': '已清除昵称',
+  // 🔴 这一句**只说昵称**。它曾经复用头像那句失败提示（『头像没有传上去』），
+  //    于是昵称没存上时界面在说另一件事 —— 判据钉在 `apps/web/tests/profile-panel.spec.tsx`。
+  'common.profile.nickname.failed': '昵称没有保存成功，请稍后再试。',
+  'common.profile.avatar.label': '头像',
+  'common.profile.avatar.change': '换一张',
+  'common.profile.avatar.remove': '移除头像',
+  'common.profile.avatar.removed': '头像已移除',
+  'common.profile.avatar.uploading': '正在上传…',
   // 🔴 这条不是错误提示，是**产品事实**：口令从不落盘（`credential-storage.ts`），
   // 所以刷新之后内存里没有它，而头像是用它加密的。没有它谁也解不开，包括我们自己。
-  'web.settings.profile.avatar.needPassword': '头像是用你的端到端加密口令保护的，本机没有保存这个口令 —— 请先在「同步设置」里填写一次，再更换或查看头像。',
-  'web.settings.profile.avatar.badType': '只支持 {types} 格式的图片。',
-  'web.settings.profile.avatar.tooBig': '图片压缩后仍超过 {max}，换一张小一点的。',
-  'web.settings.profile.avatar.failed': '头像没有传上去，请稍后再试。',
-  'web.settings.profile.email.label': '邮箱',
+  'common.profile.avatar.needPassword': '头像是用你的端到端加密口令保护的，本机没有保存这个口令 —— 请先在「同步设置」里填写一次，再更换或查看头像。',
+  'common.profile.avatar.badType': '只支持 {types} 格式的图片。',
+  'common.profile.avatar.tooBig': '图片压缩后仍超过 {max}，换一张小一点的。',
+  'common.profile.avatar.failed': '头像没有传上去，请稍后再试。',
+  // 🔴 读侧的三句（已上传 / 解不开 / 暂时取不到）与写侧那句**不能合并**：
+  // 用户动作分别是"等着""去核对口令""稍后重试"。以前读侧只有 `failed` 一句，
+  // 于是"这台设备解不开"被说成"头像没有传上去"——界面在讲一件没发生过的事。
+  'common.profile.avatar.uploaded': '头像已更新',
+  'common.profile.avatar.undecryptable': '这台设备解不开你的头像 —— 端到端加密口令不对。在「同步设置」里重新填一次口令即可。',
+  'common.profile.avatar.unreadable': '暂时读不到头像，请稍后再试。',
+  'common.profile.loadFailed': '个人信息没有读到，请稍后再试。',
+  'common.profile.email.label': '邮箱',
   // 只读要有理由，否则用户会以为这是个没做好的输入框。
-  'web.settings.profile.email.hint': '邮箱是登录标识，也是找回账号的唯一凭据，不能在这里修改。',
+  'common.profile.email.hint': '邮箱是登录标识，也是找回账号的唯一凭据，不能在这里修改。',
 
   'web.settings.display.title': '显示',
   'web.settings.display.dueNote': '任务行上的截止时间显示为日期，还是距离截止时间的倒计时。',
@@ -591,16 +601,23 @@ export const zhCN = {
   // `apps/web/src/features/trash/TrashView.tsx`。删除仍然只是软删除，
   // 这里让用户能看见并且**恢复**；彻底删除是二次确认后的不可逆动作。
   'web.trash.nav': '回收站',
-  'web.trash.intro': '这里放着已删除的任务。恢复后它会回到原来的位置。',
+  'web.trash.intro': '这里放着已删除的任务、便签、清单和习惯。恢复后它会回到原来的位置。',
   'web.trash.empty.title': '回收站是空的',
-  'web.trash.empty.hint': '在任务页删除的任务会先放到这里',
+  'web.trash.empty.hint': '删掉的任务、便签、清单和习惯会先放到这里',
   'web.trash.deletedAt': '删除于 {date}',
   'web.trash.restore': '恢复：{title}',
   'web.trash.purge': '彻底删除：{title}',
   'web.trash.confirm.title': '彻底删除「{title}」？',
   'web.trash.confirm.body': '彻底删除后它不会再出现在回收站里，也无法恢复。',
+  // 🔴 与移动端 mobile.trash.confirm.notErasure 同一句话：彻底删除只是不再提供恢复，没有把历史抹掉。
+  'web.trash.confirm.notErasure': '这不是物理擦除：操作日志里仍然留着这条记录，只是界面不再提供恢复。',
+  // 与 mobile.trash.confirm.projectTasks 同一句：删清单不级联删任务（`project-actions.ts` 文件头第 2 条）。
+  'web.trash.confirm.projectTasks': '里面还有 {count} 条任务，它们不会被删除。',
+  'web.trash.confirm.habitLogs': '它已有的打卡记录不会被删除，恢复后连续天数照旧。',
   'web.trash.confirm.submit': '彻底删除',
   'web.trash.confirm.cancel': '取消',
+  // 动作层拒绝时必须说出来（例如"已被彻底删除，无法恢复"）—— 咽掉它就是"点了没反应"。
+  'web.trash.error': '这次操作没有成功：{reason}',
   // 空状态：任何列表都必须有空状态，而且要说**下一步做什么** ——
   // 留白屏会让用户以为应用坏了。`all` 同时是兜底（新的 filter.kind 不留白）。
   'web.shell.empty.all.title': '收集箱是空的',
@@ -637,6 +654,37 @@ export const zhCN = {
   'web.sync.password.lead': '口令',
   'web.sync.password.strong': '不会',
   'web.sync.password.tail': '被保存到磁盘，只存在于本次会话的内存中。它一旦丢失，已同步的数据将无法解密 —— 请自行妥善保管。没有口令时同步会被拒绝，服务端只接受端到端加密的载荷。',
+  'web.sync.vault.title': '加密数据钥匙',
+  'web.sync.vault.description': '这把钥匙用于解锁已同步的数据。它与登录密码分开，绝不会保存在浏览器里。',
+  'web.sync.vault.accountRequired': '请先登录，再管理这个账号的加密数据钥匙。',
+  'web.sync.vault.createTitle': '创建加密数据钥匙',
+  'web.sync.vault.passphrase': '加密口令',
+  'web.sync.vault.create': '创建钥匙',
+  'web.sync.vault.recoveryLabel': '恢复码',
+  'web.sync.vault.recoveryHint': '请把这串恢复码保存到密码管理器或离线记录中。它只显示这一次，服务端无法替你找回。',
+  'web.sync.vault.recoveryConfirm': '输入恢复码以确认',
+  'web.sync.vault.confirm': '确认并发布',
+  'web.sync.vault.cancel': '取消',
+  'web.sync.vault.unlockTitle': '解锁加密数据',
+  'web.sync.vault.unlock': '用口令解锁',
+  'web.sync.vault.recoveryCode': '恢复码',
+  'web.sync.vault.unlockRecovery': '用恢复码解锁',
+  'web.sync.vault.ready': '这台设备上的加密数据已经解锁。',
+  'web.sync.vault.recoveryRotationRequired': '恢复码解锁成功。请先设置新口令并保存新的恢复码，才能使用加密数据。',
+  'web.sync.vault.lock': '锁定数据钥匙',
+  'web.sync.vault.changeTitle': '新的口令与恢复码',
+  'web.sync.vault.newPassphrase': '新的加密口令',
+  'web.sync.vault.change': '更换口令',
+  'web.sync.vault.rotateRoot': '轮换数据密钥并迁移数据',
+  'web.sync.vault.rootRotationHint': '这会生成新的数据密钥，完成所有保留加密记录的迁移后才发布。',
+  'web.sync.vault.rootRotationProgress': '正在迁移加密数据：{completed}/{total}',
+  'web.sync.vault.legacyPassphrase': '旧版加密口令（仅用于迁移）',
+  'web.sync.vault.legacyPassphraseHint': '如果所有保留记录都已经使用数据钥匙加密，请留空。只有这个账号仍有旧版口令加密记录时，才输入旧口令。',
+  'web.sync.vault.busy': '正在加载加密数据钥匙…',
+  'web.sync.vault.error': '加密数据钥匙加载或使用失败。本地数据没有变化，请检查服务端后重试。',
+  'web.sync.vault.errorMismatch': '恢复码不匹配，请准确输入刚刚显示的恢复码。',
+  'web.sync.vault.errorConflict': '另一台设备已经更换了钥匙。请重新加载后再试。',
+  'web.sync.vault.errorRotation': '服务端要求先完成全部加密数据迁移，才能更换这把钥匙。',
   'web.sync.saveAndSync': '保存并同步',
   // 状态文案原先由 `features/sync/store.ts` 的 `describeStatus` 返回中文。
   // 句子现在搬到 SyncBar 里拼（state 只带数据），否则英文界面永远显示中文。
@@ -1303,6 +1351,17 @@ export const zhCN = {
   'web.due.prevMonth': '上个月',
   'web.due.nextMonth': '下个月',
   'web.due.dayLabel': '{month}月{day}日',
+  // 🔴 时刻与日期是**同一个 `dueDate` 数字**的两种精度，不是第二个字段：
+  //    留空 = 本地零点 = "只到日"，填了 = 那天几点几分。
+  //    「全天」这个词与时间线那条带同源 —— 两处说不同话就会被读成两件事。
+  // 🔴 命名空间是 `common.` 而不是 `web.`：这四句说的是**这条截止有没有时刻**
+  //    这件事，两端共读一份（R15a 把 profile 那 19 键从 `web.` 搬进 `common.` 是
+  //    同一条裁决）。键名写"哪个壳画的"，下一端要复用时就只能再抄一份值。
+  'common.due.timeLabel': '时刻',
+  'common.due.allDay': '全天',
+  // 占位写"时:分"而不是照抄英文的 HH:MM —— 它是给人看的形状提示，不是格式代码。
+  'common.due.timePlaceholder': '时:分',
+  'common.due.timeAria': '任务「{title}」的截止时刻（留空表示全天）',
 
   // ── Web · 重复（B2-3）───────────────────────────────────────
   //    🔴 这一族补的是**两端不一致**：移动端任务详情早就能设重复，Web 一个入口都没有。
@@ -2134,6 +2193,10 @@ export const zhCN = {
   'common.weekday.fri': '五',
   'common.weekday.sat': '六',
   'common.weekday.sun': '日',
+  // R13 年档的标题。🔴 它必须**单独有一条**，不能拿 `monthTitle` 顶：
+  // 年档摊开的是整年 12 个月，标题说「2026年10月」会把人指回某一个格子。
+  // 英文那边就是裸年份 —— 中文需要一个「年」字才读得出这是个年份而不是编号。
+  'common.date.yearTitle': '{year}年',
   'common.date.monthTitle': '{year}年{month}月',
   'common.date.dayTitle': '{month}月{day}日 星期{weekday}',
   // R11 批三：周视图的标题。**措辞按 locale 各排一次序**（中文把年份放在最前，
@@ -2172,11 +2235,8 @@ export const zhCN = {
   'web.calendar.title': '日历',
   'web.calendar.prevMonth': '上个月',
   'web.calendar.nextMonth': '下个月',
-  'web.calendar.prevWeek': '上一周',
-  'web.calendar.nextWeek': '下一周',
-  'web.calendar.view.aria': '视图',
-  'web.calendar.view.month': '月',
-  'web.calendar.view.week': '周',
+  // 🔴 轴整列空白时必须说这一句：不说，"这天没定到具体时刻"与"日视图没接上数据"
+  //    在界面上长得一模一样（后者本仓为它记过一整页账）。
   'web.calendar.weekShort': '{n}周',
   'web.calendar.backToToday': '回到今天',
   'web.calendar.monthTitle': '{year}年{month}月',
@@ -2513,9 +2573,15 @@ export const zhCN = {
   // 于是**不敢删**——一个不敢用的功能等于没有。
   'mobile.lists.removeHint': '删除清单不会删掉里面的任务，它们会回到「收集箱」。',
   'mobile.lists.remove': '删除清单「{name}」',
+  // ── 行内改名 / 归档（2026-10-03 多端第二批）─────────────────
+  // 这几句由共享组件 `OrganizerList` 的 `labels.rename` / `labels.archive` 消费，
+  // 两端同一套 —— 同一句话不许两个端各写一份。
+  // 🔴 无障碍名必须带上是哪一条：读屏用户听到一串「重命名」而无从分辨改哪个。
   'common.organizer.rename.button': '重命名「{name}」',
   'common.organizer.rename.save': '保存名称',
   'common.organizer.rename.cancel': '取消改名',
+  // 归档 = 隐藏但保留数据。「归档」和「取消归档」必须是两句话术 ——
+  // 两个状态都叫同一个名字的按钮，用户按第二下时不知道自己在做什么。
   'common.organizer.archive.button': '归档「{name}」',
   'common.organizer.archive.unarchive': '取消归档「{name}」',
   'common.organizer.folder.button': '把「{name}」移入文件夹',
@@ -2531,6 +2597,7 @@ export const zhCN = {
   'common.organizer.folder.reject.unknown': '移动失败，请稍后重试',
   'common.organizer.showArchived': '显示已归档',
   'common.organizer.hideArchived': '收起已归档',
+  // 习惯的改名与删除入口（保存/取消复用上面那两句，不另立一份同义词条）。
   'common.habits.rename.button': '重命名习惯「{name}」',
   'common.habits.rename.label': '习惯名称',
   'common.habits.delete.button': '删除习惯「{name}」',
@@ -2636,6 +2703,10 @@ export const zhCN = {
   'mobile.profile.account.signInHint': '用邮箱或通行密钥登录；登录后自动接上同步，不必手抄令牌。',
   'mobile.profile.account.signedInLabel': '当前账号',
   'mobile.profile.account.signedInHint': '已拿到访问令牌。要换账号或补一条凭据，重新登录一次即可。',
+  'mobile.profile.nickname.hint': '点按这一行即可修改昵称。',
+  // 🔴 这一句必须与"图不行"分开：iOS 侧还没有读图通道，说"这张图解不开"会把人
+  // 支去换照片，而换多少张都一样。真相是这台设备暂时没有这条通道。
+  'mobile.profile.avatar.noChannel': '这台设备还不能读取本机里的图片，请先在网页版更换头像；换好之后这里会显示同一张。',
   'mobile.profile.account.offline': '还没登录',
   // ⚠️ 表单搬进设置面之后，"下面那一段"不再成立 —— 指路要说**现在**的位置，
   // 否则用户在「我的」上找一圈找不到表单，会以为功能没了。
@@ -2666,6 +2737,39 @@ export const zhCN = {
   'mobile.profile.lastSync.label': '上次成功同步',
   'mobile.profile.lastSync.never': '从未',
   'mobile.profile.clearCredentials': '清除本机保存的凭据',
+  'mobile.vault.title': '加密数据钥匙',
+  'mobile.vault.description': '这把钥匙用于解锁已同步的数据。它与登录密码分开，口令和恢复码只留在这台设备上。',
+  'mobile.vault.accountRequired': '请先登录，再管理这个账号的加密数据钥匙。',
+  'mobile.vault.createTitle': '创建加密数据钥匙',
+  'mobile.vault.passphrase': '加密口令',
+  'mobile.vault.create': '创建钥匙',
+  'mobile.vault.recoveryLabel': '恢复码',
+  'mobile.vault.recoveryHint': '请把这串恢复码保存到密码管理器或离线记录中。它只显示这一次，服务端无法替你找回。',
+  'mobile.vault.recoveryConfirm': '输入恢复码以确认',
+  'mobile.vault.confirm': '确认并发布',
+  'mobile.vault.cancel': '取消',
+  'mobile.vault.unlockTitle': '解锁加密数据',
+  'mobile.vault.unlock': '用口令解锁',
+  'mobile.vault.recoveryCode': '恢复码',
+  'mobile.vault.unlockRecovery': '用恢复码解锁',
+  'mobile.vault.ready': '这台设备上的加密数据已经解锁。',
+  'mobile.vault.recoveryRotationRequired': '恢复码解锁成功。请先设置新口令并保存新的恢复码，才能使用加密数据。',
+  'mobile.vault.lock': '锁定数据钥匙',
+  'mobile.vault.remember': '在这台设备上记住解锁状态',
+  'mobile.vault.changeTitle': '新的口令与恢复码',
+  'mobile.vault.newPassphrase': '新的加密口令',
+  'mobile.vault.change': '更换口令',
+  'mobile.vault.rotateRoot': '轮换数据密钥并迁移数据',
+  'mobile.vault.rootRotationHint': '只有所有保留的加密记录迁移完成后，才会发布新的数据密钥。',
+  'mobile.vault.rootRotationProgress': '正在迁移加密数据：{completed}/{total}',
+  'mobile.vault.busy': '正在加载加密数据钥匙…',
+  'mobile.vault.error': '加密数据钥匙加载或使用失败。本地数据没有变化，请检查服务端后重试。',
+  'mobile.vault.errorMismatch': '恢复码不匹配，请准确输入。',
+  'mobile.vault.errorRememberedKey': '记住的钥匙不属于这个账号，请用口令或恢复码解锁。',
+  'mobile.vault.errorConflict': '另一台设备已经更换了钥匙。请重新加载后再试。',
+  'mobile.vault.errorRotation': '服务端要求先完成全部加密数据迁移，才能更换这把钥匙。',
+  'mobile.vault.logoutCleanupFailed': '加密钥匙未能从这台设备清除。凭据已清掉；请先重试清理，再使用这个账号。',
+  'mobile.vault.retryCleanup': '重试清除加密钥匙',
   // 🔴 这句是**面向用户的陈述**，说错了就是应用在骗人 —— 迁移时可以"只搬不改"，
   // 但每做完一个功能就必须回来改它。原句是"日历、专注、清单与标签管理尚未实现"：
   //   日历（`CalendarScreen`）、专注（`FocusScreen`）先做完 → 去掉；
@@ -2711,7 +2815,7 @@ export const zhCN = {
   'mobile.entity.TASK': '任务',
   'mobile.entity.PROJECT': '清单',
   'mobile.entity.TAG': '标签',
-  'mobile.entity.NOTE': '笔记',
+  'mobile.entity.NOTE': '便签',
   'mobile.entity.TASK_REPEAT_CFG': '重复规则',
   'mobile.entity.REMINDER': '提醒',
   'mobile.entity.HABIT': '习惯',
@@ -2824,7 +2928,7 @@ export const zhCN = {
   // （本地与云端）都还在 —— Web 的措辞没有这一句，照抄会漏掉这个事实。
   'mobile.trash.title': '回收站',
   'mobile.trash.entry': '回收站',
-  'mobile.trash.entry.hint': '已删除的任务可以在这里恢复',
+  'mobile.trash.entry.hint': '已删除的任务、便签、清单和习惯可以在这里恢复',
   // ── 通知中心 / 活动（批二，多端覆盖审计 P0-2）────────────────────
   //    通知 kind 是封闭词表（referral-activated），措辞与 web 的
   //    web.inbox.* 同口径；服务端只存 kind + payload，话在这里说。
@@ -2907,9 +3011,9 @@ export const zhCN = {
   'mobile.security.passkeys.delete': '删除',
   'mobile.security.passkeys.deleteConfirm': '再点一次确认删除',
   'mobile.security.passkeys.deleteTitle': '删除这条通行密钥？',
-  'mobile.trash.intro': '这里放着已删除的任务。恢复后它会回到原来的位置。',
+  'mobile.trash.intro': '这里放着已删除的任务、便签、清单和习惯。恢复后它会回到原来的位置。',
   'mobile.trash.empty.title': '回收站是空的',
-  'mobile.trash.empty.hint': '在任务页删除的任务会先放到这里',
+  'mobile.trash.empty.hint': '删掉的任务、便签、清单和习惯会先放到这里',
   'mobile.trash.deletedAt': '删除于 {date}',
   'mobile.trash.restore': '恢复',
   'mobile.trash.restoreA11y': '恢复：{title}',
@@ -2918,6 +3022,8 @@ export const zhCN = {
   'mobile.trash.confirm.title': '彻底删除「{title}」？',
   'mobile.trash.confirm.body': '它会从回收站里消失，也无法再恢复。',
   'mobile.trash.confirm.notErasure': '这不是物理擦除：操作日志里仍然留着这条记录，只是界面不再提供恢复。',
+  'mobile.trash.confirm.projectTasks': '里面还有 {count} 条任务，它们不会被删除。',
+  'mobile.trash.confirm.habitLogs': '它已有的打卡记录不会被删除，恢复后连续天数照旧。',
   'mobile.trash.confirm.submit': '彻底删除',
   'mobile.trash.confirm.cancel': '取消',
 
@@ -3488,7 +3594,7 @@ export const zhCN = {
   'site.docs.reminders.s2': '什么时候会响 —— 以及为什么有时候不会',
   'site.docs.reminders.s2p1': 'Web：**应用开着**才响。到点之后由浏览器把通知弹出来，而前提是你先在界面上授权过通知权限 —— 授权必须由你那一下点击触发，这是浏览器的规则，不是我们的选择。',
   'site.docs.reminders.s2p2': '⚠️ 页面关了就什么都不会响：触发时间在本地早就算好了，但**没人在读它**。这条限制写在代码注释里，是一个已知的边界，不是临时状态。',
-  'site.docs.reminders.s2p3': '移动端：目前**没有接入系统本地通知**，所以不会在应用外弹通知。手机上的到期与提醒，现在是"在界面里看得见"，不是"会响"。',
+  'site.docs.reminders.s2p3': '移动端：Android 与 iOS 都使用系统本地通知中心。投递仍受平台权限和系统调度限制；没有权限或回执不确定时，提醒保持为到期，不伪造已投递事实。',
   'site.docs.reminders.s2p4': '时间上有几条边界：触发时刻最多排在**一年**以内；「稍后提醒」默认 **10 分钟**、最多 **7 天**，超出上限是**钳到上限并显示实际值**，而不是让你的点击失败；比当下早一点点是允许的（一分钟的窗口），因为算出时刻与真正落库之间本来就要过几百毫秒。',
   'site.docs.reminders.s2i1': '会响的三个前提：时间到了、应用开着、你已经授权过通知 —— 少一个都安静。',
   'site.docs.reminders.s2i2': '静音与"稍后提醒"是两条不同的路：前者只是这一条不再弹，后者会把触发时间整体推后。',
@@ -3505,16 +3611,17 @@ export const zhCN = {
   'site.docs.trash.title': '回收站与"彻底删除"为什么删不掉历史',
   'site.docs.trash.seo.title': '回收站与彻底删除为什么删不掉历史 —— heyta',
   'site.docs.trash.sum': '还原与彻底删除都在界面里，但后者删的是可见性，不是那一条记录 —— 这背后是一个刻意的同步协议决定。',
-  'site.docs.trash.s1': '回收站里只有任务',
-  'site.docs.trash.s1p1': '清单、标签、便签目前不进回收站 —— 它们被删掉之后没有还原入口。这不是遗漏：它们的删除语义和任务不一样。',
-  'site.docs.trash.s1p2': '回收站也不是一个单独的"箱子"、更没有另一张表：它就是同一批任务里"已删除且还没彻底删除"的那部分，**最近删掉的排最前面**。',
+  'site.docs.trash.s1': '回收站里有什么',
+  'site.docs.trash.s1p1': '任务、便签、清单、习惯删掉之后都会先进回收站，还原与彻底删除的入口都在同一块面板上。标签、提醒和专注记录**不进**回收站，这不是遗漏：标签随时可以重新建一个，提醒的删除语义是「取消」，跟「这条东西我不要了」不是同一件事，而专注记录是统计的事实源 —— 能删它就等于允许改写成长历史。',
+  'site.docs.trash.s1p3': '删一条清单不会连带删掉里面的任务 —— 它们只是变成「没有清单」，还原那条清单之后归属又回来了。删一个习惯也不会抹掉它的打卡记录：还原之后连续天数照旧。',
+  'site.docs.trash.s1p2': '回收站也不是一个单独的"箱子"、更没有另一张表：它就是同一批记录里"已删除且还没彻底删除"的那部分，**最近删掉的排最前面**。',
   'site.docs.trash.s1i1': 'Web：左侧栏的「回收站」，常驻可见。',
   'site.docs.trash.s1i2': '移动端：「我的」页面里的回收站入口。',
   'site.docs.trash.s1i3': '两个动作都在同一块面板上：还原、彻底删除 —— 后者要你确认第二次。',
-  'site.docs.trash.fig.trash': '回收站：说明文字点明这里只有任务，空着的时候也写清条目从哪儿来',
+  'site.docs.trash.fig.trash': '回收站：说明文字点名这里放着哪几类，空着的时候也写清条目从哪儿来',
   'site.docs.trash.fig.trash.alt': 'Web 回收站面板，含一句说明文字与空状态提示',
   'site.docs.trash.s2': '还原改的是什么',
-  'site.docs.trash.s2p1': '还原 = 把任务的删除标志位**清回空**，写成一条普通的更新。它不是"从备份里搬回来"：同一条任务、同一段历史继续往下长。',
+  'site.docs.trash.s2p1': '还原 = 把删除标志**清回空**，写成一条普通的更新。它不是"从备份里搬回来"：同一条记录、同一段历史继续往下长。',
   'site.docs.trash.s2p2': '已经被你"彻底删除"过的条目不再出现在回收站里，因此也还原不了 —— 界面对这两件事分开处理，是设计而不是漏的一步。',
   'site.docs.trash.s2p3': '就算绕过界面直接调用，对一条已彻底删除的任务点还原也会被**当场拒绝**。这是有意的一去不回，不是还没做完的那一步。',
   'site.docs.trash.s3': '为什么"彻底删除"不真的删',
@@ -3663,7 +3770,7 @@ export const zhCN = {
   'common.entity.TASK': '任务',
   'common.entity.PROJECT': '清单',
   'common.entity.TAG': '标签',
-  'common.entity.NOTE': '笔记',
+  'common.entity.NOTE': '便签',
   'common.entity.TASK_REPEAT_CFG': '重复规则',
   'common.entity.REMINDER': '提醒',
   'common.entity.HABIT': '习惯',
@@ -3688,6 +3795,35 @@ export const zhCN = {
   'common.conflict.reason.localArchive': '本机把它归档了',
   // 认不出来时的兜底：不能回落成服务端那句英文诊断，也不能什么都不说。
   'common.conflict.reason.fallback': '两边对同一处做了不同的改动',
+  // 🔴 这一组住在 `common.*` 而不是 `web.*`：**两端都要用**（档位每批会加一档，
+  //    所以这里刻意**不写条数** —— 写过数字的注释一定会漂）。
+  //    原来它们是 `web.calendar.view.*`，而移动端补上档位入口时要读同一组词 ——
+  //    另抄一份就是「同一个词两种说法」的开始（AGENTS §3.5 那条同形状的第二次）。
+  'common.calendar.view.aria': '视图',
+  'common.calendar.view.month': '月',
+  'common.calendar.view.week': '周',
+  'common.calendar.view.day': '日',
+  // R13：年档。🔴 它与「时间线」是**两种不同的东西**：时间线不是日历档位，
+  //   而是外壳视图的跳转（见 `calendar-view-family.spec.tsx` 钉的那条），
+  //   所以它不进 `CalendarViewKind`，这一条也不该和它混成一句。
+  'common.calendar.view.year': '年',
+  // 🔴 这六条也在 `common.*`：它们是**共享板**在周/日两档要的词，
+  //    而共享板两端同一份 ⇒ 移动端补上档位入口后必须给得出同样的词。
+  //    留在 `web.*` 里的下场就是移动端再抄一份（AGENTS §3.5 同形状的第二次）。
+  'common.calendar.prevWeek': '上一周',
+  'common.calendar.nextWeek': '下一周',
+  'common.calendar.prevDay': '上一天',
+  'common.calendar.nextDay': '下一天',
+  // R13 年档的两个箭头（读屏名）。住在 `common.*` 的理由与上面几条同一条：
+  // 共享板两端同一份 ⇒ 两端都给得出同样的词（新标签一律可选，§9.1）。
+  'common.calendar.prevYear': '上一年',
+  'common.calendar.nextYear': '下一年',
+  'common.calendar.dayAllDay': '全天',
+  'common.calendar.dayNoTimed': '这一天没有定到具体时刻的任务，它们都在上面那条「全天」里。',
+  // 🔴 「全天」那条带**自己**的空态，不能说"这一天没有到期的任务" ——
+  //   当天完全可以在 16:00 挂一条（R14 之后这是常态），那句话就成了谎话，
+  //   而它下面 20 行就是那条任务。两条句子各说各的范围。
+  'common.calendar.dayAllDayEmpty': '「全天」里还没有任务；定到具体时刻的在下面那条轴上。',
 
   // ─────────────────────────────────────────────────────────────
   // 提醒（B1-1 的界面层；web 与 mobile 共用同一批词条）
@@ -3717,6 +3853,7 @@ export const zhCN = {
   'reminder.phase.scheduled': '待触发',
   'reminder.phase.snoozed': '已推迟',
   'reminder.phase.due': '已到点',
+  'reminder.delivery.uncertain': '无法确认本机是否已提醒。可点“稍后提醒”重新安排。',
   'reminder.phase.fired': '已提醒',
   'reminder.phase.dismissed': '已关闭',
   // 没有截止时间时不能建"提前提醒"——说清原因，不要让按钮静默消失。

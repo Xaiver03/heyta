@@ -38,7 +38,11 @@ export const authenticate = async (
 
   const result = await verifyToken(token);
   if (!result.valid) {
-    return reply.code(401).send({ error: result.reason });
+    // `code` 是给客户端**机器匹配**的稳定值；`error` 是给人看的自由文本，会漂。
+    // 注销后要不要销毁本机数据只认前者 —— 见 auth.ts 的 `TokenFailureCode`。
+    return reply
+      .code(401)
+      .send({ error: result.reason, code: result.code });
   }
 
   req.user = { userId: result.userId, email: result.email };

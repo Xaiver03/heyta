@@ -20,6 +20,7 @@ vi.mock('../src/db', async () => {
   const { Prisma: PrismaModule } = await import('@prisma/client');
 
   const createTxMock = () => ({
+    vaultKeyPackage: { findUnique: vi.fn().mockResolvedValue(null) },
     operation: {
       create: vi.fn().mockImplementation(async (args: any) => {
         if (state.operations.has(args.data.id)) {
@@ -294,7 +295,7 @@ vi.mock('../src/db', async () => {
       }),
     },
     // Upload transaction writes the storage counter atomically via $executeRaw.
-    $executeRaw: vi.fn().mockResolvedValue(0),
+    $executeRaw: vi.fn().mockResolvedValue(1),
     // Raw queries issued inside the upload transaction. Every shape must be
     // recognised explicitly and anything else must THROW: this mock used to fall
     // through to a `total` row, which conflict.ts reads via

@@ -231,6 +231,45 @@ describe('全局搜索', () => {
     expect(panel).toContain('便签');
   });
 
+  /**
+   * 🔴 已删除 / 已彻底删除的任务搜不出来（缺陷 D9 的宿主级钉子）。
+   *
+   * 域层那组已经把 `searchTasks` 本身钉住了，这一条钉的是**接线**：
+   * Web 的搜索面板把 `Object.values(store.entities.tasks)`（**原始物化表，含墓碑**）
+   * 整个递给 `searchTasks`。当初的缺陷正是"滤不滤取决于调用方递什么"，
+   * 所以这条要连着递表方式一起证 —— 否则哪天有人把过滤挪回调用方、
+   * 域层测试全绿而真实入口又开始漏。
+   */
+  it('🔴 搜「季度报告」不会搜出回收站里和已彻底删除的那两条', async () => {
+    await useTaskStore.getState().addTask('季度报告 活着');
+    await useTaskStore.getState().addTask('季度报告 在回收站');
+    const trashed = Object.values(useTaskStore.getState().entities.tasks)
+      .find((t) => t.title === '季度报告 在回收站')!;
+    await useTaskStore.getState().deleteTask(trashed.id);
+    await useTaskStore.getState().addTask('季度报告 已彻底删除');
+    const purged = Object.values(useTaskStore.getState().entities.tasks)
+      .find((t) => t.title === '季度报告 已彻底删除')!;
+    await useTaskStore.getState().deleteTask(purged.id);
+    await useTaskStore.getState().purgeTask(purged.id);
+
+    // 前置条件本身要断言：墓碑**确实在原始表里**，所以后面的"搜不到"不是空集。
+    const raw = Object.values(useTaskStore.getState().entities.tasks);
+    expect(raw.filter((t) => t.title.startsWith('季度报告')).length, '原始表应有 3 条')
+      .toBe(3);
+    expect(raw.find((t) => t.title === '季度报告 活着')!.deletedAt).toBeUndefined();
+    expect(raw.find((t) => t.id === trashed.id)!.deletedAt).toBeTypeOf('number');
+    expect(raw.find((t) => t.id === purged.id)!.purgedAt).toBeTypeOf('number');
+
+    await mount();
+    await openSearch();
+    await type('季度报告');
+
+    const panel = panelText();
+    expect(panel, '活着的那条必须搜得到（正向对照）').toContain('季度报告 活着');
+    expect(panel, '回收站里的任务不该出现在搜索结果').not.toContain('在回收站');
+    expect(panel, '已彻底删除的任务不该出现在搜索结果').not.toContain('已彻底删除');
+  });
+
   it('🔴「还没输入」与「没找到」是**两种不同的空**（文案不许合并）', async () => {
     await mount();
     await openSearch();

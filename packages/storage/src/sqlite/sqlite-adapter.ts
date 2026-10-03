@@ -374,8 +374,8 @@ class SqliteAdapter implements DbAdapter {
     return this.transaction([store], 'readonly', (tx) => tx.get<T>(store, key));
   }
 
-  getAll<T>(store: string, range?: DbKeyRange): Promise<T[]> {
-    return this.transaction([store], 'readonly', (tx) => tx.getAll<T>(store, range));
+  getAll<T>(store: string, range?: DbKeyRange, limit?: number): Promise<T[]> {
+    return this.transaction([store], 'readonly', (tx) => tx.getAll<T>(store, range, limit));
   }
 
   delete(store: string, key: DbKey): Promise<void> {
@@ -522,9 +522,10 @@ class SqliteAdapter implements DbAdapter {
         return rows.length === 0 ? undefined : (JSON.parse(String(rows[0]![plan.dataColumn])) as T);
       },
 
-      getAll: async <T,>(storeName: string, range?: DbKeyRange) => {
+      getAll: async <T,>(storeName: string, range?: DbKeyRange, limit?: number) => {
+        assertIterateLimit(limit);
         const plan = assert(storeName);
-        return this.fetchRecords(driver, plan, range).map((r) => r.data as T);
+        return this.fetchRecords(driver, plan, range, limit).map((r) => r.data as T);
       },
 
       delete: async (storeName, key) => {
@@ -728,6 +729,7 @@ class SqliteAdapter implements DbAdapter {
     driver: SqliteDriver,
     plan: StorePlan,
     range?: DbKeyRange,
+    limit?: number,
   ): PhysicalRecord[] {
     const params: SqlValue[] = [];
     let where = '';
@@ -740,13 +742,15 @@ class SqliteAdapter implements DbAdapter {
       if (conditions.length > 0) where = ` WHERE ${conditions.join(' AND ')}`;
     }
 
+    const sqlLimit = limit !== undefined && (pushDown || range === undefined);
+    if (sqlLimit) params.push(limit);
     const rows = driver.all<SqlRow>(
-      `SELECT * FROM ${q(plan.table)}${where} ORDER BY ${orderByPk(plan)}`,
+      `SELECT * FROM ${q(plan.table)}${where} ORDER BY ${orderByPk(plan)}${sqlLimit ? ' LIMIT ?' : ''}`,
       params,
     );
 
     const projected = rows.map((row) => this.toPhysicalRecord(plan, row));
-    return pushDown ? projected : projected.filter((r) => keyInRange(r.pk, range));
+    return (pushDown ? projected : projected.filter((r) => keyInRange(r.pk, range))).slice(0, limit);
   }
 
   private fetchIndexRecords(

@@ -126,7 +126,12 @@ describe('auth verification cache', () => {
 
     await expect(verifyToken(token)).resolves.toEqual({
       valid: false,
+      code: 'TOKEN_REVOKED',
       reason: 'Token was revoked. Please log in again to get a new token.',
+      // 2026-10-03（批次 E / E1）：失效结果多了必填的 `code`。这一支是 **撤销**，
+      // 不是注销 —— 客户端将来只在 ACCOUNT_CLOSED 下销毁本地库，所以把码钉在这里
+      // 也顺手钉住了"改密/全设备登出走的是这一支"。判据见 account-closed-signal.spec.ts。
+      code: 'TOKEN_REVOKED',
     });
     expect(prisma.user.findUnique).toHaveBeenCalledTimes(2);
   });

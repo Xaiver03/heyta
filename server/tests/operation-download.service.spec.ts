@@ -972,9 +972,7 @@ describe('OperationDownloadService', () => {
       expect(result.snapshotVectorClock).toEqual({ 'solo-client': 42 });
     });
 
-    it('should apply limitVectorClockSize to aggregate result exceeding MAX', async () => {
-      // 🔴 条数从上限推导，不写死 —— 写死 25 时上限一提到 100 就不再超限，
-      // 裁剪不再发生，而断言仍然"通过"（一条静默失效的边界测试）。
+    it('should serve the complete aggregate when it exceeds the historical MAX', async () => {
       const clockRows = Array.from({ length: MAX_VECTOR_CLOCK_SIZE + 5 }, (_, i) => ({
         client_id: `client-${String(i).padStart(3, '0')}`,
         // 计数器保持为正：负数在向量时钟里没有意义
@@ -998,19 +996,15 @@ describe('OperationDownloadService', () => {
 
       const result = await service.getOpsSinceWithSeq(1, 10);
 
-      // Should be pruned to MAX_VECTOR_CLOCK_SIZE entries
-      expect(Object.keys(result.snapshotVectorClock!).length).toBeLessThanOrEqual(
-        MAX_VECTOR_CLOCK_SIZE,
-      );
-      // 前提校验：输入确实超限
-      expect(Object.keys(clockRows).length).toBeGreaterThan(MAX_VECTOR_CLOCK_SIZE);
-      // Highest-counter entries should be preserved
+      expect(clockRows.length).toBeGreaterThan(MAX_VECTOR_CLOCK_SIZE);
+      expect(Object.keys(result.snapshotVectorClock!)).toHaveLength(clockRows.length);
       expect(result.snapshotVectorClock!['client-000']).toBe(1000);
       expect(result.snapshotVectorClock!['client-001']).toBe(999);
+      expect(result.snapshotVectorClock!['client-104']).toBe(896);
     });
 
-    it('should preserve excludeClient and snapshot author in pruned clock', async () => {
-      // Create MAX+5 entries exceeding MAX; put excludeClient and author at the bottom
+    it('should serve low-counter clients without a preserve-list special case', async () => {
+      // Create MAX+5 entries and put the requesting client and author at the bottom.
       const clockRows = Array.from({ length: MAX_VECTOR_CLOCK_SIZE + 5 }, (_, i) => ({
         client_id: `client-${String(i).padStart(3, '0')}`,
         max_counter: BigInt(1000 - i),
@@ -1041,12 +1035,9 @@ describe('OperationDownloadService', () => {
 
       const result = await service.getOpsSinceWithSeq(1, 10, 'requesting-client');
 
-      // Both low-counter clients should be preserved despite pruning
       expect(result.snapshotVectorClock!['requesting-client']).toBe(1);
       expect(result.snapshotVectorClock!['snapshot-author']).toBe(1);
-      expect(Object.keys(result.snapshotVectorClock!).length).toBeLessThanOrEqual(
-        MAX_VECTOR_CLOCK_SIZE,
-      );
+      expect(Object.keys(result.snapshotVectorClock!)).toHaveLength(clockRows.length);
     });
 
     it('should NOT use $queryRaw when client is past snapshot', async () => {

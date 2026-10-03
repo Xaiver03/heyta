@@ -25,6 +25,11 @@ export { OperationUploadService } from './operation-upload.service';
 export { StorageQuotaService } from './storage-quota.service';
 export { SnapshotGenerationService } from './snapshot-generation.service';
 export { SnapshotService } from './snapshot.service';
+export {
+  VaultKeyMigrationError,
+  VaultKeyMigrationService,
+  vaultKeyMigrationService,
+} from './vault-key-migration.service';
 export type {
   CacheSnapshotResult,
   PreparedSnapshotCache,

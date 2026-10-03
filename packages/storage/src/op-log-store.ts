@@ -53,6 +53,16 @@ export interface StoredOperation<TOperation extends Operation<string> = Operatio
   serverSeq?: number;
 }
 
+/** D1 checkpoint envelope. `state` is reducer-defined and structured-clone safe. */
+export interface MaterializedCheckpoint {
+  formatVersion: 1;
+  coveredSeq: number;
+  state: unknown;
+  clock: Record<string, number>;
+  appliedOpIds: string[];
+  checksum: string;
+}
+
 /**
  * 一次导入追加的结果。
  *
@@ -195,6 +205,28 @@ export interface OpLogStore<
 
   /** 写入同步游标。 */
   setLastServerSeq(seq: number): Promise<void>;
+
+  /** Optional materialized-state checkpoint hooks (older hosts may omit them). */
+  readCheckpoint?(): Promise<MaterializedCheckpoint | undefined>;
+  writeCheckpoint?(checkpoint: MaterializedCheckpoint): Promise<void>;
+
+  /**
+   * Read the durable server-observed causal frontier.
+   *
+   * This is deliberately separate from the deletable materialized checkpoint.
+   * Older storage hosts may omit the optional hook; implementations that expose
+   * it must return an empty clock when no frontier has been recorded.
+   */
+  readObservedClock?(): Promise<Record<string, number>>;
+
+  /** Merge a server-observed causal frontier using component-wise max. */
+  mergeObservedClock?(clock: Record<string, number>): Promise<void>;
+
+  /** Read the durable one-way marker that some history could not be recovered. */
+  hasIncompleteHistory?(): Promise<boolean>;
+
+  /** Permanently mark history as incomplete; there is intentionally no clear hook. */
+  markHistoryIncomplete?(): Promise<void>;
 }
 
 /** 存储层的失败原因，供上层区分处理。 */
@@ -207,6 +239,8 @@ export enum OpLogStoreErrorCode {
   NESTED_TRANSACTION = 'NESTED_TRANSACTION',
   /** 存储不可用（配额耗尽、被浏览器回收等）。 */
   STORAGE_UNAVAILABLE = 'STORAGE_UNAVAILABLE',
+  /** 归档边界没有被一个完整、可校验的物化检查点覆盖。 */
+  ARCHIVE_REQUIRES_CHECKPOINT = 'ARCHIVE_REQUIRES_CHECKPOINT',
 }
 
 export class OpLogStoreError extends Error {

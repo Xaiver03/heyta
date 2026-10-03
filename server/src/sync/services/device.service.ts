@@ -27,6 +27,19 @@ export class DeviceService {
     return count > 0;
   }
 
+  /** Record revocation and remove the advisory live-device row atomically. */
+  async revokeDevice(userId: number, clientId: string): Promise<void> {
+    const now = BigInt(Date.now());
+    await prisma.$transaction(async (tx) => {
+      await tx.syncDevice.deleteMany({ where: { userId, clientId } });
+      await tx.revokedSyncDevice.upsert({
+        where: { userId_clientId: { userId, clientId } },
+        create: { userId, clientId, revokedAt: now },
+        update: { revokedAt: now },
+      });
+    });
+  }
+
   /**
    * Get all user IDs that have sync state.
    * Used for batch operations like cleanup.

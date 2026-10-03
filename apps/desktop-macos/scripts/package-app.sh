@@ -70,6 +70,41 @@ node "$REPO/packages/app-host/scripts/build-native-bridge.mjs" || { echo "🔴 �
 WEB_DIST="$REPO/apps/web/dist"
 [ -f "$WEB_DIST/index.html" ] || { echo "🔴 缺少共享 UI 产物：$WEB_DIST/index.html（先 pnpm -r build）"; exit 1; }
 
+# 🔴 **存在 ≠ 是当前源码打出来的**（2026-10-03 实测事故）。
+#    产品负责人在装好的 .app 里看到日历"内容超出容器范围"，而当前源码同一尺寸同一状态
+#    量出来是能放下的（真浏览器现量：脚注 y=697 < 视口 720）。差在哪：包里的 web-dist 是
+#    **另一次构建** —— 4 个 chunk 哈希与本机 `apps/web/dist` 不同，且
+#    `now-line` / `clock-` 两个标记在包里的 JS 里 **0 命中**（当前产物各 1 命中），
+#    也就是那份产物**早于 R13/R14**：日历的工具栏还在卡片里（多占一行）、行更高，
+#    于是当天那张卡被顶到窗口下沿之外。
+#    🔴 关键是**已有判据全绿**：截图非空白 + 主蓝命中，量的是"有没有界面"，
+#    回答不了"是不是这份源码的界面"（AGENTS §7 第 82 条的第四次露面）。
+#    所以下面这条不是仪式：它比的是**产物的输入**，输入变新而产物没重建 = 拒绝打包。
+#    ⚠️ 刻意**不**在这里顺手 `pnpm -r build`：打包脚本替别人重建共享 dist
+#       会把并行会话的 WIP 打进产品包里（那是比"旧产物"更坏的结果）。它只拒绝，并给出命令。
+WEB_STALE=""
+for d in "$REPO/apps/web/src" "$REPO/apps/web/public" "$REPO/apps/web/index.html"; do
+  [ -e "$d" ] || continue
+  hit=$(find "$d" -type f -newer "$WEB_DIST/index.html" 2>/dev/null | head -6)
+  [ -n "$hit" ] && WEB_STALE="$WEB_STALE$hit
+"
+done
+for p in "$REPO"/packages/*/; do
+  for d in "${p}src" "${p}dist"; do
+    [ -d "$d" ] || continue
+    hit=$(find "$d" -type f -newer "$WEB_DIST/index.html" 2>/dev/null | head -6)
+    [ -n "$hit" ] && WEB_STALE="$WEB_STALE$hit
+"
+  done
+done
+if [ -n "$WEB_STALE" ]; then
+  echo "🔴 共享 UI 产物比它的输入**旧** —— 打进 .app 的会是旧界面，而截图判据拦不住这件事。"
+  printf '%s' "$WEB_STALE" | sed '/^$/d' | sed 's/^/     比产物新的输入: /'
+  echo "   （每个目录最多列 6 条）闭合命令：pnpm -r build && pnpm --filter @heyta/web build"
+  exit 1
+fi
+echo "  ✅ web-dist 新鲜度对账通过（不比 apps/web 与 packages/* 的任何输入旧）"
+
 # ── ② 组装 .app ─────────────────────────────────────────────────────────
 echo ""
 echo "=== ② 组装 Heyta.app ==="

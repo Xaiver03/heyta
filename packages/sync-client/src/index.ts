@@ -17,3 +17,5 @@
 export * from './client.js';
 export * from './realtime.js';
 export * from './server-url.js';
+
+export * from './payload-cipher.js';

@@ -54,10 +54,11 @@ import {
   createRealtimeClient as createRealtimeClientRaw,
   SyncClient,
   type RealtimeClient,
+  type SyncEncryptionOptions,
   type WebSocketFactory,
 } from '@heyta/sync-client';
 
-export interface SyncWiringOptions {
+export type SyncWiringOptions = SyncEncryptionOptions & {
   /** op-log 引擎。待上传队列、重新派发、应用远端都从它派生。 */
   engine: OpLogEngine;
   /**
@@ -96,6 +97,9 @@ export function createSyncClient(options: SyncWiringOptions): SyncClient {
     clientId: engine.getClientId(),
     getToken: options.getToken,
     getPassword: options.getPassword,
+    ...(options.encryptionMode === 'vault'
+      ? { encryptionMode: 'vault' as const, getPayloadCipher: options.getPayloadCipher }
+      : { encryptionMode: 'password' as const }),
     // 游标走 OpLogStore 接口，不碰 adapter：键名与事务语义只由存储层决定。
     getLastServerSeq: () => store.getLastServerSeq(),
     setLastServerSeq: (seq) => store.setLastServerSeq(seq),
@@ -104,6 +108,8 @@ export function createSyncClient(options: SyncWiringOptions): SyncClient {
     getLocalOps: () => engine.getPendingUpload(),
     markUploaded: (seqs) => engine.markUploaded(seqs),
     applyRemote: options.applyRemote,
+    mergeRemoteClock: (clock) => engine.observeRemoteClockDurably(clock),
+    markHistoryIncomplete: () => engine.markHistoryIncomplete(),
     // 冲突判定为「本地胜出」→ 重新派发（新 op，时钟已压过远端）。
     redispatch: async (op) => {
       await engine.redispatch(op);

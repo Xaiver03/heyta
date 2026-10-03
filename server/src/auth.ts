@@ -243,9 +243,27 @@ export const replaceToken = async (
   return { token, user: { id: userId, email } };
 };
 
+/**
+ * 一枚令牌为什么不能用 —— **必填**，不是可选装饰。
+ *
+ * 存在的理由是一条产品动作：注销账号必须让每台设备真的销毁自己的**明文本地库**
+ * （服务端删完只是删掉密文历史；数据在设备上）。而客户端唯一安全的触发条件是
+ * `ACCOUNT_CLOSED` —— `TOKEN_REVOKED` 是改密 / 管理员强制登出 / passkey 恢复，
+ * 那时用户的数据还在，删库就是毁掉他的数据。
+ *
+ * 这两个原因此前**共用同一句自由文本** `'Account unavailable'`（已注销 vs 邮箱未验证），
+ * 所以"靠调用点各自记得区分"不成立：判据缺失时它会静默走错分支。
+ * 类型上必填 ⇒ 新增的失败分支不声明原因是编译不过的。
+ */
+export type TokenFailureCode =
+  | 'ACCOUNT_CLOSED'
+  | 'ACCOUNT_UNVERIFIED'
+  | 'TOKEN_REVOKED'
+  | 'TOKEN_INVALID';
+
 export type TokenVerificationResult =
   | { valid: true; userId: number; email: string }
-  | { valid: false; reason: string };
+  | { valid: false; reason: string; code: TokenFailureCode };
 
 export const verifyToken = async (token: string): Promise<TokenVerificationResult> => {
   try {
@@ -274,11 +292,16 @@ export const verifyToken = async (token: string): Promise<TokenVerificationResul
     });
 
     if (!user) {
+      // 「这枚令牌指向的账号行已经不存在」= 注销过。这一支**不需要墓碑表**：
+      // `DELETE /api/account` 是级联硬删，行没了就是没了，而 `users.id` 由序列发出、
+      // 不复用，所以"查不到"不会被误读成"还没建"。少一张表也少一份注销后仍留存的 PII。
       Logger.warn(`Token verification failed: User ${payload.userId} not found in DB`);
-      return { valid: false, reason: 'Account unavailable' };
+      return { valid: false, reason: 'Account unavailable', code: 'ACCOUNT_CLOSED' };
     }
 
     if (!user.isVerified) {
+      // 同一句 reason、**不同的 code**：邮箱未验证的账号绝不能被客户端当成"已注销"，
+      // 否则一次没点验证链接就把自己所有设备上的数据删了。
       Logger.warn(`Token verification failed: User ${payload.userId} is not verified`);
       authCache.setIfCurrent(
         payload.userId,
@@ -286,7 +309,7 @@ export const verifyToken = async (token: string): Promise<TokenVerificationResul
         false,
         cacheVersionBeforeRead,
       );
-      return { valid: false, reason: 'Account unavailable' };
+      return { valid: false, reason: 'Account unavailable', code: 'ACCOUNT_UNVERIFIED' };
     }
 
     // Check token version - if it doesn't match, the token has been revoked
@@ -300,6 +323,7 @@ export const verifyToken = async (token: string): Promise<TokenVerificationResul
       return {
         valid: false,
         reason: 'Token was revoked. Please log in again to get a new token.',
+        code: 'TOKEN_REVOKED',
       };
     }
 
@@ -310,12 +334,13 @@ export const verifyToken = async (token: string): Promise<TokenVerificationResul
       return {
         valid: false,
         reason: 'Token expired. Please log in again to get a new token.',
+        code: 'TOKEN_INVALID',
       };
     }
     // Only treat actual JWT errors as "Invalid token" (NotBeforeError extends JsonWebTokenError).
     // Database errors must propagate as 500s, not masquerade as auth failures.
     if (err instanceof JsonWebTokenError) {
-      return { valid: false, reason: 'Invalid token' };
+      return { valid: false, reason: 'Invalid token', code: 'TOKEN_INVALID' };
     }
     const errMsg =
       err instanceof Error ? `[${err.name}] ${err.message}` : 'non-Error value';

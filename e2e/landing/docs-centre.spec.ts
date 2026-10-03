@@ -892,14 +892,14 @@ const FIGURES: readonly {
   { article: 'concepts', locale: 'zh-CN', sectionId: 'habits', number: '图 15-1', file: 'W03-habits.png' },
   { article: 'views', locale: 'zh-CN', sectionId: 'quadrant', number: '图 20-1', file: 'W02-quadrant.png' },
   { article: 'views', locale: 'zh-CN', sectionId: 'timeline', number: '图 20-2', file: 'W05-timeline.png' },
-  { article: 'trash', locale: 'zh-CN', sectionId: 'tasks-only', number: '图 25-1', file: 'W07-trash.png' },
+  { article: 'trash', locale: 'zh-CN', sectionId: 'what-the-trash-holds', number: '图 25-1', file: 'W07-trash.png' },
   // 🔴 英文版挂**英文界面**的截图（B1 解决后的新产品事实）：同一节、同一图号，
   //    文件是 `*-en-*.png` 那一批 —— 与 zh 行逐行成对，顺序也一致。
   { article: 'first-run', locale: 'en', sectionId: 'first-screen', number: 'Figure 14-1', file: 'W01-en-tasks.png' },
   { article: 'concepts', locale: 'en', sectionId: 'habits', number: 'Figure 15-1', file: 'W03-en-habits.png' },
   { article: 'views', locale: 'en', sectionId: 'quadrant', number: 'Figure 20-1', file: 'W02-en-quadrant.png' },
   { article: 'views', locale: 'en', sectionId: 'timeline', number: 'Figure 20-2', file: 'W05-en-timeline.png' },
-  { article: 'trash', locale: 'en', sectionId: 'tasks-only', number: 'Figure 25-1', file: 'W07-en-trash.png' },
+  { article: 'trash', locale: 'en', sectionId: 'what-the-trash-holds', number: 'Figure 25-1', file: 'W07-en-trash.png' },
 ];
 
 const FIGURED_ARTICLE_IDS = [...new Set(FIGURES.map((figure) => figure.article))];

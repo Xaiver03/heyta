@@ -203,8 +203,8 @@ export class MemoryDbAdapter implements DbAdapter {
     return this.transaction([store], 'readonly', async (tx) => tx.get<T>(store, key));
   }
 
-  getAll<T>(store: string, range?: DbKeyRange): Promise<T[]> {
-    return this.transaction([store], 'readonly', async (tx) => tx.getAll<T>(store, range));
+  getAll<T>(store: string, range?: DbKeyRange, limit?: number): Promise<T[]> {
+    return this.transaction([store], 'readonly', async (tx) => tx.getAll<T>(store, range, limit));
   }
 
   delete(store: string, key: DbKey): Promise<void> {
@@ -477,10 +477,12 @@ export class MemoryDbAdapter implements DbAdapter {
         return store.records.get(serializeKey(key))?.value as T | undefined;
       },
 
-      getAll: async <T,>(storeName: string, range?: DbKeyRange) => {
+      getAll: async <T,>(storeName: string, range?: DbKeyRange, limit?: number) => {
+        assertIterateLimit(limit);
         const store = assert(storeName);
         return sortedRecords(store)
           .filter((r) => inRange(r.key, range))
+          .slice(0, limit)
           .map((r) => r.value as T);
       },
 

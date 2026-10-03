@@ -28,9 +28,12 @@
  */
 
 import {
+  byCreatedAtOrder,
+  isLive,
   parseCategorySlot,
   parseHabitIcon,
   toLocalDate,
+  trashedIn,
   type CategorySlot,
   type Habit,
   type HabitGoalType,
@@ -143,7 +146,18 @@ export interface HabitActions {
   /** 未删除的习惯，按 (createdAt, id) 升序。 */
   listHabits(): Habit[];
   /** 未删除的打卡记录，顺序同上。 */
-  listLogs(): HabitLog[];
+  listLogs(): HabitLog[];  /**
+   * 回收站里的习惯（`trashedIn`：有墓碑且未彻底删除，最近删除的在前）。
+   *
+   * 🔴 **打卡记录不跟着删**（`removeHabit` 早就是这条规则）：连续天数是习惯的
+   *    历史事实，删掉习惯不该抹掉它 —— 还原后 streak 必须还在。
+   */
+  listTrashedHabits(): Habit[];
+  /** 从回收站还原习惯。幂等：不在回收站返回 `false`；`purgedAt` 之后**抛错**。 */
+  restoreHabit(entityId: string): Promise<boolean>;
+  /** 彻底删除一个习惯：追加 `purgedAt` 标记，不动墓碑、不动打卡记录。 */
+  purgeHabit(entityId: string): Promise<void>;
+
 }
 
 /**
@@ -157,12 +171,7 @@ export function habitLogId(habitId: string, date: LocalDate): string {
 }
 
 function aliveOf<T extends { deletedAt?: number }>(record: Record<string, T>): T[] {
-  return Object.values(record).filter((item) => item.deletedAt === undefined);
-}
-
-function byCanonicalOrder<T extends { createdAt: number; id: string }>(a: T, b: T): number {
-  if (a.createdAt !== b.createdAt) return a.createdAt - b.createdAt;
-  return a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
+  return Object.values(record).filter(isLive);
 }
 
 export function createHabitActions(
@@ -341,11 +350,45 @@ export function createHabitActions(
     },
 
     listHabits() {
-      return aliveOf(ctx.getState().habits).sort(byCanonicalOrder);
+      return aliveOf(ctx.getState().habits).sort(byCreatedAtOrder);
+    },
+
+
+    async restoreHabit(entityId) {
+      const raw = ctx.getState().habits[entityId];
+      if (raw === undefined) throw new Error(`找不到习惯「${entityId}」`);
+      if (raw.purgedAt !== undefined) {
+        throw new Error(`习惯「${entityId}」已被彻底删除，无法恢复`);
+      }
+      if (raw.deletedAt === undefined) return false;
+      await ctx.dispatch({
+        entityType: 'HABIT' as EntityType,
+        entityId,
+        opType: OpType.Update,
+        payload: { deletedAt: null },
+      });
+      return true;
+    },
+
+    async purgeHabit(entityId) {
+      const raw = ctx.getState().habits[entityId];
+      if (raw === undefined) throw new Error(`找不到习惯「${entityId}」`);
+      if (raw.deletedAt === undefined) throw new Error(`习惯「${entityId}」不在回收站里`);
+      if (raw.purgedAt !== undefined) return;
+      await ctx.dispatch({
+        entityType: 'HABIT' as EntityType,
+        entityId,
+        opType: OpType.Update,
+        payload: { purgedAt: now() },
+      });
+    },
+
+    listTrashedHabits() {
+      return trashedIn(Object.values(ctx.getState().habits));
     },
 
     listLogs() {
-      return aliveOf(ctx.getState().habitLogs).sort(byCanonicalOrder);
+      return aliveOf(ctx.getState().habitLogs).sort(byCreatedAtOrder);
     },
   };
 }

@@ -1,6 +1,19 @@
 import { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
-import { SuperSyncDownloadOpsQuerySchema } from '@heyta/shared-schema';
+import {
+  SuperSyncDownloadOpsQuerySchema,
+  SUPER_SYNC_CLIENT_ID_REGEX,
+  vaultKeyPackageSchema,
+  vaultKeyPackageUploadSchema,
+  vaultKeyMigrationChunkSchema,
+  vaultKeyMigrationManifestSchema,
+  vaultKeyMigrationRequestIdSchema,
+  vaultKeyMigrationRequestSchema,
+  vaultKeyMigrationInventoryPageSchema,
+} from '@heyta/shared-schema';
+import { Prisma } from '@prisma/client';
 import { authenticate, getAuthUser } from '../middleware';
+import { prisma } from '../db';
+import { revokeAllTokens } from '../auth';
 import { createEntitlementGuard } from '../entitlement';
 import { loadConfigFromEnv } from '../config';
 import { getSyncService } from './sync.service';
@@ -26,6 +39,11 @@ import {
   MAX_RAW_BODY_SIZE_SNAPSHOT,
 } from './sync.routes.payload';
 import { uploadOpsHandler } from './sync.routes.ops-handler';
+import { getWsConnectionService } from './services/websocket-connection.service';
+import {
+  VaultKeyMigrationError,
+  vaultKeyMigrationService,
+} from './services/vault-key-migration.service';
 
 /**
  * 路由级限流配置。
@@ -105,8 +123,10 @@ export const syncRoutes = async (fastify: FastifyInstance): Promise<void> => {
   // POST /api/sync/ops - Upload operations
   // Route-level limiting is a pre-auth per-IP backstop for upload floods before
   // auth/DB work. uploadOpsHandler applies the separate per-user fairness limit.
+  // A separate URL prevents legacy servers from stripping encoding metadata.
+  for (const uploadPath of ['/ops', '/ops/causal']) {
   fastify.post<{ Body: UploadOpsRequest }>(
-    '/ops',
+    uploadPath,
     {
       // Cap raw request body at the base64 envelope of the binary gzip limit.
       // `parseCompressedJsonBody` still enforces MAX_COMPRESSED_SIZE_OPS
@@ -122,6 +142,7 @@ export const syncRoutes = async (fastify: FastifyInstance): Promise<void> => {
     },
     uploadOpsHandler,
   );
+  }
 
   // GET /api/sync/ops - Download operations
   fastify.get<{
@@ -173,7 +194,7 @@ export const syncRoutes = async (fastify: FastifyInstance): Promise<void> => {
 
         // Use atomic read to get ops and latestSeq in one transaction
         // This prevents race conditions where new ops arrive between the two reads
-        const { ops, latestSeq, gapDetected, latestSnapshotSeq, snapshotVectorClock } =
+        const { ops, latestSeq, gapDetected, latestSnapshotSeq, snapshotVectorClock, causalFrontier } =
           await syncService.getOpsSinceWithSeq(
             userId,
             sinceSeq,
@@ -202,8 +223,11 @@ export const syncRoutes = async (fastify: FastifyInstance): Promise<void> => {
           latestSeq,
           gapDetected: gapDetected || undefined, // Only include if true
           snapshotVectorClock, // Aggregated clock from skipped ops for conflict resolution
+          causalFrontier,
           serverTime: Date.now(), // For client clock drift detection
-          capabilities: { causalRepairSnapshots: true },
+          // The frontier is signed, bound to this account and served losslessly;
+          // clients may use the dedicated delta endpoint after validating it.
+          capabilities: { causalRepairSnapshots: true, causalFrontierDelta: true },
         };
 
         return reply.send(response);
@@ -302,6 +326,260 @@ export const syncRoutes = async (fastify: FastifyInstance): Promise<void> => {
       } catch (err) {
         Logger.error(`Get devices error: ${errorMessage(err)}`);
         return reply.status(500).send({ error: 'Internal server error' });
+      }
+    },
+  );
+
+  // Opaque vault key package. The server stores wrappers only; rootKey and
+  // recoveryCode are intentionally not valid fields in this request.
+  fastify.get('/key-package', async (req: FastifyRequest, reply: FastifyReply) => {
+    const userId = getAuthUser(req).userId;
+    const row = await prisma.vaultKeyPackage.findUnique({ where: { userId } });
+    if (!row) return reply.status(404).send({ error: 'key_package_not_found' });
+    const parsed = vaultKeyPackageSchema.safeParse(row.packageData);
+    if (!parsed.success) {
+      Logger.error(`[user:${userId}] Stored vault key package failed validation`);
+      return reply.status(500).send({ error: 'invalid_stored_key_package' });
+    }
+    // `payloadKeyVersion` is deliberately a sibling field rather than part of
+    // the wrapper package: rotating a passphrase wrapper does not rewrite op
+    // ciphertext, while a completed atomic migration advances this generation.
+    return reply.send({
+      package: parsed.data,
+      payloadKeyVersion: row.activePayloadKeyVersion ?? null,
+    });
+  });
+
+  fastify.delete<{ Params: { clientId: string } }>(
+    '/devices/:clientId',
+    { config: { rateLimit: routeRateLimit(20, '15 minutes') } },
+    async (req: FastifyRequest<{ Params: { clientId: string } }>, reply: FastifyReply) => {
+      const userId = getAuthUser(req).userId;
+      const { clientId } = req.params;
+      if (!SUPER_SYNC_CLIENT_ID_REGEX.test(clientId)) {
+        return reply.status(400).send({ error: 'invalid_client_id' });
+      }
+      await getSyncService().revokeDevice(userId, clientId);
+      await revokeAllTokens(userId);
+      getWsConnectionService().closeForUser(userId);
+      Logger.audit({ event: 'SYNC_DEVICE_REVOKED', userId, clientId });
+      return reply.send({ success: true, clientId, requiresKeyRotation: true });
+    },
+  );
+
+  fastify.put<{ Body: unknown }>(
+    '/key-package',
+    { config: { rateLimit: routeRateLimit(12, '15 minutes') } },
+    async (req: FastifyRequest<{ Body: unknown }>, reply: FastifyReply) => {
+      const userId = getAuthUser(req).userId;
+      const parsed = vaultKeyPackageUploadSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return reply.status(400).send({ error: 'invalid_key_package' });
+      }
+      const now = BigInt(Date.now());
+      const packageData = parsed.data.package as Prisma.InputJsonValue;
+      const { expectedKeyVersion } = parsed.data;
+      if (expectedKeyVersion === 0) {
+        try {
+          await prisma.vaultKeyPackage.create({
+            data: { userId, keyVersion: parsed.data.package.keyVersion, packageData, createdAt: now, updatedAt: now },
+          });
+          return reply.send({ package: parsed.data.package });
+        } catch (error) {
+          // Only a competing create is an idempotency candidate. Database
+          // failures must remain failures instead of becoming stale-version 409s.
+          if (!(error instanceof Prisma.PrismaClientKnownRequestError) || error.code !== 'P2002') throw error;
+        }
+      } else {
+        // Compare against the version the caller actually unlocked. Merely
+        // accepting every greater version lets a stale writer skip a winner.
+        // Root changes also require an atomic ciphertext migration; this
+        // wrapper-only endpoint cannot safely publish a replacement root.
+        const updated = await prisma.vaultKeyPackage.updateMany({
+          where: {
+            userId,
+            keyVersion: expectedKeyVersion,
+            packageData: { path: ['rootKeyFingerprint'], equals: parsed.data.package.rootKeyFingerprint },
+          },
+          data: { keyVersion: parsed.data.package.keyVersion, packageData, updatedAt: now },
+        });
+        if (updated.count === 1) return reply.send({ package: parsed.data.package });
+      }
+      const current = await prisma.vaultKeyPackage.findUnique({
+        where: { userId },
+        select: { keyVersion: true, packageData: true },
+      });
+      const currentPackage = vaultKeyPackageSchema.safeParse(current?.packageData);
+      // Parsing reconstructs property order, including JSONB objects whose key
+      // order is not preserved. Retrying after a lost response is safe.
+      if (current?.keyVersion === parsed.data.package.keyVersion && currentPackage.success &&
+          JSON.stringify(currentPackage.data) === JSON.stringify(parsed.data.package)) {
+        return reply.send({ package: parsed.data.package });
+      }
+      if (current?.keyVersion === expectedKeyVersion && currentPackage.success &&
+          currentPackage.data.rootKeyFingerprint !== parsed.data.package.rootKeyFingerprint) {
+        return reply.status(409).send({ error: 'root_rotation_requires_atomic_migration' });
+      }
+      return reply.status(409).send({ error: 'stale_key_package' });
+    },
+  );
+
+  fastify.delete('/key-package', async (_req: FastifyRequest, reply: FastifyReply) => {
+    // Deleting wrappers independently strands ciphertext and permits version
+    // reset. Account/data erasure must own its separate atomic cleanup policy.
+    return reply.status(409).send({ error: 'key_package_removal_requires_atomic_erasure' });
+  });
+
+  /**
+   * Migration-only retained-history inventory. It intentionally has no
+   * `sinceSeq` fallback: ordinary download may fast-forward over a drain
+   * snapshot, while a root rotation must cover every retained ciphertext.
+   */
+  fastify.get<{ Querystring: { cursor?: string; limit?: string } }>(
+    '/key-migration/inventory',
+    { config: { rateLimit: routeRateLimit(120, '15 minutes') } },
+    async (req, reply) => {
+      const userId = getAuthUser(req).userId;
+      const limit = req.query.limit === undefined ? 500 : Number(req.query.limit);
+      if (!Number.isSafeInteger(limit) || limit < 1 || limit > 500) {
+        return reply.status(400).send({ error: 'invalid_key_migration_inventory_limit' });
+      }
+      try {
+        const page = await vaultKeyMigrationService.inventory(userId, req.query.cursor, limit);
+        // The service validates this before returning; keep the route boundary
+        // explicit so an accidental future field cannot become wire contract.
+        return reply.send(vaultKeyMigrationInventoryPageSchema.parse(page));
+      } catch (error) {
+        if (error instanceof VaultKeyMigrationError) return reply.status(error.statusCode).send({ error: error.code });
+        Logger.error(`Vault key migration inventory failed for user ${userId}: ${errorMessage(error)}`);
+        return reply.status(500).send({ error: 'key_migration_failed' });
+      }
+    },
+  );
+
+  /**
+   * Atomically publish a client-produced full-history payload migration. The
+   * request body contains opaque ciphertext only; the service verifies the
+   * complete `(id, serverSeq)` inventory and the public vault-envelope
+   * generation before changing any row.
+   */
+  fastify.post<{ Body: unknown }>(
+    '/key-migration',
+    {
+      // New migrations send only a small manifest here. Inline legacy requests
+      // remain bounded; large histories use the durable chunk routes below.
+      bodyLimit: 2 * 1024 * 1024,
+      config: { rateLimit: routeRateLimit(3, '15 minutes') },
+    },
+    async (req: FastifyRequest<{ Body: unknown }>, reply: FastifyReply) => {
+      const userId = getAuthUser(req).userId;
+      const manifest = vaultKeyMigrationManifestSchema.safeParse(req.body);
+      if (manifest.success) {
+        try {
+          return reply.send(await vaultKeyMigrationService.begin(userId, manifest.data));
+        } catch (error) {
+          if (error instanceof VaultKeyMigrationError) return reply.status(error.statusCode).send({ error: error.code });
+          Logger.error(`Vault key migration manifest failed for user ${userId}: ${errorMessage(error)}`);
+          return reply.status(500).send({ error: 'key_migration_failed' });
+        }
+      }
+      const parsed = vaultKeyMigrationRequestSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return reply.status(400).send({ error: 'invalid_key_migration_request' });
+      }
+      try {
+        const result = await vaultKeyMigrationService.migrate(userId, parsed.data);
+        Logger.audit({
+          event: 'E2EE_PAYLOAD_MIGRATED',
+          userId,
+          requestId: parsed.data.requestId,
+          keyVersion: result.keyVersion,
+          payloadKeyVersion: result.payloadKeyVersion,
+          latestSeq: result.latestSeq,
+          migratedOperationCount: result.migratedOperationCount,
+        });
+        return reply.send(result);
+      } catch (error) {
+        if (error instanceof VaultKeyMigrationError) {
+          return reply.status(error.statusCode).send({ error: error.code });
+        }
+        Logger.error(`Vault key migration failed for user ${userId}: ${errorMessage(error)}`);
+        return reply.status(500).send({ error: 'key_migration_failed' });
+      }
+    },
+  );
+
+  fastify.post<{ Params: { requestId: string }; Body: unknown }>(
+    '/key-migration/:requestId/chunks',
+    {
+      bodyLimit: 34 * 1024 * 1024,
+      config: { rateLimit: routeRateLimit(120, '15 minutes') },
+    },
+    async (req, reply) => {
+      const userId = getAuthUser(req).userId;
+      const parsed = vaultKeyMigrationChunkSchema.safeParse(req.body);
+      if (!parsed.success || parsed.data.requestId !== req.params.requestId) {
+        return reply.status(400).send({ error: 'invalid_key_migration_chunk' });
+      }
+      try {
+        return reply.send(await vaultKeyMigrationService.uploadChunk(userId, parsed.data));
+      } catch (error) {
+        if (error instanceof VaultKeyMigrationError) return reply.status(error.statusCode).send({ error: error.code });
+        Logger.error(`Vault key migration chunk failed for user ${userId}: ${errorMessage(error)}`);
+        return reply.status(500).send({ error: 'key_migration_failed' });
+      }
+    },
+  );
+
+  fastify.get<{ Params: { requestId: string } }>(
+    '/key-migration/:requestId',
+    async (req, reply) => {
+      const userId = getAuthUser(req).userId;
+      if (!vaultKeyMigrationRequestIdSchema.safeParse(req.params.requestId).success) {
+        return reply.status(400).send({ error: 'invalid_key_migration_request' });
+      }
+      try {
+        return reply.send(await vaultKeyMigrationService.status(userId, req.params.requestId));
+      } catch (error) {
+        if (error instanceof VaultKeyMigrationError) return reply.status(error.statusCode).send({ error: error.code });
+        Logger.error(`Vault key migration status failed for user ${userId}: ${errorMessage(error)}`);
+        return reply.status(500).send({ error: 'key_migration_failed' });
+      }
+    },
+  );
+
+  fastify.post<{ Params: { requestId: string } }>(
+    '/key-migration/:requestId/commit',
+    { config: { rateLimit: routeRateLimit(6, '15 minutes') } },
+    async (req, reply) => {
+      const userId = getAuthUser(req).userId;
+      if (!vaultKeyMigrationRequestIdSchema.safeParse(req.params.requestId).success) {
+        return reply.status(400).send({ error: 'invalid_key_migration_request' });
+      }
+      try {
+        return reply.send(await vaultKeyMigrationService.commit(userId, req.params.requestId));
+      } catch (error) {
+        if (error instanceof VaultKeyMigrationError) return reply.status(error.statusCode).send({ error: error.code });
+        Logger.error(`Vault key migration commit failed for user ${userId}: ${errorMessage(error)}`);
+        return reply.status(500).send({ error: 'key_migration_failed' });
+      }
+    },
+  );
+
+  fastify.delete<{ Params: { requestId: string } }>(
+    '/key-migration/:requestId',
+    { config: { rateLimit: routeRateLimit(12, '15 minutes') } },
+    async (req, reply) => {
+      const userId = getAuthUser(req).userId;
+      if (!vaultKeyMigrationRequestIdSchema.safeParse(req.params.requestId).success) {
+        return reply.status(400).send({ error: 'invalid_key_migration_request' });
+      }
+      try {
+        return reply.send(await vaultKeyMigrationService.cancel(userId, req.params.requestId));
+      } catch (error) {
+        if (error instanceof VaultKeyMigrationError) return reply.status(error.statusCode).send({ error: error.code });
+        Logger.error(`Vault key migration cancellation failed for user ${userId}: ${errorMessage(error)}`);
+        return reply.status(500).send({ error: 'key_migration_failed' });
       }
     },
   );

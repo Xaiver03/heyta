@@ -91,6 +91,60 @@ const config = {
           platform,
         );
       }
+
+      /**
+       * `react-native` 的**同一条洞**，只是上面那段刻意没管它。
+       *
+       * 🔴 实测（2026-10-03，移动端便签链真机验收 `pnpm verify:mobile-notes`）：
+       *    同一个包里 `apps/mobile` 的输入框（凭据三个字段）填得进去，而
+       *    `@heyta/ui` 的 `NotesBoard` composer 一提交就**整个应用崩**：
+       *
+       *      com.facebook.react.common.JavascriptException:
+       *        Error: Unsupported top level event type "topSelectionChange" dispatched
+       *
+       *    根因是**两份 react-native 进了同一个 bundle**（同版本 0.84.1、不同 peer 解析），
+       *    现量两条：
+       *
+       *      node -e 'console.log(require.resolve("react-native",{paths:["packages/ui/src"]}))'
+       *        -> .../.pnpm/react-native@0.84.1_..._b5892f35.../node_modules/react-native/index.js
+       *      node -e 'console.log(require.resolve("react-native",{paths:["apps/mobile/src"]}))'
+       *        -> .../.pnpm/react-native@0.84.1_..._67cc6a65.../node_modules/react-native/index.js
+       *
+       *    两份各有各的事件表，于是一端创建、另一端派发 —— 报的就是那句
+       *    「不支持的顶层事件」。**上面那段文件头把 react-native 排除在改写之外，
+       *    理由是它内部大量相对/嵌套解析会被连坏**：那个顾虑是对的，但它可以绕开，
+       *    不必因此留着两份。绕法是把改写的**触发面**收到最窄：
+       *
+       *      只处理**裸**说明符 `'react-native'`（带子路径的 `react-native/Libraries/…`
+       *      一概不碰 —— 那正是原注释担心的那类），并且**跳过 react-native 自己**
+       *      （它的内部 require 起点在 `node_modules/.pnpm/react-native@…` 下）。
+       *
+       * ✅ 判据（这条改动只有一处可观测后果，就数它）：
+       *
+       *      cd apps/mobile && npx react-native bundle --platform android --dev false \
+       *        --entry-file index.js --bundle-output /tmp/p.js --sourcemap-output /tmp/p.map --reset-cache
+       *      # 再数 sourcemap 里 `…/node_modules/react-native/` 的**实例前缀**个数
+       *
+       *    实测 2026-10-03：改之前 **2 个实例**（各 429 个模块 —— 整份 RN 打了两遍），
+       *    改之后 **1 个实例**（648 个模块）。
+       *
+       * ⚠️ 这条洞一直存在，只是**以前没人从 `@heyta/ui` 里在真机上打过字**：
+       *    `SearchPanel` / `NotesBoard` / `HabitBoard` 的输入框此前从未被任何
+       *    `verify-mobile-*` 覆盖。定位靠的是同一趟里的 A/B —— `apps/mobile` 自己的
+       *    凭据输入框（app 那份 RN）填得进去，`@heyta/ui` 的便签输入框（根那份）
+       *    一点提交就崩。是这一批把移动端便签编辑接上时才照出来的。
+       */
+      if (
+        moduleName === 'react-native' &&
+        !context.originModulePath.includes(`${path.sep}.pnpm${path.sep}react-native@`)
+      ) {
+        return context.resolveRequest(
+          { ...context, originModulePath: path.join(projectRoot, 'index.js') },
+          moduleName,
+          platform,
+        );
+      }
+
       return context.resolveRequest(context, moduleName, platform);
     },
   },
