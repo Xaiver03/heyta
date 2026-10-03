@@ -2689,3 +2689,28 @@ B30 写这两段"不是再跑一遍就好的东西"，并各自给了闭合代�
    同批被扫出的另一处 `scripts/verify-mobile-repeat.sh:675`（`$XY15C）`）**在我地界内**
    （`scripts/verify-mobile-*.sh`），已就地改成 `${XY15C}` 并复验门禁只报地界外那三处 ——
    那是 `3fe7f590` 提交的真缺陷（验收日志里那个坐标读数会整个丢掉），不是顺手重构。
+
+## B37. 🔴 我自己造的一次共享工作树事故（已还原，但形状必须留档）：为了让 package.json 只带我的 hunk，覆盖了并发会话两行未提交改动（2026-10-03 16:0x）
+
+**发生了什么**：任务 1 要往根 `package.json` 加 6 个 `verify:` 别名，而并发会话在同一文件里有
+**2 行未提交**改动（`check:op-log-semantics` 那一段）。计划的四步是"备份工作树 → 写 HEAD+我的 6 行 →
+`git commit --only package.json` → 还原备份"。第一条命令里 `cp package.json /tmp/pkg.mixed.json && sh -c '...'`
+的 `sh -c` 单引号嵌套解析失败（zsh 在**整行**解析阶段就报错），于是**左边那条 `cp` 根本没执行** ——
+备份不存在，而我认为它存在。下一步 `node insert-aliases.mjs` 直接把工作树的 `package.json` 写成了
+HEAD+我的行，那 2 行随之消失（`cp /tmp/pkg.mixed.json` 报 `No such file or directory` 才暴露）。
+
+**为什么危险**：他们那 2 行没有暂存（`git status` 是 ` M`，索引等于 HEAD），共享工作树里**没有第二份**。
+如果不是本轮刚好把那段 diff 打印在会话里，恢复就只能靠猜。
+
+**怎么还原的**：按覆盖前 `git diff` 的原文重建那两条（新增 `"check:op-log-semantics":` 一行 +
+在 `check` 链的 `pnpm check:reachability && ` 之后插入 `pnpm check:op-log-semantics && `），
+脚本带**四条前置断言**（锚点命中数=1、未重复、段数必须=62、我那 6 行仍在），跑完
+`git diff --numstat -- package.json` 回到 **`2\t1`**，diff 正文两行与覆盖前逐字一致。
+
+**改的纪律（本条线后面每一步都照做）**：
+1. temp-swap 之前 `test -f <备份> || exit 1` 必须写进**同一条链**，不许凭"上一条命令看起来跑了"；
+2. 长链里 `&&` 左边只要有一个语法错误，**整行一个字符都不会执行** —— 副作用要事后测量，不要事后回忆；
+3. 更稳的做法是**不碰工作树**：改 root `package.json` 这类多人文件时，先 `git show HEAD:… > /tmp/x`、
+   在 /tmp 里造好目标内容、`git hash-object -w` + `git update-index --cacheinfo` 只动索引，
+   再用 `git commit --only` 之外…**本仓已证明 `--only` 取的是工作树内容**，所以这条路必须配
+   `git commit`（不带 --only）且**当场 `git status` 复核索引里没有别人的暂存条目**。

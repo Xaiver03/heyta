@@ -1058,3 +1058,27 @@ windows 那张还额外开着**头像菜单**（`登录 / 注册` 在第一项 +
 逐条核过归属：引用它们的 `docs/README.md` 等三份**自己就还是 `M`（未提交）**，
 而 `git show HEAD:docs/README.md | grep -c "0046-lossless"` = **0** ⇒ **HEAD 不红**，
 干净检出同一把尺子 `exit 0`（上面那条链里就含这一道）。**不代改、不 `git add` 别人的文档。**
+
+### 7.24 ✅ 任务 1 判据登记补齐（2026-10-03 16:0x，提交 `c506953b` + `76cbee51`）
+
+任务 1 那四件（6 个别名 / 2 个进 MANIFEST + 补 bootstrap + 改掉过期理由 / mobile 旅程册 2→25 /
+`verify-mobile-lists.sh:377` 的服务端计数判据）落地过程与读数是 **PROGRESS.md「任务 1 判据登记补齐」** 那一节，
+这里只记三条会影响后面批次的事实：
+
+1. 🔴 **任务书那条反向验证的前提不成立**：`check:script-snapshot` 从不扫磁盘，所以"从 MANIFEST 删一条"
+   反而**全绿**（exit 0）—— 真正会红的是"清单里的文件没有 bootstrap"。两次变异读数见 B36.1。
+   含义给后面批次：**这条门禁不会替我发现"新写的 `verify-mobile-notes.sh` 忘了登记"**，
+   所以任务 2 交付时必须手工跑那两条对账命令（`no_alias=0` / `no_manifest=0`），不能只看门禁绿。
+2. 🔴 **`pnpm check` 的段数是工作树的读数，不是仓库的属性**：HEAD（`76cbee51`）上是 **61** 段，
+   第 62 段 `check:op-log-semantics` 是并发会话**未提交**的改动（他们那条线自己带一个未跟踪脚本
+   `scripts/mutate-op-log-semantics.mjs`）。任务 0 量的 62 与此一致，但**完成条件里"62 段 exit 0"
+   这个说法要按载体写明**：本条线交付的 HEAD 上是 61 段。
+3. ⚠️ **HEAD 上 `check:shell-unicode` 是红的**（3 处在 `scripts/mutate-closeout-gates.sh`，`cc974fbd` 提交），
+   地界外不代改，登记在 B36.2 ⇒ "check 全量 exit 0"这一条在完成条件 2 上目前**不可能由本条线单独达成**。
+
+顺带一条本仓纪律级的事故（写在 B37，因为它会重演）：为了让 `package.json` 那 6 行**只带我的 hunk** 进提交，
+我按"备份工作树 → 临时写成 HEAD+我的行 → `commit --only` → 还原备份"三步走，而**备份那条 `cp` 因为同一行里
+`sh -c` 的引号解析失败根本没执行**，于是第二次尝试直接把并发会话那 2 行未提交改动覆盖了。
+已按其提交前的 `git diff` 原文逐字重建并放回（`git diff --numstat` 回到 `2/1`、两行内容与覆盖前一致）。
+教训不是"别 temp-swap"，而是**temp-swap 前必须验证备份存在**（`test -f 备份 || exit 1` 放进同一条链里），
+以及**长命令链里前面那半句也可能整行没跑** —— 不能假设"&& 左边的副作用已经发生"。

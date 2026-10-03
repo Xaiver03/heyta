@@ -1100,3 +1100,15 @@ WindowServer 94%、simruntime 进程 92% 空转，负载 128）—— iOS 27.1 �
 
 **顺带撞出的两条真问题**（都记在 B36）：`check:shell-unicode` 在**当前 HEAD 上是红的**（`mutate-closeout-gates.sh:223/232/242`，
 `cc974fbd` 提交，地界外 ⇒ 不代改）；同批扫出的 `verify-mobile-repeat.sh:675` 在我地界内、已就地修成 `${XY15C}`。
+
+### 任务 1 的两条更正与一条事故（2026-10-03 16:1x）
+
+1. 🔴 **完成条件里"62 段"要写明载体**：HEAD（`76cbee51`）上是 **61** 段 —— 第 62 段
+   `check:op-log-semantics` 是并发会话**未提交**的 package.json 改动。任务 0 量的 62 没错，
+   但它是工作树读数（同一段代码在 22:48 红 57 条、22:55 全绿那个形状的同族）。
+2. 🔴 **HEAD 上 `check:shell-unicode` 是红的**（3 处 `mutate-closeout-gates.sh`，地界外）⇒
+   "check 全量 exit 0"目前不由本条线单独可达，见 B36.2。
+3. ⚠️ **我自己造了一次共享工作树事故并已还原**（全程记在 **B37**）：为让 package.json 只带我的 hunk
+   做了 temp-swap，而备份那步 `cp` 因为同一行里 `sh -c` 的引号解析失败**整行都没执行**，
+   于是覆盖了并发会话那 2 行未提交改动；已按覆盖前 diff 原文逐字重建（`git diff --numstat` 回到 `2/1`）。
+   往后本条线的规矩：**temp-swap 前 `test -f 备份 || exit 1` 写进同一条链**，副作用事后必须测量。
