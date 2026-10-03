@@ -2430,6 +2430,22 @@ G-53 的关闭动作（不做半截）：① 先拍"我们承诺发哪几个架�
 | **G-47** | 🟡 主体未闭，决定依据变硬了 | 版本漂移第一次有"同一对象两个时刻"的实证（`@fastify/websocket` 11.3.1→11.3.3 进了真镜像）；`npm ci` 路线的三个前置量出来了（见上 ③）。不在本批做的原因：动生产安装路径 + 必须真容器闭环，而本批正卡在落地窗口 |
 | **#2** | 🔄 四步有读数、第五步缺 | 浏览器那条腿仍未跑过（被另一条会话的测试锁挡，见 §8.37）；脚本已加"截图必须晚于本次起跑"这条判据 |
 
+### 8.39 两件"落地之后"的事先把前置量出来了（不预跑，只把会不会卡摸清楚）
+
+04:0x 现量，全部只读：
+
+| 前置 | 读数 | 结论 |
+|---|---|---|
+| Windows 打包机 | `ssh windows-pc` ⇒ `OK` + 主机名回显（另有一行 openssh.com 的 PQ 警告，不影响） | ✅ 第 8 项不会被"机器不在"卡住 |
+| iOS 模拟器 | **三台同时 Booted**：`heyta-iphone-17pro`、`heyta-ios-isolated`、`iPhone Duo heyta` | 🔴 `reinstall:all` 的 ios 段第一步是 `simctl uninstall` —— 这三台里有别人正在用的（同一时刻另一条会话在跑 e2e）。这一段的**所有者与运行窗口**要先协调，不能直接起（AGENTS §7 第 9 条：共享资源独占验收） |
+| Android | `adb devices` ⇒ `emulator-5554 device` | 同上，android 段会 `pm clear`/重装 |
+| mac 端 | `/Applications/Heyta.app` 与 `/tmp/heyta-macos-dist` 都在 | ✅ 会被"清掉重装"，属预期 |
+| 浏览器那条腿自身 | `e2e/selfhost-stack/selfhost-web.spec.ts:81-84` 是**真点**「同意」（`privacy-consent-dialog` / `privacy-consent-accept`），而这两个 testId 在当前树上确实存在（`apps/web/src/features/privacy/PrivacyConsentSheet.tsx:121`、`:266`） | ✅ §8.33 那次"被闸门挡住"的形态已经不会重现；剩下的唯一前置就是窗口 |
+
+⚠️ 这一张表**不是**说第 8 项可以起 —— 它的顺序判据是"落地之后"，而落地还卡在 #7 那 5 枚重叠文件。
+记在这里是为了：等窗口真来的时候，不用再花一轮去发现"模拟器是别人的"。
+
+
 
 
 
