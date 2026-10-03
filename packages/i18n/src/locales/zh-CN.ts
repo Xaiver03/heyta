@@ -456,6 +456,9 @@ export const zhCN = {
   'web.shell.modules.title': '功能模块',
   'web.shell.account.aria': '账号',
   'web.shell.account.ariaAs': '账号：{email}',
+  // R10：身份区之后、设置之前。**六家一致**的"头像 → 菜单 → 二级页"形态，
+  // 所以它是菜单的一项而不是一个常驻 tab（见 docs/plans/ui-review-fill-zh-timeline.md §8.2）。
+  'web.shell.account.profile': '编辑个人信息',
   'web.shell.account.settings': '设置',
   'web.shell.account.signOut': '退出登录',
   'web.shell.nav.help': '帮助',
@@ -527,6 +530,34 @@ export const zhCN = {
   'web.shell.settings.close': '关闭设置',
   'web.shell.dueMode.aria': '截止时间显示方式',
   'web.shell.dueMode.date': '日期',
+
+  // ── 个人信息（R10，2026-10-03）─────────────────────────────────────────
+  // 昵称与头像。**这一页只给你自己看**：heyta 没有共享与协作，服务端也没有
+  // "按别人身份查资料"的端点，所以措辞里不许出现"其他用户会看到"。
+  // 规格（32 个码点 / 图片格式与原图上限）的唯一来源是
+  // `packages/shared-schema/src/account-profile-contract.ts`，措辞在这里。
+  'web.settings.profile.title': '个人信息',
+  'web.settings.profile.nickname.label': '昵称',
+  'web.settings.profile.nickname.placeholder': '留空则显示邮箱',
+  'web.settings.profile.nickname.hint': '最多 {max} 个字。昵称只是显示名，不是你的真实姓名；登录标识始终是邮箱。',
+  'web.settings.profile.nickname.toolong': '昵称最多 {max} 个字，现在有 {count} 个。',
+  'web.settings.profile.nickname.save': '保存昵称',
+  'web.settings.profile.nickname.saved': '昵称已保存',
+  'web.settings.profile.nickname.cleared': '已清除昵称',
+  'web.settings.profile.avatar.label': '头像',
+  'web.settings.profile.avatar.change': '换一张',
+  'web.settings.profile.avatar.remove': '移除头像',
+  'web.settings.profile.avatar.removed': '头像已移除',
+  'web.settings.profile.avatar.uploading': '正在上传…',
+  // 🔴 这条不是错误提示，是**产品事实**：口令从不落盘（`credential-storage.ts`），
+  // 所以刷新之后内存里没有它，而头像是用它加密的。没有它谁也解不开，包括我们自己。
+  'web.settings.profile.avatar.needPassword': '头像是用你的端到端加密口令保护的，本机没有保存这个口令 —— 请先在「同步设置」里填写一次，再更换或查看头像。',
+  'web.settings.profile.avatar.badType': '只支持 {types} 格式的图片。',
+  'web.settings.profile.avatar.tooBig': '图片压缩后仍超过 {max}，换一张小一点的。',
+  'web.settings.profile.avatar.failed': '头像没有传上去，请稍后再试。',
+  'web.settings.profile.email.label': '邮箱',
+  // 只读要有理由，否则用户会以为这是个没做好的输入框。
+  'web.settings.profile.email.hint': '邮箱是登录标识，也是找回账号的唯一凭据，不能在这里修改。',
 
   'web.settings.display.title': '显示',
   'web.settings.display.dueNote': '任务行上的截止时间显示为日期，还是距离截止时间的倒计时。',
@@ -687,6 +718,10 @@ export const zhCN = {
   // ⚠️ 两句仍不许断言"邮箱存在"或"账号已创建"（服务端用中性文案防邮箱枚举）。
   'web.auth.sent.login': '如果这个邮箱有账号，登录链接已经发出。点开邮件里那条链接就会回到应用并登录好；邮件不在手边时，可以把链接粘贴到下面「高级」里。',
   'web.auth.sent.register': '注册申请已提交。去邮箱点开那条验证链接 —— 点完回到这里，就已经登录好了。',
+  // 🔴 这一句只在服务端**亲口说**"信没发出去"时才出现（`emailDelivered: false`）。
+  // 它必须给出下一步，而不是"请稍后再试"：一台没配 SMTP 的服务器重试一万次
+  // 也发不出那封信。两个出口都是真的：配 SMTP，或自托管显式关掉这一步。
+  'web.auth.sent.mailNotSent': '这台服务器没能把验证邮件发出去（多半是没配邮件服务）。账号已经建好，但还没有激活：请让服务器管理员配好 SMTP 后重新提交一次注册；这台服务器只给自己人用时，也可以设 REQUIRE_EMAIL_VERIFICATION=false 跳过这一步。',
   'web.auth.sent.recovery': '如果这个邮箱有账号，找回通行密钥的链接已经发出。点开邮件里的链接即可为这个账号注册一个新通行密钥（会替换掉旧的）。',
   'web.auth.signedIn.title': '已登录',
   'web.auth.signedIn.body': '令牌已写入同步设置（{email}）。填好端到端加密口令后即可同步。',
@@ -1919,6 +1954,12 @@ export const zhCN = {
   // 「添加任务」这句话只说了一半 —— 用户按回车后任务落进收集箱、
   // 从眼前这条列表里消失，而界面上没有任何一处说过这件事。
   'web.capture.placeholderTo': '添加任务到「{list}」，回车确认（可写「明天」「下周三」「!1」）',
+  // R11 批五：日历里选中了某一天时，捕获框要**说出落点**。
+  // 悄悄改变一条任务的落点属于『界面没说谎、但用户以为没说』那一类，
+  // 所以这句提示是功能的一部分，不是装饰。
+  'web.capture.placeholderToDay': '添加到 {day}，回车确认（写了「明天」就以「明天」为准）',
+  'web.calendar.capture.add': '往选中那天加一条',
+  'web.calendar.capture.close': '收起输入框',
   'web.capture.addLabel': '新任务标题',
   'web.capture.add': '添加',
   'web.capture.matches.aria': '识别出的字段',
@@ -2094,6 +2135,10 @@ export const zhCN = {
   'common.weekday.sun': '日',
   'common.date.monthTitle': '{year}年{month}月',
   'common.date.dayTitle': '{month}月{day}日 星期{weekday}',
+  // R11 批三：周视图的标题。**措辞按 locale 各排一次序**（中文把年份放在最前，
+  // 英文把它放在最后），所以这里给的是**整条区间**的图案，不是两截日期。
+  // ⚠️ 不带年份的"10月26日 – 11月1日"在跨年那一周（12/29 – 1/4）会读不出是哪一年。
+  'common.date.weekRangeTitle': '{year}年{startMonth}月{startDay}日 – {endMonth}月{endDay}日',
   // ── 日历（Web）── 取值与 `mobile.calendar.*` **逐字相同**（同一块共享 UI，
   //    两端说法必须一致；key 分两套只是因为命名空间按端划分）。
   // ── 全局搜索（任务 + 便签 + 快速跳转）── 2026-10-01 起它是**唯一**的搜索入口
@@ -2126,6 +2171,11 @@ export const zhCN = {
   'web.calendar.title': '日历',
   'web.calendar.prevMonth': '上个月',
   'web.calendar.nextMonth': '下个月',
+  'web.calendar.prevWeek': '上一周',
+  'web.calendar.nextWeek': '下一周',
+  'web.calendar.view.aria': '视图',
+  'web.calendar.view.month': '月',
+  'web.calendar.view.week': '周',
   'web.calendar.weekShort': '{n}周',
   'web.calendar.backToToday': '回到今天',
   'web.calendar.monthTitle': '{year}年{month}月',
@@ -2135,6 +2185,7 @@ export const zhCN = {
   'web.calendar.a11y.dayWithTasks': '{date}，{count} 个任务',
   'web.calendar.a11y.dayWithTasksOne': '{date}，{count} 个任务',
   'web.calendar.a11y.dayNoTasks': '{date}，没有任务',
+  'web.calendar.a11y.moreTasks': '还有 {count} 项',
   'web.calendar.side.aria': '日历侧栏',
   'web.calendar.mini.aria': '迷你月历',
   'web.calendar.scope.all': '所有',
@@ -2357,6 +2408,7 @@ export const zhCN = {
   // 同 `mobile.common.badge.countOne`：中文无单复数，刻意逐字相同。
   'mobile.calendar.a11y.dayWithTasksOne': '{date}，{count} 个任务',
   'mobile.calendar.a11y.dayNoTasks': '{date}，没有任务',
+  'mobile.calendar.a11y.moreTasks': '还有 {count} 项',
   'mobile.calendar.a11y.markDone': '标记完成：{title}',
   'mobile.calendar.a11y.unmarkDone': '取消完成：{title}',
 
@@ -2523,6 +2575,10 @@ export const zhCN = {
   //    出现就是应用在对用户说假话。
   'mobile.auth.sent.login': '如果这个邮箱有账号，登录链接已经发出。打开邮件里的链接，或把链接粘回上面的输入框。',
   'mobile.auth.sent.register': '如果这个邮箱可用，我们会发送一封验证邮件。请查收邮件、点开验证链接，然后回到这里登录。',
+  // 与 `web.auth.sent.mailNotSent` 同一件事、同一个触发条件（服务端说信没发出去）。
+  // 两条不合并成一条是因为移动端那句原本带"如果这个邮箱可用"的中性前缀，
+  // 而这一句要说的不是邮箱，是**服务器**。
+  'mobile.auth.sent.mailNotSent': '这台服务器没能把验证邮件发出去（多半是没配邮件服务）。账号已经建好，但还没有激活：请让服务器管理员配好 SMTP 后重新提交一次注册；这台服务器只给自己人用时，也可以设 REQUIRE_EMAIL_VERIFICATION=false 跳过这一步。',
   // 验证令牌**不产出会话**（规范 §2-A1），所以验证成功后还要再走一次登录。
   // 这句话要说得像"下一步做什么"，而不是像"失败了"。
   'mobile.auth.emailVerified': '邮箱已验证，但这一步还不发令牌。请再点一次「用邮件链接登录」，把新邮件里的登录链接粘回上面的输入框。',
