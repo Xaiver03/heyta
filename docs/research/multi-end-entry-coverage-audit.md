@@ -31,7 +31,7 @@
 | **due 事后编辑** | ✅ 行尾「截止」+ 共享 DatePicker（**批一已修** 2026-10-02） | ✅ DatePicker（`TaskDetailSheet.tsx:677`） |
 | 排期 startDate/时长 | ✅ 拖拽 + 点空白 | ✅ 详情表单（`TaskDetailSheet.tsx:688`） |
 | 子任务 / 优先级 / 重复规则 / 提醒数据 | ✅ | ✅ |
-| **提醒投递** | ✅ Notification API + 权限面板 | ⛔ **永不响**（**批三停批** 2026-10-02：四个候选依赖无一过 §3.1/§3.2，逐条裁决见本文 P0-1；判据脚本 `scripts/verify-mobile-reminder-ring.sh` 已先行落地） |
+| **提醒投递** | ✅ Notification API + 权限面板 | ~~⛔ **永不响**~~ ⛔→🟡 **2026-10-03 20:0x 现量更正：并行那条线已落地**（`com/heytamobile/reminder/ReminderModule.kt` + `ReminderPackage.kt` 在位、`AndroidManifest.xml` 里 `POST_NOTIFICATIONS` 1 处、契约 `docs/adr/0051-mobile-reminder-delivery.md`）—— **不是本条线做的，本行不代其主张验收读数**。（原批三停批记录如下，留着是为了让后来者认出这个形状：**批三停批** 2026-10-02：四个候选依赖无一过 §3.1/§3.2，逐条裁决见本文 P0-1；判据脚本 `scripts/verify-mobile-reminder-ring.sh` 已先行落地。要拍的"禁令前提"见 BLOCKED **B33**） |
 | 清单/标签 建/删/取色 | ✅ | ✅ |
 | 清单/标签 **改名**、父子、归档 | 🟡 **改名与归档两端已接**（2026-10-03 第三批，判据见 §4 P2-2 / P2-6）；**父子（层级）选择器仍未做** | 🟡 同左（同一批、同一份判据） |
 | 四象限 | ✅ 含拖拽换象限 | ✅ 无拖拽（刻意） |
