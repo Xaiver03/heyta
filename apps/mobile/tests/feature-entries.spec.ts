@@ -233,8 +233,27 @@ describe('倒数日这一屏：两端消费的是同一批词条', () => {
     const countKeys = (source: string): string[] =>
       [...source.matchAll(/'(web\.countdown\.[a-z0-9.]+)'/g)].map((m) => m[1] as string);
 
-    const mobile = [...new Set(countKeys(codeOf('lib/countdown-display.ts')))].sort();
-    const web = [...new Set(countKeys(codeOfPath(WEB_COUNTDOWN_VIEW)))].sort();
+    /**
+     * 🔴 取样范围是 `eventBoardLabels` **那一个函数的函数体**，不是整个文件。
+     *
+     * 整文件扫会连"这一屏独有的失败文案"一起收进来，于是它拦的不是它声称的那件事
+     * （卡片措辞分叉），而是一类本来就该各端不同的东西。实测就是这样红的：
+     * web 的导出失败说"这台设备给不了画布"（`web.countdown.export.failed`），
+     * 移动端说四种因各有各的一句（`mobile.countdown.export.*`）——
+     * **那是设备能力的差别，不是措辞的漂移**。把判据范围放错的代价是
+     * 它一旦常红，下一次真分叉就没人看了。
+     */
+    const labelsBodyOf = (source: string): string => {
+      const start = source.indexOf('export function eventBoardLabels');
+      expect(start, '没找到 `eventBoardLabels` —— 这一侧的构造器改名了，判据已失效').toBeGreaterThanOrEqual(0);
+      const rest = source.slice(start);
+      const end = rest.indexOf('\n}');
+      expect(end, '`eventBoardLabels` 的函数体没闭合 —— 抽取规则已失效').toBeGreaterThan(0);
+      return rest.slice(0, end);
+    };
+
+    const mobile = [...new Set(countKeys(labelsBodyOf(codeOf('lib/countdown-display.ts'))))].sort();
+    const web = [...new Set(countKeys(labelsBodyOf(codeOfPath(WEB_COUNTDOWN_VIEW))))].sort();
 
     expect(mobile.length, '一个 `web.countdown.*` 都没抓到 —— 抽取规则已经失效').toBeGreaterThan(0);
     expect(web.length, '同上，web 那侧').toBeGreaterThan(0);
