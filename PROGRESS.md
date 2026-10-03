@@ -1174,6 +1174,23 @@ mobile 与 web 的 `typecheck` 均 0 错。三个新改动屏的 `style={{` 计�
 `AGENTS.md` 三处漂移登记（`:35` 漏列 `ai-tool-call.ts`、`:37` 未提工具目录已按实体拆包、
 `:295` 写"2592 通过"实际 **7839**）+ `AGENTS §7` 索引 vs `environment-traps.md` 的缺号审计。
 `pnpm check:docs` rc=0。
+
+**22:0x 续（同一节的读数被现量部分否证，留原文不重写）** ——
+本节写的载体 `/private/tmp/heyta-final` **已在 21:32 那次重启里连目录一起被清空**
+（提交完好、未提交改动与 `/tmp` 下的臂脚本丢失），现载体
+`…/01_PROJECTS/heyta-wt-ai-closeout`；上面"① 合并 ✅"只覆盖到"三个分支并成一条线"，
+`main → 集成线`那一次是 22:0x 才做的，**且有两处冲突**（台账尾部，按并集解），
+不是上面那句"预演零冲突"能代替的。② 的读数已被新载体上的一份完整读数取代：
+**build rc=0 / 61 段 = 56 绿 · 4 红 · 1 段按规则不跑**，四条红分别是
+`check:docs`（4 条死链**全部继承自 main** ⇒ 上面那句 `rc=0` 在合并态不再成立）、
+`check:privacy-consent-e2e` 与 `check:landing-e2e`（**环境无效**：新载体的
+`e2e/node_modules` 未装，失败原文 `unknown command 'test'`，用时 5s/1s 也证明没跑到浏览器）、
+`pnpm -r test`（**不在本线的产品红**：`packages/ui` 的 `toOrganizerTree` 节点多出 `archived`，
+而它自己的测试断言"只有 `id`/`name`/`children`"。本线在 `packages/ui/` 下改动 **0 文件**、
+该源文件与 spec 两侧**逐字节相同** ⇒ main 单跑同样红；最后一动是 `192a516d`，
+与 `B56` 那条 organizer 零宽同源）。逐条证据在
+`docs/plans/ai-event-tool-contract.md` §15.25–§15.27。
+
 ---
 
 ## 任务 4（成长三件 + 权益可见）—— 2026-10-03 18:2x–18:4x

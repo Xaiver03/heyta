@@ -3221,3 +3221,34 @@ git ls-files docs/research/aed-implementation-evidence.md | wc -l   # → 0（�
 3. 守卫：`blob vs HEAD` 的**新增行集合必须逐行等于**我那段文本，删除行数必须为 0；
 4. 提交后按**路径**刷共享索引（`git update-index --add --cacheinfo`）；
 5. 工作树那份仍追加我的文本，让下一个会话读到。
+
+## B59. 🔴 合并态唯一的**产品**红：`toOrganizerTree` 的节点漏出 `archived`，而它自己的测试断言"只有 id/name/children"（2026-10-03 22:0x 现量，不在本线）
+
+**症状**：`pnpm -r test` 在 `packages/ui` 一段回 `1 failed | 441 passed`：
+`tests/projects-model.spec.ts:96` 期望 `['children','id','name']`，实到 `['archived','children','id','name']`。
+
+**为什么这条要单独立账而不是一句"某测试红了"**：那句断言写的是
+"**不把整个实体漏出去**" —— 它是界面投影层的承诺。现在承诺与代码不一致，
+而 `1 failed / 441 passed` 这种形状在汇总里很容易被读成"几乎全绿"。
+
+**归属（三条独立证据，全部零成本可复跑）**：
+
+```bash
+C=/Users/rocalight/Desktop/All\ in\ one\ Data/01_PROJECTS/heyta-wt-ai-closeout
+git -C "$C" diff --name-only main...HEAD -- packages/ui | wc -l          # 0 ⇒ 本线没碰过这枚包
+cmp -s <(git -C "$C" show main:packages/ui/src/projects/model.ts) \
+       "$C/packages/ui/src/projects/model.ts" && echo 源文件相同          # 相同 ⇒ main 单跑同样红
+cmp -s <(git -C "$C" show main:packages/ui/tests/projects-model.spec.ts) \
+       "$C/packages/ui/tests/projects-model.spec.ts" && echo spec 相同
+git -C "$C" log -1 --format='%h %ad %s' --date=format:%H:%M -- packages/ui/src/projects/model.ts
+# 192a516d 17:53 —— 与 B56（侧栏清单名被挤成零宽）出自同一笔
+```
+
+**要谁拍、拍什么**：两种可能都成立，本线不代改也不为绿改别人的测试 ——
+① 投影层该剥掉 `archived`（则 `model.ts` 错，测试是对的）；
+② `archived` 是这次层级改动**故意**带上来的（则 spec 该更新，并顺手说明为什么"漏整个实体"这条承诺仍然成立）。
+判这个要 `192a516d` 的作者拍，因为它决定的是界面拿到的是什么形状。
+
+**对本线的影响**：它是合并态四条红里唯一的产品红，其余三条分别记在
+`PROGRESS.md` 的 AI 节 22:0x 续段（`check:docs` 继承自 main；两段 e2e 是环境无效）。
+**关闭判据**：`pnpm --filter @heyta/ui test` 回 `442 passed`，或 `model.ts`/spec 两侧同时更新并留一句为什么。
