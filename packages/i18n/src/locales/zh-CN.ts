@@ -256,7 +256,7 @@ export const zhCN = {
   'landing.privacy.noteProgress': '已加密 {done} / {total} 个字',
 
   // ── 落地页 · 自建 ─────────────────────────────────────────
-  'landing.selfhost.title': '自己的服务器，一条命令的事',
+  'landing.selfhost.title': '自己的服务器，一条命令起全套',
   'landing.selfhost.lede': '不需要注册账号，不需要订阅。服务端只负责转发密文与判并发，换掉它、关掉它、搬到别的机器上，你的数据都不受影响。',
   // 🔴 这一节**不许**出现命令行、内部路径或数据库机制（判据与理由见
   // `apps/landing/tests/public-copy-register.spec.tsx`）。需要逐条执行的东西
@@ -3277,7 +3277,7 @@ export const zhCN = {
   'site.docs.selfhost.s1i1': '目前**没有发布任何现成镜像**，你要在自己的机器上把它构建出来。',
   'site.docs.selfhost.s1i2': '把服务**起来**不等于部署完成：表结构变更由部署流程里的迁移步骤显式应用，服务自己不在启动时动表结构。',
   'site.docs.selfhost.s1i3': '它需要的是一台长期开着的机器、一个你自己的域名，以及"会看服务日志、能让证书按时续期"这类基本运维能力。',
-  'site.docs.selfhost.s1i4': '密钥、数据库口令、对外域名都要自己配，**没有默认值** —— 缺任何一项服务会拒绝启动。这是刻意的，它不给"用默认密钥上线"留活路。',
+  'site.docs.selfhost.s1i4': '三个必填项**没有默认值**，要自己生成：`JWT_SECRET`、`PASSWORD_PEPPER` 不给或短于 32 个字符，服务**拒绝启动**；`POSTGRES_PASSWORD` 不给，数据库容器直接退出。这是刻意的，它不给"用默认密钥上线"留活路。对外域名是另一档，它坏的形态不一样：`DOMAIN` 只给网关当站点地址（服务端本体不读它，空着是网关自己起不来），`PUBLIC_URL` 有默认值 `http://localhost:1900` —— 留着不改不会报错，坏得很安静：邮件里的链接指向 localhost。',
   'site.docs.selfhost.s2': '要配的东西',
   'site.docs.selfhost.s2i1': '邮件服务：只管**激活账号**那一步（发验证邮件）。注册与登录本身走**邮箱 + 口令**，不配 SMTP 也建得了号 —— 只是那封信发不出去，而界面会明说这件事：要么让管理员配好再提交一次，要么设 `REQUIRE_EMAIL_VERIFICATION=false` 跳过这一步。',
   'site.docs.selfhost.s2i2': '对外地址：生产环境下把它填成非加密地址，服务会拒绝启动。局域网内用明文地址是自建的正当场景，公网不是。',
@@ -3300,13 +3300,13 @@ export const zhCN = {
   'site.docs.selfhost.s6i1': '放行哪些前端来源由服务端的 `CORS_ORIGINS` 决定，多个来源用逗号分开写；生产环境下"全都放行"会被直接拒绝启动。',
   'site.docs.selfhost.s7': '怎么装：没有现成镜像，两条路自己选',
   'site.docs.selfhost.s7p1': '目前**没有发布任何 heyta 镜像**，所以这里没有可钉的版本号。不要把 `SUPERSYNC_IMAGE` 指向上游的 `master-〈提交号〉`：那是另一个项目的服务端，它的数据表结构与加密要求早已和 heyta 分开——照做只会得到一台**能正常启动、健康检查也通过、跑的却是陌生的表结构**的服务器。要钉版本，就从本仓库源码构建，并把那份源码的提交号作为版本标识传进构建。',
-  'site.docs.selfhost.s7p2': '部署脚本是唯一被支持的入口：它把整套栈（应用、PostgreSQL 数据库、Caddy 网关）一起拉起来，换上新容器**之前**先跑一次数据迁移，起来之后还会验一次健康检查。注意 `docker compose up` 本身**不是**部署：容器启动时的自动迁移默认是关的（防止重启和迁移互相踩），所以"只把容器拉起来"会跑在没迁移过的表结构上。',
+  'site.docs.selfhost.s7p2': '两条路都受支持，差别在升级时。`./scripts/deploy.sh --build` 把整套栈（应用、PostgreSQL 数据库、Caddy 网关）一起拉起来，在**旧容器还在服务**的时候先把迁移跑完，迁移不成就**不换容器**，起来之后还会验一次健康检查。另一条是一条 `docker compose` 起全套 —— 构建与一次性迁移那两份 override 都不能省（`-f docker-compose.yml -f docker-compose.build.yml -f docker-compose.migrate-once.yml`，少掉 `docker-compose.build.yml` 它就会去拉一个根本不存在的镜像），而它**只在第一次开机时迁移**：升级要么回到部署脚本，要么显式把那个一次性迁移服务再跑一遍。注意裸的 `docker compose up` **不是**部署：容器启动时的自动迁移默认是关的（防止重启和迁移互相踩），所以"只把容器拉起来"会跑在没迁移过的表结构上。',
   'site.docs.selfhost.s7p3': '加 `--build` 可以在部署机上自己构建镜像，但那是把整个仓库在部署机上完整编译一遍：峰值内存要额外 1.5 GB 以上（容器本身已占约 2.5 GB），构建缓存每构建一次涨约 1.4 GB 且**不会自动清理**。小机器的正确姿势是在别处构建好再推过去，或者直接钉住现成标签。`--build` 还会拒绝在源码不干净时构建 —— 构建产物必须能对回到某一份确切的源码。',
-  'site.docs.selfhost.s7i1': '三个必填项（签名密钥、数据库口令、对外域名）不配好，服务**拒绝启动**，这是故意的：没有"用默认密钥上线"这条路的活口。',
+  'site.docs.selfhost.s7i1': '三个必填项（`JWT_SECRET`、`PASSWORD_PEPPER`、`POSTGRES_PASSWORD`）不给齐，这套栈起不来：前两个是服务自己抛、**拒绝启动**，第三个是数据库容器直接退出。没有"用默认密钥上线"这条路的活口，这是故意的。对外域名不在必填里，它坏的形态也不一样：`DOMAIN` 只给网关当站点地址（服务端本体不读它，空着是网关自己起不来），`PUBLIC_URL` 有默认值 `http://localhost:1900` —— 留着不改不会报错，坏得很安静：邮件里的链接指向 localhost。',
   'site.docs.selfhost.s7i2': '部署脚本会核对镜像的源码版本标签，防止"拿旧镜像跑新迁移"。自建自定义镜像时要传入同样的版本标识；确信要跳过这份核对也有显式开关，但那是给你的故意，不是给你的疏忽。',
   'site.docs.selfhost.s8': '要配的环境变量，逐个说',
   'site.docs.selfhost.s8p1': '配置全在部署目录的 `.env` 一个文件里（从仓库的 env.example 复制来改）。改完重启容器生效。下面按"配错了会发生什么"来讲：',
-  'site.docs.selfhost.s8i1': '`DOMAIN` / `PUBLIC_URL`：对外域名与完整对外地址。邮件里的链接就按它生成 —— 填错的症状是"邮件里的链接打不开"。',
+  'site.docs.selfhost.s8i1': '`DOMAIN` / `PUBLIC_URL`：前者**只给 Caddy 当站点地址**（服务端本体不读它），后者才是**邮件里那些链接的来源**。`PUBLIC_URL` 填错的症状是"邮件里的链接打不开"；而它留着默认值（`http://localhost:1900`）时**不会有任何报错** —— 服务照常起、邮件照常发，只是链接指向你自己的笔记本。',
   'site.docs.selfhost.s8i2': '`JWT_SECRET`：登录令牌的签名密钥。空着拒绝启动；**部署定好之后不要再换** —— 换掉它，所有已登录设备立刻全部登出，在途的邮件链接一并作废。',
   'site.docs.selfhost.s8i3': '`POSTGRES_PASSWORD`：数据库口令。同样没有默认值。用栈里自带的数据库时不用另配连接串，默认连本栈的 PostgreSQL 16。',
   'site.docs.selfhost.s8i4': '`WEBAUTHN_RP_ID` / `WEBAUTHN_ORIGIN`：通行密钥绑定的域名。它只能取**一个**值，所以换域名 = 这台服务器上注册过的通行密钥全部作废（账号不丢，用邮件链接重新登入再注册一把即可）。必须是真实域名，纯 IP 浏览器不收。',

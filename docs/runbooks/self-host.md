@@ -1,7 +1,12 @@
 # 自建一套 heyta 同步服务端
 
-面向**第一次把 heyta 部署到自己的机器上**的人。全程只需要 Docker（或 Podman）+ git，
+面向**第一次把 heyta 部署到自己的机器上**的人。需要 Docker（含 `docker compose`）、`git`、
+`curl`，走部署脚本时还要 `jq`（它用来读"当前这套 compose 实际解析出的镜像"以核对版本；
+没有 `jq` 脚本会**响亮地**拒绝，不会静默跳过那道核对）。
 不需要我们这边的任何账号、机器或内网。
+
+⚠️ 这里**不承诺 Podman**：本批所有真跑验收都在 Docker 上做的，Podman 的 compose 兼容层
+没有一次实测记录。它大概率能跑，但那是"未证伪"，不是"支持"。
 
 > 这篇是"怎么做"。想知道"做完是什么样、有哪些旋钮"，看
 > [`server/README.md`](../../server/README.md) 与 [`server/env.example`](../../server/env.example)；
@@ -49,11 +54,17 @@ cp env.example .env
 ```
 
 `.env` 里**不给就跑不起来**的只有三个：`JWT_SECRET`（至少 32 字符，缺了或太短直接抛）、
-`PASSWORD_PEPPER`（同一条纪律）、`POSTGRES_PASSWORD`（compose 里**没有默认值**，
-不给就是空串，而 postgres 会带着空密码起来 —— 这是三个里最容易漏的一个）。
+`PASSWORD_PEPPER`（同一条纪律）、`POSTGRES_PASSWORD`。
 前两个各生成一个长随机串就行：`openssl rand -hex 32`。
 
+`POSTGRES_PASSWORD` 的"跑不起来"分两种，第二种最容易漏：
+**空库**时官方 postgres 镜像直接拒绝初始化（实测 `exit 1`，响亮）；
+但**数据卷已存在**时它会**跳过初始化、沿用卷里那个旧口令** —— 于是换口令后
+应用容器 `P1000` 认证失败并无限重启，而症状长得像"数据库坏了"。
+所以改口令要连着迁移数据卷，或者一开始就别留空。
+
 有默认值但**必须按你的域名改**的两个：`DOMAIN` 与 `PUBLIC_URL`。
+`DOMAIN` 只给 Caddy 当站点地址（服务端本体不读它）；`PUBLIC_URL` 才是邮件里那些链接的来源。
 不改的后果不是报错，是**邮件里的验证 / 找回密码链接指向 `http://localhost:1900`**
 （`PUBLIC_URL` 的默认值就是它）。而 `NODE_ENV=production` 下，**公网** host 的
 `PUBLIC_URL` 必须是 https（会抛）；局域网 / 回环地址的 http 是**放行**的 ——
@@ -66,7 +77,7 @@ cp env.example .env
 
 | 旋钮 | 默认 | 你要不要管 |
 |---|---|---|
-| `CORS_ORIGINS` | 只放行 `DOMAIN` | 界面和服务端同源部署就不用改；**分开部署**（界面在别的域名）必须把那个 origin 加进去，否则客户端表现为"离线"而服务端一条请求都没收到 |
+| `CORS_ORIGINS` | `https://app.super-productivity.com`（**上游的演示站**，而且 `env.example` 里是**未注释**的，`cp` 完就生效） | 界面与服务端同源部署时，浏览器根本不发跨域请求，所以"能不能用"不依赖它 —— 但它此刻的含义是**放行上游那个站在访问你的服务器**。自建就把它改成你自己的 origin，或干脆只留同源 |
 | `REQUIRE_EMAIL_VERIFICATION` | `true` | 不配 `SMTP_*` 就注册不进来。只给自己人用时**显式**设成 `false` —— 代价是任何人都能用任意邮箱建号，找回密码也找不到真人 |
 
 ## 3. 构建镜像
@@ -148,10 +159,19 @@ curl -fsS https://你的域名/health
   直接 `http://服务器IP:1900` 从局域网是**连不通的**（不是防火墙，是它只听回环）。
   要放开就覆盖那一行 `ports`，并想清楚你放开的是什么。
 - 如果你前面已经有 nginx / 别的站点占着 80，就别让 Caddy 起来：
-  起的时候点名服务（`docker compose -f docker-compose.yml -f docker-compose.build.yml up -d postgres supersync`），
+  起的时候点名服务，**三份 override 一份都别省**：
+
+  ```bash
+  docker compose -f docker-compose.yml -f docker-compose.build.yml \
+    -f docker-compose.migrate-once.yml up -d postgres supersync supersync-migrate
+  ```
+
   或者在自己的 override 文件里把 caddy 的 `ports` 覆盖掉。
-  ⚠️ 点名服务**不等于**可以省掉 `docker-compose.build.yml` —— 那份 override 管的是
-  "镜像从哪来"，和起哪几个服务是两回事（省掉的后果见第 4 节）。
+  ⚠️ 点名服务**不等于**可以省 override —— 它们管的是两件不同的事：
+  `docker-compose.build.yml` 管"镜像从哪来"（省掉 ⇒ 去拉一枚不存在的镜像，见第 4 节），
+  `docker-compose.migrate-once.yml` 管"表结构谁迁移"（省掉 ⇒ 起了但未迁移，
+  症状是日志里一片 `column ... does not exist` 而**容器全绿**）。
+  点名服务时也要把 `supersync-migrate` 一起点出来，否则那条一次性迁移根本不会跑。
 
 `deploy.sh` 会在最后一步因为 Caddy 绑不上端口而以"启动失败"收尾 —— 那种情况下
 `supersync-server` / `supersync-postgres` 可能已经是 `healthy` 的，
@@ -170,7 +190,7 @@ curl -fsS https://你的域名/health
 
 | 事实 | 影响 |
 |---|---|
-| 没有发布镜像、没有版本 tag 政策 | "升级到哪个版本"这件事目前没有官方答案 |
-| 没有客户端/服务端兼容矩阵 | 自建的服务端请只配**同一份源码**构建出来的客户端 |
+| 没有发布镜像，因此也**没有可钉的版本号** | "升级到哪个版本"目前唯一的官方答案是**源码提交号**；tag 三件套（`vX.Y.Z` + 滚动 `X.Y` + `latest`）与发布流水线已经写成文件但**没有启用**，启用与否是一个还没拍板的产品决定 |
+| 没有客户端/服务端兼容矩阵 | 政策写在 `server/README.md` 的 "Clients and version coupling"，而且它**刻意不承诺跨版本兼容**：镜像里那份界面与服务端同一次构建（结构上不会错配）；**其他任何客户端**（移动壳、桌面壳、你另起的界面）唯一被支持的组合是**与服务端同一份源码修订**。注意这里没有"同 major 即可"或"N-1 可用"的承诺 —— 那种话要等真做出兼容矩阵才说得出 |
 | 服务端镜像的 npm 依赖树没被钉住 | 同一份源码两次构建可能装到不同的传递依赖版本；许可证与漏洞扫描因此只能覆盖"某一次解析"（`pnpm check:image-license` 就是那条会红的对账） |
 | 没有自动更新、没有多副本编排 | 一台机器一套 compose；要横向扩展请先读 `server/docker-compose.yml` 里关于 `RUN_MIGRATIONS_ON_STARTUP` 的那段注释 |

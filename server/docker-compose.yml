@@ -108,7 +108,10 @@ services:
       - OLD_OPS_CLEANUP_DELETE_BATCH_SIZE=${OLD_OPS_CLEANUP_DELETE_BATCH_SIZE:-5000}
       - OLD_OPS_CLEANUP_MAX_DELETED_PER_RUN=${OLD_OPS_CLEANUP_MAX_DELETED_PER_RUN:-25000}
     ports:
-      - '127.0.0.1:1900:1900'
+      # 宿主端口可换（同一台机器上跑第二套栈时真的需要），**容器内端口固定 1900**：
+      # 服务端自己 `PORT=1900`（上面那行），换宿主端口不要动它。
+      # 默认值逐字等于原来写死的 `127.0.0.1:1900:1900` ⇒ 不设时行为零变化。
+      - '127.0.0.1:${SUPERSYNC_HOST_PORT:-1900}:1900'
     volumes:
       - supersync-data:/app/data
       # To publish your own Terms of Service, uncomment this and put the HTML next to
