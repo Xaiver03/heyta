@@ -472,7 +472,9 @@ cd e2e && npx playwright test tests/<某个>.spec.ts
 ## 7. 环境陷阱（索引）
 
 **全部正文在 [`docs/reference/environment-traps.md`](docs/reference/environment-traps.md)** ——
-83 条实测踩过、且会复现的坑，编号只增不改；正文里引用写「§7 #N」。
+实测踩过、且会复现的坑，编号只增不改；正文里引用写「§7 #N」。
+⚠️ 本文件**不写条数**（写过一次"83 条"，六天后就漂了）。要现量：
+`grep -cE '^[0-9]+\. ' docs/reference/environment-traps.md`。
 
 | 号段 | 主题 | 代表条目 |
 |---|---|---|
@@ -483,6 +485,7 @@ cd e2e && npx playwright test tests/<某个>.spec.ts
 | 61–79 | **工具链与脚本**（bash 3.2 / vite / Playwright / 远端 PS） | #64 `_VAR` 后跟全角字符 · #71 bundle 魔数 · #77 sed 的 C locale · #79 i18n 改完必须 build |
 | 80–83 | **壳与安装包验收**（2026-09-30 新增） | #80 RNW 吞 keydown ⇒ Esc 用捕获 · #81 窗口取证三坑 · #82 错误屏"非空白"假绿 ⇒ 主蓝判据 · #83 探针污染状态 / 原生控件跟系统强调色 |
 | 86–90 | **验证与对账脚本的自检盲区**（2026-09-30 – 10-01） | #86 一条判据里藏两个缺陷 · #87 e2e 前置 SIGKILL 别人的 dev server · #88 plumbing 半个文件的索引尾巴 · #90 diff-tree 两参比 A↔B，不是各自对父 |
+| 161–164 | **构建期数据与验证载体**（2026-10-03，倒数纪念日批次一） | #161 负数闰月被 `& 0xf` 折成 11 · #162 vitest 绿 ≠ `pnpm -r build` 绿（tsup 的 dts 阶段才查 `noUncheckedIndexedAccess`）· #163 数失败用例必须先 `NO_COLOR=1`，否则红了报 0 条 · #164 后台任务通知的 `exit code 0` 是包装命令的，不是被测命令的 |
 
 三条**元规则**（跨条目通用，先读这个再查号）：
 
