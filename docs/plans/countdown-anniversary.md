@@ -224,6 +224,24 @@ i18n **中英同步**（唯一文案事实源，`check:ui-language` 拦）；`SH
      而跑第 15 步会 `pm clear` 掉别人在上面的登录态"；而且脚本等满 900s 是 `exit 3`，
      **别把 `exit 3` 记成产品红**。
      ⚠️ **这条的前半截已满足**（2026-10-03 10:02 / 10:05）：android 与 ios 由并行会话在隔离检出 `267ac912` 重装过，本会话又**按内容**复核过设备上那份包里确有本批的 `每年` / `FREQ=YEARLY`（读数见下面第 2 条）⇒ 下次跑第 15 步**不必先重装**，但"现取在线机 + 自己的端口"那两条照旧。
+     🔴 **11:52 复量之后，上面这句"不必先重装"要收窄成两半，否则会被人当成"随便什么时候直接跑"**：
+     - ✅ **对第 15 步这条判据仍然成立**：`267ac912..HEAD` 里能进移动包的只有 `packages/i18n` 两份词表
+       （`git diff --name-only 267ac912..HEAD -- apps packages | grep -vE 'evidence/'` ⇒ 5 个文件，
+       其中 mac / landing 各占其位），而那 11 行词条改动**碰到 `recurrence` / `repeat` / `每年` 的行数 = 0**
+       （现量：`git diff 267ac912..HEAD -- packages/i18n/src/locales/zh-CN.ts packages/i18n/src/locales/en.ts | grep -E '^[-+][^-+]' | grep -icE 'recurrence|repeat|每年|weekly'` ⇒ **0**）。
+     - 🔴 **对"本轮交付的固定收尾"不成立**：§6.1.1 的判据是"装的是**当前**产物"，而词表变了 ⇒ 设备上那份
+       已经不是当前产物（差的正是 729f4bd4 / 1e092733 / bf271a1e 那三笔公开文案）。所以拿它跑第 15 步可以，
+       拿它当"这一轮收尾已跑绿"的证据不行 —— 要么先 `pnpm reinstall:mobile`，要么别写这一格。
+     - 🔴 **另一条硬前置（新量出来的）**：主检出的
+       `apps/mobile/android/app/build/outputs/apk/release/app-release.apk` mtime 是 **10-03 03:21**，
+       而 HEAD 里 **09:47 还有一笔动过 `apps/mobile` 的提交**（`c444d827`，且它是 `267ac912` 的祖先）⇒
+       **这份盘上的 APK 不可能含它**（判据：`stat -f %Sm -t '%m-%d %H:%M' <apk>` 与
+       `git log -1 --format='%h %ad' --date=format:'%m-%d %H:%M' -- apps/mobile`）。
+       谁要从主检出重装，必须先 `pnpm -r build && pnpm build:android`，不能拿这份旧 APK 装上去验。
+       ⚠️ 顺带记一条**别照抄的读数**：这份旧 APK 的 bundle 里 `每年`=1 / `FREQ=YEARLY`=1（UTF-16LE / ASCII 各按 §7 #171 的口径），
+       看起来"含本批代码"——那是真的但**只到 03:21 为止**；`yearly` 枚数在这里是 3、在设备上那份是 5。
+       **枚数差不能用来判新旧**（Hermes 按字符串内容选 latin1/UTF-16 存储，ASCII 与 CJK 计数不同形），
+       判新旧只有 mtime↔提交时间这一条可靠。
 2. **`'yearly'` 加了 id 但没人能测到"忘了加进 `REPEAT_PRESET_IDS`"** —— 这一档的表现是"界面上没有每年"，属于**按定义不可观测**，不为此扭曲设计；类型系统已能抓到"switch 少一档"与"标签少一档"（`Record<RepeatPresetId, MessageKey>` 是穷举的）。
 3. **2/29 的"平年过 2 月最后一天"口径**：需要 `BYMONTHDAY=-1`，而域层 `describeRecurrence` 与移动端 `recurrence-display` 都会把它渲染成「每年 2 月 -1 日」。现状按 RFC + 主流日历实现（只在闰年重复），并**把这条边界钉在测试里**而不是留成暗坑。真正的产品问题在倒数日（"在一起多少天"那天算不算 2/29），随 W5 一起定。
 4. **W4 判据②的界面半段**（"数据只到 2026 时 2027 显示节、不显示休/班"）：本批不做 UI，所以落的是**数据层**那半 —— 2027 有节无休、不抛错、非法日期响亮失败，都有单测与变异。界面上那条随 W5。
@@ -353,6 +371,17 @@ grep 命令**数成第二处定义（判据必须锚"行首的定义形状"，�
    而工作树台账末号是 **179** —— #177–#179 是并行会话那三笔，索引行归他们补。现量：
    `awk -F. '/^[0-9]+\. /{if($1>m)m=$1} END{print m}' docs/reference/environment-traps.md` 与
    `grep -oE '^\| *[0-9]+–[0-9]+' AGENTS.md | grep -oE '[0-9]+$' | sort -n | tail -1`。
+
+   ⚠️ **11:49–11:53 再复量：窗口的形状变了，但还不是我的** —— `sysctl -n vm.loadavg` ⇒ **22.50 / 31.28 / 44.51**
+   （1 分钟从 148 掉到 22，在落，但阈值是 12）；`pgrep -f qemu-system` ⇒ **0**（那台共用模拟器已经关了），
+   `adb devices` ⇒ 无设备，:3000 / :3100 ⇒ 两个端口**都空了**，`docker ps` ⇒ 空。
+   看起来像开了，可是：`xcrun simctl list devices booted` ⇒ **3 台 iOS 模拟器还起着**、
+   `ps Axo command | grep -cE '[x]codebuild|[g]radle'` ⇒ **2 个在跑**、`git log --since='3 minutes ago'` ⇒
+   他们最后一笔 **11:47**。⇒ 那是一条正在做设备/构建收尾的会话，**gradle 跑完就要装包**；
+   这一刻我起第二台模拟器或抢那台 AVD，压的就是它的时间判据（同一形状见上面 11:24 那段）。
+   **另记一条**：`~/.android/avd` 里仍然只有 `SSOS-Parity-A36`，但"起一台自己的"这次量清了成本 ——
+   `avdmanager` 与 `emulator` 可执行、系统镜像 `android-36/google_apis` 在位 ⇒ **技术上今天就能建**；
+   拦着的不是工具链，是"再来一台模拟器的负载"和"这台机器上有人在跑设备判据"这两件事。
 
    设备与服务端都归自己时的复跑命令：
    ```bash
