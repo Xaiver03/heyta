@@ -974,6 +974,7 @@ export {
 } from './date-picker/DatePicker.js';
 
 /**
+<<<<<<< HEAD
  * ── R14（时刻输入侧）：芯片"时刻该念什么"的那一处判定 ──
  *
  * 🔴 **本块是追加的**（`index.ts` 是多写者共享文件，只许在末尾追加）。
@@ -1002,6 +1003,8 @@ export {
 export { isNoteDraftBlank } from './notes/model.js';
 
 /**
+=======
+>>>>>>> feat/countdown-batch2
  * ── 批次二 W0：锚点弹层的定位算术 ──
  *
  * 🔴 **本块是追加的**（`index.ts` 是多写者共享文件，只许在末尾追加）。
@@ -1078,3 +1081,46 @@ export {
   type CardExportTheme,
   type TextMeasurer,
 } from './countdown/card-export-layout.js';
+<<<<<<< HEAD
+=======
+
+/**
+ * ── R14（时刻输入侧）：芯片"时刻该念什么"的那一处判定 ──
+ *
+ * 🔴 **本块是追加的**（`index.ts` 是多写者共享文件，只许在末尾追加）。
+ *
+ * 为什么单独转出一个函数，而不是让两端各自 `chip.field === 'dueTime'`：
+ * 宿主注入的 `valueLabel` 原本只有"日期 / 优先级"两条分支，时刻芯片掉进
+ * 优先级那条会念成**「不设置」**。判定写在共享层，两端只剩"取它给的串"，
+ * 新增字段时就不会有一端整块分支漏掉（AGENTS §3.5）。
+ */
+export { captureChipTimeLabel } from './capture/model.js';
+
+/**
+ * ── 多端第二批（便签编辑链）：**"改一张便签的正文"只有这一个实现** ──
+ *
+ * 🔴 **本块是追加的**（`index.ts` 是多写者共享文件，只许在末尾追加）。
+ *
+ * "点开便签、什么都没改、点一下保存"在过去会推进 `updatedAt`，而 `updatedAt`
+ * 是列表排序的第二段 —— 那条 no-op 的闸门在 `@heyta/app-host#updateNoteContent`
+ * （写不写 op 是产品语义），这里只有视图和它的交互挡板。
+ */
+export {
+  NoteEditor,
+  type NoteEditorLabels,
+  type NoteEditorProps,
+} from './notes/NoteEditor.js';
+export { isNoteDraftBlank } from './notes/model.js';
+
+/**
+ * ── 回收站与归档 W4b：删除确认的那份**影响面**取数 ──
+ *
+ * 🔴 **本块是追加的**（`index.ts` 是多写者共享文件，只许在末尾追加）。
+ *
+ * 与 `openTagCounts` 不是同一件事：那个是行右侧常驻的"还有几件没做完"，
+ * 这个是确认框里那句"删了会动到几条任务"（**含已完成**）。口径差别与理由
+ * 写在 `./projects/model.ts#liveTaskCountsByTag`。两端各数一遍的话，
+ * "删标签到底会不会动到已完成的任务"这个问题就会出现两个答案。
+ */
+export { liveTaskCountsByTag } from './projects/model.js';
+>>>>>>> feat/countdown-batch2

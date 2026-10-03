@@ -259,22 +259,22 @@ UP="$REPO/scripts/mobile-e2e-up.sh"
 
 W1=$(env -u HEYTA_E2E_UI_XML -u HEYTA_E2E_XY_PY bash -c "set -u; . '$LIB'; printf '%s|%s' \"\$UI_XML\" \"\$XY_PY\"" 2>/dev/null || true)
 if [ "$W1" = "/tmp/ui.xml|/tmp/_xy.py" ]; then
-  ok "W1 不给变量时两个路径**逐字等于原来的字面量**（$W1）"
+  ok "W1 不给变量时两个路径**逐字等于原来的字面量**（${W1}）"
 else
-  no "W1 🔴 默认值变了或读不到，实测「$W1」—— 单轮运行的行为就不再是不变的"
+  no "W1 🔴 默认值变了或读不到，实测「${W1}」—— 单轮运行的行为就不再是不变的"
 fi
 
 W2=$(HEYTA_E2E_UI_XML=/tmp/private-run.xml HEYTA_E2E_XY_PY=/tmp/private-run.py bash -c "set -u; . '$LIB'; printf '%s|%s' \"\$UI_XML\" \"\$XY_PY\"" 2>/dev/null || true)
 if [ "$W2" = "/tmp/private-run.xml|/tmp/private-run.py" ]; then
-  ok "W2 给变量时两个路径跟着走（$W2）"
+  ok "W2 给变量时两个路径跟着走（${W2}）"
 else
-  no "W2 🔴 旋钮没接上，实测「$W2」—— 并行两轮仍会共用同一个快照文件"
+  no "W2 🔴 旋钮没接上，实测「${W2}」—— 并行两轮仍会共用同一个快照文件"
 fi
 
 # 🔴 计数前先确认这把尺子有刻度：同一套过滤喂给一个**必然命中**的样本，必须数出 1。
 #    （没有这条正向对照时，"计数为 0"可能只是过滤写坏了 —— 台账里那族空测量。）
 W3_PROBE=$(printf '  grep -q foo /tmp/ui.xml\n' | grep -vE '^[[:space:]]*#' | grep -c '/tmp/ui\.xml' || true)
-[ "$W3_PROBE" = "1" ] || no "W3a 🔴 过滤器自己坏了（阳性对照应为 1，实测 $W3_PROBE）—— 下面那条 0 不作数"
+[ "$W3_PROBE" = "1" ] || no "W3a 🔴 过滤器自己坏了（阳性对照应为 1，实测 ${W3_PROBE}）—— 下面那条 0 不作数"
 W3=$(grep -vE '^[[:space:]]*#' "$LIB" | grep -v '^UI_XML=' | grep -c '/tmp/ui\.xml' || true)
 if [ "$W3_PROBE" = "1" ] && [ "$W3" = "0" ]; then
   ok "W3 lib 里除定义那一行外**没有第三处** /tmp/ui.xml 字面量（不是半套现场）"
@@ -295,7 +295,7 @@ fi
 sed 's/heyta_mobile_smoke/heyta_mobile_smokf/' "$UP" > "$W4FD/mobile-e2e-up.sh"
 W4ERR=$(bash -c "set -u; . '$W4FD/mobile-e2e.sh'" 2>&1 >/dev/null; printf 'RC=%s' "$?")
 case "$W4ERR" in
-  *RC=0*) no "W4b 🔴 默认值漂移却放行（$W4ERR）—— 守卫没有牙" ;;
+  *RC=0*) no "W4b 🔴 默认值漂移却放行（${W4ERR}）—— 守卫没有牙" ;;
   *heyta_mobile_smokf*) ok "W4b 漂移被拦下，且把两边的值都打了出来" ;;
   *) no "W4b 拦下了但没指名道姓：$W4ERR" ;;
 esac

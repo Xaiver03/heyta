@@ -107,6 +107,7 @@
     "check:calendar": "node scripts/gen-calendar-tables.mjs --check && node scripts/gen-calendar-tables.mjs --bundle && node scripts/gen-calendar-tables.mjs --verify",
     "check:holiday": "node scripts/gen-holiday-table.mjs --check",
     "check:public-facts": "node scripts/check-public-facts.mjs",
+    "check:card-export": "node scripts/check-card-export.mjs",
     "check:ai-coverage": "node scripts/check-ai-coverage.mjs",
     "check:ai-e2e": "node scripts/check-ai-e2e-preflight.mjs && pnpm --dir e2e run test",
     "check:privacy-consent-e2e": "pnpm --filter @heyta/web build && node scripts/check-ai-e2e-preflight.mjs 4322 && pnpm --dir e2e run test:privacy-consent",
@@ -149,8 +150,7 @@
     "verify:email-web": "node scripts/verify-email-web-chain.mjs",
     "verify:password-chain": "node scripts/verify-email-password-chain.mjs",
     "verify:password-web": "node scripts/verify-password-web-journey.mjs",
-    "verify:legal-links": "pnpm --dir e2e run test:legal-links",
-    "check:card-export": "node scripts/check-card-export.mjs"
+    "verify:legal-links": "pnpm --dir e2e run test:legal-links"
   },
   "devDependencies": {
     "@heyta/shared-schema": "workspace:*",

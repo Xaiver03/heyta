@@ -647,6 +647,25 @@ export {
   type PrivacyDecision,
 } from './privacy-consent.js';
 
+/**
+ * 公共事实（调休 / 补班）的下行（W4b，ADR-0052）。
+ *
+ * 🔴 这是 heyta 第一条服务端→客户端的**内容**通道，宿主必须只从 `app-host` 拿它：
+ * 判断（匿名、失败不动缓存、坏形状不覆盖好数据、装进 domain 的覆盖表）出现在
+ * `apps/*` 里就是 AGENTS.md §3.5 那个分界线上的一次后退 —— 四个壳会各抄一份，
+ * 而"抄了没抄"在界面上完全看不出来（它的失败态就是"日历少一块"，判据①禁的正是这个）。
+ */
+export {
+  installPublicFactsFromCache,
+  readPublicFactsCache,
+  refreshPublicFacts,
+  type PublicFactsCachePort,
+  type PublicFactsRefreshOptions,
+  type PublicFactsRefreshResult,
+  type PublicFactsSnapshot,
+  type PublicFactsUnavailableCause,
+} from './public-facts.js';
+
 export {
   createVaultKeyPackageStore,
   type VaultKeyPackageStore,
@@ -677,18 +696,7 @@ export {
  * 判断（匿名、失败不动缓存、坏形状不覆盖好数据、装进 domain 的覆盖表）出现在
  * `apps/*` 里就是 AGENTS.md §3.5 那个分界线上的一次后退 —— 四个壳会各抄一份，
  * 而"抄了没抄"在界面上完全看不出来（它的失败态就是"日历少一块"，判据①禁的正是这个）。
- */
-export {
-  installPublicFactsFromCache,
-  readPublicFactsCache,
-  refreshPublicFacts,
-  type PublicFactsCachePort,
-  type PublicFactsRefreshOptions,
-  type PublicFactsRefreshResult,
-  type PublicFactsSnapshot,
-  type PublicFactsUnavailableCause,
-} from './public-facts.js';
-/**
+ *//**
  * 跨视图、跨端的**选中态**（详情面的地基）。
  *
  * 🔴 「哪一类当前选中了哪一条」此前散成三份实现（web 任务侧**根本没有**、
