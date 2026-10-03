@@ -515,8 +515,8 @@ const zh = [
         rows: [
           [
             '同步事件（密文操作日志）与设备记录',
-            '**45 天**',
-            '每日定时任务自动清扫。删除条数**即使为 0 也会记一条日志**——这是为了将来能证明清扫真的执行过，而不是只看「没报错」',
+            '**45 天窗口**，但两类要分开说：**设备记录**确实按这个窗口每日清扫；**同步事件当前一条都不会被清掉**——那条清扫只处理已经存在「完整状态边界」的账号，而本产品当前的客户端不会产生这种边界（实测：每日任务的删除条数恒为 0）。窗口本身是代码里的固定常量，改它要发版本',
+            '设备记录：超过窗口仍未出现过的行直接删。同步事件：**在当前版本下不删**，保留到账号注销，或保留到清理条件真的具备的那一天。每日任务即使删除条数为 0 也会记一条日志——这是为了将来能证明清扫真的执行过，而不是只看「没报错」',
           ],
           [
             '服务器数据库备份',
@@ -526,7 +526,7 @@ const zh = [
           [
             '账户、凭据、订阅、订单、邀请与通知记录',
             '直到你**注销账号**',
-            '注销走服务端级联硬删：同步事件、设备、通行密钥、订阅、订单、邀请、通知一并消失，同时作废鉴权缓存并断开活动连接。没有冷静期，也没有回收站',
+            '注销走服务端级联硬删：同步事件、设备、通行密钥、订阅、订单、邀请、通知一并消失，同时作废鉴权缓存并断开活动连接。没有冷静期，也没有回收站。🔴 这一行删的是服务端那一份：你其它设备上的本地明文库不会因为注销而消失 —— 今天还没有“账号已注销就清除本机数据”这个动作',
           ],
           [
             '一次性令牌',
@@ -547,7 +547,7 @@ const zh = [
       },
       {
         kind: 'p',
-        text: '两句要一起写、否则这段会被读成承诺：**45 天是产品当前设定，不是你可以自选的选项**，界面上没有「更短保留期」的开关，改它要发版本。而「你在应用里点了彻底删除」**不会缩短**这个期限——它让这条数据从你的所有设备界面里消失，服务器上的那条加密历史仍要等保留期届满或注销账号才真的不在了。另有一条边界要如实登记：主机与网络层（如前置代理）的访问日志留存由部署环境决定，法定底线是网络日志留存不少于六个月；官方实例当前配置的具体留存期需运营在发布前确认。',
+        text: '两句要一起写、否则这段会被读成承诺：**45 天是产品当前设定，不是你可以自选的选项**，界面上没有「更短保留期」的开关，改它要发版本。而「你在应用里点了彻底删除」**不会缩短**这个期限——它让这条数据从你的所有设备界面里消失。🔴 还要如实补第三句：按当前版本，服务器上那条加密历史**等不到「保留期届满」**——每日清扫对我们的数据一条都不命中（见上表那一行），它真的不在，目前只有注销账号这一条路。另有一条边界要如实登记：主机与网络层（如前置代理）的访问日志留存由部署环境决定，法定底线是网络日志留存不少于六个月；官方实例当前配置的具体留存期需运营在发布前确认。',
       },
     ],
   },
@@ -1072,8 +1072,8 @@ const en = [
         rows: [
           [
             'Sync events (ciphertext operation log) and device records',
-            '**45 days**',
-            'Swept by a daily scheduled job. The number of deleted rows is logged **even when it is zero** — so that a future reader can prove the sweep actually ran, rather than relying on "no error appeared"',
+            '**A 45-day window**, but the two kinds have to be said apart: **device records** really are swept on that window daily; **sync events are not pruned by a single row today** — that sweep only processes accounts whose stream already contains a "full-state boundary", which the clients this product ships never produce (measured: the daily job deletes 0 rows). The window itself is a fixed constant in the code; changing it takes a release',
+            'Device records: rows absent past the window are deleted. Sync events: **not deleted under the current version** — they are kept until the account is closed, or until the pruning condition really becomes reachable. The number of deleted rows is logged **even when it is zero** — so that a future reader can prove the sweep actually ran, rather than relying on "no error appeared"',
           ],
           [
             'Server database backups',
@@ -1083,7 +1083,7 @@ const en = [
           [
             'Accounts, credentials, subscriptions, orders, referrals and notifications',
             'Until you **close your account**',
-            'Account deletion is a cascading hard delete on the server: sync events, devices, passkeys, subscriptions, orders, referrals and notifications all go, with the auth cache invalidated and live connections dropped. No cooling-off period, no recycle bin',
+            'Account deletion is a cascading hard delete on the server: sync events, devices, passkeys, subscriptions, orders, referrals and notifications all go, with the auth cache invalidated and live connections dropped. No cooling-off period, no recycle bin. 🔴 What this removes is the server copy: the readable local databases on your other devices survive closure — the action "the account was closed, so wipe this device" does not exist today',
           ],
           [
             'One-time tokens',
@@ -1104,7 +1104,7 @@ const en = [
       },
       {
         kind: 'p',
-        text: 'Two sentences that must travel together with that table, or it reads like a promise: **45 days is the product\'s current setting, not an option you can choose**, there is no shorter-retention switch in the interface, and changing it takes a release. And pressing "delete forever" in the app **does not shorten it** — the item disappears from every one of your screens, while the encrypted history carrying it on our server remains until the retention window expires or the account is closed. One more boundary, registered honestly: access-log retention at the host and network layer (for example a fronting proxy) is decided by the deployment environment, and the statutory floor is that network logs are kept for no less than six months; the retention actually configured for the official instance needs to be confirmed by operations before this document is published.',
+        text: 'Two sentences that must travel together with that table, or it reads like a promise: **45 days is the product\'s current setting, not an option you can choose**, there is no shorter-retention switch in the interface, and changing it takes a release. And pressing "delete forever" in the app **does not shorten it** — the item disappears from every one of your screens. 🔴 A third sentence has to be added, also honestly: under the current version that encrypted history **never reaches "the retention window expiring"** — the daily sweep does not match our data at all (see that row above), so the one route by which it really stops existing is closing the account. One more boundary, registered honestly: access-log retention at the host and network layer (for example a fronting proxy) is decided by the deployment environment, and the statutory floor is that network logs are kept for no less than six months; the retention actually configured for the official instance needs to be confirmed by operations before this document is published.',
       },
     ],
   },
