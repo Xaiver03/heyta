@@ -205,7 +205,16 @@ i18n **中英同步**（唯一文案事实源，`check:ui-language` 拦）；`SH
    - 离线做到哪一步：`bash -n` 0；把 `dueDate` 的 ms 喂进脚本里那段 python，拼出的规则串与 `packages/domain/dist` 的 `Recurrence.yearly(10,17)` **逐字相同**。⚠️ 这只算半个验证 —— 它证明不了第六枚 chip 在真机上点得到（chips 是一行横排的）。
    - 为什么没跑：2026-10-03 02:05（本地）实测 **1 分钟负载 328–353**、107 个 node/java 级进程、并行会话正在连续提交；02:09 复量还是 **48–55**（5 分钟均值 117–125），九分钟内四次读数没有一次落到 18 以下。脚本默认的 `emulator-5554` 没起，唯一在线的 `emulator-5556` 与 :3000 / :3100 两个服务端都捏在别人手里。这一刻起四端重装会把别人**有时限**的设备判据压成超时假红（同一台机器上曾实测把 load 顶到 250–537）。
      ⚠️ **10:37–10:38 复量**：负载已降到 13–38，但**设备、两个端口、compose 栈三条仍在这个会话之外**（`verify-mobile-repeat.sh:241` 是 `pm clear`，跑它 = 清掉别人在那台共用 AVD 上的登录态）。四条最新读数与复跑命令写在下面「固定收尾」一节第 3 条，**以那一节为准**。
-   - 下次跑之前必须按顺序做完（缺一条就是在验旧二进制）：`pnpm -r build` → `pnpm reinstall:mobile` → `HEYTA_E2E_SERIAL=<现取的在线机> PORT=<自己的端口> pnpm verify:mobile-repeat`；跑前重新现量四条现场判据：`ps Axo command | grep -F 'verify-mobil[e]'`、`sysctl -n vm.loadavg`、`xcrun simctl list devices booted`、`adb devices -l`。
+   - 下次跑之前必须按顺序做完（缺一条就是在验旧二进制）：`pnpm -r build` → `pnpm reinstall:mobile` → `HEYTA_E2E_SERIAL=<现取的在线机> PORT=<自己的端口> pnpm verify:mobile-repeat`；跑前重新现量四条现场判据：`pgrep -f 'verify-mobile-'`、`sysctl -n vm.loadavg`、`xcrun simctl list devices booted`、`adb devices -l`。
+     🔴 **原来这一条写的是 `ps Axo command | grep -F 'verify-mobil[e]'`，那句话是坏的，两个方向都坏**（2026-10-03 11:20 用活的对照组量出来的）：
+     `grep -F` 把 `[e]` 当**字面量**，所以它**匹配不到任何一次真运行**（真跑的脚本 argv 是 `bash scripts/verify-mobile-repeat.sh`，里面没有方括号）；
+     而它唯一能匹配到的，是**执行这条检查的那个 shell 自己**（它的命令行里原样带着那串带括号的文本）——
+     实测：起一个 argv 含 `verify-mobile-repeat-fixture` 的活进程 ⇒ 老探针报 **0**（漏），空机器上老探针报 **2**（把观察者数成在跑）。
+     `pgrep -f 'verify-mobile-'` 两条都对得上（同一对照组里命中那个 pid、清理后回 0，且**不把观察者算进去**）。
+     ✅ 这一条换掉之后，本节第 3 条那四条设备侧读数**不受影响**（它们是 `adb`/`lsof`/`docker ps` 的读数，本来就没用这条探针）。
+     ⚠️ 另两条"下一次"要带的现场事实：**`verify-mobile-repeat.sh` 没有负载门**（全仓只有 `verify-mobile-restore.sh` 里有 `wait_for_quiet_host`，`grep -rln wait_for_quiet_host scripts/` 现量），
+     所以负载**没人替你等**，要自己判；以及本机**只有一个 AVD**（`~/.android/avd` 里只有 `SSOS-Parity-A36`，它就是被占的 `emulator-5556`）⇒
+     "换一台自己的模拟器"这条路要先 `avdmanager create avd`（系统镜像只有 `android-36`，在 `/opt/homebrew/share/android-commandlinetools`），不是再起一台现成的。
      ⚠️ **这条的前半截已满足**（2026-10-03 10:02 / 10:05）：android 与 ios 由并行会话在隔离检出 `267ac912` 重装过，本会话又**按内容**复核过设备上那份包里确有本批的 `每年` / `FREQ=YEARLY`（读数见下面第 2 条）⇒ 下次跑第 15 步**不必先重装**，但"现取在线机 + 自己的端口"那两条照旧。
 2. **`'yearly'` 加了 id 但没人能测到"忘了加进 `REPEAT_PRESET_IDS`"** —— 这一档的表现是"界面上没有每年"，属于**按定义不可观测**，不为此扭曲设计；类型系统已能抓到"switch 少一档"与"标签少一档"（`Record<RepeatPresetId, MessageKey>` 是穷举的）。
 3. **2/29 的"平年过 2 月最后一天"口径**：需要 `BYMONTHDAY=-1`，而域层 `describeRecurrence` 与移动端 `recurrence-display` 都会把它渲染成「每年 2 月 -1 日」。现状按 RFC + 主流日历实现（只在闰年重复），并**把这条边界钉在测试里**而不是留成暗坑。真正的产品问题在倒数日（"在一起多少天"那天算不算 2/29），随 W5 一起定。
@@ -313,6 +322,32 @@ grep -nE '^1(6[5-9]|7[0-9])\. ' docs/reference/environment-traps.md | cut -c1-70
 🔴 台账里没落的一条待办，写在 **#168 末尾**：把 `wait_for_quiet_host` 从
 `scripts/verify-mobile-restore.sh` 抽进 `scripts/lib/` —— 它现在是某一个脚本的私有函数，
 第二个想用的时候就又是一份抄件（同族教训见 `mobile-e2e.sh` 文件头）。
+
+### 待入 §7 的一条（**正文写好了，先落在这里**：台账此刻被并行会话写脏）
+
+为什么不当场追加：`git status --porcelain -- docs/reference/environment-traps.md` 现在输出 `M`，
+工作树末号已到 **179**（`grep -nE '^[0-9]+\. ' … | tail -1`）。在一棵正被别人改的共享树上
+用 `commit --only <该路径>` 追加，会**把别人未提交的那几段一起写进我的提交**（`--only` 提交的是
+那个路径的**工作树内容**，不是我的 diff）。所以这条按规则停在单写者文档里，等台账干净时原样搬进去，
+届时编号以**当时工作树现量**为准（下面写 180 只代表 2026-10-03 11:20 那一刻）。
+
+正文（可直接粘贴）：
+
+> **180. 🔴 `grep -F` 会把手写的 `[e]` 自匹配防护当**字面量** —— 于是这条"有人在跑吗"的探针
+> 匹配不到任何一次真运行，只匹配到**执行它的 shell 自己**。**
+>
+> `ps Axo command | grep -F 'verify-mobil[e]'` 是从正则世界的 `[e]` 技巧抄过来的，但 `-F` 是固定串：
+> 模式变成字面量 `verify-mobil[e]`。真跑的脚本 argv 是 `bash scripts/verify-mobile-repeat.sh`，
+> 里面没有方括号 ⇒ **永远 0**；而执行这条检查的那个 shell，命令行里原样带着带括号的文本 ⇒
+> **空机器上稳定报 2**（它自己 + 那个 grep）。两个方向都错，且错的方式恰好是设备验收最要的两种方式：
+> 把"别人在跑"读成"没人跑"（于是敢去 `pm clear` 共用 AVD），和把"没人在跑"读成"有人在跑"。
+> ✅ 量法（2026-10-03 11:20，活的对照组）：起一个 argv 含 `verify-mobile-repeat-fixture` 的进程 ⇒
+> 老探针 **0**、`pgrep -f 'verify-mobile-'` **命中该 pid**、清理后回 **0** 且**不含观察者**。
+> 📌 一般规律：**括号自匹配防护只在正则模式里成立**；`-F`／`--fixed-strings` 下它把探针变成字面量匹配，
+> 而任何"模式串写在命令行里"的探针都会数到自己 —— 要么换 `pgrep`（macOS 无 `-c`），
+> 要么运行时拼模式（`p=$(printf 'verify-mobil%s' e)`）再 `grep -v grep`。**判这类探针之前，
+> 先起一个 argv 里真的带着那串东西的活进程当对照组**；没有对照组的占用探针不算判据。
+
 
 ---
 
