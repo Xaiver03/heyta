@@ -147,6 +147,9 @@ export async function enableAllModules(page: Page): Promise<void> {
         focus: true,
         growth: true,
         notes: true,
+        // W5 加的模块。**默认关**（`modules.ts` 的 `defaultOn: false`），而"关掉就不进 DOM"
+        // 由 `motivation.spec.ts` 那条"默认 rail 只有 7 个 tab"独立钉住 —— 它不走这里。
+        countdown: true,
       }),
     );
   });
@@ -377,6 +380,7 @@ export async function switchView(
     | '番茄钟'
     | '成长'
     | '便签'
+    | '倒数纪念日'
     | '搜索'
     | '回收站'
     | '设置',
