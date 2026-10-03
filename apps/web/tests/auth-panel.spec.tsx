@@ -317,6 +317,27 @@ describe('🔴 口令这条路在界面上**可达**（此前它是"做了但点
     expect(el.textContent ?? '').not.toContain(translate('zh-CN', 'web.auth.signedIn.title'));
   });
 
+  /**
+   * 🔴 自托管的一等公民判据：服务端**亲口说**那封信没发出去时，界面上不许
+   * 再出现"去查收邮件"。这一条要挡的不是崩溃，是一句把人永久关在门外的谎话 ——
+   * 一台没配 SMTP 的服务器上，"再点一次注册"只会再拿到同一句"请查收"。
+   * （变异：把 `AuthPanel.tsx` 里 `status.mailDelivered === false` 那个分支删掉
+   *  ⇒ 这一条红；把 `registeredFrom` 弄成永远不带 `mailDelivered` ⇒ 同样红。）
+   */
+  it('注册：服务端说信没发出去 ⇒ 换那一句，且不再提"查收邮件"', async () => {
+    stubFetch(201, { message: 'ok', emailDelivered: false });
+    const el = await renderPanel('zh-CN');
+
+    await toRegister(el);
+    await tap(el, 'auth-form-terms');
+    await typeById(el, 'auth-form-password', PASSWORD);
+    await tap(el, 'auth-form-submit');
+
+    const text = el.textContent ?? '';
+    expect(text).toContain(translate('zh-CN', 'web.auth.sent.mailNotSent'));
+    expect(text).not.toContain(translate('zh-CN', 'web.auth.sent.register'));
+  });
+
   it('「忘记密码」在登录档，点了发的是重置邮件而不是登录链接', async () => {
     stubFetch(200, { message: 'ok' });
     const el = await renderPanel('zh-CN');

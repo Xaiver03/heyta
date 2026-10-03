@@ -17,7 +17,7 @@ import { sendPasskeyRecoveryEmail, sendVerificationEmail } from './email';
 import type { ServerLocale } from './copy.generated.js';
 import { getWsConnectionService } from './sync/services/websocket-connection.service';
 import { Prisma } from '@prisma/client';
-import { loadConfigFromEnv, isConsentRequired } from './config';
+import { loadConfigFromEnv, isConsentRequired, emailVerificationRequired } from './config';
 import {
   VERIFICATION_TOKEN_EXPIRY_MS,
   MAX_VERIFICATION_RESEND_COUNT,
@@ -225,7 +225,7 @@ export const verifyRegistration = async (
   inviteCode?: string,
   /** 收件人的语言。**可选** —— 见 `auth.ts` 的 `requestLoginMagicLink`。 */
   locale?: ServerLocale,
-): Promise<{ message: string }> => {
+): Promise<{ message: string; emailDelivered?: boolean }> => {
   const { rpID, origin } = getWebAuthnConfig();
 
   const expectedChallenge = getAndClearChallenge('registration', email);
@@ -362,10 +362,18 @@ export const verifyRegistration = async (
     });
     if (!pendingCreated) return { message: REGISTRATION_SUCCESS_MESSAGE };
 
-    // In TEST_MODE with autoVerifyUsers, skip email and auto-verify
-    if (config.testMode?.autoVerifyUsers) {
+    // In TEST_MODE with autoVerifyUsers, skip email and auto-verify.
+    // 🔴 判点与 `auth.ts` 的 `registerWithMagicLink` **同一个函数**：一台没配 SMTP
+    // 的自托管服务器上，"注册要等一封发不出去的信"对三条注册路是同一种死法，
+    // 所以 `REQUIRE_EMAIL_VERIFICATION=false` 不许只装在邮箱+口令那一条上
+    // （那会让"自托管保留登录方式"变成"自托管只保留一半"）。
+    if (!emailVerificationRequired(config)) {
       await verifyEmail(verificationToken);
-      Logger.info(`[TEST_MODE] Auto-verified passkey user`);
+      Logger.info(
+        config.testMode?.autoVerifyUsers
+          ? `[TEST_MODE] Auto-verified passkey user`
+          : `[REQUIRE_EMAIL_VERIFICATION=false] Activated passkey user without email verification`,
+      );
       return {
         message: 'Registration successful. Your account has been automatically verified.',
       };
@@ -373,7 +381,8 @@ export const verifyRegistration = async (
 
     // Normal flow: send verification email
     const emailSent = await sendVerificationEmail(email, verificationToken, locale);
-    if (!emailSent) return { message: REGISTRATION_SUCCESS_MESSAGE };
+    // 信没发出去就**不许**回那句"请去查收邮件"（与 `auth.ts` 同一条修法）。
+    if (!emailSent) return { message: REGISTRATION_SUCCESS_MESSAGE, emailDelivered: false };
 
     Logger.info(`Passkey registration initiated`);
     return { message: REGISTRATION_SUCCESS_MESSAGE };

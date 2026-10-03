@@ -504,7 +504,12 @@ describe('Passkey Authentication', () => {
         clientExtensionResults: {},
       } as RegistrationResponseJSON);
 
-      expect(result).toEqual(registrationResponse);
+      // 🔴 2026-10-03：`toEqual(registrationResponse)` 拆成两半 —— 中性文案那句
+      // 一字不变（防枚举的不变量），而"信没发出去"现在必须说出口
+      // （`emailDelivered: false`）。改断言的理由见 `self-host-email-verification.spec.ts`
+      // 的头注释；这里"凭据保持 pending、不写 passkey、不删用户"三条原样保留。
+      expect(result.message).toBe(registrationResponse.message);
+      expect(result.emailDelivered).toBe(false);
       expect(mockPrisma.pendingPasskeyRegistration.create).toHaveBeenCalledOnce();
       expect(mockPrisma.passkey.create).not.toHaveBeenCalled();
       expect(mockPrisma.user.deleteMany).not.toHaveBeenCalled();
@@ -537,7 +542,9 @@ describe('Passkey Authentication', () => {
         clientExtensionResults: {},
       } as RegistrationResponseJSON);
 
-      expect(result).toEqual(registrationResponse);
+      // 同上：中性文案不变 + 说真话（`emailDelivered: false`）。
+      expect(result.message).toBe(registrationResponse.message);
+      expect(result.emailDelivered).toBe(false);
       expect(mockPrisma.pendingPasskeyRegistration.create).toHaveBeenCalledOnce();
       expect(mockPrisma.user.deleteMany).not.toHaveBeenCalled();
     });

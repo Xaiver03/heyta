@@ -111,6 +111,27 @@ type Phase =
   | { kind: 'failed'; key: MessageKey; vars?: MessageVars }
   | { kind: 'session'; session: HostedAuthSession };
 
+/**
+ * 三条注册路"成功之后说哪一句"的**唯一**判点。
+ *
+ * 🔴 服务端亲口说那封信没发出去（`emailDelivered: false`）时，"去查收邮件"
+ * 是一句谎话，而这个屏幕上它唯一的出口 —— 用户会一直等一封永远不会来的信。
+ * ⚠️ 缺省**不是** false：发信成功、连的是没有这个字段的老服务端、以及
+ * `REQUIRE_EMAIL_VERIFICATION=false` 的自托管服务器（当场激活、压根不需要信）
+ * 三种情况都说的是原来那句。
+ *
+ * ⚠️ 签名里**不要**用内联对象类型（`{ emailDelivered?: false }`）：
+ * `auth-screen-password.spec.ts` 的 `bodyOf` 是"找参数列表的右括号、再找第一个花括号"
+ * 那种源码级取法，内联类型里的 `}`/`{` 会让它取错范围（那边文件头就写了这件事）。
+ */
+type RegisterNoticeSource = { emailDelivered?: false };
+
+const registerNoticeKey = (result: RegisterNoticeSource): MessageKey => {
+  return result.emailDelivered === undefined
+    ? 'mobile.auth.sent.register'
+    : 'mobile.auth.sent.mailNotSent';
+};
+
 export interface SavedAuthSession {
   serverUrl: string;
   token: string;
@@ -276,7 +297,7 @@ export function AuthScreen({
       termsAccepted: true,
     });
     if (!result.ok) return failFrom(result);
-    setPhase({ kind: 'notice', key: 'mobile.auth.sent.register' });
+    setPhase({ kind: 'notice', key: registerNoticeKey(result) });
   };
 
   /**
@@ -323,7 +344,7 @@ export function AuthScreen({
     if (!result.ok) return fail(result.reason);
     // 中性：不读 `result.message`（那是服务端给的安全文案，而且它本身中性），
     // 也不渲染成"账号已建"。
-    setPhase({ kind: 'notice', key: 'mobile.auth.sent.register' });
+    setPhase({ kind: 'notice', key: registerNoticeKey(result) });
   };
 
   const passkeyLogin = async (): Promise<void> => {
@@ -362,7 +383,7 @@ export function AuthScreen({
     const done = await completePasskeyRegistration(options, { email, credential });
     if (!done.ok) return fail(done.reason);
     // 注册**不产出令牌**（规范 §2-A1）—— 说"去登录"，不说"已建好账号"。
-    setPhase({ kind: 'notice', key: 'mobile.auth.sent.register' });
+    setPhase({ kind: 'notice', key: registerNoticeKey(done) });
   };
 
   const redeemPasted = async (): Promise<void> => {

@@ -407,3 +407,46 @@ describe('6. 在飞守卫的状态依据', () => {
     ]);
   });
 });
+
+/**
+ * 6. 🔴 服务端说"信没发出去"时，状态里必须留着这句话的痕迹。
+ *
+ * 这一条存在的理由和第 2 组是同一个：**症状不是崩溃，是界面少说一句真话**。
+ * 一台没配 SMTP 的自托管服务器上，注册回 `emailDelivered:false`，
+ * 而 store 若把它丢掉，界面渲染的就是"去查收邮件"—— 一封永远不会来的信。
+ * 用户唯一的"再试一次"动作只会再拿到同一句谎话（`server/tests/self-host-email-verification.spec.ts`
+ * 钉的是服务端不说谎，这里钉的是**客户端不许把真话弄丢**）。
+ *
+ * 两个方向都钉：`false` 要带上来，缺省不许凭空造出来 ——
+ * 后者防的是 `mailDelivered: outcome.emailDelivered !== false` 那种反写，
+ * 它会让每次成功注册都显示"邮件没发出去"。
+ * （变异：把 `registeredFrom` 改成恒返回 `{ kind: 'registered' }` ⇒ 第一条红；
+ *  改成 `{ kind:'registered', mailDelivered: outcome.emailDelivered !== false ? false : undefined }` ⇒ 第二条红。）
+ */
+describe('6. emailDelivered:false 必须活到状态里，而缺省不许变成 false', () => {
+  it('服务端说没发出去 ⇒ registered 带着 mailDelivered:false', async () => {
+    stubPath(AUTH_PASSWORD_PATHS.register, {
+      status: 201,
+      body: { message: 'ok', emailDelivered: false },
+    });
+
+    await useAuthStore.getState().registerWithPassword(BASE_URL, 'me@example.com', 'p', true);
+
+    expect(useAuthStore.getState().status).toEqual({
+      kind: 'registered',
+      mailDelivered: false,
+    });
+  });
+
+  it('服务端没提这件事 ⇒ 状态里**没有** mailDelivered 这个键', async () => {
+    for (const body of [{ message: 'ok' }, { message: 'ok', emailDelivered: true }]) {
+      stubPath(AUTH_PASSWORD_PATHS.register, { status: 201, body });
+
+      await useAuthStore.getState().registerWithPassword(BASE_URL, 'me@example.com', 'p', true);
+
+      expect(useAuthStore.getState().status, JSON.stringify(body)).toEqual({
+        kind: 'registered',
+      });
+    }
+  });
+});

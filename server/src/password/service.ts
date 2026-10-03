@@ -144,7 +144,7 @@ export interface RegisterWithEmailPasswordInput {
  */
 export const registerWithEmailPassword = async (
   input: RegisterWithEmailPasswordInput,
-): Promise<{ message: string }> => {
+): Promise<{ message: string; emailDelivered?: boolean }> => {
   const policy = await checkNewPassword(input.password);
   if (!policy.ok) {
     throw new PasswordAuthError(

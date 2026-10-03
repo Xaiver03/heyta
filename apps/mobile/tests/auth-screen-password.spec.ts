@@ -200,13 +200,26 @@ describe('注册的两道本地闸（顺序错了就是"已经发出去了"）',
 
   it('🔴 注册成功后那句是**中性**的，不许断言"账号已创建"', () => {
     const body = bodyOf(code, 'registerWithPassword');
+    // 2026-10-03：那句提示改成走 `registerNoticeKey(result)` —— 服务端**亲口说**
+    // "信没发出去"时必须换一句（对着一个永远收不到的邮箱说"请查收"是把人关在门外）。
+    // 三条注册路原来各写字面键，正是"同一个判断写三遍然后漂一处"的形状。
+    // 所以这条判据钉的是两半，缺一半都挡不住回归：
+    //   ① 动作确实把结果交给了那个唯一判点（不再手写字面键）；
+    //   ② 判点本身只产出那两条中性键，谁都不含"已创建"。
     expect(
-      /setPhase\(\{ kind: 'notice', key: 'mobile\.auth\.sent\.register' \}\)/.test(body),
-      '注册成功没落到那句中性提示上',
+      /setPhase\(\{ kind: 'notice', key: registerNoticeKey\(result\) \}\)/.test(body),
+      '注册成功没走那个唯一判点（键又被写回字面量了？）',
+    ).toBe(true);
+    const notice = bodyOf(code, 'registerNoticeKey');
+    expect(
+      /'mobile\.auth\.sent\.register'/.test(notice) &&
+        /'mobile\.auth\.sent\.mailNotSent'/.test(notice),
+      '判点产出的两条中性键少了一条',
     ).toBe(true);
     // 服务端对"邮箱已属已验证账号"**故意**回成功而不写凭据（防枚举），
     // 所以任何"已创建"的措辞都是假话。
     expect(body, '注册结果读了服务端的 message').not.toMatch(/result\.message/);
+    expect(notice, '判点读了服务端的原文').not.toMatch(/\.message/);
   });
 
   it('🔴 登录产出会话后**停在 session 那一档**，不直接算完成', () => {

@@ -36,7 +36,19 @@ const getTransporter = async (): Promise<nodemailer.Transporter> => {
     }
 
     // Fallback to Ethereal for development if no SMTP config
-    Logger.warn('No SMTP configuration found. Using Ethereal Email for testing.');
+    //
+    // 🔴 这条兜底是**故意留给开发**的（`scripts/verify-password-web-journey.mjs`
+    // 就是靠抓下面那行 `Preview URL:` 来证明"那封信真的存在"），但它对自托管者
+    // 是一件事关隐私的取舍：**验证链接里带着一个可用的账号令牌，而它会被寄到
+    // 第三方（ethereal.email）的公开预览页上**，谁拿到那个 URL 谁就能激活账号。
+    // 所以这里把话说在前面，而不是等人去翻文档：
+    // 生产要么配 SMTP，要么显式 `REQUIRE_EMAIL_VERIFICATION=false`（见 env.example）。
+    Logger.warn(
+      'No SMTP configuration found. Using Ethereal Email for testing — ' +
+        'verification links (containing live account tokens) will be readable by anyone ' +
+        'holding the preview URL below. Configure SMTP, or set ' +
+        'REQUIRE_EMAIL_VERIFICATION=false, for any real deployment.',
+    );
     const testAccount = await nodemailer.createTestAccount();
     transporter = nodemailer.createTransport({
       host: 'smtp.ethereal.email',

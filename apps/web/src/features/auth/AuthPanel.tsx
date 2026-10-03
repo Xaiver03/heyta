@@ -344,7 +344,13 @@ export function AuthPanel({ baseUrl, onClose, onSignedIn }: AuthPanelProps): Rea
       case 'link-sent':
         return { tone: 'info', message: t('web.auth.sent.login') };
       case 'registered':
-        return { tone: 'info', message: t('web.auth.sent.register') };
+        // 🔴 服务端**亲口说**那封信没发出去时，不许再说"去查收邮件"。
+        // 用 `error` 而不是 `info`：这不是提示，是这条路此刻走不下去；
+        // 但也不标任何字段（`field` 留空）—— 该修的是服务器的邮件配置，
+        // 不是用户刚打的那一格。
+        return status.mailDelivered === false
+          ? { tone: 'error', message: t('web.auth.sent.mailNotSent') }
+          : { tone: 'info', message: t('web.auth.sent.register') };
       case 'recovery-sent':
         return { tone: 'info', message: t('web.auth.sent.recovery') };
       case 'reset-sent':
