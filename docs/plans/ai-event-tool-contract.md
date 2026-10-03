@@ -910,3 +910,24 @@ cd /private/tmp/heyta-final/e2e && pnpm install   # 该检出没有 e2e/node_mod
 
 本节写下这些的时候现场是 `load 22`、`verify-mobile-notes.sh`（pid 75769）在跑、
 `free 69%` ⇒ **② 尚未复跑**，这一笔仍是待复跑，不是绿。
+
+### 15.1 复核五条红线时撞出来的一句过期范围（已就地勘误，非放宽）
+
+红线第 2 条在 ADR-0045 §2.4 里写的是"**全仓** `host.submit` 恰好一处"。现量：**两处**非测试调用点 ——
+
+| 落点 | 属于哪条路径 | 是否设计如此 |
+|---|---|---|
+| `packages/app-host/src/ai-tool-run.ts:195` | 内置 AI（确认函数体内） | ✅ 本条钉的就是它 |
+| `packages/local-api/src/server.ts:545` | 入站本机 API / MCP | ✅ ADR-0011：显式 token + 逐工具授权后立刻执行（同文件 `:481` 那张表写明） |
+
+而 `check:ai-tools` 的扫描范围也**不是全仓**：`scripts/check-ai-tools.mjs:52-56` 只扫
+`packages/app-host/src/ai-tool-*.ts`，文件头明写"不搞全仓 grep（那会有太多假阳性）"。
+⇒ 这句是**范围词写宽**，不是不变量被破：内置 AI 这条路依然产不出未经确认的写入。
+已就地勘误三处并留原句（ADR-0045 §2.4 第 2 条、本文同批的 `ai-assistant-closure.md` 开头、
+`dida-ai-assistant-gap-analysis.md` 的两行；顺带把那两行里 `ai-tool-run.ts:183` 这个**已漂的行号**
+改成现量 `:191` —— W11 之后加的 8 行）。
+
+🟡 **登记一条缺口（不在本批顺手做）**：想让"整仓的写入口只有这两个"变成常驻判据，
+可以按**调用形状**枚举非测试的 `.submit(` 并断言集合恰好等于上面两枚。
+🔴 不能按名字匹配：`apps/mobile/src/screens/ProfileScreen.tsx:367` 那个 `form.submit()`
+是 HTML 表单提交，与写入无关 —— 按名字数会把无关调用点算进来，或者更糟，让人以为判据有牙。
