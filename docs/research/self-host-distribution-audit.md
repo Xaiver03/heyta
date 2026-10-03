@@ -889,8 +889,8 @@ i18n `22 passed`；`check:entries` 75 份一致、`check:ui-language`（zh/en �
 
 | 量 | 读数 |
 |---|---|
-| `git merge-tree --write-tree` 双向 | `REAL_RC` 均为 0，输出恰好 1 行 tree OID ⇒ 零冲突 |
-| `pnpm-lock.yaml` | main / 分支 / 合并树三边**同一个 blob** `674079fe` ⇒ 合并树不需要重装依赖（这是"软链 node_modules 可用"的前提，不是假设） |
+| `git merge-tree --write-tree` 双向 | ~~`REAL_RC` 均为 0，输出恰好 1 行 tree OID ⇒ 零冲突~~ 🔴 **这句 8 小时后就过期了**：§8.22 现量 rc=1（6 条路径冲突），§8.29 又复算一次仍是那 6 条。它只对**落笔那一趟**成立 ⇒ 用它之前必须先跑一次 `merge-tree`，不许引用 |
+| `pnpm-lock.yaml` | ~~main / 分支 / 合并树三边**同一个 blob** `674079fe` ⇒ 合并树不需要重装依赖~~ 🔴 **已过期**（§8.25 现量：main `d340e576` ≠ 分支/base `674079fe`）⇒ 落地后必须 `pnpm install`，"软链 node_modules 可用"这个前提没了 |
 | `package.json` | 合并后是第三个 blob `82ec7dcc`（main 加 `verify:mobile-notes`，本批加那批 `check:*`）|
 | 源码级文件交集 | **只有** `packages/i18n/src/locales/{zh-CN,en}.ts` 两个数据文件 |
 
@@ -1325,7 +1325,7 @@ git merge-tree --write-tree main feat/self-host-distribution   →  rc=1
 |---|---|---|
 | `.gitignore` | content（**两侧都在文件末尾追加**） | main：`/tmp/`、`e2e/_probe/`、`e2e/playwright.probe.config.ts`、`e2e/vault-results/`、`.vitest/`、`tmp-commit-plan.sh`；本批：`e2e/selfhost-stack-results/.last-run.json`（带"只忽略这一枚，s1–s3 截图仍可提交"的理由块） |
 | `apps/web/evidence/assistant/1-disclosure.png`<br>`assistant/2b-chat-dark.png`<br>`task-row-touch-target/timeline-light.png` | **binary**（git 明说 `Cannot merge binary files`） | 两侧都刷新过同一族取证图：main 有 `0c8a0ad4 test(evidence): 刷新助手/象限/触达目标的取证图（并行批次现量）`，本分支上另有一笔 `f304e713` 做了同一件事 |
-| `docs/research/self-host-distribution-audit.md` | **add/add**（merge-base 里没有这个文件） | main 有一份 **176 行**的版本；本分支这份 1100+ 行 |
+| `docs/research/self-host-distribution-audit.md` | **add/add**（merge-base 里没有这个文件） | main 有一份 **176 行**的版本；本分支这份 1100+ 行（📌 01:3x 复算：**1723** 行，main 那份仍 176 行） |
 | `package.json` | content | 两侧都往 `check` 链里加门禁（§8.12 记过的同一形状） |
 
 #### 这条读数的价值不在"有冲突"，在"它把 §8.16 变成了一条会过期的引用"
@@ -1374,6 +1374,7 @@ feat/self-host-merge-main = 38564fe8   parents: d27bccde(main) + 9930edfc(本批
 `package.json` 那块不是手改的：`/tmp/g7-union-package-json.mjs` 从两侧 blob + merge-base 算并集，
 带三条断言（两侧 scripts 键不缺、两侧链段不缺、两侧各自相对顺序不颠倒），
 结果 **135 个脚本键 / 67 段链**（本批 66 段 + main 独有的 `pnpm check:op-log-semantics`）。
+📌 01:3x 现量复算是 **136 键 / 68 段**（main 又独有 `check:md-tables`）—— 见 §8.29。
 🔴 第一版我自己写坏过一次：那次把冲突块按 main 侧收掉了 —— 症状是"合上了"，实际是**把本批五道门禁静默摘掉**。
 并集脚本就是为了不再靠手而存在的。
 
@@ -1459,6 +1460,7 @@ feat/self-host-merge-main = ceab1f78   parents: f6478fad(main) + d4e70ab4(本批
 冲突集合**一个都没变**（还是那六条路径），所以 §8.22 那四条预置解法今天仍然够用 ——
 这正是写"机械解法等现场"的意义：下一次落地的人不需要重新判断。
 `package.json` 仍然由并集脚本产出：**135 个脚本键 / 67 段链**，三条断言全过。
+📌 同一对在 01:3x 的现量是 **136 / 68**（§8.29）—— 这两个数字每次重算载体都要重新量，不许引用。
 
 载体上六道纯 fs 门禁现量（`/tmp/heyta-merge-trial`，无 `node_modules`，所以只跑不依赖依赖树的那六道）：
 `gate-wiring` 0 ｜ `selfhost-entry-command` 0 ｜ `ui-language` 0（zh 2934 / en 2934）｜
@@ -1720,4 +1722,46 @@ compose 文件，漏了内部验收手册用的 `docker-compose.test.yml` ⇒ R2
   所以这一处**不该**为了对齐而改）；② `SUPERSYNC_IMAGE` 钉成私有 tag `supersync:selfhost-verify`
   （不复用 `supersync:local`，那是别人机器上可能存在的镜像）。
   这两条是夹具性质，不构成"验的不是那句话"——真正会让绿色不迁移的是文件集合，而那一条现在被 R7 钉住了。
+
+### 8.29 载体那三行今天**机械重算不出来**了，而我先踩了一遍才回查出 §8.22 —— 于是把那两处过期读数原地划掉
+
+01:3x 按 §8.16 那三行去重算载体（本批又多了 `02b05433` 那笔），现量：
+
+```
+main = 2c0ac370（自 merge-base 前进 60 笔）  branch = 02b05433（本批 42 笔）  mb = 437e7c1a
+git merge-tree --write-tree main feat/…            → rc=1（两个方向都是）
+```
+
+**冲突路径集合与 §8.22 那一次逐条相同，一条不多一条不少**：`.gitignore`、三枚
+`apps/web/evidence/**.png`（binary）、`docs/research/self-host-distribution-audit.md`（add/add）、
+`package.json`。⇒ §8.22 那四条**预置解法今天仍然逐条可用**，且第 3 条那条证据我重新量了一遍、
+**数字一模一样**（main 那份 122 个非空行里只有 9 行不在本分支当前版本中）。
+这条重复读数有意义的地方在于：§8.22 自己写了"这条结论的保质期只到下一次 `merge-tree`"——
+这是它的**第二趟**，两趟间隔约 1 小时 20 分、main 中间前进 1 笔。
+
+**并集那一处必须重量**（不许引用）：
+
+| 量 | §8.23 当时 | 01:3x 现量 |
+|---|---|---|
+| base / main / branch 各自链段 | — | 61 / 63 / 66 |
+| 并集链段 | 67 | **68**（main 独有 2 段：`check:op-log-semantics`、**新增的** `check:md-tables`） |
+| 并集 scripts 键 | 135 | **136**（main 独有 7 键：那 2 段 + 5 条 `verify:*`；本批独有 7 键：5 段 + `check:web-artifact:app` + `verify:selfhost-stack`） |
+| 两侧相对 base 是否只增不减 | 未记 | **0 / 0**（⇒ 并集不会静默摘掉任何一侧的门禁；这条是并集脚本三条断言的前提，现在有了现量） |
+
+`pnpm-lock.yaml` 仍 `main d340e576 ≠ branch/base 674079fe` ⇒ §8.25 那条"落地必须 `pnpm install`"今天仍然成立。
+
+🔴 **本轮真正要记的是我自己的那个动作**：我是**先按 §8.16 的字面去跑**（那句"零冲突 ⇒ 三行机械重算"
+在文档里当时仍以未划线的形式活着），撞到 rc=1 才回查发现 §8.22 早就把它否证了。
+一份 1700 行的证据文档里，"某条结论已被后来的现量否证"如果只存在于后面某一节的叙述里，
+那么下一个读它的人（就是我）会照**前面那节**行动。所以这一步不是补记，是**就地修句**：
+§8.16 那张表里 `merge-tree 双向 rc=0` 与 `lockfile 三边同 blob` 两行已经原地划线并指向本节，
+旁边留了"引用它之前必须先跑一次 `merge-tree`"。
+
+**落地仍未开始，前置条件三条都没满足**（01:3x 现量）：主检出那 5 个重叠文件里还有 **3 个是 ` M`**
+（`docs/README.md`、`packages/i18n/src/locales/{zh-CN,en}.ts`）；端口 3000 / 4318 / 4319 有进程在听；
+`load 98.38 / 52.74 / 59.77`（阈值 12）。载体分支 `feat/self-host-merge-main` 还指在 `ceab1f78`
+（两个父都旧了）—— 它现在**不是**"重算一遍就行"的状态：重算要走 §8.22 那四条解法 + 并集脚本，
+而并集脚本的输入要等那两个 i18n 文件被它们的所有者提交后才固定。所以这个分支留着当形状参考，
+不当现量引用。
+
 
