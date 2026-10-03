@@ -92,6 +92,9 @@ model User {
   operations                  Operation[]
   syncState                   UserSyncState?
   devices                     SyncDevice[]
+  revokedSyncDevices          RevokedSyncDevice[]
+  vaultKeyPackage             VaultKeyPackage?
+  vaultKeyMigrations          VaultKeyMigration[]
   passkeys                    Passkey[]
   pendingPasskeyRegistrations PendingPasskeyRegistration[]
   subscriptions               Subscription[]
@@ -361,6 +364,119 @@ model SyncDevice {
 
   @@id([userId, clientId])
   @@map("sync_devices")
+}
+
+/// Tombstone for a clientId explicitly revoked by the account owner. Keeping
+/// it separate from SyncDevice prevents a revoked offline client from
+/// re-registering itself on its next upload.
+model RevokedSyncDevice {
+  userId    Int    @map("user_id")
+  clientId  String @map("client_id")
+  revokedAt BigInt @map("revoked_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([userId, clientId])
+  @@map("revoked_sync_devices")
+}
+
+/// Opaque E2EE key package. The server stores wrappers only; it cannot derive
+/// or decrypt the vault root key. A new keyVersion is published after a
+/// client-side rotation has re-encrypted every local record.
+model VaultKeyPackage {
+  userId              Int      @id @map("user_id")
+  keyVersion          Int      @map("key_version")
+  packageData         Json     @map("package_data")
+  /// Null means this account has not completed the first payload migration.
+  /// This is independent from key_version: changing a passphrase wrapper does
+  /// not require rewriting operation ciphertext.
+  activePayloadKeyVersion Int? @map("active_payload_key_version")
+  createdAt           BigInt   @map("created_at")
+  updatedAt           BigInt   @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("vault_key_packages")
+}
+
+/// Durable idempotency receipt for an atomic vault payload migration.
+/// The request fingerprint is over opaque request metadata and ciphertext;
+/// it never contains a plaintext key. A committed row is the recovery answer
+/// when the HTTP response was lost after the database transaction committed.
+model VaultKeyMigration {
+  id                    String   @id @default(cuid())
+  userId                Int      @map("user_id")
+  requestId             String   @map("request_id")
+  requestFingerprint    String   @map("request_fingerprint")
+  state                 String   @default("STAGING")
+  expectedKeyVersion    Int      @map("expected_key_version")
+  expectedLatestSeq     Int      @map("expected_latest_seq")
+  targetPayloadKeyVersion Int   @map("target_payload_key_version")
+  keyVersion            Int      @map("key_version")
+  latestSeq             Int      @map("latest_seq")
+  expectedOperationCount Int     @default(0) @map("expected_operation_count")
+  expectedPayloadBytes  BigInt   @default(0) @map("expected_payload_bytes")
+  uploadedOperationCount Int    @default(0) @map("uploaded_operation_count")
+  uploadedPayloadBytes  BigInt   @default(0) @map("uploaded_payload_bytes")
+  reservedStorageBytes  BigInt   @default(0) @map("reserved_storage_bytes")
+  migratedOperationCount Int    @default(0) @map("migrated_operation_count")
+  expiresAt             BigInt   @map("expires_at")
+  cancelledAt           BigInt?  @map("cancelled_at")
+  packageData           Json     @map("package_data")
+  createdAt             BigInt   @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  chunks VaultKeyMigrationChunk[]
+  stagedOperations VaultKeyMigrationOperation[]
+
+  @@unique([userId, requestId])
+  @@index([userId, state, expiresAt])
+  @@index([userId, createdAt])
+  @@map("vault_key_migrations")
+}
+
+/// A bounded, retryable ciphertext chunk belonging to a staged migration.
+/// Child operation rows make identity coverage and duplicate detection
+/// relational rather than trusting a large JSON array at commit time.
+model VaultKeyMigrationChunk {
+  id                String   @id @default(cuid())
+  migrationId       String   @map("migration_id")
+  chunkId           String   @map("chunk_id")
+  chunkIndex        Int      @map("chunk_index")
+  requestFingerprint String  @map("request_fingerprint")
+  operationCount    Int      @map("operation_count")
+  payloadBytes      BigInt   @map("payload_bytes")
+  createdAt         BigInt   @map("created_at")
+
+  migration  VaultKeyMigration @relation(fields: [migrationId], references: [id], onDelete: Cascade)
+  operations VaultKeyMigrationOperation[]
+
+  @@unique([migrationId, chunkId])
+  @@unique([migrationId, chunkIndex])
+  @@index([migrationId, createdAt])
+  @@map("vault_key_migration_chunks")
+}
+
+/// One staged replacement. It is opaque to the server apart from the public
+/// envelope generation and is removed after publication/cancellation.
+model VaultKeyMigrationOperation {
+  id           String   @id @default(cuid())
+  migrationId  String   @map("migration_id")
+  chunkId      String   @map("chunk_id")
+  operationId  String   @map("operation_id")
+  serverSeq    Int      @map("server_seq")
+  payload      Json
+  payloadBytes BigInt   @map("payload_bytes")
+  storageBytes BigInt   @map("storage_bytes")
+  createdAt    BigInt   @map("created_at")
+
+  migration VaultKeyMigration @relation(fields: [migrationId], references: [id], onDelete: Cascade)
+  chunk     VaultKeyMigrationChunk @relation(fields: [chunkId], references: [id], onDelete: Cascade)
+
+  @@unique([migrationId, operationId])
+  @@unique([migrationId, serverSeq])
+  @@index([migrationId, serverSeq])
+  @@map("vault_key_migration_operations")
 }
 
 // ---------------------------------------------------------------------------

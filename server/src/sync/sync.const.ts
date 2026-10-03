@@ -54,11 +54,10 @@ export const APPROX_BYTES_PER_OP = 1024;
  * `cachedPayloadBytes` lets a caller pass the payload's UTF-8 byte size when it
  * was already measured upstream (validation stringifies the payload to enforce
  * the size limit; the payload is immutable across the upload pipeline), so a
- * multi-megabyte payload isn't re-stringified here. The vector clock is always
- * (re)measured because it is pruned AFTER validation (see
- * `limitVectorClockSize`) — the stored clock
- * differs from the validation/gate-time clock, so its size must be computed at
- * the persist site.
+ * multi-megabyte payload isn't re-stringified here. The vector clock is measured
+ * at the persist site as part of durable byte accounting. The stored clock is
+ * the complete validated clock; it is not pruned between validation and
+ * persistence.
  */
 export const computeOpStorageBytes = (
   op: {
