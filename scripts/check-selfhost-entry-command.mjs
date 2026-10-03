@@ -45,6 +45,21 @@
  * 是**假红**（它在判另一件事）。它进扫描集的理由是 R1：那里的三条命令同样是抄件，
  * 漂掉 build override 会得到同一个 `pull access denied`。
  *
+ * ## 🔴 两种来源：markdown 与站内词条（`source: 'copy'`）
+ *
+ * `docs/runbooks/self-host.md` 与 `server/README.md` 是给人打开的文件，命令住在**行首**；
+ * 而站内那篇自建指南（`packages/i18n` 的 `site.docs.selfhost.*`，中英各一份）是
+ * **落地页「打开自建指南」真的点进去的那一页**，命令住在散文中间的反引号里。
+ * 它 2026-10-03 才进扫描集，且进来之前先改了一件事：当时 s7p2 只有
+ * `-f docker-compose.yml -f docker-compose.build.yml -f docker-compose.migrate-once.yml`
+ * 这个**碎片**（没前缀、没 `up -d`、没 `--build`）—— 直接纳入只会得到一条
+ * "扫了但什么都看不见"的空判据。先让文章给出完整一条，再纳入对账，顺序不能反。
+ * 词条侧走 `findCopyEntryCommands`（不折行，因为词条值是单行的），
+ * 命令形状仍从同一个 `ENTRY_BODY` 导出 —— **不抄第二份正则**。
+ * 报错定位带键名（`行号 · site.docs.selfhost.s7p2`），只给行号等于让人在 2841 行里猜。
+ * 两份词条都标 `external: true` ⇒ 受 R1–R6 与 R5 的**跨抄件逐字比对**管，
+ * 于是中英两份 + runbook + README 这四份现在必须是同一句话。
+ *
  * ## 🔴 显式排除：`docs/research/self-host-distribution-audit.md`
  *
  * 该文件 §8.11 引用的是**出事当时的旧命令**（它写的就是"这条曾经少了 build.yml"）。
@@ -62,8 +77,18 @@ const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const BUILD_OVERRIDE = 'docker-compose.build.yml';
 const MIGRATE_OVERRIDE = 'docker-compose.migrate-once.yml';
 const MIGRATOR_SERVICE = 'supersync-migrate';
+/**
+ * 入口命令的形状。🔴 只写一次，两种锚法从同一个 body 导出：
+ *  - markdown：`ENTRY_RE` 要求**行首**（允许缩进）；
+ *  - 站内词条：`ENTRY_BODY` 不带行首锚 —— 命令住在散文中间的反引号里。
+ * 把同一段 pattern 抄两遍正是本仓反复出事的地方（AGENTS §3.5 的教训）。
+ */
+const ENTRY_BODY = 'docker compose -f docker-compose\\.yml(?![A-Za-z0-9._-])';
 /** 入口命令的行首形状：`docker compose -f docker-compose.yml …`（允许 markdown 缩进）。 */
-const ENTRY_RE = /^[ \t]*docker compose -f docker-compose\.yml(?![A-Za-z0-9._-])/;
+const ENTRY_RE = new RegExp(`^[ \\t]*${ENTRY_BODY}`);
+
+/** 站内自建指南文章的词条前缀。 */
+const SELF_HOST_COPY_PREFIX = 'site.docs.selfhost.';
 
 /**
  * 扫描集。**逐文件写清它是谁的抄件**，因为"漏一份"就是这道门禁要防的形状本身。
@@ -75,6 +100,9 @@ const SCAN_SET = [
   { file: 'server/env.example', external: false, role: '配置样例里的抄件（当前 0 条，加一条就被判）' },
   { file: 'server/docker-compose.migrate-once.yml', external: false, role: 'override 文件自己的注释里印入口命令' },
   { file: 'docs/runbooks/local-server-verification.md', external: false, role: '内部本地验收手册（test override 那一套）' },
+  // 🔴 这两份是 2026-10-03 才加进来的**第四个和第五个抄件**，加它的理由见下面 findCopyEntryCommands 的头。
+  { file: 'packages/i18n/src/locales/zh-CN.ts', external: true, source: 'copy', keyPrefix: SELF_HOST_COPY_PREFIX, role: '站内自建指南文章（中文）—— 落地页「打开自建指南」点进来就是它' },
+  { file: 'packages/i18n/src/locales/en.ts', external: true, source: 'copy', keyPrefix: SELF_HOST_COPY_PREFIX, role: '站内自建指南文章（英文）—— 与中文那份是同一条命令的两种语言' },
 ];
 
 /**
@@ -95,6 +123,9 @@ const failures = [];
 const notes = [];
 /** 每个对外文档里"不点名服务"的那条主命令；跨文件做逐字比对用（R5）。 */
 const EXTERNAL_MAINS = [];
+/** 报错定位：词条抄件要带**键名**，只给行号等于让人在 2841 行里猜。 */
+const where = (m) => (m.key ? `${m.startLine} · ${m.key}` : m.startLine);
+
 const red = (file, line, rule, msg, cmd) => {
   failures.push(`${file}${line ? `:${line}` : ''}  [${rule}]\n      ${msg}${cmd ? `\n      实测该行：${cmd}` : ''}`);
 };
@@ -122,6 +153,37 @@ function findEntryCommands(file, text) {
       line = `${line.replace(/\\\s*$/, '')} ${next}`;
     }
     found.push({ line: line.replace(/\s+/g, ' ').trim(), startLine });
+  }
+  return found;
+}
+
+/**
+ * 从词条值里取入口命令。
+ *
+ * 🔴 为什么这两份抄件 2026-10-03 才进来，以及 G-49 原登记哪里说错了：
+ * 登记写"文章是入口命令的第 4 份抄件"，实测**当时它不是抄件** —— 58 条
+ * `site.docs.selfhost.*` 里唯一提到 compose 的那条（s7p2）只印了 `-f` 那三个 flag 的
+ * **碎片**：没有 `docker compose` 前缀、没有 `up -d`、也**没有 `--build`**。
+ * 而那比"没抄件"更坏：读者把碎片拼成 `docker compose … up -d` 敲下去，
+ * 得到的正是 §8.11 记的那次 `pull access denied`。
+ * ⇒ 所以这一步做两件事：文章改成给出**完整一条**（与 runbook / README 逐字相同），
+ *   并从这里起受 R1–R6 与跨抄件逐字比对管。词条值是单行的，不需要 R0 的折行拼接。
+ */
+function findCopyEntryCommands(file, text, keyPrefix) {
+  const physical = text.split('\n');
+  const keyRe = new RegExp(
+    `^\\s*'(${keyPrefix.replace(/\./g, '\\.')}[^']*)'\\s*:\\s*'(.*)',\\s*$`,
+  );
+  const cmdRe = new RegExp(`^${ENTRY_BODY}`);
+  const found = [];
+  for (let i = 0; i < physical.length; i += 1) {
+    const m = physical[i].match(keyRe);
+    if (!m) continue;
+    for (const span of m[2].matchAll(/`([^`]+)`/g)) {
+      const cmd = span[1].replace(/\s+/g, ' ').trim();
+      if (!cmdRe.test(cmd)) continue;
+      found.push({ line: cmd, startLine: i + 1, key: m[1] });
+    }
   }
   return found;
 }
@@ -163,7 +225,11 @@ for (const entry of SCAN_SET) {
     red(entry.file, null, 'R-scan', '扫描集里登记的文件不存在 —— 清单与现实漂移了。它被改名/删除，这道门禁就少了一个抄件要管');
     continue;
   }
-  const matches = findEntryCommands(entry.file, readFileSync(abs, 'utf8'));
+  const text = readFileSync(abs, 'utf8');
+  const matches =
+    entry.source === 'copy'
+      ? findCopyEntryCommands(entry.file, text, entry.keyPrefix)
+      : findEntryCommands(entry.file, text);
   TOTAL_MATCHES += matches.length;
   notes.push(`${entry.file}：命中 ${matches.length} 条入口命令（${entry.role}）`);
 
@@ -176,31 +242,31 @@ for (const entry of SCAN_SET) {
   for (const m of matches) {
     const parsed = parseCompose(m.line);
     if (parsed.malformed) {
-      red(entry.file, m.startLine, 'R2', `这条命令读不开：${parsed.malformed}`, m.line);
+      red(entry.file, where(m), 'R2', `这条命令读不开：${parsed.malformed}`, m.line);
       continue;
     }
     const { files, flags, services } = parsed;
 
     // ── R1：build override（所有扫描文件，逐行）────────────────────
     if (!files.includes(BUILD_OVERRIDE)) {
-      red(entry.file, m.startLine, 'R1', `少了 ${BUILD_OVERRIDE} ⇒ 照抄的人手里没有镜像可拉（我们不发布镜像，默认 image 是 supersync:local），实测报 pull access denied`, m.line);
+      red(entry.file, where(m), 'R1', `少了 ${BUILD_OVERRIDE} ⇒ 照抄的人手里没有镜像可拉（我们不发布镜像，默认 image 是 supersync:local），实测报 pull access denied`, m.line);
     }
 
     // ── R2：每一个 -f 指向的文件必须真的存在 ───────────────────────
     for (const f of files) {
       if (!existsSync(join(repoRoot, 'server', f))) {
-        red(entry.file, m.startLine, 'R2', `-f ${f} 在 server/ 下不存在 —— override 文件被改名或删了，而抄件还留着旧名字`, m.line);
+        red(entry.file, where(m), 'R2', `-f ${f} 在 server/ 下不存在 —— override 文件被改名或删了，而抄件还留着旧名字`, m.line);
       }
     }
 
     // ── R3：对外文档的每一份都要带一次性迁移 override ──────────────
     if (entry.external && !files.includes(MIGRATE_OVERRIDE)) {
-      red(entry.file, m.startLine, 'R3', `少了 ${MIGRATE_OVERRIDE} ⇒ 裸起在未迁移的表结构上（症状：日志一片 column does not exist 而容器全绿）`, m.line);
+      red(entry.file, where(m), 'R3', `少了 ${MIGRATE_OVERRIDE} ⇒ 裸起在未迁移的表结构上（症状：日志一片 column does not exist 而容器全绿）`, m.line);
     }
 
     // ── R4：点名服务就必须把 migrator 一起点出来 ───────────────────
     if (entry.external && services.length > 0 && !services.includes(MIGRATOR_SERVICE)) {
-      red(entry.file, m.startLine, 'R4', `点名了服务（${services.join(' ')}）却没点 ${MIGRATOR_SERVICE} ⇒ 那条一次性迁移服务根本不会被拉起，空库上"起得来"是假可用`, m.line);
+      red(entry.file, where(m), 'R4', `点名了服务（${services.join(' ')}）却没点 ${MIGRATOR_SERVICE} ⇒ 那条一次性迁移服务根本不会被拉起，空库上"起得来"是假可用`, m.line);
     }
 
     if (entry.external && services.length === 0) mains.push(m);
@@ -212,25 +278,25 @@ for (const entry of SCAN_SET) {
   if (mains.length !== 1) {
     red(
       entry.file,
-      mains.map((m) => m.startLine).join(' / ') || '—',
+      mains.map(where).join(' / ') || '—',
       'R5',
       mains.length === 0
         ? '这份对外文档里**没有**"不点名服务"的主命令（§4 那条起全套的入口）。它被删了、改名了，或被写成只点名服务的样子 —— 外人就没有"一条命令起全套"可抄'
-        : `这个对外文档里有 ${mains.length} 条"不点名服务"的入口命令（第 ${mains.map((m) => m.startLine).join(' / ')} 行）—— 主命令应当**恰好一条**。多出来的那条通常是"从主命令抄一半"漂出来的`,
+        : `这个对外文档里有 ${mains.length} 条"不点名服务"的入口命令（第 ${mains.map(where).join(' / ')} 行）—— 主命令应当**恰好一条**。多出来的那条通常是"从主命令抄一半"漂出来的`,
       '',
     );
   }
-  if (mains.length === 1) EXTERNAL_MAINS.push({ file: entry.file, line: mains[0].startLine, cmd: mains[0].line });
+  if (mains.length === 1) EXTERNAL_MAINS.push({ file: entry.file, line: where(mains[0]), cmd: mains[0].line });
 
   for (const m of mains) {
     const { files, flags } = parseCompose(m.line);
     const set = [...new Set(files)].sort().join(' ');
     const expect = [BUILD_OVERRIDE, MIGRATE_OVERRIDE, 'docker-compose.yml'].sort().join(' ');
     if (set !== expect) {
-      red(entry.file, m.startLine, 'R5', `主命令带的 compose 文件是「${set}」，应当恰好是「${expect}」`, m.line);
+      red(entry.file, where(m), 'R5', `主命令带的 compose 文件是「${set}」，应当恰好是「${expect}」`, m.line);
     }
     if (!flags.includes('--build')) {
-      red(entry.file, m.startLine, 'R5', '主命令没有 --build：镜像不会由这条命令自己产出，第一次跑仍然起不来', m.line);
+      red(entry.file, where(m), 'R5', '主命令没有 --build：镜像不会由这条命令自己产出，第一次跑仍然起不来', m.line);
     }
   }
 }
