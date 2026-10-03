@@ -833,16 +833,41 @@ ADR-0011 的实现。让本机其他程序（Claude Code / Cursor / Raycast / �
 ⚠️ 它与 `@heyta/ai` 的 `isLoopbackEndpoint` **刻意不共用**：那个处理完整 URL，
 这个处理裸主机；「共用会诱使某一方放宽自己的规则，而放宽的方向通常是**不安全**的那一边。」
 
-### 11.4 六个工具
+### 11.4 九个工具（读 4 / 写 5）
+
+> 🔴 **这张表是抄件**。唯一事实源是 `packages/local-api/src/tools/<entity>.ts` 与生成物
+> `packages/ai/src/capability-manifest.generated.ts`（`node scripts/gen-ai-capability-manifest.mjs --check`
+> 逐字节核对产物，并打印现量的工具数与覆盖面）。它原先列六个、并在 2026-10-03 漂了一次
+> （补进 `create_project`、`list_habits`、`create_habit`）—— 所以这行指针不是装饰：
+> **改完上游顺手改这张表，但别看这张表推断上游。**
 
 | 名字 | kind | 参数 | 默认 |
 |---|---|---|---|
 | `list_tasks` | read | `projectId?` / `completed?` / `limit?`（描述「默认 50」，**在筛完之后才生效**）/ `dueOn?` **或** `dueFrom?` + `dueTo?`（`YYYY-MM-DD` 闭区间，≤ 14 天；两组互斥，范围两端必须成对） | false |
 | `get_task` | read | `taskId`（必填） | false |
 | `list_projects` | read | 无 | false |
+| `list_habits` | read | 无 | false |
 | `create_task` | write | `title`（必填）/ `dueDate?` / `priority?` / `projectId?` | false |
 | `update_task` | write | `taskId`（必填）/ `fields`（必填） | false |
 | `complete_task` | write | `taskId`（必填） | false |
+| `create_project` | write | `name`（必填）/ `parentId?`（省略 = 顶层清单） | false |
+| `create_habit` | write | `name`（必填）/ `target?`（≥0，省略 = 1）/ `unit?` / `goalType?`（**封闭词表** `atLeast`/`atMost`/`exactly`，写错是**拒绝**而不是回落默认） | false |
+
+🔴 **目录顺序是一条判据**，不是聚合的巧合：所有 `read` 排在所有 `write` 之前
+（`tools/list` 与 AI 的 `tools` 数组顺序就靠它），既有工具的相对顺序不许变、
+新工具只能追加 —— 钉在 `packages/local-api/tests/tool-pack-coverage.spec.ts`。
+
+⚠️ **四个读工具各自声明 `egressFields`**（出境逐字段披露那条不变量的落点）：
+`list_tasks` = `task.id` `task.title` `task.dueDate` `task.priority` `task.completed` `task.readable`，
+`get_task` = 上面全部 **+ `task.body`**（备注只有单独取时才出境，这正是上面那条
+"列表不返回备注"的判据在出境面的镜像），`list_projects` = `project.id` `project.name` `project.taskCount`，
+`list_habits` = `habit.id` `habit.name` `habit.target` `habit.unit` `habit.goalType`
+—— 后者的投影是 `packages/app-host/src/local-api-host.ts` 里的 `habitToItem` **白名单**
+（整块习惯模型不外传）。
+🔴 **五个写工具的 `egressFields` 一律是 `[]`**：写提案出境的是**用户那句话**，不是任何本地数据。
+某个写工具若开始声明 `task.*` / `habit.*` 这类本地字段，那就是"读侧泄漏"换了条通道，
+`packages/local-api/tests/tool-egress-fields.spec.ts` 那条**真实载荷对照**（实际跑执行器收键，
+不比代码）会在它出现时响。
 
 ⚠️ `list_tasks` **不返回备注正文** —— 备注要单独用 `get_task` 取。
 每个工具的 `additionalProperties` 一律 `false`。
@@ -858,6 +883,10 @@ ADR-0011 的实现。让本机其他程序（Claude Code / Cursor / Raycast / �
 每个工具的 `additionalProperties` 一律 `false`。
 测试有**防膨胀断言** `LOCAL_API_TOOLS.length <= 10`（「Joplin 有 11 个，
 那是笔记应用。这里是任务管理，超过 10 个就该先问『真的需要吗』」）。
+🔴 **2026-10-03 记一条它和覆盖面门禁的算术冲突（要产品拍，不要顺手放宽任何一边）**：
+覆盖面口径是"每个用户可操作实体一读一写"，而未覆盖的五个实体要 **10 个新席位**、
+`EVENT` 的契约要 **6 个**，这条上限只剩 **1 席**。两条各自合理，但合起来互相封死，
+而 `pnpm check` 全绿 —— 详见 `ai-event-tool-contract.md` §5.2。
 
 ### 11.5 🔴 检查顺序：先验身份，再谈权限
 
@@ -1053,7 +1082,7 @@ interface SecretStore { get(keyRef: string): Promise<string | undefined>; }
 | 托管 AI / MaaS | 已定档（ADR-0020/0021：¥12/月 · 300 次/月 · `deepseek-flash`），但**本轮不实现**（ADR-0023）：服务本体端点 / 计量 / 收银台**都不存在**；保留策略未定案，`assertEnableable` 继续抛 `retention-undecided` |
 | AI-3 规划 | 有意推迟（需要真实数据） |
 | AI-4 复盘 | 受限分支，未开工 |
-| **AI 工具调用的 P4** | P0–P3 已落地：规则选择 + 单步执行 + 模型线格式 + 面板入口 + **多步读循环与末尾一次写提案**（[ADR-0045](../adr/0045-conversational-assistant-split-authorization-from-catalog.md)，Web 壳）。**需实体 id 的工具（P4）仍未开工** —— 单步入口下它结构性不可达，多步循环把"先查再改"变成可达了，但**目录里仍只有 6 个工具**（覆盖面 2/8 实体，见 `ai-assistant-closure.md` §7.2 第 3 条）；托管路径的权益闸门（`capability:'ai'`）也因托管 AI 未实现而未接 |
+| **AI 工具调用的 P4** | P0–P3 已落地：规则选择 + 单步执行 + 模型线格式 + 面板入口 + **多步读循环与末尾一次写提案**（[ADR-0045](../adr/0045-conversational-assistant-split-authorization-from-catalog.md)，Web 壳）。**需实体 id 的工具（P4）仍未开工** —— 单步入口下它结构性不可达，多步循环把"先查再改"变成可达了，但**目录里有 9 个工具**（读 4 / 写 5，覆盖面 **3/8** 实体 —— 口径是"读和写都有"，见 `ai-event-tool-contract.md` §2；2026-10-03 前这里写的是"6 个 / 覆盖面 2/8"，两个数都错在把只读的 `PROJECT` 计成已覆盖），且**覆盖面已有门禁**（`check-ai-coverage.mjs` §9，挂在 `check:ai-coverage` ⇒ 在 `pnpm check` 里）；托管路径的权益闸门（`capability:'ai'`）也因托管 AI 未实现而未接 |
 | 只读模式 | `grants` 已能表达，助手侧有 `read-only` 档；**入站 MCP 那侧仍没有"只读预设"的 UI 引导**（逐工具开关已有） |
 | 调用审计 | 未做（考虑过"记录每次调用"，但那本身是一份新的敏感日志） |
 | 「回退披露必须写出整条链」 | ⚠️ 见 §15.3 |
