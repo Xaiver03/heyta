@@ -109,6 +109,14 @@ export function HabitsScreen({ onBack }: { onBack: () => void }): React.JSX.Elem
   const [selectedId, setSelectedId] = useState<string | null>(null);
   /** 正在落盘的那一条 —— 置灰它，防连点发出两条 op。 */
   const [busyId, setBusyId] = useState<string | null>(null);
+  /**
+   * 改名编辑器展开的那一条（`null` = 没展开）。
+   *
+   * 🔴 存的是**习惯 id**而不是一个布尔：详情层换一条习惯时，编辑器不能跟着
+   * 留在屏幕上 —— 布尔做不到这件事，而它做到的那次就是"改了 A 的名字存到 B 上"。
+   */
+  const [renamingId, setRenamingId] = useState<string | null>(null);
+  const [renameDraft, setRenameDraft] = useState('');
 
   useEffect(() => {
     let alive = true;
@@ -172,6 +180,36 @@ export function HabitsScreen({ onBack }: { onBack: () => void }): React.JSX.Elem
     () => habits.find((habit) => habit.id === selectedId),
     [habits, selectedId],
   );
+
+  /**
+   * 保存改名 = **一条 UPD**。
+   *
+   * 🔴 空名字与"一个字没改"都不发 op：一次点击对应一个意图（AGENTS §3.4），
+   * 而"我打开了输入框又原样关掉"不是一个改名意图 —— 发出去会在别的设备上
+   * 多出一条没有信息量的历史。真正的空名字校验在动作层（它会抛错），
+   * 这里只管"按了回车什么都不该发生"。
+   */
+  const saveRename = useCallback((): void => {
+    if (actions === null || selected === undefined) return;
+    const next = renameDraft.trim();
+    const id = selected.id;
+    setRenamingId(null);
+    if (next === '' || next === selected.name) return;
+    runFor(id, actions.renameHabit(id, next));
+  }, [actions, renameDraft, runFor, selected]);
+
+  /**
+   * 删除习惯 = **一条墓碑**。
+   *
+   * 🔴 打卡历史**不级联删**（`removeHabit` 的注释）：撤销删除后连续天数还在。
+   * 先退回清单再发 op —— 不然那条记录在界面上被"看着"而它已经不在了。
+   */
+  const removeSelected = useCallback((): void => {
+    if (actions === null || selected === undefined) return;
+    const id = selected.id;
+    setSelectedId(null);
+    runFor(id, actions.removeHabit(id));
+  }, [actions, runFor, selected]);
 
   const chooseColor = useCallback(
     (habit: Habit, slot: CategorySlot | undefined): void => {
@@ -273,8 +311,57 @@ export function HabitsScreen({ onBack }: { onBack: () => void }): React.JSX.Elem
               setSelectedId(null);
             },
           },
+          // 🔴 改名与删除此前**只在动作层存在**（`renameHabit` 是新补的、
+          // `removeHabit` 早就有），界面上一个入口都没有 —— 于是"建错了改不了、
+          // 不想要了删不掉"，而这两件事 web 同样做不到（`deleteHabit` 在 store 里、
+          // 没有调用点）。零件都在、没人接线，就是这个形状。
+          {
+            icon: 'action.rename',
+            label: t('common.habits.rename.button', { name: selected.name }),
+            onPress: () => {
+              setRenamingId(selected.id);
+              setRenameDraft(selected.name);
+            },
+          },
+          {
+            icon: 'task.delete',
+            label: t('common.habits.delete.button', { name: selected.name }),
+            onPress: removeSelected,
+          },
         ]}
       >
+        {renamingId === selected.id ? (
+          /*
+            改名编辑器留在宿主（与「新建习惯」的输入框同一条处置）：移动端的
+            `TextField` 有自己的规范（44px 字段高、label/placeholder 分离），
+            web 是 DOM `<input>`，强行共享会逼一个端放弃自己的输入控件。
+            ⚠️ 初值必须是**当前名字**（不是空串）：打开后直接保存会改成空名，
+            而动作层会抛错 —— 用户看到的是"点了保存没反应"。
+          */
+          <Card>
+            <TextField
+              label={t('common.habits.rename.label')}
+              value={renameDraft}
+              onChangeText={setRenameDraft}
+              autoCapitalize="sentences"
+            />
+            <Button
+              label={t('common.organizer.rename.save')}
+              tone="primary"
+              icon="action.keep"
+              disabled={busyId === selected.id}
+              onPress={saveRename}
+            />
+            <Button
+              label={t('common.organizer.rename.cancel')}
+              tone="secondary"
+              icon="action.close"
+              onPress={() => {
+                setRenamingId(null);
+              }}
+            />
+          </Card>
+        ) : null}
         <HabitBoard
           habits={[selected]}
           logs={logs}

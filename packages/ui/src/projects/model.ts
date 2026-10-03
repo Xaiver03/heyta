@@ -45,13 +45,21 @@
  *    "槽位 → 颜色 token"的映射只有一处（`categories/model.ts#categorySlotToken`）。
  *    · 最小一步：mobile 接上 `ui/slot-picker.tsx`（那一刀属于分类，不属于本刀）。
  *
- * 3. **删除确认 / 改名 / 归档**都不在这里。web 的删除是**直接删**（无二次确认），
- *    mobile 也是；改名与归档在 `app-host` 里有动作、界面从未接上
- *    （与 `habits` 第 3 条同一个既有缺口）。影响：清单建出来改不了名。
+ * 3. **删除确认**不在这里：web 的删除是**直接删**（无二次确认），mobile 也是。
  *    · 最小一步：行尾 `•••`（宿主插槽）或详情层，先要产品定"删除要不要确认"。
  *
+ *    ✅ **「改名 / 归档界面从未接上」这句已过期（2026-10-03，多端第三批）**：
+ *    行内编辑器在 `OrganizerList` 里，两端都已传 `onRename` / `onArchive`
+ *    （`apps/mobile/src/screens/ListsSection.tsx`、`TagsSection.tsx`，
+ *    web 的 `features/projects/ProjectsPanel.tsx`）。判据：
+ *    `apps/mobile/tests/organizer-rename.spec.ts`。
+ *    留原文是为了让后来者认得出"零件都在、没人接线"这个形状。
+ *
  * 4. **`archived` 的显示开关**：本文件的 `aliveProjects` 一律**隐藏**归档清单
- *    （与迁移前的 web 选择器逐字一致）。"显示已归档"是一个新界面，不在这刀。
+ *    （与迁移前的 web 选择器逐字一致）。
+ *    ✅ "显示已归档"这一刀**已做**（2026-10-03）：`toOrganizerTree(projects,
+ *    { includeArchived })` + `archivedProjects()`，两端的开关都在
+ *    `archivedCount > 0` 时才画出来 —— 没有已归档清单时不占一行。
  */
 
 import type { Project, Tag, Task } from '@heyta/domain';
@@ -60,10 +68,20 @@ import type { Project, Tag, Task } from '@heyta/domain';
  * 一、行模型
  * ====================================================================== */
 
-/** 清单与标签共同的**最小**行字段集 —— 组件只认识这两样。 */
+/** 清单与标签共同的**最小**行字段集 —— 组件只认识这几样。 */
 export interface OrganizerItem {
   readonly id: string;
   readonly name: string;
+  /**
+   * 这一行是不是**已归档**（只有清单有；`Tag` 没这个字段）。
+   *
+   * 🔴 它存在的理由不是"多显示一个标记"，而是**让取消归档可达**：归档位一旦按下，
+   *    如果宿主不能把已归档的行也交回列表，那这条清单就再也回不来（两侧都没有
+   *    已归档视图）。`OrganizerList.onArchive` 传的是**目标状态**，
+   *    而目标状态要从这一行的真实状态推出来。
+   * ⚠️ 默认 `undefined`（= 不是已归档），所以两端不传时渲染与从前逐字相同。
+   */
+  readonly archived?: boolean;
 }
 
 /**
@@ -81,36 +99,76 @@ export interface OrganizerNode extends OrganizerItem {
  * 二、清单：拆层级
  * ====================================================================== */
 
-/** 未归档的清单。**归档 = 隐藏但保留数据**（`Project.archived` 的注释）。 */
-export function aliveProjects(projects: readonly Project[]): Project[] {
+/**
+ * 默认只留**未归档**的清单（归档 = 隐藏但保留数据，`Project.archived` 的注释）。
+ *
+ * 🔴 `includeArchived` 不是"多显示一档"，是**让取消归档可达**：默认过滤掉归档行，
+ *    而界面上又没有别的已归档视图，那么任何一次归档都是**单向门** ——
+ *    数据还在、同步也正常，只是永远回不来。宿主开了这个开关，
+ *    就必须同时给 `OrganizerList` 传 `onArchive`（它按行的 `archived` 决定传哪个目标值）。
+ */
+export function aliveProjects(
+  projects: readonly Project[],
+  includeArchived = false,
+): Project[] {
+  if (includeArchived) return [...projects];
   return projects.filter((project) => project.archived !== true);
 }
 
+/**
+ * 已归档的清单（`archived === true` 那部分）。
+ *
+ * 🔴 有它是因为「要不要把『显示已归档』这个开关画出来」取决于**有没有已归档的清单**，
+ * 而"哪几条算已归档"是领域判断。两端各写一遍 `filter(p => p.archived === true)`
+ * 就是两份口径 —— 一边写 `=== true`、一边写 `!!p.archived`，
+ * 在 `archived?: boolean` 上眼下等价，将来加第三种状态时只会有一边跟着变。
+ */
+export function archivedProjects(projects: readonly Project[]): Project[] {
+  return projects.filter((project) => project.archived === true);
+}
+
 /** 顶层清单（无 `parentId`）。 */
-export function topLevelProjects(projects: readonly Project[]): Project[] {
-  return aliveProjects(projects).filter((project) => project.parentId === undefined);
+export function topLevelProjects(
+  projects: readonly Project[],
+  includeArchived = false,
+): Project[] {
+  return aliveProjects(projects, includeArchived).filter(
+    (project) => project.parentId === undefined,
+  );
 }
 
 /** 某个清单下的子清单（**一层**）。 */
-export function childProjects(projects: readonly Project[], parentId: string): Project[] {
-  return aliveProjects(projects).filter((project) => project.parentId === parentId);
+export function childProjects(
+  projects: readonly Project[],
+  parentId: string,
+  includeArchived = false,
+): Project[] {
+  return aliveProjects(projects, includeArchived).filter(
+    (project) => project.parentId === parentId,
+  );
 }
 
 /**
  * 清单 → 可渲染的树（顶层 + 一层子级），**保持输入顺序**。
  *
- * ⚠️ 父 id 指向一条**已归档 / 不存在**的清单时，子清单会从界面上消失 ——
- * 与迁移前的 web 选择器逐字一致（`parentId === parentId` 只从顶层算起）。
- * 这是已知取舍：一个孤儿清单不显示，比把它当成顶层清单**冒充**一个
- * 用户没设过的位置更好。要改的话先在产品层定"孤儿归哪"。
+ * ⚠️ 默认（不开 `includeArchived`）时，父 id 指向一条**已归档 / 不存在**的清单，
+ * 子清单会从界面上消失 —— 与迁移前的 web 选择器逐字一致。这是已知取舍：
+ * 一个孤儿清单不显示，比把它当成顶层清单**冒充**一个用户没设过的位置更好。
+ * ✅ 开了 `includeArchived` 就没有这个副作用：归档的父也在树上，子级跟着它。
  */
-export function toOrganizerTree(projects: readonly Project[]): OrganizerNode[] {
-  return topLevelProjects(projects).map((project) => ({
+export function toOrganizerTree(
+  projects: readonly Project[],
+  options?: { readonly includeArchived?: boolean },
+): OrganizerNode[] {
+  const includeArchived = options?.includeArchived === true;
+  return topLevelProjects(projects, includeArchived).map((project) => ({
     id: project.id,
     name: project.name,
-    children: childProjects(projects, project.id).map((child) => ({
+    archived: project.archived === true,
+    children: childProjects(projects, project.id, includeArchived).map((child) => ({
       id: child.id,
       name: child.name,
+      archived: child.archived === true,
     })),
   }));
 }
@@ -252,7 +310,9 @@ export function openTagCounts(tasks: readonly Task[]): Record<string, number> {
  * 而那种漂移不会让任何测试变红。
  */
 export function toOrganizerNodes(items: readonly OrganizerItem[]): OrganizerNode[] {
-  return items.map((item) => ({ id: item.id, name: item.name, children: [] }));
+  // 整条 spread 而不是逐字段挑：漏一个字段（这里是 `archived`）的表现是
+  // "那一行永远显示成未归档"，而归档按钮于是永远说「归档」。
+  return items.map((item) => ({ ...item, children: [] }));
 }
 
 /* ========================================================================
