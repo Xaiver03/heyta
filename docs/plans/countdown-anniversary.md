@@ -215,6 +215,14 @@ i18n **中英同步**（唯一文案事实源，`check:ui-language` 拦）；`SH
      ⚠️ 另两条"下一次"要带的现场事实：**`verify-mobile-repeat.sh` 没有负载门**（全仓只有 `verify-mobile-restore.sh` 里有 `wait_for_quiet_host`，`grep -rln wait_for_quiet_host scripts/` 现量），
      所以负载**没人替你等**，要自己判；以及本机**只有一个 AVD**（`~/.android/avd` 里只有 `SSOS-Parity-A36`，它就是被占的 `emulator-5556`）⇒
      "换一台自己的模拟器"这条路要先 `avdmanager create avd`（系统镜像只有 `android-36`，在 `/opt/homebrew/share/android-commandlinetools`），不是再起一台现成的。
+     ✅ **上面那半句"repeat 没有负载门"已过期**（同日 11:34，提交 `1d085a92`）：门抽成单一所有者
+     `scripts/lib/wait-for-quiet-host.sh`，`verify-mobile-repeat.sh` 现在在 `heyta_e2e_ensure_account` **之前**判它
+     （等不到 ⇒ `exit 3` = 环境无效，不是产品失败），`verify-mobile-restore.sh` 那份私有定义删掉了。
+     现量：`grep -rln wait_for_quiet_host scripts/ | grep -v '\.snap\.'` ⇒ lib（定义）+ restore + repeat 三个文件。
+     旋钮随之改名 `HEYTA_RESTORE_LOAD_WAIT` → `HEYTA_LOAD_GATE_WAIT`（`BLOCKED.md` 里那个旧名是历史读数，没动它）。
+     🔴 **但下一次仍然要看设备那一半**：这次只消掉了"负载没人替你等"，**没有**消掉"本机只有一个 AVD、
+     而跑第 15 步会 `pm clear` 掉别人在上面的登录态"；而且脚本等满 900s 是 `exit 3`，
+     **别把 `exit 3` 记成产品红**。
      ⚠️ **这条的前半截已满足**（2026-10-03 10:02 / 10:05）：android 与 ios 由并行会话在隔离检出 `267ac912` 重装过，本会话又**按内容**复核过设备上那份包里确有本批的 `每年` / `FREQ=YEARLY`（读数见下面第 2 条）⇒ 下次跑第 15 步**不必先重装**，但"现取在线机 + 自己的端口"那两条照旧。
 2. **`'yearly'` 加了 id 但没人能测到"忘了加进 `REPEAT_PRESET_IDS`"** —— 这一档的表现是"界面上没有每年"，属于**按定义不可观测**，不为此扭曲设计；类型系统已能抓到"switch 少一档"与"标签少一档"（`Record<RepeatPresetId, MessageKey>` 是穷举的）。
 3. **2/29 的"平年过 2 月最后一天"口径**：需要 `BYMONTHDAY=-1`，而域层 `describeRecurrence` 与移动端 `recurrence-display` 都会把它渲染成「每年 2 月 -1 日」。现状按 RFC + 主流日历实现（只在闰年重复），并**把这条边界钉在测试里**而不是留成暗坑。真正的产品问题在倒数日（"在一起多少天"那天算不算 2/29），随 W5 一起定。
@@ -232,6 +240,31 @@ i18n **中英同步**（唯一文案事实源，`check:ui-language` 拦）；`SH
    - `playwright` 三条：**工作树差异**。`e2e/` 刻意不在根 pnpm 工作区内（它自带一份 lockfile，AGENTS §6），所以只有跑过 `cd e2e && pnpm install` 的那棵树才看得见它。实测同一份渲染器在隔离 worktree 出 **958** 条、在主检出出 **1093** 条。
    ⇒ 结论不变、理由换掉：**这份产物只能在装了全部 workspace 的主检出渲染**，在隔离检出渲染会**静默少一整条 workspace 的依赖**。
    🔴 顺带照出一个真缺口：`check:licenses` 判的是**准入**（有没有不合格许可），**没有任何门禁判这份产物新不新鲜**，所以它能在依赖树变化后安静过期六天。**不能**直接把 `render-license-inventory.mjs --check` 挂进 `pnpm check`：它读磁盘上的 node_modules，在没装 e2e 那份 workspace 的干净检出 / CI 上**必然假红**。要挂，得先让渲染器改从 lockfile + workspace 配置推导（不在本批，登记为 **G-1**）。
+   ⚠️ **上面那句"改从 lockfile 推导"是我提错的机制，已实测撤回；G-1 已按另一条路关掉（提交 `47897912`）**：
+   - `grep -c license pnpm-lock.yaml` ⇒ **0**。许可证字符串只住在**已安装包**的 `package.json` 里
+     （`license-inventory.mjs` 扫的是 `node_modules/.pnpm` 与 `e2e/node_modules/.pnpm` 两座虚拟 store），
+     lockfile 里**没有这个字段** ⇒ "从 lockfile 推导出整份清单"在数据模型上不成立，除非联网查 registry 或先装。
+   - 内容级 `--check` 挂不进 CI 的理由，**渲染器自己的文件头就写着**（依赖树天生平台相关，
+     `@esbuild/darwin-arm64` 与 `@esbuild/win32-x64` 二选一）—— 我写 G-1 时没去读它，
+     于是把"缺 e2e workspace"当成唯一障碍，而实际有两个。
+   - ✅ 关掉它的判据只比**一件纯文件的事**：产物是在哪一把 lockfile 下渲染的。渲染时在表头写
+     `lockfile 指纹：<sha256 前 16 位>`，`--check-stamp` 只读那份 md 与 `pnpm-lock.yaml`
+     （**不进取数据那一步**）⇒ 没有 node_modules 也能判，所以它上得了 CI，内容级比较上不了。
+     四例判据在临时"无 node_modules 检出"里跑真函数：相符 ⇒ 0 / 改一位指纹 ⇒ 1 / 删掉整行 ⇒ 1 /
+     **只换 lockfile 不动清单 ⇒ 1 报"已过期"**（最后一例就是那次六天事故的形状）。
+     现量：`node research/tools/render-license-inventory.mjs --check-stamp; echo RC=$?`。
+   ⚠️ **还欠一行接线，且欠的原因不是贵，是别人正占着那个文件**：把
+   `"check:license-stamp": "node research/tools/render-license-inventory.mjs --check-stamp"`
+   加进 `package.json` 的 `check` 链（放在 `pnpm check:licenses` 后面）。
+   `package.json` 现在是**并行会话的在途改动**：工作树里正在加 `check:mobile-first-run-gate`，
+   而它指向的 `scripts/check-mobile-first-run-gate.mjs` 还是**未跟踪**状态
+   （现量：`git show HEAD:package.json | grep -c mobile-first-run` ⇒ 0、
+   `git ls-tree -r --name-only HEAD | grep -c check-mobile-first-run-gate.mjs` ⇒ 0、
+   `ls scripts/check-mobile-first-run-gate.mjs` ⇒ 存在）。
+   这时我用 `commit --only package.json` 会把他们那两样**一起卷进我的提交**
+   （`--only` 提交的是该路径的工作树内容），而那样落进 HEAD 的是一条指向不存在文件的门禁。
+   🔴 **顺带把这条风险交回他们**：等 `package.json` 干净时（`git status --porcelain -- package.json` 为空）
+   一起补，且必须先确认那笔提交里**同时**含 `scripts/check-mobile-first-run-gate.mjs`。
 2. ✅ **撞号已按原指示处理，而且比预告的严重**：预告只说"主检出工作树里已有一条写到 136"，实测合并时 main 的台账已经编到 **160**，本批四条占的 137–140 是**真撞号**（`sed -n '/^137\./,/^137\./p'` 取到的是别人的条目）。合并方把它们重编为 **161–164**，内容一字未改。收口复核：台账 1–164 无重号（`grep -oE '^[0-9]+\. ' | sort -n | uniq -d` 只剩 `1,2,3,4,38,93,94,95` —— 全是条目正文里的有序列表，不是条目号）。
 3. ✅ **AGENTS.md §7 索引表**补了 161–164 那一行（用户 2026-10-03 指示"把落下的东西全部收口"就是 §8 要求的那次明确授权）。同批把 §7 开头写死的"83 条实测踩过"换成现量命令 —— 它本身就是本条要说的那种抄件，已经漂了。
 4. ✅ **lockfile 复解析过了：零 churn**。在合并态的隔离检出（`a29881e9` + 一次全新 `pnpm install`）跑完 `git status --porcelain` 输出 **0 行** ⇒ 合并后的 lockfile 与全部 manifest 自洽。
@@ -336,6 +369,9 @@ grep -nE '^1(6[5-9]|7[0-9])\. ' docs/reference/environment-traps.md | cut -c1-70
 🔴 台账里没落的一条待办，写在 **#168 末尾**：把 `wait_for_quiet_host` 从
 `scripts/verify-mobile-restore.sh` 抽进 `scripts/lib/` —— 它现在是某一个脚本的私有函数，
 第二个想用的时候就又是一份抄件（同族教训见 `mobile-e2e.sh` 文件头）。
+✅ **这条已于同日 11:34 落地**（`scripts/lib/wait-for-quiet-host.sh` + restore/repeat 两处引用，提交 `1d085a92`）。
+📌 因此台账干净时除了搬 **#180**，还要把 #168 末尾那两句待办改成一句过去式指针
+（**不要删** —— 那条"手写等待循环把坑踩三遍"的机制正文是判据本身，被删掉的往往是它）。
 
 ### 待入 §7 的一条（**正文写好了，先落在这里**：台账此刻被并行会话写脏）
 
