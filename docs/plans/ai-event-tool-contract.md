@@ -931,3 +931,19 @@ cd /private/tmp/heyta-final/e2e && pnpm install   # 该检出没有 e2e/node_mod
 可以按**调用形状**枚举非测试的 `.submit(` 并断言集合恰好等于上面两枚。
 🔴 不能按名字匹配：`apps/mobile/src/screens/ProfileScreen.tsx:367` 那个 `form.submit()`
 是 HTML 表单提交，与写入无关 —— 按名字数会把无关调用点算进来，或者更糟，让人以为判据有牙。
+
+### 15.2 五条红线的逐条读数（载体 `3eb38395`，每条都读了本体，不是"门禁没红"）
+
+| 红线 | 读数 | 取证落点 |
+|---|---|---|
+| ① AI 类型上产不出 op | `AiSuggestion` 只有 `feature / text / destination / toolCalls`，**没有** `OpType`/`entityId`/向量时钟 | `packages/ai/src/provider.ts:128-142`（先确认声明找得到，再谈"命中 0"） |
+| ② 写只能出自确认函数 | 内置路径 `.submit(` 一处，且在 `confirmAiToolProposal()` 之内 | `packages/app-host/src/ai-tool-run.ts:195`（声明在 `:191`）；入站那一处见 15.1 |
+| ③ 逐工具默认关 | `isToolGranted` 的实现是 `grants?.[toolName] === true` ⇒ 缺省/`undefined` 一律 **false**（fail-closed 住在被调方本体里） | `packages/local-api/src/tools.ts:337-339` |
+| ④ 出境逐字段披露 | `egressFields: readonly string[]` **没有 `?`** ⇒ 类型上必填；每个工具包都带了（`task.ts` 6 处、`note.ts` 4 处、`tag.ts` 3 处…） | `packages/local-api/src/tools/shared.ts:49` |
+| ⑤ 回退不跨越隐私边界 | `fallback-needs-consent` 仍是**独立的失败原因**（不计入端点健康、不自动换目的地） | `packages/ai/src/routing.ts:289/339/375`、`provider.ts:166` |
+| 不开托管 AI | `describeRetention('heyta-cloud') === undefined` ⇒ `assertEnableable()` 继续抛 | 门禁原样打印这条：`pnpm check:ai-coverage`（rc=0） |
+| 不 bump schema | `CURRENT_SCHEMA_VERSION = 1`；且 `origin/main...HEAD` 里**零个** `shared-schema` 或 `server/prisma/migrations` 文件 | `packages/shared-schema/src/schema-version.ts:36` + `git diff --name-only origin/main...HEAD` |
+
+覆盖面门禁在同一条载体上的完整读数：`5 个 AI 功能全部端到端可达`、
+**实体覆盖面 8/8、已登记缺口 0 项**、`目录 22 个工具 ≤ 每实体 5 × 分母 8 = 40 席（已用 22，剩 18）`。
+⚠️ 这些是**这一趟**的读数，不是长期基线 —— 抄进别的文档时请带上载体号（§14 那条教训）。
