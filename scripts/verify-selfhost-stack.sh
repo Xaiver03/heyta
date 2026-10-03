@@ -166,6 +166,7 @@ if [ "$BUILD" = "1" ]; then
   # 构建上下文 = 仓库根（与 docker-compose.build.yml 的 context: .. 一致）。
   DOCKER_BUILDKIT=1 docker build -f server/Dockerfile \
     --build-arg VCS_REF="$(git rev-parse HEAD)" \
+    ${NODE_IMAGE:+--build-arg NODE_IMAGE=$NODE_IMAGE} \
     ${APK_MIRROR:+--build-arg APK_MIRROR=$APK_MIRROR} \
     ${NPM_REGISTRY:+--build-arg NPM_REGISTRY=$NPM_REGISTRY} \
     -t "$IMAGE" . >/tmp/heyta-selfhost-image.log 2>&1 || {
