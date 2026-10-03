@@ -3811,3 +3811,26 @@ ArgumentError - path name contains null byte
 
     ✅ 修法：提交完把**同一段纯追加回磁盘**（判据：磁盘里没这段才追加 ⇒ 幂等），
     并给"追加后磁盘段落计数 +1"留一行打印。台账类文件的收尾动作有两个，不是"落 commit"一个。
+
+157. 🔴 **gitignored 的配置把测试依赖长期遮住 ⇒ "开发机上全绿"被当成"这条链是绿的"，而 CI 的唯一形态是干净检出。**
+
+    `pnpm -r test` 在**干净检出**上必红：4 个 server spec 在加载期抛
+    `JWT_SECRET environment variable is required`（`src/auth.ts:48` 的 `getJwtSecret()` 跑在**模块顶层**），
+    而开发机上有 `server/.env` 兜着（`server/.gitignore:5` 忽略它）—— 所以主工作树**永远量不到**这条红。
+    我第一轮就把它记成"取证环境缺配置，不是产品红"，**那句定性是错的**：
+    链在干净检出上必红就是链的缺陷，"我这台机器是绿的"不构成排除证据。
+
+    ✅ 修法不是给 CI 造一份 `.env`，而是**跟上仓库自己已有的约定**：需要令牌的 spec 各自用
+    `vi.hoisted(() => { process.env.JWT_SECRET ??= '<测试密钥>' })` 在 import 之前放好
+    （`password-recovery` / `magic-link-registration` / `replace-token-expiry` 早就这么写）。
+    这 4 个文件只是没跟上。用 `??=` 而不是 `=`：自己显式设过值的 spec 不被覆盖。
+
+    🔴 **两个必须一起做的动作，否则这条修法没有牙齿**：
+    1. **在干净检出上量**（本机就是 `/tmp` 那棵 detached 克隆）：4 文件 43 条 `rc=0`，
+       整段 `pnpm -r test` 从红变 **exit 0**（server 107 文件 / 2048 passed）；
+    2. **变异**：把其中一个文件退回提交态（没有那个块）再跑 ⇒ **1 failed**、报回原错。
+       没有第 2 步，"补了个 fixture"和"补了个装饰"在输出上长得一样。
+
+    📌 一般规律：**凡是"只在开发机成立"的输入（gitignored env、本机 hosts、已启动的服务、
+    装好的全局 CLI），它遮住的缺陷在 CI 上会以"加载期就红"的形态现形** —— 归因时先问
+    "这条结论是在哪种形态的树上量的"，再问"另一种形态上量过没有"。没量过就不许写"环境没问题"。
