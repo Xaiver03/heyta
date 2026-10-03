@@ -47,14 +47,21 @@
  *    `wait_laptop_has` / `heyta_e2e_ensure_account` / `$CLI sync` / `laptop()` 之一
  *    ⇒ 那句"本验收不需要联网"是假的：出口闸（`apps/mobile/src/privacy/consent-gate.ts`）
  *    会拦掉每一个请求，后面所有网络判据红在**闸门在正确地工作**上，读起来像产品坏了。
- *    六个点名本地按钮的脚本实测网络侧调用行数都是 0，所以这条零误报 ——
- *    它是白送的一条红线，用来拦住"以后往本地类脚本里加一条同步判据"那一刻。
+ *    六个点名本地按钮的脚本实测**代码行**（剥掉注释之后）网络侧调用都是 0，所以这条零误报 ——
+ *    ⚠️ 原始 `grep` 会数出 2 行（`sort-sheet:66-67` 那两句正是在解释"这三类调用是 0"），
+ *    那两条是注释不是调用，与判据 1 早先踩过的"命中文件头注释"是同一个形状。
+ *    这条因此是白送的红线，用来拦住"以后往本地类脚本里加一条同步判据"那一刻。
  *
  * 变异验证（五条各自实测会红，还原后复跑 RC=0）：
  * - A 从 `verify-mobile-auth.sh` 删掉 `handle_privacy_consent` 那一行 ⇒ 判据 1 报缺处置；
  * - B 往任意脚本里塞一份带 `input tap` 的 `dismiss_consent_xxx()` ⇒ 判据 2 报重复实现；
  * - C 把共享调用从 `dismiss_welcome_if_present()` 里摘出去 ⇒ 判据 0 红；
- * - D 删掉某个本地类脚本的 `CONSENT_GATE_PREFERRED=` ⇒ 判据 3 红（指名那个脚本）；
+ * - D 删掉 `verify-mobile-task-row.sh` 的 `CONSENT_GATE_PREFERRED=` ⇒ 判据 3 红（指名那个脚本）。
+ *   ⚠️ **判据 3 的前提是"自己按行首点名本地按钮 + 调 helper + 没设 pin"三样同时在场**，
+ *   实测有效覆盖面是 4 个（`reminder-ring` / `schedule` / `task-row` / `timeline`）；
+ *   `quadrant-fill` 与 `sort-sheet` 只有 pin、自己没有点名行 ⇒ 删掉它们的 pin **不会**红
+ *   （第一次注入就注在 `sort-sheet` 上、得到 RC=0，那不是判据没牙，是注错了对象），
+ *   那两条由判据 4 管。
  * - F 给某个本地类脚本加一行用不着的 `wait_laptop_has` ⇒ 判据 4 红（指名同一个脚本）。
  *
  * ⚠️ **本门禁自己前两跑是恒过的**，两次都是"判在不在"用了名字而不是形状：
@@ -176,13 +183,12 @@ for (const file of files) {
   // 却又调 `dismiss_welcome_if_present`，而没设 `CONSENT_GATE_PREFERRED` ——
   // 那么欢迎页 helper 内部那一次会按库的默认值点「同意并联网」，
   // **替这个脚本做了一个它明说不做的那个决定**。
-  // 2026-10-03 实测：把处置收进 lib 的同一轮就是这样差点改掉三条本地类验收的语义。
+  // 三样必须同时在场才谈得上矛盾：有效覆盖面与"只设 pin 的脚本归判据 4"见文件头「变异 D」那条。
   const namesLocalButton = new RegExp(`^\\s*${SHARED}\\s+"(只用本机|以后再说)"`, 'm').test(code);
   const pinsItsOwnChoice = /^\s*CONSENT_GATE_PREFERRED=/m.test(code);
   // 🔴 判据 4：点名了本地按钮（不授予联网）**却**在本脚本里用到了要出门的动作 ——
   // 那句"本验收不需要联网"就是假的，而它会连带把后面所有网络判据变成
-  // "闸门在正确地拦"那种红（看着像产品坏了）。六个点名本地按钮的脚本实测
-  // 网络侧调用行数都是 0（判据 4 因此零误报），所以这条红线是白送的。
+  // "闸门在正确地拦"那种红（看着像产品坏了）。零误报的依据见文件头「判据 4」。
   const pinsLocal = /^\s*CONSENT_GATE_PREFERRED=(?:"?(只用本机|以后再说)"?)/m.test(code);
   const needsNetwork = /\b(configure_sync_credentials|wait_laptop_has|heyta_e2e_ensure_account)\b|\$CLI sync|laptop\(\)/.test(code);
   if (pinsLocal && needsNetwork) {
