@@ -3339,3 +3339,31 @@ AGENTS §8 第 9 条禁止并行覆盖共享设备，所以停的是我自己那
 `~/scratch-heyta/reinstall-2236/ABORTED-mobile.txt`。中止后清掉了载体里那个未跟踪的
 `apps/mobile/android/.kotlin/`（它会被 `git ls-files -co` 当"未跟踪非忽略"送进 Windows 源码包）。
 
+## B62. 🔴 共享设备**没有锁**：起跑前的探测挡不住跑动中的撞车，因为 uninstall 在构建之后（2026-10-03 22:41 实测差点造成）
+
+**形状**：`reinstall-all.sh` 的 android 段是"先 gradle `assembleRelease`（5–8 分钟），
+**然后才** `adb uninstall` + `adb install`"。所以任何"起跑前探测到 `emulator-5554` 空闲"的闸门
+都只是在赌那几分钟里没人来 —— 而本仓那些 `verify-mobile-*.sh` **没有一把大家都认的锁**。
+今晚 22:41 就是这样：我 22:36 拿到连续两次干净采样才起跑，跑到 android 段构建期时，
+并行会话的 `verify-mobile-reminder-ring`（pid 50463）已经在**同一台设备**上活着，
+而它的 iOS 侧 verify 在这一小时内还**重启过一次**（57432 → 6809）。
+再往下就是我把别人正在验的那台设备 `adb uninstall` 掉（android 段的形状就写在
+`reinstall-all.sh:45` 那张表里：`adb uninstall → adb install`）。
+
+**这一条我不在 BLOCKED 里假装解决了**。今晚做的是把自己那段停掉（可恢复），
+并给下一次加了个**跑动中**的监视器（`~/scratch-heyta/heyta-reinstall-mobile.sh`：
+每 15s 查一次对端命中，命中就 kill 自己、记 `ENV-BUSY` / exit 3）。
+这只是我这一侧的自律，**不是锁**。
+
+**真正要的东西**（要人拍，因为要动的是别人那批脚本）：一把带 ttl 的认领锁，例如
+`/tmp/heyta-device-owner.<serial>` 里写 `pid + owner + ttl + started_at`，
+- 任何要动设备的脚本（`verify-mobile-*.sh`、`reinstall-all.sh` 的 android/ios 段、
+  `verify-multi-end` 之类）**起跑即认领、退出必释放**；
+- 认领不到就**响亮 exit 3**（环境无效），而不是等；
+- 锁的判据住进单一所有者（照 `scripts/lib/wait-for-quiet-host.sh` 那个形状），
+  否则就是"同一个判断写 N 遍"那份会漂的抄件。
+
+**关闭判据**：`grep -rl "heyta-device-owner" scripts/ | wc -l` ≥ 参与设备验收的脚本数，
+并且做一次**双向对照**：占住锁再跑任一脚本 ⇒ 它 exit 3；释放后 ⇒ 它起跑。
+（只验"能起跑"那一腿不够 —— 一条永不阻塞的锁比没有锁更误导人。）
+
