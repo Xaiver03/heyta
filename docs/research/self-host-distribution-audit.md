@@ -181,7 +181,7 @@
 | G-40⑤ | 无任何镜像发布流水线；`server/package.json` 是 1.0.0 而根包 0.0.0，无版本来源约定 | 🟡 **流水线那半已落（只写不推，§8.14 前后），版本来源这半未关**。现量（2026-10-04）：根 `0.0.0` / `apps/landing` `0.0.0` / `apps/web` `0.0.0` / `@heyta/sync-server` **`1.0.0`** ⇒ 仍然没有一个"客户端与镜像共同钉住"的版本来源。🔴 这条现在多了一条来自 G-44 的约束：版本来源不仅要存在，还要与 `MIN_CHECKPOINT_SAFE_APP_VERSION`（`18.21.2`，Super Productivity 的版本空间）**同空间**，否则补了生产者也永远判不出"新客户端"。已写进 `server/README.md` 前置条件第 1 条 |
 | G-40⑥ | 服务端无版本兼容/支持矩阵政策（行业一致形态见 §4 第 4 条） | **未关**，而且是**有意的不写**。矩阵不存在（全仓没有"支持 N-1 / 同 major"的表），触发条件三处互相指得到：`server/README.md` 三条前置（版本来源同空间 / 客户端有真 full-state 生产者 / 有东西消费那个闸门）、G-44 的重分类、以及"第一枚镜像发布时 ⑤ 与 G-44 必须同时落地"。本批没有让这条更接近 |
 | G-40⑦ | 镜像生产依赖由 `npm install` 安装，许可证门禁扫的是 pnpm store | **已证实：不是同一棵树**，差 16/143 条（2 个 name 门禁从没见过，含 Alpine 实际装的那枚原生二进制；14 条同名不同版本）。现量与对账见 §8.8；`pnpm check:image-license` 已挂进 `pnpm check`。**闭合（把树钉住）另立 G-47** |
-| G-40⑧ | 公开仓库里含内部主机 SSH 别名与公网 IP，且被落地页直链的文档带出 | 政策问题，要与 `AGENTS.md`/`deployment.md` 同批判 |
+| G-40⑧ | 公开仓库里含内部主机 SSH 别名与公网 IP，且被落地页直链的文档带出 | 🟡 **06:1x 把这一条的两个命题拆开量了（读数在 §8.54）**：后半句**已实测为 0** —— 发布产物 `apps/landing/dist` 95 个文件里三个 needle 全不命中，把它断掉的是 G-40③（链接改成与页面同一次构建的站内页面）。前半句**仍在**且前提这次是量出来的（未认证 API 回 `private=false`）：`origin/main` 上 `ubuntu-jcli` 20 文件 121 行、`windows-pc` 36 文件 97 行、那枚公网 IP 22 文件 57 行。真凭证逐行读过 = **0 处**（PEM 形状只剩两枚测试夹具，`JWT_SECRET`/`DATABASE_URL` 全是变量引用或占位符，`debug.keystore` 按约定就是公开物）。⇒ 剩下的这一半是**运维政策决定**（脱敏 / 转私有 / 接受）且落点含本批禁改的 `AGENTS.md`，本批只把数与复量命令钉住 |
 
 ### G-40①② 的落盘改法（中英各一条，可直接抄）
 
@@ -3290,6 +3290,53 @@ docker run --rm --entrypoint sh supersync:selfhost-verify -c \
 **main 的推进速率**（决定"要不要提前重算载体"的现量）：`030f0969` 05:49:26 → `70ee6868` 06:05:10 →
 `05be4729` 06:06:11 —— 最后两笔相隔 **61 秒**。任何"现在算好的 SHA"到落地那一刻必然过期，
 所以等待器**只做检测**，绝不在窗口里自动跑 `pnpm check`（`check:ai-e2e` 的前置会 SIGKILL 别人在 4318/4319/3000 上的 dev server）。
+
+### 8.54 G-40⑧ 拆成两半：公开页面那一半实测为 0 可以关，仓库那一半量清了但不是本批能改的（06:1x）
+
+登记原文是「公开仓库里含内部主机 SSH 别名与公网 IP，**且被落地页直链的文档带出**」——一句话里两个命题，
+这一轮分开量，结论一个是"可以关"、一个是"确认还在但不是代码问题"。
+
+**先证那个前提**（登记时是继承来的，不是量出来的）：未认证 `GET https://api.github.com/repos/Xaiver03/heyta`
+⇒ `HTTP=200`、`private=false`、`visibility=public`。**仓库确实公开**，这条前提成立。
+
+| 载体 | 取法 | 读数 | 判定 |
+|---|---|---|---|
+| **对外发布的那份产物**（落地页与文档站） | `apps/landing/dist` 共 **95** 个文件，三个 needle 各 `grep -rl` | `ubuntu-jcli` / `windows-pc` / 那个公网 IP **命中 0 文件** | ✅ **那半句"被落地页直链的文档带出"可以关** —— 关掉它的是 G-40③（链接从 `blob/main/<runbook>` 改成与页面同一次构建的站内 `/docs/selfhost/`），当时按"少一个 404"做的，顺带把这条披露路径也断了 |
+| **公开的那棵树**（`origin/main`，落后本地 main **76 笔**） | `git grep -l/-h -E <needle> origin/main` | `ubuntu-jcli` **20 文件 / 121 行**；`windows-pc` **36 / 97**；公网 IP **22 / 57** | 🔴 **这半句仍在**，且它是**政策决定不是缺陷** |
+
+🔴 **载体必须写成 `origin/main`，不能写成本分支**：我第一版顺手在分支树上量，得到 57 个文件 —— 那既不是公开的那棵树
+（推上去的内容少 76 笔），也不是任何对外可读的对象。**"仓库里有没有"问的是 `ls-tree`，"公开仓库泄露了什么"问的是远端那棵树**。
+
+**"有没有真凭证"这一问是逐行读过回答的，不是靠命中数**（这条纪律在别处叫"needle 命中数不等于违规，要逐行看真值形态"）：
+
+- 高风险形态（PEM 头 / `PASSPHRASE=` / `Bearer <长串>`）在公开树上只剩 **2 行**，两行都是测试夹具
+  （`WX_PRIVATE_KEY: '-----BEGIN PRIVATE KEY-----\nFAKE\n...'`、`pem = '…\nABC\n…'`）。
+- 凭证类文件名 6 枚，逐一看过：`debug.keystore`（Android **调试**密钥，按约定就是公开物）、
+  `generate-release-keystore.sh`（只 echo 变量名，不 echo 值）、`.xcode.env`、两个源码里的 Keystore 桥、一个迁移脚本。
+- 所有 `JWT_SECRET=` / `DATABASE_URL=postgresql://…` 命中全是**变量引用、占位符或 compose 的 `${}`**，没有一处内联真值。
+- 唯一一处真字面量是 `server/Dockerfile.test:56` 那个固定 e2e secret，而**没有任何构建路径用它**
+  （`docker-compose.build.yml:18` 与 workflow `:182` 都是 `server/Dockerfile`）⇒ 它是死重量，
+  且**早就在别人的清理清单上**（`docs/runbooks/finlaw-cleanup-candidates.md:303`）—— 所以这里只引不重复登记。
+
+**剩下那半句的归属**：内部主机别名 + 公网 IP 要不要脱敏（或把仓库转私有、或接受）是一个**运维/安全政策决定**，
+而它的落点包含 `AGENTS.md` 与 `docs/runbooks/deployment.md` —— 都在本批的禁改区里
+（硬约束"不碰 `AGENTS.md` 规则段"）。所以这一条的状态是「**已量化到行、已定载体、待负责人拍板**」，
+不是"待办"也不是"已处理"。复量只要一行：
+
+```sh
+git fetch origin main
+for n in ubuntu-jcli windows-pc '124\.223\.13\.226'; do
+  printf '%-22s 文件=%s 行=%s\n' "$n" \
+    "$(git grep -l -E "$n" origin/main | wc -l | tr -d ' ')" \
+    "$(git grep -h -E "$n" origin/main | wc -l | tr -d ' ')"
+done
+# 公开产物那一侧（期望恒为 0）：
+grep -rl -E 'ubuntu-jcli|windows-pc|124\.223\.13\.226' apps/landing/dist | wc -l
+```
+
+⚠️ 一条不要把这条读大的话：**公网 IP 本身不是秘密**（`heyta.waytofuture.cn` 公开解析到它，任何人都查得到）。
+这条的实际披露内容是**"那台机器用什么登录用户名、跑着哪些容器、另一台打包机叫什么"**这类内部拓扑 ——
+它降低的是攻击者的侦察成本，不构成凭证泄露。按这个严重度拍板，比按"泄露 IP 了"三个字拍板更接近事实。
 
 ### 8.53 G-51 欠的那半个正面读数：配方已在仓内，但它那条读数没有载体，只能当方法用（06:1x）
 
