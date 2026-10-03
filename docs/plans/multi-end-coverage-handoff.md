@@ -333,8 +333,23 @@ bash scripts/verify-mobile-window-gate.sh --target c   # 移动端设备验收�
    十条非绿**逐条读过原文**才归因：九条属别线（`ui-provider` / `theme` / `selection-single-source` /
    `ui-language` / `legal-permissions` / `image-license` / `crosslang-contract`(134) / `shell-unicode` /
    `-r test` 里倒数日与调休那两枚），第十条是**我的**那份未提交 spec 里一个反引号写成了单引号。
-   完整读数与为此新补的两道门（**2a** dist 门、**1b** 内存锁门，都做过阳性对照）记在 Goal 台账 §7.30 的 ② 那一条，
-   这里留作**第二住处**（一段文档的存活期取决于还有谁持有旧副本）。
+   完整读数记在 Goal 台账 §7.30 的 ② 那一条，这里留作**第二住处**（一段文档的存活期取决于还有谁持有旧副本）。
+   🔴 **这一趟之后启动器 `/tmp/heyta-run-checks.sh` 补了四道门**（每一条都是被现量照出来的，不是预防性加戏）：
+   - **1b 内存锁门**：`/tmp/tfa-test.lock` 是**本机内存闸门的 pid 文件**，读 pid → `ps -p` 活着即 `exit 3`，
+     并把**它的命令行**一起打印 —— 拒绝语里带着持锁者的命令，等于免费拿到一条归因读数（上一条 §5-2 那次
+     `CHECK_EXIT=1` 就是靠它认出 pid 34659 是另一条会话的 `verify:handoff:prod`）。逃生门 `HEYTA_TFA_OK=1`。
+   - **2a dist 门**：三段 e2e 的 webServer 是 vite，而 vite 解析 `@heyta/ui` 读的是 `packages/*/dist` ——
+     隔离载体默认没构建 ⇒ 症状是 `Failed to resolve entry for package "@heyta/ui"`，
+     读起来像产品坏了，实际是**载体不全**。现在缺 dist 就先 `timeout 900 pnpm -r build`，补不上 `exit 3`。
+     ⚠️ **这条谓词第一次写出来永远不触发**，被一正一反两枚夹具抓出两个缺陷：① `require(相对路径)` 被 Node
+     当**模块名**解析（改成 `readFileSync` + `JSON.parse`，且不再 `2>/dev/null` 吞掉报错）；
+     ② 判据写的是 `/build/.test(...)`，任何含 `build` 子串的脚本名都会命中。真实载体读数：有 build 脚本的包 **14** 个、MISS 为空。
+   - **第 3 步前的端口复量**：端口门在 1b/2a 之前过一次，而 2a 那次构建可能跑上十几分钟 ——
+     两道门之间别人把 4318/4319/4320 占了，就会拿一条带 SIGKILL 前置的链去踩（traps #87）。
+     现在**起跑前再量一次**，busy 就整段不起（`CHECK_EXIT=skip` + `SEG … rc=SKIP-PORTS`），
+     且**不打印上一趟的日志尾部**（那会让人把旧读数当本轮的）。两臂对照做过：占住 4399 ⇒ `DECISION=SKIP`，全空 ⇒ `DECISION=RUN`。
+   - **三处 `curl` 全加 `--noproxy '*'`**：这台机器的代理会把对回环端口的探测变成另一种东西
+     （§7 里 fake-ip 那一族的同源问题），去掉代理之后"空闲/被占"才是端口自己的读数。
    🔴 **起跑前必须 `4318/4319/4320` 三个端口空闲**，因为 `check:ai-e2e` 的前置会对它们发 SIGKILL（traps #87）
    —— 启动器把这一步做成硬门：只要有一个是 busy 就 **exit 3 不跑**，绝不为凑自己的读数杀掉别人的 dev server。
    00:5x 现量：三个端口 + `:3000` **全部空闲**（`:3000` 上那台旧构建已经退场）。
@@ -349,7 +364,7 @@ bash scripts/verify-mobile-window-gate.sh --target c   # 移动端设备验收�
    所以启动器现在给**两条分开报的读数**，不许互相冒充：
    ① **整条 `pnpm check` 的 exit code**（回答"链绿不绿"）；
    ② 断了才跑的**逐段表** `/tmp/check-seg-by-seg.log`（回答"每一段在自己的读数下过不过"），
-   段名/段序从 `package.json` 的 `scripts.check` 现取（**63**，抄数字一定漂）。
+   段名/段序从 `package.json` 的 `scripts.check` 现取（**02:0x 那次现取 = 63；02:3x 现取 = 74**，抄数字一定漂）。
    逐段表里三条 e2e 段**起跑前重查一次端口**，busy 就记 `rc=SKIP-PORTS` 并**跳过** ——
    既不冒充"过"，也不冒充"红"（为了凑自己的段数去杀别人的 dev server 是 traps #87 那个动作，不做）。
    记账闭合判据（02:0x 用假命令离线验过，不执行真段）：`PASS + FAIL + SKIP == 总数 63`，
