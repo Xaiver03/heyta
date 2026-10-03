@@ -407,29 +407,6 @@ export const PRICING_COMPARE_ROWS: readonly CompareRow[] = [
 ];
 
 /**
- * `/signin` 的两种登录方式。
- *
- * ⚠️ 这一页是**跳板**，不是表单（依据 D5）：认证 UI 在应用里，因为它要用的
- * 服务端地址就是同步设置里那个地址 —— 在这里再放一套表单会出现
- * "对着 A 登录、令牌存到 B"的错位。
- */
-export interface SigninMethod {
-  readonly titleKey: MessageKey;
-  readonly bodyKey: MessageKey;
-}
-
-export const SIGNIN_METHODS: readonly SigninMethod[] = [
-  {
-    titleKey: 'site.signin.method.passkey.title',
-    bodyKey: 'site.signin.method.passkey.body',
-  },
-  {
-    titleKey: 'site.signin.method.magic.title',
-    bodyKey: 'site.signin.method.magic.body',
-  },
-];
-
-/**
  * `/changelog` 的条目。
  *
  * 🔴 日期**不进词条表**：它是与语言无关的数据，而放进两张表里就多了一处

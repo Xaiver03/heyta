@@ -243,7 +243,10 @@ const DOCS_ENTRIES: Record<DocsArticleId, DocsEntry> = {
         ],
       },
       {
-        id: 'no-password',
+        // 🔴 这一节过去叫 `no-password`。它管的是"三条登录方式"，而产品的主路
+        // 恰恰是邮箱 + 口令 —— 于是**锚点本身**在对访客说一件不成立的事
+        // （它出现在 URL 和目录里）。2026-10-03 改成中性名。
+        id: 'ways-to-sign-in',
         titleKey: 'site.docs.account.s2',
         bodyKeys: ['site.docs.account.s2p1'],
         itemKeys: [
@@ -261,6 +264,13 @@ const DOCS_ENTRIES: Record<DocsArticleId, DocsEntry> = {
         id: 'whose-terms',
         titleKey: 'site.docs.account.s4',
         bodyKeys: ['site.docs.account.s4p1'],
+      },
+      {
+        // 从站点 `/signin` 那一页搬进来的（2026-10-03）：那里只留能点的出口，
+        // "为什么登录不在网站上"是一段**说明**，说明的归处是文档中心。
+        id: 'why-in-app',
+        titleKey: 'site.docs.account.s5',
+        bodyKeys: ['site.docs.account.s5p1'],
       },
     ],
   },

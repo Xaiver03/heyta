@@ -749,3 +749,89 @@ successfully applied`，`caddy` / `supersync` / `postgres` 三个都 `healthy`�
   我们自己的 `heyta.waytofuture.cn` 仍是旧容器 + 宿主 nginx 挂 `/app/`（那条 301 就是 nginx 给的）。
 - `apps/web` 的 PWA / 挂载参数改动同样没上生产。
 - 站内那篇指南文章现在是**对外部署文档**了，而它不在入口命令对账门禁的扫描集里 ⇒ **G-49**。
+
+### 8.14 🔴 产品负责人实测的第二条：**点「登录」先读到一段说明**，而那段说明里有三句话是错的
+
+原话：「点击登录怎么不直接进入到登录界面？而是出来这么一段说明文字。这段说明文字
+不应该在帮助里面吗？不应该在文档中心里面吗？」
+
+查下去是**两层**问题，第二层比第一层贵。
+
+**第一层（入口指错了）**：导航那个「登录」落在站内 `/signin/`，而那一页第一屏是
+两张方式卡 + 两节解释 + 一条 ⚠️ 注脚。想进去的人先被安排读一篇关于进去的文章。
+
+**第二层（对外说错话）**：那页的正文与词条表里有四条断言与产品不符 ——
+
+| 撤掉的对外断言（`packages/i18n` 的键） | 与它冲突的真凭据 |
+|---|---|
+| `site.signin.lede`：「账号只有两种进入方式，没有密码」 | `packages/app-host/src/hosted-auth.ts:131-135` 四条口令端点（`passwordForgot/Reset/Change/Set`），`:304` 的 `password-locked` |
+| `site.signin.noPassword`：「⚠️ 为什么没有『邮箱 + 密码』」 | 同上 —— 这不是"我们选择不做"，是**已经做了**的功能被写成不做 |
+| `site.signin.method.passkey.*` / `method.magic.*`（两张卡只列两条路） | `site.docs.account.s2` 自己就写着「三条登录方式，邮箱 + 口令是主路」—— **同一站点两页互相打脸** |
+| `site.signin.seo.description`：「支持通行密钥与邮件登录链接两种方式」 | 这条进的是搜索引擎与分享卡片，是对外最广的一层 |
+
+🔴 顺带纠掉两条同源错话：`site.docs.account.sum` 也写着「没有密码可记、也没有密码可撞」；
+`site.help.a.passkey` 与 `site.docs.account.s2i3` 把应用内的登录面板称作「**登录页**」——
+在站点也有 `/signin` 之后，那个称谓会把访客指到网站上去（真控件是 `web.auth.recovery.request`）。
+
+**为什么没有"就地补一张登录表单"**：认证 UI 必须在应用里（地址与令牌同源，否则
+"对着 A 登录、令牌存到 B"），这条不变。**变的是入口，不是认证住在哪。**
+
+落地：
+
+- 深链 `?signin`：`apps/web/src/lib/auth-deep-link.ts`（新增）+ `App.tsx` 挂载时读一次。
+  消化点在**壳**不在 `AuthPanel` —— 面板自己读的那个参数（`?invite=`）是"开着之后"的
+  字段初值，而"该不该开"的状态住在 store（`signInOpen`）。
+- 落地页侧 `signInHref(locale)`（`apps/landing/src/lib/app-url.ts`）：配了 `VITE_APP_URL`
+  才给外链，**没配就退回站内那一页**（不猜地址那条纪律没动）。
+- `/signin` 只剩出口：主行动 + （配了应用时）找回通行密钥 + 一条去文档中心的链接。
+  解释搬进 `site.docs.account.s5` / `s5p1`，挂在文档中心那篇文章的第五节。
+- `docs.ts` 里 s2 那一节的 **id 从 `no-password` 改成 `ways-to-sign-in`**：锚点出现在
+  URL 与目录里，而那一节讲的主路就是邮箱 + 口令 —— 锚点本身在对访客说不成立的话。
+
+**判据（11 条注入臂，全部实测红）**：`apps/web/tests/auth-deep-link.spec.tsx` 5 条
+（挂**完整 `<App />`**，判据是屏幕上出现 `auth-form-email`，不只看 store 字段）、
+`apps/landing/tests/app-url.spec.ts` 3 条、`render.spec.tsx` 新增 3 条
+（薄页结构、跨包字面量漂移、文档第五节真的挂上）。变异臂与读数：
+
+| 臂 | 注入的错 | 红在哪 |
+|---|---|---|
+| W1 | 删掉 `App.tsx` 那段 effect | web 4 failed / 1 passed |
+| W2 | 「有这个意图」改成「值必须等于 `1`」 | web 1 failed（裸 `?signin` 那条） |
+| W3 | 应用侧把参数改名 `login` | landing 1 failed（跨包抄件对账） |
+| L1 | 导航「登录」退回站内那一页 | landing 2 failed |
+| L2 | 把一节说明搬回 `/signin` | landing 1 failed |
+| L3 | 去掉去文档中心的链接 | landing 1 failed |
+| L4 | 落地页不加那个参数 | app-url 2 failed |
+| L5 | 词条加了、`docs.ts` 忘了挂那一节 | landing 1 failed（**"只进字典没接线"那一族**） |
+| L6 | 页头那颗应用入口消失 | landing 1 failed |
+| A1 | 薄页正文里一条链接都不剩 | public-copy-register 2 failed |
+| A3 | 摘掉薄页的 `PageHead`（只剩出口、没有标题） | public-copy-register 2 failed |
+
+🔴 **A2 那条臂是我自己写的第一个版本的判据没有牙，实测出来的**：薄页豁免的第一版
+断言"页面渲染的引言 = 注册表 `ledeKey` 的词条值"，而**两个读数都来自注册表** ——
+把 `ledeKey` 指到别的键时两边**一起变**，175 条全绿。改成结构性两条腿（正文里有
+非空 `<h1>` + 有可点的出口）之后 A1/A3 才会红。同一条教训第二次进这本账：
+**自指的对账只证明"两处抄得一样"，不证明"抄对了"。**
+
+**顺带清掉的一处"看起来在跑其实没跑"**：`public-copy-register.spec.tsx` 的断言 A
+（每页 × 每语言渲染文本 >500 字）原本对每一页一视同仁，纯出口页会被它读成"观测面塌了"。
+没有整体调低阈值（那会让真空壳页溜过去），改成**登记薄页 + 薄页自检两条腿**，
+理由与两条腿各对应什么事故写在代码注释里。
+
+**现量读数（这一轮）**：landing `1312 passed`（22 文件）、web `1507 passed | 12 skipped`、
+i18n `22 passed`；`check:entries` 75 份一致、`check:ui-language`（zh/en 各 2826 条）、
+`check:docs-voice`（site.* 1018 条零命中）、`check:layering`（9 条规则）、
+`check:claims`、`check:design`、`check:l4`、`check:reachability`、`check:docs`、
+`check:gate-wiring`（63 道定义 / 66 段链引用）全绿。
+
+🔴 **这一轮我自己造的一次事故（已还原，但过程要留）**：新建 web 侧测试时用了
+`signin-entry.spec.tsx` 这个文件名 —— 它**已经存在**，是判据 J1（头像 → 身份菜单那 8 条）。
+`Write` 直接把它整个覆盖了。发现是因为 `git status` 里出现了一行 `M apps/web/tests/...`
+而我以为那是新文件；立刻 `git checkout --` 还原，新测试改挂 `auth-deep-link.spec.tsx`
+（与它测的源文件同名，本来就该这样）。
+**成因**：我先跑的 `ls apps/web/tests | head -60`，目录比 60 行长，`s` 开头那一批
+被截断了 —— 于是"看过清单"给了我一个**假的空位**。
+**规矩**：新建文件之前用 `git cat-file -e HEAD:<路径>` 或**不限长度**的 `ls` 确认；
+`head -N` 的清单不构成"这里没有东西"的证据（与
+[`environment-traps.md`](../reference/environment-traps.md) 第 176 条同族：**读到的样本
+不等于被约束的集合**）。
