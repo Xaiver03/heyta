@@ -593,4 +593,128 @@ Node 实测 `'café'.normalize('NFC') === 'café'.normalize('NFD')` 为 **`false
 | 门禁 | `check:ui-language` / `check:layering` / `check:server-copy` / `check:server-design` / `check:design` / `check:crosslang-contract` / `check:journey-coverage` 全 OK；`check:docs` 红在 ADR-0044/0045 那两条线的未跟踪文档上，与本条线无关 |
 | 四端重装（隔离检出 @ HEAD，00:23–00:44） | `CHAIN_EXIT=0`：mac ✅ / windows ✅ / android ✅（1080x2400、内容 55.3%、主蓝 4036）/ ios ✅（1206x2622、内容 61.5%、主蓝 4136，且"已装的包比源码新"） |
 | `verify:password-web`（改完客户端之后**又跑了一遍**） | 2 passed / exit 0（真服务端 `TEST_MODE` 关 + 同源反代 + 从工作树重打的 `apps/web/dist`） |
-| 全量离线 e2e（同一批改动之后） | 96 passed / 2 skipped / **4 failed**。🔴 那 4 条**不是**本条线的：`admin-console.spec.ts` 抓的是别人在途的账号资料端点 `GET /api/account/profile` 没进假端点 —— 取证与闭口清单在 `BLOCKED.md` B14。（20:5x 那一跑同一条判据是 100 passed，差的就是那半件在途事。） |
+| 全量离线 e2e（同一批改动之后） | 96 passed / 2 skipped / **4 failed**。🔴 那 4 条**不是**本条线的：`admin-console.spec.ts` 抓的是别人在途的账号资料端点 `GET /api/account/profile` 没进假端点 —— 取证与闭口清单在 `BLOCKED.md` B14。（20:5x 那一跑同一条判据是 100 passed，差的就是那半件在途事。）
+
+## 13. 移动端那一层为什么整轮假红 —— 首启隐私同意面板（2026-10-03）
+
+> 🔴 **待入台账 `docs/reference/environment-traps.md`**：本节写作时那份台账正被另一条会话
+> 改着（工作树相对 HEAD `+31 -0`，#178/#179 是他们在飞的号），所以**不往它追加**，
+> 正文先落在这里。追加时的号**以现量 `max+1` 为准**（当时工作树最大号 = 179 ⇒ 本条应为 #180；
+> 若那两条之上又被占了号就顺延，别抢号）。
+
+### 13.1 症状与真因
+
+`verify-mobile-auth.sh` 2026-10-03 10:54–10:58 那一轮：**17 条 ❌ / 4 条 ✅**，
+其中 **11 条是"找不到输入框 / 取不到坐标 / 找不到按钮"**这一类。报出来的第一句是
+「冷启动第一屏没有『注册 / 登录』—— 入口不在第一屏」，读起来像产品把入口藏深了。
+
+真因一条都不在产品里：`apps/mobile/src/privacy/startup.ts` 在冷启动且"这台设备从没被问过"时
+弹一块首启隐私同意面板（标题「在使用联网功能之前」），而它是一块
+**`accessibilityViewIsModal` 的 RN Modal**（`apps/mobile/src/screens/PrivacyConsentSheet.tsx:196`）。
+它立着的时候，**欢迎页与主界面的节点根本不在无障碍树里** ——
+`uiautomator dump` 里只有那块面板的 9 行文字。第 0 步刚跑过 `pm clear`（= 全新设备 = 从没被问过），
+所以它必然在。
+
+这条面板是 2026-10-01 那把并行刀落地的（G-11「首启没征求过隐私同意」+ G-12「前台同步可能先于询问发请求」）。
+
+### 13.2 真正的问题不是"漏了一步"，是"处置有五份抄件"
+
+| 脚本 | 处置 | 按哪颗按钮 | 等面板吗 | 复验它走了吗 |
+|---|---|---|---|---|
+| `verify-mobile-inbox.sh:69` | 本地一份 | 同意并联网 → 只用本机 | 轮询 ≤10s | ❌ |
+| `verify-mobile-reminder-ring.sh:45` | 本地一份 | 只用本机 | 轮询 ≤10s | ❌ |
+| `verify-mobile-schedule.sh:51` | 本地一份 | 以后再说 → 只用本机 | 轮询 ≤10s | ❌ |
+| `verify-mobile-task-row.sh:85` | 本地一份 | 只用本机（**用按钮文字判面板在不在**） | ❌ 不等 | ❌ |
+| `verify-mobile-timeline.sh:65` | 本地一份 | 以后再说 → 只用本机 → text 第 2 匹配 | 轮询 ≤10s | ✅ 补点一次 |
+| `verify-mobile-auth.sh` | **谁也没抄到** | — | — | — |
+
+五份各不相同（等待、按钮、有没有复验），而第六个直接没有。
+`verify-mobile-task-row.sh` 的注释里写着当时为什么不进共享库 ——
+"这个功能还在另一条会话手里改，动 `lib/mobile-e2e.sh` 会撞车；将来它进了 lib，这段就该收掉"。
+**那句已经过期，而且它预言的后果到了**：没人回来收，于是新脚本抄不到。
+
+AGENTS §3.5 早就给过这条的形状（`ids.ts` / `createSyncClient` 那两次）：
+**抽取的收尾动作是删掉旧的那份并加门禁，不是写一个更好的新版本。**
+
+### 13.3 修法（四处，按上面那条纪律做完）
+
+1. **单一所有者**：`scripts/lib/mobile-e2e.sh` 新增 `handle_privacy_consent <按钮优先级…>`，
+   把五份抄件里**各自最好的那一片**收进来（timeline 的轮询等入场动画、
+   它的"按钮名在 content-desc 不在 text ⇒ `xy_text` 兜底要取第 2 个匹配"、
+   它的"点一次未必收下 ⇒ 复验还在就补点一次"）。
+   它自己**不碰 PASS/FAIL**，只置 `CONSENT_GATE_SEEN` / `CONSENT_GATE_CHOSEN` 给调用方断言 ——
+   "要不要把这次豁免算成一条检查"必须由脚本决定，不能由库替脚本决定。
+2. **五份抄件全部改成委托**（`inbox` / `reminder-ring` / `schedule` / `task-row` / `timeline`），
+   各自点名自己的按钮（本地类验收**不替用户做联网决定**：`只用本机` / `以后再说`）。
+3. **`dismiss_welcome_if_present` 第一件事就是收这块面板** —— 顺序就是屏幕上的顺序
+   （面板在上面）。这一改把剩下 15 个只调它的脚本一并救回来（它们全是
+   `pm clear` 之后靠无障碍树驱动界面的）。默认按钮 `同意并联网`，
+   要换的 `export CONSENT_GATE_PREFERRED=…`，理由与代价写在库的注释里。
+4. **把 J1 的豁免落成断言**（`verify-mobile-auth.sh` 新增 0.5 步）：
+   第 0 步刚 `pm clear`，所以「面板没出现」不是省一步，**是 G-11 那条要求的失败** ⇒
+   `CONSENT_GATE_SEEN` 必须 = 1。第 7 步再加一条：做过决定之后再冷启动**不许再问一遍**
+   （`startup.ts` 判的是 `undecided()`），并且**这条必须排在"欢迎页不许回来"之前** ——
+   面板盖屏时「先离线使用」读不到，那句会印成假绿。
+
+⚠️ 顺带纠正一处归因：`schedule` / `timeline` 的注释把"同意面板再弹一次"写成
+"首启两块屏**交替出现**、界面换序"。机制不是随机的 ——
+**选「以后再说」= 决定仍是没问过 ⇒ 下次冷启动或下次撞上门闸（`required-for-action`）必然再弹**。
+它们外面那圈 `settle_*` 循环处理的是这个后果。选「同意并联网」的脚本不会有这个现象。
+
+### 13.4 新门禁 `check:mobile-first-run-gate`，以及它自己第一跑就是一条恒过的判据
+
+三条判据（都已挂进 `pnpm check`，位置在 `check:script-snapshot` 之后 —— 同为"验收脚本自身结构"类）：
+
+| 判据 | 钉的事 |
+|---|---|
+| 0 | 共享实现在 `lib` 里**在**，且 `dismiss_welcome_if_present()` 里**真的还调着**它 —— 否则"调了欢迎页 helper 就算处置过"这条推定（覆盖 15 个脚本）会全部变成假绿，而门禁自己不会有任何反应 |
+| 1 | 凡 `pm clear` 之后靠无障碍树驱动界面的脚本，必须**调用**得到共享处置；输出逐条打印它是**怎么**成立的（直接调 / 经欢迎页 helper） |
+| 2 | 任何脚本里名字含 `consent` 的函数**不得**自己 `input tap` —— 那是第二份实现 |
+
+🔴 **它前两次都是恒过的**，两次都因为我判"在不在"用了名字而不是形状：
+
+1. 第一版把"驱动界面"写成 `(xy_desc|xy_text|…)\s*\(`，而 shell 里的调用是
+   `$(xy_desc "邮箱")` —— 名字后面跟的是空格和引号，**一个脚本都没被认出来**，
+   于是它打印「冷启动驱动界面 0 个」然后 ✅ 通过。
+2. 改完之后再跑变异 A（把 `auth` 的调用整行删掉）**仍然 RC=0**：
+   `src.includes('handle_privacy_consent')` 命中的是**脚本文件头里那句注释** ——
+   正是我为了让下一个人看懂为什么必须有它而写的那句话。
+   ⇒ 注释提到 ≠ 调用了。两处都改成"剥掉注释行 + 按行首调用形状匹配"。
+
+（§7 元规则二又添一种面目：**判据写错时最省事的通过方式，是让它什么都没看见**。）
+
+### 13.5 变异数字（三条各注入一次，还原后复跑）
+
+| 变异 | 结果 |
+|---|---|
+| A 拿掉 `verify-mobile-auth.sh` 的调用行 | **RC=1**，指名 `scripts/verify-mobile-auth.sh 冷启动后驱动界面，却没有任何一处走到隐私面板的共享处置` |
+| B 往 `verify-mobile-tags.sh` 塞一份带 `input tap` 的本地处置 | **RC=1**，指名 `scripts/verify-mobile-tags.sh:63 my_local_consent_handler() 自己点了按钮` |
+| C 把共享调用从 `dismiss_welcome_if_present()` 里摘出去 | **RC=1**，打的是判据 0（"这条推定现在不成立了"） |
+| 三份还原 | RC=0；`diff` 三份文件与注入前备份 = **0 行** |
+| 分母 | 扫描 21 个安卓验收脚本（排除 `-ios`：另一套无障碍技术），其中冷启动驱动界面 **21 个**，全部列出各自的成立方式 |
+
+### 13.6 顺带照出来的两件载体不新鲜（同一条纪律：远端字节 == 本地提交）
+
+- **盘上那枚 APK 是 03:21 打的**（md5 `f19dfadfcc8f1123cd36592720595bdd`），
+  而 `bb41e9fe`(07:16 `refactor(mobile-ui)`)、`ab13c22e`(09:38 `packages/ui`)、
+  `a29881e9`(09:44 合入倒数日批次一动了 `app-host`/`domain`/`op-log`)、
+  `bf271a1e`(10:55 i18n 词条) 全在它之后 ⇒ 直接跑就是"验旧产物报新结论"（§7 第 27 条）。
+  主检出的工作树正被别的会话的日历改动占着（`packages/ui/src/calendar/*`、
+  `packages/op-log/src/*` 等未提交），就地打会把别人的在飞源码混进包里，
+  所以在隔离检出 `/private/tmp/heyta-g8-clean` 上 `git checkout --detach f4fe87d2`、
+  断言**脏文件数 = 0** 之后重打：`md5 8a1d9654b397f3823d2bff0a0053238b`，11:18:29。
+  为此给 `verify-mobile-auth.sh` 加了 `HEYTA_APK` 覆盖点（沿用
+  `verify-mobile-quadrant-fill.sh:100` 已有口径，不改 lib 里那条共享路径）。
+- **两台在跑的服务端都比今天的 `server/src` 旧**：`:3000`（pid 87593，10-02 18:56，
+  `/api/account/legal-consent` → **404**）与 `:3100`（pid 58679，10-03 01:35 → 401）
+  都早于 `b055efc0` / `7e299118` / `ce23d3ab` 那三笔 `server/src` 改动。
+  本轮另起一台 `:3101`，跑隔离检出里 f4fe87d2 构建的 `server/dist`（已断言 dist 不比 src 旧），
+  用完即停 —— **不动别人的那两台**。
+  ⚠️ 起它的时候**没有把 `server/.env` 拷进 `/tmp`**：dotenv 读 `process.cwd()/.env`，
+  所以 cwd 用主检出的 `server/`、跑的产物用隔离检出那枚 dist —— 配置原位读，代码是 HEAD 的。
+
+### 13.7 这一轮的状态（写在这里，不靠记忆）
+
+设备那一跑**截至本节写作时还没跑成**：宿主机负载被另一个项目（litopia 的 gradle/OrbStack）
+顶到 17.9–180，验收链按 `≤12` 的窗口在等（等满即以"环境不成立"结束，不是产品失败）。
+**在它拿到真实读数之前，本节不写任何"移动端全绿"的结论。** |

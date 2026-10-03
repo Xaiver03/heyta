@@ -75,29 +75,19 @@ center_of() {
   awk -F'\t' '{ split($1, b, ","); printf "%d %d\n", (b[1]+b[3])/2, (b[2]+b[4])/2 }' <<< "$1"
 }
 
-# 首启的隐私同意页（2026-10-01 落地）盖在**所有屏之上**，共享 lib 的
+# 首启的隐私同意页（2026-10-01 落地）盖在**所有屏之上**，而当时共享 lib 的
 # `dismiss_welcome_if_present` 只认旧的欢迎页（「先离线使用」），对它一无所知 ——
 # 实测：不点掉的话后面每一次 `input tap` 都落在遮罩上，症状长得像"应用没起来"。
-# 这里走真实出口（点「只用本机」），**不往 SharedPreferences 塞值**：伪造的初始状态
-# 会让"首启用户看到的到底是什么"这件事永远验不到。
-# ⚠️ 写在**本脚本里**而不是共享 lib：这个功能还在另一条会话手里改，
-#    动 `lib/mobile-e2e.sh` 会撞车；将来它进了 lib，这段有存在性判断，重复执行不出事。
+# ⚠️ 这里原本写"处理只能留在本脚本里，动 `lib/mobile-e2e.sh` 会撞车（这个功能还在
+#    另一条会话手里改）"。**那句已经过期**：功能落地了，处理也收进了 lib 的
+#    `handle_privacy_consent`。留这句话是为了记下代价 —— 那五个"各抄一份"的脚本里，
+#    `verify-mobile-auth.sh` 谁也没抄到，2026-10-03 整轮假红就是这么来的。
 dismiss_privacy_consent_if_present() {
-  dump
-  if [ "$(has_text "只用本机")" != "1" ]; then
-    return 0
-  fi
-  local xy
-  xy=$(xy_text "只用本机")
-  [ -z "$xy" ] && xy=$(xy_desc "只用本机")
-  if [ -z "$xy" ]; then
-    bad "隐私同意页在，但取不到「只用本机」的坐标（文案改了？）"
-    return 1
-  fi
-  $ADB shell input tap $xy
-  sleep 3
-  echo "     已离开隐私同意页（点「只用本机」@ ${xy}）"
-  return 0
+  # 处理本身在 `lib/mobile-e2e.sh` 的 `handle_privacy_consent`（这段以前是本脚本自己
+  # 抄的一份，注释里写着"动 lib 会撞车，将来它进了 lib 这段就该收掉" —— 现在收了）。
+  # 🔴 走真实出口点「只用本机」，**不往 SharedPreferences 塞值**：伪造的初始状态
+  #    会让"首启用户看到的到底是什么"这件事永远验不到。
+  handle_privacy_consent "只用本机" "以后再说"
 }
 
 # 🔴 两条阈值都**从 token 推导**（§7 元规则二：不写魔法数字）。

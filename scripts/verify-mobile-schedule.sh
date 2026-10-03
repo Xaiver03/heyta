@@ -49,25 +49,10 @@ echo "  设备: $E2E_SERIAL"
 echo "  任务: $TITLE"
 
 dismiss_consent_if_present() {
-  local waited=0 xy label
-  while [ "$waited" -lt 10 ]; do
-    dump
-    [ "$(has_text "在使用联网功能之前")" = "1" ] && break
-    sleep 1
-    waited=$((waited + 1))
-  done
-  [ "$(has_text "在使用联网功能之前")" = "1" ] || return 0
-  xy=$(xy_desc "以后再说"); label="以后再说"
-  if [ -z "$xy" ]; then
-    xy=$(xy_desc "只用本机"); label="只用本机"
-  fi
-  if [ -z "$xy" ]; then
-    bad "同意面板在，但取不到按钮坐标"
-    return 1
-  fi
-  $ADB shell input tap $xy
-  sleep 2
-  echo "     已处理隐私同意面板（${label}）"
+  # 处理本身在 `lib/mobile-e2e.sh` 的 `handle_privacy_consent`。
+  # 🔴 本验收只看本地排期入口，**不替用户做联网决定** ⇒ 「以后再说」排第一位
+  #    （它是这条面板的合法出口之一：决定仍是"没问过"，闸门保持关闭）。
+  handle_privacy_consent "以后再说" "只用本机"
 }
 
 step "0. 装包并启动"

@@ -62,45 +62,12 @@ TITLE="tl-e2e-$(date +%H%M%S)"
 
 # 隐私同意面板（2026-10-01 并行刀新增的首启面板）：不点掉它，后面每一步
 # （建任务 / 切 chip）都被面板挡住，症状是"找不到控件"而不是"被面板挡了"。
+# 处理本身已收进 `lib/mobile-e2e.sh` 的 `handle_privacy_consent`（那三条实测形状
+# —— 入场动画延迟、按钮名在 content-desc 不在 text、点一次未必收下 —— 都在那一份里，
+# 原来五个脚本各抄一份，抄漏的那个整轮假红）。
 dismiss_consent_if_present() {
-  # 🔴 面板带入场动画**延迟出现**：dismiss 后立刻 dump 它往往还不在
-  # （上一轮就是这么漏掉的）。所以这里**轮询等它**出现（≤10s），处理后再验它走了。
-  local waited=0 xy label
-  while [ "$waited" -lt 10 ]; do
-    dump
-    [ "$(has_text "在使用联网功能之前")" = "1" ] && break
-    sleep 1
-    waited=$((waited + 1))
-  done
-  [ "$(has_text "在使用联网功能之前")" = "1" ] || return 0
-
-  # 🔴 按钮（Button）的可辨识名在 **content-desc** 上，不在 text 上（§7 #45 同族：
-  # desc/text 两张皮）—— xy_text 永远取不到它，还会误判成"按钮不存在"。
-  # 「只用本机」再退一层：正文 bullet 里也有同名 text，xy_text 必须取第 2 个匹配。
-  xy=$(xy_desc "以后再说"); label="以后再说"
-  if [ -z "$xy" ]; then
-    xy=$(xy_desc "只用本机"); label="只用本机"
-  fi
-  if [ -z "$xy" ]; then
-    xy=$(xy_text "只用本机" 1); label="只用本机（text 第 2 匹配）"
-  fi
-  if [ -z "$xy" ]; then
-    bad "同意面板在，但取不到按钮坐标（desc/text 都没命中）"
-    return 1
-  fi
-  $ADB shell input tap $xy
-  sleep 2
-  dump
-  if [ "$(has_text "在使用联网功能之前")" = "1" ]; then
-    xy=$(xy_desc "只用本机")
-    [ -z "$xy" ] && xy=$(xy_text "只用本机" 1)
-    if [ -n "$xy" ]; then
-      $ADB shell input tap $xy
-      sleep 2
-      echo "     面板还在：补点了一次按钮位"
-    fi
-  fi
-  echo "     已处理隐私同意面板（${label}，等了 $waited 秒）"
+  # 🔴 本验收只看本地时间线，不替用户做联网决定 ⇒ 「以后再说」排第一。
+  handle_privacy_consent "以后再说" "只用本机"
 }
 
 echo ""
