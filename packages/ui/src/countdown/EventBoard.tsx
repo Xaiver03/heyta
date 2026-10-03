@@ -607,9 +607,15 @@ function EventCardView({
           {labels.faceText(card.face, card.days)}
         </Text>
         <View style={styles.row}>
-          {card.nextDate !== undefined ? (
-            <Text style={[text['row-meta'], styles.meta]}>{labels.formatDate(card.nextDate)}</Text>
-          ) : null}
+          {/* 🔴 一次性且已过去的倒数日**没有"下一次"**（`nextDate` 是 undefined），
+              但那一天是这张卡唯一的事实 —— 只留"已经 31 天"而不说是哪一天，
+              用户就没法核对它到底记的是哪天。落回锚点日期，不是"没日期就不画"。 */}
+          <Text
+            style={[text['row-meta'], styles.meta]}
+            testID={`event-date-${card.id}`}
+          >
+            {labels.formatDate(card.nextDate ?? card.anchorDate)}
+          </Text>
           {card.ageDays !== undefined ? (
             <Text
               style={[text['row-meta'], styles.meta]}
