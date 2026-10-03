@@ -241,7 +241,7 @@ bash scripts/verify-mobile-window-gate.sh --target c   # 移动端设备验收�
 | 设备独占 | — | ❌ **有移动端验收在跑（pid 11584）** ← 修好的探针当场抓到的那条 `.snap` |
 | 模拟器 | ✅ 三台 booted（`heyta-iphone-17pro` / `heyta-ios-isolated` / `iPhone Duo heyta`） | ✅ `emulator-5554` 在线 |
 | 凭据三件套 | — | ✅ **都在**（不用再跑建号；旧账里"要先 fresh account"这条已过期） |
-| 服务端 | — | ⚠️ 闸门报 ✅（`:3000/health` 200），但那**不是够格的判据**：同一台 `:3000` 打 `/account/legal-consent` → **404** ⇒ 是旧构建 ⇒ §5-3 必须自己起 `:3100`（实测无连接）。详见 §5-3 |
+| 服务端 | — | ⚠️ 闸门报 ✅（`:3000/health` 200），但那**不是够格的判据**：~~同一台 `:3000` 打 `/account/legal-consent` → **404** ⇒ 是旧构建~~ ⇒ §5-3 必须自己起 `:3100`（实测无连接）。详见 §5-3。**22:5x 现量把中间那句否证了**：路由挂在 `/api` 前缀下（`server/src/api.ts:632`），所以不带 `/api` 时 `:3000` 与 `:3100` **都 404**、带 `/api` 时两台**都 401** —— 那条探针对两台机器没有分辨力，它区分的是路径写法不是构建新旧。判"旧服务端"改用工件时刻三元组（进程启动 vs `dist/src/index.js` mtime vs `server/src/**/*.ts` mtime），并已落成复用前的认证门 `certify_server_occupant()`（`14f8bbcd`，见原计划 §7.30 的 ③）。 |
 | APK 新鲜度 | — | ❌ **APK 比源码旧**（00:36:59 vs 00:49:01）⇒ 跑它验的是旧 bundle（§7 第 27 条） |
 | `reinstall-all.sh` 自身干净 | ✅ | — |
 
