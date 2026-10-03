@@ -42,7 +42,7 @@ import { readFileSync, writeFileSync, existsSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { readImageInstallShape } from './image-install-shape.mjs';
+import { readImageInstallShape, readServerInstallInput } from './image-install-shape.mjs';
 import { gateAllowsTarget, readImageLock } from './image-lock-platform.mjs';
 
 // ⚠️ 必须走 fileURLToPath：`new URL(...).pathname` 不解码百分号，而这个仓库的父目录名
@@ -176,7 +176,13 @@ for (const name of packedNames) {
 const INPUTS_BASE = {
   targetPlatform: TARGET,
   registry,
-  serverPackageJsonSha256: sha256(readFileSync(serverPkgPath, 'utf8')),
+  // 🔴 哈希的是「**能改变那棵树的字段**」，不是 `server/package.json` 整个文件的字节。
+  // 分区表与理由在 `image-install-shape.mjs` 的 `readServerInstallInput`（两个消费者共享那一份
+  // 判断）；`devDependencies` 的惰性是**有条件的**，条件由 `shape.prunesDevDependencies` 现读。
+  serverInstallInputSha256: readServerInstallInput({
+    serverPkgPath,
+    prunesDevDependencies: shape.prunesDevDependencies,
+  }).sha256,
   installShapeSha256: sha256(shape.normalizedShape),
   packedWorkspaceDeps: packedNames,
   packedPackageJsonSha256: packedPackageJson,
@@ -222,7 +228,8 @@ if (process.argv.includes('--check')) {
   const got = snap.inputs || {};
   const stale = [];
   const INPUT_LABEL = {
-    serverPackageJsonSha256: 'server/package.json',
+    serverInstallInputSha256:
+      'server/package.json 里**能改变那棵树**的那几档（分区表在 image-install-shape.mjs）',
     installShapeSha256: 'server/Dockerfile 生产阶段那几条 install 命令的形状',
     registry: 'install 命令里的 registry',
     targetPlatform: '目标平台',
@@ -247,6 +254,13 @@ if (process.argv.includes('--check')) {
         stale.push(`快照里有 ${rel} 的哈希，但当下已经没有这一枚本地包 —— 清单与现实漂移了`);
       }
     }
+  }
+  if (got.serverPackageJsonSha256 && !got.serverInstallInputSha256) {
+    stale.push(
+      '这份快照钉的还是**整个 `server/package.json` 的字节哈希**（旧键 `serverPackageJsonSha256`）—— ' +
+        '那一版把 `scripts` 这类不可能改变那棵树的改动也判成过期。新键 `serverInstallInputSha256` ' +
+        '按 `image-install-shape.mjs` 的字段分区取；重跑生成器就会换过来。',
+    );
   }
   if (stale.length > 0) {
     console.error(`❌ 镜像依赖快照已经不代表当下的声明（${stale.length} 处失真）：`);

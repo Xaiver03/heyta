@@ -282,8 +282,20 @@ COPY --from=builder --chown=supersync:nodejs /repo/packages/domain/heyta-domain-
 # ⚠️ `domain.tgz` 必须一起装：它自己还依赖 `@heyta/shared-schema`，
 # 而 `pnpm pack` 会把 domain 的 `workspace:*` 改写成真实版本号 ——
 # 所以两个 tarball 要在**同一条** `npm install` 里给，npm 才能就地满足它。
+#
+# 🔧 heyta 改动（G-54，2026-10-04）：`npm pkg delete devDependencies` 必须是**第一条 install 之前**的一步。
+# 这不是整洁，是**装不上**：npm 在 `--omit=dev` 下仍然会**解析** devDependencies 的每一枚 spec，
+# 而 main `b3397cda`（ADR-0050 密钥批次）往这里放了 `@heyta/app-host` / `@heyta/storage` /
+# `@heyta/sync-client` —— 这三枚只存在于本机 pnpm 工作区，registry 上没有 ⇒ 当场 404。
+# 实测（**与镜像同款** node:24-alpine / npm 11.19.0，两条 install 按本文件原样跑）：
+#   带着三枚 devDep ⇒ 第一条就 `code E404 … GET …/@heyta%2fapp-host`，rc=1；
+#   先删 devDependencies ⇒ 同样两条 rc=0（`added 4 packages`）。
+# 删掉它**不改变装出来的东西**（`--omit=dev` 本来就不装 dev 包；`prisma` CLI 仍然由下面
+# 那条点名的 `npm install prisma@5.22.0` 供给），只改变"这层能不能建成"。
+# 谁把这一步摘掉或挪到 install 之后，`check:image-license` 的第 5 步会点名到这里。
 ARG NPM_REGISTRY=https://registry.npmjs.org/
-RUN npm install ./sync-core.tgz ./shared-schema.tgz ./domain.tgz --registry="$NPM_REGISTRY" --ignore-scripts --omit=dev && \
+RUN npm pkg delete devDependencies && \
+    npm install ./sync-core.tgz ./shared-schema.tgz ./domain.tgz --registry="$NPM_REGISTRY" --ignore-scripts --omit=dev && \
     npm install --registry="$NPM_REGISTRY" --ignore-scripts --omit=dev && \
     npm install prisma@5.22.0 --registry="$NPM_REGISTRY" --ignore-scripts --omit=dev && \
     npx prisma generate && \
