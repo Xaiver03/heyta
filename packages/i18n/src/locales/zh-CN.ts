@@ -3893,8 +3893,6 @@ export const zhCN = {
   'common.calendar.dayAllDayEmpty': '「全天」里还没有任务；定到具体时刻的在下面那条轴上。',
   // 日历格子里的「休 / 班」（W4b 公共事实）。同一份词表既当可见字符也当读屏名 ——
   // `calendarDayMarkerView` 里 `spoken` 直接取它，所以英文侧必须是能念出来的词，不能是符号。
-  'common.calendar.dayMarker.off': '休',
-  'common.calendar.dayMarker.work': '班',
 
   // ─────────────────────────────────────────────────────────────
   // 提醒（B1-1 的界面层；web 与 mobile 共用同一批词条）

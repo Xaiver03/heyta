@@ -75,9 +75,6 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useI18n } from '@heyta/i18n';
 import { avatarInitialFromEmail } from '@heyta/shared-schema';
 import { placeAnchoredPanel } from '@heyta/ui';
-import { placeAnchoredPanel } from '@heyta/ui';
-
-import { avatarInitialFromEmail } from '@heyta/shared-schema';
 import { CircleUser, LogIn, LogOut, Settings, TrendingUp, UserRoundPen } from 'lucide-react';
 
 /**
