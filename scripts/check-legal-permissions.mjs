@@ -35,8 +35,13 @@
  * 3. **封闭清单本身会漂**：句子说出的每一项都必须是登记表里的项（新词必须登记），
  *    登记表里每一项都必须在句子里出现（除非它已被 `REVIEWED_REQUESTED` 摘掉），
  *    中英两句项数必须相等（只改一边 = 另一边变假话）。
- * 4. **通知那一族单独一臂**：它撞的不是 `permissions.ts` 而是 `third-parties.ts` 那句
- *    「移动端不申请通知权限」，而那句的依据是 2026-10-02 的**依赖裁决**（批次二 W9 已复量确认停批）。
+ * 4. **通知那一族单独一臂，而且是两侧对称的**。它撞的不是那九项，而是**六个字面位置**
+ *    （`permissions.ts` 的 Android 行 / iOS 行 + `third-parties.ts` 的推送否表行，各中英双份）。
+ *    对称的原因是这一族**正处于翻面过程中**：2026-10-02 的依赖裁决让 W9 移动半停批 ⇒ 那六句为真；
+ *    2026-10-03 20:1x 现量：另一条会话（主检出、未提交）用零第三方依赖把它做了，
+ *    manifest 里出现 `POST_NOTIFICATIONS` ⇒ 那六句当场变假话。只判"句子必须在"会在合法翻面时假红，
+ *    只判"句子必须不在"会放过他们**只改一处**的部分翻转 —— 所以逐位置判：
+ *    **申请面已声明而该位置仍声称不申请 ⇒ 红；申请面没声明而该位置不见了 ⇒ 也红**（悄悄删承诺）。
  *
  * ## 已知边界（别读多）
  *
@@ -88,6 +93,30 @@ const NON_PRIVACY_ANDROID_PERMISSIONS = new Set(['INTERNET']);
  */
 const REVIEWED_REQUESTED = [];
 
+/**
+ * 通知那一族的**六个字面位置**（三处 × 中英）。它们说的是同一件事："移动端不申请通知授权"，
+ * 而它们的真假由同一个布尔决定（见下面的 `notificationDeclared`）。
+ *
+ * ⚠️ 逐位置判而不是整族判：翻面时最容易出的事故是**只改了一份**（改了 `third-parties.ts`
+ * 忘了 `permissions.ts` 的 iOS 行），那正好留下两句互相矛盾的对外的话。
+ */
+const NOTIFICATION_CLAIM_SLOTS = [
+  { doc: PERMISSIONS_DOC, where: 'Android 行的依据（zh）', needle: '移动端代码目前不产生任何系统通知' },
+  { doc: PERMISSIONS_DOC, where: 'Android 行的依据（en）', needle: 'the mobile code currently raises no system notification at all' },
+  { doc: PERMISSIONS_DOC, where: 'iOS 行的依据（zh）', needle: '也不申请通知授权' },
+  { doc: PERMISSIONS_DOC, where: 'iOS 行的依据（en）', needle: 'notification authorisation is not requested either' },
+  { doc: THIRD_PARTIES_DOC, where: '推送 SDK 否表行（zh）', needle: '移动端不申请通知权限' },
+  { doc: THIRD_PARTIES_DOC, where: '推送 SDK 否表行（en）', needle: 'The mobile app requests no notification permission' },
+];
+
+/**
+ * 通知那一族在 iOS 侧的键 —— 它**不进**九项登记表，因为条款里那九项说的都是
+ * "读取用户数据的能力"，而通知授权是另一族（它撞的是上面那六个位置）。
+ * ⚠️ 本门禁不判断 Apple 是否真的会读这个键（未取证）；它只判断：
+ * **申请面一旦出现它，条款就必须承认移动端申请通知授权**，反过来说也一样。
+ */
+const NOTIFICATION_PLIST_KEYS = new Set(['NSUserNotificationsUsageDescription']);
+
 const fail = (msg) => {
   console.error(`❌ ${msg}`);
   process.exitCode = 1;
@@ -135,12 +164,9 @@ const claimsNotRequested = (item) => zhItems.includes(item.zh) || enItems.includ
 
 // ── 臂 1 + 臂 2：申请面 ──────────────────────────────────────────────────────
 for (const perm of declaredAndroidPermissions) {
-  // 通知先判：它撞的不是 permissions.ts 那九项，而是 third-parties.ts 那句（臂 4）。
-  // 不先判的话它会掉进下面的"未登记"分支，红是红了，但**指向的是另一份条款**。
-  if (perm === 'POST_NOTIFICATIONS') {
-    fail(`${ANDROID_MANIFEST} 声明了 POST_NOTIFICATIONS，而 ${THIRD_PARTIES_DOC} 写的是「移动端不申请通知权限，提醒只在应用内」⇒ 那条依据来自 2026-10-02 的依赖裁决（W9 移动半停批），要动它先动裁决。`);
-    continue;
-  }
+  // 通知族不在这里判：它撞的是那六个字面位置（臂 4），不是那九项。
+  // 不在这里 continue 的话它会掉进"未登记的权限"分支，红得指向另一份条款。
+  if (perm === 'POST_NOTIFICATIONS') continue;
   const item = PRIVACY_ITEMS.find((i) => i.android.includes(perm));
   if (!item) {
     if (!NON_PRIVACY_ANDROID_PERMISSIONS.has(perm)) {
@@ -162,6 +188,7 @@ for (const perm of declaredAndroidPermissions) {
   }
 }
 for (const { rel, key } of usageDescriptions) {
+  if (NOTIFICATION_PLIST_KEYS.has(key)) continue; // 通知族，臂 4 判
   const item = PRIVACY_ITEMS.find((i) => i.ios.includes(key));
   if (!item) {
     fail(`${rel} 出现 ${key}，登记表 PRIVACY_ITEMS 里没有它对应的 iOS 键 ⇒ 门禁无法判断它属于条款里的哪一句，先登记。`);
@@ -195,21 +222,44 @@ if (zhItems.length !== enItems.length) {
   fail(`中英两句的项数不等：zh=${zhItems.length} en=${enItems.length}（只改一边 = 另一边当场变假话）`);
 }
 
-// ── 臂 4：通知那一族撞的是 third-parties.ts ─────────────────────────────────
-const thirdParties = read(THIRD_PARTIES_DOC);
-if (!/移动端不申请通知权限/.test(thirdParties)) {
-  fail(`${THIRD_PARTIES_DOC} 里那句「移动端不申请通知权限」不见了 —— 它是 2026-10-02 依赖裁决（W9 移动半停批）的对外表述，删它要么连带改裁决依据，要么变成假话。`);
+// ── 臂 4：通知那一族，逐位置两侧对称 ────────────────────────────────────────
+const notificationDeclaredBy = [
+  ...(declaredAndroidPermissions.includes('POST_NOTIFICATIONS') ? [`${ANDROID_MANIFEST}:POST_NOTIFICATIONS`] : []),
+  ...usageDescriptions
+    .filter((u) => NOTIFICATION_PLIST_KEYS.has(u.key))
+    .map((u) => `${u.rel}:${u.key}`),
+];
+const notificationDeclared = notificationDeclaredBy.length > 0;
+
+const slotHits = [];
+for (const slot of NOTIFICATION_CLAIM_SLOTS) {
+  const present = read(slot.doc).includes(slot.needle);
+  slotHits.push(present);
+  if (notificationDeclared && present) {
+    fail(
+      `${slot.doc} 的 ${slot.where}仍写着「${slot.needle}」，而申请面已经声明通知授权（${notificationDeclaredBy.join(' + ')}）` +
+        `\n   ⇒ 这句对外条款当场是假话。六个位置要**一起翻**（含中英双份），翻完重跑 \`pnpm check:legal-copy\` 重生成落地页文案。`,
+    );
+  }
+  if (!notificationDeclared && !present) {
+    fail(
+      `${slot.doc} 的 ${slot.where}（「${slot.needle}」）不见了，而申请面此刻**没有**声明任何通知授权。` +
+        `\n   ⇒ 那是把一句对外承诺悄悄删掉：要么把它写回来，要么连申请面一起做。`,
+    );
+  }
 }
+
 if (entitlementKeys.some((e) => e.key === 'aps-environment')) {
-  fail(`entitlements 里有 aps-environment（推送），而否表写「否」⇒ 依据变了，条款得跟着改。`);
+  fail(`entitlements 里有 aps-environment（远程推送），而 ${THIRD_PARTIES_DOC} 的推送 SDK 行结论是「否」⇒ 依据变了，条款得跟着改。`);
 }
 
 const reading = `Android 声明 ${declaredAndroidPermissions.length} 条 [${declaredAndroidPermissions.join(', ') || '—'}]、` +
   `NS…UsageDescription ${usageDescriptions.length} 条、句子项数 zh=${zhItems.length} en=${enItems.length}、` +
-  `登记表 ${PRIVACY_ITEMS.length} 项、REVIEWED_REQUESTED ${REVIEWED_REQUESTED.length} 项`;
+  `登记表 ${PRIVACY_ITEMS.length} 项、REVIEWED_REQUESTED ${REVIEWED_REQUESTED.length} 项、` +
+  `通知授权 ${notificationDeclared ? '已声明' : '未声明'}（六个承诺位置命中 ${slotHits.filter(Boolean).length}/${NOTIFICATION_CLAIM_SLOTS.length}）`;
 
 if (process.exitCode) {
   console.error(`\n读数：${reading}`);
   process.exit(1);
 }
-console.log(`✅ 权限承诺对账通过：${reading}（声明面与"不申请"那九项逐一对得上，中英同数量）`);
+console.log(`✅ 权限承诺对账通过：${reading}（声明面与"不申请"那九项逐一对得上，中英同数量，通知族六个位置与申请面同真假）`);
