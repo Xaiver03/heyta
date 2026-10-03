@@ -121,7 +121,15 @@ export const TOKEN_GROUPS = {
     'sidebar-min-width',
     'sidebar-max-width',
     'header-height',
+    /* 中间那一列的上限。⚠️ 2026-10-03（W2）它的**语义**从"整个内容区上限"改成
+       "中间列上限"，值没动 —— 第四列出现后"内容区"已经不指原来那个东西了。 */
     'content-max',
+    /* 详情列（第四列）。2026-10-03 加（详情面工单 W2）：它是 `.ht-app` 的直接子项，
+       所以宽度必须是 token —— 挂在 `.ht-content` 里面就永远贴不到窗口右边缘，
+       读起来不是三栏而是"中间一坨里再分两栏"（理由与判据见 detail-pane-alignment.md）。 */
+    'detail-width',
+    'detail-min-width',
+    'detail-max-width',
     'prose-max',
     'quadrant-min-height',
     'panel-max-height',
