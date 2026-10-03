@@ -26,8 +26,11 @@ INTERVAL="${INTERVAL:-60}"
 STABLE_LOG="${STABLE_LOG:-/tmp/ht-r14c-window.log}"
 LOG="${LOG:-/tmp/ht-r14c-window.$(date +%Y%m%d-%H%M%S).$$.log}"
 ln -sf "$LOG" "$STABLE_LOG" 2>/dev/null
-GATE="$CARRIER/scripts/verify-mobile-window-gate.sh"
-CHAIN="$CARRIER/research/tools/r14c-carrier-chain.sh"
+# GATE/CHAIN 都可覆盖：为了本装置自己的四臂自测能拿桩试（不覆盖时走真实路径）。
+GATE="${GATE:-$CARRIER/scripts/verify-mobile-window-gate.sh}"
+# 🔴 链脚本取**主检出**那份（它自己会 `cd "$CARRIER"`）：载体现在落后于主检出，
+#    同步之前它那份可能还不存在 —— 拿主检出那份就没有"装置依赖尚未同步的文件"这种自锁。
+CHAIN="${CHAIN:-$MAIN/research/tools/r14c-carrier-chain.sh}"
 
 # ── 前提（缺一样就 exit 4，不带着坏装置进窗口）
 for f in "$GATE" "$CHAIN"; do

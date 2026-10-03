@@ -11,10 +11,11 @@
 
 ## 0. 载体（接手前先核，别信本文件里的号）
 
-| 项 | 值（10-04 00:5x 现量） | 复跑核对 |
+| 项 | 值（**02:0x 现量**，上一版是 00:5x） | 复跑核对 |
 |---|---|---|
-| `main` HEAD | `eb03420a`（**23:5x 那版写的 `0a61c0a6` 已被六笔顶掉**：两笔 vault、一笔收尾文档、我那笔文档提交，加上本轮两笔探针修复） | `git rev-parse --short HEAD` |
-| 本条线的父子层级分支 | `feat/list-parent`（工作树 `../heyta-wt-hierarchy`），tip **`c983a7cf` = 已把 `main` 合进来**（零冲突），**未 push、main 上还没落** | 别数提交笔数（会漂）：`git log --oneline <当时的 main HEAD>..feat/list-parent` 现量 |
+| `main` HEAD | `bcfee6fb`（00:5x 那版写 `eb03420a`，其后 **18 笔**，其中 **16 笔**标题是 `docs(handoff)` —— 剩下的来自并行条线的 vault/收尾） | `git rev-parse --short HEAD`；区间笔数 `git rev-list --count eb03420a..HEAD` |
+| 🔴 归属**不能**靠 `--author` 判 | 这台机器上所有并行会话共用同一个 git 用户（`邓湘雷`），`git log --author=…` 分不出哪条线 | 能用的只有两种：标题前缀（`docs(handoff)` vs `feat(...)`）与**内容 needle**（`git log -S '<只有我写的那一行>' -- <文件>`，见 §6） |
+| 本条线的父子层级分支 | `feat/list-parent`（工作树 `../heyta-wt-hierarchy`），tip **`c983a7cf`**；🔴 **02:0x 现量 `merge-base --is-ancestor main feat/list-parent` 退 1** ⇒ 分支不再是 main 的后代（main 又前进了），**要落的是一笔合并提交而不是快进**（细则见 §5 第 4 步） | 别数提交笔数（会漂）：`git log --oneline <当时的 main HEAD>..feat/list-parent` 现量 |
 | 本条线层级判据（合并态现量） | 领域 **15** / 动作层 **10** / 共享层形状 **8** / web DOM 用例（那份 spec 合并态 **38** 条，含我这 6 条），全部 0 skipped；整包：i18n 22 / domain 881 / app-host 1081 / ui 493 / mobile 666 | `pnpm --filter @heyta/domain exec vitest run tests/project-hierarchy.spec.ts` 等；归属核对用"标记命中数合并前后逐处相同"（见 §3.3） |
 | 已知 **HEAD 级**红（不是本条线的，别代改） | ~~`@heyta/ui` `projects-model.spec.ts:96`：`toOrganizerTree` 多一个 `archived` 键~~ ⇒ ✅ **已被并行批次关掉**（把 `d27bccde` 合进本条线分支后 `@heyta/ui` **488 passed / 0 failed**）。登记留着是为了让下一个人在自己又看到它时知道这是同一件事的第几趟 | `pnpm --filter @heyta/ui test` |
 | 🔴 **HEAD 级门禁红（本条线不吸收）** | `check:l4`：`apps/web/src/features` 内联样式 **112 > 基线 104（+8）**，由并行批次那笔「总接线」`d27bccde` 带进来；红名单 19 个文件逐个不是本条线碰过的（本条线在 web 的落点 `ProjectsPanel.tsx` 内联样式 **0 处**） | `node scripts/check-l4-no-style.mjs` |
