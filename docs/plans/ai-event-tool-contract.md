@@ -3543,3 +3543,39 @@ check:ai-quota rc=0
 另一处口径要说清（不是放宽，但原话读起来会误导后来者）：Goal 里那句"`host.submit` 全仓恰好一处"
 是 §15.18 之前的形状；MCP 入口那第二处是**同批发现、同批补的门禁**（任务 #34），它本身也被计数钉住，
 且那条路要过 ADR-0011 的逐工具授权。**没有哪一层在"允许更多写入口"。**
+
+#### §15.43u（10-04 06:41）③ 起之前的两项前置体检：依赖/purge  hazard 不在路上，但漂移门有一个"类"没覆盖到
+
+**(1) 载体的依赖形状 —— 排掉了一个会毁掉主检出的假设。** 本环境有一条已入档的教训：
+linked worktree 的 `node_modules` 不能软链主仓库那份（pnpm 会试图 purge 共享树）。
+06:40 现量：`heyta-wt-ai-closeout/node_modules` 与 `packages/*/node_modules` **都是真目录**（`drwxr-xr-x`，非 `l`）；
+`pnpm config get verify-deps-before-run` = `undefined`、根 `.npmrc` 与 `~/.npmrc` 都无该项；
+`grep -n 'pnpm install|--frozen|prune' scripts/reinstall-all.sh` ⇒ **零命中**，它对 pnpm 的唯一调用是
+第 183 行的 `pnpm -r build`（而段 02 已经在这棵载体上把它跑成 `rc=0`）。
+⇒ ③ 的路上没有"隐式 install/prune"这一步，不需要为它加任何旗标。**这条不是"顺手看一眼"：**
+如果它在，窗口一开队列就会在阶段 5 中间去动主检出的依赖树，那是能把别人正在跑的验收一起打掉的事故形状。
+
+**(2) 漂移门的集合摊开后发现一类没被吃到：根级 `tsconfig*.json`。** 阶段 3 用 `PKG_INPUT_RE` 判
+"载体 == 当前源码"。摊开根目录 11 个不被该式覆盖的 tracked 文件
+（`.dockerignore .gitignore AGENTS.md BLOCKED.md CLAUDE.md CONTRIBUTING.md LICENSE PROGRESS.md
+README.md THIRD_PARTY_LICENSES.md tsconfig.base.json`）—— 只有最后一个有构建消费者：
+8 个包的 `tsconfig.json` 都 `extends` 它（grep 现量：`packages/legal|ui|widget-core|i18n|local-api`、
+`apps/desktop{,.renderer}`、`apps/landing`）。改它会改**所有端**的编译产物，而旧式会把它当文档判成"零漂移"。
+
+补一项 `^tsconfig[^/]*\.json$`，并按"能不能失败"验三条（同一趟）：
+
+| 合成漂移 | 旧式 | 新式 | 该是什么 |
+|---|---|---|---|
+| `tsconfig.base.json` + `packages/ui/src/x.ts` | 1 | **2** | 新项有牙齿（不变就是装饰） |
+| `README.md` + `AGENTS.md` | 0 | 0 | 没被顺手焊死（纯文档不该挡装） |
+| `apps/web/evidence/a.png` + `docs/x.md` | 0 | 0 | 验收自己重写的产物目录仍排除 |
+
+⚠️ 诚实的一条：**这个洞在本仓从未被触发过** —— `git log -- tsconfig.base.json` 只有 P0 骨架那一笔
+`f679c67d`。补它是让**类别**闭合（"根级构建配置算不算打包输入"这个问题本来没有答案），
+不是修一次已发生的事故；别把它读成"差点装了过期产物"。
+
+**(3) 一条操作纪律的正面应用**：要改的是**正在跑**的队列脚本，而本环境已入档"不许原地编辑正在跑的
+bash 脚本"（bash 按偏移边读边执行，长度一变会从错位处继续）。次序是：
+`ps -p 10581 -o pid,ppid,lstart,command` 确认那一枚是我 06:31 自己起的、且它还停在阶段 1 的等待循环
+（`grep -c '阶段 2/5'` = 0，没开始干活）⇒ `kill 10581`（只这一枚，不按名字广播杀）⇒ 改 ⇒
+`bash -n` + 上表三条对照 ⇒ 重起（pid 35045，读数目录 `~/scratch-heyta/deliver-0641/`）。
