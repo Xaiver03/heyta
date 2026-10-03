@@ -162,8 +162,148 @@ if (mismatches.length > 0) {
   );
 }
 
+// ── 4. 提交物锁：在场、真的被生产阶段读、且覆盖每一条声明 ────────────────
+/**
+ * G-47 这一批选的形状（审计 §8.46 结论四）：把**提交物锁当构建输入**塞进 /app，
+ * 而三条安装命令一个字不改（仍是 `npm install`，不是 `npm ci` —— `npm ci` 在这里
+ * 要么冷缓存 EINTEGRITY 当场炸、要么热缓存 rc=0 **静默装上一版我们自己的代码**）。
+ *
+ * 🔴 这个形状的全部价值压在一件事上：**锁还对着当下的声明**。
+ * 一旦有人给 `server/package.json` 加了一条依赖而没重生成锁，
+ * `npm install` 照样成功（它把缺的那条现解一次，只有那一条不钉），
+ * 于是锁退化成一份没人读的装饰品 —— 而"装饰品"和"钉子"在构建日志里长得一模一样。
+ * 所以这一腿不是"顺手加的对账"：它是这个形状成立的前提。
+ */
+const lockPath = join(root, 'server/package-lock.json');
+let lock;
+try {
+  lock = JSON.parse(readFileSync(lockPath, 'utf8'));
+} catch (e) {
+  fail(
+    '读不到提交物锁 `server/package-lock.json`',
+    `  ${e.message}\n` +
+      '  镜像那棵树的第三方层现在**没有钉子**了：每次构建由 npm 现场重解，' +
+      '而"外人晚半年 build 老 tag 拿到同一棵树"这句不再成立。\n' +
+      '  重生成：`pnpm verify:selfhost-stack` 跑完从镜像里取 ' +
+      '`/app/package-lock.json`（理由见 server/Dockerfile 那段注释与审计 §8.46）。',
+  );
+}
+if (lock.lockfileVersion !== 3) {
+  fail(
+    `提交物锁的 lockfileVersion=${String(lock.lockfileVersion)}，不是 3`,
+    '  下面那几条判据（键是 `node_modules/<name>` 路径、名字不在值里）是按 v3 的形状写的。' +
+      'npm 大版本换了锁的形状，就得先改这条判据，不能让它悄悄读不到东西。',
+  );
+}
+const lockPkgs = lock.packages || {};
+const lockEntryCount = Object.keys(lockPkgs).filter((k) => k).length;
+if (lockEntryCount < 100) {
+  fail(
+    `提交物锁里只有 ${lockEntryCount} 个条目，不像一棵真的生产树`,
+    '  上次实测 320 条（含 dev 标记的那 162 条）。读空了这条判据就变成永真。',
+  );
+}
+
+// 4a. 锁必须真的被生产阶段读 —— COPY 要落在**最后一个 FROM 之后**，否则它进的是构建器阶段，
+//     镜像里那三条 install 根本看不到它（"提交了锁"与"锁生效"是两件事）。
+const dockerfileText = readFileSync(dockerfilePath, 'utf8');
+const copyIdx = dockerfileText.search(/^[^\S\n]*COPY[^\n]*package-lock\.json[^\n]*$/m);
+const lastFromIdx = dockerfileText.lastIndexOf('\nFROM');
+if (copyIdx < 0) {
+  fail(
+    '`server/Dockerfile` 里没有 COPY 提交物锁这一行',
+    '  锁在仓库里躺着但进不了镜像 ⇒ 它是一份没人读的装饰品，而 `pnpm check` 会一直绿。',
+  );
+}
+if (copyIdx < lastFromIdx) {
+  fail(
+    'COPY 锁那一行落在生产阶段**之前**（最后一个 FROM 之前）',
+    '  那意味着它进的是 builder/web 阶段，生产阶段那三条 install 看不到它 —— ' +
+      '"锁被读到了"这件事必须由 COPY 的位置来保证，不能靠注释。',
+  );
+}
+
+// 4b. 覆盖：`server/package.json` 每条 dependencies 都要在锁里有对应条目，且版本对得上范围。
+const cmpVer = (a, b) => {
+  const pa = String(a).split('.').map((x) => Number.parseInt(x, 10) || 0);
+  const pb = String(b).split('.').map((x) => Number.parseInt(x, 10) || 0);
+  for (let i = 0; i < 3; i += 1) {
+    if ((pa[i] ?? 0) !== (pb[i] ?? 0)) return (pa[i] ?? 0) < (pb[i] ?? 0) ? -1 : 1;
+  }
+  return 0;
+};
+const unsatisfied = [];
+const undetermined = [];
+let checked = 0;
+for (const [name, range] of Object.entries(serverPkg.dependencies || {})) {
+  if (name.startsWith('@heyta/')) continue; // 自家包由 tarball 供给，不进锁的 registry 层
+  const entry = lockPkgs[`node_modules/${name}`];
+  if (!entry || typeof entry.version !== 'string') {
+    unsatisfied.push(`${name}（声明 ${range}）—— 锁里**没有这一条**`);
+    continue;
+  }
+  checked += 1;
+  const r = String(range).trim();
+  const v = entry.version;
+  if (r === '*' || r === 'latest') {
+    undetermined.push(`${name}@${v}（声明 ${r}：范围里没有可判的下界）`);
+  } else if (r.startsWith('^')) {
+    const base = r.slice(1);
+    if (v.split('.')[0] !== base.split('.')[0] || cmpVer(v, base) < 0) {
+      unsatisfied.push(`${name}@${v} 不落在 ${r} 里（主版本不同，或比下界旧）`);
+    }
+  } else if (r.startsWith('~')) {
+    const base = r.slice(1);
+    if (`${v.split('.')[0]}.${v.split('.')[1]}` !== `${base.split('.')[0]}.${base.split('.')[1]}` || cmpVer(v, base) < 0) {
+      unsatisfied.push(`${name}@${v} 不落在 ${r} 里`);
+    }
+  } else if (r.startsWith('>=')) {
+    if (cmpVer(v, r.slice(2).trim()) < 0) unsatisfied.push(`${name}@${v} 比 ${r} 旧`);
+  } else if (cmpVer(v, r) !== 0) {
+    unsatisfied.push(`${name}@${v} ≠ 钉死的 ${r}`);
+  }
+}
+if (unsatisfied.length > 0) {
+  fail(
+    `提交物锁与 server/package.json 的声明对不上（${unsatisfied.length} 处）`,
+    [
+      ...unsatisfied.map((s) => `  · ${s}`),
+      '',
+      '  后果不是"构建失败"，是**这一条依赖每次构建现解一次** —— 而 `npm install` 会照常成功。',
+      '  锁于是从"钉子"退化成"装饰品"，而这两种状态在构建日志里长得一模一样。',
+      '  重生成：见 `server/Dockerfile` 里 COPY 锁那段注释与审计 §8.46（锁取自构建产物，不在宿主机另解一份）。',
+    ].join('\n'),
+  );
+}
+// 4c. 反向：锁的根条目不许凭空多出声明里没有的依赖。构建期会改写 package.json，
+//     所以**合法例外只有两类**：那三枚 `@heyta/*`（声明形态是 "*"，锁里是 file:），
+//     和 `prisma`（Dockerfile 显式点名，见上面第 1/2 步）。其余多出来的一条都要问"谁加的"。
+const rootDeps = Object.keys(lockPkgs['']?.dependencies || {});
+const declaredDeps = Object.keys(serverPkg.dependencies || {});
+const ALLOWED_EXTRA = new Set(['prisma']);
+const extraRoot = rootDeps.filter(
+  (k) => !declaredDeps.includes(k) && !ALLOWED_EXTRA.has(k) && !k.startsWith('@heyta/'),
+);
+const missingRoot = declaredDeps.filter((k) => !rootDeps.includes(k));
+if (extraRoot.length > 0 || missingRoot.length > 0) {
+  fail(
+    '锁的根条目与 server/package.json 的依赖清单互相缺项',
+    [
+      ...extraRoot.map((k) => `  · 锁里多出来：${k}（声明里没有 —— 谁把它加进锁的？）`),
+      ...missingRoot.map((k) => `  · 声明里有但锁的根条目没有：${k}`),
+      '',
+      '  例外只有两类：三枚 `@heyta/*`（构建期被改写成 file:）与 `prisma`（Dockerfile 点名）。',
+      '  要加第三类例外就把它写进 `ALLOWED_EXTRA` 并在审计文档里说清为什么。',
+    ].join('\n'),
+  );
+}
+
 console.log(
   `✅ 镜像安装合同：prisma CLI 三处同源（package.json @prisma/client ${declaredClient} ` +
     `= Dockerfile 字面量 ${dockerfilePin}${declaredCli ? ` = devDeps prisma ${declaredCli}` : ''}` +
-    `，快照 ${String(snapCli)} / ${String(snapClient)}）`,
+    `，快照 ${String(snapCli)} / ${String(snapClient)}）\n` +
+    `   提交物锁：${lockEntryCount} 条、COPY 在生产阶段、逐条盖住 ${checked} 条声明` +
+    `（不判定 ${undetermined.length} 条${undetermined.length > 0 ? `：${undetermined.join('；')}` : ''}）` +
+    ' —— 锁不在场或漏一条声明都会红在这里，而不是变成一次没人注意的现解。',
 );
+

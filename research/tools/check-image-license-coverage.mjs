@@ -17,25 +17,31 @@
 //   · 快照的 `inputs` 哈希对不上当下的 `server/package.json` 或 Dockerfile 那三条
 //     `npm install` ⇒ 红，并给出重跑命令。
 //
-// 🔴 它**没有**把洞补上 —— 补上要把镜像那棵树钉住（`pnpm deploy --prod`，G-47）。
-// 快照描述的是"2026-10-03 这一次解析出来的树"，而每次镜像构建都会重解一遍。
-// 它保证的是：**这件事不再是静默的** —— 只要有人重跑生成（改了直接依赖就必须重跑），
-// 漂移就会现形；纯传递依赖的上游发新版这一类漂移，仍然只有真去构建镜像才能发现，
-// 那条已登记成 G-47 而没有假装这里已经做到。
+// 🔴 2026-10-04：洞**补了一半，另半以另一种形式补上了**。以前这里写的是
+// "补上要把镜像那棵树钉住（`pnpm deploy --prod`，G-47）" —— 那个形状被实测否证过两轮，
+// 最后落地的形状是：提交物锁 `server/package-lock.json` 作为**构建输入**进来，
+// 安装命令仍是 `npm install`（审计 §8.46 结论四）。于是"每次构建重解一遍"这句话不再成立。
+// 还剩的漂移面只有两处，都各有判据：
+//  · 锁 ↔ 镜像里实际那棵树 ⇒ 本脚本的 `--installed-tree`（双载体），消费者 `verify:selfhost-stack`；
+//  · 锁 ↔ `server/package.json` 的声明 ⇒ `check-image-install-contract.mjs` 第 4 步，消费者 `pnpm check`。
 //
 // 用法：node research/tools/check-image-license-coverage.mjs [--quiet]
 //       node research/tools/check-image-license-coverage.mjs --installed-tree <dump.json>
 //
-// 🔴 **两种载体，别把它们读成同一件事**（2026-10-04 加的第二种，审计 §8.43）：
-//  · 不带 `--installed-tree`：对的是 `server/image-npm-tree.json` —— 那是**预测**
-//    （`gen-image-npm-tree.mjs` 替 npm 解析出来的树）。它能挂在 `pnpm check` 上，因为它不需要 docker。
+// 🔴 **两种载体，别把它们读成同一件事**（2026-10-04 加的第二种，审计 §8.43 / §8.45）：
+//  · 不带 `--installed-tree`：对的是 `server/image-npm-tree.json` —— 它由**提交物锁导出**
+//   （以前是替 npm 现场解析的预测，2026-10-04 起不是了）。它能挂在 `pnpm check` 上，
+//    因为它不需要 docker；代价是它读的是"我们说要装什么"，不是"镜像里有什么"。
 //  · 带 `--installed-tree`：对的是 `research/tools/dump-installed-tree.js` 在**跑起来的镜像里**
-//    枚举出来的那棵树 —— 那才是发出去的字节。实测两者确实有差（版本漂 1 条、平台变体各一枚），
+//    枚举出来的那棵树 —— 那才是发出去的字节。实测两者确有差（平台变体各一枚），
 //    所以"门禁绿"这句话只有第二种载体成立时才是对外承诺。
 //    它由 `scripts/verify-selfhost-stack.sh` 在每次全跑时调用（链外门禁，消费者可验：见 §8.19 那套）。
-//  · 第二种载体还多一条判定：**包自己声明的 license 必须等于登记表里抄的那一条**。
-//    预测快照里没有 license 字段，所以这条只能在真树上跑 —— 它拦的是
-//    "上游把 MIT 改成 GPL 而版本号没变，于是没有任何一层会重新看它"。
+//  · 第二种载体多一条判定：**磁盘枚举必须被 npm 自己写的锁记着，反向差集必须全是 optional**
+//    （§8.45 —— 就是这条照出了遍历器漏掉的 4 条嵌套副本）。
+//  · 两种载体都有"包自己声明的 license 必须等于登记表里抄的那一条"这条判定：
+//    以前只有真树有（预测快照里根本没有 license 字段），现在锁导出的快照也带 ——
+//    它拦的是"上游把 MIT 改成 GPL 而版本号没变，于是没有任何一层会重新看它"，
+//    以及"提交了一把过期的锁"（2026-10-04 实测：第一次就是被后者触发的）。
 
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
@@ -170,10 +176,10 @@ if (INSTALLED_TREE) {
     snapshot = JSON.parse(readFileSync(SNAPSHOT, 'utf8'));
   } catch (e) {
     console.error(`❌ 读不到镜像依赖快照 server/image-npm-tree.json：${e.message}`);
-    console.error(`   生成：${REGEN}（要联网）`);
+    console.error(`   生成：${REGEN}（不联网 —— 它读的是提交物锁 server/package-lock.json）`);
     process.exit(1);
   }
-  carrier = '预测快照';
+  carrier = '提交物锁导出的树（server/package-lock.json）';
 }
 if (!Array.isArray(snapshot.packages) || snapshot.packages.length === 0) {
   console.error('❌ 快照里没有 packages 数组或它是空的 —— 对账没有输入，不能算通过。');
@@ -450,11 +456,13 @@ if (!quiet) {
             ? `\n   两个独立载体对上了：磁盘枚举 ${treeAgreement.disk} 条 ⊆ npm 自己写的 lock 非 dev ` +
               `${treeAgreement.lock} 条，差集 ${treeAgreement.platformOnly} 条且全是 optional（本平台不装的平台变体）。`
             : '')
-      : `   ⚠️ 这**不是**"镜像的树被钉住了"：快照描述 ${snapshot.generatedAt} 那一次 npm 解析的结果，` +
-        '而每次构建 npm 都会重解 —— 仓库里没有**作为输入的** lockfile' +
-        '（镜像里那把 `/app/package-lock.json` 是构建期 npm 写出来的**产物**，钉不住下一次构建）。' +
-        '把树钉住才是闭合，已登记 G-47；' +
-        '`scripts/verify-selfhost-stack.sh` 会用 --installed-tree 对真树再跑一遍。',
+      : `   这棵树的第三方层由提交物锁 \`server/package-lock.json\` 钉住` +
+        `（快照 generatedAt=${String(snapshot.generatedAt)}，锁的哈希在 inputs 里）。` +
+        '还剩两件事要说准：\n' +
+        '     · 锁与**镜像里实际那棵树**对不对，不在这里判 —— 由本脚本的 `--installed-tree`' +
+        '（磁盘枚举 × npm 自己写的锁，双载体）在 `verify:selfhost-stack` 里判；\n' +
+        '     · 三枚 `@heyta/*` 是 `file:` tarball，每次构建字节都变，**设计上不进钉子**' +
+        '（把它们钉进 `npm ci` 会换来"冷缓存 EINTEGRITY / 热缓存静默装上一版"，审计 §8.46）。',
   );
 }
 process.exit(0);
