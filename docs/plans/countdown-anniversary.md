@@ -1,7 +1,7 @@
 # 倒数纪念日（含农历、节日、纪念卡片）实施计划
 
 > 状态：🔄 **批次一已落地**（2026-10-03，`a29881e9` 已合进 main）：W1 历法层 / W3「每年」预设 / W4 节假日随包数据 + bundle 体积闸门，落地记录与本批欠账见 **§3.5**。
-> 🔴 **批次二进行中**（全部在本地分支，未 push 未 merge）：W0 / W2 / W5 / W10 已闭合，W9 落了 web 半，**L' 的判定表已出、命中那条已修**（见 §8.2），W4b / W7 / W8 在并行工区里跑，**只剩 W6 还没开工**（撞车面的实测读数见 §8.2 开头）。逐项读数在 **§8.2 / §8.4**，本节这行原先写"⏸ 批次二未开工"，那是一句比正文更早写下、落地后没 sweep 的话 —— 同一份文档里这种"状态行跑在正文后面"的漂移已经出现过一次（见下面第 4 行那条 ADR 的教训）。
+> 🔴 **批次二进行中**（全部在本地分支，未 push 未 merge）：W0 / W2 / W5 / W10 已闭合，W9 落了 web 半、**原生投递那一半于 19:3x 复量后确认停批**（有依赖裁决，不是没做 —— 见 W9 节末那条打勾的读数），**L' 的判定表已出、命中那条已修**（见 §8.2），W4b / W7 / W8 在并行工区里跑，**唯一一条完全没开工的是 W6**（撞车面的实测读数见 §8.2 开头；它的载体已确认与 W4b 的 `dayMarker` 是同一条缝）。逐项读数在 **§8.2 / §8.4**，本节这行原先写"⏸ 批次二未开工"，那是一句比正文更早写下、落地后没 sweep 的话 —— 同一份文档里这种"状态行跑在正文后面"的漂移已经出现过一次（见下面第 4 行那条 ADR 的教训）。
 > 决策：[ADR-0044](../adr/0044-countdown-anniversary-entity-calendar-data-and-image-tiers.md)（实体 / 农历依赖 / 数据分发 / 图片双档四则）
 > 证据基础：[`countdown-anniversary-data-and-images.md`](../research/countdown-anniversary-data-and-images.md)（2026-10-02 调研，本文只引用它的结论，不重复取证）
 > 决策：✅ 已立 = [ADR-0044](../adr/0044-countdown-anniversary-entity-calendar-data-and-image-tiers.md)（2026-10-03 接受；本行原先写"🔴 待立 ADR"，那是同一份文档里比正文更早写下的一句，落地后忘了 sweep —— 按 `docs/README.md` §一，调研给证据、ADR 下结论、计划管落地）。本文不代替 ADR。
@@ -1121,7 +1121,17 @@ W0b ─> 随时可做（台账那半要等文件干净）
   🔴 合流冲突预告：主检出此刻有另一会话未提交的提醒改动（D1 墓碑任务过滤 + D14 `markDelivered` 写 `firedAt`），
   与本批在 `store.ts` / `use-reminder-notifications.ts` / `reminder-actions.spec.ts` 三个文件**同函数不同行**，
   语义互补 ⇒ 必须真三方合并、禁止整文件覆盖；他们的 `due()` 加了"任务还活着"那道门，合进来正好让 `recheck()` 一并受益。
-- [ ] 原生投递：确认**停批**（依据 `goal-multi-end-coverage.md:104`），在 AGENTS §9 标成"未闭合、有依赖裁决"
+- [x] 原生投递：**确认停批**（2026-10-03 19:3x 复量，四条现状全部与 10-02 那次裁决时一致 ⇒ 裁决**没有被推翻**，也不是"还没做"）
+  `grep -rn "new Notification(" apps/mobile/src packages/ui/src packages/app-host/src` = **0 命中**（同一条在 `apps/web/src` = **4 命中**）；
+  `apps/mobile/android/app/src/main/AndroidManifest.xml` 里 `POST_NOTIFICATIONS` **0 处**；
+  `apps/mobile/ios/Heyta/Info.plist` 与 `HeytaWidgetExtension/Info.plist` 的 `UsageDescription` 各 **0 处**；
+  判据脚本 `scripts/verify-mobile-reminder-ring.sh` 仍在位（判据先行，重开时直接用）。
+  依赖裁决原文在 `docs/plans/goal-multi-end-coverage.md` 批三那一行（四个候选逐一实测：notifee 已归档、
+  RN 官方 push 停在 2021、wix 5.2.2 过了两道门但 v5 **没有本地调度 API**、expo-notifications 被 pnpm monorepo 布局卡死），
+  解锁条件 a/b/c 也写在那一行。对外口径 `docs/research/multi-end-entry-coverage-audit.md:34`
+  （"web ✅ / 移动 ⛔永不响 + 批三停批 2026-10-02 + 裁决去向"）**已带日期，本轮不改写** ——
+  这条线的结论要变，得先有一条新的过门禁候选，不是靠重写措辞。
+  🔴 AGENTS §9 里它标成"**未闭合、有依赖裁决**"，不许出现在"本批已完成"的清单里。
 
 #### ⏹ W10 · `EVENT` 进 AI 工具目录与 local-api 契约
 
@@ -1217,7 +1227,7 @@ W0b ─> 随时可做（台账那半要等文件干净）
   并**回写 `docs/adr/0038-admin-console-scope.md` 范围表 `:75-79`**。
 - [ ] W4b 完成
 
-#### 🟡 L' · 法务联动（范围按 §4 的时序条款**收窄**，不是"把六处都改一遍"）—— 判定表已出、命中已修，仍留两条前置闸门
+#### 🟡 L' · 法务联动（范围按 §4 的时序条款**收窄**，不是"把六处都改一遍"）—— 判定表已出、命中已修，只剩一条前置闸门（L1↔W7 的 manifest 对账）
 
 - 🔴 §4 自己的话：「倒数日**纯文字版（第一版）不触发 L1/L2/L4/L5**：它不申请任何权限、不上传任何内容」。
   批次二交付的正是纯文字版（素材图片背景归 P2-9，见 §0 与 §6）⇒ **照"六处全改"施工就是按过期假设做工**。
@@ -1271,11 +1281,15 @@ W0b ─> 随时可做（台账那半要等文件干净）
      `Info.plist|AndroidManifest|Permission` 在其中命中 0）。
      W7 若引入任何新的 usage description，这行必须**先于发布**改；对账门禁应当在 W7 的 manifest
      真出现新项之后再立，现在立等于猜它的形状。
-  2. **`third-parties.ts:230-241` 否表里那一行的"依据"是条件真的**：
-     那行写「App 端推送 SDK：否 —— 🔴 **移动端不申请通知权限，提醒只在应用内**；Web 推送用的是浏览器标准能力」。
-     W9 的**移动端那一半还没开工**，所以现在仍真；一旦它申请系统通知权限或接 APNs/FCM，
-     这行的**依据**当场变假话（类别结论"否"可能仍对—— heyta 自己发 VAPID 不经 SDK ——
-     但依据措辞必须换）。⇒ 这条应当挂成 **W9 移动半的前置闸门**，与 L1 同形。
+  2. ~~**`third-parties.ts:230-241` 否表里那一行的"依据"是条件真的**…⇒ 这条应当挂成 **W9 移动半的前置闸门**，与 L1 同形。~~
+     ✅ **这条闸门已于 2026-10-03 19:3x 当场结掉，且结论是"不改现文、只换依据的措辞来源"**：
+     W9 移动半经复量确认是**停批**（不是"还没开工"）—— 移动端 `new Notification(` **0 命中**、
+     `AndroidManifest.xml` 里 `POST_NOTIFICATIONS` **0 处**、`apps/mobile/ios/Heyta/Info.plist` 与
+     `HeytaWidgetExtension/Info.plist` 的 `UsageDescription` 各 **0 处**、判据脚本
+     `scripts/verify-mobile-reminder-ring.sh` 在位（裁决原文与解锁条件 a/b/c 在
+     `goal-multi-end-coverage.md` 批三那行）。⇒ 「移动端不申请通知权限，提醒只在应用内」**是当前产品事实**，
+     那句话不必动；要记的是它的依据从"还没做"换成了"**有依赖裁决**"——
+     一句真话的依据换了，比那句话本身更容易在半年后失守，所以 AGENTS §9 的 W9 那行现在直接把四条读数印在旁边。
   3. 同一种"封闭句式没有对账门禁"的形状**还有一处没被处理**：`third-parties.ts:103`
      「下表是**全部**…第 2–5 行是对服务端代码做全量出网穷举后得到的**四类**对外请求」。
      这次判定它**不必改**（W4b 不出网），但那个"全部"以后任何一次新增出网调用都会让它变假，
