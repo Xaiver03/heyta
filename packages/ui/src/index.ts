@@ -1045,6 +1045,8 @@ export {
   type CountdownView,
   type EventCard,
 } from './countdown/model.js';
+
+/**
  * ── 回收站与归档 W4b：删除确认的那份**影响面**取数 ──
  *
  * 🔴 **本块是追加的**（`index.ts` 是多写者共享文件，只许在末尾追加）。

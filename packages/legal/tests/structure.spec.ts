@@ -450,7 +450,7 @@ describe('对外文本里可复算的数字，回到真源对账', () => {
     // 2026-10-03 vault 批次（ADR-0050）新长的三张级联表。
     { table: 'vault_key_packages', zh: '密钥包', en: 'key package' },
     { table: 'vault_key_migrations', zh: '密钥迁移记录', en: 'key migration record' },
-    { table: 'revoked_sync_devices', zh: '已吊销设备', en: 'revoked device record' },
+    { table: 'revoked_sync_devices', zh: '撤销设备记录', en: 'revoked device record' },
   ];
 
   it('🔴 推导本身有产出（数不出约束 = 探针坏了，不是"没有级联"）', () => {
