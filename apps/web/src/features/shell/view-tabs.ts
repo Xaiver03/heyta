@@ -15,6 +15,7 @@ import {
   CheckCircle2,
   CircleDot,
   Inbox,
+  Move,
   Search,
   Settings,
   StickyNote,
@@ -199,7 +200,22 @@ export const MODULE_VIEW_TABS: readonly ViewTab[] = [
   // 日历：滴答 rail 的 5 个主菜单之一（任务 / 日历 / 四象限 / 习惯 / 搜索），
   // 所以它紧跟「任务」之后。它的**渲染**与 mobile 共用 `packages/ui` 的 `CalendarBoard`。
   { key: 'calendar', labelKey: 'web.calendar.title', Icon: CalendarDays },
-  { key: 'quadrant', labelKey: 'web.shell.nav.quadrant', Icon: CircleDot },
+  // 四象限的图标 = `Move`（两条带箭头的轴交叉）。R12，2026-10-02 产品负责人看图定。
+  //
+  // 🔴 为什么**不是**语义更准的 `ChartScatter`：rail 图标只有 **16px**（`ICON_SIZE.sm`），
+  // 那个尺寸下散点糊成一团噪点、`Crosshair` 的十字几乎看不见 —— 实测对比图在
+  // `apps/web/evidence/quadrant-icon/candidates-16px.png`。**小尺寸下读不读得出形状**
+  // 是这一轮的第一判据，不是"语义准不准"。
+  //
+  // ⚠️ 它和 `QUADRANT_NAV` 那四项的图标**不是一回事**：那四项各有色块 `swatch`，
+  // 而 `NavButton` 是"有 swatch 就渲染色块、否则渲染图标"，
+  // 所以 `QUADRANT_NAV` 里的 `icon` 字段**从不渲染**，留着只为满足 `NavEntry` 的类型。
+  //
+  // ⚠️ 这段注释**必须留在数组外面**：`apps/landing/tests/mockup-shell-shape.spec.tsx`
+  // 是按**源码文本**读这些声明块的，把某一项写成多行对象会让它解析不到那一项 ——
+  // 实测过一次：只把 `Icon` 换成 `Move` 并把对象拆成多行，那条对账就报"rail 少一项"，
+  // 而 key、顺序、词条一个字都没动。
+  { key: 'quadrant', labelKey: 'web.shell.nav.quadrant', Icon: Move },
   { key: 'habits', labelKey: 'web.shell.views.habits', Icon: Check },
   { key: 'timeline', labelKey: 'web.shell.views.timeline', Icon: ChartGantt },
   { key: 'focus', labelKey: 'web.shell.views.focus', Icon: Sun },
@@ -270,16 +286,14 @@ export const VIEW_TABS: readonly ViewTab[] = [
 ];
 
 
-/** 标题直接跟着视图走的那些视图（任务 / 四象限的标题有更具体的信息，不在此列）。 */
-export const VIEW_TITLED_BY_TAB: readonly ViewKey[] = [
-  'habits',
-  'focus',
-  'timeline',
-  'growth',
-  'notes',
-  'trash',
-  'settings',
-];
+/**
+ * 🔴 这里**曾经**有一张 `VIEW_TITLED_BY_TAB` 白名单，列出"标题跟着 tab 走"的视图，
+ * 不在表上的回落到读 `store.filter`。它已于 R9 删掉，原因是它自己就是缺陷的形状：
+ * 日历后来作为模块视图加进了 `MODULE_VIEW_TABS`，**没人记得登记它**，
+ * 于是"点过象限再点日历"时页头挂着上一个视图残留的象限名。
+ * 现在标题的默认是"跟视图走"，只有任务视图（和落在象限上的四象限页）读 filter ——
+ * 见 `App.tsx` 的 `title`。**新增视图不需要再登记任何地方。**
+ */
 
 /**
  * 排序档位 → 词条键。

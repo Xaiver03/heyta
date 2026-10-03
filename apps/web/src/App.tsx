@@ -92,6 +92,7 @@ import { PrivacyConsentSheet } from './features/privacy/PrivacyConsentSheet.js';
 import { LegalReconfirmSheet } from './features/legal-recheck/LegalReconfirmSheet.js';
 import { shouldAskOnFirstLaunch, usePrivacyStore } from './features/privacy/store.js';
 import { CalendarSidebar } from './features/calendar/CalendarSidebar.js';
+import { CalendarHeaderToolbar } from './features/calendar/CalendarHeaderToolbar.js';
 import { CalendarView } from './features/calendar/CalendarView.js';
 import { useNoteStore } from './features/notes/store.js';
 import { ReminderNotifyPanel } from './features/reminders/ReminderNotifyPanel.js';
@@ -150,6 +151,9 @@ import { ImportPanel } from './features/settings/ImportPanel.js';
 import { MemoryPanel } from './features/settings/MemoryPanel.js';
 // 通行密钥自助管理（列 / 删）—— 服务端早就有端点，此前界面没有任何入口。
 import { PasskeyPanel } from './features/settings/PasskeyPanel.js';
+// 个人信息（R10）：昵称与头像的增删改查。入口在头像菜单的「编辑个人信息」，
+// 面板本体开在设置浮层第一段 —— 它需要令牌，而令牌就住在同步设置里。
+import { ProfilePanel } from './features/settings/ProfilePanel.js';
 // 隐私同意的**撤回**入口（PIPL 第 15 条：撤回要比同意更容易做到）。
 // 同意面板只在首启弹一次，之后用户要改只能从这里改 —— 没有它，一次点击就成了永久决定。
 import { PrivacyPanel } from './features/settings/PrivacyPanel.js';
@@ -170,7 +174,7 @@ import { FocusTimer } from './features/focus/FocusTimer.js';
 import { TrashView } from './features/trash/TrashView.js';
 import { LanguageSwitcher } from './features/shell/LanguageSwitcher.js';
 import { onEngineChange, readRecentOps } from './lib/oplog.js';
-import { applyTheme, resolveInitialTheme, type Theme } from './lib/theme.js';
+import { applyTheme, rememberThemeChoice, resolveInitialTheme, type Theme } from './lib/theme.js';
 
 import './styles/app.css';
 
@@ -180,7 +184,6 @@ import {
   SORT_LABEL,
   TOOL_VIEW_TABS,
   VIEW_TABS,
-  VIEW_TITLED_BY_TAB,
   anchorRailLabel,
   type ViewKey,
 } from './features/shell/view-tabs.js';
@@ -372,6 +375,23 @@ export function App(): React.JSX.Element {
     document.getElementById('settings-help')?.scrollIntoView({ block: 'start' });
     setScrollToHelp(false);
   }, [scrollToHelp, view]);
+  const [scrollToProfile, setScrollToProfile] = useState(false);
+  /**
+   * 从头像菜单点「编辑个人信息」进来时，**滚到个人信息那一节并聚焦昵称框**。
+   *
+   * 与 `scrollToHelp` 同一条纪律：必须等 `view` 真的变成 `settings` 之后再滚，
+   * 否则设置那棵树还没渲染，`getElementById` 拿到 `null` 而 `?.` 会把这件事
+   * **静默吞掉**（症状是"点了编辑个人信息，页面停在设置顶部"）。
+   *
+   * 🔴 焦点也要一起给：只滚不聚焦，键盘用户滚完了还得自己 Tab 十几下才回到
+   * 输入框；而读屏用户根本不知道自己到了哪儿。
+   */
+  useEffect(() => {
+    if (!scrollToProfile || view !== 'settings') return;
+    document.getElementById('settings-profile')?.scrollIntoView({ block: 'start' });
+    (document.querySelector<HTMLInputElement>('#profile-nickname') ?? undefined)?.focus();
+    setScrollToProfile(false);
+  }, [scrollToProfile, view]);
   const [aiSettings, setAiSettings] = useState(loadAiSettings);
   /**
    * AI 面板的「去设置」请求：切到设置页并**落在哪一块**。
@@ -498,8 +518,8 @@ export function App(): React.JSX.Element {
    *
    * 🔴 **必须同时切回 `tasks` 视图。** 在此之前侧栏的 `onClick` 只写
    * `setFilter`，于是"人在习惯页、点收集箱"会什么都没发生 ——
-   * 筛选真的变了，但当前视图根本不读它，标题也跟着 `VIEW_TITLED_BY_TAB`
-   * 显示成「习惯」。用户看到的是**点了没反应**。
+   * 筛选真的变了，但当前视图根本不读它，标题也跟着 tab 显示成「习惯」。
+   * 用户看到的是**点了没反应**。
    *
    * 侧栏里的每一项都是**任务筛选**（`TaskFilter` 的全部 5 个分支都只作用于
    * 任务视图），所以"点它就进任务视图"不是补丁，而是这个控件本来的语义。
@@ -903,47 +923,51 @@ export function App(): React.JSX.Element {
 
   const title = useMemo(() => {
     const f = store.filter;
-    // 习惯 / 番茄钟 / 时间线 / 成长 / 设置：标题跟**视图**走。
-    // 这些视图里没有"任务筛选"这回事，标题必须由视图自己决定，
-    // 否则显示的是上一个视图残留的清单名。
-    //
-    // 🔴 取的是 `labelKey` 再 `t(...)`，**不是**表里的中文本身 ——
-    // 模块级常量里不能有句子（见 `NavEntry.labelKey` 的注释）。
-    if (VIEW_TITLED_BY_TAB.includes(view)) {
-      const tab = VIEW_TABS.find((v) => v.key === view);
-      return tab === undefined ? t('web.shell.nav.tasks') : t(tab.labelKey);
-    }
     /**
-     * 四象限页要看筛选**是否真的落在某个象限上**：
-     * 落上了就用更具体的象限名（「重要且紧急」比「四象限」有用），
-     * 没落上（用户只是点了顶部标签）就不能显示上一个视图的清单名。
+     * 🔴 标题由**当前视图**裁决；`store.filter` 只在任务视图里才有发言权。
+     *
+     * 原来这里是一张**白名单**（`VIEW_TITLED_BY_TAB`：列出"标题跟视图走"的视图），
+     * 不在表上的就回落到读 filter。而日历是后来才加进 `MODULE_VIEW_TABS` 的
+     * 模块视图，**没登记进那张表** —— 于是"在收集箱点过「重要不紧急」→ 再点日历"，
+     * 内容区切过去了，标题还写着上一个视图残留的 filter。用户看到的是
+     * 「日历页的页头挂着象限名」，而侧栏在日历视图下已经换成日历自己的了，
+     * **没有任何入口能把它切回去**。
+     *
+     * 白名单要人记得登记，而"记得登记"不是机制。默认反过来之后，新增视图
+     * 天然由自己的 tab 标签命名 —— 漏登记这条路不存在了。
      */
-    if (view === 'quadrant' && f.kind !== 'quadrant') return t('web.shell.nav.quadrant');
-    if (f.kind === 'all') return t('web.shell.nav.inbox');
-    if (f.kind === 'today') return t('web.shell.nav.today');
-    // 「最近 7 天」的标题就是那一行侧栏的名字 —— 它是**一条智能清单**，
-    // 不是"某个日期的任务"，所以标题不需要跟着具体日期变。
-    if (f.kind === 'next7Days') return t('web.shell.nav.next7Days');
-    if (f.kind === 'completed') return t('web.shell.nav.completed');
-    // filter 是判别联合（含 all/today/completed/quadrant/project），
-    // **必须显式判 kind** 才能访问各自特有字段 —— 直接取 f.quadrant 编译不过。
-    if (f.kind === 'quadrant') {
+    if (f.kind === 'quadrant' && (view === 'tasks' || view === 'quadrant')) {
+      // 落在某个象限上就用**更具体的象限名**（「重要不紧急」比「四象限」有用）。
       const entry = QUADRANT_NAV.find(
         (n) => n.filter.kind === 'quadrant' && n.filter.quadrant === f.quadrant,
       );
       return entry === undefined ? t('web.shell.nav.quadrant') : t(entry.labelKey);
     }
-    if (f.kind === 'project') {
-      // 清单名是**用户自己的字**，原样显示、不翻译。
-      return projects.projects.find((p) => p.id === f.projectId)?.name ?? t('web.shell.nav.project');
+    if (view === 'tasks') {
+      if (f.kind === 'all') return t('web.shell.nav.inbox');
+      if (f.kind === 'today') return t('web.shell.nav.today');
+      // 「最近 7 天」的标题就是那一行侧栏的名字 —— 它是**一条智能清单**，
+      // 不是"某个日期的任务"，所以标题不需要跟着具体日期变。
+      if (f.kind === 'next7Days') return t('web.shell.nav.next7Days');
+      if (f.kind === 'completed') return t('web.shell.nav.completed');
+      if (f.kind === 'project') {
+        // 清单名是**用户自己的字**，原样显示、不翻译。
+        return projects.projects.find((p) => p.id === f.projectId)?.name ?? t('web.shell.nav.project');
+      }
+      if (f.kind === 'tag') {
+        // 同理：标签名也是用户自己的字，原样显示。
+        return projects.tags.find((tag) => tag.id === f.tagId)?.name ?? t('web.shell.nav.tag');
+      }
     }
-    if (f.kind === 'tag') {
-      // 同理：标签名也是用户自己的字，原样显示。
-      return projects.tags.find((tag) => tag.id === f.tagId)?.name ?? t('web.shell.nav.tag');
-    }
-    return t('web.shell.nav.tasks');
+    // 其余视图（日历 / 习惯 / 番茄钟 / 时间线 / 成长 / 便签 / 搜索 / 回收站 / 设置）：
+    // 标题跟**视图**走。这些视图里没有"任务筛选"这回事。
+    //
+    // 🔴 取的是 `labelKey` 再 `t(...)`，**不是**表里的中文本身 ——
+    // 模块级常量里不能有句子（见 `NavEntry.labelKey` 的注释）。
     // `t` 与 `view` 都进依赖：语言变了标题必须跟着变，视图换了标题也得跟着换。
     // `projects.projects` 同理 —— 清单改名后标题不该还是旧名字。
+    const tab = VIEW_TABS.find((v) => v.key === view);
+    return tab === undefined ? t('web.shell.nav.tasks') : t(tab.labelKey);
   }, [store.filter, projects.projects, view, t]);
 
   /**
@@ -1415,6 +1439,15 @@ export function App(): React.JSX.Element {
               setSettingsFocus(undefined);
               setView('settings');
             }}
+            // 「编辑个人信息」= 设置浮层里的**第一节**，所以它开的是同一个表面，
+            // 只是额外要求"落在这一节"（见上面的 scrollToProfile）。
+            // ⚠️ 未登录时**不出现**这一项（AccountMenu 内部按 showSignIn 过滤）：
+            //    昵称与头像属于账号，没有账号就没有可写的那一行。
+            onOpenProfile={() => {
+              setSettingsFocus(undefined);
+              setScrollToProfile(true);
+              setView('settings');
+            }}
             onOpenGrowth={() => {
               setSettingsFocus(undefined);
               setView('growth');
@@ -1680,6 +1713,24 @@ export function App(): React.JSX.Element {
                 只在任务视图里有意义 —— 其他视图不显示截止时间。
                 🔴 它是**开关**而不是固定行为：倒计时是待验证的 UI 假设，
                 有开关才有对照组，也才能一键回退（见 DueBadge.tsx 文件头）。 */}
+            {/*
+              R11 批二：日历那一屏的顶部工具栏（`‹ 2026年10月 ›  今天`）。
+              与上面那个任务排序下拉**同一个位置、同一个锚点**（`task-sort.spec.tsx`
+              钉的就是"视图专属控件住在 header.ht-header 里"）。
+              🔴 渲染的是共享层 `CalendarToolbar`（移动端把同一个组件画在月历卡片里，
+              那边没有页头插槽），这里只提供摆位与状态。
+            */}
+            {view === 'calendar' ? (
+              <CalendarHeaderToolbar
+                // 🔴 与 `visibleMainTabs` 同一个来源，不是"再问一遍开关"：
+                // 下拉里出现「时间线」而模块是关的 ⇒ 这条下拉就成了
+                // 绕过功能模块开关的第二条入口（`contentView` 只看 `view`）。
+                timelineEnabled={enabledModules.has('timeline')}
+                onOpenTimeline={() => {
+                  goToView('timeline');
+                }}
+              />
+            ) : null}
             <SyncBar />
             <ConflictDialog />
             {/* G-11：首启隐私同意面板。与 `ConflictDialog` 同一处挂载 ——
@@ -1701,7 +1752,14 @@ export function App(): React.JSX.Element {
                   ? t('common.a11y.toDarkTheme')
                   : t('common.a11y.toLightTheme')
               }
-              onClick={() => setTheme(theme === 'light' ? 'dark' : 'light')}
+              onClick={() => {
+                const next: Theme = theme === 'light' ? 'dark' : 'light';
+                // 🔴 这是**唯一**记账的地方：启动时的那次 `applyTheme` 只改 DOM。
+                // 否则"用户没做过选择"与"用户选了亮色"在存储里长得一模一样，
+                // 系统偏好从此再也进不来（`lib/theme.ts` 里记着症状）。
+                rememberThemeChoice(next);
+                setTheme(next);
+              }}
             >
               {theme === 'light' ? <Moon size={ICON_SIZE.md} /> : <Sun size={ICON_SIZE.md} />}
             </button>
@@ -1841,6 +1899,7 @@ export function App(): React.JSX.Element {
               }}
             />
           )}
+
           {/* 对话式助手（W12 / ADR-0045）。
               🔴 它的工具范围来自 `assistantTier`（设置里的**第二个授权前端**），
               **不是** `localApi.grants` —— 那张表管的是外部程序（MCP）能不能调工具。
@@ -2103,6 +2162,19 @@ export function App(): React.JSX.Element {
               tabIndex={-1}
             >
 
+            {/*
+              🔴 **个人信息**（R10，2026-10-03）放在设置浮层**第一段**。
+              理由不是"它最重要"，是它的**触发路径**：头像菜单里那一项叫
+              「编辑个人信息」，从那儿进来的人必须一屏就看到它，而不是先看到「显示」
+              再往下翻 —— 六家竞品都是"头像 → 菜单 → 资料页"，而资料页第一屏就是
+              昵称与头像（调研见 docs/plans/ui-review-fill-zh-timeline.md §8.2）。
+              ⚠️ 外面那层 `<div id>` 只为"从菜单进来要落在这一节"这个滚动锚点存在；
+              它不带 `ht-*` 前缀，因为 `check:row-single-source` 只许 `ht-*` 前缀族
+              **下降**，新造一族（哪怕只包一层）是要被拒的。
+            */}
+            <div id="settings-profile" data-testid="profile-section-anchor">
+              <ProfilePanel />
+            </div>
             {/*
               🔴 **显示偏好**（2026-09-30 从任务页头搬进来）：「日期 | 倒计时」
               两个词悬在页头上，用户不知道它是什么、影响什么 —— 它其实是
