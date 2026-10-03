@@ -2142,4 +2142,44 @@ git diff --name-only 43ef4a22..HEAD | grep -vc '\.md$'    # 0
 不是凭记忆。**剩下的段（`-r build` / `-r typecheck` / `-r test` / 各端 shell 门禁）没有在尖端重跑**：
 它们的输入未变，而此刻这台机器的窗口属于 ③ 的四端重装 —— 见 §15.30 末段那条取舍。
 
+## 15.32 ③ 第一次真跑的实际结局：windows ✅ 五条齐、mac 🔴 卡在启动自截屏、mobile 被我主动中止（22:36–22:42，载体 `133550d7`）
+
+守门在 22:28–22:36 之间放开（连续两次干净采样），`step3` 于 **22:36:22** 起跑，
+起跑现场由脚本自己记进 `state.log`：载体 `133550d7`、工作树未提交 **0**、android `emulator-5554 device`、
+windows-pc `REACHABLE`。跑出来的四段是**三种不同性质**的结果，逐段分开写：
+
+| 段 | 结果 | 读数（只认脚本自己打的判据行） |
+|---|---|---|
+| 1 macOS | 🔴 **红**（未装上） | `package-app.sh` 在"④ 启动验证"处失败：`sandbox_extension_issue_file_to_process failed for /tmp/heyta-macos-dist/Heyta.app: 1 (Operation not permitted)` + ScreenCaptureKit `-3811 "音频/视频捕捉失败，无法开始流播放"` + `截图失败（多半是没给屏幕录制权限）`。签名那一段是好的：`valid on disk` / `satisfies its Designated Requirement` / `Authority=Developer ID Application: …(V5S2LT9YV8)`。**因此 §6.1.1 表里"装新"那一步从没执行** —— 现量：`/Applications/Heyta.app` 的 mtime 还是 **19:05**，而 `/tmp/heyta-macos-dist/Heyta.app` 是 **22:37** |
+| 2 Windows | ✅ **五条判据全在位** | `✅ 源码包 31M（跟踪 + 未跟踪 + web-dist + bridge-bundle）` → `✅ 远端新鲜度对账通过（web-dist/index.html=217cae2a252d8948… bridge=bae7d24d7a6a5320… assets/*.js=7 枚一致）` → `✅ 远端打包 + 安装 + 启动截图完成` → `✅ 远端取证：判据齐了：5 条全在位`。**这五就是 `scripts/lib/msix-install-facts.sh` 那份清单**（`ADD_APPX=OK` / `RESULT=OK` / `PAYLOAD_WEBDIST=True` / `M2D=OK` / `SHORTCUT_OK=True`），**用户点名的"自动创建快捷方式"这项第一次随真跑绿到** |
+| 3 Android | ⏹ **我主动中止**（不是失败，是环境不许并行） | 22:41:18 现量：`═══ 3. Android ═══` 刚进构建阶段（gradle `assembleRelease` + NDK 编 op-sqlite），而**并行会话的 `verify-mobile-reminder-ring.sh`（pid 50463）正跑在同一台 `emulator-5554`** 上、它的 iOS 侧 `verify-mobile-ios-reminder.sh`（57432）+ `xcodebuild`（57745，另一枚模拟器 `1EDCFA59-…`）也活着。Android 段的下一步就是 `adb uninstall` —— 那会把别人正在验的那台设备的应用与数据清掉。AGENTS §8 第 9 条明确禁止并行覆盖共享设备，所以 kill 的是**我自己这一段**（`kill 29284 28925`），取证写在 `~/scratch-heyta/reinstall-2236/ABORTED-mobile.txt` |
+| 4 iOS | ⏹ **未起跑** | 同上中止，从未执行 |
+
+中止后恢复现场：那一段 gradle 在载体里留下一个未跟踪的 `apps/mobile/android/.kotlin/`（构建缓存，
+会被 `git ls-files -co` 当"未跟踪非忽略"送进 Windows 的源码包），已 `rm -rf` 掉，
+现量 `git status --porcelain` 回到 **0**。**这条不是洁癖**：如果留着它再跑一轮，
+Windows 段的"远端 == 本地工作树"对账就变成"远端 == 一个带脏缓存的树"。
+
+### 为什么这不能算 ③ 完成，也不能算 ③ 失败
+
+`reinstall-all.sh:200` 的形状是 `if bash package-app.sh …; then` —— mac 段**在打包脚本内部**红，
+整个脚本按 §6.1.1 应当以 rc=1 收尾。所以：
+- 四端里只有 **1 端**（windows）拿到了"装上且是当前产物"的判据；
+- mac 端连"装新"都没发生 ⇒ `/Applications` 里那份是 19:05 的旧产物，**不能报"mac 已装"**；
+- android/ios 是被我按规则停的，**按环境无效记录**，不降级、不拿旧包凑。
+
+### mac 那条红的两个候选归因（都还没证，所以先都写着）
+
+1. **启动上下文**：`sandbox_extension_issue_file_to_process … Operation not permitted` 是宿主侧给被测
+   `.app` 发沙箱扩展那一步被拒 —— 同一台机器上我的 shell 跑 `screencapture -x` 是**能出图的**
+   （现量 1 853 045 字节的合法 PNG），所以"整机没有录屏权限"这条**已被否证**；
+   剩下的解释是**被启动的那个 `.app` 处在没有该授权的启动上下文里**（从 agent 后台任务起的进程）。
+2. **僵尸实例**：`ps` 现量 `/Applications/Heyta.app/Contents/MacOS/HeytaMac` 已跑 **1:11:27**（≈21:33 起），
+   而 mac 段的"卸旧"没动过它 —— 这是 traps #81.3 那个形状（同名旧实例污染窗口/截图取证）。
+
+判这个只需要一次隔离复跑：`bash scripts/reinstall-all.sh --only mac`（`--only/--skip` 在 `:162-166`），
+先把 21:33 那个旧实例处理干净再起跑。**没有在 22:4x 就做**是因为这台机器此刻还压着并行会话的
+两条设备验收（负载 22:41 现量 `95.76 / 86.87 / 60.58`），再挂一段重构建会把别人的窗口挤没。
+
+
 

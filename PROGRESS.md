@@ -1181,6 +1181,23 @@ mobile 与 web 的 `typecheck` 均 0 错。三个新改动屏的 `style={{` 计�
 > （本轮就是这样撞了一次）。另：该脚本 `LC_ALL=C grep '[^ -~\t]'` 命中 **0** 行 = 纯 ASCII 成立
 > （AGENTS §6.1 那条 PS 5.1 的硬要求）。
 
+**③ 22:36–22:42 第一次真跑的实际结局：4 端里 1 端绿、1 端红、2 端是我主动停的** ——
+守门（连续两次干净采样）放开后 `step3` 于 22:36:22 起跑，起跑现场由脚本自己记：
+载体 `133550d7`、工作树未提交 **0**、`emulator-5554 device`、windows-pc `REACHABLE`。
+
+| 端 | 结果 | 判据行 |
+|---|---|---|
+| windows | ✅ | `源码包 31M` → `远端新鲜度对账通过（web-dist/index.html=217cae2a252d8948… bridge=bae7d24d7a6a5320… assets/*.js=7 枚一致）` → `远端打包 + 安装 + 启动截图完成` → **`远端取证：判据齐了：5 条全在位`**（即 `ADD_APPX/RESULT/PAYLOAD_WEBDIST/M2D/SHORTCUT_OK`，**用户点名的快捷方式这项第一次随真跑绿**） |
+| mac | 🔴 | `package-app.sh` 在"④ 启动验证"就失败：`sandbox_extension_issue_file_to_process … Operation not permitted` + ScreenCaptureKit `-3811` ⇒ **装新那步从未执行**（现量：`/Applications/Heyta.app` mtime 仍 **19:05**，`/tmp/heyta-macos-dist/Heyta.app` 是 **22:37**）。签名部分完好（`valid on disk` / `satisfies its DR` / `V5S2LT9YV8`）。两个候选归因与隔离复跑判据登记在 **`B61`** |
+| android | ⏹ 我停的 | 该段刚进 gradle 构建，而 22:41 现量并行会话的 `verify-mobile-reminder-ring.sh`（pid 50463）**正跑在同一台 `emulator-5554`** 上；下一步就是 `adb uninstall` ⇒ 会清掉别人正在验的设备。AGENTS §8 第 9 条禁止并行覆盖共享设备，故 `kill` 我自己那段（取证 `~/scratch-heyta/reinstall-2236/ABORTED-mobile.txt`） |
+| ios | ⏹ 未起跑 | 同上中止 |
+
+停的代价与善后都写明：**这轮不算 ③ 完成**（只有 1/4 端拿到"装上且是当前产物"的判据），
+也不算产品失败（mac 红未定性、mobile 是环境不许并行）。中止后清掉载体里那个未跟踪的
+`apps/mobile/android/.kotlin/` —— 它会被 `git ls-files -co --exclude-standard` 当"未跟踪非忽略"
+送进 Windows 的源码包，留着就等于让"远端 == 本地工作树"这条对账比的是**一个带脏缓存的树**；
+现量 `git status --porcelain` 回到 **0**。
+
 
 **④ 台账 ✅** —— 本节 + `B36` 第 2 条的 closure 指针 + 新登记 `B56`（那条挂上游的红）+
 `AGENTS.md` 三处漂移登记（`:35` 漏列 `ai-tool-call.ts`、`:37` 未提工具目录已按实体拆包、

@@ -3298,3 +3298,44 @@ comm -12 /tmp/m.txt /tmp/d.txt                                                  
 **取门禁读数前先 `grep '"check:xxx"' package.json` 拿真入口**，别凭记忆拼路径。
 （并行会话在同一天因为拼错门禁名拿到一条假红，见 `3a3071e1` 的提交信息 —— 同一种错，两个作者。）
 
+## B61. 🔴 ③ 的 macOS 段在"启动自截屏"处红：签名与打包都是好的，装新那一步根本没跑到（2026-10-03 22:3x–22:4x 现量）
+
+**现象**（载体 `heyta-wt-ai-closeout` @ `133550d7`，工作树起跑时 0 未提交）：
+`scripts/reinstall-all.sh` 第 1 段调 `apps/desktop-macos/scripts/package-app.sh`，脚本内部报：
+
+```
+sandbox_extension_issue_file_to_process failed for /tmp/heyta-macos-dist/Heyta.app: 1 (Operation not permitted)
+ScreenCaptureKit 报错：… Code=-3811 "音频/视频捕捉失败，无法开始流播放"
+截图失败（多半是没给屏幕录制权限）
+🔴 打包后的 .app 没能自截屏 —— 它跑不起来或渲染失败
+```
+
+同一段日志里**签名部分是绿的**：`valid on disk` / `satisfies its Designated Requirement` /
+`Authority=Developer ID Application: …(V5S2LT9YV8)` / `TeamIdentifier=V5S2LT9YV8`。
+
+**关键的一条现量**：`/Applications/Heyta.app` 的 mtime 仍是 **19:05**，而 `/tmp/heyta-macos-dist/Heyta.app`
+是 **22:37** ⇒ §6.1.1 表里"卸旧 → 拷进 /Applications"那一步**从未执行**（它在自截屏判据之后）。
+所以这一端既不是"装上但判据红"，也不是"产物坏了"，是**根本没装上**。
+
+**两个候选归因，都还没证**（写清楚是为了下一个人不必从头猜）：
+
+1. **启动上下文**：`sandbox_extension_issue_file_to_process … Operation not permitted` 是宿主给被测 `.app`
+   发沙箱扩展被拒。**"整机没有录屏权限"这条已被否证** —— 同一时刻我的 shell 跑
+   `screencapture -x -t png` 出的是 **1 853 045 字节的合法 PNG**。
+   剩下能解释的是：从 agent 后台任务起的进程，其启动上下文没带上该授权。
+2. **僵尸实例**（traps #81.3 那个形状）：`ps` 现量 `/Applications/Heyta.app/Contents/MacOS/HeytaMac`
+   已跑 **1:11:27**（≈21:33 起）。mac 段没动过它，新起的那个实例与它同名同窗口尺寸。
+
+**关闭判据**：先处理掉 21:33 那个旧实例（**那是用户机器上正在运行的一个 App，不由我替用户决定**），
+再 `bash scripts/reinstall-all.sh --only mac`（`--only/--skip` 定义在 `reinstall-all.sh:162-166`），
+要求看到 `安装副本启动自截屏：非空白 且 主蓝命中`（§6.1.1 的 mac 判据）与
+`/Applications/Heyta.app` 的 mtime **晚于** `/tmp/heyta-macos-dist/Heyta.app`。
+
+**同一次运行里另外三端**：windows ✅ 五条判据全在位（含用户点名的 `SHORTCUT_OK=True`，
+远端新鲜度对账 `web-dist/index.html=217cae2a252d8948…` + `assets/*.js=7 枚一致`）；
+android 与 ios 是**我主动中止**的 —— 22:41 现量并行会话的 `verify-mobile-reminder-ring.sh`（pid 50463）
+正跑在**同一台 `emulator-5554`** 上，而 Android 段的下一步就是 `adb uninstall`。
+AGENTS §8 第 9 条禁止并行覆盖共享设备，所以停的是我自己那一段；取证在
+`~/scratch-heyta/reinstall-2236/ABORTED-mobile.txt`。中止后清掉了载体里那个未跟踪的
+`apps/mobile/android/.kotlin/`（它会被 `git ls-files -co` 当"未跟踪非忽略"送进 Windows 源码包）。
+
