@@ -1222,8 +1222,33 @@ W0b ─> 随时可做（台账那半要等文件干净）
     拿到 **RC=0** 并差点照抄成"rc=0，5 格全绿"。管道后的 `$?` 是 `tail` 的，
     而这份输出的**最后几行**恰好是"不要用下列手法修绿"的科普文字（不带退出码信息）——
     两个假绿凑在一起了。上面那条带重定向的命令才是取 RC 的写法。
+  - 🔴 **04 04:4x 收尾第 1 趟顺带查出：`check:ui-provider` 整条是红的，四条里有一条点的是 W8 的 `CountdownScreen.tsx:174`——但它是探针的局限，不是崩溃**。
+      门禁报的是"共享 UI 的消费者落在 `HeytaUiProvider` 的 JSX 子树**之外**"，四条：
+      `CountdownScreen.tsx:174`（`useTheme()`）、`GrowthScreen.tsx:298`（`<GrowthBoard>`）、
+      `HabitsScreen.tsx:365`（`<HabitBoard>`）、`ui/habit-goal-slot.tsx:37`（`useTokens()`）。
+      运行时取证：`apps/mobile/src/App.tsx:283` 的 `<ThemeProvider>` 包住整个 `Root()`，
+      而 `theme.tsx:33` 就是 `HeytaUiProvider as ThemeProvider`；那三张屏由
+      `ProfileScreen.tsx:748` 的 `return featureScreen(openFeature, …)` 交出去 ——
+      **元素是函数的返回值，不是 Provider 的 JSX 字面子节点**，所以按 JSX 树走的探针看不见它。
+      旁证**没有**（我差点写一条假的）：`grep -rn "profile-entry-\(growth\|habits\|countdown\)" scripts/`
+      只命中 `check-shell-surfaces.mjs:194` 那一行台账 ⇒ **没有任何设备脚本开过这三张第二层屏**，
+      "习惯页真机跑过所以不崩"这句话我拿不出来。运行时证据只有上面那条读码。
+      🔴 反过来这也说明：**下一趟 `pnpm verify:mobile-card-export` 是移动端倒数日这张屏第一次在真机/模拟器上被打开**
+      —— 它同时也是这条 Provider 判断的现场检验（如果它抛「必须在 `<HeytaUiProvider>` 内使用」，
+      那一趟会以"屏上找不到卡片标题"红掉，而不是以崩溃红掉，所以看日志时要记得这个岔路）。
+      🔴 **归属**：四条点名的文件在 `origin/main` 与 HEAD **逐字节相同**
+      （`git show origin/main:apps/mobile/src/screens/CountdownScreen.tsx | shasum -a 256` = `aabd4c2db0de` = HEAD 那份），
+      也就是说**这条红是 main 的已提交状态，本批一笔都没动过它** ⇒ 不吸收、不代改，
+      登记为"要改的是探针的遍历（要能穿过 `return helper(...)` 这一层），不是界面"。
+      ⚠️ 但这条登记有个前提要说清：`featureScreen()` 那层是**穷尽 switch 且没有 default**（见上面 M 组注释），
+      所以"新屏忘挂 Provider"这件事它本来就拦不住 —— 拦不住不等于拦错了。
   - ⚠️ **因此这张表不能打勾**：红的要靠重打产物消，未取证的两栏**只由 §5 第 4 条 `pnpm reinstall:all` 关闭**
     （四端装上当前产物），代码与静态门禁再绿都不算。补齐后在这里改 ✅ 并写装出来的包里"这一屏真在"的取证方式。
+  - ✅ **04 04:5x 前半句已经做到并消掉了**：`pnpm --filter @heyta/web build`（`RC_WEB_BUILD=0`）后单跑
+    `pnpm check:shell-surfaces` ⇒ **`RC_SURFACES=0` / 判定 5 格：5 绿 0 红 / 未取证 2 栏**，
+    与 04 03:0x 那次读数重新对齐。🔴 顺手否证了我自己写在 §8.4 那行里的一句前瞻：完整 `pnpm check`
+    **不可能**在这一格响，因为 `package.json:58` 那条串的第一段就是 `pnpm build` ——
+    "必须先重打产物否则必红"只在**单跑门禁**时成立。这张表仍不打勾：剩下的是那 2 栏，只有装包能关。
 - [ ] W8 完成
 
 #### ⏹ W9 · 提醒：本批做"能响的那半截"，原生投递另立一单
@@ -1686,12 +1711,24 @@ W0b ─> 随时可做（台账那半要等文件干净）
 | W2 `EVENT` 实体 | ✅ | D1/D2 ✅ | 4 + 静默门禁人工勾 | 20/7/17/41/30 passed；`listEvents` 已进 READ_PATTERNS 且三腿验过能红 |
 | W6 日历第二源 | ✅ **已闭合**（`e2def90f`，04 02:5x） | W2 | 2 | 判据本体（"没有截止日的倒数日能上日历"）+ 四个档位 + 侧栏那颗点各有真 DOM 判据；三层 14/8/13 passed + e2e 3 passed 五张图人看过；变异 5 臂逐臂只红自己那条。**原判"排后：落点被整片重写"这句由 `608fa5b1` 合流关闭**（详见 §8.2 那条 W6 节）。剩 **W6-G1**：接进「今天」/收集箱要先给 `TaskList` 一条"不可交互行"的契约变更，不属于这一批 |
 | W5 卡片网格 | ✅ | W2、W0 | 5 | 12 passed + 12 例变异 0 未证 + 9 道门禁 rc=0；e2e **6 passed**（整族 15 passed）、三张图已看、看图照出"逾期卡没有日期行"并修成 `94760c82`，两腿变异各红一次 |
-| W7 成品图导出 | 🟡 **三端出图已落地并取证**，待两臂变异才打勾 | W5 | 2（含 RN 出图取证） | 载体已从 `heyta-wt-w7` 换到 `feat/countdown-batch2`（合入 `43e94b32`，**现在已是 main 的祖先**）。**04 03:1x 现量**：mobile `card-export.spec.ts` **21 passed / `MOBILE_RC=0`**、真浏览器 `countdown-export.spec.ts` **5 passed / `EXPORT_E2E_RC=0`**、门禁 `check:card-export` rc=0、成品图实测 **1080×1440 逐字等于契约**（契约从 `shared-schema/dist` 读回来，不在测试里重推公式）、六张图**人已看**且已进版本库（`apps/web/evidence/countdown-export/` + README）。"零法务变更"改成可复跑：W7 往 manifest 加的只有 `<provider>`，`git diff 43e94b32^1 43e94b32` 里**零个 `<uses-permission>`** |
-| W8 三端接线 | 🟡 **三端代码 + 壳级门禁已在 batch2**，那格门禁 04 03:2x **自己变红了（红在产物落后）** | W5/W6 | 3 | 🔴 原先这行写"排后：同 W6，日历线未落地前不动 `CalendarScreen`"—— **那是按整条线推断出来的，现量否证过**：W8 的落点在 main 里逐个文件都干净，且 web 半已随 W5 落地。载体已从 `heyta-wt-w8` 换到 `feat/countdown-batch2`（合入 `f2d09974`）。**读数取两次，因为答案在二十分钟内变了**：04 03:0x ⇒ rc=0，5 格 = 5 绿 / 0 红；**04 03:2x ⇒ rc=1，4 绿 / 1 红**，红的格是 `[web] W5 产物比源码旧`（`dist 18:53 < src 19:40`）—— 差的正是我方 `e2def90f`（W6）+ 后台面板那两笔之后没重打 `apps/web/dist`，**不是新缺陷，是自家提交把这条判据甩下了**，修法是它点名的 `pnpm --filter @heyta/web build`（门禁的"不要用它修绿"清单里明确排除了手改 dist）。未取证仍是 2 栏（`desktop-macos / countdown · 产物`、`desktop-windows / countdown · 产物`，macOS 那栏现在连 sha256 都对不上：包里 `5ab36a445c57` vs 本地 `18865497ee11`），门禁自己那句话是承重判据："这份绿说的是**通道在**，**不是**装出来的包里有这一屏" ⇒ 两栏只由 §5 第 4 条 `pnpm reinstall:all` 关闭；🔴 **而它同时给这条线加了一条新前置：收尾那趟 `pnpm check` 之前必须先重打 web 产物，否则这一格必红**（本批自己造的红，不登记给别人） |
+| W7 成品图导出 | 🟡 **web 半到最终态**（A1/A3 两臂已跑）／**移动端出图的真机读数未取** | W5 | 2（含 RN 出图取证） | 载体已从 `heyta-wt-w7` 换到 `feat/countdown-batch2`（合入 `43e94b32`，**现在已是 main 的祖先**）。**04 03:1x 现量**：mobile `card-export.spec.ts` **21 passed / `MOBILE_RC=0`**、真浏览器 `countdown-export.spec.ts` **5 passed / `EXPORT_E2E_RC=0`**、~~门禁 `check:card-export` rc=0~~ ⚠️ **这条 03:1x 读数已作废**：A1 那一臂把 `packages/ui` 的 dist 打过又还原重打过，它描述的不是现在这份产物，收尾那趟必须重取。成品图实测 **1080×1440 逐字等于契约**（契约从 `shared-schema/dist` 读回来，不在测试里重推公式）、六张图**人已看**且已进版本库（`apps/web/evidence/countdown-export/` + README）。**04 04:3x 两臂变异**（装置已落库 `research/tools/mutate-w7-card-export-arms.mjs`，A1 臂 apply/revert 两侧强制 `pnpm --filter @heyta/ui build`，因为判据读的是产物）：A1 画布宽改「契约 − 8」⇒ **2 failed / 3 passed**，红落在 `:268`「1072×1440，契约要 1080×1440」+ `:312`「暗色那张不是一档规格数」＝**同一把尺子的两处使用**，不算越界；A3 宿主不传失败文案 ⇒ **1 failed / 4 passed**，红落在 `:360`「拿不到画布时界面必须说话」；revert 后 `card-export-layout.ts` 的 sha 回到链条开头的基线 `42708dc95156`。🔴 **还剩的一条不是判据，是证据**：设备真机出图（`pnpm verify:mobile-card-export`，装置已落库并做过探针自检）排在收尾第 4 项那一趟 —— 在它跑绿之前，"三端出图已落地并取证"这句话的**移动端那一半只能算代码在、读数无**。**"零法务变更"仍是可复跑的**：W7 往 manifest 加的只有 `<provider>`，`git diff 43e94b32^1 43e94b32` 里**零个 `<uses-permission>` |
+| W8 三端接线 | 🟡 **三端代码 + 壳级门禁已在 batch2**，那格门禁 04 03:2x 自己变红、**04 04:5x 重打 web 产物后 `RC_SURFACES=0`（5 绿 0 红）**；只剩 2 栏"装出来的包里有这一屏"待收尾④ | W5/W6 | 3 | 🔴 原先这行写"排后：同 W6，日历线未落地前不动 `CalendarScreen`"—— **那是按整条线推断出来的，现量否证过**：W8 的落点在 main 里逐个文件都干净，且 web 半已随 W5 落地。载体已从 `heyta-wt-w8` 换到 `feat/countdown-batch2`（合入 `f2d09974`）。**读数取两次，因为答案在二十分钟内变了**：04 03:0x ⇒ rc=0，5 格 = 5 绿 / 0 红；**04 03:2x ⇒ rc=1，4 绿 / 1 红**，红的格是 `[web] W5 产物比源码旧`（`dist 18:53 < src 19:40`）—— 差的正是我方 `e2def90f`（W6）+ 后台面板那两笔之后没重打 `apps/web/dist`，**不是新缺陷，是自家提交把这条判据甩下了**，修法是它点名的 `pnpm --filter @heyta/web build`（门禁的"不要用它修绿"清单里明确排除了手改 dist）。未取证仍是 2 栏（`desktop-macos / countdown · 产物`、`desktop-windows / countdown · 产物`，macOS 那栏现在连 sha256 都对不上：包里 `5ab36a445c57` vs 本地 `18865497ee11`），门禁自己那句话是承重判据："这份绿说的是**通道在**，**不是**装出来的包里有这一屏" ⇒ 两栏只由 §5 第 4 条 `pnpm reinstall:all` 关闭；~~🔴 **而它同时给这条线加了一条新前置：收尾那趟 `pnpm check` 之前必须先重打 web 产物，否则这一格必红**~~ **04 04:5x 两处现量把这句前瞻否证了，原地作废**：① 跑一次 `pnpm --filter @heyta/web build`（`RC_WEB_BUILD=0`）再单跑门禁 ⇒ **`RC_SURFACES=0` / 判定 5 格：5 绿 0 红 / 未取证 2 栏**，那格红**只是产物落后**，不是缺陷；② 更关键的是 `pnpm check` 的**第一段就是 `pnpm build`**（`package.json:58`），所以完整收尾那趟**结构上不可能**在这一格响 —— 我那条"必红"前瞻是把"单跑门禁"的条件错写成了"跑 check"的条件。**本批自己造的红，不登记给别人**，但它同样不能被登记成别人拆不掉的墙 |
 | W9 提醒（web 半 + DST） | ✅ web 半 | 可与 W2 并行 | 3 | 42/28/40 passed；变异 9 臂 9/9 红、0 未证；移动端那半**没动** |
 | W10 AI 工具目录 | ✅ | **W2 之后** | 3 + 差集归零 | 130/223/1019 passed；变异**第一趟 3 臂无牙**→补判据→第二趟 6/6 红 |
 | W4b 调休通道 + ADR | ✅ **到最终态（04 04:4x）**：判据①②真界面读数 + 三臂变异各红自己那条 + 载体敞口已清零 | 独立（1 条迁移） | 4 | 全链已进 main（`6735cc39`/`b05fbc50`/`67fef701` + 服务端那 4 笔 + `check:public-facts` 八臂 8 红）。**04 03:2x**：判据②的后台面板落了（`AdminPanel.tsx` 的 `HolidayPanel`），`e2e/tests/admin-console.spec.ts` 整套 **6 passed / `ADMIN_RERUN_RC=0`**，图在 `apps/web/evidence/admin-holiday/`。🔴 这一趟最值钱的是**看图照出整格被挤成「2026…」**（04 04:2x 更正：这一句原先写"年份被挤成"，把缺陷说小了 —— 省略号截掉的是「2 天安排 · 国务院办公厅通知」整段，只有打开那张图看得出来）⇒ 修 CSS + 判据改几何（`scrollWidth-clientWidth<=1`）**并自带正向对照**（先断 `clientWidth>100`，否则"没参与布局"的 `0-0=0` 让判据永远通过——这个坑由它自己的第一趟假绿照出来：Playwright 03:21:33 就加载了 spec，判据 03:22:11 才写进去，那趟"6 passed"里根本没有它）。另补 `e2e/tests/helpers.ts:stubPublicFacts`：本批的开机拉取会把任何带"不该有非 2xx"守卫的套件无关地拖红（实测一次红五条）。**04 04:1x 第二版修复的读数**：同一套件 `6 passed / RC_W4B_OK=0`；**04 04:1x–04:4x 收口**：三臂 `RC_B1/B2/B3` 全 =1 且各红自己那条（`:887` / `:889` / `:909` 正向对照），还原后 `RC_RESTORE_ADMIN=0`（6 passed）、四个被改文件的 `shasum` 逐字等于链条开头的基线，`inbox.spec.ts` 先 `RC_INBOX_PRE=1`（2 failed）后 `RC_INBOX_POST=0`（3 passed），修复两笔入库 `87109e9e`（CSS/面板）+ `3b24f5b4`（e2e 载体），装置落版本库 `research/tools/mutate-w4b-papers-arms.mjs`（含一臂 **B4 未跑**，登记在装置文件头）。逐项读数与"第一版修复其实无效"那段在本节 W4b 的表里。
 改前/改后两张图 md5 **不同**（`8970c732…` / `f14afbc0…`，早先它们逐字节相同过，那等于什么都没证），
 看图后的两条例外都写进 [`../apps/web/evidence/admin-holiday/README.md`](../../apps/web/evidence/admin-holiday/README.md) |
 | L' 法务联动 | 🟡 判定表已出、命中已修；**它立的门禁现在响在 main 的已提交状态上** | 随最后一个改承诺的工单 | 4 | 普查 82 行 → 唯一真命中已修（`2d53ea94` + `8996de9d` + `1d71e75f`/`017adc3e`，13 臂变异全红）。🔴 **读数取三次，每次载体不同**：04 03:0x 在**主检出** ⇒ rc=1 / **2 条红**（那四句 `permissions.ts` 已被并行会话在未提交的工作树里翻掉）；04 03:5x 在**本批工作树** ⇒ rc=1 / **7 条红**；把**只含 `origin/main` 已提交内容**的七份输入喂给同一份脚本（`HEYTA_CHECK_ROOT` 探针，命令在 §8.2 L' 第 1b 条）⇒ **rc=1 / 7 条红，与喂 `HEAD` 那份逐字相同**。⇒ 归属从"别人的在飞工作树"升级为**"`b0ba4a35`（W9 原生投递）已提交在 main 上的矛盾"**：六句对外承诺没翻 + `SCHEDULE_EXACT_ALARM` 未登记（那条臂 A13 是**故意**要它响）。**不由本批代改**（是 W9 的产品/法务判断，且合流的人必须把六句 + `check:legal-copy` 同批做完）。关闭判据：`node scripts/check-legal-permissions.mjs` rc=0（每次引用本条重跑，并写明在哪个载体跑的） |
-| 收尾四项（§5） | 🟡 **两条已量，两条待安静窗口** | 全部 | 4 | ✅ 第 2 条：`node research/tools/docs-link-check.mjs` 在本检出 ⇒ **rc=0 / 死链 0 处**（⚠️ 那句"33 处"是**主检出**的读数，死链数是"仓库+本机未跟踪文件"的属性，引用必须带在哪跑的）。✅ 第 3 条：W6 五张、W7 六张、W4b 一张**都打开看过**，各自 README 写了"看见了什么"，并且**看图一共照出三处断言抓不到的东西**（W5 少一行日期 / W7 竖条不是主蓝 / W4b 年份被挤没）。⏹ 第 1 条完整 `pnpm check`（68 段，含 `check:ai-e2e` 与 `check:legal-permissions` ⇒ 后者会在 main 自带的那条红上响，读数要分段写明在谁手里）。⏹ 第 4 条 `pnpm reinstall:all` 四端 + 私有现场设备验收（排在最后；⚠️ 现场核对：Android 模拟器 `emulator-5554` 在线、iOS 起了 **两台**（`heyta-iphone-17pro` + 别人的 `heyta-ios-isolated`）、`windows-pc` SSH 可达 ⇒ 这一段是**共享资源**，动设备前要先看谁在用） |
+| 收尾四项（§5） | 🟡 **三条已量（第 1 条分两趟），第 4 条待跑** | 全部 | 4 | ✅ 第 2 条：`node research/tools/docs-link-check.mjs` 在本检出 ⇒ **rc=0 / 死链 0 处**（⚠️ 那句"33 处"是**主检出**的读数，死链数是"仓库+本机未跟踪文件"的属性，引用必须带在哪跑的）。✅ 第 3 条：W6 五张、W7 六张、W4b 一张**都打开看过**，各自 README 写了"看见了什么"，并且**看图一共照出三处断言抓不到的东西**（W5 少一行日期 / W7 竖条不是主蓝 / W4b 年份被挤没）。⏹ 第 1 条完整 `pnpm check`（68 段，含 `check:ai-e2e` 与 `check:legal-permissions` ⇒ 后者会在 main 自带的那条红上响，读数要分段写明在谁手里）。⏹ 第 4 条 `pnpm reinstall:all` 四端 + 私有现场设备验收（排在最后；⚠️ 现场核对：Android 模拟器 `emulator-5554` 在线、iOS 起了 **两台**（`heyta-iphone-17pro` + 别人的 `heyta-ios-isolated`）、`windows-pc` SSH 可达 ⇒ 这一段是**共享资源**，动设备前要先看谁在用） |
+
+🔴 **04 04:45–04:49 收尾第 1 条的第一趟已量**（载体 `7d1b85b3`，命令 `HEYTA_REPO_ROOT=$PWD node research/tools/check-segments.mjs --skip check:ai-e2e`，起点 load 11.97）：**67 段 = 60 绿 / 7 红**，前面还先跑了 `RC_WEB_BUILD=0`（那条红的 W5 产物格因此转绿）。七条红逐条给归属，不打包成"仓库还红着"：
+
+- ① `check:theme` —— **本批的**（W7 两个测试直接拿 L0 原始表）⇒ 已修 `816dea4c`，改走 `tokensForTheme()`，两套件复跑 **16 + 21 全绿**；
+- ② `check:server-legal` —— **本分支的生成物落后真源一格**（`privacy@1.1→1.2`，`ai-and-transfer` 两边都已经是 1.1）⇒ 重生成，门禁 rc=0；
+- ③ `check:shell-unicode` —— 21 处（我的设备脚本 15 + 合流带进来的 `mutate-closeout-gates.sh` 6）⇒ 用仓库自带的 `fix-shell-unicode-vars.py --write` 修，rc=0；
+- ④ `pnpm -r test` —— **本分支落后 main**：先是 op-log 的 EVENT 夹具 `opId` 不唯一 ⇒ 同一实体第二条 op 被 ADR-0009 幂等去重静默吞掉（main `94a0bb13` 已修）；取过来之后 `pnpm -r` 往下走，又在 server 段露出 **6 文件 / 61 条红**，逐条查下来**没有一条是本批造的**：`setup.ts` 的 `$executeRaw` 要回 **1** 才表示"行锁拿到了"，那是 `5d0b27b9`（vault 那条线）改的，本分支停在 merge-base 的 **0** ⇒ `Unmocked raw query in tx: SELECT id FROM users … FOR UPDATE` 把四份 spec 连坐（第五份 `duplicate-operation-precheck.spec.ts` 与 main **逐字节相同**，红只来自 setup）；第六条 `admin-log-pii` 的"正向对照"读 `git show HEAD:` —— **修复一旦提交，HEAD 就是修好的版本，命中数变 0**，也就是这条判据只在"修复还没提交"那个窗口里有牙，main 已改成沿 `git log --all` 找"最后一份还带违规的源"。六份都取回 ⇒ `2924b15d`，server 段 **119 files / 2196 passed / 1 skipped / rc=0**；
+- ⑤ `check:ui-provider` —— **main 的**（四条点名的文件与 `origin/main` 逐字节相同，且它是探针局限不是崩溃，见上面 W8 节那条）；
+- ⑥ `check:legal-permissions` —— **main 的**（W9 那六句，见 §8.2 L' 第 1b 条）；
+- ⑦ `check:licenses:stamp` —— **载体不够**：本工作树重渲染会**少 132 个包**（961 vs 清单里的 1093，`@expo/*`/`@babel/*` 那一整片都不在），也就是门禁给的修法在这棵树上会产出一个**更差**的产物 ⇒ 已回滚，登记给装齐全部 workspace 的检出。
+
+📌 两条一般形状：**"清单已过期"的修法不是"重渲染"，是"在装齐的树上重渲染"** —— 门禁自己那句只写了"缺 `e2e/`"这一种，而 linked worktree 是第二种，症状相同（数字变小）、方向相反（越修越瞎）。另一条：**`pnpm -r test` 在第一个失败包就停**，所以"某段 rc=1"完全可能只量到了 21 个包里的第 14 个 —— 报"全量绿"之前要数**跑到了第几个包**，不是数红了几条。
