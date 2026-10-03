@@ -245,7 +245,7 @@ function toIntent(name: string, a: Record<string, unknown>): ToolWriteIntentOutc
       };
     }
 
-    case 'complete_task_MUTATED': {
+    case 'complete_task': {
       if (typeof a['taskId'] !== 'string') {
         return { ok: false, message: 'complete_task 需要 taskId。' };
       }
