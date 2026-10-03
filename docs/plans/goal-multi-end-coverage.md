@@ -776,8 +776,9 @@ mac/windows 两段能不能顺带免掉？**按打包脚本吃的路径判，不
 要么别人刚关完，要么那次 `simctl` 调用本身没成功 —— **两种都可能**，所以 ios 段之前要连跑两遍确认，
 别拿单趟读数当现状（§7 元规则 1：先怀疑探针）。
 
-⇒ **本轮如实记：§6.1.1 这一轮未跑**（android/ios 两段是欠的，mac/windows 两段按包输入判与本批无关）。
-窗口条件与现量命令（下一次接手照这条走，别重新推导）：
+⇒ **本节写于 12:1x，当时的结论是"本轮未跑"。这个结论已被 13:5x 那一轮推翻**：
+android 段跑绿（并且顺带照出一处假绿，见 §7.19），ios 段被 `pod install` 挡住 ——
+**缺口从"两段没跑"变成"一段跑绿、一段有形状的阻塞"**。窗口条件与现量命令仍然有效，留在下面。
 
 > ⚠️ 负载门在这一轮**已经被并行会话抽成单一所有者** `scripts/lib/wait-for-quiet-host.sh`
 > （`1d085a92`，11:34「负载门抽成单一所有者，并给 `verify-mobile-repeat` 补上它」）。
@@ -869,3 +870,75 @@ pnpm reinstall:mobile                      # 只欠 android + ios 两段
    两种解释都可能（别人刚关完 / 那次调用本身没成功），单趟无法区分 —— 这正是元规则 1
    （"没观测到 X" ≠ "X 没发生"）在设备清单上的落点。重装与设备验收之前，
    `adb devices` 与 `simctl list devices booted` 各连跑两遍，不一致就当读数无效重取。
+   ⚠️ 本条这一轮**自己撞上了**：12:18 读到 `emulator-5554` 在，12:39 同一台 AVD 起来时编号变成
+   `emulator-5556` —— 照旧值传 `HEYTA_E2E_SERIAL` 会让 android 段"不可达"而红。
+   **设备序列号是每次现取的，不是常量。**
+
+### 7.19 🔴 §6.1.1 重装：android 跑绿，而**它第一次的绿是假的**——判据把一张桌面启动器判成"是共享 UI"（13:5x，提交 `57e0e1fc`）
+
+跑 `reinstall-all.sh --only android,ios`（隔离检出，`1ac5913a`）：
+
+| 端 | 第一趟（12:39–12:42） | 修判据后（13:50–13:51，`57e0e1fc`） |
+|---|---|---|
+| android | ✅ 打印"内容占比 92.0%、主蓝命中 29、是共享 UI" —— **但截图人打开看是桌面启动器**（`android-launcher-false-green-57e0e1fc.png`：状态栏 12:42、"Sat, Oct 3"、五个系统图标 + Google 条） | ✅ **`前台窗口确认：mCurrentFocus=Window{… com.heyta/com.heytamobile.MainActivity}`**、窗口 1080x2400、内容占比 58.3%、**主蓝命中 4001**、`ANDROID_REINSTALL_EXIT=0`；截图 `android-reinstall-57e0e1fc.png` 已人眼看：真中文首启同意面板（同意并联网=主蓝实心、只用本机=描边） |
+| ios | 🔴 `pod install` 崩（见下） | 未重跑（同一枚阻塞） |
+
+**这条假绿为什么比 §7 第 82 条更贵**：那一条补的"主蓝命中"判据，在**启动器上也会命中 29 次** ——
+Chrome 图标、信息气泡、Google 搜索栏本来就是蓝的。也就是说
+**"非空白 + 有品牌色"两条合起来仍然回答不了"这是不是我们的界面"**。
+而"谁拥有前台窗口"这件事有一个比像素统计**便宜得多也直接得多**的读数（`dumpsys window | grep mCurrentFocus`），
+判据却一直只在数像素。修法已提交（`57e0e1fc`）：截图前读 `mCurrentFocus` + `mResumedActivity` 两条
+（互为对照，不同 Android 版本给的字段不一样），不是 `com.heyta` 就 `am start -W` 显式拉起再读一次，
+仍然不是 ⇒ **不打分**；两条探针都读空 ⇒ **也不打分**（静默跳过等于这条判据是装饰）。
+
+⚠️ **产品侧结论：App 是好的**。假绿那一趟里 `adb shell pidof com.heyta` = 3766、crash buffer 空，
+补一次 `am start -W` 后焦点立刻变成我们的 Activity。红的是探针，不是产品 —— 这一句必须写下来，
+否则下一位看到"launcher 截图"会以为装出来的包起不来。
+
+ 顺带一条对 §7.15 的**补强**：修后那一趟主蓝 **4001**，与上一轮全绿重装的 **4036** 同一量级（差 0.9%）
+⇒ 本批那 8 处容器替换在设备层没有可见代价。⚠️ 但**这不构成严格 A/B**（两趟之间并行批次也往同一屏加了东西，
+比如"倒计时"档位），严格的零视觉证明仍是 §7.15 那张"调用 → `kit` 实际发出的样式"逐字对照表。
+
+**ios 段的阻塞（`pod install`，本轮新增取证）**：
+
+| 臂 | 结果 |
+|---|---|
+| 长活隔离检出 `/tmp/heyta-g5` | 🔴 `ArgumentError - path name contains null byte`，`cocoapods-1.17.0/lib/cocoapods/project.rb:452` `Pathname#realdirpath`，崩在 `Generating Pods project`（5 个 codegen spec 全部生成完、全部 pod 装完之后） |
+| 🔴 **traps #154 给的 remedy：同 commit 现开新克隆**（`git clone --no-hardlinks` + `pnpm install` @ `1ac5913a`） | **仍然崩，同一处栈** ⇒ **那条 remedy 已被本轮实测否证**（它当时量到的是"新克隆两次都 exit 0"） |
+| `LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8 pod install` | 🔴 仍然 exit 1，同一处 ⇒ 语言环境变量**不是**变量 |
+| `pod install --verbose` | 🔴 同一处栈；崩溃前的文件清单里没有非 ASCII 路径 |
+| 工具链漂移 | 排除：`/opt/homebrew/Cellar/cocoapods/` 只有 `1.17.0`，目录 mtime **Sep 25 22:21**（不是今天），ruby 4.0.7 |
+| `Podfile.lock` 自上一趟绿（`840effb1`）以来的差 | 只有 **一行**：`ReactCodegen` 的哈希（codegen 产物哈希，随任意原生模块变）⇒ 没有新增 pod |
+| 变更集里的非 ASCII 文件名 | `git diff --name-only 840effb1..1ac5913a` 共 250 个路径，`LC_ALL=C grep '[^ -~]'` **0 命中** |
+
+⇒ 现状：**四臂排除（树龄 / LANG / 工具链 / 文件名），根因未定位**，与 #154 当年一样卡在
+"要扫 `node_modules` 里 1.9 GB 的文件名才能知道哪个路径让 Ruby 拿到 NUL"。
+**这不是本条线能当场修的**，且它挡住的是"把当前源码装进 iOS 设备"这一步，不是产品行为。
+需要的是：一台 `pod install` 能过的机器（或换 ruby 3.x 下的 cocoapods），或上游修
+（CocoaPods #12798 / #12866，两条都还 open）。
+🔴 **`environment-traps.md` #154 那句"现开新克隆就能过"必须更正** —— 本轮实测否证，
+而它现在读起来像解法。这条更正**没有直接写进那个文件**，因为它此刻正被并行会话写着
+（工作树 +48 行未提交，#178–#180 是他们的），按同一份台账的规矩（多人台账正脏着时不追加、
+不整文件 `git add`）登记在这里 + 下面 §7.20 的动作项。
+
+### 7.20 Goal 终局审计（2026-10-03 13:5x）：① ② 全绿，③ 的 `check` 达成、重装差一段
+
+| objective 里的条款 | 状态 | 读数与出处 |
+|---|---|---|
+| ① 批五③ 移动端还原卡 JSX + i18n 中英复验 | ✅ | `git show HEAD:apps/mobile/src/screens/ExportScreen.tsx` 里 `restoreFromBackup`/`parseExportDocument`/`restoreIntoEmptyTarget` 三个符号**共 5 处命中**；`check:ui-language` exit 0；中英词条对等由 `@heyta/i18n` 的用例钉着（本轮 `pnpm -r test` 全过） |
+| ② 批五④ 设备判据转绿 + 变异 + 截图人看 + 审计回填 | ✅ | §7.6（26 项 / 0 失败）、§7.9（两条变异臂在当前产物上重证）、§7.12–§7.13（链逐段读数） |
+| ③ `pnpm check` 全量绿 | ✅ **达成** | §7.17：干净检出 @ `1ac5913a`，61 段一次跑完，`FULL_CHECK_INNER_EXIT=0`。**没有放宽任何基线、没有改别人的判据**；三段红（l4 / landing-e2e / shell-unicode）各自当场修 |
+| ③ `pnpm reinstall:all` 四端重装绿 | ⚠️ **差一段** | android ✅（`57e0e1fc`，含新加的前台窗口判据）；mac / windows ✅ 但**是 09:5x 那一趟的读数**，本批按包输入证明它们不受影响（`package-app.sh` 只吃 `apps/web`+`packages/app-host`）；**ios 🔴 被 `pod install` 挡住**（§7.19 那张表） |
+| ③ 按归属纪律提交 | ✅ | 本条线这一轮 7 笔：`e446e54e` `f79d3733` `1ac5913a` `661cff78` `860fe82a` `57e0e1fc` + 本笔。全部 `git commit --only <点名路径>`，每笔之后 `git show --name-status` 只含自己点名的路径（`e446e54e` 13 条、`f79d3733` 2 条、`1ac5913a` 1 条、`661cff78` 2 条、`860fe82a` 1 条）。暂存区在提交前实测 `git diff --cached --name-only \| wc -l` = **10**，全是我自己那 10 条 rename，**没有别人的暂存条目被带走** |
+
+**没做的，逐条列名 + 现量命令**（不写成"以后再说"）：
+
+1. **ios 段重装** —— 阻塞在 `pod install`（§7.19）。要跑：换一台 `pod install` 能过的机器后
+   `IOS_DEVICE_NAME="heyta-iphone-17pro" bash scripts/reinstall-all.sh --only ios`。
+   在此之前，"iOS 装的是当前源码"这句**不成立**，别引用 09:5x 那趟的 iOS 读数代替它。
+2. **落地页重新部署** —— `e446e54e` 改了用户可见 URL 前缀，线上现量 `assets/help` 200 / `assets/docs` 404
+   （§7.16）。发布要产品负责人点头。
+3. **traps #154 的 remedy 更正** —— 本轮否证（新克隆同样崩）。写回原句的动作留给
+   `environment-traps.md` 没有未提交改动的时候做（现量：`git diff --numstat docs/reference/environment-traps.md`）。
+4. **`check:macos-window` 四条跳过分支仍返回 exit 0** —— 登记在案、**尚未拍**的老缺口，本轮没动它。
+5. **M3 的 41 处内联样式** —— 现在住在基线 90 里，B18 **没有解除**，只是不再表现为红。
