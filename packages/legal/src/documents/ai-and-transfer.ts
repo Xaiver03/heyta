@@ -302,7 +302,7 @@ const zh = [
           [
             '1.1',
             '2026-10-03',
-            '第六节那张本机接口工具表加了四条倒数日工具（`list_events` / `get_event` / `create_event` / `update_event`），并写明倒数日标题往往本身就是内容；对账门禁 `pnpm check:legal-tools` 同批落地。',
+            '第六节那张本机接口工具表加了四条倒数日工具（`list_events` / `get_event` / `create_event` / `update_event`），并写明倒数日标题往往本身就是内容。这份清单与产品内的工具目录逐一核对，产品新增工具时会同步更新这里。',
           ],
           [
             '1.2',
@@ -586,7 +586,7 @@ const en = [
           [
             '1.1',
             '2026-10-03',
-            'The local-interface tool table in section six gained the four countdown tools (`list_events` / `get_event` / `create_event` / `update_event`), together with the note that a countdown title is often itself the content; the reconciliation gate `pnpm check:legal-tools` landed in the same batch.',
+            'The local-interface tool table in section six gained the four countdown tools (`list_events` / `get_event` / `create_event` / `update_event`), together with the note that a countdown title is often itself the content. This list is reconciled one-by-one against the tool catalogue inside the product, and it is updated whenever a new tool is added.',
           ],
           [
             '1.2',
