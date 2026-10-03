@@ -258,6 +258,16 @@ i18n **中英同步**（唯一文案事实源，`check:ui-language` 拦）；`SH
    W0 / W2 / W5 / W10 已闭合、W9 落了 web 半、W4b / W7 / W8 在并行工区里跑，
    **只有 W6 与 L 系列仍未开工**。现量读数一律看 §8.4 那张表，不要看这一条。
 
+   🔴 **04 05:0x 二更：连这句更正本身又过期了**，而且这次过期在**第二天早上**——它写"只有 W6 与 L 系列仍未开工"时，
+   W6 已经落地（`e2def90f`），L' 命中的那条也已经**并进 main**（取证：`git show origin/main:packages/legal/src/documents/ai-and-transfer.ts`
+   里中英两张表都有 `list_events`/`get_event`/`create_event`/`update_event` 四行，第 305 行还有一条变更记录写明
+   "第六节那张本机接口工具表加了四条倒数日工具"；本分支那份只到 `1.1`，main 那份已是 `1.2` ⇒ **是 main 走在前面，不是本批没做**）。
+   而此刻踩响 `check:legal-permissions` 的那条红**也不属于 L'**：它指的是 `third-parties.ts` 推送 SDK 的英文否表行
+   仍写「The mobile app requests no notification permission」，而 `AndroidManifest.xml` 已声明 `POST_NOTIFICATIONS`、
+   `Info.plist` 已声明 `NSUserNotificationsUsageDescription` —— 那是 **W9 原生投递那条线**的对外条款联动。
+   这条更正留在这里的意义只剩一个：**欠账清单类句子的保质期以"小时"计，凡是要引用的都必须现量重取**；
+   而这份文档里唯一不会过期的入口是 §8.4 那张表，它每一格都带"在哪测的 + 测于何时"。
+
 ### 合入时必须做的事 —— 2026-10-03 上午收口结果（逐条带读数）
 
 原条目**保留原文**，一是让后来者看清"合入前必须先做什么"这件事的形状，二是其中两条的**理由被实测否证了**，更正必须写在原句旁边。
@@ -303,6 +313,12 @@ i18n **中英同步**（唯一文案事实源，`check:ui-language` 拦）；`SH
    ✅ `对得上当前 lockfile（111cc2d1d04d3763）`，**RC=0**；跑完 `git worktree remove --force` + `prune` 收掉。
    这才是"能进 `pnpm check`"这句话的证据 —— temp 目录里手搓的那一份只能证明文件比较逻辑，
    证明不了 HEAD 这棵树的产物与 lockfile 是对得上的。
+   ⚠️ **04 05:1x 补一句：上面那两次 RC=0 都是**当时那把 lockfile（`111cc2d1d04d3763`）**的读数，而它已经变了**——
+   `2f735392`（10-03 23:58"并行批次的总接线"）把本分支的 lockfile 换成了 `0f3c1bf6d9e21526`，清单没跟着走，
+   于是这一格在 04:45 那趟 sweep 里红了。这条红**是本分支的**（main 那份清单早已重渲染到 `0f3c…`），
+   修法是取 main 那份（与本地 `diff` 只差戳行 + 生成日期两行，正文 1128 行逐字节相同）⇒ 现量 `--check-stamp` **rc=0**。
+   📌 这条门禁"不需要装任何东西"的优点反过来看就是它的**暴露面**：戳对不上时它不需要任何东西就能红，
+   所以**任何一笔动了 lockfile 的提交都会立刻把它踩响**，包括那些只是把别人的接线合过来的提交。
    📌 它能进 `pnpm check` 而内容级的 `--check` 不能，全部差别在一件事上：**它不需要装任何东西**。
    ⚠️ 等的时候照出来一条**归他们**的风险 —— "`package.json` 里已经引了
    `check:mobile-first-run-gate`，而它指向的脚本还是未跟踪状态" ⇒ 那时任何一笔从 HEAD
@@ -1719,7 +1735,7 @@ W0b ─> 随时可做（台账那半要等文件干净）
 改前/改后两张图 md5 **不同**（`8970c732…` / `f14afbc0…`，早先它们逐字节相同过，那等于什么都没证），
 看图后的两条例外都写进 [`../apps/web/evidence/admin-holiday/README.md`](../../apps/web/evidence/admin-holiday/README.md) |
 | L' 法务联动 | 🟡 判定表已出、命中已修；**它立的门禁现在响在 main 的已提交状态上** | 随最后一个改承诺的工单 | 4 | 普查 82 行 → 唯一真命中已修（`2d53ea94` + `8996de9d` + `1d71e75f`/`017adc3e`，13 臂变异全红）。🔴 **读数取三次，每次载体不同**：04 03:0x 在**主检出** ⇒ rc=1 / **2 条红**（那四句 `permissions.ts` 已被并行会话在未提交的工作树里翻掉）；04 03:5x 在**本批工作树** ⇒ rc=1 / **7 条红**；把**只含 `origin/main` 已提交内容**的七份输入喂给同一份脚本（`HEYTA_CHECK_ROOT` 探针，命令在 §8.2 L' 第 1b 条）⇒ **rc=1 / 7 条红，与喂 `HEAD` 那份逐字相同**。⇒ 归属从"别人的在飞工作树"升级为**"`b0ba4a35`（W9 原生投递）已提交在 main 上的矛盾"**：六句对外承诺没翻 + `SCHEDULE_EXACT_ALARM` 未登记（那条臂 A13 是**故意**要它响）。**不由本批代改**（是 W9 的产品/法务判断，且合流的人必须把六句 + `check:legal-copy` 同批做完）。关闭判据：`node scripts/check-legal-permissions.mjs` rc=0（每次引用本条重跑，并写明在哪个载体跑的） |
-| 收尾四项（§5） | 🟡 **三条已量（第 1 条分两趟），第 4 条待跑** | 全部 | 4 | ✅ 第 2 条：`node research/tools/docs-link-check.mjs` 在本检出 ⇒ **rc=0 / 死链 0 处**（⚠️ 那句"33 处"是**主检出**的读数，死链数是"仓库+本机未跟踪文件"的属性，引用必须带在哪跑的）。✅ 第 3 条：W6 五张、W7 六张、W4b 一张**都打开看过**，各自 README 写了"看见了什么"，并且**看图一共照出三处断言抓不到的东西**（W5 少一行日期 / W7 竖条不是主蓝 / W4b 年份被挤没）。⏹ 第 1 条完整 `pnpm check`（68 段，含 `check:ai-e2e` 与 `check:legal-permissions` ⇒ 后者会在 main 自带的那条红上响，读数要分段写明在谁手里）。⏹ 第 4 条 `pnpm reinstall:all` 四端 + 私有现场设备验收（排在最后；⚠️ 现场核对：Android 模拟器 `emulator-5554` 在线、iOS 起了 **两台**（`heyta-iphone-17pro` + 别人的 `heyta-ios-isolated`）、`windows-pc` SSH 可达 ⇒ 这一段是**共享资源**，动设备前要先看谁在用） |
+| 收尾四项（§5） | 🟡 **三条已量（第 1 条分两趟），第 4 条待跑** | 全部 | 4 | ✅ 第 2 条：`node research/tools/docs-link-check.mjs` 在本检出 ⇒ **rc=0 / 死链 0 处**（⚠️ 那句"33 处"是**主检出**的读数，死链数是"仓库+本机未跟踪文件"的属性，引用必须带在哪跑的）。✅ 第 3 条：W6 五张、W7 六张、W4b 一张**都打开看过**，各自 README 写了"看见了什么"，并且**看图一共照出三处断言抓不到的东西**（W5 少一行日期 / W7 竖条不是主蓝 / W4b 年份被挤没）。⏳ 第 1 条完整 `pnpm check`：**分两趟逐段量完了 66/68 段**（装置 `research/tools/check-segments.mjs`，段的来源是 `package.json:58` 那条真串而不是抄的名单，`--skip` 的选择器会报分母）。第一趟 04:45–04:49 @ `7d1b85b3`：**67 段 / 60 绿 / 7 红**；四笔提交把其中 4 条按各自真因修掉（`816dea4c` theme / server-legal / shell-unicode，`2924b15d` 取回 main 已落的 6 份测试修复）；第二趟 05:0x–05:12 @ `e25377f7`：**66 段 / 63 绿 / 3 红**；那三条红随后逐条对账，**其中一条当场被现量否证并修掉**（`check:licenses:stamp` —— main 早就重渲染过那份清单，取回即可，见下面第 ⑦ 条），剩下 **2 条是本批之外的已提交状态** —— `check:ui-provider`（探针穿不过 `return featureScreen(...)` 那层，四条点名文件在 `origin/main` 与 HEAD **逐字节相同**）、`check:legal-permissions`（红在 `third-parties.ts` 推送 SDK 的英文否表行 vs `POST_NOTIFICATIONS`/`NSUserNotificationsUsageDescription`，属 **W9 原生投递那条线**，不是 L'）。**没量的两段**（`pnpm -r test` 全量 + `check:ai-e2e`）排在设备窗口那一趟里（`/tmp/batch2-closeout.sh` 第 [5]/[5b] 步），原因是这两条都在**抢 CPU 或抢 vite**：另一条会话此刻正在跑它自己的 `reinstall:all`（载体 `d0a81927`，不是本批），它的设备段自带负载门，并发跑会把它的窗口挤没 —— 那正是 §8.9 禁止的事。⏹ 第 4 条 `pnpm reinstall:all` 四端 + 私有现场设备验收（排在最后；⚠️ 现场核对 **05:0x 现量**：Android 模拟器 `emulator-5554` 在线、iOS 起了 **两台**（`heyta-iphone-17pro` + 别人的 `heyta-ios-isolated`）、`windows-pc` SSH 可达，而**这三样此刻全在另一条会话的重装链手里** ⇒ 本批这一趟已改成**串行排队**（等对方链退出 + 负载门 ncpu*3/4 + 工作树必须干净 + 4318/4319 与测试锁空才跑 `check:ai-e2e`，等满记 exit 3 = 环境无效而非产品失败） |
 
 🔴 **04 04:45–04:49 收尾第 1 条的第一趟已量**（载体 `7d1b85b3`，命令 `HEYTA_REPO_ROOT=$PWD node research/tools/check-segments.mjs --skip check:ai-e2e`，起点 load 11.97）：**67 段 = 60 绿 / 7 红**，前面还先跑了 `RC_WEB_BUILD=0`（那条红的 W5 产物格因此转绿）。七条红逐条给归属，不打包成"仓库还红着"：
 
@@ -1729,6 +1745,13 @@ W0b ─> 随时可做（台账那半要等文件干净）
 - ④ `pnpm -r test` —— **本分支落后 main**：先是 op-log 的 EVENT 夹具 `opId` 不唯一 ⇒ 同一实体第二条 op 被 ADR-0009 幂等去重静默吞掉（main `94a0bb13` 已修）；取过来之后 `pnpm -r` 往下走，又在 server 段露出 **6 文件 / 61 条红**，逐条查下来**没有一条是本批造的**：`setup.ts` 的 `$executeRaw` 要回 **1** 才表示"行锁拿到了"，那是 `5d0b27b9`（vault 那条线）改的，本分支停在 merge-base 的 **0** ⇒ `Unmocked raw query in tx: SELECT id FROM users … FOR UPDATE` 把四份 spec 连坐（第五份 `duplicate-operation-precheck.spec.ts` 与 main **逐字节相同**，红只来自 setup）；第六条 `admin-log-pii` 的"正向对照"读 `git show HEAD:` —— **修复一旦提交，HEAD 就是修好的版本，命中数变 0**，也就是这条判据只在"修复还没提交"那个窗口里有牙，main 已改成沿 `git log --all` 找"最后一份还带违规的源"。六份都取回 ⇒ `2924b15d`，server 段 **119 files / 2196 passed / 1 skipped / rc=0**；
 - ⑤ `check:ui-provider` —— **main 的**（四条点名的文件与 `origin/main` 逐字节相同，且它是探针局限不是崩溃，见上面 W8 节那条）；
 - ⑥ `check:legal-permissions` —— **main 的**（W9 那六句，见 §8.2 L' 第 1b 条）；
-- ⑦ `check:licenses:stamp` —— **载体不够**：本工作树重渲染会**少 132 个包**（961 vs 清单里的 1093，`@expo/*`/`@babel/*` 那一整片都不在），也就是门禁给的修法在这棵树上会产出一个**更差**的产物 ⇒ 已回滚，登记给装齐全部 workspace 的检出。
+- ⑦ ~~`check:licenses:stamp` —— **载体不够**：本工作树重渲染会**少 132 个包**（961 vs 清单里的 1093，`@expo/*`/`@babel/*` 那一整片都不在），也就是门禁给的修法在这棵树上会产出一个**更差**的产物 ⇒ 已回滚，登记给装齐全部 workspace 的检出~~
+  🔴 **04 05:1x 就地否证并撤回**：那句"登记给装齐全部 workspace 的检出"把范围说成了**别人**，而现量是**main 早就重渲染过了**。三条命令：
+  `git show origin/main:pnpm-lock.yaml | shasum -a 256` = `0f3c1bf6d9e21526` = **本分支那份 lockfile 的指纹**（逐字节相同），
+  而 `git show origin/main:research/licenses-inventory.generated.md` 的戳也已经是 `0f3c1bf6d9e21526` ⇒ **main 在这一格是绿的，红的只是我这条分支**；
+  两份 generated 文件 `diff` 只差 **4 行**（戳行 + `生成时间：2026-10-03→10-04`），依赖清单正文 1128 行 / 43951 字节**逐字节相同** ——
+  这正是"lockfile 相同 ⇒ 依赖图相同 ⇒ 那份产物对本分支同样成立"的证明，不需要在本机装任何东西。
+  取回 main 那份 ⇒ `check:licenses:stamp` **rc=0**、`check:licenses` **rc=0**（同一批"取回 main 已落的修复"，与 ④ 同形）。
+  真因是 `2f735392`（10-03 23:58 那笔"并行批次的总接线"把 lockfile 换成了 `0f3c…`）**进了本分支，但它带来的清单重渲染没跟着进来**。
 
-📌 两条一般形状：**"清单已过期"的修法不是"重渲染"，是"在装齐的树上重渲染"** —— 门禁自己那句只写了"缺 `e2e/`"这一种，而 linked worktree 是第二种，症状相同（数字变小）、方向相反（越修越瞎）。另一条：**`pnpm -r test` 在第一个失败包就停**，所以"某段 rc=1"完全可能只量到了 21 个包里的第 14 个 —— 报"全量绿"之前要数**跑到了第几个包**，不是数红了几条。
+📌 三条一般形状：① ~~**"清单已过期"的修法不是"重渲染"，是"在装齐的树上重渲染"**~~ —— 这句被 ⑦ 自己否证了，正确顺序是**先问"main 有没有已经渲染好的那份"**，再用 `diff` 证明它对本分支同样成立（lockfile 逐字节相同 ⇒ 清单正文相同 ⇒ 只差戳与日期 = 免费的正确性证明）；"在装齐的树上重渲染"是**没有那份可取时**的次选，而不是第一选择。② **linked worktree 的 `pnpm install` 会少一整片 workspace**（这里 961 vs 1093），症状与"清单过期"长得一样（数字变小）、方向相反（越修越瞎）—— 所以"在这棵树上跑生成器"之前要先跑 `diff`。③ **`pnpm -r test` 在第一个失败包就停**，所以"某段 rc=1"完全可能只量到了 21 个包里的第 14 个 —— 报"全量绿"之前要数**跑到了第几个包**，不是数红了几条。
