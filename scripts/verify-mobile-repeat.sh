@@ -278,8 +278,13 @@ step "2. 配置同步凭据"
 configure_sync_credentials
 
 step "3. 首次同步（含一次纯 JS 的 Argon2id 派生）"
-$ADB shell input tap $TAB_PROFILE $TAB_Y; sleep 3
-dump
+$ADB shell input tap $TAB_PROFILE $TAB_Y
+# 🔴 以前这里是"固定 sleep 3 + 一次 dump"，而 `dump()` 抓不到界面时只把
+#    /tmp/ui.xml 截成空文件并打一行警告 —— 于是 `tap_label "立即同步"` 报"找不到"，
+#    看着像界面没这个按钮。实测两种时刻：负载 100+ 时 dump 连续 10 次抓不到；
+#    而手点同一个坐标、安静一点时再 dump，「立即同步」就在屏上。那是假红。
+#    改成"见到为止"（上限 8 轮 × 2s，见 lib 的 `settle_for`）。
+settle_for "立即同步"
 if XY=$(tap_label "立即同步"); then
   echo "     首次同步含密钥派生，等待中…（最长等 900 秒）"
   T=$(wait_synced 180)
@@ -309,8 +314,13 @@ else
 fi
 
 step "5. 手机同步，拿到笔记本那条任务"
-$ADB shell input tap $TAB_PROFILE $TAB_Y; sleep 3
-dump
+$ADB shell input tap $TAB_PROFILE $TAB_Y
+# 🔴 以前这里是"固定 sleep 3 + 一次 dump"，而 `dump()` 抓不到界面时只把
+#    /tmp/ui.xml 截成空文件并打一行警告 —— 于是 `tap_label "立即同步"` 报"找不到"，
+#    看着像界面没这个按钮。实测两种时刻：负载 100+ 时 dump 连续 10 次抓不到；
+#    而手点同一个坐标、安静一点时再 dump，「立即同步」就在屏上。那是假红。
+#    改成"见到为止"（上限 8 轮 × 2s，见 lib 的 `settle_for`）。
+settle_for "立即同步"
 if XY=$(tap_label "立即同步"); then
   T=$(wait_synced 180)
   if [ -n "$T" ]; then ok "手机同步完成（约 $T 秒）"; else bad "手机同步未完成"; fi
@@ -434,8 +444,13 @@ else
 fi
 
 step "11. 手机同步 → 笔记本读到重复规则（跨设备）"
-$ADB shell input tap $TAB_PROFILE $TAB_Y; sleep 3
-dump
+$ADB shell input tap $TAB_PROFILE $TAB_Y
+# 🔴 以前这里是"固定 sleep 3 + 一次 dump"，而 `dump()` 抓不到界面时只把
+#    /tmp/ui.xml 截成空文件并打一行警告 —— 于是 `tap_label "立即同步"` 报"找不到"，
+#    看着像界面没这个按钮。实测两种时刻：负载 100+ 时 dump 连续 10 次抓不到；
+#    而手点同一个坐标、安静一点时再 dump，「立即同步」就在屏上。那是假红。
+#    改成"见到为止"（上限 8 轮 × 2s，见 lib 的 `settle_for`）。
+settle_for "立即同步"
 if XY=$(tap_label "立即同步"); then
   T=$(wait_synced 180)
   if [ -n "$T" ]; then ok "手机同步完成（约 $T 秒）"; else bad "手机同步未完成"; fi
@@ -490,8 +505,13 @@ else
 fi
 
 step "13. 手机同步 → 笔记本看到同一个新到期日，且仍未完成（跨设备一致）"
-$ADB shell input tap $TAB_PROFILE $TAB_Y; sleep 3
-dump
+$ADB shell input tap $TAB_PROFILE $TAB_Y
+# 🔴 以前这里是"固定 sleep 3 + 一次 dump"，而 `dump()` 抓不到界面时只把
+#    /tmp/ui.xml 截成空文件并打一行警告 —— 于是 `tap_label "立即同步"` 报"找不到"，
+#    看着像界面没这个按钮。实测两种时刻：负载 100+ 时 dump 连续 10 次抓不到；
+#    而手点同一个坐标、安静一点时再 dump，「立即同步」就在屏上。那是假红。
+#    改成"见到为止"（上限 8 轮 × 2s，见 lib 的 `settle_for`）。
+settle_for "立即同步"
 if XY=$(tap_label "立即同步"); then
   T=$(wait_synced 180)
   if [ -n "$T" ]; then ok "手机同步完成（约 $T 秒）"; else bad "手机同步未完成"; fi
@@ -534,8 +554,13 @@ else
 fi
 if laptop_ok sync >/dev/null; then ok "笔记本已同步"; else bad "笔记本同步失败"; fi
 
-$ADB shell input tap $TAB_PROFILE $TAB_Y; sleep 3
-dump
+$ADB shell input tap $TAB_PROFILE $TAB_Y
+# 🔴 以前这里是"固定 sleep 3 + 一次 dump"，而 `dump()` 抓不到界面时只把
+#    /tmp/ui.xml 截成空文件并打一行警告 —— 于是 `tap_label "立即同步"` 报"找不到"，
+#    看着像界面没这个按钮。实测两种时刻：负载 100+ 时 dump 连续 10 次抓不到；
+#    而手点同一个坐标、安静一点时再 dump，「立即同步」就在屏上。那是假红。
+#    改成"见到为止"（上限 8 轮 × 2s，见 lib 的 `settle_for`）。
+settle_for "立即同步"
 if XY=$(tap_label "立即同步"); then
   T=$(wait_synced 180)
   if [ -n "$T" ]; then ok "手机同步完成（约 $T 秒）"; else bad "手机同步未完成"; fi
@@ -560,7 +585,13 @@ step "15. 🔴 点「每年」→ 规则落在**当前截止日**的月日、仍
 # 第 11/14 步已经把截止日顺延过两次，而 `TaskDetailSheet` 的锚点是
 # `repeatAnchor = dueLocal ?? todayLocal`（当前截止日）。拿旧日期算期望会把
 # 这条正确的实现判成红 —— 而"锚点跟着当前截止日走"本身就是要钉的语义。
-$ADB shell input tap $TAB_TASKS $TAB_Y; sleep 3
+$ADB shell input tap $TAB_TASKS $TAB_Y
+# 🔴 这里以前**一次 dump 都没有**就直接 `xy_text "$TASK_TITLE"` —— 而 `xy_text` 读的是
+#    /tmp/ui.xml，那份文件里还是**上一步的界面**（第 14 步停在「我的」页）。
+#    于是这一条不是概率红，是**恒红**："点不到任务行，第 15 步做不下去"，
+#    两趟连红且红在同一处 —— 而手动 dump 出来的任务列表里那一行明明在
+#    （`repeat-e2e-140014` / 收集箱 / 10-17 / 每周六）。
+settle_for "$TASK_TITLE"
 T15_XY=$(xy_text "$TASK_TITLE")
 if [ -z "$T15_XY" ]; then
   bad "点不到任务行，第 15 步做不下去"
@@ -613,8 +644,8 @@ print(d.isoformat(), d.month, d.day)
       fi
       # 🔴 跨设备：规则是数据，不是这台设备的属性。第 13/14 步为 WEEKLY 证过这件事，
       # 这一档也得单独证 —— 因为它换的是 BYMONTH/BYMONTHDAY 这对新参数。
-      $ADB shell input tap $TAB_PROFILE $TAB_Y; sleep 3
-      dump
+      $ADB shell input tap $TAB_PROFILE $TAB_Y
+      settle_for "立即同步"
       if XY=$(tap_label "立即同步"); then
         T=$(wait_synced 180)
         if [ -n "$T" ]; then ok "手机同步完成（约 $T 秒）"; else bad "手机同步未完成"; fi
