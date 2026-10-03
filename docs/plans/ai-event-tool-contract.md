@@ -1300,3 +1300,14 @@ cd /private/tmp/heyta-final && git merge --no-edit main && pnpm build && pnpm ch
 **其后九段第二次从未执行** —— `&&` 链断在 51 段，52..60（`privacy-consent-e2e`、`landing-e2e`、`shell-unicode`、`web-storage`、`web-migration`、`script-snapshot`、`mobile-first-run-gate`、`screenshot:verify`、`-r test`）没有读数。这次不再等整链重跑，而是把那九段在载体 `10dc0bd4` 上**逐段**补齐：每段各过一道"对端清空 + 负载门"（单一所有者 `scripts/lib/wait-for-quiet-host.sh`，本机阈值 12），被闸门挡下的记 **rc=3 = 环境无效**，不折成 1。读数落 `/tmp/heyta-tail-segs-185511/rc-<段号>-<段名>.txt`，汇总 `tally.txt`。
 
 **一条结论提前说清**：只要 main 带着 organizer 那条红，`pnpm check` **全链绿**在这条集成线上是结构上不可达的。按红线不吸收别人的债凑绿、不为跑绿放宽闸门 ⇒ ② 的完成态改写成「段 0–50 绿 + 段 51 挂上游关闭判据 + 段 52–60 逐段读数」，而不是"链绿"。
+
+**顺带一条反方向的：链的第 54 段 `check:shell-unicode` 在 main 上是红的，而本线已经修好了它。**
+
+- main 提交态 `scripts/mutate-closeout-gates.sh:223/232/242` 三处 `「$V1」` 被全角括号吞掉变量名：
+  `git show main:scripts/mutate-closeout-gates.sh | LC_ALL=C grep -cE '\$V[123][」』]'` = **3**。
+- 本线 `1a6640f2`（17:30，`git merge-base --is-ancestor 1a6640f2 HEAD` = YES）改成 `${V1}` 形状，
+  载体上同一条命令 = **0**，`pnpm check:shell-unicode` rc=0（扫 68 个 `.sh`）。
+- 这是**同一个缺陷的第二次**（`1ac5913a` 修过 4 处、`cc974fbd` 又写出 3 处），而 `check:shell-unicode`
+  是**每一次 `pnpm check` 都会跑**的那一段 ⇒ 落地本线会让 main 的第 54 段从红变绿。
+- 实测对照就在眼前：主检出 18:4x 那一趟整链 **e2e 段 `124 passed / 0 failed` 过了、死在第 54 段**
+  （`/tmp/heyta-aed-check-final6.log` 末尾 `Command failed with exit code 1`）。
