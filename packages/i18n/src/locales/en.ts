@@ -1639,6 +1639,8 @@ export const en = {
   'web.ai.chat.noTrace': 'No tools were called',
   'web.ai.chat.stoppedLead': 'Stopped at a limit: ',
   'web.ai.chat.disclaimer': 'AI output can be wrong. Check it before you rely on it.',
+  'web.ai.chat.historyLocalOnly': 'This chat is kept on this device only — never synced, never sent anywhere.',
+  'web.ai.chat.expiredProposal': 'This chat was restored from this device. A change you had not confirmed is no longer actionable — ask again to make it.',
   'web.ai.chat.resultAria': 'Assistant reply',
   'web.ai.assistant.failure.emptyText': 'Nothing to send yet.',
   'web.ai.assistant.failure.textTooLong': 'That is too long - the assistant handles short commands.',
