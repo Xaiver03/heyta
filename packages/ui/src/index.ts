@@ -984,3 +984,15 @@ export {
   type NoteEditorProps,
 } from './notes/NoteEditor.js';
 export { isNoteDraftBlank } from './notes/model.js';
+
+/**
+ * ── 回收站与归档 W4b：删除确认的那份**影响面**取数 ──
+ *
+ * 🔴 **本块是追加的**（`index.ts` 是多写者共享文件，只许在末尾追加）。
+ *
+ * 与 `openTagCounts` 不是同一件事：那个是行右侧常驻的"还有几件没做完"，
+ * 这个是确认框里那句"删了会动到几条任务"（**含已完成**）。口径差别与理由
+ * 写在 `./projects/model.ts#liveTaskCountsByTag`。两端各数一遍的话，
+ * "删标签到底会不会动到已完成的任务"这个问题就会出现两个答案。
+ */
+export { liveTaskCountsByTag } from './projects/model.js';

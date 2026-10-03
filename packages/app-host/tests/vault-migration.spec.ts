@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import {
   createVaultKeyMigrationRemote,
+  createVaultMigrationJournal,
   migrateVaultPayloads,
   type VaultKeyMigrationRemote,
   type VaultMigrationInventoryOperation,
@@ -8,6 +12,8 @@ import {
 } from '../src';
 import { createVaultPayloadCipher } from '@heyta/sync-client';
 import type { VaultKeyMigrationManifest, VaultKeyMigrationStageResponse } from '@heyta/shared-schema';
+import { NodeSqliteDriver } from '@heyta/storage/sqlite/node';
+import { INDEXEDDB_SCHEMA, SqliteAdapter } from '@heyta/storage';
 
 const oldRoot = new Uint8Array(32).fill(7);
 const newRoot = new Uint8Array(32).fill(9);
@@ -220,5 +226,71 @@ describe('vault payload migration orchestration', () => {
     expect(inventoryCalls).toBe(2);
     expect([...staged.values()]).toEqual(firstBytes);
     await expect(durableJournal.load('scope-1', 'journal-resume-1')).resolves.toBeUndefined();
+  });
+
+  it('resumes the ciphertext journal after closing and reopening a real SQLite file', async () => {
+    const inventory = await makeInventory();
+    const rawStage = stage({ requestId: 'sqlite-restart-1' });
+    let lost = false;
+    const rawRemote: VaultKeyMigrationRemote = {
+      async begin() { return rawStage; },
+      async uploadChunk(_chunk) { return rawStage; },
+      async status() { return stage({ requestId: 'sqlite-restart-1', state: 'PUBLISHED', migratedOperationCount: 2, uploadedOperationCount: 2 }); },
+      async commit() { return stage({ requestId: 'sqlite-restart-1', state: 'PUBLISHED', migratedOperationCount: 2, uploadedOperationCount: 2 }); },
+      async cancel() { return stage({ requestId: 'sqlite-restart-1', state: 'CANCELLED' }); },
+    };
+    const interruptedRemote: VaultKeyMigrationRemote = {
+      ...rawRemote,
+      async uploadChunk(chunk) {
+        const response = await rawRemote.uploadChunk(chunk);
+        if (!lost) { lost = true; throw new Error('sqlite process exited after chunk commit'); }
+        return response;
+      },
+    };
+    const dir = mkdtempSync(join(tmpdir(), 'heyta-vault-journal-'));
+    const dbPath = join(dir, 'journal.db');
+    const open = () => new SqliteAdapter({
+      schema: INDEXEDDB_SCHEMA,
+      driverFactory: () => new NodeSqliteDriver(dbPath),
+    });
+    const options = {
+      inventory,
+      package: keyPackage,
+      expectedKeyVersion: 1,
+      currentPayloadKeyVersion: 1,
+      targetPayloadKeyVersion: 2,
+      currentRootKey: oldRoot,
+      targetRootKey: newRoot,
+      requestId: 'sqlite-restart-1',
+      maxChunkPayloadBytes: 100,
+      journalScope: 'sqlite-scope-1',
+    } as const;
+
+    const firstAdapter = open();
+    await firstAdapter.init();
+    try {
+      await expect(migrateVaultPayloads({
+        ...options,
+        remote: interruptedRemote,
+        journal: createVaultMigrationJournal(firstAdapter),
+      })).rejects.toThrow('sqlite process exited after chunk commit');
+    } finally {
+      firstAdapter.close();
+    }
+
+    const secondAdapter = open();
+    await secondAdapter.init();
+    try {
+      const result = await migrateVaultPayloads({
+        ...options,
+        remote: rawRemote,
+        journal: createVaultMigrationJournal(secondAdapter),
+      });
+      expect(result).toMatchObject({ requestId: 'sqlite-restart-1', migratedOperationCount: 2 });
+      await expect(createVaultMigrationJournal(secondAdapter).load('sqlite-scope-1', 'sqlite-restart-1')).resolves.toBeUndefined();
+    } finally {
+      secondAdapter.close();
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 });
