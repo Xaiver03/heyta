@@ -2819,3 +2819,68 @@ tslib@1.14.1           （顶层 2.8.1）  在 tsyringe/node_modules 下
 （要真镜像才能跑）。链内那条（模式 A）对的是预测快照，两者读的是不同的东西，
 `check-image-license-coverage.mjs` 的 `carrier` 字段就是为了让一张表能同时服务两种载体。
 
+### 8.46 G-47 剩下那半条路：朴素形状「提交锁 + `npm ci`」被**三次实测否证**，而可用的形状也量出来了
+
+§8.43 量过三个前置（tarball 装完即删 / `pnpm pack` 字节确定 / 锁里 13 枚平台变体全 optional）。
+这一轮去量第四道 —— 也是最要命的一道：**我们自己那三枚 tarball 每次构建字节都会变，
+锁里记着它们的 sha512，`npm ci` 会不会当场炸？**
+
+先在**镜像里那把锁**上看形状（`/app/package-lock.json`，构建期 npm 自己写的）：
+
+```
+node_modules/@heyta/domain       {"resolved":"file:domain.tgz",      "integrity":"sha512-7/YHTPgpJ/6A…"}
+node_modules/@heyta/shared-schema{"resolved":"file:shared-schema.tgz","integrity":"sha512-SxM73gxzxNaN…"}
+node_modules/@heyta/sync-core    {"resolved":"file:sync-core.tgz",   "integrity":"sha512-NPfqVp3F4gvK…"}
+```
+
+三枚**都带 sha512**。于是造了一个零网络的最小工程（一枚 `file:` tarball 依赖）逐档量：
+
+| # | 造什么 | rc | 装进来的内容 | 读数 |
+|---|---|---|---|---|
+| 1 | 字节未变（control） | 0 | —— | 正常 |
+| 2 | **改一个字节重打 tarball，锁不重生成，默认（热）缓存** | **0** | **旧字节** `module.exports=1` | 🔴 **静默装旧包** |
+| 3 | 同上，但 `--cache` 指到**空目录**（= CI / Docker 构建的真实条件） | **1** | 没装上 | `EINTEGRITY`（要 `C+xdLa…`，实得 `gf7R1r…`） |
+| 4 | 反向对照：把**注册表**依赖的 integrity 末两字节改掉 | 1 | —— | `EINTEGRITY` ⇒ npm **确实**在验 integrity，第 2 档不是"它不验" |
+| 5 | 把 `file:` 条目的 `integrity` **摘掉**，冷缓存 | **0** | **新字节** `module.exports=2` | ✅ 装的是当前 tarball |
+| 6 | 第 5 档的基础上把 `package.json` 改成要 `is-odd@3.9.9`（锁里是 3.0.1） | **1** | —— | `ETARGET` ⇒ **注册表层仍然钉死**，摘 integrity 没有把锁变成装饰 |
+
+**结论一（否证朴素形状）**：照 §8.43 那句"生成锁 → 换 `npm ci`"直接做，会在**每次改源码之后**
+要么构建失败（冷缓存），要么**装进上一版我们自己的代码**（热缓存）。后者是 §7 第 27 那族
+（"APK 里是旧 JS bundle"）在依赖层的翻版，而且它 rc=0、不报错。
+
+**结论二（还有一道独立的坎，`server/Dockerfile:272-274`）**：生产阶段那三条 `npm install`
+**会把 tarball 依赖写进 `server/package.json`** —— 镜像里那把锁的根条目是
+`"@heyta/sync-core": "file:sync-core.tgz"`，而**仓库里声明的是 `"*"`**。
+`npm ci` 的前提是"锁与 `package.json` 一致"，所以提交锁之前必须先重构这三行
+（要么 `package.json` 直接声明 `file:`，要么把三枚改成 `npm install --no-save` 挂在 `ci` 之后）。
+⇒ 登记 **G-54**：构建会改写 `server/package.json`，这条以前只在注释里说过理由
+（为什么用 `"*"` 不用 `workspace:*`），没人量过它把"提交锁"这条路挡在哪一步。
+
+**结论三（可用的形状，两条，代价不同）**：
+
+- **A. 摘 integrity + `npm ci`**（第 5/6 档实测支撑）：把三枚易变 `file:` 条目的 `integrity`
+  从提交物里剥掉，注册表层照旧钉死。代价：必须先解掉结论二那道坎（重构三条 install），
+  而那三枚依赖的**声明形态**（`"*"`）同时是 pnpm 工作区解析的输入 ⇒ 动的面比"改两行 Dockerfile"大。
+  🔴 **这条代价我没量**（要真把声明改成 `file:` 跑一遍 `pnpm install` 才知道会不会炸），
+  所以它写在这里是"未实测"，不许被读成"量过了、很贵"。
+- **B. 构建期漂移断言**（不动安装语义）：提交一把**基线锁**，在同一个 `RUN` 层里
+  把 npm 刚写出来的 `/app/package-lock.json` 的**注册表条目**与基线逐条比，
+  漂移即**构建失败**（三枚 `file:` 的 integrity 变化明确排除在外 —— 那是合法的易变部分）。
+  代价：一条 COPY + 一行 node 脚本 + 一次真构建；**不需要**碰 `"*"` 那条声明。
+
+选 **B**。理由不是它省事，是它把"钉住"落在**真正需要钉的那一层**：第三方版本 = 许可证面。
+A 多出来的收益只有"连解析都不重做"，而它换来的是改生产依赖声明形态。
+🔴 B 的诚实边界要写清：**它挡的是"悄悄变了"，挡不住"故意改基线"** —— 后者由 diff 评审负责，
+和 `pnpm-lock.yaml` 的改动是同一档待遇。
+
+> ⚠️ **本节上一版这里写过一句没取证的话**，已删：「`server/package.json` 的依赖声明形态是
+> `check:image-install-contract` 与 `check:layering` 都在读的东西」。现量：
+> `check-image-install-contract.mjs:67-77` 读的是 `dependencies["@prisma/client"]`
+> （**不是**那三枚 workspace 依赖的声明形态），而 `scripts/check-layering.mjs` 里
+> `package.json` 命中 **0 次** —— 它压根不读这枚文件。写错的后果是把 A 的代价**虚高**了，
+> 而虚高的代价会把"没做"包装成"做过权衡"。A 真正的代价是"没量"，就写成"没量"。
+
+本轮**没有**动 `server/Dockerfile` 与生产安装路径（只量，不改）。
+实现与真构建复验排在下一笔。
+
+
