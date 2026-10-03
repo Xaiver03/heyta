@@ -2632,6 +2632,17 @@ export const zhCN = {
   // 两个状态都叫同一个名字的按钮，用户按第二下时不知道自己在做什么。
   'common.organizer.archive.button': '归档「{name}」',
   'common.organizer.archive.unarchive': '取消归档「{name}」',
+  'common.organizer.folder.button': '把「{name}」移入文件夹',
+  'common.organizer.folder.title': '移入文件夹',
+  'common.organizer.folder.none': '不放进文件夹（顶级）',
+  'common.organizer.folder.current': '（当前位置）',
+  'common.organizer.folder.reject.projectNotFound': '这条清单已经不在了（可能刚被删除，或同步还没到）',
+  'common.organizer.folder.reject.parentNotFound': '目标文件夹不存在',
+  'common.organizer.folder.reject.self': '清单不能放进它自己里面',
+  'common.organizer.folder.reject.cycle': '这样会形成循环：清单不能放进自己的子清单里',
+  'common.organizer.folder.reject.parentNotTopLevel': '文件夹里只能放清单，不能再放一个文件夹',
+  'common.organizer.folder.reject.hasChildren': '这条清单里面有别的清单，文件夹不能再放进文件夹',
+  'common.organizer.folder.reject.unknown': '移动失败，请稍后重试',
   'common.organizer.showArchived': '显示已归档',
   'common.organizer.hideArchived': '收起已归档',
   // 习惯的改名与删除入口（保存/取消复用上面那两句，不另立一份同义词条）。
