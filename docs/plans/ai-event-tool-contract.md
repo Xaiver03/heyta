@@ -1925,3 +1925,38 @@ grep -oE '^#{2,4} ?B[0-9]+' BLOCKED.md | grep -oE '[0-9]+' | sort -n | uniq -d  
 全链 61 段的**逐段读数仍未取**；① 的落地面也变了：`main` 现在 `96f3293d`，
 `rev-list --left-right --count main…载体 = 22/64` ⇒ 落地前要先把 main 那 22 枚并进载体，
 不能按"main 是祖先、可直落"处理（那是 14:4x 的读数，已过期）。
+
+## 15.26 合并执行记录：main 并进集成线（`75acfe3f`，2026-10-03 21:5x）
+
+① 的前半在重启后的新载体里做完了，逐项落字：
+
+- **冲突面 = 2 枚文件、各 1 块**（`BLOCKED.md` / `PROGRESS.md`），都是"各自往尾部追加"的形状，
+  按并集解，判据是**行级无损**而不是"门禁没红"：`ours 111/theirs 340`、`ours 33/theirs 251` 全部保住。
+- **同号不同物一处，第二次重编**：main 上 `d6ea2dc9`（21:4x）新立的 `B53` 是别人自查
+  "把并行会话的整节内容替他们提交了"，与本线的 `B53`（organizer 零宽）无关 ⇒
+  本线三条 `B53→B56`、`B54→B57`、`B55→B58`。合并后 `^## B[0-9]+` **重复号 = 0**。
+  🔴 重编是**区域限定**的，脚本里对"别人的那两条必须逐字未动"各写了一条反向对照；
+  且两句**分配记录**（"新条目取 B53"、"B47→B53"）按原位保留 —— 把它们一并改掉就是把移动史抹掉，
+  下一位无从知道自己看到的是第几号。
+- **段数这条读数又被载体咬了一次**：`main` 的**提交链 = 61 段**，而主检出的**工作树 = 62 段**
+  （多的那段是并行会话未提交的）。合并后集成线 = 61 段，与 main 提交链**逐段集合相等**（双向差集各 0）
+  ⇒ 这次合并没有吞掉任何一段门禁。现量：`node -e` 双向差集，别只数总长。
+- 🔴 **main 上有一笔平行的 `2474a888` 也叫 `check:ai-coverage`**，所以合并里
+  `scripts/check-ai-coverage.mjs` 是**自动合并**的（+119/−1）。那一处删除不是丢东西：
+  删的是旧的 web-only 成功文案，main 侧把它升级成"按端枚举 + `GAP_ENDS` + 半接即红"。
+  ⇒ "没报冲突"不等于"语义对"，合并后必须单独读一遍这份文件的 diff（本轮读了，判据没被削弱）。
+- **五条红线在合并态现量**：`CURRENT_SCHEMA_VERSION = 1`；`host.submit(` 字面 3 处，其中
+  `server.ts:481` 是**注释里的表格**（门禁剥注释后 = 2 处，规则 8/9 通过），两个真实写入口
+  `ai-tool-run.ts:195` / `server.ts:545` 与合并前同一对；`retention-undecided` 4 处不变；
+  `fallback-needs-consent` 6 → **8** 处（main 侧新增，方向是**更严**不是放宽）。
+- **`check:docs` 在合并态 rc=1，4 条死链全部继承自 main**（引用行在 `git show main:` 里就有、
+  目标文件在 main 树上就不存在）：`PROGRESS.md → docs/research/aed-implementation-evidence.md`、
+  `docs/plans/detail-pane-alignment.md:4 → calendar-year-time-and-mobile-profile.md`、
+  `docs/research/detail-pane-alignment-and-spaced-review.md:101 → trash-and-archive-best-practice.md`
+  与 `→ ../plans/trash-and-archive.md`。按红线不代改、不吸收凑绿。
+- **落地形状更新**：`git rev-list --left-right --count main…HEAD = 0/66` ⇒ main 已是集成线的祖先，
+  ① 的后半（本地 main 快进）在链读数取完之后做；本线五笔（`b728ff3c`…`50ddb3ce`）
+  与 `dd8f2210`/`f2d7ed40`/`fd34c42a` **均不在 main 里**（逐枚 `--is-ancestor` 量过）。
+- **② 仍未取全链读数**：合并后 `node scripts/check-ai-coverage.mjs` 因新载体没有构建产物而 rc=1
+  （它报的是"上游读不出/建不出 ⇒ 无法判定"，与规则 7 同一族），跑全段要先 `pnpm -r build`，
+  而 `vm.loadavg` 在 21:5x 是 `74 → 115`（重启后全体进程复活的风暴），闸门阈值 12 ⇒ 不起跑。
