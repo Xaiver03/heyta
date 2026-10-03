@@ -3039,3 +3039,22 @@ for b in feat/countdown-batch2 feat/countdown-w9 feat/countdown-w4b feat/countdo
 ⚠️ 也照出`check:ai-coverage` 自己那句提醒别读成通过：**`界面端覆盖：mobile 0/5` 是"显式登记的缺口"**
 （产品负责人 2026-10-03 拍板"AI 上移动端这轮不做"），它的意思是"这一端一条都没接，所以没有半接的谎"，
 **不是** mobile 已经可达。
+
+### 15.43d ③ 起装之前先把"现在四端装的是哪一批"取证了一遍 —— 结论是**都不是落地载体**，而且这一趟取证顺带证明闸门真的在挡事
+
+落地时间是 **02:06:07**（`de296b9d` 那次 Fast-forward）。四端此刻的读数：
+
+| 端 | 现量 | 判读 |
+|---|---|---|
+| mac | `/Applications/Heyta.app` mtime **10-03 23:05:40**；`Contents/Resources/web-dist` 26 个文件里 **1 个含 `heyta.ai.assistant.history`**、**0 个含 `list_events`** | 装的是**合并前**的载体：D-4(i)（助手历史）在里面，W10 的 EVENT 工具不在里面 ⇒ 一次"看起来装了"的旧产物 |
+| android | `adb -s emulator-5554 shell dumpsys package com.heyta` ⇒ `firstInstallTime 2026-10-04 00:55:36 / lastUpdateTime **02:03:04**` | 比落地早 3 分 3 秒 ⇒ **不是落地载体**（包 id 从 `apps/mobile/android/app/build.gradle:136` 现取为 `com.heyta`，我先前猜的 `cn.waytofuture.heyta` 拿到的是**空读数**） |
+| ios | `simctl get_app_container <udid> com.heyta app`（BID 从 `reinstall-all.sh:363` 的 `IOS_BID:-com.heyta` 现取）：`heyta-iphone-17pro` **10-03 19:32:56**；`heyta-ios-isolated` **10-04 02:36:46**；`iPhone Duo heyta` 10-02 19:35:12 | 主用那台是合并前的；⚠️ `heyta-ios-isolated` 的容器时间是 **02:36:46 —— 就在我取证的当口**，说明**别人此刻正往模拟器装 iOS** ⇒ 我要是照"③ 现在就跑"去做，`simctl uninstall` 清的就是别人的现场 |
+| windows | `Get-AppxPackage -Name cloud.finlaw.heyta.desktop` ⇒ `Version 1.0.0.0`，`InstallDate` 为空；再去读 `InstallLocation\resources` 报 **PathNotFound**（`WindowsApps` 的 ACL 也可能伪装成"路径不存在"） | 🟡 **未取到**新鲜度。⇒ Windows 这端的"装的是不是当前源码"**只能由 `reinstall-all.sh` 自己那四条判据给**（sha256 对账 + `PAYLOAD_WEBDIST` + `ADD_APPX=OK`/`RESULT=OK` + `M2D=`），拿这台机器的空读数当证据就是造假 |
+
+两条一般规律（都从这次的形状里出来）：
+① **包 id / BID / 设备名一律从仓里或脚本里现取**，凭域名猜出来的 id 只会得到一个"看起来干净"的空读数；
+② 内容探针（needle 命中/未命中）比安装时间**更能区分"装了"与"装对了"** —— mac 那枚两分钟前的 `mtime` 看不出问题，
+   而 `list_events` 命中 **0** 一眼就照出"这是合并前的产物"（与 §6.1.1 引的 traps #27/#82 同族）。
+
+🟡 所以 **③ 现在没有闭合**，也不是"再等等就好"的模糊状态：它闭合的形态是
+队列里那段 `reinstall-all.sh` 在**落地载体**上跑完、四端各自那条"装上的是当前产物且能起来"的判据打出来。
