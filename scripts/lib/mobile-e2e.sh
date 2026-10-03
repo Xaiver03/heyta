@@ -234,6 +234,25 @@ require_screen() {
   exit 3
 }
 
+# 反复 dump 直到界面上出现这个串（找不到就返回 1，**不改判据的颜色** ——
+# 调用方后面那句 `bad` 照样会报，只是它报之前已经给过界面这么多秒）。
+#
+# 🔴 为什么需要：`dump()` 自己会重试到"抓到 hierarchy"为止，但 hierarchy 抓到了
+#    **不等于那已经不是上一屏**。实测两处：
+#      · 切换标签后固定 `sleep 3` 再 dump —— RN 在宿主机有内存压力时渲染不完，
+#        于是"找不到「立即同步」按钮"红了，而手点同一个坐标再 dump 按钮就在屏上；
+#      · 有一步**根本没 dump**，读的是上一步留下的界面 —— 那就不是概率问题，是恒红。
+#    固定 sleep 是在猜时间；这里改成"看到为止"，最多 `轮数 × 间隔` 秒。
+settle_for() {  # <界面上应当出现的串> [轮数=8] [间隔秒=2]
+  local needle=$1 tries=${2:-8} gap=${3:-2} i
+  for ((i = 0; i < tries; i++)); do
+    dump
+    grep -qF -- "$needle" /tmp/ui.xml 2>/dev/null && return 0
+    sleep "$gap"
+  done
+  return 1
+}
+
 # 按 content-desc 定位任意节点（按钮、标签）
 xy_desc() {
   python3 /tmp/_xy.py desc "$1" 0
