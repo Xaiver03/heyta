@@ -190,3 +190,13 @@ scripts/.*.snap.*
 # `e2e/playwright.password-web.config.ts` 的 outputDir。第 66 行那条 `test-results/`
 # 挡不住它 —— Playwright 的跑批输出跟着 outputDir 改名，每改一次就要在这里多一行。
 e2e/password-web-results/
+
+# `playwright.selfhost.config.ts` 的**运行态**：上一轮哪些用例失败了。
+# 它跟着每次本地跑改变 ⇒ 每跑一次自托管验收就往 git status 里丢一个脏文件。
+# 与上面 `test-results/`、`e2e/password-web-results/` 同一族：跑批输出跟着
+# outputDir 改名，所以这里必须**逐目录点名**。
+# 🔴 只忽略这一枚：同目录的 s1–s3 截图是 §6.2 规定一要的**取证**，必须仍可提交 ——
+# 所以不能像 `password-web-results/` 那样整目录忽略。
+# ⚠️ 它此前以跟踪态进过仓库；**忽略规则不会让已跟踪的文件消失**，要让它真正不再脏
+# 需要一次 `git rm --cached e2e/selfhost-stack-results/.last-run.json`（索引动作，留给所有者）。
+e2e/selfhost-stack-results/.last-run.json
