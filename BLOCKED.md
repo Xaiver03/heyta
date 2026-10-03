@@ -2331,3 +2331,33 @@ HEAD 里我的 B25–B27 与 goal §7.1 就**从历史上消失**（他们的提
 📌 一般规律：**只要一个提交流程"不写工作树"，它就在制造"提交态领先于磁盘态"的窗口**，
 而这个窗口的关闭取决于**下一个写这个文件的人是否整文件覆盖**。共享判决/共享台账的单一所有者
 要做的不是"提交完就走"，而是"提交完把同一份事实送回磁盘"。
+## B29. 🔴 `check:docs` 在共享工作树里新红（57 段链的第 4 段），但**同一枚提交在干净检出上 exit 0** —— 红的是别人未提交的链接行 × 还没 `git add` 的目标文档（2026-10-03 08:4x 现量）
+
+`pnpm check:docs`（`research/tools/docs-link-check.mjs`）在 `0acc7a71` 的工作树上 exit 1，报
+**2 处失效章节引用 + 7 处"本机有、仓库里没有"的链接**。这**不在** goal §7.2 那 4 段红的清单里，
+也不在 §7.4「两轮 57 段红段集合逐字相同」的清单里 ⇒ 先按纪律做归因，再决定修不修。
+
+| 问 | 命令 | 读数 |
+|---|---|---|
+| 这红是我引进的吗？ | 看命中的文件 | 报出来的 9 行分布在 `docs/plans/README.md:110`、`goal-layout-audit.md:80,81`、`ui-review-fill-zh-timeline.md:2195/2344/2508`、`adr/0044:111/129` —— **本波一个都没碰**（本波只改 `multi-end-entry-coverage-audit.md` / `goal-multi-end-coverage.md` / 2 枚证据图） |
+| 链接行是**已提交**的还是**未提交**的？ | `git show HEAD:docs/plans/README.md \| sed -n '110p'` / `git show HEAD:docs/plans/goal-layout-audit.md \| sed -n '80,81p'` | 前者**空行**，后者是"写路径/setDescription"那段，**不是报出来的那句** ⇒ 链接行活在**工作树**里，不在提交里 |
+| 干净检出（CI 的唯一形态）上红不红？ | `cd /tmp/heyta-ios-ab`（detached `57b0780f`）`node research/tools/docs-link-check.mjs` | **`CLEAN_DOCS_EXIT=0`**，打印「✅ 无死链、无"本机有仓库里没有"的链接、无失效章节引用、无失效锚点」 |
+| 那 3 枚目标文档到底存不存在？ | 逐枚 `git ls-files --error-unmatch` | `docs/plans/countdown-anniversary.md` / `docs/adr/0044-*.md` / `docs/research/countdown-anniversary-data-and-images.md` = **磁盘在、git 没跟踪**（倒数纪念日那条线，项目台账记着 D1/D2/D3 未拍） |
+
+⇒ 结论：**HEAD 是干净的，红只在这台机器的混合工作树上成立**。形状是「一条线的链接改动还没提交、
+它指向的文档也还没提交」，门禁按设计在提交前把它照出来 —— 这正是那条线**自己的**待办，不是缺陷。
+
+**关闭判据**（可执行，归他们）：在主工作树跑 `node research/tools/docs-link-check.mjs` 得 exit 0，
+即三枚目标文档 `git add`（或把指向它们的链接改成纯文字），并把 `adr/0044:111/129` 引用的
+`docs/adr/README.md §1` 换成真实存在的章节号。**我不代改**：两种改法都在动他们的范围
+（要么把他们的未跟踪文档塞进我的提交，要么删他们刚写的链接），且 ADR-0044 的结论归那条线拍。
+
+📌 顺带两条现量（都属"台账要带时刻"的同族）：
+
+1. **索引里那份 `BLOCKED.md` 仍是 1507 行、最大到 B10**（B25 当时记 1508 行 —— 差 1 行，
+   说明这期间他们动过一点点，但**没有追上 HEAD 的 2333 行**）。危险不变：谁按当前暂存条目
+   提交 `BLOCKED.md`，HEAD 里 B11–B28 整段会消失且**不报错**。
+2. **`server/src/auth.ts` 此刻也在别人的暂存里**，而那正是 goal §7.5 的 JWT_SECRET 分析读的
+   文件（`getJwtSecret()` 跑在模块顶层 `:48`）。他们若把那次调用挪进函数体内，我这批补的
+   4 个 `vi.hoisted` 块就变成冗余（无害，但"承重"这个结论要重测）。下一个接手的人请先
+   `git log -1 -- server/src/auth.ts` 再引用 §7.5 那张表。
