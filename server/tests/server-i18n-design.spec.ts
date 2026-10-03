@@ -63,19 +63,18 @@ describe('🔴 一、默认中文，按 locale 切换', () => {
     expect(zh).not.toContain('<');
   });
 
-  it('🔴 resolveLocale 的优先级：显式 > Accept-Language > 默认中文', () => {
-    // 显式最优先：邮件把语言写进链接，收件人点开时**不该**被浏览器语言覆盖
-    expect(resolveLocale('en', 'zh-CN,zh;q=0.9')).toBe('en');
-    expect(resolveLocale('zh-CN', 'en-US,en;q=0.9')).toBe('zh-CN');
-    // 其次是 Accept-Language（`zh` / `en-US` 这类前缀也要认）
-    expect(resolveLocale(null, 'en-US,en;q=0.9')).toBe('en');
-    expect(resolveLocale(undefined, 'zh-Hans-CN,zh;q=0.9')).toBe('zh-CN');
-    // 都没有 ⇒ **默认中文**
-    expect(resolveLocale(null, null)).toBe('zh-CN');
-    expect(resolveLocale(undefined, undefined)).toBe('zh-CN');
-    // 不认识的语言也退回默认，而不是崩掉
-    expect(resolveLocale('fr', 'fr-FR')).toBe('zh-CN');
-    expect(resolveLocale('', '')).toBe('zh-CN');
+  it('🔴 resolveLocale 只认显式选择：没有 `?lang=` 一律中文（Accept-Language 已摘掉）', () => {
+    // 显式：邮件链接里的 `lang=` 是**发信那一刻**用户语言的快照（`email.ts` 的 `withLocale`）。
+    expect(resolveLocale('en')).toBe('en');
+    expect(resolveLocale('zh-CN')).toBe('zh-CN');
+    // 🔴 2026-10-03 产品负责人拍板：「默认应该是中文，除非用户登录之后改成了英文、
+    //   或者一开始就选了英文」。浏览器语言不是选择。
+    //   变异：把 `acceptLanguage` 参数与那条前缀匹配分支加回来 ⇒ 下面两条红。
+    expect(resolveLocale(null)).toBe('zh-CN');
+    expect(resolveLocale(undefined)).toBe('zh-CN');
+    // 集合外的值退回默认，而不是崩掉
+    expect(resolveLocale('fr')).toBe('zh-CN');
+    expect(resolveLocale('')).toBe('zh-CN');
   });
 });
 
@@ -171,7 +170,11 @@ describe('凭据页：本地化 + 语言随链接走', () => {
     expect(response.body).toContain('<html lang="en">');
   });
 
-  it('`Accept-Language: en` 也能切（没带 ?lang= 时的兜底）', async () => {
+  it('🔴 `Accept-Language: en` **不再切换** —— 没有显式 `?lang=` 就是中文', async () => {
+    // 原句（2026-10-01 起）：「`Accept-Language: en` 也能切（没带 ?lang= 时的兜底）」。
+    // 2026-10-03 产品负责人改判：「默认应该是中文，除非用户登录之后改成英文、
+    // 或者一开始就选了英文」—— 浏览器语言不是选择。这条断言因此**反向**。
+    // 变异：把 `resolveLocale` 的 acceptLanguage 分支加回来 ⇒ 这条红。
     app = await build();
     const response = await app.inject({
       method: 'GET',
@@ -179,7 +182,9 @@ describe('凭据页：本地化 + 语言随链接走', () => {
       headers: { 'accept-language': 'en-US,en;q=0.9' },
     });
 
-    expect(response.body).toContain(SERVER_COPY['en']['server.page.tokenRequired']);
+    expect(response.body).toContain(SERVER_COPY['zh-CN']['server.page.tokenRequired']);
+    expect(response.body).toContain('<html lang="zh-CN">');
+    expect(response.body).not.toContain(SERVER_COPY['en']['server.page.tokenRequired']);
   });
 
   it('🔴 页内脚本的文案经 data-* 下发，脚本里不写死任何一句', async () => {

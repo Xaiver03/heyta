@@ -67,30 +67,15 @@ echo "  设备: $E2E_SERIAL   服务端: $SERVER"
 echo "  账号 A: $EMAIL"
 
 dismiss_consent_if_present() {
-  local waited=0 xy label
-  while [ "$waited" -lt 10 ]; do
-    dump
-    [ "$(has_text "在使用联网功能之前")" = "1" ] && break
-    sleep 1
-    waited=$((waited + 1))
-  done
-  [ "$(has_text "在使用联网功能之前")" = "1" ] || return 0
-  # 🔴 本脚本要验的就是"经服务端的账号通知"，所以选**同意并联网**（见文件头）。
-  xy=$(xy_desc "同意并联网"); label="同意并联网"
-  if [ -z "$xy" ]; then xy=$(xy_text "同意并联网"); fi
-  if [ -z "$xy" ]; then
-    xy=$(xy_desc "只用本机"); label="只用本机"
-  fi
-  if [ -z "$xy" ]; then
-    bad "同意面板在，但取不到按钮坐标"
-    return 1
-  fi
-  $ADB shell input tap $xy
-  sleep 2
-  echo "     已处理隐私同意面板（${label}）"
-  if [ "$label" != "同意并联网" ]; then
+  # 处理本身在 `lib/mobile-e2e.sh` 的 `handle_privacy_consent` —— 原来五个安卓
+  # 脚本各抄一份，**抄漏的那份整轮假红**（`verify-mobile-auth.sh`，2026-10-03）。
+  # 🔴 本脚本要验的就是"经服务端的账号通知"，所以「同意并联网」排第一位（见文件头）。
+  handle_privacy_consent "同意并联网" "只用本机"
+  local rc=$?
+  if [ "$CONSENT_GATE_CHOSEN" = "只用本机" ]; then
     echo "   ⚠️ 只用本机 ⇒ 出口闸会拦掉通知请求，后面的网络判据会红 —— 那是闸门在工作。"
   fi
+  return $rc
 }
 
 step "0. 装包并启动"

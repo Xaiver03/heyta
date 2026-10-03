@@ -8,7 +8,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
  *
  * 🔴 这一组要挡的不是"字段对不对"，而是**优先级**：
  *
- *   发信：`body.locale`（客户端显式）> 账号语言 > `Accept-Language` > `zh-CN`
+ *   发信：`body.locale`（客户端显式）> 账号语言 > `zh-CN`
+ *
+ * ⚠️ 2026-10-03 起 `Accept-Language` **不在链里了**（产品负责人拍板：默认中文，
+ * 英文只能是用户自己的选择 —— 浏览器语言不是选择）。这一组里那两条"带英文
+ * 浏览器头"的用例因此从"回落 Accept-Language"改判成"仍然是中文"。
  *
  * 加这一列要修的真实场景：在中文浏览器里把应用切成英文的用户（客户端此刻
  * 还没带 body.locale 的旧版本），邮件永远是中文 —— 账号语言补上这个洞。
@@ -75,7 +79,7 @@ afterEach(async () => {
   await app.close();
 });
 
-describe('发信语言优先级：body.locale > 账号语言 > Accept-Language > zh-CN', () => {
+describe('发信语言优先级：body.locale > 账号语言 > zh-CN（浏览器语言不参与）', () => {
   const post = (payload: unknown, headers: Record<string, string> = {}) =>
     app.inject({ method: 'POST', url: '/api/login/magic-link', payload, headers });
 
@@ -93,24 +97,31 @@ describe('发信语言优先级：body.locale > 账号语言 > Accept-Language >
     expect(authSpies.requestLoginMagicLink).toHaveBeenCalledWith(EMAIL, 'en');
   });
 
-  it('账号语言高于 Accept-Language —— 浏览器语言只是环境噪声，账号语言是明确选择', async () => {
+  it('账号语言赢过浏览器头 —— 头是环境噪声，账号行是明确选择', async () => {
     mocks.user.findUnique.mockResolvedValue({ locale: 'en' });
     await post({ email: EMAIL }, { 'accept-language': 'zh-CN,zh;q=0.9' });
     expect(authSpies.requestLoginMagicLink).toHaveBeenCalledWith(EMAIL, 'en');
   });
 
-  it('没有账号语言时回落 Accept-Language；再没有则 zh-CN', async () => {
+  it('🔴 没有账号语言时**中文** —— 英文浏览器头不许把首封信变成英文', async () => {
+    // 2026-10-03 改判（产品负责人）：这一档原来是"回落 Accept-Language"，
+    // 于是英文系统上的用户哪怕界面是中文，第一封信也是英文。
+    // 变异：把 `localeFromRequest` 里的 accept-language 分支加回来 ⇒ 第一条红。
     mocks.user.findUnique.mockResolvedValue({ locale: null });
     await post({ email: EMAIL }, { 'accept-language': 'en-US,en;q=0.9' });
-    expect(authSpies.requestLoginMagicLink).toHaveBeenCalledWith(EMAIL, 'en');
+    expect(authSpies.requestLoginMagicLink).toHaveBeenCalledWith(EMAIL, 'zh-CN');
 
     await post({ email: EMAIL });
     expect(authSpies.requestLoginMagicLink).toHaveBeenLastCalledWith(EMAIL, 'zh-CN');
   });
 
-  it('账号语言列存了集合外的值时当没有（不抛错、不悄悄当默认语言用）', async () => {
+  it('账号语言列存了集合外的值时当没有（不抛错，也不许它污染显式语言）', async () => {
+    // ⚠️ 2026-10-03 改判：原来这条靠"回落 Accept-Language ⇒ en"来证明 klingon
+    //   被当没有。浏览器头摘掉之后那个读数不再能区分"klingon 被忽略"和
+    //   "klingon 被当默认语言"，所以判据换成显式通道：**账号行是脏值时，
+    //   body.locale 必须照常赢**（脏值既没抛错、也没把请求压成默认）。
     mocks.user.findUnique.mockResolvedValue({ locale: 'klingon' });
-    await post({ email: EMAIL }, { 'accept-language': 'en' });
+    await post({ email: EMAIL, locale: 'en' });
     expect(authSpies.requestLoginMagicLink).toHaveBeenCalledWith(EMAIL, 'en');
   });
 

@@ -16,11 +16,21 @@
  *
  * ## 为什么是显式清单而不是 glob
  *
- * `scripts/verify-*.sh` 里有**并行会话在途**的文件（本轮：`verify-mobile-account.sh`
- * 未跟踪、`verify-mobile-reminder-ring.sh` 已暂存未提交）—— 它们不属于本门禁的
- * 所有者，等它们落地后再加进来。`.mjs` 的验证脚本不受此坑影响（Node 在执行前
- * 整份解析），刻意不在清单里。**新增长跑 .sh 验收脚本时要加进 MANIFEST** ——
- * 这道成本是刻意的，逼人想清楚"这个脚本会不会跑很久"。
+ * 🔴 **2026-10-03 更正这一节的理由**：原先写的是「`scripts/verify-*.sh` 里有并行会话
+ * 在途的文件（`verify-mobile-account.sh` 未跟踪、`verify-mobile-reminder-ring.sh`
+ * 已暂存未提交）—— 它们不属于本门禁的所有者，等它们落地后再加进来」。
+ * **前提实测过期**：那两个文件当时都已被跟踪（`git ls-files` 里有），而清单一直没有它们，
+ * 于是"等落地再加"变成一笔永远不会被复核的欠账 —— 写在注释里的豁免，它的前提
+ * 没人再量过一次（traps #86 那一类：一条判据里藏两个缺陷，一个是缺失、一个是归因）。
+ * 现在两条都进来了，清单 = `scripts/` 下全部 `verify-*.sh` + `reinstall-all.sh`。
+ *
+ * 仍然用显式清单而不是 glob，理由换成两条站得住的：① `.mjs` 验证脚本不受此坑影响
+ * （Node 在执行前整份解析），刻意不在清单里；② **新增长跑 .sh 验收脚本时要加进
+ * MANIFEST** —— 这道成本是刻意的，逼人想清楚"这个脚本会不会跑很久"。
+ *
+ * ⚠️ **本门禁不查"漏登记"**：它只查「清单里的文件存在且有 bootstrap」（`:75` 抓反向漂移）。
+ * "磁盘上有 verify-*.sh 而清单里没有"这一档目前靠对账命令人工量（见 goal §7.24），
+ * 要把它变成常驻判据需要改本文件的判据部分，不在本轮授权范围内 → BLOCKED.md。
  *
  * ## 判据（缺一即红）
  *
@@ -40,6 +50,7 @@ const MANIFEST = [
   'scripts/verify-harmony-rnoh.sh',
   'scripts/verify-harmony-toolchain.sh',
   'scripts/verify-ios-lan-http.sh',
+  'scripts/verify-mobile-account.sh',
   'scripts/verify-mobile-auth.sh',
   'scripts/verify-mobile-autosync.sh',
   'scripts/verify-mobile-calendar.sh',
@@ -51,6 +62,7 @@ const MANIFEST = [
   'scripts/verify-mobile-lists.sh',
   'scripts/verify-mobile-quadrant-fill.sh',
   'scripts/verify-mobile-restore.sh',
+  'scripts/verify-mobile-reminder-ring.sh',
   'scripts/verify-mobile-repeat-custom.sh',
   'scripts/verify-mobile-repeat.sh',
   'scripts/verify-mobile-schedule.sh',

@@ -199,7 +199,53 @@ i18n **中英同步**（唯一文案事实源，`check:ui-language` 拦）；`SH
 
 ### 明确没做（逐条给理由，不是漏掉）
 
-1. **W3 的"真机/真服务端 yearly 断言"**（本工单原本要求补的那条）。2026-10-03 02:02（本地）实测：`emulator-5556` 正被并行会话的 `scripts/verify-mobile-restore.sh`（pid 86145 / 86147，当时已跑 11 分 46 秒）占用，且主检出有一批未提交的 `apps/mobile/**` 源码改动 —— 此时抢设备既打断对方，装出来的 APK 也不是本分支的代码。**顺延到设备空闲时**，且必须在 `pnpm reinstall:mobile` 之后跑，否则验的是旧二进制（AGENTS §6.1.1）。
+1. ~~**W3 的"真机/真服务端 yearly 断言"**（本工单原本要求补的那条）~~ ⇒ ✅ **2026-10-03 14:57:41 已跑绿**
+   （`通过 50 项，失败 0 项`、`STEP C_RC=0`；过程账与逐趟红集在下面「固定收尾」一节第 13–15 条）。
+   **下面这一整段留原位**，因为它记录的正是"这一条为什么拖到第四天才跑、以及哪些读数是判新旧的依据"，
+   那些形状下次还会遇到 —— 但读的时候要带着"标题已经闭合"这个前提，别把它当成待办。
+   脚本落点：`scripts/verify-mobile-repeat.sh` 的第 15 步（跨年那一档）+ 第 7 步的六个预设清单，但它**还没在设备上跑过**，所以这条不能记成"已交付"：
+   - 写了什么：第 7 步的选项清单从五个补成六个（含「每年」）；第 15 步点「每年」→ 断言**恰好一条** op、规则 == `FREQ=YEARLY;BYMONTH=…;BYMONTHDAY=…`、锚点 == **手机当前截止日**、面板显示「当前：每年 …」，再同步到笔记本读同一条规则。
+   - 🔴 期望值**从手机当前 `dueDate` 现场推**，不抄脚本开头的 `DUE_DATE`：`TaskDetailSheet` 的锚点是 `repeatAnchor = dueLocal ?? todayLocal`，而第 11/14 步已经把截止日顺延过两次 —— 拿旧日期算期望会把这条正确的实现判成红。"锚点跟着当前截止日走"本身也一起被钉住了。
+   - 离线做到哪一步：`bash -n` 0；把 `dueDate` 的 ms 喂进脚本里那段 python，拼出的规则串与 `packages/domain/dist` 的 `Recurrence.yearly(10,17)` **逐字相同**。⚠️ 这只算半个验证 —— 它证明不了第六枚 chip 在真机上点得到（chips 是一行横排的）。
+   - 为什么没跑：2026-10-03 02:05（本地）实测 **1 分钟负载 328–353**、107 个 node/java 级进程、并行会话正在连续提交；02:09 复量还是 **48–55**（5 分钟均值 117–125），九分钟内四次读数没有一次落到 18 以下。脚本默认的 `emulator-5554` 没起，唯一在线的 `emulator-5556` 与 :3000 / :3100 两个服务端都捏在别人手里。这一刻起四端重装会把别人**有时限**的设备判据压成超时假红（同一台机器上曾实测把 load 顶到 250–537）。
+     ⚠️ **10:37–10:38 复量**：负载已降到 13–38，但**设备、两个端口、compose 栈三条仍在这个会话之外**（`verify-mobile-repeat.sh:241` 是 `pm clear`，跑它 = 清掉别人在那台共用 AVD 上的登录态）。四条最新读数与复跑命令写在下面「固定收尾」一节第 3 条，**以那一节为准**。
+   - 下次跑之前必须按顺序做完（缺一条就是在验旧二进制）：`pnpm -r build` → `pnpm reinstall:mobile` → `HEYTA_E2E_SERIAL=<现取的在线机> PORT=<自己的端口> pnpm verify:mobile-repeat`；跑前重新现量四条现场判据：`pgrep -f 'verify-mobile-'`、`sysctl -n vm.loadavg`、`xcrun simctl list devices booted`、`adb devices -l`。
+     🔴 **原来这一条写的是 `ps Axo command | grep -F 'verify-mobil[e]'`，那句话是坏的，两个方向都坏**（2026-10-03 11:20 用活的对照组量出来的）：
+     `grep -F` 把 `[e]` 当**字面量**，所以它**匹配不到任何一次真运行**（真跑的脚本 argv 是 `bash scripts/verify-mobile-repeat.sh`，里面没有方括号）；
+     而它唯一能匹配到的，是**执行这条检查的那个 shell 自己**（它的命令行里原样带着那串带括号的文本）——
+     实测：起一个 argv 含 `verify-mobile-repeat-fixture` 的活进程 ⇒ 老探针报 **0**（漏），空机器上老探针报 **2**（把观察者数成在跑）。
+     `pgrep -f 'verify-mobile-'` 两条都对得上（同一对照组里命中那个 pid、清理后回 0，且**不把观察者算进去**）。
+     ✅ 这一条换掉之后，本节第 3 条那四条设备侧读数**不受影响**（它们是 `adb`/`lsof`/`docker ps` 的读数，本来就没用这条探针）。
+     ⚠️ 另两条"下一次"要带的现场事实：**`verify-mobile-repeat.sh` 没有负载门**（全仓只有 `verify-mobile-restore.sh` 里有 `wait_for_quiet_host`，`grep -rln wait_for_quiet_host scripts/` 现量），
+     所以负载**没人替你等**，要自己判；以及本机**只有一个 AVD**（`~/.android/avd` 里只有 `SSOS-Parity-A36`，它就是被占的 `emulator-5556`）⇒
+     "换一台自己的模拟器"这条路要先 `avdmanager create avd`（系统镜像只有 `android-36`，在 `/opt/homebrew/share/android-commandlinetools`），不是再起一台现成的。
+     ✅ **上面那半句"repeat 没有负载门"已过期**（同日 11:34，提交 `1d085a92`）：门抽成单一所有者
+     `scripts/lib/wait-for-quiet-host.sh`，`verify-mobile-repeat.sh` 现在在 `heyta_e2e_ensure_account` **之前**判它
+     （等不到 ⇒ `exit 3` = 环境无效，不是产品失败），`verify-mobile-restore.sh` 那份私有定义删掉了。
+     现量：`grep -rln wait_for_quiet_host scripts/ | grep -v '\.snap\.'` ⇒ lib（定义）+ restore + repeat 三个文件。
+     旋钮随之改名 `HEYTA_RESTORE_LOAD_WAIT` → `HEYTA_LOAD_GATE_WAIT`（`BLOCKED.md` 里那个旧名是历史读数，没动它）。
+     🔴 **但下一次仍然要看设备那一半**：这次只消掉了"负载没人替你等"，**没有**消掉"本机只有一个 AVD、
+     而跑第 15 步会 `pm clear` 掉别人在上面的登录态"；而且脚本等满 900s 是 `exit 3`，
+     **别把 `exit 3` 记成产品红**。
+     ⚠️ **这条的前半截已满足**（2026-10-03 10:02 / 10:05）：android 与 ios 由并行会话在隔离检出 `267ac912` 重装过，本会话又**按内容**复核过设备上那份包里确有本批的 `每年` / `FREQ=YEARLY`（读数见下面第 2 条）⇒ 下次跑第 15 步**不必先重装**，但"现取在线机 + 自己的端口"那两条照旧。
+     🔴 **11:52 复量之后，上面这句"不必先重装"要收窄成两半，否则会被人当成"随便什么时候直接跑"**：
+     - ✅ **对第 15 步这条判据仍然成立**：`267ac912..HEAD` 里能进移动包的只有 `packages/i18n` 两份词表
+       （`git diff --name-only 267ac912..HEAD -- apps packages | grep -vE 'evidence/'` ⇒ 5 个文件，
+       其中 mac / landing 各占其位），而那 11 行词条改动**碰到 `recurrence` / `repeat` / `每年` 的行数 = 0**
+       （现量：`git diff 267ac912..HEAD -- packages/i18n/src/locales/zh-CN.ts packages/i18n/src/locales/en.ts | grep -E '^[-+][^-+]' | grep -icE 'recurrence|repeat|每年|weekly'` ⇒ **0**）。
+     - 🔴 **对"本轮交付的固定收尾"不成立**：§6.1.1 的判据是"装的是**当前**产物"，而词表变了 ⇒ 设备上那份
+       已经不是当前产物（差的正是 729f4bd4 / 1e092733 / bf271a1e 那三笔公开文案）。所以拿它跑第 15 步可以，
+       拿它当"这一轮收尾已跑绿"的证据不行 —— 要么先 `pnpm reinstall:mobile`，要么别写这一格。
+     - 🔴 **另一条硬前置（新量出来的）**：主检出的
+       `apps/mobile/android/app/build/outputs/apk/release/app-release.apk` mtime 是 **10-03 03:21**，
+       而 HEAD 里 **09:47 还有一笔动过 `apps/mobile` 的提交**（`c444d827`，且它是 `267ac912` 的祖先）⇒
+       **这份盘上的 APK 不可能含它**（判据：`stat -f %Sm -t '%m-%d %H:%M' <apk>` 与
+       `git log -1 --format='%h %ad' --date=format:'%m-%d %H:%M' -- apps/mobile`）。
+       谁要从主检出重装，必须先 `pnpm -r build && pnpm build:android`，不能拿这份旧 APK 装上去验。
+       ⚠️ 顺带记一条**别照抄的读数**：这份旧 APK 的 bundle 里 `每年`=1 / `FREQ=YEARLY`=1（UTF-16LE / ASCII 各按 §7 #171 的口径），
+       看起来"含本批代码"——那是真的但**只到 03:21 为止**；`yearly` 枚数在这里是 3、在设备上那份是 5。
+       **枚数差不能用来判新旧**（Hermes 按字符串内容选 latin1/UTF-16 存储，ASCII 与 CJK 计数不同形），
+       判新旧只有 mtime↔提交时间这一条可靠。
 2. **`'yearly'` 加了 id 但没人能测到"忘了加进 `REPEAT_PRESET_IDS`"** —— 这一档的表现是"界面上没有每年"，属于**按定义不可观测**，不为此扭曲设计；类型系统已能抓到"switch 少一档"与"标签少一档"（`Record<RepeatPresetId, MessageKey>` 是穷举的）。
 3. **2/29 的"平年过 2 月最后一天"口径**：需要 `BYMONTHDAY=-1`，而域层 `describeRecurrence` 与移动端 `recurrence-display` 都会把它渲染成「每年 2 月 -1 日」。现状按 RFC + 主流日历实现（只在闰年重复），并**把这条边界钉在测试里**而不是留成暗坑。真正的产品问题在倒数日（"在一起多少天"那天算不算 2/29），随 W5 一起定。
 4. **W4 判据②的界面半段**（"数据只到 2026 时 2027 显示节、不显示休/班"）：本批不做 UI，所以落的是**数据层**那半 —— 2027 有节无休、不抛错、非法日期响亮失败，都有单测与变异。界面上那条随 W5。
@@ -215,7 +261,48 @@ i18n **中英同步**（唯一文案事实源，`check:ui-language` 拦）；`SH
    - `@floating-ui/*` 五条 + `react-activity-calendar` + `tabbable`：**真被删掉的依赖**。合并后的 `pnpm-lock.yaml` 里 grep 计数 0，`packages/*`、`apps/*` 里也没有任何 package.json 声明它们；清单记着它们只是因为那份产物的生成日期（2026-09-27）早于移除。
    - `playwright` 三条：**工作树差异**。`e2e/` 刻意不在根 pnpm 工作区内（它自带一份 lockfile，AGENTS §6），所以只有跑过 `cd e2e && pnpm install` 的那棵树才看得见它。实测同一份渲染器在隔离 worktree 出 **958** 条、在主检出出 **1093** 条。
    ⇒ 结论不变、理由换掉：**这份产物只能在装了全部 workspace 的主检出渲染**，在隔离检出渲染会**静默少一整条 workspace 的依赖**。
-   🔴 顺带照出一个真缺口：`check:licenses` 判的是**准入**（有没有不合格许可），**没有任何门禁判这份产物新不新鲜**，所以它能在依赖树变化后安静过期六天。**不能**直接把 `render-license-inventory.mjs --check` 挂进 `pnpm check`：它读磁盘上的 node_modules，在没装 e2e 那份 workspace 的干净检出 / CI 上**必然假红**。要挂，得先让渲染器改从 lockfile + workspace 配置推导（不在本批，登记为 **G-1**）。
+   🔴 顺带照出一个真缺口：`check:licenses` 判的是**准入**（有没有不合格许可），**没有任何门禁判这份产物新不新鲜**，所以它能在依赖树变化后安静过期六天。**不能**直接把 `render-license-inventory.mjs --check` 挂进 `pnpm check`：它读磁盘上的 node_modules，在没装 e2e 那份 workspace 的干净检出 / CI 上**必然假红**。要挂，得先让渲染器改从 lockfile + workspace 配置推导（不在本批，登记为 **CDG-1**）。
+   ⚠️ **这个短号一开始就起错了**：我原先写作 `G-1`，而 `docs/research/legal-pipl-baseline.md` 有
+   一整套**它自有的** `G-1…G-20`「核实缺口」编号，并且那里明写「两处重名会让人在跨文档跟进度时认错行」。
+   我没先查命名空间归属就用了同一个号（正是自己记过的那条教训）。现在改成 **CDG-1**（countdown 批次缺口 1）。
+   现量：`grep -n 'G-1' docs/research/legal-pipl-baseline.md | head -3` 与 `grep -rn 'CDG-1' docs/`。
+   ⚠️ **上面那句"改从 lockfile 推导"是我提错的机制，已实测撤回；**CDG-1** 已按另一条路关掉（提交 `47897912`）**：
+   - `grep -c license pnpm-lock.yaml` ⇒ **0**。许可证字符串只住在**已安装包**的 `package.json` 里
+     （`license-inventory.mjs` 扫的是 `node_modules/.pnpm` 与 `e2e/node_modules/.pnpm` 两座虚拟 store），
+     lockfile 里**没有这个字段** ⇒ "从 lockfile 推导出整份清单"在数据模型上不成立，除非联网查 registry 或先装。
+   - 内容级 `--check` 挂不进 CI 的理由，**渲染器自己的文件头就写着**（依赖树天生平台相关，
+     `@esbuild/darwin-arm64` 与 `@esbuild/win32-x64` 二选一）—— 我写 CDG-1（当时写的 G-1）时没去读它，
+     于是把"缺 e2e workspace"当成唯一障碍，而实际有两个。
+   - ✅ 关掉它的判据只比**一件纯文件的事**：产物是在哪一把 lockfile 下渲染的。渲染时在表头写
+     `lockfile 指纹：<sha256 前 16 位>`，`--check-stamp` 只读那份 md 与 `pnpm-lock.yaml`
+     （**不进取数据那一步**）⇒ 没有 node_modules 也能判，所以它上得了 CI，内容级比较上不了。
+     四例判据在临时"无 node_modules 检出"里跑真函数：相符 ⇒ 0 / 改一位指纹 ⇒ 1 / 删掉整行 ⇒ 1 /
+     **只换 lockfile 不动清单 ⇒ 1 报"已过期"**（最后一例就是那次六天事故的形状）。
+     现量：`node research/tools/render-license-inventory.mjs --check-stamp; echo RC=$?`。
+   ⚠️ **还欠一行接线，且欠的原因不是贵，是别人正占着那个文件**：把
+   `"check:license-stamp": "node research/tools/render-license-inventory.mjs --check-stamp"`
+   加进 `package.json` 的 `check` 链（放在 `pnpm check:licenses` 后面）。
+   ✅ **这一行已于同日 11:46 落地** —— 等的就是 `package.json` 变干净，且落地前先确认了
+   他们那笔是**脚本与接线同一笔提交**（不是把一条指向不存在文件的门禁推进 HEAD）：
+   `git status --porcelain -- package.json` ⇒ 空、
+   `git ls-tree -r --name-only HEAD | grep -c scripts/check-mobile-first-run-gate.mjs` ⇒ **1**、
+   `git show HEAD:package.json | grep -c 'check:mobile-first-run-gate'` ⇒ **2**（定义 + 链上引用）。
+   实际取的名字是 **`check:licenses:stamp`**（跟 `check:licenses` / `check:licenses:nuget` 同族，
+   而不是我草稿里那个孤立的名字），插在 `check:licenses` 之后。
+   现量：`pnpm -s check:licenses:stamp; echo RC=$?` ⇒ ✅ 对得上当前 lockfile，**RC 0**。
+   ✅ **而且真的在干净检出上验过一遍**（不是只验"我这台装了东西的树"）：
+   `git worktree add --detach /tmp/heyta-wt-cleanstamp HEAD` 之后那棵树里 `node_modules` **不存在**，
+   在它里面跑 `node research/tools/render-license-inventory.mjs --check-stamp` ⇒
+   ✅ `对得上当前 lockfile（111cc2d1d04d3763）`，**RC=0**；跑完 `git worktree remove --force` + `prune` 收掉。
+   这才是"能进 `pnpm check`"这句话的证据 —— temp 目录里手搓的那一份只能证明文件比较逻辑，
+   证明不了 HEAD 这棵树的产物与 lockfile 是对得上的。
+   📌 它能进 `pnpm check` 而内容级的 `--check` 不能，全部差别在一件事上：**它不需要装任何东西**。
+   ⚠️ 等的时候照出来一条**归他们**的风险 —— "`package.json` 里已经引了
+   `check:mobile-first-run-gate`，而它指向的脚本还是未跟踪状态" ⇒ 那时任何一笔从 HEAD
+   起的干净检出跑 `pnpm check` 都会红在 `MODULE_NOT_FOUND` 上。**这条现在自己关掉了**：
+   他们那一笔把脚本与接线放进了同一笔提交（上面那三条读数是它现在的状态），
+   所以我没有代改，也没动他们的行。留这段是为了记一条形状：
+   **门禁的"引用"与"被引用的那个文件"必须在同一笔提交里落地**，否则 HEAD 是不可跑的状态。
 2. ✅ **撞号已按原指示处理，而且比预告的严重**：预告只说"主检出工作树里已有一条写到 136"，实测合并时 main 的台账已经编到 **160**，本批四条占的 137–140 是**真撞号**（`sed -n '/^137\./,/^137\./p'` 取到的是别人的条目）。合并方把它们重编为 **161–164**，内容一字未改。收口复核：台账 1–164 无重号（`grep -oE '^[0-9]+\. ' | sort -n | uniq -d` 只剩 `1,2,3,4,38,93,94,95` —— 全是条目正文里的有序列表，不是条目号）。
 3. ✅ **AGENTS.md §7 索引表**补了 161–164 那一行（用户 2026-10-03 指示"把落下的东西全部收口"就是 §8 要求的那次明确授权）。同批把 §7 开头写死的"83 条实测踩过"换成现量命令 —— 它本身就是本条要说的那种抄件，已经漂了。
 4. ✅ **lockfile 复解析过了：零 churn**。在合并态的隔离检出（`a29881e9` + 一次全新 `pnpm install`）跑完 `git status --porcelain` 输出 **0 行** ⇒ 合并后的 lockfile 与全部 manifest 自洽。
@@ -225,6 +312,419 @@ i18n **中英同步**（唯一文案事实源，`check:ui-language` 拦）；`SH
 **收口时新照出来的一条（不属于本批，已归还原主线）**：合并态 `pnpm -r typecheck` 红在两处 —— `packages/app-host/tests/hosted-account-profile.spec.ts:138,156`（`null` 与 `string | undefined` 的覆写类型），来自 `7e299118`「feat(account): 账号资料三端贯通」（09:38 提交）。归属证据：`git diff --name-only 2ed84122..57078ddb` 里 `hosted|account` 命中 **0 处** ⇒ 本批不可能造成它。对方已在 `8fdcab6a` 修掉，本会话在 `8fdcab6a` 上独立复跑 `pnpm --filter @heyta/app-host typecheck` = **RC 0**。
 
 **合并态实测**（在 `a29881e9` 的隔离检出里，一条命令一段日志、每段自己那次的真实退出码）：`pnpm -r build` **0**、`pnpm check:calendar` **0**、`pnpm check:holiday` **0**、`pnpm check:licenses` **0**、`pnpm -r --filter '!@heyta/sync-server' test` **0**；`pnpm -r typecheck` 在 `a29881e9` 上 **2**（就是上面那条别人的债），在 `8fdcab6a` 上 **0**。
+
+**收口这一轮新加的判据，牙齿收进一条可复跑命令**：`bash scripts/mutate-closeout-gates.sh`
+（照 `scripts/mutate-*.mjs` 那一族的先例：manual 跑、不进 `pnpm check`，但**在仓库里**，
+所以它描述的那次变异下次任何人都能重放 —— 之前我把这类 harness 留在仓外的临时目录里，
+文档里那些"5/5、9/9"的读数就成了**只有这台机器这一次运行**能看见的东西）。
+11 例：G1–G4 许可证指纹判据（含"只换 lockfile、清单不动"这一例，就是 CDG-1 的形状；
+跑在没有 node_modules 的临时检出里，顺带证明它上得了 CI）、L1–L4 负载门（恒超标必红 / 低负载必放行 /
+边界是 ≤ / 等待序列按旋钮走）、P1–P2 设备占用探针（活的对照组揭穿 `grep -F` 那条盲探针）、
+S1 负载门的单一所有者（定义 1 处 + source 恰好 2 处）。2026-10-03 11:42 实测 **11 绿 0 红**。
+📌 写这个 harness 的当天就两次踩到自己：① S1 的 `grep 'wait_for_quiet_host()'` 把**本文件自己那行
+grep 命令**数成第二处定义（判据必须锚"行首的定义形状"，不锚一个词）；② P1/P2 的提示串里用反引号包命令，
+双引号内被当命令替换执行掉，打印出来是**两个空格**（消息里没有命令，等于把被验证的那条命令弄丢了）。
+
+### 固定收尾（AGENTS §6.1.1）：mac 段我自己跑绿了，另外三端按内容独立复核
+
+1. ✅ **mac 段 = 本会话自己跑的**（隔离检出，10:29–10:33）。读数：
+   `窗口 1092x723、heyta-reinstall-mac-installed.png.webview.png 内容占比 73.0%、主蓝命中 1269 —— 是共享 UI`。
+   第一趟（10:19）**判红过**，而红的是判据不是产品：窗口截图 13 KB / 内容 0.0% ⇒ 🔴 疑似空白，
+   同一秒的 WebView 快照是完整真界面（人已看过）。修法与变异读数写在提交 `90140793`，
+   以及下面表里的 #170。
+2. ✅ **android / ios / windows 三段没有重复跑** —— 并行会话 09:51 起在隔离检出 `267ac912`
+   跑过一趟完整的，`/tmp/heyta-g7-reinstall.log` 汇总三行 ✅（10:05）。
+   我占设备重装的代价是清掉别人的现场，所以改成**按内容**证明"装的就是当前产物"，四条现量：
+   - `git merge-base --is-ancestor a29881e9 267ac912` ⇒ 真（本批合入是那趟的祖先）
+   - `git diff --name-only 267ac912..HEAD -- apps packages | wc -l` ⇒ **8**，且 8 个全在
+     `apps/web/evidence/**`（png + 一个 txt）—— 那 14 笔里**没有一行会进包的源码**
+   - 已装的 APK 从设备拉回来再探：`adb -s emulator-5556 pull "$(adb -s emulator-5556 shell pm path com.heyta | sed 's/^package://')" …`
+     → `unzip -p … assets/index.android.bundle` → `每年`=1（UTF-16LE）/ `yearly`=5 / `FREQ=YEARLY`=1，
+     同趟阳性对照 `收集箱`=10
+   - iOS 已装容器的 `main.jsbundle`（mtime 10:05）同一趟同读数；mac 的
+     `/Applications/Heyta.app/Contents/Resources/web-dist/assets/*.js`：`FREQ=YEARLY`=1 / `yearly`=22 / `收集箱`=16
+   - 🔴 **Windows 那一端顺手量出一个真洞，并已修**：远端 `C:\src\heyta\apps\web\dist\assets`
+     实测躺着 **26 个 `index-*.js`**（本地 7 个，mtime 跨 9/27 → 10/3 六次构建），
+     因为同步是"覆盖式解包、不删远端目录"，而 vite 的 chunk 名带内容哈希**只增不减** ⇒
+     `package-msix.ps1` 把整份 `web-dist` 搬进包，装出来的包带着 ~19 枚没人引用的旧产物。
+     今天行为没坏（入口按哈希取），坏的是"清旧包"只到 `.appx` 层、没到同步源层。
+     修法两处：解包前先 `Remove-Item` 远端 `apps/web/dist`，再加一条**按枚数**的对账
+     （数不到也算红）。判据：桩 `ssh` 跑**活函数** 5/5，含"探针被调到 3 次"那条阳性对照 ——
+     第一版正是它揭穿了"两条 PASS 其实压根没走到被测判据"。正文见台账 **#175 / #176**。
+   🔴 **这条结论差点被一个坏探针推翻**：Hermes 字节码里中文是 **UTF-16LE**，
+   所以 `grep 每年` 和"按 utf8 文本读整份文件"都**恒 0**。我第一趟据此写下"装的包里没有本批代码" ——
+   那是探针坏，不是产品坏，而且**同趟的 `收集箱`=0 就是它自己的反证**，只是我没先看对照。
+   正文进台账 #171。
+3. 🔴 ~~仍欠的一件：W3「每年」的真机那一趟~~ ⇒ ✅ **2026-10-03 14:57:41 跑完：`通过 50 项，失败 0 项`、
+   `STEP C_RC=0`**，读数与逐趟红集收敛在下面第 13–15 条，这一节留原位是为了让人看清
+   "窗口没开"的判断前后反转了几次（脚本第 15 步已落地并离线验过：`bash -n` 0、
+   期望规则串与 `Recurrence.yearly(10,17)` 逐字节相同、`check:script-snapshot` 仍 ✅ 28 个脚本）。
+   2026-10-03 10:37–10:38 现量的现场 —— 四条都说明**现在跑它就是在动别人的现场**：
+   - `adb devices` ⇒ 只有 `emulator-5556`；`adb -s emulator-5556 emu avd name` ⇒ **SSOS-Parity-A36**
+     （与另一个项目共用的 AVD），`dumpsys window` 前台 = `com.heyta/com.heytamobile.MainActivity`
+   - `scripts/verify-mobile-repeat.sh:241` ⇒ `adb shell pm clear $PKG` —— 跑它会把别人在那台设备上的
+     登录态和数据**清掉**（这条在脚本里是第 241 行，不是可选项）
+   - `lsof -nP -iTCP:3000 -sTCP:LISTEN` / `:3100` ⇒ 各有一个 `node dist/src/index.js` 在听
+     （pid 87593 已 15h41m、58679 已 9h02m）
+   - `docker ps` ⇒ `supersync-server` / `supersync-postgres` **Up About a minute**：并行会话正在起**同一套 compose**，
+     换个 `PORT` 也还是会撞同一个 project
+   - `uptime` ⇒ 1 分钟负载 38.86，而本仓自己的等待阈值 = 核数 × 3/4 = **12**
+
+   ⚠️ **11:16–11:24 复量：窗口没有开，反而更堵** —— `sysctl -n vm.loadavg` ⇒ **50.64 / 31.44 / 27.96**；
+   `adb devices` ⇒ 仍只有 `emulator-5556`，而 `ls ~/.android/avd` ⇒ 这台机器上**只有 `SSOS-Parity-A36` 一个 AVD**
+   （`pgrep -f qemu-system` 那台就是它）⇒ "另起一台自己的模拟器"不是"再起一台"，要先 `avdmanager create avd`
+   （系统镜像只有 `android-36`，在 `/opt/homebrew/share/android-commandlinetools`）；
+   `lsof` ⇒ :3000 仍 pid 87593、:3100 仍 pid 58679；`pgrep -f 'verify-mobile-'` ⇒ **0**
+   （这条今天刚从一条**盲探针**换成能匹配的，见上面第 1 条的 🔴 —— 换之前它两个方向都不可信）。
+   负载 50 上再起一台模拟器会把别人**有时限**的设备判据压成超时假红，所以**没跑**。
+   📌 **谁手里**：设备与 compose 栈在并行会话手里；两条收尾等窗口：① 本节第 15 步那一趟
+   （✅ **已闭合**：2026-10-03 14:57:41 第六趟 `通过 50 项，失败 0 项`、`STEP C_RC=0`，见下面第 13–15 条）；
+   ② 台账 #181（取号以当时现量为准，见下）从我这里搬进 `docs/reference/environment-traps.md`（台账此刻 `M`，见下面一节）。
+   ⚠️ **② 到本批收口时仍未闭合**，把"在哪一步、在谁手里"写成现量而不是叙述：
+   - 挡着的只有"台账文件正被并行会话写脏"这一件事，不是内容问题：
+     `git status --porcelain -- docs/reference/environment-traps.md` ⇒ ` M`，
+     `awk -F. '/^[0-9]+\. /{if($1>m)m=$1} END{print m}' docs/reference/environment-traps.md` ⇒ 工作树 **180**、
+     `git show HEAD:docs/reference/environment-traps.md | awk -F. '/^[0-9]+\. /{if($1>m)m=$1} END{print m}'` ⇒ HEAD **177**
+     ⇒ #178–#180 是他们三笔**尚未提交**的，编号要按工作树取，正文落进去之前我先不落笔。
+   - 我的正文停在下面「待入 §7 的一条」那节，搬运 = 追加 + 把 #168 末尾的待办改成过去式，
+     两条都不需要别人做任何事，只差一次干净的写入窗口。
+   - 另一条**不属于本批、但同一把尺子量出来的**红：`node research/tools/docs-link-check.mjs` ⇒ **exit 1、8 处死链**，
+     报出来的文件是 `docs/README.md`、`docs/plans/README.md`、`docs/plans/ui-review-fill-zh-timeline.md`
+     （指向 ADR-0046/0047、trash-and-archive、calendar-year-time-and-mobile-profile 等**他们本机有、仓库里没跟踪**的文档）
+     —— 本批那两份文件（这份计划 + AGENTS 那一行）不在清单里，我没有替他们 `git add` 别人的文档。
+   📌 **另一条不属于本批、但同一把尺子量出来的缺口**：`AGENTS.md` §7 索引行现在覆盖到 **176**，
+   而工作树台账末号是 **179** —— #177–#179 是并行会话那三笔，索引行归他们补。现量：
+   `awk -F. '/^[0-9]+\. /{if($1>m)m=$1} END{print m}' docs/reference/environment-traps.md` 与
+   `grep -oE '^\| *[0-9]+–[0-9]+' AGENTS.md | grep -oE '[0-9]+$' | sort -n | tail -1`。
+
+   ⚠️ **11:49–11:53 再复量：窗口的形状变了，但还不是我的** —— `sysctl -n vm.loadavg` ⇒ **22.50 / 31.28 / 44.51**
+   （1 分钟从 148 掉到 22，在落，但阈值是 12）；`pgrep -f qemu-system` ⇒ **0**（那台共用模拟器已经关了），
+   `adb devices` ⇒ 无设备，:3000 / :3100 ⇒ 两个端口**都空了**，`docker ps` ⇒ 空。
+   看起来像开了，可是：`xcrun simctl list devices booted` ⇒ **3 台 iOS 模拟器还起着**、
+   `ps Axo command | grep -cE '[x]codebuild|[g]radle'` ⇒ **2 个在跑**、`git log --since='3 minutes ago'` ⇒
+   他们最后一笔 **11:47**。⇒ 那是一条正在做设备/构建收尾的会话，**gradle 跑完就要装包**；
+   这一刻我起第二台模拟器或抢那台 AVD，压的就是它的时间判据（同一形状见上面 11:24 那段）。
+   **另记一条**：`~/.android/avd` 里仍然只有 `SSOS-Parity-A36`，但"起一台自己的"这次量清了成本 ——
+   `avdmanager` 与 `emulator` 可执行、系统镜像 `android-36/google_apis` 在位 ⇒ **技术上今天就能建**；
+   拦着的不是工具链，是"再来一台模拟器的负载"和"这台机器上有人在跑设备判据"这两件事。
+
+   ⚠️ **11:56 复量，上面那条"在落"当场被否证**：`sysctl -n vm.loadavg` ⇒ **128.28 / 218.09 / 137.06**
+   （11:49 是 22.50 / 31.28 / 44.51 ⇒ 7 分钟内 1 分钟负载从 22 涨回 128）。
+   📌 一般规律：**1 分钟负载是一次瞬时读数，不构成趋势** —— 判"窗口开了没"要连读两次且看间隔；
+   单次读数写成"在落"就已经是过度解读（这次它错了）。
+   设备侧四条读数仍然全部指向"不是我的"：`adb devices` 无设备 / `pgrep -f qemu-system` = 0 /
+   :3000 与 :3100 都空 / `xcrun simctl list devices booted` = **3 台起着** / `gradle|xcodebuild` = **2 个在跑**。
+   📌 **push 这件事的现量（我没有推任何东西，也没有 merge）**：
+   `git rev-list --count origin/main..main` ⇒ **37 笔未推**（其中含本批收口那 16 笔），
+   `git merge-base --is-ancestor a29881e9 origin/main` ⇒ **真**（批次一的合入本身已在远端，
+   是 09:56 那一笔 `d0aa20ff` 带上去的），`git ls-remote --heads origin feat/countdown-anniversary` ⇒ **0**
+   （分支从没推过，也已被合入，留着还是删由产品负责人定：`git branch -d feat/countdown-anniversary` 我没有执行）。
+
+   设备与服务端都归自己时的复跑命令：
+   ```bash
+   HEYTA_E2E_SERIAL=<自己的模拟器> PORT=<空端口> bash scripts/verify-mobile-repeat.sh
+   ```
+   🔴 **12:01 起这一趟真的在跑了**，形状是"三层都不共享"（这条写在这里是为了：**会话死了不会留下没人知道的现场**）：
+   检出 = `../heyta-wt-closeout`（`git checkout --detach 592ea170`，跑前 `git status --porcelain` 为 0 行）；
+   设备 = **新建的私有 AVD `heyta-w3-yearly`**（`system-images;android-36;google_apis;arm64-v8a`，
+   headless `-no-window -no-snapshot-save`，不碰 `SSOS-Parity-A36`）；
+   服务端 = `PORT=3200` + `HEYTA_E2E_DB=heyta_w3_yearly_20261003`（不复用 `heyta_mobile_smoke` 那个默认库名）。
+   跑之前主检出的状态是：`adb` 无设备、`pgrep -f qemu-system`=0、:3000/:3100 全空、
+   `pgrep -f 'verify-mobile-'`=0、`gradle|xcodebuild`=0（11:58 复量），只有 3 台 iOS 模拟器起着且负载 40 在落。
+   编排脚本与各步退出码：`../heyta-wt-logs/w3-run.sh` / `w3-run.log`（每步 `STEPn_RC=`；
+   `STEP3_RC` = 当前产物 APK，`STEP7_RC` = 第 15 步那一趟，**3 = 负载等满 = 环境无效不是产品失败**）。
+   判据在第 15 步：点「每年」⇒ 规则 = `FREQ=YEARLY;BYMONTH=<当前截止月>;BYMONTHDAY=<日>`、
+   op 数**恰好 +1**、界面出现「当前：每年」、笔记本读到同一条规则。
+   ⚠️ 期望值取自**手机此刻的 dueDate**（`repeatAnchor = dueLocal ?? todayLocal`），
+   不是脚本开头写死的那个日期 —— 这一点本身是第 15 步存在的理由。
+
+   **12:04–12:27 这一趟的实测（每一条都是磁盘上的读数，不是计划）**：
+
+   1. ✅ **当前产物的 APK 里 yearly 真的在**：`app-release.apk` 67,140,908 字节（12:04 打），
+      解开 `assets/index.android.bundle` 按字节数 needle ⇒ `每年`(UTF-16LE)=**1**、
+      `FREQ=YEARLY`(ascii)=**1**、阳性对照 `收集箱`=**10**、阴性对照 `年同比不存在串`=**0**。
+      有对照是因为 #171 那个坑：**中文在 Hermes 字节码里是 UTF-16LE，`grep` 恒 0** ——
+      没有那 10 次 `收集箱`，这个 0 和"没做"长得一模一样。
+   2. 🔴 **12:09 那一趟 exit 1 是我的探针坏了，不是产品也不是环境**：编排脚本用
+      `adb -s <d> emu avd name` 的第一行去**逐字相等**比 AVD 名，而 `adb emu` 的应答是 **CRLF** ——
+      `od -c` 实测 `h e y t a - w 3 - y e a r l y \r \n` ⇒ `[ "$nm" = "$AVD" ]` **恒假**，
+      60 轮全空转。设备其实 12:05 就 `Boot completed in 25012 ms`。
+      同一个脚本里 `getprop sys.boot_completed` 那行做了 `tr -d '\r'`，**这行漏了** ——
+      典型的"同一份输出格式在一条链上被两种方式对待"。补上 `tr -d '\r'` 后第一次轮询就命中。
+      📌 待入台账（取号以当时现量为准，别照抄本行）：**`adb emu` 系（console）应答带 `\r`，
+      `getprop`/`shell` 系也带 —— 任何"逐字相等"的 adb 读数判据必须先 `tr -d '\r'`，
+      而它坏掉的形状是"永远等不到"，不是"报错"**。
+   3. 🔴 **12:16 那一趟 exit 1 是隔离检出的固有代价，不是配置错**：`git worktree add` **不带
+      `server/.env`**（它被 gitignore），而服务端有两把必填钥匙：`JWT_SECRET`
+      （`server/src/auth.ts:34` 直接抛）与 `PASSWORD_PEPPER`
+      （`server/src/index.ts:59` 的 `assertPasswordBackend` 在**绑端口之前**自检，缺了就拒绝启动）——
+      症状是"服务端 60 秒内没有就绪"，真因在 `/tmp/heyta-e2e-server.log` 的第一行。
+      我这趟的做法：给自己的栈**新生成一把**（不复用主检出那把）写进 `w3-stack.env`（权限 600、
+      值不打印、复跑复用同一把 —— 中途换值会让已注册账号的口令散列永远验不过）。
+      📌 待入台账：**"隔离检出"不等于"能跑的检出"** —— 凡是 gitignore 的配置（`server/.env`）
+      都要在隔离现场显式补，且它的失败形状是**下游超时**（栈没起来）而不是"缺文件"。
+   4. ✅ **私有库这条路线本来就有配方**：`docs/runbooks/local-server-verification.md` §步骤 1-2
+      （`createdb` + `sh scripts/migrate-deploy.sh`，macOS 要 `research/tools/macos-sed-shim` 在 PATH 上）。
+      现量：`heyta_w3_yearly_20261003` 已应用迁移 **42** 条，与共享库 `heyta_mobile_smoke` 的 **42** 条
+      **逐条等量**（这就是"我的库不是半成品"的证据；直接 `prisma migrate deploy` 会在 9 个
+      CONCURRENTLY 迁移上 P3018）。
+   5. ✅ **归属四条都成立**：`:3200` 监听者 pid = **33262**，而共享 pidfile
+      `/tmp/heyta-e2e-server.pid` 里的数**就是 33262**（跑前那个 pidfile 是**死人**：42398 已不存在）；
+      账号是 `mobile-e2e-1791001057@example.com`（本轮新建，client 数 0 < 20）。
+      ⚠️ **顺带照出的一条敞口（归他们那条线，不是本批能改的）**：`PIDFILE`/`LOGFILE`/账号凭据
+      都是**固定 `/tmp` 路径**（`mobile-e2e-up.sh:46-47`、`mobile-e2e-down.sh:16`、
+      `down` 里 purge 掉的三个 `heyta_mobile_*.txt`），而"幂等复用"的判据是**端口**
+      （`mobile-e2e-up.sh:82` 只要求 `/health` 有**任意非空**响应）⇒ 两个会话用不同 `PORT`
+      时**共用同一份 pidfile 与同一份凭据**：后写的覆盖前写的，而 `mobile-e2e-down.sh` 会杀掉
+      "最后那个写 pidfile 的人"的服务端。所以**我这趟收尾不跑 `mobile-e2e-down.sh`**，
+      改用 `../heyta-wt-logs/w3-teardown.sh`：只杀"命令行里带 3200 的占有者"、
+      只 `adb emu kill` 名为 `heyta-w3-yearly` 的设备（先读 `emu avd name` 再动手）。
+   6. 🔄 **负载门第一次在真实场景下工作**（不是变异夹具）：12:17:37 开始读数
+      **469 / 495 / 509 / 486 / 459 / 431 / 444 / 411 / 396 / 296 / 196 / 136 / 115 / 90 / 66 / 51 / 35 / 28 / 20 / 13**
+      —— 全部 `> 12` 就一律不放行，每 30s 一次、上限 900s，等满就 `exit 3`。
+      📌 这里把上一轮那条一般规律**量成了现场**：那 469 不是别人在跑设备（`pgrep -f 'verify-mobile-'`=0、
+      `xcodebuild`=0），是**同机多个 agent 会话的构建/测试并发** —— 所以"负载高"在这台机器上
+      **不构成"有人在抢设备"的证据**，两件事要各自量。
+   7. 🔴 **这一趟照出三条真 bug，各自当场修完**（都是"多个会话共用一套验收台架"这一类的，
+      每条默认值与被替换的字面量**逐字相同** ⇒ 单会话行为一字不变，每条都有改前/改后 A/B）：
+
+      | 提交 | 缺陷 | A/B 读数 |
+      |---|---|---|
+      | `87ba108f` | `lib/mobile-e2e-fresh-account.sh` 的默认地址**不跟 `PORT`**。六个设备脚本（auth / autosync / calendar / conflict / focus / repeat）都在 `lib/mobile-e2e.sh` **之前** source 它 ⇒ 那一刻 `SERVER` 必为空、写死的 `:3000` 赢。换端口的效果是"设备侧连 3200、**建号打在 3000**" | 改前 `PORT=3200` 仍得 `http://127.0.0.1:3000`；改后得 `:3200`；显式给 `SERVER` 时行为不变（`verify-mobile-ios.sh` 在 `mobile-e2e.sh` **之后**才 source，它拿到的仍是推导过的 `SERVER`） |
+      | `5ca275e1` | 凭据三个路径**写者参数化了、读者写死**：`mobile-e2e-fresh-account.sh:49-51` 收 `HEYTA_E2E_*_FILE`，而 `mobile-e2e.sh:80-82` 硬 `cat /tmp/heyta_mobile_*.txt` ⇒ 设了变量只是把号建到私有文件、验收**继续读别人那一轮的令牌**。症状不是报错，是"用错了身份"：`pm clear`、op 数、跨设备断言全落在别人的账号上 | 旧件 + 私有路径 ⇒ 读到 `/tmp` 那份；新件 + 私有路径 ⇒ 读到私有的；不给变量 ⇒ 与原字面量相同 |
+      | `3603db71` | `verify-mobile-repeat.sh` 开局 `rm -f` 两个**写死路径**的本地 sqlite ⇒ 第二个会话起这一轮，会把**第一个会话正在用的那轮**的笔记本库删掉；之后那批断言全在读一台空笔记本，看着像"手机写了、笔记本收不到"（与 traps #169 同形状，对象从设备换成文件） | 旧件设变量仍指 `/tmp/heyta-repeat-laptop.sqlite`；新件设了才换、不设相同 |
+
+   8. 🔴 **第四条不是脚本 bug，是我这次隔离设计漏的一层**：`emulator-5554` 是**全仓所有设备脚本的
+      默认串口**（`HEYTA_E2E_SERIAL` 缺省值），所以"私有 AVD"起在 5554 等于**把别人的默认设备
+      换成了我的**。实测撞上来的形状：12:33 另一个会话建号写了共享凭据（`/tmp/heyta_mobile_email.txt`
+      的 mtime），12:35 我的模拟器收到一句"等 20 秒优雅退出"就没了（`w3-emu.log:100`），
+      而我的下一趟 20 轮×3s 全报"没有名为 `heyta-w3-yearly` 的设备"。
+      ⇒ 现在这趟改成 **`-port 5556`**（串口 = `emulator-5556`），私有凭据目录 `/tmp/heyta-w3-yearly`，
+      私有 sqlite 两份。📌 一般规律：**"名字私有"不等于"命名空间私有"** —— AVD 名是我的，
+      串口号却是公共的。
+   9. ⚠️ **登记为缺口、本批不修的那一条**：`/tmp/ui.xml`（`uiautomator dump` 的宿主落点）仍是固定名，
+      并行两轮会互相覆盖 —— 闭合代价是**现量**的而不是估的：
+      `grep -rc '/tmp/ui.xml' scripts/lib/mobile-e2e.sh scripts/verify-mobile-*.sh | awk -F: '{s+=$2} END{print s}'` ⇒ **36 处**，
+      分布在 1 个 lib + 12 个验收脚本（`grep -rl 'ui\.xml' scripts/verify-mobile-*.sh | wc -l` ⇒ 12）。
+      这不是"顺手加个默认值"的量级，所以留在这里而不是塞进本批。
+   10. 📌 **我自己这一趟犯的两次探针读法错误，记下来给后来者**：
+       ① `cmp -s A B && echo "✅ 同步"` 那行**没打印**，我把紧随其后的**门禁自己的** ✅ 行（"自快照 bootstrap 全部在位"）
+          当成了它的输出，差点把"检出已同步"写进文档 —— 判据行必须与它所属的命令**在同一行可核对**，
+          或用 md5 这种带值的读数（最后就是 `md5 -q` 两边相等才认）。
+       ② 一条 A/B 探针把 `/tmp/heyta_mobile_token.txt` **原文打印了出来**（一枚本地 TEST_MODE 账号的 JWT，
+          未进任何文件/提交）。以后比较凭据只比**长度或哈希前缀**，不 `cat`。
+   11. 🔴 **12:45–12:51 那一趟整片"找不到 X"不是产品缺陷，是一台几何不对的设备**（已提交判据 `1ebbf800`）：
+       `verify-mobile-repeat.sh:101-103` 的标签栏坐标是**写死像素**
+       （`TAB_TASKS=108`、`TAB_PROFILE=972`、`TAB_Y=2253`），只在 **1080x2400@420** 这一档成立，
+       而**没有任何一条判据核对过这个前提**。我这台是 `avdmanager create avd` 不带 `--device` 时
+       默认给的 **320x640@160**（对照：那台共用的 `SSOS-Parity-A36` 是 1080x2400@420 ——
+       `grep hw.lcd. ~/.android/avd/<avd>/config.ini` 现量），于是 `input tap 972 2253`
+       **落在屏幕之外：不报错、也不生效**。表现正是"从第 2 步起每条断言都『找不到 X』"。
+       否证过程留三条读数是重点：
+       ① 我先假设"**灭屏/锁屏**"——`dumpsys power` ⇒ `mWakefulness=Awake`、
+          `settings get system screen_off_timeout` ⇒ **2147483647**、无 keyguard ⇒ **假设被否证**，
+          没有把它写进任何结论；
+       ② 再假设"**应用崩了**"——`dumpsys dropbox` ⇒ `data_app_crash`/`data_app_anr` **0 条** ⇒ 否证；
+       ③ 决定性的是**当时那份 dump 的内容**：6 个 text 节点、20 个 id 全是
+          `com.google.android.apps.nexuslauncher`（`Sat, Oct 3` / `Phone` / `heyta` / `Chrome`）——
+          **前台是桌面**，而我手动 `am start` 之后同一台设备 dump 出 **34,579 字节、包名全是
+          `com.heyta`、17 个中文 text**（任务/日历/专注/分类/我的 + 列表/四象限/时间线/日期/**倒计时**）
+          ⇒ 应用一直活着，坏的是"我点在屏幕外"。
+       📌 一般规律：**"每条断言都找不到 X"这个形状，先问"屏幕上是谁"，再问"X 做没做"** ——
+       一叠缺失断言在输出上和"应用在前台但功能坏了"长得一模一样（§7 元规则 1 的第五次现身）。
+       修法分两层，都要：①我这台改成 1080x2400@420（`config.ini` 改前三处数值、备份
+       `config.ini.bak-320x640`），编排脚本里加一条开局 `wm size`/`wm density` 对账；
+       ②脚本本体加**前提判据**（不符 ⇒ `exit 3` = 环境无效，与负载门同一约定），
+       而不是留一屏假红等人来猜。
+   12. 📌 顺带一条**没修、登记**的小口子：`verify-mobile-repeat.sh:243` 那行抬头把库名**写死印成
+       `heyta_mobile_smoke`，而真正用的库由 `HEYTA_E2E_DB` 决定 —— 我这趟是
+       `heyta_w3_yearly_20261003`，日志里那行是错的。现量：
+       `grep -n '库: heyta_mobile_smoke' scripts/verify-mobile-repeat.sh` ⇒ 1 行。
+       它不改行为，但它把"这一轮跑在哪个库上"这条取证信息印错了，属于本仓库最不该有的那类抄件。
+   13. ✅ **14:29 之后第 15 步真的在真机上跑完了**，而 W3 的产品判据**一条没红**（读数出自第四、五趟，
+       两趟这几行逐字相同）：
+       ```
+       ✅ 锚点前提成立：手机当前截止日就是顺延后的 2026-10-17
+       ✅ 换一次预设只产生了 1 条 op（1 → 2）
+       ✅ 「每年」落库的规则正确：FREQ=YEARLY;BYMONTH=10;BYMONTHDAY=17
+       ✅ 锚点跟着当前截止日走：2026-10-17
+       ✅ 面板显示「当前：每年 …」（describeRecurrence 认得这条规则）
+       ✅ 笔记本读到同一条「每年」规则：FREQ=YEARLY;BYMONTH=10;BYMONTHDAY=17
+       ```
+       期望值取自**手机此刻的截止日**（顺延两次到 10-17）而不是脚本开头写死的 10-03 ——
+       这正是第 15 步存在的理由，本轮第一次在真机上兑现。
+       红集逐趟收敛（每一趟的条数都是从日志里数出来的，汇总行 `通过 N 项，失败 M 项`）：
+
+       | 趟 | STEP C 起—止 | 通过/失败 | 当时剩下的红 |
+       |---|---|---|---|
+       | 1 | 13:49:35–13:58:21 | 35 / 6 | 「立即同步」×3、第 7 步两条、第 15 步"点不到任务行" |
+       | 2 | 14:00:14–14:06:07 | 35 / 6 | 与第 1 趟**逐条相同**（可复现 ⇒ 不是负载抖动） |
+       | 3 | 14:11:20–14:26:15 | 20 / 16 | 不作数：整趟被另一条会话重装 APK 打断（上面第 8 条） |
+       | 4 | 14:29:59–14:36:52 | 45 / 3 | 第 7 步两条、第 15 步"找不到立即同步" |
+       | 5 | 14:40:03–14:49:11 | 48 / 1 | 第 15 步"找不到立即同步" |
+
+       第 1、2 趟那 6 条里 4 条由 `a371a658`（界面断言改"见到为止"+ 补回第 15 步漏掉的那次 dump）消掉；
+       第 7 步两条由 `cc974fbd` 消掉 —— 它**不是产品没接上**：面板是 ScrollView，「重复」区块整体在
+       首屏之外，而第 7 步只在刚打开那一次 dump 上 grep。同一趟里紧接着的第 8 步用会滚动的
+       `tap_label` 点「每周」全绿、第 9 步读「当前：每周六」全绿，而**第 9 步早就为这件事写了
+       "裁掉就滚一下"**，第 7 步没有 —— 一份脚本里同一个坑的两种待遇。第五趟修好后打印
+       `向下滚过 3 屏才收齐`，并且**按滚下去的次数滚回顶部**（`scroll_to_*` 只会往前滚，
+       停在底部会让第 8 步永远找不到「每周」，那是自己弄坏下一步的前提）——
+       第 8 步在第五趟仍然绿，就是这条守卫的对照。
+       夹具在 `scripts/mutate-closeout-gates.sh` 的 **V 组**：抽出脚本本体（不是另抄一份逻辑）接到
+       虚拟滚动上，V1 首屏之外必须算收齐、V2 真缺「每年」必须报缺（W3 担心的正是产物里没这一档）、
+       V3 整块不存在两条都必须红。现量：`bash scripts/mutate-closeout-gates.sh` ⇒ **17 绿 0 红**，exit 0。
+   14. 🔴 **我为了"这轮算不算数"写的那条设备指纹探针，自己假阳性了一次**（第五趟 14:49:11 报
+       "设备被别人动过"）：结束值 `lastUpdateTime=14:41:33` 落在起跑后 90 秒内，而验收脚本的
+       **第 1 步本来就是 `adb install` 当前产物** —— 自己装的包被自己的探针读成了别人动过。
+       修法不是放宽判据，而是**把基线挪到会引起误判的那个动作之后**：编排脚本 `w3-iso.sh` 现在边跑
+       边盯日志，见到 `应用已启动` 才取基线；取不到基线就**明确不做比对**（拿起跑值去比就是这次假阳性），
+       读数两行都打印出来（`开局设备指纹（起跑值）` + `基线指纹（第 1 步装包之后）`）。
+       📌 一般规律：**判"这轮有没有被外力打断"的探针，要先问它读的那个量里有没有我自己的一步** ——
+       装包/清数据/改设置这类"验收自己的动作"和"别人动过"在 `dumpsys package` 里是同一个字段。
+       第 3 趟那次**是真的**（`firstInstallTime == lastUpdateTime == 14:19:33`，而起跑是 14:11:20），
+       所以这条探针不是没用，是原来取样点错了。
+   15. ✅ **第六趟 14:50:36–14:57:41 ⇒ `通过 50 项，失败 0 项`、`STEP C_RC=0`**，
+       第 15 步那格红消掉了，而**我给它的第一个解释是错的**，这条要写在结论前面：
+       假设是"详情面板盖住底栏 ⇒ 那一下落在面板上"，第五趟补上关闭之后**仍然红**，
+       而 `✅ 面板已关` 那条是绿的 —— 假设被自己的那一趟否证。
+       决定性的是跑完之后在那台设备上现取的一份现场：`mCurrentFocus` =
+       `com.heyta/com.heytamobile.MainActivity`、界面**停在任务列表**，
+       底栏「我的」的 `bounds=[864,2169][1080,2337]`，脚本点的 `972 2253` **明明落在里面**
+       ⇒ 不是坐标错、不是面板挡，是那一下**被 Modal 的关闭动画吃掉了**（点了、没生效、也没人再点）。
+       所以判据不是"我猜对了原因"，而是**把前提变成看得见的两行**：
+       ```
+       ✅ 面板已关（走的是第 10 步那个有名字的出口：980 340）
+       ✅ 列表回来了（点底栏的前提成立）
+       ```
+       第五、六两趟之间只差 `settle_for "$TASK_TITLE"` 这一句 ⇒ 红→绿是同一条判据的 A/B。
+       设备侧另有一条独立佐证：列表里那一行实时写着
+       `打开任务：repeat-e2e-144133，重复：每年 10 月 17 日`（无障碍标签里带着规则结论）。
+       📌 一般规律：**`input tap` 落在正确坐标上不保证被消费** —— 界面正在换场时它是**静默失败**的，
+       而"点了没反应"和"那个按钮不存在"在 dump 上长得一模一样（§7 元规则 1 的又一次现身）。
+       复跑（隔离检出 + 私有 AVD/端口/库/凭据/sqlite，全套编排在树外）：
+       ```bash
+       cd "/Users/rocalight/Desktop/All in one Data/01-PROJECTS/heyta-wt-logs"
+       bash w3-iso.sh            # STEP C_RC=0 = 这一趟算数；3 = 负载等满 = 环境无效
+       ```
+       📌 **W3 这条到此闭合**：脚本第 7 步六个预设（含「每年」）与第 15 步的跨年档位
+       都已在真机上跑绿，`verify:mobile-repeat` 覆盖的不再只有 WEEKLY。
+   16. 🔴 **收现场时我自己把那一趟又起来了一次**，原因蠢到必须写进来：收尾脚本里那行
+       `echo "… 复跑命令写着 \`bash w3-iso.sh\` …"` —— **反引号在双引号里是命令替换**，
+       于是 15:01:47 那条"清理"命令真的执行了 `bash w3-iso.sh`：起了模拟器（pid 60101）、
+       起了 :3200 服务端（pid 60644）、走到验收脚本的负载门。发现的方式也不是"知道自己在干嘛"，
+       而是脚本**卡住超过 120 秒** ⇒ `ps -o pid,ppid,lstart` 才看到 `w3-teardown.sh` 底下挂着
+       一个 `bash w3-iso.sh`。处理：按 pid 逐个 kill（只 kill 认得出 `PORT=3200` 的那个进程），
+       `adb emu kill` 收掉我的 AVD，误跑那趟的日志单独归档成 `w3-repeat3-run7-误跑.log`。
+       改完之后现场复跑过一遍收尾脚本并以读数确认它不再起任何东西：
+       `bash w3-teardown.sh; pgrep -f 'bash w3-iso.sh'` ⇒ 空，`adb devices` ⇒ 空，`qemu=0`，:3200 ⇒ 空。
+       全目录同类形状自查（现量，别靠记）—— 找"双引号里出现反引号"的行：
+       ```bash
+       grep -n '"[`]' *.sh        # 命中 0 才算干净；当时只有那一行命中，现在 0
+       ```
+       📌 这条我**已经有过一次教训**（"双引号里的 pattern 含反引号会被命令替换 ⇒ 报『没有残留』其实 grep 没跑"），
+       这次的症状更贵：不是漏测，是**在共享机器上多起了一台模拟器和一个服务端**，压的是别人那条时间判据。
+       所以规则要落成**写盘时的 grep**，不是"记得别这么写"。
+       ⚠️ 另一条同类敞口当场查到并登记（**没改**，因为那是并行会话在读的文件）：
+       `settle_for`/`dump` 系列脚本里 `/tmp/ui.xml` 仍是固定名（上面第 9 条，36 处）。
+   17. 📌 **收现场后留下的东西**（都是有意保留，为了那条复跑命令真的能复跑）：
+       私有 AVD `heyta-w3-yearly`（1080x2400@420，原 320x640 的配置备份在 `config.ini.bak-320x640`）、
+       私有库 `heyta_w3_yearly_20261003`、私有栈 env `w3-stack.env`（600 权限，只服务这台一次性库）、
+       隔离检出 `../heyta-wt-closeout`（detached `592ea170` + 三个文件按 main 镜像，md5 逐字节相同）。
+       三条撤销命令都在 `w3-teardown.sh` 的打印里（AVD / 库 / worktree），**都不自动执行**。
+4. 📌 **本会话留下的隔离检出**：`../heyta-wt-closeout`（detached，`43a6cf60`）。
+   它的**两个脚本**（`scripts/reinstall-all.sh`、`apps/desktop-macos/scripts/package-app.sh`）
+   与 main 逐字节相同（`cmp` 过）；**文档以 main 为准** —— 检出里那份落后于把台账条目
+   正式落成 #168–#171 的那一笔。留着它的唯一用途是它已经 `pnpm install` + `pnpm -r build`
+   完，等负载 ≤12 且设备归自己时可以直接在那儿跑第 15 步。
+   不需要了就 `git worktree remove --force ../heyta-wt-closeout && git worktree prune`。
+
+### 待入 §7 的四条已落进台账（本节的抄件按"抄件一定会漂"撤掉，只留指针）
+
+四条正文于 2026-10-03 10:54 落进 `docs/reference/environment-traps.md`，编号 **168–171**；
+`git diff --numstat` 的读数是 `63\t0` —— **只插入、零删除**（追加台账时"删了别人一行"
+是最贵的一种事故，所以这条必须量，不能靠眼看）。
+
+| 本批的发现 | 台账号 |
+|---|---|
+| 等负载的 `vm.loadavg` 解析自己坏了 15 轮 / 守卫也是探针 / `wait_for_quiet_host` 该抽进 `scripts/lib/` | #168 |
+| `reinstall-all.sh` 的 ios 段盲选模拟器 —— 卸载类脚本选目标不许靠默认值或 `head -1` | #169 |
+| 窗口截图当"画没画"的载体 ⇒ **同时**假红和假绿；该换载体而不是换阈值 | #170 |
+| Hermes 字节码里的中文是 UTF-16LE，`grep` 恒 0 长得和"没做"一模一样 | #171 |
+
+现量命令（**下次要引用编号前先跑它，别照抄本表** —— 这张表本身就是会漂的那一份）：
+
+```bash
+grep -nE '^1(6[5-9]|7[0-9])\. ' docs/reference/environment-traps.md | cut -c1-70
+```
+
+🔴 台账里没落的一条待办，写在 **#168 末尾**：把 `wait_for_quiet_host` 从
+`scripts/verify-mobile-restore.sh` 抽进 `scripts/lib/` —— 它现在是某一个脚本的私有函数，
+第二个想用的时候就又是一份抄件（同族教训见 `mobile-e2e.sh` 文件头）。
+✅ **这条已于同日 11:34 落地**（`scripts/lib/wait-for-quiet-host.sh` + restore/repeat 两处引用，提交 `1d085a92`）。
+📌 因此台账干净时除了搬 **#181**，还要把 #168 末尾那两句待办改成一句过去式指针
+（**不要删** —— 那条"手写等待循环把坑踩三遍"的机制正文是判据本身，被删掉的往往是它）。
+
+### 待入 §7 的两条（**正文写好了，先落在这里**：台账此刻被并行会话写脏）
+
+为什么不当场追加：`git status --porcelain -- docs/reference/environment-traps.md` 现在输出 `M`，
+工作树末号 **15:0x 复量 = 180**（`awk -F. '/^[0-9]+\. /{if($1>m)m=$1} END{print m}' docs/reference/environment-traps.md`；
+HEAD 侧仍是 177 ⇒ #178–#180 是他们尚未提交的那三笔）。在一棵正被别人改的共享树上
+用 `commit --only <该路径>` 追加，会**把别人未提交的那几段一起写进我的提交**（`--only` 提交的是
+那个路径的**工作树内容**，不是我的 diff）。所以这条按规则停在单写者文档里，等台账干净时原样搬进去，
+届时编号以**当时工作树现量**为准。
+⚠️ **这条预见在 35 分钟后就兑现了一次**：11:20 那一刻工作树末号是 179 ⇒ 我写的是 180；
+11:55 复量工作树末号已经是 **180**（并行会话新落了 #178 四端重装判据只答"装上了"不答"装的是不是本批产物"、
+#179 `tee` 吃掉退出码、#180 共享板一个 tick 里连调宿主两个 setter），三条主题与我这条都不重合 ⇒
+**我这条现在要取 #181**。这正是本条正文自己讲的教训的另一种面目：编号也是"当时那一次"的读数，
+它不像内容那样会报错，只会和别人的条目**并成同一个号**（§3.5 第 2 条那次 137–140 撞号就是这么来的）。
+现量（搬之前必跑，别照抄本节任何一处号）：
+```bash
+awk -F. '/^[0-9]+\. /{if($1>m)m=$1} END{print m}' docs/reference/environment-traps.md   # 工作树末号
+git show HEAD:docs/reference/environment-traps.md | awk -F. '/^[0-9]+\. /{if($1>m)m=$1} END{print m}'   # HEAD 末号
+```
+
+正文（可直接粘贴）：
+
+> **181（取号见上面的现量命令）. 🔴 `grep -F` 会把手写的 `[e]` 自匹配防护当**字面量** —— 于是这条"有人在跑吗"的探针
+> 匹配不到任何一次真运行，只匹配到**执行它的 shell 自己**。**
+>
+> `ps Axo command | grep -F 'verify-mobil[e]'` 是从正则世界的 `[e]` 技巧抄过来的，但 `-F` 是固定串：
+> 模式变成字面量 `verify-mobil[e]`。真跑的脚本 argv 是 `bash scripts/verify-mobile-repeat.sh`，
+> 里面没有方括号 ⇒ **永远 0**；而执行这条检查的那个 shell，命令行里原样带着带括号的文本 ⇒
+> **空机器上稳定报 2**（它自己 + 那个 grep）。两个方向都错，且错的方式恰好是设备验收最要的两种方式：
+> 把"别人在跑"读成"没人跑"（于是敢去 `pm clear` 共用 AVD），和把"没人在跑"读成"有人在跑"。
+> ✅ 量法（2026-10-03 11:20，活的对照组）：起一个 argv 含 `verify-mobile-repeat-fixture` 的进程 ⇒
+> 老探针 **0**、`pgrep -f 'verify-mobile-'` **命中该 pid**、清理后回 **0** 且**不含观察者**。
+> 📌 一般规律：**括号自匹配防护只在正则模式里成立**；`-F`／`--fixed-strings` 下它把探针变成字面量匹配，
+> 而任何"模式串写在命令行里"的探针都会数到自己 —— 要么换 `pgrep`（macOS 无 `-c`），
+> 要么运行时拼模式（`p=$(printf 'verify-mobil%s' e)`）再 `grep -v grep`。**判这类探针之前，
+> 先起一个 argv 里真的带着那串东西的活进程当对照组**；没有对照组的占用探针不算判据。
+
+正文（可直接粘贴）· 第二条：
+
+> **182（取号以搬运那一刻的现量为准，别照抄这里的号）. 🔴 收尾脚本里一句 echo 把**正要清掉的那一趟又跑了一遍** —— 反引号写在双引号里是命令替换：注释里不算，echo 里算。**
+>
+> 2026-10-03 15:01 实测：一条"把设备现场收干净"的命令执行到第 3 段那行 echo，
+> `ps -o pid,ppid,lstart` 里出现 `bash w3-teardown.sh`(父) → `bash w3-iso.sh`(子, 15:01:47) → `qemu-system-aarch64 -avd …`，
+> :3200 上同时多了一个 env 里带 `PORT=3200` 的 node 进程。
+> 发现它**不是因为知道自己写了什么**，而是因为一条本该只打印几行说明的脚本**超过 120 秒没返回** ——
+> 收尾脚本卡住本身就是"它做了没打算做的事"的信号。代价按这台机器的实际单位算：
+> 多起一台模拟器 + 一个服务端，压的是别人那条**带时间判据**的设备验收（不是"浪费点电"）。
+> ✅ 边界与修法：`#` 注释里的反引号不展开（注释不是可执行文本），**双引号里的会**；
+> echo/字符串里要指代命令就裸写或用「」。写盘之后当场自查并证明它不再起任何东西：
+> ```bash
+> grep -n '"[`]' *.sh                                   # 零命中（exit 1）才算收干净
+> bash w3-teardown.sh; pgrep -f 'bash w3-iso.sh'        # 空
+> adb devices; lsof -nP -iTCP:3200 -sTCP:LISTEN -t      # 都空
+> ```
+> 📌 一般规律：**文档里的写法与 shell 里的写法共用同一套定界符，而两套语义完全不同** ——
+> 台账里 JS 模板串那一条（注释里的反引号把模板截断）是同一族、宿主不同。
+> bash 世界里同形还有 `$(…)`：写进双引号字符串前先问一句"这串会不会被执行"。
+> ⚠️ 这条**不是新道理**，本仓库早就记过"双引号里的 pattern 含反引号会被命令替换 ⇒ 报『没有残留』其实 grep 没跑"；
+> 这次不同的只有爆炸半径（从"漏测"变成"在共享机上多起一台模拟器"）。
+> ⇒ **记在脑子里的规矩不算规矩，落在一条 grep 里的才算。**
+
 
 ---
 
@@ -287,3 +787,289 @@ i18n **中英同步**（唯一文案事实源，`check:ui-language` 拦）；`SH
 6. D1 选 (a) 之后，`EVENT` 与 `TASK` 的**提醒**共用 `REMINDER` 实体（其 id 是 `taskId:triggerAt`）——这个 id 形状要不要改？改了会不会撞上 §3.3 的持久化字段纪律？
 7. W4b 那条"服务端下发公共事实"，我给定性口径是「AGENTS §1 那句约束的是用户数据」——**这个口径会不会被后面的人拿去给别的东西开门**？如果是，判据该长什么样（比如门禁只允许 `days[]` 这一种形状走这条通道）？
 8. §2.8 我断言"用户侧功能一项没少"，依据是 Apple ADP 的官方放弃清单。**请核**：heyta 有没有哪个**已经承诺过**的能力（落地页/隐私政策/帮助文档里）恰好落在那份清单里（服务端搜索、网页端直读、代客恢复）？如果有，加密档就不是"无取舍"，§2.8 要改。
+
+---
+
+## 8. 批次二落地计划（2026-10-03 15:41 起，逐项打勾）
+
+> **口径**：一项 = 一个提交 = 一条可复跑判据 + 一次变异验证（不能失败的检查没有价值，AGENTS §8.3）。
+> 状态：⏹ 未开始 / ⏳ 进行中 / ✅ 已完成（完成时把该行改写成过去式并附**实际读数**，不写"已做"）。
+> **调研基线**：`HEAD = 5bbca12d`，2026-10-03 15:38 由五个只读调研员分别核对 EVENT 实体面、界面与三端面、提醒面、
+> AI 工具目录面、法务与调休通道面。下面每条结论都带 `file:line`，动手前逐条可复核。
+
+### 8.0 先撤两条过期断言（这本身就是本仓库最贵的一类事故）
+
+1. 🔴 **"全仓一个 `new Notification(` 都没有"是假的**，而且它同时活在三个地方：`AGENTS.md` §9 的 P2 行、
+   `apps/web/src/App.tsx:998` 的注释、`apps/web/src/features/reminders/notify.ts:11` 的注释 ——
+   而 `notify.ts:141` 就是那句注释所否证的代码本身（`new ctor!(labels.title, {...})`）。
+   链路已在：`reminder-actions.ts:319 due()` → `apps/web/src/features/reminders/store.ts:154` →
+   `use-reminder-notifications.ts:39,51-60` → `notify.ts:122-154` → `App.tsx:1000`；权限入口 `ReminderNotifyPanel.tsx:60-63`。
+   ⇒ **W9 的起点比 §3 写的低**：web 投递不是零，缺的是"到点自醒 + 档位扩展 + DST 正确"。
+   📌 一般规律：**注释里的"全仓没有 X"是断言，不是事实**，而它会比它描述的那个时代活得更久。
+2. ⚠️ 我起草批次二目标时把 **W0 写成了"批次一遗留缺口"** —— 本文 §3 的 W0 是「把锚点弹层提到共享层」。
+   遗留缺口（`/tmp/ui.xml` 固定名、`verify-mobile-repeat.sh` 硬印库名、待入台账两条）另立 **W0b**，不与 W0 混提交。
+
+### 8.1 依赖顺序（反着做会白干）
+
+```
+W0 ────────────────┐
+                   ├─> W5 ─> W7
+W2 ─> W6 ──────────┤
+ └──> W10          └─> W8（三端接线随 W5/W6 一起做，单独收尾）
+W9（web 半，可与 W2 并行）
+W4b ─> 新 ADR + 回写 ADR-0038 范围表
+L'  ─> 随最后一个改变"对外承诺"的工单一起做
+W0b ─> 随时可做（台账那半要等文件干净）
+```
+
+- 🔴 **W10 必须排在 W2 之后**：`scripts/gen-ai-capability-manifest.mjs:77-79,222-224` 在"实体未进 `EntityModelMap`
+  而工具已登记"时会**当场红**（这是好事，说明它有牙齿）。
+- 🔴 **W6/W5 必须排在 W2 之后**：`EVENT` 进 `packages/shared-schema/src/entity-types.ts:22` 之前，
+  "一条没有截止日的倒数日能上日历"这件事**结构上不可能**。
+
+### 8.2 逐项：范围 / 落点 / 判据 / 变异 / 勾
+
+#### ✅ W0 · 锚点弹层的定位算术已提到共享层（2026-10-03 15:51，`7966857a`）
+
+- **形状（已落地）**：纯函数 `placeAnchoredPanel(trigger, panel, viewport, {gap, edge}) → {top,left,placement}`
+  在 `packages/ui/src/overlay/model.ts`；**测量与重算时机留在宿主** —— 因为
+  `packages/ui/src/index.ts` 文件头明写这一层进不来任何 DOM 标签，而
+  `AccountMenu.tsx:176-202` 那段的承重件恰恰是 DOM（`getBoundingClientRect` 与
+  **捕获阶段 scroll**，`:199-202` 是修"面板停在原地"的那件）。
+  CSS `apps/web/src/styles/app/rail.css`（`position:fixed` + `--ht-z-popover`）留在 web —— 属宿主。
+  🔴 `gap`/`edge` **没有默认值**：默认值就是裸 px，而间距的唯一来源是 `tokens.css`。
+- **读数**：
+  - 新纯函数单测 **6 条**（`packages/ui/tests/overlay-place.spec.ts`），`@heyta/ui` 全量 **448 passed / 25 files**。
+  - 变异：`roomAbove > roomBelow` 改成 `>=` ⇒ **恰好 1 条红**（"两侧相等留下方"）。
+  - 注入验证（比原计划的"改回 absolute"更贴本次改动）：把翻转判据强制成"永远向下" ⇒
+    e2e `account-menu.spec.ts` 的塌缩态用例红在 `面板应当在头像**上方**`
+    （`bottom 557.25 > 419`）；还原后 **3 passed**。⇒ 证明真浏览器那条判据确实走的是共享算术。
+  - 截图已看：`e2e/test-results/account-menu-{signed-out,signed-in,narrow}.png`
+    （宽屏面板在头像下方、右边完整；窄屏向上弹、不盖住底部导航）。
+  - `check:design` / `check:l4` / `check:layering` 各 **rc=0**。
+  - `AccountMenu.tsx` 定位本体 **+11 / −16**（净减 5 行；15 行算术换成 8 行调用）。
+- [x] W0 完成
+
+#### ⏹ W0b · 批次一遗留的三条登记缺口
+
+1. `/tmp/ui.xml` 固定名 ⇒ 并行两轮互相覆盖。闭合代价**每次现量**：
+   `grep -rc '/tmp/ui.xml' scripts/lib/mobile-e2e.sh scripts/verify-mobile-*.sh | awk -F: '{s+=$2} END{print s}'`（2026-10-03 曾为 36）。
+   方案：lib 里 `UI_XML="${HEYTA_E2E_UI_XML:-/tmp/ui.xml}"`，全部读写点走该变量；**默认值不变** ⇒ 单轮运行零行为变化。
+2. `verify-mobile-repeat.sh` 抬头把库名硬印成 `heyta_mobile_smoke` ⇒ 改成打印真实 `HEYTA_E2E_DB`。
+3. 「待入 §7 的两条」正文搬进 `docs/reference/environment-traps.md` + 把 #168 末尾待办改过去式。
+   🔴 前置：`git status --porcelain -- docs/reference/environment-traps.md` 必须为空；取号以搬运那一刻的现量为准。
+- **判据**：①`bash scripts/mutate-closeout-gates.sh` 全绿且夹具不碰真 `/tmp/ui.xml`；②跑一趟 repeat，抬头打印的库名与 `HEYTA_E2E_DB` 逐字相同；
+  ③台账那一笔的 `git diff --numstat` 必须是"只插入、零删除"。
+- [ ] W0b 完成
+
+#### ⏹ W2 · `EVENT` 实体（D1/D2 已拍）
+
+- **省掉一整片工作的事实**：线协议**不枚举实体**（`shared-schema/src/supersync-http-contract.ts:145`
+  是 `entityType: z.string().max(255)`）、服务端白名单**自动跟随**（`server/src/sync/services/validation.service.ts:25`
+  `new Set(ENTITY_TYPES)`）、Prisma 的 `Operation.entityType` 是裸 String + 索引（`schema.prisma:159,182`）
+  ⇒ **EVENT 不需要任何数据库迁移**；存储三套也不用改（`packages/storage/src/stores.ts:11`、
+  `db-op-log-store.ts:299` 按 `[entityType,entityId]` 查、`sqlite-adapter.ts:272` 通用建表）。
+- **落点**：`shared-schema/src/entity-types.ts:22`；`domain/src/entities.ts`（接口 + `EntityModelMap:459` +
+  `MODELED_ENTITY_TYPES:486`）；**新建** `domain/src/events.ts`（排序/归档/下一次，照 `notes.ts:79` 三段排序）；
+  `op-log/src/state.ts:63,67,82,353,380`；**新建** `app-host/src/event-actions.ts` + `index.ts` 导出；
+  `packages/ui/src/sync/model.ts:489 ENTITY_LABEL_KEYS`；i18n 两张表各加 `common.entity.EVENT`（改完必 build，§7 #79）。
+- **字段**（§3.3：一律可选 + 运行时默认）：`title`、`date: LocalDate`、`isLunar?`、`leapMonthPolicy?: 'first'|'last'|'both'`
+  （D2 默认 `first`）、`recurrence?`、`pinnedAt?`（🔴 与"排在最前"**同一字段**，§2.4）、`archivedAt?`（🔴 独立标记，不碰 `deletedAt`，§2.5）、
+  `icon?`、`color?`、`notes?`。
+- **四条判据**：①老库回放不炸 —— 关键路径 `op-log/src/state.ts:313-315 deserializeMaterializedState`：
+  **少一个桶就整体 `return undefined`** ⇒ 老库首次启动全量重放（`checkpoint.ts:30` 的 `formatVersion` 不 bump），这条要写成断言；
+  ②🔴 §2.1 部署顺序落成可判检查：今天"老服务端 + 新客户端"的行为是 `INVALID_ENTITY_TYPE`（`validation.service.ts:111`）→
+  `packages/sync-client/src/client.ts:59` **永久拒绝名单** → `:1053-1057 markRejected` → 出队**永不重传**，只剩 `console.warn`（`:794`）
+  ⇒ 即"静默丢上云"。要响亮失败就得把"词表不认识"从"这条 op 本身坏"里分出来并上报成用户可见状态（`sync-wiring.ts:119`）。
+  `schema-version.ts:44` 只管版本号 ⇒ **零现成挂点，必须新写**；
+  ③op payload 里不得出现节假日数据（§2.2），变异 = 塞一年数据 ⇒ 红；
+  ④`scripts/check-reachability.mjs:266 ACTION_FAMILIES` 加行，漏登记即红。
+- **会红的门禁**：`domain/tests/entity-coverage.spec.ts:27,82`、`conflict-keys.spec.ts:60`、`ui/tests/sync-model.spec.ts:262`、
+  `i18n/tests/catalog.spec.ts:19`、`check:reachability`、`check:layering`（`check-layering.mjs:131` 禁止 apps 里出现 `entityType: 'EVENT'`）。
+- 🔴 **静默不管（必须人工勾）**：`check-materialized-reads.mjs:44 READ_PATTERNS` 硬编码 `.listTasks/.listProjects` ⇒
+  新 `listEvents()` 的屏不订阅 `dataRevision` 也不红；`check-ai-coverage.mjs:27` 由 `AiFeature` 驱动；
+  `check:op-log-semantics` 只锚 clientId 一行；`check:journey-coverage` 按端登记。
+  ⇒ 本单顺手做一件把静默变成会红的事：**把 `listEvents` 加进 `READ_PATTERNS`**（并注入验证它能红）。
+- **待决（写在提交信息里）**：`REMINDER` 的 id 是 `taskId:triggerAt`（`reminder-actions.ts:128`），倒数日共用它时 owner 键怎么算
+  （本文 §7 第 6 条）。倾向：`REMINDER` 加可选 `eventId`、owner 取 `taskId ?? eventId`、**id 形状不变** ⇒ 纯可加、不动已发布数据。
+- [ ] W2 完成
+
+#### ⏹ W6 · `EVENT` 成为日历的第二个事件源
+
+- **事实**：`packages/ui/src/calendar/model.ts:310,321,504-512` **只读 `task.dueDate`**（注释自己承认）；
+  消费者 `apps/web/src/features/calendar/CalendarView.tsx:39,164`、`apps/mobile/src/screens/CalendarScreen.tsx:44,337`。
+- **判据**：一条**没有截止日**的倒数日能上日历（这就是它区别于 TASK 的可观测证据）；
+  变异 = 把 EVENT 源接成"必须有 dueDate" ⇒ 红。另接进"今天"与收集箱（`App.tsx:723` 的 `refreshNow()` 是现成的"今天"重估点）。
+- [ ] W6 完成
+
+#### ⏹ W5 · 卡片网格 + 类型筛选 + pin + `⋯` 二级操作 + 归档视图
+
+- **事实**：最接近的现成品 `packages/ui/src/notes/NotesBoard.tsx:71-110`（pin/unpin）、
+  `packages/ui/src/trash/TrashBoard.tsx:48,63`（归档视图）、`packages/ui/src/material/material-surface.ts:38 materialTier`；
+  全仓 `onContextMenu`/`onLongPress` **零命中** ⇒ 二级操作面从 0 建，且依赖 W0 的弹层。
+  类型档位：纪念日 / 倒数日 / 生日 / 节日 —— 🔴 **不含"节假日"**（§0）。
+- **样式第一版只有预置模板**（§2.3）；图标给图标不给含义（§2.6）；"已经 N 天"不飘红不审判（§2.7）。
+- **判据**：①pin 变异 = 加第二个排序字段 ⇒ 红（§2.4）；②归档变异 = 实现成改 `deletedAt` ⇒ 红（§2.5）；
+  ③排序三段（钉选 → 时间 → **id 字典序兜底**），缺第三段就注入"同一毫秒两条"用例；
+  ④门禁：`check:design`、`check:l4`（内联只减不增）、`check:row-single-source`（🔴 `HT_FAMILY_BASELINE = 28`，
+  新增 `ht-countdown__*` 一族必须同时消掉一族才能净增为零）、`check:text-color`、`check:ui-language`；
+  ⑤界面结论有截图且人真的看过，主蓝数得出（§7 #82/#83）。
+- [ ] W5 完成
+
+#### ⏹ W7 · 纪念卡片导出为成品图
+
+- **事实**：`react-native-svg@15.15.5` **已在依赖树**（`apps/mobile/package.json:38`、`packages/ui/package.json:28,37`、
+  `apps/mobile/ios/Podfile.lock:2628,3026` 已 pod 已链接、`packages/ui/src/icon/Icon.tsx:47,85` 真在用）
+  ⇒ **不需要新过 §3.1/§3.2 两道门**。缺的是**栅格化**（全仓无 `toDataURL`/`toBlob`/`react-native-view-shot`/Skia）。
+  现成"渲染成图"的产品通道只有 `apps/web/src/features/settings/avatar-encode.ts`（canvas→data URL，
+  文件头明写"画布属平台能力、三端各不同"）与 macOS `WKWebView.takeSnapshot`（`HeytaMacApp.swift:181,210`，目前只在验收里用）。
+- **判据**：导出全程**零网络请求** —— 复用 `e2e/tests/privacy-consent-zero-egress.spec.ts:79-95`
+  （`page.on('request')` 分类器 + `page.on('websocket')`；`:16-30` 那条"零必须有非零正向对照"是承重的）
+  与 `e2e/tests/inbox.spec.ts:231-234`（按 method+url 数）。
+  ⚠️ 本文 §7 第 4 条要在这一单回答：Service Worker 拦掉的那部分算不算零 ⇒ 判据按"浏览器真发出去的"算，不按页面 `fetch` 调用数算。
+- 🔴 移动端渲染通道**未取证**：开工前先验 RN 能不能出图；不能就把移动端登记成**已知缺口（带编号）**，不静默降级。
+- [ ] W7 web 半完成 ／ [ ] W7 移动端出图或登记缺口
+
+#### ⏹ W8 · 三端接线与门禁
+
+- **事实**：web 开关表 `apps/web/src/features/shell/modules.ts:51-58,76-120,141-162`（7 个 key，无 countdown）；
+  移动端**没有开关表**，`apps/mobile/src/nav/TabBar.tsx:51-59` 硬编码 5 tab（`:45-49` 记着第 6 个 quadrant tab 已撤销）；
+  桌面原生壳**不含业务 UI** —— macOS `HeytaMacApp.swift:29 ShellView()` + `:399-462` WKWebView + `:361` 自定义 scheme 服务 `web-dist`；
+  Windows `MainWindow.xaml.cs:67-71`（有 `web-dist` 就是 `app` 模式）+ `:161,170-171 SetVirtualHostNameToFolderMapping("heyta.local")`；
+  **Linux 壳没有 web-dist 通道**。⇒ 新界面进桌面 = 进 web 产物，不是原生重写。
+- **会打到既有断言的地方**（先列出来，别撞了再改）：`e2e/tests/motivation.spec.ts:57,132-141,178,309-322`、
+  `e2e/tests/smoke.spec.ts:27`（`toHaveCount(10)`）、`apps/web/tests/app-mount.spec.tsx:835,851`、
+  `apps/landing/tests/mockup-shell-shape.spec.tsx:147-165,398-429`（它**读 `view-tabs.ts` 源码文本对账**）、
+  `apps/mobile/tests/projects-sections.spec.ts:81`、同步清单 `e2e/tests/helpers.ts:353-368`。
+- **判据**：倒数日入口进 `SHELL_MODULES`（🔴 **默认值是产品判断**，§3 W8 的倾向是"默认关"⇒ 关掉的模块**不进 DOM**，
+  既有 tab 计数断言不受影响）；移动端那一处重复按本文 §7 第 5 条给出裁决并登记；钉 tab 顺序的 e2e 同步更新且**仍能红**。
+- [ ] W8 完成
+
+#### ⏹ W9 · 提醒：本批做"能响的那半截"，原生投递另立一单
+
+- **事实（比 §3 写的乐观）**：web 投递已在（8.0 第 1 条）。缺三件：
+  ①档位上限是"提前 1 天"（`packages/domain/src/reminders.ts:54-61` = `[0,5m,15m,30m,1h,1d]`），而任意 `offsetMs`
+  **已接受非负数**、闸门 `MAX_REMINDER_LEAD_MS = 365d` 已在（`:70`）、API 路径已在（`reminder-actions.ts:213-222`）
+  ⇒ 扩档位是**纯可加**、不动 schema；
+  ②到点自醒：web 唯一周期 tick 是 `App.tsx:723` 的 `refreshNow()`，**不重算 `due`** ⇒ 挂一个只读 `due` 的定时，
+  不新建第二份判据（`use-reminder-notifications.ts:12-21` 已论证过"唯一判据"）；
+  ③🔴 **DST 敞口**：`reminders.ts:178 reminderTriggerFromOffset` 是纯 epoch 减法，"提前 3 天"= 硬减 72 小时，跨夏令时漂 1 小时，
+  而 `date.ts:252 startOfDay / :262 daysBetween / :211 addDays` **带现成 DST 判据却没被提醒链用上**（`check:*` 与
+  `verify:mobile-focus` 对提醒链的 DST **零断言**）。
+- **不做（有据）**：Android/iOS/mac/windows/linux 的通知投递。`docs/plans/goal-multi-end-coverage.md:104` 记着一条
+  **依赖裁决：没有任何一个 RN 本地通知库同时过 §3.1 维护性与 §3.2 许可证并具备本地调度**；`POST_NOTIFICATIONS` 不在 manifest
+  （`docs/research/legal-dataflow-client.md:163`）、iOS `Info.plist` 零 UsageDescription、`scripts/verify-mobile-reminder-ring.sh`
+  是"判据先行"（commit `ac682d96`）；§0 与 §6 本就把原生投递列为**停批项**。
+  ⇒ 这一半不是本批能解的，不假装做完；`docs/research/multi-end-entry-coverage-audit.md:34` 那行"web ✅ / 移动 ⛔永不响"保持原样并加日期。
+- **判据**：①新档位词条中英成对（`reminders-display.ts:84-105` 与 `ReminderPanel.tsx:60-65` 三处同序映射，
+  `offsetMessageKey` 的 `default: throw`（`:99`）就是漂移兜底）；②"提前 3 天跨夏令时仍是同一个本地时刻"写成真判据
+  （喂两个具体日期，一个跨 DST 边界）；③到点自醒：注入一条 `due` 已过期的提醒，tick 后 `notify` **恰好一次**
+  （变异 = 去掉去重 ⇒ 两次红）。
+- [ ] W9 完成（web 半 + DST）
+- [ ] 原生投递：确认**停批**（依据 `goal-multi-end-coverage.md:104`），在 AGENTS §9 标成"未闭合、有依赖裁决"
+
+#### ⏹ W10 · `EVENT` 进 AI 工具目录与 local-api 契约
+
+- **事实**：目录唯一真源 `packages/local-api/src/tools.ts:94 LOCAL_API_TOOLS`（6 条：读 `list_tasks:96/get_task:105/list_projects:114`，
+  写 `create_task:121/update_task:131/complete_task:138`，每条带 `egressFields` + `defaultEnabled:false:82`）；
+  app-host **import** local-api（`ai-tool-selection.ts:48`、`ai-tool-run.ts:52-61`），`runReadTool`/`toWriteIntent` 在
+  `server.ts:314/386`，MCP `executeTool`（`server.ts:444`）调同两件 ⇒ **一份目录两个前端，不许另建**。
+  授权 `tools.ts:713 isToolGranted` 是 `grants?.[name] === true`，**未列出即关**；
+  投影 `projectForTool:402 / projectListForTool:439 / readItemForTool:467` 就是"可列举不可读"的实现体。
+- **要动的 8 处**（🔴 = 漏了会红，⚠️ = 静默）：①目录条目 ②`mcp.ts:77 INPUT_SCHEMAS`（⚠️ `mcp.ts:198` 空 properties 静默回退，
+  生成器只标 `schemaRecorded:false`）③`server.ts` 的 `runReadTool`/`toWriteIntent` 分支 + `LocalApiHost` 新方法（`:95`；
+  未登记分支报 not-a-read-tool 🔴）④`local-api-host.ts` 实现 +（写）调 `event-actions.ts`，`submitIntent` 翻译在 `:227`
+  ⑤`ai-tool-selection.ts:95` 选择规则（⚠️ 缺了不红）⑥🔴 重跑 `node scripts/gen-ai-capability-manifest.mjs`
+  （漏 ⇒ `check:ai-tools` 规则 7 红，`check-ai-tools.mjs:286-303`）⑦i18n `web.ai.tools.intent*`（⚠️ 中英不齐 ⇒ `check:ui-language` 红）
+  ⑧测试 `tool-egress-fields.spec.ts`（⚠️ **非目录驱动**：新读工具"声明 == 真实投影"没人替你写）与 `ai-tool-*.spec`。
+- **最小可行范围**：读 2（`list_events`、`get_event`；正文 `notes` 只在 `get_event` 且 `isReadable` 为真时出现，照 `get_task` 形状）、
+  写提案 2（`create_event`、`update_event`；`LocalApiWriteIntent` 加 2 个**封闭变体** ⇒ UI 确认词表同步）。
+  出境：逐工具 `egressFields` 声明；前置披露走现成 `planAssistantEgress`（`ai-assistant.ts:159`，并集 `:131-139`，集合外就停 `:590-603`）——
+  当年抓现行的那条落点在 `tool-egress-fields.spec.ts:14-17,107`（`list_tasks` 把 `body` 带进列表）。
+  `ai-tool-run.ts` 与 `confirmAiToolProposal`（`:191-196`）**零改动**，`AiSettings.tsx:1126-1149` 自动长出新开关。
+- 🔴 **不做**：不开托管档（ADR-0013 `retention-undecided` 继续挡）、不立 `ENTITY_TYPES` 驱动的门禁（§3 W10 末的排期决定）。
+- **现量命令**（先证明敞口真实存在，做完后差集归零）：
+  ```bash
+  node -e "const d=require('./packages/domain/dist/index.js'),l=require('./packages/local-api/dist/index.js');
+  console.log('无工具的实体数 =', d.MODELED_ENTITY_TYPES.filter(e=>!l.LOCAL_API_TOOLS.some(t=>t.name.includes(e.toLowerCase()))).length)"
+  node scripts/gen-ai-capability-manifest.mjs --check; echo "GEN_RC=$?"
+  ```
+- [ ] W10 完成
+
+#### ⏹ W4b · 调休/补班：运营录入 + 客户端拉取（第一条服务端→客户端内容通道）
+
+- **可照的现成形状**：源 `scripts/vendor/holiday-cn/{2007..2026}.json` + `LICENSE` + 唯一读取入口 `load.mjs`
+  （校验点：`days[]` 非空 `:44`、`papers` 非空缺出处即 throw、`DATE_RE :30`、**`isOffDay` 必须 boolean `:63`**、
+  重复日 / 同一天既休又补班 throw），生成物 `packages/domain/src/generated/holiday-cn.generated.ts`，
+  门禁 `scripts/gen-holiday-table.mjs --check`（已进 `pnpm check`），查询层 `packages/domain/src/holidays.ts:75/108/121/161`。
+- 🔴 **真正的接缝**：`holidays.ts:108 adjustmentOn()` 是**纯同步、直接 import 生成物**的函数 ——
+  后台录入/校验/回显全做完、全绿，客户端读的仍是随包表，判据①"缺数据不报错不留空块"**根本没有载体**。这一步既不在后台落点里、也不在法务清单里。
+- **服务端现状**：路由注册表 `server/src/server.ts:494-586`；今天**唯一一条公开只读、非密文**下行是
+  `GET /api/push/vapid-public-key`（`push.routes.ts:152`）⇒ "公共事实"挂这一类。
+  全 `server/src` **零** `ETag`/`Cache-Control`/`Last-Modified`；可借的版本号形状只有 `PriceVersion`（`schema.prisma:388`）。
+- **要迁移吗**：**要，2 张表 1 条迁移**。理由不是"想要范式干净"：判据③（非法日期 / `isOffDay` 不是布尔）在 `Json` 列上
+  **库层拦不住** ⇒ 除"年度录入"表（存 `papers`）外要一张逐日表 `day DATE + isOffDay BOOLEAN`。
+  🔴 遵守 §4 迁移纪律：一个文件一条语句、`CONCURRENTLY` 走可恢复形状、需要 `ACCESS EXCLUSIVE` 的 DDL 自带
+  `SET LOCAL lock_timeout`、部署只走 `sh scripts/migrate-deploy.sh`、提交前 `node scripts/check-migrations.mjs`。
+  客户端数据 schema 不动（`CURRENT_SCHEMA_VERSION` 不 bump）。
+- **后台落点**（先例 = 优惠码/邀请）：`admin.routes.ts` 端点表（头注释 `:12-18`）+ `/coupons:614`/`/invites:670` 形状 +
+  `/overview:152-196` 聚合 + 白名单投影 `:98-102`；闸门 `admin.middleware.ts:34`（插件级 hook ⇒ 新路由自动受保）；
+  `admin-client.ts:190/205/244/359/368`；`AdminPanel.tsx:37-42 TABS` + `store.ts:60 AdminTab`；i18n `web.admin.*` 中英各一份；
+  测试 `server/tests/admin-routes.spec.ts`（**遍历全部路由的 401/403** + 白名单投影两型）、`admin-migration.pglite.spec.ts`、
+  `apps/web/tests/admin-panel.spec.tsx`。`check:journey-coverage` 不会因新资源红（`:50/245` 按端登记）⇒ 人工登记。
+- **客户端拉取 + 缓存**：**从零**（最接近的先例只有 `apps/web/src/pwa/push-subscribe.ts:202,367` 现拉不缓存；
+  `packages/app-host` 今天**没有任何 `fetch(`** —— 公共事实要不要破这条边界，必须写进新 ADR）。
+- **判据**：①自托管拿不到数据时**不报错、不留空块**，且要在**真界面**跑一次（截图 + 人看）；②`papers` 链接随数据入库并在后台回显；
+  ③校验层能因"日期非法 / `isOffDay` 不是布尔"拒绝录入（变异验证）；④🔴 **注入接缝本身要有判据**：`adjustmentOn` 加了
+  "部署方下发的覆盖表"入口后，必须能分别测出"有覆盖用覆盖 / 无覆盖退回随包 / 覆盖里日期非法就整年拒绝"三条分支。
+- **文档**：新写一份 ADR 给这条通道定性（§8 工作流：不改已接受 ADR 的结论，要变更另写一份）；
+  并**回写 `docs/adr/0038-admin-console-scope.md` 范围表 `:75-79`**。
+- [ ] W4b 完成
+
+#### ⏹ L' · 法务联动（范围按 §4 的时序条款**收窄**，不是"把六处都改一遍"）
+
+- 🔴 §4 自己的话：「倒数日**纯文字版（第一版）不触发 L1/L2/L4/L5**：它不申请任何权限、不上传任何内容」。
+  批次二交付的正是纯文字版（素材图片背景归 P2-9，见 §0 与 §6）⇒ **照"六处全改"施工就是按过期假设做工**。
+- 本批真正要做的是一件**可判**的事：逐条问"哪句对外承诺会因为倒数日 / 提醒到点 / 公共事实下发而变成假话"，命中才改。
+  普查命令：`grep -rnE '不申请|不上传|不会|从不|没有任何' packages/legal/src/documents/*.ts | head -80`。
+  初判候选：
+  - `permissions.ts:37 / :164`「不申请位置、通讯录、通话记录、照片、相机…」（中英两行）—— 倒数日不申请新权限 ⇒ **预计不改**，
+    但若 W9 改到 web 通知的授权文案，要看那句是否进了法务口径；
+  - `third-parties.ts:230-241`「heyta 服务器发出的对外请求」/「我们没有接入的东西（逐项列为否）」——
+    **W4b 新增一条服务端→客户端内容通道**，且这张表的行形状要求带依据 ⇒ 我倾向**要加行**（它改变了"服务器会主动下发什么"）；
+  - `privacy.ts:127-150` 三分表里"官方服务器存密文 + 元数据明文"那格 —— 公共事实是**明文的非用户数据**，
+    不改会被读成"云端一切都是密文" ⇒ 待判，且必须与新 ADR 的口径逐字一致；
+  - `terms.ts:379-391 / :745` 的服务描述与 **s12 变更历史表**（形状 `['1.1','2026-10-02 …']`）⇒ 新能力上线加一行版本记录。
+- **判据**：①`pnpm check:legal-copy` 与 `docRef` 测试能红（变异：把 `docId: 'minors'` 改成不存在的 id）；②双语成对（只改一边必须红）；
+  ③改真源后重跑 `pnpm --filter @heyta/legal build` → `node packages/legal/scripts/gen-site-copy.mjs`，🔴 **不许手改落地页文案**；
+  动到 `OPERATOR` 再跑 `check:legal-host`；④每条判定（改 / 不改）都要带"依据哪一句现文"。
+- **不做**：PIA（PIPL 第 55 条）全仓仍不存在（`packages/legal` 搜「影响评估」零命中；定性在
+  `docs/research/countdown-anniversary-data-and-images.md:174`，落点建议在 `docs/research/legal-pipl-baseline.md:967-996,1043`）
+  ⇒ 按 §6 口径**单独立项**，不塞进倒数日。
+- [ ] L' 完成（含逐条"改/不改 + 依据"的判定表）
+
+### 8.3 收尾（§5 的四条，一项都不能省）
+
+1. `pnpm -r typecheck && pnpm -r test`，然后**完整 `pnpm check`**（动过 `packages/legal` 必含 `check:legal-copy`）。
+   ⚠️ 当前 HEAD 上 `check:docs` 已红（8 处"本机有、仓库没跟踪"的死链，全在并行会话的文档里）——
+   收尾时这条红**不吸收、不代改**，写成"缺口在哪一段、在谁手里"的现量。
+2. `node research/tools/docs-link-check.mjs` 带读数复核。
+3. 界面结论必须有截图且人真的看过；验收不抢前台。
+4. `pnpm reinstall:all` 四端装上当前产物（AGENTS §6.1.1）；真机验收排在最后，用私有现场。
+
+### 8.4 进度勾选总表
+
+| 工单 | 状态 | 依赖 | 判据数 | 完成读数 |
+|---|---|---|---|---|
+| W0 弹层上提 | ⏳ | — | 3 | |
+| W0b 遗留缺口 | ⏹ | 台账需干净 | 3 | |
+| W2 `EVENT` 实体 | ⏹ | D1/D2 ✅ | 4 + 静默门禁人工勾 | |
+| W6 日历第二源 | ⏹ | W2 | 2 | |
+| W5 卡片网格 | ⏹ | W2、W0 | 5 | |
+| W7 成品图导出 | ⏹ | W5 | 2（含 RN 出图取证） | |
+| W8 三端接线 | ⏹ | W5/W6 | 3 | |
+| W9 提醒（web 半 + DST） | ⏹ | 可与 W2 并行 | 3 | |
+| W10 AI 工具目录 | ⏹ | **W2 之后** | 3 + 差集归零 | |
+| W4b 调休通道 + ADR | ⏹ | 独立（1 条迁移） | 4 | |
+| L' 法务联动 | ⏹ | 随最后一个改承诺的工单 | 4 | |
+| 收尾四项（§5） | ⏹ | 全部 | 4 | |

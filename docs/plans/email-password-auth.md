@@ -208,7 +208,7 @@ fail-open 且**必须留一条 warn** —— 没有它，"检查通过"与"根�
 `server/src/email.ts` 现在恰好三个模板（`:119` 验证 / `:142` passkey 找回 / `:165` 魔法链接登录），
 `server/src/pages.ts:48,136,197` 三张页。新增：
 
-- `sendPasswordResetEmail` → `${PUBLIC_URL}/reset-password?token=…`，`withLocale` 带上语言；语言优先级链不变（`?lang=` > 账号 `locale` > `Accept-Language` > `zh-CN`，`design-html.ts:76-99`）。
+- `sendPasswordResetEmail` → `${PUBLIC_URL}/reset-password?token=…`，`withLocale` 带上语言；当时语言优先级链不变（`?lang=` > 账号 `locale` > `Accept-Language` > `zh-CN`，`design-html.ts:76-99`）。⚠️ **2026-10-03 起 `Accept-Language` 那一档已删**，现在是 `body.locale` > 账号 `locale` > `zh-CN`（拍板口径见上面 `5-confirm-page` 那行）。
 - 第 4 张页 + `server/public/reset-password-confirm.js`（新密码 + 显隐 + 提交后**不自动登录**，直接跳登录页文案）。
 - 🔴 **真源仍只有一份**：文案进 `packages/i18n` 的 `server.*` 词条 → `server/scripts/gen-server-copy.ts` 生成 `copy.generated.ts`；色值走 `generated/tokens.json` → `design.generated.ts`。**只搬 light**。改完必须重跑生成，否则 `check:server-copy` / `check:server-design`（都挂在 `pnpm check`）红。
 - 第 6 封（可选，但 OWASP 要求）：**密码被改后的安全通知**，复用同一套模板骨架。
@@ -269,7 +269,7 @@ fail-open 且**必须留一条 warn** —— 没有它，"检查通过"与"根�
 | `2-register-policy-error` | 弱口令被拒，红色策略提示在**对话框顶部**；口令框里是 `123`，框**下方只有灰色提示**，没有「还没有填密码。」 | ✅ 矛盾 caption 已修（见下「登记 1」的拆分）；🟡 剩下的就是登记 1 那条设计观察 |
 | `3-register-submitted` | 「注册申请已提交。去邮箱点开那条验证链接」+ 邮箱行 + 改邮箱 | ✅ 成功态与可修正入口并存 |
 | `4-email-not-verified` | 「密码是对的，只差最后一步…」 | ✅ 反枚举 + 不指责用户，文案按 D5/§5 落地 |
-| `5-confirm-page` | 服务端渲染的确认页是**英文**（`Confirm your email`） | ✅ **排除，不是缺陷**：`server/src/pages.ts:48` 的 `localeOf` 走 `resolveLocale(?lang, Accept-Language, 默认 zh-CN)`，Playwright 默认发 `en-US` ⇒ 英文是**设计行为**；中英两个方向都由 `server/tests/server-i18n-design.spec.ts` 钉着 |
+| `5-confirm-page` | 服务端渲染的确认页是**英文**（`Confirm your email`） | ~~✅ **排除，不是缺陷**：`server/src/pages.ts:48` 的 `localeOf` 走 `resolveLocale(?lang, Accept-Language, 默认 zh-CN)`，Playwright 默认发 `en-US` ⇒ 英文是**设计行为**~~ 🔴 **这条"排除"是错的，2026-10-03 撤回并重开**：错在它把**探针导航的那个 URL**当成了用户点开的 URL。spec 里取链接的正则写到 `token=[0-9a-f]+` 就停，把发信时写进去的 `&lang=zh-CN` **截掉了** —— 真实收件人点的那条永远带语言。两层都修了：① 探针取整条链接，并钉「链里的 `lang=` == 界面 `<html lang>`」+「确认页的 `<html lang>` == 界面语言」；② 产品负责人同日拍板「默认中文，英文只能是用户自己选的」，于是服务端把 `Accept-Language` 整档**摘掉**（`design-html.ts` / `api.ts` 的 `localeFromRequest`、`localeForEmail`），三条反向判据各做过一次变异（把浏览器头加回去 ⇒ 恰好三条红）。中英两个方向仍由 `server/tests/server-i18n-design.spec.ts` 钉着 |
 | `6-signed-in-light` / `7-signed-in-dark` | 登录后回到收集箱，亮/暗两版都正常，主蓝在位 | ✅ 暗色不是反相（§5 那条） |
 
 **看过之后被推翻的一条怀疑（玻璃面）**：`e2e/test-results/glass-account-menu-light.png` 里我以为
@@ -593,4 +593,265 @@ Node 实测 `'café'.normalize('NFC') === 'café'.normalize('NFD')` 为 **`false
 | 门禁 | `check:ui-language` / `check:layering` / `check:server-copy` / `check:server-design` / `check:design` / `check:crosslang-contract` / `check:journey-coverage` 全 OK；`check:docs` 红在 ADR-0044/0045 那两条线的未跟踪文档上，与本条线无关 |
 | 四端重装（隔离检出 @ HEAD，00:23–00:44） | `CHAIN_EXIT=0`：mac ✅ / windows ✅ / android ✅（1080x2400、内容 55.3%、主蓝 4036）/ ios ✅（1206x2622、内容 61.5%、主蓝 4136，且"已装的包比源码新"） |
 | `verify:password-web`（改完客户端之后**又跑了一遍**） | 2 passed / exit 0（真服务端 `TEST_MODE` 关 + 同源反代 + 从工作树重打的 `apps/web/dist`） |
-| 全量离线 e2e（同一批改动之后） | 96 passed / 2 skipped / **4 failed**。🔴 那 4 条**不是**本条线的：`admin-console.spec.ts` 抓的是别人在途的账号资料端点 `GET /api/account/profile` 没进假端点 —— 取证与闭口清单在 `BLOCKED.md` B14。（20:5x 那一跑同一条判据是 100 passed，差的就是那半件在途事。） |
+| 全量离线 e2e（同一批改动之后） | 96 passed / 2 skipped / **4 failed**。🔴 那 4 条**不是**本条线的：`admin-console.spec.ts` 抓的是别人在途的账号资料端点 `GET /api/account/profile` 没进假端点 —— 取证与闭口清单在 `BLOCKED.md` B14。（20:5x 那一跑同一条判据是 100 passed，差的就是那半件在途事。）
+
+## 13. 移动端那一层为什么整轮假红 —— 首启隐私同意面板（2026-10-03）
+
+> 🔴 **待入台账 `docs/reference/environment-traps.md`**：本节写作时那份台账正被另一条会话
+> 改着（2026-10-03 12:15 现量：工作树相对 HEAD `+48 -0`，#177–#180 都是他们在飞的号且**已落到工作树**），
+> 所以**不往它追加**，正文先落在这里。追加时的号**以现量 `max+1` 为准**
+> （12:15 工作树最大号 = 180 ⇒ 本条应为 **#181**；早先写的"#180"作废，那个号已经被占了 ——
+> 这正是本条自己要防的那件事：编号是工作树的瞬时读数，按记忆写就会撞号。若之上又被占号就顺延，别抢号）。
+
+### 13.1 症状与真因
+
+`verify-mobile-auth.sh` 2026-10-03 10:54–10:58 那一轮：**17 条 ❌ / 4 条 ✅**，
+其中 **11 条是"找不到输入框 / 取不到坐标 / 找不到按钮"**这一类。报出来的第一句是
+「冷启动第一屏没有『注册 / 登录』—— 入口不在第一屏」，读起来像产品把入口藏深了。
+
+真因一条都不在产品里：`apps/mobile/src/privacy/startup.ts` 在冷启动且"这台设备从没被问过"时
+弹一块首启隐私同意面板（标题「在使用联网功能之前」），而它是一块
+**`accessibilityViewIsModal` 的 RN Modal**（`apps/mobile/src/screens/PrivacyConsentSheet.tsx:196`）。
+它立着的时候，**欢迎页与主界面的节点根本不在无障碍树里** ——
+`uiautomator dump` 里只有那块面板的 9 行文字。第 0 步刚跑过 `pm clear`（= 全新设备 = 从没被问过），
+所以它必然在。
+
+这条面板是 2026-10-01 那把并行刀落地的（G-11「首启没征求过隐私同意」+ G-12「前台同步可能先于询问发请求」）。
+
+### 13.2 真正的问题不是"漏了一步"，是"处置有五份抄件"
+
+| 脚本 | 处置 | 按哪颗按钮 | 等面板吗 | 复验它走了吗 |
+|---|---|---|---|---|
+| `verify-mobile-inbox.sh:69` | 本地一份 | 同意并联网 → 只用本机 | 轮询 ≤10s | ❌ |
+| `verify-mobile-reminder-ring.sh:45` | 本地一份 | 只用本机 | 轮询 ≤10s | ❌ |
+| `verify-mobile-schedule.sh:51` | 本地一份 | 以后再说 → 只用本机 | 轮询 ≤10s | ❌ |
+| `verify-mobile-task-row.sh:85` | 本地一份 | 只用本机（**用按钮文字判面板在不在**） | ❌ 不等 | ❌ |
+| `verify-mobile-timeline.sh:65` | 本地一份 | 以后再说 → 只用本机 → text 第 2 匹配 | 轮询 ≤10s | ✅ 补点一次 |
+| `verify-mobile-auth.sh` | **谁也没抄到** | — | — | — |
+
+五份各不相同（等待、按钮、有没有复验），而第六个直接没有。
+`verify-mobile-task-row.sh` 的注释里写着当时为什么不进共享库 ——
+"这个功能还在另一条会话手里改，动 `lib/mobile-e2e.sh` 会撞车；将来它进了 lib，这段就该收掉"。
+**那句已经过期，而且它预言的后果到了**：没人回来收，于是新脚本抄不到。
+
+AGENTS §3.5 早就给过这条的形状（`ids.ts` / `createSyncClient` 那两次）：
+**抽取的收尾动作是删掉旧的那份并加门禁，不是写一个更好的新版本。**
+
+### 13.3 修法（四处，按上面那条纪律做完）
+
+1. **单一所有者**：`scripts/lib/mobile-e2e.sh` 新增 `handle_privacy_consent <按钮优先级…>`，
+   把五份抄件里**各自最好的那一片**收进来（timeline 的轮询等入场动画、
+   它的"按钮名在 content-desc 不在 text ⇒ `xy_text` 兜底要取第 2 个匹配"、
+   它的"点一次未必收下 ⇒ 复验还在就补点一次"）。
+   它自己**不碰 PASS/FAIL**，只置 `CONSENT_GATE_SEEN` / `CONSENT_GATE_CHOSEN` 给调用方断言 ——
+   "要不要把这次豁免算成一条检查"必须由脚本决定，不能由库替脚本决定。
+2. **五份抄件全部改成委托**（`inbox` / `reminder-ring` / `schedule` / `task-row` / `timeline`），
+   各自点名自己的按钮（本地类验收**不替用户做联网决定**：`只用本机` / `以后再说`）。
+3. **`dismiss_welcome_if_present` 第一件事就是收这块面板** —— 顺序就是屏幕上的顺序
+   （面板在上面）。这一改把剩下 15 个只调它的脚本一并救回来（它们全是
+   `pm clear` 之后靠无障碍树驱动界面的）。默认按钮 `同意并联网`，
+   要换的 `export CONSENT_GATE_PREFERRED=…`，理由与代价写在库的注释里。
+4. **把 J1 的豁免落成断言**（`verify-mobile-auth.sh` 新增 0.5 步）：
+   第 0 步刚 `pm clear`，所以「面板没出现」不是省一步，**是 G-11 那条要求的失败** ⇒
+   `CONSENT_GATE_SEEN` 必须 = 1。第 7 步再加一条：做过决定之后再冷启动**不许再问一遍**
+   （`startup.ts` 判的是 `undecided()`），并且**这条必须排在"欢迎页不许回来"之前** ——
+   面板盖屏时「先离线使用」读不到，那句会印成假绿。
+
+⚠️ 顺带纠正一处归因：`schedule` / `timeline` 的注释把"同意面板再弹一次"写成
+"首启两块屏**交替出现**、界面换序"。机制不是随机的 ——
+**选「以后再说」= 决定仍是没问过 ⇒ 下次冷启动或下次撞上门闸（`required-for-action`）必然再弹**。
+它们外面那圈 `settle_*` 循环处理的是这个后果。选「同意并联网」的脚本不会有这个现象。
+
+### 13.4 新门禁 `check:mobile-first-run-gate`，以及它自己第一跑就是一条恒过的判据
+
+三条判据（都已挂进 `pnpm check`，位置在 `check:script-snapshot` 之后 —— 同为"验收脚本自身结构"类）：
+
+| 判据 | 钉的事 |
+|---|---|
+| 0 | 共享实现在 `lib` 里**在**，且 `dismiss_welcome_if_present()` 里**真的还调着**它 —— 否则"调了欢迎页 helper 就算处置过"这条推定（覆盖 15 个脚本）会全部变成假绿，而门禁自己不会有任何反应 |
+| 1 | 凡 `pm clear` 之后靠无障碍树驱动界面的脚本，必须**调用**得到共享处置；输出逐条打印它是**怎么**成立的（直接调 / 经欢迎页 helper） |
+| 2 | 任何脚本里名字含 `consent` 的函数**不得**自己 `input tap` —— 那是第二份实现 |
+
+🔴 **它前两次都是恒过的**，两次都因为我判"在不在"用了名字而不是形状：
+
+1. 第一版把"驱动界面"写成 `(xy_desc|xy_text|…)\s*\(`，而 shell 里的调用是
+   `$(xy_desc "邮箱")` —— 名字后面跟的是空格和引号，**一个脚本都没被认出来**，
+   于是它打印「冷启动驱动界面 0 个」然后 ✅ 通过。
+2. 改完之后再跑变异 A（把 `auth` 的调用整行删掉）**仍然 RC=0**：
+   `src.includes('handle_privacy_consent')` 命中的是**脚本文件头里那句注释** ——
+   正是我为了让下一个人看懂为什么必须有它而写的那句话。
+   ⇒ 注释提到 ≠ 调用了。两处都改成"剥掉注释行 + 按行首调用形状匹配"。
+
+（§7 元规则二又添一种面目：**判据写错时最省事的通过方式，是让它什么都没看见**。）
+
+### 13.5 变异数字（五条各注入一次，还原后复跑）
+
+| 变异 | 结果 |
+|---|---|
+| A 拿掉 `verify-mobile-auth.sh` 的调用行 | **RC=1**，指名 `scripts/verify-mobile-auth.sh 冷启动后驱动界面，却没有任何一处走到隐私面板的共享处置` |
+| B 往 `verify-mobile-tags.sh` 塞一份带 `input tap` 的本地处置 | **RC=1**，指名 `scripts/verify-mobile-tags.sh:63 my_local_consent_handler() 自己点了按钮` |
+| C 把共享调用从 `dismiss_welcome_if_present()` 里摘出去 | **RC=1**，打的是判据 0（"这条推定现在不成立了"） |
+| D 删掉 `verify-mobile-task-row.sh:87` 的 `CONSENT_GATE_PREFERRED=只用本机` | **RC=1**，判据 3 指名那个脚本 |
+| F 给 `verify-mobile-sort-sheet.sh` 末尾加一行惰性的 `: wait_laptop_has` | **RC=1**，判据 4 指名那个脚本 |
+| 五份还原 | 复跑 **RC=0**；两份注入过的脚本 `cmp` 与注入前备份**逐字节相同**（`task-row` sha `e06f0079…`、`sort-sheet` sha `9434b8d7…`，与注入前后一致） |
+| 分母 | 扫描 21 个安卓验收脚本（排除 `-ios`：另一套无障碍技术），其中冷启动驱动界面 **21 个**，全部列出各自的成立方式 |
+
+🔴 **D 第一次注入注错了对象，而且注完差点被我读成"变异不成立"**：
+我先删了 `verify-mobile-sort-sheet.sh:70` 那行 `CONSENT_GATE_PREFERRED=只用本机`，门禁 **RC=0** ——
+这不是判据 3 没牙，是**那条脚本本来就不满足判据 3 的前提**。判据 3 要三样同时在场：
+脚本**自己**按行首形状点名本地按钮（`task-row:94 handle_privacy_consent "只用本机" "以后再说"`）
+**且**调 `dismiss_welcome_if_present` **且**没设 `CONSENT_GATE_PREFERRED`。
+`sort-sheet` 只有后者（它靠欢迎页 helper 收面板，没有自己的点名行），摘掉 pin 之后它退化成
+"完全跟着库的默认走" —— 没有信号、也就没有矛盾，门禁**不该**报它。
+⇒ **判据 3 的有效覆盖面现量 = 4 个**（`reminder-ring`、`schedule`、`task-row`、`timeline`：
+既自己按行首点名本地按钮、又调 helper、又设了 pin），
+`quadrant-fill` 与 `sort-sheet` 只有 pin（靠 helper 收面板、自己没有点名行）——
+摘掉 pin 之后它们退化成"完全跟着库的默认走"，没有信号也就没有矛盾，
+**这两条由判据 4 管而不是判据 3**。六个点名的总数不变（4 + 2 = 6）。
+
+🔴 **数这六个时先用 BSD grep 得到 0**：`grep -cE '^[[:space:]]*CONSENT_GATE_PREFERRED=("?(只用本机|以后再说)")'`
+对已知在场的那行（`sort-sheet:70`）**恒 0 命中**，而同一条去掉交替组的模式命中 1 ——
+这台机器的 `LANG`/`LC_ALL` 都是空，交替组里两条中文串让 BSD grep 的 ERE 直接判不匹配。
+换成**门禁自己那枚 JS 正则**现量才得到 6 / 21。⇒ 数中文模式要么走 node，要么别用交替组；
+一次"0 命中"在宣布结论前要先拿一行已知在场的样本喂同一条命令（这就是阳性对照）。
+
+🔴 **同一次操作里差点写下第二个假读数**：我把整条串成
+`… && grep -c 'CONSENT_GATE_PREFERRED=' "$F" && node gate; echo RC=$?` ——
+`grep -c` 在 0 命中时**退出 1**，`&&` 链当场断掉，门禁根本没跑，而打印出来的 `RC=1`
+看起来正好是"变异让门禁转红"。⇒ 判"门禁红"只认**门禁自己的**退出码与它输出的那行指名，
+测量前后各打一次注入状态（本条最终写法：先 `grep -c` 单独成句、再单独跑 `node gate`）。
+
+### 13.6 顺带照出来的两件载体不新鲜（同一条纪律：远端字节 == 本地提交）
+
+- **盘上那枚 APK 是 03:21 打的**（md5 `f19dfadfcc8f1123cd36592720595bdd`），
+  而 `bb41e9fe`(07:16 `refactor(mobile-ui)`)、`ab13c22e`(09:38 `packages/ui`)、
+  `a29881e9`(09:44 合入倒数日批次一动了 `app-host`/`domain`/`op-log`)、
+  `bf271a1e`(10:55 i18n 词条) 全在它之后 ⇒ 直接跑就是"验旧产物报新结论"（§7 第 27 条）。
+  主检出的工作树正被别的会话的日历改动占着（`packages/ui/src/calendar/*`、
+  `packages/op-log/src/*` 等未提交），就地打会把别人的在飞源码混进包里，
+  所以在隔离检出 `/private/tmp/heyta-g8-clean` 上 `git checkout --detach f4fe87d2`、
+  断言**脏文件数 = 0** 之后重打：`md5 8a1d9654b397f3823d2bff0a0053238b`，11:18:29。
+  为此给 `verify-mobile-auth.sh` 加了 `HEYTA_APK` 覆盖点（沿用
+  `verify-mobile-quadrant-fill.sh:100` 已有口径，不改 lib 里那条共享路径）。
+- **两台在跑的服务端都比今天的 `server/src` 旧**：`:3000`（pid 87593，10-02 18:56，
+  `/api/account/legal-consent` → **404**）与 `:3100`（pid 58679，10-03 01:35 → 401）
+  都早于 `b055efc0` / `7e299118` / `ce23d3ab` 那三笔 `server/src` 改动。
+  本轮另起一台 `:3101`，跑隔离检出里 f4fe87d2 构建的 `server/dist`（已断言 dist 不比 src 旧），
+  用完即停 —— **不动别人的那两台**。
+  ⚠️ 起它的时候**没有把 `server/.env` 拷进 `/tmp`**：dotenv 读 `process.cwd()/.env`，
+  所以 cwd 用主检出的 `server/`、跑的产物用隔离检出那枚 dist —— 配置原位读，代码是 HEAD 的。
+
+### 13.6.1 顺带量出来的两条"要不要重装"的判据（省掉一轮无谓的四端重装）
+
+- **四端装的产物到今天为止还有效吗**：`69f64ae4..HEAD`（mac 那次）与 `267ac912..HEAD`
+  （另三端那次）之间的**打包输入**一共动了 11 个文件，逐个分过后只有三类：
+  ① `apps/web/evidence/*`（9 枚，证据图与日志，不进包）；
+  ② `apps/landing/docs/index.html` + `en/`（落地页产物，随那 11 条词条重生成过，`check:entries` 现量 RC=0）；
+  ③ `packages/i18n/src/locales/{zh-CN,en}.ts`（今天那 11 条公开词条）。
+- 🔴 而那 11 条**没有一条进应用壳**：逐个键去 `apps/web/src`、`apps/mobile/src`、
+  `packages/ui/src`、`packages/app-host/src` 里搜（**不限扩展名**，界面常是 `.js`），
+  四个集合命中 **0** —— 它们全是 `site.docs.*` / `site.help.*`，消费者只有
+  `apps/landing` 的文档中心（构建期烘焙进 HTML）与 `packages/legal`。
+  ⇒ 装着的那四个端**不需要为这批词条重装**；要让线上文档中心也显示新文案，缺的只是
+  落地页的重建与部署（属于"部署那条线"，本批没动）。
+- ⚠️ 反向留一行给下一个人：安装副本的 bundle 里**确实还能搜到旧串**
+  「没有邮箱+密码这条路」（`index-CObYzQxm.js` 命中 2，两种字形各扫过）。
+  那不是"界面在说旧话"，是**整张词条表被原样打进包**而没人读它 ——
+  命中旧串只证明"表在里面"，不证明"界面渲染它"；要判后者得去数消费者。
+
+### 13.7 这一轮的状态（写在这里，不靠记忆）
+
+**12:35 那一跑拿到了负载窗口，然后整轮自判无效 —— 而它先印出两条假红、一条假绿。**
+读数（`/tmp/heyta-mobile-auth-head.log`）：负载从 400+ 落到 **9.61** 命中窗口，但设备此刻被
+另一条线的 `verify-mobile-repeat.sh`（`heyta-wt-closeout` 检出）占着 ⇒ `uiautomator` **连续 10 次抓不到界面**，
+`/tmp/ui.xml` 被截成空文件；脚本随后按 lib 的约定打印
+`❌ 拿不到真实界面 —— 本轮结果无效（环境失败，不是产品失败）` 并以 **`RUN_EXIT=3`** 收尾。**产品一条没坏。**
+
+🔴 **这一跑照出的是我自己那两条判据是盲的**（撞见就当场修，不等下一轮）：
+
+| 位置 | 空 dump 上的读数 | 性质 |
+|---|---|---|
+| 0.5 步 G-11「首启必须问」 | ❌「冷启动**没有**征求隐私同意」 | **假红** —— 会响，至少自己会说话 |
+| 第 7 步「决定跨启动落盘」 | ✅「再冷启动没有重复征求」 | **假绿** —— 不响：空 dump 上 `privacy_gate_present` 为假 ⇒"没再问"**无条件为真** |
+| 第 7 步「欢迎页没有回来」 | ✅ | 同一个空 dump，紧接上一条，同样性质 |
+
+两处各补一行 `require_screen`（0.5 在判"问没问"之前先 `dump` + 要一张真界面；第 7 步在
+`launch_app` 之后、那两条缺席断言之前）。**"缺席即为真"这类断言在空界面上恒成立**，
+假绿那条比假红贵 —— 它印的是 ✅，§7 元规则二说的正是这个形状。
+同轮还核了另外两处缺席断言（`:396` 服务端没建号、`:436-438` 界面没有那四句断言性文案）：
+前者读的是库不是屏，后者要走到那一步得先 `scroll_to_desc` 抓到真节点 ⇒ **构造上自带数据门控**，不改。
+
+🔴 **另一条改的是链自己**（`/tmp/run-mobile-auth-v2.sh`，不入库）：上一版把隔离检出的 HEAD
+**钉死成 `f4fe87d2`**，而 main 一直被兄弟会话推进 ⇒ 重跑会红在"提交不等于我上次记的那个数"上，
+那既不是产物问题也不是产品问题。改成**可核对的关系**：`ISO HEAD` 必须是 `main` 的祖先
+（`merge-base --is-ancestor`），两边 sha 与「应用侧源码差集」逐枚打印；差集里只要有一枚落在
+`auth|login|password|credential|privacy|consent` 路径上就 `RUN_EXIT=5` 拒绝起跑。
+本轮现量：`f4fe87d2`（脏 0）是 `3603db71` 的祖先，差集 **2 枚**（`NotificationsScreen.tsx`、
+`SettingsScreen.tsx`），逐行看过是 `View + gap` → `Stack`/`HStack` 的**纯容器替换**
+（`testID="privacy-consent-section"`、`inbox-notifications-list` 原样保留、零文案变化）⇒ 载体可用。
+另外窗口命中后新增 **C2 设备预检**（连抓 3 次 uiautomator，且 `dump` 报成功之后还要
+`exec-out cat` 里真有 `<hierarchy>` 才算数），把"跑了一半才发现设备不可用"压成"30 秒内退回等窗口"。
+
+**v2 那一跑截至本节写作时还没有读数**；在它打印出 `RUN_EXIT=` 之前，本节不写任何"移动端全绿"的结论。
+等满窗口同样以 `RUN_EXIT=3` 结束 —— 那是**环境不成立**，不把 `≤12` 的阈值调低去挤进窗口。
+链与读数：`/tmp/heyta-mobile-auth-v2.log` = `A 产物来源核对（关系式）→ B 起/复用 :3101 的当前源码服务端
+→ C 等负载窗口（60 轮 = 30 分钟）→ C2 设备预检 → D HEYTA_APK=<ISO 那枚> bash scripts/verify-mobile-auth.sh`。
+
+🔴 **没做完的一件事，按"未量"登记而不是写个 0**：其余 20 个安卓脚本里同一类"靠缺席判通过"的断言
+有多少条**没有**先闸住真载体 —— 面积**没有量出来**。两次静态形状都失败了，而且都是被
+**我自己已知在场的那一条**（`verify-mobile-auth.sh:601` 那条 `has_desc/has_text … = "1" ⇒ else ok`）证伪的：
+① 按措辞抓 `hasnt_` / `if !` ⇒ 报 0；② 按结构抓"`then` 支先 `bad`、`else` 支是 `ok`"⇒ 仍报 0，
+因为条件里是 `$(has_desc "$L_OFFLINE")` 这种**嵌套双引号**，而且那条是 `… ] || [ … ]` 的**两测条件**，
+我的正则两头都没处理。⇒ 这件事要么写一个认得 shell 引号/`||` 的真解析（成本高，而且这些脚本正被
+兄弟会话改着，量出来的数一落地就过期），要么**逐个人工过一遍**。**在有人做完之前，这一项是敞口，不是"已确认没有其他条"**。
+
+🔴 本节的另一条教训（写下来是因为我自己又踩了一次）：**运行中的 bash 脚本不许编辑**。
+第一条链在等窗口时我改了 `/tmp/run-mobile-auth-head.sh`，bash 按字节偏移续读 ⇒
+日志里冒出 `line 77: /legal-consent)（401… : No such file or directory`，
+那条链之后的行为不可信，只能整条杀掉重来（仓里 `verify-mobile-*.sh` 的
+`HEYTA-SNAPSHOT-BOOTSTRAP` 就是为了这件事，而 `/tmp` 的手写链没有它）。
+
+---
+
+## 14. 线上部署的那套载体是哪一年的（2026-10-03 现量）
+
+起因是"用户能不能直接打开线上站点验注册登录"。答案要用**年代**回答，不能用"部署过了"回答。
+
+**探针口径**：不用界面文案（整张 `packages/i18n` 词条表都被原样打进包，命中只证明"表在里面"，
+不证明"界面渲染它" —— §13.6.1 已经为这件事栽过一次）；用**线协议路径常量**，
+它们只出现在真的调用它的那段代码里（`packages/app-host/src/hosted-auth.ts:81` 的 `HOSTED_AUTH_PATHS`）。
+
+| 探针 | 本地 `apps/web/dist`（10-03 11:13 构建） | 线上 `/app/` 入口 bundle | 落笔时刻 |
+|---|---|---|---|
+| `login/email-password` | 1 | 1 | 10-01 19:14（`abcd2238`） |
+| `password/set` | **1** | **0** | 10-01 23:10（`b75be397`） |
+| `account/legal-consent` | 1 | **0** | 10-02 08:46（`881aa92a`） |
+
+线上那枚 `index-AYTzWCmT.js` 的 `Last-Modified: Thu, 01 Oct 2026 13:00:56 GMT` = **10-01 21:00（本地时刻）**
+⇒ **线上部署的 web 应用是 10-01 21:00 那次构建**，缺三件事：给 passkey-only 账号加第一个口令的入口（`/password/set`）、
+首启法务同意闸门（G-11/G-12）、以及其后的一切。
+
+服务端比它新一点，但**同样旧**：
+
+| 线上 `heyta.waytofuture.cn` | 本机 `:3101`（当前源码构建） | 判读 |
+|---|---|---|
+| `POST /api/password/set` → **401** | 401 | 路由在（10-01 23:10 那笔已上线） |
+| `GET /api/account/legal-consent` → **404** | 401 | 路由**不在** |
+| `POST /api/account/legal-consent` → **404** | 401 | 同上 |
+
+🔴 **404 必须两个方法各打一次**：Fastify 对"路径在、方法不对"**也回 404**（报文里带着
+`Route GET:/api/… not found`），所以单看一个方法的 404 判不了"路由不存在"。这一条是靠
+**同机同路径的本机 :3101 做对照**（两条方法都回 401）才定案的，不是靠那一个状态码。
+
+**结论与处置**：
+
+- 现在**不要**把线上站点当作"当前源码的 web"来验注册登录 —— 它是 10-01 21:00 的应用。
+  要验就用本机的四个端（装着的那套 = `f47e65ca`，认证那条路自那之后**零改动**，见 §13.6.1 与本节表格），
+  或我起的这台 `:3101`（当前源码构建的服务端）。
+- 🔴 **反向风险**：拿**当前源码**的应用去连**线上**服务端会在法务同意那一步打到 404
+  （`hosted-auth.ts:121` 那条 `accountLegalConsent` 是要发请求的）。这不是"能不能注册"的问题，
+  但会是"点了同意之后一条 404"，容易被误读成产品坏了。
+- 补齐它属于**部署那条线**（本批没做，也不该由我在别人可能在发版的时候顺手做）：
+  `apps/web` 重新构建并部署 + 服务端镜像重建走 `server/scripts/deploy.sh`，
+  步骤与两个必须记住的坑见 [`../runbooks/deployment.md`](../runbooks/deployment.md) §3.7。
+  ⚠️ 本节只登记年代与判据，**不构成"已经重部署"**。

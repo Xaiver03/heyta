@@ -90,7 +90,7 @@ export const PASSWORD_NOT_SET_MESSAGE =
 
 export interface PasswordResetRequestInput {
   email: string;
-  /** 收件人语言，由路由层按 `?lang=` > 账号 `locale` > `Accept-Language` 解析。 */
+  /** 收件人语言，由路由层按 `body.locale` > 账号 `locale` > 中文解析（浏览器头不参与）。 */
   locale?: ServerLocale;
 }
 

@@ -71,10 +71,26 @@ describe('GET /reset-password：没有链接就不能开始', () => {
     expect(res.body).toContain('<html lang="zh-CN">');
   });
 
-  it('缺 token 时按 Accept-Language 出英文那一句', async () => {
+  it('缺 token + `Accept-Language: en` ⇒ **仍然是中文**（浏览器语言不是选择）', async () => {
+    // 原句（2026-09-30 起）：「缺 token 时按 Accept-Language 出英文那一句」。
+    // 2026-10-03 产品负责人改判（「默认应该是中文，除非用户登录之后改成了英文、
+    // 或者一开始就选了英文」）时，同批翻反向的三份判据在
+    // `server-i18n-design` / `account-locale` / `email-locale-wire` —— 这一份是漏掉的第四份。
+    // 变异：把 `resolveLocale` 的 `acceptLanguage` 分支加回来并让 `localeOf` 传那个头 ⇒ 这条红。
     const res = await get('/reset-password', 'en-US,en;q=0.9');
     expect(res.statusCode).toBe(400);
-    expect(res.body).toContain(SERVER_COPY.en['server.page.tokenRequired']);
+    expect(res.body).toContain(SERVER_COPY['zh-CN']['server.page.tokenRequired']);
+    expect(res.body).toContain('<html lang="zh-CN">');
+    expect(res.body).not.toContain(SERVER_COPY['en']['server.page.tokenRequired']);
+  });
+
+  it('🔴 上一条的红不是"英文整个死了"：显式 `?lang=en` 仍然切英文', async () => {
+    // 反向断言单独摆在这儿会自己变软 ——「`resolveLocale` 恒返回中文」那种变异同样
+    // 让"那句英文没出现"成立（§7 元规则 2：一条永远通过的判据比没有判据更糟）。
+    // 所以同一张页要再钉一次：**能**切，只是只认显式参数。
+    const res = await get('/reset-password?lang=en');
+    expect(res.statusCode).toBe(400);
+    expect(res.body).toContain(SERVER_COPY['en']['server.page.tokenRequired']);
     expect(res.body).toContain('<html lang="en">');
   });
 

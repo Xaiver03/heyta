@@ -62,6 +62,13 @@ trap 'rm -f -- "$0"' EXIT
 #
 set -u
 
+# 🔴 负载门放在**建号之前**：这一轮后面要 `install -r` + `pm clear`（本文件里第 241 行），
+#    而宿主机过载时 `uiautomator dump` 抓不到界面 —— 那种红是**环境失效**不是产品缺陷，
+#    可它已经先把别人的设备现场清掉了。所以先问"现在能不能跑"，再动任何东西。
+#    （判据与阈值的单一所有者在 `scripts/lib/wait-for-quiet-host.sh`，traps #168。）
+. "$(dirname "$0")/lib/wait-for-quiet-host.sh"
+wait_for_quiet_host || exit 3
+
 . "$(dirname "$0")/lib/mobile-e2e-fresh-account.sh"
 heyta_e2e_ensure_account || exit 1
 
@@ -69,8 +76,14 @@ heyta_e2e_ensure_account || exit 1
 . "$(dirname "$0")/lib/mobile-e2e.sh"
 
 TASK_TITLE="repeat-e2e-$(date +%H%M%S)"
-LAPTOP_DB=/tmp/heyta-repeat-laptop.sqlite
-PHONE_DB=/tmp/heyta-repeat-phone.sqlite
+# 🔴 这两个库的路径以前写死，而**下一行开局就 `rm -f` 它们** ——
+#    于是同一台机器上第二个会话起这一轮，会把**第一个会话正在用的那轮**的笔记本库删掉：
+#    那一批断言之后全在读一台空笔记本，症状是"手机写了、笔记本读不到"，看着像产品坏了。
+#    （与 traps #169"卸载类脚本不许盲选目标"同一个形状，只是对象从设备换成了文件。）
+#    默认值与原字面量逐字相同 ⇒ 单会话的行为一字不变；并行时给
+#    `HEYTA_REPEAT_LAPTOP_DB` / `HEYTA_REPEAT_PHONE_DB` 各指一份私有的就行。
+LAPTOP_DB="${HEYTA_REPEAT_LAPTOP_DB:-/tmp/heyta-repeat-laptop.sqlite}"
+PHONE_DB="${HEYTA_REPEAT_PHONE_DB:-/tmp/heyta-repeat-phone.sqlite}"
 rm -f "$LAPTOP_DB" "$PHONE_DB"
 
 # 🔴 坐标**由 tab 数量推导**，不许再手写一个数：底部栏是 **5 个平级 tab**
@@ -88,6 +101,23 @@ rm -f "$LAPTOP_DB" "$PHONE_DB"
 TAB_TASKS=108
 TAB_PROFILE=972
 TAB_Y=2253
+
+# 🔴 上面三个数是**写死的像素**，只在 **1080x2400 / 420dpi** 这一档几何上成立。
+#    以前没人核对这个前提 —— 2026-10-03 实测：一台 `avdmanager create avd` 默认建的
+#    AVD 是 **320x640 @160dpi**，`input tap 972 2253` 落在**屏幕之外**，不报错也不生效，
+#    于是从第 2 步起每一条断言都打印"找不到 X"，看着像产品坏了。真相是：
+#    应用活着（手动 `am start` 后 dump 出完整中文界面，`dumpsys dropbox` 里 **0 条崩溃**），
+#    坏的是一台几何不对的设备。所以把前提写成判据 —— 不符就以 **退出码 3** 结束
+#    （环境无效 ≠ 产品失败，与上面的负载门同一约定），而不是留下一屏假红。
+GEOM="$($ADB shell wm size 2>/dev/null | tr -d '\r' | sed 's/.*: //')"
+DPI="$($ADB shell wm density 2>/dev/null | tr -d '\r' | sed 's/.*: //')"
+if [ "$GEOM" != "1080x2400" ] || [ "$DPI" != "420" ]; then
+  echo "❌ 设备几何与脚本常量不符：wm size=${GEOM:-未读到} wm density=${DPI:-未读到}（需要 1080x2400 / 420）" >&2
+  echo "   ⇒ 本轮不跑（环境无效，不是产品失败）。要么用 1080x2400@420 的设备，" >&2
+  echo "     要么把上面的 TAB_* 常量按这台重新推导（不许直接改成'看起来能过'的值）。" >&2
+  exit 3
+fi
+ok "设备几何 1080x2400 / 420dpi —— 标签栏常量成立"
 
 # ── 辅助 ────────────────────────────────────────────────────
 
@@ -248,8 +278,13 @@ step "2. 配置同步凭据"
 configure_sync_credentials
 
 step "3. 首次同步（含一次纯 JS 的 Argon2id 派生）"
-$ADB shell input tap $TAB_PROFILE $TAB_Y; sleep 3
-dump
+$ADB shell input tap $TAB_PROFILE $TAB_Y
+# 🔴 以前这里是"固定 sleep 3 + 一次 dump"，而 `dump()` 抓不到界面时只把
+#    /tmp/ui.xml 截成空文件并打一行警告 —— 于是 `tap_label "立即同步"` 报"找不到"，
+#    看着像界面没这个按钮。实测两种时刻：负载 100+ 时 dump 连续 10 次抓不到；
+#    而手点同一个坐标、安静一点时再 dump，「立即同步」就在屏上。那是假红。
+#    改成"见到为止"（上限 8 轮 × 2s，见 lib 的 `settle_for`）。
+settle_for "立即同步"
 if XY=$(tap_label "立即同步"); then
   echo "     首次同步含密钥派生，等待中…（最长等 900 秒）"
   T=$(wait_synced 180)
@@ -279,8 +314,13 @@ else
 fi
 
 step "5. 手机同步，拿到笔记本那条任务"
-$ADB shell input tap $TAB_PROFILE $TAB_Y; sleep 3
-dump
+$ADB shell input tap $TAB_PROFILE $TAB_Y
+# 🔴 以前这里是"固定 sleep 3 + 一次 dump"，而 `dump()` 抓不到界面时只把
+#    /tmp/ui.xml 截成空文件并打一行警告 —— 于是 `tap_label "立即同步"` 报"找不到"，
+#    看着像界面没这个按钮。实测两种时刻：负载 100+ 时 dump 连续 10 次抓不到；
+#    而手点同一个坐标、安静一点时再 dump，「立即同步」就在屏上。那是假红。
+#    改成"见到为止"（上限 8 轮 × 2s，见 lib 的 `settle_for`）。
+settle_for "立即同步"
 if XY=$(tap_label "立即同步"); then
   T=$(wait_synced 180)
   if [ -n "$T" ]; then ok "手机同步完成（约 $T 秒）"; else bad "手机同步未完成"; fi
@@ -308,26 +348,48 @@ else
   fi
 fi
 
-step "7. 打开任务详情：出现「重复」区块与四个预设"
+step "7. 打开任务详情：出现「重复」区块与六个预设"
 TASK_XY=$(xy_text "$TASK_TITLE")
 if [ -z "$TASK_XY" ]; then
   bad "点不到任务行，后面的界面操作做不下去"
 else
-  $ADB shell input tap $TASK_XY; sleep 3
-  dump
-  if [ "$(has_text "重复")" = "1" ] || [ "$(has_desc_sub "重复")" = "1" ]; then
-    ok "详情面板里有「重复」区块"
+  $ADB shell input tap $TASK_XY
+  settle_for "不重复"
+  # 🔴 面板是 ScrollView：「重复」区块整体（标题 + 六个预设）可能都在首屏之外。
+  # 原来这里只做一次 dump 就 grep，于是把"还没滚到"报成"界面没接上"——
+  # 实测连续三趟第 7 步两条全红，而**紧接着**的第 8 步用会滚动的 `tap_label`
+  # 点「每周」全绿、第 9 步读「当前：每周六」全绿（第 9 步早就写了"裁掉就滚一下"）。
+  # 所以逐屏收集，并且收完**按滚下去的次数滚回顶部**：lib 的 `scroll_to_*` 只会往前滚，
+  # 这一趟若停在底部，第 8 步找「每周」就永远找不到 —— 那是自己弄坏下一步的前提。
+  DOWN=0
+  HAS_HEADING=0
+  MISSING=":不重复:每天:每周:工作日:每月:每年:"
+  for _ in 1 2 3 4 5; do
+    dump
+    if [ "$HAS_HEADING" = "0" ]; then
+      if [ "$(has_text "重复")" = "1" ] || [ "$(has_desc_sub "重复")" = "1" ]; then HAS_HEADING=1; fi
+    fi
+    for c in 不重复 每天 每周 工作日 每月 每年; do
+      case "$MISSING" in *":$c:"*) ;; *) continue ;; esac
+      if [ "$(has_desc "$c")" = "1" ] || [ "$(has_text "$c")" = "1" ]; then
+        MISSING="${MISSING//:$c:/:}"
+      fi
+    done
+    if [ "$HAS_HEADING" = "1" ] && [ "$MISSING" = ":" ]; then break; fi
+    $ADB shell input swipe 540 1900 540 1100 300; sleep 1.5; DOWN=$((DOWN + 1))
+  done
+  for ((i = 0; i < DOWN; i++)); do
+    $ADB shell input swipe 540 1100 540 1900 300; sleep 1.5
+  done
+  if [ "$HAS_HEADING" = "1" ]; then
+    ok "详情面板里有「重复」区块（向下滚过 $DOWN 屏才收齐 —— 它在首屏之外，不是没接上）"
   else
     bad "详情面板里没有「重复」区块（界面没接上）"
   fi
-  MISSING=""
-  for c in 不重复 每天 每周 工作日 每月; do
-    [ "$(has_desc "$c")" = "1" ] || MISSING="$MISSING $c"
-  done
-  if [ -z "$MISSING" ]; then
-    ok "五个选项都在：不重复 / 每天 / 每周 / 工作日 / 每月"
+  if [ "$MISSING" = ":" ]; then
+    ok "六个选项都在：不重复 / 每天 / 每周 / 工作日 / 每月 / 每年"
   else
-    bad "重复选项缺：$MISSING"
+    bad "重复选项缺：${MISSING//:/ }"
   fi
 fi
 
@@ -404,8 +466,13 @@ else
 fi
 
 step "11. 手机同步 → 笔记本读到重复规则（跨设备）"
-$ADB shell input tap $TAB_PROFILE $TAB_Y; sleep 3
-dump
+$ADB shell input tap $TAB_PROFILE $TAB_Y
+# 🔴 以前这里是"固定 sleep 3 + 一次 dump"，而 `dump()` 抓不到界面时只把
+#    /tmp/ui.xml 截成空文件并打一行警告 —— 于是 `tap_label "立即同步"` 报"找不到"，
+#    看着像界面没这个按钮。实测两种时刻：负载 100+ 时 dump 连续 10 次抓不到；
+#    而手点同一个坐标、安静一点时再 dump，「立即同步」就在屏上。那是假红。
+#    改成"见到为止"（上限 8 轮 × 2s，见 lib 的 `settle_for`）。
+settle_for "立即同步"
 if XY=$(tap_label "立即同步"); then
   T=$(wait_synced 180)
   if [ -n "$T" ]; then ok "手机同步完成（约 $T 秒）"; else bad "手机同步未完成"; fi
@@ -460,8 +527,13 @@ else
 fi
 
 step "13. 手机同步 → 笔记本看到同一个新到期日，且仍未完成（跨设备一致）"
-$ADB shell input tap $TAB_PROFILE $TAB_Y; sleep 3
-dump
+$ADB shell input tap $TAB_PROFILE $TAB_Y
+# 🔴 以前这里是"固定 sleep 3 + 一次 dump"，而 `dump()` 抓不到界面时只把
+#    /tmp/ui.xml 截成空文件并打一行警告 —— 于是 `tap_label "立即同步"` 报"找不到"，
+#    看着像界面没这个按钮。实测两种时刻：负载 100+ 时 dump 连续 10 次抓不到；
+#    而手点同一个坐标、安静一点时再 dump，「立即同步」就在屏上。那是假红。
+#    改成"见到为止"（上限 8 轮 × 2s，见 lib 的 `settle_for`）。
+settle_for "立即同步"
 if XY=$(tap_label "立即同步"); then
   T=$(wait_synced 180)
   if [ -n "$T" ]; then ok "手机同步完成（约 $T 秒）"; else bad "手机同步未完成"; fi
@@ -504,8 +576,13 @@ else
 fi
 if laptop_ok sync >/dev/null; then ok "笔记本已同步"; else bad "笔记本同步失败"; fi
 
-$ADB shell input tap $TAB_PROFILE $TAB_Y; sleep 3
-dump
+$ADB shell input tap $TAB_PROFILE $TAB_Y
+# 🔴 以前这里是"固定 sleep 3 + 一次 dump"，而 `dump()` 抓不到界面时只把
+#    /tmp/ui.xml 截成空文件并打一行警告 —— 于是 `tap_label "立即同步"` 报"找不到"，
+#    看着像界面没这个按钮。实测两种时刻：负载 100+ 时 dump 连续 10 次抓不到；
+#    而手点同一个坐标、安静一点时再 dump，「立即同步」就在屏上。那是假红。
+#    改成"见到为止"（上限 8 轮 × 2s，见 lib 的 `settle_for`）。
+settle_for "立即同步"
 if XY=$(tap_label "立即同步"); then
   T=$(wait_synced 180)
   if [ -n "$T" ]; then ok "手机同步完成（约 $T 秒）"; else bad "手机同步未完成"; fi
@@ -518,6 +595,121 @@ if [ "$GOT_DUE2" = "$NEXT2_MS" ]; then
   ok "手机上的到期日已推进到 $NEXT2_DATE —— 笔记本上的完成也走同一条顺延语义"
 else
   bad "手机上的到期日是「${GOT_DUE2}」，期望 ${NEXT2_DATE}（${NEXT2_MS}）"
+fi
+
+step "15. 🔴 点「每年」→ 规则落在**当前截止日**的月日、仍恰好一条 op，并且同步到笔记本"
+# 这一条证的是 W3 那一档在真机上的**接线**，不是规则数学：
+# `REPEAT_PRESET_IDS` 里有 'yearly'、词条在、`repeatPresetRule` 出得来规则，
+# 但 chips 是一行横排的 —— 第六个可能因为滚动/换行**根本点不到**，
+# 那种失效单测与 typecheck 都不会报（`Record<RepeatPresetId, MessageKey>` 只挡漏翻译）。
+#
+# 🔴 期望值**从手机当前的 dueDate 现场推**，不抄脚本开头的 DUE_DATE：
+# 第 11/14 步已经把截止日顺延过两次，而 `TaskDetailSheet` 的锚点是
+# `repeatAnchor = dueLocal ?? todayLocal`（当前截止日）。拿旧日期算期望会把
+# 这条正确的实现判成红 —— 而"锚点跟着当前截止日走"本身就是要钉的语义。
+$ADB shell input tap $TAB_TASKS $TAB_Y
+# 🔴 这里以前**一次 dump 都没有**就直接 `xy_text "$TASK_TITLE"` —— 而 `xy_text` 读的是
+#    /tmp/ui.xml，那份文件里还是**上一步的界面**（第 14 步停在「我的」页）。
+#    于是这一条不是概率红，是**恒红**："点不到任务行，第 15 步做不下去"，
+#    两趟连红且红在同一处 —— 而手动 dump 出来的任务列表里那一行明明在
+#    （`repeat-e2e-140014` / 收集箱 / 10-17 / 每周六）。
+settle_for "$TASK_TITLE"
+T15_XY=$(xy_text "$TASK_TITLE")
+if [ -z "$T15_XY" ]; then
+  bad "点不到任务行，第 15 步做不下去"
+else
+  phone_db_pull
+  CUR_DUE_MS=$(phone_field "$PHONE_DB" "$TASK_ID" dueDate)
+  YLINE=$(printf '%s' "$CUR_DUE_MS" | python3 -c '
+import datetime, sys
+d = datetime.date.fromtimestamp(int(sys.stdin.read().strip()) / 1000)
+print(d.isoformat(), d.month, d.day)
+' 2>/dev/null)
+  CUR_DUE=$(printf '%s' "$YLINE" | cut -d' ' -f1)
+  EXPECT_Y_RULE="FREQ=YEARLY;BYMONTH=$(printf '%s' "$YLINE" | cut -d' ' -f2);BYMONTHDAY=$(printf '%s' "$YLINE" | cut -d' ' -f3)"
+  if [ "$CUR_DUE" != "$NEXT2_DATE" ]; then
+    bad "手机上的截止日现在是「${CUR_DUE}」，期望 $NEXT2_DATE —— 前面的顺延没落进本地库，下面的年期望值不可信"
+  else
+    ok "锚点前提成立：手机当前截止日就是顺延后的 $NEXT2_DATE"
+    $ADB shell input tap $T15_XY; sleep 3
+    dump
+    BEFORE15=$(phone_ops_with_field "$PHONE_DB" "$TASK_ID" repeatRule)
+    echo "     点击前带 repeatRule 的 op 数：$BEFORE15"
+    if XY15=$(tap_label "每年"); then
+      sleep 2
+      phone_db_pull
+      AFTER15=$(phone_ops_with_field "$PHONE_DB" "$TASK_ID" repeatRule)
+      GOT_Y_RULE=$(phone_field "$PHONE_DB" "$TASK_ID" repeatRule)
+      GOT_Y_ANCHOR=$(phone_field "$PHONE_DB" "$TASK_ID" repeatDtstart)
+      if [ "$AFTER15" = "$((BEFORE15 + 1))" ]; then
+        ok "换一次预设只产生了 1 条 op（$BEFORE15 → ${AFTER15}）"
+      else
+        bad "换一次预设产生了 $((AFTER15 - BEFORE15)) 条带 repeatRule 的 op，应该恰好 1 条（§3.4）"
+      fi
+      if [ "$GOT_Y_RULE" = "$EXPECT_Y_RULE" ]; then
+        ok "「每年」落库的规则正确：$GOT_Y_RULE"
+      else
+        bad "「每年」落库的规则是「${GOT_Y_RULE}」，期望「${EXPECT_Y_RULE}」"
+      fi
+      # 锚点必须跟着**当前**截止日。它若写死成脚本开头那个日期，界面上任何地方都看不出来，
+      # 而下一次真正发生的日子会整年错开 —— 这正是倒数纪念日最贵的一类错。
+      if [ "$GOT_Y_ANCHOR" = "$CUR_DUE" ]; then
+        ok "锚点跟着当前截止日走：${GOT_Y_ANCHOR}"
+      else
+        bad "锚点是「${GOT_Y_ANCHOR}」，期望 ${CUR_DUE} —— 锚点没跟着截止日走"
+      fi
+      dump
+      if [ "$(has_sub "当前：每年")" = "1" ]; then
+        ok "面板显示「当前：每年 …」（describeRecurrence 认得这条规则）"
+      else
+        bad "面板上没有「当前：每年」—— 规则写进去了却读不出来"
+      fi
+      # 🔴 走标签栏之前先把面板关掉，并且**等列表回来**。
+      #    第一个假设是"面板盖住底栏，那一下落在面板上"（第 10 步早就用了那个**有名字**的
+      #    关闭出口，第 15 步却没有）—— 补上关闭之后第五趟**仍然红**：面板确实关了
+      #    （"面板已关"那条是绿的），界面却停在列表。所以盖子不是原因，
+      #    原因是关闭动画没走完 ⇒ 见下面那条 dump 实测。假设留在这里，因为它被否证过。
+      #    ⚠️ 别把这条红读成"同步坏了"：第四/五趟紧跟着"笔记本读到同一条规则"都是绿的，
+      #       自动同步已经把 op 传上去了。它挡住的是"手动这条路还能不能点"。
+      if XY15C=$(tap_label "关闭任务详情"); then
+        ok "面板已关（走的是第 10 步那个有名字的出口：${XY15C}）"
+        # 🔴 关闭动画没走完就去点底栏，那一下会被 Modal 的消失过程吃掉。实测第五趟：
+        #    面板确实关了（上面那条绿），跑完之后设备**仍停在任务列表** ——
+        #    当时那份 dump 里底栏「我的」的 bounds=[864,2169][1080,2337]，
+        #    而脚本点的 972 2253 **明明落在里面**，所以不是坐标，是没吃到这一下。
+        #    等列表回来再点 —— 与第 10 步「面板已关闭，列表回来了」同一口径。
+        if settle_for "$TASK_TITLE"; then
+          ok "列表回来了（点底栏的前提成立）"
+        else
+          bad "关掉面板后列表没回来 —— 后面点底栏没有意义"
+        fi
+      else
+        bad "关不掉面板 —— 底栏够不着，下面那句同步按钮必然报红"
+      fi
+      # 🔴 跨设备：规则是数据，不是这台设备的属性。第 13/14 步为 WEEKLY 证过这件事，
+      # 这一档也得单独证 —— 因为它换的是 BYMONTH/BYMONTHDAY 这对新参数。
+      $ADB shell input tap $TAB_PROFILE $TAB_Y
+      settle_for "立即同步"
+      if XY=$(tap_label "立即同步"); then
+        T=$(wait_synced 180)
+        if [ -n "$T" ]; then ok "手机同步完成（约 $T 秒）"; else bad "手机同步未完成"; fi
+      else
+        bad "找不到「立即同步」按钮"
+      fi
+      if laptop_pull; then
+        L_Y_RULE=$(laptop_field "$TASK_ID" repeatRule)
+        if [ "$L_Y_RULE" = "$EXPECT_Y_RULE" ]; then
+          ok "笔记本读到同一条「每年」规则：$L_Y_RULE"
+        else
+          bad "笔记本读到的是「${L_Y_RULE}」，期望「${EXPECT_Y_RULE}」"
+        fi
+      else
+        bad "笔记本下载失败，跨设备这条判据没跑成"
+      fi
+    else
+      bad "点不到「每年」这个选项（chips 换行/滚动后够不着，或词条没接上）"
+    fi
+  fi
 fi
 
 summary "移动端重复任务"

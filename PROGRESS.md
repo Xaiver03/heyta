@@ -1044,3 +1044,71 @@ WindowServer 94%、simruntime 进程 92% 空转，负载 128）—— iOS 27.1 �
 提交即崩 ×5 份 .ips；干净 HEAD worktree 构建同一操作 **ops=1 落库、App 存活** ⇒
 崩溃源是并行会话**未提交的在途文件**，已提交代码无责。27.0 输入原语差入档
 （traps #121：set-value 不进 RN 状态、HID 无中文 keycode，ASCII 全路径实测可用）。
+
+
+---
+
+# 本轮 PROGRESS — 多端入口对齐·第二批（Goal 1791013705594-6dec11，开工 2026-10-03 15:4x）
+
+## 开工回执（≤10 行）
+
+1. **目标**：把移动端与 web 之间那批「零件都在、没人接线」的差集接上——便签编辑链、
+   清单/标签改名与归档、习惯改名/删除、成长三件（热力图/周小结/补打卡）、移动端权益可见，
+   每条带可复跑判据，最后 `pnpm check` 全量绿 + 四端重装绿。
+2. **顺序**：任务 1（判据登记补齐）**排在所有功能前**——因为每批功能都要新增判据，
+   而本仓已实测有 6 个真机脚本"写了没人登记"（无别名 / 不在 MANIFEST），先把这个洞堵上，
+   否则本轮交付会重演同一件事。然后 2 便签链 → 3 改名删除 → 4 成长与权益。
+3. **让步顺序**：判据真实 > 功能做完 > 做得快。
+4. **最大风险**：`packages/i18n/src/locales/{en,zh-CN}.ts` 与 `package.json`、
+   `packages/ui/src/index.ts` 此刻**正被并行会话改着**（实测 28 个白名单路径为 `M`），
+   而每条新词条都必须动 locale。⇒ 提交一律走「HEAD + 只我的 hunk 重建暂存」，
+   绝不整文件 `git add`（本仓 2026-09-30 那轮有先例与做法）。
+5. **第二风险**：`apps/mobile/src/screens` 的 l4 内联样式基线**已顶格 90** ⇒
+   新屏一律走 `apps/mobile/src/ui/kit` 与样式表，一个 `style={{}}` 都不许新增。
+6. **第三风险**：新动作（`renameTag` / 习惯改名）会连带触发 `check:reachability`
+   与 op-log 纪律（一个意图一个 op），且**不许 bump `CURRENT_SCHEMA_VERSION`**。
+7. 任务 0 三条基线已核对：`check` 链 **62** 段、l4 基线 **104 / 90**、mobile spec **35** —— 全部与任务书一致。
+
+## 任务 1 判据登记补齐 ✅（2026-10-03 16:0x）
+
+**做了什么**（四件，全部只动地界内的文件）：
+
+| 件 | 落地 |
+|---|---|
+| 6 个别名 | `package.json` 新增 `verify:mobile-account` / `-reminder-ring` / `-quadrant-fill` / `-sort-sheet` / `-task-row` / `verify:universal-slice` ⇒ **`no_alias` 6 → 0**（29 个 `verify-*.sh` 现在全有别名） |
+| 2 个进 MANIFEST | `check-script-snapshot.mjs:37-68` 加 `verify-mobile-account.sh` 与 `-reminder-ring.sh`（28 → **30 条** = `reinstall-all.sh` + 磁盘上全部 29 个 `verify-*.sh`）⇒ **`no_manifest` 2 → 0** |
+| 那两个文件补 bootstrap | 它们**原来整块都没有**（任务书只说"进 MANIFEST"，实测进之前必须先加块，否则门禁按判据正确报红）。块从 `verify-mobile-quadrant-fill.sh:3-19` **逐字复制**，标记落在**第 3 行**（判据上限 15） |
+| 过期理由改成实测 | `check-script-snapshot.mjs:19-23` 那段「它俩未跟踪 / 已暂存未提交」被 `git ls-files` 否证 ⇒ 重写为「前提实测过期 + 显式清单剩下的两条真实理由 + **本门禁不查漏登记**」 |
+
+**journey-coverage 的 mobile 册**：2 条 → **25 条**（`check-journey-coverage.mjs:87-…`）。收录判据写成三条同时成立
+（有 `verify:*` 别名 / 真机零 mock / 验的是一段用户旅程），并把「原来只有 2 条」归因到与本门禁文件头
+同一条失效形状（手写清单漏掉的不是细节，是整个条目）；`covers` 那句「真机脚本待独占模拟器」也已换成实测读数。
+
+**`verify-mobile-lists.sh:377`**：`psql -h … -U rocalight -d … 2>/dev/null | sed` 那种"只打印不判定"改成
+四个 env 可覆盖（`HEYTA_E2E_DB{,_USER,_HOST,_PORT}`，沿用 `verify-mobile-auth.sh:125-126` 已有约定，
+默认值等价）+ **读数不是纯数字就 `bad()`** + `0` 也 `bad()`。
+两分支都实测过：真库回 `0` ⇒ 走判定分支；`-d bogus_db` ⇒ `psql: error: … does not exist` 进 `bad()`（**不再静默**）。
+
+**验收读数**（每条都在对话里贴了原文）：`check:script-snapshot` ✅ 30 个脚本 exit 0；
+`check:journey-coverage` ✅ 五端全过（mobile 25 个）`JOURNEY_EXIT=0`；`bash -n` 三个改动脚本全过。
+
+**反向验证（两条变异 + 一条机制冒烟）**：
+1. 删 `verify-mobile-account.sh` 的 bootstrap 块 ⇒ `❌ … 缺自快照 bootstrap` exit **1**；`cmp` 证明还原逐字节相同后 exit **0**。
+2. 删 MANIFEST 里的一条 ⇒ **exit 0（不红）** —— 任务书那条"必须红"的前提不成立，已登记 **B36.1** 待拍。
+3. 机制冒烟（`/tmp/g6/snaptest`，不入库）：用同一段块跑 `probe.sh`，运行途中往源文件追加 30 行 ⇒
+   `RUN-AS: …/.probe.sh.snap.53835` + `STILL-ALIVE after source edit` + exit 0 + 快照零残留 —— 新加的两块**真的在跑**。
+
+**顺带撞出的两条真问题**（都记在 B36）：`check:shell-unicode` 在**当前 HEAD 上是红的**（`mutate-closeout-gates.sh:223/232/242`，
+`cc974fbd` 提交，地界外 ⇒ 不代改）；同批扫出的 `verify-mobile-repeat.sh:675` 在我地界内、已就地修成 `${XY15C}`。
+
+### 任务 1 的两条更正与一条事故（2026-10-03 16:1x）
+
+1. 🔴 **完成条件里"62 段"要写明载体**：HEAD（`76cbee51`）上是 **61** 段 —— 第 62 段
+   `check:op-log-semantics` 是并发会话**未提交**的 package.json 改动。任务 0 量的 62 没错，
+   但它是工作树读数（同一段代码在 22:48 红 57 条、22:55 全绿那个形状的同族）。
+2. 🔴 **HEAD 上 `check:shell-unicode` 是红的**（3 处 `mutate-closeout-gates.sh`，地界外）⇒
+   "check 全量 exit 0"目前不由本条线单独可达，见 B36.2。
+3. ⚠️ **我自己造了一次共享工作树事故并已还原**（全程记在 **B37**）：为让 package.json 只带我的 hunk
+   做了 temp-swap，而备份那步 `cp` 因为同一行里 `sh -c` 的引号解析失败**整行都没执行**，
+   于是覆盖了并发会话那 2 行未提交改动；已按覆盖前 diff 原文逐字重建（`git diff --numstat` 回到 `2/1`）。
+   往后本条线的规矩：**temp-swap 前 `test -f 备份 || exit 1` 写进同一条链**，副作用事后必须测量。

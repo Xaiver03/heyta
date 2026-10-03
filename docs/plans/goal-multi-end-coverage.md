@@ -91,6 +91,12 @@
 
 ## 7. 执行记录（随批回填，不许最后一起补）
 
+> ⚠️ **读这张表之前先看文末**：下面"收尾"那一行写的是 **10:0x 的状态**（当时 `check` 还有两段红、
+> 缺口按"两段"登记）。12:0x 之后那两段红已当场解除、链本身也从 59 段长到 61 段，
+> **现状以 §7.17（61 段逐段读数）、§7.20（终局审计）与 §7.21–§7.22（ios 段解禁 + 四端同载体跑绿）为准**
+> —— 表内那行不是最新答案。
+> 留原文不改是为了让人看清"缺口当时是怎么被描述的"，不是让人照它行动。
+
 | 批 | 状态 | 判据 | 证据 |
 |---|---|---|---|
 | 一 | ✅ **已完成（2026-10-02）** | ① jsdom 5 条全绿（op 形状×3：选日/清除/快捷项各=恰好一条只带 dueDate 的 UPD；触发器×2）；② e2e 真浏览器（点开→选日→分组与徽章→**刷新仍在**）；③ 变异：onChange→no-op ⇒ **恰好 3 红**（台账在判据文件尾）；④ `check:ui-language` / `check:design` / `check:layering` 绿；web 1358 / mobile 506 / domain 750 / ui 413 全绿，typecheck 0 错；`verify:mobile-schedule` 7/7（共享 DatePicker 换装无回归） | `apps/web/tests/due-date-edit.spec.tsx` · `e2e/tests/due-date-edit.spec.ts` · `apps/web/evidence/due-date-edit/`（4 图，人已看）· `apps/mobile/evidence/android-timeline-schedule.png`（人已看）。**实施中发现并修掉**：行内 absolute 弹层被带 transform 的滚动容器裁掉（白边）⇒ Portal 到 body + fixed + 实测锚点 + 滚动即关；同族缺陷在 `TaskOrganizer` 实测存在，已登记审计文档 §4 追加发现，范围外待立项 |
@@ -403,8 +409,8 @@ bad 在一行式 then 位置 ⇒ 取 else 分支里第一条 ok），文案两�
 | 门禁 | 上一轮读数 | 本轮现量（同一口径） | 归因是否仍是原来那句 |
 |---|---|---|---|
 | `check:l4` | screens **107 > 90**（多 17 处） | screens **98 > 90**（多 **8** 处）；web features 98 ≤ 104 | ✅ 仍是 M3 的债（B18），但**处数不是本条线写的数**：这 9 处是别条线在 `731618ec..a29881e9` 之间重构掉的。🔴 本条线在含内联样式的 12 个 screens 文件里**一个都不出现**（`ExportScreen.tsx` 自 `731618ec` 起零改动，`git diff --name-only` 为空）⇒ B21 的"本批 +2 归零"仍然成立 |
-| `check:landing-e2e` | 15 passed / 2 failed | 未复跑（见下面负载那一段）；改成**静态复核**：判据仍在 `e2e/landing/docs-centre.spec.ts:950` 数 `img[src^="/assets/docs/"]`，而 `git ls-tree -d HEAD apps/landing/public/assets/` 仍只有 `help` | ✅ B24 那句未变（该红**没有被修**），且这不是"跑不出来所以不知道"—— 死链的成因在提交态里可读 |
-| `check:ai-e2e` | 98 passed / **3 failed** | 🔴 **未复跑，且这一条的归因现在不能照抄**（见下） | ❌ **前置条件已消失** |
+| `check:landing-e2e` | 15 passed / 2 failed | **同一枚 `0c171df1` 上实跑（10:00–10:01）：15 passed / 2 failed，`PLAYWRIGHT=1`** ⇒ 与上一轮读数逐字相同，红没被修。浏览器里的 DBG 行直接给出页面渲染出的 `src`：`/assets/help/first-run/W01-tasks.png`，且 `mainImgs` 与配图张数相等（图真的解码出来了） | ✅ B24 的取证成立：**判据断的是一个不存在的目录名**，产物侧四处表达都是 `help`。🔴 两条出路仍**由文档中心那条线选**，我没有代改（理由写在下面第 ③ 条与 B24 本体） |
+| `check:ai-e2e` | 98 passed / **3 failed** | ✅ **已实测定性：113 passed / 2 skipped / 0 failed，`E2E=0`**（隔离检出 `/tmp/heyta-g5`，被验树 `0c171df1`，09:54–09:59，5.5 分钟） | ✅ **B22 的归因被证实**：那三枚文件提交之后，三条红全部转绿 ⇒ 真身确实是"提交态落后于未提交的工作"，不是产品缺陷，也不是并发干扰 |
 
 🔴 **`check:ai-e2e` 那 3 条红的归因到了必须重验的时候。** B22 写的是"提交态落后于别人未提交的
 工作"，点名三枚文件（`DueEditor.tsx`、`App.tsx`、`features/shell/view-tabs.ts`）当时是 ` M`。
@@ -421,6 +427,18 @@ bad 在一行式 then 位置 ⇒ 取 else 分支里第一条 ok），文案两�
 2. **`check:ai-e2e` 的 preflight 会 SIGKILL 别的会话的 dev server**（traps #87），而此刻别人正在
    `packages/ui/src/calendar` 上写代码。这道门禁的副作用落在别人身上，不在别人活跃时按它。
 
+✅ **这两个原因在 09:54 都被消掉了，于是补了跑，B22 就此定性。** 负载从 80.6 降到 **16–26**，
+而第二个原因不需要负载配合 —— 那条 kill 只活在 `scripts/check-ai-e2e-preflight.mjs` 里，
+它的职责只是"清掉占端口的旧进程"，所以我自己**核端口**（`4318`/`4319` 监听数都是 0）之后直接跑
+`pnpm --dir e2e run test`，绕开 kill 而不改变被测内容。前置也全部重做到"与源码同代"：
+隔离检出 `git fetch && reset --hard` 到 main（`HEAD=0c171df1`，`dirty=0`）→ `pnpm install`（倒数日批次
+带来了 `lunar-typescript`，不装就是旧代产物，见 traps #27）→ `pnpm -r build`（`BUILD=0`）→ `e2e && pnpm install`。
+
+结果：**113 passed / 2 skipped / 0 failed，`E2E=0`**（5.5 分钟）。
+⇒ B22 的归因**被证实**：那三条红确实是"提交态落后于未提交的工作"，随那批提交一起转绿；
+它不是产品缺陷，也不是我最初写的"并发干扰"。分母从 101 涨到 115 是别条线新增的用例，不是本轮改了什么。
+**这条现在可以关闭**（关闭句写在 BLOCKED.md B22 本体里，不只在对话里）。
+
 现场清理：本条线起的 `vite preview :4322`（PID 27009，cwd 是隔离检出 `/tmp/heyta-ios-ab/apps/web`）
 已终止并复查端口无监听。`:3100` 那枚服务端进程的 cwd 是主工作树，不是本条线起的 —— 不动（§7 归属纪律）。
 
@@ -433,8 +451,634 @@ bad 在一行式 then 位置 ⇒ 取 else 分支里第一条 ok），文案两�
 ③ 收尾批 —— **部分完成，且未完成的那一条不在本条线手里**：
    `pnpm reinstall:all` 四端重装 ✅（§7 收尾行 + §7.8），
    按归属纪律提交 ✅（本条线累计 15 笔，`git show --numstat` 逐笔核对别人暂存条目丢失=0），
-   `pnpm check` 全量绿 ❌ **未达成**：57 段链里当前有 3 段红，
-   分别是 `check:l4`（M3 的 8 处内联样式，B18）、`check:landing-e2e`（B24，文档中心条线）、
-   `check:ai-e2e`（B22，**归因待重验**）。三段没有一段是本条线引入的，
-   而"不为了变绿去放宽基线/改别人的判据/吸收别人的债"是本 Goal 的硬约束，所以这里如实记红。
+   `pnpm check` 全量绿 ❌ **未达成**：57 段链里当前有 **2** 段红，
+   分别是 `check:l4`（M3 的 8 处内联样式，B18）与 `check:landing-e2e`（B24，文档中心条线）。
+   `check:ai-e2e` 已实测定性转绿（见上），从 3 段减到 2 段。
+   🔴 **B24 我没有代改，而且这是刻意的**：那一条里写着我自己在 05:30 取证后留下的边界
+   —— "两条正当出路（由那条线选）… ⚠️ 不要'为了让套件绿'随便挑一条 … **本条不代改**"。
+   选 1（把 `public/assets/help/` 搬到 `docs/`）会改**线上 URL** 并要求重跑 `check:entries`（75 份入口产物逐字节对账），
+   选 2（把 spec 的三处字面改回 `/assets/help/`）等于**替那条线承认**"页面在 `/docs` 而图在 `/assets/help`"这个不一致是长期形态。
+   两者都是产品决定，不是判据修复；而我这个 Goal 的完成条件不能靠替别人做决定来凑。
+   ⇒ 我只补了那条线**缺的那一块证据**（下面 B24 里新增的实测行），把改动撤回，红如实留着。
+   两段红没有一段是本条线引入的，而"不为了变绿去放宽基线/改别人的判据/吸收别人的债"是本 Goal 的硬约束，所以这里如实记红。
    ⇒ **因此本次不将 Goal 标记为 complete**：③ 的第一句没做到，做不到。
+
+### 7.11 终局快照（2026-10-03 10:0x，HEAD `69f64ae4`）：① ② 的每一条都还在绿，缺口只剩 ③ 的两段
+
+这一段是给"下一位"的：本 Goal 交付完之后，哪些证据仍然当场可复现。全部在同一枚 HEAD、
+工作树对本条线零脏文件的状态下现量（不是引用早先的读数）：
+
+| 复验项 | 命令 | 读数 |
+|---|---|---|
+| 界面文案必须是中文词条（批五新增的那批也在内） | `pnpm check:ui-language` | **0** |
+| 中英两张词条表本身 | `pnpm --filter @heyta/i18n test` | **0** |
+| 移动端类型 | `pnpm --filter @heyta/mobile typecheck` | **0** |
+| 移动端单元测试 | `pnpm --filter @heyta/mobile test` | **538 passed / 538** |
+| 空态登记（本批曾把它从 2 处红修到 0，又添过判据缺陷） | `pnpm check:empty-state` | **0** |
+| RN 无障碍属性写法（批一那处红就是它抓的） | `pnpm check:rn-aria` | **0** |
+| 设计变量裸值 | `pnpm check:design` | **0** |
+| shell 里的 `$var` 紧跟中文 | `pnpm check:shell-unicode` | **0** |
+| 长跑脚本快照（`verify-mobile-restore.sh` 在 MANIFEST 里） | `pnpm check:script-snapshot` | **0** |
+| UI Provider 边界 | `pnpm check:ui-provider` | **0** |
+| 移动端产物（bundle/Hermes 魔数那类） | `pnpm check:mobile-bundle` | **0** |
+| 死链 / 失效章节引用 / 锚点（含本文件新增的引用） | `research/tools/docs-link-check.mjs`（干净检出） | **0** |
+
+🔴 **没有绿的也一并写清**：`check` 链在此 HEAD 上仍有 2 段红 —— `check:l4`（M3 的 8 处内联样式）与
+`check:landing-e2e`（B24 的两条出路），处置与代价登记在 **BLOCKED.md B30**；`check:ai-e2e` 已实测转绿并关闭 B22。
+
+本会话为收尾又落 4 笔，逐笔 `git show --numstat` 核对"删除别人 0 行 / 别人暂存条目丢失 0"：
+`c444d827`（双臂读数与配对行号进仓库 + traps #165）、`0c171df1`（§7.10 + B22 改记待重验）、
+`3e5cef9b`（B22 关闭 + B24 只补证据 + 审计回填两条臂）、`69f64ae4`（B30）。
+
+### 7.12 把链逐段单独跑了一遍：`pnpm -r test`（第 59 段）**也是红的**，两条都在这一轮当场修完（2026-10-03 10:3x，HEAD `a2d0d634`）
+
+§7.11 的标题写着"缺口只剩 ③ 的两段"。**那句在写下的那一刻就少算了一段** —— 它是从"`&&` 链
+断在第一红之后"推断的，而推断不能替实测。这一轮把链**逐段单独跑**了一遍（`/tmp/g5-seg-lite.sh`，
+跳过需要设备/GUI/重负载的 12 段；`check:ai-e2e` 与 `check:landing-e2e` 按 B22/B24/B30 单独实测过），
+才看见第 59 段 `pnpm -r test` 也是红的：
+
+| 段 | 修复前现量 | 成因 / 归属 | 修复笔 |
+|---|---|---|---|
+| `pnpm -r test` → `server/tests/password-reset-page.spec.ts:74` | **1 failed / 22 passed**，而且对**所有机器形态**都红 | `ce23d3ab`（10-03 10:16）改语言不变量时翻了三份判据，**漏了第四份**（该文件 10-01 18:45 `b87e8844` 就在） | `c1395bf8` |
+| `pnpm -r test` → `server/tests/account-profile.spec.ts` | 干净检出上 `Test Files 1 failed` + **`Tests no tests`**（27 条一条没跑）；主检出全绿 | `7e299118`（09:38）用 `import 'dotenv/config'` 拿测试密钥，属 §7 第 **157** 条那一类的**第 5 个成员** | `a2d0d634` |
+
+两条都不是"再跑一遍就好"的东西，也都不是本条线欠的账（是本会话**撞见**的仓库级红），
+所以按硬约束当场修完，且都不是为了让套件绿而改判据：
+- 第 1 条改的是**判据方向**，依据是已经落到 main 上、并由那三份判据钉住的新产品不变量；
+  补的反向断言之外还加了同页的 🔴 阳性对照（`?lang=en` 仍切英文），两次变异方向相反、
+  各只打红一条 —— 细节与一般规律写进 §7 第 **167** 条。
+- 第 2 条改回仓库**自己已有**的约定（`vi.hoisted` + `??=`），并补
+  `server/tests/test-env-contract.spec.ts` 让这条约定**第一次变成会失败的判据**
+  （三条判据 + 一条分母断言；匹配前 `stripComments`，用"注释里提到 import 的文件不红"这条臂证承重）。
+
+🔴 本轮内我一度把第 2 条判成"隔离检出缺 `server/.env` 的**探针缺件**"。
+**那句定性是错的**，错法与第 157 条第一次那次一模一样：干净检出是 CI 的唯一形态，
+"我这台机器绿"不构成排除证据。它当时看起来可信，是因为主检出确实全绿 —— 而这两棵树形
+**只有把同一条判据各量一次**才分得开谁在说谎。写在这里是为了下一轮不把它当现状引用。
+
+修复后的现量（两种树形各量一次，不是推的）：
+
+| 载体 | 有 `server/.env` | server 整片 `vitest run` | 全仓 `pnpm -r test`（第 59 段） |
+|---|---|---|---|
+| 主工作树（`a2d0d634`） | 有 | **111 files / 2095 passed / 1 skipped** | — |
+| 隔离检出 `/tmp/heyta-g5`（detached @ `a2d0d634`） | 🔴 无 | **111 files / 2095 passed / 1 skipped** | **20 个 test 任务全过，`INNER_EXIT=0`** |
+
+server `tsc --noEmit` 另量一次 exit 0（第 162 条：`vitest` 绿不等于 `tsc` 绿）。
+
+⇒ 到这里 ③ 的"check 全量绿"仍然**未达成**，但缺口从"三段"收回成实测的**两段**
+（`check:l4` 98 > 基线 90、`check:landing-e2e` 15/2），两段各自的归属、闭合代价、
+"这一轮为什么不付"见 **BLOCKED.md B30 / B30.2**。硬约束（不放宽基线、不改别人的判据、
+不吸收别人的债凑绿）优先于把链凑绿，所以 Goal 的 ③ 依旧如实记未达成。
+
+### 7.13 把 seg-lite 跳过的 11 段补量到 7 段：加上本轮共 **8 段**拿到当前提交态上的实测读数（2026-10-03 10:4x，`d78f8414`，干净检出）
+
+§7.12 那句"缺口只剩两段"仍然带着一个**没量过的集合** —— 逐段跑的时候按名字跳过了 **11** 段
+（`/tmp/g5-seg-lite.sh:19` 的 `SKIP` 串；48 段跑、11 段 SKIP、总 59 段，三个数都由
+`node -e "…p.scripts.check.split(' && ')…"` 从 `package.json` 现取，不靠记忆）。
+这一轮在同一个载体（`/tmp/heyta-g5` detached @ `d78f8414`，无 `server/.env`）把其中 7 段补了一遍，
+先跑 `pnpm --filter "@heyta/web..." build`（`BUILD_EXIT=0`）再量，避免拿旧 dist 读数；
+`check:native-deps` 本来在 48 段里跑过，这里复量一次：
+
+| 段 | 现量 | 用时 |
+|---|---|---|
+| `check:native-deps` | ✅ exit 0（iOS 原生依赖对账：5 个 pod 全部命中 `Podfile.lock`） | 1s |
+| `check:windows-shell` | ✅ exit 0（bridge bundle 1296525 B 生成后按平台跳过） | 5s |
+| `check:linux-shell` | ✅ exit 0（GTK4 装不到 macOS ⇒ 响亮跳过） | 0s |
+| `screenshot:verify` | ✅ exit 0（注册表 23 个目标，已生成的尺寸/alpha 全对） | 1s |
+| `check:arkts` | ✅ exit 0（真实编译器 macOS `es2abc` 过 ArkTS 产物） | 0s |
+| `check:arkts-widgets` | ✅ exit 0（`WidgetParse.ts` → 7084 B PANDA 字节码） | 1s |
+| `check:mobile-bundle` | ✅ exit 0（android/js 双端 Metro bundle，`react` 只有 1 份） | 44s |
+| `check:privacy-consent-e2e` | ✅ **7 passed / 0 failed / `INNER_EXIT=0`**（真浏览器 + PROD 构建 + :4322 自己的 preview） | 7.5s |
+
+剩下 4 段各有各的处置，都不是"没顾上"：
+
+- `check:landing-e2e` —— 实跑 **15 passed / 2 failed**（§7.10 与 B30 已记），红在 B24 那条线上，
+  ⚠️ **本条不代改**（B24 原文写着两条出路"由那条线选"）。
+- `check:ai-e2e` —— 本轮 09:5x 实测已转绿（B22 因此关闭）。**这一轮没有重跑**，理由不是负载：
+  它的 preflight 会把**自己那对端口**（4318/4319）上正在监听的进程 SIGKILL 掉
+  （`scripts/check-ai-e2e-preflight.mjs:74-88`，端口是参数、杀之前打印 pid 与进程名，traps #87），
+  而这条链的副作用会落在别人身上 —— 现场此刻有别人的 :4321 dev server（pid 13957，已 15 分钟）、
+  两台 iOS 模拟器里跑着的 Heyta（pid 44087 / 47506）与一个 13 小时的 `HeytaMac`。
+  要复量：`cd /tmp/heyta-g5 && pnpm run check:ai-e2e`（前提是先确认 4318/4319 上没人）。
+- `check:macos-shell` / `check:macos-window` —— **没有跑**，两条理由都当场可核对：
+  ① 本机此刻 `loadavg 28.45 / 40.01 / 41.76`，Swift 整包编译会挤掉别人正在跑的设备验收；
+  ② 窗口门禁靠"标题 = heyta 的主窗口"选窗（traps #81.2），而现场已经有一个
+  `HeytaMac` 实例（pid 25394）在跑 —— 同名窗口会让它比的是**别人的窗口**。
+  要复量：先确认没有别人的 `HeytaMac` 与同名窗口，再 `pnpm run check:macos-shell && pnpm run check:macos-window`。
+
+⇒ 于是 ③ 的"check 全量绿"这句现在是**逐段有读数、且每个读数写明在哪个提交上量的**：
+
+| 桶 | 段 |
+|---|---|
+| 在 `d78f8414` 的干净检出上实测 exit 0 | 上表那 **8 段** |
+| 在同一棵树上、但更早的提交上实测 | seg-lite 那 **48 段**（@ `cde861c3`，10:19–10:21：**46 段 exit 0**，两段红 = `[12] check:l4` 与 `[59] pnpm -r test`；后者已在 §7.12 修掉）、`check:ai-e2e`（09:5x 那次 113 条，B22 因此关闭） |
+| 🔴 红 | `check:l4`（B30.1 逐处 blame）与 `check:landing-e2e`（B24 的两条出路待人拍） |
+| 本轮没复量 | `check:macos-shell` / `check:macos-window`（现场归属，理由见上） |
+
+⚠️ 口径提醒（traps #158）：`d78f8414` 之后 main 仍在被别人推进，**每个读数只对量它的那个提交成立** ——
+下一轮要引用哪一段，先在同一棵树上把那一段重跑一次，别把过期的读数当现状。
+
+
+本轮补量之前，seg-lite 那 48 段的**逐段读数**（载体：干净检出 `/tmp/heyta-g5`，HEAD=`cde861c3`，10:19:15→10:21:03；跳过清单是 `/tmp/g5-seg-lite.sh:19` 的 `SKIP` 串，共 11 段。⚠️ 段名列取的是命令的**第二个词**（脚本用 awk 取第二个字段），所以 `02. --filter` 是 `pnpm --filter @heyta/landing check:entries`、`59. -r` 是 `pnpm -r test`。traps #159：`/tmp` 会被同机会话扫走，所以整份读数复制在这里，不留 `/tmp` 引用）：
+
+```
+01. build  exit=0  13s
+02. --filter  exit=0  0s
+03. typecheck  exit=0  13s
+04. check:claims  exit=0  0s
+05. check:reachability  exit=0  1s
+06. check:migrations  exit=0  0s
+07. check:token-hashing  exit=0  0s
+08. check:layering  exit=0  1s
+09. check:ui-provider  exit=0  0s
+10. check:theme  exit=0  1s
+11. check:row-single-source  exit=0  0s
+12. check:l4  exit=1  0s
+13. check:empty-state  exit=0  1s
+14. check:widgets  exit=0  1s
+16. check:adaptive-cards  exit=0  1s
+17. check:pwa  exit=0  0s
+18. check:ui-language  exit=0  1s
+19. check:docs-voice  exit=0  0s
+20. check:legal-copy  exit=0  0s
+21. check:legal-host  exit=0  0s
+22. check:licenses  exit=0  1s
+23. check:licenses:nuget  exit=0  6s
+24. check:crosslang-contract  exit=0  5s
+27. check:journey-coverage  exit=0  3s
+28. check:mobile-settings  exit=0  0s
+31. check:native-bare  exit=0  0s
+32. check:docs  exit=0  1s
+33. check:pricing  exit=0  0s
+34. check:ai-quota  exit=0  1s
+35. check:ai-tools  exit=0  0s
+36. check:payment-entry  exit=0  0s
+37. check:design  exit=0  1s
+38. check:text-color  exit=0  0s
+39. check:server-design  exit=0  0s
+40. check:server-copy  exit=0  1s
+41. check:server-legal  exit=0  0s
+42. check:tokens  exit=0  1s
+43. check:calendar  exit=0  1s
+44. check:holiday  exit=0  0s
+46. check:native-deps  exit=0  0s
+48. check:rn-aria  exit=0  1s
+49. check:materialized-reads  exit=0  0s
+50. check:ai-coverage  exit=0  0s
+54. check:shell-unicode  exit=0  1s
+55. check:web-storage  exit=0  2s
+56. check:web-migration  exit=0  8s
+57. check:script-snapshot  exit=0  0s
+59. -r  exit=1  28s
+```
+
+两段红：`[12] exit=1  0s  <check:l4>` 与 `[59] exit=1  28s  <-r>`。第 59 段（`pnpm -r test`）已在 §7.12 修掉；第 12 段（`check:l4`）见 B30 / B30.1。
+
+复现这三个数（59 / 48 / 11）而不靠记忆：
+
+```bash
+node -e "const s=require('./package.json').scripts.check.split(' && ');const K='check:ai-e2e|check:privacy-consent-e2e|check:landing-e2e|check:macos-shell|check:macos-window|check:windows-shell|check:linux-shell|check:arkts|check:arkts-widgets|screenshot:verify|check:mobile-bundle';const re=new RegExp('('+K+')');console.log('总段数='+s.length,'跑='+s.filter(x=>!re.test(x)).length,'跳过='+s.filter(x=>re.test(x)).length)"
+```
+
+### 7.14 §6.1.1 固定收尾为什么这一轮**没有重跑**（2026-10-03 10:5x，HEAD `bfcc5f2f`）
+
+`reinstall:all`（清旧包 → 重打 → 四端重装 → 每端一条"装上的是当前产物且能起来"的判据）本轮已经跑过并全绿：
+**mac 主蓝 1137 / android 4036 / ios 4136 / windows 四条取证**（`ADD_APPX=OK` `RESULT=OK` `PAYLOAD_WEBDIST=True` `M2D=OK`），
+四张截图逐张人眼看过。之后本条线又落了 5 笔：
+`c1395bf8`（1 个 spec 文件）、`a2d0d634`（2 个 spec 文件）、`d78f8414`/`bfcc5f2f`（3 份台账文档 + 1 份）、`3e5cef9b` 等更早的文档笔 ——
+**全部落在 `server/tests/**` 与 `docs/**` / `BLOCKED.md`，没有一行进 `packages/*`、`apps/*`、`server/src`**。
+所以四端产物里的 JS bundle / 原生壳字节与那次全绿重装时**同源**，重跑一遍只会重装同一份产物。
+
+⚠️ 这不构成"下次可以省"：§6.1.1 的判据是**装的字节 == 当前源码**，一旦本条线再碰 `packages/` 或 `apps/`（哪怕只改一处样式），
+就必须重跑并按 §7 第 82 条做内容对账。
+
+**下一次要重跑的前提**（现场此刻不满足，写清楚而不是默默跳过）：
+1. 主工作树里有**别人未提交的源码**（`packages/ui/src/calendar/*`、`apps/web/src/features/calendar/*`、
+   `packages/i18n/src/locales/*`、`packages/local-api/src/tools.ts`）⇒ 不能在活树跑（不变量是"无别人未提交源码"）；
+   改在隔离检出跑（`ab487d9f` / B26 那条路），
+2. 现场有**两台 iOS 模拟器里的 Heyta**（pid 44087 / 47506）与一个 13 小时的 `HeytaMac`（pid 25394）在跑，
+   `simctl uninstall` + 重打会直接落到别人的验收中途；
+3. 负载 `28.45 / 40.01 / 41.76` —— 移动段自带负载门，等不到窗口会以 `exit 3` 收尾（环境无效 ≠ 产品失败，别为挤进去调阈值）。
+
+### 7.15 ✅ B30 那两段红**当场解除**，方式是把 B30 估的闭合代价逐条量了一遍 —— 两条估计都被否证（2026-10-03 12:0x–12:1x，提交 `e446e54e` + `f79d3733` + `1ac5913a`）
+
+**为什么这一轮可以动它们**：产品负责人 2026-10-03 明确授权
+「你来想办法跳过阻塞，或者说解决阻塞。我授权你来解决阻塞。你可以从产品的角度去考虑这个问题，
+从产品的角度考虑哪一个设计更加合理，然后呢去采用这个设计。」
+B24/B30 当时"不代改"的理由是**这道决定的主语不在我**，现在主语有了。
+边界规则本身不撤（下次遇到"代价落在别人面上"的两条出路，仍然先要主语）—— 见 B24 关闭段。
+
+| 段 | B30 估的闭合代价 | 实测付出的代价 | 复量 |
+|---|---|---|---|
+| `check:landing-e2e` | 搬产物 + **同步那四处表达** + 重跑 `check:entries`（75 份入口逐字节对账会变大改动） | **一行常量 + 一次 `git mv`**（`ON_DISK_PREFIX` 由 `URL_PREFIX` 派生，四处表达早被收成一处；入口 HTML 里根本不含配图 URL ⇒ 对账**零变化**） | **17 passed / 0 failed**（改前同一棵树 15/2） |
+| `check:l4` | 12 个屏按 M3 设计口径迁移 + **12 次逐屏设备取证** | **8 处换成 `kit` 现成的 `Stack`/`HStack`**，零新 API、零视觉变化、零设备动作 | **exit 0**（90 处，恰在基线 90） |
+
+🔴 **这两条登记的价值现在反过来了**：B30 用"代价很大"论证"这一轮不做是负责任的"，
+而代价里有一半是**估的**，估的依据是文档里那张旧形状（"四处表达"），不是当前这棵树。
+"12 个屏只迁了一半的余量"这句尤其误导 —— blame 逐处的结果（B30.1 自己写的表）是
+**8 处集中在两个屏、且全是纯间距容器**，而真正需要 `ListSurface`/`TaskRow` 口径的
+`TaskDetailSheet`(26)/`TasksScreen`(15) **不在超线部分里**（基线 90 就是留给它们的）。
+⇒ 教训：**登记"要闭合得付出什么"时，代价也要带取证口径**；一条高估的代价会体面地让该做的事永远排不上。
+
+两条都做了变异（不能失败的检查没有价值）：
+
+- 配图判据：把 `URL_PREFIX` 改成坏的 `/assets/doc` ⇒ **2 failed / 15 passed / `MUT_INNER_EXIT=1`**，
+  红的正是 `docs-centre.spec.ts:959`（五张配图真的挂在指定分区上）与 `:1013`（反向对照）——
+  **与原 B24 那两处红逐字同名同号**。⚠️ 这一趟跑 7.0 分钟（正常态 1.2 分钟）：图 404 ⇒ `naturalWidth`
+  等到超时，"变慢"本身就是那两条判据在等它们唯一认的东西。变异后已还原（`cmp` 与主检出逐字节判等）。
+- 内联样式棘轮：把 `inbox-notifications-list` 那一处换回 `<View style={{ gap: tokens['space.2'] }}>` ⇒
+  **恰好 1 处超线（91 > 基线 90）、exit 1**，随后 `git checkout --` 还原并与 `HEAD` 那个 blob `cmp` 判等。
+
+#### 顺手撞见的第 3 段红（不是本条线的账，但当场修了）：`check:shell-unicode`
+
+seg-lite 在 `f79d3733` 的干净检出上报 `[55] exit=1`，而**上一轮（`cde861c3`）这一段是 exit 0**。
+红在 `scripts/mutate-closeout-gates.sh` —— `b1fcc686`（11:43，并行 closeout 那条线）新写进仓库的变异臂脚本，
+4 处 `$var` 紧跟全角括号（§7 第 64 条那一族）。⚠️ **退出码不受影响**，坏的是它打印的 PASS 证据行本身：
+`ok "L3 负载 == 阈值（$LIMIT）放行"` 会打成乱码。修 `1ac5913a`：只按门禁给的原文改成 `${var}`，
+一条判据/阈值/断言都没动。复量 `check:shell-unicode` exit 0（扫了 70 个 `.sh`）、
+`check:script-snapshot` exit 0（28 个脚本 + `.gitignore` 在位）、`bash -n` 语法 OK。
+
+#### 链本身长了一圈，所以 §7.13 的三个数作废（现量，不靠记忆）
+
+```
+总段数=61 跑=50 跳过=11
+```
+
+（§7.13 记的是 59 / 48 / 11。并行的两笔把链加长了：`check:licenses:stamp` 与
+`check:mobile-first-run-gate` —— 与 `d78f8414` 的 `package.json` 逐段做差集量出来的，不是猜的。）
+现量命令沿用 §7.13 那条 `node -e`，只需把里面的 `K` 串按名字带上。
+
+**在 `f79d3733` 的干净检出（`/tmp/heyta-g5`，`INSTALL=0`、`BUILD=0`）上跑的 50 段读数**：
+49 段 exit 0，1 段红 = `check:shell-unicode`（上面那条，`1ac5913a` 已修）。
+🔴 **`check:l4` 这一段现在是 `[12] exit=0`** —— 它在 `cde861c3` 上是这一轮唯一的老红。
+`pnpm -r test`（末段）`[61] exit=0`（53s，负载 83 下仍然过）。
+
+#### 零视觉代价的证据**只到源码层**，设备层那一条还欠着
+
+`f79d3733` 那 8 处的"不改视觉"目前的证据是**逐字对照 `kit.tsx` 的实现**：
+
+| 调用 | `kit` 实际发出的样式 | 与原写法的差 |
+|---|---|---|
+| `<Stack>` | `[{gap: t['space.2']}, undefined]` | 无（屏里那个 `tokens` 就是同一个 `useTokens()`，`NotificationsScreen.tsx:62`） |
+| `<Stack gap="loose">` | `[{gap: t['space.3']}, undefined]` | 无 |
+| `<HStack>` | `[{flexDirection:'row', gap: t['space.2']}, null, undefined]` | 无（`align` 缺省 `undefined` ⇒ 不加 `alignItems`，与裸 row 等价，`kit.tsx` 注释明写这是刻意的） |
+| `<HStack align="center">` | `[{flexDirection:'row', gap}, {alignItems:'center'}, undefined]` | 无（数组扁平化后同值，只是键序不同） |
+
+`testID` 走 `{...rest}` 透传 ⇒ 依赖 `inbox-notifications-list` / `privacy-consent-section`
+的两条判据照旧命中（`check:mobile-settings`、`check:empty-state` 各 exit 0，`@heyta/mobile`
+typecheck 0 + **544 passed / 35 files**）。
+
+⚠️ 但 §6.1.1 的固定收尾这一轮**被这批改动触发了**（碰了 `apps/*`），而现场不满足 —— 见 §7.16。
+
+### 7.16 §6.1.1 这一轮**确实被触发**了，但没有跑 —— 触发范围先量窄，剩下的缺口写成有形状的（2026-10-03 12:1x，读数取自 `1ac5913a` 之后）
+
+§7.14 那句"一旦本条线再碰 `packages/` 或 `apps/` 就必须重跑"在这一轮成立了：
+`e446e54e` 碰了 `apps/landing`，`f79d3733` 碰了 `apps/mobile/src/screens`。
+先按**包输入**把范围量窄，而不是笼统说"四端都要重装"：
+
+| 提交 | 改的路径 | 进哪个产物 | 依不依据得上重装 |
+|---|---|---|---|
+| `e446e54e` | `apps/landing/**` + 一份计划文档 | **落地页站点**（`VITE_*` 构建后部署到 nginx） | 与 `reinstall:all` 的四端**无交集**（那四端装的是 `apps/web/dist` + 各端 bundle/原生壳）；它要的是**部署**，不是重装，而部署需要单独授权 |
+| `f79d3733` | `apps/mobile/src/screens/{Notifications,Settings}Screen.tsx` | **android APK + iOS .app 的 JS bundle** | 🔴 这一笔才是真触发 —— 只有 **android / ios 两段** |
+| `1ac5913a` | `scripts/mutate-closeout-gates.sh` | 不进任何产物 | 无 |
+
+🔴 **`e446e54e` 还留着一件本条线不能替它做的事**：落地页要**重新构建并部署**，线上才会出现
+`/assets/docs/…`。**线上现量（12:22，`curl --noproxy '*'`，只读 HEAD）**：
+
+| URL | 状态 |
+|---|---|
+| `https://heyta.waytofuture.cn/assets/help/first-run/W01-tasks.png` | **200** |
+| `https://heyta.waytofuture.cn/assets/docs/first-run/W01-tasks.png` | **404** |
+
+⇒ 线上**目前是自洽的**（那个构建的 HTML 引的就是 `/assets/help/`，图也在），只是**落后一个前缀** ——
+这不是坏状态，不需要回滚。真正要防的是**半趟部署**：新 HTML 配旧产物目录（或反过来）会让
+帮助配图**整片 404**，而页面本身看起来完全正常（配图那两条判据正好是这种形状的唯一防线，
+它们在**构建产物**上跑，不在线上跑 —— 所以线上这件事只能靠"同一趟构建"这条纪律）。
+部署是发布动作，按规矩要产品负责人点头，**不在本 Goal 的授权范围内**，故登记不做。
+部署后的复验就是上面那两条 `curl`（应当反过来：`docs` 200 / `help` 404）。
+
+mac/windows 两段能不能顺带免掉？**按打包脚本吃的路径判，不是按感觉判**：
+`grep -oE "apps/[a-z-]+|packages/[a-z-]+" apps/desktop-macos/scripts/package-app.sh`
+⇒ `apps/desktop-macos`、`apps/web`、`packages/app-host` —— **不含 `apps/mobile`**。
+（windows 段仍会把整棵源码树同步到 `C:\src\heyta`，但它的 sha256 对账与包 payload 都只看
+`apps/web/dist/index.html`；移动端源码进不了那个 exe。）
+
+**现场读数（12:18，这一趟）**：
+
+| 事实 | 读数 | 挡住了哪一段 |
+|---|---|---|
+| `sysctl -n vm.loadavg` | `498.52 / 632.62 / 390.04` | 全部（gradle / xcodebuild 这个量级只会把别人的读数挤坏） |
+| `adb devices` | `emulator-5554 device`，qemu pid **25285** = `-avd heyta-w3-yearly` | android 段 —— 这台 AVD 是**并行会话在用的设备**，`reinstall` 会 `pm clear`/卸装它 |
+| `ps -p 25394` | `/Applications/Heyta.app/.../HeytaMac` 已跑 **15:17:44** | mac 段 —— 判据是"装进 `/Applications` 后启动自截屏"，而别人那个实例正从同一个包在跑 |
+| 提交推进 | main 已从 `1ac5913a` 走到 `be8bebfb`（并行 `docs(gate)`） | 任何一趟重装量的都不是"我这一批定稿"，得再跑一趟 |
+
+⚠️ 一条**读数不一致**要写出来，不要藏：同一分钟里 `xcrun simctl list devices booted` 读到 **0 台**，
+而 15 分钟前那趟读到 3 台（`heyta-iphone-17pro` / `iPhone Duo heyta` / `SSOS-Duo-Fresh`）。
+要么别人刚关完，要么那次 `simctl` 调用本身没成功 —— **两种都可能**，所以 ios 段之前要连跑两遍确认，
+别拿单趟读数当现状（§7 元规则 1：先怀疑探针）。
+
+⇒ **本节写于 12:1x，当时的结论是"本轮未跑"。这个结论已被 13:5x 那一轮推翻**：
+android 段跑绿（并且顺带照出一处假绿，见 §7.19），ios 段被 `pod install` 挡住 ——
+**缺口从"两段没跑"变成"一段跑绿、一段有形状的阻塞"**。窗口条件与现量命令仍然有效，留在下面。
+
+> ⚠️ 负载门在这一轮**已经被并行会话抽成单一所有者** `scripts/lib/wait-for-quiet-host.sh`
+> （`1d085a92`，11:34「负载门抽成单一所有者，并给 `verify-mobile-repeat` 补上它」）。
+> 所以"移动段自带负载门"这句现在指向那个 lib，而不是各脚本里各写一份 ——
+> 引用阈值/等待秒数之前先 `git log -1 -- scripts/lib/wait-for-quiet-host.sh`，
+> 别拿本文件 12:1x 那段抄进去的数字当现状（这正是 §7.18 第 1 条说的"拿旧形状当现状"）。
+
+```bash
+sysctl -n vm.loadavg                       # 要 < 12（移动段自带负载门，等不到会 exit 3）
+adb devices; pgrep -fl qemu-system         # 不能是别人在用的 AVD
+xcrun simctl list devices booted           # 连跑两遍读数一致才可用
+git -C <repo> status --porcelain apps packages server/src   # 必须为空（无别人未提交源码）
+# 然后在隔离检出里（不变量：主工作树有别人未提交源码时不能在活树跑）：
+git fetch <repo> main && git reset --hard <本批定稿 sha> && pnpm install --prefer-offline
+pnpm reinstall:mobile                      # 只欠 android + ios 两段
+```
+
+装完必须补的那条**产物字面量对账**（§7 第 178 条：四端判据回答"装上了、起得来、画的是我们的界面"，
+不回答"装的是不是这一批"）：这一批**没有新增 ASCII 字面量**（换的是容器、值没变），
+所以对账 needle 取 `Stack`/`HStack` 编译后进 bundle 的形状做不到 ⇒
+用**改前/改后同一屏主蓝命中数相等**当零视觉代价的判据（`scripts/lib/png-stats`），
+并把两枚 APK 的 md5 列出来（改动前后应当**不同**，相同就说明装的还是旧的）。
+
+### 7.17 🔴 **`pnpm check` 全量绿第一次在一整条链上成立**：61 段、干净检出、`exit 0`（2026-10-03 12:29–12:37，`1ac5913a`）
+
+从 §7.2 起这一条一直被记成"不可达"（4 道红 → 3 → 2）。这一轮不是靠放宽任何判据达成的，
+而是**三段红各自当场修掉**（`check:l4`、`check:landing-e2e`、`check:shell-unicode`，见 §7.15 与 B30.3），
+然后把**整条链一次跑完**：
+
+```
+载体：隔离/干净检出 /tmp/heyta-g5（detached @ 1ac5913a，无 server/.env = CI 的唯一形态，§7 第 157 条）
+命令：pnpm check            起 12:29:0x → 止 12:37:3x，负载 13.5
+结果：FULL_CHECK_INNER_EXIT=0        ← 写在日志里的真退出码，不是包装命令的（§7 第 164 条）
+段数：61（`pnpm -r build` 起头，`pnpm -r test` 收尾）
+```
+
+末段 `pnpm -r test` 的逐包读数（同一趟）：
+
+| 包 | 读数 |
+|---|---|
+| `server` | **111 files / 2095 passed / 1 skipped** |
+| `apps/web` | 110 files / 1500 passed / 12 skipped |
+| `packages/app-host` | 47 / 974 |
+| `apps/mobile` | 34 / **538** |
+| `apps/node-host` | 9 / 165 |
+| `apps/desktop` | 2 / 12 |
+
+几条**以前红过**的段在这一趟的具体读数：`check:l4` 90 ≤ 基线 90、`check:landing-e2e` 17 passed、
+`check:shell-unicode` 扫 70 个 `.sh` 全过、`check:ai-e2e` 113 passed / 2 skipped、
+`check:privacy-consent-e2e` 7 passed、`check:macos-shell` 冒烟全过（"跨语言那一层 + 落盘 全部通过"）、
+`check:macos-window` **真跑了**（`CAPTURE_METHOD=screencapturekit`、`CROSSCHECK=ok(2240x1440)`、
+`contentOnModalRatio 0.309`、M2-macOS 三条断言全过），且证据文件给出
+**`STORAGE=shell`**（产品路径，不是页侧兜底 —— 这一行才是这条门禁的成败判据，
+见 `apps/desktop-macos/evidence/storage-host/README.md` 那四格矩阵）。
+🔴 那张窗口截图我**打开看过**（§6.2 规定一）：macOS 原生壳里的真应用 —— 蓝白 rail + 收集箱 +
+首启「在使用联网功能之前」同意面板（同意并联网 / 只用本机）+ 中文/English 切换 + 未同步指示，
+不是错误屏。
+
+⚠️ **两条边界，别让这句"全量绿"读多**：
+
+1. 它证明的是**提交态 `1ac5913a` 在干净检出上全绿**。`1ac5913a` 之后 main 又推进了两笔
+   （`be8bebfb`、`661cff78`，都是文档笔），所以"当前 main 全绿"这句要下一轮重量才成立。
+2. `check:macos-window` 的四条**跳过分支仍返回 exit 0**（非 darwin / 无 swift / 取证脚本 exit 4 /
+   非 Aqua 会话）—— 那是登记在案、**尚未拍**的一条（"全绿而这条从未执行"的可能性还在）。
+   本轮的"真跑了"是靠 `STORAGE=shell` 那一行**单独证明**的，不是靠 exit 0。
+3. 这一趟 `check:web-storage` 过的**前提是 :4321 空着**（它自己 spawn `vite --port 4321 --strictPort`）。
+   这条段的历史红就是被别人占着端口造成的，所以它的绿**依赖现场**，不是无条件属性。
+
+### 7.18 🔴 本条线这一轮学到的三条，写成**待入 traps** 的候选 —— 不直接往 `environment-traps.md` 追加
+
+`docs/reference/environment-traps.md` 此刻正被并行会话写着（工作树里 +48 行未提交，#178–#180 是他们的）。
+按本仓的规矩（多人台账正脏着的时候不追加，改投单写者文档并登记"待入"），三条先落在这里：
+
+1. **登记"要闭合得付出什么"时，代价本身也要带取证口径。**
+   B30 给两段红各写了一条代价（"同步四处表达 + 75 份入口逐字节对账" / "12 个屏按设计口径迁移 +
+   12 次逐屏设备取证"），据此判定"这一轮不付是负责任的"。实测：一行常量 + 一次 `git mv`，
+   以及 8 处换成现成共享件。🔴 **一条高估的代价会体面地让该做的事永远排不上** ——
+   它读起来像谨慎，实际是拿旧形状当现状。现量方法：估代价之前先 `grep` 那个改动的
+   **真实消费者集合**（本例：`ON_DISK_PREFIX` 由 `URL_PREFIX` 派生 ⇒ "四处"早是一处），
+   而不是照文档里那句"有四处表达"报数。
+2. **`$var` 紧跟非 ASCII 的第五种面目：坏的不是值，是那条 PASS 证据行，而退出码照常是 0。**
+   §7 第 64 条那一族此前被记成"变量名被吞 ⇒ 值丢了"。`scripts/mutate-closeout-gates.sh`
+   （`b1fcc686`）里那 4 处让**变异臂脚本自己打印的 PASS 文案**变成乱码，
+   而 `RC=0`、判据全跑 —— 也就是说这套证据"看起来齐了"，只有落到人手里的那行字是坏的。
+   现量：`node scripts/check-shell-unicode-vars.mjs`（扫 70 个 `.sh`）。
+   一般规律：**判据的读数才是交付物，退出码不是**。
+3. **设备类现量必须连跑两遍读数一致才算。**
+   同一分钟里 `xcrun simctl list devices booted` 先读到 3 台、后读到 0 台（而 15 分钟前是 3 台）。
+   两种解释都可能（别人刚关完 / 那次调用本身没成功），单趟无法区分 —— 这正是元规则 1
+   （"没观测到 X" ≠ "X 没发生"）在设备清单上的落点。重装与设备验收之前，
+   `adb devices` 与 `simctl list devices booted` 各连跑两遍，不一致就当读数无效重取。
+   ⚠️ 本条这一轮**自己撞上了**：12:18 读到 `emulator-5554` 在，12:39 同一台 AVD 起来时编号变成
+   `emulator-5556` —— 照旧值传 `HEYTA_E2E_SERIAL` 会让 android 段"不可达"而红。
+   **设备序列号是每次现取的，不是常量。**
+
+### 7.19 🔴 §6.1.1 重装：android 跑绿，而**它第一次的绿是假的**——判据把一张桌面启动器判成"是共享 UI"（13:5x，提交 `57e0e1fc`）
+
+跑 `reinstall-all.sh --only android,ios`（隔离检出，`1ac5913a`）：
+
+| 端 | 第一趟（12:39–12:42） | 修判据后（13:50–13:51，`57e0e1fc`） |
+|---|---|---|
+| android | ✅ 打印"内容占比 92.0%、主蓝命中 29、是共享 UI" —— **但截图人打开看是桌面启动器**（`android-launcher-false-green-57e0e1fc.png`：状态栏 12:42、"Sat, Oct 3"、五个系统图标 + Google 条） | ✅ **`前台窗口确认：mCurrentFocus=Window{… com.heyta/com.heytamobile.MainActivity}`**、窗口 1080x2400、内容占比 58.3%、**主蓝命中 4001**、`ANDROID_REINSTALL_EXIT=0`；截图 `android-reinstall-57e0e1fc.png` 已人眼看：真中文首启同意面板（同意并联网=主蓝实心、只用本机=描边） |
+| ios | 🔴 `pod install` 崩（见下） | 未重跑（同一枚阻塞） |
+
+**这条假绿为什么比 §7 第 82 条更贵**：那一条补的"主蓝命中"判据，在**启动器上也会命中 29 次** ——
+Chrome 图标、信息气泡、Google 搜索栏本来就是蓝的。也就是说
+**"非空白 + 有品牌色"两条合起来仍然回答不了"这是不是我们的界面"**。
+而"谁拥有前台窗口"这件事有一个比像素统计**便宜得多也直接得多**的读数（`dumpsys window | grep mCurrentFocus`），
+判据却一直只在数像素。修法已提交（`57e0e1fc`）：截图前读 `mCurrentFocus` + `mResumedActivity` 两条
+（互为对照，不同 Android 版本给的字段不一样），不是 `com.heyta` 就 `am start -W` 显式拉起再读一次，
+仍然不是 ⇒ **不打分**；两条探针都读空 ⇒ **也不打分**（静默跳过等于这条判据是装饰）。
+
+⚠️ **产品侧结论：App 是好的**。假绿那一趟里 `adb shell pidof com.heyta` = 3766、crash buffer 空，
+补一次 `am start -W` 后焦点立刻变成我们的 Activity。红的是探针，不是产品 —— 这一句必须写下来，
+否则下一位看到"launcher 截图"会以为装出来的包起不来。
+
+ 顺带一条对 §7.15 的**补强**：修后那一趟主蓝 **4001**，与上一轮全绿重装的 **4036** 同一量级（差 0.9%）
+⇒ 本批那 8 处容器替换在设备层没有可见代价。⚠️ 但**这不构成严格 A/B**（两趟之间并行批次也往同一屏加了东西，
+比如"倒计时"档位），严格的零视觉证明仍是 §7.15 那张"调用 → `kit` 实际发出的样式"逐字对照表。
+
+**ios 段的阻塞（`pod install`，本轮新增取证）**：
+
+| 臂 | 结果 |
+|---|---|
+| 长活隔离检出 `/tmp/heyta-g5` | 🔴 `ArgumentError - path name contains null byte`，`cocoapods-1.17.0/lib/cocoapods/project.rb:452` `Pathname#realdirpath`，崩在 `Generating Pods project`（5 个 codegen spec 全部生成完、全部 pod 装完之后） |
+| 🔴 **traps #154 给的 remedy：同 commit 现开新克隆**（`git clone --no-hardlinks` + `pnpm install` @ `1ac5913a`） | **仍然崩，同一处栈** ⇒ **那条 remedy 已被本轮实测否证**（它当时量到的是"新克隆两次都 exit 0"） |
+| `LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8 pod install` | 🔴 仍然 exit 1，同一处 ⇒ 语言环境变量**不是**变量 |
+| `pod install --verbose` | 🔴 同一处栈；崩溃前的文件清单里没有非 ASCII 路径 |
+| 工具链漂移 | 排除：`/opt/homebrew/Cellar/cocoapods/` 只有 `1.17.0`，目录 mtime **Sep 25 22:21**（不是今天），ruby 4.0.7 |
+| `Podfile.lock` 自上一趟绿（`840effb1`）以来的差 | 只有 **一行**：`ReactCodegen` 的哈希（codegen 产物哈希，随任意原生模块变）⇒ 没有新增 pod |
+| 变更集里的非 ASCII 文件名 | `git diff --name-only 840effb1..1ac5913a` 共 250 个路径，`LC_ALL=C grep '[^ -~]'` **0 命中** |
+
+⇒ 现状：**四臂排除（树龄 / LANG / 工具链 / 文件名），根因未定位**，与 #154 当年一样卡在
+"要扫 `node_modules` 里 1.9 GB 的文件名才能知道哪个路径让 Ruby 拿到 NUL"。
+**这不是本条线能当场修的**，且它挡住的是"把当前源码装进 iOS 设备"这一步，不是产品行为。
+需要的是：一台 `pod install` 能过的机器（或换 ruby 3.x 下的 cocoapods），或上游修
+（CocoaPods #12798 / #12866，两条都还 open）。
+🔴 **`environment-traps.md` #154 那句"现开新克隆就能过"必须更正** —— 本轮实测否证，
+而它现在读起来像解法。这条更正**没有直接写进那个文件**，因为它此刻正被并行会话写着
+（工作树 +48 行未提交，#178–#180 是他们的），按同一份台账的规矩（多人台账正脏着时不追加、
+不整文件 `git add`）登记在这里 + 下面 §7.20 的动作项。
+
+### 7.20 Goal 终局审计（2026-10-03 13:5x）：① ② 全绿，③ 的 `check` 达成、重装差一段
+
+| objective 里的条款 | 状态 | 读数与出处 |
+|---|---|---|
+| ① 批五③ 移动端还原卡 JSX + i18n 中英复验 | ✅ | `git show HEAD:apps/mobile/src/screens/ExportScreen.tsx` 里 `restoreFromBackup`/`parseExportDocument`/`restoreIntoEmptyTarget` 三个符号**共 5 处命中**；`check:ui-language` exit 0；中英词条对等由 `@heyta/i18n` 的用例钉着（本轮 `pnpm -r test` 全过） |
+| ② 批五④ 设备判据转绿 + 变异 + 截图人看 + 审计回填 | ✅ | §7.6（26 项 / 0 失败）、§7.9（两条变异臂在当前产物上重证）、§7.12–§7.13（链逐段读数） |
+| ③ `pnpm check` 全量绿 | ✅ **达成** | §7.17：干净检出 @ `1ac5913a`，61 段一次跑完，`FULL_CHECK_INNER_EXIT=0`。**没有放宽任何基线、没有改别人的判据**；三段红（l4 / landing-e2e / shell-unicode）各自当场修<br>✅ **14:32 在收尾后的 HEAD 上重证**：同一把尺子 @ `a04753b6` 仍 `FULL_CHECK_INNER_EXIT=0`，见 §7.23 |
+| ③ `pnpm reinstall:all` 四端重装绿 | ⚠️ **差一段** | android ✅（`57e0e1fc`，含新加的前台窗口判据）；mac / windows ✅ 但**是 09:5x 那一趟的读数**，本批按包输入证明它们不受影响（`package-app.sh` 只吃 `apps/web`+`packages/app-host`）；**ios 🔴 被 `pod install` 挡住**（§7.19 那张表）<br>✅ **14:2x 已关闭**：四端在**同一载体 `940af1c0`** 上逐段跑绿，见 §7.21 + §7.22（本行原句留着，因为它记录的"当时差 ios 一段"确实成立过） |
+| ③ 按归属纪律提交 | ✅ | 本条线这一轮 7 笔：`e446e54e` `f79d3733` `1ac5913a` `661cff78` `860fe82a` `57e0e1fc` + 本笔。全部 `git commit --only <点名路径>`，每笔之后 `git show --name-status` 只含自己点名的路径（`e446e54e` 13 条、`f79d3733` 2 条、`1ac5913a` 1 条、`661cff78` 2 条、`860fe82a` 1 条）。暂存区在提交前实测 `git diff --cached --name-only \| wc -l` = **10**，全是我自己那 10 条 rename，**没有别人的暂存条目被带走** |
+
+**没做的，逐条列名 + 现量命令**（不写成"以后再说"）：
+
+1. ~~**ios 段重装** —— 阻塞在 `pod install`（§7.19）。要跑：换一台 `pod install` 能过的机器后
+   `IOS_DEVICE_NAME="heyta-iphone-17pro" bash scripts/reinstall-all.sh --only ios`。
+   在此之前，"iOS 装的是当前源码"这句**不成立**，别引用 09:5x 那趟的 iOS 读数代替它。~~
+   ✅ **14:1x 已做掉**（同一条命令，载体 `940af1c0`，`INNER_EXIT=0`）—— 见 §7.21 / §7.22。
+   划线留着是因为它当时是对的，而且它下面那句"别引用旧读数"现在仍然适用于**任何**没重跑的端。
+2. **落地页重新部署** —— `e446e54e` 改了用户可见 URL 前缀，线上现量 `assets/help` 200 / `assets/docs` 404
+   （§7.16）。发布要产品负责人点头。
+3. ~~**traps #154 的 remedy 更正** —— 本轮否证（新克隆同样崩）。~~
+   ⚠️ **更正的内容变了**（§7.21）：不是"remedy 错了"，而是"这条崩溃是间歇的，
+   #154 的解法与本轮对它的否证各是一个时间窗的读数，两句都不该往下传"。
+   写回原文件的动作照旧挂在 `environment-traps.md` 干净的时候做
+   （现量：`git diff --numstat docs/reference/environment-traps.md`；14:2x 实测仍是 `48 0`）。
+4. **`check:macos-window` 四条跳过分支仍返回 exit 0** —— 登记在案、**尚未拍**的老缺口，本轮没动它。
+5. **M3 的 41 处内联样式** —— 现在住在基线 90 里，B18 **没有解除**，只是不再表现为红。
+
+### 7.21 🔴 B31 当场解除：`pod install` 在**同一棵树、同一 commit** 上现在 exit 0 —— 于是 #154 的 remedy 与本轮对它的否证**都不成立**（14:0x–14:1x，载体 `940af1c0`）
+
+§7.19 那张表把 ios 段判成"四臂排除、根因未定位"。这一轮接着查，**它自己好了**：
+
+| 时刻 | 臂 | 结果 |
+|---|---|---|
+| 06:45 | `/tmp/heyta-g5` @ `840effb1`（**就是 traps #154 本体**），含 `rm -rf Pods` 后重装 | 🔴 同一处栈 ⇒ #154 当场排除过"沙盒残留" |
+| 12:5x | `/tmp/heyta-ri-ios` @ `1ac5913a`，`LANG=en_US.UTF-8`（脚本原样） | 🔴 `ArgumentError - path name contains null byte` @ `project.rb:452` |
+| 13:5x | 同 commit 现开新克隆（否证 #154 的 remedy） | 🔴 同一处栈 |
+| 14:0x | **同一棵 ri-ios** `rm -rf Pods` + `LANG=en_US.UTF-8`（不带 `LC_ALL`） | ✅ **exit 0**，`Pod installation complete! 84 dependencies / 83 pods` |
+| 14:0x | 同一棵树 + `LANG` 与 `LC_ALL` 都设 | ✅ exit 0 |
+| 14:0x | **`/tmp/heyta-g5`（#154 当年那棵长活的树）** @ `57e0e1fc`，沙盒与 lock 不一致 ⇒ 真走 `Generating Pods project` | ✅ exit 0，日志第 167 行就是当年崩的那一行 |
+
+⇒ **变量没有被定位，但"这台机器跑不出 iOS"这句被推翻了。** 三条当时能想到的解释各自有反证：
+不是 locale（两臂都过）、不是树龄（**同一棵树先崩后过**：g5 06:45 崩 / 14:0x 过，
+ri-ios 12:5x 崩 / 14:0x 过）、**不是 CocoaPods 缓存被修好**
+（`~/Library/Caches/CocoaPods` 顶层 mtime = **10-02 00:43**，崩溃趟与成功趟之间**零修改**）。
+我这一轮为定位它加的探针臂（`prepend` 一个 `Pathname#realdirpath` 包装、把 receiver 的字节打出来）
+**没有抓到 NUL —— 因为跑不到崩了**，它只留下两条一般事实（见下）。
+
+🔴 **所以这条的形状是"间歇"，不是"还有臂没试对"**：同一条件先红后绿，那么 #154 的 remedy
+（"换棵新树，5 秒，没理由在旧树上重试"）和本轮对它的那条否证（"新克隆也崩"）**只是两个时间窗里
+各采到一次的相反读数**，两句都不该再被当成解法往下传；也别给它建失败率模型 ——
+没有一段稳定复现的样本，`p` 无从谈起。（这正是"间歇性缺陷的 p 只属于采样那段窗口"那个老坑的第三次命中。）
+可用的只有一件事：**跑不通就重跑一次再判**，而判据本身一条没动。
+
+**顺带量到的两条，值得单独入 traps**：
+
+1. 🔴 **`LANG` 与 `LC_ALL` 都为空时，`pod install` 一步都走不出去**，死在
+   `Pod::Config#installation_root` 的 `String#unicode_normalize`
+   （`Unicode Normalization not appropriate for ASCII-8BIT`），而外层栈顶是
+   `verify_podfile_exists!` —— **读起来像"找不到 Podfile"**。本机 agent 的 shell 里
+   `LANG`/`LC_ALL` 实测**都是空的**，所以 `reinstall-all.sh` pod 步骤那句
+   `env ... LANG=en_US.UTF-8` 是**承重的**，不是装饰，别删。
+2. **Ruby 4.0 的 `Pathname.new` 自己就拦 NUL 与非 ASCII-compatible 编码**
+   （`Pathname.new("/tmp\0x")` ⇒ `ArgumentError: path name contains null byte`；
+   UTF-16/UTF-32 ⇒ `Encoding::CompatibilityError: path name must be ASCII-compatible`）。
+   ⇒ 所以"`path name contains null byte`"**不是**"仓库里有个带 NUL 的文件名"——
+   那种路径根本构造不出来。#154 与本轮都往"扫 1.9 GB 文件名"那个方向走过，**方向是错的**。
+
+**iOS 段这一趟的读数**（`IOS_DEVICE_NAME="heyta-iphone-17pro" bash scripts/reinstall-all.sh --only ios`，
+在隔离检出 `/tmp/heyta-g5` @ `940af1c0` 跑；`940af1c0` 与上一趟载体 `1ac5913a` 之间
+`packages/`、`apps/mobile/src` **零源码改动**，实测 `git log --name-only` 只列出文档与两张 png）：
+
+```
+模拟器 FE195661-B021-4A71-AAD1-1F2F7AE3A102 · 沙盒已同步（Manifest.lock == Podfile.lock）
+** BUILD SUCCEEDED ** · ✅ 已安装进模拟器（全新安装）
+✅ 已装的包比源码新 —— 这一轮装的是当前产物
+窗口 1206x2622 · 内容占比 61.5% · 主蓝命中 4136   INNER_EXIT=0
+进程佐证：simctl spawn … launchctl list → `UIKitApplication:com.heyta[fb92]` pid 22330
+```
+
+证据 `apps/mobile/evidence/ios-reinstall-940af1c0.png` —— **人已看**：iOS 上的是**联网同意弹窗**
+（标题"在使用联网功能之前"、主蓝按钮"同意并联网"、`服务条款`/`隐私政策` 两个蓝链接），
+与 android 那张同一状态，正是全新安装应有的第一屏。
+
+⚠️ **两条边界，不要读多**：
+
+1. **ios 段没有 android 那条前台窗口判据**（`57e0e1fc` 只加在 android 段）。这一趟的
+   `launchctl list` 是我**事后**补的独立佐证，不在流程里。缺口登记，不冒充已做。
+2. **`pod install` 会改三个已跟踪文件**：两个 `Info.plist` 被重写（**吃掉了里面的 XML 注释**，
+   含"只使用标准加密算法…出口合规"那条，并加进 `RCTNewArchEnabled`）、
+   `Podfile.lock` 的 `hermes-engine` 哈希差 1 行。在共享工作树里**别顺手提交它们**；
+   脚本对 lock 只打 ⚠️ 不判红（提交态可复现性由 `check:native-deps` 管）。
+
+### 7.22 ✅ §6.1.1 固定收尾：四端在**同一个载体 `940af1c0`** 上全部重装跑绿（14:1x–14:2x）
+
+上面 §7.20 那行"差一段"到此关闭。四段分别用 `--only <端>` 在隔离检出 `/tmp/heyta-g5`
+（`git checkout 940af1c0`，`git status --porcelain` 实测**空**）跑，每段 `INNER_EXIT=0`：
+
+| 端 | 判据读数 | 证据 |
+|---|---|---|
+| mac | 窗口 1092x723 · webview 内容占比 **73.0%** · 主蓝命中 **1269** · `HEYTA_NO_FOCUS=1` 后台起 | `apps/desktop-macos/evidence/mac-reinstall-webview-940af1c0.png` |
+| windows | 远端新鲜度对账（`web-dist/index.html=ca473eb5…` + bridge + **7 枚 assets 一致**）· `ADD_APPX=OK` `RESULT=OK` `PAYLOAD_WEBDIST=T` `M2D=OK` | `apps/desktop-windows/evidence/windows-reinstall-first-run-940af1c0.png` |
+| android | release APK 64M 重打 · 全新安装 · ⚠️ monkey 后前台不是 `com.heyta` → `am start -W` 拉起 → **前台窗口确认** `mCurrentFocus=…com.heyta/com.heytamobile.MainActivity` · 1080x2400 · 内容 58.5% · 主蓝 **4001** | `apps/mobile/evidence/android-reinstall-940af1c0.png` |
+| ios | 沙盒同步 → `** BUILD SUCCEEDED **` → 全新安装 → **新鲜度**（已装包比源码新）· 1206x2622 · 内容 61.5% · 主蓝 **4136** · 事后独立佐证 `launchctl list` 里 `UIKitApplication:com.heyta[fb92]` pid 22330 | `apps/mobile/evidence/ios-reinstall-940af1c0.png` |
+
+**四张图都人眼看过**（§6.2 规定一）：三端是**联网同意弹窗**（mac 那张还能看到 rail 的
+收集箱/今天/最近 7 天/已完成/四象限/清单/标签 + 铃铛 + 帮助、`AI 工具调用` 行、中/EN 切换），
+windows 那张还额外开着**头像菜单**（`登录 / 注册` 在第一项 + `设置`）—— 正是 `M2D` 那条判据要看的东西。
+
+ **android 那一行的 ⚠️ 是 `57e0e1fc` 那条新判据第一次在真事件上生效**：上一轮它把一张
+桌面启动器判成绿（§7.19），这一轮它先报"monkey 之后前台不是 com.heyta"、显式拉起、确认前台，
+**才**打分。判据没动过一条，跑法也没变 —— 这是它该有的样子。
+
+⚠️ **载体与主分支的关系**（别读成"装的是 `940af1c0` 之后的东西"）：跑完之后 main 又走了两笔
+（`a371a658` `9f1cc9c3`），`git diff --name-only 940af1c0..HEAD` 实测只有
+`scripts/lib/mobile-e2e.sh`、`scripts/mutate-closeout-gates.sh`、`scripts/verify-mobile-repeat.sh`
+三行，`apps/` 与 `packages/` 命中 **0** ⇒ 四端产物输入未变。
+
+### 7.23 ✅ `pnpm check` 全量绿**在收尾之后的 HEAD 上重证了一次**（14:23–14:32，`a04753b6`）
+
+§7.17 那条绿是 `1ac5913a` 的读数，而它之后 main 又走了 6 笔（本条线 3 笔 + 并行 3 笔）。
+把整条链在**干净检出** `/tmp/heyta-g5` @ `a04753b6` 上重跑一遍：
+
+```
+命令：pnpm check（14:23:5x 起 → 14:32:0x 止）
+结果：FULL_CHECK_INNER_EXIT=0        ← 写在日志里的真退出码，不是包装命令的
+逐包：server 2095 passed | 1 skipped · web 1500 | 12 skipped · app-host 1303 ·
+      mobile 538 · node-host 165 · desktop 12 · 其余 packages 全 passed，零 failed
+```
+
+🔴 **顺带量到一条"只在混合工作树成立"的红，别误接**：同一时刻在主检出跑 `pnpm check:docs` 是 **exit 1**，
+7 处"本机有、仓库里没有"的死链全部指向并行会话**未跟踪**的文档
+（`adr/0046-*`、`plans/trash-and-archive.md`、`research/trash-and-archive-*`、
+`plans/calendar-year-time-*`、`apps/web/evidence/calendar-day/`）。
+逐条核过归属：引用它们的 `docs/README.md` 等三份**自己就还是 `M`（未提交）**，
+而 `git show HEAD:docs/README.md | grep -c "0046-lossless"` = **0** ⇒ **HEAD 不红**，
+干净检出同一把尺子 `exit 0`（上面那条链里就含这一道）。**不代改、不 `git add` 别人的文档。**
+
+### 7.24 ✅ 任务 1 判据登记补齐（2026-10-03 16:0x，提交 `c506953b` + `76cbee51`）
+
+任务 1 那四件（6 个别名 / 2 个进 MANIFEST + 补 bootstrap + 改掉过期理由 / mobile 旅程册 2→25 /
+`verify-mobile-lists.sh:377` 的服务端计数判据）落地过程与读数是 **PROGRESS.md「任务 1 判据登记补齐」** 那一节，
+这里只记三条会影响后面批次的事实：
+
+1. 🔴 **任务书那条反向验证的前提不成立**：`check:script-snapshot` 从不扫磁盘，所以"从 MANIFEST 删一条"
+   反而**全绿**（exit 0）—— 真正会红的是"清单里的文件没有 bootstrap"。两次变异读数见 B36.1。
+   含义给后面批次：**这条门禁不会替我发现"新写的 `verify-mobile-notes.sh` 忘了登记"**，
+   所以任务 2 交付时必须手工跑那两条对账命令（`no_alias=0` / `no_manifest=0`），不能只看门禁绿。
+2. 🔴 **`pnpm check` 的段数是工作树的读数，不是仓库的属性**：HEAD（`76cbee51`）上是 **61** 段，
+   第 62 段 `check:op-log-semantics` 是并发会话**未提交**的改动（他们那条线自己带一个未跟踪脚本
+   `scripts/mutate-op-log-semantics.mjs`）。任务 0 量的 62 与此一致，但**完成条件里"62 段 exit 0"
+   这个说法要按载体写明**：本条线交付的 HEAD 上是 61 段。
+3. ⚠️ **HEAD 上 `check:shell-unicode` 是红的**（3 处在 `scripts/mutate-closeout-gates.sh`，`cc974fbd` 提交），
+   地界外不代改，登记在 B36.2 ⇒ "check 全量 exit 0"这一条在完成条件 2 上目前**不可能由本条线单独达成**。
+
+顺带一条本仓纪律级的事故（写在 B37，因为它会重演）：为了让 `package.json` 那 6 行**只带我的 hunk** 进提交，
+我按"备份工作树 → 临时写成 HEAD+我的行 → `commit --only` → 还原备份"三步走，而**备份那条 `cp` 因为同一行里
+`sh -c` 的引号解析失败根本没执行**，于是第二次尝试直接把并发会话那 2 行未提交改动覆盖了。
+已按其提交前的 `git diff` 原文逐字重建并放回（`git diff --numstat` 回到 `2/1`、两行内容与覆盖前一致）。
+教训不是"别 temp-swap"，而是**temp-swap 前必须验证备份存在**（`test -f 备份 || exit 1` 放进同一条链里），
+以及**长命令链里前面那半句也可能整行没跑** —— 不能假设"&& 左边的副作用已经发生"。
