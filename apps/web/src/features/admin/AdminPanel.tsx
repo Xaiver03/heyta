@@ -706,7 +706,10 @@ function HolidayPanel(props: { store: AdminStoreState }): React.JSX.Element {
                       `isHttpPaperUrl` 的注释：`z.string().url()` 放行 `javascript:`）。
                       所以这三条同时是判据与防线：链接本身、它的文字、以及
                       `rel` 防止被打开的站点反向拿到后台这一页的 window。 */}
-                  <span className="ht-settings__admin-badges" data-testid="admin-holiday-papers">
+                  <span
+                    className="ht-settings__admin-badges ht-settings__admin-badges--papers"
+                    data-testid="admin-holiday-papers"
+                  >
                     {year.papers.map((paper) => (
                       <a
                         key={paper}
