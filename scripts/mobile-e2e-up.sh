@@ -108,6 +108,32 @@ certify_server_occupant() {
   if [ "$stale" != "0" ]; then
     bad="它的 dist 比自己的源码旧（${stale} 个 .ts 更新）"
   fi
+  # 🔴 只比产物是不够的：进程可以在 dist 重建**之前**就起来了，于是"dist 不比源码旧"照样成立，
+  # 而那个进程跑的仍然是重建前的代码（实测 :3000 那枚 —— 进程 01:26 起、dist 02:59 编）。
+  # 所以还要证第三件事：**进程比它自己的 dist 新**，即它是那份产物起来的。
+  local et dist_s start_s d h m rest s
+  et="$(ps -o etime= -p "$pid" 2>/dev/null | tr -d ' ')"
+  dist_s="$(stat -f '%m' "$srv_root/server/dist/src/index.js" 2>/dev/null)"
+  case "$et" in
+    *-*) d="${et%%-*}"; et="${et#*-}" ;;
+    *) d="" ;;
+  esac
+  case "$et" in
+    *:*:*) h="${et%%:*}"; rest="${et#*:}"; m="${rest%%:*}"; rest="${rest#*:}" ;;
+    *::*)  h="0";  rest="${et#*::}"; m="${rest%%:*}"; rest="${rest#*:}" ;;
+    *)     h="0";  m="${et%%:*}";     rest="${et#*:}" ;;
+  esac
+  # 秒位可能带百分号（macOS 在 <1s 时打 `0:05.31`），取整数部分。
+  s="${rest%%[!0-9]*}"
+  if [ -z "$et" ] || [ -z "$dist_s" ]; then
+    bad="${bad:+${bad}；}读不到进程运行时长或 dist 的 mtime —— 无法证明那个进程是这份产物起来的"
+  else
+    # `10#` 是刻意的：`08`/`09` 直接进算术会被当八进制报错，而 `${h#0}` 在 h=0 时把值掏空。
+    start_s=$(( $(date +%s) - 10#${d:-0} * 86400 - 10#${h:-0} * 3600 - 10#${m:-0} * 60 - 10#${s:-0} ))
+    if [ "$start_s" -lt "$dist_s" ]; then
+      bad="${bad:+${bad}；}那个进程比它自己的 dist 旧（进程比那次构建早 $(( (dist_s - start_s) / 60 )) 分钟）"
+    fi
+  fi
   srv_sha="$(git -C "$srv_root" rev-parse HEAD 2>/dev/null)"
   root_sha="$(git -C "$ROOT" rev-parse HEAD 2>/dev/null)"
   if [ -n "$root_sha" ] && [ "$srv_sha" != "$root_sha" ]; then
