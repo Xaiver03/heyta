@@ -46,6 +46,7 @@ import { TASK_ROW_SHAPE, TASK_ROW_TEXT } from '@heyta/design-system';
 import { useHeytaText, useHeytaTokens } from '../theme.js';
 import { resolveTaskRowDensity, type TaskRowDensity } from './density.js';
 import type { TaskRow as TaskRowModel } from './model.js';
+import { priorityColorToken } from './priority-color.js';
 
 /**
  * 行级无障碍文案。**每一项都是一整句**，不要用前缀拼标题。
@@ -182,12 +183,16 @@ export function TaskRow({
           height: tokens[TASK_ROW_SHAPE.checkboxSize],
           borderRadius: tokens[TASK_ROW_SHAPE.checkboxRadius],
           borderWidth: tokens[TASK_ROW_SHAPE.checkboxBorderWidth],
-          borderColor: tokens['color.border-strong'],
+          // 🔴 描边色**不在这里**：它按行的优先级逐行取（见 `priorityBorderColor`）。
+          // 留在本对象里就等于"所有行一个颜色"，而 W5 要表达的正是
+          // **优先级不靠一枚额外徽章、靠这枚人人都看见的圈**。
           alignItems: 'center',
           justifyContent: 'center',
         },
         boxDone: {
           backgroundColor: tokens['color.primary'],
+          // 完成态的描边仍是主色：`boxDone` 排在逐行色之后（见 JSX），
+          // "**做完了没有**"是这一行最要紧的判断，不能被优先级的颜色盖过去。
           borderColor: tokens['color.primary'],
         },
         // 勾的形状用文字画，避免为它引入一个图标依赖
@@ -245,6 +250,24 @@ export function TaskRow({
   const openLabel = labels?.open?.(row);
 
   /**
+   * 🔴 勾选框的描边色 = **这一行优先级的语义色**（W5，详情面对齐工单 A2）。
+   *
+   * 为什么占的是描边而不是新加一个控件：这枚圈**每一行都有、视线必经**，
+   * 用它承载"哪条要紧"是可以**扫**的，不用把每行的文字读一遍。
+   *
+   * ⚠️ 但它**不是唯一通道，也不许变成唯一通道**：颜色对色觉障碍用户不成立，
+   * 所以行内那枚**带文字**的优先级徽章（宿主经 `renderMeta` 注入）必须留着 ——
+   * 描边管"扫一眼"，徽章管"读得准"。删徽章是一个产品决定，不是这条的副产品。
+   *
+   * 取值仍只有一个来源：档位 → token 名的判断在 `priority-color.ts`，
+   * token → 色值的判断在设计系统。这里只做一次查表。
+   *
+   * ⚠️ `row.source.priority` 是可选字段（`entities.ts` 的 `priority?: Priority`），
+   * "`undefined` 与 `None` 同值"那条收敛也在那一份里 —— 不在这里再写一遍。
+   */
+  const priorityBorderColor = tokens[priorityColorToken(row.source.priority)];
+
+  /**
    * 🔴 锚点叫 `task-title-*`，**不能**叫 `task-row-title`：`[data-testid^="task-row-"]`
    * 在别处被当成**行数**来数（`e2e/tests/desktop-window.spec.ts`、
    * `scripts/verify-universal-slice.browser.mjs`），多一个同前缀的元素会把每一行数两遍。
@@ -293,7 +316,14 @@ export function TaskRow({
         style={styles.checkboxHit}
         testID={`task-toggle-${row.id}`}
       >
-        <View style={[styles.box, row.done ? styles.boxDone : null]}>
+        <View
+          style={[
+            styles.box,
+            { borderColor: priorityBorderColor },
+            row.done ? styles.boxDone : null,
+          ]}
+          testID={`task-box-${row.id}`}
+        >
           {row.done ? <Text style={[text[TASK_ROW_TEXT.check], styles.tick]}>✓</Text> : null}
         </View>
       </Pressable>
