@@ -162,15 +162,18 @@ export {
   HOLIDAY_ADJUSTMENT_MAX_PAPERS,
   HOLIDAY_PAPER_PROTOCOLS,
   isHttpPaperUrl,
+  HOLIDAY_ADJUSTMENT_NOTE_MAX_CHARS,
   holidayAdjustmentDaySchema,
   holidayAdjustmentYearSchema,
   holidayYearPutSchema,
   holidayAdjustmentsResponseSchema,
   holidayAdjustmentsAdminListSchema,
+  holidayAdjustmentAdminDeleteQuerySchema,
   PUBLIC_FACT_SHAPES,
 } from './holiday-adjustment-contract';
 export type {
   HolidayAdjustmentDay,
   HolidayAdjustmentYear,
   HolidayAdjustmentsResponse,
+  HolidayAdjustmentsAdminList,
 } from './holiday-adjustment-contract';
