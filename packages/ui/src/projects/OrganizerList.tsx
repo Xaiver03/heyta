@@ -42,8 +42,10 @@
  * ─────────────────────────────────────────────────────────────────────────
  * 🔴 没装进共享层的（见 `./model.ts` 文件头，那里逐条写了证据 / 影响 / 最小一步）
  *
- * 摘要：composer（新建输入框）· 取色控件 · 删除确认 / 改名 / 归档 ·
- * "显示已归档"的开关 —— 都留在各端或本刀未做。本组件管的是**行**。
+ * 摘要：composer（新建输入框）· 取色控件 · 删除确认 —— 留在各端。
+ * ✅ **改名与归档已在共享层，「显示已归档」也已装**（2026-10-03，多端第三批：
+ * `onRename` / `onArchive` + `labels.rename` / `labels.archive`，两端都传了；
+ * 判据在 `apps/mobile/tests/organizer-rename.spec.ts`）。本组件管的是**行**。
  *
  * ─────────────────────────────────────────────────────────────────────────
  * 🔴 只用 RN 原语，不 import 任何 DOM 标签
@@ -52,10 +54,10 @@
  * `<li>` 在 iOS 上不存在。
  */
 
-import React, { useMemo } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import React, { useMemo, useState } from 'react';
+import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import type { HeytaNativeTokens } from '@heyta/design-system';
-import { Trash2 } from 'lucide';
+import { Archive, ArchiveRestore, Check, Pencil, Trash2, X } from 'lucide';
 import { HeytaIcon } from '../icon/Icon.js';
 import { useHeytaText, useHeytaTokens } from '../theme.js';
 import { organizerRowKey, type OrganizerItem, type OrganizerNode } from './model.js';
@@ -77,6 +79,23 @@ export interface OrganizerListLabels {
    * 一个不敢用的功能等于没有。
    */
   readonly emptyHint?: string;
+  /**
+   * 改名的三句文案（按钮无障碍名 / 保存 / 取消）。
+   *
+   * 🔴 与 `onRename` **成对传**：组件不许自己编文案（本包不 import `@heyta/i18n`，
+   * 见文件头）。只传 `onRename` 不传这里，行上会出现一个**读屏念不出名字**的按钮 ——
+   * 那比没有按钮更糟，因为它看起来是好的。
+   */
+  readonly rename?: {
+    readonly button: (name: string) => string;
+    readonly save: string;
+    readonly cancel: string;
+  };
+  /** 归档/取消归档的无障碍名（同样与 `onArchive` 成对传）。 */
+  readonly archive?: {
+    readonly button: (name: string) => string;
+    readonly unarchive: (name: string) => string;
+  };
 }
 
 /** 每一行渲染时给插槽的上下文。 */
@@ -111,6 +130,23 @@ export interface OrganizerListProps {
   readonly onSelect?: (item: OrganizerItem, context: OrganizerRowContext) => void;
   /** 删除某一行。**写库由宿主的 action 层做**（AGENTS.md §3.5）。 */
   readonly onRemove: (item: OrganizerItem) => void;
+  /**
+   * 改名（第二个参数是**用户已经在行内输入完的新名字**）。
+   *
+   * 🔴 不传 = 行上没有改名入口，渲染与从前逐字相同。共享层因此只管"怎么改"
+   * （输入、保存、取消、空名不发），而**改什么由宿主的 action 层落**（§3.5）。
+   * 两端各写一套行内编辑器的话，"改名要不要发第二条 op"就会出现两个答案。
+   */
+  readonly onRename?: (item: OrganizerItem, name: string) => void;
+  /**
+   * 归档 / 取消归档。第二个参数是**目标状态**（`true` = 归档）。
+   *
+   * 🔴 与 `onRename` 一样是"不传就什么都不渲染"。但**只给这一半是不完整的**：
+   * 归档位靠 `item.archived` 决定画哪个图标、传哪个目标值，所以宿主传这个 prop 时
+   * 必须把已归档的行也交给列表（`toOrganizerTree(..., { includeArchived: true })`）——
+   * 否则归档是一扇**单向门**：点得进去，出不来。
+   */
+  readonly onArchive?: (item: OrganizerItem, archived: boolean) => void;
   /** 行首插槽（web 是文件夹 / 标签图标）。不传就不渲染。 */
   readonly renderLeading?: (
     item: OrganizerItem,
@@ -176,6 +212,21 @@ function makeStyles(tokens: HeytaNativeTokens) {
       height: tokens['touch-target.min'],
       borderRadius: tokens['radius.md'],
     },
+    /**
+     * 行内改名的输入框。取值与 `NotesBoard` 的 `input` 逐条相同
+     * （字段高 / 内边距 / 边框 / 底色都来自同一批 token）——
+     * 同一种控件在两处用两套尺度，就是"看着像、点起来不像"的起点。
+     */
+    input: {
+      flex: 1,
+      minHeight: tokens['touch-target.min'],
+      paddingHorizontal: tokens['size.field-padding-x'],
+      borderRadius: tokens['radius.md'],
+      borderWidth: tokens['border-width.thin'],
+      borderColor: tokens['color.border'],
+      backgroundColor: tokens['color.surface'],
+      color: tokens['color.foreground'],
+    },
     busy: {
       opacity: tokens['state.disabled-opacity'],
     },
@@ -196,6 +247,10 @@ function OrganizerRow({
   labels,
   onSelect,
   onRemove,
+  onRename,
+  onArchive,
+  editing,
+  setEditing,
   renderLeading,
   renderItemExtra,
   busy,
@@ -210,6 +265,10 @@ function OrganizerRow({
   readonly labels: OrganizerListLabels;
   readonly onSelect: OrganizerListProps['onSelect'];
   readonly onRemove: OrganizerListProps['onRemove'];
+  readonly onRename: OrganizerListProps['onRename'];
+  readonly onArchive: OrganizerListProps['onArchive'];
+  readonly editing: boolean;
+  readonly setEditing: (id: string | null) => void;
   readonly renderLeading: OrganizerListProps['renderLeading'];
   readonly renderItemExtra: OrganizerListProps['renderItemExtra'];
   readonly busy: boolean;
@@ -218,6 +277,69 @@ function OrganizerRow({
   readonly text: ReturnType<typeof useHeytaText>;
 }): React.JSX.Element {
   const key = organizerRowKey(kind, item.id);
+  const rename = labels.rename;
+  // 草稿**留在行里**而不是提到列表里：行按 id 加了 key，所以"改到一半的这条是谁"
+  // 天然跟着行走；提到父层就要自己维护 (id → 草稿) 的表，那张表迟早和列表脱节。
+  const [draft, setDraft] = useState<string | null>(null);
+
+  const stopEditing = (): void => {
+    setDraft(null);
+    setEditing(null);
+  };
+
+  const submitRename = (): void => {
+    const next = (draft ?? item.name).trim();
+    stopEditing();
+    // 🔴 空名与"一个字都没改"都不发 op。
+    //
+    // 空名那条不是形式问题：`renameProject` / `renameTag` / `renameHabit` 对空名是
+    // **抛错**的，而抛错发生在用户点完保存之后 —— 界面上的表现就是"点了没反应"。
+    // 没改也不发：那是"一条意图一条 op"的反面（一次什么都没做的 UPD 会同步到所有设备，
+    // 并把这条实体的向量时钟推一格）。
+    if (next === '' || next === item.name || onRename === undefined) return;
+    onRename(item, next);
+  };
+
+  // 改名态：**整行换成输入框**，且**不再挂 `onSelect`**。
+  //
+  // 🔴 这一点是结构问题不是审美问题：如果把 `TextInput` 塞进那块可点的
+  // `styles.main`（`Pressable`）里，点输入框会同时触发"选中这一行"，
+  // 于是"改个名字"会把用户带进清单筛选视图 —— 而输入框里的字还没提交。
+  if (editing && rename !== undefined) {
+    return (
+      <View style={styles.row} testID={`${key}-row`}>
+        <TextInput
+          style={[text['row-title'], styles.input]}
+          value={draft ?? item.name}
+          onChangeText={setDraft}
+          onSubmitEditing={submitRename}
+          selectTextOnFocus
+          autoFocus
+          accessibilityLabel={rename.button(item.name)}
+          testID={`${key}-rename-input`}
+        />
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={rename.save}
+          onPress={submitRename}
+          style={styles.remove}
+          testID={`${key}-rename-save`}
+        >
+          <HeytaIcon data={Check} size={tokens['icon.xs']} color={tokens['color.primary']} />
+        </Pressable>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={rename.cancel}
+          onPress={stopEditing}
+          style={styles.remove}
+          testID={`${key}-rename-cancel`}
+        >
+          <HeytaIcon data={X} size={tokens['icon.xs']} color={tokens['color.foreground-muted']} />
+        </Pressable>
+      </View>
+    );
+  }
+
   /**
    * 行的主体：可点（`onSelect`）时是 `Pressable`，否则是普通 `View`。
    *
@@ -260,6 +382,52 @@ function OrganizerRow({
 
       {renderItemExtra === undefined ? null : renderItemExtra(item)}
 
+      {onRename === undefined || rename === undefined ? null : (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={rename.button(item.name)}
+          aria-disabled={busy}
+          disabled={busy}
+          onPress={() => {
+            setEditing(item.id);
+          }}
+          style={[styles.remove, busy ? styles.busy : null]}
+          testID={`${key}-rename`}
+        >
+          <HeytaIcon
+            data={Pencil}
+            size={tokens['icon.xs']}
+            color={tokens['color.foreground-muted']}
+          />
+        </Pressable>
+      )}
+
+      {onArchive === undefined || labels.archive === undefined ? null : (
+        <Pressable
+          accessibilityRole="button"
+          // 名字跟着**目标动作**走（已归档的行说"取消归档"），图标也一样 ——
+          // 一个说「归档」的按钮把一条已归档的清单又归档一次，是纯噪音。
+          accessibilityLabel={
+            item.archived === true
+              ? labels.archive.unarchive(item.name)
+              : labels.archive.button(item.name)
+          }
+          aria-disabled={busy}
+          disabled={busy}
+          onPress={() => {
+            onArchive(item, item.archived !== true);
+          }}
+          style={[styles.remove, busy ? styles.busy : null]}
+          testID={`${key}-archive`}
+        >
+          <HeytaIcon
+            data={item.archived === true ? ArchiveRestore : Archive}
+            size={tokens['icon.xs']}
+            color={tokens['color.foreground-muted']}
+          />
+        </Pressable>
+      )}
+
       <Pressable
         accessibilityRole="button"
         accessibilityLabel={labels.removeLabel(item.name)}
@@ -287,6 +455,8 @@ export function OrganizerList({
   labels,
   onSelect,
   onRemove,
+  onRename,
+  onArchive,
   renderLeading,
   renderItemExtra,
   busy = false,
@@ -295,6 +465,9 @@ export function OrganizerList({
   const tokens = useHeytaTokens();
   const text = useHeytaText();
   const styles = useMemo(() => makeStyles(tokens), [tokens]);
+  // 同时只有一行在改名。这不是优化：两行同时开着时"保存"落在哪一行
+  // 只能靠点击顺序猜，而移动端屏幕小、行又窄。
+  const [editingId, setEditingId] = useState<string | null>(null);
 
   if (items.length === 0) {
     // 宿主不传 `empty` 就什么都不渲染（web 侧栏迁移前的行为，见文件头）。
@@ -345,6 +518,10 @@ export function OrganizerList({
             labels={labels}
             onSelect={onSelect}
             onRemove={onRemove}
+            onRename={onRename}
+            onArchive={onArchive}
+            editing={editingId === node.id}
+            setEditing={setEditingId}
             renderLeading={renderLeading}
             renderItemExtra={renderItemExtra}
             busy={busy}
@@ -364,6 +541,10 @@ export function OrganizerList({
                   labels={labels}
                   onSelect={onSelect}
                   onRemove={onRemove}
+                  onRename={onRename}
+                  onArchive={onArchive}
+                  editing={editingId === child.id}
+                  setEditing={setEditingId}
                   renderLeading={renderLeading}
                   renderItemExtra={renderItemExtra}
                   busy={busy}

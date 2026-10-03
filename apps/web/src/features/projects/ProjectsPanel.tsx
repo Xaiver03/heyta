@@ -51,8 +51,9 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { cssVar } from '@heyta/design-system';
 import { useI18n } from '@heyta/i18n';
 import { parseCategorySlot } from '@heyta/domain';
-import { Check, Folder, Plus, Tag as TagIcon } from 'lucide-react';
+import { Archive, Check, Folder, Plus, Tag as TagIcon } from 'lucide-react';
 import {
+  archivedProjects,
   HeytaUiProvider,
   OrganizerList,
   openTagCounts,
@@ -81,6 +82,16 @@ export function ProjectsPanel({
   // 收起不清草稿，重新点开还能接着打 —— 只有 Esc 才明确丢弃。
   const [addingProject, setAddingProject] = useState(false);
   const [addingTag, setAddingTag] = useState(false);
+  /**
+   * 「显示已归档」。默认关 —— 与迁移前那个选择器逐字一致（归档 = 从列表里消失）。
+   *
+   * 🔴 它不是装饰，是**归档这扇门的一半**：`toOrganizerTree` 不开这个开关就把
+   *    `archived === true` 全滤掉，而侧栏之外再没有已归档视图。少了这一半，
+   *    界面上每一次归档都是**单向门** —— 数据还在、也照样同步，就是永远回不来。
+   * ⚠️ 按钮只在真有一条已归档时出现：一个点开永远什么都不会变多的按钮，
+   *    是"这按钮是不是坏了"那种噪音。
+   */
+  const [showArchived, setShowArchived] = useState(false);
   const asideRef = useRef<HTMLElement>(null);
 
   /*
@@ -110,7 +121,14 @@ export function ProjectsPanel({
   }, [addingProject, addingTag]);
 
   // 层级与计数口径都在共享层（`toOrganizerTree` / `openTaskCounts`）。
-  const tree = useMemo(() => toOrganizerTree(projects.projects), [projects.projects]);
+  const archivedCount = useMemo(
+    () => archivedProjects(projects.projects).length,
+    [projects.projects],
+  );
+  const tree = useMemo(
+    () => toOrganizerTree(projects.projects, { includeArchived: showArchived }),
+    [projects.projects, showArchived],
+  );
   const tagNodes = useMemo(
     () => toOrganizerNodes(toTagItems(projects.tags)),
     [projects.tags],
@@ -144,6 +162,21 @@ export function ProjectsPanel({
         <section>
           <div className="ht-sidebar__organizer-heading">
             <h2 className="ht-nav__section ht-type-group-label">{t('web.projects.heading')}</h2>
+            {archivedCount === 0 ? null : (
+              <button
+                type="button"
+                className="ht-sidebar__organizer-add"
+                aria-label={
+                  showArchived ? t('common.organizer.hideArchived') : t('common.organizer.showArchived')
+                }
+                aria-pressed={showArchived}
+                onClick={() => {
+                  setShowArchived((prev) => !prev);
+                }}
+              >
+                <Archive size={ICON_SIZE.sm} aria-hidden="true" />
+              </button>
+            )}
             <button
               type="button"
               className="ht-sidebar__organizer-add"
@@ -197,6 +230,15 @@ export function ProjectsPanel({
             counts={counts}
             labels={{
               removeLabel: (name) => t('web.projects.delete', { name }),
+              rename: {
+                button: (name) => t('common.organizer.rename.button', { name }),
+                save: t('common.organizer.rename.save'),
+                cancel: t('common.organizer.rename.cancel'),
+              },
+              archive: {
+                button: (name) => t('common.organizer.archive.button', { name }),
+                unarchive: (name) => t('common.organizer.archive.unarchive', { name }),
+              },
               // 空态此前**根本没接线**（共享层注释写着"宿主不传就什么都不渲染"），
               // 于是侧栏里一块空白被当成"这个功能没东西"。词条与移动端同一套
               // （`common.organizer.*`）—— 同一句话不许有两个端各写一份。
@@ -205,6 +247,14 @@ export function ProjectsPanel({
             }}
             onSelect={(item) => {
               onSelect({ kind: 'project', projectId: item.id });
+            }}
+            onRename={(item, name) => {
+              void projects.renameProject(item.id, name);
+            }}
+            onArchive={(item, archived) => {
+              // 传的是**目标状态**（共享层按这一行的 `archived` 推出来的），
+              // 不是"切换一下" —— 两个写"归档"的按钮里有一个其实在取消归档。
+              void projects.archiveProject(item.id, archived);
             }}
             onRemove={(item) => {
               void projects.deleteProject(item.id);
@@ -284,11 +334,24 @@ export function ProjectsPanel({
             counts={tagCounts}
             labels={{
               removeLabel: (name) => t('web.tags.delete', { name }),
+              /*
+                标签**只接改名、不接归档**：`Tag` 领域实体里没有 `archived` 字段
+                （`Project` 有），所以这里没有"归档"这个意图可表达 —— 共享层
+                因此不渲染那个按钮（`labels.archive` 省略即不画）。
+              */
+              rename: {
+                button: (name) => t('common.organizer.rename.button', { name }),
+                save: t('common.organizer.rename.save'),
+                cancel: t('common.organizer.rename.cancel'),
+              },
               empty: t('common.organizer.tags.empty'),
               emptyHint: t('common.organizer.tags.empty.hint'),
             }}
             onSelect={(item) => {
               onSelect({ kind: 'tag', tagId: item.id });
+            }}
+            onRename={(item, name) => {
+              void projects.renameTag(item.id, name);
             }}
             onRemove={(item) => {
               void projects.deleteTag(item.id);

@@ -62,12 +62,28 @@ export interface ProjectActions {
    * 动作层永远不知道 3 号是"学习"还是"刷手机"。
    */
   setProjectColor(entityId: string, slot?: CategorySlot): Promise<void>;
-  /** 归档：隐藏但**保留数据**，可以再取消归档。 */
-  archiveProject(entityId: string): Promise<void>;
+  /**
+   * 归档：隐藏但**保留数据**，可以再取消归档。
+   *
+   * 🔴 `archived` 是**目标值**（与 `setNotePinnedToToday` 同一条契约），默认 `true`
+   *    保持既有单参调用点的行为一字不变。以前这里只有"归档"没有"取消"，
+   *    而接口注释已经写着「可以再取消归档」—— **那句话当时是不成立的**：
+   *    界面上任何一处按了归档，这条清单就再也回不来（两侧都没有已归档视图）。
+   *    把它做成目标值，取消归档才是**一次调用**能完成的事，而不是靠再写一条 `updateProject`。
+   */
+  archiveProject(entityId: string, archived?: boolean): Promise<void>;
   /** 软删除。⚠️ 不级联删除其下的任务（见文件头第 2 条）。 */
   removeProject(entityId: string): Promise<void>;
 
   createTag(name: string): Promise<string>;
+  /**
+   * 改标签名。**一条意图一条 op**：载荷只有 `name`。
+   *
+   * 🔴 它与 `renameProject` 是同一件事的另一半 —— 在那之前标签**建得出、删得掉、
+   *    取不了色、也改不了名**：名字打错只能删了重建，而删了重建会让所有任务上的
+   *    `tagIds` 指向一条已删除的标签（不报错，界面上那个标签就这么消失了）。
+   */
+  renameTag(entityId: string, name: string): Promise<void>;
   removeTag(entityId: string): Promise<void>;
 
   /** 未删除的清单，按 (createdAt, id) 升序 —— 与 `listTasks()` 同一条规则。 */
@@ -103,6 +119,13 @@ export function createProjectActions(
     const project = ctx.getState().projects[entityId];
     if (project === undefined || project.deletedAt !== undefined) return undefined;
     return project;
+  };
+
+  /** 与 `projectOf` 同一条规则：墓碑不算存在。 */
+  const tagOf = (entityId: string): Tag | undefined => {
+    const tag = ctx.getState().tags[entityId];
+    if (tag === undefined || tag.deletedAt !== undefined) return undefined;
+    return tag;
   };
 
   const updateProject = async (
@@ -160,8 +183,9 @@ export function createProjectActions(
       await updateProject(entityId, { color: clean === undefined ? null : String(clean) });
     },
 
-    async archiveProject(entityId) {
-      await updateProject(entityId, { archived: true });
+    async archiveProject(entityId, archived = true) {
+      // 目标值而不是"执行归档"：取消归档是同一条意图的反方向，不是第二种 op。
+      await updateProject(entityId, { archived });
     },
 
     async removeProject(entityId) {
@@ -189,11 +213,23 @@ export function createProjectActions(
       return entityId;
     },
 
+    async renameTag(entityId, name) {
+      const trimmed = name.trim();
+      if (trimmed === '') throw new Error('标签名称不能为空');
+      if (tagOf(entityId) === undefined) throw new Error(`找不到标签「${entityId}」`);
+      // 一条意图一条 op，载荷只有 `name`。引用它的任务**一个都不碰** ——
+      // `task.tagIds` 存的是 id，改名不需要动它们；正因为如此，"删了重建"才是坏的：
+      // 新 id 换不了旧引用，任务上那个标签就这么静默没了。
+      await ctx.dispatch({
+        entityType: 'TAG' as EntityType,
+        entityId,
+        opType: OpType.Update,
+        payload: { name: trimmed },
+      });
+    },
+
     async removeTag(entityId) {
-      const tag = ctx.getState().tags[entityId];
-      if (tag === undefined || tag.deletedAt !== undefined) {
-        throw new Error(`找不到标签「${entityId}」`);
-      }
+      if (tagOf(entityId) === undefined) throw new Error(`找不到标签「${entityId}」`);
       await ctx.dispatch({
         entityType: 'TAG' as EntityType,
         entityId,
