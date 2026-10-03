@@ -3782,3 +3782,28 @@ hierarchy 那条线那枚转圈 486 分钟的 vitest worker（B70）何时停。
 重启后的第一行就带上轮次：`0742 pid=93704 轮=1/3`；同一行还给出别的线也在等窗口
 （`纯 waiter= 35872 81345`）。⚠️ 诚实记一条没验到的：**重起链本身只在离线夹具里走过**，
 真漂移发生时会不会正好卡在两个阶段之间（比如 e2e 跑到一半）要看第一轮的现场。
+
+#### §15.43ac（10-04 07:52）落地那一刻的过期从"只在文字里说一句"变成判定，两个 fail-open 是喂空值样本抓出来的
+
+阶段 5b 原来只把 `POST_DRIFT` 打印一句"≠0 就说明这装已过期"，**动作仍是一路走到末尾写 DONE** ⇒
+同一份 rc.txt 里既有"已过期"那句话又有 `DONE` 那一行，后面读的人会挑对他有利的那一行。现在：
+
+- `decide_landing` / `decide_win_facts` 做成函数（能离线喂样本，不必为验一条分支去重跑几十分钟真装机）；
+- **`DONE` 只在 `LANDING-CURRENT` 那一支写**，其余两支写 `NOT-DONE <原因>`；重装自己判红则 `exit 1` 且**不**重起（那是产品/装置红，不是窗口问题）；
+- Windows 那半边加一条"这份取证文件**属不属于本轮**"（`mtime ≥ INST_START`）；只有属本轮才由本线
+  **自己再读一次**五事实，不只转述 `reinstall-all` 的结论（它的红可能被 tail 过滤掉）。
+
+🔴 两条 fail-open 都不是推理出来的，是喂**空值**喂出来的：
+
+| 现象 | 根因 | 修法 |
+|---|---|---|
+| `decide_landing 0 ''` 回 `LANDING-CURRENT` | `local d="${2:-0}"` 在进门之前就把"没量到"洗成 0 ⇒ 我新加的 UNKNOWN 态永远走不到；调用点 `"${POST_DRIFT:-0}"` 是同一个洞的第二半 | 参数写 `${2-}` 不给默认值、调用点传 `"${POST_DRIFT-}"`；空/非数字 ⇒ `LANDING-UNKNOWN` ⇒ 写 NOT-DONE 并走有界重起 |
+| `mtime` 或起跑为空时判成"新鲜" | 空值进 `[ "$m" -lt "$start" ]` 语法错之后**掉到最后那支 return WIN-FRESH** | 两个数各自先过 `''\|*[!0-9]*` ⇒ `WIN-NO-BASELINE`：没有比较基线就不认证据 |
+
+11 条腿全按预期：`decide_landing` 五条（`0→CURRENT / 3→STALE / 空→UNKNOWN / abc→UNKNOWN / rc=1→REINSTALL-RED`），
+`decide_win_facts` 六条（`m=s→FRESH / m<s→STALE-EVIDENCE / m>s→FRESH / 起跑空→NO-BASELINE / mtime空→NO-BASELINE / 文件缺→NO-EVIDENCE`），
+边界那两条（恰好相等、空值）都在样本里。队列按新机制重启：pid **20138** / `deliver-0752/`、`轮=1/3`，
+起跑现量 `main=37dfcc80`、载体未提交项 0、`纯 waiter= 35872 81345`。
+
+⚠️ 这轮只到"判定与动作接上"：**这些分支还没在真实落地事件上跑过**（要等窗口开、四端真装上才有现场），
+台账里不预告它们的读数。
