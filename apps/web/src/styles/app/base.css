@@ -27,10 +27,7 @@
   );
 
   /* 默认两层 + 详情列：rail + main + detail（四象限/习惯/番茄钟… 没有范围列） */
-  /* 🔴 中间那轨必须 `minmax(0, 1fr)` 而不是裸 `1fr`：grid 项默认 `min-width: auto`，
-     主区顶不住时这一轨会**溢出到详情轨下面**，而详情列带底色 ⇒ 页头右侧被盖住、
-     上面的按钮点不动（实测三条 e2e 红：`BLOCKED.md` B69）。 */
-  grid-template-columns: var(--ht-layout-rail-width) minmax(0, 1fr) var(--ht-detail-track);
+  grid-template-columns: var(--ht-layout-rail-width) 1fr var(--ht-detail-track);
   min-height: 100dvh;
   background: var(--ht-color-background);
 }
@@ -59,7 +56,7 @@
       var(--ht-sidebar-width, var(--ht-layout-sidebar-width)),
       min(var(--ht-layout-sidebar-max-width), 40vw)
     )
-    minmax(0, 1fr)
+    1fr
     var(--ht-detail-track);
 }
 
