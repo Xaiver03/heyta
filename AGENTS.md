@@ -553,6 +553,28 @@ L3 叙事三层**已实现**，**并已落到 `main`**（merge commit `84cc7f5`�
 **从不制造愧疚**。关键裁决见下面 ADR-0022 与
 [`docs/plans/roadmap.md`](docs/plans/roadmap.md) §1.2。
 
+### 2026-10-03：倒数纪念日 批次二（🔄 **进行中，全在本地分支，未 push 未 merge**）
+
+> 逐项状态与全部读数：[`docs/plans/countdown-anniversary.md`](docs/plans/countdown-anniversary.md) §8.2 / §8.4。
+> 分支：`feat/countdown-batch2`（W0/W0b/W2/W5代码半/W10）、`feat/countdown-w9`、
+> `feat/countdown-w4b`、`feat/countdown-w7`（后两条由并行子 Agent 在独立 worktree 里跑）。
+
+| 单 | 落到哪一步 | 一条读数 |
+|---|---|---|
+| W2 `EVENT` 实体 | ✅ | `ENTITY_TYPES` 加一项即穿过整链（**存储三套适配与线协议零改动**），不 bump schema；20/7/17/41/30 passed |
+| W10 AI 工具 | ✅ | 目录 4 条 EVENT 工具（读 2 写 2），MCP 与内置 AI **共用同一份目录**；写路径只到提案 |
+| W9 提醒 | ✅ web 半 | 「提前 N 天」改走日历日算术 ⇒ DST 不漂；变异 **9 臂 9/9 转红** |
+| W5 卡片网格 | 🟡 代码半 | 共享 `EventBoard` + web 宿主，11 passed + 12 例变异 0 未证；🔴 **e2e 截图那半未跑** |
+| W0b 遗留缺口 | 🟡 ①② | `/tmp/ui.xml`/`_xy.py`/库名改成带默认值的旋钮（默认值逐字不变），harness 22 绿 0 红 |
+
+🔴 **三条没做的不是遗漏，是撞车面**（记录在 §8.2 开头）：**W6 / W8** 的落点
+（`packages/ui/src/calendar/*`、`CalendarScreen.tsx`）正被并行会话整片重写；**L 系列** 的
+`packages/legal` 有 3 个文件正脏着。做之前要**重新现量** —— 那条记录本身会过期。
+
+⚠️ 一条**可迁移的判据教训**（W10 实测）：变异**第一趟 6 臂里 3 臂存活**（写工具默认打开、
+列表投影不剥正文、工具改名 ⇒ 清单推不出实体），也就是说那三条承诺当时**没有任何一层在守**。
+"做过变异验证"不等于"判据有牙" —— 要逐臂看红集，存活的那几条才是这单真正产出的判据。
+
 ### 2026-09-30：服务端面向用户的产物全部中文化 + 用设计系统 + 零渐变 ✅ **已完成**
 
 > 机制全文：[`docs/runbooks/deployment.md`](docs/runbooks/deployment.md) §3.9.2
