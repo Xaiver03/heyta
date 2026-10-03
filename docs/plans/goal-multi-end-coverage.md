@@ -1349,6 +1349,17 @@ Goal 原话点名的记账落点就是本节。**先建槽、后填读数** —�
     上限只对下一趟生效；这一趟的 mac 段读的是它自己载体 `/tmp/heyta-reinstall/…` 那份旧代码。
     📌 所以 ① 的解除条件不是"负载降下来"，而是**那条 pid 95477 消失**（现量命令
     `lsof -nP -t -- apps/desktop-macos/scripts/package-app.sh` 为空 **且** `pgrep -f 'reinstall-all\.sh'` 为空）。
+  - ⚠️ **05:3x 两条与 ① 直接相关的现场**（都要带时刻读，它们会反过来）：
+    ① **iOS 侧此刻是空的**：三台 booted 逐台 `simctl spawn <udid> launchctl list` 读
+    `UIKitApplication:com.heyta`，命中数 **0 / 0 / 0**（01:4x 那次 `heyta-ios-isolated` 还在跑）
+    ⇒ 窗口开时 ios 段不必整体判死，启动器那条"逐台读设备自己的 launchctl、只挑没跑着 com.heyta 的那台"
+    此刻三台都合格。
+    ② 🔴 **链在载体里跑的闸门 ≠ 主检出正在写的那版闸门**：`scripts/verify-mobile-window-gate.sh`
+    在主检出是 **`M`（+74 / -5 未提交）**，而我的链 `cd` 进载体 ⇒ 读到的是**已提交那版**。
+    那位正在补的"iOS 目标取不到就停 / 别人在用这台设备就 FAIL"这类**更严的分支，我这侧一个都没生效**
+    （正是记忆里那条"载体 checkout 只同步提交、不同步主检出工作树里的判据"）。
+    ⇒ ① 成交后的读数必须写明"闸门 = 提交态版本"，别把它当成最新判据的绿灯；
+    那道更严的门归它的所有者落，我不代改（撞车判据 = 该文件有别人的未提交 diff）。
 - ② Playwright 三段 + 全量 `pnpm check`：**02:35–02:41 已在载体 `f08b26e7` 上跑过一趟**（窗口 02:35:26 开：
   闸门 `--target b` 退 0，负载现量 12 = 阈值 12）。两个读数**分开报**（这是 §5-2 定的取法）：
   - **整条 `pnpm check`：`CHECK_EXIT=1`**，断在第 8 段 `check:op-log-semantics`，而拒绝它的是**本机内存闸门**
