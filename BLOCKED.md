@@ -3727,6 +3727,37 @@ docs(blocked) 7 · feat(selfhost) 6 · docs(selfhost) 6 · fix(scripts) 5 · fea
 `check:privacy-consent-e2e` 四段必须仍然 rc=0**（01:3x 在载体 `187057bb` 上现量：
 `43 ai-quota=0 · 44 ai-tools=0 · 61 ai-coverage=0 · 63 privacy-consent-e2e=0 · 24 legal-copy=0 · 25 legal-tools=0 · 27 legal-host=0 · 50 server-legal=0`）。
 
+### 01:5x 现场换了两次读数：交集从 11 → 0，但**挡路的换成另一件事**了
+
+| 现量 | 01:3x | 01:5x |
+|---|---|---|
+| main 未提交项 | 77 | **5–7**（并行会话把那一族提交了） |
+| 合并更新集 | 382 | **422** |
+| 更新集 ∩ 主检出脏项 | **11 个文件** | **0 个** ⇒ 前置 2 过了 |
+| `merge-tree` 冲突 | rc=0 | rc=0 |
+| main ⊆ 集成线？ | YES | **NO**（main 又前进到 `6afca90f`，线停在 `79fab286`）⇒ 要再吸收一次 main 才谈得上快进 |
+
+🔴 **于是"挡路"换了性质**：不再是"别人的文件在我要动的路径上"，而是
+**"main 那棵检出此刻是别人的验收现场"**。01:57 现量 `ps` 命中 2–4 条，全在 main 的树里跑：
+`heyta/scripts/.verify-mobile-ios-reminder.sh.snap.36041`（两次）、一枚从 main 的
+`node_modules/.pnpm/@esbuild…` 起的 esbuild、`heyta/scripts/tools/ios-*` 的 python。
+快进会重写 422 个文件 ⇒ 那些读数的**下半程**就不是同一个版本了。这与 traps #87
+（`check:ai-e2e` 的 preflight SIGKILL 别人的 vite）是同一类代价、方向相反：**我不动别人的现场**。
+⇒ 给 `heyta-land.sh` 加了**前置 2.5**（`main_busy` 的 pattern 里刻意带 main 工作树路径 ——
+argv 含该路径就说明"正从这棵树里跑"），非 0 就 `exit 6` 并列出是谁；
+01:57 反向对照实测：那次 dry-run 确实停在 rc=6 并列出了两条现场进程。
+顺带修掉落地脚本自己一处**显示级假红**：`grep -vE 'rc=0$'` 把 12 条 rc=0 的段全打成"非绿"，
+因为每行末尾还有 `\t15s` 的耗时 ⇒ 那条正则**永远不匹配**（"行尾"是耗时不是 rc）。改成按字段取：
+`awk -F'\t' '$3=="rc=0"'` 数绿 / `$3 ~ /^rc=[1-9]/` 数红 / `SKIPPED_BY_RULE` 数按规则不跑
+（喂 0134 那份读数复验：64 绿 / 8 红 / 1 按规则不跑 = 73，与链自己的汇总行逐字吻合）。
+
+⏳ **01:5x 已起一条有界等待**（pid 25258/25260，`~/scratch-heyta/heyta-land-when-quiet.sh`，日志
+`~/scratch-heyta/land-0158/run.log`）：等 main 现场清零 + 过仓库那道负载门，再 dry-run 复核三条前置、
+`--confirm` 快进，落完立刻在同内容的干净载体上跑逐段链。**别的会话此刻不要并发落 main。**
+它**不做**的三件事写死在脚本头上：不 push、不 force、不碰设备（③ 的四端重装留给人工，
+因为设备那边等窗口的方式不一样 —— 见 `B62`）。🔴 按上面那条现量，它这一趟大概率停在
+前置 1（main 不再是祖先）⇒ 那是**如实失败**，不是它坏了：要先吸收 main 再谈快进。
+
 **关闭判据**：`bash ~/scratch-heyta/heyta-land.sh --confirm`（默认 dry-run；它现取"更新集 ∩ 主检出脏项"，
 非空就拒绝并列出）在 rc=0 落地后，`pnpm check` 在 main 上的红集 = 上表那 5 条**减去已被各所有者闭合的**，
 且上表"是不是本批"那一列的 ❌ 一条都没变成 ✅ —— 也就是**我没有为了让 main 绿而动别人的债**。
