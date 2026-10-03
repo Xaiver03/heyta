@@ -49,6 +49,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { readImageInstallShape } from './image-install-shape.mjs';
+import { readImageLock } from './image-lock-platform.mjs';
 
 const repoRoot = fileURLToPath(new URL('../..', import.meta.url)).replace(/\/$/, '');
 const quiet = process.argv.includes('--quiet');
@@ -324,16 +325,17 @@ const sourceLicense = (dirRel) => {
 // 症状看起来像"镜像里混进了不合格许可"，实际是这条腿自己另立了政策。
 const declaredAcceptable = (id, declared) =>
   (declared && PERMISSIVE_LICENSES.has(declared)) || reviewedOther.has(id);
+// "这一条声明可不可接受"的**唯一**裁决：判定 1（树里的每一条）与判定 4（锁里的平台变体）
+// 共用同一个函数。两套定义 = 一个会漂的策略（下面 ①② 两处调用不许各写一遍条件）。
+const unacceptable = (id, declared) =>
+  Boolean(declared) &&
+  !declaredAcceptable(id, declared) &&
+  !(scanned.get(id) && (scanned.get(id).kind === 'permissive' || reviewedOther.has(id)));
 
 for (const p of snapshot.packages) {
   const id = `${p.name}@${p.version}`;
   const declared = typeof p.license === 'string' ? p.license : null;
-  if (
-    declared &&
-    !FIRST_PARTY_IN_IMAGE[p.name] &&
-    !declaredAcceptable(id, declared) &&
-    !(scanned.get(id) && (scanned.get(id).kind === 'permissive' || reviewedOther.has(id)))
-  ) {
+  if (!FIRST_PARTY_IN_IMAGE[p.name] && unacceptable(id, declared)) {
     badLicense.push(
       `${id}  包自己声明的 license=${declared} —— 既不在宽松表，也没有在 REVIEWED_OTHER 或镜像独有表里逐条判过`,
     );
@@ -435,6 +437,78 @@ if (covered.length + exempted.length + firstParty.length !== snapshot.packages.l
   ]);
 }
 
+// ── 判定 4（G-53）：锁里**每一枚**平台受限条目都要过同一套许可证权威 ──────
+// 这一层拦的不是"这次装上的那一枚合不合格"，而是"**换一台机器构建时会不会悄悄装上一枚
+// 从来没人判过的二进制包**"：
+//  · 快照钉死一个 TARGET（linux/x64/musl），现量树只有构建宿主机那一枚；
+//  · 于是一条门禁在 arm64 上跑只看见 arm64 变体、在 x64 上跑只看见 x64 变体 ——
+//    在"承诺发哪几个架构"拍板之前，**任何单台机器上的绿都不覆盖承诺面**（G-53 登记的正是这一族）。
+// 输入选**锁**而不是选树：锁是跨架构的（npm 把所有平台的变体都写进去，装哪一枚由平台决定），
+// 所以逐条判它们全部，这条判定就和"我们发哪几枚镜像"脱钩了 —— 不需要先拍那个板。
+// 字段读法与 `gen-image-npm-tree.mjs` 共用 `image-lock-platform.mjs`（两处各写一遍=漂移起点）。
+const lockGatePath = join(repoRoot, 'server/package-lock.json');
+if (!existsSync(lockGatePath)) {
+  console.error('❌ 判定 4 没有输入：`server/package-lock.json` 不在。');
+  console.error('   它是镜像那棵树的钉子（G-47），也是平台变体这一整类唯一的跨架构清单。');
+  process.exit(1);
+}
+let lockPlatformEntries;
+try {
+  lockPlatformEntries = readImageLock(readFileSync(lockGatePath, 'utf8')).entries;
+} catch (e) {
+  console.error(`❌ 判定 4 的输入读不出形状：${e.message}`);
+  process.exit(1);
+}
+const gated = lockPlatformEntries.filter((e) => e.gate.restricted);
+// 空集哨兵：生产树里"一个平台受限包都没有"要么说明字段读法坏了，
+// 要么说明原生二进制这一族真的没了 —— 两种都要人来看一眼，不能让它绿过去。
+if (gated.length === 0) {
+  console.error(
+    `❌ 提交物锁的 ${lockPlatformEntries.length} 条非 dev 条目里，**一枚**平台受限的都没有` +
+      '（`os` / `cpu` / `engines.libc` 三种形状一个都不认）。',
+  );
+  console.error(
+    '   要么 `image-lock-platform.mjs` 的字段读法坏了（那是两层判据共用的输入），' +
+      '要么 argon2 那一族真的不再按平台分发 ⇒ 把这条腿连同 G-53 一起**撤掉**，不要放宽它。',
+  );
+  process.exit(1);
+}
+const gatedProblems = [];
+for (const e of gated) {
+  const dims = [
+    e.gate.os ? `os=${e.gate.os.join('|')}` : null,
+    e.gate.cpu ? `cpu=${e.gate.cpu.join('|')}` : null,
+    e.gate.libc ? `libc=${e.gate.libc.join('|')}` : null,
+  ]
+    .filter(Boolean)
+    .join(' ');
+  if (!e.optional) {
+    gatedProblems.push(
+      `${e.id}  [${dims}] 被平台闸门管着却**不是** optional ⇒ 换架构构建时它是硬依赖，` +
+        '装不上会当场炸构建（npm 的约定是这类包一律 optional）',
+    );
+  }
+  if (!e.license) {
+    gatedProblems.push(`${e.id}  [${dims}] 锁里没有 license 字段 —— 没有声明就是没有授权，这一条不能当"应该没问题"`);
+    continue;
+  }
+  if (unacceptable(e.id, e.license)) {
+    gatedProblems.push(
+      `${e.id}  [${dims}] license=${e.license} —— 既不在宽松表，也没在 REVIEWED_OTHER 逐条判过，` +
+        '而许可证门禁扫的 pnpm store 里根本没有这一枚（它只装宿主平台那一枚）',
+    );
+  }
+}
+if (gatedProblems.length > 0) {
+  report(`锁里的平台变体有 ${gatedProblems.length} 条过不了同一套许可证权威`, [
+    ...gatedProblems,
+    '这一类包**不会**出现在本次载体的树上（除了宿主平台那一枚），所以判定 1 永远看不见它们 ——',
+    '把它们逐条判过一遍才是 G-53 的闭合；判不过的那一枚不要靠加登记放行，先看它为什么要进服务端镜像。',
+  ]);
+}
+const gatedIds = new Set(gated.map((e) => e.id));
+const gatedOutsideTree = [...gatedIds].filter((id) => !treeIds.has(id));
+
 if (findings.length > 0) {
   for (const { title, lines } of findings) {
     console.error(`\n❌ ${title}`);
@@ -463,6 +537,11 @@ if (!quiet) {
         '（磁盘枚举 × npm 自己写的锁，双载体）在 `verify:selfhost-stack` 里判；\n' +
         '     · 三枚 `@heyta/*` 是 `file:` tarball，每次构建字节都变，**设计上不进钉子**' +
         '（把它们钉进 `npm ci` 会换来"冷缓存 EINTEGRITY / 热缓存静默装上一版"，审计 §8.46）。',
+  );
+  console.log(
+    `   平台变体（G-53 那一族）：提交物锁里 ${gated.length} 枚平台受限条目逐条过了同一套许可证权威，` +
+      `全部合格；其中 ${gatedOutsideTree.length} 枚**不在本次载体的树上**` +
+      '（本次载体只装宿主平台那一枚）—— 这一层不取决于"我们承诺发哪几个架构"。',
   );
 }
 process.exit(0);

@@ -43,6 +43,7 @@ import { createHash } from 'node:crypto';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { readImageInstallShape } from './image-install-shape.mjs';
+import { gateAllowsTarget, readImageLock } from './image-lock-platform.mjs';
 
 // ⚠️ 必须走 fileURLToPath：`new URL(...).pathname` 不解码百分号，而这个仓库的父目录名
 // 带空格（"All in one Data"）—— 直接拿 pathname 会得到 `All%20in%20one`，
@@ -100,34 +101,21 @@ const committedLockText = readFileSync(committedLockPath, 'utf8');
  * 单一所有者：`--check` 与生成都走这里 —— 两边各写一遍就是下一次漂移的起点。
  */
 function deriveFromLock(lockText) {
-  let lock;
+  let parsed;
   try {
-    lock = JSON.parse(lockText);
+    parsed = readImageLock(lockText);
   } catch (e) {
-    fail(`\`server/package-lock.json\` 读不出 JSON：${e.message}`, '  它是镜像那棵树的钉子，坏了不能当"没有差异"。');
-  }
-  if (lock.lockfileVersion !== 3) {
-    fail(
-      `提交物锁的 lockfileVersion=${String(lock.lockfileVersion)}，不是 3`,
-      '  下面的解析假设"键是 node_modules/<name> 路径、包名不在值里"，那是 npm v7+ 的形状。',
-    );
+    fail(`\`server/package-lock.json\` 读不出可用形状：${e.message}`,
+      '  它是镜像那棵树的钉子，坏了不能当"没有差异"。');
   }
   const seen = new Map();
   let skippedOtherPlatform = 0;
-  for (const [key, v] of Object.entries(lock.packages || {})) {
-    const at = key.lastIndexOf('node_modules/');
-    if (at < 0) continue; // 根条目 ""
-    const name = key.slice(at + 'node_modules/'.length);
-    if (!v.version) continue;
-    if (v.dev) continue;
-    const osList = Array.isArray(v.os) && v.os.length ? v.os : null;
-    const cpuList = Array.isArray(v.cpu) && v.cpu.length ? v.cpu : null;
-    const libc = v.engines && Array.isArray(v.engines.libc) && v.engines.libc.length ? v.engines.libc : null;
-    if ((osList && !osList.includes(TARGET.os)) || (cpuList && !cpuList.includes(TARGET.cpu)) || (libc && !libc.includes(TARGET.libc))) {
+  for (const entry of parsed.entries) {
+    if (!gateAllowsTarget(entry.gate, TARGET)) {
       skippedOtherPlatform += 1;
       continue;
     }
-    const id = `${name}@${v.version}`;
+    const id = entry.id;
     // 🔴 `license` 必须一起带出去：`check-image-license-coverage` 那条"登记的 license
     //  ≠ 产物自己声明的 license"判定在**两种载体上都要有输入**。以前快照里没有本地包，
     //  它只在真树上有效；锁成为事实源之后，三枚 `@heyta/*` 进了快照，
@@ -136,10 +124,10 @@ function deriveFromLock(lockText) {
     //  只修一个就会把这条读数当成"已修"）。
     if (!seen.has(id)) {
       seen.set(id, {
-        name,
-        version: v.version,
-        optional: !!v.optional,
-        license: typeof v.license === 'string' ? v.license : null,
+        name: entry.name,
+        version: entry.version,
+        optional: entry.optional,
+        license: entry.license,
       });
     }
   }
@@ -148,7 +136,7 @@ function deriveFromLock(lockText) {
       `${a.name}@${a.version}`.localeCompare(`${b.name}@${b.version}`),
     ),
     skippedOtherPlatform,
-    entryCount: Object.keys(lock.packages || {}).filter((k) => k).length,
+    entryCount: parsed.totalKeys,
   };
 }
 const pinnedSpecs = shape.installs
