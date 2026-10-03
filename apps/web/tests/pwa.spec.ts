@@ -33,6 +33,7 @@ import {
   appendClick,
   isRecordStale,
   kindFromTag,
+  kindFromWidgetDataPath,
   parsePageMessage,
   parseWidgetClick,
   widgetTag,
@@ -465,6 +466,40 @@ describe('🔴 子路径挂载（/app/）：manifest 与 SW 地址都不许写�
     expect(serviceWorkerUrl()).toBe('/sw.js');
 
     vi.unstubAllEnvs();
+  });
+
+  /**
+   * 🔴 这条是上面两条**没覆盖到的第三种面目**：同一族的挂载路径缺陷，
+   * 但症状不是"拿到 HTML"，而是**静默不拦**。
+   *
+   * `sw.ts` 原先按写死的 `'/widgets/'` 判断要不要拦数据请求。应用挂在 `/app/` 下时，
+   * 宿主按 manifest 去取的是 `/app/widgets/today.data.json` —— 前缀对不上，
+   * SW 就当这不是它的事，一次也不拦。后果不是报错，是 Windows 组件**永远停在
+   * manifest 里那份静态占位态**，而"应用不在也能由 SW 决定显示什么"
+   * 这个平台上唯一的刷新判定点整个失效。
+   *
+   * 变异验证（本轮实测）：把 `sw.ts` 的判断换回按 `'/widgets/'` 起头的写死前缀 ⇒
+   * `mount = '/app/'` 那一支转红，而 `mount = '/'` 那一支照旧绿 ——
+   * 正是"只在部署形态里坏"的形状。
+   */
+  it('🔴 SW 认得 manifest 让宿主去取的那个 URL（两种挂载形态都要认）', () => {
+    for (const mount of ['/', '/app/']) {
+      const swHref = `https://heyta.test${mount}sw.js`;
+      const manifestHref = `https://heyta.test${mount}manifest.webmanifest`;
+      for (const w of manifest.widgets) {
+        // manifest 的 URL 相对自身解析，这是 gen-pwa.mjs 敢用相对地址的理由。
+        const pathname = new URL(w.data, manifestHref).pathname;
+        expect(
+          kindFromWidgetDataPath(pathname, swHref),
+          `挂在 ${mount} 时宿主去取 ${pathname}，而 SW 认不出它 ⇒ 静默不拦，组件只会显示静态占位态`,
+        ).not.toBeNull();
+      }
+    }
+
+    // 反向两笔：不属于本挂载点的路径、以及不是数据文件的路径，都不许被认成组件数据。
+    expect(kindFromWidgetDataPath('/widgets/today.data.json', 'https://heyta.test/app/sw.js')).toBeNull();
+    expect(kindFromWidgetDataPath('/app/assets/today.data.json', 'https://heyta.test/app/sw.js')).toBeNull();
+    expect(kindFromWidgetDataPath('/app/widgets/nosuchkind.data.json', 'https://heyta.test/app/sw.js')).toBeNull();
   });
 });
 
