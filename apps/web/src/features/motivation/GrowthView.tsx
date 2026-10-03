@@ -227,14 +227,17 @@ function heatmapLabels(t: I18nValue['t']): ActivityHeatmapLabels {
     // 就是漂移的起点。索引越界理论上不可能（由日期串切出 1–12），兜底写字面量。
     month: (month) => t(HEATMAP_MONTH_KEYS[month - 1] ?? 'web.heatmap.month.1'),
     /*
-      🔴 `web.growth.year.heatmap` 是为 **react-activity-calendar** 写的
-      （它认 `{{count}}` 双花括号），而 i18n 的插值器只认单层 `{count}` ——
-      直接 `t(key, { count })` 会得到字面的 `{2}`（那个 bug 在习惯热力图那边
-      已经踩过一次，见 `HabitsView.tsx` 文件头）。自绘热力图由宿主自己展开
-      这个库占位符：整句仍是同一条词条、同一个数字。
-      缺的 `web.growth.year.heatmap.a11y` 记在 `labels.ts` 文件头。
+      🔴 这条词条**以前**写的是 `{{count}}` —— 那是 **react-activity-calendar** 的
+      占位符语法（它认双花括号），而 i18n 的插值器只认单层 `{count}`，直接
+      `t(key, { count })` 会得到字面的 `{2}`（习惯热力图那边踩过一次，见
+      `HabitsView.tsx` 文件头）。旧代码因此在本行手工 `.replace('{{count}}', …)`。
+
+      自绘热力图之后那个库已经不在依赖里，这条词条现在是**普通插值词条**
+      （中英两侧都是 `{count}`，2026-10-03 统一），手工 replace 一并删掉。
+      ⚠️ 字形统一前不要把 key 改回双花括号：`apps/mobile/tests/growth-display.spec.ts`
+      的对偶用例会把两种字形当成两份事实源。
     */
-    grid: ({ total }) => t('web.growth.year.heatmap').replace('{{count}}', String(total)),
+    grid: ({ total }) => t('web.growth.year.heatmap', { count: total }),
     // `web.habits.heatmap.cell` 是 "{date}：{count} 次"，**不含"打卡"字样**，
     // 对"打卡 + 完成任务 + 专注轮次"的年度总览同样成立。
     cellTooltip: ({ date, count }) => t('web.habits.heatmap.cell', { date, count }),

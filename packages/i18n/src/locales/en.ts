@@ -2434,6 +2434,8 @@ export const en = {
   'mobile.profile.entry.settings.hint': 'Sync credentials, widgets and language',
   'mobile.profile.section.sync': 'Sync',
   'mobile.profile.section.status': 'Status',
+  // Mirrors the zh side: shown only when the server **explicitly** says entitled / denied.
+  'mobile.profile.entitlement.entitled': 'Hosted sync is on',
   'mobile.profile.section.language': 'Language',
   'mobile.profile.section.lists': 'Lists',
   // The auth entry sits in the top card of this screen so it is one tap away;
@@ -3493,6 +3495,11 @@ export const en = {
   'notes.a11y.pin': 'Pin the note "{excerpt}" to today',
   'notes.a11y.unpin': 'Unpin the note "{excerpt}"',
   'notes.error.empty': 'A note cannot be empty',
+  // Note editor screen (multi-end batch two). The no-change gate lives in app-host updateNoteContent.
+  'notes.edit.title': 'Edit note',
+  'notes.save': 'Save',
+  'notes.cancel': 'Cancel',
+  'notes.edit.notFound': 'This note is gone (it may have been deleted on another device)',
 
   // ── Admin console (ADR-0038) ─────────────────────────────────────────
   'web.admin.title': 'Admin',
