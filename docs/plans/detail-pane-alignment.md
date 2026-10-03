@@ -643,7 +643,7 @@ git merge-tree --write-tree --name-only main feat/detail-pane   # rc=1 = 有冲�
 |---|---|---|---|
 | `check:empty-state` | `node scripts/check-empty-state.mjs` | `🔴 有 1 处**新的**手写空态：apps/web/src/features/focus/FocusDetailPane.tsx 形态：空态 testid` | 🔴 **本分支**：站点是 `9bdab17e`（W7 番茄右栏）新写的 `<p className="ht-app__detail-empty" data-testid="focus-records-empty">`。已修 `edd9971b` |
 | `check:docs` | `node research/tools/docs-link-check.mjs` | ① `docs/plans/countdown-anniversary.md:1280` → `docs/adr/README.md` 的 §1（该章节号不存在）；② `PROGRESS.md:1362` → `docs/research/aed-implementation-evidence.md` 死链 | 别的线（倒数纪念日 + AED）。现量：`git log main..HEAD -- docs/plans/countdown-anniversary.md PROGRESS.md` **为空**（本分支没动过这两个宿主文件），且死链目标在 merge-base 的 `docs/research` 里 **0 命中**。登记不代改 |
-| `check:journey-coverage` | `node scripts/check-journey-coverage.mjs` | `[ERR_PNPM_ABORTED_REMOVE_MODULES_DIR_NO_TTY] Aborted removal of modules directory due to no TTY` → `[ERROR] Command failed with exit code 1: pnpm install` | 载体：这道内部要跑 `pnpm install`，在 linked worktree 里被拒；**判据本身没跑到**（它前面那几行旅程对账是 ✅） |
+| `check:journey-coverage` | `node scripts/check-journey-coverage.mjs` | `[ERR_PNPM_ABORTED_REMOVE_MODULES_DIR_NO_TTY] Aborted removal of modules directory due to no TTY` → `[ERROR] Command failed with exit code 1: pnpm install` | 载体：它内部经 `pnpm` 跑那条 spec，而 **pnpm 的 deps-status 预检自己会去调 `pnpm install`**（真身栈：`runDepsStatusCheck` → `runPnpmCli` → `sync`），在 linked worktree 里无 TTY 必拒 ⇒ **不是这道门禁要去装依赖**，机制与绕法见 §8.15；判据本身没跑到（它前面那几行旅程对账是 ✅） |
 | `check:widgets` | `node scripts/check-widgets.mjs` | 报的是 `packages/widget-core/tests/fixtures.spec.ts:1 夹具与重建结果不一致`，而"代码"栏里装的就是上面那条 pnpm 无 TTY 报错 | 载体（同上）：它比的是**重建命令的输出**，输出是 pnpm 的报错 ⇒ 判成"不一致"。这是"载体不可用被读成产品违规"的形状，不是夹具真漂了 |
 | `check:mobile-bundle` | `node scripts/check-mobile-bundle.mjs` | Metro `Unable to resolve module react-native-get-random-values`，脚本自己收尾写明「⛔ 打包失败（android）—— 门禁**没能运行**，这不是通过」 | 载体：本检出没有自己装过的 `apps/mobile/node_modules`。脚本这句"这不是通过"是**对的**判据措辞，别把它读成红在产品 |
 | `check:web-storage` | `node scripts/verify-web-storage-backend.mjs` | vite `server-fs-allow` 拒 `/@fs` 下主检出的 `@sqlite.org/sqlite-wasm@3.53.4-build1` → `page.waitForFunction: Timeout 60000ms exceeded` | 载体：§8 W1 行记着同一形状（linked worktree 的软链 node_modules 不在 vite 的 fs.allow 里） |
@@ -776,4 +776,49 @@ git merge-tree --write-tree --name-only main feat/detail-pane   # rc=1 = 有冲�
 （**1585 passed / 12 skipped**）、`build web tsc -b` + `vite`、`typecheck e2e family`、
 `e2e detail-pane family` **25 passed**。`docs-link-check` 对本文件 **0 命中**。
 门禁第三趟 `total=58 ok=47 red=6 skip=5 missing_env=0`。载体：`edd9971b`（代码）+ 本笔（文档）。
+
+
+## 8.15 七行工单等的那一步，先在"产物可构建"这一层量过（2026-10-04 06:2x 现量）
+
+§8 表里 W1/W2/W3/W4/W5/W6/W7 **七行都只剩同一件事**：AGENTS §6.1.1 的四端重装。
+那个收尾要的是 `packages/*/dist` 与 `apps/web/dist` 都是当前源码的产物，
+而 AGENTS 明写"门禁绿 ≠ 能打包"（本仓库踩过三次）。窗口没空的时候，能做的正确动作
+不是干等，是**把重装真正依赖的那一层先量了**。
+
+### 1. 🔴 `pnpm -r build` 在 linked worktree 里**结构性跑不了**，原因不是本单的线
+
+| 趟 | 命令 | 读数 |
+|---|---|---|
+| 1 | `pnpm -r build` | **RC=1**，`[ERR_PNPM_ABORTED_REMOVE_MODULES_DIR_NO_TTY]`，栈是 `runDepsStatusCheck` → `runPnpmCli` → `sync` |
+| 2 | `pnpm -r --config.verify-deps-before-run=false build` | **RC=1**，唯一失败项 `@heyta/sync-server@1.0.0 build: prisma generate && tsc` → **`spawn ENOENT`**（`server/` 在本检出没有自己的 `node_modules`，与 AGENTS §6 记的"沙箱里跑不了 `@heyta/sync-server`"是同一条） |
+| 3 | 同上 + `--filter '!@heyta/sync-server'` | **RC=0**，**18 个项目 `build: Done`** |
+
+⇒ **第 1 趟那条红不是任何一单的判据，是 pnpm 自己的预检**：任何经 `pnpm` 的命令在这个检出里
+都会先被 `verify-deps-before-run` 拖去跑 `pnpm install`，而那一步无 TTY 必拒。
+这一条同时**收紧了 §8.13 的归属**：那四道"载体红"里有两道（`check:journey-coverage`、`check:widgets`）
+我原先写的是"这道门禁内部要跑 `pnpm install`"—— **不准确**，门禁没有要去装依赖，
+是 pnpm 在替它装。原地改在 §8.13 那张表里（同一处，划线留原句旁边）。
+
+⚠️ **绕法只有这一种，不许用 `CI=true`**：那个变量的作用是"不再询问、直接执行"，
+pnpm 会**真的删掉并重建 modules 目录** —— 而本检出的根 `node_modules` 与 `e2e/node_modules`
+是**指向主检出的软链**（§8 W1b 边界 ⑤）。删它等于删别人那棵树的依赖。
+`--config.verify-deps-before-run=false` 只关掉预检，不动任何文件。
+
+### 2. 第 3 趟覆盖到了什么、没覆盖到什么（别读多）
+
+覆盖：14 个 `packages/*` + `apps/{web,landing,desktop,node-host}` 全部构建成功
+（`pnpm -r build` 的清单就是这 18 项 —— 现量：`grep -oE "^[a-z0-9/-]+ build: Done"` 去重 18 行）。
+
+🔴 **没覆盖：`apps/mobile` 的 JS bundle** —— 它**没有 `build` 脚本**
+（现量：`node -e "...require('./apps/mobile/package.json').scripts.build"` ⇒ `undefined`；
+有 `build` 脚本的 apps 只有 `desktop / landing / node-host / web` 四个）。
+RN 的 bundle 发生在 `build:android` / `build:ios` 里，而那一层在本检出正好是红的
+（§8.13 表里的 `check:mobile-bundle`：Metro 解析不到 `react-native-get-random-values`）。
+⇒ 所以"能打包"这一层的诚实读数是：**web / desktop / landing / node-host + 全部 packages 已证，
+mobile 的 bundle 未证（载体不可用）**。§7 第 27 条那个"APK 里是旧 JS bundle"的事故形状，
+本单**没有**把它排除掉。
+
+⇒ 对那七行的意义：四端重装在"产物可构建"这一层**没有本单的拦路项**，
+剩下的未知全在移动端载体上，而那正是 §8.10 与 §8.14 第 2 条说的那一步要在
+**有自己一份 `node_modules` 的隔离检出**里跑的理由。
 
