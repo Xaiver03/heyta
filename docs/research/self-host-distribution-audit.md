@@ -2113,7 +2113,7 @@ dial tcp [2a03:2880:f126:83:face:b00c:0:25de]:443: i/o timeout
 | `server/Dockerfile` | **三个 stage 各声明一次** `ARG NODE_IMAGE=node:24-alpine`（`ARG` 不跨 `FROM` 继承）；文件头有上面那段错误原文 |
 | `server/docker-compose.build.yml` | `args:` 加 `NODE_IMAGE: ${NODE_IMAGE:-node:24-alpine}` ⇒ `.env` 里那一行真的会变成 `--build-arg` |
 | `scripts/verify-selfhost-stack.sh` | 构建那条命令加 `${NODE_IMAGE:+--build-arg NODE_IMAGE=$NODE_IMAGE}` —— **不加这一行，验收脚本自己就用不了这个旋钮**（先漏了它，是这一节里我自己那处"改了配置没反应"的现量） |
-| `docs/runbooks/self-host.md` | §3 补第三行旋钮 + 三种失败形态的区别（`apk add`/`pnpm install` 是**无声挂住**，base 是**响亮但无线索**）；§4 那句"`APK_MIRROR` / `NPM_REGISTRY` 两个旋钮"→ 三个（同一句结论落在两份文档里，改一处必 sweep，见 [[feedback-duplicate-facts-drift]]） |
+| `docs/runbooks/self-host.md` | §3 补第三行旋钮 + 三种失败形态的区别（`apk add`/`pnpm install` 是**无声挂住**，base 是**响亮但无线索**）；§4 那句"`APK_MIRROR` / `NPM_REGISTRY` 两个旋钮"→ 三个（同一句结论落在两份文档里，改一处必 sweep 全仓） |
 | `server/README.md`（英文那份） | 同一段的英文版，含"compose 那份 args **总是**把值传下去，所以生效的是 compose 的默认值" |
 
 默认值逐字等于 `node:24-alpine` ⇒ 能直连 Docker Hub 的机器**一点行为都没变**。
@@ -2279,6 +2279,8 @@ feat/self-host-distribution    链段= 67 含 image-build-args=true 定义在场
 上面那句"既不能写'照样能装'，也不能写'装不了'"当时是对的，因为它问的是**厂商判据的充分侧**；
 本轮用的只是**必要条件那一侧**（未同意档一次都不注册 SW ⇒ 那一档下"可安装"不成立），
 所以"不成立"这个结论与当时的谨慎不冲突，而正面证据（已同意档 `beforeinstallprompt` 到底发不发）**仍然欠着**。
+🟢 **06:1x：这一发的配方已在 §8.53** —— 监听必须装在导航之前、只观测事件不 `prompt()` 这两个坑都预解了，
+欠的只剩窗口与载体（不是"不知道该怎么测"）。
 
 🔴 **顺带抓到我自己那条等待器脚本的一处语法错，而且它已经"跑起来"过**（与 §7 的"探针自己坏了"同族）。
 重排 G-47 的等待器时发现 `/tmp/queue-g47-real-tree.sh:20` 写的是
@@ -3178,6 +3180,8 @@ en 'site.platforms.web.body':
 **仍然欠的那半个读数**：已同意档下 `beforeinstallprompt` 到底发不发（正面证据）。
 它要一次真浏览器跑，等窗口；在拿到之前，上面那句措辞是**保守**的
 （"点一次就能装成应用"仍然预设了能装 —— 如果那一发测出来是不发，这句还得再退一步）。
+🟢 这一条的**配方**已在 §8.53 落好（含两个预解的坑：监听必须装在导航之前、只观测不 `prompt()`），
+欠的只剩窗口与载体，不再是"不知道该怎么测"。
 
 ### 8.51 把 §8.49 那次全跑的读数**钉在"当前产物"上**，并排掉两处"看着像缺口"的（06:0x）
 
@@ -3286,6 +3290,50 @@ docker run --rm --entrypoint sh supersync:selfhost-verify -c \
 **main 的推进速率**（决定"要不要提前重算载体"的现量）：`030f0969` 05:49:26 → `70ee6868` 06:05:10 →
 `05be4729` 06:06:11 —— 最后两笔相隔 **61 秒**。任何"现在算好的 SHA"到落地那一刻必然过期，
 所以等待器**只做检测**，绝不在窗口里自动跑 `pnpm check`（`check:ai-e2e` 的前置会 SIGKILL 别人在 4318/4319/3000 上的 dev server）。
+
+### 8.53 G-51 欠的那半个正面读数：配方已在仓内，但它那条读数没有载体，只能当方法用（06:1x）
+
+写探针之前先按"仓内可能已有现成装置"这条纪律 grep，结果**中了一整条**：
+`docs/plans/multi-platform-widgets-progress.md` **R39** 已经跑过一次 `beforeinstallprompt`，
+并把两个坑踩平了：
+
+1. 🔴 **监听必须装在"任何页面脚本之前"，不是"导航之后 N 秒"**：R39 第一版在 `Page.reload` 之后 6 秒才
+   `Runtime.evaluate` 装监听 ⇒ 读到 `捕获: NO`，长得像"Edge 不支持/不触发"。
+   真因是 **BIP 在页面加载过程中就 fire 了**，那 6 秒里事件已经过去、事件对象也没存。
+   修法是 `Page.addScriptToEvaluateOnNewDocument`（Playwright 侧对应 `context.addInitScript`，且必须在 `goto` 之前）。
+   修完立刻 `捕获: YES`。R39 自己把这条归进那一族第四次：**"没观测到 ≠ 没发生"**，与 §7 元规则 1 同一条。
+2. 🔴 **只观测事件，绝不 `prompt()`**：R39 捕到之后调 `window.__bip.prompt()`（带 `userGesture: true`），
+   **那一行结果没写进文件、脚本挂住** —— 与它 R34 那条 `Notification.requestPermission()` 同一个形状
+   （浏览器级对话框无人交互不 resolve），而 BIP **没有"预授权"对应物**，它的整个意义就是弹那个框。
+   ⇒ 我这一测的判据只能写成"事件有没有 fire / `event.reason` 与 manifest 解析结果"，
+   **不能**写成"用户点得到点不到"。
+
+⚠️ **但 R39 不能直接拿来当 G-51 的证据**：那条记录**没写被测载体**（整节里没有 URL/origin/构建形态），
+我按"引用 N 项要带哪一趟"回查过原文与仓内脚本（`__bip` / `addScriptToEvaluateOnNewDocument` 在仓库里只有文档那两处，
+探针本体是当趟的临时 CDP 脚本，没落进仓）⇒ **它证的是"Chromium 系在这个站点上会 fire"，站点不明**。
+所以本轮的处置是：**方法复用，读数作废重取**。这不是 R39 写错，是它的结论本来不需要载体 ——
+需要载体的是我这一条（要回答的对外承诺绑在 heyta 的 `/app/` + 同意闸门 + `/app/` scope 的 SW 上）。
+
+**窗口开着时这一测该怎么做（已预解两个坑，逐条可执行）**：
+
+| 步 | 做法 | 判据 |
+|---|---|---|
+| 载体 | 起自托管全栈，用**回环**地址访问 `/app/`（`localhost` 是 trustworthy origin，装入口的必要条件之一才不会被"其实是 HTTP LAN IP"污染） | 页面标题 + `navigator.serviceWorker.getRegistration().scope` 必须打出 `…/app/` |
+| 三档 | ① 全新 context（不点任何按钮）② 点界面上那个**「只用本机」** ③ 点**「同意并联网」**（与 `selfhost-web.spec.ts` 的 `openApp()` 同一个动作，不另造） | 每档各自一趟、互不共享存储 |
+| 观测 | `addInitScript` 里 `addEventListener('beforeinstallprompt', e => { e.preventDefault(); window.__bip = {fired: true, props: Object.keys(e), platform: e.platform, amount: e.availableAmount} })`，之后 `goto`，再轮询 `__bip` | ⚠️ **属性用"把事件对象自己可枚举的东西全打出来"这一式，不写死字段名**：现行 `BeforeInstallPromptEvent` 上是 `platform` / `availableAmount` / `userChoice` / `prompt()`，早期提案里那个 `reason` 我**没在这一趟里验过**，写死它就是在配方里塞一条未证的东西。①② 预期**没有** SW（生产者侧已量：同意前 `registerServiceWorker` 调用数 0）⇒ 这两档 BIP 不 fire 是**结构性的**，不是产品坏；③ 是唯一能给正面证据的一档 |
+| 截图 | 三档各一张，落在固定路径，**人打开看过**（§6.2 规定一） | 图里要能看出同意面板的状态 |
+
+🔴 本轮**没有**把这套写成 spec 文件，理由是：跑不了的判据丢进 `e2e/` 会被别人 config 的 glob 收走，
+给别人埋一次红（且违反"判据必须与它约束的改动同批落地"）。它现在只以这张表存在，
+落地那一刻与词条改动、`live-site` 那条新判据**同一次**变成文件。
+
+**当下状态不变**：G-51 仍是"已判定、补丁已备好、待表空出"，措辞按 §8.50 那版走
+（它预设"点一次同意就能装成应用"——若 ③ 档测出来是不 fire，这句还要再退一步，
+退到只承诺"离线可用 + 数据在自己浏览器里"那两条已被直接证过的）。
+
+**06:1x 的环境读数（为什么这一测今天没跑）**：`vm.loadavg` 1 分钟位 **32.11**、5 分钟位 16.14，
+容器列表为空（05:50 那趟已收），`:3000` 与 `:3100` 各有别人的 node 在听 —— 按目标那句
+"负载 >12 属环境无效，等窗口而不是调低阈值"，这一测属于**该等**的那一档，不是能做的那一档。
 
 
 
