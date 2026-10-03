@@ -168,8 +168,11 @@ else
     else
       fail "端口 ${PORT} 上的占用者认证不通过：${CERT}
    别为了让脚本跑下去就放行 —— 那正是「判据全绿而验的是旧代码」的形状。
-   要么把本 ROOT 的栈起在它自己的端口（换 PORT=），要么确要跨 ROOT 复用就显式
-   HEYTA_E2E_ALLOW_FOREIGN_SERVER=1，并在汇报里写明服务端侧判据证明的是那台机器。"
+   出路按顺序：① 把本 ROOT 的栈起在一枚空端口（PORT=<空端口> bash scripts/mobile-e2e-up.sh，
+   调用方跟着同一个 PORT）；② 让那台服务端的主人先重建再重启它
+   （pnpm --filter @heyta/server build —— 只重建 dist 不够，跑着的进程不会换代码）；
+   ③ 确要跨 ROOT 复用就显式 HEYTA_E2E_ALLOW_FOREIGN_SERVER=1，
+   并在汇报里写明服务端侧判据证明的是那台机器现在的行为。"
     fi
   else
     # 数据库连接串：优先用 server/.env 里的 POSTGRES_*，没有则退回本地默认。
