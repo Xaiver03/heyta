@@ -2255,6 +2255,115 @@ feat/self-host-distribution    链段= 67 含 image-build-args=true 定义在场
 并且凡是"循环 + 循环后的判定"这种形状，要**把循环上限临时调成 1 跑一趟**，
 好让循环后那几行被执行到 —— 不然一条只有等完才会走到的分支可以永远不被语法检查覆盖。
 
+### 8.36 §8.33 那句"第一道关进不去"是**环境瞬时读数**；这一轮顺带量出 G-52 与 G-47 的一条新证据
+
+03:41 复跑 `pnpm verify:selfhost-stack` 前先低负载复量（`vm.loadavg` = 11.58，阈值 12；
+`docker info` 返回 29.4.0 ⇒ 两个环境前置都成立），然后：
+
+```
+$ docker pull node:24-alpine
+Digest: sha256:ebfe2f90462722a7a4de65e91990e97fe0d401c70e0e762c5b53302f905ec1c1
+Status: Downloaded newer image for node:24-alpine      rc=0
+```
+
+🔴 **这把 §8.33 的"第一道关实测根本进不去第二条"从"仓库属性"降级成了"那一刻的读数"** ——
+和 §8.31 那句"这句话有保质期"是同一个形状：那句话当时是真的（本地一枚 `node:*` 缓存都没有、
+`registry-1.docker.io` 直连 000），但它没有标注保质期，所以后来者会照它排"必须先有 mirror 才能验证"。
+**现在的正确表述**：`NODE_IMAGE` 这个旋钮解决的是"**接不上时有没有出口**"，
+它不保证"接得上"，而"接得上"这一档**每次验证前要现量**，不能引用上一次的红。
+（`docs/runbooks/self-host.md:111` 那句括号里同样写着"当时的现量"，措辞已经是带保质期的，不用改。）
+
+这一轮**顺带**量出两件事，都不是我原本要量的：
+
+**① 登记 G-52：对外那句"连不上 Docker Hub 也能走通"只覆盖了三枚镜像里的一枚。**
+`server/README.md:103-104` 印的是 —— "The build override is also where `APK_MIRROR`,
+`NPM_REGISTRY` and `NODE_IMAGE` live, so it is the file that makes this path work on a machine
+that cannot reach Alpine's CDN, npm's registry, **or Docker Hub**."
+把这条**命题**（而不是字面串）拿去对账，现量是：
+
+| `image:` 出现处 | 值 | 有旋钮吗 |
+|---|---|---|
+| `server/docker-compose.yml:36`（以及 `build.yml:37`、`migrate-once.yml:57`） | `${SUPERSYNC_IMAGE:-supersync:local}` | ✅ |
+| `server/docker-compose.yml:170` | `postgres:16-alpine` | 🔴 无 |
+| `server/docker-compose.yml:273` | `caddy:2.11-alpine` | 🔴 无 |
+| `server/docker-compose.monitoring.yml:22` | `amir20/dozzle:latest` | 🔴 无 |
+| `server/docker-compose.monitoring.yml:38` | `louislam/uptime-kuma:1` | 🔴 无 |
+
+🔴 **而 §4 那条主命令起的恰好是 `caddy / postgres / supersync` 三个**（`docs/runbooks/self-host.md`
+自己写的）。所以一台连不上 `docker.io` 的主机按文档走完：构建阶段被三个旋钮救活，
+**`up` 那一刻仍然要往 Docker Hub 拉两枚**，而这两枚没有任何出口。
+这句话是**本批自己写下去的**（`NODE_IMAGE` 那一笔），所以它属于"停掉对外错话"的范围，
+不是上游遗留。
+
+为什么 R1–R5 全看不见：那五条都在比 `server/Dockerfile` 的 ARG 与 compose 的 `build.args`，
+**运行期 pull 的 `image:` 不在任何一条的枚举集合里**。这是 §8.21 那条"按命题取，不能按字面串取"
+的同一件事的第三次命中 —— 上次漏了正文里换一种措辞的同一命题，这次漏的是**同一命题的另一半时间轴**
+（构建期扫了、运行期没扫）。
+
+已经落了判据本体（**先让它红在真缺陷上，再修东西**，不是先修再补判据）：
+`research/tools/check-image-build-args.mjs` 加 **R6** —— 枚举 `server/docker-compose*.yml`
+里每一枚 `image:`，不是 `${VAR:-默认}` 形状的必须在 `IMAGE_HARDCODED` 里逐条写明"为什么它不挡路"
+（和 `DEFAULT_MAY_DIFFER` 同一个成本设计）。它**第一次跑就对当前树报 4 条红**、rc=1，
+红的位置逐行是上面那张表的后四行 —— 这是最强的"能失败"证据：被测对象是真的，不是注入的假样本。
+探针还自带两条 R0：compose 文件数为 0 或 `image:` 数为 0 都算红（遍历断掉的形状，见 §7 同族）。
+🔴 R6 要求的是 `${NAME:-默认}` **整串**，不是"以 `${` 开头"：只写 `${NAME}` 的半旋钮在变量没设时
+会把 `image:` 解析成空串，compose 报 `invalid reference format` —— 那比硬编码更难归因，
+因为它看起来像已经接好了。
+
+**G-52 这一单已做掉的部分**（同轮，03:5x）：
+
+| 动作 | 落点 | 读数 |
+|---|---|---|
+| 四枚运行期镜像接旋钮 | `docker-compose.yml`（`POSTGRES_IMAGE` / `CADDY_IMAGE`）、`docker-compose.monitoring.yml`（`DOZZLE_IMAGE` / `UPTIME_KUMA_IMAGE`） | R6 从 4 红转绿：`5 份 compose 的 7 枚 image: 全部旋钮驱动（接了旋钮 7 / 刻意硬编码 0）` |
+| 旋钮**真的接线**（不是只在 YAML 里像） | `docker compose -f docker-compose.yml config` 各渲染一次 | 不带变量 ⇒ `postgres:16-alpine` / `caddy:2.11-alpine` / `supersync:local`；带变量 ⇒ 三枚全部换成 `mirror.example.com/…`。**默认逐字节不变**是靠这条命令证的，不是靠看 YAML |
+| 那句超出的对外话 | `server/README.md` §"一条 compose 起全套" | 改成"三个旋钮管**构建**"＋另起一段列 `POSTGRES_IMAGE`/`CADDY_IMAGE` 并写明它们住在**默认**那份文件里；原文那句"makes this path work on a machine that cannot reach … Docker Hub"不再原样存在 |
+| 中文 runbook 同一命题 | `docs/runbooks/self-host.md` §3 末 + §4 括号 | §3 加两个旋钮与"构建期/运行期"的分法；§4 那句"三个旋钮在这条路上也生效"补了"只覆盖构建，运行期那两枚在默认那份文件里" |
+| 可发现性（外人唯一会去抄的那张表） | `server/env.example` 末尾 | 加五个旋钮的分组注释（build time / run time）；⚠️ 这里**不许**写入口命令，否则它就成了第 5 份抄件 —— 该文件在 `check:selfhost-entry-command` 的扫描集里，现量仍是 0 条 |
+
+🔴 **R6 的变异对照里，第一条臂是假的，纠正后才有四条**（这一条与 §7"红的是探针不是实现"同族）：
+最初的 D 臂是"`--root` 指一棵只有 `Dockerfile`、没有 compose 的树"，我以为它在测 R0，
+`rc=1` 也确实是 1 —— 但 `cat` 那个日志看到的是 **`ENOENT: … docker-compose.build.yml` 的 node 栈**，
+R0 一句都没跑。红是真的，红的**原因**不是我想证的那个。补了两行 `existsSync` 前置检查后：
+D1（缺 compose 文件）rc=1 且输出里 `Error:`/`ENOENT` 各 **0** 次、点名到具体文件；
+D2（真树但把 `image:` 行全删空）rc=1 报 R0「一个 image: 都没读到」。
+⇒ 变异臂的验收不能只看退出码，要读它**红在哪一句**（这一轮我自己差点把一条堆栈登记成判据证据）。
+其余三条臂：A 半旋钮 `${POSTGRES_IMAGE}`（无 `:-默认`）rc=1 点名那一行；B 改回硬编码 rc=1 点名 `caddy`；
+C 允许表分支（今天恒空 ⇒ **从未被执行过的那一支**）临时把 `IMAGE_HARDCODED` 填一条后 rc=0
+且把那行理由打印出来。对照：未变异的真树 rc=0。
+
+**R6 的适用面**（别读多）：它只管 `server/docker-compose*.yml`，也就是**外人那条 compose 路**。
+Helm 那条不在里面：`postgresql` 的镜像本来就走 `.Values.postgresql.image.repository`，
+但 `server/helm/supersync/templates/tests/test-connection.yaml:13` 的 `busybox:1.36` 是写死的 ——
+它只在 `helm test` 时拉，不在部署路径上，所以本批没为它加旋钮，登记在这里而不是假装 R6 覆盖了它。
+
+
+**② G-47 的"决定"其实早就写在工具自己嘴里**：`research/tools/gen-image-npm-tree.mjs:70-77`
+有一段显式 `fail`：
+
+> 仓库里出现了 npm 的 lockfile（`package-lock.json` / `npm-shrinkwrap.json` / `server/package-lock.json`）
+> —— 镜像那棵树被钉住了，这份"每次重解都要重新量"的快照就是多余的第二事实源。
+> **正确动作是把对账改成直接读那个 lockfile，并删掉本脚本。**
+
+也就是说这一单剩下的不是"再想一个形状"，而是**把那条被写下来的路走一遍**：
+生成 `server/package-lock.json` → 生产阶段 `npm install` 换 `npm ci` → 快照生成器与它那三条腿
+改成读 lockfile。代价写清楚：它动 `server/Dockerfile` 的生产阶段，
+所以**必须有一次真构建**才算闭环（`--check` 那类纯文件系统判据证明不了 `npm ci` 装得出来）。
+
+载体与 #7 的过期读数一并现量（03:41，`git log -1` 口径）：
+
+| 对象 | 读数 |
+|---|---|
+| `main` | `391e4c27`（03:41 现量） |
+| 载体 `feat/self-host-merge-main` | `564fcab8`，第一父 `f61c23af` ⇒ **已过期**，落地前按 §8.16 重算 |
+| `merge-base(main, 本分支)` | `b850b1c6` |
+| `merge-base --is-ancestor main 本分支` | **NO** ⇒ 仍不是 FF |
+| #7 那 5 枚重叠文件 | `docs/README.md` / `package.json` / `packages/i18n/src/locales/zh-CN.ts` / `…/en.ts` / `scripts/check-script-snapshot.mjs` **03:41 现量五枚全部仍是 `M`** ⇒ 前置仍未满足 |
+
+⚠️ 最后一行的路径要写全：`packages/i18n/src/locales/{zh-CN,en}.ts`（不是 `packages/i18n/src/*.ts`）。
+我这一轮先按后者探了一次，得到"这两枚干净了"的**假读数** —— 打错路径的 `git status -- <path>`
+返回空，而空看起来就是"没人动"。判"某个文件被别人提交了没有"要用**它真实存在的路径**，
+并顺手确认这个路径 `git ls-files` 认得。
+
 
 
 
