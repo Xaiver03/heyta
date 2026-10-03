@@ -405,7 +405,7 @@ W8 起**不是可回退的增量**：多步循环一旦放开，出境披露的�
 | W7（结构债） | ✅ | 见本文 W7 的"✅ 2026-10-03 做完了"那节 | 冗余前门删除 + 请求组装收成一个 + `describeRoutedFailure()` 定义点恰好一处，全部由 `check-ai-tools.mjs` 规则 6 钉住（**已注入验证会红**） |
 | W8（多步循环 + 一次性并集披露 + 硬上界） | ✅ | `ai-assistant.ts`（循环 / 档位 / 并集 / 计划）+ `packages/ai/src/assistant-limits.ts`（三个上界住在这里，不在 app-host） | `packages/app-host/tests/ai-assistant.spec.ts` 20 条：第二次请求带 `role:'tool'` 的观察、失败也回送且**仍计入步数**、写只出提案（`host.submits === 0`）、提案后**没有第二次调用**、越界字段 ⇒ 停而不是放行。`assistant-limits.spec.ts` 13 条：单位是**字节**、边界取 `>` 不取 `>=`、标签由常量推导 |
 | W9（能力清单生成器） | ✅ | `scripts/gen-ai-capability-manifest.mjs` → `packages/ai/src/capability-manifest.generated.ts`（424 行，生成物） | 手写**不可能**：清单是产物。`--check` 已作为**规则 7 接进 `check:ai-tools`**（不一致 exit 1），`capability-manifest.spec.ts` 29 条钉形状 |
-| W10（扩工具目录 + "覆盖面"门禁） | ✅ **门禁已落地**（2026-10-03，改称 `AI-COV`），覆盖面 **3/8** | `scripts/check-ai-coverage.mjs` §9（挂在既有 `check:ai-coverage` ⇒ **已在 `pnpm check` 链上**）+ [`ai-event-tool-contract.md`](ai-event-tool-contract.md) §2/§5 | 目录 **9 个工具**（读 4 / 写 5）。🔴 **此前对外说的 `2/8` 是错的**：`covered` 判的是"有任一工具"，只读一个 `list_projects` 的 `PROJECT` 被算成已覆盖 ⇒ 口径改成"读+写都有"（生成器导出的 `countsAsCovered()`，门禁只从它取、不再自己算）。本批补了 `create_project` + `list_habits`/`create_habit` ⇒ `TASK`/`PROJECT`/`HABIT` 三项齐。缺的**五项**：`TAG` `NOTE` `HABIT_LOG` `FOCUS_SESSION` `REMINDER`，全部带 `AI-COV-2/3/5/6/7` 登记。⚠️ 本文与契约文档初稿曾把 `FOCUS_SESSION` **移出分母**（当时写"分母 7、已覆盖 1"）—— 那条排除与准入判据句子（"能填**或能按**"）自相矛盾，已撤回，它带着缺口留在分母里。🔴 **剩下的五项卡在一条只有产品能拍的算术**：`packages/local-api/tests/local-api.spec.ts:87` 的 `LOCAL_API_TOOLS.length <= 10` 与"每实体一读一写"结构相撞（现 9 个 ⇒ 只剩 1 席，五项要 10 席）—— 见契约文档 §5.2，本批**没有**为塞工具而删工具、也没有擅自抬高上限。**门禁能失败已四次注入证过**（假实体 / 把 `create_project` 的 `kind` 改成 `read` ⇒ 报「读 2 / 写 0」/ 工单号改成 `TODO-7` / 🔴 `EVENT` 进两份实体清单），每次都响、还原后 exit 0，逐字读数记在契约文档 §5.3 |
+| W10（扩工具目录 + "覆盖面"门禁） | ✅ **门禁已落地且覆盖面已跑满**（2026-10-03，改称 `AI-COV`），覆盖面 **8/8** | `scripts/check-ai-coverage.mjs` §9 覆盖面 + §10 容量（挂在既有 `check:ai-coverage` ⇒ **已在 `pnpm check` 链上**，没有新增段）+ [`ai-event-tool-contract.md`](ai-event-tool-contract.md) §2/§5/§8 | 目录 **22 个工具**（读 10 / 写 12）、实体 **8 里覆盖 8**（口径：读+写都有）。🔴 **此前对外说的 `2/8` 与同日报的 `3/8` 都是过期抄件**：前者错在 `covered` 判"有任一工具"（只读一个 `list_projects` 的 `PROJECT` 被算成已覆盖），后者是**同一批早几小时**的读数 —— 本批把剩下的五格（`TAG` `NOTE` `HABIT_LOG` `FOCUS_SESSION` `REMINDER`）全部补齐，`ENTITY_COVERAGE_DEBT` 现在是**空的**。⚠️ 本文与契约文档初稿曾把 `FOCUS_SESSION` **移出分母**（当时写"分母 7、已覆盖 1"）—— 那条排除与准入判据句子（"能填**或能按**"）自相矛盾，已撤回。🔴 **初稿写"剩下五项卡在一条只有产品能拍的算术"（`local-api.spec.ts:87` 的 `<= 10` vs 每实体一读一写 ⇒ 只剩 1 席、要 10 席）—— 这条已经解除，而且不是靠拍数字**：那条上限的**单位写错了**（总量从来不是用户要理解的负担，逐工具授权清单才是）。现在改成按实体判（`shared.ts` 的 `MAX_TOOLS_PER_ENTITY = 5`，四档推导见其注释），总量成为**派生**值 = 每实体上限 × 覆盖分母。**门禁能失败**：四次注入（契约文档 §5.3）+ 六个新工具各一条行为变异（§8，含未变异的正向对照 `44 passed`） |
 | W11（批量写入） | ⛔ 未做 | — | 按本文要求：**先论证**与 AGENTS §3.4 的关系，论证不成立就不做 |
 | W12（chat 外壳） | ✅ | `apps/web/src/features/ai/AssistantPanel.tsx` + `App.tsx`（任务视图内）+ i18n 37 键 ×2 语言 | 单测 19 条（`ai-assistant-panel.spec.tsx`，含"第一次点发送 ⇒ 一个请求都没发"）；**真浏览器** `e2e/tests/ai-assistant.spec.ts` 一条旅程 + **四张**截图（含暗色那张）。⚠️ **看图的是本会话的 agent，不是产品负责人** —— 两张有问题的图确实是被"看"出来的（动画中途按快门、两种角色分不出来），但 §6.2 要求的那一眼**还没发生**，四张图在 `apps/web/evidence/assistant/` 等人看。档位选择器在设置里（`ai-assistant-tier.spec.tsx` 14 条） |
 | D-2（授权粒度） | ✅ **已拍并落地**（助手侧） | `apps/web/src/features/settings/{aiStore,AiSettings}.tsx` 的 `assistantTier` | 拍的是**助手这一侧**：读 / 读+提议两档，与入站 MCP 的**逐工具默认关**解耦但共用 `isToolGranted()`。双向不越界已在真浏览器里验（`ai-assistant.spec.ts` 第 7 步）。⚠️ 目录扩到几十个之后仍需重拍（见 §7.2 第 3 条） |
@@ -436,26 +436,30 @@ W8 起**不是可回退的增量**：多步循环一旦放开，出境披露的�
    - "14 号"这种**裸日**规则有实打实的误伤面："买 5 号电池"、"37 号楼"
      都会被吃成到期日。规则内核自己的立场是"宁可让用户看见词还留在标题里"，
      所以它需要的是一个**产品决定**（要不要接受这类误伤），不是一个待写的正则。
-3. **W10 的覆盖面门禁 ✅ 已写**（2026-10-03，`AI-COV`）：`scripts/check-ai-coverage.mjs` §9，
+3. **W10 的覆盖面门禁 ✅ 已写，且覆盖面已跑满**（2026-10-03，`AI-COV`）：`scripts/check-ai-coverage.mjs` §9（覆盖面）+ §10（容量），
    挂在既有 `check:ai-coverage` 上 ⇒ **已在 `pnpm check` 链里**（原链第 48 段 / 共 57 段），
-   没有新开 `package.json` 脚本
-   （那个文件此刻仍有别的会话的未提交改动）。**逐段跑绿读数（50 绿 + 5 红的逐条归属 +
-   一条未定性超时）在 [`ai-event-tool-contract.md`](ai-event-tool-contract.md) §7。**
-   （那个文件此刻仍有别的会话的未提交改动）。口径只从生成器的 `countsAsCovered()` 取，
+   没有新开 `package.json` 脚本（那个文件此刻仍有别的会话的未提交改动）。
+   **逐段跑绿读数（含 5 红的逐条归属与一条未定性超时）在**
+   [`ai-event-tool-contract.md`](ai-event-tool-contract.md) §7。口径只从生成器的 `countsAsCovered()` 取，
    门禁自己不重读上游。三条判据：分母算术对账、每个分母实体"要么读写齐、要么带 `AI-COV-<n>` 登记"、
    以及"**模型可选得到**"（工具必须在 `listAuthorizedTools()` 的投影里，光在目录数组中不算）。
-   🔴 **"只是主张"这句话从今天起不成立了**，但它换成了另一条要说清的话：
-   现状数字 = 目录 **9**（读 4 / 写 5）、实体 **8** 里覆盖 **3**
-   （`TASK`/`PROJECT`/`HABIT`），未覆盖 `TAG / NOTE / HABIT_LOG / FOCUS_SESSION / REMINDER`
-   五项**全部有编号登记**，不是漏网。
-   ⚠️ 本节原写的"6 个工具、覆盖 2 个、未覆盖六项（含 `HABIT`）"三个数都已过期 ——
-   那两个错数的来源是 `covered` 判"有任一工具"（把只读的 `PROJECT` 计成已覆盖），
-   详见 [`ai-event-tool-contract.md`](ai-event-tool-contract.md) §2.1。
-   🔴 **剩下五项真正卡住的地方不是"没写"，是一条算术**：
-   `packages/local-api/tests/local-api.spec.ts:87` 的 `<= 10` 上限 vs 每实体一读一写
-   ⇒ 只有 1 席、需要 10 席。这一条要产品拍（抬上限并给它一个推导理由，或腾出一个既有工具），
-   本批两端都没动。
-4. **另外四条已登记的缺口**（都不阻塞使用，但别读成"已做"）：
+   🔴 **现量：目录 22（读 10 / 写 12）、实体 8 里覆盖 8/8，`ENTITY_COVERAGE_DEBT` 台账是空的。**
+   ⚠️ 本节先后出现过三组数，都已过期，按时间排：「6 个工具 / 覆盖 2」→「9 个（读 4 / 写 5）/ 覆盖 3」→
+   现在的 22 / 8。前两组的错法**不一样**，值得分开记：第一组是 `covered` 判"有任一工具"，
+   把只读的 `PROJECT` 计成已覆盖（口径问题，见契约文档 §2.1）；第二组只是**同一批早几个小时的抄件**
+   （搬运问题）。⇒ 同一份文档里连续两次数字错，原因可以完全不同 —— 别把第二次当第一次的余波修掉。
+   🔴 **初稿写"剩下五项卡住的地方不是'没写'，是一条要产品拍的算术"**
+   （`local-api.spec.ts:87` 的 `<= 10` vs 每实体一读一写 ⇒ 只剩 1 席、需要 10 席）——
+   **这个判断是错的**：冲突是真的，但它不需要人拍，因为**那条上限的单位写错了**。
+   总量从来不是用户要理解的负担，**逐工具的授权清单**才是，而清单天然按实体分组。
+   换成 `MAX_TOOLS_PER_ENTITY`（每实体 5，四档推导见 `shared.ts` 的注释）后冲突自动消失，
+   并且新判据比旧的**更严**：旧的那条下，TASK 一家吃掉 10 席中的 5 席不会响。
+   ✅ 五项缺口全部落地：`TAG`（`list_tags` / `create_tag` / `set_task_tags`）、
+   `NOTE`（`list_notes` / `get_note` / `create_note` / `update_note`）、
+   `HABIT_LOG`（`list_checkins` / `record_checkin`）、`FOCUS_SESSION`（`list_focuses` / `log_focus`）、
+   `REMINDER`（`list_reminders` / `create_reminder`）。**每条都带行为判据 + 至少一条变异**
+   （现量读数在契约文档 §8，含一条未变异的正向对照）。
+4. **另外六条已登记的缺口**（都不阻塞使用，但别读成"已做"）：
    - **循环里没有"规则先跑、命中即零出境"的短路**。单步面板有
      （`ai-tool-call.ts`：规则命中直接执行，一次请求都不发），助手的多步循环**没有** ——
      因为一句自然语言在 loop 里可能同时要"查 + 改"，规则层认不出组合意图。
@@ -470,6 +474,16 @@ W8 起**不是可回退的增量**：多步循环一旦放开，出境披露的�
      `check-ai-tools.mjs` 的规则 7 上（`pnpm check` 会跑到）。之所以不新开一个
      `package.json` 脚本，是因为该文件此刻有**别的会话的未提交改动**，
      加脚本会把它们一起带走。等它干净时抽成独立判据。
+   - 🔴 **覆盖面"跑满"之后新暴露的一条：每实体内的动作还有缺口**，而门禁看不到它 ——
+     门禁只判到"这个实体有没有读+写"这一格。逐条台账（含每条"是还没做"还是"产品没拍"）
+     在 [`ai-event-tool-contract.md`](`ai-event-tool-contract.md`) §5.4（`PROJECT` 的改名/归档/删除、`HABIT` 的改目标、
+     `TAG` 的删除、`HABIT_LOG` 的撤销打卡、`REMINDER` 的改时刻/延后/忽略 等）。
+     ⚠️ 容量上限换形之后，**"被上限挡着"这个理由已经没有了**，别再往它身上推。
+   - ⚠️ **"要不要上 `search_tools` 式动态检索"这条已经到该重拍的点上了，本批没拍**：
+     ADR-0045 §2.6 当初给的条件句是"目录到几十个时这条要重拍"，现在 22 个 ⇒ **前提已成立**。
+     没拍不是拖延，是它要的是一个**实测**（22 条 JSON Schema 进 context 的 token 成本、
+     以及检索改一跳之后的命中率），而本批没有真端点可测（托管 AI 未开 ⇒ 只能拿本机端点量，
+     那测出来的数不属于任何一条产品档位）。**登记，不代拍**。
 5. 🔴 **这一批没有跑 `pnpm reinstall:all`（AGENTS §6.1.1 的固定收尾），两件事都是理由**：
    - 并行会话正在用同一批设备（模拟器 / 打包机）跑移动端验收，`reinstall:all` 与
      `verify:mobile-*` 并发会把对方的取证现场踩掉 —— 这条禁令在 §7 里写过不止一次；
