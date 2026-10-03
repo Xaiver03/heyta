@@ -2195,6 +2195,13 @@ cd e2e && npx playwright test tests/due-date-edit.spec.ts tests/motivation.spec.
 | `check:landing-e2e` | 仍然 **2 failed / 15 passed**（`docs-centre.spec.ts` 配图张数 / 反向对照） | B24 那条判据缺陷，未提交侧没有对应文件 —— 归因不变 |
 
 📌 这条更新的价值在**把"等别人提交"变成可核对的三枚文件名**：下一位复跑时只要 `git status` 里这三枚不再脏，就应该期待 `check:ai-e2e` 转绿；如果它们已经提交而这条仍红，那 B22 的归因就被证伪，要重新查。
+
+🔴 **2026-10-03 09:5x 复核（HEAD `c444d827`）：上面那句"预期转绿"的前提已经成立，而这一条还没重跑 —— 所以 B22 既没被证实也没被证伪，状态从"归因待定"改成"待重验"。**
+三枚文件现已全部提交（`apps/web/src/App.tsx` 与 `apps/web/src/features/shell/view-tabs.ts` 在 `c0783d2f`，`apps/web/src/features/tasks/DueEditor.tsx` 在 `adb627cc`），`git status` 里它们都不再脏。
+本轮没有跑 `check:ai-e2e`，两个原因写在 goal §7.10：同机 `vm.loadavg` 实测 80.64（那种负载下 Playwright 的读数没资格进台账），
+且这道门禁的 preflight 会 SIGKILL 别的会话的 dev server（traps #87），而此刻别人正在 `packages/ui/src/calendar` 上写代码。
+**下一位复跑时按两种结果分别处置，不要写成"应该已经好了"**：转绿 ⇒ B22 的归因成立，可直接关闭；
+仍红 ⇒ 归因被证伪（"提交态落后于未提交的工作"这句到此为止），这 3 条要重新查它们本身。
 ⚠️ 顺带一条**产品事实**（不是本条线的账，但值得被看见）：日历页页头会挂着上一个视图的象限名，这个缺陷在**已提交的 main** 上就存在，两位读者别把它读成"测试太挑"。
 ## B23. 🔴 `check:empty-state` 的两处红：一处是**判据缺陷**（已修），另一处是**别人那条线的新站点**（登记，不代改）（2026-10-03 05:27 取证）
 
