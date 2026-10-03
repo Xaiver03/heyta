@@ -26,12 +26,20 @@ import {
   runReadTool,
   toWriteIntent,
   type LocalApiHost,
+  type LocalApiFocusSession,
   type LocalApiHabit,
+  type LocalApiHabitLog,
   type LocalApiItem,
+  type LocalApiNote,
+  type LocalApiNoteRow,
   type LocalApiProject,
+  type LocalApiReminder,
+  type LocalApiTag,
   type LocalApiWriteIntent,
   type LocalApiWriteResult,
 } from '../src/index.js';
+
+import { TOOL_MINIMAL_ARGS } from './tool-minimal-args.js';
 
 const ITEM: LocalApiItem = {
   id: 't1',
@@ -44,8 +52,31 @@ const ITEM: LocalApiItem = {
 };
 const PROJECT: LocalApiProject = { id: 'p1', name: '工作', taskCount: 1 };
 const HABIT: LocalApiHabit = { id: 'h1', name: '喝水', target: 8, unit: '杯', goalType: 'atLeast' };
+const TAG: LocalApiTag = { id: 'g1', name: '家里' };
+const NOTE_ROW: LocalApiNoteRow = {
+  id: 'n1',
+  projectId: 'p1',
+  isPinnedToToday: true,
+  updatedAt: 1_700_000_000_000,
+};
+const NOTE: LocalApiNote = { ...NOTE_ROW, content: '买咖啡豆' };
+const CHECKIN: LocalApiHabitLog = { habitId: 'h1', date: '2026-10-03', value: 8 };
+const FOCUS: LocalApiFocusSession = {
+  kind: 'work',
+  taskId: 't1',
+  plannedMs: 25 * 60_000,
+  actualMs: 24 * 60_000,
+  completed: true,
+  startedAt: 1_700_000_000_000,
+};
+const REMINDER: LocalApiReminder = {
+  id: 't1:1700000000000',
+  taskId: 't1',
+  triggerAt: 1_700_000_600_000,
+  phase: 'scheduled',
+};
 
-/** 真的实现了 `LocalApiHost` 五个成员的假宿主（少了成员就编译不过 —— 那是故意的）。 */
+/** 真的实现了 `LocalApiHost` 全部成员的假宿主（少一个成员就编译不过 —— 那是故意的）。 */
 function host(): LocalApiHost {
   const items: readonly LocalApiItem[] = [ITEM];
   const projects: readonly LocalApiProject[] = [PROJECT];
@@ -55,25 +86,23 @@ function host(): LocalApiHost {
     getTask: (taskId: string) => Promise.resolve(items.find((x) => x.id === taskId)),
     listProjects: () => Promise.resolve(projects),
     listHabits: () => Promise.resolve(habits),
+    listTags: () => Promise.resolve([TAG]),
+    listNotes: () => Promise.resolve([NOTE_ROW]),
+    getNote: (noteId: string) => Promise.resolve(noteId === 'n1' ? NOTE : undefined),
+    listHabitLogs: () => Promise.resolve([CHECKIN]),
+    listFocusSessions: () => Promise.resolve([FOCUS]),
+    listReminders: () => Promise.resolve([REMINDER]),
     submit: (): Promise<LocalApiWriteResult> => Promise.resolve({ ok: true, taskId: 'created-1' }),
   };
 }
 
 /**
- * 每个工具的**最小合法参数**：参数齐全到能走完 pack 的分支，
- * 但又小到"多一个键就是在测别的用例"。
+ * 每个工具的**最小合法参数**：见 `./tool-minimal-args.ts`。
+ *
+ * ⚠️ 那张表住在这里而不是本文件，是因为 `tool-egress-fields.spec.ts` 要用同一份：
+ * 两处各写一份，新工具就会在其中一条判据里静默缺席（两条都绿，覆盖面少一格）。
  */
-const MINIMAL_ARGS: Readonly<Record<string, Record<string, unknown>>> = {
-  list_tasks: {},
-  get_task: { taskId: 't1' },
-  list_projects: {},
-  list_habits: {},
-  create_task: { title: '买咖啡豆' },
-  create_project: { name: '读书' },
-  create_habit: { name: '喝水' },
-  update_task: { taskId: 't1', fields: { title: '新标题' } },
-  complete_task: { taskId: 't1' },
-};
+const MINIMAL_ARGS = TOOL_MINIMAL_ARGS;
 
 /** 注册不齐的两种编码：读侧是 `kind`，写侧只有消息文本（`ToolWriteIntentOutcome` 没有 kind）。 */
 function notImplemented(outcome: { ok: false; message: string; kind?: string }): boolean {

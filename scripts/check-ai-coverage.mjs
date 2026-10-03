@@ -527,70 +527,33 @@ if (!exists(AI_DIST)) {
  *   · 这里的某一项**已经读写都有**了却还挂着 ⇒ 红（登记会过期，不许只增不减）；
  *   · 每一项必须带 `AI-COV-n` 工单号 + 一句**为什么**（"还没做"不是为什么）。
  * 于是它不是一份"待办清单的抄件"，而是一份**必须与上游逐字对账**的声明。
+ *
+ * ## 2026-10-03：这张表现在是空的，而它空得有历史
+ *
+ * 这里原本挂着五项（`AI-COV-2/3/5/6/7` = TAG / NOTE / HABIT_LOG / FOCUS_SESSION / REMINDER），
+ * 同一天全部落地成真的工具（`packages/local-api/src/tools/{tag,note,habit-log,focus,reminder}.ts`），
+ * 于是上面那第二条牙齿把它们**从登记里抹掉**了 —— 这正是它该有的行为：
+ * 闭合的缺口留在表里，会被读成"还欠着"，而一份会撒谎的账本比没有账本更贵。
+ *
+ * 🔴 更要紧的是那五条**的理由串**，它错了两轮，两段都留在这里（不留就是假装没说过）：
+ *   第一轮：它们抄自一份"读完代码之后的汇报"，那份汇报说这四个实体**在产品侧根本没有写动作本体**。
+ *     逐行打开被调函数本体之后四条全灭 —— `project-actions.ts:178 createTag`、
+ *     `note-actions.ts:133 createNote`、`habit-actions.ts:275 checkIn`、
+ *     `reminder-actions.ts:174 writeNew` 每一张都真的 `dispatch`。
+ *     错在哪一层：那份汇报按"函数名去搜实现"，没打开被调方；而我把它的结论直接抄进了
+ *     一道门禁的理由串 ⇒ **一句没取证的谎拿到了门禁的权威**，下一轮读到它的人只会照着
+ *     "产品没写路径"去排期。
+ *   第二轮：改成"真正的卡点只有一个，而且是量出来的：目录容量" —— 也是错的。
+ *     `local-api.spec.ts` 那条 `<= 10` 的理由自己写着"超过 10 个就先问『真的需要吗』"，
+ *     而产品负责人 2026-10-03 已经答过这个问题（"我们界面当中有的功能都支持通过 AI 去直接改"）。
+ *     一句本该用来逼人思考的启发式，被我读成了一堵墙，还写成了"要产品再拍一次"。
+ *     现在那条判据改成按实体算（`shared.ts` 的 `MAX_TOOLS_PER_ENTITY`），
+ *     总量由下面第 10 段从分母推导。
+ *
+ * 两段都是同一类失效：**登记里的 `reason` 也是断言**，与代码注释不同，它还多一层权威 ——
+ * 它是这道门禁"为什么不红"的官方说法。写进去之前必须自己走一遍取证。
  */
-const ENTITY_COVERAGE_DEBT = new Map([
-  // 🔴🔴 **下面四条的理由，第一版全是错的** —— 它们抄自一次"读完代码之后的汇报"，
-  // 那份汇报说 TAG / NOTE / HABIT_LOG / REMINDER **在产品侧根本没有写动作本体**，
-  // 所以"AI 连提案都产不出"。这次逐行打开了被调函数本体（2026-10-03）：
-  //   · project-actions.ts:178  createTag   → :183 dispatch，entityType TAG，opType Create
-  //   · note-actions.ts:133     createNote  → :140 dispatch，entityType NOTE
-  //   · habit-actions.ts:275    checkIn     → :283 dispatch，entityType HABIT_LOG
-  //   · reminder-actions.ts:174 writeNew    → :190 dispatch，entityType REMINDER
-  // 四条**全都有写路径**。错在哪一层：那份汇报按"函数名去搜实现"，没打开被调函数本体，
-  // 而我把它的结论直接抄进了一道门禁的理由串里 —— 于是**一句没取证的谎拿到了门禁的权威**，
-  // 下一轮读到它的人只会照着"产品没写路径"去排期。这正是本仓库反复付学费的形状
-  // （抄件一定会漂 + 断言"没有 X"必须读被调方本体）。原句留在下面不是为了引用，是为了认错。
-  //
-  // ⇒ 真正的卡点只有一个，而且是量出来的：目录容量，见每条末尾那句。
-  [
-    'TAG',
-    {
-      gap: 'AI-COV-2',
-      reason:
-        '产品侧**有**写路径（project-actions.ts:178 的 createTag 真的 dispatch TAG 的 CRT）。' +
-        '卡点是目录容量：覆盖它要一读一写两个条目，而 local-api.spec.ts:87 判 ' +
-        'LOCAL_API_TOOLS.length <= 10、现 9 个 ⇒ 只剩 1 席。',
-    },
-  ],
-  [
-    'NOTE',
-    {
-      gap: 'AI-COV-3',
-      reason:
-        '同 TAG：note-actions.ts:133 的 createNote 真的 dispatch NOTE 的 CRT（该文件 6 处 dispatch）。' +
-        '卡点是同一个容量判据。',
-    },
-  ],
-  [
-    'HABIT_LOG',
-    {
-      gap: 'AI-COV-5',
-      reason:
-        'habit-actions.ts:275 的 checkIn 真的 dispatch HABIT_LOG 的 CRT，HabitsScreen 与 web 的勾选都在调它' +
-        '—— 第一版那句"logHabit 没有写动作本体"是错的。卡点是同一个容量判据。',
-    },
-  ],
-  [
-    'FOCUS_SESSION',
-    {
-      gap: 'AI-COV-6',
-      reason:
-        '番茄钟能开始/结束（focus-timer.ts），AI 侧零工具。' +
-        '⚠️ 这条**刻意不放进"剔除项"**：它有用户能按的编辑面，按准入判据就该进分母。' +
-        '🔴 卡点是容量：一读一写两个条目，而 local-api.spec.ts:87 判 <= 10、现 9 个 ⇒ 只剩 1 席。' +
-        '要么重新拍那条上限，要么先腾出一个既有工具 —— **不要为了塞进去而删工具**。',
-    },
-  ],
-  [
-    'REMINDER',
-    {
-      gap: 'AI-COV-7',
-      reason:
-        '提醒在任务行上就能设，reminder-actions.ts:174 的 writeNew 真的 dispatch REMINDER 的 CRT' +
-        '（该文件 6 处 dispatch）。卡点是同一个容量判据。',
-    },
-  ],
-]);
+const ENTITY_COVERAGE_DEBT = new Map();
 
 const GEN = join(ROOT, 'scripts/gen-ai-capability-manifest.mjs');
 if (!exists(GEN)) {
@@ -710,6 +673,52 @@ if (!exists(GEN)) {
           .map(([t, d]) => `${t}=${d.gap}`)
           .join('、'),
     );
+
+    // 9e. 🔴 目录规模 = 分母的函数，不是一个人拍的数字
+    //
+    // 这一段的存在理由很具体：`local-api.spec.ts` 原来写着 `LOCAL_API_TOOLS.length <= 10`，
+    // 而第 9 段要求"每个实体读写都有工具" ⇒ 分母 8 个实体、下限 16 席，两道各自合理、
+    // 合起来**互相封死**（`docs/plans/ai-event-tool-contract.md` §5.2 记着这次算术）。
+    // 现在按实体那一列判（每个 pack 至多 `MAX_TOOLS_PER_ENTITY` 个工具），
+    // 于是总量随覆盖面**一起**长大：多一个进分母的实体就多一席预算，而不是多一个障碍。
+    const perEntityCap = upstream.maxToolsPerEntity;
+    if (typeof perEntityCap !== 'number' || !(perEntityCap > 0)) {
+      fail(
+        '读不到 `MAX_TOOLS_PER_ENTITY`（当前：' +
+          JSON.stringify(perEntityCap) +
+          '）—— 每实体容量无法核对。\n' +
+          '     它的所有者是 `packages/local-api/src/tools/shared.ts`；这一段只从产物里取，不在这里抄一个数。',
+      );
+    } else {
+      const budget = perEntityCap * denominator.length;
+      const total = manifest.tools.length;
+      if (total > budget) {
+        fail(
+          `目录有 ${String(total)} 个工具，超过每实体 ${String(perEntityCap)} × 分母 ` +
+            `${String(denominator.length)} = ${String(budget)} 的预算。\n` +
+            '     要抬这个上限，先回答"多出来那几个工具属于哪一档"（`shared.ts` 的那五行档位表）——\n' +
+            '     而不是直接改这里的数字：改这里等于让覆盖面门禁自己去放宽它检查的那个约束。',
+        );
+      } else {
+        notes.push(
+          `目录 ${String(total)} 个工具 ≤ 每实体 ${String(perEntityCap)} × 分母 ` +
+            `${String(denominator.length)} = ${String(budget)} 席` +
+            `（已用 ${String(total)}，剩 ${String(budget - total)}）。`,
+        );
+      }
+      // 反向那条腿：某个实体自己超额，也要在这里点出来（总量对得上不代表分布对得上）。
+      for (const entity of manifest.entities) {
+        const n = entity.readToolNames.length + entity.writeToolNames.length;
+        if (n > perEntityCap) {
+          fail(
+            `实体 \`${entity.entityType}\` 有 ${String(n)} 个工具（${[
+              ...entity.readToolNames,
+              ...entity.writeToolNames,
+            ].join('、')}），超过每实体 ${String(perEntityCap)} 的上限。`,
+          );
+        }
+      }
+    }
   }
 }
 

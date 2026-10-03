@@ -62,12 +62,19 @@
 import { findTool } from './tools/registry.js';
 import type { LocalApiTool } from './tools/shared.js';
 
-// 契约底层件与工具目录：从本文件转发出去，`index.ts` 的出口形状因此一字未变。
+// 契约底层件与工具目录：从本文件转发出去。
+// ⚠️ 这里加一个导出件，`index.ts` 的出口就跟着加一个 —— 那两个出口**必须同步**，
+// 否则宿主侧 `import { … } from '@heyta/local-api'` 会在**消费方**报"没有这个导出"，
+// 而生产方一路绿灯（`tools.ts` 有、`index.ts` 没转发 = 运行时 undefined）。
 export {
+  DEFAULT_LIST_LIMIT,
   LIST_TASKS_MAX_DUE_SPAN_DAYS,
+  MAX_TOOLS_PER_ENTITY,
   TOOL_ENVELOPE_EGRESS_FIELDS,
   calendarDaysBetween,
+  clampListLimit,
   parseCalendarDay,
+  parseTimeOfDay,
   projectAllForTool,
   projectForTool,
   projectListForTool,
@@ -85,6 +92,7 @@ export type {
   LocalApiWriteResult,
   LocalApiWrittenEntityType,
   ReadVerdict,
+  TimeOfDay,
   ToolKind,
 } from './tools/shared.js';
 

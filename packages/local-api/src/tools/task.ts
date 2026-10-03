@@ -48,7 +48,10 @@ const TOOLS: readonly LocalApiTool[] = [
     // 写工具的结果**不回送模型**（循环在提案那一刻就停了），所以它不贡献出境字段。
     // 它产出的是待确认提案，那是本地渲染给用户看的东西，不在出境集合里。
     egressFields: [],
-    description: '新建一个任务。必须走 heyta 的正常写入路径（op-log）。',
+    // 原来这里写着「必须走 heyta 的正常写入路径（op-log）」—— 那是**给开发者的提醒**
+    // 被印进了出境数据里：模型既读不懂 `op-log`，也不需要知道落库机制
+    // （机制由本包"产不出 op"的类型形状保证，不靠告诉模型）。
+    description: '新建一个任务。',
     kind: 'write',
     defaultEnabled: false,
   },

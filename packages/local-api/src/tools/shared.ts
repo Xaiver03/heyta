@@ -70,6 +70,49 @@ export interface LocalApiTool {
  */
 export const TOOL_ENVELOPE_EGRESS_FIELDS = ['tool.error'] as const;
 
+/**
+ * 一个实体在目录里**至多**能有几个工具。
+ *
+ * 🔴 这个数字不是拍的，是从界面动作词表推出来的 —— 一个实体在四个端上能被用户
+ * 做出来的事只有这五档：
+ *
+ * | 档 | 例 |
+ * |---|---|
+ * | 列表读 | `list_tasks` |
+ * | 单条读（带正文那一档） | `get_task` |
+ * | 新建 | `create_task` |
+ * | 修改 | `update_task` |
+ * | 该实体专属的那一个动作 | `complete_task` |
+ *
+ * TASK 就是 5 的满额。**要第 6 个，先回答它属于哪一档** —— 答不出"哪一档"通常意味着
+ * 它属于另一个实体（那该另开一个 pack），或者它是第 7 个"读法变体"（那应该做成参数，
+ * 不是做成工具：参数不进"逐工具默认关"那张清单，而那张清单的长度就是用户要理解的负担）。
+ *
+ * ⚠️ 这条取代了原来的 `LOCAL_API_TOOLS.length <= 10`。那句的理由写的是
+ * "超过 10 个就先问『真的需要吗』"，而它把**八个实体**逼进同一个 10 席里：
+ * 每实体一读一写的下限就要 16 席，所以它会在覆盖面真的补齐时把**最后一个**实体
+ * 挡在门外，而那正是"问都不问就拒绝"。总量现在由 `每实体上限 × 覆盖分母` 承接
+ * （见 `scripts/check-ai-coverage.mjs` §10），分母扩一席、目录才多一席的预算。
+ */
+export const MAX_TOOLS_PER_ENTITY = 5;
+
+/**
+ * 列表类读工具一次最多回多少条。**默认值只有一份**（原来 `50` 这个字面量
+ * 只出现在 `list_tasks` 的宿主实现里；新加的四个列表如果各抄一个数字，
+ * "AI 看到的第 N 条"就会在不同实体之间变成不同的意思）。
+ *
+ * 为什么是 50：列表是喂给模型的，一次几百条会直接吃掉上下文窗口。
+ * ⚠️ 它是**出境条数**的上界，不是"截断后再筛"的那个上界 ——
+ * 筛一定发生在截断之前（`LocalApiHost.listTasks` 的契约）。
+ */
+export const DEFAULT_LIST_LIMIT = 50;
+
+/** 把调用方给的 `limit` 收进 `[0, 500]`；非数字或负数按默认值。 */
+export function clampListLimit(raw: unknown, fallback: number = DEFAULT_LIST_LIMIT): number {
+  if (typeof raw !== 'number' || !Number.isFinite(raw) || raw < 0) return fallback;
+  return Math.min(Math.floor(raw), 500);
+}
+
 // ─────────────────────────────────────────────────────────────────────────
 // `list_tasks` 的日期参数：形状 · 互斥 · **跨度上限**
 // ─────────────────────────────────────────────────────────────────────────
@@ -246,6 +289,33 @@ export function readListTasksDueArgs(
 /** 规范化回字符串（校验已保证它是补零的 `YYYY-MM-DD`）。 */
 function formatCalendarDay(day: CalendarDay): string {
   return `${String(day.year).padStart(4, '0')}-${String(day.month).padStart(2, '0')}-${String(day.day).padStart(2, '0')}`;
+}
+
+/** 一天里的时刻：24 小时制的时与分。 */
+export interface TimeOfDay {
+  readonly hour: number;
+  readonly minute: number;
+}
+
+/**
+ * 解析 `HH:MM`（24 小时制、必须补零），不成立返回 `undefined`。
+ *
+ * 🔴 它**不产生时刻**，与 {@link parseCalendarDay} 同一个立场：
+ * "这一天这一分钟在本机是哪一个 epoch ms"只允许有一处回答
+ * （`@heyta/domain` 的 `localDateTimeToEpoch`，`packages/domain/src/date.ts:96`，由宿主调用）。
+ *
+ * ⚠️ 之所以导出给两边用（工具的形状检查 + 宿主的换算）：
+ * 同一个格式在两处各写一遍正则，就是抄件 —— 而它漂的时候症状是
+ * "工具收下了 `9:5`，宿主算不出时刻"，报错落在用户已经按下确认之后。
+ */
+export function parseTimeOfDay(text: unknown): TimeOfDay | undefined {
+  if (typeof text !== 'string') return undefined;
+  const m = /^(\d{2}):(\d{2})$/.exec(text.trim());
+  if (m === null) return undefined;
+  const hour = Number(m[1]);
+  const minute = Number(m[2]);
+  if (hour > 23 || minute > 59) return undefined;
+  return { hour, minute };
 }
 
 /** 把被拒的输入打成**一行**放进错误消息：非字符串只报类型，不让对象把内部结构带出去。 */
@@ -441,18 +511,99 @@ export type LocalApiWriteIntent =
    * `color` / `icon` / `backfillDays`：那些是用户在界面上挑的身份标记，
    * "AI 替用户选一个图标"不是产品语义。要加就得先回答"谁赋它的义"。
    */
-  | { action: 'create-habit'; name: string; target?: number; unit?: string; goalType?: string };
+  | {
+      action: 'create-habit';
+      name: string;
+      target?: number;
+      unit?: string;
+      goalType?: string;
+    }
+  /**
+   * 新建标签（TAG）。只有名称：`Tag.color` 在界面上**没有任何写入路径**
+   * （全仓只有 `OpType.Create` / `OpType.Delete` 落在 `TAG` 上），给它上色不是产品语义。
+   */
+  | { action: 'create-tag'; name: string }
+  /**
+   * 给一条任务**整组覆盖**标签（TAG）。空数组 = 清空 —— 这是界面里的那个动作，
+   * 不是"追加"：追加要由调用方先把现有 id 读回来再交全集。
+   *
+   * 🔴 刻意不是 `add-tag`：`setTags` 是字段级 LWW，"追加"语义在两个设备上会各自
+   * 算出不同的并集（AGENTS §3.4 的并发形状），而界面上也没有"追加一个标签"这个动作。
+   */
+  | { action: 'set-task-tags'; taskId: string; tagIds: readonly string[] }
+  /** 新建便签（NOTE）。`projectId` 省略 = 不归属；`isPinnedToToday` 省略 = 不钉。 */
+  | { action: 'create-note'; content: string; projectId?: string; isPinnedToToday?: boolean }
+  /** 改便签正文（NOTE）。改的是正文这一件事；归属与钉今天各有各的动作。 */
+  | { action: 'update-note'; noteId: string; content: string }
+  /**
+   * 记一次打卡（HABIT_LOG）。`date` 是 `YYYY-MM-DD` 本地日历日，省略 = 今天；
+   * `value` 省略 = 用该习惯自己的目标数值。
+   *
+   * ⚠️ 它**不是** `check-in-habit`：打卡落地的是那条**记录**（HABIT_LOG），
+   * 不是习惯定义（HABIT）—— 按名字判定实体时 `checkin` 归 HABIT_LOG，
+   * 而把工具挂到 HABIT 上会让"哪个实体被覆盖了"在两个地方各说一遍。
+   */
+  | { action: 'record-checkin'; habitId: string; date?: string; value?: number }
+  /**
+   * 记一段专注（FOCUS_SESSION）。分钟数而不是毫秒：模型算 `45 * 60000` 会算错，
+   * 而算错的方向是**把 45 分钟记成 45 毫秒**，界面上就是一条长度为 0 的记录。
+   */
+  | {
+      action: 'log-focus';
+      kind: string;
+      plannedMinutes: number;
+      actualMinutes?: number;
+      taskId?: string;
+      completed?: boolean;
+    }
+  /**
+   * 给一条任务加提醒（REMINDER）。两种形态**二选一**（互斥在本包的 `toIntent` 判）：
+   * `date` + `time` 是绝对时刻，`minutesBeforeDue` 是"比截止早 N 分钟"。
+   *
+   * 🔴 这里没有 `triggerAt` 毫秒：本包不产生时刻，"这一天这一分钟在本机是哪个时刻"
+   * 只允许有一处回答（`@heyta/domain` 的 `localDateTimeToEpoch`，由宿主调用）。
+   * 互斥由**本包的 `toIntent`** 判（两个都给 = 拒绝），宿主只补"两个都没给"那条腿
+   * —— MCP 侧的调用方不经过助手。
+   */
+  | {
+      action: 'create-reminder';
+      taskId: string;
+      date?: string;
+      time?: string;
+      minutesBeforeDue?: number;
+    };
 
 /**
- * 一条写入落地的实体类型。取值与 `packages/shared-schema` 的 `ENTITY_TYPES`
- * 逐字一致（本包零依赖，**不能** import 它，所以这里是一份手抄的封闭集合）。
+ * 一条写入落地的实体类型。
+ *
+ * 🔴 它是 `packages/shared-schema` 的 `ENTITY_TYPES` 的**子集**（不是"逐字一致"：
+ * `TASK_REPEAT_CFG` / `AI_FEEDBACK` / `GLOBAL_CONFIG` 这些没有、也不该有工具写入通道）。
+ * 本包零依赖，**看不见**那个清单，所以这里是一份手抄的封闭集合。
+ *
+ * ⚠️ 手抄就有漂移风险，所以 `packages/app-host/tests/entity-type-parity.spec.ts` 把它
+ * 在**编译期**钉成 `ENTITY_TYPES` 的子集，并在运行期钉"每个成员都真有一个 pack 能产出它"
+ * （钉它的那一层必须同时看得见两边 —— 本包看不见，就不能在本包里加这条判据）。
+ * 这条是类型级的 ⇒ 它由 `pnpm -r typecheck` 执行，不是运行期门禁；写在这里是为了让
+ * 下一个加成员的人知道有一处会替他报错，而不是"抄错了等运行时看运气"。
+ *
+ * 🔴 加成员的顺序：**先有 pack 和写入动作，再有这个成员**。反过来（先声明一个还没有
+ * 实体的类型）会让这个类型读起来像"刚发生的事"而它其实是计划 —— 而 `applyOperation`
+ * 对未建模的 entityType **静默忽略**，落一条那样的 op 是"写进去了、四个端都看不见"。
  *
  * 🔴 它为什么必须存在：`LocalApiWriteResult.taskId` 是既有的必填字段名，来自
  * 目录里只有任务写入的年代。清单/习惯的写入如果照它回一个 id，
  * MCP 客户端与模型就会以为**刚建了一条任务** —— 那是"界面在说谎"那一类，
  * 而这次说谎的对象是外部程序。
  */
-export type LocalApiWrittenEntityType = 'TASK' | 'PROJECT' | 'HABIT';
+export type LocalApiWrittenEntityType =
+  | 'TASK'
+  | 'PROJECT'
+  | 'HABIT'
+  | 'TAG'
+  | 'NOTE'
+  | 'HABIT_LOG'
+  | 'FOCUS_SESSION'
+  | 'REMINDER';
 
 export type LocalApiWriteResult =
   | {

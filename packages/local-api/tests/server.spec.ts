@@ -20,8 +20,13 @@ import {
   type JsonRpcRequest,
   type JsonRpcResponse,
   type LocalApiConfig,
+  type LocalApiFocusSession,
+  type LocalApiHabitLog,
   type LocalApiHost,
   type LocalApiItem,
+  type LocalApiNoteRow,
+  type LocalApiReminder,
+  type LocalApiTag,
   type LocalApiWriteIntent,
   type LocalApiWriteResult,
 } from '../src/index.js';
@@ -83,6 +88,12 @@ function recordingHost() {
       calls.push('listHabits');
       return Promise.resolve([{ id: 'h1', name: '喝水', target: 8 }]);
     },
+    listTags: () => Promise.resolve([] as readonly LocalApiTag[]),
+    listNotes: () => Promise.resolve([] as readonly LocalApiNoteRow[]),
+    getNote: () => Promise.resolve(undefined),
+    listHabitLogs: () => Promise.resolve([] as readonly LocalApiHabitLog[]),
+    listFocusSessions: () => Promise.resolve([] as readonly LocalApiFocusSession[]),
+    listReminders: () => Promise.resolve([] as readonly LocalApiReminder[]),
     submit: (intent) => {
       calls.push('submit');
       submitted.push(intent);
@@ -300,6 +311,12 @@ describe('🔴🔴 写操作：只经 host.submit', () => {
       getTask: () => Promise.resolve(undefined),
       listProjects: () => Promise.resolve([]),
       listHabits: () => Promise.resolve([]),
+      listTags: () => Promise.resolve([] as readonly LocalApiTag[]),
+      listNotes: () => Promise.resolve([] as readonly LocalApiNoteRow[]),
+      getNote: () => Promise.resolve(undefined),
+      listHabitLogs: () => Promise.resolve([] as readonly LocalApiHabitLog[]),
+      listFocusSessions: () => Promise.resolve([] as readonly LocalApiFocusSession[]),
+      listReminders: () => Promise.resolve([] as readonly LocalApiReminder[]),
       submit: () => Promise.resolve({ ok: false, reason: 'invalid', message: '标题太长' }),
     };
     const { handle } = handler(CONFIG, failing);
@@ -399,6 +416,12 @@ function captureHost(items: readonly LocalApiItem[] = TASKS) {
     getTask: () => Promise.resolve(undefined),
     listProjects: () => Promise.resolve([]),
     listHabits: () => Promise.resolve([]),
+    listTags: () => Promise.resolve([] as readonly LocalApiTag[]),
+    listNotes: () => Promise.resolve([] as readonly LocalApiNoteRow[]),
+    getNote: () => Promise.resolve(undefined),
+    listHabitLogs: () => Promise.resolve([] as readonly LocalApiHabitLog[]),
+    listFocusSessions: () => Promise.resolve([] as readonly LocalApiFocusSession[]),
+    listReminders: () => Promise.resolve([] as readonly LocalApiReminder[]),
     submit: () => Promise.resolve<LocalApiWriteResult>({ ok: true, taskId: 'x' }),
   };
   return { host, seen };

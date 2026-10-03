@@ -101,9 +101,9 @@ export const AI_CAPABILITY_MANIFEST =
     'source': 'ADR-0045 §2.6 纪律二',
   },
   'coverage': {
-    'covered': 3,
+    'covered': 8,
     'denominator': 8,
-    'ratio': '3/8',
+    'ratio': '8/8',
   },
   'userOperableEntityTypes': [
     'TASK',
@@ -137,13 +137,7 @@ export const AI_CAPABILITY_MANIFEST =
       'reason': '偏好纠正的落库载体（用户不直接创建它）',
     },
   ],
-  'entityTypesWithoutTools': [
-    'TAG',
-    'NOTE',
-    'HABIT_LOG',
-    'FOCUS_SESSION',
-    'REMINDER',
-  ],
+  'entityTypesWithoutTools': [] as const,
   'entities': [
     {
       'entityType': 'TASK',
@@ -176,17 +170,28 @@ export const AI_CAPABILITY_MANIFEST =
       'entityType': 'TAG',
       'materialized': true,
       'countsTowardCoverage': true,
-      'coverage': 'none',
-      'readToolNames': [] as const,
-      'writeToolNames': [] as const,
+      'coverage': 'read-write',
+      'readToolNames': [
+        'list_tags',
+      ],
+      'writeToolNames': [
+        'create_tag',
+        'set_task_tags',
+      ],
     },
     {
       'entityType': 'NOTE',
       'materialized': true,
       'countsTowardCoverage': true,
-      'coverage': 'none',
-      'readToolNames': [] as const,
-      'writeToolNames': [] as const,
+      'coverage': 'read-write',
+      'readToolNames': [
+        'list_notes',
+        'get_note',
+      ],
+      'writeToolNames': [
+        'create_note',
+        'update_note',
+      ],
     },
     {
       'entityType': 'HABIT',
@@ -204,17 +209,25 @@ export const AI_CAPABILITY_MANIFEST =
       'entityType': 'HABIT_LOG',
       'materialized': true,
       'countsTowardCoverage': true,
-      'coverage': 'none',
-      'readToolNames': [] as const,
-      'writeToolNames': [] as const,
+      'coverage': 'read-write',
+      'readToolNames': [
+        'list_checkins',
+      ],
+      'writeToolNames': [
+        'record_checkin',
+      ],
     },
     {
       'entityType': 'FOCUS_SESSION',
       'materialized': true,
       'countsTowardCoverage': true,
-      'coverage': 'none',
-      'readToolNames': [] as const,
-      'writeToolNames': [] as const,
+      'coverage': 'read-write',
+      'readToolNames': [
+        'list_focuses',
+      ],
+      'writeToolNames': [
+        'log_focus',
+      ],
     },
     {
       'entityType': 'AI_FEEDBACK',
@@ -236,9 +249,13 @@ export const AI_CAPABILITY_MANIFEST =
       'entityType': 'REMINDER',
       'materialized': true,
       'countsTowardCoverage': true,
-      'coverage': 'none',
-      'readToolNames': [] as const,
-      'writeToolNames': [] as const,
+      'coverage': 'read-write',
+      'readToolNames': [
+        'list_reminders',
+      ],
+      'writeToolNames': [
+        'create_reminder',
+      ],
     },
   ],
   'tools': [
@@ -312,10 +329,93 @@ export const AI_CAPABILITY_MANIFEST =
       'args': [] as const,
     },
     {
+      'name': 'list_tags',
+      'kind': 'read',
+      'entityType': 'TAG',
+      'description': '列出所有标签（标识与名称）。给任务打标签之前先用它拿到标签标识。',
+      'schemaRecorded': true,
+      'args': [] as const,
+    },
+    {
+      'name': 'list_notes',
+      'kind': 'read',
+      'entityType': 'NOTE',
+      'description': '列出便签的目录信息（标识、归属清单、是否钉在今天、最后修改时间），顺序和界面上一样。不返回正文 —— 正文要用 get_note 逐条取。默认最多 50 条，筛完才截断。',
+      'schemaRecorded': true,
+      'args': [
+        {
+          'name': 'limit',
+          'type': 'number',
+          'required': false,
+        },
+      ],
+    },
+    {
+      'name': 'get_note',
+      'kind': 'read',
+      'entityType': 'NOTE',
+      'description': '读取一条便签，包含正文。',
+      'schemaRecorded': true,
+      'args': [
+        {
+          'name': 'noteId',
+          'type': 'string',
+          'required': true,
+        },
+      ],
+    },
+    {
+      'name': 'list_checkins',
+      'kind': 'read',
+      'entityType': 'HABIT_LOG',
+      'description': '列出打卡记录（哪个习惯、哪一天、这一次的数值），按记录写进去的先后排。可以只看某一个习惯的。默认最多 50 条，筛完才截断。注意它列的是记录，不是习惯有哪些：习惯的定义用 list_habits。',
+      'schemaRecorded': true,
+      'args': [
+        {
+          'name': 'habitId',
+          'type': 'string',
+          'required': false,
+        },
+        {
+          'name': 'limit',
+          'type': 'number',
+          'required': false,
+        },
+      ],
+    },
+    {
+      'name': 'list_focuses',
+      'kind': 'read',
+      'entityType': 'FOCUS_SESSION',
+      'description': '列出专注记录（哪一类、计划多久、实际多久、有没有走完、从哪一刻开始），按记录写进去的先后排。默认最多 50 条。时间单位是毫秒，和记录里存的一样。',
+      'schemaRecorded': true,
+      'args': [
+        {
+          'name': 'limit',
+          'type': 'number',
+          'required': false,
+        },
+      ],
+    },
+    {
+      'name': 'list_reminders',
+      'kind': 'read',
+      'entityType': 'REMINDER',
+      'description': '列出提醒（哪条任务、哪一刻、现在走到哪一步：还没到 / 已顺延 / 该响了 / 已响过 / 已忽略），按提醒时刻从早到晚。可以只看某一条任务的。时刻是机器时间，界面上显示的是本地日期时间。',
+      'schemaRecorded': true,
+      'args': [
+        {
+          'name': 'taskId',
+          'type': 'string',
+          'required': false,
+        },
+      ],
+    },
+    {
       'name': 'create_task',
       'kind': 'write',
       'entityType': 'TASK',
-      'description': '新建一个任务。必须走 heyta 的正常写入路径（op-log）。',
+      'description': '新建一个任务。',
       'schemaRecorded': true,
       'args': [
         {
@@ -421,6 +521,169 @@ export const AI_CAPABILITY_MANIFEST =
         },
       ],
     },
+    {
+      'name': 'create_tag',
+      'kind': 'write',
+      'entityType': 'TAG',
+      'description': '新建一个标签。名称不能为空，也不能只有空格。重名不会被拒绝（界面上也是如此）。',
+      'schemaRecorded': true,
+      'args': [
+        {
+          'name': 'name',
+          'type': 'string',
+          'required': true,
+        },
+      ],
+    },
+    {
+      'name': 'set_task_tags',
+      'kind': 'write',
+      'entityType': 'TAG',
+      'description': '把一条任务的标签**整组换成**给定的这一组，传空数组就是全部清掉。这不是追加：要多打一个标签，先把现有标签取回来，连同新的一起传。不认识或已经删掉的标签标识会被拒绝而不是忽略。',
+      'schemaRecorded': true,
+      'args': [
+        {
+          'name': 'taskId',
+          'type': 'string',
+          'required': true,
+        },
+        {
+          'name': 'tagIds',
+          'type': 'array',
+          'required': true,
+        },
+      ],
+    },
+    {
+      'name': 'create_note',
+      'kind': 'write',
+      'entityType': 'NOTE',
+      'description': '新建一张便签。正文不能为空（只有空格也算空）。可以指定放进哪个清单，不指定就是不归属任何清单；可以钉在今天。',
+      'schemaRecorded': true,
+      'args': [
+        {
+          'name': 'content',
+          'type': 'string',
+          'required': true,
+        },
+        {
+          'name': 'projectId',
+          'type': 'string',
+          'required': false,
+        },
+        {
+          'name': 'isPinnedToToday',
+          'type': 'boolean',
+          'required': false,
+        },
+      ],
+    },
+    {
+      'name': 'update_note',
+      'kind': 'write',
+      'entityType': 'NOTE',
+      'description': '改写一张已有便签的正文（整段替换，不是追加）。正文不能为空。',
+      'schemaRecorded': true,
+      'args': [
+        {
+          'name': 'noteId',
+          'type': 'string',
+          'required': true,
+        },
+        {
+          'name': 'content',
+          'type': 'string',
+          'required': true,
+        },
+      ],
+    },
+    {
+      'name': 'record_checkin',
+      'kind': 'write',
+      'entityType': 'HABIT_LOG',
+      'description': '给一个习惯记一次打卡。不写日期就是今天；不写数值就是该习惯的目标数值（没目标就是 1，即"做过一次"）。同一天重复记不会多出第二条。',
+      'schemaRecorded': true,
+      'args': [
+        {
+          'name': 'habitId',
+          'type': 'string',
+          'required': true,
+        },
+        {
+          'name': 'date',
+          'type': 'string',
+          'required': false,
+        },
+        {
+          'name': 'value',
+          'type': 'number',
+          'required': false,
+        },
+      ],
+    },
+    {
+      'name': 'log_focus',
+      'kind': 'write',
+      'entityType': 'FOCUS_SESSION',
+      'description': '补记一段已经结束的专注：要写它是哪种（工作 / 短休息 / 长休息）、计划多少分钟、实际多少分钟。可以挂在一条任务上。开始或中止一个正在走的计时器不是这个工具能做的事。',
+      'schemaRecorded': true,
+      'args': [
+        {
+          'name': 'kind',
+          'type': 'string',
+          'required': true,
+        },
+        {
+          'name': 'plannedMinutes',
+          'type': 'number',
+          'required': true,
+        },
+        {
+          'name': 'actualMinutes',
+          'type': 'number',
+          'required': false,
+        },
+        {
+          'name': 'taskId',
+          'type': 'string',
+          'required': false,
+        },
+        {
+          'name': 'completed',
+          'type': 'boolean',
+          'required': false,
+        },
+      ],
+    },
+    {
+      'name': 'create_reminder',
+      'kind': 'write',
+      'entityType': 'REMINDER',
+      'description': '给一条任务加一条提醒。要么给绝对时刻（date + time，两者一起给），要么给"比截止时间早多少分钟"（minutesBeforeDue，此时任务必须有截止时间）。两种形态互斥。时刻不能在过去、也不能远于一年；一条任务超过界面上限会被拒绝而不是截着收下。',
+      'schemaRecorded': true,
+      'args': [
+        {
+          'name': 'taskId',
+          'type': 'string',
+          'required': true,
+        },
+        {
+          'name': 'date',
+          'type': 'string',
+          'required': false,
+        },
+        {
+          'name': 'time',
+          'type': 'string',
+          'required': false,
+        },
+        {
+          'name': 'minutesBeforeDue',
+          'type': 'number',
+          'required': false,
+        },
+      ],
+    },
   ],
   'protocolTypesWithoutModel': [
     'TASK_REPEAT_CFG',
@@ -445,13 +708,13 @@ export const AI_CAPABILITY_MANIFEST =
  */
 export const AI_CAPABILITY_TEXT = [
   'heyta 能力清单（由工具目录与领域实体生成，不是手写的）',
-  '覆盖口径：用户可操作的已物化实体 8 个，其中 3 个**读和写都有**工具（3/8）。',
+  '覆盖口径：用户可操作的已物化实体 8 个，其中 8 个**读和写都有**工具（8/8）。',
   '',
   '🔴 拒绝时两件事必须分开说：我没有这个工具（AI 侧缺工具） ｜ 产品做不到（实体或功能不存在）。',
   '下面标了"没有工具"的实体，在产品里是**真实存在**的：可以说"我没有这个工具"，',
   '不可以说"产品不支持"。',
   '',
-  '一、有 AI 工具的实体（3 个）',
+  '一、有 AI 工具的实体（8 个）',
   '- TASK —— 读和写都有（读 2 / 写 3）',
   '  · [读] list_tasks（projectId:string, completed:boolean, dueOn:string, dueFrom:string, dueTo:string, limit:number）',
   '  · [读] get_task（taskId*:string）',
@@ -461,16 +724,30 @@ export const AI_CAPABILITY_TEXT = [
   '- PROJECT —— 读和写都有（读 1 / 写 1）',
   '  · [读] list_projects（无参数）',
   '  · [写] create_project（name*:string, parentId:string）',
+  '- TAG —— 读和写都有（读 1 / 写 2）',
+  '  · [读] list_tags（无参数）',
+  '  · [写] create_tag（name*:string）',
+  '  · [写] set_task_tags（taskId*:string, tagIds*:array）',
+  '- NOTE —— 读和写都有（读 2 / 写 2）',
+  '  · [读] list_notes（limit:number）',
+  '  · [读] get_note（noteId*:string）',
+  '  · [写] create_note（content*:string, projectId:string, isPinnedToToday:boolean）',
+  '  · [写] update_note（noteId*:string, content*:string）',
   '- HABIT —— 读和写都有（读 1 / 写 1）',
   '  · [读] list_habits（无参数）',
   '  · [写] create_habit（name*:string, target:number, unit:string, goalType:string）',
+  '- HABIT_LOG —— 读和写都有（读 1 / 写 1）',
+  '  · [读] list_checkins（habitId:string, limit:number）',
+  '  · [写] record_checkin（habitId*:string, date:string, value:number）',
+  '- FOCUS_SESSION —— 读和写都有（读 1 / 写 1）',
+  '  · [读] list_focuses（limit:number）',
+  '  · [写] log_focus（kind*:string, plannedMinutes*:number, actualMinutes:number, taskId:string, completed:boolean）',
+  '- REMINDER —— 读和写都有（读 1 / 写 1）',
+  '  · [读] list_reminders（taskId:string）',
+  '  · [写] create_reminder（taskId*:string, date:string, time:string, minutesBeforeDue:number）',
   '',
-  '二、产品里有、但我没有任何工具的实体（5 个）—— 实体存在，只是我没配工具',
-  '- TAG：产品支持它，但我没有任何工具 —— 别说产品做不到。',
-  '- NOTE：产品支持它，但我没有任何工具 —— 别说产品做不到。',
-  '- HABIT_LOG：产品支持它，但我没有任何工具 —— 别说产品做不到。',
-  '- FOCUS_SESSION：产品支持它，但我没有任何工具 —— 别说产品做不到。',
-  '- REMINDER：产品支持它，但我没有任何工具 —— 别说产品做不到。',
+  '二、产品里有、但我没有任何工具的实体（0 个）—— 实体存在，只是我没配工具',
+  '- （无）',
   '',
   '三、不计入上面分母的已物化实体（设计如此，不是遗漏）',
   '- AI_FEEDBACK：AI 建议处置的落库载体（用户不直接创建它）',
