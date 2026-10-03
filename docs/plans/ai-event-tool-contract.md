@@ -2113,3 +2113,33 @@ grep -oE '^#{2,4} ?B[0-9]+' BLOCKED.md | grep -oE '[0-9]+' | sort -n | uniq -d  
 把 31 处字面量改成变量等于**长出第二套抄件**，那正是本仓库反复付学费的形状。
 （这套的规模也顺便量了：`e2e/tests/*.spec.ts` **41 个文件**，不是"跑一条很快"的量级。）
 
+## 15.31 把 ② 的读数从"旧 tip"搬到"当前尖端"：增量是纯文档，且六条只读门禁在尖端重取（`8ef01c5e`，22:3x）
+
+② 的 61 段逐段读数取在 `43ef4a22`（§15.27）。此后尖端又走了 **10 笔**（本线 7 笔台账/门禁修复 +
+从 main 并进来的 3 笔）—— 这句是 `git rev-list --count 43ef4a22..HEAD` 现量的，不是我数提交信息数出来的。
+**"因此旧读数仍然代表当前尖端"这句是要证的**，证法是增量文件集：
+
+```bash
+git diff --name-only 43ef4a22..HEAD      # BLOCKED.md / PROGRESS.md / ai-event-tool-contract.md
+                                         # / countdown-batch2-handoff.md / multi-end-coverage-handoff.md
+git diff --name-only 43ef4a22..HEAD | grep -vc '\.md$'    # 0
+```
+
+⇒ 增量**没有任何一个非 `.md` 文件**，所以那 61 段里凡是不读 `.md` 的段，输入字节逐字未变。
+在此基础上，把**只读且便宜**的六段在尖端重取了一遍（不写盘：跑完 `git status --porcelain` = 0）：
+
+| 段号 | 门禁 | 尖端 rc | 一句话读数 |
+|---|---|---|---|
+| 08 | `check:layering` | 0 | `apps/*` 没有重新长出业务/接线 |
+| 19 | `check:docs` | **1** | 4 条死链 + 1 处失效章节引用，**逐条归属见 §15.30**，全部在本线之外；本轮新增文本自身新增 0 |
+| 36 | `check:ai-tools` | 0 | 九条规则全过；规则 9 穷举 **20 个 src 根 / 585 个源码文件**，`host.submit(` 命中 **2 处 = 清单**；两个写入口各自恰好一处；`describeRoutedFailure()` 定义点恰好一处；**能力清单与上游一致**（规则 7 的修在尖端复验，见 §15.25） |
+| 51 | `check:ai-coverage` | 0 | 目录 22/40 席；5 个 AI 功能 web 端到端可达；**缺口端 mobile 0/5** 照旧大字打印 |
+| — | `check:ui-language` | 0 | 界面零硬编码文案 |
+| — | `check:migrations` | 0 | 迁移形状合规 |
+
+段号是从 `package.json` 的 `check` 串现取的（61 段，`check:ai-coverage` 第 51、`check:ai-e2e` 第 52、
+`check:layering` 第 8、`check:docs` 第 19、`check:typecheck` 第 3）—— 上一节表里写的段号也是这么核对的，
+不是凭记忆。**剩下的段（`-r build` / `-r typecheck` / `-r test` / 各端 shell 门禁）没有在尖端重跑**：
+它们的输入未变，而此刻这台机器的窗口属于 ③ 的四端重装 —— 见 §15.30 末段那条取舍。
+
+
