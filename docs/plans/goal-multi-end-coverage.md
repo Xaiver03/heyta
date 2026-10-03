@@ -523,3 +523,113 @@ server `tsc --noEmit` 另量一次 exit 0（第 162 条：`vitest` 绿不等于 
 （`check:l4` 98 > 基线 90、`check:landing-e2e` 15/2），两段各自的归属、闭合代价、
 "这一轮为什么不付"见 **BLOCKED.md B30 / B30.2**。硬约束（不放宽基线、不改别人的判据、
 不吸收别人的债凑绿）优先于把链凑绿，所以 Goal 的 ③ 依旧如实记未达成。
+
+### 7.13 把 seg-lite 跳过的 11 段补量到 7 段：加上本轮共 **8 段**拿到当前提交态上的实测读数（2026-10-03 10:4x，`d78f8414`，干净检出）
+
+§7.12 那句"缺口只剩两段"仍然带着一个**没量过的集合** —— 逐段跑的时候按名字跳过了 **11** 段
+（`/tmp/g5-seg-lite.sh:19` 的 `SKIP` 串；48 段跑、11 段 SKIP、总 59 段，三个数都由
+`node -e "…p.scripts.check.split(' && ')…"` 从 `package.json` 现取，不靠记忆）。
+这一轮在同一个载体（`/tmp/heyta-g5` detached @ `d78f8414`，无 `server/.env`）把其中 7 段补了一遍，
+先跑 `pnpm --filter "@heyta/web..." build`（`BUILD_EXIT=0`）再量，避免拿旧 dist 读数；
+`check:native-deps` 本来在 48 段里跑过，这里复量一次：
+
+| 段 | 现量 | 用时 |
+|---|---|---|
+| `check:native-deps` | ✅ exit 0（iOS 原生依赖对账：5 个 pod 全部命中 `Podfile.lock`） | 1s |
+| `check:windows-shell` | ✅ exit 0（bridge bundle 1296525 B 生成后按平台跳过） | 5s |
+| `check:linux-shell` | ✅ exit 0（GTK4 装不到 macOS ⇒ 响亮跳过） | 0s |
+| `screenshot:verify` | ✅ exit 0（注册表 23 个目标，已生成的尺寸/alpha 全对） | 1s |
+| `check:arkts` | ✅ exit 0（真实编译器 macOS `es2abc` 过 ArkTS 产物） | 0s |
+| `check:arkts-widgets` | ✅ exit 0（`WidgetParse.ts` → 7084 B PANDA 字节码） | 1s |
+| `check:mobile-bundle` | ✅ exit 0（android/js 双端 Metro bundle，`react` 只有 1 份） | 44s |
+| `check:privacy-consent-e2e` | ✅ **7 passed / 0 failed / `INNER_EXIT=0`**（真浏览器 + PROD 构建 + :4322 自己的 preview） | 7.5s |
+
+剩下 4 段各有各的处置，都不是"没顾上"：
+
+- `check:landing-e2e` —— 实跑 **15 passed / 2 failed**（§7.10 与 B30 已记），红在 B24 那条线上，
+  ⚠️ **本条不代改**（B24 原文写着两条出路"由那条线选"）。
+- `check:ai-e2e` —— 本轮 09:5x 实测已转绿（B22 因此关闭）。**这一轮没有重跑**，理由不是负载：
+  它的 preflight 会把**自己那对端口**（4318/4319）上正在监听的进程 SIGKILL 掉
+  （`scripts/check-ai-e2e-preflight.mjs:74-88`，端口是参数、杀之前打印 pid 与进程名，traps #87），
+  而这条链的副作用会落在别人身上 —— 现场此刻有别人的 :4321 dev server（pid 13957，已 15 分钟）、
+  两台 iOS 模拟器里跑着的 Heyta（pid 44087 / 47506）与一个 13 小时的 `HeytaMac`。
+  要复量：`cd /tmp/heyta-g5 && pnpm run check:ai-e2e`（前提是先确认 4318/4319 上没人）。
+- `check:macos-shell` / `check:macos-window` —— **没有跑**，两条理由都当场可核对：
+  ① 本机此刻 `loadavg 28.45 / 40.01 / 41.76`，Swift 整包编译会挤掉别人正在跑的设备验收；
+  ② 窗口门禁靠"标题 = heyta 的主窗口"选窗（traps #81.2），而现场已经有一个
+  `HeytaMac` 实例（pid 25394）在跑 —— 同名窗口会让它比的是**别人的窗口**。
+  要复量：先确认没有别人的 `HeytaMac` 与同名窗口，再 `pnpm run check:macos-shell && pnpm run check:macos-window`。
+
+⇒ 于是 ③ 的"check 全量绿"这句现在是**逐段有读数、且每个读数写明在哪个提交上量的**：
+
+| 桶 | 段 |
+|---|---|
+| 在 `d78f8414` 的干净检出上实测 exit 0 | 上表那 **8 段** |
+| 在同一棵树上、但更早的提交上实测 | seg-lite 那 **48 段**（@ `cde861c3`，10:19–10:21：**46 段 exit 0**，两段红 = `[12] check:l4` 与 `[59] pnpm -r test`；后者已在 §7.12 修掉）、`check:ai-e2e`（09:5x 那次 113 条，B22 因此关闭） |
+| 🔴 红 | `check:l4`（B30.1 逐处 blame）与 `check:landing-e2e`（B24 的两条出路待人拍） |
+| 本轮没复量 | `check:macos-shell` / `check:macos-window`（现场归属，理由见上） |
+
+⚠️ 口径提醒（traps #158）：`d78f8414` 之后 main 仍在被别人推进，**每个读数只对量它的那个提交成立** ——
+下一轮要引用哪一段，先在同一棵树上把那一段重跑一次，别把过期的读数当现状。
+
+
+本轮补量之前，seg-lite 那 48 段的**逐段读数**（载体：干净检出 `/tmp/heyta-g5`，HEAD=`cde861c3`，10:19:15→10:21:03；跳过清单是 `/tmp/g5-seg-lite.sh:19` 的 `SKIP` 串，共 11 段。⚠️ 段名列取的是命令的**第二个词**（脚本用 awk 取第二个字段），所以 `02. --filter` 是 `pnpm --filter @heyta/landing check:entries`、`59. -r` 是 `pnpm -r test`。traps #159：`/tmp` 会被同机会话扫走，所以整份读数复制在这里，不留 `/tmp` 引用）：
+
+```
+01. build  exit=0  13s
+02. --filter  exit=0  0s
+03. typecheck  exit=0  13s
+04. check:claims  exit=0  0s
+05. check:reachability  exit=0  1s
+06. check:migrations  exit=0  0s
+07. check:token-hashing  exit=0  0s
+08. check:layering  exit=0  1s
+09. check:ui-provider  exit=0  0s
+10. check:theme  exit=0  1s
+11. check:row-single-source  exit=0  0s
+12. check:l4  exit=1  0s
+13. check:empty-state  exit=0  1s
+14. check:widgets  exit=0  1s
+16. check:adaptive-cards  exit=0  1s
+17. check:pwa  exit=0  0s
+18. check:ui-language  exit=0  1s
+19. check:docs-voice  exit=0  0s
+20. check:legal-copy  exit=0  0s
+21. check:legal-host  exit=0  0s
+22. check:licenses  exit=0  1s
+23. check:licenses:nuget  exit=0  6s
+24. check:crosslang-contract  exit=0  5s
+27. check:journey-coverage  exit=0  3s
+28. check:mobile-settings  exit=0  0s
+31. check:native-bare  exit=0  0s
+32. check:docs  exit=0  1s
+33. check:pricing  exit=0  0s
+34. check:ai-quota  exit=0  1s
+35. check:ai-tools  exit=0  0s
+36. check:payment-entry  exit=0  0s
+37. check:design  exit=0  1s
+38. check:text-color  exit=0  0s
+39. check:server-design  exit=0  0s
+40. check:server-copy  exit=0  1s
+41. check:server-legal  exit=0  0s
+42. check:tokens  exit=0  1s
+43. check:calendar  exit=0  1s
+44. check:holiday  exit=0  0s
+46. check:native-deps  exit=0  0s
+48. check:rn-aria  exit=0  1s
+49. check:materialized-reads  exit=0  0s
+50. check:ai-coverage  exit=0  0s
+54. check:shell-unicode  exit=0  1s
+55. check:web-storage  exit=0  2s
+56. check:web-migration  exit=0  8s
+57. check:script-snapshot  exit=0  0s
+59. -r  exit=1  28s
+```
+
+两段红：`[12] exit=1  0s  <check:l4>` 与 `[59] exit=1  28s  <-r>`。第 59 段（`pnpm -r test`）已在 §7.12 修掉；第 12 段（`check:l4`）见 B30 / B30.1。
+
+复现这三个数（59 / 48 / 11）而不靠记忆：
+
+```bash
+node -e "const s=require('./package.json').scripts.check.split(' && ');const K='check:ai-e2e|check:privacy-consent-e2e|check:landing-e2e|check:macos-shell|check:macos-window|check:windows-shell|check:linux-shell|check:arkts|check:arkts-widgets|screenshot:verify|check:mobile-bundle';const re=new RegExp('('+K+')');console.log('总段数='+s.length,'跑='+s.filter(x=>!re.test(x)).length,'跳过='+s.filter(x=>re.test(x)).length)"
+```
