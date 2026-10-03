@@ -633,3 +633,23 @@ server `tsc --noEmit` 另量一次 exit 0（第 162 条：`vitest` 绿不等于 
 ```bash
 node -e "const s=require('./package.json').scripts.check.split(' && ');const K='check:ai-e2e|check:privacy-consent-e2e|check:landing-e2e|check:macos-shell|check:macos-window|check:windows-shell|check:linux-shell|check:arkts|check:arkts-widgets|screenshot:verify|check:mobile-bundle';const re=new RegExp('('+K+')');console.log('总段数='+s.length,'跑='+s.filter(x=>!re.test(x)).length,'跳过='+s.filter(x=>re.test(x)).length)"
 ```
+
+### 7.14 §6.1.1 固定收尾为什么这一轮**没有重跑**（2026-10-03 10:5x，HEAD `bfcc5f2f`）
+
+`reinstall:all`（清旧包 → 重打 → 四端重装 → 每端一条"装上的是当前产物且能起来"的判据）本轮已经跑过并全绿：
+**mac 主蓝 1137 / android 4036 / ios 4136 / windows 四条取证**（`ADD_APPX=OK` `RESULT=OK` `PAYLOAD_WEBDIST=True` `M2D=OK`），
+四张截图逐张人眼看过。之后本条线又落了 5 笔：
+`c1395bf8`（1 个 spec 文件）、`a2d0d634`（2 个 spec 文件）、`d78f8414`/`bfcc5f2f`（3 份台账文档 + 1 份）、`3e5cef9b` 等更早的文档笔 ——
+**全部落在 `server/tests/**` 与 `docs/**` / `BLOCKED.md`，没有一行进 `packages/*`、`apps/*`、`server/src`**。
+所以四端产物里的 JS bundle / 原生壳字节与那次全绿重装时**同源**，重跑一遍只会重装同一份产物。
+
+⚠️ 这不构成"下次可以省"：§6.1.1 的判据是**装的字节 == 当前源码**，一旦本条线再碰 `packages/` 或 `apps/`（哪怕只改一处样式），
+就必须重跑并按 §7 第 82 条做内容对账。
+
+**下一次要重跑的前提**（现场此刻不满足，写清楚而不是默默跳过）：
+1. 主工作树里有**别人未提交的源码**（`packages/ui/src/calendar/*`、`apps/web/src/features/calendar/*`、
+   `packages/i18n/src/locales/*`、`packages/local-api/src/tools.ts`）⇒ 不能在活树跑（不变量是"无别人未提交源码"）；
+   改在隔离检出跑（`ab487d9f` / B26 那条路），
+2. 现场有**两台 iOS 模拟器里的 Heyta**（pid 44087 / 47506）与一个 13 小时的 `HeytaMac`（pid 25394）在跑，
+   `simctl uninstall` + 重打会直接落到别人的验收中途；
+3. 负载 `28.45 / 40.01 / 41.76` —— 移动段自带负载门，等不到窗口会以 `exit 3` 收尾（环境无效 ≠ 产品失败，别为挤进去调阈值）。
