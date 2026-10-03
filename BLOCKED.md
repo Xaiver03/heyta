@@ -2963,6 +2963,14 @@ pnpm    run check:pricing-consistency   → exit=1  bytes=162    ← [ERR_PNPM_N
 门禁的权威名只有一个来源 = `package.json` 的 `scripts` 键；跑之前用
 `node -e "console.log(require('./package.json').scripts['check:docs'])"` 取一次，**不要从记忆里拼名字或路径**。
 复跑读数：~~`check:docs exit=0`（✅ 无死链）~~、`check:docs-voice exit=0`（禁词表 30 项零命中）。
+🔴 **同一个错我第三次才真正记住**（21:5x）：我照任务书里那句"`check:pricing-consistency` 绿"去跑
+`pnpm check:pricing-consistency` → pnpm 报 `Command not found`，我当场把它读成一条**红**，
+差点登记成"本批第 6 段红"。权威名是 **`check:pricing`**（`package.json` 的 scripts 键），
+任务书里那个字符串是**脚本文件名** `scripts/check-pricing-consistency.mjs`。
+**pnpm 别名 ≠ 文件名，两者都可能和记忆里那个不一样**；跑任何门禁前先
+`node -e 'const p=require("./package.json").scripts; console.log(Object.keys(p).filter(k=>/pricing/.test(k)))'` 取一次名，
+拿到 "command not found" 时**先怀疑我的调用，再怀疑产品**。现量：`pnpm check:pricing` → **exit 0**、
+`pnpm check:payment-entry` → **exit 0**。
 
 🔴 **上面那个 `exit=0` 在 21:0x 被我自己复跑否证了**（划线留原句，别让它继续当依据）：
 此刻 `NO_COLOR=1 pnpm check:docs` → **exit=1**。而 **19:4x 那次它是真的 0** ——
