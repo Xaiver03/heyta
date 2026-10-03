@@ -13,6 +13,7 @@
  */
 
 import { today } from '@heyta/domain';
+import { LOCAL_API_TOOLS, listAuthorizedTools } from '@heyta/local-api';
 import { describe, expect, it } from 'vitest';
 
 import {
@@ -185,5 +186,83 @@ describe('resolveToolSelection', () => {
     const second = resolveToolSelection('列出所有任务', options);
     expect(first).toEqual(second);
     expect(first.kind).toBe('tool');
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────
+// W10：倒数日进目录之后，**规则前门**也要够得着
+// ─────────────────────────────────────────────────────────────────────────
+
+const EVENT_GRANTS = {
+  list_tasks: true,
+  get_task: true,
+  list_projects: true,
+  list_events: true,
+} as const;
+
+describe('倒数日的选择规则（W10）', () => {
+  it.each([
+    ['看看有哪些倒数日', 'list.events'],
+    ['列出我的纪念日', 'list.events'],
+    ['最近的倒数日有哪些', 'list.events'],
+    ['有什么日子快到了', 'list.events.soon'],
+  ])('「%s」→ list_events（规则 %s）', (text, ruleId) => {
+    const result = resolveToolSelection(text, { grants: EVENT_GRANTS });
+    expect(result.kind).toBe('tool');
+    if (result.kind !== 'tool') return;
+    expect(result.tool).toBe('list_events');
+    expect(result.ruleId).toBe(ruleId);
+    expect(result.args).toEqual({});
+  });
+
+  it('🔴 倒数日的话**不该**被任务侧的规则接走（不 ambiguous、不串味）', () => {
+    // 两档工具都能接的话，界面会弹"你想用哪一个"，而那等于"我刚才是不是没说清"。
+    // 这一条挡的是"给 list.tasks 顺手加上『日子』这类宽泛的宾语"。
+    const onlyTasks = resolveToolSelection('看看有哪些倒数日', {
+      grants: { list_tasks: true, list_projects: true, list_events: true },
+    });
+    expect(onlyTasks.kind).toBe('tool');
+    if (onlyTasks.kind !== 'tool') return;
+    expect(onlyTasks.tool).toBe('list_events');
+  });
+
+  it('🔴 规则命中但没授权 ⇒ `no-tool-granted`，不是 `no-match`', () => {
+    // 这两种失败要说的话完全不同："先回去开授权" vs "没听懂"。
+    // 少了倒数日的规则，这里会变成 no-match —— 而用户明明说得很清楚。
+    expect(resolveToolSelection('看看有哪些倒数日', { grants: ALL_READ_GRANTS })).toEqual({
+      kind: 'none',
+      reason: 'no-tool-granted',
+    });
+  });
+
+  it('没听懂仍然是 no-match（倒数日的词不算命中）', () => {
+    expect(resolveToolSelection('把这段话翻译成英文', { grants: EVENT_GRANTS })).toEqual({
+      kind: 'none',
+      reason: 'no-match',
+    });
+  });
+
+  it('🔴 目录驱动：**不需要必填参数的读工具，每条都至少有一条规则能选中它**', () => {
+    // 这条是 W10 标的⚠️静默项的解药。"目录加了读工具但规则前门选不到"这种状态
+    // 在产品里的表现是：MCP 客户端（模型自己挑工具）能用，内置 AI 回"没听懂"，
+    // 而**没有任何一层会红**。判据必须目录驱动，否则它自己就是一份会漂的抄件。
+    // `get_task` / `get_event` 被排除是**规则**不是名单：它们要实体 id，
+    // 而自然语言给的是标题 —— 那是 P2 模型路径的活（见文件头）。
+    const noRequiredArgs = (name: string): readonly string[] => {
+      const [tool] = listAuthorizedTools({ [name]: true });
+      return tool?.inputSchema.required ?? [];
+    };
+    const unreachable = LOCAL_API_TOOLS.filter(
+      (tool) =>
+        tool.kind === 'read' &&
+        noRequiredArgs(tool.name).length === 0 &&
+        !DEFAULT_TOOL_SELECTION_RULES.some((rule) => rule.tool === tool.name),
+    ).map((tool) => tool.name);
+    expect(unreachable, `这些读工具规则前门永远选不到：${unreachable.join('、')}`).toEqual([]);
+    // 前提确实成立：这条判据**扫到了**倒数日，不是扫了个空集合
+    expect(LOCAL_API_TOOLS.map((t) => t.name)).toContain('list_events');
+    expect(
+      DEFAULT_TOOL_SELECTION_RULES.some((rule) => rule.tool === 'list_events'),
+    ).toBe(true);
   });
 });

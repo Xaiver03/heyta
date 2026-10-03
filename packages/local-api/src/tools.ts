@@ -87,7 +87,10 @@ export interface LocalApiTool {
  * 这里是任务管理，够用就停 —— **工具每多一个，"默认关"的清单就长一条，
  * 而用户不可能逐个理解它们的风险**。
  *
- * 所以只留 6 个：3 读 + 3 写。宁可将来加，不要现在删。
+ * 现状：6 个（3 读 + 3 写）覆盖 TASK 与 PROJECT，W10 再加 4 个
+ * （2 读 + 2 写）覆盖 EVENT ⇒ **10 条**。加的每一条都要过同一道问句：
+ * "这个实体只进界面、AI 够不着，是不是在骗用户？"（W10 的答案是"是"）。
+ * 宁可将来加，不要现在删。
  */
 export const LOCAL_API_TOOLS: readonly LocalApiTool[] = [
   {
@@ -140,6 +143,76 @@ export const LOCAL_API_TOOLS: readonly LocalApiTool[] = [
     kind: 'write',
     defaultEnabled: false,
   },
+  // ── 倒数日 / 纪念日（`EVENT`，W10）────────────────────────────────────
+  //
+  // 🔴 这四条**不是"再写四个工具"**，是把一个新实体从"AI 够不着"里捞出来。
+  // 工单 W10 的理由：新实体如果只进界面，模型面对"我生日还有几天"只能答
+  // "产品不支持" —— 而产品是支持的。能力清单必须**生成**（W9）就是为了
+  // 让这种事显形；把 `EVENT` 放进目录是这次交付的实质。
+  //
+  // ⚠️ 与任务那六条**同一套纪律**：默认关、逐条 `egressFields`、
+  // 正文只出现在单条读、写只产出提案。不另建第二份投影。
+  {
+    name: 'list_events',
+    egressFields: [
+      'event.id',
+      'event.title',
+      'event.date',
+      'event.kind',
+      'event.nextOccurrence',
+      'event.daysFromToday',
+      'event.repeating',
+      'event.isLunar',
+      'event.pinned',
+      'event.readable',
+    ],
+    description:
+      '列出倒数日与纪念日（未删除、未归档），按界面同一套顺序排：置顶在前、距下一次近的在前。' +
+      '每条给出锚点日期、类型档位、下一次发生日与相差天数。' +
+      '不返回备注正文 —— 备注要单独用 get_event 取。归档过的倒数日不在这里。',
+    kind: 'read',
+    defaultEnabled: false,
+  },
+  {
+    name: 'get_event',
+    // 🔴 含备注正文（`LocalApiEventItem.notes`）—— 与 `get_task` 同一档出境面。
+    egressFields: [
+      'event.id',
+      'event.title',
+      'event.date',
+      'event.kind',
+      'event.nextOccurrence',
+      'event.daysFromToday',
+      'event.repeating',
+      'event.isLunar',
+      'event.pinned',
+      'event.readable',
+      'event.notes',
+    ],
+    description: '读取单个倒数日/纪念日的完整内容（含备注正文）。',
+    kind: 'read',
+    defaultEnabled: false,
+  },
+  {
+    name: 'create_event',
+    // 写工具只产出提案、结果不回送模型 ⇒ 出境面是**提案里那几个字段**（= 空表）。
+    egressFields: [],
+    description:
+      '新建一个倒数日/纪念日。日期是 `YYYY-MM-DD` 的**锚点日期**（倒数日没有"几点"）。' +
+      '可给类型档位（countdown / anniversary / birthday / festival 四档之一）、' +
+      '是否按农历每年重复、RRULE 重复规则、备注。' +
+      '必须走 heyta 的正常写入路径（op-log）。',
+    kind: 'write',
+    defaultEnabled: false,
+  },
+  {
+    name: 'update_event',
+    egressFields: [],
+    description:
+      '修改倒数日字段（标题、日期、类型档位、农历、重复规则、置顶、备注）。只能改显式给定的字段。',
+    kind: 'write',
+    defaultEnabled: false,
+  },
 ];
 
 /**
@@ -151,7 +224,7 @@ export const LOCAL_API_TOOLS: readonly LocalApiTool[] = [
  * （`server.ts:347`），而 `error` 不在任何 `egressFields` 里 ⇒
  * 助手的"披露集合外就停"那道复查在第一轮运行时就把它拦下来了。
  * 把它单独列成信封而不是塞进每个工具，是因为**每个工具**都可能带它 ——
- * 逐工具声明会变成六份抄件。
+ * 逐工具声明会变成十份抄件。
  */
 export const TOOL_ENVELOPE_EGRESS_FIELDS = ['tool.error'] as const;
 
@@ -474,6 +547,113 @@ export function readItemForTool(item: LocalApiItem): ReadVerdict {
 }
 
 // ─────────────────────────────────────────────────────────────────────────
+// 倒数日 / 纪念日（`EVENT`）的投影 —— 与上面**同一套规则**，不是第二套
+// ─────────────────────────────────────────────────────────────────────────
+
+/**
+ * 喂给 `list_events` / `get_event` 的一条倒数日。
+ *
+ * 🔴 形状刻意照 `LocalApiItem`：**"存在"与"内容"是两件事**这条立场
+ * 只允许有一份实现，两个实体各自表达一遍就会各漂各的。
+ *
+ * 字段名口径与 `packages/shared-schema` 一致（`date` / `kind` / `isLunar` / `notes`）；
+ * `nextOccurrence` 与 `daysFromToday` 是**派生值**（先例：`project.taskCount`），
+ * 由宿主用领域层的 `nextEventOccurrence` / `eventDaysFromToday` 算好 ——
+ * 🔴 本包**不做日历算术**（零依赖，也不许在这里长出第二套"下一次是哪天"的判断，
+ * 那个判断的唯一归属是 `packages/domain/src/events.ts`）。
+ */
+export interface LocalApiEventItem {
+  id: string;
+  title: string;
+  /** 锚点日期 `YYYY-MM-DD`。倒数日没有"几点"，所以不是时间戳。 */
+  date: string;
+  /**
+   * 类型档位。**由领域层单点判定**（用户选过就照他说的，没选才按日期方向兜底）。
+   *
+   * ⚠️ 这里是 `string` 而不是字面量联合，**与 `LocalApiItem.priority` 同一取舍**：
+   * 本包零依赖，把 `countdown / anniversary / birthday / festival` 抄一份进来
+   * 就是词表的**第二份定义**，而领域层加一档时这里不会红（它只会一直"少一档"）。
+   * 谁认识这四个值：`packages/domain` 的 `CountdownEventKind`，
+   * 判定与校验点在 `packages/app-host/src/local-api-host.ts`。
+   */
+  kind: string;
+  /** 下一次发生日。**一次性且已过 ⇒ 缺席**（不是 `null`、不是"今天"）。 */
+  nextOccurrence?: string;
+  /** 正 = 还有 N 天，负 = 已经 N 天，0 = 就是今天。 */
+  daysFromToday: number;
+  /** 是否每年/按规则重复。 */
+  repeating: boolean;
+  /** 重复时按农历锚点推。 */
+  isLunar: boolean;
+  /** 置顶（就是 `pinnedAt` 有值，没有第二个字段）。 */
+  pinned: boolean;
+  /** 备注正文。🔴 只在 `get_event` **且** `readable` 为真时出现。 */
+  notes?: string;
+  /** 这条能不能被本机工具读到正文。逐条判定，不是逐库。 */
+  readable: boolean;
+}
+
+/**
+ * `list_events` 专用的**再窄一层**投影：连可读条目的备注也不出。
+ *
+ * ⚠️ 这里**刻意没有**对应 `projectForTool` 的"单条投影"函数 —— 不是漏了，是
+ * 倒数日的单条路径**不剥正文，而是直接拒绝**（{@link readEventForTool}）。
+ * 加一个"可读就原样返回、不可读就剥掉"的函数会造出**第二个**执行点，
+ * 而那个执行点在产品里永远走不到（`get_event` 对不可读条目根本不会返回条目）。
+ * 与任务侧的差别只在 `get_task` 用的就是那条 —— 两边各按自己的调用图留件。
+ *
+ * 🔴 照 `projectListForTool` 的样子做，理由逐字相同：目录描述与 `egressFields`
+ * 都承诺"列表里没有正文"，而宿主侧 `listEvents` 与 `getEvent` 用的是**同一个**
+ * `eventToItem`。不窄这一层，那句承诺就是空话 —— 而 `list_tasks` 上
+ * 恰恰是这么被抓现行的（见 `projectListForTool` 的注释与 W10 判据）。
+ */
+export function projectEventListForTool(
+  items: readonly LocalApiEventItem[],
+): readonly LocalApiEventItem[] {
+  // 逐条**重建**成元数据形状（白名单，不是 `delete`）：
+  // 列表要的是"连可读条目的正文也没有"，所以每条都得走这一遍。
+  return items.map(eventMetadata);
+}
+
+/** 倒数日的**元数据白名单**（正文类字段一律不在这里）。 */
+function eventMetadata(item: LocalApiEventItem): LocalApiEventItem {
+  const meta: LocalApiEventItem = {
+    id: item.id,
+    title: item.title,
+    date: item.date,
+    kind: item.kind,
+    daysFromToday: item.daysFromToday,
+    repeating: item.repeating,
+    isLunar: item.isLunar,
+    pinned: item.pinned,
+    // `readable` **照抄**：受保护的条目仍然说"有我，但不给你看"（这正是 Bear 那句）
+    readable: item.readable,
+  };
+  if (item.nextOccurrence !== undefined) meta.nextOccurrence = item.nextOccurrence;
+  // 🔴 `notes` 在这里**故意不被复制** —— 这就是整件事的目的。
+  return meta;
+}
+
+/**
+ * `get_event` 专用：不可读的倒数日**明确报错**，不是返回一个"没有备注"的空结果。
+ * 与 `readItemForTool` 同一取舍（见它上面的说明）。
+ */
+export type EventReadVerdict =
+  | { ok: true; item: LocalApiEventItem }
+  | { ok: false; reason: 'not-readable'; message: string };
+
+export function readEventForTool(item: LocalApiEventItem): EventReadVerdict {
+  if (item.readable) return { ok: true, item };
+  return {
+    ok: false,
+    reason: 'not-readable',
+    message:
+      `倒数日「${item.title}」受保护，本机工具只能看到它存在，不能读取备注内容。` +
+      '这是设计如此，不是错误。',
+  };
+}
+
+// ─────────────────────────────────────────────────────────────────────────
 // 配置与授权
 // ─────────────────────────────────────────────────────────────────────────
 
@@ -765,14 +945,46 @@ export interface LocalApiWritePort {
  * 交给 `dispatch` 的意图。
  *
  * 🔴 **刻意不是 `OpIntent`**，也没有任何 op 构造函数：
- * 工具能表达的只有下面三种动作，且**必须由壳翻译成 op**。
+ * 工具能表达的只有下面这**五种**动作，且**必须由壳翻译成 op**。
  * 这样"本机工具只能通过既定动作写"就成了类型层面的保证。
+ *
+ * ⚠️ 每加一个变体，**确认界面必须同步长出一句话**（`web.ai.tools.intent*`）——
+ * 提案卡不许出现"未知操作"，那是把用户没读过的东西摆到他们面前让他们点确认。
  */
 export type LocalApiWriteIntent =
   | { action: 'create-task'; title: string; dueDate?: string; priority?: string; projectId?: string }
   | { action: 'update-task'; taskId: string; fields: Readonly<Record<string, unknown>> }
-  | { action: 'complete-task'; taskId: string };
+  | { action: 'complete-task'; taskId: string }
+  /**
+   * 新建倒数日（W10）。`date` 是**锚点日期** `YYYY-MM-DD`，不是时刻。
+   * 省略 = 用领域层的运行时默认值（`kind` 缺席则按日期方向兜底，见 `eventKindOf`）。
+   */
+  | {
+      action: 'create-event';
+      title: string;
+      date: string;
+      /**
+       * 类型档位。⚠️ 这里是 `string` 而不是联合类型，**与 `create-task.priority` 同一取舍**：
+       * 封闭词表 `countdown / anniversary / birthday / festival` 归 `packages/domain` 的
+       * `CountdownEventKind` 所有，判定与拒绝在宿主（`local-api-host.ts`）——
+       * 本包零依赖，抄一份词表就是第二份定义，而它**只会静默少一档**。
+       */
+      kind?: string;
+      isLunar?: boolean;
+      recurrence?: string;
+      notes?: string;
+    }
+  /** 改倒数日。`fields` 只允许出现宿主认识的那几个键，不认识的一律**拒绝而不是忽略**。 */
+  | { action: 'update-event'; eventId: string; fields: Readonly<Record<string, unknown>> };
 
+/**
+ * 写入结果。
+ *
+ * ⚠️ `taskId` 这个名字**早于** `EVENT`：它现在承载的是"这次写入作用的实体 id"
+ * （倒数日返回的是 eventId）。改名会牵动 `apps/**` 的调用点，不在 W10 的最小可行范围里，
+ * 所以**留在这里写清楚**，而不是让下一个人以为倒数日返回了一个任务 id。
+ * 🔴 但它**仍然只有一个**：一条意图 = 一个实体，不返回"两个 id 让人猜"。
+ */
 export type LocalApiWriteResult =
   | { ok: true; taskId: string }
   | { ok: false; reason: 'rejected' | 'not-found' | 'invalid'; message: string };

@@ -1550,6 +1550,16 @@ export const zhCN = {
   'web.ai.tools.intentCreate': '新建任务「{title}」',
   'web.ai.tools.intentUpdate': '修改任务 {id}',
   'web.ai.tools.intentComplete': '把任务 {id} 标记完成',
+  // 🔴 W10：`LocalApiWriteIntent` 每加一个封闭变体，这里就**必须**同时长出一句 ——
+  // 提案卡不许出现"未知操作"，那是让用户对着没读过的东西点确认。
+  // 谁来拦：两道**编译期**的闸，都比测试硬 ——
+  //   ① `apps/web/src/features/ai/AiToolRun.tsx` 的 `intentText()` 是对
+  //      `intent.action` 的**穷尽 switch**，漏一个变体 `tsc` 报 TS2366（缺返回值）；
+  //   ② key 拼错 / 只加中文不加英文 ⇒ `MessageKey` 与 `en: Record<MessageKey, string>`
+  //      当场报错（见本文件头"漏翻译是编译失败"那条）。
+  // 实测：本轮先加 case 不加词条，`pnpm --filter @heyta/web typecheck` 立刻两条 TS2345。
+  'web.ai.tools.intentCreateEvent': '新建倒数纪念日「{title}」（{date}）',
+  'web.ai.tools.intentUpdateEvent': '修改倒数纪念日 {id}',
 
   // ── Web · AI · 拆解面板 ───────────────────────────────────
   'web.ai.breakdown.button': 'AI 拆解',

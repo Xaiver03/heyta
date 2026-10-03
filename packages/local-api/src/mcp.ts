@@ -10,7 +10,7 @@
  * MCP 客户端（Claude Code / Cursor 等）会把服务端返回的工具列表
  * **整个塞进模型的上下文**，模型于是知道"有这么个工具可以调"。
  *
- * 所以如果用户只授权了 `list_tasks` 却把 6 个工具全报过去：
+ * 所以如果用户只授权了 `list_tasks` 却把全部 10 个工具报过去：
  * - 模型会去调没授权的工具 → 每次都撞权限错误 → 用户以为是 bug
  * - 更糟的是，**工具的"存在"本身就是信息**：
  *   "有个 create_task 工具"告诉模型这台机器上有什么能力
@@ -50,7 +50,7 @@ export const MCP_SERVER_NAME = 'heyta';
  *
  * `inputSchema` 用 JSON Schema（MCP 的规定），**在我们这边是手工写的** ——
  * 因为 `@heyta/local-api` 是零依赖包，不引 schema 生成库；
- * 而且工具只有 6 个，手写比引入一套生成器更清楚。
+ * 而且工具只有 10 个，手写比引入一套生成器更清楚。
  */
 export interface AuthorizedToolDefinition {
   name: string;
@@ -152,7 +152,94 @@ const INPUT_SCHEMAS: Readonly<Record<string, McpToolDefinition['inputSchema']>> 
     required: ['taskId'],
     additionalProperties: false,
   },
+  // ── 倒数日 / 纪念日（W10）──────────────────────────────────────────
+  //
+  // 🔴 这四条**必须**登记。`listAuthorizedTools()` 对没登记的工具静默回退成
+  // 空 `properties`（见下面 `schema ?? {...}` 那一行），于是"这个工具不接任何参数"
+  // 与"忘了登记参数"在两个前端（MCP 客户端与内置 AI 的 `tools` 数组）上
+  // **长得一模一样**，而模型照着空 schema 永远传不出 eventId / date。
+  // 生成器能标 `schemaRecorded:false`（能力清单里会明说"字段清单不完整"），
+  // 但清单**不会因此红** —— 所以这一处漏了是⚠️静默的，只能靠测试钉。
+  list_events: {
+    type: 'object',
+    properties: {
+      limit: {
+        type: 'number',
+        description: '最多返回多少条，默认 50。顺序与界面一致（置顶在前、距下一次近的在前）。',
+      },
+    },
+    additionalProperties: false,
+  },
+  get_event: {
+    type: 'object',
+    properties: {
+      eventId: { type: 'string', description: '倒数日 id（来自 list_events）。' },
+    },
+    required: ['eventId'],
+    additionalProperties: false,
+  },
+  create_event: {
+    type: 'object',
+    properties: {
+      title: { type: 'string', description: '倒数日标题。' },
+      date: {
+        type: 'string',
+        description: '锚点日期，格式 YYYY-MM-DD。倒数日没有"几点"，不要传时间戳。',
+      },
+      kind: {
+        type: 'string',
+        description:
+          '类型档位：countdown（还没到的）/ anniversary（已发生的）/ birthday / festival 四档之一。' +
+          '不传 = 用户没选过，界面按日期方向显示。App 不替他决定含义。',
+      },
+      isLunar: {
+        type: 'boolean',
+        description: 'true = 每年重复时按农历那一天推（默认 false = 公历）。',
+      },
+      recurrence: {
+        type: 'string',
+        description: 'RRULE 重复规则，例如 "FREQ=YEARLY;INTERVAL=1"。不传 = 一次性倒数日。',
+      },
+      notes: { type: 'string', description: '备注（卡片上的那行小字）。' },
+    },
+    required: ['title', 'date'],
+    additionalProperties: false,
+  },
+  update_event: {
+    type: 'object',
+    properties: {
+      eventId: { type: 'string', description: '要改的倒数日 id。' },
+      fields: {
+        type: 'object',
+        description:
+          '要改的字段：title / date / kind / isLunar / recurrence / pinned / notes。' +
+          '只改这里给出的字段，其余不动；要把某项清空请显式传 null。',
+      },
+    },
+    required: ['eventId', 'fields'],
+    additionalProperties: false,
+  },
 };
+
+/**
+ * 这个工具的参数 schema **有没有被登记过**。
+ *
+ * 🔴 存在的唯一理由是把 `listAuthorizedTools()` 那个**静默回退**变得可测：
+ * 没登记的工具会拿到 `{ type:'object', properties:{}, additionalProperties:false }`，
+ * 而它与"这个工具真的不接参数"（`list_projects`）在两个前端上**长得一模一样** ——
+ * 于是"忘了写 schema"表现为"模型以为这个工具什么都传不了"，不报错、不崩溃。
+ * 能力清单那边也只会给一个 `schemaRecorded:false` 的**标记**（清单照出，不红）。
+ * ⚠️ 所以判据必须**目录驱动**：`LOCAL_API_TOOLS` 里每一条都得答"是"，
+ * 新增工具时不登记就红（见 `tests/mcp.spec.ts`），而不是逐工具抄名字。
+ */
+export function hasInputSchemaFor(toolName: string): boolean {
+  return Object.prototype.hasOwnProperty.call(INPUT_SCHEMAS, toolName);
+}
+
+/** `INPUT_SCHEMAS` 里登记过的工具名（用于查"孤儿抄件"：有 schema、目录里却没这个工具）。 */
+export function recordedInputSchemaNames(): readonly string[] {
+  return Object.keys(INPUT_SCHEMAS);
+}
 
 /**
  * 组装 MCP 工具定义。
