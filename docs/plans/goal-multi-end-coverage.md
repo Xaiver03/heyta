@@ -1323,6 +1323,18 @@ Goal 原话点名的记账落点就是本节。**先建槽、后填读数** —�
 每个槽位写死"待填 + 现量命令"，填的时候只替换那一条。
 
 - ① 四端重装：`INNER_EXIT=` **待填** —— 现量命令 `bash /tmp/heyta-run-reinstall.sh --go`（载体 `heyta-wt-reinstall`）；截图逐张写明钉到哪一步、人看到什么，跟在这条后面。
+  - 🔴 **04:02 现量"为什么还没成交"**（三条同时成立才算窗口开，它们不会在同一刻成立）：
+    ① **另一条会话正在跑 `reinstall:all`** —— `pid 81007`/`93771  sh /tmp/queue-reinstall-all.sh`，
+    实际那一跑是 `pid 93817 bash /tmp/heyta-reinstall/scripts/.reinstall-all.sh.snap.93817`
+    （**它用的是自己那枚载体 `/tmp/heyta-reinstall`，与我的 `heyta-wt-reinstall` 不是同一棵** ⇒ 不互踩工作树，
+    但**照样互踩设备与安装包**，所以那道门该有）
+    （就是 §6 里"它的前置不查有没有别人在重装"的那条队列，03:09 起排、04:02 开跑）。
+    我的启动器那道 `pgrep -f 'queue-reinstall-all\.sh|scripts/reinstall-all\.sh'` 门因此退 3 —— **对称的互斥由我这一侧守**。
+    ② **android 设备在用**：`emulator-5554` 上 `com.heyta` pid 20246、`mCurrentFocus` 指向它（① 要 `adb uninstall`、③ 要 `pm clear`）。
+    ③ **负载 13.20 > 阈值 12**（`ncpu×3/4`）。
+    ⚠️ 顺带一条**对 ① 有用的反向现量**：iOS 那三台 booted 里 **`heyta-iphone-17pro` 与 `iPhone Duo heyta` 的
+    `launchctl` 读空**（没跑 com.heyta），只有 `heyta-ios-isolated` 在跑 ⇒ **ios 段有可用的空闲目标**，
+    窗口开时不必把 ① 整体判死在 iOS 上。设备占用表每次现取，别抄这一行。
 - ② Playwright 三段 + 全量 `pnpm check`：**02:35–02:41 已在载体 `f08b26e7` 上跑过一趟**（窗口 02:35:26 开：
   闸门 `--target b` 退 0，负载现量 12 = 阈值 12）。两个读数**分开报**（这是 §5-2 定的取法）：
   - **整条 `pnpm check`：`CHECK_EXIT=1`**，断在第 8 段 `check:op-log-semantics`，而拒绝它的是**本机内存闸门**
