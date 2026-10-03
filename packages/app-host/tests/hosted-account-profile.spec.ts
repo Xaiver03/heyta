@@ -26,6 +26,7 @@ import {
   encodeAvatarCipher,
   fetchAccountAvatar,
   getAccountProfile,
+  resolveAccountAvatarImage,
   updateAccountDisplayName,
   uploadAccountAvatar,
   type HostedAuthOptions,
@@ -193,6 +194,60 @@ describe('头像是密文：上传与读回走同一把口令', () => {
     expect(wrong.ok).toBe(false);
   });
 
+  /**
+   * 🔴 R15b 补的一条：**服务端拿到的除了密文，一个字都不该有**。
+   *
+   * 为什么要专门钉这一条 —— `hosted-auth.ts` 的文件头记着一个**已经被改掉的第一版设计**：
+   * 把 `content_type` 做成明文列（"服务端解不开，所以它不该知道这张图是 JPEG 还是 PNG"）。
+   * 而上面那几条**都拦不住有人把它加回去**：出站 body 多一个明文键，往返照样能解开、
+   * 错口令照样解不开、原图照样不在里面 —— 三条全绿，隐私边界已经破了。
+   * "不能失败的检查没有价值"在这里反过来成立：**能通过的检查也可能没有牙齿**。
+   *
+   * ②那一段正向对照不是仪式：如果 needle 在明文里都找不到，③的"找不到"就只是
+   * 探针没跑到那段字节（§7 元规则 1 —— "探针够不着"与"东西真的不在"输出上一模一样）。
+   *
+   * 两支变异臂各自钉住一个断言，读数记在
+   * `docs/plans/calendar-year-time-and-mobile-profile.md` §3 的 R15b 那格：
+   * M15a = 往 body 里加回明文 `contentType` ⇒ ① 红；
+   * M15b = 让 `encodeAvatarCipher` 直接 base64 明文 JSON ⇒ ③ 红。
+   */
+  it('🔴 出站的**只有一个键**，密文字节里没有明文的格式、键名，也没有原图', async () => {
+    const f = fetchReturning(200, { avatarHash: 'deadbeef' });
+    vi.stubGlobal('fetch', f.impl);
+    await uploadAccountAvatar(opts(), TOKEN, PASSWORD, IMAGE);
+    const body = f.calls[0]?.body as Record<string, unknown>;
+
+    // ① 形状：只许 `cipherBase64` 一个键。多出来的每一个键都是服务端新知道的一件事。
+    expect(
+      Object.keys(body),
+      `出站 body 里出现了密文以外的键：${Object.keys(body).join(', ')}`,
+    ).toEqual(['cipherBase64']);
+
+    const cipher = body.cipherBase64;
+    expect(typeof cipher).toBe('string');
+    const bytes = Buffer.from(cipher as string, 'base64');
+
+    // ② 正向对照：四枚 needle 在**明文载荷**里必须都找得到。
+    const plain = JSON.stringify(IMAGE);
+    for (const needle of ['contentType', 'image/', 'dataBase64', IMAGE.dataBase64]) {
+      expect(
+        plain.includes(needle),
+        `对照串里没有「${needle}」⇒ 这枚 needle 选错了，下面那条"找不到"不作数`,
+      ).toBe(true);
+    }
+
+    // ③ 反向：密文解 base64 之后的**原始字节**里一枚都不许出现。
+    //    用 `Buffer.includes` 而不是先 `toString('utf8')` 再比 —— 密文不是合法 UTF-8，
+    //    解码会产生替换字符，跨界的那枚 needle 会被无声吃掉（那就是一个假绿的方向）。
+    for (const needle of ['contentType', 'image/', 'dataBase64', IMAGE.dataBase64]) {
+      expect(
+        bytes.includes(Buffer.from(needle, 'utf8')),
+        `服务端收到的字节里出现了明文「${needle}」⇒ 头像没有整体加密`,
+      ).toBe(false);
+    }
+    vi.unstubAllGlobals();
+  });
+
   it('GET avatar：响应形状不对时**不判成功**（服务端只存密文，客户端要兜住形状）', async () => {
     vi.stubGlobal('fetch', fetchReturning(200, { nope: 1 }).impl);
     expect(await fetchAccountAvatar(opts(), TOKEN, PASSWORD)).toEqual({
@@ -206,6 +261,87 @@ describe('头像是密文：上传与读回走同一把口令', () => {
     vi.stubGlobal('fetch', fetchReturning(200, { displayName: 42 }).impl);
     const out = await getAccountProfile(opts(), TOKEN);
     expect(out.ok).toBe(false);
+    vi.unstubAllGlobals();
+  });
+});
+
+/**
+ * R15b：`resolveAccountAvatarImage` 是"这台设备现在该显示什么"的唯一裁决。
+ *
+ * 🔴 这一层的判据必须用**真口令真加密**的往返，不能用形状像密文的字符串：
+ * 用假串的话 `undecryptable` 与 `bad-shape` 两条会撞成一条，
+ * 而它们对应的用户动作不同（核对口令 / 稍后重试）。
+ */
+describe('头像读侧的六种状态（界面按它出句子）', () => {
+  const IMAGE = { contentType: 'image/png' as const, dataBase64: 'iVBORw0KGgoAAAANSUhEUg==' };
+
+  it('服务端说没有头像（hash 为 null）⇒ absent，且**一个请求都不发**', async () => {
+    const f = fetchReturning(200, { cipherBase64: 'unused' });
+    vi.stubGlobal('fetch', f.impl);
+    const out = await resolveAccountAvatarImage(opts(), TOKEN, PASSWORD, null);
+    expect(out).toEqual({ state: 'absent' });
+    expect(f.calls, 'avatarHash 是 null 还去取图 = 明知没有也要跑一趟').toEqual([]);
+    vi.unstubAllGlobals();
+  });
+
+  it('口令解得开 ⇒ ready，且 dataUri 的字节形状就是契约那一枚', async () => {
+    const cipher = await encodeAvatarCipher(PASSWORD, IMAGE);
+    const f = fetchReturning(200, { cipherBase64: cipher });
+    vi.stubGlobal('fetch', f.impl);
+    const out = await resolveAccountAvatarImage(opts(), TOKEN, PASSWORD, 'some-hash');
+    expect(f.calls.map((c) => [c.method, c.url])).toEqual([
+      ['GET', `https://sync.example.com${HOSTED_AUTH_PATHS.accountAvatar}`],
+    ]);
+    expect(out).toEqual({
+      state: 'ready',
+      dataUri: `data:${IMAGE.contentType};base64,${IMAGE.dataBase64}`,
+    });
+    vi.unstubAllGlobals();
+  });
+
+  it('🔴 五种来源给出五种不同状态（合并任何一种都会让用户做错动作）', async () => {
+    const goodCipher = await encodeAvatarCipher(PASSWORD, IMAGE);
+    const wrongPassCipher = await encodeAvatarCipher('another-passphrase', IMAGE);
+
+    const states: string[] = [];
+    const record = async (
+      setup: () => { impl: typeof fetch; calls: RecordedCall[] },
+      password: string | undefined,
+      hash: string | null,
+    ): Promise<string> => {
+      const f = setup();
+      vi.stubGlobal('fetch', f.impl);
+      const out = await resolveAccountAvatarImage(opts(), TOKEN, password, hash);
+      states.push(out.state);
+      vi.unstubAllGlobals();
+      return out.state;
+    };
+
+    expect(await record(() => fetchReturning(200, {}), PASSWORD, null)).toBe('absent');
+    expect(await record(() => fetchReturning(200, { cipherBase64: goodCipher }), PASSWORD, 'h'))
+      .toBe('ready');
+    expect(await record(() => fetchReturning(200, { cipherBase64: goodCipher }), '', 'h'))
+      .toBe('needs-password');
+    expect(await record(() => fetchReturning(200, { cipherBase64: wrongPassCipher }), PASSWORD, 'h'))
+      .toBe('undecryptable');
+    expect(await record(() => fetchReturning(500, { error: 'boom' }), PASSWORD, 'h'))
+      .toBe('unreadable');
+    expect(await record(() => fetchReturning(200, { nope: 1 }), PASSWORD, 'h')).toBe('unreadable');
+
+    // 六发读数里**不同的状态**必须正好是这五枚（`no-token` 折进 `unreadable` 的理由
+    // 写在函数注释里：它有前提，本机造不出来）。
+    expect([...new Set(states)].sort()).toEqual(
+      ['absent', 'needs-password', 'ready', 'undecryptable', 'unreadable'],
+    );
+  });
+
+  it('缺口令时**不发**取图请求（闸门在 sendJson 之前，不在界面层）', async () => {
+    const f = fetchReturning(200, { cipherBase64: 'x' });
+    vi.stubGlobal('fetch', f.impl);
+    expect(await resolveAccountAvatarImage(opts(), TOKEN, undefined, 'h')).toEqual({
+      state: 'needs-password',
+    });
+    expect(f.calls, '没有口令还出站').toEqual([]);
     vi.unstubAllGlobals();
   });
 });
