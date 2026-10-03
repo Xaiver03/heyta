@@ -35,6 +35,7 @@ import {
   EXPORT_CARD_SCALE,
   EXPORT_CARD_SIZE,
 } from '@heyta/shared-schema';
+import type { LocalDate } from '@heyta/domain';
 import { cardTextsFor, type CountdownFace, type EventCard, type EventCardTexts } from '@heyta/ui';
 import { describe, expect, it } from 'vitest';
 
@@ -53,8 +54,8 @@ const CARD: EventCard = {
   declaredKind: null,
   face: 'until',
   days: 12,
-  nextDate: { year: 2026, month: 11, day: 14 },
-  anchorDate: { year: 2026, month: 11, day: 14 },
+  nextDate: '2026-11-14',
+  anchorDate: '2026-11-14',
   ageDays: undefined,
   isPinned: false,
   isLunar: false,
@@ -62,12 +63,22 @@ const CARD: EventCard = {
   template: 3,
 };
 
-/** 宿主的措辞函数（与 `apps/web` 的 `eventBoardLabels` 同一形状，这里只要那三个）。 */
+/**
+ * 宿主的措辞函数（与 `apps/web` 的 `eventBoardLabels` 同一形状，这里只要那三个）。
+ *
+ * 🔴 `LocalDate` 在 `@heyta/domain` 里就是 `'YYYY-MM-DD'` **字符串**，
+ * 而这份夹具原先写的是 `{ year, month, day }` —— vitest 照样绿，因为它自己的
+ * `formatDate` 也读那个假形状，两边自洽而与真实类型毫无关系（typecheck 才红）。
+ * 这正是"日期行的存在性"这条判据最容易骗人的地方：断的是**字面串**，
+ * 所以串必须由真实形状算出来。
+ */
 const TEXT_LABELS = {
   faceText: (face: CountdownFace, days: number) =>
     face === 'until' ? `还有 ${String(days)} 天` : `已经 ${String(days)} 天`,
-  formatDate: (date: { year: number; month: number; day: number }) =>
-    `${String(date.year)}年${String(date.month)}月${String(date.day)}日`,
+  formatDate: (date: LocalDate) => {
+    const [year, month, day] = date.split('-');
+    return `${String(year)}年${String(Number(month))}月${String(Number(day))}日`;
+  },
   ageText: (days: number) => `已经 ${String(days)} 天`,
 };
 
@@ -226,7 +237,7 @@ describe('W7 成品图版面：措辞与行数（存在性判据）', () => {
       ...CARD,
       face: 'since',
       nextDate: undefined,
-      anchorDate: { year: 2020, month: 5, day: 6 },
+      anchorDate: '2020-05-06',
     };
     expect(countText(layoutOf(past, wordsOf(past)).ops, TEXT_LABELS.formatDate(past.anchorDate))).toBe(
       1,
@@ -267,19 +278,19 @@ describe('W7 折行：行数上限与卡片同一个数，溢出留省略号', (
   const ctx = { measureText: (value: string) => ({ width: Array.from(value).length * 10 }) };
 
   it('放得下不折；放不下按宽度折；超上限的末行带省略号', () => {
-    expect(wrapText(ctx, 'abc', 100, 2)).toEqual(['abc']);
-    expect(wrapText(ctx, 'abcd', 30, 2)).toEqual(['abc', 'd']);
-    const overflow = wrapText(ctx, 'abcdefghij', 30, 2);
+    expect(wrapCardText(ctx, 'abc', 100, 2)).toEqual(['abc']);
+    expect(wrapCardText(ctx, 'abcd', 30, 2)).toEqual(['abc', 'd']);
+    const overflow = wrapCardText(ctx, 'abcdefghij', 30, 2);
     expect(overflow).toHaveLength(2);
     expect(overflow[1]?.endsWith('…')).toBe(true);
     // 阳性对照：测量真在起作用 —— 同一串给放得下的宽度就**不该折**。
-    expect(wrapText(ctx, 'abcdefghij', 100, 2)).toHaveLength(1);
-    expect(wrapText(ctx, 'abcdefghij', 60, 2)).toHaveLength(2);
+    expect(wrapCardText(ctx, 'abcdefghij', 100, 2)).toHaveLength(1);
+    expect(wrapCardText(ctx, 'abcdefghij', 60, 2)).toHaveLength(2);
   });
 
   it('空串与零宽都不产出 `[""]`（那会在图上白占一行）', () => {
-    expect(wrapText(ctx, '', 100, 2)).toEqual([]);
-    expect(wrapText(ctx, 'abc', 0, 2)).toEqual([]);
+    expect(wrapCardText(ctx, '', 100, 2)).toEqual([]);
+    expect(wrapCardText(ctx, 'abc', 0, 2)).toEqual([]);
   });
 });
 
