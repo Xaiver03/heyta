@@ -63,6 +63,51 @@ input[type="radio"] {
   background: var(--ht-color-surface);
 }
 
+/*
+ * 头像预览圈（R10，2026-10-03）。
+ *
+ * 🔴 尺寸**必须**消费 `--ht-size-avatar-lg`：那三个 token（sm/md/lg）在
+ * `tokens.css:416-418` 定义了快一年，全仓**零读者**（AGENTS §5 说的"要新变量先加
+ * token"反过来也成立 —— 加了不消费就是死账）。这里不消费它，`check:tokens`
+ * 也照样绿，所以钉住它的是一条注释 + 这个类，不是门禁。
+ *
+ * 圆用 `--ht-radius-full`（token 的注释原文就写着"胶囊、头像"）。
+ * 底色给 `surface-sunken` 而不是留空：没有头像时那个圈会显示邮箱首字母，
+ * 透明底上放一个字母读起来像"这里坏了"。
+ */
+.ht-settings__avatar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--ht-size-avatar-lg);
+  height: var(--ht-size-avatar-lg);
+  border-radius: var(--ht-radius-full);
+  border: var(--ht-border-width-thin) solid var(--ht-color-border);
+  background: var(--ht-color-surface-sunken);
+  color: var(--ht-color-foreground-muted);
+  overflow: hidden;
+}
+
+.ht-settings__avatar img {
+  width: 100%;
+  height: 100%;
+  /* 图片是方形产物（`avatar-encode.ts` 按短边居中裁过），所以 cover 不会二次裁脸；
+     这一句管的是**别的**来源（比如旧数据）：contain 会在圈里留下白边。 */
+  object-fit: cover;
+  display: block;
+}
+
+/*
+ * 文件选择器：控件本身**不可见**，由「换一张」那个按钮 `.click()` 它。
+ *
+ * 🔴 用 `display: none` 而不是 `visibility: hidden` / 移出血口：
+ * 前者不占位、后者都还占一个文件输入的高度，设置页会多出一条空白。
+ * ⚠️ 它**仍在 DOM 里**（不是条件渲染），所以真浏览器判据能直接给它塞文件。
+ */
+.ht-settings__file {
+  display: none;
+}
+
 .ht-settings__h3 {
   margin: 0;
   /* 排版四件套来自语义档位类 `ht-type-headline`（JSX 与本类成对出现）。 */
@@ -262,7 +307,19 @@ input[type="radio"] {
   color: var(--ht-color-foreground-muted);
   font-size: var(--ht-font-size-2xs);
   cursor: pointer;
-  transition: background var(--ht-duration-fast) var(--ht-ease-standard);
+  /*
+   * 🔴 这里**原来**有 `transition: background var(--ht-duration-fast)`，而它是个
+   *    对比度缺陷，不是审美选择：切主题时 `color` 是瞬切的（暗色 `foreground` 立刻
+   *    变成近白），`background` 却还在从 `--ht-color-primary-subtle` 的**亮色值**
+   *    往暗色值爬 ⇒ 中间那几十毫秒是"新主题的字压在旧主题的底上"。
+   *    实测（页头那颗语言 chip，`getComputedStyle` + WCAG 公式，2026-10-03）：
+   *      稳态 16.40:1 → 切换后 0ms **1.01:1** → 30ms 2.29:1 → 60ms 6.79:1 → 100ms 13.35:1
+   *    也就是约 50ms 全程低于正文 AA（4.5:1）。
+   *    ⚠️ 别改成"两个属性一起过渡"：端点各自合规，中点是两边各取一半 ——
+   *      算出来仍是 ~1.5:1。**成对变化的属性只要有一个被过渡，中间态必然掉对比。**
+   *    代价只有 chip 选中态切换时少了一个 150ms 的淡入；这个控件的底色变化本来
+   *    就是"点一下就完事"的状态确认，不需要动效来解释自己。
+   */
 }
 
 .ht-chip--on {
@@ -431,6 +488,7 @@ input[type="radio"] {
   border-radius: var(--ht-radius-md);
   background: var(--ht-color-surface);
 }
+
 .ht-ai__note {
   margin: 0;
   color: var(--ht-color-foreground-subtle);
