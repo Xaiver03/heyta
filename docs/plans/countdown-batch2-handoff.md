@@ -7,8 +7,12 @@
 > shared-schema / domain / ui / mobile / local-api / ai / app-host / **服务端全套**都跑过（读数见 §2.2）；
 > `check:public-facts` **已立并接进 `pnpm check`**（八臂 8 红 0 存活），`CalendarBoard` 的 `dayMarker` 缝**已开**
 > （ADR-0052 §2.6 要的那条默认值等于原值的可选 prop）。
-> 🔴 **仍未做**：W4b 客户端拉取那半（§4 第 1-2 件，判据①至今没有载体 ⇒ **W4b 不能打勾**）、
-> W7 设备出图那半、W8 原生壳那半与壳级门禁、W9 原生投递（另一条会话）；W6 停放；
+> 🔴 **23:0x 增量**：W4b **客户端拉取那半已落地**（3 笔：storage 的 META 通用读写 / app-host 的
+> `public-facts.ts` / web 接线 + i18n 中英），**判据①第一次有了真界面载体**（e2e 三档、3 passed、
+> 三张图人已看）；25 臂变异逐臂报红。⇒ W4b 只剩一条：**papers 的后台界面回显**目前只到 API 层。
+> 🔴 **仍未做**：
+> W7 设备出图那半、W8 原生壳那半与壳级门禁、W9 原生投递（另一条会话）；W6 停放（23:0x 复量仍 14 脏，
+> 且撞车面**新增 4 个未跟踪文件** —— 日/年视图与拖拽，见 §5）；
 > **收尾四项（§8.3）除第 1 条的两半之外没启动**。
 > 🔴 **所有成果都在本地分支，没有 push、没有 merge 进 `main`**。
 > 交接日期：**2026-10-03**（CST）
@@ -67,7 +71,7 @@ worktree 的未提交改动里，而 `feat/countdown-batch2` 落后 `main` **24 
 | W8 | 三端（web / mobile / 原生壳）接线与壳级门禁 | 🟡 **已提交 `b8f39cae` 并合进 batch2 `db430cc9`**：移动半（`CountdownScreen` 267 行 + `feature-entries` 109 + `countdown-display` 133）+ 领域层 `feature-modules.ts` 77 + 测试 244 行；web 半已随 W5 落地。✅ **那 244 行本轮真跑了**：`@heyta/mobile` 547 passed、`@heyta/domain` 859 passed（起手 4+15 枚红全部是读旧 dist，见 §2.2 第 1 条） | 🔴 "三端"里**原生壳那半 + 壳级门禁**没有产物 |
 | W9 | 提醒（含投递路径 —— 现状是全仓零 `new Notification(`） | 🟡 **web 半 + DST ✅**（`a8f5a9a6`，变异 9/9 红）；**原生投递那半没动** | 投递路径 = Goal 明文要求的**没做完**那半（ADR-0051 另立一单）；合流时连带兑现 §3.1 |
 | W10 | `EVENT` 必须**同时**进 AI 工具目录与 local-api 工具契约（实体与 AI 工具一起做；不改 `ENTITY_TYPES` 驱动的排期决定） | ✅ 已闭合（`8a595493` + `e2aeedc4`），目录 4 条 EVENT 工具，MCP 与内置 AI 共用同一份 | 无。⚠️ 副作用已被 L' 抓住并修（`ai-and-transfer.ts` 那张表 = 授权面） |
-| W4b | 调休/补班的运营录入通道 + 客户端拉取（heyta **第一条服务端→客户端内容通道**，**ADR 必须定性，且回写 ADR-0038 的后台范围表**） | 🟡 **服务端半已并入 batch2**（§2.1 那 4 笔 = `a39f7fa6`/`a2259e5d`/`3708d08c`/`2877dd37`，union 解掉唯一相撞面并验过两侧逐字保留）；ADR 定性 + 0038 回写 ✅（`c28e5f1a` @ `main`）；§3.2 的 **ADR 指针义务已兑现**（`1dbe6df6`，12 处逐处核过）；🔴 **门禁 `check:public-facts` 已立并接进 `pnpm check`**（`3f327dc2`，八臂 8 红 0 存活）；§4 第 3 件 **`dayMarker` 缝已开**（`509a06cd`，4 条判据 + 三臂变异全红）；**客户端拉取那半仍从零** | §4 只剩第 1-2 件（后台录入已在挑配里落地 ⇒ 实际是**客户端拉取 + META 缓存 + 宿主接线**），外加判据①要真界面截图且人看。🔴 **W4b 的勾不能打** |
+| W4b | 调休/补班的运营录入通道 + 客户端拉取（heyta **第一条服务端→客户端内容通道**，**ADR 必须定性，且回写 ADR-0038 的后台范围表**） | ✅ **代码链已闭合**（23:0x）：服务端半那 4 笔（`a39f7fa6`/`a2259e5d`/`3708d08c`/`2877dd37`）+ ADR 定性与 0038 回写（`c28e5f1a` @ `main`）+ §3.2 ADR 指针（`1dbe6df6`）+ 门禁 `check:public-facts`（`3f327dc2`，八臂 8 红 0 存活）+ `dayMarker` 缝（`509a06cd`）+ **客户端拉取三笔**（`6735cc39` storage META 通用读写 / `b05fbc50` app-host 模块 / `67fef701` web 接线 + i18n + 真界面判据）。判据①**已在真界面跑过**（三档截图人已看，读数见 §4） | 🔴 **只剩一条**：判据②"papers 在**后台界面**回显"目前只到 API 层（`admin.routes.ts` 的 GET 带 papers，但 `apps/web/src/features/admin/` 没有调休面板、`admin-client.ts` 也没有对应方法）⇒ 面板正在补（见 §4 末），补完并跑过判据才打勾 |
 | L 系列 | 法务联动 —— 改 `packages/legal` 那六处现成位置、每处中英双份、落地页文案走生成物不许手改（`check:legal-copy` 已在 `pnpm check`） | 🟡 **判定表已出、唯一真命中已修**（`2d53ea94` + `8996de9d` + `1d71e75f`/`017adc3e`） | 🔴 六处**没有被"全改一遍"是判定结果**（§4 时序条款：纯文字版不触发 L1/L2/L4/L5），但 **§3.1 那六个字面位置随 W9 那半必须翻转** |
 | 收尾 | Goal 第 7 条 + 计划 §5/§8.3 | 🟡 **§6 第 1 条的两半已做**（`pnpm -r build` rc=0、`pnpm -r typecheck` rc=0、八个包 + 服务端全套的读数见 §2.2） | `check:docs`（33 处是别人未跟踪文档的函数）、界面截图人看、`pnpm reinstall:all` 四端 —— 全未做 |
 | 同步 | 每完成一项 → 计划文档打勾 + **同步 AGENTS §9** | 🟡 计划文档已同步（`cd839ec5`）；**AGENTS §9 欠着** | `AGENTS.md` 脏 ⇒ 不能 `--only` 提交（§7 第二条），等干净后补 |
@@ -267,6 +271,35 @@ cd "…/heyta" && git merge-tree --write-tree --name-only feat/countdown-batch2 
 > （`509a06cd`，判断在 `calendar/model.ts` 的 `calendarDayMarkerView`，4 条判据 + 三臂变异全红），
 > 宿主接线还没人传它。⇒ **本节只剩第 2 件是从零**，加上判据①要在真界面上跑一次。
 
+> 🔴 **23:0x 增量 —— 第 2 件（客户端拉取）与判据①都做完了，读数如下**：
+>
+> | 落点 | 提交 | 判据与变异 |
+> |---|---|---|
+> | `OpLogStore` 开出一对 META 通用读写 | `6735cc39` | 契约一条判据覆盖四件事（缺键 `undefined` / 值型不变 / 覆盖生效 / 不碰游标），在 **6 个适配变体**上各跑一次；三臂变异 **6 红 / 6 红 / 2 红** |
+> | app-host `public-facts.ts`（匿名拉取 + 缓存 + 装进领域层） | `b05fbc50` | 10 条判据；**8 臂变异逐臂精确报红**（去 `credentials:omit` / 塞 `authorization` / 路径改回手写 / 丢 `papers` / 未配置也发请求 / 坏形状覆盖缓存 / 不发条件请求头 / 无缓存时抛错） |
+> | web 接线 + `publicFactsEpoch` + i18n 中英 + 真界面判据 | `67fef701` | 宿主层 7 条判据；**7 臂变异逐臂报红**（其中 W1/W6/W7 各命中 2 条，因为订阅与幂等共用一个守卫） |
+>
+> 🔴 **判据①第一次有了真界面载体**（`e2e/tests/public-facts.spec.ts`，3 passed，三张图入库
+> `e2e/test-results/public-facts-{local-only,self-hosted-404,deployer-supplied}.png`，**人已打开看过**）：
+> A 没配服务端 / B 那条通道 404 ⇒ 42 格齐全、随包表的「休」（10-01…10-07）与「班」（10-10）照画、
+> 控制台零 error；C 部署方只下发 10-17 ⇒ 那一格出「班」，**而 10-01 的「休」整年替换掉**（这是
+> ADR-0052 §2.2 的语义，若实现做成"合并"在界面上完全看不出来，所以两条腿都断言）。
+>
+> ⚠️ 两条**当场发现、当场没修**的：
+> ① 左侧**迷你月历不跟着画标记** —— 它是 `CalendarSidebar` 自己那份网格，不在共享板上，
+>    而它正被日历线整片重写（§5）⇒ 由 **W6 复用同一条 `dayMarker` 缝补齐**，不在这里长第二份；
+> ② 判据②"papers 在**后台界面**回显"只做到 API 层 —— 后台没有调休面板，`admin-client.ts` 也没有
+>    对应方法 ⇒ 已开工补面板（`apps/web/src/features/admin/` + `admin-client` + i18n + 判据），
+>    **面板落地并跑过判据之前 W4b 不打勾**。
+> 🔴 ③ **一条边界，免得下一个人以为"三端都接了"**：第 2 件的"宿主接线"这轮落的是 **web 那一个宿主**
+>    （工单原文点名的接点就是 `apps/web/src/features/calendar/CalendarView.tsx`）。**移动端没接**：
+>    `apps/mobile/src/screens/CalendarScreen.tsx:193` 用的是同一块共享板，加那两个可选 prop 就亮，
+>    但它缺的是**另一件东西** —— 一次宿主级启动接线（`readSyncConfig()` 的地址 + `openTaskHost()` 的
+>    store + `AppState` 回前台），而那个文件正被日历线整片重写（§5 那 14 个里就有它）。
+>    ⇒ 与迷你月历**同一笔账、同一个 owner（W6/W8）**。
+>    📌 `createPublicFactsWiring` 这个工厂**形状上已经宿主无关**（端口全注入、零 DOM），
+>    移动端接时**直接复用，不要复制一份** —— 复制的那一半就是 AGENTS §3.5 记过两次的事故形状。
+
 已落（服务端半，未提交）：两张表 + 1 条迁移（年度录入存 `papers` / 逐日 `day DATE + isOffDay BOOLEAN`）、
 线协议契约在 `shared-schema`（**唯一一份**）、`holidays.ts:108 adjustmentOn()` 接上"部署方下发的覆盖表"入口、
 `ETag` / `Cache-Control` / 304。
@@ -308,6 +341,19 @@ cd "…/heyta" && git status --porcelain -- packages/ui/src/calendar apps/web/sr
 20:2x 现量的撞车代价：`calendar/model.ts` **+264/−7**（261→518 行，含一处 166 行整块插入）、
 `CalendarBoard.tsx` +107、`CalendarScreen.tsx` +153。HEAD 与他们的版本里 `grep -c 'EVENT'` **都是 0**
 ⇒ 这条**没被别人顺带做掉**，等它归零后由我方落地（复用 §4 第 3 条的 `dayMarker` 缝）。
+
+🔴 **23:0x 复量：没有归零，而且撞车面变宽了** —— 同一命令现量仍是 **14**，但里面**新增了 4 个未跟踪文件**：
+`packages/ui/src/calendar/{CalendarDayBoard,CalendarViewTabs,CalendarYearBoard}.tsx` 与
+`apps/web/src/features/calendar/{drag-day,useDragDayNav}.*` ⇒ 日历线正在做**日视图 / 年视图 / 拖拽**，
+不是收尾中的余波。停放的判定继续成立。
+
+⚠️ **给合流的人的一条硬提醒（新）**：我方 `509a06cd` 与 `67fef701` 改的
+`packages/ui/src/calendar/{model.ts,CalendarBoard.tsx}` 和 `apps/web/src/features/calendar/{CalendarView.tsx,store.ts}`
+**逐个都在上面那 14 个里** ⇒ batch2 合回 main 时这四个文件必冲突。冲突解法不是二选一：
+`model.ts` 里我方新增的是 `CalendarDayMarker` / `CalendarDayMarkerView` / `calendarDayMarkerView`，
+`CalendarBoard.tsx` 里是 `dayMarker?` / `dayMarkerLabels?` 两个**可选** prop 与 DayCell 那一处渲染，
+`store.ts` 里是 `publicFactsEpoch` + `bumpPublicFactsEpoch` —— **全部保住**，他们的新板子（日/年视图）
+一旦也要标"休/班"，用的就是同一条缝（这正是 §4 第 3 条当初把它做成默认值等于原值的可选 prop 的理由）。
 
 ---
 
