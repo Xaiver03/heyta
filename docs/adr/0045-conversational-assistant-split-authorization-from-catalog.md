@@ -126,6 +126,17 @@ ADR-0005 给的否决理由有三条（隐私面 / 工程面 / **失败模式**�
 1. **AI 类型上产不出 op**（ADR-0005）。`AiSuggestion` 里没有 `OpType` / `entityId` / 向量时钟。
 2. **全仓 `host.submit` 恰好一处**，在 `confirmAiToolProposal()`，由 `check:ai-tools` 静态钉住
    （钉的是"**恰好**一处"，不是"在确认函数里" —— ADR-0035 明确说过 weaker 判据会漏）。
+   ⚠️ **2026-10-03 勘误（结论不变，这句的"范围"写宽了）**：现量两处非测试调用点 ——
+   `packages/app-host/src/ai-tool-run.ts:195`（确认函数体内，本条说的就是它）与
+   `packages/local-api/src/server.ts:545`（**入站那一侧**，ADR-0011 的设计：显式 token +
+   逐工具授权之后立刻执行，见同文件 `:481` 那张表）。`check:ai-tools` 的扫描范围也不是全仓 ——
+   它只扫 `packages/app-host/src/ai-tool-*.ts`（`scripts/check-ai-tools.mjs:52-56`，
+   文件头明写"不搞全仓 grep（那会有太多假阳性）"）。
+   ⇒ 本条真正钉住的是**内置 AI 这条路径产不出未经确认的写入**，它仍然成立；
+   "全仓"这个范围词请不要再往别的文档里抄。
+   🟡 想把这句变成常驻判据（枚举全仓**调用形状** `.submit(` 的非测试调用点、断言集合恰好等于
+   上面那两枚）可以做，但**不能按名字匹配**：`apps/mobile/src/screens/ProfileScreen.tsx:367`
+   那个 `form.submit()` 是 HTML 表单，与写入无关 —— 已登记为缺口，不在本批顺手做。
 3. **出境逐字段披露**，`fields` 必填，工具名也算出境数据。
 4. **回退不得跨越隐私边界**（`fallback-needs-consent`，从不自动重试到另一目的地）。
 5. **入站本机 API 默认关 + 只监听回环 + 逐工具授权**（ADR-0011）。

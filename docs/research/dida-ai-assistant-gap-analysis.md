@@ -267,7 +267,7 @@ ADR-0035 与计划里 P3 的定义是"**多步只读循环**"，写永不进循�
 | `resolveToolSelection`（规则前门） | `ai-tool-selection.ts` | **4** | ✅ 已接线 |
 | `requestToolCall`（模型前门） | `ai-tool-call.ts:178` | **4** | ✅ 已接线，**且是界面实际走的那条** |
 | `runSelectedTool`（执行核：目录 / 授权 / 参数 / 读执行 / 写提案） | `ai-tool-run.ts:129` | 直接 0，但被 `requestToolCall` 在 `ai-tool-call.ts:210` 与 `:303` 调用 | ✅ **唯一执行核，活着** |
-| `confirmAiToolProposal`（全仓唯一 `submit`） | `ai-tool-run.ts:183` | **3** | ✅ 已接线 |
+| `confirmAiToolProposal`（**内置 AI 路径**唯一的 `submit`；全仓另有入站那一处，见 ADR-0045 §2.4 的 2026-10-03 勘误） | `ai-tool-run.ts:191`（原记 `:183`，W11 之后已漂） | **3** | ✅ 已接线 |
 | `runAiTool` | `ai-tool-run.ts:106` | **0** | 🔴 **冗余外壳**：`ai-tool-run.ts:112` 只是转调 `runSelectedTool`。删它不丢任何能力 |
 | `grantedToolNames` | `ai-tool-run.ts:191` | **0** | 未用（给模型看的目录投影走 `toToolDescriptors` / `listAuthorizedTools`） |
 
@@ -331,7 +331,7 @@ ADR-0035 与计划里 P3 的定义是"**多步只读循环**"，写永不进循�
 | 过程可见性 | 「已调用 N 个工具」+ 思考块可展开 | 只有 loading 与失败文案 | **落后** |
 | 语音类 AI | AI 语音添加（一段话拆多条、不确定给两版左右滑）+ 录音转写总结（30+ 语言、失败回退普通模式） | **整条线一个都没有** | **落后**（且不在 AI 计划里） |
 | 端覆盖 | iOS / Android / 桌面 / Web | 只有 Web | **落后** |
-| **写入是否可绕过确认** | 靠文档教用户加"等我确认"；类型上无证据表明做不到 | **类型上产不出 op** + 全仓唯一 `submit` + 静态门禁 | ✅ **领先** |
+| **写入是否可绕过确认** | 靠文档教用户加"等我确认"；类型上无证据表明做不到 | **类型上产不出 op** + 内置 AI 路径唯一 `submit` + 静态门禁（门禁只扫 `packages/app-host/src/ai-tool-*.ts`） | ✅ **领先** |
 | **逐工具授权** | 无（读写同一 OAuth 级别） | 每个工具**单独默认关** + 只监听回环 + 令牌检查先于工具查找 | ✅ **领先** |
 | **出境透明度** | 未公开 | 逐字段披露，工具名也算出境数据，URL 保存与发送双点校验 | ✅ **领先** |
 | **失败可见性** | 语音线有回退；AI 助手未公开 | 7 种路由原因说人话 + 零请求判据 | ✅ **领先或持平** |
