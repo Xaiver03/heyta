@@ -1798,6 +1798,43 @@ Error: 待补签却建了实时通道：ws://127.0.0.1:4318/?token=8-cC4f_Ev09e
 "**干净**"—— 那不是我留下的状态，现在已经是 `1898803d` + 你们的两个 hunk 在工作树里。
 你们的 theme 改动**一行都没丢**，但也**一行都没提交** —— 请按原计划自己提交。
 
+## B14. 🔴 当前树上的 **5 条红是"账号资料"那半件事的**，不是邮箱+口令这条线的（2026-10-03 01:20 取证）
+
+现象（两条独立通道，同一个根）：
+
+| 通道 | 红字 |
+|---|---|
+| `cd server && npx vitest run` | `magic-link-registration.spec.ts > Login magic-link requests > should consume a login token with a token-scoped atomic update`：session 的 `user` 多了 `avatarHash` / `displayName` / `locale` |
+| `cd e2e && npx playwright test`（离线全量） | `admin-console.spec.ts` 4 条（:567 / :602 / :686 / :746），第一条的原文是 `除已登记缺失外不该有非 2xx：["/api/account/profile","/api/account/profile"]`，后面三条是它的连锁（面板压根没渲染出来）。数字：**96 passed / 2 skipped / 4 failed，EXIT=1** |
+
+归属证据（不是推测）：
+
+```
+git grep -l accountProfile HEAD -- packages apps   →  空
+工作树：packages/shared-schema/src/account-profile-contract.ts（新文件）
+        packages/app-host/src/hosted-auth.ts:113 HOSTED_AUTH_PATHS.accountProfile
+        server/src/auth.ts 里 `withAccountProfile` 命中 4 次，HEAD 里 0 次
+```
+
+⇒ 这是一件**正在做**的事（契约 + app-host 端口 + 服务端 store 三处都还没提交），
+调用方在启动/头像菜单里发了 `GET /api/account/profile`，而 **e2e 那套假端点没有这一条**，
+于是 `admin-console.spec.ts` 那条"除已登记缺失外不许有非 2xx"的自检把它抓出来了 ——
+**那条判据在正常工作**，它抓到的是"新端点没同步进测试载体"。
+
+闭口需要两样，都由做这件事的人补（我不顺手改，理由见
+`docs/plans/email-password-auth.md` §12.5：同一批未提交源码正被另一个会话写）：
+
+1. e2e 假端点补 `GET/PUT /api/account/profile` 的桩（或按 `KNOWN_MISSING` 那条纪律登记，
+   但**登记要带理由**，见 `admin-console.spec.ts:545` 附近那三条出路）；
+2. `magic-link-registration.spec.ts:524` 那条断言按新的 `user` 形状改，并写明为什么
+   （"session 里带展示字段"是这次的目的，不是回归）。
+
+同批对照：**邮箱+口令这条线自己的数是全绿的** —— server `tsc` exit 0、
+`self-host-email-verification.spec.ts` 9/9、app-host 911、i18n 22、web 1431、
+mobile 538、`verify:password-web` 真浏览器旅程 2 passed / exit 0。
+
+---
+
 ## B15. ✅ **已解除**（2026-10-03 02:51，`/tmp/restore-run23.log`）🔴 批五的设备验收被**宿主机负载**卡住（2026-10-03 00:59–01:10 取证）—— 已把"环境不成立"和"产品红"分成两个退出码，还缺一个低负载窗口
 
 **解除取证**：02:46–02:51 那一轮（run23）负载允许，**24 项全绿 / exit 0**，
@@ -1928,6 +1965,8 @@ load 59 时全量必红、单跑必过；改成"轮询到条件成立"（`waitUn
 超时消息里**打出当前界面文本**（现在这条已经在打了，保持）。
 🔴 别改成"把 `waitFor` 的 timeout 调大"—— 那是把探针 bug 变成永久豁免。
 
+---
+
 ## B18. 🔴 `pnpm check` 断在 `check:l4`，而**断点在本批开工之前就存在**（2026-10-03 04:08 实测）
 
 > 编号说明：这一条登记时误用了 `B17`（与上面"reminders 探针全量跑才红"那条同号，那条是
@@ -1960,37 +1999,99 @@ load 59 时全量必红、单跑必过；改成"轮询到条件成立"（`waitUn
 `Card` 内部默认 `gap: space.2`，所以去掉会改视觉。为不改视觉而消掉这 2 处需要把
 `tokens` 从 hook 作用域搬到模块级 StyleSheet —— 那是 M3 的形状，留给那条线一次做完。
 
-## B21. ✅ **已解除**（2026-10-03 05:40，`057ec9b7` + `7420d8d7`）🔴 多端覆盖批五**给 `check:l4` 的棘轮添了 2 处内联样式**（114 → 116，基线 90）—— 记账，不在收尾里顺手做（2026-10-03 05:04 实测）
+## B19. ✅ **已解除**（2026-10-03 04:31，对方跑完自己放了端口）🔴 4318/4319 被**另一条会话的 e2e**占着，本会话欠的两条浏览器验收因此没跑（04:30 取证）
 
-**解除取证**（05:38–05:40 实测，全部是门禁与脚本自己打印的数，不是我的推断）：
+**现场**（`lsof` + `ps`，不是我猜的）：
 
-本条原来列的"下一步"就是正解，而它比我估的便宜 —— 关键是我原先误判了一件事：
-给 `Card` 加 `gap` 档位**不需要动任何既有屏**。加的是**可选** prop，默认值取原来那个
-`space.2`，所以其余 11 张卡渲染逐字节不变；被改的只有 `ExportScreen.tsx` 一个文件。
+| 进程 | 是什么 | 启动 |
+|---|---|---|
+| `12704` | `node /private/tmp/heyta-g5/e2e/.../@playwright/test/cli.js test` | 04:21:35 |
+| `12720` | `node stub-provider.mjs` → 监听 **4319** | 04:21:36 |
+| `12722` | `pnpm --filter @heyta/web exec vite --port 4318 --strictPort` → 监听 **4318** | 04:21:36 |
 
-- `apps/mobile/src/ui/kit.tsx`：新增 `GapTier` / `gapValue` / `Stack`，`Card` 收 `gap?: GapTier`。
-- `apps/mobile/src/screens/ExportScreen.tsx`：**6 处**内联样式（本批 2 + 既有 4）全部换成 prop，
-  并删掉该文件的 `useTokens()`（间距不再由视图取 token）。
-- 门禁打印的数：`apps/mobile/src/screens` **113 → 107**（一次消掉 6 处，比原计划的"≤109"更多）。
-  基线 90 仍然红，剩的 **17 处全部属 M3 那条线**（B18 记的就是它）—— 本批的 +2 已清零。<br>⚠️ **这句归因是错的，见 B27**：超线部分里有 10 处是本条线批四自己新建 `SecurityScreen.tsx` 时添的（`git blame` 逐行数，10 处全在同一笔 `804842be` 上）。但**清完那 10 处门禁也不会绿**：107 − 10 = 97 仍 > 基线 90。
-  `ExportScreen` 已不在"含内联样式的文件"清单里（12 个文件、逐条 0 命中）。
-- `apps/mobile` typecheck 0、`check:design` 0、`check:rn-aria` 0。
+它跑的是 `/private/tmp/heyta-g5` 那份**隔离检出**（源码是它的，端口是共享的）。
 
-🔴 **零视觉代价是靠判据说的，不是靠"我觉得没变"**：android 重装截图的主蓝命中 **4036**，
-与改动前那一轮**同一个数**（`/tmp/g5-ri-mob.log` vs `/tmp/g5-ri-android2.log`，同一台
-emulator-5556、同一屏），而 `gapValue(...,'loose')` 就是 `tokens['space.3']`、
-`Stack` 默认档就是 `space.2` —— 与被替换掉的两处字面量逐字相同。
+**为什么这就够了阻塞**：`e2e/playwright.config.ts` 那两条 `webServer` 是
+`reuseExistingServer: false` —— 我这边一起跑就会**先 SIGKILL 它的 4318/4319 再占**，
+也就是 traps #87 记过的那个形状（症状是对方的用例莫名红）。所以这不是"要不要等一下"，
+是**不许跑**。
 
-**中途中止过一次重装**：`Stack` 第一版写成 `<View {...rest} style={{ gap }}>`，
-`{...rest}` 排在 `style` 前面 ⇒ 调用方传的 `style` 会被**静默丢弃**。这个缺陷本身比债更该先修
-（`Stack` 是刚立起来的"间距正解"，它吞样式会让下一个使用者的布局改动无声消失），
-所以先杀掉正在跑的那轮重装再改 —— **验的产物必须等于交付的产物**（traps #27 的方向），
-而不是"先拿有缺陷的版本把截图补上"。修法见 `7420d8d7`（解构 `style` 并合成数组）。
+**本会话欠的两条**（都在等端口，不在等产品）：
 
-原诊断**逐字保留**，因为里面两条仍然成立：① 棘轮"只减不增 + 不许调基线"对所有屏成立，
-M3 那 17 处仍然欠着（⚠️ 口径见 B27：其中 10 处其实是本条线批四的）；② 本条第 3 条理由（改布局就要重跑设备判据）是**对的** —— 成本确实付了
-（一次 `reinstall-all --only android` + 一次 `verify:mobile-restore`），只是它不该被当成不做的理由。
+1. **R9 尾巴**：`tests/narrow-sweep.spec.ts` + `tests/motivation.spec.ts`。
+   这两份最后一次改动在 `3d481852`（"首启隐私同意的出路收进 openApp"），
+   工作树里**已干净**（改动被那笔提交带走了），但**改完从没跑过**。
+   `cd e2e && npx playwright test tests/narrow-sweep.spec.ts tests/motivation.spec.ts --reporter=list --retries=0`
+2. **变异臂 L 复跑**：`e2e/tests/calendar-week.spec.ts` 最后一例在本批从"两档"改成
+   "三档（月/周/时间线）"，臂 L 的归因串（`只有` / `档位下拉里出现了`）需要重验一次。
+   `python3 /tmp/mutate-r11.py L` —— ⚠️ **电池没跑完不起第二趟**（traps #142）。
 
+**本会话已经跑过的**（时间上早于对方启动，没有互相打断）：日历 e2e 家族 **16/16**
+（含新增的 `calendar-view-family.spec.ts` 1 条 + 截图人看），以及
+`apps/web` 全量 **1496 passed / 12 skipped / 0 未处理拒绝**。
+
+**移动端那条不在这里欠**：`pnpm verify:mobile-calendar` 现在跑**测的是旧 APK**
+（装的产物早于本批改 `packages/ui` —— traps #27 的原形状）。它的前置是 §6.1.1 的
+`pnpm reinstall:all`，而那**不能在这个共用工作树里跑**（会动别人的未提交产物）。
+
+### 解除（04:31）
+
+**没有去动对方的进程** —— 是它自己跑完释放的。释放后两条都跑了：
+
+| 欠账 | 命令 | 结果 |
+|---|---|---|
+| R9 尾巴（那两份 spec 自 `3d481852` 起从没跑过） | `npx playwright test tests/narrow-sweep.spec.ts tests/motivation.spec.ts` | **17/17 通过**（含"塌缩态扫描：日历/四象限/习惯/时间线/番茄钟/成长/便签/回收站"+ 搜索与设置浮层） |
+| 臂 L 复跑（`calendar-week.spec.ts` 最后一例被本批改名/改期望） | `python3 /tmp/mutate-r11.py L` | **精确红且归因成功**：`档位下拉里出现了 4 项`，红条数=1，`restored=True` |
+
+📌 这一条的价值不在"跑绿了"，在**它把"共享端口的 e2e 必须先量现场"这件事留下了现场**：
+`reuseExistingServer: false` 意味着我一起跑就会 SIGKILL 别人的 webServer，
+所以"能不能跑 e2e"的判据不是"有没有红"，而是**4318/4319 的持有者 PID 是谁家**。
+
+## B20. 🔴 四份**未跟踪的生产者**被**已跟踪的消费者**importing —— 提交时漏一个就得到一个干净检出不上的仓库（2026-10-03 04:36 取证）
+
+共享工作树里本会话**不 `git add`**（见 §B15/§B19 的归属纪律），所以新文件全部留在未跟踪态。
+而消费者是**已跟踪且已修改**的。判据不是"看起来会断"，是逐条量过：
+
+| 消费者（已跟踪，工作树里改了） | 它 import 的生产者（🔴 未跟踪） | 只提交消费者的后果 |
+|---|---|---|
+| `apps/web/src/App.tsx` | `features/calendar/CalendarHeaderToolbar.tsx`、`features/calendar/useCalendarLabels.ts`、`features/settings/ProfilePanel.tsx`、`features/settings/avatar-encode.ts` | `TS2307 Cannot find module` —— **整个 `@heyta/web` 构建不出来** |
+| `packages/shared-schema/src/index.ts` | `src/account-profile-contract.ts` | 炸的是**所有** import `@heyta/shared-schema` 的包（op-log / storage / sync-client / 各壳） |
+| `apps/web/src/features/calendar/CalendarView.tsx` | `features/calendar/useCalendarLabels.ts` | 同上，范围小一点 |
+| `server/src/account/account-profile.routes.ts`（本身未跟踪） | —— | 它和 `packages/app-host/tests/hosted-account-profile.spec.ts` 是**同一批**，别只落一半 |
+
+**取证命令**（HEAD 里那些引用**一条都不存在**，所以断点完全由"这笔提交带了哪些文件"决定）：
+
+```bash
+git show HEAD:apps/web/src/App.tsx | grep -c 'CalendarHeaderToolbar\|ProfilePanel'   # → 0
+git show HEAD:packages/shared-schema/src/index.ts | grep -c account-profile-contract  # → 0
+git status --porcelain --untracked-files=all | grep '^??' | grep -E 'src/|tests/'
+```
+
+这正是 traps **#147** 记过的形状（"消费者已提交、生产者在未提交的工作树里"在本机**永远绿**，
+因为本机磁盘上有那份文件），只是这次不是 `dist` 掩护类型，而是**同一台机器上的未跟踪源文件**掩护构建。
+
+### 分组清单（提交者按组收，别混）
+
+- **日历线（R11 批一–批五，本会话）**：`CalendarHeaderToolbar.tsx`、`useCalendarLabels.ts`、
+  `apps/web/tests/calendar-capture.spec.tsx`、`calendar-view-family.spec.tsx`、
+  `e2e/tests/calendar-{cells,week,capture,view-family}.spec.ts`、
+  `apps/web/evidence/calendar-{cells,week,capture,view-family}/`。
+- **资料线（R10，两条会话都碰过）**：`packages/shared-schema/src/account-profile-contract.ts`、
+  `apps/web/src/features/settings/{ProfilePanel.tsx,avatar-encode.ts}`、
+  `server/src/account/account-profile.routes.ts`、
+  `packages/app-host/tests/hosted-account-profile.spec.ts`、
+  `apps/web/tests/{profile-panel,account-profile-entry}.spec.tsx`、`apps/web/evidence/profile-panel/`。
+- **主题线**：`e2e/tests/theme-switch-contrast.spec.ts`（本会话）。
+  ⚠️ `apps/web/tests/theme-boot-no-persist.spec.tsx` **不是本会话产出的**，归属另一条线。
+- **图标/取证**：`apps/web/evidence/quadrant-icon/`（R12，本会话）；
+  `apps/web/evidence/password-web-journey/` 那两张 **不是本会话的**。
+- **弹层放置（R11 收尾顺带，本会话）**：`apps/web/evidence/due-editor-placement/`
+  （README + 改前/改后两张）。源文件 `DueEditor.tsx` 与两份 spec **都是已跟踪的**，
+  所以这一组只有证据目录是新的。
+- **倒数纪念日线**：`docs/adr/0044-*`、`docs/plans/countdown-anniversary.md`、
+  `docs/research/countdown-anniversary-data-and-images.md`（`check:docs` 那 7 条里有 3 条是它们）。
+
+## B21. 🔴 多端覆盖批五**给 `check:l4` 的棘轮添了 2 处内联样式**（114 → 116，基线 90）—— 记账，不在收尾里顺手做（2026-10-03 05:04 实测）
 
 `check:l4` 断言 C 数的是"含 `style={{` 的**行数**"（`scripts/check-l4-no-style.mjs:242`，
 基线写在文件头，单位已钉死为行）。逐口径实测：
@@ -2080,6 +2181,7 @@ cd e2e && npx playwright test tests/due-date-edit.spec.ts tests/motivation.spec.
 **仍红**才轮到本条线（共享 `DatePicker` 的弹层放置）负责；在那之前改本批任何代码都是抢别人的活。
 
 
+
 **🔴 07:5x 在当前 HEAD（`8b41648a`）的干净检出上复跑：仍然 3 failed / 98 passed，但归因可以从"提交态落后"升级到"点到文件"**
 
 复跑环境：`/tmp/heyta-ios-ab` detached 到 `8b41648a`，先 `pnpm -r build`（`BUILD_EXIT=0`）再跑两段。
@@ -2094,39 +2196,7 @@ cd e2e && npx playwright test tests/due-date-edit.spec.ts tests/motivation.spec.
 
 📌 这条更新的价值在**把"等别人提交"变成可核对的三枚文件名**：下一位复跑时只要 `git status` 里这三枚不再脏，就应该期待 `check:ai-e2e` 转绿；如果它们已经提交而这条仍红，那 B22 的归因就被证伪，要重新查。
 ⚠️ 顺带一条**产品事实**（不是本条线的账，但值得被看见）：日历页页头会挂着上一个视图的象限名，这个缺陷在**已提交的 main** 上就存在，两位读者别把它读成"测试太挑"。
-## B23. ✅ **两处全部解除**（2026-10-03 06:12，`822dd1f1` 判据缺陷 + `c7f0e33a` 站点收编）🔴 `check:empty-state` 的两处红：一处是**判据缺陷**（已修），另一处**我先前记成"别人那条线的新站点"，那条归属是错的**（见下）（2026-10-03 05:27 取证）
-
-### 🔴 先撤回一条归属结论：那处红**是本 goal 批四的**，不是别人的
-
-本节原来写着"该屏由 `804842be`（「账号与安全」屏）引入，**不属于多端覆盖这五批**" —— 
-**这句是错的**：`804842be` 正是本 goal §7 第四行（批四 · 移动端账号安全包）交付的那一屏，
-证据就写在同一份文档里（那一行列的产物含 `apps/mobile/src/screens/SecurityScreen.tsx`）。
-我把"另一条产品线"和"本 goal 的另一批"混成了一个词，于是把自己线的债登记成了"不代改别人的屏"。
-📌 一般规律：**"不属于本批"和"不属于本条线"是两个判断**，写归属时得分别给证据；
-而一条写错的归属比一条没有归属更贵 —— 它让这笔债看起来有主，于是没人再去看它。
-
-### 解除取证（06:10–06:12 实测）
-
-门禁给的两条出路里，第 2 条（"若确实需要区块级空态，正确动作是先给它加一档"）是正解，
-而它比我当时估的便宜：`size?: 'page' | 'section'` 是**可选** prop、默认 `page`
-⇒ 现有站点一个像素都不变。已按那条做（`c7f0e33a`）：
-
-- `packages/ui/src/empty-state/`：模型多一档（"section 不画图标"这条判断做在模型里，
-  不在组件写 `if` —— 调用方传了 `icon` 却什么都没画，是"参数被静默丢弃"那一类）。
-- `SecurityScreen.tsx`：通行密钥空态改消费 `<EmptyState size="section" … />`。
-- 判据：新增 4 条模型用例；**变异臂**（把 `size === 'section' ? undefined : icon` 换成 `icon`）
-  **恰好 1 红**，三段 sha256 逐字节还原。
-- `check:empty-state` **exit 0**（从 1 处红到零）；`check:design` / `check:rn-aria` /
-  `check:ui-provider` 全 0；`@heyta/ui` 442 passed；`apps/mobile` typecheck 0 + 538 passed；
-  `check:l4` 移动端计数不变（107，没新增内联样式）。
-- 🔴 **设备那一轮把上一笔的"零像素变化"证伪了**：`c7f0e33a` 的组件仍写 `toEmptyStateViewModel({ icon, title, hint, detail, detailTone })`，没转发 `size` ⇒ 模型全对、442 用例全绿、门禁 exit 0，真机上那行却被撑成**居中 + 上方一大片空白**。修法是 `d25161ce`：`toEmptyStateViewModel(props)` 整体转发，把这条缝从设计上消掉。修后重装 + 重跑 `verify-mobile-account` 全绿，截图里那行回到卡片左侧的一行小字。
-  📌 **三段式 props → 模型 → 视图 里，中间那条转发没有任何一层在判**，而 `packages/ui` 的测试跑在 node（不引 DOM 栈）—— 这一层唯一的判据是实际渲染。
-
-原诊断**逐字保留**（含那句错的归属），因为"marker 把收编判成违规"这个形状仍然成立，
-而 `site-and-parity-alignment.md` 上那条"面板级空态长得像页面级"的缺口也**没有**因为
-加了一档就自动闭合 —— 那一档现在存在了，但 web 的 `NotesView` / `ReminderPanel`
-要不要改用它是那条线自己的判断。
-
+## B23. 🔴 `check:empty-state` 的两处红：一处是**判据缺陷**（已修），另一处是**别人那条线的新站点**（登记，不代改）（2026-10-03 05:27 取证）
 
 ### 已修的那处不是产品问题，是门禁把"照它自己的修法做"判成违规
 
@@ -2160,7 +2230,6 @@ cd e2e && npx playwright test tests/due-date-edit.spec.ts tests/motivation.spec.
 `apps/mobile/src/screens/SecurityScreen.tsx:272` 的
 `<Text variant="row-meta" tone="subtle">{t('mobile.security.passkeys.empty')}</Text>`
 —— 该屏由 `804842be`（「账号与安全」屏，2026-10-02 23:28）引入，**不属于多端覆盖这五批**。
-⚠️ **这句是错的，已在上面撤回**：`804842be` 就是本 goal 的批四（§7 第四行的产物清单里有这一屏）。
 两条正当出路（**由那条线选，不要为了变绿加 `EMPTY_SITES` 一行**，那等于把债合法化）：
 
 1. 换成共享 `EmptyState` —— 但它是**设置卡片里的一行占位**，共享实现是页面级
@@ -2168,8 +2237,8 @@ cd e2e && npx playwright test tests/due-date-edit.spec.ts tests/motivation.spec.
 2. 若确实需要"区块级空态"，正确动作是**先给它加一档**（`size?: 'page' | 'section'`，
    与 `NotesBoard` / `ReminderList` 记的是同一个缺口），再让这两处都消费它。
 
-**现状**：~~`check:empty-state` 从 2 处红降到 1 处红，仍红~~ ⇒ **06:12 复测 `exit 0`**（见上「解除取证」）。
-~~本条不代改别人的屏。~~ ⇒ 这句也撤回：那一屏是本条线批四的，已改（`c7f0e33a` + `d25161ce`）。
+**现状**：`check:empty-state` 从 2 处红降到 1 处红，仍红 ⇒ `pnpm check` 仍断不到后面。
+本条不代改别人的屏。
 
 ## B24. 🔴 `check:landing-e2e` 那 2 处红是**判据断在一个没人实现过的目录名上**（文档中心那条线；2026-10-03 05:30 取证）
 
@@ -2204,7 +2273,6 @@ cd e2e && npx playwright test tests/due-date-edit.spec.ts tests/motivation.spec.
 ⚠️ 不要"为了让套件绿"随便挑一条：选 1 会改线上 URL，选 2 要承认布局不一致。
 **本条不代改。**
 
-
 ## B25. 🔴 本文件（`BLOCKED.md`）在**索引里**的那份是 1508 行的旧版，只到 B10 —— 谁按当前暂存条目提交，会抹掉 HEAD 里已有的 10 段（到 B24，2026-10-03 06:30 取证）
 
 **取证**（三个源各量一次，不看 `git status` 的 `M` 就发现不了）：
@@ -2222,19 +2290,6 @@ cd e2e && npx playwright test tests/due-date-edit.spec.ts tests/motivation.spec.
 **成因**（不是谁的错，是共享工作树的结构性形状）：那条会话 `git add BLOCKED.md` 时
 HEAD 里还没有 B11；之后本文件被其他会话推进过多次。`git add` 记的是**那一刻的工作树**，
 而它比对的是**那一刻的 HEAD** —— HEAD 后来动了，暂存条目不会跟着动，也不会报警。
-
-### 该怎么做（本条不代改别人的暂存条目）
-
-1. **提交多人台账前先量三个源**：
-   `for s in "git show HEAD:BLOCKED.md" "git show :BLOCKED.md" "cat BLOCKED.md"; do eval "$s | wc -l"; done`
-   —— 暂存那份**比 HEAD 短**就是信号。
-2. 真有这种情况时**不要 `git add` 整文件再提交**（那等于用旧版覆盖 HEAD）。
-   正确动作是从 HEAD 出发重建 blob、只替换自己那一段（双边界取段），用 plumbing 提交，
-   提交后把别人的暂存条目**原样写回索引**。
-3. 已经造成覆盖时的判据：`git show HEAD~1:BLOCKED.md | grep -c "^## B"` 与新 HEAD 的差 ——    本仓库这条纪律的来源是 traps #146/#151（同一个错的两次发作）。
-
-📌 **一般规律**：共享工作树里"已暂存"不等于"待提交的改动是新增的"。暂存条目是一个**完整文件的快照**，
-它的危险方向恰好和"忘记 add"相反 —— **忘记 add 少一点，add 了旧版少一片**。
 
 ## B26. 🔴 ios 段在**长活的隔离检出**上重装不出来：兜底补好后，旧树里 `pod install` 自己崩 —— 换新克隆 4.9 秒解决（2026-10-03 06:45–06:58 实测）
 
@@ -2331,6 +2386,7 @@ HEAD 里我的 B25–B27 与 goal §7.1 就**从历史上消失**（他们的提
 📌 一般规律：**只要一个提交流程"不写工作树"，它就在制造"提交态领先于磁盘态"的窗口**，
 而这个窗口的关闭取决于**下一个写这个文件的人是否整文件覆盖**。共享判决/共享台账的单一所有者
 要做的不是"提交完就走"，而是"提交完把同一份事实送回磁盘"。
+
 ## B29. 🔴 `check:docs` 在共享工作树里新红（57 段链的第 4 段），但**同一枚提交在干净检出上 exit 0** —— 红的是别人未提交的链接行 × 还没 `git add` 的目标文档（2026-10-03 08:4x 现量）
 
 `pnpm check:docs`（`research/tools/docs-link-check.mjs`）在 `0acc7a71` 的工作树上 exit 1，报
