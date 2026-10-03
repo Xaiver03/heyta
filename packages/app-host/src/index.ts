@@ -630,8 +630,10 @@ export {
 export {
   SELECTABLE_KINDS,
   createSelectionStore,
+  moveSelectionInList,
   pruneMissingSelection,
   pruneSelection,
+  type CursorDelta,
   type SelectableKind,
   type SelectionSnapshot,
   type SelectionStore,

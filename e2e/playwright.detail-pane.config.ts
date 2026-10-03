@@ -1,9 +1,15 @@
 import { defineConfig, devices } from '@playwright/test';
 
 /**
- * 「详情面」这一族判据的真浏览器载体（工单 W2 / W3 / W4）。
+ * 「详情面」这一族判据的真浏览器载体（工单 W2 / W3 / W4 / W7 / W1b）。
  *
  * ─────────────────────────────────────────────────────────────────────────
+ * 🔴 **载体是 `vite preview` + `apps/web/dist`，不是 dev server** —— 这决定了
+ * 任何改 `apps/web/src/**` 的**变异臂都必须先重打 `apps/web`**，否则量的是旧产物。
+ * W1b 的第一趟就是这么"存活"的（改源码没重建 ⇒ 被测的那一份里根本没有变异 ⇒
+ * 判据被读成"没有牙"）。变异脚本因此加了一条前置：构建后 `dist/` 的目录摘要
+ * 必须与干净态不同，不同才允许判红/存活。
+ *
  * ## 为什么这一族要单独一份配置
  *
  * 它们的判据全是**几何**（`boundingBox()` 的右边缘、列宽、视口高度边界）。
@@ -52,7 +58,7 @@ export default defineConfig({
   testDir: './tests',
   testMatch: SWEEP
     ? /\.spec\.ts$/
-    : /detail-(column-slot|pane-overlay|pane-collapse)\.spec\.ts|focus-detail-pane\.spec\.ts/,
+    : /(detail-(column-slot|pane-overlay|pane-collapse)|focus-detail-pane|keyboard-cursor)\.spec\.ts/,
   fullyParallel: false,
   // 🔴 0 重试：这一族量的是边界值（480 vs 479）与"轨道归零"，
   // 一次红就是要人看的读数；重试会把"边界写错"洗成"偶发"。
