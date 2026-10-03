@@ -1,7 +1,8 @@
 # 交接：多端补齐（重点移动端）Goal —— 当前停在哪
 
-> 状态行：**🔄 未完成**。条件 1 的 6 行里 **3 行 ✅ / 3 行 🟡**；条件 2 **未达成**（`pnpm check` 57/62 段可过、
-> 四端重装本轮没跑）。**这条 Goal 没有被标记完成，也不要照本文件当成已完成接手。**
+> 状态行：**🔄 未完成**。条件 1 的 6 行里 **3 行 ✅ / 3 行 🟡**；条件 2 **未达成**（`pnpm check` 上一次现量是
+> **57/62 段可过** —— ⚠️ 那是旧载体上的读数，段数总数此后已漂到 **63**（现量 `node -e 'console.log(require("./package.json").scripts.check.split(" && ").length)'`），
+> 所以"57"描述的是**那一趟**，不是当前仓库；四端重装本轮没跑）。**这条 Goal 没有被标记完成，也不要照本文件当成已完成接手。**
 > 唯一权威过程账在 [`goal-multi-end-coverage.md`](goal-multi-end-coverage.md) §7（§7.27 字形定论、§7.28 完成条件逐条现量），
 > 阻塞与归属账在仓库根 [`../../BLOCKED.md`](../../BLOCKED.md)（B33/B41/B42/B43/B45/B47/B50/B51/B52），
 > 逐程流水在 [`../../PROGRESS.md`](../../PROGRESS.md)。本文件**不重复决策与归因**，只写"现在在哪、下一步按什么顺序做"。
@@ -34,8 +35,8 @@
 |---|---|---|
 | 任务 0：`check` 段数 = 62 | ⚠️ **已漂到 63**（10-04 00:5x 现量） | `node -e 'console.log(require("./package.json").scripts.check.split(" && ").length)'` → **63**。多出来的两段是 `check:md-tables` 与 `check:op-log-semantics`（定源：`git diff e5f91c3f..HEAD -- package.json` 的新增段名；各提交时的段数曲线 60→61→61→61→62→**63**）。⇒ **报"可过 N 段"必须带总数与载体**，别沿用 62 |
 | 任务 0：l4 baseline 104 / 90 | ✅ 对上 | `scripts/check-l4-no-style.mjs` `:155 baseline: 104`、`:162 baseline: 90`（现量读数 98/90，**未动阈值**） |
-| 任务 0：`apps/mobile/tests/*.spec.ts` = 35 | ⚠️ **已漂到 44** | `ls apps/mobile/tests/*.spec.ts \\| wc -l` → 44。本条线新增 3 份，其余是并行条线加的 ⇒ **接手别拿 35 当基线** |
-| 任务 0：中英词条各 2881 | ⚠️ 口径不同 | 我的解析形状量到 **zh 2911 / en 2911**（单引号键 2875 + 双引号/反引号键 36）。任务书那个数是写书人的另一套数法 ⇒ **稳的判据是"两侧键数相等"**，不是绝对值 |
+| 任务 0：`apps/mobile/tests/*.spec.ts` = 35 | ⚠️ **已漂到 44**（01:4x 复量：工作树 **44** / HEAD **44**，这一格暂时稳） | `ls apps/mobile/tests/*.spec.ts \| wc -l`。本条线新增 3 份，其余是并行条线加的 ⇒ **接手别拿 35 当基线** |
+| 任务 0：中英词条各 2881 | ⚠️ 口径不同，而且**我这条判据比仓里已有的弱** | 01:4x 现量（同一形状重数）：**HEAD 两侧各 2981**（单引号 2945 + 双引号/反引号 36）/ **工作树两侧各 2983**（别人正在这两张表里加 2 个键，两侧同步加所以仍相等）。🔴 我原先写的"稳的判据 = 两侧键数相等"是个**数数**判据，而仓里早就有一条**集合**判据：`packages/i18n/tests/catalog.spec.ts:18`「中英两表的 key 集合完全一致（双向）」—— 它同时挡漏翻译与键名错位，键数相等挡不住后者。**以后这类"两份抄件"的对账先找仓内现成装置再接**（`:24` 与 `:67` 那两条还各自挡"中文里塞英文占位"与"英文复制中文交差"） |
 | 任务 0：开工回执 ≤10 行写进 PROGRESS | ✅ | `PROGRESS.md` 首节 |
 | 任务 1：6 个脚本补 `verify:` 别名 | ✅ | 现量 `verify-*.sh` 共 **31** 个、**无别名 = 0** |
 | 任务 1：account 与 reminder-ring 进 MANIFEST + 改掉过期注释 | ✅ | `scripts/check-script-snapshot.mjs` 含 `verify-mobile-account` / `-reminder-ring` / `-notes` / `-restore` 均 true |
@@ -49,14 +50,14 @@
 | 任务 2：反向验证"拿掉 onEdit ⇒ 用例必红" | ✅ | 红→绿两段输出记在 goal §7 任务 2 那节 |
 | 任务 3：清单/标签改名、归档入口、习惯改名与删除 | ✅ | `organizer-rename.spec.ts` **26 passed**；`renameTag` 与习惯改名是本轮新建的 action（一个意图一个 op，未 fan-out） |
 | 任务 3 验收：两端各一组用例 + `check:reachability` 绿 | ✅ | reachability 现量 exit 0 |
-| **Goal 第④步：父子层级选择器**（`setParent` + 一层/环/自指守卫 + 两端界面与词条） | ✅ **做完，在未合并分支** | `feat/list-parent`（基线 `0a61c0a6`，**未合**）。读数见 §0 表第三行；**跨端形态是代拍**（依据 + 一条 `git revert` 回退写在 §5 第 4 步）；合流被并行线的七个 `M` 挡住（§3.3） |
+| **Goal 第④步：父子层级选择器**（`setParent` + 一层/环/自指守卫 + 两端界面与词条） | ✅ **做完，且分支侧已把 main 合进来** | `feat/list-parent` @ `c983a7cf`（零冲突、并集与归属核对齐，见 §3.3）。**跨端形态是代拍**（依据 + 回退写在 §5 第 4 步）。⚠️ 这一行旧账写"合流被七个 `M` 挡住"—— 只剩**两张词条表**（检出层）。🔴 01:3x 现量：main 又前进 7 笔 ⇒ **不再是快进**，要落的是一笔合并提交；零冲突已改用免检出的 `git merge-tree` 现量证过（全部更正见 §5 第 4 步） |
 | Goal 第④步的"守卫不许漂移" | ✅ 有常驻判据 | 领域那条"候选集 = `validateProjectParentChange` 的展开（唯一差别 = 归档不进候选）"逐对断言，两端都走同一个 `folderTargetsFor`；web 6 条 DOM 级判据 + 8 臂变异（`aria-disabled` 那种"说了但没禁用"的漂法也被"点它什么都不该发生"那条抓住） |
 | 任务 4：移动端传 `share`（周小结） | ✅ | `growth-share-summary.spec.ts` **13 passed** + 变异两臂 |
 | 任务 4：词条 `{{count}}` 与 `{count}` 字形统一 | ✅ | **定论是"本来就只有一种"**：`{{`/`}}` 各 2 行且**全是注释**，真值 `web.growth.year.heatmap` 两端都是单层 `{count}`；交付物 = 三条测量 + 一条常驻判据 + 一次变异（goal §7.27） |
 | 任务 4：移动端传 `activityDays`（年度热力图） | 🟡 **不归本批** | 被冻结判据 `apps/mobile/tests/growth-display.spec.ts:365` 钉成空串 ⇒ **B41** |
 | 任务 4：移动端传 `onRepair`（补打卡） | 🟡 **不归本批** | `HabitStreakList.tsx:269` 是 **或**条件 + `:302` 钉 `repairAction` 必须 `undefined` ⇒ **接了也不渲染、不报错** ⇒ **B42** |
 | 任务 4：`onFreshStart` 不许顺手加 | ✅ 按书执行 | 无对应动作 ⇒ 写进 **B43**，一行代码都没加 |
-| 任务 4：「我的」加权益/到期可见 | 🟡 **半** | 权益卡已挂（消费 `app-host#fetchHostedEntitlementReading`）；**"到 X 日到期"拿不到** —— 那次 GET 一个响应字段都不消费、web 侧同样只有两个布尔 ⇒ 要动服务端面 ⇒ **B45** |
+| 任务 4：「我的」加权益/到期可见 | 🟡 **半** | 权益卡已挂（消费 `app-host#fetchHostedEntitlementReading`）；**"到 X 日到期"拿不到** —— ⚠️ 旧账写"那次 GET 一个响应字段都不消费"，**这句是错的**（`packages/domain/src/subscription.ts:189-230` 确实消费 `status`/`errorCode`/`reason`/`currentPeriodEnd`）；真缺口是**服务端 402 body 只有 `{error, errorCode, reason}`**（`server/src/entitlement.ts:376-380`），那个可选槽位永远 undefined ⇒ 要动服务端面 ⇒ **B45**（详见 §5 第 3 步那条纠正记录） |
 | 任务 4 验收：`check:payment-entry`、pricing 一致 | ✅ | `check:payment-entry` exit 0；**权威名是 `check:pricing`**（任务书里写的 `check:pricing-consistency` 是**文件名**不是 pnpm 别名，我照名字跑得到 "command not found" 的假红 —— 第三次踩 B50，已在 B50 追加）|
 | 拍板 1：移动端提醒不做，禁令前提要拍 | ✅ 已拍并回写 | 前提被**第三个自研原生模块**否证（B33）；并行条线已实施原生投递，本行**不代其主张验收读数** |
 | 拍板 2：AI 功能不做，但 `check:ai-coverage` 改成按端枚举 | ✅ | 提交 `05293b7d`；门禁现在逐端打印 `mobile 0/5`，接一半会红（变异：塞两条探针 ⇒ 精确点名缺的 3 条）|
@@ -66,7 +67,7 @@
 | 界限：白名单外只读 | 🟡 两处越界候选，如实记 | ① 根 `package.json` 被改 —— **任务 1 要求"补 verify: 别名"必然要动它**，属隐含授权；② `BLOCKED.md` / `PROGRESS.md` 是任务书自己指定的记录文件。其余零越界 |
 | 规矩：不新增依赖 | ✅ | 51 个文件里无 lockfile、无 `package.json` 依赖段变更 |
 | 规矩：skipped 必须 0 | ✅ | 本批四份判据文件现量 **71 passed / 0 skipped** |
-| 收尾：`pnpm check` 全量 exit 0 | 🔴 **未达成 57/62** | 5 段红的逐条归属在 goal §7.28 与 **B51** |
+| 收尾：`pnpm check` 全量 exit 0 | 🔴 **未达成**（上一趟 **57/62**；⚠️ 该读数属于**那一趟的载体**，段数总数现已量 **63**） | 5 段红的逐条归属在 goal §7.28 与 **B51**；下一次现量起点应写 **≤56/63**（§3.1） |
 | 收尾：四端重装 `INNER_EXIT=0` + 四张截图 | 🔴 **本轮没跑** | 环境不在窗口（§4）；**别拿上次跑绿的载体顶替** |
 | 规矩：提交用点名路径、不 push | ✅ 且已升级 | 本轮起改用 plumbing + "blob = HEAD + 我的文本"（**B53**），并补了一步：`96f3293d` 曾把并行会话的整节替他们提交 |
 
@@ -133,6 +134,9 @@
      ② 候选含已归档清单，而 `toOrganizerTree` 默认不画归档父 ⇒ 移进去的那条**从侧栏消失**（`model.ts` 自己写成"宁可当孤儿"）。
      → B52 结构上关闭，**只剩合流**（下一条）。
    - ✅ **合流义务：本轮到底了 —— 分支侧已含 main 全部，`git merge feat/list-parent` 现在是快进**（00:5x 现量）。
+     ⚠️ ~~现在是快进~~ **01:3x 现量已失效**：main 其后又前进 7 笔（含本条线 4 笔 `docs(handoff)`），
+     双向各领先 7 ⇒ 要落的是一笔**合并提交**。"零冲突"那一半仍然成立且换了免检出的探针
+     （`git merge-tree --write-tree` rc=0、无冲突文件名）；全部现量与那条一般规律写在 §5 第 4 步。
      过程里有**一句我自己写的预测被十五分钟后的现量否证**，而且**判它的方法本身也是错的**，两条都留下：
 
      1. **23:5x 那版这里写的是**："还剩的阻塞 = 主检出 3 个落点未提交，它们一旦提交合流应当零冲突
@@ -158,12 +162,13 @@
      | main 侧 vault 词条（防"我吞他"） | en **66** / zh **66** 全在 |
      | `main 有而本分支缺的键` | 两张表都是 **0** |
      | `packages/ui/src/index.ts` 两侧导出 | `OrganizerList` 与 `FolderPicker` 两组都在 |
-     | 反向图关系 | `git merge-base --is-ancestor main feat/list-parent` → 0（**快进可合**） |
+     | 反向图关系 | `git merge-base --is-ancestor main feat/list-parent` → 0（**快进可合**）；⚠️ 01:3x 同一命令退 **1**（main 又前进 7 笔），该单元格描述的是 00:5x 那一刻的图 |
 
      🔴 **但"现在往主检出合"仍然做不到，被同一对文件挡住 —— 这次是检出层不是图层**：
      `packages/i18n/src/locales/{en,zh-CN}.ts` 在主检出里还是 `M`（00:5x 现量），
      而快进恰好要改写这两个文件 ⇒ `git merge --ff-only` 会被 git 拒绝（不会替你 stash 别人的改动）。
-     ⇒ 等的是**他们把这两张表落地**，届时在 main 上一次 `--ff-only` 就完事（零冲突已由上面的合并证过）。
+     ⇒ 等的是**他们把这两张表落地**，~~届时在 main 上一次 `--ff-only` 就完事~~
+     **届时在 main 上落一笔合并提交**（01:3x：快进已不成立，见 §5 第 4 步那条更正；零冲突已由 merge-tree 现量证过）。
      复跑：`git -C <主检出> status --porcelain -- packages/i18n/src/locales/en.ts packages/i18n/src/locales/zh-CN.ts`。
      **合并后分支的目标校验链**（载体 `heyta-wt-hierarchy` @ `c983a7cf`，00:5x 现量；
      九段逐段命令写在下面，**别去翻那个 `/tmp` 日志** —— 它是一次性现场，重启就没了）：
@@ -174,10 +179,27 @@
      （`web-list-folder` 18、两份词条表各 11、`setParent` 6、`FolderPicker` 5/3/2/2、
      `validateProjectParentChange` 5）⇒ 那 38 条里确实包含我这 6 条 DOM 用例。
      复跑：`git show f41221a8:<文件> | grep -c <标记>` 对 `grep -c <标记> <文件>`。
-   - 成长统计行：热力图无障碍名被 `apps/mobile/tests/growth-display.spec.ts:365` 钉成空串；
-     补打卡被 `HabitStreakList.tsx:269` 的 `||` 渲染条件挡住（**接了也不出现、不报错**）。→ B41 / B42。
-   - 权益行：`entitlement.ts` 那次 GET **一个响应字段都不消费**，web 侧到期条同样只有两个布尔
-     ⇒「到 X 日到期」要动服务端面。→ B45。
+   - 成长统计行：热力图无障碍名被 `apps/mobile/tests/growth-display.spec.ts:365` 钉成空串
+     （现量该行仍是 `expect(labels.heatmap.grid({ total: 42, days: 365 })).toBe('')`）；
+     补打卡被 `packages/ui/src/motivation/HabitStreakList.tsx:269` 的
+     `onRepair === undefined || labels.repairAction === undefined ? null :` 挡住（**接了也不出现、不报错**）。
+     ⚠️ 这一句旧账只写了 basename 没写目录 —— 那个文件在**共享层** `packages/ui`，不在 `apps/mobile`。→ B41 / B42。
+   - 权益行：🔴 **本轮把这条登记的"理由"纠正了，结论不变**（00:5x 现量）。
+     旧账写"`entitlement.ts` 那次 GET **一个响应字段都不消费**"—— **错的**：
+     `packages/domain/src/subscription.ts:189-230` 消费 `status` + `body.errorCode` + `body.reason` +
+     `body.currentPeriodEnd`，并在 `toHostedSyncAccess`（`:246-252`）里从它派生 `expired`。
+     真正缺的是**服务端不给那个字段**：`server/src/entitlement.ts:376-380` 的 402 响应体逐字是
+     `{error, errorCode, reason}` ⇒ 客户端解析器那个 `currentPeriodEnd?` 槽位**永远是 undefined**；
+     而 2xx 分支只回 `{kind:'entitled'}`，也**不读**任何到期信息。
+     ⇒ 结论仍归 B45（要动服务端面，本批不越权），但**闭环形状现在清楚了**：服务端在两处之一给出
+     `currentPeriodEnd`（402 body，或 `/api/sync/status` 的 200 payload），
+     客户端**已经能接**（解析器有那个可选槽位、`expired` 也由它派生），剩下只有界面那一行"到 X 日到期"。
+     ⚠️ **我在这条上 30 秒内自我否证了一次**：先写下"移动端一个权益消费者都没有"，
+     再跑 `grep -rn "toHostedSyncAccess\|SubscriptionNotice\|fetchHostedEntitlementReading" apps/mobile/src`
+     → **4 处命中**：`apps/mobile/src/screens/EntitlementSection.tsx` 是有的（它 fetch reading，
+     按 `reading.reason === 'PERIOD_ENDED'` 选变体）。**真实缺口不是"移动端没这块"，而是两端都只渲染状态、
+     没有任何到期日**（`:89-108` 三个 `Text` 全是标题/正文/本地数据说明）。
+     ⇒ 教训同 §6 那条"断言没有 X 要读被断言对象的本体"：**我这条没跑就写进文档了，被自己的下一条命令推翻。**
 4. **`verify:mobile-notes` 的剩余腿**：🔴 **本轮现量否证了"判据还没写"这个前提** ——
    真机只走到第 5 步是**执行**状态，不是**编写**状态：脚本里 13 步（0–12）、**55 条 ok/bad 断言**，
    目标原话点名的三条腿**逐条都在文件里**（带行号）：
@@ -224,7 +246,9 @@ bash scripts/verify-mobile-window-gate.sh --target c   # 移动端设备验收�
 
 1. **在隔离载体里跑它**，不要只在主检出跑就下结论 —— 它的"别人未提交源码"那条正是
    `reinstall:all` 的不变量，而隔离检出天生满足它；在主检出跑等于把别人的现场算成本轮阻塞。
-   （图层上 `git merge-base --is-ancestor main feat/list-parent` = 0，快进可合。）
+   （图层上 `git merge-base --is-ancestor main feat/list-parent` = 0，快进可合。⚠️ 括号里这句 00:5x 的读数
+   到 01:3x 已退 1 —— main 其后前进 7 笔；合流形态改成落一笔合并提交，见 §5 第 4 步。**这一句留原处是为了让人看清
+   "快进可合"的保质期就是一笔文档提交**。）
 2. **负载里可能有一截是我自己**（本轮就是：我在跑合并后的九段校验链）。判"窗口开没开"要在
    自己那阵负载过去之后再量，否则会出现"我量到自己的负载、然后判定跑不得"的空转。
 3. 闸门 green 只证明**前置**成立，不证明产物是本轮交付 —— §5-1/§5-2/§5-3 各自的判据仍要单独取。
@@ -265,6 +289,9 @@ bash scripts/verify-mobile-window-gate.sh --target c   # 移动端设备验收�
    🔴 **起跑前必须 `4318/4319/4320` 三个端口空闲**，因为 `check:ai-e2e` 的前置会对它们发 SIGKILL（traps #87）
    —— 启动器把这一步做成硬门：只要有一个是 busy 就 **exit 3 不跑**，绝不为凑自己的读数杀掉别人的 dev server。
    00:5x 现量：三个端口 + `:3000` **全部空闲**（`:3000` 上那台旧构建已经退场）。
+   ⚠️ **同一条读数在 01:3x 已翻面**（现量 `lsof -ti tcp:<p> -sTCP:LISTEN`）：`4318`=pid 92385、`4319`=pid 92369、
+   `3000`=pid 70256 都**被占**，`3100/4320/4322` 仍空 ⇒ ② 此刻起跑会按设计 exit 3。**端口空闲是趟间瞬时读数，
+   不许把上一趟的"全空闲"带到下一趟**（这正是启动器每次都重量的原因）。
 3. **把 `verify:mobile-notes` 整段跑完**（🔴 判据**不需要写** —— 第 6/7 步的 op 判据、第 8 步第三张截图、
    第 9–11 步跨设备三条腿**已经在脚本里**，带行号的现量见 §3 第 4 条）。
    🔴 **两个前置在本轮被现量改了**：① 凭据三件套**已经在**（`--target c` 报 ✅），不需要再建号；
@@ -278,6 +305,33 @@ bash scripts/verify-mobile-window-gate.sh --target c   # 移动端设备验收�
    必须先 `pnpm --filter @heyta/ui build && pnpm build:android` 再装，否则验的是旧 bundle（§7 第 27 条）。
    📌 本轮顺带踩到一条探针教训：我用 `lsof -nP -iTCP:3000 -sTCP:LISTEN` 得到"没有监听"，而 `curl` 拿到 200 ——
    **那是探针够不着**（监听进程不在我这个用户可见范围），不是"服务不存在"。§7 元规则第一条又应验一次。
+   ✅ **01:3x 补三条只读前置（开窗即执行，不用现场再判断）**：
+   ① **便签整条链已在 HEAD 里，不依赖任何未提交改动** —— `git cat-file -e HEAD:<f>` 对
+   `apps/mobile/src/screens/NoteEditScreen.tsx` / `packages/ui/src/notes/NoteEditor.tsx` /
+   `packages/app-host/src/note-actions.ts` 三处全 yes，且 `git status --porcelain | grep -i note` **0 条**
+   ⇒ ③ 可以**完全在 HEAD 载体里跑**，不必回主检出（此前没验过这一点）。
+   ② 设备侧 adb 可见的只有 `emulator-5554`（`com.heyta` versionName=1.0）；`:3100` 空着 ⇒ ③ 那条"必须自己起服务端"仍然成立。
+   ③ 现场有一条**别人正在跑的 `react-native bundle --platform android`**（pid 90249）—— 这正是窗口判据里
+   "别人的打包进程"那一档，所以此刻**不启动**我这边的重打 APK（它同时是 ③ 的硬前置与最重的一步）。
+   🔴 **01:3x 一个决定：③ 的载体换成隔离检出**，依据是同一脚本在同一对端口上的 A/B 现量
+   （`HEYTA_LOAD_GATE_WAIT=0 PORT=3100 bash scripts/verify-mobile-window-gate.sh --target c`）：
+   | 同一道 C 闸门 | 主检出 | 载体 `../heyta-wt-reinstall` |
+   |---|---|---|
+   | 未提交源码 | ❌ **67 枚**（00:5x 那次是 49 枚 —— 这本身就是会漂的数） | ✅ `packages/ apps/ server/` 里没有未提交的修改 |
+   | APK | ❌ 比源码旧（APK 00:55:22 / 源码 01:26:50） | ❌ **不存在**（那条产物路径在载体里从来没打过） |
+   | 其余各条 | 两边一致：❌ 负载 48>12、❌ 有移动端验收在跑、✅ `emulator-5554` 在线、✅ 凭据三件套齐、❌ 服务端没在 `:3100` | 同 |
+   ⇒ 主检出那 67 枚会被打进产物而判据看不出来（闸门自己的话），而便签链全在 HEAD ⇒ **在载体里跑才是"验当前提交"**；
+   代价写清楚：**开窗后 ③ 的第一件事是重打 APK**（`pnpm -r build` → `pnpm build:android` → `adb install -r`），
+   且三张取证图会落在**载体**的 `apps/mobile/evidence/` 下，收尾要点名提交它们（§7 里那条"验收会重写检出里的 evidence png"）。
+   🟢 **一条省事的顺序依赖**：① 的 android 段本来就是"清旧包 → 从当前源码重打 → 卸旧装新"，
+   而它也在**同一个载体**里跑 ⇒ **按 §5 的顺序 ①→②→③ 走，③ 的 APK 前置由 ① 顺带做完**；
+   只有 ① 的 android 段红了或想跳过 ① 先做 ③ 时，才需要上面那三条命令自己来一遍。
+   ✅ **两条启动器的"会拒跑"这道门本轮已被现量验证有牙**（不是装饰）：
+   `bash /tmp/heyta-run-checks.sh`（不带 `--go`）退 **3**，打印 `:4318 = busy / :4319 = busy`；
+   `bash /tmp/heyta-run-notes.sh`（已改指向载体，不带 `--go`）退 **3**，打印 `GATE_EXIT=3 / VERDICT=NOT-RUNNING`。
+   两者都是**闸门判"现场不成立"**那一支（`verify-mobile-window-gate.sh` 自己的退出码约定是
+   0=窗口开 / 3=现场不成立 / 1=用法错，见该文件 `:17-20`），而启动器退 3 之前都先打印了具体哪几条 ❌
+   （`/tmp/heyta-notes-preflight.log` 现量 **4 条 ❌**）—— 不是脚本静默失败被当成环境红。
 4. ✅ **父子层级选择器：做完（2026-10-03 深夜），在未合并分支 `feat/list-parent`** ——
    细节与判据在 §3.3 第一条。**跨端形态是代拍**（原话把这条列为"要产品负责人拍"）：
    现量依据 = `OrganizerList` 早就渲染一层嵌套、两端同一棵骨架，所以入口挂到它**已有**的插槽上
@@ -289,6 +343,15 @@ bash scripts/verify-mobile-window-gate.sh --target c   # 移动端设备验收�
    （`git merge-base --is-ancestor main feat/list-parent` → 0，且合并零冲突、并集已核对，见 §3.3），
    但主检出里那两张词条表还是 `M` ⇒ `--ff-only` 会被 git 拒（它不替你 stash 别人的改动）。
    这一版原先写的是"七个落点正被归档线改着"，那是把**落点清单**当成了**脏清单** —— 交集要现量。
+   🔴 **01:3x 现量把上面那句"已经快进可合"否证了，就地更正**：`merge-base --is-ancestor main feat/list-parent`
+   现在退 **1**，因为 main 自我那次核对后又前进 **7 笔**（其中 4 笔是本条线自己的 `docs(handoff)`），
+   分支侧也领先 7 笔 ⇒ 双向分叉，`--ff-only` 结构上已经不可能，要落的是一笔**合并提交**
+   （或先把 main 合进分支再 FF，但那只是把同一件事挪个地方做）。
+   ✅ **而"零冲突"这一半仍然成立，并且换了个更合适的探针**（它不需要检出，因此不会撞进别人正在跑的验收）：
+   `git merge-tree --write-tree --name-only main feat/list-parent` → **rc=0、只打印一棵树 oid、没有列出任何冲突文件**。
+   ⇒ **可迁移的那条**：**"能快进"不是一个稳的合流判据** —— 它的保质期就是下一笔落进 main 的提交，
+   连我自己的文档提交都会把它弄失效。稳的两半是：① 合并**干净**（merge-tree 现量，免检出、只读）
+   ② 落点**没被人占着**（那两张 `M` 的词条表 —— 这是检出层，git 不会替我 stash 别人的改动）。
 
 5. 若要做热力图/补打卡：那是**翻冻结判据**的权限问题，不是接线问题 —— 需要判卷文件的属主批准改 `growth-display.spec.ts:365`/`:302`。
 
