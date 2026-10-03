@@ -41,7 +41,7 @@ import {
   type InboxUnavailableCause,
 } from '@heyta/app-host';
 
-import { Button, Card, Chip, Screen, Text } from '../ui/kit';
+import { Button, Card, Chip, HStack, Screen, Stack, Text } from '../ui/kit';
 import { toRenderableNotifications } from '../lib/inbox-display';
 import { privacyConsent } from '../privacy/consent-gate';
 import { readSyncConfig } from '../sync/config';
@@ -161,12 +161,12 @@ export function NotificationsScreen({
     }
     if (state === 'unavailable') {
       return (
-        <View style={{ gap: tokens['space.2'] }}>
+        <Stack>
           <Text variant="row-meta" tone="danger">
             {t('mobile.inbox.error')}
           </Text>
           <Button label={t('mobile.inbox.retry')} onPress={onRetry} />
-        </View>
+        </Stack>
       );
     }
     if (loading) {
@@ -194,7 +194,7 @@ export function NotificationsScreen({
       return <EmptyState title={t('mobile.inbox.empty')} testID="inbox-notifications-empty" />;
     }
     return (
-      <View style={{ gap: tokens['space.2'] }} testID="inbox-notifications-list">
+      <Stack testID="inbox-notifications-list">
         {renderable.map(({ item, payload }) => {
           const bodyText =
             payload.displayName === null
@@ -205,7 +205,7 @@ export function NotificationsScreen({
                 });
           return (
             <Card key={item.id}>
-              <View style={{ flexDirection: 'row', gap: tokens['space.2'], alignItems: 'center' }}>
+              <HStack align="center">
                 {item.readAt === null ? (
                   <View
                     style={{
@@ -222,14 +222,14 @@ export function NotificationsScreen({
                 <Text variant="caption" tone="subtle">
                   {formatCompactDate(item.createdAt, Date.now())}
                 </Text>
-              </View>
+              </HStack>
               <Text variant="row-meta" tone="muted">
                 {bodyText}
               </Text>
             </Card>
           );
         })}
-      </View>
+      </Stack>
     );
   };
 
@@ -337,15 +337,12 @@ export function NotificationsScreen({
         </Text>
 
         {invite.referrals.length > 0 ? (
-          <View style={{ gap: tokens['space.2'] }}>
+          <Stack>
             <Text variant="caption" tone="subtle">
               {t('mobile.inbox.invite.listTitle')}
             </Text>
             {invite.referrals.map((referral) => (
-              <View
-                key={referral.code}
-                style={{ flexDirection: 'row', gap: tokens['space.2'], alignItems: 'center' }}
-              >
+              <HStack key={referral.code} align="center">
                 <Text variant="row-meta" tone="default" style={{ flex: 1 }}>
                   {referral.displayName ?? t('mobile.inbox.invite.unknownName')}
                 </Text>
@@ -354,9 +351,9 @@ export function NotificationsScreen({
                     ? t('mobile.inbox.invite.status.pending')
                     : t('mobile.inbox.invite.status.activated')}
                 </Text>
-              </View>
+              </HStack>
             ))}
-          </View>
+          </Stack>
         ) : null}
       </Card>
     );
@@ -368,7 +365,7 @@ export function NotificationsScreen({
       title={t('mobile.inbox.title')}
       actions={[{ icon: 'action.back', label: t('mobile.inbox.back'), onPress: onBack }]}
     >
-      <View style={{ flexDirection: 'row', gap: tokens['space.2'] }}>
+      <HStack>
         <Chip
           label={t('mobile.inbox.tab.notifications')}
           selected={tab === 'notifications'}
@@ -383,7 +380,7 @@ export function NotificationsScreen({
             setTab('activity');
           }}
         />
-      </View>
+      </HStack>
       {tab === 'notifications' ? notificationsBody() : activityBody()}
     </Screen>
   );
