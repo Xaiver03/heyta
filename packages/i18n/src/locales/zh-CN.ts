@@ -3989,7 +3989,7 @@ export const zhCN = {
   'web.countdown.a11y.menu': '「{title}」的操作',
   'web.countdown.a11y.menuClose': '收起「{title}」的操作',
   'web.countdown.export': '导出成品图',
-  'web.countdown.export.failed': '导出失败：这台设备给不了画布。任务数据没有丢，也没有发出任何请求。',
+  'web.countdown.export.failed': '导出失败：这台设备给不了画布。倒数日没有丢，也没有发出任何请求。',
   'web.countdown.error': '没能保存：',
   'web.shell.modules.countdown.label': '倒数纪念日',
   'web.shell.modules.countdown.note': '把要盯的日子排在最前面；过去的那天不算失败。',

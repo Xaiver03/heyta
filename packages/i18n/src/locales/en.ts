@@ -3749,8 +3749,7 @@ export const en = {
   'web.countdown.a11y.menu': 'Actions for “{title}”',
   'web.countdown.a11y.menuClose': 'Close actions for “{title}”',
   'web.countdown.export': 'Export card image',
-  'web.countdown.export.failed':
-    'Export failed: this device gave us no canvas. Nothing was changed and nothing was sent.',
+  'web.countdown.export.failed': 'Export failed: this device gave us no canvas. Nothing was changed and nothing was sent.',
   'web.countdown.error': 'Not saved: ',
   'web.shell.modules.countdown.label': 'Countdowns',
   'web.shell.modules.countdown.note': 'Keep the dates you watch at the top. A date that has passed is not a failure.',
