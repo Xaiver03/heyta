@@ -136,6 +136,13 @@ export const HOSTED_AUTH_PATHS = {
   passwordChange: `/api${AUTH_PASSWORD_PATHS.change}`,
   /** 已登录**加上第一个**口令（与 `passwordChange` 不是一条路，见共享契约）。 */
   passwordSet: `/api${AUTH_PASSWORD_PATHS.set}`,
+  /**
+   * 注销账号。服务端是 `DELETE /api/account`（**级联硬删**：ops / syncState / devices）。
+   *
+   * ⚠️ 这条路径以前只存在于服务端源码里 —— 客户端**没有任何调用点**，
+   * 所以"自助注销"这句话在界面上是空的（批次 E3 量的就是它）。
+   */
+  accountClosure: '/api/account',
 } as const;
 
 /**
@@ -1864,4 +1871,38 @@ export async function setInitialPassword(
   );
   if (!result.ok) return result;
   return { ok: true, message: readServerMessage(result.body) ?? '' };
+}
+
+/**
+ * 注销当前令牌所属的账号（`DELETE /api/account`，服务端**级联硬删**）。
+ *
+ * 🔴 **这个函数只做协议，不做"清本机"。** 清了哪些存储只有宿主知道
+ * （见 `./local-erasure.ts` 文件头），而这条路上有一件事绝不能写反：
+ *
+ *   **服务端没删成，就一次本机销毁都不许发生。**
+ *
+ * 反过来的那次事故是可以自己造出来的：一次 5xx 或断网就把本机数据清了，
+ * 而账号在服务端**还活着** —— 用户下次登录会看到云端那份旧数据，
+ * 于是"注销"变成了一次无声的数据丢失，而他刚刚还以为自己行使了删除权。
+ * 这个顺序由 `closeAccountAndEraseLocal()` 保证，并由
+ * `tests/account-closure.spec.ts` 逐条钉住（包括"失败时销毁器调用次数为 0"）。
+ *
+ * 令牌是**必填**的：归属由服务端按令牌判，这里不发任何"这是谁的"字段。
+ */
+export async function closeAccount(
+  options: HostedAuthOptions,
+  token: string,
+): Promise<HostedAuthOutcome<{ closed: true }>> {
+  const trimmedToken = token.trim();
+  if (trimmedToken === '') return failure('unauthorized');
+
+  const result = await sendJson(options, 'DELETE', HOSTED_AUTH_PATHS.accountClosure, undefined, trimmedToken);
+  if (!result.ok) return result;
+
+  // 服务端成功形状是 `{ success: true }`。2xx 但**不是**这个形状时不当成功 ——
+  // 注销是唯一一个"下游动作不可逆"的调用，宁可让用户重试一次。
+  const body = result.body as { success?: unknown } | undefined;
+  if (body?.success !== true) return failure('malformed-response');
+
+  return { ok: true, closed: true };
 }

@@ -26,7 +26,7 @@
  *      的外层直接上 —— 宽度会被撑到整列宽，圆变椭圆。
  */
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Pressable, Text, TextInput, View } from 'react-native';
 
 import {
@@ -154,7 +154,16 @@ export function DatePicker({
     if (parsed !== undefined) time.onChange(parsed);
   };
 
-  const weeks = monthGrid(month);
+  /**
+   * 🔴 月历必须**按月记忆化**。
+   *
+   * 这个组件在任务详情浮层里，而浮层每敲一个字就重渲染一次（标题是宿主自己的
+   * `useState`）。不记忆化 ⇒ 每次按键重建 2 × 42 个格子对象 + 每格 1–2 个内联
+   * style，而**手机上打字延迟是用户直接感知的**。
+   *
+   * ⚠️ 依赖是 `month` 而不是 `[]`：翻月走 `setMonth`，记忆化不能把用户钉在当月。
+   */
+  const weeks = useMemo(() => monthGrid(month), [month]);
 
   const chipStyle = (selected: boolean) => ({
     paddingVertical: tokens['space.1'],
