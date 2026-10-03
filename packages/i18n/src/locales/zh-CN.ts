@@ -451,6 +451,11 @@ export const zhCN = {
   'web.shell.nav.q3': '紧急不重要',
   'web.shell.nav.q4': '不重要不紧急',
   'web.shell.sidebar.resize': '调整侧栏宽度',
+  // 顶栏语言分组的**可见**标签（`LanguageSwitcher.tsx`）。它必须看得见而不是只挂在
+  // `aria-label` 上：同一个位置已经判过两次"用户根本不知道它们是什么"
+  // （`App.tsx` 排序下拉那段、`main-area.css` 的 `.ht-header__view`）。
+  // 选项本身**不翻**（永远是 `中文` / `English` 的自称，见上面 `common.lang.*` 那段）。
+  'web.shell.lang.label': '语言',
   'web.shell.views.aria': '视图',
   'web.shell.views.groupMain': '主要',
   'web.shell.modules.title': '功能模块',

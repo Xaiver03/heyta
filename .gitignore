@@ -86,6 +86,12 @@ landing-results/
 # 而这两个目录里放的正是"人必须打开看一眼"的那批截图，最容易顺手 add。
 legal-links-results/
 live-site-results/
+# `playwright.lang-shots.config.ts` 的 trace/失败现场目录（同上一条的理由）。
+# ⚠️ 它旁边那个 `e2e/lang-shots-evidence/` **不忽略**，那是刻意的两件事：
+# `-results` 是"每次跑都不一样"的调试残留，而 `e2e/lang-shots-evidence/` 里是
+# AGENTS §6.2 规定一要求的那批**改前/改后取证图**（文件名带 before/after 前缀，
+# 改前那一趟跑完就再也复现不出来），与 `apps/desktop-macos/evidence/` 同类。
+lang-shots-results/
 playwright-report/
 blob-report/
 e2e/.playwright/
