@@ -237,6 +237,32 @@ function reasonFromStatus(status: number): AdminFailureReason {
 }
 
 /**
+ * 后台请求的方法集合。
+ *
+ * 🔴 只有**这一套**传输。后台新加一个动词 = 在这一处登记一种方法，
+ * 不是另起一个 fetch（`AGENTS` §3.5 那条"同一个判断抄两遍"在传输层同样成立：
+ * 第二份 fetch 意味着第二份令牌闸与第二份状态码映射，而漂移不会报错）。
+ */
+export type AdminRequestMethod = 'POST' | 'PUT' | 'DELETE';
+
+/**
+ * 哪些方法**不带请求体**。
+ *
+ * 判据是从这里推导的，不是拍的：`DELETE /api/admin/holiday-adjustments/years`
+ * 的年份按契约住在**查询串**里（`HOLIDAY_ADJUSTMENT_PATHS.adminDelete` 写清了
+ * 为什么不许走路径参数），而请求体里再放一份年分会凭空造出
+ * "body 说 2026、query 说 2027"这种必须**额外写一条守卫**才拦得住的请求
+ * —— 那条守卫的缺失是静默的。所以这一类方法在类型上就不接受载荷。
+ *   （`POST /users/:id/unlock` 传的是 `{}`：它带请求头与空体，语义上没有载荷，
+ *    但**形状上仍是 POST**，所以留在"带体"那一侧 —— 改它会动既有三条端点的字节。）
+ */
+const ADMIN_METHODS_WITHOUT_BODY: readonly AdminRequestMethod[] = ['DELETE'];
+
+function methodCarriesBody(method: AdminRequestMethod): boolean {
+  return !ADMIN_METHODS_WITHOUT_BODY.includes(method);
+}
+
+/**
  * 发一个后台请求。
  *
  * 🔴 **不抛**。断网、DNS、证书、平台策略拦截全部落成 `network`。
@@ -244,7 +270,7 @@ function reasonFromStatus(status: number): AdminFailureReason {
 async function adminRequest<T>(
   options: AdminClientOptions,
   path: string,
-  init?: { method: 'POST'; body: unknown },
+  init?: { method: AdminRequestMethod; body?: unknown },
 ): Promise<AdminResult<T>> {
   if (options.baseUrl.trim() === '') return { ok: false, reason: 'unconfigured' };
 
@@ -253,14 +279,15 @@ async function adminRequest<T>(
 
   const fetchImpl = options.fetchImpl ?? globalThis.fetch.bind(globalThis);
   const headers: Record<string, string> = { authorization: `Bearer ${token}` };
-  if (init !== undefined) headers['content-type'] = 'application/json';
+  const withBody = init !== undefined && methodCarriesBody(init.method);
+  if (withBody) headers['content-type'] = 'application/json';
 
   let response: Response;
   try {
     response = await fetchImpl(joinEndpointUrl(options.baseUrl, path), {
       method: init?.method ?? 'GET',
       headers,
-      ...(init === undefined ? {} : { body: JSON.stringify(init.body) }),
+      ...(withBody ? { body: JSON.stringify(init?.body ?? {}) } : {}),
     });
   } catch {
     return { ok: false, reason: 'network' };
@@ -277,6 +304,85 @@ async function adminRequest<T>(
     return { ok: false, reason: 'server', status: response.status };
   }
 }
+
+// ─────────────────────────────────────────────────────────────────────
+// 调休 / 补班（公共事实）—— 与 `server/src/admin/admin.routes.ts` 那三条端点一一对应。
+//
+// 🔴 载荷与响应的**合法性规则不在这里**：它们只有一份，在
+// `packages/shared-schema/src/holiday-adjustment-contract.ts` 的
+// `holidayYearPutSchema`。本文件只做传输（照文件头那条纪律：这里不做判断）。
+// 界面把"一行一个值"拆成数组属于**收集输入**，不是裁决 —— 真正拦下
+// "2026-02-30"、"`isOffDay` 不是布尔"、"同一天出现两次"的是服务端那一次 `safeParse`。
+// ─────────────────────────────────────────────────────────────────────
+
+/** 一年：出处链接 + 逐日表 + 服务端算出的元信息。 */
+export interface AdminHolidayYear {
+  readonly year: number;
+  /** 公告原文链接（后台渲染成可点链接 = 判据②要的"回显"）。 */
+  readonly papers: string[];
+  readonly days: { day: string; isOffDay: boolean }[];
+  /** 库里实际行数：界面用它核对"存进去的 == 显示出来的"。 */
+  readonly dayCount: number;
+  readonly updatedAt: number;
+  readonly updatedBy: string | null;
+  readonly note: string | null;
+}
+
+export interface AdminHolidayYears {
+  /** 内容版本令牌 `<max(updated_at)>.<年数>.<行数>`（契约里写明它不是校验和）。 */
+  readonly version: string;
+  readonly years: AdminHolidayYear[];
+}
+
+/** `PUT` 成功回的就是"存进去的那份坐标"，界面拿它做回显核对。 */
+export interface AdminHolidayYearPutResult {
+  readonly ok: true;
+  readonly year: number;
+  readonly papers: string[];
+  readonly dayCount: number;
+}
+
+/** `PUT /api/admin/holiday-adjustments/years` 的载荷：**一次一个年度、整年替换**。 */
+export interface AdminHolidayYearPut {
+  readonly year: number;
+  readonly papers: readonly string[];
+  readonly note?: string | null;
+  readonly days: readonly { readonly day: string; readonly isOffDay: boolean }[];
+}
+
+/** `GET /api/admin/holiday-adjustments` —— 已录入的年度，含 papers。 */
+export const fetchAdminHolidayYears = (
+  options: AdminClientOptions,
+): Promise<AdminResult<AdminHolidayYears>> =>
+  adminRequest<AdminHolidayYears>(options, `${ADMIN_API_PREFIX}/holiday-adjustments`);
+
+/** `PUT /api/admin/holiday-adjustments/years` —— **整年替换**某一年。 */
+export const adminPutHolidayYear = (
+  options: AdminClientOptions,
+  payload: AdminHolidayYearPut,
+): Promise<AdminResult<AdminHolidayYearPutResult>> =>
+  adminRequest<AdminHolidayYearPutResult>(options, `${ADMIN_API_PREFIX}/holiday-adjustments/years`, {
+    method: 'PUT',
+    body: payload,
+  });
+
+/**
+ * `DELETE /api/admin/holiday-adjustments/years?year=` —— **撤销那一年的录入**。
+ *
+ * 产品语义（`docs/plans/countdown-anniversary.md` W4b 判据④那条分支）是
+ * "无覆盖 ⇒ **退回随包表**"，**不是**"那一年没有任何安排"。
+ * 年份走查询串：契约 `HOLIDAY_ADJUSTMENT_PATHS.adminDelete` 写清了为什么
+ * 它不许住进路径（两个来源 = 一条必须额外写的守卫）。
+ */
+export const adminDeleteHolidayYear = (
+  options: AdminClientOptions,
+  year: number,
+): Promise<AdminResult<{ ok: true; year: number; deleted: number }>> =>
+  adminRequest<{ ok: true; year: number; deleted: number }>(
+    options,
+    `${ADMIN_API_PREFIX}/holiday-adjustments/years${query({ year })}`,
+    { method: 'DELETE' },
+  );
 
 /** 把分页/搜索拼成查询串。`undefined` 的项不出现（服务端有默认值）。 */
 function query(params: Record<string, string | number | undefined>): string {
