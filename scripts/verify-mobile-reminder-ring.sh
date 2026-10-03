@@ -42,6 +42,10 @@ echo ""
 echo "=== 移动端提醒投递验收（真实模拟器，零 mock）==="
 echo "  设备: $E2E_SERIAL   任务: $TITLE"
 
+# 🔴 本验收的隐私决定由这里点名，不让共享的欢迎页 helper 替它选（见 lib 里
+#    `CONSENT_GATE_PREFERRED` 那段）。
+CONSENT_GATE_PREFERRED=只用本机
+
 dismiss_consent_if_present() {
   # 处理本身在 `lib/mobile-e2e.sh` 的 `handle_privacy_consent`（五个安卓脚本各抄一份
   # 的时代结束了 —— 抄漏那份的症状是整轮"找不到按钮"的假红）。

@@ -82,6 +82,10 @@ center_of() {
 #    另一条会话手里改）"。**那句已经过期**：功能落地了，处理也收进了 lib 的
 #    `handle_privacy_consent`。留这句话是为了记下代价 —— 那五个"各抄一份"的脚本里，
 #    `verify-mobile-auth.sh` 谁也没抄到，2026-10-03 整轮假红就是这么来的。
+# 🔴 本验收只看任务行勾选框（本地 op），不替用户做联网决定；点名之后
+#    `dismiss_welcome_if_present` 内部那一次也走同一颗按钮（`check:mobile-first-run-gate` 判据 3 钉的）。
+CONSENT_GATE_PREFERRED=只用本机
+
 dismiss_privacy_consent_if_present() {
   # 处理本身在 `lib/mobile-e2e.sh` 的 `handle_privacy_consent`（这段以前是本脚本自己
   # 抄的一份，注释里写着"动 lib 会撞车，将来它进了 lib 这段就该收掉" —— 现在收了）。

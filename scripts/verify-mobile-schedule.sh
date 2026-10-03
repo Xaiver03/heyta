@@ -48,6 +48,10 @@ echo "=== 移动端排期入口验收（真实模拟器，零 mock）==="
 echo "  设备: $E2E_SERIAL"
 echo "  任务: $TITLE"
 
+# 🔴 排期入口是本地行为，本验收**不替用户做联网决定**；点名之后，
+#    `dismiss_welcome_if_present` 内部那一次也会走同一颗按钮。
+CONSENT_GATE_PREFERRED=以后再说
+
 dismiss_consent_if_present() {
   # 处理本身在 `lib/mobile-e2e.sh` 的 `handle_privacy_consent`。
   # 🔴 本验收只看本地排期入口，**不替用户做联网决定** ⇒ 「以后再说」排第一位
