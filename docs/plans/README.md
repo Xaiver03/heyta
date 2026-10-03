@@ -10,6 +10,7 @@
 
 | 我想知道 | 看这一份 | 说明 |
 |---|---|---|
+| **本轮 goal：全量落账 + 分支合并 + 代码质量审计** | [`goal-landing-and-quality-audit.md`](goal-landing-and-quality-audit.md) | ✅ 已完成（2026-10-03）。82 个提交推送远端、`feat/countdown-anniversary` 合并进 main（四处冲突的产品裁决 + 陷阱编号重排 #137–140→#161–164）、验证矩阵全实跑（隔离 worktree build/typecheck/九道门禁/单测）。含 2 处已修类型潜伤、3 条登记发现，与本轮自己两次「管道吞退出码」假绿的照实记录 |
 | **当前状态 / 下一步做什么** | [`multi-end-unified-strategy.md`](multi-end-unified-strategy.md) | 🔴 **唯一权威主计划**。它同时取代了 roadmap §5 与 4 份多端计划的路线部分 |
 | **本轮 goal：设置的 IA（移动端优先 + 电脑端验证）** | [`goal-settings-ia.md`](goal-settings-ia.md) | ✅ 已完成。§7.1e 的执行 goal。主战场排序由产品负责人拍板：**移动端 + 电脑端，web 不是**；apps/web 的改动算电脑端的（macOS 壳加载共享 UI，`HeytaMacApp.swift:270`） |
 | **本轮 goal：逐页排版对齐设计系统** | [`goal-layout-audit.md`](goal-layout-audit.md) | 🔴 进行中（2026-09-29 产品负责人重启）。四象限改 2×2 十字坐标系、AI 工具行重叠、macOS 标题条融入壳；逐页立**布局判据**（此前门禁只管"值从哪来"，不管"排版怎么排"） |
