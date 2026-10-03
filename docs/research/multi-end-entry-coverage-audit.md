@@ -33,16 +33,16 @@
 | 子任务 / 优先级 / 重复规则 / 提醒数据 | ✅ | ✅ |
 | **提醒投递** | ✅ Notification API + 权限面板 | ⛔ **永不响**（**批三停批** 2026-10-02：四个候选依赖无一过 §3.1/§3.2，逐条裁决见本文 P0-1；判据脚本 `scripts/verify-mobile-reminder-ring.sh` 已先行落地） |
 | 清单/标签 建/删/取色 | ✅ | ✅ |
-| 清单/标签 **改名**、父子、归档 | ❌ | ❌ |
+| 清单/标签 **改名**、父子、归档 | 🟡 **改名与归档两端已接**（2026-10-03 第三批，判据见 §4 P2-2 / P2-6）；**父子（层级）选择器仍未做** | 🟡 同左（同一批、同一份判据） |
 | 四象限 | ✅ 含拖拽换象限 | ✅ 无拖拽（刻意） |
 | 日历 | ✅ 只读 + 勾完成 | ✅ 只读 + 勾完成 |
 | 时间线 | ✅ 三手势 | ✅ 排期表单 + 点行进详情 |
 | 习惯 建/打卡/目标/颜色 | ✅ | ✅ |
-| 习惯 **删除** | ❌（`HabitBoard.tsx:64` 明示未接） | ❌ |
+| 习惯 **改名与删除** | ✅ 详情窗格头部：内联改名框 + 删除（**墓碑** —— `listHabits` 滤掉、库里仍在，打卡历史一条都不动） | ✅ 详情层两个图标 + 内联改名框（判据 `apps/mobile/tests/organizer-rename.spec.ts` 里那条习惯 describe 4 条，见 §4 P2-3） |
 | 便签 建/钉/删 | ✅ | ✅ |
-| 便签 **编辑** | ❌（`NotesView.tsx:36` 刻意） | ❌（`NotesSection.tsx:29` 刻意） |
+| 便签 **编辑** | ✅ 便签视图里的编辑面板（共享 `NoteEditor`） | ✅ 二级全屏编辑屏（2026-10-03 第四批；判据 `apps/mobile/tests/note-edit.spec.ts` + `reminders-notes-display.spec.ts` 那条翻向断言；🟡 真机截图未取证，见 §4 P2-1） |
 | 专注 / 分类报告 / 冲突解决 / 实时同步 | ✅ | ✅ |
-| 搜索 | ✅ 可打开便签 | ✅ 不可打开便签（刻意） |
+| 搜索 | ✅ 可打开便签 | ✅ 可打开便签（2026-10-03 第四批：`SearchScreen` 传 `onOpenNote` → 同一个 `NoteEditScreen`。原文写的是「不可打开便签（刻意）」） |
 | 回收站 | ✅ 仅任务 | ✅ 仅任务 |
 | 成长统计 | ✅ 全量 | 🟡 **分享块已接**（2026-10-03，任务 4：`share` 走 RN 核心 `Clipboard`，小结文本来自 `@heyta/app-host#buildShareSummary`，判据 `apps/mobile/tests/growth-share-summary.spec.ts` 13 条 + 变异两臂）；**年度热力图 / 补打卡仍未接** —— 不是漏，是被冻结判据 `growth-display.spec.ts:365`/`:302` 钉着，见 BLOCKED **B41 / B42** |
 | **通知中心 / 邀请活动** | ✅ 铃铛 + 活动 tab | ✅ 「我的」页「通知」入口行（未读徽标）+ 通知中心两 tab（**批二已修** 2026-10-02） |
@@ -90,7 +90,7 @@
 
 | # | 缺口 | 证据 |
 |---|---|---|
-| P2-1 | **便签编辑**：能建能删不能改，任何一端都改不了 | `NotesView.tsx:36-38`、`NotesSection.tsx:29-31`（都刻意） |
+| P2-1 | ✅ **已修（2026-10-03，多端第四批）**：便签**两端都能改正文**了。编辑器抽进共享层 `packages/ui/src/notes/NoteEditor.tsx` —— 两端各写一份「多行输入 + 保存 + 取消」最容易漂出来的差异是**一端点保存会落一条什么都没改的 `UPD`**：它推进 `updatedAt`，而列表按它排第二段，用户读到的是「我只是点开看了一眼，这条便签跳到最前了」。那条闸门本身在 `@heyta/app-host#updateNoteContent`（写不写 op 是产品语义，AGENTS §3.5），这一层保证的是**两端用的是同一个入口**，所以闸门只有一处、也只会被踩到一处。移动端是「我的 → 便签」的二级全屏 Modal，搜索结果里点便签进的是同一屏（`onOpenNote`）。判据 = `apps/mobile/tests/note-edit.spec.ts`（含「改标题 ⇒ 恰好一条 UPD、载荷只有 content」）+ `reminders-notes-display.spec.ts` 那条由 not.toContain(「onEdit=」) **翻向** toContain 的断言（同时钉住真 op 的落点）+ 摘掉 `onEdit` 的变异臂转红；`check:ui-language` / `check:reachability` 各 exit 0。**仍未闭合**：真机截图 —— `scripts/verify-mobile-notes.sh` 三次被环境挡（现量负载 23.5、`:3100` 无服务、`:3000` 是并行会话的 e2e 栈），按「环境无效 ≠ 产品失败」登记，不硬挤、不起第二个 postgres。**另有两条债本轮暴露并已补**：`NoteEditor.tsx` 与它的三处配套（`notes/model.ts` 的 `isNoteDraftBlank`、`NotesBoard.tsx` 改用同一条判据、`index.ts` 导出块）在第一笔提交里**漏了**（未跟踪的新文件不在按路径过滤的提交范围内），HEAD 单独检出编译不过；成因与反向查法记在 `PROGRESS.md`。原文：~~能建能删不能改，任何一端都改不了~~ | `NoteEditor.tsx`、`NoteEditScreen.tsx`、`NotesView.tsx`、`SearchScreen.tsx` |
 | P2-2 | ✅ **已修（2026-10-03，多端第三批）**：清单/标签**两端都能改名**，标签补上原本根本不存在的动作 `renameTag`（一条 UPD、载荷只有 `name`，引用它的任务一个都不碰）。行内编辑器在共享 `OrganizerList` 里，两端各只多传 `onRename` + 两句无障碍名。判据 = `apps/mobile/tests/organizer-rename.spec.ts` 26 条（含"全局 op 数恰好 +1"这条防 fan-out、"重放后名字仍在"= 刷新还在）+ 变异两臂各自转红（摘掉移动端 `onRename` ⇒ 接线那条红；给 `renameTag` 载荷多塞一个 `color` ⇒ `expected ['name','color'] to equal ['name']`）；`check:reachability` exit 0。原文：~~web store 有 `renameProject` 零调用；移动端明示不做；标签连动作都没有~~ | `ListsSection.tsx`、`TagsSection.tsx`、`features/projects/{store,ProjectsPanel}`、`features/habits/{store,HabitsView}` |
 | P2-3 | ✅ **已修（2026-10-03，多端第三批）**：习惯**改名 + 删除**两端都有入口（移动端详情层两个图标 + 内联改名框，web 窗格头部同款）。删除是**墓碑**（`DEL` + `deletedAt`，`listHabits` 滤掉、库里仍在），且**打卡历史一条都不动** —— 撤销后连续天数还在。习惯改名刻意**不许"删了重建"**：`HABIT_LOG` 按 (habitId, date) 寻址，换 id 会让历史静默失联（用例钉住 `Object.keys(fresh.habits)` 仍是同一条）。判据 = 同上文件那条 describe 的 4 条 + `check:reachability` 0。原文：~~建了删不掉，`HabitBoard.tsx:64` 明示未接~~ | `HabitsScreen.tsx`、`features/habits/HabitsView.tsx` |
 | P2-4 | **回收站只覆盖任务**：清单/标签/习惯/便签软删后任何端都看不见、还原不了 | `tasks/store.ts:387` |
