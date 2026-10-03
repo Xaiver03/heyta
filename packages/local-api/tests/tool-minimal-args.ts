@@ -36,4 +36,9 @@ export const TOOL_MINIMAL_ARGS: Readonly<Record<string, Record<string, unknown>>
   create_reminder: { taskId: 't1', date: '2026-10-04', time: '09:00' },
   update_task: { taskId: 't1', fields: { title: '新标题' } },
   complete_task: { taskId: 't1' },
+  // W10（2026-10-03 合流移植）：倒数日四条。锚点日期必须是真实存在的一天。
+  list_events: {},
+  get_event: { eventId: 'e1' },
+  create_event: { title: '妈妈生日', date: '2027-04-12' },
+  update_event: { eventId: 'e1', fields: { pinned: true } },
 };

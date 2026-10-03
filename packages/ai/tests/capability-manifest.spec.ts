@@ -316,15 +316,10 @@ describe('分母恰好 9（W2 物化 EVENT 之后），且逐条点名', () => {
     // 工具还没接"这件事显形。W10 做完之后它必须**不再**出现（这条改向就是那件事
     // 做完了的机器化证据；反向漏做 ⇒ 这条与上面 3/9 那条一起红）。
     expect(manifest.entityTypesWithoutTools).not.toContain('EVENT');
-    // 顺序由实体清单决定，所以断言**排序后**的集合（口径是"还剩谁"，不是"谁先谁后"）
-    expect([...manifest.entityTypesWithoutTools].sort()).toEqual([
-      'FOCUS_SESSION',
-      'HABIT',
-      'HABIT_LOG',
-      'NOTE',
-      'REMINDER',
-      'TAG',
-    ]);
+    // 2026-10-03 合流后 9/9 全覆盖：分母里的实体**全部**有工具，
+    // 所以"有实体没工具"那句点名现在必须是空的。哪天目录丢了一个实体的工具，
+    // 这里会重新出现名字 —— 那就是这条判据重新开始咬人的时候。
+    expect([...manifest.entityTypesWithoutTools].sort()).toEqual([]);
   });
 
   it('分母的每个成员都**必须**在 `MODELED_ENTITY_TYPES` 里 —— 视图不是实体', async () => {
