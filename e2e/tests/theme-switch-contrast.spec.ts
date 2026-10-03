@@ -7,7 +7,7 @@
  * `.ht-chip` 只给 `background` 上了 `transition`，而 `color` 是瞬切的：
  * 切换后的头几十毫秒里，**新主题的字压在旧主题的底上**。
  *
- * ⚠️ **2026-10-04 的载体变更（判据一条没动）**：顶栏那个语言控件不再是 `.ht-chip`，
+ * ⚠️ **2026-10-03 的载体变更（判据一条没动）**：顶栏那个语言控件不再是 `.ht-chip`，
  * 换成了带可见标签的分组（`LanguageSwitcher.tsx` 文件头记着为什么）。
  * 本文件量的载体随之换成 `.ht-header__lang-option`，而**定位符仍按 testID 找**
  * —— 它测的是"页头那个语言项在切主题的那一瞬读不读得出"，与它穿哪件 CSS 无关。
@@ -42,7 +42,7 @@ import { openApp } from './helpers';
 const APP_ZH = '/?lang=zh-CN';
 /**
  * 载体：页头语言分组里**当前语言那一项**（中文界面 ⇒ zh 项是选中态）。
- * 按 testID 找而不是按类名 —— 类名 2026-10-04 换过一次，而这条判据不该跟着漂。
+ * 按 testID 找而不是按类名 —— 类名 2026-10-03 换过一次，而这条判据不该跟着漂。
  */
 const LANG_OPTION = '[data-testid="language-option-zh-CN"]';
 const AA_BODY = 4.5;
