@@ -3988,6 +3988,10 @@ export const zhCN = {
   'web.shell.modules.countdown.label': '倒数纪念日',
   'web.shell.modules.countdown.note': '把要盯的日子排在最前面；过去的那天不算失败。',
   'web.shell.views.countdown': '倒数纪念日',
+  // W8（三端接线）：移动端「我的」页的功能域入口行。**只追加在表尾** ——
+  // 这两个文件此刻在别的会话里也是脏的，重排/格式化会造出一场没人能解的三方冲突。
+  'mobile.countdown.entry': '倒数纪念日',
+  'mobile.countdown.entry.hint': '记下要盯的日子，看它还有几天',
 } as const;
 
 /**

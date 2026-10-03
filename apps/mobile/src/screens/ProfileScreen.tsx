@@ -59,8 +59,13 @@ import {
 } from '@heyta/ui';
 
 import { Button, Card, Divider, Screen, SectionHeader, Text } from '../ui/kit';
+import {
+  MOBILE_FEATURE_ENTRIES,
+  type MobileFeatureEntryKey,
+} from '../nav/feature-entries';
 import { AuthScreen, type SavedAuthSession } from './AuthScreen';
 import { ConflictSheet } from './ConflictSheet';
+import { CountdownScreen } from './CountdownScreen';
 import { ExportScreen } from './ExportScreen';
 import { GrowthScreen } from './GrowthScreen';
 import { HabitsScreen } from './HabitsScreen';
@@ -161,15 +166,20 @@ export function ProfileScreen(): React.JSX.Element {
    *
    * 🔴 底部标签必须保持 5 个（任务 / 日历 / 专注 / 分类 / 我的）。成长是
    * "关于我"的回顾视图，与设置同居一处才符合心智；挤进标签栏会让每个标签
-   * 都读不清。返回靠成长屏顶栏的返回键（`GrowthScreen` 的 `onBack`）。
+   * 都读不清。返回靠那一屏顶栏的返回键（各自的 `onBack`）。
+   *
+   * 🔴 **2026-10-04（W8）：功能域那一档入口改由 `nav/feature-entries.ts` 生成。**
+   * 原来是 `growthOpen` / `habitsOpen` 两个布尔 + 两段手写行 —— 那就是
+   * "同一个判断写两遍"，加第三个功能域（倒数纪念日）会写成第三遍，
+   * 而漏掉一处**不会报错**（少一个 setState 调用点 = 点了没反应）。
+   * 现在是一张表 + 一个状态 + 一个穷尽 switch：**加一项不接屏 = 编译错误**。
    *
    * ⚠️ 这些 `useState` 与下面的提前 return 必须**在所有 hook 之后** ——
    * 提前 return 会让后面没跑到的 hook 数量在两次渲染间变化，React 会直接报错。
    */
-  const [growthOpen, setGrowthOpen] = useState(false);
+  const [openFeature, setOpenFeature] = useState<MobileFeatureEntryKey | null>(null);
   const [trashOpen, setTrashOpen] = useState(false);
   const [exportOpen, setExportOpen] = useState(false);
-  const [habitsOpen, setHabitsOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [securityOpen, setSecurityOpen] = useState(false);
 
@@ -259,11 +269,30 @@ export function ProfileScreen(): React.JSX.Element {
   ];
 
   /**
+   * 功能域那几行**由注册表生成**（`nav/feature-entries.ts`）。
+   *
+   * 🔴 这里不许再出现一份手写的 `{ key: 'habits', label: t('…') }`：
+   * 同一件事写两遍，迟早只改一遍（AGENTS §3.5 的那条教训）。
+   */
+  const featureRows: readonly SettingsRowModel[] = MOBILE_FEATURE_ENTRIES.map(
+    (entry): SettingsRowModel => ({
+      kind: 'action',
+      testID: entry.testID,
+      label: t(entry.labelKey),
+      hint: t(entry.hintKey),
+      onPress: () => {
+        setOpenFeature(entry.key);
+      },
+    }),
+  );
+
+  /**
    * 「关于我 / 我的数据」的入口行。
    *
    * 🔴 **「设置」排第一**（goal M1：入口要在首屏一眼可见）—— 它是这组里
-   * 唯一"配置类"的动作，也是搬动后凭据表单的新家；其余四项是"关于我"的
-   * 回顾与后悔药，频率都低于它。骨架来自共享动作行。
+   * 唯一"配置类"的动作，也是搬动后凭据表单的新家；后面几项是"关于我"的
+   * 回顾与后悔药（功能域那几行由 `nav/feature-entries.ts` 生成），频率都低于它。
+   * 骨架来自共享动作行。
    */
   const entryRows: readonly SettingsRowModel[] = [
     {
@@ -311,24 +340,7 @@ export function ProfileScreen(): React.JSX.Element {
         setSecurityOpen(true);
       },
     },
-    {
-      kind: 'action',
-      testID: 'profile-entry-growth',
-      label: t('mobile.growth.entry'),
-      hint: t('mobile.growth.entry.hint'),
-      onPress: () => {
-        setGrowthOpen(true);
-      },
-    },
-    {
-      kind: 'action',
-      testID: 'profile-entry-habits',
-      label: t('mobile.habits.entry'),
-      hint: t('mobile.habits.entry.hint'),
-      onPress: () => {
-        setHabitsOpen(true);
-      },
-    },
+    ...featureRows,
     {
       kind: 'action',
       testID: 'profile-entry-trash',
@@ -350,8 +362,8 @@ export function ProfileScreen(): React.JSX.Element {
   ];
 
   /**
-   * 🔴 提前 return **必须在所有 hook 之后**（见 `growthOpen` 的注释）。
-   * 成长屏自带顶栏返回，所以这里不需要任何导航库。
+   * 🔴 提前 return **必须在所有 hook 之后**（见 `openFeature` 的注释）。
+   * 第二层屏各自带顶栏返回，所以这里不需要任何导航库。
    */
   if (securityOpen) {
     return (
@@ -416,24 +428,15 @@ export function ProfileScreen(): React.JSX.Element {
     );
   }
 
-  if (growthOpen) {
-    return (
-      <GrowthScreen
-        onBack={() => {
-          setGrowthOpen(false);
-        }}
-      />
-    );
-  }
-
-  if (habitsOpen) {
-    return (
-      <HabitsScreen
-        onBack={() => {
-          setHabitsOpen(false);
-        }}
-      />
-    );
+  if (openFeature !== null) {
+    /**
+     * 🔴 功能域那几屏**整屏替换**（第二层），返回由那一屏自己的顶栏给。
+     * 组件由穷尽 switch 决定：注册表加一项而不在这儿接上 = `apps/mobile` 编译红
+     * （这条就是"入口存在但点了没反应"那类失效的编译期版本）。
+     */
+    return featureScreen(openFeature, () => {
+      setOpenFeature(null);
+    });
   }
 
   return (
@@ -553,7 +556,35 @@ export function ProfileScreen(): React.JSX.Element {
   );
 }
 
-/** 同步状态那一行。**它必须说清是哪一种失败**，不能只写"同步失败"。 */
+/**
+ * 注册表里的功能域 → 本端那张屏。
+ *
+ * 🔴 **穷尽 switch，没有 `default`**：`MobileFeatureEntryKey` 是从
+ * `MOBILE_FEATURE_ENTRIES` 推出来的联合类型，所以往注册表里加一项、
+ * 而忘了在这儿接上屏，这个函数就"所有分支之外还可能走到结尾"——
+ * 返回类型 `React.JSX.Element` 立刻不成立 ⇒ **编译错误**。
+ *
+ * 为什么要花一个函数换掉两段 `if (xxxOpen)`：入口失效最常见的形状是
+ * "行在、点了没反应"，而它**不报错、界面也不难看**（AGENTS §7 那类）。
+ * 让它在编译期就站不住，比给它写一条运行时判据更便宜。
+ */
+function featureScreen(key: MobileFeatureEntryKey, onBack: () => void): React.JSX.Element {
+  switch (key) {
+    case 'growth':
+      return <GrowthScreen onBack={onBack} />;
+    case 'habits':
+      return <HabitsScreen onBack={onBack} />;
+    // 🔴 注册表里加了 `countdown` 而这一行没接上 ⇒ 本函数"所有分支之外还可能走到结尾"，
+    //    返回类型立刻不成立 = **编译错误**。这就是"入口在、点了没反应"那类失效的
+    //    编译期版本（`nav/feature-entries.ts` 文件头第 2 条说的就是这件事）。
+    case 'countdown':
+      return <CountdownScreen onBack={onBack} />;
+  }
+}
+
+/**
+ * 同步状态那一行。**它必须说清是哪一种失败**，不能只写"同步失败"。
+ */
 function StatusRow({
   status,
   busy,

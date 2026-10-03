@@ -3750,4 +3750,7 @@ export const en = {
   'web.shell.modules.countdown.label': 'Countdowns',
   'web.shell.modules.countdown.note': 'Keep the dates you watch at the top. A date that has passed is not a failure.',
   'web.shell.views.countdown': 'Countdowns',
+  // W8（三端接线）：与 zh-CN.ts 同批追加的两条，**中英成对**（`check:ui-language` 拦）。
+  'mobile.countdown.entry': 'Countdowns',
+  'mobile.countdown.entry.hint': 'Keep the dates you watch, and see how far off they are',
 } satisfies Record<MessageKey, string>;
