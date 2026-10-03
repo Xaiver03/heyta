@@ -177,6 +177,7 @@ import {
   saveAiSettings,
   toHealthSnapshot,
 } from './features/settings/aiStore.js';
+import { FocusDetailPane } from './features/focus/FocusDetailPane.js';
 import { FocusTimer } from './features/focus/FocusTimer.js';
 import { TrashView } from './features/trash/TrashView.js';
 import { LanguageSwitcher } from './features/shell/LanguageSwitcher.js';
@@ -2515,8 +2516,14 @@ export function App(): React.JSX.Element {
        * 所以这里也**不给它起无障碍名** —— 一个还没有内容的区域，名字会比内容更响。
        *
        * ⚠️ 窄屏（≤1023px）这一列不出现，规则与算过的账在 `styles/app/narrow.css`。
+       *
+       * 🔴 **今天它有一格内容是例外的**：专注面（工单 W7）。滴答那一栏在番茄钟视图里
+       * 是**常驻**的"概览 + 记录"，与选中了哪条任务无关 —— 所以它不需要等拍板 #1
+       * （#1 问的是"任务那一栏放什么"）。其余视图仍然空着，那仍是设计。
        */}
-      <aside className="ht-app__detail" data-testid="detail-column" />
+      <aside className="ht-app__detail" data-testid="detail-column">
+        {contentView === 'focus' ? <FocusDetailPane /> : null}
+      </aside>
       </div>
       </AiSettingsNavigationContext.Provider>
     </HeytaUiProvider>

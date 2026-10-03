@@ -82,7 +82,7 @@ function progress(over: Partial<TodayProgress> = {}): TodayProgress {
 }
 
 function totals(over: Partial<ActivityTotals> = {}): ActivityTotals {
-  return { checkIns: 0, focusMs: 0, tasksCompleted: 0, activeDays: 0, ...over };
+  return { checkIns: 0, focusCount: 0, focusMs: 0, tasksCompleted: 0, activeDays: 0, ...over };
 }
 
 /** 本周复盘的最小底：用例只声明它关心的字段。 */
@@ -279,6 +279,7 @@ describe('milestoneGroups：每维度一块，顺序与投影一致', () => {
       deriveMilestones(
         totals({
           checkIns: 5000,
+          focusCount: 0,
           focusMs: 2000 * 3_600_000,
           tasksCompleted: 9000,
           activeDays: 400,

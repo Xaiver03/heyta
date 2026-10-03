@@ -1074,6 +1074,18 @@ export const zhCN = {
   'web.focus.config.locked': '计时进行中不能改时长 —— 先中止本轮，改完再开始。',
   'web.focus.config.a11y.minutes': '{label}时长，单位分钟',
   'web.focus.config.a11y.sessions': '{label}，单位个数',
+  // 工单 W7：专注详情面（四张概览卡 + 专注记录列表）。
+  // ⚠️ 卡上的标签**不带数量**，数字单独一格 —— 那样英文不需要为「1 session / 3 sessions」
+  // 再开一对兄弟词条，而 `web.focus.completedTodayOne` 那种成对词条的存在理由在这里不成立。
+  'web.focus.detail.title': '专注概览',
+  'web.focus.detail.todayCount': '今日番茄',
+  'web.focus.detail.todayDuration': '今日专注时长',
+  'web.focus.detail.totalCount': '总番茄',
+  'web.focus.detail.totalDuration': '总专注时长',
+  'web.focus.detail.records': '专注记录',
+  'web.focus.detail.recordsEmpty': '还没有专注记录。完成一轮就会出现在这里。',
+  'web.focus.detail.unlinked': '未关联任务',
+  'web.focus.detail.aborted': '中途放弃',
 
   // ── Web · 习惯 ────────────────────────────────────────────
   'web.habits.addPlaceholder': '新习惯，例如「喝水」',
