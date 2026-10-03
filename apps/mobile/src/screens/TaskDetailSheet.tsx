@@ -69,12 +69,13 @@ import {
   ChecklistPlanPreview,
   ReminderList,
   formatDuration,
+  priorityColorToken,
   rejectionReasonOf,
   subtaskRejectionMessageKey,
 } from '@heyta/ui';
 
 import { formatStamp } from '../lib/date';
-import { PRIORITY_ORDER, priorityColorToken, priorityLabel } from '../lib/priority';
+import { PRIORITY_ORDER, priorityLabel } from '../lib/priority';
 import { describeRecurrenceText } from '../lib/recurrence-display';
 import { reminderListLabels } from '../lib/reminders-display';
 import { timelineLabels } from '../lib/timeline-labels';

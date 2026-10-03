@@ -33,7 +33,6 @@ import type { Project, Tag, Task, TaskSortKey } from '@heyta/domain';
 // **"某一天的标题"的日期语义（`isoWeekday`、`parseLocalDate`）仍只有领域层一份**，
 // 壳里只负责措辞（见 `apps/mobile/src/lib/date.ts` 文件头）。
 import {
-  Priority,
   // 🔴 分组归属规则与 Web 共用同一份（见下面 `groups` 的说明）。
   sectionTasks,
   // 标签筛选的判据也共用 —— Web 侧栏点标签走的就是它。
@@ -47,7 +46,7 @@ import {
 import { useI18n } from '@heyta/i18n';
 // 🔴 共享捕获件：与 web 用的是**同一份**（识别日期/优先级 + 芯片 + 预览）。
 // 在这一刀之前移动端只有一个纯标题输入框 —— 同一句话在两端建出不同的任务。
-import { CaptureComposer, type CaptureSubmitPlan } from '@heyta/ui';
+import { CaptureComposer, priorityColorToken, type CaptureSubmitPlan } from '@heyta/ui';
 import { useCaptureLabels } from '../lib/capture-labels';
 import { pruneSelectionAgainst, selection, useSelected } from '../lib/selection';
 import {
@@ -122,7 +121,7 @@ import {
   taskSortName,
   writeTaskSort,
 } from '../lib/task-sort';
-import { priorityBadgeLabel, priorityColorToken } from '../lib/priority';
+import { priorityBadgeLabel } from '../lib/priority';
 import { TaskDetailSheet } from './TaskDetailSheet';
 import { SearchScreen } from './SearchScreen';
 import { NoteEditScreen } from './NoteEditScreen';
@@ -745,7 +744,7 @@ export function TasksScreen({
           priority={
             badge === null
               ? null
-              : { text: badge, color: tokens[priorityColorToken(task.priority ?? Priority.None)] }
+              : { text: badge, color: tokens[priorityColorToken(task.priority)] }
           }
           repeat={repeat === undefined ? null : describeRecurrenceText(repeat.rule, t, locale)}
         />

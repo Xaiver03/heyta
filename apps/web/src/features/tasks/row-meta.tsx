@@ -25,13 +25,19 @@
  */
 
 import React from 'react';
-import { computeCountdown, Priority } from '@heyta/domain';
+import { computeCountdown } from '@heyta/domain';
 import { useI18n } from '@heyta/i18n';
-import { TaskBadges, listNameFor, useHeytaTokens, type TaskRow as SharedTaskRow } from '@heyta/ui';
+import {
+  TaskBadges,
+  listNameFor,
+  priorityColorToken,
+  useHeytaTokens,
+  type TaskRow as SharedTaskRow,
+} from '@heyta/ui';
 
 import { dueText, type DueDisplayMode } from '../../lib/due-display.js';
 import { useProjectStore } from '../projects/store.js';
-import { priorityBadgeText, priorityColorToken } from './priority-display.js';
+import { priorityBadgeText } from './priority-display.js';
 
 export function TaskRowMeta({
   row,
@@ -65,7 +71,9 @@ export function TaskRowMeta({
           ? null
           : {
               text: priority,
-              color: tokens[priorityColorToken(task.priority ?? Priority.None)],
+              // `?? Priority.None` 以前写在这里，现在由共享层那一份收敛
+              // （`priorityColorToken` 的入参含 `undefined`）。
+              color: tokens[priorityColorToken(task.priority)],
             }
       }
     />
