@@ -277,6 +277,14 @@ cd "…/heyta" && git merge-tree --write-tree --name-only feat/countdown-batch2 
 2. **客户端拉取 + 缓存**。🔴 **不要为它论证破边界** —— 我原先写"app-host 没有任何 `fetch(`"是错的，
    实测它有 **5 处 `fetchImpl`**（`admin-client` 1 / `entitlement` 1 / `inbox` 1 / `privacy-consent` 2；
    `host.ts:110`、`hosted-auth.ts:630` 绑 `globalThis.fetch`）⇒ **照 `fetchImpl` 现成形状接，公共事实不许带 token**。
+   ✅ **22:2x 补两条现成的落点**（省掉下一轮重新摸）：
+   · META 里**放字符串早有先例** —— `host.ts:205-215` 的 `resolveClientId()` 就是
+     `adapter.get<{key:string;value:string}>(STORES.META, META_KEYS.CLIENT_ID)` + `adapter.put(...)`，
+     而 `DbAdapter` 本体是 `put(store, value: unknown, key?)` / `get<T>(store, key)`（`db.types.ts:164`），
+     三套适配都吃得下 ⇒ **不需要为公共事实扩存储 API**，加 `META_KEYS` 两项即可。
+   · 🔴 **拉取必须带外做**：`packages/domain/src/holidays.ts` 文件头把"让 `adjustmentOn()` 变 async"
+     明确列为**已否证**的方案（理由写在那里："不确定"在日历上就是空白块 = 判据①要防的东西）。
+     所以形状只能是 启动/回前台 fetch → 写 META → `installHolidayAdjustmentOverrides()` → 界面重算。
 3. **`CalendarBoard` 的 `dayMarker?` 可选 prop**（默认值等于原值 ⇒ 消费者零改动）。
    ⚠️ **W6 落地时复用这条缝，不要另开注入点。**
 4. **新门禁 `scripts/check-public-facts.mjs`** 并接进 `pnpm check`，判据四条：
