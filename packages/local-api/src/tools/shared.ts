@@ -134,6 +134,22 @@ export function clampListLimit(raw: unknown, fallback: number = DEFAULT_LIST_LIM
  */
 export const LIST_TASKS_MAX_DUE_SPAN_DAYS = 14;
 
+/**
+ * 一次批量完成最多带多少条 id（W11）。上限的来源与 `LIST_TASKS_MAX_DUE_SPAN_DAYS`
+ * 同一条理由，逐字对齐 ADR-0045 §2.5：
+ *
+ * 1. **一次确认的认知负荷上界** —— 提案卡上只有数量，用户点的是一次"这 N 条都完成"，
+ *    N 没有上界就等于让用户在看不见内容的情况下签一张空白支票；
+ * 2. **向量时钟的上界** —— 每条变更各占一个刻度（`complete-tasks` 落 N 条 op），
+ *    而 `limitVectorClockSize` 的 100 是"把墙挪远不是拆掉"（ADR-0008），
+ *    所以"一次意图能推进多少刻度"必须是一个可算的数；
+ * 3. **它是"一个提案内含多条"的唯一合法表达方式** —— 超出上限**必须整批拒绝**，
+ *    不许偷偷拆成两批（拆了就等于把一次确认变成两次，而那正是 §2.4 要避免的事）。
+ *
+ * 数字取 20：与竞品的 `complete_tasks_in_project` 单次上限同档（见 gap 分析 AI-G7）。
+ */
+export const MAX_TASKS_PER_BATCH_COMPLETE = 20;
+
 /** `YYYY-MM-DD`：四位数年 + **补零**的月/日。规范形只有一份，所以必须补零。 */
 const CALENDAR_DAY_RE = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -502,6 +518,17 @@ export type LocalApiWriteIntent =
   | { action: 'create-task'; title: string; dueDate?: string; priority?: string; projectId?: string }
   | { action: 'update-task'; taskId: string; fields: Readonly<Record<string, unknown>> }
   | { action: 'complete-task'; taskId: string }
+  /**
+   * 批量完成（W11 / ADR-0045 §2.5）：**一个提案内含多条**，不是一提案一确认地 fan-out。
+   *
+   * 🔴 落 N 条 op 而不是 1 条：`entityIds` / `BATCH` 那两条"单 op 承载多实体"的路
+   * 在这个仓库里是**装饰**（reducer `packages/op-log/src/state.ts` 只读 `op.entityId`，
+   * 实体 2..N 没人应用），而服务端 `op-replay.ts` 却按全部成员处理 —— 一旦真发批量 op，
+   * 快照重建与 op-log 重放就会不一致。所以批量住在**提案/确认这一层**（§2.5 的原文是
+   * "一个提案、一次确认、一次 `submit` 里落多条"，它没有规定"一条 op"），
+   * 不住在线协议层。上限与它为什么存在见 `MAX_TASKS_PER_BATCH_COMPLETE`。
+   */
+  | { action: 'complete-tasks'; taskIds: readonly string[] }
   /** 新建清单（PROJECT）。`parentId` 省略 = 顶层；由宿主验它真的存在。 */
   | { action: 'create-project'; name: string; parentId?: string }
   /**
@@ -615,6 +642,16 @@ export type LocalApiWriteResult =
        * `entityId` + `entityType`（见 `server.ts` 的 `writeResult()`）。
        */
       taskId: string;
+      /**
+       * 🔴 批量写入时填**全部**落地 id（顺序与提交的一致）。
+       *
+       * 为什么不是"只回 `taskId` 就行"：`taskId` 在批量场景里只是第一条，
+       * 而调用方（外部程序经 MCP、以及界面上的确认卡）必须能知道"哪几条真的被改了" ——
+       * 只回一条等于对调用方说"就改了这一条"，那是说谎而不是省略。
+       * ⚠️ 单条写入**不许**填它：留空就是"这是一次单条写入"，
+       * 判据据此区分两条路径，不需要再加一个布尔字段。
+       */
+      taskIds?: readonly string[];
       /** 落地的是**别的实体**时必填（与 `entityType` 成对出现）。 */
       entityId?: string;
       /** 给了它就必须给 `entityId`；任务写入留空 = 既有形状。 */
