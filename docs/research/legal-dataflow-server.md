@@ -792,7 +792,7 @@ grep -icE "sentry|posthog|mixpanel|amplitude|firebase|bugsnag" pnpm-lock.yaml   
 | 清理对象 | ① 已被快照覆盖的旧 op（`deleteOldSyncedOpsForAllUsers`）② 超过保留期未见过的设备行 ③ 过期限流计数 ④ 过期请求去重条目 | cleanup.ts:27-77, :87 |
 | 🔴 「删了 N 条」**无条件打日志，包括 0** | 理由是 2026-08 那次全站保留期停摆只能被诊断为「缺失」 | cleanup.ts:33-40 |
 | **从未验证邮箱的僵尸账号** | 同一保留期当宽限期自动删除（刻意不加第二个旋钮） | cleanup.ts:17-19 |
-| 用户**自助注销** | `DELETE /api/account`，需鉴权，限流 3 次/15 min；`prisma.user.delete` + schema 级联（operations / syncState / devices / passkeys / subscriptions / orders / referrals / notifications 全部 `onDelete: Cascade`）；同时作废鉴权缓存并踢掉活动 WS 连接 | `server/src/api.ts:553-593`（cascade 注释 :570；审计 :583） |
+| 用户**自助注销** | `DELETE /api/account`，需鉴权，限流 3 次/15 min；`prisma.user.delete` + schema 级联（operations / syncState / devices / passkeys / subscriptions / orders / referrals / notifications 全部 `onDelete: Cascade`）；同时作废鉴权缓存并踢掉活动 WS 连接 | `server/src/api.ts:713-757`（cascade 注释 :733；审计 :746）｜🔴 2026-10-03 更正：上一版写的 `:553-593` 已漂 160 行。级联口径也更正过：**引用 `users` 且 `ON DELETE CASCADE` 的外键 16 条 / 15 张表**（`referrals` 占两条），不是文案曾经抄的 18 或 19 —— 那两个数数的是全部迁移里 `ON DELETE CASCADE` 的出现次数，含与账号无关的级联并重复计入历史重建。另：`payment_events` 没有 `userId`，注销后行仍在（订阅指针 `SetNull`）；而**服务端删完 ≠ 用户数据消失**，各端本地明文库今天没有任何清除路径（批次 E，E2/E3） |
 | 「清除我的数据」另一条路 | `USER_DATA_DELETED`：只删同步数据、保留账号 | `server/src/sync/sync.routes.ts:327-330` |
 | 单条数据删除的语义 | op-log 里是**墓碑**（软删 + `purgedAt` 标记），彻底删除不清 `deletedAt` | AGENTS.md §9（回收站条目）；**具体列语义属客户端考古范围** |
 
@@ -811,7 +811,16 @@ grep -icE "sentry|posthog|mixpanel|amplitude|firebase|bugsnag" pnpm-lock.yaml   
 8. **员工可见范围有硬白名单**：口令哈希、任何令牌、passkey 公钥与 `credentialId`、
    同步内容（只有条数）、推送 `endpoint` 都不在后台响应中（A8）。
 9. **不存支付账号信息**；webhook 原文刻意不存、只存 SHA-256 摘要（A7：schema.prisma:259-261）。
-10. **保留期与删除是代码保证的**：45 天统一保留 + 每日清理 + 自助注销级联删（上面附表）。
+10. ~~**保留期与删除是代码保证的**：45 天统一保留 + 每日清理 + 自助注销级联删（上面附表）。~~
+    🔴 **2026-10-03 更正，原句留在这里是为了看清它错在哪一层**：那句里的「每日清理」对**同步事件**不成立。
+    `deleteOldSyncedOpsForAllUsers()` 的候选集是
+    `CAUSAL_FULL_STATE_OPERATION_WHERE`（`server/src/sync/sync.types.ts:35-40`：
+    `SYNC_IMPORT` / `BACKUP_IMPORT`，或带 `repairBaseServerSeq` 的 `REPAIR`），
+    而 heyta 的客户端只产 `CRT`/`UPD`/`DEL` —— 全仓（`packages/` + `apps/`，不含
+    `research/standalone/` 那份上游抄件）对这三个词**零命中**，所以每日任务的删除条数恒为 0。
+    **仍然成立的两半**：设备行的清扫只看 `lastSeenAt`（`device.service.ts` 的
+    `deleteStaleDevices`，不挂任何边界），注销的级联硬删也真的在跑。
+    取证与影响面见 [trash-and-archive-best-practice.md](trash-and-archive-best-practice.md) §5.3 / 缺陷 D8。
 
 ### 🔴 绝对不能声明（说了就是与代码不符）
 

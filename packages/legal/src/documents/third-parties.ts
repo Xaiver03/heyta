@@ -287,7 +287,7 @@ const zh = [
           '不开启同步：第二节表里的第 2–5 行照常发生（它们是账号与支付必需的），但你的任务内容不会以密文形式离开你的设备。',
           '不开启 AI 远程、不填自建端点：第三节整张表都是空的。',
           '不开启提醒通知：推送那一行从不发生。',
-          '注销账号：服务端按表外键级联删除同步数据、设备记录、凭据、订阅与订单；备份是整库快照，**代码层没有「从备份里定点删除某条数据」的能力**，这一点我们在《你的数据权利》里如实写明，不承诺即时从备份中清除。',
+          '注销账号：服务端按表外键级联删除同步数据、设备记录、凭据、订阅与订单；备份是整库快照，**代码层没有「从备份里定点删除某条数据」的能力**，这一点我们在《你的数据权利》里如实写明，不承诺即时从备份中清除。；🔴 同样不承诺的是“注销会清掉你所有设备上的本地数据”——本地优先意味着每台设备自己有一份可读的库，而随注销信号清除本机数据的动作今天还不存在',
         ],
       },
       {
@@ -578,7 +578,7 @@ const en = [
           'Do not enable sync: rows 2–5 of Section 2 still occur (they are inherent to the account and to payment), but your task content no longer leaves your device even as ciphertext.',
           'Do not enable remote AI and do not configure a self-hosted server: Section 3 is empty in its entirety.',
           'Do not turn on reminder notifications: the push row never occurs.',
-          'Close your account: the server deletes synced data, device records, credentials, subscriptions and orders by foreign-key cascade. Backups are whole-database snapshots and **there is no capability in the code to excise one record from a backup** — we state that plainly in Your Data Rights rather than promising instant removal from backups.',
+          'Close your account: the server deletes synced data, device records, credentials, subscriptions and orders by foreign-key cascade. Backups are whole-database snapshots and **there is no capability in the code to excise one record from a backup** — we state that plainly in Your Data Rights rather than promising instant removal from backups.; nor do we promise that closure wipes local data on your other devices — local-first means each device keeps a readable database, and wiping on the closure signal does not exist today',
         ],
       },
       {
