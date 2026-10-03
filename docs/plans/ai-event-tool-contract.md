@@ -1263,3 +1263,38 @@ git diff --name-only a1ef4d9a b6294ef0 | grep -E "packages/(ai|local-api|app-hos
 `AGENTS.md:295` 那句"当前 2592 个通过 + 12 个跳过"实际是 **7839 / 12**（§15.6 ①b 的现量命令同一条）。
 
 全链与四端重装的读数在 §15.9（下一条提交，等那两趟跑完填数）。
+### 15.9 合并态全链读数：载体那行 SHA 我自己写错了一笔，而这条红不在我线上（三条证据 + 人眼看图）
+
+**读数（只认 summary 行与退出码；日志 `/tmp/heyta-merge-verify-181502/`）**
+
+| 段 | 载体 | 读数 |
+|---|---|---|
+| 合并 main@`1694b7d0` 进集成线 | — | `merge-rc.txt` = **0** |
+| `pnpm build` | `10dc0bd4` | `build-rc.txt` = **0** |
+| `pnpm check`（61 段） | `10dc0bd4` | `check-rc.txt` = **1**，断在第 51 段 `check:ai-e2e`：`3 failed / 2 skipped / 112 passed (6.6m)`；第 0–50 段全绿（`check:layering` 327 文件 9 规则、`check:ui-language` zh-CN 2860 / en 2860、`check:ai-coverage` 覆盖面 8/8 + 目录 22 工具 ≤ 40 席 都在链日志里） |
+
+🔴 **先更正我自己的一行**：runner 在 18:20:22 打印 `合并后 carrier=b6294ef0`，可链的 build 是 18:34:11、check 是 18:35:11 起跑的，中间落了 `db12dd18`(18:26:52) 与 `10dc0bd4`(18:32:38) 两笔 docs 提交 ⇒ 这条读数的载体是 **`10dc0bd4`**。两笔都是文档，`git rev-parse b6294ef0:packages/ui` 与 `10dc0bd4:packages/ui` 是同一个 tree，代码结论不变 —— 但**"打印过的 SHA"不等于"运行时的 SHA"**，而这一批的要求恰恰是读数必须写明载体。错在打印时机，不在结论。
+
+**三条红，两种性质**
+
+1. `sidebar-resize.spec.ts:132`（两个 attempt 都是）：`page.goto: net::ERR_CONNECTION_REFUSED at http://127.0.0.1:4318/?lang=zh-CN`（抛出点 `e2e/tests/helpers.ts:291`），208 ms / 212 ms 就回 —— 不是超时，是**载体没了**。对端整链 18:40:24 起跑、其 e2e 18:42:53 到，而 preflight 是**按端口不按归属**SIGKILL（`scripts/check-ai-e2e-preflight.mjs:37` `DEFAULT_PORTS=[4318,4319]`、`:83` `process.kill(pid,'SIGKILL')`）。⇒ §7 #87 的第二面，环境无效。
+2. `calendar-sidebar.spec.ts:111` 与 `:226`：红在 `calendar-sidebar.spec.ts:86` 的 `expect(sidebar.getByText(LIST, { exact: true })).toBeVisible()` ⇒ `Received: hidden`，两个 attempt 同一句 ⇒ **确定性**，不是抖动。
+
+**第 2 条在 main 侧，不在集成线上（三条互相独立的证据）**
+
+- **a 树同一性**（零成本、比复跑更硬）：`git rev-parse 10dc0bd4:packages/ui` == `git rev-parse 1694b7d0:packages/ui` == `47513f2e…`；我那 40 笔提交在 `packages/ui/` 下**零文件**。被测组件是 main 的字节，不是我改过的副本。
+- **b 配对 A/B**（同一套 117 条用例）：载体 `792f9b2d`（尚未并 `192a516d`）18:00:57 单跑 `check:ai-e2e` ⇒ `rc=0 / 115 passed / 2 skipped / 0 failed`；并进来之后 ⇒ `112 + 3 = 115`。总数相等证明是同一套用例，差集恰是这两条。
+- **c 所有者自己在飞**：主检出 `packages/ui/src/projects/OrganizerList.tsx` 的**未提交** diff 里有一句自证 —— "Let the action group move as one unit instead of **shrinking the name down to a zero-width flex item**"，配套 `minWidth: tokens['touch-target.min']`。机制就是 `192a516d` 给每行新加的四个动作按钮（色槽 / 重命名 / 归档 / 删除，见 `error-context.md` 的 a11y 快照第 62–68 行五个 button）把名字挤成零宽 flex item。
+
+**人眼看图**（§6.2 规定一第 4 条，真的打开了 `e2e/test-results/calendar-sidebar-迷你月历…-chromium/test-failed-1.png`）：侧栏「清单」区那一行显示的是 placeholder **「新清单」+ ✓**，刚创建的清单名**读不出来**，它下面一行是四个动作图标。所以这不是"用例太严"，是**界面上真的看不见那行名字** —— 一条真产品缺陷，只是它不归这条线修。
+
+**不代改的理由 + 关闭判据**：`git status --porcelain -- packages/ui` 此刻 10 个 `M`，`OrganizerList.tsx` 正脏着，而 `packages/ui` 是并行会话 W5/W6/W8 的落点。等他们提交后由我复跑：
+
+```bash
+cd /private/tmp/heyta-final && git merge --no-edit main && pnpm build && pnpm check:ai-e2e
+# 期望：115 passed / 0 failed / 2 skipped（同一套 117 条）
+```
+
+**其后九段第二次从未执行** —— `&&` 链断在 51 段，52..60（`privacy-consent-e2e`、`landing-e2e`、`shell-unicode`、`web-storage`、`web-migration`、`script-snapshot`、`mobile-first-run-gate`、`screenshot:verify`、`-r test`）没有读数。这次不再等整链重跑，而是把那九段在载体 `10dc0bd4` 上**逐段**补齐：每段各过一道"对端清空 + 负载门"（单一所有者 `scripts/lib/wait-for-quiet-host.sh`，本机阈值 12），被闸门挡下的记 **rc=3 = 环境无效**，不折成 1。读数落 `/tmp/heyta-tail-segs-185511/rc-<段号>-<段名>.txt`，汇总 `tally.txt`。
+
+**一条结论提前说清**：只要 main 带着 organizer 那条红，`pnpm check` **全链绿**在这条集成线上是结构上不可达的。按红线不吸收别人的债凑绿、不为跑绿放宽闸门 ⇒ ② 的完成态改写成「段 0–50 绿 + 段 51 挂上游关闭判据 + 段 52–60 逐段读数」，而不是"链绿"。
