@@ -456,3 +456,30 @@ bad 在一行式 then 位置 ⇒ 取 else 分支里第一条 ok），文案两�
    ⇒ 我只补了那条线**缺的那一块证据**（下面 B24 里新增的实测行），把改动撤回，红如实留着。
    两段红没有一段是本条线引入的，而"不为了变绿去放宽基线/改别人的判据/吸收别人的债"是本 Goal 的硬约束，所以这里如实记红。
    ⇒ **因此本次不将 Goal 标记为 complete**：③ 的第一句没做到，做不到。
+
+### 7.11 终局快照（2026-10-03 10:0x，HEAD `69f64ae4`）：① ② 的每一条都还在绿，缺口只剩 ③ 的两段
+
+这一段是给"下一位"的：本 Goal 交付完之后，哪些证据仍然当场可复现。全部在同一枚 HEAD、
+工作树对本条线零脏文件的状态下现量（不是引用早先的读数）：
+
+| 复验项 | 命令 | 读数 |
+|---|---|---|
+| 界面文案必须是中文词条（批五新增的那批也在内） | `pnpm check:ui-language` | **0** |
+| 中英两张词条表本身 | `pnpm --filter @heyta/i18n test` | **0** |
+| 移动端类型 | `pnpm --filter @heyta/mobile typecheck` | **0** |
+| 移动端单元测试 | `pnpm --filter @heyta/mobile test` | **538 passed / 538** |
+| 空态登记（本批曾把它从 2 处红修到 0，又添过判据缺陷） | `pnpm check:empty-state` | **0** |
+| RN 无障碍属性写法（批一那处红就是它抓的） | `pnpm check:rn-aria` | **0** |
+| 设计变量裸值 | `pnpm check:design` | **0** |
+| shell 里的 `$var` 紧跟中文 | `pnpm check:shell-unicode` | **0** |
+| 长跑脚本快照（`verify-mobile-restore.sh` 在 MANIFEST 里） | `pnpm check:script-snapshot` | **0** |
+| UI Provider 边界 | `pnpm check:ui-provider` | **0** |
+| 移动端产物（bundle/Hermes 魔数那类） | `pnpm check:mobile-bundle` | **0** |
+| 死链 / 失效章节引用 / 锚点（含本文件新增的引用） | `research/tools/docs-link-check.mjs`（干净检出） | **0** |
+
+🔴 **没有绿的也一并写清**：`check` 链在此 HEAD 上仍有 2 段红 —— `check:l4`（M3 的 8 处内联样式）与
+`check:landing-e2e`（B24 的两条出路），处置与代价登记在 **BLOCKED.md B30**；`check:ai-e2e` 已实测转绿并关闭 B22。
+
+本会话为收尾又落 4 笔，逐笔 `git show --numstat` 核对"删除别人 0 行 / 别人暂存条目丢失 0"：
+`c444d827`（双臂读数与配对行号进仓库 + traps #165）、`0c171df1`（§7.10 + B22 改记待重验）、
+`3e5cef9b`（B22 关闭 + B24 只补证据 + 审计回填两条臂）、`69f64ae4`（B30）。
