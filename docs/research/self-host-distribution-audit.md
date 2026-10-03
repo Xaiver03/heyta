@@ -246,7 +246,7 @@
 | G-41 | `env.example` 文档化的旋钮与 compose 的白名单之间没有对账 ⇒ "照着文档填了值"与"什么都没填"逐字相同 | **本批关闭**：`pnpm check:server-env`（已挂进 `pnpm check`）。现量读数见 `server/scripts/check-server-env-forwarding.mjs` 文件头；11 条豁免逐条带理由，且"豁免项必须仍然没有通路"本身是判据 ⇒ 这张表只能变小、不能变成谎话 |
 | G-42 | 自建区的四条错话（§2.3 / §7） | **未关**：`packages/i18n` 此刻仍被并行会话占着（工作树 `zh-CN.ts`/`en.ts` 有未提交改动）。改法已在 §7 备好，等它空出来直接落；不点名路径提交把他在途词条一起提走 |
 | G-43 | `checking` 期间宿主把拦截叙述成裁决（界面对用户说谎） | **本批关闭**（§8.3 第 1 条） |
-| G-44 | `appVersion` 在服务端**有消费者、没有生产者**：`server/src/sync/checkpoint-gate.ts` 拿它判 `MIN_CHECKPOINT_SAFE_APP_VERSION`，`sync.service.ts:676 touchDevice` 把它记进 `sync_devices`，而它是**下载请求上的一个可选查询参数**（`packages/shared-schema/src/supersync-http-contract.ts:191` 是 `z.string().optional()`）—— `packages/sync-client/src/client.ts:1324-1327` 只往查询串里写 `sinceSeq` 与 `excludeClient`，**没有任何 heyta 客户端发过它** | **未关**（本批只把它写成事实）。后果是那条闸门对自家客户端恒等于"未知版本"，所以 §8.5 的版本政策**不能**写成 N-1/major 矩阵，只能写成触发条件 |
+| G-44 | `appVersion` 在服务端**有消费者、没有生产者**：`server/src/sync/checkpoint-gate.ts` 拿它判 `MIN_CHECKPOINT_SAFE_APP_VERSION`，`sync.service.ts:676 touchDevice` 把它记进 `sync_devices`，而它是**下载请求上的一个可选查询参数**（`packages/shared-schema/src/supersync-http-contract.ts:191` 是 `z.string().optional()`）—— `packages/sync-client/src/client.ts:1324-1327` 只往查询串里写 `sinceSeq` 与 `excludeClient`，**没有任何 heyta 客户端发过它** | 🔴 **本批重新归类，不按原登记实现**（证据链见 §8.17）。原句"补一个生产者"是错的：三条事实连起来说明**光上报版本会把那条日志变成假信号**，而阈值 `18.21.2` 住在**上游 Super Productivity 的版本空间**里。它不是自托管分发的缺口，是"客户端检查点/全量边界"这条**未实现的功能**的一部分 ⇒ 对外说法已在 `server/README.md`「Clients and version coupling」就地改成三个前置条件（原句只列了两个，且把"只差上报"写成了事实） |
 | G-45 | 台阶 3（镜像 npm 依赖树 vs 许可证门禁扫的 pnpm store）曾是**未证实** | **本批量完并关成"有对账"**（§8.8）：`check:image-license` 逐条对账 + 四条会红的登记自检，7 发变异各自精确报红、阳性对照绿。残余风险（纯传递依赖上游发新版）已改挂 G-47 |
 | G-46 | `server/scripts/build-and-push.sh`（`pnpm --filter @heyta/server docker:build` 的唯一实体）原来是**上游形状**：它自己抄了一份 7 条的镜像输入清单，其中 3 条在本仓库不存在（实测 `[ -e ]` 全不成立），而 `apps/web` / 11 个 `packages/*` / `pnpm-lock.yaml` / `server/` 自己**一条都不在里面**；`GHCR_NAMESPACE` 默认成 `super-productivity`（**别人的组织**）；并且无论给不给版本号都**顺带覆盖 `:latest`** | **本批关闭**（§8.7 第 4 条）。三条各自都会出事，都已改：清单改成 source 同一个读者、namespace 无默认值（不给就在任何 docker 之前 exit 1）、只推点名的那一个 tag。⚠️ 消费者集合是量过的：除 `server/package.json:14` 外只有 `server/tests/migration-sql.spec.ts:345` 读它，而那一发在 `it.skip` 里 ⇒ **不报错也不守** |
 | G-47 | 镜像那棵依赖树**没有被钉住**：`check:image-license` 证明的是"2026-10-03 这一次 npm 解析结果的 143 条逐条有出处"，而每次构建 npm 都会重解一遍（没有 lockfile）。改直接依赖会红，**纯传递依赖的上游发新版不会** | **未关**（本批只登记）。闭合形状是现成的：生产阶段换成 `pnpm deploy --prod` ⇒ 三个 `workspace:*` 由 pnpm 内联、三枚 tgz 的 dance 一起消失、镜像的树**就是** `pnpm-lock.yaml` 的树 ⇒ 门禁与产物同源，`check:image-license` 与快照应当**撤掉**（不是改成读另一个文件）。代价：动生产镜像的装配路径，要单独一轮真构建复验（`pnpm verify:selfhost-stack` 全跑） |
@@ -959,3 +959,40 @@ HEAD 到 177 而工作树已到 189，190+ 属于他们）：
 而在共享工作树里跑全仓生成器是本仓已登记过的另一族坑。可复用的部分是上面那两句**方法**
 （两侧源码取交集 → 查本批 import 的 barrel 有没有正好被对方改过 → 跨接缝符号逐个查实 +
 一枚已知不存在的负向对照），不是脚本本身。
+
+### 8.17 G-44：登记说"补个生产者"，取证说"补了会把日志变成假信号"
+
+Goal 把 G-44 排成"补 `appVersion` 的生产侧"。四条实测把这条**否证**了，所以本批改的是
+**对外说法**而不是代码：
+
+1. **闸门今天唯一的消费者是一行日志。** `MIN_CHECKPOINT_SAFE_APP_VERSION` 只被
+   `server/src/sync/cleanup.ts:63-72` 读来打印 `Cleanup [checkpoint-gate]`。搜遍
+   `server/src` `server/scripts` `packages` `apps` `scripts`（排除 `dist` / `node_modules` /
+   `dist-types` / `bridge-bundle`）的 `cadence|checkpointInterval|CHECKPOINT_INTERVAL|
+   scheduleCheckpoint|createCheckpoint|autoCheckpoint`：**7 处命中，全部是注释** ——
+   `checkpoint-gate.ts:6/9/113`、`cleanup.ts:62`、`dry-run-old-ops-sweep.ts:16/182`
+   （那里把 cadence 列为"#9688 的后续方向"）、`monitor.ts:176`（说的是 autovacuum 的 cadence，
+   与本题无关）。没有任何实现。
+2. **剪枝的授权不是独立端点，而是"最新那条因果全量 op"**
+   （`server/src/sync/services/storage-quota.service.ts:417`）。
+3. **服务端这一半是实现着的，缺的是客户端那一半。**
+   `server/src/sync/sync.routes.snapshot-handler.ts` 完整解析 `snapshotOpType` 并写下边界；
+   而 `packages/sync-client`（整个目录只有 `client.ts` `index.ts` `realtime.ts` `server-url.ts`
+   **4 个文件**）对 `snapshot|checkpoint` **大小写不敏感 0 命中**，`apps/*` 源码里也没有构造点，
+   `SYNC_IMPORT / BACKUP_IMPORT / REPAIR` 在 heyta 只以枚举存在
+   （`packages/shared-schema/src/supersync-http-contract.ts:20-22`、
+   `packages/sync-core/src/operation.types.ts:18/26/34`）。
+   ⇒ 只用 heyta 客户端的账号今天**不会被剪**，代价是历史一直长 —— 存储成本，不是丢数据。
+4. **阈值住在别人的版本空间里。** `18.21.2` 是 Super Productivity 的发版号，heyta 是 `0.x`；
+   上报 heyta 空间的值只会让 `unversionedDevices` 变成"有版本但旧"，
+   而**把 `safeAccounts` 往上推的是那个假象本身** —— 真前提（客户端能因果地创建/应用全量边界）
+   并不存在。⚠️ 而且这条不对称意味着**上游 SP 客户端连我们的服务端是真的会写边界**，
+   所以不能为了让自家数字过闸门而把阈值降低：那会让 18.20 这类**真旧**客户端被判安全。
+
+⇒ 结论：G-44 不是自托管分发的缺口，属于"客户端检查点/全量边界"这条未实现的功能。
+把它从登记改成三个前置条件的写在 `server/README.md`「Clients and version coupling」
+（**详细版只住那一份**，本行是指针 —— 抄一份就会漂）。原句把前置写成两项且暗示
+"客户端只差上报版本"，那句现在看是不完整的对外说法，已就地改掉并留了这条来历。
+
+G-40⑤（版本来源）因此多了一条硬约束：**它必须和闸门共用一个版本空间**，
+不是"给 package.json 找个消费者"那么简单。
