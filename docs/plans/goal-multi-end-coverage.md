@@ -1310,7 +1310,12 @@ grep -c 'multi-end-entry-coverage-audit\|goal-multi-end-coverage\|0051-mobile-re
 **同一份文件、同一个目标、形状一变就从"看不见"变成"报出来"** ⇒ 上面那个 A/B 由双向证据闭合了。
 那一行不进本条线的提交（提交方式见交接文档"死胡同警告"第一条）。
 
-### 7.30 §5 四段的记账槽（2026-10-04 02:1x 建槽，读数待填）
+### 7.30 §5 四段的记账槽（02:1x 建槽；02:4x 已填 ②，①③④ 仍是槽）
+
+⚠️ 下面那句"一条都没有起跑"**只对建槽那一刻成立**：02:35:26 窗口开过一次（闸门 `--target b` 退 0、
+负载现量 12 = 阈值 12），② 因此有了真读数（已填进那一条），而 ① 与 ③ 在同一次窗口里被
+**设备占用**挡住（`emulator-5554` 上 `com.heyta` 正在跑，是另一条会话的 `verify:handoff:prod --mobile-only`），
+启动器按设计 `exit 3` 没去卸别人的 App。
 
 Goal 原话点名的记账落点就是本节。**先建槽、后填读数** —— 建槽这一刻（02:1x 现量）§5 那四段
 **一条都没有起跑**：窗口闸门在载体里连退 `3`（02:14:01 读数：1 分钟负载 32，阈值 12 = 16 核 × 3/4），
@@ -1318,7 +1323,40 @@ Goal 原话点名的记账落点就是本节。**先建槽、后填读数** —�
 每个槽位写死"待填 + 现量命令"，填的时候只替换那一条。
 
 - ① 四端重装：`INNER_EXIT=` **待填** —— 现量命令 `bash /tmp/heyta-run-reinstall.sh --go`（载体 `heyta-wt-reinstall`）；截图逐张写明钉到哪一步、人看到什么，跟在这条后面。
-- ② Playwright 三段 + 全量 `pnpm check`：`CHECK_EXIT=` 与逐段表 `PASS/FAIL/SKIP` **待填** —— 现量命令 `bash /tmp/heyta-run-checks.sh --go`；**段数现取 = 63**（不是 62），载体 sha 与读数同批记（脚本首尾各打一次 `CARRIER_SHA`）。
+- ② Playwright 三段 + 全量 `pnpm check`：**02:35–02:41 已在载体 `f08b26e7` 上跑过一趟**（窗口 02:35:26 开：
+  闸门 `--target b` 退 0，负载现量 12 = 阈值 12）。两个读数**分开报**（这是 §5-2 定的取法）：
+  - **整条 `pnpm check`：`CHECK_EXIT=1`**，断在第 8 段 `check:op-log-semantics`，而拒绝它的是**本机内存闸门**
+    （`/tmp/tfa-test.lock` 持有者 pid 34659，它在跑另一条会话的 `verify:handoff:prod -- --mobile-only`）
+    ⇒ 这条 1 **不是产品红**，也不能读成"链断在产品的第 8 段"。
+  - **逐段表（"可过段数"唯一诚实的取法）**：段数现取 **74**（不是 62，也不是本槽建槽时写的 63 ——
+    这一小时里 main 并进了三条长期分支），**`rc=0` 64 段 / `rc=1` 9 段 / `rc=134` 1 段**。
+    表在 `/tmp/check-seg-by-seg.log`，逐段原文在 `/tmp/seg-<N>.log`。十条非绿**逐条读过原文**再归因：
+    `check:ui-provider`（宿主没有真的挂 Provider）、`check:theme`（直接引用 L0 原始 token 表
+    `lightTokens['color.primary']`）、`check:selection-single-source`（两个可选 prop 没传 ⇒
+    typecheck 绿而界面不跟随选中）、`check:ui-language`（诊断字段里写了一整句中文
+    `sessionStorage 不可访问（隐私模式？）`）、`check:legal-permissions`（条款仍写"移动 App 不申请通知权限"，
+    而 `POST_NOTIFICATIONS` 与 `NSUserNotificationsUsageDescription` 都已声明 ⇒ 这句对外是假话，六个位置要一起翻）、
+    `check:image-license`（镜像快照里 `server/package.json` 的 sha 与当下不一致）、
+    `check:crosslang-contract` **rc=134**（C# 探针自己抛 `契约重放失败 2 条`）、`check:shell-unicode`
+    （`$var` 紧跟全角字符）、`pnpm -r test` 两枚失败文件（`apps/web due-date-edit.spec.tsx`
+    的「点月历日子格 ⇒ +1 条 UPD、payload 只有 dueDate」与 `server holiday-adjustment-migration.pglite.spec.ts`）
+    ⇒ **这九条都不在本条线的落点上**（倒数日线 / W4b 调休线 / 法务线 / 部署线 / 跨语言契约线各管各的），
+    本条线**不吸收别人的债凑绿**，只登记。
+  - 🔴 第十是**我自己的**：`check:ai-e2e` 的红来自那份还没提交的 `list-folder.spec.ts` ——
+    一个**反引号写成了单引号**（`getByTestId(\`…-menu')`），babel 报 `Unexpected token (112:43)`，
+    真实位置在 103 行。⚠️ 教训不是"typo"，是**肉眼看引号形态不构成证据**：同一段代码用
+    `JSON.stringify` 打出来两处都像反引号，是 `split(String.fromCharCode(96))` 数出来的奇数行与码点表才定位到。
+    已修，并用 `ts.transpileModule` 复验到 **诊断数 0**（此前 24 条级联错全在那一处之后）。
+  - ⚠️ 三段 e2e 在**第 3 步（先跑）**与**第 5 步（逐段）**读数不同，且差得有道理：先跑时三条全 `rc=1`，
+    那时载体刚 checkout 到新 HEAD、`packages/*/dist` 还没构建，vite 直接报
+    `Failed to resolve entry for package "@heyta/ui"` ⇒ 那是**载体没构建**，不是界面坏。
+    补构建后逐段：`privacy-consent-e2e rc=0`、`landing-e2e rc=0`、`ai-e2e rc=1`（只剩我那一条 spec 的语法错）。
+    ⇒ 启动器补了两道门：**2a** dist 门（缺则先 `pnpm -r build`，补不上 exit 3）与
+    **1b** 内存锁门（别人的测试持锁就整段不起跑，并打印持有者 pid 与它的命令行）。
+    这两道门各自做过**阳性对照**：2a 的谓词先被夹具抓出两次"永远不触发"（`require` 相对路径当模块名、
+    判据测的是脚本文本而不是**键是否存在**），1b 用当前真实持锁的 pid 跑出 `exit 3`。
+  - **这张表的保质期属于载体 `f08b26e7`**：main 在这一小时动了 276 笔，下一趟大概率是另一串数。
+    复跑命令：`bash /tmp/heyta-run-checks.sh --go`（体检先跑不带 `--go`）。
 - ③ 便签移动端验收：`NOTES_EXIT=` **待填**（第 6/7 步的 op 判据、第 8 步第三张截图、第 9–11 步跨设备三条腿各写一条读数）—— 现量命令 `bash /tmp/heyta-run-notes.sh`。
 - ④ 父子层级选择器：**这条不是"等合流"，是"等界面取证"**（02:2x 现量推翻了本槽建好时的写法）：
   `776fc23c`（写侧 + 守卫）**已是 HEAD 的祖先**、`origin/main` 也含它、本地分支 `feat/list-parent` 已被

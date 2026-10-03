@@ -324,8 +324,17 @@ bash scripts/verify-mobile-window-gate.sh --target c   # 移动端设备验收�
    因为"一段文档的存活期取决于还有谁持有它的旧副本"。）
    ⚠️ **本轮把这条的前置全部做实了**（开窗即执行，启动器 `/tmp/heyta-run-checks.sh`，体检模式已过）：
    三段名经 `package.json` 的 `scripts` 键核过（`check:ai-e2e` / `check:privacy-consent-e2e` /
-   `check:landing-e2e` 都在），段数**在脚本里现取**（当前 **63**，不是 62，见 §0.5）；
+   `check:landing-e2e` 都在），段数**在脚本里现取**（02:3x 载体 `f08b26e7` 现取 = **74**，
+   本文件早先写的 62 / 63 都是**上一批 main 的读数**，这一小时并进三条长期分支后栅栏变多了，见 §0.5）；
    载体里 `e2e/` 那份独立依赖已 `pnpm install`（269 ms，Playwright 1.63 → `chromium-1243` 缓存已在）；
+   ✅ **02:35–02:41 这一趟真跑了**（载体 `f08b26e7`；窗口 02:35:26 开：闸门 `--target b` 退 0、负载现量 12 = 阈值 12）：
+   整条 `pnpm check` `CHECK_EXIT=1`，**断因是环境**（第 8 段被本机内存闸门拒，持锁 pid 34659 = 另一条会话的
+   `verify:handoff:prod -- --mobile-only`）；逐段表 **74 段 = 64 `rc=0` / 9 `rc=1` / 1 `rc=134`**，
+   十条非绿**逐条读过原文**才归因：九条属别线（`ui-provider` / `theme` / `selection-single-source` /
+   `ui-language` / `legal-permissions` / `image-license` / `crosslang-contract`(134) / `shell-unicode` /
+   `-r test` 里倒数日与调休那两枚），第十条是**我的**那份未提交 spec 里一个反引号写成了单引号。
+   完整读数与为此新补的两道门（**2a** dist 门、**1b** 内存锁门，都做过阳性对照）记在 Goal 台账 §7.30 的 ② 那一条，
+   这里留作**第二住处**（一段文档的存活期取决于还有谁持有旧副本）。
    🔴 **起跑前必须 `4318/4319/4320` 三个端口空闲**，因为 `check:ai-e2e` 的前置会对它们发 SIGKILL（traps #87）
    —— 启动器把这一步做成硬门：只要有一个是 busy 就 **exit 3 不跑**，绝不为凑自己的读数杀掉别人的 dev server。
    00:5x 现量：三个端口 + `:3000` **全部空闲**（`:3000` 上那台旧构建已经退场）。
@@ -550,7 +559,8 @@ bash scripts/verify-mobile-window-gate.sh --target c   # 移动端设备验收�
   ③ 只有确认某条模式只属于我这一棵树时才允许按模式杀，且要在命令里带上 `-u $UID` 与逐项排除。
   ⚠️ 这次**无法回滚**（别人那一轮预检的读数已经没了），所以按仓库惯例如实登记，不写成"应该没影响到别人"。
 
-- 🔴 **`check:docs` 现在有一条红不属于本条线、也不属于仓库**（02:3x 现量，写给下一个看到它的人）：
+- 🔴 **`check:docs` 现在的红不属于本条线、也不属于仓库**（02:3x 现量 1 处，02:4x 复跑涨到 **6 处**，
+  全在**同一份 ADR 的同一节**里 ⇒ 那是那条会话正在写的段落，不是在烂）：
   `docs/adr/0050-e2ee-key-lifecycle-and-recovery.md:122` 链向 `../../scripts/verify-ios-vault-keychain.sh`，
   而后者是**未跟踪**文件（`git ls-files` 命中 **0**）。两条现量把它钉成"别人在飞的段落"而不是仓库债：
   ① `git show HEAD:<那条 ADR>` 的第 122 行是**代码围栏收尾**，那一整节只在主检出的工作树里
