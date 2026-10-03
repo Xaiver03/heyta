@@ -1287,11 +1287,21 @@ W0b ─> 随时可做（台账那半要等文件干净）
     `verify-mobile-card-export-read.mjs`；判据②（点了才出现）需要把 `featureScreen()` 那层
     在 AX 树上的形状先摸清楚 —— 而那一屏**从来没有在设备上被打开过**（见 W8 节那条 `profile-entry-` 的现量）。
 - [x] W7 web 半完成（04 04:3x：五腿 e2e 全绿 + A1/A3 两臂各自转红 + 六张图人已看。
-      ⚠️ `check:card-export` 的 `rc=0` 是 **03:1x** 的读数，而 A1 那一臂把 `packages/ui` 的 dist
-      **打过又还原重打过** ⇒ 那条读数描述的不是现在这份产物，收尾那趟必须重取）
+      ⚠️ ~~`check:card-export` 的 `rc=0` 是 **03:1x** 的读数，而 A1 那一臂把 `packages/ui` 的 dist
+      **打过又还原重打过** ⇒ 那条读数描述的不是现在这份产物，收尾那趟必须重取~~
+      ✅ **04 06:17–06:27 那趟完整 68 段 sweep 里已重取：`pnpm check:card-export` **`rc=0`**（载体 `c4332f86`，
+      同趟 `pnpm build` 是第一段 ⇒ 它量的就是刚打出来的产物）**；装包之后还要再取一次（§8.4 第 ⑬ 条那条链的末步），
+      因为那两栏 `… · 产物` 判的是**包里的字节**）
       ／ [ ] 🔄 W7 移动端出图：代码与判据在（`card-export.spec.ts` 21 passed、原生模块已注册进 `MainApplication`），
       **真机那一趟读数未取** —— 装置 `pnpm verify:mobile-card-export` 已落库并做过探针自检，排在收尾第 4 项
-  - ✅ 后半（设备出图）到最终态待变异读数；前半（web 卡片网格与导出入口）随 W5 已闭合。
+      ⚠️ **04 06:3x 现量：这一趟还开不了工**，`bash scripts/verify-mobile-window-gate.sh --target b` ⇒ `RC_WINGATE_B=3`
+      （负载 18 > 阈值 12；`adb devices` 在线 **0 台** ⇒ 那一端此刻连"可达"都不成立），
+      而别人那条装包链挂在 `notarytool submit --wait` 上已 3h21m、不会自己结束 ——
+      取证、共享目标清单与"等满按任务书第 8 条记 exit 3"写在 **§8.4 第 ⑬ 条**。
+  - ~~✅ 后半（设备出图）到最终态待变异读数~~ —— 🔴 **04 06:3x 这句原地更正：它和上一行自相矛盾**
+    （上一行刚写"真机那一趟读数未取"）。这一格在 `verify:mobile-card-export` 跑绿之前**不能**写成"到最终态"，
+    已完成的只有：版面收共享层 + RN 栅格化 + 原生落盘 + `check:card-export` 门禁 + A1/A3 两臂各自转红 +
+    **"零法务变更"四路现量（§W7 节那条 04 06:3x 的复核）**。
   - 📎 完整取证现在**有链接可给了**：[`countdown-w7-device-export.md`](countdown-w7-device-export.md)
     —— 原文那句"那份住在 `feat/countdown-w7` 上、尚未进 main，所以这里只点名不给链接（给了就是死链）"
     已过期：它**现在是 `origin/main` 的祖先**（`git show origin/main:docs/plans/countdown-w7-device-export.md` 可复跑）。
@@ -1360,7 +1370,11 @@ W0b ─> 随时可做（台账那半要等文件干净）
     与 04 03:0x 那次读数重新对齐。🔴 顺手否证了我自己写在 §8.4 那行里的一句前瞻：完整 `pnpm check`
     **不可能**在这一格响，因为 `package.json:58` 那条串的第一段就是 `pnpm build` ——
     "必须先重打产物否则必红"只在**单跑门禁**时成立。这张表仍不打勾：剩下的是那 2 栏，只有装包能关。
-- [ ] W8 完成
+- [ ] W8 完成 —— ⏳ **04 06:3x 现量**：唯一还没关的是那两栏 `desktop-{macos,windows} / countdown · 产物`，
+      而 `pnpm reinstall:all` **此刻开不了工**：`verify-mobile-window-gate.sh --target b` ⇒ `RC_WINGATE_B=3`
+      （负载 18 > 阈值 12；`adb devices` 在线 **0 台**；工作树与 `reinstall-all.sh` 两条 ✅），
+      外加别人那条装包链挂在 `notarytool submit --wait` 上 3h21m 且**它自己不会结束**。
+      取证与不并发的理由在 **§8.4 第 ⑬ 条**；等满按任务书第 8 条记 **exit 3 = 环境无效，不是产品失败**。
 
 #### ⏹ W9 · 提醒：本批做"能响的那半截"，原生投递另立一单
 
