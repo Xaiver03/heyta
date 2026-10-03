@@ -20,6 +20,7 @@
  * 而那两条词此后必须永远同步改 —— 已登记在 §8 的边界里。
  */
 import { useI18n, type Locale } from '@heyta/i18n';
+import { EmptyState, HeytaUiProvider } from '@heyta/ui';
 
 import { formatDuration } from '../categories/copy.js';
 import { useFocusStore } from './store.js';
@@ -79,9 +80,22 @@ export function FocusDetailPane(): React.JSX.Element {
       </h3>
 
       {overview.records.length === 0 ? (
-        <p className="ht-app__detail-empty ht-type-row-meta" data-testid="focus-records-empty">
-          {t('web.focus.detail.recordsEmpty')}
-        </p>
+        // 空态走**共享那一个实现**（`packages/ui` 的 `EmptyState`），不在视图里手写
+        // 骨架与文案 —— `scripts/check-empty-state.mjs` 断言 B 拦的就是手写。
+        // `size="section"`：这是"卡片里的一行占位"，不是整页空态；沿用页面档会把
+        // 详情面撑出一大块居中空白，那是视觉回归。
+        // ⚠️ `testID` 必须传：两端的既有钩子都写在空态根节点上，不传则 e2e 的
+        //    `getByTestId('focus-records-empty')` 与 jsdom 用例**同时**失去定位点。
+        // 🔴 `<HeytaUiProvider>` 包在这一处（同 `AdminPanel.tsx`）：共享 `EmptyState`
+        //    从 context 取 token 与文字样式，缺了它在**运行时**抛「useHeytaUiTheme 必须在
+        //    <HeytaUiProvider> 内使用」，而类型检查和单测都不会红。
+        <HeytaUiProvider>
+          <EmptyState
+            size="section"
+            title={t('web.focus.detail.recordsEmpty')}
+            testID="focus-records-empty"
+          />
+        </HeytaUiProvider>
       ) : (
         <ul className="ht-app__detail-records" data-testid="focus-records">
           {overview.records.map((record) => (

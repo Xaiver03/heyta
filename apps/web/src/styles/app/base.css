@@ -197,11 +197,6 @@
   color: var(--ht-color-foreground-muted);
 }
 
-.ht-app__detail-empty {
-  /* 排版四件套来自语义档位类 `ht-type-row-meta`（JSX 与本类成对出现）。 */
-  color: var(--ht-color-foreground-muted);
-}
-
 .ht-app[data-detail='collapsed'] .ht-app__detail {
   display: none;
 }
