@@ -67,6 +67,20 @@ import { selection } from './selection.js';
  * `moveCursor` + `searchCursor`），那条走的是搜索结果数组而不是 DOM。
  * 两边都响应同一个键会一次跳两格，所以这里刻意不登记，而不是"忘了加"。
  * `trash` 也不在：它的 ↑↓ 是"选恢复还是删除"，语义完全不同（`TrashView`）。
+ *
+ * 🔴 表外一共 **六** 个 `ViewKey`，上面只写了两条理由，剩下四条今天补上 ——
+ * 否则下一个读这张表的人会以为"日历/专注是漏加的"，而这张表的正确性
+ * 取决于"缺席都有理由"，不取决于"在场都对"。逐条现量（2026-10-04）：
+ *
+ * · `calendar`：共享板 `packages/ui/src/calendar/*` 里 `onKeyDown` / `ArrowUp` / `ArrowDown` /
+ *   `tabIndex` / `role="grid"` **零命中** —— 这一面今天没有可走的行，也没有任何键盘语义。
+ *   它的"当前"是**某一天**（web `features/calendar/store.ts:42` 的 `selected: LocalDate`，
+ *   mobile `CalendarScreen.tsx:67` 同名 `useState`），那是日期锚点，不是"选中一行"，
+ *   与 `SelectableKind` 的三类不同性质。**把日历做成可走的是另一件事**，前置是拍板
+ *   "详情面对某一天显示什么"（工单 C1 #1 的延伸），不是在这张表里加一行。
+ * · `focus`：没有"哪一项" —— `features/focus/store.ts:66` 是计时状态机，关联任务只由
+ *   `start(taskId?)`（`:101`）带进来。工单 §6 明文"不许把番茄页塞进列表模型"。
+ * · `growth` / `settings`：面本身不是列表（成长是图与卡，设置是浮层/面板），没有行可走。
  */
 const CURSOR_VIEWS: Partial<Record<ViewKey, { readonly kind: SelectableKind; readonly prefix: string }>> =
   {
