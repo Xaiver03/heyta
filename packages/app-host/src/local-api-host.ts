@@ -1184,13 +1184,3 @@ async function submitIntent(
   }
 }
 
-/** 把领域层的拒绝翻成一句给调用方看的话。**措辞在这里，判定不在这里。** */
-function eventRejectionMessage(
-  rejection: 'empty-title' | 'too-long-title' | 'invalid-date',
-  title: string,
-  date: string,
-): string {
-  if (rejection === 'empty-title') return '标题不能为空（空白也算空）。';
-  if (rejection === 'too-long-title') return `标题 ${String(title.length)} 字，超过上限。`;
-  return `日期「${date}」不是有效的 YYYY-MM-DD（且必须是真实存在的一天）。`;
-}

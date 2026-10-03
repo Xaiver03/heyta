@@ -26,6 +26,7 @@ import {
   type LocalApiFocusSession,
   type LocalApiHabit,
   type LocalApiHabitLog,
+  type LocalApiEventItem,
   type LocalApiHost,
   type LocalApiItem,
   type LocalApiNoteRow,
@@ -64,6 +65,9 @@ function recordingHost() {
     listHabitLogs: () => Promise.resolve([] as readonly LocalApiHabitLog[]),
     listFocusSessions: () => Promise.resolve([] as readonly LocalApiFocusSession[]),
     listReminders: () => Promise.resolve([] as readonly LocalApiReminder[]),
+    listEvents: () => Promise.resolve([] as readonly LocalApiEventItem[]),
+    getEvent: () => Promise.resolve(undefined),
+
     submit: (intent) => {
       calls.push('submit');
       submitted.push(intent);
@@ -176,6 +180,9 @@ describe('list_habits：真的从宿主读到东西', () => {
       listHabitLogs: () => Promise.resolve([] as readonly LocalApiHabitLog[]),
       listFocusSessions: () => Promise.resolve([] as readonly LocalApiFocusSession[]),
       listReminders: () => Promise.resolve([] as readonly LocalApiReminder[]),
+    listEvents: () => Promise.resolve([] as readonly LocalApiEventItem[]),
+    getEvent: () => Promise.resolve(undefined),
+
       submit: () => Promise.resolve({ ok: true, taskId: 'x' }),
     };
     const outcome = await runReadTool(empty, 'list_habits', {});

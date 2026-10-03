@@ -160,6 +160,8 @@ describe('新建提醒', () => {
     expect(alive, '存活数超过上限 ⇒ 检查跑在旧快照上，上限等于没有').toBe(MAX_REMINDERS_PER_TASK);
     expect(results.filter((r) => r.status === 'fulfilled')).toHaveLength(MAX_REMINDERS_PER_TASK);
     expect(results.filter((r) => r.status === 'rejected')).toHaveLength(3);
+  });
+
   it('🔴 排队期间任务被删除，等待中的创建会在真正写入前拒绝', async () => {
     const taskId = await makeTask();
     const originalDispatch = engine.dispatch.bind(engine);

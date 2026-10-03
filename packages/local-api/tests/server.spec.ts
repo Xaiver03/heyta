@@ -96,6 +96,8 @@ function recordingHost() {
     listHabitLogs: () => Promise.resolve([] as readonly LocalApiHabitLog[]),
     listFocusSessions: () => Promise.resolve([] as readonly LocalApiFocusSession[]),
     listReminders: () => Promise.resolve([] as readonly LocalApiReminder[]),
+    listEvents: () => Promise.resolve([] as readonly LocalApiEventItem[]),
+    getEvent: () => Promise.resolve(undefined),
     submit: (intent) => {
       calls.push('submit');
       submitted.push(intent);
@@ -326,6 +328,8 @@ describe('🔴🔴 写操作：只经 host.submit', () => {
       listHabitLogs: () => Promise.resolve([] as readonly LocalApiHabitLog[]),
       listFocusSessions: () => Promise.resolve([] as readonly LocalApiFocusSession[]),
       listReminders: () => Promise.resolve([] as readonly LocalApiReminder[]),
+      listEvents: () => Promise.resolve([] as readonly LocalApiEventItem[]),
+      getEvent: () => Promise.resolve(undefined),
       submit: () => Promise.resolve({ ok: false, reason: 'invalid', message: '标题太长' }),
     };
     const { handle } = handler(CONFIG, failing);
@@ -431,6 +435,8 @@ function captureHost(items: readonly LocalApiItem[] = TASKS) {
     listHabitLogs: () => Promise.resolve([] as readonly LocalApiHabitLog[]),
     listFocusSessions: () => Promise.resolve([] as readonly LocalApiFocusSession[]),
     listReminders: () => Promise.resolve([] as readonly LocalApiReminder[]),
+    listEvents: () => Promise.resolve([] as readonly LocalApiEventItem[]),
+    getEvent: () => Promise.resolve(undefined),
     submit: () => Promise.resolve<LocalApiWriteResult>({ ok: true, taskId: 'x' }),
   };
   return { host, seen };
@@ -711,20 +717,9 @@ describe('runReadTool —— 倒数日的读侧', () => {
     expect(run.kind).toBe('invalid-args');
   });
 
-  it('🔴 宿主没接倒数日 ⇒ 响亮报错，**不是**一个空列表', async () => {
-    // 空列表会把"这个壳没有这个能力"伪装成"你一个倒数日都没有" ——
-    // 与 `list_tasks` 那条"把筛不出伪装成筛出来的是这些"同一个形状。
-    const { host } = recordingHost(); // 刻意用不含 listEvents/getEvent 的那个
-    expect(host.listEvents).toBeUndefined();
-    for (const name of ['list_events', 'get_event']) {
-      const run = await runReadTool(host, name, { eventId: 'e1' });
-      expect(run.ok, name).toBe(false);
-      if (run.ok) continue;
-      expect(run.message, name).toContain('没有接倒数日');
-      // 🔴 真正要紧的是"**没有 payload**"：一个 `ok:true` + 空数组就是那条缺陷的形状
-      expect('payload' in run, name).toBe(false);
-    }
-  });
+  // （原"宿主没接倒数日 ⇒ 响亮报错"那条测试随 2026-10-03 合流撤掉：
+  //   listEvents/getEvent 已改为必填成员 —— 保护从运行时检查升级成编译期闸，
+  //   与 listHabits/listTags 同一立场；recordingHost 现在必须实现它们。）
 
   it('limit 是递过去的，截断由宿主做（协议层不擅自截）', async () => {
     const h = eventHost();

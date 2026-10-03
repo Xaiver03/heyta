@@ -987,6 +987,7 @@ export {
 } from './notes/NoteEditor.js';
 export { isNoteDraftBlank } from './notes/model.js';
 
+/**
  * ── 批次二 W0：锚点弹层的定位算术 ──
  *
  * 🔴 **本块是追加的**（`index.ts` 是多写者共享文件，只许在末尾追加）。
