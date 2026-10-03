@@ -65,6 +65,7 @@ import { execFileSync } from 'node:child_process';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { unionAudit, unionAuditVerdict, ownershipVerdict } from './selfhost-audit-union.mjs';
 
 const REPO = process.env.HEYTA_REPO_DIR || '/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta';
 const MAIN = process.env.HEYTA_MAIN_REF || 'main';
@@ -314,34 +315,58 @@ if (fam.png.length) {
   notes.push(`evidence PNG ${fam.png.length} 枚取 main 侧（产物，谁主张谁出图）：${fam.png.map((p) => p.split('/').pop()).join(', ')}`);
 }
 
-/* ── 审计文档：取本分支侧，但先证明"main 那份没有别人写的**节**" ───── */
+/* ── 审计文档：两边都是"追加型台账" ⇒ 解法是**并集**，择一会静默删掉别人的节 ──
+ * 判定与产出在 research/tools/selfhost-audit-union.mjs（单一所有者），这样四条断言
+ * 能用合成样本离线变异，不必为验一条判据就在真载体里留一次半合状态。
+ * 🔴 这条规则以前是「取本分支侧 + 若 main 有额外的节就 die」。die 是对的（2026-10-04 06:4x 现量：
+ *   main 刚被另一条会话提交进一整节 `## 9. 交还一条现场…`，相对 merge-base +70/−0，本分支一份都没有），
+ *   但它只做到"不背这个锅"，没做到"把这单落地"。落地路径上唯一不误删的解法是两份都留。 */
 let auditReading = '';
 if (fam.audit.length) {
+  // base 那一版优先从合并的 stage 1 取；add/add（没有 stage 1）时退回 merge-base 提交里的 blob。
+  // 🔴 两条路都取不到就**绝不**按"base 为空"去做并集 —— 产出虽无损但会把两份全文叠起来，
+  //   而"没人敢读的产出"最后一定被人手工改成择一，那才是真正的丢内容。
+  let baseTxt;
+  try { baseTxt = stage(AUDIT, 1); } catch {
+    try { baseTxt = git(['show', `${baseSha}:${AUDIT}`]); } catch {
+      die(2, '审计文档是 add/add 且 merge-base 里也没有它 ⇒ 并集规则没有共同基线可用，' +
+        '交人判（要么先让一侧的历史并进另一侧，要么这一路径手工解）。');
+    }
+  }
   const mainTxt = stage(AUDIT, 2);
   const srcTxt = stage(AUDIT, 3);
-  const headings = (t) => t.split('\n').filter((l) => /^#{2,6} /.test(l)).map((l) => l.trim());
-  const secRefs = (t) => [...new Set((t.match(/8\.\d+/g) || []))];
-  const hMiss = headings(mainTxt).filter((h) => !headings(srcTxt).includes(h));
-  const rMiss = secRefs(mainTxt).filter((r) => !secRefs(srcTxt).includes(r));
-  const orphan = mainTxt.split('\n').filter((l) => l.trim() !== '' && !new Set(srcTxt.split('\n')).has(l));
-  if (hMiss.length || rMiss.length) {
-    die(2, `审计文档取本分支侧会**丢掉别人的节**：main 那份有 ${hMiss.length} 个标题、` +
-      `${rMiss.length} 个 §8.NN 编号不在本分支那份里（这是结构性粒度，不是措辞差异）\n` +
-      [...hMiss, ...rMiss].slice(0, 6).map((l) => `      · ${l}`).join('\n'));
-  }
-  auditReading = `取本分支侧：main 那份的**每一个小节标题**（${headings(mainTxt).length} 个）与**每一个 §8.NN 编号**（${secRefs(mainTxt).length} 个）都在本分支那份里 ⇒ 取本分支侧不会丢掉任何人的"节"；行级孤儿 ${orphan.length} 行只是本批自己更早的措辞（见下）`;
-  notes.push(`审计文档：标题 ${headings(mainTxt).length}/${headings(srcTxt).length}、§编号 ${secRefs(mainTxt).length}/${secRefs(srcTxt).length} 覆盖完整；行级孤儿 ${orphan.length} 行`);
-  if (orphan.length) {
-    notes.push(`  孤儿行前 2 条：${orphan.slice(0, 2).map((l) => l.slice(0, 60)).join(' ／ ')}`);
-  }
-  git(['-C', WT, 'checkout', '--theirs', '--', AUDIT]);
+  const r = unionAudit({ base: baseTxt, main: mainTxt, src: srcTxt });
+  const verdict = unionAuditVerdict(r);
+  if (verdict) die(2, `审计文档并集：${verdict} ⇒ 绝不提交，交人判`);
+  writeFileSync(join(WT, AUDIT), r.text);
   git(['-C', WT, 'add', '--', AUDIT]);
+  auditReading = `并集：保留 main 侧 ${r.stats.mainOnly} 行（含 ${r.stats.extraMainHeadings} 个本分支没有的节标题）` +
+    ` + 本分支独有 ${r.stats.srcOnly} 行；断言 main 零丢行 / 本分支零丢行 / 无两侧之外的新行 / 无冲突标记 全过`;
+  notes.push(`审计文档并集：main 节 ${r.stats.mainHeadings}、本分支节 ${r.stats.srcHeadings}、` +
+    `main 独有行 ${r.stats.mainOnly}、本分支独有行 ${r.stats.srcOnly}、产出非空行 ${r.text.split('\n').filter((l) => l.trim() !== '').length}`);
 }
 
 const still = git(['-C', WT, 'diff', '--diff-filter=U', '--name-only']).split('\n').filter(Boolean);
 if (still.length) die(2, `解完之后仍有未解决冲突：${still.join(', ')}`);
 for (const [path, txt] of [['package.json', readFileSync(join(WT, 'package.json'), 'utf8')], ['.gitignore', readFileSync(join(WT, '.gitignore'), 'utf8')]]) {
   if (/^<{7}/m.test(txt)) die(2, `${path} 仍含冲突标记`);
+}
+
+/* ── 2b. 合并归属通式：diff(main, 载体树) ⊆ diff(merge-base, 本分支) ──────
+ * 这是"这笔合并没有吞并行会话的改动、也没有静默回退 main"的**结构层**证据。
+ * 它和上面审计文档那三条内容层断言互补：内容层管"别人那一节逐行在不在"，
+ * 这条管"本批不该碰第 34 枚文件"。两边都过才叫落地。
+ * 🔴 写集的基线只能在这里显式用 baseSha —— 用 merge-base(main, 载体) 会退化成 main 自己
+ *   （载体第一父 = main），写集于是变成 820 条、`⊆` 空洞成立。§8.52 记过一次，06:4x 又复犯一次。 */
+{
+  const writeSet = git(['diff', '--name-only', baseSha, srcSha]).split('\n').filter(Boolean);
+  const mergedSet = git(['-C', WT, 'diff', '--name-only', mainSha]).split('\n').filter(Boolean);
+  const own = ownershipVerdict({ writeSet, mergedSet });
+  if (!own.ok) {
+    die(2, `合并动了本批从没写过的路径 ${own.outside.length} 枚（前 5：${own.outside.slice(0, 5).join(', ')}）` +
+      ` —— 要么吞了并行会话的改动，要么把 main 的东西回退了。载体不落笔，交人判。`);
+  }
+  notes.push(`合并归属：写 ${own.counts.write} 枚 / 合并相对 ${MAIN} 改 ${own.counts.merged} 枚 / 集外 0 / 写集里未被改到 ${own.unfused.length} 枚`);
 }
 
 // ── 3. 纯 fs 门禁 ────────────────────────────────────────────────────
