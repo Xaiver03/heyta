@@ -1,7 +1,9 @@
 # 交接：倒数纪念日 批次二 —— 哪些真闭合了、三条并行线怎么收、合流时有两条义务必须兑现
 
 > 状态：**批次二 10 张工单里 6 张闭合**（W0 / W0b①② / W2 / W5 / W9 web 半 / W10 / L'），
-> W4b 落了服务端那半（**未提交**），W7 / W8 在飞（**未提交**），W6 停放，**收尾四项（§8.3）一项都没启动**；
+> W4b 落了服务端那半，W7 只有契约、W8 有移动半 —— 🔴 **21:0x 增量：三条并行线已全部落成本地提交（不再躺在未改动里），
+> 其中 W7 / W8 已合进 `feat/countdown-batch2` @ `db430cc9`，但合进去的内容一行验证都没跑过**（§2）；
+> W6 停放，**收尾四项（§8.3）一项都没启动**；
 > 🔴 **所有成果都在本地分支，没有 push、没有 merge 进 `main`**。
 > 交接日期：**2026-10-03**（CST）
 > 给**全新会话**用：不从聊天记录继承任何前提。每条断言都带可复现命令或实测读数。
@@ -55,11 +57,11 @@ worktree 的未提交改动里，而 `feat/countdown-batch2` 落后 `main` **24 
 | W2 | 新实体 `EVENT` 落 `shared-schema` + `domain` + `op-log` reducer + 存储三套适配 + 线协议契约；🔴 部署顺序硬约束"服务端先于客户端"；ADR-0044 已定"闰月生日逢闰过正" | ✅ 已闭合（`bb6c1203` + `05794dc5`） | 无。**但"服务端先于客户端"是部署期义务，`reinstall:all` 那一步要按它排序** |
 | W5 | 倒数日卡片网格 + 二级操作（界面） | ✅ 已闭合（`a9529a59` + `94760c82` + `c07df677`），e2e 6 passed、三张图人已看 | 无 |
 | W6 | 第二个日期数据源 | ⏹ **停放**（撞车面非空，关闭判据见 §5） | 等六个日历路径 `git status --porcelain` 归零后落地，复用 §4 第 3 条的 `dayMarker` 缝 |
-| W7 | 纪念卡片导出为**成品图**（设备渲染导出，**零通道、零法务变更**；区别于素材图） | 🔄 在飞：`heyta-wt-w7` **3 个未提交文件、零自己的提交** | 🔴 先按路径提交（§2）；判据含 RN 出图取证，**"零法务变更"要现量复核**（加通道就破 §4 前提） |
-| W8 | 三端（web / mobile / 原生壳）接线与壳级门禁 | 🔄 在飞：`heyta-wt-w8` **11 个未提交文件、零自己的提交**；web 半已随 W5 落地 | 🔴 先提交（§2）；"三端"里**原生壳那半 + 壳级门禁**尚未见产物 |
+| W7 | 纪念卡片导出为**成品图**（设备渲染导出，**零通道、零法务变更**；区别于素材图） | 🟡 **已提交 `581bdb99` 并合进 batch2 `caf9a48c`**：只有线协议契约（99 行）+ ui 侧字段（+42） | 🔴 **设备出图那半没有**：RN/原生渲染导出、`check:*` 门禁、判据（含"零法务变更"的现量复核）全未做，一行没跑过 |
+| W8 | 三端（web / mobile / 原生壳）接线与壳级门禁 | 🟡 **已提交 `b8f39cae` 并合进 batch2 `db430cc9`**：移动半（`CountdownScreen` 267 行 + `feature-entries` 109 + `countdown-display` 133）+ 领域层 `feature-modules.ts` 77 + 测试 244 行；web 半已随 W5 落地 | 🔴 **测试一行没跑过**；"三端"里**原生壳那半 + 壳级门禁**没有产物 |
 | W9 | 提醒（含投递路径 —— 现状是全仓零 `new Notification(`） | 🟡 **web 半 + DST ✅**（`a8f5a9a6`，变异 9/9 红）；**原生投递那半没动** | 投递路径 = Goal 明文要求的**没做完**那半（ADR-0051 另立一单）；合流时连带兑现 §3.1 |
 | W10 | `EVENT` 必须**同时**进 AI 工具目录与 local-api 工具契约（实体与 AI 工具一起做；不改 `ENTITY_TYPES` 驱动的排期决定） | ✅ 已闭合（`8a595493` + `e2aeedc4`），目录 4 条 EVENT 工具，MCP 与内置 AI 共用同一份 | 无。⚠️ 副作用已被 L' 抓住并修（`ai-and-transfer.ts` 那张表 = 授权面） |
-| W4b | 调休/补班的运营录入通道 + 客户端拉取（heyta **第一条服务端→客户端内容通道**，**ADR 必须定性，且回写 ADR-0038 的后台范围表**） | 🟡 **ADR 定性 + 0038 回写 ✅**（`c28e5f1a` @ `main`）；服务端半 **3 笔提交 + 8 个未提交文件**；**客户端半从零** | §4 那四件（后台录入 / 客户端拉取+缓存 / `dayMarker?` / `check-public-facts.mjs` + 判据①②③④）。🔴 **W4b 的勾不能打** |
+| W4b | 调休/补班的运营录入通道 + 客户端拉取（heyta **第一条服务端→客户端内容通道**，**ADR 必须定性，且回写 ADR-0038 的后台范围表**） | 🟡 **ADR 定性 + 0038 回写 ✅**（`c28e5f1a` @ `main`）；服务端半 **4 笔提交在 `feat/countdown-w4b`（迁移已确认存在）**；🔴 **尚未并入 batch2**（停在 §2.1 那条 union 冲突）；**客户端半从零** | §4 那四件（后台录入 / 客户端拉取+缓存 / `dayMarker?` / `check-public-facts.mjs` + 判据①②③④），外加 §2.1 的挑配方法。🔴 **W4b 的勾不能打** |
 | L 系列 | 法务联动 —— 改 `packages/legal` 那六处现成位置、每处中英双份、落地页文案走生成物不许手改（`check:legal-copy` 已在 `pnpm check`） | 🟡 **判定表已出、唯一真命中已修**（`2d53ea94` + `8996de9d` + `1d71e75f`/`017adc3e`） | 🔴 六处**没有被"全改一遍"是判定结果**（§4 时序条款：纯文字版不触发 L1/L2/L4/L5），但 **§3.1 那六个字面位置随 W9 那半必须翻转** |
 | 收尾 | Goal 第 7 条 + 计划 §5/§8.3 | ⏹ **四项一项没启动** | §6 全部 |
 | 同步 | 每完成一项 → 计划文档打勾 + **同步 AGENTS §9** | 🟡 计划文档已同步（`cd839ec5`）；**AGENTS §9 欠着** | `AGENTS.md` 脏 ⇒ 不能 `--only` 提交（§7 第二条），等干净后补 |
@@ -80,8 +82,9 @@ worktree 的未提交改动里，而 `feat/countdown-batch2` 落后 `main` **24 
 
 ## 1. 已闭合的（都已提交，可逐条复跑）
 
-载体：`feat/countdown-batch2` @ `017adc3e`，worktree `/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta-wt-batch2`
-（20:5x 现量 `git status --porcelain` ⇒ **0 行，干净**）。分支 `15 ahead / 24 behind main`。
+载体：`feat/countdown-batch2` @ `db430cc9`（21:0x 现量：W7/W8 已并进来，见 §2），worktree
+`/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta-wt-batch2`（`git status --porcelain` ⇒ **0 行，干净**）。
+分支 `19 ahead / 25 behind main`（21:1x 现量；`main` 在动，这个数每轮都要重取）。
 
 | 工单 | SHA | 一条可复跑的读数 |
 |---|---|---|
@@ -117,22 +120,54 @@ rc=0
 
 ## 2. 三条并行线的现量（20:5x 重取 —— 这类读数每次引用都要重取）
 
-| worktree | 分支 / HEAD | 未提交 | 脏文件 |
+| worktree | 分支 / HEAD | 未提交 | 状态（21:0x 更新） |
 |---|---|---|---|
-| `heyta-wt-w7` | `feat/countdown-w7` @ `8996de9d`（**= batch2 的第 3 笔，无自己的提交**） | 3 | `packages/shared-schema/src/index.ts` `M`、`packages/ui/src/countdown/model.ts` `M`、`packages/shared-schema/src/card-export-contract.ts` `??` |
-| `heyta-wt-w8` | `feat/countdown-w8` @ `8996de9d`（同上，**无自己的提交**） | 11 | `ProfileScreen.tsx` / `shell/modules.ts` / `event-tool-host.spec.ts` / `domain/src/index.ts` / i18n `en.ts`+`zh-CN.ts` `M`；`countdown-display.ts` / `nav/feature-entries.ts` / `CountdownScreen.tsx` / `feature-entries.spec.ts` / `feature-modules.ts` `??` |
-| `heyta-wt-w4b` | `feat/countdown-w4b` @ `a2313c9a`（4 ahead / **19 behind**） | 8 | `holiday-adjustment-contract.{ts,spec.ts}` / `shared-schema/src/index.ts` / `admin.routes.ts` / `server.ts` / `admin-routes.spec.ts` `M`；`server/src/holidays/` / `server/tests/holiday-admin-routes.spec.ts` `??` |
+| `heyta-wt-w7` | `feat/countdown-w7` @ `581bdb99` | **0（已提交）** | ✅ **已并入 batch2**（merge `caf9a48c`） |
+| `heyta-wt-w8` | `feat/countdown-w8` @ `b8f39cae` | **0（已提交）** | ✅ **已并入 batch2**（merge `db430cc9`） |
+| `heyta-wt-w4b` | `feat/countdown-w4b` @ `e442a3bb` | **0（已提交）** | ⏸ **尚未并入**，停在一条 union 冲突上（见 §2.1） |
 
-🔴 **W7 与 W8 的 HEAD 是同一枚 `8996de9d`，也就是说它们的成果 100% 在未提交改动里。**
-接手第一件事：**让这两条线各自提交**（或直接在合流时把它们的工作树内容按路径搬进 batch2 再提交），
-否则一次误 `git checkout` 就全没了。**提交用点名路径**（`git add <新文件>` → `git commit --only <路径>`）。
+✅ **21:0x 增量（这一段我做完了，接手者不必重做）**：三条并行线原来 100% 躺在未提交改动里，
+现已各自按点名路径落成本地提交（worktree 全部 0 脏），且 W7 / W8 已合进 `feat/countdown-batch2`：
 
-已做过的合并预演（`git merge-tree --write-tree --name-only`，零副作用，可复跑）：
+| 动作 | SHA / 读数 |
+|---|---|
+| W7 提交（3 文件 +158） | `581bdb99`，`card-export-contract.ts` 99 行新 + `ui/src/countdown/model.ts` +42 + `shared-schema/src/index.ts` +17 |
+| W8 提交（11 文件） | `b8f39cae`，含 `feature-modules.ts` 77 / `CountdownScreen.tsx` 267 / `feature-entries.spec.ts` 244（新） |
+| W4b 服务端半提交（8 文件） | `e442a3bb`；🔴 迁移**确实存在**（`a2313c9a` 带 `server/prisma/migrations/20261009000000_add_holiday_adjustments/migration.sql` 139 行 + `schema.prisma` +78，两张模型 `HolidayAdjustmentYear:996` / `HolidayAdjustmentDay:1024`） |
+| merge W7 → batch2 | `caf9a48c`，**合后 tree 与预演 tree `db0d9205…` 逐字相同** |
+| merge W8 → batch2 | `db430cc9`，合后 tree 与预演 `b5f3cd2c…` 的差集**恰好是 W7 那三枚文件**（因为基线已含 W7）⇒ 自动合并没有产生第三种形状 |
+| batch2 现态 | HEAD `db430cc9`，`git status --porcelain` = 0 脏，`main..HEAD` = **19 笔**（原 15 + 3 笔合并链 + …），**未验证**（见 §6） |
 
-- **唯一真冲突** = `scripts/verify-mobile-lists.sh`（batch2 侧 1/1，w4b 侧 26/4）。
-- `package.json`、i18n `en.ts`/`zh-CN.ts`、`packages/ui/src/index.ts` **可自动合**。
-- ⚠️ **w4b 分支捎带了 5 笔不属于批次二的提交**（organizer/habits、脚本别名等）⇒ 合流时要决定
-  是整支合并还是只挑 W4b 那 4 笔（`d4fd01a1` / `981eee43` / `7049bfed` / `a2313c9a`）。**这是范围判断，别顺手带进来。**
+🔴 **这三笔合进去的是"半成品"，不是"验证过的成品"**：W7 只有契约、**没有设备出图那半**；
+W8 有移动半与测试但**一行都没跑过**；壳级门禁没做。合流的语义只是"别丢工作"，不改变 §0.5 里两行的状态。
+
+### 2.1 W4b 的并入配方（下一次照着做，别重新推）
+
+- **决策已定：只挑 W4b 那 5 笔，不整支合并。** 那条分支相对 batch2 有 10 笔独有提交，其中 5 笔**不属于本批**：
+  `192a516d`（organizer/habits 两端改名删除）、`437e7c1a`（ledgers 文档）、`76cbee51` + `c506953b`（真机脚本别名/自快照登记）、
+  `6570e52d`（W0 打勾文档）。那是**别人在 main 线上的工作**，我吸收进本批就等于替他们决定落地时机。
+- 要挑的顺序：`981eee43` → `7049bfed` → `a2313c9a` → `e442a3bb`（4 笔代码），`d4fd01a1`（W4b 开工实测的文档笔）**单独处置**——
+  它改的 `countdown-anniversary.md` 在 main 上已经走到 `cd839ec5`/`33eea3e5`，直接 cherry-pick 必撞。
+- 🔴 **卡点与解法（已复现一次）**：`git cherry-pick -x 981eee43` 在 `packages/shared-schema/src/index.ts` 撞 `UU`——
+  HEAD 那侧是我刚合进来的 **W7 导出块**（`EXPORT_CARD_EDGE_PX` 等，带"边长/比例/格式是产品规格所以住契约层"那段注释），
+  另一侧是 **holiday-adjustment 的导出块**。两者是**不同文件的各自新增** ⇒ 正确解是 **union（两段都留）**，不是择一。
+  我按用户"到此为止"的指令已 `git cherry-pick --abort` 退回 `db430cc9`（脏 0，源提交 `e442a3bb` 仍在，零丢失）。
+- 挑完之后：`server/tests/holiday-admin-routes.spec.ts`（351 行新）与 `admin-routes.spec.ts`（+56）**第一次跑**要在 batch2 上，
+  并把契约文件头那句不存在的 `ADR-0050` 指针改成 **ADR-0052**（§3.2）。
+
+
+**冲突来源已定位（省掉下一轮重新推）**：整支合并时唯一真冲突 `scripts/verify-mobile-lists.sh` 来自
+`c506953b`（真机脚本别名那笔，**不属于本批**）⇒ 只挑 §2.1 那 4 笔代码提交就**根本碰不到它**。
+四笔的落点已逐笔量过：
+
+| 提交 | 文件与尺寸 |
+|---|---|
+| `981eee43` | `holiday-adjustment-contract.ts` 241 新 / `shared-schema/src/index.ts` +29 / 契约测试 279 新 |
+| `7049bfed` | `packages/domain/src/holidays.ts` +224 / `holiday-adjustment-override.spec.ts` 242 新（判据④那三条分支） |
+| `a2313c9a` | 迁移 `20261009000000_add_holiday_adjustments/migration.sql` 139 / `schema.prisma` +78 / pglite 迁移测试 363 新 |
+| `e442a3bb` | 契约 +177/−43、`server/src/holidays/{day-column,store,routes}`（34/353/126）、`admin.routes.ts` +108、`server.ts` +14、两个测试 |
+
+⇒ 唯一的相撞面是 `packages/shared-schema/src/index.ts`（W7 的导出块 × W4b 的导出块），解法 union。
 
 复跑命令：
 
@@ -296,13 +331,19 @@ L1 那条"前置闸门"从文档记忆变成常驻检查，踩响它的是 W9，
 > 范畴、逐项状态与 7 条硬边界的**唯一入口**是 `docs/plans/countdown-batch2-handoff.md` §0.5 —— 先读它，
 > 不要凭这份开场白施工。
 >
-> 当前：6 张工单已闭合在 `feat/countdown-batch2` @ `017adc3e`（工作树干净）；W4b 服务端半 + W7 + W8 的成果
-> **在未提交改动里**。按 §2–§3 收三条并行线：W7（3 个未提交文件）和 W8（11 个未提交文件）**先按点名路径提交再合流**；
-> W4b 已有 4 笔 + 8 个未提交文件，合流前先决定整支合并还是只挑 W4b 那 4 笔（它还捎带 5 笔不属于本批的提交）。
-> 唯一真冲突是 `scripts/verify-mobile-lists.sh`。合流时必须兑现 §3 两条义务（法务通知族六位置翻转 +
-> `SCHEDULE_EXACT_ALARM` 显式登记 + ADR 指针 `0050→0052`）。
-> 然后做 §4 的 W4b 客户端半（4 件，判据①要真界面截图且人看过）与 §5 的 W6（关闭判据是命令，不是印象），
-> 最后按 §6 跑收尾四项。
+> 接着跑 Goal `1791011766720-0444bf`（倒数纪念日批次二**全部工单实现完成**）。
+> 范畴、逐项状态与 7 条硬边界的**唯一入口**是 `docs/plans/countdown-batch2-handoff.md` §0.5 —— 先读它，
+> 不要凭这份开场白施工。
+>
+> 当前（21:0x）：6 张闭合在 `feat/countdown-batch2`；三条并行线**已各自提交**，W7（`caf9a48c`）与 W8（`db430cc9`）
+> **已合进 batch2 但一行验证都没跑过**，W4b 服务端半**尚未并入** ⇒ 第一步照 §2.1 挑那 4 笔代码提交，
+> 唯一的相撞面是 `packages/shared-schema/src/index.ts`，解法 **union（两段导出都留）**。
+> 然后：负载降下来后跑 `pnpm -r typecheck` + 相关包测试，把 W7/W8 从"合进来"变成"验证过"；
+> 做 §4 的 W4b 客户端半（4 件，判据①要真界面截图且人看过）；兑现 §3 两条合流义务
+> （法务通知族六位置翻转 + `SCHEDULE_EXACT_ALARM` 登记 + ADR 指针 `0050→0052`）；
+> 再按 §5 看 W6 的关闭判据是否归零；最后按 §6 跑收尾四项。
+>
+> **不 push、不 merge 进 main、不发问，直接做。**
 >
 > **不 push、不 merge 进 main、不发问，直接做。**
 
