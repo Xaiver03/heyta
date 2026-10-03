@@ -23,5 +23,14 @@ export const GITHUB_URL = 'https://github.com/Xaiver03/heyta';
  *
  * ⚠️ 路径**不要**在别处再抄一遍：页脚的文档分组以前自己写了一份，
  * 于是"指南搬家"要改两处，而漏掉的那一处表现为链接 404。
+ *
+ * 🔴 2026-10-03 换过一次目标，理由要留在这里：这里以前指
+ * `docs/runbooks/local-server-verification.md` —— 那是给 **P0 验收**写的手册，
+ * 它的第一节是一张**本团队内部机器表**（SSH 别名、公网 IP、哪台同时是我们的公网部署机），
+ * 而落地页把"跟着跑一遍就能起来"的承诺挂在它身上。
+ * 也就是说：**对外承诺的路径上既没有面向陌生人的部署路径，又把内部运维现场暴露在公开页面上。**
+ * 现在指向 `docs/runbooks/self-host.md`（专门写给外部部署者，零内部主机名 / 零本机路径）。
+ * 那件事登记在 `docs/research/self-host-distribution-audit.md` G-40③。
  */
-export const SELF_HOST_GUIDE_URL = `${GITHUB_URL}/blob/main/docs/runbooks/local-server-verification.md`;
+export const SELF_HOST_GUIDE_URL = `${GITHUB_URL}/blob/main/docs/runbooks/self-host.md`;
+

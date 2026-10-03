@@ -89,10 +89,15 @@
  * 用法：`pnpm --filter @heyta/landing test`（已随 `pnpm -r test` 进 `pnpm check`）
  */
 
+import { existsSync, readFileSync, readdirSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import { dirname, join, resolve } from 'node:path';
+
 import { describe, expect, it } from 'vitest';
 
 import { LOCALES, type Locale } from '@heyta/i18n/provider';
 
+import { SELF_HOST_GUIDE_URL } from '../src/lib/repo.js';
 import { SITE_PAGES } from '../src/site/pages.js';
 import { renderPage } from './helpers/render-page.js';
 // 🔴 豁免判据与 `scripts/check-docs-voice.mjs` **共用一份**（分裂的成因与代价写在那个文件头）。
@@ -458,5 +463,108 @@ describe('自检 C（正对照）：判定线上允许的说法一条都不许�
 
   it.each(MUST_NOT_CATCH)('不误伤：%s', (sample) => {
     expect(findViolations(sample), `这条被误判成贡献者语言：${sample}`).toEqual([]);
+  });
+});
+
+/**
+ * ## 公页指向的**仓库文档**（2026-10-03，缺口 G-40③）
+ *
+ * 上面那批规则管的是"公页上印的字"。这一批管的是**公页把人带去的那个文件**。
+ *
+ * 起因是实测：落地页把"要逐条执行的命令、依赖与配置文件都写在自建指南里，
+ * 跟着跑一遍就能起来"这句话挂在 `SELF_HOST_GUIDE_URL` 上，而它以前指向
+ * `docs/runbooks/local-server-verification.md` —— 那是给 **P0 验收**写的手册，
+ * 它的第一节是一张本团队内部机器表（SSH 别名、公网 IP、哪台同时是我们的部署机）。
+ * 于是那条链接**两头都不对**：对外承诺的路径上没有面向陌生人的部署路径，
+ * 而内部运维现场被公开页面直链带了出去。
+ *
+ * 四条判据，各自都验过会红（注入表记在 `docs/research/self-host-distribution-audit.md` §8.9）：
+ *  1. `apps/landing/src` 里每个 `blob/main/<路径>` 必须真的在仓库里存在 —— 死链比没链更坏；
+ *  2. 自建指南**那一头**（从常量里解析出来，不另抄一遍路径）不许含内部主机名 / 公网 IP；
+ *  3. 同一条 needle 扫描在一份**确实**含内部机器的文档上必须命中 ——
+ *     没有这条对照，第 2 条的"零命中"可能只是 needle 表或扫描坏了；
+ *  4. 页面上**渲染出来的那个 href** 必须就是常量 —— 前三条都只读常量，
+ *     而缺陷的形状恰恰是"常量改了、某个组件自己抄了一份旧路径"（`Footer.tsx` 以前就自己抄过）。
+ */
+const HERE = dirname(fileURLToPath(import.meta.url));
+const REPO_ROOT = resolve(HERE, '../../..');
+
+/** 内部运维现场的标记。每一条都在 `deployment.md` / `local-server-verification.md` 里真实出现过。 */
+const INTERNAL_OPS_NEEDLES = ['ubuntu-jcli', 'sanjiaozhou', 'finlaw', '124.223.13.226'];
+
+const listTsFiles = (dir: string): string[] => {
+  const out: string[] = [];
+  for (const entry of readdirSync(dir, { withFileTypes: true })) {
+    const child = join(dir, entry.name);
+    if (entry.isDirectory()) out.push(...listTsFiles(child));
+    else if (/\.tsx?$/.test(entry.name)) out.push(child);
+  }
+  return out;
+};
+
+const blobPathsReferencedByLandingSrc = (): string[] => {
+  const found: string[] = [];
+  for (const file of listTsFiles(join(REPO_ROOT, 'apps/landing/src'))) {
+    const text = readFileSync(file, 'utf8');
+    for (const m of text.matchAll(/blob\/main\/([A-Za-z0-9._/-]+)/g)) found.push(m[1]);
+  }
+  return found;
+};
+
+const guidePathFromConstant = (): string => {
+  const m = /blob\/main\/([A-Za-z0-9._/-]+)$/.exec(SELF_HOST_GUIDE_URL);
+  expect(m, `SELF_HOST_GUIDE_URL 不是 https://…/blob/main/<路径> 的形状：${SELF_HOST_GUIDE_URL}`).not.toBeNull();
+  return m![1];
+};
+
+describe('公页指向的仓库文档', () => {
+  it('每个 blob/main/<路径> 都真的在仓库里存在', () => {
+    const paths = blobPathsReferencedByLandingSrc();
+    // 解析层哨兵：一条都没扫到**不算通过** —— 那说明遍历或正则坏了。
+    expect(paths.length, 'apps/landing/src 里一个 blob/main/ 链接都没扫到').toBeGreaterThan(0);
+    const missing = paths.filter((p) => !existsSync(join(REPO_ROOT, p)));
+    expect(missing, `公页指向了仓库里不存在的文档：${missing.join(', ')}`).toEqual([]);
+  });
+
+  it('自建指南那一头不含内部主机名 / 公网 IP', () => {
+    const guidePath = guidePathFromConstant();
+    const guide = readFileSync(join(REPO_ROOT, guidePath), 'utf8');
+    const hits = INTERNAL_OPS_NEEDLES.filter((n) => guide.includes(n));
+    expect(hits, `对外自建指南 ${guidePath} 里出现内部运维标记：${hits.join(', ')}`).toEqual([]);
+  });
+
+  it('正面对照：同一条 needle 扫描在内部运维手册上必然命中', () => {
+    const internal = readFileSync(
+      join(REPO_ROOT, 'docs/runbooks/local-server-verification.md'),
+      'utf8',
+    );
+    const hits = INTERNAL_OPS_NEEDLES.filter((n) => internal.includes(n));
+    expect(
+      hits.length,
+      'needle 表在一份确实含内部机器的文档上也零命中 ⇒ needle 表或扫描本身坏了，' +
+        '上一条的"零命中"因此不构成证据',
+    ).toBeGreaterThanOrEqual(3);
+  });
+
+  it('首页与页脚渲染出来的 href 就是那个常量，且没有一个 a 直连内部验收手册', () => {
+    // 🔴 前三条读的都是常量；这条读**DOM**。缺陷的真实形状是"常量改了、某个组件自己抄了一份旧路径"
+    //（页脚的文档分组以前就自己抄过一遍路径，于是"指南搬家"要改两处而漏一处）。
+    const renderedHrefs = ['zh-CN', 'en'].flatMap((locale) => {
+      const view = renderPage('home', locale as Locale);
+      return [...view.querySelectorAll<HTMLAnchorElement>('a[href]')].map((a) => a.getAttribute('href') ?? '');
+    });
+
+    const toGuide = renderedHrefs.filter((h) => h === SELF_HOST_GUIDE_URL);
+    expect(
+      toGuide.length,
+      `渲染出来的页面上一个指向自建指南的链接都没有（中英两版共 ${String(renderedHrefs.length)} 个 a）` +
+        ' ⇒ 常量没被渲染出来，这条判据会变成空转',
+    ).toBeGreaterThan(0);
+
+    const internal = [...new Set(renderedHrefs.filter((h) => h.includes('local-server-verification')))];
+    expect(
+      internal,
+      `公页上有链接直连内部 P0 验收手册（它开头是一张内部机器表）：${internal.join(', ')}`,
+    ).toEqual([]);
   });
 });
