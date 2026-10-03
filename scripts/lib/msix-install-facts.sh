@@ -24,6 +24,12 @@ MSIX_REQUIRED_FACTS=(
 
 # msix_check_facts <取证文件>
 #   stdout：缺哪几条（或"全部在位"的读数）；返回 0 = 全在位，1 = 有缺。
+# 🔴 匹配形状是**整行**，不是子串（2026-10-04 现量）：子串匹配会让一行散文判绿 ——
+# 拿 `注：期望 SHORTCUT_OK=True 未满足` 喂进来，旧写法报"5 条全在位"。
+# 生产侧现在不会打印这种句子（五个键都是 `$lines += ('KEY=' + 值)` 的整行形状），
+# 但"判据能被一句文案满足"本身就是没有牙，而且将来任何一次加日志都可能踩到。
+# 取证文件是 Windows 侧写的（行尾 \r），所以先 `tr -d '\r'` 再 `-x` 整行比，
+# 两个方向都不能松：不剥 \r 就永远匹配不上（假红），不整行比就挡不住散文（假绿）。
 msix_check_facts() {
   local facts_file="$1"
   local missing="" fact
@@ -33,7 +39,7 @@ msix_check_facts() {
     return 1
   fi
   for fact in "${MSIX_REQUIRED_FACTS[@]}"; do
-    grep -q "$fact" "$facts_file" 2>/dev/null || missing="$missing $fact"
+    tr -d '\r' < "$facts_file" 2>/dev/null | grep -qxF "$fact" || missing="$missing $fact"
   done
   if [ -n "$missing" ]; then
     echo "缺判据：${missing# }（${facts_file}）"
