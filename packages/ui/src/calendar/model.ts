@@ -259,3 +259,45 @@ export function groupTasksByDueDate(tasks: readonly Task[]): Map<LocalDate, Task
   }
   return map;
 }
+
+/** `dayMarker` 能答的三种说法（`undefined` = 这一天在公共事实里没有它）。 */
+export type CalendarDayMarker = 'off' | 'work';
+
+/** 格子里那一枚标记要摆的东西。 */
+export interface CalendarDayMarkerView {
+  /** 实际写字的那个字符（或降级用的一颗点）。 */
+  readonly text: string;
+  /** 用哪个语义色 —— 只能取 token 名，组件里不许出现裸色。 */
+  readonly colorToken: 'color.success-strong' | 'color.warning-strong';
+  /**
+   * 这一格该不该被**念出来**。
+   *
+   * 🔴 与 `text` 分开是刻意的：词表没给时 `text` 退化成一颗点，而点不该进读屏名 ——
+   * 念成"2026年10月10日，没有事，圆点"是噪声。读屏只念真的有字的时候。
+   */
+  readonly spoken: string | undefined;
+}
+
+/**
+ * 把"休 / 班"这一档换算成格子里要摆的东西。
+ *
+ * 判断全部留在这里（本包文件头那条边界：有分支的逻辑进 model，组件只留摆放层），
+ * 于是它能用 node 环境一次测穿，不需要整套 DOM 夹具。
+ *
+ * @param kind   `dayMarker(date)` 的答案。`undefined` ⇒ 返回 `undefined`，一格都不画。
+ * @param labels 宿主的词表。缺省时标记只剩颜色 —— 那是 AGENTS §5 禁的接法，
+ *               所以它**能被测出来**（判据在 `tests/calendar-day-marker.spec.ts`），
+ *               而不是悄悄当成正常状态。
+ */
+export function calendarDayMarkerView(
+  kind: CalendarDayMarker | undefined,
+  labels: Readonly<{ off: string; work: string }> | undefined,
+): CalendarDayMarkerView | undefined {
+  if (kind === undefined) return undefined;
+  const word = labels?.[kind];
+  return {
+    text: word ?? '●',
+    colorToken: kind === 'off' ? 'color.success-strong' : 'color.warning-strong',
+    spoken: word,
+  };
+}

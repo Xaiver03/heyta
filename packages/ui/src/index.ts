@@ -87,6 +87,7 @@ export { CalendarBoard, type CalendarBoardProps } from './calendar/CalendarBoard
 export { CalendarToolbar, type CalendarToolbarProps } from './calendar/CalendarToolbar.js';
 export {
   calendarDayTone,
+  calendarDayMarkerView,
   calendarCellBars,
   stepCalendarCursor,
   groupTasksByDueDate,
@@ -95,6 +96,7 @@ export {
   type CalendarCellBar,
   type CalendarViewKind,
   type CalendarDayTone,
+  type CalendarDayMarker,
   type CalendarToolbarLabels,
 } from './calendar/model.js';
 export {
