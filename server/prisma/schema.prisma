@@ -969,7 +969,7 @@ model AccountNotification {
 ///
 /// ## 这是 heyta 第一条服务端→客户端的**内容**通道的数据源
 ///
-/// 定性见 [ADR-0050](../../docs/adr/0050-public-facts-are-deployer-supplied.md)：
+/// 定性见 [ADR-0052](../../docs/adr/0052-public-facts-are-deployer-supplied.md) §2：
 /// 它装的是**公共事实**（国务院哪天让上班、哪天让放假 + 公告原文出处），
 /// 不是用户数据 ⇒ 不进 op-log、不加密、不参与向量时钟与 LWW。
 /// AGENTS §1 那句「云端不是事实源」约束的是用户数据，不约束这一张表。

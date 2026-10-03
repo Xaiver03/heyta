@@ -62,8 +62,9 @@ export type HolidayDb = Pick<PrismaClient, 'holidayAdjustmentYear' | 'holidayAdj
  *（契约与库里的 CHECK 各钉了一遍），所以库里物理上最多 `MAX - MIN + 1 = 94` 个年度。
  *
  * ⚠️ 因此这一项**不是**一个限流旋钮 —— 它是一个拦不住任何真实数据的上界。
- * 它存在的唯一意义是把最坏响应体积变成一次**可复算的乘法**（ADR-0050 §5 的体积账：
- * `94 年 × 400 条/年 ≈ 37 600 条`）。真正压住匿名面的是**每条请求的速率**
+ * 它存在的唯一意义是把最坏响应体积变成一次**可复算的乘法**（两个乘数都住在契约里：
+ * `2100 − 2007 + 1 = 94` 年 × `HOLIDAY_ADJUSTMENT_MAX_DAYS_PER_YEAR = 400` 条/年
+ * ≈ 37 600 条）。真正压住匿名面的是**每条请求的速率**
  *（见 `holiday-adjustment.routes.ts` 的 per-route limit）与 ETag 命中后的 304，
  * 不是这个数。它留在代码里，是为了让那本账有一个锚点，而不是"文档里说 94"。
  */
@@ -107,7 +108,7 @@ export interface HolidayAdjustmentSnapshot {
  * 三个量合起来仍然**不是**内容哈希 —— 它是"任何一次写入都会推进"的量。
  * 之所以不真去哈希内容：那要在每次 GET 时把整个逐日表读出来重算一遍，
  * 而这条通道的全部意义就是"别每次都把整份数据发出去"。
- * ADR-0050 §4 明写它**不是**内容寻址，别拿它当校验和用。
+ * ADR-0052 §4 第 4 条钉的是「缓存不是正确性来源」（ETag 只为省流量）⇒ 别拿它当校验和用。
  */
 function holidayVersionToken(input: {
   maxUpdatedAt: number;
@@ -337,7 +338,7 @@ export async function replaceHolidayAdjustmentYear(
  *（`installHolidayAdjustmentOverrides` 的 `both-lists-empty`），因为空数组会
  * 把随包表那一年清空掉 —— 而随包表里的安排是**已公布的事实**，清空它是丢数据。
  * 删掉年度行的表现是"覆盖里不再有 2027" ⇒ 客户端下一次拉取的响应不含 2027
- * ⇒ 退回随包表。那才是"撤销这次录入"的正确语义（ADR-0050 §6）。
+ * ⇒ 退回随包表。那才是"撤销这次录入"的正确语义（ADR-0052 §2.2）。
  *
  * 逐日行靠 `ON DELETE CASCADE` 一起走；返回值是**年度行**的删除数（0 = 本来就没有）。
  */

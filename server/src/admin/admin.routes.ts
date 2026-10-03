@@ -758,7 +758,7 @@ export const adminRoutes = async (fastify: FastifyInstance): Promise<void> => {
     }
   });
 
-  // ── 调休/补班（公共事实的唯一写入口）。W4b，定性见 ADR-0050 ─────────
+  // ── 调休/补班（公共事实的唯一写入口）。W4b，定性见 ADR-0052 ─────────
   //
   // 🔴 这三条路由是这个服务端上**唯一**能写"会下发给所有人的内容"的地方，
   //    所以它们继承上面那个插件级闸门（`addHook('preHandler', requireAdmin)`）。

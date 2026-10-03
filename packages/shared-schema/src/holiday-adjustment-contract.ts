@@ -11,7 +11,7 @@
  *
  * ## 🔴 这是 heyta 第一条**匿名只读**的服务端→客户端内容通道
  *
- * 定性见 [ADR-0050](../../docs/adr/0050-public-facts-are-deployer-supplied.md)：
+ * 定性见 [ADR-0052](../../../docs/adr/0052-public-facts-are-deployer-supplied.md) §2：
  * 它下发的是**公共事实**（哪天上班、哪天放假 + 公告原文出处），不是用户数据，
  * 因此 AGENTS §1 那句「云端不是事实源」**不约束它** —— 那句话讲的是用户数据。
  *
@@ -269,9 +269,10 @@ export const holidayAdjustmentsResponseSchema = z.object({
    *
    * 客户端把它当 `If-None-Match` 的候选回传，命中就 304、连 body 都不发。
    * 三个量为什么要凑齐（少一个就有"改了数据但令牌没变"的窗口）与
-   * "它**不是**内容哈希、别当校验和用"那半句，写在
-   * [ADR-0050](../../docs/adr/0050-public-facts-are-deployer-supplied.md) §4；
-   * 实现是 `server/src/holidays/holiday-adjustment-store.ts` 的 `holidayVersionToken()`。
+   * "它**不是**内容哈希、别当校验和用"那半句，逐条推在
+   * `server/src/holidays/holiday-adjustment-store.ts` 的 `holidayVersionToken()` 里；
+   * [ADR-0052](../../../docs/adr/0052-public-facts-are-deployer-supplied.md) §4 第 4 条钉的是
+   * 更外层那条立场：**缓存不是正确性来源**（304 与网络失败必须走同一个降级分支）。
    *
    * 形状照 `PriceVersion`（`server/prisma/schema.prisma:388`）那条既有立场：
    * **版本号是数据的一部分**，不是响应头里现造的一个数。
