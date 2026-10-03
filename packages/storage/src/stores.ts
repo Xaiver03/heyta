@@ -226,6 +226,10 @@ export const META_KEYS = {
   PUBLIC_FACTS_ETAG: 'publicFactsEtag',
   /** 那次拉取的本地毫秒时间戳（只用于"缓存多旧"，不参与任何裁决）。 */
   PUBLIC_FACTS_FETCHED_AT: 'publicFactsFetchedAt',
+  /** Active encrypted-payload generation paired with the local key package. */
+  VAULT_PAYLOAD_KEY_VERSION: 'vaultPayloadKeyVersionV1',
+  /** Encrypted pending root-rotation target; never stores a plaintext root. */
+  VAULT_PENDING_ROOT_ROTATION: 'vaultPendingRootRotationV1',
 } as const;
 
 export type MetaKey = (typeof META_KEYS)[keyof typeof META_KEYS];

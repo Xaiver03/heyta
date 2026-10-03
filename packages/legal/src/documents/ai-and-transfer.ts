@@ -187,6 +187,26 @@ const zh = [
           ['`get_event`', '读取单条倒数日详情', '上面全部，**再加这条倒数日的正文全文**（写了正文才有这一格）'],
           ['`create_event`', '新建倒数日', '不读数据；写入必须经操作日志'],
           ['`update_event`', '修改倒数日', '只改你显式给出的字段'],
+          // 🔴 批次二把覆盖面从 4 个实体补到 9 个 ⇒ 这张表**必须同时**加行（下面 16 条）。
+          // 条款里那句"未列出的工具视为未授权"把这张表变成了授权面：目录里有、表里没说，
+          // 就是对着用户少说一项"打开之后别人读得到什么"。对账由 `pnpm check:legal-tools` 钉住
+          // （目录 ↔ 中文表 ↔ 英文表：集合相等 + 中英**逐行同序**，行贴错对象也会红）。
+          ['`list_habits`', '列出习惯', '习惯标识、名称、每天的目标数值、单位、达成口径（至少/至多/恰好）—— **不含打卡记录**'],
+          ['`create_habit`', '新建习惯', '不读数据；写入必须经操作日志'],
+          ['`list_checkins`', '列出打卡记录', '哪条习惯、哪一天、当天记录的数值，一次最多 50 条 —— **不含习惯名称**，但"哪天做了什么、数值多少"本身已经是一份行为记录'],
+          ['`record_checkin`', '记录一次打卡', '不读数据；写入必须经操作日志'],
+          ['`list_focuses`', '列出专注记录', '种类、关联的任务标识、计划时长、实际时长、是否完成、开始时刻，一次最多 50 条 —— **不含任务标题**，但加上时间戳就能看出一个人的作息'],
+          ['`log_focus`', '记录一次专注', '不读数据；写入必须经操作日志'],
+          ['`list_tags`', '列出标签', '标签标识与名称'],
+          ['`create_tag`', '新建标签', '不读数据；写入必须经操作日志'],
+          ['`set_task_tags`', '给任务设置标签', '不读数据；它按你显式给出的那一组**整组覆盖**该任务的标签（不是追加，没写进去的会被摘掉）'],
+          ['`create_project`', '新建清单', '不读数据；写入必须经操作日志'],
+          ['`list_notes`', '列出便签', '便签标识、所属清单、是否置顶到今天、最后修改时刻，一次最多 50 条 —— **不含正文**。便签没有标题，所以这一格出境的只有"什么时候动过"'],
+          ['`get_note`', '读取单条便签', '上面全部，**再加这张便签的正文全文**'],
+          ['`create_note`', '新建便签', '不读数据；写入必须经操作日志'],
+          ['`update_note`', '修改便签', '整段替换那张便签的正文（不是追加）'],
+          ['`list_reminders`', '列出提醒', '提醒标识、关联的任务标识、触发时刻、当前走到哪一步（还没到/已顺延/该响了/已响过/已忽略）—— **不含任务标题**'],
+          ['`create_reminder`', '新建提醒', '不读数据；写入必须经操作日志'],
         ],
       },
       {
@@ -279,6 +299,16 @@ const zh = [
         head: ['版本', '日期', '变化'],
         rows: [
           ['1.0', '2026-10-01', '首版草案（尚未生效）：逐字段出境表按实现写；明确不做脱敏；云端 AI 写作"当前不可用"；出境定性标为待法务复核。'],
+          [
+            '1.1',
+            '2026-10-03',
+            '第六节那张本机接口工具表加了四条倒数日工具（`list_events` / `get_event` / `create_event` / `update_event`），并写明倒数日标题往往本身就是内容；对账门禁 `pnpm check:legal-tools` 同批落地。',
+          ],
+          [
+            '1.2',
+            '2026-10-04',
+            '第六节那张表补齐**剩下的 16 条工具**（习惯 / 打卡 / 专注 / 标签 / 便签 / 清单 / 提醒）：目录已随 AI 覆盖面扩到 9 个实体 26 条，而条款只披露了 10 条。那句"未列出的工具视为未授权"把这张表变成了授权面，所以少一行就是对用户少说一项"打开之后别人读得到什么"。逐格取值按构建产物里的 `egressFields` 写，不写字段名以外的推测；`list_notes` 明确写明便签没有标题、列表出境的只有"什么时候动过"。',
+          ],
         ],
       },
     ],
@@ -442,6 +472,25 @@ const en = [
           ['`get_event`', 'Read one countdown in full', 'Everything above, **plus the complete note body of that entry** (only when one was written)'],
           ['`create_event`', 'Create a countdown', 'Reads nothing; writes go through the operation log'],
           ['`update_event`', 'Update a countdown', 'Only the fields explicitly supplied'],
+          // The same sixteen tools the second batch added (4 entities → 9), in the same order as
+          // the Chinese table — `pnpm check:legal-tools` asserts set equality against the catalog
+          // *and* row-by-row agreement between the two language tables.
+          ['`list_habits`', 'List habits', 'Habit id, name, daily target value, unit, goal type (at least / at most / exactly) — **no check-in records**'],
+          ['`create_habit`', 'Create a habit', 'Reads nothing; writes go through the operation log'],
+          ['`list_checkins`', 'List check-ins', 'Which habit, which date, the value recorded that day — 50 at a time. **Without habit names**, but "what you did on which day, and how much" is itself a behavioural record'],
+          ['`record_checkin`', 'Record a check-in', 'Reads nothing; writes go through the operation log'],
+          ['`list_focuses`', 'List focus sessions', 'Kind, related task id, planned duration, actual duration, whether completed, start time — 50 at a time. **Without task titles**, but timestamps alone already show a person's daily rhythm'],
+          ['`log_focus`', 'Log a focus session', 'Reads nothing; writes go through the operation log'],
+          ['`list_tags`', 'List tags', 'Tag ids and names'],
+          ['`create_tag`', 'Create a tag', 'Reads nothing; writes go through the operation log'],
+          ['`set_task_tags`', 'Set a task\'s tags', 'Reads nothing; it **replaces the whole tag set** of that task with the group you explicitly supply (not an addition — tags you leave out are removed)'],
+          ['`create_project`', 'Create a project', 'Reads nothing; writes go through the operation log'],
+          ['`list_notes`', 'List notes', 'Note id, owning project, whether pinned to today, last modified — 50 at a time, **without bodies**. Notes have no titles, so this row discloses only "when something was touched"'],
+          ['`get_note`', 'Read one note in full', 'Everything above, **plus the complete body of that note**'],
+          ['`create_note`', 'Create a note', 'Reads nothing; writes go through the operation log'],
+          ['`update_note`', 'Update a note', 'Replaces the note body outright (not an append)'],
+          ['`list_reminders`', 'List reminders', 'Reminder id, related task id, trigger time, current phase (pending / postponed / due / fired / dismissed) — **without task titles**'],
+          ['`create_reminder`', 'Create a reminder', 'Reads nothing; writes go through the operation log'],
         ],
       },
       {
@@ -534,6 +583,16 @@ const en = [
         head: ['Version', 'Date', 'Change'],
         rows: [
           ['1.0', '2026-10-01', 'First draft (not yet in force): field-by-field egress table written from the implementation; redaction explicitly disclaimed; cloud AI described as currently unavailable; the cross-border characterisation marked as pending legal review.'],
+          [
+            '1.1',
+            '2026-10-03',
+            'The local-interface tool table in section six gained the four countdown tools (`list_events` / `get_event` / `create_event` / `update_event`), together with the note that a countdown title is often itself the content; the reconciliation gate `pnpm check:legal-tools` landed in the same batch.',
+          ],
+          [
+            '1.2',
+            '2026-10-04',
+            'The same table now discloses **the remaining 16 tools** (habits / check-ins / focus / tags / notes / projects / reminders): the catalog had grown to 9 entities and 26 tools with the AI coverage work, while this document still listed 10. Because the sentence "a tool not listed is not granted" turns this table into the authorisation surface, a missing row is a missing disclosure of what becomes readable once a tool is enabled. Each cell follows the `egressFields` actually present in the built catalog, with no inference beyond the field names; `list_notes` states explicitly that notes have no titles, so the list projection discloses only "when something was touched".',
+          ],
         ],
       },
     ],
@@ -546,9 +605,11 @@ export const aiAndTransfer: LegalDocument = {
   // 版本号进同意指纹（`packages/legal/src/index.ts:125` 把每张文档拼成 `id@version`），
   // 改了文字而不 bump，等于让 1.0 那枚已存的同意去覆盖一段它没见过的话 ——
   // 这正是条款 s12 那条纪律禁止的事（"否则等于偷偷改"）。
-  version: '1.1',
+  // 🔴 1.1 → 1.2：同一张表又补了 16 条工具（目录 26 条此前只披露 10 条）。
+  // 触发的是同一句纪律，而且这次更直白：条款把这张表当授权面，表少一行 = 同意少一项。
+  version: '1.2',
   status: 'draft',
-  updatedDate: '2026-10-03',
+  updatedDate: '2026-10-04',
   title: {
     'zh-CN': 'AI 功能与数据流向',
     en: 'AI Features and Where Your Data Goes',

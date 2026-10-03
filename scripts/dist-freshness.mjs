@@ -32,6 +32,14 @@
  *
  * `--only` 是刻意的：判据的适用范围应当由"谁消费了它"决定，而不是由目录列表决定 ——
  * 后者会把别人正在改的包也算成我的问题。
+ *
+ * 🔴 `--only` 里认的是 `packages/` 下的**目录名**（`ui`），也认 `package.json` 里的
+ *    **规范包名**（`@heyta/ui`）—— 这两种写法指的是同一个包。名字两边都对不上的，
+ *    **一律 exit 1**（不受"默认永远 exit 0"那条豁免）：那种情况下体检根本没跑，
+ *    而它打印出来长得像"0 个落后 ⇒ 读的都是当前产物"。
+ *    实测：2026-10-03 传了 `@heyta/ui` 这类规范包名（旧版本只认目录名）得到
+ *    "5 个包 → 0 个包" 与一句假绿结论，而退出码是 0。
+ *    一条会因为拼错而**缩小范围**的参数必须响亮失败。
  */
 
 import fs from 'node:fs';
@@ -43,14 +51,49 @@ const SRC_EXTS = ['.ts', '.tsx', '.js', '.jsx'];
 
 const args = process.argv.slice(2);
 const strict = args.includes('--strict');
+const packagesDir = path.join(ROOT, 'packages');
+
+/**
+ * `--only` 的解析。目录名（`ui`）与规范包名（`@heyta/ui`）都认；**认不出的 exit 1**。
+ *
+ * 这里不受"默认永远 exit 0"那条豁免约束：那条豁免是给"落后但此刻正常"的，
+ * 而参数没匹配上是**体检根本没跑**。它原来会打印 `0 个包` +
+ * `落后于源码的产物：0 个（⇒ 本机判据读的都是当前产物）` 并退 0 ——
+ * 一句范围被拼错缩成空的假绿。
+ */
+function resolveOnly(raw) {
+  if (raw === undefined || raw.trim() === '') {
+    console.error('✗ `--only` 后面要跟逗号分隔的包名，例如 `--only ui,storage`');
+    process.exit(1);
+  }
+  const tokens = raw
+    .split(',')
+    .map((token) => token.trim())
+    .filter((token) => token.length > 0);
+  const resolved = [];
+  const unmatched = [];
+  for (const token of tokens) {
+    const candidate = token.startsWith('@heyta/') ? token.slice('@heyta/'.length) : token;
+    if (fs.existsSync(path.join(packagesDir, candidate, 'src'))) {
+      resolved.push(candidate);
+    } else {
+      unmatched.push(token);
+    }
+  }
+  if (unmatched.length > 0) {
+    console.error(
+      `✗ --only 里有 ${unmatched.length} 个名字没匹配到 packages/ 下带 src 的包：${unmatched.join(', ')}\n` +
+        `  可选的目录名：${fs.readdirSync(packagesDir).join(', ')}\n` +
+        `  （规范包名 @heyta/<目录名> 也认。）\n` +
+        `  🔴 不响亮失败的话这行会打印"0 个包 ⇒ 本机判据读的都是当前产物"并退 0。`,
+    );
+    process.exit(1);
+  }
+  return resolved;
+}
+
 const onlyFlagIndex = args.indexOf('--only');
-const only =
-  onlyFlagIndex === -1
-    ? null
-    : args[onlyFlagIndex + 1]
-        .split(',')
-        .map((name) => name.trim())
-        .filter((name) => name.length > 0);
+const only = onlyFlagIndex === -1 ? null : resolveOnly(args[onlyFlagIndex + 1]);
 
 /**
  * 取这个包**实际被消费的那个运行时入口文件**。
@@ -98,10 +141,10 @@ function newestSource(dir) {
   return file === '' ? null : { mtime, file };
 }
 
-const packagesDir = path.join(ROOT, 'packages');
-const names = (only ?? fs.readdirSync(packagesDir))
-  .map((name) => path.join(packagesDir, name))
-  .filter((full) => fs.existsSync(path.join(full, 'src')));
+const names = (
+  only ??
+  fs.readdirSync(packagesDir).filter((name) => fs.existsSync(path.join(packagesDir, name, 'src')))
+).map((name) => path.join(packagesDir, name));
 
 const rows = [];
 for (const full of names) {
@@ -143,7 +186,13 @@ for (const full of names) {
 const stale = rows.filter((r) => r.verdict === 'stale');
 const missing = rows.filter((r) => r.verdict === 'dist-missing');
 
-console.log(`dist 新鲜度体检（${new Date().toISOString()}，${rows.length} 个包）`);
+console.log(
+  `dist 新鲜度体检（${new Date().toISOString()}，${rows.length} 个包` +
+    (only === null
+      ? '：packages/ 下全部带 src 的包'
+      : `：--only 请求 ${only.length} 个，命中 ${rows.length} 个`) +
+    '）',
+);
 for (const row of rows) {
   if (row.verdict === 'stale') {
     console.log(

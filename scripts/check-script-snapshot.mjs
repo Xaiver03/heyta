@@ -58,6 +58,7 @@ const MANIFEST = [
   'scripts/verify-mobile-calendar.sh',
   'scripts/verify-mobile-capture.sh',
   'scripts/verify-mobile-conflict.sh',
+  'scripts/verify-mobile-due-time.sh',
   'scripts/verify-mobile-focus.sh',
   'scripts/verify-mobile-inbox.sh',
   'scripts/verify-mobile-ios.sh',

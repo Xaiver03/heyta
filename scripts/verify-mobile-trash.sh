@@ -32,17 +32,27 @@ trap 'rm -f -- "$0"' EXIT
 # 更具体的一条：本轮之前 `apps/node-host` 的 `trash` 命令**只列任务**。
 # 也就是说"笔记本的回收站里有没有这条清单"在那台设备上**根本没有读通道** ——
 # 而缺读通道和真的没收到，在输出上长得一模一样（§7 元规则一：先怀疑探针）。
-# W6-a/W6-b 把四路合并搬进 `@heyta/domain` 并让 CLI 用上之后，下面第 8 步
+# W6-a/W6-b 把四路合并搬进 `@heyta/domain` 并让 CLI 用上之后，下面第 7 步
 # 这两条判据才第一次**存在**（不是"第一次通过"）。
 #
 # ═════════════════════════════════════════════════════════════════════════
-# 五条判据，每条都把"点了"与"生效了"分开证
+# 六条判据，每条都把"点了"与"生效了"分开证
 #
 #   ① 手机删便签 → **服务端日志出现该账号的请求行**（快腿，证自动同步触发）
 #   ② 手机回收站**列出**那条便签，点恢复后那一行消失、便签回到活体列表
 #   ③ 手机点「恢复」→ 笔记本 `notes` **读得到它活着**（跨设备的还原）
 #   ④ 手机删清单 → 笔记本的回收站**也**列出它（"在回收站"这件事本身跨设备）
 #   ⑤ 全程不点任何同步按钮 —— 且**脚本自己检查自己**不含那一下点击（第 0.5 步）
+#   ⑥ 手机删标签 → 点一下**只出确认行、一条 op 都不写**，取消也不写，
+#      点「确认删除」才恰好写 1 条 `TAG/DEL`（W4b；第 6b 步）
+#
+# 🔴 ⑥ 为什么归进这个脚本而不是另起一条：标签**不进回收站**（§7.1 P-1），
+#    它是这一族删除里唯一"删了没地方捞"的那一类，判据必须能失败在**那一下点击**上；
+#    而这条链的载体（真模拟器 + 真库 + 能数 op 的通道）与上面五条完全重合。
+#
+# ⚠️ ⑥ 只证到"问句出现在设备上 + 两步各自写不写 op"。**没证**那句影响面的**数字**
+#    （"它挂在 N 条任务上"）—— 那要先给一条任务挂上标签，属于标签归属的验收而不是这一档。
+#    数字那一半钉在 `apps/web/tests/projects-panel.spec.tsx` 的渲染结果上。
 #
 # ⚠️ ② 用便签、④ 用清单：**一类只测一端等于没测**。四路合并里漏一路的症状
 #    不是报错，而是"这一类能还原却根本不出现在列表里"。
@@ -413,6 +423,103 @@ fi
 $ADB exec-out screencap -p > "$EVIDENCE/android-trash-3-phone-list.png" 2>/dev/null
 back_from_trash
 
+step "6b. W4b：标签删除要两步 —— 点一下**一条 op 都不许多写**，确认才写"
+# 🔴 为什么设备级也要钉一次：标签**不进回收站**（§7.1 P-1 拍板：重建成本≈0，
+#    防护改成"删之前告诉你影响几条任务"）。于是"按下即删"这个坏法**没有第二处能拦** ——
+#    删掉的标签在活体列表里不留痕、回收站里也找不到，而重新建一个同名标签拿到的是
+#    **新 id**，原来那些任务的归属不会回来。这一档唯一的价值就是那一下被拦住。
+TAG_T="tag-e2e-$(date +%H%M%S)"
+go_profile || exit 1
+XY=$(scroll_to_desc "给新标签起个名字")
+if [ -z "$XY" ]; then bad "找不到标签输入框（「给新标签起个名字」）"; screen_txt; exit 1; fi
+$ADB shell input tap $XY; sleep 1.2
+clear_and_type "$TAG_T" "给新标签起个名字"
+XY=$(scroll_to_desc "新建标签")
+if [ -z "$XY" ]; then bad "找不到「新建标签」按钮"; screen_txt; exit 1; fi
+$ADB shell input tap $XY; sleep 3
+dump
+if [ "$(has_desc "删除标签「${TAG_T}」")" != "1" ]; then
+  blame_crash "点「新建标签」" || bad "建完之后标签行没出现（找不到「删除标签「${TAG_T}」」）"
+  screen_txt; exit 1
+fi
+ok "标签已建：$TAG_T"
+phone_db_pull_trash
+BEFORE_TAG=$(entity_op_count TAG DEL)
+if ! printf '%s' "$BEFORE_TAG" | grep -qE '^[0-9]+$'; then
+  bad "读不到手机库的 TAG/DEL 基线计数（库没拉下来？）"; exit 1
+fi
+
+# ── 第一步：点删除，只许出确认行，一条 op 都不许多写 ──────────
+XY=$(scroll_to_desc "删除标签「${TAG_T}」")
+if [ -z "$XY" ]; then bad "标签行上没有删除入口"; screen_txt; exit 1; fi
+$ADB shell input tap $XY; sleep 3
+dump
+if [ "$(has_desc "确认删除")" != "1" ]; then
+  blame_crash "点标签删除" || bad "点了删除却没出现确认行（没有「确认删除」那个入口 —— 很可能是按下即删）"
+  screen_txt; exit 1
+fi
+if [ "$(has_text "确定要删除「${TAG_T}」吗？")" != "1" ]; then
+  bad "确认行里没有那句问句（词条没落到设备上，或渲染的不是共享那一行）"; screen_txt
+else
+  ok "确认行出现，问句是共享层那句"
+fi
+phone_db_pull_trash
+MID_TAG=$(entity_op_count TAG DEL)
+if ! printf '%s' "$MID_TAG" | grep -qE '^[0-9]+$'; then
+  bad "读不到点删除之后的 TAG/DEL 计数"
+elif [ "$MID_TAG" != "$BEFORE_TAG" ]; then
+  bad "只点了一下删除就多写了 op（${BEFORE_TAG} → ${MID_TAG}）—— 这一档存在的全部意义就是拦住那一下"
+else
+  ok "点删除**一条 op 都没写**（TAG/DEL 仍为 ${MID_TAG}）"
+fi
+$ADB exec-out screencap -p > "$EVIDENCE/android-trash-4-tag-confirm.png" 2>/dev/null
+
+# ── 第二步：取消，同样一条都不写，且那条标签必须还在 ──────────
+XY=$(scroll_to_desc "取消删除")
+if [ -z "$XY" ]; then bad "确认行里没有「取消删除」入口"; screen_txt; exit 1; fi
+$ADB shell input tap $XY; sleep 3
+dump
+if [ "$(has_desc "删除标签「${TAG_T}」")" != "1" ]; then
+  bad "点「取消删除」之后那条标签不在了（取消被当成了确认）"; screen_txt
+else
+  ok "取消之后那条标签还在"
+fi
+phone_db_pull_trash
+CANCEL_TAG=$(entity_op_count TAG DEL)
+if ! printf '%s' "$CANCEL_TAG" | grep -qE '^[0-9]+$'; then
+  bad "读不到取消之后的 TAG/DEL 计数"
+elif [ "$CANCEL_TAG" != "$BEFORE_TAG" ]; then
+  bad "点「取消删除」却写了 op（${BEFORE_TAG} → ${CANCEL_TAG}）"
+else
+  ok "取消同样一条 op 都没写"
+fi
+
+# ── 第三步：确认才真的写，且恰好一条 ──────────────────────────
+XY=$(scroll_to_desc "删除标签「${TAG_T}」")
+if [ -z "$XY" ]; then bad "第二次找不到那条标签的删除入口"; screen_txt; exit 1; fi
+$ADB shell input tap $XY; sleep 3
+XY=$(scroll_to_desc "确认删除")
+if [ -z "$XY" ]; then bad "第二次点删除后确认行没出来"; screen_txt; exit 1; fi
+$ADB shell input tap $XY; sleep 3
+phone_db_pull_trash
+AFTER_TAG=$(entity_op_count TAG DEL)
+if ! printf '%s' "$AFTER_TAG" | grep -qE '^[0-9]+$'; then
+  bad "读不到确认之后的 TAG/DEL 计数"
+else
+  WANT_TAG=$((BEFORE_TAG + 1))
+  if [ "$AFTER_TAG" -ne "$WANT_TAG" ]; then
+    bad "确认之后 TAG/DEL 不是恰好 +1（${BEFORE_TAG} → ${AFTER_TAG}，应为 ${WANT_TAG}）—— 多写就是 fan-out"
+  else
+    ok "确认之后恰好写了 1 条 TAG/DEL —— 一个意图一条 op"
+  fi
+  dump
+  if [ "$(has_desc "删除标签「${TAG_T}」")" = "1" ]; then
+    bad "确认删除之后那条标签还在活体列表里（写了 op 却没生效到界面）"; screen_txt
+  else
+    ok "确认之后那条标签从活体列表消失"
+  fi
+fi
+
 step "7. 判据 ③/④ 的对端：笔记本的回收站两类都列出、便签读得到活着"
 # 🔴 这一整步在 W6-b 之前**不可能存在**：那时 node-host 的 `trash` 只吐任务，
 #    便签与清单在笔记本侧读不出来，"跨设备的回收站"这句话只能靠界面推断。
@@ -456,9 +563,9 @@ else
 fi
 
 step "9. 截图证据落库"
-for f in android-trash-1-phone-note.png android-trash-2-phone-restored.png android-trash-3-phone-list.png; do
+for f in android-trash-1-phone-note.png android-trash-2-phone-restored.png android-trash-3-phone-list.png android-trash-4-tag-confirm.png; do
   if [ -s "$EVIDENCE/$f" ]; then ok "证据在库：apps/mobile/evidence/$f"; else bad "证据缺失：apps/mobile/evidence/$f"; fi
 done
-echo "   📷 三张图（**人必须打开看**）：回收站里有那条便签 / 点恢复之后 / 回收站里有那条清单"
+echo "   📷 四张图（**人必须打开看**）：回收站里有那条便签 / 点恢复之后 / 回收站里有那条清单 / 标签那条的删除确认行"
 
 summary "回收站跨设备：删除事实与还原都要走完 op-log → E2EE → 服务端 → 另一台设备"

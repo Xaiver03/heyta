@@ -349,10 +349,10 @@ export class OperationUploadService {
 
     // Once a full-history migration commits, every subsequent write must use
     // the published payload generation. This check is intentionally inside
-    // the same RepeatableRead transaction as the sequence allocation. A
-    // migration racing this request either waits on the shared user_sync_state
-    // row and makes this transaction fail serialization, or observes the new
-    // lastSeq and rejects its stale expectedLatestSeq.
+    // the same transaction as the sequence allocation. The caller locks the
+    // per-user sync state before entering this reducer, so a migration racing
+    // this request waits on the same row and cannot publish a new payload
+    // generation between this check and the write.
     const activePayload = await tx.vaultKeyPackage.findUnique({
       where: { userId },
       select: { activePayloadKeyVersion: true },
@@ -397,16 +397,10 @@ export class OperationUploadService {
     });
     const serverSeq = updatedState.lastSeq;
 
-    // No post-allocation conflict re-check is needed here. Under RepeatableRead
-    // every statement in this transaction reads one snapshot fixed at its first
-    // statement, and nothing between the conflict check above and this point
-    // writes to `operations`, so a second detectConflict would read the identical
-    // row set. Concurrent uploads are excluded by the lastSeq increment above:
-    // any committed concurrent upload for the same user wrote the same
-    // user_sync_state row, so the increment raises a serialization failure
-    // (40001) before this point is reached. See ARCHITECTURE-DECISIONS.md #4 —
-    // lowering the isolation level below REPEATABLE READ would require
-    // reinstating a post-allocation re-check.
+    // No post-allocation conflict re-check is needed here. The upload transaction
+    // already holds the user's sync-state row lock from its first statements;
+    // concurrent uploads and migrations for this account therefore cannot commit
+    // an intervening operation or payload generation before this increment.
 
     // Keep the exact validated clock. It is part of the operation's causal
     // proof and must never be top-K pruned before persistence.

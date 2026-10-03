@@ -670,9 +670,9 @@ def type_text(idb, companion, udid, label, want_pressable, want_field, role, val
         out["typedRc"] = f"text-failed {str(e)[:80]}"
         return out
     time.sleep(0.8)
-    # 🔴 **回读前必须先收键盘** —— 理由同 `--set`：聚焦中的 secure 框在键盘
-    #    弹着时会从 AX 树上消失，回读永远拿不到掩码（第 6 轮实测）。
-    dismiss_keyboard(idb, companion, udid)
+    # 普通 TextInput 先在键盘仍显示时回读；点击 return/完成可能触发
+    # onSubmitEditing（任务 Composer 会因此被提交并关闭）。只有字段因 secure
+    # 聚焦从 AX 树隐藏时，才收键盘后重读。
     fresh = dump_nodes(idb, companion, udid)
     tx, ty, tw, th = frame_of(node)
     back = None
@@ -680,6 +680,13 @@ def type_text(idb, companion, udid, label, want_pressable, want_field, role, val
         if is_field(n) and frame_of(n) == (tx, ty, tw, th):
             back = n.get("AXValue")
             break
+    if back is None:
+        dismiss_keyboard(idb, companion, udid)
+        fresh = dump_nodes(idb, companion, udid)
+        for n in fresh:
+            if is_field(n) and frame_of(n) == (tx, ty, tw, th):
+                back = n.get("AXValue")
+                break
     if back is None:
         for n in fresh:
             if is_field(n) and label_of(n) == label_of(node):

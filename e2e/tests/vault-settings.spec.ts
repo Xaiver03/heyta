@@ -20,6 +20,18 @@ const ACCOUNT_ID = 'vault-browser-account-1';
 const ROOT = fileURLToPath(new URL('../../', import.meta.url));
 const EVIDENCE = `${ROOT}apps/web/evidence/vault-panel`;
 
+// Even synthetic recovery codes should not be retained in traces or videos.
+test.use({ trace: 'off', video: 'off', screenshot: 'off' });
+async function screenshot(page: Page, filename: string): Promise<void> {
+  await page.screenshot({ path: `${EVIDENCE}/${filename}`, fullPage: false, mask: [
+    page.getByTestId('vault-recovery-display'), page.getByTestId('vault-recovery-code'),
+    page.getByTestId('vault-recovery-confirm'),
+  ] });
+}
+test.afterEach(async ({ page }, info) => {
+  if (info.status !== info.expectedStatus) await screenshot(page, 'fixture-failure.png');
+});
+
 async function seedCredentials(page: Page): Promise<void> {
   await page.addInitScript(({ server, accountId }) => {
     localStorage.setItem('heyta.sync.credentials', JSON.stringify({
@@ -56,7 +68,7 @@ async function installHttpFixture(page: Page): Promise<{
         await route.fulfill({
           status: 200,
           contentType: 'application/json',
-          body: JSON.stringify({ package: packageData, payloadKeyVersion: null }),
+          body: JSON.stringify({ package: packageData, payloadKeyVersion: 1 }),
         });
       }
       return;
@@ -65,7 +77,7 @@ async function installHttpFixture(page: Page): Promise<{
       putCount += 1;
       const body = route.request().postDataJSON() as { package?: Record<string, unknown> };
       packageData = body.package;
-      await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ package: packageData }) });
+      await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ package: packageData, payloadKeyVersion: 1 }) });
       return;
     }
     await route.fulfill({ status: 405, contentType: 'application/json', body: '{}' });
@@ -127,9 +139,9 @@ test('vault settings: create, confirm, lock, recovery unlock and change passphra
   const browserErrors: string[] = [];
   const notFoundResponses: string[] = [];
   page.on('console', (message) => {
-    if (message.type() === 'error') browserErrors.push(`[console.error] ${message.text()}`);
+    if (message.type() === 'error') { browserErrors.push(`[console.error] ${message.text()}`); console.error(message.text()); }
   });
-  page.on('pageerror', (error) => browserErrors.push(`[pageerror] ${error.message}`));
+  page.on('pageerror', (error) => { browserErrors.push(`[pageerror] ${error.message}`); console.error(error.message); });
   page.on('response', (response) => {
     if (response.status() === 404) notFoundResponses.push(`${response.request().method()} ${response.url()}`);
   });
@@ -146,11 +158,12 @@ test('vault settings: create, confirm, lock, recovery unlock and change passphra
   await page.getByRole('button', { name: 'Sync settings' }).click();
   const dialog = page.getByRole('dialog');
   await expect(dialog).toBeVisible();
+  await screenshot(page, '00-loaded-light.png');
   await expect(dialog.getByTestId('vault-create-form')).toBeVisible();
   await dialog.getByTestId('vault-create-passphrase').fill('correct horse battery staple');
   await dialog.getByTestId('vault-create').click();
   await expect(dialog.getByTestId('vault-recovery-display')).toBeVisible();
-  await page.screenshot({ path: `${EVIDENCE}/01-created-light.png`, fullPage: false });
+  await screenshot(page, '01-created-light.png');
   expect(fixture.putCount(), 'unconfirmed recovery code must not publish a package').toBe(0);
 
   const recoveryCode = await dialog.getByTestId('vault-recovery-display').textContent();
@@ -158,7 +171,7 @@ test('vault settings: create, confirm, lock, recovery unlock and change passphra
   await dialog.getByTestId('vault-recovery-confirm').fill(recoveryCode ?? '');
   await dialog.getByTestId('vault-publish').click();
   await expect(dialog.getByTestId('vault-ready')).toBeVisible();
-  await page.screenshot({ path: `${EVIDENCE}/02-ready-light.png`, fullPage: false });
+  await screenshot(page, '02-ready-light.png');
   expect(fixture.putCount()).toBe(1);
   expect(fixture.published()).toBeDefined();
 
@@ -172,12 +185,14 @@ test('vault settings: create, confirm, lock, recovery unlock and change passphra
   await page.getByRole('button', { name: 'Sync settings' }).click();
   const reloadedDialog = page.getByRole('dialog');
   await expect(reloadedDialog.getByTestId('vault-unlock-form')).toBeVisible();
-  await page.screenshot({ path: `${EVIDENCE}/03-locked-after-reload-light.png`, fullPage: false });
+  await screenshot(page, '03-locked-after-reload-light.png');
 
+  await page.getByRole('button', { name: 'Close sync settings' }).click();
+  await page.getByRole('button', { name: 'Switch to dark theme', exact: true }).click();
+  await page.getByRole('button', { name: 'Sync settings', exact: true }).click();
   await reloadedDialog.getByTestId('vault-recovery-code').fill('0000-0000-0000-0000-0000-0000-0000-0000-0000');
   await reloadedDialog.getByTestId('vault-unlock-recovery').click();
-  await page.evaluate(() => document.documentElement.setAttribute('data-theme', 'dark'));
-  await page.screenshot({ path: `${EVIDENCE}/04-wrong-recovery-dark.png`, fullPage: false });
+  await screenshot(page, '04-wrong-recovery-dark.png');
   await expect(reloadedDialog.getByTestId('vault-error')).toBeVisible();
   await expect(reloadedDialog.getByTestId('vault-unlocked')).toHaveCount(0);
 
@@ -197,7 +212,7 @@ test('vault settings: create, confirm, lock, recovery unlock and change passphra
   await reloadedDialog.getByTestId('vault-recovery-confirm').fill(nextRecoveryCode ?? '');
   await reloadedDialog.getByTestId('vault-publish').click();
   await expect(reloadedDialog.getByTestId('vault-ready')).toBeVisible();
-  await page.screenshot({ path: `${EVIDENCE}/05-ready-dark.png`, fullPage: false });
+  await screenshot(page, '05-ready-dark.png');
   expect(fixture.putCount()).toBe(2);
   expect(await storageDump(page)).not.toContain(nextRecoveryCode!.replaceAll('-', ''));
   expect(fixture.unexpected(), `unexpected fixture requests: ${fixture.unexpected().join(' | ')}`).toEqual([]);
@@ -206,10 +221,8 @@ test('vault settings: create, confirm, lock, recovery unlock and change passphra
   // instead of weakening the console/pageerror capture for unrelated errors.
   expect(notFoundResponses, `404 responses: ${notFoundResponses.join(' | ')}`).toEqual([
     `GET ${SERVER}/api/sync/key-package`,
-    `GET ${SERVER}/api/sync/key-package`,
   ]);
   expect(browserErrors, `browser errors: ${browserErrors.join(' | ')}`).toEqual([
-    '[console.error] Failed to load resource: the server responded with a status of 404 (Not Found)',
     '[console.error] Failed to load resource: the server responded with a status of 404 (Not Found)',
   ]);
 });

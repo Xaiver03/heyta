@@ -288,7 +288,11 @@ export class VaultKeyMigrationService {
           opType: row.opType,
           entityType: row.entityType,
           ...(row.entityId === null ? {} : { entityId: row.entityId }),
-          entityIds: row.entityIds,
+          // Keep the authenticated operation identity canonical with the
+          // ordinary download route. Prisma represents the nullable wire
+          // field as an empty array for single-entity operations, while the
+          // payload AAD treats omitted and [] differently.
+          ...(row.entityIds.length > 0 ? { entityIds: row.entityIds } : {}),
           timestamp: Number(row.clientTimestamp),
           schemaVersion: row.schemaVersion,
           payload: row.payload,
@@ -609,14 +613,45 @@ export class VaultKeyMigrationService {
           WHERE id = ${userId}
         `;
       }
-      await tx.vaultKeyPackage.update({
+      // Wrapper-only rewraps use the same sync-state/user lock order as this
+      // commit. Keep a database CAS as a second fence: if an older process or
+      // an out-of-band writer changed the package despite the lock, never
+      // overwrite that wrapper with the migration's stale target package.
+      const currentPackage = await tx.vaultKeyPackage.findUnique({
         where: { userId },
+        select: { keyVersion: true, packageData: true },
+      });
+      const currentPackageData = vaultKeyPackageSchema.safeParse(currentPackage?.packageData);
+      if (!currentPackage || !currentPackageData.success ||
+          currentPackage.keyVersion !== migration.expectedKeyVersion) {
+        throw new VaultKeyMigrationError(
+          'stale_key_version',
+          'key package changed while the payload migration was staging',
+          409,
+        );
+      }
+      const packageUpdated = await tx.vaultKeyPackage.updateMany({
+        where: {
+          userId,
+          keyVersion: migration.expectedKeyVersion,
+          packageData: {
+            path: ['rootKeyFingerprint'],
+            equals: currentPackageData.data.rootKeyFingerprint,
+          },
+        },
         data: {
           keyVersion: migration.keyVersion,
           packageData: migration.packageData as Prisma.InputJsonValue,
           activePayloadKeyVersion: migration.targetPayloadKeyVersion,
         },
       });
+      if (packageUpdated.count !== 1) {
+        throw new VaultKeyMigrationError(
+          'stale_key_version',
+          'key package changed while the payload migration was staging',
+          409,
+        );
+      }
       await tx.vaultKeyMigrationOperation.deleteMany({ where: { migrationId: migration.id } });
       await tx.vaultKeyMigrationChunk.deleteMany({ where: { migrationId: migration.id } });
       const published = await tx.vaultKeyMigration.update({

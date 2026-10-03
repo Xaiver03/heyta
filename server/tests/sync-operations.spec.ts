@@ -308,6 +308,17 @@ vi.mock('../src/db', async () => {
       if (isEntityArrayBranchQuery(strings)) {
         return entityArrayBranchRows(state.operations, params);
       }
+      if (sql.includes('FROM user_sync_state') && sql.includes('FOR UPDATE')) {
+        const [userId] = params as [number];
+        const syncState = state.userSyncStates.get(userId);
+        return [{
+          lastSeq: syncState?.lastSeq ?? 0,
+          latestStateReplacementSeq: syncState?.latestStateReplacementSeq ?? null,
+        }];
+      }
+      if (sql.includes('SELECT id FROM users WHERE id') && sql.includes('FOR UPDATE')) {
+        return [];
+      }
       // Full-state op uploads aggregate prior vector clocks in the same transaction.
       if (sql.includes('jsonb_each_text(vector_clock)')) {
         const [userId, beforeServerSeq] = params;
