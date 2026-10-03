@@ -3701,3 +3701,35 @@ grep -nE '^38\. ' "$F" | cut -c1-80                                             
 `AGENTS.md` / `environment-traps.md` 本会话仍不改：两者都在别的线手里未提交（`M`），
 `git commit --only -- <文件>` 会把别人的 hunk 一起带走；缺号与重号怎么处置（补条目还是改引用）
 是那个文件所有者的决定，本线只把现量和命令交出去。
+
+#### §15.43z（10-04 07:34）③ 的 Windows 判据查出两件事：那条快捷方式腿**从未落进任何在盘产物**，而五事实对账原来能被一句散文满足
+
+先把结论的形状说清，免得下一个人把这两件事读成一件：
+
+1. **`SHORTCUT_OK=True` 这条腿的证据面是空的**（07:22 现量）。`windows-pc:C:/src/heyta-msix/install-capture.txt`
+   只有四条（`ADD_APPX=OK / PAYLOAD_WEBDIST=True / M2D=OK / RESULT=OK`，408 B，**行尾是 \r**），
+   本机与载体里也搜不到任何含 `SHORTCUT_OK` 的产物（只有生产侧脚本自己）。
+   ⚠️ 这**不**推翻"快捷方式当时创建成功了"那次交付 —— 那条腿读回的是 `.lnk` 本体
+   （`install-and-capture.ps1:129-133`：`CreateShortcut` 回读 + `-like '*shell:AppsFolder*'` + `Test-Path`），
+   那趟的读数在会话 stdout 里，**没有落成产物文件**。
+   ⇒ 对 ③ 的实际含义：**这一轮是这条腿第一次被真机写进取证文件**，红了就是真红，不是"判据坏了吗"。
+2. **五事实对账原来是子串匹配**：喂一行散文 `注：期望 SHORTCUT_OK=True 未满足` 进去，它报"5 条全在位"并退 0。
+   ⇒ 改成整行匹配 `tr -d '\r' | grep -qxF`（提交 `214b5fd3`）。两个方向都不能松：
+   **不剥 \r 就把真绿判成假红**（取证文件确实在 Windows 侧写、实测每行以 \r 结尾），
+   **不整行比就挡不住散文**。
+
+六腿现量（收紧前 → 收紧后，夹具在 `/tmp/facts*.txt`）：
+
+| 输入 | 收紧前 | 收紧后 | 这条腿判的是 |
+|---|---|---|---|
+| 四条事实（缺 SHORTCUT） | rc=1 | rc=1 | 有牙 |
+| 五条事实 LF | rc=0 | rc=0 | 正常放行 |
+| `SHORTCUT_CREATED=False` + 失败 message | rc=1 | rc=1 | 创建失败挡得住 |
+| **散文里出现 `SHORTCUT_OK=True`** | **rc=0** | **rc=1** | 洞关上（唯一行为变化） |
+| 五条事实 **CRLF** 版 | rc=0 | rc=0 | 不因 \r 假红 |
+| windows-pc 上那份真产物 | rc=1 缺 SHORTCUT_OK=True | **逐字相同** | 真数据零行为变化 |
+
+顺带核了一处"抄件会不会漂"：`scripts/check-shell-surfaces.mjs:84` 提到 `PAYLOAD_WEBDIST=` 只是注释转述，
+**不是第二份清单**；判据的唯一定义仍在 `scripts/lib/msix-install-facts.sh`，两个消费者
+（`reinstall-all.sh:272` 与 `package-msix.sh:85`）都调它，且都把"缺一条"变成失败
+（前者不置 `RESULT_windows=OK`，后者 `exit 1`）。
