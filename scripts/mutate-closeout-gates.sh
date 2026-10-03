@@ -182,5 +182,66 @@ fi
 wait 2>/dev/null || true
 rm -rf "$UFD"
 
+say "V) 第 7 步的逐屏收集：区块在首屏之外必须算数，真缺一个必须报红"
+# 🔴 载体：**从脚本里原样抽出收集块**（不另抄一份逻辑 —— 抄的那份迟早和脚本漂移），
+#    把它的三个观测函数与 dump 接到"虚拟滚动"夹具上：一屏一个 XML，往下滚=下一屏，
+#    往上滚=上一屏。这样测的是脚本本体，而 /tmp/ui.xml 一个字都不碰
+#    （那台机器上随时可能正有别人的设备验收在读它）。
+VFD=$(mktemp -d); VXML="$VFD/ui.xml"; VSCR="$VFD/screens"; mkdir -p "$VSCR"
+HFN="$(grep -E '^has_(text|desc|desc_sub)\(\)' "$REPO/scripts/lib/mobile-e2e.sh" | sed "s#/tmp/ui.xml#$VXML#g")"
+[ -n "$HFN" ] || no "V0 没从 lib 里取出那三个观测函数（形状变了？）"
+VBLK="$(awk 'f && /^  if \[/{exit} f{print} /^  DOWN=0$/{f=1}' "$REPO/scripts/verify-mobile-repeat.sh")"
+[ -n "$VBLK" ] || no "V0 没从第 7 步抽出收集块（形状变了？）"
+cat > "$VFD/stubs.sh" <<'VSTUB'
+VPOS=0; VDN=0; VUP=0
+sleep(){ :; }
+dump(){ cat "$VDIR/$VPOS.xml" > "$VXML"; }
+ADB=swipe_stub
+swipe_stub(){
+  if [ "$5" = 1900 ]; then VDN=$((VDN+1)); VPOS=$((VPOS+1)); [ "$VPOS" -gt 2 ] && VPOS=2
+  else VUP=$((VUP+1)); VPOS=$((VPOS-1)); [ "$VPOS" -lt 0 ] && VPOS=0; fi
+}
+VSTUB
+run_vcase() {
+  cat "$VFD/stubs.sh" > "$VFD/prog.sh"
+  printf '%s\n' "$HFN" >> "$VFD/prog.sh"
+  printf '%s\n' "$VBLK" >> "$VFD/prog.sh"
+  cat >> "$VFD/prog.sh" <<'VTAIL'
+echo "HAS=$HAS_HEADING MIS=$MISSING DOWN=$DOWN DN=$VDN UP=$VUP POS=$VPOS"
+VTAIL
+  VDIR="$VSCR" VXML="$VXML" bash "$VFD/prog.sh"
+}
+
+# —— V1：真实形状（整块在首屏之外，滚两屏收齐）——
+printf '<hierarchy><node text="截止 2026-10-03"/></hierarchy>\n' > "$VSCR/0.xml"
+printf '<hierarchy><node text="重复"/><node content-desc="不重复"/><node content-desc="每天"/><node content-desc="每周"/></hierarchy>\n' > "$VSCR/1.xml"
+printf '<hierarchy><node content-desc="工作日"/><node content-desc="每月"/><node content-desc="每年"/></hierarchy>\n' > "$VSCR/2.xml"
+V1=$(run_vcase)
+if [ "$V1" = "HAS=1 MIS=: DOWN=2 DN=2 UP=2 POS=0" ]; then
+  ok "V1 区块在首屏之外：滚 2 屏收齐、两个断言都算绿（原来这两条实测三趟全红）"
+else
+  no "V1 首屏之外收齐没做到？读数是「$V1」"
+fi
+
+# —— V2：六个预设里真的少一个（正是 W3 担心的"产物里没有每年"）——
+printf '<hierarchy><node content-desc="工作日"/><node content-desc="每月"/></hierarchy>\n' > "$VSCR/2.xml"
+V2=$(run_vcase)
+if [ "$V2" = "HAS=1 MIS=:每年: DOWN=5 DN=5 UP=5 POS=0" ]; then
+  ok "V2 缺「每年」时照样报缺（收集逻辑不是"滚到就算全有"）"
+else
+  no "V2 🔴 缺一个却没报出来，读数是「$V2」—— 这条判据没牙"
+fi
+
+# —— V3：整个区块都没接上 ——
+printf '<hierarchy><node text="截止 2026-10-03"/></hierarchy>\n' > "$VSCR/1.xml"
+printf '<hierarchy><node text="提醒"/></hierarchy>\n' > "$VSCR/2.xml"
+V3=$(run_vcase)
+if [ "$V3" = "HAS=0 MIS=:不重复:每天:每周:工作日:每月:每年: DOWN=5 DN=5 UP=5 POS=0" ]; then
+  ok "V3 整块不存在时两条都红（滚满 5 屏也不会自己变绿）"
+else
+  no "V3 🔴 整块没有却读出「$V3」—— 这条判据没牙"
+fi
+rm -rf "$VFD"
+
 printf '\n=== 合计 %d 绿 / %d 红 ===\n' "$PASS" "$FAIL"
 [ "$FAIL" = "0" ] || exit 1
