@@ -483,3 +483,71 @@ AI 侧不会有任何东西提醒我们」。**这句已被同日稍后的口头
 另外两条边界条件也未被跨越：`CURRENT_SCHEMA_VERSION` 仍是 **1**
 （`packages/shared-schema/src/schema-version.ts:36`），本批**没有**给任何持久化模型加必填字段
 （新增的六个 pack 全部只读既有实体 + 写既有 payload 形状）。
+
+## 11. 合流态实测（2026-10-03，把 `main` 合进本批分支后逐段跑）
+
+登记"合流后自然消失"是一句**断言**；这一节是它的**读数**。载体是一条**临时**分支，
+本批那条分支（`1b7fdb5e`）与 `main` 都没被改动，**未 push**。
+
+| 项 | 现量 |
+|---|---|
+| 合并载体 | 临时分支 `tmp/ai-cov-on-main` = 合并提交 `3ad21570`（父：本批 `1b7fdb5e` + `main` `a04753b6`） |
+| 落后量 | 合并前 `HEAD..main` = **76 笔** |
+| 文件交集 | 本批改动 57 枚 / `main` 改动 127 枚 / 交集 **5 枚** |
+| 真冲突 | **1 个文件 2 处**（`docs/plans/ai-assistant-closure.md` 的 D-3 两行）；其余 4 枚（ADR-0045、`docs/plans/README.md`、两份词条表）自动合并 |
+| 词条表合并后 | `en.ts` / `zh-CN.ts` 各 **2847 键**、重复 **0**、两边键集差 **0 / 0** —— 这是"合并会不会把双语词条并坏"的判据，不是"看起来没红" |
+| 链的段数 | 本批 **57 段** → 合并态 **61 段**（`main` 新增 `check:licenses:stamp` / `check:calendar` / `check:holiday` / `check:mobile-first-run-gate`）；本批的 `check:ai-coverage` 在第 **51** 段，**一段都没丢** |
+
+### 11.1 逐段读数：61 段里实跑 55 段全绿，6 段是**按规则不跑**
+
+`pnpm build` 先跑（rc=0，且 `packages/local-api/dist/index.js` 比 `src/tools/tag.ts` 新 158 秒
+⇒ 后面读 dist 的那几道门禁证的是当前源码）。其余逐段 `NO_COLOR=1 pnpm <段>`，每段单独退出码
+落 `/tmp/merge-gates.log`，末行自带分母对账：
+
+- **54 段实跑，全部 rc=0**（第一轮 `SEGMENTS_RUN=30 GREEN=30 RED=0` +
+  第二轮 `SEGMENTS_RUN=24 GREEN=24 RED=0`）—— 含 `check:ai-tools`（那五条隐私不变量）
+  **盖着 `main` 的倒数日实现**跑绿，也含 `check:macos-window` / `check:arkts` /
+  `check:mobile-bundle` / `screenshot:verify`。
+- **未跑的 6 段与原因（不是遗漏）**：`check:ai-e2e`（它的 preflight 会 SIGKILL 别人的
+  dev server ⇒ 本仓硬禁止）、`check:privacy-consent-e2e` / `check:landing-e2e` /
+  `check:web-storage` / `check:web-migration`（都要起 dev server 抢端口）、`-r test`。
+  现量现场：并行会话 `heyta-wt-closeout` 正在跑 `verify-mobile-repeat` + 一枚
+  Playwright Chromium，`uptime` = `load averages: 18.11 / 16 核`。
+  在这种负载下跑全量单测只会得到**无法归因的红**，所以留到窗口空闲再补，
+  并把它算作"未测"而不是"通过"。
+
+三条"本批红过、合并态绿了"的对照，正是那句"分支落后所致"从推断升成实测：
+
+| 段 | 本批分支上 | 合并态 | 合并态打印的分母 |
+|---|---|---|---|
+| `check:docs` | 🔴 4 条死链（全指向倒数日那三个文件） | ✅ **0 条** | 245 个 Markdown / 1590 个相对链接 / 429 处跨文档章节引用 / 54 处页内锚点 |
+| `typecheck` | 🔴 2 条（`hosted-account-profile.spec.ts:138/156`） | ✅ 全包 `Done` | `main` 上那两条已由该文件的所有者自己修掉，不是本批改的 |
+| `check:l4` | 🔴 内联样式 98 > 基线 90 | ✅ **恰在基线 90** | `apps/mobile/src/screens（L4 视图）：内联样式 90 处，恰在基线 90（未新增）` |
+
+覆盖面门禁在合并态的读数与本批分支**逐字相同**：`实体覆盖面 8/8` /
+`目录 22 个工具 ≤ 每实体 5 × 分母 8 = 40 席（已用 22，剩 18）`
+⇒ "合流不会引爆任何一条 AI 门禁"这句现在是量出来的。
+
+### 11.2 🔴 合流时要改的是**两处**，不是一处
+
+本批原先只登记了 `countdown-anniversary.md:175`（「不在本批立这条门禁，后面再说」）
+要在合流时就地更正。合并态读到 :168–:171 还有第二句，而且它比 :175 更误导：
+
+> 「🔴 **这条没有门禁兜底，所以最容易整块漏掉。**…… `scripts/check-ai-coverage.mjs`
+> **由 `AiFeature` 联合类型驱动**……加一个 `EVENT` 实体不会让任何一处变红。」
+
+**这句在本批之后不再成立**：覆盖面那一节（`check-ai-coverage.mjs` §9）已由
+`EntityModelMap` / `ENTITY_TYPES` 驱动，注入 D 的现量红是「实体 `EVENT` 在分母里，
+AI 却**没有能读又能写**的工具（读 0 / 写 0）…」。它该改成"当时为什么这么判"保留原句、
+结论指向 `AI-COV` 已接管（W2 落 `EVENT` 而不配工具 ⇒ 当场红）。
+同一段里的"根治做法……这条要单独确认"也一并被否证 —— 根治做法已经存在。
+
+⇒ 合流检查项从"改一行"改成"**按关键字全篇 grep 那个文件的旧说法**"，现量命令：
+
+```bash
+git show main:docs/plans/countdown-anniversary.md \
+  | grep -n "没有门禁兜底\|后面再说\|要单独确认"
+```
+
+这是"同一个结论落在两份文档 ⇒ 改一处必漏另一处"的又一实例：`:175` 是登记到的，
+`:168`–`:171` 是靠**把合并态整篇读一遍**才发现的，不是靠推理。
