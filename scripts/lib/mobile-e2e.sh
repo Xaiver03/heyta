@@ -77,9 +77,15 @@ resolve_real_node() {
 }
 NODE=$(resolve_real_node)
 
-TOKEN=$(cat /tmp/heyta_mobile_token.txt)
-EMAIL=$(cat /tmp/heyta_mobile_email.txt)
-E2EE=$(cat /tmp/heyta_mobile_e2ee.txt)
+# 🔴 这三个路径以前是**写死的**，而生产它们的那份库（`mobile-e2e-fresh-account.sh:49-51`）
+#    早就把它们参数化成 `HEYTA_E2E_*_FILE` 了 —— 写者可换、读者不可换，
+#    于是"给这一轮开一份私有凭据"会得到一次**静默的脑裂**：号建到私有文件里，
+#    验收脚本仍从 `/tmp/heyta_mobile_token.txt` 读**别人那一轮的**令牌。
+#    症状不是报错，是"用错了账号"：`pm clear`、op 数、跨设备断言全都落在别人的身份上。
+#    默认值与原字面量逐字相同 ⇒ 不给变量时行为一字不变。
+TOKEN=$(cat "${HEYTA_E2E_TOKEN_FILE:-/tmp/heyta_mobile_token.txt}")
+EMAIL=$(cat "${HEYTA_E2E_EMAIL_FILE:-/tmp/heyta_mobile_email.txt}")
+E2EE=$(cat "${HEYTA_E2E_E2EE_FILE:-/tmp/heyta_mobile_e2ee.txt}")
 # 🔴 端口**必须**跟 `mobile-e2e-up.sh` 的 `PORT` 走，不能写死 3000。
 #
 # 那个脚本早就支持 `PORT` 了，而这里写死 —— 于是"换个端口起栈"会得到一个
