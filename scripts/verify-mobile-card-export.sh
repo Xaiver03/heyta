@@ -216,9 +216,14 @@ else
 fi
 
 step "4. 判据②：点导出**前**那个文件名不存在，点之后必须出现"
-$ADB root >/dev/null 2>&1; sleep 1
+# 🔴 读私有目录用 `adb root` + `pull`，**不用 `run-as`** —— 与 `verify-mobile-lists.sh`
+#    :89 同一台设备上的同一条结论：装的是 release 包，`run-as` 直接报
+#    "package not debuggable"，所以那条通道**根本不该被试**（原先这句错误信息里写着
+#    "run-as 与 adb root 都不通"，而代码从没跑过 run-as —— 探针的措辞会把排查方向
+#    引去怀疑一条自己没试过的通道）。
+$ADB root >/dev/null 2>&1; sleep 2; $ADB wait-for-device >/dev/null 2>&1
 if ! $ADB shell "ls $CACHE_ON_DEVICE" >/dev/null 2>&1 && [ -z "$($ADB shell ls /data/data/$PKG 2>/dev/null | tr -d '\r')" ]; then
-  echo "   ❌ 读不到 $PKG 的私有目录（run-as 与 adb root 都不通）—— 本轮无效"; exit 3
+  echo "   ❌ 读不到 $PKG 的私有目录（adb root 没通）—— 本轮无效"; exit 3
 fi
 BEFORE=$($ADB shell "ls $CACHE_ON_DEVICE 2>/dev/null" | tr -d '\r')
 if [ -z "$BEFORE" ]; then
