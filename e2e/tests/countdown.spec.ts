@@ -26,8 +26,12 @@
  *
  * ⚠️ `console` 的 error 与 `pageerror` 全部收集并**进断言**：白屏的根因几乎只在
  * 这里现形（模块 404 / CSP / React 抛错），而"那个元素没出现"本身不说原因。
+ *
+ * 📌 "怎么加一条倒数日"那几步现在住在 `./countdown-events.ts`（W7 的导出用例也要用它）。
+ *    搬过去而不是抄一份：那份代码的形状由共享 `EventBoard` 的 testID 决定，
+ *    抄两处的话契约改一次只有一份会红，另一份按旧形状点、症状是超时。
  */
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test } from '@playwright/test';
 import {
   decidePrivacyConsent,
   openApp,
@@ -35,75 +39,17 @@ import {
   switchView,
 } from './helpers';
 import { installMissingProducerShims } from './shims';
+import {
+  BOARD,
+  TAB,
+  addCountdownEvent,
+  cardByTitle,
+  collectErrors,
+  nextMonthFirst,
+  openCardMenu,
+  prevMonthSecond,
+} from './countdown-events';
 
-const TAB = '倒数纪念日';
-const BOARD = '[data-testid="countdown-view"]';
-
-/** 冻结的"今天"从**应用自己**读，不在测试里造第二个时钟。 */
-function todayParts(): { year: number; month: number; day: number } {
-  const now = new Date();
-  return { year: now.getFullYear(), month: now.getMonth() + 1, day: now.getDate() };
-}
-
-/** `YYYY年M月D日` 里那一天的**无障碍名**（共享 DatePicker 的 `dayLabel` 形状）。 */
-function cellLabel(month: number, day: number): string {
-  return `${String(month)}月${String(day)}日`;
-}
-
-/** 下一月的 1 号（永远是未来）。 */
-function nextMonthFirst(): { label: string; days: number } {
-  const now = new Date();
-  const target = Date.UTC(now.getFullYear(), now.getMonth() + 1, 1);
-  const today = Date.UTC(now.getFullYear(), now.getMonth(), now.getDate());
-  const month = new Date(target).getUTCMonth() + 1;
-  return { label: cellLabel(month, 1), days: Math.round((target - today) / 86_400_000) };
-}
-
-/** 上一月的 2 号（永远是过去；2 号在任何月份都存在）。 */
-function prevMonthSecond(): string {
-  const now = new Date();
-  const month = new Date(Date.UTC(now.getFullYear(), now.getMonth() - 1, 2)).getUTCMonth() + 1;
-  return cellLabel(month, 2);
-}
-
-/**
- * 在板子上加一条倒数日：点日期 → 翻到目标月 → 点那一格 → 输标题 → 点添加。
- *
- * 🔴 每步都**落账**（等它该产出的界面状态），不"点完就走"：
- * 点击被吞掉时，症状会是后面那条断言红，而不是"这一步没生效"。
- */
-async function addEvent(page: Page, title: string, label: string, months: number): Promise<void> {
-  await page.getByTestId('event-pick-date').click();
-  const picker = page.getByTestId('event-date-picker');
-  await expect(picker, '点「选日期」之后日历必须展开').toBeVisible();
-  for (let step = 0; step < Math.abs(months); step += 1) {
-    await page.getByRole('button', { name: months > 0 ? '下个月' : '上个月' }).click();
-  }
-  const cell = page.locator(`[aria-label="${label}"]`);
-  // 翻月之后这一格必须**唯一**（跨月的首尾行会重复出现别的月份的格子）。
-  await expect(cell, `日历里「${label}」应当只有一格`).toHaveCount(1);
-  await cell.click();
-  await expect(
-    page.getByTestId('event-pick-date'),
-    '选完日期，日历收起并把那一天回显在按钮上',
-  ).toContainText(label);
-
-  await page.getByTestId('event-title-input').fill(title);
-  await page.getByTestId('event-add').click();
-  await expect(
-    page.locator('[data-testid^="event-card-"]').filter({ hasText: title }).first(),
-    `添加「${title}」之后卡片必须出现`,
-  ).toBeVisible();
-}
-
-async function collectErrors(page: Page): Promise<string[]> {
-  const errors: string[] = [];
-  page.on('console', (msg) => {
-    if (msg.type() === 'error') errors.push(`console: ${msg.text()}`);
-  });
-  page.on('pageerror', (err) => errors.push(`pageerror: ${err.message}`));
-  return errors;
-}
 
 test.describe('倒数纪念日：真浏览器契约（W5）', () => {
   test('🔴 默认关着 ⇒ 这个 tab 根本不在 DOM（模块开关的承诺，正向对照在下一条）', async ({
@@ -145,7 +91,7 @@ test.describe('倒数纪念日：真浏览器契约（W5）', () => {
     await switchView(page, TAB);
 
     const target = nextMonthFirst();
-    await addEvent(page, '上线那天', target.label, 1);
+    await addCountdownEvent(page, '上线那天', target.label, 1);
 
     const days = page.locator('[data-testid^="event-card-"]').first().locator('[data-testid^="event-days-"]');
     // 🔴 期望值从**日历事实**算（独立真值），不是把领域的算术抄一遍：
@@ -173,9 +119,9 @@ test.describe('倒数纪念日：真浏览器契约（W5）', () => {
     await openApp(page);
     await switchView(page, TAB);
 
-    await addEvent(page, '甲日子', nextMonthFirst().label, 1);
+    await addCountdownEvent(page, '甲日子', nextMonthFirst().label, 1);
     // 第二条用**上一月**的格子 ⇒ 一前一后，顺带把"逾期"那一副面孔也画进同一张图。
-    await addEvent(page, '乙日子', prevMonthSecond(), -1);
+    await addCountdownEvent(page, '乙日子', prevMonthSecond(), -1);
 
     const cards = page.locator('[data-testid^="event-card-"]');
     await expect(cards).toHaveCount(2);
@@ -250,12 +196,9 @@ test.describe('倒数纪念日：真浏览器契约（W5）', () => {
     const errors = await collectErrors(page);
     await openApp(page);
     await switchView(page, TAB);
-    await addEvent(page, '要归档的日子', nextMonthFirst().label, 1);
+    await addCountdownEvent(page, '要归档的日子', nextMonthFirst().label, 1);
 
-    const card = page.locator('[data-testid^="event-card-"]').filter({ hasText: '要归档的日子' });
-    await expect(card).toHaveCount(1);
-    const menu = card.locator('[data-testid^="event-menu-"]');
-    await menu.click();
+    const card = await openCardMenu(page, '要归档的日子');
     await card.locator('[data-testid^="event-archive-"]').click();
 
     // 落账：归档之后主列表里它没了，而且**空态**接手（不是"整片消失"）。
@@ -272,7 +215,13 @@ test.describe('倒数纪念日：真浏览器契约（W5）', () => {
     // 🔴 归档视图里**没有**"编辑"和"归档"，只有还原/删除（§2.5 归档是独立一态）。
     await expect(archived.locator('[data-testid^="event-edit-open-"]')).toHaveCount(0);
     await archived.locator('[data-testid^="event-unarchive-"]').click();
-    await expect(page.locator('[data-testid^="event-card-"]')).toHaveCount(1);
+    // 🔴 原来这里直接数"屏幕上有一张卡"，那是**一句会随机翻转的断言**：
+    //   还原之后界面**仍停在归档视图**，所以它既可能数到还没重算完的那一张（假绿），
+    //   也可能等 15 秒数到 0（假红）。同一份代码实测两趟：16.7s 数到 0、retry 1.4s 数到 1。
+    //   正确的两条可观测后果是：归档视图空掉 + **切回主列表**它在。
+    await expect(page.getByTestId('event-empty'), '还原之后归档视图必须空掉').toBeVisible();
+    await page.getByTestId('event-toggle-view').click();
+    await expect(cardByTitle(page, '要归档的日子'), '还原之后主列表必须有它').toHaveCount(1);
     expect(errors, `控制台不该有 error：\n${errors.join('\n')}`).toEqual([]);
   });
 
@@ -280,10 +229,9 @@ test.describe('倒数纪念日：真浏览器契约（W5）', () => {
     const errors = await collectErrors(page);
     await openApp(page);
     await switchView(page, TAB);
-    await addEvent(page, '旧名字', nextMonthFirst().label, 1);
+    await addCountdownEvent(page, '旧名字', nextMonthFirst().label, 1);
 
-    const card = page.locator('[data-testid^="event-card-"]').filter({ hasText: '旧名字' });
-    await card.locator('[data-testid^="event-menu-"]').click();
+    const card = await openCardMenu(page, '旧名字');
     await card.locator('[data-testid^="event-edit-open-"]').click();
     const editorTitle = card.locator('[data-testid^="event-editor-title-"]');
     await expect(editorTitle, '编辑器必须已经展开').toBeVisible();
