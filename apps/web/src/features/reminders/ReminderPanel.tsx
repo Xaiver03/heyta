@@ -8,11 +8,13 @@
  *
  * 🔴 列表本身（一行提醒是什么状态、能对它做什么、按钮给哪几档提前量）
  * 全部由 `@heyta/ui` 的 `ReminderList` 渲染 —— 与 mobile 是**同一份实现**。
- * 本文件只做三件事：
+ * 本文件只做四件事：
  *
  *   1. 从 `useReminderStore` 取这一条任务的提醒；
  *   2. 把 `ReminderListLabels` 填成中文/英文（共享层不 import i18n）；
- *   3. 把六个回调接到动作层，并把动作抛出的错误显示出来。
+ *   3. 把六个回调接到动作层，并把动作抛出的错误显示出来；
+ *   4. **额外渲染"日级以上"的长档位那一排**（W9 ①，见 `LongOffsetTiers`）——
+ *      它没并进共享组件，因为共享组件那 6 档与两端的 key 数组是下标契约。
  *
  * ─────────────────────────────────────────────────────────────────────────
  * 🔴 绝对时刻入口为什么是"正好 1 小时"
@@ -40,6 +42,7 @@ import { Bell } from 'lucide-react';
 
 import { useTaskStore } from '../tasks/store.js';
 import { useReminderStore } from './store.js';
+import { REMINDER_LONG_TIER_LABEL_KEY, reminderLongTiers } from './reminder-tiers.js';
 
 /** chip 图标尺寸。**不许在 JSX 里散落字面量。** */
 const CHIP_ICON_SIZE = 12;
@@ -55,6 +58,11 @@ const ABSOLUTE_LEAD_MS = 60 * 60 * 1000;
  * 点下去建的却是"提前 1 天"的提醒 —— 那种错**没有任何类型或渲染断言能抓到**，
  * 所以 `apps/web/tests/reminders-panel.spec.tsx` 用
  * `REMINDER_OFFSET_PRESETS_MS.length` 把这条对应关系钉死。
+ *
+ * ⚠️ 这一份只覆盖**短档位**。日级以上的那一组在
+ * `reminder-tiers.ts`（`web.reminder.offset.*`，由本文件的 `LongOffsetTiers`
+ * 渲染）—— 它没并进这里，因为并进 `REMINDER_OFFSET_PRESETS_MS` 会同时改到
+ * 移动端的下标契约，而移动端没有那几条词条。
  */
 export const REMINDER_OFFSET_KEYS = [
   'reminder.offset.0',
@@ -186,6 +194,14 @@ export function ReminderPanel({ task }: { task: Task }): React.JSX.Element {
           testID={`reminder-list-${task.id}`}
         />
 
+        {/*
+          日级以上的长档位（W9 ①）。共享的 `ReminderList` 只渲染
+          `REMINDER_OFFSET_PRESETS_MS` 那 6 档（下标契约，移动端共用），
+          所以"提前 2 天 / 3 天 / 1 周 / 30 天"是 web 自己这一排。
+          没有截止时间时整组不渲染（相对提前量没有参照物，点了必然抛错）。
+        */}
+        <LongOffsetTiers taskId={task.id} hasDueDate={task.dueDate !== undefined} />
+
         {message !== undefined && (
           <p className="ht-settings__hint" role="alert">
             {message}
@@ -194,5 +210,60 @@ export function ReminderPanel({ task }: { task: Task }): React.JSX.Element {
       </div>
       </details>
     </HeytaUiProvider>
+  );
+}
+
+/**
+ * 「更早」那一排（W9 ①）。
+ *
+ * 为什么**不**并进上面共享 `ReminderList` 的那一排：那一排的数字来自
+ * `REMINDER_OFFSET_PRESETS_MS`，与两端各自手抄的 key 数组是**下标契约**，
+ * 而移动端还没有这几档的词条（`offsetMessageKey` 的 `default` 会抛）。
+ * ⇒ 长档位是**另一个数组**、由 web 自己渲染，共享层与移动端一字未动。
+ *
+ * 三条约束：
+ *  1. **没有截止时间时整组不渲染** —— 与共享层砍掉「截止时」那一档同一条理由：
+ *     没有参照物的相对提前点下去必然让 `createReminderBeforeDue` 抛错，
+ *     那不是一个"少一个按钮"，是"多一个必然失败的按钮"。
+ *  2. **只走 `addBeforeDue`**（同一个 op 构造、同一个动作层），这里零判断。
+ *  3. **零新样式**：容器用既有的 `.ht-settings__chips`（flex-wrap + gap），
+ *     按钮用既有的 `.ht-chip`（与头像菜单/语言切换同一对），词条走 i18n。
+ *     `check:row-single-source` 的 `ht-*` 族基线与 `check:l4` 的内联基线
+ *     因此都不受影响。
+ */
+function LongOffsetTiers({
+  taskId,
+  hasDueDate,
+}: {
+  taskId: string;
+  hasDueDate: boolean;
+}): React.JSX.Element | null {
+  const { t } = useI18n();
+  const addBeforeDue = useReminderStore((s) => s.addBeforeDue);
+  if (!hasDueDate) return null;
+  const tiers = reminderLongTiers((key) => t(key));
+  return (
+    <div data-testid="reminder-long-offsets">
+      <p className="ht-settings__hint">{t(REMINDER_LONG_TIER_LABEL_KEY)}</p>
+      <div
+        className="ht-settings__chips"
+        role="group"
+        aria-label={t(REMINDER_LONG_TIER_LABEL_KEY)}
+      >
+        {tiers.map((tier, index) => (
+          <button
+            key={tier.offsetMs}
+            type="button"
+            className="ht-chip"
+            data-testid={`reminder-long-add-${String(index)}`}
+            onClick={() => {
+              void addBeforeDue(taskId, tier.offsetMs);
+            }}
+          >
+            {tier.label}
+          </button>
+        ))}
+      </div>
+    </div>
   );
 }

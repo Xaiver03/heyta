@@ -61,6 +61,20 @@ interface ReminderState {
   snooze: (entityId: string) => Promise<void>;
   dismiss: (entityId: string) => Promise<void>;
   remove: (entityId: string) => Promise<void>;
+  /**
+   * **只看钟、重算一次"到点了没"**（W9 ②）。不产生 op、不改任何数据。
+   *
+   * 🔴 它存在的唯一理由：`refresh()` 由**引擎变化**驱动，所以"用户没操作、
+   * 但时间到了"这一刻没有任何东西去问一次 `due` —— 提醒因此只能靠手点或靠
+   * 下一条 op 才响。而这次"问一遍"**必须仍然走动作层的 `due()`**
+   * （也就是领域层的 `dueReminders()`）。这一层不许出现第二个"什么算到点"
+   * 的判断，连 `reminderEffectiveAt` 都不读：判据有两份的必然后果是
+   * "面板显示已到点、通知却不响"。
+   *
+   * ⚠️ 只 setState `due`，**不碰 `byTask`**：定时器每次醒来都调这里，
+   * 若连 `byTask` 一起换新引用，订阅它的 effect 会被无谓地重跑一遍。
+   */
+  recheck: () => void;
 }
 
 /** 与任务 / 习惯 / 专注 store 同一个形状。只含两个函数引用，不含任何判断。 */
@@ -75,8 +89,15 @@ const actionContext: ActionContext = {
  *
  * 它就是 `check:reachability` 断言 C 要的"真实宿主调用点"——
  * 在那之前 `REMINDER` 有写路径、op 能同步，但没有任何界面能建它。
+ *
+ * ⚠️ 时钟必须**晚绑定**（`() => Date.now()`），不能写成 `Date.now`：
+ * 后者在模块加载的那一刻就把函数引用固定住了，之后测试里
+ * `vi.useFakeTimers()` 换掉的 `Date` 对它**不生效** —— 症状是"定时器确实醒了、
+ * 但 `due()` 按真实时钟算，于是永远没到点"，四条判据全 0 且没有任何报错
+ * （W9 ② 实测踩过）。同一条推理见 AGENTS.md §7 第 176 条"桩在外面预取值"。
+ * 本文件里 `snooze` 用的就是晚绑定的 `Date.now()`，这里对齐它。
  */
-const reminderActions = createReminderActions(actionContext);
+const reminderActions = createReminderActions(actionContext, { now: () => Date.now() });
 
 export const useReminderStore = create<ReminderState>((set) => ({
   byTask: {},
@@ -107,6 +128,11 @@ export const useReminderStore = create<ReminderState>((set) => ({
 
   remove: async (entityId) => {
     await attempt(set, taskIdOf(entityId), () => reminderActions.removeReminder(entityId));
+  },
+
+  recheck: () => {
+    // 🔴 一次调用、零判断：`due()` 里就是领域层那份 `dueReminders()`。
+    set({ due: reminderActions.due() });
   },
 }));
 

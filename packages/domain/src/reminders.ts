@@ -20,7 +20,7 @@
  *    与时钟 —— 与 `HabitLog` 相对 `Habit` 是同一条推理。
  * 4. 计划里已经登记了结论：§B1-1 写的是「**物化 `REMINDER`** + 调度 + 本地通知」。
  *
- * ## 这个文件钉住的三件事（写在 UI 里就会各端漂移）
+ * ## 这个文件钉住的四件事（写在 UI 里就会各端漂移）
  *
  * 1. **到期判定**（{@link reminderPhase} / {@link dueReminders}）：
  *    看的是 `snoozedUntil ?? triggerAt`，不是 `triggerAt` 一个字段；
@@ -32,12 +32,17 @@
  *    带 `offsetMs` 的提醒跟着 `dueDate` 走，不带的是**绝对时刻**、不移动。
  *    两句话分开说，是因为"每天 9 点提醒我"里的 9 点是绝对时间，
  *    跟着 dueDate 漂移反而是错的。
+ * 4. **"提前 N 天"是日历算术不是减法**（{@link reminderTriggerFromOffset} /
+ *    {@link localDayBefore}，W9 ③）：整天以上的提前量走本地日历日回退，
+ *    跨夏令时不漂一小时。建提醒与重复顺延**共用这一个函数** ——
+ *    分两处写就会有一处漏，而漏的那处只在一年里的两天出错。
  *
  * ⚠️ **不发明默认值**：`Fired` / `Dismissed` 的写路径全在 app-host 的动作层，
  * 这里不提供"投递后自动删除"之类的策略 —— 那是产品决策，而且删除会让
  * 另一端把提醒同步回来（同 `habit-actions.ts` 文件头第 3 条）。
  */
 
+import { addDays, parseLocalDate, toLocalDate } from './date.js';
 import type { Reminder } from './entities.js';
 
 const MINUTE_MS = 60_000;
@@ -59,6 +64,48 @@ export const REMINDER_OFFSET_PRESETS_MS = [
   HOUR_MS,
   DAY_MS,
 ] as const;
+
+/**
+ * 「日级以上」的提前量档位（W9 ①）：倒数日场景要的是"提前 3 天告诉我"，
+ * 而上面那张表最远只到"提前 1 天"。
+ *
+ * ## 🔴 为什么不直接把它并进 {@link REMINDER_OFFSET_PRESETS_MS}
+ *
+ * 那个数组是**下标契约**的一半：`packages/ui` 的 `ReminderList` 按
+ * `labels.offsets[i] ↔ offsetPresets()[i]` 取文案，而文案映射在两处各自写了一遍
+ * （`apps/mobile/src/lib/reminders-display.ts` 的 `offsetMessageKey`、
+ * `apps/web/src/features/reminders/ReminderPanel.tsx` 的 `REMINDER_OFFSET_KEYS`）。
+ * 并进原数组等于**同时改这两处 + 那两个端的词条**，而移动端的词条键
+ * （`reminder.offset.*`）里根本没有 `2d` —— 症状是移动端提醒面板一打开就抛
+ * "没有对应的词条 key"（那是 `offsetMessageKey` 的 `default` 分支，故意的）。
+ *
+ * ⇒ 所以这里是**新增一个档位组**而不是改老数组：
+ *   · 老数组一字未动 ⇒ 已落库的提醒、两端的下标契约、旧档位的文案全部不变；
+ *   · 谁能用这一组由各宿主决定（当前只有 web 的 `ReminderPanel` 渲染它），
+ *     而"这条档位有没有对应文案"的判据在**宿主那一侧**复刻了同一个 `default: throw`
+ *     （`apps/web/src/features/reminders/reminder-tiers.ts`）。
+ *
+ * ⚠️ 上限仍然是 `MAX_REMINDER_LEAD_MS`（365 天）：这里最大的 30 天远没碰到它，
+ * 但这一组以后要加长（比如"提前半年"）时必须回头对账那条闸门。
+ */
+export const REMINDER_LONG_OFFSET_PRESETS_MS = [
+  2 * DAY_MS,
+  3 * DAY_MS,
+  7 * DAY_MS, // 一周
+  30 * DAY_MS, // 一个月（按 30 天，不是"上个月同一日"，见下）
+] as const;
+
+/**
+ * 全部档位（短档 + 日级以上），**升序**。
+ *
+ * 存在的理由是"档位阶梯只有一处能回答全量"：宿主各自 `[...short, ...long]`
+ * 拼一遍，就会有一处漏掉某档而没有任何东西会红。
+ * 自检在 `packages/domain/tests/reminders.spec.ts`（升序、首项 0、都不超闸门）。
+ */
+export const ALL_REMINDER_OFFSET_PRESETS_MS: readonly number[] = [
+  ...REMINDER_OFFSET_PRESETS_MS,
+  ...REMINDER_LONG_OFFSET_PRESETS_MS,
+];
 
 /**
  * 允许的最大提前量 / 未来跨度（365 天）。
@@ -173,13 +220,70 @@ export function reminderRejection(
 }
 
 /**
+ * `ms` 往前 `days` 个**本地日历日**的同一套钟表时间（W9 ③ 的唯一实现）。
+ *
+ * ## 为什么必须是日历日而不是 `days * 24 小时`
+ *
+ * "提前 3 天提醒我"里用户说的是**日期**，不是"72 小时"。跨夏令时的那三天只有
+ * 71 或 73 小时，于是硬减 72 小时会得到**前一天/后一天的另一个钟点**：
+ * 实测（`America/New_York`，2026-03-09 09:30 截止、提前 3 天）
+ * 日历算法给 `2026-03-06 09:30 EST`，而 `dueDate − 72h` 给 `08:30 EST` ——
+ * 用户提前一个钟点收到通知，而且**一年里只有两天错**，最难被发现了。
+ *
+ * 手法与本仓既有实现完全一致，且那两处都带着 DST 判据：
+ *   · {@link addDays} 用 `setDate()` 做日历日加减（`date.ts` 里写着
+ *     "不要自己算 `date + n*86400000` —— 夏令时切换那天会错一小时"）；
+ *   · 时刻用 `new Date(y, m, d, hh, mm, ss, ms)` 构造，**不是**"零点 + 毫秒数"
+ *     （`localDateTimeToEpoch` 的注释里就是同一条理由）。
+ *
+ * 两个边界由原生 `Date` 定义，不需要在这里发明：
+ *   · 目标日没有这个钟点（春季拨快跳过的那一小时）→ 顺延到下一个存在的时刻；
+ *   · 目标日这个钟点出现两次（秋季拨慢重复的那一小时）→ 取第一次。
+ */
+export function localDayBefore(ms: number, days: number): number {
+  if (!Number.isFinite(ms)) throw new Error(`时刻必须是有限数，收到 ${String(ms)}`);
+  if (!Number.isInteger(days) || days < 0) {
+    throw new Error(`往前天数必须是非负整数，收到 ${String(days)}`);
+  }
+  if (days === 0) return ms;
+  const src = new Date(ms);
+  // 先由 date.ts 的日历函数定出**目标日**（addDays 走 setDate，跨月/跨年/闰年
+  // 都交给原生逻辑），再在那一天上按本地钟点构造时刻。
+  const target = parseLocalDate(addDays(toLocalDate(ms), -days));
+  return new Date(
+    target.getFullYear(),
+    target.getMonth(),
+    target.getDate(),
+    src.getHours(),
+    src.getMinutes(),
+    src.getSeconds(),
+    src.getMilliseconds(),
+  ).getTime();
+}
+
+/**
  * 由任务截止时间 + 提前量算出触发时刻。负数提前量（= 截止之后）会被拒绝。
+ *
+ * ## 🔴 两种提前量、两种算术（W9 ③）
+ *
+ *   · **不足一天**（0 / 5 分 / 15 分 / 30 分 / 1 小时）：按**瞬时**减毫秒。
+ *     这是对的 —— "截止前 30 分钟"说的是那 30 分钟，不是某个日历位置。
+ *   · **整天及以上**（1 天 / 2 天 / 3 天 / 1 周 / 30 天）：先按**本地日历日**
+ *     回退整天（{@link localDayBefore}），再减不足一天的零头。
+ *     这样"提前 3 天"永远落在**同一套钟表时间**上，跨夏令时不漂。
+ *
+ * ⚠️ 这条分界**只在有夏令时的时区**才看得见差别；无夏令时的时区（例如
+ * `Asia/Shanghai`）两条路径逐字相同 —— 所以判据必须显式钉住时区，
+ * 见 `packages/domain/tests/reminders-dst.spec.ts`。
  */
 export function reminderTriggerFromOffset(dueDate: number, offsetMs: number): number {
   if (!Number.isFinite(dueDate) || !Number.isFinite(offsetMs) || offsetMs < 0) {
     throw new Error('提前量必须是非负有限数，且截止时间必须是有限数');
   }
-  return dueDate - offsetMs;
+  const wholeDays = Math.floor(offsetMs / DAY_MS);
+  const restMs = offsetMs - wholeDays * DAY_MS;
+  if (wholeDays === 0) return dueDate - restMs;
+  return localDayBefore(dueDate, wholeDays) - restMs;
 }
 
 /**
@@ -203,7 +307,12 @@ export function nextTriggerAfterRepeat(
 ): number | undefined {
   if (reminder.offsetMs === undefined) return undefined;
   if (nextDueDate === undefined || !Number.isFinite(nextDueDate)) return undefined;
-  const next = nextDueDate - reminder.offsetMs;
+  // 病态提前量（导入/手改出来的 NaN / 负数）在这里**放弃顺延**而不是抛 ——
+  // 这条路径是"完成一个重复任务"，为一个坏字段让用户的点击失败是不成比例的。
+  if (!Number.isFinite(reminder.offsetMs) || reminder.offsetMs < 0) return undefined;
+  // 🔴 与建提醒**同一个函数**（W9 ③）：顺延时若改回 `nextDueDate - offsetMs`，
+  // 那么第一次建对的"提前 3 天"在第二个周期就会漂一小时，而界面上一切正常。
+  const next = reminderTriggerFromOffset(nextDueDate, reminder.offsetMs);
   if (!Number.isFinite(next) || next <= 0) return undefined;
   if (next === reminder.triggerAt) return undefined;
   return next;
