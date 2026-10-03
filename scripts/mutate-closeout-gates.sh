@@ -74,7 +74,7 @@ cp "$REPO/research/licenses-inventory.generated.md" "$T/research/"
 printf '# 一行与清单无关的 lockfile 变化\n' >> "$T/pnpm-lock.yaml"
 out="$(stamp)"; r="$?"
 if [ "$r" = "1" ] && printf '%s' "$out" | grep -q '已过期'; then
-  ok "G4 只换 lockfile、清单不动 ⇒ RC=1（这正是 G-1 那次六天过期）"
+  ok "G4 只换 lockfile、清单不动 ⇒ RC=1（这正是 CDG-1 那次六天过期）"
 else
   no "G4 该红没红：RC=$r / $out"
 fi
