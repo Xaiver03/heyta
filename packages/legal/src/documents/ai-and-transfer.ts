@@ -479,7 +479,7 @@ const en = [
           ['`create_habit`', 'Create a habit', 'Reads nothing; writes go through the operation log'],
           ['`list_checkins`', 'List check-ins', 'Which habit, which date, the value recorded that day — 50 at a time. **Without habit names**, but "what you did on which day, and how much" is itself a behavioural record'],
           ['`record_checkin`', 'Record a check-in', 'Reads nothing; writes go through the operation log'],
-          ['`list_focuses`', 'List focus sessions', 'Kind, related task id, planned duration, actual duration, whether completed, start time — 50 at a time. **Without task titles**, but timestamps alone already show a person's daily rhythm'],
+          ['`list_focuses`', 'List focus sessions', 'Kind, related task id, planned duration, actual duration, whether completed, start time — 50 at a time. **Without task titles**, but timestamps alone already show a person\'s daily rhythm'],
           ['`log_focus`', 'Log a focus session', 'Reads nothing; writes go through the operation log'],
           ['`list_tags`', 'List tags', 'Tag ids and names'],
           ['`create_tag`', 'Create a tag', 'Reads nothing; writes go through the operation log'],
