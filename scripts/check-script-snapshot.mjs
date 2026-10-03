@@ -68,6 +68,7 @@ const MANIFEST = [
   'scripts/verify-mobile-schedule.sh',
   'scripts/verify-mobile-sort-sheet.sh',
   'scripts/verify-mobile-tags.sh',
+  'scripts/verify-mobile-notes.sh',
   'scripts/verify-mobile-task-edit.sh',
   'scripts/verify-mobile-task-row.sh',
   'scripts/verify-mobile-ticktick-import.sh',

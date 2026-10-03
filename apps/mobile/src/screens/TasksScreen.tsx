@@ -124,6 +124,7 @@ import {
 import { priorityBadgeLabel, priorityColorToken } from '../lib/priority';
 import { TaskDetailSheet } from './TaskDetailSheet';
 import { SearchScreen } from './SearchScreen';
+import { NoteEditScreen } from './NoteEditScreen';
 // 🔴 「四象限」那一档的实现（P10 收敛后**唯一**的实现）——
 // 它是共享 `QuadrantBoard` 的移动宿主，不再是第 6 个 tab 的整屏。
 import { QuadrantScreen } from './QuadrantScreen';
@@ -413,6 +414,14 @@ export function TasksScreen({
    * 两个入口各管一件事，所以两个状态也各留一份。
    */
   const [searchOpen, setSearchOpen] = useState(false);
+  /**
+   * 从**搜索结果**里点开的那条便签（多端第二批）。
+   *
+   * 与 `NotesSection` 里那个同名状态是分开的两份：两个宿主、两个入口，
+   * 各自管自己那一段的"打开了什么"。合成一份要跨屏传回调，
+   * 而 `NoteEditScreen` 自己是全屏 `Modal`，谁挂着它都一样。
+   */
+  const [editingNoteId, setEditingNoteId] = useState<string | null>(null);
   /** 截止时间的呈现方式。与 Web 端 `DueBadge` 的开关一致，默认 `date`。 */
   const [dueMode, setDueMode] = useState<DueDisplayMode>('date');
   /**
@@ -1095,7 +1104,22 @@ export function TasksScreen({
           setSearchOpen(false);
           setDetailTaskId(id);
         }}
+        onOpenNote={(id) => {
+          // 🔴 先关浮层再开编辑屏：两个 `Modal` 同时在场在 Android 上没实测过，
+          //    而"关掉搜索再看这条便签"本来就是用户想要的次序。
+          setSearchOpen(false);
+          setEditingNoteId(id);
+        }}
       />
+
+      {editingNoteId === null ? null : (
+        <NoteEditScreen
+          noteId={editingNoteId}
+          onBack={() => {
+            setEditingNoteId(null);
+          }}
+        />
+      )}
 
       <Fab icon="task.add" label={t('mobile.tasks.new')} onPress={() => setComposerOpen(true)} />
       <SortPicker

@@ -28,6 +28,7 @@ import {
   CalendarRange,
   ChartColumn,
   Check,
+  Copy,
   ChevronLeft,
   ChevronRight,
   CircleCheckBig,
@@ -198,6 +199,12 @@ const ICONS = {
   'growth.week': CalendarRange,
   'growth.milestones': Trophy,
   'growth.identity': BadgeCheck,
+  /**
+   * 「带走这一周」（把周小结复制成纯文本）。与 `growth.week` **不同字形**：
+   * 那一个是"这一周的数据"，这一个是"把这段文字交出去"—— 共享层的
+   * `ShareSummarySection` 用的也是复制图标，两端同一个语义该是同一个字形。
+   */
+  'growth.share': Copy,
 
   /**
    * 隐私同意面板。

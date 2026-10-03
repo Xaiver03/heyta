@@ -59,6 +59,7 @@ import {
 } from '@heyta/ui';
 
 import { Button, Card, Divider, Screen, SectionHeader, Text } from '../ui/kit';
+import { EntitlementSection } from './EntitlementSection';
 import { AuthScreen, type SavedAuthSession } from './AuthScreen';
 import { ConflictSheet } from './ConflictSheet';
 import { ExportScreen } from './ExportScreen';
@@ -523,6 +524,16 @@ export function ProfileScreen(): React.JSX.Element {
           <SettingsRow key={row.testID ?? row.kind} row={row} />
         ))}
       </View>
+
+      {/*
+        托管同步权益（「已开启」/「已到期」/「暂不可用」）。独立成组件有两个理由：
+        ① 它要发一次出境探测，得跟着 `privacyConsent` 闸门走，不该混进这屏的
+        凭据/头像状态机；② 本文件的冻结判据（`profile-nickname-entry.spec.ts:144`）
+        要求这里**一个 web 前缀的词条调用都没有**，而那三条说明是 web 已有的真词条
+        —— 复用它们、不复制第二份，所以引用只能落在这个独立文件里。
+        没有权益可说时它自己返回 null（不占位）。
+      */}
+      <EntitlementSection />
 
       {/* 清单 / 标签 / 便签管理。顺序是**清单在标签前**（与任务详情页一致），
           便签排最后（它读的是 NOTE，与任务的组织维度无关）。 */}

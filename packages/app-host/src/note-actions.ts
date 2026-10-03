@@ -155,13 +155,25 @@ export function createNoteActions(
     },
 
     async updateNoteContent(entityId, content) {
-      if (noteOf(entityId) === undefined) throw new Error(`找不到便签「${entityId}」`);
+      const current = noteOf(entityId);
+      if (current === undefined) throw new Error(`找不到便签「${entityId}」`);
       assertContent(content);
+      const next = content.trim();
+      /**
+       * 🔴 **正文没变就不写 op** —— 这条闸门只能住在这里，不能下放到界面。
+       *
+       * `UPD` 会推进 `updatedAt`，而 `updatedAt` 是 `sortNotesForDisplay` 的第二段。
+       * 于是"点开便签、什么都没改、点一下保存"会让这条便签**跳到列表最前面**，
+       * 而用户看到的现象是"我只是看了一眼，顺序就变了"—— 全程没有任何一处报错。
+       * 两端共用这一个入口之后，界面上少写一次判断、这里多挡一次，
+       * 比"两个端各自记得挡"便宜得多（AGENTS §3.5）。
+       */
+      if (next === current.content) return;
       await ctx.dispatch({
         entityType: 'NOTE' as EntityType,
         entityId,
         opType: OpType.Update,
-        payload: { content: content.trim() },
+        payload: { content: next },
       });
     },
 

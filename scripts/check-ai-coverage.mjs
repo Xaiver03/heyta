@@ -71,6 +71,21 @@
  * 如果某个功能**确实**不需要界面入口（例如只给本机 API / MCP 用），
  * 把它加进下面的 `NO_UI_ENTRY` 并**写明理由** —— 不要放宽匹配规则。
  * 放宽规则会让这条门禁悄悄失效，那比没有门禁更糟。
+ *
+ * ## 6b：为什么"界面"要**按端**枚举（2026-10-03）
+ *
+ * 第 6 条原来只扫 `apps/web/src/`。后果不是"移动端现在是红的"，而是**它永远不会红**：
+ * 移动端接完第一个 AI 入口之后，这条门禁照样一句"web 5/5 全覆盖"报绿 ——
+ * 而移动端可能只接了 5 条里的 1 条，剩下 4 条恰好是"设置界面能授权、授权了什么都不发生"
+ * 那个形状（就是本文件开头 2026-09-26 那次实测的失效）。
+ * **只覆盖一个端的"全覆盖"是一个谎话，不是绿灯。**
+ *
+ * 所以现在是：`web` 走原来那两级判据（一行没改，它已有的牙齿不缩水），
+ * 其余每个端进 `UI_ENDS` 表，`gap` 那栏写"这端此刻刻意没做 + 登记出处"。
+ *
+ * 🔴 这个登记**不是永久豁免**，它有一条会咬人的规则：一旦该端出现了
+ * **任何**一个 AI 入口的 import（= 有人开始接线了），剩余未接的那几条立刻转红。
+ * 半接是界面在说谎的那个形状，比全没接更糟 —— 全没接时界面上根本没有那个开关。
  */
 
 import { readFileSync, readdirSync, statSync } from 'node:fs';
@@ -83,6 +98,23 @@ const AI_DIR = join(ROOT, 'packages/ai/src');
 const APP_HOST_DIR = join(ROOT, 'packages/app-host/src');
 const DOMAIN_DIR = join(ROOT, 'packages/domain/src');
 const WEB_DIR = join(ROOT, 'apps/web/src');
+
+/**
+ * 除 web 之外要核对的端，以及它此刻**刻意没做**的登记。
+ *
+ * 🔴 `gap` 不是永久豁免：这一端一旦 import 了**任何**一个 AI 入口（= 有人开始接线），
+ * 剩余没接的那几条立刻转红。"接了 1 条、另 4 条在界面上还有开关"才是本文件开头
+ * 那个 2026-09-26 实测的失效形状，而全没接不是 —— 全没接时界面上根本没有那个开关。
+ */
+const GAP_ENDS = [
+  {
+    end: 'mobile',
+    dir: join(ROOT, 'apps/mobile/src'),
+    gap:
+      '产品负责人 2026-10-03 拍板"AI 上移动端这轮不做"：出境语义还没裁决' +
+      '（`classifyDestination` 只看端点 URL、网络接口不在模型里），见 BLOCKED B34。',
+  },
+];
 
 /**
  * 确实不需要界面入口的功能。
@@ -377,6 +409,72 @@ for (const feature of aiFeatures) {
         `     挂载点通常在 \`apps/web/src/App.tsx\`（照 \`AiBreakdown\` 的写法）。`,
     );
   }
+}
+
+// ── 6b. 登记了缺口的端：**半接即红**，登记不许变成永久豁免 ──────────────────
+const entryNames = new Set(entryByFeature.values());
+
+/**
+ * 这一端"接到过 AI 入口"的判据是**从 `@heyta/app-host` import 了那个入口名**。
+ *
+ * 🔴 不按子串找（web 那条第 1 级是 `includes(entry)`）。实测原因：`tool-calling`
+ * 的入口名恰好是 `request`，而 `apps/mobile/src` 里有 3 个文件本来就在写
+ * `requestPasswordReset` / 网络重试之类的词 —— 用子串判会得到"移动端已接 1 条"，
+ * 一条从未接线的端被探针自己点亮。import 说明符是这一层唯一不会误伤的形状。
+ */
+function aiEntriesImportedIn(dir) {
+  const hits = new Map();
+  for (const file of walk(dir, ['.ts', '.tsx'])) {
+    const src = read(file);
+    for (const m of src.matchAll(/import\s+(?:type\s+)?\{([^}]*)\}\s+from\s*['"]@heyta\/app-host['"]/g)) {
+      for (const raw of m[1].split(',')) {
+        const name = raw.trim().split(/\s+as\s+/)[0];
+        if (!entryNames.has(name)) continue;
+        if (!hits.has(name)) hits.set(name, []);
+        hits.get(name).push(file);
+      }
+    }
+  }
+  return hits;
+}
+
+const endCoverage = [];
+
+for (const spec of GAP_ENDS) {
+  if (!exists(spec.dir)) {
+    // 壳还没建（AGENTS §2 的鸿蒙就是这个状态）—— 不报错，但也不计入"覆盖"。
+    endCoverage.push({ end: spec.end, wired: null, total: entryNames.size, gap: spec.gap });
+    continue;
+  }
+  const hits = aiEntriesImportedIn(spec.dir);
+  const wired = [...hits.keys()];
+  endCoverage.push({ end: spec.end, wired: wired.length, total: entryNames.size, gap: spec.gap });
+
+  if (wired.length === 0) continue;
+
+  const missing = [...entryByFeature.entries()]
+    .filter(([, entry]) => !hits.has(entry))
+    .map(([feature]) => feature);
+
+  if (missing.length === 0) {
+    fail(
+      `端 \`${spec.end}\` 已经把**全部** ${wired.length} 条 AI 入口 import 过去了，\n` +
+        `     但它仍在本脚本的 \`GAP_ENDS\` 里挂着"没做"的登记 —— 这句现在是谎话。\n` +
+        `     把它并进上面第 6 条那**两级**核对（有调用点 + 那个界面文件自己也被挂载渲染），\n` +
+        `     然后删掉 \`GAP_ENDS\` 里这一条。只查 import 不够：组件写好了但没挂载\n` +
+        `     是这条门禁第二级专门防的那件事。`,
+    );
+    continue;
+  }
+
+  fail(
+    `端 \`${spec.end}\` **开始接** AI 了（已 import：${wired.join(', ')}），\n` +
+      `     但功能 ${missing.join(' / ')} 在这一端**一个调用点都没有**。\n` +
+      `     半接比全没接糟：设置/授权那一面是按\`AiFeature\`全量渲染的，于是用户可以\n` +
+      `     给一条空链路配好端点、勾上授权，然后**什么都不会发生，而且没有任何提示**。\n` +
+      `     要么把这 ${missing.length} 条接完并把这一端并进第 6 条那两级核对，\n` +
+      `     要么把已接的那条退回去 —— 不要给它单独加豁免。`,
+  );
 }
 
 // ── 7. 反向：不许有拼错的 feature 字面量 ──────────────────────────────────
@@ -729,6 +827,17 @@ if (!exists(GEN)) {
 console.log(`AI 功能覆盖门禁 —— 由 \`AiFeature\` 联合类型驱动`);
 console.log(`  联合类型成员：${aiFeatures.join(', ')}`);
 console.log(`  界面不可达豁免：${NO_UI_ENTRY.size === 0 ? '（无）' : [...NO_UI_ENTRY].join(', ')}`);
+// 🔴 逐端打印覆盖，不能只报一句"全部可达"：那句在只扫 web 的时候本身就是谎。
+console.log(`  界面端覆盖：web ${aiFeatures.length}/${aiFeatures.length}（两级核对）`);
+for (const cov of endCoverage) {
+  if (cov.wired === null) {
+    console.log(`  界面端覆盖：${cov.end} —— 该端的 src 目录还不存在（壳未建），不计入覆盖`);
+  } else if (cov.wired === 0) {
+    console.log(`  界面端覆盖：${cov.end} ${cov.wired}/${cov.total}（**显式登记的缺口**：${cov.gap}）`);
+  } else {
+    console.log(`  界面端覆盖：${cov.end} ${cov.wired}/${cov.total}`);
+  }
+}
 console.log('');
 
 for (const n of notes) {
@@ -748,5 +857,14 @@ if (problems.length > 0) {
   process.exit(1);
 }
 
-console.log(`✅ ${aiFeatures.length} 个 AI 功能全部端到端可达（实现 → 导出 → 路由声明 → 偏好声明 → 界面）。`);
+const gapSum = endCoverage
+  .filter((c) => c.wired === 0 || c.wired === null)
+  .map((c) => `${c.end} ${c.wired === null ? '（壳未建）' : `${c.wired}/${c.total}`}`)
+  .join('、');
+console.log(
+  `✅ ${aiFeatures.length} 个 AI 功能在 **web** 端到端可达（实现 → 导出 → 路由声明 → 偏好声明 → 界面` +
+    (gapSum === '' ? '' : `），另有显式登记的缺口端：${gapSum}`) +
+    `。`,
+);
+console.log('   ⚠️ 那句"缺口端"不是已通过 —— 它的意思是"这一端一条都没接，所以没有半接的谎"。');
 process.exit(0);

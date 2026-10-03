@@ -30,8 +30,25 @@ interface NoteState {
   notes: Note[];
   /** 新建失败的原因（内容空白等）。**必须显示出来**，不能点了没反应。 */
   error?: string;
+  /**
+   * 编辑失败的原因。**刻意与 `error` 分两个字段**：合成一个的话，
+   * 上一次"添加失败"的原因会在下一次打开编辑器时出现在编辑器里 ——
+   * 那是一条对当下这个动作没有解释的旧错误。
+   */
+  editError?: string;
 
   addNote: (content: string) => Promise<void>;
+  /**
+   * 改正文。**内容没变时动作层不写 op**（`updateNoteContent` 里那条闸门：
+   * `UPD` 会推进 `updatedAt`，而它是列表排序的第二段 —— 看一眼就保存会把
+   * 这条便签顶到最前）。这里不重复判一遍，只负责"失败要看得见"。
+   */
+  /**
+   * 返回**有没有落成**。界面上"保存成功就收起面板"要的是这个信号；
+   * 只回 `Promise<void>` 的话，失败也被 `catch` 咽成 resolve，
+   * 面板会在错误刚显示出来的同一帧被关掉。
+   */
+  updateNote: (entityId: string, content: string) => Promise<boolean>;
   removeNote: (entityId: string) => Promise<void>;
   /** `pinned` 是**目标值**，不是"切换一下"（与动作层契约一致）。 */
   togglePinned: (entityId: string, pinned: boolean) => Promise<void>;
@@ -61,6 +78,19 @@ export const useNoteStore = create<NoteState>((set) => ({
       set({ error: error instanceof Error ? error.message : String(error) });
     }
     refresh();
+  },
+
+  updateNote: async (entityId, content) => {
+    let ok = false;
+    try {
+      await noteActions.updateNoteContent(entityId, content);
+      ok = true;
+      set({ editError: undefined });
+    } catch (error) {
+      set({ editError: error instanceof Error ? error.message : String(error) });
+    }
+    refresh();
+    return ok;
   },
 
   removeNote: async (entityId) => {

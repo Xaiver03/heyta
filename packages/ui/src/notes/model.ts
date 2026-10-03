@@ -80,3 +80,17 @@ export function toNoteRows(
     isPinned: isNoteHighlighted(note),
   }));
 }
+
+/**
+ * 草稿"看起来是空的"吗 —— **共享层唯一的交互挡板**。
+ *
+ * 与 `NotesBoard` 的 composer 同一条判据、同一个出处：按了提交却什么都没发生，
+ * 用户读到的是"这个按钮坏了"。它**不是**内容规则 —— 什么算空正文、多长算超长，
+ * 权威在 `@heyta/app-host#createNoteActions`（`noteRejection`）。
+ *
+ * ⚠️ "正文没改动就不要写 op" **不在这里判**，那条住在 `updateNoteContent`：
+ * 写不写 op 是产品语义（AGENTS §3.5），而这里只决定按钮灰不灰。
+ */
+export function isNoteDraftBlank(draft: string): boolean {
+  return draft.trim() === '';
+}
