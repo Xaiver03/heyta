@@ -1043,3 +1043,41 @@ test 用了 37 秒是**增量缓存态**，不是冷启动全量。冷启动那�
 （同 §7 那条"双引号里的 pattern 会被命令替换"是一个形状）。
 相关门禁复跑：`check:script-snapshot` / `check:shell-unicode` / `check:layering` /
 `check:docs` / `check:journey-coverage` **各 rc=0**（载体 `26191c2e` 之后的工作树）。
+
+### 15.6 落地清单：哪一步做完了、哪一步卡在谁手里（每条带现量命令）
+
+**① 段数差集别再抄** —— "载体 61 段 / 主检出 62 段"这句话以后一定会漂，所以把**怎么量**留下：
+
+```bash
+node -e '
+const fs=require("fs");
+const list=(p)=>JSON.parse(fs.readFileSync(p,"utf8")).scripts.check.split("&&")
+  .map(s=>s.trim().replace(/^pnpm /,"").split(" ")[0]);
+const a=list(process.argv[2]), b=list(process.argv[3]);
+console.log("载体="+a.length, "主检出="+b.length);
+console.log("只在主检出:", b.filter(x=>!a.includes(x)).join(",")||"(无)");
+console.log("只在载体:", a.filter(x=>!b.includes(x)).join(",")||"(无)");
+' /private/tmp/heyta-final/package.json <主检出>/package.json
+```
+
+2026-10-03 17:5x 实跑：`载体=61 主检出=62`，
+差集**只有一条** `check:op-log-semantics`（并行会话**未提交**的 `package.json` 改动），
+载体侧零条独有 ⇒ 两边不是两套标准，只差那一段。
+
+**② `PROGRESS.md` / `BLOCKED.md` 这一轮的"逐条打勾"没有做**，不是忘了，是不该在此刻做：
+主检出里这两份**正被别人写着**（实测 `git status --porcelain` 对两者都回 `M`），
+而共享工作树里整文件提交会把对方未提交的段落**抹回 HEAD**（本仓 2026-09-30 有先例，
+记在项目记忆里）。所以本条线的收口全部写在这份**单写者**文档里（§15）。
+留给落地那一刻的命令（先把两边都读出来，再逐段并入，不整文件覆盖）：
+
+```bash
+git status --porcelain -- PROGRESS.md BLOCKED.md   # 必须是空才动
+```
+
+**③ 落到本地 main 同样等窗口**：`integrate/2026-10-03-closeout` 是 main 的**后代**
+（`git rev-list --left-right --count main...载体` ⇒ `0 31`，现尖更长），
+所以落地是一次快进、没有冲突面 —— 但主检出**就是** `main` 的检出，
+移动这个 ref 会让并行会话的工作树相对新 HEAD 变成"一堆未提交改动"，
+他们那一趟的读数会因此变红。等他们的验收都停了再动，且用 `--only` 逐路径、不 push。
+
+**④ push 与生产部署**：按本 Goal 的红线属共享状态动作，**没有当前明确授权不执行**。
