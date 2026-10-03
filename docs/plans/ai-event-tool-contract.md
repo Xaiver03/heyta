@@ -3548,7 +3548,10 @@ check:ai-quota rc=0
 
 **(1) 载体的依赖形状 —— 排掉了一个会毁掉主检出的假设。** 本环境有一条已入档的教训：
 linked worktree 的 `node_modules` 不能软链主仓库那份（pnpm 会试图 purge 共享树）。
-06:40 现量：`heyta-wt-ai-closeout/node_modules` 与 `packages/*/node_modules` **都是真目录**（`drwxr-xr-x`，非 `l`）；
+06:50 现量（比"根目录是不是真目录"强一档）：遍历载体里全部 `node_modules` 软链
+**3198 枚，逐个 `realpath` 后落在载体树外的 = 0**
+（⚠️ 我第一版用 `find -type l | grep -c node_modules` 量到 706 就当"外部软链数"——
+pnpm 的 `.pnpm/node_modules/*` 本来就全是树内相对链，那个数不代表任何风险，是坏探针）。
 `pnpm config get verify-deps-before-run` = `undefined`、根 `.npmrc` 与 `~/.npmrc` 都无该项；
 `grep -n 'pnpm install|--frozen|prune' scripts/reinstall-all.sh` ⇒ **零命中**，它对 pnpm 的唯一调用是
 第 183 行的 `pnpm -r build`（而段 02 已经在这棵载体上把它跑成 `rc=0`）。
