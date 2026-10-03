@@ -69,6 +69,7 @@ import type { LocalApiTool } from './tools/shared.js';
 export {
   DEFAULT_LIST_LIMIT,
   LIST_TASKS_MAX_DUE_SPAN_DAYS,
+  MAX_TASKS_PER_BATCH_COMPLETE,
   MAX_TOOLS_PER_ENTITY,
   TOOL_ENVELOPE_EGRESS_FIELDS,
   calendarDaysBetween,

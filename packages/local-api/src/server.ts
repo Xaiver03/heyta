@@ -562,7 +562,13 @@ function writeResult(result: LocalApiWriteResult): { result: unknown } {
     // 所以这里的分支**不是**"换个字段名"，而是"别说谎"。
     const payload =
       result.entityType === undefined
-        ? { ok: true, taskId: result.taskId }
+        ? {
+            ok: true,
+            taskId: result.taskId,
+            // 批量才多这一个字段：单条写入的出协议**逐字节不变**，
+            // 否则外部程序会因为一次与实现无关的形状变化而跟着改。
+            ...(result.taskIds === undefined ? {} : { taskIds: result.taskIds }),
+          }
         : { ok: true, entityId: result.entityId ?? result.taskId, entityType: result.entityType };
     return { result: toolText(payload) };
   }
