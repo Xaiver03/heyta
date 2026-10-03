@@ -154,6 +154,15 @@ export const useFocusStore = create<FocusStoreState>((set, get) => ({
   },
 
   pause: () => {
+    /**
+     * 🔴 停表必须和"进入暂停态"是**同一个动作**，不是两件先后做的事。
+     *
+     * 漏掉这一行时 interval 继续跑，`tickOnce()` 每一发都走"未到点也要重绘"那一支
+     * 把 `tick` 自增 ⇒ 订阅整个 focus store 的 `FocusTimer` 以 4Hz 重渲染，
+     * **而且跨视图不停**（切到任务页它还在转），直到用户点中止。
+     * 暂停的语义就是"没有时间在走"，所以这里没有需要保留的定时器。
+     */
+    stopTicking();
     set({ state: pauseFn(get().state, Date.now()), tick: get().tick + 1 });
   },
 
