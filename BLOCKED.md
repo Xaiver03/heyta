@@ -2756,7 +2756,7 @@ web store 有。要补的是 composer 里的层级选择器 —— 它落在"com
 （`packages/ui/src/projects/model.ts` 文件头第 2 条），且需要一条新的界面判据（真机：选父级 → 笔记本读到 `parentId`）。
 本批任务书没点这一件，按"不顺手扩范围"登记，不当已做。
 
-## B47. 🔴 一条**不在本线**的产品缺陷挡住了本线的交付：侧栏清单名被四个动作按钮挤成零宽，读不出来（2026-10-03 18:5x 现量）
+## B53. 🔴 一条**不在本线**的产品缺陷挡住了本线的交付：侧栏清单名被四个动作按钮挤成零宽，读不出来（2026-10-03 18:5x 现量）
 
 **症状（人眼看图，不是断言推断）**：`e2e/test-results/calendar-sidebar-迷你月历…-chromium/test-failed-1.png`
 里侧栏「清单」区那一行显示的是 placeholder **「新清单」+ ✓**，刚创建的清单名**看不见**；
@@ -2790,7 +2790,7 @@ cd /private/tmp/heyta-final && git merge --no-edit main && pnpm build && pnpm ch
 # 期望 115 passed / 0 failed / 2 skipped（同一套 117 条）
 ```
 
-## B48. 🔴 本线自己造的对外缺口：法务文档的工具表少列了本线加的 **16 条**，而条款把那张表当授权面（2026-10-03 19:2x 现量）
+## B54. 🔴 本线自己造的对外缺口：法务文档的工具表少列了本线加的 **16 条**，而条款把那张表当授权面（2026-10-03 19:2x 现量）
 
 `packages/local-api/src/tools/` 目录里唯一工具名 **22** 条；
 `packages/legal/src/documents/ai-and-transfer.ts`（中英两份）逐条 `includes` 之后**缺 16**，
@@ -2842,11 +2842,11 @@ shell 单引号时就是这样量出假数的，形状记下来：
 **中英两张表的逐块读数**（同一命令改成按 `const zh =` / `const en =` 切块后分别数，载体 `6bb9716f`）：
 已列的 6 条在**两块里次数完全对称** —— `list_tasks` 2/2、`get_task` 2/2、
 `list_projects` 1/1、`create_task` 1/1、`update_task` 1/1、`complete_task` 1/1（块长度 zh 9058 / en 21526）。
-⇒ 所以 B48 缺的 16 条是**两张表一起缺**，不存在"中文补了英文没补"那种半边缺口；
+⇒ 所以 B54 缺的 16 条是**两张表一起缺**，不存在"中文补了英文没补"那种半边缺口；
 ⚠️ 遗留弱点（**未修，留给 `check:legal-tools`**）：`includes` 仍是全文级判定，
 真要钉"这张表列了它"得按表的形状解析行，而不是问整份文件里有没有出现过这串字符。
 
-## B49. 🔴 Windows 打包机的对账只做了前半程：远端是**共享目的目录**，而构建要跑几分钟（2026-10-03 19:2x 只读预检照出）
+## B55. 🔴 Windows 打包机的对账只做了前半程：远端是**共享目的目录**，而构建要跑几分钟（2026-10-03 19:2x 只读预检照出）
 
 预检读数（`ssh windows-pc 'powershell -NoProfile -Command …'`，只读）：
 `WEBDIST=True`、远端 `apps/web/dist/index.html` 的 sha256 = `0191588D…`、`MTIME=2026-10-03T19:04:30`，

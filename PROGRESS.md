@@ -1157,7 +1157,7 @@ mobile 与 web 的 `typecheck` 均 0 错。三个新改动屏的 `style={{` 计�
 "打印过的 SHA"不等于"运行时的 SHA"）。`pnpm build` rc=**0**；`pnpm check`（61 段）rc=**1**，
 断在第 51 段 `check:ai-e2e`：`3 failed / 2 skipped / 112 passed`。三条红两种性质：一条是 4318
 载体被对端 preflight 按端口 SIGKILL（环境无效），两条是 `calendar-sidebar.spec.ts:111/:226` 的
-**确定性**红 —— 归属 `main` 侧 `192a516d`（三条独立证据 + 人眼看图，见 §15.9 与 `B47`）。
+**确定性**红 —— 归属 `main` 侧 `192a516d`（三条独立证据 + 人眼看图，见 §15.9 与 `B53`）。
 反方向一条：第 54 段 `check:shell-unicode` 在 `main` 上是红的（`scripts/mutate-closeout-gates.sh:223/232/242`
 三处 `「$V1」`），本线 `1a6640f2` 已修 —— **落地会让 main 这一段从红变绿**。
 段 52–60 里 54 / 57 / 59 已单跑 **rc=0**（静态判据，理由写在 §15.9 的读数表），真浏览器与设备那六段
@@ -1170,7 +1170,7 @@ mobile 与 web 的 `typecheck` 均 0 错。三个新改动屏的 `style={{` 计�
 `install-and-capture.ps1:110-133` 真建 `<Desktop>\heyta.lnk`（MSIX 走 `shell:AppsFolder` AUMID）
 并**读回来验**，判据即 `SHORTCUT_OK` —— 实现与判据齐，**未跑**（跑在 ③ 后面）。
 
-**④ 台账 ✅** —— 本节 + `B36` 第 2 条的 closure 指针 + 新登记 `B47`（那条挂上游的红）+
+**④ 台账 ✅** —— 本节 + `B36` 第 2 条的 closure 指针 + 新登记 `B53`（那条挂上游的红）+
 `AGENTS.md` 三处漂移登记（`:35` 漏列 `ai-tool-call.ts`、`:37` 未提工具目录已按实体拆包、
 `:295` 写"2592 通过"实际 **7839**）+ `AGENTS §7` 索引 vs `environment-traps.md` 的缺号审计。
 `pnpm check:docs` rc=0。
