@@ -69,11 +69,11 @@
 
 | 对外要说的那句话 | 真相的口径 | 证据 | 用它的文本 |
 |---|---|---|---|
-| "存多久" | 同步 op 与设备统一 **45 天** + 每日清理；备份 `pg_dump` 本机 **14 天** | server 末「政策撰写提示」附表；ai-rights D25 | privacy s7 / personal-info-list s7 |
+| "存多久" | ~~同步 op 与设备统一 **45 天** + 每日清理~~ ⚠️ **2026-10-03 更正**：设备行确实按 45 天每日清扫；**同步 op 那条清理对我们的数据一条都不命中**（候选集要求因果全量 op，客户端从不产 —— 见 legal-dataflow-server.md 第 10 条）。备份 `pg_dump` 本机 **14 天** | server 末「政策撰写提示」附表；ai-rights D25 | privacy s7 / personal-info-list s7（三处文案已同步改写，判据 `packages/legal/tests/retention-claim.spec.ts`） |
 | "能从备份里删掉我吗" | 🔴 没有"从既有备份单点删除"的能力 —— 不许写"X 日内于备份中完成" | ai-rights D25 | data-rights s4 |
-| "可以注销" | 服务端 `DELETE /api/account` 是真实硬删除（18 处级联），🔴 **界面上没有入口** ⇒ 文本只能写"邮件申请" | server A1；ai-rights D24 | data-rights s5（缺口 G-08） |
+| "可以注销" | 服务端 `DELETE /api/account` 是真实硬删除（~~18 处级联~~ 🔴 **2026-10-03 更正：引用 `users` 且 `ON DELETE CASCADE` 的外键 16 条、覆盖 15 张表**；"18/19" 是两种错误口径的抄件 —— 它们数的是全部迁移里 `ON DELETE CASCADE` 的出现次数，含与账号无关的级联并把历史重建重复计入。真值由 `packages/legal/tests/structure.spec.ts` 从 `server/prisma/migrations` 现量对账），🔴 **界面上没有入口** ⇒ 文本只能写"邮件申请"；🔴 而且**注销不清除你其它设备上的本地明文库**（批次 E 的 E2/E3 未落地前这就是事实） | server A1；ai-rights D24 | data-rights s5（缺口 G-08） |
 | "可以改邮箱" | 🔴 不能，产品当前没有换绑能力 | ai-rights D24 | personal-info-list s3 / data-rights s3 |
-| "彻底删除就是删干净了" | 打的是 `purgedAt` **标记**，物理回收靠 45 天清理 | client E；ai-rights D24 | data-rights s4 |
+| "彻底删除就是删干净了" | 打的是 `purgedAt` **标记**，~~物理回收靠 45 天清理~~ ⚠️ **2026-10-03 更正**：那条清理当前对我们的数据不命中，所以真的消失只有**注销账号** | client E；ai-rights D24 | data-rights s4 |
 | "可以导出我的数据" | 导出三端都有；🔴 **导入只有 Web 与 CLI** | client B16 | data-rights s2（缺口 G-09） |
 | "我们申请了 X 权限" | 🔴 **逐字抄 manifest，不概括不补**：Android 只有 `INTERNET`；iOS 零 `NS…UsageDescription`；移动端不产生系统通知，系统通知只有 Web 有 | client B17 | permissions s2 |
 

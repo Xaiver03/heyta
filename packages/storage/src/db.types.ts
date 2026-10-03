@@ -121,7 +121,7 @@ export interface DbTx {
   addToleratingDuplicate(store: string, value: unknown): Promise<DbTolerantAddResult>;
   put(store: string, value: unknown, key?: DbKey): Promise<void>;
   get<T>(store: string, key: DbKey): Promise<T | undefined>;
-  getAll<T>(store: string, range?: DbKeyRange): Promise<T[]>;
+  getAll<T>(store: string, range?: DbKeyRange, limit?: number): Promise<T[]>;
   delete(store: string, key: DbKey): Promise<void>;
   clear(store: string): Promise<void>;
   count(store: string, range?: DbKeyRange): Promise<number>;
@@ -172,7 +172,7 @@ export interface DbAdapter {
   add(store: string, value: unknown): Promise<number>;
   put(store: string, value: unknown, key?: DbKey): Promise<void>;
   get<T>(store: string, key: DbKey): Promise<T | undefined>;
-  getAll<T>(store: string, range?: DbKeyRange): Promise<T[]>;
+  getAll<T>(store: string, range?: DbKeyRange, limit?: number): Promise<T[]>;
   delete(store: string, key: DbKey): Promise<void>;
   clear(store: string): Promise<void>;
   count(store: string, range?: DbKeyRange): Promise<number>;

@@ -11,6 +11,7 @@ import { describe, it, expect } from 'vitest';
 import {
   compareVectorClocks,
   sanitizeVectorClock,
+  MAX_ACCEPTED_VECTOR_CLOCK_ENTRIES,
   VectorClock,
   MAX_VECTOR_CLOCK_SIZE,
 } from '../src/sync/sync.types';
@@ -143,10 +144,8 @@ describe('sanitizeVectorClock', () => {
       }
     });
 
-    it('should accept a clock between MAX and 2.5x MAX (conflict resolution range)', () => {
-      // During conflict resolution, clients send merged clocks that may exceed MAX
-      // but should be within the DoS cap of 2.5x MAX
-      const entryCount = MAX_VECTOR_CLOCK_SIZE + 10; // 30 entries, below 50 cap
+    it('should accept a clock above the historical 100-entry compatibility size', () => {
+      const entryCount = MAX_VECTOR_CLOCK_SIZE + 10;
       const clock: VectorClock = {};
       for (let i = 0; i < entryCount; i++) {
         clock[`client_${i}`] = i + 1;
@@ -168,47 +167,28 @@ describe('sanitizeVectorClock', () => {
       }
     });
 
-    it('should strip counter value above 100 million', () => {
+    it('should reject counter value above 100 million', () => {
       const result = sanitizeVectorClock({ clientA: 100_000_001 });
-      expect(result.valid).toBe(true);
-      if (result.valid) {
-        // The entry is stripped, not the entire clock rejected
-        expect(result.clock['clientA']).toBeUndefined();
-        expect(Object.keys(result.clock).length).toBe(0);
-      }
+      expect(result.valid).toBe(false);
     });
 
-    it('should strip only entries above 100M while keeping valid ones', () => {
+    it('should reject only entries above 100M while keeping valid ones', () => {
       const result = sanitizeVectorClock({
         validClient: 50,
         overflowClient: 100_000_001,
         anotherValid: 99_999_999,
       });
-      expect(result.valid).toBe(true);
-      if (result.valid) {
-        expect(result.clock['validClient']).toBe(50);
-        expect(result.clock['anotherValid']).toBe(99_999_999);
-        expect(result.clock['overflowClient']).toBeUndefined();
-        expect(Object.keys(result.clock).length).toBe(2);
-      }
+      expect(result.valid).toBe(false);
     });
 
-    it('should strip negative counter values', () => {
+    it('should reject negative counter values', () => {
       const result = sanitizeVectorClock({ clientA: -1, clientB: 5 });
-      expect(result.valid).toBe(true);
-      if (result.valid) {
-        expect(result.clock['clientA']).toBeUndefined();
-        expect(result.clock['clientB']).toBe(5);
-      }
+      expect(result.valid).toBe(false);
     });
 
-    it('should strip non-integer counter values', () => {
+    it('should reject non-integer counter values', () => {
       const result = sanitizeVectorClock({ clientA: 3.14, clientB: 5 });
-      expect(result.valid).toBe(true);
-      if (result.valid) {
-        expect(result.clock['clientA']).toBeUndefined();
-        expect(result.clock['clientB']).toBe(5);
-      }
+      expect(result.valid).toBe(false);
     });
 
     it('should accept counter value of 0', () => {
@@ -220,9 +200,9 @@ describe('sanitizeVectorClock', () => {
     });
   });
 
-  describe('DoS cap at 2.5x MAX', () => {
-    it('should accept clock at exactly 2.5x MAX entries', () => {
-      const maxSanitize = Math.ceil(MAX_VECTOR_CLOCK_SIZE * 2.5);
+  describe('explicit lossless DoS cap', () => {
+    it('should accept clock at exactly the explicit entry cap', () => {
+      const maxSanitize = MAX_ACCEPTED_VECTOR_CLOCK_ENTRIES;
       const clock: VectorClock = {};
       for (let i = 0; i < maxSanitize; i++) {
         clock[`client_${i}`] = i + 1;
@@ -231,8 +211,8 @@ describe('sanitizeVectorClock', () => {
       expect(result.valid).toBe(true);
     });
 
-    it('should reject clock above 2.5x MAX entries', () => {
-      const maxSanitize = Math.ceil(MAX_VECTOR_CLOCK_SIZE * 2.5);
+    it('should reject clock above the explicit entry cap', () => {
+      const maxSanitize = MAX_ACCEPTED_VECTOR_CLOCK_ENTRIES;
       const clock: VectorClock = {};
       for (let i = 0; i < maxSanitize + 1; i++) {
         clock[`client_${i}`] = i + 1;
@@ -249,10 +229,9 @@ describe('sanitizeVectorClock', () => {
       // It does NOT silently prune them down, which would violate the
       // "prune after comparison" invariant.
       //
-      // 🔴 条数必须**从上限推导**，不能写死 100：上限从 20 提到 100 之后，
-      // 2.5x = 250，写死的 100 条**不再超限**，于是 "expect(valid).toBe(false)"
-      // 变成一条永远不成立的断言 —— 而它本来是这条不变量唯一的守卫。
-      const maxSanitize = Math.ceil(MAX_VECTOR_CLOCK_SIZE * 2.5);
+      // The explicit cap is separate from the historical MAX_VECTOR_CLOCK_SIZE;
+      // this assertion proves oversized input is rejected rather than pruned.
+      const maxSanitize = MAX_ACCEPTED_VECTOR_CLOCK_ENTRIES;
       const clock: VectorClock = {};
       for (let i = 0; i < maxSanitize + 1; i++) {
         clock[`client_${i}`] = i;
@@ -277,23 +256,15 @@ describe('sanitizeVectorClock', () => {
       expect(sanitizeVectorClock(42).valid).toBe(false);
     });
 
-    it('should strip entries with empty string keys', () => {
+    it('should reject entries with empty string keys', () => {
       const result = sanitizeVectorClock({ '': 5, validKey: 10 });
-      expect(result.valid).toBe(true);
-      if (result.valid) {
-        expect(result.clock['']).toBeUndefined();
-        expect(result.clock['validKey']).toBe(10);
-      }
+      expect(result.valid).toBe(false);
     });
 
-    it('should strip entries with keys exceeding 255 characters', () => {
+    it('should reject entries with keys exceeding 255 characters', () => {
       const longKey = 'x'.repeat(256);
       const result = sanitizeVectorClock({ [longKey]: 5, normalKey: 10 });
-      expect(result.valid).toBe(true);
-      if (result.valid) {
-        expect(result.clock[longKey]).toBeUndefined();
-        expect(result.clock['normalKey']).toBe(10);
-      }
+      expect(result.valid).toBe(false);
     });
   });
 });

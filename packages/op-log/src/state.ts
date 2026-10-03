@@ -33,6 +33,7 @@ import type {
   Task,
 } from '@heyta/domain';
 import { OpType, compareVectorClocks } from '@heyta/sync-core';
+import { SUPER_SYNC_SNAPSHOT_OP_TYPES, isHeytaFullStatePayload, type HeytaFullStatePayload } from '@heyta/shared-schema';
 import type { Operation, VectorClock } from '@heyta/sync-core';
 
 /** 物化状态。所有实体按 id 索引。 */
@@ -112,6 +113,320 @@ function isModeled(entityType: string): entityType is ModeledEntity {
 /** 实体在物化状态里的形状：任意字段 + 写入闸门要读的 `updatedAt`。 */
 export type MaterializedBucket = Record<string, Record<string, unknown> & { updatedAt?: number }>;
 
+/**
+ * Reducer-only metadata. It is deliberately non-enumerable and symbol keyed:
+ * materialized entities remain wire/domain compatible, while replay can make
+ * field-level decisions without inheriting whichever partial update happened
+ * to arrive first.
+ */
+const ENTITY_VERSIONS = Symbol('heyta.entityVersions');
+const FIELD_VERSIONS = Symbol('heyta.fieldVersions');
+
+export interface OperationMeta {
+  clock: VectorClock;
+  timestamp: number;
+  /** Source device used by the wire-level LWW tie-breaker. */
+  clientId?: string;
+  opId: string;
+}
+
+export interface FieldVersion {
+  meta: OperationMeta;
+  value?: unknown;
+  deleted: boolean;
+}
+
+/** Versioned, structured-clone-safe representation used by D checkpoints. */
+export interface SerializedMaterializedState {
+  formatVersion: 1;
+  buckets: Record<keyof MaterializedState, Record<string, {
+    data: Record<string, unknown>;
+    entityVersions: OperationMeta[];
+    fieldVersions: Record<string, FieldVersion[]>;
+  }> >;
+}
+
+type InternalEntity = Record<string, unknown> & {
+  updatedAt?: number;
+  deletedAt?: number;
+  [ENTITY_VERSIONS]?: OperationMeta[];
+  [FIELD_VERSIONS]?: Record<string, FieldVersion[]>;
+};
+
+function attachMetadata(
+  entity: InternalEntity,
+  entityVersions: OperationMeta[],
+  fieldVersions: Record<string, FieldVersion[]>,
+): void {
+  Object.defineProperty(entity, ENTITY_VERSIONS, {
+    configurable: true,
+    enumerable: false,
+    value: entityVersions,
+    writable: true,
+  });
+  Object.defineProperty(entity, FIELD_VERSIONS, {
+    configurable: true,
+    enumerable: false,
+    value: fieldVersions,
+    writable: true,
+  });
+}
+
+function operationMeta(op: Operation<string>): OperationMeta {
+  return {
+    clock: { ...op.vectorClock },
+    timestamp: op.timestamp,
+    clientId: op.clientId,
+    opId: op.id,
+  };
+}
+
+function compareMeta(a: OperationMeta, b: OperationMeta): number {
+  const causal = compareVectorClocks(a.clock, b.clock);
+  if (causal === 'GREATER_THAN') return 1;
+  if (causal === 'LESS_THAN') return -1;
+  if (a.timestamp !== b.timestamp) return a.timestamp > b.timestamp ? 1 : -1;
+  // sync-core and the server use clientId for exact-millisecond concurrent
+  // writes. Keep opId as a final deterministic fallback for malformed/legacy
+  // metadata that has no clientId (and for two ops from the same client).
+  const aClientId = a.clientId ?? '';
+  const bClientId = b.clientId ?? '';
+  if (aClientId !== bClientId) return aClientId > bClientId ? 1 : -1;
+  return a.opId > b.opId ? 1 : a.opId < b.opId ? -1 : 0;
+}
+
+function selectVersion<T extends { meta: OperationMeta }>(versions: readonly T[]): T | undefined {
+  if (versions.length === 0) return undefined;
+  const maximal = versions.filter(
+    (candidate) =>
+      !versions.some(
+        (other) => other !== candidate && compareVectorClocks(other.meta.clock, candidate.meta.clock) === 'GREATER_THAN',
+      ),
+  );
+  return maximal.reduce((winner, candidate) =>
+    winner === undefined || compareMeta(candidate.meta, winner.meta) > 0 ? candidate : winner,
+  );
+}
+
+function addUnique<T extends { meta: OperationMeta }>(versions: T[], version: T): void {
+  if (versions.some((existing) => existing.meta.opId === version.meta.opId ||
+    compareVectorClocks(existing.meta.clock, version.meta.clock) === 'GREATER_THAN')) return;
+  for (let i = versions.length - 1; i >= 0; i -= 1) {
+    if (compareVectorClocks(version.meta.clock, versions[i]!.meta.clock) === 'GREATER_THAN') {
+      versions.splice(i, 1);
+    }
+  }
+  versions.push(version);
+}
+
+function addUniqueMeta(versions: OperationMeta[], version: OperationMeta): void {
+  const frontier = versions.map((meta) => ({ meta }));
+  addUnique(frontier, { meta: version });
+  versions.splice(0, versions.length, ...frontier.map(({ meta }) => meta));
+}
+
+function legacyEntityVersions(existing: InternalEntity | undefined): OperationMeta[] {
+  if (existing?.[ENTITY_VERSIONS] !== undefined) return [...existing[ENTITY_VERSIONS]];
+  const clock = existing?.['_lastClock'];
+  const opId = existing?.['_lastOpId'];
+  if (existing !== undefined && clock !== undefined && typeof opId === 'string') {
+    const clientId = existing?.['_lastClientId'];
+    return [
+      {
+        clock: { ...(clock as VectorClock) },
+        timestamp: existing.updatedAt ?? 0,
+        ...(typeof clientId === 'string' ? { clientId } : {}),
+        opId,
+      },
+    ];
+  }
+  return [];
+}
+
+function legacyFieldVersions(existing: InternalEntity | undefined): Record<string, FieldVersion[]> {
+  if (existing?.[FIELD_VERSIONS] !== undefined) {
+    return Object.fromEntries(
+      Object.entries(existing[FIELD_VERSIONS]).map(([key, versions]) => [key, [...versions]]),
+    );
+  }
+  const entityVersions = legacyEntityVersions(existing);
+  const fallback = entityVersions[0];
+  if (existing === undefined || fallback === undefined) return {};
+  const result: Record<string, FieldVersion[]> = {};
+  for (const key of Object.keys(existing)) {
+    if (key.startsWith('_') || key === 'id' || key === 'updatedAt') continue;
+    result[key] = [{ meta: fallback, value: existing[key], deleted: false }];
+  }
+  return result;
+}
+
+function cloneWithMetadata(
+  entity: InternalEntity,
+  entityVersions: OperationMeta[],
+  fieldVersions: Record<string, FieldVersion[]>,
+): InternalEntity {
+  const clone = { ...entity } as InternalEntity;
+  attachMetadata(clone, entityVersions, fieldVersions);
+  return clone;
+}
+
+function materializeVersions(
+  entityId: string,
+  entityVersions: OperationMeta[],
+  fieldVersions: Record<string, FieldVersion[]>,
+): InternalEntity {
+  const next: InternalEntity = { id: entityId };
+  for (const [key, versions] of Object.entries(fieldVersions)) {
+    const winner = selectVersion(versions);
+    if (winner !== undefined && !winner.deleted) next[key] = winner.value;
+  }
+  const winner = selectVersion(entityVersions.map((meta) => ({ meta })));
+  if (winner !== undefined) {
+    next.updatedAt = winner.meta.timestamp;
+    next._lastOpId = winner.meta.opId;
+    next._lastClock = winner.meta.clock;
+    if (winner.meta.clientId !== undefined) next._lastClientId = winner.meta.clientId;
+  }
+  next.id = entityId;
+  return cloneWithMetadata(next, entityVersions, fieldVersions);
+}
+
+/** A lossless reducer frontier, not an unversioned replacement of local state. */
+export type FullStatePayload = HeytaFullStatePayload<SerializedMaterializedState>;
+
+export function isFullStateOperation(op: Operation<string>): boolean {
+  return (SUPER_SYNC_SNAPSHOT_OP_TYPES as readonly string[]).includes(op.opType);
+}
+
+function applyFullState(state: MaterializedState, op: Operation<string>): MaterializedState {
+  const payload = op.payload;
+  if (op.entityType !== 'ALL' || !isHeytaFullStatePayload(payload)) {
+    throw new Error(`Unsupported full-state operation: ${op.id}`);
+  }
+  const incoming = deserializeMaterializedState(payload.state);
+  if (incoming === undefined) throw new Error(`Invalid full-state operation: ${op.id}`);
+  const merged = { ...state };
+  for (const bucketName of Object.values(BUCKET_BY_ENTITY)) {
+    const target = { ...state[bucketName] } as unknown as Record<string, InternalEntity>;
+    for (const [id, entity] of Object.entries(incoming[bucketName])) {
+      const versions = legacyEntityVersions(target[id]);
+      const fields = legacyFieldVersions(target[id]);
+      const assertCovered = (meta: OperationMeta): void => {
+        const relation = compareVectorClocks(op.vectorClock, meta.clock);
+        if (relation !== 'EQUAL' && relation !== 'GREATER_THAN') {
+          throw new Error(`Full-state metadata exceeds its causal boundary: ${op.id}`);
+        }
+      };
+      for (const version of legacyEntityVersions(entity as InternalEntity)) {
+        assertCovered(version);
+        addUniqueMeta(versions, version);
+      }
+      for (const [key, candidates] of Object.entries(legacyFieldVersions(entity as InternalEntity))) {
+        const existing = fields[key] ??= [];
+        for (const candidate of candidates) {
+          assertCovered(candidate.meta);
+          addUnique(existing, candidate);
+        }
+      }
+      target[id] = materializeVersions(id, versions, fields);
+    }
+    (merged as unknown as Record<string, unknown>)[bucketName] = target;
+  }
+  return merged;
+}
+
+/**
+ * Encode reducer metadata explicitly. JSON/structured clone drops Symbols, so
+ * persisting only the visible entity JSON would make the next incremental op
+ * forget causality and resurrect stale fields.
+ */
+export function serializeMaterializedState(state: MaterializedState): SerializedMaterializedState {
+  const buckets = {} as SerializedMaterializedState['buckets'];
+  for (const bucketName of Object.values(BUCKET_BY_ENTITY)) {
+    const source = state[bucketName] as unknown as Record<string, InternalEntity>;
+    const target: Record<string, SerializedMaterializedState['buckets'][keyof MaterializedState][string]> = {};
+    for (const [entityId, entity] of Object.entries(source)) {
+      target[entityId] = {
+        data: { ...entity },
+        entityVersions: [...(entity[ENTITY_VERSIONS] ?? [])].sort((a, b) => a.opId < b.opId ? -1 : a.opId > b.opId ? 1 : 0).map((meta) => ({
+          ...meta,
+          clock: { ...meta.clock },
+        })),
+        fieldVersions: Object.fromEntries(
+          Object.entries(entity[FIELD_VERSIONS] ?? {}).map(([key, versions]) => [
+            key,
+            [...versions].sort((a, b) => a.meta.opId < b.meta.opId ? -1 : a.meta.opId > b.meta.opId ? 1 : 0).map((version) => ({
+              ...version,
+              meta: { ...version.meta, clock: { ...version.meta.clock } },
+            })),
+          ]),
+        ),
+      };
+    }
+    (buckets as Record<string, unknown>)[bucketName] = target;
+  }
+  return { formatVersion: 1, buckets };
+}
+
+/** Decode a checkpoint and restore non-enumerable reducer metadata. */
+function isOperationMeta(value: unknown): value is OperationMeta {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+  const meta = value as OperationMeta;
+  return typeof meta.opId === 'string' && meta.opId.length > 0 && Number.isFinite(meta.timestamp) &&
+    (meta.clientId === undefined || typeof meta.clientId === 'string') &&
+    meta.clock !== null && typeof meta.clock === 'object' && !Array.isArray(meta.clock) &&
+    Object.values(meta.clock).every((n) => Number.isSafeInteger(n) && n >= 0);
+}
+
+export function deserializeMaterializedState(value: unknown): MaterializedState | undefined {
+  if (!value || typeof value !== 'object') return undefined;
+  const candidate = value as Partial<SerializedMaterializedState>;
+  if (candidate.formatVersion !== 1 || !candidate.buckets || typeof candidate.buckets !== 'object') {
+    return undefined;
+  }
+  const knownBuckets: readonly string[] = Object.values(BUCKET_BY_ENTITY);
+  if (Object.keys(candidate.buckets).some((key) => !knownBuckets.includes(key))) return undefined;
+  const state = emptyState();
+  for (const [entityType, bucketName] of Object.entries(BUCKET_BY_ENTITY)) {
+    const encodedBucket = (candidate.buckets as Record<string, unknown>)[bucketName];
+    if (!encodedBucket || typeof encodedBucket !== 'object' || Array.isArray(encodedBucket)) return undefined;
+    const target = state[bucketName] as unknown as Record<string, InternalEntity>;
+    for (const [entityId, encoded] of Object.entries(encodedBucket as Record<string, unknown>)) {
+      if (!encoded || typeof encoded !== 'object') return undefined;
+      const record = encoded as Partial<SerializedMaterializedState['buckets'][keyof MaterializedState][string]>;
+      if (!record.data || typeof record.data !== 'object' || Array.isArray(record.data) ||
+          !Array.isArray(record.entityVersions) || record.entityVersions.length === 0 ||
+          !record.entityVersions.every(isOperationMeta) || !record.fieldVersions ||
+          typeof record.fieldVersions !== 'object' || Array.isArray(record.fieldVersions)) {
+        return undefined;
+      }
+      for (const versions of Object.values(record.fieldVersions)) {
+        if (!Array.isArray(versions) || !versions.every((version) => version !== null &&
+            typeof version === 'object' && typeof version.deleted === 'boolean' && isOperationMeta(version.meta))) {
+          return undefined;
+        }
+      }
+      const entity = { ...(record.data as Record<string, unknown>) } as InternalEntity;
+      entity.id = entityId;
+      attachMetadata(
+        entity,
+        record.entityVersions.map((meta) => ({ ...meta, clock: { ...meta.clock } })),
+        Object.fromEntries(
+          Object.entries(record.fieldVersions).map(([key, versions]) => [
+            key,
+            (versions as FieldVersion[]).map((version) => ({
+              ...version,
+              meta: { ...version.meta, clock: { ...version.meta.clock } },
+            })),
+          ]),
+        ),
+      );
+      target[entityId] = entity;
+    }
+  }
+  return state;
+}
+
 export function bucketFor(
   state: MaterializedState,
   entityType: string,
@@ -171,7 +486,7 @@ export const UNMODELED_ENTITY_TYPES: readonly { entityType: string; reason: stri
   },
   {
     entityType: 'ALL',
-    reason: '通配类型，不是真实实体，不物化',
+    reason: '不是真实实体：全量操作的路由类型，无独立实体桶；版本化 snapshot 由 applyFullState 合并所有物化桶',
   },
 ];
 
@@ -180,9 +495,10 @@ export const UNMODELED_ENTITY_TYPES: readonly { entityType: string; reason: stri
  *
  * **纯函数**：不修改入参，返回新状态（浅拷贝被改动的桶）。
  */
-export function applyOperation(
+function applyOperationToEntity(
   state: MaterializedState,
   op: Operation<string>,
+  entityId: string,
 ): MaterializedState {
   // 系统实体（GLOBAL_CONFIG 等）落在物化状态之外，直接忽略。
   // ⚠️ 不要抛错：未来新增实体类型时，老客户端必须能优雅跳过，
@@ -190,162 +506,74 @@ export function applyOperation(
   if (!isModeled(op.entityType)) return state;
 
   const bucket = BUCKET_BY_ENTITY[op.entityType];
-  const entityId = op.entityId;
-  if (entityId === undefined) return state;
-
   const payload = op.payload;
 
-  const existing = (state[bucket] as Record<string, unknown>)[entityId] as
-    | (Record<string, unknown> & { updatedAt?: number; deletedAt?: number })
-    | undefined;
+  const existing = (state[bucket] as Record<string, unknown>)[entityId] as InternalEntity | undefined;
+  const entityVersions = legacyEntityVersions(existing);
+  const fieldVersions = legacyFieldVersions(existing);
+  const currentMeta = operationMeta(op);
+  addUniqueMeta(entityVersions, currentMeta);
 
-  // DELETE op：写入墓碑，**不物理删除**。
-  // 物理删除会让同步端永远看不到这次删除，另一端会把数据又同步回来。
-  //
-  // 🔴 墓碑**保留实体的全部原字段**（`...existing`）—— 这正是"删除可恢复"
-  // 能兑现的原因：标题、备注、清单、标签、日期、重复规则一个都没丢，
-  // 恢复只需要一条普通的 `UPD { deletedAt: null }`（下面的 `null` → 删字段
-  // 语义会把它清掉），不需要新 op 类型、不需要动 reducer、不需要 bump schema。
-  // 「彻底删除」是另一条路：一条 `UPD { purgedAt: <ts> }` 只做标记，
-  // **不清 `deletedAt`**（清掉墓碑会让离线端把旧数据当"从未删除"又同步回来）。
-  // 两者的 op 都由 `@heyta/app-host` 的 `createTaskActions` 构造 ——
-  // reducer 只认字段，不认"这是恢复还是彻底删除"。
-  if (op.opType === OpType.Delete) {
-    if (existing === undefined) return state;
-
-    // 🔴 删除也必须过同一道写入闸门，并且必须**记下自己的时钟**。
-    //
-    // 曾经这两件事都没做：DELETE 无条件写墓碑，也不更新 `_lastClock` /
-    // `_lastOpId`。后果是删除之后实体上留着的时钟是**删除之前那次写入的** ——
-    // 于是后面每条 op 都在和一个过期的时钟比较，因果判定随之失真
-    // （陈旧时钟比真实值旧，闸门会变得过于宽松，本该拒绝的写入被放进来了）。
-    if (!shouldAcceptWrite(op, existing)) return state;
-
-    return {
-      ...state,
-      [bucket]: {
-        // 与上方第 198 行同款断言：`bucket` 的类型退化成 any，
-        // 不标注就报 TS7053（这是并行会话在途代码里唯一挡住整仓构建的两处）
-        ...(state[bucket] as Record<string, unknown>),
-        [entityId]: {
-          ...existing,
-          deletedAt: op.timestamp,
-          updatedAt: op.timestamp,
-          _lastOpId: op.id,
-          _lastClock: op.vectorClock,
-        },
-      },
-    } as MaterializedState;
-  }
-
-  if (payload === null || typeof payload !== 'object') return state;
-
-  const incoming = payload as Record<string, unknown>;
-
-  /**
-   * LWW（最后写入者胜）的**实体级**闸门。
-   *
-   * 冲突判定在引擎层用向量时钟做；这里是**兜底**：
-   * 即使两条 op 被判定为并发、且引擎选择了某一条，
-   * reducer 也必须能独立地拒绝"更旧的"写入 ——
-   * 否则重放顺序一变结果就不同，违反确定性。
-   *
-   * 平局用 op.id 打破：不能留"谁先到谁赢"，那在两端会不一致。
-   */
-  if (!shouldAcceptWrite(op, existing)) return state;
-
-  // CREATE / UPDATE 合并语义：只覆盖 payload 里出现的字段。
-  // 这样"只改标题"的 op 不会把 dueDate 抹掉。
-  const merged: Record<string, unknown> = {
-    ...(existing ?? {}),
-    ...incoming,
-    id: entityId,
-    updatedAt: op.timestamp,
-    _lastOpId: op.id,
-    _lastClock: op.vectorClock,
+  const addFieldVersion = (key: string, value: unknown, deleted: boolean): void => {
+    const versions = (fieldVersions[key] ??= []);
+    addUnique(versions, { meta: currentMeta, value, deleted });
   };
 
-  /**
-   * 🔴 `null` 表示**显式清除这个字段**，不是"把它设成 null"。
-   *
-   * 为什么需要这个约定：合并语义下没法表达"取消完成"。
-   * UI 想清掉 `completedAt` 时若传 `undefined`，展开运算会跳过它
-   * （`{...a, ...{x: undefined}}` 里 x 仍然是 undefined，看似可行）——
-   * 但 JSON 序列化会**丢掉 undefined 字段**，op 传到另一端时这个意图就消失了，
-   * 于是"取消完成"在第二台设备上不生效。
-   *
-   * `null` 能安全穿过 JSON，所以用它承载"删除"语义，在这里翻译成真正的删除。
-   */
-  const toDelete: string[] = [];
-  for (const [key, value] of Object.entries(incoming)) {
-    if (value === null) toDelete.push(key);
+  // DELETE is a field-level tombstone. It must be materialized even when the
+  // create has not arrived yet, otherwise an out-of-order replay can resurrect
+  // the entity. Other fields are retained for restore/export semantics.
+  if (op.opType === OpType.Delete) {
+    addFieldVersion('deletedAt', op.timestamp, false);
+  } else {
+    if (payload === null || typeof payload !== 'object') return state;
+    const incoming = payload as Record<string, unknown>;
+    for (const [key, value] of Object.entries(incoming)) {
+      addFieldVersion(key, value, value === null);
+    }
+    // CREATE establishes the derived creation timestamp. The explicit marker
+    // is versioned just like any other field, so arrival order cannot invent it.
+    if (op.opType === OpType.Create) addFieldVersion('createdAt', op.timestamp, false);
   }
-  for (const key of toDelete) {
-    delete merged[key];
-  }
-  if (existing === undefined) {
-    merged['createdAt'] = op.timestamp;
-  }
+
+  // Soft deletion changes visibility via deletedAt, never removes content.
+  // Keep fields for trash, restore and export, including when their operations
+  // arrive after the tombstone. Older field writes cannot clear deletedAt.
+  const materialized = materializeVersions(entityId, entityVersions, fieldVersions);
 
   return {
     ...state,
-    [bucket]: { ...(state[bucket] as Record<string, unknown>), [entityId]: merged },
+    [bucket]: { ...(state[bucket] as Record<string, unknown>), [entityId]: materialized },
   } as MaterializedState;
+
 }
 
 /**
- * 写入闸门：**因果优先，墙上时钟只作兜底**。
- *
- * 🔴 为什么不能只比 `op.timestamp`（这是本仓库真实踩过的坑）：
- *
- * 同一台设备连续两次编辑同一实体会落在**同一毫秒**里，于是时间戳相等，
- * 判定就落到 `op.id` 的字典序上 —— 而 `op.id` 是随机 UUID。
- * 结果：**因果上更新的那条有一半概率被丢掉**，且完全静默。
- *
- * 实测症状：`setCompleted(true)` 紧接 `setCompleted(false)`，重开后
- * 「取消完成」约 2/3 的情况不生效（`completedAt` 仍是时间戳）。
- * op 日志里两条 op 的向量时钟清清楚楚是 `3` → `4`，同设备、顺序明确 ——
- * **它们根本不并发，不该由墙上时钟裁决。**
- *
- * 所以先用向量时钟：因果上明确更新/更旧，直接接受/拒绝，不看时间戳。
- * 只有真正**并发**（或时钟相等，即同一条 op 重放）时，才回退到
- * 时间戳 + `op.id` 字典序 —— 后者是为了保证**两端算出同一个结果**。
- *
- * 注：`_lastClock` / `_lastOpId` 都是**内存派生字段**，随 op 重放重建，
- * 不进任何持久化 schema（物化状态从不落盘）。
+ * Apply one logical operation to every entity named by its scope. `entityId`
+ * is retained for wire compatibility and is always included in the touched
+ * set; `entityIds` is an additional batch scope, never a request to create
+ * multiple operations. The same op metadata is therefore used for every
+ * member, and duplicate delivery remains idempotent per member.
  */
-function shouldAcceptWrite(
+export function applyOperation(
+  state: MaterializedState,
   op: Operation<string>,
-  existing: (Record<string, unknown> & { updatedAt?: number }) | undefined,
-): boolean {
-  if (existing === undefined) return true;
-
-  const existingClock = existing['_lastClock'] as VectorClock | undefined;
-  const incomingClock = op.vectorClock;
-  if (existingClock !== undefined && incomingClock !== undefined) {
-    const cmp = compareVectorClocks(incomingClock, existingClock);
-    // 因果上更新 → 无条件胜出（同一设备连续编辑就是这种情况）
-    if (cmp === 'GREATER_THAN') return true;
-    // 因果上更旧 → 无条件拒绝，哪怕时间戳更大（时钟回拨也挡得住）
-    if (cmp === 'LESS_THAN') return false;
-    // EQUAL（同一条 op 重放）与 CONCURRENT 才需要下面兜底
-  }
-
-  const existingUpdated = existing['updatedAt'] ?? 0;
-  if (op.timestamp < existingUpdated) return false;
-  if (op.timestamp === existingUpdated) {
-    // 同毫秒且并发：用 op.id 字典序做确定性决胜，保证两端一致
-    const existingOpId = (existing['_lastOpId'] as string | undefined) ?? '';
-    if (op.id <= existingOpId) return false;
-  }
-  return true;
+): MaterializedState {
+  if (isFullStateOperation(op)) return applyFullState(state, op);
+  if (!isModeled(op.entityType)) return state;
+  const ids = Array.from(
+    new Set([
+      ...(op.entityId !== undefined ? [op.entityId] : []),
+      ...(op.entityIds ?? []),
+    ]),
+  );
+  return ids.reduce((next, entityId) => applyOperationToEntity(next, op, entityId), state);
 }
 
 /**
-按序重放一批 op。
- *
- * ⚠️ 顺序敏感：同实体的 op 必须按发生顺序应用。
- * 调用方负责保证传入顺序（本地 op 按 seq，远程 op 按服务端序）。
+ * Replay applies the same associative field/frontier merge used by live remote
+ * delivery. Metadata remains reducer-local and is rebuilt from the op-log.
+ * Operations may arrive in any order; causal frontiers and deterministic LWW
+ * resolve the result without relying on arrival order.
  */
 export function replayOperations(
   state: MaterializedState,

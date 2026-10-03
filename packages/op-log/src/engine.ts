@@ -23,16 +23,23 @@ import {
   OpType,
   VectorClockComparison,
   compareVectorClocks,
-  limitVectorClockSize,
   mergeVectorClocks,
 } from '@heyta/sync-core';
-import type { OpLogStore, StoredOperation } from '@heyta/storage';
+import {
+  checkpointChecksum,
+  isValidCheckpoint,
+  type OpLogStore,
+} from '@heyta/storage';
 
 import {
   applyOperation,
   bucketFor,
   emptyState,
   replayOperations,
+  deserializeMaterializedState,
+  serializeMaterializedState,
+  isFullStateOperation,
+  type FullStatePayload,
   type MaterializedState,
 } from './state.js';
 
@@ -99,20 +106,100 @@ export class OpLogEngine {
    */
   private appliedOpIds = new Set<string>();
   private opCounter = 0;
+  private appliedSeq = 0;
+  private checkpointSeq = 0;
+  private mutationQueue: Promise<unknown> = Promise.resolve();
+
+  private serialize<T>(work: () => Promise<T>): Promise<T> {
+    const result = this.mutationQueue.then(work);
+    this.mutationQueue = result.catch(() => undefined);
+    return result;
+  }
+  /** Checkpoint cadence; zero disables automatic checkpoint writes. */
+  private readonly checkpointEvery: number;
 
   constructor(private readonly options: OpLogEngineOptions) {
     this.state = options.initialState ?? emptyState();
+    this.checkpointEvery = 250;
   }
 
-  /**
-   * 裁剪时钟规模。
-   *
-   * ⚠️ 第二个参数是**要保留的 clientId 列表**，不是上限大小。
-   * 自己的 clientId 必须保留 —— 被裁掉的话，本次写入就不再是
-   * "自己时钟的递增"，LWW 决胜会退化成不可预测。
-   */
+  private async writeCheckpoint(coveredSeq: number): Promise<void> {
+    const write = this.options.store.writeCheckpoint;
+    if (write === undefined || coveredSeq <= 0) return;
+    // A later successful dispatch does not prove that an earlier persisted
+    // remote op was applied. Keep the previous cache until that hole recovers.
+    const pending = await this.options.store.findPendingApply();
+    if (pending.some((row) => row.seq <= coveredSeq && !this.appliedOpIds.has(row.op.id))) return;
+    const base = {
+      formatVersion: 1 as const,
+      coveredSeq,
+      state: serializeMaterializedState(this.state),
+      clock: this.getClock(),
+      appliedOpIds: [...this.appliedOpIds],
+    };
+    await write.call(this.options.store, { ...base, checksum: checkpointChecksum(base) });
+    this.checkpointSeq = coveredSeq;
+  }
+
+  private async maybeCheckpoint(coveredSeq: number): Promise<void> {
+    if (this.checkpointEvery > 0 && coveredSeq - this.checkpointSeq >= this.checkpointEvery) {
+      try {
+        await this.writeCheckpoint(coveredSeq);
+      } catch (error) {
+        // Checkpoints accelerate recovery but never make a committed op fail.
+        console.warn('[heyta] checkpoint write skipped; next startup will replay the log', error);
+      }
+    }
+  }
+
+  /** Explicit checkpoint hook for maintenance and tests. */
+  checkpoint(): Promise<void> {
+    return this.serialize(() => this.writeCheckpoint(this.appliedSeq));
+  }
+
+  /** Queue a causal maintenance snapshot only after the local upload queue drains. */
+  createSyncCheckpoint(): Promise<DispatchResult> {
+    return this.serialize(async () => {
+      if (this.options.store.hasIncompleteHistory === undefined ||
+          this.appliedSeq !== await this.options.store.getLastLocalSeq() ||
+          await this.options.store.hasIncompleteHistory()) {
+        throw new Error('Sync checkpoint requires completely materialized history');
+      }
+      if ((await this.options.store.findPendingUpload()).length > 0 ||
+          (await this.options.store.findPendingApply()).length > 0) {
+        throw new Error('Sync checkpoint requires drained upload and apply queues');
+      }
+      // An older reducer may retain future entities in the log without knowing
+      // how to materialize them. Never let its snapshot authorize their erasure.
+      // This scan is explicit maintenance work, not part of cold-start hydration.
+      for (const { op, source, uploadStatus } of await this.options.store.getAllOps()) {
+        // Maintenance cannot turn a local-only import or a rejected intention
+        // into newly published data. Explicit backup restoration is a different
+        // user action. Stale maintenance snapshots contain no new intentions.
+        if (source === 'import' || (uploadStatus === 'rejected' && !isFullStateOperation(op))) {
+          throw new Error('Sync checkpoint requires server-accepted history, not local-only or rejected data');
+        }
+        if (!isFullStateOperation(op) && bucketFor(this.state, op.entityType) === undefined) {
+          throw new Error(`Sync checkpoint cannot represent entity type: ${op.entityType}`);
+        }
+      }
+      const payload: FullStatePayload = {
+        isFullState: true,
+        heytaStateVersion: 1,
+        state: serializeMaterializedState(this.state),
+        repairBaseServerSeq: await this.options.store.getLastServerSeq(),
+      };
+      return this.dispatchLocked({ entityType: 'ALL', entityId: '*', opType: OpType.Repair, payload });
+    });
+  }
+
+  /** Preserve every causal dimension; resource limits must reject explicitly. */
   private trimClock(clock: VectorClock): VectorClock {
-    return limitVectorClockSize(clock, [this.options.clientId]);
+    // Causal history is lossless. The old top-K helper silently deleted client
+    // dimensions and could make a valid offline write permanently concurrent
+    // with the server head. Resource limits belong at ingress (explicit reject),
+    // never in this stateful clock merge.
+    return { ...clock };
   }
 
   // ── 读 ──────────────────────────────────────────────────
@@ -224,6 +311,37 @@ export class OpLogEngine {
     return { ...this.clock };
   }
 
+  /**
+   * Observe a server-provided causal frontier (for example the clock attached
+   * to a compacted snapshot). The frontier is evidence about history that may
+   * no longer be present in the downloaded page; it must advance the next
+   * local op's clock even when no individual op was applied.
+   */
+  observeRemoteClock(clock: VectorClock): void {
+    this.clock = this.trimClock(mergeVectorClocks(this.clock, clock));
+  }
+
+  /** Persist snapshot-only history before the download cursor can advance. */
+  observeRemoteClockDurably(clock: VectorClock): Promise<void> {
+    return this.serialize(async () => {
+      if (this.options.store.mergeObservedClock === undefined) {
+        throw new Error('Storage cannot persist a server causal frontier');
+      }
+      await this.options.store.mergeObservedClock(clock);
+      this.observeRemoteClock(clock);
+    });
+  }
+
+  /** A skipped encrypted delta must never be erased by a future server drain. */
+  markHistoryIncomplete(): Promise<void> {
+    return this.serialize(async () => {
+      if (this.options.store.markHistoryIncomplete === undefined) {
+        throw new Error('Storage cannot persist incomplete sync history');
+      }
+      await this.options.store.markHistoryIncomplete();
+    });
+  }
+
   // ── 写（唯一入口） ───────────────────────────────────────
 
   /**
@@ -233,13 +351,20 @@ export class OpLogEngine {
    * 反过来的话，落盘失败时内存已经变了 —— 用户看到改动生效，
    * 刷新后消失，而且 op-log 里没有痕迹（无法恢复）。
    */
-  async dispatch(intent: OpIntent): Promise<DispatchResult> {
+  dispatch(intent: OpIntent): Promise<DispatchResult> {
+    return this.serialize(() => this.dispatchLocked(intent));
+  }
+
+  private async dispatchLocked(intent: OpIntent): Promise<DispatchResult> {
     // 先算出**本次写入之后**的时钟；op 与本地时钟用同一个值。
     const clock = this.trimClock({
       ...this.clock,
       [this.options.clientId]: (this.clock[this.options.clientId] ?? 0) + 1,
     });
     const op = this.buildOp(intent, clock);
+    // Validate pure reduction before persisting; an unsupported snapshot must
+    // not poison every subsequent recovery of this log.
+    const nextState = applyOperation(this.state, op);
 
     // 1. 落盘（原子、单调 seq）
     const seqs = await this.options.store.appendLocal([op]);
@@ -251,11 +376,14 @@ export class OpLogEngine {
     }
 
     // 2. 推进本地时钟
-    this.clock = clock;
+    this.clock = mergeVectorClocks(this.clock, clock);
 
     // 3. 应用（纯函数）
-    this.state = applyOperation(this.state, op);
+    this.state = nextState;
     this.appliedOpIds.add(op.id);
+
+    this.appliedSeq = seqs[0]!;
+    await this.maybeCheckpoint(this.appliedSeq);
 
     return { ops: [op], seqs };
   }
@@ -310,39 +438,51 @@ export class OpLogEngine {
    * 若在 2 与 3 之间崩溃，重启时 `recover()` 会扫到 pending 的 op 并重放 ——
    * 这正是"已落盘但没应用"不会静默丢数据的原因。
    */
-  async applyRemote(ops: Operation<string>[]): Promise<RemoteApplyResult> {
+  applyRemote(ops: Operation<string>[]): Promise<RemoteApplyResult> {
+    return this.serialize(() => this.applyRemoteLocked(ops));
+  }
+
+  private async applyRemoteLocked(ops: Operation<string>[]): Promise<RemoteApplyResult> {
     if (ops.length === 0) return { applied: [], skipped: 0, overwritten: [] };
+    for (const op of ops) {
+      if (isFullStateOperation(op)) applyOperation(emptyState(), op);
+    }
 
     // 1. 落盘（幂等：重复 op 会被跳过）
-    const { writtenOps, skippedCount } = await this.options.store.appendBatchSkipDuplicates(
+    const { writtenOps, skippedCount, seqs } = await this.options.store.appendBatchSkipDuplicates(
       ops,
       'remote',
       { pendingApply: true },
     );
 
+    // A retry may find a row written by a failed previous attempt. A duplicate
+    // id proves persistence, not reducer commit; finish those pending rows too.
+    const incomingIds = new Set(ops.map((op) => op.id));
+    const newIds = new Set(writtenOps.map((op) => op.id));
+    const retried = (await this.options.store.findPendingApply())
+      .filter((row) => incomingIds.has(row.op.id) && !newIds.has(row.op.id));
+    const toApply = [...writtenOps.map((op, i) => ({ op, seq: seqs[i]! })), ...retried]
+      .sort((a, b) => a.seq - b.seq);
+
     // 2. 应用
     const applied: Operation<string>[] = [];
     const overwritten: RemoteApplyResult['overwritten'] = [];
 
-    for (const op of writtenOps) {
+    for (const { op } of toApply) {
       const outcome = this.applyOne(op);
-      if (outcome.overwritten) {
-        overwritten.push({ entityType: op.entityType, entityId: op.entityId ?? '' });
-      }
+      overwritten.push(...outcome.overwritten);
       if (outcome.didApply) {
         applied.push(op);
         // 合并远程时钟：让后续本地写入与这些远程 op 形成正确的因果关系
-        this.clock = this.trimClock(mergeVectorClocks(this.clock, op.vectorClock ?? {}));
+        this.observeRemoteClock(op.vectorClock ?? {});
       }
     }
 
     // 3. 标记已应用。**这一步之后崩溃才是安全的。**
-    if (writtenOps.length > 0) {
-      const stored = await this.options.store.getOpsSince(0);
-      const seqs = stored
-        .filter((r) => writtenOps.some((o) => o.id === r.op.id))
-        .map((r) => r.seq);
-      await this.options.store.markApplied(seqs);
+    if (toApply.length > 0) {
+      await this.options.store.markApplied(toApply.map((row) => row.seq));
+      this.appliedSeq = Math.max(this.appliedSeq, ...toApply.map((row) => row.seq));
+      await this.maybeCheckpoint(this.appliedSeq);
     }
 
     return { applied, skipped: skippedCount, overwritten };
@@ -375,13 +515,22 @@ export class OpLogEngine {
    * ⚠️ 导入的 op **不进上传队列**（`source: 'import'`）—— 原因见
    * `OpLogStore.appendImported`：它们带着别的设备的 `clientId`，服务端会拒绝。
    */
-  async importOperations(ops: readonly Operation<string>[]): Promise<ImportOpsResult> {
+  importOperations(ops: readonly Operation<string>[]): Promise<ImportOpsResult> {
+    return this.serialize(() => this.importOperationsLocked(ops));
+  }
+
+  private async importOperationsLocked(ops: readonly Operation<string>[]): Promise<ImportOpsResult> {
     if (ops.length === 0) return { imported: 0, skipped: 0 };
+    // Imported snapshots follow the same pre-persistence validation as remote
+    // snapshots. Otherwise a bad backup poisons every subsequent cold start.
+    for (const op of ops) {
+      if (isFullStateOperation(op)) applyOperation(emptyState(), op);
+    }
 
     const result = await this.options.store.appendImported([...ops]);
 
     // 追加之后，状态与时钟都必须从**完整日志**重建 —— 见上面的注释。
-    await this.recover();
+    await this.recoverLocked();
 
     return { imported: result.appended.length, skipped: result.skipped.length };
   }
@@ -397,48 +546,49 @@ export class OpLogEngine {
    */
   private applyOne(op: Operation<string>): {
     didApply: boolean;
-    overwritten: boolean;
+    overwritten: RemoteApplyResult['overwritten'];
   } {
     // 幂等闸门：这条 op 处理过了
     if (this.appliedOpIds.has(op.id)) {
-      return { didApply: false, overwritten: false };
+      return { didApply: false, overwritten: [] };
     }
 
-    const comparison = compareVectorClocks(op.vectorClock ?? {}, this.clock);
 
-    if (comparison === VectorClockComparison.LESS_THAN) {
-      // 远端这条比我们已经知道的更旧 —— 应用它会回退状态
-      this.appliedOpIds.add(op.id);
-      return { didApply: false, overwritten: false };
-    }
-
-    if (comparison === VectorClockComparison.EQUAL) {
-      this.appliedOpIds.add(op.id);
-      return { didApply: false, overwritten: false };
-    }
-
-    // GREATER_THAN 或 CONCURRENT：应用。
-    // CONCURRENT 的 LWW 决胜**已经下沉到 reducer**（按 timestamp + op.id），
-    // 这里不重复实现一遍 —— 两处判定逻辑迟早会不一致。
-    const before = op.entityId === undefined ? undefined : this.snapshot(op);
+    // An unseen operation must still reach the reducer, even when its clock
+    // is below the aggregate clock we already know. A device can receive a
+    // later causal operation before an earlier one (pagination, retry, or a
+    // reconnect can reorder delivery). The aggregate clock proves that the
+    // event is not newer than everything we know; it does not prove that this
+    // specific op was applied. The reducer's per-entity clock gate handles the
+    // actual stale-write decision, while appliedOpIds remains the idempotency
+    // gate.
+    //
+    // GREATER_THAN, LESS_THAN, EQUAL, and CONCURRENT therefore all flow
+    // through applyOperation. Skipping unseen LESS_THAN/EQUAL ops here would
+    // silently drop valid data when an op arrives after one of its causal
+    // descendants.
+    const ids = [...new Set([...(op.entityId === undefined ? [] : [op.entityId]), ...(op.entityIds ?? [])])];
+    const before = bucketFor(this.state, op.entityType);
+    const snapshots = ids.map((entityId) => ({ entityId, entity: before?.[entityId] }));
     this.state = applyOperation(this.state, op);
     this.appliedOpIds.add(op.id);
 
-    const after = op.entityId === undefined ? undefined : this.snapshot(op);
+    const after = bucketFor(this.state, op.entityType);
     return {
       didApply: true,
-      overwritten:
-        comparison === VectorClockComparison.CONCURRENT &&
-        before !== undefined &&
-        after === before,
+      overwritten: snapshots.filter(({ entityId, entity }) => {
+        if (entity === undefined) return false;
+        const previousClock = (entity['_lastClock'] ?? {}) as VectorClock;
+        return compareVectorClocks(op.vectorClock ?? {}, previousClock) === VectorClockComparison.CONCURRENT &&
+          this.entityContent(entity) !== this.entityContent(after?.[entityId]);
+      }).map(({ entityId }) => ({ entityType: op.entityType, entityId })),
     };
   }
 
-  private snapshot(op: Operation<string>): string | undefined {
-    // 不在这里维护实体→桶的映射：那是 `bucketFor` 的职责，映射只有一份。
-    const bucket = bucketFor(this.state, op.entityType);
-    if (bucket === undefined || op.entityId === undefined) return undefined;
-    return String(bucket[op.entityId]?.['updatedAt'] ?? '');
+  private entityContent(entity: Record<string, unknown> | undefined): string {
+    return JSON.stringify(Object.entries(entity ?? {})
+      .filter(([key]) => !key.startsWith('_') && key !== 'updatedAt')
+      .sort(([a], [b]) => a < b ? -1 : a > b ? 1 : 0));
   }
 
   // ── 崩溃恢复 ────────────────────────────────────────────
@@ -449,7 +599,11 @@ export class OpLogEngine {
    * 找出"已落盘但未应用"的 op 并重放。**必须在接受新同步之前完成** ——
    * 否则那些 op 占着 seq 却永不生效，等于静默丢数据。
    */
-  async recover(): Promise<{ replayed: number }> {
+  recover(): Promise<{ replayed: number }> {
+    return this.serialize(() => this.recoverLocked());
+  }
+
+  private async recoverLocked(): Promise<{ replayed: number }> {
     // 🔴 启动时必须从**整个日志**重建内存状态，不能只看 pendingApply。
     //
     // 我第一版只重放了 `pendingApply`（"写了但没应用"的远程 op）。
@@ -458,6 +612,54 @@ export class OpLogEngine {
     // 这正是"op-log 是事实来源"必须能兑现的地方，而我把它走成了摆设。
     //
     // `rebuildFromLog()` 本来就写好了，只是没有被 recover 用上。
+    this.appliedOpIds.clear();
+    this.clock = {};
+    this.checkpointSeq = 0;
+    const observedClock = await this.options.store.readObservedClock?.() ?? {};
+
+    let checkpoint;
+    let checkpointState: MaterializedState | undefined;
+    try {
+      checkpoint = await this.options.store.readCheckpoint?.();
+      checkpointState = checkpoint === undefined
+        ? undefined
+        : deserializeMaterializedState(checkpoint.state);
+    } catch {
+      // A malformed checkpoint is only a cache miss. The complete op-log is
+      // still authoritative and will be replayed below.
+      checkpointState = undefined;
+    }
+    const pendingAtStart = await this.options.store.findPendingApply();
+    const checkpointValid = checkpointState !== undefined &&
+      isValidCheckpoint(checkpoint, await this.options.store.getLastLocalSeq()) &&
+      pendingAtStart.every((row) => row.seq > checkpoint.coveredSeq || checkpoint.appliedOpIds.includes(row.op.id));
+
+    if (checkpointValid && checkpointState !== undefined && checkpoint !== undefined) {
+      const loadedCheckpoint = checkpoint;
+      this.state = checkpointState;
+      this.clock = mergeVectorClocks(loadedCheckpoint.clock, observedClock);
+      for (const opId of loadedCheckpoint.appliedOpIds) this.appliedOpIds.add(opId);
+      this.appliedSeq = loadedCheckpoint.coveredSeq;
+      this.checkpointSeq = loadedCheckpoint.coveredSeq;
+      let replayed = 0;
+      for (;;) {
+        const tail = await this.options.store.getOpsSince(this.appliedSeq, 250);
+        if (tail.length === 0) break;
+        replayed += tail.length;
+        for (const record of tail.sort((a, b) => a.seq - b.seq)) {
+          if (this.appliedOpIds.has(record.op.id)) continue;
+          this.state = applyOperation(this.state, record.op);
+          this.appliedOpIds.add(record.op.id);
+          this.clock = this.trimClock(mergeVectorClocks(this.clock, record.op.vectorClock ?? {}));
+        }
+        this.appliedSeq = tail.at(-1)!.seq;
+      }
+      const pending = await this.options.store.findPendingApply();
+      if (pending.length > 0) await this.options.store.markApplied(pending.map((r) => r.seq));
+      await this.maybeCheckpoint(this.appliedSeq);
+      return { replayed };
+    }
+
     const all = await this.options.store.getAllOps();
 
     // 按 seq 升序 —— 顺序错了 LWW 的结果就会不同
@@ -476,6 +678,7 @@ export class OpLogEngine {
       this.appliedOpIds.add(record.op.id);
       this.clock = this.trimClock(mergeVectorClocks(this.clock, record.op.vectorClock ?? {}));
     }
+    this.observeRemoteClock(observedClock);
 
     // 崩溃时"写了但没应用"的远程 op：虽然上面已经从日志重放过了，
     // 但仍要把它们从 pendingApply 队列里清掉 —— 否则每次启动都重复处理。
@@ -484,6 +687,15 @@ export class OpLogEngine {
       await this.options.store.markApplied(pending.map((r) => r.seq));
     }
 
+    if (sorted.length >= this.checkpointEvery && sorted.at(-1)?.seq !== undefined) {
+      try {
+        await this.writeCheckpoint(sorted.at(-1)!.seq);
+      } catch (error) {
+        console.warn('[heyta] checkpoint write skipped after recovery', error);
+      }
+    }
+
+    this.appliedSeq = sorted.at(-1)?.seq ?? 0;
     return { replayed: sorted.length };
   }
 
@@ -493,13 +705,18 @@ export class OpLogEngine {
    * 用于：数据库损坏修复、快照校验、"清除本地缓存后恢复"。
    * 这条路径能跑通，才说明 op-log 真的是事实来源。
    */
-  async rebuildFromLog(): Promise<MaterializedState> {
+  rebuildFromLog(): Promise<MaterializedState> {
+    return this.serialize(() => this.rebuildFromLogLocked());
+  }
+
+  private async rebuildFromLogLocked(): Promise<MaterializedState> {
     const all = await this.options.store.getAllOps();
     const sorted = [...all].sort((a, b) => a.seq - b.seq);
-    this.state = replayOperations(
-      emptyState(),
-      sorted.map((r: StoredOperation<Operation<string>>) => r.op),
-    );
+    this.state = replayOperations(emptyState(), sorted.map((r) => r.op));
+    this.appliedOpIds = new Set(sorted.map((r) => r.op.id));
+    this.clock = await this.options.store.readObservedClock?.() ?? {};
+    for (const row of sorted) this.observeRemoteClock(row.op.vectorClock ?? {});
+    this.appliedSeq = sorted.at(-1)?.seq ?? 0;
     return this.state;
   }
 }

@@ -19,15 +19,15 @@
  * 加密与向量时钟都来自 `@heyta/sync-core`（vendored, MIT），**不重写**。
  */
 
-import { isEntityType } from '@heyta/shared-schema';
+import { isEntityType, isHeytaFullStatePayload, SUPER_SYNC_SNAPSHOT_OP_TYPES } from '@heyta/shared-schema';
 import {
   compareVectorClocks,
-  decrypt,
-  encrypt,
+  compactVectorClockAgainstFrontier,
   isEncryptedPayloadTransportShape,
   suggestConflictResolution,
 } from '@heyta/sync-core';
 import type { Operation } from '@heyta/sync-core';
+import { createPasswordPayloadCipher, type SyncPayloadCipher, type SyncEncryptionOptions } from './payload-cipher.js';
 
 /** 服务端单次上传/下载的上限（契约里的常量，声明在此以便分页）。 */
 const MAX_OPS_PER_UPLOAD = 500;
@@ -60,6 +60,8 @@ const PERMANENT_REJECTION_CODES: readonly string[] = [
   'INVALID_PAYLOAD',
   'PAYLOAD_TOO_LARGE',
   'INVALID_VECTOR_CLOCK',
+  // A maintenance snapshot's fixed base cannot become current by retrying it.
+  'REPAIR_STALE',
   'INVALID_TIMESTAMP',
   'MISSING_ENTITY_ID',
   'INVALID_SCHEMA_VERSION',
@@ -445,6 +447,7 @@ interface UploadResponse {
   results?: UploadResult[];
   latestSeq?: number;
   newOps?: ServerOperation[];
+  gapDetected?: boolean;
   /**
    * 搭车返回的 `newOps` **只是第一页**（服务端达到 `PIGGYBACK_LIMIT` 且后面还有）。
    * 见 `sync.routes.ops-handler.ts`：设了它就不能把游标推到 `latestSeq`，
@@ -504,6 +507,7 @@ interface WireOperation {
   timestamp: number;
   schemaVersion: number;
   isPayloadEncrypted?: boolean;
+  vectorClockEncoding?: 'full' | 'frontier-delta';
 }
 
 /**
@@ -523,9 +527,23 @@ interface DownloadResponse {
   ops?: ServerOperation[];
   hasMore?: boolean;
   latestSeq?: number;
+  gapDetected?: boolean;
+  /** Causal frontier for history compacted before this download page. */
+  snapshotVectorClock?: Record<string, number>;
+  causalFrontier?: {
+    token: string;
+    vectorClock: Record<string, number>;
+  };
+  capabilities?: { causalFrontierDelta?: boolean };
 }
 
-export interface SyncClientOptions {
+interface CausalFrontier {
+  token: string;
+  vectorClock: Record<string, number>;
+}
+
+
+export type SyncClientOptions = SyncEncryptionOptions & {
   /** 服务端根地址，例如 http://127.0.0.1:3000 */
   baseUrl: string;
   /** 取当前访问令牌。返回 undefined 表示未登录。 */
@@ -551,6 +569,14 @@ export interface SyncClientOptions {
 
   /** 把解密后的远程 op 交给 op-log 引擎。 */
   applyRemote: (ops: Operation<string>[]) => Promise<void>;
+
+  /**
+   * Merge a server-provided causal frontier even when its individual ops were
+   * compacted and therefore absent from this page.
+   */
+  mergeRemoteClock?: (clock: Record<string, number>) => Promise<void> | void;
+  /** Persist skipped history before committing a cursor beyond it. */
+  markHistoryIncomplete?: () => Promise<void>;
 
   /**
    * 冲突判定为"本地胜出"时，把这条改动**重新派发**成一条新 op。
@@ -607,7 +633,7 @@ export interface SyncClientOptions {
  */
 async function decodeServerOp(
   envelope: ServerOperation,
-  password: string,
+  payloadCipher: SyncPayloadCipher,
 ): Promise<Operation<string>> {
   const op = envelope.op;
   if (op === undefined || typeof op !== 'object') {
@@ -625,7 +651,7 @@ async function decodeServerOp(
         `op ${op.id} 标记为加密但 payload 不是字符串 —— 服务端数据可能损坏`,
       );
     }
-    const plain = await decrypt(op.payload, password);
+    const plain = await payloadCipher.decrypt(op.payload, op);
     payload = JSON.parse(plain) as unknown;
   }
 
@@ -678,6 +704,11 @@ export class SyncClient {
    */
   private transientRejects: { opId: string; errorCode: string; error: string }[] = [];
 
+  /** Last server-issued frontier for this account/device. Kept outside the
+   * op-log because it is a transport hint; absence simply disables compaction. */
+  private causalFrontier?: CausalFrontier;
+  private frontierSession?: string;
+
   constructor(private readonly options: SyncClientOptions) {
     this.fetchImpl = options.fetchImpl ?? globalThis.fetch.bind(globalThis);
     this.now = options.now ?? Date.now;
@@ -700,8 +731,20 @@ export class SyncClient {
       return report({ kind: 'error', reason: 'not-signed-in', retryable: false });
     }
 
-    const password = await this.options.getPassword();
-    if (password === undefined || password === '') {
+    // A transport hint is scoped to this authenticated client instance. Losing
+    // it is safe: logs always retain complete clocks, never transport deltas.
+    if (this.frontierSession !== token) this.causalFrontier = undefined;
+    this.frontierSession = token;
+
+    let payloadCipher: SyncPayloadCipher | undefined;
+    try {
+      payloadCipher = await this.getPayloadCipher();
+    } catch {
+      // Secure-storage and package validation errors must remain an observable
+      // locked state. Do not expose secret-bearing exception messages to logs/UI.
+      return report({ kind: 'error', reason: 'no-encryption-password', retryable: false });
+    }
+    if (payloadCipher === undefined) {
       // 🔴 绝不降级成明文。服务端会 400，但更糟的是"看起来同步成功"。
       // 宁可明确失败，也不让用户以为数据安全地上云了。
       return report({
@@ -727,7 +770,7 @@ export class SyncClient {
       // 实测：队列里混进一条 `INVALID_CLIENT_ID` 的 op 后，连续两次同步都是
       // error、待上传数恒为 1、设备再没拉到过任何远端数据。
       // 上传的问题只该影响"能不能上传"，不该影响"能不能下载"。
-      await this.upload(token, password, conflicts);
+      await this.upload(token, payloadCipher, conflicts);
 
       // 🔴 顺序：上传 → 下载 → 解决冲突 → 再上传。
       //
@@ -736,10 +779,10 @@ export class SyncClient {
       // 我第一版没有这一步，于是 CONCURRENT 会被当成硬错误 ——
       // 离线改一次就永远同步不上去。
       report({ kind: 'syncing', phase: 'download' });
-      await this.download(token, password);
+      await this.download(token, payloadCipher);
 
       if (conflicts.length > 0) {
-        const unresolved = await this.resolveConflicts(conflicts, token, password);
+        const unresolved = await this.resolveConflicts(conflicts, token, payloadCipher);
         if (unresolved.length > 0) {
           // 结构化上报，不是一句文案 —— 用户得看见两边分别是什么才能选
           return report({ kind: 'conflict', conflicts: unresolved });
@@ -850,14 +893,21 @@ export class SyncClient {
   /** 上传本地 op。分批，避免超过服务端单次上限。 */
   private async upload(
     token: string,
-    password: string,
+    payloadCipher: SyncPayloadCipher,
     conflicts: ConflictReport[],
   ): Promise<void> {
     const pending = await this.options.getLocalOps();
     if (pending.length === 0) return;
 
-    for (let i = 0; i < pending.length; i += MAX_OPS_PER_UPLOAD) {
-      const batch = pending.slice(i, i + MAX_OPS_PER_UPLOAD);
+    const batches: Operation<string>[][] = [];
+    for (const op of pending) {
+      const previous = batches.at(-1);
+      if (op.opType === 'REPAIR' || previous === undefined ||
+          previous[0]?.opType === 'REPAIR' || previous.length === MAX_OPS_PER_UPLOAD) {
+        batches.push([op]);
+      } else previous.push(op);
+    }
+    for (const batch of batches) {
 
       const ops = await Promise.all(
         batch.map(async (op) => {
@@ -870,7 +920,7 @@ export class SyncClient {
             );
           }
 
-          const cipher = await encrypt(JSON.stringify(op.payload ?? {}), password);
+          const cipher = await payloadCipher.encrypt(JSON.stringify(op.payload ?? {}), op);
 
           // 自检：服务端会检查形状，本地先确认我们真的产出了合规密文。
           // 这里失败说明加密层出了问题，而不是网络问题。
@@ -880,6 +930,9 @@ export class SyncClient {
             );
           }
 
+          const frontier = this.causalFrontier;
+          const relation = frontier ? compareVectorClocks(op.vectorClock, frontier.vectorClock) : undefined;
+          const canCompact = frontier !== undefined && (relation === 'EQUAL' || relation === 'GREATER_THAN');
           return {
             id: op.id,
             clientId: op.clientId,
@@ -889,33 +942,57 @@ export class SyncClient {
             ...(op.entityId !== undefined ? { entityId: op.entityId } : {}),
             ...(op.entityIds !== undefined ? { entityIds: op.entityIds } : {}),
             payload: cipher,
+            ...(op.opType === 'REPAIR' && isHeytaFullStatePayload(op.payload)
+              ? { repairBaseServerSeq: op.payload.repairBaseServerSeq }
+              : {}),
             // 服务端要求**显式 true**；缺失算违规，不是"当作 false"
             isPayloadEncrypted: true,
-            vectorClock: op.vectorClock,
+            vectorClock: canCompact
+              ? compactVectorClockAgainstFrontier(
+                  op.vectorClock,
+                  frontier.vectorClock,
+                  [op.clientId],
+                )
+              : op.vectorClock,
+            ...(canCompact ? { vectorClockEncoding: 'frontier-delta' as const } : {}),
             timestamp: op.timestamp,
             schemaVersion: op.schemaVersion,
           };
         }),
       );
 
-      const res = await this.fetchImpl(`${this.options.baseUrl}/api/sync/ops`, {
-        method: 'POST',
-        headers: {
-          'content-type': 'application/json',
-          authorization: `Bearer ${token}`,
+      const usesDelta = ops.some((op) => op.vectorClockEncoding === 'frontier-delta');
+      const lastKnownServerSeq = await this.options.getLastServerSeq();
+      const send = (compact: boolean) => this.fetchImpl(
+        `${this.options.baseUrl}/api/sync/${compact ? 'ops/causal' : 'ops'}`,
+        {
+          method: 'POST',
+          headers: { 'content-type': 'application/json', authorization: `Bearer ${token}` },
+          body: JSON.stringify({
+            ops: compact ? ops : ops.map((op, index) => {
+              const { vectorClockEncoding: _encoding, ...full } = op;
+              return { ...full, vectorClock: batch[index]!.vectorClock };
+            }),
+            clientId: this.options.clientId,
+            lastKnownServerSeq,
+            ...(compact ? { causalFrontierToken: this.causalFrontier!.token } : {}),
+          }),
         },
-        body: JSON.stringify({
-          ops,
-          clientId: this.options.clientId,
-          lastKnownServerSeq: await this.options.getLastServerSeq(),
-        }),
-      });
+      );
+      let res = await send(usesDelta);
+      // Server downgrade or rotated signing key: retry the SAME operations
+      // with their original complete clocks. No extra op or re-encryption.
+      if (usesDelta && (res.status === 404 || res.status === 400)) {
+        this.causalFrontier = undefined;
+        res = await send(false);
+      }
 
       if (!res.ok) {
         throw await toHttpError(res);
       }
 
       const body = (await res.json()) as UploadResponse;
+      if (body.gapDetected === true) await this.markHistoryIncomplete();
 
       // 🔴 逐条检查 accepted。
       // HTTP 200 **不代表** op 被接受 —— 服务端会对单条 op 返回
@@ -1023,7 +1100,7 @@ export class SyncClient {
         const attempts = await Promise.all(
           body.newOps.map(async (o) => {
             try {
-              return { ok: true as const, op: await decodeServerOp(o, password) };
+              return { ok: true as const, op: await decodeServerOp(o, payloadCipher) };
             } catch (error: unknown) {
               return {
                 ok: false as const,
@@ -1037,6 +1114,10 @@ export class SyncClient {
 
         const decoded = attempts.filter((a) => a.ok).map((a) => a.op);
         const failed = attempts.filter((a) => !a.ok);
+
+        const failedSnapshot = failed.find((failure) => body.newOps!.some((envelope) =>
+          envelope.op?.id === failure.opId && (SUPER_SYNC_SNAPSHOT_OP_TYPES as readonly string[]).includes(envelope.op.opType)));
+        if (failedSnapshot !== undefined) throw new UndecryptablePageError(body.newOps.length, failedSnapshot);
 
         if (decoded.length > 0) await this.options.applyRemote(decoded);
 
@@ -1053,6 +1134,7 @@ export class SyncClient {
           piggybackAllUndecodable = true;
         } else {
           // 有的解开、有的解不开 = 口令是对的，只是历史里混着别的口令写的数据。
+          await this.markHistoryIncomplete();
           for (const f of failed) this.unreadableOps.push(f);
         }
       }
@@ -1112,7 +1194,7 @@ export class SyncClient {
   private async resolveConflicts(
     conflicts: ConflictReport[],
     token: string,
-    password: string,
+    payloadCipher: SyncPayloadCipher,
   ): Promise<ConflictInfo[]> {
     const unresolved: ConflictInfo[] = [];
     const toRedispatch: Operation<string>[] = [];
@@ -1217,7 +1299,7 @@ export class SyncClient {
       // 重传仍然冲突说明自动判定不成立，那正是**该交给用户**的情况，
       // 而不是我们自己再猜一轮。
       const retryConflicts: ConflictReport[] = [];
-      await this.upload(token, password, retryConflicts);
+      await this.upload(token, payloadCipher, retryConflicts);
       if (retryConflicts.length > 0) {
         const history = await this.options.getOpsForEntity(
           retryConflicts[0]!.op.entityType,
@@ -1262,8 +1344,13 @@ export class SyncClient {
     choice: 'keep-local' | 'keep-remote',
   ): Promise<SyncStatus> {
     const token = await this.options.getToken();
-    const password = await this.options.getPassword();
-    if (token === undefined || password === undefined || password === '') {
+    let payloadCipher: SyncPayloadCipher | undefined;
+    try {
+      payloadCipher = await this.getPayloadCipher();
+    } catch {
+      return { kind: 'error', reason: 'no-encryption-password', retryable: false };
+    }
+    if (token === undefined || payloadCipher === undefined) {
       // 分成两条精确原因，而不是原来那句"未登录或缺少加密口令" ——
       // 用户能做的事完全不同（去登录 vs 去填口令），混着说等于没说。
       if (token === undefined) {
@@ -1316,8 +1403,24 @@ export class SyncClient {
     }
   }
 
+  private async getPayloadCipher(): Promise<SyncPayloadCipher | undefined> {
+    if (this.options.encryptionMode === 'vault') {
+      // Runtime guard as well: JS/native callers do not all pass through tsc.
+      return this.options.getPayloadCipher ? this.options.getPayloadCipher() : undefined;
+    }
+    const password = await this.options.getPassword();
+    return password ? createPasswordPayloadCipher(password) : undefined;
+  }
+
+  private async markHistoryIncomplete(): Promise<void> {
+    if (this.options.markHistoryIncomplete === undefined) {
+      throw new Error('Skipping history requires durable incomplete-history storage');
+    }
+    await this.options.markHistoryIncomplete();
+  }
+
   /** 增量下载。按 serverSeq 游标分页，直到 hasMore 为 false。 */
-  private async download(token: string, password: string): Promise<void> {
+  private async download(token: string, payloadCipher: SyncPayloadCipher): Promise<void> {
     for (;;) {
       const since = await this.options.getLastServerSeq();
       const url = new URL(`${this.options.baseUrl}/api/sync/ops`);
@@ -1334,6 +1437,16 @@ export class SyncClient {
 
       const body = (await res.json()) as DownloadResponse;
       const ops = body.ops ?? [];
+      if (body.gapDetected === true) await this.markHistoryIncomplete();
+
+      if (body.capabilities?.causalFrontierDelta === true && body.causalFrontier !== undefined) {
+        this.causalFrontier = body.causalFrontier;
+      } else if (body.capabilities?.causalFrontierDelta !== true) {
+        // A legacy server may silently strip the new request fields. Drop the
+        // cached token before the next upload so its compact clock is never
+        // interpreted as a complete clock by that server.
+        this.causalFrontier = undefined;
+      }
 
       if (ops.length > 0) {
         /**
@@ -1361,7 +1474,7 @@ export class SyncClient {
         const attempts = await Promise.all(
           ops.map(async (o) => {
             try {
-              return { ok: true as const, op: await decodeServerOp(o, password) };
+              return { ok: true as const, op: await decodeServerOp(o, payloadCipher) };
             } catch (error: unknown) {
               return {
                 ok: false as const,
@@ -1375,6 +1488,12 @@ export class SyncClient {
 
         const decoded = attempts.filter((a) => a.ok).map((a) => a.op);
         const failed = attempts.filter((a) => !a.ok);
+
+        // A full-state op may be the only copy of the purged server prefix.
+        // Unlike an isolated unreadable delta, skipping it loses that prefix.
+        const failedSnapshot = failed.find((failure) => ops.some((envelope) =>
+          envelope.op?.id === failure.opId && (SUPER_SYNC_SNAPSHOT_OP_TYPES as readonly string[]).includes(envelope.op.opType)));
+        if (failedSnapshot !== undefined) throw new UndecryptablePageError(ops.length, failedSnapshot);
 
         if (decoded.length > 0) await this.options.applyRemote(decoded);
 
@@ -1399,8 +1518,18 @@ export class SyncClient {
           }
           // 有的解开、有的解不开 = 口令确实是对的，只是历史里混着别的口令写的数据。
           // 跳过它们（重试也不会变好），但要**如实上报**，不能装作没这回事。
+          await this.markHistoryIncomplete();
           for (const f of failed) this.unreadableOps.push(f);
         }
+      }
+
+      // Persist snapshot-only history only after its materialization succeeds,
+      // and before the cursor commits. A failed payload must not grant causality.
+      if (body.snapshotVectorClock !== undefined) {
+        if (this.options.mergeRemoteClock === undefined) {
+          throw new Error('Snapshot frontier requires durable clock storage');
+        }
+        await this.options.mergeRemoteClock(body.snapshotVectorClock);
       }
 
       /**

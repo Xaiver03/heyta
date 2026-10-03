@@ -152,6 +152,10 @@ function Composer({
   const labels = useCaptureLabels();
   const insets = useSafeAreaInsets();
   const [busy, setBusy] = useState(false);
+  const [presented, setPresented] = useState(false);
+  useEffect(() => {
+    if (!visible) setPresented(false);
+  }, [visible]);
 
   const submit = useCallback(
     async (plan: CaptureSubmitPlan) => {
@@ -173,6 +177,7 @@ function Composer({
       transparent
       animationType="slide"
       onRequestClose={onClose}
+      onShow={() => setPresented(true)}
       // 说明：遮罩用 material.scrim。它是**纯色半透明**，不需要模糊 ——
       // 这正是它能用在 RN 上、而 chrome-tint 不能的原因。
       statusBarTranslucent
@@ -205,7 +210,10 @@ function Composer({
       />
       <KeyboardAvoidingView
         style={{ flex: 1, justifyContent: 'flex-end' }}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        // Android edge-to-edge Modal can retain full window bounds despite
+        // adjustResize, leaving the composer underneath the IME. Explicitly
+        // resize its content so accessibility coordinates remain tappable.
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
         <View
           style={{
@@ -245,12 +253,15 @@ function Composer({
                 自动抢焦点，所以那是宿主的参数而不是共享层的默认值）；
               · 提交后的清空由共享组件自己做（`apply` / `submit` 里都清了草稿）。
             */}
-            <CaptureComposer
+            {/* Mount the auto-focused input only after the native dialog is
+                shown. Otherwise its keyboard can appear before the parent
+                KeyboardAvoidingView has subscribed or measured its frame. */}
+            {presented ? <CaptureComposer
               labels={labels}
               onSubmit={submit}
               autoFocus
               testID="mobile-capture"
-            />
+            /> : null}
             {/* 取消留在这里：共享组件只管"添加"，关闭面板是 modal 的事。
 
                 ⚠️ 这里原来写着 `style={{ flex: 1 }}`，我一度以为它就是「取消」被压到

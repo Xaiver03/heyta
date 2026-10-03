@@ -137,6 +137,7 @@ export interface SavedAuthSession {
   token: string;
   password: string;
   email: string;
+  accountId: string;
 }
 
 export interface AuthScreenProps {
@@ -428,11 +429,12 @@ export function AuthScreen({
       token: session.token,
       password,
       email: session.user.email,
+      accountId: String(session.user.id),
     });
     // 🔴 顺序：**先写活配置，再触发同步**。反过来第一次同步用的还是上一次的凭据，
     //    用户会看到"第一次点没反应、第二次才成功"。
     void syncNow();
-    onSignedIn({ ...saved, email: session.user.email });
+    onSignedIn({ ...saved, email: session.user.email, accountId: String(session.user.id) });
   };
 
   return (

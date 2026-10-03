@@ -43,19 +43,22 @@
  * （与 `HabitsScreen` / `ProfileScreen` 的做事方式一致）。
  */
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from 'react';
 
 import type { Reminder } from '@heyta/domain';
 import { createReminderActions, type AppHost, type ReminderActions } from '@heyta/app-host';
 
 import { openTaskHost } from '../db/open-host';
 import { useMobileSync } from '../sync/store';
+import { onLocalWrite } from '../sync/write-signal';
 import { absoluteReminderTriggerAt, snoozeTargetAt } from './reminders-display';
+import { authorizeNativeReminders, getUncertainReminderOccurrences, subscribeReminderDelivery } from './native-reminder-scheduler';
 
 /** 提醒面板要用的全部东西 —— 界面不需要（也不该）知道下面还有没有别的。 */
 export interface TaskReminderWiring {
   /** 该任务**未删除**的提醒（`listForTask()` 已经滤掉墓碑）。 */
   readonly reminders: readonly Reminder[];
+  readonly uncertainOccurrences: readonly string[];
   /**
    * 最近一次动作的失败原因（原始文本）。`null` = 没有错误。
    *
@@ -83,6 +86,7 @@ export interface TaskReminderWiring {
  * 见 `TaskDetailSheet` 里那两处注释）。
  */
 export function useTaskReminders(taskId: string | undefined): TaskReminderWiring {
+  const uncertainOccurrences = useSyncExternalStore(subscribeReminderDelivery, getUncertainReminderOccurrences);
   // 见文件头第 2 条：同步完成信号。
   const { dataRevision } = useMobileSync();
 
@@ -121,6 +125,9 @@ export function useTaskReminders(taskId: string | undefined): TaskReminderWiring
   }, [actions, taskId]);
 
   useEffect(read, [read, dataRevision]);
+  // Receipt reconciliation writes outside this hook's run() callbacks, and
+  // local-only mode never advances the sync revision.
+  useEffect(() => onLocalWrite(read), [read]);
 
   /** 跑一个动作：成功就重读、失败就把原因摆到界面上（见文件头第 3 条）。 */
   const run = useCallback(
@@ -138,6 +145,9 @@ export function useTaskReminders(taskId: string | undefined): TaskReminderWiring
   const addBeforeDue = useCallback(
     (offsetMs: number): void => {
       if (actions === null || taskId === undefined) return;
+      void authorizeNativeReminders().catch((e: unknown) => {
+        setError(e instanceof Error ? e.message : String(e));
+      });
       run(actions.createReminderBeforeDue(taskId, offsetMs));
     },
     [actions, taskId, run],
@@ -149,6 +159,9 @@ export function useTaskReminders(taskId: string | undefined): TaskReminderWiring
    */
   const addAbsoluteInOneHour = useCallback((): void => {
     if (actions === null || taskId === undefined) return;
+    void authorizeNativeReminders().catch((e: unknown) => {
+      setError(e instanceof Error ? e.message : String(e));
+    });
     run(actions.createReminder(taskId, absoluteReminderTriggerAt(Date.now())));
   }, [actions, taskId, run]);
 
@@ -176,5 +189,5 @@ export function useTaskReminders(taskId: string | undefined): TaskReminderWiring
     [actions, run],
   );
 
-  return { reminders, error, addBeforeDue, addAbsoluteInOneHour, snooze, dismiss, remove };
+  return { reminders, uncertainOccurrences, error, addBeforeDue, addAbsoluteInOneHour, snooze, dismiss, remove };
 }

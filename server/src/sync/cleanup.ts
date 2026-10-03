@@ -3,6 +3,7 @@ import { Logger } from '../logger';
 import { runBillingReconciliation } from '../billing/reconcile-job';
 import { DEFAULT_SYNC_CONFIG, MS_PER_DAY } from './sync.types';
 import { MIN_CHECKPOINT_SAFE_APP_VERSION } from './checkpoint-gate';
+import { vaultKeyMigrationService } from './services/vault-key-migration.service';
 
 let cleanupTimer: NodeJS.Timeout | null = null;
 let initialCleanupTimer: NodeJS.Timeout | null = null;
@@ -103,6 +104,16 @@ const runDailyCleanup = async (): Promise<void> => {
     }
   } catch (error) {
     Logger.error(`Cleanup [pending-passkeys] failed: ${error}`);
+  }
+
+  // 5b. Release abandoned vault-rotation staging reservations and ciphertext
+  // chunks.  This is bounded so a fleet with many interrupted clients cannot
+  // turn the daily cleanup into one unbounded transaction.
+  try {
+    const expired = await vaultKeyMigrationService.cleanupExpired(100, Date.now());
+    Logger.info(`Cleanup [vault-migrations]: expired ${expired} staging session(s)`);
+  } catch (error) {
+    Logger.error(`Cleanup [vault-migrations] failed: ${error}`);
   }
 
   // 6. Delete abandoned unverified users (never verified, no registration still

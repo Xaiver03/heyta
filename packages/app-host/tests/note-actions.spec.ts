@@ -74,7 +74,7 @@ beforeEach(async () => {
   clock = 1_700_000_000_000;
   seq = 0;
   pseq = 0;
-  actions = createNoteActions(engine, { newNoteId: makeNoteId });
+  actions = createNoteActions(engine, { newNoteId: makeNoteId, now });
   projects = createProjectActions(engine, { newProjectId: makeProjectId });
 });
 
@@ -255,5 +255,191 @@ describe('读取与顺序', () => {
     await actions.createNote('普通');
     const pinned = await actions.createNote('钉选', { isPinnedToToday: true });
     expect(actions.highlightedNotes().map((n) => n.id)).toEqual([pinned]);
+  });
+});
+
+describe('回收站：listTrashed 与三件套', () => {
+  it('删除后出现在 listTrashed、从 listNotes 消失；还原后反过来', async () => {
+    const id = await actions.createNote('买菜');
+    expect(actions.listTrashed()).toEqual([]);
+
+    await actions.removeNote(id);
+    expect(actions.listTrashed().map((n) => n.id)).toEqual([id]);
+    expect(actions.listNotes()).toHaveLength(0);
+
+    expect(await actions.restoreNote(id)).toBe(true);
+    expect(actions.listTrashed()).toEqual([]);
+    expect(actions.listNotes().map((n) => n.id)).toEqual([id]);
+  });
+
+  it('🔴 listTrashed 不含已彻底删除的（只滤 deletedAt 的话，"彻底删除"在界面上就没有产出）', async () => {
+    const id = await actions.createNote('买菜');
+    await actions.removeNote(id);
+    await actions.purgeNote(id);
+
+    expect(actions.listTrashed()).toEqual([]);
+    // 墓碑**必须留着**：清掉 deletedAt 会让离线端把它当"从未删除"又同步回来。
+    expect(state().notes[id]?.deletedAt).toBeDefined();
+    expect(state().notes[id]?.purgedAt).toBe(clock);
+  });
+
+  it('按删除时刻倒序（同刻按 id），不是枚举顺序', async () => {
+    const first = await actions.createNote('第一条');
+    clock += 1_000;
+    await actions.removeNote(first);
+    clock += 1_000;
+    const second = await actions.createNote('第二条');
+    clock += 1_000;
+    await actions.removeNote(second);
+
+    expect(actions.listTrashed().map((n) => n.id)).toEqual([second, first]);
+  });
+
+  it('对活着的便签 purge 会抛错（否则它会无墓碑地消失，而离线端什么都不知道）', async () => {
+    const id = await actions.createNote('活着');
+    await expect(actions.purgeNote(id)).rejects.toThrow(/不在回收站里/);
+    expect(await opCount(id)).toBe(1);
+  });
+
+  it('purge 幂等：重复调用不再发 op', async () => {
+    const id = await actions.createNote('买菜');
+    await actions.removeNote(id);
+    const before = await opCount(id);
+    await actions.purgeNote(id);
+    await actions.purgeNote(id);
+    expect(await opCount(id)).toBe(before + 1);
+  });
+
+  it('🔴 已彻底删除的便签：restore 抛错而不是安静地返回 false', async () => {
+    const id = await actions.createNote('买菜');
+    await actions.removeNote(id);
+    await actions.purgeNote(id);
+
+    // "现在不用恢复"（返回 false）与"永远恢复不了"（抛错）是两句话，
+    // 界面对第二句要说"不可恢复"。见文件头第 5 条与 P-5。
+    await expect(actions.restoreNote(id)).rejects.toThrow(/已被彻底删除，无法恢复/);
+  });
+
+  it('找不到便签时 restore 抛错（不静默吞掉），未删除时返回 false', async () => {
+    await expect(actions.restoreNote('note-不存在')).rejects.toThrow(/找不到便签/);
+    const id = await actions.createNote('活着');
+    expect(await actions.restoreNote(id)).toBe(false);
+  });
+});
+
+/**
+ * 🔴 两引擎对：手机删便签 → 还原 → **另一台读到**。
+ *
+ * 为什么这一对是 W1 的主判据：本地发 op 与"另一端回放同一串 op 之后看到的是
+ * 同一个世界"是两件事。把 `restoreNote` 退化成"只改本地物化状态、不发 op"，
+ * 上面那一整组**全绿**（它们读的都是 A 自己），只有这里会红 ——
+ * 而那恰好就是本工单要防的形状（AGENTS §3.4：被回放/来自远端的 op 不得再次触发副作用，
+ * 反过来也成立：没发出去的 op 永远不会在别人那里生效）。
+ */
+describe('🔴 回收站三件套跨设备（两个真引擎 + 两个真 SQLite，零 mock）', () => {
+  async function engineB(): Promise<{
+    close: () => void;
+    onB: NoteActions;
+    applyAllFromA: () => Promise<number>;
+    state: () => Record<string, Note>;
+    /** B 自己**写出去**的 op 数（远端 op 不得触发副作用，§3.4）。 */
+    bPending: () => Promise<number>;
+  }> {
+    const adapter = new SqliteAdapter({
+      schema: INDEXEDDB_SCHEMA,
+      driverFactory: () => new NodeSqliteDriver(':memory:'),
+    });
+    await adapter.init();
+    const other = new OpLogEngine({
+      store: new DbOpLogStore(adapter),
+      clientId: 'client-note-other',
+      now,
+    });
+    return {
+      close: () => adapter.close(),
+      onB: createNoteActions(other, { newNoteId: makeNoteId, now }),
+      applyAllFromA: async () => {
+        const pending = await engine.getPendingUpload();
+        const result = await other.applyRemote(pending);
+        return result.applied.length;
+      },
+      state: () => (other.getState() as unknown as { notes: Record<string, Note> }).notes,
+      bPending: async () => (await other.getPendingUpload()).length,
+    };
+  }
+
+  it('A 删除 → B 回放：B 的回收站里也有它（"在回收站"这个事实本身跨设备）', async () => {
+    const b = await engineB();
+    try {
+      const id = await actions.createNote('买菜');
+      await actions.removeNote(id);
+      expect(await b.applyAllFromA()).toBe(2);
+
+      expect(b.onB.listNotes()).toHaveLength(0);
+      expect(b.onB.listTrashed().map((n) => n.id)).toEqual([id]);
+    } finally {
+      b.close();
+    }
+  });
+
+  it('🔴 A 删除 → 还原 → B 回放：便签活着回来，content 与 projectId 逐字段仍在', async () => {
+    const b = await engineB();
+    try {
+      const projectId = await projects.createProject('工作');
+      const id = await actions.createNote('周会纪要', { projectId, isPinnedToToday: true });
+      await actions.removeNote(id);
+      expect(await actions.restoreNote(id)).toBe(true);
+      // 4 = 建清单 CRT + 建便签 CRT + 删 DEL + 还原 UPD（`getPendingUpload` 是**整台设备**的
+      // 待上传队列，不是单实体的 —— 少算那条清单会把这条断言变成猜数字）。
+      expect(await b.applyAllFromA()).toBe(4);
+
+      const back = b.onB.listNotes().find((n) => n.id === id);
+      if (back === undefined) throw new Error(`B 那边没读到这条便签（id=${id}）`);
+      expect(back.content).toBe('周会纪要');
+      expect(noteProjectId(back)).toBe(projectId);
+      expect(back.isPinnedToToday).toBe(true);
+      // 墓碑是真清掉了，不是只在 A 的列表里被滤掉。
+      expect(b.state()[id]?.deletedAt).toBeUndefined();
+      expect(b.onB.listTrashed()).toEqual([]);
+    } finally {
+      b.close();
+    }
+  });
+
+  it('A 彻底删除 → B 回放：B 里它离开回收站、墓碑仍在、恢复被拒绝', async () => {
+    const b = await engineB();
+    try {
+      const id = await actions.createNote('买菜');
+      await actions.removeNote(id);
+      await actions.purgeNote(id);
+      expect(await b.applyAllFromA()).toBe(3);
+
+      expect(b.onB.listTrashed()).toEqual([]);
+      expect(b.state()[id]?.deletedAt).toBeDefined();
+      expect(b.state()[id]?.purgedAt).toBeTypeOf('number');
+      await expect(b.onB.restoreNote(id)).rejects.toThrow(/已被彻底删除/);
+    } finally {
+      b.close();
+    }
+  });
+
+  it('回放是幂等的：同一串 op 再送一次，B 的状态不变、也不产生新的本地 op', async () => {
+    const b = await engineB();
+    try {
+      const id = await actions.createNote('买菜');
+      await actions.removeNote(id);
+      await actions.restoreNote(id);
+      const applied = await b.applyAllFromA();
+      const after = b.onB.listNotes().map((n) => n.id);
+      // 再送一次（等价于服务端重复投递）
+      expect(await b.applyAllFromA()).toBe(0);
+      expect(b.onB.listNotes().map((n) => n.id)).toEqual(after);
+      expect(applied).toBe(3);
+      // 🔴 B 因为收到远端 op 而**没有**再写任何本地 op（§3.4 的反面：
+      // 回放不得触发副作用，否则两台设备会把同一条便签来回写下去）。
+      expect(await b.bPending()).toBe(0);
+    } finally {
+      b.close();
+    }
   });
 });

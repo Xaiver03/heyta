@@ -53,13 +53,30 @@ export function writeSyncConfig(input: {
   serverUrl: string;
   token: string;
   password: string;
+  /** Stable id returned by the authenticated session; never infer from clientId. */
+  accountId?: string;
 }): void {
   const token = input.token.trim();
   const password = input.password;
+  const serverUrl = input.serverUrl.trim();
+  const accountId = input.accountId?.trim() ?? '';
+  // An account id is bound to the authenticated server session represented by
+  // this exact server/token pair. Form edits omit accountId on purpose, so
+  // preserve it only while that pair is unchanged; changing either value must
+  // force a fresh authenticated binding instead of carrying a root key across
+  // accounts or endpoints.
+  const sameAuthenticatedSession =
+    input.accountId === undefined &&
+    current !== undefined &&
+    current.serverUrl === serverUrl &&
+    (current.token ?? '') === token;
   current = {
-    serverUrl: input.serverUrl.trim(),
+    serverUrl,
     ...(token === '' ? {} : { token }),
     ...(password === '' ? {} : { password }),
+    ...(input.accountId === undefined
+      ? (sameAuthenticatedSession && current?.accountId !== undefined ? { accountId: current.accountId } : {})
+      : (accountId === '' ? {} : { accountId })),
   };
 }
 

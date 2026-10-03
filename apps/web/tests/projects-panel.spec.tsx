@@ -753,4 +753,17 @@ describe('F 一份实现：web 侧只剩接线', () => {
     expect(source).toContain("t('web.tags.heading')");
     expect(source).toContain("t('web.tags.newPlaceholder')");
   });
+
+  it('🔴 侧栏的数据源必须是两路合并（W9 之后开关才有数据可放出来）', () => {
+    // `listProjects()` 从 W9 起**不含归档**（归档不进任何出口，P-9），
+    // 而本面板的「显示已归档」开关与 `archivedCount` 都要求归档那一路在数据里。
+    // 读错那一路的症状不是报错 —— 是"开关按了什么都没出现"。
+    const store = readFileSync(resolve(WEB_SRC, 'features/projects/store.ts'), 'utf8');
+    expect(store).toContain('projectActions.listAllProjects()');
+    expect(store).not.toContain('projectActions.listProjects()');
+
+    const panel = readFileSync(resolve(WEB_SRC, 'features/projects/ProjectsPanel.tsx'), 'utf8');
+    expect(panel).toContain('archivedProjects(projects.projects)');
+    expect(panel).toContain('includeArchived: showArchived');
+  });
 });

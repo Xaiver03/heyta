@@ -46,7 +46,15 @@ import { fileURLToPath } from 'node:url';
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
 /** 跳过这些目录 —— 里面不是我们的 shell 脚本。 */
-const SKIP_DIRS = new Set(['node_modules', '.git', 'dist', 'build', '.pnpm-store', 'release']);
+const SKIP_DIRS = new Set([
+  'node_modules',
+  '.git',
+  '.worktrees',
+  'dist',
+  'build',
+  '.pnpm-store',
+  'release',
+]);
 
 /** 与 Python 修复器**同一套判定**，避免"门禁说没问题、修复器却改了"这种不一致。 */
 const isNameStart = (c) => /[A-Za-z_]/.test(c);

@@ -83,6 +83,34 @@ export {
   type ReminderActions,
   type ReminderActionsOptions,
 } from './reminder-actions.js';
+export { planNativeReminders, type NativeReminderPlan } from './reminder-scheduler.js';
+export {
+  createVaultKeyMigrationRemote,
+  createVaultMigrationInventorySource,
+  cancelVaultPayloadMigration,
+  createVaultMigrationJournal,
+  migrateVaultPayloads,
+  VAULT_KEY_MIGRATION_INVENTORY_PATH,
+  VAULT_KEY_MIGRATION_PATH,
+  VaultMigrationError,
+  type VaultKeyMigrationRemote,
+  type VaultKeyMigrationRemoteOptions,
+  type VaultMigrationInventoryOperation,
+  type VaultMigrationInventoryPage,
+  type VaultMigrationInventorySnapshot,
+  type VaultMigrationInventorySource,
+  type VaultMigrationJournal,
+  type VaultMigrationJournalRecord,
+  type VaultMigrationOptions,
+  type VaultMigrationProgress,
+} from './vault-migration.js';
+export {
+  createReminderReconciler,
+  reconcileReminderDelivery,
+  type ReminderAuthorization,
+  type ReminderDeliveryOptions,
+  type ReminderDeliveryPort,
+} from './reminder-delivery.js';
 
 /**
  * 便签动作（幻觉 #12「笔记模块」的写路径）。
@@ -231,6 +259,7 @@ export {
   parseLegalConsentStatus,
   passkeyDeletePath,
   passkeyPath,
+  planDisplayNameWrite,
   registerWithEmailPassword,
   registerWithMagicLink,
   renamePasskey,
@@ -238,13 +267,16 @@ export {
   requestPasskeyRecovery,
   requestPasswordReset,
   resetPasswordWithToken,
+  resolveAccountAvatarImage,
   setInitialPassword,
   updateAccountDisplayName,
   updateAccountLocale,
   uploadAccountAvatar,
   verifyEmailAddress,
   verifyMagicLink,
+  type AccountAvatarImage,
   type AvatarDecodeResult,
+  type DisplayNameWritePlan,
   type HostedAuthFailure,
   type HostedAuthFailureReason,
   type HostedAuthLocale,
@@ -289,7 +321,9 @@ export {
 export {
   createLocalApiHost,
   fromLocalDateString,
+  LOCAL_API_DUE_FORMAT_HINT,
   taskToItem,
+  toLocalApiDueString,
   toLocalDateString,
   type LocalApiHostOptions,
 } from './local-api-host.js';
@@ -598,3 +632,26 @@ export {
   type PrivacyConsentRecord,
   type PrivacyDecision,
 } from './privacy-consent.js';
+
+export {
+  createVaultKeyPackageStore,
+  type VaultKeyPackageStore,
+  type VaultKeyPackageScope,
+} from './vault-key-package-store.js';
+
+export {
+  VAULT_KEY_PACKAGE_PATH,
+  VaultSessionError,
+  createVaultKeyPackageRemote,
+  createVaultKeySession,
+  type PendingVaultCreation,
+  type VaultKeyPackageRemote,
+  type VaultKeyPackageRemoteOptions,
+  type VaultKeyPackageRemoteState,
+  type VaultRootRotationMigration,
+  type VaultRootRotationMigrationInput,
+  type VaultRootRotationMigrationResult,
+  type VaultRootRotationPort,
+  type VaultKeySession,
+  type VaultSessionState,
+} from './vault-session.js';

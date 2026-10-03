@@ -10,7 +10,9 @@ import {
   SYNC_ERROR_CODES,
   createStateReplacementRequiredResults,
   SyncDeviceInfo,
+  DUPLICATE_OP_SELECT,
 } from './sync.types';
+import { isSameDuplicateOperation } from './conflict';
 import { CheckpointGateFleetSummary } from './checkpoint-gate';
 import { Logger } from '../logger';
 import { loadConfigFromEnv } from '../config';
@@ -85,6 +87,13 @@ const resolveRetainedReplacementSeq = async (
 class CleanSlateUploadRejectedError extends Error {
   constructor(readonly results: UploadResult[]) {
     super('Clean-slate replacement was rejected');
+  }
+}
+
+class StorageQuotaReservationRaceError extends Error {
+  constructor() {
+    super('Storage quota changed while upload was committing');
+    this.name = 'StorageQuotaReservationRaceError';
   }
 }
 
@@ -297,6 +306,24 @@ export class SyncService {
           }
 
           if (containsRepair && !isLegacyRepairUpload) {
+            // The response may have been lost after a singleton maintenance
+            // snapshot committed. Confirm its identity before rejecting the
+            // now-old base; never create a second snapshot on a retry.
+            if (ops.length === 1 && repairBaseServerSeq !== undefined) {
+              const op = ops[0];
+              const stored = await tx.operation.findUnique({
+                where: { id: op.id }, select: { ...DUPLICATE_OP_SELECT, serverSeq: true },
+              });
+              if (stored) {
+                const exact = this.validationService.validateOp(op, clientId).valid &&
+                  isSameDuplicateOperation(stored, userId, op, this.config.maxClockDriftMs, op.timestamp);
+                results.push(exact
+                  ? { opId: op.id, accepted: true, serverSeq: stored.serverSeq }
+                  : { opId: op.id, accepted: false, errorCode: SYNC_ERROR_CODES.INVALID_OP_ID,
+                    error: 'Operation ID already belongs to a different operation' });
+                return;
+              }
+            }
             if (
               repairBaseServerSeq === undefined ||
               repairBaseServerSeq !== currentServerSeq
@@ -493,19 +520,35 @@ export class SyncService {
           // increment) avoids double-counting anything left in the row.
           if (acceptedDeltaBytes > 0 && !shouldCleanSlate) {
             const delta = BigInt(Math.floor(acceptedDeltaBytes));
-            await tx.$executeRaw`
+            const updated = await tx.$executeRaw`
               UPDATE users
               SET storage_used_bytes = GREATEST(storage_used_bytes + ${delta}::bigint, 0::bigint)
               WHERE id = ${userId}
+                AND storage_used_bytes + COALESCE((
+                  SELECT SUM(reserved_storage_bytes)
+                  FROM vault_key_migrations
+                  WHERE user_id = ${userId}
+                    AND state = 'STAGING'
+                    AND expires_at > (EXTRACT(EPOCH FROM clock_timestamp()) * 1000)::bigint
+                ), 0::bigint) + ${delta}::bigint <= storage_quota_bytes
             `;
+            if (updated !== 1) throw new StorageQuotaReservationRaceError();
             uploadDbRoundtrips++;
           } else if (acceptedDeltaBytes > 0 && shouldCleanSlate) {
             const delta = BigInt(Math.floor(acceptedDeltaBytes));
-            await tx.$executeRaw`
+            const updated = await tx.$executeRaw`
               UPDATE users
               SET storage_used_bytes = ${delta}::bigint
               WHERE id = ${userId}
+                AND COALESCE((
+                  SELECT SUM(reserved_storage_bytes)
+                  FROM vault_key_migrations
+                  WHERE user_id = ${userId}
+                    AND state = 'STAGING'
+                    AND expires_at > (EXTRACT(EPOCH FROM clock_timestamp()) * 1000)::bigint
+                ), 0::bigint) + ${delta}::bigint <= storage_quota_bytes
             `;
+            if (updated !== 1) throw new StorageQuotaReservationRaceError();
             uploadDbRoundtrips++;
           }
         },
@@ -557,6 +600,18 @@ export class SyncService {
           `[user:${userId}] Clean-slate replacement rejected; existing data preserved`,
         );
         return err.results;
+      }
+
+      if (err instanceof StorageQuotaReservationRaceError) {
+        Logger.warn(
+          `[user:${userId}] Upload rolled back: active vault migration reservation consumed the remaining quota`,
+        );
+        return ops.map((op) => ({
+          opId: op.id,
+          accepted: false,
+          error: 'Storage quota exceeded by an active key migration',
+          errorCode: SYNC_ERROR_CODES.STORAGE_QUOTA_EXCEEDED,
+        }));
       }
 
       // Transaction failed - all operations were rolled back
@@ -621,6 +676,7 @@ export class SyncService {
     gapDetected: boolean;
     latestSnapshotSeq?: number;
     snapshotVectorClock?: VectorClock;
+    causalFrontier?: { token: string; vectorClock: VectorClock };
   }> {
     return this.operationDownloadService.getOpsSinceWithSeq(
       userId,
@@ -1000,6 +1056,10 @@ export class SyncService {
 
   async listDevices(userId: number): Promise<SyncDeviceInfo[]> {
     return this.deviceService.listDevices(userId);
+  }
+
+  async revokeDevice(userId: number, clientId: string): Promise<void> {
+    await this.deviceService.revokeDevice(userId, clientId);
   }
 }
 

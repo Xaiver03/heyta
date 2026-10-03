@@ -40,6 +40,7 @@ vi.mock('../src/db', () => {
     prisma: {
       $transaction: vi.fn().mockImplementation(async (callback: any) => {
         const tx = {
+          vaultKeyPackage: { findUnique: vi.fn().mockResolvedValue(null) },
           operation: {
             create: vi.fn().mockImplementation(async (args: any) => {
               serverSeqCounter++;
