@@ -41,6 +41,7 @@ import {
   ListTodo,
   Monitor,
   Pause,
+  Pencil,
   Play,
   Plus,
   RefreshCw,
@@ -178,6 +179,14 @@ const ICONS = {
    * 会承诺一个并不存在的动作 —— 图标和按钮文案必须说同一件事。
    */
   'action.share': Share2,
+  /**
+   * 「改名」。
+   *
+   * 🔴 与共享组件 `OrganizerList` 行上那支铅笔**同一个字形**（`Pencil`）：
+   * 清单/标签的行内改名走共享层，习惯的改名入口在宿主（输入控件规范不同、
+   * 各自各写一份），两处长得不一样会让人以为是两种不同的动作。
+   */
+  'action.rename': Pencil,
 
   /**
    * 成长（激励体系）。

@@ -2513,6 +2513,16 @@ export const zhCN = {
   // 于是**不敢删**——一个不敢用的功能等于没有。
   'mobile.lists.removeHint': '删除清单不会删掉里面的任务，它们会回到「收集箱」。',
   'mobile.lists.remove': '删除清单「{name}」',
+  'common.organizer.rename.button': '重命名「{name}」',
+  'common.organizer.rename.save': '保存名称',
+  'common.organizer.rename.cancel': '取消改名',
+  'common.organizer.archive.button': '归档「{name}」',
+  'common.organizer.archive.unarchive': '取消归档「{name}」',
+  'common.organizer.showArchived': '显示已归档',
+  'common.organizer.hideArchived': '收起已归档',
+  'common.habits.rename.button': '重命名习惯「{name}」',
+  'common.habits.rename.label': '习惯名称',
+  'common.habits.delete.button': '删除习惯「{name}」',
 
   // ── 标签 ───────────────────────────────────────────────────
   // 清单和标签在数据上是两个实体，在产品上是同一件事的两个面（组织任务）：

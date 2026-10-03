@@ -75,6 +75,14 @@ export interface HabitActionsOptions {
 export interface HabitActions {
   /** 新建习惯。返回新实体 id。 */
   createHabit(name: string, over?: NewHabitFields): Promise<string>;
+  /**
+   * 改习惯名。**一条意图一条 op**，载荷只有 `name`。
+   *
+   * 🔴 改名**不许**动打卡记录，也不许用"删了重建"代替：记录是按
+   *    (习惯 id, 日期) 寻址的，重建换了 id 之后全部历史会挂在一条已删除的习惯上 ——
+   *    连续天数归零，而**没有任何一层会报错**。
+   */
+  renameHabit(entityId: string, name: string): Promise<void>;
   /** 软删除习惯。⚠️ 打卡记录**不**级联删除（撤销删除后历史还在）。 */
   removeHabit(entityId: string): Promise<void>;
 
@@ -194,6 +202,18 @@ export function createHabitActions(
         payload: { name: trimmed, target: 1, ...over },
       });
       return entityId;
+    },
+
+    async renameHabit(entityId, name) {
+      const trimmed = name.trim();
+      if (trimmed === '') throw new Error('习惯名称不能为空');
+      if (habitOf(entityId) === undefined) throw new Error(`找不到习惯「${entityId}」`);
+      await ctx.dispatch({
+        entityType: 'HABIT' as EntityType,
+        entityId,
+        opType: OpType.Update,
+        payload: { name: trimmed },
+      });
     },
 
     async setHabitColor(entityId, slot) {
