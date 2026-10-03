@@ -249,7 +249,7 @@
 | G-44 | `appVersion` 在服务端**有消费者、没有生产者**：`server/src/sync/checkpoint-gate.ts` 拿它判 `MIN_CHECKPOINT_SAFE_APP_VERSION`，`sync.service.ts:676 touchDevice` 把它记进 `sync_devices`，而它是**下载请求上的一个可选查询参数**（`packages/shared-schema/src/supersync-http-contract.ts:191` 是 `z.string().optional()`）—— `packages/sync-client/src/client.ts:1324-1327` 只往查询串里写 `sinceSeq` 与 `excludeClient`，**没有任何 heyta 客户端发过它** | 🔴 **本批重新归类，不按原登记实现**（证据链见 §8.17）。原句"补一个生产者"是错的：三条事实连起来说明**光上报版本会把那条日志变成假信号**，而阈值 `18.21.2` 住在**上游 Super Productivity 的版本空间**里。它不是自托管分发的缺口，是"客户端检查点/全量边界"这条**未实现的功能**的一部分 ⇒ 对外说法已在 `server/README.md`「Clients and version coupling」就地改成三个前置条件（原句只列了两个，且把"只差上报"写成了事实） |
 | G-45 | 台阶 3（镜像 npm 依赖树 vs 许可证门禁扫的 pnpm store）曾是**未证实** | **本批量完并关成"有对账"**（§8.8）：`check:image-license` 逐条对账 + 四条会红的登记自检，7 发变异各自精确报红、阳性对照绿。残余风险（纯传递依赖上游发新版）已改挂 G-47 |
 | G-46 | `server/scripts/build-and-push.sh`（`pnpm --filter @heyta/server docker:build` 的唯一实体）原来是**上游形状**：它自己抄了一份 7 条的镜像输入清单，其中 3 条在本仓库不存在（实测 `[ -e ]` 全不成立），而 `apps/web` / 11 个 `packages/*` / `pnpm-lock.yaml` / `server/` 自己**一条都不在里面**；`GHCR_NAMESPACE` 默认成 `super-productivity`（**别人的组织**）；并且无论给不给版本号都**顺带覆盖 `:latest`** | **本批关闭**（§8.7 第 4 条）。三条各自都会出事，都已改：清单改成 source 同一个读者、namespace 无默认值（不给就在任何 docker 之前 exit 1）、只推点名的那一个 tag。⚠️ 消费者集合是量过的：除 `server/package.json:14` 外只有 `server/tests/migration-sql.spec.ts:345` 读它，而那一发在 `it.skip` 里 ⇒ **不报错也不守** |
-| G-47 | 镜像那棵依赖树**没有被钉住**：`check:image-license` 证明的是"2026-10-03 这一次 npm 解析结果的 143 条逐条有出处"，而每次构建 npm 都会重解一遍（没有 lockfile）。改直接依赖会红，**纯传递依赖的上游发新版不会** | 🔄 **对账已做、登记那句被量得更准、闭合形状要换**（读数见 §8.20）。现量：镜像树与 pnpm 生产树**同名同版本 125 个、镜像独有 0 个、版本不一致 14 个** —— 14 个全是镜像比 lockfile **新**，其中 12 个是传递依赖（`pino` + `@simplewebauthn/server` 底下 11 个 `@peculiar/asn1-*`，那是 **passkey 验证路径**），2 个是直接依赖（`@fastify/static ^10.1.2` 解到 10.1.5 而 pnpm 是 10.1.4、`ws ^8.18.0` 解到 8.22.0 而 pnpm 是 8.21.3）。⇒ 登记那句"改直接依赖才会漂"其实**说轻了**：没人改任何依赖，只因为版本落在 `^` 范围内，发出去的镜像就跑着一套本仓库任何测试都没跑过的版本。`--check` 新鲜度绿、覆盖率对账绿，两条都管不到这件事。🔴 **原闭合形状实测不成立**：`pnpm deploy --prod` 在 pnpm v10+ 要求 `inject-workspace-packages=true`（全仓依赖解析方式的改动），而 `--legacy` 会去 registry 取 `@heyta/i18n` 直接失败；另外 filter 打错时 `pnpm deploy` **什么都没做还 exit 0**。⇒ 换成：把已提交的那份快照从"记录 npm 这次解出什么"改成**镜像要装的版本就是它**（装配时按快照逐条钉版本），等式判据与钉版本**同一批**落地（不能先加判据把链钉红），复验仍要一轮真构建 |
+| G-47 | 镜像那棵依赖树**没有被钉住**：`check:image-license` 证明的是"2026-10-03 这一次 npm 解析结果的 143 条逐条有出处"，而每次构建 npm 都会重解一遍（没有 lockfile）。改直接依赖会红，**纯传递依赖的上游发新版不会** | 🔄 **对账已做、登记那句被量得更准、闭合形状要换**（读数见 §8.20）。现量：镜像树与 pnpm 生产树**同名同版本 125 个、镜像独有 0 个、版本不一致 14 个** —— 14 个全是镜像比 lockfile **新**，其中 12 个是传递依赖（`pino` + `@simplewebauthn/server` 底下 11 个 `@peculiar/asn1-*`，那是 **passkey 验证路径**），2 个是直接依赖（`@fastify/static ^10.1.2` 解到 10.1.5 而 pnpm 是 10.1.4、`ws ^8.18.0` 解到 8.22.0 而 pnpm 是 8.21.3）。⇒ 登记那句"改直接依赖才会漂"其实**说轻了**：没人改任何依赖，只因为版本落在 `^` 范围内，发出去的镜像就跑着一套本仓库任何测试都没跑过的版本。`--check` 新鲜度绿、覆盖率对账绿，两条都管不到这件事。🔴 **原闭合形状实测不成立**：`pnpm deploy --prod` 在 pnpm v10+ 要求 `inject-workspace-packages=true`（全仓依赖解析方式的改动），而 `--legacy` 会去 registry 取 `@heyta/i18n` 直接失败；另外 filter 打错时 `pnpm deploy` **什么都没做还 exit 0**。⇒ 换成：把已提交的那份快照从"记录 npm 这次解出什么"改成**镜像要装的版本就是它**（装配时按快照逐条钉版本），等式判据与钉版本**同一批**落地（不能先加判据把链钉红），复验仍要一轮真构建。🟡 **2026-10-04 00:4x 部分推进**（现量与判据见 §8.26）：那 143 条**仍未钉**（要 docker + 低负载窗口，与 #12 同一个），但镜像里**唯一那一枚手写版本字面量** `prisma@5.22.0` 现在有了等式判据 —— 它是第三份抄件，此前没有任何一层在守；新判据挂成 `check:image-license` 的第三条腿，5 臂注入各自精确报红、未变异对照绿。同时 §8.20 步骤 1 的**形状被改掉**（快照不能既是 install 实参的来源、又是 install 形状的哈希输入，否则等式两边都是它自己）|
 | G-48 | `check:web-artifact:app`（核对 `--base=/app/` 那份产物的那一道）**零自动消费者** —— 2026-10-03 由新门禁 `check:gate-wiring` 量出：它是 63 道 `check:*` 里唯一合法落在链外的一道，而全仓 `grep` 只有 `package.json` 自己那一行，没有任何 workflow / 验收脚本 / `deploy.sh` 调用它 ⇒「上线前跑一次」目前只写在脚本头部注释里 | ✅ **已关（2026-10-03，判据与登记见 §8.19）**。登记那半句被否证：`server/Dockerfile:191` 一直在跑同一条判据的**脚本本体**，`grep` 漏它是因为搜的是别名。决定：链**不放**这道判据（`apps/web/dist` 是一个目录、两种载体，链里 `pnpm build` 打的必然是根载体，把 `/app/` 载体放链里就是拿错的字节验对的东西 —— 现量：同一份 dist 上一条 rc=0 一条 rc=1）；改为**每个发布载体各自带对账**：runbook §3.7 的 rsync 之前插入 `pnpm check:web-artifact:app`（两处），`check:gate-wiring` 新增"链外门禁必须点名消费方文件 + 该文件里有一行**以这条命令开头**"，把"没人跑它"从一句注释变成会红的判据。6 臂注入 5 红 1 绿（绿那臂是刻意留的越界对照） |
 | G-48b | G-48 关的是"这一步在不在发布序列里"，**没有**关"这一趟有没有人真的跑过它"：`consumers` 判的是 runbook 里那行命令还在，人工 rsync 前跳不跳过去仍然只取决于人。另外 `apps/web/dist` 一目录两载体没变（§8.19 读数 B），按载体分目录要同时动 `package-app.sh` / `package-msix.ps1` / `reinstall-all.sh` 的同步对账 / `Dockerfile` —— 四端打包输入的变更 | **未关**（本批只登记，理由如上：会新增一个"能碰生产"的对外动作面，或要改四端打包输入）。挂在这里是为了让下一轮别把 G-48 的绿读成"发布已经有守卫" |
 | G-49 | 站内那篇自建指南（`packages/i18n` 的 `site.docs.selfhost.*`）是入口命令的**第 4 份抄件**，而 `check:selfhost-entry-command` 的扫描集里没有它（现有扫描集：`docs/runbooks/self-host.md`、`server/README.md`、`server/env.example`、`docker-compose.migrate-once.yml`、`local-server-verification.md`）| ✅ **本批关闭**，但**登记的前提一半是错的**（读数在 §8.18）：58 条词条里当时**没有一条**是完整入口命令，s7p2 只有 `-f` 那三个 flag 的**碎片**（没前缀、没 `up -d`、**没 `--build`**）。碎片比没抄件更坏 —— 拼起来敲就是 §8.11 那次 `pull access denied`。所以做的是两件事：文章改成给**完整一条**（中英各一份，与 runbook 逐字相同），再把这两份词条文件纳入扫描集（`source: 'copy'`） |
@@ -889,8 +889,8 @@ i18n `22 passed`；`check:entries` 75 份一致、`check:ui-language`（zh/en �
 
 | 量 | 读数 |
 |---|---|
-| `git merge-tree --write-tree` 双向 | `REAL_RC` 均为 0，输出恰好 1 行 tree OID ⇒ 零冲突 |
-| `pnpm-lock.yaml` | main / 分支 / 合并树三边**同一个 blob** `674079fe` ⇒ 合并树不需要重装依赖（这是"软链 node_modules 可用"的前提，不是假设） |
+| `git merge-tree --write-tree` 双向 | ~~`REAL_RC` 均为 0，输出恰好 1 行 tree OID ⇒ 零冲突~~ 🔴 **这句 8 小时后就过期了**：§8.22 现量 rc=1（6 条路径冲突），§8.29 又复算一次仍是那 6 条。它只对**落笔那一趟**成立 ⇒ 用它之前必须先跑一次 `merge-tree`，不许引用 |
+| `pnpm-lock.yaml` | ~~main / 分支 / 合并树三边**同一个 blob** `674079fe` ⇒ 合并树不需要重装依赖~~ 🔴 **已过期**（§8.25 现量：main `d340e576` ≠ 分支/base `674079fe`）⇒ 落地后必须 `pnpm install`，"软链 node_modules 可用"这个前提没了 |
 | `package.json` | 合并后是第三个 blob `82ec7dcc`（main 加 `verify:mobile-notes`，本批加那批 `check:*`）|
 | 源码级文件交集 | **只有** `packages/i18n/src/locales/{zh-CN,en}.ts` 两个数据文件 |
 
@@ -1325,7 +1325,7 @@ git merge-tree --write-tree main feat/self-host-distribution   →  rc=1
 |---|---|---|
 | `.gitignore` | content（**两侧都在文件末尾追加**） | main：`/tmp/`、`e2e/_probe/`、`e2e/playwright.probe.config.ts`、`e2e/vault-results/`、`.vitest/`、`tmp-commit-plan.sh`；本批：`e2e/selfhost-stack-results/.last-run.json`（带"只忽略这一枚，s1–s3 截图仍可提交"的理由块） |
 | `apps/web/evidence/assistant/1-disclosure.png`<br>`assistant/2b-chat-dark.png`<br>`task-row-touch-target/timeline-light.png` | **binary**（git 明说 `Cannot merge binary files`） | 两侧都刷新过同一族取证图：main 有 `0c8a0ad4 test(evidence): 刷新助手/象限/触达目标的取证图（并行批次现量）`，本分支上另有一笔 `f304e713` 做了同一件事 |
-| `docs/research/self-host-distribution-audit.md` | **add/add**（merge-base 里没有这个文件） | main 有一份 **176 行**的版本；本分支这份 1100+ 行 |
+| `docs/research/self-host-distribution-audit.md` | **add/add**（merge-base 里没有这个文件） | main 有一份 **176 行**的版本；本分支这份 1100+ 行（📌 01:3x 复算：**1723** 行，main 那份仍 176 行） |
 | `package.json` | content | 两侧都往 `check` 链里加门禁（§8.12 记过的同一形状） |
 
 #### 这条读数的价值不在"有冲突"，在"它把 §8.16 变成了一条会过期的引用"
@@ -1359,3 +1359,409 @@ git merge-tree --write-tree main feat/self-host-distribution   →  rc=1
 我不 rebase 掉它、不改写它（那是别人的动作），只把它的存在与解法写在这里。
 🔴 顺带一条给后来者的形状：**同一族取证图被两个会话各自刷新并各自提交**，binary 就不可合并 ——
 取证图应当由**跑那套界面的一侧**提交，或者干脆不入库（改由 `landing-results/` 那类被忽略的目录出证）。
+
+---
+
+### 8.23 合并载体第一次真的做出来了（带解法），而"在载体上跑完整 `pnpm check`"这一条今天**不能跑**——原因在链里
+
+§8.22 记下"零冲突过期了"之后，这一条把四条冲突族逐个解掉并落成一笔可复核的合并提交：
+
+```
+feat/self-host-merge-main = 38564fe8   parents: d27bccde(main) + 9930edfc(本批)
+```
+
+解法与理由逐条写在**那笔合并的提交信息里**（不是只在这里），因为下一个重做它的人需要的是解法本身。
+`package.json` 那块不是手改的：`/tmp/g7-union-package-json.mjs` 从两侧 blob + merge-base 算并集，
+带三条断言（两侧 scripts 键不缺、两侧链段不缺、两侧各自相对顺序不颠倒），
+结果 **135 个脚本键 / 67 段链**（本批 66 段 + main 独有的 `pnpm check:op-log-semantics`）。
+📌 01:3x 现量复算是 **136 键 / 68 段**（main 又独有 `check:md-tables`）—— 见 §8.29。
+🔴 第一版我自己写坏过一次：那次把冲突块按 main 侧收掉了 —— 症状是"合上了"，实际是**把本批五道门禁静默摘掉**。
+并集脚本就是为了不再靠手而存在的。
+
+#### 合并树上的门禁读数（全部现量，载体工作树 `/tmp/heyta-merge-trial`）
+
+| 门禁 | rc | 读数 |
+|---|---|---|
+| `check:gate-wiring` | **0** | 链 67 段、定义 ~~68~~ **64** 道（🔴 68 是抄错，现量与解法在 §8.25：两枚载体的脚本键/链段集合差集都是空 ⇒ 现实没变，变的是我写的数字）、链外 1 道且消费方可验（runbook 2 处 + Dockerfile 1 处）⇒ §8.19 那条新判据在**别人的 package.json** 上也成立 |
+| `check:selfhost-entry-command` | 0 | 合并后的两份词条表仍在扫描集里、R1–R6 逐行过 |
+| `check:ui-language` | 0 | **zh 2934 / en 2934** 对等（main 那 16 笔加了 108 个键，与本批的改动自动合上了） |
+| `check:script-snapshot` | 0 | 36 个脚本（main 的 `c25960cb` 又补了 5 个，MANIFEST 与磁盘对得上） |
+| `check:docs-voice` | 0 | site.* 1020 条，30 项禁词零命中 |
+| `check:docs` | **1** | 3 处失效章节引用 |
+
+🔴 最后那行才是 #1 关闭判据的**本体**，所以它必须和 main 单独跑的结果并排量：
+`/tmp/heyta-main-docs`（干净 main=d27bccde 检出）跑同一条 `node research/tools/docs-link-check.mjs`
+⇒ **同样 3 处、同一批行号**（`calendar-year-time-and-mobile-profile.md:860`、
+`countdown-anniversary.md:1091`、`countdown-anniversary.md:1295`）。
+⇒ 这笔合并**没有给链添任何新的红**，那 3 处全部在别人的计划文档里。
+（顺带：登记里那句"main 红在 5 处"也已经过期 —— main 自己那 16 笔把其中 2 处修掉了。
+数字要带载体与日期，否则它一定漂。）
+
+#### 今天**不能**跑完整 `pnpm check` 的原因，写在链自己身上
+
+链的第 47 段是 `pnpm check:ai-e2e`，而它**会 SIGKILL 别的会话的 vite**
+（`docs/reference/environment-traps.md` #87，本批早先也记过一次）。现在是 2026-10-04 00:2x，
+主检出与另外 8 个 worktree 的会话还在跑（`git worktree list` 数到 14 个检出），
+所以"在载体上跑完整链"这一条**不是没做，是现在做就会踩硬约束**（不 SIGKILL 别人的 dev server）。
+
+⇒ 载体上跑完整链的窗口条件写成可判的三条：① 主检出那 5 个重叠文件已被其所有者提交
+（这是 #1 原本的门槛）；② `lsof -ti :5173 :5174 :4318 :4319` 全空（没有别人的 vite 在跑）；
+③ 负载 ≤12。三条同时成立才跑，跑之前把这三条的读数打出来留证。
+🔴 不要用"跳过 `check:ai-e2e` 再跑其余"来绕 —— 那会让"完整链绿"这句话变成假的，
+而这条链的裁判价值恰恰在于它是完整的那一条。
+
+#### 载体是** provisional ** 的，这一点必须跟着它
+
+它合的是 `main=d27bccde`，而主检出里那 5 个重叠文件仍是 `M`。
+所以 `38564fe8` 的作用是：**解法已被验证过一次**（并集脚本 + 六道门禁 + 与 main 的红集对照），
+落地那一刻按 §8.16 的三行重算、再按上面三条窗口条件跑完整链。
+
+---
+
+### 8.24 「打开浏览器就能用」这句话的反向残留：扫了，没有；以及三条窗口条件的现量
+
+#### 对外文案的反向残留扫描（这一批把界面搬进镜像之后，旧说法应当全部消失）
+
+可疑形状（两组正则，扫 `docs/runbooks/self-host.md`、`server/README.md`、
+`docs/runbooks/deployment.md`、两份词条表）：
+`没有界面 / 不含界面 / 不带 UI / 自己托管的界面 / separately hosted UI / 前端要自己…` 与
+`自己(打包|构建|部署)(一遍)?(前端|界面|UI) / 前端也要 / UI 仍要 / 不含前端 / 没有自带界面 / separate(ly)? host`
+⇒ **命中 0**。
+
+🔴 0 命中按本批自己的规矩要带阳性对照：同一条命令形状下 `界面` 在
+`self-host.md` 命中 **4** 处、`zh-CN.ts` 命中 **83** 处（`server/README.md` 是 0 —— 那份是英文文档，
+不是探针瞎）。所以"0"是**扫到了**的 0，不是没扫。
+而正面那句在 `self-host.md:146-148`：「然后开浏览器访问 `https://你的域名/app/` —— 界面就打在服务端镜像里，
+挂载路径由 `WEB_APP_PATH` 决定（默认 `/app/`，镜像内产物路径 `WEB_APP_DIR` 默认 `/app/web-dist`；
+把界面挪到别的挂载点是两个旋钮一起改，改一个是静默无效）」—— 与实现同源（`server/src/web-app.ts`）。
+
+#### 三条窗口条件的现量（2026-10-04 00:2x）
+
+| 条件 | 为什么是它 | 现量 |
+|---|---|---|
+| ① | 主检出那 5 个重叠文件被其所有者提交（#11 的门槛） | ❌ 五个文件仍是 `M`（`docs/README.md`、`package.json`、两份词条表、`scripts/check-script-snapshot.mjs`） |
+| ② | `:5173 :5174 :4318 :4319` 全空（`check:ai-e2e` 会 SIGKILL 别人的 vite，traps #87） | ✅ 当前**一个都没在监听** —— 但这一条只在"起跑那一刻"有意义，跑的过程中任何会话起一个 dev server 就会被踩到 |
+| ③ | 负载 ≤12（#12 的验收阈值） | ❌ `load1m 50.48 / load5m 39.02`（16 核）；OrbStack 的 socket 也不存在 ⇒ #12/#14 今天**环境无效**，不是产品失败 |
+
+⇒ 三条里 ①③ 不成立，所以 #11 的完整链与 #12 的全跑**都不该现在起**。
+这一张表留在文档里，是为了让下一次不用重新推一遍"现在能不能跑"。
+
+---
+
+### 8.25 载体按 §8.16 重算了一次（main 又前进 1 笔），顺手抓到**我自己写下的两条会过期的绿**
+
+`main` 从 `d27bccde` 前进到 `f6478fad`（一笔 `docs(handoff)`，`git diff --name-only` 对
+本批拥有的 10 个路径 ⇒ **空**）。按 §8.16 那三行重算，四条解法逐条照 §8.22 回放：
+
+```
+feat/self-host-merge-main = ceab1f78   parents: f6478fad(main) + d4e70ab4(本批)
+```
+
+冲突集合**一个都没变**（还是那六条路径），所以 §8.22 那四条预置解法今天仍然够用 ——
+这正是写"机械解法等现场"的意义：下一次落地的人不需要重新判断。
+`package.json` 仍然由并集脚本产出：**135 个脚本键 / 67 段链**，三条断言全过。
+📌 同一对在 01:3x 的现量是 **136 / 68**（§8.29）—— 这两个数字每次重算载体都要重新量，不许引用。
+
+载体上六道纯 fs 门禁现量（`/tmp/heyta-merge-trial`，无 `node_modules`，所以只跑不依赖依赖树的那六道）：
+`gate-wiring` 0 ｜ `selfhost-entry-command` 0 ｜ `ui-language` 0（zh 2934 / en 2934）｜
+`script-snapshot` 0（36 个脚本）｜ `docs-voice` 0 ｜ `check:docs` **1（3 处）**。
+
+🔴 **"合并没添新红"这次换成了可复跑的比法**：§8.23 是拿散文对照行号，这一趟把两份输出
+落成文件再 `diff` —— 干净 main（`f6478fad`）检出与合并载体各跑一条
+`node research/tools/docs-link-check.mjs`，**输出只差第 1 行的分母**
+（476 → 481 处引用，多的 5 条是本批文档自己的跨文档引用），三处红的**路径、行号、目标章节**逐字相同。
+⇒ 这句话现在是**一趟读数**，不是上一次读数的引用。
+
+#### 两条我自己写下的"过期的绿"，都在这趟现量里被否证
+
+1. 🔴 **§8.23 那行"定义 68 道"从来不是读数，是抄错。** 现量 `check:gate-wiring` 在载体上印
+   **64 道 / 67 段**。而两枚载体（`38564fe8` 与 `ceab1f78`）的 `package.json` 脚本键集合与
+   链段集合经探针逐字比对**都是 `(none)` 差集** ⇒ 现实在两趟之间根本没变，变的只是我写下的数字。
+   这条和 §8.22 讲的"过期的绿比过期的红更危险"是同一族，只是更朴素：**把一次没做过的测量写成表格，
+   它就会被后来人当成有人做过的**。判据写法上的修正：表里的数字必须能由同一条命令再打一遍。
+2. 🔴 **§8.16 那句"`pnpm-lock.yaml` 三边同一个 blob ⇒ 合并树不需要重装依赖"现在不成立了。**
+   现量：merge-base `437e7c1a` = 本批 = `674079fe`，而 **main 已是 `d340e576`**（它那 16 笔里动过依赖）。
+   合并取 main 那份（本批没碰 lockfile ⇒ 无冲突），所以**落地那一趟必须先 `pnpm install`**，
+   不能像 §8.16 那样软链 `node_modules` 直接跑 —— 那句话当时是对的，它是那条"软链可用"前提的**证据**，
+   前提过期了证据就变成陷阱。已把这条写进合并提交信息里，跟着载体走。
+
+#### 三条窗口条件的现量（2026-10-04 00:3x，覆盖 §8.24 那张表）
+
+① 五个重叠文件仍是 ` M` ❌ ｜ ② `:5173 :5174 :4318 :4319` 全空 ✅（只在起跑那一刻有意义）｜
+③ **`load1m 102.46` / 16 核**（`ps` 现量：三个 python3/node 各占 ~99%、另有 headless android emulator 在跑），
+OrbStack 的 `~/.orbstack/run/docker.sock` 不存在 ❌。
+⇒ #11 的完整链、#12 的全跑、#14 的真镜像构建**三条都仍是环境无效**，不是产品失败；
+没有调低任何阈值，也没有改任何判据。
+
+#### 现场清理（为了让别人的读数不被我污染）
+
+两枚 `/tmp` trial 检出在载体提交并移动分支指针**之后**已 `git worktree remove` ——
+`git worktree list` 是 §8.23 用来数"几个会话在跑"的现量命令，我留着它就是在给别人的计数加两个假检出。
+载体本体是**分支** `feat/self-host-merge-main`（不是 /tmp、不是 SHA），SHA 只作为这一趟的读数存在。
+
+---
+
+### 8.27 🔴 「停掉对外错话」第一次量到线上：错话不止在元数据里，有一句在**正文**，而且被同一页的命令自己否证
+
+前面所有读数都是"仓库里写的是谁"。这一条量的是**访客实际读到的是谁** —— 方法从一次性脚本
+`/tmp/live-copy-probe.mjs` 收进了仓库：`e2e/live-site/live-domain.spec.ts` 新增一条用例
+（真浏览器 + `--host-resolver-rules` 钉真 IP，不进 `pnpm check`，发布那一趟跑）。
+
+现量（2026-10-04 00:5x）：
+
+| 量什么 | 读数 |
+|---|---|
+| `/docs/selfhost/` 里旧句「不是一个命令就完事」 | **4 处** —— meta description / og:description / twitter:description / JSON-LD 各一份。**是同一句话的四份抄件**，不是四处不同的话（把每处上下文打出来才看得清，`grep -c` 数行会把它读成 4 个缺陷） |
+| 同一页的新句「把服务起来那条命令不难」 | 0 ⇒ 线上落后于 `faa5e730`（那次改的两条对外词条只发出去了一半） |
+| `/docs/` 的 FAQ JSON-LD | 旧句 1 处，但同时含「没有发布任何现成镜像」⇒ 线上是**中间态**，不是某一枚 HEAD |
+| 对照（改前改后都在场的「自己运维一套服务」） | `/docs/selfhost/` 4、`/docs/` 6 ⇒ 那两个 0 是**扫到了**的 0 |
+| 🔴 `/docs/selfhost/` **正文** | 「服务自己不在启动时动表结构」**在** |
+
+#### 那一句正文才是这一条的真正发现，而它照出的是我自己的判据取错了维度
+
+`site.docs.selfhost.s1i2` 写「…服务自己不在启动时动表结构」，而**同一页 §7 让访客敲的那条入口命令
+就带着 `-f docker-compose.migrate-once.yml`** —— 首次开机动表结构的恰恰是一个服务。
+这句错话在正文里、访客逐字读得到，比 meta 里那句严重。
+
+🔴 §8.21 那次普查为什么没抓到它？因为我按**字面串**「一条命令」去扫，而它是一句**不同措辞的同一命题**。
+⇒ 教训：**扫对外承诺要按命题取，不能按字面串取** —— 同一个错误结论在一份文档里通常有两三种说法，
+只有一种会被我的 needle 命中。（同族：§8.21 记下"登记说两句、现量六处"，那是字面串还准的情况；
+这一次字面串直接漏了一整句。）
+
+已改（zh + en 同步）：
+
+- `site.docs.selfhost.s1i2`：改成"首次开机由一次性迁移服务把表结构建好，不用你手动跑；
+  但 compose 不会重跑一个已退出的服务，改了表结构之后的升级要再点名执行它一次"。
+- `site.docs.selfhost.s9p2`：把**两条路各自的时机**写清（`./scripts/deploy.sh` 换容器前跑 /
+  `docker compose` 由 `supersync-migrate` 在第一次开机跑），原来那句只描述了前一条。
+
+门禁现量全 rc=0：`@heyta/i18n` build、`check:ui-language`、`check:docs-voice`、
+`check:selfhost-entry-command`、`check:server-copy`、`check:legal-copy`、`check:entries`。
+⚠️ `check:entries` **一个 HTML 都没改** —— 这两条 key 不进静态 HTML，只进 JS bundle，
+所以"改了词条"到"访客看到"之间只剩**重新发一次落地页**这一步，没有第二条路。
+
+#### 为什么不立刻重发（以及这条判据今天为什么是红的）
+
+线上那份 build 的**来源树无法归属**：它同时带台阶 0 的改动与旧的 sum，而那批改动 main 也有，
+所以"从我这条分支发一次"**不能保证不回退别人已经发出去的内容**。
+⇒ 关闭动作绑在 #11 落地之后：**从合并后的 main 发一次**，然后复跑这条用例取绿。
+载体那侧已经量过词条表：`main` 旧句 2 / 新句 0，`feat/self-host-merge-main` 旧句 **0** / 新句 **1**
+⇒ 合并本身就会把这句话带干净，缺的只是发布。
+
+新用例的四条腿按这个顺序写（**对照先判**）：
+① 页面是 HTML ② 在场对照（章节标题 / 「自己运维一套服务」）③ 元数据旧句 = 0 ④ 新句在位 + 正文旧句 = 0。
+今天它停在第 ③ 条，报的就是那句可执行的结论：`/docs/selfhost/ 仍在线上印「不是一个命令就完事」4 处`。
+
+⚠️ 这条用例第一版**把阳性对照写成了"新句在位"**，于是它比真判据先红 —— 红在一个
+本来就不该在场的东西上，把"线上还挂着旧句"这个可执行结论盖掉了。
+**对照必须取在被验状态之外**（改前改后都在场的那半句），否则它与被验命题同生同死，等于没有对照。
+
+---
+
+### 8.26 G-47 的第三条腿：镜像里唯一那枚**手写版本字面量**是三份抄件，而它没有判据
+
+主体（把 143 条钉住）仍卡在 docker + 低负载窗口，和 #12 同一个窗口。
+但读 `server/Dockerfile` 生产阶段时照出来一件**今天就能闭合**的事，所以把它做掉了。
+
+#### 现量
+
+```
+server/Dockerfile:252   npm install prisma@5.22.0 --registry=… --ignore-scripts --omit=dev
+server/package.json     dependencies["@prisma/client"] = 5.22.0
+server/package.json     devDependencies["prisma"]      = 5.22.0
+server/image-npm-tree.json  packages: prisma@5.22.0、@prisma/client@5.22.0
+```
+
+⇒ 同一个版本号在**四个地方**，其中 `5.22.0` 那个字面量是**整个仓库里唯一手写的包版本**，
+而它不在任何 lockfile 里。今天四处一致 —— **一致不是判据，是运气**（AGENTS §8.3：不能失败的检查没有价值）。
+
+#### 为什么这条值得单独有一条判据（机制，不是"顺手对账"）
+
+`prisma` 住在 **devDependencies**，而生产阶段那条常规 `npm install` 带 `--omit=dev`
+⇒ 常规那一发**永远装不到 CLI**，镜像里 `npx prisma generate` 用的那个 CLI 版本
+**只由 Dockerfile 那枚字面量决定**。于是漂移的形状很具体：
+
+有人 bump `@prisma/client`（或 devDeps 的 `prisma`）而忘了那一行 ⇒
+镜像里用 5.22 的引擎生成 client、运行时 import 的是 5.23 的 client，
+报错点在**容器里、而且是在生产库上迁移跑过之后**；`pnpm check` 全绿，因为
+**链从来不构建镜像**（§8.7 记的就是这条盲区）。Dockerfile 自己那句
+`IMPORTANT: prisma version must match @prisma/client in package.json` 说的正是这件事 ——
+🔴 **它是一句提醒，不是一条判据**，而提醒挡不住"改了声明没改提醒"。
+
+#### 落地的判据
+
+`research/tools/check-image-install-contract.mjs`（挂成 `check:image-license` 的第三条腿，
+**不新增 `check:*` 键** ⇒ `check:gate-wiring` 的读数仍是 63 道 / 66 段，没有制造新的"链外门禁"）：
+
+| 腿 | 比的是 | 红的时候说什么 |
+|---|---|---|
+| ①↔③ | Dockerfile 字面量 ↔ `dependencies["@prisma/client"]` | 镜像里的 CLI 与运行时 client 不同版本，并给出**该改成哪一枚** |
+| ②↔③ | Dockerfile 字面量 ↔ `prisma`（devDeps 或 deps） | 本机会与镜像**各自生成一次** client，"我本地跑过迁移没问题"对容器不成立 |
+| 快照↔声明 | `image-npm-tree.json` 里 `prisma` / `@prisma/client` ↔ 上面两处 | 对账脚本此刻正在给**一个没人装过的树**打分 |
+| 没有对象 | 生产阶段读不到 `prisma@X` 点名 | 响亮失败（`prisma` 在 devDeps ⇒ 没这行镜像里就没有 CLI）——**不许退化成"没扫到也算过"** |
+
+install 形状仍然**只有一个所有者**：那条腿通过 `image-install-shape.mjs` 从 Dockerfile 读，
+不抄第二份清单（§8.8 立下的规矩）。
+
+#### 注入验证（5 臂 + 未变异对照，逐臂读数）
+
+| 臂 | 变异 | rc | 命中的判据消息 |
+|---|---|---|---|
+| A | Dockerfile `prisma@5.22.0` → `5.23.0` | 1 | 「镜像里的 prisma CLI 与运行时 @prisma/client 不是同一个版本」 |
+| B | package.json `@prisma/client` → `5.23.0` | 1 | 同 A（反方向） |
+| C | devDeps `prisma` → `5.23.0` | 1 | 「与开发者本机的 prisma CLI 不是同一个版本」 |
+| D | 快照里 `prisma` → `5.20.0` | 1 | 「快照里的 prisma=5.20.0 ≠ Dockerfile 钉的 prisma@5.22.0」 |
+| E | 那一整条点名换成 `npm install lodash` | 1 | 「生产阶段没有 `npm install prisma@<version>` 这一条了」 |
+| 对照 | 三份文件原样拷进临时目录 | **0** | 「三处同源 … 快照 5.22.0 / 5.22.0」 |
+
+夹具带**命中数断言**（`npm install prisma@5.22.0` 必须恰好命中 1 次、快照里 `prisma` 必须恰好 1 条），
+改 package.json/快照走解析器而不是猜缩进 —— 抄件会漂的第一现场就是这种"文本形状写死在夹具里"。
+
+#### 🔴 同时改掉 §8.20 步骤 1 的形状（这一条比判据本身更值钱）
+
+步骤 1 原写"装配阶段按快照里的 `name@version` 逐条钉版本"。把今天这条腿读完之后发现它有**自锚**问题：
+
+- 快照的 `inputs` 里有一枚是 **Dockerfile 的 install 形状哈希**；
+- 一旦把 143 条 `name@version` 写进那条 `npm install`，**形状哈希就是在哈希快照的内容**；
+- 于是 `--check` 从"快照 ↔ 当前声明"退化成"快照 ↔ 快照自己" ⇒ **永远绿**。
+
+⇒ 合同的**来源**必须是那个独立的东西（pnpm 的 lockfile 生产树），快照只是它的投影、
+Dockerfile 的实参来自快照。步骤 2 的等式才有两个不同的边可比的；否则新增的那条判据
+就是 §8.19 那种"一条永远绿的空判据"。
+
+🟡 顺带一条实测到的**既有守卫**（不是我要加的）：`gen-image-npm-tree.mjs` 读到生产阶段用
+`pnpm` 装会**直接 fail** 并写明"那时这条快照与对账应当**撤掉**，不是改成读别的文件"。
+也就是说如果最终走"镜像里用 pnpm 按 lockfile 装"，被撤下的是整套快照+覆盖率对账，
+而许可证门禁与镜像从此扫**同一棵树** —— 那才是 G-47 真正的终点。
+这条守卫把"半吊子迁移"（留着快照又换成 pnpm）当场拦住，值得记下来。
+
+### 8.28 🔴 验收载体自己跑的是**另一句话**：`verify-selfhost-stack.sh` 少一份 override，而它当初"有理由"
+
+本轮（2026-10-04 01:2x）量 G-49 那条门禁的扫描集时顺带读进 `scripts/verify-selfhost-stack.sh`，
+发现 §8.11 那一族**还有第三种面目**没被摘掉。
+
+**现场**（改前）：
+
+| 位置 | 实测 |
+|---|---|
+| `COMPOSE_FILES`（改前 `:101`） | 只有 `docker-compose.yml` + `docker-compose.migrate-once.yml` **两份** |
+| 对外文档那条主命令（R5 钉住的） | **三份**，多 `-f docker-compose.build.yml` |
+| 脚本里那段自校对 | `[ "$SCRIPT_ENTRY_FILES" = "docker-compose.migrate-once.yml docker-compose.yml "` ] —— 把**当时的形状**写死成期望值 |
+| 那段旁边的理由 | 「它和文档 §4 的差集应当恰好是 `docker-compose.build.yml` —— **因为脚本自己 docker build**」 |
+
+**那句理由被 `docker compose config` 否证**（它不需要 daemon，所以这条判断当场就能做）：
+两份 / 三份两种解析的**逐路径差集恰好 6 处**，全部在预期内 ——
+
+```
+services.supersync.build.{context,dockerfile,args.APK_MIRROR,args.NPM_REGISTRY,args.VCS_REF}   null → 有值
+services.supersync.environment.MIGRATE_RECOVERY_BUILD_LOCAL                                     null → "true"
+```
+
+服务清单（`caddy postgres supersync supersync-migrate`）、应用与迁移容器的 `image:`
+（两边都 `supersync:selfhost-verify`）、`RUN_MIGRATIONS_ON_STARTUP` 的解析值**一项没变**。
+⇒ 带上前那份 override **不会**触发重建（compose 没有 `--build` 就不看 `build:` 段），
+也不会换 tag ⇒「脚本自己打镜像」这个省掉它的理由收益是 **0**。
+
+**代价藏在一个环境变量里**：`docker-compose.build.yml:34` 给应用容器注
+`MIGRATE_RECOVERY_BUILD_LOCAL=true`，而它是 `server/scripts/migrate-deploy.sh:239`
+那个分支的**唯一开关** —— 决定 CONCURRENTLY 迁移失败后打印给运维的那条带外恢复命令里
+有没有 `-f docker-compose.build.yml`（全仓只有这一个消费者；`server/tests/migration-sql.spec.ts:452`
+只是文本断言）。外人照文档拿到的是**带 build.yml 的那一支**，验收跑的是**另一支** ⇒
+"三容器 healthy + 界面可用"对那一支**不构成任何证据**。这与 §8.11 是同族（"把自己要验的
+默认值换掉了"），只是这次换掉的不是镜像 tag 而是**恢复路径**。
+
+**为什么以前没人发现**：这段判断原先只有脚本自己那一份，而它把期望值写死成当时的形状 ——
+**那不是判据，是快照**：载体再漂一次只要漂成同一个值它就跟着认账，而 R1–R6 的扫描集里
+根本没有这个脚本。所以修法分两层：
+
+1. 载体改成带**同一套三份**文件（`scripts/verify-selfhost-stack.sh:110`），并**删掉**那段
+   把形状写死的自校对 —— 现在它只**打印**实测集合，打印不判定；
+2. 判定搬进门禁的单一所有者：`check-selfhost-entry-command.mjs` 新增 **R7**，读那个数组、
+   **期望值从 R5 算出的那条对外主命令导出**（不在这里抄第二份字面量），并带三条非空哨兵
+   （数组读不到 / 一个 `.yml` 都没有 / 没有期望值可用 ⇒ 都判红，不许"读不到就算过"）。
+
+**R7 第一次跑就报出真实那个洞**（不是注入）：
+
+```
+scripts/verify-selfhost-stack.sh:101  [R7]
+  验收脚本带的 compose 文件集合是「…migrate-once.yml …yml」，而外人照抄的那条主命令是
+  「…build.yml …migrate-once.yml …yml」—— 两者必须是同一套文件。
+```
+
+**变异验证**（在 `/tmp/r7-shadow` 影子根里做：门禁脚本用副本、其余文件软链到真树，
+真树那个文件全程没被写过 —— size+mtime 与起跑前相同）。**5/5 臂符合预期**：
+
+| 臂 | 变异 | 结果 |
+|---|---|---|
+| E 阳性对照 | 当前形状 | exit **0**，R7 红数 0 |
+| A | 摘掉 build.yml（回到出事那个形状） | exit 1，红数 1，定位语命中 |
+| B | `COMPOSE_FILES` 改名（探针该瞎） | exit 1，红数 1，报「读不到 COMPOSE_FILES 数组」 |
+| C | 空数组 | exit 1，红数 1，报「一个 .yml 都没有」 |
+| D | 文件名 typo | exit 1，红数 **2**（存在性 + 集合不等） |
+
+⚠️ 第一趟 E 臂**假红**过一次，而且红得很有迷惑性：影子根只软链了我"想起来要链"的三份
+compose 文件，漏了内部验收手册用的 `docker-compose.test.yml` ⇒ R2 判它不存在 ⇒ 对照先死。
+**夹具没铺全会伪装成"判据自己有洞"**，而这条判据本身恰恰是判"文件在不在"的。
+修法是把 `server/` 下**每一个** `.yml` 目录化列出来链上（`readdirSync(...).filter(.yml)`），
+不是去改断言。
+
+**顺手加的腿四**：脚本现在当场读应用容器里的 `MIGRATE_RECOVERY_BUILD_LOCAL`，不是 `true` 就
+`die`（读法与既有的 `RUN_MIGRATIONS_ON_STARTUP` 那条同形，"读不到"打成显式字面值而不是空串，
+否则探针够不着会被报成产品缺陷）。D-3 那一节的读数行同步印出这一条。
+
+**这一条还差什么**（别把上面这些读成"已经验过"）：
+
+- 腿四目前只有**静态**（R7）+ **解析层**（`config` 的 6 处差集）两份证据；它自己的**真读数**
+  要等任务 #2 那次全跑（`pnpm verify:selfhost-stack`）。本轮仍跑不了：01:2x 现量
+  `load 98.38 / 52.74 / 59.77`（阈值 12），OrbStack daemon 这次**已经起了**
+  （`/var/run/docker.sock → ~/.orbstack/run/docker.sock`，`docker version` = 29.4.0）——
+  环境无效不是产品失败，按判据等窗口，没调低阈值。
+- 载体与对外那句话**仍然有两处刻意不同**，写清楚免得被读成"一模一样"：
+  ① 不加 `--build`（镜像由脚本自己 `docker build`，为的是传 `VCS_REF=<完整 SHA>`，
+  而 build.yml 里是 `${SUPERSYNC_BUILD_SHA:-local}` ⇒ 换成 `compose build` 会把这枚标签改成 `local`，
+  所以这一处**不该**为了对齐而改）；② `SUPERSYNC_IMAGE` 钉成私有 tag `supersync:selfhost-verify`
+  （不复用 `supersync:local`，那是别人机器上可能存在的镜像）。
+  这两条是夹具性质，不构成"验的不是那句话"——真正会让绿色不迁移的是文件集合，而那一条现在被 R7 钉住了。
+
+### 8.29 载体那三行今天**机械重算不出来**了，而我先踩了一遍才回查出 §8.22 —— 于是把那两处过期读数原地划掉
+
+01:3x 按 §8.16 那三行去重算载体（本批又多了 `02b05433` 那笔），现量：
+
+```
+main = 2c0ac370（自 merge-base 前进 60 笔）  branch = 02b05433（本批 42 笔）  mb = 437e7c1a
+git merge-tree --write-tree main feat/…            → rc=1（两个方向都是）
+```
+
+**冲突路径集合与 §8.22 那一次逐条相同，一条不多一条不少**：`.gitignore`、三枚
+`apps/web/evidence/**.png`（binary）、`docs/research/self-host-distribution-audit.md`（add/add）、
+`package.json`。⇒ §8.22 那四条**预置解法今天仍然逐条可用**，且第 3 条那条证据我重新量了一遍、
+**数字一模一样**（main 那份 122 个非空行里只有 9 行不在本分支当前版本中）。
+这条重复读数有意义的地方在于：§8.22 自己写了"这条结论的保质期只到下一次 `merge-tree`"——
+这是它的**第二趟**，两趟间隔约 1 小时 20 分、main 中间前进 1 笔。
+
+**并集那一处必须重量**（不许引用）：
+
+| 量 | §8.23 当时 | 01:3x 现量 |
+|---|---|---|
+| base / main / branch 各自链段 | — | 61 / 63 / 66 |
+| 并集链段 | 67 | **68**（main 独有 2 段：`check:op-log-semantics`、**新增的** `check:md-tables`） |
+| 并集 scripts 键 | 135 | **136**（main 独有 7 键：那 2 段 + 5 条 `verify:*`；本批独有 7 键：5 段 + `check:web-artifact:app` + `verify:selfhost-stack`） |
+| 两侧相对 base 是否只增不减 | 未记 | **0 / 0**（⇒ 并集不会静默摘掉任何一侧的门禁；这条是并集脚本三条断言的前提，现在有了现量） |
+
+`pnpm-lock.yaml` 仍 `main d340e576 ≠ branch/base 674079fe` ⇒ §8.25 那条"落地必须 `pnpm install`"今天仍然成立。
+
+🔴 **本轮真正要记的是我自己的那个动作**：我是**先按 §8.16 的字面去跑**（那句"零冲突 ⇒ 三行机械重算"
+在文档里当时仍以未划线的形式活着），撞到 rc=1 才回查发现 §8.22 早就把它否证了。
+一份 1700 行的证据文档里，"某条结论已被后来的现量否证"如果只存在于后面某一节的叙述里，
+那么下一个读它的人（就是我）会照**前面那节**行动。所以这一步不是补记，是**就地修句**：
+§8.16 那张表里 `merge-tree 双向 rc=0` 与 `lockfile 三边同 blob` 两行已经原地划线并指向本节，
+旁边留了"引用它之前必须先跑一次 `merge-tree`"。
+
+**落地仍未开始，前置条件三条都没满足**（01:3x 现量）：主检出那 5 个重叠文件里还有 **3 个是 ` M`**
+（`docs/README.md`、`packages/i18n/src/locales/{zh-CN,en}.ts`）；端口 3000 / 4318 / 4319 有进程在听；
+`load 98.38 / 52.74 / 59.77`（阈值 12）。载体分支 `feat/self-host-merge-main` 还指在 `ceab1f78`
+（两个父都旧了）—— 它现在**不是**"重算一遍就行"的状态：重算要走 §8.22 那四条解法 + 并集脚本，
+而并集脚本的输入要等那两个 i18n 文件被它们的所有者提交后才固定。所以这个分支留着当形状参考，
+不当现量引用。
+
+
