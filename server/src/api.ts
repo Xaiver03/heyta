@@ -30,6 +30,7 @@ import {
   PasskeyError,
 } from './passkey';
 import { authenticate, getAuthUser } from './middleware';
+import { withAccountProfile } from './account/account-profile.store';
 import { evaluateLegalRecheck, recordLegalReconfirm } from './legal-recheck';
 import {
   loginWithEmailPassword,
@@ -928,7 +929,13 @@ export const apiRoutes = async (
           token,
           // locale = 账号语言（可空）：客户端在本机无显式选择时采纳（解析链第 2 层，
           // docs/plans/i18n-multilingual.md §3）。magic-link 那两条登录路同样带它。
-          user: { id: userInfo.userId, email: userInfo.email, locale: user?.locale ?? null },
+          // R10 起昵称与头像 hash 也在这里 —— 四条认证路**共用**
+          // `account-profile.store.ts` 的 `withAccountProfile`，不各自拼对象。
+          user: await withAccountProfile({
+            id: userInfo.userId,
+            email: userInfo.email,
+            locale: user?.locale ?? null,
+          }),
         });
       } catch (err) {
         const errMsg = err instanceof Error ? err.message : 'Unknown error';

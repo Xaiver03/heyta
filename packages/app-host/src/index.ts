@@ -198,6 +198,12 @@ export {
  * `setInitialPassword`）在这一版
  * 才补上导出：函数与契约测在 W5 就写完了，但**包外一个调用方都没有** ——
  * 症状正是本仓库反复记过的那类"功能做完了、用户做不到"。
+ *
+ * ⚠️ 头像/昵称的**类型**（`AccountProfileResponse`、`AvatarPayload`、
+ * `ACCOUNT_AVATAR_MAX_*` 那几个上限）不在下面这张名单里 —— 它们的家在
+ * `@heyta/shared-schema`（两端共用的契约层）。在这里再导一次就是一份抄件，
+ * 而抄件一定会漂：加一种图片格式时改契约、忘了改这条 re-export，
+ * 症状是"服务端收了、客户端拒显示"。宿主直接从 shared-schema 取。
  */
 export {
   HOSTED_AUTH_PATHS,
@@ -211,8 +217,12 @@ export {
   completePasskeyRecovery,
   completePasskeyRegistration,
   confirmLegalConsent,
+  deleteAccountAvatar,
+  decodeAvatarCipher,
   deletePasskey,
   extractAuthLinkToken,
+  fetchAccountAvatar,
+  getAccountProfile,
   getLegalConsentStatus,
   getPasskeyRecoveryOptions,
   LEGAL_CONSENT_REASONS,
@@ -229,9 +239,12 @@ export {
   requestPasswordReset,
   resetPasswordWithToken,
   setInitialPassword,
+  updateAccountDisplayName,
   updateAccountLocale,
+  uploadAccountAvatar,
   verifyEmailAddress,
   verifyMagicLink,
+  type AvatarDecodeResult,
   type HostedAuthFailure,
   type HostedAuthFailureReason,
   type HostedAuthLocale,
@@ -390,6 +403,7 @@ export {
   utcOffsetLabel,
   type CalendarAnchor,
 } from './calendar-anchor.js';
+
 export {
   confirmAiToolProposal,
   runSelectedTool,

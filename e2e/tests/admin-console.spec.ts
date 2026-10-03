@@ -261,6 +261,18 @@ async function seed({
       body: JSON.stringify({ passkeys: [] }),
     });
   });
+  // 🔴 同一条补位纪律，2026-10-03 多了一条：资料面板（`ProfilePanel.tsx:122` →
+  // `hosted-auth.ts#getAccountProfile`）一挂载就读 `/api/account/profile`，
+  // 而假端点只实现了模型接口 ⇒ 404 混进"不该有非 2xx"。
+  // 这里给的是**空但合法**的资料（形状逐字段抄 `accountProfileResponseSchema`：
+  // `displayName` / `avatarHash` 两个都可 `null`，本支用例不验资料编辑）。
+  await page.route(`${SERVER}/api/account/profile**`, async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ displayName: null, avatarHash: null }),
+    });
+  });
 
   const adminCalls: string[] = [];
 

@@ -101,3 +101,30 @@ export type {
   PasswordAuthErrorCode,
   PasswordPolicyCode,
 } from './auth-http-contract';
+
+// 账号资料（R10）：昵称 + 头像的路径 / 长度界限 / 响应形状。
+// ⚠️ 与上面 `AUTH_PASSWORD_*_CODE_POINTS` 同一档 —— 那才是"两端共用一个常量"的**正确**住处；
+// `HOSTED_PASSKEY_NAME_MAX_LENGTH` 住在 app-host 而服务端零 import，是同一件事的**错误**住处
+//（见 account-profile-contract.ts 文件头那段）。
+export {
+  ACCOUNT_PROFILE_PATHS,
+  ACCOUNT_DISPLAY_NAME_MAX_CODE_POINTS,
+  ACCOUNT_AVATAR_MAX_CIPHER_BASE64_BYTES,
+  ACCOUNT_AVATAR_MAX_SOURCE_BYTES,
+  ACCOUNT_AVATAR_EDGE_PX,
+  ACCOUNT_AVATAR_CONTENT_TYPES,
+  avatarPayloadSchema,
+  parseAvatarPayload,
+  displayNameCodePoints,
+  accountDisplayNameSchema,
+  accountProfileUpdateSchema,
+  accountProfileResponseSchema,
+  accountAvatarUpdateSchema,
+} from './account-profile-contract';
+export type {
+  AccountAvatarContentType,
+  AccountProfileUpdate,
+  AccountProfileResponse,
+  AccountAvatarUpdate,
+  AvatarPayload,
+} from './account-profile-contract';

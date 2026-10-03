@@ -28,6 +28,10 @@
  * 结构测试挡不住一个结构完整、中英对齐、但**内容编造**的文件 —— 它压根没这个能力。
  */
 
+import { readdirSync, readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
 import { describe, expect, it } from 'vitest';
 
 import type { LegalBlock, LegalDocument, LegalSection } from '../src/types.js';
@@ -348,5 +352,68 @@ describe('对外承诺里的主体不许错', () => {
     }
     // 反向：这条规则不能退化成"没有任何文本引用信用代码"的空判据。
     expect(citing, '没有一份文本的英文栏引用信用代码 —— 这条判据已经悬空').toBeGreaterThan(0);
+  });
+});
+
+/**
+ * 对外承诺里**可复算的数字**必须与它的数据源对账。
+ *
+ * 🔴 为什么单独立一条，而不是"改的时候记得一起改"：隐私政策里那句「共 19 处级联」是对
+ * `DELETE /api/account` 行为的**事实性承诺**（PIPL 第四十七条"删除"到底删了多少东西）。
+ * 它由一份 research 文档抄进 `privacy.ts` 的中英两栏 —— 而**抄件一定会漂**。
+ * 2026-10-03 实测就漂了一次：R10 加 `user_avatars` 那条级联关系后，真实数是 19，
+ * 文本还写着 18，而**没有任何一层会报错**（中英镜像判据只看形状，形状没变）。
+ *
+ * 所以这里不比"两个文档一不一致"（那只是把漂移换个地方存），而是**回到唯一的真源**：
+ * 迁移 SQL 里 `ON DELETE CASCADE` 的实际出现次数。加一条级联关系 ⇒ 这条自动红。
+ */
+describe('对外文本里可复算的数字，回到真源对账', () => {
+  /** 迁移目录相对本包：`packages/legal/tests` → 仓库根的 `server/prisma/migrations`（上三级）。 */
+  const MIGRATIONS = fileURLToPath(new URL('../../../server/prisma/migrations', import.meta.url));
+
+  const cascadeCount = readdirSync(MIGRATIONS, { recursive: true })
+    .filter((p): p is string => typeof p === 'string' && p.endsWith('migration.sql'))
+    .reduce((total, rel) => {
+      const sql = readFileSync(join(MIGRATIONS, rel), 'utf8');
+      return total + (sql.match(/ON DELETE CASCADE/gi)?.length ?? 0);
+    }, 0);
+
+  it('迁移里确实数得出级联关系（数不出 = 路径坏了，不是"没有级联"）', () => {
+    // 🔴 这条是上面那个 reduce 的**前提断言**：目录名写错时 cascadeCount 会是 0，
+    // 而"文本也写 0"永远不会发生，于是下面那条对账会红在错误的原因上。
+    expect(cascadeCount, `在 ${MIGRATIONS} 下数到 0 条 ON DELETE CASCADE —— 先怀疑这个探针`).toBeGreaterThan(
+      0,
+    );
+  });
+
+  it('隐私政策中英两栏的「共 N 处级联 / N cascades in total」都等于迁移里的真实级联数', () => {
+    const privacy = LEGAL_DOCUMENTS.find((d) => d.id === 'privacy');
+    expect(privacy, '注册表里没有 privacy 这份文件').toBeTruthy();
+
+    const patterns = [
+      // 中文栏：「（共 19 处级联）」
+      /共\s*(\d+)\s*处级联/g,
+      // 英文栏：「(19 cascades in total)」
+      /(\d+)\s+cascades in total/g,
+    ];
+
+    let checked = 0;
+    for (const locale of LEGAL_LOCALES) {
+      const text = columnTexts(privacy!, locale).join('\n');
+      for (const pattern of patterns) {
+        for (const match of text.matchAll(pattern)) {
+          checked += 1;
+          expect(
+            Number(match[1]),
+            `${privacy!.id} 的 ${locale} 栏承诺了 ${match[1]} 处级联，而迁移里实际是 ${cascadeCount} 条 —— ` +
+              '加/删级联关系时必须同时改这里（真源：server/prisma/migrations）',
+          ).toBe(cascadeCount);
+        }
+      }
+    }
+    // 反向防悬空：两栏各至少命中一次。命中 0 次说明措辞被改写，这条判据已经抓不到东西。
+    expect(checked, '一处"N 处级联/N cascades in total"都没命中 —— 这句话被改写了，判据已悬空').toBeGreaterThanOrEqual(
+      2,
+    );
   });
 });

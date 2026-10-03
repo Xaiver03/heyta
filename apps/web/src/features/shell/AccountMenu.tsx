@@ -73,7 +73,7 @@ import { ICON_SIZE } from '@heyta/design-system';
 
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useI18n } from '@heyta/i18n';
-import { CircleUser, LogIn, LogOut, Settings, TrendingUp } from 'lucide-react';
+import { CircleUser, LogIn, LogOut, Settings, TrendingUp, UserRoundPen } from 'lucide-react';
 
 /**
  * 读一个 token 的像素值。
@@ -93,6 +93,7 @@ export function AccountMenu({
   showSignIn = false,
   onSignIn,
   onOpenSettings,
+  onOpenProfile,
   onOpenGrowth,
   growthEnabled = false,
   onSignOut,
@@ -111,6 +112,15 @@ export function AccountMenu({
   /** 打开「登录 / 注册」面板。`showSignIn` 为真时它是菜单的第一项。 */
   onSignIn: () => void;
   onOpenSettings: () => void;
+  /**
+   * 打开「编辑个人信息」（昵称 + 头像）。
+   *
+   * 🔴 只在**已登录**时渲染。昵称与头像是**账号上的行**（`users.display_name` /
+   * `user_avatars`），没有令牌就没有可读写的那一行 —— 给没登录的人看这一项，
+   * 和这个文件头记过的那条「退出登录」是同一个错误：把一个语义上不存在
+   * 的动作摆成一个能点的按钮。
+   */
+  onOpenProfile?: () => void;
   onOpenGrowth: () => void;
   /**
    * 🔴 「成长」模块是否启用（功能模块开关）。
@@ -322,6 +332,16 @@ export function AccountMenu({
           {showSignIn
             ? item(t('web.auth.title'), LogIn, onSignIn, 'sync-signin-entry', 'primary')
             : null}
+          {/*
+            「编辑个人信息」在**身份区下面、设置上面**（R10）。
+            排序理由：它改的是"这个账号是谁"，设置改的是"这个账号怎么行为" ——
+            前者离上面那行身份更近。六家竞品里把资料页挂在设置**里面**的也有，
+            但那样会变成"设置 → 资料"两层，而这一页只有两个字段，不值得。
+            ⚠️ 未登录时不渲染（`onOpenProfile` 只在已登录那一支传）。
+          */}
+          {showSignIn || onOpenProfile === undefined
+            ? null
+            : item(t('web.shell.account.profile'), UserRoundPen, onOpenProfile, `${testID}-profile`)}
           {item(t('web.shell.account.settings'), Settings, onOpenSettings, `${testID}-settings`)}
           {/*
             「成长」用**与 rail 同一条词条**（`web.shell.views.growth` = 成长）——

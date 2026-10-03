@@ -57,7 +57,17 @@ import {
   PASSWORD_AUTH_ERROR_CODES,
   PASSWORD_POLICY_CODES,
   type PasswordPolicyCode,
+  ACCOUNT_PROFILE_PATHS,
+  accountProfileResponseSchema,
+  parseAvatarPayload,
+  type AccountAvatarContentType,
+  type AccountProfileResponse,
+  type AvatarPayload,
 } from '@heyta/shared-schema';
+// 头像的加解密**就是**同步通道那把口令与那两个函数 —— 不是"另写一套加密"。
+// 见 docs/plans/ui-review-fill-zh-timeline.md §8.6：这样它不新增任何前提
+//（`sync-client` 早写明没有口令根本同步不了）。
+import { decrypt, encrypt } from '@heyta/sync-core';
 import { joinEndpointUrl } from './endpoint-url.js';
 import { PrivacyConsentBlockedError } from './privacy-consent.js';
 
@@ -94,6 +104,14 @@ export const HOSTED_AUTH_PATHS = {
   passkeys: '/api/passkeys',
   /** 账号语言（登录态写回；应用语言解析链第 2 层）。 */
   accountLocale: '/api/account/locale',
+  /**
+   * 账号资料（R10）：昵称与**密文**头像。
+   *
+   * 🔴 路径从 `@heyta/shared-schema` 的常量拼出来，**不写字面量** ——
+   * 服务端注册路由用的就是那一个常量。抄第二份的后果是 404，而不是报错。
+   */
+  accountProfile: `/api/${ACCOUNT_PROFILE_PATHS.profile}`,
+  accountAvatar: `/api/${ACCOUNT_PROFILE_PATHS.avatar}`,
   /**
    * 法务文本的**重新确认**（读状态 GET / 记确认 POST 同一条路径）。
    *
@@ -450,6 +468,38 @@ function readServerMessage(body: unknown): string | undefined {
 }
 
 /**
+ * 服务端 `emailDelivered` 的**严格**读取：只认字面量 `false`。
+ *
+ * 🔴 为什么不是"缺省当 true"：这个字段只在**信真的没发出去**时才出现。
+ * 老服务端（没这个字段）、发信成功、以及"这台服务器压根不需要验证邮箱"三种情况
+ * 都拿不到它，而界面在那三种情况下该说的还是那句"去查收邮件 / 已经激活"。
+ * 把它读成 `!== true` 会让所有连老服务端的客户端凭空多出一句警告 ——
+ * 那是把"探针够不着"当成"事情没发生"（AGENTS §7 元规则 1）。
+ */
+function readServerEmailDelivered(body: unknown): false | undefined {
+  if (body === null || typeof body !== 'object' || Array.isArray(body)) return undefined;
+  return (body as Record<string, unknown>)['emailDelivered'] === false ? false : undefined;
+}
+
+/**
+ * 三条"注册"路（邮箱+口令 / 魔法链接 / 通行密钥）**共同**的成功响应形状。
+ *
+ * `emailDelivered?: false` 的类型就是它的语义：**只有"信没发出去"这一件事会被说出来**，
+ * 其余一切（成功、老服务端、这台服务器不需要验证）都是"没说"。
+ * 三条路共用一个构造点，是为了不再出现"其中一条忘了带这个字段"那种漂移
+ * （AGENTS §3.5：同形状的第二次就是漂移的开始）。
+ */
+export type HostedRegisterResult = { message: string; emailDelivered?: false };
+
+function registerResult(body: unknown): HostedRegisterResult {
+  const delivered = readServerEmailDelivered(body);
+  return {
+    message: readServerMessage(body) ?? '',
+    ...(delivered === undefined ? {} : { emailDelivered: delivered }),
+  };
+}
+
+/**
  * 服务端 `policyCode` 的**白名单**读取。
  *
  * 词表来自 `@heyta/shared-schema`（那四个串唯一的定义处），所以这里不需要重述它们。
@@ -714,7 +764,7 @@ export async function requestMagicLink(
 export async function registerWithMagicLink(
   options: HostedAuthOptions,
   input: { email: string; termsAccepted?: boolean; inviteCode?: string },
-): Promise<HostedAuthOutcome<{ message: string }>> {
+): Promise<HostedAuthOutcome<HostedRegisterResult>> {
   const normalized = normalizedEmail(input.email);
   if (normalized === undefined) return failure('invalid-input');
 
@@ -728,7 +778,7 @@ export async function registerWithMagicLink(
     ...(input.inviteCode === undefined ? {} : { inviteCode: input.inviteCode }),
   });
   if (!result.ok) return result;
-  return { ok: true, message: readServerMessage(result.body) ?? '' };
+  return { ok: true, ...registerResult(result.body) };
 }
 
 /**
@@ -833,7 +883,7 @@ export async function beginPasskeyRegistration(
 export async function completePasskeyRegistration(
   options: HostedAuthOptions,
   input: { email: string; credential: HostedPasskeyCredential; inviteCode?: string },
-): Promise<HostedAuthOutcome<{ message: string }>> {
+): Promise<HostedAuthOutcome<HostedRegisterResult>> {
   const normalized = normalizedEmail(input.email);
   if (normalized === undefined) return failure('invalid-input');
 
@@ -847,7 +897,7 @@ export async function completePasskeyRegistration(
     ...(input.inviteCode === undefined ? {} : { inviteCode: input.inviteCode }),
   });
   if (!result.ok) return result;
-  return { ok: true, message: readServerMessage(result.body) ?? '' };
+  return { ok: true, ...registerResult(result.body) };
 }
 
 /** 取登录 options。 */
@@ -901,6 +951,210 @@ export async function requestPasskeyRecovery(
   });
   if (!result.ok) return result;
   return { ok: true, message: readServerMessage(result.body) ?? '' };
+}
+
+/**
+ * 账号资料（R10）：昵称 + **密文**头像。五个窄函数，全部要 Bearer 令牌。
+ *
+ * 🔴 为什么头像是客户端加密的：`packages/legal` 的表 E 里"生物识别 ❌ 不收集"
+ * 的依据原文是「没有任何生物特征模板**离开你的设备**」。明文上传会让那句话变成假的
+ *（逐行对照在 docs/research/countdown-anniversary-data-and-images.md §4，
+ * 裁决在 docs/plans/ui-review-fill-zh-timeline.md §8.6）。
+ *
+ * ⚠️ 加密用的就是**同步那把口令**，所以它不新增任何前提：
+ * `sync-client` 在 `client.ts:703-709` 已经写明没有口令**根本同步不了**
+ *（`reason: 'no-encryption-password'`）。⇒ "能跨设备带回头像"的前提，
+ * 本来就等价于"能同步"。
+ */
+
+/**
+ * 头像的加密载荷：`{ contentType, dataBase64 }` 打包成 JSON，再走同步口令加密。
+ *
+ * 🔴 为什么**连图片格式都进密文**：服务端解不开，所以它不该知道这张图是 JPEG 还是 PNG。
+ * 把 `content_type` 做成明文列（本文件的第一版就是这么设计的，后来改掉），
+ * 等于在服务端多存一份"用户交来的东西是什么" —— 而它没有任何必要知道。
+ * 表里因此**没有** `content_type` 列。
+ *
+ * ⚠️ 双重 base64（图片 → base64 → 密文再 base64）体积 ×1.78。
+ * 这是"不引二进制上传通道、不引新依赖"的代价，刻意接受：
+ * 512 KB 的原图 → 约 920 KB 密文，仍远小于 2 MiB 的密文上限。
+ */
+export const encodeAvatarCipher = (
+  password: string,
+  image: { contentType: AccountAvatarContentType; dataBase64: string },
+): Promise<string> => encrypt(JSON.stringify(image), password);
+
+/**
+ * 解回来的结果。**判别式**：界面据此决定"显示图"还是说那句话。
+ *
+ * ⚠️ `no-password` 与 `network` **必须分开**：前者是"这台设备还没配口令"（正常状态，
+ * 该安静地回落到首字母），后者是"配了但没拿到"（该让人看见一次）。
+ * 把它们合成一个 reason 的后果，是一个从没设过头像的人每次启动看到一次报错。
+ */
+export type AvatarDecodeResult =
+  | { ok: true; image: AvatarPayload }
+  | {
+      ok: false;
+      /**
+       * 🔴 五种失败**不能合并**，因为用户动作不同：
+       * - `no-token`：这台设备没登录。去做登录。
+       * - `no-password`：登录了但本机没有口令（口令从不落盘）。去同步设置里填一次。
+       * - `undecryptable`：口令填了但**不对**。也是去填口令，但提示不该是"你还没设口令"。
+       * - `bad-shape`：解出来不是 `{contentType,dataBase64}`。这是服务端/数据坏了，
+       *   跟用户没关系，界面该说的是"暂时取不到"，不是催他改口令。
+       * - `network`：一次往返没成，可重试。
+       * 合并成一种的症状：从没设过头像的人每次刷新都被凶一次。
+       */
+      reason: 'no-token' | 'no-password' | 'undecryptable' | 'bad-shape' | 'network';
+    };
+
+/**
+ * 解开头像载荷。
+ *
+ * 🔴 解出来之后**必须过 zod**：那是从远端拿回来的字节，即使已解密也不能当可信对象用。
+ * 不校验的后果不是崩溃而是"界面把 `undefined` 拼进 `data:` URL"，症状是一张坏图。
+ */
+export const decodeAvatarCipher = async (
+  password: string | undefined,
+  cipherBase64: string,
+): Promise<AvatarDecodeResult> => {
+  if (password === undefined || password.trim() === '') return { ok: false, reason: 'no-password' };
+  let plain: string;
+  try {
+    plain = await decrypt(cipherBase64, password);
+  } catch {
+    // 口令不对 / 密文被截断，在这里长得一模一样 —— 都归 undecryptable，
+    // 由界面统一说"这台设备解不开头像"，不去猜哪一种。
+    return { ok: false, reason: 'undecryptable' };
+  }
+  const image = parseAvatarPayload(plain);
+  if (image === null) return { ok: false, reason: 'bad-shape' };
+  return { ok: true, image };
+};
+
+/** 读自己的资料（昵称 + `avatarHash`）。**不含**任何图片字节。 */
+export async function getAccountProfile(
+  options: HostedAuthOptions,
+  token: string,
+): Promise<HostedAuthOutcome<AccountProfileResponse>> {
+  const trimmed = token.trim();
+  if (trimmed === '') return failure('invalid-input');
+  const result = await sendJson(options, 'GET', HOSTED_AUTH_PATHS.accountProfile, undefined, trimmed);
+  if (!result.ok) return result;
+  const parsed = accountProfileResponseSchema.safeParse(result.body);
+  if (!parsed.success) return failure('network');
+  return { ok: true, ...parsed.data };
+}
+
+/**
+ * 改昵称。服务端是**唯一裁决者**（长度与空白规则都在 `@heyta/shared-schema`），
+ * 这里的 `trim()` 只是让"看起来没填"和"填了空白"在界面上说同一句话。
+ */
+export async function updateAccountDisplayName(
+  options: HostedAuthOptions,
+  token: string,
+  /** `null` = **清除**昵称（回到邮箱派生的显示名）。空串不是清除，是无效输入。 */
+  displayName: string | null,
+): Promise<HostedAuthOutcome<AccountProfileResponse>> {
+  const trimmedToken = token.trim();
+  if (trimmedToken === '') return failure('invalid-input');
+  if (displayName !== null && displayName.trim() === '') return failure('invalid-input');
+  const trimmedName = displayName === null ? null : displayName.trim();
+  const result = await sendJson(
+    options,
+    'PUT',
+    HOSTED_AUTH_PATHS.accountProfile,
+    { displayName: trimmedName },
+    trimmedToken,
+  );
+  if (!result.ok) return result;
+  const parsed = accountProfileResponseSchema.safeParse(result.body);
+  if (!parsed.success) return failure('network');
+  return { ok: true, ...parsed.data };
+}
+
+/**
+ * 上传头像（客户端加密后交出去）。
+ *
+ * ⚠️ `password` 由**宿主**传进来（与同步用的同一个来源），本函数不去"找"口令：
+ * 口令绝不长期落盘是 `sync-wiring.ts` 那条表里写明的立场，
+ * 在这里偷偷读一份就是绕过它。
+ */
+export async function uploadAccountAvatar(
+  options: HostedAuthOptions,
+  token: string,
+  password: string,
+  image: { contentType: AccountAvatarContentType; dataBase64: string },
+): Promise<HostedAuthOutcome<{ avatarHash: string }>> {
+  const trimmed = token.trim();
+  if (trimmed === '') return failure('invalid-input');
+  if (password.trim() === '') return failure('invalid-input');
+  const cipherBase64 = await encodeAvatarCipher(password, image);
+  const result = await sendJson(
+    options,
+    'PUT',
+    HOSTED_AUTH_PATHS.accountAvatar,
+    { cipherBase64 },
+    trimmed,
+  );
+  if (!result.ok) return result;
+  // 手写而不是 zod：`@heyta/app-host` **没有**那个依赖（实测 package.json），
+  // 形状校验的正当去处是 shared-schema（`parseAvatarPayload` 就在那）。
+  // 为一个 `typeof` 判断加一个依赖不值。
+  const body = result.body as { avatarHash?: unknown } | null;
+  if (body === null || typeof body.avatarHash !== 'string') return failure('network');
+  return { ok: true, avatarHash: body.avatarHash };
+}
+
+/**
+ * 取另一台设备上传的头像密文并解开。
+ *
+ * 404（`avatar-absent`）是**正常状态**，不是失败："没有头像"就该回落到首字母，
+ * 而不是让界面报一次错。所以这里把它映射成 `ok: false, reason: 'bad-shape'` 之外的
+ * 一个独立分支 —— 用 `null` 表达"服务端说没有"。
+ */
+/**
+ * 取另一台设备上传的头像密文并解开。
+ *
+ * ⚠️ **调用前提是 `avatarHash !== null`**（先读 profile，再决定要不要取图）。
+ * 这样"没有头像"根本不会走到这条请求上，也就不需要在这里区分
+ * "404 = 没有" 与 "404 = 路由错了" —— 那个区分在 `sendJson` 的返回形状里是拿不到的，
+ * 硬做只会把两种情况都映射成 `network`，让一个没设过头像的用户每次启动看到一次报错。
+ */
+export async function fetchAccountAvatar(
+  options: HostedAuthOptions,
+  token: string,
+  password: string | undefined,
+): Promise<AvatarDecodeResult> {
+  // 🔴 两道闸门都必须在 `sendJson` **之前**，这里是实测抓出来的：
+  // 第一版只有口令那道闸门，而它长在 `decodeAvatarCipher` 里 —— 于是"没有口令"
+  // 的设备的实际行为是**先把密文拉回来**再判解不开。一次纯浪费的往返还是轻的，
+  // 重的是这条规则就此住在界面层：谁忘了在自己的壳里挡一遍，它就出门了。
+  // （界面层当时确实挡住了，所以这个缺陷在 web 上看不见 —— 这是它活到今天的原因。）
+  const trimmed = token.trim();
+  if (trimmed === '') return { ok: false, reason: 'no-token' };
+  if (password === undefined || password.trim() === '') {
+    return { ok: false, reason: 'no-password' };
+  }
+  const result = await sendJson(options, 'GET', HOSTED_AUTH_PATHS.accountAvatar, undefined, trimmed);
+  if (!result.ok) return { ok: false, reason: 'network' };
+  const body = result.body as { cipherBase64?: unknown } | null;
+  if (body === null || typeof body.cipherBase64 !== 'string') {
+    return { ok: false, reason: 'bad-shape' };
+  }
+  return decodeAvatarCipher(password, body.cipherBase64);
+}
+
+/** 移除头像。**幂等**：本来就没有也算成功（服务端用 `deleteMany`，不会抛 P2025）。 */
+export async function deleteAccountAvatar(
+  options: HostedAuthOptions,
+  token: string,
+): Promise<HostedAuthOutcome<{ avatarHash: null }>> {
+  const trimmed = token.trim();
+  if (trimmed === '') return failure('invalid-input');
+  const result = await sendJson(options, 'DELETE', HOSTED_AUTH_PATHS.accountAvatar, undefined, trimmed);
+  if (!result.ok) return result;
+  return { ok: true, avatarHash: null };
 }
 
 /**
@@ -1324,6 +1578,12 @@ export async function completePasskeyEnrollment(
  * 邮箱已被占用时**同一句、同一个状态码** —— 所以这个端点不是邮箱存在性预言机，
  * 界面也不许把它渲染成"注册成功，登录好了"。
  *
+ * ⚠️ 但"去看收件箱"这句话**有一个服务端会亲口否认它**的时刻：信没发出去
+ * （没配 SMTP / 服务商拒了）。那时响应里多一个 `emailDelivered: false`，
+ * 而界面**必须**换一句 —— 对着一个永远收不到的邮箱说"请查收"是把人关在门外。
+ * 另一头，`REQUIRE_EMAIL_VERIFICATION=false` 的自托管服务器上这一步根本不存在
+ * （账号当场激活，走的是另一句文案），所以这个字段也就不会出现。
+ *
  * `termsAccepted` 只在**用户真的勾了**时才发（服务端 `z.literal(true)`）——
  * 我们绝不替用户发明一次同意。
  *
@@ -1333,7 +1593,7 @@ export async function completePasskeyEnrollment(
 export async function registerWithEmailPassword(
   options: HostedAuthOptions,
   input: { email: string; password: string; termsAccepted?: boolean; inviteCode?: string },
-): Promise<HostedAuthOutcome<{ message: string }>> {
+): Promise<HostedAuthOutcome<HostedRegisterResult>> {
   const normalized = normalizedEmail(input.email);
   if (normalized === undefined) return failure('invalid-input');
   if (input.password === '') return failure('invalid-input');
@@ -1347,7 +1607,7 @@ export async function registerWithEmailPassword(
     ...(input.inviteCode === undefined ? {} : { inviteCode: input.inviteCode }),
   });
   if (!result.ok) return result;
-  return { ok: true, message: readServerMessage(result.body) ?? '' };
+  return { ok: true, ...registerResult(result.body) };
 }
 
 /**

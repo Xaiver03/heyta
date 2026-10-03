@@ -52,7 +52,11 @@
  *   pepper、HIBP 前缀 / A4 passkey 字段与 challenge 不落库 / A5 五封邮件与 SMTP /
  *   A6 邀请关系里的第三人邮箱 / A7 微信支付 `attach` 逐字段 / A8 后台白名单投影 /
  *   A9 `logger: false`、IP 不落库 / A10 埋点与崩溃上报 14 个关键词零命中 + 出网四类目的地 /
- *   附：45 天保留期与每日清理、`DELETE /api/account` 的 18 处级联硬删）。
+ *   附：45 天保留期与每日清理、`DELETE /api/account` 的 19 处级联硬删）。
+ *   🔴 **19 这个数是可复算的**：对 `server/prisma/migrations` 下的迁移 SQL 数 `ON DELETE CASCADE`
+ *   的出现次数（`grep -rho "ON DELETE CASCADE" server/prisma/migrations | wc -l`）。
+ *   它由 `structure.spec.ts` 里那条判据钉住（数字与迁移不一致即红），所以**加一条级联关系时必须同时改这里**。
+ *   （2026-10-03 从 18 变 19：`user_avatars.user_id → users.id` 那条级联，见 R10 §8.7。）
  * - 各端本地存了什么、明文还是密文、权限清单实际内容：`docs/research/legal-dataflow-client.md`
  *   （B11 clientId 是随机假名 / **B12 本地存储是明文、E2EE 只覆盖传输** / B13 凭据落盘面 /
  *   B14 三条通知通路 / B15 小组件加密快照 / B16 导出是明文且三端通道不同 /
@@ -187,7 +191,7 @@ const zh = [
         rows: [
           [
             '邮箱地址',
-            '登录账号；发五封功能邮件（验证邮箱、魔法登录、找回通行密钥、重置口令、口令已改通知）。这是库里**唯一的直接标识符** —— 没有姓名、电话、地址、生日、头像、地理位置、通讯录。',
+            '登录账号；发五封功能邮件（验证邮箱、魔法登录、找回通行密钥、重置口令、口令已改通知）。这是库里**唯一的直接标识符** —— 没有真实姓名、电话、地址、生日、地理位置、通讯录；另有你自填的**昵称**（非实名、不做唯一）与一张**我们解不开的头像密文**，两行都在第 3 条的表里单列。',
             '我们的服务器',
             '明文',
           ],
@@ -238,6 +242,12 @@ const zh = [
             '界面语言、同意留痕、容量闸门、暴力破解防护。',
             '我们的服务器',
             '明文',
+          ],
+          [
+            '你自填的昵称，以及（可选）一张头像',
+            '只为了在你自己的设备上认出这个账号。🔴 heyta 没有共享与协作，所以两者今天**都只有你本人读得到**，服务端也不存在"按别人身份查资料"的端点。昵称是**显示名不是实名**、不做唯一性，登录标识始终是邮箱；头像在你本机压小后用**你的 E2EE 口令**整块加密上传，🔴 **我们存的是解不开的密文**，另存该密文的 SHA-256 仅用于跨设备判断"换过没有"。',
+            '我们的服务器（另在你本机）',
+            '昵称**明文**；头像**密文**',
           ],
           [
             '你在应用里输入与生成的全部内容（任务、清单、标签、便签、习惯、专注记录、提醒）',
@@ -382,9 +392,9 @@ const zh = [
             '整行删除。我们刻意不加第二个旋钮 —— 多一个参数就多一处会漂移的地方。',
           ],
           [
-            '账号本身（邮箱、口令散列、通行密钥、语言、条款接受时刻）',
+            '账号本身（邮箱、口令散列、通行密钥、语言、昵称、头像密文、条款接受时刻）',
             '到你注销账号为止。',
-            '🔴 注销是**真删除**：账号行连同名下的事件、同步状态、设备、通行密钥、订阅、订单、邀请、通知按数据库级联删除（共 18 处级联），**没有冷静期，也没有回收站**。',
+            '🔴 注销是**真删除**：账号行连同名下的事件、同步状态、设备、通行密钥、订阅、订单、邀请、通知、昵称与头像按数据库级联删除（共 19 处级联），**没有冷静期，也没有回收站**。',
           ],
           [
             '订阅、订单与优惠码核销记录',
@@ -702,7 +712,7 @@ const en = [
         rows: [
           [
             'Email address',
-            'Your sign-in identity; delivering the five functional emails (address verification, magic link, passkey recovery, password reset, password-changed notice). It is the **only direct identifier** in the database — there is no name, phone number, postal address, date of birth, avatar, location or contacts.',
+            'Your sign-in identity; delivering the five functional emails (address verification, magic link, passkey recovery, password reset, password-changed notice). It is the **only direct identifier** in the database — there is no legal name, phone number, postal address, date of birth, location or contacts. There is also a nickname you type yourself (not a legal name, not unique) and an optional avatar **we cannot decrypt**; both are listed as their own rows in section 3.',
             'Our servers',
             'Plaintext',
           ],
@@ -753,6 +763,12 @@ const en = [
             'Interface language, consent evidence, the storage gate, brute-force protection.',
             'Our servers',
             'Plaintext',
+          ],
+          [
+            'The nickname you type, and an optional avatar',
+            'Solely so you can recognise this account on your own devices. 🔴 heyta has no sharing and no collaboration, so today **only you can read either of them**, and the server exposes no endpoint that looks another user’s profile up by identity. The nickname is a **display name, not your legal name**, and is not unique — the sign-in identifier stays the email address. The avatar is downscaled on your device and encrypted with **your own E2EE passphrase** before upload; 🔴 **we store ciphertext we cannot open**, plus the SHA-256 of that ciphertext used only to tell across devices whether it changed.',
+            'Our servers (and on your device)',
+            'Nickname **plaintext**; avatar **ciphertext**',
           ],
           [
             'Everything you enter and generate inside the app (tasks, lists, labels, notes, habits, focus records, reminders)',
@@ -897,9 +913,9 @@ const en = [
             'The whole row is deleted. We deliberately do not add a second knob — one more parameter is one more place that can drift.',
           ],
           [
-            'The account itself (email address, password hash, passkeys, language, moment of accepting the terms)',
+            'The account itself (email address, password hash, passkeys, language, nickname, avatar ciphertext, moment of accepting the terms)',
             'Until you close the account.',
-            '🔴 Closure is a **genuine hard delete**: the account row and, by database cascade, its events, sync state, devices, passkeys, subscriptions, orders, referrals and notifications are deleted (18 cascades in total). **There is no cooling-off period and no trash bin.**',
+            '🔴 Closure is a **genuine hard delete**: the account row and, by database cascade, its events, sync state, devices, passkeys, subscriptions, orders, referrals, notifications, nickname and avatar are deleted (19 cascades in total). **There is no cooling-off period and no trash bin.**',
           ],
           [
             'Subscriptions, orders and coupon redemptions',
