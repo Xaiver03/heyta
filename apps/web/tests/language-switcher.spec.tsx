@@ -27,6 +27,12 @@
  * AI 面板与捕获框这一批还没迁（另一条工作流在改）。整棵树的汉字断言会把
  * "别人还没迁"当成"我迁坏了"。所以 CJK 断言**只覆盖外壳自己渲染的那几块**
  * （侧栏 + 视图 tab 条 + 空状态），那正是本轮负责的范围。
+ *
+ * 🔴 **2026-10-04 形态变更加的两条**（产品负责人："中英文的那个切换组件太离谱了"）：
+ * 控件从"两枚裸 `.ht-chip`"换成**带可见标签的分组**。语义一条没动
+ * （`LOCALES` 驱动 / 自称 / `lang` / `aria-current` / 点当前项无操作），
+ * 新增的两条钉的是**形态本身**：① 顶栏只有一个入口、且入口自己说明自己是什么；
+ * ② 当前语言不只靠颜色标。这两条在旧形态上都会红 —— 改前实测过（见工单汇报）。
  */
 
 import { IDBFactory, IDBKeyRange } from 'fake-indexeddb';
@@ -101,6 +107,34 @@ function shellText(el: HTMLElement): string {
   return parts.map((node) => node?.textContent ?? '').join(' ');
 }
 
+/** 顶栏那个语言**分组**本身（`role="group"` 的容器）。找不到就抛，理由同 `option()`。 */
+function switcher(el: HTMLElement): HTMLElement {
+  const node = el.querySelector<HTMLElement>('[data-testid="language-switcher"]');
+  if (node === null) throw new Error('外壳里没有语言分组容器 —— 语言控件退化成了几个散按钮');
+  return node;
+}
+
+/** 分组的名字来自**可见**的那个标签（不是只挂在 `aria-label` 上的一份抄件）。 */
+function switcherLabel(el: HTMLElement): HTMLElement {
+  const group = switcher(el);
+  const id = group.getAttribute('aria-labelledby');
+  if (id === null || id === '') {
+    throw new Error('语言分组没有 aria-labelledby —— 名字要由那个可见标签提供，不是抄第二份');
+  }
+  const label = el.querySelector<HTMLElement>(`#${id}`);
+  if (label === null) throw new Error(`aria-labelledby 指向的 #${id} 不在 DOM 里`);
+  // 🔴 「看得见」是这条判据的全部意义：把标签换成 `.sr-only` 仍然满足
+  //   "分组有可访问名"，但产品负责人那句"用户根本不知道它们是什么"就回来了。
+  //   jsdom 没有布局盒，所以这里查的是**结构**（挂着渲染它的那个类、没挂隐藏类）；
+  //   "真的画出来了"由 e2e 的 `getByRole('group', { name: '语言' })` + 截图负责。
+  if (label.className.includes('sr-only')) throw new Error('语言标签被藏成 sr-only —— 界面上没人看得见它');
+  if (!label.className.includes('ht-header__lang-label')) {
+    throw new Error('语言标签没挂 ht-header__lang-label —— 它不再是页头那一族的成员');
+  }
+  if (label.textContent === '') throw new Error('语言标签是空的 —— 分组名字来自哪里？');
+  return label;
+}
+
 beforeEach(async () => {
   // 这些用例要走「成长/番茄钟/便签」——它们默认是关的（见 enable-all-modules.ts）。
   enableModules(['focus', 'growth', 'notes']);
@@ -128,9 +162,38 @@ describe('🔴 可达性：真实外壳里有没有那个控件', () => {
     for (const node of found) {
       // 每一项都在顶栏的全局控件区（与主题切换并列），任何视图下都看得见。
       expect(node.closest('.ht-header__actions')).not.toBeNull();
+      // 🔴 而且都在**同一个分组**里 —— 散在 `.ht-header__actions` 上的按钮没有组名，
+      // 辅助技术读到的是两个孤零零的词，而不是"语言：中文 / English"。
+      expect(node.closest('[data-testid="language-switcher"]')).toBe(switcher(el));
       // 每一项的 lang 就是它自己 —— 屏幕阅读器用正确的发音规则读那个词。
       expect(node.getAttribute('lang')).toBe(node.getAttribute('data-testid')?.replace('language-option-', ''));
     }
+  });
+
+  it('🔴 顶栏里语言这件事**只有一个入口**，而且那个入口自己说明自己是什么', () => {
+    const el = mount();
+    // 一个入口，不是两枚裸胶囊、也不是"胶囊 + 设置页里再来一份"。
+    // 「同一个动作两个入口」是仓库明确判过的错形（docs/plans/goal-layout-audit.md §6 第 2 条）。
+    expect(el.querySelectorAll('[data-testid="language-switcher"]')).toHaveLength(1);
+
+    const group = switcher(el);
+    expect(group.getAttribute('role')).toBe('group');
+    // 名字**由可见标签提供**（`aria-labelledby`），所以界面与辅助技术读的是同一份字。
+    expect(switcherLabel(el).textContent).toBe('语言');
+    expect(group.getAttribute('aria-label')).toBeNull();
+  });
+
+  it('🔴 当前语言不只靠颜色标出来：勾只出现在它身上（不靠颜色单独表意）', () => {
+    const el = mount();
+    const on = option(el, 'zh-CN');
+    const off = option(el, 'en');
+    // 颜色之外的那一条通道：一枚 svg 勾。变异：拿掉它 ⇒ 这条红。
+    expect(on.querySelector('svg')).not.toBeNull();
+    expect(off.querySelector('svg')).toBeNull();
+    // 勾是装饰，名字由按钮文本提供 —— 不许再多一个可访问名。
+    expect(on.querySelector('svg')?.getAttribute('aria-hidden')).toBe('true');
+    expect(on.textContent).toBe('中文');
+    expect(off.textContent).toBe('English');
   });
 
   it('当前语言那一项是标出来的，其余写着各自语言的自称', () => {
@@ -172,6 +235,9 @@ describe('🔴 点一下：界面上的可见文案真的变（不是只改 stat
     // 「帮助」在 tablist **外面**（它是动作）—— 单独断言，正好钉住这一点。
     expect(el.querySelector('[data-testid="rail-help"]')?.textContent).toContain('Help');
     expect(el.textContent).toContain('Your inbox is empty');
+    // 分组自己的标签也跟着翻过去（它是 `web.shell.lang.label`，不是硬编码的「语言」）。
+    // 自称那两项**不许**跟着翻 —— 上面刚断言过 `English` 仍是 `English`。
+    expect(switcherLabel(el).textContent).toBe('Language');
 
     expect(el.textContent).not.toContain('收集箱');
     expect(el.textContent).not.toContain('回收站');
