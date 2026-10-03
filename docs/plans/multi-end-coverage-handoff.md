@@ -13,16 +13,16 @@
 
 | 项 | 值（**02:0x 现量**，上一版是 00:5x） | 复跑核对 |
 |---|---|---|
-| `main` HEAD | `bcfee6fb`（00:5x 那版写 `eb03420a`，其后 **18 笔**，其中 **16 笔**标题是 `docs(handoff)` —— 剩下的来自并行条线的 vault/收尾） | `git rev-parse --short HEAD`；区间笔数 `git rev-list --count eb03420a..HEAD` |
+| `main` HEAD | `ee8b17fe`（02:3x 现量）。距 02:0x 那一版 `bcfee6fb` **276 笔**，但**这不等于"25 分钟里写了 276 笔"**：区间里 **38 笔是 merge**，`--no-merges` 是 238 笔 —— 绝大多数是并行会话把长期分支（closeout / 自托管 / detail-pane）并进 main 时**带进来的既有历史** | `git rev-parse --short HEAD`；区间构成 `git rev-list --count --merges <旧>..HEAD` + `--no-merges`（**只报"多少笔"会把一次合并读成一次大改**） |
 | 🔴 归属**不能**靠 `--author` 判 | 这台机器上所有并行会话共用同一个 git 用户（`邓湘雷`），`git log --author=…` 分不出哪条线 | 能用的只有两种：标题前缀（`docs(handoff)` vs `feat(...)`）与**内容 needle**（`git log -S '<只有我写的那一行>' -- <文件>`，见 §6） |
-| 本条线的父子层级分支 | `feat/list-parent`（工作树 `../heyta-wt-hierarchy`），tip **`c983a7cf`**；🔴 **02:0x 现量 `merge-base --is-ancestor main feat/list-parent` 退 1** ⇒ 分支不再是 main 的后代（main 又前进了），**要落的是一笔合并提交而不是快进**（细则见 §5 第 4 步） | 别数提交笔数（会漂）：`git log --oneline <当时的 main HEAD>..feat/list-parent` 现量 |
+| 本条线的父子层级分支 | ✅ **已落 main，不再是一笔待做的合并**（02:3x 现量推翻了本行旧版）：`git merge-base --is-ancestor 776fc23c HEAD` 退 **0**、`origin/main` 也含它、本地分支 `feat/list-parent` 已删（02:3x `git worktree list` 里也**没有** `heyta-wt-hierarchy` 了）；**是谁、经哪条分支把它合进去的没有现量**，本行只登记能证的两件事：那笔在 main 的祖先里，且分支与 worktree 都不在了 ⇒ §5 第 4 步剩下的只有**界面取证**（细则以 §5 第 4 步现量为准，旧版那句"要落的是一笔合并提交"划线作废） | `git branch -a --contains 776fc23c`（应含 `main` 与 `origin/main`）；`git branch --list feat/list-parent` 应为**空** |
 | 本条线层级判据（合并态现量） | 领域 **15** / 动作层 **10** / 共享层形状 **8** / web DOM 用例（那份 spec 合并态 **38** 条，含我这 6 条），全部 0 skipped；整包：i18n 22 / domain 881 / app-host 1081 / ui 493 / mobile 666 | `pnpm --filter @heyta/domain exec vitest run tests/project-hierarchy.spec.ts` 等；归属核对用"标记命中数合并前后逐处相同"（见 §3.3） |
 | 已知 **HEAD 级**红（不是本条线的，别代改） | ~~`@heyta/ui` `projects-model.spec.ts:96`：`toOrganizerTree` 多一个 `archived` 键~~ ⇒ ✅ **已被并行批次关掉**（把 `d27bccde` 合进本条线分支后 `@heyta/ui` **488 passed / 0 failed**）。登记留着是为了让下一个人在自己又看到它时知道这是同一件事的第几趟 | `pnpm --filter @heyta/ui test` |
 | 🔴 **HEAD 级门禁红（本条线不吸收）** | `check:l4`：`apps/web/src/features` 内联样式 **112 > 基线 104（+8）**，由并行批次那笔「总接线」`d27bccde` 带进来；红名单 19 个文件逐个不是本条线碰过的（本条线在 web 的落点 `ProjectsPanel.tsx` 内联样式 **0 处**） | `node scripts/check-l4-no-style.mjs` |
 | l4 棘轮 | 见 §0.5（阈值 ≤104/90，别名是 `check:l4` 不是 `check:l4-no-style`，见 §6） | `node scripts/check-l4-no-style.mjs` |
 
-⚠️ **接手第一件事**：`git status --porcelain` 02:0x 现量 **19 条**（源码面 `packages/ apps/ server/ scripts/` 只 **14 条**）。
-同一格的历史读数：**约 270 → 13 → 35（七分钟内涨）→ 19（一小时后又落回来）**
+⚠️ **接手第一件事**：`git status --porcelain` 02:3x 现量 **45 条**（源码面 `packages/ apps/ server/ scripts/` **36 条**）。
+同一格的历史读数：**约 270 → 13 → 35（七分钟内涨）→ 19 → 45**
 —— 这个数**两个方向都会动**，不是单调涨，所以它只能在动手那一刻重量。它决定三件事：
 闸门那条"别人未提交的源码"、④ 那笔合并的落点交集、以及 `reinstall:all` 会把谁的半成品装上四端。
 本仓库是**共享工作树**，`git commit`（裸）提交的是整个索引 ⇒ 永远点名路径提交。
