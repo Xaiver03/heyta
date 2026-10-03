@@ -1064,3 +1064,19 @@ export { isNoteDraftBlank } from './notes/model.js';
  * "删标签到底会不会动到已完成的任务"这个问题就会出现两个答案。
  */
 export { liveTaskCountsByTag } from './projects/model.js';
+
+/**
+ * ── 批次二 W6：日历的**第二个日期数据源**（倒数日 / 纪念日）──
+ *
+ * 🔴 **本块是追加的**（`index.ts` 是多写者共享文件，只许在末尾追加）。
+ *
+ * 转出的是"哪些格子有日子、那一行怎么写"；哪些天真的发生属于 `@heyta/domain`，
+ * 而 op 的构造属于 `@heyta/app-host`。宿主只许 `import` 这一份 ——
+ * web 与 mobile 各摊一遍的漂移形状是"面板说还有 12 天、日历那格画在明天"。
+ */
+export {
+  calendarEventBarTitle,
+  groupEventsByOccurrence,
+  type CalendarDayEvent,
+  type CalendarEventBarLabels,
+} from './calendar/model.js';
