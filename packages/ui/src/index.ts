@@ -943,3 +943,20 @@ export {
   type NoteEditorProps,
 } from './notes/NoteEditor.js';
 export { isNoteDraftBlank } from './notes/model.js';
+
+/**
+ * ── 详情面对齐 W5：**优先级 → 语义色 token 名，全仓唯一的一份** ──
+ *
+ * 🔴 **本块是追加的**（`index.ts` 是多写者共享文件，只许在末尾追加）。
+ *
+ * 这一刀搬的是「颜色」那一半，不是「文案」那一半：`packages/ui` 依赖不了
+ * `@heyta/i18n`（`MessageKey`），但已经依赖 `@heyta/domain`（`Priority`）。
+ * 之前那份"依赖不了 i18n ⇒ 整个文件都不能共享"的理由只挡住了标签，
+ * 却把颜色也一起留在了两个宿主里各写一遍 —— 逐字相同的两份，
+ * 而"复选框描边即优先级"正因为没人是它的唯一所有者而没落地。
+ * 理由与两边的分工表在 `task-list/priority-color.ts` 的文件头。
+ */
+export {
+  priorityColorToken,
+  type PriorityColorToken,
+} from './task-list/priority-color.js';
