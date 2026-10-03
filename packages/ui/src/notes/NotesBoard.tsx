@@ -65,7 +65,7 @@ import type { Note } from '@heyta/domain';
 import { Pin, PinOff, Plus, Trash2 } from 'lucide';
 import { HeytaIcon } from '../icon/Icon.js';
 import { useHeytaText, useHeytaTokens } from '../theme.js';
-import { NOTE_EXCERPT_LENGTH, toNoteRows } from './model.js';
+import { NOTE_EXCERPT_LENGTH, isNoteDraftBlank, toNoteRows } from './model.js';
 
 /** 面板全部文案，**每一项都由宿主注入**（见文件头）。 */
 export interface NotesBoardLabels {
@@ -231,7 +231,7 @@ export function NotesBoard({
    * 清空会让用户以为自己写的空格被当成了一张便签。
    */
   function submit(): void {
-    if (draft.trim() === '') return;
+    if (isNoteDraftBlank(draft)) return;
     onAdd(draft);
     setDraft('');
   }
@@ -257,10 +257,10 @@ export function NotesBoard({
         // 🔴 用**平铺** `aria-*`，不要用对象形态 `accessibilityState` / `accessibilityValue`：
         // RNW 0.21 会把对象形态**整个丢掉**（实测 `aria-checked` / `aria-valuenow` 都不出现），
         // 而 RN 0.71+ 两端都认平铺形态。判据见 `pnpm check:rn-aria`。
-          aria-disabled={draft.trim() === ''}
-          disabled={draft.trim() === ''}
+          aria-disabled={isNoteDraftBlank(draft)}
+          disabled={isNoteDraftBlank(draft)}
           onPress={submit}
-          style={[styles.addButton, draft.trim() === '' ? styles.addDisabled : null]}
+          style={[styles.addButton, isNoteDraftBlank(draft) ? styles.addDisabled : null]}
           testID="notes-submit"
         >
           <HeytaIcon data={Plus} size={tokens['icon.xs']} color={tokens['color.on-primary']} />

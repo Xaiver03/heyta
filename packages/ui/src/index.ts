@@ -927,3 +927,19 @@ export {
   type DatePickerLabels,
   type DatePickerQuickPick,
 } from './date-picker/DatePicker.js';
+
+/**
+ * ── 多端第二批（便签编辑链）：**"改一张便签的正文"只有这一个实现** ──
+ *
+ * 🔴 **本块是追加的**（`index.ts` 是多写者共享文件，只许在末尾追加）。
+ *
+ * "点开便签、什么都没改、点一下保存"在过去会推进 `updatedAt`，而 `updatedAt`
+ * 是列表排序的第二段 —— 那条 no-op 的闸门在 `@heyta/app-host#updateNoteContent`
+ * （写不写 op 是产品语义），这里只有视图和它的交互挡板。
+ */
+export {
+  NoteEditor,
+  type NoteEditorLabels,
+  type NoteEditorProps,
+} from './notes/NoteEditor.js';
+export { isNoteDraftBlank } from './notes/model.js';

@@ -2647,12 +2647,26 @@ B30 写这两段"不是再跑一遍就好的东西"，并各自给了闭合代�
 判据 ①（后台/锁屏仍投递）与 ③（force-stop 后仍投递）的路，代价是 `AndroidManifest.xml`
 要加 `POST_NOTIFICATIONS` 与精确闹钟权限。**这一句要产品负责人拍**，本 Goal 不动。
 
+✅ **2026-10-03 20:0x 现量：这句话已经被倒数纪念日那条线拍掉并落地了 —— 不是本条线做的。**
+`apps/mobile/android/app/src/main/java/com/heytamobile/reminder/{ReminderModule.kt,ReminderPackage.kt}`
+在位、`AndroidManifest.xml` 里 `POST_NOTIFICATIONS` **1 处**、契约新写了一份
+`docs/adr/0051-mobile-reminder-delivery.md`（AGENTS.md 那张批次表里 W9 原生投递已从「⛔ 停批」改成
+「✅ 已实现」）。本条线的**验收读数不代它们主张**（他们的日志我没跑）；
+矩阵 §3 那行「⛔ 永不响」我已就地加日期指针，原文留着。
+📌 对下一批有用的形式：禁令的前提（"只有三方库这条路"）现在被**第三个**自研模块坐实否证 ⇒
+「禁止手搓原生模块」这条若要继续留，得改写成立法意图（例如"通知/闹钟这类必须走 ADR + 设备判据"），
+否则它会一次一次被违反而没人报错 —— 这正是 §7.24 那条"登记不会替我发现"的同族。
+
 ## B34. AI 上移动端要拍的语义，与鸿蒙更硬的那条阻塞
 
 - AI：`classifyDestination` 只看端点 URL（`packages/ai/src/supply.ts:91-101`），
   **网络接口不在模型里** ⇒ "蜂窝算不算远程"在类型上目前无法表达。要拍的是
   "要不要为移动新增第四道按网络类型收紧的闸"。本 Goal 只做不依赖裁决的那半件
   （把 `check-ai-coverage.mjs` 改成按端枚举）。
+  ✅ **那半件已于 19:3x 落地**（门禁现在逐端打印 `web 5/5`、`mobile 0/5（显式登记的缺口）`，
+  而"半接即红"那条变异实测过了：临时塞 2 条探针 import ⇒ 精确点名缺的
+  `prioritize / duration-estimate / tool-calling` 三条并 `exit=1`；删掉 ⇒ `exit=0`）。
+  **出境语义那一句仍未拍**，所以移动端 AI 的功能一条都没接，这是拍板不是漏。
 - 鸿蒙：外部条件（模拟器镜像 + 签名）之外还有一条更硬的：**`@op-engineering/op-sqlite`
   官方不支持鸿蒙**（`docs/plans/multi-end-unified-strategy.md:1527`「鸿蒙壳最大风险点，仍未验」）
   ⇒ 买齐镜像与签名仍然造不出能用的壳。要人拍"选库还是自写存储驱动"。
@@ -2758,9 +2772,18 @@ web store 有。要补的是 composer 里的层级选择器 —— 它落在"com
 expect(labels.heatmap.grid({ total: 42, days: 365 })).toBe('');
 ```
 
-而那个文件的注释写着「一旦有人传了 activityDays，这条会先红」—— **它是有意的 tripwire，
-锁的就是"本端还没接热力图"这个状态**。判卷冻结在先，我没有翻它的权限
+而那个文件的注释写着「一旦有人传了 activityDays，这条会先红」—— ~~它是有意的 tripwire，
+锁的就是"本端还没接热力图"这个状态~~。判卷冻结在先，我没有翻它的权限
 （任务书唯一的例外是 `reminders-notes-display.spec.ts:261`）。
+
+⚠️ **2026-10-03 20:0x 复核：那句"会先红"是被否证的**（否证的是冻结文件注释里的因果，不是结论）。
+`:365` 只调 `growthBoardLabels(zh).heatmap.grid(...)` —— 它读的是**标签适配层**的输出，
+**从不读 `GrowthScreen` 传了什么 prop**（`apps/mobile` 下 `activityDays` 共 **9 处**命中：适配层注释 2（`growth-display.ts:276/278`）/
+屏幕自述 5（`GrowthScreen.tsx:61/68/70/75/311`）/ 这条判据自己 2（`growth-display.spec.ts:362` 标题 + `:364` 注释），
+**没有一处**在断言屏幕传了什么）。所以"传了 `activityDays` 这条会先红"不成立，
+它不是 tripwire，是一句**只对标签层生效的钉子**。
+**结论不变**：拦住的不是"传 prop"，是"给它一个诚实的名字"—— 见下面那段"为什么不绕"，
+那条理由不依赖这句被否证的因果。留原文是为了让后来者知道这句错在哪。
 
 🔴 **为什么不绕**：绕法是把 `grid` 从空串改成真句而不接线，或接线而让 `grid` 继续回空串。
 后者会让热力图**渲染出一块没有任何无障碍名的网格** —— 那恰好是那条判据要拦的假绿
@@ -2777,6 +2800,14 @@ expect(labels.heatmap.grid({ total: 42, days: 365 })).toBe('');
 `growth-display.spec.ts:302` 断言 `labels.streaks.repairAction` 是 `undefined`（注释：
 「移动端刻意不给 `freeze` / 两个 Action 按钮：退回纯文字（与迁移前一致）」）。
 所以本批只把**文案**接上、按钮不接。
+
+🔴 **20:0x 复核补一层机制取证 —— 这不是"判据拦我"，是"接了也不出现"**：
+共享组件 `packages/ui/src/motivation/HabitStreakList.tsx:269` 的渲染条件是
+`onRepair === undefined || labels.repairAction === undefined ? null : <Pressable …>`
+（**或**条件；`GrowthBoard.tsx:245` 只是把 `onRepair` 透传下去）。
+所以**只传 `onRepair`、标签仍是 `undefined`，那个按钮根本不会渲染**，界面上只会多一行提示文字，
+**而且不报错** —— 这正是 AGENTS §3.5 说的那种"零件都在、没人接线"的坏法换了个位置。
+要让按钮出现必须给 `repairAction` 一个真句子，而那正是 `:302` 钉成 `undefined` 的东西 ⇒ **仍然要翻冻结判据**。
 
 动作层**不是缺的**：`createHabitActions(host).checkIn(habitId, date)` 能补打历史日期，
 `HabitsScreen.tsx:372` 已经这么用了。所以 B42 的"最小一步"只有翻判据 + 传一个函数，
@@ -2836,3 +2867,204 @@ grep -c "推不出表名" packages/legal/tests/structure.spec.ts                
 ```bash
 pnpm --filter @heyta/app-host --filter @heyta/i18n --filter @heyta/ui --filter @heyta/mobile --filter @heyta/web typecheck   # EXIT=0
 ```
+
+## B47. `docs/research/trash-and-archive-best-practice.md:179` 那句「删习惯的入口本身未接」已被第三批否证 —— 但那份文件不在本条线地界内（2026-10-03）
+
+全仓扫 `HabitBoard.tsx:64` 这个引用时抓到的。那一行的现值：
+
+```
+| `HABIT` | ✅ | ❌ | ❌ | ❌ | ❌ | **删习惯的入口本身未接**（`HabitBoard.tsx:64`） |
+```
+
+**它现在是错的**：第三批（`192a516d`）之后两端都有删除入口，`HabitBoard.tsx` 里那句自述也已经
+在本轮连同这条一起改成"曾未接、现已接"。该文件属另一条线（回收站/归档）的调研台账，
+白名单没写它 ⇒ **不代改**，把一行改法留在这里给它的owner：
+
+- 最后一列改成：`**删习惯的入口已在两端接上**（2026-10-03 第三批；判据 apps/mobile/tests/organizer-rename.spec.ts 的习惯 describe）—— 但 HABIT 仍不进回收站面（本表前三列不变）`
+
+同一次扫描还看到 `.worktrees/detail-pane/…` 里有一份同名审计文档的旧副本 —— 那是别的检出，不动。
+
+## B48. 全量 `pnpm check` 本轮跑了 58 段全绿，**4 段主动不跑**：段1 build、段53/54/55 e2e（2026-10-03 19:0x）
+
+不是跑不动，是**跑下去会打断别人**：`check:ai-e2e` 的前置会 SIGKILL 占用 vite 端口的进程
+（traps #87），而此刻 `:3000` 上是并行会话的 e2e 栈（PID 80257，pidfile 对得上），
+Android 模拟器 `heyta-w3-yearly` 已经跑了 2h10m。段1 `pnpm build` 会重写 `packages/*/dist`，
+而判据读 dist（traps 里那条"变异共享包要 build 后再跑"是同一枚硬币）—— 在别人跑到一半时重写
+就是给对方造一个假红。
+
+**已跑到的读数**（逐段取真实退出码，段数硬门 = 62）：
+
+```
+SEG 2…26 全部 exit=0（静态段 50 条）        →  SUMMARY green=50 red=0 deferred=12 total=62
+SEG 3  exit=0 pnpm typecheck               →
+SEG 27 exit=0 check:macos-shell             SEG 28 exit=0 check:macos-window
+SEG 31 exit=0 check:windows-shell           SEG 32 exit=0 check:linux-shell
+SEG 47 exit=0 check:arkts                   SEG 61 exit=0 screenshot:verify
+SEG 62 exit=0 pnpm -r test
+（合计 58 段 exit=0，0 段红）
+```
+
+顺带 **B46 已解除**：`pnpm -r typecheck` 现在整链 exit=0（`packages/legal` 那 +117 行由它自己
+的 owner 补完了）。所以"全量 check 只剩 4 段没跑"这件事，卡的是**设备与端口窗口**，不是代码。
+
+## B49. `pnpm reinstall:all` 四端重装：本轮同样被设备占用挡住，且它比验收更具破坏性（2026-10-03）
+
+`reinstall:all` 的 android 段会 `adb uninstall` + 全新安装、ios 段会 `simctl uninstall`
+（traps #169 已因此加过"不许盲选目标"的约束）。**现在这台模拟器正被另一个会话用于它自己的
+验收** —— 我这边装下去，对方那一轮读到的就是被我换掉的产物。这属于"影响到别人"的动作，
+不是"我这边慢一点"的问题，所以**不硬跑**，等窗口或产品负责人指定顺序。
+~~`docs/research/multi-end-entry-coverage-audit.md` §3 里那两行"设备级截图未取证"因此还是 🟡。~~
+**这句 19:2x 就地更正**：盘上其实留着 17:20 那趟的两张真机截图（`android-notes-1-editor-open.png` /
+`android-notes-2-list-after-edit.png`），我之前按"没取证"记了 —— 因为我按**脚本第 12 步的整体判据**
+去推断"这张图存不存在"，而**没去 `ls` 那一步**。实际状态是"前两步有图、第三张（第 8 步 搜索点开便签）没有"，
+已按逐张说明写进审计 §3.2。**教训**：登记"未取证"之前先 `ls` 一遍目标目录 —— "整条没跑通"
+推出不了"一张都没有"，而后者的错代价是对外报缺、把已有的证据埋掉。
+
+**这两张凭什么算当前产物**（traps #27 要的就是这一条）：逐字节复现做不到（那枚 `app-release.apk`
+已被 19:07 并行会话的构建覆盖），能用的是三条 —— ① 便签链六个源文件最后写入都在 16:20–16:31，
+此后 `git diff HEAD` 逐字为空；② 这一趟的 needle 是 `note-e2e-171747`（17:17:47 起跑），
+比最后一次改动晚 46 分钟以上；③ 「编辑便签」那一屏由 `NoteEditScreen` + `NoteEditor` 渲染，
+这两个文件 16:21 之前不存在，**早于它们的构建画不出图 1 那个样子**。
+
+## B50. 任务书里两个门禁名**不存在**，而我用它们跑批量循环时 `-s` 把唯一的诊断吞掉了 ⇒ 两条假红（2026-10-03 19:2x）
+
+任务书 §任务 4 写「`check:payment-entry`、`check:pricing-consistency` 绿」，§现状 写
+`check-l4-no-style.mjs:155/162`。实测 `package.json` 的脚本名是 **`check:pricing`** 和 **`check:l4`**
+（`check-pricing-consistency.mjs` / `check-l4-no-style.mjs` 是**文件名**，不是脚本名）：
+
+```
+check:pricing-consistency NOT-A-SCRIPT
+check:l4-no-style         NOT-A-SCRIPT
+check:pricing             EXISTS
+check:l4                  EXISTS
+```
+
+**真正的坑是失败形状**（不是名字写错，名字写错谁都会）：
+
+```
+pnpm -s run check:pricing-consistency   → exit=1  bytes=0      ← 红，且零输出
+pnpm    run check:pricing-consistency   → exit=1  bytes=162    ← [ERR_PNPM_NO_SCRIPT] + "Did you mean …"
+```
+
+也就是说**加 `-s` 之后，"脚本名不存在"和"门禁真的判红"在输出上长得一模一样**（都是非零 + 空）。
+我那批循环正是 `-s` + 只打印末行，于是把**两条本来 exit=0 的门禁报成了红**，
+还差点按"HEAD 又被别人弄红了"去归因。改对名字后现量：
+`check:l4` exit=0（`apps/web/src/features 98 ≤ 104`、`apps/mobile/src/screens 90 = 90`）、
+`check:pricing` exit=0（价格四处一致）。
+
+**防法（写给自己的规矩，不改任何判卷文件）**：批量循环跑门禁前，先逐名 assert 它存在于
+`package.json`，不存在就**响亮退出**；循环里不要用 `-s`，或在非零时**把 stdout+stderr 全文贴出来**。
+建议入 `docs/reference/environment-traps.md`（与 #164「后台通知的 exit code 是包装命令的」同族：
+**退出码不属于你以为的那个东西**）—— 该文件不在本批地界内，**不代改**，留给它的 owner。
+
+⚠️ **一小时内我自己又犯了一次同一个错**（19:4x）：`node scripts/check-docs-link.mjs` → `exit=1`，
+而真实文件是 `research/tools/docs-link-check.mjs`（pnpm 名 `check:docs`）。这次运气好 —— 直接调 `node`
+所以 `MODULE_NOT_FOUND` 被原样打出来了，当场看穿，没有误判成"HEAD 又被人弄红"。**防法升级一句**：
+门禁的权威名只有一个来源 = `package.json` 的 `scripts` 键；跑之前用
+`node -e "console.log(require('./package.json').scripts['check:docs'])"` 取一次，**不要从记忆里拼名字或路径**。
+复跑读数：~~`check:docs exit=0`（✅ 无死链）~~、`check:docs-voice exit=0`（禁词表 30 项零命中）。
+
+🔴 **上面那个 `exit=0` 在 21:0x 被我自己复跑否证了**（划线留原句，别让它继续当依据）：
+此刻 `NO_COLOR=1 pnpm check:docs` → **exit=1**。而 **19:4x 那次它是真的 0** ——
+两者都是现量，差别不在判据、在**别人的工作树**：那二十多分钟里并行会话往 `docs/README.md`、
+`ui-review-fill-zh-timeline.md` 里追加了指向**自己还没 `git add` 的新文件**的引用
+（HEAD 版 `ui-review-fill` 2709 行 → 工作树 2996 行）。
+**可迁移的一句**：`check:docs` 这类"扫全仓文档"的门禁，读数属于**工作树时刻**而不属于提交，
+所以**上一句写的 exit 码必须带取证时刻**，否则下一批会拿它当 HEAD 的属性。
+逐条归属、三趟总数（27/32/33）与那 3 条 HEAD 上就红的在 **B51**，表在 goal 文档 §7.28 末尾。
+
+## B51. `check:docs` 第 34 段红：33 处里 3 处在 HEAD 上就成立，而 3 份涉事文件都不在本批地界内（2026-10-03 21:3x）
+
+**现象**：`NO_COLOR=1 pnpm check:docs` → exit=1，打印「发现 N 处本机有、仓库里没有的链接」。
+N 是活的：同一小时三趟 **27 / 32 / 33**。
+
+**逐条归属**（方法：对每一处问 `git show HEAD:<源文件>` 里还写不写这个目标 + `git ls-tree HEAD -- <绝对路径>` 空不空）：
+
+| 类 | 处数（三趟） | 归属 |
+|---|---|---|
+| 只在混合工作树成立 | 24 / 29 / 30 | 源文件全是 `M`（别人未提交的引用），目标全是别人**还没 `git add`** 的文件（`docs/adr/0046/0047/0048`、`docs/plans/trash-and-archive*.md`、`docs/research/performance-hotpaths-audit.md`——后者 HEAD 里连文件都没有） |
+| **HEAD 上就红** | **3（三趟相同）** | `docs/plans/detail-pane-alignment.md:4` → `calendar-year-time-and-mobile-profile.md`；`docs/research/detail-pane-alignment-and-spaced-review.md:101` → `trash-and-archive-best-practice.md` 与 `../plans/trash-and-archive.md`。**这三条的源文件工作树干净、HEAD 已跟踪** ⇒ 是"引用进了提交、目标文件漏了 `git add`"，CI 与干净检出上一样红 |
+| 本条线造成 | **0（三趟相同）** | `grep -c 'multi-end-entry-coverage-audit\|goal-multi-end-coverage\|0051-mobile-reminder'` 于日志 → 0 |
+
+**为什么不代改**：这 3 份文件（`docs/plans/detail-pane-alignment.md`、
+`docs/research/detail-pane-alignment-and-spaced-review.md`、以及被指的
+`calendar-year-time-and-mobile-profile.md`）**一个都不在本批白名单地界内**
+（白名单只有两份台账 md + 代码侧若干），改法是"把 0046/0047/0048/trash-and-archive 那批 add 进来"
+还是"把那三处引用改成纯文字"，取决于那两个 owner 有没有打算提交那些文件 —— 由我替他们选，
+要么替他们把半成品推进仓库，要么抹掉他们打算留的链接。**两条都是越权。**
+
+**给下一批的一句话**：这 3 条**不会**因为本条线交付而消失，`pnpm check` 的第 34 段在 HEAD 上就是红的；
+谁接手谁要么 add 目标、要么改引用，别把它算进"本批欠的债"。
+
+🔴 **顺带两条探针纪律**（都是这一条量出来的，写进 goal §7.28）：
+① **判死链归属要用链接整串，不能用 basename** —— 目标叫 `README.md` 时按名字在 HEAD 里 grep 命中 6 行，
+探针判它"HEAD 上就红"，实际 HEAD 版那份文件只有 2709 行、引用在未提交的 2737 行；
+② 反向的坑：按**解析后的绝对路径**去 grep，而文档里写的是相对串 `](../../apps/web/…)`，
+0 命中会被误读成"HEAD 没引用"。**零命中要先确认 needle 的形状和被扫文本的形状一致。**
+
+
+## B52. 「清单父子层级选择器」：~~改父的写动作在 app-host 里根本不存在~~ ⇒ 更正为**接口面上没有，但通用的 payload 派发是现成的**；真缺的是两端界面 + 跨端形态裁决（2026-10-03 21:5x 实测，22:0x 自我更正）
+
+**为什么它挡着审计矩阵那一行翻 ✅**：那一行写的是「清单/标签 **改名**、**父子**、**归档**」，
+本批把改名与归档两端都接了（判据 `apps/mobile/tests/organizer-rename.spec.ts` 26 passed），
+**留 🟡 的就是"父子"这一项**。我这一轮把它查到底，结论是它**不属于本 goal 的前提**
+（本 goal 的前提是"零件都在、没人接线"）。
+
+**三条现量**（都在仓库根跑，第二条带阳性对照）：
+
+```bash
+# ① ProjectActions 到底有几个动作
+awk '/^export interface ProjectActions/,/^}/' packages/app-host/src/project-actions.ts \
+  | grep -oE '^  [a-zA-Z]+\(' | tr -d ' ('
+#   → createProject / renameProject / setProjectColor / archiveProject / removeProject
+#     ~~🔴 没有任何一个能改已存在清单的父~~
+#     🔴 **接口面（ProjectActions）上确实没有改父的方法**，但我上面那句"没有任何一个能改父"**说满了**，
+#        被自己下一趟探针否证：同文件 `:165` 有一个**模块内私有**的
+#        `const updateProject = async (entityId, payload: Record<string, unknown>)`
+#        —— 它校验实体存在、直接 `dispatch({entityType:'PROJECT', opType:Update, payload})`，
+#        **payload 是开放的**。rename / setColor / archive 三个动作都是它的一行包装
+#        （`:209` `{name}`、`:225` `{color}`、`:230` `{archived}`）。
+#        ⇒ 缺的是**接口上一个同样形状的包装**，不是"一条新的写路径"。成本比我下面写的低。
+
+# ② 精确名找"改父"的动作（阳性对照：任务侧同一条命令查 setParent，命中 3）
+grep -rnw -e setProjectParent -e moveProjectToFolder -e reparentProject -e setParentProject \
+  packages apps --include='*.ts' --include='*.tsx' | grep -v '/dist/' | wc -l   # → 0
+grep -rnw setParent packages/app-host/src --include='*.ts' | wc -l               # → 3（对照有效）
+
+# ③ createProject(name, parentId?) 那个第二参，有没有界面路径把它喂进来
+grep -rn 'createProject(' apps/web/src apps/mobile/src | grep -v '/dist/'
+#   → web: store.ts:69  createProject(name, parentId)   ← store **转发了自己的形参**，不是它决定父
+#     mobile: TaskDetailSheet.tsx:608 / ListsSection.tsx:167   ← 两处都只传 name
+grep -rn 'addProject(' apps/web/src --include='*.tsx'
+#   → 唯一调用点 ProjectsPanel.tsx:200  void projects.addProject(draft);   ← **一个参数**
+#   ⇒ 全仓没有任何一条**界面路径**能给出父清单（store 那层是管道，不是决策者）
+
+# ④ 清单侧有没有现成的嵌套守卫（任务侧有，清单侧没有）
+grep -rnw -e isFolder -e projectDepth packages/domain/src packages/app-host/src --include='*.ts' | wc -l
+#   → 0（两个名字都 0 命中）；`cycle` 6 命中**全在任务侧** subtasks/actions，与 PROJECT 无关
+#   ⇒ 新的 `setParent` 包装**必须自带守卫**（一层文件夹、不许指向自己/自己的子、不许形成环）
+```
+
+⚠️ **第②条差点把我骗过去**：我第一趟用 `grep -rn 'moveProject'` 找"移动清单"，命中 **13 行**，
+看起来像"动作存在、只是没人接"。而那 13 行全是 **`removeProject`** —— `moveProject` 是它的子串。
+**needle 要用词边界（`-w`）或带前导点，零命中还要挂一条同形阳性对照**，否则"不存在"会被误报成"存在"，
+反过来"存在"也会从"不存在"里误报出来。
+
+**所以"父子"缺的不是新写路径，是两样**：① `ProjectActions` 上一个 `setParent(entityId, parentId?)`
+包装（照 `archiveProject` 的形状写，三行，走同一个 `updateProject`，一个意图 = 一个 op）
+**+ 环/深度守卫**（任务侧 `setParent` 已经有现成的守卫可以对照：`actions.ts:613-625` 先判 `verdict` 再写）；
+② **两端的选择器界面 + 词条**（这一层才是真工作量，而且 web 同样没有）。
+**跨端形态是产品裁决**：移动端单方做出嵌套、桌面端仍是平铺，我不能替领导拍这个板。
+
+🔴 **这一条把我自己上一版的结论改小了，也把"下一批的成本"改小了**：我原先写的是
+"要新增共享写动作 = 一条新的写路径"，读起来像要动领域层与线协议；实测是
+**payload 通道本来就是开放的，只差接口上一个包装**。
+**教训一句**：判"某个写动作不存在"时，光列接口方法名不够 —— 还要看接口后面那个通用派发器
+有没有被别的动作共用（共用了就说明通道是现成的，缺的只是门面）。
+
+**领域层已经把设计钉死了**（`packages/domain/src/entities.ts:270-277`）：
+`parentId` 可选、**只允许一层文件夹 + 其下清单，不支持任意深度嵌套**（避免循环引用与深度查询）。
+⇒ 下一批真要做，守卫的形状是现成的，不必重新设计。
+
+**本批不做**：地界内能做的（改名/归档两端）已全部做完并带判据；这一项要新增共享写动作 + 双端界面，
+且跨端形态待裁决。**那一行因此留 🟡，不是"本批漏做"**。
