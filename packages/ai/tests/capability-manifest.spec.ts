@@ -57,6 +57,7 @@ interface GeneratorModule {
   DENOMINATOR_EXCLUSIONS: readonly { entityType: string; reason: string }[];
   NON_ENTITY_VIEWS: readonly string[];
   SYSTEM_ENTITY_TYPES: readonly string[];
+  TOOL_ENTITY_OVERRIDES: Readonly<Record<string, string>>;
   attributeToolByName: (name: string) => { entityType: string | null; how: string | null };
   buildCapabilityManifest: (input: unknown) => FixtureManifest;
   renderModelText: (manifest: unknown) => string;
