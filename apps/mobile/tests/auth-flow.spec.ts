@@ -25,7 +25,7 @@ import {
   forgetSignedInUser,
   saveAuthSession,
 } from '../src/auth/session';
-import { readSyncConfig, clearSyncConfig } from '../src/sync/config';
+import { readSyncConfig, clearSyncConfig, writeSyncConfig } from '../src/sync/config';
 import {
   hasSeenWelcome,
   markWelcomeSeen,
@@ -156,6 +156,33 @@ describe('saveAuthSession', () => {
   it('口令为空时**不写** password 字段（那是"没填"，不是"空口令"）', () => {
     saveAuthSession({ serverUrl: 'http://x', token: 'tok', password: '', email: 'a@b.c' });
     expect(readSyncConfig()).toEqual({ serverUrl: 'http://x', token: 'tok' });
+  });
+
+  it('只在同一 server/token 会话内继承 accountId，换凭据或端点必须重新绑定', () => {
+    saveAuthSession({
+      serverUrl: 'https://one.example.test',
+      token: 'token-a',
+      password: 'pw',
+      email: 'a@b.c',
+      accountId: 'account-a',
+    });
+
+    // Password edits are not an authentication-session change.
+    writeSyncConfig({ serverUrl: 'https://one.example.test', token: 'token-a', password: 'new-pw' });
+    expect(readSyncConfig()?.accountId).toBe('account-a');
+
+    writeSyncConfig({ serverUrl: 'https://one.example.test', token: 'token-b', password: 'new-pw' });
+    expect(readSyncConfig()?.accountId).toBeUndefined();
+
+    saveAuthSession({
+      serverUrl: 'https://one.example.test',
+      token: 'token-b',
+      password: 'new-pw',
+      email: 'a@b.c',
+      accountId: 'account-b',
+    });
+    writeSyncConfig({ serverUrl: 'https://two.example.test', token: 'token-b', password: 'new-pw' });
+    expect(readSyncConfig()?.accountId).toBeUndefined();
   });
 
   it('清除凭据后邮箱也忘掉（不许留下"已登录"的假象）', () => {

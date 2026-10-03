@@ -420,7 +420,9 @@ export const adminRoutes = async (fastify: FastifyInstance): Promise<void> => {
         data: { lockedUntil: null, failedLoginAttempts: 0 },
         select: { id: true, email: true },
       });
-      Logger.info(`Admin unlocked user #${String(user.id)} (${user.email})`);
+      // 日志里不落邮箱：GDPR 下这是可识别个人信息，而日志既没有脱敏也没有到期删除机制
+      // （隐私政策自己就写着这句）。审计要的是"谁被解锁了"，userId 足够定位。
+      Logger.info(`Admin unlocked user #${String(user.id)}`);
       return reply.send({ ok: true, user });
     } catch (err) {
       // Prisma 的 P2025 = 记录不存在。这是预期结果（并发删除 / 手输错 id），
@@ -490,7 +492,9 @@ export const adminRoutes = async (fastify: FastifyInstance): Promise<void> => {
         data: { tokenVersion: { increment: 1 } },
         select: { id: true, email: true, tokenVersion: true },
       });
-      Logger.info(`Admin forced logout of user #${String(user.id)} (${user.email})`);
+      // 同上：强制登出的审计行不落邮箱明文（`admin-log-pii` 门禁会红，见
+      // `server/tests/admin-log-pii.spec.ts`）。
+      Logger.info(`Admin forced logout of user #${String(user.id)}`);
       return reply.send({ ok: true, user });
     } catch (err) {
       if (typeof err === 'object' && err !== null && (err as { code?: string }).code === 'P2025') {

@@ -142,6 +142,10 @@ describe('1. 口令登录成功必须真的接上同步配置', () => {
     // 🔴 这一行是"界面说成功、功能也接上"的唯一判据：删掉 applyAuthSession 就红。
     expect(useSyncStore.getState().token).toBe(SESSION.token);
     expect(useSyncStore.getState().baseUrl).toBe(BASE_URL);
+    // Vault mode must bind to the authenticated account id, never to a device id
+    // or an email that can change.  This is the production handoff that selects
+    // the account/server-scoped opaque key-package session.
+    expect(useSyncStore.getState().accountId).toBe(String(SESSION.user.id));
   });
 
   it('请求打到 /api/login/email-password，方法 POST', async () => {
