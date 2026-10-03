@@ -190,3 +190,11 @@ scripts/.*.snap.*
 # `e2e/playwright.password-web.config.ts` 的 outputDir。第 66 行那条 `test-results/`
 # 挡不住它 —— Playwright 的跑批输出跟着 outputDir 改名，每改一次就要在这里多一行。
 e2e/password-web-results/
+
+# 调查探针与运行残留，勿提交（2026-10-03 收口）
+/tmp/
+e2e/_probe/
+e2e/playwright.probe.config.ts
+e2e/vault-results/
+.vitest/
+tmp-commit-plan.sh
