@@ -1192,3 +1192,59 @@ grep -cE '^[0-9]+\. ' docs/reference/environment-traps.md
 
 ⇒ 新条目落地时**必须在主检出现量重取**，别拿这两个数中的任何一个直接当"下一个号"。
 另外 §15.3 记的 #38/#93/#94/#95 四处重号也一并处理。
+
+### 15.8 落地那一刻 main 又前进了，所以"落地"从快进变成一次带对账的合并（2026-10-03 18:2x 现量）
+
+§15.6 ③ 那句"是 main 的后代 ⇒ 快进"到 18:1x 过期：并行会话又往 main 落了一笔
+`192a516d`（清单/标签/习惯的改名与删除，两端界面 + `packages/app-host` 动作层 + i18n 词条）。
+现量 `git rev-list --left-right --count main...载体` = **`1 40`**。
+所以顺序换成：**先把 main 并进本线 → 全链复跑 → 重装 → 再快进 main**。
+
+**并之前先做零风险预演**：`git merge-tree --write-tree HEAD main`（不动工作树）回一棵 tree、
+**零冲突**；两侧改动文件集合的交集**只有** `packages/i18n/src/locales/{zh-CN,en}.ts`
+（`comm -12` 于 `git diff --name-only main...HEAD` 与 `git show --name-only 192a516d`）。
+
+**交集那份必须逐条对账 —— "没冲突"挡不住重复键静默取后者**，那是 git 看不见、只有语义层知道的失败形状：
+
+| 参照点 | zh 键数 | en 键数 | 重复键 | 单边键 |
+|---|---:|---:|---:|---:|
+| 本线 `a1ef4d9a` | 2850 | 2850 | 0 | 0 |
+| 对方那笔 `192a516d` | 2841 | 2841 | 0 | 0 |
+| 预演那棵 tree `b08b020c` | 2860 | 2860 | 0 | 0 |
+
+算术闭合：`2850 + 10 = 2860` 且 `2841 + 19 = 2860` ⇒ 两边新增**都在**，没有一条被顶掉。
+旁证用别人写的门禁而不是我自己的解析器：`pnpm check:ui-language` 自己打印
+"词条表 zh-CN 2850 条 / en 2850 条"，与本线读数逐字相等。
+⚠️ 我第一版正则写成 `^(?:'[^']+')\s*:`，**漏了闭合引号** ⇒ 三个参照点**全部 0 命中**。
+"三份都是 0"看着最干净，其实是探针坏（§7 元规则 1）。
+
+**合并落地 = `b6294ef0`**（父 `a1ef4d9a` + `192a516d`），三条核对全过：
+合并后的 tree **与预演那棵 `b08b020c` 逐字节相同**；合并后 `git status --porcelain` 为空；
+合并态 i18n 再量一次 **2860 / 2860，重复 0、单边 0**。
+
+**五条红线在合并态复测**（读本体，不是转述"门禁没红"）：合并 delta 的 19 个文件里
+**没有一条住在隐私路径上** —— 命令与判读：
+
+```bash
+git diff --name-only a1ef4d9a b6294ef0 | grep -E "packages/(ai|local-api|app-host)/src|shared-schema|credential"
+```
+
+`CURRENT_SCHEMA_VERSION = 1` 未 bump（`packages/shared-schema/src/schema-version.ts:36`）；
+`host.submit(` 的**非测试调用点恰好 2 处**（`packages/app-host/src/ai-tool-run.ts:195` 走用户确认、
+`packages/local-api/src/server.ts:545` 是入站那两条中的一条，按 ADR-0011 逐工具授权）——
+其余命中全在注释与表格里，按调用形状数不进去；`retention-undecided` 抛出点 4 处
+（`packages/ai/src/supply.ts`，`managed` 仍被挡着）、`fallback-needs-consent` 6 处
+（回退不跨越隐私边界那条仍在）、逐工具默认关的判定仍在 `packages/local-api/src/tools.ts:338`
+（`grants?.[toolName] === true` —— 没写进授权表就是不给）。
+载体上单跑的便宜门禁：`check:ai-coverage` / `check:ai-tools` / `check:layering` / `check:ui-language` 全 rc=0。
+
+**顺带查出三处文档漂移（属 `AGENTS.md`，按 §8 要用户点头才改，只登记不代改）**：
+`AGENTS.md:35` 把 `packages/app-host` 的 AI 工具路径列成两个文件，树上是**三个** ——
+多出的 `ai-tool-call.ts` 是"**模型路径单步调用**"那一层，它的文件头钉的是顺序：
+先 `resolveToolSelection()`（纯规则、本机、零出境），只有规则给 `no-match` / `ambiguous`
+才把话发给模型。漏列它的代价不是排版，是那句"能在本机定下来的事不送端点"在地图上找不到落点；
+`AGENTS.md:37` 的 `packages/local-api/`
+那行没提工具目录**已按实体拆包**（`src/tools/` 现在 11 个文件）；
+`AGENTS.md:295` 那句"当前 2592 个通过 + 12 个跳过"实际是 **7839 / 12**（§15.6 ①b 的现量命令同一条）。
+
+全链与四端重装的读数在 §15.9（下一条提交，等那两趟跑完填数）。
