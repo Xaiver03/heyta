@@ -78,6 +78,14 @@ interface FixtureManifest {
   coverage: { covered: number; denominator: number; ratio: string };
   userOperableEntityTypes: readonly string[];
   entityTypesWithoutTools: readonly string[];
+  entities: readonly {
+    entityType: string;
+    materialized: boolean;
+    countsTowardCoverage: boolean;
+    coverage: 'read-write' | 'read-only' | 'write-only' | 'none';
+    readToolNames: readonly string[];
+    writeToolNames: readonly string[];
+  }[];
   tools: readonly {
     name: string;
     kind: string;
