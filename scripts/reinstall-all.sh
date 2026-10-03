@@ -99,21 +99,34 @@ PNPM="$(resolve_pnpm)"
 #    这不是新发现：壳自己的代码（`HeytaMacApp.swift` 的 `captureAndExit` 注释）写着
 #    "**WebView 的内容没合成进窗口**是这台机器上的**常态**"，并规定两份产物各证一件事：
 #    窗口截图证"有一个真的 macOS 窗口"，`OUT.webview.png` 证"那份共享 UI 真渲染了"。
-#    ⇒ 主蓝必须数**第二个参数**那张（WebView 快照），非空白/透明仍数窗口截图。
+#    ⇒ 主蓝必须数**第二个参数**那张（WebView 快照）。
+# 🔴 第四轮实测（2026-10-03）：原句"非空白/透明**仍数窗口截图**"是**错的**，当场把它
+#    照成假红 —— mac 段打包验证里窗口截图 13 KB / 内容 0.0% ⇒ 🔴 疑似空白，
+#    而同一秒的 WebView 快照是完整真界面（主蓝 1269，人眼看过）。
+#    反向也实测过：09-30 的窗口截图 205/206/272 KB、内容 ~100%，判据放行了，
+#    可那三张里主蓝是 4/17/0 —— 放行的是壳自己的暗底 + 一行诊断字。
+#    ⇒ 窗口合成既会**假红**（没合成 = 空白）也会**假绿**（自家底 = 非空白），
+#    "画没画出来"这个问题只能压在 WebView 快照上；窗口图只负责"是不是真窗口"
+#    （透明/标题/尺寸）。没有快照时才退回窗口图当内容载体。
 # 用法：shot_ok <窗口 png> [webView png]；输出 ✅/🔴 行。
 shot_ok() {
   node - "$1" "${2:-}" <<'JS'
 import('./scripts/screenshots/png-stats.mjs').then((m) => {
   const st = m.inspectPng(process.argv[2]);
+  const brandShot = process.argv[3] || process.argv[2];
+  const cs = brandShot === process.argv[2] ? st : m.inspectPng(brandShot);
+  const base = (p) => p.split('/').pop();
   let bad = false;
   if (st.hasTransparency) { console.log('  🔴 含实际透明像素'); bad = true; }
-  if (m.looksBlank(st)) { console.log('  🔴 疑似空白'); bad = true; }
-  const brandShot = process.argv[3] || process.argv[2];
+  if (m.looksBlank(cs)) { console.log(`  🔴 疑似空白（数的是 ${base(brandShot)}）`); bad = true; }
+  if (cs !== st && m.looksBlank(st)) {
+    console.log(`  ⚠️ 窗口截图内容 ${(st.contentRatio * 100).toFixed(1)}% —— 本机常态：WebView 没合成进窗口，不据此判红`);
+  }
   const blue = m.countBrandBlue(brandShot);
-  console.log(`  主蓝采样命中 ${blue}（数的是 ${brandShot.split('/').pop()}）`);
+  console.log(`  主蓝采样命中 ${blue}（数的是 ${base(brandShot)}）`);
   if (blue < 20) { console.log('  🔴 截图里没有 heyta 主蓝 —— 是错误屏/别的界面，不是共享 UI'); bad = true; }
   if (bad) process.exit(1);
-  console.log(`  ✅ 截图 ${st.width}x${st.height}、内容占比 ${(st.contentRatio * 100).toFixed(1)}%、主蓝命中 ${blue} —— 是共享 UI`);
+  console.log(`  ✅ 窗口 ${st.width}x${st.height}、${base(brandShot)} 内容占比 ${(cs.contentRatio * 100).toFixed(1)}%、主蓝命中 ${blue} —— 是共享 UI`);
 }).catch((e) => { console.log(`  🔴 读不了截图：${e.message}`); process.exit(1); });
 JS
 }
@@ -298,11 +311,28 @@ if printf '%s' "$WANT" | grep -q "ios"; then
   RESULT_ios=FAIL
   UDID="$(xcrun simctl list devices 2>/dev/null | grep Booted | grep -F "$DEVICE_NAME" \
     | head -1 | sed -E 's/.*\(([0-9A-F-]{36})\).*/\1/')"
-  [ -n "$UDID" ] || UDID="$(xcrun simctl list devices 2>/dev/null | grep Booted \
-    | head -1 | sed -E 's/.*\(([0-9A-F-]{36})\).*/\1/')"
+  # 🔴 原来这里退化成"随便挑第一台已启动的模拟器"。这一段的下一个动作就是
+  #    `simctl uninstall` —— 一台**别人项目的**设备会被静默卸掉 App。
+  #    本机实测三台同时 Booted：heyta-iphone-17pro / iPhone Duo heyta / SSOS-Duo-Fresh，
+  #    而默认名 "iPhone 17 Pro" 一个都不匹配（真名用连字符小写），所以**每次**都走盲选。
+  #    现在：只有一台时才认它；多于一台且名字不匹配 ⇒ 响亮失败并把候选打出来。
   if [ -z "$UDID" ]; then
-    echo "  🔴 没有已启动的模拟器 —— 先 xcrun simctl boot \"$DEVICE_NAME\""
-  else
+    BOOTED="$(xcrun simctl list devices 2>/dev/null | grep Booted | sed 's/^ *//;s/ *(Booted)//')"
+    BOOTED_N=$(printf '%s\n' "$BOOTED" | grep -c .)
+    if [ "$BOOTED_N" = "1" ]; then
+      UDID="$(printf '%s\n' "$BOOTED" | sed -E 's/.*\(([0-9A-F-]{36})\).*/\1/')"
+      echo "  ⚠️ 名字含 \"$DEVICE_NAME\" 的模拟器没有已启动的，但**只有一台**已启动 ⇒ 用它：$BOOTED"
+    elif [ "$BOOTED_N" -gt 1 ]; then
+      echo "  🔴 有 $BOOTED_N 台已启动模拟器，且没有一台名字含 \"$DEVICE_NAME\" —— **不猜**（这一段会 simctl uninstall）"
+      # ⚠️ 候选一行一个：`printf '%s | ' $BOOTED` 会按空格拆词，把 "iPhone Duo heyta"
+      #    打成三个"候选"，而照它填 IOS_DEVICE_NAME 就永远匹配不上。
+      printf '%s\n' "$BOOTED" | sed 's/^/     候选: /'
+      echo "     要跑这一端：IOS_DEVICE_NAME=\"<候选里的准确名字>\" bash scripts/reinstall-all.sh --only ios"
+    else
+      echo "  🔴 没有已启动的模拟器 —— 先 xcrun simctl boot \"$DEVICE_NAME\""
+    fi
+  fi
+  if [ -n "$UDID" ]; then
     echo "  模拟器：$UDID"
     # 🔴 Pods 沙盒必须先与**提交态的 Podfile.lock** 同步，否则 xcodebuild 第一步就死在
     #    "[CP] Check Pods Manifest.lock"：`error: The sandbox is not in sync with the Podfile.lock.`
