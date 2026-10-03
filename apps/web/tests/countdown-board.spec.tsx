@@ -209,6 +209,24 @@ describe('EventBoard（W5 卡片网格与二级操作）', () => {
     expect(past?.getAttribute('style') ?? '').toContain('color');
   });
 
+  it('②b 🔴 过期那张仍然说得出"是哪一天"（没有下一次 ⇒ 落回锚点，不是整行不画）', () => {
+    // 这条是**看截图**照出来的：真浏览器里未逾期那张有"11月1日 星期日"，
+    // 逾期那张只有"已经 31 天"，日期那一整行没了 —— 用户无法核对它记的是哪天。
+    // 断言不写死星期几（那会是第二套事实源），只钉"这一行在、且是那一天"。
+    const { el } = render({
+      events: [ev({ id: 'future', date: '2026-12-31' }), ev({ id: 'past', date: '2026-01-01' })],
+    });
+    const futureDate = byTestId(el, 'event-date-future');
+    const pastDate = byTestId(el, 'event-date-past');
+    expect(futureDate, '未逾期那张必须有日期行').not.toBeNull();
+    expect(pastDate, '逾期那张也必须有一行日期').not.toBeNull();
+    expect(futureDate?.textContent ?? '').toContain('12月31日');
+    expect(pastDate?.textContent ?? '').toContain('1月1日');
+    // 阳性对照：两行不是同一个空串，也不是同一句话。
+    expect((pastDate?.textContent ?? '').trim().length).toBeGreaterThan(0);
+    expect(pastDate?.textContent).not.toBe(futureDate?.textContent);
+  });
+
   it('③ 筛选档位是 5 个，且没有「节假日」（§2.2：它不是用户实体）', () => {
     const { el } = render();
     const filters = [...el.querySelectorAll('[data-testid^="event-filter-"]')].map(
