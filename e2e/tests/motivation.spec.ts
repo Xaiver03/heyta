@@ -50,11 +50,14 @@ import { installMissingProducerShims } from './shims';
 // 🔴 2026-09-29：视图切换从**顶栏一行**搬进了**侧栏**并**分成两组**
 //（`dida-view-unification.md` §4.4：顶栏在 1280px 下只能完整显示 5/8）。
 // 顺序随之改变：主视图（任务/四象限/习惯/时间线）在前，低频的（番茄钟/成长/便签/回收站/设置）在后。
-// ⚠️ rail 上 11 个入口、tablist 里 **10 个** —— 「设置」收进头像菜单，不是 tab。
-// `smoke.spec.ts:27` 断言的同样是 `toHaveCount(10)`，两处必须一起改。
+// ⚠️ rail 上 12 个入口、tablist 里 **11 个** —— 「设置」收进头像菜单，不是 tab。
+// `smoke.spec.ts:27` 断言的同样是 `toHaveCount(11)`，两处必须一起改。
 // 🔴 「搜索」排在**上段最后一个**（滴答的 rail 就是这样）：
 // 它常驻不给关，位置在全部视图之后、下段工具之前。
-const TABS = ['任务', '日历', '四象限', '习惯', '时间线', '番茄钟', '成长', '便签', '搜索', '回收站', '设置'] as const;
+// W5 的「倒数纪念日」是**模块视图**，所以它进 `MODULE_VIEW_TABS` 的末尾 ⇒
+// 顺序上紧跟「便签」之后、落在「搜索」之前（`view-tabs.ts` 的
+// `VIEW_TABS = [...ALWAYS_ON, ...MODULE, SEARCH, ...TOOLS, SETTINGS]`）。
+const TABS = ['任务', '日历', '四象限', '习惯', '时间线', '番茄钟', '成长', '便签', '倒数纪念日', '搜索', '回收站', '设置'] as const;
 type Tab = (typeof TABS)[number];
 
 /**
@@ -73,6 +76,7 @@ const TITLED = [
   '时间线',
   '成长',
   '便签',
+  '倒数纪念日',
   '搜索',
   '回收站',
   '设置',
@@ -130,9 +134,9 @@ test.describe('激励体系：真浏览器契约', () => {
     await openApp(page);
 
     const tabs = page.getByRole('tab');
-    // 🔴 **10 而不是 11**：十一个入口里「设置」收在**头像菜单**（它是低频配置，
-    // 不是"去哪看"），所以它不在 tablist 里。其余 10 个都在。
-    await expect(tabs).toHaveCount(10);
+    // 🔴 **11 而不是 12**：十二个入口里「设置」收在**头像菜单**（它是低频配置，
+    // 不是"去哪看"），所以它不在 tablist 里。其余 11 个都在。
+    await expect(tabs).toHaveCount(11);
 
     const labels = (await tabs.allTextContents()).map((t) => t.trim());
     expect(labels, '标签的顺序与文案都必须与 VIEW_TABS 逐字一致（少了「设置」）').toEqual([
@@ -295,6 +299,8 @@ test.describe('激励体系：真浏览器契约', () => {
     番茄钟: 'focus-ring',
     成长: 'growth-board',
     便签: 'notes-board',
+    // W5：共享 `EventBoard` 在 web 宿主上的根 testID（`CountdownView.tsx` 传的）。
+    倒数纪念日: 'countdown-view',
     搜索: 'search-panel',
     回收站: 'trash-board',
     设置: 'settings-sheet',
