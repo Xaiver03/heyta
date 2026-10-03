@@ -21,6 +21,7 @@ vi.mock('../src/db', async () => {
   const { Prisma: PrismaModule } = await import('@prisma/client');
 
   const createTxMock = () => ({
+    vaultKeyPackage: { findUnique: vi.fn().mockResolvedValue(null) },
     operation: {
       create: vi.fn().mockImplementation(async (args: any) => {
         if (state.operations.has(args.data.id)) {
