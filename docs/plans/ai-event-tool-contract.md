@@ -2943,3 +2943,61 @@ If you are running pnpm in CI, set the CI environment variable to "true", or set
 
 
 
+
+## 15.43 ① 的落地这一半做完了；顺带撤回一根我自己写的探针（它把"交集 4"读成 0）（10-04 02:0x–02:2x，落地载体 `de296b9d`）
+
+**落地成事实**：主检出 02:06:07 的 reflog 是 `merge integrate/2026-10-03-closeout: Fast-forward`，现量三条源分支都是 main 的祖先：
+
+```bash
+for b in feat/ai-entity-coverage feat/assistant-history-local-persistence integrate/2026-10-03-closeout; do
+  git merge-base --is-ancestor "$b" main && echo "IN $b"; done   # 三条都 YES
+```
+
+本批的代码在 main 里逐枚 `git show main:<路径>` 取到：`scripts/check-ai-coverage.mjs`、
+`packages/app-host/src/ai-tool-selection.ts`（`list_events` / `get_event` / `create_event` 的选取规则）、
+`apps/web/src/features/ai/assistant-history.ts`（D-4(i) 的本机持久化）、`packages/app-host/src/ai-tool-run.ts` 的批量提案（W11）。
+`check:ai-coverage · check:ai-tools · check:legal-tools · check:ai-quota · check:privacy-consent-e2e` 五段现量都还在 `pnpm check` 的串里
+（段数以 `node -e 'process.stdout.write(String(require("./package.json").scripts.check.split("&&").length))'` 现取为准；18:2x 量到 **74** —— 目标文本里那句"HEAD 上 61 段、工作树 62 段"已经过期，见 §15.42 同族的"报段数必须带载体"）。
+
+**没有吞别人的改动**：落地那一刻挡路的交集是 **4** 枚（`PROGRESS.md`、`apps/web/tests/local-data-destruction.spec.ts`、
+`apps/web/tests/sync-reason-coverage.spec.ts`、`scripts/verify-mobile-auth.sh`），其中别人那三枚由**所有者自己在 02:05:55 提交**（`258813a8`）之后交集才归零。
+我没有 stash、没有 `--no-verify`、没有替谁提交一个 hunk，也没有动 main 的共享索引。
+
+🔴 **撤回一条我自己的探针缺陷，并把它记成判据**：第一次算交集我用的是
+
+```bash
+git status --porcelain=v1 | sed 's/^\s*[MADR?]*\s*//'   # 🔴 BSD sed 不认 \s ⇒ 前缀根本没剥掉
+```
+
+于是"更新集 ∩ 脏集合"报 **0** —— 而那正是我的放行条件，我差点据此宣布"窗口开、可以落"。
+改用位置确定的 `cut -c4-`（porcelain v1 的第 1–2 列是状态码、第 3 列是空格）之后，同一棵树现量是 **4**。
+⇒ **"交集=0"这类空集读数在被当成放行条件之前，必须先喂一条必然命中的对照**（这里就是拿已知脏的那枚文件名走同一根管道，看它活不活）。
+这与 `land.sh` 里那根 `sed 's/^...//'`（按位置剥，正确）不是同一根探针；B65 那趟"11→0"用的是按位置的写法，本节不据我这轮的失败去推翻它 —— 只提醒后来者：**空集最像干净，也最可能是探针没跑**。
+
+**五条隐私不变量在落地载体上的源码级复核**（都是读代码本体，不依赖任何一趟跑过的读数）：
+
+| 不变量 | 现量 | 谁钉它 |
+|---|---|---|
+| AI 类型上产不出 op | `grep -rE 'createOp\|toOp\(\|OpLogEntry\|appendOp' packages/ai/src` = **0 命中** | **类型层**（该包零运行时依赖、源码里没有 op 类型）；门禁侧只有 `check:layering` 的 `no-op-construction-in-apps` 管 **apps/\***，`check:ai-coverage` 里**没有**这条断言（`grep -cE 'packages/ai.*(产不出\|不得构造)' scripts/check-ai-coverage.mjs` = 0） |
+| `host.submit` 恰好一处 | ⚠️ **准确说法是"非注释命中两处，而这两处就是全部入口"**：`ai-tool-run.ts:195`（内置 AI，确认后才写）与 `local-api/src/server.ts:590`（MCP／本机 API，ADR-0011 的显式调用） | `check-ai-tools.mjs:471` 的静态计数（脚本原文："`host.submit(` 的**非注释**命中恰好两处，其余全在 `tests/`"） |
+| 逐工具默认关 | `isToolGranted()` 本体 = `grants?.[toolName] === true`（`tools.ts:449`）⇒ 缺省即关，无 `typeof` 绕过 | ⚠️ **只有单测钉**（`grep -rl isToolGranted scripts/` = **0**，`packages/*/tests` 里 2 个文件断言它）；`check-ai-tools.mjs:408` 提到"逐工具默认关"是**注释不是断言** |
+| 出境逐字段披露 | `egress.ts:159` `buildDisclosure(request)` 产出 `EgressDisclosure`，且 :151 注释明写"拒绝时**必须**带上披露" | `check:ai-coverage` 的 9d 臂 + 词条 key `web.ai.disclosure.e2ee{Lead,Strong}`（中英成对由它管） |
+| 回退不跨越隐私边界 | `provider.ts:166` 的 `'fallback-needs-consent'` 是**独立失败原因**，`routing.ts:812` 返回它 ⇒ 一次请求都不发 | ⚠️ **只有单测钉（`packages/ai/tests` 里 7 处），没有任何 `check:*` 门禁引用这个串** —— 现量：`grep -rln fallback-needs-consent scripts/` = 0 |
+
+⚠️ 第二行是**这次才照出来的措辞问题，不是我放宽了红线**：Goal 原文写"全仓恰好一处"，仓里真正被钉住的性质是"入口能列完 ⇒ 两处"。
+这两个说法在只有内置 AI 一个入口时等价，MCP／本机 API 那条入口进来之后就不等价了。留原句 + 这一行更正，
+别让下一位拿"一处"去判一个本来正确的实现（判"还有一处 submit"去查的人，会查出 `tests/` 里那批合法夹具）。
+
+🟡 **顺带照出一条缺口，登记而不在这批补**：五条不变量里**只有两条真的有 `check:*` 门禁钉**（submit 计数、出境披露话术），
+另外三条靠"类型层 + 单测"：`grep -rl isToolGranted scripts/` = 0、`grep -rln fallback-needs-consent scripts/` = 0、
+`check:ai-coverage` 里也没有"packages/ai 产不出 op"的断言。按仓里既有的立场（AGENTS §8 第 3 条"不能失败的检查没有价值"
+与本文件 L' 那条"封闭句式必须配对账门禁"），这三条属于**承诺已经写在文档与 ADR 里、但改坏它只能靠单测发现**的那一类。
+补法是三条独立的 `check:*` 臂（各配一次变异），成本不在本批的范围里 ⇒ **登记为下一批的候选，工单号本批不代开**。
+
+**②③ 现在排在同一条等窗口的队列上**（既不与别人那趟链挤窗口，也不重跑已经跑绿的读数）：`~/scratch-heyta/heyta-deliver-on-window.sh`。
+阶段：现场闸门（pattern 里**含别人那趟链的每个 argv 形状**：`heyta-window-chain · heyta-run-reinstall · heyta-run-checks · heyta-run-notes · heyta-land-parent-merge`）
+→ 仓库那道负载门（阈值 = 核数×3/4，不自己定）→ 链逐段读数（载体=落地载体）→ **非 docs 漂移必须为 0 才允许起装**
+→ `check:ai-e2e`（这一段用**端口**当门而不是用 pattern 猜：4318/4319 都空闲才起，因为它的 preflight 会 SIGKILL 那两个端口上 LISTEN 的进程，traps #87）
+→ 四端重装（`IOS_DEVICE_NAME` 显式给，不靠 `head -1` 猜设备，traps #169）。
+每条前置等满都以 **exit 3** 收尾并打印现量命令（环境无效 ≠ 产品失败），全程不 push。
+02:2x 起跑前现场：负载 32→（阈值 12）、现场命中 3、`ssh windows-pc hostname` rc=0、载体五枚 `dist` 在场、`node_modules` 零软链。
