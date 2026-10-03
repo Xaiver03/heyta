@@ -141,7 +141,7 @@ describe('E2 —— 清单与真源逐字对账（抄件一定会漂）', () => 
     // 所以这里必须按同一条规则派生，不能只比一个字符串常量。
     const worker = readFileSync(join(WEB_SRC, 'worker/storage.worker.ts'), 'utf8');
     const driver = readFileSync(
-      join(process.cwd(), '../packages/storage/src/sqlite/sqlite-wasm-driver.ts'),
+      join(REPO_ROOT, 'packages/storage/src/sqlite/sqlite-wasm-driver.ts'),
       'utf8',
     );
     const vfs = literal(worker, /const DB_VFS_NAME = '([^']+)'/);
