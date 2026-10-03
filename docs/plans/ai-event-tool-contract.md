@@ -2878,6 +2878,63 @@ D 是这组里唯一有意义的一臂 —— A/B/C 只证明"表侧有牙"，�
   `mcp.ts` 的注释、`server/src/legal.generated.ts` 再生成，全部落在别人的 `cdf421b3`/`4fad02b0`/`d718f248` 里。
   下一位读 HEAD 的人只会看到"fix(legal,ai): 终态合流收口"，看不到那 16 行是谁欠的 —— 所以这段是必要记录，不是仪式。
 
+## 15.42 ② 的第一条红是**装置红**：软链来的 `node_modules` 会让 pnpm 去清别人那棵依赖树，而把它"修绿"的两个开关都是破坏性的（10-04 01:3x，载体 `15862311`）
+
+**原话读数**：01:24:42 起跑（pid 61964），载体 `heyta-wt-verify-integration` @ `15862311`，
+未跟踪 21 枚（软链 21 / **非软链 0**）⇒ "干净检出"这条成立。负载门 01:32:42 放行，
+第一段 `pnpm -r build` **rc=1**，全文 1440 B 里只有这一段有效：
+
+```
+[ERR_PNPM_ABORTED_REMOVE_MODULES_DIR_NO_TTY] Aborted removal of modules directory due to no TTY
+If you are running pnpm in CI, set the CI environment variable to "true", or set "confirmModulesPurge" to "false".
+```
+
+**这不是产品红**（一行源码都没编到）。机制：那棵检出的 `node_modules` 是 **21 枚软链**，
+指向载体 `heyta-wt-ai-closeout` 里的真目录；pnpm 11.8.0 在跑脚本前做一次 deps 状态检查，
+认定"这棵 modules 目录不是为当前 project root 装的" ⇒ 要**整目录重建**，没有 TTY 所以中止。
+⚠️ **中止救了我们**：让它继续的两条开关（`CI=true` / `confirmModulesPurge=false`）等于
+**授权 pnpm 去清那棵别人正在用的树**。§15.39 量过 `node_modules/` 这条 ignore 规则挡不住软链，
+这次是同一枚软链的第二种代价 —— 不再只是"未跟踪项数读错"，而是"一次装机构建会顺着它删别人的东西"。
+⇒ **不设那两个开关**，改装置：
+
+1. `heyta-chain.sh` 加了起跑硬前置（`bash -n` 过）：软链数 ≠ 0 ⇒ **`exit 5`** 并写明是装置问题；
+   载体未提交项 ≠ 0 ⇒ **`exit 4`**（混合态的红/绿只在混合态成立，§15.40）。
+2. 🔴 **"干净检出"要的判据是"无未提交混合态"，不是"连依赖树也复制一份"**。
+   载体此刻现量：`脏项=0 未跟踪=0`、root 与 `packages/local-api`、`apps/web` 的 `node_modules`
+   都是**真目录**、`lsof` 对端命中 0 ⇒ **01:34 起把链搬回载体跑**，读数载体写
+   `heyta-wt-ai-closeout @ 15862311`。真要另一棵树，就在里面 `pnpm install` 出真 `node_modules`，**别软链**。
+
+**① 的现量又换了一次数**（"挡路的是哪几个文件"每次都要重量，这件事本身就是 B63 那一族的教训）：
+`git merge-tree --write-tree main 15862311` ⇒ **rc=0、零冲突** —— 合并从来不是障碍。
+更新集 **382** 个文件 ∩ main 检出脏项 **77** 项 = **11 个文件**挡路（上一版记的是 9 个）：
+`AGENTS.md`、`PROGRESS.md`、`docs/README.md`、`docs/reference/environment-traps.md`、
+`apps/web/src/features/sync/store.ts`、`apps/web/src/main.tsx`、`packages/app-host/src/index.ts`、
+`packages/i18n/src/locales/zh-CN.ts`、`packages/i18n/src/locales/en.ts`、
+`packages/sync-client/src/client.ts`、`packages/ui/src/sync/model.ts`。
+🔴 逐行读过 ⇒ **全部是别人在飞的那条 W9/vault 并发线**（`PROGRESS.md` 那两行的原话是
+"01:00 Web 并发迁移真链路已先证红…过程并入环境陷阱 #191 和 AGENTS §8.9"）。
+三条不落地都试不得：不代他们提交、不 rebase 掉、**也不用 plumbing 把 `refs/heads/main` 指到合并树而不动工作树** ——
+那样那 382−11=**371** 个"没脏但内容变了"的文件会全部显示成相对新 HEAD 的改动
+（按 git 的 status 定义它们落在"Changes to be committed"位，index 与 worktree 都还是旧 main 的内容 ——
+**这一句是按规则推的，没实测**），等于摆出一块"任何人一次整文件 `git add` 就能把合并撤掉"的现场，
+正是记忆里那条反向事故的形状。
+
+🟢 **一条把 ③ 从"等落地"里解放出来的现量**：`git diff --name-only 15862311 <合并树>` =
+**1 个文件**（`docs/plans/multi-end-coverage-handoff.md`），非 `docs/` 命中 **0**
+⇒ 落地给 main 的**只有文档**，四端装出来的字节与载体一致 ⇒ ③ 的装机读数在载体上取、落地后**不必重跑**。
+复算命令：`git diff --name-only 15862311 $(git merge-tree --write-tree main 15862311 | head -1) | grep -vc '^docs/'`（**应为 0**）。
+
+**④ 的复核（B63 的关闭判据在现载体上仍未满足，而且这次连"追加"都不做）**：
+`15862311` 现量 —— `^[0-9]+\. ` 命中 **207** 行 / 去重 **194** / 最大号 **198**；
+重号集合 `{38, 93, 94, 95}`（`grep -nE '^38\. '` ⇒ `:708` 与 `:779` 是两条不同内容的条目），
+缺号集合 `{83, 84, 85, 120}`。**同一读数在 `main` 的 HEAD（最大号 190）和 main 的活树上完全一致**
+⇒ 既不是本批造成的，也不是别人在飞造成的。
+⚠️ 所以这次**不把新条目追加进 `environment-traps.md`**：该文件在 main 检出里正被 #191 那条线写着（`= M`），
+而它此刻已经住着 4 个重号 —— 从这里再追加一枚就是亲手制造第五个重号，
+那正是 B63 诊断出的机制（"无编号小节 + 局部 1..N 列表 + 全局递增号"三套制并存）。
+⇒ **上面那条装置红待入 traps**（下一枚空号按那时工作树现取，别在这里写死"应为 #199"），
+正文在本节，可直接抄；`~/scratch-heyta/heyta-chain.sh` 的前置代码就是它的可执行形态。
+
 
 
 
