@@ -92,6 +92,22 @@
 ⚠️ 门禁**刻意不钉 `defaultOn` 的具体真假**：那是产品判断，钉死它等于让门禁替产品负责人
 拍板。门禁只要求"必须显式写出来"（W1）。
 
+🔴 **W3 单独挡不住"改成 `display:none` 但仍然渲染"** —— 那种写法里
+`enabledModules.has(` 还在过滤表达式里，W3 照样绿。真正兜住那一档的是
+`apps/web/tests/app-mount.spec.tsx:856` 那条**DOM 级**逐字对标签
+（`rail.querySelectorAll('button[role="tab"]')` **不看可见性**）—— 臂 A 实测过
+它会对"多出来的那一颗"红。
+
+⚠️ 而 **e2e 那一层单独不够**，两处反面断言都数不到"隐藏但存在"：
+`countdown.spec.ts:120` 与 `motivation.spec.ts:182` 用的是 `getByRole(...)`，
+Playwright 默认 `includeHidden: false` ⇒ `display:none` 的元素**根本不进它的匹配集**。
+（`countdown.spec.ts:121` 那句 `page.locator('[data-testid="countdown-view"]')` 是
+CSS 定位、确实 DOM 级，但**那块板只在视图被选中时才渲染** ⇒ 它证的是"没切过去"，
+不证"rail 上没有那颗 tab"。）
+
+⇒ 分层是：**门禁 W3 判"机制还在"，jsdom 那条 DOM 级断言判"DOM 里真没有"**。
+写门禁时以为 W3 就够，是这次差点漏掉的一格。
+
 ## 4. 移动端那一处重复：裁决与登记
 
 工单 §7 第 5 条问的是：「移动端 tab 会重复一次 —— 该不该被 `check:layering` 拦，
