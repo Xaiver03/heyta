@@ -422,12 +422,51 @@ export interface LocalApiWritePort {
  * `runReadTool` / `toWriteIntent` 会回 `tool-not-implemented`（响亮失败，
  * 不是"这个工具不存在"），而 `tests/tool-pack-coverage.spec.ts` 遍历整份目录
  * 逐个驱动一遍 —— 漏认领的红就在那一条测试里，不在生产路径上。
+ *
+ * 🔴 每加一个成员，**每个宿主都必须把它翻译成动作**：`LocalApiHost.submit` 的
+ * 实现里那个 `switch` 没有 `default`，漏一条就编译不过。这不是不便，是
+ * ADR-0035 / AGENTS §3.5 要的"逼每个宿主表态" —— 反过来（把新实体塞进既有
+ * 成员，例如用 `create-task` 假装建习惯）会让界面与统计一起说谎。
  */
 export type LocalApiWriteIntent =
   | { action: 'create-task'; title: string; dueDate?: string; priority?: string; projectId?: string }
   | { action: 'update-task'; taskId: string; fields: Readonly<Record<string, unknown>> }
-  | { action: 'complete-task'; taskId: string };
+  | { action: 'complete-task'; taskId: string }
+  /** 新建清单（PROJECT）。`parentId` 省略 = 顶层；由宿主验它真的存在。 */
+  | { action: 'create-project'; name: string; parentId?: string }
+  /**
+   * 新建习惯（HABIT）。
+   *
+   * ⚠️ 这里只有**名称 + 目标三件事**（数值 / 单位 / 达成口径），刻意不含
+   * `color` / `icon` / `backfillDays`：那些是用户在界面上挑的身份标记，
+   * "AI 替用户选一个图标"不是产品语义。要加就得先回答"谁赋它的义"。
+   */
+  | { action: 'create-habit'; name: string; target?: number; unit?: string; goalType?: string };
+
+/**
+ * 一条写入落地的实体类型。取值与 `packages/shared-schema` 的 `ENTITY_TYPES`
+ * 逐字一致（本包零依赖，**不能** import 它，所以这里是一份手抄的封闭集合）。
+ *
+ * 🔴 它为什么必须存在：`LocalApiWriteResult.taskId` 是既有的必填字段名，来自
+ * 目录里只有任务写入的年代。清单/习惯的写入如果照它回一个 id，
+ * MCP 客户端与模型就会以为**刚建了一条任务** —— 那是"界面在说谎"那一类，
+ * 而这次说谎的对象是外部程序。
+ */
+export type LocalApiWrittenEntityType = 'TASK' | 'PROJECT' | 'HABIT';
 
 export type LocalApiWriteResult =
-  | { ok: true; taskId: string }
+  | {
+      ok: true;
+      /**
+       * 🔴 **既有形状**：任务写入时它就是任务 id，别的写入也必须填（填的是
+       * 那条落地实体的 id），因为三个宿主与既有判据都按 `result.taskId` 读它。
+       * 出协议时它**不会**单独代表非任务实体 —— 那种情况回的是
+       * `entityId` + `entityType`（见 `server.ts` 的 `writeResult()`）。
+       */
+      taskId: string;
+      /** 落地的是**别的实体**时必填（与 `entityType` 成对出现）。 */
+      entityId?: string;
+      /** 给了它就必须给 `entityId`；任务写入留空 = 既有形状。 */
+      entityType?: LocalApiWrittenEntityType;
+    }
   | { ok: false; reason: 'rejected' | 'not-found' | 'invalid'; message: string };

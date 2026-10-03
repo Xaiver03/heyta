@@ -1452,6 +1452,8 @@ export const en = {
   'web.ai.tools.intentCreate': 'Create task "{title}"',
   'web.ai.tools.intentUpdate': 'Update task {id}',
   'web.ai.tools.intentComplete': 'Mark task {id} as done',
+  'web.ai.tools.intentCreateProject': 'Create list "{name}"',
+  'web.ai.tools.intentCreateHabit': 'Create habit "{name}"',
 
   // ── Web · AI · breakdown panel ────────────────────────────
   'web.ai.breakdown.button': 'AI breakdown',

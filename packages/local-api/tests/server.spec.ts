@@ -79,6 +79,10 @@ function recordingHost() {
       calls.push('listProjects');
       return Promise.resolve([{ id: 'p1', name: '工作', taskCount: 3 }]);
     },
+    listHabits: () => {
+      calls.push('listHabits');
+      return Promise.resolve([{ id: 'h1', name: '喝水', target: 8 }]);
+    },
     submit: (intent) => {
       calls.push('submit');
       submitted.push(intent);
@@ -295,6 +299,7 @@ describe('🔴🔴 写操作：只经 host.submit', () => {
       listTasks: () => Promise.resolve([]),
       getTask: () => Promise.resolve(undefined),
       listProjects: () => Promise.resolve([]),
+      listHabits: () => Promise.resolve([]),
       submit: () => Promise.resolve({ ok: false, reason: 'invalid', message: '标题太长' }),
     };
     const { handle } = handler(CONFIG, failing);
@@ -393,6 +398,7 @@ function captureHost(items: readonly LocalApiItem[] = TASKS) {
     },
     getTask: () => Promise.resolve(undefined),
     listProjects: () => Promise.resolve([]),
+    listHabits: () => Promise.resolve([]),
     submit: () => Promise.resolve<LocalApiWriteResult>({ ok: true, taskId: 'x' }),
   };
   return { host, seen };

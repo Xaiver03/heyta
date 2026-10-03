@@ -26,6 +26,7 @@ import {
   runReadTool,
   toWriteIntent,
   type LocalApiHost,
+  type LocalApiHabit,
   type LocalApiItem,
   type LocalApiProject,
   type LocalApiWriteIntent,
@@ -42,15 +43,18 @@ const ITEM: LocalApiItem = {
   readable: true,
 };
 const PROJECT: LocalApiProject = { id: 'p1', name: '工作', taskCount: 1 };
+const HABIT: LocalApiHabit = { id: 'h1', name: '喝水', target: 8, unit: '杯', goalType: 'atLeast' };
 
-/** 真的实现了 `LocalApiHost` 四个成员的假宿主（少了成员就编译不过 —— 那是故意的）。 */
+/** 真的实现了 `LocalApiHost` 五个成员的假宿主（少了成员就编译不过 —— 那是故意的）。 */
 function host(): LocalApiHost {
   const items: readonly LocalApiItem[] = [ITEM];
   const projects: readonly LocalApiProject[] = [PROJECT];
+  const habits: readonly LocalApiHabit[] = [HABIT];
   return {
     listTasks: () => Promise.resolve(items),
     getTask: (taskId: string) => Promise.resolve(items.find((x) => x.id === taskId)),
     listProjects: () => Promise.resolve(projects),
+    listHabits: () => Promise.resolve(habits),
     submit: (): Promise<LocalApiWriteResult> => Promise.resolve({ ok: true, taskId: 'created-1' }),
   };
 }
@@ -63,7 +67,10 @@ const MINIMAL_ARGS: Readonly<Record<string, Record<string, unknown>>> = {
   list_tasks: {},
   get_task: { taskId: 't1' },
   list_projects: {},
+  list_habits: {},
   create_task: { title: '买咖啡豆' },
+  create_project: { name: '读书' },
+  create_habit: { name: '喝水' },
   update_task: { taskId: 't1', fields: { title: '新标题' } },
   complete_task: { taskId: 't1' },
 };

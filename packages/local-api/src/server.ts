@@ -61,6 +61,27 @@ export interface LocalApiProject {
 }
 
 /**
+ * 习惯定义。与 `LocalApiProject` 同一类：**名字不是敏感正文**，所以没有
+ * `readable` 这一层（受保护的是任务的备注正文，不是"某人有个习惯叫 X"）。
+ *
+ * ⚠️ 只有这四个字段。`Habit` 上还有 `frequency` / `color` / `icon` /
+ * `backfillDays`（`packages/domain/src/entities.ts`），它们**刻意不出现**：
+ * 白名单重建（同 `projectForTool` 的纪律）—— 新字段默认不暴露。
+ * 📤 这里的每一个键都必须在 `tools/habit.ts` 的 `egressFields` 里有一行，
+ * 判据是 `tests/tool-egress-fields.spec.ts`。
+ */
+export interface LocalApiHabit {
+  id: string;
+  name: string;
+  /** 打卡目标的数值（如 8 杯水）。省略 = 纯打卡型（界面上按"做过一次"算）。 */
+  target?: number;
+  /** 目标单位，如「杯」「页」「分钟」。 */
+  unit?: string;
+  /** 达成口径：`atLeast` / `atMost` / `exactly`（取值由宿主验，不认识的直接拒）。 */
+  goalType?: string;
+}
+
+/**
  * `list_tasks` 的查询条件（日期已经过 `readListTasksDueArgs` 校验）。
  *
  * ⚠️ 三个日期参数是 `YYYY-MM-DD` 的**日历日字符串**，不是时刻 —— 本包刻意不产生时刻：
@@ -83,8 +104,8 @@ export interface ListTasksQuery {
  * 宿主端口 —— 由壳实现。
  *
  * 🔴 `submit` 的注释里写着它必须是 `dispatch()`，但**类型上无法强制**。
- * 能强制的是**形状**（`LocalApiWriteIntent` 是封闭的三种动作），
- * 以及**没有别的写入口**（本文件只调 `host.submit`，绝不自己写）。
+ * 能强制的是**形状**（`LocalApiWriteIntent` 是一个封闭联合，成员只有一个工具的
+ * 参数能表达得出一件事），以及**没有别的写入口**（本文件只调 `host.submit`，绝不自己写）。
  *
  * 剩下那一半靠门禁：`check:layering` 应该拦下 `apps/*` 里绕过
  * `LocalApiWritePort` 直接构造 op 的代码（见 ADR-0011 §5 的待办）。
@@ -106,6 +127,16 @@ export interface LocalApiHost {
   getTask(taskId: string): Promise<LocalApiItem | undefined>;
   /** 列清单。 */
   listProjects(): Promise<readonly LocalApiProject[]>;
+  /**
+   * 列习惯（**定义**，不含打卡记录）。
+   *
+   * 🔴 它是必填成员，不是可选的：`tools/habit.ts` 的 `list_habits` 只能经它读，
+   * 而**每一个实现 `LocalApiHost` 的宿主都必须表态**（真壳走
+   * `createLocalApiHost()`，测试假宿主必须写出一条真的列表）。
+   * 可选成员会让"这个宿主忘了接"落到运行时，而症状是"AI 说它没有这个能力" ——
+   * 那正是能力清单这一整套生成物要消灭的那类谎话。
+   */
+  listHabits(): Promise<readonly LocalApiHabit[]>;
   /**
    * 🔴 **必须是 `dispatch()`。**
    *
@@ -432,7 +463,16 @@ function toolText(payload: unknown): unknown {
 /** 写入结果 → MCP 结果。失败也走 `content`（因为它是"工具执行结果失败"，不是协议错误）。 */
 function writeResult(result: LocalApiWriteResult): { result: unknown } {
   if (result.ok) {
-    return { result: toolText({ ok: true, taskId: result.taskId }) };
+    // 🔴 **不能把清单/习惯的 id 回成 `{taskId}`** —— 那等于对模型与外部程序说
+    // "刚建了一条任务"，而它建的是一条清单。`entityType` 在时出
+    // `entityId` + `entityType`（同一条纪律：给调用方的字段名必须说出它是什么）。
+    // ⚠️ `taskId` 作为必填字段留在类型里是既有形状（三个宿主与既有判据都按它读），
+    // 所以这里的分支**不是**"换个字段名"，而是"别说谎"。
+    const payload =
+      result.entityType === undefined
+        ? { ok: true, taskId: result.taskId }
+        : { ok: true, entityId: result.entityId ?? result.taskId, entityType: result.entityType };
+    return { result: toolText(payload) };
   }
   const payload = toolText({ ok: false, reason: result.reason, message: result.message }) as {
     content: readonly { type: string; text: string }[];

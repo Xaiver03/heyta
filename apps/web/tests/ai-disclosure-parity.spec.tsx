@@ -114,6 +114,7 @@ function fakeHost(): LocalApiHost {
     listTasks: () => Promise.resolve(items),
     getTask: () => Promise.resolve(items[0]),
     listProjects: () => Promise.resolve([]),
+    listHabits: () => Promise.resolve([]),
     submit: () => Promise.resolve({ ok: true as const, taskId: 'created-1' }),
   };
 }
