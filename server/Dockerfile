@@ -244,6 +244,20 @@ COPY --from=builder --chown=supersync:nodejs /repo/server/prisma ./prisma
 COPY --from=builder --chown=supersync:nodejs /repo/server/scripts ./scripts
 COPY --from=builder --chown=supersync:nodejs /repo/server/src ./src
 COPY --from=builder --chown=supersync:nodejs /repo/server/package.json ./package.json
+# 🔧 heyta 改动（G-47 的闭合形状，审计 §8.46 结论四）：**提交物锁**作为输入进来，
+# 而下面那三条安装命令**一个字都不改**（仍是 `npm install`，不是 `npm ci`）。
+# 为什么不换成朴素大家都写的 `npm ci` —— 三档实测（审计 §8.46 的表）：
+#  · `npm install` 认锁：锁里钉 2.1.2、范围内有 2.1.3 ⇒ 装的就是 2.1.2，也不改写锁；
+#  · 锁里那三枚 `file:` 条目的 integrity 过期时，`npm install` 装的是**当前 tarball 的字节**（rc=0）；
+#  · 同样条件下 `npm ci` 两样都不成立：冷缓存 `EINTEGRITY` 当场炸，热缓存 rc=0 却**静默装上一版**
+#    —— 后者是 §7 第 27 那族（旧 bundle 进包）在依赖层的翻版，而且它不报错。
+# ⇒ 收益是"老 tag 晚半年 build 也解析出同一棵树"（对自建者是可用性，不只是整洁）。
+# ⚠️ 这把锁取自**构建产物** `/app/package-lock.json`，不是宿主机另解一份：它的根条目里那三枚
+#    依赖写的是 `file:*.tgz`，而仓库 `server/package.json` 声明的是 `"*"` —— 因为下面第一条
+#    install 本来就会把 package.json 改写成那个形状。读着别扭是真的，但它与镜像里实际生效那次
+#    解析逐字同源；手工"归一"成看起来干净的样子就会造出第二事实源。
+#    防它腐烂的门禁在 `research/tools/check-image-install-contract.mjs`。
+COPY --chown=supersync:nodejs server/package-lock.json ./package-lock.json
 # 🔧 heyta 改动：共享 UI 产物进运行时镜像。
 #
 # 目标目录名 `/app/web-dist` 与挂载路径 `/app/` 的**默认值**住在
