@@ -1446,7 +1446,7 @@ W0b ─> 随时可做（台账那半要等文件干净）
     与 app-host 那 10 条里各测了一腿。`scripts/check-public-facts.mjs` **已存在并接进 `pnpm check`**（`3f327dc2`）。
     同一条 grep 在 `feat/countdown-batch2` 载体上现量 **命中 6 个文件**（`app-host/src/public-facts.ts`、
     `ui/src/calendar/{model.ts,CalendarBoard.tsx}`、`apps/web/src/features/calendar/{CalendarView.tsx,store.ts}` 等）。
-- [ ] 🟡 **W4b 代码链已闭合，只剩一条**（23:0x，`feat/countdown-batch2` 上 `6735cc39` + `b05fbc50` + `67fef701`）：
+- [x] ✅ **W4b 到最终态（04 04:4x）** —— 这一格原本写的是"🟡 代码链已闭合，只剩一条"（23:0x，`feat/countdown-batch2` 上 `6735cc39` + `b05fbc50` + `67fef701`）：
     服务端两张表 + 1 条迁移 + 线协议契约 + 后台三条端点 + ADR-0052 定性 + `check:public-facts`
     + **客户端匿名拉取 / `STORES.META` 缓存 / 装进领域层覆盖表 / web 日历的「休 / 班」/ i18n 中英**全部落地，
     判据①有真界面截图。**没做的那一条**：判据②写的是"`papers` 随数据入库并**在后台回显**"——
@@ -1520,8 +1520,12 @@ W0b ─> 随时可做（台账那半要等文件干净）
       `card-export-layout.ts 42708dc95156` / `CountdownView.tsx a877b7c83173`）。
       修复那两笔已单独入库（`87109e9e`），提交时刻在链条把变异全部还原**之后** ——
       半途提交会把带 `href={undefined}` 的那份源码交出去。
-    - ⏹ **这张表还差最后一条实测量**：`inbox.spec.ts` 被开机拉取拖红那条**先量出红、再补 `stubPublicFacts` 量回绿**
-      （见上面那条穷举；链条第 [8] 步正在等窗口）。
+    - ✅ **04 04:4x `inbox.spec.ts` 那条也量完了（先红后绿）**：`RC_INBOX_PRE=1`（**2 failed / 1 passed**）
+      → 补两处 `stubPublicFacts(page, SERVER)`（`3b24f5b4`）→ `RC_INBOX_POST=0`（**3 passed / 6.5s**）。
+      🔴 **这一对本身就是这条修复的 apply/revert 两臂**，不需要再造第三个变异：
+      "没有这条登记"就是违规态，而它已经在同一台机器、同一套界面上量出过逐字相同的红。
+      上面那套静态穷举因此是**双向校验成立**的 —— 它说"只剩一个文件"，实跑就只红那一个文件的**两个凭据点**
+      （第三条用例不塞凭据，它不红；这恰好是"①会发这条请求"那一栏的对照组）。
     - 🔴 **第一版修复是无效的，而照出它的正是那条正向对照**（04 03:38 现量）。
       第一版给共用的 `.ht-settings__admin-badges` 加了 `min-inline-size: 0` + `flex-wrap: wrap`，
       理由写的是"徽标不可收缩"。带正向对照重跑 ⇒ `GEOM_OK_RC=1`，报错原文
@@ -1686,7 +1690,7 @@ W0b ─> 随时可做（台账那半要等文件干净）
 | W8 三端接线 | 🟡 **三端代码 + 壳级门禁已在 batch2**，那格门禁 04 03:2x **自己变红了（红在产物落后）** | W5/W6 | 3 | 🔴 原先这行写"排后：同 W6，日历线未落地前不动 `CalendarScreen`"—— **那是按整条线推断出来的，现量否证过**：W8 的落点在 main 里逐个文件都干净，且 web 半已随 W5 落地。载体已从 `heyta-wt-w8` 换到 `feat/countdown-batch2`（合入 `f2d09974`）。**读数取两次，因为答案在二十分钟内变了**：04 03:0x ⇒ rc=0，5 格 = 5 绿 / 0 红；**04 03:2x ⇒ rc=1，4 绿 / 1 红**，红的格是 `[web] W5 产物比源码旧`（`dist 18:53 < src 19:40`）—— 差的正是我方 `e2def90f`（W6）+ 后台面板那两笔之后没重打 `apps/web/dist`，**不是新缺陷，是自家提交把这条判据甩下了**，修法是它点名的 `pnpm --filter @heyta/web build`（门禁的"不要用它修绿"清单里明确排除了手改 dist）。未取证仍是 2 栏（`desktop-macos / countdown · 产物`、`desktop-windows / countdown · 产物`，macOS 那栏现在连 sha256 都对不上：包里 `5ab36a445c57` vs 本地 `18865497ee11`），门禁自己那句话是承重判据："这份绿说的是**通道在**，**不是**装出来的包里有这一屏" ⇒ 两栏只由 §5 第 4 条 `pnpm reinstall:all` 关闭；🔴 **而它同时给这条线加了一条新前置：收尾那趟 `pnpm check` 之前必须先重打 web 产物，否则这一格必红**（本批自己造的红，不登记给别人） |
 | W9 提醒（web 半 + DST） | ✅ web 半 | 可与 W2 并行 | 3 | 42/28/40 passed；变异 9 臂 9/9 红、0 未证；移动端那半**没动** |
 | W10 AI 工具目录 | ✅ | **W2 之后** | 3 + 差集归零 | 130/223/1019 passed；变异**第一趟 3 臂无牙**→补判据→第二趟 6/6 红 |
-| W4b 调休通道 + ADR | 🟡 **判据①②都有真界面读数**，待三臂变异才打勾 | 独立（1 条迁移） | 4 | 全链已进 main（`6735cc39`/`b05fbc50`/`67fef701` + 服务端那 4 笔 + `check:public-facts` 八臂 8 红）。**04 03:2x**：判据②的后台面板落了（`AdminPanel.tsx` 的 `HolidayPanel`），`e2e/tests/admin-console.spec.ts` 整套 **6 passed / `ADMIN_RERUN_RC=0`**，图在 `apps/web/evidence/admin-holiday/`。🔴 这一趟最值钱的是**看图照出整格被挤成「2026…」**（04 04:2x 更正：这一句原先写"年份被挤成"，把缺陷说小了 —— 省略号截掉的是「2 天安排 · 国务院办公厅通知」整段，只有打开那张图看得出来）⇒ 修 CSS + 判据改几何（`scrollWidth-clientWidth<=1`）**并自带正向对照**（先断 `clientWidth>100`，否则"没参与布局"的 `0-0=0` 让判据永远通过——这个坑由它自己的第一趟假绿照出来：Playwright 03:21:33 就加载了 spec，判据 03:22:11 才写进去，那趟"6 passed"里根本没有它）。另补 `e2e/tests/helpers.ts:stubPublicFacts`：本批的开机拉取会把任何带"不该有非 2xx"守卫的套件无关地拖红（实测一次红五条）。**04 04:1x 第二版修复的读数**：同一套件 `6 passed / RC_W4B_OK=0`，
+| W4b 调休通道 + ADR | ✅ **到最终态（04 04:4x）**：判据①②真界面读数 + 三臂变异各红自己那条 + 载体敞口已清零 | 独立（1 条迁移） | 4 | 全链已进 main（`6735cc39`/`b05fbc50`/`67fef701` + 服务端那 4 笔 + `check:public-facts` 八臂 8 红）。**04 03:2x**：判据②的后台面板落了（`AdminPanel.tsx` 的 `HolidayPanel`），`e2e/tests/admin-console.spec.ts` 整套 **6 passed / `ADMIN_RERUN_RC=0`**，图在 `apps/web/evidence/admin-holiday/`。🔴 这一趟最值钱的是**看图照出整格被挤成「2026…」**（04 04:2x 更正：这一句原先写"年份被挤成"，把缺陷说小了 —— 省略号截掉的是「2 天安排 · 国务院办公厅通知」整段，只有打开那张图看得出来）⇒ 修 CSS + 判据改几何（`scrollWidth-clientWidth<=1`）**并自带正向对照**（先断 `clientWidth>100`，否则"没参与布局"的 `0-0=0` 让判据永远通过——这个坑由它自己的第一趟假绿照出来：Playwright 03:21:33 就加载了 spec，判据 03:22:11 才写进去，那趟"6 passed"里根本没有它）。另补 `e2e/tests/helpers.ts:stubPublicFacts`：本批的开机拉取会把任何带"不该有非 2xx"守卫的套件无关地拖红（实测一次红五条）。**04 04:1x 第二版修复的读数**：同一套件 `6 passed / RC_W4B_OK=0`；**04 04:1x–04:4x 收口**：三臂 `RC_B1/B2/B3` 全 =1 且各红自己那条（`:887` / `:889` / `:909` 正向对照），还原后 `RC_RESTORE_ADMIN=0`（6 passed）、四个被改文件的 `shasum` 逐字等于链条开头的基线，`inbox.spec.ts` 先 `RC_INBOX_PRE=1`（2 failed）后 `RC_INBOX_POST=0`（3 passed），修复两笔入库 `87109e9e`（CSS/面板）+ `3b24f5b4`（e2e 载体），装置落版本库 `research/tools/mutate-w4b-papers-arms.mjs`（含一臂 **B4 未跑**，登记在装置文件头）。逐项读数与"第一版修复其实无效"那段在本节 W4b 的表里。
 改前/改后两张图 md5 **不同**（`8970c732…` / `f14afbc0…`，早先它们逐字节相同过，那等于什么都没证），
 看图后的两条例外都写进 [`../apps/web/evidence/admin-holiday/README.md`](../../apps/web/evidence/admin-holiday/README.md) |
 | L' 法务联动 | 🟡 判定表已出、命中已修；**它立的门禁现在响在 main 的已提交状态上** | 随最后一个改承诺的工单 | 4 | 普查 82 行 → 唯一真命中已修（`2d53ea94` + `8996de9d` + `1d71e75f`/`017adc3e`，13 臂变异全红）。🔴 **读数取三次，每次载体不同**：04 03:0x 在**主检出** ⇒ rc=1 / **2 条红**（那四句 `permissions.ts` 已被并行会话在未提交的工作树里翻掉）；04 03:5x 在**本批工作树** ⇒ rc=1 / **7 条红**；把**只含 `origin/main` 已提交内容**的七份输入喂给同一份脚本（`HEYTA_CHECK_ROOT` 探针，命令在 §8.2 L' 第 1b 条）⇒ **rc=1 / 7 条红，与喂 `HEAD` 那份逐字相同**。⇒ 归属从"别人的在飞工作树"升级为**"`b0ba4a35`（W9 原生投递）已提交在 main 上的矛盾"**：六句对外承诺没翻 + `SCHEDULE_EXACT_ALARM` 未登记（那条臂 A13 是**故意**要它响）。**不由本批代改**（是 W9 的产品/法务判断，且合流的人必须把六句 + `check:legal-copy` 同批做完）。关闭判据：`node scripts/check-legal-permissions.mjs` rc=0（每次引用本条重跑，并写明在哪个载体跑的） |
