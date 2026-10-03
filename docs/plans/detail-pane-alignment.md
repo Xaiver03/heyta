@@ -517,7 +517,14 @@ M11（摘掉 `.ht-header__actions` 的 `flex-wrap`）**两扇门全绿**：不�
 | 共享目标 | `emulator-5554` 在线；iOS 侧**三台** Booted（`heyta-iphone-17pro` / `heyta-ios-isolated` / `iPhone Duo heyta`）；Windows 打包机 `ssh windows-pc` 可达（`SSH_OK`） |
 
 ⇒ **另一条会话正在做四端重装**，而它的载体是 `/tmp/heyta-reinstall` 那棵隔离检出，
-**不是本分支**（本分支这三笔 `6c3c1ecd` / `f1a37d74` / `c58da733` 未 push 未 merge）。
+**不是本分支**。现量它那份载体（四条都可复跑）：
+`rev-parse --short HEAD` ⇒ `d0a81927`（一个 self-host 合流载体）；
+`rev-list --count HEAD..main` ⇒ **落后 main 20 笔**；
+`git merge-base --is-ancestor 6c3c1ecd d0a81927` ⇒ **不含本分支 W1b**（整条本分支都不含）；
+它那本台账的最大号 207，而 main 已经是 211。
+⇒ 那一轮装出来的四端产物**既不含本线、也不是 main 的当前态** ——
+这正是 main 上 `a2a6541b`（traps #208）自己刚记的那句"另一条线的四端重装跑在落后 main 19 笔的
+载体上"的**同形状下一次发生**。
 按 AGENTS §8 第 9 条（共享资源独占验收）与环境陷阱里的负载门：**不并行覆盖、不挤进去、
 不调低阈值**。所以八行仍写"未做四端重装"，这一节就是那句的取证行。
 
@@ -543,3 +550,29 @@ M11（摘掉 `.ht-header__actions` 的 `flex-wrap`）**两扇门全绿**：不�
 "编号只增不改"是这本台账的承重规则，同号会让跨文件引用（含本文件里那些"→ §7 #N"）歧义。
 不在这里改：**重编号会让全仓已有引用全部失效**，那是要台账所有者拍的一次行为变更；
 但**取号方（也就是我）能立刻做的是先量合并目标**，这一条已经写进上面那段。
+
+## 8.11 合流面现量（2026-10-04 05:0x，用 plumbing 预演，**没有对任何分支做合并**）
+
+八行只差四端重装，而"什么时候装得有意义"取决于合流干净不干净。用一条零副作用的命令量出来
+（`git merge-tree` 只写对象库，不动工作树、不动任何分支）：
+
+```bash
+git merge-tree --write-tree --name-only main feat/detail-pane   # rc=1 = 有冲突
+```
+
+**冲突 3 个文件**，逐条写清是谁跟谁撞：
+
+| 文件 | main 侧 | 本分支侧 | 性质 |
+|---|---|---|---|
+| `docs/reference/environment-traps.md` | +626/−20（#182–#211，末笔 `a2a6541b`） | +26（#212/#213） | **纯文本撞在文件末尾，号不撞**（212/213 在 main 上现量空闲）⇒ 解法是两边都留 |
+| `packages/app-host/src/habit-actions.ts` | +52/−9（`00b5065c`：回收站四类实体 + 删除四态，ADR-0048/0049） | +72/−9（W6 计数型 `value` / W8a 值与词同源） | 🔴 **语义合流，不是文本合流**：两边给同一批动作各加了一层前置 |
+| `packages/app-host/tests/habit-actions.spec.ts` | +103（同一笔） | +122（同上） | 上面那对的判据侧，跟着一起判 |
+
+**自动合干净的 6 个**：`apps/web/src/App.tsx`、`packages/app-host/src/index.ts`、
+`apps/web/src/features/focus/store.ts`、`apps/web/src/styles/app/main-area.css`、
+两个 i18n locale —— 其中前两枚正是 **W1b 这一轮改的那两个文件**，
+所以本轮的接线在合流时不会丢、也不需要人判。
+
+🔴 **本单不处置那对 `habit-actions` 冲突**：两边各是一条线的承重判据（删除四态 × 计数型 `value`），
+"解成能编译"是最容易也最错的做法 —— 要两单的所有者一起确认**四条判据在合流后都还在**。
+这一节是留给合流那一趟的现量，不是给谁的待办。
