@@ -92,8 +92,23 @@ NPM_REGISTRY=https://你的-npm-镜像
 ## 4. 只想用一条 `docker compose` 起全套（含第一次的迁移）
 
 ```bash
-docker compose -f docker-compose.yml -f docker-compose.migrate-once.yml up -d
+docker compose -f docker-compose.yml -f docker-compose.build.yml \
+  -f docker-compose.migrate-once.yml up -d --build
 ```
+
+**`docker-compose.build.yml` 那一份不能省。** 我们没发布镜像，而默认图里
+`image:` 的取值是 `${SUPERSYNC_IMAGE:-supersync:local}` —— 不带这一份 override 时，
+compose 手里既没有 build 说明、本地也没有那个 tag，于是它去**拉**，实测得到的是：
+
+```
+Image supersync:local Error pull access denied for supersync, repository does not exist
+or may require 'docker login'
+```
+
+那句 `may require 'docker login'` 是这条路上最容易误导人的一步 —— 它会让人去找
+"该登录哪个仓库"，而真相是**根本没有仓库**。带上 build override 之后，同一条命令
+自己把镜像打出来（`APK_MIRROR` / `NPM_REGISTRY` 两个旋钮在这条路上也生效，
+它们就住在这份 override 的 `args` 里）。
 
 `docker-compose.migrate-once.yml` 是一个**一次性迁移服务**的 override：默认服务图里
 没有它（那里恰好是 `caddy / postgres / supersync` 三个），加进来之后迁移跑完就退出，
@@ -103,8 +118,8 @@ docker compose -f docker-compose.yml -f docker-compose.migrate-once.yml up -d
 所以升级时要么用第 3 节的 `./scripts/deploy.sh`，要么显式补一刀：
 
 ```bash
-docker compose -f docker-compose.yml -f docker-compose.migrate-once.yml \
-  up -d --force-recreate supersync-migrate
+docker compose -f docker-compose.yml -f docker-compose.build.yml \
+  -f docker-compose.migrate-once.yml up -d --build --force-recreate supersync-migrate
 ```
 
 裸跑 `docker compose up -d`（不带 override、也不用 `deploy.sh`）会**起在一个
@@ -133,8 +148,10 @@ curl -fsS https://你的域名/health
   直接 `http://服务器IP:1900` 从局域网是**连不通的**（不是防火墙，是它只听回环）。
   要放开就覆盖那一行 `ports`，并想清楚你放开的是什么。
 - 如果你前面已经有 nginx / 别的站点占着 80，就别让 Caddy 起来：
-  起的时候点名服务（`docker compose -f docker-compose.yml up -d postgres supersync`），
+  起的时候点名服务（`docker compose -f docker-compose.yml -f docker-compose.build.yml up -d postgres supersync`），
   或者在自己的 override 文件里把 caddy 的 `ports` 覆盖掉。
+  ⚠️ 点名服务**不等于**可以省掉 `docker-compose.build.yml` —— 那份 override 管的是
+  "镜像从哪来"，和起哪几个服务是两回事（省掉的后果见第 4 节）。
 
 `deploy.sh` 会在最后一步因为 Caddy 绑不上端口而以"启动失败"收尾 —— 那种情况下
 `supersync-server` / `supersync-postgres` 可能已经是 `healthy` 的，

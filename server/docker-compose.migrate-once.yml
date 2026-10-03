@@ -1,6 +1,11 @@
 # D-3：一次性迁移服务（**显式 opt-in 的 override，不是默认服务图的一部分**）
 #
-#     docker compose -f docker-compose.yml -f docker-compose.migrate-once.yml up -d
+#     完整命令只有一份，在 docs/runbooks/self-host.md §4（中文）与
+#     server/README.md（英文）。这里刻意**不重抄一遍** —— 2026-10-03 实测，
+#     这条命令一共被抄了 3 处，其中 2 处漏了 `docker-compose.build.yml`，
+#     照抄的人拿到的是 `pull access denied for supersync … may require 'docker login'`
+#     （我们不发布镜像，没有可登录的仓库）。漏抄的那两处已修，
+#     而"文档里那两处不许漂"由 scripts/verify-selfhost-stack.sh 的入口命令对账钉住。
 #
 # ## 为什么它不进 docker-compose.yml
 #
@@ -24,10 +29,8 @@
 # 一次性服务退出 0 之后，容器以 `exited (0)` 留着；下一次 `up -d` 只要该服务的
 # **配置哈希没变，compose 不会重建它** ⇒ 新镜像里的新迁移不会被应用。
 # 升级请走 `./scripts/deploy.sh`（它是受支持入口，见 `server/README.md` 第一屏），
-# 或者显式强制重建：
-#
-#     docker compose -f docker-compose.yml -f docker-compose.migrate-once.yml \
-#       up -d --force-recreate supersync-migrate
+# 或者对上面那份入口命令**原样**再加一个 `--force-recreate supersync-migrate`
+# （那份命令的唯一真本见文件头指的 §4，别在这里重抄一份）。
 #
 # 这条不是边角注意事项：一个"只在第一次开机管用"的迁移入口，如果文档把它写成
 # "以后每次都不用管"，那它比没有更糟 —— 它会让运维**相信自己已经迁过了**。
