@@ -38,14 +38,15 @@
  *
  * B. **宿主里不许重新长出本地选中态**：`const [detailTaskId, setX] = useState<...>(null)`
  *    这种"选中形状"的声明在 `各宿主的 src 目录` 里必须为 0。
- *    ⚠️ 判据刻意窄：只认 `detail|selected|open|active|edit(ing)` + 实体名 + `Id` 这个组合，
+ *    ⚠️ 判据刻意窄：认 `detail|selected|open|active|edit(ing)` + 实体名 + `Id`，
+ *    以及**不带实体名**的 `detailId` / `selectedId` / `editingId`（见下面 `SELECTION_NAME`
+ *    那段：为什么 `activeId` 与裸 `editingId` 的两种既有写法不能被扫进来），
  *    所以 `renamingId`（改名编辑器）、`busyId`（防连点）、`draft` 都不算 ——
  *    它们不是"当前选中了哪一条"。把范围放宽会淹死在噪音里，然后被人整片注释绕过。
- *    🔴 `edit(ing)` 是 2026-10-03 补的，因为这条判据**当场漏掉过真的两份**：
+ *    🔴 `edit(ing)` 与"裸名"两个分支都是 2026-10-03 被**变异臂**逼出来的：
  *    `NotesSection.editingId` 与 `TasksScreen.editingNoteId` 是同一个问题
- *    （"现在在编辑哪条便签"）的两份本地状态，而旧的正则一个都不认。
- *    仍未覆盖：不带实体名的 `const [editingId] = useState(...)`（名字里没有 Note）——
- *    如实登记，别把它当成"选中态再也回不去了"。
+ *    （"现在在编辑哪条便签"）的两份本地状态，旧正则一个都不认；
+ *    把 web 便签改回裸名 `useState` 的那条臂**第一次跑时活着**，才有第二个分支。
  *
  * C. **词表只有一个家**：`SelectableKind` 的**定义**只许出现在 `packages/app-host`。
  *    宿主里出现一份同名的联合类型 = 第二套"哪些东西可以被选中"，
@@ -76,7 +77,8 @@
  * 怎么确认它能失败（不要删这一段）
  * ─────────────────────────────────────────────────────────────────────────
  *
- * 实测（一趟跑六条正臂 + 一条负向对照，跑完复原并复跑确认回到绿）：
+ * 实测（2026-10-03 两趟 rig：正臂 + 负向对照 + 分母自检，每臂跑完复原并复跑确认回到绿；
+ * 终态 Z2 = web / mobile / 本门禁三处 RC=0）。**下面每一行都是跑过的**，不是设想：
  *
  * | 注入 | 结果 |
  * |---|---|
@@ -84,18 +86,32 @@
  * | B 在 `App.tsx` 注入 `const [detailTaskId] = useState<string \| null>(null)` | 红：断言 B |
  * | B2 同上但**带** setter（`const [selectedTaskId, setSelectedTaskId] = …`） | 红：断言 B |
  * | B3 `const [editingNoteId] = useState<string \| null>(null)` | 红：断言 B（`edit(ing)` 分支） |
+ * | **H1** 把 web 便签的 `useSelected('note')` 换回**裸名** `const [editingId] = useState(…)` | 🔴 **第一次跑存活**（裸名当时不在判据里）→ 补第二个分支后重跑：**红：断言 B** |
+ * | **H2** 注入裸名 `const [selectedId] = useState<string \| null>(null)` | 红：断言 B（第二个分支的另一形状） |
  * | C 在宿主里 `type SelectableKind = 'task' \| 'habit'` | 红：断言 C |
  * | A2 实例建在 `App.tsx` 而不是 `lib/selection` | 红：断言 A ×2（数量 + 落点） |
  * | D 往词表数组里加一项 `'widget'`（宿主里没有） | 红：断言 D |
- * | E 删掉 web 四象限那两行 `onOpenTask={…}` / `activeTaskId={…}`（**现场那次事故**） | 红：断言 E ×2 |
- * | E2 只删其中一行 | 红：断言 E ×1（逐 prop 判，不是"整文件没用就算"） |
- * | E3 把终点消费者 TaskList 的 `activeTaskId === row.id` 换成别的 | 红：断言 E |
- * | **负向对照**：把这些字样**只写进注释** | 绿（剥注释生效，不误伤） |
+ * | E 删掉 web 四象限那两行 `onOpenTask={…}` / `activeTaskId={…}`（**现场那次事故**） | 红：断言 E（一段里点名两行）+ 四象限真 DOM 判据 2 条 |
+ * | E2 同上但**只删** `activeTaskId` 那一行 | 红：断言 E 一行（逐 prop 判，不是"整文件没用才算"） |
+ * | E3 把 `WIRE_DIRS` 清空（扫描层没了） | 红：断言 E 的**分母自检** —— "没有断线"与"没在线可断"是两件事 |
+ * | **负向对照 N1**：把这些字样**只写进注释** | 绿（剥注释生效，不误伤） |
+ * | **负向对照 N2**：树上本来就活着 `const [activeId] = useState(…)`（dnd-kit 正在拖）与改名编辑器的 `editingRowId` | 绿（第二条不在 `WIRE_PROPS`，第一条不在裸名分支的词表里） |
+ *
+ * 与本门禁**同一批**跑的行为臂（红的是判据而不是门禁，记在这里因为它们是同一条接线）：
+ * TaskList 的 `{ active: activeTaskId === row.id }` → `false` ⇒ 列表与四象限底色各红 1 条；
+ * TimelineBoard 两处 `activeTaskId === row.taskId ? […rowActive] : …` 各摘一次 ⇒ 时间线底色红；
+ * TimelineBoard 两处 `onPress` 一起摘 ⇒ 时间线"点一行通知宿主"红；
+ * NotesView 退回裸名 `useState` ⇒ 便签三条行为判据**全红**；
+ * `App.tsx` 的 `selection.select('note', noteId)` 摘掉 ⇒ 搜索入口那条红；
+ * `App.tsx` 四处投影里断掉一处 ⇒ A 组计数红（这条正是"期望值跟着覆盖面走"的牙）；
+ * NotesSection 摘掉 `pruneSelectionAgainst` ⇒ mobile 回落那条红；
+ * TasksScreen 三处 `activeTaskId={detailTaskId}` 全摘 ⇒ mobile 组 5 计数红。
  *
  * 🔴 **B 第一版是存活的**：那时 setter 被写成必需，无 setter 的
- * `const [detailTaskId] = useState(...)` 直接漏过去 —— 而"只读不写"恰恰是
- * 面板从 props 拿 id 的常见形状。判据能不能回答，只有变异臂说了算；
- * 上面 B 与 B2 两条分开留，是因为它们测的是正则的两个不同分支。
+ * `const [detailTaskId] = useState(...)` 直接漏过去。**H1 是同一个死的第二次**：
+ * `edit(ing)` 分支补上了**带实体名**的形状，裸名 `editingId` 仍然漏 ——
+ * 我是靠把真代码改回去那条臂发现的，不是靠读正则。
+ * 判据能不能回答，只有变异臂说了算。
  *
  * ⚠️ 这道门禁**不拦**的形状（如实登记，别把它当成"选中态再也回不去了"）：
  * 模块级 `let selectedTaskId: string | null = null`、`useReducer` 里的选中、
@@ -123,8 +139,32 @@ const HOSTS = ['apps/web', 'apps/mobile'];
 /** 断言 A 要求的最小出现次数：每个宿主恰好一份实例。 */
 const REQUIRED_STORE_INSTANCES = HOSTS.length;
 
+/**
+ * B 认的"选中形状"的名字。**两个分支**：
+ *
+ * 1. `前缀 + 实体名 + Id`（`detailTaskId` / `editingNoteId` / …）—— 一直都有。
+ * 2. `前缀 + Id`（**不带实体名**），但只认 `detail|selected|edit(ing)` 三个前缀。
+ *
+ * 🔴 第 2 个分支是 2026-10-03 由**变异臂**逼出来的：把 web 便签的选中换回
+ * `const [editingId] = useState<string | null>(null)` 时门禁**当场存活** ——
+ * 而 `selectedId` 正是移动端 `HabitsScreen` 删掉的那份本地状态用过的名字，
+ * 也就是说这条缺口不是假想，是"同一个问题曾经就在这里、判据看不见它"。
+ *
+ * ⚠️ 第 2 个分支**不含** `active` 与 `open`，这不是遗漏：
+ * `apps/web/src/features/quadrant/QuadrantBoard.tsx` 的 `const [activeId] = useState(...)`
+ * 是 dnd-kit 的"**正在拖**哪一颗"，不是"当前看的是哪一条"。把它扫进来会让门禁
+ * 在接线全对的树上恒红，而恒红的判据活不过下一轮。
+ *
+ * 🔴 为了腾出裸名 `editingId`，`PasskeyPanel` 里那份行内改名编辑器的状态
+ * 已改名 `editingRowId`（2026-10-03）。它原本就叫 `editingId`，而**这个词表里它是合法的**
+ * —— 但"哪个词合法"这件事不能靠两个人各猜一次：改名之后，`editingId` 这个名字
+ * 从此只表示"选中/正在编辑的那一条"，而改名编辑器那种一次性、单屏、跨屏不需要保持的
+ * 状态必须带自己的名字（第一次改名我撞上了 store 里已有的 `renamingId` —— 那个是
+ * "**请求在途**的那条"，与"开着输入框的那一行"是两件事，两个概念不能并成一个名字）。
+ * 仍未覆盖：模块级 `let editingId = null`、`useReducer` 里的选中（见下面那段）。
+ */
 const SELECTION_NAME =
-  /^(?:detail|selected|open|active|edit(?:ing)?)(?:Task|Habit|Note|Project|Tag|Event)Id$/;
+  /^(?:(?:detail|selected|open|active|edit(?:ing)?)(?:Task|Habit|Note|Project|Tag|Event)Id|(?:detail|selected|edit(?:ing)?)Id)$/;
 
 /**
  * A 认的"实例化"：**赋值左边**才算。
