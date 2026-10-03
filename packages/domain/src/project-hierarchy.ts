@@ -14,7 +14,7 @@
  * 清单的语义是**只有一层**。把两种语义折进同一个函数，改一个会悄悄改掉另一个。
  */
 
-import type { Project } from './entities.js';
+import { byCreatedAtOrder, isArchived, isLive, type Project } from './entities.js';
 
 /**
  * 改父被拒绝的原因。**封闭集合**（与任务侧 `ParentChangeRejection` 同一条取舍：
@@ -70,7 +70,9 @@ export function validateProjectParentChange(
 ): ProjectParentResult {
   const byId = new Map<string, Project>();
   for (const project of projects) {
-    if (project.deletedAt === undefined) byId.set(project.id, project);
+    // `isLive` 是"未软删除"的唯一判据（`entities.ts`）—— 这里原来手写
+    // `deletedAt === undefined`，那是同一件事的第二份写法，而它少一种状态的空间。
+    if (isLive(project)) byId.set(project.id, project);
   }
 
   if (byId.get(projectId) === undefined) return { ok: false, reason: 'project_not_found' };
@@ -131,23 +133,16 @@ export function folderTargetsFor(
   projects: readonly Project[],
   projectId: string,
 ): Project[] {
-  const alive = projects.filter((project) => project.deletedAt === undefined);
+  const alive = projects.filter((project) => isLive(project));
   return alive
     .filter(
       (candidate) =>
-        candidate.archived !== true &&
+        !isArchived(candidate) &&
         candidate.id !== projectId &&
         validateProjectParentChange(alive, projectId, candidate.id).ok,
     )
-    // 同一条规则里 `parentId` 可能是"没这个键"（reducer 把 null 翻成删除），
-    // 而排序要确定性 —— 按创建时间、同刻按 id，与 `listProjects()` 同一条规范顺序。
-    .sort((a, b) =>
-      a.createdAt !== b.createdAt
-        ? a.createdAt - b.createdAt
-        : a.id < b.id
-          ? -1
-          : a.id > b.id
-            ? 1
-            : 0,
-    );
+    // 规范顺序只有一个所有者：`byCreatedAtOrder`（创建时间升序、同刻按 id）。
+    // 这里原来手写那三行比较 —— 那份抄件与 `listProjects()` 眼下等价，
+    // 而"眼下等价"的抄件正是会在某一边被改掉时不报错的那种。
+    .sort(byCreatedAtOrder);
 }
