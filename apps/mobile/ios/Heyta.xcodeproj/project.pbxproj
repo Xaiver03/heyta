@@ -20,6 +20,8 @@
 		BCEFFD3F2AF9BA4D4D74A03C /* HeytaWidgetBundle.swift in Sources */ = {isa = PBXBuildFile; fileRef = 043B3AB8A7839FD9E717C737 /* HeytaWidgetBundle.swift */; };
 		C7BF8A4B8258E1E0A2713805 /* HeytaWidgetKit in Frameworks */ = {isa = PBXBuildFile; productRef = BAF2BC86C34AAABEFEAD0650 /* HeytaWidgetKit */; };
 		E10761744B4ACA38F1304981 /* HeytaWidgetModule.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7BB312F0DA2AD3E458F74337 /* HeytaWidgetModule.swift */; };
+		08A586DCA89443645736DBA3 /* HeytaCardExportModule.swift in Sources */ = {isa = PBXBuildFile; fileRef = C3A570098A9418530328BCED /* HeytaCardExportModule.swift */; };
+		39D6C8C223EFBC8A1BFA779C /* HeytaCardExportModuleBridge.m in Sources */ = {isa = PBXBuildFile; fileRef = 5E4F69A1BDAFCBF9E9DFF5AA /* HeytaCardExportModuleBridge.m */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -61,6 +63,8 @@
 		7A10000C2C0A00010066001A /* SceneDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = SceneDelegate.swift; path = Heyta/SceneDelegate.swift; sourceTree = "<group>"; };
 		7BB312F0DA2AD3E458F74337 /* HeytaWidgetModule.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = HeytaWidgetModule.swift; path = Heyta/HeytaWidgetModule.swift; sourceTree = "<group>"; };
 		7CAF7A9B123DBD3433233462 /* HeytaWidgetModuleBridge.m */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.objc; name = HeytaWidgetModuleBridge.m; path = Heyta/HeytaWidgetModuleBridge.m; sourceTree = "<group>"; };
+		C3A570098A9418530328BCED /* HeytaCardExportModule.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = HeytaCardExportModule.swift; path = Heyta/HeytaCardExportModule.swift; sourceTree = "<group>"; };
+		5E4F69A1BDAFCBF9E9DFF5AA /* HeytaCardExportModuleBridge.m */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.objc; name = HeytaCardExportModuleBridge.m; path = Heyta/HeytaCardExportModuleBridge.m; sourceTree = "<group>"; };
 		81AB9BB72411601600AC10FF /* LaunchScreen.storyboard */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = file.storyboard; name = LaunchScreen.storyboard; path = Heyta/LaunchScreen.storyboard; sourceTree = "<group>"; };
 		8D22EB6C565E4257AB4A6650 /* HeytaWidgetExtension.entitlements */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.entitlements; name = HeytaWidgetExtension.entitlements; path = HeytaWidgetExtension.entitlements; sourceTree = "<group>"; };
 		9FDD8A63A9057319E7AF1AC4 /* HeytaWidgetExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = HeytaWidgetExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -100,6 +104,8 @@
 				13B07FB81A68108700A75B9A /* PrivacyInfo.xcprivacy */,
 				7BB312F0DA2AD3E458F74337 /* HeytaWidgetModule.swift */,
 				7CAF7A9B123DBD3433233462 /* HeytaWidgetModuleBridge.m */,
+				C3A570098A9418530328BCED /* HeytaCardExportModule.swift */,
+				5E4F69A1BDAFCBF9E9DFF5AA /* HeytaCardExportModuleBridge.m */,
 			);
 			name = Heyta;
 			sourceTree = "<group>";
@@ -361,6 +367,8 @@
 				7A10000E2C0A00010066001A /* SceneDelegate.swift in Sources */,
 				E10761744B4ACA38F1304981 /* HeytaWidgetModule.swift in Sources */,
 				008BCDCCEA59400F058F1BF0 /* HeytaWidgetModuleBridge.m in Sources */,
+				08A586DCA89443645736DBA3 /* HeytaCardExportModule.swift in Sources */,
+				39D6C8C223EFBC8A1BFA779C /* HeytaCardExportModuleBridge.m in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

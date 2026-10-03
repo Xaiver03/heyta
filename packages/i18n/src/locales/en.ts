@@ -3758,4 +3758,8 @@ export const en = {
   // W8（三端接线）：与 zh-CN.ts 同批追加的两条，**中英成对**（`check:ui-language` 拦）。
   'mobile.countdown.entry': 'Countdowns',
   'mobile.countdown.entry.hint': 'Keep the dates you watch, and see how far off they are',
+  'mobile.countdown.export.noModule': 'This build of heyta ships without the export component — it is not a data problem; reinstalling this version fixes it.',
+  'mobile.countdown.export.rasterize': 'The system could not draw the card into an image. Nothing was lost and nothing left this device.',
+  'mobile.countdown.export.write': 'The image was rendered, but it could not be written to storage on this device.',
+  'mobile.countdown.export.share': 'The share sheet rejected this image.',
 } satisfies Record<MessageKey, string>;

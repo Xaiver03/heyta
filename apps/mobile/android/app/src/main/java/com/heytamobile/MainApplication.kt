@@ -6,6 +6,7 @@ import com.facebook.react.ReactApplication
 import com.facebook.react.ReactHost
 import com.facebook.react.ReactNativeApplicationEntryPoint.loadReactNative
 import com.facebook.react.defaults.DefaultReactHost.getDefaultReactHost
+import com.heytamobile.fs.CardExportPackage
 import com.heytamobile.fs.LocalFsPackage
 import com.heytamobile.widget.WidgetPackage
 
@@ -29,6 +30,11 @@ class MainApplication : Application(), ReactApplication {
           // autolinking 看不到它。⚠️ 忘了这一行时 JS 侧拿到 undefined，
           // 界面会显示"这台设备读不了本地文件" —— 是响亮的，不会静默。
           add(LocalFsPackage())
+          // 成品图落盘（W7 设备出图）。栅格化由 react-native-svg 的原生模块做，
+          // 这里补的是"base64 → 能被分享的文件"那一环。
+          // ⚠️ 忘了这一行时 `NativeModules.HeytaCardExport` 是 undefined，
+          //    JS 侧必须把它当成**会显示的失败**（"这台设备导不出图"），不许静默。
+          add(CardExportPackage())
         },
     )
   }

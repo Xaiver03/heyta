@@ -42,9 +42,9 @@ import {
   buildCardExportLayout,
   cardExportFileName,
   cardExportFileStem,
-  wrapText,
+  wrapCardText,
   type CardExportDrawOp,
-} from '../src/features/countdown/card-export.js';
+} from '@heyta/ui';
 
 const CARD: EventCard = {
   id: 'e1',
@@ -75,7 +75,7 @@ function wordsOf(card: EventCard): EventCardTexts {
   return cardTextsFor(card, TEXT_LABELS);
 }
 
-function layoutOf(card: EventCard, words: EventCardTexts, dark = false) {
+function layoutOf(card: EventCard, words: EventCardTexts, dark = false, rasterScale = EXPORT_CARD_SCALE) {
   const tokens = dark ? darkTokens : lightTokens;
   return buildCardExportLayout({
     texts: words,
@@ -98,7 +98,7 @@ function layoutOf(card: EventCard, words: EventCardTexts, dark = false) {
     },
     accentColor: tokens['color.primary'],
     dateStem: words.date,
-  });
+  }, rasterScale);
 }
 
 const isText = (op: CardExportDrawOp): boolean => op.kind === 'text';
@@ -284,10 +284,20 @@ describe('W7 折行：行数上限与卡片同一个数，溢出留省略号', (
 });
 
 describe('W7 · 判据④：零网络是**扫出来**的，不是主张的', () => {
-  /** 导出这条路径上的源文件：**逐个点名**，不靠目录枚举（目录里混着别人的文件）。 */
+  /**
+   * 导出这条路径上的源文件：**逐个点名**，不靠目录枚举（目录里混着别人的文件）。
+   *
+   * 🔴 为什么 web 的测试要扫到 `packages/ui` 与 `apps/mobile`：这一单要证的"零出网"
+   * 是**成品图这件事**的，不是 web 这一端的。三端各扫各的 = 每一端都只证明了自己那一截，
+   * 而版面/落盘那两截谁都没管。这一条是"非零对照"同一把尺子的取样范围。
+   */
   const SOURCES = [
     '../src/features/countdown/card-export.ts',
     '../src/features/countdown/CountdownView.tsx',
+    '../../../packages/ui/src/countdown/card-export-layout.ts',
+    '../../../packages/ui/src/countdown/EventBoard.tsx',
+    '../../../apps/mobile/src/lib/card-export.tsx',
+    '../../../apps/mobile/src/lib/card-export-native.ts',
   ];
 
   /** 只匹配**调用形状**（`fetch(` / `new X` / `.sendBeacon(`），否则注释里提一个词就红。 */
