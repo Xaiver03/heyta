@@ -1,9 +1,15 @@
 # 交接：倒数纪念日 批次二 —— 哪些真闭合了、三条并行线怎么收、合流时有两条义务必须兑现
 
-> 状态：**批次二 10 张工单里 6 张闭合**（W0 / W0b①② / W2 / W5 / W9 web 半 / W10 / L'），
-> W4b 落了服务端那半，W7 只有契约、W8 有移动半 —— 🔴 **21:0x 增量：三条并行线已全部落成本地提交（不再躺在未改动里），
-> 其中 W7 / W8 已合进 `feat/countdown-batch2` @ `db430cc9`，但合进去的内容一行验证都没跑过**（§2）；
-> W6 停放，**收尾四项（§8.3）一项都没启动**；
+> 状态：**批次二 10 张工单里 6 张闭合**（W0 / W0b①② / W2 / W5 / W9 web 半 / W10 / L'）。
+> 🔴 **22:0x 增量（本段全部做完并验证过，接手者不必重做）**：W4b 服务端半那 4 笔**已挑进**
+> `feat/countdown-batch2`（合流义务 §3.2 的 ADR 指针**已逐处核完**，现量是 12 处不是 1 处）；
+> 三条并行线合进来的内容**第一次跑了验证** —— `pnpm -r build` rc=0、`pnpm -r typecheck` 从 2 枚红修到 rc=0、
+> shared-schema / domain / ui / mobile / local-api / ai / app-host / **服务端全套**都跑过（读数见 §2.2）；
+> `check:public-facts` **已立并接进 `pnpm check`**（八臂 8 红 0 存活），`CalendarBoard` 的 `dayMarker` 缝**已开**
+> （ADR-0052 §2.6 要的那条默认值等于原值的可选 prop）。
+> 🔴 **仍未做**：W4b 客户端拉取那半（§4 第 1-2 件，判据①至今没有载体 ⇒ **W4b 不能打勾**）、
+> W7 设备出图那半、W8 原生壳那半与壳级门禁、W9 原生投递（另一条会话）；W6 停放；
+> **收尾四项（§8.3）除第 1 条的两半之外没启动**。
 > 🔴 **所有成果都在本地分支，没有 push、没有 merge 进 `main`**。
 > 交接日期：**2026-10-03**（CST）
 > 给**全新会话**用：不从聊天记录继承任何前提。每条断言都带可复现命令或实测读数。
@@ -18,7 +24,7 @@
 > | 要做什么 | 读哪节 |
 > |---|---|
 > | **知道 Goal 要求做完的全部范畴**（离开聊天也能接着跑） | §0.5 —— 🔴 它是任务书原文，逐项标了当前状态 |
-> | **收三条并行线**（W7/W8/W4b → batch2） | §2（逐文件现量 + 唯一冲突文件 + 已做的合并预演结论） |
+> | **收三条并行线**（W7/W8/W4b → batch2） | §2 —— ✅ **22:0x 已全部收完**；验证读数在 **§2.2**（新） |
 > | **合流时的两条硬义务**（法务六位置翻转 / ADR 编号指针） | §3 —— 🔴 这两条**没有门禁兜底**，漏了就变成对外说假话 |
 > | **接着写 W4b 剩余半** | §4（有现成形状，附 file:line 与实测的"不要另建一套"的读数） |
 > | **跑收尾** | §6（四条，含 `check:docs` 那 33 处红的正确处置） |
@@ -54,16 +60,16 @@ worktree 的未提交改动里，而 `feat/countdown-batch2` 落后 `main` **24 
 | # | Goal 要求的范畴（原文，不缩减） | 现在到哪一步 | 还差什么 |
 |---|---|---|---|
 | W0 | 批次一遗留的登记缺口收掉（`/tmp/ui.xml` 固定名 36 处、`verify-mobile-repeat.sh:243` 硬印库名、**待入台账的两条正文搬运**） | 🟡 **①② done**（`6598703b`，harness 22 绿 0 红） | ③ **台账搬运没做**：`environment-traps.md` 正脏 ⇒ 正文停在计划 §3.5（`:675` 起），任务 #14 |
-| W2 | 新实体 `EVENT` 落 `shared-schema` + `domain` + `op-log` reducer + 存储三套适配 + 线协议契约；🔴 部署顺序硬约束"服务端先于客户端"；ADR-0044 已定"闰月生日逢闰过正" | ✅ 已闭合（`bb6c1203` + `05794dc5`） | 无。**但"服务端先于客户端"是部署期义务，`reinstall:all` 那一步要按它排序** |
+| W2 | 新实体 `EVENT` 落 `shared-schema` + `domain` + `op-log` reducer + 存储三套适配 + 线协议契约；🔴 部署顺序硬约束"服务端先于客户端"；ADR-0044 已定"闰月生日逢闰过正" | ✅ 已闭合（`bb6c1203` + `05794dc5`），**且服务端那一腿本轮补上了**（`30340fa2`：`EVENT` 认领进 `validation.service.spec.ts` 的手写实体清单） | 无。**但"服务端先于客户端"是部署期义务，`reinstall:all` 那一步要按它排序** |
 | W5 | 倒数日卡片网格 + 二级操作（界面） | ✅ 已闭合（`a9529a59` + `94760c82` + `c07df677`），e2e 6 passed、三张图人已看 | 无 |
 | W6 | 第二个日期数据源 | ⏹ **停放**（撞车面非空，关闭判据见 §5） | 等六个日历路径 `git status --porcelain` 归零后落地，复用 §4 第 3 条的 `dayMarker` 缝 |
-| W7 | 纪念卡片导出为**成品图**（设备渲染导出，**零通道、零法务变更**；区别于素材图） | 🟡 **已提交 `581bdb99` 并合进 batch2 `caf9a48c`**：只有线协议契约（99 行）+ ui 侧字段（+42） | 🔴 **设备出图那半没有**：RN/原生渲染导出、`check:*` 门禁、判据（含"零法务变更"的现量复核）全未做，一行没跑过 |
-| W8 | 三端（web / mobile / 原生壳）接线与壳级门禁 | 🟡 **已提交 `b8f39cae` 并合进 batch2 `db430cc9`**：移动半（`CountdownScreen` 267 行 + `feature-entries` 109 + `countdown-display` 133）+ 领域层 `feature-modules.ts` 77 + 测试 244 行；web 半已随 W5 落地 | 🔴 **测试一行没跑过**；"三端"里**原生壳那半 + 壳级门禁**没有产物 |
+| W7 | 纪念卡片导出为**成品图**（设备渲染导出，**零通道、零法务变更**；区别于素材图） | 🟡 **已提交 `581bdb99` 并合进 batch2 `caf9a48c`**：只有线协议契约（99 行）+ ui 侧字段（+42）。🔴 合进来的东西**本轮第一次跑过**：`shared-schema` 117 passed、`pnpm -r build` rc=0（⚠️ 但它是靠 build 才第一次进 dist —— 起手 `grep -c EXPORT_CARD_EDGE_PX dist/index.js` = **0**） | 🔴 **设备出图那半没有**：RN/原生渲染导出、`check:*` 门禁、判据（含"零法务变更"的现量复核）全未做 |
+| W8 | 三端（web / mobile / 原生壳）接线与壳级门禁 | 🟡 **已提交 `b8f39cae` 并合进 batch2 `db430cc9`**：移动半（`CountdownScreen` 267 行 + `feature-entries` 109 + `countdown-display` 133）+ 领域层 `feature-modules.ts` 77 + 测试 244 行；web 半已随 W5 落地。✅ **那 244 行本轮真跑了**：`@heyta/mobile` 547 passed、`@heyta/domain` 859 passed（起手 4+15 枚红全部是读旧 dist，见 §2.2 第 1 条） | 🔴 "三端"里**原生壳那半 + 壳级门禁**没有产物 |
 | W9 | 提醒（含投递路径 —— 现状是全仓零 `new Notification(`） | 🟡 **web 半 + DST ✅**（`a8f5a9a6`，变异 9/9 红）；**原生投递那半没动** | 投递路径 = Goal 明文要求的**没做完**那半（ADR-0051 另立一单）；合流时连带兑现 §3.1 |
 | W10 | `EVENT` 必须**同时**进 AI 工具目录与 local-api 工具契约（实体与 AI 工具一起做；不改 `ENTITY_TYPES` 驱动的排期决定） | ✅ 已闭合（`8a595493` + `e2aeedc4`），目录 4 条 EVENT 工具，MCP 与内置 AI 共用同一份 | 无。⚠️ 副作用已被 L' 抓住并修（`ai-and-transfer.ts` 那张表 = 授权面） |
-| W4b | 调休/补班的运营录入通道 + 客户端拉取（heyta **第一条服务端→客户端内容通道**，**ADR 必须定性，且回写 ADR-0038 的后台范围表**） | 🟡 **ADR 定性 + 0038 回写 ✅**（`c28e5f1a` @ `main`）；服务端半 **4 笔提交在 `feat/countdown-w4b`（迁移已确认存在）**；🔴 **尚未并入 batch2**（停在 §2.1 那条 union 冲突）；**客户端半从零** | §4 那四件（后台录入 / 客户端拉取+缓存 / `dayMarker?` / `check-public-facts.mjs` + 判据①②③④），外加 §2.1 的挑配方法。🔴 **W4b 的勾不能打** |
+| W4b | 调休/补班的运营录入通道 + 客户端拉取（heyta **第一条服务端→客户端内容通道**，**ADR 必须定性，且回写 ADR-0038 的后台范围表**） | 🟡 **服务端半已并入 batch2**（§2.1 那 4 笔 = `a39f7fa6`/`a2259e5d`/`3708d08c`/`2877dd37`，union 解掉唯一相撞面并验过两侧逐字保留）；ADR 定性 + 0038 回写 ✅（`c28e5f1a` @ `main`）；§3.2 的 **ADR 指针义务已兑现**（`1dbe6df6`，12 处逐处核过）；🔴 **门禁 `check:public-facts` 已立并接进 `pnpm check`**（`3f327dc2`，八臂 8 红 0 存活）；§4 第 3 件 **`dayMarker` 缝已开**（`509a06cd`，4 条判据 + 三臂变异全红）；**客户端拉取那半仍从零** | §4 只剩第 1-2 件（后台录入已在挑配里落地 ⇒ 实际是**客户端拉取 + META 缓存 + 宿主接线**），外加判据①要真界面截图且人看。🔴 **W4b 的勾不能打** |
 | L 系列 | 法务联动 —— 改 `packages/legal` 那六处现成位置、每处中英双份、落地页文案走生成物不许手改（`check:legal-copy` 已在 `pnpm check`） | 🟡 **判定表已出、唯一真命中已修**（`2d53ea94` + `8996de9d` + `1d71e75f`/`017adc3e`） | 🔴 六处**没有被"全改一遍"是判定结果**（§4 时序条款：纯文字版不触发 L1/L2/L4/L5），但 **§3.1 那六个字面位置随 W9 那半必须翻转** |
-| 收尾 | Goal 第 7 条 + 计划 §5/§8.3 | ⏹ **四项一项没启动** | §6 全部 |
+| 收尾 | Goal 第 7 条 + 计划 §5/§8.3 | 🟡 **§6 第 1 条的两半已做**（`pnpm -r build` rc=0、`pnpm -r typecheck` rc=0、八个包 + 服务端全套的读数见 §2.2） | `check:docs`（33 处是别人未跟踪文档的函数）、界面截图人看、`pnpm reinstall:all` 四端 —— 全未做 |
 | 同步 | 每完成一项 → 计划文档打勾 + **同步 AGENTS §9** | 🟡 计划文档已同步（`cd839ec5`）；**AGENTS §9 欠着** | `AGENTS.md` 脏 ⇒ 不能 `--only` 提交（§7 第二条），等干净后补 |
 
 **硬边界与纪律（任务书原文 7 条，逐条仍在生效）**：
@@ -118,13 +124,13 @@ rc=0
 
 ---
 
-## 2. 三条并行线的现量（20:5x 重取 —— 这类读数每次引用都要重取）
+## 2. 三条并行线的现量（22:0x 已全部收进 batch2；下面的逐文件读数是当时取的，引用前重取）
 
 | worktree | 分支 / HEAD | 未提交 | 状态（21:0x 更新） |
 |---|---|---|---|
 | `heyta-wt-w7` | `feat/countdown-w7` @ `581bdb99` | **0（已提交）** | ✅ **已并入 batch2**（merge `caf9a48c`） |
 | `heyta-wt-w8` | `feat/countdown-w8` @ `b8f39cae` | **0（已提交）** | ✅ **已并入 batch2**（merge `db430cc9`） |
-| `heyta-wt-w4b` | `feat/countdown-w4b` @ `e442a3bb` | **0（已提交）** | ⏸ **尚未并入**，停在一条 union 冲突上（见 §2.1） |
+| `heyta-wt-w4b` | `feat/countdown-w4b` @ `e442a3bb` | **0（已提交）** | ✅ **那 4 笔代码提交已挑进 batch2**（`a39f7fa6`/`a2259e5d`/`3708d08c`/`2877dd37`，union 解掉唯一相撞面）；`d4fd01a1` 那笔文档单独处置，未并 |
 
 ✅ **21:0x 增量（这一段我做完了，接手者不必重做）**：三条并行线原来 100% 躺在未提交改动里，
 现已各自按点名路径落成本地提交（worktree 全部 0 脏），且 W7 / W8 已合进 `feat/countdown-batch2`：
@@ -177,6 +183,46 @@ cd "…/heyta" && git merge-tree --write-tree --name-only feat/countdown-batch2 
 
 ---
 
+### 2.2 首次验证读数（22:0x，载体 = `feat/countdown-batch2` @ `509a06cd`）
+
+合进来的东西**第一次真跑**。逐条可复跑：
+
+| 跑的是什么 | 命令 | 读数 |
+|---|---|---|
+| 全量构建 | `pnpm -r build` | **rc=0**，含 `server build$ prisma generate && tsc` |
+| 全量类型 | `pnpm -r typecheck` | 起手 **2 枚红** → 修完 **rc=0**（19 个包；server 没有 typecheck 脚本，它的类型由 `tsc` 在 build 里查） |
+| W4b 契约 | `pnpm --filter @heyta/shared-schema test` | **117 passed** |
+| W4b 判据④三条分支 | `pnpm --filter @heyta/domain test` | **859 passed**（起手 15 枚红，见下面第 2 条） |
+| W7 消费面 | `pnpm --filter @heyta/ui test` | **452 passed**（448 + 新开的 dayMarker 缝 4 条） |
+| W8 移动半 | `pnpm --filter @heyta/mobile test` | **547 passed**（起手 4 枚红，同一原因） |
+| W10 的两处类型红 | `pnpm --filter @heyta/local-api test` / `@heyta/ai test` | **130 / 223 passed** |
+| 服务端全套（**第一次**） | `pnpm --filter @heyta/sync-server test` | 起手 **1 failed**（下面第 3 条）→ 修完那条 spec 单独复跑 **62 passed** |
+| 共享组件回归 | `pnpm --filter @heyta/web test` | **1512 passed / 12 skipped** |
+| 新门禁 | `pnpm check:public-facts` | rc=0；`GET 路由 20 条，匿名 3 条` |
+| 样式与文案 | `check:design` / `check:ui-language` | ✅ 无硬编码 / ✅ 299 文件 379 处文案 |
+
+**三条只能在本轮拿到的事实**（都是"上一轮写成主张、这一轮跑出来"那种）：
+
+1. 🔴 **那 19 枚红没有一枚是产品缺陷，全部是判据读了旧 `dist`。** 起手 `packages/shared-schema/dist/index.js`
+   的时间戳是 **17:05**，而 `grep -c EXPORT_CARD_EDGE_PX dist/index.js` = **0** —— 也就是说 W7 的契约
+   **从来没被构建过**。`pnpm --filter @heyta/shared-schema build` + `@heyta/domain build` 之后
+   15+4 枚一起消失。⇒ AGENTS §7 第 27 条那一族的又一副面孔：**共享包源码变了，任何读 dist 的判据
+   都还在测上一个版本**，而它报出来的错长得像真缺陷。
+2. 🔴 **交接 §6 那句"沙箱里跑不了 `@heyta/sync-server`（`prisma generate` EPERM）"被现量否证。**
+   本轮 `prisma generate` 正常出来（`Generated Prisma Client (v5.22.0) … in 147ms`），服务端 91 个测试文件
+   跑起来了。**别把环境主张当常量抄下去** —— 它多半取决于当时谁的进程占着什么。
+3. ✅ **服务端那一枚红是真的，而且是 W2 欠的一步**：`validation.service.spec.ts` 的
+   `ALLOWED_ENTITY_TYPES` "精确数量"断言红 —— 它对照的 `HEYTA_ENTITY_TYPES` 是一份**手写清单**，
+   而清单自己的注释写着"加实体必须是有意识的决定，不能被顺手带过去"。W2 加了 `EVENT` 却没在服务端这侧认领，
+   因为当时只跑了 `packages/*`。⇒ 修的是**认领**（`30340fa2`），不是数量断言。
+   这条同时说明：**W2 那个 ✅ 原本缺了服务端这一腿**。
+
+**载体事实**：本轮 21:13→21:39 之间这台 Mac **重启过一次**（`uptime` 从 `up 7 days` 变成 `up 8 mins`），
+负载随之从 375 掉到 15-25；并行会话的重活被打断过，接手时它们的现场要重新现量。
+
+---
+
+
 ## 3. 🔴 合流时必须兑现的两条义务（没有门禁兜底，漏了就对外说假话）
 
 ### 3.1 L' 通知族：六个字面位置要跟着 W9 翻转
@@ -204,9 +250,22 @@ cd "…/heyta" && git merge-tree --write-tree --name-only feat/countdown-batch2 
 **ADR-0052**（`c28e5f1a` @ `main`）。⇒ 合流时把那处指针改成 0052。
 `AGENTS.md` 里并行会话也写过一行 `0050→0051` 的错引，**不代改**（他们的文件正脏）。
 
+✅ **本义务已于 `1dbe6df6` 兑现**，但现量比这里写的**大一个数量级**：不是"那处"，是 **12 处 / 9 个文件**。
+逐处对着 ADR-0052 的正文核过，机械换号会留下三类错：① 章节号错（`§3/§6` 在 0052 里是 §2.1/§2.2，
+0052 的 §3 是"为什么不选另外两条路"）；② **两处引用了 0052 里根本没有的话**（"§5 的体积账"、
+"§4 明写它不是内容寻址"）—— 已改成引用真实立场（§4 第 4 条"缓存不是正确性来源"），
+"体积账"归给契约常量自己推导；③ `holiday-adjustment-contract.ts` 那条链接**少一层 `../`**，
+换了号也仍是死的。📌 **`docs-link-check` 只走 `.md`**（实测 `collectMarkdown` 只收 `.md`）⇒
+代码注释里的链接**没有任何门禁在看**，所以它能编号和深度同时错而全绿。
+
 ---
 
 ## 4. W4b 剩下的半（客户端侧，全部从零）
+
+> 🔴 **22:0x 更新**：下面第 1 件（后台录入）随 §2.1 那 4 笔**已经落地**（`admin.routes.ts` 的 GET/PUT/DELETE
+> 三端点 + `server/tests/holiday-admin-routes.spec.ts` 351 行）；第 3 件（`dayMarker?`）**缝已开**
+> （`509a06cd`，判断在 `calendar/model.ts` 的 `calendarDayMarkerView`，4 条判据 + 三臂变异全红），
+> 宿主接线还没人传它。⇒ **本节只剩第 2 件是从零**，加上判据①要在真界面上跑一次。
 
 已落（服务端半，未提交）：两张表 + 1 条迁移（年度录入存 `papers` / 逐日 `day DATE + isOffDay BOOLEAN`）、
 线协议契约在 `shared-schema`（**唯一一份**）、`holidays.ts:108 adjustmentOn()` 接上"部署方下发的覆盖表"入口、
@@ -244,7 +303,7 @@ cd "…/heyta" && git status --porcelain -- packages/ui/src/calendar apps/web/sr
 
 ---
 
-## 6. 收尾四项（计划 §8.3，一项都没启动）
+## 6. 收尾四项（计划 §8.3）—— 第 1 条的两半已在 22:0x 做完，读数在 §2.2
 
 1. `pnpm -r typecheck && pnpm -r test` → **完整 `pnpm check`**。
    🔴 **`check:docs` 现在必然红：33 处**"本机有、仓库没跟踪"的死链，**全部落在并行会话的未跟踪文档上**
@@ -276,7 +335,8 @@ cd "…/heyta" && git status --porcelain -- packages/ui/src/calendar apps/web/sr
   ```
   | [countdown-batch2-handoff.md](plans/countdown-batch2-handoff.md) | **交接：倒数纪念日批次二** —— 6 张闭合、3 条并行线未提交、合流时两条法务/ADR 义务 |
   ```
-- 台账 `docs/reference/environment-traps.md`：工作树现量 `grep -cE '^[0-9]+\. '` ⇒ **196** 条。
+- 台账 `docs/reference/environment-traps.md`：工作树现量 `grep -cE '^[0-9]+\. '` ⇒ **197** 条（22:0x 重取；
+  写过一次"196"几天后就漂了 —— **这类计数每次引用都要重取**）。
   计划 §3.5 里"待入 §7 的两条"正文已写好（`docs/plans/countdown-anniversary.md:675` 起），**编号按执行当时的现量取**，别按 HEAD。
   任务 #14：搬运 + 把 #168 改过去式（等该文件干净）。
 - 其他在飞分支（**不属于本批，别并**）：`feat/detail-pane`、`feat/self-host-distribution`、
@@ -335,15 +395,19 @@ L1 那条"前置闸门"从文档记忆变成常驻检查，踩响它的是 W9，
 > 范畴、逐项状态与 7 条硬边界的**唯一入口**是 `docs/plans/countdown-batch2-handoff.md` §0.5 —— 先读它，
 > 不要凭这份开场白施工。
 >
-> 当前（21:0x）：6 张闭合在 `feat/countdown-batch2`；三条并行线**已各自提交**，W7（`caf9a48c`）与 W8（`db430cc9`）
-> **已合进 batch2 但一行验证都没跑过**，W4b 服务端半**尚未并入** ⇒ 第一步照 §2.1 挑那 4 笔代码提交，
-> 唯一的相撞面是 `packages/shared-schema/src/index.ts`，解法 **union（两段导出都留）**。
-> 然后：负载降下来后跑 `pnpm -r typecheck` + 相关包测试，把 W7/W8 从"合进来"变成"验证过"；
-> 做 §4 的 W4b 客户端半（4 件，判据①要真界面截图且人看过）；兑现 §3 两条合流义务
-> （法务通知族六位置翻转 + `SCHEDULE_EXACT_ALARM` 登记 + ADR 指针 `0050→0052`）；
-> 再按 §5 看 W6 的关闭判据是否归零；最后按 §6 跑收尾四项。
+> 当前（22:0x，载体 = `feat/countdown-batch2` @ `509a06cd`）：§2.1 的挑配**已做完**（W4b 那 4 笔 =
+> `a39f7fa6`→`2877dd37`，唯一相撞面按 union 解、两侧逐字保留）；合进来的东西**第一次跑了验证**，
+> 读数与三条只能在本轮拿到的事实在 **§2.2**（那 19 枚红全是"判据读旧 dist"；服务端跑得起来，
+> 原先那句"沙箱跑不了 sync-server"被否证；服务端照出一枚真红 = W2 欠的 `EVENT` 认领，已修）；
+> §3.2 的 ADR 指针义务**已兑现**（现量 12 处不是 1 处，含两处引用了 ADR 里根本没有的话）；
+> `check:public-facts` **已立并接进 `pnpm check`**（八臂 8 红 0 存活）；`CalendarBoard` 的 `dayMarker`
+> **缝已开**（默认值等于原值，4 条判据 + 三臂变异全红）。
 >
-> **不 push、不 merge 进 main、不发问，直接做。**
+> 还差的，按依赖顺序：**(1) W4b 客户端拉取那半**（§4 第 2 件：照 `fetchImpl` 现成形状、公共事实**不带 token**、
+> 落 `STORES.META`；⚠️ `packages/domain` 文件头把"让 `adjustmentOn` 变 async"列为**已否证**的方案 ⇒ 拉取必须带外做）
+> → **(2) 宿主接线**（web 的接点 `apps/web/src/features/calendar/CalendarView.tsx:147`；主检出那一带仍 14 个脏文件）
+> → **(3) 判据①在真界面跑一次**（截图 + 人真的看过）→ **(4) W7 设备出图那半** → **(5) W8 原生壳那半 + 壳级门禁**
+> → **(6) 兑现 §3.1**（挂在 W9 原生投递上，另一条会话在做）→ **(7) §5 看 W6 归零没有** → **(8) §6 收尾**。
 >
 > **不 push、不 merge 进 main、不发问，直接做。**
 
