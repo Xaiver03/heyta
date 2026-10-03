@@ -284,6 +284,25 @@ test('PWA 资产在 /app/ 子路径下拿到真身，且 SW 真的注册成功',
   await page.screenshot({ path: `${SHOT_DIR}/live-app-pwa.png` });
   console.log(`📷 应用（PWA 验收）：${SHOT_DIR}/live-app-pwa.png（#root textContent ${String(rootLength)} 字符）`);
 
+  /**
+   * 🔴 **必须先在真界面上点「同意」，下面那段探测才有东西可探。**
+   *
+   * 这道闸是隐私那条线（G-12 / G-27）落进来的，它把**三件事一起**搬到同意之后：
+   * `window.fetch` 换成带闸的（未同意一个字节都不出进程）、实时通道、以及
+   * **`serviceWorker.register()` 本身**（`apps/web/src/features/privacy/startup-network.ts`
+   * 那张表最后一行）。所以在这个全新上下文里，未同意时下面两件事必然发生：
+   *
+   * - `fetch(manifestUrl)` 同步抛 `PrivacyConsentBlockedError`；
+   * - `navigator.serviceWorker.ready` **永远不 resolve**（不是失败，是没人注册过）——
+   *   这条最坏，因为它会被读成"SW 坏了"，而产品行为是完全对的。
+   *
+   * ⚠️ 本条用例在 2026-09-30 是**没有这一步也能绿**的，因为那时还没有这道闸。
+   *    它的标题那句"SW 真的注册成功"现在的准确口径是**"同意之后"** ——
+   *    这与 `live-signin-entry.spec.ts:106` 走的是同一个动作，不是这条用例自己造的约定。
+   */
+  await page.locator('[data-testid="privacy-consent-accept"]').first().click();
+  await expect(page.locator('[data-testid="privacy-consent-dialog"]')).toHaveCount(0);
+
   const probe = await page.evaluate(async () => {
     const manifestUrl = new URL('manifest.webmanifest', window.location.href);
     const response = await fetch(manifestUrl);
