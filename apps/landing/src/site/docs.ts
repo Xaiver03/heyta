@@ -588,9 +588,9 @@ const DOCS_ENTRIES: Record<DocsArticleId, DocsEntry> = {
     moduleId: 'data',
     sections: [
       {
-        id: 'tasks-only',
+        id: 'what-the-trash-holds',
         titleKey: 'site.docs.trash.s1',
-        bodyKeys: ['site.docs.trash.s1p1', 'site.docs.trash.s1p2'],
+        bodyKeys: ['site.docs.trash.s1p1', 'site.docs.trash.s1p2', 'site.docs.trash.s1p3'],
         itemKeys: [
           'site.docs.trash.s1i1',
           'site.docs.trash.s1i2',
