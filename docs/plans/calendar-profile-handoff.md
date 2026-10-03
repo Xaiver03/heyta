@@ -560,6 +560,24 @@ print("墙上 16:00 =",wall,"  零点+16h =",midnight+57600000,"  差 ms =",wall
    ✅ 闸门本身这一轮修了两处（都不是为了跑绿）：`$BOOTED` 未加引号导致模拟器名被分词显示成
    `iPhone; Duo; heyta`；以及三台 booted 时静默取第一台 —— 现在外部 `IOS_DEVICE_NAME` 优先、
    取到的整名与来源都会打印、列表为空则 exit 3 不猜目标。
+   🔴 **01:5x 逐段现量：B 的"受阻"不是一条，是四条，各自卡在不同资源上**——
+   ① **mac**：`/Applications/Heyta.app` mtime `10-03 23:05:40`（比当前源码旧三小时，正是 B 要修的那件事）；
+   它写的是全机共享的 `/Applications`，而另一条会话的 mac 壳判据读的就是那份安装副本。
+   ② **ios**：`xcrun simctl list devices booted` 现量 **3 台 Booted**（`heyta-iphone-17pro` /
+   `heyta-ios-isolated` / `iPhone Duo heyta`），目标设备名在列 ⇒ 闸门那条 ✅；🔴 但同一时刻
+   `.verify-mobile-ios-reminder.sh.snap.36041` 正在跑（pid **36041**，W9 那条线的 iOS 验收），
+   而 ios 段的动作序列里就有 `simctl uninstall` —— 那会把对方那趟的界面连数据一起卸掉（AGENTS §8.9）。
+   ③ **android**：`emulator-5554` 在线，`pm list packages` 里只有 `com.heyta` + `com.heyta.test`
+   （焦点 `com.heyta/com.heytamobile.MainActivity`，Java 包名与 applicationId 不同是预期的），
+   但同一台 emulator 也正是 C 的载体，android 段的 `adb uninstall` 会把 C 待射那一趟的重装掉
+   ⇒ 与 ② 同一个运行者阻塞。
+   ④ **windows**：打包机可达（`ssh -o BatchMode=yes windows-pc "echo WIN_OK"` ⇒ `WIN_OK`）⇒ 这一段不缺主机；
+   缺的是"送过去的字节 == 当前源码"：主检出 `packages`/`apps`/`server` 现量 **86 枚脏**（全归 vault 那条线），
+   而 `sync_windows_sources()` 送的就是在作工作树 ⇒ 在主检出跑等于把别人的 WIP 打成产物。
+   ✅ ④ 有现成的干净载体：`heyta-wt-r14c`（闸门五节里工作树那节 ✅）。
+   ⚠️ 如实记一次自伤读数：我这轮第一条数 booted 的命令写成小写 `grep -c 'booted'` ⇒ 报 **0**，
+   而 simctl 的状态串是 `(Booted)`（仓内 `reinstall-all.sh:368` 用的就是 `grep Booted`）——
+   打印原始输出才发现是探针坏了、不是模拟器全关，这是 AGENTS §7 元规则一（先怀疑探针）的又一次现量复现。
 4. **C（R14c 的 Android 真机腿）**。🟢 **23:5x 更新：那条脚本已经写出来了** ——
    `scripts/verify-mobile-due-time.sh`（604 行 / 14 step / 11 判据 + 3 对照，离线先验读数见过程账 §3·补 ⑩）。
    原写法仍然有效：bootstrap 在前 15 行（实测在第 3 行），`MANIFEST` 那一行**待插**
@@ -613,6 +631,29 @@ print("墙上 16:00 =",wall,"  零点+16h =",midnight+57600000,"  差 ms =",wall
    `CARRIER="/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta-wt-r14c" BUDGET=3600 bash research/tools/r14c-window-retry.sh`
    （日志 `/tmp/ht-r14c-window.log`，哨兵 `ATTEMPT rc=` / `WINDOW=open|timeout` / `ALL_DONE final_rc=`；
    四臂自测：缺载体 exit 1、预算 0→3 且写 `WINDOW=timeout`、桩闸门退 0→0、桩闸门退 7→**7** 不被洗白）。
+   🔴 **02:0x：那两条新守卫已经先验到有牙了（零设备、零窗口 —— PATH 里的桩 adb）**。做法是把
+   `scripts/verify-mobile-due-time.sh:336-348` **逐字节**抽出（`cmp -s` 与源相同；抽完先 `tail -2` 确认末行是
+   `ok` 而不是紧接着那句 `pm clear` —— 上一轮"多抽一行副作用"的教训照做了），套上 `ok` / `bad` / `screen_txt`
+   三个 helper 桩与 `$ADB`、`$APK_SHA` 两个变量，三臂各跑一次、退出码单独取：**ok** ⇒ rc=**0** + `OK_LINE`
+   （句中带回 `APK sha256=…`，即产物归属被打进了绿线）+ 走到块尾；**fail**（桩回 `Failure [INSTALL_FAILED_ABORTED]`
+   且 rc=1）⇒ rc=**1** + `BAD_LINE: adb install 退出码 1 ⇒ 停…` + `SCREEN_TXT_CALLED`（第一条红会 dump 屏幕）；
+   **quiet**（桩 **rc=0 但输出里没有 `Success`**）⇒ rc=**1** + `BAD_LINE: …退出码 0 但输出里没有 Success…`，
+   且**没有** `SCREEN_TXT_CALLED` —— 第二条红不 dump，这是形状差异不是缺陷，如实记着。
+   ⚠️ 第一趟三臂**全部塌成同一条"退出码 126"的红**：桩忘了 `chmod +x`。红的是我的探针，不是判据
+   （AGENTS §7 元规则一）。修的是装置 —— 加一句前提断言 `[ -x "$ADB" ] || exit 4`，三臂这才分开。
+   🔴 **顺带量清一件之前没人写过的事：窗口开时那一趟跑的到底是哪份判据。** 装置调的是**载体那份**
+   （`r14c-window-retry.sh:25` `GATE="$CARRIER/scripts/verify-mobile-window-gate.sh"`）。载体（detached `93113e30`）现量：
+   `scripts/verify-mobile-due-time.sh` 是 ` M` 且与主检出工作树**逐字节相同**（⇒ 带着上面这两条新守卫）；
+   `scripts/verify-mobile-window-gate.sh` 是 `SAME_as_HEAD`，**没有** 01:2x 那两处修复（与主检出 diff **25 行**，逐条读过：
+   一处是 booted 名字的显示分词、一处是 `--confirm` 取 iOS 目标）。⇒ **对 `--target c` 的裁决没有影响**
+   （那两处只作用于 iOS 那一侧的显示与 `--target b` 的取设备），但归属必须写准：**这一趟如果绿了，
+   绿的是"HEAD 的产物 + 尚未提交的判据守卫"** ⇒ A 那份点名清单里"两枚脚本与两份文档同一笔"不是仪式，
+   否则下一个人拿不到同一条判据。载体那份 ` M` **不会**被闸门第二节拦住，因为第二节只
+   `git status --porcelain -- packages apps server`（`verify-mobile-window-gate.sh:87`），`scripts/` 不在范围里。
+   判"这一趟用的是带守卫的那份"的现量命令：
+   `cd <载体> && git status --porcelain -- scripts/verify-mobile-due-time.sh`（应打 ` M`）`&& grep -c INSTALL_RC` ≥ 1。
+   ✅ 另清一处疑点：脚本里剩下的那枚 `tail -1 | sed`（`:250`）**不是漏网的管道判据** —— 它取的是 `wm size` 的**值**，
+   紧跟 `case "$SW$SH" in ''|*[!0-9]*)` 拒空值/非数字并 exit 3，还会把原始串打出来（`:252-254`）。
 5. **A（入库）** —— 🟢 **00:0x 现量：本会话没有 `git add`，但别人那笔 `2f735392`（"并行批次的总接线 —— 门禁注册、词条表、包清单与证据归位"）
    把工作树整片吸了进去，本线 **19 枚判据文件里 17 枚已在 HEAD**（含 23:5x 刚写的 `scripts/verify-mobile-due-time.sh` 与台账整段），
    五张证据目录合计 **29 枚 png 已在 HEAD**，`check:docs` 指向本线的红 **归零**（现量 2 红全在 `countdown-anniversary.md:1091/1295`，不归本线）。
