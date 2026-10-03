@@ -174,6 +174,7 @@ import { FocusTimer } from './features/focus/FocusTimer.js';
 import { TrashView } from './features/trash/TrashView.js';
 import { LanguageSwitcher } from './features/shell/LanguageSwitcher.js';
 import { onEngineChange, readRecentOps } from './lib/oplog.js';
+import { pruneSelectionFromEntities, selection, useSelected } from './lib/selection.js';
 import { applyTheme, rememberThemeChoice, resolveInitialTheme, type Theme } from './lib/theme.js';
 
 import './styles/app.css';
@@ -212,6 +213,27 @@ export function App(): React.JSX.Element {
    */
   const visible = useTaskStore(useShallow(selectVisibleTasks));
   const counts = useTaskStore(useShallow(selectQuadrantCounts));
+  /**
+   * 详情面的**选中态**（W1）。它住 `@heyta/app-host`，web 只有这一行胶水。
+   *
+   * 🔴 为什么不是 `useState`：选中要能跨视图（列表 / 日历 / 四象限 / 时间线 /
+   * 搜索 / 回收站是同一批任务），而各视图各存一份的结果就是"从搜索点进一条、
+   * 切回日历，选中丢了；而在习惯页它又是另一套回落规则"。
+   * 此前它确实散成三份：web 任务侧**根本没有**（行体不可点）、
+   * web 习惯侧一个 `useState`、移动端任务侧另一个 `useState`。
+   *
+   * ⚠️ 返回的是**原始值**，所以不需要 `useShallow` —— 上面那段"引用稳定"
+   * 的教训对它同样成立，只是它天然满足。
+   */
+  const selectedTaskId = useSelected('task');
+  /**
+   * 🔴 必须是 `useCallback` 而不是行内箭头：`TaskList` 把 `onOpenTask` 放进了
+   * 行渲染的 `useMemo` 依赖里，每次渲染换新函数 = 整表所有行重建，
+   * 而这一栏是要装常驻详情面的（W2），白重渲染的代价会从"看不见"变成"看得见地卡"。
+   */
+  const openTask = useCallback((taskId: string) => {
+    selection.select('task', taskId);
+  }, []);
   const [view, setView] = useState<ViewKey>('tasks');
   /**
    * 已启用的功能模块（**设备本地**，见 `features/shell/modules.ts`）。
@@ -693,6 +715,22 @@ export function App(): React.JSX.Element {
       unsubscribe();
     };
   }, [aiSettings.memoryEnabled]);
+
+  /**
+   * 选中态的**回落**（W1）：实体不在了就把选中丢掉，免得详情面继续显示一条
+   * 已经不存在的东西 —— 那是界面在说谎。
+   *
+   * 🔴 判据是"**实体还在不在**"，**不是**"它在当前筛选下可不可见"。
+   * 写成后者的话，用户从「今天」切到「收集箱」的那一刻，正在详情面里编辑的
+   * 那条任务会被判定"不存在"、面板自己关掉。这条红线在 `app-host` 的
+   * `selection.ts` 文件头，判据钉在 `packages/app-host/tests/selection.spec.ts`；
+   * 本行只是它的**消费者**，所以这里连比较都不写，只把物化状态递进去。
+   *
+   * ⚠️ 软删除（进回收站）**算"不在了"**：详情面跟着关，恢复动作在回收站里做。
+   */
+  useEffect(() => {
+    pruneSelectionFromEntities(store.entities);
+  }, [store.entities]);
 
   // 主题应用到 <html data-theme>，tokens.css 的暗色覆盖挂在那里
   useEffect(() => {
@@ -1963,6 +2001,8 @@ export function App(): React.JSX.Element {
               <TaskList
                 tasks={visible}
                 sort={taskSort}
+                onOpenTask={openTask}
+                activeTaskId={selectedTaskId}
                 onToggleTask={(taskId) => {
                   void store.toggleComplete(taskId);
                 }}
@@ -2027,6 +2067,8 @@ export function App(): React.JSX.Element {
                         <TaskList
                           tasks={group.tasks}
                           sort={taskSort}
+                          onOpenTask={openTask}
+                          activeTaskId={selectedTaskId}
                           onToggleTask={(taskId) => {
                             void store.toggleComplete(taskId);
                           }}

@@ -77,6 +77,7 @@ import { HabitBoard, HabitProgressList } from '@heyta/ui';
 
 import { openTaskHost } from '../db/open-host';
 import { habitBoardLabels, habitListLabels } from '../lib/habits-display';
+import { pruneSelectionAgainst, selection, useSelected } from '../lib/selection';
 import { useToday } from '../lib/use-today';
 import { useMobileSync } from '../sync/store';
 import { Button, Card, EmptyState, Screen, Text, TextField } from '../ui/kit';
@@ -103,10 +104,15 @@ export function HabitsScreen({ onBack }: { onBack: () => void }): React.JSX.Elem
   /**
    * 🔴 详情层展开的那一条。`null` = 停在清单。
    *
-   * 它是**本地导航态**，不是业务数据 —— 不进 op-log、不落盘：手机上的
+   * 它是**视图态**，不是业务数据 —— 不进 op-log、不落盘：手机上
    * "我正在看哪一条"换一台设备没有意义，同步过去反而是噪音。
+   *
+   * ⚠️ 状态本身住在 `@heyta/app-host`（`lib/selection.ts` 只是本壳的胶水），
+   * 与任务详情、便签、清单、标签是**同一份**选中态。这里原本是 `useState`，
+   * 而 web 习惯页有它自己的一份、移动端任务页又有一份 —— 三份的回落规则不同，
+   * "在某个视图里选中消失后面板该不该自己关"就变成每个屏各答一遍。
    */
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const selectedId = useSelected('habit');
   /** 正在落盘的那一条 —— 置灰它，防连点发出两条 op。 */
   const [busyId, setBusyId] = useState<string | null>(null);
   /**
@@ -138,9 +144,32 @@ export function HabitsScreen({ onBack }: { onBack: () => void }): React.JSX.Elem
   const refresh = useCallback(() => {
     if (!actions) return;
     // ⚠️ 两个 list 都是**同步**的（读的是已物化的内存状态），不是 Promise。
-    setHabits(actions.listHabits());
+    const aliveHabits = actions.listHabits();
+    setHabits(aliveHabits);
     setLogs(actions.listLogs());
+    /**
+     * 选中态的**回落**：详情层展开着的那条习惯被删掉（本机删、或另一台设备
+     * 删了同步过来）时，选中清空 ⇒ 界面退回清单。
+     *
+     * 🔴 传的是 `listHabits()` 的**全集**而不是筛选后的那一截 —— 后者会得到
+     * "用户换个筛选，正在看的那条就被判成不存在、面板自己关掉"。
+     */
+    pruneSelectionAgainst({ habit: aliveHabits.map((habit) => habit.id) });
   }, [actions]);
+
+  /**
+   * 离开这一屏时收起详情层（与 `TasksScreen` 同一条理由）。
+   *
+   * 🔴 这是**移动端的形态**决定的，不是共享层的规则：这里的详情是一个二级屏，
+   * 外壳按标签切屏会卸载本屏；选中态留着的话，切回「习惯」就发现自己
+   * 莫名站在某条习惯的详情里。web 相反 —— 常驻列跨视图保持选中正是它的价值。
+   */
+  useEffect(
+    () => () => {
+      selection.select('habit', null);
+    },
+    [],
+  );
 
   useEffect(() => {
     if (!host) return;
@@ -207,7 +236,7 @@ export function HabitsScreen({ onBack }: { onBack: () => void }): React.JSX.Elem
   const removeSelected = useCallback((): void => {
     if (actions === null || selected === undefined) return;
     const id = selected.id;
-    setSelectedId(null);
+    selection.select('habit', null);
     runFor(id, actions.removeHabit(id));
   }, [actions, runFor, selected]);
 
@@ -308,7 +337,7 @@ export function HabitsScreen({ onBack }: { onBack: () => void }): React.JSX.Elem
             icon: 'action.back',
             label: t('mobile.growth.back'),
             onPress: () => {
-              setSelectedId(null);
+              selection.select('habit', null);
             },
           },
           // 🔴 改名与删除此前**只在动作层存在**（`renameHabit` 是新补的、
@@ -438,7 +467,7 @@ export function HabitsScreen({ onBack }: { onBack: () => void }): React.JSX.Elem
         growth={habitGrowth}
         labels={listLabels}
         onSelect={(habitId) => {
-          setSelectedId(habitId);
+          selection.select('habit', habitId);
         }}
         testID="habit-list"
       />

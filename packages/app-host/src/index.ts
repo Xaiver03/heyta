@@ -598,3 +598,31 @@ export {
   type PrivacyConsentRecord,
   type PrivacyDecision,
 } from './privacy-consent.js';
+
+/**
+ * 跨视图、跨端的**选中态**（详情面的地基）。
+ *
+ * 🔴 「哪一类当前选中了哪一条」此前散成三份实现（web 任务侧**根本没有**、
+ * web 习惯侧一个 `useState`、移动端任务侧另一个 `useState`），
+ * 三份 = 三套回落规则。它和任务 op 构造同一条理由待在这里（AGENTS.md §3.5）：
+ * **每个宿主都要做、且必须一模一样**，而"选中对象消失时怎么办"正是最容易各写各的那一行。
+ *
+ * ⚠️ 它**不是数据**：不进 op-log、不参与向量时钟、绝不同步。
+ * 所以这里一个 op 都不构造 —— 也别指望 `check:layering` 的
+ * `no-op-construction-in-apps` 会管它，它管不着没有 op 的东西，
+ * 这条由 `pnpm check:selection-single-source` 钉（宿主重新长出本地选中态即红）。
+ *
+ * 🔴 React 绑定**不在**本包：`@heyta/ui` 不依赖 `@heyta/app-host`（实测零 import），
+ * 而本包对宿主是"可直接 require 的接线层"，拽进 react 会让 node-host / CLI 跟着背上 UI 依赖。
+ * 所以宿主各留三行 `useSyncExternalStore` 的胶水 —— 胶水里不许有规则，
+ * 有规则的那几行（词表 / 替换 / 回落 / 通知）全在这里。
+ */
+export {
+  SELECTABLE_KINDS,
+  createSelectionStore,
+  pruneMissingSelection,
+  pruneSelection,
+  type SelectableKind,
+  type SelectionSnapshot,
+  type SelectionStore,
+} from './selection.js';
