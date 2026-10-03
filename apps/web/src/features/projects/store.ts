@@ -39,12 +39,14 @@ interface ProjectState {
 
   addProject: (name: string, parentId?: string) => Promise<void>;
   renameProject: (id: string, name: string) => Promise<void>;
-  archiveProject: (id: string) => Promise<void>;
+  /** 归档/取消归档。**目标状态**省略时 = 归档（`app-host` 那边的默认值）。 */
+  archiveProject: (id: string, archived?: boolean) => Promise<void>;
   deleteProject: (id: string) => Promise<void>;
   /** 分类色槽位（1–8），`undefined` 表示清除。存槽位号，不存颜色本身。 */
   setProjectColor: (id: string, slot?: CategorySlot) => Promise<void>;
 
   addTag: (name: string) => Promise<void>;
+  renameTag: (id: string, name: string) => Promise<void>;
   deleteTag: (id: string) => Promise<void>;
 }
 
@@ -72,8 +74,8 @@ export const useProjectStore = create<ProjectState>(() => ({
     await projectActions.renameProject(id, name);
   },
 
-  archiveProject: async (id) => {
-    await projectActions.archiveProject(id);
+  archiveProject: async (id, archived) => {
+    await projectActions.archiveProject(id, archived);
   },
 
   deleteProject: async (id) => {
@@ -91,6 +93,12 @@ export const useProjectStore = create<ProjectState>(() => ({
   addTag: async (name) => {
     if (name.trim() === '') return;
     await projectActions.createTag(name);
+  },
+
+  renameTag: async (id, name) => {
+    // 与 renameProject 同一条交互决策：空回车什么都不发生，动作层负责抛错。
+    if (name.trim() === '') return;
+    await projectActions.renameTag(id, name);
   },
 
   deleteTag: async (id) => {

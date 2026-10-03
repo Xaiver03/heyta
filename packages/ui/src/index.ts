@@ -545,6 +545,7 @@ export {
 } from './projects/OrganizerList.js';
 export {
   aliveProjects,
+  archivedProjects,
   childProjects,
   openTagCounts,
   openTaskCount,

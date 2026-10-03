@@ -60,6 +60,11 @@ interface HabitState {
   /** 撤销打卡。 */
   undoCheckIn: (habitId: string, date?: LocalDate) => Promise<void>;
   deleteHabit: (habitId: string) => Promise<void>;
+  /**
+   * 改名。**不许**用"删了重建"代替它 —— 打卡记录按 `(习惯 id, 日期)` 寻址，
+   * 重建会换 id，于是那条习惯的历史整个清零（`app-host` 侧同一条理由）。
+   */
+  renameHabit: (habitId: string, name: string) => Promise<void>;
   /** 分类色槽位（1–8），`undefined` 表示清除。存槽位号，不存颜色本身。 */
   setHabitColor: (habitId: string, slot?: CategorySlot) => Promise<void>;
   /**
@@ -107,6 +112,14 @@ export const useHabitStore = create<HabitState>(() => ({
 
   undoCheckIn: async (habitId, date) => {
     await habitActions.undoCheckIn(habitId, date);
+    refresh();
+  },
+
+  renameHabit: async (habitId, name) => {
+    // 交互决策，不是数据决策：按了空回车就该什么都不发生。
+    // 空名字的**校验**在动作层（它会抛错），这里只拦"用户其实没想改"。
+    if (name.trim() === '') return;
+    await habitActions.renameHabit(habitId, name);
     refresh();
   },
 

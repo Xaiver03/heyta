@@ -1112,3 +1112,31 @@ WindowServer 94%、simruntime 进程 92% 空转，负载 128）—— iOS 27.1 �
    做了 temp-swap，而备份那步 `cp` 因为同一行里 `sh -c` 的引号解析失败**整行都没执行**，
    于是覆盖了并发会话那 2 行未提交改动；已按覆盖前 diff 原文逐字重建（`git diff --numstat` 回到 `2/1`）。
    往后本条线的规矩：**temp-swap 前 `test -f 备份 || exit 1` 写进同一条链**，副作用事后必须测量。
+
+### 任务 3 改名与删除（2026-10-03 17:4x，本条线）
+
+**做了什么**（两端 + 共享层 + 词条，无新依赖、无 schema 变更）：
+- 动作层：`renameTag`（新，`packages/app-host/src/project-actions.ts`）、`renameHabit`（新，`habit-actions.ts`）各**一条 UPD、载荷只有 `name`**。
+- 移动端：`ListsSection`（改名 + 归档/取消归档 + 「显示已归档」开关）、`TagsSection`（改名）、
+  `HabitsScreen`（改名内联框 + 删除），`icons.tsx` 补 `action.rename`（与共享层那支铅笔同字形）。
+- web：`features/projects/{store,ProjectsPanel}` 补 `renameTag` 调用点 + 标签行 rename；
+  `features/habits/{store,HabitsView}` 补 `renameHabit` 与**已有却零调用点**的 `deleteHabit`。
+- 共享层：`archivedProjects()` 进 `projects/model.ts` 并从 `@heyta/ui` 导出（两端「哪几条算已归档」不再各写一遍），
+  `OrganizerList.tsx` 补它缺的 `Check` 图标导入（这是 UI 包 dts 构建当时唯一失败原因）。
+
+**判据（现量）**：`apps/mobile/tests/organizer-rename.spec.ts` **26 条全绿**；
+`pnpm --filter @heyta/mobile test` = **39 files / 612 passed / 0 skipped**（开工基线 35 files）；
+`pnpm --filter @heyta/web test` = 114 files / **1562 passed**（13 skipped 是既有的浏览器 E2E 默认跳过，非本批新增）；
+`check:reachability` / `check:ui-language` / `check:l4` / `check:row-single-source` / `check:layering` / `check:design` 各 **exit 0**；
+mobile 与 web 的 `typecheck` 均 0 错。三个新改动屏的 `style={{` 计数 = **0**（棘轮 90 不许净增）。
+
+**两条变异，各自精确转红再还原转绿**：
+1. 摘掉 `ListsSection` 的整个 `onRename` 块 ⇒ `接线：入口在两端都真的连着` 那条红（**1 failed | 25 passed**）；还原后 26/26。
+2. 给 `renameTag` 的载荷多塞一个 `color: '3'`（重建 `@heyta/app-host` 后跑）⇒
+   `AssertionError: expected [ 'name', 'color' ] to deeply equal [ 'name' ]`（**1 failed | 25 passed**）；
+   还原源码 + 重建，`grep -c 'color: "3"' dist/index.js` = **0**，26/26。
+
+**一条产品裁决（自己拍的，理由写进代码）**：只给 `onArchive` 不给 `includeArchived` + 显示开关 = **单向门**，
+所以三条必须同批落地；标签**不接归档**（`Tag` 没有 `archived` 字段，不是漏做）。
+
+**未做/已登记**：新建清单的父级选择器（P2-6 的另一半，见 B40）；web 侧行为用例（`apps/web/tests/**` 在地界外，见 B38）。

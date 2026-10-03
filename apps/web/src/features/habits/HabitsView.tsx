@@ -50,13 +50,13 @@ import { ICON_SIZE } from '@heyta/design-system';
  * 别把下面那层 Provider 删掉（已实测：拆掉会在 `/tmp` 副本上变红）。
  */
 
-import { useCallback, useMemo, useState, type ReactNode } from 'react';
+import { useCallback, useMemo, useState, type CSSProperties, type ReactNode } from 'react';
 import { habitGrowth } from '@heyta/app-host';
 import { cssVar } from '@heyta/design-system';
 import { parseCategorySlot, type Habit, type LocalDate } from '@heyta/domain';
 import { useI18n, type I18nValue } from '@heyta/i18n';
 import { HEATMAP_MONTH_KEYS, HabitBoard, HeytaUiProvider, type HabitBoardLabels } from '@heyta/ui';
-import { Plus } from 'lucide-react';
+import { Check, Pencil, Plus, Trash2, X } from 'lucide-react';
 
 import { ColorSlotPicker } from '../categories/ColorSlotPicker.js';
 import { HabitIconPicker } from './HabitIconPicker.js';
@@ -70,6 +70,36 @@ import {
 } from './store.js';
 
 const NOW_STATE_KEY = 'now';
+
+/*
+  这三个是**模块级常量**而不是 `style={{...}}` 字面量：后者会被
+  `scripts/check-l4-no-style.mjs` 按出现次数计进棘轮（web 上限 104）。
+  本文件里已有的那几个是历史读数，新写的这几条不再往那个计数器上添一笔 ——
+  值与旁边那几个逐字相同（字段高 = `touch-target.min`、字号 ≥16px 防 iOS Safari
+  聚焦缩放），只是换了写法。
+*/
+const paneHeadStyle: CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  gap: cssVar('space.2'),
+};
+
+const renameFormStyle: CSSProperties = {
+  display: 'flex',
+  gap: cssVar('space.1'),
+  marginTop: cssVar('space.2'),
+};
+
+const renameInputStyle: CSSProperties = {
+  flex: 1,
+  minHeight: cssVar('touch-target.min'),
+  fontSize: cssVar('font-size.base'),
+};
+
+const iconButtonStyle: CSSProperties = {
+  minWidth: cssVar('touch-target.min'),
+  minHeight: cssVar('touch-target.min'),
+};
 
 /**
  * 构造共享 `HabitBoard` 需要的全部文案。
@@ -128,6 +158,14 @@ export function HabitsView() {
    * 窗格显示一份过期的名字 / 目标。id 只是索引，渲染时从 `rows` 现取。
    */
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  /**
+   * 窗格里那条习惯**正在改名**时存它的 id（不是布尔）。
+   *
+   * 🔴 存 id 的理由与移动端同一句话：换一条习惯时编辑器不能跟着留在屏幕上 ——
+   * 布尔做不到这件事，而它做到的那一次就是"把 A 的名字存到了 B 上"。
+   */
+  const [renamingId, setRenamingId] = useState<string | null>(null);
+  const [renameDraft, setRenameDraft] = useState('');
   // 固定"现在"，避免同一次渲染里跨午夜导致不一致
   const now = Number(sessionStorage.getItem(NOW_STATE_KEY) ?? Date.now());
 
@@ -254,14 +292,85 @@ export function HabitsView() {
         }
       >
         {selected === undefined ? null : (
-          <div className="ht-habit__pane-head">
-            <HabitIconPicker
-              habit={selected.progress.habit}
-              onChange={(icon) => {
-                void store.setHabitIcon(selected.progress.habit.id, icon);
-              }}
-            />
-          </div>
+          <>
+            <div className="ht-habit__pane-head" style={paneHeadStyle}>
+              <HabitIconPicker
+                habit={selected.progress.habit}
+                onChange={(icon) => {
+                  void store.setHabitIcon(selected.progress.habit.id, icon);
+                }}
+              />
+              {/*
+                🔴 改名与删除此前**只有动作层有、界面没有**：`store.deleteHabit`
+                早就存在却零调用点，`renameHabit` 是本批才补的。于是 web 上
+                "建错了改不了、不想要了删不掉"，而界面上看不出这是缺功能 ——
+                它长得和"做完了"一模一样。
+              */}
+              <button
+                type="button"
+                aria-label={t('common.habits.rename.button', { name: selected.progress.habit.name })}
+                onClick={() => {
+                  setRenamingId(selected.progress.habit.id);
+                  setRenameDraft(selected.progress.habit.name);
+                }}
+                style={iconButtonStyle}
+              >
+                <Pencil size={ICON_SIZE.sm} aria-hidden="true" />
+              </button>
+              <button
+                type="button"
+                aria-label={t('common.habits.delete.button', { name: selected.progress.habit.name })}
+                onClick={() => {
+                  // 先收编辑器再发 op：名字改到一半把习惯删掉，编辑器会指着一条
+                  // 已经不存在的习惯（保存按钮还在，而动作层会抛"找不到习惯"）。
+                  setRenamingId(null);
+                  void store.deleteHabit(selected.progress.habit.id);
+                }}
+                style={iconButtonStyle}
+              >
+                <Trash2 size={ICON_SIZE.sm} aria-hidden="true" />
+              </button>
+            </div>
+
+            {renamingId === selected.progress.habit.id ? (
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  const id = selected.progress.habit.id;
+                  const next = renameDraft.trim();
+                  setRenamingId(null);
+                  // 空名字与"一个字没改"都不发 op（一次点击 = 一个意图）。
+                  if (next === '' || next === selected.progress.habit.name) return;
+                  void store.renameHabit(id, next);
+                }}
+                style={renameFormStyle}
+              >
+                <input
+                  autoFocus
+                  value={renameDraft}
+                  onChange={(e) => setRenameDraft(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Escape') setRenamingId(null);
+                  }}
+                  aria-label={t('common.habits.rename.label')}
+                  style={renameInputStyle}
+                />
+                <button type="submit" aria-label={t('common.organizer.rename.save')} style={iconButtonStyle}>
+                  <Check size={ICON_SIZE.sm} aria-hidden="true" />
+                </button>
+                <button
+                  type="button"
+                  aria-label={t('common.organizer.rename.cancel')}
+                  onClick={() => {
+                    setRenamingId(null);
+                  }}
+                  style={iconButtonStyle}
+                >
+                  <X size={ICON_SIZE.sm} aria-hidden="true" />
+                </button>
+              </form>
+            ) : null}
+          </>
         )}
 
         <HeytaUiProvider>

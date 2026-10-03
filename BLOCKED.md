@@ -2714,3 +2714,35 @@ HEAD+我的行，那 2 行随之消失（`cp /tmp/pkg.mixed.json` 报 `No such f
    在 /tmp 里造好目标内容、`git hash-object -w` + `git update-index --cacheinfo` 只动索引，
    再用 `git commit --only` 之外…**本仓已证明 `--only` 取的是工作树内容**，所以这条路必须配
    `git commit`（不带 --only）且**当场 `git status` 复核索引里没有别人的暂存条目**。
+
+## B38. `apps/web/tests/**` 不在「只允许改」清单里，任务 3 要求"两端各一组用例"因此只能一端落一半（2026-10-03 17:4x）
+
+任务书原文：**验收：两端各一组用例**；界限原文：只允许改 `apps/mobile/src/**`、
+`apps/web/src/features/{…}/**`、`packages/{ui,app-host,i18n}/src/**`…… `apps/web/tests/**` 不在其中。
+
+**我怎么处理的（不改动别人的判卷面）**：行为判据落在**允许新建**的
+`apps/mobile/tests/organizer-rename.spec.ts`，而它测的是 `@heyta/app-host` 的**真实动作层 + 真实引擎 + 真实 SQLite**，
+两端调的是同一个函数，所以"改名后重放仍在 / 删除是墓碑 / 一个意图一条 op"这三件事**只有一份实现可测**；
+web 那一半用**接线断言**（`store.renameTag` 有真调用点、`ProjectsPanel`/`HabitsView` 传了 `onRename`）钉住。
+差的是"web 界面层的行为用例"——那需要在 `apps/web/tests/` 新建文件，超出地界，故登记不擅自扩界。
+
+## B39. 任务 2 的真机判据被并发会话占用设备挡住；本轮另查明一次"假红"的根因是系统权限弹窗（2026-10-03 17:39–17:44）
+
+**占用**：`scripts/verify-mobile-notes.sh` 的"别人正在用这台设备"探测拦下我这一跑，
+输出 `❌ 这台设备上还有别的移动端验收在跑：68134 85182 bash ./scripts/verify-mobile-aed.sh` → **exit 3**
+（按纪律：环境无效 ≠ 产品失败，不硬挤、不改别人的脚本）。审计 P2-1 与 §5 那两行**因此还没翻 ✅**。
+
+**顺带查出的假红根因**（上一跑 17:39 那次报"找不到便签输入框"）：
+填完凭据、第一次唤起中文输入法时，系统弹了「Allow Google to take pictures and record video?」，
+而 `uiautomator dump` 导出的是**当前活动窗口**的树 —— 弹窗在时应用的一个节点都读不到。
+修法（在我地界内的 `scripts/verify-mobile-notes.sh`）：新增 `dismiss_permission_dialog()`，
+**先证明弹窗在**（读到 `Don't allow` / `不允许` 那颗按钮）才按现取坐标点"不允许"，点完复查仍在就报出来；
+在第 1 步末尾与第 2 步开头各调一次。同批把第 2 步那句写死的 `input tap 945 $TAB_Y` 换成**现取坐标**
+（`xy_desc "我的"`），注释写明为什么不套用 `tap_tab`（便签输入框要滚动才露出来，拿它当换页标记会把成功读成失败）。
+
+## B40. 「新建清单时选父级」仍没做（P2-6 只翻绿了归档那一半）
+
+`createProject(name, parentId?)` 的第二参在移动端**没有调用点**（`ListsSection.tsx:162` 只传名字），
+web store 有。要补的是 composer 里的层级选择器 —— 它落在"composer 留在各端"那一条既有分工里
+（`packages/ui/src/projects/model.ts` 文件头第 2 条），且需要一条新的界面判据（真机：选父级 → 笔记本读到 `parentId`）。
+本批任务书没点这一件，按"不顺手扩范围"登记，不当已做。

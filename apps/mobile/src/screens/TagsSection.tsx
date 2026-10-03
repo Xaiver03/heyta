@@ -123,8 +123,21 @@ export function TagsSection(): React.JSX.Element {
           items={nodes}
           labels={{
             removeLabel: (label) => t('mobile.tags.remove', { name: label }),
+            // 只接改名、不接归档：`Tag` 领域实体里**没有** `archived` 字段
+            // （`Project` 有），所以这里没有"归档标签"这个意图可表达。
+            // 共享层的规矩是"文案与回调成对"—— `labels.archive` 省略即不画那个按钮，
+            // 于是缺的不是接线，而是领域里还没有的那个概念。
+            rename: {
+              button: (label) => t('common.organizer.rename.button', { name: label }),
+              save: t('common.organizer.rename.save'),
+              cancel: t('common.organizer.rename.cancel'),
+            },
             empty: t('common.organizer.tags.empty'),
             emptyHint: t('common.organizer.tags.empty.hint'),
+          }}
+          onRename={(item, next) => {
+            if (actions === null) return;
+            run(actions.renameTag(item.id, next));
           }}
           onRemove={(item) => {
             if (actions === null) return;

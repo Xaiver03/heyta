@@ -91,11 +91,11 @@
 | # | 缺口 | 证据 |
 |---|---|---|
 | P2-1 | **便签编辑**：能建能删不能改，任何一端都改不了 | `NotesView.tsx:36-38`、`NotesSection.tsx:29-31`（都刻意） |
-| P2-2 | **清单/标签改名**：web store 有 `renameProject`（projects/store.ts:41）零调用；移动端明示不做；标签连动作都没有 | `ListsSection.tsx:49-50` |
-| P2-3 | **习惯删除**：建了删不掉，`HabitBoard` 明示未接 | `HabitBoard.tsx:64` |
+| P2-2 | ✅ **已修（2026-10-03，多端第三批）**：清单/标签**两端都能改名**，标签补上原本根本不存在的动作 `renameTag`（一条 UPD、载荷只有 `name`，引用它的任务一个都不碰）。行内编辑器在共享 `OrganizerList` 里，两端各只多传 `onRename` + 两句无障碍名。判据 = `apps/mobile/tests/organizer-rename.spec.ts` 26 条（含"全局 op 数恰好 +1"这条防 fan-out、"重放后名字仍在"= 刷新还在）+ 变异两臂各自转红（摘掉移动端 `onRename` ⇒ 接线那条红；给 `renameTag` 载荷多塞一个 `color` ⇒ `expected ['name','color'] to equal ['name']`）；`check:reachability` exit 0。原文：~~web store 有 `renameProject` 零调用；移动端明示不做；标签连动作都没有~~ | `ListsSection.tsx`、`TagsSection.tsx`、`features/projects/{store,ProjectsPanel}`、`features/habits/{store,HabitsView}` |
+| P2-3 | ✅ **已修（2026-10-03，多端第三批）**：习惯**改名 + 删除**两端都有入口（移动端详情层两个图标 + 内联改名框，web 窗格头部同款）。删除是**墓碑**（`DEL` + `deletedAt`，`listHabits` 滤掉、库里仍在），且**打卡历史一条都不动** —— 撤销后连续天数还在。习惯改名刻意**不许"删了重建"**：`HABIT_LOG` 按 (habitId, date) 寻址，换 id 会让历史静默失联（用例钉住 `Object.keys(fresh.habits)` 仍是同一条）。判据 = 同上文件那条 describe 的 4 条 + `check:reachability` 0。原文：~~建了删不掉，`HabitBoard.tsx:64` 明示未接~~ | `HabitsScreen.tsx`、`features/habits/HabitsView.tsx` |
 | P2-4 | **回收站只覆盖任务**：清单/标签/习惯/便签软删后任何端都看不见、还原不了 | `tasks/store.ts:387` |
 | P2-5 | **日历创建/拖拽**：两端日历都只读（只勾完成）；时间线 P2 的排期手势没有搬到日历 | `CalendarBoard.tsx:71` 唯一动作 prop |
-| P2-6 | **清单父子/归档**：`createProject(name)` 单参，无层级选择器 | `ListsSection.tsx:49-50` |
+| P2-6 | 🟡 **归档已修 / 层级选择器仍未做（2026-10-03，多端第三批）**：归档与**取消归档**两端可达，`archiveProject(id, archived)` 收的是**目标状态**；"显示已归档"开关只在 `archivedCount > 0` 时出现，口径由共享层 `archivedProjects()` / `toOrganizerTree(…, { includeArchived })` 唯一提供（两端各写一遍 filter 就是两份口径）。**只给 `onArchive` 不给回程 = 单向门**，所以三条必须同批落地，用例逐条钉住。**仍未做**：新建时的父级选择器 —— `createProject(name, parentId?)` 第二参在移动端没有调用点（web store 有），移动端建出来的清单恒为顶层。判据 = 同上文件的归档 2 条 + 接线那 1 条（`includeArchived: showArchived` 与开关必须同时在场）。原文：~~`createProject(name)` 单参，无层级选择器~~ | `ListsSection.tsx`、`features/projects/ProjectsPanel.tsx`、`packages/ui/src/projects/{model,OrganizerList}.ts(x)` |
 | P2-7 | **订阅权益可见性**（移动端）：无任何权益 UI；**触发条件**：计费上线前必须补（ADR-0023 红线的配套可见性） | app-host `entitlement.ts` 零消费 |
 
 小项杂记：移动端成长屏缺年度热力图/分享/补打卡按钮（`GrowthScreen.tsx:59-75` 明示未传 props）；移动端设置无帮助面板；`updateAccountLocale`（账号级语言）两端都没接（web 语言切换写设备层）。
