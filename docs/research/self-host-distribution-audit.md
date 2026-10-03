@@ -251,7 +251,7 @@
 | G-46 | `server/scripts/build-and-push.sh`（`pnpm --filter @heyta/server docker:build` 的唯一实体）原来是**上游形状**：它自己抄了一份 7 条的镜像输入清单，其中 3 条在本仓库不存在（实测 `[ -e ]` 全不成立），而 `apps/web` / 11 个 `packages/*` / `pnpm-lock.yaml` / `server/` 自己**一条都不在里面**；`GHCR_NAMESPACE` 默认成 `super-productivity`（**别人的组织**）；并且无论给不给版本号都**顺带覆盖 `:latest`** | **本批关闭**（§8.7 第 4 条）。三条各自都会出事，都已改：清单改成 source 同一个读者、namespace 无默认值（不给就在任何 docker 之前 exit 1）、只推点名的那一个 tag。⚠️ 消费者集合是量过的：除 `server/package.json:14` 外只有 `server/tests/migration-sql.spec.ts:345` 读它，而那一发在 `it.skip` 里 ⇒ **不报错也不守** |
 | G-47 | 镜像那棵依赖树**没有被钉住**：`check:image-license` 证明的是"2026-10-03 这一次 npm 解析结果的 143 条逐条有出处"，而每次构建 npm 都会重解一遍（没有 lockfile）。改直接依赖会红，**纯传递依赖的上游发新版不会** | **未关**（本批只登记）。闭合形状是现成的：生产阶段换成 `pnpm deploy --prod` ⇒ 三个 `workspace:*` 由 pnpm 内联、三枚 tgz 的 dance 一起消失、镜像的树**就是** `pnpm-lock.yaml` 的树 ⇒ 门禁与产物同源，`check:image-license` 与快照应当**撤掉**（不是改成读另一个文件）。代价：动生产镜像的装配路径，要单独一轮真构建复验（`pnpm verify:selfhost-stack` 全跑） |
 | G-48 | `check:web-artifact:app`（核对 `--base=/app/` 那份产物的那一道）**零自动消费者** —— 2026-10-03 由新门禁 `check:gate-wiring` 量出：它是 63 道 `check:*` 里唯一合法落在链外的一道，而全仓 `grep` 只有 `package.json` 自己那一行，没有任何 workflow / 验收脚本 / `deploy.sh` 调用它 ⇒「上线前跑一次」目前只写在脚本头部注释里 | **未关**（本批只登记）。它进不了 `pnpm check`（链里那份产物是默认根路径打的，拿错的产物验对的东西），要闭合得挂到**镜像构建与 rsync 那条路径**上（与 G-47 那轮一起做最省） |
-| G-49 | 站内那篇自建指南（`packages/i18n` 的 `site.docs.selfhost.*`）是入口命令的**第 4 份抄件**，而 `check:selfhost-entry-command` 的扫描集里没有它（现有扫描集：`docs/runbooks/self-host.md`、`server/README.md`、`server/env.example`、`docker-compose.migrate-once.yml`、`local-server-verification.md`）| **未关**（本批只登记）。触发它升格的是 2026-10-03 那次换目标：落地页的「打开自建指南」现在**就是**指向这篇站内文章（理由与实测见 §8.13），所以它不再是"营销文案"，而是外人照着敲的那一份。闭合形状：把两份词条表按 `site.docs.selfhost.` 前缀纳入扫描集，并给它一条**自己的**行形状规则（文章里是散文，不是 markdown 代码块 —— 现有 `ENTRY_RE` 要求行首 `docker compose -f …`，对词条值恒不命中，直接加进扫描集会变成"扫了但什么都看不见"）|
+| G-49 | 站内那篇自建指南（`packages/i18n` 的 `site.docs.selfhost.*`）是入口命令的**第 4 份抄件**，而 `check:selfhost-entry-command` 的扫描集里没有它（现有扫描集：`docs/runbooks/self-host.md`、`server/README.md`、`server/env.example`、`docker-compose.migrate-once.yml`、`local-server-verification.md`）| ✅ **本批关闭**，但**登记的前提一半是错的**（读数在 §8.18）：58 条词条里当时**没有一条**是完整入口命令，s7p2 只有 `-f` 那三个 flag 的**碎片**（没前缀、没 `up -d`、**没 `--build`**）。碎片比没抄件更坏 —— 拼起来敲就是 §8.11 那次 `pull access denied`。所以做的是两件事：文章改成给**完整一条**（中英各一份，与 runbook 逐字相同），再把这两份词条文件纳入扫描集（`source: 'copy'`） |
 
 
 
@@ -996,3 +996,49 @@ Goal 把 G-44 排成"补 `appVersion` 的生产侧"。四条实测把这条**否
 
 G-40⑤（版本来源）因此多了一条硬约束：**它必须和闸门共用一个版本空间**，
 不是"给 package.json 找个消费者"那么简单。
+
+### 8.18 G-49：登记说"文章是第 4 份抄件"，实测它连一条完整命令都没有 —— 而碎片比没抄件更坏
+
+取证形状（`site.docs.selfhost.*` 共 **58 条**，中英各一份）：
+
+- 行首是 `docker compose` 的命令：**0 条**（所以"第 4 份抄件"这句按字面不成立）；
+- 提到 compose 的只有 `s7p2` 一条，而它印的是 `-f docker-compose.yml -f docker-compose.build.yml
+  -f docker-compose.migrate-once.yml` 这个**碎片** —— 没有 `docker compose` 前缀、没有 `up -d`、
+  **没有 `--build`**。
+
+🔴 碎片不是"缺一条判据"，是**一个会伤人的呈现**：读者把它拼成 `docker compose … up -d` 敲下去，
+少的正是 `--build`，得到的就是 §8.11 记的那次 `pull access denied`。
+所以闭合做的是两步，顺序不能反：**先让文章给出完整一条**（中英各一份，与 runbook 逐字相同），
+**再把它纳入对账** —— 反过来只会得到一条"扫了但读不到东西"的空判据。
+
+门禁侧（`scripts/check-selfhost-entry-command.mjs`）：
+
+- 扫描集从 5 份变 **7 份**（新增两份词条表，`source: 'copy'`），现量命中 **9 条**入口命令、
+  两份词条各贡献 1 条主命令 ⇒ R5 的**跨抄件逐字比对**现在覆盖它们（中英与 runbook/README 同一句）。
+- 🔴 命令形状的正则**没有抄第二份**：`ENTRY_BODY` 是唯一常量，markdown 的行首版与词条的前缀版
+  都从它导出（"同一个判断抄三遍"是本仓反复出事的地方）。
+- 词条报错定位带**键名**（`行号 · site.docs.selfhost.s7p2`）—— 只给行号等于让人在 2841 行里猜。
+
+五臂变异（每臂跑完立即还原，还原后与基线 **md5 逐字相同**、复跑复绿）：
+
+| 臂 | 改哪 | 期望 | 实到 |
+|---|---|---|---|
+| A | 中文抄件去掉 `--build` | R5 | ✅ |
+| B | 英文抄件把 `migrate-once` 改名 | R2（文件不存在） | ✅ |
+| C | 中文抄件退回成 `-f` 碎片 | R6（探针读不到主命令） | ✅ |
+| D | runbook 主命令丢 build override | R1 | ✅ |
+| E | runbook 末尾留悬空反斜杠 | R0 | ✅（**要构造得对**：文件必须以反斜杠结尾且**没有**尾随换行，否则 `split('\n')` 会给出一个空串当续行，R0 永远不触发 —— 我第一次就构造错了一次，症状是"红是红了，但红在 R5"） |
+
+浏览器侧（§6.2 规定一）：`e2e/landing/docs-centre.spec.ts` 新增一条，**1 passed**，
+截图 `e2e/landing-results/g49-selfhost{,-en}.png` 两张**人都看过** —— 中英两版在
+"怎么装 / How to install"一节都渲染出完整一条。
+🔴 这条判据**刻意不 import 门禁脚本**，而是自己读那份 markdown 折行取参照物：
+两边从同一个读者拿期望值，判据就只是把门禁念一遍。
+
+回归到的门禁（全 rc=0）：`ui-language` / `docs-voice` / `script-snapshot` / `server-copy` /
+`legal-copy` / `check:entries` / `selfhost-entry-command`。`check:entries` 无变化是预期的 ——
+文章是客户端渲染，入口 HTML 只有 head/meta。
+
+⚠️ **一条已知没做的**：命令在文章里是**散文中的内联代码**（软换行），不是围栏代码块。
+复制不受影响（浏览器软换行不插入换行符），但要给它一个真正的代码块需要文档渲染器加一种
+新的分区形状 —— 那是界面结构改动，不在这一批里顺手做。
