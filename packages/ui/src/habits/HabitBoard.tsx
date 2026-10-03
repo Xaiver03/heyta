@@ -142,7 +142,7 @@ export interface HabitBoardLabels {
   readonly streakCurrent: (count: number) => string;
   /** 历史最长。 */
   readonly streakLongest: (count: number) => string;
-  /** 累计次数。 */
+  /** 累计达成天数（生产者 = `resilience.total`，不是打卡次数）。 */
   readonly streakTotal: (count: number) => string;
   /** 冻结说明（"这段连续里有 N 天是冻结保住的"）。只在冻结数 > 0 时调用。 */
   readonly freeze: (count: number) => string;

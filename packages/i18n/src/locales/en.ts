@@ -1023,8 +1023,8 @@ export const en = {
   'web.habits.freshStartAction': 'Start again today',
   'web.habits.a11y.freshStart': 'Check in "{name}" again today',
   // The third metric: the one that only ever grows (never reset by a break).
-  'web.habits.streak.total': '{count} check-ins',
-  'web.habits.streak.totalOne': '{count} check-in',
+  'web.habits.streak.total': 'Total {count} days',
+  'web.habits.streak.totalOne': 'Total {count} day',
   // Heatmap copy is passed *by us* to react-activity-calendar; its defaults are English-only.
   // `{{count}}` is the library's own placeholder and must survive verbatim.
   // ── M3 knife 7 (habits): copy for the self-drawn heatmap ──
