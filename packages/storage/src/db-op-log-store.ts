@@ -465,6 +465,17 @@ export class DbOpLogStore<TOperation extends Operation<string> = Operation>
       await writeMeta(tx, META_KEYS.LAST_SERVER_SEQ, seq);
     });
   }
+
+  async getMetaValue(key: string): Promise<string | number | undefined> {
+    const rec = await this.db.get<{ key: string; value: string | number }>(STORES.META, key);
+    return rec?.value;
+  }
+
+  async setMetaValue(key: string, value: string | number): Promise<void> {
+    await this.db.transaction([STORES.META], 'readwrite', async (tx) => {
+      await writeMeta(tx, key, value);
+    });
+  }
 }
 
 // ─────────────────────────────────────────────────────────────
