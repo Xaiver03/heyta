@@ -185,7 +185,7 @@ vi.mock('../src/db', async () => {
       }),
     },
     // Upload transaction writes the storage counter atomically via $executeRaw.
-    $executeRaw: vi.fn().mockResolvedValue(0),
+    $executeRaw: vi.fn().mockResolvedValue(1),
     $queryRaw: vi.fn().mockImplementation(async (strings: any, ...params: unknown[]) => {
       // The download path's newest-causal-full-state lookup ships as a pre-built
       // `Prisma.Sql` so its op_type values stay literals, so it arrives as ONE object
@@ -228,7 +228,14 @@ vi.mock('../src/db', async () => {
 
       if (sql.includes('FROM user_sync_state') && sql.includes('FOR UPDATE')) {
         const [txUserId] = params as [number];
-        return [{ lastSeq: state.userSyncStates.get(txUserId)?.lastSeq ?? 0 }];
+        return [{
+          lastSeq: state.userSyncStates.get(txUserId)?.lastSeq ?? 0,
+          latestStateReplacementSeq: state.userSyncStates.get(txUserId)?.latestStateReplacementSeq ?? null,
+        }];
+      }
+
+      if (sql.includes('SELECT id FROM users WHERE id') && sql.includes('FOR UPDATE')) {
+        return [];
       }
 
       // Anything left must be the multi-entity conflict lookup. Assert that

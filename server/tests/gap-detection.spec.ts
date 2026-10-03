@@ -207,13 +207,20 @@ vi.mock('../src/db', async () => {
           rawQueryValues(strings, params),
         );
       }
+      const sql = Array.isArray(strings) ? strings.join('') : String(strings);
+      if (sql.includes('FROM user_sync_state') && sql.includes('FOR UPDATE')) {
+        return [{ lastSeq: state.serverSeqCounter, latestStateReplacementSeq: null }];
+      }
+      if (sql.includes('SELECT id FROM users WHERE id') && sql.includes('FOR UPDATE')) {
+        return [];
+      }
       if (!isEntityArrayBranchQuery(strings)) {
         throw new Error(`Unexpected raw query: ${String(strings)}`);
       }
       return entityArrayBranchRows(state.operations, params);
     }),
     // Upload transaction writes the storage counter atomically via $executeRaw.
-    $executeRaw: vi.fn().mockResolvedValue(0),
+    $executeRaw: vi.fn().mockResolvedValue(1),
   });
 
   return {
