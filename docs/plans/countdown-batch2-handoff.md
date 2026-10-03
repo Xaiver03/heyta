@@ -61,9 +61,12 @@ git rev-list --count HEAD..origin/main       # 同刻读数：228 —— main �
   `GET /api/holiday-adjustments`，而假服务端只实现 `/v1/chat/completions` ⇒ 带
   「除已登记缺失外不该有非 2xx」守卫的套件被无关地拖红（`admin-console.spec.ts` 实测一次红五条，
   修法见 `e2e/tests/helpers.ts` 新增的 `stubPublicFacts`，与 `stubLegalRecheck` 同形同因）；
-② W9 那半在 main 上声明了 `POST_NOTIFICATIONS`，而 `third-parties.ts` 那六句"移动端不申请通知权限"
-  没跟着翻 ⇒ **`node scripts/check-legal-permissions.mjs` 在干净 main 上就 rc=1**
-  （取证与归属写在 `countdown-anniversary.md` §8.2 的 W9 节，本批不代它翻那六句）。
+② W9 那半在 main 上声明了 `POST_NOTIFICATIONS` + `SCHEDULE_EXACT_ALARM`，而 `permissions.ts` /
+  `third-parties.ts` 那六句"移动端不申请通知权限"没跟着翻、那条闹钟权限也没登记
+  ⇒ **`node scripts/check-legal-permissions.mjs` 在干净 main 上就 rc=1，且是 7 条红而不是 2 条**。
+  04 03:5x 用门禁自己的 `HEYTA_CHECK_ROOT` 旋钮把七份输入换成**只含 `origin/main` 已提交内容**的一份，
+  ⇒ **rc=1 / 7 条红**，与喂 `HEAD` 那次末行逐字相同 —— 所以这句"干净 main 上就红"从推断升级成了实测
+  （命令与探针踩坑见 `countdown-anniversary.md` §8.2 L' 第 1b 条；本批不代它翻那六句）。
 
 本轮新增了一条**常驻门禁**：`pnpm check:legal-permissions`（`1d71e75f` + 加固 `017adc3e`，在 batch2 分支），
 它把"移动端不申请任何权限"这类**对外承诺**与 manifest / Info.plist / entitlements 的**真实声明面**对账。
@@ -92,11 +95,11 @@ git rev-list --count HEAD..origin/main       # 同刻读数：228 —— main �
 | W5 | 倒数日卡片网格 + 二级操作（界面） | ✅ 已闭合（`a9529a59` + `94760c82` + `c07df677`），e2e 6 passed、三张图人已看 | 无 |
 | W6 | 第二个日期数据源 | ✅ **已闭合**（`e2def90f` @ `feat/countdown-batch2`，2026-10-04 02:5x） | 无。⚠️ 原句"等六个日历路径归零后落地"的载体已经不存在了 —— 那六个路径的未提交 diff 随 main 的推进被各自所有者提交掉，`608fa5b1` 把合并基搬到 batch2 上，落地前重跑了一次关闭判据（`git status --porcelain -- packages/ui/src/calendar apps/web/src/features/calendar apps/mobile/src/screens/CalendarScreen.tsx` 输出为空）。**留了一条编号缺口 W6-G1**：接进「今天」/收集箱要先给共享 `TaskList` 一条"不可交互行"的契约变更（把 EVENT 塞进任务行要么伪造 `completedAt`、违反 §3.4 一个意图一个 op，要么凭空造第三种行形），不属于这一批 |
 | W7 | 纪念卡片导出为**成品图**（设备渲染导出，**零通道、零法务变更**；区别于素材图） | ✅ **三端都到最终态**（`43e94b32`，**现在已是 `origin/main` 的祖先**）：共享版面 `packages/ui/src/countdown/card-export-layout.ts` + web `<canvas>` 出图 + 移动原生落盘（Android `cacheDir` + `FileProvider`、iOS 写沙盒，两端**都不走相册**）+ 门禁 `check:card-export`。**04 03:1x 现量**：`apps/mobile/tests/card-export.spec.ts` **21 passed**（`MOBILE_RC=0`）、`e2e/tests/countdown-export.spec.ts` **5 passed**（`EXPORT_E2E_RC=0`）、成品图与四张界面图**人已看**且**已进版本库**（`apps/web/evidence/countdown-export/`，含每张"看见了什么"+ 两件事：竖条是 `surface-sunken` 不是主蓝＝夹具没选模板，这是设计；「还有 28 天」与「11月1日」互相自洽＝只有看图才会做的交叉验证） | 只剩**两臂变异**（A1 画布宽不再等于契约 / A3 宿主不传失败文案），装置在 `/tmp/w7-mutate.mjs`，跑完把读数写进 `countdown-anniversary.md` 的 W7 节才打勾 |
-| W8 | 三端（web / mobile / 原生壳）接线与壳级门禁 | ✅ **三端代码 + 壳级门禁都在 main 上了**（`f2d09974`）。**04 03:0x 现量**：`node scripts/check-shell-surfaces.mjs` ⇒ **rc=0，判定 5 格 = 5 绿 / 0 红，未取证 2 栏**（`desktop-macos / countdown · 产物`、`desktop-windows / countdown · 产物`）。🔴 门禁自己那句话是判据本体："这份绿说的是**通道在**，**不是**装出来的包里有这一屏" | 那两栏**只由** Goal 第 ⑤ 条的 `pnpm reinstall:all` 关闭（它顺带把 `apps/web/dist` 打进两端安装包）。在此之前本行不打勾 —— 这正是 AGENTS §6.1.1 与 §7 第 27/82 条要防的那种"绿了但装的是旧产物" |
+| W8 | 三端（web / mobile / 原生壳）接线与壳级门禁 | ✅ **三端代码 + 壳级门禁都在 main 上了**（`f2d09974`）。🔴 **但这条门禁 04 03:2x 现量 rc=1、5 格 4 绿 / 1 红**，红的格是 `[web] W5 产物比源码旧`（`dist 18:53 < src 19:40`）—— **是自家提交（`e2def90f` W6 + 后台面板）把这条判据甩下的，不是新缺陷**；同一条命令 03:0x 那次确实 rc=0 / 5 绿，两次都真。未取证 2 栏不变（`desktop-{macos,windows} / countdown · 产物`，macOS 那栏包里 `index.html` sha256 与本工作树 `apps/web/dist` 不符）。门禁自己那句话是判据本体："这份绿说的是**通道在**，**不是**装出来的包里有这一屏" | 那两栏**只由** Goal 第 ⑤ 条的 `pnpm reinstall:all` 关闭（它顺带把 `apps/web/dist` 打进两端安装包）。在此之前本行不打勾 —— 这正是 AGENTS §6.1.1 与 §7 第 27/82 条要防的那种"绿了但装的是旧产物"。<br>📌 **本行新加的一条前置**：`check:shell-surfaces` 在 `pnpm check` 那 68 段里，所以**收尾那趟 check 之前必须先 `pnpm --filter @heyta/web build`**，否则这一格必红 —— 而且修法只能是重打，门禁的"不要用它修绿"清单里明确排除了手改 `apps/web/dist`。 |
 | W9 | 提醒（含投递路径 —— 现状是全仓零 `new Notification(`） | 🟡 **web 半 + DST ✅**（`a8f5a9a6`，变异 9/9 红）；**原生投递那半没动** | 投递路径 = Goal 明文要求的**没做完**那半（ADR-0051 另立一单）；合流时连带兑现 §3.1 |
 | W10 | `EVENT` 必须**同时**进 AI 工具目录与 local-api 工具契约（实体与 AI 工具一起做；不改 `ENTITY_TYPES` 驱动的排期决定） | ✅ 已闭合（`8a595493` + `e2aeedc4`），目录 4 条 EVENT 工具，MCP 与内置 AI 共用同一份 | 无。⚠️ 副作用已被 L' 抓住并修（`ai-and-transfer.ts` 那张表 = 授权面） |
 | W4b | 调休/补班的运营录入通道 + 客户端拉取（heyta **第一条服务端→客户端内容通道**，**ADR 必须定性，且回写 ADR-0038 的后台范围表**） | ✅ **代码链闭合，判据②的面板也落了**：服务端半 4 笔 + ADR 定性与 0038 回写（`c28e5f1a`）+ 门禁 `check:public-facts`（八臂 8 红 0 存活）+ `dayMarker` 缝 + 客户端拉取三笔（`6735cc39`/`b05fbc50`/`67fef701`）。**判据①**真界面三档截图已看；**判据②**的后台面板在 `apps/web/src/features/admin/AdminPanel.tsx`（`HolidayPanel`，把 `papers` 渲染成 `<a href>` + `rel="noreferrer noopener"`），e2e 那条用例（`admin-console.spec.ts`「调休/补班那一页把出处回显成可点链接」）**04 03:0x 第一趟跑出来是红的**：五条同因红，报错逐字相同 `除已登记缺失外不该有非 2xx：["/api/holiday-adjustments"]` —— 根因不是面板，是**本批自己的**开机拉取没人登记（见 §0 第 ① 条例外），补了 `e2e/tests/helpers.ts:stubPublicFacts` 之后重跑 | 待这一趟的 `ADMIN_RERUN_RC=0` + 截图人看 + 一臂变异（把 `papers` 从 `<a>` 降级成纯文本 ⇒ 必须红）。三条齐了才打勾 |
-| L 系列 | 法务联动 —— 改 `packages/legal` 那六处现成位置、每处中英双份、落地页文案走生成物不许手改（`check:legal-copy` 已在 `pnpm check`） | 🟡 **判定表已出、唯一真命中已修**（`2d53ea94` + `8996de9d` + `1d71e75f`/`017adc3e`）。🔴 **04 03:0x 现量：§3.1 那六个字面位置现在真的红了，而且红在 main 上** —— `node scripts/check-legal-permissions.mjs` ⇒ **rc=1**，两条落在 `third-parties.ts` 的推送 SDK 否表行（zh + en），因为 `b0ba4a35`（W9 原生投递，**已在 `origin/main`**）往 manifest 加了 `POST_NOTIFICATIONS` 而句子没翻。取证：门禁脚本与它在 `check` 里的挂钩**都在 main 上**、矛盾两端**都已提交在 main**、主检出 `packages/legal` 5 个 `M` 里那六句**已经不见了**（正在被并行会话翻） | ⇒ **归属不在本批**：六句必须一起翻并重跑 `check:legal-copy`，本批代改会造出三方冲突。**关闭判据**：`node scripts/check-legal-permissions.mjs` rc=0（每次引用本条重跑） |
+| L 系列 | 法务联动 —— 改 `packages/legal` 那六处现成位置、每处中英双份、落地页文案走生成物不许手改（`check:legal-copy` 已在 `pnpm check`） | 🟡 **判定表已出、唯一真命中已修**（`2d53ea94` + `8996de9d` + `1d71e75f`/`017adc3e`）。🔴 现量读数**只在 §0 第 ② 条与 `countdown-anniversary.md` §8.2 L' 第 1b 条各写一次**（同一对抄件会漂：这两处曾分别写"2 条红"与"6 条红"，04 03:5x 实测都是 **7 条**，且红的是 main 的**已提交状态**——把七份输入换成只含 `origin/main` 内容的探针根复现相同）| ⇒ **归属不在本批**：六句必须一起翻并重跑 `check:legal-copy`，本批代改会造出三方冲突。**关闭判据**：`node scripts/check-legal-permissions.mjs` rc=0（每次引用本条重跑，并写明在哪个载体跑的） |
 | 收尾 | Goal 第 7 条 + 计划 §5/§8.3 | 🟡 §8.3 第 1 条的两半已做（`pnpm -r build` / `pnpm -r typecheck` rc=0）。**04 02:5x 现量更正**：`node research/tools/docs-link-check.mjs` 在 `heyta-wt-batch2` 隔离检出 ⇒ **rc=0，死链 0 处** —— 上面那句"33 处"是**主检出**（有别人未跟踪文档）的读数，死链数是"仓库 + 本机未跟踪文件"的属性，不是仓库属性 | 完整 `pnpm check`（要安静窗口）、界面截图人看（W6/W7 已看，W4b 判据②待看）、`pnpm reinstall:all` 四端 —— 未做 |
 | 同步 | 每完成一项 → 计划文档打勾 + **同步 AGENTS §9** | 🟡 计划文档已同步（`cd839ec5`）；**AGENTS §9 欠着** | `AGENTS.md` 脏 ⇒ 不能 `--only` 提交（§7 第二条），等干净后补 |
 
@@ -355,12 +358,21 @@ cd "…/heyta" && git merge-tree --write-tree --name-only feat/countdown-batch2 
 
 ---
 
-## 5. W6 保持停放（关闭判据是**可判的**，不是"等日历线忙完"这种印象）
+## 5. W6 的关闭判据：判过两次红、一次归零，归零那次已落地
+
+> ✅ **04 02:5x 收口**：本节标题原来叫"W6 保持停放"。W6 已落地成 `e2def90f` ——
+> 判据本体（"一条**没有截止日**的倒数日能上日历"）+ 四个档位 + 侧栏那颗点各有真 DOM 判据，
+> 三层 14/8/13 passed + e2e 3 passed 五张图人看过 + 变异 5 臂逐臂只红自己那条。
+> 原文留着，是因为**"停放"这个判定当时是对的**，而它对的方式就是下面这条命令。
 
 ```bash
 cd "…/heyta" && git status --porcelain -- packages/ui/src/calendar apps/web/src/features/calendar \
-  apps/mobile/src/screens/CalendarScreen.tsx | wc -l      # 现在 = 非 0 ⇒ 继续停
+  apps/mobile/src/screens/CalendarScreen.tsx | wc -l      # 归零才动；每次引用本条都要重跑这一行
 ```
+
+🔴 **这条判据给的是活树瞬时读数，不是提交属性** —— 下面两段是当时的逐次现量，原样保留：
+20:2x 非 0 ⇒ 停；23:0x 复量仍是 14 且**变宽**；04 02:3x 在 `608fa5b1` 把 main 搬进 batch2 之后**归零** ⇒ 落地。
+**同一行命令六小时里给出三种答案**，所以"已归零/仍撞车"这类断言离开日期与载体就没有意义。
 
 20:2x 现量的撞车代价：`calendar/model.ts` **+264/−7**（261→518 行，含一处 166 行整块插入）、
 `CalendarBoard.tsx` +107、`CalendarScreen.tsx` +153。HEAD 与他们的版本里 `grep -c 'EVENT'` **都是 0**
@@ -371,13 +383,50 @@ cd "…/heyta" && git status --porcelain -- packages/ui/src/calendar apps/web/sr
 `apps/web/src/features/calendar/{drag-day,useDragDayNav}.*` ⇒ 日历线正在做**日视图 / 年视图 / 拖拽**，
 不是收尾中的余波。停放的判定继续成立。
 
-⚠️ **给合流的人的一条硬提醒（新）**：我方 `509a06cd` 与 `67fef701` 改的
+⚠️ **给合流的人的一条硬提醒（原文保留，下面那段是它的结案）**：我方 `509a06cd` 与 `67fef701` 改的
 `packages/ui/src/calendar/{model.ts,CalendarBoard.tsx}` 和 `apps/web/src/features/calendar/{CalendarView.tsx,store.ts}`
 **逐个都在上面那 14 个里** ⇒ batch2 合回 main 时这四个文件必冲突。冲突解法不是二选一：
 `model.ts` 里我方新增的是 `CalendarDayMarker` / `CalendarDayMarkerView` / `calendarDayMarkerView`，
 `CalendarBoard.tsx` 里是 `dayMarker?` / `dayMarkerLabels?` 两个**可选** prop 与 DayCell 那一处渲染，
 `store.ts` 里是 `publicFactsEpoch` + `bumpPublicFactsEpoch` —— **全部保住**，他们的新板子（日/年视图）
 一旦也要标"休/班"，用的就是同一条缝（这正是 §4 第 3 条当初把它做成默认值等于原值的可选 prop 的理由）。
+
+✅ **04 02:5x 结案：合流已经发生，四条锚点在 `origin/main` 上全部保住**。
+载体是 `origin/main`（我的分支缺它身上 228 笔：`git rev-list --count HEAD..origin/main`；
+它缺我这边的 5 笔：`git rev-list --count origin/main..HEAD`），命令现量：
+
+```bash
+cd "…/heyta-wt-batch2" && for spec in \
+  "packages/ui/src/calendar/model.ts:calendarDayMarkerView" \
+  "packages/ui/src/calendar/CalendarBoard.tsx:dayMarker" \
+  "apps/web/src/features/calendar/store.ts:publicFactsEpoch" \
+  "apps/web/src/features/calendar/CalendarView.tsx:publicFactsEpoch"; do
+  f=${spec%%:*}; n=${spec##*:}; echo "origin/main $f 含 $n: $(git show origin/main:$f | grep -c "$n")"; done
+```
+
+读数 **1 / 14 / 4 / 2**。
+
+🔴 **我在这条结案上先写错过一次，错在我的取证命令本身**：上面第一段我曾判成
+"它是以**内容**而非**提交**的形式进去的，因为 `git log --oneline HEAD..origin/main | grep -E '509a06cd|67fef701'` 现量 0 行"。
+那句 0 行是真的，**结论是假的** —— `HEAD..origin/main` 是**差集**，按定义不打印 HEAD 自己的祖先，
+而那两笔本来就是 batch2 分支上的提交、合流后同时是 HEAD 与 `origin/main` 的祖先 ⇒
+**这个命令结构上不可能打印出它们**，"合流已完成"这个最强的情形恰好给出 0 行。
+换成逐笔判祖先现量：
+
+```bash
+for c in 509a06cd 67fef701 6735cc39 b05fbc50 e2def90f; do
+  git merge-base --is-ancestor $c origin/main && echo "$c in origin/main=yes" || echo "$c in origin/main=no"; done
+```
+
+读数：**`509a06cd` / `67fef701` / `6735cc39` / `b05fbc50` 四笔全 yes**（W4b 服务端那两笔 + `dayMarker` 那条缝 + epoch，
+**是以提交的形式进的 main**），只有 **`e2def90f`（今天 02:3x 落的 W6）no** —— 它还在上面那 5 笔里。
+⇒ 结案改成：**缝四条全在、提交形式进的 main；缺的不是缝，是缝的那个消费者**
+（"一条没有截止日的倒数日能上日历"这条行为还没进 main）。
+
+📌 **可迁移的判据**：判"某笔提交在不在 X 里"只能用 `git merge-base --is-ancestor <c> X`，
+不能用 `git log <A>..<B>` 的清单去 grep —— 后者是差集，对"两边共有"的提交恒不打印，
+于是"已经合流"会被读成"从没存在过"。这是 §7"0 命中先查 needle 住在哪"的同族：
+这里 needle 住的那个集合**根本不在扫的集合里**。
 
 ---
 
