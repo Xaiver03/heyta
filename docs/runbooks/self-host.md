@@ -97,6 +97,29 @@ APK_MIRROR=你的-alpine-镜像源
 NPM_REGISTRY=https://你的-npm-镜像
 ```
 
+还有**第三行**，它坏的形态和上面两行不一样，所以单独说：`NODE_IMAGE`。前两个旋钮作用在
+Dockerfile **已经跑起来之后**的层，而 base 镜像是在任何一条指令执行**之前**就要拉下来的 ——
+连不上 `docker.io` 的主机得到的是一条**响亮但无线索**的失败：
+
+```
+#2 [internal] load metadata for docker.io/library/node:24-alpine
+#2 ERROR: failed to authorize: DeadlineExceeded: failed to fetch anonymous token:
+#2   Get "https://auth.docker.io/token?scope=repository%3Alibrary%2Fnode%3Apull…": i/o timeout
+```
+
+（2026-10-04 在本机实测到的原文；当时的现量是本地一枚 `node:*` 缓存都没有，
+`registry-1.docker.io` 直连拿到 000，而就近的公开加速源能拉到 `alpine`。）
+
+```bash
+NODE_IMAGE=你自己的源/library/node:24-alpine
+```
+
+默认值逐字等于 `node:24-alpine`，所以**不带这一行 = 今天的行为一点没变**。
+仓库里不写死任何地域性源，理由与 `APK_MIRROR` 同一条：那会让别处的自建者拿到慢源。
+⚠️ `server/Dockerfile` 有**三个阶段**，而 `ARG` 不跨 `FROM` 继承，所以那里声明了三次 ——
+这三处必须同源，否则 `web` 阶段与 `production` 阶段会各自拉不同的 base，
+"我的镜像里到底装了什么"就再也对不上了。
+
 镜像仓库同理：**我们不提供任何第三方公共镜像**，需要就近拉取就把它推到
 **你自己的** registry，`SUPERSYNC_IMAGE` 指向那里。
 
@@ -118,7 +141,7 @@ or may require 'docker login'
 
 那句 `may require 'docker login'` 是这条路上最容易误导人的一步 —— 它会让人去找
 "该登录哪个仓库"，而真相是**根本没有仓库**。带上 build override 之后，同一条命令
-自己把镜像打出来（`APK_MIRROR` / `NPM_REGISTRY` 两个旋钮在这条路上也生效，
+自己把镜像打出来（`APK_MIRROR` / `NPM_REGISTRY` / `NODE_IMAGE` 三个旋钮在这条路上也生效，
 它们就住在这份 override 的 `args` 里）。
 
 `docker-compose.migrate-once.yml` 是一个**一次性迁移服务**的 override：默认服务图里

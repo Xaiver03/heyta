@@ -100,8 +100,18 @@ are published, and the default `image:` value is `${SUPERSYNC_IMAGE:-supersync:l
 the build override compose has neither a build definition nor a local tag, so it tries to
 **pull** and you get `pull access denied for supersync, repository does not exist or may require
 'docker login'`. That hint is the misleading part: there is no registry to log in to. The build
-override is also where `APK_MIRROR` and `NPM_REGISTRY` live, so it is the file that makes this
-path work on a machine that cannot reach Alpine's CDN or npm's registry.
+override is also where `APK_MIRROR`, `NPM_REGISTRY` and `NODE_IMAGE` live, so it is the file that
+makes this path work on a machine that cannot reach Alpine's CDN, npm's registry, or Docker Hub.
+
+`NODE_IMAGE` fails differently from the other two, which is why it is called out: the Alpine and npm
+knobs affect layers that only run **after** the build has started, while the base image is pulled
+**before** the first instruction executes. On a host that cannot reach `docker.io` the build dies at
+`load metadata for docker.io/library/node:24-alpine` with `failed to fetch anonymous token … i/o
+timeout` — no layer-level clue, because no layer was ever reached. Set it to a base you can actually
+pull (`NODE_IMAGE=your-mirror/library/node:24-alpine`). The default is byte-identical to today's
+behavior, and no regional mirror is hardcoded in this repo for the same reason as `APK_MIRROR`.
+⚠️ `server/Dockerfile` has three stages and `ARG` does not cross `FROM`, so all three declare it;
+they must stay on the same base or the `web` and `production` stages end up built on different images.
 
 The override adds exactly one service and does not touch the default graph. It waits for
 Postgres to be healthy, runs `scripts/migrate-deploy.sh` from the image, and only then lets the
