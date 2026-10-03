@@ -1806,6 +1806,76 @@ BFS 停在 18 个直接依赖上，输出"两边差 127 条"。第二版读了 s
 就是替一个还没定的答案预置判据。文件头写了这条理由）。
 ⚠️ 探针本身两趟是坏的，两次症状都长得像"发现"，记录在上面第二节 —— 那两趟比这份读数更值得读。
 
+---
+
+## 9. 交还一条现场：`reinstall:all` 的 mac 段不是"慢"，是不朽（2026-10-04 06:0x 现量）
+
+本节写在这里而不是 `BLOCKED.md` / `environment-traps.md`，因为那两个文件此刻都有别的会话
+大量未提交行（traps 台账现量 `+73 / -0`），往正脏着的多人台账追加会同时踩上"抢归属"和
+"被别人整文件 `git add` 抹回去"两个形状（本会话已各实测过一次）。本文是单写者面，
+所以把"要交给那条线处理"的事实落在它自己的审计文档里，并在此登记待入 traps 的号位。
+
+**谁在跑**（三枚 pid，逐条现量）：
+
+```
+81007 → 93771 → 93772 → 93817  bash /tmp/heyta-reinstall/scripts/.reinstall-all.sh.snap.93817
+95477  bash apps/desktop-macos/scripts/package-app.sh /tmp/heyta-macos-dist   etime 02:39:59  TIME 0:00.04
+98934  .../usr/bin/notarytool submit /tmp/heyta-macos-dist/Heyta-1.0.0.dmg …  --wait
+       + 同一条管道上的 98935 tail -8、98936 awk
+```
+
+**判据（为什么认定是不朽而不是慢）**：`lsof -a -p 95477 -i` 与 `-a -p 98934 -i` **各 0 条 TCP**
+（🔴 不带 `-a` 时 `-p` 与 `-i` 是**并集**，会打印全系统的网络文件 —— 我第一次就把它读成"有很多连接"），
+累计 CPU 三次采样不涨（0:00.03 → 0:00.04），`etime` 从 1h57m 走到 2h40m，
+它自己的日志停在 `═══ 1. macOS ═══`。一条到 Apple 的网络连接都没有的 `notarytool --wait`
+不会返回，后面的 windows / android / ios 三段**永远不会开始**。
+
+**根因与已落的修法**：`xcrun notarytool submit --wait` 没有上限，裸 macOS 又没有 GNU `timeout`。
+上限已进仓库 —— `694c05e3` 给 `package-app.sh` 加了 `HEYTA_NOTARY_TIMEOUT`（默认 900s）
+与无 coreutils 时的纯 bash 看门狗（rc=124 单独一条结论，不装订票据；五臂夹具逐臂量过）。
+**但它救不了已经挂住的这一跑**：那一趟读的是它自己载体
+`/tmp/heyta-reinstall/apps/desktop-macos/scripts/package-app.sh`（现量 17 066 字节，
+`grep -c HEYTA_NOTARY_TIMEOUT` = **0**），不是主检出那枚 19 444 字节的已修版本。
+⇒ 下一趟（载体先推到 `≥ 694c05e3`）才受上限约束。
+
+**它同时钉住两条别的线的验收**（这是要交还的理由，不是抱怨）：
+
+- 我的 §5-1（`pnpm reinstall:all` 四端 + `INNER_EXIT=0` + 四张人看过的截图）：
+  互斥门要求"没有别人在重装"，而 `pgrep -f 'reinstall-all\.sh'` 命中 93817。
+- 我的 §5-3（`verify-mobile-notes`）**也会被钉住**，如果下面那条改动按现形态提交：
+  🔴 主检出里 `scripts/verify-mobile-window-gate.sh` 有别人**未提交的 +74 / −5**，
+  其中新增了一条 `❌ 有另一趟 reinstall-all 在跑（pid：…）—— 它的 android 段会对同一台设备 adb uninstall`
+  （06:03 实测在 target c 分支命中 93817）。那条门本身方向是对的（B 与 C 会拆对方的现场），
+  但它的**净效果**是把"一条已经挂死的跑"变成"永久封路" —— 因为挂死者永不消失。
+  ⇒ 建议它的主人把两种持有者分开：**真在跑**（CPU 在涨 / 有 TCP）与**已经死等**
+  （CPU 不涨 + `lsof -a -p <pid> -i` 零连接）；后者应当响亮报"这一趟已经挂死，需要它的所有者处理"，
+  而不是让每个后来者无限重排。我不代改那个文件（撞车判据成立：它有别人的未提交 diff）。
+
+**归它的所有者做的两个动作**（都不需要我这侧配合）：
+
+1. 终止那一棵：`kill 98934 95477 93817`（或 `kill -- -<pgid>`）。我这侧不会代杀 ——
+   那是别人的一条验收，杀掉会让它的日志与载体停在半路（AGENTS §8.9）。
+2. 重跑前先 `git -C /tmp/heyta-reinstall checkout --detach <main HEAD>`（或换一棵新载体），
+   否则上限不生效。
+
+**现量命令**（复制即可复核，全部只读；🔴 路径要指到**它自己那棵树**，
+相对路径按调用方 cwd 解析会量到另一枚 inode 而报"进程不在" —— 这个坑我踩过并写进 goal §7.30 ①）：
+
+```bash
+pgrep -f 'reinstall-all\.sh|package-app\.sh'
+for p in $(pgrep -f 'package-app\.sh'); do
+  ps -o pid,etime,time,stat -p "$p" | tail -1
+  echo "  载体=$(lsof -a -p "$p" -d cwd -Fn | grep '^n' | head -1 | cut -c2-)  TCP=$(lsof -a -p "$p" -i | tail -n +2 | wc -l | tr -d ' ')"
+done
+stat -f '%z 字节' /tmp/heyta-reinstall/apps/desktop-macos/scripts/package-app.sh   # 17066 = 无上限那份
+```
+
+待入 traps：**#216**（按工作树现量最大号 215 往后取；等 `docs/reference/environment-traps.md`
+里那 73 行未提交段落落定后追加，避免撞号与整文件覆盖）。要入的那条一句话：
+**"判某个进程是否持有某文件"时，路径必须按对方那棵树的绝对路径解析（逐 pid 取 `cwd` 再拼），
+从自己这棵树解析同名相对路径会命中另一枚 inode，探针于是把"活着"报成"没了"。**
+镜像面已经在本节上面（不带 `-a` 的 `lsof -p PID -i` 是并集）。
+
 
 
 
