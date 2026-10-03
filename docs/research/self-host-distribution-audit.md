@@ -3781,6 +3781,15 @@ image-license, crosslang-contract, journey-coverage, ai-tools, ai-coverage, web-
 
 #### 还欠的（别当已完成）
 
+⑧ **按命题扫过"还有没有第二处会踩同一个 E404 的构建面"**（不是只扫我改的那一处）：
+`git ls-files | grep -i dockerfile` 全仓只有两枚 —— `server/Dockerfile` 与 `server/Dockerfile.test`。
+后者确实跑 `npm install`（还不带 `--omit=dev`），但它 `COPY` 的是
+`packages/super-sync-server/package.json` 与 `packages/sync-core/…` 这套**上游目录布局**，
+在本仓库里那些路径根本不存在（我们的服务端在 `server/`），所以它在第一步就死，
+且本仓 §8.54 早就量过"**没有任何构建路径用它**"（`.github/workflows/heyta-server-image.yml:182`
+指向的是 `file: server/Dockerfile`，同一条 `docker build-push-action` ⇒ 修法自动被发布路径继承）。
+⇒ 这条不是"又一个 G-54"，是一枚上游遗留的死件；留在这里是因为**"只修我看见的那一处"就是漂移的起点**。
+
 1. **真构建**：载体重算（带上本节这几笔）之后跑一次 `verify:selfhost-stack`，看生产阶段那层建成、
    并且 `check:image-license` 在载体上从 🔴 变 ✅。这一步同时是 #2 的第 N 趟现量。
 2. ~~**main 侧同段复跑**：拿一个 main 的 detached 检出跑**同一条**纯 fs 段，把上面那 13 条红逐条归属
