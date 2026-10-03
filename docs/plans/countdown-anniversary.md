@@ -199,7 +199,12 @@ i18n **中英同步**（唯一文案事实源，`check:ui-language` 拦）；`SH
 
 ### 明确没做（逐条给理由，不是漏掉）
 
-1. **W3 的"真机/真服务端 yearly 断言"**（本工单原本要求补的那条）。2026-10-03 02:02（本地）实测：`emulator-5556` 正被并行会话的 `scripts/verify-mobile-restore.sh`（pid 86145 / 86147，当时已跑 11 分 46 秒）占用，且主检出有一批未提交的 `apps/mobile/**` 源码改动 —— 此时抢设备既打断对方，装出来的 APK 也不是本分支的代码。**顺延到设备空闲时**，且必须在 `pnpm reinstall:mobile` 之后跑，否则验的是旧二进制（AGENTS §6.1.1）。
+1. **W3 的"真机/真服务端 yearly 断言"**（本工单原本要求补的那条）—— 收口时已**写成 `scripts/verify-mobile-repeat.sh` 的第 15 步**，但它**还没在设备上跑过**，所以这条不能记成"已交付"：
+   - 写了什么：第 7 步的选项清单从五个补成六个（含「每年」）；第 15 步点「每年」→ 断言**恰好一条** op、规则 == `FREQ=YEARLY;BYMONTH=…;BYMONTHDAY=…`、锚点 == **手机当前截止日**、面板显示「当前：每年 …」，再同步到笔记本读同一条规则。
+   - 🔴 期望值**从手机当前 `dueDate` 现场推**，不抄脚本开头的 `DUE_DATE`：`TaskDetailSheet` 的锚点是 `repeatAnchor = dueLocal ?? todayLocal`，而第 11/14 步已经把截止日顺延过两次 —— 拿旧日期算期望会把这条正确的实现判成红。"锚点跟着当前截止日走"本身也一起被钉住了。
+   - 离线做到哪一步：`bash -n` 0；把 `dueDate` 的 ms 喂进脚本里那段 python，拼出的规则串与 `packages/domain/dist` 的 `Recurrence.yearly(10,17)` **逐字相同**。⚠️ 这只算半个验证 —— 它证明不了第六枚 chip 在真机上点得到（chips 是一行横排的）。
+   - 为什么没跑：2026-10-03 02:05（本地）实测 **1 分钟负载 328–353**、107 个 node/java 级进程、并行会话正在连续提交；脚本默认的 `emulator-5554` 没起，唯一在线的 `emulator-5556` 与 :3000 / :3100 两个服务端都捏在别人手里。这一刻起四端重装会把别人**有时限**的设备判据压成超时假红（同一台机器上曾实测把 load 顶到 250–537）。
+   - 下次跑之前必须按顺序做完（缺一条就是在验旧二进制）：`pnpm -r build` → `pnpm reinstall:mobile` → `HEYTA_E2E_SERIAL=<现取的在线机> PORT=<自己的端口> pnpm verify:mobile-repeat`；跑前重新现量四条现场判据：`ps Axo command | grep -F 'verify-mobil[e]'`、`sysctl -n vm.loadavg`、`xcrun simctl list devices booted`、`adb devices -l`。
 2. **`'yearly'` 加了 id 但没人能测到"忘了加进 `REPEAT_PRESET_IDS`"** —— 这一档的表现是"界面上没有每年"，属于**按定义不可观测**，不为此扭曲设计；类型系统已能抓到"switch 少一档"与"标签少一档"（`Record<RepeatPresetId, MessageKey>` 是穷举的）。
 3. **2/29 的"平年过 2 月最后一天"口径**：需要 `BYMONTHDAY=-1`，而域层 `describeRecurrence` 与移动端 `recurrence-display` 都会把它渲染成「每年 2 月 -1 日」。现状按 RFC + 主流日历实现（只在闰年重复），并**把这条边界钉在测试里**而不是留成暗坑。真正的产品问题在倒数日（"在一起多少天"那天算不算 2/29），随 W5 一起定。
 4. **W4 判据②的界面半段**（"数据只到 2026 时 2027 显示节、不显示休/班"）：本批不做 UI，所以落的是**数据层**那半 —— 2027 有节无休、不抛错、非法日期响亮失败，都有单测与变异。界面上那条随 W5。
@@ -225,6 +230,27 @@ i18n **中英同步**（唯一文案事实源，`check:ui-language` 拦）；`SH
 **收口时新照出来的一条（不属于本批，已归还原主线）**：合并态 `pnpm -r typecheck` 红在两处 —— `packages/app-host/tests/hosted-account-profile.spec.ts:138,156`（`null` 与 `string | undefined` 的覆写类型），来自 `7e299118`「feat(account): 账号资料三端贯通」（09:38 提交）。归属证据：`git diff --name-only 2ed84122..57078ddb` 里 `hosted|account` 命中 **0 处** ⇒ 本批不可能造成它。对方已在 `8fdcab6a` 修掉，本会话在 `8fdcab6a` 上独立复跑 `pnpm --filter @heyta/app-host typecheck` = **RC 0**。
 
 **合并态实测**（在 `a29881e9` 的隔离检出里，一条命令一段日志、每段自己那次的真实退出码）：`pnpm -r build` **0**、`pnpm check:calendar` **0**、`pnpm check:holiday` **0**、`pnpm check:licenses` **0**、`pnpm -r --filter '!@heyta/sync-server' test` **0**；`pnpm -r typecheck` 在 `a29881e9` 上 **2**（就是上面那条别人的债），在 `8fdcab6a` 上 **0**。
+
+### 收口之后仍欠的两件事（一条是环境，一条是排期 —— 都不是"忘了"）
+
+1. 🔴 **AGENTS §6.1.1 的固定收尾 `pnpm reinstall:all` 本批一次都没跑过**，所以"四个端都装上了当前源码的产物"这件事**尚未成立**，本批的交付状态只能写到"门禁绿 + 产物打得出"。不跑的理由与读数写在上面「明确没做」第 1 条（1 分钟负载 328–353）。跑的时候按实测过的做法在**隔离检出**里跑，别等主检出干净（主检出长期有别人的未提交源码，Windows 段送的是 `git ls-files -co`，那等于把半成品装上四端）：
+   ```bash
+   git worktree add --detach ../heyta-wt-reinstall <当前 main HEAD>
+   cd ../heyta-wt-reinstall && pnpm install && pnpm -r build
+   (cd apps/mobile/ios && pod install)          # 🔴 隔离检出必须先补这步，否则 ios 段必红
+   bash scripts/reinstall-all.sh                # 或 --only mac,android,ios（汇总会大字列出没装的端）
+   ```
+   ⚠️ Windows 段之前先确认那台打包机与隧道没被别人占着（它 `Remove-AppxPackage` + `Add-AppxPackage` 是**真卸真装**，会打断对方的壳级取证）。
+   📌 这一次重装同时能清掉 [`ai-assistant-closure.md`](ai-assistant-closure.md) 记着的那笔同种欠账 —— 那条线也还没装过当前产物。
+2. **待入 §7 台账的一条**（2026-10-03 收口实测）。**现在故意不追加进 `docs/reference/environment-traps.md`**：那条台账今天已经被两条会话撞过一次号（本批的 137–140 撞上 main 的 124–160，合并时才重编成 161–164），在它还脏着、别人随时会 `git add` 整份文件的时候往里追加就是再撞一次。落地时**编号取现量的 `max(现有编号)+1` 起**，正文照抄：
+
+   > 🔴 **等负载的循环里，解析 `vm.loadavg` 的那一步自己坏了，而且坏了 15 轮没人发现。**
+   > `sysctl -n vm.loadavg | tr -d '{} ' | cut -d' ' -f1` 看着只是"剥花括号取第一个数"，
+   > 但 **`tr -d ' '` 把分隔符连同三个值一起粘成一个非法整数**（`65.9440.2735`），
+   > 于是 `[ "${L%.*}" -lt 14 ]` **每轮都报 `integer expression expected`、条件恒假、循环恒睡**。
+   > 症状是"窗口永远不清"，真相是**判据从来没比较成功过** —— 恒假的等待条件比没有条件更糟，
+   > 因为它看起来还在等。⇒ 三个值的 `loadavg` 用 `awk '{print $1}'`（顺手剥掉花括号），
+   > 并且等待循环**第一轮就把解析出的数打出来**；解析失败必须第一轮可见。
 
 ---
 

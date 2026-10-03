@@ -308,7 +308,7 @@ else
   fi
 fi
 
-step "7. 打开任务详情：出现「重复」区块与四个预设"
+step "7. 打开任务详情：出现「重复」区块与六个预设"
 TASK_XY=$(xy_text "$TASK_TITLE")
 if [ -z "$TASK_XY" ]; then
   bad "点不到任务行，后面的界面操作做不下去"
@@ -321,11 +321,11 @@ else
     bad "详情面板里没有「重复」区块（界面没接上）"
   fi
   MISSING=""
-  for c in 不重复 每天 每周 工作日 每月; do
+  for c in 不重复 每天 每周 工作日 每月 每年; do
     [ "$(has_desc "$c")" = "1" ] || MISSING="$MISSING $c"
   done
   if [ -z "$MISSING" ]; then
-    ok "五个选项都在：不重复 / 每天 / 每周 / 工作日 / 每月"
+    ok "六个选项都在：不重复 / 每天 / 每周 / 工作日 / 每月 / 每年"
   else
     bad "重复选项缺：$MISSING"
   fi
@@ -518,6 +518,93 @@ if [ "$GOT_DUE2" = "$NEXT2_MS" ]; then
   ok "手机上的到期日已推进到 $NEXT2_DATE —— 笔记本上的完成也走同一条顺延语义"
 else
   bad "手机上的到期日是「${GOT_DUE2}」，期望 ${NEXT2_DATE}（${NEXT2_MS}）"
+fi
+
+step "15. 🔴 点「每年」→ 规则落在**当前截止日**的月日、仍恰好一条 op，并且同步到笔记本"
+# 这一条证的是 W3 那一档在真机上的**接线**，不是规则数学：
+# `REPEAT_PRESET_IDS` 里有 'yearly'、词条在、`repeatPresetRule` 出得来规则，
+# 但 chips 是一行横排的 —— 第六个可能因为滚动/换行**根本点不到**，
+# 那种失效单测与 typecheck 都不会报（`Record<RepeatPresetId, MessageKey>` 只挡漏翻译）。
+#
+# 🔴 期望值**从手机当前的 dueDate 现场推**，不抄脚本开头的 DUE_DATE：
+# 第 11/14 步已经把截止日顺延过两次，而 `TaskDetailSheet` 的锚点是
+# `repeatAnchor = dueLocal ?? todayLocal`（当前截止日）。拿旧日期算期望会把
+# 这条正确的实现判成红 —— 而"锚点跟着当前截止日走"本身就是要钉的语义。
+$ADB shell input tap $TAB_TASKS $TAB_Y; sleep 3
+T15_XY=$(xy_text "$TASK_TITLE")
+if [ -z "$T15_XY" ]; then
+  bad "点不到任务行，第 15 步做不下去"
+else
+  phone_db_pull
+  CUR_DUE_MS=$(phone_field "$PHONE_DB" "$TASK_ID" dueDate)
+  YLINE=$(printf '%s' "$CUR_DUE_MS" | python3 -c '
+import datetime, sys
+d = datetime.date.fromtimestamp(int(sys.stdin.read().strip()) / 1000)
+print(d.isoformat(), d.month, d.day)
+' 2>/dev/null)
+  CUR_DUE=$(printf '%s' "$YLINE" | cut -d' ' -f1)
+  EXPECT_Y_RULE="FREQ=YEARLY;BYMONTH=$(printf '%s' "$YLINE" | cut -d' ' -f2);BYMONTHDAY=$(printf '%s' "$YLINE" | cut -d' ' -f3)"
+  if [ "$CUR_DUE" != "$NEXT2_DATE" ]; then
+    bad "手机上的截止日现在是「${CUR_DUE}」，期望 $NEXT2_DATE —— 前面的顺延没落进本地库，下面的年期望值不可信"
+  else
+    ok "锚点前提成立：手机当前截止日就是顺延后的 $NEXT2_DATE"
+    $ADB shell input tap $T15_XY; sleep 3
+    dump
+    BEFORE15=$(phone_ops_with_field "$PHONE_DB" "$TASK_ID" repeatRule)
+    echo "     点击前带 repeatRule 的 op 数：$BEFORE15"
+    if XY15=$(tap_label "每年"); then
+      sleep 2
+      phone_db_pull
+      AFTER15=$(phone_ops_with_field "$PHONE_DB" "$TASK_ID" repeatRule)
+      GOT_Y_RULE=$(phone_field "$PHONE_DB" "$TASK_ID" repeatRule)
+      GOT_Y_ANCHOR=$(phone_field "$PHONE_DB" "$TASK_ID" repeatDtstart)
+      if [ "$AFTER15" = "$((BEFORE15 + 1))" ]; then
+        ok "换一次预设只产生了 1 条 op（$BEFORE15 → ${AFTER15}）"
+      else
+        bad "换一次预设产生了 $((AFTER15 - BEFORE15)) 条带 repeatRule 的 op，应该恰好 1 条（§3.4）"
+      fi
+      if [ "$GOT_Y_RULE" = "$EXPECT_Y_RULE" ]; then
+        ok "「每年」落库的规则正确：$GOT_Y_RULE"
+      else
+        bad "「每年」落库的规则是「${GOT_Y_RULE}」，期望「${EXPECT_Y_RULE}」"
+      fi
+      # 锚点必须跟着**当前**截止日。它若写死成脚本开头那个日期，界面上任何地方都看不出来，
+      # 而下一次真正发生的日子会整年错开 —— 这正是倒数纪念日最贵的一类错。
+      if [ "$GOT_Y_ANCHOR" = "$CUR_DUE" ]; then
+        ok "锚点跟着当前截止日走：${GOT_Y_ANCHOR}"
+      else
+        bad "锚点是「${GOT_Y_ANCHOR}」，期望 ${CUR_DUE} —— 锚点没跟着截止日走"
+      fi
+      dump
+      if [ "$(has_sub "当前：每年")" = "1" ]; then
+        ok "面板显示「当前：每年 …」（describeRecurrence 认得这条规则）"
+      else
+        bad "面板上没有「当前：每年」—— 规则写进去了却读不出来"
+      fi
+      # 🔴 跨设备：规则是数据，不是这台设备的属性。第 13/14 步为 WEEKLY 证过这件事，
+      # 这一档也得单独证 —— 因为它换的是 BYMONTH/BYMONTHDAY 这对新参数。
+      $ADB shell input tap $TAB_PROFILE $TAB_Y; sleep 3
+      dump
+      if XY=$(tap_label "立即同步"); then
+        T=$(wait_synced 180)
+        if [ -n "$T" ]; then ok "手机同步完成（约 $T 秒）"; else bad "手机同步未完成"; fi
+      else
+        bad "找不到「立即同步」按钮"
+      fi
+      if laptop_pull; then
+        L_Y_RULE=$(laptop_field "$TASK_ID" repeatRule)
+        if [ "$L_Y_RULE" = "$EXPECT_Y_RULE" ]; then
+          ok "笔记本读到同一条「每年」规则：$L_Y_RULE"
+        else
+          bad "笔记本读到的是「${L_Y_RULE}」，期望「${EXPECT_Y_RULE}」"
+        fi
+      else
+        bad "笔记本下载失败，跨设备这条判据没跑成"
+      fi
+    else
+      bad "点不到「每年」这个选项（chips 换行/滚动后够不着，或词条没接上）"
+    fi
+  fi
 fi
 
 summary "移动端重复任务"
