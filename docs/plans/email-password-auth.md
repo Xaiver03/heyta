@@ -761,15 +761,41 @@ AGENTS §3.5 早就给过这条的形状（`ids.ts` / `createSyncClient` 那两�
 
 ### 13.7 这一轮的状态（写在这里，不靠记忆）
 
-设备那一跑**截至本节写作时还没跑成**：宿主机负载被另一个项目（litopia 的 gradle/OrbStack）
-顶到 17.9–**664**（12:04 现量 164），验收链按 `≤12` 的窗口在等（120 轮 × 30s = 60 分钟上限；
-等满即以 `RUN_EXIT=3` 结束 —— **环境不成立，不是产品失败**，不为挤进窗口把阈值调低）。
-**在它拿到真实读数之前，本节不写任何"移动端全绿"的结论。**
+**12:35 那一跑拿到了负载窗口，然后整轮自判无效 —— 而它先印出两条假红、一条假绿。**
+读数（`/tmp/heyta-mobile-auth-head.log`）：负载从 400+ 落到 **9.61** 命中窗口，但设备此刻被
+另一条线的 `verify-mobile-repeat.sh`（`heyta-wt-closeout` 检出）占着 ⇒ `uiautomator` **连续 10 次抓不到界面**，
+`/tmp/ui.xml` 被截成空文件；脚本随后按 lib 的约定打印
+`❌ 拿不到真实界面 —— 本轮结果无效（环境失败，不是产品失败）` 并以 **`RUN_EXIT=3`** 收尾。**产品一条没坏。**
 
-跑的是这条链，读数都落在 `/tmp/heyta-mobile-auth-head.log`：
-`A 产物来源核对（隔离检出 HEAD=f4fe87d2 且脏 0；APK md5 8a1d9654…；server/dist 不比 src 旧）
-→ B 起一台 :3101 的 HEAD 服务端（legal-consent=401，路由在）→ C 等负载窗口
-→ D HEYTA_APK=<HEAD 那枚> bash scripts/verify-mobile-auth.sh`。
+🔴 **这一跑照出的是我自己那两条判据是盲的**（撞见就当场修，不等下一轮）：
+
+| 位置 | 空 dump 上的读数 | 性质 |
+|---|---|---|
+| 0.5 步 G-11「首启必须问」 | ❌「冷启动**没有**征求隐私同意」 | **假红** —— 会响，至少自己会说话 |
+| 第 7 步「决定跨启动落盘」 | ✅「再冷启动没有重复征求」 | **假绿** —— 不响：空 dump 上 `privacy_gate_present` 为假 ⇒"没再问"**无条件为真** |
+| 第 7 步「欢迎页没有回来」 | ✅ | 同一个空 dump，紧接上一条，同样性质 |
+
+两处各补一行 `require_screen`（0.5 在判"问没问"之前先 `dump` + 要一张真界面；第 7 步在
+`launch_app` 之后、那两条缺席断言之前）。**"缺席即为真"这类断言在空界面上恒成立**，
+假绿那条比假红贵 —— 它印的是 ✅，§7 元规则二说的正是这个形状。
+同轮还核了另外两处缺席断言（`:396` 服务端没建号、`:436-438` 界面没有那四句断言性文案）：
+前者读的是库不是屏，后者要走到那一步得先 `scroll_to_desc` 抓到真节点 ⇒ **构造上自带数据门控**，不改。
+
+🔴 **另一条改的是链自己**（`/tmp/run-mobile-auth-v2.sh`，不入库）：上一版把隔离检出的 HEAD
+**钉死成 `f4fe87d2`**，而 main 一直被兄弟会话推进 ⇒ 重跑会红在"提交不等于我上次记的那个数"上，
+那既不是产物问题也不是产品问题。改成**可核对的关系**：`ISO HEAD` 必须是 `main` 的祖先
+（`merge-base --is-ancestor`），两边 sha 与「应用侧源码差集」逐枚打印；差集里只要有一枚落在
+`auth|login|password|credential|privacy|consent` 路径上就 `RUN_EXIT=5` 拒绝起跑。
+本轮现量：`f4fe87d2`（脏 0）是 `3603db71` 的祖先，差集 **2 枚**（`NotificationsScreen.tsx`、
+`SettingsScreen.tsx`），逐行看过是 `View + gap` → `Stack`/`HStack` 的**纯容器替换**
+（`testID="privacy-consent-section"`、`inbox-notifications-list` 原样保留、零文案变化）⇒ 载体可用。
+另外窗口命中后新增 **C2 设备预检**（连抓 3 次 uiautomator，且 `dump` 报成功之后还要
+`exec-out cat` 里真有 `<hierarchy>` 才算数），把"跑了一半才发现设备不可用"压成"30 秒内退回等窗口"。
+
+**v2 那一跑截至本节写作时还没有读数**；在它打印出 `RUN_EXIT=` 之前，本节不写任何"移动端全绿"的结论。
+等满窗口同样以 `RUN_EXIT=3` 结束 —— 那是**环境不成立**，不把 `≤12` 的阈值调低去挤进窗口。
+链与读数：`/tmp/heyta-mobile-auth-v2.log` = `A 产物来源核对（关系式）→ B 起/复用 :3101 的当前源码服务端
+→ C 等负载窗口（60 轮 = 30 分钟）→ C2 设备预检 → D HEYTA_APK=<ISO 那枚> bash scripts/verify-mobile-auth.sh`。
 
 🔴 本节的另一条教训（写下来是因为我自己又踩了一次）：**运行中的 bash 脚本不许编辑**。
 第一条链在等窗口时我改了 `/tmp/run-mobile-auth-head.sh`，bash 按字节偏移续读 ⇒
