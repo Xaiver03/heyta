@@ -1296,3 +1296,15 @@ grep -c 'multi-end-entry-coverage-audit\|goal-multi-end-coverage\|0051-mobile-re
 日志里 `goal-multi-end-coverage` **0 命中** ⇒ 同一个仓库里、同一次扫描下，**行内代码形状确实不进判据，
 `[]( )` 形状进**（那一趟它自己就把 `ui-review-fill-zh-timeline.md:2737` 的同路径 `[]( )` 形态报了出来）。
 不是推测，是这一轮顺手做出来的 A/B。
+### 7.29 交接落盘（2026-10-03 21:2x，载体 96f3293d 之后）
+
+本条线的交接文档已按 `docs/` 分层规则落在 [`docs/plans/multi-end-coverage-handoff.md`](multi-end-coverage-handoff.md)
+（同目录已有 10 份 `*-handoff.md`，形态一致），并挂进 `docs/README.md` 的 plans 索引。
+**它只写"现在在哪 + 下一步按什么顺序做 + 别再走一遍的死胡同"**，决策与归因仍在本文件 §7 与 `BLOCKED.md`。
+
+⚠️ 上一条那个"`goal-multi-end-coverage` 0 命中"的读数是**按趟成立**的：本文件是共享台账，
+21:1x 之后它已出现 **1 处**命中 —— 出处不是我写的句子，是并行会话把 104 行那句 W9 状态里的
+`docs/adr/0051-…` 从行内代码改成了真链接 `../adr/0051-mobile-reminder-delivery.md`（目标仍未被 git 跟踪）。
+**同一份文件、同一个目标、形状一变就从"看不见"变成"报出来"** ⇒ 上面那个 A/B 由双向证据闭合了。
+那一行不进本条线的提交（提交方式见交接文档"死胡同警告"第一条）。
+

@@ -1364,3 +1364,22 @@ OS 通知投递通过。原 [多端计划](docs/plans/goal-multi-end-coverage.md
 通知回执事实分层写入 AGENTS §8；具体事故扩充环境陷阱 #181 并追加提醒验收条目。
 [文档中心](docs/README.md) 已链接 B/C ADR 与既有证据，避免成为孤立记忆。
 这些新增流程约束目前是人工执行规则，不宣称已全部由自动门禁覆盖。
+
+## 21:2x（载体 96f3293d 之后）：交接落盘 + 提交纪律里又踩到两条
+
+- 新建 `docs/plans/multi-end-coverage-handoff.md`（同目录已有 10 份 `*-handoff.md`，形态一致），
+  并从 goal §7.29 与 `docs/README.md` 的 plans 索引各挂一处（AGENTS §8「新文档必须由原计划或文档中心链接」）。
+- **Goal 状态没有变**：条件 1 = 3 ✅ / 3 🟡（🟡 的三条拦路全在本批权限外：B41/B42 要翻冻结判据、B45 要动服务端、
+  B52 要跨端形态裁决）；条件 2 未达成（`pnpm check` **57/62**、四端重装**本轮没跑**）。
+  ⇒ **不标 complete**，交接给下一个会话按 §5 的顺序接着跑。
+- 🔴 **本轮两条新踩的坑**（都记进了交接文档的"死胡同警告"）：
+  ① 脚本开了 `set -o pipefail` 之后，`if ! diff -u A B | grep -q …` **永远走 else 分支** ——
+  `diff` 在有差异时退 1，管道整体状态被 pipefail 变成 1，匹配成功也被读成失败。
+  我在这条上**空转了四趟**，中途还把它误判成"脚本里写中文 needle 不匹配"（改成直接 `grep 文件` 立刻通）。
+  ② `git commit --only` 之后共享索引仍停在**上一笔 HEAD** ⇒ `git status` 报 `MM`，
+  而别人一次**裸** `git commit` 就会把我这几百行倒回去。收尾必须按**路径**把索引刷到新内容
+  （`git update-index --cacheinfo 100644,<HEAD blob>,<path>`，路径清单里**不能混目录**）。
+- ⚠️ 我又犯了一次记忆里那条"Edit 别吃掉相邻块的边界行"：给 `docs/README.md` 插索引行时
+  把 `old_string` 写成"那一行 + 换行"，结果两行被粘成一行（`… 不重复决策 || [subscription-wechat…`）。
+  当场用 python 精确修回（needle 命中数断言 = 1），净效果校验为 **+1 行 / 0 删**
+  （那 1 条删除是并行会话自己对 ADR-0043 表格行的改写，不是我造成的）。
