@@ -44,7 +44,7 @@
     "check:legal-host": "node scripts/check-legal-host.mjs",
     "check:licenses": "node research/tools/license-inventory.mjs",
     "check:licenses:stamp": "node research/tools/render-license-inventory.mjs --check-stamp",
-    "check:image-license": "node research/tools/gen-image-npm-tree.mjs --check && node research/tools/check-image-license-coverage.mjs --quiet",
+    "check:image-license": "node research/tools/gen-image-npm-tree.mjs --check && node research/tools/check-image-license-coverage.mjs --quiet && node research/tools/check-image-install-contract.mjs",
     "check:docs": "node research/tools/docs-link-check.mjs",
     "check:pricing": "node scripts/check-pricing-consistency.mjs",
     "check:ai-quota": "node scripts/check-ai-quota-consistency.mjs",
