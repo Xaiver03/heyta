@@ -1757,6 +1757,8 @@ export const zhCN = {
   'web.ai.chat.noTrace': '没有调用工具',
   'web.ai.chat.stoppedLead': '在上界处停下了：',
   'web.ai.chat.disclaimer': '内容由 AI 生成，可能有错。落库前请自己看一眼。',
+  'web.ai.chat.historyLocalOnly': '这段对话只保存在这台设备上：不同步到其他设备，也不会发送到任何地方。',
+  'web.ai.chat.expiredProposal': '这段对话是从本机恢复的。其中那条你还没确认的改动已经失效 —— 要改请重新说一次。',
   'web.ai.chat.resultAria': '助手的回答',
   'web.ai.assistant.failure.emptyText': '还没有输入内容。',
   'web.ai.assistant.failure.textTooLong': '这句话太长了，助手只处理短命令。',
