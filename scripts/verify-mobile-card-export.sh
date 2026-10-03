@@ -113,10 +113,26 @@ step "0b. 产物新鲜度：装上的包不许比源码旧（AGENTS §6.1.1、§
 # 🔴 这条不是仪式：本仓三次"判据对着旧二进制报绿"。宁可拒跑，也不要在旧 APK 上
 #    量出一个"看起来属于本轮"的 IHDR。
 APK_LINE=$($ADB shell dumpsys package "$PKG" 2>/dev/null | grep -m1 'lastUpdateTime' | tr -d '\r')
-APK_EPOCH=$(printf '%s' "$APK_LINE" | sed 's/.*=//;s/ .*//')
-if [ -z "$APK_EPOCH" ] || ! [ "$APK_EPOCH" -eq "$APK_EPOCH" ] 2>/dev/null; then
-  echo "   ❌ 读不到 $PKG 的安装时间（应用没装？）—— 本轮无效"; exit 3
+# 🔴 两种形状都得吃：这台模拟器打的是**格式化时间**（`lastUpdateTime=2026-10-04 07:05:07`），
+#    旧版 Android 打的是 **epoch 秒**。原先那句 `sed 's/.*=//;s/ .*//'` 对前者得到
+#    `2026-10-04`（不是整数），于是"应用没装？"这条读数其实是**探针读不出格式** ——
+#    04 07:1x 第一次执行到这一步才照出来（前两次都停在第 0 步的现场门，从没走到 0b）。
+APK_RAW=$(printf '%s' "$APK_LINE" | sed 's/.*=//')
+APK_EPOCH=''
+case "$APK_RAW" in
+  ''|*[!0-9]*) ;;                                  # 不是纯数字 ⇒ 走日期那一支
+  *) APK_EPOCH=$APK_RAW ;;
+esac
+if [ -z "$APK_EPOCH" ]; then
+  APK_EPOCH=$(date -j -f '%Y-%m-%d %H:%M:%S' "$(printf '%s' "$APK_RAW" | cut -c1-19)" +%s 2>/dev/null || true)
 fi
+# 1577836800 = 2020-01-01：解析不出、或早于它，都判"探针读不出格式"而不是"包很旧"。
+if [ -z "$APK_EPOCH" ] || ! [ "$APK_EPOCH" -eq "$APK_EPOCH" ] 2>/dev/null || [ "$APK_EPOCH" -lt 1577836800 ]; then
+  echo "   ❌ 读不出 $PKG 的安装时间：原始行「${APK_LINE:-（空 ⇒ 包没装或 dumpsys 里没这一行）}」"
+  echo "      这是**探针读不出格式**，不是产品失败；本轮无效"
+  exit 3
+fi
+echo "   新鲜度门输入（设备侧）：${APK_LINE} ⇒ epoch ${APK_EPOCH}"
 NEWEST_SRC=0
 for path in apps/mobile/src packages/ui/src/countdown; do
   [ -d "$HEYTA_REPO_ROOT/$path" ] || { echo "   ❌ $path 不在，新鲜度门没有输入（本轮无效）"; exit 3; }
