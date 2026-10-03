@@ -506,7 +506,10 @@ const blobPathsReferencedByLandingSrc = (): string[] => {
   const found: string[] = [];
   for (const file of listTsFiles(join(REPO_ROOT, 'apps/landing/src'))) {
     const text = readFileSync(file, 'utf8');
-    for (const m of text.matchAll(/blob\/main\/([A-Za-z0-9._/-]+)/g)) found.push(m[1]);
+    for (const m of text.matchAll(/blob\/main\/([A-Za-z0-9._/-]+)/g)) {
+      const path = m[1];
+      if (path !== undefined) found.push(path);
+    }
   }
   return found;
 };
@@ -514,7 +517,7 @@ const blobPathsReferencedByLandingSrc = (): string[] => {
 const guidePathFromConstant = (): string => {
   const m = /blob\/main\/([A-Za-z0-9._/-]+)$/.exec(SELF_HOST_GUIDE_URL);
   expect(m, `SELF_HOST_GUIDE_URL 不是 https://…/blob/main/<路径> 的形状：${SELF_HOST_GUIDE_URL}`).not.toBeNull();
-  return m![1];
+  return m?.[1] ?? '';
 };
 
 describe('公页指向的仓库文档', () => {
