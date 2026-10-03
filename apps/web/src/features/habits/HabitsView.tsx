@@ -122,6 +122,21 @@ export function habitBoardLabels(t: I18nValue['t']): HabitBoardLabels {
     streakCurrent: (count) => currentStreakText(count, t),
     streakLongest: (count) => longestStreakText(count, t),
     streakTotal: (count) => totalCheckInText(count, t),
+    /*
+      数量行（工单 W6）。三个都是**共享层点名要求**的字段，不是可选装饰：
+      `HabitBoardLabels` 把它们写成必填，所以少接一个编译就红 ——
+      可选 prop 会把"宿主没接"伪装成"做完了"，这条在 §8 的 W3 那轮记过。
+      单位为空时补 `web.habits.goal.defaultUnit`（与目标摘要同一个 fallback，
+      共享层不猜：猜出来的"次"对"每天 30 分钟"是错的）。
+    */
+    amount: ({ value, target, unit }) =>
+      t('common.habits.amount.today', {
+        value,
+        target,
+        unit: unit === '' ? t('web.habits.goal.defaultUnit') : unit,
+      }),
+    amountPlusA11y: ({ name }) => t('common.habits.amount.plus', { name }),
+    amountMinusA11y: ({ name }) => t('common.habits.amount.minus', { name }),
     freeze: (count) => t('web.habits.freeze', { count }),
     repair: ({ date, count }) => t('web.habits.repair', { date, count }),
     repairAction: t('web.habits.repairAction'),
@@ -389,8 +404,8 @@ export function HabitsView() {
             // 🔴 配对函数来自 app-host —— 共享层不认识它（见那边的文件头）。
             growth={habitGrowth}
             labels={labels}
-            onCheckIn={(habitId, date?: LocalDate) => {
-              run(habitId, store.checkIn(habitId, date));
+            onCheckIn={(habitId, date?: LocalDate, value?: number) => {
+              run(habitId, store.checkIn(habitId, date, value));
             }}
             onUndoCheckIn={(habitId, date?: LocalDate) => {
               run(habitId, store.undoCheckIn(habitId, date));

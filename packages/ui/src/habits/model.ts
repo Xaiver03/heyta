@@ -17,7 +17,8 @@
  * 所以配对**由宿主注入**（{@link HabitGrowthFn}）—— 两端都传
  * `habitGrowth`，测试传一个桩。这里只做**展示**上的事：
  *
- *   1. 把「今天有没有打卡」「今天那条 log」补上（宿主的两份投影都缺这一步）；
+ *   1. 把「今天有没有打卡」「今天那条 log」「**今天记了几格**」补上
+ *      （宿主的两份投影都缺前两步里的"几格"，工单 W6）；
  *   2. 近 N 天格子怎么排（列 = 周、行 = 星期几、跨月在哪一列打月份标签）；
  *   3. 0/4 两档的强度 token 映射（`@heyta/design-system` 的 `HEAT_TOKENS`）。
  *
@@ -34,6 +35,7 @@ import { HEAT_TOKENS } from '@heyta/design-system';
 import {
   addDays,
   completionRatio,
+  habitLogValue,
   isoWeekday,
   toLocalDate,
   type Habit,
@@ -113,11 +115,23 @@ export interface HabitProgressRow {
   /**
    * 今日完成比例（0–1）。
    *
-   * 🔴 它由 `@heyta/domain#completionRatio` 算（`log.value / (habit.target ?? 1)`），
+   * 🔴 它由 `@heyta/domain#completionRatio` 算（`habitLogValue / (habit.target ?? 1)`），
    * 不是"打过就是 1" —— 目标 8 杯水、今天喝了 4 杯时它是 0.5。
    * 共享层带上它，是为了让"今天完成了多少"在两端只有一个答案。
    */
   readonly todayRatio: number;
+  /**
+   * 今天**记了几格**（工单 W6 的那个数）。没有记录时是 0，不是 undefined。
+   *
+   * 🔴 算法在 `@heyta/domain#habitLogValue`，与"这天算不算达成"（`isAchieved`）
+   * 和上面那个比例**同一个缺省** —— 一条存在但没写 `value` 的打卡记录只能有一种
+   * 读法。以前这里没有所有者：详情自己写 `?? target ?? 1`、比例写 `?? 0`，
+   * 于是同一格可以同时"算达成"和"完成度 0 %"。
+   *
+   * ⚠️ 它**不是** `Math.round(todayRatio * target)`：比例被 `Math.min(1, …)` 截断过，
+   * 超目标时（记 10 / 目标 8）反算回来会掉成 8 —— 那是把用户写下的数字改小了。
+   */
+  readonly todayValue: number;
   /** 今日打卡记录（未删除；可能不存在）。 */
   readonly todayLog: HabitLog | undefined;
   /** 连续天数结果（current / longest / lastDate）。**日历口径**。 */
@@ -166,12 +180,39 @@ export function toHabitProgressRows(
       habit,
       todayLog,
       doneToday: todayLog !== undefined,
-      // 传 `undefined` 表示"今天还没打卡" —— 领域层会按 value 0 算。
+      // 传 `undefined` 表示"今天还没打卡" —— 领域层会按 0 格算。
       todayRatio: completionRatio(habit, todayLog),
+      todayValue: habitLogValue(habit, todayLog),
       streak,
       resilience,
     };
   });
+}
+
+/**
+ * 这条习惯**有没有"量"可说**（工单 W6：数量行与步进器该不该出现）。
+ *
+ * 🔴 判据是"一天能不能记下 **1 格以外**的数"，不是"用户有没有填过目标"：
+ * `createHabit` 对每条习惯都写 `target: 1`，所以"`target !== undefined`"
+ * 会让每条纯打卡型习惯都多出一行「1/1」—— 那是噪声，不是信息。
+ *
+ * | 习惯 | 显示 | 为什么 |
+ * |---|---|---|
+ * | 目标 8 杯（`atLeast`） | ✅ | 8 格里记 5 格是事实 |
+ * | 目标 30 分钟（时长型） | ✅ | 同上，量纲是分钟 |
+ * | **目标 0.5 小时** | ✅ | 小数目标同样多格 —— 判据写成 `> 1` 会让它**看不见**（实测） |
+ * | 目标 1、口径 `atMost` / `exactly` | ✅ | **"最多 1 杯"要的正是能记下"今天 2 杯"** —— 破戒是数据 |
+ * | 目标 0（`atMost` + 0 = 一次都不碰） | ✅ | 同上 |
+ * | 目标 1、口径 `atLeast`（新建默认） | ❌ | 只有一格可记，量本身不携带信息 |
+ *
+ * ⚠️ 单位（`unit`）**不参与判定**：它只是量纲。"每天 1 分钟"在数据上确实只有
+ * 1 格可记，画一个步进器不会多出一个可写的数。
+ */
+export function hasCountableGoal(habit: Habit): boolean {
+  // 刻意是 `!== 1` 而不是 `> 1`：小数目标（0.5 小时）与 0 都在合法域里
+  //（`setHabitGoal` 只拦负数与非有限数），用 `> 1` 会把它们判成"没什么可记"。
+  if ((habit.target ?? 1) !== 1) return true;
+  return habit.goalType === 'atMost' || habit.goalType === 'exactly';
 }
 
 /**

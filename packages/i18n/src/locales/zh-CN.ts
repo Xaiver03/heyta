@@ -2523,6 +2523,11 @@ export const zhCN = {
   'common.habits.rename.button': '重命名习惯「{name}」',
   'common.habits.rename.label': '习惯名称',
   'common.habits.delete.button': '删除习惯「{name}」',
+  // 工单 W6：计数型习惯"今天记了几格"。句子写成 `{value}/{target}{unit}` 而不是
+  // 三个占位符裸串 —— 纯占位符的 zh 词条在 `check:ui-language` 眼里与"忘了翻译"同一件事。
+  'common.habits.amount.today': '今天 {value}/{target} {unit}',
+  'common.habits.amount.plus': '给「{name}」加 1',
+  'common.habits.amount.minus': '给「{name}」减 1',
 
   // ── 标签 ───────────────────────────────────────────────────
   // 清单和标签在数据上是两个实体，在产品上是同一件事的两个面（组织任务）：

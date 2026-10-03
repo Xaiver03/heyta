@@ -11,7 +11,7 @@
  * 热力图几档"的差异**不会让任何测试变红** —— 差异本身没有断言。
  *
  * ─────────────────────────────────────────────────────────────────────────
- * 判据怎么定的（四道）
+ * 判据怎么定的（A–D 四道行为判据，加 E 源码级、F 数量行两组）
  *
  * **A. 热力图是自绘的，且每一格带得住确切数字。**
  *    `react-activity-calendar` 是 DOM 库，共享层换成 RN 原语自绘；
@@ -29,6 +29,9 @@
  *    （`streakIfRepaired ≥ 2` 等），共享层**不许**自己再判一次。
  *
  * **D. 空态只有共享层那一句。**
+ *
+ * **F. 数量行（工单 W6）**：`HabitLog.value` 可读、可改，且默认习惯一个节点都不多。
+ *    见文件末尾那一组 —— 它对应该单验收的三条，另加两条"形状在、线没接"的源码级腿。
  *
  * ⚠️ RNW 的 `Pressable` 渲染成 `<div role="button">`（不是 `<button>`），
  * 所以下面一律用 `testID`（RNW → `data-testid`）寻址，不用标签名。
@@ -107,6 +110,12 @@ const LABELS: HabitBoardLabels = {
     `已经 ${String(days)} 天没打卡了。最长 ${String(longest)} 天、累计 ${String(total)} 天都还在。`,
   freshStartAction: '今天重新开始',
   freshStartA11y: (name) => `今天为「${name}」重新打卡`,
+  // 工单 W6 那三个（`HabitBoardLabels` 里是**必填**，少接一个编译就红 ——
+  // 可选 prop 会把"宿主没接"伪装成"做完了"）。桩故意用另一种格式，
+  // 这样下面的判据读到的是**桩的产出**，不是词条表的句子。
+  amount: ({ value, target, unit }) => `桩:${String(value)}/${String(target)}|${unit}`,
+  amountPlusA11y: ({ name }) => `桩加一:${name}`,
+  amountMinusA11y: ({ name }) => `桩减一:${name}`,
   empty: '还没有习惯。添加一个开始打卡。',
   heatmap: {
     month: () => '某月',
@@ -170,7 +179,7 @@ function renderBoard(props: {
   habits: readonly Habit[];
   logs: readonly HabitLog[];
   labels?: HabitBoardLabels;
-  onCheckIn?: (id: string, date?: string) => void;
+  onCheckIn?: (id: string, date?: string, value?: number) => void;
   onUndoCheckIn?: (id: string, date?: string) => void;
   busyHabitId?: string | null;
   growthFn?: HabitGrowthFn;
@@ -394,5 +403,209 @@ describe('E. web 视图不再有第二份实现（源码级判据）', () => {
     expect((view.textContent ?? '').replace(/\s+/gu, '')).toContain(
       expected.replace(/\s+/gu, ''),
     );
+  });
+});
+
+/**
+ * F. 数量行（工单 W6：`HabitLog.value` 第一次在界面上可读、可写）
+ *
+ * 工单原话的三条验收在这里各对应一组：
+ *   ① 目标 8、今天记 5 ⇒ 界面显示 5（F1/F2；落盘那腿在 app-host）
+ *   ② 不传 value 时逐字保持旧行为（F6 行为级 + F7 源码级）
+ *   ③ 撤销打卡仍走软删（F4/F5：减到 0 走的是 `onUndoCheckIn`，不是记一条 0）
+ *
+ * ⚠️ 这里量的是**共享组件的产出**。宿主有没有把第三个参数接住是 F8 那条
+ * 源码级判据的事 —— 它在 jsdom 里量不到（测试自己就是宿主）。
+ */
+describe('F. 数量行：读数与步进', () => {
+  const counted = habit({ target: 8, unit: '杯' });
+
+  it('F1 🔴 计数型习惯渲染数量行，文本是 `labels.amount` 的产出（值来自日志）', () => {
+    const view = renderBoard({ habits: [counted], logs: [log('2026-09-28', { value: 5 })] });
+    const row = byTestId(view, 'habit-amount-h1');
+    expect(row).not.toBeNull();
+    expect(row?.textContent).toContain('桩:5/8|杯');
+    // 存在性先于取值：两个按钮与那句文本**都得在**，否则"读数正确"可能只是整行没渲染。
+    expect(byTestId(view, 'habit-amount-plus-h1')).not.toBeNull();
+    expect(byTestId(view, 'habit-amount-minus-h1')).not.toBeNull();
+    // 文本自己有一个 testID：浏览器层的判据要能精确指着**那一个字**量颜色，
+    // 量整行会读到继承色（暗色下整片都是 foreground，那样恒真）。
+    expect(byTestId(view, 'habit-amount-text-h1')?.textContent).toContain('桩:5/8|杯');
+  });
+
+  it('F2 🔴 一条"每天做一次"的默认习惯**一个节点都不多**（老界面的 DOM 逐字不变）', () => {
+    const view = renderBoard({ habits: [habit()], logs: [log('2026-09-28', { value: 1 })] });
+    expect(byTestId(view, 'habit-amount-h1')).toBeNull();
+    // 正对照：卡本身渲染了（否则"没有数量行"是空转断言）。
+    expect(byTestId(view, 'habit-card-h1')).not.toBeNull();
+    expect(byTestId(view, 'habit-checkin-h1')).not.toBeNull();
+  });
+
+  it('F3 「+」带的是**明确数值**（已有 5 ⇒ 6），且日期位留空表示今天', () => {
+    const onCheckIn = vi.fn();
+    const view = renderBoard({
+      habits: [counted],
+      logs: [log('2026-09-28', { value: 5 })],
+      onCheckIn,
+    });
+    act(() => {
+      byTestId(view, 'habit-amount-plus-h1')?.click();
+    });
+    expect(onCheckIn).toHaveBeenCalledWith('h1', undefined, 6);
+  });
+
+  it('F4 「−」在量大于 1 时也是改量（5 ⇒ 4），不发撤销', () => {
+    const onCheckIn = vi.fn();
+    const onUndo = vi.fn();
+    const view = renderBoard({
+      habits: [counted],
+      logs: [log('2026-09-28', { value: 5 })],
+      onCheckIn,
+      onUndoCheckIn: onUndo,
+    });
+    act(() => {
+      byTestId(view, 'habit-amount-minus-h1')?.click();
+    });
+    expect(onCheckIn).toHaveBeenCalledWith('h1', undefined, 4);
+    expect(onUndo).not.toHaveBeenCalled();
+  });
+
+  it('F5 🔴 减到 0 走的是**撤销打卡**（0 不是一条合法的量，界面上不许写出它）', () => {
+    const onCheckIn = vi.fn();
+    const onUndo = vi.fn();
+    const view = renderBoard({
+      habits: [counted],
+      logs: [log('2026-09-28', { value: 1 })],
+      onCheckIn,
+      onUndoCheckIn: onUndo,
+    });
+    act(() => {
+      byTestId(view, 'habit-amount-minus-h1')?.click();
+    });
+    expect(onUndo).toHaveBeenCalledWith('h1');
+    expect(onCheckIn).not.toHaveBeenCalled();
+  });
+
+  it('F5b 🔴 小数目标（0.5 小时）减下去也不会漏出**负数** —— 同一条腿走撤销', () => {
+    const onCheckIn = vi.fn();
+    const onUndo = vi.fn();
+    const view = renderBoard({
+      habits: [habit({ target: 0.5, unit: '小时' })],
+      logs: [log('2026-09-28', { value: 0.5 })],
+      onCheckIn,
+      onUndoCheckIn: onUndo,
+    });
+    // 前提：小数目标**得先有这一行**（判据第一版 `target > 1` 在这里是空的，
+    // 而"按钮不存在 ⇒ 什么都没调"会让下面两条断言双双假绿）。
+    expect(byTestId(view, 'habit-amount-h1')).not.toBeNull();
+    act(() => {
+      byTestId(view, 'habit-amount-minus-h1')?.click();
+    });
+    expect(onUndo).toHaveBeenCalledTimes(1);
+    expect(onCheckIn).not.toHaveBeenCalled();
+  });
+
+  it('F6 今天还没打卡 ⇒ 「−」置灰且点下去什么都不发生（正对照：「+」能用）', () => {
+    const onCheckIn = vi.fn();
+    const onUndo = vi.fn();
+    const view = renderBoard({ habits: [counted], logs: [], onCheckIn, onUndoCheckIn: onUndo });
+    const minus = byTestId(view, 'habit-amount-minus-h1');
+    expect(minus?.getAttribute('aria-disabled')).toBe('true');
+    act(() => {
+      minus?.click();
+    });
+    expect(onCheckIn).not.toHaveBeenCalled();
+    expect(onUndo).not.toHaveBeenCalled();
+
+    const plus = byTestId(view, 'habit-amount-plus-h1');
+    expect(plus?.getAttribute('aria-disabled')).not.toBe('true');
+    act(() => {
+      plus?.click();
+    });
+    expect(onCheckIn).toHaveBeenCalledWith('h1', undefined, 1);
+  });
+
+  it('F7 落盘中的那条习惯，两个步进按钮都置灰（防连点发出两条 op）', () => {
+    const view = renderBoard({
+      habits: [counted],
+      logs: [log('2026-09-28', { value: 5 })],
+      busyHabitId: 'h1',
+    });
+    expect(byTestId(view, 'habit-amount-plus-h1')?.getAttribute('aria-disabled')).toBe('true');
+    expect(byTestId(view, 'habit-amount-minus-h1')?.getAttribute('aria-disabled')).toBe('true');
+  });
+
+  it('F8 主打卡按钮**一个额外参数都不带** —— 判据②"逐字旧行为"的源码级腿', () => {
+    const board = readFileSync(resolve(UI_SRC, 'habits/HabitBoard.tsx'), 'utf8');
+    // 主按钮那一处：`onCheckIn(row.habit.id)`，右边不许跟逗号。
+    expect(board).toMatch(/onCheckIn\(row\.habit\.id\)/u);
+    // 步进那一处必须带三个实参（`undefined` = 今天）。写成两处同样的形状就是没分清两条路。
+    expect(board).toMatch(/onCheckIn\(row\.habit\.id,\s*undefined,\s*row\.todayValue \+ 1\)/u);
+    // 而数量那一格读的是共享行上的字段，不是组件里现算的除法。
+    expect(board).toContain('row.todayValue');
+    expect(board).not.toMatch(/Math\.round\(\s*row\.todayRatio/u);
+  });
+
+  it('F9 🔴 两份 labels 构造器都接了那三个字段，两个宿主都透传第三个参数', () => {
+    /**
+     * 症状分两种，都要能红：
+     *  · 宿主**没接文案** ⇒ 共享层的必填字段会让编译红（所以这条只能验"接了且接的是
+     *    同一批 key"，防的是两边各建一条同义键）；
+     *  · 宿主**没透传 value** ⇒ 步进器画出来了、点下去什么都不记（形状在、线没接，
+     *    正是"共享组件默认值=原行为"那类假绿的镜像）。
+     */
+    for (const [where, rel] of [
+      ['web', 'features/habits/HabitsView.tsx'],
+      ['mobile', '../../../apps/mobile/src/lib/habits-display.ts'],
+    ] as const) {
+      const src = readFileSync(resolve(WEB_SRC, rel), 'utf8');
+      for (const field of ['amount', 'amountPlusA11y', 'amountMinusA11y']) {
+        expect(src, `${where} 的 labels 构造器没接 ${field}`).toContain(`${field}:`);
+      }
+      // 两边必须用**同一批** key（同义键不会让任何测试变红，只会让两端说两句话）。
+      for (const key of [
+        'common.habits.amount.today',
+        'common.habits.amount.plus',
+        'common.habits.amount.minus',
+      ]) {
+        expect(src, `${where} 没有用 ${key}`).toContain(key);
+      }
+    }
+
+    let passed = 0;
+    for (const rel of [
+      'features/habits/HabitsView.tsx',
+      '../../../apps/mobile/src/screens/HabitsScreen.tsx',
+    ] as const) {
+      if (/checkIn\(\s*habitId,\s*date,\s*value\s*\)/u.test(readFileSync(resolve(WEB_SRC, rel), 'utf8'))) {
+        passed += 1;
+      }
+    }
+    expect(passed, '透传 value 的宿主不足两个 —— 步进器在某一端是坏的').toBe(2);
+  });
+
+  it('F10 单位为空时共享层传的是**空串**（兜底那句「次」归宿主，共享层不猜量纲）', () => {
+    const seen: Parameters<HabitBoardLabels['amount']>[0][] = [];
+    const view = renderBoard({
+      habits: [habit({ target: 8 })],
+      logs: [],
+      labels: {
+        ...LABELS,
+        amount: (info) => {
+          seen.push(info);
+          return '桩';
+        },
+      },
+    });
+    expect(byTestId(view, 'habit-amount-h1')).not.toBeNull();
+    expect(seen).toEqual([{ value: 0, target: 8, unit: '' }]);
+  });
+
+  it('F11 超目标也要能记（`atMost` 的"破戒"是数据，不是被 clamp 掉的 8）', () => {
+    const view = renderBoard({
+      habits: [habit({ target: 2, unit: '杯', goalType: 'atMost' })],
+      logs: [log('2026-09-28', { value: 3 })],
+    });
+    expect(byTestId(view, 'habit-amount-h1')?.textContent).toContain('桩:3/2|杯');
   });
 });

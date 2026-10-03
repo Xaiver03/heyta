@@ -117,6 +117,20 @@ export function habitBoardLabels(t: I18nValue['t']): HabitBoardLabels {
     streakCurrent: (count) => currentStreakText(count, t),
     streakLongest: (count) => longestStreakText(count, t),
     streakTotal: (count) => totalCheckInText(count, t),
+    /*
+      数量行（工单 W6）—— 与 web 那份 `habitBoardLabels` **同一批 key**
+      （`common.habits.amount.*`），一条新键都没加：同一条习惯在两端说出
+      两个样子的"今天记了几格"，是这个数最容易被打折的地方。
+      单位为空的 fallback 也复用同一条 `web.habits.goal.defaultUnit`。
+    */
+    amount: ({ value, target, unit }) =>
+      t('common.habits.amount.today', {
+        value,
+        target,
+        unit: unit === '' ? t('web.habits.goal.defaultUnit') : unit,
+      }),
+    amountPlusA11y: ({ name }) => t('common.habits.amount.plus', { name }),
+    amountMinusA11y: ({ name }) => t('common.habits.amount.minus', { name }),
     freeze: (count) => t('web.habits.freeze', { count }),
     repair: ({ date, count }) => t('web.habits.repair', { date, count }),
     repairAction: t('web.habits.repairAction'),
