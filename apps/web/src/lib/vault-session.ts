@@ -9,6 +9,7 @@ import {
   createVaultKeyMigrationRemote,
   createVaultMigrationInventorySource,
   createVaultMigrationJournal,
+  cancelVaultPayloadMigrationForScope,
   migrateVaultPayloads,
   createVaultKeyPackageRemote,
   createVaultKeyPackageStore,
@@ -28,6 +29,12 @@ let session: VaultKeySession | undefined;
 let sessionScopeKey: string | undefined;
 let sessionBindingKey: string | undefined;
 let sessionEpoch = 0;
+let inFlightLoad: {
+  scopeKey: string;
+  bindingKey: string;
+  epoch: number;
+  promise: Promise<VaultKeySession>;
+} | undefined;
 
 async function packageStore(): Promise<ReturnType<typeof createVaultKeyPackageStore>> {
   if (storePromise !== undefined) return storePromise;
@@ -49,40 +56,54 @@ export async function getWebVaultSession(
   const normalizedAccountId = accountId.trim();
   if (normalizedAccountId === '') throw new Error('Vault account id is required');
   const key = `${normalizedAccountId}\u0000${origin}`;
-  const requestEpoch = sessionEpoch;
   const binding = `${key}\u0000${await getToken?.() ?? ''}`;
-  if (requestEpoch !== sessionEpoch) throw new Error('Web vault session was invalidated during load');
-  let created = false;
-  if (session === undefined || sessionBindingKey !== binding) {
-    const creationEpoch = sessionEpoch + 1;
-    sessionEpoch = creationEpoch;
-    session?.lock();
-    const nextSession = await createVaultKeySession({
-      store: await packageStore(),
-      scope: { accountId: normalizedAccountId, serverOrigin: origin },
-    });
-    if (creationEpoch !== sessionEpoch) {
-      nextSession.lock();
+  // React StrictMode and the sync store can ask for the same session during
+  // one render. Share that exact load instead of letting the second request
+  // advance the invalidation epoch and kill the first request mid-hydration.
+  const existing = inFlightLoad;
+  if (existing !== undefined && existing.scopeKey === key && existing.bindingKey === binding &&
+      existing.epoch === sessionEpoch) {
+    return existing.promise;
+  }
+  const promise = (async (): Promise<VaultKeySession> => {
+    let created = false;
+    if (session === undefined || sessionBindingKey !== binding) {
+      const creationEpoch = sessionEpoch + 1;
+      sessionEpoch = creationEpoch;
+      session?.lock();
+      const nextSession = await createVaultKeySession({
+        store: await packageStore(),
+        scope: { accountId: normalizedAccountId, serverOrigin: origin },
+      });
+      if (creationEpoch !== sessionEpoch) {
+        nextSession.lock();
+        throw new Error('Web vault session was invalidated during load');
+      }
+      session = nextSession;
+      sessionScopeKey = key;
+      sessionBindingKey = binding;
+      created = true;
+    }
+    const epoch = sessionEpoch;
+    if (created && getToken !== undefined) {
+      // The package revision and the active ciphertext generation are separate.
+      // Read the authenticated server metadata before the first sync after a
+      // reload so a passphrase re-wrap cannot make new uploads use the revision
+      // number as its payload generation.
+      await session!.refreshFromRemote(getWebVaultRemote(serverUrl, getToken));
+    }
+    if (epoch !== sessionEpoch || session === undefined) {
+      session?.lock();
       throw new Error('Web vault session was invalidated during load');
     }
-    session = nextSession;
-    sessionScopeKey = key;
-    sessionBindingKey = binding;
-    created = true;
+    return session;
+  })();
+  inFlightLoad = { scopeKey: key, bindingKey: binding, epoch: sessionEpoch, promise };
+  try {
+    return await promise;
+  } finally {
+    if (inFlightLoad?.promise === promise) inFlightLoad = undefined;
   }
-  const epoch = sessionEpoch;
-  if (created && getToken !== undefined) {
-    // The package revision and the active ciphertext generation are separate.
-    // Read the authenticated server metadata before the first sync after a
-    // reload so a passphrase re-wrap cannot make new uploads use the revision
-    // number as their payload generation.
-    await session.refreshFromRemote(getWebVaultRemote(serverUrl, getToken));
-  }
-  if (epoch !== sessionEpoch || session === undefined) {
-    session?.lock();
-    throw new Error('Web vault session was invalidated during load');
-  }
-  return session;
 }
 
 /** Synchronously fence the web vault before credentials are cleared. */
@@ -144,4 +165,22 @@ export async function confirmWebVaultRootRotation(
   });
   if (published === undefined) throw new Error('Vault migration did not publish a result');
   return published;
+}
+
+/** Cancel server staging before dropping the locally encrypted pending draft. */
+export async function cancelWebVaultRootRotation(
+  session: VaultKeySession,
+  options: { baseUrl: string; token: string },
+): Promise<void> {
+  const adapter = await adapterPromise;
+  if (adapter === undefined) throw new Error('Vault storage is unavailable');
+  const remoteOptions = {
+    baseUrl: options.baseUrl,
+    getToken: async () => options.token,
+  };
+  const journal = createVaultMigrationJournal(adapter);
+  const remote = createVaultKeyMigrationRemote(remoteOptions);
+  const journalScope = `${session.scope.accountId}\u0000${session.scope.serverOrigin}`;
+  await cancelVaultPayloadMigrationForScope(remote, journal, journalScope);
+  await session.cancelPendingRootRotation();
 }

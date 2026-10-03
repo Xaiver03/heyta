@@ -36,7 +36,9 @@ const hasVaultMarker = (bytes: Uint8Array): boolean =>
 
 const identityAAD = (op: SyncPayloadIdentity): string => JSON.stringify([
   op.id, op.clientId, op.actionType, op.opType, op.entityType,
-  op.entityId ?? null, op.entityIds ?? null, op.timestamp, op.schemaVersion,
+  // HTTP inventory/download omit empty entityIds. Authenticate that canonical
+  // identity before encryption too, while retaining every nonempty target list.
+  op.entityId ?? null, op.entityIds?.length ? op.entityIds : null, op.timestamp, op.schemaVersion,
 ]);
 
 export const createPasswordPayloadCipher = (password: string): SyncPayloadCipher => ({

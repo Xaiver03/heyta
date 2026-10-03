@@ -12,7 +12,7 @@ const dbName = 'heyta_bc_devices_20261003';
 const dbUrl = databaseUrlFor(dbName);
 ensureDatabase({ root, dbUrl, dbName });
 ensureServerBuilt({ root, dbUrl });
-const build = spawn('pnpm', ['--filter', '@heyta/web^...', 'build'], { cwd: root, stdio: 'inherit' });
+const build = spawn('pnpm', ['--filter', '@heyta/web...', 'build'], { cwd: root, stdio: 'inherit' });
 if (await new Promise((resolve) => build.on('exit', resolve)) !== 0) process.exit(1);
 const server = await startServer({ root, node: resolveNode(), port: 3246, dbUrl,
   corsOrigins: ['http://127.0.0.1:4346'], logFile: '/tmp/heyta-vault-web-api.log' });

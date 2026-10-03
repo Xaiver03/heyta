@@ -144,6 +144,16 @@ press_scroll() {
 }
 fill_composer_title() {
   local value="$1" _i
+  # idb set-value treats slash-bearing calendar text as a native text action and
+  # can close this Composer; use HID input for capture markers and read the RN
+  # state while the keyboard remains visible.
+  case "$value" in
+    */*|*:*)
+      ax - --field --type-text "$value" --json >/dev/null 2>&1 || true
+      sleep 1
+      [ "$(jget "$(ax "添加" --pressable --list --exact --json)" enabled)" = "True" ] && return 0
+      ;;
+  esac
   for _i in 1 2 3; do
     ax - --field --set "$value" --json >/dev/null 2>&1 || true
     sleep 1
@@ -152,6 +162,57 @@ fill_composer_title() {
   ax - --field --type-text "$value" >/dev/null 2>&1 || true
   sleep 1
   [ "$(jget "$(ax "添加" --pressable --list --exact --json)" enabled)" = "True" ]
+}
+clear_task_search() {
+  local _i out detail
+  # SearchTextInput can still be settling after cold start. A successful
+  # idb set-value return code alone is insufficient: require the AX value to
+  # read back as the placeholder before tapping the FAB, otherwise the title
+  # is silently left in search and the following tap is a false fixture step.
+  for _i in 1 2 3 4 5; do
+    ax "搜索任务（标题与备注）" --field --set "" --json >/dev/null 2>&1 || true
+    sleep 1
+    out="$(ax "搜索任务（标题与备注）" --field --list --exact --json 2>/dev/null || true)"
+    detail="$(jget "$out" detail)"
+    [ "$detail" = "搜索任务" ] && return 0
+    ax --dismiss-keyboard --json >/dev/null 2>&1 || true
+    sleep 1
+  done
+  return 1
+}
+dismiss_keyboard_checked() {
+  local _i out kpresent
+  # idb may report a successful dismiss before UIKit has removed the keyboard
+  # nodes. Do not tap the FAB until the keyboard's language-specific Search key
+  # is gone; otherwise the tap is consumed by the keyboard while the script
+  # continues as if Composer had opened.
+  for _i in 1 2 3 4 5; do
+    ax --dismiss-keyboard --json >/dev/null 2>&1 || true
+    sleep 2
+    out="$(ax --keyboard --json 2>/dev/null || true)"
+    kpresent="$(jget "$out" present)"
+    # A transient empty AX tree must not count as a hidden keyboard. Require
+    # the keyboard probe to say False and the FAB to be present in the same
+    # settled frame; this also proves the tap target is no longer covered.
+    if [ "$kpresent" = "False" ] && wait_has "新建任务" 2; then return 0; fi
+  done
+  return 1
+}
+open_task_composer() {
+  local _i result field detail
+  for _i in 1 2 3 4; do
+    wait_has "新建任务" 3 || true
+    result="$(ax "新建任务" --pressable --press --exact --json 2>/dev/null || true)"
+    [ "$(jget "$result" result)" = "success" ] || continue
+    sleep 1
+    field="$(ax - --field --list --json 2>/dev/null || true)"
+    detail="$(jget "$field" detail)"
+    case "$detail" in
+      添加任务*) return 0 ;;
+    esac
+    dismiss_keyboard_checked || true
+  done
+  return 1
 }
 snapshot() {
   mkdir -p "$(dirname "$SCREENSHOT")"
@@ -332,9 +393,9 @@ PHONE_DB="$(phone_db)"
 [ -f "$PHONE_DB" ] && ok "已定位模拟器真 SQLite：$PHONE_DB" || bad "找不到 SQLite：$PHONE_DB"
 
 TITLE="ios-reminder-delivery-$(date +%H%M%S)"
-# 先由宿主计算一个合法的未来 occurrence，再把日期/时刻交给共享
-# CaptureComposer 解析。这样仍是用户正常输入路径，同时避开详情页日期
-# 长表单的 AX 夹具；标题提交后解析器会移除这两个 marker，任务行仍叫 TITLE。
+# 先由宿主计算一个合法的未来 occurrence。HID 只能稳定输入 ASCII，
+# 所以 Composer 只创建标题；日期与时刻随后通过详情页的真实快捷项和
+# 截止时刻输入框设置，避免把中文/斜杠塞进键盘夹具而改变产品状态。
 DUE_PAIR="$(python3 - <<'PY'
 from datetime import datetime, timedelta
 now = datetime.now().astimezone() + timedelta(minutes=3)
@@ -345,41 +406,61 @@ DUE_ISO="${DUE_PAIR%%|*}"
 _REST="${DUE_PAIR#*|}"
 DUE_MD="${_REST%%|*}"
 DUE_HM="${_REST#*|}"
-TITLE_RAW="${TITLE} ${DUE_MD} ${DUE_HM}"
+TASK_TITLE="$TITLE"
+TITLE_RAW="$TITLE"
 # 任务页的搜索框在冷启动时可能自动聚焦；键盘会遮住右下角 FAB，
 # ax tap 即使返回系统 success 也不能到达新建按钮。先按结构性 KeyboardKey
 # 收键，再要求 Composer 输入框真实出现。
-ax --dismiss-keyboard --json >/dev/null 2>&1 || true
-sleep 2
+if clear_task_search; then
+  ok "已清空搜索框并回读占位文案"
+else
+  bad "搜索框清空后回读仍不是占位文案"
+fi
+if dismiss_keyboard_checked; then
+  ok "已确认软键盘收起"
+else
+  bad "软键盘未确认收起"
+fi
 NEW_RESULT=""
-for _i in 1 2 3; do
-  NEW_RESULT="$(ax "新建任务" --pressable --press --json 2>/dev/null || true)"
-  [ "$(jget "$NEW_RESULT" result)" = "success" ] && break
-  ax --dismiss-keyboard --json >/dev/null 2>&1 || true
-  sleep 2
-done
-if ax - --field --wait 10 --list --json | grep -q '"found": "True"'; then
+if ! open_task_composer; then
+  bad "新建任务按钮未真正打开 Composer"
+elif ax - --field --wait 10 --list --json | grep -q '"found": "True"'; then
   if fill_composer_title "$TITLE_RAW"; then
     press "添加" >/dev/null 2>&1 || true
-    wait_gone "添加" 15 && ok "通过 RN Composer 创建任务：$TITLE" || bad "任务 Composer 未关闭"
+    wait_gone "添加" 15 && ok "通过 RN Composer 创建任务：$TASK_TITLE" || bad "任务 Composer 未关闭"
   else
     bad "任务标题未进入 RN 状态，添加按钮仍禁用"
   fi
 else
   bad "RN Composer 没有文本输入框"
 fi
-wait_has "打开任务：$TITLE" 20 || { bad "任务行不可见：$TITLE"; summary; exit 1; }
-press "打开任务：$TITLE" >/dev/null 2>&1 || true
+wait_has "打开任务：$TASK_TITLE" 20 || { bad "任务行不可见：$TASK_TITLE"; summary; exit 1; }
+press "打开任务：$TASK_TITLE" >/dev/null 2>&1 || true
 wait_has "任务详情" 12 || true
 
 # 日期与时刻由宿主 Python 计算成 ISO/HH:mm，再映射成当前中文界面的真实
-# 无障碍标签；不把英文 `yesterday` 塞给 CaptureComposer（它不会把任意英文词
-# 当日期）。提醒领域拒绝早于当前一分钟的 trigger，因此这里等待一个真实的
+# 无障碍标签。提醒领域拒绝早于当前一分钟的 trigger，因此这里等待一个真实的
 # 未来 occurrence，到了时刻后再终止进程，验证系统投递与启动回收。
 DUE_ISO="${DUE_PAIR%%|*}"
 _REST="${DUE_PAIR#*|}"
 echo "   宿主计算的未来日期：${DUE_ISO} ${DUE_HM}（CaptureComposer：${DUE_MD} ${DUE_HM}）"
-ok "CaptureComposer 已将合法未来日期/时刻交给共享解析器"
+if press_scroll "今天"; then
+  ok "通过任务详情 UI 设置今天的截止日期"
+else
+  bad "任务详情 UI 的「今天」快捷项不可达"
+fi
+TIME_LABEL="任务「${TITLE}」的截止时刻（留空表示全天）"
+TIME_RESULT="$(ax "$TIME_LABEL" --field --scroll-into-view --exact --json 2>/dev/null || true)"
+if [ "$(jget "$TIME_RESULT" found)" = "True" ]; then
+  TIME_RESULT="$(ax "$TIME_LABEL" --field --type-text "$DUE_HM" --exact --json 2>/dev/null || true)"
+  if [ "$(jget "$TIME_RESULT" detail)" = "$DUE_HM" ]; then
+    ok "通过任务详情 UI 设置未来截止时刻 ${DUE_HM}"
+  else
+    bad "截止时刻未回读为 ${DUE_HM}"
+  fi
+else
+  bad "任务详情 UI 的截止时刻输入框不可达"
+fi
 if press_scroll "截止时"; then ok "通过提醒 UI 创建未来 occurrence"; else bad "提醒 UI 的「截止时」不可达"; fi
 
 # 首次排程会弹系统通知权限。系统弹窗可能不在应用 AX 树中，先轮询 idb AX；
@@ -428,8 +509,8 @@ fi
 # 把当前任务删除，回读 ops 中该任务的 REMINDER 删除/取消事实；原生 cancel
 # 不是业务 op，但 UI 删除必须让下次 reconcile 不再重新排程。
 if press_scroll "关闭任务详情" || press "关闭任务详情" >/dev/null 2>&1; then :; fi
-if wait_has "打开任务：$TITLE" 8; then
-  press "打开任务：$TITLE" >/dev/null 2>&1 || true
+if wait_has "打开任务：$TASK_TITLE" 8; then
+  press "打开任务：$TASK_TITLE" >/dev/null 2>&1 || true
   if press_scroll "删除任务" || press_scroll "删除"; then
     sleep 3
     ok "通过任务详情 UI 触发删除路径"

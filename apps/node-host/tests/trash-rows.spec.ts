@@ -180,3 +180,44 @@ describe('CLI 命令清单与 USAGE 同源', () => {
     expect([...listed].filter((name) => name === 'auth')).toEqual(['auth']);
   });
 });
+
+/**
+ * CLI 的 `trash` / `notes` **必须走宿主那一份**，不许自己数一路。
+ *
+ * 🔴 这条是本轮变异照出来的洞，不是设想出来的：把 `case 'trash'` 退回
+ * `host.listTrashed()`（也就是 CLI 原来的样子）时，本文件上面那些判据
+ * **一条都没红** —— 因为它们测的是 `host.trashRows()`（宿主层），
+ * 而 CLI 那句"取哪一路"没有任何东西在看。
+ * 症状恰好是 W6-b 存在的全部理由的反面：CLI 少三类、而每一层都不报错。
+ *
+ * ⚠️ 这是**形状锁**而不是行为验证：它钉的是"这个 case 调的是哪个函数"。
+ * 真把四类打进行为里需要跑子进程（CLI 要先 `auth` 注册才能碰库），
+ * 那条成本登记在计划 §11.12，没有假装这里已经做了。
+ */
+describe('CLI 的回收站与便签两路走宿主，不自己数', () => {
+  const src = readFileSync(join(import.meta.dirname, '..', 'src', 'cli.ts'), 'utf8');
+
+  /** 取 `case '<name>':` 到下一个 `case '` 之间的正文（找不到就返回空串，由前提判红）。 */
+  function caseBody(name: string): string {
+    const at = src.indexOf(`case '${name}'`);
+    if (at < 0) return '';
+    const next = src.indexOf("case '", at + 1);
+    return next < 0 ? src.slice(at) : src.slice(at, next);
+  }
+
+  it('trash：取的是 `host.trashRows()`，不是任务那一路的 `listTrashed`', () => {
+    const body = caseBody('trash');
+    // 前提：块真的找得到（找不到时下面两条断言都会"空对空地通过"）。
+    expect(body.length, '找不到 case "trash"').toBeGreaterThan(20);
+    expect(body).toContain('host.trashRows()');
+    expect(body, 'CLI 的 trash 又自己数一路（那就是"回收站少三类"那个原状）').not.toContain(
+      'listTrashed(',
+    );
+  });
+
+  it('notes：取的是 `host.listNotes()`', () => {
+    const body = caseBody('notes');
+    expect(body.length, '找不到 case "notes"').toBeGreaterThan(10);
+    expect(body).toContain('host.listNotes()');
+  });
+});

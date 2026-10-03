@@ -667,6 +667,7 @@ export const zhCN = {
   'web.sync.vault.create': '创建钥匙',
   'web.sync.vault.recoveryLabel': '恢复码',
   'web.sync.vault.recoveryHint': '请把这串恢复码保存到密码管理器或离线记录中。它只显示这一次，服务端无法替你找回。',
+  'web.sync.vault.recoveryResume': '这次轮换已经在之前准备好了。请输入你保存的恢复码以继续。',
   'web.sync.vault.recoveryConfirm': '输入恢复码以确认',
   'web.sync.vault.confirm': '确认并发布',
   'web.sync.vault.cancel': '取消',
@@ -2645,6 +2646,16 @@ export const zhCN = {
   'common.organizer.folder.reject.unknown': '移动失败，请稍后重试',
   'common.organizer.showArchived': '显示已归档',
   'common.organizer.hideArchived': '收起已归档',
+  // ── 删除确认（2026-10-03 回收站与归档 W4b）────────────────────
+  // 由共享组件 `OrganizerList` 的 `labels.confirmRemove` 消费，两端同一套。
+  // 🔴 `impactTags` 这一句是这一档存在的全部理由，两个方向的误判都要堵上：
+  // 「它挂在 8 条任务上」会被读成"删它会动那 8 条任务"（于是不敢删）；
+  // 而"标签随时可以再建一个"也不成立 —— 新建的同名标签是**新 id**，
+  // 那 8 条任务的归属不会自己回来。
+  'common.organizer.confirm.ask': '确定要删除「{name}」吗？',
+  'common.organizer.confirm.impactTags': '它挂在 {count} 条任务上。这些任务不会被删除，只是不再带这个标签。',
+  'common.organizer.confirm.delete': '确认删除',
+  'common.organizer.confirm.cancel': '取消删除',
   // 习惯的改名与删除入口（保存/取消复用上面那两句，不另立一份同义词条）。
   'common.habits.rename.button': '重命名习惯「{name}」',
   'common.habits.rename.label': '习惯名称',
@@ -2793,6 +2804,7 @@ export const zhCN = {
   'mobile.vault.create': '创建钥匙',
   'mobile.vault.recoveryLabel': '恢复码',
   'mobile.vault.recoveryHint': '请把这串恢复码保存到密码管理器或离线记录中。它只显示这一次，服务端无法替你找回。',
+  'mobile.vault.recoveryResume': '这次轮换已经在之前准备好了。请输入你保存的恢复码以继续。',
   'mobile.vault.recoveryConfirm': '输入恢复码以确认',
   'mobile.vault.confirm': '确认并发布',
   'mobile.vault.cancel': '取消',

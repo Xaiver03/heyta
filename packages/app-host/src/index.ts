@@ -88,6 +88,7 @@ export {
   createVaultKeyMigrationRemote,
   createVaultMigrationInventorySource,
   cancelVaultPayloadMigration,
+  cancelVaultPayloadMigrationForScope,
   createVaultMigrationJournal,
   migrateVaultPayloads,
   VAULT_KEY_MIGRATION_INVENTORY_PATH,

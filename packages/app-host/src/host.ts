@@ -55,6 +55,7 @@ import {
   createVaultKeyMigrationRemote,
   createVaultMigrationInventorySource,
   createVaultMigrationJournal,
+  cancelVaultPayloadMigrationForScope,
   migrateVaultPayloads,
   type VaultMigrationProgress,
 } from './vault-migration.js';
@@ -172,6 +173,8 @@ export interface AppHost {
     enteredRecoveryCode: string,
     onProgress?: (progress: VaultMigrationProgress) => void,
   ): Promise<VaultKeyMigrationResponse>;
+  /** Release any staged root migration and remove its local encrypted draft. */
+  cancelVaultRootRotation(): Promise<void>;
 
   /**
    * 当前物化状态。
@@ -324,6 +327,19 @@ export async function openAppHost(options: AppHostOptions): Promise<AppHost> {
   let vaultSessionBinding: string | undefined;
   let vaultEpoch = 0;
   let autoUnlockDisabledScope: string | undefined;
+  let vaultExclusiveTail: Promise<void> = Promise.resolve();
+
+  const withVaultExclusive = async <T>(action: () => Promise<T>): Promise<T> => {
+    const previous = vaultExclusiveTail;
+    let release!: () => void;
+    vaultExclusiveTail = new Promise<void>((resolve) => { release = resolve; });
+    await previous;
+    try {
+      return await action();
+    } finally {
+      release();
+    }
+  };
 
   /**
    * 读取当前生效的同步凭据。
@@ -407,6 +423,7 @@ export async function openAppHost(options: AppHostOptions): Promise<AppHost> {
           const root = new Uint8Array(decodeBase64(remembered));
           try {
             nextSession.unlockWithRootKey(root);
+            await nextSession.restorePendingRootRotation();
           } finally {
             root.fill(0);
           }
@@ -525,44 +542,67 @@ export async function openAppHost(options: AppHostOptions): Promise<AppHost> {
       enteredRecoveryCode: string,
       onProgress?: (progress: VaultMigrationProgress) => void,
     ): Promise<VaultKeyMigrationResponse> {
-      const session = await readVaultSession();
-      if (session === undefined) throw new Error('Vault session is unavailable');
-      const config = readSyncConfig();
-      if (config.token === undefined || config.token === '' || config.serverUrl.trim() === '') {
-        throw new Error('Vault migration credentials are unavailable');
-      }
-      const currentPayloadKeyVersion = session.payloadKeyVersion ?? null;
-      const targetPayloadKeyVersion = (session.payloadKeyVersion ?? 0) + 1;
-      const remoteOptions = {
-        baseUrl: config.serverUrl,
-        getToken: async () => readSyncConfig().token,
-        ...(options.fetchImpl !== undefined ? { fetchImpl: options.fetchImpl } : {}),
-      };
-      const inventory = createVaultMigrationInventorySource(remoteOptions);
-      const migrationRemote = createVaultKeyMigrationRemote(remoteOptions);
-      const journalScope = `${session.scope.accountId}\u0000${session.scope.serverOrigin}`;
-      let published: VaultKeyMigrationResponse | undefined;
-      await session.confirmAndMigrateRootRotation(pending, enteredRecoveryCode, async (input) => {
-        published = await migrateVaultPayloads({
-          inventory,
-          remote: migrationRemote,
-          package: input.targetPackage,
-          expectedKeyVersion: input.currentPackage.keyVersion,
-          currentPayloadKeyVersion,
-          targetPayloadKeyVersion,
-          currentRootKey: input.currentRootKey,
-          targetRootKey: input.targetRootKey,
-          ...(currentPayloadKeyVersion === null && config.password !== undefined
-            ? { legacyPassword: config.password }
-            : {}),
-          journal: vaultMigrationJournal,
-          journalScope,
-          onProgress,
+      return withVaultExclusive(async () => {
+        const session = await readVaultSession();
+        if (session === undefined) throw new Error('Vault session is unavailable');
+        const config = readSyncConfig();
+        if (config.token === undefined || config.token === '' || config.serverUrl.trim() === '') {
+          throw new Error('Vault migration credentials are unavailable');
+        }
+        const migrationEpoch = vaultEpoch;
+        const migrationToken = config.token;
+        const currentPayloadKeyVersion = session.payloadKeyVersion ?? null;
+        const targetPayloadKeyVersion = (session.payloadKeyVersion ?? 0) + 1;
+        const remoteOptions = {
+          baseUrl: config.serverUrl,
+          getToken: async () => migrationToken,
+          ...(options.fetchImpl !== undefined ? { fetchImpl: options.fetchImpl } : {}),
+        };
+        const inventory = createVaultMigrationInventorySource(remoteOptions);
+        const migrationRemote = createVaultKeyMigrationRemote(remoteOptions);
+        const journalScope = `${session.scope.accountId}\u0000${session.scope.serverOrigin}`;
+        let published: VaultKeyMigrationResponse | undefined;
+        await session.confirmAndMigrateRootRotation(pending, enteredRecoveryCode, async (input) => {
+          published = await migrateVaultPayloads({
+            inventory,
+            remote: migrationRemote,
+            package: input.targetPackage,
+            expectedKeyVersion: input.currentPackage.keyVersion,
+            currentPayloadKeyVersion,
+            targetPayloadKeyVersion,
+            currentRootKey: input.currentRootKey,
+            targetRootKey: input.targetRootKey,
+            ...(currentPayloadKeyVersion === null && config.password !== undefined
+              ? { legacyPassword: config.password }
+              : {}),
+            journal: vaultMigrationJournal,
+            journalScope,
+            onProgress,
+          });
+          return published;
         });
+        if (migrationEpoch !== vaultEpoch) throw new Error('Vault migration was invalidated by credential changes');
+        if (published === undefined) throw new Error('Vault migration did not publish a result');
         return published;
       });
-      if (published === undefined) throw new Error('Vault migration did not publish a result');
-      return published;
+    },
+
+    async cancelVaultRootRotation(): Promise<void> {
+      await withVaultExclusive(async () => {
+        const session = await readVaultSession();
+        if (session === undefined) return;
+        const config = readSyncConfig();
+        const remote = config.token === undefined || config.token === '' || config.serverUrl.trim() === ''
+          ? undefined
+          : createVaultKeyMigrationRemote({
+            baseUrl: config.serverUrl,
+            getToken: async () => config.token,
+            ...(options.fetchImpl !== undefined ? { fetchImpl: options.fetchImpl } : {}),
+          });
+        const journalScope = `${session.scope.accountId}\u0000${session.scope.serverOrigin}`;
+        if (remote !== undefined) await cancelVaultPayloadMigrationForScope(remote, vaultMigrationJournal, journalScope);
+        await session.cancelPendingRootRotation();
+      });
     },
 
     async dispatch(intent: OpIntent): Promise<void> {
@@ -572,18 +612,22 @@ export async function openAppHost(options: AppHostOptions): Promise<AppHost> {
     getState: () => engine.getState(),
 
     async sync(): Promise<SyncStatus> {
-      const client = buildSyncClient();
-      if (client === undefined) return notConfigured();
-      return client.sync();
+      return withVaultExclusive(async () => {
+        const client = buildSyncClient();
+        if (client === undefined) return notConfigured();
+        return client.sync();
+      });
     },
 
     async resolveConflict(
       conflict: ConflictInfo,
       choice: 'keep-local' | 'keep-remote',
     ): Promise<SyncStatus> {
-      const client = buildSyncClient();
-      if (client === undefined) return notConfigured();
-      return client.resolveConflict(conflict, choice);
+      return withVaultExclusive(async () => {
+        const client = buildSyncClient();
+        if (client === undefined) return notConfigured();
+        return client.resolveConflict(conflict, choice);
+      });
     },
 
     async pendingUploadCount(): Promise<number> {

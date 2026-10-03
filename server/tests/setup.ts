@@ -342,6 +342,17 @@ vi.mock('../src/db', () => {
               return entityArrayBranchRows(testData.operations, params);
             }
             const sql = Array.isArray(strings) ? strings.join('') : String(strings);
+            if (sql.includes('FROM user_sync_state') && sql.includes('FOR UPDATE')) {
+              const [txUserId] = params as [number];
+              const syncState = testData.userSyncStates.get(txUserId);
+              return [{
+                lastSeq: syncState?.lastSeq ?? 0,
+                latestStateReplacementSeq: syncState?.latestStateReplacementSeq ?? null,
+              }];
+            }
+            if (sql.includes('SELECT id FROM users WHERE id') && sql.includes('FOR UPDATE')) {
+              return [];
+            }
             throw new Error(`Unmocked raw query in tx: ${sql}`);
           }),
         // The upload transaction writes the storage counter atomically via

@@ -963,6 +963,10 @@ rg -n 'deletedAt !==? undefined|purgedAt ===? undefined' packages apps   # 排�
 
 ### 11.9 W4b · 标签删除确认（登记，本轮**没做**，因为落点正被别人重写）
 
+✅ **本节已被 §11.13 取代（2026-10-04 0:3x）**：撞车条件在 10-03 23:5x 现量已不成立，
+这一单当晚做掉了。下面这节**整段留着**，因为它是"登记时成立的理由会过期"的样本 ——
+读它的时候请连着 §11.13 那张落点表一起看，别看成本节就以为还没做。
+
 W4 那张表的 `TAG` 行是拍过板的：**不进回收站，改成单击即删 + 删除确认里写明影响 N 条任务**（理由在 §7.1 P-1 与 §W4 表格那一行 —— 标签重建成本≈0，但**影响面**是真实风险，所以防护放在"删之前告诉你影响多少条"）。本轮把它量清楚了，然后停在门口。
 
 **现状（全部本轮现量）**
@@ -1023,3 +1027,83 @@ git status --porcelain -- apps/web/src/features  ⇒ ?? apps/web/src/features/sy
 **没跑的重门禁（写明没跑，不算绿）**：`check:ai-e2e`、`check:landing-e2e`、`check:privacy-consent-e2e`、`check:macos-window` / `macos-shell` / `windows-shell` / `linux-shell`、`screenshot:verify`、`check:mobile-bundle`、`pnpm reinstall:all`。
 现量理由（22:4x）：`uptime` 报 **load average 39.53**，`pgrep -fl playwright` 抓到 **5 个以上** `chrome-headless-shell` 在跑（并行会话的浏览器验收正在进行）。本仓纪律是这些载体**必须串行**，且 `check:ai-e2e` 会 SIGKILL 别人的 vite（§7 第 87 条）。
 ⇒ 这批重门禁里**与本批有关的只有 `check:landing-e2e`**：本批改了落地文档中心一个分区锚点（`tasks-only` → `what-the-trash-holds`，3 个文件 5 处，`grep` 现量残留 0）。这条风险**没有留给浏览器验收**，它落成了常驻判据：新门禁第 5 条调 `docsFiguresOf()`（对找不到的分区是**抛错**而不是静默丢图），**变异臂 H**：把 `helpFigures.ts` 里 `W07` 那一处的 `sectionId` 改回旧名 ⇒ **恰好 1 红**，报的正是"配图挂在不存在分区上"，还原后 sha256 逐字节相同、`typecheck` rc=0。⚠️ 浏览器那一趟**仍未跑**（本批没有主张它的读数）：它验的是渲染形状，而这一条风险住在注册表映射层，两者不互相替代。
+
+### 11.12 W6-a / W6-b ✅ 回收站那一路合并搬进领域层（第三个宿主是逼出它的东西）
+
+**起因（不是"少写点代码"）**：W6 的判据 ④ 要在**笔记本**上断言"回收站里也列出那条清单"，
+而 `apps/node-host` 当时**根本没有这个读通道** —— 它的 `trash` 只列任务，且那份四路合并
+在 `packages/ui`（`trash/model.ts`）里，node 进程 import 不动（RN 是 Flow 源码）。
+于是"同一台设备的同一个回收站"有了两个答案：界面四类、CLI 一类。缺读通道与真的没收到
+在输出上长得一模一样（§7 元规则一）。
+
+| 步 | 落点 | 一条现量 |
+|---|---|---|
+| W6-a 归属 | `packages/domain/src/trash-rows.ts`（166 行，新）：`TRASH_KINDS` / `toTrashItems` / `liveTaskCountOfProject`；`NOTE_EXCERPT_LENGTH` 从 `packages/ui` 挪进 `notes.ts` | `packages/ui/src/trash/model.ts` **已删除**；`ui/src/index.ts` 那 8 行转出摘掉，不留兼容再导出 |
+| 三宿主改读同一份 | `apps/web/.../TrashView.tsx`、`apps/mobile/.../TrashScreen.tsx`、`apps/node-host/src/host.ts` | `packages/domain/tests/trash-rows.spec.ts` 里"三宿主同源"那 6 条：存在性（`toTrashItems(`）+ 形状禁止（`deletedAt ?? updatedAt`、`b.deletedAt - a.deletedAt`、`noteExcerpt(…, <数字>)`） |
+| W6-b CLI | `host.trashRows()` / `host.listNotes()` 上到 `NodeHost` 接口；`cli.ts` 的 `trash` 改吐四类、新增 `notes` | `apps/node-host/tests/trash-rows.spec.ts` **8 passed**（真 SQLite）+ USAGE↔`case` 对账门禁 |
+| 探针去重 | `settle_foreground` / `dismiss_permission_dialog` / `tap_tab` / `blame_crash` 从 `verify-mobile-notes.sh` 搬进 `scripts/lib/mobile-e2e.sh` | 四段函数体 `awk`+`md5` 逐字节相同；notes 脚本 522→**521** 行、11 个调用点没动 |
+| W6-c 脚本 | `scripts/verify-mobile-trash.sh`（六条判据，含第 0.5 步的元判据）+ `package.json` 与 `check:script-snapshot` 注册 | 元判据现量 **0**（真文件）/ **1**（临时副本里塞一条 `phone_sync`）；`bash -n` 通过；快照门 `✅ 36 个脚本` |
+
+**变异读数（2026-10-04 0:3x 重跑；上一批读数跨了上下文压缩，不拿旧数报）**
+
+| 臂 | 只拿掉哪一处修复 | 领域层 | node-host | web |
+|---|---|---|---|---|
+| A1 | `toTrashItems` 里 NOTE 那一路不并入 | **8 红** | **2 红** | **6 红** |
+| A2′ | 成员判据把 `purgedAt` 那一半漏回来 | **3 红** | 0 红 | 0 红 |
+| A3 | 排序退回只按 `deletedAt`（丢 id 决胜） | **2 红** | 0 红 | 0 红 |
+| A4′ | CLI 的 `trash` 退回 `host.listTrashed()` | —— | **1 红**（新加的 CLI 形状锁） | —— |
+
+🔴 **A4 第一次跑是 0 红，这条臂本身才是本轮 W6-b 的真正产出**：上面那些判据测的是
+宿主层的 `host.trashRows()`，而 **CLI 那句"取哪一路"没有任何东西在看**。补的判据是形状锁
+（读 `src/cli.ts`，钉 `case 'trash'` 块必须调 `host.trashRows()`、不许出现 `listTrashed(`）。
+⚠️ 它是形状锁不是行为验证：真把四类打进行为需要跑子进程，而 CLI 要先 `auth` 才碰库 ——
+**这条成本登记在这里，没假装已做**。
+
+⚠️ A2′ / A3 在 node-host 与 web 上 0 红，**不是判据没牙，是输入够不着**：宿主那两路的入参来自
+`listTrashed()` / `listTrash*()`，**已彻底删除的条目在动作层就被滤掉了**，而"同一毫秒删除的两条"
+真动作也造不出确定值。这两半只有直接喂原始表的领域层判据能钉 —— 覆盖分工，不是缺口。
+
+⚠️ 两条命令性的教训（都在这一批现量到）：
+1. **变异臂必须自证载体变了。** 第一版 A2 让 `pnpm --filter @heyta/domain build` 在 DTS 阶段红
+   （`inTrash` 变成未使用），而判据跑的是 **dist** —— 那次报的"node-host 全绿"同时可能是
+   "判据没牙"和"变异根本没进载体"。重跑改成 `inTrash(x) || x.purgedAt !== undefined`
+   （保留 `inTrash` 引用，构建干净）并**先打印 dist 里变异针脚的命中数**，再报红集。
+2. **还原一律按字节回写、放在每臂自己的 `finally` 里。** 前两版分别用"字符串再替换"和
+   "try 体内还原"，都被异常跳过过一次，**两次都把变异体留在了共享工作树里**（一次连 dist 都照它重打了）。
+   构建失败在这一版里是一条读数（`BUILD=…`），不是异常。
+
+### 11.13 W4b ✅ 标签删除确认（撞车解除后当轮做完，不是登记）
+
+§11.9 把它停在门口时给的理由是"`OrganizerList.tsx` 正被别人整段重写"。
+2026-10-03 23:5x 现量：那五个落点（`OrganizerList.tsx` / `projects/model.ts` /
+`project-actions.ts` / `ProjectsPanel.tsx` / `TagsSection.tsx`）**逐个都是干净的** ⇒ 条件已经不成立，
+这一单当场做掉。**撞车的判据是同一文件的未提交 diff，不是写下结论时的那个瞬间。**
+
+| 步 | 落点 | 说明 |
+|---|---|---|
+| 取数 | `packages/ui/src/projects/model.ts#liveTaskCountsByTag` | 与 `openTagCounts` **差一条滤**：影响面含已完成（`isLive` 判据）。§11.9 原写的是 `liveTaskCountOfTag(tasks, tagId)`，落成 map 是因为行要的是按 id 查表 |
+| 交互 | `OrganizerList.tsx`：`labels.confirmRemove`（四句文案）+ `removeImpact`（按 id 的影响面） | 传了文案=打开这一步；省略=按下即 `onRemove`，渲染与从前逐字相同。armed 态收掉原删除按钮，确认行走 `accessibilityLiveRegion="polite"`；改名与"先确认"互斥 |
+| 两端 | `ProjectsPanel.tsx`（标签那一列）、`TagsSection.tsx` | 移动端为算影响面第一次读了 `createTaskActions(host).listTasks()`（在 `dataRevision` 订阅内，`check:materialized-reads` 绿） |
+| 词条 | `common.organizer.confirm.{ask,impactTags,delete,cancel}` | 中英各 4 条成对；`impact` 那句写清"任务不会被删除，只是不再带这个标签" |
+| 判据 | `packages/ui/tests/projects-model.spec.ts` +5、`apps/web/tests/projects-panel.spec.tsx` +7（含把原来那条"按下即删"改掉并写明为什么改）、`apps/mobile/tests/projects-sections.spec.ts` +5 | 另有设备级判据并入 `verify-mobile-trash.sh` 第 6b 步（点一下不写 op / 取消不写 / 确认恰好 +1 条 `TAG/DEL`） |
+
+**变异读数（只拿掉修复，同一台机器同一晚）**
+
+| 臂 | 拿掉什么 | 读数 |
+|---|---|---|
+| M1/M7 | armed 分支改成直接 `onRemove`（闸门没了） | web **7 红** |
+| M2 | 宿主把 `removeImpact` 传成 `tagCounts`（口径顶替） | web **恰好 1 红** —— 只有"常驻计数=1 与影响面=3 同时在场"那条抓得住 |
+| M3 | 移动端没打开确认 | mobile **1 红** |
+| M4′ | 组件里 `impact <= 0` 那一半闸门去掉 | **0 红**（见下） |
+| M5 | `liveTaskCountsByTag` 也滤已完成 | 领域 **2 红** + web **1 红**（mobile 源码级判据不受影响，已单独复跑确认） |
+| M6 | 组件里多一个不受文案挡的 `onRemove(item)` | mobile 形状锁 **1 红**（`onRemove` 调用点数 = 2 那条） |
+
+⚠️ **M4′ 是一条没有牙的腿，如实写**：两个宿主传进来的 map **永远不含 0 键**
+（`liveTaskCountsByTag` 只在命中时建键），所以"影响面为 0 也不画句子"这半条在现有载体下不可观测。
+保留它的理由是**与同一组件里 `counts` 的 `> 0` 形状对称**（组件契约"只在非零时渲染"），
+不是因为有任何判据在守它 —— 将来给第三个宿主接 `removeImpact` 时，这半条才第一次有被需要的可能。
+
+⚠️ 顺带照出来并当场改掉的两处过期注释：`OrganizerList.tsx` 文件头把"删除确认"划给宿主
+（而两端都没做 —— 那句"分工"其实是一句没人认领的 TODO）；`projects/model.ts` 第 3 条同款；
+`TagsSection.tsx` 的"不改名"早被 10-03 那批否证。三处都**留原句 + 划线 + 写清为什么错**，
+没有原地抹平。

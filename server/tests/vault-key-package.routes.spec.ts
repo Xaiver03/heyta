@@ -4,7 +4,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
   closeForUser: vi.fn(),
+  $transaction: vi.fn(),
+  $queryRaw: vi.fn().mockResolvedValue([]),
   user: { findUnique: vi.fn() },
+  userSyncState: { upsert: vi.fn(), findUnique: vi.fn() },
+  operation: { count: vi.fn() },
   vaultKeyPackage: {
     findUnique: vi.fn(),
     updateMany: vi.fn(),
@@ -48,6 +52,9 @@ describe('opaque vault key-package routes', () => {
   beforeEach(async () => {
     vi.clearAllMocks();
     mocks.user.findUnique.mockResolvedValue({ id: 1, tokenVersion: 0, isVerified: 1 });
+    mocks.userSyncState.upsert.mockResolvedValue({ userId: 1, lastSeq: 0 });
+    mocks.operation.count.mockResolvedValue(0);
+    mocks.$transaction.mockImplementation(async (callback: (tx: typeof mocks) => Promise<unknown>) => callback(mocks));
     mocks.vaultKeyPackage.findUnique.mockResolvedValue(null);
     mocks.vaultKeyPackage.updateMany.mockResolvedValue({ count: 0 });
     mocks.vaultKeyPackage.create.mockImplementation(async ({ data }: { data: unknown }) => ({
@@ -66,14 +73,15 @@ describe('opaque vault key-package routes', () => {
     expect(put.statusCode).toBe(200);
     const write = mocks.vaultKeyPackage.create.mock.calls[0]?.[0] as { data: { packageData: Record<string, unknown> } };
     expect(write.data.packageData).toEqual(PACKAGE);
+    expect((write.data as { activePayloadKeyVersion?: number }).activePayloadKeyVersion).toBe(1);
     expect(JSON.stringify(write.data.packageData)).not.toContain('"rootKey":');
     expect(JSON.stringify(write.data.packageData)).not.toContain('"recoveryCode":');
     expect(mocks.vaultKeyPackage.updateMany).not.toHaveBeenCalled();
 
-    mocks.vaultKeyPackage.findUnique.mockResolvedValue({ packageData: PACKAGE });
+    mocks.vaultKeyPackage.findUnique.mockResolvedValue({ packageData: PACKAGE, activePayloadKeyVersion: 1 });
     const get = await app.inject({ method: 'GET', url: '/api/sync/key-package', headers: AUTH });
     expect(get.statusCode).toBe(200);
-    expect(get.json()).toEqual({ package: PACKAGE, payloadKeyVersion: null });
+    expect(get.json()).toEqual({ package: PACKAGE, payloadKeyVersion: 1 });
   });
 
   it('rejects plaintext secrets and stale key versions before writing', async () => {
@@ -96,7 +104,7 @@ describe('opaque vault key-package routes', () => {
     mocks.vaultKeyPackage.findUnique.mockResolvedValue({ keyVersion: 1, packageData: PACKAGE });
     const res = await app.inject({ method: 'PUT', url: '/api/sync/key-package', headers: AUTH, payload: { expectedKeyVersion: 0, package: PACKAGE } });
     expect(res.statusCode).toBe(200);
-    expect(res.json()).toEqual({ package: PACKAGE });
+    expect(res.json()).toEqual({ package: PACKAGE, payloadKeyVersion: null });
   });
 
   it('requires authentication and refuses to strand ciphertext by removing its key package', async () => {

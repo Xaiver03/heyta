@@ -53,13 +53,9 @@
  *   A6 邀请关系里的第三人邮箱 / A7 微信支付 `attach` 逐字段 / A8 后台白名单投影 /
  *   A9 `logger: false`、IP 不落库 / A10 埋点与崩溃上报 14 个关键词零命中 + 出网四类目的地 /
  *   附：45 天保留期与每日清理、`DELETE /api/account` 的级联硬删（引用 `users` 且 CASCADE 的
- *   外键 16 条、覆盖 15 张表 —— 2026-10-03 更正：此前这里与正文写的"19 处"数的是
- *   **全部迁移里 `ON DELETE CASCADE` 的出现次数**，含与账号无关的级联且重复计数历史重建；
- *   口径与真值由 `packages/legal/tests/structure.spec.ts` 从迁移现量对账）。
- *   🔴 **19 这个数是可复算的**：对 `server/prisma/migrations` 下的迁移 SQL 数 `ON DELETE CASCADE`
- *   的出现次数（`grep -rho "ON DELETE CASCADE" server/prisma/migrations | wc -l`）。
- *   它由 `structure.spec.ts` 里那条判据钉住（数字与迁移不一致即红），所以**加一条级联关系时必须同时改这里**。
- *   （2026-10-03 从 18 变 19：`user_avatars.user_id → users.id` 那条级联，见 R10 §8.7。）
+ *   外键 19 条、覆盖 18 张表；新增密钥包、迁移记录与撤销设备记录）。
+ *   数字由 `packages/legal/tests/structure.spec.ts` 顺序回放迁移中的外键增删后计算，
+ *   不能用全部 SQL 中 CASCADE 的出现次数替代；新增关系须同步更新类别说明与中英数字。
  * - 各端本地存了什么、明文还是密文、权限清单实际内容：`docs/research/legal-dataflow-client.md`
  *   （B11 clientId 是随机假名 / **B12 本地存储是明文、E2EE 只覆盖传输** / B13 凭据落盘面 /
  *   B14 三条通知通路 / B15 小组件加密快照 / B16 导出是明文且三端通道不同 /
@@ -127,7 +123,11 @@ const zh = [
     blocks: [
       {
         kind: 'p',
-        text: '这一节放在第二条，因为它是整份政策里最容易被写成假话的地方。heyta 的加密**只覆盖同步通道**：一条改动在离开你的设备之前就被加密，服务器收到的是密文，而它不持有解密所需的密钥（密钥由你的口令在你的设备上派生）。但这**不等于"你的数据全是加密的"** —— 下面三种位置必须分开说。',
+        text: '这一节放在第二条，因为它是整份政策里最容易被写成假话的地方。heyta 的加密**只覆盖同步通道**：一条改动在离开你的设备之前就被加密，服务器收到的是密文，而它不持有解密所需的密钥（新格式使用设备生成的随机数据密钥，由加密口令和恢复码分别加密保护；旧格式仍由加密口令派生密钥）。但这**不等于"你的数据全是加密的"** —— 下面三种位置必须分开说。',
+      },
+      {
+        kind: 'p',
+        text: '加密密钥与恢复：服务器保存加密密钥包及其版本、密钥指纹，以及撤销设备记录，用于跨设备解锁、迁移和阻止已撤销会话继续访问；这些记录保留至账号注销。服务器不接收加密口令、恢复码或未包裹的数据密钥。迁移期间暂存替换密文，发布或取消时释放；未完成的暂存 24 小时后过期，由清理任务释放，迁移状态回执保留至注销。浏览器只持久化加密包、加密迁移草稿与密文续传记录；移动端仅在你明确选择记住解锁后，将数据密钥交给系统安全存储。加密口令与恢复码都丢失时，服务端无法恢复你的内容；撤销设备无法抹除该设备已经取得的本地内容或密钥。',
       },
       {
         kind: 'table',
@@ -135,7 +135,7 @@ const zh = [
         rows: [
           [
             '**你自己的设备**（Web 用浏览器自带的本地存储，移动端与桌面端用本机的数据库文件）',
-            '🔴 **明文**。heyta 不加密磁盘上的数据，一个字节都不加。',
+            '🔴 任务等业务数据是**明文**。这不包括下述加密密钥包和系统安全存储。',
             '拿到这台设备、解开这个账户的人，就能读到你的全部任务、清单、便签、习惯与专注记录。防线是设备自身的锁屏、系统账户与文件权限 —— FileVault、APFS、Android FBE 这些是**操作系统**的能力，不是本应用提供的。',
           ],
           [
@@ -397,7 +397,7 @@ const zh = [
           [
             '账号本身（邮箱、口令散列、通行密钥、语言、昵称、头像密文、条款接受时刻）',
             '到你注销账号为止。',
-            '🔴 注销是**真删除**：账号行连同名下的同步事件、同步状态、设备记录、通行密钥（含未完成的通行密钥注册）、订阅、订单、优惠码核销、邀请码与邀请关系、通知、昵称与头像、条款接受记录、墓碑、推送订阅、密钥包与密钥迁移记录、已吊销设备，按数据库外键级联删除（共 19 处级联，覆盖 18 张表），**没有冷静期，也没有回收站**。🔴 两件事不在这条范围里，我们照实写：**（一）你其它设备上的本地明文数据不会因注销而消失。** 注销删的是服务端，而"本地优先"意味着每台设备自己就有一份可读的库；当前代码里没有任何"账号已注销 ⇒ 清除本机数据"的路径，界面上也还没有注销入口（注销靠邮件申请）。把这一条写成"你的所有数据立即彻底销毁"就是假话。**（二）整库备份里的副本要等那份备份自己过期**，见下面"数据库备份"那一行。',
+            '🔴 注销是**真删除**：账号行连同名下的同步事件、同步状态、设备记录、通行密钥（含未完成的通行密钥注册）、订阅、订单、优惠码核销、邀请码与邀请关系、通知、昵称与头像、条款接受记录、墓碑、推送订阅、加密密钥包、密钥迁移记录、撤销设备记录，按数据库外键级联删除（共 19 处级联，覆盖 18 张表），**没有冷静期，也没有回收站**。🔴 两件事不在这条范围里，我们照实写：**（一）你其它设备上的本地明文数据不会因注销而消失。** 注销删的是服务端，而"本地优先"意味着每台设备自己就有一份可读的库；当前代码里没有任何"账号已注销 ⇒ 清除本机数据"的路径，界面上也还没有注销入口（注销靠邮件申请）。把这一条写成"你的所有数据立即彻底销毁"就是假话。**（二）整库备份里的副本要等那份备份自己过期**，见下面"数据库备份"那一行。',
           ],
           [
             '订阅、订单与优惠码核销记录',
@@ -588,6 +588,7 @@ const zh = [
         kind: 'table',
         head: ['版本', '日期与变更摘要'],
         rows: [
+          ['1.2', '`2026-10-04` 补充密钥包、恢复码、系统安全存储与密文迁移记录的用途和留存边界；注销范围增加三类记录，按迁移真源更新级联数量。业务本地库仍为明文。**状态：草案，尚未经法务复核、尚未生效。**'],
           [
             '1.0',
             '`2026-10-01` 首次起草。全文依据三份代码考古（服务端数据流 / 客户端与权限 / AI 出境与权利实现）写成，逐条对照《认定方法》六大类与第十七条的四项必备内容。**状态：草案，尚未经法务复核、尚未生效** —— 页面顶部会显示"尚未生效"横幅，本文中的时限（15 个工作日）、保留期（45 天 / 14 天）与各项承诺在产品负责人核定、法务复核之前仍可能改写。',
@@ -648,7 +649,11 @@ const en = [
     blocks: [
       {
         kind: 'p',
-        text: 'This section comes second because it is where this policy would most easily turn into a false statement. heyta’s encryption **covers the sync channel only**: a change is encrypted before it leaves your device, the server receives ciphertext, and the server does not hold what would be needed to decrypt it (the key is derived from your password, on your device). That is **not** the same as “all of your data is encrypted”, and the three locations below must be kept apart.',
+        text: 'This section comes second because it is where this policy would most easily turn into a false statement. heyta’s encryption **covers the sync channel only**: a change is encrypted before it leaves your device, the server receives ciphertext, and the server does not hold what would be needed to decrypt it (new-format data uses a random key generated on your device and separately wrapped with your encryption passphrase and recovery code; legacy data still uses a passphrase-derived key). That is **not** the same as “all of your data is encrypted”, and the three locations below must be kept apart.',
+      },
+      {
+        kind: 'p',
+        text: 'Encryption keys and recovery: the server retains wrapped key packages, their versions and key fingerprints, and revoked device records until account closure to support unlocking across devices, migration and rejection of revoked sessions. It never receives your encryption passphrase, recovery code or unwrapped data key. Replacement ciphertext is staged during migration and released on publication or cancellation; unfinished staging expires after 24 hours and is released by cleanup, while migration status receipts remain until account closure. Browsers persist only wrapped packages, encrypted migration drafts and ciphertext resume records. Mobile devices place a data key in OS secure storage only when you explicitly choose to remember unlocking. If both the encryption passphrase and recovery code are lost, the server cannot recover your content. Revocation cannot erase content or keys a device already obtained.',
       },
       {
         kind: 'table',
@@ -656,7 +661,7 @@ const en = [
         rows: [
           [
             '**Your own device** (your browser\'s built-in local storage on the web; a database file on the device for mobile and desktop)',
-            '🔴 **Plaintext**. heyta does not encrypt anything on disk, not a single byte.',
+            '🔴 Task and other application data is **plaintext**. Wrapped key packages and OS secure storage described below are separate.',
             'Anyone holding this device who unlocks this account can read every task, list, note, habit and focus record you have. The line of defence is the device’s own lock screen, OS account and file permissions — FileVault, APFS and Android FBE are **operating system** capabilities, not features of this app.',
           ],
           [
@@ -918,7 +923,7 @@ const en = [
           [
             'The account itself (email address, password hash, passkeys, language, nickname, avatar ciphertext, moment of accepting the terms)',
             'Until you close the account.',
-            '🔴 Closure is a **genuine hard delete**: the account row and, by database foreign-key cascade, everything under it — sync events, sync state, device records, passkeys (including pending passkey registrations), subscriptions, checkout orders, coupon redemptions, invite codes and referral relationships, notifications, nickname and avatar, consent records, tombstones, push subscriptions, key packages, key migration records and revoked device records — are deleted (19 cascades in total, across 18 tables). **There is no cooling-off period and no trash bin.** 🔴 Two things fall outside that scope, and we say so plainly. **(1) Local plaintext data on your other devices is not removed by closure.** Closing an account deletes on the server, while "local-first" means every device keeps its own readable database; there is currently no code path that wipes a device when its account is closed, and no closure button in the interface (closure is by email request). Writing this as "all your data is destroyed immediately" would be false. **(2) Copies inside whole-database backups survive until that backup expires of itself** — see the "Database backups" row below.',
+            '🔴 Closure is a **genuine hard delete**: the account row and, by database foreign-key cascade, everything under it — sync events, sync state, device records, passkeys (including pending passkey registrations), subscriptions, checkout orders, coupon redemptions, invite codes and referral relationships, notifications, nickname and avatar, consent records, tombstones, push subscriptions, wrapped key packages, key migration records and revoked device records — are deleted (19 cascades in total, across 18 tables). **There is no cooling-off period and no trash bin.** 🔴 Two things fall outside that scope, and we say so plainly. **(1) Local plaintext data on your other devices is not removed by closure.** Closing an account deletes on the server, while "local-first" means every device keeps its own readable database; there is currently no code path that wipes a device when its account is closed, and no closure button in the interface (closure is by email request). Writing this as "all your data is destroyed immediately" would be false. **(2) Copies inside whole-database backups survive until that backup expires of itself** — see the "Database backups" row below.',
           ],
           [
             'Subscriptions, orders and coupon redemptions',
@@ -1109,6 +1114,7 @@ const en = [
         kind: 'table',
         head: ['Version', 'Date and summary of changes'],
         rows: [
+          ['1.2', '`2026-10-04` Adds purposes and retention boundaries for wrapped keys, recovery codes, OS secure storage and ciphertext migration records. Adds three categories to account deletion and updates cascade counts from migrations. Local application data remains plaintext. **Status: draft, not yet reviewed by counsel or in effect.**'],
           [
             '1.0',
             '`2026-10-01` First draft. Written clause by clause from three code archaeology reports (server data flow / clients and permissions / AI egress and rights as implemented), checked against all six categories of the Method and against the four mandatory elements of Article 17. **Status: draft — not yet reviewed by counsel, not yet in effect**; the page shows a “not yet in effect” banner, and the time limits (15 working days), retention periods (45 days / 14 days) and every other undertaking in this text may still be rewritten before sign-off by the product owner and legal review.',
@@ -1125,9 +1131,9 @@ const en = [
 
 export const privacy: LegalDocument = {
   id: 'privacy',
-  version: '1.1',
+  version: '1.2',
   status: 'draft',
-  updatedDate: '2026-10-02',
+  updatedDate: '2026-10-04',
   title: {
     'zh-CN': '隐私政策',
     en: 'Privacy Policy',

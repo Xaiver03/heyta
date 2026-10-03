@@ -605,6 +605,7 @@ export const en = {
   'web.sync.vault.create': 'Create key',
   'web.sync.vault.recoveryLabel': 'Recovery code',
   'web.sync.vault.recoveryHint': 'Save this code in a password manager or offline record. It is shown once and cannot be recovered from the server.',
+  'web.sync.vault.recoveryResume': 'This rotation was prepared earlier. Enter the recovery code you saved to resume it.',
   'web.sync.vault.recoveryConfirm': 'Enter the recovery code to confirm',
   'web.sync.vault.confirm': 'Confirm and publish',
   'web.sync.vault.cancel': 'Cancel',
@@ -2464,6 +2465,15 @@ export const en = {
   'common.organizer.folder.reject.unknown': 'Could not move it — please try again later',
   'common.organizer.showArchived': 'Show archived',
   'common.organizer.hideArchived': 'Hide archived',
+  // Delete confirmation (trash & archive W4b, 2026-10-03) — consumed by the
+  // shared `OrganizerList` via `labels.confirmRemove`; one sentence, one entry.
+  // impactTags is the whole reason this step exists: "on 8 tasks" reads as
+  // "deleting it touches those 8" (so people never delete), while "you can always
+  // recreate it" is also false — a new tag has a NEW id, those tasks do not re-attach.
+  'common.organizer.confirm.ask': 'Delete "{name}"?',
+  'common.organizer.confirm.impactTags': 'It is on {count} task(s). Those tasks will not be deleted — they just lose this tag.',
+  'common.organizer.confirm.delete': 'Confirm deletion',
+  'common.organizer.confirm.cancel': 'Cancel deletion',
   'common.habits.rename.button': 'Rename habit "{name}"',
   'common.habits.rename.label': 'Habit name',
   'common.habits.delete.button': 'Delete habit "{name}"',
@@ -2595,6 +2605,7 @@ export const en = {
   'mobile.vault.create': 'Create key',
   'mobile.vault.recoveryLabel': 'Recovery code',
   'mobile.vault.recoveryHint': 'Save this code in a password manager or offline record. It is shown once and cannot be recovered from the server.',
+  'mobile.vault.recoveryResume': 'This rotation was prepared earlier. Enter the recovery code you saved to resume it.',
   'mobile.vault.recoveryConfirm': 'Enter the recovery code to confirm',
   'mobile.vault.confirm': 'Confirm and publish',
   'mobile.vault.cancel': 'Cancel',

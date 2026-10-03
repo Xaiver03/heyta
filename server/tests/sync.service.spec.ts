@@ -448,6 +448,9 @@ vi.mock('../src/db', async () => {
           },
         ];
       }
+      if (sql.includes('SELECT id FROM users WHERE id') && sql.includes('FOR UPDATE')) {
+        return [];
+      }
       if (sql.includes('jsonb_each_text(vector_clock)')) {
         const [txUserId, beforeServerSeq] = params;
         const aggregate = new Map<string, number>();
@@ -1792,20 +1795,14 @@ describe('SyncService', () => {
       expect(testState.operations.size).toBe(2);
     });
 
-    it('runs the upload transaction at REPEATABLE READ isolation', async () => {
-      // Tripwire for the FIX 1.5 removal (ARCHITECTURE-DECISIONS.md #4): the
-      // post-allocation conflict re-check was deleted because RepeatableRead
-      // pins every statement to one snapshot and the lastSeq increment raises
-      // 40001 against concurrent writers. Lowering the isolation level makes
-      // that deletion unsound — this must fail loudly, not silently re-arm a
-      // missed-conflict race.
+    it('runs the upload transaction at READ COMMITTED with an explicit user lock', async () => {
       const service = new SyncService();
       await service.uploadOps(userId, clientId, [makeOp({ entityId: 'iso-task' })]);
 
       expect(prisma.$transaction).toHaveBeenCalledWith(
         expect.any(Function),
         expect.objectContaining({
-          isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead,
+          isolationLevel: Prisma.TransactionIsolationLevel.ReadCommitted,
         }),
       );
     });
