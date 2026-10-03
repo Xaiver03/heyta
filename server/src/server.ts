@@ -12,6 +12,7 @@ import {
   isConsentRequired,
 } from './config';
 import { Logger } from './logger';
+import { registerWebApp, resolveWebAppMount } from './web-app';
 import { prisma, disconnectDb } from './db';
 import websocket from '@fastify/websocket';
 import { apiRoutes } from './api';
@@ -598,6 +599,10 @@ export const createServer = (
 
       // Page Routes
       await fastifyServer.register(pageRoutes, { prefix: '/' });
+
+      // 共享 UI（"打开浏览器就能用"的那一半）。挂在**最后**：它只吃 /app/ 前缀，
+      // 但兜底处理在封装作用域内，晚注册可以保证前面任何一条真路由先被匹配。
+      await registerWebApp(fastifyServer, resolveWebAppMount(fullConfig));
 
       // Start cleanup jobs
       startCleanupJobs();

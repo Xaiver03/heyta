@@ -140,6 +140,15 @@
     const kind = tag.slice(WIDGET_TAG_PREFIX.length);
     return ADAPTIVE_CARD_KINDS.includes(kind) ? kind : null;
   }
+  var WIDGET_DATA_DIR = "widgets/";
+  var WIDGET_DATA_SUFFIX = ".data.json";
+  function kindFromWidgetDataPath(pathname, swHref) {
+    const prefix = new URL(WIDGET_DATA_DIR, swHref).pathname;
+    if (!pathname.startsWith(prefix)) return null;
+    const rest = pathname.slice(prefix.length);
+    if (!rest.endsWith(WIDGET_DATA_SUFFIX)) return null;
+    return kindFromTag(`${WIDGET_TAG_PREFIX}${rest.slice(0, -WIDGET_DATA_SUFFIX.length)}`);
+  }
   var SW_CLICK_LOG_MAX = 500;
   function parseWidgetClick(data, now) {
     if (!data || typeof data !== "object") return null;
@@ -193,14 +202,6 @@
   }
 
   // src/pwa/sw.ts
-  var WIDGET_DATA_PREFIX = "/widgets/";
-  var WIDGET_DATA_SUFFIX = ".data.json";
-  function kindFromDataPath(pathname) {
-    if (!pathname.startsWith(WIDGET_DATA_PREFIX)) return null;
-    const rest = pathname.slice(WIDGET_DATA_PREFIX.length);
-    if (!rest.endsWith(WIDGET_DATA_SUFFIX)) return null;
-    return kindFromTag(`heyta-${rest.slice(0, -WIDGET_DATA_SUFFIX.length)}`);
-  }
   var sw = self;
   var DB_NAME = "heyta-widget";
   var DB_VERSION = 1;
@@ -304,7 +305,7 @@
   sw.addEventListener("fetch", (event) => {
     if (event.request.method !== "GET") return;
     const url = new URL(event.request.url);
-    const kind = url.origin === self.location.origin ? kindFromDataPath(url.pathname) : null;
+    const kind = url.origin === self.location.origin ? kindFromWidgetDataPath(url.pathname, self.location.href) : null;
     if (kind !== null) {
       event.respondWith(
         (async () => {

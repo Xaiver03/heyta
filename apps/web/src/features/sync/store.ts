@@ -421,8 +421,16 @@ function consentGate(): SyncStatus | null {
  *
  * 判据用 `dataEgressAllowed()`，**不在这里重判 `phase`**：漏掉 `checking` 就是
  * "冷启动先把数据推出去、再收到要补签"，那道闸只剩弹个窗。
+ *
+ * 🔴 但先要 `await legalRecheck.settled()`。原来这里是同步判的，于是
+ * "还没问到答案"被写成了 `legal-reconfirm-required`，界面上那句话是
+ * "条款文本已经更新，而这个账号还没有重新确认" —— 而实测（自建栈真浏览器，
+ * 全新设备登录后第一次点同步）服务端对同一账号已答 `needsReconfirm:false`，
+ * 下载请求一个都没发，再点一次才同步成功。**既谎了，又拦住了一件本来该成的事。**
+ * 等一问落定再判不是新增等待：那一问在登录时就已经发出去了，等的是同一个请求。
  */
-function reconfirmGate(): SyncStatus | null {
+async function reconfirmGate(): Promise<SyncStatus | null> {
+  await legalRecheck.settled();
   if (requireLegalReconfirm()) return null;
   return { kind: 'error', reason: 'legal-reconfirm-required', retryable: false };
 }
@@ -573,7 +581,7 @@ export const useSyncStore = create<SyncStoreState>((set, get) => ({
     }
 
     // 🔴 第二道闸（G-27）。两处出站动作都要过，一处理由见 `reconfirmGate()`。
-    const reconfirm = reconfirmGate();
+    const reconfirm = await reconfirmGate();
     if (reconfirm !== null) {
       set({ status: reconfirm });
       return reconfirm;
@@ -609,7 +617,7 @@ export const useSyncStore = create<SyncStoreState>((set, get) => ({
     }
 
     // 🔴 第二道闸（G-27）。两处出站动作都要过，一处理由见 `reconfirmGate()`。
-    const reconfirm = reconfirmGate();
+    const reconfirm = await reconfirmGate();
     if (reconfirm !== null) {
       set({ status: reconfirm });
       return reconfirm;

@@ -92,6 +92,9 @@ live-site-results/
 # AGENTS §6.2 规定一要求的那批**改前/改后取证图**（文件名带 before/after 前缀，
 # 改前那一趟跑完就再也复现不出来），与 `apps/desktop-macos/evidence/` 同类。
 lang-shots-results/
+# `live-signin-entry.spec.ts` 的专属取证目录（同上一条理由：不跟共享目录挤，
+# 否则别的套件跑一轮就把人还没看的图删了）。
+live-signin-results/
 playwright-report/
 blob-report/
 e2e/.playwright/
@@ -204,3 +207,12 @@ e2e/playwright.probe.config.ts
 e2e/vault-results/
 .vitest/
 tmp-commit-plan.sh
+# `playwright.selfhost.config.ts` 的**运行态**：上一轮哪些用例失败了。
+# 它跟着每次本地跑改变 ⇒ 每跑一次自托管验收就往 git status 里丢一个脏文件。
+# 与上面 `test-results/`、`e2e/password-web-results/` 同一族：跑批输出跟着
+# outputDir 改名，所以这里必须**逐目录点名**。
+# 🔴 只忽略这一枚：同目录的 s1–s3 截图是 §6.2 规定一要的**取证**，必须仍可提交 ——
+# 所以不能像 `password-web-results/` 那样整目录忽略。
+# ⚠️ 它此前以跟踪态进过仓库；**忽略规则不会让已跟踪的文件消失**，要让它真正不再脏
+# 需要一次 `git rm --cached e2e/selfhost-stack-results/.last-run.json`（索引动作，留给所有者）。
+e2e/selfhost-stack-results/.last-run.json

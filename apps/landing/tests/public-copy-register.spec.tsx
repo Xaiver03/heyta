@@ -89,10 +89,17 @@
  * 用法：`pnpm --filter @heyta/landing test`（已随 `pnpm -r test` 进 `pnpm check`）
  */
 
+import { execFileSync } from 'node:child_process';
+import { existsSync, readFileSync, readdirSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import { dirname, join, resolve } from 'node:path';
+
 import { describe, expect, it } from 'vitest';
 
 import { LOCALES, type Locale } from '@heyta/i18n/provider';
+import { CATALOGS } from '@heyta/i18n';
 
+import { SELF_HOST_GUIDE_URL } from '../src/lib/repo.js';
 import { SITE_PAGES } from '../src/site/pages.js';
 import { renderPage } from './helpers/render-page.js';
 // 🔴 豁免判据与 `scripts/check-docs-voice.mjs` **共用一份**（分裂的成因与代价写在那个文件头）。
@@ -335,10 +342,45 @@ describe('🔴 公页不许说贡献者语言', () => {
    * 而观测面塌掉的原因通常不是本文件 —— 是 `helpers/render-page.tsx` 的脚手架
    * 坏了、或注册表被清空了。所以这里**响亮地失败**，而不是继续报"✅ 全部合规"。
    */
+  /**
+   * 唯一登记为**可以薄**的页面。
+   *
+   * 🔴 2026-10-03：`signin` 被改成纯跳板（产品负责人实测：点「登录」先读到一段说明
+   * 是错的形状，说明搬进了文档中心）。"标题 + 引言 + 两个出口"按定义凑不满 500 字。
+   * ⚠️ 但**阈值不能整体调低** —— A 存在的理由正是抓住"页面在、正文没挂上"，
+   * 把 500 改小会让真正的空壳页跟着一起溜过去。
+   *
+   * 所以这条豁免**自己检查两件事**（不是"这页不看"）：
+   *   ① `#main` 里必须有一个非空的 `<h1>`（正文真的挂上了，不是只剩外壳）；
+   *   ② 正文里必须有**能点的出口** —— 没有出口的薄页就是空页，那正是 A 要抓的东西。
+   *
+   * ⚠️ ①这里刻意**不**去比对"页面渲染的引言 = 注册表 `ledeKey` 的词条值"：
+   * 那两个读数都来自注册表，把 `ledeKey` 指到别的键时两边会**一起变**，
+   * 于是那条判据永远不会红（已实测：指错键 175 条全绿）。一条不可能红的判据
+   * 比没有判据更糟 —— 它会把"这里有守着"的错觉一起带进来。
+   */
+  const THIN_PAGE_IDS: readonly string[] = ['signin'];
+
   it.each(PAGE_IDS.flatMap((pageId) => LOCALE_IDS.map((locale) => [pageId, locale] as const)))(
     '%s / %s：确实渲染出可读文本（否则本门禁是在对空白打分）',
     (pageId, locale) => {
-      const text = collectRenderedText(renderPage(pageId, locale));
+      const view = renderPage(pageId, locale);
+      const text = collectRenderedText(view);
+
+      if (THIN_PAGE_IDS.includes(pageId)) {
+        const main = view.querySelector('#main');
+        const h1 = main?.querySelector('h1');
+        expect(
+          h1?.textContent?.trim() ?? '',
+          `${pageId} / ${locale} 是登记过的薄页，但正文里没有一个非空的 <h1> —— 那是空页，不是薄页`,
+        ).not.toBe('');
+        expect(
+          main?.querySelector('a[href]') ?? null,
+          `${pageId} / ${locale} 是登记过的薄页，但正文里没有任何可点的出口 —— 那是空页，不是薄页`,
+        ).not.toBeNull();
+        return;
+      }
+
       expect(
         text.length,
         `${pageId} / ${locale} 只渲染出 ${String(text.length)} 个字符 —— 观测面塌了`,
@@ -458,5 +500,226 @@ describe('自检 C（正对照）：判定线上允许的说法一条都不许�
 
   it.each(MUST_NOT_CATCH)('不误伤：%s', (sample) => {
     expect(findViolations(sample), `这条被误判成贡献者语言：${sample}`).toEqual([]);
+  });
+});
+
+/**
+ * ## 公页指向的**仓库文档**（2026-10-03，缺口 G-40③）
+ *
+ * 上面那批规则管的是"公页上印的字"。这一批管的是**公页把人带去的那个文件**。
+ *
+ * 起因是实测：落地页把"要逐条执行的命令、依赖与配置文件都写在自建指南里，
+ * 跟着跑一遍就能起来"这句话挂在 `SELF_HOST_GUIDE_URL` 上，而它以前指向
+ * `docs/runbooks/local-server-verification.md` —— 那是给 **P0 验收**写的手册，
+ * 它的第一节是一张本团队内部机器表（SSH 别名、公网 IP、哪台同时是我们的部署机）。
+ * 于是那条链接**两头都不对**：对外承诺的路径上没有面向陌生人的部署路径，
+ * 而内部运维现场被公开页面直链带了出去。
+ *
+ * 四条判据（注入表原本记在 `docs/research/self-host-distribution-audit.md` §8.9；
+ * 2026-10-03 第 1、2 条各被现实改了一次形状，改动理由写在 §8.13）：
+ *  1. `apps/landing/src` 里每个 `blob/main/<路径>` 必须在**已推送的默认分支**上存在 ——
+ *     🔴 原来只 `existsSync` 本地工作树，于是"文件只活在没合入的分支上"判绿、线上 404；
+ *  2. 自建指南那一头不许含内部主机名 / 公网 IP。目标现在是**站内那篇文章**，
+ *     所以扫的是它的正文（从词条表按前缀取，中英两版），并且抽取层自己带哨兵与阳性对照；
+ *  3. 同一条 needle 扫描在一份**确实**含内部机器的文档上必须命中 ——
+ *     没有这条对照，第 2 条的"零命中"可能只是 needle 表或扫描坏了；
+ *  4. 页面上**渲染出来的那个 href** 必须就是常量 —— 前三条都只读常量，
+ *     而缺陷的形状恰恰是"常量改了、某个组件自己抄了一份旧路径"（`Footer.tsx` 以前就自己抄过）。
+ */
+const HERE = dirname(fileURLToPath(import.meta.url));
+const REPO_ROOT = resolve(HERE, '../../..');
+
+/** 内部运维现场的标记。每一条都在 `deployment.md` / `local-server-verification.md` 里真实出现过。 */
+const INTERNAL_OPS_NEEDLES = ['ubuntu-jcli', 'sanjiaozhou', 'finlaw', '124.223.13.226'];
+
+const listTsFiles = (dir: string): string[] => {
+  const out: string[] = [];
+  for (const entry of readdirSync(dir, { withFileTypes: true })) {
+    const child = join(dir, entry.name);
+    if (entry.isDirectory()) out.push(...listTsFiles(child));
+    else if (/\.tsx?$/.test(entry.name)) out.push(child);
+  }
+  return out;
+};
+
+/**
+ * 只认**代码行**里的 `blob/main/<路径>`。
+ *
+ * 🔴 为什么必须剥整行注释：2026-10-03 把自建指南的链接改成站内路径之后，
+ * `lib/repo.ts` 的注释里留着"它以前指 `…/blob/main/docs/runbooks/self-host.md`"这段历史，
+ * 扫描器把它当成一条真链接 ⇒ 判据红在一段解释自己为什么改的散文上。
+ * 注释不是链接。⚠️ 边界：只剥**整行**注释（`//`、`/*`、`*` 开头），
+ * 因为代码行里 `https://` 含有 `//`，按行内位置剥会把真链接削掉。
+ * ⚠️ 这里刻意不用"一个正则搞定"：`^\s*(?!…)[^*]` 那种写法会因为 `\s*` 回溯而
+ * 把 ` * 注释` 判成代码行（实测就是这样让第一条判据红在一段散文上的）。
+ */
+const isCodeLine = (line: string): boolean => {
+  const t = line.trimStart();
+  return !(
+    t.startsWith('//') || t.startsWith('/*') || t.startsWith('*/') || t.startsWith('*')
+  );
+};
+
+const blobPathsReferencedByLandingSrc = (): string[] => {
+  const found: string[] = [];
+  for (const file of listTsFiles(join(REPO_ROOT, 'apps/landing/src'))) {
+    const text = readFileSync(file, 'utf8');
+    for (const line of text.split('\n')) {
+      if (!isCodeLine(line)) continue;
+      for (const m of line.matchAll(/blob\/main\/([A-Za-z0-9._/-]+)/g)) {
+        const path = m[1];
+        if (path !== undefined) found.push(path);
+      }
+    }
+  }
+  return found;
+};
+
+/**
+ * 该路径在**已推送的默认分支**（本地记录的 `origin/main`）上是否存在。
+ *
+ * ⚠️ 它读的是本地的 remote-tracking ref，所以"刚推上去"要 `git fetch` 之后才反映得出来。
+ * 这不是缺陷而是边界：这条判据防的是"文件只活在我这棵树上"，而那正好是出事当时的形状。
+ * ref 取不到时**响亮地失败**，不静默放行（静默放行 = 这条判据变成装饰）。
+ */
+const pushedDefaultBranchHas = (path: string): boolean => {
+  try {
+    execFileSync('git', ['rev-parse', '--verify', '--quiet', 'origin/main'], {
+      cwd: REPO_ROOT,
+      stdio: ['ignore', 'ignore', 'ignore'],
+    });
+  } catch {
+    throw new Error('本地没有 origin/main 这个 ref —— 这条判据没法判断，不静默放行（先 git fetch）');
+  }
+  try {
+    execFileSync('git', ['cat-file', '-e', `origin/main:${path}`], {
+      cwd: REPO_ROOT,
+      stdio: ['ignore', 'ignore', 'ignore'],
+    });
+    return true;
+  } catch {
+    return false;
+  }
+};
+
+/**
+ * 站内那篇自建指南的 href 必须**就是**页面注册表里那条 path 加尾斜杠。
+ * 不抄第二份路径：以前页脚自己抄过一遍，于是"指南搬家"要改两处而漏一处。
+ */
+const guideHrefFromRegistry = (): string => {
+  const page = SITE_PAGES.find((p) => p.id === 'selfhost');
+  expect(page, '页面注册表里没有 id="selfhost" —— 这条链接无人可核对').toBeDefined();
+  expect(
+    SELF_HOST_GUIDE_URL,
+    `SELF_HOST_GUIDE_URL 不再是注册表里那条 path 加尾斜杠（现在=${SELF_HOST_GUIDE_URL}，` +
+      `注册表=${String(page?.path)}/）⇒ 要么指南又搬家了，要么这里抄了第二份`,
+  ).toBe(`${String(page?.path)}/`);
+  return SELF_HOST_GUIDE_URL;
+};
+
+/**
+ * 站内那篇文章的**正文**（中英两版），从词条表按前缀取。
+ * 🔴 不拿正则去啃 TS 源文件：那会变成第二套转义规则（`server-copy` 生成器踩过）。
+ *    取到多少条、里面必须有什么，都由下面两条判据各自带对照。
+ */
+const selfHostArticleValues = (): string[] => {
+  const out: string[] = [];
+  for (const catalog of [CATALOGS['zh-CN'], CATALOGS.en]) {
+    for (const [key, value] of Object.entries(catalog)) {
+      if (key.startsWith('site.docs.selfhost.')) out.push(value);
+    }
+  }
+  return out;
+};
+
+describe('公页指向的仓库文档', () => {
+  it('每个 blob/main/<路径> 都在**已推送的默认分支**上存在（工作树里有不算）', () => {
+    const paths = blobPathsReferencedByLandingSrc();
+    // 解析层哨兵：一条都没扫到**不算通过** —— 那说明遍历或正则坏了。
+    expect(paths.length, 'apps/landing/src 里一个 blob/main/ 链接都没扫到').toBeGreaterThan(0);
+    // 剥注释那一步的阳性对照：页脚的真链接必须仍在集合里。
+    // 没有这条，"整行注释都剥掉"会把扫描器削成空集，而下面两条判据会一起变成装饰。
+    expect(
+      paths,
+      `扫到的 blob 路径里没有 CONTRIBUTING.md（实得 ${paths.join(', ') || '空'}）⇒ 剥注释剥过头了`,
+    ).toContain('CONTRIBUTING.md');
+    const missingLocally = paths.filter((p) => !existsSync(join(REPO_ROOT, p)));
+    expect(missingLocally, `公页指向了仓库里不存在的文档：${missingLocally.join(', ')}`).toEqual([]);
+    // 🔴 这一段是补 2026-10-03 那次实测的：链接指向的是**公开远端的 main**，
+    // 而原来这条判据只 `existsSync` 本地工作树 —— 于是"文件只活在没合入的分支上"
+    // 会判绿，线上是 404（自建指南那条当时就是这样死的）。
+    const missingUpstream = paths.filter((p) => !pushedDefaultBranchHas(p));
+    expect(
+      missingUpstream,
+      `公页直链的文档在 origin/main 上不存在（本地有、没推上去 = 外人点开就是 404）：${missingUpstream.join(', ')}` +
+        '。要么把它合进并推到默认分支，要么别在公页上直链。',
+    ).toEqual([]);
+  });
+
+  it('自建指南的链接指向站内那篇文章，且那篇文章不含内部主机名 / 公网 IP', () => {
+    const href = guideHrefFromRegistry();
+    expect(href, `自建指南链接不再是站内路径：${href}`).toMatch(/^\/docs\/[a-z-]+\/$/);
+    const values = selfHostArticleValues();
+    // 抽取层哨兵：文章有 20+ 段，只抽到个位数说明前缀或目录结构变了。
+    expect(values.length, `只从词条表里抽到 ${String(values.length)} 条自建指南正文`).toBeGreaterThanOrEqual(
+      20,
+    );
+    // 同趟阳性对照：抽取本身坏了的话，下面那条"零命中"就不构成证据。
+    expect(
+      values.some((v) => v.includes('三个必填项')),
+      '抽取到的正文里没有「三个必填项」⇒ 抽取层坏了，"不含内部标记"这条判据在空转',
+    ).toBe(true);
+    const hits = INTERNAL_OPS_NEEDLES.filter((n) => values.some((v) => v.includes(n)));
+    expect(hits, `站内自建指南（${href}）里出现内部运维标记：${hits.join(', ')}`).toEqual([]);
+  });
+
+  it('正面对照：同一条 needle 扫描在内部运维手册上必然命中', () => {
+    const internal = readFileSync(
+      join(REPO_ROOT, 'docs/runbooks/local-server-verification.md'),
+      'utf8',
+    );
+    const hits = INTERNAL_OPS_NEEDLES.filter((n) => internal.includes(n));
+    expect(
+      hits.length,
+      'needle 表在一份确实含内部机器的文档上也零命中 ⇒ needle 表或扫描本身坏了，' +
+        '上一条的"零命中"因此不构成证据',
+    ).toBeGreaterThanOrEqual(3);
+  });
+
+  it('首页与页脚渲染出来的 href 就是那个常量，且没有一个 a 直连内部验收手册', () => {
+    // 🔴 前三条读的都是常量；这条读**DOM**。缺陷的真实形状是"常量改了、某个组件自己抄了一份旧路径"
+    //（页脚的文档分组以前就自己抄过一遍路径，于是"指南搬家"要改两处而漏一处）。
+    const renderedHrefs = ['zh-CN', 'en'].flatMap((locale) => {
+      const view = renderPage('home', locale as Locale);
+      return [...view.querySelectorAll<HTMLAnchorElement>('a[href]')].map((a) => a.getAttribute('href') ?? '');
+    });
+
+    const toGuide = renderedHrefs.filter((h) => h === SELF_HOST_GUIDE_URL);
+    expect(
+      toGuide.length,
+      `渲染出来的页面上一个指向自建指南的链接都没有（中英两版共 ${String(renderedHrefs.length)} 个 a）` +
+        ' ⇒ 常量没被渲染出来，这条判据会变成空转',
+    ).toBeGreaterThan(0);
+
+    // 🔴 上面那一条**单独是不够的**：2026-10-03 实测，把 `Footer.tsx` 改成自己抄一份
+    // `/docs/selfhost`（少一个尾斜杠）时它照样绿 —— 因为自建区那一处仍然用的常量，
+    // "至少有一个链接等于常量"就成立了。真正要判的是**集合**：
+    // 页面上所有指向自建指南的 href，只许有常量这一个值。
+    const guideish = [
+      ...new Set(
+        renderedHrefs.filter((h) => !h.startsWith('#') && /selfhost/i.test(h)),
+      ),
+    ].sort();
+    expect(
+      guideish,
+      `公页上指向自建指南的 href 不止一个值（实得 ${guideish.join(' , ')}）` +
+        ` ⇒ 有组件自己抄了一份路径，而"指南搬家"就又要改两处了`,
+    ).toEqual([SELF_HOST_GUIDE_URL]);
+
+    const internal = [...new Set(renderedHrefs.filter((h) => h.includes('local-server-verification')))];
+    expect(
+      internal,
+      `公页上有链接直连内部 P0 验收手册（它开头是一张内部机器表）：${internal.join(', ')}`,
+    ).toEqual([]);
   });
 });
