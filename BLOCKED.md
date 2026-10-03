@@ -3298,6 +3298,39 @@ comm -12 /tmp/m.txt /tmp/d.txt                                                  
 **取门禁读数前先 `grep '"check:xxx"' package.json` 拿真入口**，别凭记忆拼路径。
 （并行会话在同一天因为拼错门禁名拿到一条假红，见 `3a3071e1` 的提交信息 —— 同一种错，两个作者。）
 
+### 23:0x 复量：仍是 15 个，而且**没有一个**是"只脏了 stat"
+
+主检出 HEAD 仍是 `e3312dba`、脏项 **356**（22:3x 是 343 ⇒ 别人又写了 13 项），交集 `comm -12` 仍 **15**。
+这条复量的价值在于**排除了一个看起来很省事的假出路**：`git status` 的 ` M` 有时只是索引 stat 过期，
+刷新后内容其实与 HEAD 相同，那种"脏"并不挡快进。逐文件量内容差之后：
+
+```bash
+cd <主检出> && while read -r f; do git diff --numstat HEAD -- "$f"; done < /tmp/intersect.txt
+```
+
+| 文件 | 未提交内容差 |
+|---|---|
+| `docs/reference/environment-traps.md` | **187+/0−** |
+| `packages/app-host/tests/local-api-host.spec.ts` | 164+/3− |
+| `packages/i18n/src/locales/zh-CN.ts` / `en.ts` | 167+/38− / 153+/36− |
+| `packages/app-host/tests/reminder-actions.spec.ts` | 198+/5− |
+| `packages/domain/tests/capture.spec.ts` | 112+/0− |
+| `packages/app-host/src/reminder-actions.ts` | 96+/15− |
+| `packages/app-host/src/local-api-host.ts` | 73+/17− |
+| `packages/domain/src/capture.ts` | 65+/5− |
+| `scripts/reinstall-all.sh` | 25+/2− |
+| `PROGRESS.md` / `docs/plans/README.md` | 9+/0− / 4+/0− |
+| `packages/local-api/src/mcp.ts` / `tools.ts` | 6+/2− / 4+/2− |
+| `scripts/mutate-closeout-gates.sh` | 3+/3− |
+
+**15 个全部有真实行级差**（未提交新增合计 **1,266 行**：187+164+167+153+198+112+96+73+65+25+9+4+6+4+3）
+⇒ "刷一下索引就能落"这条路**不成立**，
+`git update-index --refresh` 那类动作也不会让交集变空。落地仍然只认上面那条关闭判据
+（`comm -12` 为空 ⇒ `heyta-land.sh --confirm`）。
+⚠️ 另一条读出来的信息：`reinstall-all.sh` 与 `mutate-closeout-gates.sh` 此刻**正被别人改着**
+（前者 25+/2−）—— 我 ③ 的两段跑的都是**载体里已提交的那份**（`8a947a16`/`86e23864`），
+所以他们的改动既不会进我的产物，也不该被我的读数代言。
+
 ## B61. 🔴 ③ 的 macOS 段在"启动自截屏"处红：签名与打包都是好的，装新那一步根本没跑到（2026-10-03 22:3x–22:4x 现量）
 
 **现象**（载体 `heyta-wt-ai-closeout` @ `133550d7`，工作树起跑时 0 未提交）：
