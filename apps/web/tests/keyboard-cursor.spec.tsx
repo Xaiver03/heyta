@@ -180,7 +180,7 @@ describe('跨视图通用（工单 W1 的那条硬要求）', () => {
   });
 });
 
-describe('两种"不响应"，各挡一种坏', () => {
+describe('三种"不响应"，各挡一种坏', () => {
   it('焦点在输入框里（正在打字）⇒ 不动选中', async () => {
     rows('task-item', ['t1', 't2']);
     await mount('tasks');
