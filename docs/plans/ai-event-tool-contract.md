@@ -2382,5 +2382,23 @@ pnpm build:android                       # :10 ⇒ 里面是 gradle
 ⇒ 之前想过的那条"我在载体里把 main 挪到集成线、不碰主检出工作树"的省事路**结构上不存在**，
 落地只能在主检出里做一次真的 `merge --ff-only`。这句写进 `B60`，省得下一个人再去试一遍。
 
+### 四、① 前半（"三个分支并成一条线"）在尖端重验一遍，因为已经合过三次 main
+
+`git merge-base --is-ancestor <分支> <载体 HEAD>` 现量（尖端 `851a67c4`）：
+
+| 被并的分支 | 在载体里 | 在 main 里 |
+|---|---|---|
+| `feat/ai-entity-coverage` = `dd8f2210` | ✅ YES | ❌ NO（正是要落的东西） |
+| `feat/assistant-history-local-persistence` = `f2d7ed40` | ✅ YES | ❌ NO |
+| `integrate/2026-10-03-closeout` = `fd34c42a` | ✅ YES | ❌ NO |
+| `main`（`0a61c0a6`） | ✅ YES | — |
+
+待落 **88 笔**，`main..HEAD` 的文件构成：47 `.ts` / 14 `.md` / 6 `.tsx` / 6 `.mjs` / 5 `.png` / 4 `.sh` / 1 `.ps1`。
+⚠️ **别用作者数当"这条线是我的"的证据**：我顺手跑了 `git log --format='%an' main..HEAD | uniq -c`，
+得到 `88 邓湘雷` —— 看着像"全是本条线的提交"，其实**这台机器上所有并行会话共用同一个 git 身份**，
+这个数什么也不区分。真正说明"没夹带别人分支"的是**构造性**的那一条：
+载体只合过 `main` + 上面那三个分支，而 `main..HEAD` 按定义不含 main 的东西。
+（`88` 而不是 87：这一节自己的提交也算进去了。）
+
 
 
