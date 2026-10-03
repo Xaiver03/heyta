@@ -2012,3 +2012,45 @@ grep -oE '^#{2,4} ?B[0-9]+' BLOCKED.md | grep -oE '[0-9]+' | sort -n | uniq -d  
 🔴 一条元结论（今天第二次撞上）：**"预演过零冲突"不等于"合并没有冲突"**。
 14:4x 那次 `merge-tree` 预演对的是"三个分支之间"，22:0x 真合并对的是"main 与集成线"，
 输入变了结论就作废 —— 凡是把预演结果写成"已验证"的地方，都要带上它验的是哪一次。
+
+## 15.29 五条隐私红线在**合并且已构建**状态下的现量（载体 `heyta-wt-ai-closeout` @ `4ee6e76a`，22:2x）
+
+§15.18 那次是对着**分支**逐条读到判定机制的；这一节是合并进 main 之后重取一遍，
+并补上 §15.18 当时没量的那一列：**每条判据现在由谁自动消费**（"谁在守"和"守的是什么"是两列，
+只写前者就是那句会漂的抄件）。
+
+| 红线原句 | 判定机制住在哪 | 合并态现量 | 自动消费者 |
+|---|---|---|---|
+| AI 类型上产不出 op | **不是某条门禁，是包管理器的物理事实**：`packages/ai` 零依赖，`node_modules` 里只有 `tsup / typescript / vitest` ⇒ `@heyta/op-log` 在这个包里**根本解析不到** | `packages/ai/src` 对 `createOp\|OpLogRecord\|@heyta/op-log\|@heyta/sync-core\|dispatch(` 命中 **2**，两处都是 `provider.ts:14/16` 的注释（ADR-0005 §3.1 的说明原文），代码 **0** 处；`package.json` 的 `dependencies` 与 `peerDependencies` 均不存在 | `pnpm -r build`（本轮 rc=0）+ 链第 03 段 `check:typecheck` —— 有人想让它能产 op，第一步必须往 `packages/ai/package.json` 加依赖，而那一步会立刻出现在 diff 里 |
+| `host.submit` 全仓恰好一处 | `check:ai-tools` 规则 2（RUN_FILE 恰好 1 次且落在 `confirmAiToolProposal()` 之后）+ 规则 8（MCP 入口恰好 1 次且落在 `executeTool()` 内）+ 规则 9（全仓写入口**可穷举**：清单外出现 `host.submit(` 即红） | 真实调用点 **2 处**：`packages/app-host/src/ai-tool-run.ts:195`、`packages/local-api/src/server.ts:545`（`server.ts:481` 与 `ai-tool-run.ts:188` 是注释表，剥注释后不计数）；`host.ts:331-332` 把端口接到 `engine.dispatch()` | 链第 36 段 `check:ai-tools`（本轮绿） |
+| 逐工具默认关 | `packages/local-api/src/tools.ts:337-339`：`return grants?.[toolName] === true;` —— 缺键 / `undefined` / `false` 三种形态**一律拒**，没有"默认开"的分支 | 逐字读回原函数体，合并态未变 | `check:ai-tools` 规则 3-6 + `packages/local-api` 那 146 条测试 |
+| 出境逐字段披露 | 承诺住在**工具目录**的 `LocalApiTool.egressFields`，真实载荷住在 `projectForTool` / `projectListForTool`，判据是"**实际跑一遍 `runReadTool`、收集载荷里出现的键**"而不是读代码列表 | 目录 22（读 10 / 写 12）：读工具声明条数 `list_tasks:6 get_task:7 list_projects:3 list_habits:5 list_tags:2 list_notes:4 get_note:5 list_checkins:3 list_focuses:6 list_reminders:4`（合 45），写工具 12 条**全部空表**，信封 `TOOL_ENVELOPE_EGRESS_FIELDS=["tool.error"]` 单独一份（不逐工具抄成六份） | `packages/local-api/tests/tool-egress-fields.spec.ts` **9 tests 绿**（`chain-2200/segments.log:1447`；该包 `Test Files 7 passed / Tests 146 passed`，`:1450-1451`）。其中"遍历整份目录"那条**以目录本身为取样清单** ⇒ 新加一个读工具不会被"判据没铺到它"漏掉；另有 `ownerPhone` / `streakDays` 两条阳性对照，证明这条判据真有牙齿 |
+| 回退不跨越隐私边界 | `fallback-needs-consent` 这个失败形状（本机端点挂了**不许**悄悄改发云端，一次请求都不发）；`retention-undecided` 挡住 `managed` | 命中 **8** 处（上一轮 §15.18 是 6 处 —— 方向是**变严**，不是被削弱）；`retention-undecided` **4** 处，`assertEnableable()` 仍抛，托管 AI 未开 | `packages/ai/tests/routing.spec.ts` + `assistant-limits.spec.ts`（在 `pnpm -r test` 里） |
+
+🔴 顺带把 `CURRENT_SCHEMA_VERSION` 一并现量：值 **1**，本轮未 bump；新持久化字段全部可选带运行时默认值
+（助手会话历史那条按 D-4(i) 根本没进 op-log，所以连字段都没新增）。
+
+### 这一节自己走错的一步（值得留着）
+
+我第一趟量第 4 条时，把正则打在了 `packages/ai/src/capability-manifest.generated.ts` 上，
+得到 `egressFields: 出现=0`。**0 命中不是红线被破坏，是我找错了对象**：
+那份产物是**给模型看的语料**（工具目录 + 实体清单的生成物），出境承诺的真源在 `local-api` 的工具目录里。
+如果我当时把"0 命中"当成违规，就会去"修"一份本来正确的产物 —— 而那正是 `check:ai-tools` 规则 7
+要防的"手改产物 = 给模型写一句谎话"。判据读不到东西时，先确认**读的是不是承载它的那份**。
+
+另一个同类的操作陷阱：全仓 `grep` 不带路径限定时命中了 `apps/landing/dist/assets/*.js`
+（压缩产物，里面 `form.submit()` 这类字样成千上万），单次输出 10 MB。
+**扫源码必须显式限定 `src` 与扩展名**，否则真正要看的那 2 处会被冲掉。
+
+### ② 的 e2e 三条腿读数（载体同上，日志 `~/scratch-heyta/e2e-rerun-2214/`，22:1x）
+
+| 腿 | 退出码 | summary 行 |
+|---|---|---|
+| `privacy-consent` | 0 | `7 passed (7.7s)` |
+| `landing-e2e` | 0 | `17 passed (1.0m)` |
+| `ai-e2e` | `ENV-BUSY(port=4318)` | `端口 4318 被占（node,56997）⇒ 记 ENV-BUSY 跳过，不 SIGKILL、不复用别人的服务器` |
+
+第三条**没有降级判据**：`check:ai-e2e` 的前置会把 4318/4319 上 LISTEN 的进程 SIGKILL
+（traps #87），而那两个端口此刻的主人是**另一个会话的 linked worktree**
+（`heyta/.worktrees/detail-pane`）。为了拿一个"绿"去杀掉别人正在跑的 dev server 不是验证，
+是破坏 —— 所以这里如实记 `ENV-BUSY`，重跑入口留在 `~/scratch-heyta/heyta-e2e-rerun.sh`。
