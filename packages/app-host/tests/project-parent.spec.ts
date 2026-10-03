@@ -136,7 +136,9 @@ describe('setParent：允许的移动', () => {
 });
 
 describe('setParent：被拒时一条 op 都不多写', () => {
-  const cases: { name: string; target: string; parent: 'self' | 'inside' | 'looseB' }[] = [
+  /** 从 `seed()` 的返回类型取键，避免这里抄一份清单名列表（抄了就一定会漂）。 */
+  type TreeKey = keyof Awaited<ReturnType<typeof seed>>;
+  const cases: { name: string; target: TreeKey; parent: 'self' | 'inside' | 'looseB' }[] = [
     { name: 'self', target: 'looseA', parent: 'self' },
     { name: 'parent_not_top_level（挂进文件夹里的清单）', target: 'looseA', parent: 'inside' },
     { name: 'has_children（文件夹不能进文件夹）', target: 'folder', parent: 'looseB' },

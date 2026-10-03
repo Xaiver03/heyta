@@ -63,10 +63,16 @@
 
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 
-import type { Project } from '@heyta/domain';
-import { useI18n } from '@heyta/i18n';
+import { folderTargetsFor, type Project } from '@heyta/domain';
+import { useI18n, type MessageKey } from '@heyta/i18n';
 import { createProjectActions, type AppHost, type ProjectActions } from '@heyta/app-host';
-import { archivedProjects, OrganizerList, toOrganizerTree } from '@heyta/ui';
+import {
+  archivedProjects,
+  FolderPicker,
+  folderRejectionMessageKey,
+  OrganizerList,
+  toOrganizerTree,
+} from '@heyta/ui';
 
 import { openTaskHost } from '../db/open-host';
 import { useMobileSync } from '../sync/store';
@@ -96,6 +102,14 @@ export function ListsSection(): React.JSX.Element {
    * 默认关闭（与迁移前 web 的选择器逐字一致：`archived !== true` 全隐藏）。
    */
   const [showArchived, setShowArchived] = useState(false);
+  /**
+   * 「移入文件夹」被领域层拒绝时那一句人话。
+   *
+   * 🔴 必须有这一格：通用的 `run()` 只 `.then(read)`，没有 `.catch`，
+   *    而 `setParent` 被拒时会 throw ⇒ 变成 unhandled rejection，
+   *    用户看到的是"点了没反应"（与 `TaskDetailSheet.runSetParent` 同一条理由）。
+   */
+  const [folderError, setFolderError] = useState('');
 
   useEffect(() => {
     let alive = true;
@@ -153,6 +167,24 @@ export function ListsSection(): React.JSX.Element {
    */
   const archivedCount = useMemo(() => archivedProjects(projects).length, [projects]);
 
+  /**
+   * 每行"现在能移进哪些清单"。
+   *
+   * 🔴 这里**不判断能不能移** —— 判断在领域层 `folderTargetsFor`
+   * （它就是 `validateProjectParentChange` 的逐目标展开），web 侧栏调的是同一个函数。
+   * 两端各筛一遍迟早漂成两套标准，而漂移的症状不是报错，是"手机上能选、电脑上不能选"。
+   */
+  const folderTargets = useMemo(
+    () =>
+      new Map(projects.map((project) => [project.id, folderTargetsFor(projects, project.id)])),
+    [projects],
+  );
+  const parentOf = useCallback(
+    (id: string): string | undefined =>
+      projects.find((project) => project.id === id)?.parentId ?? undefined,
+    [projects],
+  );
+
   const add = useCallback((): void => {
     const trimmed = name.trim();
     // 「按了空回车什么都不做」是**交互**决定，由界面自己判断 ——
@@ -197,6 +229,42 @@ export function ListsSection(): React.JSX.Element {
             empty: t('common.organizer.lists.empty'),
             emptyHint: t('common.organizer.lists.empty.hint'),
           }}
+          /*
+            ✅ 「移入文件夹」走的是共享层**已有**的 `renderItemExtra` 行尾插槽
+            （web 的取色入口就走这条），所以 `OrganizerList` 的行骨架一行没改 ——
+            两端不传时渲染逐字不变。写库仍然只经 `actions.setParent`（§3.4：
+            op-log 是唯一写入口，UI 不许自己改状态）。
+            ⚠️ 它处在开标签的属性表里，所以只能用块注释形态 ——
+            花括号包起来的 JSX 注释在这里会被解析成展开属性（TS1005）。
+          */
+          renderItemExtra={(item) => (
+            <FolderPicker
+              item={item}
+              candidates={(folderTargets.get(item.id) ?? []).map((target) => ({
+                id: target.id,
+                name: target.name,
+              }))}
+              currentParentId={parentOf(item.id)}
+              disabled={busy}
+              labels={{
+                button: (label) => t('common.organizer.folder.button', { name: label }),
+                title: t('common.organizer.folder.title'),
+                none: t('common.organizer.folder.none'),
+                current: t('common.organizer.folder.current'),
+              }}
+              onSelect={(targetId) => {
+                if (actions === null) return;
+                setFolderError('');
+                run(
+                  actions.setParent(item.id, targetId).catch((cause: unknown) => {
+                    // 认的是**机器可读的原因**（`rejectionReasonOf`），不是消息串里有没有某个词。
+                    setFolderError(t(folderRejectionMessageKey(cause) as MessageKey));
+                  }),
+                );
+              }}
+              testID={`mobile-list-folder-${item.id}`}
+            />
+          )}
           onRename={(item, next) => {
             if (actions === null) return;
             run(actions.renameProject(item.id, next));
@@ -214,6 +282,12 @@ export function ListsSection(): React.JSX.Element {
           busy={busy}
           testID="mobile-projects-list"
         />
+        {folderError === '' ? null : (
+          // kit 的 `Text` 没有 testID（它的属性表是白名单），判据按**文案内容**认这条。
+          <Text variant="row-meta" tone="danger">
+            {folderError}
+          </Text>
+        )}
         {archivedCount === 0 ? null : (
           <Button
             label={
