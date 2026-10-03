@@ -17,7 +17,7 @@
  * 所以这里做一件**可失败、且能证明会失败**的事：**数 `submit(` 出现了几次、
  * 出现在哪个函数里**。故意在错误的位置加一次写，它必须红。
  *
- * ## 七条规则，每条都对应一个真实会被写出来的错
+ * ## 九条规则，每条都对应一个真实会被写出来的错
  *
  * | # | 规则 | 拦住的是 |
  * |---|---|---|
@@ -28,12 +28,14 @@
  * | 5 | 不得 import `@heyta/op-log` | 让"造不出 op"在类型上失效 |
  * | 6 | W7 删掉的冗余前门不得回来；`describeRoutedFailure()` 只许有一个定义点 | 「同一个判断再写一遍」 |
  * | 7 | 能力清单产物必须与上游一致（调生成器的 `--check`） | 给模型看的语料和真实目录漂了 |
+ * | 8 | 第二个入口（MCP `executeTool()`）的写点也恰好一处 | 给外部程序多开一条不经过形状校验的写路径 |
+ * | 9 | 全仓 `src` 里的写入口必须**恰好是清单上那两个文件** | 第三个入口，以及"入口文件被删导致规则 1/2 静默不执行" |
  *
  * ⚠️ 规则 2 的"恰好一处"是**承重**的，不是洁癖：只检查"有没有在确认函数里"
  * 的话，同时留着另一处直接 `submit` 仍然会绿。
  */
 
-import { readFileSync, readdirSync, existsSync } from 'node:fs';
+import { readFileSync, readdirSync, existsSync, statSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -215,20 +217,67 @@ for (const file of files) {
 // 不剥注释的话这条门禁会对**正确的代码**报红（本文件顶部那条立场）。
 const DECL_PATTERN = (name) => new RegExp(`^(?:export\\s+)?(?:async\\s+)?function\\s+${name}\\b`, 'm');
 
-/** 递归列出 `WATCH_DIR` 下所有非测试 `.ts`（覆盖范围打印出来：0 项的检查等于没有检查）。 */
-function listAppHostSourceFiles(dir) {
+/**
+ * 递归列出 `dir` 下所有非测试源码文件（覆盖范围打印出来：0 项的检查等于没有检查）。
+ *
+ * 默认只收 `.ts`（规则 6 的口径）。规则 9 还要 `.tsx` —— 它是"有没有第三个写入口"，
+ * 界面壳里的写点也算入口，所以**扫描面必须比规则 6 宽**：窄了就又回到原问题。
+ */
+function listSourceFiles(dir, extensions = ['.ts']) {
   const out = [];
   for (const entry of readdirSync(dir, { withFileTypes: true })) {
     const full = path.join(dir, entry.name);
     if (entry.isDirectory()) {
-      out.push(...listAppHostSourceFiles(full));
+      if (SKIP_DIRS.has(entry.name)) continue;
+      out.push(...listSourceFiles(full, extensions));
       continue;
     }
-    if (!entry.name.endsWith('.ts')) continue;
-    if (/\.(spec|test)\.ts$/.test(entry.name)) continue;
+    if (entry.isSymbolicLink()) {
+      // 指向**文件**的软链照常收：故障注入假根就是软链镜像，而规则 1-8 读的
+      // 正是那些软链文件（`readFileSync` 跟随）。只跳指向**目录**的软链 ——
+      // 递归环只可能来自目录（链接进来的 `node_modules`）。
+      let followed;
+      try {
+        followed = statSync(full);
+      } catch {
+        continue; // 断链
+      }
+      if (followed.isDirectory()) continue;
+    }
+    if (!extensions.some((ext) => entry.name.endsWith(ext))) continue;
+    if (/\.(spec|test)\.tsx?$/.test(entry.name)) continue;
     out.push(full);
   }
   return out.sort();
+}
+
+/** 构建产物与依赖：它们不是"源码事实"，扫到只会产出假入口。 */
+const SKIP_DIRS = new Set([
+  'node_modules',
+  'dist',
+  'renderer-dist',
+  'build',
+  'out',
+  'coverage',
+  'Pods',
+  '.expo',
+]);
+
+/** 规则 9 的扫描根：每个包/壳的 `src`。 */
+function listPackageSrcs() {
+  const roots = [];
+  for (const top of ['packages', 'apps']) {
+    const dir = path.join(ROOT, top);
+    if (!existsSync(dir)) continue;
+    const candidates = [path.join(dir, 'src')];
+    for (const entry of readdirSync(dir, { withFileTypes: true })) {
+      if (entry.isDirectory()) candidates.push(path.join(dir, entry.name, 'src'));
+    }
+    for (const c of candidates) {
+      if (existsSync(c)) roots.push(c);
+    }
+  }
+  return roots.sort();
 }
 
 /** 不许再出现的名字（W7 删掉的冗余前门）。 */
@@ -236,7 +285,7 @@ const BANNED_NAMES = ['runAiTool', 'grantedToolNames'];
 /** 必须**只有一个定义点**、且住在 owner 文件里的抄件。 */
 const SINGLE_OWNER = { name: 'describeRoutedFailure', owner: 'ai-failure-fallback.ts' };
 
-const allSourceFiles = listAppHostSourceFiles(WATCH_DIR);
+const allSourceFiles = listSourceFiles(WATCH_DIR);
 if (allSourceFiles.length === 0) {
   console.error(`❌ check:ai-tools 在 ${WATCH_DIR} 递归扫到 0 个 .ts —— 规则 6 无从判断，判红。`);
   process.exit(1);
@@ -311,6 +360,128 @@ if (existsSync(MANIFEST_GENERATOR)) {
   );
 }
 
+// ── 规则 8：第二个入口（本机 API / MCP）的写点也必须恰好一处 ─────────────
+//
+// 为什么现在补：规则 2 钉的是**助手**入口（`RUN_FILE`），而 `WATCH_DIR` 只有
+// `packages/app-host/src` + 前缀 `ai-tool-`（见本文件顶部那句"只扫这几个文件"）。
+// 但全仓的写点其实有**两处**：MCP / 本机 API 在
+// `packages/local-api/src/server.ts` 的 `executeTool()` 里也调 `host.submit(intent)`，
+// 那条"立刻写"是 ADR-0011 的设计（外部程序显式调用 + 逐工具默认关 + 只监听回环 + 显式 token），
+// 与助手的"确认后才写"守的不是同一件事 —— 所以红线「`host.submit` 恰好一处」在**仓库级**
+// 从来就不成立，它成立的是"**每个入口各自恰好一处**"。
+// 取证与措辞更正见 `docs/plans/ai-event-tool-contract.md` §15.18。
+//
+// 🔴 这条规则拦的是：在 MCP 入口**旁边再加一个写点**（那等于给外部程序多开一条
+// 不经过 `toWriteIntent()` 形状校验的写路径），而结构上这件事以前没有任何一层会红。
+// 判据形状与规则 2 一致：先剥注释（那两份文件的注释里大量提到 `host.submit`），
+// 再比次数与位置；为 0 也要红（写路径断了 = 工具全部写不了，而不是"更安全"）。
+const MCP_ENTRY = path.join(ROOT, 'packages', 'local-api', 'src', 'server.ts');
+const MCP_MARKER = 'async function executeTool(';
+if (!existsSync(MCP_ENTRY)) {
+  violate(
+    'packages/local-api/src/server.ts',
+    1,
+    'MCP / 本机 API 入口文件不存在',
+    '它是两个写入口之一。文件没了而这条判据静默跳过 = 一条永远通过的判据（比没有更坏）。',
+    '恢复该文件，或连同 ADR-0011 一起撤销这个入口 —— 不要把判据改成"文件在才检查"。',
+  );
+} else {
+  const mcpCode = stripComments(readFileSync(MCP_ENTRY, 'utf8'));
+  const mcpLines = readFileSync(MCP_ENTRY, 'utf8').split('\n');
+  const mcpOccurrences = mcpCode.split('.submit(').length - 1;
+  if (mcpOccurrences !== 1) {
+    violate(
+      path.relative(ROOT, MCP_ENTRY),
+      1,
+      `MCP 入口的写调用出现了 ${String(mcpOccurrences)} 次（必须恰好 1 次）`,
+      '这个入口的写只允许有 `executeTool()` 里那一处：所有工具写入都先过 `toWriteIntent()` 的' +
+        '形状校验，再由宿主翻译成动作。多一处 = 外部程序能绕过形状直接写；为 0 = 这个入口写不进任何东西。',
+      '只保留 `executeTool()` 里那一行 `host.submit(write.intent)`。',
+    );
+  } else {
+    const mcpFnAt = mcpCode.indexOf(MCP_MARKER);
+    const mcpSubmitAt = mcpCode.indexOf('.submit(');
+    if (mcpFnAt === -1 || mcpSubmitAt < mcpFnAt) {
+      // 行号要落在**代码行**上：这个文件的注释里也写着 `host.submit(intent)`，
+      // 直接 findIndex 会把人指到那张注释表上去。
+      const mcpLine = mcpLines.findIndex((l) => !isCommentLine(l) && l.includes('.submit(')) + 1;
+      violate(
+        path.relative(ROOT, MCP_ENTRY),
+        mcpLine > 0 ? mcpLine : 1,
+        'MCP 入口的写调用不在 `executeTool()` 里',
+        '在授权判定与 `toWriteIntent()` 之外写 = 有一条不受逐工具授权约束的路径。',
+        '把写留在 `executeTool()` 的 write 分支里。',
+      );
+    }
+  }
+}
+
+// ── 规则 9：写入口必须**可穷举**（全仓 src 里恰好这两个文件） ───────────
+//
+// 规则 2 与规则 8 各自钉住一个入口，但它们挡不住"**第三个**入口"：
+// 别处再加一行 `host.submit(...)`，那两条判据照旧绿。红线那句
+// 「`host.submit` 全仓恰好一处」真正要保的东西是**入口能列完** ——
+// 而这条链全部的安全性来自"每笔写入都答得出它是从哪个入口进来的"。
+//
+// 🔴 还顺手补了一个更隐蔽的洞：规则 1/2 挂在 `WATCH_PREFIX` 的枚举上，
+// 把 `ai-tool-run.ts` **整个删掉**时那个 for 循环根本不执行 ⇒ 静默绿
+// （`files.length === 0` 那道闸要的是"全没了"，少一个不算）。
+// 本条的"少了一枚"那一腿正好拦住它。
+//
+// 现量（载体 `a9e032ac`，本文件那次改动之前）：1899 个源码文件里
+// `host.submit(` 的**非注释**命中恰好两处，其余全在 `tests/`
+// （那是一百多处直接喂端口的夹具，不是入口）。
+const WRITE_ENTRIES = [
+  'packages/app-host/src/ai-tool-run.ts',
+  'packages/local-api/src/server.ts',
+];
+
+const scanRoots = listPackageSrcs();
+const scannedFiles = [];
+for (const dir of scanRoots) {
+  scannedFiles.push(...listSourceFiles(dir, ['.ts', '.tsx']));
+}
+const foundEntries = [];
+for (const file of scannedFiles) {
+  if (stripComments(readFileSync(file, 'utf8')).includes('host.submit(')) {
+    foundEntries.push(path.relative(ROOT, file));
+  }
+}
+const extraEntries = foundEntries.filter((f) => !WRITE_ENTRIES.includes(f)).sort();
+const goneEntries = WRITE_ENTRIES.filter((f) => !foundEntries.includes(f)).sort();
+if (extraEntries.length > 0) {
+  violate(
+    extraEntries[0],
+    1,
+    `出现了清单外的写入口：${extraEntries.join('、')}`,
+    '写入口是可以列完的。一条不在这张清单上的 `host.submit(`，就是一条**没人评审过的写路径**：' +
+      '它既不经过助手侧的"确认之后才写"，也不经过 MCP 侧的 `toWriteIntent()` 形状校验与逐工具授权。',
+    `要么并进 ${WRITE_ENTRIES.join(' / ')} 之一，要么**同时**改这张清单与 ADR-0005/ADR-0011 的入口表，` +
+      '并在 `docs/reference/ai-architecture.md` 登记第三个入口的授权面。',
+  );
+}
+if (goneEntries.length > 0) {
+  violate(
+    goneEntries[0],
+    1,
+    `清单上的写入口没了：${goneEntries.join('、')}`,
+    '这个入口还在被对外承诺（ADR-0005 / ADR-0011），而"没了"有两种：真的撤了（那要连同 ADR 一起撤），' +
+      '或者被改名/挪走而**写点跟着漂到了一个没人扫的位置** —— 后者最坏，因为规则 1/2 是按文件名枚举的，' +
+      '文件一没，那两条判据会安静地不执行。',
+    '恢复该文件，或把新路径同时改进 `WRITE_ENTRIES` 与上面的文件名常量 —— 不要让判据悄悄变成空集。',
+  );
+}
+if (scanRoots.length === 0 || scannedFiles.length === 0) {
+  violate(
+    'scripts/check-ai-tools.mjs',
+    1,
+    `规则 9 的扫描面为空（src 根 ${String(scanRoots.length)} 个 / 文件 ${String(scannedFiles.length)} 个）`,
+    '一个 0 项的枚举会给出"没有多余入口 + 入口都在"的**完美读数**，而它什么都没看。' +
+      '扫描根一旦被挪走（比如包结构重组），这条判据就从"守卫"变成"装饰"。',
+    '修 `listPackageSrcs()` 的扫描根，而不是把这条判据删掉。',
+  );
+}
+
 if (violations.length > 0) {
   console.error(`\n❌ AI 工具路径门禁失败：${String(violations.length)} 处\n`);
   for (const v of violations) {
@@ -324,6 +495,10 @@ if (violations.length > 0) {
 console.log(
   `✅ AI 工具路径门禁通过：ai-tool-* ${String(files.length)} 个文件；` +
     `规则 6 扫描范围 ${String(allSourceFiles.length)} 个 .ts；` +
-    '写只出现在确认函数里、无 op 构造、无网络调用、未 import op-log、' +
+    `规则 9 写入口穷举 ${String(scanRoots.length)} 个 src 根 / ${String(scannedFiles.length)} 个源码文件，` +
+    `命中 ${String(foundEntries.length)} 处（= 清单）；` +
+    '两个写入口各自恰好一处且都在指定函数内' +
+    '（助手 `confirmAiToolProposal()` / MCP `executeTool()`）、' +
+    '无 op 构造、无网络调用、未 import op-log、' +
     '无冗余前门、`describeRoutedFailure()` 定义点恰好一处、能力清单与上游一致。',
 );
