@@ -467,9 +467,36 @@ policy that cannot be enforced is decoration:
   "supported versions" table would be unreadable by the software it describes.
 
 The trigger to revisit this: the first time images are published (see
-`docs/research/self-host-distribution-audit.md` §7 G-40⑤/⑥), a compatibility matrix has to
-be written *and* clients have to start reporting `appVersion` — those two land together or
-neither is a policy.
+`docs/research/self-host-distribution-audit.md` §7 G-40⑤/⑥). Reporting `appVersion` is
+**one** prerequisite, not the pair the sentence used to claim — the full chain is:
+
+1. a **version source** for client builds (G-40⑤) whose space matches the gate's constant.
+   `MIN_CHECKPOINT_SAFE_APP_VERSION` is `18.21.2`, a *Super Productivity* release number, and
+   heyta versions are `0.x` — so a heyta-space value always compares as "old" and reporting
+   it changes nothing except the wording an operator reads.
+2. a client that **creates** a causal full-state boundary. The sweep authorizes deletion from
+   the newest causal full-state op (`storage-quota.service.ts:417`), and no heyta client
+   creates one. To be exact about which half is missing: the **server side is fully
+   implemented** (`sync/sync.routes.snapshot-handler.ts` parses `snapshotOpType` and writes
+   the boundary), while the client side never calls it — `SYNC_IMPORT` / `BACKUP_IMPORT` /
+   `REPAIR` appear in heyta's code only as enum members
+   (`packages/shared-schema/src/supersync-http-contract.ts:20-22`,
+   `packages/sync-core/src/operation.types.ts:18/26/34`); `packages/sync-client` contains no
+   snapshot or checkpoint path at all (4 files, zero case-insensitive matches), and no
+   `apps/*` source constructs one. Practical consequence today: for accounts that only ever
+   use heyta clients nothing is pruned, so history grows — a storage cost, not a data-loss
+   risk. An upstream *Super Productivity* client pointed at this server **does** create
+   boundaries, which is precisely why the version check can't be loosened to fit heyta's
+   numbers: a `0.x` value would have to be compared against a cut meaningfully expressed in
+   `18.x` space.
+3. something that **acts** on the gate. Right now its only consumer is the daily
+   `Cleanup [checkpoint-gate]` log line (`sync/cleanup.ts`); no automatic cadence exists.
+
+⚠️ Which is also why (2) can't be skipped: sending a version without a client-side
+full-state path would push `safeAccounts` toward "all safe" while the property the gate
+protects is still absent — the log would read safer than the software is. All three land
+together, or a "supported versions" table stays what it is today: unreadable by the
+software it describes.
 
 ## Maintenance
 
