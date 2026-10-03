@@ -1541,6 +1541,9 @@ describe('vault production sync wiring', () => {
     expect(await codec.decrypt(sent['payload'] as string, local)).toBe(JSON.stringify(local.payload));
     expect(h.applied.flat().map((op) => op.payload)).toContainEqual(remote.payload);
     expect(h.cursor.value).toBe(2);
+  });
+});
+
 // ─────────────────────────────────────────────────────────────────────────
 // §2.1 的硬顺序：服务端词表落后于客户端（W2 判据 ②）
 //

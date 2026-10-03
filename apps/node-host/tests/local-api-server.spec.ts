@@ -59,6 +59,8 @@ function fakeHost() {
     listHabitLogs: () => Promise.resolve([] as readonly LocalApiHabitLog[]),
     listFocusSessions: () => Promise.resolve([] as readonly LocalApiFocusSession[]),
     listReminders: () => Promise.resolve([] as readonly LocalApiReminder[]),
+    listEvents: () => Promise.resolve([]),
+    getEvent: () => Promise.resolve(undefined),
     submit: (intent) => {
       submitted.push(intent);
       return Promise.resolve({ ok: true, taskId: 't-new' });
@@ -213,6 +215,8 @@ describe('🔴 真实 HTTP 往返', () => {
       listHabitLogs: () => Promise.resolve([] as readonly LocalApiHabitLog[]),
       listFocusSessions: () => Promise.resolve([] as readonly LocalApiFocusSession[]),
       listReminders: () => Promise.resolve([] as readonly LocalApiReminder[]),
+      listEvents: () => Promise.resolve([]),
+      getEvent: () => Promise.resolve(undefined),
       submit: () => Promise.resolve({ ok: true, taskId: 'x' }),
     };
     server = await startOnFreePort(host);
