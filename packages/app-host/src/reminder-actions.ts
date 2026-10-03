@@ -152,6 +152,31 @@ export function createReminderActions(
       Object.values(ctx.getState().reminders).filter((reminder) => reminder.taskId === taskId),
     );
 
+  /**
+   * 每任务的写链。
+   *
+   * 🔴 上限判的是"存活数"，而 `ctx.dispatch` 把 op **落到物化状态是异步的** ⇒
+   * 并发调用会在同一个旧快照上全部通过检查。实测（真引擎 + 真 SQLite）连点 8 次
+   * `createReminder` 会让 **8 条全部落库**，而 `MAX_REMINDERS_PER_TASK` 是 5 ——
+   * 界面上则表现为"渲染出 6 条而错误是空的"，看起来像用例超时。
+   * 把「读存活数 → dispatch → 状态可见」排在同一条链上，检查与写才是原子的。
+   * 链按任务分键，跑完就摘掉，不让这张 Map 变成跨任务的常驻内存。
+   */
+  const writeChain = new Map<string, Promise<unknown>>();
+  const serialize = <T>(taskId: string, fn: () => Promise<T>): Promise<T> => {
+    const prev = writeChain.get(taskId) ?? Promise.resolve();
+    const result = prev.then(fn, fn);
+    const settled = result.then(
+      () => undefined,
+      () => undefined,
+    );
+    writeChain.set(taskId, settled);
+    void settled.then(() => {
+      if (writeChain.get(taskId) === settled) writeChain.delete(taskId);
+    });
+    return result;
+  };
+
   const assertTrigger = (triggerAt: number): void => {
     const rejection = reminderRejection(triggerAt, now());
     if (rejection !== undefined) {
@@ -176,30 +201,33 @@ export function createReminderActions(
     triggerAt: number,
     over: NewReminderFields,
   ): Promise<string> {
-    const entityId = reminderId(taskId, triggerAt);
-    // 幂等：同任务同刻已经有一条存活提醒 → 直接返回它（见文件头第 1 条）。
-    if (reminderOf(entityId) !== undefined) return entityId;
+    return serialize(taskId, async () => {
+      const entityId = reminderId(taskId, triggerAt);
+      // 幂等：同任务同刻已经有一条存活提醒 → 直接返回它（见文件头第 1 条）。
+      if (reminderOf(entityId) !== undefined) return entityId;
 
-    // 见文件头第 3 条：封顶只数**存活**提醒，墓碑不占名额。
-    if (aliveOfTask(taskId).length >= MAX_REMINDERS_PER_TASK) {
-      throw new Error(
-        `一条任务最多 ${String(MAX_REMINDERS_PER_TASK)} 条提醒（${taskId} 已经到上限）`,
-      );
-    }
+      // 见文件头第 3 条：封顶只数**存活**提醒，墓碑不占名额。
+      // 🔴 这一段必须在 `serialize` 里面 —— 检查在旧快照上跑就等于没有上限。
+      if (aliveOfTask(taskId).length >= MAX_REMINDERS_PER_TASK) {
+        throw new Error(
+          `一条任务最多 ${String(MAX_REMINDERS_PER_TASK)} 条提醒（${taskId} 已经到上限）`,
+        );
+      }
 
-    await ctx.dispatch({
-      entityType: 'REMINDER' as EntityType,
-      entityId,
-      opType: OpType.Create,
-      payload: {
-        taskId,
-        triggerAt,
-        // `offsetMs` 只在给定时出现；`undefined` 会被 JSON 丢掉，
-        // 而"没有提前量"与"提前量为 0"是两件事（前者不随重复移动）。
-        ...(over.offsetMs === undefined ? {} : { offsetMs: over.offsetMs }),
-      },
+      await ctx.dispatch({
+        entityType: 'REMINDER' as EntityType,
+        entityId,
+        opType: OpType.Create,
+        payload: {
+          taskId,
+          triggerAt,
+          // `offsetMs` 只在给定时出现；`undefined` 会被 JSON 丢掉，
+          // 而"没有提前量"与"提前量为 0"是两件事（前者不随重复移动）。
+          ...(over.offsetMs === undefined ? {} : { offsetMs: over.offsetMs }),
+        },
+      });
+      return entityId;
     });
-    return entityId;
   }
 
   return {
