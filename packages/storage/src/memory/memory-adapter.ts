@@ -20,6 +20,7 @@ import {
   type DbAdapter,
   type DbCursorAction,
   type DbCursorVisitor,
+  type DbDestroyReport,
   type DbIndexQuery,
   type DbIterateOptions,
   type DbKey,
@@ -181,6 +182,31 @@ export class MemoryDbAdapter implements DbAdapter {
 
   close(): void {
     this.closing = true;
+  }
+
+  /**
+   * 清空全部 store 的记录与自增计数器。
+   *
+   * ⚠️ **保留 store 的 schema**：`DbAdapter.destroy` 的契约是"数据没了"，
+   * 不是"这个适配器废了"。把 `stores` 整张 Map 清空会让之后任何一次读
+   * 变成"没有这个 store"的异常，而那会被读成"销毁失败"。
+   * 内存实现没有持久容器可删，所以 `containerRemoved` 报 true 的理由是
+   * **进程内没有任何东西留下来**（不是"文件删了"）—— `target` 写明它。
+   */
+  async destroy(): Promise<DbDestroyReport> {
+    this.closing = false;
+    let storesCleared = 0;
+    for (const store of this.stores.values()) {
+      store.records.clear();
+      store.autoIncrement = 0;
+      storesCleared += 1;
+    }
+    return {
+      target: 'memory',
+      containerRemoved: true,
+      reason: '内存实现：没有持久容器，清空即不留任何东西',
+      storesCleared,
+    };
   }
 
   /** 建表。可重复调用（幂等），用于测试里动态加 store。 */

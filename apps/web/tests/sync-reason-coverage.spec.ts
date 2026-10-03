@@ -58,6 +58,7 @@ const EXPECTED: Record<SyncFailureReason, SyncFailureMessageKey | undefined> = {
   'not-configured': 'common.sync.error.notConfigured',
   'not-signed-in': 'common.sync.error.notSignedIn',
   'no-encryption-password': 'common.sync.error.noPassword',
+  'account-closed': 'common.sync.error.accountClosed',
   'local-op-missing': 'common.sync.error.localOpMissing',
   'remote-version-unavailable': 'common.sync.error.remoteVersionUnavailable',
   'undecryptable-ops': 'common.sync.error.undecryptableOps',

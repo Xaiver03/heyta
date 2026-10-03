@@ -1413,3 +1413,7 @@ OS 通知投递通过。原 [多端计划](docs/plans/goal-multi-end-coverage.md
 - 00:28 独立复核发现首次建包误判 legacy 历史世代，以及 wrapper 更新与迁移并发覆盖；服务端正补事务判据。另将 payload cipher 的空 `entityIds` 规范为下载时的省略形状：新回归先在 AES 认证处失败，再修复后 14/14 通过；非空列表篡改仍必须拒绝。
 
 - 00:39 Web 真 PostgreSQL 旅程扩至 3/3：旧密文首次建包与迁移、新设备恢复，以及 chunk 网络中断重启续传、commit 响应丢失查询同 requestId、取消后刷新无 pending 全部通过；DEV StrictMode 并发 session 已合并，fixture 1/1。全仓 typecheck 通过；全量测试抓到新增三类密钥表未同步隐私文档，已补中英用途/留存/注销类别及草案版本 1.2，legal 66/66。后续继续全量测试与原生验收。
+
+- 01:00 Web 并发迁移真链路已先证红：inventory 屏障后在界面新建任务并同步，commit 返回 409、generation 没有推进。前两次探针被 Service Worker 绕过，修正为独立 context 禁 SW 并断言屏障确实命中后才得到产品缺陷证据；过程并入环境陷阱 #191 和 AGENTS §8.9，互斥修复进行中。
+
+- 2026-10-04 续验：迁移服务端已 PUBLISHED 但浏览器未收到响应的真实 reload 用例补到 5/5 全绿。生产入口现在保留 ciphertext-only journal，只有新 package/root 与 payload generation 在本地同一事务 `saveBound` 成功后才 ack 清理；随后再次 root rotation 通过，证明 journal 不会阻塞后续迁移。证据见 ADR-0050 与 `apps/web/evidence/vault-panel/pg-commit-restart-*`。Web build 另修正 ServiceWorkerRegistration 的异步注销调用。Goal 仍 active：Android Vault 真实 UI、iOS OS 投递/Keychain、最终全仓门禁与四端当前源码重装未完成。

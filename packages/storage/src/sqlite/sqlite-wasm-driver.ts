@@ -51,7 +51,7 @@
  * 所以文件名统一由本模块规范化，调用方不该自己拼。
  */
 
-import type { SqliteDriver, SqlValue } from './sqlite-driver.js';
+import type { SqliteContainerRemoval, SqliteDriver, SqlValue } from './sqlite-driver.js';
 
 /**
  * `oo1.DB` 中我们真正用到的那一小部分。
@@ -80,6 +80,19 @@ export interface OpfsSahPoolUtil {
   readonly OpfsSAHPoolDb: new (filename: string, options?: unknown) => Oo1Db;
   getFileCount?(): number;
   getCapacity?(): number;
+  /**
+   * 清空池里**每一个**槽位的内容与名字映射。
+   *
+   * ✅ 不是猜的：`dist/index.mjs` 里 `class OpfsSAHPoolUtil` 的
+   * `async wipeFiles()` 走 `#p.reset(true)`，而 reset 对每个 SAH 调
+   * `sah.truncate(HEADER_OFFSET_DATA)`。也就是说它**真的截断了字节**，
+   * 不是只删映射。
+   *
+   * 🔴 `unlink()` **不能**当销毁用 —— 它只把「文件名 → 槽位」的映射摘掉
+   * （`deletePath` 的本体就是删 map + 清关联路径），**旧字节原地留在池里**。
+   * 用它会得到一份"看起来没了、其实还在"的报告，那正是这一层最不该撒的谎。
+   */
+  wipeFiles?(): Promise<unknown>;
 }
 
 export interface SqliteWasmDriverOptions {
@@ -121,7 +134,11 @@ export async function openSqliteWasmDriver(
   options: SqliteWasmDriverOptions,
 ): Promise<SqliteDriver> {
   const pool = await installOpfsSahPool(options);
-  return new SqliteWasmDriver(new pool.OpfsSAHPoolDb(normalizeFilename(options.filename)));
+  return new SqliteWasmDriver(new pool.OpfsSAHPoolDb(normalizeFilename(options.filename)), {
+    pool,
+    filename: normalizeFilename(options.filename),
+    vfsName: options.vfsName ?? 'heyta-opfs',
+  });
 }
 
 /**
@@ -148,7 +165,8 @@ export async function createOpfsSahPoolDriverFactory(
 ): Promise<() => SqliteDriver> {
   const pool = await installOpfsSahPool(options);
   const filename = normalizeFilename(options.filename);
-  return () => new SqliteWasmDriver(new pool.OpfsSAHPoolDb(filename));
+  const removal = { pool, filename, vfsName: options.vfsName ?? 'heyta-opfs' };
+  return () => new SqliteWasmDriver(new pool.OpfsSAHPoolDb(filename), removal);
 }
 
 /**
@@ -214,7 +232,19 @@ function normalizeFilename(filename: string): string {
 export class SqliteWasmDriver implements SqliteDriver {
   private db: Oo1Db | undefined;
 
-  constructor(db: Oo1Db) {
+  /**
+   * @param removal 删容器需要的两样东西：所在池 + 文件名。
+   *   省略时 `removeDatabase()` 不存在（见 {@link SqliteDriver.removeDatabase}）——
+   *   适配器会把这件事**报出来**而不是当作已销毁，所以它是可选的但不能悄悄省。
+   */
+  constructor(
+    db: Oo1Db,
+    private readonly removal?: {
+      readonly pool: OpfsSahPoolUtil;
+      readonly filename: string;
+      readonly vfsName: string;
+    },
+  ) {
     this.db = db;
   }
 
@@ -277,6 +307,50 @@ export class SqliteWasmDriver implements SqliteDriver {
       message.includes('1555') ||
       message.includes('2067')
     );
+  }
+
+  /**
+   * 抹掉 OPFS 里这份库。
+   *
+   * 🔴 用 `pool.wipeFiles()` 而不是 `pool.unlink(filename)`，理由是**残留字节**：
+   * `unlink` 只删「文件名 → 槽位」的映射，旧字节留在池里（上游 `deletePath`
+   * 的函数体就是删 map + 清关联路径，一次 truncate 都不做）。
+   * `wipeFiles` → `reset(true)` 才逐枚 `sah.truncate()`。
+   *
+   * ⚠️ 它清的是**这一整个 VFS 池**（我们的 VFS 与目录是按应用命名的，
+   * `heyta-web` / `.heyta-web`，不与别的库共享 —— 文件头那条"目录名与 VFS 名
+   * 必须一起换"的警告说的就是这件事）。注销账号要的效果正是"这个应用在这台
+   * 设备的浏览器里没有留下任何东西"，所以整池清掉是**范围内的**，不是附带损害。
+   *
+   * ⚠️ OPFS 只有真浏览器有：Node 侧判据碰不到这条路（见文件头第一段），
+   * 所以这里的调用形状由 `packages/storage/tests/opfs-destruction.spec.ts`
+   * 用一个**照上游 dist 抄出来的池对象**验，池本身的行为不在这儿证明。
+   */
+  removeDatabase(): SqliteContainerRemoval | Promise<SqliteContainerRemoval> {
+    const target = `opfs:${this.removal?.vfsName ?? '?'}/${this.removal?.filename ?? '?'}`;
+    const removal = this.removal;
+    if (removal === undefined) {
+      return {
+        target,
+        containerRemoved: false,
+        reason: '这个驱动没有池上下文：内容已清空，OPFS 里的字节仍在',
+      };
+    }
+    if (removal.pool.wipeFiles === undefined) {
+      return {
+        target,
+        containerRemoved: false,
+        reason: 'sqlite-wasm 的池没有 wipeFiles()：不能用 unlink() 代替，它不截断字节',
+      };
+    }
+    return removal.pool
+      .wipeFiles()
+      .then(() => ({ target, containerRemoved: true }))
+      .catch((error: unknown) => ({
+        target,
+        containerRemoved: false,
+        reason: `wipeFiles() 失败：${error instanceof Error ? error.message : String(error)}`,
+      }));
   }
 
   private requireDb(): Oo1Db {

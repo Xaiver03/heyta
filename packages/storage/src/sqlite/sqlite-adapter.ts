@@ -34,6 +34,7 @@ import {
   type DbAdapter,
   type DbCursorAction,
   type DbCursorVisitor,
+  type DbDestroyReport,
   type DbIndexQuery,
   type DbIterateOptions,
   type DbKey,
@@ -236,6 +237,62 @@ class SqliteAdapter implements DbAdapter {
     this.driver?.close();
     this.driver = undefined;
     this.opening = undefined;
+  }
+
+  /**
+   * 销毁这份库：**排空在途事务 → DROP 全部表 → VACUUM → close → 让驱动删文件**。
+   *
+   * 🔴 为什么不"逐行 `DELETE FROM` 就够了"（这一版之前的做法是根本没有这一步）：
+   *  `DELETE FROM` 只把页标成空闲，**内容还在文件里**，而 SQLite 默认还会
+   *  继续把 WAL 写到 `-wal`。`VACUUM` 重写整个库文件，把空闲页丢回去；
+   *  真正的收尾是**删文件**（`driver.removeDatabase`）—— 删不掉时
+   *  报告里必须写清"容器还在"，调用方才知道自己承诺了多少。
+   *
+   * 🔴 **走队列**（与 `transaction` 同一条 `this.queue`）：销毁与写入并发时，
+   *  不入队会让"写完又落回来"的 op 在 DROP 之后重新建表 ——
+   *  那时报告已经说了"销毁成功"，而数据还在。这是本条契约唯一真正要防的竞态。
+   */
+  async destroy(): Promise<DbDestroyReport> {
+    const run = async (): Promise<DbDestroyReport> => {
+      // 即使这份库这次从没开过也要开一下：文件可能由上一次运行留下，
+      // 而"销毁一份没打开过的库"必须是**幂等成功**，不是空操作。
+      const driver = await this.ensureOpen();
+
+      let storesCleared = 0;
+      for (const plan of this.plans) {
+        driver.exec(`DROP TABLE IF EXISTS ${q(plan.table)}`);
+        storesCleared += 1;
+        for (const index of plan.indexes) {
+          if (index.multiEntry !== true) continue;
+          driver.exec(`DROP TABLE IF EXISTS ${q(index.childTable!)}`);
+          storesCleared += 1;
+        }
+      }
+      driver.exec(`DROP TABLE IF EXISTS ${q(SEQ_TABLE)}`);
+      storesCleared += 1;
+      // 丢掉空闲页里残留的明文（容器删不掉时，这是唯一的补救，且不完备）。
+      driver.exec('VACUUM');
+
+      this.close();
+
+      if (driver.removeDatabase === undefined) {
+        return {
+          target: 'sqlite',
+          containerRemoved: false,
+          reason: '这个驱动没有 removeDatabase（原生桥尚未实现，见批次 E）：内容已清空，文件仍在',
+          storesCleared,
+        };
+      }
+      const removal = await driver.removeDatabase();
+      return { ...removal, storesCleared };
+    };
+
+    const result = this.queue.then(run, run);
+    this.queue = result.then(
+      () => undefined,
+      () => undefined,
+    );
+    return result;
   }
 
   /** 打开连接并建 schema。幂等（`CREATE ... IF NOT EXISTS`），可并发调用。 */

@@ -9,6 +9,7 @@
  */
 
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { View } from 'react-native';
 import {
   type AppHost,
   VaultSessionError,
@@ -209,6 +210,7 @@ export function VaultSettingsSection(): React.JSX.Element {
 
   const unlocked = session?.state === 'unlocked';
   const requiresRecoveryRotation = session?.requiresRecoveryRotation === true;
+  const legacyPayloadMigrationRequired = session?.payloadKeyVersion === null;
   const hasPackage = session?.keyPackage !== undefined;
   // Session state is a live getter; this counter gives React a repaint after
   // lock/unlock without introducing a second session state machine.
@@ -348,9 +350,18 @@ export function VaultSettingsSection(): React.JSX.Element {
       {!loading && session !== undefined && unlocked && pending === undefined ? (
         <Card>
           <Stack>
-            <Text variant={requiresRecoveryRotation ? 'caption' : 'row-title'} tone={requiresRecoveryRotation ? 'warning' : undefined}>
-              {requiresRecoveryRotation ? t('mobile.vault.recoveryRotationRequired') : t('mobile.vault.ready')}
-            </Text>
+            <View testID={legacyPayloadMigrationRequired ? 'mobile-vault-legacy-migration' : 'mobile-vault-status'}>
+              <Text
+                variant={requiresRecoveryRotation || legacyPayloadMigrationRequired ? 'caption' : 'row-title'}
+                tone={requiresRecoveryRotation || legacyPayloadMigrationRequired ? 'warning' : undefined}
+              >
+                {requiresRecoveryRotation
+                  ? t('mobile.vault.recoveryRotationRequired')
+                  : legacyPayloadMigrationRequired
+                    ? t('mobile.vault.legacyMigrationRequired')
+                    : t('mobile.vault.ready')}
+              </Text>
+            </View>
             <Button
               label={t('mobile.vault.lock')}
               onPress={() => {
@@ -377,7 +388,7 @@ export function VaultSettingsSection(): React.JSX.Element {
                 setPendingAction('change');
                 setPendingCode('');
               })}
-              disabled={busy || newPassphrase.length === 0}
+              disabled={busy || newPassphrase.length === 0 || legacyPayloadMigrationRequired}
             />
             <Button
               label={t('mobile.vault.rotateRoot')}

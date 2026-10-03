@@ -4721,3 +4721,18 @@ ArgumentError - path name contains null byte
      这些规则已落在 `ios-ax-shim.py`、`verify-mobile-ios-reminder.sh` 和 ADR-0051；新脚本也必须登记
      `check-script-snapshot` 的显式清单。验收截图必须先保存、再人工查看；旧的全黑截图只能作失败证据，
      不能被引用为通知投递成功。
+
+
+191. **真实浏览器的网络故障注入必须先证明拦截发生；Service Worker 能绕过 page.route。**
+
+     2026-10-04 Vault 并发迁移验收在静态生产构建上暂停 inventory 响应，准备在暂停期间
+     新建任务。前两轮一直等不到屏障，但截图已显示迁移完成：应用的 Service Worker
+     转发了请求，Playwright 的 `page.route` 没有介入。这不是“迁移没有发请求”。
+     同一份产物在独立 context 明确 `serviceWorkers: 'block'` 后，屏障实际命中，
+     随后的真实并发上传让 commit 返回 409、payload generation 保持 1，判据才抓到
+     缺少 Web 同步/迁移互斥的缺陷。PWA 自身仍由独立门禁验收，这个控制条件只用于
+     Vault 的 HTTP 故障注入。
+
+     `e2e/vault/vault-journey.spec.ts` 每个屏障都须有正向前提（实际到达该请求），
+     等待用有限时的 poll，而不是无期限 Promise；失败前截图，恢复码遮挡，关闭 trace/video。
+     “没有请求”必须区分排队、错误、Service Worker 代发和探针没有命中。

@@ -1,6 +1,10 @@
 #import <React/RCTBridgeModule.h>
 
-@interface RCT_EXTERN_MODULE(HeytaReminderModule, NSObject)
+// The Swift type keeps its Objective-C runtime name `HeytaReminderModule`,
+// while JavaScript consumes the stable public name `HeytaReminder`. Using
+// RCT_EXTERN_MODULE here silently exported the former and left
+// NativeModules.HeytaReminder undefined on iOS.
+@interface RCT_EXTERN_REMAP_MODULE(HeytaReminder, HeytaReminderModule, NSObject)
 
 RCT_EXTERN_METHOD(authorizationStatus:(RCTPromiseResolveBlock)resolve
                   reject:(RCTPromiseRejectBlock)reject)

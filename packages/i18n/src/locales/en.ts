@@ -61,6 +61,17 @@ export const en = {
   // Without the second one the first reaction is "did I lose my data?", and people
   // respond to that by wiping the local store.
   'common.sync.error.unauthorized': 'This device’s sign-in credential is no longer valid (you may have signed out on another device, or changed your password), so syncing stopped — your local data is intact and still readable; it will continue syncing once you sign in again',
+  // reason === 'account-closed': the account itself was deleted (stable code
+  // ACCOUNT_CLOSED). This sentence and the one above are a pair that MUST stay
+  // apart - each promises the opposite about the local store. Merging them lies
+  // in both directions: reading "wrong password" as "closed" destroys the user's
+  // data, and reading "closed" as "just sign in again" leaves the plaintext here.
+  // Wording boundary (ADR-0048): this states the *rule* - closing an account
+  // erases this device's copy - not the outcome of this particular run. A failed
+  // erasure surfaces through the status' `message` and the console; this sentence
+  // must not promise success on their behalf, and must not claim that backups or
+  // other devices were handled.
+  'common.sync.error.accountClosed': 'This account has been closed and can no longer sign in, so syncing stopped — closing an account erases the local copy on this device. Contact the server operator if this is unexpected.',
   // reason === 'consent-required': no consent yet, so not a single request was sent.
   // Do not fold this into "not configured" or "offline": those tell the user to fill in
   // an address or check the network, while the only useful action here is to decide.
@@ -2560,6 +2571,7 @@ export const en = {
   'mobile.vault.unlockRecovery': 'Unlock with recovery code',
   'mobile.vault.ready': 'Encrypted data is unlocked on this device.',
   'mobile.vault.recoveryRotationRequired': 'Recovery unlock succeeded. Set a new passphrase and save the new recovery code before encrypted data can be used.',
+  'mobile.vault.legacyMigrationRequired': 'Legacy encrypted data has not been migrated. Use the old encryption passphrase to complete data-key rotation before syncing or writing encrypted data.',
   'mobile.vault.lock': 'Lock data key',
   'mobile.vault.remember': 'Remember unlock on this device',
   'mobile.vault.changeTitle': 'New passphrase and recovery code',

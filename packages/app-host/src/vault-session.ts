@@ -66,10 +66,8 @@ export interface VaultKeyPackageRemote {
   get(): Promise<VaultKeyPackage | undefined>;
   /** Read the package together with the active ciphertext generation. */
   getState?(): Promise<VaultKeyPackageRemoteState | undefined>;
-  /** A modern server returns the active payload generation with the package.
-   * Older servers may return only the package; that response must preserve the
-   * session's previously observed generation rather than inventing one. */
-  put(keyPackage: VaultKeyPackage, expectedKeyVersion: number): Promise<VaultKeyPackage | VaultKeyPackageRemoteState>;
+  /** A modern server must return the active payload generation with the package. */
+  put(keyPackage: VaultKeyPackage, expectedKeyVersion: number): Promise<VaultKeyPackageRemoteState>;
 }
 
 export interface VaultKeyPackageRemoteState {
@@ -257,14 +255,7 @@ export const createVaultKeyPackageRemote = (
         (error as Error & { responseBody?: unknown }).responseBody = body;
         throw error;
       }
-      if (typeof body !== 'object' || body === null || !('package' in body)) {
-        throw new Error('Malformed vault key-package response');
-      }
-      // Wrapper-only responses from older servers omit the generation. Keep
-      // that compatibility shape explicit; callers must never infer it from
-      // the wrapper revision.
-      if ('payloadKeyVersion' in body) return validateRemoteState(body);
-      return validatePackage((body as { package: unknown }).package);
+      return validateRemoteState(body);
     },
   };
 };
@@ -533,13 +524,9 @@ class VaultKeySessionImpl implements VaultKeySession {
     const epoch = this.lifecycleEpoch;
     if (remote !== undefined) {
       try {
-        const published = await remote.put(pendingPackage, expected);
-        const publishedState = typeof published === 'object' && published !== null &&
-          'package' in published && 'payloadKeyVersion' in published
-          ? validateRemoteState(published)
-          : undefined;
-        committedPackage = publishedState?.package ?? validatePackage(published);
-        if (publishedState !== undefined) committedPayloadKeyVersion = publishedState.payloadKeyVersion;
+        const publishedState = validateRemoteState(await remote.put(pendingPackage, expected));
+        committedPackage = publishedState.package;
+        committedPayloadKeyVersion = publishedState.payloadKeyVersion;
         if (!packageSame(committedPackage, pendingPackage)) {
           throw new VaultSessionError('Remote returned a different package', 'remote-publish-conflict');
         }
@@ -698,6 +685,22 @@ class VaultKeySessionImpl implements VaultKeySession {
     const remotePackage = remoteState.package;
     validatePackage(remotePackage);
     const local = this.currentPackage;
+    // A server commit may have completed after the process died but before
+    // saveBound() installed the new local package. Preserve the old package
+    // here: it is the only context that can decrypt the pending target root
+    // draft, and the durable migration journal must resume with its requestId.
+    // Never let refresh turn a recoverable local transition into an apparent
+    // ordinary remote rotation.
+    const pendingPackage = await this.store.peekPendingRootRotationPackage(this.scope);
+    if (pendingPackage !== undefined && local !== undefined &&
+        packageSame(remotePackage, pendingPackage)) {
+      return local;
+    }
+    if (pendingPackage !== undefined && local !== undefined &&
+        remotePackage.keyVersion > local.keyVersion &&
+        remotePackage.rootKeyFingerprint !== pendingPackage.rootKeyFingerprint) {
+      throw new VaultSessionError('Remote package conflicts with the pending root rotation', 'remote-publish-conflict');
+    }
     if (local !== undefined) {
       if (remotePackage.keyVersion < local.keyVersion) {
         throw new VaultSessionError('Remote vault key package is older than the local pin', 'remote-downgrade');

@@ -60,11 +60,13 @@ native save/load/remove 必须跨 wrapper 实例串行，登出同步推进 epoc
 
 恢复码丢失且 E2EE 口令也丢失时，数据仍不可恢复，这是 E2EE 的必要结果。恢复码本身是高价值秘密，必须以纸面/密码管理器方式保存，不能截图上传或放入同步数据。
 
-已落地的服务端契约是 `GET/PUT /api/sync/key-package`、`POST /api/sync/key-migration`、`DELETE /api/sync/devices/:clientId`；key-package PUT 只保存 strict schema 校验后的 opaque package，并用 `expectedKeyVersion` 做单步 CAS，同时要求 root fingerprint 不变。首次 PUT 还在同步事务中判断历史并返回准确的 `payloadKeyVersion`；wrapper-only PUT 使用同一锁序，migration commit 对 wrapper revision/fingerprint 再做 CAS。独立 DELETE key-package 会拒绝，以免制造“没有可恢复 wrapper”的中间态。
+已落地的服务端契约是 `GET/PUT /api/sync/key-package`、`POST /api/sync/key-migration`、`DELETE /api/sync/devices/:clientId`；key-package PUT 只保存 strict schema 校验后的 opaque package，并用 `expectedKeyVersion` 做单步 CAS，同时要求 root fingerprint 不变。首次 PUT 还在同步事务中判断历史并返回准确的 `payloadKeyVersion`；key-package GET/PUT 都必须返回完整的 `{ package, payloadKeyVersion }`，客户端不接受只有 wrapper 的旧响应，也不从 wrapper revision 猜 payload generation。migration commit 对 wrapper revision/fingerprint 再做 CAS。独立 DELETE key-package 会拒绝，以免制造“没有可恢复 wrapper”的中间态。
 
 大历史的迁移采用持久 staging 协议，避免把全部密文塞进一个 HTTP body：`POST /api/sync/key-migration` 只创建 manifest，`POST /api/sync/key-migration/:requestId/chunks` 接收有序、可重试的 bounded chunk，`GET` 可恢复进度，`POST .../commit` 才是客户端完成解密/重加密后的原子发布边界，`DELETE` 取消并释放 staging。manifest 固定 `expectedKeyVersion`、`expectedLatestSeq`、独立的 `targetPayloadKeyVersion`、操作数和 payload 字节预算；每个 chunk 有自己的幂等指纹，服务端按 `(operation.id, operation.serverSeq)` 建唯一约束，拒绝缺失/重复/未知/旧世代/legacy 密文。staging reservation 计入配额 admission，过期清理、取消和成功发布都会在事务中释放；普通 `/ops` 上传也必须在同一配额判断中计入仍有效的 reservation，reservation 查询失败时 fail-closed，不能乐观放行。用户行锁与普通上传使用同一锁序，避免 TOCTOU 竞争；真实 PostgreSQL/HTTP 验收必须证明竞争上传返回 `STORAGE_QUOTA_EXCEEDED` 且 operation 没有落库。中断后可以用同一 requestId 查询并续传。最终事务锁定 `user_sync_state`，用一条 SQL `UPDATE ... FROM` 替换全部 operation payload、清除旧快照缓存、调整存储计量、发布 wrapper 与 payload generation，并写入持久化回执。服务端仍不能证明密文内容的密码学正确性；它证明的是完整身份覆盖和原子发布。迁移完成后，上传入口拒绝 legacy 或旧 payload generation。旧的 inline POST 仅保留为受限兼容路径，大历史必须走 staging。客户端宿主与 Web 迁移入口已接通并有下述真实链路证据；移动跨端密钥迁移和真实安装产物仍在收尾。
 
-客户端编排已固定在 `@heyta/app-host` 的 `migrateVaultPayloads`：它只接受服务端专用 inventory 分页，不读取本地 op-log 冒充完整历史；每一页必须保持同一 `latestSeq`、严格递增的 `(serverSeq, id)`，并明确声明没有未迁移的 snapshot 边界。若服务端仍保留 snapshot cache，inventory 必须同时给出 retained causal full-state op 的 `replayBaseServerSeq`，且它必须是首条 retained operation；只有满足这个判据，commit 清除 snapshot 才安全，否则客户端必须以 `snapshot_boundary` 拒绝进入 staging。迁移 inventory 与普通 `/ops` 下载必须对 `entityIds: []` 使用同一 canonical wire identity（空数组省略），否则 AAD 会在迁移写入与新设备下载之间漂移。客户端随后在内存中逐条用旧 root 解密、用新 root 和目标 payload 世代重加密，计算服务端相同的 JSON UTF-8 字节预算，再创建 manifest、上传确定性 chunk id。root、明文和替换载荷不进入普通 storage、op-log 或日志。相同 `requestId` 可重新执行 begin/chunk，commit 响应丢失时必须查询同一 requestId；ciphertext-only durable journal 只保存 manifest 和加密 chunk，用于跨进程复用相同 nonce/fingerprint，绝不保存 root、口令或明文。取消由同一个 remote port 暴露，供宿主在用户明确放弃或确认无法继续时释放 reservation。普通 upload 与 reservation 操作统一按 `user_sync_state → users` 加锁，upload 事务使用 `READ COMMITTED`，由最终条件 UPDATE 重新读取 live reservation；不能只依赖事务外的 quota preflight。窄范围判据在 `packages/app-host/tests/vault-migration.spec.ts`：分页完整性、snapshot 边界、分片、目标世代解密、commit 丢响应恢复，以及真实 SQLite 文件关闭/重开后的跨进程 journal 续传；真实 PostgreSQL/HTTP 判据在 `server/tests/integration/vault-key-migration-client.integration.spec.ts` 与 `vault-key-migration-http.integration.spec.ts`。
+客户端编排已固定在 `@heyta/app-host` 的 `migrateVaultPayloads`：它只接受服务端专用 inventory 分页，不读取本地 op-log 冒充完整历史；每一页必须保持同一 `latestSeq`、严格递增的 `(serverSeq, id)`，并明确声明没有未迁移的 snapshot 边界。若服务端仍保留 snapshot cache，inventory 必须同时给出 retained causal full-state op 的 `replayBaseServerSeq`，且它必须是首条 retained operation；只有满足这个判据，commit 清除 snapshot 才安全，否则客户端必须以 `snapshot_boundary` 拒绝进入 staging。迁移 inventory 与普通 `/ops` 下载必须对 `entityIds: []` 使用同一 canonical wire identity（空数组省略），否则 AAD 会在迁移写入与新设备下载之间漂移。客户端随后在内存中逐条用旧 root 解密、用新 root 和目标 payload 世代重加密，计算服务端相同的 JSON UTF-8 字节预算，再创建 manifest、上传确定性 chunk id。root、明文和替换载荷不进入普通 storage、op-log 或日志。相同 `requestId` 可重新执行 begin/chunk，commit 响应丢失时必须查询同一 requestId；ciphertext-only durable journal 只保存 manifest 和加密 chunk，用于跨进程复用相同 nonce/fingerprint，绝不保存 root、口令或明文。**服务端返回 `PUBLISHED` 只证明云端原子提交完成，不得单独清 journal：生产宿主必须以 `clearJournalOnPublished: false` 保留 journal，待 `confirmAndMigrateRootRotation` 成功完成本地 `saveBound`（package、payload generation、pending draft 同一事务）后，再调用 `acknowledgeVaultPayloadMigration`。启动 refresh 发现远端 package 正好是 pending target 时，必须保留本地旧 package/root 上下文，让旧口令和原 requestId 恢复；不得先用远端 target 覆盖本地状态。**取消由同一个 remote port 暴露，供宿主在用户明确放弃或确认无法继续时释放 reservation。普通 upload 与 reservation 操作统一按 `user_sync_state → users` 加锁，upload 事务使用 `READ COMMITTED`，由最终条件 UPDATE 重新读取 live reservation；不能只依赖事务外的 quota preflight。窄范围判据在 `packages/app-host/tests/vault-migration.spec.ts`：分页完整性、snapshot 边界、分片、目标世代解密、commit 丢响应恢复，以及真实 SQLite 文件关闭/重开后的跨进程 journal 续传；真实 PostgreSQL/HTTP 判据在 `server/tests/integration/vault-key-migration-client.integration.spec.ts` 与 `vault-key-migration-http.integration.spec.ts`。
+
+Web 宿主还必须把普通同步与 root migration 视为同一账号的一条进程内写队列：`syncNow()`、冲突解决、迁移确认和取消共用 `withWebSyncMutationExclusive`，保证 inventory/stage/commit 完成后才允许下一次本地上传。这个互斥只治理同一页面内的本地竞态；另一台设备的并发写入不能被吞掉，仍须由服务端以 `stale_latest_seq` 拒绝，用户取消残留 staging 后重新开始迁移。迁移失败必须保留 journal 与 pending draft，取消必须先释放服务端 staging 再删除本地 draft。若进程在本地安装成功后、journal ack 前退出，下一次 rotation 允许先以当前 root 的 fingerprint、当前 payload generation 和服务端 `status(requestId)=PUBLISHED` 三项证据清除已完成的旧 journal，再创建新 request；没有这三项证据必须保留 journal 并拒绝继续，避免把未完成迁移误当成已安装。
 
 生产入口由 `VaultKeySession.beginRootRotation` 与 `confirmAndMigrateRootRotation` 组成：前者只生成不同 root 的新 package，后者必须先确认新恢复码，再执行完整密文迁移，成功后才安装新 package 和 payload generation；fingerprint 不变的 wrapper-only 请求会被拒绝。`AppHost.confirmVaultRootRotation` 统一接入服务端 inventory、ciphertext-only journal 和原子 commit，Web 与移动端既有 Vault 设置面板提供轮换按钮、进度、失败重试和取消入口。设备撤销后的旧 tokenVersion 不能复用旧 root；重新认证后必须由仍受信任且已解锁的设备执行完整 rotation。
 
@@ -81,7 +83,7 @@ native save/load/remove 必须跨 wrapper 实例串行，登出同步推进 epoc
 | OS 安全存储原生适配 | Android 运行时已验，iOS 运行时待验 | Android Keystore envelope 的 scope 隔离、四个独立进程、设备重启、删除持久性共五阶段通过；iOS `WhenUnlockedThisDeviceOnly` Keychain 当前仅代码/编译证据，TS port 12 tests |
 | OS 安全存储与恢复码 UI | 代码/编译完成，实机待验收 | 移动端设置面板已接入创建、二次确认、口令/恢复码解锁、强制恢复轮换、锁定、opt-in 记住解锁和登出清除；host 首次同步前恢复、持久 remembered-unlock fence、同步 invalidate/epoch、server/token 绑定与 native remove 失败重试已由 `packages/app-host/tests/host.spec.ts`、`apps/mobile/tests/vault-secure-storage.spec.ts` 覆盖；`apps/mobile` typecheck 通过。账号隔离、重启/锁屏可用性、第二进程探针仍需在当前安装产物上执行；没有默认记住解锁或生物识别承诺 |
 | Web 恢复码 UI 与浏览器存储边界 | 已完成当前边界 | `e2e/tests/vault-settings.spec.ts`：创建/确认发布、reload 后锁定、错误恢复码拒绝、恢复码解锁、锁定、更换口令和新恢复码确认；明暗截图已人工复查。HTTP fixture 仅覆盖 transport，不替代真实 PostgreSQL |
-| Android/iOS/Web 跨端互操作 | 未完成 | 尚未完成新格式安装产物、设备加入/轮换和恢复全链路验收 |
+| Android/iOS/Web 跨端互操作 | 部分完成 | Web/PG 三设备与 legacy 旅程已通过；Android 当前 Release 安装产物已重建并通过无 Metro 自足启动/非空截图门禁，移动 Vault UI 仍需在真实认证会话下完成创建、恢复、轮换和跨端任务互读；iOS 原生安装产物互操作仍待验收 |
 
 ### 真实浏览器与 PostgreSQL 续验入口
 
@@ -99,8 +101,40 @@ A 创建并上传任务，B 恢复码解锁后强制更新 wrapper，再迁移 r
 [新设备读取旧任务](../../apps/web/evidence/vault-panel/pg-legacy-new-device.png)已人工查看。
 第三条旅程通过真实网络故障验证：chunk 请求中断后刷新浏览器，使用旧口令解锁并重新输入已保存的新恢复码，续传同一 requestId；服务端 commit 已落库而响应被丢弃时查询原请求恢复；取消 STAGING 后服务端返回 CANCELLED，刷新后无残留 pending。
 [重启后的恢复入口](../../apps/web/evidence/vault-panel/pg-resume-after-restart.png)已人工查看。
-三条旅程共 **3/3** 通过。该结果不覆盖移动原生互操作，后者继续单独验收。
+截至 2026-10-04，五条旅程共 **5/5** 通过：前三条覆盖三设备、legacy 历史和网络中断/取消；
+第四条在 inventory 请求屏障处通过界面新增任务，证明本页普通同步排在迁移发布后，且新设备能读到该任务；
+第五条覆盖服务端已提交但浏览器尚未收到响应时的真实 reload 恢复，并在恢复后再次执行
+root rotation，证明本地安装成功后 journal 已清理且不会阻止下一次迁移。
+[重启恢复入口](../../apps/web/evidence/vault-panel/pg-resume-after-restart.png)已人工查看。
+该结果不覆盖移动原生互操作，
+后者继续单独验收。
 持久证据截图必须遮住恢复码，测试关闭 trace/video，错误日志不能携带口令或 root。
+
+### Android Release 续验（2026-10-04）
+
+移动端的 Release 包必须在当前源码和当前 workspace 依赖构建后再验收，不能用之前安装的
+debug/旧 bundle 作为 Vault 证据。此次执行了：
+
+```bash
+pnpm --filter @heyta/i18n build
+pnpm --filter @heyta/app-host build
+pnpm --filter @heyta/mobile build:android
+bash apps/mobile/scripts/verify-release-builds.sh android
+```
+
+`verify-release-builds.sh` 的 Android 包身份固定为 manifest 的真实 `applicationId=com.heyta`；
+`com.heytamobile` 只保留 Activity 的 Java namespace，不能用于卸载、启动或截图判据。API 36
+模拟器上 `monkey -p` 可能返回组件 disabled override（-5），因此门禁使用显式的
+`am start -W -n com.heyta/com.heytamobile.MainActivity` 并要求 `Status: ok`。本轮包大小为
+66,785,976 字节，证据为 [`android-release.png`](../../apps/mobile/evidence/android-release.png)
+及 [`android-release.txt`](../../apps/mobile/evidence/android-release.txt)；门禁截图先处理首启
+隐私同意，再选择“只用本机”进入任务首页，截图由人工查看，确认是非空的真实任务界面且主蓝可见。
+
+Android Vault UI 必须先通过既有 `verify-mobile-auth.sh` 建立真实认证会话；只在同步设置里
+粘贴 JWT 只会配置同步，不会产生 Vault 的 authenticated `accountId`，此时「加密数据钥匙」
+显示“请先登录”是正确结果。真实旅程仍需在同一个 TEST_MODE 服务端生命周期内完成认证后再测，
+不得把“服务端进程在启动脚本退出后已被清理”或旧 UI 截图记成 Vault 失败/成功。所有恢复码
+截图必须先遮挡，再写入 evidence；恢复码、root、口令不能进入 dump、logcat、trace 或文档。
 
 ### 验证纪律
 

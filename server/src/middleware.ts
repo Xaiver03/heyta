@@ -40,8 +40,19 @@ export const authenticate = async (
   if (!result.valid) {
     // `code` 是给客户端**机器匹配**的稳定值；`error` 是给人看的自由文本，会漂。
     // 注销后要不要销毁本机数据只认前者 —— 见 auth.ts 的 `TokenFailureCode`。
+    //
+    // 🔴 E1b：账号**注销**用 **410 Gone**，其余仍是 401。
+    // 理由不是好看：`401` 的语义是"认证失败，**可以**带着新凭据重试"，
+    // 而注销是"这个账号永远不会再有效"。任何按状态码做重试策略的中间层
+    // （网关、旧客户端、监控）都会把前者当可重试，于是拿一枚永不复活的令牌
+    // 一直敲 —— 那正是本仓库在 `'unauthorized'` 那条上写过的失败形状。
+    //
+    // ⚠️ 但**客户端的判定不许改成看状态码**（`isAccountClosedFailure` 只认稳定码）。
+    // 一条只认 `410` 的判据会在同一个进程里毁掉另一种数据：`401` 的其它码
+    // （`TOKEN_REVOKED` = 改口令 / 被踢下线）下正确的动作是**什么都不删**。
+    // 410 是对外说的"别重试了"，码是对内说的"删不删"。
     return reply
-      .code(401)
+      .code(result.code === 'ACCOUNT_CLOSED' ? 410 : 401)
       .send({ error: result.reason, code: result.code });
   }
 

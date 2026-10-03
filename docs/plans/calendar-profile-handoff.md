@@ -232,6 +232,21 @@ git add e2e/tests/calendar-day.spec.ts e2e/tests/calendar-year.spec.ts e2e/tests
 
 
 🔴 **刻意不含** `e2e/tests/vault-settings.spec.ts`（vault 那条线的）。枚举命令与逐枚归属在过程账 §3·补 ⑧·附三。
+🟢 **00:5x 现量：A 的债基本清了，但清法和我原来写的不一样，而且我那份点名清单里有一条是错的。**
+- 已在 HEAD 且**工作树与 HEAD 一致**（我 00:2x–00:4x 写的所有内容都被并行会话的提交带走了，含我自己那两笔修复）：
+  `scripts/verify-mobile-window-gate.sh`、`scripts/dist-freshness.mjs`（`resolveOnly` 在 HEAD 里 **2 处命中**）、
+  `package.json`（`check:md-tables` 在 HEAD 里 **2 处命中**，链中那段 `check:docs && pnpm check:md-tables` 原样在）、
+  `scripts/check-script-snapshot.mjs`、本文件（我 00:3x/00:4x 那四段新写的句子逐段在 HEAD 里核到）。
+  只剩**过程账本篇**此刻是 ` M` —— 因为它正在被我写。
+- 🔴 **上面那份 `git add` 清单里的 `e2e/_probe/probe-reload-crash.spec.ts` 与 `e2e/playwright.probe.config.ts` 两条是错的，别照着跑。**
+  它们从 **23:58 的 `2f735392`** 起就被 `.gitignore:196-197` 明文登记为
+  "调查探针与运行残留，勿提交（2026-10-03 收口）"。
+  我 00:0x–00:3x 三次用 `git ls-files --error-unmatch` 得到 "OUT" 就把它们记成"该入库而没入"，
+  并写进了闭合命令 —— 而 `git add` 对 ignored 路径默认**直接失败**，加 `-f` 又违背仓库已经拍过的决定。
+  ⇒ 判"该入库而没入"之前必须先 `git check-ignore -v <路径>`；**被 .gitignore 带理由登记过的文件不是债**。
+  （这正是本篇 §3 那条"断言'没有 X'的取证门槛"的又一种面目：我查的是"在不在索引"，
+  而那句结论要的是"该不该在仓库里"。）
+- 因此 **A 现在没有待办**：本线没有任何"该入库而未入库"的文件。
 之后 `NO_COLOR=1 node research/tools/docs-link-check.mjs > /tmp/docs.out 2>&1; echo rc=$?`。
 🔴 **00:3x 现量（原来那段"13 处 / 31 处 / 33 处"的读数全部作废，一个都不许引用）**：
 那道门现在是 **6 处红，本线 0 处** ——
@@ -503,6 +518,48 @@ print("墙上 16:00 =",wall,"  零点+16h =",midnight+57600000,"  差 ms =",wall
    打出的路径必须落在这棵检出里。🔴 别拿 `require.resolve("@heyta/ui")` 当配方 —— 该包无 `main`、只有 `exports`，
    CJS 解析器当场报错；要按"链接真实存在的位置"验。
    复跑：`bash scripts/verify-mobile-window-gate.sh --target b`（dry-run）→ `--confirm`。
+   🔴 **00:5x：这三条判据不够，现场教出来的第四条已经写进闸门了。** 见过程账 §3·补 ⑭ 全时间线，摘要三句：
+   ① 00:48:37 现量 `packages`/`apps` **0 枚脏** + 服务端 `:3000/health` ok + 凭据三件套齐 + APK `00:36:59`，
+   ② 我据此起了 B，40 秒后 `ps` 查出 **`88869 .verify-mobile-ios-reminder.sh.snap.88869` 正在跑** ——
+   我的闸门当时打印 ✅"没有别人在抢设备"，因为那份 pgrep 抄件跨不过路径空格、也看不见 `.snap` 形态
+   （`ad9dce8e` 00:47:53 刚修完公开函数并点名了我这份抄件；`eb03420a` 00:50 把它接上共用探针），
+   ③ 我随即停掉；日志证明它停在段 1 的 `package-app.sh`（`Terminated: 15`），
+   **`simctl uninstall` / `adb uninstall` 都没执行过**：`/Applications/Heyta.app` 仍在（mtime 23:05）、
+   `pm list packages | grep -c heyta` = 2、对方进程未受影响。
+   ⇒ **第四条开工判据 = 设备与模拟器上没有别人的验收在跑**（`lib/mobile-e2e-runner-probe.sh` 的
+   `mobile_e2e_runner_lines`）。🔴 **`reinstall-all.sh` 自己不查这一条** —— 它只查"工作树干净"，
+   而"干净"与"没人正在用这台设备"是两件事（AGENTS §8.9 在打包输入那一侧有门禁、设备状态那一侧没有）。
+   现跑（00:5x）该段读数：**❌ 有移动端验收在跑（pid 16583）** ⇒ B 与 C 仍不可开跑。
+   ⚠️ 我这趟还留下一笔要如实说的副作用：段 0 把共享检出**全部 `packages/*/dist` 重建了一遍**（约 00:49:2x）。
+   源码未动、产物与提交后源码一致，但当时正在读 dist 的并行会话读到的是我刷新的那一份。
+   🔴 **01:2x 现量复跑：B 的前置从四条变成五条，而且第五条是代码侧的红，不是现场。**
+   `sh -c 'NO_COLOR=1 bash scripts/verify-mobile-window-gate.sh --target b > /tmp/x 2>&1; echo rc=$?'`
+   ⇒ **rc=3**，负载 **89**（1 分钟值，15 分钟前还是 13.79 —— 单点读数不是窗口）、脏源码 **45 枚**（00:2x 是 28 枚，
+   涨在 vault/提醒那条线：`packages/{app-host,storage,i18n,ui,sync-client}`、`apps/{web,mobile}`、6 枚 vault-panel png、`server/tests/*`）。
+   **新第五条 = `pnpm -r build` 此刻在主检出是红的**：
+   `packages/i18n/src/locales/en.ts(74,3) TS1117 同一对象字面量里重复键`，
+   只读扫描现量 `common.sync.error.accountClosed` **第 73 行与第 74 行相邻重复**（工作树 en 2982 键 / 重复 1 处；
+   zh-CN 重复 **0** 处 —— 日志里那条 `zh-CN.ts(97,3)` 已被对方改走，引用它要带趟）；
+   阴性对照 `git show HEAD:` 两本表各 2980 键、重复 **0** ⇒ **HEAD 建得出，红的这截在未提交改动里**。
+   为什么原先那句"只有 tsup 的 dts 阶段会报、typecheck 放过"**不成立并已撤回**：
+   一次性夹具（相邻两个同名键）跑 `npx tsc --noEmit --target ES2022` ⇒ **照样报 TS1117**，
+   所以 `pnpm -r typecheck` 覆盖这一类；而 01:27/01:28 两次 `pnpm --filter @heyta/i18n typecheck` **rc=0**
+   的正确读法是**那枚重复键在那之前已被所有者改掉**（01:28 现量：en 0 处 / zh-CN 0 处，各 2982 键）。
+   ⇒ 🔴 **这条"第五条前置"的有效期只有四分钟**，现在大概率已经不成立。
+   全量 `pnpm -r build` 本会话**没有重测**：重测的代价是再重写一遍 7 枚 dist，
+   而这本来就是 B 自己第 0 步的岗位 —— 由它来量，不在这里预先宣布它过了。
+   ⚠️ 另一件不属于本线、由这轮顺带量到的红：`pnpm check:ui-language` **rc=1**，6 处全在
+   `apps/web/src/lib/local-data-destruction.ts`（未跟踪新文件，HEAD 里没有）—— 别人的在飞文件，不由本会话改。
+   **不归本会话改**（AGENTS §8.2 不为跑绿动别人半成品），归 vault/账号关闭那条线，复跑命令：
+   `node /tmp/ht-guard/dupkeys.js`（只读扫；它是本轮的一次性夹具，若要长期守应落成 `scripts/` 里的门禁）。
+   ⚠️ 同时如实登记本会话的一次自伤：为测闸门"取哪台 iOS 设备"抽行配桩时**多抽了末行**，
+   于是主检出里真跑了两次 `reinstall-all.sh`。两臂都停在它自己的第 0 步（rc=1）：
+   `/Applications/Heyta.app` mtime 仍 23:05、`pm list packages` heyta 计数仍 2、焦点仍 `com.heyta`、booted 仍 3 台 ——
+   **没有卸载/安装发生**；但 **7 枚 `packages/*/dist/index.js` 在 01:24–01:25 被重写**，
+   含 `i18n/dist`（它的源码此刻带重复键，JS 取后者 ⇒ 现在读 i18n 产物的人取到的是第 74 行那版英文）。
+   ✅ 闸门本身这一轮修了两处（都不是为了跑绿）：`$BOOTED` 未加引号导致模拟器名被分词显示成
+   `iPhone; Duo; heyta`；以及三台 booted 时静默取第一台 —— 现在外部 `IOS_DEVICE_NAME` 优先、
+   取到的整名与来源都会打印、列表为空则 exit 3 不猜目标。
 4. **C（R14c 的 Android 真机腿）**。🟢 **23:5x 更新：那条脚本已经写出来了** ——
    `scripts/verify-mobile-due-time.sh`（604 行 / 14 step / 11 判据 + 3 对照，离线先验读数见过程账 §3·补 ⑩）。
    原写法仍然有效：bootstrap 在前 15 行（实测在第 3 行），`MANIFEST` 那一行**待插**
@@ -531,6 +588,31 @@ print("墙上 16:00 =",wall,"  零点+16h =",midnight+57600000,"  差 ms =",wall
    ⇒ C 的正解与 B 同一个：**从 HEAD 切干净检出 + 真 `pnpm install`（不软链 node_modules）+ 在那里 build**，
    打完的 APK 只含已提交代码；设备腿本身仍要等 emulator 窗口与负载门。
    复跑（干跑体检，不动设备）：`bash scripts/verify-mobile-window-gate.sh --target c`。
+   🟢 **01:1x 现量：上面那句"正解 = 切干净检出 + 真 install + 在那里 build"已经做完了，不是建议。**
+   载体 `heyta-wt-r14c`（detached **`93113e30`**）里 `research/tools/r14c-carrier-chain.sh` 六步跑了五步全 rc=0：
+   install → **解析自证**（`realpath apps/mobile/node_modules/@heyta/ui` = 载体内的 `packages/ui`，
+   这条就是 00:4x 那个软链事故的正面反证）→ `pnpm -r build` → 起栈 → **`build_android` rc=0，
+   `app-release.apk` 66 785 752 B / 01:05:18**。第六步 `verify` **exit 3**，原因是它自己第 0 节的
+   设备体检当场数出**别人那一趟在跑**（`2227 bash …/scripts/.verify-mobile-auth.sh.snap.2227`，etime 43s）——
+   🔴 这是运行者探针**第一次抓到外部运行者**（00:4x 那次抓到的是我自己的盲副本），而且我这趟
+   **零设备动作就退出**，没动过 `pm clear`/安装。
+   ⇒ 闸门对载体干跑：**rc=3，6 ✅ / 2 ❌**，红的只剩 **负载 49 > 12** 与 **设备上有运行者**；
+   而 `APK 不比源码旧` 这条**自己从红翻绿**（APK 01:05:18 > 最新源码 01:00:54）——
+   它测的就是"打包做没做"，所以载体打了一次包它就该绿。
+   ⚠️ 原来那四条"不满足的前置"（`:3000`/`:3100` 无服务、凭据全无、APK 落后、需要别人的 WIP）
+   现在只剩**环境两条**：负载与设备独占。代码侧一条都不欠。
+   🔴 **01:5x 复跑（"引用前必须复跑"这条规矩现量过了）**：窗口重试装置已到第 **40** 趟
+   （`/tmp/ht-r14c-window.log`，01:46:43 那一趟），闸门五节与上面**逐节相同**——
+   工作树 ✅ / 凭据三件套 ✅ / `:3000/health` ✅ / **APK 不比源码旧** ✅ / MANIFEST ✅，
+   红的仍是同样两条：负载（那趟现量 **268**，阈值 12）与设备独占
+   （**运行者 pid 在轮换**：67993 → 87967 ⇒ 别人那趟设备验收收了又起了一趟新的，
+   不是同一趟跑了四十分钟）。
+   ⇒ "代码侧一条都不欠"到 01:5x 仍成立，且**不必重打包**：闸门自己数的 APK `01:05:18`
+   仍晚于载体内最新源码 `01:00:54`。
+   **可复跑命令（等窗口并自动射，不重复实现任何前置）**：
+   `CARRIER="/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta-wt-r14c" BUDGET=3600 bash research/tools/r14c-window-retry.sh`
+   （日志 `/tmp/ht-r14c-window.log`，哨兵 `ATTEMPT rc=` / `WINDOW=open|timeout` / `ALL_DONE final_rc=`；
+   四臂自测：缺载体 exit 1、预算 0→3 且写 `WINDOW=timeout`、桩闸门退 0→0、桩闸门退 7→**7** 不被洗白）。
 5. **A（入库）** —— 🟢 **00:0x 现量：本会话没有 `git add`，但别人那笔 `2f735392`（"并行批次的总接线 —— 门禁注册、词条表、包清单与证据归位"）
    把工作树整片吸了进去，本线 **19 枚判据文件里 17 枚已在 HEAD**（含 23:5x 刚写的 `scripts/verify-mobile-due-time.sh` 与台账整段），
    五张证据目录合计 **29 枚 png 已在 HEAD**，`check:docs` 指向本线的红 **归零**（现量 2 红全在 `countdown-anniversary.md:1091/1295`，不归本线）。
@@ -550,16 +632,53 @@ print("墙上 16:00 =",wall,"  零点+16h =",midnight+57600000,"  差 ms =",wall
    `NO_COLOR=1 node research/tools/docs-link-check.mjs > /tmp/docs.out 2>&1; echo rc=$?; grep -c '\->' /tmp/docs.out`（=2）。
    🔴 **别把"别人已经提交了"读成"本线入库完成"**：上面那份点名清单（19 枚 + 三份文档 + 五张证据目录）
    是**下一次真有提交权时的最小集**，因为它同时覆盖 §4 A 原来漏 18 枚那件事 —— 现在只是有人替我们做掉了一部分。
+   🟢 **00:5x：这一条现在可以判闭合了**，闭合方式与上面那句警告不冲突 —— 不是"我以为好了"，是**逐枚现量**：
+   `git ls-tree HEAD` + `git status --porcelain` 两边都取过，本线点名的文件里除过程账本篇（正在被写）之外**全部在 HEAD 且工作树一致**；
+   那两枚 `e2e/_probe` 探针**本来就不是债**（`.gitignore:196-197` 从 23:58 起带理由登记为"勿提交"，
+   我把它记成债并写进 `git add` 清单，那是错的，纠正见 §4 A）。⇒ **A 无待办。**
+   🔴 **01:3x 更正：上面那句"A 无待办"此刻不成立了** —— 它成立的前提是"本线点名的文件全在 HEAD"，
+   而我随后又写了四枚新装置、改了两枚已跟踪脚本。**旧范围的完成证据不覆盖新增项**（AGENTS §8.7）。
+   现量未入库对象 = **4 枚 `M` + 4 枚 `??`**，全部属于本线（同目录下筛过，`research/tools/` 里没有别人的未跟踪文件），
+   下一次有提交权时的**点名最小集**：
+
+   ```bash
+   git add docs/plans/calendar-year-time-and-mobile-profile.md docs/plans/calendar-profile-handoff.md \
+     scripts/verify-mobile-due-time.sh scripts/verify-mobile-window-gate.sh \
+     research/tools/r14c-carrier-chain.sh research/tools/r14c-window-retry.sh \
+     research/tools/h-flaky-window-watcher.sh research/tools/calendar-line-judgment-rerun.sh
+   ```
+
+   ⚠️ 两枚脚本与两份文档**必须同一笔**：`verify-mobile-due-time.sh` 的新守卫（安装退出码 + `Success` +
+   APK sha256）和 `verify-mobile-window-gate.sh` 的 iOS 目标选择改动，都是台账里引用的判据本体；
+   只提交文档会得到"描述了判据、判据还在工作树外"那个老形状（§4 A 原来漏 18 枚判据就是同一件事）。
+   四枚 `research/tools/*.sh` 是本线的**运行装置**（载体链 / 窗口重试 / flaky 看守 / 判据复跑），
+   台账按路径引用它们 —— 不入库的后果与漏 png 一样：**干净检出上那些"可复跑命令"是死引用，
+   而 `check:docs` 只扫 markdown 链接、不扫反引号里的路径**（本轮实测：报 0 处）。
+   复跑这份清单：`git status --porcelain -- docs/plans/calendar-year-time-and-mobile-profile.md docs/plans/calendar-profile-handoff.md scripts/verify-mobile-due-time.sh scripts/verify-mobile-window-gate.sh research/tools/`
+
 6. **E（接门禁）** —— ✅ **00:01 已落地**（`package.json` 在那笔提交之后是干净的，前置满足）：
    新增 `"check:md-tables": "node scripts/check-md-table-rows.mjs"`，并把 `pnpm check:md-tables`
    插在 `pnpm check` 链的 `pnpm check:docs` 之后（链现量 **63 段**、该条目出现 **1 次**、`require('./package.json')` 解析通过）。
    **它有牙**：在台账第 664 行注入一枚错位表行 ⇒ `pnpm check:md-tables` rc=**1** 并指到行号
    （报的是"表头下面没有分隔行"那一档，不是列数那一档 —— 两条都是它自己的判据，这里如实写）；
    用 `cp` 复原后 `cmp -s` 字节级相同、复跑 rc=**0**。改动**只有 package.json 两行**，未 `git add`。
+   🟢 **01:5x 现量收口：那两行现在已在 HEAD，不再在工作树里。** 复跑读数：`package.json`
+   `git status --porcelain` 为空且 `git diff --quiet HEAD` ⇒ SAME；`git show HEAD:package.json`
+   里 `check:md-tables` 命中 **2 行**（定义行 + `check` 长串中 `pnpm check:docs &&` 之后那一处，idx=879）；
+   `git ls-tree HEAD` 里 `scripts/check-md-table-rows.mjs` 与 `scripts/dist-freshness.mjs` **两枚都被跟踪**
+   ⇒ 过程账 §5 第 6 行那条"接进 `check` 之前必须先把两枚脚本 `git add`"的前置**由别人那笔
+   `102d064f`（10-04 00:46，vault 那条线）替本线完成了** —— 它提交 `package.json` 时把我那两行整行吸了进去；
+   **归属记在那笔提交名下，不记本线**。平态现量：`node scripts/check-md-table-rows.mjs` ⇒ rc=**0**
+   「4 个文件，列数、断行与"是不是表"都一致」。
+   ⚠️ 一条读数形状（与 §6 第 10 条同族）：这脚本的报错走 **stderr**，所以 `> out 2>/dev/null`
+   在 rc=1 时留下的是**空 stdout** —— 它与"跑了且干净"长得一模一样，判成败只认退出码。
 7. 边界 F 里**只有两条值得排下一批**：捕获语法的英文规则表（要先拍"规则表归 domain 还是归 i18n"），
    和 `web.*` 被移动壳读的那笔纯改名（🔴 **这里不写条数** —— 23:06 现量是 188 处 / 13 文件 / 187 行 / 180 个去重键，
    但同一个格子在 19:3x 之前写的是 179：**这条边界没有门禁，只有台账里的一个数**，所以引用前必须重跑
    `grep -rho -- "'web\.[a-zA-Z0-9._-]*'" apps/mobile/src | wc -l`，阳性对照同趟跑 `'common\.'`。要先给 `check:l4` 挣出余量）。其余留在台账里不动。
+   🔴 **01:5x 按上面那句规矩复跑了一遍（这条边界没有门禁，只有台账里的一个数）**：现量
+   **188 处 / 13 个文件 / 180 个去重键** —— 与上一段那组数字逐字相同（所以这次不需要改文档）；
+   同趟阳性对照 `'common\.'` = **111** 处 ⇒ 扫描器接得上，188 不是探针坏出来的空读数。
 
 ---
 

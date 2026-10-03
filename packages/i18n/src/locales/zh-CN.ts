@@ -80,6 +80,19 @@ export const zhCN = {
    */
   'common.sync.error.unauthorized': '这台设备的登录凭据已失效（可能是在别的设备上退出了登录，或改过口令），同步已停止 —— 本地数据完好、仍可读写，重新登录后会继续同步',
   /**
+   * 🔴 `reason === 'account-closed'`：账号**注销**了（稳定码 `ACCOUNT_CLOSED`）。
+   *
+   * 这一句与上面那句 `unauthorized` 是**一对必须分开的防线**：两句对本机数据许的是
+   * **相反**的承诺（完好 / 清除），合成一句就在两个方向上说谎 ——
+   * 把"口令打错"读成"注销"会当场毁掉用户的数据，把"注销"读成"重新登录就好"
+   * 会让明文永远留着。
+   *
+   * ⚠️ 措辞边界（ADR-0048）：这里说的是**规则**（注销后本机会清除这份副本），
+   * 不是这一次的**结果** —— 清除失败时状态里的 `message` 与 console 会另行说明，
+   * 这句不许替它承诺成功。其它设备与备份各有边界，那句话在隐私政策里。
+   */
+  'common.sync.error.accountClosed': '这个账号已经注销，无法再次登录，同步已停止 —— 注销后这台设备上的本地副本会被清除。如果这不是你的操作，请联系服务端运营者',
+  /**
    * 🔴 `reason === 'consent-required'`：**还没同意，所以一个请求都没发**（计划 G-12）。
    *
    * 这句不许写成"还没配置同步服务"或"当前离线"：那两种的用户动作是"填地址"和"查网络"，
@@ -2755,6 +2768,7 @@ export const zhCN = {
   'mobile.vault.unlockRecovery': '用恢复码解锁',
   'mobile.vault.ready': '这台设备上的加密数据已经解锁。',
   'mobile.vault.recoveryRotationRequired': '恢复码解锁成功。请先设置新口令并保存新的恢复码，才能使用加密数据。',
+  'mobile.vault.legacyMigrationRequired': '旧版加密数据尚未迁移。请使用原加密口令完成数据密钥轮换后，才能同步或写入加密数据。',
   'mobile.vault.lock': '锁定数据钥匙',
   'mobile.vault.remember': '在这台设备上记住解锁状态',
   'mobile.vault.changeTitle': '新的口令与恢复码',
