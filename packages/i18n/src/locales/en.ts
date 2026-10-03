@@ -994,6 +994,18 @@ export const en = {
   'web.focus.config.locked': 'Durations cannot change while the timer runs — stop this round, edit, then start again.',
   'web.focus.config.a11y.minutes': '{label} duration in minutes',
   'web.focus.config.a11y.sessions': '{label} in sessions',
+  // Ticket W7: the focus details pane (four overview cards + the record list).
+  // ⚠️ Card labels carry **no count** — the number is its own field, so English does not
+  // need a sibling pair like `web.focus.completedTodayOne` for these.
+  'web.focus.detail.title': 'Focus overview',
+  'web.focus.detail.todayCount': 'Sessions today',
+  'web.focus.detail.todayDuration': 'Focus time today',
+  'web.focus.detail.totalCount': 'Total sessions',
+  'web.focus.detail.totalDuration': 'Total focus time',
+  'web.focus.detail.records': 'Focus records',
+  'web.focus.detail.recordsEmpty': 'No focus records yet. Finish a session and it will show up here.',
+  'web.focus.detail.unlinked': 'No linked task',
+  'web.focus.detail.aborted': 'Ended early',
 
   // ── Web · habits ──────────────────────────────────────────
   'web.habits.addPlaceholder': 'New habit, for example "Drink water"',

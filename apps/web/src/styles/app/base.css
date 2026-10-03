@@ -99,6 +99,109 @@
   --ht-detail-track: 0;
 }
 
+/* ── 详情列的内容：专注概览（工单 W7）───────────────────────
+ *
+ * ⚠️ 命名全部挂在既有的 `.ht-app` 族下（`.ht-app__detail-*`），
+ * 不新起 `.ht-focus` 一族 —— `check:row-single-source` 数的是顶层 `ht-*` 家族名，
+ * 而它余量为 0（28 = 基线 28）。同一先例见上面 `.ht-app__detail` 那段注释。
+ */
+.ht-app__detail-focus {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ht-space-4);
+  padding: var(--ht-space-4);
+}
+
+.ht-app__detail-heading {
+  /* 区块标题档：lg + semibold（AGENTS §5 的文字层级表）。
+     刻意**不是** xl —— 一屏一个页标题，页标题在 `.ht-header__title`。 */
+  font-size: var(--ht-font-size-lg);
+  font-weight: var(--ht-font-weight-semibold);
+  line-height: var(--ht-line-height-tight);
+  color: var(--ht-color-foreground);
+}
+
+.ht-app__detail-cards {
+  display: grid;
+  /* 两列等宽；`minmax(0, 1fr)` 让长数字（"12 小时 30 分钟"）不会把列撑破。 */
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--ht-space-3);
+}
+
+.ht-app__detail-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ht-space-1);
+  padding: var(--ht-space-3);
+  border: var(--ht-border-width-thin) solid var(--ht-color-border);
+  border-radius: var(--ht-radius-md);
+  background: var(--ht-color-surface);
+}
+
+.ht-app__detail-card-label {
+  /* 排版四件套来自语义档位类 `ht-type-caption`（JSX 与本类成对出现）。 */
+  color: var(--ht-color-foreground-muted);
+}
+
+.ht-app__detail-card-value {
+  /* 🔴 `.tabular-nums` 不是装饰：番茄钟与统计数字不加它，
+     每次"25 → 24"这种变化都会让整列宽度抖一下（AGENTS §5 明列的常见错）。 */
+  font-size: var(--ht-font-size-xl);
+  font-weight: var(--ht-font-weight-semibold);
+  line-height: var(--ht-line-height-tight);
+  font-variant-numeric: tabular-nums;
+  color: var(--ht-color-foreground);
+}
+
+.ht-app__detail-records {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ht-space-2);
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.ht-app__detail-record {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--ht-space-1) var(--ht-space-2);
+  align-items: baseline;
+  padding-block: var(--ht-space-2);
+  border-block-start: var(--ht-border-width-thin) solid var(--ht-color-border);
+  /* 排版四件套来自语义档位类 `ht-type-row-meta`（JSX 与本类成对出现）。 */
+}
+
+.ht-app__detail-record-time {
+  font-variant-numeric: tabular-nums;
+  color: var(--ht-color-foreground-muted);
+}
+
+.ht-app__detail-record-duration {
+  font-variant-numeric: tabular-nums;
+  color: var(--ht-color-foreground);
+}
+
+.ht-app__detail-record-task {
+  /* 任务名是最长的一段，给它整行的省略权而不是把列撑破。 */
+  grid-column: 1 / -1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--ht-color-foreground-muted);
+}
+
+.ht-app__detail-record-aborted {
+  /* 排版四件套来自语义档位类 `ht-type-caption`（JSX 与本类成对出现）。 */
+  color: var(--ht-color-foreground-muted);
+}
+
+.ht-app__detail-empty {
+  /* 排版四件套来自语义档位类 `ht-type-row-meta`（JSX 与本类成对出现）。 */
+  color: var(--ht-color-foreground-muted);
+}
+
 .ht-app[data-detail='collapsed'] .ht-app__detail {
   display: none;
 }
