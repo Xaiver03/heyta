@@ -79,7 +79,7 @@ export function ListsSection(): React.JSX.Element {
    *
    *   1. 门禁会拦（`scripts/check-materialized-reads.mjs`：任何屏只要调用了
    *      读物化状态的 API，就必须在同一个文件里引用 `dataRevision`）。
-   *   2. **它才是真正让这段界面正确的那个东西。** `listProjects()` 读的是
+   *   2. **它才是真正让这段界面正确的那个东西。** `listAllProjects()` 读的是
    *      **已物化的内存状态**，同步在后台改了状态**不会**触发 React 重渲染。
    *      不订阅的话：在另一台设备上建的清单，这台设备**同步完了也看不见**，
    *      而且没有任何报错 —— 界面只是"看起来没这个清单"。
@@ -117,8 +117,13 @@ export function ListsSection(): React.JSX.Element {
 
   const read = useCallback((): void => {
     if (actions === null) return;
-    // ⚠️ `listProjects()` 是**同步**的（读已物化状态），不是 Promise。
-    setProjects(actions.listProjects());
+    // ⚠️ `listAllProjects()` 是**同步**的（读已物化状态），不是 Promise。
+    //
+    // 🔴 这里**不能**换成 `listProjects()`。W9 之后那条只给可见的（归档被动作层滤掉，
+    //   这样出口就不会再露出归档清单），而本屏的「显示已归档」开关与 `archivedCount`
+    //   都要靠归档那一路的数据。只接一路不会报错 —— 它会表现成
+    //   "开关按了什么都没出现"，也就是共享层注释点名的那个**单向门**。
+    setProjects(actions.listAllProjects());
   }, [actions]);
 
   useEffect(read, [read, dataRevision]);

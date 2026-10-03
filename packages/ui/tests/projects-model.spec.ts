@@ -91,10 +91,21 @@ describe('清单层级：顶层 / 一层子级 / 归档隐藏', () => {
     ]);
   });
 
-  it('toOrganizerTree 的每一层都只有 id / name / children —— 不把整个实体漏出去', () => {
+  it('toOrganizerTree 的每一层只带行模型字段 —— 含 archived 以支持取消归档', () => {
     const first = toOrganizerTree(projects)[0]!;
-    expect(Object.keys(first).sort()).toEqual(['children', 'id', 'name']);
-    expect(Object.keys(first.children[0]!).sort()).toEqual(['id', 'name']);
+    expect(Object.keys(first).sort()).toEqual(['archived', 'children', 'id', 'name']);
+    expect(first.archived).toBe(false);
+    expect(Object.keys(first.children[0]!).sort()).toEqual(['archived', 'id', 'name']);
+    expect(first.children[0]!.archived).toBe(false);
+  });
+
+  it('includeArchived 会保留行的 archived 状态，而不是把实体原样漏出', () => {
+    const tree = toOrganizerTree(projects, { includeArchived: true });
+    const archived = tree.find((node) => node.id === 'p9');
+    expect(archived).toMatchObject({ id: 'p9', name: '旧项目', archived: true });
+    expect(archived?.children).toEqual([
+      { id: 'p9a', name: '旧项目子', archived: false },
+    ]);
   });
 });
 

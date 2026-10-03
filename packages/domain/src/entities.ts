@@ -51,6 +51,114 @@ export interface EntityBase {
   purgedAt?: number;
 }
 
+/**
+ * 「这条现在算在回收站里吗」—— 四态语义里**唯一一处**判回收站归属的地方。
+ *
+ * 🔴 两个条件都要，缺一不可：
+ *  · 只看 `deletedAt` ⇒ 已彻底删除的条目会一直留在回收站里，而"彻底删除"
+ *    这个动作在界面上就没有产出（用户点了、它还在）；
+ *  · 只看 `purgedAt` ⇒ 一条活着的实体被误标 `purgedAt`（不该发生，但类型上
+ *    挡不住）会凭空从回收站"消失"，而它其实还在所有视图里。
+ *
+ * 为什么放在领域层而不是各动作层各写一遍：`purge` 已经从任务扩到便签
+ * （W1），下一步是清单与习惯（W4）。**"什么算在回收站里"是一个产品语义**
+ * （AGENTS §3.5），写成 N 份就是 N 个可能各答一半的地方。
+ *
+ * 🔴 返回的是**类型谓词**而不是 `boolean`：它同时把 `deletedAt` 收窄成
+ * `number`。于是"回收站里的一行一定有删除时刻"这件事由编译器保证，
+ * 下游不必再写 `deletedAt ?? updatedAt` 那种**永远走不到**的兜底 ——
+ * 而那个兜底原来正是两端各自"小心一点"的来源。
+ */
+export function inTrash(entity: EntityBase): entity is EntityBase & { deletedAt: number } {
+  return entity.deletedAt !== undefined && entity.purgedAt === undefined;
+}
+
+/**
+ * 回收站顺序：**最近删除的在前**，同刻按 id 字典序。
+ *
+ * 泛型到 {@link EntityBase} ⇒ 任务、便签、清单、习惯共用同一个序，
+ * 于是"两路数据源并进同一个回收站"时**合并结果也是确定的**。
+ *
+ * ⚠️ 决胜项与 `byCanonicalOrder` 同一个理由：`deletedAt` 来自毫秒时钟，
+ * 同一台设备连续删两条经常落在同一毫秒里，此时顺序会退化成
+ * `Object.values` 的枚举顺序 —— 那是**各端不同**的。
+ */
+export function byDeletedOrder(a: EntityBase, b: EntityBase): number {
+  const ad = a.deletedAt ?? 0;
+  const bd = b.deletedAt ?? 0;
+  if (ad !== bd) return bd - ad;
+  return a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
+}
+
+/**
+ * 「这条算已归档吗」—— 唯一的读侧判据（P-7）。
+ *
+ * 🔴 判的是 `=== true` 而不是"有值"：`archived` 是可选布尔，历史上**从未写过
+ * `false`**（早期只有"归档"没有"取消"）。写成 `!!entity.archived` 眼下等价，
+ * 但那条线一旦有人补一个 `archived: undefined` 的清除操作就会分叉 ——
+ * 而"清除归档"必须等于"未归档"，不是"未知"。
+ *
+ * 为什么在领域层：同一个判断此前有 `packages/ui/src/projects/model.ts` 与
+ * 动作层两份字面量，而 W9 之后动作层也要判（`listProjects()` 藏归档、
+ * `listArchivedProjects()` 只留归档）。两份字面量的表现是"一边改了另一边没改"，
+ * 而界面上看不出任何区别。
+ */
+export function isArchived(entity: { archived?: boolean }): boolean {
+  return entity.archived === true;
+}
+
+/**
+ * 「这条还活着吗」—— 未软删除的唯一判据。
+ *
+ * 🔴 它**不等于** `!inTrash(x)`：一条已彻底删除（`purgedAt`）的实体既不在回收站里
+ *   （`inTrash` 为假）、也不算活着。把两者混用会让"彻底删除过的任务"被算进
+ *   清单的任务数、被数进统计 —— 而那正是"界面还在说一条已经不存在的数据"。
+ *
+ * 权威在领域层，是因为这句判断曾经散在六处各写一遍（动作层的 `aliveOf` 两份 +
+ * `listAlive`、领域层自己的 `aliveTasks` / `aliveNotes`，外加回收站那句"数活着的任务"）。
+ * 六处可以各漏一半，而漏的那一半不会报错 —— 它只是少滤了几条。
+ *
+ * ⚠️ 入参刻意写成结构类型而不是 `EntityBase`：`aliveOf` 那类跨实体的辅助函数
+ *   手上只有 `T extends { deletedAt?: number }`，收窄参数才会**逼着**它们改调用
+ *   而不是再写一份字面量。
+ */
+export function isLive(entity: { deletedAt?: number }): boolean {
+  return entity.deletedAt === undefined;
+}
+
+/**
+ * 回收站的成员：**有墓碑、且没有被彻底删除**，按 {@link byDeletedOrder} 排。
+ *
+ * 它就是 `Object.values(...).filter(inTrash).sort(byDeletedOrder)` 这一行。
+ * 判据与顺序都不在这里重写（权威是上面那两个），这里只把"挑 + 排"这一遍
+ * 固定成一次 —— 任务 / 便签 / 清单 / 习惯四处都要用，写四遍就有四种可能各漏一半，
+ * 而漏掉 `purgedAt` 那一半的表现是"彻底删除过的条目一直赖在回收站里"。
+ */
+export function trashedIn<T extends EntityBase>(entities: readonly T[]): T[] {
+  return entities.filter(inTrash).sort(byDeletedOrder);
+}
+
+/**
+ * 跨端一致的规范顺序：创建时间升序，同刻按 id 字典序。
+ *
+ * 🔴 **不要去掉那个 id 决胜**：`createdAt` 来自毫秒时钟，同一台设备连续建两条
+ * 经常落在同一毫秒里，此时排序结果取决于 `Object.values` 的枚举顺序 ——
+ * 那是**各端不同**的（IndexedDB 按索引键、SQLite 按主键，见 AGENTS §7 第 16 条）。
+ * 表现是同一份数据在两台设备上顺序不同，而没有任何一处报错。
+ *
+ * 这条规则原先在 `TaskActions`、`ProjectActions`、`HabitActions` 里**各写了一遍**
+ *（逐字相同）。收成一处还有一个具体的下游：W9 之后"可见清单 + 已归档清单"两路要
+ * 并成一个列表喂给界面，而**合并之后再排序**必须有唯一的比较器 ——
+ * 每个宿主自己写一遍就是"两端的侧栏顺序可以不同"。
+ */
+export function byCreatedAtOrder(
+  a: { createdAt: number; id: string },
+  b: { createdAt: number; id: string },
+): number {
+  if (a.createdAt !== b.createdAt) return a.createdAt - b.createdAt;
+  return a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
+}
+
 // ─────────────────────────────────────────────────────────────
 // 任务
 // ─────────────────────────────────────────────────────────────
@@ -446,6 +554,11 @@ export interface Reminder extends EntityBase {
   offsetMs?: number;
   /** 已投递的时刻。存在即表示本机已经发过这条通知（幂等依据）。 */
   firedAt?: number;
+  /**
+   * `firedAt` 所对应的有效触发时刻。旧数据没有这个 marker 时，保留旧的
+   * "曾投递即结束" 语义；新数据在 snooze/改期后可凭 marker 识别新 occurrence。
+   */
+  firedForTriggerAt?: number;
   /** 「稍后提醒」到（epoch ms）。存在且未到时，触发时刻以它为准。 */
   snoozedUntil?: number;
   /** 用户主动关闭。存在即不再触发（清除写 `null`，见 `reminders.ts`）。 */

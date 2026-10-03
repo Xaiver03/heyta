@@ -28,6 +28,13 @@ import { currentState, dispatchIntent, onEngineChange } from '../../lib/oplog.js
 interface NoteState {
   /** 未删除的便签，**规范顺序**（来自动作层的 `listNotes()`）。 */
   notes: Note[];
+  /**
+   * 回收站里的便签（W1）。**另一路数据源，不是 `notes` 的反面** ——
+   * "哪些算在回收站里"由动作层的 `listTrashed()`（= 领域层 `inTrash`）回答，
+   * 这里不自己 `filter(deletedAt)`：那样会把"已彻底删除"那一半漏掉，
+   * 于是"彻底删除"在界面上变成一个没有产出的动作。
+   */
+  trashed: Note[];
   /** 新建失败的原因（内容空白等）。**必须显示出来**，不能点了没反应。 */
   error?: string;
   /**
@@ -50,6 +57,15 @@ interface NoteState {
    */
   updateNote: (entityId: string, content: string) => Promise<boolean>;
   removeNote: (entityId: string) => Promise<void>;
+  /**
+   * 从回收站取回一条便签。返回**有没有真的落成**（`false` = 它本来就没被删除）。
+   *
+   * ⚠️ 已彻底删除的便签会**抛错**而不是返回 `false` —— "现在不用恢复"与
+   * "永远恢复不了"要分成两句话，界面对后者要说"不可恢复"。
+   */
+  restoreNote: (entityId: string) => Promise<boolean>;
+  /** 彻底删除（写 `purgedAt` 标记，墓碑保留）。**不可逆**，确认框由界面负责。 */
+  purgeNote: (entityId: string) => Promise<void>;
   /** `pinned` 是**目标值**，不是"切换一下"（与动作层契约一致）。 */
   togglePinned: (entityId: string, pinned: boolean) => Promise<void>;
 }
@@ -69,6 +85,7 @@ const noteActions = createNoteActions(actionContext);
 
 export const useNoteStore = create<NoteState>((set) => ({
   notes: [],
+  trashed: [],
 
   addNote: async (content) => {
     try {
@@ -98,15 +115,29 @@ export const useNoteStore = create<NoteState>((set) => ({
     refresh();
   },
 
+  restoreNote: async (entityId) => {
+    const restored = await noteActions.restoreNote(entityId);
+    refresh();
+    return restored;
+  },
+
+  purgeNote: async (entityId) => {
+    await noteActions.purgeNote(entityId);
+    refresh();
+  },
+
   togglePinned: async (entityId, pinned) => {
     await noteActions.setNotePinnedToToday(entityId, pinned);
     refresh();
   },
 }));
 
-/** 从动作层重新读 —— "哪些算未删除""顺序"都是产品语义，不在这里过滤或排序。 */
+/** 从动作层重新读 —— "哪些算未删除""哪些算在回收站""顺序"都是产品语义，不在这里过滤或排序。 */
 function refresh(): void {
-  useNoteStore.setState({ notes: noteActions.listNotes() });
+  useNoteStore.setState({
+    notes: noteActions.listNotes(),
+    trashed: noteActions.listTrashed(),
+  });
 }
 
 // 引擎状态变化时自动刷新（含远程 op 应用后）

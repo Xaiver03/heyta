@@ -195,10 +195,14 @@ const USAGE = `heyta node-host —— 非 Web 宿主（真实 SQLite + 真实同
                             🔴 这一步只产出令牌：同步还要**另一个**口令，见 --password
   add <标题> [--due 2026-10-05]  创建一个任务（--due 是**本地日期**）
   list [--all]              列出任务（默认只列未完成）
-  trash                     列出回收站里的任务（有墓碑且未彻底删除）
+  trash                     列出回收站里的**全部四类**（任务 / 便签 / 清单 / 习惯）
+                            行形状、标题与顺序与两端界面同源（@heyta/domain）。
                             🔴 remove 与 purge 都会让 list 变空，没有这条
                             就区分不开"进了回收站"和"彻底删掉"——判据会在只做了
-                            前者时照样绿
+                            前者时照样绿。而它原来**只列任务**，于是"另一台设备的
+                            回收站里有没有这条清单"在这台设备上读不出来
+  notes                     列出未删除的便签（正文原样）。W6 的判据靠它读
+                            "手机上删掉又还原的那条便签，在这台设备上活着" 
   rename <id> <标题>        改标题
   complete <id>             标记完成
   reopen <id>               取消完成
@@ -357,25 +361,41 @@ async function main(): Promise<number> {
       }
 
       case 'trash': {
-        const trashed = host.listTrashed();
+        // 🔴 四路合并、取标题、判序**不在这里写**：规则在 `@heyta/domain#toTrashItems`，
+        // 与两端界面同源。这里曾经只列任务那一路，于是"另一台设备的回收站里
+        // 有没有这条清单/这条便签"在这个宿主上根本没法断言（W6 判据 ④ 的前提）。
+        const rows = host.trashRows();
+        if (json) {
+          out(JSON.stringify({ ok: true, command: 'trash', rows }));
+        } else if (rows.length === 0) {
+          out('（回收站为空）');
+        } else {
+          for (const row of rows) {
+            out(`${row.title}  [${row.kind}]  (${row.id})`);
+          }
+        }
+        return 0;
+      }
+
+      case 'notes': {
+        const notes = host.listNotes();
         if (json) {
           out(
             JSON.stringify({
               ok: true,
-              command: 'trash',
-              tasks: trashed.map((task) => ({
-                id: task.id,
-                title: task.title,
-                deletedAt: task.deletedAt ?? null,
-                purgedAt: task.purgedAt ?? null,
+              command: 'notes',
+              notes: notes.map((note) => ({
+                id: note.id,
+                content: note.content,
+                updatedAt: note.updatedAt,
               })),
             }),
           );
-        } else if (trashed.length === 0) {
-          out('（回收站为空）');
+        } else if (notes.length === 0) {
+          out('（没有便签）');
         } else {
-          for (const task of trashed) {
-            out(`${task.title}  (${task.id})`);
+          for (const note of notes) {
+            out(`${note.content}  (${note.id})`);
           }
         }
         return 0;
