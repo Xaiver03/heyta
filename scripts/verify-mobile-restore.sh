@@ -108,18 +108,8 @@ echo "  设备: $HEYTA_E2E_SERIAL   服务端: $SERVER   账号: $EMAIL"
 # 实测两轮（load 62 / load 18）都是这样把一次环境失效打印成一堆产品缺陷的。
 # 判据本身没错，错在跑它的时间。负载不达标就**以退出码 3 结束**（环境无效 ≠ 产品失败，
 # 共享库 `require_screen` 用的是同一个约定）。
-wait_for_quiet_host() {
-  local cores limit waited=0 load
-  cores=$(sysctl -n hw.ncpu)
-  limit=$((cores * 3 / 4))
-  while :; do
-    load=$(uptime | sed 's/.*load averages: //' | awk '{print int($1)}')
-    [ "$load" -le "$limit" ] && { echo "   负载 $load ≤ ${limit}（$cores 核），开始"; return 0; }
-    [ "$waited" -ge "${HEYTA_RESTORE_LOAD_WAIT:-900}" ] && { echo "   ❌ 等满 ${HEYTA_RESTORE_LOAD_WAIT:-900}s 负载仍是 $load —— 本轮不跑（环境无效，不是产品失败）" >&2; return 1; }
-    echo "   负载 $load > ${limit}，等 30s（累计 ${waited}s）"
-    sleep 30; waited=$((waited + 30))
-  done
-}
+# 函数原先住在这里（traps #168 末尾那条待办）；现在只有一个所有者。
+. "$(dirname "$0")/lib/wait-for-quiet-host.sh"
 wait_for_quiet_host || exit 3
 
 # 🔴 web 那半边的前置也要在**开局**判掉。判据②要真浏览器打开 `WEB_BASE` 用 ExportPanel

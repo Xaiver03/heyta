@@ -90,7 +90,8 @@ async function openCalendar(): Promise<void> {
     (b) => b.textContent?.trim() === '日历',
   );
   expect(tab, 'rail 上找不到「日历」').toBeDefined();
-  await click(tab ?? undefined);
+  // click 的签名是 `HTMLElement | null`（见上）—— 传 undefined 绕过了它自带的非空断言。
+  await click(tab ?? null);
   expect(q('calendar-board'), '切过去后月历没渲染').not.toBeNull();
 }
 

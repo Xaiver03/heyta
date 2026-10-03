@@ -178,42 +178,38 @@ const PasswordSetSchema = z.object({
  * 从请求里解析收件人语言。
  *
  * 顺序与 `design-html.ts` 的 `resolveLocale` 一致：
- *   ① `body.locale`（客户端当前语言，**可选**——客户端不传也完全正常工作）
- *   ② `Accept-Language`（浏览器自动带，覆盖"系统语言"这一档）
- *   ③ 默认 `zh-CN`
+ *   ① `body.locale`（客户端当前界面语言，**可选**——客户端不传也完全正常工作）
+ *   ② 默认 `zh-CN`
  *
  * 🔴 **刻意不改任何 zod schema**：`body.locale` 是可选字段，zod 的 `z.object()`
  * 默认会剥掉未声明的键 —— 也就是说这个字段**不会**进 `parseResult.data`，
  * 但也**不会**让请求失败。加它不需要动 schema，于是也不会与正在改这些
  * schema 的人撞车。（要让它进 `data` 就得改 schema，代价远大于收益。）
  */
-const localeFromRequest = (req: {
-  body?: unknown;
-  headers: Record<string, unknown>;
-}): ServerLocale => {
+const localeFromRequest = (req: { body?: unknown }): ServerLocale => {
   const body = req.body as { locale?: unknown } | undefined;
-  const explicit = typeof body?.locale === 'string' ? body.locale : null;
-  const header = req.headers['accept-language'];
-  return resolveLocale(explicit, typeof header === 'string' ? header : null);
+  return resolveLocale(typeof body?.locale === 'string' ? body.locale : null);
 };
 
 /**
- * 🔴 **发信端点的语言优先级**（2026-10-01 拍板，docs/plans/i18n-multilingual.md §3）：
+ * 🔴 **发信端点的语言优先级**（2026-10-01 定，2026-10-03 产品负责人改判）：
  *
  *   ① `body.locale` —— 客户端当前界面语言（显式、最新鲜）
  *   ② **账号语言**（`users.locale`，按收件邮箱查）—— 用户在别的设备登录态下设过
- *   ③ `Accept-Language`（浏览器自动带）
- *   ④ 默认 `zh-CN`
+ *   ③ 默认 `zh-CN`
  *
  * ② 只在 ① 缺失时生效：客户端带上 `locale` 就说明用户此刻看着那种语言的界面，
- * 比（可能陈旧的）账号行更新鲜。② 高于 ③ 是刻意的：账号语言是一次**明确的
- * 用户选择**，浏览器语言只是环境噪声 —— 没有它，在中文浏览器里把应用切成
- * 英文的用户，邮件永远是中文。
+ * 比（可能陈旧的）账号行更新鲜。
+ *
+ * 🔴 **`Accept-Language` 这一档已删**（2026-10-03）：拍板口径是「默认中文，除非
+ * 用户登录之后改成英文、或一开始就选了英文」。浏览器语言不是选择，是环境噪声，
+ * 而它当时正把中文界面注册的人的第一封邮件渲染成英文。原来那条"② 高于 ③"的
+ * 理由（账号语言是明确选择、浏览器语言不是）现在推得更远：**只有明确选择参与**。
  *
  * 多一次 `findUnique` 是可接受的：发信端点都是稀疏、限流的用户动作。
  */
 const localeForEmail = async (
-  req: { body?: unknown; headers: Record<string, unknown> },
+  req: { body?: unknown },
   email: string,
 ): Promise<ServerLocale> => {
   const body = req.body as { locale?: unknown } | undefined;

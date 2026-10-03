@@ -100,6 +100,7 @@ const REPEAT_LABEL_KEYS: Record<RepeatPresetId, MessageKey> = {
   weekly: 'mobile.detail.repeat.weekly',
   weekdays: 'mobile.detail.repeat.weekdays',
   monthly: 'mobile.detail.repeat.monthly',
+  yearly: 'mobile.detail.repeat.yearly',
 };
 
 export function TaskDetailSheet({

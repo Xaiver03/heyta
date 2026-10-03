@@ -61,7 +61,13 @@ const TOKEN = 'jwt-from-login';
 const PASSWORD = 'e2ee-passphrase';
 const PROFILE = { displayName: '小鹿', avatarHash: null };
 
-const profileBody = (over: Partial<typeof PROFILE> = {}) => ({ ...PROFILE, ...over });
+// 🔴 覆写类型要显式写成**线上的形状**（两个都可空），不能 `Partial<typeof PROFILE>`：
+// 字面量推断会把 displayName 收窄成 `string`、avatarHash 收窄成 `null`，
+// 于是"传 null 清除昵称""传回真实 hash"这两个用例在类型上就写不出来（TS2322）。
+const profileBody = (over: Partial<{ displayName: string | null; avatarHash: string | null }> = {}) => ({
+  ...PROFILE,
+  ...over,
+});
 
 describe('未登录 / 空令牌：一个请求都不发', () => {
   it('getAccountProfile：令牌为空串或纯空白 ⇒ invalid-input，且 fetch 零调用', async () => {

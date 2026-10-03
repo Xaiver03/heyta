@@ -177,10 +177,17 @@ screenshots/web-mobile/  MW01 … MW03                         （3）
 
 1. 图号 = `图 <章>-<序>`：**章 = 文章在 `SITE_PAGES` 注册表里的序号**（从 1，含分类页顺序），
    **序 = 该文章内第几张**（从 1）。两个都由脚本算，人不手写编号，只写 caption key。
-2. 资产落点：`apps/landing/public/assets/help/<articleId>/<file>.png`（`screenshots/` 在仓库根，
+2. 资产落点：`apps/landing/public/assets/docs/<articleId>/<file>.png`（`screenshots/` 在仓库根，
    落地页构建够不着，必须复制进 `public/`）。
+   ⚠️ 2026-10-03 从 `assets/help/` 改成 `assets/docs/`：**用户可见的 URL 跟着页面所在的
+   `/docs/` 走**；`f82ace65`（10-02 08:46）把页面搬到 `/docs/`、把 e2e 判据写成 `/assets/docs/`，
+   却没搬产物目录，于是那条判据一直断在一个不存在的目录名上（取证见 `BLOCKED.md` B24）。
+   内部标识（`helpFigures.ts`、`HELP_FIGURE_ROOT`、`gen-help-figures.mjs`、词条 key `site.help.*`）
+   **仍叫 help** —— 它们命名的是内容种类（帮助文章），不是 URL；这条分叉是登记过的。
+   改名只动了一行：URL 前缀与磁盘前缀现在同住 `helpFigures.ts:232`（`ON_DISK_PREFIX` 由它派生），
+   生成器与孤儿扫描都 import 同一处。
 3. 生成器：`apps/landing/scripts/gen-help-figures.mjs` —— 读一张**文章 → 图**映射表
-   （`src/site/helpFigures.ts`），把 `screenshots/**` 的对应文件复制进 `public/assets/help/`，
+   （`src/site/helpFigures.ts`），把 `screenshots/**` 的对应文件复制进 `public/assets/docs/`，
    并把 caption/alt **词条 key** 与算好的图号注入分区。要求：
    - 源文件不存在 ⇒ **响亮失败**（不写半成品）；
    - 每张复制后跑 `inspectPng`：尺寸符合目标设备预设、`hasAlpha=false`、非空白；

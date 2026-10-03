@@ -5,7 +5,8 @@
  * 🔴 **这里只登记意图，不登记图号，也不登记像素。**
  * 图号（`图 14-1`）由 [`docs.ts`](./docs.ts) 的 `docsFiguresOf()` 从**注册表顺序**算出来，
  * 像素住在 `screenshots/`（由 `scripts/screenshots/` 那套采集与验收管），
- * 复制品住在 `public/assets/help/`（由 `scripts/gen-help-figures.mjs` 生成）。
+ * 复制品住在 `public/assets/docs/`（由 `scripts/gen-help-figures.mjs` 生成；
+ * 目录名跟着页面所在的 `/docs/` 走，理由写在下面 `URL_PREFIX` 那一节）。
  * 三处各管一件事，所以"改了正文顺序图号还是旧的""图换了她没重跑"
  * 这两类漂移都发生不了 —— 手写编号的保质期是**下一次插入一节**。
  *
@@ -214,11 +215,21 @@ export function helpFigureFile(figure: HelpFigure): string {
  * 复制品在站点里的**同一件事的两个视图**：访客看到的 URL 与生成器落盘的目录。
  *
  * 🔴 这两行必须留在一起。以前磁盘路径写在生成器里、URL 写在 `docs.ts` 里，
- * 于是 `public/assets/help/` 这条规则有四处表达（映射、生成器、渲染器、孤儿扫描），
- * 而"把 `assets/help` 改名"这种活只需要改一处就能让另外三处悄悄断掉。
+ * 于是这条规则有四处表达（映射、生成器、渲染器、孤儿扫描），
+ * 而"改名"这种活只需要改一处就能让另外三处悄悄断掉。
  * vite 配置里**没有** `base`，所以根绝对路径就是对的（`pages.ts` 同源）。
+ *
+ * ⚠️ 2026-10-03 定为 `/assets/docs`（原先是 `/assets/help`）：**用户可见的 URL 跟着页面走**，
+ * 而这些图就挂在 `/docs/<文章>/` 那一面上。旧的 `help` 名是 `f82ace65`（10-02 08:46
+ * 「帮助中心迁到 /docs 文档站形态」）**没搬完**的那一半 —— 同一笔里页面搬到了 `/docs/`、
+ * e2e 判据也写成了 `/assets/docs/`，只有产物目录留着 `help`，于是那条判据从那天起
+ * 一直断在一个不存在的目录名上（取证与两条出路见 `BLOCKED.md` B24）。
+ * 🔴 内部标识符（本文件名、`helpFigureSrc` / `HELP_FIGURE_ROOT`、`gen-help-figures.mjs`、
+ * 词条 key `site.help.*`）**仍然叫 help，它们指的是内容种类**（帮助文章），不是 URL；
+ * 改这些名字会牵动 i18n key 与整片词条，收益只有"名字更好看"，所以刻意不做。
+ * 两边名字不同是**登记过的**，不是待发现的坑。
  */
-const URL_PREFIX = '/assets/help';
+const URL_PREFIX = '/assets/docs';
 const ON_DISK_PREFIX = 'apps/landing/public' + URL_PREFIX;
 
 /** 一张图对访客的地址。 */

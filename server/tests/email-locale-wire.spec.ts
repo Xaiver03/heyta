@@ -341,11 +341,15 @@ describe('账号语言 → 邮件语言：真 SMTP 线上落件的字节', () =>
     expect(mail.text).toContain('lang=en');
   });
 
-  it('账号没存语言时按 Accept-Language（en-US 浏览器 ⇒ 英文件）', async () => {
+  it('🔴 账号没存语言时**中文件** —— 英文浏览器头不许在线上把信翻成英文', async () => {
+    // 2026-10-03 改判（产品负责人）：这条原来断言的是"en-US 浏览器 ⇒ 英文件"。
+    // 判据落在**真 SMTP 收件器的字节**上，不是 mock 的调用参数：
+    // 变异 = 把 `localeFromRequest` 里读 `accept-language` 的那几行加回来 ⇒ 这条红。
     mocks.user.findUnique.mockResolvedValue(accountRow(null));
     const mail = await request({ email: 'polyglot@example.com' }, { 'accept-language': 'en-US,en;q=0.9' });
 
-    expect(mail.text.match(CJK)).toBeNull();
+    expect(mail.text).toContain('lang=zh-CN');
+    expect(mail.text.match(CJK)).not.toBeNull();
   });
 
   it('信封本身对：真连上了、RCPT TO 是收件人、text 与 html 两个 part 都在', async () => {

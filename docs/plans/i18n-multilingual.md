@@ -1459,7 +1459,11 @@ case 'ollama': return t('common.ai.preset.ollama.label');
    解析链测试翻转（`tests/setup.ts` 把 jsdom 的 `navigator.language` 钉成 zh-CN，保住「无偏好 ⇒ 中文」）。
    账号语言半边同期落地：`users.locale` **可选列** + 登录响应回传 + 本机无显式选择时采纳 +
    登录态改语言写回账号（`pushLocaleToAccount`）+ `hosted-auth` 三个发信函数带 locale，
-   服务端解析 `body > 账号（按邮箱查）> Accept-Language > zh-CN`。
+   服务端解析 `body > 账号（按邮箱查）> zh-CN`。
+   ⚠️ 2026-10-03 改判：这条链原本还有一档 `Accept-Language`，已删 —— 产品口径是
+   「默认中文，英文只能是用户自己的选择」，而浏览器语言不是选择（实测：中文界面注册的人
+   第一封信是英文）。**客户端**的第 3 层（`navigator.language` 决定界面语言）保留 ——
+   那是用户此刻看着的界面，信跟着它走正是"看得懂"；被删的是服务端**越过界面语言**去猜。
    **判据实跑结果**（本轮，真浏览器 Playwright，截图人看过）：
    zh-CN 浏览器首开 `/app` → 中文；**en-US 浏览器首开 → 英文**（第 3 层直接生效，无需登录）；
    点「English」→ 侧栏 `Inbox` + `localStorage['heyta.locale']=en` + `<html lang>=en` + 当前语言 chip 换成主蓝边框；

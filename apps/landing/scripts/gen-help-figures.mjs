@@ -125,7 +125,7 @@ function resolveFigure(articleId, figure) {
   };
 }
 
-/** 递归列出 `public/assets/help/` 下全部 PNG（用于抓孤儿文件）。 */
+/** 递归列出复制品根目录（`HELP_FIGURE_ROOT`，现为 `public/assets/docs/`）下全部 PNG（用于抓孤儿文件）。 */
 function listAssets(dir, out = []) {
   if (!existsSync(dir)) return out;
   for (const entry of readdirSync(dir, { withFileTypes: true })) {

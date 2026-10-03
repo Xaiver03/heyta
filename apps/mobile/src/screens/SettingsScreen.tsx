@@ -48,6 +48,7 @@ import {
   Chip,
   IconButton,
   SectionHeader,
+  Stack,
   Text,
   TextField,
 } from '../ui/kit';
@@ -300,10 +301,10 @@ export function SettingsScreen({
               排在这里的成本是"改服务器地址要往下滚一格"，撤回的成本是"找不到入口"，
               后者是合规问题，前者不是。
             */}
-            <View testID="privacy-consent-section" style={{ gap: tokens['space.3'] }}>
+            <Stack gap="loose" testID="privacy-consent-section">
               <SectionHeader icon="privacy.consent" title={t('common.privacy.settings.title')} />
               <Card>
-                <View style={{ gap: tokens['space.2'] }}>
+                <Stack>
                   <Text variant="row-title">
                     {t(consentStateKey)}
                     {consentRecord === null
@@ -315,7 +316,7 @@ export function SettingsScreen({
                   <Text variant="caption" tone="subtle">
                     {t('common.privacy.settings.revokeHint')}
                   </Text>
-                </View>
+                </Stack>
               </Card>
               {consentRecord === null ? (
                 // 没决定过（首启跳过了、或刚撤回）：把**同一张**面板再打开一次。
@@ -336,7 +337,7 @@ export function SettingsScreen({
                   {t('common.privacy.consent.notPersisted')}
                 </Text>
               ) : null}
-            </View>
+            </Stack>
 
             {/*
               ── 同步凭据（手动兜底路径）───────────────────────────

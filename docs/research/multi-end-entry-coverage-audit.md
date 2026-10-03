@@ -74,6 +74,11 @@
 
 > 🔴 **这一行原先写的是「24 项全绿（run23，02:46–02:51）」，那是引用落后**：run27（06:02）就已经是 26 项（其间 `8ecc0575` 给脚本加了首条「web 载体可达」判据，把"等 pm clear 之后才发现连不上"变成开局就判）。2026-10-03 08:26 这一轮是在移动端 UI 换成 `Stack` / `Card gap` 重构**之后**重跑的，`apps/mobile/evidence/android-restore-{done,tasks}.png` 两张证据图也已换成这一轮的产物。
 > 另记一条读数纪律：**判据点数 ≠ 执行数** —— 脚本里 `ok` 的**调用点** 21 处，跑出来的 ✅ 是 26 条，因为凭据那三格（服务器地址 / 访问令牌 / 加密口令）由一个循环点位打。引用"N 项"时要说清是哪一趟，而不是哪一份脚本。
+> 🔴 两条**变异臂**也已在新产物上各自重证一趟（批五入账时它们跑在布局重构**之前**的产物上）：
+> M2（`confirmRestore` 在写库前 `return`）**23 通过 / 2 失败**，M1（预检拒绝后不把原因说出来）**24 通过 / 2 失败**，
+> 各自的红恰好是设计要抓的那两条；两臂都做了三段 sha256（变异前 = 还原后，逐字节相同）与两枚 APK md5（变异包 ≠ 干净包），
+> 复跑腿重装干净包后回到 **26 / 0 / exit 0**。全部读数与"红→绿配对行号"在仓库内的
+> `apps/mobile/evidence/verify-mobile-restore-arms-20261003.txt`（明细见 [`../plans/goal-multi-end-coverage.md`](../plans/goal-multi-end-coverage.md) §7.9）。
 ⚠️ **三条边界，都不算已验或不算已修**：
 ① **还原回来的数据只在这台设备上** —— `appendImported` 把这些 op 标成"不进上传队列"，因为备份里的 op 带的是**原设备**的 `clientId`，而服务端 `validateOp` 对不匹配的署名逐条回 `INVALID_CLIENT_ID`（`server/src/sync/services/validation.service.ts:75`）。这是既有设计（`packages/storage/src/db-op-log-store.ts:100`/`:161` 明写"不要为了让它也能上传把 source 改成 'local'"），**本轮只把界面文案改对**（原来那句"配置同步后会自动上行"是假的，见 traps #138）；"还原后多端可见"要成立需要一条新裁决（还原时按本机 clientId 重签），**未做**。
 ② **iOS 的"选文件"没有原生读取模块**（RN 0.84.1 在 Android 上根本读不出本机 URI，只能自带模块，见 traps #124；iOS 侧退到 RN 的 blob 通道，未在模拟器验证）。

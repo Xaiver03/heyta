@@ -163,7 +163,7 @@
         "name": "How do I run my own server?",
         "acceptedAnswer": {
           "@type": "Answer",
-          "text": "You can, but this is \"operate a service yourself\", not one command and you are done: no prebuilt image is published (you build it), bringing the service up is not a deployment (the table-structure changes have to be applied explicitly, once), and you cannot register at all without an email service. See \"Running your own sync server\"."
+          "text": "You can, but this is \"operate a service yourself\", not one command and you are done: no prebuilt image is published (you build it), bringing the service up is not a deployment (the table-structure changes have to be applied explicitly, once). Registration and sign-in run on email + password; outgoing mail only covers the *activate your account* step — you can still create an account without SMTP and the app says so plainly, while a private instance can skip the step with REQUIRE_EMAIL_VERIFICATION=false. See \"Running your own sync server\"."
         }
       },
       {

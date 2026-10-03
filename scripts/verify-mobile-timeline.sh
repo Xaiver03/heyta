@@ -60,47 +60,16 @@ export PATH="/opt/homebrew/bin:$PATH"
 
 TITLE="tl-e2e-$(date +%H%M%S)"
 
+CONSENT_GATE_PREFERRED=以后再说
+
 # 隐私同意面板（2026-10-01 并行刀新增的首启面板）：不点掉它，后面每一步
 # （建任务 / 切 chip）都被面板挡住，症状是"找不到控件"而不是"被面板挡了"。
+# 处理本身已收进 `lib/mobile-e2e.sh` 的 `handle_privacy_consent`（那三条实测形状
+# —— 入场动画延迟、按钮名在 content-desc 不在 text、点一次未必收下 —— 都在那一份里，
+# 原来五个脚本各抄一份，抄漏的那个整轮假红）。
 dismiss_consent_if_present() {
-  # 🔴 面板带入场动画**延迟出现**：dismiss 后立刻 dump 它往往还不在
-  # （上一轮就是这么漏掉的）。所以这里**轮询等它**出现（≤10s），处理后再验它走了。
-  local waited=0 xy label
-  while [ "$waited" -lt 10 ]; do
-    dump
-    [ "$(has_text "在使用联网功能之前")" = "1" ] && break
-    sleep 1
-    waited=$((waited + 1))
-  done
-  [ "$(has_text "在使用联网功能之前")" = "1" ] || return 0
-
-  # 🔴 按钮（Button）的可辨识名在 **content-desc** 上，不在 text 上（§7 #45 同族：
-  # desc/text 两张皮）—— xy_text 永远取不到它，还会误判成"按钮不存在"。
-  # 「只用本机」再退一层：正文 bullet 里也有同名 text，xy_text 必须取第 2 个匹配。
-  xy=$(xy_desc "以后再说"); label="以后再说"
-  if [ -z "$xy" ]; then
-    xy=$(xy_desc "只用本机"); label="只用本机"
-  fi
-  if [ -z "$xy" ]; then
-    xy=$(xy_text "只用本机" 1); label="只用本机（text 第 2 匹配）"
-  fi
-  if [ -z "$xy" ]; then
-    bad "同意面板在，但取不到按钮坐标（desc/text 都没命中）"
-    return 1
-  fi
-  $ADB shell input tap $xy
-  sleep 2
-  dump
-  if [ "$(has_text "在使用联网功能之前")" = "1" ]; then
-    xy=$(xy_desc "只用本机")
-    [ -z "$xy" ] && xy=$(xy_text "只用本机" 1)
-    if [ -n "$xy" ]; then
-      $ADB shell input tap $xy
-      sleep 2
-      echo "     面板还在：补点了一次按钮位"
-    fi
-  fi
-  echo "     已处理隐私同意面板（${label}，等了 $waited 秒）"
+  # 🔴 本验收只看本地时间线，不替用户做联网决定 ⇒ 「以后再说」排第一。
+  handle_privacy_consent "以后再说" "只用本机"
 }
 
 echo ""
@@ -124,9 +93,19 @@ if [ -n "$($ADB shell pidof "$PKG" 2>/dev/null | tr -d '\r')" ]; then
 else
   bad "被测应用（${PKG}）没有运行 —— 前台可能是别的包"; screen_txt
 fi
-# 🔴 首启的两块屏**交替出现**（实测顺序：同意面板 → 欢迎页 → 先离线使用 →
-# 同意面板再弹 → 任务页）：任何"各处理一次"的固定序列都会在换序后整轮作废。
+# 🔴 首启的两块屏会**反复出现**（实测顺序：同意面板 → 欢迎页 → 先离线使用 →
+# 同意面板再弹 → 任务页）：任何"各处理一次"的固定序列都会整轮作废。
 # 所以这里收敛循环：两块屏都不在场才算稳定（有界，4 轮）。
+#
+# ⚠️ **上一版把原因写成"界面随机换序"，那句是错的归因**（2026-10-03 读源码否证）。
+#    真正的原因就是本脚本自己选的「以后再说」：
+#      · `closePrivacySheet()`（consent-ui.ts:76）只把面板**收起来**，
+#        **不记录任何决定** ⇒ `undecided()` 仍为真 ⇒
+#        下一次冷启动 `shouldAskOnFirstLaunch()`（同文件 :127）必然再问一遍；
+#      · 而同文件 `requireNetworkConsent()`（:115）在任何"要出门"的动作上会
+#        `openPrivacySheet('required-for-action')` —— 这就是"同意面板再弹"那一次。
+#    ⇒ 循环是**这条选择的代价**，不是界面的脾气。选「同意并联网」的脚本没有这个现象
+#    （决定落盘了）。别把它改造成"点一次就算处理完"。
 settle_first_run_screens() {
   local i
   for i in 1 2 3 4; do

@@ -63,6 +63,12 @@ set -u
 export PATH="/opt/homebrew/bin:$PATH"
 . "$(dirname "$0")/lib/mobile-e2e.sh"
 
+# 🔴 本验收全程不落任何要出门的动作（实测：`configure_sync_credentials` /
+#    `wait_laptop_has` / 笔记本 CLI 三类调用行数都是 0），所以点**「只用本机」**——
+#    这既是真用户走这条旅程时会做的选择，也让"这条验收不需要联网"变成一条
+#    可以被门禁核对的声明（`check:mobile-first-run-gate` 判据 4）。
+CONSENT_GATE_PREFERRED=只用本机
+
 BOUNDS="python3 $(dirname "$0")/lib/ui-bounds.py"
 EVIDENCE="$HEYTA_REPO_ROOT/apps/mobile/evidence"
 # 滑动手势取屏幕中列（1080 宽）。
