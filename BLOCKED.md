@@ -3837,7 +3837,14 @@ HEAD 没这行引用，那一趟这段应当是绿的；如果它红了，说明
 **为什么没做完**：② 与 ③ 的前置是同一条窗口（负载 ≤12 + 无人在跑设备/e2e + 无另一趟链）。
 01:00–03:00 现量负载在 **50–86** 之间起伏，`qemu-system-aarch64-headless` 单进程 651% CPU，
 外加三条并行线各自在跑 Playwright 与设备点击（`ps` 现取，argv 计数按 §7 #201 只当**保守阻塞**用）。
-队列 `~/scratch-heyta/heyta-deliver-on-window.sh` 每 60s 重过一次现场门，等满以 **exit 3** 收尾
+03:33 更正口径：**设备那一刻其实没人占**（共用探针 `mobile_e2e_runner_lines` 读数为空），
+挡住的是负载与**另外两条线**（`/tmp/heyta-window-chain4.sh` 已是别人那条链的第四次起跑尝试）⇒ 这个窗口今晚是
+三条线同时在等。队列已改成先过仓里那道**规范闸门** `scripts/verify-mobile-window-gate.sh --target b`
+（03:33 单跑现量：四条前置里三条 ✅，唯一 ❌ 是负载 21 > 12），设备独占改用共用探针，
+并新增"载体先快进到 main"那一步（03:32 现量落后 31 笔，其中就有这两个脚本）—— 细则在
+`docs/plans/ai-event-tool-contract.md` §15.43i。
+
+队列 `~/scratch-heyta/heyta-deliver-on-window.sh` 每 60–90s 重过一次门，等满以 **exit 3** 收尾
 （**环境无效 ≠ 产品失败**，不改负载阈值、不硬装、不 pkill 任何不是它 pid 的进程）。
 
 **关闭判据**（四条全中才算 ③ 做完，`cat ~/scratch-heyta/deliver-*/rc.txt` 一次读全）：
