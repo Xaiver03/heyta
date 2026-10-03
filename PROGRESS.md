@@ -1166,9 +1166,21 @@ mobile 与 web 的 `typecheck` 均 0 错。三个新改动屏的 `style={{` 计�
 **③ 交付 ⏸（前置不成立，不放宽闸门）** —— `pnpm reinstall:all` 的闸门是"链 rc=0"，而只要 `main`
 带着 organizer 那条红它就结构上不可达。本轮把 Windows 段的判据从两条补成**五条且住进单一所有者**
 （`scripts/lib/msix-install-facts.sh`：`ADD_APPX=OK` / `RESULT=OK` / `PAYLOAD_WEBDIST=True` /
-`M2D=OK` / `SHORTCUT_OK=True`，四个读取点已接上）；用户点名的「自动创建快捷方式」是
-`install-and-capture.ps1:110-133` 真建 `<Desktop>\heyta.lnk`（MSIX 走 `shell:AppsFolder` AUMID）
-并**读回来验**，判据即 `SHORTCUT_OK` —— 实现与判据齐，**未跑**（跑在 ③ 后面）。
+`M2D=OK` / `SHORTCUT_OK=True`）；用户点名的「自动创建快捷方式」真身在
+**`apps/desktop-windows/scripts/install-and-capture.ps1`**（段落从 `:82` 起，`:110` 建
+`<Desktop>\heyta.lnk`，MSIX 走 `explorer.exe shell:AppsFolder\<PFN>!App` 与脚本自己的启动路径**同一条**，
+`:236` 把 `SHORTCUT_OK=` 写进取证文件），实现与判据齐，**未跑**（跑在 ③ 后面）。
+
+> 🔴 22:0x 现量把上面这段里**我自己写错的两处**改掉，原文形状留在下面，因为它们是同一种错的两个实例：
+> ① 原句写"四个读取点已接上" —— 实际是**一个**调用点（`reinstall-all.sh:249 msix_check_facts`）
+> 读一份**五项**清单（`scripts/lib/msix-install-facts.sh` 在 `:158` 被 source）。"多个读取点"
+> 在这里不是优点，恰恰是要避免的形状：同一条判断写四遍才会漂。现量：
+> `grep -c msix_check_facts scripts/reinstall-all.sh` = 1。
+> ② 原句只写 `install-and-capture.ps1:110-133` 不带目录 —— 本仓 `scripts/windows/` 与
+> `apps/desktop-windows/scripts/` **两处都有 ps1**，光给文件名会让下一位去敲一条不存在的路径
+> （本轮就是这样撞了一次）。另：该脚本 `LC_ALL=C grep '[^ -~\t]'` 命中 **0** 行 = 纯 ASCII 成立
+> （AGENTS §6.1 那条 PS 5.1 的硬要求）。
+
 
 **④ 台账 ✅** —— 本节 + `B36` 第 2 条的 closure 指针 + 新登记 `B56`（那条挂上游的红）+
 `AGENTS.md` 三处漂移登记（`:35` 漏列 `ai-tool-call.ts`、`:37` 未提工具目录已按实体拆包、
