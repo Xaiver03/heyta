@@ -101,12 +101,9 @@ export const AI_CAPABILITY_MANIFEST =
     'source': 'ADR-0045 §2.6 纪律二',
   },
   'coverage': {
-    'covered': 8,
-    'denominator': 8,
-    'ratio': '8/8',
-    'covered': 3,
+    'covered': 9,
     'denominator': 9,
-    'ratio': '3/9',
+    'ratio': '9/9',
   },
   'userOperableEntityTypes': [
     'TASK',
@@ -431,6 +428,34 @@ export const AI_CAPABILITY_MANIFEST =
       ],
     },
     {
+      'name': 'list_events',
+      'kind': 'read',
+      'entityType': 'EVENT',
+      'description': '列出倒数日与纪念日（未删除、未归档），按界面同一套顺序排：置顶在前、距下一次近的在前。每条给出锚点日期、类型档位、下一次发生日与相差天数。不返回备注正文 —— 备注要单独用 get_event 取。归档过的倒数日不在这里。',
+      'schemaRecorded': true,
+      'args': [
+        {
+          'name': 'limit',
+          'type': 'number',
+          'required': false,
+        },
+      ],
+    },
+    {
+      'name': 'get_event',
+      'kind': 'read',
+      'entityType': 'EVENT',
+      'description': '读取单个倒数日/纪念日的完整内容（含备注正文）。',
+      'schemaRecorded': true,
+      'args': [
+        {
+          'name': 'eventId',
+          'type': 'string',
+          'required': true,
+        },
+      ],
+    },
+    {
       'name': 'create_task',
       'kind': 'write',
       'entityType': 'TASK',
@@ -709,38 +734,10 @@ export const AI_CAPABILITY_MANIFEST =
       ],
     },
     {
-      'name': 'list_events',
-      'kind': 'read',
-      'entityType': 'EVENT',
-      'description': '列出倒数日与纪念日（未删除、未归档），按界面同一套顺序排：置顶在前、距下一次近的在前。每条给出锚点日期、类型档位、下一次发生日与相差天数。不返回备注正文 —— 备注要单独用 get_event 取。归档过的倒数日不在这里。',
-      'schemaRecorded': true,
-      'args': [
-        {
-          'name': 'limit',
-          'type': 'number',
-          'required': false,
-        },
-      ],
-    },
-    {
-      'name': 'get_event',
-      'kind': 'read',
-      'entityType': 'EVENT',
-      'description': '读取单个倒数日/纪念日的完整内容（含备注正文）。',
-      'schemaRecorded': true,
-      'args': [
-        {
-          'name': 'eventId',
-          'type': 'string',
-          'required': true,
-        },
-      ],
-    },
-    {
       'name': 'create_event',
       'kind': 'write',
       'entityType': 'EVENT',
-      'description': '新建一个倒数日/纪念日。日期是 `YYYY-MM-DD` 的**锚点日期**（倒数日没有"几点"）。可给类型档位（countdown / anniversary / birthday / festival 四档之一）、是否按农历每年重复、RRULE 重复规则、备注。必须走 heyta 的正常写入路径（op-log）。',
+      'description': '新建一个倒数日/纪念日。日期是 `YYYY-MM-DD` 的**锚点日期**（倒数日没有“几点”）。可给类型档位（countdown / anniversary / birthday / festival 四档之一）、是否按农历每年重复、RRULE 重复规则、备注。必须走 heyta 的正常写入路径（op-log）。',
       'schemaRecorded': true,
       'args': [
         {
@@ -818,15 +815,13 @@ export const AI_CAPABILITY_MANIFEST =
  */
 export const AI_CAPABILITY_TEXT = [
   'heyta 能力清单（由工具目录与领域实体生成，不是手写的）',
-  '覆盖口径：用户可操作的已物化实体 8 个，其中 8 个**读和写都有**工具（8/8）。',
-  '覆盖口径：用户可操作的已物化实体 9 个，其中 3 个有 AI 工具（3/9）。',
+  '覆盖口径：用户可操作的已物化实体 9 个，其中 9 个**读和写都有**工具（9/9）。',
   '',
   '🔴 拒绝时两件事必须分开说：我没有这个工具（AI 侧缺工具） ｜ 产品做不到（实体或功能不存在）。',
   '下面标了"没有工具"的实体，在产品里是**真实存在**的：可以说"我没有这个工具"，',
   '不可以说"产品不支持"。',
   '',
-  '一、有 AI 工具的实体（8 个）',
-  '一、有 AI 工具的实体（3 个）',
+  '一、有 AI 工具的实体（9 个）',
   '- TASK —— 读和写都有（读 2 / 写 3）',
   '  · [读] list_tasks（projectId:string, completed:boolean, dueOn:string, dueFrom:string, dueTo:string, limit:number）',
   '  · [读] get_task（taskId*:string）',
