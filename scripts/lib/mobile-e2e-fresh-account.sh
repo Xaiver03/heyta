@@ -33,10 +33,19 @@
 #   heyta_e2e_fresh_account            # 建号并写凭据文件
 #
 # 环境变量：
-#   SERVER              默认 http://127.0.0.1:3000
+#   SERVER              默认 http://127.0.0.1:${PORT:-3000} —— 🔴 端口跟着 `PORT` 走，理由见下
 #   HEYTA_E2E_KEEP_ACCOUNT=1   复用已有凭据文件，不建新号（排查用）
 
-HEYTA_E2E_SERVER="${SERVER:-http://127.0.0.1:3000}"
+# 🔴 这一行的默认值以前写死 `:3000`，而六个验收脚本（auth/autosync/calendar/conflict/
+#    focus/repeat）都是在 `. lib/mobile-e2e.sh`（它才从 `PORT` 推 `SERVER`）**之前**
+#    source 本文件 —— 于是那一刻 `SERVER` 必然是空的，默认值就赢了：
+#    `PORT=3200` 换了端口，设备侧连 3200、**建号却打到 3000**。实测症状是一句
+#    "❌ 建号失败（http://127.0.0.1:3000/api/test/create-user）… 需要服务端以 TEST_MODE 运行"，
+#    而真相只是"3000 上根本没有我们的服务端"。这正是 `mobile-e2e.sh:83` 那段注释
+#    警告过的形状（去连 3000 上别人的进程），只是当时只修了 `SERVER` 那一半。
+#    显式给 `SERVER` 时行为不变（`verify-mobile-ios.sh` 在 `mobile-e2e.sh` **之后**才 source 本文件，
+#    它拿到的仍是那个已经推导过的 `SERVER`）。
+HEYTA_E2E_SERVER="${SERVER:-http://127.0.0.1:${PORT:-3000}}"
 HEYTA_E2E_TOKEN_FILE="${HEYTA_E2E_TOKEN_FILE:-/tmp/heyta_mobile_token.txt}"
 HEYTA_E2E_EMAIL_FILE="${HEYTA_E2E_EMAIL_FILE:-/tmp/heyta_mobile_email.txt}"
 HEYTA_E2E_E2EE_FILE="${HEYTA_E2E_E2EE_FILE:-/tmp/heyta_mobile_e2ee.txt}"
