@@ -56,6 +56,7 @@ import {
   archivedProjects,
   HeytaUiProvider,
   OrganizerList,
+  liveTaskCountsByTag,
   openTagCounts,
   openTaskCounts,
   toOrganizerNodes,
@@ -145,6 +146,18 @@ export function ProjectsPanel({
    */
   const tagCounts = useMemo(
     () => openTagCounts(Object.values(tasks.entities.tasks)),
+    [tasks.entities.tasks],
+  );
+  /**
+   * 删除确认里那句"它挂在几条任务上"（W4b）。
+   *
+   * 🔴 **不是** `tagCounts` 换个名字：那个滤掉了已完成的任务，而这个必须含 ——
+   * 一条挂满已完成任务的标签，删它照样会让那些任务失去归属，
+   * 用 `tagCounts` 顶替就会在界面上说"没有任务受影响"。口径只有一处
+   * （`@heyta/ui#liveTaskCountsByTag`），移动端拿的是同一个函数。
+   */
+  const tagRemoveImpact = useMemo(
+    () => liveTaskCountsByTag(Object.values(tasks.entities.tasks)),
     [tasks.entities.tasks],
   );
 
@@ -332,6 +345,7 @@ export function ProjectsPanel({
             kind="tag"
             items={tagNodes}
             counts={tagCounts}
+            removeImpact={tagRemoveImpact}
             labels={{
               removeLabel: (name) => t('web.tags.delete', { name }),
               /*
@@ -343,6 +357,12 @@ export function ProjectsPanel({
                 button: (name) => t('common.organizer.rename.button', { name }),
                 save: t('common.organizer.rename.save'),
                 cancel: t('common.organizer.rename.cancel'),
+              },
+              confirmRemove: {
+                ask: (name) => t('common.organizer.confirm.ask', { name }),
+                impact: (count) => t('common.organizer.confirm.impactTags', { count }),
+                confirm: t('common.organizer.confirm.delete'),
+                cancel: t('common.organizer.confirm.cancel'),
               },
               empty: t('common.organizer.tags.empty'),
               emptyHint: t('common.organizer.tags.empty.hint'),

@@ -1,40 +1,14 @@
 import { useEffect, useState } from 'react';
-import { cssVar } from '@heyta/design-system';
 import { useI18n } from '@heyta/i18n';
 import {
   VaultSessionError,
   type PendingVaultCreation,
   type VaultKeySession,
 } from '@heyta/app-host';
-import { confirmWebVaultRootRotation, getWebVaultRemote, getWebVaultSession } from '../../lib/vault-session.js';
+import { cancelWebVaultRootRotation, confirmWebVaultRootRotation, getWebVaultRemote, getWebVaultSession } from '../../lib/vault-session.js';
 import { useSyncStore } from './store.js';
 
 type PendingAction = 'create' | 'change' | 'rotate';
-
-const fieldStyle: React.CSSProperties = {
-  minHeight: cssVar('touch-target.min'),
-  padding: `0 ${cssVar('space.2')}`,
-  borderRadius: cssVar('radius.md'),
-  border: `${cssVar('border-width.thin')} solid ${cssVar('color.border')}`,
-  background: cssVar('color.background'),
-  color: cssVar('color.foreground'),
-  fontSize: cssVar('font-size.base'),
-  fontFamily: cssVar('font.sans'),
-};
-
-const labelStyle: React.CSSProperties = {
-  display: 'flex',
-  flexDirection: 'column',
-  gap: cssVar('space.1'),
-  fontSize: cssVar('font-size.2xs'),
-  color: cssVar('color.foreground-muted'),
-};
-
-const actionStyle: React.CSSProperties = {
-  display: 'flex',
-  flexWrap: 'wrap',
-  gap: cssVar('space.2'),
-};
 
 function errorKey(error: unknown): string {
   if (!(error instanceof VaultSessionError)) return 'web.sync.vault.error';
@@ -83,7 +57,14 @@ export function VaultSettingsPanel() {
     setLoading(true);
     void getWebVaultSession(sync.accountId, sync.baseUrl, async () => sync.token)
       .then((next) => {
-        if (!cancelled) setSession(next);
+        if (!cancelled) {
+          setSession(next);
+          const restored = next.getPendingRootRotation();
+          if (restored !== undefined) {
+            setPending(restored);
+            setPendingAction('rotate');
+          }
+        }
       })
       .catch(() => {
         if (!cancelled) setError('web.sync.vault.error');
@@ -122,18 +103,12 @@ export function VaultSettingsPanel() {
     <section
       aria-labelledby="vault-settings-title"
       data-testid="vault-settings"
-      style={{
-        display: 'flex',
-        flexDirection: 'column',
-        gap: cssVar('space.2'),
-        paddingTop: cssVar('space.2'),
-        borderTop: `${cssVar('border-width.thin')} solid ${cssVar('color.border-subtle')}`,
-      }}
+      className="ht-settings ht-settings__vault"
     >
-      <h3 id="vault-settings-title" style={{ margin: 0, fontSize: cssVar('font-size.base') }}>
+      <h3 id="vault-settings-title" className="ht-settings__h3 ht-type-headline">
         {t('web.sync.vault.title')}
       </h3>
-      <p style={{ margin: 0, color: cssVar('color.foreground-muted'), fontSize: cssVar('font-size.2xs'), lineHeight: cssVar('line-height.normal') }}>
+      <p className="ht-settings__hint">
         {t('web.sync.vault.description')}
       </p>
 
@@ -142,13 +117,13 @@ export function VaultSettingsPanel() {
         <p data-testid="vault-account-required">{t('web.sync.vault.accountRequired')}</p>
       ) : null}
       {error !== undefined ? (
-        <p role="alert" data-testid="vault-error" style={{ color: cssVar('color.danger') }}>{t(error as never)}</p>
+        <p role="alert" data-testid="vault-error" className="ht-settings__danger">{t(error as never)}</p>
       ) : null}
 
       {!loading && session !== undefined && !hasPackage && pending === undefined ? (
-        <div data-testid="vault-create-form" style={{ display: 'flex', flexDirection: 'column', gap: cssVar('space.2') }}>
+        <div data-testid="vault-create-form" className="ht-settings__section">
           <strong>{t('web.sync.vault.createTitle')}</strong>
-          <label style={labelStyle}>
+          <label className="ht-settings__field">
             {t('web.sync.vault.passphrase')}
             <input
               data-testid="vault-create-passphrase"
@@ -156,10 +131,10 @@ export function VaultSettingsPanel() {
               autoComplete="new-password"
               value={passphrase}
               onChange={(event) => setPassphrase(event.target.value)}
-              style={fieldStyle}
+              className="ht-input"
             />
           </label>
-          <div style={actionStyle}>
+          <div className="ht-settings__actions">
             <button
               type="button"
               className="ht-btn ht-btn--primary"
@@ -179,9 +154,9 @@ export function VaultSettingsPanel() {
       ) : null}
 
       {!loading && session !== undefined && hasPackage && !unlocked && pending === undefined ? (
-        <div data-testid="vault-unlock-form" style={{ display: 'flex', flexDirection: 'column', gap: cssVar('space.2') }}>
+        <div data-testid="vault-unlock-form" className="ht-settings__section">
           <strong>{t('web.sync.vault.unlockTitle')}</strong>
-          <label style={labelStyle}>
+          <label className="ht-settings__field">
             {t('web.sync.vault.passphrase')}
             <input
               data-testid="vault-passphrase"
@@ -189,34 +164,52 @@ export function VaultSettingsPanel() {
               autoComplete="current-password"
               value={passphrase}
               onChange={(event) => setPassphrase(event.target.value)}
-              style={fieldStyle}
+              className="ht-input"
             />
           </label>
-          <div style={actionStyle}>
-            <button type="button" className="ht-btn ht-btn--primary" data-testid="vault-unlock" disabled={busy || passphrase.length === 0} onClick={() => void run(() => session.unlockWithPassphrase(passphrase))}>
+          <div className="ht-settings__actions">
+            <button type="button" className="ht-btn ht-btn--primary" data-testid="vault-unlock" disabled={busy || passphrase.length === 0} onClick={() => void run(async () => {
+              await session.unlockWithPassphrase(passphrase);
+              const restored = session.getPendingRootRotation();
+              if (restored !== undefined) {
+                setPending(restored);
+                setPendingAction('rotate');
+              }
+            })}>
               {t('web.sync.vault.unlock')}
             </button>
           </div>
-          <label style={labelStyle}>
+          <label className="ht-settings__field">
             {t('web.sync.vault.recoveryCode')}
-            <input data-testid="vault-recovery-code" type="text" autoComplete="off" value={recoveryCode} onChange={(event) => setRecoveryCode(event.target.value)} style={fieldStyle} />
+            <input data-testid="vault-recovery-code" type="text" autoComplete="off" value={recoveryCode} onChange={(event) => setRecoveryCode(event.target.value)} className="ht-input" />
           </label>
-          <button type="button" className="ht-btn ht-btn--ghost" data-testid="vault-unlock-recovery" disabled={busy || recoveryCode.length === 0} onClick={() => void run(() => session.unlockWithRecoveryCode(recoveryCode), 'web.sync.vault.errorMismatch')}>
+          <button type="button" className="ht-btn ht-btn--ghost" data-testid="vault-unlock-recovery" disabled={busy || recoveryCode.length === 0} onClick={() => void run(async () => {
+            await session.unlockWithRecoveryCode(recoveryCode);
+            const restored = session.getPendingRootRotation();
+            if (restored !== undefined) {
+              setPending(restored);
+              setPendingAction('rotate');
+            }
+          }, 'web.sync.vault.errorMismatch')}>
             {t('web.sync.vault.unlockRecovery')}
           </button>
         </div>
       ) : null}
 
       {pending !== undefined ? (
-        <div data-testid="vault-pending" style={{ display: 'flex', flexDirection: 'column', gap: cssVar('space.2') }}>
+        <div data-testid="vault-pending" className="ht-settings__section">
           <strong>{t('web.sync.vault.recoveryLabel')}</strong>
-          <code data-testid="vault-recovery-display" style={{ userSelect: 'all', wordBreak: 'break-all' }}>{pending.recoveryCode}</code>
-          <p style={{ margin: 0, color: cssVar('color.foreground-muted'), fontSize: cssVar('font-size.2xs') }}>{t('web.sync.vault.recoveryHint')}</p>
-          <label style={labelStyle}>
+          {pending.recoveryCode !== '' ? (
+            <code data-testid="vault-recovery-display" className="ht-settings__vault-code">{pending.recoveryCode}</code>
+          ) : (
+            <p data-testid="vault-recovery-resume" className="ht-settings__hint">{t('web.sync.vault.recoveryResume')}</p>
+          )}
+          <p className="ht-settings__hint">{t('web.sync.vault.recoveryHint')}</p>
+          <label className="ht-settings__field">
             {t('web.sync.vault.recoveryConfirm')}
-            <input data-testid="vault-recovery-confirm" type="text" autoComplete="off" value={pendingCode} onChange={(event) => setPendingCode(event.target.value)} style={fieldStyle} />
+            <input data-testid="vault-recovery-confirm" type="text" autoComplete="off" value={pendingCode} onChange={(event) => setPendingCode(event.target.value)} className="ht-input" />
           </label>
-          <div style={actionStyle}>
+          <div className="ht-settings__actions">
             <button
               type="button"
               className="ht-btn ht-btn--primary"
@@ -244,15 +237,23 @@ export function VaultSettingsPanel() {
             >
               {t('web.sync.vault.confirm')}
             </button>
-            <button type="button" className="ht-btn ht-btn--ghost" data-testid="vault-cancel-pending" disabled={busy} onClick={() => { setPending(undefined); setPendingAction(undefined); setMigrationProgress(undefined); setLegacyPassphrase(''); }}>
+            <button type="button" className="ht-btn ht-btn--ghost" data-testid="vault-cancel-pending" disabled={busy} onClick={() => void run(async () => {
+              if (pendingAction === 'rotate' && session !== undefined && sync.token !== undefined) {
+                await cancelWebVaultRootRotation(session, { baseUrl: sync.baseUrl, token: sync.token });
+              }
+              setPending(undefined);
+              setPendingAction(undefined);
+              setMigrationProgress(undefined);
+              setLegacyPassphrase('');
+            })}>
               {t('web.sync.vault.cancel')}
             </button>
           </div>
-          {pendingAction === 'change' ? <p style={{ margin: 0, fontSize: cssVar('font-size.2xs') }}>{t('web.sync.vault.changeTitle')}</p> : null}
+          {pendingAction === 'change' ? <p className="ht-settings__hint">{t('web.sync.vault.changeTitle')}</p> : null}
           {pendingAction === 'rotate' ? (
             <>
-              <p style={{ margin: 0, fontSize: cssVar('font-size.2xs') }}>{t('web.sync.vault.rootRotationHint')}</p>
-              <label style={labelStyle}>
+              <p className="ht-settings__hint">{t('web.sync.vault.rootRotationHint')}</p>
+              <label className="ht-settings__field">
                 {t('web.sync.vault.legacyPassphrase')}
                 <input
                   data-testid="vault-legacy-passphrase"
@@ -260,31 +261,31 @@ export function VaultSettingsPanel() {
                   autoComplete="off"
                   value={legacyPassphrase}
                   onChange={(event) => setLegacyPassphrase(event.target.value)}
-                  style={fieldStyle}
+                  className="ht-input"
                 />
               </label>
-              <p style={{ margin: 0, color: cssVar('color.foreground-muted'), fontSize: cssVar('font-size.2xs') }}>
+              <p className="ht-settings__hint">
                 {t('web.sync.vault.legacyPassphraseHint')}
               </p>
             </>
           ) : null}
-          {migrationProgress !== undefined ? <p data-testid="vault-migration-progress">{t('web.sync.vault.rootRotationProgress', migrationProgress)}</p> : null}
+          {migrationProgress !== undefined ? <p className="ht-settings__hint" data-testid="vault-migration-progress">{t('web.sync.vault.rootRotationProgress', migrationProgress)}</p> : null}
         </div>
       ) : null}
 
       {!loading && session !== undefined && unlocked && pending === undefined ? (
-        <div data-testid="vault-unlocked" style={{ display: 'flex', flexDirection: 'column', gap: cssVar('space.2') }}>
-          <p style={{ margin: 0 }} data-testid={session.requiresRecoveryRotation ? 'vault-recovery-rotation' : 'vault-ready'}>
+        <div data-testid="vault-unlocked" className="ht-settings__section">
+          <p className="ht-settings__hint" data-testid={session.requiresRecoveryRotation ? 'vault-recovery-rotation' : 'vault-ready'}>
             {session.requiresRecoveryRotation ? t('web.sync.vault.recoveryRotationRequired') : t('web.sync.vault.ready')}
           </p>
-          <div style={actionStyle}>
+          <div className="ht-settings__actions">
             <button type="button" className="ht-btn ht-btn--ghost" data-testid="vault-lock" onClick={() => { session.lock(); setRevision((value) => value + 1); }}>
               {t('web.sync.vault.lock')}
             </button>
           </div>
-          <label style={labelStyle}>
+          <label className="ht-settings__field">
             {t('web.sync.vault.newPassphrase')}
-            <input data-testid="vault-new-passphrase" type="password" autoComplete="new-password" value={newPassphrase} onChange={(event) => setNewPassphrase(event.target.value)} style={fieldStyle} />
+            <input data-testid="vault-new-passphrase" type="password" autoComplete="new-password" value={newPassphrase} onChange={(event) => setNewPassphrase(event.target.value)} className="ht-input" />
           </label>
           <button type="button" className="ht-btn ht-btn--ghost" data-testid="vault-change-passphrase" disabled={busy || newPassphrase.length === 0} onClick={() => void run(async () => {
             const next = await session.beginPassphraseChange(newPassphrase);

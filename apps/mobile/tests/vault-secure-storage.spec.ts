@@ -130,4 +130,89 @@ describe('vault secure storage port', () => {
     await expect(saving).rejects.toThrow('保存期间已失效');
     expect(writes).toEqual([['vault.rememberedUnlockDisabled:https://sync.example.test/\u0000account-1', '1']]);
   });
+
+  it('deletes after an in-flight save across independently created wrappers', async () => {
+    const account = { ...scope, accountId: 'late-native-save' };
+    let finishSave!: () => void;
+    let started!: () => void;
+    const start = new Promise<void>((resolve) => { started = resolve; });
+    const finish = new Promise<void>((resolve) => { finishSave = resolve; });
+    let item: string | null = null;
+    let marker: string | undefined;
+    const events: string[] = [];
+    const native: VaultSecureStorageNative = {
+      load: async () => item,
+      save: async (_origin, _account, root) => {
+        started();
+        await finish;
+        item = root;
+        events.push('save');
+        return true;
+      },
+      remove: async () => { item = null; events.push('remove'); return true; },
+    };
+    const prefs = { read: () => marker, write: (_name: string, value: string) => { marker = value; return true; } };
+    const saver = createRememberedUnlockVaultStorage(createVaultSecureStorage(native), prefs);
+    const logout = createRememberedUnlockVaultStorage(createVaultSecureStorage(native), prefs);
+    const saving = saver.save(account, key);
+    const rejected = expect(saving).rejects.toThrow('保存期间已失效');
+    await start;
+    const removing = logout.remove(account);
+    expect(marker).toBe('1');
+    finishSave();
+    await rejected;
+    await removing;
+    expect(item === null, 'logout must leave no native root even when an older save resolves late').toBe(true);
+    expect(events).toEqual(['save', 'remove']);
+    await expect(saver.load(account)).resolves.toBeUndefined();
+  });
+
+  it('does not return a root from a native load that resolves after logout', async () => {
+    const account = { ...scope, accountId: 'late-native-load' };
+    let finishLoad!: (value: string) => void;
+    let started!: () => void;
+    const start = new Promise<void>((resolve) => { started = resolve; });
+    const native = nativeFixture();
+    native.load = vi.fn(() => {
+      started();
+      return new Promise<string>((resolve) => { finishLoad = resolve; });
+    });
+    let marker = '0';
+    const prefs = { read: () => marker, write: (_name: string, value: string) => { marker = value; return true; } };
+    const reader = createRememberedUnlockVaultStorage(createVaultSecureStorage(native), prefs);
+    const logout = createRememberedUnlockVaultStorage(createVaultSecureStorage(native), prefs);
+    const loading = reader.load(account);
+    await start;
+    const removing = logout.remove(account);
+    finishLoad(key);
+    await expect(loading).resolves.toBeUndefined();
+    await removing;
+    expect(native.remove).toHaveBeenCalledOnce();
+  });
+
+  it('still attempts native deletion if the preference fence cannot be persisted', async () => {
+    const account = { ...scope, accountId: 'failed-fence' };
+    const native = nativeFixture();
+    const storage = createRememberedUnlockVaultStorage(createVaultSecureStorage(native), {
+      read: () => '0', write: () => false,
+    });
+    await expect(storage.remove(account)).rejects.toThrow('禁用状态未能写入');
+    expect(native.remove).toHaveBeenCalledOnce();
+    await expect(storage.load(account)).resolves.toBeUndefined();
+    expect(native.load).not.toHaveBeenCalled();
+  });
+
+  it('an explicit later opt-in can enable the same account again', async () => {
+    const account = { ...scope, accountId: 'later-opt-in' };
+    let marker = '0';
+    const native = nativeFixture();
+    native.load = vi.fn(async () => key);
+    const storage = createRememberedUnlockVaultStorage(createVaultSecureStorage(native), {
+      read: () => marker, write: (_name, value) => { marker = value; return true; },
+    });
+    await storage.remove(account);
+    await expect(storage.load(account)).resolves.toBeUndefined();
+    await storage.save(account, key);
+    await expect(storage.load(account)).resolves.toBe(key);
+  });
 });
