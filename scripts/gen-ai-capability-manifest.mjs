@@ -132,11 +132,19 @@
  * —— 它不落盘、不进线协议，改它不代表任何用户数据迁移（AGENTS §3.3 那堵墙不在这里）。
  */
 
-import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync, realpathSync, writeFileSync } from 'node:fs';
 import { dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
-const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
+// 🔴 根**可以**被注入，而且必须能被注入：`check:ai-tools` 的规则 7 会 spawn 本文件，
+// 而它自己的 `ROOT` 认 `HEYTA_CHECK_ROOT`。如果本文件只认"我自己住在哪"，
+// 注入假根时两边就不是同一棵树 —— 于是它会**认真地核对错的树**，
+// 并给出一个看起来完全合法的"与上游一致"。故障注入假根本身也是软链进来的，
+// 那正是 traps #180 的第二种空跑形状。未注入时逐字等于原来的取值，行为不变。
+const ROOT =
+  process.env.HEYTA_CHECK_ROOT !== undefined && process.env.HEYTA_CHECK_ROOT !== ''
+    ? resolve(process.env.HEYTA_CHECK_ROOT)
+    : resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const ARTIFACT = join(ROOT, 'packages/ai/src/capability-manifest.generated.ts');
 
 /** 产物自身的结构版本（见文件头：不是 `CURRENT_SCHEMA_VERSION`）。 */
@@ -1074,8 +1082,16 @@ export async function main(argv = process.argv.slice(2)) {
   return 0;
 }
 
+// 🔴 `import.meta.url` 是**过了 realpath** 的 URL，而 `process.argv[1]` 是调用者拼的形状。
+// 路径里任何一段软链（`/tmp` → `/private/tmp`、故障注入假根里那些指向真脚本的 symlink）
+// 都会让逐字比较失配 ⇒ 本文件**一个字节都不核对、零输出、退出 0**。
+// 实测（同一棵树、同一份文件，只换路径拼法）：
+//   `node /tmp/…/scripts/gen-ai-capability-manifest.mjs --check`         → 无输出，exit 0
+//   `node /private/tmp/…/scripts/gen-ai-capability-manifest.mjs --check` → 报「读不到 dist」，exit 1
+// 上一轮那个 exit 0 被读成了"清单与上游一致"。先 realpath 再比，把空跑这条路堵掉。
 const invokedDirectly =
-  process.argv[1] !== undefined && import.meta.url === pathToFileURL(process.argv[1]).href;
+  process.argv[1] !== undefined &&
+  import.meta.url === pathToFileURL(realpathSync(process.argv[1])).href;
 
 if (invokedDirectly) {
   try {
