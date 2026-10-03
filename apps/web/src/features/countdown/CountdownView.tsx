@@ -152,12 +152,6 @@ function datePickerLabels(t: Translate) {
 /**
  * 板子本体：**必须活在 `<HeytaUiProvider>` 里面**。
  *
- * 成品图要读当前主题的 `tokens` 与 `text`（唯一事实源），而 `useHeytaUiTheme()`
- * 在 Provider 外面是**运行时抛错**、类型与单测都不红（文件头那条 M3 教训）。
- * 所以主题读取只能开在这一层 —— 这也是为什么 `exportEventCard` 的入参
- * 是"整套主题表"而不是几个颜色：颜色一旦被宿主挑着传，就会有人图省事写 `#fff`。/**
- * 板子本体：**必须活在 `<HeytaUiProvider>` 里面**。
- *
  * 成品图要读当前主题的 `tokens` 与 `text`（设计系统唯一事实源），而
  * `useHeytaUiTheme()` 在 Provider 外面是**运行时抛错**、类型与单测都不红
  * （文件头那条 M3 教训）。所以主题读取只能开在这一层。
