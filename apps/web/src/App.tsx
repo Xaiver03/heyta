@@ -182,6 +182,7 @@ import { FocusTimer } from './features/focus/FocusTimer.js';
 import { TrashView } from './features/trash/TrashView.js';
 import { LanguageSwitcher } from './features/shell/LanguageSwitcher.js';
 import { onEngineChange, readRecentOps } from './lib/oplog.js';
+import { useSelectionKeyboardCursor } from './lib/keyboard-cursor.js';
 import { pruneSelectionFromEntities, selection, useSelected } from './lib/selection.js';
 import { applyTheme, rememberThemeChoice, resolveInitialTheme, type Theme } from './lib/theme.js';
 
@@ -512,6 +513,12 @@ export function App(): React.JSX.Element {
    * （浮层之下"下层可见"，§11.5）。
    */
   const contentView = view === 'settings' || view === 'search' ? settingsBaseView : view;
+  /**
+   * 🔴 键盘光标绑的是**这一行的值**，不是 `view`：设置与搜索都是浮层/面板，
+   * 底下那一栏还挂着（`settingsBaseView` 存在的理由）。绑 `view` 的话，
+   * 打开设置面板会把光标从「任务」切走 —— 而用户看到的还是那一栏列表。
+   */
+  useSelectionKeyboardCursor(contentView);
 
   /**
    * 第二列（侧栏）在哪些视图出现。
