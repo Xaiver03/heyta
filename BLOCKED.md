@@ -2811,13 +2811,40 @@ cd /private/tmp/heyta-final && git merge --no-edit main && pnpm build && pnpm ch
 
 **关闭路径**：`check:legal-tools` 进 `main` 之后，由本线按它的形状补齐 16 条 + 与那条线对齐版本号；
 现量命令（node，别用 shell —— 见 `docs/plans/ai-event-tool-contract.md` §15.15 末尾那三趟 16/0/24）：
+
 ```bash
-node -e 'const fs=require("fs"),cp=require("child_process");const d="packages/local-api/src/tools";const n=new Set();
-for(const f of fs.readdirSync(d)){if(!f.endsWith(".ts")||f==="registry.ts")continue;
-for(const m of fs.readFileSync(d+"/"+f,"utf8").matchAll(/name:\s*['"]([a-z0-9_.]+)['"]/g))n.add(m[1]);}
+# 前提：`pnpm build` 已跑（读的是 dist）。本仓的 check 链第 1 段就是它。
+node -e 'const fs=require("fs");const {LOCAL_API_TOOLS}=require("./packages/local-api/dist/index.js");
+const names=LOCAL_API_TOOLS.map(x=>x.name);
 const t=fs.readFileSync("packages/legal/src/documents/ai-and-transfer.ts","utf8");
-console.log("dir="+n.size+" missing="+[...n].filter(x=>!t.includes(x)).length)'
+const miss=names.filter(n=>!t.includes(n));
+console.log("dir="+names.length+" missing="+miss.length+" -> "+miss.join(" "))'
+# 载体 6bb9716f 读数：dir=22 missing=16
+#   -> list_habits list_tags list_notes get_note list_checkins list_focuses list_reminders
+#      create_project create_habit create_tag set_task_tags create_note update_note
+#      record_checkin log_focus create_reminder
 ```
+
+🔴 **复现这条命令时别手改它** —— 我把上一版（`readdirSync` + 正则 `name:\s*['"]…['"]`）手改进
+shell 单引号时就是这样量出假数的，形状记下来：
+
+那一版**原样从文件里跑是对的**（`dir=22 missing=16`，与门禁读数一致）；
+但我复现时把 `['"]` 这个字符类**换成 `.`**（它没法在 bash 的单引号里嵌套），于是
+`name: z.string()` 这类**参数形状声明**开始被当成工具名，`dir` 变 **24**，多出两个垃圾 token
+`tring` 与 `a`。最危险的是 **`missing` 仍然是 16**：那两个垃圾名过不了 `!t.includes(name)`
+（文档源码里当然有 `string`、也到处有字母 `a`），被**无声吸收**，没进缺项计数。
+⇒ 两条一般规律：**(a)** 一条只能靠 shell 单引号嵌套传递的取证命令是**易碎的**，
+下一个人必然要"等价改写"它，而等价改写点就是坏掉的地方 —— 上面因此换成**读产物**的写法
+（`require('…/dist').LOCAL_API_TOOLS`，数的是真对象而不是扫源码的形状）；
+**(b)** 用 `includes(全文)` 做成员判定的对账**只挡漏抄、不挡抄错**：
+它永远不会因为"这个名字根本不该存在"而报错。
+
+**中英两张表的逐块读数**（同一命令改成按 `const zh =` / `const en =` 切块后分别数，载体 `6bb9716f`）：
+已列的 6 条在**两块里次数完全对称** —— `list_tasks` 2/2、`get_task` 2/2、
+`list_projects` 1/1、`create_task` 1/1、`update_task` 1/1、`complete_task` 1/1（块长度 zh 9058 / en 21526）。
+⇒ 所以 B48 缺的 16 条是**两张表一起缺**，不存在"中文补了英文没补"那种半边缺口；
+⚠️ 遗留弱点（**未修，留给 `check:legal-tools`**）：`includes` 仍是全文级判定，
+真要钉"这张表列了它"得按表的形状解析行，而不是问整份文件里有没有出现过这串字符。
 
 ## B49. 🔴 Windows 打包机的对账只做了前半程：远端是**共享目的目录**，而构建要跑几分钟（2026-10-03 19:2x 只读预检照出）
 
