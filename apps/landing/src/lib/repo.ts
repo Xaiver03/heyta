@@ -45,8 +45,11 @@ export const GITHUB_URL = 'https://github.com/Xaiver03/heyta';
  * ⇒ 站内文章才是与落地页**同一次发布**的 target：`/docs/selfhost/` 由同一个构建产出、
  * 同一条 rsync 上线，不存在"改了落地页但目标还没发布"这种中间态。
  * 路径从页面注册表里取（不抄第二份），并做成**同源相对路径** —— 换域名时它不需要跟着改。
- * ⚠️ 代价登记在 G-49：站内那篇文章是入口命令的第 4 份抄件，
- * 而 `check:selfhost-entry-command` 的扫描集里目前没有它。
+ * ✅ 代价登记在 G-49 的**已经关掉**（2026-10-03）：站内那篇文章原本是入口命令的第 4 份抄件，
+ * 而现在 `packages/i18n/src/locales/{zh-CN,en}.ts` 两份词条表都在
+ * `check:selfhost-entry-command` 的扫描集里（`source: 'copy'` 那一档），
+ * 浏览器侧另有一条独立读 runbook 的对照判据。留这一行是为了记下"这条链的目标同时是一份抄件"
+ * 这件事本身 —— 它不再是风险，但它是这个链接为什么必须与文档同批发布的理由。
  */
 export const SELF_HOST_GUIDE_URL = (() => {
   const page = SITE_PAGES.find((p) => p.id === 'selfhost');
