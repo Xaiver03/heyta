@@ -73,7 +73,23 @@ function eventActionsNow() {
   return createEventActions(engine, { now });
 }
 
-async function seed(): Promise<string[]> {
+/**
+ * 🔴 返回的是**五元组**而不是 `string[]`。
+ *
+ * 原来写 `Promise<string[]>`，于是 `const [birthday, countdown] = await seed()`
+ * 在 `noUncheckedIndexedAccess` 下每一项都是 `string | undefined`，
+ * `byId.get(countdown)` 一类调用**typecheck 直接红 26 处**
+ * （`pnpm --filter @heyta/app-host typecheck`，2026-10-04 实测于 W8 的基点）。
+ * 测试**照跑照绿** —— vitest 不查类型，所以这条红只在 typecheck 里现形，
+ * 正是 §7 第 162 条记的那个形状（"vitest 绿 ≠ 构建/类型绿"）。
+ *
+ * 修法是把**夹具的真实形状**写进类型：这里确实固定建五条、顺序固定，
+ * 那就返回元组，而不是在每个调用点补 `!` 或 `?? ''`
+ * （那等于让"取到 undefined"变成一条静默通过的断言）。
+ */
+async function seed(): Promise<
+  [string, string, string, string, string]
+> {
   const ea = eventActionsNow();
   const birthday = await ea.createEvent('妈妈生日', '1968-04-12', {
     kind: 'birthday',
