@@ -966,11 +966,29 @@ W0b ─> 随时可做（台账那半要等文件干净）
 
 #### ⏹ W6 · `EVENT` 成为日历的第二个事件源
 
-- **事实**：`packages/ui/src/calendar/model.ts:310,321,504-512` **只读 `task.dueDate`**（注释自己承认）；
-  消费者 `apps/web/src/features/calendar/CalendarView.tsx:39,164`、`apps/mobile/src/screens/CalendarScreen.tsx:44,337`。
+- **事实**：唯一的按日聚合是 `packages/ui/src/calendar/model.ts#groupTasksByDueDate`，它
+  `if (task.dueDate === undefined) continue;` —— 🔴 **没有截止时间的任务不上日历**，且注释自己承认这一点
+  （所以宿主必须显示 `labels.footnote`）。消费者两处：`apps/web/src/features/calendar/CalendarView.tsx`
+  与 `apps/mobile/src/screens/CalendarScreen.tsx`。
+  ⚠️ **2026-10-03 20:2x 更正本条的坐标**：原文写的是 `model.ts:310,321,504-512` 与
+  `CalendarView.tsx:39,164` / `CalendarScreen.tsx:44,337` —— 那组行号取自**当时脏着的工作树**，
+  HEAD 的 `model.ts` 只有 **261 行**（`groupTasksByDueDate` 在 252–255），根本没有 310/504 这些行。
+  ⇒ 从这一行起本单**按符号锚定，不按行号锚定**（同一文件的工作树版本此刻是 518 行，见下）。
+  HEAD 里 `grep -c 'EVENT|CountdownEvent' model.ts` = **0**，他们工作树版本也还是 **0**
+  ⇒ 这条线在忙的不是 EVENT，W6 没有被别人做掉。
 - **判据**：一条**没有截止日**的倒数日能上日历（这就是它区别于 TASK 的可观测证据）；
   变异 = 把 EVENT 源接成"必须有 dueDate" ⇒ 红。另接进"今天"与收集箱（`App.tsx:723` 的 `refreshNow()` 是现成的"今天"重估点）。
-- [ ] W6 完成
+- [ ] W6 完成 —— 🔴 **20:2x 逐文件现量：仍是撞车面，且这次量得出代价**
+  主检出里本单落点的未提交 diff（`git diff --numstat`）：
+  `packages/ui/src/calendar/model.ts` **+264/−7**（261 → 518 行，其中一处插入是 `@@ -162,3 +181,169 @@`
+  = 一次 166 行的插入，正压在 W6 要改的那段聚合逻辑的下游）、`CalendarBoard.tsx` +107/−33、
+  `date-text.ts` +74/−1、`CalendarToolbar.tsx` +56/−9、`CalendarScreen.tsx` +153/−3、
+  `apps/web/src/features/calendar/{CalendarView 26/0, store 33/16, CalendarHeaderToolbar 17/7, useCalendarLabels 24/2}`。
+  ⇒ 现在在 batch2 里做 W6 = 在一个**即将整片重写**的文件上造第二份改动，合流时没人能干净三方合并；
+  而 W4b 已经确认"休/班"的自然落点是共享 `CalendarBoard` 的 `DayCell` 上的一个
+  **默认值等于原值的可选 prop（`dayMarker?`）** ⇒ **W6 落地时必须复用那条缝，不要另开一个注入点**。
+  **关闭判据（何时可以动）**：`git status --porcelain -- packages/ui/src/calendar apps/web/src/features/calendar apps/mobile/src/screens/CalendarScreen.tsx` 输出为空
+  （他们的 +264 那批已提交并进了我要基于的那条线）—— 每次引用本条都要重跑这一行，别信这段文字。
 
 #### ✅ W5 · 卡片网格 + 类型筛选 + pin + `⋯` 二级操作 + 归档视图
 
