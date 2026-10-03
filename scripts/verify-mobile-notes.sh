@@ -370,23 +370,35 @@ step "7. 反证：一个字不改直接保存、以及点取消 —— 都必须
 # `if (next === current.content) return`）。只判条数，不判"界面没变"。
 require_screen
 BEFORE=$(note_op_count "$PHONE_DB" UPD)
-open_editor_for "$NOTE_B"
-close_editor_with "保存"
-phone_db_pull
-AFTER=$(note_op_count "$PHONE_DB" UPD)
-if [ "$AFTER" != "$BEFORE" ]; then
+# 下面这一档不是形式主义：`note_op_count` 读不到库时返回**空串**（函数注释自己要求调用方判
+# "不是数字"，第 6 步判了、这里原来没判）。拉库一失败，`"$AFTER" != "$BEFORE"` 就退化成
+# `"" != ""` ⇒ 恒假 ⇒ 打印"没改动 → 一条 op 都没写"。那是一条**永远通过**的判据，
+# 而它挡的正是变异 M2（拿掉 note-actions.ts 里 `if (next === current.content) return`）。
+if ! printf '%s' "$BEFORE" | grep -qE '^[0-9]+$'; then
+  bad "第 7 步起跑前就读不到手机库的 NOTE/UPD 计数（实际「${BEFORE:-空}」）—— 探针没跑成，这一档不作数"
+else
+  open_editor_for "$NOTE_B"
+  close_editor_with "保存"
+  phone_db_pull
+  AFTER=$(note_op_count "$PHONE_DB" UPD)
+  if ! printf '%s' "$AFTER" | grep -qE '^[0-9]+$'; then
+    bad "保存后读不到计数（改前=${BEFORE}、改后=「${AFTER:-空}」）—— 不能把'读不到'读成'没多写'"
+  elif [ "$AFTER" != "$BEFORE" ]; then
   bad "没改动却多写了 op（${BEFORE} → ${AFTER}）—— 就是「看一眼就把这条顶到列表最前」那个事故形状"
-else
-  ok "没改动 → 一条 op 都没写（NOTE/UPD 仍为 ${AFTER}）"
-fi
-open_editor_for "$NOTE_B"
-close_editor_with "取消"
-phone_db_pull
-CANCEL_N=$(note_op_count "$PHONE_DB" UPD)
-if [ "$CANCEL_N" != "$BEFORE" ]; then
-  bad "点「取消」却写了 op（${BEFORE} → ${CANCEL_N}）"
-else
-  ok "点「取消」同样一条 op 都没写"
+  else
+    ok "没改动 → 一条 op 都没写（NOTE/UPD 仍为 ${AFTER}）"
+  fi
+  open_editor_for "$NOTE_B"
+  close_editor_with "取消"
+  phone_db_pull
+  CANCEL_N=$(note_op_count "$PHONE_DB" UPD)
+  if ! printf '%s' "$CANCEL_N" | grep -qE '^[0-9]+$'; then
+    bad "点取消后读不到计数（基线=${BEFORE}、取消后=「${CANCEL_N:-空}」）—— 同上，不作数"
+  elif [ "$CANCEL_N" != "$BEFORE" ]; then
+    bad "点「取消」却写了 op（${BEFORE} → ${CANCEL_N}）"
+  else
+    ok "点「取消」同样一条 op 都没写"
+  fi
 fi
 
 step "8. 第二个宿主：任务页搜索里点开这条便签"
