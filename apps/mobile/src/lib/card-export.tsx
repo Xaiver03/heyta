@@ -31,7 +31,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { PixelRatio, Platform, Share, View } from 'react-native';
 import { Rect, Svg, Text as SvgText } from 'react-native-svg';
-import { buildCardExportLayout, cardExportFileName, cardExportFileStem, type CardExportLayout, type CardExportRequest } from '@heyta/ui';
+import { buildCardExportLayout, cardExportFileName, cardExportFileStem, type CardExportLayout, type CardExportRequest } from '@heyta/ui/node';
 import { cardTextLinesFor, rasterRequestFor, rasterScaleFor } from './card-export-units';
 import { writeCardPng, type CardExportFailureCode } from './card-export-native';
 

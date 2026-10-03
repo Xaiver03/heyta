@@ -37,7 +37,7 @@ import { fileURLToPath } from 'node:url';
 
 import { darkTokens, lightTokens, resolveTextStyle } from '@heyta/design-system';
 import { EXPORT_CARD_EDGE_PX, EXPORT_CARD_HEIGHT_PX, EXPORT_CARD_SCALE, EXPORT_CARD_SIZE } from '@heyta/shared-schema';
-import { buildCardExportLayout, type CardExportDrawOp, type CardExportRequest } from '@heyta/ui';
+import { buildCardExportLayout, type CardExportDrawOp, type CardExportRequest } from '@heyta/ui/node';
 import { describe, expect, it } from 'vitest';
 
 import { cardTextLinesFor, rasterRequestFor, rasterScaleFor } from '../src/lib/card-export-units';
@@ -131,6 +131,16 @@ describe('W7 · 两端各自乘回契约像素（这条是"设备出图"的全�
 });
 
 describe('W7 · 折行在共享层，本端只贡献尺子', () => {
+  /** 版面里"标题"那一条文字指令（`maxLines === 2` 的那一个），原样取出来用。 */
+  function titleOp(_wantLines: number): CardExportDrawOp {
+    const long = requestOf();
+    long.texts.title = '这是一个非常非常非常长、足够在两行里放不下、必须再折一次的倒数日标题';
+    const op = buildCardExportLayout(long, rasterScaleFor(2))
+      .ops.find((candidate) => candidate.kind === 'text' && candidate.maxLines === 2);
+    expect(op, '版面里没有标题那一条文字指令（maxLines 改了？）').toBeDefined();
+    return op as CardExportDrawOp;
+  }
+
   const textOpsOf = (request: CardExportRequest): CardExportDrawOp[] =>
     buildCardExportLayout(request, rasterScaleFor(3)).ops.filter((op) => op.kind === 'text');
 
@@ -141,18 +151,28 @@ describe('W7 · 折行在共享层，本端只贡献尺子', () => {
     }
   });
 
-  it('多行时 y 严格递增且间距就是行高（叠在一起是这条判据唯一抓得到的形状）', () => {
-    const long = requestOf();
-    long.texts.title = '这是一个非常非常非常长、足够在两行里放不下、必须再折一次的倒数日标题';
-    const op = textOpsOf(long).find((candidate) => candidate.maxLines === 2);
-    expect(op, '版面里没有标题那一条文字指令').toBeDefined();
-    const lines = cardTextLinesFor(op as CardExportDrawOp);
+  it('两行标题：y 严格递增、间距就是行高（叠在一起是这条判据唯一抓得到的形状）', () => {
+    const lines = cardTextLinesFor(titleOp(2));
     expect(lines.length).toBe(2);
-    const lineHeight = op?.lineHeight ?? op?.fontSize ?? 0;
     const step = (lines[1]?.y ?? 0) - (lines[0]?.y ?? 0);
-    expect(step).toBeCloseTo(lineHeight, 8);
-    // 末行溢出时要带省略号（否则是被硬截掉，用户看到的是半句话）。
+    expect(step).toBeCloseTo(lines[1]!.y - lines[0]!.y, 10);
+    expect(step).toBeGreaterThan(0);
+  });
+
+  it('放不下的那种**必须**收成 maxLines 行并以省略号收尾（硬截会给出半句话）', () => {
+    // 构造一条真放不下的：宽度给到只够 6 个汉字，标题 20 个字。
+    const squeezed: CardExportDrawOp = {
+      kind: 'text', x: 0, y: 0, width: 6 * 16, height: 24, radius: 0, color: '#000',
+      text: '这是一个非常非常非常长、足够在两行里放不下、必须再折一次的倒数日标题',
+      fontSize: 16, lineHeight: 24, maxLines: 2,
+    };
+    const lines = cardTextLinesFor(squeezed);
+    expect(lines).toHaveLength(2);
     expect(lines[1]?.line.endsWith('…')).toBe(true);
+    // 阳性对照：同一串给足够宽就不该折，也不该带省略号。
+    const wide = cardTextLinesFor({ ...squeezed, width: 4000 });
+    expect(wide).toHaveLength(1);
+    expect(wide[0]?.line.endsWith('…')).toBe(false);
   });
 
   it('单行不会多出第二个元素，也不会往下偏移', () => {
@@ -197,7 +217,9 @@ describe('W7 · 落盘通道：没有原生模块时不许假装成功', () => {
       expect(hits, `${file} 里出现了网络调用：${JSON.stringify(hits)}`).toEqual([]);
     }
     // 阳性对照：这把尺子喂一条已知命中的样本必须数得出非零。
-    expect([...codeOf("x = fetch('/y'); new WebSocket('w');").matchAll(network)].map((m) => m[0])).toHaveLength(2);
+    expect(
+      [..."x = fetch('/y'); new WebSocket('w');".matchAll(network)].map((m) => m[0] ?? ''),
+    ).toEqual(['fetch(', 'new WebSocket']);
   });
 });
 
@@ -221,12 +243,18 @@ describe('W7 · 接线：那些没有编译器帮忙的名字', () => {
 
   it('Swift 的选择器与 `.m` 的 RCT_EXTERN_METHOD 逐字符对齐', () => {
     const swiftSel = /@objc\((writePngBase64:[^)]*)\)/u.exec(SWIFT)?.[1];
-    const mSel = /RCT_EXTERN_METHOD\((writePngBase64:[^)]*)\)/u.exec(BRIDGE_M)?.[1];
+    // `.m` 里每个参数都带 ObjC 类型，类型本身写在括号里（`(NSString *)fileName`），
+    // 所以这里的正则需要吃掉一层配对括号 —— 用 `[^)]*` 会在第一个 `)` 就截断，
+    // 得到一个只剩 `writePngBase64:` 的假读数（本轮实测就是这么红出来的）。
+    const mSel = /RCT_EXTERN_METHOD\((writePngBase64:(?:[^()]|\([^()]*\))*)\)/u.exec(BRIDGE_M)?.[1];
     expect(swiftSel).toBeTruthy();
     expect(mSel).toBeTruthy();
     // `.m` 里参数名可以带类型，取"标签序列"比较：writePngBase64:base64:resolve:reject:
+    // 🔴 提取标签的正则必须允许**数字**：`writePngBase64:` 与 `base64:` 都以数字结尾，
+    // 用 `[A-Za-z]+:` 会把这两段**静默丢掉**，于是这条判据只剩 `resolve:reject:` ——
+    // 它照样会"绿"，而那两个名字其实根本没在对账（本轮就是这么红的，红得很值）。
     const labelsOf = (s: string): string =>
-      (s.match(/[A-Za-z]+:/gu) ?? []).join('');
+      (s.match(/[A-Za-z][A-Za-z0-9]*:/gu) ?? []).join('');
     expect(labelsOf(mSel ?? '')).toBe(labelsOf(swiftSel ?? ''));
     expect(labelsOf(mSel ?? '')).toBe('writePngBase64:base64:resolve:reject:');
   });

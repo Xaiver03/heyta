@@ -16,7 +16,7 @@
  */
 
 import { EXPORT_CARD_EDGE_PX, EXPORT_CARD_HEIGHT_PX, EXPORT_CARD_SCALE } from '@heyta/shared-schema';
-import { estimateAdvance, wrapCardText, type CardExportDrawOp } from '@heyta/ui';
+import { estimateAdvance, wrapCardText, type CardExportDrawOp } from '@heyta/ui/node';
 
 /**
  * 密度 → "语义 token → 该端绘制单位"的倍率。
