@@ -86,6 +86,9 @@ landing-results/
 # 而这两个目录里放的正是"人必须打开看一眼"的那批截图，最容易顺手 add。
 legal-links-results/
 live-site-results/
+# `live-signin-entry.spec.ts` 的专属取证目录（同上一条理由：不跟共享目录挤，
+# 否则别的套件跑一轮就把人还没看的图删了）。
+live-signin-results/
 playwright-report/
 blob-report/
 e2e/.playwright/
