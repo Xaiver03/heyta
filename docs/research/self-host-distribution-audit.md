@@ -2663,3 +2663,44 @@ VERIFY_EXIT=0
 一次真构建 + `verify:selfhost-stack` 复跑才算闭环。
 **本批不做的原因不变**：它动的是"镜像里到底装了什么"，而这一批正卡在落地窗口，
 把一次生产路径重写塞进待评审的合并里，代价是让别的会话评审一个他们没预期的东西。
+
+### 8.44 对账换到**真产物**上跑之后，第一次开口就照出两条对外缺陷：镜像里两枚包根本没声明 license
+
+上面那句"本批不做生产安装路径"仍然成立，但**"对账"这一半不需要等** ——
+它缺的只是一棵真的树。于是把 `check:image-license-coverage` 加了第二种载体：
+
+| 载体 | 输入 | 跑在哪 | 能说什么话 |
+|---|---|---|---|
+| 预测快照（原有） | `server/image-npm-tree.json` | `pnpm check`（不联网、不 docker） | "如果 npm 按这份预测解析，许可是干净的" |
+| 真镜像树（本轮加） | `research/tools/dump-installed-tree.js` 在**跑起来的镜像里**枚举 | `scripts/verify-selfhost-stack.sh` 每次全跑 | "发出去的那一枚里，装的每一条都被扫过或逐条登记过" |
+
+新加的三条判定只在真产物上成立：登记里的 license 必须等于**包自己声明的**那一条
+（拦"上游改了许可而版本号没变"）；本仓库那三枚包要求镜像内声明与源码侧声明逐字相同；
+dump 里 `license` 列有值的条目数 <100 直接判红（否则"登记=声明"会静默退化成永真）。
+
+🔴 **第一次跑就红了，而且红的是真缺陷**：`@heyta/sync-core` 与 `@heyta/shared-schema`
+在镜像里的 `package.json` **没有 license 字段** —— 两枚包目录下都有 MIT 的 LICENSE 文件，
+`PROVENANCE.md` 也写着 MIT，但 manifest 缺声明 ⇒ **发出去的产物自称"无授权"**。
+按 AGENTS §3.2 那是"无 LICENSE 文件 = 无授权 = 一行都不能用"的同一族，只是这次缺的是**声明**不是文件。
+补了两枚 `"license": "MIT"`（值来自各自目录里那份 LICENSE 的第一行，不是从 ADR 抄的）。
+顺带：`packages/domain` 反过来 —— manifest 声明 MIT 而目录里**没有 LICENSE 文件**，登记不改（不在本批面上）。
+
+⇒ 这条腿自己还有一次**当场生效**的证明：改完那两枚 manifest，快照新鲜度那条腿立刻红了
+（它哈希这三枚被 pack 进镜像的 manifest），重跑 `gen-image-npm-tree.mjs` 之后 `check:image-license` 全链复绿。
+
+⚠️ **我自己在这条腿上差点装出一个更严的第二套政策**：第一版的"声明必须宽松"只查
+`PERMISSIVE_LICENSES`，于是 glob / lru-cache / minimatch / minipass / path-scurry（`BlueOak-1.0.0`）
+与 nodemailer（`MIT-0`）全被判红 —— 而它们在 pnpm store 里**早就被 `REVIEWED_OTHER` 逐条判过**。
+症状看起来像"镜像里混进了不合格许可"，实际是新腿另立了一套比门禁本体更严的判据。
+⇒ 加判定只能引用**已有的那一个权威**（宽松表 ∪ REVIEWED_OTHER ∪ 镜像独有表），
+不许在第二处重写"什么算可以"（§7 第 4 条"词表两套定义"的又一副面孔）。
+
+登记表还多了一个 `carrier` 字段，因为它解决的是第二种载体带来的新问题：
+arm64 变体与"npm 取到比 pnpm 锁更新的版本"这两类条目**只在一种载体上出现**，
+按"不在树里就算过期"判会让同一张表在两种载体上互相打脸。
+`carrier` 写非法值 ⇒ 直接红（不许拿它当逃避过期检查的后门）。
+
+七臂变异各红一次、control 绿、每次改动 `cmp` 还原比对：
+license 列全空 / 混入未登记的 GPL 包 / `--installed-tree` 参数被吃掉 / 路径不存在（rc=1，**不带管道**量的）/
+源码侧 license 改成 GPL / 登记的 license 与产物声明不符 / `carrier` 写成 'both'。
+快照模式读数零变化：143 = 127 + 16 + 0。
