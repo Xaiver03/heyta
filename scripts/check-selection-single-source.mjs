@@ -29,7 +29,7 @@
  * 它只是从此多一个没人读的所有者。
  *
  * ─────────────────────────────────────────────────────────────────────────
- * 四条断言
+ * 五条断言
  * ─────────────────────────────────────────────────────────────────────────
  *
  * A. **宿主各有一份实例，且只有那一份**：`createSelectionStore(` 在 `各宿主的 src 目录`
@@ -58,6 +58,20 @@
  *    而**没有任何一处界面会选中一条清单或标签** —— 于是"支持六类"读起来像已完成，
  *    实际只有三类活着。加一类之前先让某个宿主选中它。
  *
+ * E. **接线不许断在中转层**：任何**声明**了 `readonly activeTaskId?` / `readonly onOpenTask?`
+ *    的文件，必须在同一文件里把它**用起来** —— 三选一：当 JSX 属性传下去（`NAME={`）、
+ *    调用它（`NAME(` / `NAME?.(`）、或读它（`NAME ===` / `!==`，即自己就是终点）。
+ *    扫描范围比 A–D **多一层**：两个宿主的 `src` 加上 `packages/ui/src`，
+ *    因为断点恰恰出现在中间那层。
+ *
+ * 🔴 这条不是预防性的，是 2026-10-03 现场补的：`apps/web/src/features/quadrant/QuadrantBoard.tsx`
+ * 把 `onOpenTask` 与 `activeTaskId` 两个 prop 都声明了、也都解构了，**唯独没往
+ * `<SharedQuadrantBoard>` 传**。于是"任务的三种投影接同一个选中"实际只有两种接上，
+ * 而当时 A/B/C/D 四条全绿、`pnpm -r typecheck` 全绿（两个 prop 都是**可选**的），
+ * 界面只是"四象限不跟随选中" —— 没有任何一层会失败。
+ * **可选 prop 会把"宿主没接"伪装成"做完了"**，这是本仓库共享层惯用法自带的盲区，
+ * 只有把声明与使用放在同一个文件里比一次才拦得住。
+ *
  * ─────────────────────────────────────────────────────────────────────────
  * 怎么确认它能失败（不要删这一段）
  * ─────────────────────────────────────────────────────────────────────────
@@ -73,6 +87,9 @@
  * | C 在宿主里 `type SelectableKind = 'task' \| 'habit'` | 红：断言 C |
  * | A2 实例建在 `App.tsx` 而不是 `lib/selection` | 红：断言 A ×2（数量 + 落点） |
  * | D 往词表数组里加一项 `'widget'`（宿主里没有） | 红：断言 D |
+ * | E 删掉 web 四象限那两行 `onOpenTask={…}` / `activeTaskId={…}`（**现场那次事故**） | 红：断言 E ×2 |
+ * | E2 只删其中一行 | 红：断言 E ×1（逐 prop 判，不是"整文件没用就算"） |
+ * | E3 把终点消费者 TaskList 的 `activeTaskId === row.id` 换成别的 | 红：断言 E |
  * | **负向对照**：把这些字样**只写进注释** | 绿（剥注释生效，不误伤） |
  *
  * 🔴 **B 第一版是存活的**：那时 setter 被写成必需，无 setter 的
@@ -83,6 +100,9 @@
  * ⚠️ 这道门禁**不拦**的形状（如实登记，别把它当成"选中态再也回不去了"）：
  * 模块级 `let selectedTaskId: string | null = null`、`useReducer` 里的选中、
  * 以及"多选取中"（`selectedIds` 复数 —— 那是筛选范围，不是"当前看哪一条"）。
+ * E 还有一条**已知边界**：它比的是"同一个文件里声明了有没有用"，所以
+ * 用 `{...props}` 整体转发会被判红（现在没有这种写法）。真要用就得把名字
+ * 加进 `WIRE_PROPS` 旁边那条说明里并改掉这条的判法 —— 不要靠注释绕过。
  */
 
 import { readFileSync, readdirSync, statSync } from 'node:fs';
@@ -164,6 +184,39 @@ function readVocab() {
 const consumerOf = (kind) => new RegExp(`\\b(?:select|useSelected)\\(\\s*'${kind}'\\s*[,)]`);
 
 /**
+ * E 管的两个"接线名"：宿主管选中的两个出口 —— 一个是值（现在看的是哪一条），
+ * 一个是回调（点某一条时通知宿主）。
+ * 🔴 以后再有第三个跨层转发的选中 prop，要加进这里，否则它断在中间层没人知道。
+ */
+const WIRE_PROPS = ['activeTaskId', 'onOpenTask'];
+
+/**
+ * E 的扫描范围：两个宿主的 `src` **加上 `packages/ui/src`**。
+ * ⚠️ 比 A–D 多一层是有原因的：A–D 判的是"宿主里别长出第二份"，只看宿主；
+ * 而 E 判的那类缺陷恰好长在中间那层（宿主 → 共享板子 → 行）。
+ */
+const WIRE_DIRS = [...HOSTS.map((host) => path.join(ROOT, host, 'src')), path.join(ROOT, 'packages/ui/src')];
+
+/** 声明形状：`readonly NAME?:` 和 `readonly NAME:` —— 必填的那一种更该拦。 */
+const declOf = (name) => new RegExp(`readonly\\s+${name}\\??\\s*:`);
+
+/**
+ * 使用形状：传下去（`NAME={`）/ 调用（`NAME(`、`NAME?.(`）/ 读它（`===`、`!==`）。
+ *
+ * 🔴 **解构那一行刻意不算使用**：`const { tasks, onOpenTask } = props;` 只证明
+ * 有人把它从 props 里取出来，而那正是事故现场做的事。所以每条 pattern 都要求
+ * 名字后面**紧跟** `={` / `(` / `===`，中间不许有别的 token ——
+ * 类型标注 `NAME?: (taskId: string) => void` 里那个 `(` 前面隔着 `:`，不会被误认。
+ */
+const useOf = (name) => [
+  new RegExp(`\\b${name}=\\{`),
+  new RegExp(`\\b${name}\\s*\\?\\.\\(`),
+  new RegExp(`\\b${name}\\s*\\(`),
+  new RegExp(`\\b${name}\\s*===`),
+  new RegExp(`\\b${name}\\s*!==`),
+];
+
+/**
  * 先把注释剥掉再匹配。
  *
  * 🔴 这不是可选的整洁：本仓库的门禁吃过两次"注释里的字样被当成代码"的亏 ——
@@ -231,6 +284,30 @@ for (const file of files) {
   });
 }
 
+/**
+ * E：扫"声明了却没往下传/没读"的死接线。
+ * `declared` 是这条判据的分母 —— 它若为 0，说明扫描层坏了（目录没了/正则不认了），
+ * 那种情况下"零断线"是假的绿，所以单独判红。
+ */
+const declaredWires = [];
+const brokenWires = [];
+for (const dir of WIRE_DIRS) {
+  if (!statSync(dir, { throwIfNoEntry: false })) {
+    console.error(`✗ E 的扫描目录不存在：${path.relative(ROOT, dir)} —— 判红而不是跳过`);
+    process.exit(1);
+  }
+  for (const file of walk(dir)) {
+    const src = stripComments(readFileSync(file, 'utf8'));
+    for (const name of WIRE_PROPS) {
+      if (!declOf(name).test(src)) continue;
+      declaredWires.push(`${path.relative(ROOT, file)}  ${name}`);
+      if (!useOf(name).some((re) => re.test(src))) {
+        brokenWires.push(`${path.relative(ROOT, file)}  ${name}`);
+      }
+    }
+  }
+}
+
 const failures = [];
 
 // A：数量要对，而且必须落在各宿主的 lib/selection.* 里。
@@ -269,6 +346,20 @@ if (orphans.length > 0) {
   );
 }
 
+if (declaredWires.length === 0) {
+  failures.push(
+    `断言 E：在 ${WIRE_DIRS.map((d) => path.relative(ROOT, d)).join(', ')} 里一处 ${WIRE_PROPS.join('/')} 的声明都没扫到。\n` +
+      `  「没有断线」和「没在线可断」是两件事 —— 判红，让下一个来看的人先修扫描而不是庆祝。`,
+  );
+}
+if (brokenWires.length > 0) {
+  failures.push(
+    `断言 E：这些文件**声明**了选中接线却没用起来（既不传下去、也不读）：\n  ${brokenWires.join('\n  ')}\n` +
+      `  两个 prop 都是可选的 ⇒ typecheck 不会失败，症状只是"这一块不跟随选中"。\n` +
+      `  改法：把该名字作为 JSX 属性传给这一层渲染的板子（NAME=\{NAME\}）；这一层若确实不该管，就把声明删掉。`,
+  );
+}
+
 if (failures.length > 0) {
   console.error('✗ 选中态的所有者不唯一：\n');
   for (const f of failures) console.error(f + '\n');
@@ -279,5 +370,6 @@ if (failures.length > 0) {
 const counts = vocab.map((kind) => `${kind} ${consumersByKind.get(kind).length}`).join(' / ');
 console.log(
   `✅ 选中态只有一个所有者：${REQUIRED_STORE_INSTANCES} 份实例（${HOSTS.join(', ')}）` +
-    `，宿主内本地选中态 0 处，词表定义 0 处，词表 ${vocab.length} 类全有消费者（${counts}）`,
+    `，宿主内本地选中态 0 处，词表定义 0 处，词表 ${vocab.length} 类全有消费者（${counts}）` +
+    `，接线声明 ${declaredWires.length} 处全部用起来`,
 );
