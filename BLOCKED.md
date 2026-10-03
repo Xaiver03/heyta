@@ -2894,3 +2894,34 @@ SEG 62 exit=0 pnpm -r test
 此后 `git diff HEAD` 逐字为空；② 这一趟的 needle 是 `note-e2e-171747`（17:17:47 起跑），
 比最后一次改动晚 46 分钟以上；③ 「编辑便签」那一屏由 `NoteEditScreen` + `NoteEditor` 渲染，
 这两个文件 16:21 之前不存在，**早于它们的构建画不出图 1 那个样子**。
+
+## B50. 任务书里两个门禁名**不存在**，而我用它们跑批量循环时 `-s` 把唯一的诊断吞掉了 ⇒ 两条假红（2026-10-03 19:2x）
+
+任务书 §任务 4 写「`check:payment-entry`、`check:pricing-consistency` 绿」，§现状 写
+`check-l4-no-style.mjs:155/162`。实测 `package.json` 的脚本名是 **`check:pricing`** 和 **`check:l4`**
+（`check-pricing-consistency.mjs` / `check-l4-no-style.mjs` 是**文件名**，不是脚本名）：
+
+```
+check:pricing-consistency NOT-A-SCRIPT
+check:l4-no-style         NOT-A-SCRIPT
+check:pricing             EXISTS
+check:l4                  EXISTS
+```
+
+**真正的坑是失败形状**（不是名字写错，名字写错谁都会）：
+
+```
+pnpm -s run check:pricing-consistency   → exit=1  bytes=0      ← 红，且零输出
+pnpm    run check:pricing-consistency   → exit=1  bytes=162    ← [ERR_PNPM_NO_SCRIPT] + "Did you mean …"
+```
+
+也就是说**加 `-s` 之后，"脚本名不存在"和"门禁真的判红"在输出上长得一模一样**（都是非零 + 空）。
+我那批循环正是 `-s` + 只打印末行，于是把**两条本来 exit=0 的门禁报成了红**，
+还差点按"HEAD 又被别人弄红了"去归因。改对名字后现量：
+`check:l4` exit=0（`apps/web/src/features 98 ≤ 104`、`apps/mobile/src/screens 90 = 90`）、
+`check:pricing` exit=0（价格四处一致）。
+
+**防法（写给自己的规矩，不改任何判卷文件）**：批量循环跑门禁前，先逐名 assert 它存在于
+`package.json`，不存在就**响亮退出**；循环里不要用 `-s`，或在非零时**把 stdout+stderr 全文贴出来**。
+建议入 `docs/reference/environment-traps.md`（与 #164「后台通知的 exit code 是包装命令的」同族：
+**退出码不属于你以为的那个东西**）—— 该文件不在本批地界内，**不代改**，留给它的 owner。

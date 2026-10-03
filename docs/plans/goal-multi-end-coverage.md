@@ -1082,3 +1082,47 @@ windows 那张还额外开着**头像菜单**（`登录 / 注册` 在第一项 +
 已按其提交前的 `git diff` 原文逐字重建并放回（`git diff --numstat` 回到 `2/1`、两行内容与覆盖前一致）。
 教训不是"别 temp-swap"，而是**temp-swap 前必须验证备份存在**（`test -f 备份 || exit 1` 放进同一条链里），
 以及**长命令链里前面那半句也可能整行没跑** —— 不能假设"&& 左边的副作用已经发生"。
+
+### 7.25 ✅ 任务 2/3/4 落地，加三条"不是代码问题"的事故（2026-10-03 16:0x–19:2x，载体 `ff205edc`）
+
+五笔提交：`192a516d`（清单/标签/习惯的改名与删除，两端）、`120c8153`（周小结带走 / 权益可见 / 便签改得动）、
+`814b35b4`（补上一笔漏掉的共享编辑器本体）、`54669937`（矩阵四行改口 + 被本批否证的自述注释）、
+`ff205edc`（真机两张截图入库 + 审计 §3.2）。
+
+**完成条件 1 的现量** —— 六行各自的复跑命令，`cd apps/mobile`，载体 `ff205edc`：
+
+| 命令 | 读数 |
+|---|---|
+| `npx vitest run tests/organizer-rename.spec.ts` | `exit=0` ｜ `Test Files 1 passed (1)` ｜ `Tests 26 passed (26)` |
+| `npx vitest run tests/note-edit.spec.ts` | `exit=0` ｜ `Tests 15 passed (15)` |
+| `npx vitest run tests/growth-share-summary.spec.ts` | `exit=0` ｜ `Tests 13 passed (13)` |
+| `npx vitest run tests/reminders-notes-display.spec.ts` | `exit=0` ｜ `Tests 17 passed (17)` |
+| `node scripts/check-l4-no-style.mjs` | `exit=0` ｜ web `98 ≤ 104`、`apps/mobile/src/screens` `90 = 90` |
+| `node scripts/check-pricing-consistency.mjs` | `exit=0` ｜ 价格四处一致（¥5/¥12 两档） |
+| `check:reachability` `check:ui-language` `check:payment-entry` `check:script-snapshot` `check:journey-coverage` | 各 `exit=0`（词条表中英各 2881、扫描 300 文件零硬编码） |
+
+三条后来者会重复踩的，都发生在这一批：
+
+1. 🔴 **按路径过滤的提交看不见未跟踪的新文件**。`120c8153` 漏了 `packages/ui/src/notes/NoteEditor.tsx`
+   和三处配套，于是 **HEAD 单独检出编译不过**（`NoteEditScreen.tsx:41` import 的是 HEAD 里不存在的导出），
+   而同一时刻工作树里 `pnpm check` 全绿 —— 因为工作树有那个文件。查法不是"再提交一次试试看"，
+   是**反向 import 图**：`git archive HEAD | tar x` 拿到纯 HEAD 那棵树，再逐个 import 查它引的符号
+   在同树的导出面里有没有。正向（我的文件 import 谁）看不到这个洞，因为两边都"在"。
+2. 🔴 **我把"整条设备脚本没跑通"记成了"一张截图都没有"** —— `ls apps/mobile/evidence/` 实测两张存在且非空，
+   人打开看过（一张是「编辑便签」那屏，一张是改过之后的列表）。错因：拿脚本第 12 步那条**整体判据**
+   （三张齐才算过）去倒推局部是否存在。**"整体没过"推不出"局部都没有"**，登记"未取证"前先 `ls`。
+   那枚 `app-release.apk` 已被并行会话 19:07 的构建覆盖 ⇒ 新鲜度**无法逐字节复现**，改用三条：
+   六个源文件最后写入在 16:20–16:31 且此后 vs HEAD 逐字为空 / needle 自带 `171747` 比最后改动晚 46 分钟 /
+   「编辑便签」那一屏只有 16:21 之后才存在的 `NoteEditScreen` + `NoteEditor` 画得出来（第三条同时否证了
+   我自己那句"装的是旧产物"）。
+3. 🔴 **`pnpm -s run <不存在的脚本名>` 是 `exit=1` + 零输出**，与"门禁真的判红"在输出上完全同形
+   （去掉 `-s` 才有 `[ERR_PNPM_NO_SCRIPT]` + "Did you mean…"）。我因此把两条 `exit=0` 的门禁报成了红。
+   真实脚本名是 `check:pricing` 与 `check:l4` —— 任务书里写的 `check:pricing-consistency` /
+   `check-l4-no-style.mjs` 是**文件名**，登记在 **B50**，含防法：批量循环前先逐名 assert 存在于
+   `package.json`，且循环里不要用 `-s`（非零时贴全文）。
+
+**完成条件 2 的现状（诚实版）**：62 段链在载体 `54669937` 上实测 **58 段 `exit=0`、0 段红**，4 段未跑
+（段1 `pnpm build` + 段53/54/55 三段 Playwright）；原因与现量读数在 **B48** —— `:3000` 仍被并行会话占着
+（本轮复量 `node 80257 … TCP *:3000 (LISTEN)` 仍在），而 `check:ai-e2e` 的前置会 SIGKILL 别人的 vite（traps #87），
+`pnpm build` 会在别人跑到一半时重写 `packages/*/dist`。四端重装未跑（**B49**，它会 `adb uninstall` / `simctl uninstall`，
+是"影响别人"而不是"我这边慢"）。`skipped=0` 与 `l4 ≤ 104/90` 两条本轮复量成立。
