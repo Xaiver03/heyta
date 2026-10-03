@@ -342,10 +342,45 @@ describe('🔴 公页不许说贡献者语言', () => {
    * 而观测面塌掉的原因通常不是本文件 —— 是 `helpers/render-page.tsx` 的脚手架
    * 坏了、或注册表被清空了。所以这里**响亮地失败**，而不是继续报"✅ 全部合规"。
    */
+  /**
+   * 唯一登记为**可以薄**的页面。
+   *
+   * 🔴 2026-10-03：`signin` 被改成纯跳板（产品负责人实测：点「登录」先读到一段说明
+   * 是错的形状，说明搬进了文档中心）。"标题 + 引言 + 两个出口"按定义凑不满 500 字。
+   * ⚠️ 但**阈值不能整体调低** —— A 存在的理由正是抓住"页面在、正文没挂上"，
+   * 把 500 改小会让真正的空壳页跟着一起溜过去。
+   *
+   * 所以这条豁免**自己检查两件事**（不是"这页不看"）：
+   *   ① `#main` 里必须有一个非空的 `<h1>`（正文真的挂上了，不是只剩外壳）；
+   *   ② 正文里必须有**能点的出口** —— 没有出口的薄页就是空页，那正是 A 要抓的东西。
+   *
+   * ⚠️ ①这里刻意**不**去比对"页面渲染的引言 = 注册表 `ledeKey` 的词条值"：
+   * 那两个读数都来自注册表，把 `ledeKey` 指到别的键时两边会**一起变**，
+   * 于是那条判据永远不会红（已实测：指错键 175 条全绿）。一条不可能红的判据
+   * 比没有判据更糟 —— 它会把"这里有守着"的错觉一起带进来。
+   */
+  const THIN_PAGE_IDS: readonly string[] = ['signin'];
+
   it.each(PAGE_IDS.flatMap((pageId) => LOCALE_IDS.map((locale) => [pageId, locale] as const)))(
     '%s / %s：确实渲染出可读文本（否则本门禁是在对空白打分）',
     (pageId, locale) => {
-      const text = collectRenderedText(renderPage(pageId, locale));
+      const view = renderPage(pageId, locale);
+      const text = collectRenderedText(view);
+
+      if (THIN_PAGE_IDS.includes(pageId)) {
+        const main = view.querySelector('#main');
+        const h1 = main?.querySelector('h1');
+        expect(
+          h1?.textContent?.trim() ?? '',
+          `${pageId} / ${locale} 是登记过的薄页，但正文里没有一个非空的 <h1> —— 那是空页，不是薄页`,
+        ).not.toBe('');
+        expect(
+          main?.querySelector('a[href]') ?? null,
+          `${pageId} / ${locale} 是登记过的薄页，但正文里没有任何可点的出口 —— 那是空页，不是薄页`,
+        ).not.toBeNull();
+        return;
+      }
+
       expect(
         text.length,
         `${pageId} / ${locale} 只渲染出 ${String(text.length)} 个字符 —— 观测面塌了`,

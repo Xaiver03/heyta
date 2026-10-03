@@ -75,6 +75,7 @@ import {
   useTaskStore,
   type TaskFilter,
 } from './features/tasks/store.js';
+import { wantsSignInOnLoad } from './lib/auth-deep-link.js';
 import { type DueDisplayMode } from './lib/due-display.js';
 import { TaskRowMeta } from './features/tasks/row-meta.js';
 import { loadDueDisplay, saveDueDisplay } from './features/tasks/due-display-pref.js';
@@ -361,6 +362,17 @@ export function App(): React.JSX.Element {
    */
   useEffect(() => {
     if (shouldAskOnFirstLaunch()) usePrivacyStore.getState().openSheet('first-launch');
+  }, []);
+
+  /**
+   * 落地页的「登录」带 `?signin` 进来时，**直接把认证面板打开**。
+   *
+   * 只在挂载时看一次：用户手动关掉面板之后地址还在，但"每次重渲染都抢回来"不是
+   * 我们要的行为（刷新才重新打开，是可预期的）。消化点为什么在壳而不在 `AuthPanel`，
+   * 理由写在 `lib/auth-deep-link.ts` 文件头。
+   */
+  useEffect(() => {
+    if (wantsSignInOnLoad()) useSyncStore.getState().openSignIn();
   }, []);
 
   /**

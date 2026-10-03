@@ -507,6 +507,13 @@ rsync -az --delete apps/landing/dist/ ubuntu-jcli:/var/www/heyta-landing/
 "只能自建"。仓库默认构建（无该变量）**是故意的**：应用还没部署时露出一个
 「立即使用」，比没有入口更坏。
 
+⚠️ **2026-10-03 起这条管两个意图，不只一个**：`VITE_APP_URL` 现在同时决定
+「立即使用」（→ 应用根）与导航上那个「登录」（→ 应用根 **带 `?signin`，进去直接打开认证面板**，
+判据在 `apps/landing/src/lib/app-url.ts` 的 `signInHref()`）。没配置时两者各自退回
+站内形状（自建那一节 / `/signin/` 那一页），**不会**出现一个指向不存在应用的链接。
+`apps/web` 那一侧读的参数名住在 `apps/web/src/lib/auth-deep-link.ts` ——
+两份抄件由 `apps/landing/tests/render.spec.tsx` 逐字对账（改名任何一边都会红）。
+
 #### 应用里的站点入口：`VITE_SITE_URL`（通常**不用配**）
 
 2026-09-28 起，应用内新增了「帮助与关于」（设置页），以及两处上下文入口

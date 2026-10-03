@@ -2947,7 +2947,7 @@ export const en = {
   'site.help.q.passphrase': 'I forgot my encryption passphrase. What now?',
   'site.help.a.passphrase': '**There is no recovery, and that is by design, not an oversight.** End-to-end encryption means the server holds only ciphertext and has no passphrase that unlocks it — any "recovery" would mean the server could read your data. What you can do: export your data from an old device that can still unlock, then start fresh with a new passphrase on the new one. So keep the passphrase safe.',
   'site.help.q.passkey': 'How do passkeys work?',
-  'site.help.a.passkey': 'Choose "passkey" when signing in and confirm with your device\'s face / fingerprint / system PIN. There is no password to remember and none to breach. If you lose it, the sign-in page offers "Lost your passkey?", which emails a recovery link where you register a new one. ⚠️ **The last remaining credential cannot be deleted** — delete it and you are locked out.',
+  'site.help.a.passkey': 'Choose "passkey" when signing in and confirm with your device\'s face / fingerprint / system PIN. There is no password to remember and none to breach. If you lose it, the app\'s sign-in panel offers "Lost your passkey?", which emails a recovery link where you register a new one. ⚠️ **The last remaining credential cannot be deleted** — delete it and you are locked out.',
   'site.help.q.quadrant': 'How are the four quadrants classified?',
   'site.help.a.quadrant': 'Quadrants are **computed on the spot**, not labels you attach to a task: "urgent" depends on whether the due date falls inside the near-term window, and "important" comes from the flag you set yourself (falling back to priority when you never set it). Change the due date or priority and the task changes cell — so the quadrants can never disagree with your tasks.',
   'site.help.q.repeat': 'How do I set up a repeating task?',
@@ -3024,7 +3024,7 @@ export const en = {
   // Accounts, tokens, and how you sign in
   'site.docs.account.title': 'Accounts, tokens, and how you sign in',
   'site.docs.account.seo.title': 'Accounts, tokens, and how you sign in — heyta',
-  'site.docs.account.sum': 'heyta has no password to remember and none to credential-stuff — so where does the access token that syncing needs come from?',
+  'site.docs.account.sum': 'Registration and sign-in run on email plus password, and the passkey and the emailed link both stayed — so where does the access token that syncing needs come from?',
   'site.docs.account.s1': 'Three boxes, that is all',
   'site.docs.account.s1p1': 'The sync settings have exactly three fields: server address, access token, end-to-end encryption passphrase.',
   'site.docs.account.s1i1': 'Server address: the sync server you want to connect to. Leave everything empty and you are using heyta purely locally — the data stays on this device.',
@@ -3034,11 +3034,13 @@ export const en = {
   'site.docs.account.s2p1': 'Registration and sign-in run on **email plus password**; the emailed link and the passkey both stayed. What the server holds for your password is not something it can read back or hand to anyone — if you forget it, "Forgot your password" mails a one-time reset link, which is a real reset rather than a way around the password.',
   'site.docs.account.s2i1': 'Email plus password: give your address, set a password (at least 8 characters), click the link in the verification mail to activate, then sign in with that password.',
   'site.docs.account.s2i2': 'Emailed link (when you would rather not remember anything): enter your address, open the mail, click the link — signed in.',
-  'site.docs.account.s2i3': 'Passkey: confirm with the device itself — face, fingerprint, or system PIN. Nothing to remember, so nothing to leak. Lost it? The sign-in page offers "Lost your passkey?" and mails a recovery link; that step has to call the platform authenticator in a real browser, so it opens a standalone page rather than an in-app sheet.',
+  'site.docs.account.s2i3': 'Passkey: confirm with the device itself — face, fingerprint, or system PIN. Nothing to remember, so nothing to leak. Lost it? The app\'s sign-in panel offers "Lost your passkey?" and mails a recovery link; that step has to call the platform authenticator in a real browser, so it opens a standalone page rather than an in-app sheet.',
   'site.docs.account.s3': 'Why the desktop shells hand off to your browser',
   'site.docs.account.s3p1': 'Passkeys do not work inside the macOS and Windows shells (measured: the embedded WebView exposes no platform authenticator). So the shell sends you to your **system browser** to sign in and takes the result back automatically; if the operating system never hands the address back, that page also shows a link you can click yourself.',
   'site.docs.account.s4': 'The terms belong to "that server"',
   'site.docs.account.s4p1': 'The checkbox at registration reads "the terms of service and privacy policy **offered by this server**". Because anyone can deploy heyta — who runs the server you connect to, and which terms apply, is that server\'s decision.',
+  'site.docs.account.s5': 'Why signing in happens in the app, not on the website',
+  'site.docs.account.s5p1': 'The server address used for signing in is **the same one** as in your sync settings — the two have to match, or you get "signed in against server A while the token was stored for B", which is brutally hard to trace. So the sign-in page on this site does one thing: it carries you into the app\'s sign-in panel instead of duplicating a form. A passkey has one more constraint — it must be bound to one specific domain, and that step can only happen in a real browser.',
 
   // The encryption passphrase
   'site.docs.passphrase.title': 'The encryption passphrase',
@@ -3370,21 +3372,24 @@ export const en = {
   'site.changelog.note': 'Older updates are archived.',
 
   // ── Sign in ──
+  //   🔴 This page is a **doorway**, not an explainer for a login form (D5).
+  //   It used to say "there are exactly two ways in, and there is no password"
+  //   plus three paragraphs of justification — while the product's main path is
+  //   **email plus password** (`site.docs.account.s2`, and the password API the
+  //   app actually calls). That is a false outward statement, not a tone issue,
+  //   so the whole block was removed on 2026-10-03: the explanation moved into
+  //   the docs centre ("Accounts, tokens, and how you sign in", s5) and the page
+  //   keeps only the things you can actually click.
   'site.signin.seo.title': 'Sign in — heyta',
-  'site.signin.seo.description': 'Sign in to heyta with a passkey or an emailed sign-in link.',
+  'site.signin.seo.description': 'Sign in to heyta with email plus password, a passkey, or an emailed link — all of them inside the app.',
   'site.signin.title': 'Sign in',
-  'site.signin.lede': 'There are exactly two ways in, and there is no password.',
-  'site.signin.method.passkey.title': 'Passkey (recommended)',
-  'site.signin.method.passkey.body': 'Sign in with the device itself — face, fingerprint or system PIN. The key never leaves your device, and there is no password to be reused or leaked.',
-  'site.signin.method.magic.title': 'Emailed sign-in link',
-  'site.signin.method.magic.body': 'Enter an address, get a one-time link, click it and you are in. Handy on a device whose passkey is not set up yet.',
-  'site.signin.noPassword': '⚠️ Why there is no "email + password": a credential that can be stuffed, phished, and needs a hash stored server-side is the one weak link in a product whose server cannot read your content.',
-  // R2: `site.signin.cta` was here with zero source references; the page's CTAs
-  // come from `site.signin.recover.link` and the nav's sign-in entry.
-  'site.signin.recover.title': 'Lost your passkey?',
-  'site.signin.recover.body': 'Inside the app, "Lost your passkey?" emails a recovery link where you can register a new one.',
-  'site.signin.why.title': 'Why signing in happens in the app, not on this page',
-  'site.signin.why.body': 'A passkey must be bound to **one specific domain**, and the server address used for signing in is the very one in the app’s sync settings. Copying the auth UI onto this page would recreate "sign in against server A while the token is stored for B" — so this page is a doorway, not a second login box.',
+  'site.signin.lede': 'Signing in happens inside the app: email plus password, a passkey and an emailed link are all supported.',
+  'site.signin.cta': 'Sign in in the app',
+  'site.signin.helpLink': 'How signing in works, and where the token comes from, is in the docs centre article "Accounts, tokens, and how you sign in"',
+  // R2 deleted `site.signin.cta` as a zero-reference key (back then this page's
+  // only CTA was passkey recovery). It has a consumer again now that the
+  // explainer is gone — the lifetime of that claim depends on the page
+  // structure, not on the dictionary.
 
   'web.about.title': 'Help & about',
   'web.about.lead': 'The help centre, the changelog and pricing all live on the website — they need to be indexable and shareable on their own, so there is only one copy of each.',
