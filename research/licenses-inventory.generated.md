@@ -5,9 +5,9 @@
 > 数据来源：**实际安装的依赖树**（pnpm store），不是 lockfile 的声明。
 > 去重口径：`包名@版本`（同名多版本分别登记）。
 
-生成时间：2026-09-27
+生成时间：2026-10-03
 
-**总计 962 个包** —— 宽松许可 961，受限 0，无许可证 0，白名单外已登记 1。
+**总计 1093 个包** —— 宽松许可 1092，受限 0，无许可证 0，白名单外已登记 1。
 
 准入门槛（见 THIRD_PARTY_LICENSES.md）：许可允许闭源商用；且 2021 年后仍在更新。
 
@@ -26,7 +26,7 @@
 
 - **CC-BY-4.0**（`caniuse-lite@1.0.30001812`）：caniuse-lite@1.0.30001812：browserslist 的**构建期数据包**，不进入运行时产物；CC-BY 是署名许可（不是禁用的 CC-BY-NC），归属已在 THIRD_PARTY_LICENSES.md §2 登记。
 
-### 📋 全部依赖（962 个）
+### 📋 全部依赖（1093 个）
 
 这一段是**全量底稿**：上面两节的所有结论都能在这里逐行核到。严格按包名排序（`localeCompare`），同名多版本分行列出。
 
@@ -67,12 +67,14 @@
 | `@babel/plugin-bugfix-safari-rest-destructuring-rhs-array` | 7.29.7 | MIT |
 | `@babel/plugin-bugfix-v8-spread-parameters-in-optional-chaining` | 7.29.7 | MIT |
 | `@babel/plugin-bugfix-v8-static-class-fields-redefine-readonly` | 7.29.7 | MIT |
+| `@babel/plugin-proposal-decorators` | 7.29.7 | MIT |
 | `@babel/plugin-proposal-export-default-from` | 7.29.7 | MIT |
 | `@babel/plugin-proposal-private-property-in-object` | 7.21.0-placeholder-for-preset-env.2 | MIT |
 | `@babel/plugin-syntax-async-generators` | 7.8.4 | MIT |
 | `@babel/plugin-syntax-bigint` | 7.8.3 | MIT |
 | `@babel/plugin-syntax-class-properties` | 7.12.13 | MIT |
 | `@babel/plugin-syntax-class-static-block` | 7.14.5 | MIT |
+| `@babel/plugin-syntax-decorators` | 7.29.7 | MIT |
 | `@babel/plugin-syntax-dynamic-import` | 7.8.3 | MIT |
 | `@babel/plugin-syntax-export-default-from` | 7.29.7 | MIT |
 | `@babel/plugin-syntax-flow` | 7.29.7 | MIT |
@@ -134,8 +136,10 @@
 | `@babel/plugin-transform-property-literals` | 7.29.7 | MIT |
 | `@babel/plugin-transform-react-display-name` | 7.29.7 | MIT |
 | `@babel/plugin-transform-react-jsx` | 7.29.7 | MIT |
+| `@babel/plugin-transform-react-jsx-development` | 7.29.7 | MIT |
 | `@babel/plugin-transform-react-jsx-self` | 7.29.7 | MIT |
 | `@babel/plugin-transform-react-jsx-source` | 7.29.7 | MIT |
+| `@babel/plugin-transform-react-pure-annotations` | 7.29.7 | MIT |
 | `@babel/plugin-transform-regenerator` | 7.29.8 | MIT |
 | `@babel/plugin-transform-regexp-modifiers` | 7.29.7 | MIT |
 | `@babel/plugin-transform-reserved-words` | 7.29.7 | MIT |
@@ -152,6 +156,7 @@
 | `@babel/plugin-transform-unicode-sets-regex` | 7.29.7 | MIT |
 | `@babel/preset-env` | 7.29.7 | MIT |
 | `@babel/preset-modules` | 0.1.6-no-external-plugins | MIT |
+| `@babel/preset-typescript` | 7.29.7 | MIT |
 | `@babel/runtime` | 7.29.7 | MIT |
 | `@babel/template` | 7.29.7 | MIT |
 | `@babel/traverse` | 7.29.8 | MIT |
@@ -179,6 +184,37 @@
 | `@electron/windows-sign` | 2.1.0 | BSD-2-Clause |
 | `@esbuild/darwin-arm64` | 0.27.7 | MIT |
 | `@exodus/bytes` | 1.16.0 | MIT |
+| `@expo/cli` | 57.0.27 | MIT |
+| `@expo/code-signing-certificates` | 0.0.6 | MIT |
+| `@expo/config` | 57.0.9 | MIT |
+| `@expo/config-plugins` | 57.0.9 | MIT |
+| `@expo/config-types` | 57.0.2 | MIT |
+| `@expo/devcert` | 1.2.1 | MIT |
+| `@expo/devtools` | 57.0.1 | MIT |
+| `@expo/dom-webview` | 57.0.1 | MIT |
+| `@expo/env` | 2.4.3 | MIT |
+| `@expo/expo-modules-macros-plugin` | 0.6.1 | MIT |
+| `@expo/fingerprint` | 0.20.13 | MIT |
+| `@expo/image-utils` | 0.11.5 | MIT |
+| `@expo/inline-modules` | 0.1.7 | MIT |
+| `@expo/json-file` | 11.0.1 | MIT |
+| `@expo/local-build-cache-provider` | 57.0.8 | MIT |
+| `@expo/log-box` | 57.0.4 | MIT |
+| `@expo/metro` | 56.0.2 | MIT |
+| `@expo/metro-config` | 57.0.12 | MIT |
+| `@expo/metro-file-map` | 57.0.3 | MIT |
+| `@expo/osascript` | 2.7.1 | MIT |
+| `@expo/package-manager` | 1.13.1 | MIT |
+| `@expo/plist` | 0.8.1 | MIT |
+| `@expo/prebuild-config` | 57.0.16 | MIT |
+| `@expo/require-utils` | 57.0.5 | MIT |
+| `@expo/router-server` | 57.0.11 | MIT |
+| `@expo/schema-utils` | 57.0.2 | MIT |
+| `@expo/sdk-runtime-versions` | 1.0.0 | MIT |
+| `@expo/spawn-async` | 1.8.0 | MIT |
+| `@expo/sudo-prompt` | 9.3.2 | MIT |
+| `@expo/ws-tunnel` | 2.0.0 | MIT |
+| `@expo/xcpretty` | 4.4.5 | BSD-3-Clause |
 | `@fastify/accept-negotiator` | 2.1.0 | MIT |
 | `@fastify/ajv-compiler` | 4.0.6 | MIT |
 | `@fastify/cors` | 11.3.0 | MIT |
@@ -192,11 +228,6 @@
 | `@fastify/send` | 4.1.1 | MIT |
 | `@fastify/static` | 10.1.4 | MIT |
 | `@fastify/websocket` | 11.3.1 | MIT |
-| `@floating-ui/core` | 1.8.0 | MIT |
-| `@floating-ui/dom` | 1.8.0 | MIT |
-| `@floating-ui/react` | 0.27.20 | MIT |
-| `@floating-ui/react-dom` | 2.1.9 | MIT |
-| `@floating-ui/utils` | 0.2.12 | MIT |
 | `@hapi/hoek` | 9.3.0 | BSD-3-Clause |
 | `@hapi/topo` | 5.1.0 | BSD-3-Clause |
 | `@hexagon/base64` | 1.1.28 | MIT |
@@ -222,6 +253,8 @@
 | `@noble/ciphers` | 2.4.0 | MIT |
 | `@noble/hashes` | 2.4.0 | MIT |
 | `@noble/hashes` | 1.8.0 | MIT |
+| `@node-rs/argon2` | 2.2.1 | MIT |
+| `@node-rs/argon2-darwin-arm64` | 2.2.1 | MIT |
 | `@nodelib/fs.scandir` | 2.1.5 | MIT |
 | `@nodelib/fs.stat` | 2.0.5 | MIT |
 | `@nodelib/fs.walk` | 1.2.8 | MIT |
@@ -261,18 +294,25 @@
 | `@react-native-community/cli-server-api` | 20.1.0 | MIT |
 | `@react-native-community/cli-tools` | 20.1.0 | MIT |
 | `@react-native-community/cli-types` | 20.1.0 | MIT |
+| `@react-native-documents/picker` | 12.0.2 | MIT |
 | `@react-native/assets-registry` | 0.84.1 | MIT |
 | `@react-native/babel-plugin-codegen` | 0.84.1 | MIT |
+| `@react-native/babel-plugin-codegen` | 0.86.3 | MIT |
 | `@react-native/babel-preset` | 0.84.1 | MIT |
 | `@react-native/codegen` | 0.84.1 | MIT |
+| `@react-native/codegen` | 0.86.3 | MIT |
 | `@react-native/community-cli-plugin` | 0.84.1 | MIT |
 | `@react-native/debugger-frontend` | 0.84.1 | BSD-3-Clause |
+| `@react-native/debugger-frontend` | 0.86.3 | BSD-3-Clause |
 | `@react-native/debugger-shell` | 0.84.1 | MIT |
+| `@react-native/debugger-shell` | 0.86.3 | MIT |
+| `@react-native/dev-middleware` | 0.86.3 | MIT |
 | `@react-native/dev-middleware` | 0.84.1 | MIT |
 | `@react-native/gradle-plugin` | 0.84.1 | MIT |
 | `@react-native/js-polyfills` | 0.84.1 | MIT |
 | `@react-native/metro-babel-transformer` | 0.84.1 | MIT |
 | `@react-native/metro-config` | 0.84.1 | MIT |
+| `@react-native/normalize-colors` | 0.86.3 | MIT |
 | `@react-native/normalize-colors` | 0.74.89 | MIT |
 | `@react-native/normalize-colors` | 0.84.1 | MIT |
 | `@react-native/typescript-config` | 0.84.1 | MIT |
@@ -326,6 +366,7 @@
 | `@types/ws` | 8.18.1 | MIT |
 | `@types/yargs` | 17.0.35 | MIT |
 | `@types/yargs-parser` | 21.0.3 | MIT |
+| `@ungap/structured-clone` | 1.4.0 | ISC |
 | `@vitejs/plugin-react` | 5.2.0 | MIT |
 | `@vitest/expect` | 4.1.11 | MIT |
 | `@vitest/mocker` | 4.1.11 | MIT |
@@ -337,7 +378,10 @@
 | `@vitest/spy` | 5.0.1 | MIT |
 | `@vitest/utils` | 4.1.11 | MIT |
 | `@vscode/sudo-prompt` | 9.3.2 | MIT |
+| `@xmldom/xmldom` | 0.8.15 | MIT |
 | `@xmldom/xmldom` | 0.9.12 | MIT |
+| `@zxcvbn-ts/dictionary-compression` | 3.0.1 | MIT |
+| `@zxcvbn-ts/language-common` | 4.1.3 | MIT |
 | `abort-controller` | 3.0.0 | MIT |
 | `abstract-logging` | 2.0.1 | MIT |
 | `accepts` | 1.3.8 | MIT |
@@ -345,9 +389,11 @@
 | `acorn` | 8.18.0 | MIT |
 | `acorn-walk` | 8.3.5 | MIT |
 | `agent-base` | 7.1.4 | MIT |
+| `agent-cli-detector` | 0.1.7 | MIT |
 | `ajv` | 8.20.0 | MIT |
 | `ajv-formats` | 3.0.1 | MIT |
 | `anser` | 1.4.10 | MIT |
+| `ansi-escapes` | 4.3.2 | MIT |
 | `ansi-fragments` | 0.2.1 | MIT |
 | `ansi-regex` | 4.1.1 | MIT |
 | `ansi-regex` | 5.0.1 | MIT |
@@ -357,6 +403,7 @@
 | `any-promise` | 1.3.0 | MIT |
 | `anymatch` | 3.1.3 | ISC |
 | `appdirsjs` | 1.2.8 | MIT |
+| `arg` | 5.0.2 | MIT |
 | `arg` | 4.1.3 | MIT |
 | `argparse` | 1.0.10 | MIT |
 | `argparse` | 2.0.1 | Python-2.0 |
@@ -375,20 +422,29 @@
 | `babel-plugin-polyfill-corejs3` | 0.13.0 | MIT |
 | `babel-plugin-polyfill-corejs3` | 0.14.2 | MIT |
 | `babel-plugin-polyfill-regenerator` | 0.6.8 | MIT |
+| `babel-plugin-react-compiler` | 1.0.0 | MIT |
+| `babel-plugin-react-native-web` | 0.21.3 | MIT |
 | `babel-plugin-syntax-hermes-parser` | 0.32.0 | MIT |
+| `babel-plugin-syntax-hermes-parser` | 0.36.1 | MIT |
 | `babel-plugin-transform-flow-enums` | 0.0.2 | MIT |
 | `babel-preset-current-node-syntax` | 1.2.0 | MIT |
+| `babel-preset-expo` | 57.0.13 | MIT |
 | `babel-preset-jest` | 29.6.3 | MIT |
+| `badgin` | 1.2.3 | MIT |
 | `balanced-match` | 1.0.2 | MIT |
 | `balanced-match` | 4.0.4 | MIT |
 | `base64-js` | 1.5.1 | MIT |
 | `baseline-browser-mapping` | 2.11.26 | Apache-2.0 |
 | `bcryptjs` | 3.0.3 | BSD-3-Clause |
 | `bidi-js` | 1.1.0 | MIT |
+| `big-integer` | 1.6.52 | Unlicense |
 | `binary-extensions` | 2.3.0 | MIT |
 | `bl` | 4.1.0 | MIT |
 | `body-parser` | 1.20.8 | MIT |
 | `boolbase` | 1.0.0 | ISC |
+| `bplist-creator` | 0.1.0 | MIT |
+| `bplist-parser` | 0.3.2 | MIT |
+| `bplist-parser` | 0.3.1 | MIT |
 | `brace-expansion` | 1.1.21 | MIT |
 | `brace-expansion` | 5.0.12 | MIT |
 | `braces` | 3.0.3 | MIT |
@@ -408,12 +464,15 @@
 | `caniuse-lite` | 1.0.30001812 | CC-BY-4.0 |
 | `chai` | 6.2.2 | MIT |
 | `chalk` | 4.1.2 | MIT |
+| `chalk` | 2.4.2 | MIT |
 | `chokidar` | 3.6.0 | MIT |
 | `chokidar` | 4.0.3 | MIT |
 | `chrome-launcher` | 0.15.2 | Apache-2.0 |
 | `chromium-edge-launcher` | 0.2.0 | Apache-2.0 |
-| `ci-info` | 2.0.0 | MIT |
+| `chromium-edge-launcher` | 0.3.0 | Apache-2.0 |
 | `ci-info` | 3.9.0 | MIT |
+| `ci-info` | 2.0.0 | MIT |
+| `cli-cursor` | 2.1.0 | MIT |
 | `cli-cursor` | 3.1.0 | MIT |
 | `cli-spinners` | 2.9.2 | MIT |
 | `cliui` | 6.0.0 | ISC |
@@ -430,6 +489,7 @@
 | `commander` | 12.1.0 | MIT |
 | `commander` | 2.20.3 | MIT |
 | `commander` | 4.1.1 | MIT |
+| `commander` | 7.2.0 | MIT |
 | `component-emitter` | 1.3.1 | MIT |
 | `compressible` | 2.0.18 | MIT |
 | `compression` | 1.8.2 | MIT |
@@ -460,6 +520,7 @@
 | `date-fns` | 4.4.0 | MIT |
 | `dayjs` | 1.11.23 | MIT |
 | `debug` | 4.4.3 | MIT |
+| `debug` | 3.2.7 | MIT |
 | `debug` | 2.6.9 | MIT |
 | `decamelize` | 1.2.0 | MIT |
 | `decimal.js` | 10.6.0 | MIT |
@@ -472,6 +533,7 @@
 | `detect-libc` | 2.1.2 | Apache-2.0 |
 | `dezalgo` | 1.0.4 | ISC |
 | `diff` | 4.0.4 | BSD-3-Clause |
+| `dnssd-advertise` | 1.1.6 | MIT |
 | `dom-serializer` | 2.0.0 | MIT |
 | `domelementtype` | 2.3.0 | BSD-2-Clause |
 | `domhandler` | 5.0.3 | BSD-2-Clause |
@@ -504,6 +566,7 @@
 | `esbuild` | 0.27.7 | MIT |
 | `escalade` | 3.2.0 | MIT |
 | `escape-html` | 1.0.3 | MIT |
+| `escape-string-regexp` | 1.0.5 | MIT |
 | `escape-string-regexp` | 4.0.0 | MIT |
 | `escape-string-regexp` | 2.0.0 | MIT |
 | `esprima` | 4.0.1 | BSD-2-Clause |
@@ -513,6 +576,18 @@
 | `event-target-shim` | 5.0.1 | MIT |
 | `execa` | 5.1.1 | MIT |
 | `expect-type` | 1.4.0 | Apache-2.0 |
+| `expo` | 57.0.26 | MIT |
+| `expo-application` | 57.0.3 | MIT |
+| `expo-asset` | 57.0.18 | MIT |
+| `expo-constants` | 57.0.20 | MIT |
+| `expo-file-system` | 57.0.7 | MIT |
+| `expo-font` | 57.0.4 | MIT |
+| `expo-keep-awake` | 57.0.2 | MIT |
+| `expo-modules-autolinking` | 57.0.13 | MIT |
+| `expo-modules-core` | 57.0.20 | MIT |
+| `expo-modules-jsi` | 57.1.1 | MIT |
+| `expo-notifications` | 57.0.21 | MIT |
+| `expo-server` | 57.0.3 | MIT |
 | `exponential-backoff` | 3.1.3 | Apache-2.0 |
 | `fake-indexeddb` | 6.2.5 | Apache-2.0 |
 | `fast-base64-decode` | 1.0.0 | MIT |
@@ -536,6 +611,7 @@
 | `fbjs` | 3.0.5 | MIT |
 | `fbjs-css-vars` | 1.0.2 | MIT |
 | `fdir` | 6.5.0 | MIT |
+| `fetch-nodeshim` | 0.4.10 | MIT |
 | `fflate` | 0.8.3 | MIT |
 | `filename-reserved-regex` | 3.0.0 | MIT |
 | `filenamify` | 6.0.0 | MIT |
@@ -547,6 +623,7 @@
 | `fix-dts-default-cjs-exports` | 1.0.1 | MIT |
 | `flora-colossus` | 3.0.2 | MIT |
 | `flow-enums-runtime` | 0.0.6 | MIT |
+| `fontfaceobserver` | 2.3.0 | BSD-2-Clause |
 | `form-data` | 4.0.6 | MIT |
 | `formidable` | 3.5.4 | MIT |
 | `framer-motion` | 13.4.4 | MIT |
@@ -562,6 +639,7 @@
 | `get-package-type` | 0.1.0 | MIT |
 | `get-proto` | 1.0.1 | MIT |
 | `get-stream` | 6.0.1 | MIT |
+| `getenv` | 2.0.0 | MIT |
 | `glob` | 13.0.6 | BlueOak-1.0.0 |
 | `glob` | 7.2.3 | ISC |
 | `glob-parent` | 5.1.2 | ISC |
@@ -577,8 +655,13 @@
 | `hermes-compiler` | 250829098.0.9 | MIT |
 | `hermes-estree` | 0.32.0 | MIT |
 | `hermes-estree` | 0.35.0 | MIT |
+| `hermes-estree` | 0.36.0 | MIT |
+| `hermes-estree` | 0.36.1 | MIT |
+| `hermes-parser` | 0.36.1 | MIT |
 | `hermes-parser` | 0.32.0 | MIT |
+| `hermes-parser` | 0.36.0 | MIT |
 | `hermes-parser` | 0.35.0 | MIT |
+| `hosted-git-info` | 7.0.2 | ISC |
 | `html-encoding-sniffer` | 6.0.0 | MIT |
 | `http-errors` | 2.0.1 | MIT |
 | `http-proxy-agent` | 7.0.2 | MIT |
@@ -588,6 +671,7 @@
 | `ical.js` | 2.2.1 | MPL-2.0 |
 | `iconv-lite` | 0.4.24 | MIT |
 | `ieee754` | 1.2.1 | BSD-3-Clause |
+| `ignore` | 5.3.2 | MIT |
 | `ignore-by-default` | 1.0.1 | ISC |
 | `import-fresh` | 3.3.1 | MIT |
 | `imurmurhash` | 0.1.4 | MIT |
@@ -624,11 +708,12 @@
 | `jest-util` | 29.7.0 | MIT |
 | `jest-validate` | 29.7.0 | MIT |
 | `jest-worker` | 29.7.0 | MIT |
+| `jimp-compact` | 0.16.1 | MIT |
 | `joi` | 17.13.8 | BSD-3-Clause |
 | `joycon` | 3.1.1 | MIT |
 | `js-tokens` | 4.0.0 | MIT |
-| `js-yaml` | 3.15.2 | MIT |
 | `js-yaml` | 4.3.2 | MIT |
+| `js-yaml` | 3.15.2 | MIT |
 | `jsc-safe-url` | 0.2.4 | 0BSD |
 | `jsdom` | 27.4.0 | MIT |
 | `jsesc` | 3.1.0 | MIT |
@@ -642,6 +727,7 @@
 | `jwa` | 2.0.1 | MIT |
 | `jws` | 4.0.1 | MIT |
 | `kleur` | 3.0.3 | MIT |
+| `lan-network` | 0.2.1 | MIT |
 | `launch-editor` | 2.14.1 | MIT |
 | `leven` | 3.1.0 | MIT |
 | `light-my-request` | 6.6.0 | BSD-3-Clause |
@@ -662,14 +748,17 @@
 | `lodash.isstring` | 4.0.1 | MIT |
 | `lodash.once` | 4.1.1 | MIT |
 | `lodash.throttle` | 4.1.1 | MIT |
+| `log-symbols` | 2.2.0 | MIT |
 | `log-symbols` | 4.1.0 | MIT |
 | `logkitty` | 0.7.1 | MIT |
 | `loose-envify` | 1.4.0 | MIT |
 | `lru-cache` | 11.5.3 | BlueOak-1.0.0 |
 | `lru-cache` | 5.1.1 | ISC |
+| `lru-cache` | 10.4.3 | ISC |
 | `lucide` | 1.48.0 | ISC |
 | `lucide-react` | 0.545.0 | ISC |
 | `lucide-react-native` | 1.48.0 | ISC |
+| `lunar-typescript` | 1.8.6 | MIT |
 | `magic-string` | 0.30.21 | MIT |
 | `magic-string` | 1.4.2 | MIT |
 | `make-error` | 1.3.6 | ISC |
@@ -685,19 +774,33 @@
 | `merge2` | 1.4.1 | MIT |
 | `meshoptimizer` | 1.1.1 | MIT |
 | `methods` | 1.1.2 | MIT |
+| `metro` | 0.84.5 | MIT |
 | `metro` | 0.83.8 | MIT |
+| `metro-babel-transformer` | 0.84.5 | MIT |
 | `metro-babel-transformer` | 0.83.8 | MIT |
+| `metro-cache` | 0.84.5 | MIT |
 | `metro-cache` | 0.83.8 | MIT |
+| `metro-cache-key` | 0.84.5 | MIT |
 | `metro-cache-key` | 0.83.8 | MIT |
+| `metro-config` | 0.84.5 | MIT |
 | `metro-config` | 0.83.8 | MIT |
+| `metro-core` | 0.84.5 | MIT |
 | `metro-core` | 0.83.8 | MIT |
+| `metro-file-map` | 0.84.5 | MIT |
 | `metro-file-map` | 0.83.8 | MIT |
+| `metro-minify-terser` | 0.84.5 | MIT |
 | `metro-minify-terser` | 0.83.8 | MIT |
+| `metro-resolver` | 0.84.5 | MIT |
 | `metro-resolver` | 0.83.8 | MIT |
+| `metro-runtime` | 0.84.5 | MIT |
 | `metro-runtime` | 0.83.8 | MIT |
+| `metro-source-map` | 0.84.5 | MIT |
 | `metro-source-map` | 0.83.8 | MIT |
+| `metro-symbolicate` | 0.84.5 | MIT |
 | `metro-symbolicate` | 0.83.8 | MIT |
+| `metro-transform-plugins` | 0.84.5 | MIT |
 | `metro-transform-plugins` | 0.83.8 | MIT |
+| `metro-transform-worker` | 0.84.5 | MIT |
 | `metro-transform-worker` | 0.83.8 | MIT |
 | `micromatch` | 4.0.8 | MIT |
 | `mime` | 3.0.0 | MIT |
@@ -707,6 +810,7 @@
 | `mime-db` | 1.52.0 | MIT |
 | `mime-types` | 2.1.35 | MIT |
 | `mime-types` | 3.0.2 | MIT |
+| `mimic-fn` | 1.2.0 | MIT |
 | `mimic-fn` | 2.1.0 | MIT |
 | `minimatch` | 10.2.6 | BlueOak-1.0.0 |
 | `minimatch` | 3.1.5 | ISC |
@@ -718,6 +822,7 @@
 | `motion-utils` | 13.3.0 | MIT |
 | `ms` | 2.0.0 | MIT |
 | `ms` | 2.1.3 | MIT |
+| `multitars` | 1.0.2 | MIT |
 | `mz` | 2.7.0 | MIT |
 | `nanoid` | 3.3.19 | MIT |
 | `negotiator` | 0.6.3 | MIT |
@@ -731,10 +836,12 @@
 | `nodemailer` | 9.1.1 | MIT-0 |
 | `nodemon` | 3.1.14 | MIT |
 | `normalize-path` | 3.0.0 | MIT |
+| `npm-package-arg` | 11.0.3 | ISC |
 | `npm-run-path` | 4.0.1 | MIT |
 | `nth-check` | 2.1.1 | BSD-2-Clause |
 | `nullthrows` | 1.1.1 | MIT |
 | `ob1` | 0.83.8 | MIT |
+| `ob1` | 0.84.5 | MIT |
 | `object-assign` | 4.1.1 | MIT |
 | `object-inspect` | 1.13.4 | MIT |
 | `obug` | 2.2.1 | MIT |
@@ -744,8 +851,10 @@
 | `on-headers` | 1.1.0 | MIT |
 | `once` | 1.4.0 | ISC |
 | `onetime` | 5.1.2 | MIT |
+| `onetime` | 2.0.1 | MIT |
 | `open` | 7.4.2 | MIT |
 | `open` | 6.4.0 | MIT |
+| `ora` | 3.4.0 | MIT |
 | `ora` | 5.4.1 | MIT |
 | `p-limit` | 2.3.0 | MIT |
 | `p-limit` | 3.1.0 | MIT |
@@ -754,6 +863,7 @@
 | `p-try` | 2.2.0 | MIT |
 | `parent-module` | 1.0.1 | MIT |
 | `parse-json` | 5.2.0 | MIT |
+| `parse-png` | 2.1.0 | MIT |
 | `parse5` | 8.0.1 | MIT |
 | `parseurl` | 1.3.3 | MIT |
 | `path-exists` | 4.0.0 | MIT |
@@ -764,8 +874,8 @@
 | `pathe` | 2.0.3 | MIT |
 | `pe-library` | 1.0.1 | MIT |
 | `picocolors` | 1.1.1 | ISC |
-| `picomatch` | 2.3.2 | MIT |
 | `picomatch` | 4.0.7 | MIT |
+| `picomatch` | 2.3.2 | MIT |
 | `pino` | 10.3.1 | MIT |
 | `pino-abstract-transport` | 3.0.0 | MIT |
 | `pino-std-serializers` | 7.1.0 | MIT |
@@ -774,12 +884,14 @@
 | `playwright` | 1.63.0 | Apache-2.0 |
 | `playwright-core` | 1.63.0 | Apache-2.0 |
 | `plist` | 3.1.1 | MIT |
+| `pngjs` | 3.4.0 | MIT |
 | `postcss` | 8.5.28 | MIT |
 | `postcss-load-config` | 6.0.1 | MIT |
 | `postcss-value-parser` | 4.2.0 | MIT |
 | `postject` | 1.0.0-alpha.6 | MIT |
 | `pretty-format` | 29.7.0 | MIT |
 | `prisma` | 5.22.0 | Apache-2.0 |
+| `proc-log` | 4.2.0 | ISC |
 | `process-warning` | 5.1.0 | MIT |
 | `process-warning` | 4.0.1 | MIT |
 | `progress` | 2.0.3 | MIT |
@@ -798,12 +910,13 @@
 | `raw-body` | 2.5.3 | MIT |
 | `react` | 19.3.0 | MIT |
 | `react` | 19.2.3 | MIT |
-| `react-activity-calendar` | 3.2.1 | MIT |
 | `react-devtools-core` | 6.1.5 | MIT |
 | `react-dom` | 19.3.0 | MIT |
 | `react-is` | 18.3.1 | MIT |
 | `react-native` | 0.84.1 | MIT |
+| `react-native-document-picker` | 9.3.1 | MIT |
 | `react-native-get-random-values` | 2.0.0 | MIT |
+| `react-native-notifications` | 5.2.2 | MIT |
 | `react-native-safe-area-context` | 5.10.0 | MIT |
 | `react-native-svg` | 15.15.5 | MIT |
 | `react-native-web` | 0.21.3 | MIT |
@@ -828,6 +941,8 @@
 | `resolve` | 1.22.12 | MIT |
 | `resolve-from` | 5.0.0 | MIT |
 | `resolve-from` | 4.0.0 | MIT |
+| `resolve-workspace-root` | 2.0.1 | MIT |
+| `restore-cursor` | 2.0.0 | MIT |
 | `restore-cursor` | 3.1.0 | MIT |
 | `ret` | 0.5.0 | MIT |
 | `retry` | 0.12.0 | MIT |
@@ -841,6 +956,8 @@
 | `safe-regex2` | 5.1.1 | MIT |
 | `safe-stable-stringify` | 2.5.0 | MIT |
 | `safer-buffer` | 2.1.2 | MIT |
+| `sandbox-cli-detector` | 0.2.0 | MIT |
+| `sax` | 1.6.1 | BlueOak-1.0.0 |
 | `saxes` | 6.0.0 | ISC |
 | `scheduler` | 0.28.0 | MIT |
 | `scheduler` | 0.27.0 | MIT |
@@ -863,10 +980,12 @@
 | `side-channel-weakmap` | 1.0.2 | MIT |
 | `siginfo` | 2.0.0 | ISC |
 | `signal-exit` | 3.0.7 | ISC |
+| `simple-plist` | 1.3.1 | MIT |
 | `simple-update-notifier` | 2.0.0 | MIT |
 | `sisteransi` | 1.0.5 | MIT |
 | `slash` | 3.0.0 | MIT |
 | `slice-ansi` | 2.1.0 | MIT |
+| `slugify` | 1.6.9 | MIT |
 | `sonic-boom` | 4.2.1 | MIT |
 | `source-map` | 0.6.1 | BSD-3-Clause |
 | `source-map` | 0.5.7 | BSD-3-Clause |
@@ -882,6 +1001,7 @@
 | `statuses` | 1.5.0 | MIT |
 | `statuses` | 2.0.2 | MIT |
 | `std-env` | 4.2.0 | MIT |
+| `stream-buffers` | 2.2.0 | Unlicense |
 | `stream-shift` | 1.0.3 | MIT |
 | `string_decoder` | 1.3.0 | MIT |
 | `string-width` | 4.2.3 | MIT |
@@ -889,17 +1009,19 @@
 | `strip-ansi` | 6.0.1 | MIT |
 | `strip-final-newline` | 2.0.0 | MIT |
 | `strnum` | 1.1.2 | MIT |
+| `structured-headers` | 0.4.1 | MIT |
 | `styleq` | 0.1.3 | MIT |
 | `sucrase` | 3.35.1 | MIT |
 | `sumchecker` | 3.0.1 | Apache-2.0 |
 | `superagent` | 10.4.1 | MIT |
 | `supertest` | 7.3.0 | MIT |
-| `supports-color` | 7.2.0 | MIT |
 | `supports-color` | 5.5.0 | MIT |
+| `supports-color` | 7.2.0 | MIT |
 | `supports-color` | 8.1.1 | MIT |
+| `supports-hyperlinks` | 2.3.0 | MIT |
 | `supports-preserve-symlinks-flag` | 1.0.0 | MIT |
 | `symbol-tree` | 3.2.4 | MIT |
-| `tabbable` | 6.5.0 | MIT |
+| `terminal-link` | 2.1.1 | MIT |
 | `terser` | 5.51.2 | BSD-2-Clause |
 | `test-exclude` | 6.0.0 | ISC |
 | `thenify` | 3.3.1 | MIT |
@@ -920,6 +1042,7 @@
 | `to-regex-range` | 5.0.1 | MIT |
 | `toad-cache` | 3.7.4 | MIT |
 | `toidentifier` | 1.0.1 | MIT |
+| `toqr` | 0.1.1 | MIT |
 | `touch` | 3.1.1 | ISC |
 | `tough-cookie` | 6.0.2 | BSD-3-Clause |
 | `tr46` | 0.0.3 | MIT |
@@ -932,6 +1055,7 @@
 | `tsup` | 8.5.1 | MIT |
 | `tsyringe` | 4.10.0 | MIT |
 | `type-detect` | 4.0.8 | MIT |
+| `type-fest` | 0.21.3 | (MIT OR CC0-1.0) |
 | `type-fest` | 0.7.1 | (MIT OR CC0-1.0) |
 | `type-is` | 1.6.18 | MIT |
 | `typescript` | 5.9.3 | Apache-2.0 |
@@ -950,8 +1074,10 @@
 | `update-browserslist-db` | 1.3.3 | MIT |
 | `util-deprecate` | 1.0.2 | MIT |
 | `utils-merge` | 1.0.1 | MIT |
+| `uuid` | 7.0.3 | MIT |
 | `uuidv7` | 1.2.1 | Apache-2.0 |
 | `v8-compile-cache-lib` | 3.0.1 | MIT |
+| `validate-npm-package-name` | 5.0.1 | ISC |
 | `vary` | 1.1.2 | MIT |
 | `vite` | 7.3.6 | MIT |
 | `vite` | 8.3.1 | MIT |
@@ -968,18 +1094,22 @@
 | `whatwg-mimetype` | 4.0.0 | MIT |
 | `whatwg-url` | 15.1.0 | MIT |
 | `whatwg-url` | 5.0.0 | MIT |
+| `whatwg-url-minimum` | 0.1.2 | MIT |
 | `which` | 2.0.2 | ISC |
 | `which-module` | 2.0.1 | ISC |
 | `why-is-node-running` | 2.3.0 | MIT |
-| `wrap-ansi` | 6.2.0 | MIT |
 | `wrap-ansi` | 7.0.0 | MIT |
+| `wrap-ansi` | 6.2.0 | MIT |
 | `wrappy` | 1.0.2 | ISC |
 | `write-file-atomic` | 4.0.2 | ISC |
 | `ws` | 8.21.3 | MIT |
 | `ws` | 7.5.13 | MIT |
 | `ws` | 6.2.6 | MIT |
+| `xcode` | 3.0.1 | Apache-2.0 |
 | `xml-name-validator` | 5.0.0 | Apache-2.0 |
+| `xml2js` | 0.6.0 | MIT |
 | `xmlbuilder` | 15.1.1 | MIT |
+| `xmlbuilder` | 11.0.1 | MIT |
 | `xmlchars` | 2.2.0 | MIT |
 | `y18n` | 4.0.3 | ISC |
 | `y18n` | 5.0.8 | ISC |
@@ -992,5 +1122,6 @@
 | `yargs-parser` | 21.1.1 | ISC |
 | `yn` | 3.1.1 | MIT |
 | `yocto-queue` | 0.1.0 | MIT |
+| `zod` | 3.25.76 | MIT |
 | `zod` | 4.6.5 | MIT |
 | `zustand` | 5.0.15 | MIT |
