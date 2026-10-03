@@ -251,6 +251,7 @@
 | G-46 | `server/scripts/build-and-push.sh`（`pnpm --filter @heyta/server docker:build` 的唯一实体）原来是**上游形状**：它自己抄了一份 7 条的镜像输入清单，其中 3 条在本仓库不存在（实测 `[ -e ]` 全不成立），而 `apps/web` / 11 个 `packages/*` / `pnpm-lock.yaml` / `server/` 自己**一条都不在里面**；`GHCR_NAMESPACE` 默认成 `super-productivity`（**别人的组织**）；并且无论给不给版本号都**顺带覆盖 `:latest`** | **本批关闭**（§8.7 第 4 条）。三条各自都会出事，都已改：清单改成 source 同一个读者、namespace 无默认值（不给就在任何 docker 之前 exit 1）、只推点名的那一个 tag。⚠️ 消费者集合是量过的：除 `server/package.json:14` 外只有 `server/tests/migration-sql.spec.ts:345` 读它，而那一发在 `it.skip` 里 ⇒ **不报错也不守** |
 | G-47 | 镜像那棵依赖树**没有被钉住**：`check:image-license` 证明的是"2026-10-03 这一次 npm 解析结果的 143 条逐条有出处"，而每次构建 npm 都会重解一遍（没有 lockfile）。改直接依赖会红，**纯传递依赖的上游发新版不会** | **未关**（本批只登记）。闭合形状是现成的：生产阶段换成 `pnpm deploy --prod` ⇒ 三个 `workspace:*` 由 pnpm 内联、三枚 tgz 的 dance 一起消失、镜像的树**就是** `pnpm-lock.yaml` 的树 ⇒ 门禁与产物同源，`check:image-license` 与快照应当**撤掉**（不是改成读另一个文件）。代价：动生产镜像的装配路径，要单独一轮真构建复验（`pnpm verify:selfhost-stack` 全跑） |
 | G-48 | `check:web-artifact:app`（核对 `--base=/app/` 那份产物的那一道）**零自动消费者** —— 2026-10-03 由新门禁 `check:gate-wiring` 量出：它是 63 道 `check:*` 里唯一合法落在链外的一道，而全仓 `grep` 只有 `package.json` 自己那一行，没有任何 workflow / 验收脚本 / `deploy.sh` 调用它 ⇒「上线前跑一次」目前只写在脚本头部注释里 | **未关**（本批只登记）。它进不了 `pnpm check`（链里那份产物是默认根路径打的，拿错的产物验对的东西），要闭合得挂到**镜像构建与 rsync 那条路径**上（与 G-47 那轮一起做最省） |
+| G-49 | 站内那篇自建指南（`packages/i18n` 的 `site.docs.selfhost.*`）是入口命令的**第 4 份抄件**，而 `check:selfhost-entry-command` 的扫描集里没有它（现有扫描集：`docs/runbooks/self-host.md`、`server/README.md`、`server/env.example`、`docker-compose.migrate-once.yml`、`local-server-verification.md`）| **未关**（本批只登记）。触发它升格的是 2026-10-03 那次换目标：落地页的「打开自建指南」现在**就是**指向这篇站内文章（理由与实测见 §8.13），所以它不再是"营销文案"，而是外人照着敲的那一份。闭合形状：把两份词条表按 `site.docs.selfhost.` 前缀纳入扫描集，并给它一条**自己的**行形状规则（文章里是散文，不是 markdown 代码块 —— 现有 `ENTRY_RE` 要求行首 `docker compose -f …`，对词条值恒不命中，直接加进扫描集会变成"扫了但什么都看不见"）|
 
 
 
@@ -693,3 +694,58 @@ successfully applied`，`caddy` / `supersync` / `postgres` 三个都 `healthy`�
 其后各段在同一棵合并树上重跑，`TAIL1_RC=0`：`check:gate-wiring`、`check:selfhost-entry-command`、
 `check:web-storage`、`check:web-migration`、`check:web-artifact`、`check:script-snapshot`、
 `check:mobile-first-run-gate`、`screenshot:verify`。
+### 8.13 上线这一轮：落地页发了，而**发出去的第一版自己带着一条 404** —— 是发布后的实测抓出来的
+
+2026-10-03 产品负责人说「现在的话可以部署上线了。可以开始合并了」。合并见 §8.12，本节只记发布。
+
+**发布前先量"线上现在到底印的什么"** —— 因为"词条改了"与"页面上是那句话"是两件事：
+
+| 量什么 | 发布前读数 | 怎么量的 |
+|---|---|---|
+| 线上落地页 bundle 里 `/app/` 出现次数 | **0** | `curl` 取 `main-CSL_7LHx.js` 再数 |
+| 线上落地页 bundle 里「一条命令」出现次数 | **0** | 同上（中英两版词条都在里面） |
+| 线上 `/app/` 与 `/app` | 200 与 301 | `curl -o /dev/null -w` |
+
+第一行就是 `deployment.md` 那句「不带 `VITE_APP_URL` 重新构建，入口会静默消失」的**活样本**：
+线上那一版从来没带过这个变量，所以落地页**根本没有进应用的入口**，
+而页面不报错、`curl -I` 200、看着一切正常。
+
+**发布动作**：远端先备份（`/tmp/heyta-landing-backup-pre-4dfd2b3b.tgz`）→
+`VITE_APP_URL=https://heyta.waytofuture.cn/app/ pnpm --filter @heyta/landing build` →
+`rsync -az --delete` → 线上复验。
+
+🔴 **然后第一版发出去的东西里有一条死链**，而它是本批自己换出来的：
+落地页「打开自建指南」在 G-40③ 那一轮从内部 P0 手册改指了
+`docs/runbooks/self-host.md`，形状是 `github.com/…/blob/main/<路径>` ——
+**那个文件只存在于还没合入、也没推送的分支上**。实测：仓库根 200、页脚另外四条 blob 链接 200、
+**这一条 404**。而守它的判据是 `existsSync(仓库根/<路径>)`，量的是我这棵工作树。
+⇒ 修在 `4fa0833a`：链接换成站内那篇文章（同一次构建、同一条 rsync，不存在"页面发了目标还没发"），
+判据补上"必须在 `origin/main` 上存在"这一条腿，并顺手抓到第 4 条判据本来就漏
+（组件自己抄一份路径时它照样绿 —— 改成判集合）。四发变异各自精确报红。
+
+**发布后读数**（真浏览器 + 人真的看了那张图）：
+
+| 判据 | 读数 |
+|---|---|
+| 「打开自建指南」渲染出来的 href | `/docs/selfhost/` |
+| 点下去 | `https://heyta.waytofuture.cn/docs/selfhost/`，标题「自建一套同步服务器」，`404` / `Not Found` 字样 0 |
+| 文章正文含 | 「三个必填项」、「只给 Caddy 当站点地址」、「docker-compose.build.yml」三条**都在** |
+| 卡片标题 | 「完整步骤在自建指南里」（旧值「…在仓库里」0 命中） |
+| 落地页自建区标题 | 「自己的服务器，一条命令起全套」 |
+| 应用入口 | bundle 里 `https://heyta.waytofuture.cn/app/` 命中；点「立即使用」落到 `/app/`，`document.title = heyta` |
+| 旧域名 `heyta.finlaw.cloud` | 线上首页 + 文章页 **0 命中** |
+| console / pageerror | 0 条 |
+
+⚠️ **G-40④ 的现状要写准**：这条没关。改完之后落地页说「一条命令**起全套**」、
+文章第一句说「不是一个命令就完事」—— 张力从"同站打脸"收敛成"起来 ≠ 完事"，
+但**要不要对外承诺"一条命令"这件事本身**仍是 D-2，没人拍。
+
+**这一轮明确没做的（别读成"做完了"）**：
+
+- **镜像没发**、**远端没推**：`origin/main` 落后本地 `main` 72 笔，推它等于替 70 多笔
+  别人未过目的提交对外发布 —— 那是另一个决定，不在"可以开始合并了"的范围里。
+- **生产服务端镜像没重建**：本批服务端侧的改动（`/app` 自跳转、`WEB_APP_DIR` 默认值的说法、
+  `SUPERSYNC_HOST_PORT` 旋钮、一次性迁移 override）**只在自托管构建路径上生效**；
+  我们自己的 `heyta.waytofuture.cn` 仍是旧容器 + 宿主 nginx 挂 `/app/`（那条 301 就是 nginx 给的）。
+- `apps/web` 的 PWA / 挂载参数改动同样没上生产。
+- 站内那篇指南文章现在是**对外部署文档**了，而它不在入口命令对账门禁的扫描集里 ⇒ **G-49**。
