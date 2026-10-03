@@ -1,0 +1,10 @@
+Android vault storage: pending
+ad35d671d4f4fe81f9763a3d23198211caa9a4031d948b7cf647f3a09658d31e  apps/mobile/android/app/build/outputs/apk/debug/app-debug.apk
+937ba5a3e41ae0668d1e551c5062df50b0ab86617e874f3d196aecf4b3b0f67e  apps/mobile/android/app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
+PASS phase=isolation
+PASS phase=seed
+PASS phase=verify
+PASS phase=remove
+PASS phase=clean
+RESULT=OK; process restart + device reboot + scoped deletion verified
+Lock-screen authentication is not claimed by Android Keystore policy.

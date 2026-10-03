@@ -32,7 +32,6 @@ import {
   isoWeek,
   isoWeekday,
   monthGrid,
-  startOfMonth,
   weekGrid,
   type LocalDate,
   type MonthGridCell,
@@ -44,9 +43,12 @@ import { EmptyState } from '../empty-state/EmptyState.js';
 import { HeytaIcon } from '../icon/Icon.js';
 import { TaskList } from '../task-list/TaskList.js';
 import { useHeytaText, useHeytaTokens } from '../theme.js';
+import { CalendarDayBoard } from './CalendarDayBoard.js';
+import { CalendarYearBoard } from './CalendarYearBoard.js';
 import { CalendarToolbar } from './CalendarToolbar.js';
 import {
   calendarCellBars,
+  calendarCursorFor,
   calendarDayTone,
   MAX_CALENDAR_BARS,
   MAX_WEEK_CALENDAR_BARS,
@@ -74,6 +76,15 @@ export interface CalendarBoardProps {
   readonly onToday?: (() => void) | undefined;
   /** 点某一天（宿主应当**同时**把月份跟过去，见下）。 */
   readonly onSelect: (date: LocalDate) => void;
+  /**
+   * 年档里点某一张月卡（R13）。**给的是那个月的 1 号。**
+   *
+   * ⚠️ 可选，而**不给时月卡整块不可点** —— 这不是偷懒，是 §9.3 那条立场
+   *   （「不摆点了没反应的菜单项」）在年档的落地形状：共享层不知道宿主的
+   *   "点一张月卡该去哪"，那就由宿主明说；宿主没说，界面就不假装能点。
+   *   两个宿主目前都接了（切到那个月的月档、游标跟过去、**选中那天不动**）。
+   */
+  readonly onPickMonth?: ((monthFirstDay: LocalDate) => void) | undefined;
   readonly onToggleTask: (taskId: string) => void;
   /**
    * 点整行。**不给时整行不可点**（共享 `TaskList` 的契约：
@@ -107,6 +118,13 @@ export interface CalendarBoardProps {
    *   而且点格子时游标要跟去的地方也不同（见下面的 `pickDay`）。
    */
   readonly view?: CalendarViewKind | undefined;
+  /**
+   * 当前时刻（epoch ms）。**只在日档有用**：那条"现在"线要它才画得了。
+   *
+   * ⚠️ 可选且**不给就不画** —— 界面状态 store 里不存时钟（存了就会漂：刷新后
+   *   那条线停在旧时刻，而它看着和"活的"一模一样）。宿主从任务 store 的 `now` 透传。
+   */
+  readonly now?: number | undefined;
   /**
    * 工具栏**末尾**那一格的内容（Web 用它挂视图档位下拉）。
    *
@@ -289,6 +307,7 @@ export function CalendarBoard({
   selected,
   onCursorChange,
   onSelect,
+  onPickMonth,
   onToday,
   onToggleTask,
   onOpenTask,
@@ -297,6 +316,7 @@ export function CalendarBoard({
   testID = 'calendar-board',
   toolbar = 'inline',
   view = 'month',
+  now,
   toolbarTrailing,
 }: CalendarBoardProps): React.JSX.Element {
   const tokens = useHeytaTokens();
@@ -319,38 +339,81 @@ export function CalendarBoard({
    *
    * 🔴 **必须同时把游标跟过去**：否则选了"上月 30 号"却还停在本月，
    * 下面列出的日子在网格里根本看不到 —— 用户会以为点错了。
-   * 跟去哪里由档位决定：月视图跟到"那个月的 1 号"（游标的表示），
-   * 周视图跟到**那一天本身** —— 游标是"这一周里的任意一天"，
-   * 而跟到 `startOfMonth` 会把画面跳到月初那一周，正是这条规则要防的事。
+   * 跟去哪里由档位决定：**月**档跟到"那个月的 1 号"（游标的表示），
+   * **周与日**档跟到**那一天本身** —— 游标的约定是"这一段里的任意一天"，
+   * 而日档那一段只有一天。跟到 `startOfMonth` 会把画面跳到月初，正是这条规则要防的事。
    */
   const pickDay = useCallback(
     (date: LocalDate) => {
       onSelect(date);
-      onCursorChange(view === 'week' ? date : startOfMonth(date));
+      // 🔴 归一化规则用 `calendarCursorFor`（`model.ts`），这里**不再写一遍**：
+      //   同一条判断落在"共享板 + 两个宿主"三处，就是 §3.5 说的同形状的第二次。
+      onCursorChange(calendarCursorFor(view, date));
     },
     [onSelect, onCursorChange, view],
   );
 
   return (
     <View style={styles.root} testID={testID}>
-      {/* ── 月历 ─────────────────────────────────────────────
-          🔴 这张卡片有**自己的 testID**：宿主需要区分"指针在月历网格上"与
-          "在下面那份当天清单上"。Web 的滚轮翻月只在卡片内接管滚轮，
-          清单那一块仍要能正常滚页（见 `apps/web/.../useWheelMonthNav.ts`）。 */}
-      <View
-        testID={`${testID}-month-card`}
-        style={[
-          styles.monthCard,
-          {
-            gap: tokens['space.2'],
-            padding: tokens['space.3'],
-            borderRadius: tokens['radius.md'],
-            borderWidth: tokens['border-width.thin'],
-            borderColor: tokens['color.border'],
-            backgroundColor: tokens['color.surface'],
-          },
-        ]}
-      >
+      {/* ── 日档（R11 批四）与年档（R13）：整屏换一块板，共用同一格工具栏 ──────
+          日档：一天摊开成**全天带 + 24 小时轴**，形状由产品负责人 2026-10-03 的截图拍板。
+          年档：12 张缩略月卡，见 `CalendarYearBoard` 文件头。
+          🔴 这两档**都不画**下面那两块（当天标题 + 当天清单）：标题在工具栏里，
+          而"当天清单"在日档已被摊开成带与轴、在年档根本不属于这一屏 ——
+          留着就是同一屏两份当天的账。
+          工具栏**照旧要**：`‹ ›` 与「今天」是这两档唯一的移动入口（配合宿主的
+          横向拖拽），而移动端是 `toolbar='inline'`，撤掉卡片就等于撤掉导航。
+          ⚠️ 那一格的 testID 是 `${view}-card`：日档那条判据钉的是 `-day-card`，
+             合并成一个分支后它必须**逐字节还是那个名字** —— 所以这里让 `view` 直接拼，
+             不另起一套命名（改名不是本次重构的目的，去掉第三份重复才是）。 */}
+      {view === 'day' || view === 'year' ? (
+        <>
+          {toolbar === 'external' ? null : (
+            <View style={[styles.card, styles.dayToolbarCard]} testID={`${testID}-${view}-card`}>
+              <CalendarToolbar
+                cursor={cursor}
+                onCursorChange={onCursorChange}
+                onToday={onToday}
+                labels={labels}
+                view={view}
+                trailing={toolbarTrailing}
+              />
+            </View>
+          )}
+          {view === 'year' ? (
+            <CalendarYearBoard
+              tasks={tasks}
+              today={today}
+              // 🔴 与日档同一条理由：年档渲染的也是**游标**（`‹ ›` / 滚轮写的都是它）。
+              year={cursor}
+              onPickMonth={onPickMonth}
+              labels={labels}
+              testID={`${testID}-year`}
+            />
+          ) : (
+            <CalendarDayBoard
+              tasks={tasks}
+              // 🔴 日档渲染的是**游标**：`‹ ›`、滚轮、横向拖拽写的都是游标，
+              //   渲染 selected 的话宿主一旦没同步，箭头就"点了没反应"。
+              //   宿主侧那条"游标与选中同一天"由 `cursorFor` / `setCursor` 保证
+              //   （见 `apps/web/src/features/calendar/store.ts`）。
+              day={cursor}
+              now={now}
+              onToggleTask={onToggleTask}
+              onOpenTask={onOpenTask}
+              busyTaskId={busyTaskId}
+              labels={labels}
+              testID={`${testID}-day`}
+            />
+          )}
+        </>
+      ) : (
+        <>
+          {/* ── 月历 ─────────────────────────────────────────────
+              🔴 这张卡片有**自己的 testID**：宿主需要区分"指针在月历网格上"与
+              "在下面那份当天清单上"。Web 的滚轮翻月只在卡片内接管滚轮，
+              清单那一块仍要能正常滚页（见 `apps/web/.../useWheelMonthNav.ts`）。 */}
+          <View testID={`${testID}-month-card`} style={[styles.monthCard, styles.card]}>
         {/*
           工具栏（`‹ 2026年10月 ›  今天`）。**同一份组件、两种摆位**：
           默认画在卡片里（移动端没有页头插槽），Web 传 `toolbar="external"`
@@ -448,16 +511,8 @@ export function CalendarBoard({
       </View>
 
       <View
-        style={[
-          styles.daySection,
-          {
-            padding: tokens['space.3'],
-            borderRadius: tokens['radius.md'],
-            borderWidth: tokens['border-width.thin'],
-            borderColor: tokens['color.border'],
-            backgroundColor: tokens['color.surface'],
-          },
-        ]}
+        style={[styles.daySection, styles.card]}
+        testID={`${testID}-day-section`}
       >
         {dayTasks.length === 0 ? (
           // 🔴 空态走**共享那一个实现**（`check:empty-state` 的判据 3：
@@ -478,6 +533,8 @@ export function CalendarBoard({
           />
         )}
       </View>
+        </>
+      )}
 
       {/*
         页脚那颗「回到今天」。**只在工具栏没有它的时候**才画。
@@ -570,7 +627,24 @@ function makeStyles(tokens: HeytaNativeTokens) {
      */
     monthCard: {
       flexShrink: 0,
+      gap: tokens['space.2'],
     },
+    /*
+     * 卡片的外壳（内边距 / 圆角 / 边框 / 底色）**只写这一次**。
+     *
+     * 🔴 原来三处各写一份字面的 token 组合（月历卡、当天卡、日档的工具栏卡）。
+     *    三份"看着一样"的边框就是 `check:design` 拦的那件事的起点：某天真要改
+     *    卡片描边时，漏掉的那一处不会报错，只会**在那一屏上长得不一样**。
+     */
+    card: {
+      padding: tokens['space.3'],
+      borderRadius: tokens['radius.md'],
+      borderWidth: tokens['border-width.thin'],
+      borderColor: tokens['color.border'],
+      backgroundColor: tokens['color.surface'],
+    },
+    /** 日档的那条工具栏卡：外壳与另两张相同，只需要"不许被压"。 */
+    dayToolbarCard: { flexShrink: 0 },
     /* 板内头部已搬进 `CalendarToolbar`（批二）—— 原来这里的
        `monthRow` / `monthTitle` / `iconButton` / `todayButton` 四条跟着搬走，
        留着的下场就是"同一颗按钮两处定义"。 */

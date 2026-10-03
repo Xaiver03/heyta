@@ -18,6 +18,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { parseCapture, dueDateToEpoch } from '../src/capture.js';
+import { isAllDayDueMs, localTimeOf, parseLocalTime, timeOfDayMs } from '../src/date.js';
 import {
   SOON_THRESHOLD_DAYS,
   computeCountdown,
@@ -482,6 +483,117 @@ describe('parseCapture —— 边界与卫生', () => {
     expect(d.getDate()).toBe(26);
     expect(d.getHours()).toBe(0);
     expect(d.getMinutes()).toBe(0);
+  });
+});
+
+describe('parseCapture —— 时刻（R14：`明天16:00 交周报`）', () => {
+  it('日期 + 时刻一起采纳，两个片段都从标题里带走', () => {
+    const r = parseCapture('明天16:00 交周报', { now: FRIDAY });
+    expect(r.dueDate).toBe('2026-09-26');
+    expect(r.dueTime).toBe('16:00');
+    expect(r.title).toBe('交周报');
+    expect(r.matches).toHaveLength(2);
+    // 🔴 不丢字不变量在这里同样成立：两个片段都是 applied:true
+    expect(r.matches.map((m) => m.applied)).toEqual([true, true]);
+  });
+
+  it('绝对日期 + 时刻', () => {
+    const r = parseCapture('10月8号 09:30 开会', { now: FRIDAY });
+    expect(r.dueDate).toBe('2026-10-08');
+    expect(r.dueTime).toBe('09:30');
+    expect(r.title).toBe('开会');
+  });
+
+  it('🔴 时刻**从不单独成立**：没有日期时这条匹配 applied:false，原文留在标题里', () => {
+    // 若这里"采纳"了裸的 16:00，界面会写出一条 dueDate=今天零点 + 时刻的 op，
+    // 而用户从没说过"今天" —— 那是替用户编日期（文件头不变量禁止的事）。
+    const r = parseCapture('16:00 交周报', { now: FRIDAY });
+    expect(r.dueDate).toBeUndefined();
+    expect(r.dueTime).toBeUndefined();
+    expect(r.matches).toHaveLength(1);
+    expect(r.matches[0]!.applied).toBe(false);
+    expect(r.title).toBe('16:00 交周报');
+  });
+
+  it('同字段的第二条时刻留在标题里（与两个日期的规则逐字同形）', () => {
+    const r = parseCapture('明天 09:30-10:30 对齐', { now: FRIDAY });
+    expect(r.dueTime).toBe('09:30');
+    // ⚠️ 实测读数，不是理想形状：区间写法只吃头一点，连接符 `-` 会悬挂在残句开头。
+    //   这条**不是 R14 引入的** —— 日期侧一直是同一个形状（下面那条把它的读数钉在原地），
+    //   所以两处必须一起改才有意义；只改时刻侧会让两个字段行为分叉（AGENTS §3.5）。
+    //   台账 §6 登记成已知边界。
+    expect(r.title).toBe('-10:30 对齐');
+    expect(
+      parseCapture('明天-后天 开会', { now: FRIDAY }).title,
+      '日期侧的悬挂连接符（同一条边界的前例）',
+    ).toBe('-后天 开会');
+  });
+
+  it('🔴 不像时刻的一律不吃：带秒的、越界的、被数字贴住的', () => {
+    for (const [input, why] of [
+      ['开会 12:30:45', '带秒不是 HH:MM，整串原样留着'],
+      ['开会 24:00', '24 点不存在（而"4:00"被前面的数字贴住，不许从中间咬一口）'],
+      ['开会 9:70', '70 分不存在'],
+      ['开会 16:001', '后面贴着数字 = 这不是一个时刻'],
+    ] as const) {
+      const r = parseCapture(input, { now: FRIDAY });
+      expect(r.dueTime, why).toBeUndefined();
+      expect(r.matches, `${why}；也不该留下半条识别结果`).toHaveLength(0);
+      expect(r.title, why).toBe(input);
+    }
+  });
+
+  it('单位数小时补零：`9:05` 采纳成 `09:05`', () => {
+    const r = parseCapture('明天9:05 打卡', { now: FRIDAY });
+    expect(r.dueTime).toBe('09:05');
+    // raw 是原文（`9:05`），display 是归一化后的值 —— 两个通道分开，
+    // 否则"移除原文"和"写入的值"会互相顶替。
+    expect(r.matches[1]!.raw).toBe('9:05');
+    expect(r.matches[1]!.display).toBe('09:05');
+  });
+});
+
+describe('日期↔时刻的换算（R14 的"不 bump schema"就落在这两个函数上）', () => {
+  it('dueDateToEpoch 带时刻 → 本地那一刻；不带 → 本地零点', () => {
+    const withTime = dueDateToEpoch('2026-09-26', '16:00');
+    const d = new Date(withTime);
+    expect([d.getFullYear(), d.getMonth(), d.getDate()]).toEqual([2026, 8, 26]);
+    expect([d.getHours(), d.getMinutes()]).toEqual([16, 0]);
+    expect(withTime).toBe(dueDateToEpoch('2026-09-26') + 16 * 60 * 60 * 1000);
+  });
+
+  it('🔴 `isAllDayDueMs` 与 `localTimeOf` 严格互斥（同一输入不能一个说"全天"、另一个给时刻）', () => {
+    const allDay = dueDateToEpoch('2026-09-26');
+    const timed = dueDateToEpoch('2026-09-26', '00:30');
+    expect(isAllDayDueMs(allDay)).toBe(true);
+    expect(localTimeOf(allDay)).toBeUndefined();
+    expect(isAllDayDueMs(timed)).toBe(false);
+    expect(localTimeOf(timed)).toBe('00:30');
+  });
+
+  it('非零点的秒/毫秒也算"有时刻"', () => {
+    // 这条防的是只判 `getHours()||getMinutes()` 的实现 —— 那种写法会把
+    // `00:00:30` 说成"全天"，而它不是本地零点。
+    const ts = dueDateToEpoch('2026-09-26') + 30_000;
+    expect(isAllDayDueMs(ts)).toBe(false);
+    expect(localTimeOf(ts)).toBe('00:00');
+  });
+
+  it('parseLocalTime 只认 `H:MM`/`HH:MM`，其余返回 undefined 而不是抛', () => {
+    expect(parseLocalTime('16:00')).toBe('16:00');
+    expect(parseLocalTime(' 9:05 ')).toBe('09:05');
+    for (const bad of ['', '24:00', '9:60', '9:5', '16', '16:00:00', 'abc', '16-00']) {
+      expect(parseLocalTime(bad), `不该过：${bad}`).toBeUndefined();
+    }
+  });
+
+  it('timeOfDayMs 对非法输入抛错：那是程序错，不是用户输入错', () => {
+    expect(timeOfDayMs('16:00')).toBe(16 * 60 * 60 * 1000);
+    // `LocalTime` 是 `string` 的别名（不是一等公民的标记类型），所以编译器挡不住，
+    // 只有运行时的形状检查挡得住 —— 这条用例就是那面墙存在过的证据。
+    expect(timeOfDayMs('09:05')).toBe(9 * 60 * 60 * 1000 + 5 * 60 * 1000);
+    expect(() => timeOfDayMs('16:00:00')).toThrow();
+    expect(() => timeOfDayMs('16-00')).toThrow();
   });
 });
 

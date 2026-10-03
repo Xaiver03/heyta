@@ -57,6 +57,7 @@ import { useLocalePreference } from '../i18n/locale-preference';
 import { useTokens } from '../theme';
 import type { SyncCredentialForm } from '../sync/credential-form';
 import { DEFAULT_SERVER_URL } from '../sync/config';
+import { VaultSettingsSection } from './VaultSettingsSection';
 import {
   privacyConsent,
   privacyConsentActions,
@@ -87,6 +88,8 @@ export function SettingsScreen({
   onClose,
   form,
   onClearCredentials,
+  vaultCleanupPending,
+  onRetryVaultCleanup,
 }: {
   /** 「我的」持有这个状态；关闭只是把它拨回 `false`，不卸载「我的」。 */
   visible: boolean;
@@ -95,6 +98,9 @@ export function SettingsScreen({
   form: SyncCredentialForm;
   /** 清凭据（磁盘 + 小组件 + 账号 + 表单状态）由「我的」按序组合，这里只触发。 */
   onClearCredentials: () => void;
+  /** A failed native secure-store delete stays visible until it succeeds. */
+  vaultCleanupPending?: boolean;
+  onRetryVaultCleanup?: () => void;
 }): React.JSX.Element {
   const { t } = useI18n();
   const tokens = useTokens();
@@ -384,6 +390,22 @@ export function SettingsScreen({
                 />
               </View>
             </Card>
+
+            <VaultSettingsSection />
+            {vaultCleanupPending && onRetryVaultCleanup !== undefined ? (
+              <Card>
+                <Stack>
+                  <Text variant="caption" tone="danger">
+                    {t('mobile.vault.logoutCleanupFailed')}
+                  </Text>
+                  <Button
+                    label={t('mobile.vault.retryCleanup')}
+                    onPress={onRetryVaultCleanup}
+                    tone="ghost"
+                  />
+                </Stack>
+              </Card>
+            ) : null}
 
             {/*
               清凭据必须**连小组件一起清**（决策 D6）—— 组合逻辑在

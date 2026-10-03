@@ -397,8 +397,10 @@ export class IndexedDbAdapter implements DbAdapter {
           : req(store(s).put(value, key)).then(() => undefined),
       get: <T,>(s: string, key: DbKey) =>
         req(store(s).get(key)) as Promise<T | undefined>,
-      getAll: <T,>(s: string, range?: DbKeyRange) =>
-        req(store(s).getAll(buildRange(range))) as Promise<T[]>,
+      getAll: <T,>(s: string, range?: DbKeyRange, limit?: number) => {
+        assertIterateLimit(limit);
+        return req(store(s).getAll(buildRange(range), limit)) as Promise<T[]>;
+      },
       delete: (s, key) => req(store(s).delete(key)).then(() => undefined),
       clear: (s) => req(store(s).clear()).then(() => undefined),
       count: (s, range?: DbKeyRange) => req(store(s).count(buildRange(range))),
@@ -481,8 +483,8 @@ export class IndexedDbAdapter implements DbAdapter {
     return this.transaction([store], 'readonly', (tx) => tx.get<T>(store, key));
   }
 
-  async getAll<T>(store: string, range?: DbKeyRange): Promise<T[]> {
-    return this.transaction([store], 'readonly', (tx) => tx.getAll<T>(store, range));
+  async getAll<T>(store: string, range?: DbKeyRange, limit?: number): Promise<T[]> {
+    return this.transaction([store], 'readonly', (tx) => tx.getAll<T>(store, range, limit));
   }
 
   async delete(store: string, key: DbKey): Promise<void> {

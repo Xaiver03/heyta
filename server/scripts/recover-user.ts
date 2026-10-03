@@ -17,7 +17,7 @@
  * first. See docs/backup-and-recovery.md for the full procedure.
  */
 
-import { readFileSync, writeFileSync } from 'node:fs';
+import { chmodSync, readFileSync, writeFileSync } from 'node:fs';
 import { prisma, disconnectDb } from '../src/db';
 import { replayOpsToState, type ReplayOperationRow } from '../src/sync/op-replay';
 
@@ -311,7 +311,11 @@ const recover = async (
   if (!outPath) {
     throw new Error('--out <path> is required (or use --dry-run to preview).');
   }
-  writeFileSync(outPath, JSON.stringify(state, null, 2), 'utf8');
+  // 🔴 产物是某个用户的**全量明文**，默认权限（umask 022 ⇒ 0644）会让它对所有本机账户可读
+  //   —— 一台跑同步服务的机器上还有别人（CI、其它运维脚本、被拖走的备份）。
+  //   `mode` 只在创建时生效，所以已存在的文件要再显式 chmod 一次。
+  writeFileSync(outPath, JSON.stringify(state, null, 2), { encoding: 'utf8', mode: 0o600 });
+  chmodSync(outPath, 0o600);
   console.log(`\nWrote recovered state to ${outPath}`);
   console.log(
     "This file contains the user's COMPLETE plaintext data. Transmit it over a\n" +

@@ -25,7 +25,13 @@ import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 
 import { cssVar } from '@heyta/design-system';
-import { dueDateToEpoch, quickDuePickDates, toLocalDate, type Task } from '@heyta/domain';
+import {
+  dueDateToEpoch,
+  localTimeOf,
+  quickDuePickDates,
+  toLocalDate,
+  type Task,
+} from '@heyta/domain';
 import { useI18n } from '@heyta/i18n';
 import { DatePicker, WEEKDAY_MESSAGE_KEYS, formatMonthTitleText, type DatePickerQuickPick } from '@heyta/ui';
 import { Calendar } from 'lucide-react';
@@ -43,13 +49,19 @@ const PANEL_EDGE = 8;
 /** 面板与锚点之间的缝。 */
 const PANEL_GAP = 8;
 /**
- * 面板**估计高**（实测约 474：4 个快捷项 + 月标题 + 星期行 + 6 周）。
+ * 面板**估计高**（实测约 474：4 个快捷项 + 月标题 + 星期行 + 6 周，
+ * 再加时刻那一行 ≈ 38 ⇒ 512；取 540 留一点余量）。
  *
  * 🔴 它是估计，不是事实 —— 事实由 `e2e/tests/due-date-edit.spec.ts` 那条
  *   "每一格都在视口内"的量兜住：**估计一旦漂小，那条判据立刻红**，
- *   而不是让用户选不到日期。
+ *   而不是让用户选不到日期。加时刻那一行之前它是 500，
+ *   而"面板里新增一栏会被同一条量到"正是留这条判据的理由。
+ *
+ * 🔴 它是 **export 的**：`apps/web/tests/due-date-edit.spec.tsx` 的那四条
+ *   放置判据从这个常数推导，而不是自己抄一个 500 —— 抄的那一份已经漂过一次
+ *   （加时刻行后实现变了、测试里的"面板高"还是旧值，四条照样全绿）。
  */
-const PANEL_HEIGHT_ESTIMATE = 500;
+export const DUE_PANEL_HEIGHT_ESTIMATE = 540;
 
 /**
  * 面板顶边落在视口的哪个 y。
@@ -64,11 +76,11 @@ export function panelTopFor(
   anchorRect: { top: number; bottom: number },
   viewportHeight: number,
 ): number {
-  const down = anchorRect.bottom + PANEL_GAP + PANEL_HEIGHT_ESTIMATE;
-  const up = anchorRect.top - PANEL_GAP - PANEL_HEIGHT_ESTIMATE;
+  const down = anchorRect.bottom + PANEL_GAP + DUE_PANEL_HEIGHT_ESTIMATE;
+  const up = anchorRect.top - PANEL_GAP - DUE_PANEL_HEIGHT_ESTIMATE;
   if (down + PANEL_EDGE <= viewportHeight) return anchorRect.bottom + PANEL_GAP;
   if (up >= PANEL_EDGE) return up;
-  return Math.max(PANEL_EDGE, viewportHeight - PANEL_HEIGHT_ESTIMATE - PANEL_EDGE);
+  return Math.max(PANEL_EDGE, viewportHeight - DUE_PANEL_HEIGHT_ESTIMATE - PANEL_EDGE);
 }
 
 /** 快捷项 key → 本端措辞。日期数学在 domain，这里只管说话。 */
@@ -156,13 +168,20 @@ export function DueEditor({
     date: pick.date,
   }));
 
+  /*
+   * 触发器上写的是**这条截止的精度**：`10月4日` 或 `10月4日 16:00`。
+   * 判"有没有时刻"用的是共享层那一份 `localTimeOf`（时间线那条「全天」带
+   * 读的是同一个判定）—— 这里如果自己再 `getHours() !== 0` 一次，
+   * 就会出现"编辑器说全天、时间线画在 16:00"。
+   */
+  const timeValue = task.dueDate === undefined ? undefined : localTimeOf(task.dueDate);
   const valueText =
     value === undefined
       ? undefined
-      : t('web.due.dayLabel', {
+      : `${t('web.due.dayLabel', {
           month: Number(value.slice(5, 7)),
           day: Number(value.slice(8, 10)),
-        });
+        })}${timeValue === undefined ? '' : ` ${timeValue}`}`;
 
   /** 选择器本体 —— 两副身体（Portal 的 fixed 卡 / details 内的在流卡）共用。 */
   const panelBody = (
@@ -178,8 +197,35 @@ export function DueEditor({
         nextMonth: t('web.due.nextMonth'),
         dayLabel: (month, day) => t('web.due.dayLabel', { month, day }),
       }}
+      time={{
+        value: timeValue,
+        // 🔴 没有日期就没有"几点"可言 —— 这一行会画出来但填不进字。
+        enabled: value !== undefined,
+        labels: {
+          timeLabel: t('common.due.timeLabel'),
+          allDay: t('common.due.allDay'),
+          placeholder: t('common.due.timePlaceholder'),
+          aria: t('common.due.timeAria', { title: task.title }),
+        },
+        onChange: (next) => {
+          // `value` 一定在（`enabled` 为假时组件不会回调），这个判断是给
+          // 类型看的，不是给运行时兜底的。
+          if (value === undefined) return;
+          onSetDueDate(dueDateToEpoch(value, next));
+        },
+      }}
       onChange={(date) => {
-        onSetDueDate(date === undefined ? undefined : dueDateToEpoch(date));
+        /*
+         * 换日子**搬运已填的时刻**。
+         *
+         * 🔴 不搬就是"改个日期，16:00 悄悄没了" —— 界面上看不出任何事发生过，
+         *   而提醒会因此提前一整天到（提醒算的是 `dueDate - offset`）。
+         *   仓里对这件事已有先例：`postponeToToday` 用
+         *   `dueDate - startOfDay(dueDate)` 主动把时分搬到新的一天，
+         *   同一条立场在这里的输入侧执行一次。
+         *   清掉日子（`undefined`）没有"哪一天的几点"可言，那时才真的归零。
+         */
+        onSetDueDate(date === undefined ? undefined : dueDateToEpoch(date, timeValue));
       }}
     />
   );

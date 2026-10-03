@@ -171,6 +171,10 @@ function makeStyles(tokens: HeytaNativeTokens) {
     },
     row: {
       flexDirection: 'row',
+      // At the narrowest web sidebar width the action buttons cannot share a
+      // line with the name. Let the action group move as one unit instead of
+      // shrinking the name down to a zero-width flex item.
+      flexWrap: 'wrap',
       alignItems: 'center',
       gap: tokens['space.2'],
       // 「这一行是一个可点目标」的最小高度。删除按钮是行内唯一的紧凑元素，
@@ -183,6 +187,10 @@ function makeStyles(tokens: HeytaNativeTokens) {
       flexDirection: 'row',
       alignItems: 'center',
       gap: tokens['space.2'],
+      // Keep a real first-line target for the leading icon and name. The
+      // enclosing row wraps the action group below it when the sidebar is
+      // narrow, so this is a layout floor rather than a truncation hack.
+      minWidth: tokens['touch-target.min'],
       minHeight: tokens['touch-target.min'],
     },
     name: {
@@ -211,6 +219,18 @@ function makeStyles(tokens: HeytaNativeTokens) {
       width: tokens['touch-target.min'],
       height: tokens['touch-target.min'],
       borderRadius: tokens['radius.md'],
+    },
+    actions: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      alignItems: 'center',
+      gap: tokens['space.2'],
+      flexShrink: 0,
+      // A 192px sidebar leaves less room than the complete set of 44px
+      // targets. Cap this wrapped line so the last target wraps inside the
+      // sidebar instead of overflowing it.
+      maxWidth: '100%',
+      minWidth: 0,
     },
     /**
      * 行内改名的输入框。取值与 `NotesBoard` 的 `input` 逐条相同
@@ -380,70 +400,72 @@ function OrganizerRow({
         </Pressable>
       )}
 
-      {renderItemExtra === undefined ? null : renderItemExtra(item)}
+      <View style={styles.actions}>
+        {renderItemExtra === undefined ? null : renderItemExtra(item)}
 
-      {onRename === undefined || rename === undefined ? null : (
+        {onRename === undefined || rename === undefined ? null : (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={rename.button(item.name)}
+            aria-disabled={busy}
+            disabled={busy}
+            onPress={() => {
+              setEditing(item.id);
+            }}
+            style={[styles.remove, busy ? styles.busy : null]}
+            testID={`${key}-rename`}
+          >
+            <HeytaIcon
+              data={Pencil}
+              size={tokens['icon.xs']}
+              color={tokens['color.foreground-muted']}
+            />
+          </Pressable>
+        )}
+
+        {onArchive === undefined || labels.archive === undefined ? null : (
+          <Pressable
+            accessibilityRole="button"
+            // 名字跟着**目标动作**走（已归档的行说"取消归档"），图标也一样 ——
+            // 一个说「归档」的按钮把一条已归档的清单又归档一次，是纯噪音。
+            accessibilityLabel={
+              item.archived === true
+                ? labels.archive.unarchive(item.name)
+                : labels.archive.button(item.name)
+            }
+            aria-disabled={busy}
+            disabled={busy}
+            onPress={() => {
+              onArchive(item, item.archived !== true);
+            }}
+            style={[styles.remove, busy ? styles.busy : null]}
+            testID={`${key}-archive`}
+          >
+            <HeytaIcon
+              data={item.archived === true ? ArchiveRestore : Archive}
+              size={tokens['icon.xs']}
+              color={tokens['color.foreground-muted']}
+            />
+          </Pressable>
+        )}
+
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel={rename.button(item.name)}
+          accessibilityLabel={labels.removeLabel(item.name)}
+          // 🔴 用**平铺** `aria-*`，不要用对象形态 `accessibilityState` / `accessibilityValue`：
+          // RNW 0.21 会把对象形态**整个丢掉**（实测 `aria-checked` / `aria-valuenow` 都不出现），
+          // 而 RN 0.71+ 两端都认平铺形态。判据见 `pnpm check:rn-aria`。
           aria-disabled={busy}
           disabled={busy}
           onPress={() => {
-            setEditing(item.id);
+            onRemove(item);
           }}
           style={[styles.remove, busy ? styles.busy : null]}
-          testID={`${key}-rename`}
+          testID={`${key}-remove`}
         >
-          <HeytaIcon
-            data={Pencil}
-            size={tokens['icon.xs']}
-            color={tokens['color.foreground-muted']}
-          />
+          <HeytaIcon data={Trash2} size={tokens['icon.xs']} color={tokens['color.danger']} />
         </Pressable>
-      )}
-
-      {onArchive === undefined || labels.archive === undefined ? null : (
-        <Pressable
-          accessibilityRole="button"
-          // 名字跟着**目标动作**走（已归档的行说"取消归档"），图标也一样 ——
-          // 一个说「归档」的按钮把一条已归档的清单又归档一次，是纯噪音。
-          accessibilityLabel={
-            item.archived === true
-              ? labels.archive.unarchive(item.name)
-              : labels.archive.button(item.name)
-          }
-          aria-disabled={busy}
-          disabled={busy}
-          onPress={() => {
-            onArchive(item, item.archived !== true);
-          }}
-          style={[styles.remove, busy ? styles.busy : null]}
-          testID={`${key}-archive`}
-        >
-          <HeytaIcon
-            data={item.archived === true ? ArchiveRestore : Archive}
-            size={tokens['icon.xs']}
-            color={tokens['color.foreground-muted']}
-          />
-        </Pressable>
-      )}
-
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel={labels.removeLabel(item.name)}
-        // 🔴 用**平铺** `aria-*`，不要用对象形态 `accessibilityState` / `accessibilityValue`：
-        // RNW 0.21 会把对象形态**整个丢掉**（实测 `aria-checked` / `aria-valuenow` 都不出现），
-        // 而 RN 0.71+ 两端都认平铺形态。判据见 `pnpm check:rn-aria`。
-        aria-disabled={busy}
-        disabled={busy}
-        onPress={() => {
-          onRemove(item);
-        }}
-        style={[styles.remove, busy ? styles.busy : null]}
-        testID={`${key}-remove`}
-      >
-        <HeytaIcon data={Trash2} size={tokens['icon.xs']} color={tokens['color.danger']} />
-      </Pressable>
+      </View>
     </View>
   );
 }

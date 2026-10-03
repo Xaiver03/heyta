@@ -19,6 +19,7 @@ export * from './reminders.js';
 export * from './timeline.js';
 export * from './timeline-position.js';
 export * from './notes.js';
+export * from './trash-rows.js';
 export * from './search.js';
 export * from './habit-streak.js';
 export * from './habit-resilience.js';

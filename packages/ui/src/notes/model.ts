@@ -29,19 +29,17 @@
 
 import {
   isNoteHighlighted,
+  NOTE_EXCERPT_LENGTH,
   noteExcerpt,
   sortNotesForDisplay,
   type Note,
 } from '@heyta/domain';
 
 /**
- * 列表默认的摘要长度（字符数）。
- *
- * ⚠️ 它是**展示**尺度，不是领域闸门（内容上限是 `noteExcerpt` 之外的
- * `NOTE_MAX_CONTENT_LENGTH`）。60 与迁移前 web 便签列表的视觉行宽一致 ——
- * 改它会让所有已有截图里的截断位置变一次，所以它是常量而不是随手传的魔数。
+ * 摘要长度的**所有者是领域层**（`@heyta/domain#NOTE_EXCERPT_LENGTH`）：
+ * 回收站那一行与 node-host 的 CLI 都要用同一个截断位置，而它们不依赖本包。
+ * 这里不再转出它 —— 一个常量有两个转出点，抄件就开始漂。
  */
-export const NOTE_EXCERPT_LENGTH = 60;
 
 /**
  * 一条便签在列表里的一行。

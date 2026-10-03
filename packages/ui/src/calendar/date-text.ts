@@ -49,9 +49,30 @@ export type CalendarDateKey =
   | 'common.weekday.fri'
   | 'common.weekday.sat'
   | 'common.weekday.sun'
+  | 'common.date.yearTitle'
   | 'common.date.monthTitle'
   | 'common.date.dayTitle'
-  | 'common.date.weekRangeTitle';
+  | 'common.date.weekRangeTitle'
+  // 🔴 年档那 12 张月卡要的**短月份名**（zh「10月」/ en `Oct`）。
+  //   它们**不是新抄件**：这一批 key 早已是仓里月份名的唯一一份，
+  //   时间线（`TimelineViewLabels.monthNames`）与两个宿主都从它们建数组 ——
+  //   移动端 `apps/mobile/src/lib/timeline-labels.ts:81` 读的也是 `web.board.month.*`。
+  //   这里宁可让日历也读这批"名字带 web. 但两端都在用"的 key，
+  //   也不给月份名开第三套（AGENTS §3.5 那条同形状的第二次）。
+  //   ⚠️ 命名空间本身是个存量瑕疵（`web.*` 被 mobile 读），归并重排是另一步，
+  //      已登记在 `docs/plans/calendar-year-time-and-mobile-profile.md` §5。
+  | 'web.board.month.1'
+  | 'web.board.month.2'
+  | 'web.board.month.3'
+  | 'web.board.month.4'
+  | 'web.board.month.5'
+  | 'web.board.month.6'
+  | 'web.board.month.7'
+  | 'web.board.month.8'
+  | 'web.board.month.9'
+  | 'web.board.month.10'
+  | 'web.board.month.11'
+  | 'web.board.month.12';
 
 /**
  * 宿主注入的翻译函数。
@@ -119,6 +140,58 @@ export function formatDayTitleText(date: LocalDate, t: CalendarTranslate): strin
     day: d.getDate(),
     weekday: t(weekdayMessageKey(isoWeekday(date))),
   });
+}
+
+/**
+ * 月份（1..12）→ 词条 key。
+ *
+ * 🔴 与 `weekdayMessageKey` 同一个理由用 `switch`：在 `noUncheckedIndexedAccess` 下
+ *   数组下标访问永远是 `T | undefined`，那会逼出一句永远走不到的兜底。
+ *   入参是**人读的 1..12**（与 `daysInMonth` 同一条口径），不是 JS `Date` 的 0..11 ——
+ *   差一格的症状是"每张月卡顶上写的月份都比实际早一个月"，而它看着仍是张日历。
+ */
+export function monthMessageKey(month: number): CalendarDateKey {
+  switch (month) {
+    case 1:
+      return 'web.board.month.1';
+    case 2:
+      return 'web.board.month.2';
+    case 3:
+      return 'web.board.month.3';
+    case 4:
+      return 'web.board.month.4';
+    case 5:
+      return 'web.board.month.5';
+    case 6:
+      return 'web.board.month.6';
+    case 7:
+      return 'web.board.month.7';
+    case 8:
+      return 'web.board.month.8';
+    case 9:
+      return 'web.board.month.9';
+    case 10:
+      return 'web.board.month.10';
+    case 11:
+      return 'web.board.month.11';
+    default:
+      return 'web.board.month.12';
+  }
+}
+
+/** 月卡顶上的短月份名（zh「10月」/ en `Oct`）。 */
+export function formatMonthShortText(date: LocalDate, t: CalendarTranslate): string {
+  return t(monthMessageKey(parseLocalDate(date).getMonth() + 1));
+}
+
+/**
+ * 「2026年」—— 年档的标题。
+ *
+ * 🔴 不能拿 `formatMonthTitleText` 顶：年档摊开 12 个月，标题却指着一个月。
+ *   措辞在词条里（`common.date.yearTitle`），英文那侧就是裸年份。
+ */
+export function formatYearTitleText(date: LocalDate, t: CalendarTranslate): string {
+  return t('common.date.yearTitle', { year: parseLocalDate(date).getFullYear() });
 }
 
 /**

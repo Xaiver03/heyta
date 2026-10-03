@@ -51,6 +51,13 @@ export {
   type TrashBoardLabels,
   type TrashBoardProps,
 } from './trash/TrashBoard.js';
+/**
+ * 回收站的**行模型**不在本包转出（`TRASH_KINDS` / `TrashItem` / `toTrashItems` /
+ * `liveTaskCountOfProject`）—— 所有者是 `@heyta/domain#trash-rows`。
+ * 理由：`apps/node-host` 的 CLI 与验收脚本要用同一份"回收站里有什么"，
+ * 而它们不能依赖本包（RN 会被拖进 node 进程）。放在 ui 里就会出现第三个宿主
+ * 自己抄一遍，而它抄的那一份只包含任务。
+ */
 export {
   SearchPanel,
   type SearchPanelLabels,
@@ -84,16 +91,35 @@ export {
   type SearchGroups,
 } from './search/model.js';
 export { CalendarBoard, type CalendarBoardProps } from './calendar/CalendarBoard.js';
+export { CalendarDayBoard, type CalendarDayBoardProps } from './calendar/CalendarDayBoard.js';
+export { CalendarYearBoard, type CalendarYearBoardProps } from './calendar/CalendarYearBoard.js';
 export { CalendarToolbar, type CalendarToolbarProps } from './calendar/CalendarToolbar.js';
+export {
+  CalendarViewTabs,
+  type CalendarViewTabsLabels,
+  type CalendarViewTabsProps,
+} from './calendar/CalendarViewTabs.js';
 export {
   calendarDayTone,
   calendarCellBars,
+  calendarDayBuckets,
+  calendarHourMark,
+  calendarCursorFor,
+  calendarSelectedForCursor,
+  calendarYearColumns,
+  calendarMonthDrill,
   stepCalendarCursor,
   groupTasksByDueDate,
   MAX_CALENDAR_BARS,
+  MAX_WEEK_CALENDAR_BARS,
+  HOURS_IN_DAY,
+  CALENDAR_VIEW_LABEL_KEYS,
+  CALENDAR_VIEW_ORDER,
   type CalendarBoardLabels,
   type CalendarCellBar,
   type CalendarViewKind,
+  type CalendarViewLabelKey,
+  type CalendarDayBuckets,
   type CalendarDayTone,
   type CalendarToolbarLabels,
 } from './calendar/model.js';
@@ -101,6 +127,9 @@ export {
   formatDayTitleText,
   formatWeekRangeText,
   weekdayMessageKey,
+  monthMessageKey,
+  formatMonthShortText,
+  formatYearTitleText,
   formatMonthTitleText,
   WEEKDAY_MESSAGE_KEYS,
   type CalendarDateKey,
@@ -616,7 +645,6 @@ export {
   type NotesBoardProps,
 } from './notes/NotesBoard.js';
 export {
-  NOTE_EXCERPT_LENGTH,
   toNoteRows,
   type NoteRow,
 } from './notes/model.js';
@@ -926,7 +954,20 @@ export {
   DatePicker,
   type DatePickerLabels,
   type DatePickerQuickPick,
+  type DatePickerTime,
 } from './date-picker/DatePicker.js';
+
+/**
+ * ── R14（时刻输入侧）：芯片"时刻该念什么"的那一处判定 ──
+ *
+ * 🔴 **本块是追加的**（`index.ts` 是多写者共享文件，只许在末尾追加）。
+ *
+ * 为什么单独转出一个函数，而不是让两端各自 `chip.field === 'dueTime'`：
+ * 宿主注入的 `valueLabel` 原本只有"日期 / 优先级"两条分支，时刻芯片掉进
+ * 优先级那条会念成**「不设置」**。判定写在共享层，两端只剩"取它给的串"，
+ * 新增字段时就不会有一端整块分支漏掉（AGENTS §3.5）。
+ */
+export { captureChipTimeLabel } from './capture/model.js';
 
 /**
  * ── 多端第二批（便签编辑链）：**"改一张便签的正文"只有这一个实现** ──

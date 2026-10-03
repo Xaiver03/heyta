@@ -22,6 +22,7 @@ import {
   isReminderPending,
   nextTriggerAfterRepeat,
   reminderEffectiveAt,
+  reminderIsFired,
   reminderPhase,
   reminderRejection,
   reminderTriggerFromOffset,
@@ -71,6 +72,14 @@ describe('到期判定（reminderPhase / dueReminders）', () => {
     expect(reminderPhase(r, NOW + HOUR + MINUTE)).toBe('snoozed');
     // snooze 到点 → due
     expect(reminderPhase(r, NOW + HOUR + 30 * MINUTE)).toBe('due');
+  });
+
+  it('新的有效触发时刻不再继承旧 occurrence 的 fired marker，旧数据仍按 firedAt 兼容', () => {
+    const oldTrigger = NOW + HOUR;
+    const nextTrigger = NOW + 2 * HOUR;
+    expect(reminderIsFired(reminder({ triggerAt: oldTrigger, firedAt: NOW, firedForTriggerAt: oldTrigger }))).toBe(true);
+    expect(reminderIsFired(reminder({ triggerAt: nextTrigger, firedAt: NOW, firedForTriggerAt: oldTrigger }))).toBe(false);
+    expect(reminderIsFired(reminder({ triggerAt: nextTrigger, firedAt: NOW }))).toBe(true);
   });
 
   it('墓碑（deletedAt）不出现在到点集合里，即使状态是 due', () => {

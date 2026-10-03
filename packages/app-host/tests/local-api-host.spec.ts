@@ -14,7 +14,9 @@
  *      —— 这一类错误本仓库已经踩过一次（模型把"明天"算成 4 个半月前）
  */
 
-import { Priority } from '@heyta/domain';
+import { readFileSync } from 'node:fs';
+
+import { dueDateToEpoch, localTimeOf, Priority } from '@heyta/domain';
 import { OpLogEngine } from '@heyta/op-log';
 import { DbOpLogStore, INDEXEDDB_SCHEMA, SqliteAdapter } from '@heyta/storage';
 import { NodeSqliteDriver } from '@heyta/storage/sqlite/node';
@@ -22,10 +24,12 @@ import { OpType, type Operation } from '@heyta/sync-core';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { createTaskActions, type TaskActions } from '../src/actions.js';
+import { createProjectActions } from '../src/project-actions.js';
 import {
   createLocalApiHost,
   fromLocalDateString,
   taskToItem,
+  toLocalApiDueString,
   toLocalDateString,
 } from '../src/local-api-host.js';
 import type { LocalApiHost } from '@heyta/local-api';
@@ -134,6 +138,108 @@ describe('🔴 日期转换 —— 本地时区，不是 UTC', () => {
 // 🔴 可读性
 // ─────────────────────────────────────────────────────────────────────────
 
+/*
+ * ── R14：本机工具（MCP / 脚本 / 编辑器）看到的**时刻** ─────────────
+ *
+ * 这一组钉的是"链的最后一米"：界面上能设的时刻，出了界面必须还看得见 ——
+ * 以前 `taskToItem` 直接 `toLocalDateString(...)`（只留日），于是
+ * "16:00 接孩子"在 MCP 眼里与"今天接孩子"**是同一个值**，而写入侧只收 `YYYY-MM-DD`
+ * ⇒ 本机工具既读不到也写不进时刻。两处都是**静默**的。
+ *
+ * 🔴 为什么刻意用**同一个键**带 `T16:00` 而不是新增 `dueTime`：
+ *   `dueDate` 已经在两个工具的 `egressFields` 出境披露清单里（`tools.ts:97` / `:109`）、
+ *   两处白名单投影里（`tools.ts:411` / `:448`）与 MCP 输出 schema 里。
+ *   新增字段要同时改这五处，**少改最后一处就是"把没披露过的字段送出去"**。
+ */
+describe('🔴 R14 本机工具那一侧的时刻', () => {
+  it('有时刻的带 `T16:00`，只到日的一格都不多写', () => {
+    expect(toLocalApiDueString(dueDateToEpoch('2026-03-15', '16:00'))).toBe('2026-03-15T16:00');
+    const allDay = toLocalApiDueString(dueDateToEpoch('2026-03-15'));
+    expect(allDay).toBe('2026-03-15');
+    // 🔴 反向对照：不许写成 `2026-03-15T00:00` —— 那会把"只到日"伪装成"定在午夜"，
+    //   而这两种任务在日档里住在**不同的带**（全天带 vs 00:00 那一格）。
+    expect(allDay.includes('T'), allDay).toBe(false);
+  });
+
+  it('🔴 投影真的走了那一个换算（不是这里自己再拼一次日子）', () => {
+    const timed = taskToItem(
+      {
+        id: 't1',
+        title: '接孩子',
+        dueDate: dueDateToEpoch('2026-03-15', '16:00'),
+        createdAt: 0,
+        updatedAt: 0,
+      } as never,
+      true,
+    );
+    expect(timed.dueDate).toBe('2026-03-15T16:00');
+    const dayOnly = taskToItem(
+      {
+        id: 't2',
+        title: '交房租',
+        dueDate: dueDateToEpoch('2026-03-15'),
+        createdAt: 0,
+        updatedAt: 0,
+      } as never,
+      true,
+    );
+    expect(dayOnly.dueDate).toBe('2026-03-15');
+  });
+
+  it('收 `T16:00` 且落在**本地那一分钟**；往返一致', () => {
+    const epoch = fromLocalDateString('2026-03-15T16:00');
+    expect(epoch).toBeDefined();
+    const d = new Date(epoch as number);
+    expect([d.getFullYear(), d.getMonth(), d.getDate(), d.getHours(), d.getMinutes()]).toEqual([
+      2026, 2, 15, 16, 0,
+    ]);
+    expect(localTimeOf(epoch as number)).toBe('16:00');
+    expect(toLocalApiDueString(epoch as number)).toBe('2026-03-15T16:00');
+    // 只到日的那一条往返**不长出 `T`**（否则读回去的人会以为它定在午夜）
+    expect(toLocalApiDueString(fromLocalDateString('2026-03-15') as number)).toBe('2026-03-15');
+  });
+
+  it('🔴 时刻形状不合法一律拒（不猜、不截断成日子）', () => {
+    for (const bad of [
+      '2026-03-15T25:00',
+      '2026-03-15T16:99',
+      '2026-03-15T16', // 半截时刻
+      '2026-03-15 16:00', // 空格不是 `T`
+      '2026-03-15T16:00:00', // 带秒：规范形只到分
+      '2026-03-15T10:00:00Z',
+      '2026-02-31T10:00', // 日子不存在，带了时刻也不该被放过
+    ]) {
+      expect(fromLocalDateString(bad), bad).toBeUndefined();
+    }
+  });
+
+  it('🔴 create-task 带时刻 ⇒ op 载荷就是那一分钟；非法形状被拒且说的是两种口径', async () => {
+    const ok = await makeHost().submit({
+      action: 'create-task',
+      title: '带时刻的任务',
+      dueDate: '2026-03-15T16:00',
+    });
+    expect(ok.ok).toBe(true);
+    if (!ok.ok) return;
+    const payload = (await opsOf(ok.taskId))[0]?.payload as Record<string, unknown>;
+    expect(payload['dueDate']).toBe(dueDateToEpoch('2026-03-15', '16:00'));
+
+    const bad = await makeHost().submit({
+      action: 'create-task',
+      title: '坏形状',
+      dueDate: '2026-03-15T25:00',
+    });
+    expect(bad.ok).toBe(false);
+    if (bad.ok) return;
+    expect(bad.reason).toBe('invalid');
+    // 报错要说出**两种**都收 —— 只提 `YYYY-MM-DD` 等于让工具作者以为时刻写不进去。
+    // ⚠️ 第二条不能用 `toContain('YYYY-MM-DD')`：`YYYY-MM-DDTHH:MM` 里本来就含它，
+    //   那是一条**永远通过**的判据（§7 元规则 2）。这里要的是"裸日期的那种写法也被提到"。
+    expect(bad.message).toContain('YYYY-MM-DDTHH:MM');
+    expect(bad.message, bad.message).toMatch(/YYYY-MM-DD(?!T)/u);
+  });
+});
+
 describe('🔴🔴 不可读任务连 body 字段都不存在', () => {
   it('readable=false 时没有 body（不是空串、不是 null）', () => {
     const item = taskToItem(
@@ -238,8 +344,63 @@ describe('读操作', () => {
   });
 
   it('listProjects 带上任务数', async () => {
-    const projects = await makeHost().listProjects();
-    expect(Array.isArray(projects)).toBe(true);
+    // 🔴 这条原先只断言 `Array.isArray(projects)` —— 名字写着"带上任务数"，
+    // 而**没有任何一行在看任务数**，也就是说 taskCount 恒为 0 它照样绿。
+    // 现在按名字把它验实：两进一出 + 一条已删除的不计入。
+    const projects = createProjectActions(engine);
+    // ⚠️ 两条清单的 `createdAt` 必须**不同**：清单 id 是随机的，
+    // 同刻创建时顺序会退化成按 id 字典序 —— 那是一条会偶尔自己红、
+    // 而跟被测行为没有任何关系的判据。
+    const work = await projects.createProject('工作');
+    clock += 1000;
+    const home = await projects.createProject('生活');
+    clock += 1000;
+
+    await actions.create('一');
+    clock += 1000;
+    await actions.create('二', { projectId: work });
+    clock += 1000;
+    await actions.create('三', { projectId: home });
+    clock += 1000;
+    await actions.create('四', { projectId: work });
+    clock += 1000;
+    const gone = await actions.create('五', { projectId: work });
+    await actions.remove(gone);
+
+    const listed = await makeHost().listProjects();
+    expect(listed.map((p) => [p.id, p.name, p.taskCount])).toEqual([
+      [work, '工作', 2],
+      [home, '生活', 1],
+    ]);
+  });
+
+  it('🔴 归档的清单不许出现在出口（W9 / P-9）', async () => {
+    // 界面上「收起来」的清单，助手与 CLI 不能还当活的摆出来 ——
+    // 这一条钉的就是那个不一致。
+    const projects = createProjectActions(engine);
+    const visible = await projects.createProject('还在用');
+    const archived = await projects.createProject('收起来了');
+    await projects.archiveProject(archived);
+
+    const listed = await makeHost().listProjects();
+
+    expect(listed.map((p) => p.id)).not.toContain(archived);
+    // 🔴 正向对照腿**不许省**：这条路上"没出现"同样可能是根本没接通
+    //（AGENTS §7 元规则 1：探针坏 / 够不着 / 真没有，三者输出相同）。
+    expect(listed.map((p) => p.id)).toContain(visible);
+  });
+
+  it('🔴 出口层不许自己重新判"哪些清单算活的"（I5：隐藏由层负责）', async () => {
+    // 这一条不看行为、看**形状**：`local-api-host.ts` 里一旦再出现对原始表的
+    // `projects` 遍历，就说明"什么算可见清单"又有了第二份判据 ——
+    // 而 W9 之前的第二份正是只答了"未删除"、漏了"未归档"的那一份。
+    // ⚠️ 先剥注释：本文件自己的注释里就写着那句旧代码，不剥会把说明当成违规。
+    const src = readFileSync(new URL('../src/local-api-host.ts', import.meta.url), 'utf8')
+      .replace(/\/\*[\s\S]*?\*\//g, '')
+      .replace(/(^|\s)\/\/[^\n]*/g, '$1');
+    expect(src).toContain('projectActions.listProjects()');
+    // 原始表里那一列从此不该再被碰过 —— 一条就够，不需要匹配整句形状。
+    expect(src).not.toContain('.projects');
   });
 });
 

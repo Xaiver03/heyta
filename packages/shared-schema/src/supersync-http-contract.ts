@@ -118,6 +118,16 @@ const SuperSyncRequestIdSchema = z.string().regex(SUPER_SYNC_REQUEST_ID_REGEX);
 
 export const SuperSyncVectorClockSchema = z.record(z.string(), z.number());
 
+/**
+ * A server-issued, signed causal frontier.  The token binds the clock to the
+ * server's retained history; clients must never invent one locally.
+ */
+export const SuperSyncCausalFrontierSchema = z.object({
+  token: z.string().min(1).max(65536),
+  vectorClock: SuperSyncVectorClockSchema,
+});
+export type SuperSyncCausalFrontier = z.infer<typeof SuperSyncCausalFrontierSchema>;
+
 export const SuperSyncClientIdSchema = z
   .string()
   .min(1)
@@ -140,6 +150,9 @@ export const SuperSyncOperationSchema = z.object({
     .optional(),
   payload: z.unknown(),
   vectorClock: SuperSyncVectorClockSchema,
+  /** When present, `vectorClock` is a delta against the signed frontier in the
+   * upload envelope. Old clients omit this field and send a complete clock. */
+  vectorClockEncoding: z.enum(['full', 'frontier-delta']).optional(),
   timestamp: z.number(),
   schemaVersion: z.number().int().min(1).max(100),
   /** Optional (absent on old clients) — readers must sniff the payload type
@@ -175,6 +188,8 @@ export const SuperSyncUploadOpsRequestSchema = z.object({
   clientId: SuperSyncClientIdSchema,
   lastKnownServerSeq: z.number().optional(),
   requestId: SuperSyncRequestIdSchema.optional(),
+  /** Signed frontier used by operations encoded as `frontier-delta`. */
+  causalFrontierToken: z.string().min(1).max(65536).optional(),
 });
 
 export const SuperSyncDownloadOpsQuerySchema = z.object({
@@ -258,6 +273,7 @@ export const SuperSyncUploadOpsResponseSchema = z
     newOps: z.array(SuperSyncServerOperationSchema).optional(),
     latestSeq: z.number(),
     hasMorePiggyback: z.boolean().optional(),
+    gapDetected: z.boolean().optional(),
     deduplicated: z.boolean().optional(),
   })
   .passthrough();
@@ -269,12 +285,14 @@ export const SuperSyncDownloadOpsResponseSchema = z
     latestSeq: z.number(),
     gapDetected: z.boolean().optional(),
     snapshotVectorClock: SuperSyncVectorClockSchema.optional(),
+    causalFrontier: SuperSyncCausalFrontierSchema.optional(),
     serverTime: z.number().optional(),
     // Capability flags are plain booleans: a `literal(true)` would turn a
     // server that ever reports `false` into a page-wide parse failure.
     capabilities: z
       .object({
         causalRepairSnapshots: z.boolean().optional(),
+        causalFrontierDelta: z.boolean().optional(),
       })
       .optional(),
   })
