@@ -2022,13 +2022,46 @@ grep -oE '^#{2,4} ?B[0-9]+' BLOCKED.md | grep -oE '[0-9]+' | sort -n | uniq -d  
 | 红线原句 | 判定机制住在哪 | 合并态现量 | 自动消费者 |
 |---|---|---|---|
 | AI 类型上产不出 op | **不是某条门禁，是包管理器的物理事实**：`packages/ai` 零依赖，`node_modules` 里只有 `tsup / typescript / vitest` ⇒ `@heyta/op-log` 在这个包里**根本解析不到** | `packages/ai/src` 对 `createOp\|OpLogRecord\|@heyta/op-log\|@heyta/sync-core\|dispatch(` 命中 **2**，两处都是 `provider.ts:14/16` 的注释（ADR-0005 §3.1 的说明原文），代码 **0** 处；`package.json` 的 `dependencies` 与 `peerDependencies` 均不存在 | `pnpm -r build`（本轮 rc=0）+ 链第 03 段 `check:typecheck` —— 有人想让它能产 op，第一步必须往 `packages/ai/package.json` 加依赖，而那一步会立刻出现在 diff 里 |
-| `host.submit` 全仓恰好一处 | `check:ai-tools` 规则 2（RUN_FILE 恰好 1 次且落在 `confirmAiToolProposal()` 之后）+ 规则 8（MCP 入口恰好 1 次且落在 `executeTool()` 内）+ 规则 9（全仓写入口**可穷举**：清单外出现 `host.submit(` 即红） | 真实调用点 **2 处**：`packages/app-host/src/ai-tool-run.ts:195`、`packages/local-api/src/server.ts:545`（`server.ts:481` 与 `ai-tool-run.ts:188` 是注释表，剥注释后不计数）；`host.ts:331-332` 把端口接到 `engine.dispatch()` | 链第 36 段 `check:ai-tools`（本轮绿） |
+| `host.submit` 全仓恰好一处 | `check:ai-tools` 规则 2（RUN_FILE 恰好 1 次且落在 `confirmAiToolProposal()` 之后）+ 规则 8（MCP 入口恰好 1 次且落在 `executeTool()` 内）+ 规则 9（全仓写入口**可穷举**：清单外出现 `host.submit(` 即红） | 真实调用点 **2 处**：`packages/app-host/src/ai-tool-run.ts:195`、`packages/local-api/src/server.ts:545`（`server.ts:481` 与 `ai-tool-run.ts:188` 是注释表，剥注释后不计数）；端口的接法见下面"勘误"那条划线链 | 链第 36 段 `check:ai-tools`（本轮绿） |
 | 逐工具默认关 | `packages/local-api/src/tools.ts:337-339`：`return grants?.[toolName] === true;` —— 缺键 / `undefined` / `false` 三种形态**一律拒**，没有"默认开"的分支 | 逐字读回原函数体，合并态未变 | `check:ai-tools` 规则 3-6 + `packages/local-api` 那 146 条测试 |
 | 出境逐字段披露 | 承诺住在**工具目录**的 `LocalApiTool.egressFields`，真实载荷住在 `projectForTool` / `projectListForTool`，判据是"**实际跑一遍 `runReadTool`、收集载荷里出现的键**"而不是读代码列表 | 目录 22（读 10 / 写 12）：读工具声明条数 `list_tasks:6 get_task:7 list_projects:3 list_habits:5 list_tags:2 list_notes:4 get_note:5 list_checkins:3 list_focuses:6 list_reminders:4`（合 45），写工具 12 条**全部空表**，信封 `TOOL_ENVELOPE_EGRESS_FIELDS=["tool.error"]` 单独一份（不逐工具抄成六份） | `packages/local-api/tests/tool-egress-fields.spec.ts` **9 tests 绿**（`chain-2200/segments.log:1447`；该包 `Test Files 7 passed / Tests 146 passed`，`:1450-1451`）。其中"遍历整份目录"那条**以目录本身为取样清单** ⇒ 新加一个读工具不会被"判据没铺到它"漏掉；另有 `ownerPhone` / `streakDays` 两条阳性对照，证明这条判据真有牙齿 |
 | 回退不跨越隐私边界 | `fallback-needs-consent` 这个失败形状（本机端点挂了**不许**悄悄改发云端，一次请求都不发）；`retention-undecided` 挡住 `managed` | 命中 **8** 处（上一轮 §15.18 是 6 处 —— 方向是**变严**，不是被削弱）；`retention-undecided` **4** 处，`assertEnableable()` 仍抛，托管 AI 未开 | `packages/ai/tests/routing.spec.ts` + `assistant-limits.spec.ts`（在 `pnpm -r test` 里） |
 
 🔴 顺带把 `CURRENT_SCHEMA_VERSION` 一并现量：值 **1**，本轮未 bump；新持久化字段全部可选带运行时默认值
 （助手会话历史那条按 D-4(i) 根本没进 op-log，所以连字段都没新增）。
+
+### 勘误（23:3x，尖端 `6b6449a7` 重跑指针时查出来的）：上表那格 `host.ts:331-332` 路径写得不完整
+
+我重跑这条指针时先按 `packages/local-api/src/host.ts` 去找 ⇒ **文件不存在**，差点就把这格判成
+"指针坏了"并重写成别的。**先别改，先把歧义解掉**：`host.ts` 这个名字在仓里有三份
+（`packages/app-host/src/host.ts`、`apps/node-host/src/host.ts`、`apps/desktop/src/host.ts`），
+而我那一格指的是**第一份**，它现在仍然逐字成立：
+
+```
+packages/app-host/src/host.ts:331  async dispatch(intent: OpIntent): Promise<void> {
+packages/app-host/src/host.ts:332    await engine.dispatch(intent);
+```
+
+所以这一格的缺陷不是"值错了"，是**路径不完整 + 把三跳压成一跳**。完整那条链是：
+
+```
+host.submit 调用点（ai-tool-run.ts:195 / server.ts:545）
+  → 端口 submit: (intent) => submitIntent(…)      packages/app-host/src/local-api-host.ts:423
+  → async function submitIntent(…)                 packages/app-host/src/local-api-host.ts:455
+  → 各 *Actions 经 ActionContext 的 ctx.dispatch(…)  （同文件 :310 那段注释就是讲这个）
+  → packages/app-host/src/host.ts:331 → engine.dispatch()
+```
+
+📌 一般规律两条：**仓名相同的文件必须带目录写**（本仓 `scripts/windows/` 与
+`apps/desktop-windows/scripts/` 两处都有 ps1，是同一件事的第二次）；
+以及**"指针查不到"先怀疑自己按错了目录**，不要立刻把一条成立的证据划成错的 ——
+我这次如果直接改，就会把一条真证据改坏，而那正是这张表存在的目的。
+
+⚠️ 同一趟里还撞到一个**假 0**：我用 `grep 'grants?\['` 去找第 3 条那行，返回空，
+读起来像"fail-closed 那行没了"。其实是 BRE 里 `?` 是字面量、`[` 开了个未闭合的字符类
+—— **模式自己坏了**。`sed -n '337,339p'` 现量那三行仍然逐字是
+`export function isToolGranted(…)` / `return grants?.[toolName] === true;` / `}`，第 3 条未变。
+（同族教训：正则的 0 命中一律先证明模式自己会命中。）
 
 ### 这一节自己走错的一步（值得留着）
 
