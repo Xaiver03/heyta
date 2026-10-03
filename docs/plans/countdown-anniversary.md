@@ -239,13 +239,17 @@ i18n **中英同步**（唯一文案事实源，`check:ui-language` 拦）；`SH
    - `@floating-ui/*` 五条 + `react-activity-calendar` + `tabbable`：**真被删掉的依赖**。合并后的 `pnpm-lock.yaml` 里 grep 计数 0，`packages/*`、`apps/*` 里也没有任何 package.json 声明它们；清单记着它们只是因为那份产物的生成日期（2026-09-27）早于移除。
    - `playwright` 三条：**工作树差异**。`e2e/` 刻意不在根 pnpm 工作区内（它自带一份 lockfile，AGENTS §6），所以只有跑过 `cd e2e && pnpm install` 的那棵树才看得见它。实测同一份渲染器在隔离 worktree 出 **958** 条、在主检出出 **1093** 条。
    ⇒ 结论不变、理由换掉：**这份产物只能在装了全部 workspace 的主检出渲染**，在隔离检出渲染会**静默少一整条 workspace 的依赖**。
-   🔴 顺带照出一个真缺口：`check:licenses` 判的是**准入**（有没有不合格许可），**没有任何门禁判这份产物新不新鲜**，所以它能在依赖树变化后安静过期六天。**不能**直接把 `render-license-inventory.mjs --check` 挂进 `pnpm check`：它读磁盘上的 node_modules，在没装 e2e 那份 workspace 的干净检出 / CI 上**必然假红**。要挂，得先让渲染器改从 lockfile + workspace 配置推导（不在本批，登记为 **G-1**）。
-   ⚠️ **上面那句"改从 lockfile 推导"是我提错的机制，已实测撤回；G-1 已按另一条路关掉（提交 `47897912`）**：
+   🔴 顺带照出一个真缺口：`check:licenses` 判的是**准入**（有没有不合格许可），**没有任何门禁判这份产物新不新鲜**，所以它能在依赖树变化后安静过期六天。**不能**直接把 `render-license-inventory.mjs --check` 挂进 `pnpm check`：它读磁盘上的 node_modules，在没装 e2e 那份 workspace 的干净检出 / CI 上**必然假红**。要挂，得先让渲染器改从 lockfile + workspace 配置推导（不在本批，登记为 **CDG-1**）。
+   ⚠️ **这个短号一开始就起错了**：我原先写作 `G-1`，而 `docs/research/legal-pipl-baseline.md` 有
+   一整套**它自有的** `G-1…G-20`「核实缺口」编号，并且那里明写「两处重名会让人在跨文档跟进度时认错行」。
+   我没先查命名空间归属就用了同一个号（正是自己记过的那条教训）。现在改成 **CDG-1**（countdown 批次缺口 1）。
+   现量：`grep -n 'G-1' docs/research/legal-pipl-baseline.md | head -3` 与 `grep -rn 'CDG-1' docs/`。
+   ⚠️ **上面那句"改从 lockfile 推导"是我提错的机制，已实测撤回；**CDG-1** 已按另一条路关掉（提交 `47897912`）**：
    - `grep -c license pnpm-lock.yaml` ⇒ **0**。许可证字符串只住在**已安装包**的 `package.json` 里
      （`license-inventory.mjs` 扫的是 `node_modules/.pnpm` 与 `e2e/node_modules/.pnpm` 两座虚拟 store），
      lockfile 里**没有这个字段** ⇒ "从 lockfile 推导出整份清单"在数据模型上不成立，除非联网查 registry 或先装。
    - 内容级 `--check` 挂不进 CI 的理由，**渲染器自己的文件头就写着**（依赖树天生平台相关，
-     `@esbuild/darwin-arm64` 与 `@esbuild/win32-x64` 二选一）—— 我写 G-1 时没去读它，
+     `@esbuild/darwin-arm64` 与 `@esbuild/win32-x64` 二选一）—— 我写 CDG-1（当时写的 G-1）时没去读它，
      于是把"缺 e2e workspace"当成唯一障碍，而实际有两个。
    - ✅ 关掉它的判据只比**一件纯文件的事**：产物是在哪一把 lockfile 下渲染的。渲染时在表头写
      `lockfile 指纹：<sha256 前 16 位>`，`--check-stamp` 只读那份 md 与 `pnpm-lock.yaml`
@@ -279,7 +283,7 @@ i18n **中英同步**（唯一文案事实源，`check:ui-language` 拦）；`SH
 （照 `scripts/mutate-*.mjs` 那一族的先例：manual 跑、不进 `pnpm check`，但**在仓库里**，
 所以它描述的那次变异下次任何人都能重放 —— 之前我把这类 harness 留在仓外的临时目录里，
 文档里那些"5/5、9/9"的读数就成了**只有这台机器这一次运行**能看见的东西）。
-11 例：G1–G4 许可证指纹判据（含"只换 lockfile、清单不动"这一例，就是 G-1 的形状；
+11 例：G1–G4 许可证指纹判据（含"只换 lockfile、清单不动"这一例，就是 CDG-1 的形状；
 跑在没有 node_modules 的临时检出里，顺带证明它上得了 CI）、L1–L4 负载门（恒超标必红 / 低负载必放行 /
 边界是 ≤ / 等待序列按旋钮走）、P1–P2 设备占用探针（活的对照组揭穿 `grep -F` 那条盲探针）、
 S1 负载门的单一所有者（定义 1 处 + source 恰好 2 处）。2026-10-03 11:42 实测 **11 绿 0 红**。
