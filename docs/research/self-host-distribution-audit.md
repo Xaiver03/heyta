@@ -3225,6 +3225,67 @@ git diff --name-only a70b0ef8 HEAD -- "${SUPER_SYNC_IMAGE_INPUTS[@]}" | grep -c 
 main 已走到 `030f0969` ⇒ 载体又过一期（只认分支名不认 SHA 这条纪律不变）。
 本轮**没有**重算载体：main 两三分钟前进一笔，而现在重算出来的 SHA 在我写下它的同一轮就会过期，
 且真正的阻塞不在 SHA 在那 5 枚文件上 —— 重算留到它们变干净那一刻做。
+🔴 **最后这半句在写下几分钟内就被 §8.52 否证**：那 5 枚里今天只有 1 枚真挡路，
+而挡路的两枚从没在这张表里。原句留着是因为它错得有价值 —— 它记的是一个**没量过的口径**。
+
+### 8.52 #7 的等待面量错了：真正的阻塞集是 **3 枚**，其中 2 枚从没登记过（06:0x）
+
+上一节那句"重算留到那 5 枚变干净那一刻"本身是个**未量的口径**。这一轮去量，
+第一次就把自己算错的地方照出来了 —— 值得原样留下，因为它是"每个数字都合理但集合是错的"那一类。
+
+| 算法 | 得到 | 判定 |
+|---|---|---|
+| `git diff --name-only main HEAD` | **820** 条路径 | 🔴 **错**：这里面绝大多数是 main 自己新增、本批没有的文件，合并**不会写它们**。拿它去交主检出的脏清单得到 **100 枚"阻塞文件"** —— 一个看起来"根本不可能落地"的假集 |
+| `git diff --name-only "$(git merge-base main HEAD)" HEAD` | **33** 条 = 合并真正会写进 main 的路径 | ✅ 这才是枚举源（"本批相对 base 的贡献集"） |
+| 33 ∩ 主检出 151 条脏 | **3 枚** | `package.json`、`research/tools/check-image-license-coverage.mjs`、`server/image-npm-tree.json` |
+| `git merge-tree --write-tree main HEAD`（只读） | rc=1，冲突面**恰好 1 条路径**（`package.json`，1/2/3 三个 stage） | §8.22 预置的另外五条（`.gitignore` / 三枚 evidence PNG / 本审计文档 add/add / 链）**今天都不触发** |
+
+🔴 **登记的 5 枚里只有 1 枚（`package.json`）今天还挡路**；另外 4 枚（`docs/README.md`、两份词条表、
+`scripts/check-script-snapshot.mjs`）本批相对 merge-base **一个字都没改** —— 它们脏是别人的事，
+合并既不读也不写。它们一直挂在等待面上，是 §8.16 之后没重算过集合。
+而**冒出来两枚从没登记过的**。
+
+**那两枚是本批自己的文件，正被另一条会话在主检出改着**（diff 全文我读过）：
+
+1. `research/tools/check-image-license-coverage.mjs`：`+1` 行，往 `IMAGE_ONLY_PACKAGES` 加
+   `@fastify/websocket@11.3.3`，理由写"npm 解析到 2026-10-03 新发布的 11.3.3，已核对发布 tarball 的 package/LICENSE 为 MIT"。
+2. `server/image-npm-tree.json`：3 行，把快照里 `@fastify/websocket` 从 **11.3.1 → 11.3.3**、`generatedAt` 刷新、
+   `serverPackageJsonSha256` 跟着变。
+
+**成因不是有人动我的东西，是 main 还带着旧版生成器**：`git show main:research/tools/gen-image-npm-tree.mjs`
+第 13 行仍写着"用法（**要联网**，它就是在问 registry 要解析结果）"、第 211 行还在跑
+`install --package-lock-only` 现解 —— 形状 C（离线读提交物锁）只在本分支。所以谁今天跑 main 那一份，
+得到的都是 registry 当下解析的 11.3.3，而 main 提交物里钉着 10-03 07:58 那趟解出来的 11.3.1，
+两边对不上就只能手加一条许可登记。**这个 hazard 在落地那一刻自动消失**（落地后生成器读锁，不再现解）。
+
+**落地时这三枚各怎么解（先写死，免得临场重新判断）**：
+
+| 文件 | 解法 | 依据 |
+|---|---|---|
+| `package.json` | 取**并集**（链），载体脚本自动算 | §8.34 那个"并集从没写回"的洞已修；§8.41 已确认 `"check"` 是一整行 ⇒ 两侧都改才冲突 |
+| `server/image-npm-tree.json` | **取本分支** | 本分支 146 条、由提交物锁派生、带 `packageLockSha256`；main 提交物 143 条旧形状，他们改出来的**也还是旧形状**（`inputs` 里没有 `packageLockSha256`）。⚠️ 他们那份落地后会被 `gen --check` 判红，因为它是联网现解的产物 |
+| `check-image-license-coverage.mjs` | **取本分支**，且**零信息丢失** | 本分支第 130 行已有同一条 `@fastify/websocket@11.3.3`，还多带"为什么不写 `carrier`"的推理；他们唯一多出来的是那句"已核对发布 tarball 的 LICENSE" —— 这一轮我**自己从真产物里读了那份 LICENSE** 并写进了注释，所以他们的验证不是被丢弃，是被换成可重跑的形式 |
+
+```sh
+# 06:08 实测：读的是 05:50 那趟建出来的镜像里随包发布的那份 LICENSE，不是 registry 元数据
+docker run --rm --entrypoint sh supersync:selfhost-verify -c \
+  'node -e "const p=require(\"/app/node_modules/@fastify/websocket/package.json\");console.log(p.version,p.license)"; head -3 /app/node_modules/@fastify/websocket/LICENSE'
+# → 11.3.3 MIT / 正文首行 "MIT License" / Copyright (c) 2017-present The Fastify team
+```
+
+🔴 **这两枚的性质和那 4 枚不同，处置也就不同**：那 4 枚是"别人在改别人的文件，等他们提交"；
+这两枚是"**别人在改本批的文件**"。按 AGENTS §9 那条，撞车的判据是同一文件的未提交 diff，
+不是"某条线在忙"的印象 —— 这种必须**当面协调**（他们提交或还原），不能被动等：
+他们的改动若被一次 `git checkout` 或别的批次整文件 `git add` 带走，本批的许可证登记表就少一条
+真验证过的项目而**没有任何一层会报红**（§7 里"我 plumbing 提进多人台账的段落会被别人整文件 `git add` 抹回去"那条的反向形态）。
+
+**顺带对自己那条硬约束做了一次自查**（用 `diff --stat` 量，不是回忆）：`packages/shared-schema` 与
+`packages/sync-core` 相对 merge-base 各只有 **1 行**，且都是 `"license": "MIT"` 声明
+（04:4x 那趟补的"镜像里 manifest 没有 license 字段"）⇒ **没碰 `CURRENT_SCHEMA_VERSION`、线协议、迁移**。
+
+**main 的推进速率**（决定"要不要提前重算载体"的现量）：`030f0969` 05:49:26 → `70ee6868` 06:05:10 →
+`05be4729` 06:06:11 —— 最后两笔相隔 **61 秒**。任何"现在算好的 SHA"到落地那一刻必然过期，
+所以等待器**只做检测**，绝不在窗口里自动跑 `pnpm check`（`check:ai-e2e` 的前置会 SIGKILL 别人在 4318/4319/3000 上的 dev server）。
 
 
 

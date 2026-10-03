@@ -133,6 +133,13 @@ const IMAGE_ONLY_PACKAGES = {
     checkedAt: '2026-10-04',
     why: 'pnpm-lock 锁在 11.3.1，而 npm 每次构建取 ^11.3.0 范围内最新 ⇒ 两条解析路必然漂',
   },
+  // 🔴 上面这条的许可依据取自**镜像产物里随包发布的那份 LICENSE 文件**，不是 registry 元数据
+  // （元数据会漂，产物不会 —— 与 §7 那条"值对得上不等于它就是那个角色"同一个道理）：
+  //   docker run --rm --entrypoint sh supersync:selfhost-verify -c \
+  //     'node -e "console.log(require(\"/app/node_modules/@fastify/websocket/package.json\").version)"
+  //      head -3 /app/node_modules/@fastify/websocket/LICENSE'
+  // 2026-10-04 06:08 实测输出：`11.3.3` / `license=MIT` / 正文首行 `MIT License`，
+  // 署名 `Copyright (c) 2017-present The Fastify team`。
 };
 
 const PERMISSIVE_LICENSES = new Set([
