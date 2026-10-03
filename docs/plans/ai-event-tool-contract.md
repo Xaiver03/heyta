@@ -2181,5 +2181,110 @@ Windows 段的"远端 == 本地工作树"对账就变成"远端 == 一个带脏�
 先把 21:33 那个旧实例处理干净再起跑。**没有在 22:4x 就做**是因为这台机器此刻还压着并行会话的
 两条设备验收（负载 22:41 现量 `95.76 / 86.87 / 60.58`），再挂一段重构建会把别人的窗口挤没。
 
+## 15.33 ③ 的第二趟：负载判据交回单一所有者，以及编号台账的一次现量复核（载体 `8a947a16`，23:0x）
+
+### 一、负载这一半我不再自己写（两次抄件都是坏的）
+
+`~/scratch-heyta/heyta-reinstall-gated.sh`（新）取代 `heyta-reinstall-mobile.sh`：
+负载判断整段交回仓内的单一所有者 ——
+
+```bash
+. "$CARRIER/scripts/lib/wait-for-quiet-host.sh"
+wait_for_quiet_host || exit 3          # HEYTA_LOAD_GATE_WAIT=1800
+```
+
+**为什么要交回**：今晚我在这台机器上手写过两版负载判据，两版都是坏的，而且坏的形态互不相同 ——
+
+| 版本 | 写的是什么 | 真实行为 |
+|---|---|---|
+| `heyta-reinstall-gate.sh`（22:36 那趟用的） | `L1=$(printf '%s' "$LOAD" \| awk '{print $1}')` 只**打印** | 从未参与判定 ⇒ ③ 的第一趟是在负载 ~20–40 上起跑的（B61 里"那次 mac 段同时压着并行构建"就是这么来的） |
+| `heyta-reinstall-mobile.sh`（22:48 那趟） | `tr -d '{} ' \| cut -d, -f1 \| tr -d '.'` | 去空格把 `vm.loadavg` 的三个数**粘成一个 12 位整数** ⇒ `-le 12` 恒假 ⇒ 闸门会等满上限后 exit 3，症状与"环境一直不干净"逐字相同 |
+
+`wait_for_quiet_host` 读的是 `uptime`（traps #168 已经把那个坑踩平并写在函数注释里）。
+**我两次都是绕开它自己重写，两次都重新踩了它注释里明写着的那条** —— 这就是 AGENTS §3.5
+那句"抽出来不等于重复被消除"在闸门上的版本。设备占用那一半**留在**我的脚本里，
+因为仓内确实没有所有者（B62 要拍的就是那把锁）。
+
+新脚本还做了一件事：**闸门有负向对照**。23:01 投放时现量对端命中 3（并行会话的
+`.verify-mobile-ios-reminder.sh.snap.4230` 及其子进程）⇒ 日志立刻打"对端在跑…⇒ 等 20s"，
+23:03 三次干净采样后才放开。之前那两版的坏之所以危险，就是它们**从不产生"我在等"这一行**。
+
+### 二、`setsid` 在 macOS 上不存在：一次"进程根本没起来"被读成"闸门在等"
+
+第一次投放写的是 `nohup setsid bash … &`。`nohup: setsid: No such file or directory` —— 任务当场死掉，
+`gate.log` 一行都没多。**这个症状和"闸门正在等窗口"在日志上几乎分不开**（都是"没有新行"），
+区别只在 `ps -p $PID`。改成 `nohup bash … < /dev/null > out 2>&1 &` + pidfile 守卫后起跑正常。
+⇒ 投放后台跑之前必须先 `ps -p` 证明它在，而不是看日志有没有新行。待入 traps。
+
+### 三、B60 那个"15 个文件"的交叠，23:0x 重取**仍然是 15**
+
+现量命令（可重跑）：
+
+```bash
+git -C <载体> diff --name-only main...integrate/2026-10-03-closeout | sort -u > /tmp/carrier-files.txt   # 83 个
+git -C <主检出> status --porcelain | sed 's/^...//;s/ -> .*//' | sort -u > /tmp/main-dirty.txt            # 356 个
+comm -12 /tmp/carrier-files.txt /tmp/main-dirty.txt                                                        # 15 个
+```
+
+逐条：`PROGRESS.md`、`docs/plans/README.md`、`docs/reference/environment-traps.md`、
+`packages/app-host/src/{local-api-host,reminder-actions}.ts`、
+`packages/app-host/tests/{local-api-host,reminder-actions}.spec.ts`、
+`packages/domain/src/capture.ts`、`packages/domain/tests/capture.spec.ts`、
+`packages/i18n/src/locales/{en,zh-CN}.ts`、`packages/local-api/src/{mcp,tools}.ts`、
+`scripts/mutate-closeout-gates.sh`、`scripts/reinstall-all.sh`。
+主检出 HEAD 仍是 `e3312dba`（23:0x 现量），所以落地这个动作**没有新前提可争取**，
+只有等这 15 个文件由各自所有者提交 —— `heyta-land.sh --confirm` 已备好，不重复摸索。
+
+### 四、④ 的编号复核：台账本身有 4 个号被两条不同条目占用（有真影响面）
+
+对 `docs/reference/environment-traps.md`（载体提交态）现量：最大号 **180**，
+`^[0-9]+\. ` 命中 **189** 行 / 去重 **176**。
+
+🔴 **先校正探针**：这 13 行的差额**不是台账缺陷**，是嵌套有序列表的 `1. / 2. / 3. / 4.` 被同一条
+正则算进去了（`^(\d+)\. ` 对顶格子列表项同样成立）。分开算法就是这一条（B63 引的也是它）：
+
+```bash
+node -e '
+const fs=require("fs");
+const lines=fs.readFileSync("docs/reference/environment-traps.md","utf8").split("\n");
+const seen={};
+lines.forEach((l,i)=>{const m=l.match(/^(\d+)\. /); if(m){const n=+m[1];(seen[n]=seen[n]||[]).push(i+1);}});
+console.log("重号="+JSON.stringify(Object.entries(seen).filter(([,v])=>v.length>1)
+  .map(([n,v])=>n+"@"+v.join("/"))));            // 1/2/3/4 是嵌套列表，不是条目号
+const e=Object.keys(seen).map(Number).filter(n=>n>4).sort((a,b)=>a-b);
+const miss=[]; for(let i=Math.min(...e);i<=Math.max(...e);i++) if(!e.includes(i)) miss.push(i);
+console.log("条目号最大="+Math.max(...e)+"  缺号="+JSON.stringify(miss));
+'
+```
+
+去掉 `1..4` 之后：
+
+| 缺陷 | 现量 |
+|---|---|
+| **一个号两条不同条目** | `#38`（`:708` 常量当两种单位用 vs `:779` 软键盘吞 tap）、`#93`（`:2450` 手写解析器 vs `:2889` Prefab/JDK 24）、`#94`（`:2491` `base64 -d` 不认 base64url vs `:2908` 共享验收助手假设过时）、`#95`（`:2519` 新镜像+旧 `.env` vs `:2940` Expo 装不进 pnpm monorepo） |
+| **缺号** | `1..180` 内缺 `#83 #84 #85 #120`（`#82` 存在，内容是 aka.ms 短链回退 Bing，与 AGENTS §7 索引行"80–83 … #83 探针污染状态"**不是同一条**） |
+| **AGENTS.md 内部就有一对二** | `:961 #82` 非空白挡不住错误屏 / `:1048 #82` 重装≠当前源码；`:1008 #83` 探针改变状态 / `:1074 #83` MSIX 纯 ASCII —— 而 §7 自己写着"新的条目追加到 traps 文件末尾，不要写回本文件" |
+
+影响面（消费者集合，不是"应该没人用"）：
+
+```bash
+grep -rnoE '(§7[^。]{0,12}第[ ]?(38|93|94|95) 条|第 ?(38|93|94|95) 条|traps #(38|93|94|95))' \
+  AGENTS.md docs packages apps scripts --include='*.md' --include='*.ts' --include='*.tsx' --include='*.sh' --include='*.mjs'
+```
+
+**13 处 / 10 个文件**。⚠️ 其中 `docs/research/legal-pipl-baseline.md:239,826` 的"第 38 条"是
+**PIPL 法条**、不是 traps 引用，所以真实受影响是 **11 处**，其中四处是**验收脚本的注释**
+（`scripts/verify-mobile-lists.sh:44`、`scripts/verify-ios-lan-http.sh:133`、
+`scripts/lib/mobile-e2e.sh:919,1029` 都写"§7 第 38 条"）—— 脚本注释里指向一个有两个含义的号，
+下一位只能猜作者当时想的是"常量两种单位"还是"软键盘吞 tap"（按上下文几乎肯定是后者，但那是读出来的，不是台账给的）。
+
+**为什么不由我改**：修它要同时动 `AGENTS.md` 与 `docs/reference/environment-traps.md`，
+23:0x 现量这两个文件在主检出里**都是 `M`**（`PROGRESS.md`、`package.json` 同）。
+按 AGENTS §7 的"编号只增不改"和 §8 第 9 条的共享面纪律，这是**要人拍的台账动作**，
+登记成 BLOCKED `B63`（含上面那条现量命令），不在别人脏着的状态里就地重排号。
+🔴 顺带一条对 §7 索引行自身的批评：AGENTS.md 明写"本文件**不写条数**（写过一次'83 条'，六天后就漂了）"，
+但它自己**装着** 82/83 那几条的正文 ⇒ 索引声称"正文在 traps 文件"，而正文有两处住在索引里。
+这就是 #38/#93/#94/#95 那四个重号的成因形状：**同一条判断写两处，第二处拿到的是下一个号位。**
+
 
 
