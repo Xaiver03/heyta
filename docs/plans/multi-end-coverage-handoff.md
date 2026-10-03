@@ -90,5 +90,6 @@
 - 行内代码（反引号）里的路径**不是链接**，`check:docs` 看不见它 —— 别把"没被报"读成"是好的"。
 - 门禁名的唯一权威来源是 `package.json` 的 `scripts` 键（`check:docs` = `node research/tools/docs-link-check.mjs`，
   没有 `scripts/check-docs-link.mjs` 这个文件）。
+- 🔴 **提交共享台账（`BLOCKED.md` / `PROGRESS.md`）时，提交内容 = `git show HEAD:<文件>` + 你自己那段文本**，不要拿工作树文件当提交源：追加区是所有会话共用的尾部，"单 hunk + 删除 0 行"只证明形状是追加，**不证明作者是你**（`96f3293d` 就把并行会话的整节替他们提交了，详见 B53）。
 - 脚本里开了 `set -o pipefail` 时，**别写 `if ! diff -u A B | grep -q …`**：`diff` 在有差异时退 1，
   整条管道状态就是 1，匹配成功也会被读成失败（本轮在此空转四趟）。改成直接 `grep 文件`。
