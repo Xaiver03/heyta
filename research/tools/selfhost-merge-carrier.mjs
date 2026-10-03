@@ -25,6 +25,8 @@
  *     🔴 断言④是前提断言：并集脚本默认"只增不减"，谁摘了 base 的一段就必须停下来人判，
  *     否则摘掉的那段会被当成"另一边没有"而**静默消失**。
  *     第一版（手改）把冲突块按 main 侧收掉，症状是"合上了"而实际摘掉本批五道门禁。
+ *     🔴 并集算出来还要**写回并 round-trip**（这段是 2026-10-04 现量补的，见下面第 1 族的注释：
+ *     main 先吸收了整批 ⇒ tChain ⊆ oChain，"没写回"这个洞一直不被任何输入触发）。
  *  2. `.gitignore`：交给 `git merge-file --diff3`，只对**纯追加**的冲突块（base 段为空）
  *     做"两块都留"；base 段非空 ⇒ 那不是双方各自追加，退 2 交人判。
  *     ⚠️ 不要用"公共前缀 + 两条尾巴"：其前提是两侧都只在 EOF 追加，而本批在第 89 行
@@ -195,6 +197,36 @@ if (fam.pkg.length) {
   if (dropped.main.length) bad.push(`main 相对 base 摘掉 ${dropped.main.length} 段：${dropped.main.join(', ')}`);
   if (dropped.src.length) bad.push(`本批相对 base 摘掉 ${dropped.src.length} 段：${dropped.src.join(', ')}`);
   if (bad.length) die(2, `package.json 并集判定失败：${bad.join(' · ')}`);
+  /**
+   * 🔴 **把算出来的并集真的写回 `check` 这一条**（2026-10-04 现量补上的）。
+   *
+   * 上面那个逐键复制的循环里 `k === 'check'` 被 `continue` 跳过，因为它由链并集单独处理 ——
+   * 但"单独处理"原先**只处理到内存里**：`result` 从来没有赋回 `outPkg.scripts.check`，
+   * 于是写盘的永远是 main 那份链。下面那条"写完回读再验"的断言把它拦下来了
+   * （`缺链段 1（check:image-build-args）· 磁盘 segs=74，应当=75`，exit 5）。
+   *
+   * 为什么这个洞一直没人看见：main 早先把整批都吸进去了（§8.32），所以 tChain ⊆ oChain，
+   * `result` 恒等于 `oChain` ⇒ 不写回也没丢东西。**直到本批第一次往链里加一段
+   * main 还没有的新门禁**，它才第一次真的少一段。这是"判据从没被需要的输入触发过"的形状 ——
+   * 断言①②③④都成立，产出却是错的。
+   *
+   * 重建字符串时不凭"`pnpm ` 开头"这个印象：先用两侧的**原文**建映射，取不到再退回加前缀，
+   * 最后断言"重建串 `seg()` 回去逐段等于 result"。少这一步的话，
+   * 链里任何一段不带 `pnpm ` 前缀（例如直接 `node scripts/…`）都会被悄悄改成另一条命令。
+   */
+  const originalOf = new Map();
+  for (const rawChain of [ours.scripts.check, theirs.scripts.check]) {
+    for (const raw of rawChain.split(' && ')) {
+      const key = raw.replace(/^pnpm /, '').trim();
+      if (!originalOf.has(key)) originalOf.set(key, raw.trim());
+    }
+  }
+  outPkg.scripts.check = result.map((s) => originalOf.get(s) ?? `pnpm ${s}`).join(' && ');
+  const rebuilt = seg(outPkg.scripts.check);
+  if (rebuilt.length !== result.length || rebuilt.some((s, i) => s !== result[i])) {
+    die(5, '并集链序列化**不能 round-trip**：重建后再切段与内存里的并集不一致' +
+      `\n  重建=${rebuilt.join(' | ')}\n  并集=${result.join(' | ')}`);
+  }
   writeFileSync(join(WT, 'package.json'), `${JSON.stringify(outPkg, null, 2)}\n`);
   git(['-C', WT, 'add', '--', 'package.json']);
   pkgReading = `并集 scripts 键 ${Object.keys(outPkg.scripts).length} 个 · check 链段 main=${oChain.length} 本批=${tChain.length} base=${bChain.length} 并集=${result.length}（摘段 0/0）`;

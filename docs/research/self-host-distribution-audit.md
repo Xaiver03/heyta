@@ -2162,6 +2162,62 @@ PrivacyConsentBlockedError: privacy-consent-not-granted: 用户尚未同意隐�
 | **#2（本目标第 2 项）** | `pnpm verify:selfhost-stack` 全跑现量仍缺。旋钮已接进脚本，下一趟要带 `NODE_IMAGE=<自己拉得到的源>/library/node:24-alpine` | 无测试锁 + load ≤12 的窗口；等满以 rc=3 记"环境无效≠产品失败" |
 | **G-50** | 站内「自建一套同步服务器」那篇文章（外人从落地页点进来的**那一份**）里，`镜像/国内/拉取/registry` **一个词都没有**（`grep` 现量 0 命中）—— 也就是它把上面这个第一关**完全没提**。要补需要动 `packages/i18n` 中英两份 + `apps/landing/src/site/docs.ts` 的 key 清单 + 重跑 `gen:entries` 与 `check:entries` | 那两份词条表**此刻仍在主检出未提交**（就是 #7 那 5 个重叠文件之二）⇒ 现在动它等于给落地加冲突面。登记，不沉默 |
 
+### 8.34 载体脚本自己那条"写完回读"的断言，第一次运行就抓到**它自己的洞**：并集算出来了，从没写回
+
+本轮往 `check` 链里加了 `check:image-build-args`（§8.33 ③），重算载体时脚本 **exit 5**：
+
+```
+· MERGE_HEAD=f6b44ff6 已确认 · 冲突 1 条：package.json
+· package.json 并集 scripts 键 143 个 · check 链段 main=74 本批=67 base=66 并集=75（摘段 0/0）
+❌ package.json 并集写回后回读**不含**完整并集：缺链段 1（check:image-build-args）· 缺键 0（）
+   —— 磁盘 segs=74，应当=75
+```
+
+#### 真相不是"并集算错"，是**算对了没写**
+
+`package.json` 那一族的逐键复制循环里有一句 `if (… || k === 'check') continue;` ——
+`check` 被跳过是**对的**（它由链并集单独处理），但"单独处理"原先只处理到**内存**：
+`result` 从未赋回 `outPkg.scripts.check`，于是写盘的永远是 main 那份链。
+四条断言（键不缺 / 段不缺 / 顺序不颠倒 / 不摘 base 段）当时**全部成立**，产出却是错的。
+
+🔴 为什么这个洞活了这么多轮才第一次响：main 早先把整批都吸进去了（§8.32），
+所以 `tChain ⊆ oChain` ⇒ `result` 恒等于 `oChain`，不写回也不丢任何东西。
+**本批第一次往链里加一段 main 还没有的新门禁**，它才第一次真的少一段。
+这是"判据从没被它需要的输入触发过"的形状 —— 与 §7 #165 那一族同形：
+一条断言的强度不由"它跑过多少次"回答，只由"有没有一种输入能让它红"回答。
+这次是**我自己加的输入**把它照出来的，而那正是它该有的第一次用途。
+
+修法（`research/tools/selfhost-merge-carrier.mjs`）：
+
+1. `outPkg.scripts.check = result` 序列化后真的写回去；
+2. 序列化**不凭**"`pnpm ` 开头"这个印象 —— 先用两侧的**原文**建映射（`seg()` 只是切掉 `^pnpm `，
+   链里任何一段不带这个前缀都会改写命令本身），取不到才退回加前缀；
+3. 加一条 round-trip 断言：重建串再 `seg()` 回去必须**逐段等于** `result`，不一致 exit 5。
+   ①②③ 合起来才是"我算的那条链就是磁盘上那条链"。
+
+#### 修完的载体（现量，且**独立复核**过，不采信脚本自己的报告）
+
+| 项 | 读数 |
+|---|---|
+| 载体 | `c229bab6` = main `f61c23af` × `feat/self-host-distribution` `f6b44ff6`（`feat/self-host-merge-main` 已指过去） |
+| 冲突 | 1 条：`package.json`（分族 pkg=1 gi=0 png=0 audit=0 **other=0** ⇒ 没出现预置四族之外的路径） |
+| 链段 | main=74 本批=67 base=66 **并集=75**，摘段 0/0 |
+| 纯 fs 门禁 | 5 道全 exit 0：`check:gate-wiring` / `check:selfhost-entry-command` / `check:script-snapshot` / `check:docs` / `check:md-tables` |
+
+独立复核的那三条（`git show <ref>:package.json` 直接读三个 blob，不经过载体脚本）：
+
+```
+c229bab6                       链段= 75 含 image-build-args=true 定义在场=true
+main                           链段= 74 含 image-build-args=false 定义在场=false
+feat/self-host-distribution    链段= 67 含 image-build-args=true 定义在场=true
+```
+
+⚠️ **载体又是活的**：`main` 本轮从 `62576fa3` 走到 `f61c23af`（不到一小时两笔）。
+所以"完整 `pnpm check` 跑在哪一枚载体上"这件事**只能在跑的那一刻现取** ——
+这正是 §8.31 把它脚本化的理由：测量链的第 3 步在起跑**之前**再跑一次
+`node research/tools/selfhost-merge-carrier.mjs`，而不是拿今天这个 `c229bab6` 去交差。
+
+
 
 
 
