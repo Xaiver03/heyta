@@ -753,7 +753,7 @@ node scripts/check-pricing-consistency.mjs
    理由与它抓出的那个缺陷见 §7.14 第 1 条；"派生 ≠ 硬编码两种"这条也已在
    **隔离检出**里用真变异证完（见 §7.14 第 2 条），不再是没有证据的边界。
    落地页复刻改用同一份 `LOCALES`/`LOCALE_LABEL_KEY`。
-   🔴 **2026-10-04 形态变更（上面"一排 `.ht-chip`"那句随之过期）**：产品负责人
+   🔴 **2026-10-03 形态变更（上面"一排 `.ht-chip`"那句随之过期）**：产品负责人
    「中英文的那个切换组件太离谱了，你看一下规范应该是什么样子的」。查到的规范
    **四条全在仓库里**，逐条的令牌名与实测数字记在
    [`apps/web/src/styles/app/main-area.css`](../../apps/web/src/styles/app/main-area.css)
@@ -1537,7 +1537,7 @@ case 'ollama': return t('common.ai.preset.ollama.label');
   判据：`verify-i18n-failures.mjs` 的 `readiness` 组 **12 条**（/tmp 副本隔离，不动真实仓库），
   含"塞规则但漏 locale""把 en 的 forbidden 拿掉""已迁移文件里写硬编码文案"等注入。
 - ✅ **web 切换器从二态 toggle 改 `LOCALES` 列表**（本轮）：`LanguageSwitcher.tsx` 渲染
-  `LOCALES.map(…)` 的一排语言项（2026-10-04 起是页头那个**带可见标签的分组**，
+  `LOCALES.map(…)` 的一排语言项（2026-10-03 起是页头那个**带可见标签的分组**，
   见上面 §7.8 最后那段；此前是复用 `.ht-chip--on` 的一排胶囊），语言名用**自称**词条
   `common.lang.*`；自称 key 登记成 `LOCALE_LABEL_KEY`（`satisfies Record<Locale, MessageKey>`）
   —— **加 `Locale` 忘了登记自称 = 编译错误**，这就是"准备好但先不做"的具体形状。
