@@ -44,6 +44,7 @@ import type { CountdownFilter, EventBoardLabels } from '@heyta/ui';
 import { formatDayTitleText } from '@heyta/ui';
 
 import type { Translate } from '../i18n/translate';
+import type { CardExportFailureCode } from './card-export-native';
 
 /**
  * 类型档位 → 词条键（穷尽 `switch`，加一档不映射就编译红）。
@@ -110,10 +111,38 @@ export function eventBoardLabels(t: Translate): EventBoardLabels {
     fieldTemplate: t('web.countdown.field.template'),
     templateDefault: t('web.countdown.template.none'),
     templateName: (slot) => t('web.countdown.template.slot', { slot }),
+    // W7：给了这一格才会渲染（与 `onExportCard` **成对**，见共享层注释）。
+    // 词条复用 `web.countdown.export` —— 同一件事在两端的名字必须一样，
+    // 各起一个键迟早漂成"导出图片 / 导出成品图"两种说法。
+    exportCard: t('web.countdown.export'),
     a11yMenu: (title) => t('web.countdown.a11y.menu', { title }),
     a11yCloseMenu: (title) => t('web.countdown.a11y.menuClose', { title }),
     errorPrefix: t('web.countdown.error'),
   };
+}
+
+/**
+ * 导出失败那一句。**四种因各有各的一句**，共用一句就等于把
+ * "这台设备的包里没带导出组件"与"分享面板拒了"说成同一件事 ——
+ * 而前者该重装、后者该换个去处，让用户去做错的那件事比不提示更糟。
+ *
+ * `detail` 是原生**原样**回来的字符串：按本屏的分工不翻译（翻译之后既没法搜索、
+ * 也没法对照日志，与"打开宿主失败"那条同一理由）。
+ */
+export function exportFailureText(
+  t: Translate,
+  error: CardExportFailureCode,
+  detail?: string,
+): string {
+  const sentence =
+    error === 'no-module'
+      ? t('mobile.countdown.export.noModule')
+      : error === 'rasterize-empty'
+        ? t('mobile.countdown.export.rasterize')
+        : error === 'write-failed'
+          ? t('mobile.countdown.export.write')
+          : t('mobile.countdown.export.share');
+  return detail === undefined || detail === '' ? sentence : `${sentence}（${detail}）`;
 }
 
 /** 筛选档位 → 词条键（`全部` 与四种类型；穷尽 switch，加一档不映射就编译红）。 */

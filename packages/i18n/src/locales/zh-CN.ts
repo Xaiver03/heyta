@@ -3988,6 +3988,8 @@ export const zhCN = {
   'web.countdown.template.slot': '模板 {slot}',
   'web.countdown.a11y.menu': '「{title}」的操作',
   'web.countdown.a11y.menuClose': '收起「{title}」的操作',
+  'web.countdown.export': '导出成品图',
+  'web.countdown.export.failed': '导出失败：这台设备给不了画布。倒数日没有丢，也没有发出任何请求。',
   'web.countdown.error': '没能保存：',
   'web.shell.modules.countdown.label': '倒数纪念日',
   'web.shell.modules.countdown.note': '把要盯的日子排在最前面；过去的那天不算失败。',
@@ -4023,6 +4025,10 @@ export const zhCN = {
   'web.admin.holiday.notice.saved': '{year} 年已保存，共 {count} 天安排。',
   'web.admin.holiday.notice.deleted': '{year} 年的录入已撤销，那一年退回随包的公告数据。',
   'web.admin.holiday.notice.failed': '没有保存：服务端拒绝了这次录入，原因见上面的提示。',
+  'mobile.countdown.export.noModule': '这台设备上的 heyta 没有带导出组件 —— 不是数据问题，重装这个版本就能用。',
+  'mobile.countdown.export.rasterize': '系统没能把卡片画成图。倒数日没有丢，也没有发出任何请求。',
+  'mobile.countdown.export.write': '图已经画好了，但没能写进这台设备的存储。',
+  'mobile.countdown.export.share': '分享面板拒绝了这张图。',
 } as const;
 
 /**
