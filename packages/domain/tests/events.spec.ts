@@ -165,7 +165,11 @@ describe('每年重复（农历）与闰月三个档位', () => {
     const secondParts = solarToLunar(second as string);
     expect(secondParts.leap).toBe(true);
     expect(secondParts.month).toBe(leapMonth);
-    expect(second > (first as string)).toBe(true);
+    // 🔴 前提先钉住：`nextEventOccurrence` 的类型是 `LocalDate | undefined`，
+    //    少这一句时 `second > first` 会在"根本没算出下一次"时以
+    //    `expect(false).toBe(true)` 失败 —— 报的是顺序，而真相是"没算出来"。
+    expect(second).toBeDefined();
+    expect((second as string) > (first as string)).toBe(true);
   });
 
   it('该农历月没有那一天 → 退到该月最后一天，不滚进下一个月', () => {
