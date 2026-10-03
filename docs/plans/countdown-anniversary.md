@@ -1162,8 +1162,24 @@ W0b ─> 随时可做（台账那半要等文件干净）
     `packages/ui/src/countdown/EventBoard.tsx:641` 在 `card.template === undefined` 时故意用 `color.surface-sunken`；
     但这也意味着**本批的出图证据里没有一张是"选了模板"的卡**（分类色那条路径只有 `category-model.spec.ts` 钉着，没有出图级证据）。
     ② 「还有 28 天」与「11月1日」互相自洽（今天 10-04）——这是"数字与日期是不是同一次算出来的"的免费交叉验证。
-  - ⚠️ **待补**：两臂变异（A1 画布宽不再等于契约 / A3 宿主不传失败文案）跑完才打勾，装置 `/tmp/w7-mutate.mjs`。
-- [ ] W7 web 半完成 ／ [ ] W7 移动端出图或登记缺口
+  - ✅ **04 04:2x–04:3x 两臂变异跑完**，装置已落版本库 `research/tools/mutate-w7-card-export-arms.mjs`
+    （原先只活在 `/tmp/w7-mutate.mjs`；A1 那臂在 apply/revert 两侧都**强制**跟一次
+    `pnpm --filter @heyta/ui build` —— 判据读的是产物，不重打 dist 的臂"存活"是假的）：
+    | 臂 | 改动 | 读数 | 红落在哪 |
+    |---|---|---|---|
+    | A1 | 画布宽 = `(契约 − 8)` | `RC_A1=1` / **2 failed, 3 passed** | `:268`「导出的图是 **1072×1440**，契约要的是 1080×1440」+ `:312`「暗色那一张的尺寸不是一档规格数」 |
+    | A3 | 宿主不再把失败文案传下去（`exportFailed={undefined}`） | `RC_A3=1` / **1 failed, 4 passed** | `:360`「拿不到画布时界面必须说话（失败静默吞掉是便签那条高危）」 |
+    🔴 **A1 红两条不算越界，但这句话要说清**：`:268` 与 `:312` 是**同一把尺子**（契约尺寸）的两处使用
+    —— 亮色那张与暗色那张各自比一次。"一臂只红一条"的正确写法是**只红它所代表的那条不变量**，
+    而不是"只红一行"；反过来 A3 只红一行，因为它动的就是那一条承诺。
+    revert 后 `card-export-layout.ts` 的 sha 回到链条开头的基线 `42708dc95156`。
+  - ⏹ **W7 剩下的那条不是判据，是证据**：设备真机出图读数（`pnpm verify:mobile-card-export`）
+    排在收尾第 4 项那一趟里，见 `docs/plans/countdown-w7-device-export.md` §7 第 2 条。
+- [x] W7 web 半完成（04 04:3x：五腿 e2e 全绿 + A1/A3 两臂各自转红 + 六张图人已看。
+      ⚠️ `check:card-export` 的 `rc=0` 是 **03:1x** 的读数，而 A1 那一臂把 `packages/ui` 的 dist
+      **打过又还原重打过** ⇒ 那条读数描述的不是现在这份产物，收尾那趟必须重取）
+      ／ [ ] 🔄 W7 移动端出图：代码与判据在（`card-export.spec.ts` 21 passed、原生模块已注册进 `MainApplication`），
+      **真机那一趟读数未取** —— 装置 `pnpm verify:mobile-card-export` 已落库并做过探针自检，排在收尾第 4 项
   - ✅ 后半（设备出图）到最终态待变异读数；前半（web 卡片网格与导出入口）随 W5 已闭合。
   - 📎 完整取证现在**有链接可给了**：[`countdown-w7-device-export.md`](countdown-w7-device-export.md)
     —— 原文那句"那份住在 `feat/countdown-w7` 上、尚未进 main，所以这里只点名不给链接（给了就是死链）"
@@ -1478,7 +1494,9 @@ W0b ─> 随时可做（台账那半要等文件干净）
         交集 ⇒ **只剩 `inbox.spec.ts` 一个文件、三处 `assertNoProblems`**（`:304 :361 :392`，
         凭据点在 `:103` 与 `:311`）—— 上面那条预测的**范围**已由静态穷举钉住，
         但**它到底红不红仍待那一趟实跑**（穷举证明的是"没有第四个文件要修"，不是"inbox 已修"）。
-    - ✅ **04 04:1x–04:2x 判据②的三臂变异跑完（一臂一条自己的红，装置 `/tmp/w4b-mutate.mjs`）**。
+    - ✅ **04 04:1x–04:2x 判据②的三臂变异跑完（一臂一条自己的红）**，装置已落版本库
+      `research/tools/mutate-w4b-papers-arms.mjs`（原先住在 `/tmp/w4b-mutate.mjs` —— 一次性读数配一次性装置，
+      下一轮就只能重新猜）。
       每处替换都先断言**命中数恰好 1** 再落盘（"改了个不存在的串然后宣布判据有牙"是这条线专门防的），
       每臂跑完整套 `tests/admin-console.spec.ts`：
       | 臂 | 改动 | 读数 | 红落在哪条断言 |
@@ -1490,8 +1508,15 @@ W0b ─> 随时可做（台账那半要等文件干净）
       也就是拿掉修复后这一格退回 48px，正是 03:3x 那次"第一版修复什么都没改"被照出来的同一读数。
       三臂的 `revert` 都回显 sha 且**与链条开头的基线逐字节相同**（面板 `76d2959fdde6`、CSS `fc7f6a0e27f6`）——
       这一步不是仪式：变异台只保证"替换命中一次"，**还原是否回到原点**必须由 sha 说话。
-    - ⏹ **这张表还不能打勾**，欠两条实测量：①链条第 [7] 步"三处还原后整套复绿"的读数；
-      ②`inbox.spec.ts` 被开机拉取拖红那条**先量出红、再补 `stubPublicFacts` 量回绿**（见上面那条穷举）。
+    - ✅ **04 04:3x 三处还原后整套复绿（链条第 [7] 步）**：`RC_RESTORE_ADMIN=0` ⇒ admin-console **6 passed (1.5m)**、
+      `RC_RESTORE_EXPORT=0` ⇒ countdown-export **5 passed (13.6s)**。
+      还原到位是有凭据的，不是"看起来没红"：四个被改动过的文件跑完后 `shasum -a 256` **逐字等于链条开头**
+      打的那份基线（`admin.css fc7f6a0e27f6` / `AdminPanel.tsx 76d2959fdde6` /
+      `card-export-layout.ts 42708dc95156` / `CountdownView.tsx a877b7c83173`）。
+      修复那两笔已单独入库（`87109e9e`），提交时刻在链条把变异全部还原**之后** ——
+      半途提交会把带 `href={undefined}` 的那份源码交出去。
+    - ⏹ **这张表还差最后一条实测量**：`inbox.spec.ts` 被开机拉取拖红那条**先量出红、再补 `stubPublicFacts` 量回绿**
+      （见上面那条穷举；链条第 [8] 步正在等窗口）。
     - 🔴 **第一版修复是无效的，而照出它的正是那条正向对照**（04 03:38 现量）。
       第一版给共用的 `.ht-settings__admin-badges` 加了 `min-inline-size: 0` + `flex-wrap: wrap`，
       理由写的是"徽标不可收缩"。带正向对照重跑 ⇒ `GEOM_OK_RC=1`，报错原文
