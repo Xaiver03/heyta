@@ -3985,7 +3985,6 @@ export const en = {
   'web.admin.holiday.notice.saved': 'Saved {year}: {count} scheduled days.',
   'web.admin.holiday.notice.deleted': 'The {year} entry has been revoked; that year falls back to the bundled gazette data.',
   'web.admin.holiday.notice.failed': 'Not saved: the server rejected this submission, see the message above for why.',
-} satisfies Record<MessageKey, string>;
   'mobile.countdown.export.noModule': 'This build of heyta ships without the export component — it is not a data problem; reinstalling this version fixes it.',
   'mobile.countdown.export.rasterize': 'The system could not draw the card into an image. Nothing was lost and nothing left this device.',
   'mobile.countdown.export.write': 'The image was rendered, but it could not be written to storage on this device.',
