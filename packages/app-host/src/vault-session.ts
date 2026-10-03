@@ -66,7 +66,10 @@ export interface VaultKeyPackageRemote {
   get(): Promise<VaultKeyPackage | undefined>;
   /** Read the package together with the active ciphertext generation. */
   getState?(): Promise<VaultKeyPackageRemoteState | undefined>;
-  put(keyPackage: VaultKeyPackage, expectedKeyVersion: number): Promise<VaultKeyPackage>;
+  /** A modern server returns the active payload generation with the package.
+   * Older servers may return only the package; that response must preserve the
+   * session's previously observed generation rather than inventing one. */
+  put(keyPackage: VaultKeyPackage, expectedKeyVersion: number): Promise<VaultKeyPackage | VaultKeyPackageRemoteState>;
 }
 
 export interface VaultKeyPackageRemoteState {
@@ -128,11 +131,15 @@ export interface VaultKeySession {
   /** Recovery unlock is a one-time bridge; a new wrapper must be published before data use. */
   readonly requiresRecoveryRotation: boolean;
   /** Published ciphertext generation, if the server has migrated this vault. */
-  readonly payloadKeyVersion: number | undefined;
+  readonly payloadKeyVersion: number | null | undefined;
+  /** A root-rotation draft recovered from the local encrypted journal. */
+  getPendingRootRotation(): PendingVaultCreation | undefined;
   unlockWithPassphrase(passphrase: string): Promise<void>;
   unlockWithRecoveryCode(recoveryCode: string): Promise<void>;
   /** Install a root key obtained from an explicitly opted-in native secure store. */
   unlockWithRootKey(rootKey: Uint8Array): void;
+  /** Hydrate an encrypted pending root rotation after a synchronous root install. */
+  restorePendingRootRotation(): Promise<void>;
   /** Return a disposable copy for an explicitly opted-in native secure-store save. */
   copyUnlockedRootKey(): Uint8Array;
   lock(): void;
@@ -142,6 +149,8 @@ export interface VaultKeySession {
   beginPassphraseChange(newPassphrase: string): Promise<PendingVaultCreation>;
   /** Generate a new root and wrappers; no server mutation occurs yet. */
   beginRootRotation(newPassphrase: string): Promise<PendingVaultCreation>;
+  /** Cancel a local root-rotation draft after releasing any server staging. */
+  cancelPendingRootRotation(pending?: PendingVaultCreation): Promise<void>;
   confirmAndPublish(
     pending: PendingVaultCreation,
     enteredRecoveryCode: string,
@@ -251,6 +260,10 @@ export const createVaultKeyPackageRemote = (
       if (typeof body !== 'object' || body === null || !('package' in body)) {
         throw new Error('Malformed vault key-package response');
       }
+      // Wrapper-only responses from older servers omit the generation. Keep
+      // that compatibility shape explicit; callers must never infer it from
+      // the wrapper revision.
+      if ('payloadKeyVersion' in body) return validateRemoteState(body);
       return validatePackage((body as { package: unknown }).package);
     },
   };
@@ -269,7 +282,8 @@ class VaultKeySessionImpl implements VaultKeySession {
   private recoveryRotationRequired = false;
   /** Invalidates in-flight KDFs when the host locks this session. */
   private lifecycleEpoch = 0;
-  private activePayloadKeyVersion: number | undefined;
+  private activePayloadKeyVersion: number | null | undefined;
+  private pendingRootRotation: PendingVaultCreation | undefined;
   private pendingRoots = new WeakMap<object, Uint8Array>();
   private pendingCodes = new WeakMap<object, string>();
   private pendingPackages = new WeakMap<object, VaultKeyPackage>();
@@ -280,9 +294,11 @@ class VaultKeySessionImpl implements VaultKeySession {
     scope: VaultKeyPackageScope,
     currentPackage: VaultKeyPackage | undefined,
     private readonly store: VaultKeyPackageStore,
+    activePayloadKeyVersion?: number | null,
   ) {
     this.scope = scope;
     this.currentPackage = currentPackage;
+    this.activePayloadKeyVersion = activePayloadKeyVersion;
   }
 
   get state(): VaultSessionState {
@@ -297,8 +313,12 @@ class VaultKeySessionImpl implements VaultKeySession {
     return this.recoveryRotationRequired;
   }
 
-  get payloadKeyVersion(): number | undefined {
+  get payloadKeyVersion(): number | null | undefined {
     return this.activePayloadKeyVersion;
+  }
+
+  getPendingRootRotation(): PendingVaultCreation | undefined {
+    return this.pendingRootRotation;
   }
 
   async unlockWithPassphrase(passphrase: string): Promise<void> {
@@ -312,6 +332,7 @@ class VaultKeySessionImpl implements VaultKeySession {
     }
     this.replaceRoot(rootKey);
     this.recoveryRotationRequired = false;
+    await this.restorePendingRootRotation();
   }
 
   async unlockWithRecoveryCode(recoveryCode: string): Promise<void> {
@@ -325,6 +346,7 @@ class VaultKeySessionImpl implements VaultKeySession {
     }
     this.replaceRoot(rootKey);
     this.recoveryRotationRequired = true;
+    await this.restorePendingRootRotation();
   }
 
   unlockWithRootKey(rootKey: Uint8Array): void {
@@ -336,6 +358,8 @@ class VaultKeySessionImpl implements VaultKeySession {
     }
     this.replaceRoot(rootKey);
     this.recoveryRotationRequired = false;
+    // Synchronous secure-store unlock callers explicitly await
+    // restorePendingRootRotation() when they need the recovered draft.
   }
 
   copyUnlockedRootKey(): Uint8Array {
@@ -355,18 +379,25 @@ class VaultKeySessionImpl implements VaultKeySession {
       this.pendingConsumed.add(key);
     }
     this.pendingKeys.clear();
+    this.pendingRootRotation = undefined;
   }
 
   async getPayloadCipher(): Promise<SyncPayloadCipher | undefined> {
-    if (this.rootKey === undefined || this.currentPackage === undefined || this.recoveryRotationRequired) return undefined;
+    // A known null generation means the server still has legacy ciphertext.
+    // Do not let ordinary sync write a new-root envelope into that cohort;
+    // the explicit root migration path must establish the first generation.
+    if (this.rootKey === undefined || this.currentPackage === undefined ||
+        this.recoveryRotationRequired || this.activePayloadKeyVersion === null) return undefined;
     // Return a session-bound façade, rather than a cipher that captures a root
     // forever. A caller may retain this object across lock(); every operation
     // re-checks the live session and therefore fails closed after locking.
     const session = this;
+    const facadeEpoch = this.lifecycleEpoch;
     const withLiveCipher = (): SyncPayloadCipher => {
       const rootKey = session.rootKey;
       const keyPackage = session.currentPackage;
-      if (rootKey === undefined || keyPackage === undefined) {
+      if (rootKey === undefined || keyPackage === undefined ||
+          session.recoveryRotationRequired || session.lifecycleEpoch !== facadeEpoch) {
         throw new Error('Vault is locked');
       }
       const payloadKeyVersion = session.activePayloadKeyVersion ?? keyPackage.keyVersion;
@@ -423,12 +454,13 @@ class VaultKeySessionImpl implements VaultKeySession {
     }
     const epoch = this.lifecycleEpoch;
     const sourceRoot = cloneKey(this.rootKey);
-    let created: CreatedVaultKeyPackage;
+    let created: CreatedVaultKeyPackage | undefined;
     try {
       created = await rewrapVaultKeyPackage(this.currentPackage, sourceRoot, newPassphrase);
     } finally {
       wipe(sourceRoot);
     }
+    if (created === undefined) throw new Error('Vault root rotation did not create a package');
     if (epoch !== this.lifecycleEpoch) {
       wipe(created.rootKey);
       throw new VaultSessionError('Vault session was locked during key change', 'vault-locked');
@@ -437,22 +469,40 @@ class VaultKeySessionImpl implements VaultKeySession {
   }
 
   async beginRootRotation(newPassphrase: string): Promise<PendingVaultCreation> {
+    if (this.pendingRootRotation !== undefined) return this.pendingRootRotation;
     if (this.currentPackage === undefined || this.rootKey === undefined) {
       throw new VaultSessionError('Unlock the vault before rotating its root', 'missing-package');
     }
     const epoch = this.lifecycleEpoch;
     const sourceRoot = cloneKey(this.rootKey);
-    let created: CreatedVaultKeyPackage;
+    let created: CreatedVaultKeyPackage | undefined;
     try {
       created = await rotateVaultKey(this.currentPackage, sourceRoot, newPassphrase);
+      if (epoch !== this.lifecycleEpoch) {
+        wipe(created.rootKey);
+        throw new VaultSessionError('Vault session was locked during root rotation', 'vault-locked');
+      }
+      // The draft is encrypted under the current root. Keep that disposable
+      // copy alive until the local transaction has completed; wiping it in a
+      // finally immediately after rotateVaultKey would persist a draft that
+      // can never be decrypted after restart.
+      await this.store.savePendingRootRotation(created.package, this.scope, sourceRoot, created.rootKey);
+    } catch (error) {
+      // The session owns the generated target root until makePending() takes
+      // ownership of it. Do not leave it live when staging fails.
+      wipe(created?.rootKey);
+      throw error;
     } finally {
       wipe(sourceRoot);
     }
     if (epoch !== this.lifecycleEpoch) {
+      await this.store.clearPendingRootRotation();
       wipe(created.rootKey);
       throw new VaultSessionError('Vault session was locked during root rotation', 'vault-locked');
     }
-    return this.makePending(created);
+    const pending = this.makePending(created);
+    this.pendingRootRotation = pending;
+    return pending;
   }
 
   async confirmAndPublish(
@@ -479,11 +529,17 @@ class VaultKeySessionImpl implements VaultKeySession {
     }
 
     let committedPackage = pendingPackage;
+    let committedPayloadKeyVersion = this.activePayloadKeyVersion;
     const epoch = this.lifecycleEpoch;
     if (remote !== undefined) {
       try {
-        committedPackage = await remote.put(pendingPackage, expected);
-        validatePackage(committedPackage);
+        const published = await remote.put(pendingPackage, expected);
+        const publishedState = typeof published === 'object' && published !== null &&
+          'package' in published && 'payloadKeyVersion' in published
+          ? validateRemoteState(published)
+          : undefined;
+        committedPackage = publishedState?.package ?? validatePackage(published);
+        if (publishedState !== undefined) committedPayloadKeyVersion = publishedState.payloadKeyVersion;
         if (!packageSame(committedPackage, pendingPackage)) {
           throw new VaultSessionError('Remote returned a different package', 'remote-publish-conflict');
         }
@@ -492,9 +548,11 @@ class VaultKeySessionImpl implements VaultKeySession {
         // accept only an exact package match. The old local package remains in
         // place until this check succeeds.
         try {
-          const observed = await remote.get();
+          const observedState = remote.getState !== undefined ? await remote.getState() : undefined;
+          const observed = observedState?.package ?? await remote.get();
           if (observed !== undefined && packageSame(observed, pendingPackage)) {
             committedPackage = observed;
+            if (observedState !== undefined) committedPayloadKeyVersion = observedState.payloadKeyVersion;
           } else {
             throw error;
           }
@@ -511,11 +569,15 @@ class VaultKeySessionImpl implements VaultKeySession {
 
     // The local old package is never cleared before the remote CAS succeeds.
     // saveBound is a single local transaction for package + account binding.
-    await this.store.saveBound(committedPackage, this.scope);
+    // The server owns payload-generation assignment. In particular, a first
+    // wrapper can legitimately return null when legacy ciphertext exists;
+    // never derive a generation from the wrapper revision.
+    await this.store.saveBound(committedPackage, this.scope, committedPayloadKeyVersion);
     if (epoch !== this.lifecycleEpoch || this.pendingConsumed.has(key)) {
       throw new VaultSessionError('Vault session was locked during key publication', 'vault-locked');
     }
     this.currentPackage = committedPackage;
+    this.activePayloadKeyVersion = committedPayloadKeyVersion;
     this.replaceRoot(pendingRoot);
     this.recoveryRotationRequired = false;
     this.pendingConsumed.add(key);
@@ -524,6 +586,7 @@ class VaultKeySessionImpl implements VaultKeySession {
     this.pendingCodes.delete(key);
     this.pendingPackages.delete(key);
     this.pendingKeys.delete(key);
+    if (this.pendingRootRotation === pending) this.pendingRootRotation = undefined;
   }
 
   async confirmAndMigrateRootRotation(
@@ -538,11 +601,23 @@ class VaultKeySessionImpl implements VaultKeySession {
     const pendingCode = this.pendingCodes.get(key);
     const currentPackage = this.currentPackage;
     const currentRoot = this.rootKey;
-    if (pendingPackage === undefined || pendingRoot === undefined || pendingCode === undefined ||
+    if (pendingPackage === undefined || pendingRoot === undefined ||
         currentPackage === undefined || currentRoot === undefined) {
       throw new VaultSessionError('Vault root rotation requires an unlocked session', 'missing-package');
     }
-    if (enteredRecoveryCode.replaceAll('-', '').replaceAll(' ', '').toUpperCase() !== pendingCode) {
+    if (pendingCode === undefined) {
+      let recovered: Uint8Array | undefined;
+      try {
+        recovered = await unlockVaultWithRecoveryCode(pendingPackage, enteredRecoveryCode);
+        if (vaultRootKeyFingerprint(recovered) !== pendingPackage.rootKeyFingerprint) {
+          throw new Error('Recovery code fingerprint mismatch');
+        }
+      } catch {
+        throw new VaultSessionError('Recovery code confirmation did not match', 'recovery-confirmation-mismatch');
+      } finally {
+        wipe(recovered);
+      }
+    } else if (enteredRecoveryCode.replaceAll('-', '').replaceAll(' ', '').toUpperCase() !== pendingCode) {
       throw new VaultSessionError('Recovery code confirmation did not match', 'recovery-confirmation-mismatch');
     }
     if (pendingPackage.keyVersion !== currentPackage.keyVersion + 1) {
@@ -574,7 +649,7 @@ class VaultKeySessionImpl implements VaultKeySession {
     if (result.keyVersion !== pendingPackage.keyVersion || result.payloadKeyVersion <= 0) {
       throw new VaultSessionError('Root migration returned an invalid published generation', 'remote-publish-conflict');
     }
-    await this.store.saveBound(pendingPackage, this.scope);
+    await this.store.saveBound(pendingPackage, this.scope, result.payloadKeyVersion);
     if (epoch !== this.lifecycleEpoch || this.pendingConsumed.has(key)) {
       throw new VaultSessionError('Vault session was locked while installing migrated root', 'vault-locked');
     }
@@ -588,7 +663,24 @@ class VaultKeySessionImpl implements VaultKeySession {
     this.pendingCodes.delete(key);
     this.pendingPackages.delete(key);
     this.pendingKeys.delete(key);
+    this.pendingRootRotation = undefined;
     return result;
+  }
+
+  async cancelPendingRootRotation(pending?: PendingVaultCreation): Promise<void> {
+    const target = pending ?? this.pendingRootRotation;
+    if (target !== undefined) {
+      const key = target as object;
+      const root = this.pendingRoots.get(key);
+      wipe(root);
+      this.pendingRoots.delete(key);
+      this.pendingCodes.delete(key);
+      this.pendingPackages.delete(key);
+      this.pendingKeys.delete(key);
+      this.pendingConsumed.add(key);
+    }
+    this.pendingRootRotation = undefined;
+    await this.store.clearPendingRootRotation();
   }
 
   async refreshFromRemote(remote: VaultKeyPackageRemote): Promise<VaultKeyPackage | undefined> {
@@ -618,13 +710,17 @@ class VaultKeySessionImpl implements VaultKeySession {
         throw new VaultSessionError('Root rotation requires an atomic ciphertext migration', 'root-rotation-required');
       }
       if (remotePackage.keyVersion === local.keyVersion) {
-        this.activePayloadKeyVersion = remoteState.payloadKeyVersion ?? undefined;
+        // Persist the server-owned generation without using saveBound(): a
+        // same-package refresh must not erase an encrypted pending rotation
+        // draft that is waiting for the user's confirmation after restart.
+        await this.store.savePayloadKeyVersion(remoteState.payloadKeyVersion);
+        this.activePayloadKeyVersion = remoteState.payloadKeyVersion;
         return local;
       }
     }
-    await this.store.saveBound(remotePackage, this.scope);
+    await this.store.saveBound(remotePackage, this.scope, remoteState.payloadKeyVersion);
     this.currentPackage = remotePackage;
-    this.activePayloadKeyVersion = remoteState.payloadKeyVersion ?? undefined;
+    this.activePayloadKeyVersion = remoteState.payloadKeyVersion;
     return remotePackage;
   }
 
@@ -632,6 +728,37 @@ class VaultKeySessionImpl implements VaultKeySession {
     wipe(this.rootKey);
     this.rootKey = cloneKey(next);
     wipe(next);
+  }
+
+  async restorePendingRootRotation(): Promise<void> {
+    if (this.currentPackage === undefined || this.rootKey === undefined || this.pendingRootRotation !== undefined) return;
+    const epoch = this.lifecycleEpoch;
+    const currentPackage = this.currentPackage;
+    const currentRoot = cloneKey(this.rootKey);
+    const persisted = await this.store.loadPendingRootRotation(this.scope, currentRoot);
+    wipe(currentRoot);
+    if (epoch !== this.lifecycleEpoch || currentPackage !== this.currentPackage) {
+      wipe(persisted?.rootKey);
+      return;
+    }
+    if (persisted === undefined) return;
+    try {
+      if (persisted.package.keyVersion !== this.currentPackage.keyVersion + 1 ||
+          persisted.package.rootKeyFingerprint === this.currentPackage.rootKeyFingerprint) {
+        await this.store.clearPendingRootRotation();
+        wipe(persisted.rootKey);
+        return;
+      }
+      const pending = Object.freeze({ package: persisted.package, recoveryCode: '' });
+      const key = pending as object;
+      this.pendingRoots.set(key, persisted.rootKey);
+      this.pendingPackages.set(key, persisted.package);
+      this.pendingKeys.add(key);
+      this.pendingRootRotation = pending;
+    } catch (error) {
+      wipe(persisted.rootKey);
+      throw error;
+    }
   }
 
   private assertRemoteScope(remote: VaultKeyPackageRemote | undefined): void {
@@ -665,9 +792,10 @@ export async function createVaultKeySession(options: {
     serverOrigin: canonicalOrigin(options.scope.serverOrigin),
   };
   if (scope.accountId === '') throw new Error('Vault account id is required');
-  const [localPackage, persistedScope] = await Promise.all([
+  const [localPackage, persistedScope, payloadKeyVersion] = await Promise.all([
     options.store.load(),
     options.store.loadScope(),
+    options.store.loadPayloadKeyVersion(),
   ]);
   if (localPackage !== undefined && persistedScope === undefined) {
     throw new VaultSessionError('Local vault package has no account/server binding', 'unbound-local-package');
@@ -675,5 +803,5 @@ export async function createVaultKeySession(options: {
   if (persistedScope !== undefined && !scopeEqual(scope, persistedScope)) {
     throw new VaultSessionError('Local vault package belongs to another account/server', 'scope-mismatch');
   }
-  return new VaultKeySessionImpl(scope, localPackage, options.store);
+  return new VaultKeySessionImpl(scope, localPackage, options.store, payloadKeyVersion);
 }

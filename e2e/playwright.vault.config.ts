@@ -1,6 +1,9 @@
 import { defineConfig, devices } from '@playwright/test';
 
-/** Isolated ports and result directory: never stop another suite's server. */
+/** Isolated ports and result directory: never stop another suite's server.
+ * The runner builds a static artifact first. Live edits must not HMR-reset a
+ * vault session halfway through a recovery or key migration assertion.
+ */
 export default defineConfig({
   testDir: './vault', outputDir: './vault-results',
   workers: 1, fullyParallel: false, retries: 0, forbidOnly: !!process.env['CI'],
@@ -9,7 +12,7 @@ export default defineConfig({
   use: { baseURL: 'http://127.0.0.1:4346', actionTimeout: 20_000, trace: 'off', video: 'off', screenshot: 'off' },
   projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
   webServer: {
-    command: 'pnpm --filter @heyta/web exec vite --host 127.0.0.1 --port 4346 --strictPort',
+    command: 'pnpm --filter @heyta/web exec vite preview --host 127.0.0.1 --port 4346 --strictPort',
     cwd: '..', url: 'http://127.0.0.1:4346', reuseExistingServer: false, timeout: 120_000,
   },
 });

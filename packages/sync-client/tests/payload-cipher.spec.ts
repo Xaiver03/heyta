@@ -10,6 +10,14 @@ const rootKey = new Uint8Array(32).fill(42);
 const cipher = () => createVaultPayloadCipher({ current: { keyVersion: 1, rootKey } });
 
 describe('versioned sync payload cipher', () => {
+  it('authenticates empty entityIds with the same identity as their omitted HTTP download shape', async () => {
+    const encoded = await cipher().encrypt('single task', { ...identity, entityIds: [] });
+    expect(await cipher().decrypt(encoded, identity)).toBe('single task');
+    const omitted = await cipher().encrypt('single task', identity);
+    expect(await cipher().decrypt(omitted, { ...identity, entityIds: [] })).toBe('single task');
+    await expect(cipher().decrypt(encoded, { ...identity, entityIds: ['other-task'] })).rejects.toThrow();
+  });
+
   it('roundtrips unicode without a password and stays in the server base64 transport contract', async () => {
     const encoded = await cipher().encrypt('{"title":"任务 🦊"}', identity);
     expect(isEncryptedPayloadTransportShape(encoded)).toBe(true);

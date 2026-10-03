@@ -22,6 +22,10 @@ vi.mock('../src/db', () => ({
       },
       vaultKeyPackage: {
         findUnique: vi.fn().mockResolvedValue(state.packageRow),
+        updateMany: vi.fn().mockImplementation(async ({ data }: any) => {
+          state.packageRow = { ...state.packageRow, ...data };
+          return { count: 1 };
+        }),
         update: vi.fn().mockImplementation(async ({ data }: any) => {
           state.packageRow = { ...state.packageRow, ...data };
           return state.packageRow;

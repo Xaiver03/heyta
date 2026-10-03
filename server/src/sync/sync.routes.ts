@@ -63,6 +63,35 @@ import {
  */
 const RATE_LIMIT_DISABLED = loadConfigFromEnv().testMode !== undefined;
 
+/**
+ * Serialize key-package writes with operation uploads and atomic payload
+ * migrations.  The package row is not the synchronization fence: an upload
+ * owns `user_sync_state` first and then `users`, and a migration uses the same
+ * order.  A wrapper-only rewrap must join that order or it can be overwritten
+ * by a migration commit that started before the rewrap.
+ */
+const withVaultKeyPackageWriteLock = async <T>(
+  userId: number,
+  fn: (tx: Prisma.TransactionClient) => Promise<T>,
+): Promise<T> => prisma.$transaction(
+  async (tx) => {
+    await tx.userSyncState.upsert({
+      where: { userId },
+      create: { userId, lastSeq: 0 },
+      update: {},
+    });
+    await tx.$queryRaw`
+      SELECT user_id
+      FROM user_sync_state
+      WHERE user_id = ${userId}
+      FOR UPDATE
+    `;
+    await tx.$queryRaw`SELECT id FROM users WHERE id = ${userId} FOR UPDATE`;
+    return fn(tx);
+  },
+  { timeout: 30_000, isolationLevel: Prisma.TransactionIsolationLevel.ReadCommitted },
+);
+
 function routeRateLimit(max: number, timeWindow: string): false | { max: number; timeWindow: string } {
   if (RATE_LIMIT_DISABLED) return false;
   return { max, timeWindow };
@@ -381,10 +410,28 @@ export const syncRoutes = async (fastify: FastifyInstance): Promise<void> => {
       const { expectedKeyVersion } = parsed.data;
       if (expectedKeyVersion === 0) {
         try {
-          await prisma.vaultKeyPackage.create({
-            data: { userId, keyVersion: parsed.data.package.keyVersion, packageData, createdAt: now, updatedAt: now },
+          const payloadKeyVersion = await withVaultKeyPackageWriteLock(userId, async (tx) => {
+            // A package can be absent on an account that already has the
+            // password-era operation history (for example, while an account
+            // is being upgraded to vault mode).  Generation 1 is valid only
+            // for a genuinely empty history.  For retained history leave the
+            // generation unset so the client enters the explicit legacy
+            // migration path and supplies the old password to the decryptor.
+            const operationCount = await tx.operation.count({ where: { userId } });
+            const activePayloadKeyVersion = operationCount === 0 ? 1 : null;
+            await tx.vaultKeyPackage.create({
+              data: {
+                userId,
+                keyVersion: parsed.data.package.keyVersion,
+                packageData,
+                activePayloadKeyVersion,
+                createdAt: now,
+                updatedAt: now,
+              },
+            });
+            return activePayloadKeyVersion;
           });
-          return reply.send({ package: parsed.data.package });
+          return reply.send({ package: parsed.data.package, payloadKeyVersion });
         } catch (error) {
           // Only a competing create is an idempotency candidate. Database
           // failures must remain failures instead of becoming stale-version 409s.
@@ -395,26 +442,29 @@ export const syncRoutes = async (fastify: FastifyInstance): Promise<void> => {
         // accepting every greater version lets a stale writer skip a winner.
         // Root changes also require an atomic ciphertext migration; this
         // wrapper-only endpoint cannot safely publish a replacement root.
-        const updated = await prisma.vaultKeyPackage.updateMany({
+        const updated = await withVaultKeyPackageWriteLock(userId, (tx) => tx.vaultKeyPackage.updateMany({
           where: {
             userId,
             keyVersion: expectedKeyVersion,
             packageData: { path: ['rootKeyFingerprint'], equals: parsed.data.package.rootKeyFingerprint },
           },
           data: { keyVersion: parsed.data.package.keyVersion, packageData, updatedAt: now },
-        });
+        }));
         if (updated.count === 1) return reply.send({ package: parsed.data.package });
       }
       const current = await prisma.vaultKeyPackage.findUnique({
         where: { userId },
-        select: { keyVersion: true, packageData: true },
+        select: { keyVersion: true, packageData: true, activePayloadKeyVersion: true },
       });
       const currentPackage = vaultKeyPackageSchema.safeParse(current?.packageData);
       // Parsing reconstructs property order, including JSONB objects whose key
       // order is not preserved. Retrying after a lost response is safe.
       if (current?.keyVersion === parsed.data.package.keyVersion && currentPackage.success &&
           JSON.stringify(currentPackage.data) === JSON.stringify(parsed.data.package)) {
-        return reply.send({ package: parsed.data.package });
+        return reply.send({
+          package: parsed.data.package,
+          payloadKeyVersion: current.activePayloadKeyVersion ?? null,
+        });
       }
       if (current?.keyVersion === expectedKeyVersion && currentPackage.success &&
           currentPackage.data.rootKeyFingerprint !== parsed.data.package.rootKeyFingerprint) {

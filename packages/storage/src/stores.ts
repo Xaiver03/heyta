@@ -210,6 +210,10 @@ export const META_KEYS = {
   VAULT_KEY_SCOPE: 'vaultKeyScopeV1',
   /** Ciphertext-only durable key-migration journal; no root/plaintext/password. */
   VAULT_MIGRATION_JOURNAL: 'vaultMigrationJournalV1',
+  /** Active encrypted-payload generation paired with the local key package. */
+  VAULT_PAYLOAD_KEY_VERSION: 'vaultPayloadKeyVersionV1',
+  /** Encrypted pending root-rotation target; never stores a plaintext root. */
+  VAULT_PENDING_ROOT_ROTATION: 'vaultPendingRootRotationV1',
 } as const;
 
 export type MetaKey = (typeof META_KEYS)[keyof typeof META_KEYS];

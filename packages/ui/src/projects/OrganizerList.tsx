@@ -42,10 +42,14 @@
  * ─────────────────────────────────────────────────────────────────────────
  * 🔴 没装进共享层的（见 `./model.ts` 文件头，那里逐条写了证据 / 影响 / 最小一步）
  *
- * 摘要：composer（新建输入框）· 取色控件 · 删除确认 —— 留在各端。
- * ✅ **改名与归档已在共享层，「显示已归档」也已装**（2026-10-03，多端第三批：
+ * 摘要：composer（新建输入框）· 取色控件 —— 留在各端。
+ * ✅ **改名、归档与「显示已归档」已在共享层**（2026-10-03，多端第三批：
  * `onRename` / `onArchive` + `labels.rename` / `labels.archive`，两端都传了；
- * 判据在 `apps/mobile/tests/organizer-rename.spec.ts`）。本组件管的是**行**。
+ * 判据在 `apps/mobile/tests/organizer-rename.spec.ts`）。
+ * ✅ **删除确认也在共享层**（同日 W4b，`labels.confirmRemove` + `removeImpact`）——
+ * 它原先写在这里是"留在各端"那一条，而那条**从未落地**：`OrganizerList` 的注释说
+ * 确认是宿主的事，两个宿主**一个都没做**，于是"删标签要不要确认"在产品上的答案是
+ * "不要、一次点击立即写 op"。本组件管的是**行**，行上的每一步确认都只有一份。
  *
  * ─────────────────────────────────────────────────────────────────────────
  * 🔴 只用 RN 原语，不 import 任何 DOM 标签
@@ -96,6 +100,28 @@ export interface OrganizerListLabels {
     readonly button: (name: string) => string;
     readonly unarchive: (name: string) => string;
   };
+  /**
+   * 删除确认那一行的四句文案（问句 / 影响面 / 确认 / 取消）。
+   *
+   * 🔴 **传了这份文案就等于打开了确认这一步**（与 `rename` / `archive` 的
+   * "文案与回调成对"同一条规矩，只是这里要用的回调本来就是 `onRemove`）：
+   * 省略 ⇒ 按下删除**直接** `onRemove`，渲染与从前逐字相同。
+   *
+   * 🔴 `impact` 的措辞必须说清**里面的东西不会被删除**（标签：那些任务只是不再带
+   * 这个标签；清单：里面的任务不会被删除）—— 这是这一档存在的全部理由，
+   * 两个方向的误判各堵一次：
+   *
+   * · 用户看到"这个标签在 8 个任务上用着"时读到的是"删它会动那 8 个任务"，于是**不敢删**；
+   * · 反过来"随时可以重新建一个"也不能让人以为重建之后一切照旧 ——
+   *   新建的同名标签拿到的是**新 id**，那 8 条任务的归属**不会**自己回来。
+   */
+  readonly confirmRemove?: {
+    readonly ask: (name: string) => string;
+    /** 影响面那句；`removeImpact` 给不出 `> 0` 时**不渲染**（没有数字就不编一句话）。 */
+    readonly impact: (count: number) => string;
+    readonly confirm: string;
+    readonly cancel: string;
+  };
 }
 
 /** 每一行渲染时给插槽的上下文。 */
@@ -125,6 +151,16 @@ export interface OrganizerListProps {
    * 否则同一个数字在侧栏上下两节长成两种含义，用户只会看到"这两个数对不上"。
    */
   readonly counts?: Readonly<Record<string, number>>;
+  /**
+   * 每一行**删除之后的影响面**（这条标签挂在几条存活任务上 / 这条清单里有几条任务）。
+   *
+   * 🔴 它**不是** `counts` 的另一种画法，两者口径不同（`counts` = 未删除**且未完成**，
+   * 影响面 = 未删除、**含已完成**）—— 拿 `counts` 顶替会让确认框在一条挂满已完成任务的
+   * 标签上说"没有任务受影响"。取数只有 `@heyta/ui#liveTaskCountsByTag` 一处。
+   *
+   * 只在 `labels.confirmRemove` 存在时被消费；`> 0` 才渲染那句影响面。
+   */
+  readonly removeImpact?: Readonly<Record<string, number>>;
   readonly labels: OrganizerListLabels;
   /** 点了某一行（**不是**删除）。不传 = 这些行不可点。 */
   readonly onSelect?: (item: OrganizerItem, context: OrganizerRowContext) => void;
@@ -250,6 +286,26 @@ function makeStyles(tokens: HeytaNativeTokens) {
     busy: {
       opacity: tokens['state.disabled-opacity'],
     },
+    /**
+     * 删除确认那一行。
+     *
+     * 🔴 `width: '100%'` 是**结构**而不是审美：外层 `styles.row` 是 `flexWrap: 'wrap'`，
+     * 不给满宽的话这段会挤在删除按钮右边那一格子里，在 192px 侧栏里被切成两半 ——
+     * 一句"删了会怎样"被截断，比没有这句话更糟。
+     */
+    confirm: {
+      width: '100%',
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      alignItems: 'center',
+      gap: tokens['space.2'],
+      rowGap: tokens['space.1'],
+    },
+    confirmActions: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: tokens['space.2'],
+    },
   });
 }
 
@@ -271,6 +327,9 @@ function OrganizerRow({
   onArchive,
   editing,
   setEditing,
+  pendingRemove,
+  setPendingRemove,
+  impact,
   renderLeading,
   renderItemExtra,
   busy,
@@ -289,6 +348,11 @@ function OrganizerRow({
   readonly onArchive: OrganizerListProps['onArchive'];
   readonly editing: boolean;
   readonly setEditing: (id: string | null) => void;
+  /** 这一行是不是处在"等一下，先确认"的状态。 */
+  readonly pendingRemove: boolean;
+  readonly setPendingRemove: (id: string | null) => void;
+  /** 这一行删除后的影响面（条数）。`undefined` 或 `<= 0` ⇒ **不渲染那句影响面**。 */
+  readonly impact: number | undefined;
   readonly renderLeading: OrganizerListProps['renderLeading'];
   readonly renderItemExtra: OrganizerListProps['renderItemExtra'];
   readonly busy: boolean;
@@ -298,6 +362,7 @@ function OrganizerRow({
 }): React.JSX.Element {
   const key = organizerRowKey(kind, item.id);
   const rename = labels.rename;
+  const confirmLabels = labels.confirmRemove;
   // 草稿**留在行里**而不是提到列表里：行按 id 加了 key，所以"改到一半的这条是谁"
   // 天然跟着行走；提到父层就要自己维护 (id → 草稿) 的表，那张表迟早和列表脱节。
   const [draft, setDraft] = useState<string | null>(null);
@@ -410,6 +475,10 @@ function OrganizerRow({
             aria-disabled={busy}
             disabled={busy}
             onPress={() => {
+              // 改名与"先确认"互斥：两个状态同时挂在这一行上时，
+              // 渲染的是改名分支，那把 armed 的删除确认就变成**看不见但还在**的状态 ——
+              // 用户点下一个删除时会以为自己是第一次点。
+              setPendingRemove(null);
               setEditing(item.id);
             }}
             style={[styles.remove, busy ? styles.busy : null]}
@@ -449,23 +518,81 @@ function OrganizerRow({
           </Pressable>
         )}
 
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel={labels.removeLabel(item.name)}
-          // 🔴 用**平铺** `aria-*`，不要用对象形态 `accessibilityState` / `accessibilityValue`：
-          // RNW 0.21 会把对象形态**整个丢掉**（实测 `aria-checked` / `aria-valuenow` 都不出现），
-          // 而 RN 0.71+ 两端都认平铺形态。判据见 `pnpm check:rn-aria`。
-          aria-disabled={busy}
-          disabled={busy}
-          onPress={() => {
-            onRemove(item);
-          }}
-          style={[styles.remove, busy ? styles.busy : null]}
-          testID={`${key}-remove`}
-        >
-          <HeytaIcon data={Trash2} size={tokens['icon.xs']} color={tokens['color.danger']} />
-        </Pressable>
+        {confirmLabels === undefined || !pendingRemove ? (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={labels.removeLabel(item.name)}
+            // 🔴 用**平铺** `aria-*`，不要用对象形态 `accessibilityState` / `accessibilityValue`：
+            // RNW 0.21 会把对象形态**整个丢掉**（实测 `aria-checked` / `aria-valuenow` 都不出现），
+            // 而 RN 0.71+ 两端都认平铺形态。判据见 `pnpm check:rn-aria`。
+            aria-disabled={busy}
+            disabled={busy}
+            onPress={() => {
+              // 🔴 要确认的形态**不在这里写 op** —— 只是把这一行置成"等一下"。
+              //
+              // 为什么这一档必须有界面对话框而不是宿主各写一个：两端各写 =
+              // "删标签到底要不要确认"会有两个答案，而差异不会让任何测试变红
+              // （AGENTS §3.5）。为什么不是 `window.confirm`：移动端没有它，
+              // 而且它的文案不受 i18n 管（`check:ui-language` 那条"界面零硬编码"从这儿开始）。
+              if (confirmLabels === undefined) {
+                onRemove(item);
+                return;
+              }
+              setEditing(null);
+              setPendingRemove(item.id);
+            }}
+            style={[styles.remove, busy ? styles.busy : null]}
+            testID={`${key}-remove`}
+          >
+            <HeytaIcon data={Trash2} size={tokens['icon.xs']} color={tokens['color.danger']} />
+          </Pressable>
+        ) : null}
       </View>
+
+      {confirmLabels === undefined || !pendingRemove ? null : (
+        // 确认那一行。**只有把这一行删掉这一步走到一半时**才出现在 DOM 里 ——
+        // 没点删除时它一个节点都不渲染，所以"默认形态与从前逐字相同"是可证的
+        // （判据：不传 `labels.confirmRemove` 时 DOM 里没有 `…-confirm`）。
+        <View style={styles.confirm} accessibilityLiveRegion="polite" testID={`${key}-confirm`}>
+          <Text style={[text['row-meta'], { color: tokens['color.foreground'] }]}>
+            {confirmLabels.ask(item.name)}
+          </Text>
+          {impact === undefined || impact <= 0 ? null : (
+            <Text style={[text.caption, { color: tokens['color.foreground-muted'] }]}>
+              {confirmLabels.impact(impact)}
+            </Text>
+          )}
+          <View style={styles.confirmActions}>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={confirmLabels.confirm}
+              aria-disabled={busy}
+              disabled={busy}
+              onPress={() => {
+                // 先收状态再回调：宿主的 `onRemove` 会让这一行整条消失，
+                // 之后再 setState 就是对着已卸载的行写状态。
+                setPendingRemove(null);
+                onRemove(item);
+              }}
+              style={[styles.remove, busy ? styles.busy : null]}
+              testID={`${key}-confirm-yes`}
+            >
+              <HeytaIcon data={Trash2} size={tokens['icon.xs']} color={tokens['color.danger']} />
+            </Pressable>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={confirmLabels.cancel}
+              onPress={() => {
+                setPendingRemove(null);
+              }}
+              style={styles.remove}
+              testID={`${key}-confirm-no`}
+            >
+              <HeytaIcon data={X} size={tokens['icon.xs']} color={tokens['color.foreground-muted']} />
+            </Pressable>
+          </View>
+        </View>
+      )}
     </View>
   );
 }
@@ -474,6 +601,7 @@ export function OrganizerList({
   kind,
   items,
   counts,
+  removeImpact,
   labels,
   onSelect,
   onRemove,
@@ -490,6 +618,9 @@ export function OrganizerList({
   // 同时只有一行在改名。这不是优化：两行同时开着时"保存"落在哪一行
   // 只能靠点击顺序猜，而移动端屏幕小、行又窄。
   const [editingId, setEditingId] = useState<string | null>(null);
+  // 同上，另一侧：**同时只有一行在"等一下，先确认"**。两行都 armed 时
+  // 「确认删除」落在哪一条只能靠点的顺序猜，而删错了没有回收站可捞（标签不进回收站）。
+  const [pendingRemoveId, setPendingRemoveId] = useState<string | null>(null);
 
   if (items.length === 0) {
     // 宿主不传 `empty` 就什么都不渲染（web 侧栏迁移前的行为，见文件头）。
@@ -544,6 +675,9 @@ export function OrganizerList({
             onArchive={onArchive}
             editing={editingId === node.id}
             setEditing={setEditingId}
+            pendingRemove={pendingRemoveId === node.id}
+            setPendingRemove={setPendingRemoveId}
+            impact={removeImpact?.[node.id]}
             renderLeading={renderLeading}
             renderItemExtra={renderItemExtra}
             busy={busy}
@@ -567,6 +701,9 @@ export function OrganizerList({
                   onArchive={onArchive}
                   editing={editingId === child.id}
                   setEditing={setEditingId}
+                  pendingRemove={pendingRemoveId === child.id}
+                  setPendingRemove={setPendingRemoveId}
+                  impact={removeImpact?.[child.id]}
                   renderLeading={renderLeading}
                   renderItemExtra={renderItemExtra}
                   busy={busy}

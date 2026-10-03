@@ -103,9 +103,83 @@ describe.skipIf(!DATABASE_URL)('client vault migration planner over real HTTP/Po
     const rows = await db.operation.findMany({ where: { userId }, orderBy: { serverSeq: 'asc' } });
     const cipher = createVaultPayloadCipher({ current: { keyVersion: 1, rootKey: newRoot } });
     for (const row of rows) {
-      const identity = { id: row.id, clientId: row.clientId, actionType: row.actionType, opType: row.opType, entityType: row.entityType, entityId: row.entityId ?? undefined, entityIds: row.entityIds, timestamp: Number(row.clientTimestamp), schemaVersion: row.schemaVersion };
+      const identity = { id: row.id, clientId: row.clientId, actionType: row.actionType, opType: row.opType, entityType: row.entityType, entityId: row.entityId ?? undefined, ...(row.entityIds.length > 0 ? { entityIds: row.entityIds } : {}), timestamp: Number(row.clientTimestamp), schemaVersion: row.schemaVersion };
       expect(await cipher.decrypt(row.payload as string, identity)).toContain('task-');
       expect(Buffer.from(decodeBase64(row.payload as string)).subarray(0, 'heyta-vault-op/'.length).toString('ascii')).toBe('heyta-vault-op/');
+    }
+  }, 30000);
+
+  it('round-trips a vault op whose source identity explicitly has empty entityIds', async () => {
+    const user = await db.user.create({ data: { email: `vault-client-empty-ids-${randomUUID()}@test.local`, isVerified: 1 } });
+    const scopedAuthorization = `Bearer ${jwt.sign({ userId: user.id, email: user.email, tokenVersion: 0 }, process.env.JWT_SECRET!)}`;
+    const transport = { baseUrl: base, getToken: async () => scopedAuthorization.slice('Bearer '.length) };
+    const identity = {
+      id: `vault-empty-ids-${randomUUID()}`,
+      clientId: 'vault-device',
+      actionType: 'UPDATE',
+      opType: 'UPD',
+      entityType: 'TASK',
+      entityId: 'vault-empty-task',
+      entityIds: [],
+      timestamp: 10,
+      schemaVersion: 1,
+    } as const;
+    const sourceCipher = createVaultPayloadCipher({ current: { keyVersion: 1, rootKey: oldRoot } });
+    const payload = await sourceCipher.encrypt(JSON.stringify({ title: 'empty entityIds' }), identity);
+    await db.vaultKeyPackage.create({
+      data: { userId: user.id, keyVersion: 1, packageData: packageFor(1), activePayloadKeyVersion: 1, createdAt: 1n, updatedAt: 1n },
+    });
+
+    try {
+      const upload = await fetch(`${base}/api/sync/ops`, {
+        method: 'POST',
+        headers: { authorization: scopedAuthorization, 'content-type': 'application/json' },
+        body: JSON.stringify({
+          clientId: identity.clientId,
+          lastKnownServerSeq: 0,
+          ops: [{ ...identity, payload, vectorClock: { [identity.clientId]: 1 }, isPayloadEncrypted: true }],
+        }),
+      });
+      expect(upload.status).toBe(200);
+      expect((await upload.json()).results?.[0]?.accepted).toBe(true);
+
+      const adapter = new MemoryDbAdapter(INDEXEDDB_SCHEMA);
+      await adapter.init();
+      const journal = createVaultMigrationJournal(adapter);
+      const result = await migrateVaultPayloads({
+        inventory: createVaultMigrationInventorySource(transport),
+        remote: createVaultKeyMigrationRemote(transport),
+        journal,
+        journalScope: `scope-${user.id}`,
+        package: packageFor(2),
+        expectedKeyVersion: 1,
+        currentPayloadKeyVersion: 1,
+        targetPayloadKeyVersion: 2,
+        currentRootKey: oldRoot,
+        targetRootKey: newRoot,
+        requestId: 'client-planner-empty-ids-1',
+      });
+      expect(result.migratedOperationCount).toBe(1);
+
+      const download = await fetch(`${base}/api/sync/ops?sinceSeq=0&limit=500`, { headers: { authorization: scopedAuthorization } });
+      expect(download.status).toBe(200);
+      const body = await download.json() as { ops: Array<{ op: Record<string, unknown> }> };
+      const downloaded = body.ops[0]!.op;
+      const targetCipher = createVaultPayloadCipher({ current: { keyVersion: 2, rootKey: newRoot } });
+      await expect(targetCipher.decrypt(downloaded.payload as string, {
+        id: downloaded.id as string,
+        clientId: downloaded.clientId as string,
+        actionType: downloaded.actionType as string,
+        opType: downloaded.opType as string,
+        entityType: downloaded.entityType as string,
+        entityId: downloaded.entityId as string,
+        entityIds: downloaded.entityIds as string[] | undefined,
+        timestamp: downloaded.timestamp as number,
+        schemaVersion: downloaded.schemaVersion as number,
+      })).resolves.toContain('empty entityIds');
+      adapter.close();
+    } finally {
+      await db.user.delete({ where: { id: user.id } });
     }
   }, 30000);
 
@@ -248,7 +322,7 @@ describe.skipIf(!DATABASE_URL)('client vault migration planner over real HTTP/Po
           opType: row.opType,
           entityType: row.entityType,
           entityId: row.entityId ?? undefined,
-          entityIds: row.entityIds,
+          ...(row.entityIds.length > 0 ? { entityIds: row.entityIds } : {}),
           timestamp: Number(row.clientTimestamp),
           schemaVersion: row.schemaVersion,
         };

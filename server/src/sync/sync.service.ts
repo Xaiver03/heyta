@@ -247,29 +247,32 @@ export class SyncService {
             lastKnownServerSeq !== undefined ||
             (containsRepair && !isLegacyRepairUpload);
           let currentServerSeq = 0;
+          // Every accepted upload participates in the same lock order as a
+          // vault reservation: user_sync_state first, then users. The route's
+          // quota preflight runs outside this transaction, so this lock is the
+          // commit-time serialization point for reservation mutations.
+          await tx.userSyncState.upsert({
+            where: { userId },
+            create: { userId, lastSeq: 0 },
+            update: {},
+          });
+          const rows = await tx.$queryRaw<
+            Array<{
+              lastSeq: number;
+              latestStateReplacementSeq: number | null;
+            }>
+          >`
+            SELECT
+              last_seq AS "lastSeq",
+              latest_state_replacement_seq AS "latestStateReplacementSeq"
+            FROM user_sync_state
+            WHERE user_id = ${userId}
+            FOR UPDATE
+          `;
+          currentServerSeq = rows[0]?.lastSeq ?? 0;
+          await tx.$queryRaw`SELECT id FROM users WHERE id = ${userId} FOR UPDATE`;
+
           if (needsSyncStateLock) {
-            // Serialize state replacements, cursor checks, and later inserts on
-            // the same per-user row. Whichever request acquires this lock first
-            // defines the safe order seen by every other server instance.
-            await tx.userSyncState.upsert({
-              where: { userId },
-              create: { userId, lastSeq: 0 },
-              update: {},
-            });
-            const rows = await tx.$queryRaw<
-              Array<{
-                lastSeq: number;
-                latestStateReplacementSeq: number | null;
-              }>
-            >`
-              SELECT
-                last_seq AS "lastSeq",
-                latest_state_replacement_seq AS "latestStateReplacementSeq"
-              FROM user_sync_state
-              WHERE user_id = ${userId}
-              FOR UPDATE
-            `;
-            currentServerSeq = rows[0]?.lastSeq ?? 0;
             let latestStateReplacementSeq = rows[0]?.latestStateReplacementSeq ?? null;
             if (latestStateReplacementSeq === null) {
               // The column is intentionally not backfilled during migration:
@@ -398,19 +401,6 @@ export class SyncService {
           // `markStorageNeedsReconcile` marker is lost too.
           let acceptedDeltaBytes = 0;
           let unserializableAccepted = 0;
-
-          // Ensure user has sync state row (init if needed)
-          // We assume user exists in `users` table because of foreign key,
-          // but if `uploadOps` is called, authentication should have verified user existence.
-          // However, `user_sync_state` might not exist yet.
-          if (!needsSyncStateLock) {
-            await tx.userSyncState.upsert({
-              where: { userId },
-              create: { userId, lastSeq: 0 },
-              update: {}, // No-op update to ensure it exists
-            });
-            uploadDbRoundtrips++;
-          }
 
           const firstOperationById = new Map<
             string,
@@ -556,10 +546,11 @@ export class SyncService {
           // Large operations like SYNC_IMPORT/BACKUP_IMPORT can have payloads up to 20MB.
           // Default Prisma timeout (5s) is too short for these. Use 60s to match generateSnapshot.
           timeout: 60000,
-          // FIX 1.6: Set explicit isolation level for strict consistency.
-          // Accepted writers serialize through the shared
-          // user_sync_state.last_seq row update; see ARCHITECTURE-DECISIONS.md #4.
-          isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead,
+          // READ COMMITTED is required here: a reservation may commit after
+          // this transaction begins but before its final quota UPDATE. Each
+          // statement must observe that latest committed reservation; the
+          // user-row lock above supplies the ordering contract.
+          isolationLevel: Prisma.TransactionIsolationLevel.ReadCommitted,
         },
       );
 
@@ -573,7 +564,7 @@ export class SyncService {
         this.requestDeduplicationService.clearForUser(userId);
       }
 
-      // Outside the RepeatableRead transaction on purpose: the download route
+      // Outside the upload transaction on purpose: the download route
       // touches the same (user_id, client_id) row fire-and-forget, and a touch
       // committing between this transaction's snapshot and its own upsert
       // aborted the WHOLE upload with a serialization failure (40001). Seen

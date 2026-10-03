@@ -18,6 +18,8 @@ import { readDevicePref, writeDevicePref } from '../prefs/device-prefs';
 const MODULE_NAME = 'HeytaVaultSecureStorage';
 const REMEMBERED_UNLOCK_DISABLED_PREFIX = 'vault.rememberedUnlockDisabled:';
 const rememberedUnlockEpochs = new Map<string, number>();
+const rememberedUnlockDisabled = new Set<string>();
+const nativeOperations = new Map<string, Promise<void>>();
 
 // This marker is deliberately a non-secret device preference. It fences a
 // secure-store item after logout even when native deletion fails. A missing
@@ -35,6 +37,21 @@ function rememberedUnlockEpoch(scope: VaultSecureStorageScope): { key: string; v
 function fenceRememberedUnlock(scope: VaultSecureStorageScope): void {
   const { key, value } = rememberedUnlockEpoch(scope);
   rememberedUnlockEpochs.set(key, value + 1);
+  rememberedUnlockDisabled.add(key);
+}
+
+/** Every wrapper instance shares the native queue: logout must delete after
+ * an earlier save settles, even if that save reports failure. The preference
+ * fence remains synchronous and never waits for this queue.
+ */
+function serialNative<T>(key: string, action: () => Promise<T>): Promise<T> {
+  const result = (nativeOperations.get(key) ?? Promise.resolve()).then(action);
+  const settled = result.then(() => undefined, () => undefined);
+  nativeOperations.set(key, settled);
+  void settled.then(() => {
+    if (nativeOperations.get(key) === settled) nativeOperations.delete(key);
+  });
+  return result;
 }
 
 export interface VaultSecureStorageScope {
@@ -152,28 +169,36 @@ export function createRememberedUnlockVaultStorage(
 ): VaultSecureStorage {
   return {
     async load(scope) {
-      const key = rememberedUnlockMarkerKey(scope);
-      if (prefs.read(key) !== '0') return undefined;
-      return storage.load(scope);
+      const before = rememberedUnlockEpoch(scope);
+      if (rememberedUnlockDisabled.has(before.key) || prefs.read(before.key) !== '0') return undefined;
+      const root = await serialNative(before.key, () => storage.load(scope));
+      if (rememberedUnlockEpoch(scope).value !== before.value ||
+          rememberedUnlockDisabled.has(before.key) || prefs.read(before.key) !== '0') return undefined;
+      return root;
     },
     async save(scope, rootKeyBase64) {
       const before = rememberedUnlockEpoch(scope);
-      await storage.save(scope, rootKeyBase64);
-      const after = rememberedUnlockEpoch(scope);
-      if (after.value !== before.value) {
-        throw new Error('vault remembered-unlock 状态在保存期间已失效');
-      }
-      if (!prefs.write(after.key, '0')) {
-        throw new Error('vault remembered-unlock 状态未能写入设备偏好');
-      }
+      await serialNative(before.key, async () => {
+        if (rememberedUnlockEpoch(scope).value !== before.value) {
+          throw new Error('vault remembered-unlock 状态在保存期间已失效');
+        }
+        await storage.save(scope, rootKeyBase64);
+        if (rememberedUnlockEpoch(scope).value !== before.value) {
+          throw new Error('vault remembered-unlock 状态在保存期间已失效');
+        }
+        if (!prefs.write(before.key, '0')) {
+          throw new Error('vault remembered-unlock 状态未能写入设备偏好');
+        }
+        rememberedUnlockDisabled.delete(before.key);
+      });
     },
     async remove(scope) {
       fenceRememberedUnlock(scope);
       const { key } = rememberedUnlockEpoch(scope);
-      if (!prefs.write(key, '1')) {
-        throw new Error('vault remembered-unlock 禁用状态未能写入设备偏好');
-      }
-      await storage.remove(scope);
+      let fenceSaved = false;
+      try { fenceSaved = prefs.write(key, '1'); } catch { /* Still attempt native deletion. */ }
+      await serialNative(key, () => storage.remove(scope));
+      if (!fenceSaved) throw new Error('vault remembered-unlock 禁用状态未能写入设备偏好');
     },
   };
 }
@@ -194,7 +219,8 @@ export async function clearVaultRootKey(scope: VaultSecureStorageScope): Promise
  */
 export function isVaultRootAutoUnlockDisabled(scope: VaultSecureStorageScope): boolean {
   try {
-    return readDevicePref(rememberedUnlockMarkerKey(scope)) !== '0';
+    const key = rememberedUnlockMarkerKey(scope);
+    return rememberedUnlockDisabled.has(key) || readDevicePref(key) !== '0';
   } catch {
     return true;
   }
@@ -205,13 +231,6 @@ function rememberedUnlockStorage(): VaultSecureStorage {
     read: readDevicePref,
     write: writeDevicePref,
   });
-}
-
-/** Persist the explicit opt-in which permits remembered root loading. */
-export function enableVaultRootAutoUnlock(scope: VaultSecureStorageScope): void {
-  if (!writeDevicePref(rememberedUnlockMarkerKey(scope), '0')) {
-    throw new Error('vault remembered-unlock 状态未能写入设备偏好');
-  }
 }
 
 /** Fence remembered unlock before attempting native deletion. */

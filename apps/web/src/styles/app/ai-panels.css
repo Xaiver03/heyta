@@ -11,6 +11,18 @@
   font-size: var(--ht-font-size-sm);
 }
 
+/* 同步设置里的 Vault 区域沿用设置页的 L1 原语；Vault 视图只负责状态与动作。 */
+.ht-settings__vault {
+  gap: var(--ht-space-2);
+  padding-block-start: var(--ht-space-2);
+  border-block-start: var(--ht-border-width-thin) solid var(--ht-color-border-subtle);
+}
+
+.ht-settings__vault-code {
+  user-select: all;
+  overflow-wrap: anywhere;
+}
+
 /* 🔴 品牌控件色（2026-09-30）：原生复选框/单选默认跟随 **macOS 系统强调色** ——
    这台机器的强调色是石墨灰，装出来的包里所有勾选框都是灰的（主蓝命中 0）。
    品牌控件的选中色必须来自设计系统（AGENTS §5：变量来源唯一），
