@@ -140,6 +140,10 @@ const IMAGE_ONLY_PACKAGES = {
   //      head -3 /app/node_modules/@fastify/websocket/LICENSE'
   // 2026-10-04 06:08 实测输出：`11.3.3` / `license=MIT` / 正文首行 `MIT License`，
   // 署名 `Copyright (c) 2017-present The Fastify team`。
+  // ✅ 同一条判定还有**第二条独立取证路**（另一载体，不是同一份证据的复述）：发布 tarball 里的
+  // `package/LICENSE` 也是 MIT —— 主检出里另一条会话线在 18:35Z 重生成快照时独立核过这一路
+  // （2026-10-04 06:3x 现量：该登记在人家工作树里尚未提交）。两条路一起指 MIT，
+  // 所以这条登记的依据不依赖"我恰好手边有一枚构建好的镜像"。
 };
 
 const PERMISSIVE_LICENSES = new Set([
