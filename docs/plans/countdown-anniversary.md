@@ -1304,10 +1304,20 @@ W0b ─> 随时可做（台账那半要等文件干净）
     iOS 侧停在"代码 + node 侧单测"这一档 ——
     `HeytaCardExportModule.swift:67` 写 `temporaryDirectory/card-export/`、`card-export.tsx:173` 在
     `Share.share` **之前**就拿到 URI，所以落盘这件事本身是可证的，缺的只是没人去按它。
-    ⚠️ **别把这条读成"顺手就能补"**：iOS 那套 harness 不共享 —— `verify-mobile-ios.sh` 1813 行自带全部
+    ⚠️ ~~**别把这条读成"顺手就能补"**：iOS 那套 harness 不共享 —— `verify-mobile-ios.sh` 1813 行自带全部
     AX 助手（`ax` / `press_until` / `settle_for` / `dismiss_overlays`），`scripts/lib/` 里没有可复用的 iOS lib，
-    所以补它 = 现写一份 ~250 行探针，而**没有设备窗口时探针无法迭代**（每一趟都要重装 + 起模拟器）。
-    可关闭它的最小口径已经想清楚，写在下面，等窗口而不是现在盲写：
+    所以补它 = 现写一份 ~250 行探针，而**没有设备窗口时探针无法迭代**（每一趟都要重装 + 起模拟器）。~~
+    🔴 **04 07:3x 这句"闭合代价"被现量否证，改价写在下面**（登记成债之前先实测贵不贵）：
+    ① `ax()` **不是** 1813 行里的一段 —— 它是 `verify-mobile-ios.sh:172` 那 **3 行包装**，真身是仓内文件
+    **`scripts/tools/ios-ax-shim.py`（959 行）**，CLI 契约现成（`--udid --idb --companion [--pressable|--field|--exact|--role|--wait|--list|--press|--set|--keyboard|--scroll-into-view|--dismiss-keyboard|--type-text|--tap X Y|--json] [label]`，`--help` 实测可打）；
+    ② `resolve_idb()` **就在共享 lib 里**（`scripts/lib/mobile-e2e.sh:970`）—— 我那句"`scripts/lib/` 里没有可复用的 iOS lib"是**没打开 lib 就下的结论**；
+    ③ 真正只住在 `verify-mobile-ios.sh` 里的只有两个小流程助手：`press_until`（`:283`，**48 行**）与
+    `dismiss_overlays`（`:371`，**32 行**）。
+    ⇒ 实际形状是"复用 shim CLI + lib 里的 `resolve_idb` + 抄两个小助手"，不是"现写 250 行"。
+    窗口这一条仍然成立但已不阻塞（07:3x 现量：三台已启动模拟器都在、`get_app_container` 三台全 rc=0）。
+    已转成任务 **#21**（`scripts/verify-mobile-card-export-ios.sh` + 根入口 `verify:mobile-card-export:ios`，
+    退出码沿用 0/1/3 三档不混，且**只对自己造的那台模拟器动手**）。
+    可关闭它的最小口径已经想清楚，写在下面：
     iOS 的读数通道其实比 Android **更便宜** —— `xcrun simctl get_app_container <UDID> <BID> data`/`tmp/card-export/`
     是**宿主机直接可读的目录**，不需要 `adb root` 那一档（Android 侧的 release 包不可 `run-as`，见上面第 4 步那段），
     所以 IHDR 那条判据只差 UI 驱动。判据①（读数器自检）与判据③（字节等于契约）可原样复用
@@ -1327,8 +1337,13 @@ W0b ─> 随时可做（台账那半要等文件干净）
       ✅ **04 06:17–06:27 那趟完整 68 段 sweep 里已重取：`pnpm check:card-export` **`rc=0`**（载体 `c4332f86`，
       同趟 `pnpm build` 是第一段 ⇒ 它量的就是刚打出来的产物）**；装包之后还要再取一次（§8.4 第 ⑬ 条那条链的末步），
       因为那两栏 `… · 产物` 判的是**包里的字节**）
-      ／ [ ] 🔄 W7 移动端出图：代码与判据在（`card-export.spec.ts` 21 passed、原生模块已注册进 `MainApplication`），
-      **真机那一趟读数未取** —— 装置 `pnpm verify:mobile-card-export` 已落库并做过探针自检，排在收尾第 4 项
+      ／ [x] ✅ **W7 移动端出图（Android）已跑到最终态**（04 07:41，载体 `7c63411b`，
+      `pnpm verify:mobile-card-export` ⇒ **`RC=0`**，逐条读数在 §8.4 第 ㉓ 条；
+      设备写进沙盒、再拉回本机入库的那张成品图在
+      [`apps/mobile/evidence/card-export/latest-card.png`](../../apps/mobile/evidence/card-export/latest-card.png)，
+      **人打开看过**，看见了什么与四条机器判据写在同目录的 `README.md`）
+      ／ [ ] 🔄 **iOS 那一半仍未取设备读数**（编号 **W7-G3**，任务 #21）—— 而且这一轮新量出一条更硬的：
+      iOS 原生模块**根本编不过**，见 §8.4 第 ㉔ 条（`import React` 已修，但"修完能不能建"还没验）
       ⚠️ **04 06:3x 现量：这一趟还开不了工**，`bash scripts/verify-mobile-window-gate.sh --target b` ⇒ `RC_WINGATE_B=3`
       （负载 18 > 阈值 12；`adb devices` 在线 **0 台** ⇒ 那一端此刻连"可达"都不成立），
       而别人那条装包链挂在 `notarytool submit --wait` 上已 3h21m、不会自己结束 ——
@@ -2288,3 +2303,35 @@ W0b ─> 随时可做（台账那半要等文件干净）
   ✅ 处置是**重装**（门要的就是这个），不是把 mtime 抹回去骗过它 —— 后者正是 §7 元规则二禁的那种"让判据闭嘴"。
   ④ `RC_MAC` 仍未跑：`package-app.sh` + `notarytool submit` 此刻 **4 小时 03 分**（07:15:33 现量），
   且 07:0x 起还多出两枚 `queue-reinstall-all.sh`。链 I 每次开工前重查这一档。
+
+- ㉓ **链 I：android 端第二次装上当前产物，随后设备出图那一趟卡在探针上**（04 07:22:00–07:33:36，载体 `ab4c706b`→`b3ede439`，日志 `/tmp/device-closeout-I.log`）：
+  `RC_ANDROID=0`（窗口 1080×2400、内容占比 58.3%、主蓝命中 4001）、`RC_SURFACES_AFTER=0`（5 绿 / 0 红，未取证仍 2 栏）、
+  `RC_CARDEXPORT_GATE=0`、`RC_IOS=1`（见第 ㉔ 条）、`RC_MAC` 未跑（这一档仍被占，07:33:35 现量 4h21m）。
+  新鲜度门这回**放行**：`lastUpdateTime=2026-10-04 07:22:38 ⇒ epoch 1791069758` ≥ 源码最新；
+  判据①两腿也照旧绿（正向 `1080×1440 SHA=221f0d78811c` / 反向 `3×2 BLANK=true`）。
+  🔴 然后第 2 步红在**探针**：`❌ 底部找不到「我的」这一格` —— 而它自己打印的界面文本清单里**最后一行就是「我的」**。
+  根因量清了（同一台设备、同一份 dump、bash 里跑，zsh 那次读数无效）：
+  `scroll_to_text` / `scroll_to_desc` 走的是 `*-sane` 模式，带一条 `cy < 2100` 守卫
+  （防"ScrollView 折叠线以下的节点照样在无障碍树里、按它的'中心点'点下去会跳到别的标签页"，
+  理由写在 `scripts/lib/mobile-e2e.sh:1259` 那段注释里）。**底栏自己的中心天然就在 2100 以下**：
+  「我的」那颗可点 View 是 `bounds=[864,2169][1080,2337]` ⇒ 中心 **2253** ⇒ 被守卫滤掉 ⇒ **恒空**。
+  三种取法同时量：`xy_desc`=**972 2253**、`scroll_to_desc`=**空**、`scroll_to_text`=**空**。
+  ✅ 修 `80f7be46`：底栏目标改走 `xy_desc`（不写死 `945 2253` 那种字面坐标 —— 兄弟脚本里那种硬码是旧账）。
+  ⚠️ 顺带一条方法论：**我第一版这个诊断是在 zsh 里 `source` 那个 lib 做的，三个读数全空，
+  看起来"证实"了守卫没问题而界面有问题** —— 真因是 lib 里 `ADB="adb -s …"` 这种"变量装命令"的写法
+  在 zsh 下不做词分割（`command not found: adb -s emulator-5554`）。**换 shell 复跑之前那些读数一律作废**。
+
+- ㉔ 🔴 **W7 的 iOS 原生模块从来没编过译**：`reinstall-all --only ios` 第一次真跑到 `xcodebuild`
+  ⇒ **`BUILD FAILED`，22 条 error 全在 `apps/mobile/ios/Heyta/HeytaCardExportModule.swift`**，
+  首条是 `:52:42 error: cannot find type 'RCTPromiseResolveBlock' in scope`（连带 `'@escaping' only applies to function types` 与
+  `RCTPromiseRejectBlock` 同一条）。根因只有一行：那份文件只写了 `import Foundation`，
+  而同仓兄弟模块 `HeytaReminderModule.swift:3` / `HeytaVaultSecureStorage.swift:3` 都写着 **`import React`**
+  （那两个 typedef 是 React 的 ObjC 类型）。✅ 已修 `7c63411b`。
+  ⚠️ **为什么门禁全绿而它还是坏了**：`check:card-export` 数的是 **pbxproj 里有没有这两个文件**
+  （它自己的文件头就写着这条用途），TS 侧 `card-export.spec.ts` 21 passed 量的是 JS 折算逻辑 ——
+  **没有任何一层跑过 Swift 编译器**。这正是 AGENTS §6.1.1 那句"门禁绿 ≠ 能打包"的第四次现形
+  （前三次：#27 旧 bundle、#28、#31）。
+  🔴 所以台账里"W7 iOS 侧代码链闭合"这句**当时就不成立**，正确说法是"代码写完了、注册进 target 了、**没编过**"。
+  ⚠️ 修完之后**仍未验**（要 `xcodebuild` 再跑一趟，而它顺带把 `Podfile.lock` 的 `hermes-engine` 哈希改了
+  一行、把 `project.pbxproj` 重排了 5 行 —— 两处都是工具噪声，已 `git checkout --` 还原，
+  但每次跑 ios 段都会再脏一次，这是这台机器的既有条件，不是本轮引入的）。
