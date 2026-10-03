@@ -568,12 +568,14 @@ export function App(): React.JSX.Element {
    * 而任务视图当时可能停在「今天」这类筛选上，被点的那条**根本不在列表里**。
    * 用户看到的是"点了没反应"（与 `goToFilter` 那条注释记的 bug 同一类）。
    *
-   * 所以两件事一起做：① 筛选切到「全部」（保证它在列表里）；
-   * ② 滚到那一行 —— 列表有几十行时"它在列表里"与"你看得见它"不是一回事。
+   * 所以三件事一起做：① 选中它（W1 —— 行的高亮与详情面都读这一个值）；
+   * ② 筛选切到「全部」（保证它在列表里）；
+   * ③ 滚到那一行 —— 列表有几十行时"它在列表里"与"你看得见它"不是一回事。
    * ⚠️ 滚要在**下一帧**：这一帧 React 还没把新筛选下的行画出来。
    */
   const openTaskFromSearch = useCallback(
     (taskId: string) => {
+      selection.select('task', taskId);
       goToFilter({ kind: 'all' });
       requestAnimationFrame(() => {
         document
@@ -1225,10 +1227,16 @@ export function App(): React.JSX.Element {
   }, []);
 
   /**
-   * 打开一条便签结果 = **进便签视图**（浮层挂在 `view` 上，切过去就自然关掉）。
+   * 打开一条便签结果 = **选中它并进便签视图**（浮层挂在 `view` 上，切过去就自然关掉）。
    * 点与 ↵ 共用这一条，出口才不会漂成两份。
+   *
+   * 🔴 `noteId` 以前是**丢掉的**（回调签名不带参数，TS 不报错），于是"点了搜索结果
+   * 里的便签"只换来一次视图切换 —— 与上面 `openTaskFromSearch` 那条 2026-09-30 修掉的
+   * 缺陷同一个形状。选中态成为一等状态之后，这里必须把它写进去，
+   * 便签面板才知道要打开哪一条。
    */
-  const openNoteFromSearch = useCallback(() => {
+  const openNoteFromSearch = useCallback((noteId: string) => {
+    selection.select('note', noteId);
     setSettingsFocus(undefined);
     setView('notes');
   }, []);
@@ -1246,7 +1254,7 @@ export function App(): React.JSX.Element {
         return;
       }
       if (entry.kind === 'note') {
-        openNoteFromSearch();
+        openNoteFromSearch(entry.id);
         return;
       }
       // 跳转项的动作住在宿主给的 `quickActions` 里，这里只按 id 找回它。
@@ -2136,7 +2144,14 @@ export function App(): React.JSX.Element {
             </div>
           )}
           {contentView === 'calendar' && <CalendarView />}
-          {contentView === 'quadrant' && <QuadrantBoard />}
+          {/**
+           * 四象限 = 同一批任务的另一种投影（共享 `QuadrantBoard` 每格直接渲染
+           * 共享 `TaskList`）。🔴 所以**选中必须接同一个值**：在列表里选中一条再切过来，
+           * 那一条要还是高亮的那一条 —— 各投影各留一份选中，就是各答一遍回落规则。
+           */}
+          {contentView === 'quadrant' && (
+            <QuadrantBoard onOpenTask={openTask} activeTaskId={selectedTaskId} />
+          )}
           {contentView === 'habits' && <HabitsView />}
           {/**
            * 番茄钟。**计时核心来自 `@heyta/ui` 的共享 `FocusPanel`**
@@ -2177,6 +2192,10 @@ export function App(): React.JSX.Element {
                   .addTask(t('web.board.untitledTask'), { startDate: atMs })
                   .catch((e) => console.error('DBG onCreateAt failed:', e));
               }}
+              // 点行 = 选中，与列表/四象限同一个值（同一批任务的第三种投影）。
+              // 触屏端早就接了，web 这边此前行体不可点 ⇒ 两端同一个界面两种能力。
+              onOpenTask={openTask}
+              activeTaskId={selectedTaskId}
             />
           )}
           {contentView === 'growth' && <GrowthView />}

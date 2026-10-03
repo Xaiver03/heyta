@@ -83,6 +83,8 @@ export interface QuadrantScreenProps {
   readonly onToggleTask: (taskId: string) => void;
   /** 点整行的行为：打开任务详情。 */
   readonly onOpenTask: (taskId: string) => void;
+  /** 选中的那一条 ⇒ 高亮。传的是宿主的**全局选中**，不是本屏自己记的 id。 */
+  readonly activeTaskId?: string | null;
 }
 
 export function QuadrantScreen({
@@ -94,6 +96,7 @@ export function QuadrantScreen({
   renderTrailing,
   onToggleTask,
   onOpenTask,
+  activeTaskId,
 }: QuadrantScreenProps): React.JSX.Element {
   const { t } = useI18n();
   const boardLabels = useMemo(() => quadrantBoardLabels(t), [t]);
@@ -105,6 +108,7 @@ export function QuadrantScreen({
       labels={boardLabels}
       onToggleTask={onToggleTask}
       onOpenTask={onOpenTask}
+      activeTaskId={activeTaskId}
       taskLabels={labels}
       renderMeta={renderMeta}
       renderTrailing={renderTrailing}

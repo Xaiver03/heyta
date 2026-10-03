@@ -34,7 +34,7 @@
  * 仍然是这里的判据 —— 面板与入口要么一起有，要么一个都不留。
  */
 
-import { useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import { useI18n, type I18nValue } from '@heyta/i18n';
 import {
   HeytaUiProvider,
@@ -44,6 +44,7 @@ import {
   type NotesBoardLabels,
 } from '@heyta/ui';
 
+import { selection, useSelected } from '../../lib/selection.js';
 import { useNoteStore } from './store.js';
 
 /** 构造共享 `NotesBoard` 的全部文案。字段名与 `NotesBoardLabels` 逐项对应，漏了编译不过。 */
@@ -86,12 +87,15 @@ export function NotesView(): React.JSX.Element {
   const editError = useNoteStore((s) => s.editError);
 
   /**
-   * 正在编辑的那条便签 id，`null` = 面板没开。
+   * 正在编辑的那条便签 = **选中的那一条**（`null` = 面板没开）。
    *
    * 🔴 用 **id** 而不是 `Note` 对象：`refresh()` 之后对象会换新引用，
    * 存对象会让面板在每次同步后拿到一份过期快照（与移动端同一个取舍）。
+   * 而它读的是共享选中态、不是本地 `useState`：搜索那条入口只能把 id 交进选中态，
+   * 面板才会在切到便签视图时显示**被点的那一条**（此前 `openNoteFromSearch` 把 id 丢了，
+   * 用户看到的只是"视图换了，什么都没打开"）。
    */
-  const [editingId, setEditingId] = useState<string | null>(null);
+  const editingId = useSelected('note');
 
   const labels = useMemo(() => notesBoardLabels(t), [t]);
   const editorLabels = useMemo(() => noteEditorLabels(t), [t]);
@@ -112,11 +116,11 @@ export function NotesView(): React.JSX.Element {
             void updateNote(activeEditing.id, content).then((ok) => {
               // 只有真落成了才收面板：失败时错误要留在屏幕上，
               // 否则用户看到的是"点了保存，面板自己关了，什么也没改"。
-              if (ok) setEditingId(null);
+              if (ok) selection.select('note', null);
             });
           }}
           onCancel={() => {
-            setEditingId(null);
+            selection.select('note', null);
           }}
           testID="notes-editor"
         />
@@ -133,7 +137,7 @@ export function NotesView(): React.JSX.Element {
           void togglePinned(entityId, pinned);
         }}
         onEdit={(entityId) => {
-          setEditingId(entityId);
+          selection.select('note', entityId);
         }}
         labels={labels}
         testID="notes-board"

@@ -142,7 +142,17 @@ function CellDropZone({ quadrant }: { quadrant: Quadrant }) {
   );
 }
 
-export function QuadrantBoard() {
+/**
+ * `onOpenTask` / `activeTaskId` 是宿主管"选中是哪一条"的两个出口，本层只转接 ——
+ * 选中态本身不在这里，它只有一个所有者（`apps/web/src/lib/selection.ts`）。
+ * ⚠️ 与下面 `activeId`（dnd-kit 的**正在拖**那条）无关，两个名字像但不是一件事。
+ */
+interface QuadrantBoardProps {
+  readonly onOpenTask?: (taskId: string) => void;
+  readonly activeTaskId?: string | null;
+}
+
+export function QuadrantBoard({ onOpenTask, activeTaskId }: QuadrantBoardProps = {}) {
   const { t } = useI18n();
   const store = useTaskStore();
   const [activeId, setActiveId] = useState<string | undefined>();

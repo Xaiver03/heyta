@@ -160,6 +160,49 @@ describe('A. 任务视图的两条渲染路径都接上了选中', () => {
   });
 });
 
+/**
+ * 🔴 这一组是 Goal 那句"选中要应用到很多地方，不能只应用到一个地方"在 web 的落点。
+ * 数的是**接线点**：任务在这一侧有三种投影（列表 / 四象限 / 时间线）加一个搜索入口，
+ * 少接一处不会报错，症状是"在列表里选中一条，切到四象限就不认识它了" ——
+ * 而那正是这次要消掉的"各投影各留一份选中"的形状。
+ */
+describe('D. 其余两种投影与搜索的两个入口也接上了', () => {
+  /** 取某个 JSX 开标签到它自己的 `/>` 之间那一段（多行属性也能读）。 */
+  const tagBlock = (opening: string): string => {
+    const at = APP_SOURCE.indexOf(opening);
+    expect(at, `App.tsx 里找不到 ${opening}`).toBeGreaterThanOrEqual(0);
+    const end = APP_SOURCE.indexOf('/>', at);
+    expect(end, `${opening} 没有闭合的 "/>"`).toBeGreaterThan(at);
+    return APP_SOURCE.slice(at, end);
+  };
+
+  it('四象限：一处调用，`onOpenTask` 与 `activeTaskId` 都递到', () => {
+    const block = tagBlock('<QuadrantBoard');
+    expect(block).toContain('onOpenTask={openTask}');
+    expect(block).toContain('activeTaskId={selectedTaskId}');
+  });
+
+  it('时间线：同样两处都递到（此前 web 的行体根本不可点，而触屏端早就能）', () => {
+    const block = tagBlock('<TimelinePanel');
+    expect(block).toContain('onOpenTask={openTask}');
+    expect(block).toContain('activeTaskId={selectedTaskId}');
+  });
+
+  it('搜索结果：任务与便签各自写选中，而不是只切视图', () => {
+    // 两条都连 `useCallback` 的头一起判：只 grep `select('task'` 的话，
+    // 把实参改名或换成常量都能绿，而"回调签名不收 id"这个真缺陷正是原样。
+    expect(APP_SOURCE).toMatch(
+      /const openTaskFromSearch = useCallback\(\s*\(taskId: string\) => \{\s*selection\.select\('task', taskId\);/,
+    );
+    expect(APP_SOURCE).toMatch(
+      /const openNoteFromSearch = useCallback\(\s*\(noteId: string\) => \{\s*selection\.select\('note', noteId\);/,
+    );
+    // ↵ 那条路必须把 id 传下去。`openNoteFromSearch()`（空实参）就是本次修掉的形状。
+    expect(APP_SOURCE).toContain('openNoteFromSearch(entry.id)');
+    expect(APP_SOURCE).not.toMatch(/openNoteFromSearch\(\s*\)/);
+  });
+});
+
 describe('B. 真点一行 = 选中那一条', () => {
   it('点第二行 ⇒ store 与详情槽都是它的 id，且按下确实到达了 onPress', () => {
     const seen: string[] = [];

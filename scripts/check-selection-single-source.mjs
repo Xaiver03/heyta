@@ -29,7 +29,7 @@
  * 它只是从此多一个没人读的所有者。
  *
  * ─────────────────────────────────────────────────────────────────────────
- * 三条断言
+ * 四条断言
  * ─────────────────────────────────────────────────────────────────────────
  *
  * A. **宿主各有一份实例，且只有那一份**：`createSelectionStore(` 在 `各宿主的 src 目录`
@@ -38,27 +38,41 @@
  *
  * B. **宿主里不许重新长出本地选中态**：`const [detailTaskId, setX] = useState<...>(null)`
  *    这种"选中形状"的声明在 `各宿主的 src 目录` 里必须为 0。
- *    ⚠️ 判据刻意窄：只认 `detail|selected|open|active` + 实体名 + `Id` 这个组合，
+ *    ⚠️ 判据刻意窄：只认 `detail|selected|open|active|edit(ing)` + 实体名 + `Id` 这个组合，
  *    所以 `renamingId`（改名编辑器）、`busyId`（防连点）、`draft` 都不算 ——
  *    它们不是"当前选中了哪一条"。把范围放宽会淹死在噪音里，然后被人整片注释绕过。
+ *    🔴 `edit(ing)` 是 2026-10-03 补的，因为这条判据**当场漏掉过真的两份**：
+ *    `NotesSection.editingId` 与 `TasksScreen.editingNoteId` 是同一个问题
+ *    （"现在在编辑哪条便签"）的两份本地状态，而旧的正则一个都不认。
+ *    仍未覆盖：不带实体名的 `const [editingId] = useState(...)`（名字里没有 Note）——
+ *    如实登记，别把它当成"选中态再也回不去了"。
  *
  * C. **词表只有一个家**：`SelectableKind` 的**定义**只许出现在 `packages/app-host`。
  *    宿主里出现一份同名的联合类型 = 第二套"哪些东西可以被选中"，
  *    新增一类时必然漏改一处，症状是那一类的选中态静默失效。
  *
+ * D. **词表里每一类都得有宿主真的选中过它**：逐类扫 `select('kind'` / `useSelected('kind'`，
+ *    零消费者的那一类判红。词表从 `selection.ts` 的**数组字面量**现读（不抄清单）。
+ *    🔴 这一条防的是"槽位建了、界面上没有这个功能"：`SelectableKind` 里曾写着
+ *    `project | tag | event`，`pruneSelection` 的谓词也照着写了 project/tag，
+ *    而**没有任何一处界面会选中一条清单或标签** —— 于是"支持六类"读起来像已完成，
+ *    实际只有三类活着。加一类之前先让某个宿主选中它。
+ *
  * ─────────────────────────────────────────────────────────────────────────
  * 怎么确认它能失败（不要删这一段）
  * ─────────────────────────────────────────────────────────────────────────
  *
- * 实测（一趟跑五条正臂 + 一条负向对照，跑完复原并复跑确认回到绿）：
+ * 实测（一趟跑六条正臂 + 一条负向对照，跑完复原并复跑确认回到绿）：
  *
  * | 注入 | 结果 |
  * |---|---|
  * | A 把 mobile 那份实例换成 `undefined`（少接一个宿主） | 红：断言 A |
  * | B 在 `App.tsx` 注入 `const [detailTaskId] = useState<string \| null>(null)` | 红：断言 B |
  * | B2 同上但**带** setter（`const [selectedTaskId, setSelectedTaskId] = …`） | 红：断言 B |
+ * | B3 `const [editingNoteId] = useState<string \| null>(null)` | 红：断言 B（`edit(ing)` 分支） |
  * | C 在宿主里 `type SelectableKind = 'task' \| 'habit'` | 红：断言 C |
- * | D 实例建在 `App.tsx` 而不是 `lib/selection` | 红：断言 A ×2（数量 + 落点） |
+ * | A2 实例建在 `App.tsx` 而不是 `lib/selection` | 红：断言 A ×2（数量 + 落点） |
+ * | D 往词表数组里加一项 `'widget'`（宿主里没有） | 红：断言 D |
  * | **负向对照**：把这些字样**只写进注释** | 绿（剥注释生效，不误伤） |
  *
  * 🔴 **B 第一版是存活的**：那时 setter 被写成必需，无 setter 的
@@ -77,13 +91,20 @@ import process from 'node:process';
 
 const ROOT = path.resolve(import.meta.dirname, '..');
 
+/** 响亮失败：锚点没了就红，不许静默跳过（跳过 = 这道门禁从此只是装饰）。 */
+function fail(message) {
+  console.error(`✗ 选中态门禁：${message}`);
+  process.exit(1);
+}
+
 /** 只扫这两个宿主（它们才有"详情面/详情层"）。node-host 是 CLI，没有选中态。 */
 const HOSTS = ['apps/web', 'apps/mobile'];
 
 /** 断言 A 要求的最小出现次数：每个宿主恰好一份实例。 */
 const REQUIRED_STORE_INSTANCES = HOSTS.length;
 
-const SELECTION_NAME = /^(?:detail|selected|open|active)(?:Task|Habit|Note|Project|Tag|Event)Id$/;
+const SELECTION_NAME =
+  /^(?:detail|selected|open|active|edit(?:ing)?)(?:Task|Habit|Note|Project|Tag|Event)Id$/;
 
 /**
  * A 认的"实例化"：**赋值左边**才算。
@@ -109,6 +130,38 @@ const LOCAL_STATE_DECL =
     不是第二个定义。少写这个等号，门禁会在接线正确的项目上恒红，
     然后被人加一行 `// eslint-disable` 绕过（本仓库记过的那种死法）。 */
 const KIND_DEFINITION = /(?:^|\s)(?:export\s+)?type\s+SelectableKind\s*=/;
+
+/** D 的词表来源：唯一的那个家。**清单抄在这里就会开始漂**，所以读真身。 */
+const VOCAB_FILE = path.join(ROOT, 'packages/app-host/src/selection.ts');
+
+/** 词表项必须长这样；出现别的形状就响亮地红，不让它变成"解析不到⇒判据空跑"。 */
+const KIND_WORD = /^[a-z][A-Za-z0-9]*$/;
+
+/**
+ * 从 `SELECTABLE_KINDS` 的**数组字面量**里取词表。
+ *
+ * 🔴 取数组而不是取联合类型：数组是运行时唯一被 `for (const kind of …)` 消费的
+ * 那份（`pruneSelection` 遍历的就是它），联合类型只是它的类型侧影子。
+ * ⚠️ 解析要允许换行 —— 词表被人排成多行是迟早的事，写死单行会在那一天静默取到空集。
+ */
+function readVocab() {
+  const source = readFileSync(VOCAB_FILE, 'utf8');
+  const block = /export const SELECTABLE_KINDS(?::[^=]*)?=\s*\[([\s\S]*?)\]/.exec(source);
+  if (block === null) {
+    fail(`断言 D：在 ${path.relative(ROOT, VOCAB_FILE)} 里找不到 SELECTABLE_KINDS 的数组字面量`);
+  }
+  const kinds = [...block[1].matchAll(/'([^']*)'/g)].map((m) => m[1]);
+  if (kinds.length === 0) {
+    fail('断言 D：词表解析出 0 项 —— 解析器坏了，不是"没有类别"');
+  }
+  for (const kind of kinds) {
+    if (!KIND_WORD.test(kind)) fail(`断言 D：词表项「${kind}」不是合法标识符，消费方正则无法安全构造`);
+  }
+  return kinds;
+}
+
+/** 某类的消费方写法：`select('kind'` 或 `useSelected('kind'`。 */
+const consumerOf = (kind) => new RegExp(`\\b(?:select|useSelected)\\(\\s*'${kind}'\\s*[,)]`);
 
 /**
  * 先把注释剥掉再匹配。
@@ -152,6 +205,11 @@ const instances = [];
 const localSelection = [];
 const localKindDefs = [];
 
+const vocab = readVocab();
+const consumerRegex = vocab.map((kind) => [kind, consumerOf(kind)]);
+/** 每个词表项的消费点（`文件:行`）。空的那一类就是"槽位建了、没人选中过它"。 */
+const consumersByKind = new Map(vocab.map((kind) => [kind, []]));
+
 for (const file of files) {
   const rel = path.relative(ROOT, file);
   const lines = stripComments(readFileSync(file, 'utf8')).split('\n');
@@ -166,6 +224,9 @@ for (const file of files) {
     }
     if (KIND_DEFINITION.test(line)) {
       localKindDefs.push(`${rel}:${i + 1}`);
+    }
+    for (const [kind, re] of consumerRegex) {
+      if (re.test(line)) consumersByKind.get(kind).push(`${rel}:${i + 1}`);
     }
   });
 }
@@ -195,8 +256,16 @@ if (localSelection.length > 0) {
 
 // C：词表只能在 packages/app-host 定义。
 if (localKindDefs.length > 0) {
+  failures.push(`断言 C：宿主里重新定义了 SelectableKind（词表只有一个家）：\n  ${localKindDefs.join('\n  ')}`);
+}
+
+// D：词表里**每一类**都得有宿主真的选中过它。
+const orphans = vocab.filter((kind) => consumersByKind.get(kind).length === 0);
+if (orphans.length > 0) {
   failures.push(
-    `断言 C：宿主里重新定义了 SelectableKind（词表只有一个家）：\n  ${localKindDefs.join('\n  ')}`,
+    `断言 D：这些类别在两个宿主里没有任何一处 select/useSelected（每类应 ≥1）：\n  ${orphans.join(', ')}\n` +
+      `  「槽位建了、界面上没有这个功能」是本仓库记过四次的形状（tagIds 那段是原件）。\n` +
+      `  要么让某个宿主真的选中它，要么从 SELECTABLE_KINDS 删掉 —— 等真有详情面再加回来。`,
   );
 }
 
@@ -207,7 +276,8 @@ if (failures.length > 0) {
   process.exit(1);
 }
 
+const counts = vocab.map((kind) => `${kind} ${consumersByKind.get(kind).length}`).join(' / ');
 console.log(
   `✅ 选中态只有一个所有者：${REQUIRED_STORE_INSTANCES} 份实例（${HOSTS.join(', ')}）` +
-    `，宿主内本地选中态 0 处，词表定义 0 处`,
+    `，宿主内本地选中态 0 处，词表定义 0 处，词表 ${vocab.length} 类全有消费者（${counts}）`,
 );
