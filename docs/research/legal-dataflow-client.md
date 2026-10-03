@@ -143,7 +143,9 @@
 ### 导入入口（哪些端有）
 - **Web**：`apps/web/src/features/settings/ImportPanel.tsx`（还原 heyta 自己的导出文件）→ `restoreIntoEmptyTarget`（`apps/web/src/lib/oplog.ts:478-483`）。🔴 **只支持还原到空库**，非空目标在写之前拒绝（`oplog.ts:474`），不做「合并到已有数据」。另有 `TickTickImportPanel.tsx`（从滴答清单导入，走普通 op、可与既有数据共存，是**另一件事**）。
 - **node-host CLI**：`cli.ts:420` `parseExportDocument(readFileSync(inPath))` → `restoreExport`/`restoreIntoEmptyTarget`（`apps/node-host/src/host.ts:171`）。
-- **移动端**：🔴 **没有导入入口**（与 AGENTS §9 一致：「导入只有 Web 与 CLI，移动端没有」）。移动端拿到的东西导不回来。
+- **移动端**：✅ **有导入入口（2026-10-03 goal 批五落地）** —— 「我的 → 导出数据」页的「从备份还原」卡：选文件（`@react-native-documents/picker` + 本机读取通道）或粘贴 JSON 两条路 → `parseExportDocument` 预检并展示 counts → 确认 → `restoreIntoEmptyTarget`。与 Web 同一条口径：**只支持还原到空库**，非空目标在写之前拒绝。
+  ⚠️ 原文写「移动端没有导入入口 / 拿到的东西导不回来」，已被批五推翻（AGENTS 第 3 项同步更正）。
+  🔴 **数据流事实（政策口径要用这条，不是"导不回来"）**：还原回来的 op 带的是**备份来源设备**的 `clientId`，服务端 `validateOp` 对不匹配的署名逐条回 `INVALID_CLIENT_ID` ⇒ **这些 op 不会上行**，还原结果只存在于该设备本地。移动端的界面文案按此改写（含"只在这台设备上"），设备级判据 `scripts/verify-mobile-restore.sh` 会钉住这句文案。
 
 ---
 
