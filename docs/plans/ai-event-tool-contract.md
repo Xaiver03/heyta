@@ -1064,6 +1064,37 @@ console.log("只在载体:", a.filter(x=>!b.includes(x)).join(",")||"(无)");
 差集**只有一条** `check:op-log-semantics`（并行会话**未提交**的 `package.json` 改动），
 载体侧零条独有 ⇒ 两边不是两套标准，只差那一段。
 
+**①b `pnpm -r test` 的用例数也从盘上日志重量了**（Phase A 那份 `test.log`，
+命令与 AGENTS 那条"沙箱里复现"的口径一致：`--filter '!@heyta/sync-server'`）。
+🔴 数之前**先剥 ANSI**：vitest 的颜色码夹在 `Tests` 与数字之间，
+`grep -E "Tests +[0-9]+ passed"` 在未剥色的日志上恒 0 —— 这就是 traps #163 的形状，
+我第一趟正好踩出了那个"0 包"的空测量。
+
+逐包（19 个包全有 summary 行）：
+
+| 包 | passed | | 包 | passed |
+|---|---:|---|---|---:|
+| `apps/landing` | 1303 | | `packages/storage` | 314 |
+| `apps/web` | 1530 (+12 skipped) | | `packages/sync-core` | 282 |
+| `packages/app-host` | 1078 | | `packages/ai` | 223 |
+| `packages/domain` | 828 | | `packages/widget-core` | 193 |
+| `apps/mobile` | 538 | | `apps/node-host` | 165 |
+| `packages/ui` | 442 | | `packages/local-api` | 146 |
+| `packages/design-system` | 489 | | `packages/sync-client` | 84 |
+| `packages/op-log` | 51 | | `packages/shared-schema` | 80 |
+| `packages/legal` | 59 | | `packages/i18n` | 22 |
+| | | | `apps/desktop` | 12 |
+
+**合计 7839 passed / 12 skipped / 0 failed。**
+⚠️ 因此 **AGENTS §6 那句"当前 2592 个通过 + 12 个跳过"已经过期到只剩三分之一不到**
+（同一命令、同一 filter 量的）。改 `AGENTS.md` 属 §8 里"要用户明确要求"那一类，
+所以这里只登记读数与现量命令，**不代改**。
+📌 上面这张表**逐包复核过**：用一个独立解析器把 `test.log` 里的 19 行 summary
+重新抽出来，与表内 19 条**逐一相等**、合计同为 7839、failed 行 0 条。
+第一版解析器按 `> <pkg> test` 找包名，**匹配 0 行**（实际形状是
+`<pkg> test:      Tests  N passed`）—— 又是一次"空测量看着最干净"，
+所以判"表没问题"之前先要证明解析器能抓到已知存在的行。
+
 **② `PROGRESS.md` / `BLOCKED.md` 这一轮的"逐条打勾"没有做**，不是忘了，是不该在此刻做：
 主检出里这两份**正被别人写着**（实测 `git status --porcelain` 对两者都回 `M`），
 而共享工作树里整文件提交会把对方未提交的段落**抹回 HEAD**（本仓 2026-09-30 有先例，
@@ -1081,3 +1112,68 @@ git status --porcelain -- PROGRESS.md BLOCKED.md   # 必须是空才动
 他们那一趟的读数会因此变红。等他们的验收都停了再动，且用 `--only` 逐路径、不 push。
 
 **④ push 与生产部署**：按本 Goal 的红线属共享状态动作，**没有当前明确授权不执行**。
+
+---
+
+### 15.7 Phase B 那条红 `check:ai-e2e`：归因到"两趟共用 4318/4319"，不是产品坏了（单窗口复验在跑）
+
+先给读数（只认 summary 行与退出码）：
+
+| 项 | 读数 | 出处 |
+|---|---|---|
+| 载体 | `5fe19343` | `/tmp/heyta-intg-chain-175109/runner.log` |
+| 整链 | `rc=1`（17:59:39） | `check-rc.txt` |
+| 失败段 | 只有 `check:ai-e2e` | `check.log` |
+| e2e summary | **2 failed / 2 flaky / 2 skipped / 111 passed (5.8m)** | `check.clean.log:1589` 附近 |
+| failed 两条 | `ai-duration.spec.ts:36` 与 `:92`，各带 `retry #1` | 同上 `:1206-1209` |
+| 报错原文 | 「不应该发出任何模型请求，实际收到：[...]」，`Expected: 0 / Received: 1`，落在 `helpers.ts:103` | `:1352-1450` |
+| flaky 两条 | `ai-capture.spec.ts:50`、`ai-prioritize.spec.ts:50`（都是"等假端点收到精确次数"的那族） | `:1590-1591` |
+
+**为什么判定是两趟并发共用同一对端口，而不是产品缺陷** —— 四段代码读数 + 一条只有并发能解释的现象：
+
+1. `e2e/tests/helpers.ts:36` 把假端点写死成 `http://127.0.0.1:4319`；
+   `e2e/stub-provider.mjs:33` 虽然有 `STUB_PORT` 环境变量，但 **helpers 与
+   `playwright.config.ts` 都不读它** ⇒ 并发两趟**没有端口隔离**，只能抢同一个进程。
+2. `playwright.config.ts:29 / :50` 是 `fullyParallel: false` + `workers: 1`
+   ⇒ **同一趟内部不存在"两个 worker 互相污染计数"** 这条路。计数被污染只能来自进程外。
+3. 计数是**假端点进程里的一份全局账**（`tests/helpers.ts:68-73` 的注释自己写着
+   "整个测试运行只启动一次，所以它是跨用例共享的"，靠每条用例开头 `resetStub` 清零）。
+4. `scripts/check-ai-e2e-preflight.mjs:37 / :83`：起 e2e 前把**任何**监听
+   4318/4319 的进程 `SIGKILL` —— 它按端口杀，**不认是谁的**。
+   时间线实测：我的 e2e 窗口开在 17:52:09，对方（主检出）`pnpm check` pid 20014
+   起于 17:50:49、其 `check:ai-e2e` pid 37239 起于 **17:53:25**。
+   ⇒ 对方的 preflight 把我的 stub/vite 杀了并绑上自己的，我那趟之后的
+   `GET /__requests` 读的就是**对方那趟的账**。
+
+只有并发能解释的那一条：同一条用例 `ai-duration:36` 第一次看到的是
+`feature:"breakdown"`，`retry #1` 看到的是 `feature:"capture"`。重试**只重跑这一条**，
+而我那趟里 `ai-breakdown`/`ai-capture` 早已跑完（单 worker、顺序确定）——
+"上一族的在途请求"解释不了两次不同的特征，更解释不了第二次那条是**更晚**的族；
+能解释的只有"另有一趟正在按自己的顺序往前走"。
+
+🔴 **不许套用旁边那句现成的解释**：`playwright.config.ts:39` 写着
+`ai-duration:36` 是"前一族把它拖慢而偶发超时"的已知负载型 flake。
+那说的是**超时**；这次的报错是**多收到一次模型请求**，形状不同。
+把这条红登记成"已知 flake"就是拿标签代替读数。
+
+**对称风险，如实披露**：我那趟 17:52:09 的 preflight 同样按端口杀过
+4318/4319 上的进程 —— 也就是**我很可能打断了对方的验收**，
+而不只是"对方的验收脏了我"。这是 traps #87 的第二张面孔：#87 记的是"抢别人的 dev server"，
+这里被抢的是**带着计数的那份假端点**，后果从"白跑一趟"升级成"报出一条不属于任何产品的红"。
+
+**决定性复验（这才是判据，上面只是归因）**：单窗口重跑，闸门比之前更硬 ——
+不仅过负载门，还要求 `ps` 里**没有别人的** `bin/pnpm check` / `check:ai-e2e` /
+`check:privacy-consent-e2e` / `check:landing-e2e` 才起跑：
+
+```bash
+bash /tmp/heyta-e2e-alone.sh    # 载体见 $OUT/runner.log；读数 $OUT/e2e.log + $OUT/rc.txt
+```
+
+- 若 `rc=0` ⇒ 记"链上那条红 = 并发共用假端点的计数污染"，本条闭环；
+- 若仍红 ⇒ 它是**真缺陷**，在载体上直接修 `ai-duration.spec.ts:36/:92`，不改判据。
+
+**结构性修法（登记，本轮不做）**：让 `STUB_ORIGIN`/`baseURL`/preflight 端口都从
+`STUB_PORT`/`WEB_PORT` 取（默认值保持 4319/4318 不变），并发两趟就能各起一套、
+既不互相 `SIGKILL` 也不共读一份计数。没在此刻做的理由：这三处是**三个并行会话都在跑的
+共享 e2e 基础设施**，改它属于跨条线动作，而本 Goal 的四件事不含它；且改完必须
+用"同时起两趟"来证明它真的有牙，否则只是把常量换了个来源。
