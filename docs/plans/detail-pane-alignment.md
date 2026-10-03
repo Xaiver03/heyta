@@ -822,3 +822,23 @@ mobile 的 bundle 未证（载体不可用）**。§7 第 27 条那个"APK 里�
 剩下的未知全在移动端载体上，而那正是 §8.10 与 §8.14 第 2 条说的那一步要在
 **有自己一份 `node_modules` 的隔离检出**里跑的理由。
 
+### 3. 工单 §1 的第四道闸门：干净检出复跑（06:2x 现量，顺带换了一种更安全的臂形状）
+
+`git worktree add --detach /tmp/heyta-dp-clean 1cd39ddc`（一次性检出，**不装任何依赖**），
+把源码扫描类门禁全部搬过去跑：
+
+`empty-state` / `layering` / `selection-single-source` / `row-single-source` / `l4-no-style` /
+`migrations` / `ui-language` / `design` ⇒ **八道全 RC=0**。
+
+🔴 更值钱的是第二半：**把 §8.14 的 E1 臂也搬进去重跑** —— 在干净树里把手写空态注回
+`FocusDetailPane.tsx`，`check:empty-state` 同样 **RC=1** 且点名同一个文件、同一个形态
+（`形态：空态 testid`）。⇒ 那条红与那条绿都**不依赖混合工作树**（不是"只在活树里成立"的第三种门禁红）。
+
+📌 顺手记一条**臂的更好形状**：变异跑在一次性检出里，`restore` 这一步就**不存在**了 ——
+不需要 sha256 比对、不会发生 §8.9 第 5 条那次"`git restore` 连自己未提交的修复一起抹掉"的事故，
+也不需要"防留场"的收尾断言。代价是一次 `git worktree add` + 一次 `remove --force`（本单实测：
+纯 node 门禁不需要 `node_modules`，所以连软链都不用搭）。
+⇒ **只对源码扫描类判据成立**；jsdom / e2e 那两层要读 `node_modules` 与 `dist`，
+仍得留在带软链的检出里跑（那两层的臂就继续用 sha256 复原比对）。
+
+
