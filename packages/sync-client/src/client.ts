@@ -384,6 +384,21 @@ export type SyncFailureReason =
    */
   | 'unauthorized'
   /**
+   * 服务端说**这个账号已经注销了**（稳定码 `ACCOUNT_CLOSED`，E1 落的）。
+   *
+   * 🔴 必须与 `'unauthorized'` 分开，因为两句话要用户做的事**正好相反**：
+   *   · `'unauthorized'` = 凭据过期/被别的设备登出/改了口令 ⇒「重新登录，数据都在」。
+   *     那一条的立场是「**绝不清本地数据**」，本地库是唯一可读的事实源（D5）。
+   *   · 这一条 = 账号这个法律主体没了 ⇒「重新登录是不可能的」，
+   *     而按 ADR-0048 的承诺，本机那份明文**必须**跟着消失。
+   * 合成一条的结果只能是两种错之一：把注销读成"再登录一次就好"（明文永远留着），
+   * 或把口令打错读成"账号没了"（**当场毁掉用户的数据**）。后者是不可逆的，
+   * 所以这一条的判据必须**只认稳定码，绝不认文案、绝不认状态码本身**。
+   *
+   * ⚠️ `retryable: false`：注销不会因为你再试一次就撤销。
+   */
+  | 'account-closed'
+  /**
    * 🔴 **用户还没有同意隐私规则，所以一个请求都不许发**（计划 G-12）。
    *
    * 由宿主判断，不是这个包 —— 与 `'not-configured'` 同一类。
@@ -589,6 +604,23 @@ export type SyncClientOptions = SyncEncryptionOptions & {
 
   /** 冲突判定为"远端胜出"时，把本地这条移出上传队列（不删除）。 */
   discardLocal: (opIds: string[]) => Promise<void>;
+
+  /**
+   * 服务端报出 `ACCOUNT_CLOSED` 时的处置：**把本机这份明文库真的销毁**。
+   *
+   * 🔴 客户端**先 await 这个回调，再上报状态**。顺序是有牙的：
+   * 反过来的话界面会先显示"账号已注销，数据已清除"，而销毁还在排队 ——
+   * 那一瞬间界面在说谎，而这句话是隐私承诺的落点（ADR-0048）。
+   *
+   * ⚠️ **没装回调时不许静默**。这条路径存在的唯一理由就是"信号收到了、
+   * 本机却什么都没少"（本仓库 §10.2 量的正是这个），所以缺回调会
+   * ① 打一条 console.error，② 把"本机明文仍在"写进 `message` 让界面能露出来。
+   * 具体清哪些存储由**宿主**决定（`@heyta/app-host` 的 local-erasure 注册表），
+   * 因为这个包不知道 IndexedDB / OPFS / localStorage 长什么样。
+   *
+   * 幂等：可能每次同步都被调一次（`SyncClient` 不缓存、每次重建）。
+   */
+  onAccountClosed?: () => Promise<void>;
 
   /**
    * 服务端**永久拒绝**时，把这些 op 移出上传队列（不删除、**不标成已上传**）。
@@ -891,6 +923,21 @@ export class SyncClient {
       }
       const message = error instanceof Error ? error.message : String(error);
       /**
+       * 🔴 账号注销的判定必须在 `'unauthorized'` **之前**，两边都不能省。
+       *
+       * 顺序错了：注销被读成"重新登录"，本机明文永远留着。
+       * 只留一条：`401 ACCOUNT_CLOSED` 在两种读法下都合法，于是同一份响应
+       * 一会儿毁数据、一会儿留数据 —— 那比没有判据更难查。
+       */
+      if (isAccountClosedFailure(error)) {
+        return report({
+          kind: 'error',
+          reason: 'account-closed',
+          retryable: false,
+          message: await this.eraseLocalData(message),
+        });
+      }
+      /**
        * 🔴 令牌被拒**先于**离线判定，且**不可重试**。
        *
        * 落到下面那条通用通道意味着 `retryable: true` —— 退避调度器会拿着
@@ -907,6 +954,39 @@ export class SyncClient {
           ? { kind: 'offline', since: this.now() }
           : { kind: 'error', reason: 'unexpected', message, retryable: true },
       );
+    }
+  }
+
+  /**
+   * 账号注销时销毁本机数据，并把**处置结果**写成一句诊断（进 `message`）。
+   *
+   * 🔴 三种结局必须能区分，因为界面和取证都要回答"本机到底清了没有"：
+   *   · 宿主没装销毁器 → `console.error` + 「本机明文仍在」。
+   *     这一条不是装饰：批次 E 量的原始缺陷就是"信号收到了、没人清"，
+   *     而它当时**一个字节都不报**。
+   *   · 销毁器抛错 → 同样响亮，并把原因带出去（**不重试**：清不干净是环境问题，
+   *     不是再来一次就好的事）。
+   *   · 成功 → 只说"已按宿主的销毁器清除"，**不宣称"彻底销毁"** ——
+   *     备份与别的设备不在这次操作的作用域里（ADR-0048 的分层实话）。
+   */
+  private async eraseLocalData(diagnostic: string): Promise<string> {
+    const eraser = this.options.onAccountClosed;
+    if (eraser === undefined) {
+      // eslint-disable-next-line no-console -- 本机没清就必须留下痕迹，见上面那段。
+      console.error(
+        '[heyta] 服务端报出 ACCOUNT_CLOSED，但这个宿主没有安装本机销毁器：本地明文仍在。' +
+          ' 请给 createSyncClient 传 onAccountClosed（或经 @heyta/app-host 注册销毁器）。',
+      );
+      return `${diagnostic} — 本机明文仍在（宿主未安装销毁器）`;
+    }
+    try {
+      await eraser();
+      return `${diagnostic} — 本机数据已按宿主的销毁器清除（备份与其它设备不在此范围）`;
+    } catch (cause) {
+      // eslint-disable-next-line no-console -- 清不干净是要人来看的事，不是要吞的异常。
+      console.error('[heyta] 账号已注销，但本机数据销毁失败', cause);
+      const reason = cause instanceof Error ? cause.message : String(cause);
+      return `${diagnostic} — 本机数据没能清干净：${reason}`;
     }
   }
 
@@ -1615,24 +1695,38 @@ export class SyncClient {
 export class SyncHttpError extends Error {
   readonly status: number;
 
-  constructor(status: number, detail: string) {
+  /**
+   * 服务端给的**稳定码**（`ACCOUNT_CLOSED` / `E2EE_REQUIRED` / …），原样留着。
+   *
+   * 🔴 必须有它：`status` 只能说"这枚令牌不行"，说不了"**为什么**不行"，
+   * 而注销账号与改口令/被踢下线在 `401` 上是**同一个状态码**。
+   * 少了这个字段，客户端要判"账号没了"就只剩对 `detail` 那句**文案**做匹配 ——
+   * 那是本文件已经写过两次的失败模式（见 `SyncHttpError` 文件头与
+   * `isNetworkError` 的注释）。状态码不能只进文案不进类型，稳定码也一样。
+   */
+  readonly code: string | undefined;
+
+  constructor(status: number, detail: string, code?: string) {
     super(`同步请求失败：HTTP ${String(status)}${detail === '' ? '' : ` — ${detail}`}`);
     this.name = 'SyncHttpError';
     this.status = status;
+    this.code = code;
   }
 }
 
 /** 把非 2xx 响应变成带服务端信息的错误。 */
 async function toHttpError(res: Response): Promise<SyncHttpError> {
   let detail = '';
+  let code: string | undefined;
   try {
-    const body = (await res.json()) as { error?: string; message?: string };
+    const body = (await res.json()) as { error?: string; message?: string; code?: string };
     detail = body.error ?? body.message ?? '';
+    code = body.code;
   } catch {
     // 响应体不是 JSON —— 不要因为解析失败而丢掉状态码
     detail = '';
   }
-  return new SyncHttpError(res.status, detail);
+  return new SyncHttpError(res.status, detail, code);
 }
 
 /**
@@ -1648,6 +1742,23 @@ async function toHttpError(res: Response): Promise<SyncHttpError> {
  */
 export function isUnauthorizedFailure(error: unknown): boolean {
   return error instanceof SyncHttpError && (error.status === 401 || error.status === 403);
+}
+
+/**
+ * 服务端用来标"账号已注销"的**稳定码**（E1 在 middleware 里发的）。
+ *
+ * 🔴 判定**只认这个码，不认状态码、不认文案**。理由不是洁癖：
+ * 这一条判据的下游动作是**销毁本机数据**，误判的代价是不可逆的。
+ *   · 状态码不行：`401` 同时是"令牌过期"（改口令、别的设备登出）的答复，
+ *     而那些情形下正确的动作恰恰是**什么都不删**（`'unauthorized'` 那条）。
+ *   · 文案不行：本文件已经有两处踩过"对一句随时会变的中文做正则"（见
+ *     `isNetworkError` 与 `SyncHttpError` 的注释）。
+ */
+export const ACCOUNT_CLOSED_CODE = 'ACCOUNT_CLOSED';
+
+/** 这次的失败是不是"账号没了"（而不是"这枚令牌没了"）。 */
+export function isAccountClosedFailure(error: unknown): boolean {
+  return error instanceof SyncHttpError && error.code === ACCOUNT_CLOSED_CODE;
 }
 
 /**

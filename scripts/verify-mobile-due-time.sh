@@ -295,6 +295,15 @@ if [ "$NEWEST_SRC" -gt "$APK_MT" ]; then
   exit 3
 fi
 ok "APK 不比源码旧（APK $(date -r "$APK_MT" '+%F %T') ≥ 最新源码 $(date -r "$NEWEST_SRC" '+%F %T')）"
+# 🔴 读数要能归因到**具体那一枚产物**：mtime 只说"新不新"，说不了"是哪一份"。
+# 并行会话在同一个路径上重打过 APK（本仓 §7 #27 那一族），事后拿日志对源码时
+# 只有内容指纹能回答"这轮装进去的到底是哪个字节集合"。
+APK_SHA=$(shasum -a 256 "$APK" 2>/dev/null | awk '{print $1}')
+if [ -z "$APK_SHA" ]; then
+  echo "   ❌ 取不到 APK 的 sha256（shasum 失败或文件不可读）—— 这轮的产物无法归因" >&2
+  exit 3
+fi
+echo "   APK sha256=${APK_SHA} size=$(stat -f %z "$APK")"
 
 DEV_TZ=$($ADB shell getprop persist.sys.timezone 2>/dev/null | tr -d '\r')
 if [ -z "$DEV_TZ" ]; then
@@ -322,7 +331,21 @@ rm -f "$LAPTOP_DB"
 
 # ── 第 1 步：装包、离开首启覆盖层、配凭据
 step "1. 装包并启动"
-$ADB install -r "$APK" 2>&1 | tail -1 | sed 's/^/   /'
+# 🔴 原来这一行是 `$ADB install -r "$APK" 2>&1 | tail -1 | sed …`：管道的退出码是 sed 的（§7 #45），
+# 装失败**什么都不会说**，然后继续用设备上那台旧包跑完整轮判据 —— 假绿形状与 #27 同一个。
+INSTALL_OUT=$($ADB install -r "$APK" 2>&1)
+INSTALL_RC=$?
+printf '%s\n' "$INSTALL_OUT" | sed 's/^/   /'
+if [ "$INSTALL_RC" -ne 0 ]; then
+  bad "adb install 退出码 $INSTALL_RC ⇒ 停：装失败还往下跑，验的是设备上残留的旧包"
+  screen_txt
+  exit 1
+fi
+if ! printf '%s\n' "$INSTALL_OUT" | grep -q "Success"; then
+  bad "adb install 退出码 0 但输出里没有 Success —— 不能把「命令没报错」当「装上了」（AGENTS §6.1.1）"
+  exit 1
+fi
+ok "安装成功（rc=0 且输出含 Success；APK sha256=${APK_SHA:-未取}）"
 $ADB shell pm clear $PKG >/dev/null 2>&1
 $ADB shell am force-stop $PKG; sleep 1
 launch_app; sleep 6

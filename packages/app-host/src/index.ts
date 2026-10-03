@@ -90,6 +90,7 @@ export {
   cancelVaultPayloadMigration,
   cancelVaultPayloadMigrationForScope,
   createVaultMigrationJournal,
+  acknowledgeVaultPayloadMigration,
   migrateVaultPayloads,
   VAULT_KEY_MIGRATION_INVENTORY_PATH,
   VAULT_KEY_MIGRATION_PATH,
@@ -152,6 +153,18 @@ export {
 } from './sync-wiring.js';
 
 export { newTaskId, randomId, usingRandomIdFallback } from './ids.js';
+
+/**
+ * 本机数据销毁器：宿主在自己的启动路径注册，`createSyncClient()` 在共享接缝
+ * 装默认回调（为什么是注册表而不是逐端传参，见 `local-erasure.ts` 文件头）。
+ */
+export {
+  eraseLocalData,
+  hasLocalEraser,
+  lastErasureReports,
+  type LocalEraser,
+  registerLocalEraser,
+} from './local-erasure.js';
 
 /**
  * 权益探测。**所有宿主共用这一份** —— 见 `entitlement.ts` 文件头：

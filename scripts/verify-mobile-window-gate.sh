@@ -112,7 +112,19 @@ case "$TARGET" in
     if [ -z "$(printf '%s' "$BOOTED" | tr -d '[:space:]')" ]; then
       warn "没有已启动的 iOS 模拟器 —— B 的 ios 段会判红（脚本如实报因，不硬装）"
     else
-      pass "有已启动的模拟器：$(printf '%s; ' $BOOTED)"
+      # 🔴 `$BOOTED` 不加引号会被**按空格分词**：一台叫 `iPhone Duo heyta` 的模拟器
+      # 会打印成 `iPhone; Duo; heyta`（01:2x 实测），三个名字看着像六台。
+      # 显示错了不要紧，要紧的是它让人以为"名字里没空格"，而下面 --confirm 取的
+      # 是真名字 —— 两边对不上就会有人怀疑赋值那一侧。逐行读，保留空格。
+      BOOTED_LIST=$(printf '%s\n' "$BOOTED" | while IFS= read -r n; do [ -n "$n" ] && printf '%s; ' "$n"; done)
+      pass "有已启动的模拟器：${BOOTED_LIST%; *}"
+      BOOTED_N=$(printf '%s\n' "$BOOTED" | grep -c '[^[:space:]]')
+      if [ "$BOOTED_N" -gt 1 ]; then
+        # ⚠️ 故意**不进 FAIL**：这台机器常年三台 booted，把它做成前置就等于
+        # 一条天生红的门禁（AGENTS §8.3）—— 那不是"更安全"，是"没人会再跑它"。
+        # 它的作用只是把"取哪一台"这件事从静默变成打印出来可否认。
+        echo "   ⚠️ $BOOTED_N 台模拟器同时 booted —— --confirm 默认取列表第一台；要指定另一台就显式传 IOS_DEVICE_NAME"
+      fi
     fi
     CMD="IOS_DEVICE_NAME=\"<上面现取的名字>\" bash scripts/reinstall-all.sh"
     ;;
@@ -210,7 +222,16 @@ fi
 echo "   窗口开着，--confirm 已给，开始执行："
 echo "     $CMD"
 if [ "$TARGET" = "b" ]; then
-  IOS_NAME=$(printf '%s\n' "$BOOTED" | head -1)
+  # 🔴 原来这里无条件取 booted 列表的第一台。现场有**三台** booted（01:2x 现量），
+  # 而 `reinstall-all.sh` 的 ios 段会对它拿到的名字做 `simctl uninstall` ——
+  # "列表第一台"不是"我要的那台"，选错的代价是卸掉别人正在用的模拟器（§7 #169）。
+  # ⇒ 外部显式传的优先；没传才回落到第一台，并且**把取到的名字打出来**让人能否证。
+  IOS_NAME="${IOS_DEVICE_NAME:-$(printf '%s\n' "$BOOTED" | head -1)}"
+  if [ -z "$(printf '%s' "$IOS_NAME" | tr -d '[:space:]')" ]; then
+    echo "❌ iOS 目标取不到设备名（外部没传 IOS_DEVICE_NAME，且 booted 列表为空）—— 停，不让脚本自己猜目标" >&2
+    exit 3
+  fi
+  echo "   iOS 目标设备名 = [$IOS_NAME]（来源：${IOS_DEVICE_NAME:+外部显式传入}${IOS_DEVICE_NAME:-booted 列表第一台}）"
   IOS_DEVICE_NAME="$IOS_NAME" bash scripts/reinstall-all.sh
 else
   bash scripts/verify-mobile-due-time.sh

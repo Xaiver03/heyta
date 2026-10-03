@@ -26,6 +26,8 @@ import {
   applyFeedbackCorrections,
   applyPreferenceCorrections,
   computeFocusGaps,
+  emptyFeedbackPreferenceSet,
+  emptyPreferenceSet,
   groupTasksByDate,
   inferFeedbackPreferences,
   inferPreferences,
@@ -662,18 +664,38 @@ export function App(): React.JSX.Element {
    * 被抑制的偏好已经不在纠正后的集合里了。
    */
   const memory = useMemo(() => {
+    /**
+     * 🔴 总开关关着时**一个集合都不取**。
+     *
+     * `inferPreferences` 内部本来就有这道闸门（`memoryEnabled:false` ⇒ 空集），
+     * 但实参在**调用点先求值**：`Object.values(store.entities.tasks)` 会把整张任务表
+     * 物化成数组，`focusSessions` / `aiFeedback` / `preferenceCorrections` 同理。
+     * 闸门在被调方里 ⇒ 关着的时候照样付全额的 O(全部实体)，付完立刻扔掉。
+     *
+     * 隐私语义也要求这一刀在**取数之前**：ADR-0014 的承诺是"关着就不推断",
+     * 而不是"推断完不显示"。放在这里之后，关闭态连一次属性读取都不发生。
+     */
+    if (aiSettings.memoryEnabled !== true) {
+      return {
+        preferenceSet: emptyPreferenceSet(false),
+        feedbackSet: emptyFeedbackPreferenceSet(false),
+        rawPresentIds: [] as string[],
+        corrections: [] as { id: string; preferenceId: string; kind: 'suppress'; deletedAt?: number }[],
+        focusGaps: null,
+      };
+    }
+
     const offsets = { now: Date.now(), utcOffsetMinutes: -new Date().getTimezoneOffset() };
 
     /**
      * 🔴 「说的 vs 做的」落差 —— 记忆护城河第一次真正接到界面上。
      *
-     * 只在**记忆开启**且**事件流已就绪**时计算：
-     *   - 关闭时连算都不算（隐私红线：不留"算了但没显示"的中间态）；
+     * 只在**事件流已就绪**时计算：
      *   - `opWindow === null` 时传 `null`，面板据此说明"暂时算不出推迟次数"
      *     —— 绝不能退化成"推迟 0 次"（那是编造）。
      */
     const focusGaps =
-      aiSettings.memoryEnabled === true && opWindow !== null
+      opWindow !== null
         ? computeFocusGaps({
             tasks: Object.values(store.entities.tasks),
             focusSessions: Object.values(store.entities.focusSessions),

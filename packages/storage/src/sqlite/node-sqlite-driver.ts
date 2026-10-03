@@ -14,7 +14,9 @@
 
 import { DatabaseSync } from 'node:sqlite';
 
-import type { SqliteDriver, SqlValue } from './sqlite-driver.js';
+import { rmSync } from 'node:fs';
+
+import type { SqliteContainerRemoval, SqlValue, SqliteDriver } from './sqlite-driver.js';
 
 export class NodeSqliteDriver implements SqliteDriver {
   private db: DatabaseSync | undefined;
@@ -41,6 +43,37 @@ export class NodeSqliteDriver implements SqliteDriver {
     if (this.db === undefined) return;
     this.db.close();
     this.db = undefined;
+  }
+
+  /**
+   * 删掉库文件，连带 SQLite 的旁挂文件。
+   *
+   * 🔴 `-wal` 与 `-shm` 必须一起删：只删主文件会留下一份 **能把明文重放出来的日志**
+   *  （WAL 里是已提交但尚未回填进主文件的页）。这三个必须一起处置。
+   *
+   * ⚠️ `:memory:` 没有文件 —— 关掉连接就是销毁，直接报"容器没了"。
+   */
+  removeDatabase(): SqliteContainerRemoval {
+    const target = this.path;
+    if (target === ':memory:') return { target, containerRemoved: true };
+
+    let failure: unknown;
+    for (const suffix of ['', '-wal', '-shm']) {
+      try {
+        // `force: true` 让"文件本来就不存在"是成功而不是错误（幂等）。
+        rmSync(target + suffix, { force: true });
+      } catch (error) {
+        failure ??= error;
+      }
+    }
+    if (failure !== undefined) {
+      return {
+        target,
+        containerRemoved: false,
+        reason: `删除库文件失败：${failure instanceof Error ? failure.message : String(failure)}`,
+      };
+    }
+    return { target, containerRemoved: true };
   }
 
   private requireDb(): DatabaseSync {

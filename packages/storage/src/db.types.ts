@@ -93,6 +93,31 @@ export interface DbIterateOptions {
 }
 
 /**
+ * {@link DbAdapter.destroy} 的返回值 —— **一次销毁的书面凭据，不是成功标志位**。
+ *
+ * 🔴 为什么要有这个形状：注销账号承诺的是"这台设备上的我不见了"，
+ * 而"把每张表的行删干净"与"那个文件/那个库真的不存在了"是**两件事**。
+ * 只回 `Promise<void>` 的 destroy 会让第一件读起来像第二件 ——
+ * 那是政策里最贵的一类假话（见 ADR-0048 与隐私政策那句分层实话）。
+ *
+ * ⚠️ 调用方**必须把 `containerRemoved === false` 说出去**（界面或日志），
+ * 不许把它折叠成"已销毁"。
+ */
+export interface DbDestroyReport {
+  /** 销毁对象的标识（库名 / 文件名 / `:memory:`），用于把凭据对上号。 */
+  readonly target: string;
+  /**
+   * true = 持久容器本身（库文件、IndexedDB 数据库）已经不在了。
+   * false = 只清空了内容，容器还在（残留页理论上可被取证恢复）。
+   */
+  readonly containerRemoved: boolean;
+  /** `containerRemoved === false` 时**必须**给出原因（缺了就说不清它为什么没成）。 */
+  readonly reason?: string;
+  /** 被清掉的 store 数量 —— 判据用它钉"清空这件事确实扫过了全部表"。 */
+  readonly storesCleared: number;
+}
+
+/**
  * 事务句柄。只有通过 {@link DbAdapter.transaction} 列出的 store 才能被访问。
  *
  * ⚠️ 本接口**不提供嵌套事务**。嵌套 `transaction` 调用是调用方的 bug，
@@ -212,6 +237,32 @@ export interface DbAdapter {
    * 返回的 Promise 决议时提交，拒绝时回滚。
    */
   transaction<T>(stores: string[], mode: DbTxMode, fn: (tx: DbTx) => Promise<T>): Promise<T>;
+
+  /**
+   * **销毁本机这份明文库**：清空全部 store，并在平台允许时移除持久容器本身。
+   *
+   * 🔴 它**必须在接口上，而且是必填项**。这不是风格问题，是这一条承诺的形状：
+   * 「注销账号 = 这台设备上的我没了」。本仓库对"该在接口上却没在接口上"
+   * 已经付过一次学费 —— `addToleratingDuplicate` 当时只在 IndexedDB 实现上、
+   * 不在接口里，于是新适配器"按接口老实实现"就会在运行时报
+   * `is not a function`（见 {@link DbTx.addToleratingDuplicate}）。
+   * `destroy` 的失败模式更糟：**漏掉它的一端不会报错，只会继续留着用户的明文**，
+   * 而那正是这条承诺唯一要防的事。所以它是必填的 —— 少实现一个就是编译错误。
+   *
+   * 语义（契约测试逐条钉住，见 `tests/contract/adapter.contract.ts`）：
+   *  1. **幂等**：销毁一份已经没了的库不是错误。
+   *  2. **先排空在途事务再动手**：销毁与写入并发时，"写完又落回来"会让
+   *     销毁报告说谎。
+   *  3. **不 `close()` 后就完事**：`close()` 的契约是"后续操作透明重开"，
+   *     它**不删任何东西**；把 close 当 destroy 是本条存在的历史原因。
+   *  4. 返回 {@link DbDestroyReport}：调用方要拿到"容器到底没了没有"的书面凭据。
+   *  5. 之后**这个实例不再保证可用**（调用方应丢弃它）。
+   *
+   * ⚠️ **删干净不等于没有残留**：SQLite 的页在磁盘上可能被恢复，SSD 无法真正
+   * 擦除，备份与日志不在这次操作的作用域里。政策必须按这个边界写
+   * （ADR-0048 与隐私政策的分层实话），代码不许把 report 说得比它做到的更好。
+   */
+  destroy(): Promise<DbDestroyReport>;
 }
 
 /**

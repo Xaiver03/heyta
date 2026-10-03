@@ -9,6 +9,7 @@ import {
   createVaultKeyMigrationRemote,
   createVaultMigrationInventorySource,
   createVaultMigrationJournal,
+  acknowledgeVaultPayloadMigration,
   cancelVaultPayloadMigrationForScope,
   migrateVaultPayloads,
   createVaultKeyPackageRemote,
@@ -35,6 +36,32 @@ let inFlightLoad: {
   epoch: number;
   promise: Promise<VaultKeySession>;
 } | undefined;
+
+/**
+ * Serialize account-local vault mutations with ordinary Web sync.
+ *
+ * Root migration has an inventory/stage/commit window.  A sync started by a
+ * retry timer or the realtime hint must not upload in that window: the
+ * migration manifest pins `latestSeq`, so a local upload there would turn a
+ * perfectly valid migration into a self-inflicted `stale_latest_seq` failure.
+ * The queue is deliberately process-local; writes from another device remain
+ * concurrent and must still be reported by the server.
+ */
+let webSyncMutationTail: Promise<void> = Promise.resolve();
+
+export async function withWebSyncMutationExclusive<T>(action: () => Promise<T>): Promise<T> {
+  const previous = webSyncMutationTail;
+  let release!: () => void;
+  webSyncMutationTail = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  await previous;
+  try {
+    return await action();
+  } finally {
+    release();
+  }
+}
 
 async function packageStore(): Promise<ReturnType<typeof createVaultKeyPackageStore>> {
   if (storePromise !== undefined) return storePromise;
@@ -133,38 +160,46 @@ export async function confirmWebVaultRootRotation(
     onProgress?: (progress: VaultMigrationProgress) => void;
   },
 ): Promise<VaultKeyMigrationResponse> {
-  const adapter = await adapterPromise;
-  if (adapter === undefined) throw new Error('Vault storage is unavailable');
-  const remoteOptions = {
-    baseUrl: options.baseUrl,
-    getToken: async () => options.token,
-  };
-  const currentPayloadKeyVersion = session.payloadKeyVersion ?? null;
-  const targetPayloadKeyVersion = (session.payloadKeyVersion ?? 0) + 1;
-  const migrationRemote = createVaultKeyMigrationRemote(remoteOptions);
-  const journal = createVaultMigrationJournal(adapter);
-  let published: VaultKeyMigrationResponse | undefined;
-  await session.confirmAndMigrateRootRotation(pending, enteredRecoveryCode, async (input) => {
-    published = await migrateVaultPayloads({
-      inventory: createVaultMigrationInventorySource(remoteOptions),
-      remote: migrationRemote,
-      package: input.targetPackage,
-      expectedKeyVersion: input.currentPackage.keyVersion,
-      currentPayloadKeyVersion,
-      targetPayloadKeyVersion,
-      currentRootKey: input.currentRootKey,
-      targetRootKey: input.targetRootKey,
-      ...(currentPayloadKeyVersion === null && options.password !== undefined
-        ? { legacyPassword: options.password }
-        : {}),
-      journal,
-      journalScope: `${session.scope.accountId}\u0000${session.scope.serverOrigin}`,
-      onProgress: options.onProgress,
+  return withWebSyncMutationExclusive(async () => {
+    const adapter = await adapterPromise;
+    if (adapter === undefined) throw new Error('Vault storage is unavailable');
+    const remoteOptions = {
+      baseUrl: options.baseUrl,
+      getToken: async () => options.token,
+    };
+    const currentPayloadKeyVersion = session.payloadKeyVersion ?? null;
+    const targetPayloadKeyVersion = (session.payloadKeyVersion ?? 0) + 1;
+    const migrationRemote = createVaultKeyMigrationRemote(remoteOptions);
+    const journal = createVaultMigrationJournal(adapter);
+    let published: VaultKeyMigrationResponse | undefined;
+    await session.confirmAndMigrateRootRotation(pending, enteredRecoveryCode, async (input) => {
+      published = await migrateVaultPayloads({
+        inventory: createVaultMigrationInventorySource(remoteOptions),
+        remote: migrationRemote,
+        package: input.targetPackage,
+        expectedKeyVersion: input.currentPackage.keyVersion,
+        currentPayloadKeyVersion,
+        targetPayloadKeyVersion,
+        currentRootKey: input.currentRootKey,
+        targetRootKey: input.targetRootKey,
+        ...(currentPayloadKeyVersion === null && options.password !== undefined
+          ? { legacyPassword: options.password }
+          : {}),
+        journal,
+        journalScope: `${session.scope.accountId}\u0000${session.scope.serverOrigin}`,
+        clearJournalOnPublished: false,
+        onProgress: options.onProgress,
+      });
+      return published;
     });
+    if (published === undefined) throw new Error('Vault migration did not publish a result');
+    await acknowledgeVaultPayloadMigration(
+      journal,
+      `${session.scope.accountId}\u0000${session.scope.serverOrigin}`,
+      published.requestId,
+    );
     return published;
   });
-  if (published === undefined) throw new Error('Vault migration did not publish a result');
-  return published;
 }
 
 /** Cancel server staging before dropping the locally encrypted pending draft. */
@@ -172,15 +207,17 @@ export async function cancelWebVaultRootRotation(
   session: VaultKeySession,
   options: { baseUrl: string; token: string },
 ): Promise<void> {
-  const adapter = await adapterPromise;
-  if (adapter === undefined) throw new Error('Vault storage is unavailable');
-  const remoteOptions = {
-    baseUrl: options.baseUrl,
-    getToken: async () => options.token,
-  };
-  const journal = createVaultMigrationJournal(adapter);
-  const remote = createVaultKeyMigrationRemote(remoteOptions);
-  const journalScope = `${session.scope.accountId}\u0000${session.scope.serverOrigin}`;
-  await cancelVaultPayloadMigrationForScope(remote, journal, journalScope);
-  await session.cancelPendingRootRotation();
+  await withWebSyncMutationExclusive(async () => {
+    const adapter = await adapterPromise;
+    if (adapter === undefined) throw new Error('Vault storage is unavailable');
+    const remoteOptions = {
+      baseUrl: options.baseUrl,
+      getToken: async () => options.token,
+    };
+    const journal = createVaultMigrationJournal(adapter);
+    const remote = createVaultKeyMigrationRemote(remoteOptions);
+    const journalScope = `${session.scope.accountId}\u0000${session.scope.serverOrigin}`;
+    await cancelVaultPayloadMigrationForScope(remote, journal, journalScope);
+    await session.cancelPendingRootRotation();
+  });
 }

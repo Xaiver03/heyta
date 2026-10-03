@@ -14,7 +14,7 @@ import {
   createVaultPayloadCipher,
   type SyncPayloadIdentity,
 } from '@heyta/sync-client';
-import type { VaultKeyPackage } from '@heyta/sync-core';
+import { vaultRootKeyFingerprint, type VaultKeyPackage } from '@heyta/sync-core';
 import { META_KEYS, STORES, type DbAdapter } from '@heyta/storage';
 import { randomId } from './ids.js';
 import { joinEndpointUrl } from './endpoint-url.js';
@@ -152,6 +152,12 @@ export interface VaultMigrationOptions {
   journalScope: string;
   /** Keep below the server's 32 MiB payload budget to leave HTTP body headroom. */
   maxChunkPayloadBytes?: number;
+  /**
+   * The low-level orchestrator historically acknowledged a published
+   * migration itself. Production hosts disable that behaviour so the journal
+   * remains durable until the new package/root has been installed locally.
+   */
+  clearJournalOnPublished?: boolean;
   onProgress?: (progress: VaultMigrationProgress) => void;
 }
 
@@ -330,14 +336,40 @@ export async function migrateVaultPayloads(options: VaultMigrationOptions): Prom
     // A journal is the sole resume source after a process restart. It is
     // intentionally checked before inventory/decryption so ciphertext and its
     // nonce are reused byte-for-byte rather than randomly re-encrypted.
-    if (JSON.stringify(prior.manifest.package) !== JSON.stringify(options.package) ||
-        prior.manifest.expectedKeyVersion !== options.expectedKeyVersion ||
-        prior.manifest.targetPayloadKeyVersion !== options.targetPayloadKeyVersion) {
+    const journalMatchesRequest = JSON.stringify(prior.manifest.package) === JSON.stringify(options.package) &&
+      prior.manifest.expectedKeyVersion === options.expectedKeyVersion &&
+      prior.manifest.targetPayloadKeyVersion === options.targetPayloadKeyVersion;
+    if (!journalMatchesRequest) {
+      // A process can die after saveBound() commits the new package but before
+      // the host acknowledges the journal. There is then no pending draft,
+      // and a subsequent rotation must not be blocked by that completed old
+      // request. Only self-heal when all local-generation evidence matches
+      // the old manifest *and* the authenticated server says it is PUBLISHED.
+      const priorWasInstalled = options.requestId === undefined &&
+        prior.manifest.package.keyVersion === options.expectedKeyVersion &&
+        prior.manifest.targetPayloadKeyVersion === options.currentPayloadKeyVersion &&
+        vaultRootKeyFingerprint(options.currentRootKey) === prior.manifest.package.rootKeyFingerprint;
+      if (priorWasInstalled) {
+        try {
+          const published = validateStage(await options.remote.status(prior.requestId));
+          if (published.state === 'PUBLISHED' &&
+              published.keyVersion === prior.manifest.package.keyVersion &&
+              published.payloadKeyVersion === prior.manifest.targetPayloadKeyVersion) {
+            await options.journal.clear(options.journalScope, prior.requestId);
+            return migrateVaultPayloads(options);
+          }
+        } catch {
+          // Keep the journal on an unavailable/malformed status response;
+          // clearing it without server confirmation would lose resumability.
+        }
+      }
       throw new VaultMigrationError('Migration journal does not match the requested key transition', 'inventory_changed');
     }
     let resumedStage = validateStage(await options.remote.begin(prior.manifest));
     if (resumedStage.state === 'PUBLISHED') {
-      await options.journal.clear(options.journalScope, requestId);
+      if (options.clearJournalOnPublished !== false) {
+        await options.journal.clear(options.journalScope, requestId);
+      }
       return {
         requestId: resumedStage.requestId,
         keyVersion: resumedStage.keyVersion,
@@ -358,7 +390,9 @@ export async function migrateVaultPayloads(options: VaultMigrationOptions): Prom
     if (resumedStage.state !== 'PUBLISHED') {
       throw new VaultMigrationError('Server did not publish the resumed key migration', 'migration_failed');
     }
-    await options.journal.clear(options.journalScope, requestId);
+    if (options.clearJournalOnPublished !== false) {
+      await options.journal.clear(options.journalScope, requestId);
+    }
     return {
       requestId: resumedStage.requestId,
       keyVersion: resumedStage.keyVersion,
@@ -442,7 +476,9 @@ export async function migrateVaultPayloads(options: VaultMigrationOptions): Prom
   await options.journal.save({ scope: options.journalScope, requestId, manifest, chunks: journalChunks });
   let stage = validateStage(await options.remote.begin(manifest));
   if (stage.state === 'PUBLISHED') {
-    await options.journal.clear(options.journalScope, requestId);
+    if (options.clearJournalOnPublished !== false) {
+      await options.journal.clear(options.journalScope, requestId);
+    }
     return {
       requestId: stage.requestId,
       keyVersion: stage.keyVersion,
@@ -469,7 +505,9 @@ export async function migrateVaultPayloads(options: VaultMigrationOptions): Prom
   if (stage.state !== 'PUBLISHED') {
     throw new VaultMigrationError('Server did not publish the complete key migration', 'migration_failed');
   }
-  await options.journal.clear(options.journalScope, requestId);
+  if (options.clearJournalOnPublished !== false) {
+    await options.journal.clear(options.journalScope, requestId);
+  }
   return {
     requestId: stage.requestId,
     keyVersion: stage.keyVersion,
@@ -497,6 +535,20 @@ export const cancelVaultPayloadMigrationForScope = async (
   await journal.clear(journalScope, pending.requestId);
   return stage;
 };
+
+/**
+ * Acknowledge a migration only after the host has installed its published
+ * package and payload generation. Keeping this explicit prevents a process
+ * exit or credential invalidation between server commit and local install
+ * from destroying the only retry record.
+ */
+export async function acknowledgeVaultPayloadMigration(
+  journal: VaultMigrationJournal,
+  journalScope: string,
+  requestId: string,
+): Promise<void> {
+  await journal.clear(journalScope, requestId);
+}
 
 export const VAULT_KEY_MIGRATION_INVENTORY_PATH = '/api/sync/key-migration/inventory';
 export const VAULT_KEY_MIGRATION_PATH = '/api/sync/key-migration';
