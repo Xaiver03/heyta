@@ -435,6 +435,21 @@ bash scripts/verify-mobile-window-gate.sh --target c   # 移动端设备验收�
      带 `.js` 后缀的导入实际落在 `.tsx` 上）—— 差点把"我的探针瞎"写成"合并结果坏了"。
      补上 `.tsx`/`index.tsx` 两种候选后同一棵树 **0 条**解析不到。
      ⇒ 同族教训：**扩展名交替要把长的放前面**，而"解析不到 N 条"这种读数必须先怀疑候选表而不是仓库。
+   🔴 **02:3x 现量把上面这一整块的前提否证了：那一笔不需要我落，别线已经落了。**
+   `git merge-base --is-ancestor 776fc23c HEAD` → **0**（`776fc23c` 就是写侧那笔），`git branch -a --contains` 里
+   `origin/main` 也在，而本地分支 `feat/list-parent` **已被那条 closeout 线合掉并删除** ⇒
+   `heyta-land-parent-merge.sh` 里那个 `$BR` 解析不出来，脚本却把它打印成 `VERDICT=有冲突，不合` ——
+   **一次假红，而且红的是"已经做完的事"**（下一读它的人会去找那 14 个文件的冲突，而冲突不存在）。
+   链因此换 v2：段 1 不再"默认合并"，改成**先验 `776fc23c` 在不在 HEAD 的祖先里**，
+   在 ⇒ 只打印接线现量；不在 ⇒ 才回去走那三条门。**换的是判据，不是提示语。**
+   HEAD 侧 02:3x 现量：`setParent` 声明 **6** 处、领域层拒因枚举行 **8** 行、`FolderPicker` web/mobile 各 **2** 处、
+   `common.organizer.folder.*` 词条 zh/en 各 **11** 条命中。
+   ⚠️ 取数本身的探针坑（同一批里踩的）：`git grep -c <rev> -- <path>` 打印的是 `HEAD:路径:条数`，
+   我先用 `cut -d: -f2` 取了一轮 ⇒ 拿到的是**文件路径**，打印出来看着完全像个读数。取数只能取**末段**。
+   ⇒ **④ 剩下的只有界面取证**：spec 草稿在 `/tmp/list-folder.spec.ts`，
+   🔴 **它一次都没跑过**（02:2x 想 `--list` 收集，被本机那道内存闸门以"已有测试在跑"拒绝），
+   跑通之前**不进 `e2e/tests/`、不进提交**；取证腿挂在 `heyta-run-checks.sh` 的 **2b 段** ——
+   那里直接 `playwright test <那一条 spec>`，**不走** `check:ai-e2e`（它的前置会对 4318/4319/4320 发 SIGKILL）。
 
 5. 若要做热力图/补打卡：那是**翻冻结判据**的权限问题，不是接线问题 —— 需要判卷文件的属主批准改 `growth-display.spec.ts:365`/`:302`。
 
@@ -534,6 +549,13 @@ bash scripts/verify-mobile-window-gate.sh --target c   # 移动端设备验收�
   ② 只 `kill <我自己那个 pid>`（我这条哨兵是 `nohup bash -c '…'`，pid 在启动时就打印过，本来就该直接用它）；
   ③ 只有确认某条模式只属于我这一棵树时才允许按模式杀，且要在命令里带上 `-u $UID` 与逐项排除。
   ⚠️ 这次**无法回滚**（别人那一轮预检的读数已经没了），所以按仓库惯例如实登记，不写成"应该没影响到别人"。
+
+- 🔴 **"分支不在了"有两种成因，探针必须分得开**（02:3x 现量）：`git merge-tree --write-tree main feat/list-parent`
+  报 `not something we can merge` 时，我的脚本直接打印 `VERDICT=有冲突，不合`。真相是**别线已经把它合进 main
+  并删了本地分支**（`git merge-base --is-ancestor 776fc23c HEAD` 退 **0**，`origin/main` 也含它）。
+  这两种"合不上"在屏幕上长得一模一样，但一个是"去解冲突"，另一个是"活已经干完了、别再去解一场不存在的冲突"。
+  ⇒ **凡引用具名 ref 的探针，都要先回答"这个 ref 为什么不在了"**：先查它最后那笔提交在不在 HEAD 的祖先里，
+  再谈冲突。`--is-ancestor` 在这里比 `merge-tree` 更便宜，而且它顺带把"我是不是该做这件事"也回答了。
 
 > ✅ **本节那几条"待入 traps"已落权威位置**（02:1x 现量 `environment-traps.md` 未提交行数 = 0 之后才动的笔）：
 > **#200** 合流判据不许写"能快进"、**#201** `ps` 的 argv 数不出"谁在跑套件"、**#202** 按名广播 `pkill` 的自报。

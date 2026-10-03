@@ -1320,7 +1320,15 @@ Goal 原话点名的记账落点就是本节。**先建槽、后填读数** —�
 - ① 四端重装：`INNER_EXIT=` **待填** —— 现量命令 `bash /tmp/heyta-run-reinstall.sh --go`（载体 `heyta-wt-reinstall`）；截图逐张写明钉到哪一步、人看到什么，跟在这条后面。
 - ② Playwright 三段 + 全量 `pnpm check`：`CHECK_EXIT=` 与逐段表 `PASS/FAIL/SKIP` **待填** —— 现量命令 `bash /tmp/heyta-run-checks.sh --go`；**段数现取 = 63**（不是 62），载体 sha 与读数同批记（脚本首尾各打一次 `CARRIER_SHA`）。
 - ③ 便签移动端验收：`NOTES_EXIT=` **待填**（第 6/7 步的 op 判据、第 8 步第三张截图、第 9–11 步跨设备三条腿各写一条读数）—— 现量命令 `bash /tmp/heyta-run-notes.sh`。
-- ④ 父子层级合流：`MERGE_RC=` 与 `main 现在=<sha>`、以及合并结果侧的 `AUDIT_RC=` / `IMPORT_CHECK_RC=` **待填** —— 现量命令 `bash /tmp/heyta-land-parent-merge.sh --apply`；02:0x 的 dry-run 三条门全过（`merge-tree rc=0` / 被碰 14 枚 ∩ 主检出未提交 = 0 / `STAGED_ENTRIES=0`），但**那是趟间读数，`--apply` 那一刻会重过**。
+- ④ 父子层级选择器：**这条不是"等合流"，是"等界面取证"**（02:2x 现量推翻了本槽建好时的写法）：
+  `776fc23c`（写侧 + 守卫）**已是 HEAD 的祖先**、`origin/main` 也含它、本地分支 `feat/list-parent` 已被
+  那条 closeout 线合掉并删除 ⇒ `heyta-land-parent-merge.sh` 里那个分支名解析不出来，**不是冲突**。
+  剩下要填的是 `FOLDER_SPEC_RC=` + 那四张 `e2e/test-results/list-folder-*.png`（每张写明人看到什么）——
+  现量命令 `bash /tmp/heyta-run-checks.sh --go` 的 **2b 段**（直接 `playwright test` 那一条 spec，
+  **不走** `check:ai-e2e` 那道会对 4318/4319 发 SIGKILL 的前置）。spec 草稿在 `/tmp/list-folder.spec.ts`；
+  🔴 **它一次都没跑过**（02:2x 想 `--list` 收集一下，被本机那道内存闸门以"已有测试在跑"拒绝）⇒ 红/绿未知，
+  跑通之前不进 `e2e/tests/`、不进提交。HEAD 侧的接线现量：`setParent` 声明 6 处、领域层枚举行 8 行、
+  `FolderPicker` web/mobile 各 2 处、`common.organizer.folder.*` 词条 zh/en 各 11 条命中。
 
 🔴 **建槽而不是"等有读数再写整节"的理由**：一段文档在这本台账上的存活期取决于**还有谁持有它的旧副本**，
 不取决于它是否进了 HEAD —— 上一轮我 plumbing 进台账的段落，被并行会话的下一次整文件 `git add` 抹回去过一次。
