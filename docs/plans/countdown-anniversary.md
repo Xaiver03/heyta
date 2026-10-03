@@ -1008,6 +1008,7 @@ W0b ─> 随时可做（台账那半要等文件干净）
   要错位需要某一列被撑开），所以我照猜测改的一版 `minmax(0, 1fr)` **在没有浏览器可量时撤回了**。
   编号 **R-1**，取证与下一步在 §8.4 第 ⑨ 条。**这不推翻 W6 的功能闭环**（四个档位 + 侧栏都认得 `EVENT` 那五张图都看了），
   但它意味着"侧栏那一半"目前带一条未定的几何红 —— 别把这个勾读成"侧栏没有任何已知红"。
+  ~~（这一句的状态到 04 05:5x 为止；红已按上面的机制修掉，读数见本节末尾与 §8.4 第 ⑨ 条。）~~
   🔴 **04 05:3x 把"那颗点撑开 grid track"这条猜测就地否证**（三条都是现量/可复算的算术，不是印象）：
   `--ht-font-size-2xs` = **11px**（`packages/design-system/src/tokens.css:220`），
   那颗点的文本就是 `common.calendar.dayMarker.off/work` 那两格、**各一个 CJK 字**（`packages/i18n/src/locales/zh-CN.ts:3812-3813`），
@@ -1049,10 +1050,12 @@ W0b ─> 随时可做（台账那半要等文件干净）
     这一槽每天都存在，让"有没有那颗点"决定不了格子高度，六周才不会因为有的周有班、有的周没班而长短不齐。
     宽度算术在**最窄档**也成立：`--ht-layout-sidebar-min-width` = 192px ⇒ 一轨 27px，
     而 `点 8 + gap 4 + 休 11 = 23px`。
+  - **移动壳没有同一形状**（省得下一个人去找）：`grep -rn "aspectRatio" apps/mobile/src` 命中 **0**，
+    而 `apps/mobile/src/screens/CalendarScreen.tsx` 里 `grep -rn "mini\|MiniMonth\|sidebar"` 也命中 **0**
+    —— 移动侧走的是共享 `CalendarBoard`（它的格子没有"宽跟高走"的耦合），web 侧这条侧栏迷你月历是**独一份**。
   - **代价**：W6 判据①"侧栏那颗点"的**版面变了**（同而不是在下），那批截图作为证据已过期 ⇒
     重拍重看，读数见 §8.4 第 ⑨ 条。
-  - ✅ **修法读数（04 06:0x–06:1x，载体 = 本分支工作树，锁是我自己原子拿的、拿锁后确认无别的 playwright）**：
-    `pnpm --filter @heyta/web typecheck` **`RC_TYPECHECK_WEB=0`**；
+  - ✅ **修法读数（04 06:0x–06:1x，载体 = 本分支工作树，锁是我自己原子拿的、拿锁后确认无别的 playwright）**：    `pnpm --filter @heyta/web typecheck` **`RC_TYPECHECK_WEB=0`**；
     `check:design` / `check:l4` / `check:ui-language` 三道**各自 rc=0**（后者现量：扫 317 文件、418 处文案、词条 zh/en 各 3023）；
     真浏览器那条**报过红的同一判据** `e2e/tests/calendar-sidebar.spec.ts:111` **`RC_E2E_SIDEBAR=0`、`2 passed (6.9s)`**
     —— 这就是它的 A/B：同一台机器、同一份 spec，05:47 那趟 `✘ 1 … 差 5.3px`，修完这趟两条全过，
