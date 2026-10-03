@@ -54,11 +54,29 @@ import { toLocalDate, type LocalDate, type Task } from '@heyta/domain';
 import { EmptyState } from '../empty-state/EmptyState.js';
 import { TaskList } from '../task-list/TaskList.js';
 import { useHeytaText, useHeytaTokens } from '../theme.js';
-import { calendarDayBuckets, type CalendarBoardLabels } from './model.js';
+import { CalendarEventRow } from './CalendarEventRow.js';
+import {
+  calendarDayBuckets,
+  type CalendarBoardLabels,
+  type CalendarDayEvent,
+  type CalendarEventBarLabels,
+} from './model.js';
 
 export interface CalendarDayBoardProps {
   /** 全部候选任务（已按范围筛过）。分桶只看 `dueDate` 落在 `day` 的那些。 */
   readonly tasks: readonly Task[];
+  /**
+   * 这一天的倒数日（W6）。**由调用方投影好再传进来** —— 本档不做日期算术，
+   * 也不许自己 `filter()` 一遍任务列表（那是第二份"哪一天发生"的数学）。
+   *
+   * 🔴 可选且默认 `undefined` = 一格都不画（§9.1：新 props 的默认值必须等于
+   *   "接之前"的形状）。⚠️ 它**不放进全天那个空态的判定里**：那两句话说的都是
+   *   "任务"（`labels.dayEmpty` / `dayAllDayEmpty`），把倒数日算进分母就等于
+   *   让一句关于任务的话去数别的类型的条目。
+   */
+  readonly events?: readonly CalendarDayEvent[] | undefined;
+  /** 那一行怎么写（宿主注入）。不给就只剩标题，与网格那条同一条理由。 */
+  readonly eventLabels?: CalendarEventBarLabels | undefined;
   /** 正在看的那一天。 */
   readonly day: LocalDate;
   /**
@@ -79,6 +97,8 @@ export interface CalendarDayBoardProps {
 
 export function CalendarDayBoard({
   tasks,
+  events,
+  eventLabels,
   day,
   now,
   onToggleTask,
@@ -141,6 +161,24 @@ export function CalendarDayBoard({
         ) : (
           <TaskList tasks={buckets.allDay} {...taskListProps} testID={`${testID}-all-day-list`} />
         )}
+        {/*
+          倒数日（W6）落在**「全天」这一带**，不是新造第三块：这一带定义就是
+          "这一天里没有时刻的那些"（文件头那张表），而倒数日只有一个日期、没有时刻
+          ⇒ 它按形状就该在这里。⚠️ 它**不进**上面那个空态的分母 —— 那两句话说的
+          都是"任务"，把别的类型算进去就是让一句话去数它没提到的东西。
+        */}
+        {(events ?? []).map((event) => (
+          <CalendarEventRow
+            key={event.id}
+            event={event}
+            labels={eventLabels}
+            /* 🔴 挂在**「全天」那一带**名下（`-all-day-event-`），不是 `-event-`：
+               月档那份"选中那天的清单"用的就是 `calendar-board-day-event-<id>`，
+               而两块板共用同一个 `testID` 前缀 —— 名字撞上了，判据就分不清
+               它量的是哪一屏（这两块板同屏不共存，所以今天还测不出来）。 */
+            testID={`${testID}-all-day-event-${event.id}`}
+          />
+        ))}
       </View>
 
       {/* ── 24 小时轴（可滚）───────────────────────────────────── */}

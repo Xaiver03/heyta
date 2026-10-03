@@ -374,6 +374,27 @@
   border-radius: var(--ht-radius-full);
 }
 
+/*
+ * 迷你月历里的「休 / 班」（W4b 的公共事实，W6 补齐侧栏这一半 ——
+ * 原先只有主区月历画，侧栏那颗点说"这天有没有事"，却不说"这天是不是班"）。
+ *
+ * 🔴 用哪一个颜色**不在这里判**：class 尾巴就是共享层 `calendarDayMarkerView`
+ *    返回的那个 token 名（`color.success-strong` → `--success-strong`）。
+ *    这里再判一次"休该是绿的"，就是同一格两份裁决。
+ */
+.ht-sidebar__day-marker {
+  font-size: var(--ht-font-size-2xs);
+  line-height: var(--ht-line-height-tight);
+}
+
+.ht-sidebar__day-marker--success-strong {
+  color: var(--ht-color-success-strong);
+}
+
+.ht-sidebar__day-marker--warning-strong {
+  color: var(--ht-color-warning-strong);
+}
+
 /* 今天：列头与数字同色（主蓝），圈出一层边 —— 与主区月历同一条表达。 */
 .ht-sidebar__day--today {
   color: var(--ht-color-primary);

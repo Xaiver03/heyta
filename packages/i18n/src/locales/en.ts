@@ -3565,6 +3565,12 @@ export const en = {
   'common.conflict.reason.fallback': 'Both sides made different changes to the same thing',
   'common.calendar.dayMarker.off': 'Off',
   'common.calendar.dayMarker.work': 'Work',
+  // The countdown line inside a calendar cell (W6, the calendar's second source).
+  // Lives under `common.*` because the shared board is one implementation for both
+  // shells; worded exactly like the countdown panel's own line.
+  'common.calendar.event.today': 'Today',
+  'common.calendar.event.until': '{days} days to go',
+  'common.calendar.event.since': '{days} days so far',
 
   // 🔴 This group lives under `common.*`, not `web.*`: **both shells read it**
   //    (a view tier is added per batch, so the count is deliberately not written
