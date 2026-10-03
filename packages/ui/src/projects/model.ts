@@ -45,8 +45,16 @@
  *    "槽位 → 颜色 token"的映射只有一处（`categories/model.ts#categorySlotToken`）。
  *    · 最小一步：mobile 接上 `ui/slot-picker.tsx`（那一刀属于分类，不属于本刀）。
  *
- * 3. **删除确认**不在这里：web 的删除是**直接删**（无二次确认），mobile 也是。
+ * 3. ~~**删除确认**不在这里：web 的删除是**直接删**（无二次确认），mobile 也是。~~
  *    · 最小一步：行尾 `•••`（宿主插槽）或详情层，先要产品定"删除要不要确认"。
+ *
+ *    ✅ **已过期（2026-10-04，回收站与归档 W4b）**：产品早已定了"删标签要确认"
+ *    （§7.1 P-1：标签不进回收站，防护改成删前告知影响面），落点是共享组件的
+ *    `labels.confirmRemove` + `removeImpact`（`OrganizerList`，两端同一份），
+ *    取数口径只有本文件的 `liveTaskCountsByTag` 一处。
+ *    🔴 留原句是因为它记的是一种**会反复出现的形状**：注释把一件事划给"宿主"，
+ *    两个宿主都没做，于是那句话读起来像分工、实际是一句**没人认领的 TODO** ——
+ *    而"删除要不要确认"这个产品问题，界面上的答案就是"不要"。
  *
  *    ✅ **「改名 / 归档界面从未接上」这句已过期（2026-10-03，多端第三批）**：
  *    行内编辑器在 `OrganizerList` 里，两端都已传 `onRename` / `onArchive`
@@ -67,7 +75,7 @@
  *    `archivedCount > 0` 时才画出来 —— 没有已归档清单时不占一行。
  */
 
-import { isArchived, type Project, type Tag, type Task } from '@heyta/domain';
+import { isArchived, isLive, type Project, type Tag, type Task } from '@heyta/domain';
 
 /* ========================================================================
  * 一、行模型
@@ -300,6 +308,37 @@ export function openTagCounts(tasks: readonly Task[]): Record<string, number> {
   const counts: Record<string, number> = {};
   for (const task of tasks) {
     if (task.deletedAt !== undefined || task.completedAt !== undefined) continue;
+    for (const tagId of task.tagIds ?? []) {
+      counts[tagId] = (counts[tagId] ?? 0) + 1;
+    }
+  }
+  return counts;
+}
+
+/**
+ * 一次遍历算出**所有标签的影响面**：每条标签挂在几条**还活着**的任务上（**含已完成**）。
+ *
+ * 🔴 它与 `openTagCounts` **不是同一件事**，两者混用会少承诺：
+ *
+ * | | `openTagCounts` | 这里 |
+ * |---|---|---|
+ * | 用途 | 行右侧那个常驻数字 | 删除确认里那句"影响 N 条任务" |
+ * | 滤掉已完成 | ✅ | ❌ |
+ * | 滤掉墓碑 | ✅（字面量） | ✅（`isLive`） |
+ *
+ * 为什么影响面**必须**含已完成：删一条标签之后，那些已完成的任务上的 `tagIds`
+ * 同样指向一个已经不存在的 id（`project-actions.ts#removeTag` 只 `DEL` 标签实体，
+ * 不回收任务上的引用）。只数未完成的 ⇒ 界面在一条**已经挂满已完成任务**的标签上
+ * 说"没有任务受影响"，而用户重建同名标签后那些任务**不会**重新挂回来 ——
+ * 那是假承诺，也正是"删标签 = 删了东西"这种误判的来源。
+ *
+ * ⚠️ 数字是**摘掉标签**的条数，不是"会被删除的任务"条数（任务一条都不删）。
+ * 措辞由词条承担，见 `common.organizer.remove.impact`。
+ */
+export function liveTaskCountsByTag(tasks: readonly Task[]): Record<string, number> {
+  const counts: Record<string, number> = {};
+  for (const task of tasks) {
+    if (!isLive(task)) continue;
     for (const tagId of task.tagIds ?? []) {
       counts[tagId] = (counts[tagId] ?? 0) + 1;
     }

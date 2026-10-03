@@ -28,9 +28,9 @@ describe.skipIf(!DATABASE_URL)('vault key-package CAS over HTTP/PostgreSQL', () 
     passphrase: wrapper(seed),
     recovery: wrapper(seed + 10),
   });
-  const put = (body: unknown) => fetch(`${base}/api/sync/key-package`, {
+  const put = (body: unknown, token = authorization) => fetch(`${base}/api/sync/key-package`, {
     method: 'PUT',
-    headers: { authorization, 'content-type': 'application/json' },
+    headers: { authorization: token, 'content-type': 'application/json' },
     body: JSON.stringify(body),
   });
 
@@ -77,6 +77,7 @@ describe.skipIf(!DATABASE_URL)('vault key-package CAS over HTTP/PostgreSQL', () 
 
     const stored = await db.vaultKeyPackage.findUniqueOrThrow({ where: { userId } });
     expect(stored.keyVersion).toBe(2);
+    expect(stored.activePayloadKeyVersion).toBe(1);
     expect(stored.packageData).toEqual(winner);
   }, 30000);
 
@@ -118,4 +119,93 @@ describe.skipIf(!DATABASE_URL)('vault key-package CAS over HTTP/PostgreSQL', () 
     expect(removal.status).toBe(409);
     expect(await db.vaultKeyPackage.findUnique({ where: { userId } })).not.toBeNull();
   });
+
+  it('leaves the payload generation unset when bootstrapping an account with legacy history', async () => {
+    const legacyUser = await db.user.create({
+      data: { email: `vault-key-package-legacy-${randomUUID()}@test.local`, isVerified: 1 },
+    });
+    const token = `Bearer ${jwt.sign({ userId: legacyUser.id, email: legacyUser.email, tokenVersion: 0 }, process.env.JWT_SECRET!)}`;
+    await db.userSyncState.create({ data: { userId: legacyUser.id, lastSeq: 1 } });
+    await db.operation.create({
+      data: {
+        id: `legacy-op-${randomUUID()}`,
+        userId: legacyUser.id,
+        clientId: 'legacy-client',
+        serverSeq: 1,
+        actionType: 'UPDATE',
+        opType: 'UPD',
+        entityType: 'TASK',
+        entityId: 'legacy-task',
+        entityIds: [],
+        payload: Buffer.alloc(28, 9).toString('base64'),
+        payloadBytes: 100n,
+        vectorClock: { 'legacy-client': 1 },
+        schemaVersion: 1,
+        clientTimestamp: 1n,
+        receivedAt: 1n,
+        isPayloadEncrypted: true,
+      },
+    });
+
+    try {
+      const response = await put({ expectedKeyVersion: 0, package: packageFor(1) }, token);
+      expect(response.status).toBe(200);
+      expect((await response.json()).payloadKeyVersion).toBeNull();
+      const stored = await db.vaultKeyPackage.findUniqueOrThrow({ where: { userId: legacyUser.id } });
+      expect(stored.activePayloadKeyVersion).toBeNull();
+    } finally {
+      await db.user.delete({ where: { id: legacyUser.id } });
+    }
+  }, 30000);
+
+  it('waits for a migration-style package commit before applying a wrapper rewrap', async () => {
+    const raceUser = await db.user.create({
+      data: { email: `vault-key-package-race-${randomUUID()}@test.local`, isVerified: 1 },
+    });
+    const token = `Bearer ${jwt.sign({ userId: raceUser.id, email: raceUser.email, tokenVersion: 0 }, process.env.JWT_SECRET!)}`;
+    await db.userSyncState.create({ data: { userId: raceUser.id, lastSeq: 0 } });
+    await db.vaultKeyPackage.create({
+      data: { userId: raceUser.id, keyVersion: 1, packageData: packageFor(1), activePayloadKeyVersion: 1, createdAt: 1n, updatedAt: 1n },
+    });
+    const next = packageFor(2);
+    const wrapperCandidate = {
+      ...next,
+      passphrase: { ...next.passphrase, ciphertext: Buffer.alloc(48, 77).toString('base64') },
+    };
+    let release!: () => void;
+    let locked!: () => void;
+    const held = new Promise<void>((resolve) => { release = resolve; });
+    const ready = new Promise<void>((resolve) => { locked = resolve; });
+    const migrationCommit = db.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT user_id FROM user_sync_state WHERE user_id = ${raceUser.id} FOR UPDATE`;
+      await tx.$queryRaw`SELECT id FROM users WHERE id = ${raceUser.id} FOR UPDATE`;
+      locked();
+      await held;
+      await tx.vaultKeyPackage.update({
+        where: { userId: raceUser.id },
+        data: { keyVersion: 2, packageData: next, activePayloadKeyVersion: 2 },
+      });
+    }, { timeout: 30_000 });
+
+    try {
+      await ready;
+      let wrapperResolved = false;
+      const wrapperRewrap = put({ expectedKeyVersion: 1, package: wrapperCandidate }, token).then((response) => {
+        wrapperResolved = true;
+        return response;
+      });
+      await new Promise((resolve) => setTimeout(resolve, 30));
+      expect(wrapperResolved).toBe(false);
+      release();
+      await migrationCommit;
+      const response = await wrapperRewrap;
+      expect(response.status).toBe(409);
+      expect((await response.json()).error).toBe('stale_key_package');
+      expect((await db.vaultKeyPackage.findUniqueOrThrow({ where: { userId: raceUser.id } })).activePayloadKeyVersion).toBe(2);
+    } finally {
+      release();
+      await migrationCommit.catch(() => undefined);
+      await db.user.delete({ where: { id: raceUser.id } });
+    }
+  }, 30000);
 });

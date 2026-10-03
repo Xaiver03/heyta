@@ -96,6 +96,21 @@ describe('vault key session', () => {
     expect(await session.getPayloadCipher()).toBeDefined();
   });
 
+  it('invalidates an already-issued cipher facade when recovery unlock reopens the session', async () => {
+    const store = await makeStore();
+    const session = await createVaultKeySession({ store, scope });
+    const initial = await session.beginCreation('old passphrase');
+    await session.confirmAndPublish(initial, initial.recoveryCode);
+    const facade = await session.getPayloadCipher();
+    expect(facade).toBeDefined();
+    session.lock();
+    await session.unlockWithRecoveryCode(initial.recoveryCode);
+    await expect(facade!.encrypt('secret', {
+      id: 'recovery-facade', clientId: 'client-1', actionType: 'create', opType: 'ADD',
+      entityType: 'TASK', entityId: 'task-1', timestamp: 1, schemaVersion: 1,
+    })).rejects.toThrow('Vault is locked');
+  });
+
   it('does not install a KDF result after the session is locked mid-operation', async () => {
     const store = await makeStore();
     const session = await createVaultKeySession({ store, scope });
@@ -198,6 +213,44 @@ describe('vault key session', () => {
       .getFloat64('heyta-vault-op/'.length + 1, false)).toBe(1);
   });
 
+  it('uses the server payload generation for the first wrapper before a wrapper-only revision', async () => {
+    const store = await makeStore();
+    const session = await createVaultKeySession({ store, scope });
+    const initial = await session.beginCreation('old passphrase');
+    await session.confirmAndPublish(initial, initial.recoveryCode, {
+      serverOrigin: scope.serverOrigin,
+      get: async () => initial.package,
+      put: async () => ({ package: initial.package, payloadKeyVersion: 1 }),
+    });
+    expect(session.payloadKeyVersion).toBe(1);
+    await expect(store.loadPayloadKeyVersion()).resolves.toBe(1);
+    const changed = await session.beginPassphraseChange('new passphrase');
+    await session.confirmAndPublish(changed, changed.recoveryCode);
+    expect(session.payloadKeyVersion).toBe(1);
+    const cipher = await session.getPayloadCipher();
+    const encoded = await cipher!.encrypt('payload', {
+      id: 'bootstrap-op', clientId: 'client-1', actionType: 'create', opType: 'ADD',
+      entityType: 'TASK', entityId: 'task-1', timestamp: 1, schemaVersion: 1,
+    });
+    const bytes = new Uint8Array(decodeBase64(encoded));
+    expect(new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength)
+      .getFloat64('heyta-vault-op/'.length + 1, false)).toBe(1);
+  });
+
+  it('preserves an explicit legacy generation from the server and blocks ordinary writes', async () => {
+    const store = await makeStore();
+    const session = await createVaultKeySession({ store, scope });
+    const initial = await session.beginCreation('legacy passphrase');
+    await session.confirmAndPublish(initial, initial.recoveryCode, {
+      serverOrigin: scope.serverOrigin,
+      get: async () => initial.package,
+      put: async () => ({ package: initial.package, payloadKeyVersion: null }),
+    });
+    expect(session.payloadKeyVersion).toBeNull();
+    await expect(store.loadPayloadKeyVersion()).resolves.toBeNull();
+    expect(await session.getPayloadCipher()).toBeUndefined();
+  });
+
   it('root rotation migrates before installing the new package and generation', async () => {
     const store = await makeStore();
     const session = await createVaultKeySession({ store, scope });
@@ -223,5 +276,25 @@ describe('vault key session', () => {
     expect(session.keyPackage?.rootKeyFingerprint).toBe(pending.package.rootKeyFingerprint);
     expect(session.payloadKeyVersion).toBe(2);
     expect(session.state).toBe('unlocked');
+  });
+
+  it('persists a root-rotation draft encrypted under the current root and restores it after restart', async () => {
+    const store = await makeStore();
+    const first = await createVaultKeySession({ store, scope });
+    const initial = await first.beginCreation('old passphrase');
+    await first.confirmAndPublish(initial, initial.recoveryCode);
+    const pending = await first.beginRootRotation('new passphrase');
+    first.lock();
+
+    const restarted = await createVaultKeySession({ store, scope });
+    await restarted.unlockWithPassphrase('old passphrase');
+    const resumed = restarted.getPendingRootRotation();
+    expect(resumed?.package.rootKeyFingerprint).toBe(pending.package.rootKeyFingerprint);
+    expect(resumed?.recoveryCode).toBe('');
+    await restarted.confirmAndMigrateRootRotation(resumed!, pending.recoveryCode, async (input) => ({
+      keyVersion: input.targetPackage.keyVersion,
+      payloadKeyVersion: 2,
+    }));
+    expect(restarted.getPendingRootRotation()).toBeUndefined();
   });
 });
