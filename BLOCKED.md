@@ -2789,3 +2789,32 @@ instead of **shrinking the name down to a zero-width flex item**" + `minWidth: t
 cd /private/tmp/heyta-final && git merge --no-edit main && pnpm build && pnpm check:ai-e2e
 # 期望 115 passed / 0 failed / 2 skipped（同一套 117 条）
 ```
+
+## B48. 🔴 本线自己造的对外缺口：法务文档的工具表少列了本线加的 **16 条**，而条款把那张表当授权面（2026-10-03 19:2x 现量）
+
+`packages/local-api/src/tools/` 目录里唯一工具名 **22** 条；
+`packages/legal/src/documents/ai-and-transfer.ts`（中英两份）逐条 `includes` 之后**缺 16**，
+缺的正好是本线这一批加的（表里已有的 6 条是更早的 task/project 工具）：
+`create_habit` `create_note` `create_project` `create_reminder` `create_tag` `get_note`
+`list_checkins` `list_focuses` `list_habits` `list_notes` `list_reminders` `list_tags`
+`log_focus` `record_checkin` `set_task_tags` `update_note`。
+三个版本读数一致（`main` 提交态 / 隔离载体 / 主检出工作树 都缺 16）⇒ 另一条线补的是 EVENT 那 4 条，没覆盖到本线这 16 条。
+
+**为什么算缺陷而不是文档美化**：条款里"未列出的即视为未授权"那句使那张表成为**用户同意过的授权面**，
+少列 16 条 = 用户同意的是一个比实际存在更小的面；且该文档有版本机制
+（`ai-and-transfer.ts:532  version: '1.0'`，版本进**同意指纹**）——补内容要连带 bump 版本。
+
+**为什么不就地改**：① 法务文本 + 同意版本号是对外承诺，难回退，要产品负责人确认；
+② 同一份文件另一条线正在别的 worktree 里做 `1.0→1.1` 的同类 bump（还没进 `main`），
+两边各自 1.1 会造出"同版本不同内容"；③ 他们那条 `check:legal-tools`（目录 ↔ 中文表 ↔ 英文表 三方对账 + 逐行同序）
+**还没提交**（`git show main:package.json | grep -c check:legal-tools` = 0），现在补的是没有门禁的那份真源。
+
+**关闭路径**：`check:legal-tools` 进 `main` 之后，由本线按它的形状补齐 16 条 + 与那条线对齐版本号；
+现量命令（node，别用 shell —— 见 `docs/plans/ai-event-tool-contract.md` §15.15 末尾那三趟 16/0/24）：
+```bash
+node -e 'const fs=require("fs"),cp=require("child_process");const d="packages/local-api/src/tools";const n=new Set();
+for(const f of fs.readdirSync(d)){if(!f.endsWith(".ts")||f==="registry.ts")continue;
+for(const m of fs.readFileSync(d+"/"+f,"utf8").matchAll(/name:\s*['"]([a-z0-9_.]+)['"]/g))n.add(m[1]);}
+const t=fs.readFileSync("packages/legal/src/documents/ai-and-transfer.ts","utf8");
+console.log("dir="+n.size+" missing="+[...n].filter(x=>!t.includes(x)).length)'
+```
