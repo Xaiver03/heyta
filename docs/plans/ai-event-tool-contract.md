@@ -1361,3 +1361,39 @@ comm -12 /tmp/mine.txt /tmp/theirs.txt | while read f; do
 **两个解锁条件挂在只读轮询上**（`/tmp/heyta-unblock/poll.log`，60 分钟封顶，不并发跑重活）：
 ① organizer 修复进 `main`（判据 = `main:packages/ui/src/projects/OrganizerList.tsx` 里 `minWidth` 命中 > 0）；
 ② 上面那 13 条重叠路径清空。两个都满足才做**最后一次**合并 + 全链复跑，避免"每合并一次就把读数作废一次"。
+
+### 15.11 Windows 取证判据的八条变异臂已备好并验过有牙，但**排在落地之后**——顺带量出一件更要紧的事
+
+**基线**：`bash scripts/mutate-closeout-gates.sh` 在载体 `05d0d7fc` 上 **17 绿 / 0 红**，耗时 **6.8 s**
+（还是在 `vm.loadavg` 200 的情况下跑的）。
+
+🔴 **更要紧的那件事：这个变异台有 0 个自动消费者。**
+`grep -rn 'mutate-closeout-gates' package.json scripts/*.mjs scripts/*.sh` ⇒ **无任何命中**
+（它自己除外）。也就是说 G1–G4 / L1–L4 / P1–P2 / S1 / V1–V3 这 17 条"必须能红"的检查，
+**只在有人手跑的那一次有效** —— 与 §8.3 那条立场（不能失败的检查没有价值）相邻但不同：
+这是"**能失败、但没人跑**"。接进 `pnpm check` 的代价刚量出来：**7 秒**。
+
+**新加的八条 W 臂**（覆盖 §15.5 抽出来的 `scripts/lib/msix-install-facts.sh` 五条判据）：
+W1 五条齐 ⇒ rc=0 且报条数（阳性对照，不许误挡）· W2 拿掉 `SHORTCUT_OK=True` ⇒ rc=1 **且指名缺的就是它**
+（用户点名那条判据有牙）· W3 值改成 `False` ⇒ rc=1（判的是键值对不是键名）· W4 取证文件不存在 ⇒ rc=1
+且报"文件不存在"而不是"缺判据" · W5 清单 ↔ 产出方对账（每条键名都要在 `install-and-capture.ps1` 里有写出点）·
+W6 **反向对照**：往清单里塞一条产物里没有的 ⇒ 立刻红且指名它（这条臂自己也要有牙）·
+W7 两个读取方都 source 单一所有者（2/2）· W8 读取方剥掉注释后不得有内联判据字面量。
+
+**验法**（一次性副本，不动仓库）：把台子拷进工作树里跑 ⇒ **25 绿 / 0 红**；
+变异 = 从 `MSIX_REQUIRED_FACTS` 里摘掉 `"SHORTCUT_OK=True"` 一行 ⇒ **恰好 W2 + W3 红（23 绿 / 2 红）**；
+`git checkout --` 复原后回到 **25 绿 / 0 红**，并核过 `grep -c` 与 `git status` 都回到原样。
+
+**为什么不现在把它落进仓库**：要改的两个文件都在**撞车面**上 ——
+`scripts/mutate-closeout-gates.sh` 在主检出正脏着（它就是 §15.10 那 13 条重叠路径之一），
+`package.json` 是 `B37` 那次事故的现场文件（为了让它只带自己的 hunk 覆盖过别人两行未提交改动）。
+paste-ready 内容在 `/tmp/heyta-w-arms.sh`（含 W8 那版正确的"先剥注释再数"写法），
+接链那一行是 `check:closeout-mutations` ⇒ `bash scripts/mutate-closeout-gates.sh`，排在落地之后做。
+
+📌 **两次探针自伤，都是我自己的 rig 位置错，不是判据坏**（记下来因为症状完全像"仓库坏了"）：
+第一趟 V0–V3 与 W 全红，报 `//scripts/lib/…: No such file`；第二趟报 `/private/tmp/scripts/…`。
+根因是台子自己按 `REPO="$(cd "$(dirname "$0")/.." && pwd)"` 算仓库根 ——
+我用 `REPO=… bash …` 传进去**会被那一行覆盖**，而把副本放在工作树根目录时 `dirname $0` 是 `.` ⇒ `..` 走到 `/private/tmp`。
+正确放法：副本要在**与 `scripts/` 同级语义**的目录里（`.rig/mutate-closeout-gates.sh`）。
+一般规律：**把别人的脚本拷出去跑之前，先读它怎么定位自己**（`dirname $0` / `import.meta.url` / `process.argv[1]`），
+否则第一趟红一定是探针。
