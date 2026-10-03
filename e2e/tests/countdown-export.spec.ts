@@ -43,10 +43,11 @@
  * ## 截图（AGENTS §6.2 规定一）
  *
  * 先截图、再断言，固定路径。导出那张**成品图本身**就是证据文件（不是窗口截图）：
- *   · `/tmp/heyta-card-export-results/board.png`（点导出之前那一屏）
- *   · `/tmp/heyta-card-export-results/card-light.png` / `card-dark.png`（导出的图）
- *   · `/tmp/heyta-card-export-results/export-failed.png`（失败上屏那一格）
- * 落在 `/tmp` 而不是 `test-results/`：后者每轮被 Playwright 清空，会把上一轮唯一的证据删掉。
+ *   · `apps/web/evidence/countdown-export/board.png`（点导出之前那一屏）
+ *   · 同目录 `card-light.png` / `card-dark.png`（导出的成品图本身）
+ *   · 同目录 `export-failed.png`（失败上屏那一格）
+ * 落在版本库里的 `apps/web/evidence/…` 而不是 `test-results/`：后者每轮被 Playwright 清空，
+ * 会把上一轮唯一的证据删掉，而"截图且人看过"这条判据的凭据必须能被下一个人复查。
  */
 import { expect, test, type Page } from '@playwright/test';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
@@ -73,7 +74,7 @@ import {
   trackEgress,
 } from './net-egress';
 
-const EVIDENCE = '/tmp/heyta-card-export-results';
+const EVIDENCE = '../apps/web/evidence/countdown-export';
 const TITLE = '结婚纪念日';
 
 type Rgb = readonly [number, number, number];
