@@ -1123,11 +1123,26 @@ git status --porcelain -- PROGRESS.md BLOCKED.md   # 必须是空才动
 |---|---|---|
 | 载体 | `5fe19343` | `/tmp/heyta-intg-chain-175109/runner.log` |
 | 整链 | `rc=1`（17:59:39） | `check-rc.txt` |
-| 失败段 | 只有 `check:ai-e2e` | `check.log` |
+| 失败段 | `check:ai-e2e`（链在这里退出码 1 就断了） | `check.log` 末 6 行：两条 `[ELIFECYCLE]` |
 | e2e summary | **2 failed / 2 flaky / 2 skipped / 111 passed (5.8m)** | `check.clean.log:1589` 附近 |
 | failed 两条 | `ai-duration.spec.ts:36` 与 `:92`，各带 `retry #1` | 同上 `:1206-1209` |
 | 报错原文 | 「不应该发出任何模型请求，实际收到：[...]」，`Expected: 0 / Received: 1`，落在 `helpers.ts:103` | `:1352-1450` |
 | flaky 两条 | `ai-capture.spec.ts:50`、`ai-prioritize.spec.ts:50`（都是"等假端点收到精确次数"的那族） | `:1590-1591` |
+
+🔴 **"链上只有 e2e 一段红"这句话是错的，正确的说法是"链断在 e2e"**。
+`pnpm check` 是一条 `&&` 串（段序见日志第 1 行的整条回显），`check:ai-e2e` 之后还排着
+`check:privacy-consent-e2e`、`check:landing-e2e`、`check:shell-unicode`、`check:web-storage`、
+`check:web-migration`、`check:script-snapshot`、`check:mobile-first-run-gate`、
+`screenshot:verify`、`pnpm -r test` 九段。`&&` 的短路语义决定了前一枚退出 1 之后的段
+**不可能执行**，日志尾部正是两条 `[ELIFECYCLE] Command failed with exit code 1`；
+直接证据另有一条：`privacy-consent-zero-egress` 这个用例名在整份日志里 **0 命中**。
+⚠️ 我第一版取证用的是"段名在日志里出现几次"，结果**每段都只出现 1 次**（包括确实跑过的
+`check:layering`）—— 因为只有整条命令被回显一次，各段自己的输出里不一定带段名。
+那个探针证明不了任何事（§7 元规则 1：先怀疑探针），所以这里的论据换成上面那三条。
+⇒ 载体 `5fe19343` 上**没有**这九段的读数（`-r test` 另有 Phase A 的独立读数 7839，
+但那不等价于链里那一段），要覆盖它们只能等合并态那一趟跑完。
+这条更正本身就是"读数要写明跑到哪一层"（§12.2 立过的规矩）的又一次违反，
+所以我把它写在读数表下面而不是注释里。
 
 **为什么判定是两趟并发共用同一对端口，而不是产品缺陷** —— 四段代码读数 + 一条只有并发能解释的现象：
 
