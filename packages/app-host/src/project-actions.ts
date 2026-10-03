@@ -30,7 +30,13 @@
  * ─────────────────────────────────────────────────────────────────────────
  */
 
-import { parseCategorySlot, type CategorySlot, type Project, type Tag } from '@heyta/domain';
+import {
+  parseCategorySlot,
+  validateProjectParentChange,
+  type CategorySlot,
+  type Project,
+  type Tag,
+} from '@heyta/domain';
 import type { EntityType } from '@heyta/shared-schema';
 import { OpType } from '@heyta/sync-core';
 
@@ -72,6 +78,19 @@ export interface ProjectActions {
    *    把它做成目标值，取消归档才是**一次调用**能完成的事，而不是靠再写一条 `updateProject`。
    */
   archiveProject(entityId: string, archived?: boolean): Promise<void>;
+  /**
+   * 改父：把清单挂进某个**顶级**清单（它就是文件夹），或提为顶级（省略 `parentId`）。
+   *
+   * 🔴 一层规则与全部守卫在领域层 `validateProjectParentChange`，**不在这里自己算**
+   *    （与任务侧 `actions.ts` 的 `setParent` 同一条分工：动作层只负责把拒绝
+   *    翻成一句能定位的话，然后把载荷交给 `updateProject`）。
+   * ⚠️ **必须是 `async`**：校验失败时 `throw` 要变成一个被拒绝的 Promise，
+   *    非 async 会同步抛出，而调用方 `void actions.setParent(...)` 接不住
+   *    （与任务侧 `setParent` / `setTags` 同一个坑）。
+   * 🔴 一个用户意图 = 一个 op：载荷只有 `parentId`，不顺带动 `archived`、
+   *    也不 fan-out 成"把子清单逐条重写一遍"。
+   */
+  setParent(entityId: string, parentId?: string): Promise<void>;
   /** 软删除。⚠️ 不级联删除其下的任务（见文件头第 2 条）。 */
   removeProject(entityId: string): Promise<void>;
 
@@ -186,6 +205,21 @@ export function createProjectActions(
     async archiveProject(entityId, archived = true) {
       // 目标值而不是"执行归档"：取消归档是同一条意图的反方向，不是第二种 op。
       await updateProject(entityId, { archived });
+    },
+
+    async setParent(entityId, parentId) {
+      const verdict = validateProjectParentChange(
+        Object.values(ctx.getState().projects),
+        entityId,
+        parentId,
+      );
+      if (!verdict.ok) {
+        // 把领域层的封闭集合翻成一句能定位的话。**不吞、不降级成静默空操作** ——
+        // 静默的后果是"用户以为移好了，层级没变"（与任务侧 `setParent` 同一条理由）。
+        throw new Error(`改父被拒绝（${verdict.reason}）：${entityId} → ${parentId ?? '顶级'}`);
+      }
+      // `undefined` → `null`：见文件头第 1 条，`null` 才能穿过 JSON 表达"清除"。
+      await updateProject(entityId, { parentId: verdict.parentId ?? null });
     },
 
     async removeProject(entityId) {
