@@ -1140,3 +1140,37 @@ mobile 与 web 的 `typecheck` 均 0 错。三个新改动屏的 `style={{` 计�
 所以三条必须同批落地；标签**不接归档**（`Tag` 没有 `archived` 字段，不是漏做）。
 
 **未做/已登记**：新建清单的父级选择器（P2-6 的另一半，见 B40）；web 侧行为用例（`apps/web/tests/**` 在地界外，见 B38）。
+
+## AI 覆盖面收口（Goal 1791019648012-9e53f6，2026-10-03 15:2x–20:0x）🟡 三项闭合 / 一项挂上游
+
+细节全在 `docs/plans/ai-event-tool-contract.md` §15.5–§15.9，本节只放**带载体的读数**（抄件必漂）。
+
+**① 合并 ✅** —— `feat/ai-entity-coverage` + `feat/assistant-history-local-persistence` +
+`integrate/2026-10-03-closeout` 并成一条集成线。落地形状**从快进改成带对账的合并**，因为 `main`
+在这批工作期间前进了三次（`792f9b2d` → `192a516d` → `1694b7d0` → `120c8153`）。
+预演 `git merge-tree --write-tree` 零冲突；两侧文件交集**只有 i18n 两份词条表**，逐条量过：
+三处参照键数 2850 / 2841 / 2860、重复键 0、单边键 0、算术闭合；合并结果 tree 与预演预测
+`b08b020c` 逐字节相同。
+
+**② 集成态验证 🟡（段 0–50 绿 / 段 51 挂上游 / 段 52–60 逐段补）** —— 载体 `10dc0bd4`
+（🔴 更正：runner 打印的是合并那一刻的 `b6294ef0`，而链起跑时 HEAD 已前进两笔 docs ——
+"打印过的 SHA"不等于"运行时的 SHA"）。`pnpm build` rc=**0**；`pnpm check`（61 段）rc=**1**，
+断在第 51 段 `check:ai-e2e`：`3 failed / 2 skipped / 112 passed`。三条红两种性质：一条是 4318
+载体被对端 preflight 按端口 SIGKILL（环境无效），两条是 `calendar-sidebar.spec.ts:111/:226` 的
+**确定性**红 —— 归属 `main` 侧 `192a516d`（三条独立证据 + 人眼看图，见 §15.9 与 `B47`）。
+反方向一条：第 54 段 `check:shell-unicode` 在 `main` 上是红的（`scripts/mutate-closeout-gates.sh:223/232/242`
+三处 `「$V1」`），本线 `1a6640f2` 已修 —— **落地会让 main 这一段从红变绿**。
+段 52–60 里 54 / 57 / 59 已单跑 **rc=0**（静态判据，理由写在 §15.9 的读数表），真浏览器与设备那六段
+全部留在"对端清空 + 负载门"后面，一条都不提前跑。
+
+**③ 交付 ⏸（前置不成立，不放宽闸门）** —— `pnpm reinstall:all` 的闸门是"链 rc=0"，而只要 `main`
+带着 organizer 那条红它就结构上不可达。本轮把 Windows 段的判据从两条补成**五条且住进单一所有者**
+（`scripts/lib/msix-install-facts.sh`：`ADD_APPX=OK` / `RESULT=OK` / `PAYLOAD_WEBDIST=True` /
+`M2D=OK` / `SHORTCUT_OK=True`，四个读取点已接上）；用户点名的「自动创建快捷方式」是
+`install-and-capture.ps1:110-133` 真建 `<Desktop>\heyta.lnk`（MSIX 走 `shell:AppsFolder` AUMID）
+并**读回来验**，判据即 `SHORTCUT_OK` —— 实现与判据齐，**未跑**（跑在 ③ 后面）。
+
+**④ 台账 ✅** —— 本节 + `B36` 第 2 条的 closure 指针 + 新登记 `B47`（那条挂上游的红）+
+`AGENTS.md` 三处漂移登记（`:35` 漏列 `ai-tool-call.ts`、`:37` 未提工具目录已按实体拆包、
+`:295` 写"2592 通过"实际 **7839**）+ `AGENTS §7` 索引 vs `environment-traps.md` 的缺号审计。
+`pnpm check:docs` rc=0。

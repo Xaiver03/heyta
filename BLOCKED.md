@@ -2690,6 +2690,15 @@ B30 写这两段"不是再跑一遍就好的东西"，并各自给了闭合代�
    （`scripts/verify-mobile-*.sh`），已就地改成 `${XY15C}` 并复验门禁只报地界外那三处 ——
    那是 `3fe7f590` 提交的真缺陷（验收日志里那个坐标读数会整个丢掉），不是顺手重构。
 
+   ✅ **2026-10-03 19:0x 由 AI 覆盖面那条线闭合（提交 `1a6640f2`）**：那三处已改成 `「${V1}」` 形状。
+   这是**同一个缺陷的第二次**（`1ac5913a` 修过 4 处、`cc974fbd` 又写出 3 处），而 `check:shell-unicode`
+   是**每一次 `pnpm check` 都跑**的一段 ⇒ 在本线落地之前 `main` 上第 54 段是红的。
+   现量（两条一对，负向不许单独成立）：
+   ```bash
+   git show main:scripts/mutate-closeout-gates.sh | LC_ALL=C grep -cE '\$V[123][」』]'   # 修复前形态 = 3
+   LC_ALL=C grep -cE '\$V[123][」』]' scripts/mutate-closeout-gates.sh                     # 载体上 = 0
+   ```
+
 ## B37. 🔴 我自己造的一次共享工作树事故（已还原，但形状必须留档）：为了让 package.json 只带我的 hunk，覆盖了并发会话两行未提交改动（2026-10-03 16:0x）
 
 **发生了什么**：任务 1 要往根 `package.json` 加 6 个 `verify:` 别名，而并发会话在同一文件里有
@@ -2746,3 +2755,37 @@ web 那一半用**接线断言**（`store.renameTag` 有真调用点、`Projects
 web store 有。要补的是 composer 里的层级选择器 —— 它落在"composer 留在各端"那一条既有分工里
 （`packages/ui/src/projects/model.ts` 文件头第 2 条），且需要一条新的界面判据（真机：选父级 → 笔记本读到 `parentId`）。
 本批任务书没点这一件，按"不顺手扩范围"登记，不当已做。
+
+## B47. 🔴 一条**不在本线**的产品缺陷挡住了本线的交付：侧栏清单名被四个动作按钮挤成零宽，读不出来（2026-10-03 18:5x 现量）
+
+**症状（人眼看图，不是断言推断）**：`e2e/test-results/calendar-sidebar-迷你月历…-chromium/test-failed-1.png`
+里侧栏「清单」区那一行显示的是 placeholder **「新清单」+ ✓**，刚创建的清单名**看不见**；
+它下面一行是四个动作图标（色槽 / 重命名 / 归档 / 删除）。
+
+**判据位置**：`e2e/tests/calendar-sidebar.spec.ts:86` 的
+`expect(sidebar.getByText(LIST, { exact: true })).toBeVisible()` ⇒ `Received: hidden`，
+两个 attempt 同一句 ⇒ **确定性**，不是负载抖动。机制：`192a516d` 给每行新加的动作组把名字
+挤成**零宽 flex item**（`name: { flexShrink: 1 }` 无 `minWidth`）。
+
+**为什么登记而不是就地修**：`git status --porcelain -- packages/ui` 此刻 10 个 `M`，
+`OrganizerList.tsx` 正被并行会话改（其未提交 diff 自证："Let the action group move as one unit
+instead of **shrinking the name down to a zero-width flex item**" + `minWidth: tokens['touch-target.min']`）。
+代改在飞的界面 = 制造第二次共享工作树事故（`B37` 那个形状）。
+
+**归属的三条独立证据**（全部零成本、可在干净检出复跑）：
+1. `git rev-parse <载体>:packages/ui` == `git rev-parse <main>:packages/ui` == `47513f2e…`，
+   而本批 40 笔提交在 `packages/ui/` 下**零文件** ⇒ 被测组件是 main 的字节。
+2. 配对 A/B：同一套 117 条用例，载体 `792f9b2d`（未并 `192a516d`）单跑 `115 passed / 0 failed`；
+   并进来之后 `112 + 3`。总数相等证明是同一套用例。
+3. 所有者工作树带那笔未提交修复跑整链时这两条 **✓35 / ✓36 全过**
+   （`/tmp/heyta-aed-check-final6.log:1243-1244`，载体 = 主检出工作树、非干净检出）。
+
+**代价（这条为什么要单独立账）**：它不是"一条用例红着"，它让 **AGENTS §6.1.1 的固定收尾在本线上
+结构上不可达** —— `pnpm check` 断在第 51 段 ⇒ `reinstall:all` 的"链 rc=0"前置永远不成立。
+按红线不吸收别人的债凑绿、不放宽闸门。
+
+**关闭判据**（由本线复跑，不需要谁点头）：
+```bash
+cd /private/tmp/heyta-final && git merge --no-edit main && pnpm build && pnpm check:ai-e2e
+# 期望 115 passed / 0 failed / 2 skipped（同一套 117 条）
+```
