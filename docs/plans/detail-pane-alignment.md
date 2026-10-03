@@ -1107,3 +1107,48 @@ W1 判据的一条修订（要拍板），而不是顺手重构。
    —— 且现在的预期写得更准了：**在主检出（node_modules 是真目录）里跑**，而不是"换个时间再试"。
    ⚠️ 本单**没有**为这两条重做变异验证：那两条门禁的判据不属于本单，给别人的门禁补"能不能失败"是替别人做事，
    本单只主张"判据本体这次真的跑到了、跑出来是绿"。
+
+## 8.20 W1 那句"跨视图通用"补一次**按 ViewKey 全枚举**的对账（2026-10-04 07:0x 现量）
+
+为什么要单独开这一节：Goal 的原话是"选中它可能需要应用到很多地方的，不能只应用到一个地方"。
+W1 落地时登记的是**词表三类 + 门禁那张三面行为臂表**，但**没有把外壳的每一个面逐个对过**；
+"有清单/标签/回收站/时间线的名字出现在要求里，而账本里只有 task/habit/note"这件事本身就该被读成一个疑点。
+本轮按 `apps/web/src/features/shell/view-tabs.ts:113` 的 **`ViewKey` 全部 11 项**枚举，逐面现量。
+取证方式：一次只读枚举 agent + 主线程**逐行读回**（结果：agent 给的 `TasksScreen.tsx:1046` 读出来是
+`busyTaskId={busyId}`（拖拽忙态）不是选中态 ⇒ **不采信**，这一行的教训与 §8.16 ### 3 同族）。
+
+| 面（ViewKey） | "当前哪一项"住在哪 | 是不是同一套 | 回落 | 详情面 |
+|---|---|---|---|---|
+| `tasks` | `useSelected('task')` `apps/web/src/App.tsx:237`，写入口 `:244` | ✅ 共享实例 `apps/web/src/lib/selection.ts:32`（`createSelectionStore`） | `App.tsx:791` 挂 `pruneSelectionFromEntities`（`lib/selection.ts:48`） | 接 |
+| `quadrant` | **同一个 task 槽**投影：`App.tsx:2243` `<QuadrantBoard activeTaskId={selectedTaskId}>` | ✅ 同一份，不是又接一个 | 同上 | 接 |
+| `timeline` | 同上：`App.tsx:2288 activeTaskId={selectedTaskId}` | ✅ | 同上 | 接 |
+| `habits` | `HabitsView.tsx:181 useSelected('habit')` | ✅ | 🔴 **两面不一样**：web `HabitsView.tsx:216` `rows.find(...) ?? rows[0]`；mobile `HabitsScreen.tsx:115/157` 不兜第一条、退回清单 | 接 |
+| `notes` | `NotesView.tsx:98 editingId = useSelected('note')` | ✅ | `:105` `?? null`（不兜第一条） | 接 |
+| `search` | 局部光标 `App.tsx:1211 searchCursor`（走结果数组，不走 DOM） | 刻意**不进** selection，理由写在 `lib/keyboard-cursor.ts:66-68`；打开结果时才写共享槽（`App.tsx:593` task / `:1297` note） | `App.tsx:1248-1249` `activeSearchEntry = … searchEntries[searchCursor] ?? null` | 不接（浮层） |
+| `trash` | 只有"二次确认目标" `TrashView.tsx:60 confirmingId`（`:66-69` 条目消失自动关） | 刻意不进表（`keyboard-cursor.ts:69`：↑↓ 在那里是"选恢复还是删除"） | 无 | 不接 |
+| `calendar` | **没有"选中一行"**：它的"当前"是某一天 `features/calendar/store.ts:42 selected: LocalDate` | 与 `SelectableKind` 不同性质；共享板 `packages/ui/src/calendar/*` 里 `onKeyDown`/`ArrowUp`/`ArrowDown`/`tabIndex`/`role="grid"` **零命中** ⇒ 这一面今天没有任何键盘光标 | 跨零点自动带走到今天（mobile `CalendarScreen.tsx:69-75`） | 不接（⇒ 见下面缺口①） |
+| `focus` | **没有"哪一项"**：`features/focus/store.ts:66 state`（计时状态机），关联任务只由 `start(taskId?)`（`:101`）带进来 | §6 明文"不许把番茄页塞进列表模型" | — | W7 的右栏读 `overview`，不读 selection |
+| `growth` / `settings` | 面本身不是列表（图与卡 / 浮层面板） | 没有可走的行 | — | 不接 |
+| **清单 / 标签**（rail 里的 PROJECT / TAG） | **不是选中，是筛选**：`ProjectsPanel.tsx:248`（清单）/ `:350`（标签）的 `onSelect` → `App.tsx:569 goToFilter` → `features/tasks/store.ts:235 filter` | 🔴 代码里写着为什么不进词表：`apps/web/src/lib/selection.ts:53-55`"清单/标签在两侧都是**筛选**（点它换中间那一栏）"；mobile 更硬：`ListsSection.tsx:174`"不传 `onSelect`：移动端没有侧栏筛选这个概念" | — | 不接 |
+
+⇒ 三条判定：
+
+1. **Goal 那句"不能只应用到一个地方"是成立的，而且成立的形状比"多处各接一份"更强**：
+   任务 / 四象限 / 时间线**共享同一个 task 槽**（`App.tsx:2243/2288` 两处投影，不是两份状态），
+   习惯与便签各占一个槽，两端各自只有**一份实例**（web `lib/selection.ts:32`、mobile `lib/selection.ts:30`）。
+   现量门禁：`node scripts/check-selection-single-source.mjs` ⇒ RC=0，"2 份实例 / 宿主内本地选中态 **0** 处 /
+   词表 3 类全有消费者（task 10 / habit 7 / note 13）/ 接线声明 17 处全部用起来"。
+2. **清单/标签/回收站/日历/专注不进词表是记录在案的决定**，不是漏做 —— 每条都有代码注释或本节行号可指。
+   ⚠️ 但本轮照出一个真的**文档缺口**：`CURSOR_VIEWS` 表外有六个 `ViewKey`，注释只写了两条理由（search / trash），
+   **calendar / focus / growth / settings 这四条是空的**，读起来就像"忘了加"。
+   ⇒ 本轮补的就是这一处（`apps/web/src/lib/keyboard-cursor.ts:63-84` 的注释，零行为变化；
+   配套读数：`pnpm --config.verify-deps-before-run=false --filter @heyta/web run typecheck` RC=0 且 `error TS` 计数 0、
+   `check:selection-single-source` RC=0、`check:layering` RC=0）。
+   🔴 本节**不新增判据**，所以也不给它配变异臂 —— 注释类改动没有可失败的判据，硬造一条只会得到一条永真的检查。
+3. **登记两条不归本单动手的缺口**（都不是 bug，是要拍板或属于别的时刻）：
+   - ① **日历的"当前那一天"两端分叉且没有理由注释**：web 在 `features/calendar/store.ts:42`（zustand），
+     mobile 在 `CalendarScreen.tsx:67`（屏内 `useState`）。要不要给它进词表、详情面对"某一天"显示什么 ——
+     是 C1 **#1** 的延伸，属产品决定。本单**不擅自统一**（那等于替 #1 拍板）。
+   - ② **专注的 `state.taskId` 是一个潜在的第二个 task 所有者**：今天由计时状态机持有、不进 selection，
+     W7 的右栏也不读它 ⇒ 现在无冲突。但如果以后要在专注面上"指出这一条任务"，那里会变成第二个写 `task` 槽的地方，
+     与 §3.5 那条"同形状的第二次"事故同族。登记在案，等真要做时先过这道账。
