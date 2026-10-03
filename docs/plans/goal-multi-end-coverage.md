@@ -1347,6 +1347,16 @@ Goal 原话点名的记账落点就是本节。**先建槽、后填读数** —�
     五臂夹具逐臂量过：`hang`→"N s 内没有返回"且 staple 0 次、`reject`→rc=1 分支、
     无 `timeout` 二进制的 `hang`→看门狗仍返回 124）。**但它救不了已经挂住的这一跑** ——
     上限只对下一趟生效；这一趟的 mac 段读的是它自己载体 `/tmp/heyta-reinstall/…` 那份旧代码。
+  - ✅ **05:4x ① 的"起跑前就绪表"**（每条都是只读探，为的是窗口一开就没有**可预备的**失败原因）：
+    | 端 | 前置现量 |
+    |---|---|
+    | mac | 公证 key 在 `~/Library/Private/AppStoreConnect/AuthKey_P68MYZ66HR.p8`；`/Applications/Heyta.app` 已装（段里会先卸） |
+    | windows | `ssh windows-pc` 可达；远端默认 shell 是 **cmd 不是 PowerShell**（我第一发 `if (Test-Path …)` 被原样 echo、`whoami` 没执行）；`C:\src\heyta` = YES、`apps\web\dist\index.html` = YES、**没有 dotnet 在跑**（不抢 `C:\src\heyta`） |
+    | android | `emulator-5554` 在线；此刻 `com.heyta` pid 20246 **在跑** ⇒ 这一条是唯一还没空的设备门 |
+    | ios | 三台 booted 的 `launchctl` 全读空（05:3x 现量 0/0/0），启动器那条"逐台挑没跑着 com.heyta 的那台"三台都合格 |
+    ⚠️ 顺带一条**会被误读成缺陷**的形态：远端 cmd 的中文输出是 GBK，`tasklist` 那句"没有运行的任务…"在
+    本地看就是乱码 ⇒ **判"远端没在跑"要认结构化的 `echo YES/NO`，别拿乱码句子做 needle**
+    （三层引号套 PowerShell 在这台机器上还会静默空输出，是同一族的另一面）。
     📌 所以 ① 的解除条件不是"负载降下来"，而是**那条 pid 95477 消失**（现量命令
     `lsof -nP -t -- apps/desktop-macos/scripts/package-app.sh` 为空 **且** `pgrep -f 'reinstall-all\.sh'` 为空）。
   - ⚠️ **05:3x 两条与 ① 直接相关的现场**（都要带时刻读，它们会反过来）：
