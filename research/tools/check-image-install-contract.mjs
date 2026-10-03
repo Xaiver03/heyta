@@ -44,7 +44,7 @@
 import { readFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { readImageInstallShape } from './image-install-shape.mjs';
+import { readImageInstallShape, readProductionStage } from './image-install-shape.mjs';
 
 const ROOT_DEFAULT = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 
@@ -298,6 +298,71 @@ if (extraRoot.length > 0 || missingRoot.length > 0) {
   );
 }
 
+// ── 5. "装得上"的两条腿：devDependencies 要在第一条 install **之前**摘掉，
+//        而 `dependencies` 档每一枚 `@heyta/*` 都要给得出货 ────────────────────
+//
+// 为什么这一条存在（现量，不是推测）：main `b3397cda`（ADR-0050 密钥批次）把
+// `@heyta/app-host` / `@heyta/storage` / `@heyta/sync-client` 加进了 `server/package.json`
+// 的 **devDependencies** —— 对本机 `pnpm test` 是对的，对镜像构建是致命的：
+// **npm 在 `--omit=dev` 下仍然会解析 devDependencies 的每一枚 spec**，而这三个名字只存在于
+// 本机 pnpm 工作区，registry 上就是 404 ⇒ 生产阶段的第一条 install 当场死。
+// 实测（**与镜像同款** node:24-alpine / npm 11.19.0，install 命令按本文件原样）：
+//   带着三枚 devDep ⇒ 第一条就 `code E404 … GET …/@heyta%2fapp-host`，rc=1；
+//   装之前 `npm pkg delete devDependencies` ⇒ 同样两条 rc=0（`added 4 packages`）。
+// 读数与变异见 `docs/research/self-host-distribution-audit.md` §8.59。
+const stageLines = readProductionStage(dockerfilePath);
+if (!shape.prunesDevDependencies) {
+  fail(
+    '生产阶段没有在**第一条 install 之前**删掉 devDependencies',
+    [
+      '  需要一句 `npm pkg delete devDependencies`，位置严格早于第一条 install（同一个 RUN 的第一步，',
+      '  或更早的一个 RUN）。判"在不在"用的是**步骤顺序**，不是"文件里出现过这句话"—— 装在 install',
+      '  之后等于没装：那一层已经死了。',
+      '',
+      '  删掉它不改变装出来的东西（`--omit=dev` 本来就不装 dev 包；`prisma` CLI 由第 1/2 步那条',
+      '  点名的 install 供给），只改变"这层能不能建成"。',
+      '  不修的后果长这样：`pnpm check` 全绿（链从不构建镜像），而外人 `docker compose up -d --build`',
+      '  在依赖那一层 E404 —— 正是本批次要消灭的那类对外错话。',
+    ].join('\n'),
+  );
+}
+
+// 5b. `dependencies` 档没有"摘掉"这个选项 —— 它是真要装进镜像的，所以每一枚 `@heyta/*`
+//     必须同时 (i) 被 COPY 进生产阶段 (ii) 出现在某条 install 的 specs 里。
+//     这一腿挡的是"往 dependencies 里加一枚本地包却没给 tgz"，与第 5 步是同一个 E404、
+//     但修法不同（那一条只能"多给一枚货"）。
+const tgzSource = new Map(); // "./sync-core.tgz" -> "sync-core"（COPY 来源里的 packages/<目录>）
+for (const line of stageLines) {
+  const dest = line.match(/^COPY\b.*?(\.\/[\w.-]+\.tgz)\s*$/);
+  const dir = line.match(/packages\/([\w.-]+)\//);
+  if (dest && dir) tgzSource.set(dest[1], dir[1]);
+}
+const installSpecs = shape.installs.flatMap((i) => i.specs);
+const unsupplied = [];
+for (const name of Object.keys(serverPkg.dependencies || {})) {
+  if (!name.startsWith('@heyta/')) continue;
+  const dir = name.slice('@heyta/'.length);
+  const hit = installSpecs.find((s) => tgzSource.get(s) === dir);
+  if (!hit) {
+    unsupplied.push(
+      `${name}（应在 packages/${dir}）—— 生产阶段没有 COPY 它的 tgz，或 COPY 了却没进任何一条 install`,
+    );
+  }
+}
+if (unsupplied.length > 0) {
+  fail(
+    `server/package.json 的 dependencies 里有 ${unsupplied.length} 枚本地包没被供上货`,
+    [
+      ...unsupplied.map((s) => `  · ${s}`),
+      '',
+      '  npm 会先拿本地 tarball 去满足 "*"，供不上就转向 registry ⇒ E404（这三枚是我们自己的包，',
+      '  registry 上永远没有）。修法是在生产阶段加一条 `COPY --from=builder .../heyta-<名>-*.tgz ./<名>.tgz`',
+      '  并把它写进**第一条** install 的 specs（同一条里给多枚，npm 才能就地满足包与包之间的依赖）。',
+    ].join('\n'),
+  );
+}
+
+const localDepCount = Object.keys(serverPkg.dependencies || {}).filter((n) => n.startsWith('@heyta/')).length;
 console.log(
   `✅ 镜像安装合同：prisma CLI 三处同源（package.json @prisma/client ${declaredClient} ` +
     `= Dockerfile 字面量 ${dockerfilePin}${declaredCli ? ` = devDeps prisma ${declaredCli}` : ''}` +

@@ -48,7 +48,7 @@ import { createHash } from 'node:crypto';
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { readImageInstallShape } from './image-install-shape.mjs';
+import { readImageInstallShape, readServerInstallInput } from './image-install-shape.mjs';
 import { readImageLock } from './image-lock-platform.mjs';
 
 const repoRoot = fileURLToPath(new URL('../..', import.meta.url)).replace(/\/$/, '');
@@ -262,17 +262,32 @@ if (snapshot.installedTree) {
 
 // ── 新鲜度：快照描述的必须是**当下**这套声明（只对预测快照成立）──────
 const stale = [];
-const currentPkgSha = sha256(readFileSync(join(repoRoot, 'server/package.json'), 'utf8'));
-if (!INSTALLED_TREE && currentPkgSha !== snapshot.inputs?.serverPackageJsonSha256) {
-  stale.push('server/package.json 变了（快照里的哈希与当下不一致）');
-}
+// 🔴 这两枚哈希都从**同一个共享模块**读（`image-install-shape.mjs`），不在这里自己再算一遍：
+// "package.json 里哪些字段算改变镜像那棵树"本身就是会漂的那个判断，而它以前住在两个文件里
+// 各写一遍（各自 `sha256(整个文件)`）。现量：main `b3397cda` 只动了 `scripts` 与三枚
+// devDependencies，载体上这条新鲜度判据就红了 —— 红得没错（它盖住了"改了没重跑"），
+// 但那种红教不会任何人任何东西，而它恰恰会盖住真正要紧的那一档。
+let currentPkgSha = null;
 let currentShapeSha = null;
 if (!INSTALLED_TREE) {
   try {
-    currentShapeSha = sha256(readImageInstallShape(join(repoRoot, 'server/Dockerfile')).normalizedShape);
+    const stage = readImageInstallShape(join(repoRoot, 'server/Dockerfile'));
+    currentShapeSha = sha256(stage.normalizedShape);
+    currentPkgSha = readServerInstallInput({
+      serverPkgPath: join(repoRoot, 'server/package.json'),
+      prunesDevDependencies: stage.prunesDevDependencies,
+    }).sha256;
   } catch (e) {
-    stale.push(`Dockerfile 的生产阶段读不出来了：${e.message}`);
+    stale.push(`生产阶段或装依赖的输入读不出来了：${e.message}`);
   }
+}
+if (currentPkgSha && currentPkgSha !== snapshot.inputs?.serverInstallInputSha256) {
+  stale.push(
+    'server/package.json 里**能改变那棵树**的那几档变了（快照里的哈希与当下不一致）' +
+      (snapshot.inputs?.serverPackageJsonSha256
+        ? '；顺带说一句：这份快照钉的还是整个文件的字节哈希，那是上一版判据 —— 重跑生成器就会换成新的键'
+        : ''),
+  );
 }
 if (currentShapeSha && currentShapeSha !== snapshot.inputs?.installShapeSha256) {
   stale.push('server/Dockerfile 里生产阶段那几条 install 命令的形状变了');

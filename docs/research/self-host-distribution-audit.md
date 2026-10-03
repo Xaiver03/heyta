@@ -3674,6 +3674,120 @@ en 'site.platforms.web.body':
 它和 §7 第 89 类（`comm` 前没排序）、"值对得上不等于它就是那个角色"同一个根：
 **判据的比较语义必须交给拥有该语义的那一层**（目录包含交给 git / 排序交给 `sort` / 版本交给锁文件）。
 
+### 8.59 G-54：main 那一笔把**镜像构建本身**打死了，而 `pnpm check` 全绿（07:2x，载体侧现量照出来的）
+
+这一条不是"载体上多一道红要处理"，是**外人一条 compose 起全套这件事在此刻不成立**。
+发现路径很偶然：§8.55 之后我第一次把链里"纯 fs 那一段"搬到**没有 node_modules 的合并载体**上跑，
+想给 #1 的关闭判据攒一份逐段归属读数 —— `check:image-license` 在其中报了一处失真：
+`server/package.json 变了（快照里的 serverPackageJsonSha256 与当下不一致）`。
+顺着这一条往下挖，底下压着的是一枚构建期炸弹。
+
+**① 机制（实测，不是推理）。** main 侧 `b3397cda`（`feat(server,app-host,web,mobile): vault/E2EE 密钥生命周期与找回（ADR-0050）`，
+2026-10-03 23:58）往 `server/package.json` 的 **devDependencies** 里加了三枚只存在于本机 pnpm 工作区的包：
+`@heyta/app-host` / `@heyta/storage` / `@heyta/sync-client`，值都是 `"*"`。
+🔴 **npm 在 `--omit=dev` 下仍然会解析 devDependencies 的每一枚 spec** —— 它不装它们，但它要先**解**它们；
+registry 上这三个名字是 404 ⇒ 生产阶段那条 `npm install` **在装第一个包之前就死**。
+而 `dependencies` 那一档的三枚 `@heyta/*` 之所以一直没炸，是因为 Dockerfile 先把三枚 tgz COPY 进生产阶段、
+再在**第一条** install 里把它们作为实参给出（`server/Dockerfile:286`），npm 就地满足、不去 registry。
+devDependencies 没有这条供给路径，也没有"就地满足"这个选项。
+
+**② 鉴别实验（用镜像同款 npm，不是本机那一版）。** 本机是 npm 10.9.4，运行时镜像是 `node:24-alpine` ⇒ npm **11.19.0**，
+跨大版本在 dev 解析上完全可能不同，所以两版都跑了：
+
+| 臂 | package.json 形状 | 第一条 install（三枚 tgz） | 第二条 install（裸） |
+|---|---|---|---|
+| A 现状（= main 那笔之后） | 3 枚 `@heyta/*` devDep | **rc=1 `code E404 … GET …/@heyta%2fapp-host`** | rc=1 同 |
+| B 装之前先 `npm pkg delete devDependencies` | 同上 | **rc=0**（`added 4 packages`） | rc=0 |
+| 反证（同锁、同镜像，去掉那三枚 devDep） | 无 | rc=0 | rc=0 |
+
+两臂在 npm 10.9.4 与 11.19.0 上同形。三枚生产依赖用**桩 tarball** 供给（这里问的是"npm 会不会去 registry 取 dev 那一档"，
+桩不影响这个问题）；第一臂还顺手抓到我自己一次 harness 缺陷 —— 桩产物名是 `heyta-domain-1.0.0.tgz`，
+而 Dockerfile 找的是 `./domain.tgz`，于是两臂**都** rc=254、看起来像"fix 无效"。文件名对不上不代表机制不成立。
+
+⚠️ **边界（别读多）**：我**没有**在 main 那棵树上跑过一次真 `docker build`（要 10+ 分钟和一个低负载窗口）。
+上面那三行是"按生产阶段原样的两条命令 + 同款 npm"级别的证据；
+真构建那一层的证据落在**带修法的那一趟**（载体重算之后跑 `verify:selfhost-stack`，见下面"还欠的"）。
+
+**③ 修法落在哪：落在我们这一侧，而且不改他们那笔。** 他们往 devDeps 放这三枚是**对本机 `pnpm test` 正确**的改动；
+错的是"镜像构建会读到同一份 package.json"这件事没人想过。所以修法是在生产阶段装依赖之前把它摘掉 ——
+`server/Dockerfile` 的 install RUN 加**第一步** `npm pkg delete devDependencies`：
+不改变装出来的任何东西（`--omit=dev` 本来不装 dev 包；`prisma` CLI 仍由那条点名的 install 供给），
+只改变"这一层能不能建成"。它是本批自己的文件，动它不需要谁同意；动他们的 `server/package.json` 需要。
+
+**④ 顺带修掉的那件"红得没道理"的事（同一个哈希的两头）。** 新鲜度判据原来哈希的是
+**整个 `server/package.json` 的字节**，于是 main 那一笔里连 `scripts` 的 vitest 清单也算"快照过期"——
+而 `image-install-shape.mjs` 文件头早就写着它对 Dockerfile 的正确立场：
+"只哈希装东西的那几行，否则改一行注释就会让快照看起来过期，而那种红灯教不会任何人任何东西"。
+**同一个道理当时只落在了 Dockerfile 那一侧。** 现在两处都归一个所有者：
+`readServerInstallInput()` 按**显式分区**取哈希（`TREE_AFFECTING` = dependencies / optionalDependencies / overrides /
+peerDependencies / bundleDependencies；`INERT` = scripts / name / engines / … 各带一句为什么），
+而**没被判定过的新顶层字段直接红并点名**（默认值必须是"要人回答一次"，不是"悄悄算进去"或"悄悄不算"）。
+`devDependencies` 的惰性写成**有条件的**：条件就是第 ③ 步那条 RUN 在场，由 `prunesDevDependencies` 现读 Dockerfile 判定；
+**不在** ⇒ 这一档自动挪回被哈希的集合。键名跟着换（`serverPackageJsonSha256` → `serverInstallInputSha256`），
+`--check` 里另加一条"钉的还是旧键"的点名，免得换代变成一次看不懂的红。
+两个消费者（生成器 + 对账）现在共享这同一份判断 —— 这条改动本身的正当性不需要各证一遍，
+需要证的是**分区表有分辨力**（下面第 ⑥ 点）。
+
+**⑤ 重生成是零行为变化的，而且是量出来的。** `node research/tools/gen-image-npm-tree.mjs` 重跑之后：
+
+| 量 | 读数 |
+|---|---|
+| `packages` 逐字节相同 | **true**（146 条 / 146 条） |
+| `inputs` 缺键 | 只有 `serverPackageJsonSha256`（旧键，故意不保留） |
+| `inputs` 新键 | 只有 `serverInstallInputSha256` |
+| `inputs` 里值变了的其它键 | **0** —— 第 ③ 步那句 Dockerfile 改动**没有**动 `installShapeSha256`（它只哈希 install 那几条，`npm pkg delete` 不是 install） |
+
+`check:image-license` 三条腿在分支上复跑全 ✅；四个邻居 `check:image-build-args` / `check:script-snapshot` /
+`check:gate-wiring` / `check:selfhost-entry-command` 各 rc=0（`pnpm` 未报 ELIFECYCLE）。
+🔴 那条 `rc=` 打空的老账又踩了一次：这次是 zsh 下 `${PIPESTATUS[0]}` 为空 —— 判绿只认 rc 与 summary 行，见 §7 第 45 条那一族。
+
+**⑥ 变异台：10 臂 / 12 条判定，`bad=0`**（`/tmp/g54-arms.mjs`，全部在 `/tmp` 的一次性副本里做，
+收尾逐路径打 `git status` 证明工作树只剩我自己改的 6 枚）。其中三臂是**这次改动的目的**，期望值是**绿**：
+
+| 臂 | 期望 | 读数 |
+|---|---|---|
+| control（原样） | 两个脚本都绿 | ✅ rc=0 ×2 |
+| 5a-1 删掉 prune 那一步 | contract 红 | ✅ rc=1，点名"第一条 install 之前" |
+| 5a-2 把 prune 挪到所有 install **之后** | contract 红 | ✅ rc=1 —— 判的是**步骤顺序**，不是"文件里出现过这句话" |
+| 5a-3 只在注释里留着那句话 | contract 红 | ✅ rc=1 |
+| 5b-1 声明照旧但摘掉 domain 那枚 tgz 的 COPY | contract 红 | ✅ rc=1，点名 `@heyta/domain（应在 packages/domain）` |
+| 分区-1 只改 `scripts` 一个字符 | 快照**不该**再判过期 | ✅ rc=0（旧判据在这里必红 —— 这正是载体上那一处失真） |
+| 分区-2 改 `dependencies` 的范围 | 必须红 | ✅ rc=1 |
+| 分区-3 加一个没判定过的顶层字段 | 必须红且点名 | ✅ rc=1，点名 `heytaMystery` |
+| 分区-4 **复刻 main 那一笔**（devDeps+scripts） | 快照绿 **且** 5a 仍绿 | ✅ rc=0 ×2 |
+| 分区-4b 同一份 package.json，但把 prune 摘掉（= main 当下那棵树） | 必须红 | ✅ rc=1，消息里带着 E404 那一手 |
+
+⚠️ 第一版的 5b 臂我用的是"往 dependencies 里加一枚 `@heyta/ui` 不供货" —— 它**确实**红了，
+但红在第 4c 腿（"锁的根条目与声明互相缺项"），我的新消息一次都没机会打印。
+🔴 **一臂变异如果先撞上更靠前的那道腿，它证明的是那道腿有牙，不是新腿有牙**；
+换成"声明不动、只摘 COPY"才只让新腿可命中。这类"needle 未命中但 rc 对"要靠**同时断言两件事**才照得出来。
+
+**⑦ 这轮顺手拿到的 #1 逐段归属读数**（在**无 node_modules 的载体** `c8664057` 上跑链里纯 fs 那一段，
+`/tmp/carrier-static.log`）：`green=33 needsdeps=5 red=13`，红集
+`op-log-semantics, ui-provider, theme, selection-single-source, widgets, ui-language, legal-permissions,
+image-license, crosslang-contract, journey-coverage, ai-tools, ai-coverage, web-artifact`，载体脏文件=0。
+其中 4 条（`ai-tools`/`web-artifact`/`crosslang-contract`/`op-log-semantics`）的报错原文就是"读不到构建产物 / 基线不绿"，
+属"这段本来就得起依赖"，不是产品红；`image-license` 那条就是本节这条；
+剩下的 `legal-permissions`（AndroidManifest 里 `SCHEDULE_EXACT_ALARM` 不在登记表）看着像 W9 那一族。
+🔴 **逐条归属到"非本批"这一步还没做完** —— 关闭判据要求的是每条红都能在**干净 main** 上同样复现，
+那需要一个 main 的 detached 检出跑同一段（见"还欠的"）。
+
+#### 本节新增与结转的编号
+
+| 号 | 状态 | 事项 |
+|---|---|---|
+| **G-54** | 🔴 **修法已提交在本分支，判据已落，真构建那一层证据未取** | `server/package.json` 的 devDependencies 里有 registry 上取不到的本地包 ⇒ `npm install --omit=dev` **在 `--omit=dev` 下仍解析 dev spec** ⇒ 镜像生产阶段第一条 install 就 E404。归属：main `b3397cda`（不是本批引入），但**它同样挡在本批的落地件上**，因为载体取的是 main 那一版 `server/package.json`。修法 `server/Dockerfile` 装之前 `npm pkg delete devDependencies` + 第 5 步两腿判据 + 新鲜度哈希按字段分区。⚠️ **本批那句"外人一条 compose 起全套"在 main 当下的树上是假的** —— 而它不在任何一道 `pnpm check` 的可见范围里（链从不构建镜像），这正是 §8.11 那条"验收脚本把自己要验的默认值换掉"的又一种面目 |
+| **G-54b** | 登记，不动 | "往 `dependencies` 里加一枚 `@heyta/*` 却没给 tgz" 这一类由第 5b 腿挡住了；**往 devDependencies 加**这一类只被 prune 挡住。两种形状不同源，注释里各写了一句，别合并成一句 |
+
+#### 还欠的（别当已完成）
+
+1. **真构建**：载体重算（带上本节这几笔）之后跑一次 `verify:selfhost-stack`，看生产阶段那层建成、
+   并且 `check:image-license` 在载体上从 🔴 变 ✅。这一步同时是 #2 的第 N 趟现量。
+2. **main 侧同段复跑**：拿一个 main 的 detached 检出跑**同一条**纯 fs 段，把上面那 13 条红逐条归属
+   （"main 也红" = 非本批；"只有载体红" = 接缝）。这是 #1 关闭判据要求的那一句，不是可选项。
+3. **协调项**：他们那笔对**服务端 `pnpm test`** 是必要的。如果他们以后往 `dependencies` 里也放工作区包，
+   5b 腿会红并给出补 tgz 的修法 —— 届时要说清的是"这三枚为什么要进生产树"，不是"怎么让门禁闭嘴"。
+
 
 
 

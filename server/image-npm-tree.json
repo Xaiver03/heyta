@@ -1,6 +1,6 @@
 {
   "_what": "镜像生产阶段（`server/Dockerfile` 的 FROM … AS production）会装的那棵依赖树，**由提交物锁 `server/package-lock.json` 导出**。不是清单、不是许可判定 —— 判定在 research/tools/check-image-license-coverage.mjs。",
-  "generatedAt": "2026-10-03T21:19:36Z",
+  "generatedAt": "2026-10-03T23:21:43Z",
   "generator": "research/tools/gen-image-npm-tree.mjs",
   "inputs": {
     "targetPlatform": {
@@ -9,7 +9,7 @@
       "libc": "musl"
     },
     "registry": "https://registry.npmjs.org/",
-    "serverPackageJsonSha256": "b152bf0433395e3f42470baa04d9d6f0b7ae26b58a84c940de679858b72a8c74",
+    "serverInstallInputSha256": "59836b4113b0aa2837bbe451d45dd4d882483ac3816fc132d54e7c305ad0e1dc",
     "installShapeSha256": "4b555c29f4aab19827e73338bb4ef15b24ce5fb33443799d7c76504424b89f12",
     "packedWorkspaceDeps": [
       "@heyta/domain",
