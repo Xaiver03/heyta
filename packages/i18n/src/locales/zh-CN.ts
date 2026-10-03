@@ -3996,6 +3996,33 @@ export const zhCN = {
   // 这两个文件此刻在别的会话里也是脏的，重排/格式化会造出一场没人能解的三方冲突。
   'mobile.countdown.entry': '倒数纪念日',
   'mobile.countdown.entry.hint': '记下要盯的日子，看它还有几天',
+  // ── W4b：后台「调休 / 补班」录入面板（公共事实的唯一写入口）─────────
+  // ⚠️ 两条措辞约束，都是产品语义不是修辞：
+  //   1. 撤销那一年**不等于**"那一年没有任何安排" —— 未覆盖的年份各端读的是
+  //      App 随包的国务院公告数据（`packages/domain` 的 holiday-cn 生成物），
+  //      所以界面必须说"退回随包数据"，说成"清空"会让运营以为撤销完日历上什么都不标。
+  //   2. 这一层**不判日期合法性**（判据在 `holidayYearPutSchema`），
+  //      所以文案不许出现"格式正确才能保存"这类承诺 —— 失败了界面只会转述服务端的拒绝。
+  'web.admin.tab.holidays': '调休/补班',
+  'web.admin.holiday.lead': '这里录入的是覆盖表：某一年一旦被整年替换，各端就用它，不再用随包的公告数据。',
+  'web.admin.holiday.list': '已录入的年度',
+  'web.admin.holiday.version': '内容版本：{version}',
+  'web.admin.holiday.dayCount': '{count} 天安排',
+  'web.admin.holiday.list.none': '还没有录入过任何一年，各端读的都是随包数据。',
+  'web.admin.holiday.revoke': '撤销这一年',
+  'web.admin.holiday.revoke.confirm': '撤销之后，那一年退回随包的公告数据，日历仍按那份数据标注休与班。',
+  'web.admin.holiday.revoke.yes': '确认撤销',
+  'web.admin.holiday.form.title': '录入一整年',
+  'web.admin.holiday.form.lead': '一次提交替换整年：这里写的就是那一年的全部安排，没有列到的日期一律按"正常上班"处理。',
+  'web.admin.holiday.form.year': '年份',
+  'web.admin.holiday.form.papers': '公告原文链接（一行一条，必须至少一条）',
+  'web.admin.holiday.form.offDays': '放假日期（一行一个 YYYY-MM-DD）',
+  'web.admin.holiday.form.workDays': '补班日期（一行一个 YYYY-MM-DD）',
+  'web.admin.holiday.form.note': '运营备注（只给后台看，不下发给客户端）',
+  'web.admin.holiday.save': '保存这一年',
+  'web.admin.holiday.notice.saved': '{year} 年已保存，共 {count} 天安排。',
+  'web.admin.holiday.notice.deleted': '{year} 年的录入已撤销，那一年退回随包的公告数据。',
+  'web.admin.holiday.notice.failed': '没有保存：服务端拒绝了这次录入，原因见上面的提示。',
 } as const;
 
 /**

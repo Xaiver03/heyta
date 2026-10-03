@@ -20,7 +20,11 @@ import { describe, expect, it, vi, type Mock } from 'vitest';
 
 import {
   ADMIN_API_PREFIX,
+  adminForceUserLogout,
+  adminDeleteHolidayYear,
+  adminPutHolidayYear,
   adminUnlockUser,
+  fetchAdminHolidayYears,
   fetchAdminOverview,
   fetchAdminUsers,
   type AdminClientOptions,
@@ -147,5 +151,90 @@ describe('🔴 失败原因是可区分的（403 ≠ 401 ≠ 网络）', () => {
     const fetchImpl = stubResponse(200, payload);
     const result = await fetchAdminOverview(withFetch(fetchImpl));
     expect(result).toEqual({ ok: true, data: payload });
+  });
+});
+
+/* ──────────────────────────────────────────────────────────────────────────
+ * 调休 / 补班（W4b 的三条管理端点）。
+ *
+ * 这一组钉的是**传输**，不是界面：
+ *   · 写面（PUT / DELETE）与读面（GET）**必须共用同一道令牌闸** ——
+ *     `AGENTS` §3.5 说"第二份 fetch 意味着第二份令牌闸"，这条就是防它的；
+ *   · PUT 是**整年替换**，所以年份只能出现在 body 里（契约 `holidayYearPutSchema`）；
+ *   · DELETE 的年份只能出现在**查询串**里，且**不带动作体**。
+ *     理由不是风格：契约 `HOLIDAY_ADJUSTMENT_PATHS.adminDelete` 写明
+ *     "同一个数字两个来源"要额外一条守卫才拦得住，而那条守卫的缺失是静默的。
+ * ──────────────────────────────────────────────────────────────────────── */
+const HOLIDAY_PAYLOAD = {
+  year: 2027,
+  papers: ['https://www.gov.cn/gongbao/content/2026/content_12345.htm'],
+  note: '据 2026-11 调整公告',
+  days: [
+    { day: '2027-01-02', isOffDay: true },
+    { day: '2027-01-09', isOffDay: false },
+  ],
+};
+
+describe('🔴 调休 / 补班三条端点的传输形状', () => {
+  it('GET 打的是 /api/admin/holiday-adjustments，方法默认 GET 且无 body', async () => {
+    const fetchImpl = stubResponse(200, { version: '1.1.2', years: [] });
+
+    const result = await fetchAdminHolidayYears(withFetch(fetchImpl));
+
+    expect(result.ok).toBe(true);
+    const [url, init] = fetchImpl.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe(`${BASE}${ADMIN_API_PREFIX}/holiday-adjustments`);
+    expect(init.method).toBe('GET');
+    expect(init.body).toBeUndefined();
+  });
+
+  it('PUT 是整年替换：方法 PUT、路径不带年份、年份与逐日表都在 body 里', async () => {
+    const fetchImpl = stubResponse(200, { ok: true, year: 2027, papers: [], dayCount: 2 });
+
+    await adminPutHolidayYear(withFetch(fetchImpl), HOLIDAY_PAYLOAD);
+
+    const [url, init] = fetchImpl.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe(`${BASE}${ADMIN_API_PREFIX}/holiday-adjustments/years`);
+    expect(url).not.toContain('2027');
+    expect(init.method).toBe('PUT');
+    expect(JSON.parse(String(init.body))).toEqual(HOLIDAY_PAYLOAD);
+    expect((init.headers as Record<string, string>)['content-type']).toBe('application/json');
+  });
+
+  it('DELETE 的年份只在查询串里，且**不带动作体**（两个来源 = 一条多余的守卫）', async () => {
+    const fetchImpl = stubResponse(200, { ok: true, year: 2027, deleted: 1 });
+
+    await adminDeleteHolidayYear(withFetch(fetchImpl), 2027);
+
+    const [url, init] = fetchImpl.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe(`${BASE}${ADMIN_API_PREFIX}/holiday-adjustments/years?year=2027`);
+    expect(init.method).toBe('DELETE');
+    expect(init.body).toBeUndefined();
+    expect(init.headers as Record<string, string | undefined>).not.toHaveProperty('content-type');
+  });
+
+  it('🔴 未登录时 PUT 与 DELETE 也一个请求都不发（写面与读面同一道闸）', async () => {
+    const fetchImpl = stubResponse(200, {});
+    const options = withFetch(fetchImpl, { getToken: async () => undefined });
+
+    expect(await fetchAdminHolidayYears(options)).toEqual({ ok: false, reason: 'no-token' });
+    expect(await adminPutHolidayYear(options, HOLIDAY_PAYLOAD)).toEqual({
+      ok: false,
+      reason: 'no-token',
+    });
+    expect(await adminDeleteHolidayYear(options, 2027)).toEqual({ ok: false, reason: 'no-token' });
+    // 这条是"第二份 fetch 会带出第二份令牌闸"的正面答案：新动词走的还是同一条短路。
+    expect(fetchImpl).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    [400, 'invalid'],
+    [401, 'unauthorized'],
+    [403, 'forbidden'],
+    [500, 'server'],
+  ] as const)('PUT 遇到 HTTP %i ⇒ %s（失败原因与读面同一套词表）', async (status, reason) => {
+    const fetchImpl = stubResponse(status, { error: 'x' });
+    const result = await adminPutHolidayYear(withFetch(fetchImpl), HOLIDAY_PAYLOAD);
+    expect(result).toEqual({ ok: false, reason, status });
   });
 });

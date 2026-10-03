@@ -3755,4 +3755,27 @@ export const en = {
   // W8（三端接线）：与 zh-CN.ts 同批追加的两条，**中英成对**（`check:ui-language` 拦）。
   'mobile.countdown.entry': 'Countdowns',
   'mobile.countdown.entry.hint': 'Keep the dates you watch, and see how far off they are',
+  // W4b: the admin "work-day changes" panel. Same two wording constraints as zh-CN:
+  // revoking a year falls back to the bundled gazette data (it is NOT "empty that year"),
+  // and the UI never claims to validate dates - the server contract is the only judge.
+  'web.admin.tab.holidays': 'Work-day changes',
+  'web.admin.holiday.lead': 'What you enter here is an override: once a year is replaced, every client reads it instead of the bundled gazette data.',
+  'web.admin.holiday.list': 'Recorded years',
+  'web.admin.holiday.version': 'Content version: {version}',
+  'web.admin.holiday.dayCount': '{count} scheduled days',
+  'web.admin.holiday.list.none': 'No year recorded yet, so every client is reading the bundled data.',
+  'web.admin.holiday.revoke': 'Revoke this year',
+  'web.admin.holiday.revoke.confirm': 'After revoking, that year falls back to the bundled gazette data and the calendar still marks rest and work days from it.',
+  'web.admin.holiday.revoke.yes': 'Confirm revoke',
+  'web.admin.holiday.form.title': 'Record a whole year',
+  'web.admin.holiday.form.lead': 'One submission replaces the entire year: what is written here is all of that year, and any date not listed stays a normal working day.',
+  'web.admin.holiday.form.year': 'Year',
+  'web.admin.holiday.form.papers': 'Gazette source links (one per line, at least one)',
+  'web.admin.holiday.form.offDays': 'Days off (one YYYY-MM-DD per line)',
+  'web.admin.holiday.form.workDays': 'Make-up working days (one YYYY-MM-DD per line)',
+  'web.admin.holiday.form.note': 'Operator note (admin only, never delivered to clients)',
+  'web.admin.holiday.save': 'Save this year',
+  'web.admin.holiday.notice.saved': 'Saved {year}: {count} scheduled days.',
+  'web.admin.holiday.notice.deleted': 'The {year} entry has been revoked; that year falls back to the bundled gazette data.',
+  'web.admin.holiday.notice.failed': 'Not saved: the server rejected this submission, see the message above for why.',
 } satisfies Record<MessageKey, string>;
