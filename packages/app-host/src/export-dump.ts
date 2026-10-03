@@ -34,7 +34,7 @@
  * ─────────────────────────────────────────────────────────────────────────
  */
 
-import type { Priority, Task } from '@heyta/domain';
+import { localTimeOf, type LocalTime, type Priority, type Task } from '@heyta/domain';
 import { bucketFor, type MaterializedState } from '@heyta/op-log';
 import { CURRENT_SCHEMA_VERSION, ENTITY_TYPES } from '@heyta/shared-schema';
 import type { Operation } from '@heyta/sync-core';
@@ -248,6 +248,15 @@ export interface ExportTaskRow {
   completed: boolean;
   /** 本地日期 `YYYY-MM-DD`（时区语义来自宿主，复用 `toLocalDateString`）。 */
   dueDate?: string;
+  /**
+   * 本地时刻 `HH:MM`，**没有时刻（"只到日"）时整个键缺席**。
+   *
+   * 🔴 为什么必须有这一栏：`toLocalDateString` 是**有损**的 —— 它只留日。
+   * 一条"明天 16:00"的任务在没有 `dueTime` 的清单里会被写成"明天"，
+   * 而清单看起来是完整的：用户看不出丢了什么，核对的人也看不出导出少了一栏。
+   * 这类"静默有损"正是本文件开头对墓碑的那条纪律要防的东西。
+   */
+  dueTime?: LocalTime;
   priority?: Priority;
   projectName?: string;
   /** 已解析成名字并排序。 */
@@ -273,12 +282,16 @@ function toExportTaskRow(task: Task, state: MaterializedState): ExportTaskRow {
     .map((id) => state.tags[id]?.name)
     .filter((name): name is string => name !== undefined)
     .sort();
+  // 🔴 只算一次：`localTimeOf` 与 `isAllDue` 的互斥性由领域层保证，
+  //   这里不许自己再判"零点不算时刻"—— 那就是第二套判据（AGENTS §3.5）。
+  const dueTime = task.dueDate === undefined ? undefined : localTimeOf(task.dueDate);
 
   return {
     id: task.id,
     title: task.title,
     completed: task.completedAt !== undefined,
     ...(task.dueDate !== undefined ? { dueDate: toLocalDateString(task.dueDate) } : {}),
+    ...(dueTime === undefined ? {} : { dueTime }),
     ...(task.priority !== undefined ? { priority: task.priority } : {}),
     ...(project !== undefined ? { projectName: project.name } : {}),
     tagNames,
@@ -339,10 +352,19 @@ export function renderTasksMarkdown(
     );
     lines.push('| --- | --- | --- | --- | --- | --- |');
     for (const row of rows) {
+      // 「截止」这一栏**不加第二列**：日 + 时刻合成一个单元格（`2026-10-04 16:00`），
+      // 没时刻时逐字节还是旧的那一份。列数变了会同时改掉表头分隔行与所有
+      // 既有断言，而产品上要的只是"时刻别丢"。
+      const due =
+        row.dueDate === undefined
+          ? copy.none
+          : row.dueTime === undefined
+            ? row.dueDate
+            : `${row.dueDate} ${row.dueTime}`;
       const cells = [
         row.title,
         row.completed ? copy.done : copy.open,
-        row.dueDate ?? copy.none,
+        due,
         row.priority === undefined ? copy.none : copy.priorityLabel(row.priority),
         row.projectName ?? copy.none,
         row.tagNames.length === 0 ? copy.none : row.tagNames.join(', '),

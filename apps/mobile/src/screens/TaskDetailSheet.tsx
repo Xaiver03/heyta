@@ -49,6 +49,7 @@ import {
   isImportant,
   // 🔴 自定义 RRULE 的合法性判据 —— 与领域层同一份（B2-3 的移动端尾巴）。
   isValidRecurrenceRule,
+  localTimeOf,
   toLocalDate,
   type Project,
   type Tag,
@@ -83,7 +84,7 @@ import { useText, useTheme, useTokens } from '../theme';
 // web 补 due 编辑时两端要同一只选择器。本地的 `ui/DatePicker.tsx` 已删 ——
 // 消费共享份，不留第二份（AGENTS §3.5 的收尾纪律）。
 import { DatePicker } from '@heyta/ui';
-import { datePickerLabels } from '../lib/date-picker-labels';
+import { datePickerLabels, datePickerTimeLabels } from '../lib/date-picker-labels';
 import { quickDatePicks } from '../lib/quick-dates';
 import { Button, Chip, IconButton, SectionHeader, Text, TextField } from '../ui/kit';
 
@@ -172,6 +173,7 @@ export function TaskDetailSheet({
    */
   const {
     reminders,
+    uncertainOccurrences,
     error: reminderError,
     addBeforeDue,
     addAbsoluteInOneHour,
@@ -351,6 +353,18 @@ export function TaskDetailSheet({
   // 共享 DatePicker 的注入物（快捷项日期数学在 domain，措辞在这里）。
   const datePicks = quickDatePicks(todayLocal, t);
   const datePickerText = datePickerLabels(t);
+  /**
+   * 这条截止**现在带不带时刻**，以及带的是几点。
+   *
+   * 🔴 判定只读共享层那一份 `localTimeOf`，而且**一次渲染只算这一次**：
+   * 时刻栏显示的值与换日子时要搬运的值必须是同一个读数，否则会出现
+   * "栏里写着 16:00、写进库里的却是 00:00"。时间线上那条「全天」带读的
+   * 也是同一个函数 —— 两端各判一次就会分叉（AGENTS §3.5）。
+   * ⚠️ 不能写 `localTimeOf(task.dueDate ?? 0)`：`0` 是 1970-01-01，在 UTC+8 上
+   * 读得出 08:00 —— 一条本来没有截止的任务会被安上一个凭空的时刻。
+   */
+  const dueTimeValue = task.dueDate === undefined ? undefined : localTimeOf(task.dueDate);
+  const dueTimeText = datePickerTimeLabels(t, task.title);
   const done = task.completedAt !== undefined;
   /**
    * 当前是否"重要"。
@@ -688,10 +702,39 @@ export function TaskDetailSheet({
                 today={todayLocal}
                 quickPicks={datePicks}
                 labels={datePickerText}
+                // 🔴 屏上有两张 `DatePicker`（截止 / 排期起点），而组件的 testID 默认值
+                // 是 `date-picker`，时刻栏由此派生成 `date-picker-time-input`。
+                // 不传宿主前缀 ⇒ 两条派生出**同一个** testID，设备脚本就分不清它点的是
+                // 哪一张（`verify:mobile-*` 那一族按 testID 找元素，见 AGENTS §6.1）。
+                testID="task-due"
+                // 🔴 时刻栏整块住在共享层（`DatePickerTime`），这里只注入**值**与**措辞**。
+                // 移动端此前一直不传这个 prop —— 而共享层那句"不传就一个节点都不画"
+                // 让它安静了整批：结果是"能看日子、不能定时刻"。
+                time={{
+                  value: dueTimeValue,
+                  // 没有日子就没有"几点"可言 —— 栏会画出来但填不进字（灰由共享层负责）。
+                  enabled: dueLocal !== undefined,
+                  labels: dueTimeText,
+                  onChange: (next) => {
+                    // `enabled` 为假时组件不回调；这一句是给类型看的，不是运行时兜底。
+                    if (dueLocal === undefined) return;
+                    run(actions.setDueDate(task.id, dueDateToEpoch(dueLocal, next)));
+                  },
+                }}
                 onChange={(date) => {
                   // 🔴 清除传 `undefined`，由 app-host 写成 `null`
                   // （见 `TaskActions.setDueDate` 的注释）。
-                  run(actions.setDueDate(task.id, date === undefined ? undefined : dueDateToEpoch(date)));
+                  //
+                  // 🔴 换日子**搬运这条已有的时刻**（`dueTimeValue`，与时刻栏读的
+                  // 同一个数）：这条任务可能从 web 或自然语言输入那里带着 16:00
+                  // 同步过来，这里只写日子的话时刻就静默归零 —— 而提醒算的是
+                  // `dueDate - offset`，归零等于把提醒挪了一整天。界面上不会有任何异常。
+                  run(
+                    actions.setDueDate(
+                      task.id,
+                      date === undefined ? undefined : dueDateToEpoch(date, dueTimeValue),
+                    ),
+                  );
                 }}
               />
             </View>
@@ -711,6 +754,8 @@ export function TaskDetailSheet({
                 today={todayLocal}
                 quickPicks={datePicks}
                 labels={datePickerText}
+                // 与截止那张分开（见上面 `task-due` 那段理由）。
+                testID="task-schedule-start"
                 onChange={(date) => {
                   // 显式 `undefined` ⇒ 动作层写成 `null`（清除排期起点）。
                   run(
@@ -842,6 +887,7 @@ export function TaskDetailSheet({
             */}
             <ReminderList
               reminders={reminders}
+              uncertainOccurrences={uncertainOccurrences}
               // 显式传 `now` —— 跨过触发点时徽标要跟着从"待触发"变"已到点"；
               // `useToday()` 在回到前台与跨零点时会刷新它（见 `lib/use-today.ts`）。
               now={now}
