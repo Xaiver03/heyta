@@ -36,7 +36,7 @@ import { Check, Github, Languages, Menu, Moon, Sun } from 'lucide-react';
 
 import { LOCALES, useI18n, useLocale } from '@heyta/i18n/provider';
 
-import { startCta } from '../lib/app-url.js';
+import { signInHref, startCta } from '../lib/app-url.js';
 import { useMotionPreset } from '../lib/motion.js';
 import type { Theme } from '../lib/theme.js';
 import { navPages, pageById, type SitePage } from '../site/pages.js';
@@ -118,9 +118,16 @@ export function Nav({
    * 「登录」是注册表里的一条页面，但它挂在**操作位**而不是链接组里 ——
    * 它是回访用户的入口，与「立即使用」（新访客的入口）是两个不同的意图，
    * 混进一列同质链接里就没人找得到了（依据 A5-2，见 `pages.ts` 的 signin 条目）。
+   *
+   * 🔴 2026-10-03 改过一次落点：它以前指站内那张 `/signin` 说明页，而产品负责人实测的
+   * 结论是"点登录怎么先读到一段说明"。现在**带 `?signin` 直接进应用并把认证面板打开**；
+   * 没配应用地址时退回那张页面（它本身也只剩一个跳转与一条帮助链接，不再是一篇说明）。
+   * 两个意图仍然分开：「登录」= 我已有账号，「立即使用」= 我要开始用。
    */
   const signin = pageById('signin');
-  const signinHref = siteHref(signin, locale);
+  const signinAppHref = signInHref(locale);
+  const signinHref = signinAppHref ?? siteHref(signin, locale);
+  const signinExternal = signinAppHref !== null;
   const signinLabel = t(signin.labelKey);
 
   // 主题按钮的可访问名取决于**当前主题**（说的是"切到哪去"）。先把词条取出来再绑。
@@ -225,7 +232,11 @@ export function Nav({
             <Github size={ICON_SIZE.md} />
           </a>
 
-          <a className="lp-nav__link lp-nav__signin" href={signinHref}>
+          <a
+            className="lp-nav__link lp-nav__signin"
+            href={signinHref}
+            {...(signinExternal ? { rel: 'noopener noreferrer' } : {})}
+          >
             {signinLabel}
           </a>
 
@@ -342,7 +353,11 @@ export function Nav({
                   {link.label}
                 </a>
               ))}
-              <a className="lp-nav__menu-link" href={signinHref}>
+              <a
+                className="lp-nav__menu-link"
+                href={signinHref}
+                {...(signinExternal ? { rel: 'noopener noreferrer' } : {})}
+              >
                 {signinLabel}
               </a>
             </nav>

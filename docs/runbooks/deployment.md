@@ -51,7 +51,7 @@
 
 | 机器 | SSH 别名 | IP | 跑什么 | 对外地址 | 状态 |
 |---|---|---|---|---|---|
-| **腾讯云 ubuntu-jcli** | `ubuntu-jcli`（别名 `finlaw`） | `124.223.13.226` | ✅ **heyta 公网部署**（supersync）；另有 xiaoli-* 等约 34 个容器、宿主机 nginx、mihomo | `https://heyta.finlaw.cloud`（测试阶段唯一域名） | ✅ 在线，容器 healthy |
+| **腾讯云 ubuntu-jcli** | `ubuntu-jcli`（别名 `finlaw`） | `124.223.13.226` | ✅ **heyta 公网部署**（supersync）；另有 xiaoli-* 等约 34 个容器、宿主机 nginx、mihomo | `https://heyta.waytofuture.cn`（**当前产品入口**，2026-09-30 迁来，见 §3.7.2；`heyta.finlaw.cloud` 只留作回滚路径） | ✅ 在线，容器 healthy |
 | **腾讯云轻量 12km（=OPP）** | `12km` / `12kmroot` | `121.4.24.238` | Caddy + Dokploy + Litopia 生产/预发 + Mailu 邮件 + cloudflared 等 32 个容器 | `mail.litopia.space`（**唯一还指向它的 litopia 域名**） | 🔴 **实例已过期**（2026-09-25 21:32 到期），仍在跑 |
 | **腾讯云 sanjiaozhou** | `sanjiaozhou` | `101.34.250.109` | **mihomo 故障切换代理**；Caddy（80/443）+ 大量项目（Litopia 站点、SSOS、Mailu、CMS 等） | `litopia.space`、`api` / `docs` / `studio` / `staging`、`openpenpal.com`、`finlaw.cloud` 等 | ✅ 在线，负载正常 |
 | **华为云 wunoos** | `wunoos` | `119.8.167.61` | ⚪ 未核实（用户明确交代**不要用**） | `climming.*` / `huagong.finlaw.cloud` 等指向它 | 仅确认 SSH 可达 |
@@ -232,6 +232,11 @@
   **不匹配** `/app`，而落地页给出的地址去掉尾斜杠是**故意的**（`apps/landing/src/lib/app-url.ts`）。
   少了它，`/app` 会掉进 `location /` 拿回**落地页 HTML**（HTTP 200、看着正常，点进去却是别的页面）。
   带 `$is_args$args` 是为了**保留查询串** —— `?lang=en` 必须跟着走，否则英文用户又回到中文应用。
+  🟢 **2026-10-03 起这条从"必须"降成"留着无害"**：服务端自己注册了
+  `GET /app → 307 /app/`（`server/src/web-app.ts`，判据 `server/tests/web-app-slash-redirect.spec.ts`），
+  所以**跑当前镜像**的自建者不写这条 nginx 规则也不会踩到。上面那句"少了它拿回落地页 HTML"
+  现在只对**旧镜像**成立 —— 上面这套 nginx 配置里这条规则仍然保留（nginx 的精确匹配先命中，
+  于是仍然是 301 在前、服务端的 307 在后者不会被用到），删它没有收益。
 - ✅ `location /api/` → `proxy_pass http://127.0.0.1:1900;`，带 `Upgrade` / `Connection: upgrade`
   （WebSocket，真实路径 `/api/sync/ws`）、`Host` / `X-Real-IP` / `X-Forwarded-For` /
   `X-Forwarded-Proto`，`proxy_read_timeout 90s` / `proxy_send_timeout 90s`。
@@ -422,8 +427,14 @@ location ~ ^/(health|live)$ {
 }
 ```
 
-⚠️ 这条**不在仓库里** —— 和 `/app/` 那段一样，nginx 站点文件只是主机上的文件（见 §7）。
-改完记得回来更新本节。
+⚠️ 这句**已过期**（2026-10-03 逐字核过）：原文写"这条不在仓库里 —— nginx 站点文件只是主机上的文件"。
+现在它在：`server/deploy/nginx/` 是线上站点文件的**版本化镜像**
+（`heyta.finlaw.cloud.conf`、`heyta.waytofuture.cn.conf` 两份都在 `git ls-files` 里），
+`server/scripts/nginx-sync.sh --apply` 才是把改动推上服务器的那一步。
+
+真正的告诫是**反过来**的方向，而且现在更要紧：**改仓库里那一份不会改变线上行为**。
+所以改站点配置要动两处（服务器上的文件 + 仓库里的镜像），只动一处就出现
+"仓库说的和线上跑的不是同一份"——那正是这个目录被建出来的原因（见其 README）。
 
 **旧域名 `heyta-tmp.litopia.space`（已弃用，只留端点与入口 301）：**
 
@@ -458,15 +469,28 @@ location ~ ^/(health|live)$ {
 | nginx 片段 | `/etc/nginx/sites-available/heyta.waytofuture.cn` —— 应用（`/app/`）、同步 API（`/api/`）与三张凭据页都在这里；`heyta.finlaw.cloud` 那份保留但**不是入口** |
 | 旧地址 | `https://heyta-tmp.litopia.space/app/` 与 `https://heyta.finlaw.cloud/app/` 都**不再提供服务**（两者都留作回滚路径，passkey 均不可用：RP ID 只能有一个，见 §3.7.1） |
 
-#### 重新发布的两条命令
+#### 重新发布的三条命令
+
+🔴 **三条都在仓库根跑，不要 `cd apps/web`。** 原来这一段是 `cd apps/web && …` 后面紧跟
+`rsync -az --delete apps/web/dist/ …` —— 那条 rsync 的源路径在 `cd` 之后**不存在**，
+照抄的人得到一条 rsync 报错，而它看起来像"服务器连不上"。
+下面这一段与落地页那组（「站点与应用要**一起**发布」）现在同一个形状：**同一条命令链只有一份写法**。
 
 ```bash
-# 1) 构建：🔴 --base=/app/ 不能省
-cd apps/web && pnpm exec tsc -b && pnpm exec vite build --base=/app/
+# 1) 构建：🔴 挂载路径必须显式给（参数在 apps/web/vite.config.ts 的 webBase()，取值不合理会当场报错）
+HEYTA_WEB_BASE=/app/ pnpm --filter @heyta/web build
 
-# 2) 上传
+# 2) 🔴 发布前对账：产物自己声明的挂载路径，必须等于我们真要放在的位置
+pnpm check:web-artifact:app
+
+# 3) 上传
 rsync -az --delete apps/web/dist/ ubuntu-jcli:/var/www/heyta-app/
 ```
+
+🔴 **第 2 条不是仪式，它挡的是这一族里最难归因的那一发**：`apps/web/dist` 是**一个目录、两种载体**
+（`/` 给 dev/preview/`pnpm check`，`/app/` 给生产），谁最后构建谁覆盖谁。
+在 build 与 rsync 之间跑一次对账，就把"发出去的字节是不是这个载体"变成了判据 ——
+而只比"本地 vs 远端哈希"是挡不住的（两边可以是同一份错的产物，§7 第 82 条）。
 
 🔴 **`--base=/app/` 必须显式给。** Vite 默认 `base` 是 `/`，产物的资源引用是
 **根绝对路径**（`/assets/…`）。挂在 `/app/` 下时浏览器会去请求
@@ -480,13 +504,28 @@ rsync -az --delete apps/web/dist/ ubuntu-jcli:/var/www/heyta-app/
 （判据在 `apps/landing/src/lib/app-url.ts`）：
 
 ```bash
-cd apps/landing && VITE_APP_URL=https://heyta.finlaw.cloud/app/ pnpm exec vite build
+# 两条都在**仓库根**跑。
+# 🔴 2026-10-03 实测更正：这里原来写的是 `cd apps/landing && VITE_APP_URL=… pnpm exec vite build`
+#    紧跟一行 `rsync -az --delete apps/landing/dist/ …` —— 第二行的路径在 `cd` 之后**不存在**，
+#    照抄的人会得到一条 rsync 报错，而它看起来像"服务器连不上"。改成与下面
+#    「站点与应用要**一起**发布，而且站点先发」那两条同一个形状（同一条命令只有一份写法）。
+VITE_APP_URL=https://heyta.waytofuture.cn/app/ pnpm --filter @heyta/landing build
 rsync -az --delete apps/landing/dist/ ubuntu-jcli:/var/www/heyta-landing/
 ```
+
+⚠️ 域名那一串是**抄不得的**：它必须等于当前 canonical 域名（以 §3.7.2 为准），
+否则落地页会把人送到一个不再提供服务的入口。上面这行的取值日期是 2026-10-03。
 
 🔴 **不带这个变量重新构建落地页，入口会静默消失** —— 页面不报错，只是又变回
 "只能自建"。仓库默认构建（无该变量）**是故意的**：应用还没部署时露出一个
 「立即使用」，比没有入口更坏。
+
+⚠️ **2026-10-03 起这条管两个意图，不只一个**：`VITE_APP_URL` 现在同时决定
+「立即使用」（→ 应用根）与导航上那个「登录」（→ 应用根 **带 `?signin`，进去直接打开认证面板**，
+判据在 `apps/landing/src/lib/app-url.ts` 的 `signInHref()`）。没配置时两者各自退回
+站内形状（自建那一节 / `/signin/` 那一页），**不会**出现一个指向不存在应用的链接。
+`apps/web` 那一侧读的参数名住在 `apps/web/src/lib/auth-deep-link.ts` ——
+两份抄件由 `apps/landing/tests/render.spec.tsx` 逐字对账（改名任何一边都会红）。
 
 #### 应用里的站点入口：`VITE_SITE_URL`（通常**不用配**）
 
@@ -545,8 +584,10 @@ cd apps/web && VITE_SITE_URL=https://site.example.com pnpm exec tsc -b && \
 | `/app/` 白屏、`#root` 空的、`/assets/index-*.js` **404** | 工作区的 `build` 脚本**不带 `--base=/app/`**，产物引用 `/assets/…`，而那个前缀属于落地页 |
 | 落地页的「立即使用」**消失** | 那个 `build` 脚本**不带 `VITE_APP_URL`**，入口按设计不渲染 |
 
-⚠️ 所以：**要发布就用本节这两条命令，不要用 `pnpm --filter … build`。**
+⚠️ 所以：**要发布就用本节列出的那组命令，不要用裸的 `pnpm --filter … build`。**
 两者名字一样、行为不同 —— 这正是"命令看起来对、结果错得没有报错"的那一类。
+（🔴 这里原先写的是"这两条命令"，而应用那组已经含一条发布前对账 —— 把**条数**写进结论句，
+它就是下一个会漂的东西。发布序列的唯一清单在 §3.7「重新发布的三条命令」。）
 
 #### 🔴 2026-09-27 又两个坑（本次一并修掉，都在站点文件里）
 
@@ -735,7 +776,7 @@ L5 当次两侧逐字相同（九份里 `terms@1.1`、其余 `1.0`），但脚�
 ssh ubuntu-jcli 'grep -o "\"lang\"" /var/www/heyta-app/assets/index-*.js | wc -l'
 ```
 
-修法是**重建应用本体**（§3.7 那两条命令），不是重发落地页。实测结果：
+修法是**重建应用本体**（§3.7「重新发布的三条命令」），不是重发落地页。实测结果：
 中文页 → `/app/` → `#root` 141 字符；英文页 → `/app/?lang=en` → `html lang="en"`、
 `#root` 335 字符；旧域名 `/app/` → 301 → 同样可用；`/health` 仍 200 JSON 未被重定向。
 （共 23 项断言，见 `verify-domain` 脚本；它住在 `/tmp`，不属于仓库。）
@@ -751,7 +792,9 @@ git worktree remove --force /tmp/heyta-head 2>/dev/null || true
 rm -rf /tmp/heyta-head
 git worktree add --detach /tmp/heyta-head HEAD
 cd /tmp/heyta-head && pnpm install && pnpm build
-cd apps/web && pnpm exec tsc -b && pnpm exec vite build --base=/app/
+# ↓ 下面三条都在这个干净检出**的根**跑（原写法 `cd apps/web` 之后那条 rsync 的源路径不存在）
+HEYTA_WEB_BASE=/app/ pnpm --filter @heyta/web build
+pnpm check:web-artifact:app
 rsync -az --delete apps/web/dist/ ubuntu-jcli:/var/www/heyta-app/
 ```
 
@@ -779,6 +822,59 @@ ssh ubuntu-jcli 'ls /var/www/heyta-app/assets/'
 
 `apps/web` 一有提交就要重建。这跟落地页那条（`VITE_APP_URL`）是两件事：
 落地页管"入口在不在、指向哪"，应用管"点进去之后是什么"。
+
+#### 🔴 2026-10-03：线上那份应用**三列塌成三段全宽**，而门禁全绿 —— 根因还是"产物比源码旧"
+
+现象是产品负责人**肉眼**看出来的，没有任何一条判据报过：`/app/` 在 2560 宽下
+rail、sidebar、main 各占满一整行竖着堆，图标旁边没有名字。
+
+实测根因（三层，缺一层就会归错因）：
+
+| 量什么 | 读数 |
+|---|---|
+| `.ht-app` 的 computed `grid-template-columns` | `2560px` —— **一列**，不是三列 |
+| 线上 CSS 里 `.ht-app--with-sidebar` 那条声明 | 引用 `--ht-layout-sidebar-min-width` 与 `-max-width` |
+| 同一份 CSS 的 `:root` | **没有这两条定义** |
+
+⇒ 引用落空让**整条声明**在 computed-value 阶段失效，网格退化成单列。
+控制台 0 条错误、CSS 200、资源零缺失、`pnpm check` 全绿 —— 也就是说这一族坏法
+在 CSS 层的表现是"**布局塌了，但所有读数都正常**"。
+
+**修法与验证顺序**（每一步都有读数，别跳）：
+
+```bash
+# 1) 从当前源码重打，带挂载参数
+cd apps/web && pnpm exec vite build --base=/app/
+# 2) 本地量几何要用**与生产同形状**的静态服务：
+#    ⚠️ `vite preview` 在 --base=/app/ 下会把 /app/assets/*.js 回成 index.html（text/html），
+#    拿它验产物会得到"整页空白"的**假结论** —— 本次实测踩到，别再用 preview 验 /app/ 产物。
+# 3) 备份 → 发布 → 线上复量同一组几何 + 截图给人看
+ssh ubuntu-jcli 'tar czf /tmp/heyta-app-backup-pre-a6e1a017.tgz -C /var/www heyta-app'
+rsync -az --delete apps/web/dist/ ubuntu-jcli:/var/www/heyta-app/
+```
+
+🔴 **上面这段是 2026-10-03 那一趟实际跑的顺序，留作事故记录，不要照抄**：它少了 rsync 之前的
+产物对账（`pnpm check:web-artifact:app`），而且 `cd apps/web` 之后那条 rsync 的源路径并不存在。
+要重发请照 §3.7「重新发布的三条命令」。**不改写这一段本身** —— 把事故现场的命令改成"后来修好的样子"，
+下一轮就没人能从这段读出当时到底跑了什么。
+
+本地与线上读数一致：`64px 240px 2256px`（rail / sidebar / main），`errs 0 条`。
+备份：`/tmp/heyta-app-backup-pre-a6e1a017.tgz`。
+
+**判据（这次不再靠人眼）**：`check:web-artifact` 加了第 5 条 —— 产物里每个**无兜底值**的
+`var(--ht-*)` 必须在该 CSS 里定义过。只判 `--ht-` 命名空间（实测第三方 react-native-web
+自己用 `var(--placeholderTextColor)`，算进来就是天天加豁免）；带兜底值的不判（规范上优雅降级）。
+注入验证：把当前 CSS 里那两条定义摘掉 ⇒ **精确复刻线上那一版** ⇒ 报出两个名字、`rc=1`；真产物 `rc=0`。
+
+🔴 **线上现在跑的是哪个 commit 要写明白**：本次产物
+（`index-CBdUhwXG.css` / `index-8ESfmTgh.js`）来自分支 `feat/self-host-distribution` 的 `a6e1a017`，
+**它还没合进 `main`**（被并行会话在飞的 6 个重叠文件挡着，见 `docs/research/self-host-distribution-audit.md` §8.13）。
+也就是说这一刻 **生产 ≠ main** —— 下次重建前必须先确认那批改动已经进 main，否则会把修复覆盖回去。
+
+📌 **待入 `environment-traps`**（该文件此刻正被并行会话改着，不往里挤）：
+"产物比源码旧"在 CSS 层的**第三种面目** —— 前两种是 APK 里打旧 JS bundle（§7 第 27 条）
+与安装包没打 `web-dist`（第 82 条）；这一种是旧产物的 CSS 引用了当时还不存在的 token，
+症状既不是白屏也不是缺样式，而是**布局塌了但每个读数都正常**。
 
 #### 变更前备份（回滚用）
 
@@ -846,6 +942,9 @@ Playwright 实测：中文页与英文页各两个入口都指向应用地址且
 ⚠️ 正是这一步抓到了一个 `curl` 抓不到的 bug：`appUrl()` 会去掉末尾斜杠，
 而 nginx 的 `location /app/` **不匹配** `/app` —— 点链接（而不是手输 `/app/`）
 的用户拿到的是 JSON 404。修法即 `location = /app { return 301 /app/; }`。
+🟢 **2026-10-03 补**：这条修法后来**下沉到服务端自己**了（`GET /app → 307 /app/`，
+`server/src/web-app.ts`），因为自建的人不会记得加这条 nginx 规则，而少它的表现和
+"应用坏了"长得一样。上面这段历史记录本身不改 —— 它记的是**当时**靠 nginx 补的那一刀。
 
 #### 还没做的
 
@@ -886,8 +985,10 @@ Playwright 实测：中文页与英文页各两个入口都指向应用地址且
      本机 `mime.types` 里没有 `.webmanifest`。不影响解析（浏览器按 `link` 的 `rel` 认），
      但值得补一条 `application/manifest+json webmanifest;`。
 
-- 应用产物没走 CDN、没有 SRI、没有构建版本号注入；`/app/` 那段 nginx **不在仓库里**
-  （仓库只跟踪 `server/Caddyfile`），只能上机改 —— 改完记得回来更新本节。
+- 应用产物没走 CDN、没有 SRI、没有构建版本号注入。`/app/` 那段 nginx **在仓库里有镜像**
+  （`server/deploy/nginx/*.conf`，那个目录自 2026-09-28 起被跟踪 —— 本条原先写"仓库只跟踪
+  `server/Caddyfile`"，是过期话），但**那份镜像不是部署源** —— 改它不会改变线上，要
+  `server/scripts/nginx-sync.sh --apply`。
 - `heyta-tmp.litopia.space` 那份 nginx 站点仍在（`location /` → 1900 的 Connect 页与 `/api/`、
   `/health`；`/app*` 与 `/landing*` 已改成 **301**），留作回滚路径。它**已经不是入口**了：
   落地页的「立即使用」自 2026-09-27 起指向 `heyta.finlaw.cloud`，而且那里 passkey 不可用（§3.7.1）。

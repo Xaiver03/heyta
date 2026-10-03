@@ -51,6 +51,36 @@ export function kindFromTag(tag: string): AdaptiveCardKind | null {
     : null;
 }
 
+/** 组件数据文件所在的目录段（相对应用挂载点），与 `gen-pwa.mjs` 的 `data` 字段同一套拼法。 */
+export const WIDGET_DATA_DIR = 'widgets/';
+
+/** 组件数据文件的后缀。 */
+export const WIDGET_DATA_SUFFIX = '.data.json';
+
+/**
+ * 从一个请求的 pathname 解出"这是哪一款组件的数据"。不是数据请求则 `null`。
+ *
+ * 🔴 **前缀必须由 SW 自己所在的目录推出来，不许写死 `/widgets/`。**
+ * 应用挂在 `/app/` 下时，宿主请求的是 `/app/widgets/today.data.json`；
+ * 按根绝对去比就永远不匹配，而这条路的失败方式是**静默不拦**——不报错、不记日志，
+ * 组件于是永远停在 manifest 里那份静态占位态，
+ * "应用不在也能由 SW 决定显示什么"这个 Windows 上唯一的判定点整个失效。
+ * 它与 `register.ts` 的 `SW_URL`、manifest 里的 `start_url` 是同一族缺陷的第三处。
+ *
+ * @param pathname 请求的 pathname
+ * @param swHref `self.location.href` —— 必须是绝对 URL（SW 的地址就是 `<挂载点>/sw.js`）
+ */
+export function kindFromWidgetDataPath(
+  pathname: string,
+  swHref: string,
+): AdaptiveCardKind | null {
+  const prefix = new URL(WIDGET_DATA_DIR, swHref).pathname;
+  if (!pathname.startsWith(prefix)) return null;
+  const rest = pathname.slice(prefix.length);
+  if (!rest.endsWith(WIDGET_DATA_SUFFIX)) return null;
+  return kindFromTag(`${WIDGET_TAG_PREFIX}${rest.slice(0, -WIDGET_DATA_SUFFIX.length)}`);
+}
+
 // ─────────────────────────────────────────────────────────────────────
 // 点击
 // ─────────────────────────────────────────────────────────────────────

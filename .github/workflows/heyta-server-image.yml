@@ -1,0 +1,192 @@
+name: 服务端镜像发布（文件已落地，**当下这条路走不通**）
+
+# 为什么这个文件存在，以及它为什么现在**不会发布任何东西**
+# ==========================================================
+#
+# 依据 `docs/research/self-host-distribution-audit.md` 台阶 2：那条要求是
+# "**只落地文件，不推送、不发布任何镜像** —— 发布承诺要产品负责人单独拍板"。
+#
+# 🔴 拦着它的是**两个可核对的事实**，不是一个 `if: false`：
+#
+#   1. 本仓库**没有任何 `vX.Y.Z` tag**（`git tag -l 'v*.*.*'` 现在数得出 0 个），
+#      而唯一触发方式是 `push: tags` —— 刻意**没有** `workflow_dispatch`：
+#      手动触发会绕过这一重，而它需要的版本号输入在这个文件里没有任何步骤真正用到
+#      （一个没人消费的手动输入 = 一个会失败但失败点不在你按下去那一下的按钮）。
+#      将来发版要做的动作就是"打 tag"本身 —— 那一步就是拍板。
+#   2. `guard` job 在仓库变量 `GHCR_NAMESPACE` 未设时 **exit 1**（实测：本仓库
+#      Settings → Secrets and variables → Actions → Variables 里现在没有这个变量）。
+#      这是这条路上**唯一会自己失败**的步骤，也是当下真正拦住它的那一环。
+#
+# ⚠️ **`environment: image-publish` 不是第三重保险** —— 我一开始把它写成了保险，
+# 那一句是错的，2026-10-03 查官方文档否证：
+# "运行引用不存在环境的工作流程时，**将会创建**一个使用该引用名称的环境。"
+# （docs.github.com → Actions → 管理部署环境）。也就是说"环境不存在"既不会让作业
+# 不执行，也不会报错，它只会**凭空长出一个环境**。所以它的真实作用是**留痕**：
+# 一旦这条路被走过，仓库里会多一个删不掉痕迹的 environment，那本身就是证据。
+# 拍板之后要显式创建它并按需加保护规则（required reviewers），那是人的决定，
+# 不是这份文件的默认值。
+#
+# ## tag 三件套（政策本体，写在文件里而不是只在文档里）
+#
+#   · ghcr.io/<owner>/heyta-server:vX.Y.Z   —— 精确钉版本用这个
+#   · ghcr.io/<owner>/heyta-server:X.Y      —— 滚动补丁位（SemVer 兼容范围内）
+#   · ghcr.io/<owner>/heyta-server:latest   —— 只指向**最高**那个 semver
+#
+# `latest=auto` 是关键那一格：metadata-action 只在当前 tag 是全仓库最高 semver 时
+# 才打 `latest`。没有它，回头补发一个 1.2.3 会把 `latest` 从 1.4.0 上**拽下来** ——
+# 那是"照文档拉 latest 的人静默降级"的形状。
+#
+# ## 为什么构建前要先证 "HEAD == deploy.sh 算出的那个 revision"
+#
+# `server/scripts/deploy.sh` 每次部署都拿镜像的
+# `org.opencontainers.image.revision` 与
+# `git log -1 --format=%H -- $(镜像输入清单)` 比，**不等就 `exit 1`**
+# （实测那条分支是 `ERROR: The supersync image revision does not match …`，
+# 不是 WARNING）。所以把 `VCS_REF` 直接填成"被 tag 的那个提交"只在
+# **那一笔恰好改动了某个镜像输入**时才成立。一笔什么都不改、只加了 tag 的
+# release 提交会打出一个"每次部署都被拒"的镜像 —— 而 CI 全绿。
+#
+# 所以下面不是"假设它成立"，而是**当场量**：两者不等就拒绝发布，并说清怎么修
+# （正常发版会 bump 根 `package.json`，而它在清单里，所以天然满足；
+# 不满足说明 tag 打错位置了）。
+#
+# 清单只有一份：`server/image-inputs.txt`，由 `server/scripts/image-inputs.sh` 读。
+# 这个 workflow 和 deploy.sh **source 同一个读者** —— 抄一份路径列表到这里就是
+# 第五份抄件，而两边差一个提交的症状是"外人按文档部署必失败"。
+#
+# ## 大陆可达性（口径，不是待办）
+#
+# 按调研结论：官方分发点**只有 GHCR 这一个**。不在本仓库、也不在任何对外文档里
+# 把任何第三方公共 mirror 写成官方分发点。大陆网络可达性由**部署者自己**配
+# mirror / 反向代理，教程见 `docs/runbooks/deployment.md`。
+# 理由：把第三方 mirror 写成官方 = 把"镜像内容是谁签的、什么时候被换过"这两个
+# 问题引进供应链，而我们没有任何手段审计那个第三方。
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+# 只有读代码 + 往 GHCR 推自己包的权限。没有 `id-token: write` ——
+# 供应链签名（artifact attestations / SBOM）按审计 §4 的结论**后置**，
+# 六家同类项目没一家把它当首发前提。留在这儿的注释就是那个决定的入口。
+permissions:
+  contents: read
+  packages: write
+
+concurrency:
+  group: server-image-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  IMAGE_NAME: ${{ vars.GHCR_NAMESPACE }}/heyta-server
+
+jobs:
+  guard:
+    name: 先确认这条路是被批准过的
+    runs-on: ubuntu-latest
+    steps:
+      - name: 没有 GHCR_NAMESPACE 就拒绝开始
+        # 🔴 这一条是这条路上**唯一会自己失败**的判据（保险 2 的可执行版本）。
+        # 没有 namespace ⇒ 连镜像名都拼不出来 ⇒ 宁可不跑，也不要"推到默认名字"
+        # 那种看起来成功、实际把包发到了一个没人负责的地方。
+        run: |
+          # 取 namespace（第一个 `/` 之前）。`${IMAGE_NAME%%/*}` 在
+          # IMAGE_NAME="/heyta-server"（= 变量没设）时是**空串** —— 那才是这一条
+          # 要抓的形状。⚠️ 别写成 `${IMAGE_NAME##*/}`（取最后一段）：那个永远等于
+          # "heyta-server"，条件恒假，判据会变成一个永不成立的装饰。
+          namespace="${IMAGE_NAME%%/*}"
+          if [ -z "$namespace" ]; then
+            echo "❌ 仓库变量 GHCR_NAMESPACE 未设置 —— 本 workflow 刻意不猜要推到哪个 namespace。"
+            echo "   发布镜像需要产品负责人拍板，拍板之后在 Settings → Secrets and variables → Actions →"
+            echo "   Variables (repository) 里新增 GHCR_NAMESPACE（值 = 你的 GHCR 账号或组织名），"
+            echo "   并创建名为 image-publish 的 environment（它不是闸门，是留痕 —— 见文件头）。"
+            exit 1
+          fi
+          echo "✅ namespace = $namespace"
+        env:
+          IMAGE_NAME: ${{ env.IMAGE_NAME }}
+
+  publish:
+    name: 构建并推送（需要 image-publish 环境）
+    needs: guard
+    # ⚠️ 见文件头：这一行**拦不住**任何人（GitHub 会自动创建缺失的环境）。它的用处是
+    # 让"发布过一次"在仓库设置里留下痕迹，并给将来加 required reviewers 留出位置。
+    environment: image-publish
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # 🔴 不是深度 1：revision 核对要能在这棵树上跑 `git log -- <输入>`，
+          # 而 metadata-action 算 `latest=auto` 需要能列出所有既有 tag。
+          fetch-depth: 0
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: 取 release 提交号，并证明它 == deploy.sh 会算的那个
+        id: sha
+        run: |
+          set -eu
+          inputs_file=/tmp/heyta-image-inputs.txt
+          # 同一个读者，同一份清单 —— 不抄路径。
+          # shellcheck disable=SC1091
+          if ! (cd server && . scripts/image-inputs.sh && printf '%s\n' "${SUPER_SYNC_IMAGE_INPUTS[@]}") >"$inputs_file"; then
+            echo "❌ 镜像输入清单读取失败（原因见上一行；清单空 / 文件不存在 / 项不存在都会在这里响亮失败）"
+            exit 1
+          fi
+          inputs=()
+          while IFS= read -r line; do
+            if [ -n "$line" ]; then inputs+=("$line"); fi
+          done <"$inputs_file"
+          if [ "${#inputs[@]}" -eq 0 ]; then
+            echo "❌ 清单读出来是 0 项 —— 拒绝在没有输入清单的情况下打 revision 标签"
+            exit 1
+          fi
+          head_commit="$(git rev-parse HEAD)"
+          # ⚠️ 必须和 deploy.sh 的 supersync_image_source_revision() **逐字同式**，
+          # 且 cwd 同样是 server/（清单里的路径以那里为基准）。
+          cd server
+          inputs_revision="$(git log -1 --format=%H -- "${inputs[@]}")"
+          cd ..
+          echo "   release 提交 (HEAD)   = $head_commit"
+          echo "   镜像输入的最后一个提交 = $inputs_revision  ← deploy.sh 算的就是这个"
+          if [ "$inputs_revision" != "$head_commit" ]; then
+            echo "❌ tag 落在一笔**没有改动任何镜像输入**的提交上。"
+            echo "   这样打出来的镜像，其 revision 标签会和上一次的输入提交同号，"
+            echo "   而任何在更新的检出上跑 deploy.sh 的人都会被 'revision does not match' 硬拒。"
+            echo "   修法：把 tag 打在真正改动镜像输入的那一笔上（bump 根 package.json 天然满足）。"
+            exit 1
+          fi
+          echo "revision=$head_commit" >> "$GITHUB_OUTPUT"
+          echo "✅ revision 核对前提成立：镜像标签 == deploy.sh 的期望值（$head_commit）"
+
+      - name: 决定要打的标签
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.IMAGE_NAME }}
+          tags: |
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+          flavor: |
+            latest=auto
+
+      - name: 构建并推送
+        uses: docker/build-push-action@v6
+        with:
+          # 🔴 上下文是**仓库根**，dockerfile 才是 server/Dockerfile：
+          # 镜像要 COPY packages/* 与 apps/web（共享 UI 在 web stage 里从源码构建），
+          # 把上下文设成 server/ 会打出一个**没有界面**的镜像 ——
+          # 而它照样能启动、照样 /health 200。
+          context: .
+          file: server/Dockerfile
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          build-args: |
+            VCS_REF=${{ steps.sha.outputs.revision }}
+          provenance: false
+          # 平台：与 `server/Dockerfile` 现有实测范围一致（本机 amd64/arm64 单架构）。
+          # 🔴 加 platforms 之前要先确认 web stage 与 npm 安装在目标架构上真跑过，
+          # 否则 multi-arch 会打出"只有一层是好的"镜像。见 docs/reference/build-matrix.md。
+          platforms: linux/amd64

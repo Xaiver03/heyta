@@ -194,7 +194,51 @@ const reactNativeSvgCjsInterop = {
   },
 };
 
+/**
+ * 应用挂在什么路径下（Vite 的 `base`）—— **现在是构建参数，不再靠"记得传 `--base=`"**。
+ *
+ * ## 它修的是什么
+ *
+ * `docs/runbooks/deployment.md:471` 写着「`--base=/app/` 必须显式给」，
+ * 而 `server/deploy/nginx/*.conf` 里也各钉了一遍。也就是说这条纪律的执行方式是
+ * **在三个地方的注释里提醒人别忘** —— 忘了不报错：产物引用 `/assets/…`，
+ * 挂在 `/app/` 下时那个前缀属于落地页，症状是「控制台报样式表 MIME 是 `text/html`」
+ * 加一片空白（2026-09-30 的 Windows 事故是它的反面：产物按 `/app/` 打、文件在根下，
+ * 而本地↔远端 sha256 对账照样通过 —— 见 §7 第 82 条）。
+ *
+ * 两种形态都出过事，共同点是**没有任何一层能看见"挂载路径"这件事**。
+ * 所以这里把它收成一个有名字的参数，并在取值明显不合理时**当场报错**，
+ * 让"忘了"变成"构建失败"。
+ *
+ * ## 默认值为什么仍然是 `/`
+ *
+ * `vite dev`、`vite preview`、以及 `pnpm check` 里那条 e2e 都跑在根路径。
+ * 把默认改成 `/app/` 会一次打断这三处，而它们不是部署形态。
+ * ⇒ 部署形态**显式声明**（`HEYTA_WEB_BASE=/app/ pnpm --filter @heyta/web build`），
+ *   而"产物到底按什么打的"由 `scripts/check-web-artifact.mjs` 从**产物自身**反推核对，
+ *   不信任任何人（包括这个默认值）。
+ *
+ * ⚠️ 命令行 `--base=` 仍然优先于这里（Vite 的 CLI 覆盖 config），
+ * 所以 runbook 里那些老命令不会因为我加了这个而变行为。
+ */
+function webBase(): string {
+  const raw = process.env.HEYTA_WEB_BASE;
+  if (raw === undefined || raw.trim() === '') return '/';
+  const trimmed = raw.trim();
+  // ⚠️ 别把这根正则写成 `/^\/.*\/$/`：那会把合法值 `/` 一起拒掉 —— 单个 `/` 只有一个字符，
+  // 喂不满"两个斜杠位"。实测：同形状的正则在 `scripts/check-web-artifact.mjs` 上
+  // 把 `--mount /` 判成"形状不对"，而 `/` 恰好是 dev/preview 与 `pnpm check` 用的那一档。
+  if (!/^\/(?:.*\/)?$/.test(trimmed)) {
+    throw new Error(
+      `HEYTA_WEB_BASE 必须是首尾都带斜杠的路径（根路径用 "/"），收到 ${JSON.stringify(raw)}。` +
+        ' 例如：HEYTA_WEB_BASE=/app/',
+    );
+  }
+  return trimmed;
+}
+
 export default defineConfig({
+  base: webBase(),
   /**
    * 🔴 `global` 必须存在 —— 否则**成长页整棵 React 树会卸载成白屏**。
    *

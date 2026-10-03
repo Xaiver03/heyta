@@ -2,28 +2,35 @@
  * `/signin`：登录
  * =================
  *
- * 🔴 **这是一个跳板页，不是登录表单**（依据 D5）。
+ * 🔴 **这是一页出口，不是一段说明**（2026-10-03 的产品负责人实测）。
  *
- * 认证 UI 本来就在应用里（开在同步设置内部），而它要用的服务端地址
- * **就是同步设置里的那个地址** —— 在这里再放一套表单，就会出现
- * "对着 A 登录、令牌存到 B"这种极难排查的错位。所以这一页只做三件事：
- * 说清支持哪些方式、说明为什么认证在应用里、指出找不回通行密钥时该去哪。
+ * 原来这一页排着两张"方式卡"、一节「为什么登录在应用里」、一节「通行密钥丢了？」，
+ * 末尾还有一条「⚠️ 为什么没有邮箱 + 密码」。两个问题叠在一起：
  *
- * 页面顶部那个行动点（`PageHead` 里的）就是入口：没配 `VITE_APP_URL` 时
- * 它指向首页的自建那一节，配了就直接进应用。
+ * 1. 想登录的人点开「登录」，先读的是一段**关于**登录的阅读材料。
+ *    说明文字的位置是文档中心，不是行动点的对面 —— 于是"为什么认证在应用里"
+ *    整段搬进了 `site.docs.account.s5`（那一篇本来就讲登录方式）。
+ * 2. 那段说明里写着"只有两种进入方式，没有密码"，而产品的主路是**邮箱 + 口令**。
+ *    这不是措辞问题，是对访客说了不成立的话（`check:claims` 那一类）。
  *
- * ⚠️ 这里**没有**"邮箱 + 密码"表单，理由写在 `site.signin.noPassword` 里 ——
- * 它作为页末说明渲染，而不是塞进正文：它是对一页缺席东西的解释，
- * 放在最后才不会打断"怎么进去"这条主线。
+ * 所以这一页现在只做三件事：给出**去应用登录**的出口、在配了应用地址时给出
+ * **找回通行密钥**的出口、指一条去文档中心的链接。没有正文。
+ *
+ * 🔴 认证 UI 为什么仍然不在这里（依据 D5）：它要用的服务端地址**就是**同步设置里
+ * 那个地址，在这里再放一套表单会出现"对着 A 登录、令牌存到 B"的错位。
+ * 这条理由现在写在文档中心，而不是写在这一页上 —— 它回答的是"为什么点完会跳走"，
+ * 而那是一个人**先撞上这件事、之后才会去查**的问题。
+ *
+ * ⚠️ 没配 `VITE_APP_URL` 时**不猜地址**：主行动退回首页的自建那一节，
+ * 找回那一条整条不渲染（一个指向不存在应用的链接点下去是 404，比没有出口更坏）。
  */
 
-import { useI18n } from '@heyta/i18n/provider';
+import { useI18n, useLocale } from '@heyta/i18n/provider';
 
-import { appPathHref } from '../lib/app-url.js';
-import { KeyText, PageHead, PageSections, RichText } from '../site/PageSections.js';
-import { SIGNIN_METHODS } from '../site/content.js';
-import type { MessageKey } from '@heyta/i18n/provider';
-import type { SitePage } from '../site/pages.js';
+import { appPathHref, signInHref, startCta, type StartCta } from '../lib/app-url.js';
+import { PageHead } from '../site/PageSections.js';
+import { pageById, type SitePage } from '../site/pages.js';
+import { siteHref } from '../site/paths.js';
 
 /**
  * 找回通行密钥那张页面的路径。
@@ -34,58 +41,75 @@ import type { SitePage } from '../site/pages.js';
  */
 const RECOVER_PATH = '/recover-passkey';
 
-/** 「为什么登录在应用里」与「通行密钥丢了怎么办」两节，按 key 排。 */
-const SECTIONS = [
-  { id: 'why-in-app', titleKey: 'site.signin.why.title', bodyKeys: ['site.signin.why.body'] },
-  {
-    id: 'recover',
-    titleKey: 'site.signin.recover.title',
-    bodyKeys: ['site.signin.recover.body'],
-  },
-] as const satisfies readonly { id: string; titleKey: MessageKey; bodyKeys: readonly MessageKey[] }[];
-
 export function SigninPage({ page }: { page: SitePage }): React.JSX.Element {
   const { t } = useI18n();
+  const locale = useLocale();
+
   /**
-   * 找回入口。**没配 `VITE_APP_URL` 时是 `null`，那时不渲染任何东西** ——
-   * 与「立即使用」同一条判据：一个猜出来的地址点下去是 404，比没有入口更坏。
+   * 主行动：配了应用就是「去应用登录 → 应用（带 `?signin`，面板当场打开）」，
+   * 没配就退回 `startCta()` 那一条（「开始自建 → #selfhost」）。
+   *
+   * ⚠️ 复用 `StartCta` 这个形状而不是另发明一个：它的三个字段（`href` /
+   * `labelKey` / `external`）正是"外链必须带 `rel`"这条判据要的三个读数。
    */
+  const appSignin = signInHref(locale);
+  const cta: StartCta =
+    appSignin === null
+      ? startCta(locale)
+      : { href: appSignin, labelKey: 'site.signin.cta', external: true };
+
   const recoverHref = appPathHref(RECOVER_PATH);
 
   return (
     <>
-      <PageHead page={page} />
-      <div className="lp-section">
-        <PageSections sections={SECTIONS}>
-          {/* 两种方式并排：它们是**同一个意图的两条路**，不是两个推荐等级 */}
-          <ul className="lp-methods">
-            {SIGNIN_METHODS.map((method) => (
-              <li key={method.titleKey} className="lp-methods__item">
-                <h3 className="lp-methods__title">
-                  <KeyText messageKey={method.titleKey} />
-                </h3>
-                <p className="lp-prose">
-                  <KeyText messageKey={method.bodyKey} />
-                </p>
-              </li>
-            ))}
-          </ul>
+      {/*
+        `cta={false}`：页头那颗走的是 `siteCta`（「立即使用」→ 应用根），
+        而这一页的主行动是「去应用登录」（→ 应用 + 打开认证面板）。
+        两颗并排会让访客挑错，而它们说的本来就不是同一件事。
+      */}
+      <PageHead page={page} cta={false} />
 
-          {recoverHref === null ? null : (
-            // 🔴 这一段是**说出"怎么点"**，不是把恢复流程复制到站点上：
-            // 真正发信、注册新凭据的页面是服务端那张（`/recover-passkey`），
-            // 而在站点上再做一个表单就会出现"对着 A 提交、令牌存到 B"。
-            <p className="lp-page__cta">
-              <a className="lp-btn lp-btn--secondary" href={recoverHref}>
-                {t('site.signin.recover.link')}
-              </a>
-            </p>
-          )}
+      {/*
+        🔴 两个容器的取舍都是实测出来的，别照"别的页怎么写"改回去：
 
-          <p className="lp-note">
-            <RichText text={t('site.signin.noPassword')} />
+        · **必须有 `.lp-wrap`**（横向内容列）。少这一层，出口按钮甩到视口左边缘，
+          而它上面的标题与引言在内容列里 —— 同一屏两套左边距，读起来像页面坏了
+          （2026-10-03 第一版线上截图就是这个形状，`live-signin-entry.spec.ts`
+          拿"与页脚那条链接同一列"当判据钉住它）。
+
+        · **不套 `.lp-section`**。那一层给的是"一整节内容"的纵向留白
+          （`padding-block: space-16 × 1.75`），而这一页整页只有三行出口 ——
+          套上它会在引言与主行动之间留出一段约 150px 的空洞，
+          读起来仍然像页面缺了一块。
+      */}
+      <div className="lp-wrap">
+        <p className="lp-page__cta">
+          <a
+            className="lp-btn lp-btn--primary"
+            href={cta.href}
+            {...(cta.external ? { rel: 'noopener noreferrer' } : {})}
+          >
+            {t(cta.labelKey)}
+          </a>
+        </p>
+
+        {recoverHref === null ? null : (
+          <p className="lp-page__cta">
+            <a className="lp-btn lp-btn--secondary" href={recoverHref} rel="noopener noreferrer">
+              {t('site.signin.recover.link')}
+            </a>
           </p>
-        </PageSections>
+        )}
+
+        {/*
+          用 `.lp-prose` 而不是 `.lp-note`：后者是一枚**带边框的卡片**，
+          这一页只有它一个卡片时，读起来像"这里有个提示"，而不是一句去处。
+        */}
+        <p className="lp-prose">
+          <a className="lp-link" href={siteHref(pageById('account'), locale)}>
+            {t('site.signin.helpLink')}
+          </a>
+        </p>
       </div>
     </>
   );

@@ -779,3 +779,73 @@ describe('auth token hashing cleanup migration', () => {
     expect(statements).not.toMatch(/token_version/i);
   });
 });
+
+describe('一次性迁移 override（D-3：compose 自己就够，但不改默认服务图）', () => {
+  const composeFile = readFileSync(join(currentDir, '../docker-compose.yml'), 'utf8');
+  const override = readFileSync(
+    join(currentDir, '../docker-compose.migrate-once.yml'),
+    'utf8',
+  );
+
+  // 从 `services:` 段里取两空格缩进的服务名。解析层坏掉的形状是"返回空数组"，
+  // 于是下面每条 toEqual 都变成"空 = 空"的假绿 —— 所以每个用例都先喂一条必然命中的名字。
+  const servicesIn = (text: string): string[] => {
+    const lines = text.split('\n');
+    const start = lines.findIndex((line) => line === 'services:');
+    expect(start, '这个文件里没有一个顶格的 services: 行 —— 解析层没有输入可读。').toBeGreaterThanOrEqual(0);
+    const out: string[] = [];
+    for (const line of lines.slice(start + 1)) {
+      // 顶格 = 已经出了 services 段（volumes / networks）。
+      if (/^[^\s#]/.test(line)) break;
+      const m = line.match(/^  ([a-z][a-z0-9_-]*):\s*$/);
+      if (m) out.push(m[1]);
+    }
+    return out.sort();
+  };
+
+  it('默认服务图恰好三个 —— 迁移服务不许进默认档', () => {
+    const services = servicesIn(composeFile);
+    expect(services).toContain('supersync');
+    expect(services).toEqual(['caddy', 'postgres', 'supersync']);
+    // 🔴 这条是本轮的红线：一次性服务一旦落进默认图，就会和 `deploy.sh` 自己的
+    // migrator 在同一次 `up` 里抢 Prisma 的迁移锁 —— `RUN_MIGRATIONS_ON_STARTUP`
+    // 默认 false 防的正是这件事。所以这里既查"三个"，也查"这个名字没出现在默认文件里"。
+    expect(composeFile).not.toContain('supersync-migrate');
+    expect(composeFile).toContain('RUN_MIGRATIONS_ON_STARTUP=${RUN_MIGRATIONS_ON_STARTUP:-false}');
+  });
+
+  it('override 只加那一个服务，其余两张图逐字不变', () => {
+    const services = servicesIn(override);
+    expect(services).toEqual(['supersync', 'supersync-migrate']);
+    expect(override).not.toMatch(/^  postgres:$/m);
+    expect(override).not.toMatch(/^  caddy:$/m);
+  });
+
+  it('一次性服务跑的是**镜像里那一份**迁移脚本，并带上让校验真的生效的开关', () => {
+    // 🔴 每条都锚在**行形状**上，不用 `includes(字面量)`。实测原因：这个文件的注释里
+    // 就写着 `REQUIRE_DATABASE_POOL_LIMITS=true`（第 17 行，讲 helm 那段），
+    // 于是"把环境行删掉"这一发变异**一个测试都没打死** —— 注释把判据喂饱了。
+    // 与 `check-server-env-forwarding.mjs` 同批修掉的那个放水是同一个形状。
+    const envLine = (key: string, value: string) =>
+      new RegExp(`^[ \\t]*-[ \\t]*${key}=${value}[ \\t]*$`, 'm');
+    expect(override).toMatch(/entrypoint:\s*\[.*migrate-deploy\.sh/s);
+    // 与主容器同一枚镜像（写在 `image:` 那一行，不是某句注释里提了一下）。
+    expect(override).toMatch(/^ *image: \$\{SUPERSYNC_IMAGE:-supersync:local\}$/m);
+    expect(override).toContain("restart: 'no'");
+    expect(override).toMatch(/condition:\s*service_completed_successfully/);
+    expect(override).toMatch(envLine('REQUIRE_DATABASE_POOL_LIMITS', 'true'));
+    // 行锚定但不以 `$` 收尾 —— 这一行的值是一个 `${VAR:-…}` 插值，行尾是它的 `}`。
+    expect(override).toMatch(/^ *-{1} *DATABASE_URL=.*connection_limit=60&pool_timeout=10/m);
+  });
+
+  it('受支持入口写在对外第一屏，且说清"一次性服务只在第一次开机迁移"', () => {
+    const readme = readFileSync(join(currentDir, '../README.md'), 'utf8');
+    const firstScreen = readme.split('\n').slice(0, 120).join('\n');
+    expect(firstScreen).toContain('./scripts/deploy.sh');
+    expect(firstScreen).toContain('docker-compose.migrate-once.yml');
+    expect(firstScreen).toContain('unmigrated');
+    // "只在第一次管用"这条必须披露。少了它，这个入口会被读成"以后每次都不用管"——
+    // 那比没有更糟：它让运维相信自己已经迁过了。
+    expect(firstScreen).toContain('--force-recreate supersync-migrate');
+  });
+});
