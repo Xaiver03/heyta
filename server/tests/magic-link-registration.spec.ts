@@ -344,7 +344,13 @@ describe('Magic Link Registration', () => {
 
       const result = await registerWithMagicLink(testEmail, Date.now());
 
-      expect(result).toEqual(registrationResponse);
+      // 🔴 2026-10-03：这条断言从 `toEqual(registrationResponse)` 拆成两半。
+      // 原本它同时钉了两件事 —— "文案是那句中性的"（防枚举的不变量，继续钉）
+      // 和"响应**只有**这一个键"（那不是不变量，恰恰是本轮要改的东西：
+      // 信没发出去时服务端必须说出来）。改的理由写在这里，不是为了跑绿。
+      // 判据的完整一组在 `self-host-email-verification.spec.ts`。
+      expect(result.message).toBe(registrationResponse.message);
+      expect(result.emailDelivered).toBe(false);
       expect(mockPrisma.user.deleteMany).not.toHaveBeenCalled();
     });
 
@@ -359,7 +365,9 @@ describe('Magic Link Registration', () => {
 
       const result = await registerWithMagicLink(testEmail, Date.now());
 
-      expect(result).toEqual(registrationResponse);
+      // 同上：中性文案一字不变，而"信没发出去"必须说出口。
+      expect(result.message).toBe(registrationResponse.message);
+      expect(result.emailDelivered).toBe(false);
       // Should NOT delete the pre-existing user
       expect(mockPrisma.user.delete).not.toHaveBeenCalled();
       expect(mockPrisma.user.deleteMany).not.toHaveBeenCalled();
@@ -516,12 +524,27 @@ describe('Magic Link Registration', () => {
         loginToken,
         loginTokenExpiresAt: BigInt(Date.now() + 60_000),
         tokenVersion: 0,
+        // 真库这一列可空但**一定存在**（值可能是 null）。fixture 里没有它，
+        // 响应里就会出现 `locale: undefined` —— 而 undefined 在 JSON 里会被丢掉，
+        // 于是"服务端到底有没有回这一项"在测试里看不出来。补成真实形状。
+        locale: null,
       });
       mockPrisma.user.updateMany.mockResolvedValue({ count: 1 });
 
       const result = await verifyLoginMagicLink(loginToken);
 
-      expect(result.user).toEqual({ id: verifiedUser.id, email: testEmail });
+      // R10（2026-10-03）：三条登录路的出参统一走 `withAccountProfile`，
+      // 所以这里现在多两个键。改这条断言**不是**为了让测试变绿 —— 它测的是
+      // "登录响应带上资料"这个本次要求的行为变化。反面判据在
+      // `server/tests/account-profile.spec.ts`：键集合必须**恰好**是这五个，
+      // 多一个（`passwordHash` 之类）就红。少写这两行才是真的把变化藏起来。
+      expect(result.user).toEqual({
+        id: verifiedUser.id,
+        email: testEmail,
+        locale: null,
+        displayName: null,
+        avatarHash: null,
+      });
       expect(mockPrisma.user.updateMany).toHaveBeenCalledWith({
         where: {
           id: verifiedUser.id,

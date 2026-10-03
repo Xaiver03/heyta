@@ -260,11 +260,25 @@ const zh = [
             '服务器明文（未设置时为空，表示从未改过）',
             '非必要',
           ],
+          [
+            '昵称（显示名）',
+            '让你在自己的设备上认出一个账号是谁的；不用于向他人展示',
+            '你自填，可留空',
+            '服务器明文。**它不是实名、不做唯一性**，登录标识始终是上面那行邮箱；🔴 heyta 没有共享与协作，所以今天**只有你本人**读得到它——服务端也没有按他人身份查它的端点',
+            '非必要（留空即回落到邮箱派生的显示名）',
+          ],
+          [
+            '头像图片',
+            '同上：只给你自己看',
+            '你选一张，应用在本机把它压成小方形后上传',
+            '🔴 **服务器密文**（用它自己的 Argon2id + AES-GCM 口令加密后整块存二进制，我们解不开）。服务器上另存该密文的 SHA-256，只用于跨设备判断"换过没有"；原图不存磁盘、不进对象存储。两条边界：① 它需要**已设置 E2EE 口令**才能上传与读回；② 密文相同即哈希相同，严格说这一点泄露"同一张图重复上传过"',
+            '非必要',
+          ],
         ],
       },
       {
         kind: 'p',
-        text: '一句能逐项核对的话：账号表里**没有姓名、没有电话、没有地址、没有生日、没有头像**，也没有任何个人资料字段。列清单就是上面这些。',
+        text: '一句能逐项核对的话：账号表里**没有真实姓名、没有电话、没有地址、没有生日、没有地理位置、没有通讯录**；昵称是你自填的显示名（不是实名、不做唯一），头像是我们**解不开的密文**。列清单就是上面这些。',
       },
       {
         kind: 'callout',
@@ -803,11 +817,25 @@ const en = [
             'Cleartext on the server (null means you never changed it)',
             'Not necessary',
           ],
+          [
+            'Nickname (display name)',
+            'Lets you recognise which account is yours on your own devices; it is not used to show you to anyone else',
+            'You type it; it may stay empty',
+            'Cleartext on the server. **It is not your legal name and is not unique** — the sign-in identifier remains the email address in the row above. 🔴 heyta has no sharing or collaboration, so today **only you** can read it, and the server exposes no endpoint that looks another user’s profile up by identity',
+            'Not necessary (when empty, the display name falls back to one derived from your email)',
+          ],
+          [
+            'Avatar image',
+            'Same purpose: it is only ever shown to you',
+            'You pick one; the app downscales it to a small square on your device before uploading',
+            '🔴 **Ciphertext on the server** — encrypted with your own Argon2id + AES-GCM passphrase and stored as one indivisible binary blob we cannot open. The server also stores the SHA-256 of that ciphertext, used only to tell across devices whether it changed. The original file is never written to disk or to object storage. Two boundaries: ① uploading and reading it back require an **E2EE passphrase to be set**; ② identical ciphertext yields an identical hash, so strictly speaking that leaks "the same image was uploaded twice"',
+            'Not necessary',
+          ],
         ],
       },
       {
         kind: 'p',
-        text: 'One sentence that can be checked column by column: the account table holds **no name, no phone number, no postal address, no date of birth, no avatar**, and no profile fields of any kind. What is listed above is the entire list.',
+        text: 'One sentence that can be checked column by column: the account table holds **no legal name, no phone number, no postal address, no date of birth, no location and no contacts**; the nickname is a display name you type yourself (not your legal name, not unique), and the avatar is a blob **we cannot decrypt**. What is listed above is the entire list.',
       },
       {
         kind: 'callout',

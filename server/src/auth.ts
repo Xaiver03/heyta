@@ -5,12 +5,13 @@ import { Logger } from './logger';
 import { randomBytes } from 'crypto';
 import { sendLoginMagicLinkEmail, sendVerificationEmail } from './email';
 import type { ServerLocale } from './copy.generated.js';
-import { loadConfigFromEnv, isConsentRequired } from './config';
+import { loadConfigFromEnv, isConsentRequired, emailVerificationRequired } from './config';
 import { Prisma } from '@prisma/client';
 import { authCache } from './auth-cache';
 import { getDefaultStorageQuotaBytes } from './sync/services/storage-quota.service';
 import { hashToken } from './auth-tokens';
 import { consentedLegalSetVersion } from './legal-consent';
+import { withAccountProfile, type AccountSessionUser } from './account/account-profile.store';
 
 // Auth constants
 const MIN_JWT_SECRET_LENGTH = 32;
@@ -443,7 +444,7 @@ export const issueSession = (user: {
 
 export const verifyLoginMagicLink = async (
   token: string,
-): Promise<{ token: string; user: { id: number; email: string; locale: string | null } }> => {
+): Promise<{ token: string; user: AccountSessionUser }> => {
   // 邮件里那句令牌**原样**传进来，库里那一列是它的 SHA-256 ⇒ 每次按哈希查。
   const tokenHash = hashToken(token);
   const user = await prisma.user.findFirst({
@@ -489,7 +490,7 @@ export const verifyLoginMagicLink = async (
 
   Logger.info(`User logged in via magic link (ID: ${user.id})`);
 
-  return { token: jwtToken, user: { id: user.id, email: user.email, locale: user.locale } };
+  return { token: jwtToken, user: await withAccountProfile(user) };
 };
 
 /** 邮箱链接换会话的结果。**判别式**：页面据此决定"写会话并跳应用"还是"只提示已确认"。 */
@@ -497,10 +498,12 @@ export type EmailLinkVerifyResult =
   | {
       kind: 'session';
       token: string;
-      /** `locale` 是账号语言（可空）—— 客户端在本机无显式选择时采纳它（解析链第 2 层）。 */
-      user: { id: number; email: string; locale: string | null };
+      /** `locale` 是账号语言（可空）—— 客户端在本机无显式选择时采纳它（解析链第 2 层）。
+       *  `displayName` / `avatarHash` 也在这里：三条认证路**共用**
+       *  `account-profile.store.ts` 的那一个出口，不各自拼 `user` 对象。 */
+      user: AccountSessionUser;
     }
-  | { kind: 'verified-only'; user: { id: number; email: string; locale: string | null } };
+  | { kind: 'verified-only'; user: AccountSessionUser };
 
 /**
  * **邮箱链接的唯一校验入口**：邮件里那个 `token` 换会话（ADR-0039 §2.1）。
@@ -534,7 +537,9 @@ export const verifyEmailLink = async (token: string): Promise<EmailLinkVerifyRes
     });
     return {
       kind: 'verified-only',
-      user: user ?? { id: pendingPasskey.userId, email: '', locale: null },
+      user: await withAccountProfile(
+        user ?? { id: pendingPasskey.userId, email: '', locale: null },
+      ),
     };
   }
 
@@ -549,7 +554,7 @@ export const verifyEmailLink = async (token: string): Promise<EmailLinkVerifyRes
   return {
     kind: 'session',
     token: issueSession(user),
-    user: { id: user.id, email: user.email, locale: user.locale },
+    user: await withAccountProfile(user),
   };
 };
 
@@ -579,7 +584,7 @@ export const registerWithMagicLink = async (
    *    在任何路径上都**覆盖不了一个活账号的口令**。口令属于验证前的登记动作。
    */
   passwordHash?: string,
-): Promise<{ message: string }> => {
+): Promise<{ message: string; emailDelivered?: boolean }> => {
   const normalizedEmail = email.toLowerCase();
 
   // Check if email already exists and is verified
@@ -598,6 +603,12 @@ export const registerWithMagicLink = async (
   try {
     // In TEST_MODE with autoVerifyUsers, skip email and auto-verify
     const config = loadConfigFromEnv();
+    // 🔴 "要不要靠这封信"只有一个判点，而它现在是**两个**条件的合取
+    // （`TEST_MODE.autoVerifyUsers` 这个 E2E 夹具 + `REQUIRE_EMAIL_VERIFICATION=false`
+    // 这个自托管显式选择），两条注册路共用 —— 判点本身在 `config.ts` 里，
+    // 这里只是取一次。理由与"下面三处共用同一个 `verifyByEmail`"写在
+    // `emailVerificationRequired` 的注释上。
+    const verifyByEmail = emailVerificationRequired(config);
 
     // 这一行账号的 id。两条分支（重发令牌 / 新建）都会给它赋值，
     // 因为邀请码绑定需要一个明确的"被邀请人"，而它只在这两处拿得到。
@@ -609,11 +620,16 @@ export const registerWithMagicLink = async (
         return { message: REGISTRATION_SUCCESS_MESSAGE };
       }
 
-      if (!config.testMode?.autoVerifyUsers) {
+      if (verifyByEmail) {
         // Send email BEFORE updating DB to avoid invalidating the old token on failure
         const emailSent = await sendVerificationEmail(normalizedEmail, verificationToken, locale);
         if (!emailSent) {
-          return { message: REGISTRATION_SUCCESS_MESSAGE };
+          // 🔴 这里以前回的是**同一句**"请去查收邮件"。而那封信根本没发出去
+          // （没配 SMTP / 服务商拒了）—— 于是界面承诺了一件没发生的事，而用户
+          // 唯一能做的"再点一次注册"只会再拿到同一句谎话。
+          // `emailDelivered: false` 是给客户端的那半句真话（中性文案不能变成
+          // 邮箱存在性预言机，所以状态码与 message 都不变，只加这个可选字段）。
+          return { message: REGISTRATION_SUCCESS_MESSAGE, emailDelivered: false };
         }
       }
 
@@ -678,12 +694,14 @@ export const registerWithMagicLink = async (
 
       registeredUserId = createdUser.id;
 
-      if (!config.testMode?.autoVerifyUsers) {
+      if (verifyByEmail) {
         // Keep the unverified row on delivery failure. Deleting it can race a
         // concurrent registration that has already started using the same row.
         const emailSent = await sendVerificationEmail(normalizedEmail, verificationToken, locale);
         if (!emailSent) {
-          return { message: REGISTRATION_SUCCESS_MESSAGE };
+          // 与上面重发分支同一条：状态码与中性 message 都不变（不能变成邮箱
+          // 存在性预言机），但**不再谎称信已发出**。
+          return { message: REGISTRATION_SUCCESS_MESSAGE, emailDelivered: false };
         }
       }
     }
@@ -692,7 +710,7 @@ export const registerWithMagicLink = async (
     // 刻意放在两条分支之外：重发令牌的路径也该把码绑上。
     await attachInviteSafe(registeredUserId, inviteCode);
 
-    if (config.testMode?.autoVerifyUsers) {
+    if (!verifyByEmail) {
       await prisma.user.update({
         where: { email: normalizedEmail },
         data: {
@@ -704,7 +722,13 @@ export const registerWithMagicLink = async (
       // 🔴 TEST_MODE 也必须结算邀请。少了这一行，所有自动化验收（e2e / verify:*）
       // 都会对着一个"奖励永远不会发"的账号跑绿 —— 而那正是最需要被验的那条路径。
       await settleReferralSafe(prisma, registeredUserId);
-      Logger.info(`[TEST_MODE] Auto-verified magic-link user`);
+      // 日志要分得清是**谁**关掉了这道门：夹具与自托管运营者是两件不同的事，
+      // 而运维排查时"[TEST_MODE] 出现在一台生产服务器上"正是最想看到的那类信号。
+      Logger.info(
+        config.testMode?.autoVerifyUsers
+          ? `[TEST_MODE] Auto-verified magic-link user`
+          : `[REQUIRE_EMAIL_VERIFICATION=false] Activated magic-link user without email verification`,
+      );
       return {
         message: 'Registration successful. Your account has been automatically verified.',
       };

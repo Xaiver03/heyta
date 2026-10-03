@@ -1,0 +1,373 @@
+/**
+ * 设置页的「个人信息」：昵称与头像的增删改查（R10）
+ * =================================================
+ *
+ * 产品负责人 2026-10-02 的原话是"个人 Profile 页面的增删改查"。形态取自她认可的
+ * 六家竞品：**头像 → 菜单 → 二级页**（菜单项「编辑个人信息」，落点就是本面板）。
+ * 完整调研与裁决链在 `docs/plans/ui-review-fill-zh-timeline.md` §8。
+ *
+ * ## 为什么它在设置浮层里，而不是一个新的 `view`
+ *
+ * 应用只有**一个**次级表面机制（`App.tsx` 的 `settingsBaseView` + `.ht-sheet`），
+ * 它的存在理由是"次级表面里做的事都需要回头看下面"。再造一个浮层态就是把同一件事
+ * 写第二份 —— 而本仓库已经为这种事付过三次学费（AGENTS §3.5 的两处实测漂移、
+ * §7 第 66 条）。加一个 `ViewKey` 还会连带撞 R9 那条页头标题判据与 `narrow-sweep`
+ * 的视图遍历（它按 `VIEW_TABS` 数视图）。
+ *
+ * ## 🔴 分层：这个文件里不许有什么
+ *
+ * | 不许有 | 住在哪 |
+ * |---|---|
+ * | 端点路径、请求体、失败归类 | `@heyta/app-host` 的 `hosted-auth.ts` |
+ * | 32 个码点 / 512 KB / 允许的格式 | `@heyta/shared-schema` 的 `account-profile-contract.ts` |
+ * | 加密本身（Argon2id + AES-GCM） | `@heyta/sync-core`，由 app-host 调用 |
+ * | 任何措辞 | `@heyta/i18n`（`check:ui-language` 拦硬编码） |
+ *
+ * 这里只有三件事：**渲染**、**收集输入**、**把图片压成契约要的形状**。
+ * 第三件是**平台能力**（canvas 是浏览器的），所以它属于壳而不属于 app-host ——
+ * RN 那侧要换 `ImageEditor`，但两端的**数字**是同一个。
+ *
+ * ## 🔴 三条容易写错的地方
+ *
+ *   1. **口令不在内存里的时候，头像既看不见也换不了，而这不是错误。**
+ *      `credential-storage.ts` 的立场是"只落 `baseUrl` 与 `token`，**绝不落口令**"，
+ *      所以每个新会话都要用户再填一次（`SyncBar.tsx:143-147` 已经写明了这件事）。
+ *      口令就是头像的钥匙 —— 没有它，服务端那份密文对**我们**也一样解不开。
+ *      所以这里给的是一个**陈述句**（`…avatar.needPassword`），不是红字、不是"加载失败"。
+ *      ⚠️ 把它做成错误提示的症状：从没设过头像的人每次刷新都被凶一次。
+ *
+ *   2. **昵称的字数用码点，不用 `.length`。**
+ *      `displayNameCodePoints` 与 `ACCOUNT_DISPLAY_NAME_MAX_CODE_POINTS` 都来自契约：
+ *      界面自己数一遍就是第二套口径，而 emoji（代理对）会让两套口径差一倍 ——
+ *      症状是"界面说没超，服务端拒了"，那是最让用户困惑的一种不一致。
+ *
+ *   3. **空昵称是合法值，语义是"清除"。**
+ *      留空 ⇒ 界面回落到邮箱派生的显示名（`displayNameFromEmail`，一份只读派生值）。
+ *      所以保存按钮不能因为"没填"而变成"没操作"：从有到空是一次**真实的**写。
+ */
+
+import { useEffect, useRef, useState } from 'react';
+import { useI18n } from '@heyta/i18n';
+import {
+  deleteAccountAvatar,
+  fetchAccountAvatar,
+  getAccountProfile,
+  updateAccountDisplayName,
+  uploadAccountAvatar,
+} from '@heyta/app-host';
+import {
+  ACCOUNT_AVATAR_CONTENT_TYPES,
+  ACCOUNT_AVATAR_EDGE_PX,
+  ACCOUNT_AVATAR_MAX_SOURCE_BYTES,
+  ACCOUNT_DISPLAY_NAME_MAX_CODE_POINTS,
+  displayNameCodePoints,
+} from '@heyta/shared-schema';
+
+import { useSyncStore } from '../sync/store.js';
+import { loadAvatarImage, type AvatarFileError } from './avatar-encode.js';
+
+/** 一次写请求的结果，只用于决定底部那一行字。 */
+type Notice =
+  | { kind: 'idle' }
+  | { kind: 'busy' }
+  | { kind: 'done'; text: string }
+  | { kind: 'error'; text: string };
+
+export function ProfilePanel(): React.JSX.Element {
+  const { t } = useI18n();
+
+  const baseUrl = useSyncStore((s) => s.baseUrl);
+  const token = useSyncStore((s) => s.token);
+  const password = useSyncStore((s) => s.password);
+  const email = useSyncStore((s) => s.email);
+
+  /** 🔴 没有令牌就**一个请求都不发**（规则住在 app-host，这里只是不去调它）。 */
+  const signedIn = baseUrl !== '' && token !== undefined;
+  /** 口令只在内存里，所以它决定的是"这台设备今天能不能碰头像"。 */
+  const canTouchAvatar = signedIn && password !== undefined && password !== '';
+
+  const [draft, setDraft] = useState('');
+  /** 服务端当前那个昵称。用来区分"没改过"与"改回原值"，也用来出占位符。 */
+  const [savedName, setSavedName] = useState<string | null>(null);
+  const [avatarUrl, setAvatarUrl] = useState<string | undefined>(undefined);
+  const [nameNotice, setNameNotice] = useState<Notice>({ kind: 'idle' });
+  const [avatarNotice, setAvatarNotice] = useState<Notice>({ kind: 'idle' });
+  const fileRef = useRef<HTMLInputElement | null>(null);
+  /** 卸载后**不许**再 setState：这两条路都是 await 回来的。 */
+  const aliveRef = useRef(true);
+  useEffect(
+    () => () => {
+      aliveRef.current = false;
+    },
+    [],
+  );
+
+  /**
+   * 读取当前资料。
+   *
+   * 🔴 头像**分两步**：先拿 `avatarHash`（服务端给的就是这个，它解不开内容），
+   * 再用口令把密文解出来。所以"有没有头像"和"这台设备能不能显示头像"
+   * 是两个不同的问题，界面上必须分开答 —— 合并成一个的症状是没有口令的人
+   * 被告知"你还没有头像"，然后他传一张上去，把**自己原来那张**覆盖掉。
+   */
+  useEffect(() => {
+    if (!signedIn || token === undefined) {
+      setSavedName(null);
+      setDraft('');
+      setAvatarUrl(undefined);
+      return;
+    }
+    const options = { baseUrl };
+    void (async () => {
+      const profile = await getAccountProfile(options, token);
+      if (!aliveRef.current) return;
+      if (!profile.ok) {
+        setNameNotice({ kind: 'error', text: t('web.settings.profile.avatar.failed') });
+        return;
+      }
+      setSavedName(profile.displayName);
+      setDraft(profile.displayName ?? '');
+      if (profile.avatarHash === null) {
+        setAvatarUrl(undefined);
+        return;
+      }
+      if (password === undefined || password === '') return;
+      const decoded = await fetchAccountAvatar(options, token, password);
+      if (!aliveRef.current) return;
+      // `AvatarDecodeResult` 的成功支是 `{ ok: true, image }` —— 多一层，
+      // 因为"解出来的东西"和"解码这件事的结果"不是一回事（失败支只有 reason）。
+      setAvatarUrl(
+        decoded.ok
+          ? `data:${decoded.image.contentType};base64,${decoded.image.dataBase64}`
+          : undefined,
+      );
+    })();
+  }, [baseUrl, password, signedIn, t, token]);
+
+  /** 换一张：编码在前、上限判断在后，任何一步不对都**不发请求**。 */
+  const onPickFile = async (file: File): Promise<void> => {
+    if (!signedIn || token === undefined || password === undefined) {
+      setAvatarNotice({
+        kind: 'error',
+        text: t('web.settings.profile.avatar.needPassword'),
+      });
+      return;
+    }
+    setAvatarNotice({ kind: 'busy' });
+    const encoded = await loadAvatarImage(file);
+    if (!aliveRef.current) return;
+    if (!encoded.ok) {
+      setAvatarNotice({ kind: 'error', text: fileErrorText(encoded.error) });
+      return;
+    }
+    const outcome = await uploadAccountAvatar(
+      { baseUrl },
+      token,
+      password,
+      encoded.image,
+    );
+    if (!aliveRef.current) return;
+    if (!outcome.ok) {
+      setAvatarNotice({ kind: 'error', text: t('web.settings.profile.avatar.failed') });
+      return;
+    }
+    setAvatarUrl(`data:${encoded.image.contentType};base64,${encoded.image.dataBase64}`);
+    setAvatarNotice({ kind: 'done', text: t('web.settings.profile.nickname.saved') });
+  };
+
+  const fileErrorText = (error: AvatarFileError): string =>
+    error === 'bad-type'
+      ? t('web.settings.profile.avatar.badType', {
+          types: ACCOUNT_AVATAR_CONTENT_TYPES.map((c) => c.replace('image/', '')).join(' / '),
+        })
+      : error === 'too-big'
+        ? t('web.settings.profile.avatar.tooBig', {
+            max: `${Math.floor(ACCOUNT_AVATAR_MAX_SOURCE_BYTES / 1024)} KB`,
+          })
+        : t('web.settings.profile.avatar.failed');
+
+  const saveNickname = async (): Promise<void> => {
+    if (!signedIn || token === undefined) return;
+    // 🔴 超长**不发请求**。服务端也会拒（同一枚常量），但那是第二次机会而不是理由：
+    // 发出去只会让红字晚一个来回出现，而这一段网络往返本身就是用户不需要的代价。
+    // 与"未登录不发请求"同一条纪律 —— 区别只在于这条规则**住在这里**，
+    // 因为"超没超长"是输入框的状态，app-host 看不到。
+    if (displayNameCodePoints(draft) > ACCOUNT_DISPLAY_NAME_MAX_CODE_POINTS) return;
+    if (draft.trim() === (savedName ?? '').trim()) return;
+    setNameNotice({ kind: 'busy' });
+    // 🔴 空框发的是 `null`（清除），**不是**空串。这两件事在服务端是两个不同的结果：
+    // `null` 写进列、界面回落到邮箱派生名；空串被契约拒成 400。
+    // 把它们混成一个，"清除昵称"这个动作就永远做不到（见契约里那段）。
+    const outcome = await updateAccountDisplayName(
+      { baseUrl },
+      token,
+      draft.trim() === '' ? null : draft,
+    );
+    if (!aliveRef.current) return;
+    if (!outcome.ok) {
+      setNameNotice({ kind: 'error', text: t('web.settings.profile.avatar.failed') });
+      return;
+    }
+    setSavedName(outcome.displayName);
+    setNameNotice({
+      kind: 'done',
+      text:
+        outcome.displayName === null
+          ? t('web.settings.profile.nickname.cleared')
+          : t('web.settings.profile.nickname.saved'),
+    });
+  };
+
+  const removeAvatar = async (): Promise<void> => {
+    if (!signedIn || token === undefined) return;
+    setAvatarNotice({ kind: 'busy' });
+    const outcome = await deleteAccountAvatar({ baseUrl }, token);
+    if (!aliveRef.current) return;
+    if (!outcome.ok) {
+      setAvatarNotice({ kind: 'error', text: t('web.settings.profile.avatar.failed') });
+      return;
+    }
+    setAvatarUrl(undefined);
+    setAvatarNotice({ kind: 'done', text: t('web.settings.profile.avatar.removed') });
+  };
+
+  const codePoints = displayNameCodePoints(draft);
+  const tooLong = codePoints > ACCOUNT_DISPLAY_NAME_MAX_CODE_POINTS;
+  /** 与当前值相同 ⇒ 这一次点击不产生写（空转的请求也算副作用）。 */
+  const unchanged = draft.trim() === (savedName ?? '').trim();
+
+  return (
+    <section className="ht-settings" data-testid="profile-panel">
+      <h2 className="ht-settings__title ht-type-section-title">
+        {t('web.settings.profile.title')}
+      </h2>
+
+      <div className="ht-settings__section" data-testid="profile-avatar-row">
+        <div className="ht-settings__item-label">{t('web.settings.profile.avatar.label')}</div>
+        <div className="ht-settings__avatar" data-testid="profile-avatar">
+          {avatarUrl === undefined ? (
+            // 没有图就用邮箱首字母。⚠️ 拿不到邮箱时**不编一个字母**（与头像菜单同一条纪律）。
+            <span aria-hidden="true">{(email?.split('@')[0] ?? '').trim().charAt(0).toUpperCase()}</span>
+          ) : (
+            <img src={avatarUrl} alt="" data-testid="profile-avatar-img" />
+          )}
+        </div>
+        {/*
+          文件输入本身**不显示**：它是隐藏的，点「换一张」才弹系统选择框。
+          ⚠️ 但它必须**在 DOM 里**而不是条件渲染 —— 真浏览器判据要点它，
+          而 `accept` 白名单是契约的一部分（服务端只看密文，格式只有这里能拦）。
+        */}
+        <input
+          ref={fileRef}
+          type="file"
+          accept={ACCOUNT_AVATAR_CONTENT_TYPES.join(',')}
+          className="ht-settings__file"
+          data-testid="profile-avatar-file"
+          onChange={(event) => {
+            const file = event.target.files?.[0];
+            event.target.value = '';
+            if (file !== undefined) void onPickFile(file);
+          }}
+        />
+        <div className="ht-settings__actions">
+          <button
+            type="button"
+            className="ht-btn ht-btn--ghost"
+            data-testid="profile-avatar-change"
+            onClick={() => fileRef.current?.click()}
+          >
+            {t('web.settings.profile.avatar.change')}
+          </button>
+          {avatarUrl === undefined ? null : (
+            <button
+              type="button"
+              className="ht-btn ht-btn--ghost"
+              data-testid="profile-avatar-remove"
+              onClick={() => void removeAvatar()}
+            >
+              {t('web.settings.profile.avatar.remove')}
+            </button>
+          )}
+        </div>
+        {canTouchAvatar ? null : (
+          <p className="ht-settings__hint" data-testid="profile-avatar-need-password">
+            {t('web.settings.profile.avatar.needPassword')}
+          </p>
+        )}
+        <NoticeLine notice={avatarNotice} testId="profile-avatar-notice" />
+      </div>
+
+      <div className="ht-settings__section" data-testid="profile-nickname-row">
+        <label className="ht-settings__item-label" htmlFor="profile-nickname">
+          {t('web.settings.profile.nickname.label')}
+        </label>
+        <input
+          id="profile-nickname"
+          type="text"
+          className="ht-input"
+          data-testid="profile-nickname-input"
+          value={draft}
+          maxLength={ACCOUNT_DISPLAY_NAME_MAX_CODE_POINTS * 2}
+          placeholder={t('web.settings.profile.nickname.placeholder')}
+          onChange={(event) => {
+            setDraft(event.target.value);
+            setNameNotice({ kind: 'idle' });
+          }}
+        />
+        <p className="ht-settings__hint">
+          {t('web.settings.profile.nickname.hint', {
+            max: String(ACCOUNT_DISPLAY_NAME_MAX_CODE_POINTS),
+          })}
+        </p>
+        {tooLong ? (
+          <p className="ht-settings__danger" data-testid="profile-nickname-toolong">
+            {t('web.settings.profile.nickname.toolong', {
+              max: String(ACCOUNT_DISPLAY_NAME_MAX_CODE_POINTS),
+              count: String(codePoints),
+            })}
+          </p>
+        ) : null}
+        <div className="ht-settings__actions">
+          <button
+            type="button"
+            className="ht-btn ht-btn--primary"
+            data-testid="profile-nickname-save"
+            onClick={() => void saveNickname()}
+          >
+            {t('web.settings.profile.nickname.save')}
+          </button>
+        </div>
+        <NoticeLine notice={nameNotice} testId="profile-nickname-notice" />
+      </div>
+
+      {email === undefined ? null : (
+        <div className="ht-settings__section" data-testid="profile-email-row">
+          <div className="ht-settings__item-label">{t('web.settings.profile.email.label')}</div>
+          <p className="ht-settings__hint" data-testid="profile-email">
+            {email}
+          </p>
+          <p className="ht-settings__hint">{t('web.settings.profile.email.hint')}</p>
+        </div>
+      )}
+    </section>
+  );
+}
+
+function NoticeLine({
+  notice,
+  testId,
+}: {
+  notice: Notice;
+  testId: string;
+}): React.JSX.Element | null {
+  if (notice.kind === 'idle' || notice.kind === 'busy') return null;
+  return (
+    <p
+      className={notice.kind === 'error' ? 'ht-settings__danger' : 'ht-settings__notice'}
+      data-testid={testId}
+      role="status"
+    >
+      {notice.text}
+    </p>
+  );
+}

@@ -34,6 +34,7 @@ import {
 } from './sync/services/websocket-connection.service';
 import { testRoutes } from './test-routes';
 import { activityRoutes } from './activity/activity.routes';
+import { accountProfileRoutes } from './account/account-profile.routes';
 import { adminRoutes } from './admin/admin.routes';
 
 // HTML escape to prevent XSS in generated HTML
@@ -560,6 +561,12 @@ export const createServer = (
       //    "有人用我的邀请码激活了" —— 那是他的账号事实，不是付费能力。
       //    把通知也放到闸门后面，会让一个到期的人连"我为什么被降级"都看不到。
       await fastifyServer.register(activityRoutes, { prefix: '/api' });
+
+      // 账号资料（R10：昵称 + 密文头像）。它**不在** `apiRoutes` 里，理由和
+      // `activityRoutes` 一样：那一个文件已经 1868 行，而这几条路由与认证/同步
+      // 没有任何共享状态。路径与客户端共用 `@heyta/shared-schema` 的常量。
+      // ⚠️ 它同样不受计费闸门影响 —— 改自己的昵称不是付费能力。
+      await fastifyServer.register(accountProfileRoutes, { prefix: '/api' });
 
       // 运营管理后台（ADR-0038）。**默认没有人是管理员**（`users.is_admin` 默认
       // false），所以这个前缀对所有人都是 403，直到有人跑过

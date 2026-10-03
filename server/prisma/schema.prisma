@@ -60,6 +60,34 @@ model User {
   // AGENTS §3.3：新增持久化字段一律可选 —— null = 用户从未在登录态下改过语言，
   // 邮件语言照旧走 请求显式 > 账号 > Accept-Language > zh-CN。
   locale                        String?
+  // 账号资料（R10，2026-10-02 产品负责人裁决）。**明文**，与 `locale` 同一档：
+  // 账号级、Bearer 归属、不参与 op-log 加密通道。
+  //
+  // 🔴 为什么昵称可以明文、而**头像不行**（见下面 `UserAvatar` 那段）：
+  // 这两件事常被混成一句"反正都是 profile"，但它们对的是**不同的行**。
+  // `packages/legal` 的表 E 是**逐项**对照《个人信息保护法》第二十八条那个列举
+  //（生物识别 / 宗教信仰 / 特定身份 / 医疗健康 / 金融账户 / 行踪轨迹 / 未成年人）——
+  // 昵称不在那个列举里，也不与任何一行的"不收集"依据冲突；
+  // 而**人脸照片命中"生物识别"那一行**，那一行的依据是**结构性**的
+  //（原文："没有任何生物特征模板离开你的设备"）。
+  // ⇒ 同一张资料页里一个走明文、一个必须走密文，**不是一致性瑕疵，是两行不同的承诺**。
+  //
+  // 对外文本这边还有一条要一起看：`privacy.ts` 第 2 条写的本来就是
+  // 「端到端加密覆盖**内容**，不覆盖元数据」，并且那里明确**不写**
+  // "服务端完全看不到你的任何数据"那句绝对化的话 —— 所以加明文昵称**不产生虚假陈述**。
+  // 但那一节数过的「明文元数据一共 11 项」是逐表逐列取证来的
+  //（`docs/research/legal-dataflow-client.md` A1/A2），🔴 **要跟着这一笔一起改**，
+  // 不许下次再补。归 docs/plans/ui-review-fill-zh-timeline.md §8.7 的收尾清单。
+  //
+  // ⚠️ **今天它只有本人能读**：heyta 没有共享/协作（E2EE 下服务端解不开，结构上做不了），
+  // 所以"全员可见"是为将来预留的属性、不是已存在的行为。
+  // 读取端点一律 `preHandler: authenticate` + `getAuthUser(req)`，
+  // **不许**出现按 id/email 查别人资料的公开端点 —— 那是一次独立的产品决定，
+  // 不在本次裁决里（裁决原文见 docs/plans/ui-review-fill-zh-timeline.md §8.6）。
+  //
+  // 空 = 用户从未设置过 ⇒ 界面回落到邮箱派生的显示名（`displayNameFromEmail`，
+  // 那是一份**只读**派生值，不是这一列）。
+  displayName                   String?  @map("display_name")
 
   operations                  Operation[]
   syncState                   UserSyncState?
@@ -75,6 +103,7 @@ model User {
   referralReceived            Referral?             @relation("ReferralInvitee")
   notifications               AccountNotification[]
   consents                    UserConsent[]
+  avatar                      UserAvatar?
 
   @@index([verificationToken])
   @@index([resetPasswordToken])
@@ -834,6 +863,66 @@ model UserConsent {
   @@unique([userId, kind, documentVersion])
   @@index([userId, acceptedAt])
   @@map("user_consents")
+}
+
+/// 账号头像（R10，2026-10-02 产品负责人裁决）。**一行一个人**，主键就是 `user_id`。
+///
+/// ## 🔴 存的是**密文**，而且这一条不是"更安全一点"，是自家对外文本的依据问题
+///
+/// `packages/legal/src/documents/personal-info-list.ts` 的**表 E「敏感个人信息」**
+/// 逐项对照《个人信息保护法》第二十八条，"生物识别"那一行写的是 **❌ 不收集**，
+/// 而它给的理由是**结构性**的：「没有任何生物特征模板**离开你的设备**」。
+/// 一张明文人脸照片一旦进库，那句话说的是**这个字段/这条通道不存在**，
+/// 于是那一行的依据当场失效 —— 不是"变弱"，是**变成假的**。
+///（同族裁决见 ADR-0025；调研与逐行对照在
+/// `docs/research/countdown-anniversary-data-and-images.md` §4。）
+///
+/// 表 E 末尾还有一句反过来读才是要害的话：
+/// 「这个结论建立在**我们不判断内容**这个前提上，不是建立在**我们看不到内容**上」。
+/// 一旦某条通道让我们**看得到**（明文图片），"我们不判断内容"就不再是理由了。
+///
+/// ⚠️ 也**不能**用"自托管的人自己承担代价"把它做成明文：隐私政策是我们写的，
+/// 自托管部署者读的是**同一份**，"不收集生物识别"不能因为部署形态不同就变成假的。
+/// 承担代价说的是**存储与带宽**，不是**改变对外承诺的事实**。
+///
+/// ## 为什么这一条不新增任何前提
+///
+/// 密文用的是**同步通道那把口令**（`sync-core` 的 `encrypt`）。而
+/// `sync-client/src/client.ts:703-709` 已经写明：**没有口令根本同步不了**
+///（`reason: 'no-encryption-password'`）。⇒ 头像要跨设备，前提本来就是"能同步"，
+/// 而"能同步"蕴含"有口令"。**加密不引入任何一个明文方案没有的条件。**
+///
+/// ## 密文是 base64 字符串 ⇒ 不需要上传通道
+///
+/// 载荷走 JSON body，与 op 上传**完全同形**，所以服务端不需要 multipart、
+/// 不需要自定义 content type parser、不引入任何新依赖（AGENTS §3.1/§3.2 两道门）。
+/// 也正因为服务端解不开，它**不知道**这张图是什么格式 ——
+/// 所以这里**没有 `content_type` 列**：格式和字节一起进密文，由客户端读回来。
+///
+/// ## 🔴 `hash` 泄露什么，说清楚
+///
+/// 它是**密文**的 SHA-256，用作缓存失效键（换图即换 URL，抄 Discord 那个形状）。
+/// 同一张图重复上传会得到相同 hash ⇒ 严格说它泄露"两次内容相等"。
+/// 今天这条信息只对**本人**可见（无协作、无公开端点），而本人已经知道自己的图，
+/// 所以不构成泄露面。⚠️ **将来若开放"别人能看到头像"，这一列要重新评估** ——
+/// 那是一次独立决定（同 §8.6 那条边界），不许顺手加。
+model UserAvatar {
+  userId Int @id @map("user_id")
+
+  /// 密文字节（`encrypt()` 产出的 base64 解码后的 BYTEA —— 存解码形态省 33% 体积，
+  /// 线上传输仍是 base64 字符串）。里面是 `{contentType, dataBase64}` 的 JSON，
+  /// 所以**图片格式本身也在密文里**。
+  cipher Bytes
+
+  /// `cipher` 的 SHA-256（hex）。用途见上面那段。
+  hash String
+
+  /// 上传时刻（epoch ms）。
+  updatedAt BigInt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("user_avatars")
 }
 
 /// 账号级通知（应用内通知中心的一条）。
