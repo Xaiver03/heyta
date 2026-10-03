@@ -2336,6 +2336,21 @@ Helm 那条不在里面：`postgresql` 的镜像本来就走 `.Values.postgresql
 但 `server/helm/supersync/templates/tests/test-connection.yaml:13` 的 `busybox:1.36` 是写死的 ——
 它只在 `helm test` 时拉，不在部署路径上，所以本批没为它加旋钮，登记在这里而不是假装 R6 覆盖了它。
 
+载体与 #7 的过期读数一并现量（03:41，`git log -1` 口径）：
+
+| 对象 | 读数 |
+|---|---|
+| `main` | `391e4c27`（03:41 现量） |
+| 载体 `feat/self-host-merge-main` | `564fcab8`，第一父 `f61c23af` ⇒ **已过期**，落地前按 §8.16 重算 |
+| `merge-base(main, 本分支)` | `b850b1c6` |
+| `merge-base --is-ancestor main 本分支` | **NO** ⇒ 仍不是 FF |
+| #7 那 5 枚重叠文件 | `docs/README.md` / `package.json` / `packages/i18n/src/locales/zh-CN.ts` / `…/en.ts` / `scripts/check-script-snapshot.mjs` **03:41 现量五枚全部仍是 `M`** ⇒ 前置仍未满足 |
+
+⚠️ 最后一行的路径要写全：`packages/i18n/src/locales/{zh-CN,en}.ts`（不是 `packages/i18n/src/*.ts`）。
+我这一轮先按后者探了一次，得到"这两枚干净了"的**假读数** —— 打错路径的 `git status -- <path>`
+返回空，而空看起来就是"没人动"。判"某个文件被别人提交了没有"要用**它真实存在的路径**，
+并顺手确认这个路径 `git ls-files` 认得。
+
 ### 8.37 `verify:selfhost-stack` 全跑第一次跑到**最后一腿**：五步里四步有读数，第五步被另一条会话的测试锁挡下
 
 03:41:48 起跑，负载 11.58（阈值内）、`docker info` 可用，`EXIT=1`。逐步读数（日志
@@ -2466,6 +2481,18 @@ G-53 的关闭动作（不做半截）：① 先拍"我们承诺发哪几个架�
 ⚠️ 这一张表**不是**说第 8 项可以起 —— 它的顺序判据是"落地之后"，而落地还卡在 #7 那 5 枚重叠文件。
 记在这里是为了：等窗口真来的时候，不用再花一轮去发现"模拟器是别人的"。
 
+**② G-47 的"决定"其实早就写在工具自己嘴里**：`research/tools/gen-image-npm-tree.mjs:70-77`
+有一段显式 `fail`：
+
+> 仓库里出现了 npm 的 lockfile（`package-lock.json` / `npm-shrinkwrap.json` / `server/package-lock.json`）
+> —— 镜像那棵树被钉住了，这份"每次重解都要重新量"的快照就是多余的第二事实源。
+> **正确动作是把对账改成直接读那个 lockfile，并删掉本脚本。**
+
+也就是说这一单剩下的不是"再想一个形状"，而是**把那条被写下来的路走一遍**：
+生成 `server/package-lock.json` → 生产阶段 `npm install` 换 `npm ci` → 快照生成器与它那三条腿
+改成读 lockfile。代价写清楚：它动 `server/Dockerfile` 的生产阶段，
+所以**必须有一次真构建**才算闭环（`--check` 那类纯文件系统判据证明不了 `npm ci` 装得出来）。
+
 ### 8.40 我自己那枚"等窗口"的负载探针，两版都是坏的，而第二版坏得更像对的
 
 等 `verify:selfhost-stack` 的干净窗口时写了个 `/tmp/window-wait.sh`（锁空 + 1 分钟负载 ≤12 才放行）。
@@ -2503,6 +2530,9 @@ $ sysctl -n vm.loadavg | awk '{gsub(/[{}]/, ""); print "  $1=["$1"]  $2=["$2"]  
 |---|---|---|
 | 本分支（`feat/self-host-distribution`） | 186 | **177** |
 | 主检出工作树（2026-10-04 04:1x 现量） | 218 | **209** |
+
+⇒ 按我这句话去写"记作 #178"，撞上的是一条**早就存在**的号（178 到 209 都在主检出里）。
+**取号只认主检出工作树，而且每次现取** —— 分支上那份是合并前的旧快照，它的最大号不是下一个可用号。
 
 ### 8.41 §8.32 那句"冲突族今天不触发"活了不到一小时：04:1x `merge-tree` 又回 rc=1，唯一撞的还是 `package.json`
 
@@ -2597,46 +2627,13 @@ VERIFY_EXIT=0
 但它是**构建产物**，`--check` 不能拿当前工作树去比 —— 要落地就得让 Dockerfile 在装完之后把它
 `COPY --from=` 出来，作为发布物的一部分或由验收脚本现取。这条记成下一批的工单，本批不动生产安装路径。
 
-⇒ 按我这句话去写"记作 #178"，撞上的是一条**早就存在**的号（178 到 209 都在主检出里）。
-**取号只认主检出工作树，而且每次现取** —— 分支上那份是合并前的旧快照，它的最大号不是下一个可用号。
+⚠️ 落地时这四处 `e2e/selfhost-stack-results/*.png` 属于 §8.22 第 3 族（binary，取 main）。
+本批提交它们只为让"这一趟真跑过"留在树里，**它们不是不可再生证据**：可重跑，而判据的载体是上面那张
+"每张看到了什么"的表 —— 所以取 main 不丢任何主张。
 
-
-
-
-
-
-**② G-47 的"决定"其实早就写在工具自己嘴里**：`research/tools/gen-image-npm-tree.mjs:70-77`
-有一段显式 `fail`：
-
-> 仓库里出现了 npm 的 lockfile（`package-lock.json` / `npm-shrinkwrap.json` / `server/package-lock.json`）
-> —— 镜像那棵树被钉住了，这份"每次重解都要重新量"的快照就是多余的第二事实源。
-> **正确动作是把对账改成直接读那个 lockfile，并删掉本脚本。**
-
-也就是说这一单剩下的不是"再想一个形状"，而是**把那条被写下来的路走一遍**：
-生成 `server/package-lock.json` → 生产阶段 `npm install` 换 `npm ci` → 快照生成器与它那三条腿
-改成读 lockfile。代价写清楚：它动 `server/Dockerfile` 的生产阶段，
-所以**必须有一次真构建**才算闭环（`--check` 那类纯文件系统判据证明不了 `npm ci` 装得出来）。
-
-载体与 #7 的过期读数一并现量（03:41，`git log -1` 口径）：
-
-| 对象 | 读数 |
-|---|---|
-| `main` | `391e4c27`（03:41 现量） |
-| 载体 `feat/self-host-merge-main` | `564fcab8`，第一父 `f61c23af` ⇒ **已过期**，落地前按 §8.16 重算 |
-| `merge-base(main, 本分支)` | `b850b1c6` |
-| `merge-base --is-ancestor main 本分支` | **NO** ⇒ 仍不是 FF |
-| #7 那 5 枚重叠文件 | `docs/README.md` / `package.json` / `packages/i18n/src/locales/zh-CN.ts` / `…/en.ts` / `scripts/check-script-snapshot.mjs` **03:41 现量五枚全部仍是 `M`** ⇒ 前置仍未满足 |
-
-⚠️ 最后一行的路径要写全：`packages/i18n/src/locales/{zh-CN,en}.ts`（不是 `packages/i18n/src/*.ts`）。
-我这一轮先按后者探了一次，得到"这两枚干净了"的**假读数** —— 打错路径的 `git status -- <path>`
-返回空，而空看起来就是"没人动"。判"某个文件被别人提交了没有"要用**它真实存在的路径**，
-并顺手确认这个路径 `git ls-files` 认得。
-
-
-
-
-
-
-
-
-
+🔴 **这一节差点把这份文档的结构弄坏，形状值得记**：我往文末追加 §8.41/§8.42 时，`Edit` 的 `old_string`
+命中的其实是**文件中部**的一张表（§8.40 那两行读数表），于是新小节被插在"那张表"和"它自己的收尾段落"之间 ——
+**追加变成了插入，而且成功、无报错**。症状是 §8.36 / §8.39 / §8.40 的尾巴全跑到 §8.42 之后。
+⇒ 往长文档末尾追加之前先 `tail` 一眼确认锚点在文末，或直接走"读全文 → 按行 splice → 断言后写回"的脚本。
+修的时候也用脚本：三块各**先断言首行内容 + 锚点唯一**，任何一块不匹配就整批不落盘；
+守恒检查是 `diff <(sort 旧) <(sort 新)` —— 纯移动只应剩空行差，出现任何内容差就是改错了字。
