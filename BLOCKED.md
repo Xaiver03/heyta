@@ -2746,3 +2746,93 @@ web 那一半用**接线断言**（`store.renameTag` 有真调用点、`Projects
 web store 有。要补的是 composer 里的层级选择器 —— 它落在"composer 留在各端"那一条既有分工里
 （`packages/ui/src/projects/model.ts` 文件头第 2 条），且需要一条新的界面判据（真机：选父级 → 笔记本读到 `parentId`）。
 本批任务书没点这一件，按"不顺手扩范围"登记，不当已做。
+
+
+## B41. 移动端年度热力图（`activityDays`）**不是没做，是被一条冻结判据钉住**（2026-10-03，任务 4）
+
+任务 4 要求移动端 `GrowthBoard` 传 `activityDays`。代码层两步都现成
+（`dailyActivityCountsFromState(tables, now)` 已在 `packages/app-host/src/motivation.ts` 导出），
+**真正拦住的是判卷本身**：`apps/mobile/tests/growth-display.spec.ts:365` 断言
+
+```ts
+expect(labels.heatmap.grid({ total: 42, days: 365 })).toBe('');
+```
+
+而那个文件的注释写着「一旦有人传了 activityDays，这条会先红」—— **它是有意的 tripwire，
+锁的就是"本端还没接热力图"这个状态**。判卷冻结在先，我没有翻它的权限
+（任务书唯一的例外是 `reminders-notes-display.spec.ts:261`）。
+
+🔴 **为什么不绕**：绕法是把 `grid` 从空串改成真句而不接线，或接线而让 `grid` 继续回空串。
+后者会让热力图**渲染出一块没有任何无障碍名的网格** —— 那恰好是那条判据要拦的假绿
+（看不见的东西不报错，只是没人知道它没名字）。选**不绕**。
+
+**最小一步**（一件独立小活，需要一次真机验收）：
+1. `growth-display.spec.ts:365` 的 `toBe('')` 翻成断言真句（先补 `mobile.growth.year.heatmap`，
+   含 `{total}`/`{days}`，中英各一条）；
+2. `GrowthScreen.tsx` 传 `activityDays={dailyActivityCountsFromState(tables, now)}`；
+3. 移动端年度视图的**布局**要真机看一眼（一屏放不放得下 365 格），这是它必须带真机的理由。
+
+## B42. 「补打卡」按钮（`onRepair`）同样被冻结判据钉住，接法本来已经写好（2026-10-03）
+
+`growth-display.spec.ts:302` 断言 `labels.streaks.repairAction` 是 `undefined`（注释：
+「移动端刻意不给 `freeze` / 两个 Action 按钮：退回纯文字（与迁移前一致）」）。
+所以本批只把**文案**接上、按钮不接。
+
+动作层**不是缺的**：`createHabitActions(host).checkIn(habitId, date)` 能补打历史日期，
+`HabitsScreen.tsx:372` 已经这么用了。所以 B42 的"最小一步"只有翻判据 + 传一个函数，
+比 B41 更便宜 —— 但它同样需要真机确认"点了以后连续天数真的回来"。
+
+## B43. `onFreshStart`（重新开始）在动作层**根本没有对应动作**，不许顺手编一个（2026-10-03）
+
+任务书已经点破这一条。实测：`packages/app-host/src/habit-actions.ts` 里只有
+`checkIn` / `uncheck` / `pause` / `resume`，没有任何"把当前连续清零重来"的语义。
+要让按钮出现就必须**新造一个 op**，而"什么算重新开始"是产品语义（谁决定？要不要留痕？
+跟 `pause` 的边界在哪？）—— 这不在本批白名单里，也不是接线缺口，是功能缺口。**登记，不编**。
+
+## B44. 移动端分享块的"已复制"是**交给系统**，不是**验证过剪贴板里就是这段**（2026-10-03）
+
+`GrowthScreen.tsx` 的复制走 RN 核心 `Clipboard.setString`（实测 0.84.1 两端仍注册：
+Android `MainReactPackage.kt`、iOS `React/CoreModules/RCTClipboard.mm`）。
+它是 `void`：写进去以后**读不回来**，所以 `onCopy` 永远不会 reject，
+"已复制"这句话的强度只到"已经交给系统"。
+
+缺的那条判据是设备级的：**点完复制 → 到系统粘贴框贴一次 → 断言贴出来的字节等于小结**。
+这要 `verify-mobile-growth.sh`（新建）+ 一台真模拟器，本批没跑（设备被并发验收占过，见 B39）。
+🔴 界面文案没有说谎：三条借的都是 web 现成词条（`复制本周小结`/`已复制`/`复制失败`），
+`growth-share-summary.spec.ts` 钉住"一行都不许是函数自己造的"。
+
+## B45. 权益块拿不到「还有几天到期」，以及 `unconfigured`/`unavailable` 刻意整块不渲染（2026-10-03）
+
+`EntitlementSection.tsx` 只渲两种状态：`entitled`（一句话 + 本地数据那句）与 `denied`
+（按 `PERIOD_ENDED` / 其它原因分"到期"与"暂不可用"两句话）。两条裁断记在这儿：
+
+1. **到期日拿不到**：`HostedEntitlementReading`（`packages/app-host/src/entitlement.ts:71`）
+   只在 `denied` 分支带 `currentPeriodEnd`，`entitled` 分支没有日期字段。
+   要显示"到 X 日"得改**服务端响应面** —— 本批明确不许碰 `server/` 与计费。
+   所以 `entitled` 只说"官方托管同步已开启"，**不编一个日期**。
+2. **探测失败 ≠ 没权益**：`unconfigured`（没配凭据）与 `unavailable`（拿不到结果）
+   都 `return null`。把"我不知道"渲染成"你被降级了"是界面在说谎，
+   而这条一旦写错，用户会去看一份并不存在的账单。
+
+## B46. `pnpm -r typecheck` 现在会红在 `packages/legal` —— **不是本条线，且只在混合工作树成立**（2026-10-03 18:3x）
+
+```
+packages/legal typecheck: tests/structure.spec.ts(407,16): error TS18048: 'name' is possibly 'undefined'.
+（407 / 413 / 414 / 415，共 6 条，全在同一段新代码里）
+```
+
+归属证据（可复跑）：
+
+```bash
+git status --porcelain -- packages/legal       # 4 个文件 M + 1 个 ??（都不是我的地界）
+git show HEAD:packages/legal/tests/structure.spec.ts | grep -c "推不出表名"   # 0
+grep -c "推不出表名" packages/legal/tests/structure.spec.ts                 # 1
+```
+
+那段代码**只在工作树里**（HEAD 版 419 行，工作树 536 行，+117 行是别人在飞的 FK 表名推导），
+所以这笔红**不在 `main` 上**，也不在我改的任何文件里。`packages/legal` 不在本批白名单 ⇒ 不代改。
+**不受影响的复现**：本条线的五个工程单独 typecheck 是 exit 0 ——
+
+```bash
+pnpm --filter @heyta/app-host --filter @heyta/i18n --filter @heyta/ui --filter @heyta/mobile --filter @heyta/web typecheck   # EXIT=0
+```

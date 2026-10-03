@@ -44,7 +44,7 @@
 | 专注 / 分类报告 / 冲突解决 / 实时同步 | ✅ | ✅ |
 | 搜索 | ✅ 可打开便签 | ✅ 不可打开便签（刻意） |
 | 回收站 | ✅ 仅任务 | ✅ 仅任务 |
-| 成长统计 | ✅ 全量 | 🟡 缺热力图/分享/补打卡（刻意） |
+| 成长统计 | ✅ 全量 | 🟡 **分享块已接**（2026-10-03，任务 4：`share` 走 RN 核心 `Clipboard`，小结文本来自 `@heyta/app-host#buildShareSummary`，判据 `apps/mobile/tests/growth-share-summary.spec.ts` 13 条 + 变异两臂）；**年度热力图 / 补打卡仍未接** —— 不是漏，是被冻结判据 `growth-display.spec.ts:365`/`:302` 钉着，见 BLOCKED **B41 / B42** |
 | **通知中心 / 邀请活动** | ✅ 铃铛 + 活动 tab | ✅ 「我的」页「通知」入口行（未读徽标）+ 通知中心两 tab（**批二已修** 2026-10-02） |
 | **AI 全家**（拆解/估时/优先级/捕获/工具/设置） | ✅ 6 入口 | ❌ **零入口**（**刻意不在本 goal**：出境闸门的移动语义要先裁决，见 goal §6 排除项与本文 P1-3） |
 | 导出 | ✅ 下载 | ✅ 系统分享 |
@@ -53,7 +53,7 @@
 | **改密码 / 通行密钥管理** | ✅ PasswordPanel + PasskeyPanel | ✅ 「账号与安全」入口行 → SecurityScreen（**批四已修** 2026-10-02） |
 | 登出 | ✅ 清凭据 | ✅ 清凭据（等价） |
 | 模块开关 | ✅ 7 模块 | ❌ 固定 5 tab（立场差异） |
-| 订阅/权益可见 | ✅ 到期条 | ❌ |
+| 订阅/权益可见 | ✅ 到期条 | 🟡 **「我的」页有一条权益卡**（2026-10-03，任务 4：`EntitlementSection` 消费 `app-host#fetchHostedEntitlementReading`，四态只渲两态）；**拿不到"到 X 日到期"**，因为 `entitled` 分支没有日期字段 ⇒ 要改服务端面，本批不许碰（BLOCKED **B45**）。设备级截图未取证 |
 | 同步设置 / 隐私同意 / 小组件 / 语言 | ✅ | ✅ |
 
 ## 4. 真缺口清单
@@ -96,9 +96,9 @@
 | P2-4 | **回收站只覆盖任务**：清单/标签/习惯/便签软删后任何端都看不见、还原不了 | `tasks/store.ts:387` |
 | P2-5 | **日历创建/拖拽**：两端日历都只读（只勾完成）；时间线 P2 的排期手势没有搬到日历 | `CalendarBoard.tsx:71` 唯一动作 prop |
 | P2-6 | 🟡 **归档已修 / 层级选择器仍未做（2026-10-03，多端第三批）**：归档与**取消归档**两端可达，`archiveProject(id, archived)` 收的是**目标状态**；"显示已归档"开关只在 `archivedCount > 0` 时出现，口径由共享层 `archivedProjects()` / `toOrganizerTree(…, { includeArchived })` 唯一提供（两端各写一遍 filter 就是两份口径）。**只给 `onArchive` 不给回程 = 单向门**，所以三条必须同批落地，用例逐条钉住。**仍未做**：新建时的父级选择器 —— `createProject(name, parentId?)` 第二参在移动端没有调用点（web store 有），移动端建出来的清单恒为顶层。判据 = 同上文件的归档 2 条 + 接线那 1 条（`includeArchived: showArchived` 与开关必须同时在场）。原文：~~`createProject(name)` 单参，无层级选择器~~ | `ListsSection.tsx`、`features/projects/ProjectsPanel.tsx`、`packages/ui/src/projects/{model,OrganizerList}.ts(x)` |
-| P2-7 | **订阅权益可见性**（移动端）：无任何权益 UI；**触发条件**：计费上线前必须补（ADR-0023 红线的配套可见性） | app-host `entitlement.ts` 零消费 |
+| P2-7 | 🟡 **权益可见性有一条卡了，但"到期日"这一半仍缺（2026-10-03，多端第四批）**：移动端「我的」页新增 `EntitlementSection`，**唯一入口**是 `app-host#fetchHostedEntitlementReading`（此前它零消费这句已过期）。四态只渲两态：`entitled` 一句"官方托管同步已开启"、`denied` 按 `PERIOD_ENDED` 与其余原因分"到期"／"暂不可用"两句（不混成一句"请订阅"）；`unconfigured`/`unavailable` **整块不渲染** —— 探测失败不等于没权益，把"我不知道"画成"你被降级了"是界面在说谎。**仍缺**：`entitled` 分支的响应里**没有日期字段**（`entitlement.ts:71` 的 `HostedEntitlementReading` 只在 `denied` 带 `currentPeriodEnd`），所以拿不到"到 X 日到期"，要补必须动服务端面 ⇒ 本批白名单外（BLOCKED **B45**）。判据 = `apps/mobile/tests/growth-share-summary.spec.ts` 里挂载 2 条 + 判断串 7 条 + "本屏零 `t('web.` 调用、但复用一条 web 现成句子"1 条；`check:payment-entry` / `check:pricing` 各 exit 0。**设备级截图未取证**（同一台模拟器被并发验收占过，见 B39）。**触发条件不变**：计费上线前必须补到期日那一半（ADR-0023 红线的配套可见性）。原文：~~无任何权益 UI；app-host `entitlement.ts` 零消费~~ | `EntitlementSection.tsx`、`packages/app-host/src/entitlement.ts` |
 
-小项杂记：移动端成长屏缺年度热力图/分享/补打卡按钮（`GrowthScreen.tsx:59-75` 明示未传 props）；移动端设置无帮助面板；`updateAccountLocale`（账号级语言）两端都没接（web 语言切换写设备层）。
+小项杂记：移动端成长屏的**分享块已接**（2026-10-03 任务 4，`buildShareSummary` 从 web 搬进 `app-host` 供两端共用）；**年度热力图 / 补打卡按钮仍未接**，且这不是漏 —— 是被冻结判据 `apps/mobile/tests/growth-display.spec.ts:365`（热力图的无障碍名）与 `:302`（两个 Action 按钮）钉住的，翻它需要一次真机验收，逐条见 BLOCKED **B41 / B42 / B43**；移动端设置无帮助面板；`updateAccountLocale`（账号级语言）两端都没接（web 语言切换写设备层）。
 
 ### 审计追加发现（2026-10-02，批一实施中实测）
 
@@ -111,7 +111,7 @@
 - **时间线拖拽手势不上移动端**：排期走详情表单 —— 本次 goal §9 记录的立场。
 - **模块开关不上移动端**：web 用开关收窄 rail，移动端固定 5 tab；两种 IA 各自成立，但**值得一句跨端立场说明**（哪个是原则、哪个是权宜）。
 - **导出形态**：web 下载 vs 移动系统分享。**滴答导入形态**：web 面板 vs 移动粘贴。
-- **成长屏移动端裁剪**：无热力图/分享。
+- ~~**成长屏移动端裁剪**：无热力图/分享。~~ 🟡 **这句到 2026-10-03 只剩一半，且剩的那半不是立场**：分享块已接（复制走 RN 核心 `Clipboard`，见 §4 小项杂记）；**热力图仍没有**，但拦它的是冻结判据 `growth-display.spec.ts:365`，不是"小屏放不下"这条设计判断 —— 所以它已从"合法单端形态差异"移进"有主的小一步"（BLOCKED **B41**）。
 - 番茄钟/成长/便签 web 默认关模块，移动端 focus 常驻 tab —— 同"模块开关"条。
 
 ## 6. 合法单端

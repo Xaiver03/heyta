@@ -74,6 +74,7 @@
     "verify:realtime-push": "node scripts/verify-realtime-push.mjs",
     "verify:mobile-lists": "bash scripts/verify-mobile-lists.sh",
     "verify:mobile-tags": "bash scripts/verify-mobile-tags.sh",
+    "verify:mobile-notes": "bash scripts/verify-mobile-notes.sh",
     "verify:mobile-account": "bash scripts/verify-mobile-account.sh",
     "verify:mobile-reminder-ring": "bash scripts/verify-mobile-reminder-ring.sh",
     "verify:mobile-quadrant-fill": "bash scripts/verify-mobile-quadrant-fill.sh",
