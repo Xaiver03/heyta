@@ -353,21 +353,43 @@ TASK_XY=$(xy_text "$TASK_TITLE")
 if [ -z "$TASK_XY" ]; then
   bad "点不到任务行，后面的界面操作做不下去"
 else
-  $ADB shell input tap $TASK_XY; sleep 3
-  dump
-  if [ "$(has_text "重复")" = "1" ] || [ "$(has_desc_sub "重复")" = "1" ]; then
-    ok "详情面板里有「重复」区块"
+  $ADB shell input tap $TASK_XY
+  settle_for "不重复"
+  # 🔴 面板是 ScrollView：「重复」区块整体（标题 + 六个预设）可能都在首屏之外。
+  # 原来这里只做一次 dump 就 grep，于是把"还没滚到"报成"界面没接上"——
+  # 实测连续三趟第 7 步两条全红，而**紧接着**的第 8 步用会滚动的 `tap_label`
+  # 点「每周」全绿、第 9 步读「当前：每周六」全绿（第 9 步早就写了"裁掉就滚一下"）。
+  # 所以逐屏收集，并且收完**按滚下去的次数滚回顶部**：lib 的 `scroll_to_*` 只会往前滚，
+  # 这一趟若停在底部，第 8 步找「每周」就永远找不到 —— 那是自己弄坏下一步的前提。
+  DOWN=0
+  HAS_HEADING=0
+  MISSING=":不重复:每天:每周:工作日:每月:每年:"
+  for _ in 1 2 3 4 5; do
+    dump
+    if [ "$HAS_HEADING" = "0" ]; then
+      if [ "$(has_text "重复")" = "1" ] || [ "$(has_desc_sub "重复")" = "1" ]; then HAS_HEADING=1; fi
+    fi
+    for c in 不重复 每天 每周 工作日 每月 每年; do
+      case "$MISSING" in *":$c:"*) ;; *) continue ;; esac
+      if [ "$(has_desc "$c")" = "1" ] || [ "$(has_text "$c")" = "1" ]; then
+        MISSING="${MISSING//:$c:/:}"
+      fi
+    done
+    if [ "$HAS_HEADING" = "1" ] && [ "$MISSING" = ":" ]; then break; fi
+    $ADB shell input swipe 540 1900 540 1100 300; sleep 1.5; DOWN=$((DOWN + 1))
+  done
+  for ((i = 0; i < DOWN; i++)); do
+    $ADB shell input swipe 540 1100 540 1900 300; sleep 1.5
+  done
+  if [ "$HAS_HEADING" = "1" ]; then
+    ok "详情面板里有「重复」区块（向下滚过 $DOWN 屏才收齐 —— 它在首屏之外，不是没接上）"
   else
     bad "详情面板里没有「重复」区块（界面没接上）"
   fi
-  MISSING=""
-  for c in 不重复 每天 每周 工作日 每月 每年; do
-    [ "$(has_desc "$c")" = "1" ] || MISSING="$MISSING $c"
-  done
-  if [ -z "$MISSING" ]; then
+  if [ "$MISSING" = ":" ]; then
     ok "六个选项都在：不重复 / 每天 / 每周 / 工作日 / 每月 / 每年"
   else
-    bad "重复选项缺：$MISSING"
+    bad "重复选项缺：${MISSING//:/ }"
   fi
 fi
 
@@ -641,6 +663,28 @@ print(d.isoformat(), d.month, d.day)
         ok "面板显示「当前：每年 …」（describeRecurrence 认得这条规则）"
       else
         bad "面板上没有「当前：每年」—— 规则写进去了却读不出来"
+      fi
+      # 🔴 走标签栏之前先把面板关掉，并且**等列表回来**。
+      #    第一个假设是"面板盖住底栏，那一下落在面板上"（第 10 步早就用了那个**有名字**的
+      #    关闭出口，第 15 步却没有）—— 补上关闭之后第五趟**仍然红**：面板确实关了
+      #    （"面板已关"那条是绿的），界面却停在列表。所以盖子不是原因，
+      #    原因是关闭动画没走完 ⇒ 见下面那条 dump 实测。假设留在这里，因为它被否证过。
+      #    ⚠️ 别把这条红读成"同步坏了"：第四/五趟紧跟着"笔记本读到同一条规则"都是绿的，
+      #       自动同步已经把 op 传上去了。它挡住的是"手动这条路还能不能点"。
+      if XY15C=$(tap_label "关闭任务详情"); then
+        ok "面板已关（走的是第 10 步那个有名字的出口：$XY15C）"
+        # 🔴 关闭动画没走完就去点底栏，那一下会被 Modal 的消失过程吃掉。实测第五趟：
+        #    面板确实关了（上面那条绿），跑完之后设备**仍停在任务列表** ——
+        #    当时那份 dump 里底栏「我的」的 bounds=[864,2169][1080,2337]，
+        #    而脚本点的 972 2253 **明明落在里面**，所以不是坐标，是没吃到这一下。
+        #    等列表回来再点 —— 与第 10 步「面板已关闭，列表回来了」同一口径。
+        if settle_for "$TASK_TITLE"; then
+          ok "列表回来了（点底栏的前提成立）"
+        else
+          bad "关掉面板后列表没回来 —— 后面点底栏没有意义"
+        fi
+      else
+        bad "关不掉面板 —— 底栏够不着，下面那句同步按钮必然报红"
       fi
       # 🔴 跨设备：规则是数据，不是这台设备的属性。第 13/14 步为 WEEKLY 证过这件事，
       # 这一档也得单独证 —— 因为它换的是 BYMONTH/BYMONTHDAY 这对新参数。
