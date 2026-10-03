@@ -34,10 +34,13 @@ import {
   LOCAL_API_TOOLS,
   authorizeToolCall,
   findTool,
+  projectEventListForTool,
   projectListForTool,
+  readEventForTool,
   readItemForTool,
   readListTasksDueArgs,
   type LocalApiConfig,
+  type LocalApiEventItem,
   type LocalApiItem,
   type LocalApiWriteIntent,
   type LocalApiWriteResult,
@@ -83,10 +86,23 @@ export interface ListTasksQuery {
 }
 
 /**
+ * `list_events` 的查询条件（W10）。
+ *
+ * ⚠️ 刻意**只有** `limit`，没有日期筛选：倒数日的"哪一天"有三种口径
+ * （锚点日 / 下一次发生日 / 农历换算后的公历日），而这三段的判断
+ * 全在 `packages/domain/src/events.ts` 一处。协议层要是接受 `dueOn` 之类的参数，
+ * 就等于在这里长出**第二套**"下一次是哪天" —— 那正是 AGENTS §3.5 记着两次学费的形状。
+ * 要按日期筛，现在的做法是列出来让调用方读 `nextOccurrence` 字段。
+ */
+export interface ListEventsQuery {
+  limit?: number;
+}
+
+/**
  * 宿主端口 —— 由壳实现。
  *
  * 🔴 `submit` 的注释里写着它必须是 `dispatch()`，但**类型上无法强制**。
- * 能强制的是**形状**（`LocalApiWriteIntent` 是封闭的三种动作），
+ * 能强制的是**形状**（`LocalApiWriteIntent` 是封闭的五种动作），
  * 以及**没有别的写入口**（本文件只调 `host.submit`，绝不自己写）。
  *
  * 剩下那一半靠门禁：`check:layering` 应该拦下 `apps/*` 里绕过
@@ -109,6 +125,22 @@ export interface LocalApiHost {
   getTask(taskId: string): Promise<LocalApiItem | undefined>;
   /** 列清单。 */
   listProjects(): Promise<readonly LocalApiProject[]>;
+  /**
+   * 列倒数日 / 纪念日（W10）。**同样由壳逐条标注 `readable`。**
+   *
+   * ⚠️ **为什么是可选的（`?`），而 `listTasks` 不是** —— 这是一次权衡，不是偷懒：
+   * `LocalApiHost` 目前有 6 个真实/测试实现点，其中 5 个在 `apps/**` 的测试假宿主里，
+   * 而本工单的文件边界不许我改它们。把这两个方法做成必填会让整个仓库编译不过，
+   * 做成可选则**必须**保证"没接"这件事是**响亮**的：见下面 `runReadTool` 里
+   * 的 `hostDoesNotSupport()` —— 它返回的是 `ok: false`，**不会**退化成
+   * "返回一个空列表"，那正是 `list_tasks` 那条缺陷的形状（把筛不出伪装成筛出来的是这些）。
+   * 🔴 三个真实宿主（web store / node-host CLI / MCP stdio）都走
+   * `createLocalApiHost()`，也就是**全部已经实现**了这两个方法。
+   * 等 `apps/**` 的假宿主补齐后应当把这层 `?` 去掉。
+   */
+  listEvents?(args: ListEventsQuery): Promise<readonly LocalApiEventItem[]>;
+  /** 取单个倒数日。取不到返回 `undefined`（不是抛错）。同 `listEvents` 的可选理由。 */
+  getEvent?(eventId: string): Promise<LocalApiEventItem | undefined>;
   /**
    * 🔴 **必须是 `dispatch()`。**
    *
@@ -360,9 +392,59 @@ export async function runReadTool(
       return { ok: true, payload: await host.listProjects() };
     }
 
+    case 'list_events': {
+      // 🔴 宿主**没接**倒数日 ⇒ 响亮报错，**不是**"返回一个空列表"。
+      // 后者会把"这个壳没有这个能力"伪装成"你一个倒数日都没有"，
+      // 与 `list_tasks` 那条"把筛不出伪装成筛出来的是这些"是同一个 bug 的形状。
+      if (host.listEvents === undefined) return hostDoesNotSupport(name);
+      const items = await host.listEvents({
+        ...(typeof a['limit'] === 'number' ? { limit: a['limit'] } : {}),
+      });
+      // 🔴 列表里备注一律不出（`projectEventListForTool` —— 与 `list_tasks` 同一刀）。
+      return { ok: true, payload: projectEventListForTool(items) };
+    }
+
+    case 'get_event': {
+      if (host.getEvent === undefined) return hostDoesNotSupport(name);
+      if (typeof a['eventId'] !== 'string') {
+        return { ok: false, kind: 'invalid-args', message: 'get_event 需要 eventId。' };
+      }
+      const item = await host.getEvent(a['eventId']);
+      // ⚠️ 找不到时**不是错误**，而是带 `error` 字段的正常结果 —— 与 `get_task` 同一形状
+      // （那是既有行为，`tool-egress-fields` 的 `{error}` 信封声明就是为它写的）。
+      if (item === undefined) {
+        return { ok: true, payload: { error: '没有找到这个倒数日。' } };
+      }
+      const read = readEventForTool(item);
+      // 🔴 受保护 → **错误**，不是空结果。
+      if (!read.ok) {
+        return { ok: false, kind: 'not-readable', message: read.message };
+      }
+      return { ok: true, payload: read.item };
+    }
+
     default:
       return { ok: false, kind: 'not-a-read-tool', message: `「${name}」不是只读工具。` };
   }
+}
+
+/**
+ * 宿主没有实现这一段能力时的回答。
+ *
+ * 🔴 单独成一个函数，是为了让**两个**入口（内置 AI 与 MCP）说的是同一句话 ——
+ * 两个前端一份判断（不变量 19）。
+ * ⚠️ `kind` 取 `invalid-args` 而不是新造一档：新增一档会牵动
+ * `ai-tool-run.ts` 的失败映射与 `apps/web` 的失败文案表，而那两处不在本工单范围内
+ * （W10 的验收明确要求 `ai-tool-run.ts` 零改动）。真正的信息在 `message` 里。
+ */
+function hostDoesNotSupport(name: string): ToolReadOutcome {
+  return {
+    ok: false,
+    kind: 'invalid-args',
+    message:
+      `这个宿主没有接倒数日（${name} 需要宿主实现对应的读方法），` +
+      '所以一个字节都没有读到 —— 不是"你没有倒数日"。',
+  };
 }
 
 /**
@@ -422,6 +504,45 @@ export function toWriteIntent(name: string, args: unknown): ToolWriteIntentOutco
         return { ok: false, message: 'complete_task 需要 taskId。' };
       }
       return { ok: true, intent: { action: 'complete-task', taskId: a['taskId'] } };
+    }
+
+    case 'create_event': {
+      // ⚠️ 这里只做**形状**检查（有没有这个键、是不是字符串）。
+      // "这个日期是不是真实存在的一天""这个 kind 在不在封闭词表里"由**宿主**判
+      // （`packages/domain` 的 `eventRejection` 是唯一归属）——
+      // 在本包再判一遍就是第二套日历判断，而那正是 AGENTS §3.5 记着学费的形状。
+      if (typeof a['title'] !== 'string' || a['title'].trim() === '') {
+        return { ok: false, message: 'create_event 需要 title。' };
+      }
+      if (typeof a['date'] !== 'string' || a['date'].trim() === '') {
+        return { ok: false, message: 'create_event 需要 date（锚点日期，YYYY-MM-DD）。' };
+      }
+      return {
+        ok: true,
+        intent: {
+          action: 'create-event',
+          title: a['title'],
+          date: a['date'],
+          ...(typeof a['kind'] === 'string' ? { kind: a['kind'] } : {}),
+          ...(typeof a['isLunar'] === 'boolean' ? { isLunar: a['isLunar'] } : {}),
+          ...(typeof a['recurrence'] === 'string' ? { recurrence: a['recurrence'] } : {}),
+          ...(typeof a['notes'] === 'string' ? { notes: a['notes'] } : {}),
+        },
+      };
+    }
+
+    case 'update_event': {
+      if (typeof a['eventId'] !== 'string' || typeof a['fields'] !== 'object' || a['fields'] === null) {
+        return { ok: false, message: 'update_event 需要 eventId 与 fields。' };
+      }
+      return {
+        ok: true,
+        intent: {
+          action: 'update-event',
+          eventId: a['eventId'],
+          fields: a['fields'] as Record<string, unknown>,
+        },
+      };
     }
 
     default:
