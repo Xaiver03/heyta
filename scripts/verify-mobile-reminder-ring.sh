@@ -1,4 +1,22 @@
 #!/bin/bash
+
+# 🔴 HEYTA-SNAPSHOT-BOOTSTRAP v1（traps #110/#113）—— bash 对脚本是按字节偏移
+#    增量读取的：运行中被编辑，后半段就从错位字节开始解析，炸出假语法错误。
+#    入口先把整份脚本拷成同目录隐藏快照再 exec 副本 —— 之后对源文件的任何
+#    编辑都影响不到本次运行；$0 的 dirname 不变，lib/tools 定位照旧。
+#    快照名 .原名.snap.PID（进 .gitignore）；trap 尽力清理，被 kill -9 留下的
+#    由下一次运行按 mmin +240 顺带扫掉。
+case "$(basename "$0")" in
+  .*.snap.*) ;; # 已是快照：正常往下跑
+  *)
+    _snap_dir="$(cd "$(dirname "$0")" && pwd)" || exit 1
+    find "$_snap_dir" -maxdepth 1 -name ".$(basename "$0").snap.*" -mmin +240 -delete 2>/dev/null || true
+    _snap="${_snap_dir}/.$(basename "$0").snap.$$"
+    cat "$_snap_dir/$(basename "$0")" > "$_snap" || exit 1
+    exec bash "$_snap" "$@"
+    ;;
+esac
+trap 'rm -f -- "$0"' EXIT
 #
 # 移动端「提醒投递」验收（真模拟器，零 mock）
 # ============================================
@@ -42,21 +60,21 @@ echo ""
 echo "=== 移动端提醒投递验收（真实模拟器，零 mock）==="
 echo "  设备: $E2E_SERIAL   任务: $TITLE"
 
+# 🔴 本验收的隐私决定由这里点名，不让共享的欢迎页 helper 替它选（见 lib 里
+#    `CONSENT_GATE_PREFERRED` 那段）。
+CONSENT_GATE_PREFERRED=只用本机
+
 dismiss_consent_if_present() {
-  local waited=0 xy label
-  while [ "$waited" -lt 10 ]; do
-    dump
-    [ "$(has_text "在使用联网功能之前")" = "1" ] && break
-    sleep 1
-    waited=$((waited + 1))
-  done
-  [ "$(has_text "在使用联网功能之前")" = "1" ] || return 0
-  xy=$(xy_desc "只用本机"); label="只用本机"
-  if [ -z "$xy" ]; then xy=$(xy_text "只用本机"); fi
-  if [ -n "$xy" ]; then
-    $ADB shell input tap $xy; sleep 2
-    echo "     已处理隐私同意面板（${label}）—— 提醒是本地 op，本验收不需要联网"
+  # 处理本身在 `lib/mobile-e2e.sh` 的 `handle_privacy_consent`（五个安卓脚本各抄一份
+  # 的时代结束了 —— 抄漏那份的症状是整轮"找不到按钮"的假红）。
+  # 🔴 本验收选**「只用本机」**：提醒是本地 op，不需要联网许可；替用户点「同意并联网」
+  #    等于让一段本地判据的验收顺手做了一个隐私决定。
+  handle_privacy_consent "只用本机" "以后再说"
+  local rc=$?
+  if [ "$CONSENT_GATE_SEEN" = "1" ]; then
+    echo "     （提醒是本地 op，本验收不需要联网）"
   fi
+  return $rc
 }
 
 # 通知栏里有没有含 $1 的通知。标题带时间戳（ring-e2e-<HHMMSS>），不会撞别的应用。

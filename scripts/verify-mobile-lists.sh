@@ -373,9 +373,31 @@ else
   bad "笔记本上这条任务没有 projectId —— 归属没同步过去"; screen_txt
 fi
 
-step "10. 直接查 Postgres"
-psql -h 127.0.0.1 -p 5432 -U rocalight -d heyta_mobile_smoke -tAc \
-  "SELECT count(*) FROM operations WHERE op_type='CRT' AND entity_type='PROJECT'" 2>/dev/null \
-  | sed 's|^|      服务端 PROJECT/CRT op 数 = |'
+step "10. 直接查 Postgres（服务端数得出那条 op 吗）"
+#
+# 🔴 这一条原先**只打印、不判定**：`2>/dev/null` 把"连不上库""库不存在""权限不对"
+#    三种失败全吞掉，管道另一端 `sed` 于是打印「服务端 PROJECT/CRT op 数 = 」（空值），
+#    而 `summary` 只看 `$FAIL` ⇒ **整趟照样 exit 0**。
+#    这一步存在的意义是「界面说同步好了，服务端真的收到了吗」——
+#    读数拿不到时它必须响；不响就等于这一格从来没被验过（AGENTS §7 元规则 2）。
+#
+# 连接参数走 env（与 `verify-mobile-auth.sh:125` 同一套约定，不再硬编码某台机器的
+# 用户名）；默认值与原来逐字相同，所以现有跑法的行为不变。
+PG_DB="${HEYTA_E2E_DB:-heyta_mobile_smoke}"
+PG_USER="${HEYTA_E2E_DB_USER:-$(whoami)}"
+PG_HOST="${HEYTA_E2E_DB_HOST:-127.0.0.1}"
+PG_PORT="${HEYTA_E2E_DB_PORT:-5432}"
+SRV_PROJECT_OPS=$(psql -h "$PG_HOST" -p "$PG_PORT" -U "$PG_USER" -d "$PG_DB" -tAc \
+  "SELECT count(*) FROM operations WHERE op_type='CRT' AND entity_type='PROJECT'" 2>&1)
+if ! printf '%s' "$SRV_PROJECT_OPS" | grep -qE '^[0-9]+$'; then
+  bad "读不到服务端的 PROJECT/CRT op 计数（库 ${PG_DB} @ ${PG_HOST}:${PG_PORT}，用户 ${PG_USER}）—— 原始输出：$(printf '%s' "$SRV_PROJECT_OPS" | head -3 | tr '\n' ' ')"
+else
+  ok "服务端 PROJECT/CRT op 数 = $SRV_PROJECT_OPS"
+  if [ "$SRV_PROJECT_OPS" -ge 1 ]; then
+    ok "手机上那条清单真的出去了 —— 服务端 operations 表里数得出它的 CRT op"
+  else
+    bad "服务端 PROJECT/CRT op 数 = 0 —— 界面说清单建好了并同步了，服务端一条都没收到"
+  fi
+fi
 
 summary "移动端清单闭环"
