@@ -3932,3 +3932,39 @@ sha 对任何字节串都算得出来，所以"`hash-object` 成功打印了一�
 逐段报出的文件**都在别人的面上**（CalendarDayBoard / countdown-card-export.spec / third-parties.ts /
 镜像依赖快照 / C# 契约重放 / r14c-window-retry.sh / server 的 holiday-adjustment pglite 等）。
 **B66 的 ③ 仍然开着**：阶段 5 被那棵挂在 notarization 上的对端进程按着（见 B67）。
+
+## B69. 🔴 三栏详情列把页头右侧**盖住并吃掉点击**（1280px 实测）：本线 e2e 的「切换到暗色主题」点不动，红在别人的面上，改法是一行
+
+**症状**（载体 `1ebcf136`，2026-10-04 05:36 那次 `pnpm --dir e2e run test`）：
+`e2e/tests/ai-assistant.spec.ts:65` 第 121 行 `getByRole('button', { name: '切换到暗色主题' }).click()`
+超时 60s，Playwright 的命中测试报：
+
+```
+<aside class="ht-app__detail" data-testid="detail-column"></aside> intercepts pointer events
+```
+
+那个 aside 在快照里是**空的**（没有选中项），却仍然占着轨道并带 `background`。
+
+**图证（人已看）**：`heyta-wt-ai-closeout/e2e/test-results/ai-assistant-…-chromium/test-failed-1.png`
+—— 页头那一行在 **x≈930 处被切**（`语言 中文 ✓ En…` 的 `English` 只剩半个），
+右侧到 1280 是一整块空白详情列。也就是说**真人也点不到**「English」与「切换到暗色主题」，
+这不是测试夹具的怪癖。会话本身是好的（截图里用户气泡 + 「假端点收到 1 条工具结果 / 用了 1 步工具」都在），
+红只在这一步。
+
+**机制（读提交态 CSS 得到的，不是猜）**：`apps/web/src/styles/app/base.css:30`（默认那条）与 `:52-60`（带侧栏那条，裸 `1fr` 在第 59 行）
+`grid-template-columns` 里，中间那一列写的是**裸 `1fr`**。grid 项默认 `min-width: auto` ⇒
+主区的最小内容宽度顶不住时，`1fr` 轨道**溢出到详情轨道下面**，而 `.ht-app__detail` 带底色
+（`base.css:76-83`）就把它**画在上面**。详情列是这一批新加的 ⇒ 这条洞是它带来的。
+
+**一行改法**（两处都要改，`--with-sidebar` 那条和默认那条）：`1fr` → `minmax(0, 1fr)`。
+同文件里侧栏那一轨已经有 `min(…, 40vw)` 的兜底思路（`base.css:44-51` 的注释与那段 `clamp`），这是同一条纪律的另一端。
+
+**为什么本线不自己改**：① `apps/web/src/App.tsx` 在主检出是 `M`（详情面那条线正在写这一片），
+按"红在别人的面上就交给那条线"的既有纪律不抢；② 改完必须**真浏览器复跑**那条 spec 才算数
+（§6.2 规定一），而此刻 e2e 窗口正被 05:32 起跑的那一趟占着（同一趟里 `admin-console` 4 条、
+`calendar-cells:76` 也在红），再起一趟会撞端口 4318/4319 与 `tfa-test.lock`。
+⇒ **本线的判据一条都不放宽**：`ai-assistant.spec.ts` 不改、不跳过、不加 `force: true`。
+
+**复查命令**（谁落这一行谁跑）：
+`cd e2e && npx playwright test tests/ai-assistant.spec.ts`，判据是那条用例转绿
+**且** `apps/web/evidence/assistant/2b-chat-dark.png` 落盘（暗色那张）。
