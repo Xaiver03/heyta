@@ -130,8 +130,8 @@ focus_ops_in() {  # <sqlite 文件>
 # 从 dump 里取倒计时（MM:SS）并换算成秒；取不到返回空字符串。
 countdown_seconds() {
   python3 - <<'PY'
-import re
-xml = open('/tmp/ui.xml', encoding='utf-8', errors='replace').read()
+import os, re
+xml = open(os.environ['UI_XML'], encoding='utf-8', errors='replace').read()
 m = re.findall(r'text="(\d{1,2}):(\d{2})"', xml)
 print(int(m[0][0]) * 60 + int(m[0][1]) if m else '')
 PY
@@ -140,7 +140,7 @@ PY
 # ── 开始 ────────────────────────────────────────────────────
 echo ""
 echo "=== 移动端专注（番茄钟）闭环验收（真实模拟器 + 真服务端，零 mock）==="
-echo "  设备: $E2E_SERIAL   服务端: $SERVER   库: heyta_mobile_smoke"
+echo "  设备: $E2E_SERIAL   服务端: $SERVER   库: $E2E_DB"
 echo "  账号: $EMAIL"
 echo "  任务: $TASK_TITLE"
 
@@ -176,7 +176,7 @@ heyta_e2e_assert_client_budget || bad "账号 client 数已逼近向量时钟上
 #        关：✅ 服务端收到了专注记录（3 → 4）  → 26/26
 #        开：❌ 服务端没收到专注记录（3 → 3）  → 25/26
 #    ——判据没变、产品没坏，变的是"基线取晚了"。
-SRV_FOCUS_BASELINE=$(psql -h 127.0.0.1 -p 5432 -U rocalight -d heyta_mobile_smoke -tAc \
+SRV_FOCUS_BASELINE=$(psql -h 127.0.0.1 -p 5432 -U "$E2E_DB_USER" -d "$E2E_DB" -tAc \
   "SELECT count(*) FROM operations WHERE entity_type='FOCUS_SESSION';" 2>/dev/null | tr -d ' ')
 echo "     运行前的服务端 FOCUS_SESSION 基线 = ${SRV_FOCUS_BASELINE:-?}"
 
@@ -388,7 +388,7 @@ if ELAPSED=$(wait_synced 60); then
 else
   bad "手机第二次同步没成功"
 fi
-SRV_AFTER=$(psql -h 127.0.0.1 -p 5432 -U rocalight -d heyta_mobile_smoke -tAc \
+SRV_AFTER=$(psql -h 127.0.0.1 -p 5432 -U "$E2E_DB_USER" -d "$E2E_DB" -tAc \
   "SELECT count(*) FROM operations WHERE entity_type='FOCUS_SESSION';" 2>/dev/null | tr -d ' ')
 if [ "${SRV_AFTER:-0}" -gt "${SRV_FOCUS_BASELINE:-0}" ]; then
   ok "服务端收到了专注记录（$SRV_FOCUS_BASELINE → ${SRV_AFTER}，本次运行确实新增了）"
