@@ -1355,6 +1355,29 @@ Goal 原话点名的记账落点就是本节。**先建槽、后填读数** —�
     **1b** 内存锁门（别人的测试持锁就整段不起跑，并打印持有者 pid 与它的命令行）。
     这两道门各自做过**阳性对照**：2a 的谓词先被夹具抓出两次"永远不触发"（`require` 相对路径当模块名、
     判据测的是脚本文本而不是**键是否存在**），1b 用当前真实持锁的 pid 跑出 `exit 3`。
+  - ✅ **第二趟（03:42–03:56，载体 `391e4c27`）：`check:ai-e2e` 拿到了"没有本条线债"的读数** ——
+    `142 passed / 13 failed / 2 skipped`（13.5 分钟，`rc=1`）、`privacy-consent-e2e rc=0`（7 passed）。
+    上一趟那条**属于我自己的**红（spec 语法错）已经不在，而本条线新加的 `tests/list-folder.spec.ts`
+    **在这趟全套件里是过的**（它被套件收走跑，不是只在我单独点它时过 —— 这是"进 `e2e/tests/`"的真实代价与真实收益）。
+    13 条失败**逐条读过错误行**再分组，三组：
+    ① **8 条同一根因**：`GET /api/holiday-adjustments` 落进**四份各自维护**的"不该有未登记请求"白名单
+    （`admin-console.spec.ts:559` ×4、`inbox.spec.ts:228`/`:307`、`profile-avatar-e2ee.spec.ts:321`、
+    `vault-settings.spec.ts:218`）。服务端路由**在 HEAD 里**（`server/src/holidays/holiday-adjustment.routes.ts`）
+    ⇒ 不是产品坏，是**应用启动期新增了一次公共事实拉取，而 e2e 那个假服务端只实现 `/v1/chat/completions`**。
+    这与 `e2e/tests/helpers.ts:244` 注释里记的 2026-10-02 legal-consent"一次红六条"是**同一件事的第二次**，
+    只是这次打穿的是四份白名单而不是一份 —— 归 W4b/公共事实那条线，本条线不代改
+    （`helpers.ts` 在主检出里正 `M`，改它就是造三方冲突）。
+    📌 可迁移：**"启动期多发一个请求"是一次全局变更**，它的爆炸半径等于"有几份白名单各自记着它"，
+    而不是等于 1。
+    ② **3 条超时**（`ai-assistant.spec.ts:65`、`calendar-cells.spec.ts:257`、`task-row-touch-target.spec.ts:119`）
+    错误行都卡在 `locator.click` 于 `<button aria-label="切换到暗色主题">` 上 60s。
+    ⚠️ **只写观察，不写结论**：同趟 `calendar-cells.spec.ts:76` 独立报「页头横向溢出：
+    scrollWidth 925 > clientWidth 624」，两者相容（溢出 ⇒ 那颗按钮被挤出可点区），
+    但**起跑时 1min 负载 21**，超时类读数要先做一次低负载复跑才有资格归因。定点动作：
+    负载 ≤12 时单跑这三个文件。
+    ③ **1 条行为红**：`calendar-day.spec.ts:186`「往左拖之后标题不是下一天（实测「10月4日 星期日」）」
+    —— 今天 10-04、期望 10-05，拖拽没换日。与 traps **#172**（宿主挂 `pointermove` 的轻拖/重拖分叉）同族，归日历线。
+    🔴 三组**都不由本条线吸收凑绿**：② 这一格要的是"可过段数 + 载体 sha + 逐条归因"，不是"我把它修到绿"。
   - **这张表的保质期属于载体 `f08b26e7`**：main 在这一小时动了 276 笔，下一趟大概率是另一串数。
     复跑命令：`bash /tmp/heyta-run-checks.sh --go`（体检先跑不带 `--go`）。
 - ③ 便签移动端验收：`NOTES_EXIT=` **待填**（第 6/7 步的 op 判据、第 8 步第三张截图、第 9–11 步跨设备三条腿各写一条读数）—— 现量命令 `bash /tmp/heyta-run-notes.sh`。
