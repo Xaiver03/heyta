@@ -3331,6 +3331,55 @@ ScreenCaptureKit 报错：… Code=-3811 "音频/视频捕捉失败，无法开�
 要求看到 `安装副本启动自截屏：非空白 且 主蓝命中`（§6.1.1 的 mac 判据）与
 `/Applications/Heyta.app` 的 mtime **晚于** `/tmp/heyta-macos-dist/Heyta.app`。
 
+### 22:4x 复验：上面两个候选**都被否证**，这条红被缩到"打包那一次里 ScreenCaptureKit 间歇失败"
+
+我没有重跑打包（那要占几分钟构建），而是**直接用 22:37 那次已经打出来的产物**做同一条启动路径
+（`package-app.sh:177` 的形状：`HEYTA_NO_FOCUS=1 HEYTA_SELF_CAPTURE=<png> Heyta.app/Contents/MacOS/HeytaMac`），
+9 秒后只回收我自己起的那个 pid：
+
+```
+WINDOW_SIZE=1092x723   WINDOW_TITLE=heyta   PNG_BYTES=13913
+CAPTURE_METHOD=screencapturekit            WEBVIEW_SNAPSHOT_BYTES=118556
+```
+
+同一次输出里**仍然**印着 `sandbox_extension_issue_file_to_process failed … Operation not permitted`
+—— 也就是说那一行是**噪声，不是失败原因**（它以前就被当成"多半是没给屏幕录制权限"的依据，这次被否证）。
+用仓内真判据 `scripts/screenshots/png-stats.mjs`（和 `reinstall-all.sh:113 shot_ok` 逐字同形状）打分：
+
+```
+✅ 窗口 1092x723、heyta-selftest-A.png.webview.png 内容占比 99.8%、主蓝命中 79 —— 是共享 UI
+```
+
+**而且人真的打开了那张图看了**（AGENTS §6.2 规定一第 4 条）：那是收集箱页的**深色主题**真界面 ——
+左 rail（收集箱/今天/最近 7 天/已完成/四象限/清单/标签）、`AI 工具调用` 与 `对话助手` 两块、
+右上 `中文/English` 与"未同步"指示都在。主蓝只有 79（历史上那张 WebView 快照是 1269）
+**不是渲染坏了**，是这一屏在深色主题下蓝色元素本来就少（rail 激活项、添加按钮、四象限圆点、中文 pill）。
+
+⇒ 三个候选里：
+1. ~~整机没有录屏权限~~ —— 否证（我的 shell `screencapture -x` 出 1.85 MB 合法 PNG；且这条路径自己出了图）。
+2. ~~21:33 那个旧实例挡着~~ —— 否证（它**当时也还在跑**：22:52 现量 pid 772 `lstart=Sat Oct 3 21:33:00`、
+   `etime 1:19:31`，也就是我 22:49 那次成功出图时它活着；我起的那个 pid 已回收）。
+3. ✅ 剩下的解释：**打包那一次里 ScreenCaptureKit 的 `-3811` 是间歇性的**（"无法开始流播放"），
+   与负载/并发采集窗口有关 —— 那次 mac 段是在四端连跑的开头、机器同时压着并行会话的构建。
+
+**所以关闭判据改小、也改准**：不需要动用户那个在跑的 App，只需要 `--only mac` **重跑一次**并按
+`shot_ok` 的三条（无透明 / 快照非空白 / 主蓝 ≥ 20）拿绿 + `/Applications/Heyta.app` mtime 变新。
+⚠️ 但"重跑一次就绿"**还没验** —— 上面证的是"产物能渲染"，不是"打包脚本这次会放行"。
+
+📌 这条一般规律**待入 `docs/reference/environment-traps.md`**（那个文件此刻正被并行会话脏着几百行，
+按 §7 的规矩是"追加到末尾、编号递增"，不该由我在别人脏着的状态里就地改）：
+**`sandbox_extension_issue_file_to_process … Operation not permitted` 是一行噪声，不是失败原因** ——
+它和一次**成功**的 ScreenCaptureKit 截图同批出现（22:49 实测：同一份 stdout 里既有这行，
+又有 `WINDOW_TITLE=heyta` / `WEBVIEW_SNAPSHOT_BYTES=118556`，且那张快照过 `shot_ok`）。
+把打包失败归因成"没给屏幕录制权限"的那句话，就是读日志时**只看了第一行红字**。
+
+### 顺带看图时撞见的一条（**未量化**，不当结论用）
+
+那张 1092x723 的快照里，`对话助手` 输入框右端的「发送」「新会话」两个按钮**看起来落在输入框右边界之外**，
+且呈禁用灰。这只是肉眼看图，**没有量过任何几何**（DOM 里 `发送` 的 rect 与容器 rect 谁包谁）。
+按"别报没取证的界面路径"这条纪律，它现在只算一条待量观察，落在本线的
+`apps/web/src/features/ai/AssistantPanel.tsx`；要动它得先在真浏览器里量出 rect 差。
+
 **同一次运行里另外三端**：windows ✅ 五条判据全在位（含用户点名的 `SHORTCUT_OK=True`，
 远端新鲜度对账 `web-dist/index.html=217cae2a252d8948…` + `assets/*.js=7 枚一致`）；
 android 与 ios 是**我主动中止**的 —— 22:41 现量并行会话的 `verify-mobile-reminder-ring.sh`（pid 50463）
