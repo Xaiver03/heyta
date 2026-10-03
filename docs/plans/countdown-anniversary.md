@@ -829,19 +829,26 @@ W0b ─> 随时可做（台账那半要等文件干净）
 
 ### 8.2 逐项：范围 / 落点 / 判据 / 变异 / 勾
 
-#### ⏳ W0 · 锚点弹层提到共享层（`packages/ui`），`AccountMenu` 改成消费者
+#### ✅ W0 · 锚点弹层的定位算术已提到共享层（2026-10-03 15:51，`7966857a`）
 
-- **事实**：`packages/ui/src/index.ts` 文件头明写这一层**进不来任何 DOM 标签**，而
-  `apps/web/src/features/shell/AccountMenu.tsx:176-202` 整段靠 `getBoundingClientRect` / `window` /
-  **捕获阶段 scroll**（`:199-202` 是修"面板停在原地"的承重件）⇒ **不能整段搬**。
-  现量：`grep -rn getBoundingClientRect packages/ui/src | wc -l` ⇒ 0。
-- **形状**：纯函数 `placeAnchoredPanel(triggerRect, panelRect, viewport, gap, opts) → {top,left,placement}`
-  进 `packages/ui/src/overlay/model.ts`；**测量由宿主注入**（web 用 rect + 捕获 scroll；RN 用 `onLayout`/`measureInWindow`）。
-  CSS `apps/web/src/styles/app/rail.css:129-143`（`position:fixed` + `--ht-z-popover`）留在 web —— 属宿主。
-- **判据**：①复用既有注入验证：`e2e/account-menu.spec.ts` 的"面板右边必须可见"在改回 `absolute` 时仍转红；
-  ②新纯函数单测覆盖 roomAbove/roomBelow + 夹视口 + 翻转四组矩形；③`AccountMenu.tsx` 定位本体行数下降（`git diff --numstat` 进提交信息）。
-- **变异**：把 placement 的 `>` 改成 `>=`，或拿掉夹视口 ⇒ 至少一条单测红。
-- [ ] W0 完成
+- **形状（已落地）**：纯函数 `placeAnchoredPanel(trigger, panel, viewport, {gap, edge}) → {top,left,placement}`
+  在 `packages/ui/src/overlay/model.ts`；**测量与重算时机留在宿主** —— 因为
+  `packages/ui/src/index.ts` 文件头明写这一层进不来任何 DOM 标签，而
+  `AccountMenu.tsx:176-202` 那段的承重件恰恰是 DOM（`getBoundingClientRect` 与
+  **捕获阶段 scroll**，`:199-202` 是修"面板停在原地"的那件）。
+  CSS `apps/web/src/styles/app/rail.css`（`position:fixed` + `--ht-z-popover`）留在 web —— 属宿主。
+  🔴 `gap`/`edge` **没有默认值**：默认值就是裸 px，而间距的唯一来源是 `tokens.css`。
+- **读数**：
+  - 新纯函数单测 **6 条**（`packages/ui/tests/overlay-place.spec.ts`），`@heyta/ui` 全量 **448 passed / 25 files**。
+  - 变异：`roomAbove > roomBelow` 改成 `>=` ⇒ **恰好 1 条红**（"两侧相等留下方"）。
+  - 注入验证（比原计划的"改回 absolute"更贴本次改动）：把翻转判据强制成"永远向下" ⇒
+    e2e `account-menu.spec.ts` 的塌缩态用例红在 `面板应当在头像**上方**`
+    （`bottom 557.25 > 419`）；还原后 **3 passed**。⇒ 证明真浏览器那条判据确实走的是共享算术。
+  - 截图已看：`e2e/test-results/account-menu-{signed-out,signed-in,narrow}.png`
+    （宽屏面板在头像下方、右边完整；窄屏向上弹、不盖住底部导航）。
+  - `check:design` / `check:l4` / `check:layering` 各 **rc=0**。
+  - `AccountMenu.tsx` 定位本体 **+11 / −16**（净减 5 行；15 行算术换成 8 行调用）。
+- [x] W0 完成
 
 #### ⏹ W0b · 批次一遗留的三条登记缺口
 
