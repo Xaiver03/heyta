@@ -1,4 +1,22 @@
 #!/bin/bash
+
+# 🔴 HEYTA-SNAPSHOT-BOOTSTRAP v1（traps #110/#113）—— bash 对脚本是按字节偏移
+#    增量读取的：运行中被编辑，后半段就从错位字节开始解析，炸出假语法错误。
+#    入口先把整份脚本拷成同目录隐藏快照再 exec 副本 —— 之后对源文件的任何
+#    编辑都影响不到本次运行；$0 的 dirname 不变，lib/tools 定位照旧。
+#    快照名 .原名.snap.PID（进 .gitignore）；trap 尽力清理，被 kill -9 留下的
+#    由下一次运行按 mmin +240 顺带扫掉。
+case "$(basename "$0")" in
+  .*.snap.*) ;; # 已是快照：正常往下跑
+  *)
+    _snap_dir="$(cd "$(dirname "$0")" && pwd)" || exit 1
+    find "$_snap_dir" -maxdepth 1 -name ".$(basename "$0").snap.*" -mmin +240 -delete 2>/dev/null || true
+    _snap="${_snap_dir}/.$(basename "$0").snap.$$"
+    cat "$_snap_dir/$(basename "$0")" > "$_snap" || exit 1
+    exec bash "$_snap" "$@"
+    ;;
+esac
+trap 'rm -f -- "$0"' EXIT
 # 自托管整套验收：一条命令 = 打镜像 → 起栈 → 真浏览器走三条判据 → 拆栈。
 # ============================================================================
 #
@@ -6,6 +24,15 @@
 #   pnpm verify:selfhost-stack          # 完整跑（含 docker build）
 #   pnpm verify:selfhost-stack --no-build      # 复用已有镜像（改判据时用）
 #   pnpm verify:selfhost-stack --keep          # 跑完不拆栈，留给人打开浏览器看
+#                                              # 🔴 此时**也保留**那份一次性凭据文件
+#                                              # （下面打印的拆栈命令要用它的 --env-file）
+#
+# ## 判据分了两处，是有意为之
+#
+# 「文档里那条入口命令对不对」这件事**不在这份脚本里判** —— 它在
+# `scripts/check-selfhost-entry-command.mjs`（纯文件系统，`pnpm check` 一定会跑到，
+# 没有 docker 的机器也在判）。本脚本只是**调用**它。原先那段抄在这里，而这份脚本
+# 要 docker ⇒ 没有 docker 的环境上等于没有判据。
 #
 # ## 它判的那句话
 #
@@ -85,9 +112,23 @@ for arg in "$@"; do
 done
 
 cleanup() {
+  # 快照副本（bootstrap 那行 trap 会被下面 `trap 'cleanup; …' EXIT` 整个替换掉 ——
+  # bash 的 EXIT trap 只有一个。不在这里带上，每跑一次就往 scripts/ 里留一个
+  # .verify-selfhost-stack.sh.snap.PID；.gitignore 挡得住提交，挡不住堆盘）。
+  rm -f -- "$0"
+  if [ "$KEEP" = "1" ]; then
+    # 🔴 `--keep` 时**不能**删这份凭据文件。它打印的那条"手工拆栈"命令里带
+    # `--env-file "$ENV_FILE"`，而 `down` 要读同一份 env 才算得出这套资源 ——
+    # 文件被 trap 删掉之后，照着输出执行得到的是 env file not found，
+    # 那一栈就留在机器上了（"探针把取证路径自己删了"的形状：提示与清理必须同口径）。
+    # 它里面是一次性随机凭据，所以这里把路径**打出来**，拆完由人顺手 rm。
+    log "   一次性凭据文件**保留**（上面那条拆栈命令的 --env-file 就是它）：${ENV_FILE}"
+    return 0
+  fi
   rm -f "$ENV_FILE"
 }
-trap cleanup EXIT
+# 🔴 必须把 cleanup 与快照删除**串在同一条** trap 里（见上面 cleanup 的第一行）。
+trap 'cleanup; rm -f -- "$0"' EXIT
 
 log() { printf '%s\n' "$*"; }
 die() { printf '\n❌ %s\n' "$*" >&2; exit 1; }
@@ -186,55 +227,33 @@ OVERRIDE_SERVICES="$(services_of "${COMPOSE_FILES[@]}")"
 }
 log "    服务图对账：默认 3 个（未动） · 带 override 4 个（+supersync-migrate）"
 
-# ── 对外文档那条入口命令的对账 ─────────────────────────────────────
-# 为什么要这一条：文档 §4 印的就是"一条 compose 起全套"，而这条脚本量的是
-# 自己那套（先 `docker build` 出私有 tag、再用 SUPERSYNC_IMAGE 指过去）。
-# 两者**本来就该不一样** —— 脚本手里有镜像，陌生人手里没有。
-# 但"不一样"的方向漂起来是无声的：2026-10-03 实测，文档少带了
-# `docker-compose.build.yml`，于是陌生人照抄得到的是
-# `pull access denied for supersync … may require 'docker login'`
+# ── 对外文档那条入口命令的对账（判据的**唯一所有者**是那份 .mjs）────────
+# 为什么要抽出去：这段判断原先只活在本文件里，而本文件**要 docker、要起栈** ⇒
+# 没有 docker 的机器与 CI 上等于没有判据 —— 漂了没人红，直到某个外人照抄踩坑。
+# 2026-10-03 实测漂的就是这个方向：文档少带了 `docker-compose.build.yml`，
+# 于是陌生人照抄得到 `pull access denied for supersync … may require 'docker login'`
 # （我们根本没有仓库，那句提示把人引向"去找登录凭据"）。
-# 所以这里把文档那一行的 -f 集合钉成期望值，漂了就红。
-GUIDE="$REPO_ROOT/docs/runbooks/self-host.md"
-README="$REPO_ROOT/server/README.md"
-# 🔴 同一条命令现在有**两份抄件**（中文指南 + server/README）。抄件的漂法是固定的：
-# 改一处、忘另一处，而两边看起来都自洽。所以这里逐份量，任何一份漂了就红。
-DOC_LINES=""
-for doc in "$GUIDE" "$README"; do
-  # 续行（行尾反斜杠）先折回来，否则第二条 -f 会掉到下一行去。
-  # ⚠️ 这里**必须用 awk**，不能用 `tr '\n' X | sed 's/\\X//'`：BSD sed 的 BRE 不解释
-  # `\036` 这类八进制转义，它会把那三个字符当字面量去找 ⇒ **折叠静默失败**，
-  # 于是判据只读到第一条物理行、报"文档少了 migrate-once override"（2026-10-03 实测，
-  # 探针自己坏了、文档是好的）。
-  line="$(awk '{ if ($0 ~ /\\$/) { sub(/\\$/,""); printf "%s ", $0 } else { print } }' "$doc" \
-    | grep -m1 '^docker compose -f docker-compose\.yml' || true)"
-  [ -n "$line" ] || die "${doc#$REPO_ROOT/} 里找不到以 'docker compose -f docker-compose.yml' 开头的那条入口命令 —— 它被改名、换行或删掉了，而这条判据将变成空转。"
-  # 🔴 折行之后要先压空格：续行是缩进的（两个前导空格），压完才 `-f x.yml` 的形状统一。
-  # 不压的实测后果不是漏判整条，而是**只漏掉续行上那一个 -f**（看起来像"文档少了 override"，
-  # 其实是探针自己没把行读全）。
-  line="$(printf '%s\n' "$line" | tr -s ' ')"
-  DOC_LINES="${DOC_LINES}${line}
-"
-done
-DOC_ENTRY_FILES="$(printf '%s' "$DOC_LINES" | grep -o -- '-f [A-Za-z0-9._-]*\.yml' | sed 's/^-f //' | LC_ALL=C sort -u | tr '\n' ' ')"
-EXPECTED_DOC_FILES="docker-compose.build.yml docker-compose.migrate-once.yml docker-compose.yml "
-[ "$DOC_ENTRY_FILES" = "$EXPECTED_DOC_FILES" ] || {
-  printf '两份文档里那条命令实际带的文件：%s\n' "$DOC_ENTRY_FILES" >&2
-  printf '应当带的：%s\n' "$EXPECTED_DOC_FILES" >&2
-  die "入口命令少了 build override ⇒ 照抄的人没有镜像可拉（默认 image 是 supersync:local，而我们不发布镜像）。"
-}
-# 两份必须**逐字相同**（只比集合会把"一份带 --build、一份不带"读成绿）。
-[ "$(printf '%s' "$DOC_LINES" | LC_ALL=C sort -u | wc -l | tr -d ' ')" = "1" ] ||
-  die "中文指南与 server/README 里那条入口命令已经漂开（各自的内容见上一段）。"
-case "$DOC_LINES" in
-  *--build*) ;;
-  *) die "入口命令没有 --build：镜像不会由这条命令自己产出，第一次跑仍然起不来。" ;;
-esac
+# 这里**只调用、不再抄一份**：同一个判断抄两遍就是下一次漂移的起点（AGENTS §3.5）。
+log "==> 入口命令抄件对账（纯文件系统）"
+node "$REPO_ROOT/scripts/check-selfhost-entry-command.mjs" ||
+  die "文档/README 里那条入口命令已经漂了 —— 上面点名了哪个文件哪一行。停在起栈之前是有意的：照抄会失败的那条命令，起起来的栈证明不了它自己对外可用。"
 # 脚本自己那两套也要钉住（它和文档不同是**有理由的**，理由变了就要改这里，不能漂）。
-SCRIPT_ENTRY_FILES="$(printf '%s\n' "${COMPOSE_FILES[@]}" | sed 's#.*/##' | LC_ALL=C sort | tr '\n' ' ')"
+# 🔴 量的是**文件名集合**，所以必须先把 `-f` 这些开关滤掉。`${COMPOSE_FILES[@]}` 里
+# `-f` 与路径是成对存的，原先那句 `sed 's#.*/##'` 会把两个 `-f` 也数进去 ⇒ 排序后
+# 得到「-f -f docker-compose.migrate-once.yml docker-compose.yml」，与期望值**永不相等**：
+# 这条判断在 HEAD 版里是**每次跑都红**（实测：bash 把那段单拎出来跑就是 exit 1），
+# 而症状长得像"脚本自己漂了"。判据坏在"永不相等"这一档上，比没有判据更误导人。
+SCRIPT_ENTRY_LIST=""
+for entry in "${COMPOSE_FILES[@]}"; do
+  case "$entry" in
+    *.yml) SCRIPT_ENTRY_LIST="${SCRIPT_ENTRY_LIST}$(basename "$entry")
+" ;;
+  esac
+done
+SCRIPT_ENTRY_FILES="$(printf '%s' "$SCRIPT_ENTRY_LIST" | LC_ALL=C sort -u | tr '\n' ' ')"
 [ "$SCRIPT_ENTRY_FILES" = "docker-compose.migrate-once.yml docker-compose.yml " ] ||
   die "本脚本带的 compose 文件集合变了（现在是 ${SCRIPT_ENTRY_FILES}）。它和文档 §4 的差集应当恰好是 docker-compose.build.yml —— 因为脚本自己 docker build。"
-log "    入口命令对账：文档 3 份（含 build override + --build） · 本脚本 2 份（自己打镜像）"
+log "    入口命令对账：抄件全部在位（判据见 scripts/check-selfhost-entry-command.mjs） · 本脚本 2 份（自己打镜像，所以不带 build override）"
 
 cd server
 # 🔴 先把这一套的**卷**清掉。实测形态：上一轮的 postgres 数据卷还在，
@@ -355,8 +374,13 @@ ls -1 e2e/selfhost-stack-results/*.png 2>/dev/null | sed 's/^/  /' || log "  （
 
 if [ "$KEEP" = "1" ]; then
   log ""
-  log "⚠️ 栈留着没拆（--keep）：$BASE 现在可以直接用浏览器打开。"
-  log "   拆掉：docker compose -p $PROJECT --env-file $ENV_FILE ${COMPOSE_FILES[*]} down -v"
+  log "⚠️ 栈留着没拆（--keep）：${BASE} 现在可以直接用浏览器打开。"
+  # 🔴 这条命令里的 `--env-file` **必须真的能用**。以前 trap 无条件 `rm -f "$ENV_FILE"`，
+  # 于是 --keep 打印出来的是一条**照着执行拆不掉**的假提示（`down` 读不到那份 env，
+  # 栈就留在机器上了）。现在 cleanup 在 --keep 时保留它并把路径打出来。
+  log "   拆掉（整条可以直接粘贴执行）："
+  log "   docker compose -p ${PROJECT} --env-file ${ENV_FILE} ${COMPOSE_FILES[*]} down -v"
+  log "   拆完顺手 rm 掉上面那份一次性凭据文件（随机凭据，别留在 /tmp）"
 else
   down_stack
 fi

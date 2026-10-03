@@ -11,12 +11,18 @@
 // 查不到又没被逐条登记 ⇒ 红。
 //
 // 用法（**要联网**，它就是在问 registry 要解析结果）：
-//   node research/tools/gen-image-npm-tree.mjs            # 写快照
-//   node research/tools/gen-image-npm-tree.mjs --stdout    # 只打印，不落盘
+//   node research/tools/gen-image-npm-tree.mjs             # 写快照（**要联网**）
+//   node research/tools/gen-image-npm-tree.mjs --stdout     # 只打印，不落盘（要联网）
+//   node research/tools/gen-image-npm-tree.mjs --check      # 只验新鲜度：**不联网、不落盘**
 //
-// 什么时候要重跑：改了 `server/package.json`、三个被打包进镜像的工作区包之一的依赖，
-// 或者 Dockerfile 里那三条 `npm install` 的形状 —— 前两者会改 `inputs` 里的哈希，
-// 第三者会改 `installShapeSha256`，对账脚本对不上就红。
+// 🔴 `--check` 是那道"快照还代不代表当下"的**门禁本体**（挂在 `check:image-license`
+// 前面，所以 `pnpm check` 一定会跑到它）。它只读文件、只比 `inputs` 里的哈希，
+// 因此没有网络、没有 docker 的机器上也在判。原先只有对账脚本比 `server/package.json`
+// 与 install 形状两枚哈希，**三枚被 npm pack 进镜像的本地包的依赖漂了没人红**。
+//
+// 什么时候要重跑生成（写快照那条）：改了 `server/package.json`、三枚被打包进镜像的
+// 工作区包之一的 package.json（含 `dependencies`），或 Dockerfile 里那三条 `npm install`
+// 的形状 —— 三者都会改 `inputs` 里的某一枚哈希，`--check` 会点名到具体是哪一枚。
 
 import { readFileSync, rmSync, writeFileSync, existsSync, mkdtempSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
@@ -84,17 +90,38 @@ const serverPkg = JSON.parse(readFileSync(serverPkgPath, 'utf8'));
 const packedNames = Object.keys(serverPkg.dependencies || {}).filter((n) => n.startsWith('@heyta/'));
 const mergedDeps = {};
 const sources = { server: serverPkg };
+// 🔴 这三枚包**的内容哈希**要进快照的 inputs：Dockerfile 的构建阶段会把它们各自
+// `npm pack` 成 tgz 装进镜像，而本文件又把它们各自的 `dependencies` 并进了 mergedDeps
+// （`@heyta/domain` 当前就带着 `ical.js`）。只哈希 `server/package.json` 的话，
+// **改这三枚里的任何一枚依赖都不会让任何一层变红** —— 快照描述的已经不是镜像里的
+// 那棵树了，而它看起来仍然自洽。这就是"新鲜度哈希没盖住真正被打进镜像的东西"。
+const packedPackageJson = {};
 for (const name of packedNames) {
   const dir = name.slice('@heyta/'.length);
   const p = join(repoRoot, 'packages', dir, 'package.json');
+  const rel = `packages/${dir}/package.json`;
   if (!existsSync(p)) {
     fail(
-      `server/package.json 依赖 ${name}，但 \`packages/${dir}/package.json\` 不在。` +
+      `server/package.json 依赖 ${name}，但 \`${rel}\` 不在。` +
         '包名 → 目录名的映射（@heyta/<目录>）被打破了，快照会漏掉这一整包依赖。',
     );
   }
-  sources[dir] = JSON.parse(readFileSync(p, 'utf8'));
+  const text = readFileSync(p, 'utf8');
+  packedPackageJson[rel] = sha256(text);
+  sources[dir] = JSON.parse(text);
 }
+const INPUTS_BASE = {
+  targetPlatform: TARGET,
+  registry,
+  serverPackageJsonSha256: sha256(readFileSync(serverPkgPath, 'utf8')),
+  installShapeSha256: sha256(shape.normalizedShape),
+  packedWorkspaceDeps: packedNames,
+  packedPackageJsonSha256: packedPackageJson,
+};
+if (Object.keys(packedPackageJson).length === 0) {
+  fail('一枚 @heyta/ 工作区包都没读到 —— 镜像里那三个 tgz 就是从它们来的，读空了快照会假装镜像没有本地包。');
+}
+
 for (const [label, pkg] of Object.entries(sources)) {
   for (const [dep, range] of Object.entries(pkg.dependencies || {})) {
     if (dep.startsWith('@heyta/')) continue; // 自家包由 tarball 供给，不是 registry 的事
@@ -112,6 +139,60 @@ for (const spec of pinnedSpecs) {
   const at = spec.lastIndexOf('@');
   if (at <= 0) fail(`读出来的安装目标 ${spec} 不是 name@version 形状，无法并进快照。`);
   mergedDeps[spec.slice(0, at)] = spec.slice(at + 1);
+}
+
+// ── 2b. `--check`：**纯文件系统**的新鲜度门禁（不联网、不落盘）──────────
+// 为什么放在生成器里而不是对账脚本里：`check:image-license-coverage.mjs` 只比
+// `server/package.json` 与 install 形状这两枚哈希，而"哪些输入算变了"这件事
+// 归生成器所有 —— 它才是读这些输入的人。再加一份判断到对面那个文件，
+// 就是同一个条件抄两遍（下一次漂移的起点）。
+if (process.argv.includes('--check')) {
+  let snap;
+  try {
+    snap = JSON.parse(readFileSync(outPath, 'utf8'));
+  } catch (e) {
+    fail(`读不到快照 ${outPath.replace(`${repoRoot}/`, '')}：${e.message}`);
+  }
+  const got = snap.inputs || {};
+  const stale = [];
+  const INPUT_LABEL = {
+    serverPackageJsonSha256: 'server/package.json',
+    installShapeSha256: 'server/Dockerfile 生产阶段那几条 install 命令的形状',
+    registry: 'install 命令里的 registry',
+    targetPlatform: '目标平台',
+    packedWorkspaceDeps: '@heyta/ 工作区包的清单',
+  };
+  for (const [key, text] of Object.entries(INPUT_LABEL)) {
+    if (JSON.stringify(got[key]) !== JSON.stringify(INPUTS_BASE[key])) {
+      stale.push(`${text} 变了（快照里的 ${key} 与当下不一致）`);
+    }
+  }
+  if (!got.packedPackageJsonSha256) {
+    stale.push('快照里**没有** packedPackageJsonSha256 这一档 ⇒ 它早于"三枚本地包也要盖住"这条判据');
+  } else {
+    for (const [rel, hash] of Object.entries(packedPackageJson)) {
+      if (got.packedPackageJsonSha256[rel] !== hash) {
+        stale.push(`${rel} 变了 —— 它被 npm pack 成 tgz 装进镜像，它的 dependencies 也在快照描述的那棵树里（快照哈希 ${String(got.packedPackageJsonSha256[rel]).slice(0, 12)}… ≠ 当下 ${hash.slice(0, 12)}…）`);
+      }
+    }
+    for (const rel of Object.keys(got.packedPackageJsonSha256)) {
+      if (!(rel in packedPackageJson)) {
+        stale.push(`快照里有 ${rel} 的哈希，但当下已经没有这一枚本地包 —— 清单与现实漂移了`);
+      }
+    }
+  }
+  if (stale.length > 0) {
+    console.error(`❌ 镜像依赖快照已经不代表当下的声明（${stale.length} 处失真）：`);
+    for (const s of stale) console.error(`   - ${s}`);
+    console.error(`   重跑：${'node research/tools/gen-image-npm-tree.mjs'}（要联网），`);
+    console.error('   然后按 check:image-license 给出的新差集更新 IMAGE_ONLY_PACKAGES。');
+    process.exit(1);
+  }
+  console.log(
+    `✅ 镜像依赖快照的输入仍然对得上当下声明：server/package.json + Dockerfile install 形状 + ` +
+      `${Object.keys(packedPackageJson).length} 枚打进镜像的本地包（${Object.keys(packedPackageJson).join(' / ')}）`,
+  );
+  process.exit(0);
 }
 
 // ── 3. 让 npm 自己解一遍（就是镜像里那一步的解析结果） ────────────────
@@ -157,11 +238,7 @@ try {
     generatedAt: new Date().toISOString().replace(/\.\d+Z$/, 'Z'),
     generator: 'research/tools/gen-image-npm-tree.mjs',
     inputs: {
-      targetPlatform: TARGET,
-      registry,
-      serverPackageJsonSha256: sha256(readFileSync(serverPkgPath, 'utf8')),
-      installShapeSha256: sha256(shape.normalizedShape),
-      packedWorkspaceDeps: packedNames,
+      ...INPUTS_BASE,
       localTarballs: tarballSpecs,
       registryResolvedDeps: Object.keys(mergedDeps).sort().length,
       skippedForOtherPlatform: skippedOtherPlatform,
