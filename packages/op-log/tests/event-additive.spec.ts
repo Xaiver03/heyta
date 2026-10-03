@@ -26,9 +26,13 @@ import {
   type MaterializedState,
 } from '../src/state.js';
 
+let opSeq = 0;
 const op = (over: Partial<Operation<string>> & { entityType: string; entityId: string }): Operation<string> =>
   ({
-    id: `op-${over.entityType}-${over.entityId}`,
+    // 🔴 id 必须逐条唯一：归约器按 opId 幂等去重（ADR-0009 的契约 —— 同 id 就是同一条
+    // op 的重复投递），旧的 `op-${type}-${id}` 默认值会让同一实体的第二条 op被
+    // 当成重复投递静默吞掉（2026-10-03 合流时被字段版本归约器当场抓出来）。
+    id: `op-${over.entityType}-${over.entityId}-${String((opSeq += 1))}`,
     vectorClock: { client: 1 },
     timestamp: 1_700_000_000_000,
     opType: OpType.Create,

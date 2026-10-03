@@ -44,7 +44,7 @@ function makeHost() {
 }
 
 /** 未删除实体的条数（效果读数的分母必须是活的实体，不然墓碑也算"写成功"）。 */
-function alive<K extends 'tasks' | 'projects' | 'habits' | 'tags' | 'notes' | 'habitLogs' | 'focusSessions' | 'reminders'>(
+function alive<K extends 'tasks' | 'projects' | 'habits' | 'tags' | 'notes' | 'habitLogs' | 'focusSessions' | 'reminders' | 'events'>(
   key: K,
 ): number {
   const record = engine.getState()[key] as Record<string, { deletedAt?: number }>;
@@ -155,6 +155,24 @@ const CASES: readonly Case[] = [
     label: '专注记录',
     args: async () => ({ kind: 'work', plannedMinutes: 25 }),
     effect: () => alive('focusSessions'),
+  },
+  {
+    tool: 'create_event',
+    intentAction: 'create-event',
+    label: '倒数日',
+    args: async () => ({ title: '妈妈生日', date: '2027-04-12' }),
+    effect: () => alive('events'),
+  },
+  {
+    tool: 'update_event',
+    intentAction: 'update-event',
+    label: '倒数日置顶',
+    args: async () => ({
+      eventId: await seed({ action: 'create-event', title: '体检', date: '2027-06-01' }),
+      fields: { pinned: true },
+    }),
+    effect: () =>
+      Object.values(engine.getState().events).filter((e) => e.pinnedAt !== undefined).length,
   },
   {
     tool: 'create_reminder',

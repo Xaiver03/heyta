@@ -216,7 +216,13 @@ describe('1–2. 到点自醒 + 恰好一次（假时钟，之后不再有任何
     expect(calls, '第二条到点时没接着响（排程只排了一次就没续上）').toHaveLength(2);
   });
 
-  it('🔴 醒的时候不写 op（定时器只读；写会让对端再弹一遍）', async () => {
+  it('🔴 醒的路径与写的路径分离：定时器只触发投递，`firedAt` 由**投递成功**那一层落库', async () => {
+    // 2026-10-03 合流改判：这条测试原先断言"醒的时候不写 op"—— 那是 D14 修复
+    // （投出去了必须落 `firedAt`，否则刷新一次或另一台设备把同一条再弹一遍）
+    // 接线**之前**的世界。合流后的契约：
+    //   - 定时器（`recheck`）仍然**只读**：它自己不构造 op；
+    //   - 但投递成功 ⇒ `markDelivered` 写 `firedAt`（一条 UPD，绑定 occurrence）。
+    // 所以这里的正确读数是"恰好两条 op：Create + 投递回执"，而不是一条。
     const id = await seedReminder(Date.now() + 5 * SECOND);
     takeOverClock();
     await mountProbe();
@@ -225,11 +231,10 @@ describe('1–2. 到点自醒 + 恰好一次（假时钟，之后不再有任何
     await advance(2 * HOUR);
     vi.useRealTimers(); // 读 op 数要过 IndexedDB，必须在真定时器下
 
-    expect(await opCount(id), '定时器投了一条 op 出去（投递不是写数据的时机）').toBe(1);
-    // 只有建它的那一条 Create op：`firedAt` 没被顺手写上。
+    expect(await opCount(id), 'Create + 投递回执，恰好两条；多一条=投了两次，少一条=没落库').toBe(2);
     const saved = useReminderStore.getState().byTask[taskIdOf(id)]?.find((r) => r.id === id);
-    expect(saved?.firedAt, '定时器写了 firedAt').toBeUndefined();
-    expect(saved?.dismissedAt, '定时器写了 dismissedAt').toBeUndefined();
+    expect(saved?.firedAt, '投递成功后必须写上 firedAt（D14：投过就没有的磁盘那一半）').toBeDefined();
+    expect(saved?.dismissedAt, 'dismiss 是用户动作，投递不许顺手写').toBeUndefined();
   });
 });
 

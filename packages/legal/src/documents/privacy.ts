@@ -397,7 +397,7 @@ const zh = [
           [
             '账号本身（邮箱、口令散列、通行密钥、语言、昵称、头像密文、条款接受时刻）',
             '到你注销账号为止。',
-            '🔴 注销是**真删除**：账号行连同名下的同步事件、同步状态、设备记录、通行密钥（含未完成的通行密钥注册）、订阅、订单、优惠码核销、邀请码与邀请关系、通知、昵称与头像、条款接受记录、墓碑、推送订阅，按数据库外键级联删除（共 16 处级联，覆盖 15 张表），**没有冷静期，也没有回收站**。🔴 两件事不在这条范围里，我们照实写：**（一）你其它设备上的本地明文数据不会因注销而消失。** 注销删的是服务端，而"本地优先"意味着每台设备自己就有一份可读的库；当前代码里没有任何"账号已注销 ⇒ 清除本机数据"的路径，界面上也还没有注销入口（注销靠邮件申请）。把这一条写成"你的所有数据立即彻底销毁"就是假话。**（二）整库备份里的副本要等那份备份自己过期**，见下面"数据库备份"那一行。',
+            '🔴 注销是**真删除**：账号行连同名下的同步事件、同步状态、设备记录、通行密钥（含未完成的通行密钥注册）、订阅、订单、优惠码核销、邀请码与邀请关系、通知、昵称与头像、条款接受记录、墓碑、推送订阅、密钥包与密钥迁移记录、已吊销设备，按数据库外键级联删除（共 19 处级联，覆盖 18 张表），**没有冷静期，也没有回收站**。🔴 两件事不在这条范围里，我们照实写：**（一）你其它设备上的本地明文数据不会因注销而消失。** 注销删的是服务端，而"本地优先"意味着每台设备自己就有一份可读的库；当前代码里没有任何"账号已注销 ⇒ 清除本机数据"的路径，界面上也还没有注销入口（注销靠邮件申请）。把这一条写成"你的所有数据立即彻底销毁"就是假话。**（二）整库备份里的副本要等那份备份自己过期**，见下面"数据库备份"那一行。',
           ],
           [
             '订阅、订单与优惠码核销记录',
@@ -918,7 +918,7 @@ const en = [
           [
             'The account itself (email address, password hash, passkeys, language, nickname, avatar ciphertext, moment of accepting the terms)',
             'Until you close the account.',
-            '🔴 Closure is a **genuine hard delete**: the account row and, by database foreign-key cascade, everything under it — sync events, sync state, device records, passkeys (including pending passkey registrations), subscriptions, checkout orders, coupon redemptions, invite codes and referral relationships, notifications, nickname and avatar, consent records, tombstones and push subscriptions — are deleted (16 cascades in total, across 15 tables). **There is no cooling-off period and no trash bin.** 🔴 Two things fall outside that scope, and we say so plainly. **(1) Local plaintext data on your other devices is not removed by closure.** Closing an account deletes on the server, while "local-first" means every device keeps its own readable database; there is currently no code path that wipes a device when its account is closed, and no closure button in the interface (closure is by email request). Writing this as "all your data is destroyed immediately" would be false. **(2) Copies inside whole-database backups survive until that backup expires of itself** — see the "Database backups" row below.',
+            '🔴 Closure is a **genuine hard delete**: the account row and, by database foreign-key cascade, everything under it — sync events, sync state, device records, passkeys (including pending passkey registrations), subscriptions, checkout orders, coupon redemptions, invite codes and referral relationships, notifications, nickname and avatar, consent records, tombstones, push subscriptions, key packages, key migration records and revoked device records — are deleted (19 cascades in total, across 18 tables). **There is no cooling-off period and no trash bin.** 🔴 Two things fall outside that scope, and we say so plainly. **(1) Local plaintext data on your other devices is not removed by closure.** Closing an account deletes on the server, while "local-first" means every device keeps its own readable database; there is currently no code path that wipes a device when its account is closed, and no closure button in the interface (closure is by email request). Writing this as "all your data is destroyed immediately" would be false. **(2) Copies inside whole-database backups survive until that backup expires of itself** — see the "Database backups" row below.',
           ],
           [
             'Subscriptions, orders and coupon redemptions',

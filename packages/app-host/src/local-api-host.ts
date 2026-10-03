@@ -772,7 +772,8 @@ async function submitIntent(
         return { ok: false, reason: 'invalid', message: '清单名称不能为空。' };
       }
       if (intent.parentId !== undefined) {
-        const parent = ctx.getState().projects[intent.parentId];
+        // 经动作层读（I5 门禁：出口层不碰原始表 —— 归档与否由层负责，这里只问"存在且非墓碑"）。
+        const parent = projectActions.listAllProjects().find((p) => p.id === intent.parentId);
         if (parent === undefined || parent.deletedAt !== undefined) {
           return {
             ok: false,
@@ -890,7 +891,7 @@ async function submitIntent(
         };
       }
       if (intent.projectId !== undefined) {
-        const parent = ctx.getState().projects[intent.projectId];
+        const parent = projectActions.listAllProjects().find((p) => p.id === intent.projectId);
         if (parent === undefined || parent.deletedAt !== undefined) {
           return {
             ok: false,
