@@ -1552,3 +1552,19 @@ OS 通知投递通过。原 [多端计划](docs/plans/goal-multi-end-coverage.md
 - 2026-10-04 续验：迁移服务端已 PUBLISHED 但浏览器未收到响应的真实 reload 用例补到 5/5 全绿。生产入口现在保留 ciphertext-only journal，只有新 package/root 与 payload generation 在本地同一事务 `saveBound` 成功后才 ack 清理；随后再次 root rotation 通过，证明 journal 不会阻塞后续迁移。证据见 ADR-0050 与 `apps/web/evidence/vault-panel/pg-commit-restart-*`。Web build 另修正 ServiceWorkerRegistration 的异步注销调用。Goal 仍 active：Android Vault 真实 UI、iOS OS 投递/Keychain、最终全仓门禁与四端当前源码重装未完成。
 
 - 2026-10-04 iOS 提醒续验：修复 `HeytaReminderModuleBridge.m` 的导出名错配（`RCT_EXTERN_MODULE` 实际导出 `HeytaReminderModule`，JS 读取 `HeytaReminder`），改为 `RCT_EXTERN_REMAP_MODULE` 后，Release 模拟器真实日志出现授权 `granted=true`、排程 `error=none`；`heyta-reminder-receipts.json` 有 `posted/receipts`，启动 reconcile 后 SQLite 出现同时含 `firedAt` 与 `firedForTriggerAt` 的 REMINDER op。隐私覆盖层先由 AX 真实关闭并复核消失。证据与限制已写入 ADR-0051：这证明 iOS 模拟器 OS 投递闭环，不替代实体设备通知权限或 iOS Keychain 验收；本轮未取得新的 Keychain 实机证据。
+
+### 2026-10-04 02:0x–02:2x · D-3 收口：① 落地成事实，②③ 排在同一条等窗口的队列上（落地载体 `de296b9d`）
+
+- **① 合并落地**：main 于 02:06:07 Fast-forward 到集成线 `de296b9d`，三条源分支（覆盖面 / 助手会话历史 / closeout）现量都在 main 里；
+  本批代码与五段 AI/法务门禁在 main 的 `scripts.check` 串里逐枚取到（段数 02:2x 现量 **74** —— 目标原文"HEAD 上 61 段、工作树 62 段"已过期，报段数必须带载体）。
+  落地那一刻挡路的交集是 4 枚而非 11 枚，其中 3 枚由所有者自己在 `258813a8` 提交后归零 ⇒ 没有吞任何 hunk。
+- **两条我自己的说法被撤回**（细节在 `docs/plans/ai-event-tool-contract.md` §15.43）：
+  ① `host.submit` 真正被钉的性质是"非注释命中**两处**＝全部入口"（内置 AI + MCP／本机 API），不是 Goal 原文那句"恰好一处"；
+  ② 五条隐私不变量里**只有两条有 `check:*` 门禁钉**（submit 计数、出境披露话术），另外三条靠类型层与单测
+  （`grep -rl isToolGranted scripts/` = 0、`grep -rln fallback-needs-consent scripts/` = 0）⇒ 登记为下一批候选，本批不代开工单、也不谎称有门禁。
+- **一根探针被当场否证并写回原句**：`sed 's/^\s*//'`（BSD 不认 `\s`）把"合并更新集 ∩ 主检出脏项"从 **4** 读成 **0**，而 0 正是放行条件
+  ⇒ 空集读数当放行前必须先跑一条**必然命中**的对照。这一条同时挂进 `BLOCKED.md` B65 的复核段。
+- **②③ 现在的形状**：一条等窗口的队列 `~/scratch-heyta/heyta-deliver-on-window.sh` ——
+  现场闸门（pattern 里含**别人那趟链**的每个 argv 形状，不与它挤同一个窗口）→ 仓库那道负载门（阈值 12，不自定）
+  → 链逐段读数（载体=落地载体）→ **非 docs 漂移必须为 0 才允许起装** → `check:ai-e2e`（用 4318/4319 端口空闲当门，因为它的 preflight 会 SIGKILL 那两个端口上的进程）
+  → 四端重装（`IOS_DEVICE_NAME` 显式给，不 `head -1` 猜设备）。每条前置等满都以 **exit 3** 收尾（环境无效 ≠ 产品失败），全程不 push。

@@ -2957,7 +2957,7 @@ for b in feat/ai-entity-coverage feat/assistant-history-local-persistence integr
 `packages/app-host/src/ai-tool-selection.ts`（`list_events` / `get_event` / `create_event` 的选取规则）、
 `apps/web/src/features/ai/assistant-history.ts`（D-4(i) 的本机持久化）、`packages/app-host/src/ai-tool-run.ts` 的批量提案（W11）。
 `check:ai-coverage · check:ai-tools · check:legal-tools · check:ai-quota · check:privacy-consent-e2e` 五段现量都还在 `pnpm check` 的串里
-（段数以 `node -e 'process.stdout.write(String(require("./package.json").scripts.check.split("&&").length))'` 现取为准；18:2x 量到 **74** —— 目标文本里那句"HEAD 上 61 段、工作树 62 段"已经过期，见 §15.42 同族的"报段数必须带载体"）。
+（段数以 `node -e 'process.stdout.write(String(require("./package.json").scripts.check.split("&&").length))'` 现取为准；02:2x 量到 **74** —— 目标文本里那句"HEAD 上 61 段、工作树 62 段"已经过期，见 §15.42 同族的"报段数必须带载体"）。
 
 **没有吞别人的改动**：落地那一刻挡路的交集是 **4** 枚（`PROGRESS.md`、`apps/web/tests/local-data-destruction.spec.ts`、
 `apps/web/tests/sync-reason-coverage.spec.ts`、`scripts/verify-mobile-auth.sh`），其中别人那三枚由**所有者自己在 02:05:55 提交**（`258813a8`）之后交集才归零。
