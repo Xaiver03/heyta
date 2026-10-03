@@ -52,16 +52,20 @@ import type { CountdownEvent } from '@heyta/domain';
 import type {
   CountdownFilter,
   CountdownView as BoardView,
+  EventCard,
+  EventCardTexts,
   EventEditPatch,
 } from '@heyta/ui';
-import { EventBoard } from '@heyta/ui';
+import { categorySlotToken, EventBoard } from '@heyta/ui';
 import { useI18n } from '@heyta/i18n';
 
 import { openTaskHost } from '../db/open-host';
-import { eventBoardLabels } from '../lib/countdown-display';
+import { useCardExporter } from '../lib/card-export';
+import { eventBoardLabels, exportFailureText } from '../lib/countdown-display';
 import { datePickerLabels } from '../lib/date-picker-labels';
 import { useToday } from '../lib/use-today';
 import { useMobileSync } from '../sync/store';
+import { useTheme } from '../theme';
 import { EmptyState, Screen } from '../ui/kit';
 
 export function CountdownScreen({ onBack }: { onBack: () => void }): React.JSX.Element {
@@ -160,6 +164,46 @@ export function CountdownScreen({ onBack }: { onBack: () => void }): React.JSX.E
   const pickerLabels = useMemo(() => datePickerLabels(t), [t]);
 
   /**
+   * 成品图导出（W7）。
+   *
+   * 🔴 `useCardExporter()` 是 hook ⇒ 必须排在两个提前 return **之前**
+   * （本文件上面那条"hook 数量随渲染变化"的教训同一个形状）。
+   * 它要一张真的挂在视图树里的 `<Svg>` 才能栅格化，所以宿主必须把 `surface`
+   * 渲染出来 —— 不渲染就等于按钮存在而点了没反应。
+   */
+  const theme = useTheme();
+  const { exportCard, surface } = useCardExporter();
+  const [exportError, setExportError] = useState<string | undefined>(undefined);
+
+  const runExport = useCallback(
+    (card: EventCard, texts: EventCardTexts): void => {
+      void exportCard({
+        texts,
+        theme: { tokens: theme.tokens, text: theme.text },
+        // 与卡片上**同一个表达式**：模板 = 分类色板的一格，没选过就是沉底色。
+        // 在界面上挑颜色而不是把 slot 交出去，是为了让共享版面永远不碰色值。
+        accentColor:
+          card.template === undefined
+            ? theme.tokens['color.surface-sunken']
+            : theme.tokens[categorySlotToken(card.template)],
+        // 文件名里的日期段就是屏上那一行（同一次 `cardTextsFor` 的产物），
+        // 所以"图上写的日子"与"文件名里的日子"不可能不一致。
+        dateStem: texts.date,
+      }).then((result) => {
+        if (result.ok) {
+          setExportError(undefined);
+          return;
+        }
+        // 用户自己关掉分享面板**不是失败**，界面不许说"导不出来"（那是把人自己的
+        // 动作报成设备的错）。这一档与四种失败分开，否则这句话永远在误导人。
+        if ('cancelled' in result) return;
+        setExportError(exportFailureText(t, result.error, result.detail));
+      });
+    },
+    [exportCard, t, theme],
+  );
+
+  /**
    * 🔴 提前 return **必须在所有 hook 之后**（AGENTS §7 记过这个真 bug：
    * 先 return 后 hook 会让两次的 hook 数量不同 → `Rendered more hooks than
    * during the previous render.`，整屏白）。
@@ -240,10 +284,17 @@ export function CountdownScreen({ onBack }: { onBack: () => void }): React.JSX.E
         // `error` 同时用于错误屏，所以取的是**同一个 state**：两处各存一份
         // 就会有一处滞后，而"界面说没报错、卡片上面却写着失败"是最难归因的形态。
         error={error ?? undefined}
+        // 导出失败是**另一件事**：它不碰任何数据，所以不许借用 `error` 那个通道
+        // （借用的后果是"卡片上方写着失败，而那次失败其实什么都没改"）。
+        exportError={exportError}
+        onExportCard={(_entityId, card, texts) => runExport(card, texts)}
         datePickerLabels={pickerLabels}
         labels={labels}
         testID="countdown-view"
       />
+      {/* 栅格化要用的一张离屏 `<Svg>`（1×1、opacity 0、不吃触摸）。少了这一行，
+          按钮照样在、点了永远没有图 —— 而那正是本仓登记过的那种"看起来成功了"。 */}
+      {surface}
     </Screen>
   );
 }

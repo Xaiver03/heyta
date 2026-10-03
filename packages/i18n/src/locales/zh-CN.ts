@@ -3998,6 +3998,10 @@ export const zhCN = {
   // 这两个文件此刻在别的会话里也是脏的，重排/格式化会造出一场没人能解的三方冲突。
   'mobile.countdown.entry': '倒数纪念日',
   'mobile.countdown.entry.hint': '记下要盯的日子，看它还有几天',
+  'mobile.countdown.export.noModule': '这台设备上的 heyta 没有带导出组件 —— 不是数据问题，重装这个版本就能用。',
+  'mobile.countdown.export.rasterize': '系统没能把卡片画成图。倒数日没有丢，也没有发出任何请求。',
+  'mobile.countdown.export.write': '图已经画好了，但没能写进这台设备的存储。',
+  'mobile.countdown.export.share': '分享面板拒绝了这张图。',
 } as const;
 
 /**
