@@ -87,7 +87,7 @@ BAD_CLIENT="some-other-device-client"
 
 echo ""
 echo "=== 同步队列自愈验收（真服务端 + 真 SQLite，零 mock）==="
-echo "  服务端: $SERVER   库: heyta_mobile_smoke"
+echo "  服务端: $SERVER   库: $E2E_DB"
 echo "  账号:   $EMAIL"
 echo "  被注入的坏 op: ${BAD_ID}（clientId=${BAD_CLIENT}）"
 

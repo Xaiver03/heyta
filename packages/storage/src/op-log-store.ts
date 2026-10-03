@@ -227,6 +227,23 @@ export interface OpLogStore<
 
   /** Permanently mark history as incomplete; there is intentionally no clear hook. */
   markHistoryIncomplete?(): Promise<void>;
+  /**
+   * 读 `STORES.META` 里的一个键（原样返回存的值）。
+   *
+   * 🔴 为什么把 META 的通用读法开在**这个接口**上，而不是让调用方自己拿 `DbAdapter`：
+   *   web 的默认存储路径是 **Worker + OPFS SQLite**，桌面壳那条是**壳里的 SQLite** ——
+   *   这两条路上**页侧根本没有 `DbAdapter`**，只有一个 `OpLogStore` 代理。
+   *   如果这个能力只存在于 `DbAdapter`，"公共事实缓存在 web 上能用"就会**静默地假**
+   *   （ADR-0052 §2.5 点名要进 `STORES.META`，而三条后端路径都得进得了）。
+   *   开在接口上之后，桥上的转发列表是**显式列出的**（见 `oplog-worker-bridge.ts` 那条
+   *   "不用 Proxy"的理由），漏转发会在**第一次调用时响亮报错**，不是返回空值。
+   *
+   * 键名只在 `META_KEYS` 定义一次；这里不认识具体键，避免把语义复制进存储层。
+   */
+  getMetaValue(key: string): Promise<string | number | undefined>;
+
+  /** 写 `STORES.META` 里的一个键。值只允许 `string | number`（要过结构化克隆）。 */
+  setMetaValue(key: string, value: string | number): Promise<void>;
 }
 
 /** 存储层的失败原因，供上层区分处理。 */

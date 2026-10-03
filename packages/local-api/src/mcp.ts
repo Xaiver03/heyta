@@ -10,7 +10,7 @@
  * MCP 客户端（Claude Code / Cursor 等）会把服务端返回的工具列表
  * **整个塞进模型的上下文**，模型于是知道"有这么个工具可以调"。
  *
- * 所以如果用户只授权了 `list_tasks` 却把 6 个工具全报过去：
+ * 所以如果用户只授权了 `list_tasks` 却把全部 10 个工具报过去：
  * - 模型会去调没授权的工具 → 每次都撞权限错误 → 用户以为是 bug
  * - 更糟的是，**工具的"存在"本身就是信息**：
  *   "有个 create_task 工具"告诉模型这台机器上有什么能力
@@ -78,6 +78,26 @@ export type McpToolDefinition = AuthorizedToolDefinition;
  * 每个工具的参数 schema 现在住在 `src/tools/<entity>.ts` 的 `schemas` 里
  * （一个工具一处声明）。这里只留**投影**，不再有一份按工具名手抄的清单。
  */
+
+/**
+ * 这个工具的参数 schema **有没有被登记过**。
+ *
+ * 🔴 存在的唯一理由是把 `listAuthorizedTools()` 那个**静默回退**变得可测：
+ * 没登记的工具会拿到 `{ type:'object', properties:{}, additionalProperties:false }`，
+ * 而它与"这个工具真的不接参数"（`list_projects`）在两个前端上**长得一模一样** ——
+ * 于是"忘了写 schema"表现为"模型以为这个工具什么都传不了"，不报错、不崩溃。
+ * 能力清单那边也只会给一个 `schemaRecorded:false` 的**标记**（清单照出，不红）。
+ * ⚠️ 所以判据必须**目录驱动**：`LOCAL_API_TOOLS` 里每一条都得答"是"，
+ * 新增工具时不登记就红（见 `tests/mcp.spec.ts`），而不是逐工具抄名字。
+ */
+export function hasInputSchemaFor(toolName: string): boolean {
+  return Object.prototype.hasOwnProperty.call(INPUT_SCHEMAS, toolName);
+}
+
+/** `INPUT_SCHEMAS` 里登记过的工具名（用于查"孤儿抄件"：有 schema、目录里却没这个工具）。 */
+export function recordedInputSchemaNames(): readonly string[] {
+  return Object.keys(INPUT_SCHEMAS);
+}
 
 /**
  * 组装 MCP 工具定义。

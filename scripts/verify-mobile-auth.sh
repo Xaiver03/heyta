@@ -122,8 +122,8 @@ L_SEND_LINK="用邮件链接登录"
 L_VERIFY="验证并登录"
 L_SAVE_SYNC="保存并启用同步"
 
-PG_DB="${HEYTA_E2E_DB:-heyta_mobile_smoke}"
-PG_USER="${HEYTA_E2E_DB_USER:-$(whoami)}"
+PG_DB="$E2E_DB"
+PG_USER="$E2E_DB_USER"
 
 # 🔴 **前置：这台模拟器上不能同时跑两个移动端验收。**
 #
@@ -187,7 +187,7 @@ user_exists() {  # <email>  → 行数 | unknown
 
 # 界面里**不含**某段文本。与 `has_sub` 配对使用 —— "断言一句话不存在"
 # 与"断言一句话存在"一样重要（J3 就是靠它成立的）。
-hasnt_sub() { grep -q "text=\"[^\"]*$1" /tmp/ui.xml 2>/dev/null && echo 0 || echo 1; }
+hasnt_sub() { grep -q "text=\"[^\"]*$1" "$UI_XML" 2>/dev/null && echo 0 || echo 1; }
 
 # 把一个**滚动面板**拨回顶部。
 #

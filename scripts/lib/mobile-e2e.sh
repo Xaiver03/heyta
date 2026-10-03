@@ -28,6 +28,48 @@ export PATH="/opt/homebrew/bin:$PATH"
 E2E_SERIAL="${HEYTA_E2E_SERIAL:-emulator-5554}"
 ADB="adb -s $E2E_SERIAL"
 PKG=com.heyta
+
+# ── W0b ①：这一趟验收的**现场路径**（快照文件 + 定位器脚本）─────────────
+#
+# 🔴 为什么这两个名字必须可换：并行两轮验收共用 `/tmp/ui.xml` 时，B 轮的
+#    `rm`/`cat >` 会把 A 轮正在读的快照换掉，A 轮的每条断言于是都在读
+#    **另一屏**的界面 —— 表现是"上一屏"（第 60 行注释记的就是这个形状）。
+#    `/tmp/_xy.py` 更要命：它不是一个数据文件，而是 lib 每轮**重写再执行**的
+#    代码 —— 两轮并发时 A 可能执行到 B 刚写了一半的那份（半文件）。
+#
+#    默认值**逐字不变** ⇒ 单轮运行零行为变化；并行时导出两个变量就各用各的。
+# 🔴 `export` 是承重的，不是风格：`_xy.py` 与三处 `python3 - <<'PY'` 都是
+#    子进程，shell 变量不导过去就传不进去（症状是"设了环境变量，python 那几处
+#    还在读 /tmp/ui.xml"，而 grep 类断言已经切过去了 —— 半套现场比全套更难查）。
+UI_XML="${HEYTA_E2E_UI_XML:-/tmp/ui.xml}"
+XY_PY="${HEYTA_E2E_XY_PY:-/tmp/_xy.py}"
+export UI_XML XY_PY
+# 🔴 这一趟用的**库名**也只有一个住处。它今天只有两个用途：横幅打印，以及需要
+#    直连数据库的脚本（`verify-mobile-auth.sh`）拿它当 `PG_DB`。原来 5 个脚本的
+#    横幅把库名**印成字面量** —— 换私有库之后横幅还在说另一台库（W0b ②）。
+#    这与"设备号硬印 emulator-5554"是同一个错的另一副面目：跑的是对的现场，
+#    取证输出里写的是另一个现场，下次排查会把人引去查一台根本没用的库。
+E2E_DB="${HEYTA_E2E_DB:-heyta_mobile_smoke}"
+# 🔴 数据库**用户名**也不能印/连一个字面量：`verify-multi-end-sync.sh` 里三处
+#    `psql -U rocalight` 换一台机器（或 CI）就连不上别人建的库，而失败形态是
+#    "库不存在/连不上"，看起来像服务端坏了。口径与 `verify-mobile-auth.sh` 一致：
+#    变量可覆盖，默认取当前登录用户。
+E2E_DB_USER="${HEYTA_E2E_DB_USER:-$(whoami)}"
+export E2E_DB_USER
+
+# 🔴 建库那一头（`mobile-e2e-up.sh`）自己也有一份**默认值**。两处不一致的症状
+#    不是崩，是"横幅说库叫 A、容器里的库叫 B" —— 所以在这里当场比对，不一致就
+#    响亮失败（一次 grep 的成本，换掉一整轮误导人的取证）。
+#    比的是默认值而不是生效值：用户显式给了私有库名时不该报警。
+#    拿不到那一行（格式变了 / 文件不在）就**跳过**，不发明兜底值。
+E2E_DB_DEFAULT=heyta_mobile_smoke
+_UP_DEFAULT=$(sed -n 's/^HEYTA_E2E_DB="\${HEYTA_E2E_DB:-\([^"]*\)}"$/\1/p' \
+  "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/mobile-e2e-up.sh" 2>/dev/null | head -1)
+if [ -n "$_UP_DEFAULT" ] && [ "$_UP_DEFAULT" != "$E2E_DB_DEFAULT" ]; then
+  echo "❌ 库名默认值漂移：lib=$E2E_DB_DEFAULT mobile-e2e-up.sh=$_UP_DEFAULT" >&2
+  echo "   两处必须逐字相同 —— 横幅打印的库名就是建库那处用的库名。" >&2
+  exit 1
+fi
 # 🔴 这两个**必须**是绝对路径，不能是"仓库根相对"。
 #
 #    实测：脚本一旦不是从仓库根跑（例如 `cd scripts && bash verify-mobile-ios.sh`），
@@ -156,8 +198,8 @@ dump() {
   for tries in 1 2 3 4 5 6 7 8 9 10; do
     $ADB shell rm -f /sdcard/ui.xml >/dev/null 2>&1
     $ADB shell uiautomator dump /sdcard/ui.xml >/dev/null 2>&1
-    $ADB shell cat /sdcard/ui.xml > /tmp/ui.xml 2>/dev/null
-    if grep -q '<hierarchy' /tmp/ui.xml 2>/dev/null; then
+    $ADB shell cat /sdcard/ui.xml > "$UI_XML" 2>/dev/null
+    if grep -q '<hierarchy' "$UI_XML" 2>/dev/null; then
       # 🔴 **系统 ANR 弹窗要当场关掉，否则整轮验收都在看弹窗。**
       #
       # 实测（2026-09-26，宿主机 load average 66~233）：模拟器的 System UI
@@ -168,11 +210,11 @@ dump() {
       #
       # 这类"探针成功、内容是被别的东西盖住的"最费时间，所以在这里统一处理：
       # 认出 ANR 弹窗 → 点「Wait」→ 重新抓一次，让调用方拿到真正的界面。
-      if grep -q "isn't responding\|is not responding\|无响应" /tmp/ui.xml 2>/dev/null; then
+      if grep -q "isn't responding\|is not responding\|无响应" "$UI_XML" 2>/dev/null; then
         local anr_xy
-        anr_xy=$(python3 /tmp/_xy.py text "Wait" 0 2>/dev/null)
-        [ -z "$anr_xy" ] && anr_xy=$(python3 /tmp/_xy.py text "等待" 0 2>/dev/null)
-        [ -z "$anr_xy" ] && anr_xy=$(python3 /tmp/_xy.py text "Close app" 0 2>/dev/null)
+        anr_xy=$(python3 "$XY_PY" text "Wait" 0 2>/dev/null)
+        [ -z "$anr_xy" ] && anr_xy=$(python3 "$XY_PY" text "等待" 0 2>/dev/null)
+        [ -z "$anr_xy" ] && anr_xy=$(python3 "$XY_PY" text "Close app" 0 2>/dev/null)
         if [ -n "$anr_xy" ]; then
           echo "   ⚠️ 检测到系统 ANR 弹窗（宿主机过载），点掉它再重抓界面" >&2
           $ADB shell input tap $anr_xy >/dev/null 2>&1
@@ -213,7 +255,7 @@ dump() {
   #     由**它**决定是否终止整轮（退出码 3 = 这轮在环境上不成立，不是产品失败）。
   echo "" >&2
   echo "   ⚠️ uiautomator 连续 10 次抓不到界面（设备不空闲 / 宿主机过载）。" >&2
-  echo "      **/tmp/ui.xml 已被截成空文件** —— 接下来任何断言都会报「找不到 X」，" >&2
+  echo "      **$UI_XML 已被截成空文件** —— 接下来任何断言都会报「找不到 X」，" >&2
   echo "      那是假红，不是产品缺陷。需要在真实界面上断言的地方请用 require_screen。" >&2
   echo "      本机负载：$(uptime | sed 's/.*load averages: //')" >&2
   return 1
@@ -227,7 +269,7 @@ dump() {
 # 退出码 3（**不是** 1）：1 = "有断言失败"，3 = "这轮在环境上就不成立"。
 # 两者的处置完全不同，不能混成一个数字。
 require_screen() {
-  if grep -q '<hierarchy' /tmp/ui.xml 2>/dev/null; then return 0; fi
+  if grep -q '<hierarchy' "$UI_XML" 2>/dev/null; then return 0; fi
   echo "" >&2
   echo "   ❌ 拿不到真实界面 —— **本轮结果无效**（环境失败，不是产品失败）。" >&2
   echo "      本机负载：$(uptime | sed 's/.*load averages: //')。等空闲后重跑。" >&2
@@ -247,7 +289,7 @@ settle_for() {  # <界面上应当出现的串> [轮数=8] [间隔秒=2]
   local needle=$1 tries=${2:-8} gap=${3:-2} i
   for ((i = 0; i < tries; i++)); do
     dump
-    grep -qF -- "$needle" /tmp/ui.xml 2>/dev/null && return 0
+    grep -qF -- "$needle" "$UI_XML" 2>/dev/null && return 0
     sleep "$gap"
   done
   return 1
@@ -255,14 +297,14 @@ settle_for() {  # <界面上应当出现的串> [轮数=8] [间隔秒=2]
 
 # 按 content-desc 定位任意节点（按钮、标签）
 xy_desc() {
-  python3 /tmp/_xy.py desc "$1" 0
+  python3 "$XY_PY" desc "$1" 0
 }
 # 🔴 只认输入框：标签和输入框的 desc 相同，必须靠 class 区分
 xy_edit() {
-  python3 /tmp/_xy.py edit "$1" 0
+  python3 "$XY_PY" edit "$1" 0
 }
 xy_edit_any() {
-  python3 /tmp/_xy.py editany "" 0
+  python3 "$XY_PY" editany "" 0
 }
 # 🔴 只认**在可点区域里**的输入框（与 `desc-sane` / `text-sane` 同一条理由）：
 #    ScrollView 折叠线以下的节点**仍然在无障碍树里**，但 `bounds` 的 top > bottom
@@ -270,7 +312,7 @@ xy_edit_any() {
 #    而调用方看到坐标拿到了、以为点成功了。
 #    注册/登录面板比一屏长（三个字段 + 同意项 + 六个动作），必然会用到它。
 xy_edit_sane() {
-  python3 /tmp/_xy.py edit-sane "$1" 0
+  python3 "$XY_PY" edit-sane "$1" 0
 }
 # 读某个输入框**当前实际内容**。
 #
@@ -280,26 +322,26 @@ xy_edit_sane() {
 #    于是脚本报"没填进去"，方向被引去怀疑应用 —— 而应用没问题，是输入没送到。
 #    有了读回，才能"发现少了什么、把缺的补上"，而不是赌它一次成功。
 edit_value() {  # <标签>
-  python3 /tmp/_xy.py editval "$1" 0
+  python3 "$XY_PY" editval "$1" 0
 }
 # 按可见文本定位（第 2 个参数是"第几个"，用于两个同名按钮）
 xy_text() {
-  python3 /tmp/_xy.py text "$1" "${2:-0}"
+  python3 "$XY_PY" text "$1" "${2:-0}"
 }
-has_text()  { grep -q "text=\"$1\"" /tmp/ui.xml && echo 1 || echo 0; }
+has_text()  { grep -q "text=\"$1\"" "$UI_XML" && echo 1 || echo 0; }
 # 安全输入框（`secureTextEntry`）的内容**永远不出现在 dump 里**，节点上只有
 # `password="true"`。所以「口令填对了吗」这件事无法用 UI dump 证明。
-has_secure(){ grep -q 'password="true"' /tmp/ui.xml && echo 1 || echo 0; }
+has_secure(){ grep -q 'password="true"' "$UI_XML" && echo 1 || echo 0; }
 # 🔴 `has_text` 是**整节点精确匹配**（`text="..."` 后面必须紧跟引号）。
 # 状态行是「有 1 处冲突待你选择」这种拼接过的句子，用精确匹配永远查不到 ——
 # 那会让一条**已经出现**的冲突被记成"没出现"。
-has_sub()   { grep -q "text=\"[^\"]*$1" /tmp/ui.xml && echo 1 || echo 0; }
+has_sub()   { grep -q "text=\"[^\"]*$1" "$UI_XML" && echo 1 || echo 0; }
 # 按 content-desc 精确匹配。勾选框、按钮这类节点的可辨识名在 `content-desc` 上，
 # 而不是 `text` —— 用 `has_text` 查它们**永远是 0**，于是"没找到"会被误记成"没生效"。
-has_desc()  { grep -q "content-desc=\"$1\"" /tmp/ui.xml && echo 1 || echo 0; }
+has_desc()  { grep -q "content-desc=\"$1\"" "$UI_XML" && echo 1 || echo 0; }
 # content-desc 的**前缀**匹配。与 `has_sub` 同理，只是查 desc。
 # 用于"文案尾部会变"的节点（例如同步按钮在 busy 时是「正在同步…」）。
-has_desc_sub() { grep -q "content-desc=\"[^\"]*$1" /tmp/ui.xml && echo 1 || echo 0; }
+has_desc_sub() { grep -q "content-desc=\"[^\"]*$1" "$UI_XML" && echo 1 || echo 0; }
 
 # 等「我的」页出现「已是最新」。
 # 🔴 首次同步要付一次 Argon2id 密钥派生。Hermes 没有 WebAssembly，走纯 JS ——
@@ -520,7 +562,7 @@ wait_laptop_has() {  # <标题> <轮数>，每轮 5 秒；默认 60 轮 = 300 �
 scroll_to_desc() {
   for _ in 1 2 3 4 5; do
     dump
-    XY=$(python3 /tmp/_xy.py desc-sane "$1" 0)
+    XY=$(python3 "$XY_PY" desc-sane "$1" 0)
     if [ -n "$XY" ]; then printf '%s' "$XY"; return 0; fi
     $ADB shell input swipe 540 1900 540 1100 300; sleep 1.5
   done
@@ -531,7 +573,7 @@ scroll_to_desc() {
 scroll_to_text() {
   for _ in 1 2 3 4 5; do
     dump
-    XY=$(python3 /tmp/_xy.py text-sane "$1" 0)
+    XY=$(python3 "$XY_PY" text-sane "$1" 0)
     if [ -n "$XY" ]; then printf '%s' "$XY"; return 0; fi
     $ADB shell input swipe 540 1900 540 1100 250; sleep 1.5
   done
@@ -788,8 +830,8 @@ handle_privacy_consent() {
 
 screen_txt(){
   python3 - <<'PY'
-import re
-s=open('/tmp/ui.xml',encoding='utf-8',errors='replace').read()
+import os, re
+s=open(os.environ['UI_XML'],encoding='utf-8',errors='replace').read()
 seen=[]
 for m in re.finditer(r'<node[^>]*?>', s):
     t=re.search(r'\stext="([^"]*)"',m.group(0))
@@ -1160,10 +1202,10 @@ require_window() {  # <设备名前缀>
 }
 
 # ── 定位器（写成独立文件，避免在脚本里嵌套 heredoc）────────
-cat > /tmp/_xy.py <<'PY'
-import re, sys
+cat > "$XY_PY" <<'PY'
+import os, re, sys
 mode, want, nth = sys.argv[1], sys.argv[2], int(sys.argv[3])
-s = open('/tmp/ui.xml', encoding='utf-8', errors='replace').read()
+s = open(os.environ['UI_XML'], encoding='utf-8', errors='replace').read()
 
 if mode == 'editval':
     # 返回某个输入框的**当前文本**（按 content-desc 找，只认 EditText）。
@@ -1242,9 +1284,9 @@ configure_sync_credentials() {
   dump
   local settings_xy
   settings_xy=$(python3 - <<'PY'
-import re, sys
+import os, re, sys
 try:
-    s = open('/tmp/ui.xml').read()
+    s = open(os.environ['UI_XML']).read()
 except OSError:
     sys.exit(0)
 m = re.search(r'resource-id="profile-entry-settings"[^>]*bounds="\[(\d+),(\d+)\]\[(\d+),(\d+)\]"', s)

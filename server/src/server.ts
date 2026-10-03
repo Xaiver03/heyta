@@ -35,6 +35,7 @@ import {
 import { testRoutes } from './test-routes';
 import { activityRoutes } from './activity/activity.routes';
 import { accountProfileRoutes } from './account/account-profile.routes';
+import { holidayAdjustmentRoutes } from './holidays/holiday-adjustment.routes';
 import { adminRoutes } from './admin/admin.routes';
 
 // HTML escape to prevent XSS in generated HTML
@@ -567,6 +568,19 @@ export const createServer = (
       // 没有任何共享状态。路径与客户端共用 `@heyta/shared-schema` 的常量。
       // ⚠️ 它同样不受计费闸门影响 —— 改自己的昵称不是付费能力。
       await fastifyServer.register(accountProfileRoutes, { prefix: '/api' });
+
+      // 调休/补班（公共事实）的**匿名只读**下行。W4b，定性见 ADR-0052。
+      //
+      // 🔴 这是这个服务端上**第一条**不需要凭据就能读的 JSON 下行
+      //（`push.routes.ts:127` 那条 vapid 是认证**后**只读，未登录 401）。
+      // 因此两件事必须在这一处显式决定，而不是沿用默认：
+      //   · 速率：per-route `rateLimit`（见 `HOLIDAY_PUBLIC_RATE_LIMIT`），比全局那一条紧；
+      //   · 缓存：ETag + `Cache-Control`，让"匿名 + 全量数据"不变成每次渲染都打一遍服务端。
+      // ⚠️ 它**不受计费闸门影响**，与 `activityRoutes` 同一条理由：
+      //    日历上"哪天上班"不是付费能力，把它放到闸门后面会让到期用户看到
+      //    一个**少了标注**的日历，而那不是"降级"，那是**界面在悄悄说谎**。
+      //    同理它也**不需要** `requireTermsConsent`：读公共事实不产生任何账号级写入。
+      await fastifyServer.register(holidayAdjustmentRoutes, { prefix: '/api' });
 
       // 运营管理后台（ADR-0038）。**默认没有人是管理员**（`users.is_admin` 默认
       // false），所以这个前缀对所有人都是 403，直到有人跑过

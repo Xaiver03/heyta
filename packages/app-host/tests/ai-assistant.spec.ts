@@ -26,6 +26,8 @@ import {
   type EgressConsent,
 } from '@heyta/ai';
 import type { LocalApiHabit, LocalApiHost, LocalApiItem, LocalApiProject } from '@heyta/local-api';
+import { LOCAL_API_TOOLS } from '@heyta/local-api';
+import type { LocalApiHost, LocalApiItem, LocalApiProject } from '@heyta/local-api';
 
 import {
   assistantEgressFields,
@@ -393,6 +395,12 @@ describe('🔴 出境披露：循环前一次算完，越界就停', () => {
     // `list_focuses` / `list_reminders`，2026-10-03 补齐六个实体工具之后）。
     // 写成 `LOCAL_API_TOOLS.filter(…)` 的长度就是拿被验的那份推导去当期望值 —— 一条永真判据。
     expect(plan.tools.length).toBe(10);
+    // 🔴 这句以前写的是 `toBe(3)` —— 一个**手抄的**读工具数。W10 给目录加了
+    // `list_events` / `get_event`，那条硬编码会红，而红的原因不是缺陷。
+    // 正确形状与这条用例的标题同义：**从常量推导**，即"读-only 档 = 目录里全部读工具"。
+    // 前提由下面那条 `>= 3` 兜住（目录萎缩到比已知基线还小时要有声音）。
+    expect(plan.tools).toEqual(LOCAL_API_TOOLS.filter((t) => t.kind === 'read').map((t) => t.name));
+    expect(plan.tools.length).toBeGreaterThanOrEqual(3);
     expect(plan.fields).toEqual(assistantEgressFields('read-only'));
   });
 
@@ -522,6 +530,10 @@ describe('授权前端有两个，判断只有一个', () => {
         'update_task',
       ].sort(),
     );
+    // 🔴 判据与这条用例的标题对齐：名单**由目录推导**，不是手抄一份工具名。
+    // 手抄的那版在 W10 目录扩到 10 条时红了 —— 而那一次红没有任何信息量。
+    expect(Object.keys(grants).sort()).toEqual(LOCAL_API_TOOLS.map((t) => t.name).sort());
+    expect(LOCAL_API_TOOLS.length).toBeGreaterThanOrEqual(10);
     expect(grants['list_tasks']).toBe(true);
     expect(grants['create_task']).toBe(false);
     expect(assistantGrants('read-and-propose')['create_task']).toBe(true);

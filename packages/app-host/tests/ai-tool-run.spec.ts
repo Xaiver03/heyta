@@ -15,6 +15,12 @@
 import { describe, expect, it } from 'vitest';
 
 import type { LocalApiHabit, LocalApiHost, LocalApiItem, LocalApiProject } from '@heyta/local-api';
+import type {
+  LocalApiEventItem,
+  LocalApiHost,
+  LocalApiItem,
+  LocalApiProject,
+} from '@heyta/local-api';
 
 import { confirmAiToolProposal, runSelectedTool } from '../src/ai-tool-run.js';
 import {
@@ -240,6 +246,157 @@ describe('runSelectedTool（直接传入选择结果）', () => {
       { host, grants: READ_GRANTS },
     );
     expect(outcome.kind).toBe('ambiguous');
+    expect(host.submits).toBe(0);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────
+// W10：倒数日走同一条执行链（**不新增任何执行代码**，只证明它接得上）
+// ─────────────────────────────────────────────────────────────────────────
+
+const EVENT_ITEMS: readonly LocalApiEventItem[] = [
+  {
+    id: 'e1',
+    title: '妈妈生日',
+    date: '1968-04-12',
+    kind: 'birthday',
+    nextOccurrence: '2027-04-12',
+    daysFromToday: 190,
+    repeating: true,
+    isLunar: false,
+    pinned: false,
+    notes: '记得订蛋糕',
+    readable: true,
+  },
+  {
+    id: 'e2',
+    title: '体检报告',
+    date: '2026-11-01',
+    kind: 'countdown',
+    nextOccurrence: '2026-11-01',
+    daysFromToday: 28,
+    repeating: false,
+    isLunar: false,
+    pinned: false,
+    notes: '身份证号 110101...',
+    readable: false,
+  },
+];
+
+/**
+ * 带倒数日的假宿主。
+ *
+ * ⚠️ 它**不是** `{ ...fakeHost(), listEvents }`：展开会**复制** `submits` 这个数，
+ * 而 `submit` 的闭包仍然去 +1 那个**原对象**上的字段 —— 于是本文件最重的那条
+ * 判据（提案阶段 `submits` 必须是 0、确认之后必须是 1）会**永远读到 0**，
+ * 一条"根本没写库"的假绿。与 `fakeHost` 一样自引用地建，计数器才在同一个对象上。
+ */
+function eventHost(): LocalApiHost & { submits: number } {
+  const host = {
+    submits: 0,
+    listTasks: (): Promise<readonly LocalApiItem[]> => Promise.resolve([]),
+    getTask: (taskId: string): Promise<LocalApiItem | undefined> =>
+      Promise.resolve(UNRELATED_TASKS.find((x) => x.id === taskId)),
+    listProjects: (): Promise<readonly LocalApiProject[]> =>
+      Promise.resolve([{ id: 'p1', name: '工作', taskCount: 2 }]),
+    listEvents: (): Promise<readonly LocalApiEventItem[]> => Promise.resolve(EVENT_ITEMS),
+    getEvent: (eventId: string): Promise<LocalApiEventItem | undefined> =>
+      Promise.resolve(EVENT_ITEMS.find((e) => e.id === eventId)),
+    submit: (): Promise<{ ok: true; taskId: string }> => {
+      host.submits += 1;
+      return Promise.resolve({ ok: true, taskId: 'created-1' });
+    },
+  };
+  return host;
+}
+
+const UNRELATED_TASKS: readonly LocalApiItem[] = [];
+
+const EVENT_READ_GRANTS = { list_events: true, get_event: true } as const;
+
+describe('倒数日走 AI 执行链（W10）', () => {
+  it('规则命中 list_events ⇒ 观察结果，且**一个字节都没写**', async () => {
+    const host = eventHost();
+    const run = await runThroughRules('看看有哪些倒数日', {
+      host,
+      grants: { ...EVENT_READ_GRANTS },
+    });
+    expect(run.kind).toBe('observation');
+    if (run.kind !== 'observation') return;
+    expect(run.tool).toBe('list_events');
+    expect(host.submits).toBe(0);
+    // 🔴 与 MCP 侧**逐字相同**的投影：受保护那条只剩元数据、列表里连可读的备注也没有
+    const json = JSON.stringify(run.data);
+    expect(json).not.toContain('记得订蛋糕');
+    expect(json).not.toContain('110101');
+    const items = run.data as readonly { id: string; readable: boolean }[];
+    expect(items.map((i) => i.id)).toEqual(['e1', 'e2']);
+    expect(items[1]?.readable).toBe(false);
+  });
+
+  it('get_event 读受保护那条 ⇒ failed/not-readable（与 get_task 同一档处理）', async () => {
+    const rule: ToolSelectionRule = { id: 'get.event', tool: 'get_event', pattern: /体检/, args: () => ({ eventId: 'e2' }) };
+    const run = await runThroughRules('打开体检那条倒数日', {
+      host: eventHost(),
+      grants: { get_event: true },
+      rules: [rule],
+    });
+    expect(run.kind).toBe('failed');
+    if (run.kind !== 'failed') return;
+    expect(run.reason).toBe('not-readable');
+    expect(run.message).toContain('受保护');
+  });
+
+  it('🔴🔴 create_event 只产出**提案**：`submit` 计数必须是 0，确认之后才是 1', async () => {
+    const host = eventHost();
+    const rule: ToolSelectionRule = {
+      id: 'create.event',
+      tool: 'create_event',
+      pattern: /倒数日\s*(.+)$/,
+      args: () => ({ title: '结婚纪念日', date: '2016-05-01', kind: 'anniversary' }),
+    };
+    const run = await runThroughRules('倒数日 结婚纪念日', {
+      host,
+      grants: { create_event: true },
+      rules: [rule],
+    });
+    expect(run.kind).toBe('proposal');
+    if (run.kind !== 'proposal') return;
+    expect(host.submits).toBe(0);
+    expect(run.proposal.intent).toEqual({
+      action: 'create-event',
+      title: '结婚纪念日',
+      date: '2016-05-01',
+      kind: 'anniversary',
+    });
+
+    // 确认之后才落地，而且**只落一次**
+    await confirmAiToolProposal(host, run.proposal);
+    expect(host.submits).toBe(1);
+  });
+
+  it('执行前复查对倒数日同样成立：选择之后撤销授权 ⇒ denied', async () => {
+    const host = eventHost();
+    const selection = resolveToolSelection('看看有哪些倒数日', { grants: EVENT_READ_GRANTS });
+    expect(selection.kind).toBe('tool');
+    const run = await runSelectedTool(selection, { host, grants: {} });
+    expect(run.kind).toBe('denied');
+    expect(host.submits).toBe(0);
+  });
+
+  it('参数缺 date ⇒ failed/invalid-args，**不拿空参数去调宿主**', async () => {
+    const host = eventHost();
+    const rule: ToolSelectionRule = {
+      id: 'create.event.broken',
+      tool: 'create_event',
+      pattern: /建个倒数日/,
+      args: () => ({ title: '只有标题' }),
+    };
+    const run = await runThroughRules('建个倒数日', { host, grants: { create_event: true }, rules: [rule] });
+    expect(run.kind).toBe('failed');
+    if (run.kind !== 'failed') return;
+    expect(run.reason).toBe('invalid-args');
+    expect(run.message).toContain('date');
     expect(host.submits).toBe(0);
   });
 });

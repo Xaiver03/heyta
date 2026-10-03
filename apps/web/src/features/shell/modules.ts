@@ -39,23 +39,22 @@
  */
 
 import type { MessageKey } from '@heyta/i18n';
+import type { FeatureModuleKey } from '@heyta/domain';
 
 /**
  * 可开关的模块 key。
+ *
+ * 🔴 **词表不在这里，在 `@heyta/domain` 的 `FEATURE_MODULE_KEYS`**（W8 / 本文 §7 第 5 条）：
+ * "heyta 有哪几个功能域"是产品语义，四个端必须用同一批词；
+ * 而"这一端把哪几个摆在哪里、默认开不开"才是平台差异。
+ * 这里因此只是**别名** —— 移动端若自己编一个 web 没有的 key，是编译错误而不是漂移。
  *
  * ⚠️ 它是 `apps/web` 的 `ViewKey` 的**子集**（`tasks` / `settings` 不在里面 ——
  * 那两个是"去哪都需要的"，不给关）。这里刻意**不 import `App.tsx` 的 `ViewKey`**：
  * 那会形成 `App.tsx ↔ modules.ts` 的循环 import，而循环 import 的症状是
  * "某一边拿到 undefined"，且**只在某些打包顺序下才出现**。
  */
-export type ShellModuleKey =
-  | 'calendar'
-  | 'quadrant'
-  | 'habits'
-  | 'timeline'
-  | 'focus'
-  | 'growth'
-  | 'notes';
+export type ShellModuleKey = FeatureModuleKey;
 
 export interface ShellModule {
   readonly key: ShellModuleKey;
@@ -115,6 +114,16 @@ export const SHELL_MODULES: readonly ShellModule[] = [
     key: 'notes',
     labelKey: 'web.shell.modules.notes.label',
     noteKey: 'web.shell.modules.notes.note',
+    defaultOn: false,
+  },
+  {
+    // 🔴 默认关是产品负责人拍的（`docs/plans/countdown-anniversary.md` §3 W8）。
+    //    它和「日历」的区别不是重不重要，而是**用的频率**：倒数日一周点几次，
+    //    而 rail 是每天点几十次的地方。关掉的模块**不进 DOM**（不是 `display:none`），
+    //    所以这条默认值不会动到任何既有的 tab 计数断言。
+    key: 'countdown',
+    labelKey: 'web.shell.modules.countdown.label',
+    noteKey: 'web.shell.modules.countdown.note',
     defaultOn: false,
   },
 ];

@@ -356,6 +356,13 @@ export function createWorkerOpLogSession<TOperation extends Operation<string> = 
     getLastServerSeq: () => call('getLastServerSeq', []) as Promise<number>,
     setLastServerSeq: (seq) => call('setLastServerSeq', [seq]) as Promise<void>,
 
+    // ── META 通用读写（公共事实缓存走这里，ADR-0052 §2.5）──
+    // 🔴 页侧**没有** `DbAdapter`（库在 Worker / 壳里），所以这条是三条后端路径
+    // 唯一都能到达 `STORES.META` 的口子。漏转发不会静默返回空值：
+    // `handleOpLogWorkerRequest` 找不到方法名时会响亮报错。
+    getMetaValue: (key) => call('getMetaValue', [key]) as Promise<string | number | undefined>,
+    setMetaValue: (key, value) => call('setMetaValue', [key, value]) as Promise<void>,
+
     // ── 继承自 `RemoteOperationApplyStorePort` ──
     appendBatchSkipDuplicates: (ops, source, options) =>
       call('appendBatchSkipDuplicates', [ops, source, options]) as ReturnType<

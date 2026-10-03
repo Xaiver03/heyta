@@ -462,6 +462,25 @@ const EMPTY_SITES = {
     // 仍然成立，仍然挂在 `site-and-parity-alignment.md` 的欠账上。
     // 判据也没松：故障注入实测 —— 新文件里手写 `<Text>{t('x.empty')}</Text>` 仍然红，
     // 同一个文件里"共享组件 + 另写一处"仍然红，只有纯共享组件用法不再点名。
+    /**
+     * 倒数纪念日（批次二 W5，2026-10-03）。
+     *
+     * 🔴 **这是真 +1，不是搬家**：倒数日在此之前**没有任何界面**，"还没有倒数日"
+     * 这两行文案是随功能新生的（与 `notes` / `reminders` 那条的措辞同一个性质，
+     * 与 `categories/copy.ts` 那条"换了个位置"的性质相反）。
+     *
+     * **渲染已经收编**：共享 `EventBoard` 用的是
+     * `packages/ui/src/empty-state/EmptyState.tsx`（`icon` + `title` + `hint` +
+     * `testID="event-empty"`），宿主侧没有手写骨架、没有空槽位类、没有空态 testid
+     * —— 所以这个文件**只**出现在本栏。
+     * 它不是 `NotesBoard` 那种"区块级空态塞不进页面级组件"的例外：倒数日是**一个视图**，
+     * 空的时候整块内容区就是空的，正是页面级那一档。
+     *
+     * **为什么文案仍在宿主侧**：与 `timeline/labels.ts`、`categories/copy.ts`
+     * 逐字相同的理由 —— 共享层**不许 import `@heyta/i18n`**（会拖进第二份 React，
+     * `check:mobile-bundle` 盯着），模板只能留在有 i18n 的那一侧。
+     */
+    'apps/web/src/features/countdown/CountdownView.tsx',
   ],
   '空态文案 prop': [
     /**

@@ -809,6 +809,26 @@ export class SyncClient {
                 .join(', '),
           );
         }
+        /**
+         * 🔴 §2.1 那条硬顺序（服务端先于客户端）在这里落地成一句**可行动**的话。
+         *
+         * `INVALID_ENTITY_TYPE` 与"这条 op 本身坏"（`INVALID_PAYLOAD` 那一类）是
+         * **两件相反的事**：前者是服务器的词表落后，用户的动作是"升级服务端"，
+         * 而数据**完好地留在本机**；后者是数据坏了，升级服务端没有用。
+         * 两者共用一句"永久拒绝 N 条"，自托管的部署者只会去查自己的网络。
+         */
+        const vocabularyRejects = this.rejectedOps.filter(
+          (r) =>
+            r.errorCode === 'INVALID_ENTITY_TYPE' ||
+            r.errorCode === 'INVALID_SCHEMA_VERSION',
+        );
+        if (vocabularyRejects.length > 0) {
+          parts.push(
+            `其中 ${String(vocabularyRejects.length)} 条是服务端**不认识它的实体类型** —— ` +
+              '这台服务器的版本落后于客户端。这些数据仍完整保存在本机，' +
+              '请先升级服务端（自托管部署尤其注意这一点），然后再同步一次。',
+          );
+        }
         if (this.transientRejects.length > 0) {
           parts.push(
             `暂时被挡 ${String(this.transientRejects.length)} 条（仍在队列里，下次会重传）：` +

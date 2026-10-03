@@ -1541,5 +1541,53 @@ describe('vault production sync wiring', () => {
     expect(await codec.decrypt(sent['payload'] as string, local)).toBe(JSON.stringify(local.payload));
     expect(h.applied.flat().map((op) => op.payload)).toContainEqual(remote.payload);
     expect(h.cursor.value).toBe(2);
+// ─────────────────────────────────────────────────────────────────────────
+// §2.1 的硬顺序：服务端词表落后于客户端（W2 判据 ②）
+//
+// 加一个新实体时，"老服务端 + 新客户端"是**一定会出现**的组合（自托管部署者
+// 天然落后）。这条组合下服务端回 `INVALID_ENTITY_TYPE`，客户端把它算永久拒绝 ——
+// 数据不会丢（还在本机），但**必须说得出下一步动作是"升级服务端"**。
+//
+// 🔴 两条用例是一对：第二条是阴性对照。如果那句提示挂在任何永久拒绝上，
+// 用户就会拿着一枚作废的 clientId 去升级服务器 —— 那比不提示更糟。
+// ─────────────────────────────────────────────────────────────────────────
+describe('§2.1 服务端词表落后于客户端', () => {
+  const rejectedUpload = (errorCode: string, error: string) =>
+    makeHarness(
+      (url) =>
+        url.includes('/ops')
+          ? okJson({
+              results: [{ opId: 'op-1', accepted: false, errorCode, error }],
+              latestSeq: 0,
+            })
+          : okJson({ ops: [], latestSeq: 0, hasMore: false }),
+      { ops: [makeOp({ entityType: 'EVENT', entityId: 'e1', payload: { title: '结婚纪念日', date: '2020-05-01' } })] },
+    );
+
+  it('INVALID_ENTITY_TYPE：报永久拒绝，且说得出"升级服务端"与"数据仍在本地"', async () => {
+    const h = rejectedUpload('INVALID_ENTITY_TYPE', 'Invalid entityType: EVENT');
+    const status = await h.client.sync();
+
+    expect(status.kind).toBe('error');
+    if (status.kind !== 'error') return;
+    expect(status.reason).toBe('upload-rejected');
+    expect(status.retryable).toBe(false);
+    expect(status.message).toContain('不认识它的实体类型');
+    expect(status.message).toContain('请先升级服务端');
+    expect(status.message).toContain('仍完整保存在本机');
+    // 数据没上云 ⇒ 不许标成已上传，必须走 markRejected
+    expect(h.marked).toHaveLength(0);
+    expect(h.rejected.flat()).toEqual(['op-1']);
+  });
+
+  it('阴性对照：INVALID_CLIENT_ID 不许被套上同一句"升级服务端"', async () => {
+    const h = rejectedUpload('INVALID_CLIENT_ID', 'Operation clientId does not match request clientId');
+    const status = await h.client.sync();
+
+    expect(status.kind).toBe('error');
+    if (status.kind !== 'error') return;
+    expect(status.reason).toBe('upload-rejected');
+    expect(status.message).toContain('INVALID_CLIENT_ID');
+    expect(status.message).not.toContain('升级服务端');
   });
 });

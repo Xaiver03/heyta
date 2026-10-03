@@ -27,6 +27,7 @@ import {
   type LocalApiFocusSession,
   type LocalApiHabit,
   type LocalApiHabitLog,
+  type LocalApiEventItem,
   type LocalApiHost,
   type LocalApiItem,
   type LocalApiNote,
@@ -234,6 +235,12 @@ describe('egressFields 声明 == 真实投影', () => {
     const writes = LOCAL_API_TOOLS.filter((t) => t.kind === 'write');
     expect(writes.length).toBeGreaterThanOrEqual(5);
     for (const tool of writes) {
+  it('写工具不出境任何数据字段：`egressFields` 必须是空表', () => {
+    // 目录驱动：**每一个** `kind === 'write'` 的工具都要过这条，
+    // 手抄三条名字的版本会在加第四条写工具时静默漏掉它。
+    for (const name of [...LOCAL_API_TOOLS.filter((t) => t.kind === 'write').map((t) => t.name)]) {
+      const tool = findTool(name);
+      expect(tool, `目录里没有工具「${name}」`).toBeDefined();
       // 写工具只产出提案、结果不回送模型 ⇒ 它不贡献出境字段。
       // 这里刻意**不点名工具**：点名就是那份会漏抄的清单（本文件开头那条理由）。
       expect(tool.egressFields, `${tool.name} 的出境字段必须是空表`).toEqual([]);
@@ -280,5 +287,119 @@ describe('egressFields 声明 == 真实投影', () => {
     if (!run.ok) return;
     const declared = new Set((findTool('list_tags')?.egressFields ?? []).map((f) => f.split('.').at(-1) ?? f));
     expect([...keysIn(run.payload)].filter((k) => !declared.has(k))).toEqual(['ownerPhone']);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────
+// W10：倒数日（`EVENT`）的同一笔账
+//
+// 🔴 这一段**必须手写**。`tool-egress-fields` 不是目录驱动的（它不知道目录里有谁），
+// 所以"新加一个读工具"不会自动长出"它的声明 == 它的真实投影"这条判据 ——
+// 工单 W10 把这件事点名成⚠️静默项，就是因为漏了它没有任何东西会红。
+// ─────────────────────────────────────────────────────────────────────────
+
+/** 每个字段都填满的倒数日样本：漏声明最容易发生在"这个字段平时是 undefined"的时候。 */
+const EVENT_ITEM: LocalApiEventItem = {
+  id: 'e1',
+  title: '妈妈生日',
+  date: '1968-04-12',
+  kind: 'birthday',
+  nextOccurrence: '2027-04-12',
+  daysFromToday: 190,
+  repeating: true,
+  isLunar: false,
+  pinned: true,
+  notes: '记得订蛋糕',
+  readable: true,
+};
+const PROTECTED_EVENT: LocalApiEventItem = {
+  ...EVENT_ITEM,
+  id: 'e2',
+  title: '体检报告',
+  notes: '身份证号 110101...',
+  readable: false,
+};
+
+function eventHost(events: readonly LocalApiEventItem[]): LocalApiHost {
+  return {
+    listTasks: async () => [],
+    getTask: async () => undefined,
+    listProjects: async () => [],
+    listEvents: async () => events,
+    getEvent: async (eventId: string) => events.find((e) => e.id === eventId),
+    submit: async () => ({ ok: true, taskId: 'created-1' }),
+  };
+}
+
+describe('倒数日工具的 egressFields 声明 == 真实投影', () => {
+  it('list_events：可读与受保护两种条目，实际出去的键都在声明里', async () => {
+    const readable = await runReadTool(eventHost([EVENT_ITEM]), 'list_events', {});
+    const protectedRun = await runReadTool(eventHost([PROTECTED_EVENT]), 'list_events', {});
+    expect(readable.ok).toBe(true);
+    expect(protectedRun.ok).toBe(true);
+    if (!readable.ok || !protectedRun.ok) return;
+
+    const declared = declaredKeys('list_events');
+    const actual = new Set([...keysIn(readable.payload), ...keysIn(protectedRun.payload)]);
+    const outside = [...actual].filter((k) => !declared.has(k) && !envelopeKeys.has(k));
+    expect(outside, `实际送出但没声明：${outside.join('、')}`).toEqual([]);
+  });
+
+  it('🔴 list_events 不返回备注正文 —— 目录描述与声明都这么承诺', async () => {
+    // 宿主给列表带上了 `notes`（真实宿主就是这么做的：与 `getEvent` 共用 `eventToItem`），
+    // 列表层必须把它剥掉。**去掉 `projectEventListForTool` 里那一刀 ⇒ 这条红。**
+    const run = await runReadTool(eventHost([EVENT_ITEM]), 'list_events', {});
+    expect(run.ok).toBe(true);
+    if (!run.ok) return;
+    expect(JSON.stringify(run.payload)).not.toContain('记得订蛋糕');
+    expect(keysIn(run.payload).has('notes')).toBe(false);
+    // 但正文**没有丢失**：同一条用 get_event 取得到。
+    const detail = await runReadTool(eventHost([EVENT_ITEM]), 'get_event', { eventId: 'e1' });
+    expect(detail.ok).toBe(true);
+    if (!detail.ok) return;
+    expect(JSON.stringify(detail.payload)).toContain('记得订蛋糕');
+  });
+
+  it('get_event：命中的条目 + 没命中的 `{error}` 信封都在声明里', async () => {
+    const found = await runReadTool(eventHost([EVENT_ITEM]), 'get_event', { eventId: 'e1' });
+    const missing = await runReadTool(eventHost([EVENT_ITEM]), 'get_event', { eventId: 'nope' });
+    expect(found.ok).toBe(true);
+    expect(missing.ok).toBe(true);
+    if (!found.ok || !missing.ok) return;
+    const declared = declaredKeys('get_event');
+    const actual = new Set([...keysIn(found.payload), ...keysIn(missing.payload)]);
+    const outside = [...actual].filter((k) => !declared.has(k) && !envelopeKeys.has(k));
+    expect(outside, `实际送出但没声明：${outside.join('、')}`).toEqual([]);
+  });
+
+  it('🔴 判据有牙齿：宿主多挂一个没声明的键，get_event 会点出来、list_events 剥得掉', async () => {
+    const leaky = { ...EVENT_ITEM, ownerPhone: '13900000000' } as unknown as LocalApiEventItem;
+
+    const detail = await runReadTool(eventHost([leaky]), 'get_event', { eventId: 'e1' });
+    expect(detail.ok).toBe(true);
+    if (detail.ok) {
+      // `get_event` 对可读条目是**原样返回**，所以这个键真的会出去 ——
+      // 而声明里没有它 ⇒ 助手那道"披露集合外就停"的复查必须能点出来。
+      expect([...keysIn(detail.payload)].filter((k) => !declaredKeys('get_event').has(k))).toEqual([
+        'ownerPhone',
+      ]);
+    }
+
+    // 列表那一侧走白名单重建，所以同一个键**根本出不去**。
+    const listRun = await runReadTool(eventHost([leaky]), 'list_events', {});
+    expect(listRun.ok).toBe(true);
+    if (listRun.ok) {
+      const declared = declaredKeys('list_events');
+      expect([...keysIn(listRun.payload)].filter((k) => !declared.has(k))).toEqual([]);
+    }
+  });
+
+  it('受保护条目在两个视图里都是"存在但不给看"：readable=false 且没有 notes', async () => {
+    const list = await runReadTool(eventHost([PROTECTED_EVENT]), 'list_events', {});
+    expect(list.ok).toBe(true);
+    if (list.ok) expect(JSON.stringify(list.payload)).not.toContain('110101');
+    // 单条读**直接拒绝**，不返回一个"看起来没有备注"的结果
+    const one = await runReadTool(eventHost([PROTECTED_EVENT]), 'get_event', { eventId: 'e2' });
+    expect(one.ok).toBe(false);
   });
 });

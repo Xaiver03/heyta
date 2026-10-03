@@ -30,14 +30,14 @@
 export type AiCapabilityEntityType =
   'TASK' | 'PROJECT' | 'TAG' | 'NOTE' |
     'HABIT' | 'HABIT_LOG' | 'FOCUS_SESSION' | 'AI_FEEDBACK' |
-    'PREFERENCE_CORRECTION' | 'REMINDER' | 'TASK_REPEAT_CFG' | 'GLOBAL_CONFIG' |
-    'MIGRATION' | 'RECOVERY' | 'ALL';
+    'PREFERENCE_CORRECTION' | 'REMINDER' | 'EVENT' | 'TASK_REPEAT_CFG' |
+    'GLOBAL_CONFIG' | 'MIGRATION' | 'RECOVERY' | 'ALL';
 
 /** 真的被 `packages/op-log` 物化了领域模型的实体类型。 */
 export type AiCapabilityModeledEntityType =
   'TASK' | 'PROJECT' | 'TAG' | 'NOTE' |
     'HABIT' | 'HABIT_LOG' | 'FOCUS_SESSION' | 'AI_FEEDBACK' |
-    'PREFERENCE_CORRECTION' | 'REMINDER';
+    'PREFERENCE_CORRECTION' | 'REMINDER' | 'EVENT';
 
 /** 工具的可写性 —— 判定读写只有这两个取值（`@heyta/local-api` 的 `ToolKind`）。 */
 export type AiCapabilityToolKind = 'read' | 'write';
@@ -104,6 +104,9 @@ export const AI_CAPABILITY_MANIFEST =
     'covered': 8,
     'denominator': 8,
     'ratio': '8/8',
+    'covered': 3,
+    'denominator': 9,
+    'ratio': '3/9',
   },
   'userOperableEntityTypes': [
     'TASK',
@@ -114,6 +117,7 @@ export const AI_CAPABILITY_MANIFEST =
     'HABIT_LOG',
     'FOCUS_SESSION',
     'REMINDER',
+    'EVENT',
   ],
   'modelledEntityTypes': [
     'TASK',
@@ -126,6 +130,7 @@ export const AI_CAPABILITY_MANIFEST =
     'AI_FEEDBACK',
     'PREFERENCE_CORRECTION',
     'REMINDER',
+    'EVENT',
   ],
   'excludedFromDenominator': [
     {
@@ -255,6 +260,20 @@ export const AI_CAPABILITY_MANIFEST =
       ],
       'writeToolNames': [
         'create_reminder',
+      ],
+    },
+    {
+      'entityType': 'EVENT',
+      'materialized': true,
+      'countsTowardCoverage': true,
+      'coverage': 'read-write',
+      'readToolNames': [
+        'list_events',
+        'get_event',
+      ],
+      'writeToolNames': [
+        'create_event',
+        'update_event',
       ],
     },
   ],
@@ -689,6 +708,92 @@ export const AI_CAPABILITY_MANIFEST =
         },
       ],
     },
+    {
+      'name': 'list_events',
+      'kind': 'read',
+      'entityType': 'EVENT',
+      'description': '列出倒数日与纪念日（未删除、未归档），按界面同一套顺序排：置顶在前、距下一次近的在前。每条给出锚点日期、类型档位、下一次发生日与相差天数。不返回备注正文 —— 备注要单独用 get_event 取。归档过的倒数日不在这里。',
+      'schemaRecorded': true,
+      'args': [
+        {
+          'name': 'limit',
+          'type': 'number',
+          'required': false,
+        },
+      ],
+    },
+    {
+      'name': 'get_event',
+      'kind': 'read',
+      'entityType': 'EVENT',
+      'description': '读取单个倒数日/纪念日的完整内容（含备注正文）。',
+      'schemaRecorded': true,
+      'args': [
+        {
+          'name': 'eventId',
+          'type': 'string',
+          'required': true,
+        },
+      ],
+    },
+    {
+      'name': 'create_event',
+      'kind': 'write',
+      'entityType': 'EVENT',
+      'description': '新建一个倒数日/纪念日。日期是 `YYYY-MM-DD` 的**锚点日期**（倒数日没有"几点"）。可给类型档位（countdown / anniversary / birthday / festival 四档之一）、是否按农历每年重复、RRULE 重复规则、备注。必须走 heyta 的正常写入路径（op-log）。',
+      'schemaRecorded': true,
+      'args': [
+        {
+          'name': 'title',
+          'type': 'string',
+          'required': true,
+        },
+        {
+          'name': 'date',
+          'type': 'string',
+          'required': true,
+        },
+        {
+          'name': 'kind',
+          'type': 'string',
+          'required': false,
+        },
+        {
+          'name': 'isLunar',
+          'type': 'boolean',
+          'required': false,
+        },
+        {
+          'name': 'recurrence',
+          'type': 'string',
+          'required': false,
+        },
+        {
+          'name': 'notes',
+          'type': 'string',
+          'required': false,
+        },
+      ],
+    },
+    {
+      'name': 'update_event',
+      'kind': 'write',
+      'entityType': 'EVENT',
+      'description': '修改倒数日字段（标题、日期、类型档位、农历、重复规则、置顶、备注）。只能改显式给定的字段。',
+      'schemaRecorded': true,
+      'args': [
+        {
+          'name': 'eventId',
+          'type': 'string',
+          'required': true,
+        },
+        {
+          'name': 'fields',
+          'type': 'object',
+          'required': true,
+        },
+      ],
+    },
   ],
   'protocolTypesWithoutModel': [
     'TASK_REPEAT_CFG',
@@ -714,12 +819,14 @@ export const AI_CAPABILITY_MANIFEST =
 export const AI_CAPABILITY_TEXT = [
   'heyta 能力清单（由工具目录与领域实体生成，不是手写的）',
   '覆盖口径：用户可操作的已物化实体 8 个，其中 8 个**读和写都有**工具（8/8）。',
+  '覆盖口径：用户可操作的已物化实体 9 个，其中 3 个有 AI 工具（3/9）。',
   '',
   '🔴 拒绝时两件事必须分开说：我没有这个工具（AI 侧缺工具） ｜ 产品做不到（实体或功能不存在）。',
   '下面标了"没有工具"的实体，在产品里是**真实存在**的：可以说"我没有这个工具"，',
   '不可以说"产品不支持"。',
   '',
   '一、有 AI 工具的实体（8 个）',
+  '一、有 AI 工具的实体（3 个）',
   '- TASK —— 读和写都有（读 2 / 写 3）',
   '  · [读] list_tasks（projectId:string, completed:boolean, dueOn:string, dueFrom:string, dueTo:string, limit:number）',
   '  · [读] get_task（taskId*:string）',
@@ -750,6 +857,11 @@ export const AI_CAPABILITY_TEXT = [
   '- REMINDER —— 读和写都有（读 1 / 写 1）',
   '  · [读] list_reminders（taskId:string）',
   '  · [写] create_reminder（taskId*:string, date:string, time:string, minutesBeforeDue:number）',
+  '- EVENT —— 读和写都有（读 2 / 写 2）',
+  '  · [读] list_events（limit:number）',
+  '  · [读] get_event（eventId*:string）',
+  '  · [写] create_event（title*:string, date*:string, kind:string, isLunar:boolean, recurrence:string, notes:string）',
+  '  · [写] update_event（eventId*:string, fields*:object）',
   '',
   '二、产品里有、但我没有任何工具的实体（0 个）—— 实体存在，只是我没配工具',
   '- （无）',

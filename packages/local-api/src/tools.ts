@@ -100,6 +100,113 @@ export type {
 export { LOCAL_API_TOOLS, findTool, toolNames } from './tools/registry.js';
 
 // ─────────────────────────────────────────────────────────────────────────
+// 倒数日 / 纪念日（`EVENT`）的投影 —— 与上面**同一套规则**，不是第二套
+// ─────────────────────────────────────────────────────────────────────────
+
+/**
+ * 喂给 `list_events` / `get_event` 的一条倒数日。
+ *
+ * 🔴 形状刻意照 `LocalApiItem`：**"存在"与"内容"是两件事**这条立场
+ * 只允许有一份实现，两个实体各自表达一遍就会各漂各的。
+ *
+ * 字段名口径与 `packages/shared-schema` 一致（`date` / `kind` / `isLunar` / `notes`）；
+ * `nextOccurrence` 与 `daysFromToday` 是**派生值**（先例：`project.taskCount`），
+ * 由宿主用领域层的 `nextEventOccurrence` / `eventDaysFromToday` 算好 ——
+ * 🔴 本包**不做日历算术**（零依赖，也不许在这里长出第二套"下一次是哪天"的判断，
+ * 那个判断的唯一归属是 `packages/domain/src/events.ts`）。
+ */
+export interface LocalApiEventItem {
+  id: string;
+  title: string;
+  /** 锚点日期 `YYYY-MM-DD`。倒数日没有"几点"，所以不是时间戳。 */
+  date: string;
+  /**
+   * 类型档位。**由领域层单点判定**（用户选过就照他说的，没选才按日期方向兜底）。
+   *
+   * ⚠️ 这里是 `string` 而不是字面量联合，**与 `LocalApiItem.priority` 同一取舍**：
+   * 本包零依赖，把 `countdown / anniversary / birthday / festival` 抄一份进来
+   * 就是词表的**第二份定义**，而领域层加一档时这里不会红（它只会一直"少一档"）。
+   * 谁认识这四个值：`packages/domain` 的 `CountdownEventKind`，
+   * 判定与校验点在 `packages/app-host/src/local-api-host.ts`。
+   */
+  kind: string;
+  /** 下一次发生日。**一次性且已过 ⇒ 缺席**（不是 `null`、不是"今天"）。 */
+  nextOccurrence?: string;
+  /** 正 = 还有 N 天，负 = 已经 N 天，0 = 就是今天。 */
+  daysFromToday: number;
+  /** 是否每年/按规则重复。 */
+  repeating: boolean;
+  /** 重复时按农历锚点推。 */
+  isLunar: boolean;
+  /** 置顶（就是 `pinnedAt` 有值，没有第二个字段）。 */
+  pinned: boolean;
+  /** 备注正文。🔴 只在 `get_event` **且** `readable` 为真时出现。 */
+  notes?: string;
+  /** 这条能不能被本机工具读到正文。逐条判定，不是逐库。 */
+  readable: boolean;
+}
+
+/**
+ * `list_events` 专用的**再窄一层**投影：连可读条目的备注也不出。
+ *
+ * ⚠️ 这里**刻意没有**对应 `projectForTool` 的"单条投影"函数 —— 不是漏了，是
+ * 倒数日的单条路径**不剥正文，而是直接拒绝**（{@link readEventForTool}）。
+ * 加一个"可读就原样返回、不可读就剥掉"的函数会造出**第二个**执行点，
+ * 而那个执行点在产品里永远走不到（`get_event` 对不可读条目根本不会返回条目）。
+ * 与任务侧的差别只在 `get_task` 用的就是那条 —— 两边各按自己的调用图留件。
+ *
+ * 🔴 照 `projectListForTool` 的样子做，理由逐字相同：目录描述与 `egressFields`
+ * 都承诺"列表里没有正文"，而宿主侧 `listEvents` 与 `getEvent` 用的是**同一个**
+ * `eventToItem`。不窄这一层，那句承诺就是空话 —— 而 `list_tasks` 上
+ * 恰恰是这么被抓现行的（见 `projectListForTool` 的注释与 W10 判据）。
+ */
+export function projectEventListForTool(
+  items: readonly LocalApiEventItem[],
+): readonly LocalApiEventItem[] {
+  // 逐条**重建**成元数据形状（白名单，不是 `delete`）：
+  // 列表要的是"连可读条目的正文也没有"，所以每条都得走这一遍。
+  return items.map(eventMetadata);
+}
+
+/** 倒数日的**元数据白名单**（正文类字段一律不在这里）。 */
+function eventMetadata(item: LocalApiEventItem): LocalApiEventItem {
+  const meta: LocalApiEventItem = {
+    id: item.id,
+    title: item.title,
+    date: item.date,
+    kind: item.kind,
+    daysFromToday: item.daysFromToday,
+    repeating: item.repeating,
+    isLunar: item.isLunar,
+    pinned: item.pinned,
+    // `readable` **照抄**：受保护的条目仍然说"有我，但不给你看"（这正是 Bear 那句）
+    readable: item.readable,
+  };
+  if (item.nextOccurrence !== undefined) meta.nextOccurrence = item.nextOccurrence;
+  // 🔴 `notes` 在这里**故意不被复制** —— 这就是整件事的目的。
+  return meta;
+}
+
+/**
+ * `get_event` 专用：不可读的倒数日**明确报错**，不是返回一个"没有备注"的空结果。
+ * 与 `readItemForTool` 同一取舍（见它上面的说明）。
+ */
+export type EventReadVerdict =
+  | { ok: true; item: LocalApiEventItem }
+  | { ok: false; reason: 'not-readable'; message: string };
+
+export function readEventForTool(item: LocalApiEventItem): EventReadVerdict {
+  if (item.readable) return { ok: true, item };
+  return {
+    ok: false,
+    reason: 'not-readable',
+    message:
+      `倒数日「${item.title}」受保护，本机工具只能看到它存在，不能读取备注内容。` +
+      '这是设计如此，不是错误。',
+  };
+}
+
+// ─────────────────────────────────────────────────────────────────────────
 // 配置与授权
 // ─────────────────────────────────────────────────────────────────────────
 
@@ -132,8 +239,13 @@ export interface LocalApiConfig {
    * 对照 Joplin：同样"token guards against local programs"。
    */
   token?: string;
-  /** 逐工具授权。**未列出的工具一律视为关闭。** */
-  grants?: Readonly<Record<string, boolean>>;
+  /**
+   * 逐工具授权。**未列出的工具一律视为关闭。**
+   *
+   * 值允许 `undefined` 不是松一口子：判定是 `=== true`（fail-closed），而判据必须能
+   * 表达"键存在、值是 undefined"这一档 —— 它挡的是"有人把判定改成 `name in grants`"。
+   */
+  grants?: Readonly<Record<string, boolean | undefined>>;
 }
 
 export const DEFAULT_LOCAL_API_CONFIG: LocalApiConfig = {

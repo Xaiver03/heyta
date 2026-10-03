@@ -22,6 +22,7 @@
 
 import type {
   AiFeedback,
+  CountdownEvent,
   FocusSession,
   PreferenceCorrection,
   Habit,
@@ -62,6 +63,12 @@ export interface MaterializedState {
    * 理由逐条写在 `packages/domain/src/entities.ts` 的 `Reminder` 上。
    */
   reminders: Record<string, Reminder>;
+  /**
+   * 倒数日 / 纪念日（ADR-0044 D1）。
+   *
+   * ⚠️ 它**不是**"没有截止日的任务"：见 `CountdownEvent` 文件头三条理由。
+   */
+  events: Record<string, CountdownEvent>;
 }
 
 export function emptyState(): MaterializedState {
@@ -76,6 +83,7 @@ export function emptyState(): MaterializedState {
     aiFeedback: {},
     preferenceCorrections: {},
     reminders: {},
+    events: {},
   };
 }
 
@@ -91,6 +99,7 @@ const BUCKET_BY_ENTITY = {
   AI_FEEDBACK: 'aiFeedback',
   PREFERENCE_CORRECTION: 'preferenceCorrections',
   REMINDER: 'reminders',
+  EVENT: 'events',
 } as const;
 
 type ModeledEntity = keyof typeof BUCKET_BY_ENTITY;

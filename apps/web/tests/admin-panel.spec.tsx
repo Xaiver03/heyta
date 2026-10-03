@@ -22,6 +22,9 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { I18nProvider } from '@heyta/i18n';
+// 🔴 请求体的**唯一事实源**。测试直接拿它判发出的 body，所以界面里再写一份校验
+// 既没必要、也不会让这里变松 —— 两边标准必须只有一个。
+import { holidayYearPutSchema } from '@heyta/shared-schema';
 
 import { AdminPanel } from '../src/features/admin/AdminPanel.js';
 import { __resetAdminForTests } from '../src/features/admin/store.js';
@@ -172,12 +175,15 @@ describe('是管理员：渲染面板与概览', () => {
     expect(overview!.textContent).toContain('123.00 CNY');
   });
 
-  it('面板上有六个标签页，默认停在概览', async () => {
+  it('面板上有七个标签页，默认停在概览', async () => {
     stubFetch(200);
     const el = await renderPanel();
 
     const tabs = [...el.querySelectorAll('[role="tab"]')];
-    expect(tabs).toHaveLength(6);
+    // 第六个是 W4b 的「调休/补班」（`TABS` 与 `AdminTab` 同批加的），
+    // 第七个之前是「邀请」。⚠️ 这条判据的价值在"标签页数 = TABS 的长度"：
+    // 只改数字不改 TABS（或反过来）都会让它红。
+    expect(tabs).toHaveLength(7);
     expect(tabs[0]!.getAttribute('aria-selected')).toBe('true');
   });
 
@@ -458,3 +464,315 @@ async function clickIn(scope: HTMLElement, text: string): Promise<void> {
   });
   await flush();
 }
+
+/* ──────────────────────────────────────────────────────────────────────────
+ * W4b · 后台「调休 / 补班」面板。
+ *
+ * 服务端与线协议先于这一块存在（三条端点在 `server/src/admin/admin.routes.ts`，
+ * 请求体的**唯一事实源**是 `packages/shared-schema` 的 `holidayYearPutSchema`），
+ * 所以这一组判据钉的全是**接线层**能做错的事：
+ *
+ *   ① 出处链接必须**作为链接**渲染出来（判据②"回显"；只印一个数量不算）；
+ *   ② 保存发的是 **PUT**，body 过**契约**（界面里不许再写一份校验，
+ *      所以这里也不是"照着界面实现写一份断言"，而是直接拿契约来判）；
+ *   ③ 服务端拒绝时**错误可见**，而且不许把运营刚敲的那一年清空；
+ *   ④ 令牌没了 ⇒ 写面与读面**一个请求都不发**（那道闸住在 admin-client，
+ *      这里从界面侧确认它对新动词同样成立）；
+ *   ⑤ 撤销是**两步**，措辞是"退回随包数据"，不是"清空那一年"。
+ *
+ * 假后台**带状态**（PUT 真的写进 state、GET 真的读回来）：如果假服务端自己不变，
+ * 一个只改本地副本的实现也能让断言通过（§7 第 50 条）。
+ * ──────────────────────────────────────────────────────────────────────── */
+
+const PAPER_GOV_A = 'https://www.gov.cn/zhengce/content/202611/content_a.htm';
+const PAPER_GOV_B = 'https://www.gov.cn/gongbao/content/2027/content_b.htm';
+const HOLIDAY_T0 = Date.UTC(2026, 9, 1, 8, 30, 0);
+
+/** 后台 GET 的一行（`holidayAdjustmentsAdminListSchema` 的年度形状）。 */
+function recordedYear(overrides: Record<string, unknown> = {}) {
+  return {
+    year: 2026,
+    papers: [PAPER_GOV_A, PAPER_GOV_B],
+    days: [
+      { day: '2026-01-03', isOffDay: false },
+      { day: '2026-02-15', isOffDay: true },
+    ],
+    dayCount: 2,
+    updatedAt: HOLIDAY_T0,
+    updatedBy: 'boss@example.test',
+    note: '据 2026-11 调整公告',
+    ...overrides,
+  };
+}
+
+interface FakeHolidayServer {
+  listFetches: number;
+  putBodies: unknown[];
+  deletes: string[];
+}
+
+/**
+ * @param putStatus 400 用来演"契约拒了这次录入"（服务端会把逐字段原因回出来，
+ *                  但 `AdminResult` 的信封只带状态码 —— 界面要说的是"被拒绝"，
+ *                  而不是假装知道是哪一行错了）。
+ */
+function stubHolidayServer(
+  initial: ReturnType<typeof recordedYear>[] = [],
+  putStatus = 200,
+): FakeHolidayServer {
+  const years: unknown[] = [...initial];
+  const state: FakeHolidayServer = { listFetches: 0, putBodies: [], deletes: [] };
+  fetchMock = vi.fn((url: string, init?: { method?: string; body?: string }) => {
+    const path = url.replace(/^.*\/api\/admin/, '').split('?')[0];
+    const method = init?.method ?? 'GET';
+    if (path === '/overview') return Promise.resolve(json(OVERVIEW));
+    if (path === '/holiday-adjustments' && method === 'GET') {
+      state.listFetches += 1;
+      return Promise.resolve(json({ version: `1.${String(years.length)}.2`, years }));
+    }
+    if (path === '/holiday-adjustments/years' && method === 'PUT') {
+      const body = JSON.parse(String(init?.body)) as {
+        year: number;
+        papers: string[];
+        note: string | null;
+        days: { day: string; isOffDay: boolean }[];
+      };
+      state.putBodies.push(body);
+      if (putStatus !== 200) {
+        return Promise.resolve({
+          status: putStatus,
+          ok: false,
+          json: () =>
+            Promise.resolve({ error: 'Invalid holiday adjustment year.', issues: [] }),
+        } as unknown as Response);
+      }
+      // 🔴 真的写进 state：判据②要的是"**入库后**能回显"，不是"把请求里的字符串再印一遍"。
+      const stored = {
+        ...body,
+        dayCount: body.days.length,
+        updatedAt: HOLIDAY_T0 + 1,
+        updatedBy: 'boss@example.test',
+      };
+      years.splice(0, years.length, ...years.filter((y) => (y as { year: number }).year !== body.year), stored);
+      return Promise.resolve(
+        json({ ok: true, year: body.year, papers: body.papers, dayCount: body.days.length }),
+      );
+    }
+    if (path === '/holiday-adjustments/years' && method === 'DELETE') {
+      const year = Number(new URL(url).searchParams.get('year'));
+      const before = years.length;
+      years.splice(0, years.length, ...years.filter((y) => (y as { year: number }).year !== year));
+      state.deletes.push(`${method} ${url}`);
+      return Promise.resolve(json({ ok: true, year, deleted: before - years.length }));
+    }
+    return Promise.resolve(json({ items: [], total: 0, limit: 50, offset: 0 }));
+  });
+  vi.stubGlobal('fetch', fetchMock);
+  return state;
+}
+
+/** 受控组件要**真的**触发 React 的 onChange（直接改 `.value` 会被 React 覆盖回去）。 */
+async function typeInto(el: HTMLElement, testId: string, value: string): Promise<void> {
+  const node = el.querySelector<HTMLInputElement | HTMLTextAreaElement>(
+    `[data-testid="${testId}"]`,
+  );
+  if (node === null) throw new Error(`找不到输入框 ${testId}`);
+  const proto = node instanceof HTMLTextAreaElement ? HTMLTextAreaElement : HTMLInputElement;
+  await act(async () => {
+    Object.getOwnPropertyDescriptor(proto.prototype, 'value')?.set?.call(node, value);
+    node.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+}
+
+async function pressTestId(el: HTMLElement, testId: string): Promise<void> {
+  const node = el.querySelector<HTMLButtonElement>(`[data-testid="${testId}"]`);
+  if (node === null) throw new Error(`找不到控件 ${testId}`);
+  await act(async () => {
+    node.click();
+    await new Promise((resolve) => {
+      setTimeout(resolve, 0);
+    });
+  });
+}
+
+/** 打开调休页（会触发一次列表 GET）。 */
+async function openHolidayTab(el: HTMLElement): Promise<void> {
+  await clickTab(el, '调休/补班');
+}
+
+describe('🔴 调休：出处链接必须回显成可点链接（判据②）', () => {
+  it('papers 渲染成 <a href>，链接文字就是那条 URL 本身', async () => {
+    stubHolidayServer([recordedYear()]);
+    const el = await renderPanel();
+    await openHolidayTab(el);
+
+    const links = [
+      ...el.querySelectorAll<HTMLAnchorElement>('[data-testid="admin-holiday-papers"] a'),
+    ];
+    expect(links).toHaveLength(2);
+    expect(links.map((link) => link.getAttribute('href'))).toEqual([PAPER_GOV_A, PAPER_GOV_B]);
+    expect(links[0]?.textContent).toBe(PAPER_GOV_A);
+    // 后台是被录入内容喂数据的页面：新标签页打开必须切断 window 反向引用。
+    expect(links[0]?.getAttribute('rel')).toContain('noopener');
+    // 录入者也要看得见 —— 这是"谁录的"这条审计事实唯一面向运营者的出口。
+    expect(el.querySelector('[data-testid="admin-holiday-years"]')!.textContent).toContain(
+      'boss@example.test',
+    );
+  });
+
+  it('没有任何录入时说的是"各端读的是随包数据"，不是"出错了"', async () => {
+    stubHolidayServer([]);
+    const el = await renderPanel();
+    await openHolidayTab(el);
+
+    expect(el.querySelectorAll('[data-testid="admin-holiday-papers"] a')).toHaveLength(0);
+    expect(el.textContent).toContain('还没有录入过任何一年');
+  });
+});
+
+describe('🔴 调休：保存 = 一次 PUT，body 由契约判', () => {
+  it('两个日期框各自决定 isOffDay，且整年只发一个请求', async () => {
+    const state = stubHolidayServer([]);
+    const el = await renderPanel();
+    await openHolidayTab(el);
+
+    await typeInto(el, 'admin-holiday-year-input', '2027');
+    await typeInto(el, 'admin-holiday-papers-input', PAPER_GOV_A);
+    await typeInto(el, 'admin-holiday-off-input', '2027-01-02\n2027-01-03\n');
+    await typeInto(el, 'admin-holiday-work-input', '2027-01-09');
+
+    await pressTestId(el, 'admin-holiday-save');
+
+    expect(state.putBodies).toHaveLength(1);
+    const body = state.putBodies[0];
+    // 🔴 唯一事实源是契约：这里**不重写一份校验**，只是把发出的东西交给它判。
+    // 界面少发一个键、把 isOffDay 写成字符串、note 发空串而不是 null ⇒ 这一条就红。
+    const parsed = holidayYearPutSchema.safeParse(body);
+    expect(parsed.success, JSON.stringify(parsed.success ? {} : parsed.error.issues)).toBe(true);
+    expect(body).toEqual({
+      year: 2027,
+      papers: [PAPER_GOV_A],
+      // 一个用户意图 = 一个请求：整年替换，不 fan-out。
+      note: null,
+      days: [
+        { day: '2027-01-02', isOffDay: true },
+        { day: '2027-01-03', isOffDay: true },
+        { day: '2027-01-09', isOffDay: false },
+      ],
+    });
+
+    // 保存**之后**必须再读一次服务端（`listFetches`：进页面 1 次 + 保存后 1 次）。
+    expect(state.listFetches).toBe(2);
+    const shown = [
+      ...el.querySelectorAll<HTMLAnchorElement>('[data-testid="admin-holiday-papers"] a'),
+    ];
+    expect(shown.map((link) => link.getAttribute('href'))).toEqual([PAPER_GOV_A]);
+    expect(el.querySelector('[data-testid="admin-holiday-notice"]')!.textContent).toContain(
+      '2027 年已保存，共 3 天安排',
+    );
+  });
+
+  it('填了备注就带上；不填是 null，不是空串', async () => {
+    const state = stubHolidayServer([]);
+    const el = await renderPanel();
+    await openHolidayTab(el);
+    await typeInto(el, 'admin-holiday-year-input', '2027');
+    await typeInto(el, 'admin-holiday-papers-input', PAPER_GOV_A);
+    await typeInto(el, 'admin-holiday-off-input', '2027-05-01');
+    await typeInto(el, 'admin-holiday-note-input', '据 2026-11 调整公告');
+    await pressTestId(el, 'admin-holiday-save');
+
+    const body = state.putBodies[0] as { note: string | null };
+    expect(body.note).toBe('据 2026-11 调整公告');
+    expect(holidayYearPutSchema.safeParse(body).success).toBe(true);
+  });
+});
+
+describe('🔴 调休：服务端拒绝时不许静默，也不许吞掉输入', () => {
+  it('PUT 回 400 ⇒ 错误行与"没有保存"都在，而那一年逐日表还留在框里', async () => {
+    const state = stubHolidayServer([], 400);
+    const el = await renderPanel();
+    await openHolidayTab(el);
+    await typeInto(el, 'admin-holiday-year-input', '2027');
+    await typeInto(el, 'admin-holiday-papers-input', PAPER_GOV_A);
+    await typeInto(el, 'admin-holiday-off-input', '2027-02-30');
+    await pressTestId(el, 'admin-holiday-save');
+
+    // 界面**不判日期**：`2027-02-30` 照样发出去了 —— 判它的是契约。
+    // 这条断言防的是"以后有人往界面里加一份正则校验"，那会变成两套标准。
+    expect(state.putBodies).toHaveLength(1);
+    expect(
+      (state.putBodies[0] as { days: { day: string }[] }).days[0]?.day,
+    ).toBe('2027-02-30');
+
+    expect(el.querySelector('[data-testid="admin-error"]')!.textContent).toContain(
+      '请求参数不合法',
+    );
+    expect(el.querySelector('[data-testid="admin-holiday-notice"]')!.textContent).toContain(
+      '没有保存',
+    );
+    // 失败了还清空 = 把运营刚敲的一整年丢掉，让他从头再打一遍。
+    expect(
+      (el.querySelector('[data-testid="admin-holiday-off-input"]') as HTMLTextAreaElement).value,
+    ).toBe('2027-02-30');
+    // 没存进去就不许假装回显。
+    expect(el.querySelectorAll('[data-testid="admin-holiday-papers"] a')).toHaveLength(0);
+  });
+});
+
+describe('🔴 调休：没有令牌就一个请求都不发', () => {
+  it('会话中途令牌消失 ⇒ 保存/撤销都不许出门，并把原因说出来', async () => {
+    const state = stubHolidayServer([recordedYear({ year: 2026 })]);
+    const el = await renderPanel();
+    await openHolidayTab(el);
+    const before = fetchMock.mock.calls.length;
+
+    useSyncStore.setState({ token: undefined });
+    await typeInto(el, 'admin-holiday-year-input', '2027');
+    await typeInto(el, 'admin-holiday-papers-input', PAPER_GOV_A);
+    await typeInto(el, 'admin-holiday-off-input', '2027-01-02');
+    await pressTestId(el, 'admin-holiday-save');
+    await pressTestId(el, 'admin-holiday-revoke');
+    await pressTestId(el, 'admin-holiday-revoke-yes');
+
+    // 写面与读面共用同一道闸（`adminRequest` 里那一处短路）。
+    expect(fetchMock.mock.calls.length).toBe(before);
+    expect(state.putBodies).toHaveLength(0);
+    expect(state.deletes).toHaveLength(0);
+    expect(el.querySelector('[data-testid="admin-error"]')!.textContent).toContain('尚未登录');
+  });
+});
+
+describe('🔴 调休：撤销是两步，而且说的是"退回随包数据"', () => {
+  it('第一下只出确认文案，第二下才发 DELETE，年份在查询串里', async () => {
+    const state = stubHolidayServer([recordedYear({ year: 2026 })]);
+    const el = await renderPanel();
+    await openHolidayTab(el);
+
+    await pressTestId(el, 'admin-holiday-revoke');
+    const confirm = el.querySelector('[data-testid="admin-holiday-revoke-confirm"]');
+    expect(confirm).not.toBeNull();
+    // 🔴 语义判据：撤销一年 = 退回随包表，**不是**"清空那一年"。
+    expect(confirm!.textContent).toContain('随包');
+    expect(confirm!.textContent).not.toContain('清空');
+    // 一次点击不许删数据。
+    expect(state.deletes).toHaveLength(0);
+
+    await pressTestId(el, 'admin-holiday-revoke-cancel');
+    expect(el.querySelector('[data-testid="admin-holiday-revoke-confirm"]')).toBeNull();
+    expect(state.deletes).toHaveLength(0);
+
+    await pressTestId(el, 'admin-holiday-revoke');
+    await pressTestId(el, 'admin-holiday-revoke-yes');
+
+    expect(state.deletes).toHaveLength(1);
+    expect(state.deletes[0]).toContain('DELETE');
+    expect(state.deletes[0]).toContain('/api/admin/holiday-adjustments/years?year=2026');
+    // 撤销之后重读：那一行是从服务端消失的，不是本地抹掉的。
+    expect(state.listFetches).toBe(2);
+    expect(el.querySelector('[data-testid="admin-holiday-notice"]')!.textContent).toContain(
+      '2026 年的录入已撤销',
+    );
+    expect(el.querySelectorAll('[data-testid="admin-holiday-papers"] a')).toHaveLength(0);
+  });
+});
