@@ -3260,3 +3260,41 @@ git -C "$C" log -1 --format='%h %ad %s' --date=format:%H:%M -- packages/ui/src/p
 **对本线的影响**：它是合并态四条红里唯一的产品红，其余三条分别记在
 `PROGRESS.md` 的 AI 节 22:0x 续段（`check:docs` 继承自 main；两段 e2e 是环境无效）。
 **关闭判据**：`pnpm --filter @heyta/ui test` 回 `442 passed`，或 `model.ts`/spec 两侧同时更新并留一句为什么。
+
+## B60. 🔴 落地（Goal ① 的最后一步）卡的不是"main 脏"这一句，是** 15 个与我要落的内容直接重叠的文件**（2026-10-03 22:3x 现量）
+
+**现象**：集成线已经包含 main（`d5348ceb`，`merge-base --is-ancestor main HEAD` = YES），
+`heyta-land.sh` 三条前置里两条成立，只剩"主检出工作树干净"这一条：`git status --porcelain` = **343 项**。
+
+**这句本身没有信息量** —— "343 项脏"读起来像"再等等就好"。所以把它量成了集合：
+
+```bash
+cd <主检出>
+git diff --name-only main..integrate/2026-10-03-closeout | sort -u > /tmp/m.txt   # 83 个
+git status --porcelain | awk '{print $2}' | sort -u > /tmp/d.txt                  # 343 个
+comm -12 /tmp/m.txt /tmp/d.txt                                                    # 交集 15 个
+```
+
+交集那 15 个是：`PROGRESS.md`、`docs/plans/README.md`、`docs/reference/environment-traps.md`、
+`packages/app-host/src/{local-api-host,reminder-actions}.ts`、
+`packages/app-host/tests/{local-api-host,reminder-actions}.spec.ts`、
+`packages/domain/src/capture.ts`、`packages/domain/tests/capture.spec.ts`、
+`packages/i18n/src/locales/{en,zh-CN}.ts`、`packages/local-api/src/{tools,mcp}.ts`、
+`scripts/mutate-closeout-gates.sh`、`scripts/reinstall-all.sh`。
+
+**为什么这条必须登记而不是"顺手落一下"**：交集非空意味着快进会**覆盖别人未提交的行**。
+看文件名就知道是谁在写：`reminder-actions` + `local-api-host` + `i18n` 两条是
+**提醒投递（W9 原生侧）**那条线正在改的面；`scripts/mutate-closeout-gates.sh` 是
+**W 臂入仓**（任务 #31）那条线的落点；`reinstall-all.sh` 是**本条 Goal ③ 自己**正在读的脚本。
+快进这三簇中的任意一簇，代价是别人几分钟的工作无声消失 —— 而 git 只在部分重叠时报错，
+**完全不重叠时它连报错都不会有**（那才是真正危险的那一半：改动被静默留在旧基上）。
+
+**关闭判据**（不代任何人提交）：上面那条 `comm -12` 输出为空 —— 也就是那 15 个文件被各自所有者提交后，
+`~/scratch-heyta/heyta-land.sh --confirm` 一条命令落地。脚本不会 force、不会 push。
+
+**顺带记一条操作教训**：本轮我两次把门禁名写错（`scripts/docs-link-check.mjs` 而不是
+`research/tools/docs-link-check.mjs`），两次的症状都是 **rc=1 + 一个和判据无关的报错**
+（`MODULE_NOT_FOUND`）。这类"红得很假"的失败如果不看错误原文就会被记成"判据红 = 产品有问题"。
+**取门禁读数前先 `grep '"check:xxx"' package.json` 拿真入口**，别凭记忆拼路径。
+（并行会话在同一天因为拼错门禁名拿到一条假红，见 `3a3071e1` 的提交信息 —— 同一种错，两个作者。）
+

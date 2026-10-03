@@ -2054,3 +2054,62 @@ grep -oE '^#{2,4} ?B[0-9]+' BLOCKED.md | grep -oE '[0-9]+' | sort -n | uniq -d  
 （traps #87），而那两个端口此刻的主人是**另一个会话的 linked worktree**
 （`heyta/.worktrees/detail-pane`）。为了拿一个"绿"去杀掉别人正在跑的 dev server 不是验证，
 是破坏 —— 所以这里如实记 `ENV-BUSY`，重跑入口留在 `~/scratch-heyta/heyta-e2e-rerun.sh`。
+
+## 15.30 第二次把 main 并进集成线，与"落地卡在哪个具体文件上"的量化（载体 `d5348ceb`，22:2x）
+
+### 合并
+
+22:2x 现量：main 又前进 **3 笔**（`3a3071e1 / 6e90df77 / e3312dba`），动的文件**只有 3 个**
+（`BLOCKED.md`、`docs/plans/countdown-batch2-handoff.md`、`docs/plans/multi-end-coverage-handoff.md`），
+全部纯 docs。先用 `git merge-tree --write-tree` **只读**预演（不碰工作树）⇒ rc=0 且不打印任何冲突文件名，
+再执行真合并 `d5348ceb`（`merge-base --is-ancestor main HEAD` = YES，载体领先 main **73**，工作树 0 未提交）。
+
+合并态复核（因为①的落地判据是"这条线本身可信"）：
+
+| 复核项 | 读数 |
+|---|---|
+| `pnpm check` 链段数 | 载体 HEAD **61** 段（`check:ai-coverage` 第 51、`check:ai-e2e` 第 52、末段 `pnpm -r test`）；主检出工作树 **62** 段 —— 那 1 段差是别人的未提交改动，不是这条线的属性（§15.27 那句"报段数必须带载体"仍然成立） |
+| 死链 | 仍 **4 条 + 1 处失效章节引用**，逐条归属：`PROGRESS.md:1424` 属提交 `96f3293d`（并行会话的 A/E/D 那条），`detail-pane-alignment.md:4`、`detail-pane-alignment-and-spaced-review.md:101`（×2）、`countdown-anniversary.md:1280` 全在本线之外。**本轮新增文本自身新增 0** |
+| 🔴 为什么 `PROGRESS.md:1424` 那条我不改 | 它虽是别人**已提交**的死链，但 `PROGRESS.md` 此刻在主检出里是**未提交脏文件**（在下面那 15 个交集里）。在别人正在写的文件里改一行，下一步就是替他暂存或与他冲突 —— 登记而不代改 |
+| `environment-traps` 编号 | **189** 行 / 最大号 **180** / 重号 **38·93·94·95**（`1 2 3 4` 是内部有序列表被行首模式误抓，属计数噪声）—— 与合并前逐字相同 |
+| `BLOCKED.md` 的 B 号命名空间 | 新登记 **B60**（`grep -cE '^#+ *B60'` = 1）；同一次现量照出**本文件本来就有**的重号 **B30 / B31 各 2 处** ⇒ "我取到的号唯一"只证明我没撞别人，不证明这套编号体系干净（§15.24 那次撞车的根因是同一个：没有一条门禁在管 B 号唯一性） |
+
+### 落地三条前置的现状（这次落成**文件清单**，不落成"还是没落地"）
+
+`~/scratch-heyta/heyta-land.sh` 的三条前置在 22:3x 逐条现量：
+
+1. **前置 1（目标包含 main）✅ 成立** —— 就是上面那次合并换来的。
+2. **前置 2（主检出工作树干净）❌ 不成立**：`git status --porcelain` = **343 项**。
+   这一条原来是整句"别人没提交"，现在量出了**它到底卡在哪些文件**：
+   合并要改的 83 个文件 ∩ 主检出的脏文件 = **15 个**，逐枚是
+   `PROGRESS.md`、`docs/plans/README.md`、`docs/reference/environment-traps.md`、
+   `packages/app-host/src/{local-api-host,reminder-actions}.ts`、
+   `packages/app-host/tests/{local-api-host,reminder-actions}.spec.ts`、
+   `packages/domain/src/capture.ts`、`packages/domain/tests/capture.spec.ts`、
+   `packages/i18n/src/locales/{en,zh-CN}.ts`、`packages/local-api/src/{tools,mcp}.ts`、
+   `scripts/mutate-closeout-gates.sh`、`scripts/reinstall-all.sh`。
+   ⇒ 这 15 个不是"泛泛的脏"，而是**提醒投递线（reminder-actions/local-api/i18n）和 W 臂那条线（mutate-closeout-gates.sh）正在写的文件**，
+   与我要落的内容直接重叠。快进它们脚下会覆盖未提交改动，所以这里**不是保守，是有主**：
+   等这 15 个文件被各自所有者提交，`heyta-land.sh --confirm` 一条命令就落。
+3. **前置 3（当天逐段读数文件）✅ 成立**（`~/scratch-heyta/chain-2200/segments-rc.txt`）。
+
+### 一个开了又没用的窗口，和为什么不用它
+
+22:28 现量：4318/4319 **已经空了**（`lsof -sTCP:LISTEN` 无输出）—— 也就是 ② 最后那段
+`check:ai-e2e` 那一刻是能跑的。**我没有跑**，理由是量出来的而不是感觉：
+同一时刻 ③ 的守门正在等它的窗口（`gate.log`：22:25 拿到干净采样 1/2，随后连续 4 次
+"对端在跑"，负载 `10.47 / 22.91 / 44.01`）。`reinstall:all` 要连跑四段重构建（mac 打包 +
+远端 MSIX + APK + xcodebuild），而 e2e 那一套要起 vite dev + 假端点再把 41 个 spec 文件跑完
+—— **同跑两件事的结局是两边的读数都不能解释**。
+③ 是 Goal 的交付项，② 的那段已经有"按规则不跑"的如实记录，所以把窗口让给 ③。
+
+顺带量清了一件以后还会问的事：**离线主套件不能靠"换个端口"绕开别人**。
+4318/4319 不是配置项而是字面量：现量 **31 处、分布在 15 个文件**里 ——
+`playwright.config.ts` 7 处（`baseURL` + 两条 `webServer`）、`stub-provider.mjs` 5 处，
+其余散在 `tests/helpers.ts`、`smoke.spec.ts`、`inbox.spec.ts`、`admin-console.spec.ts`、
+`ai-duration.spec.ts` 等 spec 里自己写死。仓库的隔离模式是**另开一份 config 用自己的端口**
+（4322 privacy / 4323 legal-reconfirm / 4328 multi-end / 4329 auth / 4330+4332 legal-links / 4401 password-web），
+而离线主套件刻意不换端口 ⇒ 想跑它只有"等 4318/4319 空"这一条路；
+把 31 处字面量改成变量等于**长出第二套抄件**，那正是本仓库反复付学费的形状。
+（这套的规模也顺便量了：`e2e/tests/*.spec.ts` **41 个文件**，不是"跑一条很快"的量级。）
+
