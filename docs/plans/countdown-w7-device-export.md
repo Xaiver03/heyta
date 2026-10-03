@@ -312,8 +312,11 @@ list reporter 的 `✘` 前是**两个**空格而正则要求一个，加上没�
 
 1. ✅ §6.3 那批 e2e 变异臂：六臂全跑（含一条把我自己的预期否证的 M2b），rig 已落
    `research/tools/mutate-w7-e2e-arms.mjs`（不住 `/tmp`，重启带不走）。
-2. ⏹ 移动端**真机**出图读数（G1 的闭合判据 / G2 的唯一硬证据）：
-   `scripts/verify-mobile-card-export.mjs` —— 起 emulator → 点导出 →
-   从分享面板落回的文件里数 IHDR。这一条是**唯一**能证伪"iOS 折算猜错"的东西。
+2. 🔄 移动端**真机**出图读数（G1 的闭合判据 / G2 的唯一硬证据）：
+   装置**已经在了** —— `scripts/verify-mobile-card-export.sh`（+ 它的读数器
+   `scripts/verify-mobile-card-export-read.mjs`，`pnpm verify:mobile-card-export`）。
+   起 emulator → 「我的」→ 倒数日 → 卡片菜单 → 点导出 → 从 `cacheDir/card-export/` 拉回那张图数 IHDR。
+   ⚠️ 原文把装置写成 `.mjs`（一个不存在的路径）—— 那是一句**先于实现写下的名字**，
+   现已按真身改指；这一条仍是**唯一**能证伪"iOS 折算猜错"的东西，且**读数尚未取**（脚本没跑过一轮真机）。
 3. ⏹ iOS pbxproj 那 8 行的**构建级**验证（`plutil -lint` 只证 XML 合法，不证编译进 target）。
 4. ⏹ 与 `feat/countdown-batch2` 合流（W7 三笔 + W8 那四笔），合流后 `pnpm reinstall:all` 四端重装。
