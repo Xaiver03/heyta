@@ -3292,6 +3292,20 @@ comm -12 /tmp/m.txt /tmp/d.txt                                                  
 **关闭判据**（不代任何人提交）：上面那条 `comm -12` 输出为空 —— 也就是那 15 个文件被各自所有者提交后，
 `~/scratch-heyta/heyta-land.sh --confirm` 一条命令落地。脚本不会 force、不会 push。
 
+⚠️ **23:2x 把这条判据与脚本对齐了**（原文留，因为"为什么会写成整树干净"本身就是教训）：
+`heyta-land.sh` 的前置 2 原先要求**整棵主检出干净**（现量 371 项未提交 ⇒ 在这台机器上永不成立），
+而本节写的关闭判据是"**交集**为空"。独立探针实测（`/tmp/landprobe3` 两腿）证明
+**git 自己就是按路径挡的**：脏文件不在合并更新集合里 ⇒ `merge --ff-only` rc=0 且那文件的本地改动原样保住；
+在集合里 ⇒ git `Aborting`、rc=1、HEAD 未动。⇒ 前置 2 已改成算交集，非空就拒并逐文件打出别人的未提交行数；
+**git 那道按路径的守卫继续当后盾**，没加 force、没加 push。改完的真读数：
+`✓ 快进成立：87 笔待落` → `❌ 更新 83 个文件，其中 15 个正被别人未提交地改着`
+（15 这个数与本节上面那条独立 `comm -12` 算法逐字相同）。
+
+🔴 **顺带杀掉一条看起来很省事的出路**："我在载体里把 `main` 指针挪到集成线，不碰主检出的工作树" ——
+**结构上不存在**：`git branch -f main …` 在 `main` 正被某个 worktree checkout 时被 git 直接拒绝
+（`fatal: cannot force update the branch 'main' used by worktree at …`，23:2x 探针实测）。
+所以落地只能在主检出里做一次真的 `merge --ff-only`，也就是必须等这 15 个文件。
+
 **顺带记一条操作教训**：本轮我两次把门禁名写错（`scripts/docs-link-check.mjs` 而不是
 `research/tools/docs-link-check.mjs`），两次的症状都是 **rc=1 + 一个和判据无关的报错**
 （`MODULE_NOT_FOUND`）。这类"红得很假"的失败如果不看错误原文就会被记成"判据红 = 产品有问题"。
