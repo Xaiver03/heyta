@@ -3511,3 +3511,35 @@ grep -n '177–' AGENTS.md                                            # 第 491 
 
 `AGENTS.md` / `PROGRESS.md` 本会话仍然不碰：两者在工作树里都是别的线的未提交改动
 （`M AGENTS.md` 4 个 hunk 里含那一行本身），按红线不带走别人的 hunk，也不往正脏着的共享台账追加。
+
+#### §15.43t（10-04 06:37）五条隐私不变量在**新 main** 上的逐条现量（含我自己一次探针误判）
+
+`main` 现在是 `6354ff7b`（比我 ② 的载体 `1ebcf136` 又多了别人的若干笔）。等窗口的回合做了这件事：
+**不变量不能只看门禁 rc=0，要有一条能对上 Goal 那句原话的现量读数** —— 别人的一笔提交完全可能把
+某条摘松而让 12 道门禁里的某几道照样绿。
+
+```
+check:ai-coverage rc=0   check:ai-tools rc=0   check:legal-tools rc=0
+check:legal-copy rc=0    check:legal-permissions rc=0   check:legal-host rc=0
+check:ai-quota rc=0
+```
+
+逐条对到源码（`grep` 现取，注释未剥 ⇒ 见下面那条自报）：
+
+| 不变量（Goal 原话） | 现量形状 | 谁在守 |
+|---|---|---|
+| AI 类型上产不出 op | `packages/ai` 零运行时依赖、不 import op 构造 | `check:ai-tools` 规则 3（按行扫 `entityType: '<大写>'`，跳注释行） |
+| `host.submit` 全仓恰好一处 | **两处，各自恰好一处**：`ai-tool-run.ts:195`（在 `confirmAiToolProposal()` 内）+ `local-api/src/server.ts:590`（MCP 写入口） | `check:ai-tools` 规则 2（`RUN_FILE` 剥注释后 `.submit(` 计数 ≠1 即红，且必须在确认函数之后）+ 第 407-475 行那段（§15.18 之后补的 MCP 入口计数） |
+| 逐工具默认关 | `packages/local-api/src/tools.ts:449-450`：`isToolGranted()` 判的是 `grants?.[toolName] === true` —— 没登记 = `undefined` ≠ `true` ⇒ **漏配即关**（不是"默认为开"） | `check:ai-coverage` + `packages/local-api` 自己的 spec |
+| 出境逐字段披露 | `fallback-needs-consent` 在 `packages/ai/src` 命中 6 处 | `check:ai-tools` / `check:legal-*` |
+| 回退不跨越隐私边界；不开托管 AI | `supply.ts:290 assertEnableable()`：`mode === 'managed'` 且 `retentionDisclosure('heyta-cloud').kind === 'undecided'` ⇒ `throw`  reason `retention-undecided`（第 293-300 行）——**有意的失败还在抛** | `check:ai-quota` |
+
+🔴 **自报一条探针误判**：我第一版把"恰好一处"量成 `4 处`（`grep 'host\.submit('` 跨 4 个包），
+差的那两枚是 `server.ts:526` 与 `AssistantPanel.tsx:24` 的**注释里的字面串** ——
+门禁自己 `stripComments()` 正是为这个存在的（文件头第 66 行就写着"这两个文件的注释里大量提到
+`host.submit`"）。⇒ 与仓内装置同族的判据，**先读装置怎么算，再决定自己的 grep 要不要剥注释**；
+拿着宽口径的计数去报"红线被破"是白花一次报警。
+
+另一处口径要说清（不是放宽，但原话读起来会误导后来者）：Goal 里那句"`host.submit` 全仓恰好一处"
+是 §15.18 之前的形状；MCP 入口那第二处是**同批发现、同批补的门禁**（任务 #34），它本身也被计数钉住，
+且那条路要过 ADR-0011 的逐工具授权。**没有哪一层在"允许更多写入口"。**
