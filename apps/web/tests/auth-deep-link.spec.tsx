@@ -38,6 +38,7 @@ import { emptyState } from '@heyta/op-log';
 
 import { __resetAuthForTests } from '../src/features/auth/store.js';
 import { privacyConsentActions } from '../src/features/privacy/consent-gate.js';
+import { usePrivacyStore } from '../src/features/privacy/store.js';
 import { __resetOpLogForTests, initOpLog } from '../src/lib/oplog.js';
 import { useSyncStore } from '../src/features/sync/store.js';
 import { useTaskStore } from '../src/features/tasks/store.js';
@@ -165,5 +166,45 @@ describe('🔴 带 `?signin` 冷启动 = 登录界面直接出现', () => {
 
     expect(useSyncStore.getState().signInOpen).toBe(false);
     expect(signInFormVisible(view)).toBe(false);
+  });
+
+  /**
+   * 🔴 首启隐私那一层还等着回答时，**不许在它上面再叠一层模态**。
+   *
+   * 这条钉的是深链改动**自己引入**的缺陷：线上截图里"Sign in or register"被
+   * 「Before any network feature runs」那张卡片盖住一半，症状与用户报的
+   * "界面完全混乱"是同一类。隐私那一层是必须先回答的问题，所以深链的意图
+   * **记住一次、等它落下再兑现**。
+   *
+   * ⚠️ 判据不能用 store 里的 `open` 来分流：那一层是**同一次提交的 effect 阶段**
+   * 打开的，渲染期读到的是 `false`。所以分流用的是那个 effect 自己用的谓词
+   * `shouldAskOnFirstLaunch()` —— 这条用例就是它的回归钉。
+   */
+  it('隐私决定还没做过：先只看到隐私那一层，答完才出现登录表单', async () => {
+    // 撤销 beforeEach 里替用户做过的那次决定（走生产代码，不手写 localStorage）。
+    privacyConsentActions.revoke();
+    const view = await mountApp('/app?signin=1');
+
+    // 第一屏：只有隐私那一层。
+    expect(usePrivacyStore.getState().open).toBe(true);
+    expect(view.querySelector('[data-testid="privacy-consent-dialog"]')).not.toBeNull();
+    expect(useSyncStore.getState().signInOpen).toBe(false);
+    expect(signInFormVisible(view)).toBe(false);
+
+    // 用户**点**「同意并联网」之后，深链的意图才兑现 —— 而不是永远不兑现。
+    // ⚠️ 走真实点击而不是直接调 `privacyConsentActions.accept()`：那条只是决定，
+    // 收起那一层的是 store 的 `accept()`（按钮挂的是它）。直接调决定会让
+    // `open` 永远为真，用例红在**测试自己的夹具**上而不是产品上。
+    const acceptButton = view.querySelector<HTMLButtonElement>(
+      '[data-testid="privacy-consent-accept"]',
+    );
+    expect(acceptButton, '隐私那一层必须有可点的「同意」').not.toBeNull();
+    await act(async () => {
+      acceptButton!.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+
+    expect(usePrivacyStore.getState().open).toBe(false);
+    expect(useSyncStore.getState().signInOpen).toBe(true);
+    expect(signInFormVisible(view)).toBe(true);
   });
 });
