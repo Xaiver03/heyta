@@ -3104,3 +3104,71 @@ seq 1 202 | comm -23 - <(…sorted…)                        # 缺号
    AGENTS.md "不允许出现 `^[0-9]{2}\. ` 形状的行"（注入一枚就该红）。
 4. 元规则一句：**"`§7` 编号只增不改"这句话本身需要一条门禁**，否则它就是一张会漂的抄件 ——
    而它漂的方式是**两个文件同号不同事**，读的人不会察觉，只会引用错。
+
+### 15.43f ② 的 73 段读数在**落地载体**上量完了：64 绿 / 8 红 / 1 按规则不跑 —— 八条红逐段归属，没有一条落在本线文件上（载体 `ce6c1c98`，01:34–01:39）
+
+现量命令（读数落盘，不靠回忆）：
+
+```bash
+awk -F'\t' '$3 ~ /^rc=[1-9]/ {print $1, $2, $3}' ~/scratch-heyta/chain-ai-closeout-0134/segments-rc.txt
+grep -a SUMMARY ~/scratch-heyta/chain-ai-closeout-0134/segments-rc.txt
+```
+
+**本线自己的那五道 gate 全绿**（这是 ② 真正要回答的那一句）：段 11 `check:layering`、
+段 25 `check:legal-tools`、段 43 `check:ai-quota`、段 44 `check:ai-tools`、段 61 `check:ai-coverage`
+都是 `rc=0`。段 62 `check:ai-e2e` 是 `SKIPPED_BY_RULE`（它会 SIGKILL 4318/4319 上别人在跑的 vite，
+§7 #87），**不算通过**，另在交付队列里用"两个端口都空闲"当门单独补跑一次。
+
+八条红的归属（逐条读它**自己报出的那个文件**，不按印象、不按 `--author`）：
+
+| 段 | gate | 报错点名的东西（原文摘要） | 归属 |
+|---|---|---|---|
+| 12 | `check:ui-provider` | `apps/mobile/src/screens/GrowthScreen.tsx:298` 的 `<GrowthBoard>` 落在 `HeytaUiProvider` 子树**之外**，共 3 处 | 移动端成长面（非本线） |
+| 15 | `check:selection-single-source` | 选中态所有者不唯一：`packages/ui/src/calendar/CalendarDayBoard.tsx` 的 `onOpenTask` | 日历 / 三栏详情面那条线 |
+| 26 | `check:legal-permissions` | `AndroidManifest.xml` 声明了 `SCHEDULE_EXACT_ALARM` 而未登记；`packages/legal/…/permissions.ts` 的中英依据仍写"移动端代码目前不产生任何系统通知" | 倒数纪念日批次二（W9 原生投递）。该权限经 `43fee3dd`（W7 移动半的合并）进树，`git log -1 -- AndroidManifest.xml` 现取 |
+| 29 | `check:licenses:stamp` | 清单指纹是 lockfile `111cc2d1d04d3763` 下渲染的，当前是 `0f3c1bf6d9e21526` | 装置/载体属性：要在"装了全部 workspace"的检出里重渲染。载体 `e2e/node_modules` **有**，所以这条不是"载体缺依赖"，是**别人改了 lockfile 没重渲染** |
+| 31 | `check:image-license` | `server/package.json` 变了，镜像快照 `serverPackageJsonSha256` 失真 1 处（重跑要联网） | 改 `server/package.json` 的那条线 |
+| 64 | `check:landing-e2e` | `net::ERR_CONNECTION_REFUSED 127.0.0.1:4320/docs/…` | 环境：落地页 preview 服务没起（**不是**产品红） |
+| 65 | `check:shell-unicode` | `scripts/mutate-closeout-gates.sh` 里 `$W1）` 这类"`$var` 紧跟非 ASCII"6 处；`blame -L262` = `58dd8ec6`（批次二吸收 main） | 倒数纪念日批次二 |
+| 73 | `pnpm -r test` | `packages/domain` 一条翻译断言：`0.000 准备季度汇报 ↔ 做 Q3 review 要用的 PPT` | domain / i18n 那条线 |
+
+🔴 **一句反着读的话，别让它溜过去**：这八条红里**没有一条**是本批（覆盖面 / 裸号 / 会话历史）造成的，
+但它们**全部**是**已提交状态**的属性 —— 载体是干净检出（未提交项 0），所以这不是"混合工作树才红"。
+也就是说 `main` 此刻带着这八条红，而 Goal 的 ② 只承诺"读数写明载体 + 逐段归属"，
+不承诺替别的线把它们改绿（§8.7：范围扩大后旧范围的证据不覆盖新增项；本批也不吸收别人的债凑绿）。
+
+### 15.43g ③ 起装之前先把"探针本身"校准了一遍 —— 四端**当前装的都是过期构建**，而且这一轮探出的四个读数各自都是一条 traps
+
+02:48–02:51 现量（`bash /tmp/paxprobe/run.sh`，探针块是从 `~/scratch-heyta/heyta-deliver-on-window.sh`
+的阶段 5b 用 `awk` 原样切出来的，**不是另写一份**）：
+
+| 端 | 读数 | 含义 |
+|---|---|---|
+| mac | `PAX_MAC=MISMATCH`：`/Applications/Heyta.app/…/web-dist/index.html` 引用 `index-Da9aaZLq.js`（sha `dd7f8156…`），而载体 `apps/web/dist` 里那枚文件名**根本不存在**（载体当前是 `index-BGKxdnVs.js`）；标记 `list_events` 在已装包里 **0** 处、载体包里 **2** 处 | 装的是 10-03 23:05 的构建，**早于落地** |
+| android | `PAX_AND=SIZE-DIFF`：已装 `66,953,324 B` vs 载体构建产物 `67,183,868 B`，`dumpsys` 的 `lastUpdateTime=2026-10-04 02:46:47` | 02:46 有人重装过，**装的不是本线载体**（另一条线的产物） |
+| ios | `PAX_IOS=MISMATCH`：已装 `main.jsbundle` sha `e713c7bf…`，构建侧路径 `/tmp/heyta-ios-release/Build/Products/Release-iphonesimulator/Heyta.app/main.jsbundle` 此刻**不存在** | 探针对还没跑过 ⇒ 记 `NOT-READABLE` 才对（这条已经改：判据从 `-n` 换成 `-f`） |
+| windows | `PAX_WIN=NOT-PROVEN`：本机日志里 `ADD_APPX=` / `PAYLOAD_WEBDIST=` / `M2D=` **一条都没取到** | 没证据就是没证据，**不**读成"装上了" |
+
+🔴 **所以 ③ 的当前状态是"未完成"，且这不是坏消息而是这一节的全部内容**：四端里三端装着过期或别人的构建、
+一端连读数都没有。任何"本轮交付完成"的说法都必须先让阶段 5 真跑一遍并由这五个读数背书。
+
+这一轮顺带把三条新陷阱钉进了权威位置（号按工作树现取：追加前 `grep -oE '^[0-9]+\. '` 最大 **203**）：
+
+- **#204** 已装 payload 取"那枚主包"不能 `ls assets/index-*.js | head -1` —— 字典序挑中的是 215 KB 的**副产物**，
+  `index.html` 引用的那枚是 1.9 MB 的主包；而且两枚 mtime 相同、目录文件数与载体都是 9，
+  所以"数量对得上、时间也新"挡不住"装的是另一份构建"。
+- **#205** 等窗口的后台链把日志写成 `printf … | tee -a` ⇒ 启动它的那个回合一结束，链死在下一条 `say`，
+  `rc.txt` 留 0 字节。**读这类日志：最后一行没有结论句就要怀疑探针本身**，别读成"它还在等"。
+- **#206** main 每几分钟前进一笔（02:46→02:52 走了 `2a5c3587 → 4a9de8b6 → 67149961`，三笔全 docs）
+  ⇒ 交付门**不能**写成"载体 == main HEAD"（永不放行），要写成**打包输入集差集为 0**；
+  并且起跑前重量一次、装完再量一次。
+
+### 15.43h ④ 的两处台账我**没有**写进去，理由要留在这儿（否则下一位会以为我漏了）
+
+| 文件 | 此刻未提交的东西 | 为什么不当场追加 |
+|---|---|---|
+| `AGENTS.md` | 2 个 hunk（§8.10 那条编号段 + §9 表里 W9 原生投递那一行改成"Android 主链与异常恢复已验，iOS 续验中"） | 那是批次二 / W9 那条线的正文。`git commit --only -- AGENTS.md` 提交的是**整个工作树内容**，会把他们没跑完判据的两段一起带走（红线：不带走别人的 hunk）。§7 索引表里"177–198"那一行现在应写成 **177–206**，这笔更正随他们的提交落地后由下一位一并补 |
+| `PROGRESS.md` | +4 行（"B/C 全量验收补正…"与"B/C 收口续验：C# 存储契约重放…66/66"） | 同一条理由。本线那三行（段数 02:2x 现量 **74**、撤回 `host.submit` 那句、②③ 的形状）已在 `1571` 行之前落进提交 |
+
+⇒ 本节（§15.43f/g/h）就是这两处本该写的内容的**当前唯一落点**；下一位接手时把它并进
+`PROGRESS.md` 与 `AGENTS.md` 的对应小节即可，不需要重新取证（读数都带了载体与时刻）。
