@@ -186,6 +186,56 @@ OVERRIDE_SERVICES="$(services_of "${COMPOSE_FILES[@]}")"
 }
 log "    服务图对账：默认 3 个（未动） · 带 override 4 个（+supersync-migrate）"
 
+# ── 对外文档那条入口命令的对账 ─────────────────────────────────────
+# 为什么要这一条：文档 §4 印的就是"一条 compose 起全套"，而这条脚本量的是
+# 自己那套（先 `docker build` 出私有 tag、再用 SUPERSYNC_IMAGE 指过去）。
+# 两者**本来就该不一样** —— 脚本手里有镜像，陌生人手里没有。
+# 但"不一样"的方向漂起来是无声的：2026-10-03 实测，文档少带了
+# `docker-compose.build.yml`，于是陌生人照抄得到的是
+# `pull access denied for supersync … may require 'docker login'`
+# （我们根本没有仓库，那句提示把人引向"去找登录凭据"）。
+# 所以这里把文档那一行的 -f 集合钉成期望值，漂了就红。
+GUIDE="$REPO_ROOT/docs/runbooks/self-host.md"
+README="$REPO_ROOT/server/README.md"
+# 🔴 同一条命令现在有**两份抄件**（中文指南 + server/README）。抄件的漂法是固定的：
+# 改一处、忘另一处，而两边看起来都自洽。所以这里逐份量，任何一份漂了就红。
+DOC_LINES=""
+for doc in "$GUIDE" "$README"; do
+  # 续行（行尾反斜杠）先折回来，否则第二条 -f 会掉到下一行去。
+  # ⚠️ 这里**必须用 awk**，不能用 `tr '\n' X | sed 's/\\X//'`：BSD sed 的 BRE 不解释
+  # `\036` 这类八进制转义，它会把那三个字符当字面量去找 ⇒ **折叠静默失败**，
+  # 于是判据只读到第一条物理行、报"文档少了 migrate-once override"（2026-10-03 实测，
+  # 探针自己坏了、文档是好的）。
+  line="$(awk '{ if ($0 ~ /\\$/) { sub(/\\$/,""); printf "%s ", $0 } else { print } }' "$doc" \
+    | grep -m1 '^docker compose -f docker-compose\.yml' || true)"
+  [ -n "$line" ] || die "${doc#$REPO_ROOT/} 里找不到以 'docker compose -f docker-compose.yml' 开头的那条入口命令 —— 它被改名、换行或删掉了，而这条判据将变成空转。"
+  # 🔴 折行之后要先压空格：续行是缩进的（两个前导空格），压完才 `-f x.yml` 的形状统一。
+  # 不压的实测后果不是漏判整条，而是**只漏掉续行上那一个 -f**（看起来像"文档少了 override"，
+  # 其实是探针自己没把行读全）。
+  line="$(printf '%s\n' "$line" | tr -s ' ')"
+  DOC_LINES="${DOC_LINES}${line}
+"
+done
+DOC_ENTRY_FILES="$(printf '%s' "$DOC_LINES" | grep -o -- '-f [A-Za-z0-9._-]*\.yml' | sed 's/^-f //' | LC_ALL=C sort -u | tr '\n' ' ')"
+EXPECTED_DOC_FILES="docker-compose.build.yml docker-compose.migrate-once.yml docker-compose.yml "
+[ "$DOC_ENTRY_FILES" = "$EXPECTED_DOC_FILES" ] || {
+  printf '两份文档里那条命令实际带的文件：%s\n' "$DOC_ENTRY_FILES" >&2
+  printf '应当带的：%s\n' "$EXPECTED_DOC_FILES" >&2
+  die "入口命令少了 build override ⇒ 照抄的人没有镜像可拉（默认 image 是 supersync:local，而我们不发布镜像）。"
+}
+# 两份必须**逐字相同**（只比集合会把"一份带 --build、一份不带"读成绿）。
+[ "$(printf '%s' "$DOC_LINES" | LC_ALL=C sort -u | wc -l | tr -d ' ')" = "1" ] ||
+  die "中文指南与 server/README 里那条入口命令已经漂开（各自的内容见上一段）。"
+case "$DOC_LINES" in
+  *--build*) ;;
+  *) die "入口命令没有 --build：镜像不会由这条命令自己产出，第一次跑仍然起不来。" ;;
+esac
+# 脚本自己那两套也要钉住（它和文档不同是**有理由的**，理由变了就要改这里，不能漂）。
+SCRIPT_ENTRY_FILES="$(printf '%s\n' "${COMPOSE_FILES[@]}" | sed 's#.*/##' | LC_ALL=C sort | tr '\n' ' ')"
+[ "$SCRIPT_ENTRY_FILES" = "docker-compose.migrate-once.yml docker-compose.yml " ] ||
+  die "本脚本带的 compose 文件集合变了（现在是 ${SCRIPT_ENTRY_FILES}）。它和文档 §4 的差集应当恰好是 docker-compose.build.yml —— 因为脚本自己 docker build。"
+log "    入口命令对账：文档 3 份（含 build override + --build） · 本脚本 2 份（自己打镜像）"
+
 cd server
 # 🔴 先把这一套的**卷**清掉。实测形态：上一轮的 postgres 数据卷还在，
 # 而 `POSTGRES_PASSWORD` 是每次随机生成的 —— 官方镜像看到非空数据目录就**跳过初始化**，

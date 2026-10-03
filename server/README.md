@@ -82,8 +82,17 @@ If you want compose alone to be enough — first boot, no `deploy.sh` — opt in
 migrator, which is the same shape as the Helm chart's `migrate-db` init container:
 
 ```bash
-docker compose -f docker-compose.yml -f docker-compose.migrate-once.yml up -d
+docker compose -f docker-compose.yml -f docker-compose.build.yml \
+  -f docker-compose.migrate-once.yml up -d --build
 ```
+
+🔴 **Do not drop `docker-compose.build.yml` unless you already have the image.** No heyta images
+are published, and the default `image:` value is `${SUPERSYNC_IMAGE:-supersync:local}` — without
+the build override compose has neither a build definition nor a local tag, so it tries to
+**pull** and you get `pull access denied for supersync, repository does not exist or may require
+'docker login'`. That hint is the misleading part: there is no registry to log in to. The build
+override is also where `APK_MIRROR` and `NPM_REGISTRY` live, so it is the file that makes this
+path work on a machine that cannot reach Alpine's CDN or npm's registry.
 
 The override adds exactly one service and does not touch the default graph. It waits for
 Postgres to be healthy, runs `scripts/migrate-deploy.sh` from the image, and only then lets the

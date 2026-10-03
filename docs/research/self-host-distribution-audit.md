@@ -559,3 +559,61 @@ done   # 五行都必须 ≥1，出现 0 就是这次合并把某个人的门禁
 （同族先例：§7 第 88 条"plumbing 半个文件的索引尾巴"—— 都是**合并/暂存动作会静默丢内容**，
 而丢后的输出与"一切正常"完全一样。）
 
+### 8.11 🔴 收尾复看时抓到的一条：对外那份指南 §4 印的命令**照抄会失败**，而它当初"验过"
+
+`docs/runbooks/self-host.md` §4 的标题是"只想用一条 `docker compose` 起全套"，
+印的却是：
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.migrate-once.yml up -d
+```
+
+**它漏了 `docker-compose.build.yml`。** 默认图里 `image:` 是 `${SUPERSYNC_IMAGE:-supersync:local}`，
+而我们不发布镜像 —— 于是照抄的人手里既没有 build 说明也没有本地 tag，compose 去**拉**，实测得到：
+
+```
+Image supersync:local Error pull access denied for supersync, repository does not exist
+or may require 'docker login'
+```
+
+最后那半句是这条路上最容易把人带偏的提示：它会让人去找"该登录哪个仓库"，
+而真相是**根本没有仓库**。（`check:entries` 那类门禁抓不到它，单元测试也抓不到 ——
+它是一行**给人抄的 shell**。）
+
+**为什么它当初"过了"**：`scripts/verify-selfhost-stack.sh` 量的是自己那一套 ——
+先 `docker build` 出一个私有 tag，再在一次性 env 里写 `SUPERSYNC_IMAGE=<那个 tag>`，
+最后 `up -d postgres supersync`（还刻意不起 caddy）。
+**这条路径结构上看不见 §4 的缺陷**：脚本手里永远有镜像，而陌生人手里没有；
+脚本永远带 `SUPERSYNC_IMAGE`，而文档那条靠默认值。
+这是 §7 元规则第 1 条的第三种面目 —— 探针不是坏，是**探针量的不是那道门**。
+
+修了三层：
+
+| 层 | 动作 |
+|---|---|
+| 命令本身 | 指南 §4 与 `server/README.md` 各补上 `-f docker-compose.build.yml` 与 `--build`，并把"为什么不能省"连同那句误导性报错一起写进正文（两份是**逐字同一条命令**，见下面的判据） |
+| 抄件 | `server/docker-compose.migrate-once.yml` 文件头原本也重抄了这条命令（**同一个错的第二份**）。改成指向唯一真本，不再重抄 —— 三处抄件里两处漏同一份 override，正是"同一个值抄三遍"的标准漂法 |
+| 判据 | 脚本新增"入口命令对账"：把两份文档里那条命令折行后**逐字比对**（只比 `-f` 集合会把"一份带 `--build`、一份不带"读成绿），集合必须恰好是 3 份，且必须带 `--build`；同时钉住**脚本自己**那两套是 2 份并写明为什么不同（脚本自己 `docker build`） |
+
+真跑过（不是 `config` 干跑）：从 `server/` 目录用**文档印的那条命令**起了一整套 ——
+compose 自己打出 `supersync:local`，一次性迁移容器 `Exited (0)` 且日志 `All migrations have been
+successfully applied`，`caddy` / `supersync` / `postgres` 三个都 `healthy`；
+`/health` 200、`/app/` 返回的 HTML 里资源前缀是 `/app/assets/…` 且该 js **200**。
+再对同一套栈跑 `playwright.selfhost.config.ts`：**S1/S2/S3 3 passed**（含"SW 在 `/app/` scope 下注册上"
+与"全新设备只能从服务端读到那条任务"），截图 `e2e/selfhost-stack-results/s1-app-loaded.png` 等 4 张，
+**人已看过**（是应用本体：蓝白、左侧 rail、收集箱空态）。跑完 `down -v` 拆干净，临时 env 文件已删。
+
+⚠️ 三条可迁移的判据（前两条已在本节正文，这条是新的）：
+**验收脚本自带的 env 覆盖会把自己要验的默认值换掉** —— 这条脚本写 `SUPERSYNC_IMAGE`，
+于是"默认值好不好使"这件事在它的世界里根本不存在。判"某条对外命令可用"，
+就得**用那条命令原样跑一次**，而不是跑一条"等价"的。
+
+🔴 待入 `environment-traps`（本批现量，等该文件在途段落落定后按当时最大号追加）：
+**BSD sed 的 BRE 不解释 `\036` 这类八进制转义**，它按字面量 `036` 去找 ⇒
+`tr '\n' '\036' | sed 's/\\\036//g'` 这种"折续行"写法在 macOS 上**静默不折叠**，
+判据只读到第一条物理行，报出来的形状是"文档少带了一个 override"（其实是探针没读全）。
+折续行要用 `awk '{ if ($0 ~ /\\$/) { sub(/\\$/,""); printf "%s ", $0 } else { print } }'`。
+同段还有第二条：**折回来之后要先 `tr -s ' '`**，续行的缩进会留下双空格，
+而 `-f x.yml` 这种"一个空格"的正则只会吃掉第一个 `-f` —— 症状同样是"少一个"，不是"全没有"。
+两次都是**探针自己坏、文档是好的**，都靠"先跑基线再看注入"才分得开。
+
