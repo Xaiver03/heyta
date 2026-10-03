@@ -4974,3 +4974,25 @@ ArgumentError - path name contains null byte
      ✅ 固定顺序：① 先 `pgrep -f <模式>` 列 pid，并看**父链与工作目录**判归属；② 只 `kill <我自己那个 pid>`
      （哨兵启动时就把 pid 打出来，本来就该用它）；③ 确实要按模式杀时带上 `-u "$UID"` 并逐项排除别人的树。
      已经发生的无法回滚，所以这条连同"谁受影响未知"一起登记，不写成"应该没影响到别人"。
+203. 🔴 **"分支不在了"有三种成因，探针却把它们印成同一句话** —— 引具名 ref 的脚本必须先答"它为什么不在了"，
+    再报它自己认为的原因。
+
+    `git merge-tree --write-tree main feat/list-parent` 退 **1**，stderr 是
+    `merge-tree: feat/list-parent - not something we can merge`，而我的脚本紧接着打印
+    `VERDICT=有冲突，不合`。真相是那条分支**已被并行会话合进 main 并删了本地分支**：
+    `git merge-base --is-ancestor 776fc23c HEAD` 退 **0**，`git branch -a --contains 776fc23c` 里
+    `origin/main` 也在。于是那件**已经做完的活**在日志里留下一条假红，
+    而下一个读它的人会去解一场**不存在的冲突**（更糟的是他大概率能"解成功"一次，把那笔已存在的工作再解一遍）。
+
+    三种"合不上"必须在读数里分开：① ref 不存在、但那笔提交**在** HEAD 的祖先里 ⇒ **活已完成，别合**；
+    ② ref 不存在、且不在祖先里 ⇒ 分支被删而工作没落地（去找 reflog / `--all`，**也不是**找冲突）；
+    ③ ref 在、`merge-tree` 退非 0 ⇒ 这才是真有冲突。
+
+    ✅ 修法（换判据，不是加提示语）：先 `git merge-base --is-ancestor <那笔> <rev>`，命中就只打印接线现量、
+    跳过合并；不命中才走 `merge-tree` 与那三条门。**`--is-ancestor` 比 `merge-tree` 便宜，
+    而且它顺带回答了"我还要不要做这件事"** —— 这是它该排在第一位的真正理由，不是"多一层保险"。
+
+    同一次读数量出来的第二个坑：`git grep -c <rev> -- <path>` 打印的是 `rev:路径:条数`，
+    我用 `cut -d: -f2` 取了一轮 ⇒ 拿到的是**文件路径**，输出里 `web=apps/web/src/…/ProjectsPanel.tsx`
+    看着完全像个读数。取数只能取末段（`awk -F: '{print $NF}'`）；
+    凡多段分隔的 git 输出（`--numstat`、`status --porcelain=v2`）都先原样打一遍再决定切第几段。
