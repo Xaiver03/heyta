@@ -51,7 +51,7 @@
 
 | 机器 | SSH 别名 | IP | 跑什么 | 对外地址 | 状态 |
 |---|---|---|---|---|---|
-| **腾讯云 ubuntu-jcli** | `ubuntu-jcli`（别名 `finlaw`） | `124.223.13.226` | ✅ **heyta 公网部署**（supersync）；另有 xiaoli-* 等约 34 个容器、宿主机 nginx、mihomo | `https://heyta.finlaw.cloud`（测试阶段唯一域名） | ✅ 在线，容器 healthy |
+| **腾讯云 ubuntu-jcli** | `ubuntu-jcli`（别名 `finlaw`） | `124.223.13.226` | ✅ **heyta 公网部署**（supersync）；另有 xiaoli-* 等约 34 个容器、宿主机 nginx、mihomo | `https://heyta.waytofuture.cn`（**当前产品入口**，2026-09-30 迁来，见 §3.7.2；`heyta.finlaw.cloud` 只留作回滚路径） | ✅ 在线，容器 healthy |
 | **腾讯云轻量 12km（=OPP）** | `12km` / `12kmroot` | `121.4.24.238` | Caddy + Dokploy + Litopia 生产/预发 + Mailu 邮件 + cloudflared 等 32 个容器 | `mail.litopia.space`（**唯一还指向它的 litopia 域名**） | 🔴 **实例已过期**（2026-09-25 21:32 到期），仍在跑 |
 | **腾讯云 sanjiaozhou** | `sanjiaozhou` | `101.34.250.109` | **mihomo 故障切换代理**；Caddy（80/443）+ 大量项目（Litopia 站点、SSOS、Mailu、CMS 等） | `litopia.space`、`api` / `docs` / `studio` / `staging`、`openpenpal.com`、`finlaw.cloud` 等 | ✅ 在线，负载正常 |
 | **华为云 wunoos** | `wunoos` | `119.8.167.61` | ⚪ 未核实（用户明确交代**不要用**） | `climming.*` / `huagong.finlaw.cloud` 等指向它 | 仅确认 SSH 可达 |
@@ -491,9 +491,17 @@ rsync -az --delete apps/web/dist/ ubuntu-jcli:/var/www/heyta-app/
 （判据在 `apps/landing/src/lib/app-url.ts`）：
 
 ```bash
-cd apps/landing && VITE_APP_URL=https://heyta.finlaw.cloud/app/ pnpm exec vite build
+# 两条都在**仓库根**跑。
+# 🔴 2026-10-03 实测更正：这里原来写的是 `cd apps/landing && VITE_APP_URL=… pnpm exec vite build`
+#    紧跟一行 `rsync -az --delete apps/landing/dist/ …` —— 第二行的路径在 `cd` 之后**不存在**，
+#    照抄的人会得到一条 rsync 报错，而它看起来像"服务器连不上"。改成与下面
+#    「站点与应用要**一起**发布，而且站点先发」那两条同一个形状（同一条命令只有一份写法）。
+VITE_APP_URL=https://heyta.waytofuture.cn/app/ pnpm --filter @heyta/landing build
 rsync -az --delete apps/landing/dist/ ubuntu-jcli:/var/www/heyta-landing/
 ```
+
+⚠️ 域名那一串是**抄不得的**：它必须等于当前 canonical 域名（以 §3.7.2 为准），
+否则落地页会把人送到一个不再提供服务的入口。上面这行的取值日期是 2026-10-03。
 
 🔴 **不带这个变量重新构建落地页，入口会静默消失** —— 页面不报错，只是又变回
 "只能自建"。仓库默认构建（无该变量）**是故意的**：应用还没部署时露出一个
