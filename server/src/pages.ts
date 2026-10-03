@@ -39,16 +39,15 @@ const OK_ICON =
 
 export async function pageRoutes(fastify: FastifyInstance) {
   /**
-   * 🔴 三张页面都从**同一个**地方取语言：URL 里的 `?lang=` 优先，
-   * 其次 `Accept-Language`，都没有就**中文**（`resolveLocale` 的兜底）。
+   * 🔴 四张页面都从**同一个**地方取语言：URL 里的 `?lang=`，没有就**中文**。
    *
    * 邮件在发信时就把 `lang` 写进了链接，所以点进来的人看到的
    * 就是收信那一刻该看到的语言（见 `email.ts` 的 `withLocale`）。
+   *
+   * ⚠️ 这里**不读** `Accept-Language`（2026-10-03 起；理由写在 `resolveLocale`）：
+   * 浏览器语言不是用户的选择，而它曾让中文界面注册的人点开一整页英文。
    */
-  const localeOf = (req: { query: { lang?: string }; headers: Record<string, unknown> }) =>
-    resolveLocale(req.query.lang, typeof req.headers['accept-language'] === 'string'
-      ? req.headers['accept-language']
-      : null);
+  const localeOf = (req: { query: { lang?: string } }) => resolveLocale(req.query.lang);
 
   fastify.get<{ Querystring: VerifyEmailQuery }>(
     '/verify-email',

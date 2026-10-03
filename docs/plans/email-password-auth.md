@@ -208,7 +208,7 @@ fail-open 且**必须留一条 warn** —— 没有它，"检查通过"与"根�
 `server/src/email.ts` 现在恰好三个模板（`:119` 验证 / `:142` passkey 找回 / `:165` 魔法链接登录），
 `server/src/pages.ts:48,136,197` 三张页。新增：
 
-- `sendPasswordResetEmail` → `${PUBLIC_URL}/reset-password?token=…`，`withLocale` 带上语言；语言优先级链不变（`?lang=` > 账号 `locale` > `Accept-Language` > `zh-CN`，`design-html.ts:76-99`）。
+- `sendPasswordResetEmail` → `${PUBLIC_URL}/reset-password?token=…`，`withLocale` 带上语言；当时语言优先级链不变（`?lang=` > 账号 `locale` > `Accept-Language` > `zh-CN`，`design-html.ts:76-99`）。⚠️ **2026-10-03 起 `Accept-Language` 那一档已删**，现在是 `body.locale` > 账号 `locale` > `zh-CN`（拍板口径见上面 `5-confirm-page` 那行）。
 - 第 4 张页 + `server/public/reset-password-confirm.js`（新密码 + 显隐 + 提交后**不自动登录**，直接跳登录页文案）。
 - 🔴 **真源仍只有一份**：文案进 `packages/i18n` 的 `server.*` 词条 → `server/scripts/gen-server-copy.ts` 生成 `copy.generated.ts`；色值走 `generated/tokens.json` → `design.generated.ts`。**只搬 light**。改完必须重跑生成，否则 `check:server-copy` / `check:server-design`（都挂在 `pnpm check`）红。
 - 第 6 封（可选，但 OWASP 要求）：**密码被改后的安全通知**，复用同一套模板骨架。
@@ -269,7 +269,7 @@ fail-open 且**必须留一条 warn** —— 没有它，"检查通过"与"根�
 | `2-register-policy-error` | 弱口令被拒，红色策略提示在**对话框顶部**；口令框里是 `123`，框**下方只有灰色提示**，没有「还没有填密码。」 | ✅ 矛盾 caption 已修（见下「登记 1」的拆分）；🟡 剩下的就是登记 1 那条设计观察 |
 | `3-register-submitted` | 「注册申请已提交。去邮箱点开那条验证链接」+ 邮箱行 + 改邮箱 | ✅ 成功态与可修正入口并存 |
 | `4-email-not-verified` | 「密码是对的，只差最后一步…」 | ✅ 反枚举 + 不指责用户，文案按 D5/§5 落地 |
-| `5-confirm-page` | 服务端渲染的确认页是**英文**（`Confirm your email`） | ✅ **排除，不是缺陷**：`server/src/pages.ts:48` 的 `localeOf` 走 `resolveLocale(?lang, Accept-Language, 默认 zh-CN)`，Playwright 默认发 `en-US` ⇒ 英文是**设计行为**；中英两个方向都由 `server/tests/server-i18n-design.spec.ts` 钉着 |
+| `5-confirm-page` | 服务端渲染的确认页是**英文**（`Confirm your email`） | ~~✅ **排除，不是缺陷**：`server/src/pages.ts:48` 的 `localeOf` 走 `resolveLocale(?lang, Accept-Language, 默认 zh-CN)`，Playwright 默认发 `en-US` ⇒ 英文是**设计行为**~~ 🔴 **这条"排除"是错的，2026-10-03 撤回并重开**：错在它把**探针导航的那个 URL**当成了用户点开的 URL。spec 里取链接的正则写到 `token=[0-9a-f]+` 就停，把发信时写进去的 `&lang=zh-CN` **截掉了** —— 真实收件人点的那条永远带语言。两层都修了：① 探针取整条链接，并钉「链里的 `lang=` == 界面 `<html lang>`」+「确认页的 `<html lang>` == 界面语言」；② 产品负责人同日拍板「默认中文，英文只能是用户自己选的」，于是服务端把 `Accept-Language` 整档**摘掉**（`design-html.ts` / `api.ts` 的 `localeFromRequest`、`localeForEmail`），三条反向判据各做过一次变异（把浏览器头加回去 ⇒ 恰好三条红）。中英两个方向仍由 `server/tests/server-i18n-design.spec.ts` 钉着 |
 | `6-signed-in-light` / `7-signed-in-dark` | 登录后回到收集箱，亮/暗两版都正常，主蓝在位 | ✅ 暗色不是反相（§5 那条） |
 
 **看过之后被推翻的一条怀疑（玻璃面）**：`e2e/test-results/glass-account-menu-light.png` 里我以为
