@@ -125,7 +125,7 @@ function makeStyles(tokens: HeytaNativeTokens) {
       gap: tokens['space.2'],
       minHeight: tokens['touch-target.min'],
     },
-    /** 等宽数字与名字共用同一套排版，这里只借用它保证不出现裸值。 */
+    /** 候选的名字：过长时**截断**，不许把菜单撑宽（行内展开没有横向余量可借）。 */
     optionName: { flexShrink: 1 },
     marker: { width: tokens['icon.xs'] },
     /** 展开后那一句标题。 */
