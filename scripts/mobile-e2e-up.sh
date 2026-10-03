@@ -71,6 +71,56 @@ fail() {
   exit 1
 }
 
+# 复用「已在运行的服务端」之前，先认证它是谁、跑的是哪一版代码。
+#
+# 🔴 为什么必须有这一条：`/health` 只回答「这个端口上有一个服务端」，回答不了
+# 「它是不是本 ROOT 起的」「它是不是当前源码编的」。2026-10-04 实测到的形状是：
+# 一棵检出的脚本复用到了另一棵检出 02:59 起的 dist，而那棵树有 3 个源文件比它自己的
+# dist 新 —— 于是整轮设备验收的**服务端半侧**验的是旧代码，而所有判据都绿。
+# 这就是「测试全绿 ≠ 这是当前产物」在服务端这一侧的面目。
+#
+# 默认**拒绝**认证不了的占用者。确要跨 ROOT 复用（故意连一台已经起好的栈）：
+#   HEYTA_E2E_ALLOW_FOREIGN_SERVER=1
+# 放行时脚本会大字打印「本轮服务端侧判据只能证明那台机器现在的行为」——
+# 这个口子是给人看的，不是用来让红变成绿的。
+#
+# 成功时把认证结论打到 stdout（调用方捕获后原样打印），失败时把**原因**打到 stdout
+# 并退 1。原因必须写清楚，否则下一次还是只会看到「认证不通过」四个字再去怀疑探针。
+certify_server_occupant() {
+  local pids n pid cwd srv_root stale srv_sha root_sha bad=""
+  pids="$(lsof -nP -ti "tcp:${PORT}" -sTCP:LISTEN 2>/dev/null)"
+  n="$(printf '%s\n' "$pids" | grep -c .)"
+  if [ "$n" != "1" ]; then
+    echo "读不到 :${PORT} 上唯一的监听 pid（实测 ${n} 枚：$(printf '%s' "$pids" | tr '\n' ' ')）—— 不能把「/health 有响应」当成「那是我们的服务端」"
+    return 1
+  fi
+  pid="$pids"
+  # `-a` 不能省：不带它时 `-p` 与 `-d` 是**并集**，读到的 cwd 可能是别人进程的。
+  cwd="$(lsof -a -p "$pid" -d cwd -Fn 2>/dev/null | sed -n 's/^n//p' | head -1)"
+  case "$cwd" in
+    */server) srv_root="${cwd%/server}" ;;
+    *) echo "pid ${pid} 的 cwd 不是一棵检出的 server/（实测：${cwd:-读不到}）—— 无从核对它跑的是哪份代码"; return 1 ;;
+  esac
+  if [ ! -f "$srv_root/server/dist/src/index.js" ]; then
+    echo "pid ${pid} 的 ROOT（${srv_root}）里没有 server/dist/src/index.js —— 起它的那份产物已经不在了"; return 1
+  fi
+  stale="$(find "$srv_root/server/src" -name '*.ts' -newer "$srv_root/server/dist/src/index.js" 2>/dev/null | wc -l | tr -d ' ')"
+  if [ "$stale" != "0" ]; then
+    bad="它的 dist 比自己的源码旧（${stale} 个 .ts 更新）"
+  fi
+  srv_sha="$(git -C "$srv_root" rev-parse HEAD 2>/dev/null)"
+  root_sha="$(git -C "$ROOT" rev-parse HEAD 2>/dev/null)"
+  if [ -n "$root_sha" ] && [ "$srv_sha" != "$root_sha" ]; then
+    bad="${bad:+${bad}；}它的 ROOT HEAD ${srv_sha:-读不到} ≠ 本 ROOT HEAD ${root_sha}"
+  fi
+  if [ -n "$bad" ]; then
+    echo "pid ${pid}（ROOT ${srv_root}）：${bad}"
+    return 1
+  fi
+  echo "pid ${pid}，ROOT ${srv_root}，HEAD ${srv_sha}，dist 不比自己的源码旧"
+  return 0
+}
+
 echo "════ 移动端 E2E 栈 ════"
 
 # ── 1. 服务端 ────────────────────────────────────────────────────────────────
@@ -81,7 +131,20 @@ else
   # 而脚本若把"进程起来了"当成"服务端可用"，就会在真正跑 E2E 时才炸。
   HEALTH="$(curl -s --noproxy '*' -m 4 "${HOST_SERVER}/health" 2>/dev/null)"
   if [ -n "$HEALTH" ]; then
-    echo "   ⏭  服务端已在运行：$HEALTH"
+    CERT="$(certify_server_occupant)"
+    CERT_RC=$?
+    if [ "$CERT_RC" = "0" ]; then
+      echo "   ⏭  服务端已在运行，且认证通过（${CERT}）：$HEALTH"
+    elif [ "${HEYTA_E2E_ALLOW_FOREIGN_SERVER:-0}" = "1" ]; then
+      echo "   ⚠️  服务端已在运行但**认证不通过**（${CERT}）"
+      echo "       HEYTA_E2E_ALLOW_FOREIGN_SERVER=1 ⇒ 放行。本轮服务端侧的全部判据只能证明"
+      echo "       「那台机器现在的行为」，不能证明「本 ROOT 源码的行为」—— 结论要这么写。"
+    else
+      fail "端口 ${PORT} 上的占用者认证不通过：${CERT}
+   别为了让脚本跑下去就放行 —— 那正是「判据全绿而验的是旧代码」的形状。
+   要么把本 ROOT 的栈起在它自己的端口（换 PORT=），要么确要跨 ROOT 复用就显式
+   HEYTA_E2E_ALLOW_FOREIGN_SERVER=1，并在汇报里写明服务端侧判据证明的是那台机器。"
+    fi
   else
     # 数据库连接串：优先用 server/.env 里的 POSTGRES_*，没有则退回本地默认。
     # ⚠️ 只读键值，不打印口令。
