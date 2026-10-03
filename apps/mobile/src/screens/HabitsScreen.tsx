@@ -397,8 +397,10 @@ export function HabitsScreen({ onBack }: { onBack: () => void }): React.JSX.Elem
           now={now}
           growth={habitGrowth}
           labels={labels}
-          onCheckIn={(habitId, date) => {
-            runFor(habitId, actions.checkIn(habitId, date));
+          onCheckIn={(habitId, date, value) => {
+            // 🔴 第三个参数**必须透传**（工单 W6）：数量行的「+」带的是明确数值，
+            //    漏在这里就等于移动端能看见"今天记了几格"却永远改不了它。
+            runFor(habitId, actions.checkIn(habitId, date, value));
           }}
           onUndoCheckIn={(habitId, date) => {
             runFor(habitId, actions.undoCheckIn(habitId, date));

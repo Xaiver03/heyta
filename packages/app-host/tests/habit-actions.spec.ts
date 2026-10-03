@@ -418,3 +418,125 @@ describe('习惯目标（setHabitGoal）', () => {
     expect(isAchieved(habitAfter, logAfter), '改成 atMost/0 之后 1 次就不该算达成').toBe(false);
   });
 });
+
+/**
+ * 工单 W6：`checkIn` 的**量**这一米。
+ *
+ * 三条判据逐条对应工单里的验收：
+ *   ① 目标 8、今天记 5 ⇒ 落盘 `value=5`
+ *   ② 不传 `value` 时逐字保持旧行为（缺省 = target）
+ *   ③ 撤销打卡仍走软删（`undoCheckIn` 那几条已有，这里只补"减到 0 不是记 0"）
+ *
+ * 另外钉住两条工单没写、但加了这个通道之后**才会存在**的失败形状：
+ *   · 幂等纪律不能被"能改量"悄悄削弱（同值 / 不给值 ⇒ 零 op）
+ *   · 比较的是**有效值**，不是 `value` 这个键（否则"记满"会在一条没写量的旧记录上
+ *     白写一条 op，而 reducer 收敛成同一条实体 ⇒ 测试全绿、op-log 在长胖）
+ */
+describe('打卡量（W6）', () => {
+  it('🔴 判据①：目标 8、记 5 ⇒ 落盘 value=5，且物化状态读到 5', async () => {
+    const id = await actions.createHabit('阅读', { target: 8 });
+    expect(await actions.checkIn(id, DAY1, 5)).toBe(true);
+    expect(payloadOf(await opOf('HABIT_LOG', habitLogId(id, DAY1))).value).toBe(5);
+    expect(actions.listLogs()[0]!.value).toBe(5);
+  });
+
+  it('🔴 判据②：已经打过卡时**不给** value ⇒ 幂等空操作，一条 op 都不发', async () => {
+    const id = await actions.createHabit('阅读', { target: 8 });
+    await actions.checkIn(id, DAY1);
+    const before = (await engine.getOpsForEntity('HABIT_LOG', habitLogId(id, DAY1))).length;
+
+    expect(await actions.checkIn(id, DAY1)).toBe(false);
+    expect((await engine.getOpsForEntity('HABIT_LOG', habitLogId(id, DAY1))).length).toBe(before);
+  });
+
+  it('已经打过卡时给**与当前相同**的量 ⇒ 同样零 op（点了个没变化的东西）', async () => {
+    const id = await actions.createHabit('阅读', { target: 8 });
+    await actions.checkIn(id, DAY1, 5);
+    const before = (await engine.getOpsForEntity('HABIT_LOG', habitLogId(id, DAY1))).length;
+
+    expect(await actions.checkIn(id, DAY1, 5)).toBe(false);
+    expect((await engine.getOpsForEntity('HABIT_LOG', habitLogId(id, DAY1))).length).toBe(before);
+  });
+
+  it('🔴 改量是**一条 UPD**，payload 只有 `value`（不重发身份字段）', async () => {
+    const id = await actions.createHabit('阅读', { target: 8 });
+    await actions.checkIn(id, DAY1, 5);
+
+    expect(await actions.checkIn(id, DAY1, 3)).toBe(true);
+    const ops = await engine.getOpsForEntity('HABIT_LOG', habitLogId(id, DAY1));
+    expect(ops).toHaveLength(2);
+    const update = ops.at(-1)!;
+    expect(update.opType).toBe(OpType.Update);
+    expect(Object.keys(payloadOf(update))).toEqual(['value']);
+    expect(actions.listLogs()[0]!.value).toBe(3);
+  });
+
+  it('🔴 缺省比的是**有效值**：一条没写量的旧记录上"记满"不再白写一条 op', async () => {
+    const id = await actions.createHabit('阅读', { target: 8 });
+    // 绕过动作层直接落一条**没有 value** 的打卡（磁盘上真实存在这种形状：
+    // `HabitLog.value` 是可选字段，`entities.ts:309`）。
+    await engine.dispatch({
+      entityType: 'HABIT_LOG',
+      entityId: habitLogId(id, DAY1),
+      opType: OpType.Create,
+      payload: { habitId: id, date: DAY1 },
+    });
+    const before = (await engine.getOpsForEntity('HABIT_LOG', habitLogId(id, DAY1))).length;
+    expect(actions.listLogs()[0]!.value).toBeUndefined();
+
+    // 它读出来就是 8（`@heyta/domain#habitLogValue`），所以"记 8"没有变化。
+    expect(await actions.checkIn(id, DAY1, 8)).toBe(false);
+    expect((await engine.getOpsForEntity('HABIT_LOG', habitLogId(id, DAY1))).length).toBe(before);
+
+    // 而"记 5"是有变化的 —— 这条正对照防的是"比较恒假 ⇒ 整条判断其实是空转"。
+    expect(await actions.checkIn(id, DAY1, 5)).toBe(true);
+  });
+
+  it('0 / 负数 / 非有限数 ⇒ 抛，且不留下任何 op', async () => {
+    const id = await actions.createHabit('阅读', { target: 8 });
+    for (const bad of [0, -3, Number.NaN, Number.POSITIVE_INFINITY]) {
+      await expect(actions.checkIn(id, DAY1, bad)).rejects.toThrow(/大于 0 的有限数/);
+    }
+    expect(actions.listLogs()).toEqual([]);
+    expect(await engine.getOpsForEntity('HABIT_LOG', habitLogId(id, DAY1))).toHaveLength(0);
+  });
+
+  it('⚠️ 刻意**允许小数**（"每天 0.5 小时"是合法目标，卡整数会把合法数据判成非法输入）', async () => {
+    const id = await actions.createHabit('有氧', { target: 1, unit: '小时' });
+    expect(await actions.checkIn(id, DAY1, 0.5)).toBe(true);
+    expect(actions.listLogs()[0]!.value).toBe(0.5);
+    expect(isAchieved(actions.listHabits()[0]!, actions.listLogs()[0]!)).toBe(false);
+  });
+
+  it('🔴 判据③：撤销打卡**仍然是软删**，改量这一米没把它换成物理删', async () => {
+    const id = await actions.createHabit('阅读', { target: 8 });
+    await actions.checkIn(id, DAY1, 5);
+    const before = (await engine.getOpsForEntity('HABIT_LOG', habitLogId(id, DAY1))).length;
+
+    expect(await actions.undoCheckIn(id, DAY1)).toBe(true);
+    const last = await opOf('HABIT_LOG', habitLogId(id, DAY1));
+    expect(last.opType).toBe(OpType.Delete);
+    expect(actions.listLogs()).toEqual([]);
+    // 撤销走的是 `DEL`，不是 `{value: 0}` —— 这条是"减到 0"那条 UI 判据的底层依据。
+    expect((await engine.getOpsForEntity('HABIT_LOG', habitLogId(id, DAY1))).length).toBe(before + 1);
+  });
+
+  it('🔴 `target: 0`（"一次都不碰"）时按默认打卡记 **1**，不是 0 —— 0 会把"做了"记成"守住了"', async () => {
+    const id = await actions.createHabit('喝咖啡', { target: 0, goalType: 'atMost' });
+    expect(await actions.checkIn(id, DAY1)).toBe(true);
+
+    const logged = actions.listLogs()[0]!;
+    expect(logged.value).toBe(1);
+    // 这一句才是这条判据的全部意思：做了 1 次 ⇒ **未**达成。
+    // 缺省若写成 `habit.target ?? 1`（= 0），`atMost` 的 `value <= target` 会判它达成，
+    // 于是"破戒"在连续天数里被记成"守住"，而界面上一个字都不报。
+    expect(isAchieved(actions.listHabits()[0]!, logged)).toBe(false);
+  });
+
+  it('改过的量在**换一天**时不受影响（缺省落 target，不是沿用昨天的 5）', async () => {
+    const id = await actions.createHabit('阅读', { target: 8 });
+    await actions.checkIn(id, DAY1, 5);
+    await actions.checkIn(id, DAY2);
+    expect(actions.listLogs().find((l) => l.date === DAY2)?.value).toBe(8);
+  });
+});

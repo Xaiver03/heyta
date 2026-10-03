@@ -2355,6 +2355,10 @@ export const en = {
   'common.habits.rename.button': 'Rename habit "{name}"',
   'common.habits.rename.label': 'Habit name',
   'common.habits.delete.button': 'Delete habit "{name}"',
+  // 工单 W6：与 zh 同三条（键集对等由类型系统钉住，少一条就编译不过）。
+  'common.habits.amount.today': 'Today {value}/{target} {unit}',
+  'common.habits.amount.plus': 'Increase {name} by 1',
+  'common.habits.amount.minus': 'Decrease {name} by 1',
   'mobile.profile.section.tags': 'Tags',
   'common.organizer.tags.empty': 'No tags yet',
   'common.organizer.tags.empty.hint': 'Tags group tasks across lists — for example "Urgent" or "Waiting".',

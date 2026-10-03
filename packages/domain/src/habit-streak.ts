@@ -50,6 +50,24 @@ export function isScheduledOn(frequency: HabitFrequency | undefined, date: Local
 }
 
 /**
+ * 这一天**记了几格**（工单 W6 的那个数的唯一算法）。
+ *
+ * 🔴 规则只有一条：**一条存在的打卡记录没写 `value` 时按 `target` 算，不是按 0**。
+ * 理由是写路径就是这么写的（`@heyta/app-host#checkIn` 缺省落进 `habit.target ?? 1`），
+ * 而"打过卡"在界面上只能有一个意思。
+ * 这条以前**没有所有者**：`isAchieved` 用 `?? target`、`completionRatio` 用 `?? 0`、
+ * 移动端的详情自己写了一遍 `?? target ?? 1` —— 三份答案是同一条不变量的三个断面，
+ * 症状是"连续天数说今天达成、完成度说 0 %"，而两边都不报错。
+ *
+ * ⚠️ **根本没有记录**时返回 0（不是 target）：那是"今天没做"，
+ * 与"做了但没记量"是两件事，必须分开。
+ */
+export function habitLogValue(habit: Habit, log: HabitLog | undefined): number {
+  if (log === undefined) return 0;
+  return log.value ?? habit.target ?? 1;
+}
+
+/**
  * 打卡是否算"达成"。
  *
  * ⚠️ **导出**是刻意的：`habit-resilience.ts` 必须用同一套判据。
@@ -58,7 +76,7 @@ export function isScheduledOn(frequency: HabitFrequency | undefined, date: Local
  */
 export function isAchieved(habit: Habit, log: HabitLog): boolean {
   const target = habit.target ?? 1;
-  const value = log.value ?? target;
+  const value = habitLogValue(habit, log);
   switch (habit.goalType ?? 'atLeast') {
     case 'atLeast':
       return value >= target;
@@ -211,10 +229,15 @@ function isStillAlive(
 /**
  * 习惯在给定日期的完成进度（0–1）。
  * UI 用来画环形进度，避免在组件里重复实现这个除法。
+ *
+ * 🔴 分子走 {@link habitLogValue}，与 `isAchieved` **同一个缺省**。
+ * 这里曾经是 `log?.value ?? 0` —— 于是"打过一条没写量的卡"会同时
+ * 「算达成」（`isAchieved` 缺 target）与「完成度 0 %」（这里缺 0），
+ * 而这两句话说的是同一格。W6 把"今天记了几格"定成只有一个答案之后，
+ * 这条缺省就是那个唯一算法的第二个断面。
  */
 export function completionRatio(habit: Habit, log: HabitLog | undefined): number {
   const target = habit.target ?? 1;
   if (target <= 0) return 0;
-  const value = log?.value ?? 0;
-  return Math.min(1, value / target);
+  return Math.min(1, habitLogValue(habit, log) / target);
 }
