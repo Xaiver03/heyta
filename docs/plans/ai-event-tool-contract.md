@@ -3733,3 +3733,25 @@ grep -nE '^38\. ' "$F" | cut -c1-80                                             
 **不是第二份清单**；判据的唯一定义仍在 `scripts/lib/msix-install-facts.sh`，两个消费者
 （`reinstall-all.sh:272` 与 `package-msix.sh:85`）都调它，且都把"缺一条"变成失败
 （前者不置 `RESULT_windows=OK`，后者 `exit 1`）。
+
+#### §15.43aa（10-04 07:38）D-3 收口 Goal 的四件套逐项对账（AGENTS 工作流第 7 条：按范围逐项，不按感觉宣布完成）
+
+| 项 | 判它做完的那条读数 | 载体 | 状态 |
+|---|---|---|---|
+| ① 合并 | `git merge-base --is-ancestor integrate/2026-10-03-closeout HEAD` ⇒ YES（`dd8f2210`/`f2d7ed40`/`fd34c42a` 三条已在一条线上） | `main=d30ae468`（每次重印；本线那几笔是 `3d14767d 60c6fd71 8d17e99f 214b5fd3 e8508736`） | ✅ |
+| ② 集成态验证 | `pnpm -r build` rc=0（段 02）、`-r typecheck` rc=0（段 04）、链 74 段 = 59 绿 / 14 红 / 1 按规则不跑、`check:ai-e2e` 141 passed / 14 skipped / 2 failed、W11 那腿 `tests/tool-batch-complete.spec.ts (13 tests)` | ⚠️ **载体 `1ebcf136`**（队列阶段 1.5 会 `merge --ff-only main` 后重跑刷成落地载体） | ✅ 带载体标签 |
+| ③ 交付 | `bash scripts/verify-mobile-window-gate.sh --target b` rc=**0** **且** `scripts/reinstall-all.sh` 四段各自打出该端判据（mac/android 主蓝命中、windows 五事实齐、ios 新鲜度） | 队列 pid 18678 / `~/scratch-heyta/deliver-0712/`（07:38 累计等 1440s / 7200s） | 🔴 **未闭合**，见下面两组数 |
+| ④ 台账 | 四节台账 + 一处判据修复全部按路径提交；死链检查 `node research/tools/docs-link-check.mjs` rc=0；traps 编号复核带可复跑命令（§15.43y） | 同上 main | ✅ 授权范围内 |
+
+🔴 **③ 为什么还不能宣布做完 —— 两组数分开看**：
+
+1. **窗口关着**（07:04 现量，`--target b` rc=3，五条前置不成立）：负载 39 > 12 · 主检出 128 枚别人未提交的源码 ·
+   另一趟 `reinstall-all` 挂着（93817，墙钟 3h51m 而 CPU 累计 `0:00.01`）· 移动端验收在跑（91783）· 3 台模拟器 booted。
+2. **载体侧我能在自己权限内做的都做完了**（07:37 现量，这组是"窗口一开就不会中途炸"的前置）：
+   载体 `1ebcf136` 未提交项 = 0；63 枚 `@heyta/*` 软链**全部**解析在载体本树（0 枚指向外面）；
+   `ios/Pods` 与 `*.xcworkspace` 确实缺（都被 gitignore），而 `reinstall-all.sh:390-425` 那步
+   `pod install` 兜底**在载体这份脚本里在位**；`IOS_DEVICE_NAME=heyta-iphone-17pro` 那台在 booted 清单里。
+
+⇒ 结论只能是"**③ 等的是别人的现场，不是本线的活没干**"。等满按环境无效 `exit 3` 如实记录，
+不降级判据、不为跑绿放宽闸门（红线原文）。要人拍板的三件：93817 由谁处置、128 枚源码由各自所有者落定、
+hierarchy 那条线那枚转圈 486 分钟的 vitest worker（B70）何时停。
