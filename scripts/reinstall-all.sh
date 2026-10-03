@@ -286,12 +286,45 @@ if printf '%s' "$WANT" | grep -q "android"; then
         adb -s "$SERIAL" shell monkey -p "$PKG" -c android.intent.category.LAUNCHER 1 >/dev/null 2>&1
         sleep 8
         ANDROID_SHOT="/tmp/heyta-reinstall-android.png"
-        adb -s "$SERIAL" exec-out screencap -p > "$ANDROID_SHOT" 2>/dev/null
-        if [ -s "$ANDROID_SHOT" ] && shot_ok_logged "$ANDROID_SHOT"; then
-          echo "  截图证据：$ANDROID_SHOT"
-          RESULT_android=OK
+        # 🔴 截图之前必须先证明"屏上这个窗口就是我们的 App"，否则**不打分**。
+        #    实测过的假绿（2026-10-03，emulator-5556 / AVD heyta-w3-yearly）：monkey 之后
+        #    `mCurrentFocus` 仍是 launcher，而截图判据两条全过 ——
+        #    内容占比 92.0%、主蓝命中 29（Chrome / 信息 / 搜索栏图标本身就是蓝的）。
+        #    也就是说 §7 第 82 条补的"主蓝命中"在**启动器**上也会命中：判界面必须有
+        #    界面特征，而"谁的窗口"这件事最直接的读数就是窗口焦点，不是像素统计。
+        #    ⚠️ 两个探针都读不到时**判红并打印原文** —— 静默跳过等于这条判据只是装饰。
+        focus_line() {
+          adb -s "$SERIAL" shell dumpsys window 2>/dev/null | grep -m1 mCurrentFocus | tr -d '\r'
+        }
+        resumed_line() {
+          adb -s "$SERIAL" shell dumpsys activity activities 2>/dev/null | grep -m1 mResumedActivity | tr -d '\r'
+        }
+        FOCUS="$(focus_line)"; RESUMED="$(resumed_line)"
+        if ! printf '%s %s' "$FOCUS" "$RESUMED" | grep -q "$PKG"; then
+          echo "  ⚠️ monkey 之后前台不是 ${PKG}，用 am start -W 显式拉起再验一次"
+          ACT="$(adb -s "$SERIAL" shell cmd package resolve-activity --brief "$PKG" 2>/dev/null | tail -1 | tr -d '\r')"
+          if [ -n "$ACT" ]; then
+            adb -s "$SERIAL" shell am start -W -n "$ACT" >/dev/null 2>&1
+            sleep 4
+            FOCUS="$(focus_line)"; RESUMED="$(resumed_line)"
+          fi
+        fi
+        if [ -z "$FOCUS$RESUMED" ]; then
+          echo "  🔴 前台窗口探针读不到（mCurrentFocus / mResumedActivity 均空）—— **不打分**"
+          echo "     设备：${SERIAL}；请手工核对，不要拿这张截图当'装上了当前产物'的证据"
+        elif ! printf '%s %s' "$FOCUS" "$RESUMED" | grep -q "$PKG"; then
+          echo "  🔴 截图时前台仍不是 ${PKG} —— **不打分**（对着 launcher 打分必然假绿）"
+          echo "     mCurrentFocus:    $FOCUS"
+          echo "     mResumedActivity: $RESUMED"
         else
-          echo "  🔴 启动后截图为空/缺失 —— 装上了但没起来"
+          echo "  ✅ 前台窗口确认：$FOCUS"
+          adb -s "$SERIAL" exec-out screencap -p > "$ANDROID_SHOT" 2>/dev/null
+          if [ -s "$ANDROID_SHOT" ] && shot_ok_logged "$ANDROID_SHOT"; then
+            echo "  截图证据：$ANDROID_SHOT"
+            RESULT_android=OK
+          else
+            echo "  🔴 启动后截图为空/缺失 —— 装上了但没起来"
+          fi
         fi
       else
         echo "  🔴 adb install 失败"
