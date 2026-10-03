@@ -285,7 +285,7 @@ describe('growthBoardLabels：移动壳与共享 GrowthBoard 的**唯一接缝**
     expect(labels.streaks.empty).not.toBe('');
     expect(labels.streaks.current).toBe('当前连续（天）');
     expect(labels.streaks.longest(21)).toBe('最长 21 天');
-    expect(labels.streaks.total(40)).toBe('累计 40 次');
+    expect(labels.streaks.total(40)).toBe('累计 40 天');
     const repair = labels.streaks.repair({ date: '2026-09-26', count: 5 });
     expect(repair).toContain('5');
     const fresh = labels.streaks.freshStart({ days: 9, longest: 21, total: 40 });

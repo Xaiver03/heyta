@@ -91,10 +91,16 @@ describe('清单层级：顶层 / 一层子级 / 归档隐藏', () => {
     ]);
   });
 
-  it('toOrganizerTree 的每一层都只有 id / name / children —— 不把整个实体漏出去', () => {
+  it('toOrganizerTree 的每一层都是**白名单投影** —— 不把整个实体漏出去', () => {
+    // 🔴 这条判据钉的是"只有这几列"，不是"这几列的名字"。
+    // `archived` 在 2026-10-03 的 `192a516d` 里进来了，而且**是承重的**：
+    // `OrganizerList.tsx:411-424` 按它决定画哪个归档图标、往 `onArchive` 传哪个**目标状态**
+    // （`apps/web/src/features/projects/ProjectsPanel.tsx:254` 就是那个消费者）。
+    // 那笔提交加了字段没同步这条期望 ⇒ 门禁从那天起是红的。这里把清单补齐，
+    // 判据的强度不变：再多一列（比如有人把 `color` 或整个 `Project` 漏出去）照样红。
     const first = toOrganizerTree(projects)[0]!;
-    expect(Object.keys(first).sort()).toEqual(['children', 'id', 'name']);
-    expect(Object.keys(first.children[0]!).sort()).toEqual(['id', 'name']);
+    expect(Object.keys(first).sort()).toEqual(['archived', 'children', 'id', 'name']);
+    expect(Object.keys(first.children[0]!).sort()).toEqual(['archived', 'id', 'name']);
   });
 });
 

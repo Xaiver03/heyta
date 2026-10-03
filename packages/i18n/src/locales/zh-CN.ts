@@ -1098,13 +1098,13 @@ export const zhCN = {
   'web.habits.repairAction': '补上',
   'web.habits.a11y.repair': '把 {date} 的「{name}」补上',
   // 新鲜开始：**不出现"你已经落后了"** —— 只陈述"过去的没有被清掉"。
-  'web.habits.freshStart': '已经 {days} 天没打卡了。最长 {longest} 天、累计 {total} 次都还在，重新开始不会清掉它们。',
+  'web.habits.freshStart': '已经 {days} 天没打卡了。最长 {longest} 天、累计 {total} 天都还在，重新开始不会清掉它们。',
   'web.habits.freshStartAction': '今天重新开始',
   'web.habits.a11y.freshStart': '今天为「{name}」重新打卡',
   // 三个指标里的第三个：**只增不减**的那个（累计）。
   // 中文无单复数，两句刻意逐字相同（en 侧才会不同）。
-  'web.habits.streak.total': '累计 {count} 次',
-  'web.habits.streak.totalOne': '累计 {count} 次',
+  'web.habits.streak.total': '累计 {count} 天',
+  'web.habits.streak.totalOne': '累计 {count} 天',
   // 热力图文案由**我们**传给 react-activity-calendar —— 它的默认文案是英文，
   // 而 `{{count}}` 是**库自己的**占位符，必须原样留着（不是我们的 `{name}` 形状）。
   // ── M3 第七刀（habits）：共享热力图的两条文案 ──────────────
@@ -1141,7 +1141,7 @@ export const zhCN = {
   'web.habits.week.done': '{date} 已打卡',
   'web.habits.week.missed': '{date} 没打卡',
   // 整行的读法：**三个数字一次说完**，屏幕阅读器不必逐 chip 猜。
-  'web.habits.row.aria': '「{name}」连续 {current} 天，最长 {longest} 天，累计 {total} 次',
+  'web.habits.row.aria': '「{name}」连续 {current} 天，最长 {longest} 天，累计 {total} 天',
   'web.habits.row.selectA11y': '查看「{name}」的打卡记录',
 
   // ── Web · 热力图共用文案（习惯页与成长页）─────────────────
@@ -2776,10 +2776,10 @@ export const zhCN = {
   'mobile.growth.streak.empty': '还没有习惯。在网页端建好习惯后会自动同步到这里。',
   'mobile.growth.streak.current': '当前连续（天）',
   'mobile.growth.streak.longest': '最长 {days} 天',
-  'mobile.growth.streak.total': '累计 {count} 次',
+  'mobile.growth.streak.total': '累计 {count} 天',
   'mobile.growth.streak.repair': '昨天还能补回来——补完是 {days} 天',
-  'mobile.growth.streak.freshStart': '距上次 {days} 天。最长 {longest} 天、累计 {total} 次都还在。',
-  'mobile.growth.streak.a11y': '{name}：当前连续 {current} 天，最长 {longest} 天，累计 {total} 次',
+  'mobile.growth.streak.freshStart': '距上次 {days} 天。最长 {longest} 天、累计 {total} 天都还在。',
+  'mobile.growth.streak.a11y': '{name}：当前连续 {current} 天，最长 {longest} 天，累计 {total} 天',
 
   // 里程碑（L3）。累计只加不减，没有扣分项。
   'mobile.growth.milestones.title': '里程碑',

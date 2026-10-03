@@ -203,7 +203,7 @@ describe('A. 左列：一行一个习惯，三个具体数字写在行上', () =
   });
 
   it('整行的 `aria-label` 一次把三个数字念完（屏幕阅读器不必逐 chip 猜）', () => {
-    expect(rowOf('阅读').getAttribute('aria-label')).toBe('「阅读」连续 2 天，最长 6 天，累计 8 次');
+    expect(rowOf('阅读').getAttribute('aria-label')).toBe('「阅读」连续 2 天，最长 6 天，累计 8 天');
   });
 
   it('行首图标圆盘每行恰好一个，且带一个 svg 字形', () => {
