@@ -1014,3 +1014,32 @@ test 用了 37 秒是**增量缓存态**，不是冷启动全量。冷启动那�
 再 `cd e2e && pnpm install`（该检出**没有** `e2e/node_modules`，实测），最后才 `pnpm check`。
 判据是脚本自己写的 `/tmp/heyta-intg-chain-*/check-rc.txt`，
 **不是包装层的退出码**（traps #164：通知里的 `exit code 0` 属于包装命令）。
+
+### 15.5 Windows 那条"硬判据"其实硬不起来 —— 三处各修一半，判据搬进单一所有者
+
+③ 要求"Windows 段带 … + 自动创建快捷方式"。去读实现才发现**这条判据没有读者**：
+
+| 事实 | 落点 | 后果 |
+|---|---|---|
+| `install-and-capture.ps1` 自己 `exit 1`（回读 `.lnk` 的 target 才算 `SHORTCUT_OK`） | 该文件 `:133` `:243` | 传不上来 —— **两层**都断：ssh 侧输出串了 `grep` 再串 `awk`，管道尾的 rc 覆盖掉远端 rc（`package-msix.sh:68-70`）；PS 侧是 `schtasks /it` 异步投进交互会话，父脚本只**读它写的取证文件**（`package-msix.ps1:266-280`），从不看 `LastTaskResult` |
+| `package-msix.sh` 取回取证文件后**一条判据都不查** | `:78` `scp … || true` 之后直接往下走 | 装机失败、快捷方式没建成 ⇒ **rc=0** |
+| `reinstall-all.sh` 有一份**四项**清单 | 原 `:246-255` | 新加的第五项（`SHORTCUT_OK`）只进了生成它的那一侧，读它的那一侧看不见 |
+
+这正是本仓反复记的那一族：**"判据存在"与"有人判"是两件事**，而清单抄成两处就一定会漂。
+修法是搬进单一所有者 `scripts/lib/msix-install-facts.sh`（`MSIX_REQUIRED_FACTS` 五条 + `msix_check_facts`），
+`reinstall-all.sh` 与 `package-msix.sh` 都调它；打包脚本那一侧从"不判"改成"判不过 exit 1"。
+
+**判据能失败吗 —— 四条夹具实测**（`/tmp/msix-fact-test.sh`）：
+
+| 夹具 | rc | 报的那一条 |
+|---|---|---|
+| 五条齐 | **0** | `判据齐了：5 条全在位`（阳性对照在前） |
+| 缺 `SHORTCUT_OK=True` | **1** | `缺判据：SHORTCUT_OK=True` |
+| `RESULT=INSTALL_FAILED` | **1** | `缺判据：RESULT=OK` |
+| 取证文件不存在 | **1** | `取证文件不存在：…`（以前这条路被 `|| true` 吞掉） |
+
+⚠️ 中间我自己造过一次假读数并当场撤掉：外层 zsh 把内联 `bash -c "…; echo rc=$?"` 里的
+`$?` **先展开成外层的状态**，于是四条全打印 `rc=0`。改成落成脚本文件再跑才是真读数
+（同 §7 那条"双引号里的 pattern 会被命令替换"是一个形状）。
+相关门禁复跑：`check:script-snapshot` / `check:shell-unicode` / `check:layering` /
+`check:docs` / `check:journey-coverage` **各 rc=0**（载体 `26191c2e` 之后的工作树）。
