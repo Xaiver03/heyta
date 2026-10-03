@@ -787,3 +787,282 @@ git show HEAD:docs/reference/environment-traps.md | awk -F. '/^[0-9]+\. /{if($1>
 6. D1 选 (a) 之后，`EVENT` 与 `TASK` 的**提醒**共用 `REMINDER` 实体（其 id 是 `taskId:triggerAt`）——这个 id 形状要不要改？改了会不会撞上 §3.3 的持久化字段纪律？
 7. W4b 那条"服务端下发公共事实"，我给定性口径是「AGENTS §1 那句约束的是用户数据」——**这个口径会不会被后面的人拿去给别的东西开门**？如果是，判据该长什么样（比如门禁只允许 `days[]` 这一种形状走这条通道）？
 8. §2.8 我断言"用户侧功能一项没少"，依据是 Apple ADP 的官方放弃清单。**请核**：heyta 有没有哪个**已经承诺过**的能力（落地页/隐私政策/帮助文档里）恰好落在那份清单里（服务端搜索、网页端直读、代客恢复）？如果有，加密档就不是"无取舍"，§2.8 要改。
+
+---
+
+## 8. 批次二落地计划（2026-10-03 15:41 起，逐项打勾）
+
+> **口径**：一项 = 一个提交 = 一条可复跑判据 + 一次变异验证（不能失败的检查没有价值，AGENTS §8.3）。
+> 状态：⏹ 未开始 / ⏳ 进行中 / ✅ 已完成（完成时把该行改写成过去式并附**实际读数**，不写"已做"）。
+> **调研基线**：`HEAD = 5bbca12d`，2026-10-03 15:38 由五个只读调研员分别核对 EVENT 实体面、界面与三端面、提醒面、
+> AI 工具目录面、法务与调休通道面。下面每条结论都带 `file:line`，动手前逐条可复核。
+
+### 8.0 先撤两条过期断言（这本身就是本仓库最贵的一类事故）
+
+1. 🔴 **"全仓一个 `new Notification(` 都没有"是假的**，而且它同时活在三个地方：`AGENTS.md` §9 的 P2 行、
+   `apps/web/src/App.tsx:998` 的注释、`apps/web/src/features/reminders/notify.ts:11` 的注释 ——
+   而 `notify.ts:141` 就是那句注释所否证的代码本身（`new ctor!(labels.title, {...})`）。
+   链路已在：`reminder-actions.ts:319 due()` → `apps/web/src/features/reminders/store.ts:154` →
+   `use-reminder-notifications.ts:39,51-60` → `notify.ts:122-154` → `App.tsx:1000`；权限入口 `ReminderNotifyPanel.tsx:60-63`。
+   ⇒ **W9 的起点比 §3 写的低**：web 投递不是零，缺的是"到点自醒 + 档位扩展 + DST 正确"。
+   📌 一般规律：**注释里的"全仓没有 X"是断言，不是事实**，而它会比它描述的那个时代活得更久。
+2. ⚠️ 我起草批次二目标时把 **W0 写成了"批次一遗留缺口"** —— 本文 §3 的 W0 是「把锚点弹层提到共享层」。
+   遗留缺口（`/tmp/ui.xml` 固定名、`verify-mobile-repeat.sh` 硬印库名、待入台账两条）另立 **W0b**，不与 W0 混提交。
+
+### 8.1 依赖顺序（反着做会白干）
+
+```
+W0 ────────────────┐
+                   ├─> W5 ─> W7
+W2 ─> W6 ──────────┤
+ └──> W10          └─> W8（三端接线随 W5/W6 一起做，单独收尾）
+W9（web 半，可与 W2 并行）
+W4b ─> 新 ADR + 回写 ADR-0038 范围表
+L'  ─> 随最后一个改变"对外承诺"的工单一起做
+W0b ─> 随时可做（台账那半要等文件干净）
+```
+
+- 🔴 **W10 必须排在 W2 之后**：`scripts/gen-ai-capability-manifest.mjs:77-79,222-224` 在"实体未进 `EntityModelMap`
+  而工具已登记"时会**当场红**（这是好事，说明它有牙齿）。
+- 🔴 **W6/W5 必须排在 W2 之后**：`EVENT` 进 `packages/shared-schema/src/entity-types.ts:22` 之前，
+  "一条没有截止日的倒数日能上日历"这件事**结构上不可能**。
+
+### 8.2 逐项：范围 / 落点 / 判据 / 变异 / 勾
+
+#### ⏳ W0 · 锚点弹层提到共享层（`packages/ui`），`AccountMenu` 改成消费者
+
+- **事实**：`packages/ui/src/index.ts` 文件头明写这一层**进不来任何 DOM 标签**，而
+  `apps/web/src/features/shell/AccountMenu.tsx:176-202` 整段靠 `getBoundingClientRect` / `window` /
+  **捕获阶段 scroll**（`:199-202` 是修"面板停在原地"的承重件）⇒ **不能整段搬**。
+  现量：`grep -rn getBoundingClientRect packages/ui/src | wc -l` ⇒ 0。
+- **形状**：纯函数 `placeAnchoredPanel(triggerRect, panelRect, viewport, gap, opts) → {top,left,placement}`
+  进 `packages/ui/src/overlay/model.ts`；**测量由宿主注入**（web 用 rect + 捕获 scroll；RN 用 `onLayout`/`measureInWindow`）。
+  CSS `apps/web/src/styles/app/rail.css:129-143`（`position:fixed` + `--ht-z-popover`）留在 web —— 属宿主。
+- **判据**：①复用既有注入验证：`e2e/account-menu.spec.ts` 的"面板右边必须可见"在改回 `absolute` 时仍转红；
+  ②新纯函数单测覆盖 roomAbove/roomBelow + 夹视口 + 翻转四组矩形；③`AccountMenu.tsx` 定位本体行数下降（`git diff --numstat` 进提交信息）。
+- **变异**：把 placement 的 `>` 改成 `>=`，或拿掉夹视口 ⇒ 至少一条单测红。
+- [ ] W0 完成
+
+#### ⏹ W0b · 批次一遗留的三条登记缺口
+
+1. `/tmp/ui.xml` 固定名 ⇒ 并行两轮互相覆盖。闭合代价**每次现量**：
+   `grep -rc '/tmp/ui.xml' scripts/lib/mobile-e2e.sh scripts/verify-mobile-*.sh | awk -F: '{s+=$2} END{print s}'`（2026-10-03 曾为 36）。
+   方案：lib 里 `UI_XML="${HEYTA_E2E_UI_XML:-/tmp/ui.xml}"`，全部读写点走该变量；**默认值不变** ⇒ 单轮运行零行为变化。
+2. `verify-mobile-repeat.sh` 抬头把库名硬印成 `heyta_mobile_smoke` ⇒ 改成打印真实 `HEYTA_E2E_DB`。
+3. 「待入 §7 的两条」正文搬进 `docs/reference/environment-traps.md` + 把 #168 末尾待办改过去式。
+   🔴 前置：`git status --porcelain -- docs/reference/environment-traps.md` 必须为空；取号以搬运那一刻的现量为准。
+- **判据**：①`bash scripts/mutate-closeout-gates.sh` 全绿且夹具不碰真 `/tmp/ui.xml`；②跑一趟 repeat，抬头打印的库名与 `HEYTA_E2E_DB` 逐字相同；
+  ③台账那一笔的 `git diff --numstat` 必须是"只插入、零删除"。
+- [ ] W0b 完成
+
+#### ⏹ W2 · `EVENT` 实体（D1/D2 已拍）
+
+- **省掉一整片工作的事实**：线协议**不枚举实体**（`shared-schema/src/supersync-http-contract.ts:145`
+  是 `entityType: z.string().max(255)`）、服务端白名单**自动跟随**（`server/src/sync/services/validation.service.ts:25`
+  `new Set(ENTITY_TYPES)`）、Prisma 的 `Operation.entityType` 是裸 String + 索引（`schema.prisma:159,182`）
+  ⇒ **EVENT 不需要任何数据库迁移**；存储三套也不用改（`packages/storage/src/stores.ts:11`、
+  `db-op-log-store.ts:299` 按 `[entityType,entityId]` 查、`sqlite-adapter.ts:272` 通用建表）。
+- **落点**：`shared-schema/src/entity-types.ts:22`；`domain/src/entities.ts`（接口 + `EntityModelMap:459` +
+  `MODELED_ENTITY_TYPES:486`）；**新建** `domain/src/events.ts`（排序/归档/下一次，照 `notes.ts:79` 三段排序）；
+  `op-log/src/state.ts:63,67,82,353,380`；**新建** `app-host/src/event-actions.ts` + `index.ts` 导出；
+  `packages/ui/src/sync/model.ts:489 ENTITY_LABEL_KEYS`；i18n 两张表各加 `common.entity.EVENT`（改完必 build，§7 #79）。
+- **字段**（§3.3：一律可选 + 运行时默认）：`title`、`date: LocalDate`、`isLunar?`、`leapMonthPolicy?: 'first'|'last'|'both'`
+  （D2 默认 `first`）、`recurrence?`、`pinnedAt?`（🔴 与"排在最前"**同一字段**，§2.4）、`archivedAt?`（🔴 独立标记，不碰 `deletedAt`，§2.5）、
+  `icon?`、`color?`、`notes?`。
+- **四条判据**：①老库回放不炸 —— 关键路径 `op-log/src/state.ts:313-315 deserializeMaterializedState`：
+  **少一个桶就整体 `return undefined`** ⇒ 老库首次启动全量重放（`checkpoint.ts:30` 的 `formatVersion` 不 bump），这条要写成断言；
+  ②🔴 §2.1 部署顺序落成可判检查：今天"老服务端 + 新客户端"的行为是 `INVALID_ENTITY_TYPE`（`validation.service.ts:111`）→
+  `packages/sync-client/src/client.ts:59` **永久拒绝名单** → `:1053-1057 markRejected` → 出队**永不重传**，只剩 `console.warn`（`:794`）
+  ⇒ 即"静默丢上云"。要响亮失败就得把"词表不认识"从"这条 op 本身坏"里分出来并上报成用户可见状态（`sync-wiring.ts:119`）。
+  `schema-version.ts:44` 只管版本号 ⇒ **零现成挂点，必须新写**；
+  ③op payload 里不得出现节假日数据（§2.2），变异 = 塞一年数据 ⇒ 红；
+  ④`scripts/check-reachability.mjs:266 ACTION_FAMILIES` 加行，漏登记即红。
+- **会红的门禁**：`domain/tests/entity-coverage.spec.ts:27,82`、`conflict-keys.spec.ts:60`、`ui/tests/sync-model.spec.ts:262`、
+  `i18n/tests/catalog.spec.ts:19`、`check:reachability`、`check:layering`（`check-layering.mjs:131` 禁止 apps 里出现 `entityType: 'EVENT'`）。
+- 🔴 **静默不管（必须人工勾）**：`check-materialized-reads.mjs:44 READ_PATTERNS` 硬编码 `.listTasks/.listProjects` ⇒
+  新 `listEvents()` 的屏不订阅 `dataRevision` 也不红；`check-ai-coverage.mjs:27` 由 `AiFeature` 驱动；
+  `check:op-log-semantics` 只锚 clientId 一行；`check:journey-coverage` 按端登记。
+  ⇒ 本单顺手做一件把静默变成会红的事：**把 `listEvents` 加进 `READ_PATTERNS`**（并注入验证它能红）。
+- **待决（写在提交信息里）**：`REMINDER` 的 id 是 `taskId:triggerAt`（`reminder-actions.ts:128`），倒数日共用它时 owner 键怎么算
+  （本文 §7 第 6 条）。倾向：`REMINDER` 加可选 `eventId`、owner 取 `taskId ?? eventId`、**id 形状不变** ⇒ 纯可加、不动已发布数据。
+- [ ] W2 完成
+
+#### ⏹ W6 · `EVENT` 成为日历的第二个事件源
+
+- **事实**：`packages/ui/src/calendar/model.ts:310,321,504-512` **只读 `task.dueDate`**（注释自己承认）；
+  消费者 `apps/web/src/features/calendar/CalendarView.tsx:39,164`、`apps/mobile/src/screens/CalendarScreen.tsx:44,337`。
+- **判据**：一条**没有截止日**的倒数日能上日历（这就是它区别于 TASK 的可观测证据）；
+  变异 = 把 EVENT 源接成"必须有 dueDate" ⇒ 红。另接进"今天"与收集箱（`App.tsx:723` 的 `refreshNow()` 是现成的"今天"重估点）。
+- [ ] W6 完成
+
+#### ⏹ W5 · 卡片网格 + 类型筛选 + pin + `⋯` 二级操作 + 归档视图
+
+- **事实**：最接近的现成品 `packages/ui/src/notes/NotesBoard.tsx:71-110`（pin/unpin）、
+  `packages/ui/src/trash/TrashBoard.tsx:48,63`（归档视图）、`packages/ui/src/material/material-surface.ts:38 materialTier`；
+  全仓 `onContextMenu`/`onLongPress` **零命中** ⇒ 二级操作面从 0 建，且依赖 W0 的弹层。
+  类型档位：纪念日 / 倒数日 / 生日 / 节日 —— 🔴 **不含"节假日"**（§0）。
+- **样式第一版只有预置模板**（§2.3）；图标给图标不给含义（§2.6）；"已经 N 天"不飘红不审判（§2.7）。
+- **判据**：①pin 变异 = 加第二个排序字段 ⇒ 红（§2.4）；②归档变异 = 实现成改 `deletedAt` ⇒ 红（§2.5）；
+  ③排序三段（钉选 → 时间 → **id 字典序兜底**），缺第三段就注入"同一毫秒两条"用例；
+  ④门禁：`check:design`、`check:l4`（内联只减不增）、`check:row-single-source`（🔴 `HT_FAMILY_BASELINE = 28`，
+  新增 `ht-countdown__*` 一族必须同时消掉一族才能净增为零）、`check:text-color`、`check:ui-language`；
+  ⑤界面结论有截图且人真的看过，主蓝数得出（§7 #82/#83）。
+- [ ] W5 完成
+
+#### ⏹ W7 · 纪念卡片导出为成品图
+
+- **事实**：`react-native-svg@15.15.5` **已在依赖树**（`apps/mobile/package.json:38`、`packages/ui/package.json:28,37`、
+  `apps/mobile/ios/Podfile.lock:2628,3026` 已 pod 已链接、`packages/ui/src/icon/Icon.tsx:47,85` 真在用）
+  ⇒ **不需要新过 §3.1/§3.2 两道门**。缺的是**栅格化**（全仓无 `toDataURL`/`toBlob`/`react-native-view-shot`/Skia）。
+  现成"渲染成图"的产品通道只有 `apps/web/src/features/settings/avatar-encode.ts`（canvas→data URL，
+  文件头明写"画布属平台能力、三端各不同"）与 macOS `WKWebView.takeSnapshot`（`HeytaMacApp.swift:181,210`，目前只在验收里用）。
+- **判据**：导出全程**零网络请求** —— 复用 `e2e/tests/privacy-consent-zero-egress.spec.ts:79-95`
+  （`page.on('request')` 分类器 + `page.on('websocket')`；`:16-30` 那条"零必须有非零正向对照"是承重的）
+  与 `e2e/tests/inbox.spec.ts:231-234`（按 method+url 数）。
+  ⚠️ 本文 §7 第 4 条要在这一单回答：Service Worker 拦掉的那部分算不算零 ⇒ 判据按"浏览器真发出去的"算，不按页面 `fetch` 调用数算。
+- 🔴 移动端渲染通道**未取证**：开工前先验 RN 能不能出图；不能就把移动端登记成**已知缺口（带编号）**，不静默降级。
+- [ ] W7 web 半完成 ／ [ ] W7 移动端出图或登记缺口
+
+#### ⏹ W8 · 三端接线与门禁
+
+- **事实**：web 开关表 `apps/web/src/features/shell/modules.ts:51-58,76-120,141-162`（7 个 key，无 countdown）；
+  移动端**没有开关表**，`apps/mobile/src/nav/TabBar.tsx:51-59` 硬编码 5 tab（`:45-49` 记着第 6 个 quadrant tab 已撤销）；
+  桌面原生壳**不含业务 UI** —— macOS `HeytaMacApp.swift:29 ShellView()` + `:399-462` WKWebView + `:361` 自定义 scheme 服务 `web-dist`；
+  Windows `MainWindow.xaml.cs:67-71`（有 `web-dist` 就是 `app` 模式）+ `:161,170-171 SetVirtualHostNameToFolderMapping("heyta.local")`；
+  **Linux 壳没有 web-dist 通道**。⇒ 新界面进桌面 = 进 web 产物，不是原生重写。
+- **会打到既有断言的地方**（先列出来，别撞了再改）：`e2e/tests/motivation.spec.ts:57,132-141,178,309-322`、
+  `e2e/tests/smoke.spec.ts:27`（`toHaveCount(10)`）、`apps/web/tests/app-mount.spec.tsx:835,851`、
+  `apps/landing/tests/mockup-shell-shape.spec.tsx:147-165,398-429`（它**读 `view-tabs.ts` 源码文本对账**）、
+  `apps/mobile/tests/projects-sections.spec.ts:81`、同步清单 `e2e/tests/helpers.ts:353-368`。
+- **判据**：倒数日入口进 `SHELL_MODULES`（🔴 **默认值是产品判断**，§3 W8 的倾向是"默认关"⇒ 关掉的模块**不进 DOM**，
+  既有 tab 计数断言不受影响）；移动端那一处重复按本文 §7 第 5 条给出裁决并登记；钉 tab 顺序的 e2e 同步更新且**仍能红**。
+- [ ] W8 完成
+
+#### ⏹ W9 · 提醒：本批做"能响的那半截"，原生投递另立一单
+
+- **事实（比 §3 写的乐观）**：web 投递已在（8.0 第 1 条）。缺三件：
+  ①档位上限是"提前 1 天"（`packages/domain/src/reminders.ts:54-61` = `[0,5m,15m,30m,1h,1d]`），而任意 `offsetMs`
+  **已接受非负数**、闸门 `MAX_REMINDER_LEAD_MS = 365d` 已在（`:70`）、API 路径已在（`reminder-actions.ts:213-222`）
+  ⇒ 扩档位是**纯可加**、不动 schema；
+  ②到点自醒：web 唯一周期 tick 是 `App.tsx:723` 的 `refreshNow()`，**不重算 `due`** ⇒ 挂一个只读 `due` 的定时，
+  不新建第二份判据（`use-reminder-notifications.ts:12-21` 已论证过"唯一判据"）；
+  ③🔴 **DST 敞口**：`reminders.ts:178 reminderTriggerFromOffset` 是纯 epoch 减法，"提前 3 天"= 硬减 72 小时，跨夏令时漂 1 小时，
+  而 `date.ts:252 startOfDay / :262 daysBetween / :211 addDays` **带现成 DST 判据却没被提醒链用上**（`check:*` 与
+  `verify:mobile-focus` 对提醒链的 DST **零断言**）。
+- **不做（有据）**：Android/iOS/mac/windows/linux 的通知投递。`docs/plans/goal-multi-end-coverage.md:104` 记着一条
+  **依赖裁决：没有任何一个 RN 本地通知库同时过 §3.1 维护性与 §3.2 许可证并具备本地调度**；`POST_NOTIFICATIONS` 不在 manifest
+  （`docs/research/legal-dataflow-client.md:163`）、iOS `Info.plist` 零 UsageDescription、`scripts/verify-mobile-reminder-ring.sh`
+  是"判据先行"（commit `ac682d96`）；§0 与 §6 本就把原生投递列为**停批项**。
+  ⇒ 这一半不是本批能解的，不假装做完；`docs/research/multi-end-entry-coverage-audit.md:34` 那行"web ✅ / 移动 ⛔永不响"保持原样并加日期。
+- **判据**：①新档位词条中英成对（`reminders-display.ts:84-105` 与 `ReminderPanel.tsx:60-65` 三处同序映射，
+  `offsetMessageKey` 的 `default: throw`（`:99`）就是漂移兜底）；②"提前 3 天跨夏令时仍是同一个本地时刻"写成真判据
+  （喂两个具体日期，一个跨 DST 边界）；③到点自醒：注入一条 `due` 已过期的提醒，tick 后 `notify` **恰好一次**
+  （变异 = 去掉去重 ⇒ 两次红）。
+- [ ] W9 完成（web 半 + DST）
+- [ ] 原生投递：确认**停批**（依据 `goal-multi-end-coverage.md:104`），在 AGENTS §9 标成"未闭合、有依赖裁决"
+
+#### ⏹ W10 · `EVENT` 进 AI 工具目录与 local-api 契约
+
+- **事实**：目录唯一真源 `packages/local-api/src/tools.ts:94 LOCAL_API_TOOLS`（6 条：读 `list_tasks:96/get_task:105/list_projects:114`，
+  写 `create_task:121/update_task:131/complete_task:138`，每条带 `egressFields` + `defaultEnabled:false:82`）；
+  app-host **import** local-api（`ai-tool-selection.ts:48`、`ai-tool-run.ts:52-61`），`runReadTool`/`toWriteIntent` 在
+  `server.ts:314/386`，MCP `executeTool`（`server.ts:444`）调同两件 ⇒ **一份目录两个前端，不许另建**。
+  授权 `tools.ts:713 isToolGranted` 是 `grants?.[name] === true`，**未列出即关**；
+  投影 `projectForTool:402 / projectListForTool:439 / readItemForTool:467` 就是"可列举不可读"的实现体。
+- **要动的 8 处**（🔴 = 漏了会红，⚠️ = 静默）：①目录条目 ②`mcp.ts:77 INPUT_SCHEMAS`（⚠️ `mcp.ts:198` 空 properties 静默回退，
+  生成器只标 `schemaRecorded:false`）③`server.ts` 的 `runReadTool`/`toWriteIntent` 分支 + `LocalApiHost` 新方法（`:95`；
+  未登记分支报 not-a-read-tool 🔴）④`local-api-host.ts` 实现 +（写）调 `event-actions.ts`，`submitIntent` 翻译在 `:227`
+  ⑤`ai-tool-selection.ts:95` 选择规则（⚠️ 缺了不红）⑥🔴 重跑 `node scripts/gen-ai-capability-manifest.mjs`
+  （漏 ⇒ `check:ai-tools` 规则 7 红，`check-ai-tools.mjs:286-303`）⑦i18n `web.ai.tools.intent*`（⚠️ 中英不齐 ⇒ `check:ui-language` 红）
+  ⑧测试 `tool-egress-fields.spec.ts`（⚠️ **非目录驱动**：新读工具"声明 == 真实投影"没人替你写）与 `ai-tool-*.spec`。
+- **最小可行范围**：读 2（`list_events`、`get_event`；正文 `notes` 只在 `get_event` 且 `isReadable` 为真时出现，照 `get_task` 形状）、
+  写提案 2（`create_event`、`update_event`；`LocalApiWriteIntent` 加 2 个**封闭变体** ⇒ UI 确认词表同步）。
+  出境：逐工具 `egressFields` 声明；前置披露走现成 `planAssistantEgress`（`ai-assistant.ts:159`，并集 `:131-139`，集合外就停 `:590-603`）——
+  当年抓现行的那条落点在 `tool-egress-fields.spec.ts:14-17,107`（`list_tasks` 把 `body` 带进列表）。
+  `ai-tool-run.ts` 与 `confirmAiToolProposal`（`:191-196`）**零改动**，`AiSettings.tsx:1126-1149` 自动长出新开关。
+- 🔴 **不做**：不开托管档（ADR-0013 `retention-undecided` 继续挡）、不立 `ENTITY_TYPES` 驱动的门禁（§3 W10 末的排期决定）。
+- **现量命令**（先证明敞口真实存在，做完后差集归零）：
+  ```bash
+  node -e "const d=require('./packages/domain/dist/index.js'),l=require('./packages/local-api/dist/index.js');
+  console.log('无工具的实体数 =', d.MODELED_ENTITY_TYPES.filter(e=>!l.LOCAL_API_TOOLS.some(t=>t.name.includes(e.toLowerCase()))).length)"
+  node scripts/gen-ai-capability-manifest.mjs --check; echo "GEN_RC=$?"
+  ```
+- [ ] W10 完成
+
+#### ⏹ W4b · 调休/补班：运营录入 + 客户端拉取（第一条服务端→客户端内容通道）
+
+- **可照的现成形状**：源 `scripts/vendor/holiday-cn/{2007..2026}.json` + `LICENSE` + 唯一读取入口 `load.mjs`
+  （校验点：`days[]` 非空 `:44`、`papers` 非空缺出处即 throw、`DATE_RE :30`、**`isOffDay` 必须 boolean `:63`**、
+  重复日 / 同一天既休又补班 throw），生成物 `packages/domain/src/generated/holiday-cn.generated.ts`，
+  门禁 `scripts/gen-holiday-table.mjs --check`（已进 `pnpm check`），查询层 `packages/domain/src/holidays.ts:75/108/121/161`。
+- 🔴 **真正的接缝**：`holidays.ts:108 adjustmentOn()` 是**纯同步、直接 import 生成物**的函数 ——
+  后台录入/校验/回显全做完、全绿，客户端读的仍是随包表，判据①"缺数据不报错不留空块"**根本没有载体**。这一步既不在后台落点里、也不在法务清单里。
+- **服务端现状**：路由注册表 `server/src/server.ts:494-586`；今天**唯一一条公开只读、非密文**下行是
+  `GET /api/push/vapid-public-key`（`push.routes.ts:152`）⇒ "公共事实"挂这一类。
+  全 `server/src` **零** `ETag`/`Cache-Control`/`Last-Modified`；可借的版本号形状只有 `PriceVersion`（`schema.prisma:388`）。
+- **要迁移吗**：**要，2 张表 1 条迁移**。理由不是"想要范式干净"：判据③（非法日期 / `isOffDay` 不是布尔）在 `Json` 列上
+  **库层拦不住** ⇒ 除"年度录入"表（存 `papers`）外要一张逐日表 `day DATE + isOffDay BOOLEAN`。
+  🔴 遵守 §4 迁移纪律：一个文件一条语句、`CONCURRENTLY` 走可恢复形状、需要 `ACCESS EXCLUSIVE` 的 DDL 自带
+  `SET LOCAL lock_timeout`、部署只走 `sh scripts/migrate-deploy.sh`、提交前 `node scripts/check-migrations.mjs`。
+  客户端数据 schema 不动（`CURRENT_SCHEMA_VERSION` 不 bump）。
+- **后台落点**（先例 = 优惠码/邀请）：`admin.routes.ts` 端点表（头注释 `:12-18`）+ `/coupons:614`/`/invites:670` 形状 +
+  `/overview:152-196` 聚合 + 白名单投影 `:98-102`；闸门 `admin.middleware.ts:34`（插件级 hook ⇒ 新路由自动受保）；
+  `admin-client.ts:190/205/244/359/368`；`AdminPanel.tsx:37-42 TABS` + `store.ts:60 AdminTab`；i18n `web.admin.*` 中英各一份；
+  测试 `server/tests/admin-routes.spec.ts`（**遍历全部路由的 401/403** + 白名单投影两型）、`admin-migration.pglite.spec.ts`、
+  `apps/web/tests/admin-panel.spec.tsx`。`check:journey-coverage` 不会因新资源红（`:50/245` 按端登记）⇒ 人工登记。
+- **客户端拉取 + 缓存**：**从零**（最接近的先例只有 `apps/web/src/pwa/push-subscribe.ts:202,367` 现拉不缓存；
+  `packages/app-host` 今天**没有任何 `fetch(`** —— 公共事实要不要破这条边界，必须写进新 ADR）。
+- **判据**：①自托管拿不到数据时**不报错、不留空块**，且要在**真界面**跑一次（截图 + 人看）；②`papers` 链接随数据入库并在后台回显；
+  ③校验层能因"日期非法 / `isOffDay` 不是布尔"拒绝录入（变异验证）；④🔴 **注入接缝本身要有判据**：`adjustmentOn` 加了
+  "部署方下发的覆盖表"入口后，必须能分别测出"有覆盖用覆盖 / 无覆盖退回随包 / 覆盖里日期非法就整年拒绝"三条分支。
+- **文档**：新写一份 ADR 给这条通道定性（§8 工作流：不改已接受 ADR 的结论，要变更另写一份）；
+  并**回写 `docs/adr/0038-admin-console-scope.md` 范围表 `:75-79`**。
+- [ ] W4b 完成
+
+#### ⏹ L' · 法务联动（范围按 §4 的时序条款**收窄**，不是"把六处都改一遍"）
+
+- 🔴 §4 自己的话：「倒数日**纯文字版（第一版）不触发 L1/L2/L4/L5**：它不申请任何权限、不上传任何内容」。
+  批次二交付的正是纯文字版（素材图片背景归 P2-9，见 §0 与 §6）⇒ **照"六处全改"施工就是按过期假设做工**。
+- 本批真正要做的是一件**可判**的事：逐条问"哪句对外承诺会因为倒数日 / 提醒到点 / 公共事实下发而变成假话"，命中才改。
+  普查命令：`grep -rnE '不申请|不上传|不会|从不|没有任何' packages/legal/src/documents/*.ts | head -80`。
+  初判候选：
+  - `permissions.ts:37 / :164`「不申请位置、通讯录、通话记录、照片、相机…」（中英两行）—— 倒数日不申请新权限 ⇒ **预计不改**，
+    但若 W9 改到 web 通知的授权文案，要看那句是否进了法务口径；
+  - `third-parties.ts:230-241`「heyta 服务器发出的对外请求」/「我们没有接入的东西（逐项列为否）」——
+    **W4b 新增一条服务端→客户端内容通道**，且这张表的行形状要求带依据 ⇒ 我倾向**要加行**（它改变了"服务器会主动下发什么"）；
+  - `privacy.ts:127-150` 三分表里"官方服务器存密文 + 元数据明文"那格 —— 公共事实是**明文的非用户数据**，
+    不改会被读成"云端一切都是密文" ⇒ 待判，且必须与新 ADR 的口径逐字一致；
+  - `terms.ts:379-391 / :745` 的服务描述与 **s12 变更历史表**（形状 `['1.1','2026-10-02 …']`）⇒ 新能力上线加一行版本记录。
+- **判据**：①`pnpm check:legal-copy` 与 `docRef` 测试能红（变异：把 `docId: 'minors'` 改成不存在的 id）；②双语成对（只改一边必须红）；
+  ③改真源后重跑 `pnpm --filter @heyta/legal build` → `node packages/legal/scripts/gen-site-copy.mjs`，🔴 **不许手改落地页文案**；
+  动到 `OPERATOR` 再跑 `check:legal-host`；④每条判定（改 / 不改）都要带"依据哪一句现文"。
+- **不做**：PIA（PIPL 第 55 条）全仓仍不存在（`packages/legal` 搜「影响评估」零命中；定性在
+  `docs/research/countdown-anniversary-data-and-images.md:174`，落点建议在 `docs/research/legal-pipl-baseline.md:967-996,1043`）
+  ⇒ 按 §6 口径**单独立项**，不塞进倒数日。
+- [ ] L' 完成（含逐条"改/不改 + 依据"的判定表）
+
+### 8.3 收尾（§5 的四条，一项都不能省）
+
+1. `pnpm -r typecheck && pnpm -r test`，然后**完整 `pnpm check`**（动过 `packages/legal` 必含 `check:legal-copy`）。
+   ⚠️ 当前 HEAD 上 `check:docs` 已红（8 处"本机有、仓库没跟踪"的死链，全在并行会话的文档里）——
+   收尾时这条红**不吸收、不代改**，写成"缺口在哪一段、在谁手里"的现量。
+2. `node research/tools/docs-link-check.mjs` 带读数复核。
+3. 界面结论必须有截图且人真的看过；验收不抢前台。
+4. `pnpm reinstall:all` 四端装上当前产物（AGENTS §6.1.1）；真机验收排在最后，用私有现场。
+
+### 8.4 进度勾选总表
+
+| 工单 | 状态 | 依赖 | 判据数 | 完成读数 |
+|---|---|---|---|---|
+| W0 弹层上提 | ⏳ | — | 3 | |
+| W0b 遗留缺口 | ⏹ | 台账需干净 | 3 | |
+| W2 `EVENT` 实体 | ⏹ | D1/D2 ✅ | 4 + 静默门禁人工勾 | |
+| W6 日历第二源 | ⏹ | W2 | 2 | |
+| W5 卡片网格 | ⏹ | W2、W0 | 5 | |
+| W7 成品图导出 | ⏹ | W5 | 2（含 RN 出图取证） | |
+| W8 三端接线 | ⏹ | W5/W6 | 3 | |
+| W9 提醒（web 半 + DST） | ⏹ | 可与 W2 并行 | 3 | |
+| W10 AI 工具目录 | ⏹ | **W2 之后** | 3 + 差集归零 | |
+| W4b 调休通道 + ADR | ⏹ | 独立（1 条迁移） | 4 | |
+| L' 法务联动 | ⏹ | 随最后一个改承诺的工单 | 4 | |
+| 收尾四项（§5） | ⏹ | 全部 | 4 | |
