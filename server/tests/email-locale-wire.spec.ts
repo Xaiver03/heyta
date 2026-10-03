@@ -48,6 +48,14 @@ import { PRODUCT_NAME } from '../src/config';
 import { t } from '../src/design-html.js';
 import { __resetMailTransporterForTests } from '../src/email';
 
+// 🔴 `getJwtSecret()` 跑在 `../src/auth` 的**模块顶层** ⇒ 令牌相关 import 一加载就要读它。
+//    开发机上有 `server/.env` 兜着，而**干净检出（CI 的唯一形态）没有** —— 于是这文件不是断言失败，
+//    是加载期就红。约定同 `password-recovery.spec.ts` / `magic-link-registration.spec.ts`：
+//    用 `vi.hoisted` 在所有 import 之前把测试密钥放好，`??=` 保证自己显式设过值的文件不被覆盖。
+vi.hoisted(() => {
+  process.env.JWT_SECRET ??= 'test-jwt-secret-that-is-long-enough-for-validation';
+});
+
 // ── 最小 SMTP 收件器 ────────────────────────────────────────────────────
 
 interface Captured {

@@ -38,6 +38,14 @@ vi.mock('../src/auth', async (importOriginal) => {
 import { apiRoutes } from '../src/api';
 import { LEGAL_SET_VERSION } from '../src/legal.generated';
 
+// 🔴 `getJwtSecret()` 跑在 `../src/auth` 的**模块顶层** ⇒ 令牌相关 import 一加载就要读它。
+//    开发机上有 `server/.env` 兜着，而**干净检出（CI 的唯一形态）没有** —— 于是这文件不是断言失败，
+//    是加载期就红。约定同 `password-recovery.spec.ts` / `magic-link-registration.spec.ts`：
+//    用 `vi.hoisted` 在所有 import 之前把测试密钥放好，`??=` 保证自己显式设过值的文件不被覆盖。
+vi.hoisted(() => {
+  process.env.JWT_SECRET ??= 'test-jwt-secret-that-is-long-enough-for-validation';
+});
+
 const OLD = 'terms@1.0;privacy@1.0;minors@1.0';
 const OFFICIAL_URL = 'https://heyta.waytofuture.cn';
 const SELF_HOSTED_URL = 'https://heyta.example-corp.com';
