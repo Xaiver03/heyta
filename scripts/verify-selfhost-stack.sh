@@ -59,12 +59,13 @@ trap 'rm -f -- "$0"' EXIT
 # "从空库起一条 compose 能不能用" —— 那必须是**新库**。
 # 同理这里的凭据是随机值且**不进任何仓库**：它们只活在这条命令的临时文件里。
 #
-# ## 🔴 迁移这一环判的是 D-3，而且是**两条腿**
+# ## 🔴 迁移这一环判的是 D-3，而且是**四条腿**
 #
-# 本脚本**始终带上** `docker-compose.migrate-once.yml`（对外文档第一屏写的那条
-# "compose 自己就够"的入口），并且夹具里**不设** `RUN_MIGRATIONS_ON_STARTUP`
+# 本脚本**始终带上对外文档第一屏那条入口的同一套文件**（`docker-compose.yml` +
+# `.build.yml` + `.migrate-once.yml`，由 R7 钉住；见下面 `COMPOSE_FILES` 那段），并且
+# 夹具里**不设** `RUN_MIGRATIONS_ON_STARTUP`
 # —— 于是容器里读到的是 `docker-compose.yml:50` 那个默认 `false`。
-# 两条合起来才证明"空库起来的那套能用的界面，迁移是被**那个一次性服务**做掉的"：
+# 这几条合起来才证明"空库起来的那套能用的界面，迁移是被**那个一次性服务**做掉的"：
 #
 #   · 腿一：一次性容器**退出码 0**，且库里「已成功应用」的**不同迁移名数**等于磁盘上的
 #     迁移目录数（阈值从被约束的常量推导，不是"大于 0"—— 后者在只建了基线表时也能绿）；
@@ -74,6 +75,9 @@ trap 'rm -f -- "$0"' EXIT
 #     CONCURRENTLY 走"回滚标记 + 带外恢复"，恢复成功后同一个名字**留两行**（一条痕迹、
 #     一条结果）。本机现量：42 个目录 / 42 个已应用名 / 5 条回滚痕迹 / 悬挂 0 / 重复完成 0。
 #     按行数判会把一次**正确**的部署判成失败。
+#   · 腿四：应用容器当场带着 `MIGRATE_RECOVERY_BUILD_LOCAL=true` —— 它证明这套栈拿到的是
+#     外人照文档起的那一支（那条 flag 决定迁移失败时打印的带外恢复命令里有没有
+#     `-f docker-compose.build.yml`）。2026-10-04 之前脚本只带两份文件，这一支**从来没被跑过**。
 #
 # 只留腿一就是假绿：那种写法下迁移可能来自应用自己启动那一段（旧脚本正是这样，
 # 它偷偷设 `RUN_MIGRATIONS_ON_STARTUP=true`），于是这条命令验的**从来不是** D-3，
@@ -95,10 +99,18 @@ BASE="http://127.0.0.1:${PORT}/app/"
 BUILD=1
 KEEP=0
 
-# 🔴 两份 compose 文件写成**一个数组**，因为"带不带 override"就是这条验收的判据本体。
+# 🔴 三份 compose 文件写成**一个数组**，因为"带不带 override"就是这条验收的判据本体。
 # 各段自己拼 `-f a -f b` 的写法，漂起来的方向是某个调用忘了带 override ——
 # 那次跑的就不是对外文档里那条入口，而输出照样全绿。
-COMPOSE_FILES=(-f "$REPO_ROOT/server/docker-compose.yml" -f "$REPO_ROOT/server/docker-compose.migrate-once.yml")
+#
+# 这里的集合**必须与文档 §4 那条主命令同一套文件**，由 `check:selfhost-entry-command.mjs`
+# 的 R7 判（判据只有一个所有者，脚本里不留第二份期望值）。2026-10-04 之前这里是两份，
+# 当时的理由「因为脚本自己 docker build」已被否证 —— `docker compose config` 实测带不带
+# `docker-compose.build.yml` 都解析成同一个 `image:`，而 compose 没有 `--build` 不会因为
+# 存在 `build:` 段去重建 ⇒ 省掉它的收益是 0，代价是应用容器少了它注入的
+# `MIGRATE_RECOVERY_BUILD_LOCAL=true`（`migrate-deploy.sh` 那条带外恢复命令的开关）。
+# 记录在 `docs/research/self-host-distribution-audit.md` §8.28。
+COMPOSE_FILES=(-f "$REPO_ROOT/server/docker-compose.yml" -f "$REPO_ROOT/server/docker-compose.build.yml" -f "$REPO_ROOT/server/docker-compose.migrate-once.yml")
 compose() {
   docker compose -p "$PROJECT" --env-file "$ENV_FILE" "${COMPOSE_FILES[@]}" "$@"
 }
@@ -237,12 +249,15 @@ log "    服务图对账：默认 3 个（未动） · 带 override 4 个（+sup
 log "==> 入口命令抄件对账（纯文件系统）"
 node "$REPO_ROOT/scripts/check-selfhost-entry-command.mjs" ||
   die "文档/README 里那条入口命令已经漂了 —— 上面点名了哪个文件哪一行。停在起栈之前是有意的：照抄会失败的那条命令，起起来的栈证明不了它自己对外可用。"
-# 脚本自己那两套也要钉住（它和文档不同是**有理由的**，理由变了就要改这里，不能漂）。
-# 🔴 量的是**文件名集合**，所以必须先把 `-f` 这些开关滤掉。`${COMPOSE_FILES[@]}` 里
-# `-f` 与路径是成对存的，原先那句 `sed 's#.*/##'` 会把两个 `-f` 也数进去 ⇒ 排序后
-# 得到「-f -f docker-compose.migrate-once.yml docker-compose.yml」，与期望值**永不相等**：
-# 这条判断在 HEAD 版里是**每次跑都红**（实测：bash 把那段单拎出来跑就是 exit 1），
-# 而症状长得像"脚本自己漂了"。判据坏在"永不相等"这一档上，比没有判据更误导人。
+# 🔴 原来这里还有一段 `[ "$SCRIPT_ENTRY_FILES" = "…两份…" ] || die`，2026-10-04 删掉：
+# 它把**当时的形状**当期望值写死在脚本里，那不是判据而是快照 —— 脚本再漂一次只要漂成
+# 同一个值它就跟着认账，而期望值的真源是文档那条主命令。这件事的判据归
+# `check-selfhost-entry-command.mjs` 的 R7（它自己读 `COMPOSE_FILES` 数组、从对外主命令
+# 导出不许有第二份）。下面只**打印**实测集合，打印不判定。
+# ⚠️ 计算集合时要把 `-f` 这些开关滤掉：`${COMPOSE_FILES[@]}` 里 `-f` 与路径成对存，
+# 原先那句 `sed 's#.*/##'` 把两个 `-f` 也数进去 ⇒ 排序后得到「-f -f …yml …yml」，
+# 与期望值**永不相等** —— 那条判断在 HEAD 版里是**每次跑都红**（实测单拎出来 exit 1），
+# 症状却长得像"脚本自己漂了"。判据坏在"永不相等"这一档，比没有判据更误导人。
 SCRIPT_ENTRY_LIST=""
 for entry in "${COMPOSE_FILES[@]}"; do
   case "$entry" in
@@ -251,9 +266,7 @@ for entry in "${COMPOSE_FILES[@]}"; do
   esac
 done
 SCRIPT_ENTRY_FILES="$(printf '%s' "$SCRIPT_ENTRY_LIST" | LC_ALL=C sort -u | tr '\n' ' ')"
-[ "$SCRIPT_ENTRY_FILES" = "docker-compose.migrate-once.yml docker-compose.yml " ] ||
-  die "本脚本带的 compose 文件集合变了（现在是 ${SCRIPT_ENTRY_FILES}）。它和文档 §4 的差集应当恰好是 docker-compose.build.yml —— 因为脚本自己 docker build。"
-log "    入口命令对账：抄件全部在位（判据见 scripts/check-selfhost-entry-command.mjs） · 本脚本 2 份（自己打镜像，所以不带 build override）"
+log "    入口命令对账：抄件全部在位（判据见 scripts/check-selfhost-entry-command.mjs） · 本脚本带的文件：${SCRIPT_ENTRY_FILES}"
 
 cd server
 # 🔴 先把这一套的**卷**清掉。实测形态：上一轮的 postgres 数据卷还在，
@@ -291,11 +304,13 @@ if [ "$healthy" != "1" ]; then
 fi
 
 # ── D-3：迁移是**那个一次性服务**做的，不是应用自己启动时做的 ────────────
-# 三条各管一段，缺任何一条这个结论都不成立：
+# 四条各管一段，缺任何一条这个结论都不成立：
 #   1 一次性容器退出码 0（它真跑完了，不是还在跑、也不是失败后被 restart 策略留着）；
 #   2 应用容器自己读到的 RUN_MIGRATIONS_ON_STARTUP 当场是 false（排除"迁移来自应用"）；
 #   3 库里已 applied 的迁移数 **等于** 磁盘上的迁移目录数（阈值从被约束的常量推导，
 #     不是"大于 0" —— 后者在只建了基线表、一条迁移都没跑的时候也能绿）。
+#   4 应用容器当场带着 MIGRATE_RECOVERY_BUILD_LOCAL=true（它跑的确实是文档那条入口那一支，
+#     不是脚本自己凑出来的另一支）。
 # ⚠️ 这里用 `supersync`/`supersync` 是因为**上面那份夹具没设** POSTGRES_USER/POSTGRES_DB，
 # 于是走 `docker-compose.yml` 的默认值；换夹具要同步换这里的两个名字。
 MIG_PS="$(compose ps -a --format '{{.Service}}|{{.State}}|{{.ExitCode}}' supersync-migrate 2>/dev/null | head -1)"
@@ -308,6 +323,18 @@ APP_STARTUP_MIGRATE="$(docker exec supersync-server printenv RUN_MIGRATIONS_ON_S
 if [ "$APP_STARTUP_MIGRATE" != "false" ]; then
   printf '   应用容器里的 RUN_MIGRATIONS_ON_STARTUP 实测 = %s\n' "$APP_STARTUP_MIGRATE" >&2
   die "这条验收只在「迁移由一次性服务完成」时才有意义。应用自己启动即迁移 ⇒ 判到的是另一条语义（那正是默认档刻意不承诺的），而界面照样能用、上面两条照样全绿。"
+fi
+# 🔴 腿四（2026-10-04 加）：应用容器必须带着 `MIGRATE_RECOVERY_BUILD_LOCAL=true`。
+# 它是 `server/scripts/migrate-deploy.sh:239` 那个分支的**唯一开关** —— 决定 CONCURRENTLY
+# 迁移失败后打印给运维的那条带外恢复命令里，有没有 `-f docker-compose.build.yml`。
+# 外人照文档那条入口（带 build override）拿到的就是**这一支**；2026-10-04 之前本脚本
+# 只带两份文件，跑的是**另一支**，于是"栈全绿"对那一支不构成任何证据。
+# 这里判的是容器里**当场读到的值**，不是 compose 解析结果 —— 解析对了但镜像/文件被换掉，
+# 也只有这一条会现形。
+APP_RECOVERY_FLAG="$(docker exec supersync-server printenv MIGRATE_RECOVERY_BUILD_LOCAL 2>/dev/null || echo '<没有这个变量>')"
+if [ "$APP_RECOVERY_FLAG" != "true" ]; then
+  printf '   应用容器里的 MIGRATE_RECOVERY_BUILD_LOCAL 实测 = %s\n' "$APP_RECOVERY_FLAG" >&2
+  die "应用容器没带上这个 flag ⇒ 本脚本验的那套**不是**外人照文档起的那套（少带了 docker-compose.build.yml），迁移失败时运维拿到的恢复命令会缺 -f docker-compose.build.yml。"
 fi
 MIGRATION_DIRS=$(find server/prisma/migrations -mindepth 1 -maxdepth 1 -type d | wc -l | tr -d ' ')
 psql_t() { compose exec -T postgres psql -U supersync -d supersync -tA -c "$1" 2>/dev/null | tr -d '[:space:]'; }
@@ -338,7 +365,7 @@ done
 # 那才是要拦的一条，而且它有牙：漏跑一条迁移 ⇒ 下面 INFLIGHT 或 APPLIED 必然不匹配。
 [ "${INFLIGHT:-1}" = "0" ] || die "有 ${INFLIGHT} 条迁移处在「既没完成也没回滚」的状态（PENDING/IN_PROGRESS）= 迁移被打断在中间，这台实例的 schema 不是干净状态。"
 [ "${DUPDONE:-1}" = "0" ] || die "有 ${DUPDONE} 个迁移名出现了**两条**已完成的行 —— 台账写脏了，APPLIED 那个数就不再是证据（两条同一名字 + 一条漏跑，计数照样相等）。"
-log "    D-3 对账：一次性容器 exited(0) · 应用侧 RUN_MIGRATIONS_ON_STARTUP=false · 已应用 ${APPLIED}/${MIGRATION_DIRS} · 悬挂 0 · 重复完成 0 · 带外恢复痕迹 ${TRACE} 条（设计内）"
+log "    D-3 对账：一次性容器 exited(0) · 应用侧 RUN_MIGRATIONS_ON_STARTUP=false · 带外恢复 flag=true（与文档那条入口同一支）· 已应用 ${APPLIED}/${MIGRATION_DIRS} · 悬挂 0 · 重复完成 0 · 回滚痕迹 ${TRACE} 条（设计内）"
 
 
 # 🔴 前置判据：**这台实例真的有界面**。

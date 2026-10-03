@@ -37,6 +37,26 @@
  *     「只比集合」会把"一份带 --build、一份不带"读成绿，所以逐字比。
  *  R6 非空哨兵：每个对外文档**至少命中一条**。命中数为 0 时这条判据会静默空转 ——
  *     原先那段就是这样坏的（命令被改名/换行/删掉 ⇒ 对账读不到东西 ⇒ 绿）。
+ *  R7 🔴 **验收载体**（`scripts/verify-selfhost-stack.sh` 的 `COMPOSE_FILES`）的 `-f` 集合
+ *     必须与对外主命令的**逐字相同**。这条 2026-10-04 才加，因为原先这里没有判据：
+ *     脚本自己有一段 `[ "$SCRIPT_ENTRY_FILES" = "…两份…" ]`，它把**当时的形状**写死成
+ *     期望值 —— 那不是判据，是快照：脚本再漂一次（只要漂成同一个值）它就跟着一起漂。
+ *     期望值必须由**被验的那句话**导出，不能由抄件自己导出。
+ *
+ * ## 🔴 R7 抓到的那个洞（为什么"脚本自己打镜像"不是省掉 build override 的理由）
+ *
+ * 脚本里那句注释写的是「它和文档 §4 的差集应当恰好是 `docker-compose.build.yml` ——
+ * **因为脚本自己 docker build**」。实测否证：`docker compose config`（不需要 daemon）
+ * 在带与不带 `docker-compose.build.yml` 两种解析下，`image:` 都解析成
+ * `supersync:selfhost-verify`（三个文件写的是同一个 `${SUPERSYNC_IMAGE:-supersync:local}`），
+ * 而 compose 没有 `--build` 就**不会**因为存在 `build:` 段去重建。
+ * ⇒ 省掉它的收益是 0。省掉它的代价却藏在环境里：`docker-compose.build.yml:34` 给
+ * `supersync` 注了 `MIGRATE_RECOVERY_BUILD_LOCAL=true`，它是
+ * `server/scripts/migrate-deploy.sh:239` 那个分支的**唯一开关**，决定 CONCURRENTLY
+ * 失败后打印的那条带外恢复命令里有没有 `-f docker-compose.build.yml`。
+ * 也就是说：外人照文档拿到的是**带 build.yml 的那一支**，而验收跑的是**另一支** ——
+ * 栈全绿也不构成那一支的证据。这与 §8.11 记的是同一族（"把自己要验的默认值换掉了"），
+ * 只是这次换的是 env 而不是镜像 tag。
  *
  * ## 内部文件（`local-server-verification.md`）只受 R1/R2 管，为什么
  *
@@ -89,6 +109,9 @@ const ENTRY_RE = new RegExp(`^[ \\t]*${ENTRY_BODY}`);
 
 /** 站内自建指南文章的词条前缀。 */
 const SELF_HOST_COPY_PREFIX = 'site.docs.selfhost.';
+
+/** 🔴 R7 的载体：那条要起真栈的验收脚本本身（见文件头 R7 那一节）。 */
+const HARNESS_FILE = 'scripts/verify-selfhost-stack.sh';
 
 /**
  * 扫描集。**逐文件写清它是谁的抄件**，因为"漏一份"就是这道门禁要防的形状本身。
@@ -186,6 +209,36 @@ function findCopyEntryCommands(file, text, keyPrefix) {
     }
   }
   return found;
+}
+
+/**
+ * 从验收脚本里读 `COMPOSE_FILES=(…)` 这个数组的 `-f` 集合（R7）。
+ *
+ * 🔴 为什么读**数组**而不是读那条 `docker compose … up` 命令行：
+ * 脚本把文件集合存成一个变量、所有段都从它拼 —— 那正是它当初防漂移的设计
+ * （"各段自己拼 `-f a -f b` 的写法，漂起来的方向是某个调用忘了带 override"）。
+ * 探针要跟着这个设计：判的是**唯一那一处**，不是某一处的调用。
+ * 找不到的时候**不许当空集通过**（R7 的哨兵分支），那与 R6 防的是同一件事。
+ */
+function findHarnessComposeFiles(file, text) {
+  const physical = text.split('\n');
+  const start = physical.findIndex((l) => /^[ \t]*COMPOSE_FILES=\(/.test(l));
+  if (start === -1) return { missing: true };
+  // 数组可能折行写：一路读到出现闭合 `)` 的那一行为止（读不到 ⇒ 形状坏了，报 malformed）。
+  let end = start;
+  while (end < physical.length && !physical[end].includes(')')) end += 1;
+  if (end >= physical.length) return { malformed: 'COMPOSE_FILES=( 之后找不到闭合的 )' };
+  const body = physical
+    .slice(start, end + 1)
+    .join(' ')
+    .replace(/^[^(]*\(/, '')
+    .replace(/\).*$/, '');
+  const files = body
+    .split(/\s+/)
+    .map((tok) => tok.replace(/^"|"$/g, ''))
+    .filter((tok) => tok.endsWith('.yml'))
+    .map((tok) => tok.slice(tok.lastIndexOf('/') + 1));
+  return { files, startLine: start + 1 };
 }
 
 /** 拆 `-f x.yml` / flags / 动词 / 点名的服务。读不出来就返回 null 并判红。 */
@@ -312,6 +365,56 @@ if (EXTERNAL_MAINS.length >= 2 && distinct.length > 1) {
     '',
   );
 }
+// ── R7：验收载体跑的必须就是**那同一句话**，期望值从对外主命令导出 ──────
+// 🔴 不在这里抄第二份字面量：原先 `verify-selfhost-stack.sh` 自己写死了
+// `[ "$SCRIPT_ENTRY_FILES" = "docker-compose.migrate-once.yml docker-compose.yml " ]` ——
+// 那是把**当时的形状**当期望值，脚本再漂一次只要漂成同一个值它就跟着认账。
+// 期望值的唯一来源是 R5 已经算出来的那条主命令。
+{
+  const abs = join(repoRoot, HARNESS_FILE);
+  if (!existsSync(abs)) {
+    red(HARNESS_FILE, null, 'R7', 'R7 登记的载体文件不存在了 —— 它被改名或删除，而这条门禁还写着它。别再留一条读不到东西的判据');
+  } else {
+    const harness = findHarnessComposeFiles(HARNESS_FILE, readFileSync(abs, 'utf8'));
+    const setOf = (cmd) => [...new Set(parseCompose(cmd).files)].sort().join(' ');
+    const mainSets = [...new Set(EXTERNAL_MAINS.map((m) => setOf(m.cmd)))];
+    if (harness.missing || harness.malformed) {
+      red(
+        HARNESS_FILE,
+        null,
+        'R7',
+        `读不到 COMPOSE_FILES 数组（${harness.missing ? '那个变量没了' : harness.malformed}）—— 它改成逐段拼 -f 了，而那是当初防漂移的设计。判据读不到东西**不算通过**`,
+        '',
+      );
+    } else if (harness.files.length === 0) {
+      red(HARNESS_FILE, harness.startLine, 'R7', 'COMPOSE_FILES 里一个 .yml 都没有 —— 空集合不是"通过"，是探针瞎了（R6 防的同一件事）', '');
+    } else {
+      // 载体自己的文件也要存在（它用的是 $REPO_ROOT 绝对路径，改名后 `compose` 会直接失败，
+      // 但那要等到起栈才发现 —— 这里纯文件系统就能抓到）。
+      for (const f of harness.files) {
+        if (!existsSync(join(repoRoot, 'server', f))) {
+          red(HARNESS_FILE, harness.startLine, 'R7', `-f ${f} 在 server/ 下不存在`, '');
+        }
+      }
+      const set = [...new Set(harness.files)].sort().join(' ');
+      if (mainSets.length === 0) {
+        red(HARNESS_FILE, harness.startLine, 'R7', '对账没有期望值可用：对外主命令一条都没命中（R5/R6 应当同时红）。R7 不静默跳过', '');
+      } else if (!mainSets.includes(set)) {
+        red(
+          HARNESS_FILE,
+          harness.startLine,
+          'R7',
+          `验收脚本带的 compose 文件集合是「${set}」，而外人照抄的那条主命令是「${mainSets.join(' / ')}」—— 两者必须是同一套文件。` +
+            `差一个 override，跑的就不是对外那句话：build.yml 会给应用容器注 MIGRATE_RECOVERY_BUILD_LOCAL=true，` +
+            `它是 migrate-deploy.sh 里带外恢复命令那一支的唯一开关（详见本文件头 R7 那一节）`,
+          '',
+        );
+      } else {
+        notes.push(`${HARNESS_FILE}：COMPOSE_FILES 的 -f 集合「${set}」与对外主命令**同一套文件**（R7）`);
+      }
+    }
+  }
+}
 
 // ── 豁免的承重断言：排除必须"确有其事"，不能变成静默漏洞 ────────────
 for (const ex of EXCLUDES) {
@@ -344,5 +447,5 @@ if (failures.length > 0) {
 }
 
 const total = TOTAL_MATCHES;
-console.log(`✅ 自托管入口命令对账：扫描集 ${SCAN_SET.length} 份文件 + 故意排除 ${EXCLUDES.length} 份，命中 ${total} 条入口命令，逐行过了 R1–R6`);
+console.log(`✅ 自托管入口命令对账：扫描集 ${SCAN_SET.length} 份文件 + 故意排除 ${EXCLUDES.length} 份，命中 ${total} 条入口命令，逐行过了 R1–R6，R7 把验收载体也钉在同一套文件上`);
 for (const n of notes) console.log(`   · ${n}`);

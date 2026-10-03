@@ -1632,3 +1632,92 @@ Dockerfile 的实参来自快照。步骤 2 的等式才有两个不同的边可
 也就是说如果最终走"镜像里用 pnpm 按 lockfile 装"，被撤下的是整套快照+覆盖率对账，
 而许可证门禁与镜像从此扫**同一棵树** —— 那才是 G-47 真正的终点。
 这条守卫把"半吊子迁移"（留着快照又换成 pnpm）当场拦住，值得记下来。
+
+### 8.28 🔴 验收载体自己跑的是**另一句话**：`verify-selfhost-stack.sh` 少一份 override，而它当初"有理由"
+
+本轮（2026-10-04 01:2x）量 G-49 那条门禁的扫描集时顺带读进 `scripts/verify-selfhost-stack.sh`，
+发现 §8.11 那一族**还有第三种面目**没被摘掉。
+
+**现场**（改前）：
+
+| 位置 | 实测 |
+|---|---|
+| `COMPOSE_FILES`（改前 `:101`） | 只有 `docker-compose.yml` + `docker-compose.migrate-once.yml` **两份** |
+| 对外文档那条主命令（R5 钉住的） | **三份**，多 `-f docker-compose.build.yml` |
+| 脚本里那段自校对 | `[ "$SCRIPT_ENTRY_FILES" = "docker-compose.migrate-once.yml docker-compose.yml "` ] —— 把**当时的形状**写死成期望值 |
+| 那段旁边的理由 | 「它和文档 §4 的差集应当恰好是 `docker-compose.build.yml` —— **因为脚本自己 docker build**」 |
+
+**那句理由被 `docker compose config` 否证**（它不需要 daemon，所以这条判断当场就能做）：
+两份 / 三份两种解析的**逐路径差集恰好 6 处**，全部在预期内 ——
+
+```
+services.supersync.build.{context,dockerfile,args.APK_MIRROR,args.NPM_REGISTRY,args.VCS_REF}   null → 有值
+services.supersync.environment.MIGRATE_RECOVERY_BUILD_LOCAL                                     null → "true"
+```
+
+服务清单（`caddy postgres supersync supersync-migrate`）、应用与迁移容器的 `image:`
+（两边都 `supersync:selfhost-verify`）、`RUN_MIGRATIONS_ON_STARTUP` 的解析值**一项没变**。
+⇒ 带上前那份 override **不会**触发重建（compose 没有 `--build` 就不看 `build:` 段），
+也不会换 tag ⇒「脚本自己打镜像」这个省掉它的理由收益是 **0**。
+
+**代价藏在一个环境变量里**：`docker-compose.build.yml:34` 给应用容器注
+`MIGRATE_RECOVERY_BUILD_LOCAL=true`，而它是 `server/scripts/migrate-deploy.sh:239`
+那个分支的**唯一开关** —— 决定 CONCURRENTLY 迁移失败后打印给运维的那条带外恢复命令里
+有没有 `-f docker-compose.build.yml`（全仓只有这一个消费者；`server/tests/migration-sql.spec.ts:452`
+只是文本断言）。外人照文档拿到的是**带 build.yml 的那一支**，验收跑的是**另一支** ⇒
+"三容器 healthy + 界面可用"对那一支**不构成任何证据**。这与 §8.11 是同族（"把自己要验的
+默认值换掉了"），只是这次换掉的不是镜像 tag 而是**恢复路径**。
+
+**为什么以前没人发现**：这段判断原先只有脚本自己那一份，而它把期望值写死成当时的形状 ——
+**那不是判据，是快照**：载体再漂一次只要漂成同一个值它就跟着认账，而 R1–R6 的扫描集里
+根本没有这个脚本。所以修法分两层：
+
+1. 载体改成带**同一套三份**文件（`scripts/verify-selfhost-stack.sh:110`），并**删掉**那段
+   把形状写死的自校对 —— 现在它只**打印**实测集合，打印不判定；
+2. 判定搬进门禁的单一所有者：`check-selfhost-entry-command.mjs` 新增 **R7**，读那个数组、
+   **期望值从 R5 算出的那条对外主命令导出**（不在这里抄第二份字面量），并带三条非空哨兵
+   （数组读不到 / 一个 `.yml` 都没有 / 没有期望值可用 ⇒ 都判红，不许"读不到就算过"）。
+
+**R7 第一次跑就报出真实那个洞**（不是注入）：
+
+```
+scripts/verify-selfhost-stack.sh:101  [R7]
+  验收脚本带的 compose 文件集合是「…migrate-once.yml …yml」，而外人照抄的那条主命令是
+  「…build.yml …migrate-once.yml …yml」—— 两者必须是同一套文件。
+```
+
+**变异验证**（在 `/tmp/r7-shadow` 影子根里做：门禁脚本用副本、其余文件软链到真树，
+真树那个文件全程没被写过 —— size+mtime 与起跑前相同）。**5/5 臂符合预期**：
+
+| 臂 | 变异 | 结果 |
+|---|---|---|
+| E 阳性对照 | 当前形状 | exit **0**，R7 红数 0 |
+| A | 摘掉 build.yml（回到出事那个形状） | exit 1，红数 1，定位语命中 |
+| B | `COMPOSE_FILES` 改名（探针该瞎） | exit 1，红数 1，报「读不到 COMPOSE_FILES 数组」 |
+| C | 空数组 | exit 1，红数 1，报「一个 .yml 都没有」 |
+| D | 文件名 typo | exit 1，红数 **2**（存在性 + 集合不等） |
+
+⚠️ 第一趟 E 臂**假红**过一次，而且红得很有迷惑性：影子根只软链了我"想起来要链"的三份
+compose 文件，漏了内部验收手册用的 `docker-compose.test.yml` ⇒ R2 判它不存在 ⇒ 对照先死。
+**夹具没铺全会伪装成"判据自己有洞"**，而这条判据本身恰恰是判"文件在不在"的。
+修法是把 `server/` 下**每一个** `.yml` 目录化列出来链上（`readdirSync(...).filter(.yml)`），
+不是去改断言。
+
+**顺手加的腿四**：脚本现在当场读应用容器里的 `MIGRATE_RECOVERY_BUILD_LOCAL`，不是 `true` 就
+`die`（读法与既有的 `RUN_MIGRATIONS_ON_STARTUP` 那条同形，"读不到"打成显式字面值而不是空串，
+否则探针够不着会被报成产品缺陷）。D-3 那一节的读数行同步印出这一条。
+
+**这一条还差什么**（别把上面这些读成"已经验过"）：
+
+- 腿四目前只有**静态**（R7）+ **解析层**（`config` 的 6 处差集）两份证据；它自己的**真读数**
+  要等任务 #2 那次全跑（`pnpm verify:selfhost-stack`）。本轮仍跑不了：01:2x 现量
+  `load 98.38 / 52.74 / 59.77`（阈值 12），OrbStack daemon 这次**已经起了**
+  （`/var/run/docker.sock → ~/.orbstack/run/docker.sock`，`docker version` = 29.4.0）——
+  环境无效不是产品失败，按判据等窗口，没调低阈值。
+- 载体与对外那句话**仍然有两处刻意不同**，写清楚免得被读成"一模一样"：
+  ① 不加 `--build`（镜像由脚本自己 `docker build`，为的是传 `VCS_REF=<完整 SHA>`，
+  而 build.yml 里是 `${SUPERSYNC_BUILD_SHA:-local}` ⇒ 换成 `compose build` 会把这枚标签改成 `local`，
+  所以这一处**不该**为了对齐而改）；② `SUPERSYNC_IMAGE` 钉成私有 tag `supersync:selfhost-verify`
+  （不复用 `supersync:local`，那是别人机器上可能存在的镜像）。
+  这两条是夹具性质，不构成"验的不是那句话"——真正会让绿色不迁移的是文件集合，而那一条现在被 R7 钉住了。
+
