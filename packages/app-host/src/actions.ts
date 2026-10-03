@@ -36,7 +36,10 @@ import {
   MAX_DURATION_MINUTES,
   MIN_DURATION_MINUTES,
   Priority,
+  byCreatedAtOrder,
+  isLive,
   isValidRecurrenceRule,
+  trashedIn,
   nextOccurrence,
   parseLocalDate,
   startOfDay,
@@ -684,22 +687,21 @@ export function createTaskActions(
     },
 
     listTasks(): Task[] {
-      return listAlive(ctx.getState().tasks).sort(byCanonicalOrder);
+      return listAlive(ctx.getState().tasks).sort(byCreatedAtOrder);
     },
 
     listPendingTasks(): Task[] {
       // 与 listTasks 同一份顺序、同一个"未删除"判据 —— 只有"未完成"是新增的。
       return listAlive(ctx.getState().tasks)
         .filter((task) => task.completedAt === undefined)
-        .sort(byCanonicalOrder);
+        .sort(byCreatedAtOrder);
     },
 
     listTrashed(): Task[] {
-      // 回收站 = 有墓碑、且没有被彻底删除。
-      // `purgedAt` 之后 `deletedAt` 仍然在（墓碑必须留着），所以两个条件都要。
-      return Object.values(ctx.getState().tasks)
-        .filter((task) => task.deletedAt !== undefined && task.purgedAt === undefined)
-        .sort(byDeletedOrder);
+      // 回收站 = 有墓碑、且没有被彻底删除。判据、顺序、"挑 + 排"这一遍
+      // 都在领域层（`entities.ts` 的 `trashedIn`）—— 便签、清单、习惯
+      // 共用同一个答案，不许这里再写一份。
+      return trashedIn(Object.values(ctx.getState().tasks));
     },
 
     findTask: taskOf,
@@ -708,32 +710,5 @@ export function createTaskActions(
 
 /** 未软删除的任务（顺序未定义，调用方自己 sort）。 */
 function listAlive(tasks: Record<string, Task>): Task[] {
-  return Object.values(tasks).filter((task) => task.deletedAt === undefined);
-}
-
-/**
- * 回收站顺序：**最近删除的在前**，同刻按 id 字典序。
- *
- * 决胜项与 `byCanonicalOrder` 同一个理由：`deletedAt` 来自毫秒时钟，
- * 同一台设备连续删两条经常落在同一毫秒里，此时顺序会退化成
- * `Object.values` 的枚举顺序 —— 那是**各端不同**的。
- */
-function byDeletedOrder(a: Task, b: Task): number {
-  const ad = a.deletedAt ?? 0;
-  const bd = b.deletedAt ?? 0;
-  if (ad !== bd) return bd - ad;
-  return a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
-}
-
-/**
- * 跨端一致的规范顺序：创建时间升序，同刻按 id 字典序。
- *
- * 🔴 **不要去掉那个 id 决胜**：`createdAt` 来自毫秒时钟，同一台设备连续建两条
- * 经常落在同一毫秒里，此时排序结果取决于 `Object.values` 的枚举顺序 ——
- * 那是**各端不同**的（IndexedDB 按索引键、SQLite 按主键，见 AGENTS.md §7 第 16 条）。
- * 表现是同一份数据在两台设备上顺序不同，而没有任何一处报错。
- */
-function byCanonicalOrder(a: Task, b: Task): number {
-  if (a.createdAt !== b.createdAt) return a.createdAt - b.createdAt;
-  return a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
+  return Object.values(tasks).filter(isLive);
 }
