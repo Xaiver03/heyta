@@ -19,7 +19,8 @@
  */
 
 import { execFileSync, spawn, spawnSync } from 'node:child_process';
-import { appendFile, existsSync, readdirSync, statSync } from 'node:fs';
+import { randomBytes } from 'node:crypto';
+import { appendFile, existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import os from 'node:os';
 import { setTimeout as sleep } from 'node:timers/promises';
 
@@ -209,6 +210,32 @@ function serverSourcesNewerThan(root, entry) {
 }
 
 /**
+ * `server/.env` 里是否**定义了**某个键（只看键名，不解析值、不把它读进进程环境）。
+ *
+ * 存在的理由：`server/index.ts` 第一行是 `import 'dotenv/config'`，而 dotenv
+ * **不覆盖已经存在的 `process.env`**。所以驱动一旦注入一个一次性值，它就会
+ * **盖掉**开发机上 `.env` 里那一个 —— 那不是我们要的效果（本机读数应当不变）。
+ * 这道检查让注入只在"真的谁都没给"的场合生效：干净检出、新克隆、隔离 worktree。
+ */
+function declaredInServerDotEnv(root, name) {
+  const file = `${root}server/.env`;
+  if (!existsSync(file)) return false;
+  let raw;
+  try {
+    raw = readFileSync(file, 'utf8');
+  } catch {
+    return false;
+  }
+  return raw.split('\n').some((line) => line.trimStart().startsWith(`${name}=`));
+}
+
+/** 一次性密钥：只在进程环境和本机 .env 都没有时给（见 `declaredInServerDotEnv`）。 */
+function secretFallback(root, name) {
+  if (process.env[name] !== undefined || declaredInServerDotEnv(root, name)) return {};
+  return { [name]: randomBytes(32).toString('hex') };
+}
+
+/**
  * 拉起服务端并等到 `/health` 真的通（它真的 ping 一次数据库，比探 TCP 端口严格）。
  *
  * `host` 默认 `127.0.0.1`；桌面壳那条路要让**远端 Windows** 访问，
@@ -244,6 +271,18 @@ export async function startServer({
     cwd: `${root}server`,
     env: {
       ...process.env,
+      // 🔴 干净检出（隔离 worktree / 新克隆）上 `server/.env` **不存在** —— 它被
+      //    gitignore，而服务端有**两处启动自检缺了就拒绝起来**：`JWT_SECRET`
+      //    （`auth.ts:34`）与 `PASSWORD_PEPPER`（`password/hash.ts:50`）。症状是
+      //    "服务端未能就绪"，看起来像产品坏了，而它其实是**验收载体依赖了一份
+      //    不进仓库的配置**。调用方各自的文件头都写着"不需要任何环境变量"，
+      //    那就得自己兜两枚**一次性**的：库是本轮造的、令牌与口令散列随进程一起死，
+      //    它们不承担生产密钥的任何义务。
+      //    （2026-10-03 实测：`verify:password-web` 在 /tmp 的隔离检出里先崩在
+      //     JWT_SECRET，补上后崩在 PASSWORD_PEPPER —— 一次只报一个是这类启动检查的
+      //     常态，所以两个必须一起兜，别等下一轮。）
+      ...secretFallback(root, 'JWT_SECRET'),
+      ...secretFallback(root, 'PASSWORD_PEPPER'),
       DATABASE_URL: dbUrl,
       NODE_ENV: 'test',
       ...(testMode
