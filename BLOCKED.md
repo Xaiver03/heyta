@@ -3610,3 +3610,44 @@ Booted 清单排序一变他们的验收就换了一台设备，而且不会有�
 **任何"用一个阈值区分两种东西"的判据，都要单独喂它本该区分开的那一对样本**，
 这里就是"全局的 7."与"局部的 4."各喂一次。
 
+## B64. 🔴 `check:legal-permissions` 是**已提交态的红**：W9 改了申请面没翻条款 ⇒ `pnpm check` 结构性不可全绿（2026-10-04 00:5x 载体 `d718f248` 现量）
+
+**这不是谁在飞。** 现量：`NO_COLOR=1 node scripts/check-legal-permissions.mjs` ⇒ **rc=1，7 条 ❌**，
+而涉及的四个文件（`permissions.ts` / `third-parties.ts` / `AndroidManifest.xml` / 那条门禁脚本自己）
+`git status --porcelain` **全部干净** —— 红在 HEAD 里。
+
+根因是**两侧不同步**，而且方向是"代码先动、条款没跟"：
+
+| 事实 | 证据（现量命令/字段） |
+|---|---|
+| W9 的原生投递给 Android 加了 `POST_NOTIFICATIONS` + `SCHEDULE_EXACT_ALARM`、给 iOS 加了 `NSUserNotificationsUsageDescription` | `git log -S"POST_NOTIFICATIONS" -- apps/mobile/android/app/src/main/AndroidManifest.xml` ⇒ `b0ba4a35 23:58 feat(app-host,mobile,web): W9 提醒的原生投递（ADR-0051）` |
+| 而条款里**六个位置**（`permissions.ts` Android/iOS 中英各两 + `third-parties.ts` 推送 SDK 否表中英各一）还写着"移动端不申请通知授权" | 门禁逐条点名行号与那句原文，命中 6/6 |
+| `SCHEDULE_EXACT_ALARM` 谁都没登记 | 既不在 `PRIVACY_ITEMS` 也不在 `NON_PRIVACY_ANDROID_PERMISSIONS` ⇒ 门禁拒绝给"通过" |
+| **这条门禁按设计工作了** | `017adc3e 20:16 feat(gates): 权限对账的通知臂改成六个字面位置、两侧对称 —— W9 原生半落地时它会精准指到该翻的那句`；提交信息里就把用途写明了 |
+
+🔴 对本 Goal 的直接影响写在这是**② 的读数边界**上：`e54b899b`（那趟干净检出的载体）
+同样以 `b0ba4a35` 为祖先（`git merge-base --is-ancestor b0ba4a35 e54b899b` ⇒ YES），
+所以那一趟的逐段读数里 `check:legal-permissions` **必红**。
+报"链 X 段绿"时必须带这一句，否则是把"链没跑完"和"链跑到了一段已知不可绿的段"混成一件事。
+
+⚠️ **为什么不代翻**（这不是偷懒，是判据）：那六句要说的是"什么时候申请通知授权、申请来做什么、
+被拒之后怎么降级、跳不跳系统设置"。这些事实只有 W9 的所有者手里有。
+我照门禁的提示语编一段**对外法务条款**，产出的是一条"看起来绿了的假话"，
+比留着这条红贵得多 —— 与 AGENTS §8 第 10 条（安全判据不得为测试桩降级）、
+§7 元规则二（一条永远通过的判据比没有判据更糟）是同一条纪律。
+同理 `SCHEDULE_EXACT_ALARM` 归"隐私"还是"非隐私"要人来拍（登记进哪一侧都要写理由）。
+
+📌 顺带否证一条登记在 AGENTS §9 L' 行的前置闸门措辞：它写的是
+"`permissions.ts` 那句**不申请照片**要等 W7 的 manifest 才知会不会变假"。
+现量变假的不是照片那一句，是**通知**那一组（六个位置），且触发它的是 W9 不是 W7。
+⇒ 那条闸门的**方向对了**（改申请面就会翻假条款），但它押的**权限种类和工单都不对**；
+这说明"预先登记哪一句会变假"这件事，能登记的是**形状**（申请面与条款必须同步），
+不是具体某一句。照片那一句**本轮顺手量了**：门禁自己的读数行写
+"Android 声明 3 条 `[INTERNET, POST_NOTIFICATIONS, SCHEDULE_EXACT_ALARM]`、NS…UsageDescription 1 条"
+⇒ 申请面里没有 `READ_MEDIA_IMAGES`、也没有 `NSPhotoLibraryUsageDescription`，
+所以"不申请照片"**仍然为真**，L' 那条前置闸门押错了权限种类但没有押错结论的方向。
+
+**闭合判据**（谁做谁打勾）：六个位置中英同步翻掉 → `pnpm check:legal-copy` 重生成落地页文案 →
+`SCHEDULE_EXACT_ALARM` 进两张表之一并写理由 → `NO_COLOR=1 node scripts/check-legal-permissions.mjs` rc=0。
+
+
