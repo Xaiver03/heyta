@@ -1944,8 +1944,26 @@ W0b ─> 随时可做（台账那半要等文件干净）
   它把同一条登记命名成 `stubEmptyHolidayAdjustments`，命中 `helpers.ts` + `inbox` + `vault-settings` +
   `profile-avatar-e2ee` + `admin-console` 五处（现量：`git -C heyta diff HEAD --stat -- e2e/tests/...`
   = helpers +12 / profile-avatar +2 / vault-settings +3−1，且 `git show origin/main:e2e/tests/helpers.ts`
-  里**两个名字都没有** ⇒ 他们那版还没提交）。合流时**只留一份**，留带方法守卫的那份，
-  另一个名字的调用点全换过去；这一步不做就会出现两个并存的同义夹具。
+  里**两个名字都没有** ⇒ 他们那版还没提交）。~~合流时**只留一份**，留带方法守卫的那份，
+  另一个名字的调用点全换过去；这一步不做就会出现两个并存的同义夹具。~~
+  🔴 **04 06:4x 这句里"留带方法守卫的那份"是个假选择，已现量否证并改成可执行裁决**：
+  把两棵树里的函数体各自抽出来、只把函数名归一化后取 sha256 ⇒ **两边都是 `82fa6148363b`**
+  （`stubPublicFacts` 体 403 字节 / `stubEmptyHolidayAdjustments` 体 415 字节，差的那 12 字节
+  **恰好等于两个名字的长度差** ⇒ 除名字外**逐字节相同**，方法守卫两边都有，因为那份守卫就是照他们那版补回来的）。
+  ⇒ 合流要做的不是"选强的那份"，是**改名**这一件事。裁决：**留 `stubEmptyHolidayAdjustments`**，
+  理由不是"谁先提交"，是这个名字说的是**载荷**（空表），而 `stubPublicFacts` 说的是通道 ——
+  后者会让下一个人误以为它给的是"真的公共事实"，而这条通道将来确实可能要有非空夹具的版本。
+  现量：主检出工作树 `grep -c stubPublicFacts e2e/tests/helpers.ts` = **0**、
+  `grep -c stubEmptyHolidayAdjustments` = **1**（定义），调用点两边都是**同一批 4 条 spec / 5 处**
+  （`inbox` ×2、`vault-settings`、`profile-avatar-e2ee`、`admin-console`）。
+  ✅ **可复跑的收口判据**（谁合流谁跑，两条都要成立）：
+  `grep -rn stubPublicFacts e2e/tests/ | wc -l` ⇒ **0**，
+  且 `grep -rn "stubEmptyHolidayAdjustments(page" e2e/tests/ | wc -l` ⇒ **≥ 5**。
+  ⚠️ **合流面此刻比先前更广**（04 06:43 现量，主检出脏 155 个文件，与本批落点交集 **16 个**）：
+  除上面那 7 个 e2e 文件外，还包含**本批 W7 的那条 e2e 载体 `e2e/tests/countdown-export.spec.ts` 本身**，
+  以及 `packages/legal/src/documents/` 下 **9 份文档 + `packages/legal/tests/structure.spec.ts`**
+  —— 也就是 §8.2 L' 那六处条款的位置**全部**在别人手里。⇒ 合流前必须重跑这一条交集命令，
+  它每一轮都在变（同一句"3 个文件脏"六天变成"6 个"的先例已经记在上面）。
   ✅ **修后读数（04 06:15，同一把锁、同一台机器、`--retries=0`）**：这两条 spec 单跑
   **`RC_FIXTURE_E2E=0` / `2 passed (8.7s)`**（`profile-avatar-e2ee.spec.ts:218` 与
   `vault-settings.spec.ts:141` 各一条）。⚠️ 这一趟之后又被重写掉 **10 个已跟踪 evidence png**，
