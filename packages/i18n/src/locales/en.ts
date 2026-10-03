@@ -3445,6 +3445,8 @@ export const en = {
   'common.conflict.reason.remoteArchive': 'The other device archived it',
   'common.conflict.reason.localArchive': 'This device archived it',
   'common.conflict.reason.fallback': 'Both sides made different changes to the same thing',
+  'common.calendar.dayMarker.off': 'Off',
+  'common.calendar.dayMarker.work': 'Work',
 
   // Reminders (B1-1 UI layer; shared by web and mobile).
   // 🔴 `reminder.offset.*` must stay 1:1 and in order with
