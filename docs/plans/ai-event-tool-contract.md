@@ -3001,3 +3001,20 @@ git status --porcelain=v1 | sed 's/^\s*[MADR?]*\s*//'   # 🔴 BSD sed 不认 \s
 → 四端重装（`IOS_DEVICE_NAME` 显式给，不靠 `head -1` 猜设备，traps #169）。
 每条前置等满都以 **exit 3** 收尾并打印现量命令（环境无效 ≠ 产品失败），全程不 push。
 02:2x 起跑前现场：负载 32→（阈值 12）、现场命中 3、`ssh windows-pc hostname` rc=0、载体五枚 `dist` 在场、`node_modules` 零软链。
+
+### 15.43b 一笔**没落**的 §9 更正（不是偷懒，是 AGENTS.md 此刻正被别人未提交地写着）
+
+`AGENTS.md` §9 那句 `### 2026-10-03：倒数纪念日 批次二（🔄 进行中，全在本地分支，未 push 未 merge）` **已被否证**，现量（02:3x，main `2a5c3587`）：
+
+```bash
+for b in feat/countdown-batch2 feat/countdown-w9 feat/countdown-w4b feat/countdown-w7 feat/countdown-w8; do
+  printf '%s:%s ' "${b#feat/}" "$(git merge-base --is-ancestor "$b" main && echo IN || echo 不在)"; done
+# countdown-batch2:IN  countdown-w9:不在  countdown-w4b:不在  countdown-w7:不在  countdown-w8:不在
+```
+
+⇒ `feat/countdown-batch2`（W0/W0b/W2/W5/W10）**已经在 main 里**，那行还写"未 merge"会让下一位把这单重做一遍。
+**这一笔我没有落**：`git status --porcelain -- AGENTS.md` 现量 `M` —— 别人正未提交地改同一个文件，
+而我用的 `git commit --only AGENTS.md` 提交的是**整个文件的当前内容**，会把他们那一版还没跑完判据的行一起带走
+（AGENTS §8 第 1 条"不吞并行会话的改动"在这里的形态就是"不替别人提交"）。
+**接手第一件事**：等 `AGENTS.md` 干净时把那行状态改成 `🔄 部分已落 main`，并在同一行带上上面那条现量命令
+（分支集合每天都在变，写死"batch2 已落、w4b 未落"就是造下一份会漂的抄件）。
