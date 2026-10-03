@@ -1855,3 +1855,73 @@ grep -oE '^#{2,4} ?B[0-9]+' BLOCKED.md | grep -oE '[0-9]+' | sort -n | uniq -d  
 
 ⚠️ 顺带确认的一件事：`PROGRESS.md` 里我那段收尾写着 Windows 快捷方式**实现与判据齐（`SHORTCUT_OK`）、未跑**
 —— 也就是 ③ 的那半件不缺代码，缺的还是"链 rc=0"这道前置。
+
+## 15.25 载体被一次重启整个清掉，以及规则 7 的"退出 0 不等于核对过"（2026-10-03 21:3x）
+
+**事件（先记损失面，因为它决定了下面哪些读数是重建后重取的）**
+
+`kern.boottime = Sat Oct 3 21:32:15 2026`：机器重启过一次，`/private/tmp` 随之清空。
+被清掉的不只是临时文件，而是**整条集成线的载体目录**——`git worktree list` 现在把
+`/private/tmp/heyta-final`、`/private/tmp/heyta-ai-cov`、`/private/tmp/heyta-day-rule`
+以及六个一次性 dry-run 检出全部报成 `prunable`（目录不在了）。
+
+| 东西 | 状态 |
+|---|---|
+| 五笔提交（`b728ff3c`…`b7d04e20`）与分支 `integrate/2026-10-03-closeout` | ✅ 完好（对象在 `.git` 里） |
+| 规则 7 的**未提交**编辑（把"上游没构建"与"清单漂移"分开报） | ❌ 丢在目录里，本轮重写 |
+| `/tmp/heyta-mutate-rule8.mjs`（10 臂）与它的日志 | ❌ 丢；读数当时已记进 §15.19，但**脚本没了 = 不可复跑** |
+| `/tmp/heyta-decisive.sh`（自足等待器）与 `/tmp/heyta-decisive/chain.log` | ❌ 丢；那趟本来也在等窗口，没有已产出的段读数 |
+
+🔴 **可迁移的一条**："跑过一次并绿"如果只把读数写进文档、把脚本留在 `/tmp`，
+下一次重启后就退化成"一句没人能复查的主张"。本轮起臂脚本一律放 `~/scratch-heyta/`，
+载体一律放持久路径。**新载体**：`/Users/rocalight/Desktop/All in one Data/01_PROJECTS/heyta-wt-ai-closeout`
+（分支不变、tip 不变）。重建命令：`git worktree prune && git worktree add "<上述路径>" integrate/2026-10-03-closeout`。
+下文所有读数都写在这棵树里；旧文档里凡是写 `/private/tmp/heyta-final` 的，指的都是同一分支的旧载体。
+
+**规则 7：一处真缺陷，而且是"会伪装成通过的"那一类**
+
+疑点来自上一轮留下的矛盾：注入假根跑门禁时它报"能力清单与上游一致"，而那个假根里
+`packages/*/dist` **根本不存在**。本轮把它查到底，机制是两层，都不在"消息写得不够细"这一层：
+
+1. **生成器会静默空跑。** 它的入口守卫是
+   `import.meta.url === pathToFileURL(process.argv[1]).href`，而 `import.meta.url` 是**过了 realpath** 的。
+   路径里任何一段软链（`/tmp → /private/tmp`、假根里指向真脚本的 symlink）都让比较失配
+   ⇒ main 块整个不执行 ⇒ **零输出、退出 0、一个字节都没核对**。实测对照（同一棵树、同一份文件，只换拼法）：
+
+   | 拼法 | 输出 | 退出码 |
+   |---|---|---|
+   | `node /tmp/heyta-symtest/scripts/gen-ai-capability-manifest.mjs --check` | 无 | **0** |
+   | `node /private/tmp/heyta-symtest/scripts/gen-ai-capability-manifest.mjs --check` | 报「读不到 dist」 | 1 |
+
+   入 `traps #180`。修：比较前先 `realpathSync(process.argv[1])`；修后同一拼法回 `exit 1` 并打印真结论。
+2. **两边的根不是同一棵树。** 门禁的 `ROOT` 认 `HEYTA_CHECK_ROOT`，生成器的 `ROOT` 只认
+   "我自己住在哪" ⇒ 注入时它核对的是**另一棵树**，还会给出一个看起来完全合法的"与上游一致"。
+   修：门禁 spawn 时把根传下去，生成器同样接受 `HEYTA_CHECK_ROOT`（未注入时逐字等于原取值）。
+   生效证据：`HEYTA_CHECK_ROOT=<主检出>` 跑载体里的生成器，它报的是
+   **主检出的产物**里没有 `LOCAL_API_TOOL_PACKS` —— 载体自己的 dist（不存在）已不参与。
+   ⚠️ 这句只用于证明"读取确实换了根"，**不**主张主检出坏了：那棵树里 `dist` 是哪一趟打的没查。
+
+3. 上一条修的是机制，这一条修的是**判绿方式**：门禁现在要求生成器**给出结论行**
+   （`与上游一致`）才算通过，并把 rc≠0 分成"上游还没构建"（`读不到 …/dist/index.js`）
+   与"清单漂移"两种报法——它们的修复动作相反。原话"混起来的是上一层"只对一半：
+   真凶在**被调方自己的入口守卫**里，上一层只是没察觉。
+
+**能失败（全部在假根里，不改载体、不改共享工作树）**
+
+- `node ~/scratch-heyta/mutate-rule7.mjs` → **5 臂 5/5**（没构建 / 真漂移 / 空跑必须红 / 两条阳性对照），整体 `EXIT=0`。
+- `node ~/scratch-heyta/mutate-rule89.mjs` → **10 臂 10/10**（规则 8/9 那批原样重建，`EXIT=0`）。
+- 臂 1（天然场景）：在未构建的新载体里 `node scripts/check-ai-tools.mjs` → `EXIT=1`，唯一违规就是
+  `能力清单的**上游还没构建出来**`，其余九条规则零违规。
+
+🔴 重建 10 臂时发现一件比原缺陷更贵的事：**原版把真生成器 symlink 进假根，于是规则 7 在
+那些臂里一直是静默空跑的**——而"期望整体 rc=0"的两臂（基线、注释阳性对照）正是踩在这个空跑上
+通过的。规则 7 修好后同形假根会真的去核对（假根没 dist ⇒ 红）。⇒ 臂必须把**无关规则显式中性化**
+（桩打印结论、退出 0），不能靠它们碰巧不响；这条已写进 `traps #180` 末段。
+
+**②/③ 的窗口现状（现量，别读成"已跑"）**
+
+重启后整机负载 `vm.loadavg = { 74.76 46.69 32.94 }`（16 核，闸门阈值 = 12），
+起 `pnpm install --frozen-lockfile`（新载体没有 `node_modules`）前的这一行读数就是归因凭据。
+全链 61 段的**逐段读数仍未取**；① 的落地面也变了：`main` 现在 `96f3293d`，
+`rev-list --left-right --count main…载体 = 22/64` ⇒ 落地前要先把 main 那 22 枚并进载体，
+不能按"main 是祖先、可直落"处理（那是 14:4x 的读数，已过期）。

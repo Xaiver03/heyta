@@ -4555,3 +4555,36 @@ ArgumentError - path name contains null byte
     如果它在输入为空时也返回"不命中"，那它对**任何**输入都返回"不命中" ——
     它没有方向，只有形状。与 #45/#163/#168 同族（管道的退出码、ANSI 计数、自己写的解析器），
     但与它们不同的是：**这次假过伪装成"自检通过"，而自检本来是用来防假过的**。
+
+180. 🔴 **子进程"退出 0"不等于"它核对了"。判据脚本的入口守卫拿 `import.meta.url`（已过
+    realpath）逐字比 `process.argv[1]`，路径里任何一段软链都会让它**零输出、空跑、退出 0**。**
+
+    2026-10-03 实测。`check:ai-tools` 规则 7 用 `spawnSync(node, [生成器, '--check'])`
+    然后**只看 `status !== 0`**。在一次故障注入里它打印"能力清单与上游一致 ✅"，
+    而那次核对**根本没发生**。同一棵树、同一份文件，只换路径拼法：
+
+    | 拼法 | 输出 | 退出码 |
+    |---|---|---|
+    | `node /tmp/…/scripts/gen-ai-capability-manifest.mjs --check` | **零字节** | **0** |
+    | `node /private/tmp/…/scripts/gen-ai-capability-manifest.mjs --check` | 报「读不到 dist」 | 1 |
+
+    机制：`import.meta.url` 是 **realpath 之后**的 URL，`pathToFileURL(argv[1])` 保留
+    调用者拼的形状；`/tmp → /private/tmp` 是软链，故障注入假根里那些"指向真脚本的
+    symlink"同理 ⇒ `invokedDirectly === false` ⇒ main 块整个不执行。
+    ⚠️ 还有第二种同形空跑，别只修一种：门禁的 `ROOT` 可被 `HEYTA_CHECK_ROOT` 注入，
+    而生成器自己的 `ROOT` 取自**它自己文件的位置** ⇒ 注入假根时"核对"发生在假根之外（跨根）。
+
+    ✅ 修两层，缺一不可：① 生成器比较前先 `realpathSync(process.argv[1])`；
+    ② 门禁判绿**认它说了什么**（结论行「与上游一致」在不在），不只认退出码 ——
+    并把"上游还没构建"与"清单漂移"分开报（它们的修复动作是**相反**的：前者该跑 build，
+    后者产物并没有错却被支去重新生成）。判绿只认退出码这件事在这批里已经是第二次
+    （#164 后台任务通知的 `exit code 0` 是包装命令的）。
+
+    📌 连带后果（比原缺陷更贵）：**凡是把真脚本 symlink 进假根的注入臂，都可能在
+    "以为在测规则 A"的同时让规则 B 静默空跑**，而"期望整体 rc=0"的阳性对照臂正是踩在
+    这种空跑上通过的。⇒ 重建那批臂时要把**无关规则显式中性化**（桩打印结论、退出 0），
+    不能靠它们碰巧不响。本条的现量复跑：
+    `node ~/scratch-heyta/mutate-rule7.mjs`（5 臂）与 `node ~/scratch-heyta/mutate-rule89.mjs`（10 臂）。
+    ⚠️ 臂脚本放 `~` 下而不是 `/tmp`：21:32 那次重启把 `/private/tmp` 整个清掉，
+    载体 worktree 与上一版臂**连同它"当时通过=10"的可复现性**一起没了 —— 读数留在台账里，
+    脚本没了就等于下一次只能重新怀疑。

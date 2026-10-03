@@ -337,18 +337,57 @@ if (existsSync(MANIFEST_GENERATOR)) {
   const checked = spawnSync(process.execPath, [MANIFEST_GENERATOR, '--check'], {
     cwd: ROOT,
     encoding: 'utf8',
+    // 🔴 把根**传下去**：生成器原来只认"我自己住在哪"，注入假根时两边不是同一棵树，
+    // 于是它会认真地核对**错的树**并给出一个看起来完全合法的"与上游一致"（traps #180 ②）。
+    // 未注入时 `ROOT` 就是它自己那棵树，这一行不改变任何行为。
+    env: { ...process.env, HEYTA_CHECK_ROOT: ROOT },
   });
-  if (checked.status !== 0) {
+  const genOut = `${checked.stdout ?? ''}${checked.stderr ?? ''}`;
+  // 🔴 退出码 0 只证明"它跑了、没抛错"，不证明"它核对了"。这一条原来只看
+  // `status !== 0`，于是漏过两种**都返回 0** 的空跑：
+  // ① 生成器的入口守卫拿 `import.meta.url`（过了 realpath）逐字比 `argv[1]`，路径里
+  //    任何一段软链都让它判定"自己不是入口" ⇒ 零输出、退出 0、一个字节都没核对
+  //    （实测同一棵树两种拼法：`/tmp/…` 无输出 exit 0，`/private/tmp/…` 报真结论 exit 1。
+  //    已在生成器那头修掉，但**这条判据不能依赖上游修没修**。）
+  // ② 本门禁的 `ROOT` 可被 `HEYTA_CHECK_ROOT` 注入，而生成器自己的 `ROOT` 取自
+  //    **它自己文件的位置** —— 两个根不是同一棵树时，"核对"发生在假根之外。
+  // ⇒ 判绿认的是它**说了什么**：没有结论行就不算通过。
+  const CONCLUSION = '与上游一致';
+  if (checked.status === 0 && !genOut.includes(CONCLUSION)) {
     violate(
-      path.relative(ROOT, path.join('packages/ai/src/capability-manifest.generated.ts')),
+      path.relative(ROOT, MANIFEST_GENERATOR),
       1,
-      '能力清单与上游（工具目录 + 实体清单）不一致',
-      '那份清单是**给模型看的语料**。它一旦和真实目录漂了，模型就会说"我做不到"于一个' +
-        '其实做得到的动作，或者反过来编造一个不存在的工具 —— 而两种都不会编译报错。',
-      '跑 `node scripts/gen-ai-capability-manifest.mjs` 重新生成，别手改产物。',
+      `能力清单核对**没有给出结论**（退出 0、输出 ${String(genOut.length)} 字节，里面没有「${CONCLUSION}」）`,
+      '这份清单是**给模型看的出境语料**。"没人核对过"和"核对过且一致"在旧的判据里长得' +
+        '一模一样，而假绿恰好藏在退出码这一层 —— 它不区分"没问题"和"没检查"。',
+      '直接跑一次 `node scripts/gen-ai-capability-manifest.mjs --check` 看它到底有没有在核对' +
+        '（⚠️ 用不带软链的实路径跑，软链路径会让生成器误判自己不是入口）。',
     );
-    process.stderr.write(checked.stdout ?? '');
-    process.stderr.write(checked.stderr ?? '');
+    process.stderr.write(genOut);
+  } else if (checked.status !== 0) {
+    // 🔴 两种失败要分开报：它们要求的修复动作**是相反的**。
+    // 上游没构建时产物并没有错 —— 报成"不一致、重新生成"会把人支去改一份正确的抄件。
+    const noBuild = /读不到[^\n]*dist[\\/]index\.js/.test(genOut);
+    if (noBuild) {
+      violate(
+        path.relative(ROOT, path.join('packages/ai/src/capability-manifest.generated.ts')),
+        1,
+        '能力清单的**上游还没构建出来**（不是"不一致"，是"根本没核对"）',
+        '生成器读的是**构建产物**（`packages/*/dist/index.js`），读不到就拒绝生成。' +
+          '这个 rc≠0 和"清单漂了"共用一个退出码，混报会让人以为产物写错了。',
+        '先跑 `pnpm -r build`（`pnpm check` 链的第一段就是它，正常路径碰不到这个）。',
+      );
+    } else {
+      violate(
+        path.relative(ROOT, path.join('packages/ai/src/capability-manifest.generated.ts')),
+        1,
+        '能力清单与上游（工具目录 + 实体清单）不一致',
+        '那份清单是**给模型看的语料**。它一旦和真实目录漂了，模型就会说"我做不到"于一个' +
+          '其实做得到的动作，或者反过来编造一个不存在的工具 —— 而两种都不会编译报错。',
+        '跑 `node scripts/gen-ai-capability-manifest.mjs` 重新生成，别手改产物。',
+      );
+    }
+    process.stderr.write(genOut);
   }
 } else {
   violate(
