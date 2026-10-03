@@ -1,6 +1,6 @@
 # EVENT（倒数日 / 纪念日）的 AI 工具契约
 
-> 状态：**设计已定，实现待两头合流**。
+> 状态：**EVENT 契约已定死（实现等倒数日那条线）；覆盖面门禁 ✅ 已落地**（现状 3/8，见 §5）。
 > 立论依据：ADR-0044（倒数日实体）、ADR-0045（对话式助手与授权解耦）、AGENTS §3.4 / §3.5。
 > 编号消歧：本文说的"覆盖面门禁"在 `docs/plans/ai-assistant-closure.md` 里叫 **W10**，
 > 而 `docs/plans/countdown-anniversary.md` **也有一个 W10，是同一件事**（两条线各自起了名）。
@@ -14,9 +14,17 @@
 **不在本批立这条门禁，后面再说**」，`:176` 紧接着承认后果：「所以 W2 落 `EVENT` 时，
 AI 侧不会有任何东西提醒我们」。**这句已被同日稍后的口头拍板推翻**：倒数日与 AI 工具同批设计。
 
-⚠️ 那份文件此刻在主检出里正被一次 merge 占用（`.git/MERGE_HEAD` 在飞），所以本文件先落，
-**合流时必须把 `:175` 那句就地改成指向本文**，并保留原句的删除线 —— 按"改一处必 sweep 全仓"，
-同一句话在 `docs/plans/ai-assistant-closure.md` 的 D-3 行（`:409`）还有一处，一并更正。
+⚠️ 本文初稿写"那份文件此刻正被一次 merge 占用（`.git/MERGE_HEAD` 在飞），所以先落本文、
+合流时再改" —— **这个前提当天就消失了**：合流已完成、`countdown-anniversary.md` 已在 `main`。
+🔴 **但它 `:175` 那句到今天仍然是旧的**（现量：
+`git show main:docs/plans/countdown-anniversary.md | sed -n '175p'`）。
+它给的理由是「这条门禁一上就会让**现有 10 个实体里那些没接 AI 的当场全红**」，
+而**这批的落地方式恰好让那个理由不再成立**：`AI-COV` 门禁不是"没工具就红"，
+是"**没工具又没有 `AI-COV-<n>` 缺口登记**才红"（`check-ai-coverage.mjs:531` 起的
+`ENTITY_COVERAGE_DEBT`，今天的五项未覆盖实体全都挂在里面、门禁照样 exit 0）。
+⇒ 合流时必须把 `:175` 就地改成指向本文并保留删除线；本批**不碰那个文件**（它属于并行那条线）。
+按"改一处必 sweep 全仓"，同一句结论在 `docs/plans/ai-assistant-closure.md` 的 D-3 行
+也有一处，两处已同日更正。
 
 **这条裁决不是新立场，是把已经写了的话变成有牙齿的状态。** ADR-0044:96 原文：
 「`EVENT` 不会让任何 AI 门禁变红……⇒ 加了实体却漏接工具目录是**静默通过**……
@@ -32,10 +40,12 @@ AI 侧不会有任何东西提醒我们」。**这句已被同日稍后的口头
 
 ### 2.1 "已覆盖"必须是**读 + 写都有**
 
-`scripts/gen-ai-capability-manifest.mjs:460-471` 已经算出了每实体的
-`read-write / read-only / write-only / none`，但 `:479-482` 的 `covered` 判的是
+`scripts/gen-ai-capability-manifest.mjs` 已经算出了每实体的
+`read-write / read-only / write-only / none`，但当时 `covered` 判的是
 `coverage !== 'none'` —— 于是 `PROJECT` 靠一个只读的 `list_projects` 就被计成已覆盖。
-产品立场是「界面有的功能都能**改**」，所以判据取 `coverage === 'read-write'`。
+产品立场是「界面有的功能都能**改**」，所以判据取 `coverage === 'read-write'`，
+现已落成生成器导出的**唯一口径函数** `countsAsCovered()`（`:349`，被 `:516` 消费），
+`check-ai-coverage.mjs` §9 只从它取口径、**不再自己算一遍**。
 
 ### 2.2 分母的准入判据（本轮定下来，之前没人写）
 
@@ -52,20 +62,30 @@ AI 侧不会有任何东西提醒我们」。**这句已被同日稍后的口头
 | `HABIT` | ✅ | `habit-actions.ts:77-136`；`HabitsView.tsx:177` |
 | `HABIT_LOG` | ✅ | **打卡是用户按的**：`habit-actions.ts:129 checkIn` ← `HabitsView.tsx:278` |
 | `REMINDER` | ✅ | `reminder-actions.ts:78-104`；web `features/reminders/store.ts:79`（⚠️ mobile 侧零界面，见 §3.5 第 2 问） |
-| `FOCUS_SESSION` | ❌ **本轮移出** | 唯一写入口是计时器结束时自动 `log()`：`apps/mobile/src/lib/focus-timer.ts:177`，`focus-actions.ts:45` 只有 `log/listSessions`，**没有** `update/remove` |
+| `FOCUS_SESSION` | ✅ **留在分母**（本行原判"移出"，2026-10-03 当天被自己的准入判据否证，见下） | 开始/中止是用户按的，两端同一个共享面板：web `apps/web/src/features/focus/FocusTimer.tsx:240` → `@heyta/ui` 的 `FocusPanel`，mobile `apps/mobile/src/screens/FocusScreen.tsx:271` 调 `startFocus`（`focus-timer.ts:237`）⇒ 命中"能按"那一半 |
 | `AI_FEEDBACK` | ❌ | 用户点的是"对 AI 建议的处置"，不是撰写资料：`apps/web/src/App.tsx:854` |
 | `PREFERENCE_CORRECTION` | ❌ | 同上，界面只有"忘掉这个偏好"一个开关：`App.tsx:2259` |
 
-🔴 **移出 `FOCUS_SESSION` 是本次改动里最可辩论的一条**，反方论点写在这里：
-"开始一次 25 分钟专注"也是用户手势。区分理由是**值由谁给** —— 专注时长由计时器产生、
-用户不当场填任何字段，而打卡的日期/数值用户可以给。
-**如果产品哪天加了"手动补记一次专注"的编辑面，它必须回到分母**，
-这条判据在 `AI-COV` 的门禁里就是靠 `focus-actions.ts` 有没有 `create*`/`update*` 来判的。
+🔴 **原判"移出 `FOCUS_SESSION`"已经被撤回，撤回的理由值得留着**：当时写的是
+"唯一写入口是计时器结束时自动 `log()`，`focus-actions.ts:45` 只有 `log/listSessions`、
+没有 `update/remove`"，并把区分线放在**值由谁给**（时长由计时器产生、用户不当场填字段）。
+这句和上面那条判据句子**互相矛盾**：判据写的是"用户能**填**或能**按**"，
+而"开始一次专注"就是用户按的 —— 按这个判据它就该进分母。
+两条里必须有一条让步，产品立场（"界面上有的功能 AI 都能操作"）要求让步的是那条排除。
 
-改完的数：**分母 7、当前已覆盖 1（只有 `TASK` 读+写齐）**，
-此前对外说的 `2/8` 两个数都是错的（`ai-assistant-closure.md` §7、
-`docs/research/dida365-feature-benchmark.md:132` 也已过期 —— 它写着 `NOTE`
-"零 Action、零 UI"，而 `note-actions.ts:77-95` 有 9 个成员且两端都在用）。
+⚠️ 当时还写过一句"这条判据在门禁里就是靠 `focus-actions.ts` 有没有 `create*`/`update*` 来判的" ——
+**那句是假的，落地的门禁不做这件事**：`AI-COV` 门禁只读工具目录与实体清单两边，
+它**从不打开任何 action 文件**。把"判据怎么落成代码"写错，比写漏一条更贵 ——
+下一个人会去查一个不存在机制。今天 `FOCUS_SESSION` 是**带着缺口登记**（`AI-COV-6`）
+留在分母里的，而不是被搬出去。
+
+改完的数（现量：`node scripts/gen-ai-capability-manifest.mjs --check`）：
+**分母 8、当前已覆盖 3（`TASK` / `PROJECT` / `HABIT` 读+写齐）**，目录 9 个工具（读 4 / 写 5）。
+本文初稿写的「分母 7、已覆盖 1」两个数都已过期（分母因 `FOCUS_SESSION` 回到 8；
+覆盖因补了 `create_project` + `list_habits`/`create_habit` 到 3）。
+此前对外说的 `2/8` 也是错的（`covered` 判的是"有任一工具"）——
+`ai-assistant-closure.md` §7、`docs/research/dida365-feature-benchmark.md:132` 也已过期 —— 它写着 `NOTE`
+"零 Action、零 UI"，而 `note-actions.ts:77-95` 有 9 个成员且两端都在用。
 
 ---
 
@@ -111,9 +131,11 @@ AI 侧不会有任何东西提醒我们」。**这句已被同日稍后的口头
 
 1. `EVENT` 进 `EntityModelMap` 的那一刻，`AI-COV` 门禁**必须变红**，
    直到 `list_events` + ≥1 个写提案工具登记齐（判据是 §2.2 那句准入线，不是某个清单）。
-   ⚠️ 这条现在**已经有半个实现**：生成器在 `:78-79` 会对"工具归到无领域模型的实体"当场红，
-   在 `:222-224` 写着「`EVENT` 已经在表里，但它在 `EntityModelMap` 里还不存在」——
-   缺的是**反向**那条（实体有了、工具没有 ⇒ 红），那才是 ADR-0044:96 要的东西。
+   ✅ 这条**两端现在都有牙齿了**（本批落地）：正向半边在生成器 `:457`
+   （工具归到没有领域模型的实体 ⇒ 当场红，并点名 ADR-0044/0045"同批"那条，见 `:86`），
+   反向半边在 `scripts/check-ai-coverage.mjs` §9 —— 实体在分母里、既没工具又没有
+   `AI-COV-n` 缺口登记 ⇒ 红。**已用注入验过**：塞一个假实体、以及把 `EVENT` 塞进两份实体清单，
+   两次都响（逐字读数见 §5.3）。
 2. 每个 `egressFields` 声明必须 ⊇ **真实载荷键**（形状照
    `packages/local-api/tests/tool-egress-fields.spec.ts`：实际跑执行器收键，不比代码）。
 3. "模型可选得到"要单独钉：工具必须出现在 `listAuthorizedTools()` 的输出里
@@ -141,3 +163,96 @@ AI 侧不会有任何东西提醒我们」。**这句已被同日稍后的口头
 倒数日那一批**不必**做：不必自己写覆盖面门禁 —— `AI-COV` 提供，
 它落地时应当**只做一件事**：把 `EVENT` 加进 `EntityModelMap`，然后看门禁红，
 再照 §3.1/§3.2 把工具补上。如果它先落地而门禁还没写，本文 §3.4 第 1 条就是它的验收标准。
+
+---
+
+## 5. 门禁落地后的现状与**唯一一条会卡住后续覆盖面的硬约束**
+
+### 5.1 现状（现量，2026-10-03）
+
+`node scripts/gen-ai-capability-manifest.mjs --check` 打印的三行就是门禁读数的真源：
+
+- 工具目录 **9 个**（读 4 / 写 5）：`list_tasks` `get_task` `list_projects` `list_habits` /
+  `create_task` `update_task` `complete_task` `create_project` `create_habit`
+- 覆盖面 **3/8**：`TASK`、`PROJECT`、`HABIT` 读+写齐
+- 无工具实体 **5 个**：`TAG` `NOTE` `HABIT_LOG` `FOCUS_SESSION` `REMINDER`，
+  全部带 `AI-COV-2/3/5/6/7` 登记（`check-ai-coverage.mjs:531` 起的 `ENTITY_COVERAGE_DEBT`）
+
+`AI-COV` 门禁（`scripts/check-ai-coverage.mjs` §9，已挂在既有 `check:ai-coverage` 里，
+所以**已经在 `pnpm check` 链上**）只从生成器取口径，自己不再读一遍上游。
+它能失败，已用**四次**独立注入证过（§5.3），每次都精确响、还原后 exit 0。
+
+### 5.3 四次注入的实际读数（2026-10-03，还原后 `node scripts/check-ai-coverage.mjs` exit 0）
+
+| # | 注入 | 门禁的**实际**答复（逐字摘录） |
+|---|---|---|
+| A | 往两份实体清单塞一个**假实体** `FAKE_THING` | exit 1：「实体 `FAKE_THING` 在分母里，AI 却**没有能读又能写**的工具（读 0 / 写 0），而 `ENTITY_COVERAGE_DEBT` 里也没有它」，分母读数同步变成 `3/9` |
+| B | 把 `create_project` 的 `kind` 从 `write` 改成 `read`（等价于"写工具没了"） | exit 1：「实体 `PROJECT` 在分母里，AI 却**没有能读又能写**的工具（**读 2 / 写 0**）」—— 注意它没算成已覆盖，多一个读工具不加分 |
+| C | 把 `REMINDER` 的工单号从 `AI-COV-7` 改成 `TODO-7` | exit 1：「`REMINDER` 的缺口登记没有形如 `AI-COV-<n>` 的工单号（当前：TODO-7）。**没有编号的豁免等于没有豁免**」 |
+| D | 🔴 **把 `EVENT` 真的加进两份实体清单**（D-3 说的就是这一刻） | exit 1，逐字是：「实体 `EVENT` 在分母里，AI 却**没有能读又能写**的工具（读 0 / 写 0）…ADR-0044 与 ADR-0045 §2.6 要求实体和它的 AI 工具**同批**落地」 |
+
+⚠️ **注入 D 的一半过程本身也是一条证据**：只往 `EntityModelMap` 那侧加 `EVENT`、
+没同步 `ENTITY_TYPES` 时，门禁报的是**另一条**红 ——
+「`EVENT` 在 `EntityModelMap` 里，却不在 `ENTITY_TYPES` 里 —— 两端实体清单已经不一致」。
+也就是说"两份清单只改一份"这个常见错误**不会**被覆盖判据悄悄吸收，它自己有一道闸。
+（这条是实测撞出来的，不是设计的副产品 —— 记录它是因为它会告诉下一个人：
+红的**文字**不同，说明响的是**哪一道**闸。）
+
+🔴 注入手法（写下来是因为它可复跑，也因为它有前提）：直接改
+`packages/domain/dist/index.js` 与 `packages/shared-schema/dist/index.js` 里的实体数组
+（`dist/` 被 gitignore，改完 `cp` 回备份、`cmp -s` 证逐字节还原），
+**不改 `src/`**。理由是门禁的上游就是这两个 dist —— 绕开重建，也就不污染工作树。
+⚠️ 前提：`dist` 必须比 `src` 新（本批开头刚跑过全量构建）。**若 `dist` 是旧的，
+这套注入仍然会响，但它响的是"旧产物的覆盖面"而不是当前源码** —— 重跑前先确认构建新鲜。
+
+### 5.2 🔴 目录容量判据与覆盖面要求**结构上相撞**，这一条要产品拍
+
+`packages/local-api/tests/local-api.spec.ts:87` 钉着
+`expect(LOCAL_API_TOOLS.length).toBeLessThanOrEqual(10)`，理由写在 `:86`
+（"这里是任务管理，超过 10 个就该先问'真的需要吗'"）。
+而 §2.2 的口径是**每个实体至少要一读一写两个条目**。现在 9 个 ⇒ **只剩 1 席**，
+意味着：
+
+- 剩下 5 个无工具实体**不可能**靠"继续加工具"覆盖完（要 10 个新席位）；
+- `EVENT` 落进分母时同样要 2 席（§3.1/§3.2 定的是读 2 / 写 4）。
+
+**本批刻意没有绕过它**：没有为了塞工具而删既有工具，也没有把上限改成 12/20。
+两条可走的路，都需要产品拍一条：
+
+1. **重新拍那条上限**（并让它从"一个魔法数"变成有理由的判据，比如按
+   `tools/list` 的 token 成本或按"每实体一读一写"的算术推出来）；
+2. **把某个既有工具腾出去** —— 但要先证明它在界面上没有唯一职责，
+   否则覆盖面是"悄悄缩水"，比红更糟（这条正是 `tool-pack-coverage.spec.ts`
+   文件头写的判据取向）。
+
+⚠️ 不要第三种做法："把缺口从登记里删掉让它不红"。台账有三条牙齿
+（必须带 `AI-COV-<n>` 工单号、必须写明**为什么**、实体已经不在分母里却还挂着 ⇒ 红），
+删条目会在下一条判据上响。
+
+---
+
+## 6. 三条本批踩到的、**可以迁移**的坑（尚未占台账编号）
+
+`docs/reference/environment-traps.md` 在 `main` 上已经排到 **#171**，而这批工作在一条
+落后于 `main` 的分支上 —— 在这里直接续号会在合流时撞出两个 #172。所以本批**不占号**，
+把三条原文放在自己的单写者文档里，等合流时由收口那次按当时的台账末尾搬进去。
+
+1. **委派给子 agent 的文件，它可能在 `git add` **之后**继续写。**
+   本批真发生了一次：一笔提交里落进 `case 'complete_task_MUTATED'` —— 变异实验的还原动作
+   发生在暂存之后，提交物因此带上了变异体（`85f13aaf` 单独修回）。
+   ⇒ 提交任何委派目录前先 `git grep MUTATED <那个目录>`，把它当一次廉价闸门，
+   而不是"我记得它说还原了"。
+
+2. **门禁的 `reason` 字符串会把它抄来的那句话变成事实。**
+   `ENTITY_COVERAGE_DEBT` 里最初四条理由写的是"TAG/NOTE/HABIT_LOG/REMINDER 在产品里
+   **没有写动作本体**"，抄自一份未逐条核过的报告。读被调方本体之后**四条全被否证**：
+   `project-actions.ts:178`、`note-actions.ts:133`、`habit-actions.ts:275`、
+   `reminder-actions.ts:174` 各自真的 dispatch 一条 CRT。
+   ⇒ 写进门禁的归因是**断言**，不是注释：每条都要打开被调方本体；
+   改的时候保留原句 + 标 ⚠️，让下一个人看见它错在哪一层。
+
+3. **两条各自合理的判据可以在算术上互相封死，而两边都不会报错。**
+   `local-api.spec.ts:87` 的 `<= 10`（"超过 10 个就该先问真的需要吗"）和覆盖面
+   "每实体一读一写"都是好东西，但 9 个条目 + 每实体 2 席 ⇒ 剩下 5 个实体**永远补不完**，
+   而 `pnpm check` 全绿。⇒ 加"容量类"上限时，同时写下它约束的那个增长向量需要多少席；
+   撞到就把冲突**登记成待拍项**，不要靠删工具或抬数字解决。
