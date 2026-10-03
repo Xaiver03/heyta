@@ -104,6 +104,14 @@ export function intentText(intent: LocalApiWriteIntent, t: I18nValue['t']): stri
       return t('web.ai.tools.intentUpdate', { id: intent.taskId });
     case 'complete-task':
       return t('web.ai.tools.intentComplete', { id: intent.taskId });
+    // 🔴 W10：目录长了两个写工具 ⇒ 这里的**每个封闭变体都必须有一句人话**。
+    // 少一个 case 不是"少一句文案"那么轻：TypeScript 会因为这个 switch 不再穷尽
+    // 而直接报 `TS2366`（函数缺返回值）—— 这是**好事**，它把"提案卡对着用户
+    // 显示 undefined"这种界面说谎挡在编译期。词条在中英两份里同步（i18n 门禁）。
+    case 'create-event':
+      return t('web.ai.tools.intentCreateEvent', { title: intent.title, date: intent.date });
+    case 'update-event':
+      return t('web.ai.tools.intentUpdateEvent', { id: intent.eventId });
   }
 }
 
