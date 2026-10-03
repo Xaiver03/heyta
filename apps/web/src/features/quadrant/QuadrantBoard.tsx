@@ -273,6 +273,8 @@ export function QuadrantBoard({ onOpenTask, activeTaskId }: QuadrantBoardProps =
           renderTrailing={renderTrailing}
           renderCellOverlay={renderCellOverlay}
           highlightedQuadrant={overQuadrant}
+          onOpenTask={onOpenTask}
+          activeTaskId={activeTaskId}
           testID="quadrant-board"
         />
       </HeytaUiProvider>

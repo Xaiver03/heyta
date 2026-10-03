@@ -374,3 +374,68 @@ describe('web 换装：宿主渲染出四格与共享行', () => {
     expect(container.querySelector('[data-testid="quadrant-drag-t1"]')).not.toBeNull();
   });
 });
+
+/**
+ * 选中（工单 W1）：四象限是任务的**第三种投影**，它必须跟随同一个选中。
+ *
+ * 🔴 这两条**必须挂 web 宿主**（`WebQuadrantBoard`），不能只挂共享板子：
+ * 2026-10-03 实测的断点就在宿主这一层 —— `features/quadrant/QuadrantBoard.tsx`
+ * 把 `onOpenTask` / `activeTaskId` 声明了、也解构了，**唯独没往共享板子传**。
+ * 挂共享板子的用例照样全绿，而界面上四象限根本不跟随选中。
+ * 宿主这一层的转发只有"真的从宿主挂下去"才量得到（`check:selection-single-source`
+ * 的断言 E 是它的静态兜底，那条查的是"声明了有没有用"，行为还得看这里）。
+ */
+describe('选中：四象限这一种投影也跟随（经 web 宿主）', () => {
+  /** 两条同格（第 1 格）的未完成任务 —— 高亮必须只落在那一条上。 */
+  function seed(): void {
+    const a = task({ id: 't1', important: true, dueDate: NOW + HOUR });
+    const b = task({ id: 't2', important: true, dueDate: NOW + 2 * HOUR });
+    useTaskStore.setState({
+      entities: { ...emptyState(), tasks: { t1: a, t2: b } },
+      now: NOW,
+    });
+  }
+
+  /**
+   * 🔴 底色要从 `getComputedStyle` 读，**不是 `el.style.*`**：RNW 把样式对象编译成
+   * class（`r-backgroundColor-o5e8d5`）而不写内联 style，后者恒为 `''`。
+   * 实测未选中的行回 `rgba(0, 0, 0, 0)`，选中的行回 `rgb(239, 246, 255)`。
+   */
+  const paint = (container: HTMLElement, id: string): string => {
+    const el = container.querySelector<HTMLElement>(`[data-testid="task-item-${id}"]`);
+    expect(el, `四象限里没有 task-item-${id}`).not.toBeNull();
+    return getComputedStyle(el as Element).backgroundColor.trim();
+  };
+
+  const TRANSPARENT = 'rgba(0, 0, 0, 0)';
+
+  it('🔴 宿主递 activeTaskId ⇒ 四格里只有那一条带底色', () => {
+    seed();
+    const container = mount(<WebQuadrantBoard activeTaskId="t2" onOpenTask={() => {}} />);
+    const selected = paint(container, 't2');
+    expect(selected, '四象限里选中的那条没有底色 —— 宿主的转发断了或共享层没接').not.toBe(
+      TRANSPARENT,
+    );
+    expect(paint(container, 't1'), '没选中的那条也画了底色').toBe(TRANSPARENT);
+  });
+
+  it('🔴 点格子里的一行 ⇒ 宿主收到那一行的 id', () => {
+    seed();
+    const seen: string[] = [];
+    const container = mount(<WebQuadrantBoard onOpenTask={(id) => seen.push(id)} />);
+    const body = container.querySelector<HTMLElement>('[data-testid="task-row-t2"]');
+    expect(body, '格子里那一行的行体没渲染出来').not.toBeNull();
+    expect(body?.getAttribute('role'), '行体不是可点区域 —— onOpenTask 没递到共享层').toBe('button');
+    act(() => {
+      for (const type of ['pointerdown', 'mousedown', 'pointerup', 'mouseup', 'click'] as const) {
+        body!.dispatchEvent(
+          type.startsWith('pointer')
+            ? new PointerEvent(type, { bubbles: true, pointerId: 1 })
+            : new MouseEvent(type, { bubbles: true }),
+        );
+      }
+    });
+    // 计数器是"事件没被吞"的阳性对照：为空时这条用例什么都没测。
+    expect(seen, '一次按下没到达宿主').toEqual(['t2']);
+  });
+});

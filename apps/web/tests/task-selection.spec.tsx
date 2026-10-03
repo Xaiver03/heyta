@@ -6,7 +6,8 @@
  * 理由与解锁条件写在 §8 那一行，不在这里含糊）。共享层自己的规则在
  * `packages/app-host/tests/selection.spec.ts`，**那边证明不了这边接上了** ——
  * 本仓库为这个形状付过两次学费（"抽出了共享实现，但旧那份没删"、
- * "零件都在、没人接线"）。所以这里三组各钉一个宿主侧的事实：
+ * "零件都在、没人接线"）。所以这里各组各钉一个宿主侧的事实
+ *（A 接线点计数 · B 真点一行 + 真画一行 · C 回落口径 · D 其余投影与搜索的两个入口）：
  *
  * **A. 两个列表调用点都接上了。** web 的任务视图有**两条**渲染路径：
  * 不分组的平铺列表与按日期分组的列表。只接一条的后果是"分组的时候点行没反应"，
@@ -37,6 +38,21 @@ import { HeytaUiProvider, resolveHeytaUiTheme, TaskList } from '@heyta/ui';
 import { pruneSelectionFromEntities, selection, useSelected } from '../src/lib/selection.js';
 
 const THEME = resolveHeytaUiTheme({ scheme: 'light', reducedTransparency: false });
+
+/**
+ * 选中那一行的底色应当**正是**设计系统的主色浅档。
+ * 🔴 期望值从 token 推导而不是抄字符串：把 `#eff6ff` 写死在测试里就等于
+ * 造了第二份事实源，token 一改这条判据会红在**正确**的改动上（那种红最后会被改掉）。
+ * `getComputedStyle` 回的是 `rgb(r, g, b)` 形状，所以要做一次换算。
+ */
+const EXPECTED_ACTIVE_BG = (() => {
+  const hex = THEME.tokens['color.primary-subtle'].replace('#', '');
+  const byte = (at: number): number => Number.parseInt(hex.slice(at, at + 2), 16);
+  return `rgb(${byte(0)}, ${byte(2)}, ${byte(4)})`;
+})();
+
+/** 探针实测：RNW 在 jsdom 里给"没有底色"的容器回的是这个串，不是空串。 */
+const TRANSPARENT = 'rgba(0, 0, 0, 0)';
 /** 正午的"现在"：跨零点与夏令时都不会把它挪到别的日子。 */
 const NOW = new Date(2026, 8, 25, 12, 0, 0).getTime();
 
@@ -136,22 +152,31 @@ function Host({
   );
 }
 
-describe('A. 任务视图的两条渲染路径都接上了选中', () => {
-  it('两处 `<TaskList` 调用、两处 `onOpenTask`，数量相等', () => {
+describe('A. 任务的每一处投影都接上了选中', () => {
+  const count = (needle: string): number => APP_SOURCE.split(needle).length - 1;
+
+  /**
+   * 投影点 = App 里"把一批任务画出来"的地方：平铺与分组两处 `<TaskList`、
+   * 四象限一处、时间线一处。
+   * ⚠️ 那个 `4` 是**这一行的和**，不是抄来的数；新增一类投影必须显式加一项，
+   * 而漏加的下场是下面那句"每个投影点都递了 `onOpenTask`"当场红
+   * （2026-10-03 加四象限与时间线时，本组正因为还写着"两处"而红 —— 那一次红得对：
+   * 判据的期望值没跟着覆盖面走，它就会悄悄变成一条只守旧形状的空判据）。
+   */
+  const projections = count('<TaskList') + count('<QuadrantBoard') + count('<TimelinePanel');
+
+  it('🔴 每一处投影都递了 `onOpenTask`（数量相等，而不是 grep 到一个就算过）', () => {
     // 阳性对照：读到的是不是那个文件，先证一次。
     expect(APP_SOURCE).toContain('export function App(');
-    const calls = APP_SOURCE.split('<TaskList').length - 1;
-    const withOpen = APP_SOURCE.split('onOpenTask={openTask}').length - 1;
-    expect(calls).toBeGreaterThanOrEqual(2);
-    expect(withOpen).toBe(2);
+    expect(count('<TaskList')).toBeGreaterThanOrEqual(2);
+    expect(projections).toBe(4);
     // 🔴 "接了一个点漏另一个"就是本仓库那种部分接线的形状：不比这两个数，
-    //    第三条渲染路径将来加进去时不会有人发现它没接。
-    expect(withOpen).toBe(calls);
+    //    下一条渲染路径加进去时不会有人发现它没接。
+    expect(count('onOpenTask={openTask}')).toBe(projections);
   });
 
-  it('行的高亮光标与选中是**同一个值**', () => {
-    const withActive = APP_SOURCE.split('activeTaskId={selectedTaskId}').length - 1;
-    expect(withActive).toBe(2);
+  it('行的高亮光标与选中是**同一个值**，且每一处投影都递到', () => {
+    expect(count('activeTaskId={selectedTaskId}')).toBe(projections);
     expect(APP_SOURCE).toContain("const selectedTaskId = useSelected('task');");
   });
 
@@ -229,6 +254,44 @@ describe('B. 真点一行 = 选中那一条', () => {
     });
     expect(a.querySelector('[data-testid="detail-slot"]')?.textContent).toBe('t1');
     expect(b.querySelector('[data-testid="detail-slot"]')?.textContent).toBe('t1');
+  });
+
+  it('选中的那一行**在 DOM 上被画出来**，其余行没被画（"选中看得见"的地基）', () => {
+    // 前面几条证的是"选中这个值是对的"。但界面上的选中是一个**底色**：
+    // 值对了而没画出来（或每行都画）用户看不出任何区别，而 fs 级的 A 组看不见它。
+    // 变异臂：把 `TaskRow` 的 `active ? …` 换成恒 `styles.row` → 第一句红；
+    // 换成恒 `styles.rowActive` → 第二句红。
+    const container = mount(<Host tasks={[task('t1'), task('t2'), task('t3')]} />);
+    act(() => {
+      selection.select('task', 't2');
+    });
+    /**
+     * 🔴 载体：**必须走 `getComputedStyle`，`el.style.*` 在这个载体里恒为空**。
+     * 实测（2026-10-03，一次性探针）：RNW 把样式对象编译成 class
+     * （`class="… r-backgroundColor-o5e8d5 r-borderRadius-1xfd6ze"`），
+     * **不写内联 `style`**，所以 `el.style.backgroundColor` 是 `''` ——
+     * 用它当判据会得到"四格与列表全都没底色"这种**看起来像四个真缺陷**的空读数。
+     * （对照：几何类判据 `style.left` 能用，那是运行时算出来的内联值，不走 StyleSheet。）
+     *
+     * ⚠️ 锚点是 `task-item-*`（外层那一行），不是 `task-row-*`（行体）：
+     * `rowActive` 挂在 `TaskRow` 最外层那个 `View` 上。
+     */
+    const paint = (id: string): string => {
+      const el = container.querySelector<HTMLElement>(`[data-testid="task-item-${id}"]`);
+      expect(el, `行 ${id} 没渲染出来`).not.toBeNull();
+      return getComputedStyle(el as Element).backgroundColor.trim();
+    };
+    const selectedPaint = paint('t2');
+    expect(selectedPaint, '选中的那行没有底色').not.toBe('');
+    expect(selectedPaint, '底色不是设计系统的主色浅档').toBe(EXPECTED_ACTIVE_BG);
+    expect(paint('t1'), '没选中的行也有底色 —— 高亮等于没有信息').toBe(TRANSPARENT);
+    expect(paint('t3')).toBe(TRANSPARENT);
+    // 换一条：底色跟着走，不是钉在某一行上（这条抓的是"光标写死"的那种实现）。
+    act(() => {
+      selection.select('task', 't3');
+    });
+    expect(paint('t2'), '换选中之后旧那行还留着底色').toBe(TRANSPARENT);
+    expect(paint('t3'), '新选中的那行没有底色').toBe(selectedPaint);
   });
 
   it('没传 `onOpenTask` 时行体不可点（钉住共享层这个设计，防它以后加默认值）', () => {
