@@ -686,8 +686,13 @@ export interface LocalApiConfig {
    * 对照 Joplin：同样"token guards against local programs"。
    */
   token?: string;
-  /** 逐工具授权。**未列出的工具一律视为关闭。** */
-  grants?: Readonly<Record<string, boolean>>;
+  /**
+   * 逐工具授权。**未列出的工具一律视为关闭。**
+   *
+   * 值允许 `undefined` 不是松一口子：判定是 `=== true`（fail-closed），而判据必须能
+   * 表达"键存在、值是 undefined"这一档 —— 它挡的是"有人把判定改成 `name in grants`"。
+   */
+  grants?: Readonly<Record<string, boolean | undefined>>;
 }
 
 export const DEFAULT_LOCAL_API_CONFIG: LocalApiConfig = {
