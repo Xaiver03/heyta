@@ -129,7 +129,7 @@ heyta 的核心闭环（任务 / 清单 / 标签 / 四象限 / 习惯 / 专注 /
 
 | # | 能力 | 滴答有 | heyta 状态 | 证据 | 缺口 |
 |---|---|---|---|---|---|
-| 5.1 | Markdown 笔记 | ✅ | 🟡（**只有模型**） | `Note` 实体 — `entities.ts:177-188`；op-log 有 notes 桶 — `state.ts:76`；在 `EntityModelMap` 里 | 🔴 **零 Action、零 UI**：app-host 无 `createNote` / `listNotes`；全仓唯一引用是移动端冲突文案 `mobile.entity.NOTE`（`apps/mobile/src/sync/conflict-view.ts:93`）。**不可创建、不可查看** |
+| 5.1 | Markdown 笔记 | ✅ | 🟡（**只有模型**） | `Note` 实体 — `entities.ts:177-188`；op-log 有 notes 桶 — `state.ts:76`；在 `EntityModelMap` 里 | ⚠️ **本行的原判"零 Action、零 UI、不可创建不可查看"已过期（2026-10-03 逐条核过被否证）**：`packages/app-host/src/note-actions.ts` 有 `createNote`（`:133`）与 `listNotes`（`:91/:217`），界面 `apps/web/src/features/notes/NotesView.tsx` + `apps/mobile/src/screens/NotesSection.tsx` + 共享 `packages/ui/src/notes/NotesBoard.tsx`。🔴 **仍然成立的那半条**：AI 工具目录里**一个 `NOTE` 工具都没有** ⇒ 对 AI 而言确实"不可创建、不可查看"，登记为 `AI-COV-3`（见 [`ai-event-tool-contract.md`](../plans/ai-event-tool-contract.md) §5.1） |
 
 > [feature-matrix.md](feature-matrix.md) 自己建议「MVP 阶段直接不做笔记」。
 > 现状是**保留了数据模型却没有任何入口** —— 这属于 §3 的"看起来有、其实没有"。
@@ -224,7 +224,7 @@ heyta 的核心闭环（任务 / 清单 / 标签 / 四象限 / 习惯 / 专注 /
 | 9 | **习惯计数型 / 时长型** | 界面不可达，只能单次打卡 | 模型有 `target`/`unit`/`goalType`，`isAchieved` **三种口径都实现了** |
 | 10 | **「实时」多设备同步** | 没有客户端连 WebSocket | 服务端 WS 广播、连接服务、快照通知**全写好了** |
 | 11 | **桌面端** | 渲染进程是占位（一个 TaskList） | Electron 壳 + 打包脚本 + **三平台分发包真的在 `release/`** |
-| 12 | **笔记模块** | 零 Action、零 UI | `Note` 实体 + op-log 桶 + 类型映射**齐全** |
+| 12 | **笔记模块** | ⚠️ 原判"零 Action、零 UI"**已过期**（2026-10-03 核过：`note-actions.ts:133/:217` 有 `createNote`/`listNotes`，web + mobile + 共享 `NotesBoard` 都有界面）；**当天连 AI 侧那一米也已补**：`NOTE` 现有 `list_notes` / `get_note` / `create_note` / `update_note` 四条（原登记的 `AI-COV-3` 缺口已关闭） | `Note` 实体 + op-log 桶 + 类型映射**齐全** |
 | 13 | **鸿蒙** | `Index.ets` 是 22 行 DevEco 模板，RN 没接进去 | `pnpm verify:harmony-toolchain` **真的**打出了 20 MB release HAP |
 
 > **共同形状**：**基础设施做完了，最后一米没接。**
@@ -294,7 +294,7 @@ heyta 的核心闭环（任务 / 清单 / 标签 / 四象限 / 习惯 / 专注 /
 | 1 | **端到端加密同步** | 服务端**强制密文** ingress，明文一律 400 `E2EE_REQUIRED` | 滴答做不到（它的服务端要读明文做提醒 / 统计 / 搜索） |
 | 2 | **自建服务器，永久免费** | `docker compose` 三件套，不需要 Redis / S3 | 滴答**只提供 SaaS**；这是"数据在你自己机器上"的硬保证 |
 | 3 | **不按功能收费** | [ADR-0020](../adr/0020-ai-subscription-two-tiers.md) §3.2 + `check-pricing-consistency.mjs` 强制 | 滴答免费档 9 个清单 / 99 个任务；我们**没有功能闸门** |
-| 4 | **本机 API + MCP server** | `packages/local-api`，6 个工具，默认关、只监听回环、逐工具授权 | 滴答 2026-04 才上 MCP；我们的**默认关 + 逐工具授权**更严 |
+| 4 | **本机 API + MCP server** | `packages/local-api`，**22 个工具**（读 10 / 写 12；⚠️ 2026-10-03 现量，同日曾先后记成 6 与 9），默认关、只监听回环、逐工具授权 | 滴答 2026-04 才上 MCP；我们的**默认关 + 逐工具授权**更严 |
 | 5 | **BYOK / 自带推理端点** | `packages/ai`，零厂商 SDK，内置预设只有本地 Ollama / LM Studio | 滴答的 AI 只能用它的云端 |
 | 6 | **导出含墓碑与完整 op-log** | `export-dump.ts` —— 含 `counts` 可核对 | "导全了"可被**验证**，而不是靠信 |
 | 7 | **四象限是派生视图** | [ADR-0015](../adr/0015-four-quadrant-as-derived-view.md) | 不是第四套存储，不会漂移 |

@@ -33,11 +33,11 @@
  */
 
 import {
-  LOCAL_API_TOOLS,
   authorizeToolCall,
   type LocalApiConfig,
   type LocalApiTool,
 } from './tools.js';
+import { LOCAL_API_TOOLS, inputSchemaForTool } from './tools/registry.js';
 
 /** 我们按这个版本的 MCP 形状输出。 */
 export const MCP_PROTOCOL_VERSION = '2025-06-18';
@@ -50,7 +50,8 @@ export const MCP_SERVER_NAME = 'heyta';
  *
  * `inputSchema` 用 JSON Schema（MCP 的规定），**在我们这边是手工写的** ——
  * 因为 `@heyta/local-api` 是零依赖包，不引 schema 生成库；
- * 而且工具只有 6 个，手写比引入一套生成器更清楚。
+ * 而且工具数量有限，手写比引入一套生成器更清楚。
+ * 写的位置是各个 `src/tools/<entity>.ts`（一个工具一处声明），本文件只做投影。
  */
 export interface AuthorizedToolDefinition {
   name: string;
@@ -73,86 +74,10 @@ export interface AuthorizedToolDefinition {
  */
 export type McpToolDefinition = AuthorizedToolDefinition;
 
-/** 每个工具的参数 schema。 */
-const INPUT_SCHEMAS: Readonly<Record<string, McpToolDefinition['inputSchema']>> = {
-  list_tasks: {
-    type: 'object',
-    properties: {
-      projectId: { type: 'string', description: '只列某个清单里的任务。' },
-      completed: {
-        type: 'boolean',
-        description: 'true 只列已完成的，false 只列未完成的，不传则都要。',
-      },
-      dueOn: {
-        type: 'string',
-        description:
-          '只要截止日正好是这一天的任务，格式 YYYY-MM-DD，与返回里的 dueDate 同一口径。' +
-          '与 dueFrom / dueTo 互斥。没有截止日的任务不属于任何一天，不会出现在结果里。',
-      },
-      dueFrom: {
-        type: 'string',
-        description:
-          '日期范围起点（包含这一天），格式 YYYY-MM-DD，必须与 dueTo 一起给。' +
-          '与 dueOn 互斥。范围含两端，最多 14 天。',
-      },
-      dueTo: {
-        type: 'string',
-        description:
-          '日期范围终点（包含这一天），格式 YYYY-MM-DD，必须与 dueFrom 一起给。' +
-          '与 dueOn 互斥。范围含两端，最多 14 天。',
-      },
-      limit: {
-        type: 'number',
-        description: '最多返回多少条，默认 50。在按清单 / 完成状态 / 截止日期筛完之后才生效。',
-      },
-    },
-    additionalProperties: false,
-  },
-  get_task: {
-    type: 'object',
-    properties: {
-      taskId: { type: 'string', description: '任务 id。' },
-    },
-    required: ['taskId'],
-    additionalProperties: false,
-  },
-  list_projects: {
-    type: 'object',
-    properties: {},
-    additionalProperties: false,
-  },
-  create_task: {
-    type: 'object',
-    properties: {
-      title: { type: 'string', description: '任务标题。' },
-      dueDate: { type: 'string', description: '截止日期，`YYYY-MM-DD`。' },
-      priority: { type: 'string', description: '优先级：high / medium / low。' },
-      projectId: { type: 'string', description: '放进哪个清单。' },
-    },
-    required: ['title'],
-    additionalProperties: false,
-  },
-  update_task: {
-    type: 'object',
-    properties: {
-      taskId: { type: 'string', description: '要改的任务 id。' },
-      fields: {
-        type: 'object',
-        description: '要改的字段。只改这里给出的字段，其余不动。',
-      },
-    },
-    required: ['taskId', 'fields'],
-    additionalProperties: false,
-  },
-  complete_task: {
-    type: 'object',
-    properties: {
-      taskId: { type: 'string', description: '要标记完成的任务 id。' },
-    },
-    required: ['taskId'],
-    additionalProperties: false,
-  },
-};
+/**
+ * 每个工具的参数 schema 现在住在 `src/tools/<entity>.ts` 的 `schemas` 里
+ * （一个工具一处声明）。这里只留**投影**，不再有一份按工具名手抄的清单。
+ */
 
 /**
  * 组装 MCP 工具定义。
@@ -184,6 +109,13 @@ export function listMcpTools(config: LocalApiConfig): readonly McpToolDefinition
  *
  * ⚠️ 它**不看** `enabled` / `token`：列表是"这个用户授权过哪些工具"，
  * 与"服务有没有在监听"无关（后者由 `authorizeToolCall` 在调用时管）。
+ *
+ * 🔴 最后那个 `??` 兜底**别删**：pack 的 `schemas` 是**按工具名**登记的，
+ * 一个 pack 完全可以先在 `tools` 里声明工具、还没来得及写 schema —— 这条路径今天
+ * 仍然可达（`scripts/gen-ai-capability-manifest.mjs` 靠它把 `schemaRecorded:false`
+ * 写进给模型看的能力清单，并在 stderr 里点名）。
+ * 有了 pack 接缝之后，"漏登记 schema"不再需要跨三个文件同步，但它**仍然会被写错**，
+ * 而"字段清单不完整"这件事只在这条回退还在的时候才可观察。
  */
 export function listAuthorizedTools(
   grants: LocalApiConfig['grants'],
@@ -191,7 +123,7 @@ export function listAuthorizedTools(
   const granted = LOCAL_API_TOOLS.filter((tool) => grants?.[tool.name] === true);
 
   return granted.map((tool) => {
-    const schema = INPUT_SCHEMAS[tool.name];
+    const schema = inputSchemaForTool(tool.name);
     return {
       name: tool.name,
       description: describeForMcp(tool),
@@ -208,10 +140,15 @@ export function listAuthorizedTools(
  * 写清楚能减少"请求没授权的能力"这类无用往返。
  */
 function describeForMcp(tool: LocalApiTool): string {
+  // 🔴 这句提醒里不许出现内部架构词（`op-log` / `dispatch` / ADR 编号…）：
+  // 它是**出境数据**，模型读不懂的行话只会变成错调用 —— 而它原来写的正是
+  // 「必须经 heyta 的正常写入路径（op-log）」，被 `tests/mcp.spec.ts` 那条
+  // "整份目录无黑话"的判据扫出来（那条判据原来只看 `list_tasks`，所以这句话活了很久）。
+  // 对 MCP 的调用方，真正相关的事实是**这条调用会不会改数据、什么时候生效**：
+  // 外部工具调用是直接落库的（`executeTool` 的写分支 `host.submit`），
+  // 而"要用户在界面上确认"是 heyta **内置助手**那条路，不是这条。
   const kindNote =
-    tool.kind === 'write'
-      ? '（会修改数据：必须经 heyta 的正常写入路径）'
-      : '（只读，不会修改任何数据）';
+    tool.kind === 'write' ? '（会修改数据：调用即生效）' : '（只读，不会修改任何数据）';
   return `${tool.description} ${kindNote}`;
 }
 

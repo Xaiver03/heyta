@@ -52,6 +52,11 @@
  *      加密保护」的明确否定仍在**界面真正渲染的两份词条表**里
  *      （ADR-0006 的结论不许被悄悄改掉）
  *
+ * 再加一段**另一个轴**的覆盖（第 9 段，详见那里的注释）：驱动源不是 `AiFeature`
+ * 而是 `EntityModelMap` —— 每个用户可操作的实体都必须**读得到也改得动**，
+ * 否则要带 `AI-COV-n` 工单号在这里逐字点名。倒数日 `EVENT` 落进
+ * `EntityModelMap` 的那一刻，这一段会当场变红（ADR-0044 要的"同批"就是靠它执行）。
+ *
  * ## 为什么第 8 条是运行时而不是静态
  *
  * 因为它是**决策**，不是**写法**。静态地 grep `supply.ts` 只能证明
@@ -70,7 +75,7 @@
 
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { basename, join, relative } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const ROOT = join(fileURLToPath(new URL('.', import.meta.url)), '..');
 
@@ -488,6 +493,232 @@ if (!exists(AI_DIST)) {
     notes.push(
       `出境披露的否定话术在 ${e2eeChecked.length} 份词条表（${e2eeChecked.join(', ')}）里都在（ADR-0006）。`,
     );
+  }
+}
+
+// ───────────────────────────────────────────────────────────────────────────
+// 9. 实体覆盖面：界面里能操作的东西，AI 必须**读得到也改得动**
+// ───────────────────────────────────────────────────────────────────────────
+/**
+ * ## 为什么这一段住在这里而不是新写一个脚本
+ *
+ * 上面那 8 段回答的是「**声明的 AI 功能**能不能走到」，驱动源是 `AiFeature`；
+ * 这一段回答的是「**用户可操作的实体**AI 碰不碰得到」，驱动源是 `EntityModelMap`。
+ * 同一个问题（界面在说谎）的两个轴，同一道门禁 —— 拆成两个脚本之后，
+ * "加了一个实体"要记得去两个地方登记，而漏登记正是这一段要防的事。
+ *
+ * ## 分母与口径都不在这里重算
+ *
+ * 全部来自 `gen-ai-capability-manifest.mjs`（`readUpstream()` + `buildCapabilityManifest()`
+ * + `countsAsCovered()`）。这一段**不 import `LOCAL_API_TOOLS`、不读 `EntityModelMap` 源码** ——
+ * 自己再读一遍就是第二份判据，而两份判据一定会漂（AGENTS §3.5 的形状）。
+ *
+ * ## 🔴 「算覆盖」的口径是**能读 + 能写**，不是"有任何一个工具"
+ *
+ * 只有 `list_projects` 的 PROJECT 对这个问题的答案是**不能**：助手能看见清单，
+ * 却提不出"把这条放进「工作」"。旧口径数出来 2/8，新口径 1/8 ——
+ * 前者是一句写进过台账的虚报（纠正记录在 `docs/plans/ai-event-tool-contract.md` §2.1）。
+ *
+ * ## 已知缺口必须**逐个点名**，不许静默
+ *
+ * `ENTITY_COVERAGE_DEBT` 是唯一的豁免通道，而它有三条牙齿：
+ *   · 分母里出现一个**不在这里、又没有读写工具**的实体 ⇒ 红（这就是"新实体没进目录
+ *     就判红"，倒数日 `EVENT` 落进 `EntityModelMap` 的那一刻会走到这条）；
+ *   · 这里的某一项**已经读写都有**了却还挂着 ⇒ 红（登记会过期，不许只增不减）；
+ *   · 每一项必须带 `AI-COV-n` 工单号 + 一句**为什么**（"还没做"不是为什么）。
+ * 于是它不是一份"待办清单的抄件"，而是一份**必须与上游逐字对账**的声明。
+ *
+ * ## 2026-10-03：这张表现在是空的，而它空得有历史
+ *
+ * 这里原本挂着五项（`AI-COV-2/3/5/6/7` = TAG / NOTE / HABIT_LOG / FOCUS_SESSION / REMINDER），
+ * 同一天全部落地成真的工具（`packages/local-api/src/tools/{tag,note,habit-log,focus,reminder}.ts`），
+ * 于是上面那第二条牙齿把它们**从登记里抹掉**了 —— 这正是它该有的行为：
+ * 闭合的缺口留在表里，会被读成"还欠着"，而一份会撒谎的账本比没有账本更贵。
+ *
+ * 🔴 更要紧的是那五条**的理由串**，它错了两轮，两段都留在这里（不留就是假装没说过）：
+ *   第一轮：它们抄自一份"读完代码之后的汇报"，那份汇报说这四个实体**在产品侧根本没有写动作本体**。
+ *     逐行打开被调函数本体之后四条全灭 —— `project-actions.ts:178 createTag`、
+ *     `note-actions.ts:133 createNote`、`habit-actions.ts:275 checkIn`、
+ *     `reminder-actions.ts:174 writeNew` 每一张都真的 `dispatch`。
+ *     错在哪一层：那份汇报按"函数名去搜实现"，没打开被调方；而我把它的结论直接抄进了
+ *     一道门禁的理由串 ⇒ **一句没取证的谎拿到了门禁的权威**，下一轮读到它的人只会照着
+ *     "产品没写路径"去排期。
+ *   第二轮：改成"真正的卡点只有一个，而且是量出来的：目录容量" —— 也是错的。
+ *     `local-api.spec.ts` 那条 `<= 10` 的理由自己写着"超过 10 个就先问『真的需要吗』"，
+ *     而产品负责人 2026-10-03 已经答过这个问题（"我们界面当中有的功能都支持通过 AI 去直接改"）。
+ *     一句本该用来逼人思考的启发式，被我读成了一堵墙，还写成了"要产品再拍一次"。
+ *     现在那条判据改成按实体算（`shared.ts` 的 `MAX_TOOLS_PER_ENTITY`），
+ *     总量由下面第 10 段从分母推导。
+ *
+ * 两段都是同一类失效：**登记里的 `reason` 也是断言**，与代码注释不同，它还多一层权威 ——
+ * 它是这道门禁"为什么不红"的官方说法。写进去之前必须自己走一遍取证。
+ */
+const ENTITY_COVERAGE_DEBT = new Map();
+
+const GEN = join(ROOT, 'scripts/gen-ai-capability-manifest.mjs');
+if (!exists(GEN)) {
+  fail(
+    '读不到 `scripts/gen-ai-capability-manifest.mjs` —— 实体覆盖面无法核对。\n' +
+      '     这一段**只从它那里取口径**，不允许自己再读一遍上游。',
+  );
+} else {
+  const gen = await import(pathToFileURL(GEN).href);
+  let manifest = null;
+  let upstream = null;
+  try {
+    upstream = await gen.readUpstream();
+    manifest = gen.buildCapabilityManifest(upstream);
+  } catch (err) {
+    const list = Array.isArray(err?.problems) ? err.problems : [String(err?.message ?? err)];
+    fail(
+      `能力清单的上游读不出/建不出，实体覆盖面这一段**无法判定**：\n` +
+        list.map((p) => `     · ${p}`).join('\n'),
+    );
+  }
+
+  if (manifest !== null && upstream !== null) {
+    const visible = new Set(upstream.modelVisibleToolNames ?? []);
+    const egressByTool = new Map(
+      (upstream.tools ?? []).map((t) => [t.name, t.egressFields]),
+    );
+    const byType = new Map(manifest.entities.map((e) => [e.entityType, e]));
+    const denominator = manifest.userOperableEntityTypes;
+
+    // 9a. 分母的算术本身要成立（剔除表与上游对不上时，`denominator` 会悄悄变大/变小）
+    const excludedCount = manifest.excludedFromDenominator.length;
+    if (denominator.length !== manifest.modelledEntityTypes.length - excludedCount) {
+      fail(
+        `覆盖面分母的算术对不上：物化实体 ${String(manifest.modelledEntityTypes.length)} 个 − ` +
+          `剔除 ${String(excludedCount)} 个 ≠ 分母 ${String(denominator.length)} 个。\n` +
+          '     说明剔除表与 `EntityModelMap` 已经不一致，或者分母被从别处改了。',
+      );
+    }
+
+    // 9b. 逐个实体：要么读写都有，要么带着工单号在这里点名
+    for (const entityType of denominator) {
+      const entity = byType.get(entityType);
+      const covered = gen.countsAsCovered(entity);
+      const debt = ENTITY_COVERAGE_DEBT.get(entityType);
+      if (covered && debt !== undefined) {
+        fail(
+          `\`${entityType}\` 现在**读和写都有工具**了，但 \`ENTITY_COVERAGE_DEBT\` 里还挂着它` +
+            `（工单 ${debt.gap}）。\n` +
+            '     把那条登记删掉。豁免清单只增不减，就会从"已知缺口"烂成"没人看的清单"。',
+        );
+        continue;
+      }
+      if (!covered && debt === undefined) {
+        fail(
+          `实体 \`${entityType}\` 在分母里，AI 却**没有能读又能写**的工具` +
+            `（读 ${String(entity.readToolNames.length)} / 写 ${String(entity.writeToolNames.length)}），` +
+            `而 \`ENTITY_COVERAGE_DEBT\` 里也没有它。\n` +
+            '     🔴 这正是本段要拦的那一件事：**新实体进了 `EntityModelMap`，AI 目录却没有跟上** ——\n' +
+            '     ADR-0044 与 ADR-0045 §2.6 要求实体和它的 AI 工具**同批**落地。\n' +
+            '     二选一：补工具，或者加一条带 `AI-COV-n` 工单号的登记并写明**为什么**现在不做。',
+        );
+        continue;
+      }
+      if (debt !== undefined && (typeof debt.gap !== 'string' || !/^AI-COV-\d+$/.test(debt.gap))) {
+        fail(
+          `\`${entityType}\` 的缺口登记没有形如 \`AI-COV-<n>\` 的工单号（当前：${String(debt.gap)}）。\n` +
+            '     没有编号的豁免等于没有豁免 —— 下一轮没人能找到它是谁登记的、为什么登记的。',
+        );
+      }
+      if (debt !== undefined && (typeof debt.reason !== 'string' || debt.reason.length < 20)) {
+        fail(
+          `\`${entityType}\` 的缺口登记缺一句**为什么**（` +
+            '`"还没做"` 不算理由 —— 说清是"产品侧没有写动作本体"还是"授权口径没拍"。）',
+        );
+      }
+    }
+
+    // 9c. 登记表不能挂着已经不在分母里的名字
+    for (const [entityType] of ENTITY_COVERAGE_DEBT) {
+      if (!denominator.includes(entityType)) {
+        fail(
+          `\`ENTITY_COVERAGE_DEBT\` 里有 \`${entityType}\`，但它**已经不在分母里**了。\n` +
+            '     要么它被从 `EntityModelMap` 删了（那这条登记该一起删），' +
+            '要么分母口径被改了（那要重新拍一次，不许顺手）。',
+        );
+      }
+    }
+
+    // 9d. 🔴 「模型可选得到」+「出境逐字段披露」——两条不变量一起查
+    for (const entity of manifest.entities) {
+      if (!entity.countsTowardCoverage) continue;
+      for (const toolName of [...entity.readToolNames, ...entity.writeToolNames]) {
+        if (!visible.has(toolName)) {
+          fail(
+            `工具 \`${toolName}\`（实体 \`${entity.entityType}\`）在目录里，\n` +
+              '     却不在 `listAuthorizedTools(全授权)` 的投影里 —— **模型看不见它**，\n' +
+              '     于是"AI 支持这个实体"是一句只有界面知道的话。（未授权即不可见是另一件事。）',
+          );
+        }
+        const fields = egressByTool.get(toolName);
+        if (!Array.isArray(fields)) {
+          fail(
+            `工具 \`${toolName}\` 没有声明 \`egressFields\`（当前：${JSON.stringify(fields)}）。\n` +
+              '     隐私不变量第四条是「出境**逐字段**披露」，而这份声明就是披露块里那一行的来源：\n' +
+              '     缺它 = 用户点"发送"时看不到这次到底把哪些字段发出去了。',
+          );
+        }
+      }
+    }
+
+    const coveredList = denominator.filter((t) => gen.countsAsCovered(byType.get(t)));
+    notes.push(
+      `实体覆盖面 ${String(coveredList.length)}/${String(denominator.length)}` +
+        `（口径：读和写都有工具）；已登记缺口 ${String(ENTITY_COVERAGE_DEBT.size)} 项：` +
+        [...ENTITY_COVERAGE_DEBT.entries()]
+          .map(([t, d]) => `${t}=${d.gap}`)
+          .join('、'),
+    );
+
+    // 9e. 🔴 目录规模 = 分母的函数，不是一个人拍的数字
+    //
+    // 这一段的存在理由很具体：`local-api.spec.ts` 原来写着 `LOCAL_API_TOOLS.length <= 10`，
+    // 而第 9 段要求"每个实体读写都有工具" ⇒ 分母 8 个实体、下限 16 席，两道各自合理、
+    // 合起来**互相封死**（`docs/plans/ai-event-tool-contract.md` §5.2 记着这次算术）。
+    // 现在按实体那一列判（每个 pack 至多 `MAX_TOOLS_PER_ENTITY` 个工具），
+    // 于是总量随覆盖面**一起**长大：多一个进分母的实体就多一席预算，而不是多一个障碍。
+    const perEntityCap = upstream.maxToolsPerEntity;
+    if (typeof perEntityCap !== 'number' || !(perEntityCap > 0)) {
+      fail(
+        '读不到 `MAX_TOOLS_PER_ENTITY`（当前：' +
+          JSON.stringify(perEntityCap) +
+          '）—— 每实体容量无法核对。\n' +
+          '     它的所有者是 `packages/local-api/src/tools/shared.ts`；这一段只从产物里取，不在这里抄一个数。',
+      );
+    } else {
+      const budget = perEntityCap * denominator.length;
+      const total = manifest.tools.length;
+      if (total > budget) {
+        fail(
+          `目录有 ${String(total)} 个工具，超过每实体 ${String(perEntityCap)} × 分母 ` +
+            `${String(denominator.length)} = ${String(budget)} 的预算。\n` +
+            '     要抬这个上限，先回答"多出来那几个工具属于哪一档"（`shared.ts` 的那五行档位表）——\n' +
+            '     而不是直接改这里的数字：改这里等于让覆盖面门禁自己去放宽它检查的那个约束。',
+        );
+      } else {
+        notes.push(
+          `目录 ${String(total)} 个工具 ≤ 每实体 ${String(perEntityCap)} × 分母 ` +
+            `${String(denominator.length)} = ${String(budget)} 席` +
+            `（已用 ${String(total)}，剩 ${String(budget - total)}）。`,
+        );
+      }
+      // 反向那条腿：某个实体自己超额，也要在这里点出来（总量对得上不代表分布对得上）。
+      for (const entity of manifest.entities) {
+        const n = entity.readToolNames.length + entity.writeToolNames.length;
+        if (n > perEntityCap) {
+          fail(
+            `实体 \`${entity.entityType}\` 有 ${String(n)} 个工具（${[
+              ...entity.readToolNames,
+              ...entity.writeToolNames,
+            ].join('、')}），超过每实体 ${String(perEntityCap)} 的上限。`,
+          );
+        }
+      }
+    }
   }
 }
 

@@ -20,8 +20,13 @@ import { afterEach, describe, expect, it } from 'vitest';
 
 import {
   type LocalApiConfig,
+  type LocalApiFocusSession,
+  type LocalApiHabitLog,
   type LocalApiHost,
   type LocalApiItem,
+  type LocalApiNoteRow,
+  type LocalApiReminder,
+  type LocalApiTag,
   type LocalApiWriteIntent,
 } from '@heyta/local-api';
 
@@ -47,6 +52,13 @@ function fakeHost() {
     listTasks: () => Promise.resolve([TASK]),
     getTask: () => Promise.resolve(TASK),
     listProjects: () => Promise.resolve([]),
+    listHabits: () => Promise.resolve([]),
+    listTags: () => Promise.resolve([] as readonly LocalApiTag[]),
+    listNotes: () => Promise.resolve([] as readonly LocalApiNoteRow[]),
+    getNote: () => Promise.resolve(undefined),
+    listHabitLogs: () => Promise.resolve([] as readonly LocalApiHabitLog[]),
+    listFocusSessions: () => Promise.resolve([] as readonly LocalApiFocusSession[]),
+    listReminders: () => Promise.resolve([] as readonly LocalApiReminder[]),
     submit: (intent) => {
       submitted.push(intent);
       return Promise.resolve({ ok: true, taskId: 't-new' });
@@ -194,6 +206,13 @@ describe('🔴 真实 HTTP 往返', () => {
       listTasks: () => Promise.resolve([secret]),
       getTask: () => Promise.resolve(secret),
       listProjects: () => Promise.resolve([]),
+      listHabits: () => Promise.resolve([]),
+      listTags: () => Promise.resolve([] as readonly LocalApiTag[]),
+      listNotes: () => Promise.resolve([] as readonly LocalApiNoteRow[]),
+      getNote: () => Promise.resolve(undefined),
+      listHabitLogs: () => Promise.resolve([] as readonly LocalApiHabitLog[]),
+      listFocusSessions: () => Promise.resolve([] as readonly LocalApiFocusSession[]),
+      listReminders: () => Promise.resolve([] as readonly LocalApiReminder[]),
       submit: () => Promise.resolve({ ok: true, taskId: 'x' }),
     };
     server = await startOnFreePort(host);

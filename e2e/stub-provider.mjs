@@ -40,6 +40,9 @@ const ROUTES = [
   ['你是一个任务耗时估计助手', 'duration-estimate'],
   // 对话助手（W12）。判据是它系统提示词的首句 —— 与其他四行同一条规则。
   ['你是 heyta 任务管理器里的助手', 'assistant'],
+  // 🔴 单步工具面板（W5）。它过去**不在表里**，所以这个假端点从来不会为它回
+  // `tool_calls` —— 那条路径在浏览器级证据里是空的，不是"测了没测到"。
+  ['你是 heyta 任务管理器的工具选择器', 'tool-calling'],
 ];
 
 /** 每次调用的记录，给测试断言用。 */
@@ -239,8 +242,41 @@ const server = createServer((req, res) => {
      * ⚠️ 工具名只挑目录里**一定存在**的那个，参数不带任何编造的 id ——
      * 与上面 `prioritize` 那条同一纪律：假端点编造 id 会让判据白测。
      */
+    /**
+     * 🔴 **两个入口都要回 `tool_calls`**：助手（多步）与单步工具面板（W5）。
+     *
+     * 单步那条的脚本同样是确定的，而且**不许自己编标题**：
+     * 只有用户的话里带"新建任务：<标题>"这个哨兵时才回 `create_task`，
+     * 标题**逐字取自请求里的那段用户文本**。于是测试断言的是
+     * "我打进去那几个字最后出现在任务列表里"，
+     * 而不是"假端点随口说的一个词凑巧被界面渲染出来了"。
+     */
+    // ⚠️ **不能锚 `^`**：出境的用户文本带着前缀（`ai-tool-call.ts` 的
+    // `user: \`用户这句话：${source.text}\``），整串并不以"新建任务"开头。
+    const createTitle = /新建任务[：:](.+)$/s.exec(user.trim());
     const message =
-      feature === 'assistant' && !hasToolResult
+      feature === 'tool-calling'
+        ? {
+            role: 'assistant',
+            content: null,
+            tool_calls: [
+              createTitle
+                ? {
+                    id: 'stub-call-write',
+                    type: 'function',
+                    function: {
+                      name: 'create_task',
+                      arguments: JSON.stringify({ title: createTitle[1].trim() }),
+                    },
+                  }
+                : {
+                    id: 'stub-call-read',
+                    type: 'function',
+                    function: { name: 'list_tasks', arguments: '{}' },
+                  },
+            ],
+          }
+        : feature === 'assistant' && !hasToolResult
         ? {
             role: 'assistant',
             content: null,
