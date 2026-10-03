@@ -3821,3 +3821,36 @@ python3 /private/tmp/w6c_move_helpers.py     pid 73233 / 85116   各 ~97% CPU，
 ② **没有改 `check:docs` 的判据**去放过它；③ 也**不预测链会红在这里** —— ② 的链跑在干净载体上，
 HEAD 没这行引用，那一趟这段应当是绿的；如果它红了，说明这一小时内那条线把这两样提交了而脚本没跟着进库，
 **那才是需要他们立刻处理的仓库级死链**，读数出来时按这条对账。
+
+## B66. 🔴 ③ 的交付没做完，卡在**同一个稀缺窗口**上；而这一轮取证把"四端现在装的是哪一份"钉成了读数 —— **三端过期、一端无读数**
+
+**时刻与载体**：2026-10-04 02:48–02:51，载体 `heyta-wt-ai-closeout @ ce6c1c98`（未提交项 0，
+`integrate/2026-10-03-closeout` 已在 main 里 —— `merge-base --is-ancestor` 退 0）。
+
+| 端 | 读数（探针见 `docs/plans/ai-event-tool-contract.md` §15.43g） | 判 |
+|---|---|---|
+| mac | `.app` 里 `index.html` 引用 `index-Da9aaZLq.js`（sha `dd7f8156…`，23:05 构建），载体当前构建是 `index-BGKxdnVs.js`；标记 `list_events` 已装 **0** / 载体 **2** | **MISMATCH** |
+| android | 已装 APK `66,953,324 B`，载体构建产物 `67,183,868 B`；`lastUpdateTime=2026-10-04 02:46:47`（有人刚重装过，**不是本线载体**） | **SIZE-DIFF** |
+| ios | 已装 `main.jsbundle` sha `e713c7bf…`；构建侧 `/tmp/heyta-ios-release/…/main.jsbundle` 此刻不存在（那一端本轮没跑过） | **无对照** |
+| windows | 本机日志里 `ADD_APPX=` / `PAYLOAD_WEBDIST=` / `M2D=` **一条都没取到** | **NOT-PROVEN** |
+
+**为什么没做完**：② 与 ③ 的前置是同一条窗口（负载 ≤12 + 无人在跑设备/e2e + 无另一趟链）。
+01:00–03:00 现量负载在 **50–86** 之间起伏，`qemu-system-aarch64-headless` 单进程 651% CPU，
+外加三条并行线各自在跑 Playwright 与设备点击（`ps` 现取，argv 计数按 §7 #201 只当**保守阻塞**用）。
+队列 `~/scratch-heyta/heyta-deliver-on-window.sh` 每 60s 重过一次现场门，等满以 **exit 3** 收尾
+（**环境无效 ≠ 产品失败**，不改负载阈值、不硬装、不 pkill 任何不是它 pid 的进程）。
+
+**关闭判据**（四条全中才算 ③ 做完，`cat ~/scratch-heyta/deliver-*/rc.txt` 一次读全）：
+
+1. `REINSTALL rc=0` **且** 它的载体与 `CHAIN rc=0` 那条是同一枚 SHA；
+2. `PAX_MAC=MATCH` 且 `PAX_IOS=MATCH`（逐字节同，不是"mtime 新"）；
+3. `PAX_AND=MATCH` 或写明"装了别人那一份、尺寸差多少"（不许读成通过）；
+4. `PAX_WIN=PROVEN`（`ADD_APPX=OK` + `PAYLOAD_WEBDIST=True` + `M2D=OK` 三条同时取到）
+   **且** 收尾那行 `装完之后 main→重装载体的打包输入差集 = 0`（§7 #206）。
+
+**不许的关闭方式**（都出现过 tempting 的形态）：拿"链 64 绿"当交付证据（链答的是源码，不是安装包，§7 #82）；
+拿"`simctl install` / `adb install` 退 0"当"装的是当前产物"；把 windows 的 `NOT-PROVEN` 读成"远端跑过了应该没问题"。
+
+**留给下一批的一条待拍**（不是本批能拍的）：若窗口长期不开（本晚实测 01:00→03:00 未开过一整段），
+交付要不要**降级成只装 mac 一端**先满足"界面上人能看到当前产物"这一诉求 ——
+那是一端与四端的口径差别，要产品负责人明确改 §6.1.1 才成立；本批不代拍、也不擅自只装一端就报交付完成。
