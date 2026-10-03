@@ -1064,6 +1064,10 @@ W0b ─> 随时可做（台账那半要等文件干净）
   （"数据只到 2026 时，2027 显示节、不显示休/班"）写成"随 W5"。这句在 W5 收尾时**现量否证过一次**：
   `packages/domain/src/holidays.ts:108 adjustmentOn` 与 `festivalsOn` 在**任何界面里都没有消费者**
   （全仓 grep 只命中 `domain` 自己 + 它的测试 ⇒ 日历面根本没读这两个函数）。
+  ⚠️ **23:0x 起这句只剩一半成立**（原文留着，因为它记录了"当初挂错工单"这件事本身）：
+  `adjustmentOn` 现在**有真消费者了** —— web 日历经 `CalendarBoard` 的 `dayMarker?` 读它并画出「休 / 班」
+  （`67fef701`，判据①三档 e2e 已跑过）。**`festivalsOn` 仍然零消费者** ⇒ "2027 显示节"那一半
+  照旧挂在 W6 / W8，等日历那片文件不再被并行会话整片重写时随同一条缝补齐。
   倒数日卡片面本来就不画休/班（那是日历那一屏的事），所以这条**不是 W5 漏做，是当初挂错了工单**，
   改挂 **W6 / W8**（日历第二源 + 三端接线）—— 而那两个落点正是并行会话在整片重写的
   `packages/ui/src/calendar/*`，所以它现在**做不了**，不是不想做。
@@ -1288,11 +1292,19 @@ W0b ─> 随时可做（台账那半要等文件干净）
     `0050-public-facts-are-deployer-supplied.md`」，而 `0050` 已被 E2EE 密钥生命周期占用、`0051` 被移动端提醒占用
     ⇒ 合流时**那个指针必须改指 0052**；如果并行那条线自己也写了同号文件，保留一份、把增量并进 §2/§4 后删重复件。
     复跑：`ls docs/adr | grep -oE '^0[0-9]{3}' | sort -n | tail -3`（20:4x 读数 = 0050 / 0051 / 0052）。
-  - 🔴 **这不等于 W4b 完成**。判据①②③④ 里 ①（拿不到数据 ⇒ 不报错、不留空块，还要真界面截图 + 人看）
-    与 ④（注入接缝的三条分支）目前**没有载体**：客户端拉取那半 + 共享 `CalendarBoard` 的 `dayMarker?` 那个可选 prop
-    都还没落点（20:4x 现量：`grep -rln "holidayAdjustment\|dayMarker" packages/app-host/src packages/ui/src apps/web/src packages/storage/src`
-    ⇒ 命中集合里没有这四条路径下的文件）。`scripts/check-public-facts.mjs` 在 main 与 w4b 工区都**不存在**。
-- [ ] W4b 完成 —— 代码那半（客户端拉取 + `dayMarker` + `check:public-facts` + 判据①-④）在 `heyta-wt-w4b` 工区进行中，本表不代它主张读数
+  - ⚠️ **上面这句 20:4x 的读数已过期，23:0x 起两条判据都有了载体**（原文留着让人看清它当时是对的）：
+    ① 的载体是 `e2e/tests/public-facts.spec.ts` 三档（没配服务端 / 那条通道 404 / 部署方只下发一天），
+    **3 passed、三张图人已打开看**；④ 的三条分支在领域层（`packages/domain/tests/holiday-adjustment-override.spec.ts`）
+    与 app-host 那 10 条里各测了一腿。`scripts/check-public-facts.mjs` **已存在并接进 `pnpm check`**（`3f327dc2`）。
+    同一条 grep 在 `feat/countdown-batch2` 载体上现量 **命中 6 个文件**（`app-host/src/public-facts.ts`、
+    `ui/src/calendar/{model.ts,CalendarBoard.tsx}`、`apps/web/src/features/calendar/{CalendarView.tsx,store.ts}` 等）。
+- [ ] 🟡 **W4b 代码链已闭合，只剩一条**（23:0x，`feat/countdown-batch2` 上 `6735cc39` + `b05fbc50` + `67fef701`）：
+    服务端两张表 + 1 条迁移 + 线协议契约 + 后台三条端点 + ADR-0052 定性 + `check:public-facts`
+    + **客户端匿名拉取 / `STORES.META` 缓存 / 装进领域层覆盖表 / web 日历的「休 / 班」/ i18n 中英**全部落地，
+    判据①有真界面截图。**没做的那一条**：判据②写的是"`papers` 随数据入库并**在后台回显**"——
+    入库与 API 回显有（`admin.routes.ts` 的 GET 带 `papers`），**后台界面没有**
+    （`apps/web/src/features/admin/` 里没有调休面板、`admin-client.ts` 里也没有对应方法）
+    ⇒ 运营者现在只能靠 curl 录入，这条通道对她还没真正可用。补齐并跑过判据之后这张表才打勾。
 
 #### 🟡 L' · 法务联动（范围按 §4 的时序条款**收窄**，不是"把六处都改一遍"）—— 判定表已出、命中已修；剩下的那条闸门已于 20:1x **立成常驻门禁 `check:legal-permissions`**，而踩响它的是 W9 不是 W7
 
