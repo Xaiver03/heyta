@@ -249,7 +249,7 @@
 | G-44 | `appVersion` 在服务端**有消费者、没有生产者**：`server/src/sync/checkpoint-gate.ts` 拿它判 `MIN_CHECKPOINT_SAFE_APP_VERSION`，`sync.service.ts:676 touchDevice` 把它记进 `sync_devices`，而它是**下载请求上的一个可选查询参数**（`packages/shared-schema/src/supersync-http-contract.ts:191` 是 `z.string().optional()`）—— `packages/sync-client/src/client.ts:1324-1327` 只往查询串里写 `sinceSeq` 与 `excludeClient`，**没有任何 heyta 客户端发过它** | 🔴 **本批重新归类，不按原登记实现**（证据链见 §8.17）。原句"补一个生产者"是错的：三条事实连起来说明**光上报版本会把那条日志变成假信号**，而阈值 `18.21.2` 住在**上游 Super Productivity 的版本空间**里。它不是自托管分发的缺口，是"客户端检查点/全量边界"这条**未实现的功能**的一部分 ⇒ 对外说法已在 `server/README.md`「Clients and version coupling」就地改成三个前置条件（原句只列了两个，且把"只差上报"写成了事实） |
 | G-45 | 台阶 3（镜像 npm 依赖树 vs 许可证门禁扫的 pnpm store）曾是**未证实** | **本批量完并关成"有对账"**（§8.8）：`check:image-license` 逐条对账 + 四条会红的登记自检，7 发变异各自精确报红、阳性对照绿。残余风险（纯传递依赖上游发新版）已改挂 G-47 |
 | G-46 | `server/scripts/build-and-push.sh`（`pnpm --filter @heyta/server docker:build` 的唯一实体）原来是**上游形状**：它自己抄了一份 7 条的镜像输入清单，其中 3 条在本仓库不存在（实测 `[ -e ]` 全不成立），而 `apps/web` / 11 个 `packages/*` / `pnpm-lock.yaml` / `server/` 自己**一条都不在里面**；`GHCR_NAMESPACE` 默认成 `super-productivity`（**别人的组织**）；并且无论给不给版本号都**顺带覆盖 `:latest`** | **本批关闭**（§8.7 第 4 条）。三条各自都会出事，都已改：清单改成 source 同一个读者、namespace 无默认值（不给就在任何 docker 之前 exit 1）、只推点名的那一个 tag。⚠️ 消费者集合是量过的：除 `server/package.json:14` 外只有 `server/tests/migration-sql.spec.ts:345` 读它，而那一发在 `it.skip` 里 ⇒ **不报错也不守** |
-| G-47 | 镜像那棵依赖树**没有被钉住**：`check:image-license` 证明的是"2026-10-03 这一次 npm 解析结果的 143 条逐条有出处"，而每次构建 npm 都会重解一遍（没有 lockfile）。改直接依赖会红，**纯传递依赖的上游发新版不会** | **未关**（本批只登记）。闭合形状是现成的：生产阶段换成 `pnpm deploy --prod` ⇒ 三个 `workspace:*` 由 pnpm 内联、三枚 tgz 的 dance 一起消失、镜像的树**就是** `pnpm-lock.yaml` 的树 ⇒ 门禁与产物同源，`check:image-license` 与快照应当**撤掉**（不是改成读另一个文件）。代价：动生产镜像的装配路径，要单独一轮真构建复验（`pnpm verify:selfhost-stack` 全跑） |
+| G-47 | 镜像那棵依赖树**没有被钉住**：`check:image-license` 证明的是"2026-10-03 这一次 npm 解析结果的 143 条逐条有出处"，而每次构建 npm 都会重解一遍（没有 lockfile）。改直接依赖会红，**纯传递依赖的上游发新版不会** | 🔄 **对账已做、登记那句被量得更准、闭合形状要换**（读数见 §8.20）。现量：镜像树与 pnpm 生产树**同名同版本 125 个、镜像独有 0 个、版本不一致 14 个** —— 14 个全是镜像比 lockfile **新**，其中 12 个是传递依赖（`pino` + `@simplewebauthn/server` 底下 11 个 `@peculiar/asn1-*`，那是 **passkey 验证路径**），2 个是直接依赖（`@fastify/static ^10.1.2` 解到 10.1.5 而 pnpm 是 10.1.4、`ws ^8.18.0` 解到 8.22.0 而 pnpm 是 8.21.3）。⇒ 登记那句"改直接依赖才会漂"其实**说轻了**：没人改任何依赖，只因为版本落在 `^` 范围内，发出去的镜像就跑着一套本仓库任何测试都没跑过的版本。`--check` 新鲜度绿、覆盖率对账绿，两条都管不到这件事。🔴 **原闭合形状实测不成立**：`pnpm deploy --prod` 在 pnpm v10+ 要求 `inject-workspace-packages=true`（全仓依赖解析方式的改动），而 `--legacy` 会去 registry 取 `@heyta/i18n` 直接失败；另外 filter 打错时 `pnpm deploy` **什么都没做还 exit 0**。⇒ 换成：把已提交的那份快照从"记录 npm 这次解出什么"改成**镜像要装的版本就是它**（装配时按快照逐条钉版本），等式判据与钉版本**同一批**落地（不能先加判据把链钉红），复验仍要一轮真构建 |
 | G-48 | `check:web-artifact:app`（核对 `--base=/app/` 那份产物的那一道）**零自动消费者** —— 2026-10-03 由新门禁 `check:gate-wiring` 量出：它是 63 道 `check:*` 里唯一合法落在链外的一道，而全仓 `grep` 只有 `package.json` 自己那一行，没有任何 workflow / 验收脚本 / `deploy.sh` 调用它 ⇒「上线前跑一次」目前只写在脚本头部注释里 | ✅ **已关（2026-10-03，判据与登记见 §8.19）**。登记那半句被否证：`server/Dockerfile:191` 一直在跑同一条判据的**脚本本体**，`grep` 漏它是因为搜的是别名。决定：链**不放**这道判据（`apps/web/dist` 是一个目录、两种载体，链里 `pnpm build` 打的必然是根载体，把 `/app/` 载体放链里就是拿错的字节验对的东西 —— 现量：同一份 dist 上一条 rc=0 一条 rc=1）；改为**每个发布载体各自带对账**：runbook §3.7 的 rsync 之前插入 `pnpm check:web-artifact:app`（两处），`check:gate-wiring` 新增"链外门禁必须点名消费方文件 + 该文件里有一行**以这条命令开头**"，把"没人跑它"从一句注释变成会红的判据。6 臂注入 5 红 1 绿（绿那臂是刻意留的越界对照） |
 | G-48b | G-48 关的是"这一步在不在发布序列里"，**没有**关"这一趟有没有人真的跑过它"：`consumers` 判的是 runbook 里那行命令还在，人工 rsync 前跳不跳过去仍然只取决于人。另外 `apps/web/dist` 一目录两载体没变（§8.19 读数 B），按载体分目录要同时动 `package-app.sh` / `package-msix.ps1` / `reinstall-all.sh` 的同步对账 / `Dockerfile` —— 四端打包输入的变更 | **未关**（本批只登记，理由如上：会新增一个"能碰生产"的对外动作面，或要改四端打包输入）。挂在这里是为了让下一轮别把 G-48 的绿读成"发布已经有守卫" |
 | G-49 | 站内那篇自建指南（`packages/i18n` 的 `site.docs.selfhost.*`）是入口命令的**第 4 份抄件**，而 `check:selfhost-entry-command` 的扫描集里没有它（现有扫描集：`docs/runbooks/self-host.md`、`server/README.md`、`server/env.example`、`docker-compose.migrate-once.yml`、`local-server-verification.md`）| ✅ **本批关闭**，但**登记的前提一半是错的**（读数在 §8.18）：58 条词条里当时**没有一条**是完整入口命令，s7p2 只有 `-f` 那三个 flag 的**碎片**（没前缀、没 `up -d`、**没 `--build`**）。碎片比没抄件更坏 —— 拼起来敲就是 §8.11 那次 `pull access denied`。所以做的是两件事：文章改成给**完整一条**（中英各一份，与 runbook 逐字相同），再把这两份词条文件纳入扫描集（`source: 'copy'`） |
@@ -1132,3 +1132,94 @@ G-40⑤（版本来源）因此多了一条硬约束：**它必须和闸门共�
    改名要把 `package-app.sh` / `package-msix.ps1` / `reinstall-all.sh` 的同步对账 / Dockerfile
    一起改，属于四端打包输入的变更 ⇒ 不在"关一条门禁"这一批里顺手做，
    本轮的缓解是对账必须紧跟构建（同一条命令链里），错了会响亮报两侧取值。
+
+---
+
+### 8.20 G-47：登记说"传上游发新版不会红"，实测是"没人发版也在漂"，而写好的那个闭合形状走不通
+
+这一条今天**没有关闭**，但把它从"一句推测"变成了"14 个包名"，并且把登记里现成的闭合形状
+（`pnpm deploy --prod`）实测否掉了。这两件事都做完了才动手写下一批，顺序不能反过来。
+
+#### 现量：镜像那棵树 vs pnpm 那棵树
+
+A 侧取 `pnpm --filter @heyta/sync-server list --prod --depth Infinity --json`
+（**让 pnpm 自己算它按 lockfile 装出来的树**，不另写一个 YAML 解析器 —— 那会变成第二套转义规则），
+B 侧取已提交的 `server/image-npm-tree.json`（`generatedAt=2026-10-03T07:58:46Z`，`--check` rc=0 输入哈希仍对得上）。
+
+| 量什么 | 读数 |
+|---|---|
+| A 侧包名 / name@version | 154 / 159（其中 3 个是 `@heyta/{domain,shared-schema,sync-core}` 本体） |
+| B 侧包名 / name@version | **139 / 143** |
+| 只在 B 侧（镜像多装了东西） | **0 个** ⇒ 问题不是"多装了"，纯粹是版本 |
+| 只在 A 侧 | 12 个 = 11 个平台专属（`@node-rs/argon2-{darwin-arm64,win32-*,linux-arm-*,…}`）+ `fsevents` ⇒ **不算漂移** |
+| 同名同版本 | 125 个 |
+| 🔴 **同名不同版本** | **14 个，全部是 B 比 A 新** |
+
+那 14 个（镜像 / pnpm）：
+
+```
+@fastify/static       10.1.5 / 10.1.4     ← server 直接依赖，范围 ^10.1.2
+ws                    8.22.0 / 8.21.3     ← server 直接依赖，范围 ^8.18.0
+pino                 10.4.0 / 10.3.1     ← 传递
+@peculiar/asn1-*     2.10.0 / 2.9.5     ← 传递，11 个，由 @simplewebauthn/server 拉进来
+```
+
+🔴 **这一发要打掉登记里那句"改直接依赖会红，纯传递依赖的上游发新版不会"**：它说轻了。
+两个**直接依赖**也在漂，而且没有任何人改过 `server/package.json` ——
+`^10.1.2` 同时容得下 10.1.4 和 10.1.5，`^8.18.0` 同时容得下 8.21.3 和 8.22.0。
+**漂不需要动作，只需要时间。** 而 `@peculiar/asn1-*` 那一族坐在 `@simplewebauthn/server` 底下，
+也就是 **passkey 注册与验证的解析路径**上；`@fastify/static` 是托管 `/app/` 的那个包；`ws` 是实时同步。
+发出去的镜像跑着一套本仓库**任何一条测试都没跑过**的版本组合，而 `pnpm check` 全绿 ——
+因为链验的是 pnpm 那棵树，镜像装的是 npm 那棵树。
+
+`check:image-license` 那两条今天都是绿的（`--check` rc=0、覆盖率对账 rc=0）——
+它们管的是"**每一条有没有出处**"，不管"**是不是审过的那一个版本**"。
+这正是 G-47 说的"有守卫 ≠ 有牙"，只是牙在另一处：**快照与解析之间**没有等式。
+
+⚠️ 探针层的一条（不改结论但会改读数）：B 侧按 `TARGET={os:linux,cpu:x64,libc:musl}` 解，
+A 侧装在这台 darwin/arm64 上 ⇒ 不先按平台分层，`@node-rs/argon2-*` 那 11 个会被读成"pnpm 多装了 11 个包"。
+差集必须先过这一层再谈漂移。
+
+#### 为什么登记里那个"现成的闭合形状"今天走不通
+
+`pnpm deploy` 这四发都是实测，不是推断（pnpm 11.8.0）：
+
+| 试的东西 | 结果 |
+|---|---|
+| `pnpm deploy --prod --out=<dir> server` | `Unknown option: 'out'` rc=1 —— 正确形状是 `pnpm --filter <包名> deploy --prod <目录>` |
+| `pnpm --filter @heyta/server deploy …` | **打印 `No projects matched the filters` 然后 exit 0**，目标目录根本没建。真名是 `@heyta/sync-server` ⇒ 🔴 **filter 打错的 deploy 会静默什么都不做还报成功**：把它写进 Dockerfile 的人会得到一个"依赖装好了"的镜像层，里面一个包都没有 |
+| 同上，加 `--fail-if-no-match` | rc=1 `ERR_PNPM_DEPLOY_NONINJECTED_WORKSPACE`：pnpm v10+ 只从 `inject-workspace-packages=true` 的工作区 deploy |
+| `--legacy` | rc=1 `@heyta/i18n is not in the npm registry, or you have no permission to fetch it` —— legacy 实现**不内联 workspace 依赖**，回头去 registry 取我们的包；而它失败前已经把 server 的 36 个文件（6.8 MB）拷进目标目录，`node_modules` 是 0 条 ⇒ **一次失败的 deploy 会留下一个看起来像产物的半成品目录** |
+
+⇒ 登记里那句"三个 `workspace:*` 由 pnpm 内联、三枚 tgz 的 dance 一起消失"要么要求
+`inject-workspace-packages=true`（**全仓依赖解析方式改动**：每个包的 node_modules 从符号链接变实体拷贝，
+`pnpm -r build` / `check:licenses` 扫的 store / 四端打包输入都得重新验一遍），要么走 `--legacy`
+（pnpm 自己标注的旧实现，且实测它现在解不了 workspace）。两个都不是"改一行 Dockerfile"。
+
+#### 今天为什么没把判据先加上
+
+等式判据（快照的每个 `name@version` 必须等于 pnpm 树里的）现在加上去**就是 14 条红**，
+而红着的链会被 #11 那次合并载体全量跑当成"这批弄坏了仓库"。
+把链留在红态、或者为了让它绿而先放宽判据，是同一件事的两个错法（AGENTS §8.4：不要为了让测试变绿而改测试）。
+⇒ 判据必须和"镜像装的确实是这份快照"**同一批**落地，一批里两件事一起变绿。
+
+#### 下一批的三步（编号在这，别靠记忆）
+
+1. **把快照从"读数"升成"合同"**：`server/image-npm-tree.json` 已经带 `inputs` 三枚哈希与
+   `generatedAt`；改成装配阶段按快照里的 `name@version` **逐条钉版本**安装（`npm install` 的实参来自快照，
+   不再来自 `^` 范围）。这样"审过的版本"与"装出去的版本"之间第一次有等式，
+   而且**不新增第二份 lockfile**（第二份抄件会漂是这个批次反复付过学费的形状）。
+   重跑生成脚本这个动作随之变成"提交一次版本变更"，由现有 `--check` 的哈希判据盯着。
+2. **等式判据同批进链**：新增一条比对（快照 ↔ pnpm 生产树，按平台分层排除原生包），
+   并做注入验证能红（把快照里一条版本号改一位 ⇒ 红；把平台分层拿掉 ⇒ 应报出 `@node-rs/*` 那一族，
+   否则说明分层本身没牙）。
+3. **真构建复验**（需要 docker daemon + 负载 ≤12 的窗口，与 #12 同一个窗口）：
+   `pnpm verify:selfhost-stack` 全跑，并在**镜像内**读一次实际装的树，与快照逐条比 ——
+   这一步的判据是"镜像里数出来的 143 条与快照逐字相同"，不是"构建退出码 0"。
+   ⚠️ 若这一批最终改成 `pnpm deploy` 路线，Dockerfile 里那条必须带 `--fail-if-no-match`，
+   并且解包目标要用一个**新建的空目录**（失败的 deploy 会留下半成品，`COPY` 会把它当产物）。
+
+🔴 三条读数都属于"登记与现实的差"这一族，写在这里而不是只写在提交信息里：
+`check:image-license` 绿、`--check` 绿、`pnpm check` 全绿，**三条同时成立的时候，
+生产镜像已经在跑 14 个没被测过的版本**，其中 11 个在 passkey 的解析路径上。
+一条"逐条有出处"的门禁给出的安全感，恰好是这件事最难被发现的原因。
