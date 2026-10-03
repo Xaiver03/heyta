@@ -1191,6 +1191,21 @@ W0b ─> 随时可做（台账那半要等文件干净）
     revert 后 `card-export-layout.ts` 的 sha 回到链条开头的基线 `42708dc95156`。
   - ⏹ **W7 剩下的那条不是判据，是证据**：设备真机出图读数（`pnpm verify:mobile-card-export`）
     排在收尾第 4 项那一趟里，见 `docs/plans/countdown-w7-device-export.md` §7 第 2 条。
+  - 🔴 **W7-G3（04 05:2x 编号登记）：那条装置只覆盖 Android，iOS 那一半没有设备读数**。
+    现量：`scripts/verify-mobile-card-export.sh` 305 行里 `adb`/`$PKG`/`keyevent` 是唯一的驱动通道，
+    而 `grep -icE "ios|simctl|swift"` 在它全文里命中 **0**（连注释都没提 iOS）——
+    iOS 侧停在"代码 + node 侧单测"这一档 ——
+    `HeytaCardExportModule.swift:67` 写 `temporaryDirectory/card-export/`、`card-export.tsx:173` 在
+    `Share.share` **之前**就拿到 URI，所以落盘这件事本身是可证的，缺的只是没人去按它。
+    ⚠️ **别把这条读成"顺手就能补"**：iOS 那套 harness 不共享 —— `verify-mobile-ios.sh` 1813 行自带全部
+    AX 助手（`ax` / `press_until` / `settle_for` / `dismiss_overlays`），`scripts/lib/` 里没有可复用的 iOS lib，
+    所以补它 = 现写一份 ~250 行探针，而**没有设备窗口时探针无法迭代**（每一趟都要重装 + 起模拟器）。
+    可关闭它的最小口径已经想清楚，写在下面，等窗口而不是现在盲写：
+    iOS 的读数通道其实比 Android **更便宜** —— `xcrun simctl get_app_container <UDID> <BID> data`/`tmp/card-export/`
+    是**宿主机直接可读的目录**，不需要 `adb root` 那一档（Android 侧的 release 包不可 `run-as`，见上面第 4 步那段），
+    所以 IHDR 那条判据只差 UI 驱动。判据①（读数器自检）与判据③（字节等于契约）可原样复用
+    `verify-mobile-card-export-read.mjs`；判据②（点了才出现）需要把 `featureScreen()` 那层
+    在 AX 树上的形状先摸清楚 —— 而那一屏**从来没有在设备上被打开过**（见 W8 节那条 `profile-entry-` 的现量）。
 - [x] W7 web 半完成（04 04:3x：五腿 e2e 全绿 + A1/A3 两臂各自转红 + 六张图人已看。
       ⚠️ `check:card-export` 的 `rc=0` 是 **03:1x** 的读数，而 A1 那一臂把 `packages/ui` 的 dist
       **打过又还原重打过** ⇒ 那条读数描述的不是现在这份产物，收尾那趟必须重取）
