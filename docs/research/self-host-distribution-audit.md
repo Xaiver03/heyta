@@ -1359,3 +1359,58 @@ git merge-tree --write-tree main feat/self-host-distribution   →  rc=1
 我不 rebase 掉它、不改写它（那是别人的动作），只把它的存在与解法写在这里。
 🔴 顺带一条给后来者的形状：**同一族取证图被两个会话各自刷新并各自提交**，binary 就不可合并 ——
 取证图应当由**跑那套界面的一侧**提交，或者干脆不入库（改由 `landing-results/` 那类被忽略的目录出证）。
+
+---
+
+### 8.23 合并载体第一次真的做出来了（带解法），而"在载体上跑完整 `pnpm check`"这一条今天**不能跑**——原因在链里
+
+§8.22 记下"零冲突过期了"之后，这一条把四条冲突族逐个解掉并落成一笔可复核的合并提交：
+
+```
+feat/self-host-merge-main = 38564fe8   parents: d27bccde(main) + 9930edfc(本批)
+```
+
+解法与理由逐条写在**那笔合并的提交信息里**（不是只在这里），因为下一个重做它的人需要的是解法本身。
+`package.json` 那块不是手改的：`/tmp/g7-union-package-json.mjs` 从两侧 blob + merge-base 算并集，
+带三条断言（两侧 scripts 键不缺、两侧链段不缺、两侧各自相对顺序不颠倒），
+结果 **135 个脚本键 / 67 段链**（本批 66 段 + main 独有的 `pnpm check:op-log-semantics`）。
+🔴 第一版我自己写坏过一次：那次把冲突块按 main 侧收掉了 —— 症状是"合上了"，实际是**把本批五道门禁静默摘掉**。
+并集脚本就是为了不再靠手而存在的。
+
+#### 合并树上的门禁读数（全部现量，载体工作树 `/tmp/heyta-merge-trial`）
+
+| 门禁 | rc | 读数 |
+|---|---|---|
+| `check:gate-wiring` | **0** | 链 67 段、定义 68 道、链外 1 道且消费方可验（runbook 2 处 + Dockerfile 1 处）⇒ §8.19 那条新判据在**别人的 package.json** 上也成立 |
+| `check:selfhost-entry-command` | 0 | 合并后的两份词条表仍在扫描集里、R1–R6 逐行过 |
+| `check:ui-language` | 0 | **zh 2934 / en 2934** 对等（main 那 16 笔加了 108 个键，与本批的改动自动合上了） |
+| `check:script-snapshot` | 0 | 36 个脚本（main 的 `c25960cb` 又补了 5 个，MANIFEST 与磁盘对得上） |
+| `check:docs-voice` | 0 | site.* 1020 条，30 项禁词零命中 |
+| `check:docs` | **1** | 3 处失效章节引用 |
+
+🔴 最后那行才是 #1 关闭判据的**本体**，所以它必须和 main 单独跑的结果并排量：
+`/tmp/heyta-main-docs`（干净 main=d27bccde 检出）跑同一条 `node research/tools/docs-link-check.mjs`
+⇒ **同样 3 处、同一批行号**（`calendar-year-time-and-mobile-profile.md:860`、
+`countdown-anniversary.md:1091`、`countdown-anniversary.md:1295`）。
+⇒ 这笔合并**没有给链添任何新的红**，那 3 处全部在别人的计划文档里。
+（顺带：登记里那句"main 红在 5 处"也已经过期 —— main 自己那 16 笔把其中 2 处修掉了。
+数字要带载体与日期，否则它一定漂。）
+
+#### 今天**不能**跑完整 `pnpm check` 的原因，写在链自己身上
+
+链的第 47 段是 `pnpm check:ai-e2e`，而它**会 SIGKILL 别的会话的 vite**
+（`docs/reference/environment-traps.md` #87，本批早先也记过一次）。现在是 2026-10-04 00:2x，
+主检出与另外 8 个 worktree 的会话还在跑（`git worktree list` 数到 14 个检出），
+所以"在载体上跑完整链"这一条**不是没做，是现在做就会踩硬约束**（不 SIGKILL 别人的 dev server）。
+
+⇒ 载体上跑完整链的窗口条件写成可判的三条：① 主检出那 5 个重叠文件已被其所有者提交
+（这是 #1 原本的门槛）；② `lsof -ti :5173 :5174 :4318 :4319` 全空（没有别人的 vite 在跑）；
+③ 负载 ≤12。三条同时成立才跑，跑之前把这三条的读数打出来留证。
+🔴 不要用"跳过 `check:ai-e2e` 再跑其余"来绕 —— 那会让"完整链绿"这句话变成假的，
+而这条链的裁判价值恰恰在于它是完整的那一条。
+
+#### 载体是** provisional ** 的，这一点必须跟着它
+
+它合的是 `main=d27bccde`，而主检出里那 5 个重叠文件仍是 `M`。
+所以 `38564fe8` 的作用是：**解法已被验证过一次**（并集脚本 + 六道门禁 + 与 main 的红集对照），
+落地那一刻按 §8.16 的三行重算、再按上面三条窗口条件跑完整链。
