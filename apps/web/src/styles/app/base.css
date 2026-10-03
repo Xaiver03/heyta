@@ -7,13 +7,27 @@
  *
  * 布局策略：CSS Grid **三层**（rail 视图 / sidebar 范围 / main），
  * 而 **sidebar 只在有范围的视图里存在** —— 所以列数由修饰类决定，不是固定的。
+ * 最后一列是**详情列**（`.ht-app__detail`）：宽由 token 定、在窄视口收起。
  * 移动端塌缩成单栏 + 底部导航。
  */
 
 .ht-app {
   display: grid;
-  /* 默认两层：rail + main（四象限/习惯/番茄钟… 这些视图**没有**范围列） */
-  grid-template-columns: var(--ht-layout-rail-width) 1fr;
+  /*
+    详情列的轨道宽度**只在这里算一次**，两条 `grid-template-columns`
+    （有 sidebar / 没有 sidebar）各自把它拼在末尾。
+    为什么是自定义属性而不是把 clamp 抄两遍：抄两遍就会漂 ——
+    `check:row-single-source` 那条纪律防的就是这个形状。
+    塌缩态把它改成 `0`（见 `narrow.css`），两行轨道声明都不用动。
+  */
+  --ht-detail-track: clamp(
+    var(--ht-layout-detail-min-width),
+    var(--ht-layout-detail-width),
+    var(--ht-layout-detail-max-width)
+  );
+
+  /* 默认两层 + 详情列：rail + main + detail（四象限/习惯/番茄钟… 没有范围列） */
+  grid-template-columns: var(--ht-layout-rail-width) 1fr var(--ht-detail-track);
   min-height: 100dvh;
   background: var(--ht-color-background);
 }
@@ -42,5 +56,28 @@
       var(--ht-sidebar-width, var(--ht-layout-sidebar-width)),
       min(var(--ht-layout-sidebar-max-width), 40vw)
     )
-    1fr;
+    1fr
+    var(--ht-detail-track);
+}
+
+/*
+ * 详情列（选中项的面单）。
+ *
+ * 🔴 **它必须是 `.ht-app` 的直接子项**，不能挂在 `.ht-content` 里面分栏。
+ * `.ht-content` 自己带着 `max-inline-size` + `margin-inline: auto`（居中），
+ * 放进去会得到"中间那一坨里再分栏"——左右各留一道白，右边不贴视口边缘。
+ * 滴答那个形状是**第四列**，不是内容区里的第二栏。
+ * 承重判据在 `e2e/tests/detail-column-slot.spec.ts`（比 `boundingBox()` 的右边缘）。
+ *
+ * ⚠️ 命名走 `.ht-app__detail` 而不是新起 `.ht-detail` 一族：
+ * `check:row-single-source` 数的是顶层 `ht-*` 家族名，余量为 0 ——
+ * 新家族名会把基线顶上去。已有先例 `.ht-content__calendar-host`。
+ */
+.ht-app__detail {
+  /* 一屏封顶 + 内部滚动：和 `.ht-sidebar--calendar` 同一条理由，
+     详情页里"到期复习/记录列表"这类区块会往下长，不该把整页推走。 */
+  block-size: 100dvh;
+  overflow-y: auto;
+  border-left: var(--ht-border-width-thin) solid var(--ht-color-border);
+  background: var(--ht-color-surface);
 }

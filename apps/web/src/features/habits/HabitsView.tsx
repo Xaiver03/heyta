@@ -59,6 +59,7 @@ import { HEATMAP_MONTH_KEYS, HabitBoard, HeytaUiProvider, type HabitBoardLabels 
 import { Check, Pencil, Plus, Trash2, X } from 'lucide-react';
 
 import { ColorSlotPicker } from '../categories/ColorSlotPicker.js';
+import { selection, useSelected } from '../../lib/selection.js';
 import { HabitIconPicker } from './HabitIconPicker.js';
 import { HabitsList, HABIT_ROW_WEEK_DAYS, type HabitsListRow } from './HabitsList.js';
 import { checkInLabel, currentStreakText, longestStreakText, totalCheckInText } from './copy.js';
@@ -152,12 +153,17 @@ export function HabitsView() {
   /** 正在落盘的习惯 —— 置灰它那一行的按钮，防连点发出两条 op。 */
   const [busyId, setBusyId] = useState<string | null>(null);
   /**
-   * 右窗格展开的那一条。
+   * 右窗格展开的那一条 —— 读**全壳那一份选中态**（`lib/selection.ts` →
+   * `@heyta/app-host` 的 `selection.ts`），不再是本视图自己的 `useState`。
    *
    * 🔴 **存 id，不存对象**：`store.habits` 每次 op 后都是新数组，握住对象会让
    * 窗格显示一份过期的名字 / 目标。id 只是索引，渲染时从 `rows` 现取。
+   *
+   * ⚠️ 这一处原本是 `useState`。它和移动端习惯页、移动端任务页各有一份同名状态，
+   * 三份的**回落规则并不相同** —— 那正是"从搜索点进一条、切回列表就丢了"这类
+   * 只在某个视图出现的行为的成因。抽到共享层之后，回落只有一条（实体没了才清）。
    */
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const selectedId = useSelected('habit');
   /**
    * 窗格里那条习惯**正在改名**时存它的 id（不是布尔）。
    *
@@ -278,7 +284,7 @@ export function HabitsView() {
           rows={rows}
           selectedId={selected?.progress.habit.id}
           onSelect={(habitId) => {
-            setSelectedId(habitId);
+            selection.select('habit', habitId);
           }}
         />
       </div>

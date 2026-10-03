@@ -53,6 +53,7 @@ import { SearchPanel, type SearchPanelLabels } from '@heyta/ui';
 
 import { openTaskHost } from '../db/open-host';
 import { searchPanelLabels } from '../lib/search-display';
+import { pruneSelectionAgainst } from '../lib/selection';
 import { useMobileSync } from '../sync/store';
 import { useTheme, useTokens } from '../theme';
 import { Button, Text } from '../ui/kit';
@@ -115,7 +116,11 @@ export function SearchScreen({
   useEffect(() => {
     if (noteActions === null) return;
     // ⚠️ `listNotes()` 是同步的（读已物化状态），不是 Promise。
-    setNotes(noteActions.listNotes());
+    const listed = noteActions.listNotes();
+    setNotes(listed);
+    // 🔴 回落喂**全集**而不是筛完的 `results.notes`：后者会让"改一下搜索词"
+    // 把正在编辑的那条判定成不存在、编辑屏自己关掉。
+    pruneSelectionAgainst({ note: listed.map((note) => note.id) });
   }, [noteActions, dataRevision]);
 
   /**

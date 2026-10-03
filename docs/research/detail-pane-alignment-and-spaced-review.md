@@ -98,7 +98,7 @@
 | 总专注时长 | ✅ `milestones.ts:59-65` → [`packages/app-host/src/motivation.ts:105-111`](../../packages/app-host/src/motivation.ts)，但**只活在分享纯文本与里程碑阶梯里** | 有数、没面 |
 | 「专注记录」列表 | ❌ **一条专注记录都没被逐条渲染过**：`listSessions()` 全仓唯一消费者是 `FocusScreen.tsx:196`，且只喂给 `focusStatsForDay` 做当日汇总 | 界面层（数据在） |
 | 「添加专注记录」表单（任务/开始/结束/类型/**笔记**） | ❌ **缺整条写路径**：`FocusActions` 只有 `log`/`listSessions`（[`packages/app-host/src/focus-actions.ts:35-53`](../../packages/app-host/src/focus-actions.ts)），且 `log` 前置明写"**只接受已经结束的轮次**"；`FocusSession` **无 `note`**；全仓 `FOCUS_SESSION` 写入点只有 `focus-actions.ts:139` 一处 | 领域 + 动作 + 界面 |
-| （对照）滴答桌面端"仅可补记不可删" | 我们 `FOCUS_SESSION` **连删除动作都没有**（[trash-and-archive-best-practice.md:181](trash-and-archive-best-practice.md)、`:191`），且"不做删除"是**已拍决定**（[trash-and-archive.md:237](../plans/trash-and-archive.md)） | 要改先重开那条决定 |
+| （对照）滴答桌面端"仅可补记不可删" | 我们 `FOCUS_SESSION` **连删除动作都没有**（`docs/research/trash-and-archive-best-practice.md:181`、`:191`），且"不做删除"是**已拍决定**（`docs/plans/trash-and-archive.md:237`）。⚠️ 这两份按 2026-10-03 现量**只活在主检出的未提交改动里**（`git log --all --diff-filter=A` 查不到）⇒ 写成路径而不是链接，否则干净检出上是死链；那条决定的正文归回收站那条线自己提交 | 要改先重开那条决定 |
 
 ⚠️ 另有一处**文档与代码不符**：[`docs/reference/architecture.md:129`](../reference/architecture.md) 写着 `FocusSession — … mode(pomo/stopwatch), duration` —— **代码里没有这两个字段**，不能拿它当"已建模"的证据。
 

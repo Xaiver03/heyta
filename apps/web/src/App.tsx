@@ -175,6 +175,7 @@ import { FocusTimer } from './features/focus/FocusTimer.js';
 import { TrashView } from './features/trash/TrashView.js';
 import { LanguageSwitcher } from './features/shell/LanguageSwitcher.js';
 import { onEngineChange, readRecentOps } from './lib/oplog.js';
+import { pruneSelectionFromEntities, selection, useSelected } from './lib/selection.js';
 import { applyTheme, rememberThemeChoice, resolveInitialTheme, type Theme } from './lib/theme.js';
 
 import './styles/app.css';
@@ -213,6 +214,27 @@ export function App(): React.JSX.Element {
    */
   const visible = useTaskStore(useShallow(selectVisibleTasks));
   const counts = useTaskStore(useShallow(selectQuadrantCounts));
+  /**
+   * 详情面的**选中态**（W1）。它住 `@heyta/app-host`，web 只有这一行胶水。
+   *
+   * 🔴 为什么不是 `useState`：选中要能跨视图（列表 / 日历 / 四象限 / 时间线 /
+   * 搜索 / 回收站是同一批任务），而各视图各存一份的结果就是"从搜索点进一条、
+   * 切回日历，选中丢了；而在习惯页它又是另一套回落规则"。
+   * 此前它确实散成三份：web 任务侧**根本没有**（行体不可点）、
+   * web 习惯侧一个 `useState`、移动端任务侧另一个 `useState`。
+   *
+   * ⚠️ 返回的是**原始值**，所以不需要 `useShallow` —— 上面那段"引用稳定"
+   * 的教训对它同样成立，只是它天然满足。
+   */
+  const selectedTaskId = useSelected('task');
+  /**
+   * 🔴 必须是 `useCallback` 而不是行内箭头：`TaskList` 把 `onOpenTask` 放进了
+   * 行渲染的 `useMemo` 依赖里，每次渲染换新函数 = 整表所有行重建，
+   * 而这一栏是要装常驻详情面的（W2），白重渲染的代价会从"看不见"变成"看得见地卡"。
+   */
+  const openTask = useCallback((taskId: string) => {
+    selection.select('task', taskId);
+  }, []);
   const [view, setView] = useState<ViewKey>('tasks');
   /**
    * 已启用的功能模块（**设备本地**，见 `features/shell/modules.ts`）。
@@ -547,12 +569,14 @@ export function App(): React.JSX.Element {
    * 而任务视图当时可能停在「今天」这类筛选上，被点的那条**根本不在列表里**。
    * 用户看到的是"点了没反应"（与 `goToFilter` 那条注释记的 bug 同一类）。
    *
-   * 所以两件事一起做：① 筛选切到「全部」（保证它在列表里）；
-   * ② 滚到那一行 —— 列表有几十行时"它在列表里"与"你看得见它"不是一回事。
+   * 所以三件事一起做：① 选中它（W1 —— 行的高亮与详情面都读这一个值）；
+   * ② 筛选切到「全部」（保证它在列表里）；
+   * ③ 滚到那一行 —— 列表有几十行时"它在列表里"与"你看得见它"不是一回事。
    * ⚠️ 滚要在**下一帧**：这一帧 React 还没把新筛选下的行画出来。
    */
   const openTaskFromSearch = useCallback(
     (taskId: string) => {
+      selection.select('task', taskId);
       goToFilter({ kind: 'all' });
       requestAnimationFrame(() => {
         document
@@ -694,6 +718,22 @@ export function App(): React.JSX.Element {
       unsubscribe();
     };
   }, [aiSettings.memoryEnabled]);
+
+  /**
+   * 选中态的**回落**（W1）：实体不在了就把选中丢掉，免得详情面继续显示一条
+   * 已经不存在的东西 —— 那是界面在说谎。
+   *
+   * 🔴 判据是"**实体还在不在**"，**不是**"它在当前筛选下可不可见"。
+   * 写成后者的话，用户从「今天」切到「收集箱」的那一刻，正在详情面里编辑的
+   * 那条任务会被判定"不存在"、面板自己关掉。这条红线在 `app-host` 的
+   * `selection.ts` 文件头，判据钉在 `packages/app-host/tests/selection.spec.ts`；
+   * 本行只是它的**消费者**，所以这里连比较都不写，只把物化状态递进去。
+   *
+   * ⚠️ 软删除（进回收站）**算"不在了"**：详情面跟着关，恢复动作在回收站里做。
+   */
+  useEffect(() => {
+    pruneSelectionFromEntities(store.entities);
+  }, [store.entities]);
 
   // 主题应用到 <html data-theme>，tokens.css 的暗色覆盖挂在那里
   useEffect(() => {
@@ -1188,10 +1228,16 @@ export function App(): React.JSX.Element {
   }, []);
 
   /**
-   * 打开一条便签结果 = **进便签视图**（浮层挂在 `view` 上，切过去就自然关掉）。
+   * 打开一条便签结果 = **选中它并进便签视图**（浮层挂在 `view` 上，切过去就自然关掉）。
    * 点与 ↵ 共用这一条，出口才不会漂成两份。
+   *
+   * 🔴 `noteId` 以前是**丢掉的**（回调签名不带参数，TS 不报错），于是"点了搜索结果
+   * 里的便签"只换来一次视图切换 —— 与上面 `openTaskFromSearch` 那条 2026-09-30 修掉的
+   * 缺陷同一个形状。选中态成为一等状态之后，这里必须把它写进去，
+   * 便签面板才知道要打开哪一条。
    */
-  const openNoteFromSearch = useCallback(() => {
+  const openNoteFromSearch = useCallback((noteId: string) => {
+    selection.select('note', noteId);
     setSettingsFocus(undefined);
     setView('notes');
   }, []);
@@ -1209,7 +1255,7 @@ export function App(): React.JSX.Element {
         return;
       }
       if (entry.kind === 'note') {
-        openNoteFromSearch();
+        openNoteFromSearch(entry.id);
         return;
       }
       // 跳转项的动作住在宿主给的 `quickActions` 里，这里只按 id 找回它。
@@ -1964,6 +2010,8 @@ export function App(): React.JSX.Element {
               <TaskList
                 tasks={visible}
                 sort={taskSort}
+                onOpenTask={openTask}
+                activeTaskId={selectedTaskId}
                 onToggleTask={(taskId) => {
                   void store.toggleComplete(taskId);
                 }}
@@ -2028,6 +2076,8 @@ export function App(): React.JSX.Element {
                         <TaskList
                           tasks={group.tasks}
                           sort={taskSort}
+                          onOpenTask={openTask}
+                          activeTaskId={selectedTaskId}
                           onToggleTask={(taskId) => {
                             void store.toggleComplete(taskId);
                           }}
@@ -2095,7 +2145,14 @@ export function App(): React.JSX.Element {
             </div>
           )}
           {contentView === 'calendar' && <CalendarView />}
-          {contentView === 'quadrant' && <QuadrantBoard />}
+          {/**
+           * 四象限 = 同一批任务的另一种投影（共享 `QuadrantBoard` 每格直接渲染
+           * 共享 `TaskList`）。🔴 所以**选中必须接同一个值**：在列表里选中一条再切过来，
+           * 那一条要还是高亮的那一条 —— 各投影各留一份选中，就是各答一遍回落规则。
+           */}
+          {contentView === 'quadrant' && (
+            <QuadrantBoard onOpenTask={openTask} activeTaskId={selectedTaskId} />
+          )}
           {contentView === 'habits' && <HabitsView />}
           {/**
            * 番茄钟。**计时核心来自 `@heyta/ui` 的共享 `FocusPanel`**
@@ -2136,6 +2193,10 @@ export function App(): React.JSX.Element {
                   .addTask(t('web.board.untitledTask'), { startDate: atMs })
                   .catch((e) => console.error('DBG onCreateAt failed:', e));
               }}
+              // 点行 = 选中，与列表/四象限同一个值（同一批任务的第三种投影）。
+              // 触屏端早就接了，web 这边此前行体不可点 ⇒ 两端同一个界面两种能力。
+              onOpenTask={openTask}
+              activeTaskId={selectedTaskId}
             />
           )}
           {contentView === 'growth' && <GrowthView />}
@@ -2322,6 +2383,24 @@ export function App(): React.JSX.Element {
           )}
         </div>
       </main>
+      {/*
+       * 🔴 详情列（工单 W2）：`.ht-app` 的**直接子项**，与 `<main>` 平级。
+       *
+       * 为什么必须是兄弟而不是 `.ht-content` 的后代：那一层带
+       * `max-inline-size: var(--ht-layout-content-max)` + `margin-inline: auto`，
+       * 挂在里面的列**永远贴不到窗口右边缘**，读起来就不是"三栏 + 右详情"而是
+       * "中间一坨里再分两栏"。这条是 W2 的承重判据（`boundingBox` 右边缘相等），
+       * 变异臂就是把这一列搬回 `.ht-content` 里面 —— 搬回去它必须转红。
+       *
+       * ⚠️ 今天它是**空的**，这是设计不是半成品：产品负责人对这一栏的原话是
+       * "即使没东西也空在那里，一旦选中任何东西右边就出详细的面单"。
+       * 被主计划 §5.4 否决的是"没有选中态时往槽里塞装饰"，而 W1 的选中态已经就绪。
+       * 往里放什么属于"详情面本体"那一单（阻塞在拍板 #1/#8），
+       * 所以这里也**不给它起无障碍名** —— 一个还没有内容的区域，名字会比内容更响。
+       *
+       * ⚠️ 窄屏（≤1023px）这一列不出现，规则与算过的账在 `styles/app/narrow.css`。
+       */}
+      <aside className="ht-app__detail" data-testid="detail-column" />
       </div>
       </AiSettingsNavigationContext.Provider>
     </HeytaUiProvider>

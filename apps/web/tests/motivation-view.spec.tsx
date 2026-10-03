@@ -385,7 +385,7 @@ describe('习惯卡片（L2）真的显示出三个数', () => {
     //      没有它的话，"界面里没有余额"也可能只是"界面还没刷新"。
     expect(numbers?.freezesHeld).toBe(1);
     const flat = (container?.textContent ?? '').replace(/\s+/gu, '');
-    expect(flat).toContain(`累计${String(numbers?.total)}次`);
+    expect(flat).toContain(`累计${String(numbers?.total)}天`);
 
     // 才是要守的那条：余额不上界面。
     expect(flat).not.toContain('个冻结');

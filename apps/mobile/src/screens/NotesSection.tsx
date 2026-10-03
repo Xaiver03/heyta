@@ -47,6 +47,7 @@ import { NotesBoard } from '@heyta/ui';
 
 import { openTaskHost } from '../db/open-host';
 import { notesBoardLabels } from '../lib/notes-display';
+import { pruneSelectionAgainst, selection, useSelected } from '../lib/selection';
 import { NoteEditScreen } from './NoteEditScreen';
 import { useMobileSync } from '../sync/store';
 import { Card, SectionHeader, Text } from '../ui/kit';
@@ -66,13 +67,16 @@ export function NotesSection(): React.JSX.Element {
   /** 见文件头决定 3：失败原因原样显示，不静默吞。 */
   const [error, setError] = useState<string | null>(null);
   /**
-   * 正在编辑的那条便签 id，`null` = 编辑屏没开。
+   * 正在编辑的那条便签 = **选中的那一条**（`null` = 编辑屏没开）。
    *
    * 🔴 刻意**不放**在 `ProfileScreen` 的那一族 `useState` 里：编辑屏是全屏
-   * `Modal`（见 `NoteEditScreen` 文件头那条理由），挂在拥有这段数据的本文件里，
-   * 「我的」页就不用为一个它不关心的状态多一层回调；而搜索那条入口另有一个宿主。
+   * `Modal`（见 `NoteEditScreen` 文件头那条理由），谁拥有数据谁挂它。
+   * ~~而搜索那条入口另有一个宿主，两边各留一份本地状态~~
+   * **（2026-10-03 W1 已推翻，留原文是为了让后来者认出这个形状）**：
+   * 两份本地状态 = 同一个问题答两遍，而"选中态"是模块级单例，
+   * 共享它不需要跨屏传回调。
    */
-  const [editingId, setEditingId] = useState<string | null>(null);
+  const editingId = useSelected('note');
 
   useEffect(() => {
     let alive = true;
@@ -96,10 +100,26 @@ export function NotesSection(): React.JSX.Element {
     if (actions === null) return;
     // ⚠️ `listNotes()` 是**同步**的（读已物化状态），不是 Promise。
     // 顺序（钉选 → 更新时间 → id）由共享 model 决定，本文件不排。
-    setNotes(actions.listNotes());
+    const listed = actions.listNotes();
+    setNotes(listed);
+    // 🔴 递给回落的是**未筛选的全集**：写成筛完的那一截，用户切一下分组
+    // 正在编辑的便签就会被判定"不存在"、编辑屏自己关掉。
+    pruneSelectionAgainst({ note: listed.map((note) => note.id) });
   }, [actions]);
 
   useEffect(read, [read, dataRevision]);
+
+  /**
+   * 离开这一段时收起编辑屏 —— 与 `TasksScreen` / `HabitsScreen` 同一条**移动端形态**
+   * （外壳按标签切屏会卸载本屏，选中态留着就会"切回来凭空弹出一个编辑屏"）。
+   * 规则的正文在那两处的注释里，这里不复述（复述一遍就是第二份抄件）。
+   */
+  useEffect(
+    () => () => {
+      selection.select('note', null);
+    },
+    [],
+  );
 
   const run = useCallback(
     (pending: Promise<unknown>): void => {
@@ -144,7 +164,7 @@ export function NotesSection(): React.JSX.Element {
           // 摘要那段因此从纯文本变成可点的编辑入口（共享组件按传没传决定）。
           // ⚠️ `NotesBoard` 交出的是**行 id**，与 `onRemove` / `onTogglePinned` 同一个键。
           onEdit={(entityId) => {
-            setEditingId(entityId);
+            selection.select('note', entityId);
           }}
           testID="mobile-notes-board"
         />
@@ -153,7 +173,7 @@ export function NotesSection(): React.JSX.Element {
         <NoteEditScreen
           noteId={editingId}
           onBack={() => {
-            setEditingId(null);
+            selection.select('note', null);
           }}
         />
       )}

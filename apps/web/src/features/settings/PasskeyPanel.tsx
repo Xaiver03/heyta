@@ -155,7 +155,7 @@ export function PasskeyPanel(): React.JSX.Element {
   /** 两段式删除：第一下进入"确认"，第二下才真的删。 */
   const [confirmingId, setConfirmingId] = useState<string | undefined>(undefined);
   /** 正在改名的是哪一行（同一时刻只开一个输入框）。 */
-  const [editingId, setEditingId] = useState<string | undefined>(undefined);
+  const [editingRowId, setEditingRowId] = useState<string | undefined>(undefined);
   /** 改名输入框里的草稿。 */
   const [draftName, setDraftName] = useState<string>('');
 
@@ -169,7 +169,7 @@ export function PasskeyPanel(): React.JSX.Element {
 
   const closeEditors = (): void => {
     setConfirmingId(undefined);
-    setEditingId(undefined);
+    setEditingRowId(undefined);
   };
 
   return (
@@ -286,7 +286,7 @@ export function PasskeyPanel(): React.JSX.Element {
               const deleting = deletingId === passkey.id;
               const renaming = renamingId === passkey.id;
               const confirming = confirmingId === passkey.id;
-              const editing = editingId === passkey.id;
+              const editing = editingRowId === passkey.id;
               return (
                 <section
                   className="ht-settings__section"
@@ -334,7 +334,7 @@ export function PasskeyPanel(): React.JSX.Element {
                             // 🔴 **只在成功时**收起输入框。失败还收起就等于把
                             // 用户刚打的字丢掉 —— 而失败正是他要改一改再存的时候。
                             if (usePasskeysStore.getState().renameFailure === undefined) {
-                              setEditingId(undefined);
+                              setEditingRowId(undefined);
                             }
                           })();
                         }}
@@ -351,7 +351,7 @@ export function PasskeyPanel(): React.JSX.Element {
                         className="ht-btn ht-btn--ghost"
                         data-testid={`passkey-name-cancel-${passkey.id}`}
                         disabled={renaming}
-                        onClick={() => setEditingId(undefined)}
+                        onClick={() => setEditingRowId(undefined)}
                       >
                         {t('web.passkeys.cancel')}
                       </button>
@@ -398,7 +398,7 @@ export function PasskeyPanel(): React.JSX.Element {
                               setConfirmingId(undefined);
                               // 草稿从**当前名字**起步；没名字时是空串。
                               setDraftName(passkey.name ?? '');
-                              setEditingId(passkey.id);
+                              setEditingRowId(passkey.id);
                             }}
                           >
                             <Pencil size={ICON_SIZE.xs} aria-hidden="true" /> {t('web.passkeys.rename')}
@@ -410,7 +410,7 @@ export function PasskeyPanel(): React.JSX.Element {
                             disabled={deleting}
                             onClick={() => {
                               dismissNotice();
-                              setEditingId(undefined);
+                              setEditingRowId(undefined);
                               setConfirmingId(passkey.id);
                             }}
                           >
