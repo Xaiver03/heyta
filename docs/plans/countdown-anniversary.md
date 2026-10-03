@@ -1284,6 +1284,14 @@ W0b ─> 随时可做（台账那半要等文件干净）
     iOS 的读数通道其实比 Android **更便宜** —— `xcrun simctl get_app_container <UDID> <BID> data`/`tmp/card-export/`
     是**宿主机直接可读的目录**，不需要 `adb root` 那一档（Android 侧的 release 包不可 `run-as`，见上面第 4 步那段），
     所以 IHDR 那条判据只差 UI 驱动。判据①（读数器自检）与判据③（字节等于契约）可原样复用
+    ✅ **04 06:4x：那句"通道更便宜"从推断变成现量**（纯只读，没有动任何一台模拟器）——
+    三台已启动模拟器（`heyta-iphone-17pro` FE195661… / `heyta-ios-isolated` 1EDCFA59… /
+    `iPhone Duo heyta` 742A8651…）上 `com.heyta` **都装着**，
+    `xcrun simctl get_app_container <UDID> com.heyta data` 三台都解析出宿主机可读的容器路径
+    （`…/Data/Containers/Data/Application/<UUID>`），`ls <容器>/tmp` 直接可读；
+    而 `tmp/card-export/` **三台都不存在** ⇒ 缺的确实只剩"在 iOS 上把导出那一下按出来"，
+    **不是**"读不到"。⚠️ 这三台此刻都在另一条会话手里（`heyta-ios-isolated` 那台是别人为隔离造的），
+    所以本批只证通道、不去按那一下（§8.9 + §7 第 82 条那族"别动别人的设备"）。
     `verify-mobile-card-export-read.mjs`；判据②（点了才出现）需要把 `featureScreen()` 那层
     在 AX 树上的形状先摸清楚 —— 而那一屏**从来没有在设备上被打开过**（见 W8 节那条 `profile-entry-` 的现量）。
 - [x] W7 web 半完成（04 04:3x：五腿 e2e 全绿 + A1/A3 两臂各自转红 + 六张图人已看。
