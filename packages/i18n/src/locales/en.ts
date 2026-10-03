@@ -219,7 +219,7 @@ export const en = {
   'landing.privacy.noteProgress': 'Encrypted {done} / {total} characters',
 
   // ── Landing · self-host ───────────────────────────────────
-  'landing.selfhost.title': 'Your own server, one command away',
+  'landing.selfhost.title': 'Your own server, one command to bring up the whole stack',
   'landing.selfhost.lede': 'No account and no subscription. The server only relays ciphertext and orders concurrent changes: replace it, shut it down, or move it to another machine and your data is unaffected.',
   // 🔴 No shell commands, repository paths or database internals in this
   // section -- the criterion and the reason live in
@@ -232,7 +232,7 @@ export const en = {
   'landing.selfhost.step2.body': 'On first launch, pick one: your own server address or the hosted option. You can switch whenever you want.',
   'landing.selfhost.step3.title': 'You set the secrets',
   'landing.selfhost.step3.body': 'There are no default credentials — it is not a zero-thought installer, but every step is documented.',
-  'landing.selfhost.guide.title': 'The full walk-through lives in the repo',
+  'landing.selfhost.guide.title': 'The full walk-through is in the self-hosting guide',
   'landing.selfhost.guide.body': 'Every command, requirement and config file is in the self-hosting guide; follow it once and it comes up.',
   'landing.selfhost.guide.link': 'Open the self-host guide',
 
@@ -2959,7 +2959,7 @@ export const en = {
   'site.help.q.passphrase': 'I forgot my encryption passphrase. What now?',
   'site.help.a.passphrase': '**There is no recovery, and that is by design, not an oversight.** End-to-end encryption means the server holds only ciphertext and has no passphrase that unlocks it — any "recovery" would mean the server could read your data. What you can do: export your data from an old device that can still unlock, then start fresh with a new passphrase on the new one. So keep the passphrase safe.',
   'site.help.q.passkey': 'How do passkeys work?',
-  'site.help.a.passkey': 'Choose "passkey" when signing in and confirm with your device\'s face / fingerprint / system PIN. There is no password to remember and none to breach. If you lose it, the sign-in page offers "Lost your passkey?", which emails a recovery link where you register a new one. ⚠️ **The last remaining credential cannot be deleted** — delete it and you are locked out.',
+  'site.help.a.passkey': 'Choose "passkey" when signing in and confirm with your device\'s face / fingerprint / system PIN. There is no password to remember and none to breach. If you lose it, the app\'s sign-in panel offers "Lost your passkey?", which emails a recovery link where you register a new one. ⚠️ **The last remaining credential cannot be deleted** — delete it and you are locked out.',
   'site.help.q.quadrant': 'How are the four quadrants classified?',
   'site.help.a.quadrant': 'Quadrants are **computed on the spot**, not labels you attach to a task: "urgent" depends on whether the due date falls inside the near-term window, and "important" comes from the flag you set yourself (falling back to priority when you never set it). Change the due date or priority and the task changes cell — so the quadrants can never disagree with your tasks.',
   'site.help.q.repeat': 'How do I set up a repeating task?',
@@ -3036,7 +3036,7 @@ export const en = {
   // Accounts, tokens, and how you sign in
   'site.docs.account.title': 'Accounts, tokens, and how you sign in',
   'site.docs.account.seo.title': 'Accounts, tokens, and how you sign in — heyta',
-  'site.docs.account.sum': 'heyta has no password to remember and none to credential-stuff — so where does the access token that syncing needs come from?',
+  'site.docs.account.sum': 'Registration and sign-in run on email plus password, and the passkey and the emailed link both stayed — so where does the access token that syncing needs come from?',
   'site.docs.account.s1': 'Three boxes, that is all',
   'site.docs.account.s1p1': 'The sync settings have exactly three fields: server address, access token, end-to-end encryption passphrase.',
   'site.docs.account.s1i1': 'Server address: the sync server you want to connect to. Leave everything empty and you are using heyta purely locally — the data stays on this device.',
@@ -3046,11 +3046,13 @@ export const en = {
   'site.docs.account.s2p1': 'Registration and sign-in run on **email plus password**; the emailed link and the passkey both stayed. What the server holds for your password is not something it can read back or hand to anyone — if you forget it, "Forgot your password" mails a one-time reset link, which is a real reset rather than a way around the password.',
   'site.docs.account.s2i1': 'Email plus password: give your address, set a password (at least 8 characters), click the link in the verification mail to activate, then sign in with that password.',
   'site.docs.account.s2i2': 'Emailed link (when you would rather not remember anything): enter your address, open the mail, click the link — signed in.',
-  'site.docs.account.s2i3': 'Passkey: confirm with the device itself — face, fingerprint, or system PIN. Nothing to remember, so nothing to leak. Lost it? The sign-in page offers "Lost your passkey?" and mails a recovery link; that step has to call the platform authenticator in a real browser, so it opens a standalone page rather than an in-app sheet.',
+  'site.docs.account.s2i3': 'Passkey: confirm with the device itself — face, fingerprint, or system PIN. Nothing to remember, so nothing to leak. Lost it? The app\'s sign-in panel offers "Lost your passkey?" and mails a recovery link; that step has to call the platform authenticator in a real browser, so it opens a standalone page rather than an in-app sheet.',
   'site.docs.account.s3': 'Why the desktop shells hand off to your browser',
   'site.docs.account.s3p1': 'Passkeys do not work inside the macOS and Windows shells (measured: the embedded WebView exposes no platform authenticator). So the shell sends you to your **system browser** to sign in and takes the result back automatically; if the operating system never hands the address back, that page also shows a link you can click yourself.',
   'site.docs.account.s4': 'The terms belong to "that server"',
   'site.docs.account.s4p1': 'The checkbox at registration reads "the terms of service and privacy policy **offered by this server**". Because anyone can deploy heyta — who runs the server you connect to, and which terms apply, is that server\'s decision.',
+  'site.docs.account.s5': 'Why signing in happens in the app, not on the website',
+  'site.docs.account.s5p1': 'The server address used for signing in is **the same one** as in your sync settings — the two have to match, or you get "signed in against server A while the token was stored for B", which is brutally hard to trace. So the sign-in page on this site does one thing: it carries you into the app\'s sign-in panel instead of duplicating a form. A passkey has one more constraint — it must be bound to one specific domain, and that step can only happen in a real browser.',
 
   // The encryption passphrase
   'site.docs.passphrase.title': 'The encryption passphrase',
@@ -3088,7 +3090,7 @@ export const en = {
   'site.docs.selfhost.s1i1': '**No prebuilt image is published** — you build it on your own machine.',
   'site.docs.selfhost.s1i2': 'Bringing the service **up** is not a deployment: schema changes are applied explicitly by the migration step in the deploy flow — the service itself never touches the schema at startup.',
   'site.docs.selfhost.s1i3': 'What it takes is a machine that stays on, a domain of your own, and the basic operational habits — reading service logs, letting certificates renew on time.',
-  'site.docs.selfhost.s1i4': 'The key, the database password and the public hostname are yours to set — **there are no defaults**. Missing any one of them, the service **refuses to boot**; that is deliberate, so nobody can ship on a default secret.',
+  'site.docs.selfhost.s1i4': 'Three settings have **no defaults** and are yours to generate: without `JWT_SECRET` or `PASSWORD_PEPPER` (or with either shorter than 32 characters) the service **refuses to boot**; without `POSTGRES_PASSWORD` the database container exits immediately. That is deliberate, so nobody can ship on a default secret. The public hostname is a different kind of knob and fails in a different way: `DOMAIN` is only the gateway site address (the sync service never reads it, and left empty it is the gateway that fails to start), while `PUBLIC_URL` defaults to `http://localhost:1900` — leaving it alone raises no error, it quietly points the links in emails at localhost.',
   'site.docs.selfhost.s2': 'What has to be configured',
   'site.docs.selfhost.s2i1': 'SMTP: it covers the **account activation** step (the verification email) and nothing else. Registration and sign-in run on **email + password**, so an account can still be created without SMTP — the link simply never arrives, and the app says that out loud instead of pretending it did: configure SMTP and submit again, or set `REQUIRE_EMAIL_VERIFICATION=false` to skip the step.',
   'site.docs.selfhost.s2i2': 'Public address: in production, a non-https public URL makes the service refuse to start. Plaintext HTTP is a legitimate self-hosting choice on a LAN, not on the public internet.',
@@ -3110,14 +3112,14 @@ export const en = {
   'site.docs.selfhost.s6p2': 'So debug in reverse: look at the browser console for a cross-origin error before you look at the server. A quiet log does not mean a healthy service — it can mean nobody asked it anything.',
   'site.docs.selfhost.s6i1': 'Which origins get through is the server setting `CORS_ORIGINS`, a comma-separated list; in production a wildcard there makes the service refuse to start.',
   'site.docs.selfhost.s7': 'How to install: no ready-made images, two routes to pick from',
-  'site.docs.selfhost.s7p1': 'Upstream publishes no versioned images — only `latest` and `master-<commit>` tags that follow the main branch. To pin a version, point `SUPERSYNC_IMAGE` at a specific `master-<commit>`; without pinning, every pull is an upgrade to the latest main branch.',
-  'site.docs.selfhost.s7p2': 'The deploy script is the only supported entry point: it brings up the whole stack (app, PostgreSQL database, Caddy gateway), runs the database migration **before** swapping in the new container, and checks the health endpoint afterwards. Note that `docker compose up` by itself is **not** a deployment: automatic migrations at container startup are off by default (so a restart cannot race the migrator) — a stack started that way runs against an unmigrated schema.',
+  'site.docs.selfhost.s7p1': 'No heyta images are published today, so there is no version number to pin here. Do **not** point `SUPERSYNC_IMAGE` at upstream `master-<commit>` tags: those images belong to a different project, whose table layout and encryption requirements have already diverged from heyta. Doing so leaves you with a server that **starts fine and passes its health check while running an unfamiliar schema**. To pin a version, build from this repository and pass that source revision into the build as its version label.',
+  'site.docs.selfhost.s7p2': 'Both entries are supported, and the difference shows up when you upgrade. `./scripts/deploy.sh --build` brings up the whole stack (app, PostgreSQL database, Caddy gateway), applies the database migration **while the old containers are still serving**, **refuses to swap in** the new container if that fails, and checks the health endpoint afterwards. The other one is a single command that brings the whole stack up: `docker compose -f docker-compose.yml -f docker-compose.build.yml -f docker-compose.migrate-once.yml up -d --build`. Neither the build override nor the one-shot migration override can be left out, and neither can `--build` — without `docker-compose.build.yml` compose goes after an image that does not exist, while without `--build` nothing gets built, and both shortcuts end at the same failure to start. And it migrates **only on the first boot**: to upgrade, either use the deploy script or explicitly re-run that one-shot migration service. Note that a bare `docker compose up` is **not** a deployment: automatic migrations at container startup are off by default (so a restart cannot race the migrator) — a stack started that way runs against an unmigrated schema.',
   'site.docs.selfhost.s7p3': 'With `--build` the image is compiled right on the deploy host — a full build of the whole repository: expect a peak of 1.5 GB of extra RAM (the containers already reserve about 2.5 GB), and a build cache that grows by roughly 1.4 GB per build and is **never pruned for you**. On a small machine, build elsewhere and push the image, or pin a ready-made tag. `--build` also refuses to build from dirty sources — a build artifact must trace back to one exact source tree.',
-  'site.docs.selfhost.s7i1': 'The three required settings (signing secret, database password, public domain) leave no room for defaults: with any one missing, the service **refuses to start**. There is deliberately no "launch with a default secret" path.',
+  'site.docs.selfhost.s7i1': 'The three required settings (`JWT_SECRET`, `PASSWORD_PEPPER`, `POSTGRES_PASSWORD`) leave no room for defaults: the first two are enforced by the service itself, which **refuses to start**, the third by the database container, which exits immediately. There is deliberately no "launch with a default secret" path. The public hostname is not on that list and fails in a different way: `DOMAIN` is only the gateway site address (the sync service never reads it, and left empty it is the gateway that fails to start), while `PUBLIC_URL` defaults to `http://localhost:1900` — leaving it alone raises no error, it quietly points the links in emails at localhost.',
   'site.docs.selfhost.s7i2': 'The deploy script cross-checks the image\'s source-revision label so an old image cannot run new migrations. Custom images must pass the same revision; there is an explicit switch to skip the check, and it exists for deliberate overrides — not for oversights.',
   'site.docs.selfhost.s8': 'The environment variables, one by one',
   'site.docs.selfhost.s8p1': 'All configuration lives in one `.env` file in the deploy directory (copy it from the repository\'s env.example and edit). Changes take effect on container restart. Each one below is explained by what goes wrong when it is wrong:',
-  'site.docs.selfhost.s8i1': '`DOMAIN` / `PUBLIC_URL`: the public domain and full public address. The links in emails are generated from it — a wrong value shows up as "the link in the email does not open".',
+  'site.docs.selfhost.s8i1': '`DOMAIN` / `PUBLIC_URL`: the first is **only the Caddy site address** (the server itself never reads it), while the second is **where the links inside emails come from**. A wrong `PUBLIC_URL` shows up as "the link in the email does not open"; leaving it at the default (`http://localhost:1900`) raises **no error at all** — the server starts, the mail goes out, and the link points at your laptop.',
   'site.docs.selfhost.s8i2': '`JWT_SECRET`: the signing secret for login tokens. Empty means the service refuses to start; once set at first deployment, **do not change it** — rotating it signs out every logged-in device immediately and voids any email link already in flight.',
   'site.docs.selfhost.s8i3': '`POSTGRES_PASSWORD`: the database password, also with no default. When you use the bundled database there is no separate connection string to set — the default points at the stack\'s own PostgreSQL 16.',
   'site.docs.selfhost.s8i4': '`WEBAUTHN_RP_ID` / `WEBAUTHN_ORIGIN`: the domain passkeys are bound to. It holds exactly **one** value, so changing the domain invalidates every passkey registered on this server (accounts survive; sign in with an email link and register a new passkey). It must be a real domain — browsers reject bare IP addresses.',
@@ -3382,21 +3384,24 @@ export const en = {
   'site.changelog.note': 'Older updates are archived.',
 
   // ── Sign in ──
+  //   🔴 This page is a **doorway**, not an explainer for a login form (D5).
+  //   It used to say "there are exactly two ways in, and there is no password"
+  //   plus three paragraphs of justification — while the product's main path is
+  //   **email plus password** (`site.docs.account.s2`, and the password API the
+  //   app actually calls). That is a false outward statement, not a tone issue,
+  //   so the whole block was removed on 2026-10-03: the explanation moved into
+  //   the docs centre ("Accounts, tokens, and how you sign in", s5) and the page
+  //   keeps only the things you can actually click.
   'site.signin.seo.title': 'Sign in — heyta',
-  'site.signin.seo.description': 'Sign in to heyta with a passkey or an emailed sign-in link.',
+  'site.signin.seo.description': 'Sign in to heyta with email plus password, a passkey, or an emailed link — all of them inside the app.',
   'site.signin.title': 'Sign in',
-  'site.signin.lede': 'There are exactly two ways in, and there is no password.',
-  'site.signin.method.passkey.title': 'Passkey (recommended)',
-  'site.signin.method.passkey.body': 'Sign in with the device itself — face, fingerprint or system PIN. The key never leaves your device, and there is no password to be reused or leaked.',
-  'site.signin.method.magic.title': 'Emailed sign-in link',
-  'site.signin.method.magic.body': 'Enter an address, get a one-time link, click it and you are in. Handy on a device whose passkey is not set up yet.',
-  'site.signin.noPassword': '⚠️ Why there is no "email + password": a credential that can be stuffed, phished, and needs a hash stored server-side is the one weak link in a product whose server cannot read your content.',
-  // R2: `site.signin.cta` was here with zero source references; the page's CTAs
-  // come from `site.signin.recover.link` and the nav's sign-in entry.
-  'site.signin.recover.title': 'Lost your passkey?',
-  'site.signin.recover.body': 'Inside the app, "Lost your passkey?" emails a recovery link where you can register a new one.',
-  'site.signin.why.title': 'Why signing in happens in the app, not on this page',
-  'site.signin.why.body': 'A passkey must be bound to **one specific domain**, and the server address used for signing in is the very one in the app’s sync settings. Copying the auth UI onto this page would recreate "sign in against server A while the token is stored for B" — so this page is a doorway, not a second login box.',
+  'site.signin.lede': 'Signing in happens inside the app: email plus password, a passkey and an emailed link are all supported.',
+  'site.signin.cta': 'Sign in in the app',
+  'site.signin.helpLink': 'How signing in works, and where the token comes from, is in the docs centre article "Accounts, tokens, and how you sign in"',
+  // R2 deleted `site.signin.cta` as a zero-reference key (back then this page's
+  // only CTA was passkey recovery). It has a consumer again now that the
+  // explainer is gone — the lifetime of that claim depends on the page
+  // structure, not on the dictionary.
 
   'web.about.title': 'Help & about',
   'web.about.lead': 'The help centre, the changelog and pricing all live on the website — they need to be indexable and shareable on their own, so there is only one copy of each.',

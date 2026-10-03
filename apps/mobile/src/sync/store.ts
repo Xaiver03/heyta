@@ -18,6 +18,7 @@ import type { ConflictInfo, SyncStatus } from '@heyta/sync-client';
 import { requireNetworkConsent } from '../privacy/consent-ui';
 // 🔴 G-27 的第二道闸：装配在 `legal-recheck/gate.ts`，界面状态在同目录的 `reconfirm-ui.ts`，
 // 判定本身在 `@heyta/app-host`。这里只用它们，不再长出一份。
+import { legalRecheck } from '../legal-recheck/gate';
 import { requireLegalReconfirm } from '../legal-recheck/reconfirm-ui';
 import { readSyncConfig } from './config';
 import { openTaskHost } from '../db/open-host';
@@ -129,8 +130,13 @@ function consentGate(): SyncStatus | null {
  * 判据用 `requireLegalReconfirm()`（内部是 `dataEgressAllowed()`），
  * **不在这里重判 `phase`**：漏掉 `checking` 就是"冷启动先把数据推出去、
  * 再收到要补签"，那道闸只剩弹个窗。
+ *
+ * 🔴 但先要 `await legalRecheck.settled()`：`checking` 拦得住，却不是一句可以说出口的话。
+ * 原来这里同步判，"还没问到答案"就渲染成了"条款文本已经更新，而这个账号还没有重新确认"
+ * —— 与 web 侧同一形态（实测见 `reconfirmGate()` in `apps/web/src/features/sync/store.ts`）。
  */
-function reconfirmGate(): SyncStatus | null {
+async function reconfirmGate(): Promise<SyncStatus | null> {
+  await legalRecheck.settled();
   if (requireLegalReconfirm()) return null;
   return { kind: 'error', reason: 'legal-reconfirm-required', retryable: false };
 }
@@ -177,7 +183,7 @@ export async function syncNow(): Promise<SyncStatus> {
    * 拦下时 `requireLegalReconfirm()` 会顺手把补签面板弹起来 —— 只写一条错误状态，
    * 用户读到的是"同步失败了"，而出路界面上没给。
    */
-  const reconfirmBlocked = reconfirmGate();
+  const reconfirmBlocked = await reconfirmGate();
   if (reconfirmBlocked !== null) {
     set({ status: reconfirmBlocked });
     return reconfirmBlocked;
@@ -252,7 +258,7 @@ export async function resolveConflictNow(
    * 缺的只是"拦下时给出 `consent-required` 这条能看懂的状态"。补它属于 G-12 那一行，
    * 不在本轮范围 —— 本轮只把 G-27 这第二道闸补到与 web 相同的**两个**出站点上。
    */
-  const reconfirm = reconfirmGate();
+  const reconfirm = await reconfirmGate();
   if (reconfirm !== null) {
     set({ status: reconfirm });
     return reconfirm;

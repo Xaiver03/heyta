@@ -465,12 +465,19 @@ Web 设置页有「导出数据」（JSON 完整保真 / 任务清单 Markdown�
   也就是**主要的登录路径**。而它躲过了此前所有验收，因为
   **每一次都是只看状态码、没看响应体**。
 
-  ✅ 已修（2026-09-27，nginx 加三个脚本的 `proxy_pass`；配置在服务器上、不在仓库里，
-  所以完整记录写在 `docs/runbooks/deployment.md` §3.3.1）。修完后的真浏览器实测：
+  ✅ 已修（2026-09-27，nginx 加三个脚本的 `proxy_pass`；完整记录写在
+  `docs/runbooks/deployment.md` §3.3.1）。修完后的真浏览器实测：
   `Content-Type: application/javascript`、`SimpleWebAuthnBrowser === "object"`、
   点按钮 → `200 /api/recover/passkey/options` + `200 /api/recover/passkey/complete`、
   页面出现成功文案；并且**清空虚拟认证器**（= 真的丢了通行密钥）后用恢复出的新凭据
   登录拿到真 JWT、`GET /api/sync/status` 200。
+
+  ⚠️ 这句**已过期**（2026-10-03 逐字核过）：原文在这条里写着"配置在服务器上、**不在仓库里**"。
+  现在这两份站点配置在 `server/deploy/nginx/`（`heyta.finlaw.cloud.conf` 与
+  `heyta.waytofuture.cn.conf`，`git ls-files` 各 1 条），那三段 `location`
+  就在跟踪的文件里（前者 144 行是页面路径、167 与 172 行是那三个脚本）。
+  **当时的教训仍然成立，但"只能上机改"不再成立**
+  —— 反向的坑变成了：仓库里的配置若不跑 `server/scripts/nginx-sync.sh --apply` 就不会生效。
 
   📌 **教训（已写进 `AGENTS.md` §7 与部署手册）**：对服务端渲染页面引用的每个资源，
   验收必须断言 **`Content-Type` 和内容开头**，不能只断言 `200`。

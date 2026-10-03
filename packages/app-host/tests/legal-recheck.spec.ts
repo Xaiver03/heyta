@@ -185,6 +185,87 @@ describe('读侧：问一次，按答案决定拦不拦', () => {
     expect(gate.dataEgressAllowed()).toBe(true);
   });
 
+  it('🔴 `settled()`：答案没回来前**不许**落定（宿主靠它决定"有没有资格说这句话"）', async () => {
+    const gateAnswers = deferred();
+    let arrived = (): void => {};
+    const arrivedSignal = new Promise<void>((r) => {
+      arrived = r;
+    });
+    const { gate } = harness([
+      async () => {
+        arrived();
+        await gateAnswers.promise;
+        return json(200, NEEDS);
+      },
+    ]);
+    const round = gate.refresh();
+    await arrivedSignal;
+
+    let waiting = true;
+    const settled = gate.settled().then(() => {
+      waiting = false;
+    });
+    // 让微任务与宏任务各转一圈：如果 `settled()` 在 `checking` 就落定了，这里已经能看到。
+    await new Promise((r) => setTimeout(r, 0));
+    expect(waiting, '还在 checking 就报"等完了" —— 宿主拿它当裁决，界面就会说"你要重新确认"').toBe(
+      true,
+    );
+    // 而"拦不拦"这条不变量一个字都没动：等待**不是**放行。
+    expect(gate.dataEgressAllowed()).toBe(false);
+
+    gateAnswers.resolve();
+    await round;
+    await settled;
+    expect(waiting).toBe(false);
+    expect(gate.current().phase).toBe('needs-reconfirm');
+  });
+
+  it('🔴 等的时候又来了更晚的一轮 ⇒ `settled()` 等的是**最后那一轮**（换令牌的竞态）', async () => {
+    const first = deferred();
+    const second = deferred();
+    let firstArrived = (): void => {};
+    const firstArrivedSignal = new Promise<void>((r) => {
+      firstArrived = r;
+    });
+    const { gate } = harness([
+      async () => {
+        firstArrived();
+        await first.promise;
+        return json(200, NEEDS);
+      },
+      async () => {
+        await second.promise;
+        return json(200, status());
+      },
+    ]);
+    const slowRound = gate.refresh();
+    await firstArrivedSignal;
+    // 令牌刷新 ⇒ 立刻重问，而**上一轮还在路上**（文件头"代际计数"列的第一种形态）。
+    const fastRound = gate.refresh();
+
+    let done = false;
+    const waiting = gate.settled().then(() => {
+      done = true;
+    });
+    first.resolve();
+    await slowRound;
+    await new Promise((r) => setTimeout(r, 0));
+    expect(done, '早那一轮答完就落定 —— 而当前这一轮还没答案').toBe(false);
+
+    second.resolve();
+    await fastRound;
+    await waiting;
+    expect(done).toBe(true);
+    expect(gate.current().phase).toBe('clear');
+  });
+
+  it('没在途询问时 `settled()` 立刻完成（没问过的状态不许把同步卡住）', async () => {
+    const { gate, requests } = harness([]);
+    await gate.settled();
+    expect(requests).toHaveLength(0);
+    expect(gate.dataEgressAllowed()).toBe(true);
+  });
+
   it('🔴 问不到 ⇒ **放行**且**不弹**（三种问不到的形态各来一遍）', async () => {
     for (const [label, reply] of [
       ['5xx', { status: 500, body: { error: 'boom' } }],

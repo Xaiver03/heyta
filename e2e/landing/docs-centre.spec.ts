@@ -1,3 +1,7 @@
+import { readFileSync } from 'node:fs';
+import { dirname, join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
 import { expect, test, type Page } from '@playwright/test';
 
 /**
@@ -1370,5 +1374,70 @@ test('五个分类每个都有 ≥2 篇有正文的文章：十四篇 × 中英�
     expect(zhDeep.length, `${category}：中文版有正文的文章数（死规矩 ≥ 2）`).toBeGreaterThanOrEqual(2);
     expect(enDeep.length, `${category}：英文版有正文的文章数（死规矩 ≥ 2）`).toBeGreaterThanOrEqual(2);
   }
+  expectCleanConsole(hits);
+});
+
+/**
+ * 从仓库那份中文指南里把**主命令**读回来（自己折行）。
+ *
+ * 🔴 这里刻意不 import `scripts/check-selfhost-entry-command.mjs`：那条门禁已经在做
+ * "抄件之间逐字相同"，如果这条浏览器判据再从同一个读者拿期望值，它就只是把门禁
+ * 又念了一遍 —— 词条改坏、门禁脚本与浏览器同时改口径时两边一起错。
+ * 两边独立读同一份 markdown，才有对照价值。
+ */
+function mainCommandFromRunbook(): string {
+  const here = dirname(fileURLToPath(import.meta.url));
+  const file = resolve(here, '..', '..', 'docs', 'runbooks', 'self-host.md');
+  const physical = readFileSync(file, 'utf8').split('\n');
+  for (let i = 0; i < physical.length; i += 1) {
+    if (!/^[ \t]*docker compose -f docker-compose\.yml/.test(physical[i])) continue;
+    let line = physical[i];
+    while (/\\\s*$/.test(line) && physical[i + 1] !== undefined) {
+      i += 1;
+      line = `${line.replace(/\\\s*$/, '')} ${physical[i]}`;
+    }
+    const folded = line.replace(/\s+/g, ' ').trim();
+    // 主命令是"不点名服务"的那一条；点名服务的形状（带 --force-recreate supersync-migrate）
+    // 是另一条，不能当参照物。
+    if (!folded.includes('--force-recreate')) return folded;
+  }
+  return '';
+}
+
+test('自建指南文章给的是完整可抄的一条命令，且与仓库指南逐字相同（G-49）', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 900 });
+  const hits = watchConsole(page);
+
+  const mainCmd = mainCommandFromRunbook();
+  expect(mainCmd, '仓库指南里读不到主命令 —— 这条判据失去参照物，那不是"通过"').not.toBe('');
+
+  const TRIPLE = '-f docker-compose.yml -f docker-compose.build.yml -f docker-compose.migrate-once.yml';
+
+  for (const path of ['/docs/selfhost/', '/en/docs/selfhost/']) {
+    await readArticle(page, path);
+    await page
+      .locator('#main')
+      .screenshot({ path: `landing-results/g49-selfhost${path.startsWith('/en') ? '-en' : ''}.png` });
+
+    const text = (await page.locator('#main').innerText()).replace(/\s+/g, ' ');
+
+    // 1) 存在性：页面上真有**完整一条**，与仓库指南逐字相同（含 --build、含 up -d）。
+    expect(
+      text.includes(mainCmd),
+      `${path}：页面上没有逐字相同的主命令。仓库指南那条是：${mainCmd}`,
+    ).toBe(true);
+
+    // 2) 反向对照：那一串 -f 只能出现在带 `docker compose` 前缀的完整命令里。
+    //    本批改掉的正是"只有 flag 碎片"的呈现 —— 把它拼成 docker compose … up -d 敲下去
+    //    会少了 --build，得到的就是 §8.11 那次 pull access denied。
+    const triples = text.split(TRIPLE).length - 1;
+    const prefixed = text.split(`docker compose ${TRIPLE}`).length - 1;
+    expect(
+      prefixed,
+      `${path}：有 ${triples} 串 -f，其中只有 ${prefixed} 串前面带 \`docker compose\` —— 碎片形状回来了`,
+    ).toBe(triples);
+    expect(triples, `${path}：主命令那串 -f 在页面上消失了`).toBeGreaterThan(0);
+  }
+
   expectCleanConsole(hits);
 });

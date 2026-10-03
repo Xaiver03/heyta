@@ -100,6 +100,32 @@ export function appPathHref(path: string): string | null {
 }
 
 /**
+ * 「登录」这个意图：带 `?signin` 进应用，让应用**把认证面板直接打开**。
+ *
+ * 🔴 2026-10-03 的改动。在此之前它落在站内 `/signin/` 那张页面上，而那张页面的
+ * 第一屏是三段解释（为什么认证在应用里 / 两种方式 / 找回通行密钥）——
+ * 访客点"登录"却先读到一篇说明。产品负责人实测后否掉了这个形状。
+ * 认证 UI 仍然**只在应用里**（地址与令牌必须同源，否则会出现"对着 A 登录、令牌存到 B"），
+ * 这条没变；变的是入口。解释的内容搬进了文档中心那篇《账号、令牌与登录方式》。
+ *
+ * ⚠️ `signin` 这个字面量与 `apps/web/src/lib/auth-deep-link.ts` 里那条是**同一份值的两份抄件**
+ *   （落地页不能依赖 `@heyta/domain`，那会把整个领域包打进落地页的 bundle）。
+ *   钉它们相等的是 `apps/landing/tests/render.spec.tsx` —— 漂移会在 CI 里红，
+ *   而不是在用户点了没反应时才被发现。
+ *
+ * @returns 绝对地址；**未配置应用地址时返回 `null`**，调用方据此退回站内那张页面。
+ */
+const SIGNIN_PARAM = 'signin';
+
+export function signInHref(locale: Locale): string | null {
+  const url = appUrl();
+  if (url === null) return null;
+  const parsed = new URL(withLocale(url, locale));
+  parsed.searchParams.set(SIGNIN_PARAM, '1');
+  return parsed.toString();
+}
+
+/**
  * 「开始使用」这个意图该指向哪。
  *
  * 全页**只有这一个**意图对应**一个**标签（见 `FinalCta.tsx` 顶部）：
