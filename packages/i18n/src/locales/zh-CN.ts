@@ -3642,6 +3642,7 @@ export const zhCN = {
   'common.entity.NOTE': '笔记',
   'common.entity.TASK_REPEAT_CFG': '重复规则',
   'common.entity.REMINDER': '提醒',
+  'common.entity.EVENT': '倒数纪念日',
   'common.entity.HABIT': '习惯',
   'common.entity.HABIT_LOG': '打卡记录',
   'common.entity.FOCUS_SESSION': '专注记录',

@@ -101,6 +101,12 @@ export {
   type NoteActions,
   type NoteActionsOptions,
 } from './note-actions.js';
+export {
+  createEventActions,
+  type EventActions,
+  type EventActionsOptions,
+  type NewEventFields,
+} from './event-actions.js';
 
 /**
  * 同步接线。**所有宿主共用这一份** —— 见 `sync-wiring.ts` 文件头：
