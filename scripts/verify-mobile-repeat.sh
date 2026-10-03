@@ -257,7 +257,7 @@ ok "完成后应推进到 ${NEXT_DATE}，再完成一次到 $NEXT2_DATE"
 # ── 开始 ────────────────────────────────────────────────────
 echo ""
 echo "=== 移动端重复任务验收（真实模拟器 + 真服务端 + 真笔记本设备，零 mock）==="
-echo "  设备: $E2E_SERIAL   服务端: $SERVER   库: heyta_mobile_smoke"
+echo "  设备: $E2E_SERIAL   服务端: $SERVER   库: $E2E_DB"
 echo "  账号: $EMAIL"
 echo "  任务: ${TASK_TITLE}（截止 ${DUE_DATE}，每周重复）"
 

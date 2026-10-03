@@ -76,7 +76,7 @@ LAPTOP_ROUNDS="${HEYTA_AUTOSYNC_LAPTOP_ROUNDS:-180}"
 
 echo ""
 echo "=== 移动端自动同步验收（真实模拟器 + 真服务端，零 mock）==="
-echo "  设备: $E2E_SERIAL   服务端: $SERVER   库: heyta_mobile_smoke"
+echo "  设备: $E2E_SERIAL   服务端: $SERVER   库: $E2E_DB"
 echo "  账号: $EMAIL"
 echo "  任务: $TITLE"
 echo "  🔴 本轮**不会**点击任何同步按钮 —— 这是本验收的全部意义"
@@ -197,7 +197,7 @@ if [ "$(has_text "已全部上传")" = "1" ]; then
   ok "待上传队列已排空（不是「拉下来了但没推上去」）"
 elif has_sub "项"; then
   # 有「N 项」= 队列里还有东西。把那一行原文一起报出来，便于定位。
-  PENDING_TXT=$(grep -oE 'text="[^"]*项"' /tmp/ui.xml | head -1)
+  PENDING_TXT=$(grep -oE 'text="[^"]*项"' "$UI_XML" | head -1)
   bad "待上传没有归零 —— 写入没全部推出去（${PENDING_TXT}）"
 else
   bad "读不到待上传状态"; screen_txt

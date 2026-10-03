@@ -374,7 +374,7 @@ else
 fi
 
 step "10. 直接查 Postgres"
-psql -h 127.0.0.1 -p 5432 -U rocalight -d heyta_mobile_smoke -tAc \
+psql -h 127.0.0.1 -p 5432 -U "$E2E_DB_USER" -d "$E2E_DB" -tAc \
   "SELECT count(*) FROM operations WHERE op_type='CRT' AND entity_type='PROJECT'" 2>/dev/null \
   | sed 's|^|      服务端 PROJECT/CRT op 数 = |'
 
