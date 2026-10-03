@@ -45,13 +45,21 @@
  * 🔴 因此**依赖 `pnpm build`** —— `pnpm check` 会先构建，单独跑本脚本时若缺产物会
  * **响亮失败并说明怎么补**，而不是"读不到就当没问题"。
  *
- * 唯一一处**读源码文本**的地方是 `mcp.ts` 的 `INPUT_SCHEMAS` 键集合。
- * 它只回答一个 dist 答不了的问题：「这个工具的参数 schema **有没有被人登记过**」——
- * `listAuthorizedTools()` 对没登记的工具回退成空 `properties`，与"这个工具确实不接参数"
- * （`list_projects`）在 dist 层面长得**一模一样**。所以：
- * · 值（字段名 / 类型）来自 dist；
- * · "有没有登记"这个结构事实来自源码键名。
- * 两处不重叠，也就不存在第二份判断。
+ * ## 「有没有登记 schema」这件事，以前只能读源码 —— 现在不用了
+ *
+ * 以前唯一一处**读源码文本**的地方是 `mcp.ts` 的 `INPUT_SCHEMAS` 键集合，
+ * 它回答的是「这个工具的参数 schema **有没有被人登记过**」——
+ * 因为 `listAuthorizedTools()` 对没登记的工具回退成空 `properties`，
+ * 与"这个工具确实不接参数"（`list_projects`）在投影层面长得**一模一样**。
+ *
+ * 🔴 2026-10-03 工具目录按实体拆包（`packages/local-api/src/tools/<entity>.ts`）之后，
+ * "登记过"本身成了产物的一部分：`LOCAL_API_TOOL_PACKS[i].schemas` 的键集
+ * 就是"人写过 schema 的工具名"，dist 直接答得了 ⇒ 那个源码扫描的前提消失，已删。
+ * **现在本脚本不读任何源码文本**，全部事实来自 dist。
+ *
+ * ⚠️ 静默回退**没有被顺手删**（`mcp.ts` 里那条 `schema ?? 空 properties` 还在，
+ * 而且仍然可达：一个 pack 完全可以先声明工具、还没来得及写 schema）。
+ * 拿掉它要连 `schemaRecorded` 一起重新设计 —— 那是单独一张工单，不在本次纯结构重构里。
  *
  * ─────────────────────────────────────────────────────────────────────────
  * ## 分母口径是钉死的（ADR-0045 §2.7，照做、不重算）
@@ -77,11 +85,14 @@
  *    ⇒ 红。这是"清单跟随上游"的承重结构：新工具不可能被静默漏掉。
  * 2. 工具被归到一个**没有领域模型**的实体（例如 `EVENT` 还没落地就先上了它的工具）
  *    ⇒ 红，并点名 ADR-0044/0045 §2.6 那条"实体与它的 AI 工具**同批**"。
- * 3. `mcp.ts` 里有 schema 键、目录里却没有这个工具（孤儿抄件）⇒ 红。
+ * 3. 目录里有某个工具、`listAuthorizedTools(全授权)` 的投影里却没有它 ⇒ 红
+ *    （模型根本看不见它）；反过来投影里有、目录里没有 ⇒ 同样红（第二份定义）。
+ *    "登记了 schema 却没有这个工具"这一类现在由 `buildToolPackRegistry()`
+ *    在装配时直接抛错，本脚本不再抄第二份判据。
  * 4. 工具名重复 / `kind` 不是 `read|write` / 上游清单为空 / 剔除项已从 `EntityModelMap` 消失
  *    / 视图名变成了实体 ⇒ 全部红。
  *
- * 只有一种情况**刻意不失败**：工具在 `mcp.ts` 里没有登记参数 schema。
+ * 只有一种情况**刻意不失败**：工具在它自己那个实体 pack 的 `schemas` 里没有登记参数 schema。
  * 那种工具仍然可用（MCP 侧的回退就是为此存在的），所以清单**照样出**，
  * 但带上 `schemaRecorded: false` 标记，并在文本投影里**明说**"这个工具的字段清单不完整" ——
  * 让模型知道自己看到的可能是不全的，比让整个门禁红更值钱。
@@ -321,6 +332,28 @@ export function attributeToolByName(name) {
 // C. 纯构建：输入上游事实 → 输出清单（所有校验都在这里，可被 fixture 驱动）
 // ─────────────────────────────────────────────────────────────────────────
 
+/**
+ * 🔴 **覆盖面的唯一判定口径：读得到 *且* 改得动。**
+ *
+ * 为什么不是"有任何一个工具就算"：`covered` 这个数出现在产物文本、
+ * `pnpm check` 的输出和 `ai-assistant-closure.md` 的台账里，
+ * 而它回答的产品问题是「界面里有的功能，AI 能不能也做」。
+ * 只有 `list_projects` 的 PROJECT 对这个问题的答案是**不能** ——
+ * 助手能看见清单，却提不出"把这条放进「工作」"。
+ * 按"有任何工具就算"数出来的是 **2/8**，按能读能写数是 **1/8**：
+ * 前者是一句虚报，而它已经写进过台账（`docs/plans/ai-event-tool-contract.md` §2.1 记着这次纠正）。
+ *
+ * 口径只有这一处。`check:ai-coverage` 的第 9 段 import 的就是它 ——
+ * 门禁和产物如果各写一份，漂移只是时间问题（AGENTS §3.5 那条教训的形状）。
+ */
+export function countsAsCovered(entity) {
+  return (
+    entity !== undefined &&
+    entity.readToolNames.length > 0 &&
+    entity.writeToolNames.length > 0
+  );
+}
+
 export class CapabilityManifestError extends Error {
   constructor(problems) {
     const list = Array.isArray(problems) ? problems : [problems];
@@ -479,7 +512,9 @@ export function buildCapabilityManifest(input) {
   const entityTypesWithoutTools = userOperable.filter(
     (t) => entities.find((e) => e.entityType === t).coverage === 'none',
   );
-  const covered = userOperable.length - entityTypesWithoutTools.length;
+  const covered = userOperable.filter((t) =>
+    countsAsCovered(entities.find((e) => e.entityType === t)),
+  ).length;
 
   return {
     manifestVersion: MANIFEST_VERSION,
@@ -531,7 +566,7 @@ export function renderModelText(manifest) {
   const byName = new Map(manifest.tools.map((t) => [t.name, t]));
 
   lines.push('heyta 能力清单（由工具目录与领域实体生成，不是手写的）');
-  lines.push(`覆盖口径：用户可操作的已物化实体 ${manifest.coverage.denominator} 个，其中 ${manifest.coverage.covered} 个有 AI 工具（${manifest.coverage.ratio}）。`);
+  lines.push(`覆盖口径：用户可操作的已物化实体 ${manifest.coverage.denominator} 个，其中 ${manifest.coverage.covered} 个**读和写都有**工具（${manifest.coverage.ratio}）。`);
   lines.push('');
   lines.push('🔴 拒绝时两件事必须分开说：' + manifest.policy.refusalMustSeparate + '。');
   lines.push('下面标了"没有工具"的实体，在产品里是**真实存在**的：可以说"我没有这个工具"，');
@@ -653,8 +688,8 @@ const ARTIFACT_HEADER = [
   '/**',
   ' * heyta 的**产品级 AI 能力清单** —— **自动生成，请勿手改**。',
   ' *',
-  ' * 唯一事实源：`packages/local-api/src/tools.ts`（工具目录）+ `packages/local-api/src/mcp.ts`',
-  ' * （参数 schema）+ `packages/domain` 的 `MODELED_ENTITY_TYPES` + `packages/shared-schema`',
+  ' * 唯一事实源：`packages/local-api/src/tools/<entity>.ts`（每个实体一个 pack：目录声明',
+  ' * + 参数 schema + 执行器）+ `packages/domain` 的 `MODELED_ENTITY_TYPES` + `packages/shared-schema`',
   ' * 的 `ENTITY_TYPES`。改**上游**，不要改这里 —— 这里每改一个字节都是给模型的一句谎话。',
   ' *',
   ' * 重新生成：`node scripts/gen-ai-capability-manifest.mjs`',
@@ -711,7 +746,7 @@ export function renderTypeScript(manifest, text) {
   lines.push('  readonly kind: AiCapabilityToolKind;');
   lines.push('  readonly entityType: AiCapabilityModeledEntityType;');
   lines.push('  readonly description: string;');
-  lines.push('  /** `false` = `mcp.ts` 的 `INPUT_SCHEMAS` 里没有这个工具 —— `args` 可能**不完整**。 */');
+  lines.push('  /** `false` = 这个工具没在自己那个实体 pack 的 `schemas` 里登记 —— `args` 可能**不完整**。 */');
   lines.push('  readonly schemaRecorded: boolean;');
   lines.push('  readonly args: readonly AiCapabilityToolArg[];');
   lines.push('}');
@@ -770,7 +805,6 @@ export function renderTypeScript(manifest, text) {
 const LOCAL_API_DIST = join(ROOT, 'packages/local-api/dist/index.js');
 const DOMAIN_DIST = join(ROOT, 'packages/domain/dist/index.js');
 const SHARED_SCHEMA_DIST = join(ROOT, 'packages/shared-schema/dist/index.js');
-const MCP_SOURCE = join(ROOT, 'packages/local-api/src/mcp.ts');
 
 function missingDistMessage(file) {
   return (
@@ -779,66 +813,11 @@ function missingDistMessage(file) {
   );
 }
 
-/**
- * 扫 `mcp.ts` 里 `INPUT_SCHEMAS` 的**顶层键名**。
- *
- * 🔴 只取键名、不解析值 —— 值来自 dist 的 `listAuthorizedTools()`。
- * 为什么非读源码不可：dist 层面"没登记 schema"与"确实不接参数"长得一模一样
- * （`listAuthorizedTools` 有 `schema ?? 空 properties` 的回退）。见文件头的表格。
- */
-export function readInputSchemaKeys(source) {
-  const marker = 'INPUT_SCHEMAS';
-  const at = source.indexOf(marker);
-  if (at === -1) return null;
-  const open = source.indexOf('{', source.indexOf('=', at));
-  if (open === -1) return null;
-
-  let depth = 0;
-  const keys = [];
-  for (let i = open; i < source.length; i += 1) {
-    const ch = source[i];
-    if (ch === '"' || ch === "'" || ch === '`') {
-      const quote = ch;
-      i += 1;
-      while (i < source.length) {
-        if (source[i] === '\\') {
-          i += 2;
-          continue;
-        }
-        if (source[i] === quote) break;
-        i += 1;
-      }
-      continue;
-    }
-    if (ch === '{' || ch === '[' || ch === '(') {
-      depth += 1;
-      continue;
-    }
-    if (ch === '}' || ch === ']' || ch === ')') {
-      depth -= 1;
-      if (depth === 0) break; // 顶层对象闭合，扫完
-      continue;
-    }
-    if (depth !== 1) continue;
-    if (/[A-Za-z_]/.test(ch) === false) continue;
-    let j = i;
-    while (j < source.length && /[A-Za-z0-9_]/.test(source[j])) j += 1;
-    const word = source.slice(i, j);
-    // 只认「键:」形状（`const INPUT_SCHEMAS` 那行里的标识符 depth 是 0，不会进来）。
-    if (/^\s*:/.test(source.slice(j, j + 40))) keys.push(word);
-    i = j - 1;
-  }
-  return keys;
-}
-
 /** @returns {Promise<{protocolEntityTypes: string[], modeledEntityTypes: string[], tools: object[], warnings: string[]}>} */
 export async function readUpstream() {
   const problems = [];
   for (const file of [LOCAL_API_DIST, DOMAIN_DIST, SHARED_SCHEMA_DIST]) {
     if (!existsSync(file)) problems.push(missingDistMessage(file));
-  }
-  if (!existsSync(MCP_SOURCE)) {
-    problems.push(`读不到 \`${relative(ROOT, MCP_SOURCE)}\` —— 参数 schema 的登记情况无法核对。`);
   }
   if (problems.length > 0) throw new CapabilityManifestError(problems);
 
@@ -848,11 +827,18 @@ export async function readUpstream() {
 
   const directory = localApi.LOCAL_API_TOOLS;
   const listAuthorizedTools = localApi.listAuthorizedTools;
+  const packs = localApi.LOCAL_API_TOOL_PACKS;
   const modeled = domain.MODELED_ENTITY_TYPES;
   const protocol = sharedSchema.ENTITY_TYPES;
   if (!Array.isArray(directory) || typeof listAuthorizedTools !== 'function') {
     throw new CapabilityManifestError(
       '`@heyta/local-api` 的产物里没有 `LOCAL_API_TOOLS` / `listAuthorizedTools` —— 导出形状变了，本生成器要跟着改（不是放宽校验）。',
+    );
+  }
+  if (!Array.isArray(packs)) {
+    throw new CapabilityManifestError(
+      '`@heyta/local-api` 的产物里没有 `LOCAL_API_TOOL_PACKS` —— 工具目录不再是从 pack 聚合出来的，' +
+        '「这个工具的参数 schema 登记过没有」就又没有可问的地方了。要么恢复这条导出，要么连同 `schemaRecorded` 一起重新设计，不要让它静默变成"永远为真"。',
     );
   }
   if (!Array.isArray(modeled) || !Array.isArray(protocol)) {
@@ -866,23 +852,62 @@ export async function readUpstream() {
   const grants = Object.fromEntries(directory.map((tool) => [tool.name, true]));
   const definitions = listAuthorizedTools(grants);
 
-  const schemaKeys = readInputSchemaKeys(readFileSync(MCP_SOURCE, 'utf8'));
+  /**
+   * 参数 schema 的登记情况**不再扫 `mcp.ts` 的源码**，改查 pack 的声明。
+   *
+   * 以前必须扫源码，是因为 schema 手抄在 `mcp.ts` 的 `INPUT_SCHEMAS` 里 ——
+   * 那是目录之外的**第二份定义**，只能靠"扫出来再比名字"发现孤儿。
+   * 现在每个实体 pack 自带 `schemas`（`packages/local-api/src/tools/<entity>.ts`），
+   * 键集就是"人写过 schema 的工具名"，从 dist 直接问得到。
+   *
+   * 🔴 不能用 `definition.inputSchema !== undefined` 代替它：`listAuthorizedTools()`
+   *    对没登记的工具**回退成空 `properties`**，于是每个工具都"有 schema"，
+   *    那条判据会变成**永远为真**—— 而它承载的是「出境逐字段披露」这个隐私不变量
+   *    的完整性声明（AGENTS §7 元规则 2：一条永远通过的判据比没有判据更糟）。
+   *
+   * 两个方向的对账（目录 ↔ 投影）留在下面这两个循环里：它们问的是**另一件事**
+   * —— "声明了却没被投影出去 / 投影出去却没在目录里声明"。
+   * "孤儿 schema"（登记了 schema 但目录里没有这个工具）现在由
+   * `buildToolPackRegistry()` 在装配时**直接抛错**（产物 import 不出来 = 这里也失败），
+   * 所以这里不再抄第二份判据。
+   */
+  const schemaKeys = new Set(packs.flatMap((pack) => Object.keys(pack?.schemas ?? {})));
   const keyProblems = [];
-  if (schemaKeys === null) {
-    keyProblems.push('`mcp.ts` 里找不到 `INPUT_SCHEMAS` —— 参数 schema 的登记情况无法核对，不要绕过这一步。');
-  } else if (schemaKeys.length === 0 && directory.length > 0) {
-    // 🔴 探针够不着 ≠ 一切正常（AGENTS §7 元规则 1）：扫出空集只说明解析前提变了，
-    //    而继续跑会把**每个**工具都标成"没登记 schema"，那是全场一致的假结论。
+  if (schemaKeys.size === 0 && directory.length > 0) {
+    // 🔴 探针够不着 ≠ 一切正常（AGENTS §7 元规则 1）：空集合会让下面的
+    //    `schemaRecorded` 全场为 false、把"每个工具都没登记"读成一次一致的结论。
     keyProblems.push(
-      '`mcp.ts` 的 `INPUT_SCHEMAS` 顶层键**一个都没扫到** —— 形状变了（或被搬走了），先改本脚本的扫描前提，不要放过。',
+      `一个 pack 的 \`schemas\` 键都没读到，而目录里有 ${String(directory.length)} 个工具 —— ` +
+        '这是探针够不着（pack 的形状变了？`LOCAL_API_TOOL_PACKS` 是空数组？），先改本脚本的前提，不要放过。',
     );
-  } else {
-    for (const key of schemaKeys) {
-      if (!directory.some((tool) => tool.name === key)) {
-        keyProblems.push(
-          `\`mcp.ts\` 的 \`INPUT_SCHEMAS\` 里有 \`${key}\`，但工具目录里没有它 —— 孤儿抄件，删掉那段 schema（留着就是第二份定义）。`,
-        );
-      }
+  }
+  if (definitions.length === 0 && directory.length > 0) {
+    // 🔴 同上：空投影会让下面两个循环一个都不命中，把"没有违规"读成假结论。
+    keyProblems.push(
+      `\`listAuthorizedTools(全授权)\` 投影出来是**空的**，而目录里有 ${String(directory.length)} 个工具 —— ` +
+        '这是探针够不着，不是"没有违规"。',
+    );
+  }
+  for (const tool of directory) {
+    if (!definitions.some((d) => d.name === tool.name)) {
+      keyProblems.push(
+        `工具 \`${tool.name}\` 在目录里，却不在 \`listAuthorizedTools(全授权)\` 的投影里 —— ` +
+          '模型看不见它，界面却会照样宣称支持。（未授权即不可见是另一件事，这里是"全授权"。）',
+      );
+    }
+  }
+  for (const definition of definitions) {
+    if (!directory.some((tool) => tool.name === definition.name)) {
+      keyProblems.push(
+        `投影里有 \`${definition.name}\`，工具目录里却没有它 —— 目录不再是唯一的声明处，` +
+          '这就是"第二份定义"的形状（ADR-0035）。',
+      );
+    }
+    if (definition.inputSchema?.type !== 'object') {
+      keyProblems.push(
+        `工具 \`${definition.name}\` 的投影没有 JSON Schema 形状的 \`inputSchema\` —— ` +
+          '模型拿不到参数说明，这个工具等于只能靠猜。',
+      );
     }
   }
   if (keyProblems.length > 0) throw new CapabilityManifestError(keyProblems);
@@ -893,11 +918,11 @@ export async function readUpstream() {
     const schema = definition?.inputSchema;
     const properties = schema?.properties ?? {};
     const required = schema?.required ?? [];
-    const schemaRecorded = schemaKeys === null ? true : schemaKeys.includes(tool.name);
+    const schemaRecorded = schemaKeys.has(tool.name);
     if (!schemaRecorded) {
       warnings.push(
-        `工具 \`${tool.name}\` 在 \`mcp.ts\` 的 \`INPUT_SCHEMAS\` 里没有登记 —— 清单会带上 schemaRecorded:false，` +
-          `并在文本投影里明说它的字段可能不完整。`,
+        `工具 \`${tool.name}\` 没有在它自己那个 \`packages/local-api/src/tools/<entity>.ts\` 的 \`schemas\` 里登记 —— ` +
+          `清单会带上 schemaRecorded:false，并在文本投影里明说它的字段可能不完整。`,
       );
     }
     return {
@@ -905,6 +930,10 @@ export async function readUpstream() {
       kind: tool.kind,
       description: tool.description,
       schemaRecorded,
+      // 🔴 「出境逐字段披露」这条隐私不变量的载体就是它。`check:ai-coverage` 第 9 段
+      // 要按工具逐个核对"声明了没有"，所以它必须**从同一趟读取里出来** ——
+      // 让门禁自己去 import 一次 `LOCAL_API_TOOLS` 就是第二份读取路径，会漂。
+      egressFields: tool.egressFields,
       args: Object.entries(properties).map(([name, spec]) => ({
         name,
         type: typeof spec?.type === 'string' ? spec.type : 'unknown',
@@ -918,6 +947,11 @@ export async function readUpstream() {
     modeledEntityTypes: [...modeled],
     tools,
     warnings,
+    // 🔴 **「模型可选得到」的观测点**：这不是目录的长度，而是
+    // `listAuthorizedTools(全授权)` 真投影出来的那份 —— 与内置 AI 的 `tools` 数组、
+    // MCP 的 `tools/list` 同一次调用（ADR-0035：一份目录 + 一份投影）。
+    // 目录里有、投影里没有 ⇒ 模型根本看不见它，界面却会照样宣称支持。
+    modelVisibleToolNames: definitions.map((d) => d.name),
   };
 }
 

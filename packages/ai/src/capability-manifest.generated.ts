@@ -1,8 +1,8 @@
 /**
  * heyta 的**产品级 AI 能力清单** —— **自动生成，请勿手改**。
  *
- * 唯一事实源：`packages/local-api/src/tools.ts`（工具目录）+ `packages/local-api/src/mcp.ts`
- * （参数 schema）+ `packages/domain` 的 `MODELED_ENTITY_TYPES` + `packages/shared-schema`
+ * 唯一事实源：`packages/local-api/src/tools/<entity>.ts`（每个实体一个 pack：目录声明
+ * + 参数 schema + 执行器）+ `packages/domain` 的 `MODELED_ENTITY_TYPES` + `packages/shared-schema`
  * 的 `ENTITY_TYPES`。改**上游**，不要改这里 —— 这里每改一个字节都是给模型的一句谎话。
  *
  * 重新生成：`node scripts/gen-ai-capability-manifest.mjs`
@@ -57,7 +57,7 @@ export interface AiCapabilityTool {
   readonly kind: AiCapabilityToolKind;
   readonly entityType: AiCapabilityModeledEntityType;
   readonly description: string;
-  /** `false` = `mcp.ts` 的 `INPUT_SCHEMAS` 里没有这个工具 —— `args` 可能**不完整**。 */
+  /** `false` = 这个工具没在自己那个实体 pack 的 `schemas` 里登记 —— `args` 可能**不完整**。 */
   readonly schemaRecorded: boolean;
   readonly args: readonly AiCapabilityToolArg[];
 }
@@ -101,9 +101,9 @@ export const AI_CAPABILITY_MANIFEST =
     'source': 'ADR-0045 §2.6 纪律二',
   },
   'coverage': {
-    'covered': 2,
+    'covered': 1,
     'denominator': 8,
-    'ratio': '2/8',
+    'ratio': '1/8',
   },
   'userOperableEntityTypes': [
     'TASK',
@@ -384,13 +384,13 @@ export const AI_CAPABILITY_MANIFEST =
  */
 export const AI_CAPABILITY_TEXT = [
   'heyta 能力清单（由工具目录与领域实体生成，不是手写的）',
-  '覆盖口径：用户可操作的已物化实体 8 个，其中 2 个有 AI 工具（2/8）。',
+  '覆盖口径：用户可操作的已物化实体 8 个，其中 1 个**读和写都有**工具（1/8）。',
   '',
   '🔴 拒绝时两件事必须分开说：我没有这个工具（AI 侧缺工具） ｜ 产品做不到（实体或功能不存在）。',
   '下面标了"没有工具"的实体，在产品里是**真实存在**的：可以说"我没有这个工具"，',
   '不可以说"产品不支持"。',
   '',
-  '一、有 AI 工具的实体（2 个）',
+  '一、有 AI 工具的实体（1 个）',
   '- TASK —— 读和写都有（读 2 / 写 3）',
   '  · [读] list_tasks（projectId:string, completed:boolean, dueOn:string, dueFrom:string, dueTo:string, limit:number）',
   '  · [读] get_task（taskId*:string）',
