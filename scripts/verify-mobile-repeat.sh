@@ -76,8 +76,14 @@ heyta_e2e_ensure_account || exit 1
 . "$(dirname "$0")/lib/mobile-e2e.sh"
 
 TASK_TITLE="repeat-e2e-$(date +%H%M%S)"
-LAPTOP_DB=/tmp/heyta-repeat-laptop.sqlite
-PHONE_DB=/tmp/heyta-repeat-phone.sqlite
+# 🔴 这两个库的路径以前写死，而**下一行开局就 `rm -f` 它们** ——
+#    于是同一台机器上第二个会话起这一轮，会把**第一个会话正在用的那轮**的笔记本库删掉：
+#    那一批断言之后全在读一台空笔记本，症状是"手机写了、笔记本读不到"，看着像产品坏了。
+#    （与 traps #169"卸载类脚本不许盲选目标"同一个形状，只是对象从设备换成了文件。）
+#    默认值与原字面量逐字相同 ⇒ 单会话的行为一字不变；并行时给
+#    `HEYTA_REPEAT_LAPTOP_DB` / `HEYTA_REPEAT_PHONE_DB` 各指一份私有的就行。
+LAPTOP_DB="${HEYTA_REPEAT_LAPTOP_DB:-/tmp/heyta-repeat-laptop.sqlite}"
+PHONE_DB="${HEYTA_REPEAT_PHONE_DB:-/tmp/heyta-repeat-phone.sqlite}"
 rm -f "$LAPTOP_DB" "$PHONE_DB"
 
 # 🔴 坐标**由 tab 数量推导**，不许再手写一个数：底部栏是 **5 个平级 tab**
