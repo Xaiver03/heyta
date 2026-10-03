@@ -381,8 +381,18 @@ sudo -n nginx -t          # 删完必须先验语法
 | `sites-enabled/heyta.finlaw.cloud` | `heyta.finlaw.cloud` | **测试阶段唯一的域名**（2026-09-27 起）：`/` 与 `/en/` → 落地页（`root /var/www/heyta-landing` + SPA 兜底）；`/app/`（含 `= /app` 重定向与 `/app/assets/`）→ 应用（`alias /var/www/heyta-app/`）；`/api/` 与 `/verify-email`、`/recover-passkey`、`/magic-login` → `proxy_pass http://127.0.0.1:1900`（同步服务，含 WebSocket 升级头）。迁移见 [deployment.md §3.7](deployment.md) 的 3.7.1 小节 |
 | `sites-enabled/heyta-tmp` | `124.223.13.226 heyta-tmp.litopia.space` | `location /`、`/api/`、`/health` → `proxy_pass http://127.0.0.1:1900`（同步服务的 Connect 页 —— 端点，**刻意不 301**）；`/app*` 与 `/landing*` → `301` 到 `heyta.finlaw.cloud`。**已弃用，留作回滚路径，不是入口**；该域名下 passkey 不可用（`WEBAUTHN_RP_ID` 只能是 `heyta.finlaw.cloud`） |
 
-> ⚠️ 两份站点文件都**不在仓库里**（仓库只跟踪 `server/Caddyfile`），改它们只能上机；
-> 每次改完要回来更新本表，以及 `deployment.md` 里对应的那一节（§3.7，其中有 3.7.1）。
+> ⚠️ 这句**已过期一半**（2026-10-03 逐字核过）：原文写"两份站点文件都**不在仓库里**
+> （仓库只跟踪 `server/Caddyfile`），改它们只能上机"。
+> `heyta.finlaw.cloud` 那份现在**在仓库里** —— `server/deploy/nginx/heyta.finlaw.cloud.conf`，
+> 由 `server/scripts/nginx-sync.sh` 做双向同步（默认 `--check`：把线上那份 `sudo -n cat` 回来
+> 与仓库副本 `diff`，逐字节一致退 0、有漂移打印完整 diff 后退 1；
+> `--pull` 把线上抓回仓库、`--apply` 先备份 + `nginx -t` 通过才 reload）。
+> 同目录还纳管了当前域名的 `heyta.waytofuture.cn.conf`。
+> **上表写的那份 `heyta-tmp` 仍然只在服务器上**（脚本的 `HEYTA_NGINX_REMOTE_PATH`
+> 默认指向 finlaw 那一份，一次只对齐一份）。
+> 所以真正的 hazard 换了方向：**在仓库里改了却不 `--apply`，线上就不变**，
+> 而 `pnpm check` 对此一无所知。每次改完要回来更新本表，以及
+> `deployment.md` 里对应的那一节（§3.7，其中有 3.7.1）。
 
 ### 4.4 全机基础设施（与 heyta 无关但动了会出大事）
 

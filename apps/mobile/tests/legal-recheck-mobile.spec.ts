@@ -380,6 +380,34 @@ describe('数据出站：拦得住、放得开', () => {
     expect(host.resolveCalls, '没补签却把解决结果推出去了').toBe(0);
   });
 
+  it('🔴 询问还在路上时点同步 ⇒ **等答案落地再判**（"还没问到"不是"要重新确认"）', async () => {
+    const h = await load();
+    net.mode = 'hanging';
+
+    h.gate.askLegalRecheck();
+    await flush();
+    expect(h.gate.legalRecheck.current().phase, '前置：这一条要对着"还在问"验').toBe('checking');
+
+    // 不 await：这一条同步此刻**必须**还卡在等那一问，它才有资格说"等到了再判"。
+    const pendingSync = h.sync.syncNow();
+    await flush();
+    expect(host.syncCalls, '前置：答案还没回来就把数据放出去了').toBe(0);
+
+    // 答案落地时服务端说的是"就是当前这一版"。
+    net.mode = 'current';
+    net.release?.();
+    const status = await pendingSync;
+
+    // 🔴 这两半都是实测过的形态（自建栈真浏览器，全新设备登录后第一次点同步）：
+    // 原来这里同步判定，于是状态栏出现"条款文本已经更新，而这个账号还没有重新确认"，
+    // 而服务端对同一账号已答 `needsReconfirm:false` —— **既谎了，又拦住了一件本来该成的事**。
+    expect(JSON.stringify(status), '还没问到答案就对外说"要重新确认"').not.toContain(
+      'legal-reconfirm-required',
+    );
+    expect(host.syncCalls, '答案说不用补签，同步却没走出去').toBe(1);
+    expect(h.ui.legalReconfirmSheetState().open, '没问到答案就弹了补签面板').toBe(false);
+  });
+
   it('🔴 **没问过（anonymous）⇒ 不拦**：`syncNow()` 照走（放行的默认值不能反过来变成锁）', async () => {
     const h = await load();
 
@@ -587,9 +615,11 @@ describe('调用点与顺序（删掉或挪晚都会红）', () => {
       '解决冲突会重新派发 op 并同步 —— 只拦「立即同步」等于留一条侧门',
     );
     expect(
-      // 只数**调用**：`function reconfirmGate():` 那一行也含 `reconfirmGate()` 这个子串，
+      // 只数**调用**：`async function reconfirmGate():` 那一行也含 `reconfirmGate()` 这个子串，
       // 按子串数会把定义算成第三个调用点（判据当场虚一格）。
-      (code.match(/=\s*reconfirmGate\(\)/g) ?? []).length,
+      // ⚠️ 调用点现在都带 `await`（等那一问落定才有资格判，见 `settled()`），
+      // 模式必须跟着带 `await` —— 否则这条计数会静默变成 0，而 0 ≠ "侧门被堵上了"。
+      (code.match(/=\s*await\s+reconfirmGate\(\)/g) ?? []).length,
       '出站点只剩一个在过闸（web 是两个：syncNow + resolveConflict）',
     ).toBe(2);
   });

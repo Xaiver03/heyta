@@ -162,6 +162,32 @@ export interface ServerConfig {
    * Should point to the reverse-proxied address users can access.
    */
   publicUrl: string;
+  /**
+   * 共享 UI（`apps/web` 的生产产物）在**这台服务器上**的位置。
+   *
+   * ## 为什么这是自托管的主要长度所在
+   *
+   * 这一串配置（compose、Caddyfile、env.example、helm、迁移脚本）以前"已经齐了"，
+   * 但里面**没有一个是客户端**：Caddy 只 `reverse_proxy supersync:1900`，
+   * `public/` 只有凭据页。⇒ 外人把服务端跑起来之后，手上是一个**没有界面的 API**。
+   * 业界六个同类项目里五个把前端 bake 进服务端镜像，正是为了这一条
+   * （证据与出处见 `docs/research/self-host-distribution-audit.md` §4）。
+   *
+   * ## 两个值都是"位置"，不是"开关"
+   *
+   * 开关由**目录在不在**决定，不由某个 `*_ENABLED` 布尔决定。理由是失败形态：
+   * 布尔开着而目录不存在时，服务照常起来、`/health` 200、界面 404 ——
+   * 那和本仓库反复出事的"界面对用户说谎"是同一类。
+   * 由产物本身的存在决定，就只剩两种诚实状态：**挂着**，或启动日志里明说没挂。
+   *
+   * - `webAppDir`：镜像内的绝对路径。空串 = 显式不挂（开发机上用）。
+   * - `webAppPath`：对外挂载路径，必须首尾都带斜杠。
+   *   它要与产物**对上**：产物是 `HEYTA_WEB_BASE=/app/ vite build` 打出来的，
+   *   挂在别的前缀下会拿到 HTML 而不是样式表 —— 这条由
+   *   `scripts/check-web-artifact.mjs` 在构建期钉住，不在运行时猜。
+   */
+  webAppDir: string;
+  webAppPath: string;
   cors: {
     enabled: boolean;
     allowedOrigins?: CorsOrigin[];
@@ -285,6 +311,11 @@ const DEFAULT_CONFIG: ServerConfig = {
   },
   // 🔴 默认**要**验证邮箱：官方托管实例的行为不变，关掉它是自托管的显式选择。
   requireEmailVerification: true,
+  // 镜像里 bake 进来的共享 UI 位置（`server/Dockerfile` 的 web 阶段产物）。
+  // 这两个默认值在容器外（本机、测试）指向不存在的目录 ⇒ 界面不挂，
+  // 而启动日志会明说不挂 —— 见 `web-app.ts` 里那条日志为什么必须是 info 而不是 debug。
+  webAppDir: '/app/web-dist',
+  webAppPath: '/app/',
 };
 
 /**
@@ -555,6 +586,29 @@ export const loadConfigFromEnv = (
       );
     }
     config.requireEmailVerification = rawRequireEmailVerification === 'true';
+  }
+
+  // 共享 UI 的位置。取值严格，理由与本文件其它闸门一致：**拼错要报错，不许静默落到"没界面"**。
+  if (process.env.WEB_APP_DIR !== undefined) {
+    const raw = process.env.WEB_APP_DIR.trim();
+    // 空串是显式的"不挂"（本机开发与测试用），不是"忘了配"。
+    if (raw !== '' && !path.isAbsolute(raw)) {
+      throw new Error(
+        `Invalid WEB_APP_DIR: ${JSON.stringify(process.env.WEB_APP_DIR)}. ` +
+          `要的是绝对路径（例如 /app/web-dist），或空串表示这台实例不服务共享 UI。`,
+      );
+    }
+    config.webAppDir = raw;
+  }
+  if (process.env.WEB_APP_PATH !== undefined) {
+    const raw = process.env.WEB_APP_PATH.trim();
+    if (!/^\/(?:.*\/)?$/.test(raw)) {
+      throw new Error(
+        `Invalid WEB_APP_PATH: ${JSON.stringify(process.env.WEB_APP_PATH)}. ` +
+          `要的是首尾都带斜杠的路径（例如 /app/，或根路径用 /）。`,
+      );
+    }
+    config.webAppPath = raw;
   }
 
   // 微信支付（Native 扫码）—— **运营者显式开关 + 六个凭证全齐**才注册。

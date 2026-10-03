@@ -105,19 +105,35 @@ if [ "${SUPERSYNC_SKIP_IMAGE_REVISION_CHECK:-}" != "true" ] && ! command -v jq >
     exit 1
 fi
 
+# 🔧 heyta 改动：镜像输入清单**只有这一份**，而且它是一个**文件**（`../image-inputs.txt`），
+# 由 `scripts/image-inputs.sh` 读进来。
+#
+# 原来这四个判断（算 revision / `git diff` / `git diff --cached` / `git ls-files --others`）
+# 各自抄了一遍路径列表，而"哪几个路径算镜像输入"是一个判断被写了四遍 ——
+# 这正是本仓库 §3.2 那条教训的形状（"失败判据被抄了三遍，三遍都漏了同一项"）。
+# 现在只有一份，四段都吃它。
+#
+# 为什么搬到文件而不是留在脚本里：发布流水线（`.github/workflows/heyta-server-image.yml`）
+# 要往镜像里写 `org.opencontainers.image.revision`，而 `deploy.sh` 每次部署都拿
+# **同一个式子**算期望值。两边差一个提交，自托管用户每次部署都被
+# `verify_supersync_image_revision` 硬拒（实测那条是 `exit 1`，不是警告）。
+# 抄一份列表过去就是第五份抄件 —— 所以它改成 source 同一个读者。
+#
+# ⚠️ 要加/减输入，改 `../image-inputs.txt`（那里写着"必须和 Dockerfile 真正 COPY 的
+# 东西对齐"的理由，以及"不许出现不存在的文件"为什么必须响亮失败）。
+# 读者会校验每一项真实存在，清单读空或不存在的项都会**直接退出**。
+# shellcheck disable=SC1091
+if ! . "$SCRIPT_DIR/image-inputs.sh"; then
+    echo "ERROR: 读镜像输入清单失败，拒绝继续（没有这份清单，revision 核对与脏树检查都是空的）。" >&2
+    exit 1
+fi
+echo "==> 镜像输入清单：${SUPER_SYNC_IMAGE_INPUTS_LIST}（$(printf '%s\n' "${SUPER_SYNC_IMAGE_INPUTS[@]}" | wc -l | tr -d ' ') 项）"
+
 supersync_image_source_revision() {
     local revision
 
     revision="$(git log -1 --format=%H -- \
-        ../.dockerignore \
-        ../.github/workflows/supersync-docker.yml \
-        ../package.json \
-        ../pnpm-lock.yaml \
-        ../tsconfig.base.json \
-        ../packages/shared-schema \
-        ../packages/sync-core \
-        ../packages/domain \
-        . 2>/dev/null || true)"
+        "${SUPER_SYNC_IMAGE_INPUTS[@]}" 2>/dev/null || true)"
     if [ -n "$revision" ]; then
         printf '%s\n' "$revision"
         return
@@ -150,43 +166,19 @@ assert_clean_supersync_image_inputs() {
     fi
 
     if ! git diff --quiet -- \
-        ../.dockerignore \
-        ../.github/workflows/supersync-docker.yml \
-        ../package.json \
-        ../pnpm-lock.yaml \
-        ../tsconfig.base.json \
-        ../packages/shared-schema \
-        ../packages/sync-core \
-        ../packages/domain \
-        . ||
+        "${SUPER_SYNC_IMAGE_INPUTS[@]}" ||
         ! git diff --cached --quiet -- \
-            ../.dockerignore \
-            ../.github/workflows/supersync-docker.yml \
-            ../package.json \
-            ../pnpm-lock.yaml \
-            ../tsconfig.base.json \
-            ../packages/shared-schema \
-            ../packages/sync-core \
-            ../packages/domain \
-            .; then
+            "${SUPER_SYNC_IMAGE_INPUTS[@]}"; then
         echo ""
         echo "ERROR: Refusing to build a labeled supersync image from dirty tracked input files."
-        echo "       Commit or stash changes under packages/sync-core, packages/shared-schema,"
-        echo "       packages/domain, tsconfig.base.json, package*.json, or"
-        echo "       .dockerignore/.github/workflows/supersync-docker.yml before running --build."
+        echo "       Commit or stash changes in the image inputs before running --build."
+        echo "       Inputs (one list, read by scripts/image-inputs.sh):"
+        printf '%s\n' "${SUPER_SYNC_IMAGE_INPUTS[@]}" | sed 's/^/       - /'
         exit 1
     fi
 
     untracked_files="$(git ls-files --others --exclude-standard -- \
-        ../.dockerignore \
-        ../.github/workflows/supersync-docker.yml \
-        ../package.json \
-        ../pnpm-lock.yaml \
-        ../tsconfig.base.json \
-        ../packages/shared-schema \
-        ../packages/sync-core \
-        ../packages/domain \
-        . 2>/dev/null || true)"
+        "${SUPER_SYNC_IMAGE_INPUTS[@]}" 2>/dev/null || true)"
     if [ -n "$untracked_files" ]; then
         echo ""
         echo "ERROR: Refusing to build a labeled supersync image with untracked input files."
@@ -234,6 +226,25 @@ if [ "$BUILD_LOCAL" = true ]; then
     docker compose $COMPOSE_FILES build
 else
     # Pull from registry (default)
+    #
+    # 🔴 heyta publishes NO image, so this default path points at nothing: the
+    # resolved tag is `supersync:local`, which only ever exists if somebody built
+    # it on this machine. Asking Docker for it does not fail cleanly -- Docker
+    # answers `pull access denied for supersync, repository does not exist or may
+    # require 'docker login'`, which sends the operator hunting for credentials to
+    # a registry that does not exist. Fail here instead, naming the real fix.
+    # The image is read back from compose itself (not from a copy of its default)
+    # so this check cannot drift away from docker-compose.yml.
+    RESOLVED_IMAGE="$(docker compose $COMPOSE_FILES config --format json 2>/dev/null \
+        | jq -r '.services.supersync.image // empty' || true)"
+    if [ -n "$RESOLVED_IMAGE" ] \
+        && [ "${RESOLVED_IMAGE##*:}" = "local" ] \
+        && ! docker image inspect "$RESOLVED_IMAGE" >/dev/null 2>&1; then
+        echo "ERROR: '$RESOLVED_IMAGE' is not present locally, and heyta publishes no image to pull."
+        echo "       First deploy on this machine: ./scripts/deploy.sh --build"
+        echo "       Or build elsewhere, push to YOUR OWN registry, and set SUPERSYNC_IMAGE to that tag."
+        exit 1
+    fi
     echo "==> Pulling latest image..."
     docker compose $COMPOSE_FILES pull supersync
 fi
